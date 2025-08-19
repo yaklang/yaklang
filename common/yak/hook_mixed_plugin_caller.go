@@ -24,6 +24,20 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var defaultInvalidSuffix = []string{
+	".js",
+	".css",
+	".xml",
+	".jpg", ".jpeg", ".png",
+	".mp3", ".mp4", ".ico", ".bmp",
+	".flv", ".aac", ".ogg", ".avi",
+	".svg", ".gif", ".woff", ".woff2",
+	".doc", ".docx", ".pptx",
+	".ppt", ".pdf",
+	".swf",
+	".json",
+}
+
 const (
 	// func mirrorHTTPFlow(isHttps, url, request, response, body)
 	//     mirror hijacked by filtered http flows
@@ -335,13 +349,16 @@ func (c *MixPluginCaller) ResetFilter() {
 	c.websiteFilter = webFilter
 }
 
-func (c *MixPluginCaller) IsPassed(target string) bool {
+func (c *MixPluginCaller) IsPassed(target string, static ...bool) bool {
 	if c.pluginScanFilter == nil {
 		return true
 	}
 	f := c.pluginScanFilter
-
-	return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
+	if len(static) > 0 && static[0] {
+		return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, append(f.ExcludePluginScanURIs, defaultInvalidSuffix...), target)
+	} else {
+		return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
+	}
 }
 
 func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
@@ -855,6 +872,12 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 			return
 		}
 	}
+
+	if !m.IsPassed(u, true) {
+		log.Infof("call MirrorHTTPFlow error: url[%v] not passed", u)
+		return
+	}
+
 	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
 		callers.Call(HOOK_MirrorFilteredHTTPFlow,
 			WithCallConfigRuntimeCtx(runtimeCtx),
