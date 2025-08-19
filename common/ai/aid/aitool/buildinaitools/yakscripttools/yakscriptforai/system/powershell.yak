@@ -23,7 +23,7 @@ ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprin
 // 构建PowerShell命令执行器，使用Windows PowerShell
 // 使用 -NoProfile 避免加载用户配置文件，-ExecutionPolicy Bypass 允许执行脚本
 // -Command 参数用于执行命令
-cmd, err := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command)
+cmd, err := exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command %s" % command)
 if err != nil {
     yakit.Error("Failed to create PowerShell command: %v", err)
     return

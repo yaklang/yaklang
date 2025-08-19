@@ -21,7 +21,7 @@ if timeoutSeconds <= 0 {
 ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSeconds) + "s")~)
 
 // 构建cmd命令执行器，使用Windows的cmd.exe
-cmd, err := exec.CommandContext(ctx, "cmd", "/c", command)
+cmd, err := exec.CommandContext(ctx, "cmd /c %s" % command)
 if err != nil {
     yakit.Error("Failed to create command: %v", err)
     return
