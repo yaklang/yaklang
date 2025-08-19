@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -262,5 +263,26 @@ func (s *SFFrameResult) GetDescription() string {
 			"solution": s.rule.Solution,
 		}
 		return codec.AnyToString(info)
+	}
+}
+
+func (s *SFFrameResult) ToGRPCModel() *ypb.SyntaxFlowResult {
+	if s == nil {
+		return nil
+	}
+	return &ypb.SyntaxFlowResult{
+		ResultID:    0,
+		TaskID:      "", // TODO: TaskID
+		Kind:        "", // TODO: Kind
+		ProgramName: "", // TODO: ProgramName
+
+		RuleName:    s.rule.RuleName,
+		Title:       s.rule.Title,
+		TitleZh:     s.rule.TitleZh,
+		Description: s.GetDescription(),
+		Severity:    string(s.rule.Severity),
+		Purpose:     string(s.rule.Purpose),
+		Language:    s.rule.Language,
+		RuleContent: s.rule.Content,
 	}
 }

@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"context"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -12,8 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-var ResultCache *utils.CacheWithKey[uint, *SyntaxFlowResult] = utils.NewTTLCacheWithKey[uint, *SyntaxFlowResult](time.Minute * 10)
 
 func LoadResultByRuleContent(programName, ruleContent string, kind schema.SyntaxflowResultKind) (*SyntaxFlowResult, error) {
 	result := ssadb.GetResultByRuleContent(programName, ruleContent, kind)
@@ -29,7 +26,7 @@ func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 		// Skip cache when force is true
 	} else {
 		// check cache
-		if result, ok := ResultCache.Get(resultID); ok {
+		if result := CreateResultFromCache(resultSaveDatabase, uint64(resultID)); result != nil {
 			return result, nil
 		}
 	}
@@ -42,8 +39,6 @@ func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	// set cache
-	ResultCache.Set(resultID, result)
 	return result, nil
 }
 
@@ -114,6 +109,9 @@ func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResul
 	if r == nil || r.memResult == nil || r.program == nil {
 		return 0, utils.Error("result or program  is nil")
 	}
+	if len(TaskIDs) > 0 {
+		r.TaskID = TaskIDs[0]
+	}
 	// result
 	result := ssadb.CreateResult(TaskIDs...)
 	result.CheckMsg = r.GetCheckMsg()
@@ -153,7 +151,20 @@ func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResul
 	r.dbResult = result
 	return result.ID, errs
 }
+func (r *SyntaxFlowResult) CreateRisk() error {
+	if r == nil {
+		return utils.Errorf("SyntaxFlowResult is nil")
+	}
 
+	r.GetAlertValues().ForEach(func(i string, v Values) bool {
+		for index, v := range v {
+			r.SaveRisk(i, index, v, false)
+		}
+		return true
+	})
+
+	return nil
+}
 func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditResult) error {
 	// result := r.dbResult
 	if result == nil {
@@ -188,7 +199,7 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		}
 		// save variable that has value
 		for index, v := range values {
-			hash := r.SaveRisk(name, index, v, result)
+			hash := r.SaveRisk(name, index, v, true)
 			if hash != "" {
 				opts = append(opts, OptionSaveValue_ResultRiskHash(hash))
 			}
@@ -207,8 +218,20 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelResult() *ypb.SyntaxFlowResult {
-	if r == nil || r.dbResult == nil {
+	if r == nil {
 		return nil
 	}
-	return r.dbResult.ToGRPCModel()
+	var ret *ypb.SyntaxFlowResult
+	if r.dbResult != nil {
+		ret = r.dbResult.ToGRPCModel()
+	}
+	if r.memResult != nil {
+		ret = r.memResult.ToGRPCModel()
+	}
+	if ret != nil {
+		ret.ResultID = uint64(r.id)
+		ret.TaskID = r.TaskID
+		ret.SaveKind = string(r.GetResultSaveKind())
+	}
+	return ret
 }
