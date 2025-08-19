@@ -3,6 +3,7 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
@@ -22,7 +23,7 @@ type UserInteractiveOption struct {
 
 // handleUserInteractiveClient 使用 promptui 处理 EVENT_TYPE_REQUIRE_USER_INTERACTIVE 事件
 func handleUserInteractiveClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
-	NewStdinManager().PreventDefault()
+	stdin := NewStdinManager().PreventDefault()
 	defer NewStdinManager().RecoverDefault()
 
 	// 解析交互事件内容
@@ -126,6 +127,7 @@ func handleUserInteractiveClient(event *schema.AiOutputEvent, inputChan chan<- *
 		Templates: templates,
 		Size:      4,
 		Searcher:  searcher,
+		Stdin:     io.NopCloser(stdin),
 	}
 
 	fmt.Printf("\n[用户交互请求]\n")
