@@ -48,10 +48,14 @@ func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item
 const defaultPipeSize = 200
 
 func NewPipe[T, U any](ctx context.Context, initBufSize int, handler func(item T) (U, error)) *Pipe[T, U] {
+	pipeSize := defaultPipeSize
+	if initBufSize > 0 {
+		pipeSize = initBufSize
+	}
 	ret := &Pipe[T, U]{
 		ctx:     ctx,
-		in:      chanx.NewUnlimitedChan[T](ctx, defaultPipeSize),
-		out:     chanx.NewUnlimitedChan[U](ctx, defaultPipeSize),
+		in:      chanx.NewUnlimitedChan[T](ctx, pipeSize),
+		out:     chanx.NewUnlimitedChan[U](ctx, pipeSize),
 		handler: handler,
 	}
 
