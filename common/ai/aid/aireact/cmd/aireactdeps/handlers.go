@@ -5,11 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/jsonpath"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/log"
@@ -259,6 +260,7 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 		}
 	case schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE:
 		fmt.Printf("[require-user-interative] received, start to trigger user option")
+		fmt.Println(string(event.Content))
 	case schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE:
 		fmt.Printf("[plan_review]: %s\n", string(event.Content))
 	case schema.EVENT_TYPE_TASK_REVIEW_REQUIRE:
