@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/jsonpath"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -261,8 +262,18 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 	case schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE:
 		fmt.Printf("[require-user-interative] received, start to trigger user option")
 		fmt.Println(string(event.Content))
+
+		// 在交互模式下，处理用户交互
+		if interactiveMode {
+			handleUserInteractiveClient(event, inputChan)
+		}
 	case schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE:
 		fmt.Printf("[plan_review]: %s\n", string(event.Content))
+
+		// 在交互模式下，处理用户交互
+		if interactiveMode {
+			handlePlanReviewRequireClient(event, inputChan)
+		}
 	case schema.EVENT_TYPE_TASK_REVIEW_REQUIRE:
 		fmt.Printf("[task_review]: %s\n", string(event.Content))
 	case schema.EVENT_TYPE_REVIEW_RELEASE:
@@ -536,4 +547,276 @@ func displayFormattedTimeline(jsonContent string) {
 	}
 
 	fmt.Printf("\n")
+}
+
+// PlanSelector 定义计划审核选择器项
+type PlanSelector struct {
+	ID               string `json:"id"`
+	Value            string `json:"value"`
+	Prompt           string `json:"prompt"`
+	PromptEnglish    string `json:"prompt_english"`
+	AllowExtraPrompt bool   `json:"allow_extra_prompt"`
+	ParamSchema      string `json:"param_schema"`
+}
+
+// handlePlanReviewRequireClient 使用 promptui 处理 PLAN_REVIEW_REQUIRE 事件
+func handlePlanReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
+	// 解析审核事件内容
+	var reviewData map[string]interface{}
+	if err := json.Unmarshal(event.Content, &reviewData); err != nil {
+		log.Errorf("Failed to parse plan review event: %v", err)
+		return
+	}
+
+	// 从事件中提取信息
+	eventID := event.GetInteractiveId()
+	if eventID == "" {
+		log.Errorf("No interactive ID found in plan review event")
+		return
+	}
+
+	// 提取 selectors
+	selectors, _ := reviewData["selectors"].([]interface{})
+	var planSelectors []PlanSelector
+
+	if len(selectors) > 0 {
+		for _, sel := range selectors {
+			if selMap, ok := sel.(map[string]interface{}); ok {
+				selector := PlanSelector{
+					ID:               getString(selMap, "id"),
+					Value:            getString(selMap, "value"),
+					Prompt:           getString(selMap, "prompt"),
+					PromptEnglish:    getString(selMap, "prompt_english"),
+					AllowExtraPrompt: getBool(selMap, "allow_extra_prompt"),
+					ParamSchema:      getString(selMap, "param_schema"),
+				}
+				planSelectors = append(planSelectors, selector)
+			}
+		}
+	}
+
+	// 如果没有提供选项，使用默认选项
+	if len(planSelectors) == 0 {
+		planSelectors = []PlanSelector{
+			{Value: "continue", Prompt: "计划合理，继续执行", PromptEnglish: "The plan is reasonable, continue execution"},
+			{Value: "unclear", Prompt: "目标不明确", PromptEnglish: "The plan is too vague and fuzzy"},
+			{Value: "incomplete", Prompt: "有遗漏", PromptEnglish: "The plan is not complete enough"},
+		}
+	}
+
+	// 创建 promptui 选择器
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}?",
+		Active:   "▶ {{ .Prompt | cyan }}",
+		Inactive: "  {{ .Prompt }}",
+		Selected: "✓ {{ .Prompt | green }}",
+		Details: `
+--------- 选项详情 ----------
+{{ "操作:" | faint }}	{{ .Value }}
+{{ "描述:" | faint }}	{{ .Prompt }}
+{{ if .PromptEnglish }}{{ "English:" | faint }}	{{ .PromptEnglish }}{{ end }}`,
+	}
+
+	searcher := func(input string, index int) bool {
+		selector := planSelectors[index]
+		name := strings.Replace(strings.ToLower(selector.Prompt), " ", "", -1)
+		input = strings.Replace(strings.ToLower(input), " ", "", -1)
+		return strings.Contains(name, input)
+	}
+
+	prompt := promptui.Select{
+		Label:     "请选择对该计划的操作",
+		Items:     planSelectors,
+		Templates: templates,
+		Size:      4,
+		Searcher:  searcher,
+	}
+
+	fmt.Printf("\n[PLAN REVIEW REQUIRED]\n")
+	fmt.Printf("请审核AI制定的执行计划，选择您的操作：\n\n")
+
+	selectedIndex, _, err := prompt.Run()
+	if err != nil {
+		log.Errorf("Prompt failed: %v", err)
+		return
+	}
+
+	selectedSelector := planSelectors[selectedIndex]
+	fmt.Printf("\n您选择了: %s - %s\n", selectedSelector.Value, selectedSelector.Prompt)
+
+	// 如果需要额外输入，询问用户
+	var extraPrompt string
+	if selectedSelector.AllowExtraPrompt && selectedSelector.Value != "continue" {
+		extraPromptUI := promptui.Prompt{
+			Label: "请提供额外的指导意见 (可选，直接回车跳过)",
+		}
+		extraPrompt, _ = extraPromptUI.Run()
+	}
+
+	// 构建响应
+	response := map[string]interface{}{
+		"suggestion": selectedSelector.Value,
+	}
+
+	if strings.TrimSpace(extraPrompt) != "" {
+		response["extra_prompt"] = strings.TrimSpace(extraPrompt)
+	}
+
+	responseJSON, _ := json.Marshal(response)
+
+	// 创建并发送输入事件到 ReAct
+	inputEvent := &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        eventID,
+		InteractiveJSONInput: string(responseJSON),
+	}
+
+	// 发送输入事件
+	select {
+	case inputChan <- inputEvent:
+		fmt.Printf("✓ 已发送您的选择: %s\n\n", selectedSelector.Value)
+	default:
+		log.Errorf("Failed to send plan review input event")
+	}
+}
+
+// UserInteractiveOption 定义用户交互选项
+type UserInteractiveOption struct {
+	Index             int    `json:"index"`
+	PromptTitle       string `json:"prompt_title"`
+	OptionName        string `json:"option_name"`
+	OptionDescription string `json:"option_description"`
+	Prompt            string `json:"prompt"`
+}
+
+// handleUserInteractiveClient 使用 promptui 处理 EVENT_TYPE_REQUIRE_USER_INTERACTIVE 事件
+func handleUserInteractiveClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
+	// 解析交互事件内容
+	var interactiveData map[string]interface{}
+	if err := json.Unmarshal(event.Content, &interactiveData); err != nil {
+		log.Errorf("Failed to parse interactive event: %v", err)
+		return
+	}
+
+	// 从事件中提取信息
+	eventID := event.GetInteractiveId()
+	if eventID == "" {
+		log.Errorf("No interactive ID found in interactive event")
+		return
+	}
+
+	question := getString(interactiveData, "prompt")
+	if question == "" {
+		question = getString(interactiveData, "question")
+	}
+
+	// 提取选项
+	options, _ := interactiveData["options"].([]interface{})
+	var userOptions []UserInteractiveOption
+
+	if len(options) > 0 {
+		for i, opt := range options {
+			if optMap, ok := opt.(map[string]interface{}); ok {
+				option := UserInteractiveOption{
+					Index:             i,
+					PromptTitle:       getString(optMap, "prompt_title"),
+					OptionName:        getString(optMap, "option_name"),
+					OptionDescription: getString(optMap, "option_description"),
+					Prompt:            getString(optMap, "prompt"),
+				}
+
+				// 如果有 option_name，优先使用它作为显示文本
+				if option.OptionName != "" && option.PromptTitle == "" {
+					option.PromptTitle = option.OptionName
+				}
+
+				userOptions = append(userOptions, option)
+			}
+		}
+	}
+
+	// 如果没有提供选项，创建默认选项
+	if len(userOptions) == 0 {
+		userOptions = []UserInteractiveOption{
+			{Index: 0, PromptTitle: "继续", OptionDescription: "继续执行"},
+			{Index: 1, PromptTitle: "取消", OptionDescription: "取消操作"},
+		}
+	}
+
+	// 创建 promptui 选择器
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}?",
+		Active:   "▶ {{ .PromptTitle | cyan }}",
+		Inactive: "  {{ .PromptTitle }}",
+		Selected: "✓ {{ .PromptTitle | green }}",
+		Details: `
+--------- 选项详情 ----------
+{{ "选项:" | faint }}	{{ .PromptTitle }}
+{{ if .OptionDescription }}{{ "描述:" | faint }}	{{ .OptionDescription }}{{ end }}`,
+	}
+
+	searcher := func(input string, index int) bool {
+		option := userOptions[index]
+		name := strings.Replace(strings.ToLower(option.PromptTitle), " ", "", -1)
+		input = strings.Replace(strings.ToLower(input), " ", "", -1)
+		return strings.Contains(name, input)
+	}
+
+	prompt := promptui.Select{
+		Label:     question,
+		Items:     userOptions,
+		Templates: templates,
+		Size:      4,
+		Searcher:  searcher,
+	}
+
+	fmt.Printf("\n[用户交互请求]\n")
+	fmt.Printf("问题: %s\n\n", question)
+	fmt.Printf("请选择您的回答：\n\n")
+
+	selectedIndex, _, err := prompt.Run()
+	if err != nil {
+		log.Errorf("Prompt failed: %v", err)
+		return
+	}
+
+	selectedOption := userOptions[selectedIndex]
+	fmt.Printf("\n您选择了: %s", selectedOption.PromptTitle)
+	if selectedOption.OptionDescription != "" {
+		fmt.Printf(" - %s", selectedOption.OptionDescription)
+	}
+	fmt.Printf("\n")
+
+	// 构建响应 - 使用选项的索引
+	response := map[string]interface{}{
+		"choice":          selectedOption.Index,
+		"selected_option": selectedOption.PromptTitle,
+	}
+
+	responseJSON, _ := json.Marshal(response)
+
+	// 创建并发送输入事件到 ReAct
+	inputEvent := &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        eventID,
+		InteractiveJSONInput: string(responseJSON),
+	}
+
+	// 发送输入事件
+	select {
+	case inputChan <- inputEvent:
+		fmt.Printf("✓ 已发送您的选择: %s\n\n", selectedOption.PromptTitle)
+	default:
+		log.Errorf("Failed to send user interactive input event")
+	}
+}
+
+// getBool 安全地从映射中提取布尔值
+func getBool(m map[string]interface{}, key string) bool {
+	if val, ok := m[key]; ok {
+		if b, ok := val.(bool); ok {
+			return b
+		}
+	}
+	return false
 }

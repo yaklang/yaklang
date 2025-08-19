@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/manifoldco/promptui"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
 )
 
 func main() {

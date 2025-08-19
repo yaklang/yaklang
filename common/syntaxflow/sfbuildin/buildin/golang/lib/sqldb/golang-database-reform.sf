@@ -101,7 +101,6 @@ import (
     "log"
 
     "github.com/hedonist/reform"
-    _ "modernc.org/sqlite"
 )
 
 // User 定义用户模型
@@ -177,7 +176,6 @@ import (
     "log"
 
     "github.com/hedonist/reform"
-    _ "modernc.org/sqlite"
 )
 
 func main() {

@@ -3,11 +3,13 @@ package aireactdeps
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/cmd/aireactdeps/promptui"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 // getString 安全地从映射中提取字符串值
@@ -20,7 +22,7 @@ func getString(m map[string]interface{}, key string) string {
 	return ""
 }
 
-// handleReviewRequireClient 使用输入通道处理 TOOL_USE_REVIEW_REQUIRE 事件
+// handleReviewRequireClient 使用 promptui 处理 TOOL_USE_REVIEW_REQUIRE 事件
 func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInputEvent) {
 	// 解析审核事件内容
 	var reviewData map[string]interface{}
@@ -42,16 +44,14 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 
 	// 显示工具信息
 	fmt.Printf("\n[TOOL REVIEW REQUIRED]\n")
-	fmt.Printf("Tool: %s\n", toolName)
+	fmt.Printf("工具: %s\n", toolName)
 	if toolDesc != "" {
-		fmt.Printf("Description: %s\n", toolDesc)
+		fmt.Printf("描述: %s\n", toolDesc)
 	}
 
-	config := &CLIConfig{DebugMode: true} // 临时配置
-	if config.DebugMode {
-		if params, ok := reviewData["params"]; ok {
-			fmt.Printf("Parameters: %v\n", params)
-		}
+	// 显示参数信息（调试模式）
+	if params, ok := reviewData["params"]; ok {
+		fmt.Printf("参数: %v\n", params)
 	}
 
 	// 显示选择器（如果可用）
@@ -81,59 +81,57 @@ func handleReviewRequireClient(event *schema.AiOutputEvent, inputChan chan<- *yp
 		}
 	}
 
-	// 显示选项
-	fmt.Printf("\nPlease choose an action:\n")
-	for i, option := range options {
-		if option.Value == "continue" {
-			fmt.Printf("  %d. %s - %s (default, press Enter)\n", i+1, option.Value, option.Prompt)
-		} else {
-			fmt.Printf("  %d. %s - %s\n", i+1, option.Value, option.Prompt)
+	// 创建 promptui 选择器
+	templates := &promptui.SelectTemplates{
+		Label:    "{{ . }}?",
+		Active:   "▶ {{ .Prompt | cyan }}",
+		Inactive: "  {{ .Prompt }}",
+		Selected: "✓ {{ .Prompt | green }}",
+		Details: `
+--------- 选项详情 ----------
+{{ "操作:" | faint }}	{{ .Value }}
+{{ "描述:" | faint }}	{{ .Prompt }}`,
+	}
+
+	searcher := func(input string, index int) bool {
+		option := options[index]
+		name := strings.Replace(strings.ToLower(option.Prompt), " ", "", -1)
+		input = strings.Replace(strings.ToLower(input), " ", "", -1)
+		return strings.Contains(name, input)
+	}
+
+	prompt := promptui.Select{
+		Label:     "请选择对该工具使用的操作",
+		Items:     options,
+		Templates: templates,
+		Size:      4,
+		Searcher:  searcher,
+	}
+
+	fmt.Printf("\n请审核AI要使用的工具，选择您的操作：\n\n")
+
+	selectedIndex, _, err := prompt.Run()
+	if err != nil {
+		log.Errorf("Prompt failed: %v", err)
+		// 发生错误时默认选择 continue
+		sendToolReviewResponse(inputChan, eventID, "continue")
+		return
+	}
+
+	selectedOption := options[selectedIndex]
+	fmt.Printf("\n您选择了: %s - %s\n", selectedOption.Value, selectedOption.Prompt)
+
+	// 如果选择了需要额外输入的选项，询问用户
+	var extraPrompt string
+	if selectedOption.Value != "continue" {
+		extraPromptUI := promptui.Prompt{
+			Label: "请提供额外的指导意见 (可选，直接回车跳过)",
 		}
+		extraPrompt, _ = extraPromptUI.Run()
 	}
 
-	// 检查继续选项是否存在以显示提示消息
-	hasContinue := false
-	for _, option := range options {
-		if option.Value == "continue" {
-			hasContinue = true
-			break
-		}
-	}
-
-	if hasContinue {
-		fmt.Printf("Your choice (1-%d, Enter for continue): ", len(options))
-	} else {
-		fmt.Printf("Your choice (1-%d): ", len(options))
-	}
-
-	// 设置审核状态并等待全局输入
-	globalState.SetReviewState(true, options, eventID)
-	//// 添加超时机制以在没有收到输入时自动继续
-	//go func(eventID string) {
-	//	time.Sleep(60 * time.Second) // 60秒超时
-	//	waiting, _, currentEventID := globalState.GetReviewState()
-	//	if waiting && currentEventID == eventID {
-	//		log.Warnf("Review timeout reached, auto-selecting continue")
-	//		globalState.SetReviewState(false, nil, "")
-	//
-	//		// 直接发送继续响应
-	//		inputEvent := &ypb.AIInputEvent{
-	//			IsInteractiveMessage: true,
-	//			InteractiveId:        eventID,
-	//			InteractiveJSONInput: `{"suggestion": "continue"}`,
-	//		}
-	//
-	//		// 尝试通过 inputChan 发送
-	//		select {
-	//		case inputChan <- inputEvent:
-	//			fmt.Printf("\n[TIMEOUT]: Auto-selected continue after 60 seconds\n> ")
-	//		default:
-	//			log.Errorf("Failed to send timeout input event")
-	//		}
-	//	}
-	//}(eventID)
-
-	// processReviewInput 函数将在输入到达时处理实际输入
+	// 发送响应
+	sendToolReviewResponse(inputChan, eventID, selectedOption.Value, extraPrompt)
 }
 
 // processReviewInput 处理审核选择的用户输入
@@ -213,6 +211,35 @@ func processReviewInput(input string, reactInstance *aireact.ReAct) {
 }
 
 // 辅助函数
+
+// sendToolReviewResponse 发送工具审核响应
+func sendToolReviewResponse(inputChan chan<- *ypb.AIInputEvent, eventID, suggestion string, extraPrompt ...string) {
+	// 构建响应
+	response := map[string]interface{}{
+		"suggestion": suggestion,
+	}
+
+	if len(extraPrompt) > 0 && strings.TrimSpace(extraPrompt[0]) != "" {
+		response["extra_prompt"] = strings.TrimSpace(extraPrompt[0])
+	}
+
+	responseJSON, _ := json.Marshal(response)
+
+	// 创建并发送输入事件
+	inputEvent := &ypb.AIInputEvent{
+		IsInteractiveMessage: true,
+		InteractiveId:        eventID,
+		InteractiveJSONInput: string(responseJSON),
+	}
+
+	// 发送输入事件
+	select {
+	case inputChan <- inputEvent:
+		fmt.Printf("✓ 已发送您的选择: %s\n\n", suggestion)
+	default:
+		log.Errorf("Failed to send tool review input event")
+	}
+}
 
 // parseSelectionIndex 将用户输入解析为选择索引（基于1）并返回基于0的索引，如果无效则返回-1
 func parseSelectionIndex(input string, maxOptions int) int {
