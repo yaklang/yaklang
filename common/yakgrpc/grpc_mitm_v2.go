@@ -1813,17 +1813,18 @@ func (s *Server) checkLongRunningTraces(manager *yak.YakToCallerManager, traceUp
 			continue
 		}
 
-		// 检查运行时间是否超过阈值（5秒）
+		// 检查运行时间是否超过阈值，使用管理器中的可配置阈值
 		if !trace.StartTime.IsZero() {
 			elapsed := time.Since(trace.StartTime)
-			if elapsed > time.Duration(consts.PluginCallDurationThresholdSeconds)*time.Second {
+			threshold := manager.GetLongRunningThreshold()
+			if elapsed > time.Duration(threshold)*time.Second {
 				// 标记为已推送
 				(*pushedTraces)[trace.TraceID] = true
 
 				// 推送到通道
 				select {
 				case traceUpdateChan <- trace:
-					log.Debugf("检测到长时间运行的trace: %s, 运行时间: %v", trace.TraceID, elapsed)
+					log.Debugf("检测到长时间运行的trace: %s, 运行时间: %v, 阈值: %ds", trace.TraceID, elapsed, threshold)
 				default:
 					log.Warn("trace update channel is full, dropping long running trace update")
 				}

@@ -318,17 +318,21 @@ type YakToCallerManager struct {
 	// 插件执行跟踪器
 	executionTracker *PluginExecutionTracker
 	enableTracing    bool
+
+	// 插件长时间运行阈值（秒），用于 trace 推送判断
+	longRunningThreshold int
 }
 
 func NewYakToCallerManager() *YakToCallerManager {
 	caller := &YakToCallerManager{
-		table:              new(sync.Map),
-		baseWaitGroup:      new(sync.WaitGroup),
-		loadTimeout:        10 * time.Second,
-		callTimeout:        time.Duration(consts.GetGlobalCallerCallPluginTimeout() * float64(time.Second)),
-		ContextCancelFuncs: new(sync.Map),
-		executionTracker:   NewPluginExecutionTracker(),
-		enableTracing:      false,
+		table:                new(sync.Map),
+		baseWaitGroup:        new(sync.WaitGroup),
+		loadTimeout:          10 * time.Second,
+		callTimeout:          time.Duration(consts.GetGlobalCallerCallPluginTimeout() * float64(time.Second)),
+		ContextCancelFuncs:   new(sync.Map),
+		executionTracker:     NewPluginExecutionTracker(),
+		enableTracing:        false,
+		longRunningThreshold: consts.PluginCallDurationThresholdSeconds, // 默认使用全局常量
 	}
 	return caller
 }
@@ -348,6 +352,16 @@ func (y *YakToCallerManager) SetCallPluginTimeout(i float64) {
 
 func (y *YakToCallerManager) SetDividedContext(b bool) {
 	y.dividedContext = b
+}
+
+// SetLongRunningThreshold 设置插件长时间运行阈值（秒）
+func (y *YakToCallerManager) SetLongRunningThreshold(seconds int) {
+	y.longRunningThreshold = seconds
+}
+
+// GetLongRunningThreshold 获取插件长时间运行阈值（秒）
+func (y *YakToCallerManager) GetLongRunningThreshold() int {
+	return y.longRunningThreshold
 }
 
 func (y *YakToCallerManager) SetConcurrent(i int) error {
