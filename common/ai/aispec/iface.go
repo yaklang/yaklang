@@ -6,6 +6,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
+type GeneralChatter func(string, ...AIConfigOption) (string, error)
+
 type Chatter interface {
 	Chat(string, ...any) (string, error)
 	ChatEx([]ChatDetail, ...any) ([]ChatChoice, error)

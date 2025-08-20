@@ -2,8 +2,9 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"github.com/yaklang/yaklang/common/consts"
@@ -39,6 +40,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 		return &ypb.GetAIToolListResponse{
 			Tools: []*ypb.AITool{
 				{
+					ID:          int64(tool.ID),
 					Name:        tool.Name,
 					Description: tool.Description,
 					Content:     tool.Content,
@@ -63,6 +65,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 	var result []*ypb.AITool
 	for _, tool := range tools {
 		result = append(result, &ypb.AITool{
+			ID:          int64(tool.ID),
 			Name:        tool.Name,
 			Description: tool.Description,
 			Content:     tool.Content,
@@ -122,21 +125,65 @@ func (s *Server) SaveAITool(ctx context.Context, req *ypb.SaveAIToolRequest) (*y
 	}, nil
 }
 
+func (s *Server) UpdateAITool(ctx context.Context, req *ypb.UpdateAIToolRequest) (*ypb.DbOperateMessage, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil, utils.Errorf("database not initialized")
+	}
+
+	aitool := &schema.AIYakTool{
+		Name:        req.GetName(),
+		Description: req.GetDescription(),
+		Content:     req.GetContent(),
+		Path:        req.GetToolPath(),
+		Keywords:    strings.Join(req.GetKeywords(), ","),
+	}
+	aitool.ID = uint(req.GetID())
+	affected, err := yakit.UpdateAIYakToolByID(db, aitool)
+	if err != nil {
+		return nil, utils.Errorf("failed to update AI tool: %s", err)
+	}
+	return &ypb.DbOperateMessage{
+		TableName:  (&schema.AIYakTool{}).TableName(),
+		Operation:  "update",
+		EffectRows: affected,
+	}, nil
+}
+
 func (s *Server) DeleteAITool(ctx context.Context, req *ypb.DeleteAIToolRequest) (*ypb.DbOperateMessage, error) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
 		return nil, utils.Errorf("database not initialized")
 	}
 
-	affected, err := yakit.DeleteAIYakTools(db, req.GetToolNames()...)
-	if err != nil {
-		return nil, utils.Errorf("failed to delete AI tool: %s", err)
+	if len(req.GetToolNames()) > 0 {
+		affected, err := yakit.DeleteAIYakTools(db, req.GetToolNames()...)
+		if err != nil {
+			return nil, utils.Errorf("failed to delete AI tool: %s", err)
+		}
+
+		return &ypb.DbOperateMessage{
+			TableName:  (&schema.AIYakTool{}).TableName(),
+			Operation:  "delete",
+			EffectRows: affected,
+		}, nil
+	} else {
+		ids := req.GetIDs()
+		idsForUint := make([]uint, len(ids))
+		for i, id := range ids {
+			idsForUint[i] = uint(id)
+		}
+		affected, err := yakit.DeleteAIYakToolByID(db, idsForUint...)
+		if err != nil {
+			return nil, utils.Errorf("failed to delete AI tool: %s", err)
+		}
+		return &ypb.DbOperateMessage{
+			TableName:  (&schema.AIYakTool{}).TableName(),
+			Operation:  "delete",
+			EffectRows: affected,
+		}, nil
 	}
-	return &ypb.DbOperateMessage{
-		TableName:  (&schema.AIYakTool{}).TableName(),
-		Operation:  "delete",
-		EffectRows: affected,
-	}, nil
+
 }
 
 func (s *Server) ToggleAIToolFavorite(ctx context.Context, req *ypb.ToggleAIToolFavoriteRequest) (*ypb.ToggleAIToolFavoriteResponse, error) {
