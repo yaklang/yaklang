@@ -6,9 +6,10 @@ import (
 )
 
 func (v *Value) GetBottomUses(opt ...OperationOption) Values {
+	var ret Values
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
-	ret := v.getBottomUses(actx, opt...)
+	ret = v.getBottomUses(actx, opt...)
 	return MergeValues(ret)
 }
 
