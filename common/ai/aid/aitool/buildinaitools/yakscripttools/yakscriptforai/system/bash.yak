@@ -73,15 +73,23 @@ if err != nil {
     yakit.Error("%v command execution failed: %v", shellType, err)
 }
 
+toUtf8 = (s)=>{
+    res,err = codec.GBKSafe(s)
+    if err {
+        return s
+    }
+    return res
+}
+
 // 输出执行结果
 count := 0
 if stdoutbuf.Len() > 0 {
     count++
-    yakit.Info("Stdout:\n%v", string(stdoutbuf.String()))
+    yakit.Info("Stdout:\n%v", toUtf8(stdoutbuf.String()))
 }
 if stderrbuf.Len() > 0 {
     count++
-    yakit.Info("Stderr:\n%v", string(stderrbuf.String()))
+    yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
 }
 if count <= 0 {
     yakit.Info("No output found, %v command execution failed or output is empty", shellType)
