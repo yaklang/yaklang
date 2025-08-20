@@ -3,12 +3,12 @@ package ssaprofile
 import (
 	"fmt"
 	"slices"
-	"sync"
 	syncAtomic "sync/atomic"
 	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type Profile struct {
@@ -48,19 +48,13 @@ func (profile *Profile) String() string {
 	return ret
 }
 
-var profileListMap = make(map[string]*Profile)
-var lock = sync.RWMutex{}
+var profileListMap = utils.NewSafeMap[*Profile]()
 
-func GetProfileListMap() map[string]*Profile {
-	lock.RLock()
-	defer lock.RUnlock()
+func GetProfileListMap() *utils.SafeMap[*Profile] {
 	return profileListMap
 }
-
 func Refresh() {
-	lock.Lock()
-	defer lock.Unlock()
-	profileListMap = make(map[string]*Profile)
+	profileListMap.Clear()
 }
 
 func ProfileAdd(enable bool, name string, fs ...func()) {
@@ -77,20 +71,29 @@ func ProfileAdd(enable bool, name string, fs ...func()) {
 }
 
 func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Infof("err: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
 	if name == "" {
 		return fmt.Errorf("ProfileAdd name is empty")
 	}
 
 	var p *Profile
 	if enable {
-		lock.RLock()
-		p = profileListMap[name]
-		lock.RUnlock()
-		if p == nil {
+		var ok bool
+		p, ok = profileListMap.Get(name)
+		if !ok {
 			p = &Profile{
-				Name:  name,
-				Times: make([]uint64, 0, len(fs)),
+				Name:       name,
+				TotalTime:  0,
+				Count:      0,
+				ErrorCount: 0,
+				Times:      make([]uint64, 0, len(fs)),
 			}
+			profileListMap.Set(name, p)
 		}
 	}
 
@@ -117,20 +120,18 @@ func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
 	if enable {
 		syncAtomic.AddUint64(&p.TotalTime, total)
 		syncAtomic.AddUint64(&p.Count, 1)
-		lock.Lock()
-		profileListMap[name] = p
-		lock.Unlock()
 	}
 	return nil
 }
 
-func ShowCacheCost(pprof ...map[string]*Profile) {
+func ShowCacheCost(pprof ...*utils.SafeMap[*Profile]) {
 
-	show := func(index int, prof map[string]*Profile) {
-		profiles := make([]*Profile, 0, len(prof))
-		for _, profile := range prof {
-			profiles = append(profiles, profile)
-		}
+	show := func(index int, prof *utils.SafeMap[*Profile]) {
+		profiles := make([]*Profile, 0, prof.Count())
+		prof.ForEach(func(key string, value *Profile) bool {
+			profiles = append(profiles, value)
+			return true
+		})
 
 		slices.SortFunc(profiles, func(a, b *Profile) int {
 			if a.TotalTime < b.TotalTime {
@@ -157,12 +158,13 @@ func ShowCacheCost(pprof ...map[string]*Profile) {
 	}
 }
 
-func ShowDiffCacheCost(databaseCost, memoryCost map[string]*Profile) {
+func ShowDiffCacheCost(databaseCost, memoryCost *utils.SafeMap[*Profile]) {
 
-	profiles := make([]*Profile, 0, len(databaseCost))
-	for _, profile := range databaseCost {
+	profiles := make([]*Profile, 0, databaseCost.Count())
+	databaseCost.ForEach(func(key string, profile *Profile) bool {
 		profiles = append(profiles, profile)
-	}
+		return true
+	})
 
 	slices.SortFunc(profiles, func(a, b *Profile) int {
 		if a.TotalTime < b.TotalTime {
@@ -175,7 +177,7 @@ func ShowDiffCacheCost(databaseCost, memoryCost map[string]*Profile) {
 
 	for _, database := range profiles {
 		key := database.Name
-		memory, memory_have := memoryCost[key]
+		memory, memory_have := memoryCost.Get(key)
 		if !memory_have {
 			log.Errorf("Profile [%s] not found in memory cost", key)
 			log.Error(database.String())
