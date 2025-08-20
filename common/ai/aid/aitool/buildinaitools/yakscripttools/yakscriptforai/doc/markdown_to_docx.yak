@@ -31,8 +31,8 @@ yakit.Info("Initial conversion completed: %v", outputPath)
 // 处理输出目录和文件名设置
 finalOutputPath := outputPath
 if outputDir != "" || outputName != "" {
-    var newPath string
-    var fileName string
+    var newPath
+    var fileName
     
     if outputName != "" {
         // 使用自定义文件名
