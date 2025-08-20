@@ -33,7 +33,8 @@ type TaskProgress struct {
 }
 
 type AiTask struct {
-	config *Config
+	*aicommon.Emitter
+	*Config
 
 	Index      string    `json:"index"`
 	Name       string    `json:"name"`
@@ -63,6 +64,14 @@ type AiTask struct {
 	TaskContinueCount int64 `json:"task_continue_count"` // 任务继续执行的次数
 }
 
+func (t *AiTask) GetEmitter() *aicommon.Emitter {
+	if t.Emitter == nil {
+		return t.Config.GetEmitter()
+	}
+	return t.Emitter
+
+}
+
 func (t *AiTask) GetIndex() string {
 	return t.Index
 }
@@ -75,21 +84,21 @@ var _ aicommon.AITask = (*AiTask)(nil)
 
 func (t *AiTask) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 	for _, cb := range []aicommon.AICallbackType{
-		t.config.taskAICallback,
-		t.config.coordinatorAICallback,
-		t.config.planAICallback,
+		t.Config.taskAICallback,
+		t.Config.coordinatorAICallback,
+		t.Config.planAICallback,
 	} {
 		if cb == nil {
 			continue
 		}
-		return cb(t.config, request)
+		return cb(t.Config, request)
 	}
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
 func (t *AiTask) PushToolCallResult(i *aitool.ToolResult) {
 	t.toolCallResultIds.Set(i.GetID(), i)
-	t.config.memory.PushToolCallResults(i)
+	t.Config.memory.PushToolCallResults(i)
 	atomic.AddInt64(&t.ToolCallCount, 1)
 }
 
@@ -221,7 +230,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *AiTask,
 			if task == nil {
 				return
 			}
-			task.config = c
+			task.Config = c
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -258,7 +267,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *AiTask,
 		if err == nil && planObj.Action == "plan" && len(planObj.Tasks) > 0 {
 			// 创建主任务
 			mainTask := &AiTask{
-				config:   c,
+				Config:   c,
 				Name:     planObj.MainTask,
 				Goal:     planObj.MainTaskGoal,
 				Subtasks: make([]*AiTask, 0),
@@ -277,7 +286,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *AiTask,
 				if len(planObj.Tasks) > 1 {
 					for _, subtask := range planObj.Tasks[1:] {
 						mainTask.Subtasks = append(mainTask.Subtasks, &AiTask{
-							config:            c,
+							Config:            c,
 							Name:              subtask.SubtaskName,
 							Goal:              subtask.SubtaskGoal,
 							ParentTask:        mainTask,
@@ -290,7 +299,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *AiTask,
 				// 主任务名称存在，将所有任务作为子任务
 				for _, subtask := range planObj.Tasks {
 					mainTask.Subtasks = append(mainTask.Subtasks, &AiTask{
-						config:            c,
+						Config:            c,
 						Name:              subtask.SubtaskName,
 						Goal:              subtask.SubtaskGoal,
 						ParentTask:        mainTask,
@@ -327,7 +336,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *AiTask,
 			if name, ok := taskMap["name"].(string); ok && name != "" {
 				taskIns := &AiTask{
 					Name:              name,
-					config:            c,
+					Config:            c,
 					metadata:          map[string]interface{}{},
 					toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
 				}
@@ -379,5 +388,5 @@ func (t *AiTask) QuoteGoal() string {
 }
 
 func (t *AiTask) CanContinue() bool {
-	return t.TaskContinueCount < t.config.maxTaskContinue
+	return t.TaskContinueCount < t.Config.maxTaskContinue
 }

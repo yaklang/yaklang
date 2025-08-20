@@ -87,9 +87,7 @@ type Config struct {
 	guardian     *asyncGuardian
 	eventHandler func(e *schema.AiOutputEvent)
 
-	// hook before emit
-	eventProcessHandler *utils.Stack[func(e *schema.AiOutputEvent) *schema.AiOutputEvent]
-	saveEvent           bool
+	saveEvent bool
 
 	// tool manager
 	aiToolManager       *buildinaitools.AiToolManager

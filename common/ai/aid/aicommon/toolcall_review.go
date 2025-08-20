@@ -94,8 +94,16 @@ func (t *ToolCaller) review(
 		}
 		return targetTool, param, result, HandleToolUseNext_Override, nil
 	case "wrong_params":
-		e.EmitError("wrong params suggestion received, but no handler defined")
-		return targetTool, param, nil, HandleToolUseNext_Override, nil
+		if t.reviewWrongParamHandler == nil {
+			e.EmitError("wrong params suggestion received, but no handler defined")
+			return targetTool, param, nil, HandleToolUseNext_Override, nil
+		}
+		newParam, err := t.reviewWrongParamHandler(targetTool, param, userInput.GetString("extra_prompt"))
+		if err != nil {
+			e.EmitError("error handling tool review: %v", err)
+			return targetTool, param, nil, HandleToolUseNext_Default, nil
+		}
+		return targetTool, newParam, nil, HandleToolUseNext_Default, nil
 	case "direct_answer":
 		userCancelHandler("direct answer without tool")
 		return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil

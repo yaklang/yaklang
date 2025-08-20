@@ -2,7 +2,9 @@ package aicommon
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"sync"
 	"time"
@@ -16,16 +18,76 @@ import (
 )
 
 type BaseEmitter func(e *schema.AiOutputEvent) error
-
+type EventProcesser func(e *schema.AiOutputEvent) *schema.AiOutputEvent
 type Emitter struct {
 	streamWG              *sync.WaitGroup
 	id                    string
-	emit                  BaseEmitter
+	baseEmitter           BaseEmitter
+	eventProcesserStack   *utils.Stack[EventProcesser]
 	interactiveEventSaver func(string, *schema.AiOutputEvent)
 }
 
 func (i *Emitter) Emit(e *schema.AiOutputEvent) error {
 	return i.emit(e)
+}
+
+func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
+	err := yakit.CreateAIProcess(consts.GetGormProjectDatabase(), newProcess)
+	if err != nil {
+		return nil
+	}
+	callBack := func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		event.Processes = append(event.Processes, newProcess)
+		return event
+	}
+	return i.PushEventProcesser(callBack)
+}
+
+func (i *Emitter) PushEventProcesser(newHandler EventProcesser) *Emitter {
+	var copyEmitter = new(Emitter)
+	*copyEmitter = *i
+	if copyEmitter.eventProcesserStack == nil {
+		copyEmitter.eventProcesserStack = utils.NewStack[EventProcesser]()
+	}
+	copyEmitter.eventProcesserStack.Push(newHandler)
+	return copyEmitter
+}
+
+func (i *Emitter) PopEventProcesser() *Emitter {
+	var copyEmitter = new(Emitter)
+	*copyEmitter = *i
+	if copyEmitter.eventProcesserStack == nil {
+		return copyEmitter
+	}
+	copyEmitter.eventProcesserStack.Pop()
+	return copyEmitter
+}
+
+func (i *Emitter) callEventBeforeSave(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+	if i.eventProcesserStack == nil || i.eventProcesserStack.Len() == 0 {
+		return event
+	}
+	i.eventProcesserStack.ForeachStack(func(f EventProcesser) bool {
+		event = f(event)
+		return true
+	})
+	return event
+}
+
+func (i *Emitter) emit(e *schema.AiOutputEvent) (retErr error) {
+	if err := recover(); err != nil {
+		retErr = utils.Errorf("Emitter panic: %v", err)
+		_ = retErr
+	}
+	if i.eventProcesserStack != nil {
+		e = i.callEventBeforeSave(e)
+	}
+	if i.baseEmitter != nil {
+		if err := i.baseEmitter(e); err != nil {
+			return utils.Errorf("emit event failed: %v", err)
+		}
+	}
+	return nil
 }
 
 func (i *Emitter) StoreInteractiveEvent(id string, e *schema.AiOutputEvent) {
@@ -44,16 +106,9 @@ func (r *Emitter) SetInteractiveEventSaver(saver func(string, *schema.AiOutputEv
 
 func NewEmitter(id string, emitter BaseEmitter) *Emitter {
 	return &Emitter{
-		streamWG: &sync.WaitGroup{},
-		id:       id,
-		emit: func(e *schema.AiOutputEvent) (retErr error) {
-			if err := recover(); err != nil {
-				retErr = utils.Errorf("Emitter panic: %v", err)
-				_ = retErr
-			}
-			retErr = emitter(e)
-			return retErr
-		},
+		streamWG:    &sync.WaitGroup{},
+		id:          id,
+		baseEmitter: emitter,
 	}
 }
 

@@ -325,7 +325,7 @@ func (m *Memory) CurrentTaskTimeline() string {
 }
 
 func (m *Memory) TaskMaxContinue() int64 {
-	return m.CurrentTask.config.maxTaskContinue
+	return m.CurrentTask.Config.maxTaskContinue
 }
 
 // timeline limit set

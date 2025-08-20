@@ -31,15 +31,15 @@ func (t *AiTask) getToolRequired(response string) []*aitool.Tool {
 		if rawData, ok := data["tool"]; ok && fmt.Sprint(rawData) != "" {
 			toolName := fmt.Sprint(rawData)
 			count := 0
-			toolIns, err := t.config.aiToolManager.GetToolByName(toolName)
+			toolIns, err := t.aiToolManager.GetToolByName(toolName)
 			if err != nil {
-				t.config.EmitError("error searching tool: %v", err)
+				t.EmitError("error searching tool: %v", err)
 				continue
 			}
 			count++
 			toolRequired = append(toolRequired, toolIns)
 			if count <= 0 {
-				t.config.EmitInfo("require-tool for %v, but not found it", toolName)
+				t.EmitInfo("require-tool for %v, but not found it", toolName)
 			}
 		}
 	}
@@ -62,22 +62,23 @@ func (t *AiTask) getToolResultAction(response string) string {
 
 func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	caller, err := aicommon.NewToolCaller(
-		aicommon.WithToolCaller_RuntimeId(t.config.GetRuntimeId()),
+		aicommon.WithToolCaller_RuntimeId(t.GetRuntimeId()),
 		aicommon.WithToolCaller_Task(t),
-		aicommon.WithToolCaller_AICallerConfig(t.config),
-		aicommon.WithToolCaller_Emitter(t.config.GetEmitter()),
-		aicommon.WithToolCaller_AICaller(t.config),
+		aicommon.WithToolCaller_AICallerConfig(t),
+		aicommon.WithToolCaller_Emitter(t.GetEmitter()),
+		aicommon.WithToolCaller_AICaller(t),
 		aicommon.WithToolCaller_GenerateToolParamsBuilder(t.generateRequireToolResponsePrompt),
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
-			t.config = t.config.pushProcess(&schema.AiProcess{
+			t.Emitter = t.Emitter.AssociativeAIProcess(&schema.AiProcess{
 				ProcessId:   callToolId,
 				ProcessType: schema.AI_Call_Tool,
 			})
 		}),
 		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
-			t.config = t.config.popEventBeforeSave()
+			t.Emitter = t.Emitter.PopEventProcesser()
 		}),
 		aicommon.WithToolCaller_ReviewWrongTool(t.toolReviewPolicy_wrongTool),
+		aicommon.WithToolCaller_ReviewWrongParam(t.toolReviewPolicy_wrongParam),
 	)
 	if err != nil {
 		return nil, false, utils.Errorf("error creating tool caller: %v", err)
@@ -93,11 +94,11 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 	}
 
 	var action *aicommon.Action
-	err = t.config.callAiTransaction(decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	err = t.callAiTransaction(decisionPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
 	}, func(continueResult *aicommon.AIResponse) error {
-		nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.config.GetEmitter()))
+		nextResponse, err := io.ReadAll(continueResult.GetOutputStreamReader("decision", true, t.GetEmitter()))
 		if err != nil {
 			err = utils.Errorf("error reading AI response: %v", err)
 			return utils.Errorf("error reading AI response: %v", err)
@@ -131,11 +132,11 @@ func (t *AiTask) toolResultDecision(result *aitool.ToolResult, targetTool *aitoo
 			t.TaskSummary = t.LongSummary
 		}
 
-		t.config.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action.Name())
+		t.EmitInfo("tool[%v] and next do the action: %v", targetTool.Name, action.Name())
 		return nil
 	})
 	if err != nil {
-		t.config.EmitWarning("no action found, using default action, finished")
+		t.EmitWarning("no action found, using default action, finished")
 		return "", err
 	}
 	return action.Name(), nil
