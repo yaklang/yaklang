@@ -38,7 +38,7 @@ func ExtractAudioFromVideo(inputFile string, opts ...Option) (*AudioExtractionRe
 
 	// If no output file is specified, create a temporary one.
 	if o.outputAudioFile == "" {
-		tmpFile, err := ioutil.TempFile(consts.GetDefaultYakitBaseTempDir(), "extracted-audio-*.wav")
+		tmpFile, err := ioutil.TempFile(consts.GetDefaultYakitBaseTempDir(), "extracted-audio-*.mp3")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create temporary audio file: %w", err)
 		}
@@ -62,8 +62,8 @@ func ExtractAudioFromVideo(inputFile string, opts ...Option) (*AudioExtractionRe
 	args = append(args,
 		"-ar", strconv.Itoa(o.audioSampleRate),
 		"-ac", strconv.Itoa(o.audioChannels),
-		"-c:a", "pcm_s16le",
-		"-f", "wav",
+		"-c:a", "libmp3lame",
+		"-q:a", "7",
 		o.outputAudioFile,
 	)
 
