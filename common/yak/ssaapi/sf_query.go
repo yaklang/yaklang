@@ -35,7 +35,8 @@ type queryConfig struct {
 	rule        *schema.SyntaxFlowRule // use this
 
 	// runtime
-	vm *sfvm.SyntaxFlowVirtualMachine
+	vm    *sfvm.SyntaxFlowVirtualMachine
+	frame *sfvm.SFFrame
 
 	// runtime config
 	opts []sfvm.Option // config
@@ -55,6 +56,9 @@ type queryConfig struct {
 }
 
 func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
+	if frame := config.frame; frame != nil {
+		return frame, nil
+	}
 	// get vm
 	vm := config.vm
 	if vm == nil {
@@ -162,11 +166,14 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}))
 
 	// runtime
-	res, err := frame.Feed(value, config.opts...)
+	var res *sfvm.SFFrameResult
+	res, err = frame.Feed(value, config.opts...)
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
 	}
-	ret := CreateResultFromQuery(res)
+
+	var ret *SyntaxFlowResult
+	ret = CreateResultFromQuery(res)
 
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
@@ -238,6 +245,12 @@ func QueryWithRuleContent(rule string) QueryOption {
 func QueryWithVM(vm *sfvm.SyntaxFlowVirtualMachine) QueryOption {
 	return func(c *queryConfig) {
 		c.vm = vm
+	}
+}
+
+func QueryWithFrame(f *sfvm.SFFrame) QueryOption {
+	return func(c *queryConfig) {
+		c.frame = f
 	}
 }
 
