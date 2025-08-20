@@ -82,7 +82,7 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 		}
 
 		i.Subtasks = append(i.Subtasks, &AiTask{
-			config:     p.RootTask.config,
+			Config:     p.RootTask.Config,
 			Name:       name,
 			Goal:       goal,
 			ParentTask: i,
@@ -136,7 +136,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 			if task == nil {
 				return
 			}
-			task.config = pr.config
+			task.Config = pr.config
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -175,7 +175,7 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 						continue
 					}
 					rootTask.Subtasks = append(rootTask.Subtasks, &AiTask{
-						config: pr.config,
+						Config: pr.config,
 						Name:   subtask.GetAnyToString("subtask_name"),
 						Goal:   subtask.GetAnyToString("subtask_goal"),
 					})

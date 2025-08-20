@@ -24,10 +24,6 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	if c.eventProcessHandler != nil {
-		e = c.callEventBeforeSave(e)
-	}
-
 	if c.saveEvent && e.ShouldSave() { // not save system and sync
 		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
 		if err != nil {
@@ -149,49 +145,6 @@ func (r *Config) EmitUpdateTaskStatus(task *AiTask) {
 			"executed":     task.executed,
 		},
 	})
-}
-
-func (c *Config) pushProcess(newProcess *schema.AiProcess) *Config {
-	err := yakit.CreateAIProcess(consts.GetGormProjectDatabase(), newProcess)
-	if err != nil {
-		return nil
-	}
-	callBack := func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-		event.Processes = append(event.Processes, newProcess)
-		return event
-	}
-	return c.pushEventBeforeSave(callBack)
-}
-
-func (c *Config) pushEventBeforeSave(newHandler func(event *schema.AiOutputEvent) *schema.AiOutputEvent) *Config {
-	var subConfig = new(Config)
-	*subConfig = *c
-	if subConfig.eventProcessHandler == nil {
-		subConfig.eventProcessHandler = utils.NewStack[func(event *schema.AiOutputEvent) *schema.AiOutputEvent]()
-	}
-	subConfig.eventProcessHandler.Push(newHandler)
-	return subConfig
-}
-
-func (c *Config) popEventBeforeSave() *Config {
-	var subConfig = new(Config)
-	*subConfig = *c
-	if subConfig.eventProcessHandler == nil {
-		return subConfig
-	}
-	subConfig.eventProcessHandler.Pop()
-	return subConfig
-}
-
-func (c *Config) callEventBeforeSave(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-	if c.eventProcessHandler == nil || c.eventProcessHandler.Len() == 0 {
-		return event
-	}
-	c.eventProcessHandler.ForeachStack(func(f func(e *schema.AiOutputEvent) *schema.AiOutputEvent) bool {
-		event = f(event)
-		return true
-	})
-	return event
 }
 
 type SyncType string

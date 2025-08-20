@@ -27,7 +27,8 @@ type ToolCaller struct {
 	onCallToolStart func(callToolId string)
 	onCallToolEnd   func(callToolId string)
 
-	reviewWrongToolHandler func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, error)
+	reviewWrongToolHandler  func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, error)
+	reviewWrongParamHandler func(tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 }
 
 type ToolCallerOption func(tc *ToolCaller)
@@ -37,6 +38,14 @@ func WithToolCaller_ReviewWrongTool(
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reviewWrongToolHandler = handler
+	}
+}
+
+func WithToolCaller_ReviewWrongParam(
+	handler func(tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error),
+) ToolCallerOption {
+	return func(tc *ToolCaller) {
+		tc.reviewWrongParamHandler = handler
 	}
 }
 

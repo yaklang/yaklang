@@ -69,24 +69,24 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 	// 2. 根据审查建议处理
 	switch suggestion {
 	case "deeply_think":
-		t.config.EmitInfo("deeply think")
+		t.EmitInfo("deeply think")
 		err := t.DeepThink(utils.InterfaceToString(param))
 		if err != nil {
-			t.config.EmitError("invoke planRequest failed: %v", err)
+			t.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
-		t.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
-			"root_task": t.config.getCurrentTaskPlan(),
+		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.getCurrentTaskPlan(),
 		})
-		return t.config.aiTaskRuntime.executeSubTask(1, t)
+		return t.aiTaskRuntime.executeSubTask(1, t)
 	case "inaccurate":
-		t.config.EmitInfo("inaccurate")
+		t.EmitInfo("inaccurate")
 		return t.executeTask()
 	case "continue":
-		t.config.EmitInfo("continue")
+		t.EmitInfo("continue")
 		return nil
 	case "end":
-		t.config.EmitInfo("end")
+		t.EmitInfo("end")
 
 		parentTask := t.ParentTask
 		index := -1
@@ -97,30 +97,30 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 			}
 		}
 		if index == -1 {
-			t.config.EmitError("current task not found in parent task")
+			t.EmitError("current task not found in parent task")
 			return utils.Error("current task not found in parent task")
 		}
 		parentTask.Subtasks = parentTask.Subtasks[:index+1]
-		t.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
-			"root_task": t.config.getCurrentTaskPlan(),
+		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.getCurrentTaskPlan(),
 		})
 	case "adjust_plan":
 		suggestion := param.GetString("suggestion")
 		if suggestion == "" {
-			t.config.EmitError("suggestion is empty")
+			t.EmitError("suggestion is empty")
 			return utils.Error("suggestion is empty")
 		}
-		t.config.EmitInfo("adjust plan")
+		t.EmitInfo("adjust plan")
 		err := t.AdjustPlan(utils.InterfaceToString(suggestion))
 		if err != nil {
-			t.config.EmitError("invoke planRequest failed: %v", err)
+			t.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
-		t.config.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
-			"root_task": t.config.getCurrentTaskPlan(),
+		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.getCurrentTaskPlan(),
 		})
 	default:
-		t.config.EmitError("unknown review suggestion: %s", suggestion)
+		t.EmitError("unknown review suggestion: %s", suggestion)
 		return utils.Errorf("unknown review suggestion: %s", suggestion)
 	}
 	return nil
