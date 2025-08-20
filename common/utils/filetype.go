@@ -67,6 +67,6 @@ func IsAudio(filePath string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("cannot detect mime type for '%s': %w", filePath, err)
 	}
-	log.Printf("File '%s' detected as MIME: %s", filePath, mime.String())
+	log.Infof("File '%s' detected as MIME: %s", filePath, mime.String())
 	return strings.HasPrefix(mime.String(), "audio/"), nil
 }
