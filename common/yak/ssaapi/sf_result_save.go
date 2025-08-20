@@ -114,6 +114,7 @@ func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResul
 	}
 	// result
 	result := ssadb.CreateResult(TaskIDs...)
+	r.id = result.ID
 	result.CheckMsg = r.GetCheckMsg()
 	result.Errors = r.GetErrors()
 

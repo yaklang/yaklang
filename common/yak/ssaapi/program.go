@@ -2,18 +2,18 @@ package ssaapi
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"sort"
 	"time"
 
-	"github.com/google/uuid"
+	"go.uber.org/atomic"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -24,13 +24,13 @@ type Program struct {
 	Program   *ssa.Program
 	irProgram *ssadb.IrProgram
 	// DBCache *ssa.Cache
-	config *config
-
+	config         *config
 	enableDatabase bool
 	// come from database will affect search operation
 	comeFromDatabase bool
 	//value cache
 	nodeId2ValueCache *utils.CacheWithKey[uint, *Value]
+	id                *atomic.Int64
 }
 
 type Programs []*Program
@@ -81,6 +81,7 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 		config:            config,
 		enableDatabase:    config.databaseKind != ssa.ProgramCacheMemory,
 		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
+		id:                atomic.NewInt64(0),
 	}
 
 	// if config.DatabaseProgramName == "" {
@@ -183,7 +184,9 @@ func (p *Program) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
 
 // normal from ssa value
 func (v *Value) NewValue(value ssa.Instruction) *Value {
-	iv, err := v.ParentProgram.NewValue(value)
+	var iv *Value
+	var err error
+	iv, err = v.ParentProgram.NewValue(value)
 	if err != nil {
 		log.Errorf("NewValue: new value failed: %v", err)
 		return nil
@@ -197,13 +200,15 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 		runtime.Stack(raw, false)
 		return nil, utils.Errorf("instruction is nil: %s", string(raw))
 	}
-
-	v := &Value{
-		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
+	var v *Value
+	var uuidStr string
+	uuidStr = fmt.Sprintf("uuid-%d", p.id.Inc())
+	v = &Value{
+		runtimeCtx:    nil,
 		ParentProgram: p,
-		uuid:          uuid.NewString(),
-		EffectOn:      utils.NewSafeMapWithKey[string, *Value](),
-		DependOn:      utils.NewSafeMapWithKey[string, *Value](),
+		uuid:          uuidStr,
+		EffectOn:      nil,
+		DependOn:      nil,
 	}
 
 	// if lazy, get the real inst

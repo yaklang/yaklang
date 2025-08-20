@@ -11,9 +11,10 @@ import (
 
 // GetTopDefs desc all of 'Defs' is not used by any other value
 func (i *Value) GetTopDefs(opt ...OperationOption) Values {
+	var ret Values
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = i
-	ret := i.getTopDefs(actx, opt...)
+	ret = i.getTopDefs(actx, opt...)
 	return MergeValues(ret)
 }
 
@@ -74,6 +75,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	//		}
 	//	}
 	//}()
+
 	if i == nil {
 		return nil
 	}
@@ -95,12 +97,15 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return i.getTopDefs(actx, opt...)
 	}
-	shouldExit, recoverStack := actx.check(i)
+	var shouldExit bool
+	var recoverStack func()
+	shouldExit, recoverStack = actx.check(i)
 	defer recoverStack()
 	if shouldExit {
 		return Values{i}
 	}
-	err := actx.hook(i)
+	var err error
+	err = actx.hook(i)
 	if err != nil {
 		return Values{i}
 	}
@@ -159,7 +164,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return i.visitedDefs(actx, opt...)
 	}
-
 	switch inst := i.innerValue.(type) {
 	case *ssa.Undefined:
 		if inst.Kind == ssa.UndefinedValueReturn {
@@ -522,14 +526,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	case *ssa.Make:
 		var values Values
 		values = append(values, i)
-		for key, member := range inst.GetAllMember() {
+		var allmember map[ssa.Value]ssa.Value
+		allmember = inst.GetAllMember()
+		for key, member := range allmember {
 			value := i.NewValue(member)
 			if err := actx.pushObject(i, i.NewValue(key), value); err != nil {
 				//log.Errorf("push object failed: %v", err)
-				continue
+				// continue
+			} else {
+				var vs Values
+				vs = value.getTopDefs(actx, opt...)
+				values = append(values, vs...)
+				actx.popObject()
 			}
-			values = append(values, value.getTopDefs(actx, opt...)...)
-			actx.popObject()
 		}
 		return values
 	}

@@ -1179,17 +1179,17 @@ var ssaCodeScan = &cli.Command{
 		// Ensure the file is closed after we're done
 		defer config.DeferFunc()
 
-		compileTimeStart := time.Now()
+		// compileTimeStart := time.Now()
 		prog, err := getProgram(ctx, config)
 		if err != nil {
 			log.Errorf("get program failed: %s", err)
 			return err
 		}
-		compileTime := time.Since(compileTimeStart)
-		log.Infof("get or parse rule success, cost %v", compileTime)
+		// compileTime := time.Since(compileTimeStart)s.
+		// log.Infof("get or parse rule success, cost %v", compileTime)
 
 		log.Infof("================= get or parse rule ================")
-		scanTimeStart := time.Now()
+		// scanTimeStart := time.Now()
 		ruleFilter := &ypb.SyntaxFlowRuleFilter{
 			Language:          []string{prog.GetLanguage()},
 			Keyword:           c.String("rule-keyword"),
@@ -1203,19 +1203,19 @@ var ssaCodeScan = &cli.Command{
 			// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
 			return err
 		}
-		scanTime := time.Since(scanTimeStart)
+		// scanTime := time.Since(scanTimeStart)
 		// log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
 
-		exportTimeStart := time.Now()
+		// exportTimeStart := time.Now()
 		ShowRisk(config.Format, riskCh, config.OutputWriter)
-		exportTime := time.Since(exportTimeStart)
-		log.Infof("show result success, cost %v", exportTime)
+		// exportTime := time.Since(exportTimeStart)
+		// log.Infof("show result success, cost %v", exportTime)
 		// show echo  time
-		log.Infof("finish all time cost:")
-		log.Infof("rule sync: %v", ruleTime)
-		log.Infof("compile: %v", compileTime)
-		log.Infof("scan: %v", scanTime)
-		log.Infof("export: %v", exportTime)
+		// log.Infof("finish all time cost:")
+		// log.Infof("rule sync: %v", ruleTime)
+		// log.Infof("compile: %v", compileTime)
+		// log.Infof("scan: %v", scanTime)
+		// log.Infof("export: %v", exportTime)
 		ssaprofile.ShowCacheCost()
 		return nil
 	},

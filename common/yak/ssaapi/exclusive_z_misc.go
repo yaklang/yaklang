@@ -44,17 +44,30 @@ var (
 	ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX ContextID = "call_entry_trace_idx"
 )
 
+func NewRuntimeContext() *omap.OrderedMap[ContextID, *Value] {
+	return omap.NewEmptyOrderedMap[ContextID, *Value]()
+}
+
 // GetContextValue can handle context
 func (v *Value) GetContextValue(i ContextID) (*Value, bool) {
+	if v.runtimeCtx == nil {
+		v.runtimeCtx = NewRuntimeContext()
+	}
 	return v.runtimeCtx.Get(i)
 }
 
 func (v *Value) SetContextValue(i ContextID, values *Value) *Value {
+	if v.runtimeCtx == nil {
+		v.runtimeCtx = NewRuntimeContext()
+	}
 	v.runtimeCtx.Set(i, values)
 	return v
 }
 
 func (v *Value) SetDepth(i int) {
+	if v.runtimeCtx == nil {
+		v.runtimeCtx = NewRuntimeContext()
+	}
 	v.runtimeCtx.Set("depth", v.NewValue(ssa.NewConst(i)))
 }
 

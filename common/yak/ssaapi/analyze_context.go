@@ -93,12 +93,12 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	}
 	a.enterRecursive()
 	// 1w recursive call check
-	if !utils.InGithubActions() {
-		if a.getRecursiveCounter() > 10000 {
-			log.Warnf("recursive call is over 10000, stop it")
-			return
-		}
+	// if !utils.InGithubActions() {
+	if a.getRecursiveCounter() > 10000 {
+		log.Warnf("recursive call is over 10000, stop it")
+		return
 	}
+	// }
 	if a.depth > 0 && a.config.MaxDepth > 0 && a.depth > a.config.MaxDepth {
 		a.reachedDepthLimited = true
 		return
