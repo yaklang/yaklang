@@ -281,3 +281,22 @@ func QuerySSARiskCount(DB *gorm.DB, filter *ypb.SSARisksFilter) (int, error) {
 func YieldSSARisk(db *gorm.DB, ctx context.Context) chan *schema.SSARisk {
 	return bizhelper.YieldModel[*schema.SSARisk](ctx, db, bizhelper.WithYieldModel_PageSize(100))
 }
+
+type SSARiskLevelCount struct {
+	Count    int64  `json:"count"`
+	Severity string `json:"severity"`
+}
+
+func GetSSARiskLevelCount(DB *gorm.DB, filter *ypb.SSARisksFilter) ([]*SSARiskLevelCount, error) {
+	db := DB.Model(&schema.SSARisk{})
+	// db = db.Debug()
+
+	db = FilterSSARisk(db, filter)
+	db = db.Select("severity as severity, COUNT(*) as count").Group("severity")
+
+	var v []*SSARiskLevelCount
+	if err := db.Scan(&v).Error; err != nil {
+		return nil, utils.Errorf("scan failed: %v", err)
+	}
+	return v, nil
+}
