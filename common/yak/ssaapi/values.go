@@ -1069,7 +1069,7 @@ func (v *Value) GetDependOn() Values {
 			for _, id := range nodeIds {
 				d := v.NewValueFromAuditNode(id)
 				if d != nil {
-					v.DependOn.Set(d.GetUUID(), d)
+					v.setDependOn(d)
 				}
 			}
 		}

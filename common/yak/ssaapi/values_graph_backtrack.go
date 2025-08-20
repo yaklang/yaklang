@@ -65,7 +65,8 @@ func (v *Value) RecursiveDependsAndEffects(h func(value *Value) error) {
 // strict common dependencies.
 func FindStrictCommonDepends(val Values) Values {
 	for _, v := range val {
-		if v.DependOn.Count() == 0 && v.EffectOn.Count() == 0 {
+		if (v.DependOn == nil || v.DependOn.Count() == 0) &&
+			(v.EffectOn == nil || v.EffectOn.Count() == 0) {
 			v.GetTopDefs()
 		}
 	}
@@ -109,7 +110,8 @@ func FindStrictCommonDepends(val Values) Values {
 // dependencies by rebuilding the top-level definition.
 func FindFlexibleCommonDepends(val Values) Values {
 	for _, v := range val {
-		if v.DependOn.Count() == 0 && v.EffectOn.Count() == 0 {
+		if (v.DependOn == nil || v.DependOn.Count() == 0) &&
+			(v.EffectOn == nil || v.EffectOn.Count() == 0) {
 			v.GetTopDefs()
 		}
 	}

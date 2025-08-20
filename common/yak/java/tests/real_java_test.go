@@ -2,7 +2,10 @@ package tests
 
 import (
 	_ "embed"
+	"os"
+	"path/filepath"
 	"runtime"
+	"runtime/trace"
 	"testing"
 	"time"
 
@@ -30,7 +33,7 @@ func TestRealJava_PanicInMemberCall(t *testing.T) {
 	}, ssaapi.WithLanguage(ssaapi.JAVA))
 }
 
-func TestA(t *testing.T) {
+func TestCodeCompile(t *testing.T) {
 	t.Skip()
 
 	go func() {
@@ -114,4 +117,130 @@ func TestA(t *testing.T) {
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 	}
+}
+
+func TestCodeScan(t *testing.T) {
+
+	f, err := os.Create("trace.out")
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	path, err := filepath.Abs(f.Name())
+	log.Infof("path: %s, %s, %v", f.Name(), path, err)
+	defer f.Close()
+
+	err = trace.Start(f)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	defer trace.Stop()
+
+	vf := filesys.NewVirtualFs()
+	code := `
+package com.example.demo.controller.deepcross;
+
+import com.example.demo.controller.utils.DummyUtil;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class DeepCrossController {
+    @GetMapping({"/xss/direct/1", "/xss/no-cross/1"})
+    public ResponseEntity<String> noDeepCross(@RequestParam(required = false) String body) {
+        if (body == null) {
+            return ResponseEntity.ok("No input, try <a href='/xss/no-cross?body=hello-world'>here</a>");
+        }
+        ResponseEntity<String> resp = ResponseEntity.ok(body);
+        return resp;
+    }
+
+    @GetMapping({"/xss/direct/2", "/xss/no-cross/2"})
+    public ResponseEntity<String> noDeepCross1(@RequestParam(required = false) String body) {
+        if (body == null) {
+            return ResponseEntity.ok("No input, try <a href='/xss/no-cross?body=hello-world'>here</a>");
+        }
+        ResponseEntity<String> resp = ResponseEntity.ok().body(body);
+        return resp;
+    }
+
+    @GetMapping({"/xss/direct/3", "/xss/no-cross/3"})
+    public ResponseEntity<String> noDeepCross2(@RequestParam(required = false) String body) {
+        if (body == null) {
+            return ResponseEntity.ok("No input, try <a href='/xss/no-cross?body=hello-world'>here</a>");
+        }
+        ResponseEntity<String> resp = new ResponseEntity(body, HttpStatus.OK);
+        return resp;
+    }
+
+    @GetMapping({"/xss/direct/4", "/xss/no-cross/4"})
+    public ResponseEntity<String> noDeepCross4(@RequestParam(required = false) String body) {
+        if (body == null) {
+            return ResponseEntity.ok("No input, try <a href='/xss/no-cross?body=hello-world'>here</a>");
+        }
+        ResponseEntity<String> resp = new ResponseEntity(body, HttpStatus.OK);
+        return resp;
+    }
+
+    @GetMapping({"/xss/direct/5"})
+    public ResponseEntity<String> noDeepCross5(@RequestParam(required = false) String body) {
+        if (body == null) {
+            return ResponseEntity.ok("No input, try <a href='/xss/no-cross?body=hello-world'>here</a>");
+        }
+        body = "Pre Handle" + body;
+        body = body.replaceAll("Hello", "---Hello---");
+        body += "\n\nSigned by DeepCrossController";
+        ResponseEntity<String> resp = new ResponseEntity(body, HttpStatus.OK);
+        return resp;
+    }
+
+    @GetMapping({"/xss/direct/6"})
+    public ResponseEntity<String> noDeepCross6(@RequestParam(required = false) String body) {
+        if (body == null) {
+            return ResponseEntity.ok("No input, try <a href='/xss/no-cross?body=hello-world'>here</a>");
+        }
+        body = body.replaceAll("Hello", "---Hello---");
+        body += "\n\nSigned by DeepCrossController";
+        body = DummyUtil.filterXSS(body);
+        ResponseEntity<String> resp = new ResponseEntity(body, HttpStatus.OK);
+        return resp;
+    }
+}
+
+
+`
+	vf.AddFile("xss.java", code)
+	rule := `
+*?{opcode:return} as $sink;
+$sink #-> ?{opcode: param} as $result;
+// $sink #{
+    // until: "*?{opcode: param} as $source",
+// }->;
+	`
+
+	progName := uuid.NewString()
+	compileStart := time.Now()
+	prog, err := ssaapi.ParseProject(
+		ssaapi.WithFileSystem(vf),
+		ssaapi.WithProgramName(progName),
+		ssaapi.WithMemory(),
+	)
+	compile := time.Since(compileStart)
+	require.NoError(t, err)
+	prog.Show()
+
+	queryStart := time.Now()
+	result, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithProcessCallback(func(f float64, s string) {
+		log.Infof("Progress: %.2f%%, Status: %s", f*100, s)
+	}))
+	query := time.Since(queryStart)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	result.GetValues("result").Show()
+	log.Infof("Time: \n\tCompile time: %s, \n\tQuery time: %s, \n\tTotal time: %s", compile, query, compile+query)
+	ssaprofile.ShowCacheCost()
 }
