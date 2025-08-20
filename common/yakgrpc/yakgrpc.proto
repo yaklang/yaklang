@@ -881,6 +881,7 @@ service Yak {
   rpc GetAIToolList(GetAIToolListRequest) returns(GetAIToolListResponse);
   rpc DeleteAITool(DeleteAIToolRequest) returns(DbOperateMessage);
   rpc SaveAITool(SaveAIToolRequest) returns(DbOperateMessage);
+  rpc UpdateAITool(UpdateAIToolRequest) returns(DbOperateMessage);
   rpc ToggleAIToolFavorite(ToggleAIToolFavoriteRequest) returns(ToggleAIToolFavoriteResponse);
   rpc AIToolGenerateMetadata(AIToolGenerateMetadataRequest) returns(AIToolGenerateMetadataResponse);
 
@@ -889,6 +890,8 @@ service Yak {
   rpc IsLocalModelReady(IsLocalModelReadyRequest) returns (IsLocalModelReadyResponse);
   rpc InstallLlamaServer(InstallLlamaServerRequest) returns (stream ExecResult);
   rpc StartLocalModel(StartLocalModelRequest) returns (stream ExecResult);
+  rpc StopLocalModel(StopLocalModelRequest) returns (GeneralResponse);
+
   rpc DownloadLocalModel(DownloadLocalModelRequest) returns (stream ExecResult);
   rpc GetSupportedLocalModels(Empty) returns (GetSupportedLocalModelsResponse);
   rpc AddLocalModel(AddLocalModelRequest) returns (GeneralResponse);
@@ -958,6 +961,28 @@ message AddLocalModelRequest {
 message DeleteLocalModelRequest {
   string Name = 1;
   bool DeleteSourceFile = 2;
+}
+
+message StopLocalModelRequest {
+  string ModelName = 1;
+}
+
+message LocalModelStatus {
+  string Status = 2;
+  string Host = 3;
+  int32 Port = 4;
+  string Model = 5;
+  string ModelPath = 6;
+  string LlamaServerPath = 7;
+  int32 ContextSize = 8;
+  bool ContBatching = 9;
+  int32 BatchSize = 10;
+  int32 Threads = 11;
+  bool Detached = 12;
+  bool Debug = 13;
+  string Pooling = 14;
+  int32 StartupTimeout = 15;
+  repeated string Args = 16;
 }
 
 message ThirdPartyBinary {
@@ -1163,12 +1188,24 @@ message SaveAIToolRequest {
   repeated string Keywords = 5;
 }
 
+message UpdateAIToolRequest {
+  int64 ID = 1;
+  string Name = 2;
+  string Description = 3;
+  string Content = 4;
+  string ToolPath = 5;
+  repeated string Keywords = 6;
+}
+
+
 message DeleteAIToolRequest {
   repeated string ToolNames = 1;
+  repeated int64 IDs = 2;
 }
 
 message ToggleAIToolFavoriteRequest {
   string ToolName = 1;
+  int64 ID = 2;
 }
 
 message ToggleAIToolFavoriteResponse {
@@ -1183,6 +1220,7 @@ message AITool {
   string ToolPath = 4;
   repeated string Keywords = 5;
   bool IsFavorite = 6;
+  int64 ID = 7;
 }
 
 message GetAIToolListResponse {
@@ -1320,6 +1358,9 @@ message AIStartParams {
   bool AllowGenerateReport = 24;
 
   int64 TaskMaxContinueCount = 25;
+
+  // 选择 AI 服务
+  string AIService = 26;
 }
 
 message AITaskFilter {
@@ -7438,6 +7479,13 @@ message StartLocalModelRequest {
   string ModelName = 1;
   string Host = 2;
   int32 Port = 3;
+  int32 ContextSize = 4;
+  int32 BatchSize = 5;
+  int32 Threads = 6;
+  bool Debug = 8;
+  string Pooling = 9;
+  int64 StartupTimeoutMs = 10;
+  repeated string Args = 11;
 }
 
 message DownloadLocalModelRequest {
@@ -7455,6 +7503,7 @@ message LocalModelConfig {
   bool IsLocal = 7;
   bool IsReady = 8;
   string Path = 9;
+  LocalModelStatus Status = 10;
 }
 
 message GetSupportedLocalModelsResponse {

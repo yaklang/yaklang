@@ -398,6 +398,21 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	return responseRsp, nil
 }
 
+func LoadChater(name string) (aispec.GeneralChatter, error) {
+	gateway, ok := aispec.Lookup(name)
+	if !ok {
+		return nil, errors.New("not found valid ai agent")
+	}
+	return func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(name)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Warnf("check valid by %s failed: %s", name, err)
+			return "", err
+		}
+		return gateway.Chat(msg)
+	}, nil
+}
+
 var Exports = map[string]any{
 	"OpenAI":   OpenAI,
 	"ChatGLM":  ChatGLM,

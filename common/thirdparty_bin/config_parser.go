@@ -129,9 +129,6 @@ func ParseConfig(data []byte) (*ConfigFile, error) {
 			// 构建完整的URL，如果是相对URL则拼接baseurl
 			fullURL := buildFullURL(configFile.BaseURL, configDownloadInfo.URL)
 
-			// 构建完整的URL，如果是相对URL则拼接baseurl
-			fullURL := buildFullURL(configFile.BaseURL, configDownloadInfo.URL)
-
 			binary.DownloadInfoMap[platform] = &DownloadInfo{
 				URL:     fullURL,
 				MD5:     configDownloadInfo.MD5,

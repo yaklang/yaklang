@@ -224,6 +224,15 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 		}))
 	}
 
+	if serviceName := startParams.GetAIService(); serviceName != "" {
+		callback, err := localModelAICallbackByServiceName(serviceName)
+		if err != nil {
+			log.Errorf("load ai service failed: %v", err)
+		} else {
+			aidOption = append(aidOption, aid.WithAICallback(callback))
+		}
+	}
+
 	if mockedAIChat != nil {
 		aidOption = append(aidOption, aid.WithAICallback(aicommon.AIChatToAICallbackType(mockedAIChat)))
 	}
@@ -273,4 +282,16 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	}
 
 	return aidOption
+}
+
+func localModelAICallbackByServiceName(serviceName string) (func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error), error) {
+	// localmodelManager := localmodel.GetManager()
+	// service, err := localmodelManager.GetServiceStatus(startParams.GetAIService())
+	// if err != nil {
+	// }
+	chat, err := ai.LoadChater(serviceName)
+	if err != nil {
+		return nil, fmt.Errorf("load ai service failed: %v", err)
+	}
+	return aicommon.AIChatToAICallbackType(chat), nil
 }
