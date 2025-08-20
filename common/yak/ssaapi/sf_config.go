@@ -10,6 +10,7 @@ type RecursiveConfig struct {
 	config        *sf.Config
 	configItems   []*sf.RecursiveConfigItem
 	vm            *sf.SyntaxFlowVirtualMachine
+	frame         []*sfvm.SFFrame
 }
 
 func clearSymbolTable(res *sf.SFFrameResult) {
@@ -30,6 +31,13 @@ func CreateRecursiveConfigFromItems(
 	}
 	clearSymbolTable(contextResult)
 	res.vm.SetConfig(config)
+	res.frame = make([]*sf.SFFrame, len(configItems))
+	for index, item := range configItems {
+		frame, err := res.vm.Compile(item.Value)
+		if err == nil {
+			res.frame[index] = frame
+		}
+	}
 	return res
 }
 
@@ -100,14 +108,16 @@ func (r *RecursiveConfig) compileAndRun(value sf.ValueOperator) map[sf.Recursive
 	ret := make(map[sfvm.RecursiveConfigKey]struct{})
 	for index, item := range r.configItems {
 		_ = index
-		// if !item.SyntaxFlowRule {
-		// 	continue
-		// }
-		res, err := QuerySyntaxflow(
+		if r.frame[index] == nil {
+			continue
+		}
+		var res *SyntaxFlowResult
+		var err error
+		res, err = QuerySyntaxflow(
 			QueryWithVM(r.vm),
 			QueryWithInitVar(r.contextResult.SymbolTable),
 			QueryWithValue(value),
-			QueryWithRuleContent(item.Value),
+			QueryWithFrame(r.frame[index]),
 		)
 		if err != nil {
 			log.Errorf("syntaxflow rule exec fail: %v", err)
