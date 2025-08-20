@@ -108,9 +108,9 @@ SOLUTION
 }
 
 desc(
-    lang:java,
-    alert_num:1,
-    "file://demo.java":<<<CODE
+	lang:java
+	alert_num:1
+	"file://demo.java":<<<CODE
     package org.joychou.controller;
 
     import org.apache.commons.lang.StringUtils;
@@ -147,7 +147,7 @@ desc(
         }
     }
 CODE
-    "safefile://demo2.java":<<<CODE
+	"safefile://demo2.java":<<<CODE
      package org.joychou.controller;
 
         import org.apache.commons.lang.StringUtils;
