@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 )
 
 func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *ImageResult, error) {
@@ -52,7 +53,7 @@ func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *Image
 		defer cancel()
 
 		var outBuf, errBuf bytes.Buffer
-		cmd := exec.CommandContext(ctx, page2imgPath, "-i", input, "-o", outputFmt)
+		cmd := exec.CommandContext(ctx, page2imgPath, "-i", input, "-o", outputFmt, "-s", "200")
 		cmd.Stdout = &outBuf
 		cmd.Stderr = &errBuf
 
@@ -102,7 +103,25 @@ func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *Image
 				for _, of := range sortOrderedFile(orderedFiles) {
 					log.Infof("find page image idx[%v]: %v", of.idx, of.filename)
 					fileName := of.filename
-					data, err := os.ReadFile(filepath.Join(outputTmp, fileName))
+					filePath := filepath.Join(outputTmp, fileName)
+
+					// compress
+					compressedFile := filepath.Join(outputTmp, "compressed_"+fileName)
+					err := ffmpegutils.CompressImage(filePath, compressedFile)
+					if err == nil {
+						var originalSize int64
+						var nowSize int64
+						if s, err := os.Stat(filePath); err == nil {
+							originalSize = s.Size()
+						}
+						if s, err := os.Stat(compressedFile); err == nil {
+							nowSize = s.Size()
+						}
+						log.Infof("compressed page image %s, from: %v -> %v", fileName, originalSize, nowSize)
+						filePath = compressedFile
+					}
+
+					data, err := os.ReadFile(filePath)
 					if err != nil {
 						log.Errorf("read file failed: %v", err)
 						continue
@@ -112,6 +131,7 @@ func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *Image
 						RawImage: data,
 						MIMEType: mime,
 					}
+					// os.Remove(filepath.Join(outputTmp, fileName))
 				}
 				select {
 				case <-finishedCtx.Done():

@@ -130,7 +130,7 @@
             "type": "string"
           },
           "text": {
-            "description": "The transcribed text content.",
+            "description": "The transcribed text content. For large body text sections, convert the OCR output to Markdown, preserving formulas and tables. For all other smaller text snippets and isolated fragments, output them as plain text. if many main paragraphs are present, merge them into the ONE paragraph element.",
             "type": "string"
           }
         },
