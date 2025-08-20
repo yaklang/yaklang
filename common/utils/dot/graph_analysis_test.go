@@ -119,16 +119,16 @@ func TestGraphAnalysisNodeLabels(t *testing.T) {
 	// Create nodes with specific labels
 	g.AddEdgeByLabel("NodeA", "NodeB", "connection")
 
-	// Test GetNodeLabel
-	if g.GetNodeLabel("NodeA") != "NodeA" {
-		t.Errorf("Expected NodeA, got %s", g.GetNodeLabel("NodeA"))
+	// Test GetNodeByLabel
+	if g.GetNodeByLabel("NodeA") != "NodeA" {
+		t.Errorf("Expected NodeA, got %s", g.GetNodeByLabel("NodeA"))
 	}
 
-	if g.GetNodeLabel("NodeB") != "NodeB" {
-		t.Errorf("Expected NodeB, got %s", g.GetNodeLabel("NodeB"))
+	if g.GetNodeByLabel("NodeB") != "NodeB" {
+		t.Errorf("Expected NodeB, got %s", g.GetNodeByLabel("NodeB"))
 	}
 
-	if g.GetNodeLabel("NonExistent") != "" {
+	if g.GetNodeByLabel("NonExistent") != "" {
 		t.Error("Should return empty string for non-existent node")
 	}
 }

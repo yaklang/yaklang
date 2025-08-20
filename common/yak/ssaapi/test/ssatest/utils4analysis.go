@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -790,6 +792,127 @@ func CheckSyntaxFlowDotGraph(
 					expectedEdge.From, expectedEdge.To, expectedEdge.Label)
 			}
 		}
+		return nil
+	}, opt...)
+}
+
+type GraphNodeInfo struct {
+	Label string
+	*ssaapi.CodeRange
+}
+
+func (g *GraphNodeInfo) Hash() string {
+	if g == nil {
+		return ""
+	}
+	return codec.Md5(g.Label + g.CodeRange.JsonString())
+}
+
+// checkSyntaxFlowGraphInfoCore extracts the common verification logic used by
+// CheckSyntaxFlowGraphInfo and CheckSyntaxFlowGraphInfoWithFs.
+func checkSyntaxFlowGraphInfoCore(
+	t *testing.T,
+	values ssaapi.Values,
+	programName string,
+	variableName string,
+	exceptedNodes map[string]GraphNodeInfo,
+	exceptedPaths [][]string,
+) {
+	require.Greater(t, values.Len(), 0)
+	values.Show()
+
+	dotGraph := ssaapi.NewValuesGraph(values)
+	nodeInfos, err := dotGraph.GenerateValuesGraphInfo(values)
+	require.NoError(t, err)
+	fmt.Printf("------VariableName:%s-------\n", variableName)
+	dotGraph.ShowDot()
+	// check node content and range
+	for _, value := range values {
+		info, ok := nodeInfos[value.GetUUID()]
+		require.True(t, ok)
+
+		nodeInfoMap := make(map[string]*ssaapi.NodeInfo) // nodeInfoHash -> nodeInfo
+		nodeNameMap := make(map[string]string)           // nodeName -> nodeId
+
+		for _, nodeInfo := range info.NodeInfos {
+			if programName != "" {
+				// 存进去数据库URL会拼上去项目名称，这里把它清除掉，不然对比会失效
+				nodeInfo.CodeRange.URL = strings.TrimPrefix(nodeInfo.CodeRange.URL, "/"+programName)
+				// 如果URL是空的，设置为根路径
+				if nodeInfo.CodeRange.URL == "" {
+					nodeInfo.CodeRange.URL = "/"
+				}
+			}
+			nodeInfoMap[nodeInfo.Hash()] = nodeInfo
+			log.Infof("Node: %s, Label: %s, Range: %s",
+				nodeInfo.NodeID, nodeInfo.IRCode, nodeInfo.CodeRange.JsonString())
+		}
+		// check excepted nodes
+		for name, expectNode := range exceptedNodes {
+			hash := expectNode.Hash()
+			nodeInfo, ok := nodeInfoMap[hash]
+			require.True(t, ok)
+			nodeNameMap[name] = nodeInfo.NodeID
+			require.True(t, ok)
+		}
+
+		// check excepted edges
+		paths := make([][]string, len(exceptedPaths))
+		for i, expectPath := range exceptedPaths {
+			path := make([]string, len(expectPath))
+			for j, nodeName := range expectPath {
+				nodeId, ok := nodeNameMap[nodeName]
+				require.True(t, ok, "node %s not found in nodeNameMap", nodeName)
+				path[j] = nodeId
+			}
+			paths[i] = path
+		}
+
+		graphPaths := info.GraphPaths
+		for i, path := range paths {
+			require.Equal(t, len(path), len(graphPaths[i]), "paths length not match")
+			for j, nodeId := range path {
+				require.Equal(t, graphPaths[i][j], nodeId, "paths node id not match")
+			}
+		}
+	}
+}
+
+func CheckSyntaxFlowGraphInfo(
+	t *testing.T,
+	code string,
+	sfRule string,
+	variableName string,
+	exceptedNodes map[string]GraphNodeInfo, // map nodeName -> nodeInfo
+	exceptedPaths [][]string,
+	opt ...ssaapi.Option,
+) {
+	Check(t, code, func(prog *ssaapi.Program) error {
+		result, err := prog.SyntaxFlowWithError(sfRule)
+		require.NoError(t, err)
+
+		values := result.GetValues(variableName)
+		checkSyntaxFlowGraphInfoCore(t, values, prog.GetProgramName(), variableName, exceptedNodes, exceptedPaths)
+		return nil
+	}, opt...)
+}
+
+func CheckSyntaxFlowGraphInfoWithFs(
+	t *testing.T,
+	fs fi.FileSystem,
+	sfRule string,
+	variableName string,
+	exceptedNodes map[string]GraphNodeInfo, // map nodeName -> nodeInfo
+	exceptedPaths [][]string,
+	opt ...ssaapi.Option,
+) {
+	CheckWithFS(fs, t, func(prog ssaapi.Programs) error {
+		result, err := prog.SyntaxFlowWithError(sfRule)
+		require.NoError(t, err)
+
+		values := result.GetValues(variableName)
+		progName := prog[0].GetProgramName()
+		checkSyntaxFlowGraphInfoCore(t, values, progName, variableName, exceptedNodes, exceptedPaths)
 		return nil
 	}, opt...)
 }

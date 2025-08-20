@@ -1,7 +1,6 @@
 package yakurl
 
 import (
-	"bytes"
 	"sort"
 	"strconv"
 	"strings"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -226,7 +224,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 	variable := query.variable
 	index := query.index
 	result := query.Result
-	programName := query.programName
+	//programName := query.programName
 	url := params.GetUrl()
 	// page start from 1
 	if params.Page <= 1 {
@@ -259,7 +257,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 			if v == nil || err != nil {
 				continue
 			}
-			codeRange, source := ssaapi.CoverCodeRange(programName, v.GetRange())
+			codeRange, source := ssaapi.CoverCodeRange(v.GetRange())
 			if query.haveRange && codeRange.URL == "" {
 				continue
 			}
@@ -293,8 +291,10 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 		}
 		value := vs[index]
 		msg, _ := result.GetAlertMsg(variable)
-		res := Value2Response(programName, value, msg, url)
-		resources = append(resources, res)
+		res := Value2Response(value, msg, url)
+		if res != nil {
+			resources = append(resources, res)
+		}
 	}
 
 	// result_id
@@ -408,46 +408,23 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 //	return ret, source
 //}
 
-type NodeInfo struct {
-	NodeID          string            `json:"node_id"`
-	IRCode          string            `json:"ir_code"`
-	SourceCode      string            `json:"source_code"`
-	SourceCodeStart int               `json:"source_code_start"`
-	CodeRange       *ssaapi.CodeRange `json:"code_range"`
-}
+// Legacy NodeInfo type for backward compatibility
+// Deprecated: Use ssaapi.NodeInfo instead
+type NodeInfo = ssaapi.NodeInfo
 
-func coverNodeInfos(graph *ssaapi.ValueGraph, programName string) []*NodeInfo {
-	res := make([]*NodeInfo, 0, len(graph.Node2Value))
-	for id, node := range graph.Node2Value {
-		codeRange, source := ssaapi.CoverCodeRange(programName, node.GetRange())
-		ret := &NodeInfo{
-			NodeID:     dot.NodeName(id),
-			IRCode:     node.String(),
-			SourceCode: source,
-			CodeRange:  codeRange,
-		}
-		res = append(res, ret)
-	}
-	return res
-}
-
-func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
+func Value2Response(value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
 	vg := ssaapi.NewValueGraph(value)
-	nodeID := vg.Value2Node[value]
-	nodeInfos := coverNodeInfos(vg, programName)
-	graphLines := vg.DeepFirstGraphPrev(value)
-
-	var buf bytes.Buffer
-	vg.GenerateDOT(&buf)
-	dotString := buf.String()
+	graphInfo, err := vg.GenerateValueGraphInfo(value)
+	if err != nil || graphInfo == nil {
+		return nil
+	}
 	res := createNewRes(url, 0, []extra{
-		{"node_id", dot.NodeName(nodeID)},
-		{"graph", dotString},
-		{"graph_info", nodeInfos},
+		{"node_id", graphInfo.NodeID},
+		{"graph", graphInfo.DotGraph},
+		{"graph_info", graphInfo.NodeInfos},
 		{"message", msg},
-		{"graph_line", graphLines},
+		{"graph_line", graphInfo.GraphPaths},
 	})
-
 	res.ResourceType = "information"
 	res.ResourceName = value.String()
 	return res

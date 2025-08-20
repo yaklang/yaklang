@@ -109,13 +109,14 @@ func generatePathDescription(risk *schema.SSARisk) string {
 }
 
 // coverNodeAndEdgeInfos converts graph nodes and edges to NodeInfo and EdgeInfo
+// TODO:这里应该和ssaapi的graph用一套
 func coverNodeAndEdgeInfos(graph *ssaapi.ValueGraph, programName string, risk *schema.SSARisk) ([]*NodeInfo, []*EdgeInfo) {
 	nodes := make([]*NodeInfo, 0, len(graph.Node2Value))
 	edges := make([]*EdgeInfo, 0)
 
 	nodeMap := make(map[int]*NodeInfo)
 	for id, node := range graph.Node2Value {
-		codeRange, source := ssaapi.CoverCodeRange(programName, node.GetRange())
+		codeRange, source := ssaapi.CoverCodeRange(node.GetRange())
 		nodeInfo := &NodeInfo{
 			NodeID:          dot.NodeName(id),
 			IRCode:          node.String(),

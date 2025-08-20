@@ -39,7 +39,7 @@ func (c *CodeRange) JsonString() string {
 
 const CodeContextLine = 3
 
-func CoverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) {
+func CoverCodeRange(r memedit.RangeIf) (*CodeRange, string) {
 	// url := ""
 	source := ""
 	ret := &CodeRange{
@@ -82,7 +82,7 @@ func buildSSARisk(
 	if progName == "" {
 		return nil
 	}
-	riskCodeRange, CodeFragment := CoverCodeRange(progName, value.GetRange())
+	riskCodeRange, CodeFragment := CoverCodeRange(value.GetRange())
 	rule := result.rule
 	newSSARisk := &schema.SSARisk{
 		CodeSourceUrl: utils.EscapeInvalidUTF8Byte([]byte(riskCodeRange.URL)),
