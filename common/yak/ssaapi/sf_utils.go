@@ -79,7 +79,7 @@ func _SFValueListToValues(count int, list *sfvm.ValueList) (Values, error) {
 		return nil, utils.Errorf("too many nested ValueList: %d", count)
 	}
 	var vals Values
-	list.ForEach(func(i any) {
+	list.Recursive(func(i sfvm.ValueOperator) error {
 		switch element := i.(type) {
 		case *Value:
 			vals = append(vals, element)
@@ -95,6 +95,7 @@ func _SFValueListToValues(count int, list *sfvm.ValueList) (Values, error) {
 		default:
 			log.Warnf("cannot handle type: %T", i)
 		}
+		return nil
 	})
 	return vals, nil
 }

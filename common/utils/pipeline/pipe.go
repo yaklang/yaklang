@@ -5,6 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
@@ -12,6 +13,7 @@ type Pipe[T, U any] struct {
 	ctx     context.Context
 	in      *chanx.UnlimitedChan[T]
 	out     *chanx.UnlimitedChan[U]
+	err     error
 	feedWG  sync.WaitGroup
 	wg      sync.WaitGroup
 	handler func(item T) (U, error)
@@ -110,6 +112,8 @@ func (p *Pipe[T, U]) process() {
 				defer p.wg.Done()
 				if result, err := p.handler(t); err == nil {
 					p.out.SafeFeed(result)
+				} else {
+					p.err = utils.JoinErrors(p.err, err)
 				}
 			}(item)
 		}
@@ -120,4 +124,8 @@ func (p *Pipe[T, U]) Close() {
 	p.in.Close()
 	p.wg.Wait() // wait for all processing goroutines to finish
 	p.out.Close()
+}
+
+func (p *Pipe[T, U]) Error() error {
+	return p.err
 }
