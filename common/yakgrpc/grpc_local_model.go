@@ -5,12 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
-	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/localmodel"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/consts"
@@ -29,24 +28,6 @@ type CustomLocalModel struct {
 	ModelType   string `json:"model_type"`
 	Description string `json:"description"`
 	Path        string `json:"path"`
-}
-
-// RunningModelInfo 运行中模型的信息
-type RunningModelInfo struct {
-	Cmd       *exec.Cmd
-	Host      string
-	Port      int32
-	ModelType string
-}
-
-// LocalModelManager 本地模型管理器
-type LocalModelManager struct {
-	mutex         sync.RWMutex
-	runningModels map[string]*RunningModelInfo
-}
-
-var localModelManager = &LocalModelManager{
-	runningModels: make(map[string]*RunningModelInfo),
 }
 
 // getCustomModelsFromDB 从数据库获取自定义模型列表
@@ -83,6 +64,7 @@ func getModelTypeByTags(tags ...string) string {
 	typeMap := map[string]string{
 		"embedding":      "embedding",
 		"aichat":         "aichat",
+		"chat":           "aichat",
 		"speech-to-text": "speech-to-text",
 	}
 
@@ -129,10 +111,13 @@ func getSupportedModels() []*ypb.LocalModelConfig {
 				binPath = ""
 			}
 		}
-
+		modelType := getModelTypeByTags(bin.Tags...)
+		if modelType == "" {
+			modelType = "aichat"
+		}
 		builtinModels = append(builtinModels, &ypb.LocalModelConfig{
 			Name:        bin.Name,
-			Type:        getModelTypeByTags(bin.Tags...),
+			Type:        modelType,
 			DownloadURL: downloadUrl.URL,
 			Description: bin.Description,
 			Path:        binPath,
@@ -156,8 +141,48 @@ func getSupportedModels() []*ypb.LocalModelConfig {
 
 // GetSupportedLocalModels 获取支持的本地模型列表
 func (s *Server) GetSupportedLocalModels(ctx context.Context, req *ypb.Empty) (*ypb.GetSupportedLocalModelsResponse, error) {
+	manager := localmodel.GetManager()
+	services := manager.ListServices()
+
+	statusesMap := map[string]*ypb.LocalModelStatus{}
+	for _, service := range services {
+		log.Infof("found local model service: %v, %v", service.Config.Model, service.Status)
+		statusesMap[service.Config.Model] = &ypb.LocalModelStatus{
+			Status:          service.Status.String(),
+			Host:            service.Config.Host,
+			Port:            service.Config.Port,
+			Model:           service.Config.Model,
+			ModelPath:       service.Config.ModelPath,
+			LlamaServerPath: service.Config.LlamaServerPath,
+			ContextSize:     int32(service.Config.ContextSize),
+			ContBatching:    service.Config.ContBatching,
+			BatchSize:       int32(service.Config.BatchSize),
+			Threads:         int32(service.Config.Threads),
+			Detached:        service.Config.Detached,
+			Debug:           service.Config.Debug,
+			Pooling:         service.Config.Pooling,
+			StartupTimeout:  int32(service.Config.StartupTimeout.Seconds()),
+			Args:            service.Config.Args,
+		}
+	}
+
+	allSupportModels := getSupportedModels()
+	allSupportModelsPB := []*ypb.LocalModelConfig{}
+	for _, model := range allSupportModels {
+		allSupportModelsPB = append(allSupportModelsPB, &ypb.LocalModelConfig{
+			Name:        model.Name,
+			Type:        model.Type,
+			DownloadURL: model.DownloadURL,
+			Description: model.Description,
+			IsLocal:     model.IsLocal,
+			IsReady:     model.IsReady,
+			Path:        model.Path,
+			DefaultPort: model.DefaultPort,
+			Status:      statusesMap[model.Name],
+		})
+	}
 	return &ypb.GetSupportedLocalModelsResponse{
-		Models: getSupportedModels(),
+		Models: allSupportModelsPB,
 	}, nil
 }
 
@@ -274,12 +299,13 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 	}
 
 	// 检查模型是否已在运行
-	localModelManager.mutex.RLock()
-	if cmd, exists := localModelManager.runningModels[modelName]; exists && cmd.Cmd.ProcessState == nil {
-		localModelManager.mutex.RUnlock()
-		return utils.Errorf("模型 %s 已在运行中", modelName)
+	manager := localmodel.GetManager()
+	service, err := manager.GetServiceStatus(modelName)
+	if err == nil && service != nil {
+		if service.Status == localmodel.StatusRunning {
+			return utils.Errorf("模型 %s 已在运行中", modelName)
+		}
 	}
-	localModelManager.mutex.RUnlock()
 
 	// 检查模型是否就绪
 	readyResp, err := s.IsLocalModelReady(stream.Context(), &ypb.IsLocalModelReadyRequest{ModelName: modelName})
@@ -305,124 +331,88 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 		return utils.Errorf("不支持的模型: %s", modelName)
 	}
 
-	// 构建启动命令
+	// 获取依赖路径信息
 	llamaServerPath := consts.GetLlamaServerPath()
-	modelPath := consts.GetAIModelFilePath(targetModel.FileName)
-	if modelPath == "" {
-		return utils.Errorf("模型文件不存在: %s", targetModel.FileName)
+	modelPath := targetModel.Path
+
+	// 构建启动命令
+	opts := []localmodel.Option{
+		localmodel.WithModelPath(modelPath),
+		localmodel.WithEmbeddingModel(modelName),
+		localmodel.WithLlamaServerPath(llamaServerPath),
+		localmodel.WithDetached(true),
+		localmodel.WithDebug(true),
+		localmodel.WithStartupTimeout(10 * time.Second),
 	}
 
-	host := req.GetHost()
-	if host == "" {
-		host = "127.0.0.1"
+	if req.GetHost() != "" {
+		opts = append(opts, localmodel.WithHost(req.GetHost()))
 	}
-
-	port := req.GetPort()
-	if port == 0 {
-		port = targetModel.DefaultPort
+	if req.GetPort() != 0 {
+		opts = append(opts, localmodel.WithPort(req.GetPort()))
 	}
-
-	args := []string{
-		"-m", modelPath,
-		"--host", host,
-		"--port", fmt.Sprintf("%d", port),
-		"--verbose-prompt",
+	if req.GetContextSize() != 0 {
+		opts = append(opts, localmodel.WithContextSize(int(req.GetContextSize())))
 	}
-
-	if targetModel.Type == "embedding" {
-		args = append(args, "--embedding")
+	if req.GetBatchSize() != 0 {
+		opts = append(opts, localmodel.WithBatchSize(int(req.GetBatchSize())))
+	}
+	if req.GetThreads() != 0 {
+		opts = append(opts, localmodel.WithThreads(int(req.GetThreads())))
+	}
+	if req.GetDebug() {
+		opts = append(opts, localmodel.WithDebug(true))
+	}
+	if req.GetPooling() != "" {
+		opts = append(opts, localmodel.WithPooling(req.GetPooling()))
+	}
+	if req.GetStartupTimeoutMs() != 0 {
+		opts = append(opts, localmodel.WithStartupTimeout(time.Duration(req.GetStartupTimeoutMs())*time.Millisecond))
+	}
+	if len(req.GetArgs()) > 0 {
+		opts = append(opts, localmodel.WithArgs(req.GetArgs()...))
 	}
 
 	stream.Send(&ypb.ExecResult{
 		IsMessage: true,
-		Message:   []byte(fmt.Sprintf("启动模型: %s，端口: %d", modelName, port)),
+		Message:   []byte(fmt.Sprintf("启动模型: %s，端口: %d", modelName, req.GetPort())),
 	})
 
-	cmd := exec.CommandContext(stream.Context(), llamaServerPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	log.Infof("启动命令: %s", cmd.String())
-	err = cmd.Start()
+	err = manager.StartEmbeddingService(
+		fmt.Sprintf("%s:%d", req.GetHost(), req.GetPort()),
+		opts...,
+	)
 	if err != nil {
 		return utils.Errorf("启动模型失败: %v", err)
 	}
 
-	// 保存运行中的模型
-	localModelManager.mutex.Lock()
-	localModelManager.runningModels[modelName] = &RunningModelInfo{
-		Cmd:       cmd,
-		Host:      host,
-		Port:      port,
-		ModelType: targetModel.Type,
-	}
-	localModelManager.mutex.Unlock()
-
 	stream.Send(&ypb.ExecResult{
 		IsMessage: true,
-		Message:   []byte(fmt.Sprintf("模型 %s 启动成功，PID: %d", modelName, cmd.Process.Pid)),
+		Message:   []byte(fmt.Sprintf("模型 %s 启动成功", modelName)),
 	})
 
-	// 等待一段时间以确保服务启动
-	time.Sleep(3 * time.Second)
+	return nil
+}
 
-	// 监听上下文取消和进程结束
-	ctx := stream.Context()
-	done := make(chan error, 1)
-
-	// 在单独的goroutine中等待进程结束
-	go func() {
-		done <- cmd.Wait()
-	}()
-
-	select {
-	case <-ctx.Done():
-		// 用户取消了操作，结束进程
-		log.Infof("检测到上下文取消，停止模型 %s，PID: %d", modelName, cmd.Process.Pid)
-		if cmd.Process != nil {
-			err := cmd.Process.Kill()
-			if err != nil {
-				log.Warnf("强制停止模型进程失败: %v", err)
-			}
-		}
-
-		// 等待进程完全结束
-		<-done
-
-		// 清理运行中的模型记录
-		localModelManager.mutex.Lock()
-		delete(localModelManager.runningModels, modelName)
-		localModelManager.mutex.Unlock()
-
-		stream.Send(&ypb.ExecResult{
-			IsMessage: true,
-			Message:   []byte(fmt.Sprintf("模型 %s 已被用户取消并停止", modelName)),
-		})
-
-		return ctx.Err()
-
-	case err := <-done:
-		// 进程正常结束
-		localModelManager.mutex.Lock()
-		delete(localModelManager.runningModels, modelName)
-		localModelManager.mutex.Unlock()
-
-		if err != nil {
-			log.Errorf("模型 %s 进程异常结束: %v", modelName, err)
-			stream.Send(&ypb.ExecResult{
-				IsMessage: true,
-				Message:   []byte(fmt.Sprintf("模型 %s 进程异常结束: %v", modelName, err)),
-			})
-			return utils.Errorf("模型进程异常结束: %v", err)
-		} else {
-			log.Infof("模型 %s 进程正常结束", modelName)
-			stream.Send(&ypb.ExecResult{
-				IsMessage: true,
-				Message:   []byte(fmt.Sprintf("模型 %s 进程已结束", modelName)),
-			})
-			return nil
+func (s *Server) StopLocalModel(ctx context.Context, req *ypb.StopLocalModelRequest) (*ypb.GeneralResponse, error) {
+	manager := localmodel.GetManager()
+	services := manager.ListServices()
+	var service *localmodel.Service
+	for _, s := range services {
+		if s.Config.Model == req.GetModelName() {
+			service = s
+			break
 		}
 	}
+	if service == nil {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("未找到模型服务: %s", req.GetModelName())
+	}
+	err := manager.StopService(service.Name)
+	return &ypb.GeneralResponse{
+		Ok: err == nil,
+	}, err
 }
 
 type BuildInVectorDBLink struct {
@@ -568,10 +558,18 @@ func (s *Server) AddLocalModel(ctx context.Context, req *ypb.AddLocalModelReques
 		}
 	}
 
+	modelType := req.GetModelType()
+	modelType = getModelTypeByTags(modelType)
+	if modelType == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("不支持的模型类型: %s", req.GetModelType())
+	}
+
 	// 创建新模型
 	newModel := CustomLocalModel{
 		Name:        req.GetName(),
-		ModelType:   req.GetModelType(),
+		ModelType:   modelType,
 		Description: req.GetDescription(),
 		Path:        req.GetPath(),
 	}
@@ -763,26 +761,17 @@ func (s *Server) UpdateLocalModel(ctx context.Context, req *ypb.UpdateLocalModel
 }
 
 func (s *Server) GetAllStartedLocalModels(ctx context.Context, req *ypb.Empty) (*ypb.GetAllStartedLocalModelsResponse, error) {
-	localModelManager.mutex.RLock()
-	defer localModelManager.mutex.RUnlock()
-
-	var models []*ypb.StartedLocalModelInfo
-
-	// 遍历所有运行中的模型
-	for modelName, cmdInfo := range localModelManager.runningModels {
-		// 检查进程是否还在运行
-		if cmdInfo.Cmd.ProcessState == nil || !cmdInfo.Cmd.ProcessState.Exited() {
-			// 检查模型类型是否为aichat
-			if cmdInfo.ModelType == "aichat" {
-				// 创建StartedLocalModelInfo结构体
-				modelInfo := &ypb.StartedLocalModelInfo{
-					Name:      modelName,
-					ModelType: cmdInfo.ModelType,
-					Host:      cmdInfo.Host, // 从RunningModelInfo获取主机
-					Port:      cmdInfo.Port, // 从RunningModelInfo获取端口
-				}
-				models = append(models, modelInfo)
-			}
+	localModelManager := localmodel.GetManager()
+	services := localModelManager.ListServices()
+	models := []*ypb.StartedLocalModelInfo{}
+	for _, service := range services {
+		if service.Status == localmodel.StatusRunning {
+			models = append(models, &ypb.StartedLocalModelInfo{
+				Name:      service.Config.Model,
+				ModelType: "embedding",
+				Host:      service.Config.Host,
+				Port:      service.Config.Port,
+			})
 		}
 	}
 

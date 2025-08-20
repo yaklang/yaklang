@@ -2,6 +2,8 @@ package localmodel
 
 import (
 	"fmt"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -20,35 +22,37 @@ type ModelConfig struct {
 
 // ServiceConfig 服务配置
 type ServiceConfig struct {
-	Host           string        `json:"host"`
-	Port           int32         `json:"port"`
-	Model          string        `json:"model"`
-	ModelPath      string        `json:"modelPath"`
-	ContextSize    int           `json:"contextSize"`
-	ContBatching   bool          `json:"contBatching"` // 连续批处理
-	BatchSize      int           `json:"batchSize"`    // 批处理大小
-	Threads        int           `json:"threads"`      // 线程数
-	Detached       bool          `json:"detached"`
-	Debug          bool          `json:"debug"`
-	Pooling        string        `json:"pooling"` // 池化方式
-	StartupTimeout time.Duration `json:"startupTimeout"`
-	Args           []string      `json:"args"`
+	Host            string        `json:"host"`
+	Port            int32         `json:"port"`
+	Model           string        `json:"model"`
+	ModelPath       string        `json:"modelPath"`
+	LlamaServerPath string        `json:"llamaServerPath"`
+	ContextSize     int           `json:"contextSize"`
+	ContBatching    bool          `json:"contBatching"` // 连续批处理
+	BatchSize       int           `json:"batchSize"`    // 批处理大小
+	Threads         int           `json:"threads"`      // 线程数
+	Detached        bool          `json:"detached"`
+	Debug           bool          `json:"debug"`
+	Pooling         string        `json:"pooling"` // 池化方式
+	StartupTimeout  time.Duration `json:"startupTimeout"`
+	Args            []string      `json:"args"`
 }
 
 // DefaultServiceConfig 返回默认服务配置
 func DefaultServiceConfig() *ServiceConfig {
 	return &ServiceConfig{
-		Host:           "127.0.0.1",
-		Port:           8080,
-		ContextSize:    4096,
-		ContBatching:   true, // 默认开启连续批处理
-		BatchSize:      1024, // 默认批处理大小
-		Threads:        8,    // 默认线程数
-		Detached:       false,
-		Debug:          false,
-		Pooling:        "last",
-		StartupTimeout: 30 * time.Second,
-		Args:           []string{},
+		Host:            "127.0.0.1",
+		Port:            8080,
+		ContextSize:     4096,
+		ContBatching:    true, // 默认开启连续批处理
+		BatchSize:       1024, // 默认批处理大小
+		Threads:         8,    // 默认线程数
+		Detached:        false,
+		Debug:           false,
+		Pooling:         "last",
+		StartupTimeout:  30 * time.Second,
+		LlamaServerPath: consts.GetLlamaServerPath(),
+		Args:            []string{},
 	}
 }
 
@@ -116,4 +120,14 @@ func GetLlamaServerPath() (string, error) {
 		return "", fmt.Errorf("llama-server not installed")
 	}
 	return llamaServerPath, nil
+}
+
+// GetDefaultYakBinaryPath 获取默认的 yak 二进制文件路径
+func GetDefaultYakBinaryPath() string {
+	engineDir := consts.GetDefaultYakitEngineDir()
+	binaryName := "yak"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+	return filepath.Join(engineDir, binaryName)
 }

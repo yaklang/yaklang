@@ -43,6 +43,15 @@ func WithModelPath(path string) Option {
 	}
 }
 
+// WithLlamaServerPath 设置 llama-server 路径
+func WithLlamaServerPath(path string) Option {
+	return func(c *ServiceConfig) {
+		if path != "" {
+			c.LlamaServerPath = path
+		}
+	}
+}
+
 // WithContextSize 设置上下文大小
 func WithContextSize(size int) Option {
 	return func(c *ServiceConfig) {
@@ -104,5 +113,12 @@ func WithStartupTimeout(timeout time.Duration) Option {
 func WithArgs(args ...string) Option {
 	return func(c *ServiceConfig) {
 		c.Args = append(c.Args, args...)
+	}
+}
+
+// WithPooling 设置池化方式
+func WithPooling(pooling string) Option {
+	return func(c *ServiceConfig) {
+		c.Pooling = pooling
 	}
 }

@@ -512,12 +512,14 @@ const (
 	Yak_GetAIToolList_FullMethodName                              = "/ypb.Yak/GetAIToolList"
 	Yak_DeleteAITool_FullMethodName                               = "/ypb.Yak/DeleteAITool"
 	Yak_SaveAITool_FullMethodName                                 = "/ypb.Yak/SaveAITool"
+	Yak_UpdateAITool_FullMethodName                               = "/ypb.Yak/UpdateAITool"
 	Yak_ToggleAIToolFavorite_FullMethodName                       = "/ypb.Yak/ToggleAIToolFavorite"
 	Yak_AIToolGenerateMetadata_FullMethodName                     = "/ypb.Yak/AIToolGenerateMetadata"
 	Yak_IsLlamaServerReady_FullMethodName                         = "/ypb.Yak/IsLlamaServerReady"
 	Yak_IsLocalModelReady_FullMethodName                          = "/ypb.Yak/IsLocalModelReady"
 	Yak_InstallLlamaServer_FullMethodName                         = "/ypb.Yak/InstallLlamaServer"
 	Yak_StartLocalModel_FullMethodName                            = "/ypb.Yak/StartLocalModel"
+	Yak_StopLocalModel_FullMethodName                             = "/ypb.Yak/StopLocalModel"
 	Yak_DownloadLocalModel_FullMethodName                         = "/ypb.Yak/DownloadLocalModel"
 	Yak_GetSupportedLocalModels_FullMethodName                    = "/ypb.Yak/GetSupportedLocalModels"
 	Yak_AddLocalModel_FullMethodName                              = "/ypb.Yak/AddLocalModel"
@@ -1181,6 +1183,7 @@ type YakClient interface {
 	GetAIToolList(ctx context.Context, in *GetAIToolListRequest, opts ...grpc.CallOption) (*GetAIToolListResponse, error)
 	DeleteAITool(ctx context.Context, in *DeleteAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	UpdateAITool(ctx context.Context, in *UpdateAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(ctx context.Context, in *AIToolGenerateMetadataRequest, opts ...grpc.CallOption) (*AIToolGenerateMetadataResponse, error)
 	// Local Model Management
@@ -1188,6 +1191,7 @@ type YakClient interface {
 	IsLocalModelReady(ctx context.Context, in *IsLocalModelReadyRequest, opts ...grpc.CallOption) (*IsLocalModelReadyResponse, error)
 	InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	StopLocalModel(ctx context.Context, in *StopLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	GetSupportedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSupportedLocalModelsResponse, error)
 	AddLocalModel(ctx context.Context, in *AddLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
@@ -6887,6 +6891,16 @@ func (c *yakClient) SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts 
 	return out, nil
 }
 
+func (c *yakClient) UpdateAITool(ctx context.Context, in *UpdateAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateAITool_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ToggleAIToolFavoriteResponse)
@@ -6964,6 +6978,16 @@ func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequ
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartLocalModelClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) StopLocalModel(ctx context.Context, in *StopLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_StopLocalModel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -7908,6 +7932,7 @@ type YakServer interface {
 	GetAIToolList(context.Context, *GetAIToolListRequest) (*GetAIToolListResponse, error)
 	DeleteAITool(context.Context, *DeleteAIToolRequest) (*DbOperateMessage, error)
 	SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error)
+	UpdateAITool(context.Context, *UpdateAIToolRequest) (*DbOperateMessage, error)
 	ToggleAIToolFavorite(context.Context, *ToggleAIToolFavoriteRequest) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(context.Context, *AIToolGenerateMetadataRequest) (*AIToolGenerateMetadataResponse, error)
 	// Local Model Management
@@ -7915,6 +7940,7 @@ type YakServer interface {
 	IsLocalModelReady(context.Context, *IsLocalModelReadyRequest) (*IsLocalModelReadyResponse, error)
 	InstallLlamaServer(*InstallLlamaServerRequest, grpc.ServerStreamingServer[ExecResult]) error
 	StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
+	StopLocalModel(context.Context, *StopLocalModelRequest) (*GeneralResponse, error)
 	DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
 	GetSupportedLocalModels(context.Context, *Empty) (*GetSupportedLocalModelsResponse, error)
 	AddLocalModel(context.Context, *AddLocalModelRequest) (*GeneralResponse, error)
@@ -9434,6 +9460,9 @@ func (UnimplementedYakServer) DeleteAITool(context.Context, *DeleteAIToolRequest
 func (UnimplementedYakServer) SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveAITool not implemented")
 }
+func (UnimplementedYakServer) UpdateAITool(context.Context, *UpdateAIToolRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAITool not implemented")
+}
 func (UnimplementedYakServer) ToggleAIToolFavorite(context.Context, *ToggleAIToolFavoriteRequest) (*ToggleAIToolFavoriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ToggleAIToolFavorite not implemented")
 }
@@ -9451,6 +9480,9 @@ func (UnimplementedYakServer) InstallLlamaServer(*InstallLlamaServerRequest, grp
 }
 func (UnimplementedYakServer) StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
 	return status.Errorf(codes.Unimplemented, "method StartLocalModel not implemented")
+}
+func (UnimplementedYakServer) StopLocalModel(context.Context, *StopLocalModelRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopLocalModel not implemented")
 }
 func (UnimplementedYakServer) DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadLocalModel not implemented")
@@ -17731,6 +17763,24 @@ func _Yak_SaveAITool_Handler(srv interface{}, ctx context.Context, dec func(inte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_UpdateAITool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAIToolRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAITool(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAITool_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAITool(ctx, req.(*UpdateAIToolRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_ToggleAIToolFavorite_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ToggleAIToolFavoriteRequest)
 	if err := dec(in); err != nil {
@@ -17824,6 +17874,24 @@ func _Yak_StartLocalModel_Handler(srv interface{}, stream grpc.ServerStream) err
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartLocalModelServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_StopLocalModel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopLocalModelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).StopLocalModel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_StopLocalModel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).StopLocalModel(ctx, req.(*StopLocalModelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _Yak_DownloadLocalModel_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(DownloadLocalModelRequest)
@@ -19888,6 +19956,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_SaveAITool_Handler,
 		},
 		{
+			MethodName: "UpdateAITool",
+			Handler:    _Yak_UpdateAITool_Handler,
+		},
+		{
 			MethodName: "ToggleAIToolFavorite",
 			Handler:    _Yak_ToggleAIToolFavorite_Handler,
 		},
@@ -19902,6 +19974,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "IsLocalModelReady",
 			Handler:    _Yak_IsLocalModelReady_Handler,
+		},
+		{
+			MethodName: "StopLocalModel",
+			Handler:    _Yak_StopLocalModel_Handler,
 		},
 		{
 			MethodName: "GetSupportedLocalModels",

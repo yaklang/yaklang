@@ -16,6 +16,14 @@ func SaveAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	return db.RowsAffected, nil
 }
 
+func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
+	db = db.Model(&schema.AIYakTool{})
+	if db := db.Where("id = ?", tool.ID).Assign(tool).Save(&schema.AIYakTool{}); db.Error != nil {
+		return 0, utils.Errorf("update AIYakTool failed: %s", db.Error)
+	}
+	return db.RowsAffected, nil
+}
+
 func GetAIYakTool(db *gorm.DB, name string) (*schema.AIYakTool, error) {
 	db = db.Model(&schema.AIYakTool{})
 	var tool schema.AIYakTool
@@ -49,6 +57,14 @@ func SearchAIYakTool(db *gorm.DB, keywords string) ([]*schema.AIYakTool, error) 
 func DeleteAIYakTools(db *gorm.DB, names ...string) (int64, error) {
 	db = db.Model(&schema.AIYakTool{})
 	if db := db.Where("name IN (?)", names).Delete(&schema.AIYakTool{}); db.Error != nil {
+		return 0, utils.Errorf("delete AIYakTool failed: %s", db.Error)
+	}
+	return db.RowsAffected, nil
+}
+
+func DeleteAIYakToolByID(db *gorm.DB, ids ...uint) (int64, error) {
+	db = db.Model(&schema.AIYakTool{})
+	if db := db.Where("id IN (?)", ids).Delete(&schema.AIYakTool{}); db.Error != nil {
 		return 0, utils.Errorf("delete AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil
