@@ -241,6 +241,22 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 
 func sendFrame(filename, dir string, ch chan<- *FfmpegStreamResult) {
 	filePath := filepath.Join(dir, filename)
+
+	compressedFile := filepath.Join(dir, "compressed_"+filename)
+	err := CompressImage(filePath, compressedFile)
+	if err == nil {
+		var originalSize int64
+		var nowSize int64
+		if s, err := os.Stat(filePath); err == nil {
+			originalSize = s.Size()
+		}
+		if s, err := os.Stat(compressedFile); err == nil {
+			nowSize = s.Size()
+		}
+		log.Infof("compressed frame %s, from: %v -> %v", filename, originalSize, nowSize)
+		filePath = compressedFile
+	}
+
 	data, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		ch <- &FfmpegStreamResult{Error: fmt.Errorf("failed to read frame file %s: %w", filename, err)}
