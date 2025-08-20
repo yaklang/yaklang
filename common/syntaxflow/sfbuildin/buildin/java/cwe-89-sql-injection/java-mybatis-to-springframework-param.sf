@@ -99,10 +99,12 @@ REFERENCE
 <mybatisSink> as $sink
 
 alert $sink for {
-    title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
-    title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
-    level: "low",
-    solution:"检测到Java MyBatis/iBatis XML Mapper 不安全(${...})参数，请检测是否安全的使用"
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	level: "low",
+	solution: <<<SOLUTION
+检测到Java MyBatis/iBatis XML Mapper 不安全(${...})参数，请检测是否安全的使用
+SOLUTION
 }
 
 $sink#{
@@ -609,5 +611,4 @@ TEXT
     </delete>
 </mapper>
 TEXT
-
 )
