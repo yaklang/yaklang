@@ -59,16 +59,16 @@ binaries:
     install_type: "bin"
     download_info_map:
       "darwin-amd64":
-        url: "/page2img/2025-07-21/page2img-darwin-amd64"
+        url: "/page2img/2025-08-20/page2img-darwin-amd64"
         bin_path: "page2img"
       "darwin-arm64":
-        url: "/page2img/2025-07-21/page2img-darwin-arm64"
+        url: "/page2img/2025-08-20/page2img-darwin-arm64"
         bin_path: "page2img"
       "windows-amd64":
-        url: "http://oss-qn.yaklang.com/page2img/2025-07-21/page2img-windows-amd64.exe"
+        url: "/page2img/2025-08-20/page2img-windows-amd64.exe"
         bin_path: "page2img.exe"
       "linux-amd64":
-        url: "http://oss-qn.yaklang.com/page2img/2025-07-21/page2img-linux-amd64"
+        url: "/page2img/2025-08-20/page2img-linux-amd64"
         bin_path: "page2img"
   - name: "pandoc"
     description: "pandoc - A tool for file covert"
