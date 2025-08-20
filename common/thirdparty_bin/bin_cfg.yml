@@ -34,22 +34,22 @@ binaries:
     install_type: "archive"
     download_info_map:
       darwin-amd64:
-        url: "/llama.cpp/llama-b5702-bin-macos-x64.zip"
+        url: "/llama.cpp/llama-b6209-bin-macos-x64.zip"
         pick: "build/bin/*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
       darwin-arm64:
-        url: "/llama.cpp/llama-b5712-bin-macos-arm64.zip"
+        url: "/llama.cpp/llama-b6209-bin-macos-arm64.zip"
         pick: "build/bin/*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
       windows-amd64:
-        url: "/llama.cpp/llama-b5702-bin-win-cpu-x64.zip"
+        url: "/llama.cpp/llama-b6209-bin-win-cpu-x64.zip"
         pick: "*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server.exe"
       linux-amd64:
-        url: "/llama.cpp/llama-b5702-bin-ubuntu-x64.zip"
+        url: "/llama.cpp/llama-b6209-bin-ubuntu-x64.zip"
         pick: "*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
