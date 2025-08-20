@@ -88,5 +88,45 @@ func CompressImage(inputFile, outputFile string, opts ...Option) error {
 		}
 	}
 
-	return fmt.Errorf("failed to compress image under target size %d after %d iterations", o.targetImageSize, maxCompressIterations)
+	// 最后尝试使用 scale 滤镜进行压缩
+	log.Infof("quality-based compression failed, trying scale filter as fallback")
+
+	args := []string{
+		"-i", inputFile,
+		"-nostdin",
+		"-y",
+		"-vf", "scale=1080:1080:force_original_aspect_ratio=decrease",
+		"-q:v", strconv.Itoa(jpegMaxQuality), // Use maximum quality setting for scale compression
+		outputFile,
+	}
+
+	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
+	if o.debug {
+		cmd.Stderr = log.NewLogWriter(log.DebugLevel)
+		log.Infof("executing fallback image compression with scale filter: %s", cmd.String())
+	}
+
+	lastErr = cmd.Run()
+	if lastErr != nil {
+		return fmt.Errorf("fallback ffmpeg execution with scale filter failed: %w", lastErr)
+	}
+
+	// Check final file size
+	info, err := os.Stat(outputFile)
+	if err != nil {
+		return fmt.Errorf("could not stat final output image file: %w", err)
+	}
+
+	fileSize := info.Size()
+	if o.debug {
+		log.Debugf("fallback compression result: size=%d bytes, target=%d bytes", fileSize, o.targetImageSize)
+	}
+
+	if fileSize <= o.targetImageSize {
+		log.Infof("image compressed successfully with scale filter to %d bytes (under %d)", fileSize, o.targetImageSize)
+		return nil
+	}
+
+	log.Warnf("even with scale filter, image size %d bytes still exceeds target %d bytes", fileSize, o.targetImageSize)
+	return fmt.Errorf("failed to compress image under target size %d even with scale filter fallback", o.targetImageSize)
 }

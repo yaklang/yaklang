@@ -3,12 +3,13 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"os"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -694,10 +695,14 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 		return nil, fmt.Errorf("failed to analyze media image: %w", err)
 	}
 
-	err = ar.Run()
-	if err != nil {
-		return nil, fmt.Errorf("failed to run analyze media image: %w", err)
-	}
+	go func() {
+		defer resultChan.Close()
 
-	return resultChan.OutputChannel(), fmt.Errorf("no images found in media file: %s", mediaPath)
+		err := ar.Run()
+		if err != nil {
+			log.Errorf("failed to run analyze media image: %v", err)
+		}
+	}()
+
+	return resultChan.OutputChannel(), nil
 }
