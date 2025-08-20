@@ -161,19 +161,27 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.Kind = m.kind
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
-	if riskCountMap := m.GetRiskCountMap(); riskCountMap != nil {
-		for key, count := range riskCountMap.GetAll() {
-			switch schema.ValidSeverityType(key) {
-			case schema.SFR_SEVERITY_INFO:
-				m.taskRecorder.InfoCount = count
-			case schema.SFR_SEVERITY_WARNING:
-				m.taskRecorder.WarningCount = count
-			case schema.SFR_SEVERITY_CRITICAL:
-				m.taskRecorder.CriticalCount = count
-			case schema.SFR_SEVERITY_HIGH:
-				m.taskRecorder.HighCount = count
-			case schema.SFR_SEVERITY_LOW:
-				m.taskRecorder.LowCount = count
+
+	if m.status == schema.SYNTAXFLOWSCAN_DONE {
+		levelCounts, err := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{m.TaskId()},
+		})
+		if err != nil {
+			return err
+		}
+
+		for _, c := range levelCounts {
+			switch c.Severity {
+			case string(schema.SFR_SEVERITY_INFO):
+				m.taskRecorder.InfoCount = c.Count
+			case string(schema.SFR_SEVERITY_WARNING):
+				m.taskRecorder.WarningCount = c.Count
+			case string(schema.SFR_SEVERITY_CRITICAL):
+				m.taskRecorder.CriticalCount = c.Count
+			case string(schema.SFR_SEVERITY_HIGH):
+				m.taskRecorder.HighCount = c.Count
+			case string(schema.SFR_SEVERITY_LOW):
+				m.taskRecorder.LowCount = c.Count
 			}
 		}
 	}
