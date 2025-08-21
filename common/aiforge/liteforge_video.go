@@ -63,13 +63,13 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 			}
 			count := 0
 			for fResult := range ffmpegResult {
-				analyzeConfig.AnalyzeStatusCard("extract frames", totalCount)
 				ffmpegChan.SafeFeed(&InterimData{
 					AudioResults: audioRes,
 					ImageData:    fResult,
 				})
 				count++
 				totalCount++
+				analyzeConfig.AnalyzeStatusCard("[analyze video]:extract frames", totalCount)
 			}
 			analyzeConfig.AnalyzeLog("Extracted %d video frames for segment: %s", count, segment.String())
 		}
@@ -83,11 +83,11 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 				return
 			}
 			for fResult := range ffmpegResult {
-				analyzeConfig.AnalyzeStatusCard("extract frames", totalCount)
 				ffmpegChan.SafeFeed(&InterimData{
 					ImageData: fResult,
 				})
 				totalCount++
+				analyzeConfig.AnalyzeStatusCard("[analyze video]:extract frames", totalCount)
 			}
 		}
 	}()
@@ -106,7 +106,7 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 
 		analyzeConfig.AnalyzeLog("Finish to analyze video frame %d, current CumulativeSummary is [%s] ", frameCount, utils.ShrinkString(cumulativeSummary, 100))
 		frameCount++
-		analyzeConfig.AnalyzeStatusCard("processed frames", frameCount)
+		analyzeConfig.AnalyzeStatusCard("[analyze video]:analysed frames", frameCount)
 		return imageResult, nil
 	},
 		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency), utils.WithParallelProcessFinishCallback(func() {

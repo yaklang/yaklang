@@ -56,8 +56,6 @@ func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowle
 		startOnce.Do(func() {
 			refineConfig.AnalyzeStatusCard("Refine", "refining chunks")
 		})
-		count++
-		refineConfig.AnalyzeStatusCard("refine chunk count", count)
 
 		knowledgeRawData := v.Dump()
 		query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` ", refinePrompt, knowledgeRawData)
@@ -66,6 +64,8 @@ func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowle
 		if err != nil {
 			return nil, utils.Errorf("failed to convert knowledge base to knowledge: %v", err)
 		}
+		count++
+		refineConfig.AnalyzeStatusCard("refine chunk count", count)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

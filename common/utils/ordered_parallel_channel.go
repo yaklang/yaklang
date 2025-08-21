@@ -75,9 +75,9 @@ func OrderedParallelProcess[I any, O any](
 		for data := range inputCh {
 			startOnce.Do(config.StartCallback)
 			swg.Add(1)
+			currentIndex := index
 			go func() {
 				defer swg.Done()
-				currentIndex := index
 				output, err := processFunc(data)
 				// 将处理结果（包含原始索引）发送到 resultsCh
 				resultsCh.SafeFeed(Result[O]{
@@ -113,6 +113,10 @@ func OrderedParallelProcess[I any, O any](
 				delete(buffer, nextIndex)
 				nextIndex++
 			}
+		}
+
+		if len(buffer) > 0 {
+			log.Errorf("Some results were not processed in order, remaining items: %v", buffer)
 		}
 	}()
 	return finalOutputCh.OutputChannel()
