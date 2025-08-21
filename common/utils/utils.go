@@ -112,6 +112,18 @@ func GetContextKeyString(ctx context.Context, key string) string {
 	return ""
 }
 
+func GetContextKeyBool(ctx context.Context, key string) bool {
+	if ctx == nil {
+		return false
+	}
+	if v := ctx.Value(key); v != nil {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
 func SetContextKey(ctx context.Context, key string, value any) context.Context {
 	if ctx == nil {
 		ctx = context.Background()
