@@ -5,8 +5,7 @@
       "@action",
       "next_action",
       "human_readable_thought",
-      "cumulative_summary",
-      "is_final_step"
+      "cumulative_summary"
     ],
     "properties": {
       "@action": {
@@ -34,7 +33,8 @@
             "enum": [
               "directly_answer",
               "request_plan_and_execution",
-              "require_tool"
+              "require_tool",
+              "ask_for_clarification"
             ],
             "type": "string"
           }
@@ -48,10 +48,6 @@
       "human_readable_thought": {
         "description": "Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. Examples: 'Okay, I understand. Searching for the requested information now...', 'I need to use a tool to get the current stock price.', 'This is a complex request, I will try to execute tool step by step.'",
         "type": "string"
-      },
-      "is_final_step": {
-        "description": "Set this to 'true' ONLY when the user's overall request has been fully satisfied and no more actions are needed. Otherwise, set it to 'false' to continue the process.",
-        "type": "boolean"
       }
     },
     "additionalProperties": true

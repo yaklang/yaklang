@@ -12,6 +12,7 @@ const (
 	ActionDirectlyAnswer       ActionType = "directly_answer"
 	ActionRequireTool          ActionType = "require_tool"
 	ActionRequestPlanExecution ActionType = "request_plan_and_execution"
+	ActionAskForClarification  ActionType = "ask_for_clarification"
 )
 
 // ReAct actions available
@@ -41,11 +42,13 @@ func (r *ReAct) parseReActAction(response string) (*aicommon.Action, error) {
 		string(ActionDirectlyAnswer),
 		string(ActionRequireTool),
 		string(ActionRequestPlanExecution),
+		string(ActionAskForClarification),
 	}, actionType) {
 		return nil, utils.Errorf("invalid action type '%s', must be one of: %v", actionType, []any{
 			ActionDirectlyAnswer,
 			ActionRequireTool,
 			ActionRequestPlanExecution,
+			ActionAskForClarification,
 		})
 	}
 	return action, nil

@@ -181,17 +181,6 @@ func WithEventInputChan(ch chan *ypb.AIInputEvent) Option {
 	}
 }
 
-// WithTools adds tools to the tool manager
-func WithTools(tools ...*aitool.Tool) Option {
-	return func(cfg *ReActConfig) {
-		if cfg.aiToolManagerOption == nil {
-			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
-		}
-		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
-			buildinaitools.WithExtendTools(tools, true))
-	}
-}
-
 // WithToolManager sets a custom tool manager
 func WithToolManager(manager *buildinaitools.AiToolManager) Option {
 	return func(cfg *ReActConfig) {
@@ -254,6 +243,16 @@ func WithTopToolsCount(count int) Option {
 func WithToolReview(enabled bool) Option {
 	return func(cfg *ReActConfig) {
 		cfg.enableToolReview = enabled
+	}
+}
+
+func WithTools(tool *aitool.Tool) Option {
+	return func(cfg *ReActConfig) {
+		if cfg.aiToolManagerOption == nil {
+			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
+			buildinaitools.WithExtendTools([]*aitool.Tool{tool}, true))
 	}
 }
 

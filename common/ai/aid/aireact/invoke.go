@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -175,7 +176,6 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			log.Infof("Requesting tool: %s", toolPayload)
 			if err := r.handleRequireTool(toolPayload); err != nil {
 				log.Errorf("Tool execution failed: %v", err)
-				spew.Dump(action)
 			} else {
 				// Tool executed successfully, now verify if user needs are satisfied
 				// Temporarily release the lock before calling verification to avoid deadlock
@@ -195,36 +195,63 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 					log.Infof("User needs not fully satisfied, continuing analysis...")
 				}
 			}
-			// Also check if explicitly marked as final step
-			if action.GetBool("is_final_step") {
-				r.config.finished = true
-			}
-
 		case ActionRequestPlanExecution:
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
 			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)
 			if err := r.invokePlanAndExecute(planPayload); err != nil {
 				log.Errorf("Plan execution failed: %v", err)
 			}
+		case ActionAskForClarification:
+			nextAction := action.GetInvokeParams("next_action")
+			payloads := nextAction.GetStringSlice("ask_for_clarification_payload")
+			// emit the clarification request
+			if len(payloads) == 0 {
+				payload := nextAction.GetAnyToString("ask_for_clarification_payload")
+				payloads = append(payloads, payload)
+			}
+			ep := r.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
+			ep.SetDefaultSuggestionContinue()
+
+			var opts []map[string]any
+			for i, payload := range payloads {
+				opts = append(opts, map[string]any{
+					"index":        i + 1,
+					"prompt_title": payload,
+				})
+			}
+			result := map[string]any{
+				"id":      ep.GetId(),
+				"prompt":  action.GetString("human_readable_thought"),
+				"options": opts,
+			}
+			ep.SetReviewMaterials(result)
+			err := r.config.SubmitCheckpointRequest(ep.GetCheckpoint(), result)
+			if err != nil {
+				log.Errorf("Failed to submit checkpoint request: %v", err)
+			}
+			r.config.EmitInteractiveJSON(
+				ep.GetId(),
+				schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE,
+				"require-user-interact",
+				result,
+			)
+			r.config.DoWaitAgree(r.config.GetContext(), ep)
+			params := ep.GetParams()
+			r.config.EmitInteractiveRelease(ep.GetId(), params)
+			r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+			r.addToTimeline(
+				"ask_for_clarification",
+				fmt.Sprintf("User clarification requested: %s result: %v",
+					action.GetString("human_readable_thought"), spew.Sdump(params)),
+				ep.GetId(),
+			)
 		default:
 			r.EmitError("unknown action type: %v", actionType)
 			r.config.finished = true
 		}
-
-		// Timeline will automatically store tool results via handleRequireTool
-		// No need to manually update conversation history as timeline handles this
-
-		// Check if final step
-		if action.GetBool("is_final_step") {
-			r.config.finished = true
-			log.Infof("ReAct main loop completed")
-			break
-		}
 	}
-
 	if r.config.currentIteration >= r.config.maxIterations {
-		log.Infof("ReAct loop reached maximum iterations")
+		r.EmitWarning("Too many iterations[%v] is reached, stopping ReAct loop, max: %v", r.config.currentIteration, r.config.maxIterations)
 	}
-
 	return nil
 }
