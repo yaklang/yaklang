@@ -45,21 +45,34 @@
 
 **对于你在第一阶段确定的每一个逻辑块，请独立执行以下所有提炼步骤：**
 
+**对于你在第一阶段确定的每一个逻辑块，请独立执行以下所有提炼步骤：**
+
 3.  **情境化分析 (Contextualized Analysis for the Chunk):**
     *   聚焦于当前块所包含的`main_analysis_json`的特定部分。
     *   将`supplementary_text_context`的上下文信息应用到对这个具体块的理解上。
 
 4.  **确定内容类型 (`content_type` for the Chunk):**
-    *   为**当前块**确定其最贴切的内容类型 (`narrative`, `instructive`, `descriptive`, etc.)。一个输入源可能包含不同类型的块。
+    *   为**当前块**确定其最贴切的内容类型。**优先考虑知识性分类**，如 `conceptual_explanation` (概念阐释), `technical_breakdown` (技术分解), `historical_context` (历史背景), `symbolism_analysis` (象征分析), `process_description` (流程描述) 等。
 
-5.  **合成嵌入文本 (`embedding_text` for the Chunk):**
-    *   为**当前块**创作一段流畅、信息密集的自然语言描述。
-    *   融合该块内的`cumulative_summary`片段、关键元素、关系和文本。
-    *   **必须注入上下文**。例如，如果这是一个故事的第二块，你的描述应该是“紧接着，主角...”
+5.  **合成知识嵌入文本 (`embedding_text` for the Chunk):**
+    *   **这是最重要的改造步骤。你的目标是创造一个“知识原子” (Knowledge Atom)，而不是一个叙事摘要。**
+    *   **应用以下转换原则：**
+        *   **从描述到解释:** 不要说“有什么”，而要解释“这是什么”、“它意味着什么”或“它的原理是什么”。
+        *   **从具体到抽象:** 从具体例子（如“这个角色在哭”）上升到一般概念（如“此场景通过角色的情绪表现来渲染悲伤气氛，是推动情节发展的重要情感节点”）。
+        *   **从时序到逻辑:** 不要按时间顺序复述事件。按逻辑、主题或重要性组织信息。
+        *   **定义与阐明:** 如果出现关键术语（如一个技术概念、一个艺术风格、一个叙事手法），像教科书一样对其进行定义和解释。
+        *   **建立因果/概念关联:** 明确指出元素之间的深层联系。例如，“材料A的低导热性（属性）是其被用作隔热层（功能）的根本原因。”
+
+    *   **写作风格:**
+        *   使用**客观、正式、百科全书式**的语言。
+        *   避免使用“然后”、“接下来”等纯粹的叙事性连接词。
+        *   确保生成的文本即使脱离原始上下文，也具有高度的独立可读性和信息价值。
 
 6.  **提炼结构化元数据 (`structured_metadata` for the Chunk):**
     *   为**当前块**提取`title`, `summary`, `keywords`, 和 `key_entities`。
-    *   根据该块的`content_type`，填充`narrative_context`或`instructive_context`。
+    *   **`title`** 应像一个百科词条的标题（例如，“蒸汽机的工作原理”）。
+    *   **`summary`** 应是对该知识片段核心论点的高度浓缩。
+    *   **`keywords`** 应包含更多概念性、主题性的词汇。
 
 7.  **分配源元数据 (`source_metadata` for the Chunk):**
     *   为每个生成的块分配唯一的`chunk_id`。如果原始`chunk_id`是`chunk_abc`，你可以将其细分为`chunk_abc-1`, `chunk_abc-2`等，以保持追溯性。
@@ -69,3 +82,38 @@
 8.  **组装为JSON数组 (Assemble into JSON Array):**
     *   将为每一个逻辑块生成的所有RAG JSON对象，收集到一个**单一的JSON数组**中。
     *   确保整个输出是一个合法的JSON数组，并且数组中的每个对象都严格符合`RagEmbeddingSourceSchema`。
+
+
+``` example json
+{
+  "@action": "object",
+  "rag_source_list": [
+    {
+      "title": "知识一",
+      "content_type": "知识分类",
+      "embedding_text": "知识一描述的详细内容，解释了其背景、原理和应用。",
+      "structured_metadata": {
+        "summary": "...",
+        "keywords": [
+            "关键词1",
+            "关键词2",
+            "关键词3"
+        ],
+        "key_entities": [
+            "实体1",
+            "实体2"
+        ],
+        "contextual_attributes": [
+          {
+            "category": "MainConcepts",
+            "details": [
+              "核心概念1",
+            ]
+          },
+          ...
+        ]
+      }
+    },
+  ]
+}
+```
