@@ -5,6 +5,8 @@ import (
 	"math"
 	"sync"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // SizedWaitGroup has the same role and close to the
@@ -121,8 +123,8 @@ func (s *SizedWaitGroup) AddWithContext(ctx context.Context, delta ...int) error
 func (s *SizedWaitGroup) Done() {
 	defer func() {
 		if r := recover(); r != nil {
-			errMsg, ok := r.(string)
-			if ok && errMsg == "sync: negative WaitGroup counter" {
+			if errMsg := InterfaceToString(r); errMsg == "sync: negative WaitGroup counter" {
+				log.Error(errMsg)
 			} else {
 				panic(r)
 			}
