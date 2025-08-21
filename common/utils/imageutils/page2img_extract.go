@@ -76,6 +76,9 @@ func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *Image
 					if _, ok := filter[fileName]; ok {
 						continue
 					}
+					if info, err := file.Info(); err != nil || info.Size() <= 0 {
+						continue
+					}
 					filter[fileName] = true
 
 					_, filenameWithoutDir := filepath.Split(fileName)

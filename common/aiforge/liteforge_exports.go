@@ -30,7 +30,6 @@ var LiteForgeExport = map[string]interface{}{
 	"AnalyzeAudioFile": AnalyzeAudioFile,
 	"AnalyzeVideo":     AnalyzeVideo,
 	"AnalyzeFile":      AnalyzeFile,
-	"Refine":           Refine,
 	"imageExtraPrompt": WithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
 	"analyzeCtx":        WithAnalyzeContext,    // use for analyzeContext
@@ -44,6 +43,14 @@ var LiteForgeExport = map[string]interface{}{
 	"context":           LiteForgeExecWithContext,
 	"verboseName":       _withVerboseName,
 	"forceImage":        _withForceImage,
+
+	"Refine":               Refine,
+	"knowledgeBaseName":    _refine_WithKnowledgeBaseName,
+	"knowledgeBaseDesc":    _refine_WithKnowledgeBaseDesc,
+	"knowledgeBaseType":    _refine_WithKnowledgeBaseType,
+	"knowledgeEntryLength": _refine_WithKnowledgeEntryLength,
+	"refinePrompt":         _refine_WithRefinePrompt,
+	"strictRefine":         _refine_WithStrict,
 }
 
 type liteforgeConfig struct {
