@@ -8,19 +8,20 @@ import (
 )
 
 type AnalysisConfig struct {
-	Ctx               context.Context
-	ExtraPrompt       string
-	AnalyzeLog        func(format string, args ...interface{})
-	AnalyzeStatusCard func(id string, data interface{}, tags ...string)
+	Ctx                context.Context
+	ExtraPrompt        string
+	AnalyzeLog         func(format string, args ...interface{})
+	AnalyzeStatusCard  func(id string, data interface{}, tags ...string)
+	AnalyzeConcurrency int
 
-	AnalyzeStreamChunkCallback func(chunk chunkmaker.Chunk)
-	chunkOption                []chunkmaker.Option
-	fallbackOptions            []any
+	chunkOption     []chunkmaker.Option
+	fallbackOptions []any
 }
 
 func NewAnalysisConfig(opts ...any) *AnalysisConfig {
 	cfg := &AnalysisConfig{
-		ExtraPrompt: "",
+		ExtraPrompt:        "",
+		AnalyzeConcurrency: 20,
 		AnalyzeLog: func(format string, args ...interface{}) {
 			log.Infof(format, args...)
 		},
@@ -86,8 +87,8 @@ func WithAnalyzeStatusCard(handler func(id string, data interface{}, tags ...str
 	}
 }
 
-func WithAnalyzeStreamChunkCallback(handler func(chunk chunkmaker.Chunk)) AnalysisOption {
+func WithAnalyzeConcurrency(concurrency int) AnalysisOption {
 	return func(config *AnalysisConfig) {
-		config.AnalyzeStreamChunkCallback = handler
+		config.AnalyzeConcurrency = concurrency
 	}
 }

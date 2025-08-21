@@ -2,6 +2,8 @@ package ffmpegutils
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"os"
 	"os/exec"
 	"strconv"
@@ -14,6 +16,47 @@ const (
 	jpegMinQuality        = 2
 	jpegMaxQuality        = 31
 )
+
+func CompressImageRaw(inputRaw []byte, opts ...Option) ([]byte, error) {
+	// 1. Validate input raw data
+	if len(inputRaw) == 0 {
+		return nil, utils.Errorf("input raw image data is empty")
+	}
+	if ffmpegBinaryPath == "" {
+		return nil, utils.Errorf("ffmpeg binary path is not configured")
+	}
+
+	tempInputFile, err := os.CreateTemp(consts.GetDefaultYakitBaseTempDir(), "ffmpeg_compress_*.raw")
+	if err != nil {
+		return nil, utils.Errorf("could not create temporary input file: %w", err)
+	}
+	defer os.Remove(tempInputFile.Name())
+
+	if _, err := tempInputFile.Write(inputRaw); err != nil {
+		return nil, utils.Errorf("could not write to temporary input file: %w", err)
+	}
+	tempInputFile.Close()
+
+	tempOutputFile, err := os.CreateTemp(consts.GetDefaultYakitBaseTempDir(), "ffmpeg_compress_*.raw")
+	if err != nil {
+		return nil, utils.Errorf("could not create temporary outputfile file: %w", err)
+	}
+	defer os.Remove(tempOutputFile.Name())
+	tempOutputFile.Close()
+
+	err = CompressImage(tempInputFile.Name(), tempOutputFile.Name(), opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Read the compressed output file
+	compressedData, err := os.ReadFile(tempOutputFile.Name())
+	if err != nil {
+		return nil, utils.Errorf("could not read compressed output file: %w", err)
+	}
+
+	return compressedData, nil
+}
 
 // CompressImage resizes an image to be under a target size, saving it to outputFile.
 // It iteratively adjusts the JPEG quality to meet the size constraint.
