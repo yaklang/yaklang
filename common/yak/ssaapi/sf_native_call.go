@@ -839,7 +839,7 @@ func init() {
 			result, _ := frame.GetSFResult()
 			if result != nil {
 				result.SymbolTable.Delete(name)
-				delete(result.AlertSymbolTable, name)
+				result.AlertSymbolTable.Delete(name)
 				delete(result.GetRule().AlertDesc, name)
 			}
 		}

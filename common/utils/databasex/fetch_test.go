@@ -136,9 +136,6 @@ func TestCloseWithDelete(t *testing.T) {
 	}
 	t.Run("DeleteOnClose", func(t *testing.T) {
 		var deletedItems []FetchTestItem
-		deleteFunc := func(items []FetchTestItem) {
-			deletedItems = append(deletedItems, items...)
-		}
 
 		fetch := databasex.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
@@ -147,7 +144,7 @@ func TestCloseWithDelete(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Close with delete function
-		fetch.Close(deleteFunc)
+		fetch.Close()
 
 		// Check if items were deleted correctly
 		assert.NotEmpty(t, deletedItems)
