@@ -4,17 +4,16 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
-	"time"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *ImageResult, error) {
@@ -59,20 +58,12 @@ func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *Image
 
 		go func() {
 			defer close(ch)
-
 			filter := map[string]bool{}
-			for {
-				time.Sleep(1 * time.Second)
-				// read dir and get all files
+			process := func() {
 				files, err := os.ReadDir(outputTmp)
 				if err != nil {
 					log.Errorf("read dir failed: %v", err)
-					select {
-					case <-finishedCtx.Done():
-						return
-					default:
-					}
-					continue
+					return
 				}
 
 				var orderedFiles = make([]*orderedFile, 0, len(files))
@@ -133,10 +124,17 @@ func ExtractDocumentPagesContext(ctx context.Context, input string) (chan *Image
 					}
 					// os.Remove(filepath.Join(outputTmp, fileName))
 				}
+			}
+
+			for {
 				select {
+				case <-time.After(time.Second):
+					process()
 				case <-finishedCtx.Done():
+					process()
 					return
-				default:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}()
