@@ -94,7 +94,7 @@ func NewTask(id string, userInput string, emitter *aicommon.Emitter) *Task {
 		})
 		log.Debugf("Task created: %s with input: %s", task.Id, task.UserInput)
 	} else {
-		log.Warnf("Task created without emitter: %s with input: %s", task.Id, task.UserInput)
+		//log.Warnf("Task created without emitter: %s with input: %s", task.Id, task.UserInput)
 	}
 	return task
 }
