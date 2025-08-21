@@ -1307,8 +1307,8 @@ func TestGetFullHTTPRequestQueryParam(t *testing.T) {
 	}{
 		{
 			origin: `GET /?a=1&b=2 HTTP/1.1
-Host: www.baidu.com
-`,
+		Host: www.baidu.com
+		`,
 
 			expected: map[string][]string{
 				"a": {"1"},
@@ -1317,11 +1317,21 @@ Host: www.baidu.com
 		},
 		{
 			origin: `GET /?a=1&a=2 HTTP/1.1
+		Host: www.baidu.com
+		`,
+
+			expected: map[string][]string{
+				"a": {"1", "2"},
+			},
+		},
+		{
+			origin: `GET /?a&b=2 HTTP/1.1
 Host: www.baidu.com
 `,
 
 			expected: map[string][]string{
-				"a": {"1", "2"},
+				"a": {""},
+				"b": {"2"},
 			},
 		},
 	}
