@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -142,6 +143,24 @@ func buildSSARisk(
 			newSSARisk.Details = alertInfo.Msg
 		}
 	}
+
+	newSSARisk.RiskFeatureHash = utils.CalcSha1(
+		// SSA Feature
+		newSSARisk.FunctionName,
+		value.String(),
+		// SyntaxFlow Rule Feature
+		newSSARisk.FromRule,
+		newSSARisk.Variable,
+		string(newSSARisk.Severity),
+		newSSARisk.RiskType,
+		newSSARisk.Language,
+		newSSARisk.Title,
+	)
+
+	// 设置任务名称
+	// TODO: 可能后面发起扫描任务用户可以自己设置扫描名称
+	newSSARisk.TaskName = time.Now().Format("2006-01-02 15:04:05")
+
 	return newSSARisk
 }
 
