@@ -25,17 +25,24 @@ import (
 )
 
 var defaultInvalidSuffix = []string{
-	".js",
-	".css",
-	".xml",
-	".jpg", ".jpeg", ".png",
-	".mp3", ".mp4", ".ico", ".bmp",
-	".flv", ".aac", ".ogg", ".avi",
-	".svg", ".gif", ".woff", ".woff2",
-	".doc", ".docx", ".pptx",
-	".ppt", ".pdf",
-	".swf",
-	".json",
+	"\\.js",
+	"\\.css",
+	"\\.xml",
+	"\\.jpg", "\\.jpeg", "\\.png",
+	"\\.mp3", "\\.mp4", "\\.ico", "\\.bmp",
+	"\\.flv", "\\.aac", "\\.ogg", "\\.avi",
+	"\\.svg", "\\.gif", "\\.woff", "\\.woff2",
+	"\\.doc", "\\.docx", "\\.pptx",
+	"\\.ppt", "\\.pdf",
+	"\\.swf",
+	"\\.json",
+}
+
+var jsContentTypes = []string{
+	"text/javascript",
+	"application/javascript",
+	"application/x-javascript",
+	"application/ecmascript",
 }
 
 const (
@@ -349,16 +356,25 @@ func (c *MixPluginCaller) ResetFilter() {
 	c.websiteFilter = webFilter
 }
 
-func (c *MixPluginCaller) IsPassed(target string, static ...bool) bool {
+func (c *MixPluginCaller) IsPassed(target string) bool {
 	if c.pluginScanFilter == nil {
 		return true
 	}
 	f := c.pluginScanFilter
-	if len(static) > 0 && static[0] {
-		return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, append(f.ExcludePluginScanURIs, defaultInvalidSuffix...), target)
-	} else {
-		return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
+	return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
+}
+
+func (c *MixPluginCaller) IsStatic(target, request string) bool {
+	parts := strings.Split(target, "?")
+	basePath := parts[0]
+	if !utils.IncludeExcludeChecker(nil, defaultInvalidSuffix, basePath) {
+		return true
 	}
+	if utils.IncludeExcludeChecker(jsContentTypes, nil, request) {
+		return true
+	}
+
+	return false
 }
 
 func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
@@ -873,12 +889,10 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 		}
 	}
 
-	if !m.IsPassed(u, true) {
-		log.Infof("call MirrorHTTPFlow error: url[%v] not passed", u)
-		return
-	}
-
 	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
+		if m.IsStatic(u, string(req)) {
+			return
+		}
 		callers.Call(HOOK_MirrorFilteredHTTPFlow,
 			WithCallConfigRuntimeCtx(runtimeCtx),
 			WithCallConfigForceSync(forceSync),
