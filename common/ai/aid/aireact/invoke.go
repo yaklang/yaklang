@@ -203,15 +203,11 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			}
 		case ActionAskForClarification:
 			nextAction := action.GetInvokeParams("next_action")
-			payloads := nextAction.GetStringSlice("ask_for_clarification_payload")
-			// emit the clarification request
-			if len(payloads) == 0 {
-				payload := nextAction.GetAnyToString("ask_for_clarification_payload")
-				payloads = append(payloads, payload)
-			}
+			obj := nextAction.GetObject("ask_for_clarification_payload")
+			payloads := obj.GetStringSlice("options")
+			question := obj.GetString("question")
 			ep := r.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 			ep.SetDefaultSuggestionContinue()
-
 			var opts []map[string]any
 			for i, payload := range payloads {
 				opts = append(opts, map[string]any{
@@ -221,7 +217,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			}
 			result := map[string]any{
 				"id":      ep.GetId(),
-				"prompt":  action.GetString("human_readable_thought"),
+				"prompt":  question,
 				"options": opts,
 			}
 			ep.SetReviewMaterials(result)
@@ -235,7 +231,9 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 				"require-user-interact",
 				result,
 			)
-			r.config.DoWaitAgree(r.config.GetContext(), ep)
+			ctx := r.config.GetContext()
+			ctx = utils.SetContextKey(ctx, SKIP_AI_REVIEW, true)
+			r.config.DoWaitAgree(ctx, ep)
 			params := ep.GetParams()
 			r.config.EmitInteractiveRelease(ep.GetId(), params)
 			r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)

@@ -12,8 +12,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+const SKIP_AI_REVIEW = "skip_ai_review"
+
 func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoint) {
-	if r.autoAIReview {
+	skipAIReview := utils.GetContextKeyBool(ctx, SKIP_AI_REVIEW)
+	if r.autoAIReview && !skipAIReview {
 		go func() {
 			// In auto-review mode, automatically approve the request
 			materials := endpoint.GetReviewMaterials()
