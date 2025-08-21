@@ -18,7 +18,7 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
-{"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": ["` + flag + `", "option2", "option3"] },
+{"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": {"question": "...mocked question...", "options": ["` + flag + `", "option2", "option3"]} },
 "human_readable_thought": "mocked thought for tool calling", "cumulative_summary": "..cumulative-mocked for tool calling.."}
 `))
 		rsp.Close()
