@@ -2,12 +2,12 @@ package aiforge
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 	"github.com/yaklang/yaklang/common/utils/imageutils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -151,6 +151,34 @@ func _withImage(anyImageInput ...any) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		for _, anyImg := range anyImageInput {
 			for img := range imageutils.ExtractImage(anyImg) {
+				cfg.images = append(cfg.images, &aicommon.ImageData{
+					IsBase64: true,
+					Data:     []byte(img.Base64()),
+				})
+			}
+		}
+	}
+}
+
+// liteforge.image is an option for liteforge.Execute
+// it adds image data to the execution context
+//
+// example:
+// ```
+// liteforge.Execute(<<<PROMPT
+// SOME_CONTENT
+// PROMPT, liteforge.image(imageData))
+// ```
+func _withImageCompress(anyImageInput ...any) LiteForgeExecOption {
+	return func(cfg *liteforgeConfig) {
+		for _, anyImg := range anyImageInput {
+			for img := range imageutils.ExtractImage(anyImg) {
+				if len(img.RawImage) > 300*1024 {
+					raw, err := ffmpegutils.CompressImageRaw(img.RawImage)
+					if err == nil {
+						img.RawImage = raw
+					}
+				}
 				cfg.images = append(cfg.images, &aicommon.ImageData{
 					IsBase64: true,
 					Data:     []byte(img.Base64()),

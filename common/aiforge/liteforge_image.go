@@ -458,7 +458,7 @@ func AnalyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
 
 func AnalyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	var imgCfg = NewAnalysisConfig(opts...)
-	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImage(image), _withForceImage(true))
+	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImageCompress(image), _withForceImage(true))
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
 	// 构建详细的分析提示
 	prompt := `Your primary task is to perform a comprehensive, multi-modal analysis of the provided inputs. You will receive an **image** and, optionally, **supplementary text** (such as a title, user description, or speech-to-text transcript). Your analysis must holistically synthesize information from both sources to generate a detailed JSON output.
@@ -669,23 +669,14 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 		return nil, err
 	}
 
-	var resultChan = chanx.NewUnlimitedChan[AnalysisResult](analyzeConfig.Ctx, 100)
-
+	indexedChannel := chanx.NewUnlimitedChan[chunkmaker.Chunk](analyzeConfig.Ctx, 100)
 	count := 0
 	ar, err := aireducer.NewReducerEx(cm,
 		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+			analyzeConfig.AnalyzeLog("chunk index[%d] Analyzing media type [%s]", count, chunk.MIMEType().String())
+			indexedChannel.SafeFeed(chunk)
 			count++
-			if chunk.MIMEType().IsImage() {
-				analyzeConfig.AnalyzeLog("chunk index[%d] Analyzing media image type [%s]", count, chunk.MIMEType().String())
-				imageResult, err := AnalyzeImage(chunk.Data(), opts)
-				if err != nil {
-					return fmt.Errorf("failed to analyze media image: %w", err)
-				}
-				resultChan.SafeFeed(imageResult)
-			} else {
-				analyzeConfig.AnalyzeLog("chunk index[%d] Analyzing media text type [%s]", count, chunk.MIMEType().String())
-				resultChan.SafeFeed(&TextAnalysisResult{Text: chunk.MIMEType().String()})
-			}
+			analyzeConfig.AnalyzeStatusCard("extracting chunk count", count)
 			return nil
 		}),
 		aireducer.WithContext(analyzeConfig.Ctx),
@@ -696,13 +687,28 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	}
 
 	go func() {
-		defer resultChan.Close()
-
-		err := ar.Run()
+		err = ar.Run()
 		if err != nil {
 			log.Errorf("failed to run analyze media image: %v", err)
 		}
 	}()
 
-	return resultChan.OutputChannel(), nil
+	processedCount := 0
+
+	return utils.OrderedParallelProcessSkipError[chunkmaker.Chunk, AnalysisResult](analyzeConfig.Ctx, indexedChannel.OutputChannel(), func(chunk chunkmaker.Chunk) (AnalysisResult, error) {
+		processedCount++
+		analyzeConfig.AnalyzeStatusCard("processed chunk count", processedCount)
+		if chunk.MIMEType().IsImage() {
+			return AnalyzeImage(chunk.Data(), opts)
+		} else {
+			return &TextAnalysisResult{Text: string(chunk.Data())}, nil
+		}
+	},
+		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency),
+		utils.WithParallelProcessStartCallback(func() {
+			analyzeConfig.AnalyzeStatusCard("Media Analysis", "processing media chunk")
+		}),
+		utils.WithParallelProcessFinishCallback(func() {
+			analyzeConfig.AnalyzeStatusCard("Media Analysis", "finished analysis")
+		})), nil
 }

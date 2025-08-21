@@ -6,7 +6,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
-	"sync"
 )
 
 type VideoAnalysisResult struct {
@@ -22,7 +21,7 @@ func (v VideoAnalysisResult) Dump() string {
 	return v.ImageSegment.Dump()
 }
 
-func AnalyzeVideo(video string, options ...any) (<-chan *VideoAnalysisResult, error) {
+func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
 
 	analyzeConfig.AnalyzeStatusCard("Video Analysis", "start analyzing audio")
@@ -64,13 +63,13 @@ func AnalyzeVideo(video string, options ...any) (<-chan *VideoAnalysisResult, er
 			}
 			count := 0
 			for fResult := range ffmpegResult {
-				count++
-				totalCount++
 				analyzeConfig.AnalyzeStatusCard("extract frames", totalCount)
 				ffmpegChan.SafeFeed(&InterimData{
 					AudioResults: audioRes,
 					ImageData:    fResult,
 				})
+				count++
+				totalCount++
 			}
 			analyzeConfig.AnalyzeLog("Extracted %d video frames for segment: %s", count, segment.String())
 		}
@@ -84,55 +83,39 @@ func AnalyzeVideo(video string, options ...any) (<-chan *VideoAnalysisResult, er
 				return
 			}
 			for fResult := range ffmpegResult {
-				totalCount++
 				analyzeConfig.AnalyzeStatusCard("extract frames", totalCount)
 				ffmpegChan.SafeFeed(&InterimData{
 					ImageData: fResult,
 				})
+				totalCount++
 			}
 		}
 	}()
 
-	videoResultChan := chanx.NewUnlimitedChan[*VideoAnalysisResult](analyzeConfig.Ctx, 100)
 	extraPromptFormat := "**Supplementary Information**: %s\n cumulative summary: %s\n %s"
 	frameCount := 0
 	cumulativeSummary := ""
-	go func() {
-		startOnce := sync.Once{}
-		defer videoResultChan.Close()
-		defer analyzeConfig.AnalyzeStatusCard("Video Analysis", "finish")
-		for {
-			select {
-			case <-analyzeConfig.Ctx.Done():
-				analyzeConfig.AnalyzeLog("Video analysis context done, exiting...")
-				return
-			case data, ok := <-ffmpegChan.OutputChannel():
-				startOnce.Do(func() {
-					analyzeConfig.AnalyzeLog("Finish to analyze video frames; total %d", frameCount)
-					analyzeConfig.AnalyzeStatusCard("Video Analysis", "analyzing video frame")
-				})
-				if !ok {
-					return
-				}
-				analyzeConfig.AnalyzeLog("Start to analyze video frame %d, Supplementary Information: %s", frameCount, data.AudioResults.TimelineSegment.Dump())
-				imageResult, err := AnalyzeImage(data.ImageData.RawData, WithExtraPrompt(fmt.Sprintf(extraPromptFormat, data.AudioResults.TimelineSegment.Dump(), cumulativeSummary, analyzeConfig.ExtraPrompt)))
-				if err != nil {
-					log.Errorf("Failed to analyze video frame %d: %v", frameCount, err)
-					return
-				}
-
-				cumulativeSummary = imageResult.CumulativeSummary
-				videoResultChan.SafeFeed(&VideoAnalysisResult{
-					CumulativeSummary: cumulativeSummary,
-					ImageSegment:      imageResult,
-				})
-
-				analyzeConfig.AnalyzeLog("Finish to analyze video frame %d, current CumulativeSummary is [%s] ", frameCount, utils.ShrinkString(cumulativeSummary, 100))
-				frameCount++
-				analyzeConfig.AnalyzeStatusCard("processed frames", frameCount)
-			}
+	return utils.OrderedParallelProcessSkipError(analyzeConfig.Ctx, ffmpegChan.OutputChannel(), func(data *InterimData) (AnalysisResult, error) {
+		analyzeConfig.AnalyzeLog("Start to analyze video frame %d, Supplementary Information: %s", frameCount, data.AudioResults.TimelineSegment.Dump())
+		imageResult, err := AnalyzeImage(data.ImageData.RawData, WithExtraPrompt(fmt.Sprintf(extraPromptFormat, data.AudioResults.TimelineSegment.Dump(), cumulativeSummary, analyzeConfig.ExtraPrompt)))
+		if err != nil {
+			return nil, err
 		}
-	}()
 
-	return videoResultChan.OutputChannel(), nil
+		cumulativeSummary = imageResult.CumulativeSummary
+
+		analyzeConfig.AnalyzeLog("Finish to analyze video frame %d, current CumulativeSummary is [%s] ", frameCount, utils.ShrinkString(cumulativeSummary, 100))
+		frameCount++
+		analyzeConfig.AnalyzeStatusCard("processed frames", frameCount)
+		return imageResult, nil
+	},
+		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency), utils.WithParallelProcessFinishCallback(func() {
+			analyzeConfig.AnalyzeLog("Finish to analyze video frame %d", frameCount)
+			analyzeConfig.AnalyzeStatusCard("Video Analysis", "finish")
+		}),
+		utils.WithParallelProcessStartCallback(func() {
+			analyzeConfig.AnalyzeLog("Finish to analyze video frames; total %d", frameCount)
+			analyzeConfig.AnalyzeStatusCard("Video Analysis", "analyzing video frame")
+		}),
+	), nil
 }
