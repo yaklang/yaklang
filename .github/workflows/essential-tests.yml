@@ -128,20 +128,16 @@ jobs:
               # jwt
               go test --timeout 1m ./common/authhack/...
 
-          - name: Test AI Infra
+          - name: Test AI Infra / RAG / Knowledge
             run: |
               go test -timeout 2m ./common/ai/aid/...
               go test -timeout 60s ./common/ai/tests/...
               go test -timeout 60s ./common/ai/aispec/...
               go test -timeout 60s ./common/aireducer/...
               go test -timeout 40s ./common/aiforge/aibp/forge_builder_test.go
-
-          - name: Test AI RAG | Knowledge Base
-            run: |
-              # AI RAG
+              
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
-              # Knowledge Base
               go test -timeout 1m -run TestMUSTPASS ./common/yakgrpc/yakit
 
           - name: Test SSA / SSAAPI
