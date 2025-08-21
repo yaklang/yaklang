@@ -72,6 +72,6 @@ Respond with a JSON object following the schema below:
 {{ .Schema }}
 ```
 
-如果你想要使用工具，Example: {"@action": "object", "next_action": "require_tool", "tool_require_payload": "..[your-toolname].."}
-如果你觉得问题比较简单，直接回答 Example: {"@action": "object", "next_action": "directly_answer", "answer_payload": "..[your-answer].."}
-如果你觉得任务复杂，请你使用 {"@action": "object", "next_action": "request_plan_and_execution", "plan_request_payload": "..[something-helpful-for-design-plan].."}
+如果你想要使用工具，Example: {"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "..[your-toolname].."}, "cumulative_summary": "...", "human_readable_thought": "..."}
+如果你觉得问题比较简单，直接回答 Example: {"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "..[your-answer].."}, "cumulative_summary": "...", "human_readable_thought": "..."}
+如果你觉得任务复杂，请你使用 {"@action": "object", "next_action": {"type": "request_plan_and_execution", "plan_request_payload": "..[something-helpful-for-design-plan].."}, "cumulative_summary": "...", "human_readable_thought": "..."}
