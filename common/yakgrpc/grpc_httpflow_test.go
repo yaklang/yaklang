@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bytedance/mockey"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io"
 	"net/http"
 	"os"
@@ -1226,5 +1230,54 @@ Content-Length: 10
 			Id: []int64{int64(id)},
 		})
 		require.NoError(t, err)
+	})
+}
+
+func TestDoHTTPFlowsToOnline(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := utils.RandStringBytes(5)
+	url1 := "http://" + token + ".com"
+	flow1, err := yakit.CreateHTTPFlow(
+		yakit.CreateHTTPFlowWithURL(url1),
+		yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: "+token+".com\r\n\r\n"+token)),
+	)
+
+	require.NoError(t, err)
+	err = yakit.InsertHTTPFlow(db, flow1)
+	require.NoError(t, err)
+	defer yakit.DeleteHTTPFlowByID(db, int64(flow1.ID))
+
+	mockey.PatchConvey("skip token check", t, func() {
+		mockClient := new(yaklib.OnlineClient)
+
+		// 总是成功返回
+		mockey.Mock((*yaklib.OnlineClient).UploadHTTPFlowToOnline).
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest, data []byte) error {
+				var tmp HTTPFlowShare
+				_ = json.Unmarshal(data, &tmp)
+				return nil
+			}).Build()
+
+		mockey.Mock(yaklib.NewOnlineClient).
+			To(func(baseUrl string) *yaklib.OnlineClient {
+				return mockClient
+			}).Build()
+
+		server := &TestServerWrapper{
+			onlineClient: yaklib.OnlineClient{},
+		}
+
+		toOnlineReq := &ypb.HTTPFlowsToOnlineRequest{
+			Token:       "test-token",
+			ProjectName: "test-project",
+		}
+
+		success, failed, err := server.DoHTTPFlowsSync(context.Background(), db, toOnlineReq)
+
+		// 验证结果
+		assert.NoError(t, err)
+		assert.NotNil(t, success)
+		assert.Contains(t, success, flow1.Hash) // 验证插入的 flow 被成功上传
+		assert.Empty(t, failed)
 	})
 }
