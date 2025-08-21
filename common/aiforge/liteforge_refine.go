@@ -3,7 +3,6 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -33,11 +32,11 @@ func Refine(path string, option ...any) (*knowledgebase.KnowledgeBase, error) {
 }
 
 func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowledgebase.KnowledgeBase, error) {
-	refineConfig := NewAnalysisConfig(options...)
-	knowledgeDatabaseName := uuid.New().String()
+	refineConfig := NewRefineConfig(options...)
+	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
 
 	refineConfig.AnalyzeStatusCard("Refine", "creating knowledge base")
-	kb, err := knowledgebase.NewKnowledgeBase(db, knowledgeDatabaseName, "refine-kb", "")
+	kb, err := knowledgebase.NewKnowledgeBase(db, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
 	if err != nil {
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
 	}
@@ -56,15 +55,23 @@ func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowle
 		startOnce.Do(func() {
 			refineConfig.AnalyzeStatusCard("Refine", "refining chunks")
 		})
-
+		count++
 		knowledgeRawData := v.Dump()
-		query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` ", refinePrompt, knowledgeRawData)
-
+		if len(knowledgeRawData) <= 0 {
+			log.Errorf("no knowledge data could be converted")
+			refineConfig.AnalyzeLog("skip refine chunk [%d]: no knowledge data could be converted", count)
+			continue
+		}
+		query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` \nextract prompt:\n%s ", refinePrompt, knowledgeRawData, refineConfig.RefinePrompt)
 		refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, _withOutputJSONSchema(refineSchema))...)
 		if err != nil {
-			return nil, utils.Errorf("failed to convert knowledge base to knowledge: %v", err)
+			if refineConfig.Strict {
+				return nil, utils.Errorf("failed to execute liteforge: %v", err)
+			}
+			refineConfig.AnalyzeLog("refine chunk [%d] failed: %v", count, err)
+			log.Errorf("refine chunk [%d] failed: %v", count, err)
+			continue
 		}
-		count++
 		refineConfig.AnalyzeStatusCard("refine chunk count", count)
 		wg.Add(1)
 		go func() {
@@ -78,8 +85,8 @@ func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowle
 				if len(entry.KnowledgeDetails) <= 0 {
 					continue
 				}
-				if len(entry.KnowledgeDetails) > 1500 {
-					detailList, err := SplitTextSafe(entry.KnowledgeDetails, 1000, options...)
+				if len(entry.KnowledgeDetails) > refineConfig.KnowledgeEntryLength {
+					detailList, err := SplitTextSafe(entry.KnowledgeDetails, refineConfig.KnowledgeEntryLength, options...)
 					if err != nil {
 						return
 					}
