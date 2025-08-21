@@ -1953,21 +1953,38 @@ func TestReplaceHTTPPacketFormEncoded(t *testing.T) {
 		{
 			// append
 			origin: `GET / HTTP/1.1
-Host: www.baidu.com
-`,
+		Host: www.baidu.com
+		`,
 			key:   "a",
 			value: "1",
 		},
 		{
 			// append with no-form data
 			origin: `POST / HTTP/1.1
-Host: www.baidu.com
-Content-Type: application/x-www-form-urlencoded
-Content-Length: 7
+		Host: www.baidu.com
+		Content-Type: application/x-www-form-urlencoded
+		Content-Length: 7
 
-a=1&b=2`,
+		a=1&b=2`,
 			key:   "a",
 			value: "1",
+		},
+		{
+			// replace
+			origin: `POST / HTTP/1.1
+		Host: www.baidu.com
+		Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+		------WebKitFormBoundary7MA4YWxkTrZu0gW
+		Content-Disposition: form-data; name="a"
+
+		1
+		------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldKey:          "a",
+			oldValue:        "1",
+			key:             "a",
+			value:           "2",
+			exceptFormCount: 1,
 		},
 		{
 			// replace
@@ -1982,7 +1999,7 @@ Content-Disposition: form-data; name="a"
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
 			oldKey:          "a",
 			oldValue:        "1",
-			key:             "a",
+			key:             "b",
 			value:           "2",
 			exceptFormCount: 1,
 		},
@@ -2051,18 +2068,18 @@ func TestAppendHTTPPacketFormEncoded(t *testing.T) {
 	}{
 		{
 			origin: `GET / HTTP/1.1
-Host: www.baidu.com
-`,
+		Host: www.baidu.com
+		`,
 			key:   "a",
 			value: "1",
 		},
 		{
 			origin: `POST / HTTP/1.1
-Host: www.baidu.com
-Content-Type: application/x-www-form-urlencoded
-Content-Length: 7
+		Host: www.baidu.com
+		Content-Type: application/x-www-form-urlencoded
+		Content-Length: 7
 
-a=1&b=2`,
+		a=1&b=2`,
 			key:   "a",
 			value: "1",
 		},
