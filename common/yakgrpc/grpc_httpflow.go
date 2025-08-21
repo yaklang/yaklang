@@ -619,15 +619,18 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		projectGeneralStorage []*schema.ProjectGeneralStorage
 	)
 	if httpFlow.Hash != "" {
-		db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.Hash)
+		db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.HiddenIndex)
 		extracted := yakit.BatchExtractedData(db1, ctx)
 		for v := range extracted {
 			extractedData = append(extractedData, &schema.ExtractedData{
-				SourceType:  v.SourceType,
-				TraceId:     v.TraceId,
-				Regexp:      utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
-				RuleVerbose: utils.EscapeInvalidUTF8Byte([]byte(v.RuleVerbose)),
-				Data:        utils.EscapeInvalidUTF8Byte([]byte(v.Data)),
+				SourceType:     v.SourceType,
+				TraceId:        v.TraceId,
+				Regexp:         utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
+				RuleVerbose:    utils.EscapeInvalidUTF8Byte([]byte(v.RuleVerbose)),
+				Data:           utils.EscapeInvalidUTF8Byte([]byte(v.Data)),
+				DataIndex:      v.DataIndex,
+				Length:         v.Length,
+				IsMatchRequest: v.IsMatchRequest,
 			})
 		}
 	}
@@ -718,7 +721,7 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 	db := s.GetProjectDatabase()
 	db = db.Where("upload_online <> '1' ")
 
-	_, _, err := s.doHTTPFlowsSync(ctx, db, req)
+	_, _, err := s.DoHTTPFlowsSync(ctx, db, req)
 	if err != nil {
 		return nil, err
 	}
@@ -740,7 +743,7 @@ func (s *Server) HTTPFlowsToOnlineBatch(ctx context.Context, req *ypb.HTTPFlowsT
 	db = db.Where("upload_online <> '1' ")
 	db = yakit.FilterHTTPFlow(db, req.UploadHTTPFlowsWhere)
 
-	success, failed, err := s.doHTTPFlowsSync(ctx, db, req.ToOnlineWhere)
+	success, failed, err := s.DoHTTPFlowsSync(ctx, db, req.ToOnlineWhere)
 	if err != nil {
 		return nil, err
 	}
@@ -751,7 +754,7 @@ func (s *Server) HTTPFlowsToOnlineBatch(ctx context.Context, req *ypb.HTTPFlowsT
 	}, nil
 }
 
-func (s *Server) doHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *ypb.HTTPFlowsToOnlineRequest) (success []string, failed []string, err error) {
+func (s *Server) DoHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *ypb.HTTPFlowsToOnlineRequest) (success []string, failed []string, err error) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	limit := make(chan struct{}, 20)
