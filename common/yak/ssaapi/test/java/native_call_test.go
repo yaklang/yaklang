@@ -502,36 +502,39 @@ alert $output
 }
 
 func TestNativeCall_GetFileFullName(t *testing.T) {
-	fs := filesys.NewVirtualFs()
-	fs.AddFile("/src/main/java/abc.java", `package main;`)
-	fs.AddFile("/src/main/java/bcd.java", `package main2;`)
-	programID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
-	require.NoError(t, err)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-	}()
-	result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindSearch))
-	log.Infof("getFullFileName result: %v", result)
-	result.Show()
-	require.NoError(t, err)
-	id := result.GetResultID()
-	dbResult, err := ssaapi.LoadResultByID(id)
-	require.NoError(t, err)
-	log.Infof("dbResult: %v", dbResult)
-	dbResult.Show()
-	values := dbResult.GetValues("sink")
-	require.True(t, !values.IsEmpty())
-	values.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *ssaapi.Value:
-			require.True(t, ret.GetRange() != nil)
-			require.True(t, ret.GetRange().GetEditor() != nil)
-			editor := ret.GetRange().GetEditor()
-			require.Contains(t, editor.GetUrl(), "src/main/java/abc.java")
-			require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
-		}
-		return nil
+	t.Run("check file FullName", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("/src/main/java/abc.java", `package main;`)
+		fs.AddFile("/src/main/java/bcd.java", `package main2;`)
+		programID := uuid.NewString()
+		programID = strings.ReplaceAll(programID, "a", "b")
+		prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+		require.NoError(t, err)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		}()
+		result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindSearch))
+		log.Infof("getFullFileName result: %v", result)
+		result.Show()
+		require.NoError(t, err)
+		id := result.GetResultID()
+		dbResult, err := ssaapi.LoadResultByID(id)
+		require.NoError(t, err)
+		log.Infof("dbResult: %v", dbResult)
+		dbResult.Show()
+		values := dbResult.GetValues("sink")
+		require.True(t, !values.IsEmpty())
+		values.Recursive(func(operator sfvm.ValueOperator) error {
+			switch ret := operator.(type) {
+			case *ssaapi.Value:
+				require.True(t, ret.GetRange() != nil)
+				require.True(t, ret.GetRange().GetEditor() != nil)
+				editor := ret.GetRange().GetEditor()
+				require.Contains(t, editor.GetUrl(), "src/main/java/abc.java")
+				require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
+			}
+			return nil
+		})
 	})
 }
 
