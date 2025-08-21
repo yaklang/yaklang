@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -44,8 +45,8 @@ func (wg *WaitGroupProxy) SetZero() {
 func (wg *WaitGroupProxy) Done() {
 	defer func() {
 		if r := recover(); r != nil {
-			errMsg, ok := r.(string)
-			if ok && errMsg == "sync: negative WaitGroup counter" {
+			if errMsg := utils.InterfaceToString(r); errMsg == "sync: negative WaitGroup counter" {
+				log.Error(errMsg)
 			} else {
 				panic(r)
 			}
