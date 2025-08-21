@@ -14,7 +14,7 @@ type RecursiveConfig struct {
 }
 
 func clearSymbolTable(res *sf.SFFrameResult) {
-	delete(res.AlertSymbolTable, sfvm.RecursiveMagicVariable)
+	res.AlertSymbolTable.Delete(sfvm.RecursiveMagicVariable)
 	res.SymbolTable.Delete(sfvm.RecursiveMagicVariable)
 }
 
