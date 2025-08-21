@@ -1084,7 +1084,15 @@ func (y *YakToCallerManager) Call(name string, opts ...CallOpt) (results []any) 
 }
 
 func (y *YakToCallerManager) Wait() {
-	defer y.vulFilter.Close()
+	defer func() {
+		y.vulFilter.Close()
+		if r := recover(); r != nil {
+			if errMsg := utils.InterfaceToString(r); errMsg != "" {
+				log.Error(errMsg)
+			}
+		}
+	}()
+
 	if y.swg == nil {
 		return
 	}

@@ -343,7 +343,14 @@ func (c *MixPluginCaller) Wait() {
 	waitChan := make(chan struct{})
 
 	go func() {
-		defer close(waitChan)
+		defer func() {
+			close(waitChan)
+			if r := recover(); r != nil {
+				if errMsg := utils.InterfaceToString(r); errMsg != "" {
+					log.Error(errMsg)
+				}
+			}
+		}()
 
 		log.Debugf("start to wait local mix caller...")
 		c.swg.Wait()
