@@ -115,11 +115,11 @@ func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 // ```
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
 	headers := []string{firstLine}
-	_, body := SplitHTTPPacket(packet, nil,nil, func(line string) string {
+	_, body := SplitHTTPPacket(packet, nil, nil, func(line string) string {
 		headers = append(headers, line)
 		return line
 	})
-	return append([]byte(strings.Join(headers, CRLF) + CRLF + CRLF ), body... )
+	return append([]byte(strings.Join(headers, CRLF)+CRLF+CRLF), body...)
 }
 
 // ReplaceHTTPPacketMethod 是一个辅助函数，用于改变请求报文，修改请求方法
@@ -1006,6 +1006,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 // ```
 func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+		isNew := false
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1017,6 +1018,8 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 				var reader io.Reader = part
 				if part.FormName() == key {
 					reader = strings.NewReader(value)
+				} else {
+					isNew = true
 				}
 				partWriter, err := multipartWriter.CreatePart(part.Header)
 				if err != nil {
@@ -1027,7 +1030,8 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 					break
 				}
 			}
-		} else if multipartWriter != nil {
+		}
+		if multipartWriter != nil && isNew {
 			// append form
 			multipartWriter.WriteField(key, value)
 		}
