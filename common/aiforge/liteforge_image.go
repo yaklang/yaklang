@@ -687,6 +687,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	}
 
 	go func() {
+		defer indexedChannel.Close()
 		err = ar.Run()
 		if err != nil {
 			log.Errorf("failed to run analyze media image: %v", err)
@@ -696,8 +697,10 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	processedCount := 0
 
 	return utils.OrderedParallelProcessSkipError[chunkmaker.Chunk, AnalysisResult](analyzeConfig.Ctx, indexedChannel.OutputChannel(), func(chunk chunkmaker.Chunk) (AnalysisResult, error) {
-		processedCount++
-		analyzeConfig.AnalyzeStatusCard("processed chunk count", processedCount)
+		defer func() {
+			processedCount++
+			analyzeConfig.AnalyzeStatusCard("processed chunk count", processedCount)
+		}()
 		if chunk.MIMEType().IsImage() {
 			return AnalyzeImage(chunk.Data(), opts)
 		} else {
