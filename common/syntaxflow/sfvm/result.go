@@ -28,7 +28,7 @@ type SFFrameResult struct {
 	// value
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
 	UnNameValue      ValueOperator
-	AlertSymbolTable map[string]ValueOperator
+	AlertSymbolTable *utils.SafeMap[ValueOperator]
 }
 
 func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
@@ -38,7 +38,7 @@ func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
 		Description:      omap.NewEmptyOrderedMap[string, string](),
 		CheckParams:      make([]string, 0),
 		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
-		AlertSymbolTable: make(map[string]ValueOperator),
+		AlertSymbolTable: utils.NewSafeMap[ValueOperator](),
 	}
 }
 
@@ -63,9 +63,10 @@ func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 		}
 		return true
 	})
-	for k, v := range result.AlertSymbolTable {
-		s.AlertSymbolTable[k] = v
-	}
+	result.AlertSymbolTable.ForEach(func(key string, value ValueOperator) bool {
+		s.AlertSymbolTable.Set(key, value)
+		return true
+	})
 	//for k, v := range result.AlertDesc {
 	//	s.AlertDesc[k] = v
 	//}
@@ -136,13 +137,14 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 			return true
 		})
 	} else {
-		if len(s.AlertSymbolTable) > 0 {
-			for name, value := range s.AlertSymbolTable {
-				if info, b := s.GetAlertInfo(name); b {
-					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", name, codec.AnyToString(info.Msg)))
+		if s.AlertSymbolTable.Count() > 0 {
+			s.AlertSymbolTable.ForEach(func(key string, value ValueOperator) bool {
+				if info, b := s.GetAlertInfo(key); b {
+					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", key, codec.AnyToString(info.Msg)))
 				}
-				showValueMap(buf, name, value, cfg)
-			}
+				showValueMap(buf, key, value, cfg)
+				return true
+			})
 		} else if s.SymbolTable.Len() > 0 {
 			s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
 				showValueMap(buf, i, v, cfg)

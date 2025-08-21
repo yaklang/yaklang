@@ -881,7 +881,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		//	}
 		//	m[item.Key] = item.Value
 		//})
-		s.result.AlertSymbolTable[i.UnaryStr] = value
+		s.result.AlertSymbolTable.Set(i.UnaryStr, value)
 		//alStr := i.ValueByIndex(0)
 		//if alStr != "" {
 		//	m["__extra__"] = alStr
