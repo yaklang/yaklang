@@ -165,6 +165,15 @@ func (r *ReAct) startQueueProcessor(ctx context.Context) {
 				log.Infof("Task queue processor started for ReAct instance: %s", r.config.id)
 			}
 
+			// register hook for queue
+			r.taskQueue.AddEnqueueHook(func(task *Task) (bool, error) {
+				r.EmitEnqueueReActTask(task)
+				return true, nil
+			})
+			r.taskQueue.AddDequeueHook(func(task *Task, reason string) {
+				r.EmitDequeueReActTask(task, reason)
+			})
+
 			ticker := time.NewTicker(100 * time.Millisecond) // 每100ms检查一次队列
 			defer ticker.Stop()
 
@@ -185,6 +194,10 @@ func (r *ReAct) startQueueProcessor(ctx context.Context) {
 
 // processNextTaskFromQueue 处理队列中的下一个任务
 func (r *ReAct) processNextTaskFromQueue() {
+	if r.taskQueue.IsEmpty() {
+		return
+	}
+
 	r.queueMutex.Lock()
 	// 如果正在处理任务，直接返回
 	if r.isProcessing {
@@ -193,6 +206,7 @@ func (r *ReAct) processNextTaskFromQueue() {
 	}
 
 	// 从队列获取下一个任务
+	log.Infof("start to get first task from queue for ReAct instance: %s", r.config.id)
 	nextTask := r.taskQueue.GetFirst()
 	if nextTask == nil {
 		r.queueMutex.Unlock()
@@ -219,10 +233,12 @@ func (r *ReAct) processNextTaskFromQueue() {
 // processTask 处理单个 Task
 func (r *ReAct) processTask(task *Task) {
 	defer func() {
+		log.Info("require queue mutex")
 		r.queueMutex.Lock()
 		r.isProcessing = false
 		r.currentTask = nil // 清空当前任务
 		r.queueMutex.Unlock()
+		log.Info("release queue mutex")
 
 		if r.config.debugEvent {
 			log.Infof("Task processing completed: %s", task.GetId())
