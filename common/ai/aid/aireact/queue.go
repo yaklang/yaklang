@@ -7,30 +7,63 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
-// TaskHook 定义任务预处理钩子函数类型
+func (r *ReAct) EmitEnqueueReActTask(t *Task) {
+	if t == nil {
+		return
+	}
+	if r.taskQueue == nil {
+		log.Warnf("ReAct task queue is not initialized, cannot emit enqueue event for task [%s]", t.GetId())
+		return
+	}
+	r.EmitStructured("react_task_enqueue", map[string]interface{}{
+		"react_task_id":    t.GetId(),
+		"react_task_input": t.GetUserInput(),
+	})
+}
+
+func (r *ReAct) EmitDequeueReActTask(t *Task, reason string) {
+	if t == nil {
+		return
+	}
+	if r.taskQueue == nil {
+		log.Warnf("ReAct task queue is not initialized, cannot emit dequeue event for task [%s]", t.GetId())
+		return
+	}
+	r.EmitStructured("react_task_dequeue", map[string]interface{}{
+		"react_task_id":    t.GetId(),
+		"react_task_input": t.GetUserInput(),
+		"reason":           reason,
+	})
+}
+
+// taskEnqueueHook 定义任务预处理钩子函数类型
 // 钩子函数可以修改任务状态，返回值决定是否继续入队
-type TaskHook func(task *Task) (shouldQueue bool, err error)
+type taskEnqueueHook func(task *Task) (shouldQueue bool, err error)
+
+type taskDequeueHook func(task *Task, reason string)
 
 // TaskQueue 任务队列结构
 type TaskQueue struct {
-	mutex     sync.RWMutex
-	queue     *list.List // 使用链表实现队列
-	hooks     []TaskHook // 预处理钩子集合
-	queueName string     // 队列名称，用于日志记录
+	mutex        sync.RWMutex
+	queue        *list.List        // 使用链表实现队列
+	dequeueHooks []taskDequeueHook // 取消入队钩子集合
+	enqueueHook  []taskEnqueueHook // 预处理钩子集合
+	queueName    string            // 队列名称，用于日志记录
 }
 
 // NewTaskQueue 创建新的任务队列
 func NewTaskQueue(name string) *TaskQueue {
 	return &TaskQueue{
-		queue:     list.New(),
-		hooks:     make([]TaskHook, 0),
-		queueName: name,
+		queue:        list.New(),
+		enqueueHook:  make([]taskEnqueueHook, 0),
+		dequeueHooks: make([]taskDequeueHook, 0),
+		queueName:    name,
 	}
 }
 
 // executeHooks 执行所有预处理钩子
 func (tq *TaskQueue) executeHooks(task *Task) (bool, error) {
-	for _, hook := range tq.hooks {
+	for _, hook := range tq.enqueueHook {
 		shouldQueue, err := hook(task)
 		if err != nil {
 			log.Errorf("Task queue hook execution failed: %v", err)
@@ -40,6 +73,14 @@ func (tq *TaskQueue) executeHooks(task *Task) (bool, error) {
 			log.Infof("Task [%s] was filtered out by hook", task.GetId())
 			return false, nil
 		}
+	}
+	return true, nil
+}
+
+// executeDequeueHooks 执行所有出队钩子
+func (tq *TaskQueue) executeDequeueHooks(task *Task, reason string) (bool, error) {
+	for _, hook := range tq.dequeueHooks {
+		hook(task, reason)
 	}
 	return true, nil
 }
@@ -55,6 +96,17 @@ func (tq *TaskQueue) GetFirst() *Task {
 	}
 
 	task := front.Value.(*Task)
+
+	// 执行出队钩子
+	shouldDequeue, err := tq.executeDequeueHooks(task, "normal")
+	if err != nil {
+		log.Errorf("Task dequeue hook failed: %v", err)
+		return nil
+	}
+	if !shouldDequeue {
+		return nil
+	}
+
 	tq.queue.Remove(front)
 
 	log.Debugf("Task queue [%s]: dequeued task [%s]", tq.queueName, task.GetId())
@@ -128,13 +180,22 @@ func (tq *TaskQueue) GetQueueingCount() int {
 	return tq.queue.Len()
 }
 
-// AddHook 添加预处理钩子
-func (tq *TaskQueue) AddHook(hook TaskHook) {
+// AddEnqueueHook 添加预处理钩子
+func (tq *TaskQueue) AddEnqueueHook(hook taskEnqueueHook) {
 	tq.mutex.Lock()
 	defer tq.mutex.Unlock()
 
-	tq.hooks = append(tq.hooks, hook)
-	log.Debugf("Task queue [%s]: added new hook", tq.queueName)
+	tq.enqueueHook = append(tq.enqueueHook, hook)
+	log.Debugf("Task queue [%s]: added new enqueue hook", tq.queueName)
+}
+
+// AddDequeueHook 添加出队钩子
+func (tq *TaskQueue) AddDequeueHook(hook taskDequeueHook) {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+
+	tq.dequeueHooks = append(tq.dequeueHooks, hook)
+	log.Debugf("Task queue [%s]: added new remove from queue hook", tq.queueName)
 }
 
 // ClearHooks 清除所有预处理钩子
@@ -142,8 +203,17 @@ func (tq *TaskQueue) ClearHooks() {
 	tq.mutex.Lock()
 	defer tq.mutex.Unlock()
 
-	tq.hooks = make([]TaskHook, 0)
-	log.Debugf("Task queue [%s]: cleared all hooks", tq.queueName)
+	tq.enqueueHook = make([]taskEnqueueHook, 0)
+	log.Debugf("Task queue [%s]: cleared all enqueueHook", tq.queueName)
+}
+
+// ClearRemoveFromQueueHooks 清除所有出队钩子
+func (tq *TaskQueue) ClearRemoveFromQueueHooks() {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+
+	tq.dequeueHooks = make([]taskDequeueHook, 0)
+	log.Debugf("Task queue [%s]: cleared all dequeueHooks", tq.queueName)
 }
 
 // Clear 清空队列中的所有任务
@@ -186,7 +256,7 @@ func (tq *TaskQueue) GetQueueName() string {
 
 // TaskDuplicateFilter 创建一个过滤重复任务的Hook
 // 基于任务ID进行去重
-func TaskDuplicateFilter() TaskHook {
+func TaskDuplicateFilter() taskEnqueueHook {
 	taskIds := make(map[string]bool)
 	return func(task *Task) (bool, error) {
 		id := task.GetId()
@@ -201,7 +271,7 @@ func TaskDuplicateFilter() TaskHook {
 
 // TaskPriorityFilter 创建一个基于任务优先级的Hook
 // 可以根据任务属性设置优先级规则
-func TaskPriorityFilter(allowedIds []string) TaskHook {
+func TaskPriorityFilter(allowedIds []string) taskEnqueueHook {
 	allowedMap := make(map[string]bool)
 	for _, id := range allowedIds {
 		allowedMap[id] = true
@@ -222,7 +292,7 @@ func TaskPriorityFilter(allowedIds []string) TaskHook {
 }
 
 // TaskLogger 创建一个记录任务信息的Hook
-func TaskLogger() TaskHook {
+func TaskLogger() taskEnqueueHook {
 	return func(task *Task) (bool, error) {
 		log.Infof("Processing task: id=[%s], input=[%s], status=[%s]",
 			task.GetId(), task.GetUserInput(), task.GetStatus())
