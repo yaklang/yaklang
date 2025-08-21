@@ -59,6 +59,13 @@ type SSARisk struct {
 
 	// 最新处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status" gorm:"index;default:'not_set'"`
+
+	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞
+	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
+	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
+
+	// 任务名称，用于追踪 Risk 来自哪次扫描任务
+	TaskName string `json:"task_name" gorm:"index"`
 }
 
 func (s *SSARisk) CalcHash() string {
