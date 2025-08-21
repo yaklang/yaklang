@@ -2,12 +2,11 @@ package aireact
 
 import (
 	"fmt"
-	"strings"
-	"time"
-
+	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
@@ -36,31 +35,25 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 // enqueueTask 将输入事件转换为任务并添加到队列
 func (r *ReAct) enqueueTask(event *ypb.AIInputEvent) error {
 	// 创建基于aireact.Task的任务（初始状态为created）
-	task := NewTask(
-		fmt.Sprintf("react-task-%d", time.Now().UnixNano()),
-		event.FreeInput,
-	)
+	task := NewTask(fmt.Sprintf("react-task-%v", ksuid.New().String()), event.FreeInput, r.Emitter)
 
 	if r.config.debugEvent {
 		log.Infof("Task created: %s with input: %s", task.GetId(), event.FreeInput)
 	}
 
-	// 检查当前是否有任务正在处理
-	r.queueMutex.RLock()
+	r.queueMutex.Lock()
+	defer r.queueMutex.Unlock()
+
 	isCurrentlyProcessing := r.isProcessing
 	currentTask := r.currentTask
-	r.queueMutex.RUnlock()
-
 	if !isCurrentlyProcessing {
 		// 没有任务在处理，直接开始处理新任务
 		task.SetStatus(string(TaskStatus_Processing))
 		r.addToTimeline("processing", fmt.Sprintf("Task immediately started processing: %s", event.FreeInput), task.GetId())
 
 		// 设置当前任务并标记为正在处理
-		r.queueMutex.Lock()
 		r.currentTask = task
 		r.isProcessing = true
-		r.queueMutex.Unlock()
 
 		if r.config.debugEvent {
 			log.Infof("Task %s immediately started processing", task.GetId())
@@ -68,10 +61,10 @@ func (r *ReAct) enqueueTask(event *ypb.AIInputEvent) error {
 
 		// 异步处理任务
 		go r.processTask(task)
-
 		return nil
 	}
 
+	log.Infof("Task enqueue started processing: %s", task.GetId())
 	// 有任务正在处理，需要评估新任务是否与当前任务相关
 	if currentTask != nil && task.IsRelatedTo(currentTask) {
 		// 任务相关，进入evaluating状态然后直接追加到timeline
