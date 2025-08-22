@@ -26974,13 +26974,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -36205,8 +36205,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -52542,6 +52542,7 @@ type SSARiskDisposalData struct {
 	Status        string                 `protobuf:"bytes,4,opt,name=Status,proto3" json:"Status,omitempty"`
 	Comment       string                 `protobuf:"bytes,5,opt,name=Comment,proto3" json:"Comment,omitempty"`
 	RiskId        int64                  `protobuf:"varint,6,opt,name=RiskId,proto3" json:"RiskId,omitempty"`
+	TaskName      string                 `protobuf:"bytes,7,opt,name=TaskName,proto3" json:"TaskName,omitempty"` // 任务名称，追踪处置来自哪次扫描任务
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -52616,6 +52617,13 @@ func (x *SSARiskDisposalData) GetRiskId() int64 {
 		return x.RiskId
 	}
 	return 0
+}
+
+func (x *SSARiskDisposalData) GetTaskName() string {
+	if x != nil {
+		return x.TaskName
+	}
+	return ""
 }
 
 type SSARiskDisposalsFilter struct {
@@ -61550,14 +61558,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16NewSSARiskReadResponse\"c\n" +
 	"\x1eSSARiskFeedbackToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12+\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x13.ypb.SSARisksFilterR\x06Filter\"\xab\x01\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x13.ypb.SSARisksFilterR\x06Filter\"\xc7\x01\n" +
 	"\x13SSARiskDisposalData\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tCreatedAt\x18\x02 \x01(\x03R\tCreatedAt\x12\x1c\n" +
 	"\tUpdatedAt\x18\x03 \x01(\x03R\tUpdatedAt\x12\x16\n" +
 	"\x06Status\x18\x04 \x01(\tR\x06Status\x12\x18\n" +
 	"\aComment\x18\x05 \x01(\tR\aComment\x12\x16\n" +
-	"\x06RiskId\x18\x06 \x01(\x03R\x06RiskId\"p\n" +
+	"\x06RiskId\x18\x06 \x01(\x03R\x06RiskId\x12\x1a\n" +
+	"\bTaskName\x18\a \x01(\tR\bTaskName\"p\n" +
 	"\x16SSARiskDisposalsFilter\x12\x0e\n" +
 	"\x02ID\x18\x01 \x03(\x03R\x02ID\x12\x16\n" +
 	"\x06Status\x18\x02 \x03(\tR\x06Status\x12\x16\n" +

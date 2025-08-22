@@ -40,11 +40,22 @@ func CreateSSARiskDisposals(db *gorm.DB, req *ypb.CreateSSARiskDisposalsRequest)
 
 	var result []schema.SSARiskDisposals
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
-		for _, riskId := range riskIds {
+		// 获取所有相关的 Risk 记录
+		var risks []schema.SSARisk
+		err := tx.Where("id IN (?)", riskIds).Find(&risks).Error
+		if err != nil {
+			return utils.Errorf("CreateSSARiskDisposals failed to query risks: %v", err)
+		}
+
+		// 为每个 Risk 创建处置记录（保留原有的针对单个 Risk 的处置）
+		for _, risk := range risks {
 			disposal := schema.SSARiskDisposals{
-				Status:    req.GetStatus(),
-				Comment:   req.GetComment(),
-				SSARiskID: riskId,
+				SSARiskID:       int64(uint64(risk.ID)),
+				RiskFeatureHash: risk.RiskFeatureHash, // 设置 RiskFeatureHash 用于继承
+				TaskName:        risk.TaskName,
+				TaskCreatedAt:   risk.TaskCreatedAt,
+				Status:          req.GetStatus(),
+				Comment:         req.GetComment(),
 			}
 			if err := tx.Create(&disposal).Error; err != nil {
 				return utils.Errorf("CreateSSARiskDisposals failed during create: %v", err)
@@ -83,13 +94,43 @@ func QuerySSARiskDisposals(db *gorm.DB, req *ypb.QuerySSARiskDisposalsRequest) (
 }
 
 func GetSSARiskDisposals(db *gorm.DB, riskId int64) ([]schema.SSARiskDisposals, error) {
+	return GetSSARiskDisposalsWithInheritance(db, riskId)
+}
+
+// GetSSARiskDisposalsOnly 只获取特定 Risk 的直接处置信息（不包括继承）
+func GetSSARiskDisposalsOnly(db *gorm.DB, riskId int64) ([]schema.SSARiskDisposals, error) {
 	db = db.Model(&schema.SSARiskDisposals{})
 	var disposals []schema.SSARiskDisposals
 	if err := db.Where("ssa_risk_id = ?", riskId).
 		Order("updated_at DESC").
 		Find(&disposals).Error; err != nil {
-		return nil, utils.Errorf("GetSSARiskDisposals failed: %v", err)
+		return nil, utils.Errorf("GetSSARiskDisposalsOnly failed: %v", err)
 	}
+	return disposals, nil
+}
+
+// GetSSARiskDisposalsWithInheritance 获取特定 Risk 的处置信息，包括通过 RiskFeatureHash 继承的历史处置信息
+// 只返回早于或等于当前Risk任务创建时间的处置记录，避免后续扫描的处置信息影响当前Risk的查询
+func GetSSARiskDisposalsWithInheritance(db *gorm.DB, riskId int64) ([]schema.SSARiskDisposals, error) {
+	var risk schema.SSARisk
+	if err := db.Where("id = ?", riskId).First(&risk).Error; err != nil {
+		return nil, utils.Errorf("GetSSARiskDisposalsWithInheritance failed to query risk: %v", err)
+	}
+
+	// 如果没有 RiskFeatureHash，则只返回该 Risk 的直接处置信息
+	if risk.RiskFeatureHash == "" {
+		return GetSSARiskDisposalsOnly(db, riskId)
+	}
+
+	// 查询所有相同 RiskFeatureHash 的处置信息，但只包括早于或等于当前Risk任务创建时间的记录
+	var disposals []schema.SSARiskDisposals
+	if err := db.Model(&schema.SSARiskDisposals{}).
+		Where("risk_feature_hash = ? AND task_created_at <= ?", risk.RiskFeatureHash, risk.TaskCreatedAt).
+		Order("task_created_at DESC, updated_at DESC").
+		Find(&disposals).Error; err != nil {
+		return nil, utils.Errorf("GetSSARiskDisposalsWithInheritance failed: %v", err)
+	}
+
 	return disposals, nil
 }
 
