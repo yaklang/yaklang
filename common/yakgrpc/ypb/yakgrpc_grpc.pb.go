@@ -495,6 +495,7 @@ const (
 	Yak_SearchNoteContent_FullMethodName                          = "/ypb.Yak/SearchNoteContent"
 	Yak_ImportNote_FullMethodName                                 = "/ypb.Yak/ImportNote"
 	Yak_ExportNote_FullMethodName                                 = "/ypb.Yak/ExportNote"
+	Yak_StartAIReAct_FullMethodName                               = "/ypb.Yak/StartAIReAct"
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
 	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
 	Yak_DeleteAITask_FullMethodName                               = "/ypb.Yak/DeleteAITask"
@@ -1155,6 +1156,7 @@ type YakClient interface {
 	ImportNote(ctx context.Context, in *ImportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportNoteResponse], error)
 	ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error)
 	// AI Task
+	StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
 	DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
@@ -6685,9 +6687,22 @@ func (c *yakClient) ExportNote(ctx context.Context, in *ExportNoteRequest, opts 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExportNoteClient = grpc.ServerStreamingClient[ExportNoteResponse]
 
+func (c *yakClient) StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_StartAIReAct_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[AIInputEvent, AIOutputEvent]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartAIReActClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent]
+
 func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_StartAITask_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_StartAITask_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6730,7 +6745,7 @@ func (c *yakClient) QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, o
 
 func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_StartAITriage_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_StartAITriage_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6793,7 +6808,7 @@ func (c *yakClient) GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts 
 
 func (c *yakClient) StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_StartMcpServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[90], Yak_StartMcpServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6892,7 +6907,7 @@ func (c *yakClient) IsLocalModelReady(ctx context.Context, in *IsLocalModelReady
 
 func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[90], Yak_InstallLlamaServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_InstallLlamaServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6911,7 +6926,7 @@ type Yak_InstallLlamaServerClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_StartLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[92], Yak_StartLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6930,7 +6945,7 @@ type Yak_StartLocalModelClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[92], Yak_DownloadLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_DownloadLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6969,7 +6984,7 @@ func (c *yakClient) IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearc
 
 func (c *yakClient) InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_InitSearchVectorDatabase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[94], Yak_InitSearchVectorDatabase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7018,7 +7033,7 @@ func (c *yakClient) ListThirdPartyBinary(ctx context.Context, in *Empty, opts ..
 
 func (c *yakClient) InstallThirdPartyBinary(ctx context.Context, in *InstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[94], Yak_InstallThirdPartyBinary_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_InstallThirdPartyBinary_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7057,7 +7072,7 @@ func (c *yakClient) IsThirdPartyBinaryReady(ctx context.Context, in *IsThirdPart
 
 func (c *yakClient) StartThirdPartyBinary(ctx context.Context, in *StartThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_StartThirdPartyBinary_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[96], Yak_StartThirdPartyBinary_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7076,7 +7091,7 @@ type Yak_StartThirdPartyBinaryClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[96], Yak_PluginTrace_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[97], Yak_PluginTrace_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7802,6 +7817,7 @@ type YakServer interface {
 	ImportNote(*ImportNoteRequest, grpc.ServerStreamingServer[ImportNoteResponse]) error
 	ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error
 	// AI Task
+	StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
 	DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error)
@@ -9288,6 +9304,9 @@ func (UnimplementedYakServer) ImportNote(*ImportNoteRequest, grpc.ServerStreamin
 }
 func (UnimplementedYakServer) ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method ExportNote not implemented")
+}
+func (UnimplementedYakServer) StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method StartAIReAct not implemented")
 }
 func (UnimplementedYakServer) StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITask not implemented")
@@ -17350,6 +17369,13 @@ func _Yak_ExportNote_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExportNoteServer = grpc.ServerStreamingServer[ExportNoteResponse]
 
+func _Yak_StartAIReAct_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).StartAIReAct(&grpc.GenericServerStream[AIInputEvent, AIOutputEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartAIReActServer = grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]
+
 func _Yak_StartAITask_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).StartAITask(&grpc.GenericServerStream[AIInputEvent, AIOutputEvent]{ServerStream: stream})
 }
@@ -20185,6 +20211,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "ExportNote",
 			Handler:       _Yak_ExportNote_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "StartAIReAct",
+			Handler:       _Yak_StartAIReAct_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 		{
 			StreamName:    "StartAITask",
