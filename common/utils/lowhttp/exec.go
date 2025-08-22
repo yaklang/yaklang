@@ -180,10 +180,63 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	for _, opt := range opts {
 		opt(option)
 	}
+	retryHandler := option.RetryHandler
+	retry := func(rsp *LowhttpResponse, rawBytes []byte, retryTimes int) bool {
+		if retryHandler != nil {
+			rspRaw, _, err := FixHTTPResponse(rawBytes)
+			if err != nil {
+				rspRaw = rawBytes
+			}
+			var httpsFlag = option.Https
+			var rawReq = option.Packet
+			var retryFlag bool
+			retryHandler(httpsFlag, retryTimes, rawReq, rspRaw, func(i ...[]byte) {
+				if len(i) > 0 {
+					option.Packet = i[0]
+				}
+				retryFlag = true
+			})
+			return retryFlag
+		} else {
+			statusCode := GetStatusCodeFromResponse(rawBytes)
+			if len(option.RetryNotInStatusCode) > 0 {
+				var retryNotIn = true
+				for _, sc := range option.RetryNotInStatusCode { // black list first
+					if statusCode == sc || (statusCode >= 300 && statusCode < 400) { // 3xx code can't retry
+						retryNotIn = false
+						break
+					}
+				}
+				if retryNotIn {
+					return true
+				}
+			}
+			// in statuscode
+			for _, sc := range option.RetryInStatusCode {
+				if statusCode == sc {
+					return true
+				}
+			}
+			return false
+		}
+	}
+	retryTimes := 0
+	for {
+		response, err := HTTPWithoutRetry(option)
+		if err != nil {
+			return response, err
+		}
+		if retry(response, response.RawPacket, retryTimes) && (retryTimes < option.RetryTimes || retryHandler != nil) {
+			retryTimes += 1
+			time.Sleep(utils.JitterBackoff(option.RetryWaitTime, option.RetryMaxWaitTime, retryTimes))
+			log.Infof("retry reconnect because [%d / %d]", retryTimes, option.RetryMaxWaitTime)
+			continue
+		}
+		return response, nil
+	}
+}
 
-	/*
-		init option config
-	*/
+func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	var (
 		https                   = option.Https
 		forceHttp2              = option.Http2
@@ -197,9 +250,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		timeout                 = option.Timeout
 		connectTimeout          = option.ConnectTimeout
 		maxRetryTimes           = option.RetryTimes
-		retryInStatusCode       = option.RetryInStatusCode
-		retryNotInStatusCode    = option.RetryNotInStatusCode
-		retryHandler            = option.RetryHandler
 		customFailureChecker    = option.CustomFailureChecker
 		retryWaitTime           = option.RetryWaitTime
 		retryMaxWaitTime        = option.RetryMaxWaitTime
@@ -226,52 +276,8 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		randomJA3FingerPrint    = option.RandomJA3FingerPrint
 		clientHelloSpec         = option.ClientHelloSpec
 		dialer                  = option.Dialer
-		retryTimes              = 0
 	)
 
-	retry := func(rsp *LowhttpResponse, rawBytes []byte, retryTimes int) bool {
-		if retryHandler != nil {
-			rspRaw, _, err := FixHTTPResponse(rawBytes)
-			if err != nil {
-				rspRaw = rawBytes
-			}
-			var httpsFlag = https
-			var rawReq = requestPacket
-			if utils.IsNil(response) {
-				httpsFlag = rsp.Https
-				rawReq = rsp.RawRequest
-			}
-			var retryFlag bool
-			retryHandler(httpsFlag, retryTimes, rawReq, rspRaw, func(i ...[]byte) {
-				if len(i) > 0 {
-					requestPacket = i[0]
-				}
-				retryFlag = true
-			})
-			return retryFlag
-		} else {
-			statusCode := GetStatusCodeFromResponse(rawBytes)
-			if len(retryNotInStatusCode) > 0 {
-				var retryNotIn = true
-				for _, sc := range retryNotInStatusCode { // black list first
-					if statusCode == sc || (statusCode >= 300 && statusCode < 400) { // 3xx code can't retry
-						retryNotIn = false
-						break
-					}
-				}
-				if retryNotIn {
-					return true
-				}
-			}
-			// in statuscode
-			for _, sc := range retryInStatusCode {
-				if statusCode == sc {
-					return true
-				}
-			}
-			return false
-		}
-	}
 	failureChecker := func(rsp *LowhttpResponse) error {
 		if customFailureChecker != nil && rsp != nil {
 			var failureMsg string
@@ -287,7 +293,6 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		return nil
 	}
 
-RETRY:
 	connectTimeout = 2 * time.Second
 	if reqIns == nil {
 		// create new request instance for httpctx
@@ -810,13 +815,6 @@ RECONNECT:
 			}
 			httpctx.SetBareResponseBytes(reqIns, responsePacket)
 			response.RawPacket = responsePacket
-			// status code retry
-			if retry(response, responsePacket, retryTimes) && (retryTimes < maxRetryTimes || retryHandler != nil) {
-				retryTimes += 1
-				time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
-				log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
-				goto RETRY
-			}
 
 			err = failureChecker(response)
 			return response, err
@@ -1122,14 +1120,6 @@ RECONNECT:
 	// 更新cookiejar中的cookie
 	if session != nil && firstResponse != nil {
 		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
-	}
-
-	// status code retry
-	if retry(response, rawBytes, retryTimes) && (retryTimes < maxRetryTimes || retryHandler != nil) {
-		retryTimes += 1
-		time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
-		log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
-		goto RETRY
 	}
 
 	response.BareResponse = rawBytes
