@@ -273,28 +273,39 @@ func (kb *KnowledgeBase) DeleteKnowledgeEntry(entryID int64) error {
 // SearchKnowledgeEntries 搜索知识条目，返回知识库条目对象
 func (kb *KnowledgeBase) SearchKnowledgeEntries(query string, limit int) ([]*schema.KnowledgeBaseEntry, error) {
 	// 先通过RAG系统进行向量搜索
-	searchResults, err := kb.ragSystem.QueryWithPage(query, 1, limit)
+	searchResults, err := kb.ragSystem.QueryWithPage(query, 1, limit+5)
 	if err != nil {
 		return nil, utils.Errorf("RAG搜索失败: %v", err)
 	}
 
 	// 通过搜索结果中的文档ID查询对应的知识库条目
 	var entries []*schema.KnowledgeBaseEntry
+	docIDs := make(map[string]bool)
 	for _, result := range searchResults {
-		// 文档ID就是知识库条目的ID
-		entryID, err := strconv.ParseInt(result.Document.ID, 10, 64)
-		if err != nil {
-			// 如果ID解析失败，跳过这个结果
-			continue
+		var docID string
+		if result.Document.Metadata["original_doc_id"] != nil {
+			docID = result.Document.Metadata["original_doc_id"].(string)
+		} else {
+			docID = result.Document.ID
 		}
 
-		entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
-		if err != nil {
-			// 如果查询失败，跳过这个结果
-			continue
-		}
+		if docID != "" && !docIDs[docID] {
+			docIDs[docID] = true
+			// 文档ID就是知识库条目的ID
+			entryID, err := strconv.ParseInt(docID, 10, 64)
+			if err != nil {
+				// 如果ID解析失败，跳过这个结果
+				continue
+			}
 
-		entries = append(entries, entry)
+			entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
+			if err != nil {
+				// 如果查询失败，跳过这个结果
+				continue
+			}
+
+			entries = append(entries, entry)
+		}
 	}
 
 	return entries, nil

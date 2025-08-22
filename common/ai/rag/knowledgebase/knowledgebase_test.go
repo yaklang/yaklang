@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // testEmbedder 测试用的嵌入器函数
@@ -205,4 +206,60 @@ func TestKnowledgeBaseOperations(t *testing.T) {
 	assert.True(t, status.InSync)
 	assert.Equal(t, 1, status.DatabaseEntries)
 	assert.Equal(t, 1, status.RAGDocuments)
+}
+
+// 测试添加一个超大文档并查询
+func TestAddLargeDocument(t *testing.T) {
+	// 创建临时数据库
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// 创建知识库
+	kb, err := NewKnowledgeBase(
+		db,
+		"large-doc-kb",
+		"超大文档知识库",
+		"large-doc",
+		rag.WithEmbeddingModel("mock-model"),
+		rag.WithModelDimension(3),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, kb)
+
+	// 添加一个超大文档
+	doc := &schema.KnowledgeBaseEntry{
+		KnowledgeBaseID:    1,
+		KnowledgeTitle:     "超大文档",
+		KnowledgeType:      "Test",
+		ImportanceScore:    8,
+		Keywords:           []string{"超大文档"},
+		KnowledgeDetails:   "\\n为什么检索增强生成很重要？\\nLLM 是一项关键的人工智能（AI）技术，为智能聊天机器人和其他自然语言处理（NLP）应用程序提供支持。目标创建能够是通过交叉引用权威知识来源，在各种环境中回答用户问题的机器人。不幸的是，LLM 技术的性质给 LLM 响应带来了不可预测性。此外，LLM 训练数据是静态的，从而为其掌握的知识限定了截止日期。\\n\\nLLM 面临的已知挑战包括：\\n\\n在没有答案的情况下提供虚假信息。\\n在用户需要具体的最新响应时，提供过时或宽泛的信息。\\n依据非权威来源创建响应。\\n由于术语混淆，不同的培训来源使用相同的术语来谈论不同的事情，因此会产生不准确的响应。\\n您可以将大语言模型看作是一个过于热情的新员工，他拒绝随时了解时事，但总是会绝对自信地回答每一个问题。不幸的是，这种态度会对用户的信任产生负面影响，这是您不希望聊天机器人效仿的！\\n\\nRAG 是解决其中一些挑战的一种方法。它会重定向 LLM，从权威的、预先确定的知识来源中检索相关信息。组织可以更好地控制生成的文本输出，并且用户可以深入了解 LLM 如何生成响应。\\n\\n检索增强生成有哪些好处？\\nRAG 技术为组织的生成式人工智能工作带来了多项好处。\\n\\n经济高效的实施\\n聊天机器人开发通常从基础模型开始。基础模型（FM）是在广泛的广义和未标记数据上训练的 API 可访问 LLM。针对组织或领域特定信息重新训练基础模型的计算和财务成本很高。RAG 是一种将新数据引入 LLM 的更加经济高效的方法。它使生成式人工智能技术更广泛地得以获取和使用。\\n\\n当前信息\\n即使 LLM 的原始训练数据来源适合您的需求，但保持相关性也具有挑战性。RAG 允许开发人员为生成模型提供最新的研究、统计数据或新闻。他们可以使用 RAG 将 LLM 直接连接到实时社交媒体提要、新闻网站或其他经常更新的信息来源。LLM 随即可以向用户提供最新信息。\\n\\n增强用户信任度\\nRAG 允许 LLM 通过来源归属来呈现准确的信息。输出可以包括对来源的引文或引用。如果需要进一步说明或更详细的信息，用户也可以自己查找源文档。",
+		Summary:            "超大文档摘要",
+		SourcePage:         1,
+		PotentialQuestions: []string{"什么是超大文档?", "如何使用超大文档?"},
+	}
+
+	err = kb.AddKnowledgeEntry(doc)
+	assert.NoError(t, err)
+
+	doc2 := &schema.KnowledgeBaseEntry{
+		KnowledgeBaseID:    1,
+		KnowledgeTitle:     "超大文档2",
+		KnowledgeType:      "Test",
+		ImportanceScore:    8,
+		Keywords:           []string{"超大文档2"},
+		KnowledgeDetails:   "\\n为什么检索增强生成很重要？\\nLLM 是一项关键的人工智能（AI）技术，为智能聊天机器人和其他自然语言处理（NLP）应用程序提供支持。目标创建能够是通过交叉引用权威知识来源，在各种环境中回答用户问题的机器人。不幸的是，LLM 技术的性质给 LLM 响应带来了不可预测性。此外，LLM 训练数据是静态的，从而为其掌握的知识限定了截止日期。\\n\\nLLM 面临的已知挑战包括：\\n\\n在没有答案的情况下提供虚假信息。\\n在用户需要具体的最新响应时，提供过时或宽泛的信息。\\n依据非权威来源创建响应。\\n由于术语混淆，不同的培训来源使用相同的术语来谈论不同的事情，因此会产生不准确的响应。\\n您可以将大语言模型看作是一个过于热情的新员工，他拒绝随时了解时事，但总是会绝对自信地回答每一个问题。不幸的是，这种态度会对用户的信任产生负面影响，这是您不希望聊天机器人效仿的！\\n\\nRAG 是解决其中一些挑战的一种方法。它会重定向 LLM，从权威的、预先确定的知识来源中检索相关信息。组织可以更好地控制生成的文本输出，并且用户可以深入了解 LLM 如何生成响应。\\n\\n检索增强生成有哪些好处？\\nRAG 技术为组织的生成式人工智能工作带来了多项好处。\\n\\n经济高效的实施\\n聊天机器人开发通常从基础模型开始。基础模型（FM）是在广泛的广义和未标记数据上训练的 API 可访问 LLM。针对组织或领域特定信息重新训练基础模型的计算和财务成本很高。RAG 是一种将新数据引入 LLM 的更加经济高效的方法。它使生成式人工智能技术更广泛地得以获取和使用。\\n\\n当前信息\\n即使 LLM 的原始训练数据来源适合您的需求，但保持相关性也具有挑战性。RAG 允许开发人员为生成模型提供最新的研究、统计数据或新闻。他们可以使用 RAG 将 LLM 直接连接到实时社交媒体提要、新闻网站或其他经常更新的信息来源。LLM 随即可以向用户提供最新信息。\\n\\n增强用户信任度\\nRAG 允许 LLM 通过来源归属来呈现准确的信息。输出可以包括对来源的引文或引用。如果需要进一步说明或更详细的信息，用户也可以自己查找源文档。",
+		Summary:            "超大文档2摘要",
+		SourcePage:         1,
+		PotentialQuestions: []string{"什么是超大文档2?", "如何使用超大文档2?"},
+	}
+
+	err = kb.AddKnowledgeEntry(doc2)
+	assert.NoError(t, err)
+
+	results, err := kb.SearchKnowledgeEntries("检索增强", 2)
+	assert.NoError(t, err)
+	assert.Len(t, results, 2)
 }

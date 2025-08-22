@@ -1,10 +1,23 @@
 package rag
 
 import (
+	"errors"
 	"fmt"
+	"sort"
+	"sync"
 
+	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+)
+
+// BigTextPlan 常量定义
+const (
+	// BigTextPlanChunkText 将大文本分割成多个文档分别存储
+	BigTextPlanChunkText = "chunkText"
+
+	// BigTextPlanChunkTextAndAvgPooling 将大文本分割后生成多个嵌入向量，然后平均池化成一个文档存储
+	BigTextPlanChunkTextAndAvgPooling = "chunkTextAndAvgPooling"
 )
 
 // Document 表示可以被检索的文档
@@ -49,15 +62,23 @@ type VectorStore interface {
 
 // RAGSystem 表示完整的 RAG 系统
 type RAGSystem struct {
-	Embedder    EmbeddingClient // 嵌入向量生成器
-	VectorStore VectorStore     // 向量存储
+	Embedder     EmbeddingClient // 嵌入向量生成器
+	VectorStore  VectorStore     // 向量存储
+	BigTextPlan  string          // 大文本方案
+	Concurrent   int             // 并发数
+	MaxChunkSize int             // 最大块大小
+	ChunkOverlap int             // 块重叠
 }
 
 // NewRAGSystem 创建一个新的 RAG 系统
 func NewRAGSystem(embedder EmbeddingClient, store VectorStore) *RAGSystem {
 	return &RAGSystem{
-		Embedder:    embedder,
-		VectorStore: store,
+		Embedder:     embedder,
+		VectorStore:  store,
+		BigTextPlan:  BigTextPlanChunkText, // 默认使用分块策略
+		Concurrent:   10,
+		MaxChunkSize: 800,
+		ChunkOverlap: 100,
 	}
 }
 
@@ -99,6 +120,58 @@ func NewRAGSystemWithOptionalEmbedding(store VectorStore, embedder EmbeddingClie
 	return NewRAGSystem(embedder, store), nil
 }
 
+// SetBigTextPlan 设置大文本处理方案
+func (r *RAGSystem) SetBigTextPlan(plan string) {
+	r.BigTextPlan = plan
+	log.Infof("set big text plan to: %s", plan)
+}
+
+// averagePooling 对多个嵌入向量进行平均池化
+func averagePooling(embeddings [][]float32) []float32 {
+	if len(embeddings) == 0 {
+		return nil
+	}
+
+	if len(embeddings) == 1 {
+		return embeddings[0]
+	}
+
+	// 获取向量维度
+	dim := len(embeddings[0])
+	if dim == 0 {
+		return nil
+	}
+
+	// 初始化结果向量
+	result := make([]float32, dim)
+	validCount := 0
+
+	// 累加所有向量
+	for _, embedding := range embeddings {
+		if len(embedding) != dim {
+			log.Warnf("embedding dimension mismatch: expected %d, got %d", dim, len(embedding))
+			continue
+		}
+		validCount++
+		for i, val := range embedding {
+			result[i] += val
+		}
+	}
+
+	// 如果没有有效向量，返回nil
+	if validCount == 0 {
+		return nil
+	}
+
+	// 计算平均值
+	count := float32(validCount)
+	for i := range result {
+		result[i] /= count
+	}
+
+	return result
+}
+
 func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
 	log.Infof("adding document with id: %s, content length: %d", docId, len(content))
 	doc := &Document{
@@ -119,31 +192,262 @@ func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) er
 // AddDocuments 添加文档到 RAG 系统
 func (r *RAGSystem) addDocuments(docs ...Document) error {
 	log.Infof("adding %d documents to RAG system", len(docs))
+
+	var finalDocs []Document
+
 	// 为每个文档生成嵌入向量
 	for i := range docs {
 		log.Infof("generating embedding for document %s (index %d)", docs[i].ID, i)
-		embedding, err := r.Embedder.Embedding(docs[i].Content)
+
+		// 首先尝试直接生成嵌入
+		embeddingData, err := r.Embedder.Embedding(docs[i].Content)
 		if err != nil {
+			if errors.Is(err, embedding.ErrInputTooLarge) {
+				// 如果失败且是由于文本过大，使用BigTextPlan处理
+				processedDocs, processErr := r.processBigText(docs[i])
+				if processErr != nil {
+					log.Errorf("failed to process big text for document %s: %v", docs[i].ID, processErr)
+					return utils.Errorf("failed to process document %s: %v", docs[i].ID, processErr)
+				}
+
+				// 将处理后的文档添加到最终文档列表
+				finalDocs = append(finalDocs, processedDocs...)
+				continue
+			}
 			log.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
 			return utils.Errorf("failed to generate embedding for document %s: %v", docs[i].ID, err)
 		}
-		if len(embedding) <= 0 {
+
+		if len(embeddingData) <= 0 {
 			log.Errorf("empty embedding generated for document %s", docs[i].ID)
 			return utils.Errorf("failed to generate embedding for document (empty embedding) %s", docs[i].ID)
 		}
-		log.Infof("successfully generated embedding for document %s, dimension: %d", docs[i].ID, len(embedding))
-		docs[i].Embedding = embedding
+
+		log.Infof("successfully generated embedding for document %s, dimension: %d", docs[i].ID, len(embeddingData))
+		docs[i].Embedding = embeddingData
+		finalDocs = append(finalDocs, docs[i])
 	}
 
-	log.Infof("adding %d documents with embeddings to vector store", len(docs))
+	log.Infof("adding %d processed documents with embeddings to vector store", len(finalDocs))
 	// 添加到向量存储
-	err := r.VectorStore.Add(docs...)
+	err := r.VectorStore.Add(finalDocs...)
 	if err != nil {
 		log.Errorf("failed to add documents to vector store: %v", err)
 		return err
 	}
-	log.Infof("successfully added %d documents to vector store", len(docs))
+	log.Infof("successfully added %d documents to vector store", len(finalDocs))
 	return nil
+}
+
+// processBigText 处理大文本，根据BigTextPlan策略进行不同的处理
+func (r *RAGSystem) processBigText(doc Document) ([]Document, error) {
+	log.Infof("processing big text for document %s using plan: %s", doc.ID, r.BigTextPlan)
+
+	// 设置合理的分块参数
+	maxChunkSize := r.MaxChunkSize // 默认块大小（rune计算）
+	overlap := r.ChunkOverlap      // 默认重叠
+
+	// 根据元数据调整分块参数
+	if chunkSize, ok := doc.Metadata["chunk_size"].(int); ok && chunkSize > 0 {
+		maxChunkSize = chunkSize
+	}
+	if chunkOverlap, ok := doc.Metadata["chunk_overlap"].(int); ok && chunkOverlap >= 0 {
+		overlap = chunkOverlap
+	}
+
+	// 分割文本
+	chunks := ChunkText(doc.Content, maxChunkSize, overlap)
+	if len(chunks) == 0 {
+		return nil, utils.Errorf("failed to chunk text for document %s", doc.ID)
+	}
+
+	log.Infof("split document %s into %d chunks", doc.ID, len(chunks))
+
+	switch r.BigTextPlan {
+	case BigTextPlanChunkText:
+		return r.processChunkText(doc, chunks)
+	case BigTextPlanChunkTextAndAvgPooling:
+		return r.processChunkTextAndAvgPooling(doc, chunks)
+	default:
+		log.Warnf("unknown big text plan: %s, using default chunkText", r.BigTextPlan)
+		return r.processChunkText(doc, chunks)
+	}
+}
+
+// processChunkText 将文本分割成多个文档分别存储
+func (r *RAGSystem) processChunkText(originalDoc Document, chunks []string) ([]Document, error) {
+	log.Infof("processing document %s with chunkText strategy, creating %d documents", originalDoc.ID, len(chunks))
+
+	if len(chunks) == 0 {
+		return []Document{}, nil
+	}
+
+	// 并行处理结果结构
+	type chunkResult struct {
+		index int
+		doc   Document
+		err   error
+	}
+
+	// 创建结果channel和sync.WaitGroup
+	resultChan := make(chan chunkResult, len(chunks))
+	var wg sync.WaitGroup
+
+	// 并行处理每个chunk
+	for i, chunk := range chunks {
+		wg.Add(1)
+		go func(index int, chunkText string) {
+			defer wg.Done()
+
+			// 为每个分块生成嵌入
+			embedding, err := r.Embedder.Embedding(chunkText)
+			if err != nil {
+				log.Errorf("failed to generate embedding for chunk %d of document %s: %v", index, originalDoc.ID, err)
+				resultChan <- chunkResult{
+					index: index,
+					err:   utils.Errorf("failed to generate embedding for chunk %d: %v", index, err),
+				}
+				return
+			}
+
+			if len(embedding) == 0 {
+				log.Warnf("empty embedding for chunk %d of document %s, skipping", index, originalDoc.ID)
+				resultChan <- chunkResult{
+					index: index,
+					err:   nil, // 空embedding不是错误，只是跳过
+				}
+				return
+			}
+
+			// 创建新文档
+			chunkDoc := Document{
+				ID:        fmt.Sprintf("%s_chunk_%d", originalDoc.ID, index),
+				Content:   chunkText,
+				Metadata:  make(map[string]any),
+				Embedding: embedding,
+			}
+
+			// 复制原始文档的元数据
+			for k, v := range originalDoc.Metadata {
+				chunkDoc.Metadata[k] = v
+			}
+
+			// 添加分块特有的元数据
+			chunkDoc.Metadata["original_doc_id"] = originalDoc.ID
+			chunkDoc.Metadata["chunk_index"] = index
+			chunkDoc.Metadata["total_chunks"] = len(chunks)
+			chunkDoc.Metadata["is_chunk"] = true
+
+			resultChan <- chunkResult{
+				index: index,
+				doc:   chunkDoc,
+				err:   nil,
+			}
+		}(i, chunk)
+	}
+
+	// 等待所有goroutine完成
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+
+	// 收集结果
+	results := make([]chunkResult, 0, len(chunks))
+	for result := range resultChan {
+		results = append(results, result)
+	}
+
+	// 检查错误
+	var firstError error
+	validDocs := make([]Document, 0, len(chunks))
+
+	// 按原始索引顺序排序结果
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].index < results[j].index
+	})
+
+	for _, result := range results {
+		if result.err != nil {
+			if firstError == nil {
+				firstError = result.err
+			}
+			continue
+		}
+
+		// 只有非空embedding的文档才添加到结果中
+		if len(result.doc.Embedding) > 0 {
+			validDocs = append(validDocs, result.doc)
+		}
+	}
+
+	// 如果有错误，返回第一个错误
+	if firstError != nil {
+		return nil, firstError
+	}
+
+	log.Infof("successfully created %d chunk documents for %s", len(validDocs), originalDoc.ID)
+	return validDocs, nil
+}
+
+// processChunkTextAndAvgPooling 将文本分割后生成多个嵌入向量，然后平均池化成一个文档存储
+func (r *RAGSystem) processChunkTextAndAvgPooling(originalDoc Document, chunks []string) ([]Document, error) {
+	log.Infof("processing document %s with chunkTextAndAvgPooling strategy", originalDoc.ID)
+
+	var embeddings [][]float32
+	var combinedContent string
+
+	// 为每个分块生成嵌入
+	for i, chunk := range chunks {
+		embedding, err := r.Embedder.Embedding(chunk)
+		if err != nil {
+			log.Errorf("failed to generate embedding for chunk %d of document %s: %v", i, originalDoc.ID, err)
+			return nil, utils.Errorf("failed to generate embedding for chunk %d: %v", i, err)
+		}
+
+		if len(embedding) == 0 {
+			log.Warnf("empty embedding for chunk %d of document %s, skipping", i, originalDoc.ID)
+			continue
+		}
+
+		embeddings = append(embeddings, embedding)
+		if i == 0 {
+			combinedContent = chunk
+		} else {
+			combinedContent += " " + chunk
+		}
+	}
+
+	if len(embeddings) == 0 {
+		return nil, utils.Errorf("no valid embeddings generated for document %s", originalDoc.ID)
+	}
+
+	// 对所有嵌入向量进行平均池化
+	avgEmbedding := averagePooling(embeddings)
+	if avgEmbedding == nil {
+		return nil, utils.Errorf("failed to compute average pooling for document %s", originalDoc.ID)
+	}
+
+	// 创建合并后的文档
+	pooledDoc := Document{
+		ID:        originalDoc.ID,
+		Content:   combinedContent,
+		Metadata:  make(map[string]any),
+		Embedding: avgEmbedding,
+	}
+
+	// 复制原始文档的元数据
+	for k, v := range originalDoc.Metadata {
+		pooledDoc.Metadata[k] = v
+	}
+
+	// 添加池化特有的元数据
+	pooledDoc.Metadata["is_pooled"] = true
+	pooledDoc.Metadata["pooled_chunks"] = len(embeddings)
+	pooledDoc.Metadata["pooling_method"] = "average"
+
+	log.Infof("successfully created pooled document for %s from %d chunks", originalDoc.ID, len(embeddings))
+	return []Document{pooledDoc}, nil
 }
 
 // QueryWithPage 根据查询文本检索相关文档并返回结果
