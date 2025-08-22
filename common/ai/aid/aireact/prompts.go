@@ -132,8 +132,8 @@ func (pm *PromptManager) GenerateLoopPrompt(userQuery string, tools []*aitool.To
 	}
 
 	// Set conversation memory
-	if pm.react.config.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.config.cumulativeSummary
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
 	}
 
 	// Set timeline memory
@@ -161,8 +161,8 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 		data.OriginalQuery = pm.react.config.memory.Query
 		data.Timeline = pm.react.config.memory.Timeline()
 	}
-	data.CumulativeSummary = pm.react.config.cumulativeSummary
-	data.CurrentIteration = pm.react.config.currentIteration
+	data.CumulativeSummary = pm.react.cumulativeSummary
+	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = pm.react.config.maxIterations
 
 	return pm.executeTemplate("tool-params", toolParamsPromptTemplate, data)
@@ -205,8 +205,8 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolName, toolParams 
 	}
 
 	// Set conversation memory
-	if pm.react.config.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.config.cumulativeSummary
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
 	}
 
 	// Set timeline memory

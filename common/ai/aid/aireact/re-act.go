@@ -36,6 +36,12 @@ type ReactTaskItem struct {
 type ReAct struct {
 	*aicommon.Emitter
 
+	// runtime fields
+	cumulativeSummary           string // Cumulative summary for conversation memory
+	currentIteration            int
+	currentUserInteractiveCount int // 当前用户交互次数
+	finished                    bool
+
 	config        *ReActConfig
 	promptManager *PromptManager
 
@@ -243,8 +249,9 @@ func (r *ReAct) processTask(task *Task) {
 	// 从任务中提取用户输入
 	userInput := task.GetUserInput()
 
-	r.config.finished = false
-	r.config.currentIteration = 0
+	r.finished = false
+	r.currentIteration = 0
+	r.currentUserInteractiveCount = 0
 	// 为新任务重置内存
 
 	// 重新初始化内存

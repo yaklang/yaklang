@@ -18,8 +18,8 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 		log.Infof("Using free input: %s", userInput)
 	}
 	// Reset session state if needed
-	r.config.finished = false
-	r.config.currentIteration = 0
+	r.finished = false
+	r.currentIteration = 0
 	if r.config.debugEvent {
 		log.Infof("Reset ReAct session for new input")
 	}

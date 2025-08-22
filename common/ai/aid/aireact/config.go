@@ -106,12 +106,9 @@ type ReActConfig struct {
 	maxIterations int
 
 	// Memory and state
-	memory            *aid.Memory // Replace conversationHistory with Memory/Timeline
-	cumulativeSummary string      // Cumulative summary for conversation memory
-	currentIteration  int
-	finished          bool
-	language          string // Response language preference
-	topToolsCount     int    // Number of top tools to display in prompt
+	memory        *aid.Memory // Replace conversationHistory with Memory/Timeline
+	language      string      // Response language preference
+	topToolsCount int         // Number of top tools to display in prompt
 
 	// Consumption tracking
 	inputConsumption  *int64
@@ -124,6 +121,15 @@ type ReActConfig struct {
 
 	// async Guardian
 	guardian *aicommon.AsyncGuardian
+
+	userInteractiveLimitedTimes int64
+}
+
+func (cfg *ReActConfig) GetUserInteractiveLimitedTimes() int64 {
+	if cfg.userInteractiveLimitedTimes <= 0 {
+		return 3 // Default to 100 if not set
+	}
+	return cfg.userInteractiveLimitedTimes
 }
 
 func (cfg *ReActConfig) GetTimelineRecordLimit() int64 {
@@ -416,20 +422,18 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		autoApproveTools:         false,
-		maxIterations:            100,
-		memory:                   aid.GetDefaultMemory(), // Initialize with default memory
-		cumulativeSummary:        "",
-		currentIteration:         0,
-		finished:                 false,
-		language:                 "zh", // Default to Chinese
-		topToolsCount:            20,   // Default to show top 20 tools
-		inputConsumption:         new(int64),
-		outputConsumption:        new(int64),
-		aiTransactionAutoRetry:   5,
-		timelineLimit:            100,       // Default limit for timeline records
-		timelineContentSizeLimit: 50 * 1024, // Default limit for 50k
-		guardian:                 aicommon.NewAsyncGuardian(ctx, id),
+		autoApproveTools:            false,
+		maxIterations:               100,
+		memory:                      aid.GetDefaultMemory(), // Initialize with default memory
+		language:                    "zh",                   // Default to Chinese
+		topToolsCount:               20,                     // Default to show top 20 tools
+		inputConsumption:            new(int64),
+		outputConsumption:           new(int64),
+		aiTransactionAutoRetry:      5,
+		timelineLimit:               100,       // Default limit for timeline records
+		timelineContentSizeLimit:    50 * 1024, // Default limit for 50k
+		guardian:                    aicommon.NewAsyncGuardian(ctx, id),
+		userInteractiveLimitedTimes: 3, // Default to 3 times
 	}
 
 	// Initialize emitter
@@ -488,5 +492,15 @@ func WithGuardianStreamTrigger(nodeId string, trigger aicommon.GuardianMirrorStr
 		cfg.guardian.RegisterMirrorStreamTrigger(nodeId, func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
 			trigger(unlimitedChan, emitter)
 		})
+	}
+}
+
+func WithUserInteractiveLimitedTimes(times int64) Option {
+	return func(cfg *ReActConfig) {
+		if times > 0 {
+			cfg.userInteractiveLimitedTimes = times
+		} else {
+			cfg.userInteractiveLimitedTimes = 3 // Default to 3 if not set
+		}
 	}
 }

@@ -55,17 +55,17 @@ func (r *ReAct) invokePlanAndExecute(planPayload string) error {
 		aid.WithDisallowRequireForUserPrompt(),
 	)
 	if err != nil {
-		r.config.finished = true
+		r.finished = true
 		log.Errorf("Failed to create coordinator for plan execution: %v", err)
 		return utils.Errorf("failed to create coordinator for plan execution: %v", err)
 	}
 	if err := cod.Run(); err != nil {
-		r.config.finished = true
+		r.finished = true
 		log.Errorf("Plan execution failed: %v", err)
 		return utils.Errorf("plan execution failed: %v", err)
 	}
 	// Emit the final result from the coordinator
-	r.config.finished = true
+	r.finished = true
 
 	return nil
 }
