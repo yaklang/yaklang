@@ -250,6 +250,10 @@ TOOLREQUIRED:
 
 func (t *AiTask) executeTaskPushTaskIndex() error {
 	// 在执行任务之前，推送事件到事件栈
+	t.syncGuardian.SetSyncData(SYNC_TYPE_CURRENT_TASK, func() any {
+		return t
+	})
+	t.EmitJSON(schema.EVENT_TYPE_CURRENT_TASK, "system", t)
 	t.Emitter = t.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 		if event.TaskIndex == "" {
 			event.TaskIndex = t.Index

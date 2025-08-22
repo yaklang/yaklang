@@ -99,7 +99,7 @@ func (r *Config) EmitRequireReviewForPlan(rsp *PlanResponse, id string) {
 }
 
 func (r *Config) EmitCurrentConfigInfo() {
-	r.EmitJSON(schema.EVENT_TYPE_AID_CONFIG, "system", r.SimpleInfoMap())
+	r.EmitJSON(schema.EVENT_TYPE_AI_CONFIG, "system", r.SimpleInfoMap())
 }
 
 func (r *Config) EmitPushTask(task *AiTask) {
@@ -147,28 +147,12 @@ func (r *Config) EmitUpdateTaskStatus(task *AiTask) {
 	})
 }
 
-type SyncType string
-
 const (
-	SYNC_TYPE_PLAN          SyncType = "plan"
-	SYNC_TYPE_CONSUMPTION   SyncType = "consumption"
-	SYNC_TYPE_PING          SyncType = "ping"
-	SYNC_TYPE_PROCESS_EVENT SyncType = "sync_process_event"
-
-	ProcessID           string = "process_id"
-	SyncProcessEeventID        = "sync_process_event_id"
+	SYNC_TYPE_PLAN         string = "plan"
+	SYNC_TYPE_CONSUMPTION  string = "consumption"
+	SYNC_TYPE_CONFIG       string = "config"
+	SYNC_TYPE_CURRENT_TASK string = "current_task"
 )
-
-func ParseSyncType(s string) (SyncType, bool) {
-	for _, t := range []SyncType{
-		SYNC_TYPE_PLAN, SYNC_TYPE_CONSUMPTION, SYNC_TYPE_PING, SYNC_TYPE_PROCESS_EVENT,
-	} {
-		if string(t) == s {
-			return t, true
-		}
-	}
-	return "", false
-}
 
 type InputEvent struct {
 	Id string
@@ -176,7 +160,7 @@ type InputEvent struct {
 	// 是否是同步信息
 	IsSyncInfo bool
 	// 同步类型 一般认为有 plan consumption
-	SyncType SyncType
+	SyncType string
 
 	IsInteractive bool
 	Params        aitool.InvokeParams
@@ -184,10 +168,7 @@ type InputEvent struct {
 
 func ConvertAIInputEventToAIDInputEvent(event *ypb.AIInputEvent) (*InputEvent, error) {
 	if event.IsSyncMessage {
-		t, ok := ParseSyncType(event.GetSyncType())
-		if !ok {
-			return nil, utils.Errorf("parse sync type failed, got: %v", event.GetSyncType())
-		}
+		t := event.GetSyncType()
 		var params = make(aitool.InvokeParams)
 		err := json.Unmarshal([]byte(event.GetSyncJsonInput()), &params)
 		if err != nil {
