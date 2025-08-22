@@ -411,7 +411,7 @@ func TestMUSTPASS_AveragePooling(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestMUSTPASS_AddDocuments(t *testing.T) {
+func Test_AddDocuments(t *testing.T) {
 	testRag, err := Get("testRag")
 	assert.NoError(t, err)
 
