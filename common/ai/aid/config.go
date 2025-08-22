@@ -84,7 +84,7 @@ type Config struct {
 	taskAICallback        aicommon.AICallbackType // no need to think, low level
 
 	// asyncGuardian can auto collect event handler data
-	guardian     *asyncGuardian
+	guardian     *aicommon.AsyncGuardian
 	eventHandler func(e *schema.AiOutputEvent)
 
 	saveEvent bool
@@ -439,7 +439,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		id:                          id,
 		epm:                         aicommon.NewEndpointManagerContext(ctx),
 		memory:                      nil, // default mem cannot create in config
-		guardian:                    newAsyncGuardian(ctx, id),
+		guardian:                    aicommon.NewAsyncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
 		syncMap:                     make(map[string]func() any),
 		inputConsumption:            new(int64),
@@ -959,7 +959,7 @@ func WithRiskControlForgeName(forgeName string, callbackType aicommon.AICallback
 	}
 }
 
-func WithGuardianEventTrigger(eventTrigger schema.EventType, callback GuardianEventTrigger) Option {
+func WithGuardianEventTrigger(eventTrigger schema.EventType, callback aicommon.GuardianEventTrigger) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -967,11 +967,11 @@ func WithGuardianEventTrigger(eventTrigger schema.EventType, callback GuardianEv
 		if config.guardian == nil {
 			return utils.Error("BUG: guardian cannot be empty (ASYNC Guardian)")
 		}
-		return config.guardian.registerEventTrigger(eventTrigger, callback)
+		return config.guardian.RegisterEventTrigger(eventTrigger, callback)
 	}
 }
 
-func WithGuardianMirrorStreamMirror(streamName string, callback GuardianMirrorStreamTrigger) Option {
+func WithGuardianMirrorStreamMirror(streamName string, callback aicommon.GuardianMirrorStreamTrigger) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -979,7 +979,7 @@ func WithGuardianMirrorStreamMirror(streamName string, callback GuardianMirrorSt
 		if config.guardian == nil {
 			return utils.Error("BUG: guardian cannot be empty (ASYNC Guardian)")
 		}
-		return config.guardian.registerMirrorEventTrigger(streamName, callback)
+		return config.guardian.RegisterMirrorEventTrigger(streamName, callback)
 	}
 }
 
@@ -1015,7 +1015,7 @@ func WithForgeName(forgeName string) Option {
 
 func WithTaskAnalysis(b bool) Option {
 	return func(config *Config) error {
-		return WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+		return WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 			var plansUUID string
 			var planTree string
 			type analyzeItem struct {

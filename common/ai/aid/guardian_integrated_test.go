@@ -95,7 +95,7 @@ func TestCoordinator_GUARDIAN_OUTPUT_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 			if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -266,7 +266,7 @@ func TestCoordinator_GUARDIAN_SMOKING_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+		WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 			if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				guardianSmokingTestPassed = true
 			} else {
@@ -425,7 +425,7 @@ func TestCoordinator_GUARDIAN_StreamSmocking_ToolUseReview(t *testing.T) {
 			return rsp, nil
 		}),
 		WithAIAgree(),
-		WithGuardianMirrorStreamMirror("test", func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter GuardianEmitter) {
+		WithGuardianMirrorStreamMirror("test", func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
 			for event := range unlimitedChan.OutputChannel() {
 				if event.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 					guardianSmokingTestPassed = true

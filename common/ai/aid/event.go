@@ -32,7 +32,7 @@ func (c *Config) emitBaseHandler(e *schema.AiOutputEvent) {
 	}
 
 	if c.guardian != nil {
-		c.guardian.feed(e)
+		c.guardian.Feed(e)
 	}
 
 	if utils.StringArrayContains(c.disableOutputEventType, string(e.Type)) {
