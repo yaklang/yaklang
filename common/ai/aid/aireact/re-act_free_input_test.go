@@ -79,3 +79,60 @@ LOOP:
 		t.Fatal("Expected to have at least one result event, but got none")
 	}
 }
+
+func TestReAct_FreeInput_MultiCalls(t *testing.T) {
+	flag := ksuid.New().String()
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+	ins, err := NewReAct(
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedFreeInputOutput(i, flag)
+		}),
+		WithDebug(false),
+		WithEventInputChan(in),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = ins
+	go func() {
+		for i := 0; i < 3; i++ {
+			in <- &ypb.AIInputEvent{
+				IsFreeInput: true,
+				FreeInput:   "abc",
+			}
+		}
+		close(in)
+	}()
+	after := time.After(5 * time.Second)
+
+	haveResult := false
+
+	count := 0
+LOOP:
+	for {
+		select {
+		case e := <-out:
+			fmt.Println(e.String())
+			if e.NodeId == "result" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..result")
+				if strings.Contains(utils.InterfaceToString(result), flag) {
+					haveResult = true
+					count++
+					if count >= 3 {
+						break LOOP
+					}
+				}
+			}
+		case <-after:
+			break LOOP
+		}
+	}
+
+	if !haveResult {
+		t.Fatal("Expected to have at least one result event, but got none")
+	}
+}

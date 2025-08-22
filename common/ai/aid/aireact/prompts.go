@@ -15,6 +15,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func nonce() string {
+	return utils.RandAlphaNumStringBytes(5)
+}
+
 // Embed template files
 //
 //go:embed prompts/loop/loop.txt
@@ -88,8 +92,10 @@ type ToolParamsPromptData struct {
 
 // VerificationPromptData contains data for verification prompt
 type VerificationPromptData struct {
+	Nonce         string
 	OriginalQuery string
-	ToolName      string
+	IsToolCall    bool
+	Payload       string
 	Timeline      string
 	Language      string
 	Schema        string
@@ -192,10 +198,13 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 }
 
 // GenerateVerificationPrompt generates verification prompt using template
-func (pm *PromptManager) GenerateVerificationPrompt(originalQuery, toolName string) (string, error) {
+func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string) (string, error) {
 	data := &VerificationPromptData{
+		Nonce:         nonce(),
 		OriginalQuery: originalQuery,
-		ToolName:      toolName,
+		IsToolCall:    isToolResult,
+		Payload:       payload,
+		Timeline:      pm.react.config.memory.Timeline(),
 		Language:      pm.react.config.language,
 		Schema:        verificationSchemaJSON,
 	}
