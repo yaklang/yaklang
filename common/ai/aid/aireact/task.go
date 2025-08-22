@@ -30,6 +30,18 @@ type Task struct {
 	CreatedAt time.Time
 }
 
+func (t *Task) IsFinished() bool {
+	t.RLock()
+	defer t.RUnlock()
+
+	switch t.Status {
+	case string(TaskStatus_Completed), string(TaskStatus_Aborted):
+		return true
+	default:
+		return false
+	}
+}
+
 func (t *Task) SetEmitter(e *aicommon.Emitter) {
 	t.emitter = e
 }

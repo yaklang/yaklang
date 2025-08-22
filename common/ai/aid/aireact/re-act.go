@@ -8,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -46,11 +45,9 @@ type ReAct struct {
 	promptManager *PromptManager
 
 	// 任务队列相关
-	currentTask          *Task        // 当前正在处理的任务
-	taskQueue            *TaskQueue   // 任务队列
-	queueProcessor       sync.Once    // 确保队列处理器只启动一次
-	queueMutex           sync.RWMutex // 保护队列相关状态
-	isProcessing         bool         // 是否正在处理任务
+	currentTask          *Task      // 当前正在处理的任务
+	taskQueue            *TaskQueue // 任务队列
+	queueProcessor       sync.Once  // 确保队列处理器只启动一次
 	timeline             *aicommon.Timeline
 	mirrorMutex          sync.RWMutex
 	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
@@ -83,7 +80,6 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
 		taskQueue:            NewTaskQueue("react-main-queue"),
-		isProcessing:         false,
 		timeline:             aicommon.NewTimeline(cfg.timelineLimit, cfg, nil),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 	}
@@ -182,7 +178,7 @@ func (r *ReAct) startQueueProcessor(ctx context.Context) {
 			for {
 				select {
 				case <-ticker.C:
-					r.processNextTaskFromQueue()
+					r.processReActFromQueue()
 				case <-ctx.Done():
 					if r.config.debugEvent {
 						log.Infof("Task queue processor stopped for ReAct instance: %s", r.config.id)
@@ -194,99 +190,8 @@ func (r *ReAct) startQueueProcessor(ctx context.Context) {
 	})
 }
 
-// processNextTaskFromQueue 处理队列中的下一个任务
-func (r *ReAct) processNextTaskFromQueue() {
-	if r.taskQueue.IsEmpty() {
-		return
-	}
-
-	r.queueMutex.Lock()
-	// 如果正在处理任务，直接返回
-	if r.isProcessing {
-		r.queueMutex.Unlock()
-		return
-	}
-
-	// 从队列获取下一个任务
-	log.Infof("start to get first task from queue for ReAct instance: %s", r.config.id)
-	nextTask := r.taskQueue.GetFirst()
-	if nextTask == nil {
-		r.queueMutex.Unlock()
-		return
-	}
-
-	// 标记正在处理并设置当前任务
-	r.isProcessing = true
-	r.currentTask = nextTask
-	r.queueMutex.Unlock()
-
-	// 更新任务状态为处理中
-	nextTask.SetStatus(string(TaskStatus_Processing))
-	r.addToTimeline("processing", fmt.Sprintf("Started processing task from queue: %s", nextTask.GetUserInput()), nextTask.GetId())
-
-	if r.config.debugEvent {
-		log.Infof("Processing task from queue: %s", nextTask.GetId())
-	}
-
-	// 异步处理任务
-	go r.processTask(nextTask)
-}
-
-// processTask 处理单个 Task
-func (r *ReAct) processTask(task *Task) {
-	defer func() {
-		r.queueMutex.Lock()
-		r.isProcessing = false
-		r.currentTask = nil // 清空当前任务
-		r.queueMutex.Unlock()
-		if r.config.debugEvent {
-			log.Infof("Task processing completed: %s", task.GetId())
-		}
-	}()
-
-	// 任务状态应该已经在调用前被设置为处理中，这里不需要重复设置
-
-	// 从任务中提取用户输入
-	userInput := task.GetUserInput()
-
-	r.finished = false
-	r.currentIteration = 0
-	r.currentUserInteractiveCount = 0
-	// 为新任务重置内存
-
-	// 重新初始化内存
-	if r.config.memory == nil {
-		r.config.memory = aid.GetDefaultMemory()
-		r.config.memory.SetTimelineAI(r.config)
-		r.config.memory.StoreTools(func() []*aitool.Tool {
-			if r.config.aiToolManager == nil {
-				return []*aitool.Tool{}
-			}
-			tools, err := r.config.aiToolManager.GetEnableTools()
-			if err != nil {
-				return []*aitool.Tool{}
-			}
-			return tools
-		})
-	}
-
-	// 执行主循环
-	err := r.executeMainLoop(userInput)
-	if err != nil {
-		log.Errorf("Task execution failed: %v", err)
-		task.SetStatus(string(TaskStatus_Aborted))
-		r.addToTimeline("error", fmt.Sprintf("Task execution failed: %v", err), task.GetId())
-	} else {
-		task.SetStatus(string(TaskStatus_Completed))
-		r.addToTimeline("completed", fmt.Sprintf("Task completed: %s", task.GetUserInput()), task.GetId())
-	}
-}
-
 // GetQueueInfo 获取任务队列信息
 func (r *ReAct) GetQueueInfo() map[string]interface{} {
-	r.queueMutex.RLock()
-	defer r.queueMutex.RUnlock()
-
 	queueingTasks := r.taskQueue.GetQueueingTasks()
 	taskInfos := make([]map[string]interface{}, 0, len(queueingTasks))
 
@@ -304,7 +209,7 @@ func (r *ReAct) GetQueueInfo() map[string]interface{} {
 	return map[string]interface{}{
 		"queue_name":    r.taskQueue.GetQueueName(),
 		"total_tasks":   r.taskQueue.GetQueueingCount(),
-		"is_processing": r.isProcessing,
+		"is_processing": r.IsProcessingReAct(),
 		"tasks":         taskInfos,
 		"queue_empty":   r.taskQueue.IsEmpty(),
 	}
@@ -370,4 +275,11 @@ func (r *ReAct) startEventLoop(ctx context.Context) {
 			}
 		}()
 	})
+}
+
+func (r *ReAct) IsFinished() bool {
+	if r.GetCurrentTask() == nil {
+		return true
+	}
+	return r.GetCurrentTask().IsFinished()
 }
