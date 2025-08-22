@@ -77,9 +77,13 @@ func CoverCodeRange(programName string, r memedit.RangeIf) (*CodeRange, string) 
 func buildSSARisk(
 	result *SyntaxFlowResult,
 	variable string, index int, value *Value,
+	auditResult *ssadb.AuditResult,
 ) *schema.SSARisk {
 	progName := result.GetProgramName()
 	if progName == "" {
+		return nil
+	}
+	if auditResult == nil {
 		return nil
 	}
 	riskCodeRange, CodeFragment := CoverCodeRange(progName, value.GetRange())
@@ -97,9 +101,11 @@ func buildSSARisk(
 		CVE:           rule.CVE,
 
 		FromRule:    rule.RuleName,
+		RuntimeId:   auditResult.TaskID,
 		IsPotential: false,
 		ProgramName: progName,
 		// result
+		ResultID: uint64(auditResult.ID),
 		Variable: variable,
 		Index:    int64(index),
 
@@ -156,9 +162,10 @@ func buildSSARisk(
 		newSSARisk.Title,
 	)
 
-	// 设置任务名称
+	// 设置任务名称和任务创建时间
+	newSSARisk.TaskCreatedAt = auditResult.CreatedAt
 	// TODO: 可能后面发起扫描任务用户可以自己设置扫描名称
-	newSSARisk.TaskName = time.Now().Format("2006-01-02 15:04:05")
+	newSSARisk.TaskName = auditResult.CreatedAt.Format("2006-01-02 15:04:05")
 
 	return newSSARisk
 }
@@ -172,7 +179,7 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, sa
 	if !ok {
 		return ""
 	}
-	ssaRisk := buildSSARisk(r, variable, index, value)
+	ssaRisk := buildSSARisk(r, variable, index, value, result)
 	if ssaRisk == nil {
 		return ""
 	}
