@@ -615,13 +615,9 @@ func (m *Manager) StopService(serviceName string) error {
 	log.Infof("Stopping service: %s", serviceName)
 
 	if service.IsDetached {
-		// 杀死进程
-		p, err := os.FindProcess(service.ProcessID)
+		// 跨平台的进程终止
+		err := m.killDetachedService(service)
 		if err != nil {
-			log.Warnf("Failed to find process %d: %v", service.ProcessID, err)
-		}
-
-		if err := p.Signal(syscall.SIGINT); err != nil {
 			log.Warnf("Failed to kill service %s: %v", serviceName, err)
 		}
 		return nil
@@ -1177,4 +1173,151 @@ func toUTF8(data []byte) string {
 	reader := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
 	utf8Data, _ := io.ReadAll(reader)
 	return string(utf8Data)
+}
+
+// killDetachedService 跨平台终止分离式服务进程
+func (m *Manager) killDetachedService(service *ServiceInfo) error {
+	if runtime.GOOS == "windows" {
+		return m.killDetachedServiceWindows(service)
+	}
+	return m.killDetachedServiceUnix(service)
+}
+
+// killDetachedServiceWindows Windows平台下终止分离式服务进程
+func (m *Manager) killDetachedServiceWindows(service *ServiceInfo) error {
+	// 1. 首先尝试终止当前服务进程
+	if service.ProcessID > 0 {
+		if err := m.killProcessWindows(service.ProcessID); err != nil {
+			log.Warnf("Failed to kill main service process %d: %v", service.ProcessID, err)
+		}
+	}
+
+	// 2. 查找并终止匹配的llama-server进程
+	llamaServerPIDs, err := m.findLlamaServerProcessesWindows(service.Config.Host, service.Config.Port)
+	if err != nil {
+		log.Warnf("Failed to find llama-server processes: %v", err)
+	} else {
+		for _, pid := range llamaServerPIDs {
+			if err := m.killProcessWindows(pid); err != nil {
+				log.Warnf("Failed to kill llama-server process %d: %v", pid, err)
+			} else {
+				log.Infof("Successfully killed llama-server process %d", pid)
+			}
+		}
+	}
+
+	return nil
+}
+
+// killDetachedServiceUnix Unix平台下终止分离式服务进程
+func (m *Manager) killDetachedServiceUnix(service *ServiceInfo) error {
+	// Unix系统保持原有逻辑
+	p, err := os.FindProcess(service.ProcessID)
+	if err != nil {
+		return fmt.Errorf("failed to find process %d: %v", service.ProcessID, err)
+	}
+
+	if err := p.Signal(syscall.SIGINT); err != nil {
+		return fmt.Errorf("failed to send SIGINT to process %d: %v", service.ProcessID, err)
+	}
+
+	return nil
+}
+
+// killProcessWindows Windows下终止指定PID的进程
+func (m *Manager) killProcessWindows(pid int) error {
+	cmd := exec.Command("taskkill", "/F", "/PID", fmt.Sprintf("%d", pid))
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("taskkill failed for PID %d: %v, output: %s", pid, err, string(output))
+	}
+	log.Infof("Successfully killed process %d on Windows", pid)
+	return nil
+}
+
+// findLlamaServerProcessesWindows 在Windows下查找匹配host和port的llama-server进程
+func (m *Manager) findLlamaServerProcessesWindows(host string, port int32) ([]int, error) {
+	var pids []int
+
+	// 使用wmic查找llama-server进程
+	cmd := exec.Command("wmic", "process", "where", "name='llama-server.exe'", "get", "ProcessId,CommandLine", "/format:csv")
+	output, err := cmd.Output()
+	if err != nil {
+		// 如果wmic失败，尝试使用tasklist
+		return m.findLlamaServerProcessesWindowsTasklist(host, port)
+	}
+
+	lines := strings.Split(toUTF8(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Node,") {
+			continue
+		}
+
+		// CSV格式: Node,CommandLine,ProcessId
+		parts := strings.Split(line, ",")
+		if len(parts) < 3 {
+			continue
+		}
+
+		commandLine := parts[1]
+		pidStr := parts[2]
+
+		// 检查命令行是否包含匹配的host和port
+		if m.isLlamaServerCommandMatching(commandLine, host, port) {
+			if pid, err := strconv.Atoi(pidStr); err == nil {
+				pids = append(pids, pid)
+				log.Infof("Found matching llama-server process: PID=%d, Command=%s", pid, commandLine)
+			}
+		}
+	}
+
+	return pids, nil
+}
+
+// findLlamaServerProcessesWindowsTasklist 使用tasklist作为备用方案
+func (m *Manager) findLlamaServerProcessesWindowsTasklist(host string, port int32) ([]int, error) {
+	var pids []int
+
+	cmd := exec.Command("tasklist", "/fo", "csv", "/v")
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute tasklist: %v", err)
+	}
+
+	lines := strings.Split(toUTF8(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "\"Image Name\"") {
+			continue
+		}
+
+		// 查找包含llama-server的进程
+		if strings.Contains(line, "llama-server") {
+			// 这是一个简化版本，实际实现中可能需要更复杂的解析
+			// 因为tasklist不直接提供命令行参数
+			re := regexp.MustCompile(`"(\d+)"`)
+			matches := re.FindAllStringSubmatch(line, -1)
+			if len(matches) >= 2 {
+				pidStr := matches[1][1] // 第二个数字通常是PID
+				if pid, err := strconv.Atoi(pidStr); err == nil {
+					pids = append(pids, pid)
+					log.Infof("Found llama-server process (via tasklist): PID=%d", pid)
+				}
+			}
+		}
+	}
+
+	return pids, nil
+}
+
+// isLlamaServerCommandMatching 检查llama-server命令行是否匹配指定的host和port
+func (m *Manager) isLlamaServerCommandMatching(commandLine string, host string, port int32) bool {
+	// 检查命令行是否包含指定的host和port参数
+	hostPattern := fmt.Sprintf("--host %s", host)
+	portPattern := fmt.Sprintf("--port %d", port)
+
+	return strings.Contains(commandLine, "llama-server") &&
+		strings.Contains(commandLine, hostPattern) &&
+		strings.Contains(commandLine, portPattern)
 }
