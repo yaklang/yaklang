@@ -98,15 +98,41 @@ SOLUTION
 REFERENCE
 )
 
-./find|select|where|update|where/ as $function
+
+
+./find|select|where|update|execute|exec/ as $function
 <include('php-tp-all-extern-variable-param-source')> as $params
 
-$function(* as $allParams)
-
-$allParams?{<self> #{include: <<<CODE
-* & $params
+$function(,* as $allParams,)
+$allParams#{
+include: <<<CODE
+    * & $params
 CODE
-}->} as $sink
+}-> as $sink 
+
+// $snik ?{opcode: const} as $constSink 
+// alert $constSink for {
+//     level: "info"
+//     title: "检测到PHP SQL注入漏洞 注入点为常量"
+// }
+
+$sink?{!opcode:const} as $controledSink 
+
+$controledSink<dataflow(exclude:<<<CODE
+*?{<typeName()> ?{have: "number"}} as $number
+CODE)> as $controledNoNumberSink 
+
+alert $controledNoNumberSink for {
+    level: "mid" 
+    title: "检测到PHP SQL注入漏洞 数据可控"
+}
+
+ $controledSink - $controledNoNumberSink as $controledNumberSink 
+alert $controledNumberSink for {
+    level: "info", 
+    title: "检测到PHP SQL注入漏洞 可控数据仅为数字类型"
+}
+
 
 alert $sink for {
 	level: "low",
