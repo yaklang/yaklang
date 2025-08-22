@@ -2,6 +2,7 @@ package schema
 
 import (
 	"errors"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -14,8 +15,10 @@ type SSARiskDisposals struct {
 	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 	// TaskName 用于记录任务名称，追踪处置来自哪次扫描任务
 	TaskName string `json:"task_name" gorm:"index"`
-	Status   string `json:"status" gorm:"index"`
-	Comment  string `json:"comment" gorm:"type:text"`
+	// TaskCreatedAt 用于记录任务创建时间，用于过滤继承的处置信息
+	TaskCreatedAt time.Time `json:"task_created_at" gorm:"index"`
+	Status        string    `json:"status" gorm:"index"`
+	Comment       string    `json:"comment" gorm:"type:text"`
 }
 
 func (s *SSARiskDisposals) BeforeCreate() {
