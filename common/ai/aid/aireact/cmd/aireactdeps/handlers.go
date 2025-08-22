@@ -432,7 +432,7 @@ func handleClientEvent(event *schema.AiOutputEvent, inputChan chan<- *ypb.AIInpu
 	case schema.EVENT_TYPE_STREAM:
 		// 始终显示带有滚动效果的流事件
 		fmt.Printf("[stream]: %s\n", string(event.StreamDelta))
-	case schema.EVENT_TYPE_PRESSURE, schema.EVENT_TYPE_AID_CONFIG:
+	case schema.EVENT_TYPE_PRESSURE, schema.EVENT_TYPE_AI_CONFIG:
 		log.Debugf("received event: %s", event.Type)
 	case schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS:
 		fmt.Println("[status]: AI first byte cost (ms): ", jsonpath.FindFirst(string(event.Content), "$.ms"))

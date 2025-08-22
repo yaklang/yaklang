@@ -105,8 +105,10 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 }
 
 func (c *Config) newPlanResponse(rootTask *AiTask) *PlanResponse {
-	c.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
-		return rootTask
+	c.syncGuardian.SetSyncData(SYNC_TYPE_PLAN, func() any {
+		return map[string]any{
+			"root_task": rootTask,
+		}
 	})
 	return &PlanResponse{
 		RootTask: rootTask,

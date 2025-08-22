@@ -22,6 +22,10 @@ const (
 	// 探活
 	EVENT_TYPE_PONG EventType = "pong" // ping response ping-pong is a check for alive item
 
+	EVENT_TYPE_AI_CONFIG EventType = "ai_config" // ai config event, used to emit the current config information
+
+	EVENT_TYPE_CURRENT_TASK EventType = "current_task" // ai current task event, used to emit the current task information
+
 	// 压力值
 	EVENT_TYPE_PRESSURE EventType = "pressure" // pressure for ai context percent
 
@@ -56,8 +60,6 @@ const (
 	EVENT_TYPE_REVIEW_RELEASE EventType = "review_release"
 
 	EVENT_TYPE_INPUT EventType = "input"
-
-	EVENT_TYPE_AID_CONFIG = "aid_config" // aid config event, used to emit the current config information
 
 	EVENT_TYPE_YAKIT_EXEC_RESULT = "yak_exec_result" // yakit exec result event, used to emit the yakit exec result information
 

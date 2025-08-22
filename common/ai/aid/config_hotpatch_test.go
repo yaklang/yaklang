@@ -72,7 +72,7 @@ LOOP:
 	for {
 		select {
 		case result := <-outputChan:
-			if result.Type == schema.EVENT_TYPE_AID_CONFIG {
+			if result.Type == schema.EVENT_TYPE_AI_CONFIG {
 				if strings.Contains(string(result.Content), keywordsToken) {
 					originConfigCheck = true
 					hotpatchOptionChan.SafeFeed(WithToolKeywords(newKeywordsToken))

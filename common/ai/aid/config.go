@@ -116,9 +116,7 @@ type Config struct {
 
 	//review suggestion
 
-	// sync
-	syncMutex *sync.RWMutex
-	syncMap   map[string]func() any
+	syncGuardian *aicommon.SyncEventGuardian
 
 	inputConsumption  *int64
 	outputConsumption *int64
@@ -345,12 +343,6 @@ func (c *Config) IsCtxDone() bool {
 	}
 }
 
-func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
-	c.syncMutex.Lock()
-	defer c.syncMutex.Unlock()
-	c.syncMap[string(i)] = callback
-}
-
 func (c *Config) ProcessExtendedActionCallback(resp string) {
 	actions := aicommon.ExtractAllAction(resp)
 	for _, action := range actions {
@@ -440,8 +432,6 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		epm:                         aicommon.NewEndpointManagerContext(ctx),
 		memory:                      nil, // default mem cannot create in config
 		guardian:                    aicommon.NewAsyncGuardian(ctx, id),
-		syncMutex:                   new(sync.RWMutex),
-		syncMap:                     make(map[string]func() any),
 		inputConsumption:            new(int64),
 		outputConsumption:           new(int64),
 		aiCallTokenLimit:            int64(1000 * 30),
