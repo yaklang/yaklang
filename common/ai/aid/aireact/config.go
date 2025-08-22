@@ -124,6 +124,9 @@ type ReActConfig struct {
 	aiTransactionAutoRetry   int64
 	timelineLimit            int64 // Limit for timeline records
 	timelineContentSizeLimit int64 // Limit for timeline content size
+
+	// async Guardian
+	guardian *aicommon.AsyncGuardian
 }
 
 func (cfg *ReActConfig) GetTimelineRecordLimit() int64 {
@@ -430,10 +433,12 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		aiTransactionAutoRetry:   5,
 		timelineLimit:            100,       // Default limit for timeline records
 		timelineContentSizeLimit: 50 * 1024, // Default limit for 50k
+		guardian:                 aicommon.NewAsyncGuardian(ctx, id),
 	}
 
 	// Initialize emitter
 	config.Emitter = aicommon.NewEmitter(id, func(e *schema.AiOutputEvent) error {
+		config.guardian.Feed(e)
 		if config.eventHandler != nil {
 			config.eventHandler(e)
 		}
@@ -471,5 +476,21 @@ func NewReActConfig(ctx context.Context, opts ...Option) *ReActConfig {
 func WithAutoApproveTools() Option {
 	return func(cfg *ReActConfig) {
 		cfg.autoApproveTools = true
+	}
+}
+
+func WithGuardianEventTrigger(i schema.EventType, callback aicommon.GuardianEventTrigger) Option {
+	return func(cfg *ReActConfig) {
+		cfg.guardian.RegisterEventTrigger(i, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, aicaller aicommon.AICaller) {
+			callback(event, emitter, aicaller)
+		})
+	}
+}
+
+func WithGuardianStreamTrigger(nodeId string, trigger aicommon.GuardianMirrorStreamTrigger) Option {
+	return func(cfg *ReActConfig) {
+		cfg.guardian.RegisterMirrorStreamTrigger(nodeId, func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
+			trigger(unlimitedChan, emitter)
+		})
 	}
 }

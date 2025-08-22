@@ -34,20 +34,18 @@ type ReactTaskItem struct {
 }
 
 type ReAct struct {
-	config        *ReActConfig
-	promptManager *PromptManager
 	*aicommon.Emitter
 
+	config        *ReActConfig
+	promptManager *PromptManager
+
 	// 任务队列相关
-	currentTask    *Task        // 当前正在处理的任务
-	taskQueue      *TaskQueue   // 任务队列
-	queueProcessor sync.Once    // 确保队列处理器只启动一次
-	queueMutex     sync.RWMutex // 保护队列相关状态
-	isProcessing   bool         // 是否正在处理任务
-
-	// 时间线相关
-	timeline *aicommon.Timeline
-
+	currentTask          *Task        // 当前正在处理的任务
+	taskQueue            *TaskQueue   // 任务队列
+	queueProcessor       sync.Once    // 确保队列处理器只启动一次
+	queueMutex           sync.RWMutex // 保护队列相关状态
+	isProcessing         bool         // 是否正在处理任务
+	timeline             *aicommon.Timeline
 	mirrorMutex          sync.RWMutex
 	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
 }
