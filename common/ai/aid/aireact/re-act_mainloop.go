@@ -196,6 +196,19 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}
+			satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, false, suggestion)
+			if err != nil {
+				currentTask.SetStatus(string(TaskStatus_Aborted))
+				continue
+			} else if satisfied {
+				r.EmitResult(finalResult)
+				currentTask.SetStatus(string(TaskStatus_Completed))
+				continue
+			} else {
+				// User needs not satisfied, continue loop
+				log.Infof("User needs not fully satisfied, continuing analysis...")
+				continue
+			}
 		default:
 			r.EmitError("unknown action type: %v", actionType)
 			r.finished = true
