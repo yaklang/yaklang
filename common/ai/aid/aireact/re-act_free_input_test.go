@@ -16,12 +16,13 @@ import (
 
 func mockedFreeInputOutput(config aicommon.AICallerConfigIf, flag string) (*aicommon.AIResponse, error) {
 	rsp := config.NewAIResponse()
-	rsp.EmitOutputStream(bytes.NewBufferString(`
+	rs := bytes.NewBufferString(`
 {"@action": "object", "next_action": {
 	"type": "directly_answer",
 	"answer_payload": "..[mocked_answer` + flag + `]..",
 }, "human_readable_thought": "mocked thought` + flag + `", "cumulative_summary": "..cumulative-mocked` + flag + `.."}
-`))
+`)
+	rsp.EmitOutputStream(rs)
 	rsp.Close()
 	return rsp, nil
 }
@@ -34,7 +35,7 @@ func TestReAct_FreeInput(t *testing.T) {
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedFreeInputOutput(i, flag)
 		}),
-		WithDebug(true),
+		WithDebug(false),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
