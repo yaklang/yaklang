@@ -39,7 +39,7 @@ type ReAct struct {
 	// runtime fields
 	cumulativeSummary           string // Cumulative summary for conversation memory
 	currentIteration            int
-	currentUserInteractiveCount int // 当前用户交互次数
+	currentUserInteractiveCount int64 // 当前用户交互次数
 	finished                    bool
 
 	config        *ReActConfig

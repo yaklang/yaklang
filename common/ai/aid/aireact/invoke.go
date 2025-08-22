@@ -16,9 +16,24 @@ import (
 // Schema and action types are now managed by the prompt manager
 
 // generateMainLoopPrompt generates the prompt for the main ReAct loop
-func (r *ReAct) generateMainLoopPrompt(userQuery string, tools []*aitool.Tool) string {
+func (r *ReAct) generateMainLoopPrompt(
+	userQuery string,
+	tools []*aitool.Tool,
+) string {
+	// Generate prompt for main loop
+	var enableUserInteractive bool = true
+	if r.currentUserInteractiveCount >= r.config.userInteractiveLimitedTimes {
+		enableUserInteractive = false
+	}
+
 	// Use the prompt manager to generate the prompt
-	prompt, err := r.promptManager.GenerateLoopPrompt(userQuery, tools)
+	prompt, err := r.promptManager.GenerateLoopPrompt(
+		userQuery,
+		enableUserInteractive,
+		r.currentUserInteractiveCount,
+		r.config.userInteractiveLimitedTimes,
+		tools,
+	)
 	if err != nil {
 		// Fallback to basic prompt if template fails
 		log.Errorf("Failed to generate loop prompt from template: %v", err)
@@ -97,7 +112,6 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			log.Infof("Retrieved %d available tools", len(tools))
 		}
 
-		// Generate prompt for main loop
 		prompt := r.generateMainLoopPrompt(userQuery, tools)
 
 		if r.config.debugPrompt {
@@ -198,6 +212,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 				log.Errorf("Plan execution failed: %v", err)
 			}
 		case ActionAskForClarification:
+			r.currentUserInteractiveCount++
 			nextAction := action.GetInvokeParams("next_action")
 			obj := nextAction.GetObject("ask_for_clarification_payload")
 			payloads := obj.GetStringSlice("options")
