@@ -2,6 +2,8 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -55,6 +57,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aireact.WithEventInputChan(inputEvent),
 		aireact.WithContext(baseCtx),
 		aireact.WithBuiltinTools(),
+		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
 	}
 
 	reAct, err := aireact.NewReAct(reActOptions...)
