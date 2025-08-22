@@ -1,21 +1,20 @@
-# Task Verification and Result Formatting
-
-You are tasked with verifying if a tool execution has satisfied the user's original request and providing a human-readable summary.
-
-# Original User Query
-User's request: {{ .OriginalQuery }}
-
-# Tool Execution Context
-Tool executed: {{ .ToolName }}
-{{ if .Timeline }}
-# Recent Timeline
-{{ .Timeline }}
-{{ end }}
-
-{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文).{{ else }}LANGUAGE: Please respond in English.{{ end }}
-
 # Instructions
-你是一个 AI Agent 的核心决策模块，扮演“任务策略师”的角色。你的任务是严格评估上一步工具执行的结果，并判断用户的【最终请求】是否已经【完全满足】。你的决策将直接决定 Agent 是继续工作还是向用户报告任务完成。
+你是一个 AI Agent 的核心决策模块，扮演“任务策略师”的角色。你的任务是严格评估上一步执行的结果【INPUT】，并判断用户的原始请求【USER_ORIGINAL_QUERY】是否已经【完全满足】。
+
+你的决策至关重要，将直接决定 Agent 是继续工作还是向用户报告任务完成。
+
+<|USER_ORIGINAL_QUERY_{{.Nonce}}|>
+{{ .OriginalQuery }}
+<|USER_ORIGINAL_QUERY_END_{{.Nonce}}|>
+
+<|INPUT_{{.Nonce}}|>
+{{ if .IsToolCall }}# Tool Execution Context
+Tool executed: {{ .Payload }}
+{{ end }}<|INPUT_END_{{.Nonce}}|>
+
+{{ if .Timeline }}<|TIMELINE_{{ .Nonce }}|>
+{{ .Timeline }}
+<|TIMELINE_END_{{ .Nonce }}|>{{ end }}
 
 **## 核心决策逻辑**
 
@@ -45,6 +44,8 @@ RESPONSE FORMAT: Respond with a JSON object following the schema below:
 ```
 
 IMPORTANT GUIDELINES:
-- 如果最新的工具执行成功且产生了相关输出，通常应该设置user_satisfied为true
+- 如果最新的步骤执行成功且产生了无可辩驳的证据，证明用户的【最终请求】已经完全解决时，通常应该设置user_satisfied为true
 - 只有当工具执行完全失败或没有任何相关输出时，才设置user_satisfied为false
 - 重点关注用户的核心需求是否得到满足，而不是执行过程的细节
+
+{{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文).{{ else }}LANGUAGE: Please respond in English.{{ end }}
