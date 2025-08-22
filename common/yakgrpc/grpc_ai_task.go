@@ -32,7 +32,7 @@ var RedirectForge = "redirect_forge"
 func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
-		log.Infof("recv first msg failed: %v", err)
+		log.Errorf("recv first msg failed: %v", err)
 		return utils.Errorf("recv first msg failed: %v", err)
 	}
 
