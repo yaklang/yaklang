@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
@@ -33,14 +34,13 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		log.Infof("ReAct AI Error Learning: 已启用增强的AI错误学习功能，AI将自动从失败中学习并改进响应质量")
 	}
 
-	r.config.mu.Lock()
-	defer r.config.mu.Unlock()
-
 	// Check if finished while holding lock
+	r.config.mu.Lock()
 	if r.config.finished {
 		if r.config.debugEvent {
 			log.Warn("executeMainLoop: ReAct session has finished")
 		}
+		r.config.mu.Unlock()
 		return utils.Error("ReAct session has finished")
 	}
 	if r.config.debugEvent {
@@ -71,7 +71,19 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			r.config.currentIteration, r.config.maxIterations, r.config.finished)
 	}
 
+	// Release lock before entering the main loop
+	r.config.mu.Unlock()
+
 	for r.config.currentIteration < r.config.maxIterations && !r.config.finished {
+		// Acquire lock for this iteration
+		r.config.mu.Lock()
+
+		// Check if finished while holding lock
+		if r.config.finished {
+			r.config.mu.Unlock()
+			break
+		}
+
 		if r.config.debugEvent {
 			log.Infof("executeMainLoop: entering loop iteration. currentIteration=%d, maxIterations=%d, finished=%t",
 				r.config.currentIteration, r.config.maxIterations, r.config.finished)
@@ -87,6 +99,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		tools, err := r.config.aiToolManager.GetEnableTools()
 		if err != nil {
 			log.Errorf("Failed to get available tools: %v", err)
+			r.config.mu.Unlock()
 			return utils.Errorf("failed to get available tools: %v", err)
 		}
 		if r.config.debugEvent {
