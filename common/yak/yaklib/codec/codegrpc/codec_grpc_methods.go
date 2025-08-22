@@ -14,12 +14,13 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"hash"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/jsonpath"
 
 	"github.com/samber/lo"
 	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
@@ -598,6 +599,60 @@ func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV strin
 	}
 	flow.Text = dec
 	return nil
+}
+
+// Tag = "加密"
+// CodecName = "SM2加密"
+// Desc = """​​SM2​​ 是中国国家密码管理局（OSCCA）于 2010 年发布的一种基于​​椭圆曲线密码学（Elliptic Curve Cryptography, ECC）​​的公钥密码算法标准，属于​​国家商用密码体系（SM系列算法）​​中的重要组成部分。"""
+// Params = [
+// { Name = "pubKey", Type = "text", Required = true,Label = "公钥"},
+// { Name = "encryptSchema", Type = "select",DefaultValue = "C1C2C3", Options = ["ASN1", "C1C2C3", "C1C3C2"], Required = true, Label = "编码格式"},
+// ]
+func (flow *CodecExecFlow) SM2Encrypt(pubKey string, encryptSchema string) error {
+	var data []byte
+	var err error
+
+	switch encryptSchema { // choose alg
+	case "ASN1":
+		data, err = codec.SM2EncryptASN1([]byte(pubKey), []byte(flow.Text))
+	case "C1C2C3":
+		data, err = codec.SM2EncryptC1C2C3([]byte(pubKey), []byte(flow.Text))
+	case "C1C3C2":
+		data, err = codec.SM2EncryptC1C3C2([]byte(pubKey), []byte(flow.Text))
+	default:
+	}
+	if err == nil {
+		flow.Text = data
+	}
+
+	return err
+}
+
+// Tag = "解密"
+// CodecName = "SM2解密"
+// Desc = """​​SM2​​ 是中国国家密码管理局（OSCCA）于 2010 年发布的一种基于​​椭圆曲线密码学（Elliptic Curve Cryptography, ECC）​​的公钥密码算法标准，属于​​国家商用密码体系（SM系列算法）​​中的重要组成部分。"""
+// Params = [
+// { Name = "priKey", Type = "text", Required = true,Label = "私钥"},
+// { Name = "decryptSchema", Type = "select",DefaultValue = "C1C2C3", Options = ["ASN1", "C1C2C3", "C1C3C2"], Required = true, Label = "编码格式"},
+// ]
+func (flow *CodecExecFlow) SM2Decrypt(priKey string, decryptSchema string) error {
+	var data []byte
+	var err error
+
+	switch decryptSchema { // choose alg
+	case "ASN1":
+		data, err = codec.SM2DecryptASN1([]byte(priKey), []byte(flow.Text))
+	case "C1C2C3":
+		data, err = codec.SM2DecryptC1C2C3([]byte(priKey), []byte(flow.Text))
+	case "C1C3C2":
+		data, err = codec.SM2DecryptC1C3C2([]byte(priKey), []byte(flow.Text))
+	default:
+	}
+	if err == nil {
+		flow.Text = data
+	}
+
+	return err
 }
 
 // Tag = "加密"
