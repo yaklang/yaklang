@@ -16,6 +16,14 @@ func SaveAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	return db.RowsAffected, nil
 }
 
+func CreateAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
+	db = db.Model(&schema.AIYakTool{})
+	if db := db.Create(tool); db.Error != nil {
+		return 0, utils.Errorf("create/update AIYakTool failed: %s", db.Error)
+	}
+	return db.RowsAffected, nil
+}
+
 func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	db = db.Model(&schema.AIYakTool{})
 	if db := db.Where("id = ?", tool.ID).Updates(tool); db.Error != nil {

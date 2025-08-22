@@ -137,7 +137,7 @@ func (s *Server) SaveAITool(ctx context.Context, req *ypb.SaveAIToolRequest) (*y
 		Keywords:    strings.Join(req.GetKeywords(), ","),
 	}
 
-	affected, err := yakit.SaveAIYakTool(db, tool)
+	affected, err := yakit.CreateAIYakTool(db, tool)
 	if err != nil {
 		return nil, utils.Errorf("failed to create AI tool: %s", err)
 	}
