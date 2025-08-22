@@ -80,13 +80,17 @@ var LocalModelCommands = []*cli.Command{
 				Name:  "llama-server-path",
 				Usage: "llama-server 路径",
 			},
+			cli.StringFlag{
+				Name:  "service-type",
+				Usage: "服务类型",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			fmt.Println("=== Yaklang Local Model Manager ===")
 
 			// 获取管理器单例
 			manager := localmodel.GetManager()
-
+			manager.SetCliMode(true)
 			// 如果只是列出模型
 			if c.Bool("list-models") {
 				listSupportedModels(manager)
@@ -141,10 +145,10 @@ func checkLocalModels(manager *localmodel.Manager) {
 
 	// 检查默认模型
 	fmt.Println("1. 默认嵌入模型 (Qwen3-Embedding-0.6B-Q4_K_M):")
-	defaultPath := manager.GetDefaultEmbeddingModelPath()
+	defaultPath := localmodel.GetDefaultEmbeddingModelPath()
 	fmt.Printf("   路径: %s\n", defaultPath)
 
-	available := manager.IsDefaultModelAvailable()
+	available := localmodel.IsDefaultModelAvailable()
 	fmt.Printf("   可用: %t\n", available)
 
 	// 检查 llama-server
@@ -187,7 +191,7 @@ func startEmbeddingService(c *cli.Context, manager *localmodel.Manager) error {
 	if c.String("model-path") != "" {
 		fmt.Printf("  模型路径: %s\n", c.String("model-path"))
 	} else {
-		defaultPath := manager.GetDefaultEmbeddingModelPath()
+		defaultPath := localmodel.GetDefaultEmbeddingModelPath()
 		fmt.Printf("  模型路径: %s (默认)\n", defaultPath)
 	}
 	fmt.Printf("  上下文大小: %d\n", c.Int("context-size"))
@@ -222,7 +226,7 @@ func startEmbeddingService(c *cli.Context, manager *localmodel.Manager) error {
 	var options []localmodel.Option
 
 	if c.String("model") != "" {
-		options = append(options, localmodel.WithEmbeddingModel(c.String("model")))
+		options = append(options, localmodel.WithModel(c.String("model")))
 	}
 
 	if llamaServerPath := c.String("llama-server-path"); llamaServerPath != "" {
@@ -241,11 +245,12 @@ func startEmbeddingService(c *cli.Context, manager *localmodel.Manager) error {
 		localmodel.WithDetached(c.Bool("detached")),
 		localmodel.WithDebug(c.Bool("debug")),
 		localmodel.WithStartupTimeout(time.Duration(c.Int("timeout"))*time.Second),
+		localmodel.WithModelType(c.String("service-type")),
 	)
 
 	// 启动服务
 	fmt.Println("\n启动服务...")
-	err := manager.StartEmbeddingService(address, options...)
+	err := manager.StartService(address, options...)
 	if err != nil {
 		return fmt.Errorf("启动服务失败: %v", err)
 	}
@@ -268,7 +273,6 @@ func startEmbeddingService(c *cli.Context, manager *localmodel.Manager) error {
 			}
 		}
 	}
-
 	// 设置信号处理
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
@@ -276,11 +280,53 @@ func startEmbeddingService(c *cli.Context, manager *localmodel.Manager) error {
 	fmt.Println("\n服务正在运行中... 按 Ctrl+C 停止")
 	fmt.Printf("嵌入服务地址: http://%s\n", address)
 
-	// 等待信号
-	<-sigChan
+	// 启动监控协程
+	serviceName := fmt.Sprintf("%s-%s-%d", c.String("service-type"), c.String("host"), c.Int("port"))
+	if serviceName == "--" {
+		serviceName = fmt.Sprintf("embedding-%s-%d", c.String("host"), c.Int("port"))
+	}
+
+	monitorDone := make(chan bool, 1)
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				// 检查服务状态
+				serviceInfo, err := manager.GetServiceStatus(serviceName)
+				if err != nil {
+					log.Errorf("获取服务状态失败: %v", err)
+					fmt.Printf("\n服务状态检查失败，正在退出: %v\n", err)
+					monitorDone <- true
+					return
+				}
+
+				// 检查服务是否在运行中
+				if serviceInfo.Status != localmodel.StatusRunning {
+					log.Errorf("服务状态异常: %s", serviceInfo.Status.String())
+					fmt.Printf("\n服务状态不是运行中 (%s)，正在退出\n", serviceInfo.Status.String())
+					monitorDone <- true
+					return
+				}
+			case <-monitorDone:
+				return
+			}
+		}
+	}()
+
+	// 等待信号或监控协程退出
+	select {
+	case <-sigChan:
+		fmt.Println("\n接收到停止信号...")
+		monitorDone <- true
+	case <-monitorDone:
+		fmt.Println("\n监控协程检测到异常，程序即将退出...")
+	}
 
 	fmt.Println("\n正在停止服务...")
-	err = manager.StopAllServices()
+	err = manager.StopService(serviceName)
 	if err != nil {
 		log.Errorf("停止服务时出错: %v", err)
 	} else {

@@ -96,10 +96,10 @@ func TestOptions(t *testing.T) {
 		t.Errorf("WithPort failed, expected 9090, got %d", config.Port)
 	}
 
-	// Test WithEmbeddingModel
-	WithEmbeddingModel("test-model")(config)
+	// Test WithModel
+	WithModel("test-model")(config)
 	if config.Model != "test-model" {
-		t.Errorf("WithEmbeddingModel failed, expected 'test-model', got '%s'", config.Model)
+		t.Errorf("WithModel failed, expected 'test-model', got '%s'", config.Model)
 	}
 
 	// Test WithContextSize
@@ -238,7 +238,7 @@ func TestManagerModelAPIs(t *testing.T) {
 	manager := GetManager()
 
 	// 测试获取默认模型路径
-	defaultPath := manager.GetDefaultEmbeddingModelPath()
+	defaultPath := GetDefaultEmbeddingModelPath()
 	if defaultPath == "" {
 		t.Error("Default embedding model path should not be empty")
 	}
@@ -272,7 +272,7 @@ func TestManagerModelAPIs(t *testing.T) {
 	t.Logf("Qwen3 model exists: %t", exists)
 
 	// 测试默认模型可用性
-	available := manager.IsDefaultModelAvailable()
+	available := IsDefaultModelAvailable()
 	t.Logf("Default model available: %t", available)
 }
 
@@ -651,7 +651,7 @@ func TestMUSTPASS_ServiceLifecycle(t *testing.T) {
 	// 启动服务
 	err = manager.StartEmbeddingService(
 		address,
-		WithEmbeddingModel("test-model"),
+		WithModel("test-model"),
 		WithModelPath(tmpModelPath),
 		WithLlamaServerPath(mockPath),
 		WithDebug(true),
@@ -736,7 +736,7 @@ func TestMUSTPASS_DetachedMode(t *testing.T) {
 	// 启动 detached 模式服务
 	err = manager.StartEmbeddingService(
 		address,
-		WithEmbeddingModel("test-model"),
+		WithModel("test-model"),
 		WithModelPath(tmpModelPath),
 		WithLlamaServerPath(mockPath),
 		WithDetached(true),
@@ -927,7 +927,7 @@ func TestMUSTPASS_DetachedModePersistence(t *testing.T) {
 	// 启动 detached 模式服务
 	err = manager1.StartEmbeddingService(
 		address,
-		WithEmbeddingModel("persistence-test-model"),
+		WithModel("persistence-test-model"),
 		WithModelPath(tmpModelPath),
 		WithLlamaServerPath(mockPath),
 		WithDetached(true),
@@ -1050,7 +1050,7 @@ func TestMUSTPASS_DetachedModeProcessTermination(t *testing.T) {
 	// 启动 detached 模式服务
 	err = manager.StartEmbeddingService(
 		address,
-		WithEmbeddingModel("termination-test-model"),
+		WithModel("termination-test-model"),
 		WithModelPath(tmpModelPath),
 		WithDetached(true),
 		WithDebug(true),

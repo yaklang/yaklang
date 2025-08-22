@@ -11,10 +11,12 @@ import (
 	"os/exec"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 	"unicode/utf8"
 
@@ -38,6 +40,14 @@ const (
 	StatusError
 )
 
+// ServiceType 服务类型
+type ServiceType string
+
+const (
+	ServiceTypeEmbedding ServiceType = "embedding"
+	ServiceTypeChat      ServiceType = "aichat"
+)
+
 func (s ServiceStatus) String() string {
 	switch s {
 	case StatusStopped:
@@ -55,9 +65,21 @@ func (s ServiceStatus) String() string {
 	}
 }
 
+func (t ServiceType) String() string {
+	switch t {
+	case ServiceTypeEmbedding:
+		return "embedding"
+	case ServiceTypeChat:
+		return "aichat"
+	default:
+		return ""
+	}
+}
+
 // ServiceInfo 服务信息
 type ServiceInfo struct {
 	Name       string         `json:"name"`
+	Type       ServiceType    `json:"type"`
 	Status     ServiceStatus  `json:"status"`
 	Config     *ServiceConfig `json:"config"`
 	IsDetached bool           `json:"isDetached"`
@@ -74,6 +96,7 @@ type ServiceInfo struct {
 type Manager struct {
 	mutex             sync.RWMutex
 	services          map[string]*ServiceInfo
+	cliMode           bool
 	currentBinaryPath string // 当前二进制文件路径（用于 Detached 模式）
 }
 
@@ -98,6 +121,13 @@ func GetManager() *Manager {
 // Deprecated: Use GetManager() instead
 func NewManager() *Manager {
 	return GetManager()
+}
+
+// SetCliMode 设置 CLI 模式
+func (m *Manager) SetCliMode(cliMode bool) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.cliMode = cliMode
 }
 
 // SetCurrentBinaryPath 设置当前二进制文件路径（用于 Detached 模式）
@@ -141,18 +171,6 @@ func (m *Manager) GetLocalModelPath(modelName string) (string, error) {
 	return GetModelPath(modelName)
 }
 
-// GetDefaultEmbeddingModelPath 获取默认嵌入模型路径
-func (m *Manager) GetDefaultEmbeddingModelPath() string {
-	return consts.GetQwen3Embedding0_6BQ4_0ModelPath()
-}
-
-// IsDefaultModelAvailable 检查默认模型是否可用
-func (m *Manager) IsDefaultModelAvailable() bool {
-	modelPath := m.GetDefaultEmbeddingModelPath()
-	exists, err := utils.PathExists(modelPath)
-	return err == nil && exists
-}
-
 // ListLocalModels 列出本地可用的模型
 func (m *Manager) ListLocalModels() []string {
 	var availableModels []string
@@ -167,8 +185,8 @@ func (m *Manager) ListLocalModels() []string {
 	return availableModels
 }
 
-// StartEmbeddingService 启动嵌入服务
-func (m *Manager) StartEmbeddingService(address string, options ...Option) error {
+// StartService 启动服务的通用方法
+func (m *Manager) StartService(address string, options ...Option) error {
 	// 解析地址
 	host, portStr, err := net.SplitHostPort(address)
 	if err != nil {
@@ -190,6 +208,24 @@ func (m *Manager) StartEmbeddingService(address string, options ...Option) error
 		option(config)
 	}
 
+	// 检查port和当前服务是否冲突
+	var allPorts []int32
+	for _, service := range m.services {
+		if service.ProcessID == os.Getpid() {
+			continue
+		}
+		allPorts = append(allPorts, service.Config.Port)
+	}
+
+	if slices.Contains(allPorts, int32(port)) {
+		return fmt.Errorf("port %d is already in use", port)
+	}
+
+	serviceType := config.ModelType
+	if serviceType == "" {
+		serviceType = string(ServiceTypeChat)
+	}
+
 	// 如果没有指定模型路径，尝试从模型名称获取
 	if config.ModelPath == "" {
 		if config.Model != "" {
@@ -201,8 +237,24 @@ func (m *Manager) StartEmbeddingService(address string, options ...Option) error
 			config.ModelPath = modelPath
 		} else {
 			// 没有指定模型，使用默认模型
-			config.ModelPath = m.GetDefaultEmbeddingModelPath()
-			config.Model = "Qwen3-Embedding-0.6B-Q4_K_M" // 设置默认模型名称
+			switch serviceType {
+			case string(ServiceTypeEmbedding):
+				config.ModelPath = GetDefaultEmbeddingModelPath()
+				config.Model = "Qwen3-Embedding-0.6B-Q4_K_M"
+			case string(ServiceTypeChat):
+				defaultModel := GetDefaultChatModel()
+				if defaultModel == nil {
+					return fmt.Errorf("no default chat model available")
+				}
+				modelPath, err := m.GetLocalModelPath(defaultModel.Name)
+				if err != nil {
+					return fmt.Errorf("failed to get default chat model path: %v", err)
+				}
+				config.ModelPath = modelPath
+				config.Model = defaultModel.Name
+			default:
+				return fmt.Errorf("unsupported service type: %v", serviceType)
+			}
 		}
 	}
 
@@ -211,8 +263,24 @@ func (m *Manager) StartEmbeddingService(address string, options ...Option) error
 		return fmt.Errorf("model validation failed: %v, for model: %v", err, config.ModelPath)
 	}
 
+	// 验证模型类型（确保模型类型与服务类型匹配）
+	if config.Model != "" {
+		if modelConfig, err := FindModelConfig(config.Model); err == nil {
+			expectedType := ""
+			switch serviceType {
+			case string(ServiceTypeEmbedding):
+				expectedType = "embedding"
+			case string(ServiceTypeChat):
+				expectedType = "chat"
+			}
+			if modelConfig.Type != expectedType {
+				return fmt.Errorf("model %s is not a %s model (type: %s)", config.Model, expectedType, modelConfig.Type)
+			}
+		}
+	}
+
 	// 生成服务名称
-	serviceName := fmt.Sprintf("embedding-%s-%d", host, port)
+	serviceName := fmt.Sprintf("%s-%s-%d", serviceType, host, port)
 
 	// 检查服务是否已存在
 	m.mutex.Lock()
@@ -227,10 +295,12 @@ func (m *Manager) StartEmbeddingService(address string, options ...Option) error
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	service := &ServiceInfo{
 		Name:       serviceName,
+		Type:       ServiceType(serviceType),
 		Status:     StatusStarting,
 		Config:     config,
 		StartTime:  time.Now(),
 		ctx:        ctx,
+		IsDetached: config.Detached,
 		cancelFunc: cancelFunc,
 	}
 
@@ -239,13 +309,29 @@ func (m *Manager) StartEmbeddingService(address string, options ...Option) error
 
 	// 异步启动服务
 	done := make(chan error, 3)
-	go m.startService(service, config.LlamaServerPath, done)
-	log.Infof("Starting embedding service: %s", serviceName)
+	go m.startServiceInternal(service, config.LlamaServerPath, done)
+
+	// 等待启动完成或超时
+	if err := m.waitForService(service); err != nil {
+		return err
+	}
+
+	log.Infof("Starting %s service: %s", serviceType, serviceName)
 	return nil
 }
 
-// startService 启动服务的内部方法
-func (m *Manager) startService(service *ServiceInfo, llamaServerPath string, done chan error) {
+// StartEmbeddingService 启动嵌入服务
+func (m *Manager) StartEmbeddingService(address string, options ...Option) error {
+	return m.StartService(address, append(options, WithModelType("embedding"))...)
+}
+
+// StartChatService 启动聊天服务
+func (m *Manager) StartChatService(address string, options ...Option) error {
+	return m.StartService(address, append(options, WithModelType("aichat"))...)
+}
+
+// startServiceInternal 启动服务的内部方法
+func (m *Manager) startServiceInternal(service *ServiceInfo, llamaServerPath string, done chan error) {
 	doneOnce := new(sync.Once)
 	finished := func(err error) {
 		doneOnce.Do(func() {
@@ -345,11 +431,6 @@ func (m *Manager) startService(service *ServiceInfo, llamaServerPath string, don
 		}
 	}
 
-	// 等待启动完成或超时
-	if err := m.waitForService(service); err != nil {
-		log.Warnf("Service %s startup validation failed: %v", service.Name, err)
-	}
-
 	// 等待进程结束
 	err := cmd.Wait()
 
@@ -378,8 +459,11 @@ func (m *Manager) buildArgs(config *ServiceConfig) []string {
 		"--host", config.Host,
 		"--port", fmt.Sprintf("%d", config.Port),
 		"--ctx-size", fmt.Sprintf("%d", config.ContextSize),
-		"--embedding", // 嵌入模式
 		"--verbose-prompt",
+	}
+
+	if config.ModelType == "embedding" {
+		args = append(args, "--embedding")
 	}
 
 	if config.Pooling != "" {
@@ -457,6 +541,10 @@ func (m *Manager) buildDetachedArgs(config *ServiceConfig) ([]string, error) {
 		args = append(args, "--llama-server-path", config.LlamaServerPath)
 	}
 
+	if config.ModelType != "" {
+		args = append(args, "--service-type", config.ModelType)
+	}
+
 	return args, nil
 }
 
@@ -532,7 +620,8 @@ func (m *Manager) StopService(serviceName string) error {
 		if err != nil {
 			log.Warnf("Failed to find process %d: %v", service.ProcessID, err)
 		}
-		if err := p.Kill(); err != nil {
+
+		if err := p.Signal(syscall.SIGINT); err != nil {
 			log.Warnf("Failed to kill service %s: %v", serviceName, err)
 		}
 		return nil
@@ -560,6 +649,7 @@ func (m *Manager) StopService(serviceName string) error {
 			}
 		}
 	}
+
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	service.Status = StatusStopped
@@ -589,8 +679,8 @@ func (m *Manager) StopAllServices() error {
 	return nil
 }
 
-// NotFoundError 服务不存在错误
-var NotFoundError = errors.New("service not found")
+// ErrServiceNotFound 服务不存在错误
+var ErrServiceNotFound = errors.New("service not found")
 
 // GetServiceStatus 获取服务状态
 func (m *Manager) GetServiceStatus(serviceName string) (*ServiceInfo, error) {
@@ -600,7 +690,7 @@ func (m *Manager) GetServiceStatus(serviceName string) (*ServiceInfo, error) {
 
 	service, exists := m.services[serviceName]
 	if !exists {
-		return nil, fmt.Errorf("stop service %s failed: %w", serviceName, NotFoundError)
+		return nil, fmt.Errorf("stop service %s failed: %w", serviceName, ErrServiceNotFound)
 	}
 
 	// 返回副本以避免并发修改
@@ -906,7 +996,7 @@ func (m *Manager) parseProcessToService(proc *ProcessInfo) *ServiceInfo {
 	}
 
 	// 生成服务名称
-	serviceName := fmt.Sprintf("embedding-%s-%d", config.Host, config.Port)
+	serviceName := fmt.Sprintf("%s-%s-%d", config.ModelType, config.Model, config.Port)
 
 	return &ServiceInfo{
 		Name:       serviceName,
@@ -1027,23 +1117,54 @@ func (m *Manager) parseArgsToConfig(args []string) *ServiceConfig {
 /*
 使用示例:
 
-manager, err = localmodel.NewManager()
-if err != nil {
-	return
-}
+manager := localmodel.GetManager()
 
-// StartEmbeddingService
-err = manager.StartEmbeddingService(
-	"127.0.0.1:11434",
+// 启动嵌入服务
+err := manager.StartEmbeddingService(
+	"127.0.0.1:8080",
 	localmodel.WithEmbeddingModel("Qwen3-Embedding-0.6B-Q4_K_M"),
 	localmodel.WithDetached(true),
 	localmodel.WithDebug(true),
-	localmodel.WithModelPath("/tmp/Qwen3-Embedding-0.6B-Q4_K_M.gguf"),
 	localmodel.WithContextSize(4096),
-	localmodel.WithParallelism(5),
+	localmodel.WithThreads(8),
 )
 if err != nil {
-	die(err)
+	log.Fatal(err)
+}
+
+// 启动聊天服务
+err = manager.StartChatService(
+	"127.0.0.1:8081",
+	localmodel.WithChatModel("Qwen2.5-3B-Instruct-Q4_K_M"),
+	localmodel.WithDetached(true),
+	localmodel.WithDebug(false),
+	localmodel.WithContextSize(8192),
+	localmodel.WithThreads(16),
+)
+if err != nil {
+	log.Fatal(err)
+}
+
+// 等待服务启动
+err = manager.WaitForEmbeddingService("127.0.0.1:8080", 30.0)
+if err != nil {
+	log.Fatal(err)
+}
+
+err = manager.WaitForChatService("127.0.0.1:8081", 30.0)
+if err != nil {
+	log.Fatal(err)
+}
+
+// 便捷函数使用示例
+err = localmodel.StartEmbedding("127.0.0.1:8080", localmodel.WithModel("Qwen3-Embedding-0.6B-Q4_K_M"))
+if err != nil {
+	log.Fatal(err)
+}
+
+err = localmodel.StartChat("127.0.0.1:8081", localmodel.WithModel("Qwen2.5-3B-Instruct-Q4_K_M"))
+if err != nil {
+	log.Fatal(err)
 }
 */
 

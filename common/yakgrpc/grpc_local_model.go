@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/localmodel"
@@ -18,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"golang.org/x/exp/slices"
 )
 
 var USER_CUSTOM_LOCAL_MODEL_KEY = "USER_CUSTOM_LOCAL_MODEL"
@@ -168,7 +170,11 @@ func (s *Server) GetSupportedLocalModels(ctx context.Context, req *ypb.Empty) (*
 
 	allSupportModels := getSupportedModels()
 	allSupportModelsPB := []*ypb.LocalModelConfig{}
+	allowModelTypes := []string{"embedding", "aichat"}
 	for _, model := range allSupportModels {
+		if !slices.Contains(allowModelTypes, model.Type) {
+			continue
+		}
 		allSupportModelsPB = append(allSupportModelsPB, &ypb.LocalModelConfig{
 			Name:        model.Name,
 			Type:        model.Type,
@@ -338,11 +344,11 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 	// 构建启动命令
 	opts := []localmodel.Option{
 		localmodel.WithModelPath(modelPath),
-		localmodel.WithEmbeddingModel(modelName),
+		localmodel.WithModel(modelName),
 		localmodel.WithLlamaServerPath(llamaServerPath),
 		localmodel.WithDetached(true),
 		localmodel.WithDebug(true),
-		localmodel.WithStartupTimeout(10 * time.Second),
+		localmodel.WithStartupTimeout(30 * time.Second),
 	}
 
 	if req.GetHost() != "" {
@@ -373,12 +379,18 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 		opts = append(opts, localmodel.WithArgs(req.GetArgs()...))
 	}
 
+	modelType := getModelTypeByTags(targetModel.Type)
+	if modelType == "" {
+		modelType = "aichat"
+	}
+
+	opts = append(opts, localmodel.WithModelType(modelType))
 	stream.Send(&ypb.ExecResult{
 		IsMessage: true,
 		Message:   []byte(fmt.Sprintf("启动模型: %s，端口: %d", modelName, req.GetPort())),
 	})
 
-	err = manager.StartEmbeddingService(
+	err = manager.StartService(
 		fmt.Sprintf("%s:%d", req.GetHost(), req.GetPort()),
 		opts...,
 	)
@@ -768,7 +780,7 @@ func (s *Server) GetAllStartedLocalModels(ctx context.Context, req *ypb.Empty) (
 		if service.Status == localmodel.StatusRunning {
 			models = append(models, &ypb.StartedLocalModelInfo{
 				Name:      service.Config.Model,
-				ModelType: "embedding",
+				ModelType: service.Config.ModelType,
 				Host:      service.Config.Host,
 				Port:      service.Config.Port,
 			})
@@ -790,6 +802,9 @@ func (s *Server) ClearAllModels(ctx context.Context, req *ypb.ClearAllModelsRequ
 			DeleteSourceFile: req.GetDeleteSourceFile(),
 		})
 		if err != nil {
+			if strings.Contains(err.Error(), "未下载，请先下载") {
+				continue
+			}
 			errors = append(errors, err)
 		}
 		if !resp.GetOk() {

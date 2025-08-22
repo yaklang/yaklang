@@ -52,6 +52,29 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 		}, nil
 	}
 
+	// If ToolID is provided, search by ID
+	if req.GetToolID() != 0 {
+		tool, err := yakit.GetAIYakToolByID(db, uint(req.GetToolID()))
+		if err != nil {
+			return &ypb.GetAIToolListResponse{
+				Tools: []*ypb.AITool{},
+			}, nil
+		}
+		return &ypb.GetAIToolListResponse{
+			Tools: []*ypb.AITool{
+				{
+					ID:          int64(tool.ID),
+					Name:        tool.Name,
+					Description: tool.Description,
+					Content:     tool.Content,
+					ToolPath:    tool.Path,
+					Keywords:    strings.Split(tool.Keywords, ","),
+					IsFavorite:  tool.IsFavorite,
+				},
+			},
+		}, nil
+	}
+
 	// Otherwise use Query for fuzzy search with pagination
 	pagination, tools, err = yakit.SearchAIYakToolWithPagination(db, req.GetQuery(), req.GetOnlyFavorites(), req.GetPagination())
 	if err != nil {
@@ -192,13 +215,18 @@ func (s *Server) ToggleAIToolFavorite(ctx context.Context, req *ypb.ToggleAITool
 		return nil, utils.Errorf("database not initialized")
 	}
 
-	if req.GetToolName() == "" {
-		return nil, utils.Errorf("tool name cannot be empty")
-	}
-
-	isFavorite, err := yakit.ToggleAIYakToolFavorite(db, req.GetToolName())
-	if err != nil {
-		return nil, utils.Errorf("failed to toggle AI tool favorite status: %s", err)
+	var isFavorite bool
+	var err error
+	if req.GetToolName() != "" {
+		isFavorite, err = yakit.ToggleAIYakToolFavorite(db, req.GetToolName())
+		if err != nil {
+			return nil, utils.Errorf("failed to toggle AI tool favorite status: %s", err)
+		}
+	} else {
+		isFavorite, err = yakit.ToggleAIYakToolFavoriteByID(db, uint(req.GetID()))
+		if err != nil {
+			return nil, utils.Errorf("failed to toggle AI tool favorite status: %s", err)
+		}
 	}
 
 	message := "Tool added to favorites"
