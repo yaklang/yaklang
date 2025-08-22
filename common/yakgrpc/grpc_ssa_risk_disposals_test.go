@@ -7,10 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/consts"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -657,6 +658,16 @@ alert $result for {
 	ctx := context.Background()
 	testUUID := uuid.NewString()
 
+	// 在所有子测试完成后统一清理处置记录
+	defer func() {
+		// 清理所有相关的处置记录
+		yakit.DeleteSSARiskDisposals(ssadb.GetDB(), &ypb.DeleteSSARiskDisposalsRequest{
+			Filter: &ypb.SSARiskDisposalsFilter{
+				Search: testUUID,
+			},
+		})
+	}()
+
 	// 为第一个 Risk 创建处置信息
 	t.Run("为第一个Risk创建处置信息", func(t *testing.T) {
 		createResp, err := client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
@@ -738,5 +749,274 @@ alert $result for {
 		// 确保第二次扫描的处置记录在前面
 		require.True(t, t1.After(t2), "第二次扫描的处置记录应该在前面")
 		t.Logf("第一个Risk继承查询验证通过: 共 %d 条处置记录", len(getResp.Data))
+	})
+}
+
+func TestGRPCMUSTPASS_SSARiskDisposal_ComplexInheritanceScenario(t *testing.T) {
+	// 测试复杂场景
+	// 	1.发起一次扫描A，扫描A产生Risk 11、Risk12
+	//	 处置扫描A产生的漏洞，给Risk11 Risk 12都打上评论
+	//	 > Risk11(新增) Risk12(新增)
+	//	2. 发起第二次扫描B，扫描B产生Risk 21、Risk22、Risk23,其中Risk 21和Risk 22和扫描A的Risk 11、Risk 12为属于同一个风险。那么Risk 11和Risk 12会携带上Risk 11、Risk 12的审计信息。
+	//	 处置B产生的漏洞，给Risk 22,  Risk 23打上评论
+	//	 > Risk 21(携带) Risk 22（新增+携带） Risk 23（新增）
+	//	3. 第三次扫描C,产生Risk 32、Risk 33
+	//	 对比上次少了个Risk 21，Risk 32 Risk 33携带上次的评论
+	//   Risk 31(无) Risk 32(携带) Risk 33（携带）
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	// risk会用来计算riskFeatureHash，所以使用uuid做risk避免旧暑假影响
+	uuidRisk := uuid.NewString()
+	rule := fmt.Sprintf(`
+sink1 as $sink1
+alert $sink1 for {
+	desc: "Source-Sink vulnerability"
+	Title:"SQL Injection"
+	risk:"%s"
+}
+
+sink2 as $sink2
+alert $sink2 for {
+	desc: "Source-Sink vulnerability"
+	Title:"SQL Injection"
+	risk:"%s"
+}
+
+sink3 as $sink3
+alert $sink3 for {
+	desc: "Source-Sink vulnerability"
+	Title:"SQL Injection"
+	risk:"%s"
+}
+		`, uuidRisk, uuidRisk, uuidRisk)
+
+	ctx := context.Background()
+	testUUID := uuid.NewString()
+
+	programsToClean := make([]string, 0)
+	// 在所有子测试完成后统一清理处置记录
+	defer func() {
+		// 清理所有相关的处置记录
+		yakit.DeleteSSARiskDisposals(ssadb.GetDB(), &ypb.DeleteSSARiskDisposalsRequest{
+			Filter: &ypb.SSARiskDisposalsFilter{
+				Search: testUUID,
+			},
+		})
+		yakit.DeleteSSAProgram(ssadb.GetDB(), &ypb.SSAProgramFilter{ProgramNames: programsToClean})
+	}()
+
+	// === 第一次扫描 A ===
+	t.Run("扫描A: 产生Risk11和Risk12", func(t *testing.T) {
+		programName := "complex_test_scan_A_" + uuid.NewString()
+
+		testCodeA := `
+sink1(a)
+sink2(a)
+	`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("test.yak", testCodeA)
+
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
+		require.NoError(t, err)
+		require.NotEmpty(t, programs)
+
+		result, err := programs.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
+		require.NoError(t, err)
+		_, err = result.Save(schema.SFResultKindDebug)
+		require.NoError(t, err)
+
+		// 查询生成的 Risk
+		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{programName},
+		}, &ypb.Paging{OrderBy: "id", Order: "asc"})
+		require.NoError(t, err)
+		require.Len(t, risks, 2)
+
+		t.Logf("=== 扫描A生成的Risk ===")
+		for i, risk := range risks {
+			t.Logf("Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s, TaskName=%s",
+				i+1, risk.ID, risk.Title, risk.RiskFeatureHash, risk.TaskName)
+		}
+
+		// 为 Risk11 和 Risk12 创建处置信息
+		createResp, err := client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+			RiskIds: []int64{int64(risks[0].ID), int64(risks[1].ID)},
+			Status:  "not_issue",
+			Comment: "扫描A的处置-" + testUUID,
+		})
+		require.NoError(t, err)
+		require.Len(t, createResp.Data, 2)
+
+		// 等待一秒确保下次扫描的时间戳不同
+		time.Sleep(1 * time.Second)
+	})
+
+	// === 第二次扫描 B ===
+	var scanBRisks []*schema.SSARisk
+	t.Run("扫描B: 产生Risk21、Risk22、Risk23", func(t *testing.T) {
+		programName := "complex_test_scan_B_" + uuid.NewString()
+		programsToClean = append(programsToClean, programName)
+		testCode2 := `
+sink1(a)
+sink2(a)
+sink3(a)
+`
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("test.yak", testCode2)
+
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
+		require.NoError(t, err)
+		require.NotEmpty(t, programs)
+		prog := programs[0]
+
+		// 产生 Risk21、Risk22、Risk23
+		result, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
+		require.NoError(t, err)
+		_, err = result.Save(schema.SFResultKindDebug)
+		require.NoError(t, err)
+
+		// 查询生成的 Risk
+		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{programName},
+		}, &ypb.Paging{OrderBy: "id", Order: "asc"})
+		require.NoError(t, err)
+		require.Len(t, risks, 3) // 应该有3个risk
+		scanBRisks = risks
+
+		t.Logf("=== 扫描B生成的Risk ===")
+		for i, risk := range risks {
+			t.Logf("Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s, TaskName=%s",
+				i+1, risk.ID, risk.Title, risk.RiskFeatureHash, risk.TaskName)
+		}
+
+		// 验证 Risk21 和 Risk22 继承了扫描A的处置信息
+		for i := 0; i < 2; i++ {
+			getResp, err := client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+				RiskId: int64(risks[i].ID),
+			})
+			require.NoError(t, err)
+			require.NotNil(t, getResp)
+			require.Len(t, getResp.Data, 1, "Risk2%d应该继承扫描A的处置信息", i+1)
+			require.Equal(t, "not_issue", getResp.Data[0].Status)
+			require.Equal(t, getResp.Data[0].Comment, "扫描A的处置-"+testUUID)
+			t.Logf("Risk2%d 成功继承了扫描A的处置信息", i+1)
+		}
+
+		// Risk23 应该没有处置信息
+		getResp, err := client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(risks[2].ID),
+		})
+		require.NoError(t, err)
+		require.Len(t, getResp.Data, 0, "Risk23应该没有处置信息")
+
+		// 为 Risk22 和 Risk23 创建新的处置信息
+		// Risk22 修改为新的评论
+		_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+			RiskIds: []int64{int64(risks[1].ID)},
+			Status:  "is_issue",
+			Comment: "扫描B-Risk22的新处置-" + testUUID,
+		})
+		require.NoError(t, err)
+
+		// Risk23 新增评论
+		_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+			RiskIds: []int64{int64(risks[2].ID)},
+			Status:  "suspicious",
+			Comment: "扫描B-Risk23的处置-" + testUUID,
+		})
+		require.NoError(t, err)
+
+		// 等待一秒确保下次扫描的时间戳不同
+		time.Sleep(1 * time.Second)
+	})
+
+	// 验证扫描B的处置状态
+	t.Run("验证扫描B的处置状态", func(t *testing.T) {
+		// Risk21: 只有继承的评论
+		getResp, err := client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(scanBRisks[0].ID),
+		})
+		require.NoError(t, err)
+		require.Len(t, getResp.Data, 1)
+		require.Equal(t, "not_issue", getResp.Data[0].Status)
+		require.Contains(t, getResp.Data[0].Comment, "扫描A的处置-"+testUUID)
+
+		// Risk22: 应该有两条记录，新的在前面
+		getResp, err = client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(scanBRisks[1].ID),
+		})
+		require.NoError(t, err)
+		require.Len(t, getResp.Data, 2)
+		require.Equal(t, "is_issue", getResp.Data[0].Status)
+		require.Contains(t, getResp.Data[0].Comment, "扫描B-Risk22的新处置-"+testUUID)
+		require.Equal(t, "not_issue", getResp.Data[1].Status)
+		require.Contains(t, getResp.Data[1].Comment, "扫描A的处置-"+testUUID)
+
+		// Risk23: 只有新的评论
+		getResp, err = client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(scanBRisks[2].ID),
+		})
+		require.NoError(t, err)
+		require.Len(t, getResp.Data, 1)
+		require.Equal(t, "suspicious", getResp.Data[0].Status)
+		require.Contains(t, getResp.Data[0].Comment, "扫描B-Risk23的处置-"+testUUID)
+	})
+
+	// === 第三次扫描 C ===
+	t.Run("扫描C: 产生Risk32、Risk33，缺少Risk21", func(t *testing.T) {
+		programName := "complex_test_scan_C_" + uuid.NewString()
+		programsToClean = append(programsToClean, programName)
+
+		vf := filesys.NewVirtualFs()
+		testCode3 := `
+sink2(a)
+sink3(a)
+`
+		vf.AddFile("test.yak", testCode3)
+
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
+		require.NoError(t, err)
+		require.NotEmpty(t, programs)
+		prog := programs[0]
+
+		result, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
+		require.NoError(t, err)
+		_, err = result.Save(schema.SFResultKindDebug)
+		require.NoError(t, err)
+
+		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{programName},
+		}, &ypb.Paging{OrderBy: "id", Order: "asc"})
+		require.NoError(t, err)
+		require.Len(t, risks, 2) // 应该有2个risk (Risk32, Risk33)
+
+		t.Logf("=== 扫描C生成的Risk ===")
+		for i, risk := range risks {
+			t.Logf("Risk3%d: ID=%d, Title=%s, RiskFeatureHash=%s, TaskName=%s",
+				i+2, risk.ID, risk.Title, risk.RiskFeatureHash, risk.TaskName)
+		}
+
+		// 验证 Risk32 和 Risk33 继承了扫描B的处置信息
+		// Risk32 (对应之前的Risk22): 应该继承最新的处置信息
+		getResp, err := client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(risks[0].ID),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, getResp)
+		require.Len(t, getResp.Data, 2, "Risk32应该继承扫描B的所有处置信息")
+		require.Equal(t, "is_issue", getResp.Data[0].Status)
+		require.Contains(t, getResp.Data[0].Comment, "扫描B-Risk22的新处置-"+testUUID)
+		t.Logf("Risk32 成功继承了扫描B的处置信息")
+
+		// Risk33 (对应之前的Risk23): 应该继承扫描B的处置信息
+		getResp, err = client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(risks[1].ID),
+		})
+		require.NoError(t, err)
+		require.Len(t, getResp.Data, 1, "Risk33应该继承扫描B的处置信息")
+		require.Equal(t, "suspicious", getResp.Data[0].Status)
+		require.Contains(t, getResp.Data[0].Comment, "扫描B-Risk23的处置-"+testUUID)
+		t.Logf("Risk33 成功继承了扫描B的处置信息")
 	})
 }
