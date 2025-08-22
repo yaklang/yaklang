@@ -101,8 +101,7 @@ func (r *ReAct) extractResponseContent(resp *aicommon.AIResponse) string {
 		return ""
 	}
 
-	reader := resp.GetUnboundStreamReader(false)
-
+	reader := resp.GetOutputStreamReader("re-act-loop", false, r.config.Emitter)
 	content, err := io.ReadAll(reader)
 	if err != nil {
 		log.Errorf("failed to read response content: %v", err)

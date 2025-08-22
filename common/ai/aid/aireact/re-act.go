@@ -229,13 +229,10 @@ func (r *ReAct) processNextTaskFromQueue() {
 // processTask 处理单个 Task
 func (r *ReAct) processTask(task *Task) {
 	defer func() {
-		log.Info("require queue mutex")
 		r.queueMutex.Lock()
 		r.isProcessing = false
 		r.currentTask = nil // 清空当前任务
 		r.queueMutex.Unlock()
-		log.Info("release queue mutex")
-
 		if r.config.debugEvent {
 			log.Infof("Task processing completed: %s", task.GetId())
 		}
