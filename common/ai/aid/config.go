@@ -979,7 +979,7 @@ func WithGuardianMirrorStreamMirror(streamName string, callback aicommon.Guardia
 		if config.guardian == nil {
 			return utils.Error("BUG: guardian cannot be empty (ASYNC Guardian)")
 		}
-		return config.guardian.RegisterMirrorEventTrigger(streamName, callback)
+		return config.guardian.RegisterMirrorStreamTrigger(streamName, callback)
 	}
 }
 
