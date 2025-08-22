@@ -1243,8 +1243,7 @@ func TestDoHTTPFlowsToOnline(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	err = yakit.InsertHTTPFlow(db, flow1)
-	require.NoError(t, err)
+	require.NoError(t, yakit.InsertHTTPFlow(db, flow1))
 	defer yakit.DeleteHTTPFlowByID(db, int64(flow1.ID))
 
 	mockey.PatchConvey("skip token check", t, func() {
@@ -1264,6 +1263,7 @@ func TestDoHTTPFlowsToOnline(t *testing.T) {
 			}).Build()
 
 		server := &TestServerWrapper{
+			Server:       &Server{},
 			onlineClient: yaklib.OnlineClient{},
 		}
 
@@ -1277,7 +1277,7 @@ func TestDoHTTPFlowsToOnline(t *testing.T) {
 		// 验证结果
 		assert.NoError(t, err)
 		assert.NotNil(t, success)
-		assert.Contains(t, success, flow1.Hash) // 验证插入的 flow 被成功上传
+		assert.Contains(t, success, flow1.Hash)
 		assert.Empty(t, failed)
 	})
 }
