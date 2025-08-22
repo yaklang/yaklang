@@ -71,9 +71,6 @@ type ReActConfig struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// Synchronization
-	mu sync.RWMutex
-
 	// Event loop management
 	startInputEventOnce sync.Once
 	eventInputChan      *chanx.UnlimitedChan[*ypb.AIInputEvent]
@@ -412,7 +409,6 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		task:                task,
 		ctx:                 ctx,
 		cancel:              cancel,
-		mu:                  sync.RWMutex{},
 		startInputEventOnce: sync.Once{},
 		eventInputChan:      chanx.NewUnlimitedChan[*ypb.AIInputEvent](ctx, 2),
 		id:                  id,
