@@ -35,7 +35,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 	}
 
 	// Check if finished while holding lock
-	if r.config.finished {
+	if r.finished {
 		if r.config.debugEvent {
 			log.Warn("executeMainLoop: ReAct session has finished")
 		}
@@ -58,34 +58,34 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 	r.config.memory.StoreQuery(userQuery)
 
 	// Reset iteration state for new conversation
-	r.config.currentIteration = 0
-	r.config.finished = false
+	r.currentIteration = 0
+	r.finished = false
 	if r.config.debugEvent {
 		log.Infof("Initialized memory with user query: %s", userQuery)
 	}
 
 	if r.config.debugEvent {
 		log.Infof("executeMainLoop: starting main loop. currentIteration=%d, maxIterations=%d, finished=%t",
-			r.config.currentIteration, r.config.maxIterations, r.config.finished)
+			r.currentIteration, r.config.maxIterations, r.finished)
 	}
 
-	for r.config.currentIteration < r.config.maxIterations && !r.config.finished {
+	for r.currentIteration < r.config.maxIterations && !r.finished {
 		// Acquire lock for this iteration
 		// Check if finished while holding lock
-		if r.config.finished {
+		if r.finished {
 			break
 		}
 
 		if r.config.debugEvent {
 			log.Infof("executeMainLoop: entering loop iteration. currentIteration=%d, maxIterations=%d, finished=%t",
-				r.config.currentIteration, r.config.maxIterations, r.config.finished)
+				r.currentIteration, r.config.maxIterations, r.finished)
 		}
-		r.config.currentIteration++
+		r.currentIteration++
 
 		if r.config.debugEvent {
-			log.Infof("Starting ReAct iteration %d/%d", r.config.currentIteration, r.config.maxIterations)
+			log.Infof("Starting ReAct iteration %d/%d", r.currentIteration, r.config.maxIterations)
 		}
-		r.EmitIteration(r.config.currentIteration, r.config.maxIterations)
+		r.EmitIteration(r.currentIteration, r.config.maxIterations)
 
 		// Get available tools
 		tools, err := r.config.aiToolManager.GetEnableTools()
@@ -153,7 +153,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		// Update cumulative summary for memory
 		newSummary := action.GetString("cumulative_summary")
 		if newSummary != "" {
-			r.config.cumulativeSummary = newSummary
+			r.cumulativeSummary = newSummary
 			if r.config.debugEvent {
 				log.Infof("Updated cumulative summary: %s", newSummary)
 			}
@@ -168,7 +168,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			r.EmitAction(fmt.Sprintf("Answer: %s", answerPayload))
 			r.EmitResult(answerPayload)
 			// Always mark as finished for direct answers to avoid loops
-			r.config.finished = true
+			r.finished = true
 			// Store interaction in memory (no tool call result for direct answers)
 		case ActionRequireTool:
 			toolPayload := action.GetInvokeParams("next_action").GetString("tool_require_payload")
@@ -181,11 +181,11 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 				satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, toolPayload)
 				if err != nil {
 					log.Errorf("Verification failed: %v", err)
-					r.config.finished = true
+					r.finished = true
 				} else if satisfied {
 					// User needs are satisfied, emit final result and finish
 					r.EmitResult(finalResult)
-					r.config.finished = true
+					r.finished = true
 				} else {
 					// User needs not satisfied, continue loop
 					log.Infof("User needs not fully satisfied, continuing analysis...")
@@ -241,11 +241,11 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			)
 		default:
 			r.EmitError("unknown action type: %v", actionType)
-			r.config.finished = true
+			r.finished = true
 		}
 	}
-	if r.config.currentIteration >= r.config.maxIterations {
-		r.EmitWarning("Too many iterations[%v] is reached, stopping ReAct loop, max: %v", r.config.currentIteration, r.config.maxIterations)
+	if r.currentIteration >= r.config.maxIterations {
+		r.EmitWarning("Too many iterations[%v] is reached, stopping ReAct loop, max: %v", r.currentIteration, r.config.maxIterations)
 	}
 	return nil
 }
