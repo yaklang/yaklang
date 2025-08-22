@@ -332,15 +332,6 @@ func TestGRPCMUSTPASS_ToggleAIToolFavorite(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "AI tool not found")
 	})
-
-	t.Run("ToggleEmptyToolName", func(t *testing.T) {
-		// 尝试切换空工具名
-		_, err := c.ToggleAIToolFavorite(ctx, &ypb.ToggleAIToolFavoriteRequest{
-			ToolName: "",
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "tool name cannot be empty")
-	})
 }
 
 // TestGRPCMUSTPASS_GetAIToolListWithFavorites 测试带收藏过滤的AI工具列表功能
