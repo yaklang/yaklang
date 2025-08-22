@@ -35,12 +35,10 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 	}
 
 	// Check if finished while holding lock
-	r.config.mu.Lock()
 	if r.config.finished {
 		if r.config.debugEvent {
 			log.Warn("executeMainLoop: ReAct session has finished")
 		}
-		r.config.mu.Unlock()
 		return utils.Error("ReAct session has finished")
 	}
 	if r.config.debugEvent {
@@ -71,16 +69,10 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			r.config.currentIteration, r.config.maxIterations, r.config.finished)
 	}
 
-	// Release lock before entering the main loop
-	r.config.mu.Unlock()
-
 	for r.config.currentIteration < r.config.maxIterations && !r.config.finished {
 		// Acquire lock for this iteration
-		r.config.mu.Lock()
-
 		// Check if finished while holding lock
 		if r.config.finished {
-			r.config.mu.Unlock()
 			break
 		}
 
@@ -99,7 +91,6 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		tools, err := r.config.aiToolManager.GetEnableTools()
 		if err != nil {
 			log.Errorf("Failed to get available tools: %v", err)
-			r.config.mu.Unlock()
 			return utils.Errorf("failed to get available tools: %v", err)
 		}
 		if r.config.debugEvent {
@@ -118,8 +109,6 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		var actionErr error
 
 		// Temporarily release lock for AI transaction to prevent deadlocks
-		r.config.mu.Unlock()
-
 		transactionErr := aicommon.CallAITransaction(r.config, prompt,
 			func(req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				// Use the stored callback
@@ -141,9 +130,6 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 
 				return nil
 			})
-
-		// Re-acquire lock
-		r.config.mu.Lock()
 
 		if transactionErr != nil {
 			log.Errorf("AI transaction failed (内置错误学习功能): %v", transactionErr)
@@ -192,10 +178,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			} else {
 				// Tool executed successfully, now verify if user needs are satisfied
 				// Temporarily release the lock before calling verification to avoid deadlock
-				r.config.mu.Unlock()
 				satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, toolPayload)
-				r.config.mu.Lock()
-
 				if err != nil {
 					log.Errorf("Verification failed: %v", err)
 					r.config.finished = true

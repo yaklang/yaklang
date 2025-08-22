@@ -115,8 +115,6 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 
 // UpdateDebugMode dynamically updates the debug mode settings
 func (r *ReAct) UpdateDebugMode(debug bool) {
-	r.config.mu.Lock()
-	defer r.config.mu.Unlock()
 	r.config.debugEvent = debug
 	r.config.debugPrompt = debug
 }
@@ -248,8 +246,6 @@ func (r *ReAct) processTask(task *Task) {
 	// 从任务中提取用户输入
 	userInput := task.GetUserInput()
 
-	// 重置会话状态
-	r.config.mu.Lock()
 	r.config.finished = false
 	r.config.currentIteration = 0
 	// 为新任务重置内存
@@ -269,7 +265,6 @@ func (r *ReAct) processTask(task *Task) {
 			return tools
 		})
 	}
-	r.config.mu.Unlock()
 
 	// 执行主循环
 	err := r.executeMainLoop(userInput)
