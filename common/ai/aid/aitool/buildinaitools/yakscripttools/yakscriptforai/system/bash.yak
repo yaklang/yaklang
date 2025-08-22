@@ -31,7 +31,7 @@ if shellType == "" {
     yakit.Info("Using specified shell: %v", shellType)
 }
 
-yakit.Info("Executing %v command: %v", shellType, command)
+yakit.Info("Executing %v command: %#v", shellType, command)
 
 // 验证超时参数，确保不为零或负数
 if timeoutSeconds <= 0 {
@@ -46,9 +46,9 @@ var cmd
 var err
 switch shellType {
 case "bash":
-    cmd, err = exec.CommandContext(ctx, "bash -c %s" % command)
+    cmd, err = exec.CommandContext(ctx, "bash -c %#v" % command)
 case "cmd":
-    cmd, err = exec.CommandContext(ctx, "cmd /c %s" % command)
+    cmd, err = exec.CommandContext(ctx, "cmd /c %v" % command)
 case "powershell":
     cmd, err = exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command %s" % command)
 default:
