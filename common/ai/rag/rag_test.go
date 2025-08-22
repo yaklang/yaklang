@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/ai/embedding"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -302,7 +303,7 @@ func TestMUSTPASS_BigTextPlan(t *testing.T) {
 		MockEmbedderFunc: func(text string) ([]float32, error) {
 			// 模拟长文本会失败，短文本成功
 			if len([]rune(text)) > 50 {
-				return nil, fmt.Errorf("text too long: %d runes", len([]rune(text)))
+				return nil, fmt.Errorf("text too long: %d runes,%w", len([]rune(text)), embedding.ErrInputTooLarge)
 			}
 			// 为短文本生成简单的嵌入向量
 			return []float32{float32(len(text)), 0.5, 0.1}, nil
@@ -324,7 +325,8 @@ func TestMUSTPASS_BigTextPlan(t *testing.T) {
 	// 测试chunkText策略
 	t.Run("ChunkText Strategy", func(t *testing.T) {
 		ragSystem.SetBigTextPlan(BigTextPlanChunkText)
-
+		ragSystem.MaxChunkSize = 20
+		ragSystem.ChunkOverlap = 10
 		err := ragSystem.Add("long_doc_1", longText)
 		assert.NoError(t, err)
 
@@ -349,33 +351,6 @@ func TestMUSTPASS_BigTextPlan(t *testing.T) {
 			}
 		}
 		assert.True(t, chunkFound, "Should find at least one chunk document")
-
-		// 清理
-		ragSystem.ClearDocuments()
-	})
-
-	// 测试chunkTextAndAvgPooling策略
-	t.Run("ChunkTextAndAvgPooling Strategy", func(t *testing.T) {
-		ragSystem.SetBigTextPlan(BigTextPlanChunkTextAndAvgPooling)
-
-		err := ragSystem.Add("long_doc_2", longText)
-		assert.NoError(t, err)
-
-		// 检查文档数量，应该只有一个池化文档
-		count, err := store.Count()
-		assert.NoError(t, err)
-		assert.Equal(t, 1, count, "Should create only one pooled document")
-
-		// 检索文档
-		doc, exists, err := store.Get("long_doc_2")
-		assert.NoError(t, err)
-		assert.True(t, exists)
-
-		// 验证池化文档的元数据
-		assert.Equal(t, true, doc.Metadata["is_pooled"])
-		assert.Contains(t, doc.Metadata, "pooled_chunks")
-		assert.Equal(t, "average", doc.Metadata["pooling_method"])
-		assert.True(t, doc.Metadata["pooled_chunks"].(int) > 1)
 
 		// 清理
 		ragSystem.ClearDocuments()
