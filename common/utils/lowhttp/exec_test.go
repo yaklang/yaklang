@@ -982,6 +982,51 @@ User-Agent: yaklang-test/1.0
 		require.Equal(t, count, 6, "server should be called at 6 times")
 		require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
 	})
+
+	t.Run("retry defer", func(t *testing.T) {
+		count := 0
+		host, port := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			count++
+			if count < 3 {
+				return []byte("HTTP/1.1 403 Forbidden\r\nServer: nginx\r\n\r\n")
+			}
+			if count < 6 {
+				return []byte("HTTP/1.1 500 Internal Server Error\r\nServer: nginx\r\n\r\n")
+			}
+
+			return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\nContent-Length: %d\r\n\r\n%s", len(flag), flag))
+		})
+
+		hostport := utils.HostPort(host, port)
+		packet := `GET / HTTP/1.1
+Host: ` + hostport + `
+User-Agent: yaklang-test/1.0
+
+`
+		saveCount := 0
+		respPtr := ""
+
+		rsp, err := HTTP(WithPacketBytes(
+			[]byte(packet)),
+			WithTimeout(time.Second),
+			WithRetryWaitTime(20*time.Millisecond),
+			WithRetryNotInStatusCode([]int{500, 200}),
+			WithRetryInStatusCode([]int{500}),
+			WithRetryTimes(10),
+			WithSaveHTTPFlowHandler(func(response *LowhttpResponse) {
+				if respPtr == fmt.Sprintf("%p", response) { // 检测重试是否出现相同的指针，避免save的时候出现覆盖操作
+					t.Fatal("response pointer should not be the same")
+				}
+				respPtr = fmt.Sprintf("%p", response)
+				saveCount++
+			}),
+			WithSaveHTTPFlowSync(true),
+		)
+		require.NoError(t, err)
+		require.Equal(t, count, 6, "server should be called at 6 times")
+		require.Equal(t, saveCount, 6, "save count should be 6")
+		require.True(t, strings.Contains(string(rsp.RawPacket), string(flag)), "final response should contain the flag")
+	})
 }
 
 func TestHTTP_ContentLengthEdgeAndNegativeCases(t *testing.T) {
