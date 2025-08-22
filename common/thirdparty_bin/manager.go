@@ -654,7 +654,7 @@ func GetAllStatus() ([]*BinaryStatus, error) {
 
 // GetBinaryNamesByTags 使用默认管理器根据tags获取二进制文件名称列表
 // tags参数为需要匹配的标签列表，binary必须包含所有指定的标签才会被返回
-func GetBinaryNamesByTags(tags ...string) []string {
+func GetBinaryNamesByTags(tags []string) []string {
 	if DefaultManager == nil {
 		return []string{}
 	}
@@ -663,7 +663,7 @@ func GetBinaryNamesByTags(tags ...string) []string {
 
 // GetBinaryNamesByAnyTag 使用默认管理器根据tags获取二进制文件名称列表
 // tags参数为需要匹配的标签列表，binary只要包含任意一个指定的标签就会被返回
-func GetBinaryNamesByAnyTag(tags ...string) []string {
+func GetBinaryNamesByAnyTag(tags []string) []string {
 	if DefaultManager == nil {
 		return []string{}
 	}

@@ -11,15 +11,12 @@ binaries:
       linux-amd64:
         url: "/vulinbox/latest/vulinbox_linux_amd64"
         bin_path: "vulinbox"
-        md5: "45dcb17dff8c669ad74008c2c5bd9d0d"
       "darwin-*":  # 使用glob模式匹配所有macOS平台 (darwin-amd64, darwin-arm64等)
         url: "/vulinbox/latest/vulinbox_darwin_amd64"
         bin_path: "vulinbox"
-        md5: "37b5cf1bb6c2cd2b2452dd21aa90dc11"
       windows-amd64:
         url: "/vulinbox/latest/vulinbox_windows_amd64.exe"
         bin_path: "vulinbox.exe"
-        md5: "cd772f9d2067420c06f31761b60487c9"
   - name: "ffmpeg"
     description: "FFmpeg - A complete, cross-platform solution to record, convert and stream audio and video"
     version: "latest"
@@ -28,11 +25,9 @@ binaries:
       darwin-*:
         url: "/ffmpeg/ffmpeg-v6.0-darwin-amd64"
         bin_path: "ffmpeg"
-        md5: "c7bbeeae6e5f5235814074c3d062e875"
       windows-*:
         url: "/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
         bin_path: "ffmpeg.exe"
-        md5: "7ace86d71e5777e2a3f3749a90d3f202"
   - name: "llama-server"
     description: "Llama Server - A server for running Llama models"
     version: "latest"
@@ -43,25 +38,21 @@ binaries:
         pick: "build/bin/*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
-        md5: "e75a04d9bc1ab62d223ee59a47eb7b64"
       darwin-arm64:
         url: "/llama.cpp/llama-b6209-bin-macos-arm64.zip"
         pick: "build/bin/*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
-        md5: "b920396bede8fa804ca662bbd5a5bc21"
       windows-amd64:
         url: "/llama.cpp/llama-b6209-bin-win-cpu-x64.zip"
         pick: "*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server.exe"
-        md5: "3e344f2c3f10b63114ac528418e17b24"
       linux-amd64:
         url: "/llama.cpp/llama-b6209-bin-ubuntu-x64.zip"
         pick: "*"
         bin_dir: "llama-server"
         bin_path: "llama-server/llama-server"
-        md5: "5742ba51382a0ecc34f7ffb197945f06"
   - name: "page2image"
     description: "Page2Image - A tool for converting web pages to images"
     version: "latest"
@@ -70,11 +61,9 @@ binaries:
       "darwin-amd64":
         url: "/page2img/2025-08-20/page2img-darwin-amd64"
         bin_path: "page2img"
-        md5: "8a3f782b6b806e78857e546c926de157"
       "darwin-arm64":
         url: "/page2img/2025-08-20/page2img-darwin-arm64"
         bin_path: "page2img"
-        md5: "43ee33e24f121dd09b7f7dc9d612ee4c"
       "windows-amd64":
         url: "/page2img/2025-08-20/page2img-windows-amd64.exe"
         bin_path: "page2img.exe"
@@ -104,48 +93,42 @@ binaries:
         pick: "*"
         bin_dir: "whisper.cpp"
         bin_path: "whisper.cpp/whisper-cli"
-        md5: "b64ce414c4cd0ba1fe3bb633e2a87556"
       "darwin-arm64":
         url: "/whisper.cpp/20250729/whisper.cpp-macos-arm64.zip"
         pick: "*"
         bin_dir: "whisper.cpp"
         bin_path: "whisper.cpp/whisper-cli"
-        md5: "603435f009b681721087a52b0f982442"
       "windows-amd64":
         url: "/whisper.cpp/20250729/whisper.cpp-windows-amd64.zip"
         pick: "*"
         bin_dir: "whisper.cpp"
         bin_path: "whisper.cpp/whisper-cli.exe"
-        md5: "7223e5d7a3226d014a481f04b2f0c35a"
       "linux-amd64":
         url: "/whisper.cpp/20250729/whisper.cpp-linux-amd64.zip"
         pick: "*"
         bin_dir: "whisper.cpp"
         bin_path: "whisper.cpp/whisper-cli"
-        md5: "a10c806579c1495bdc4fa9c5fb6a27c1"
   - name: "model-whisper-medium-q5"
-    tags: "aimodel,speech-to-text"
-    description: "OpenAI Whisper Medium 模型 - 基于Transformer架构的高精度多语言语音识别模型，支持语音转录和翻译，适用于复杂噪声环境，模型参数量769M，上下文长度30秒，在准确性和效率间提供最佳平衡，支持多语言语音识别和英语翻译"
+    tags: "aimodel"
+    description: "Whisper Medium Q5 model"
     version: "latest"
     install_type: "bin"
     download_info_map:
       "*":
         url: "/gguf/whisper-medium-q5.gguf"
         bin_path: "aimodel/whisper-medium-q5.gguf"
-        md5: "3bb99a2f4c3b88d2645f878e6e39a8aa"
   - name: "model-Qwen3-Embedding-0.6B-Q8"
     tags: "aimodel,embedding"
-    description: "阿里云通义千问Qwen3嵌入模型(0.6B参数) - 最新一代文本嵌入模型，专为文本检索、分类、聚类等任务设计，支持100+语言，32K上下文长度，1024维嵌入向量，支持用户定义维度(32-1024)，在MTEB多语言排行榜表现优异，Q8量化版本在保持高精度的同时显著降低内存占用"
+    description: "Qwen3 Embedding model Q8_K_M"
     version: "latest"
     install_type: "bin"
     download_info_map:
       "*":
         url: "/gguf/Qwen3-Embedding-0.6B-Q8_0.gguf"
         bin_path: "aimodel/Qwen3-Embedding-0.6B-Q8_0.gguf"
-        md5: "ece7872b28d3a0ca8b8927eb05c991d7"
   - name: "model-Qwen3-Embedding-0.6B-Q4"
     tags: "aimodel,embedding"
-    description: "阿里云通义千问Qwen3嵌入模型(0.6B参数) - 高效轻量版文本嵌入模型，继承Qwen3系列的多语言能力和长文本理解优势，专为资源受限环境优化，Q4量化版本在大幅减少存储和计算需求的同时保持良好的嵌入质量，适用于边缘设备部署和大规模文本检索应用"
+    description: "Qwen3 Embedding model Q4_K_M"
     version: "latest"
     install_type: "bin"
     download_info_map:
