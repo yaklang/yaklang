@@ -23,6 +23,9 @@ var loopPromptTemplate string
 //go:embed prompts/loop/loop.json
 var loopSchemaJSON string
 
+//go:embed prompts/loop/loop_without_ask_for_clarification.json
+var loopSchemaWithoutAskForClarificationJSON string
+
 //go:embed prompts/tool-params/tool-params.txt
 var toolParamsPromptTemplate string
 
@@ -50,6 +53,10 @@ func NewPromptManager(react *ReAct) *PromptManager {
 
 // LoopPromptData contains data for the main loop prompt template
 type LoopPromptData struct {
+	AllowAskForClarification       bool
+	AskForClarificationCurrentTime int64
+	AstForClarificationMaxTimes    int64
+
 	CurrentTime        string
 	OSArch             string
 	WorkingDir         string
@@ -105,18 +112,34 @@ type AIReviewPromptData struct {
 }
 
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
-func (pm *PromptManager) GenerateLoopPrompt(userQuery string, tools []*aitool.Tool) (string, error) {
+func (pm *PromptManager) GenerateLoopPrompt(
+	userQuery string,
+	allowUserInteractive bool,
+	currentUserInteractiveCount,
+	userInteractiveLimitedTimes int64,
+	tools []*aitool.Tool,
+) (string, error) {
+	var loopSchema string
+	if allowUserInteractive {
+		loopSchema = loopSchemaJSON
+	} else {
+		loopSchema = loopSchemaWithoutAskForClarificationJSON
+	}
+
 	// Build template data
 	data := &LoopPromptData{
-		CurrentTime:   time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:        fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:     userQuery,
-		Nonce:         utils.RandStringBytes(4),
-		Language:      pm.react.config.language,
-		Schema:        loopSchemaJSON,
-		Tools:         tools,
-		ToolsCount:    len(tools),
-		TopToolsCount: pm.react.config.topToolsCount,
+		AllowAskForClarification:       allowUserInteractive,
+		AskForClarificationCurrentTime: currentUserInteractiveCount,
+		AstForClarificationMaxTimes:    userInteractiveLimitedTimes,
+		CurrentTime:                    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:                         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:                      userQuery,
+		Nonce:                          utils.RandStringBytes(4),
+		Language:                       pm.react.config.language,
+		Schema:                         loopSchema,
+		Tools:                          tools,
+		ToolsCount:                     len(tools),
+		TopToolsCount:                  pm.react.config.topToolsCount,
 	}
 
 	// Set working directory
