@@ -60,7 +60,7 @@ func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
 	result, err := l.embedding.Embedding(text)
 	if err != nil {
 		log.Errorf("failed to generate embedding: %v", err)
-		return nil, fmt.Errorf("failed to generate embedding: %v", err)
+		return nil, fmt.Errorf("failed to generate embedding: %w", err)
 	}
 
 	log.Infof("successfully generated embedding with dimension: %d", len(result))

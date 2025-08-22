@@ -14,6 +14,10 @@ import (
 
 type Vector = func() []float32
 
+// FilterFunc is a callback function used to filter nodes during search.
+// It returns true if the node should be included in the results, false otherwise.
+type FilterFunc[K cmp.Ordered] func(key K, vector Vector) bool
+
 // Node is a node in the graph.
 type Node[K cmp.Ordered] struct {
 	Key   K
@@ -87,6 +91,7 @@ func (n *LayerNode[K]) search(
 	efSearch int,
 	target Vector,
 	distance DistanceFunc,
+	filter FilterFunc[K],
 ) []searchCandidate[K] {
 	// This is a basic greedy algorithm to find the entry point at the given level
 	// that is closest to the target node.
@@ -104,8 +109,13 @@ func (n *LayerNode[K]) search(
 	)
 	result.Init(make([]searchCandidate[K], 0, k))
 
-	// Begin with the entry node in the result set.
-	result.Push(candidates.Min())
+	// Begin with the entry node in the result set (if it passes the filter).
+	if candidates.Len() > 0 {
+		entryCandidate := candidates.Min()
+		if filter == nil || filter(entryCandidate.node.Key, entryCandidate.node.Value) {
+			result.Push(entryCandidate)
+		}
+	}
 	visited[n.Key] = true
 
 	for candidates.Len() > 0 {
@@ -125,8 +135,17 @@ func (n *LayerNode[K]) search(
 			}
 			visited[neighborID] = true
 
+			// Apply filter if provided
+			if filter != nil && !filter(neighbor.Key, neighbor.Value) {
+				continue
+			}
+
 			dist := distance(neighbor.Value, target)
-			improved = improved || dist < result.Min().dist
+			if result.Len() > 0 {
+				improved = improved || dist < result.Min().dist
+			} else {
+				improved = true
+			}
 			if result.Len() < k {
 				result.Push(searchCandidate[K]{node: neighbor, dist: dist})
 			} else if dist < result.Max().dist {
@@ -144,6 +163,11 @@ func (n *LayerNode[K]) search(
 		// Termination condition: no improvement in distance and at least
 		// kMin candidates in the result set.
 		if !improved && result.Len() >= k {
+			break
+		}
+
+		// Early termination if we can't find any more valid candidates
+		if result.Len() == 0 && candidates.Len() == 0 {
 			break
 		}
 	}
@@ -505,7 +529,7 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 				panic("(*Graph).Distance must be set")
 			}
 
-			neighborhood := searchPoint.search(g.M, g.EfSearch, vec, g.Distance)
+			neighborhood := searchPoint.search(g.M, g.EfSearch, vec, g.Distance, nil)
 			if len(neighborhood) == 0 {
 				// This should never happen because the searchPoint itself
 				// should be in the result set.
@@ -540,7 +564,7 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 
 // Search finds the k nearest neighbors from the target node.
 func (h *Graph[K]) Search(near []float32, k int) []Node[K] {
-	sr := h.search(func() []float32 { return near }, k)
+	sr := h.search(func() []float32 { return near }, k, nil)
 	out := make([]Node[K], len(sr))
 	for i, node := range sr {
 		out[i] = node.Node
@@ -551,7 +575,25 @@ func (h *Graph[K]) Search(near []float32, k int) []Node[K] {
 // SearchWithDistance finds the k nearest neighbors from the target node
 // and returns the distance.
 func (h *Graph[K]) SearchWithDistance(near []float32, k int) []SearchResult[K] {
-	return h.search(func() []float32 { return near }, k)
+	return h.search(func() []float32 { return near }, k, nil)
+}
+
+// SearchWithFilter finds the k nearest neighbors from the target node with a filter function.
+// The filter function is called for each candidate node and should return true if the node
+// should be included in the results.
+func (h *Graph[K]) SearchWithFilter(near []float32, k int, filter FilterFunc[K]) []Node[K] {
+	sr := h.search(func() []float32 { return near }, k, filter)
+	out := make([]Node[K], len(sr))
+	for i, node := range sr {
+		out[i] = node.Node
+	}
+	return out
+}
+
+// SearchWithDistanceAndFilter finds the k nearest neighbors from the target node with a filter function
+// and returns the distance.
+func (h *Graph[K]) SearchWithDistanceAndFilter(near []float32, k int, filter FilterFunc[K]) []SearchResult[K] {
+	return h.search(func() []float32 { return near }, k, filter)
 }
 
 type SearchResult[T cmp.Ordered] struct {
@@ -559,7 +601,7 @@ type SearchResult[T cmp.Ordered] struct {
 	Distance float32
 }
 
-func (h *Graph[K]) search(near Vector, k int) []SearchResult[K] {
+func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResult[K] {
 	h.assertDims(near)
 	if len(h.Layers) == 0 {
 		return nil
@@ -579,12 +621,12 @@ func (h *Graph[K]) search(near Vector, k int) []SearchResult[K] {
 
 		// Descending hierarchies
 		if layer > 0 {
-			nodes := searchPoint.search(1, efSearch, near, h.Distance)
+			nodes := searchPoint.search(1, efSearch, near, h.Distance, nil)
 			elevator = ptr(nodes[0].node.Key)
 			continue
 		}
 
-		nodes := searchPoint.search(k, efSearch, near, h.Distance)
+		nodes := searchPoint.search(k, efSearch, near, h.Distance, filter)
 		out := make([]SearchResult[K], 0, len(nodes))
 
 		for _, node := range nodes {
