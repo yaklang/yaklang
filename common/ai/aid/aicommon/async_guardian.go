@@ -130,7 +130,7 @@ func (a *AsyncGuardian) RegisterEventTrigger(eventType schema.EventType, trigger
 	return nil
 }
 
-func (a *AsyncGuardian) RegisterMirrorEventTrigger(mirror string, trigger GuardianMirrorStreamTrigger) error {
+func (a *AsyncGuardian) RegisterMirrorStreamTrigger(mirror string, trigger GuardianMirrorStreamTrigger) error {
 	a.rwm.Lock()
 	defer a.rwm.Unlock()
 

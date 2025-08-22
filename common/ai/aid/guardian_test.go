@@ -179,7 +179,7 @@ func TestAsyncGuardian_RegisterMirrorEventTrigger(t *testing.T) {
 		emitter.EmitStructured(mirrorNodeId, &schema.AiOutputEvent{Type: "event_from_mirror", Content: []byte("mirror_data")})
 	}
 
-	err := g.RegisterMirrorEventTrigger(mirrorName, mirrorTrigger)
+	err := g.RegisterMirrorStreamTrigger(mirrorName, mirrorTrigger)
 	assert.NoError(t, err)
 
 	g.SetOutputEmitter("emitter_coord_id", func(event *schema.AiOutputEvent) {
@@ -320,7 +320,7 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 		eventTriggerCalled = true
 		emitter.EmitStructured("event_trigger_node", &schema.AiOutputEvent{Type: "from_event_trigger"})
 	})
-	g.RegisterMirrorEventTrigger("interaction_mirror", func(uc *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
+	g.RegisterMirrorStreamTrigger("interaction_mirror", func(uc *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
 		mirrorTriggerCalled = true
 		for event := range uc.OutputChannel() {
 			_ = event
