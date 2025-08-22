@@ -81,7 +81,7 @@ func getModelTypeByTags(tags ...string) string {
 // getSupportedModels 获取支持的模型列表（包括内置和自定义）
 func getSupportedModels() []*ypb.LocalModelConfig {
 	// 内置模型
-	aimodelNames := thirdparty_bin.GetBinaryNamesByTags("aimodel")
+	aimodelNames := thirdparty_bin.GetBinaryNamesByTags([]string{"aimodel"})
 	allBins := thirdparty_bin.GetRegisteredBinaries()
 
 	builtinModels := []*ypb.LocalModelConfig{}
