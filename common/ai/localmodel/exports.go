@@ -75,3 +75,47 @@ func GetSupportedModelNames() []string {
 	}
 	return names
 }
+
+// 便捷的服务启动函数
+
+// StartEmbedding 启动嵌入服务（便捷函数）
+func StartEmbedding(address string, options ...Option) error {
+	manager := GetManager()
+	return manager.StartEmbeddingService(address, options...)
+}
+
+// StartChat 启动聊天服务（便捷函数）
+func StartChat(address string, options ...Option) error {
+	manager := GetManager()
+	return manager.StartChatService(address, options...)
+}
+
+// WaitForEmbedding 等待嵌入服务启动（便捷函数）
+func WaitForEmbedding(address string, timeoutSeconds float64) error {
+	manager := GetManager()
+	return manager.WaitForEmbeddingService(address, timeoutSeconds)
+}
+
+// StopAllServices 停止所有服务（便捷函数）
+func StopAllServices() error {
+	manager := GetManager()
+	return manager.StopAllServices()
+}
+
+// StopService 停止指定服务（便捷函数）
+func StopService(serviceName string) error {
+	manager := GetManager()
+	return manager.StopService(serviceName)
+}
+
+// ListServices 列出所有服务（便捷函数）
+func ListServices() []*ServiceInfo {
+	manager := GetManager()
+	return manager.ListServices()
+}
+
+// GetServiceStatus 获取服务状态（便捷函数）
+func GetServiceStatus(serviceName string) (*ServiceInfo, error) {
+	manager := GetManager()
+	return manager.GetServiceStatus(serviceName)
+}
