@@ -362,6 +362,8 @@ func (r *Emitter) EmitReasonStreamEvent(nodeId string, startTime time.Time, read
 func (r *Emitter) emitStreamEvent(e *streamEvent) {
 	r.streamWG.Add(1)
 
+	startTS := e.startTime.Unix()
+	ewid := ksuid.New().String()
 	producer := newStreamAIOutputEventWriter(
 		r.id,
 		e.nodeId,
@@ -369,8 +371,8 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 		e.isSystem,
 		e.isReason,
 		r.emit,
-		e.startTime.Unix(),
-		ksuid.New().String(),
+		startTS,
+		ewid,
 		e.taskIndex,
 	)
 
@@ -382,6 +384,15 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 			}
 		}()
 		io.Copy(producer, e.reader)
+		r.EmitStructured("stream-finished", map[string]any{
+			"node_id":          e.nodeId,
+			"coordinator_id":   r.id,
+			"is_system":        e.isSystem,
+			"is_reason":        e.isReason,
+			"start_timestamp":  startTS,
+			"task_index":       e.taskIndex,
+			"event_watcher_id": ewid,
+		})
 	}()
 }
 

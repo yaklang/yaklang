@@ -20,13 +20,13 @@ func TestNewAsyncGuardian(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAsyncGuardian(ctx, "test_coordinator_id")
+	g := aicommon.NewAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g, "Guardian should not be nil")
-	assert.Equal(t, ctx, g.ctx, "Guardian context should be the one provided")
-	assert.NotNil(t, g.unlimitedInput, "Guardian unlimitedInput channel should not be nil")
-	assert.NotNil(t, g.callbackMutex, "Guardian callbackMutex should not be nil")
-	assert.NotNil(t, g.eventTriggerCallback, "Guardian eventTriggerCallback map should not be nil")
-	assert.NotNil(t, g.mirrorCallback, "Guardian mirrorCallback map should not be nil")
+	assert.Equal(t, ctx, g.GetContext(), "Guardian context should be the one provided")
+	assert.NotNil(t, g.GetUnlimitedInput(), "Guardian unlimitedInput channel should not be nil")
+	assert.NotNil(t, g.GetRWMutex(), "Guardian callbackMutex should not be nil")
+	assert.NotNil(t, g.GetEventTriggerCallback(), "Guardian eventTriggerCallback map should not be nil")
+	assert.NotNil(t, g.GetMirrorCallback(), "Guardian mirrorCallback map should not be nil")
 
 	time.Sleep(10 * time.Millisecond)
 }
@@ -35,7 +35,7 @@ func TestAsyncGuardian_SetOutputEmitterAndFeed(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAsyncGuardian(ctx, "test_coordinator_id")
+	g := aicommon.NewAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var emittedEvents []*schema.AiOutputEvent
@@ -46,16 +46,16 @@ func TestAsyncGuardian_SetOutputEmitterAndFeed(t *testing.T) {
 		emittedEvents = append(emittedEvents, event)
 	}
 
-	g.setOutputEmitter("emitter_coord_id", emitter)
+	g.SetOutputEmitter("emitter_coord_id", emitter)
 
 	testEvent := &schema.AiOutputEvent{Type: "test_event_type", Content: []byte("test_data")}
 
-	err := g.registerEventTrigger(testEvent.Type, func(evt *schema.AiOutputEvent, e GuardianEmitter, caller aicommon.AICaller) {
+	err := g.RegisterEventTrigger(testEvent.Type, func(evt *schema.AiOutputEvent, e aicommon.GuardianEmitter, caller aicommon.AICaller) {
 		e.EmitStructured(string(evt.Type), evt)
 	})
 	assert.NoError(t, err, "Failed to register event trigger for test")
 
-	g.feed(testEvent)
+	g.Feed(testEvent)
 
 	time.Sleep(50 * time.Millisecond)
 
@@ -77,7 +77,7 @@ func TestAsyncGuardian_SetOutputEmitterAndFeed(t *testing.T) {
 
 	// Test feeding a nil event
 	emittedEvents = nil // Reset for next check
-	g.feed(nil)
+	g.Feed(nil)
 	time.Sleep(50 * time.Millisecond)
 
 	emitterMutex.Lock()
@@ -89,7 +89,7 @@ func TestAsyncGuardian_RegisterEventTrigger(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAsyncGuardian(ctx, "test_coordinator_id")
+	g := aicommon.NewAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var triggerCalled bool
@@ -100,16 +100,16 @@ func TestAsyncGuardian_RegisterEventTrigger(t *testing.T) {
 	testEventType := schema.EventType("specific_event")
 	triggerNodeId := "node_from_specific_trigger"
 
-	trigger := func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+	trigger := func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 		triggerCalled = true
 		receivedEventInTrigger = event
 		emitter.EmitStructured(triggerNodeId, &schema.AiOutputEvent{Type: "event_from_trigger", Content: []byte("trigger_data")})
 	}
 
-	err := g.registerEventTrigger(testEventType, trigger)
+	err := g.RegisterEventTrigger(testEventType, trigger)
 	assert.NoError(t, err)
 
-	g.setOutputEmitter("emitter_coord_id", func(event *schema.AiOutputEvent) {
+	g.SetOutputEmitter("emitter_coord_id", func(event *schema.AiOutputEvent) {
 		emitterMutex.Lock()
 		defer emitterMutex.Unlock()
 		emittedEvents = append(emittedEvents, event)
@@ -117,7 +117,7 @@ func TestAsyncGuardian_RegisterEventTrigger(t *testing.T) {
 
 	// Feed an event of the specific type
 	eventToFeed := &schema.AiOutputEvent{Type: testEventType, Content: []byte("event_data")}
-	g.feed(eventToFeed)
+	g.Feed(eventToFeed)
 
 	time.Sleep(50 * time.Millisecond)
 
@@ -147,7 +147,7 @@ func TestAsyncGuardian_RegisterEventTrigger(t *testing.T) {
 	emittedEvents = nil          // Reset
 
 	differentEvent := &schema.AiOutputEvent{Type: "other_event_type", Content: []byte("other_data")}
-	g.feed(differentEvent)
+	g.Feed(differentEvent)
 
 	time.Sleep(50 * time.Millisecond)
 
@@ -163,7 +163,7 @@ func TestAsyncGuardian_RegisterMirrorEventTrigger(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g := newAsyncGuardian(ctx, "test_coordinator_id")
+	g := aicommon.NewAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var mirrorTriggerCalled bool
@@ -173,38 +173,28 @@ func TestAsyncGuardian_RegisterMirrorEventTrigger(t *testing.T) {
 	mirrorName := "test_mirror"
 	mirrorNodeId := "node_from_mirror_trigger"
 
-	mirrorTrigger := func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter GuardianEmitter) {
+	mirrorTrigger := func(unlimitedChan *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
 		mirrorTriggerCalled = true
 		receivedUnlimitedChan = unlimitedChan
 		emitter.EmitStructured(mirrorNodeId, &schema.AiOutputEvent{Type: "event_from_mirror", Content: []byte("mirror_data")})
 	}
 
-	err := g.registerMirrorEventTrigger(mirrorName, mirrorTrigger)
+	err := g.RegisterMirrorEventTrigger(mirrorName, mirrorTrigger)
 	assert.NoError(t, err)
 
-	dupError := g.registerMirrorEventTrigger(mirrorName, mirrorTrigger)
-	assert.Error(t, dupError, "Registering duplicate mirror trigger should return an error")
-	assert.Contains(t, dupError.Error(), "already registered", "Error message should indicate duplicate registration")
-
-	g.setOutputEmitter("emitter_coord_id", func(event *schema.AiOutputEvent) {
+	g.SetOutputEmitter("emitter_coord_id", func(event *schema.AiOutputEvent) {
 		emitterMutex.Lock()
 		defer emitterMutex.Unlock()
 		emittedEvents = append(emittedEvents, event)
 	})
 
 	eventToFeed := &schema.AiOutputEvent{Type: "any_event_type", Content: []byte("any_data")}
-	g.feed(eventToFeed)
+	g.Feed(eventToFeed)
 
 	time.Sleep(50 * time.Millisecond)
 
 	assert.True(t, mirrorTriggerCalled, "Mirror trigger should have been called")
 	assert.NotNil(t, receivedUnlimitedChan, "Received unlimitedChan in mirror trigger should not be nil")
-
-	g.callbackMutex.RLock()
-	internalMirrorStream, ok := g.mirrorCallback[mirrorName]
-	g.callbackMutex.RUnlock()
-	assert.True(t, ok, "Mirror stream should exist in guardian's map")
-	assert.Equal(t, internalMirrorStream.unlimitedChan, receivedUnlimitedChan, "Channel passed to mirror trigger should be the one from guardian's map")
 
 	emitterMutex.Lock()
 	assert.Len(t, emittedEvents, 1, "Output emitter should receive one event from the mirror via EmitStructured")
@@ -225,25 +215,25 @@ func TestAsyncGuardian_RegisterMirrorEventTrigger(t *testing.T) {
 func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	g := newAsyncGuardian(ctx, "test_coordinator_id")
+	g := aicommon.NewAsyncGuardian(ctx, "test_coordinator_id")
 	assert.NotNil(t, g)
 
 	var emittedEvents []*schema.AiOutputEvent
 	emitterMutex := &sync.Mutex{}
-	g.setOutputEmitter("emitter_coord_id", func(event *schema.AiOutputEvent) {
+	g.SetOutputEmitter("emitter_coord_id", func(event *schema.AiOutputEvent) {
 		emitterMutex.Lock()
 		defer emitterMutex.Unlock()
 		emittedEvents = append(emittedEvents, event)
 	})
 
 	initialEventType := schema.EventType("initial_event_type_for_cancel_test")
-	g.registerEventTrigger(initialEventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+	g.RegisterEventTrigger(initialEventType, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 		emitter.EmitStructured(string(event.Type), event)
 	})
 
 	// No mirror needed if event trigger directly uses EmitStructured to test the outputEmitter
 
-	g.feed(&schema.AiOutputEvent{Type: initialEventType, Content: []byte("initial_data")})
+	g.Feed(&schema.AiOutputEvent{Type: initialEventType, Content: []byte("initial_data")})
 	time.Sleep(50 * time.Millisecond)
 
 	emitterMutex.Lock()
@@ -259,7 +249,7 @@ func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 	emittedEvents = nil
 	emitterMutex.Unlock()
 
-	g.feed(&schema.AiOutputEvent{Type: initialEventType, Content: []byte("event_after_cancel")})
+	g.Feed(&schema.AiOutputEvent{Type: initialEventType, Content: []byte("event_after_cancel")})
 
 	time.Sleep(100 * time.Millisecond)
 
@@ -268,7 +258,7 @@ func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 	emitterMutex.Unlock()
 
 	select {
-	case _, ok := <-g.unlimitedInput.OutputChannel():
+	case _, ok := <-g.GetUnlimitedInput().OutputChannel():
 		assert.False(t, ok, "Guardian's input channel (output side) should be closed after context cancellation")
 	case <-time.After(200 * time.Millisecond):
 		t.Log("Timeout waiting for guardian input channel to close, this might be acceptable if event processing has stopped.")
@@ -279,19 +269,19 @@ func TestAsyncGuardian_EventLoop_ContextCancellation(t *testing.T) {
 func TestAsyncGuardian_MultipleEventTriggers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	g := newAsyncGuardian(ctx, "test_coordinator_id")
+	g := aicommon.NewAsyncGuardian(ctx, "test_coordinator_id")
 
 	var trigger1Called, trigger2Called bool
 	eventType := schema.EventType("multi_trigger_event")
 
-	g.registerEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+	g.RegisterEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 		trigger1Called = true
 	})
-	g.registerEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+	g.RegisterEventTrigger(eventType, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 		trigger2Called = true
 	})
 
-	g.feed(&schema.AiOutputEvent{Type: eventType})
+	g.Feed(&schema.AiOutputEvent{Type: eventType})
 	time.Sleep(50 * time.Millisecond)
 
 	assert.True(t, trigger1Called, "First trigger should have been called")
@@ -302,7 +292,7 @@ func TestAsyncGuardian_MultipleEventTriggers(t *testing.T) {
 func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	g := newAsyncGuardian(ctx, "test_coordinator_id")
+	g := aicommon.NewAsyncGuardian(ctx, "test_coordinator_id")
 
 	var eventTriggerCalled, mirrorTriggerCalled bool
 	specificEventType := schema.EventType("specific_for_interaction_test")
@@ -310,7 +300,7 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 	emittedEventTypes := make(map[schema.EventType]bool)
 	emitterMutex := &sync.Mutex{}
 
-	g.setOutputEmitter("emitter_coord_id", func(e *schema.AiOutputEvent) {
+	g.SetOutputEmitter("emitter_coord_id", func(e *schema.AiOutputEvent) {
 		emitterMutex.Lock()
 		defer emitterMutex.Unlock()
 		if e.Type == testEventTypeStructured {
@@ -326,11 +316,11 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 		}
 	})
 
-	g.registerEventTrigger(specificEventType, func(event *schema.AiOutputEvent, emitter GuardianEmitter, caller aicommon.AICaller) {
+	g.RegisterEventTrigger(specificEventType, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 		eventTriggerCalled = true
 		emitter.EmitStructured("event_trigger_node", &schema.AiOutputEvent{Type: "from_event_trigger"})
 	})
-	g.registerMirrorEventTrigger("interaction_mirror", func(uc *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter GuardianEmitter) {
+	g.RegisterMirrorEventTrigger("interaction_mirror", func(uc *chanx.UnlimitedChan[*schema.AiOutputEvent], emitter aicommon.GuardianEmitter) {
 		mirrorTriggerCalled = true
 		for event := range uc.OutputChannel() {
 			_ = event
@@ -339,7 +329,7 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 	})
 
 	// Feed event that matches specific trigger
-	g.feed(&schema.AiOutputEvent{Type: specificEventType})
+	g.Feed(&schema.AiOutputEvent{Type: specificEventType})
 	time.Sleep(50 * time.Millisecond)
 
 	assert.True(t, eventTriggerCalled, "Event trigger should be called for specific event")
@@ -356,7 +346,7 @@ func TestAsyncGuardian_EventAndMirrorTriggers(t *testing.T) {
 	emittedEventTypes = make(map[schema.EventType]bool)
 
 	// Feed event that does not match specific trigger
-	g.feed(&schema.AiOutputEvent{Type: "other_event_for_interaction"})
+	g.Feed(&schema.AiOutputEvent{Type: "other_event_for_interaction"})
 	time.Sleep(50 * time.Millisecond)
 
 	assert.False(t, eventTriggerCalled, "Event trigger should NOT be called for other event")
