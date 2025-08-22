@@ -31,6 +31,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	inputEvent := make(chan *ypb.AIInputEvent, 1000)
 
 	var currentCoordinatorId = startParams.CoordinatorId
+	_ = currentCoordinatorId
 	var coordinatorIdOnce = new(sync.Once)
 	feedback := func(e *schema.AiOutputEvent) {
 		if e.Timestamp <= 0 {
