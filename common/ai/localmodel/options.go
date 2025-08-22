@@ -25,8 +25,8 @@ func WithPort(port int32) Option {
 	}
 }
 
-// WithEmbeddingModel 设置嵌入模型
-func WithEmbeddingModel(model string) Option {
+// WithModel 设置模型
+func WithModel(model string) Option {
 	return func(c *ServiceConfig) {
 		if model != "" {
 			c.Model = model
@@ -120,5 +120,11 @@ func WithArgs(args ...string) Option {
 func WithPooling(pooling string) Option {
 	return func(c *ServiceConfig) {
 		c.Pooling = pooling
+	}
+}
+
+func WithModelType(modelType string) Option {
+	return func(c *ServiceConfig) {
+		c.ModelType = modelType
 	}
 }

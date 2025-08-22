@@ -25,6 +25,7 @@ type ServiceConfig struct {
 	Host            string        `json:"host"`
 	Port            int32         `json:"port"`
 	Model           string        `json:"model"`
+	ModelType       string        `json:"modelType"`
 	ModelPath       string        `json:"modelPath"`
 	LlamaServerPath string        `json:"llamaServerPath"`
 	ContextSize     int           `json:"contextSize"`
@@ -130,4 +131,35 @@ func GetDefaultYakBinaryPath() string {
 		binaryName += ".exe"
 	}
 	return filepath.Join(engineDir, binaryName)
+}
+
+// GetModelsByType 根据类型获取模型列表
+func GetModelsByType(modelType string) []*ModelConfig {
+	models := GetSupportedModels()
+	var filteredModels []*ModelConfig
+	for _, model := range models {
+		if model.Type == modelType {
+			filteredModels = append(filteredModels, model)
+		}
+	}
+	return filteredModels
+}
+
+// GetEmbeddingModels 获取嵌入模型列表
+func GetEmbeddingModels() []*ModelConfig {
+	return GetModelsByType("embedding")
+}
+
+// GetChatModels 获取聊天模型列表
+func GetChatModels() []*ModelConfig {
+	return GetModelsByType("aichat")
+}
+
+// GetDefaultChatModel 获取默认聊天模型
+func GetDefaultChatModel() *ModelConfig {
+	chatModels := GetChatModels()
+	if len(chatModels) > 0 {
+		return chatModels[0] // 返回第一个聊天模型作为默认
+	}
+	return nil
 }

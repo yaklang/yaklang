@@ -18,7 +18,7 @@ func SaveAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 
 func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	db = db.Model(&schema.AIYakTool{})
-	if db := db.Where("id = ?", tool.ID).Assign(tool).Save(&schema.AIYakTool{}); db.Error != nil {
+	if db := db.Where("id = ?", tool.ID).Updates(tool); db.Error != nil {
 		return 0, utils.Errorf("update AIYakTool failed: %s", db.Error)
 	}
 	return db.RowsAffected, nil
@@ -32,6 +32,16 @@ func GetAIYakTool(db *gorm.DB, name string) (*schema.AIYakTool, error) {
 	}
 	return &tool, nil
 }
+
+func GetAIYakToolByID(db *gorm.DB, id uint) (*schema.AIYakTool, error) {
+	db = db.Model(&schema.AIYakTool{})
+	var tool schema.AIYakTool
+	if err := db.Where("id = ?", id).First(&tool).Error; err != nil {
+		return nil, err
+	}
+	return &tool, nil
+}
+
 func SearchAIYakToolByPath(db *gorm.DB, path string) ([]*schema.AIYakTool, error) {
 	db = db.Model(&schema.AIYakTool{})
 	var tools []*schema.AIYakTool
@@ -114,6 +124,25 @@ func ToggleAIYakToolFavorite(db *gorm.DB, toolName string) (bool, error) {
 
 	var tool schema.AIYakTool
 	if err := db.Where("name = ?", toolName).First(&tool).Error; err != nil {
+		return false, utils.Errorf("AI tool not found: %s", err)
+	}
+
+	// Toggle the favorite status
+	tool.IsFavorite = !tool.IsFavorite
+
+	if err := db.Save(&tool).Error; err != nil {
+		return false, utils.Errorf("failed to update AI tool favorite status: %s", err)
+	}
+
+	return tool.IsFavorite, nil
+}
+
+// ToggleAIYakToolFavoriteByID toggles the favorite status of an AI tool by ID
+func ToggleAIYakToolFavoriteByID(db *gorm.DB, toolID uint) (bool, error) {
+	db = db.Model(&schema.AIYakTool{})
+
+	var tool schema.AIYakTool
+	if err := db.Where("id = ?", toolID).First(&tool).Error; err != nil {
 		return false, utils.Errorf("AI tool not found: %s", err)
 	}
 

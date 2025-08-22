@@ -88,10 +88,10 @@ func checkLocalModels(manager *localmodel.Manager) {
 
 	// 检查默认模型
 	fmt.Println("1. 默认嵌入模型 (Qwen3-Embedding-0.6B-Q4_K_M):")
-	defaultPath := manager.GetDefaultEmbeddingModelPath()
+	defaultPath := localmodel.GetDefaultEmbeddingModelPath()
 	fmt.Printf("   路径: %s\n", defaultPath)
 
-	available := manager.IsDefaultModelAvailable()
+	available := localmodel.IsDefaultModelAvailable()
 	fmt.Printf("   可用: %t\n", available)
 
 	// 检查 llama-server
@@ -134,7 +134,7 @@ func startEmbeddingService(manager *localmodel.Manager) {
 	if *modelPath != "" {
 		fmt.Printf("  模型路径: %s\n", *modelPath)
 	} else {
-		defaultPath := manager.GetDefaultEmbeddingModelPath()
+		defaultPath := localmodel.GetDefaultEmbeddingModelPath()
 		fmt.Printf("  模型路径: %s (默认)\n", defaultPath)
 	}
 	fmt.Printf("  上下文大小: %d\n", *contextSize)
@@ -162,7 +162,7 @@ func startEmbeddingService(manager *localmodel.Manager) {
 	var options []localmodel.Option
 
 	if *model != "" {
-		options = append(options, localmodel.WithEmbeddingModel(*model))
+		options = append(options, localmodel.WithModel(*model))
 	}
 
 	if *modelPath != "" {

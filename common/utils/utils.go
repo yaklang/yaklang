@@ -23,6 +23,7 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
+	_ "github.com/mattn/go-sqlite3"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
