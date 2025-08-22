@@ -152,6 +152,7 @@ const (
 	SYNC_TYPE_CONSUMPTION  string = "consumption"
 	SYNC_TYPE_CONFIG       string = "config"
 	SYNC_TYPE_CURRENT_TASK string = "current_task"
+	SYNC_TYPE_PING         string = "ping"
 )
 
 type InputEvent struct {
