@@ -97,6 +97,17 @@ func (c *Config) startEventLoop(ctx context.Context) {
 							} else {
 								c.EmitWarning("sync method: %v is not supported yet", SYNC_TYPE_PLAN)
 							}
+						case SYNC_TYPE_CURRENT_TASK:
+							c.syncMutex.RLock()
+							callback, _ := c.syncMap[string(SYNC_TYPE_CURRENT_TASK)]
+							c.syncMutex.RUnlock()
+							if callback != nil {
+								c.EmitJSON(schema.EVENT_CURRENT_TASK, "system", callback())
+							} else {
+								c.EmitWarning("sync method: %v is not supported yet", SYNC_TYPE_PLAN)
+							}
+						case SYNC_TYPE_CONFIG:
+							c.EmitCurrentConfigInfo()
 						case SYNC_TYPE_PROCESS_EVENT:
 							processID := event.Params.GetString(ProcessID)
 							syncID := event.Params.GetString(SyncProcessEeventID)

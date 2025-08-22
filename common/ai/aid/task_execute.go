@@ -250,6 +250,10 @@ TOOLREQUIRED:
 
 func (t *AiTask) executeTaskPushTaskIndex() error {
 	// 在执行任务之前，推送事件到事件栈
+	t.EmitJSON(schema.EVENT_CURRENT_TASK, "system", t)
+	t.SetSyncCallback(SYNC_TYPE_CURRENT_TASK, func() any {
+		return t
+	})
 	t.Emitter = t.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 		if event.TaskIndex == "" {
 			event.TaskIndex = t.Index
@@ -259,7 +263,6 @@ func (t *AiTask) executeTaskPushTaskIndex() error {
 	defer func() {
 		t.Emitter = t.GetEmitter().PopEventProcesser()
 	}()
-
 	// 执行实际的任务
 	return t.executeTask()
 }

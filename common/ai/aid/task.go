@@ -69,7 +69,6 @@ func (t *AiTask) GetEmitter() *aicommon.Emitter {
 		return t.Config.GetEmitter()
 	}
 	return t.Emitter
-
 }
 
 func (t *AiTask) GetIndex() string {

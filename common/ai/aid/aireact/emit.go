@@ -38,19 +38,5 @@ func (r *ReAct) EmitResult(result interface{}) {
 
 // EmitStreamReader emits streaming content from a reader using embedded Emitter
 func (r *ReAct) EmitStreamReader(nodeId string, reader io.Reader) {
-	go func() {
-		buffer := make([]byte, 1024)
-		for {
-			n, err := reader.Read(buffer)
-			if n > 0 {
-				r.Emitter.EmitStream(nodeId, string(buffer[:n]))
-			}
-			if err != nil {
-				if err != io.EOF {
-					r.Emitter.EmitError(fmt.Sprintf("Stream read error: %v", err))
-				}
-				break
-			}
-		}
-	}()
+	r.Emitter.EmitStreamEventFromReader(nodeId, reader)
 }

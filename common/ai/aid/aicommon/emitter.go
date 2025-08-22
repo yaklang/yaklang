@@ -147,6 +147,18 @@ func (r *Emitter) EmitStatus(key string, value any) {
 	})
 }
 
+func (r *Emitter) EmitStreamEnd(streamID string) {
+	r.emit(&schema.AiOutputEvent{
+		CoordinatorId: r.id,
+		Type:          schema.EVENT_TYPE_STREAM,
+		IsJson:        true,
+		IsStream:      true,
+		EventUUID:     streamID,
+		IsStreamEnd:   true,
+	})
+}
+
+// EmitStream emits a stream event simple stream
 func (r *Emitter) EmitStream(nodeId string, content string) {
 	r.emit(&schema.AiOutputEvent{
 		CoordinatorId: r.id,
@@ -310,6 +322,14 @@ func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.
 	r.EmitStreamEventEx(nodeId, startTime, reader, taskIndex, false, finishCallback...)
 }
 
+func (r *Emitter) EmitStreamEventFromReader(nodeId string, reader io.Reader) {
+	r.emitStreamEvent(&streamEvent{
+		startTime: time.Now(),
+		nodeId:    nodeId,
+		reader:    reader,
+	})
+}
+
 func (r *Emitter) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool, finishCallback ...func()) {
 	r.emitStreamEvent(&streamEvent{
 		disableMarkdown:    disableMarkdown,
@@ -381,7 +401,14 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 				f()
 			}
 		}()
-		io.Copy(producer, e.reader)
+		defer func() {
+			r.EmitStreamEnd(producer.eventWriterID)
+		}()
+
+		_, err := io.Copy(producer, e.reader)
+		if err != nil {
+			r.EmitError(fmt.Sprintf("Stream emit error: %v", err))
+		}
 	}()
 }
 

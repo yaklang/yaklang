@@ -42,6 +42,8 @@ const (
 	EVENT_TOOL_CALL_ERROR       = "tool_call_error"       // tool call error event, used to emit the tool call error information
 	EVENT_TOOL_CALL_SUMMARY     = "tool_call_summary"     // tool call summary event, used to emit the tool call summary information
 
+	EVENT_CURRENT_TASK EventType = "current_task" // current task start event, used to emit the current task start information
+
 	EVENT_TYPE_PLAN                    EventType = "plan"
 	EVENT_TYPE_SELECT                  EventType = "select"
 	EVENT_TYPE_PERMISSION_REQUIRE      EventType = "permission_require"
@@ -77,6 +79,7 @@ type AiOutputEvent struct {
 	NodeId      string
 	IsSystem    bool
 	IsStream    bool
+	IsStreamEnd bool
 	IsReason    bool
 	IsSync      bool
 	StreamDelta []byte
