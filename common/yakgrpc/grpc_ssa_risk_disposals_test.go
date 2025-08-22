@@ -2,14 +2,21 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func prepareTestData(t *testing.T) (client ypb.YakClient, taskId string, riskIds []int64) {
@@ -578,5 +585,158 @@ func TestGRPCMUSTPASS_SSARiskDisposals_DeleteAndUpdateRiskStatus(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.Len(t, queryResp.Data, 0)
+	})
+}
+
+func TestGRPCMUSTPASS_SSARiskDisposal_InheritanceFeature(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	testCode := `
+a = source() 
+sink(a)
+	`
+	risk := uuid.NewString()
+	testRule := fmt.Sprintf(`
+sink as $sink
+$sink #-> as $result
+alert $result for {
+	desc: "Source-Sink vulnerability"
+	Title:"SQL Injection"
+	level:"high"
+	risk:"%s"
+}
+	`, risk)
+
+	// 执行两次独立的扫描，生成具有相同 RiskFeatureHash 的风险
+	riskCount := 2
+	risks := make([]*schema.SSARisk, riskCount)
+	programNames := make([]string, riskCount)
+
+	for i := 0; i < riskCount; i++ {
+		programNames[i] = "inheritance_test_" + uuid.NewString()
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("test.yak", testCode)
+
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programNames[i]))
+		require.NoError(t, err)
+		require.NotEmpty(t, programs)
+		prog := programs[0]
+
+		result, err := prog.SyntaxFlowWithError(testRule, ssaapi.QueryWithEnableDebug(true))
+		require.NoError(t, err)
+		_, err = result.Save(schema.SFResultKindDebug)
+		require.NoError(t, err)
+
+		_, queryRisk, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{programNames[i]},
+		}, nil)
+		risks[i] = queryRisk[0]
+		// 添加延迟确保 TaskName 不同
+		time.Sleep(1 * time.Second)
+	}
+
+	// 清理测试数据
+	defer func() {
+		for _, programName := range programNames {
+			ssadb.DeleteProgram(ssadb.GetDB(), programName)
+		}
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: programNames,
+		})
+	}()
+
+	require.Len(t, risks, riskCount)
+	// 验证 RiskFeatureHash 相同但 TaskName 不同
+	require.Equal(t, risks[0].RiskFeatureHash, risks[1].RiskFeatureHash, "RiskFeatureHash 应该相同")
+	require.NotEqual(t, risks[0].TaskName, risks[1].TaskName, "TaskName 应该不同")
+	require.NotEmpty(t, risks[0].RiskFeatureHash, "RiskFeatureHash 不应该为空")
+	require.NotEmpty(t, risks[1].RiskFeatureHash, "RiskFeatureHash 不应该为空")
+
+	ctx := context.Background()
+	testUUID := uuid.NewString()
+
+	// 为第一个 Risk 创建处置信息
+	t.Run("为第一个Risk创建处置信息", func(t *testing.T) {
+		createResp, err := client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+			RiskIds: []int64{int64(risks[0].ID)},
+			Status:  "not_issue",
+			Comment: "第一次扫描的处置-" + testUUID,
+		})
+		require.NoError(t, err)
+		require.Len(t, createResp.Data, 1)
+		require.Equal(t, int64(risks[0].ID), createResp.Data[0].RiskId)
+	})
+
+	// 等待数据库更新
+	time.Sleep(100 * time.Millisecond)
+
+	// 为第二个 Risk 创建处置信息
+	t.Run("为第二个Risk创建处置信息", func(t *testing.T) {
+		createResp, err := client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+			RiskIds: []int64{int64(risks[1].ID)},
+			Status:  "is_issue",
+			Comment: "第二次扫描的处置-" + testUUID,
+		})
+		require.NoError(t, err)
+		require.Len(t, createResp.Data, 1)
+		require.Equal(t, int64(risks[1].ID), createResp.Data[0].RiskId)
+	})
+
+	// 等待数据库更新
+	time.Sleep(100 * time.Millisecond)
+
+	// 测试第一个 Risk 的继承查询
+	t.Run("测试第一个Risk的继承查询", func(t *testing.T) {
+		getResp, err := client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(risks[0].ID),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, getResp)
+		// 只能搜到第一次扫描的处置记录
+		t.Logf("=== 第一个Risk(ID=%d)的查询结果 ===", risks[1].ID)
+		t.Logf("查询到 %d 条处置记录:", len(getResp.Data))
+		for i, disposal := range getResp.Data {
+			t.Logf("  [%d] DisposalID=%d, RiskID=%d, Status=%s, TaskName=%s, Comment=%s, CreatedAt=%d",
+				i+1, disposal.Id, disposal.RiskId, disposal.Status, disposal.TaskName, disposal.Comment, disposal.CreatedAt)
+		}
+
+		require.Equal(t, len(getResp.Data), 1)
+		require.Equal(t, getResp.Data[0].Status, "not_issue")
+		require.Equal(t, getResp.Data[0].Comment, "第一次扫描的处置-"+testUUID)
+	})
+
+	// 测试第二个 Risk 的继承查询
+	t.Run("测试第二个Risk的继承查询", func(t *testing.T) {
+		getResp, err := client.GetSSARiskDisposal(ctx, &ypb.GetSSARiskDisposalRequest{
+			RiskId: int64(risks[1].ID),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, getResp)
+		t.Logf("=== 第二个Risk(ID=%d)的查询结果 ===", risks[0].ID)
+		t.Logf("查询到 %d 条处置记录:", len(getResp.Data))
+		for i, disposal := range getResp.Data {
+			t.Logf("  [%d] DisposalID=%d, RiskID=%d, TaskName =%s,Status=%s, Comment=%s, CreatedAt=%d",
+				i+1, disposal.Id, disposal.RiskId, disposal.TaskName, disposal.Status, disposal.Comment, disposal.CreatedAt)
+		}
+
+		// 返回结果先按照TaskCreatedAt降序排列,再按照CreatedAt降序排列
+		// 也就是新扫描的项目处置信息会排在前面
+		rspData := getResp.Data
+		require.Equal(t, len(rspData), 2)
+		require.Equal(t, rspData[0].Status, "is_issue", "应该包含 not_issue 状态")
+		require.Equal(t, rspData[1].Status, "not_issue", "应该包含 is_issue 状态")
+		require.Equal(t, rspData[0].Comment, "第二次扫描的处置-"+testUUID, "应该包含第二次扫描的备注")
+		require.Equal(t, rspData[1].Comment, "第一次扫描的处置-"+testUUID, "应该包含第一次扫描的备注")
+		// 任务创建时间
+		layout := "2006-01-02 15:04:05"
+		t1, err := time.Parse(layout, rspData[0].TaskName)
+		require.NoError(t, err)
+		t2, err := time.Parse(layout, rspData[1].TaskName)
+		require.NoError(t, err)
+		// 确保第二次扫描的处置记录在前面
+		require.True(t, t1.After(t2), "第二次扫描的处置记录应该在前面")
+		t.Logf("第一个Risk继承查询验证通过: 共 %d 条处置记录", len(getResp.Data))
 	})
 }
