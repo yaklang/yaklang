@@ -123,14 +123,14 @@ $controledSink<dataflow(exclude:<<<CODE
 CODE)> as $controledNoNumberSink 
 
 alert $controledNoNumberSink for {
-    level: "mid" 
-    title: "检测到PHP SQL注入漏洞 数据可控"
+	level: "mid",
+	title: "检测到PHP SQL注入漏洞 数据可控",
 }
 
- $controledSink - $controledNoNumberSink as $controledNumberSink 
+$controledSink - $controledNoNumberSink as $controledNumberSink 
 alert $controledNumberSink for {
-    level: "info", 
-    title: "检测到PHP SQL注入漏洞 可控数据仅为数字类型"
+	level: "info",
+	title: "检测到PHP SQL注入漏洞 可控数据仅为数字类型",
 }
 
 
