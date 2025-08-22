@@ -1514,8 +1514,8 @@
   {
     "rule_id": "df78b6fe-a4ca-4ef0-91ee-d9f23b651e3f",
     "rule_name": "检测PHP ThinkPHP SQL注入漏洞",
-    "hash": "96822776e605180204e4bddbe79181459a9ac897c125938e71f845733ce651e9",
-    "version": "20250820.0001"
+    "hash": "5923051b9ad1373ada1274bf58cc88838c6342b55938c0f6e828da0489395810",
+    "version": "20250822.0001"
   },
   {
     "rule_id": "c773c9e1-71f1-4aed-b71f-68b8e468786f",
