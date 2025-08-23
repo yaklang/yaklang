@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
 	"github.com/yaklang/yaklang/common/log"
 
@@ -57,29 +59,54 @@ func glance(i filesys_interface.FileSystem) string {
 	var buf bytes.Buffer
 	var fileCount = 0
 	var dirCount = 0
-	var firstFiles []string
+
 	err := Recursive(".", WithStat(func(isDir bool, pathname string, info os.FileInfo) error {
 		if isDir {
 			dirCount++
 		} else {
 			fileCount++
-			if fileCount <= 24 {
-				firstFiles = append(firstFiles, pathname)
-			}
 		}
 		return nil
 	}), WithFileSystem(i))
 
-	buf.WriteString(fmt.Sprintf("total: %v[dir: %v file: %v]\n", fileCount+dirCount, dirCount, fileCount))
-	if len(firstFiles) > 0 {
-		buf.WriteString("glance some first files...\n")
-		for idx, line := range firstFiles {
-			buf.WriteString(fmt.Sprintf("  %d. %v\n", idx, line))
-		}
-		if fileCount > len(firstFiles) {
-			buf.WriteString("...\n")
+	// 获取当前工作目录的绝对路径
+	currentDir := "."
+	if wd, err := i.Getwd(); err == nil && wd != "" {
+		currentDir = wd
+	}
+
+	// 如果是本地文件系统类型，并且返回的是相对路径，尝试获取绝对路径
+	if currentDir == "." || !filepath.IsAbs(currentDir) {
+		switch i.(type) {
+		case *LocalFs:
+			if absPath, err := os.Getwd(); err == nil {
+				currentDir = absPath
+			}
+		case *RelLocalFs:
+			// 对于 RelLocalFs，将相对路径转换为绝对路径
+			if absPath, err := filepath.Abs(currentDir); err == nil {
+				currentDir = absPath
+			}
+		default:
+			// 对于其他类型，如果不是绝对路径，尝试转换
+			if !filepath.IsAbs(currentDir) {
+				if absPath, err := filepath.Abs(currentDir); err == nil {
+					currentDir = absPath
+				}
+			}
 		}
 	}
+
+	// 写入当前目录和统计信息
+	buf.WriteString(fmt.Sprintf("current dir: %s\n", currentDir))
+	buf.WriteString(fmt.Sprintf("total: %v[dir: %v file: %v]\n", fileCount+dirCount, dirCount, fileCount))
+
+	// 使用 DumpTreeViewWithLimits 直接从 FileSystem 生成树形视图，限制为 4 层深度，50 行输出
+	treeOutput := DumpTreeViewWithLimits(i, 4, 50)
+	if treeOutput != "" {
+		buf.WriteString(treeOutput)
+	}
+
 	if err != nil {
 		buf.WriteString("\nWARN:" + err.Error())
 	}
