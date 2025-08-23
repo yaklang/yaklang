@@ -15,6 +15,7 @@ type Node struct {
 	name     string
 	children map[string]*Node
 	isFile   bool
+	fullPath string // 完整路径，用于获取文件信息
 }
 
 // TreeView 表示树形视图结构
@@ -22,9 +23,11 @@ type TreeView struct {
 	root           *Node
 	index          *suffixarray.Index
 	data           []byte
-	maxDepth       int  // 最大深度，0表示无限制
-	maxLines       int  // 最大行数，0表示无限制
-	collapseSingle bool // 是否合并单文件夹
+	maxDepth       int                          // 最大深度，0表示无限制
+	maxLines       int                          // 最大行数，0表示无限制
+	collapseSingle bool                         // 是否合并单文件夹
+	filesystem     filesys_interface.FileSystem // 文件系统引用，用于获取文件信息
+	rootPath       string                       // 根路径
 }
 
 // NewTreeView 创建新的树形视图实例（无限制）
@@ -59,6 +62,8 @@ func NewTreeViewWithOptions(paths []string, maxDepth, maxLines int, collapseSing
 		maxDepth:       maxDepth,
 		maxLines:       maxLines,
 		collapseSingle: collapseSingle,
+		filesystem:     nil,
+		rootPath:       "",
 	}
 }
 
@@ -98,7 +103,25 @@ func NewTreeViewFromFSWithOptions(filesystem filesys_interface.FileSystem, root 
 	}
 
 	paths := collectPathsFromFS(filesystem, root)
-	return NewTreeViewWithOptions(paths, maxDepth, maxLines, collapseSingle)
+	// 为文件系统创建特殊的树结构，保存完整路径信息
+	data := []byte(strings.Join(paths, "\n"))
+	index := suffixarray.New(data)
+	treeRoot := buildTreeWithPaths(paths)
+	if collapseSingle {
+		treeRoot = collapseTree(treeRoot)
+	}
+
+	tv := &TreeView{
+		root:           treeRoot,
+		index:          index,
+		data:           data,
+		maxDepth:       maxDepth,
+		maxLines:       maxLines,
+		collapseSingle: collapseSingle,
+		filesystem:     filesystem,
+		rootPath:       root,
+	}
+	return tv
 }
 
 // collectPathsFromFS 从 FileSystem 递归收集所有路径
@@ -156,6 +179,17 @@ func newNode(name string) *Node {
 		name:     name,
 		children: make(map[string]*Node),
 		isFile:   false,
+		fullPath: "",
+	}
+}
+
+// newNodeWithPath 创建带路径的新节点
+func newNodeWithPath(name, fullPath string) *Node {
+	return &Node{
+		name:     name,
+		children: make(map[string]*Node),
+		isFile:   false,
+		fullPath: fullPath,
 	}
 }
 
@@ -185,6 +219,49 @@ func buildTree(paths []string) *Node {
 			current = current.children[part]
 			if i == len(parts)-1 {
 				current.isFile = true
+			}
+		}
+	}
+
+	return root
+}
+
+// buildTreeWithPaths 构建带路径信息的树结构
+func buildTreeWithPaths(paths []string) *Node {
+	if paths == nil {
+		return newNode("")
+	}
+
+	root := newNode("")
+
+	for _, fullPath := range paths {
+		if fullPath == "" {
+			continue
+		}
+
+		parts := strings.Split(strings.TrimSpace(fullPath), "/")
+		current := root
+		currentPath := ""
+
+		for i, part := range parts {
+			if part == "" {
+				continue
+			}
+
+			// 构建当前路径
+			if currentPath == "" {
+				currentPath = part
+			} else {
+				currentPath = filepath.Join(currentPath, part)
+			}
+
+			if _, exists := current.children[part]; !exists {
+				current.children[part] = newNodeWithPath(part, currentPath)
+			}
+			current = current.children[part]
+			if i == len(parts)-1 {
+				current.isFile = true
+				current.fullPath = fullPath // 保存完整路径
 			}
 		}
 	}
@@ -268,12 +345,74 @@ func (tv *TreeView) Print() string {
 	var builder strings.Builder
 	builder.WriteString(".\n")
 	lineCount := 1
-	tv.printNode(tv.root, "", true, &builder, 0, &lineCount)
+	tv.printNodeWithPathAndRemaining(tv.root, "", true, &builder, 0, &lineCount, "", 0)
 	return builder.String()
+}
+
+// getFileInfoFromNode 从节点获取文件信息字符串
+func (tv *TreeView) getFileInfoFromNode(node *Node) string {
+	if tv.filesystem == nil || node == nil || !node.isFile {
+		return ""
+	}
+
+	// 使用节点中保存的完整路径
+	filePath := node.fullPath
+	if filePath == "" {
+		return ""
+	}
+
+	// log.Debugf("trying to get file info for path: %s", filePath)
+	info, err := tv.filesystem.Stat(filePath)
+	if err != nil {
+		// log.Debugf("failed to get file info for %s: %v", filePath, err)
+		return ""
+	}
+
+	// 格式化文件大小
+	size := info.Size()
+	var sizeStr string
+	if size < 1024 {
+		sizeStr = fmt.Sprintf("%d bytes", size)
+	} else if size < 1024*1024 {
+		sizeStr = fmt.Sprintf("%.1f KB", float64(size)/1024)
+	} else if size < 1024*1024*1024 {
+		sizeStr = fmt.Sprintf("%.1f MB", float64(size)/(1024*1024))
+	} else {
+		sizeStr = fmt.Sprintf("%.1f GB", float64(size)/(1024*1024*1024))
+	}
+
+	return fmt.Sprintf(" (%s)", sizeStr)
+}
+
+// countRemainingItems 计算剩余项目数量
+func (tv *TreeView) countRemainingItems(node *Node, currentDepth int) int {
+	if node == nil || node.children == nil {
+		return 0
+	}
+
+	count := 0
+	for _, child := range node.children {
+		count++
+		if !child.isFile && (tv.maxDepth == 0 || currentDepth+1 < tv.maxDepth) {
+			count += tv.countRemainingItems(child, currentDepth+1)
+		}
+	}
+
+	return count
 }
 
 // printNode 打印节点（内部方法）
 func (tv *TreeView) printNode(node *Node, prefix string, isLast bool, builder *strings.Builder, depth int, lineCount *int) {
+	tv.printNodeWithPath(node, prefix, isLast, builder, depth, lineCount, "")
+}
+
+// printNodeWithPath 打印节点带路径（内部方法）
+func (tv *TreeView) printNodeWithPath(node *Node, prefix string, isLast bool, builder *strings.Builder, depth int, lineCount *int, currentPath string) {
+	tv.printNodeWithPathAndRemaining(node, prefix, isLast, builder, depth, lineCount, currentPath, 0)
+}
+
+// printNodeWithPathAndRemaining 打印节点带路径和剩余项目信息（内部方法）
+func (tv *TreeView) printNodeWithPathAndRemaining(node *Node, prefix string, isLast bool, builder *strings.Builder, depth int, lineCount *int, currentPath string, remainingSiblings int) {
 	if node == nil || builder == nil {
 		return
 	}
@@ -281,10 +420,16 @@ func (tv *TreeView) printNode(node *Node, prefix string, isLast bool, builder *s
 	// 检查行数限制
 	if tv.maxLines > 0 && *lineCount >= tv.maxLines {
 		if *lineCount == tv.maxLines {
-			if isLast {
-				builder.WriteString(fmt.Sprintf("%s└── ...\n", prefix))
+			var ellipsisText string
+			if remainingSiblings > 0 {
+				ellipsisText = fmt.Sprintf("... (%d more items)", remainingSiblings)
 			} else {
-				builder.WriteString(fmt.Sprintf("%s├── ...\n", prefix))
+				ellipsisText = "..."
+			}
+			if isLast {
+				builder.WriteString(fmt.Sprintf("%s└── %s\n", prefix, ellipsisText))
+			} else {
+				builder.WriteString(fmt.Sprintf("%s├── %s\n", prefix, ellipsisText))
 			}
 			*lineCount++
 		}
@@ -294,10 +439,20 @@ func (tv *TreeView) printNode(node *Node, prefix string, isLast bool, builder *s
 	// 检查深度限制
 	if tv.maxDepth > 0 && depth >= tv.maxDepth {
 		if node.name != "" {
-			if isLast {
-				builder.WriteString(fmt.Sprintf("%s└── %s ...\n", prefix, node.name))
+			var displayText string
+			if node.isFile {
+				// 对于文件，显示文件信息而不是 "..."
+				fileInfo := tv.getFileInfoFromNode(node)
+				displayText = node.name + fileInfo
 			} else {
-				builder.WriteString(fmt.Sprintf("%s├── %s ...\n", prefix, node.name))
+				// 对于目录，计算子项数量
+				childCount := len(node.children)
+				displayText = fmt.Sprintf("%s ... (%d items)", node.name, childCount)
+			}
+			if isLast {
+				builder.WriteString(fmt.Sprintf("%s└── %s\n", prefix, displayText))
+			} else {
+				builder.WriteString(fmt.Sprintf("%s├── %s\n", prefix, displayText))
 			}
 			*lineCount++
 		}
@@ -305,14 +460,30 @@ func (tv *TreeView) printNode(node *Node, prefix string, isLast bool, builder *s
 	}
 
 	if node.name != "" {
+		nodePath := currentPath
+		if currentPath == "" {
+			nodePath = node.name
+		} else {
+			nodePath = filepath.Join(currentPath, node.name)
+		}
+		var displayText string
+		if node.isFile {
+			// 对于文件，显示文件信息
+			fileInfo := tv.getFileInfoFromNode(node)
+			displayText = node.name + fileInfo
+		} else {
+			// 对于目录，只显示名称
+			displayText = node.name
+		}
 		if isLast {
-			builder.WriteString(fmt.Sprintf("%s└── %s\n", prefix, node.name))
+			builder.WriteString(fmt.Sprintf("%s└── %s\n", prefix, displayText))
 			prefix += "    "
 		} else {
-			builder.WriteString(fmt.Sprintf("%s├── %s\n", prefix, node.name))
+			builder.WriteString(fmt.Sprintf("%s├── %s\n", prefix, displayText))
 			prefix += "│   "
 		}
 		*lineCount++
+		currentPath = nodePath
 	}
 
 	if node.children == nil {
@@ -343,7 +514,17 @@ func (tv *TreeView) printNode(node *Node, prefix string, isLast bool, builder *s
 
 	for i, key := range keys {
 		isLastChild := i == len(keys)-1
-		tv.printNode(node.children[key], prefix, isLastChild, builder, depth+1, lineCount)
+		childPath := currentPath
+		if node.name != "" {
+			if currentPath == "" {
+				childPath = node.name
+			} else {
+				childPath = filepath.Join(currentPath, node.name)
+			}
+		}
+		// 计算剩余的兄弟节点数量
+		remainingSiblings := len(keys) - i - 1
+		tv.printNodeWithPathAndRemaining(node.children[key], prefix, isLastChild, builder, depth+1, lineCount, childPath, remainingSiblings)
 	}
 }
 
