@@ -62,7 +62,6 @@ func (m *Timeline) SetAICaller(ai AICaller) {
 
 func (m *Timeline) GetAICaller() AICaller {
 	if m.ai == nil {
-		log.Error("get ai caller is nil")
 		return nil
 	}
 	return m.ai
