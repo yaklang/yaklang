@@ -17,7 +17,7 @@ func (c *Config) startEventLoop(ctx context.Context) {
 		consumptionUUID := ksuid.New().String()
 		validator := make(chan struct{})
 		go func() {
-			log.Infof("config %s started, start to handle receiving loop", c.id)
+			//log.Infof("config %s started, start to handle receiving loop", c.id)
 			logOnce := new(sync.Once)
 			ticker := time.NewTicker(time.Second)
 			defer ticker.Stop()

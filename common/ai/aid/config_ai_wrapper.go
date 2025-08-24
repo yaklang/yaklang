@@ -55,7 +55,7 @@ func (c *Config) wrapper(i aicommon.AICallbackType) aicommon.AICallbackType {
 		if seq <= 0 {
 			seq = aidConfig.AcquireId()
 			request.CallOnAcquireSeq(seq)
-			aidConfig.EmitInfo("prepare to call ai, create new seq is %v", seq)
+			//aidConfig.EmitInfo("prepare to call ai, create new seq is %v", seq)
 		} else {
 			aidConfig.EmitInfo("prepare to retry call ai, with an existed seq: %v", seq)
 		}

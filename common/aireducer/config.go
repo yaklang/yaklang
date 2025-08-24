@@ -89,7 +89,16 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-// aireducer.reducer
+// aireducer.reducerCallback is called when a new chunk is ready to be processed.
+//
+// Example:
+// ```
+//
+//	aireducer.NewReducerFromFile("example.txt", aireducer.reducerCallback((config, memory, chunk) => {
+//			// handle chunk
+//	}))
+//
+// ```
 func WithReducerCallback(callback ReducerCallbackType) Option {
 	return func(c *Config) {
 		c.callback = callback
