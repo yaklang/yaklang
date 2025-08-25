@@ -50,4 +50,54 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Manager(t *testing.T) {
 		require.NotNil(t, newTask.config.Filter)
 		require.Equal(t, newTask.config.Filter.Language, []string{"java"})
 	})
+
+	t.Run("test scan batch increment", func(t *testing.T) {
+		taskId1 := uuid.NewString()
+		programName := uuid.NewString()
+		task1, err := CreateSyntaxflowTaskById(taskId1, context.Background(), &ypb.SyntaxFlowScanRequest{
+			ControlMode: "",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{"java"},
+			},
+			ProgramName: []string{programName},
+		}, nil)
+		require.NoError(t, err)
+
+		err = task1.SaveTask()
+		require.NoError(t, err)
+
+		taskId2 := uuid.NewString()
+		task2, err := CreateSyntaxflowTaskById(taskId2, context.Background(), &ypb.SyntaxFlowScanRequest{
+			ControlMode: "",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{"java"},
+			},
+			ProgramName: []string{programName},
+		}, nil)
+		require.NoError(t, err)
+
+		err = task2.SaveTask()
+		require.NoError(t, err)
+
+		require.Equal(t, task1.taskRecorder.ScanBatch+1, task2.taskRecorder.ScanBatch)
+		log.Infof("Same program - Task1 scan batch: %d, Task2 scan batch: %d",
+			task1.taskRecorder.ScanBatch, task2.taskRecorder.ScanBatch)
+
+		taskId3 := uuid.NewString()
+		newProgramName := uuid.NewString()
+		task3, err := CreateSyntaxflowTaskById(taskId3, context.Background(), &ypb.SyntaxFlowScanRequest{
+			ControlMode: "",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{"java"},
+			},
+			ProgramName: []string{newProgramName},
+		}, nil)
+		require.NoError(t, err)
+
+		err = task3.SaveTask()
+		require.NoError(t, err)
+
+		require.Equal(t, uint64(1), task3.taskRecorder.ScanBatch)
+		log.Infof("Different program - Task3 scan batch: %d", task3.taskRecorder.ScanBatch)
+	})
 }
