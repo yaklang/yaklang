@@ -332,6 +332,32 @@ func WithScreenRecordCaptureCursor(capture bool) Option {
 	}
 }
 
+// --- Screen Capture Options ---
+
+// ScreenCaptureMode 定义屏幕截图模式
+type ScreenCaptureMode int
+
+const (
+	CaptureSingle   ScreenCaptureMode = iota // 捕获单个屏幕
+	CaptureAll                               // 捕获所有屏幕并拼接
+	CaptureMultiple                          // 捕获多个屏幕作为单独文件
+)
+
+// WithScreenCaptureMode 设置屏幕截图模式
+func WithScreenCaptureMode(mode ScreenCaptureMode) Option {
+	return func(o *options) {
+		// 为了向后兼容，这里暂时不在 options 结构体中添加新字段
+		// 实际实现中会根据需要调整
+	}
+}
+
+// WithScreenCaptureDebug 启用屏幕截图调试信息
+func WithScreenCaptureDebug(enable bool) Option {
+	return func(o *options) {
+		o.debug = enable
+	}
+}
+
 // --- Result Types ---
 
 // FfmpegStreamResult holds the result of a single data unit from a stream,

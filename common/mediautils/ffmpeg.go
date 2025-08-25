@@ -130,15 +130,35 @@ func _burnInSubtitles(inputVideo string, srtFile string, opts ...ffmpegutils.Opt
 	return outputPath, nil
 }
 
+// ffmpeg.ExtractUserScreenshot can capture user screen screenshots with multi-monitor support
+//
+// example:
+// ```
+// result, err = ffmpeg.ExtractUserScreenshot()
+// die(err)
+// filename, err = result.SaveToFile()
+// println(filename)
+//
+// // With debug mode
+// result = ffmpeg.ExtractUserScreenshot(ffmpeg.withScreenCaptureDebug(true))~
+//
+// // Screenshot is automatically concatenated if multiple screens are detected
+// ```
+func _extractUserScreenShot(opts ...ffmpegutils.Option) (*ffmpegutils.FfmpegStreamResult, error) {
+	return ffmpegutils.ExtractUserScreenShot(opts...)
+}
+
 var FfmpegExports = map[string]any{
 	"ExtractAudioFromVideo":              _extractAudioFromVideo,
 	"ExtractFineGrainedFramesFromVideo":  _extractFineGrainedFramesFromVideo,
 	"ExtractBroadGrainedFramesFromVideo": _extractBroadGrainedFramesFromVideo,
 	"BurnSRTIntoVideo":                   _burnInSubtitles,
+	"ExtractUserScreenshot":              _extractUserScreenShot,
 
 	"withStartEnd":                            ffmpegutils.WithStartEndSeconds,
 	"withTimestampOverlay":                    ffmpegutils.WithTimestampOverlay,
 	"withSubtitlePadding":                     ffmpegutils.WithSubtitlePadding,
 	"withOutputFile":                          ffmpegutils.WithOutputVideoFile,
 	"withIgnoreBottomPaddingInSceneDetection": ffmpegutils.WithIgnoreBottomPaddingInSceneDetection,
+	"withScreenCaptureDebug":                  ffmpegutils.WithScreenCaptureDebug,
 }
