@@ -306,6 +306,8 @@ func signatureSchemesForCertificate(version uint16, cert *Certificate) []Signatu
 		}
 	case ed25519.PublicKey:
 		sigAlgs = []SignatureScheme{Ed25519}
+	case *sm2.PublicKey:
+		sigAlgs = []SignatureScheme{SM2WITHSM3}
 	default:
 		return nil
 	}
@@ -334,6 +336,10 @@ func selectSignatureScheme(vers uint16, c *Certificate, peerAlgs []SignatureSche
 		// For TLS 1.2, if the client didn't send signature_algorithms then we
 		// can assume that it supports SHA1. See RFC 5246, Section 7.4.1.4.1.
 		peerAlgs = []SignatureScheme{PKCS1WithSHA1, ECDSAWithSHA1}
+	}
+
+	if len(peerAlgs) == 0 && vers == VersionGMSSL {
+		peerAlgs = []SignatureScheme{SM2WITHSM3}
 	}
 	// Pick signature scheme in the peer's preference order, as our
 	// preference order is not configurable.

@@ -18,16 +18,21 @@ package x509
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/ecdh"
+	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/md5"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
+	"fmt"
 	"hash"
 	"math/big"
 	"reflect"
@@ -368,4 +373,153 @@ func MarshalSm2PrivateKey(key *sm2.PrivateKey, pwd []byte) ([]byte, error) {
 		return MarshalSm2UnecryptedPrivateKey(key)
 	}
 	return MarshalSm2EcryptedPrivateKey(key, pwd)
+}
+
+var (
+	// RFC 3279, 2.3 Public Key Algorithms
+	// RFC 8410, Section 3
+	//	id-X25519    OBJECT IDENTIFIER ::= { 1 3 101 110 }
+	//	id-Ed25519   OBJECT IDENTIFIER ::= { 1 3 101 112 }
+	oidPublicKeyX25519  = asn1.ObjectIdentifier{1, 3, 101, 110}
+	oidPublicKeyEd25519 = asn1.ObjectIdentifier{1, 3, 101, 112}
+)
+
+// MarshalPKCS8PrivateKey converts a private key to PKCS #8, ASN.1 DER form.
+//
+// The following key types are currently supported: *[rsa.PrivateKey],
+// *[ecdsa.PrivateKey], [ed25519.PrivateKey] (not a pointer), and *[ecdh.PrivateKey].
+// Unsupported key types result in an error. ** add sm2  **
+//
+// This kind of key is commonly encoded in PEM blocks of type "PRIVATE KEY".
+func MarshalPKCS8PrivateKey(key any) ([]byte, error) {
+	var privKey pkcs8
+
+	switch k := key.(type) {
+	case *rsa.PrivateKey:
+		privKey.Algo = pkix.AlgorithmIdentifier{
+			Algorithm:  oidPublicKeyRSA,
+			Parameters: asn1.NullRawValue,
+		}
+		privKey.PrivateKey = MarshalPKCS1PrivateKey(k)
+
+	case *ecdsa.PrivateKey:
+		oid, ok := oidFromNamedCurve(k.Curve)
+		if !ok {
+			return nil, errors.New("x509: unknown curve while marshaling to PKCS#8")
+		}
+		oidBytes, err := asn1.Marshal(oid)
+		if err != nil {
+			return nil, errors.New("x509: failed to marshal curve OID: " + err.Error())
+		}
+		privKey.Algo = pkix.AlgorithmIdentifier{
+			Algorithm: oidPublicKeyECDSA,
+			Parameters: asn1.RawValue{
+				FullBytes: oidBytes,
+			},
+		}
+		if privKey.PrivateKey, err = marshalECPrivateKeyWithOID(k, nil); err != nil {
+			return nil, errors.New("x509: failed to marshal EC private key while building PKCS#8: " + err.Error())
+		}
+
+	case ed25519.PrivateKey:
+		privKey.Algo = pkix.AlgorithmIdentifier{
+			Algorithm: oidPublicKeyEd25519,
+		}
+		curvePrivateKey, err := asn1.Marshal(k.Seed())
+		if err != nil {
+			return nil, fmt.Errorf("x509: failed to marshal private key: %v", err)
+		}
+		privKey.PrivateKey = curvePrivateKey
+
+	case *ecdh.PrivateKey:
+		if k.Curve() == ecdh.X25519() {
+			privKey.Algo = pkix.AlgorithmIdentifier{
+				Algorithm: oidPublicKeyX25519,
+			}
+			var err error
+			if privKey.PrivateKey, err = asn1.Marshal(k.Bytes()); err != nil {
+				return nil, fmt.Errorf("x509: failed to marshal private key: %v", err)
+			}
+		} else {
+			oid, ok := oidFromECDHCurve(k.Curve())
+			if !ok {
+				return nil, errors.New("x509: unknown curve while marshaling to PKCS#8")
+			}
+			oidBytes, err := asn1.Marshal(oid)
+			if err != nil {
+				return nil, errors.New("x509: failed to marshal curve OID: " + err.Error())
+			}
+			privKey.Algo = pkix.AlgorithmIdentifier{
+				Algorithm: oidPublicKeyECDSA,
+				Parameters: asn1.RawValue{
+					FullBytes: oidBytes,
+				},
+			}
+			if privKey.PrivateKey, err = marshalECDHPrivateKey(k); err != nil {
+				return nil, errors.New("x509: failed to marshal EC private key while building PKCS#8: " + err.Error())
+			}
+		}
+	case *sm2.PrivateKey:
+		return MarshalSm2UnecryptedPrivateKey(k)
+
+	default:
+		return nil, fmt.Errorf("x509: unknown key type while marshaling PKCS#8: %T", key)
+	}
+
+	return asn1.Marshal(privKey)
+}
+
+// ecPrivateKey reflects an ASN.1 Elliptic Curve Private Key Structure.
+// References:
+//
+//	RFC 5915
+//	SEC1 - http://www.secg.org/sec1-v2.pdf
+//
+// Per RFC 5915 the NamedCurveOID is marked as ASN.1 OPTIONAL, however in
+// most cases it is not.
+type ecPrivateKey struct {
+	Version       int
+	PrivateKey    []byte
+	NamedCurveOID asn1.ObjectIdentifier `asn1:"optional,explicit,tag:0"`
+	PublicKey     asn1.BitString        `asn1:"optional,explicit,tag:1"`
+}
+
+// marshalECPrivateKeyWithOID marshals an EC private key into ASN.1, DER format and
+// sets the curve ID to the given OID, or omits it if OID is nil.
+func marshalECPrivateKeyWithOID(key *ecdsa.PrivateKey, oid asn1.ObjectIdentifier) ([]byte, error) {
+	if !key.Curve.IsOnCurve(key.X, key.Y) {
+		return nil, errors.New("invalid elliptic key public key")
+	}
+	privateKey := make([]byte, (key.Curve.Params().N.BitLen()+7)/8)
+	return asn1.Marshal(ecPrivateKey{
+		Version:       1,
+		PrivateKey:    key.D.FillBytes(privateKey),
+		NamedCurveOID: oid,
+		PublicKey:     asn1.BitString{Bytes: elliptic.Marshal(key.Curve, key.X, key.Y)},
+	})
+}
+
+func oidFromECDHCurve(curve ecdh.Curve) (asn1.ObjectIdentifier, bool) {
+	switch curve {
+	case ecdh.X25519():
+		return oidPublicKeyX25519, true
+	case ecdh.P256():
+		return oidNamedCurveP256, true
+	case ecdh.P384():
+		return oidNamedCurveP384, true
+	case ecdh.P521():
+		return oidNamedCurveP521, true
+	}
+
+	return nil, false
+}
+
+// marshalECDHPrivateKey marshals an EC private key into ASN.1, DER format
+// suitable for NIST curves.
+func marshalECDHPrivateKey(key *ecdh.PrivateKey) ([]byte, error) {
+	return asn1.Marshal(ecPrivateKey{
+		Version:    1,
+		PrivateKey: key.Bytes(),
+		PublicKey:  asn1.BitString{Bytes: key.PublicKey().Bytes()},
+	})
 }
