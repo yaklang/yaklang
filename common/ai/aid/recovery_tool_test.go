@@ -3,10 +3,11 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
@@ -128,6 +129,12 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 				utils.MatchAllOfSubString(request.GetPrompt(), `task-failed`, `task-skipped`) ||
 				utils.MatchAllOfSubString(request.GetPrompt(), `"enum": ["continue-current-task"`) ||
 				utils.MatchAllOfSubString(request.GetPrompt(), `工具的结果如下，产生结果时间为`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
+				return rsp, nil
+			}
+
+			// 如果没有匹配到特定的模式，但包含决策相关的关键字，返回默认决策
+			if utils.MatchAnyOfSubString(request.GetPrompt(), `continue-current-task`, `proceed-next-task`, `task-failed`, `task-skipped`) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
 				return rsp, nil
 			}
