@@ -142,6 +142,15 @@ func _burnInSubtitles(inputVideo string, srtFile string, opts ...ffmpegutils.Opt
 // // With debug mode
 // result = ffmpeg.ExtractUserScreenshot(ffmpeg.withScreenCaptureDebug(true))~
 //
+// // With high quality (无损压缩)
+// result = ffmpeg.ExtractUserScreenshot(ffmpeg.withScreenCaptureQuality(ffmpeg.QualityHigh))~
+//
+// // With normal quality (平衡质量和大小)
+// result = ffmpeg.ExtractUserScreenshot(ffmpeg.withScreenCaptureQuality(ffmpeg.QualityNormal))~
+//
+// // With low quality (快速截图，小文件)
+// result = ffmpeg.ExtractUserScreenshot(ffmpeg.withScreenCaptureQuality(ffmpeg.QualityLow))~
+//
 // // Screenshot is automatically concatenated if multiple screens are detected
 // ```
 func _extractUserScreenShot(opts ...ffmpegutils.Option) (*ffmpegutils.FfmpegStreamResult, error) {
@@ -161,4 +170,8 @@ var FfmpegExports = map[string]any{
 	"withOutputFile":                          ffmpegutils.WithOutputVideoFile,
 	"withIgnoreBottomPaddingInSceneDetection": ffmpegutils.WithIgnoreBottomPaddingInSceneDetection,
 	"withScreenCaptureDebug":                  ffmpegutils.WithScreenCaptureDebug,
+	"withScreenCaptureQuality":                ffmpegutils.WithScreenCaptureQuality,
+	"QualityLow":                              ffmpegutils.QualityLow,
+	"QualityNormal":                           ffmpegutils.QualityNormal,
+	"QualityHigh":                             ffmpegutils.QualityHigh,
 }
