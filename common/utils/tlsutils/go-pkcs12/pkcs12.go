@@ -30,6 +30,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
+
+	x509gm "github.com/yaklang/yaklang/common/gmsm/x509"
 )
 
 // DefaultPassword is the string "changeit", a commonly-used password for
@@ -430,7 +433,18 @@ func DecodeChain(pfxData []byte, password string) (privateKey interface{}, certi
 			}
 			certs, err := x509.ParseCertificates(certsData)
 			if err != nil {
-				return nil, nil, nil, err
+				if strings.EqualFold(err.Error(), "x509: unsupported elliptic curve") {
+					gmcerts, err := x509gm.ParseCertificates(certsData)
+					if err != nil {
+						return nil, nil, nil, err
+					}
+					certs = make([]*x509.Certificate, 0)
+					for _, cert := range gmcerts {
+						certs = append(certs, cert.ToX509Certificate())
+					}
+				} else {
+					return nil, nil, nil, err
+				}
 			}
 			if len(certs) != 1 {
 				err = errors.New("pkcs12: expected exactly one certificate in the certBag")
@@ -668,7 +682,7 @@ func (enc *Encoder) Encode(privateKey interface{}, certificate *x509.Certificate
 		keyBag.Value.Class = 2
 		keyBag.Value.Tag = 0
 		keyBag.Value.IsCompound = true
-		if keyBag.Value.Bytes, err = x509.MarshalPKCS8PrivateKey(privateKey); err != nil {
+		if keyBag.Value.Bytes, err = x509gm.MarshalPKCS8PrivateKey(privateKey); err != nil {
 			return nil, err
 		}
 	} else {

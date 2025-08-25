@@ -209,6 +209,7 @@ var defaultSupportedSignatureAlgorithms = []SignatureScheme{
 	ECDSAWithP521AndSHA512,
 	PKCS1WithSHA1,
 	ECDSAWithSHA1,
+	SM2WITHSM3,
 }
 
 // helloRetryRequestRandom is set as the Random value of a ServerHello

@@ -24,14 +24,19 @@ func GetX509GMServerTlsConfigWithAuth(ca, server, serverKey []byte, auth bool) (
 		return nil, errors.New("append ca pem error")
 	}
 
-	serverPair, err := gmtls.X509KeyPair(server, serverKey)
+	signCert, err := gmtls.X509KeyPair(server, serverKey)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptCert, err := gmtls.X509KeyPair(server, serverKey)
 	if err != nil {
 		return nil, err
 	}
 
 	config := gmtls.Config{
 		GMSupport:    &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
-		Certificates: []gmtls.Certificate{serverPair},
+		Certificates: []gmtls.Certificate{signCert, encryptCert},
 		ClientCAs:    p,
 	}
 	if auth {
@@ -87,8 +92,15 @@ func GetX509GMServerTlsConfigWithOnly(ca, server, serverKey []byte, auth bool) (
 	//return gmtls.NewBasicAutoSwitchConfig(&signCertPair, &encipherCertPair, &rsaKey)
 
 }
-
 func SignGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notAfter time.Time, auth bool) ([]byte, []byte, error) {
+	return signGMServerCrtNKeyWithParams(ca, privateKey, cn, notAfter, auth, true)
+}
+
+func SignGMClientCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notAfter time.Time, auth bool) ([]byte, []byte, error) {
+	return signGMServerCrtNKeyWithParams(ca, privateKey, cn, notAfter, auth, false)
+}
+
+func signGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notAfter time.Time, auth bool, isServerAuth bool) ([]byte, []byte, error) {
 	// 解析 ca 的 key
 	var pkey *sm2.PrivateKey
 	var err error
@@ -120,14 +132,19 @@ func SignGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notA
 		NotBefore: time.Unix(946656000, 0),
 		NotAfter:  notAfter,
 
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageServerAuth,
-		},
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  false,
+		SignatureAlgorithm:    x509.SM2WithSM3,
 	}
-	if !auth {
+
+	if auth {
+		if isServerAuth {
+			template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+		} else {
+			template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+		}
+	} else {
 		template.ExtKeyUsage = nil
 	}
 

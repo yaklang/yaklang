@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/yaklang/yaklang/common/consts"
 	"net"
+	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/davecgh/go-spew/spew"
 	utls "github.com/refraction-networking/utls"
@@ -168,6 +170,9 @@ func LoadP12Bytes(p12bytes []byte, password string) error {
 	{
 		client, err := utls.X509KeyPair(cCert, cKey)
 		if err != nil {
+			if strings.Contains(err.Error(), "unsupported elliptic curve") {
+				return nil
+			}
 			return err
 		}
 		for _, caBytes := range ca {
@@ -238,24 +243,25 @@ func LoadCertificatesConfig(i any) error {
 			if len(presetClientCertificates) == 0 {
 				return nil
 			}
-			ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
-				// 服务端请求客户端证书时，如果客户端没有配置证书，是否能完成握手取决于服务器的配置
-				//if len(presetClientCertificates) == 0 {
-				//	log.Warn("server request client certificate, but no client certificate configured")
-				//	// sendClientCertificate 不允许发送 nil，否则会 panic 所以尝试发送一个空的证书
-				//	// 这个解决方案可能会导致服务器拒绝握手，因为它可能会试图验证一个空的证书。
-				//	// 如果服务器配置为VerifyClientCertIfGiven，并且它期望如果客户端提供了证书就必须是有效的，那么这个方法可能会失败。
-				//	return &tls.Certificate{}, nil
-				//}
-				for _, cert := range presetClientCertificates {
-					err := info.SupportsCertificate(&cert)
-					if err != nil {
-						continue
-					}
-					return &cert, nil
-				}
-				return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(presetClientCertificates), info.Version)
-			}
+			//ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
+			// 服务端请求客户端证书时，如果客户端没有配置证书，是否能完成握手取决于服务器的配置
+			//if len(presetClientCertificates) == 0 {
+			//	log.Warn("server request client certificate, but no client certificate configured")
+			//	// sendClientCertificate 不允许发送 nil，否则会 panic 所以尝试发送一个空的证书
+			//	// 这个解决方案可能会导致服务器拒绝握手，因为它可能会试图验证一个空的证书。
+			//	// 如果服务器配置为VerifyClientCertIfGiven，并且它期望如果客户端提供了证书就必须是有效的，那么这个方法可能会失败。
+			//	return &tls.Certificate{}, nil
+			//}
+			//		for _, cert := range presetClientCertificates {
+			//			err := info.SupportsCertificate(&cert)
+			//			if err != nil {
+			//				continue
+			//			}
+			//			return &cert, nil
+			//		}
+			//		return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(presetClientCertificates), info.Version)
+			//	}
+			ret.Certificates = append(ret.Certificates, presetClientCertificates...)
 		}
 		return nil
 	case *tls.Config:
