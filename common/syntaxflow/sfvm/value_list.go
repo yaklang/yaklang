@@ -4,7 +4,9 @@ import (
 	"context"
 	"strings"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/pipeline"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -41,31 +43,21 @@ func (v *ValueList) Count() int {
 }
 
 func (v *ValueList) pipeLineRun(f func(ValueOperator) (ValueOperator, error)) (ValueOperator, error) {
-	// TODO: use this pipeline run
-	// ctx := context.Background()
-	// size := v.Count()
-	// pipe := pipeline.NewPipe(ctx, size, func(v ValueOperator) (ValueOperator, error) {
-	// 	var err error
-	// 	var value ValueOperator
-	// 	value, err = f(v)
-	// 	return value, err
-	// })
-	// v.Recursive(func(operator ValueOperator) error {
-	// 	pipe.Feed(operator)
-	// 	return nil
-	// })
-	// pipe.Close()
-	// data := NewValues(lo.ChannelToSlice(pipe.Out()))
-	// return data, pipe.Error()
-	var e error
-	var res []ValueOperator
+	ctx := context.Background()
+	size := v.Count()
+	pipe := pipeline.NewPipe(ctx, size, func(v ValueOperator) (ValueOperator, error) {
+		var err error
+		var value ValueOperator
+		value, err = f(v)
+		return value, err
+	})
 	v.Recursive(func(operator ValueOperator) error {
-		value, err := f(operator)
-		res = append(res, value)
-		e = utils.JoinErrors(e, err)
+		pipe.Feed(operator)
 		return nil
 	})
-	return NewValues(res), nil
+	pipe.Close()
+	data := NewValues(lo.ChannelToSlice(pipe.Out()))
+	return data, nil
 }
 
 func (v *ValueList) CompareConst(comparator *ConstComparator) []bool {
