@@ -272,22 +272,21 @@ func TestTopDefGraphEdgeLabel(t *testing.T) {
 				},
 			},
 		},
-		// todo：数据流拼接后速度很慢，等待重构effect on 和depend on
-		//{
-		//	"test topdef:test level1 object",
-		//	`f = () => {return {"key":"value"}}
-		//obj = f()
-		//a = obj.key`,
-		//	`a #-> as $result`,
-		//	map[string][]ssatest.EdgeInfo{
-		//		"result": {
-		//			{From: "f()", To: ".key", Label: "depend_on"},
-		//			{From: "\"value\"", To: ".key", Label: "depend_on"},
-		//			{From: "() => {return {\"key\":\"value\"}}", To: "f()", Label: "depend_on"},
-		//			{From: "{\"key\":\"value\"}", To: "() => {return {\"key\":\"value\"}}", Label: "depend_on"},
-		//		},
-		//	},
-		//},
+		{
+			"test topdef:test level1 object",
+			`f = () => {return {"key":"value"}}
+		obj = f()
+		a = obj.key`,
+			`a #-> as $result`,
+			map[string][]ssatest.EdgeInfo{
+				"result": {
+					{From: "f()", To: ".key", Label: "depend_on"},
+					{From: "\"value\"", To: ".key", Label: "depend_on"},
+					{From: "() => {return {\"key\":\"value\"}}", To: "f()", Label: "depend_on"},
+					{From: "{\"key\":\"value\"}", To: "() => {return {\"key\":\"value\"}}", Label: "depend_on"},
+				},
+			},
+		},
 		{
 			"test topdef: test level2 simple",
 			`

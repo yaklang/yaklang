@@ -617,23 +617,41 @@ func (g *Graph) HasEdgeWithLabel(fromLabel, toLabel, expectedLabel string) bool 
 
 func (g *Graph) HasEdgeContainLabel(fromLabel, toLabel, expectedLabel string) bool {
 	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
 
-	if len(fromNodes) == 0 {
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
 		return false
 	}
+
 	for _, fromNode := range fromNodes {
-		for _, next := range fromNode.nexts {
-			toNode := g.GetNodeByID(next)
-			if toNode.label == toLabel {
-				return true
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id && strings.Contains(edge.Label, expectedLabel) {
+					return true
+				}
 			}
 		}
 	}
 	return false
 }
 
-// GetNodeLabel returns the label of a node by its label name
-func (g *Graph) GetNodeLabel(nodeLabel string) string {
+func (g *Graph) HasEdgeContainLabelByNodeId(fromNodeId, toNodeId int, expectedLabel string) bool {
+	fromNode := g.GetNodeByID(fromNodeId)
+	toNode := g.GetNodeByID(toNodeId)
+
+	if fromNode == nil || toNode == nil {
+		return false
+	}
+	for _, edge := range g.edges {
+		if edge.from.id == fromNode.id && edge.to.id == toNode.id && strings.Contains(edge.Label, expectedLabel) {
+			return true
+		}
+	}
+	return false
+}
+
+// GetNodeByLabel returns the label of a node by its label name
+func (g *Graph) GetNodeByLabel(nodeLabel string) string {
 	id, exists := g.NodeExisted(nodeLabel)
 	if !exists {
 		return ""
