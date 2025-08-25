@@ -57,6 +57,11 @@ func Instruction2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode)
 
 // IrCodeToInstruction : unmarshal ir code to instruction, used in LazyInstruction
 func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, cache *ProgramCache) Instruction {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("err: %v", err)
+		}
+	}()
 	instructionFromIrCode(inst, ir)
 	c.valueFromIrCode(cache, inst, ir)
 	basicBlockFromIrCode(inst, ir)
@@ -164,11 +169,19 @@ func instructionFromIrCode(inst Instruction, ir *ssadb.IrCode) {
 				log.Errorf("BUG: set CurrentFunction[%d]: ", ir.CurrentFunction)
 			}
 		}
-		if currentBlock, ok := inst.GetInstructionById(ir.CurrentBlock); ok && currentBlock != nil {
-			if block, ok := ToBasicBlock(currentBlock); ok {
+		if !ir.IsBlock {
+			if currentBlock, ok := inst.GetInstructionById(ir.CurrentBlock); ok && currentBlock != nil {
+				if block, ok := ToBasicBlock(currentBlock); ok {
+					inst.SetBlock(block)
+				} else {
+					log.Errorf("BUG: set CurrentBlock[%d]:", ir.CurrentBlock)
+				}
+			}
+		} else {
+			if block, ok := ToBasicBlock(inst); ok {
 				inst.SetBlock(block)
 			} else {
-				log.Errorf("BUG: set CurrentBlock[%d]:", ir.CurrentBlock)
+				log.Errorf("BUG: set currentblock for block :%v", inst)
 			}
 		}
 	}
