@@ -406,7 +406,7 @@ func (c *Blueprint) storeField(name string, val Value, _type BlueprintFieldKind)
 	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInstPlaceholder(name)))
 }
 
-func (b *Blueprint) InitializeWithContainer(con *Make) error {
+func (b *Blueprint) InitializeWithContainer(con Value) error {
 	if b._container != nil {
 		return utils.Errorf("the container is already initialized id:(%v)", b._container.GetId())
 	}
