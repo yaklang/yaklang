@@ -343,6 +343,15 @@ const (
 	CaptureMultiple                          // 捕获多个屏幕作为单独文件
 )
 
+// ScreenCaptureQuality 定义屏幕截图质量级别
+type ScreenCaptureQuality int
+
+const (
+	QualityLow    ScreenCaptureQuality = iota // 低质量，快速截图
+	QualityNormal                             // 正常质量
+	QualityHigh                               // 高质量，无损截图
+)
+
 // WithScreenCaptureMode 设置屏幕截图模式
 func WithScreenCaptureMode(mode ScreenCaptureMode) Option {
 	return func(o *options) {
@@ -355,6 +364,23 @@ func WithScreenCaptureMode(mode ScreenCaptureMode) Option {
 func WithScreenCaptureDebug(enable bool) Option {
 	return func(o *options) {
 		o.debug = enable
+	}
+}
+
+// WithScreenCaptureQuality 设置屏幕截图质量
+func WithScreenCaptureQuality(quality ScreenCaptureQuality) Option {
+	return func(o *options) {
+		// 根据质量级别设置对应的frameQuality值
+		switch quality {
+		case QualityLow:
+			o.frameQuality = 20 // 低质量，快速截图
+		case QualityNormal:
+			o.frameQuality = 10 // 正常质量
+		case QualityHigh:
+			o.frameQuality = 1 // 高质量，无损截图
+		default:
+			o.frameQuality = 1 // 默认高质量
+		}
 	}
 }
 

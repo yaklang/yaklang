@@ -141,8 +141,14 @@ func captureScreenLinux(o *options) (*FfmpegStreamResult, error) {
 func captureSingleScreenMacOS(outputPath string, o *options) (*FfmpegStreamResult, error) {
 	args := []string{
 		"-f", "avfoundation",
+		"-capture_cursor", "1", // 捕获鼠标光标
+		"-capture_mouse_clicks", "0", // 不捕获鼠标点击
 		"-i", "0:", // 截取屏幕0，macOS avfoundation 从0开始
 		"-vframes", "1", // 只捕获一帧
+		"-pix_fmt", "rgba", // 使用 RGBA 像素格式保持透明度和质量
+		"-compression_level", "0", // PNG 无损压缩
+		"-pred", "1", // PNG 预测滤波器
+		"-q:v", strconv.Itoa(o.frameQuality), // 使用配置的质量参数
 		"-y", // 覆盖输出文件
 		outputPath,
 	}
@@ -165,8 +171,13 @@ func captureSingleScreenMacOS(outputPath string, o *options) (*FfmpegStreamResul
 func captureSingleScreenWindows(outputPath string, o *options) (*FfmpegStreamResult, error) {
 	args := []string{
 		"-f", "gdigrab",
+		"-draw_mouse", "1", // 捕获鼠标光标
 		"-i", "desktop", // 截取桌面
 		"-vframes", "1", // 只捕获一帧
+		"-pix_fmt", "rgba", // 使用 RGBA 像素格式保持质量
+		"-compression_level", "0", // PNG 无损压缩
+		"-pred", "1", // PNG 预测滤波器
+		"-q:v", strconv.Itoa(o.frameQuality), // 使用配置的质量参数
 		"-y", // 覆盖输出文件
 		outputPath,
 	}
@@ -189,8 +200,13 @@ func captureSingleScreenWindows(outputPath string, o *options) (*FfmpegStreamRes
 func captureSingleScreenLinux(outputPath string, o *options) (*FfmpegStreamResult, error) {
 	args := []string{
 		"-f", "x11grab",
+		"-draw_mouse", "1", // 捕获鼠标光标
 		"-i", ":0.0", // 截取 display :0.0
 		"-vframes", "1", // 只捕获一帧
+		"-pix_fmt", "rgba", // 使用 RGBA 像素格式保持质量
+		"-compression_level", "0", // PNG 无损压缩
+		"-pred", "1", // PNG 预测滤波器
+		"-q:v", strconv.Itoa(o.frameQuality), // 使用配置的质量参数
 		"-y", // 覆盖输出文件
 		outputPath,
 	}
@@ -590,7 +606,13 @@ func concatenateScreens(screenFiles []string, outputPath string, o *options) (*F
 		args = append(args, "-filter_complex", filterStr.String(), "-map", "[v]")
 	}
 
-	args = append(args, "-y", outputPath)
+	// 添加高质量参数
+	args = append(args,
+		"-pix_fmt", "rgba", // 使用 RGBA 像素格式保持质量
+		"-compression_level", "0", // PNG 无损压缩
+		"-pred", "1", // PNG 预测滤波器
+		"-q:v", strconv.Itoa(o.frameQuality), // 使用配置的质量参数
+		"-y", outputPath)
 
 	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
 	if o.debug {
