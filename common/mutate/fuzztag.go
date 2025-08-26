@@ -1020,7 +1020,7 @@ func init() {
 		Alias:               []string{"re:n", "regex:n", "regexp:n"},
 		Description:         "使用正则生成所有可能的字符中的随机n个",
 		TagNameVerbose:      "正则生成n条数据",
-		ArgumentDescription: "{{string([a-z0-9]:正则表达式)}}{{optional(number(1:数量))}}",
+		ArgumentDescription: "{{string_split([a-z0-9]:正则表达式)}}{{optional(number(1:数量))}}",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "rangechar",
