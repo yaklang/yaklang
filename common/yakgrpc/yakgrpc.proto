@@ -1312,6 +1312,8 @@ message AIStartParams {
   repeated ExecParamItem ForgeParams = 6;
 
   // 是否禁用人机交互（AI 可能会主动问人问题）
+  // 在 AI ReAct 中，他对应的是 EnableUserInteract
+  // 在 AI Coordinator 中，还是原来的样子
   bool DisallowRequireForUserPrompt = 7;
 
   // Review 政策

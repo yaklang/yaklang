@@ -3,8 +3,9 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"sync"
 
-	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -12,17 +13,42 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *ReAct) invokePlanAndExecute(planPayload string) error {
+func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, planPayload string) error {
+	doneOnce := new(sync.Once)
+	done := func() {
+		doneOnce.Do(func() {
+			close(doneChannel)
+		})
+	}
+	defer func() {
+		done()
+		if err := recover(); err != nil {
+			log.Errorf("invokePlanAndExecute panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
 	// create config with timeline
 	// generate config
-
+	uid := uuid.New().String()
+	params := map[string]any{
+		"re-act_id":      r.config.id,
+		"re-act_task":    r.GetCurrentTask().GetId(),
+		"coordinator_id": uid,
+	}
+	r.EmitJSON(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION, r.config.id, params)
+	defer func() {
+		r.EmitJSON(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION, r.config.id, params)
+	}()
 	r.EmitAction(fmt.Sprintf("Plan request: %s", planPayload))
 
-	planCtx, cancel := context.WithCancel(r.config.GetContext())
+	if ctx == nil {
+		ctx = r.config.ctx
+	}
+	planCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	inputChannel := make(chan *aid.InputEvent, 100)
-	uid := ksuid.New().String()
 	r.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
 		go func() {
 			log.Infof("Received AI input event: %v", event)
@@ -41,12 +67,14 @@ func (r *ReAct) invokePlanAndExecute(planPayload string) error {
 	cod, err := aid.NewCoordinatorContext(
 		planCtx,
 		planPayload,
+		aid.WithCoordinatorId(uid),
 		aid.WithMemory(r.config.memory),
 		aid.WithAICallback(r.config.aiCallback),
 		aid.WithAllowPlanUserInteract(true),
 		aid.WithAgreeManual(),
 		aid.WithEventInputChan(inputChannel),
 		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
+			e.CoordinatorId = uid
 			emitErr := r.config.Emit(e)
 			if emitErr != nil {
 				log.Errorf("Failed to emit event: %v", emitErr)
@@ -59,6 +87,7 @@ func (r *ReAct) invokePlanAndExecute(planPayload string) error {
 		log.Errorf("Failed to create coordinator for plan execution: %v", err)
 		return utils.Errorf("failed to create coordinator for plan execution: %v", err)
 	}
+	done()
 	if err := cod.Run(); err != nil {
 		r.finished = true
 		log.Errorf("Plan execution failed: %v", err)

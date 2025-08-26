@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"fmt"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
@@ -57,6 +58,7 @@ func (r *ReAct) GetCurrentTask() *Task {
 func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 	// 创建基于aireact.Task的任务（初始状态为created）
 	task := NewTask(fmt.Sprintf("re-act-task-%v", ksuid.New().String()), event.FreeInput, r.Emitter)
+	task.ctx, task.cancel = context.WithCancel(r.config.GetContext())
 
 	if r.config.debugEvent {
 		log.Infof("Task created: %s with input: %s", task.GetId(), event.FreeInput)
