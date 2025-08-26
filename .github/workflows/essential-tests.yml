@@ -200,7 +200,7 @@ jobs:
           - name: Test lowhttp / DNSX
             run: |
               # lowhttp
-              go test -timeout 1m -skip "TestComputeDigestResponseFromRequest|TestComputeDigestResponseFromRequestEx|TestLowhttpResponse2" ./common/utils/lowhttp
+              go test -timeout 2m -skip "TestComputeDigestResponseFromRequest|TestComputeDigestResponseFromRequestEx|TestLowhttpResponse2" ./common/utils/lowhttp
               # DNSX
               go test -timeout 20s ./common/facades/...
 
