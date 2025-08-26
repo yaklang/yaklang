@@ -83,14 +83,13 @@ func (s *Server) GetSSARiskDisposal(ctx context.Context, req *ypb.GetSSARiskDisp
 		return nil, utils.Error("GetSSARiskDisposal faild: riskId is not valid")
 	}
 
-	disposal, err := yakit.GetSSARiskDisposals(s.GetSSADatabase(), riskId)
+	// 使用 GetSSARiskDisposalsWithTaskInfo 来获取包含任务信息的处置数据
+	disposal, err := yakit.GetSSARiskDisposalsWithTaskInfo(s.GetSSADatabase(), riskId)
 	if err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposal failed: %v", err)
 	}
-	result := lo.Map(disposal, func(item schema.SSARiskDisposals, index int) *ypb.SSARiskDisposalData {
-		return item.ToGRPCModel()
-	})
+
 	return &ypb.GetSSARiskDisposalResponse{
-		Data: result,
+		Data: disposal,
 	}, nil
 }
