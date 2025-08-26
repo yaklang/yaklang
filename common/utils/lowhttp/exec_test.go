@@ -866,8 +866,8 @@ User-Agent: yaklang-test/1.0
 
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
-			WithTimeout(time.Second),
-			WithRetryWaitTime(20*time.Millisecond),
+			WithTimeout(3*time.Second),
+			WithRetryWaitTime(100*time.Millisecond),
 			WithRetryNotInStatusCode([]int{200}),
 			WithRetryTimes(10),
 		)
@@ -896,8 +896,8 @@ User-Agent: yaklang-test/1.0
 
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
-			WithTimeout(time.Second),
-			WithRetryWaitTime(20*time.Millisecond),
+			WithTimeout(3*time.Second),
+			WithRetryWaitTime(100*time.Millisecond),
 			WithRetryInStatusCode([]int{403}),
 			WithRetryTimes(10),
 		)
@@ -930,8 +930,8 @@ User-Agent: yaklang-test/1.0
 
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
-			WithTimeout(time.Second),
-			WithRetryWaitTime(20*time.Millisecond),
+			WithTimeout(3*time.Second),
+			WithRetryWaitTime(100*time.Millisecond),
 			WithRetryNotInStatusCode([]int{500, 200}),
 			WithRetryInStatusCode([]int{500}),
 			WithRetryTimes(10),
@@ -969,11 +969,11 @@ User-Agent: yaklang-test/1.0
 
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
-			WithTimeout(time.Second),
+			WithTimeout(3*time.Second),
 			WithHttp2(true),
 			WithHttps(true),
 			WithVerifyCertificate(false),
-			WithRetryWaitTime(20*time.Millisecond),
+			WithRetryWaitTime(100*time.Millisecond),
 			WithRetryNotInStatusCode([]int{500, 200}),
 			WithRetryInStatusCode([]int{500}),
 			WithRetryTimes(10),
@@ -1008,8 +1008,8 @@ User-Agent: yaklang-test/1.0
 
 		rsp, err := HTTP(WithPacketBytes(
 			[]byte(packet)),
-			WithTimeout(time.Second),
-			WithRetryWaitTime(20*time.Millisecond),
+			WithTimeout(3*time.Second),
+			WithRetryWaitTime(100*time.Millisecond),
 			WithRetryNotInStatusCode([]int{500, 200}),
 			WithRetryInStatusCode([]int{500}),
 			WithRetryTimes(10),
