@@ -18,7 +18,7 @@ basicItem = `md5(%v)` % expr
 token = codec.Md5(exprInfo.result)
 yakit.Info("USE UnionItem: %v token: %v", basicItem, token)
 
-unionPayloads = func() {
+genUnionPayloads = func() {
     var unionPayloads = []
     var results = []
     for i in 16 {
@@ -29,7 +29,7 @@ unionPayloads = func() {
     return results
 }
 
-stackedPayloads = func() {
+genStackedPayloads = func() {
     var payloads = []
     var results = []
     for i in 16 {
@@ -72,7 +72,7 @@ generatePayloads = func(headerValue){
     suffix = [" -- ", " # "]
     prefix = sqlBuildPrefix(headerValue)
     //Build Union Injection Payload
-    unionPayloads= unionPayloads()
+    unionPayloads= genUnionPayloads()
     check = i => func{
         return str.Contains(i, token)
     }
@@ -85,7 +85,7 @@ generatePayloads = func(headerValue){
         }
     }
     //Build Stacked Injection Payload
-    stackedPayloads  = stackedPayloads()
+    stackedPayloads  = genStackedPayloads()
 
     for p in prefix {
         for s in suffix {
