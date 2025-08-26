@@ -59,7 +59,7 @@ func (t *ReactTask) GetName() string {
 	return t.name
 }
 
-func ConvertYBPAIStartParamsToReActOptions(i *ypb.AIStartParams) []Option {
+func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []Option {
 	opts := make([]Option, 0)
 	if i == nil {
 		return opts
@@ -68,6 +68,26 @@ func ConvertYBPAIStartParamsToReActOptions(i *ypb.AIStartParams) []Option {
 		opts = append(opts, WithUserInteractive(false))
 	} else {
 		opts = append(opts, WithUserInteractive(true))
+	}
+
+	if i.ReviewPolicy != "" {
+		opts = append(opts, WithReviewPolicy(aicommon.AgreePolicyType(i.ReviewPolicy)))
+	}
+
+	if i.ReActMaxIteration > 0 {
+		opts = append(opts, WithMaxIterations(int(i.ReActMaxIteration)))
+	}
+
+	if i.GetTimelineItemLimit() > 0 {
+		opts = append(opts, WithTimelineLimit(i.GetTimelineItemLimit()))
+	}
+
+	if i.GetTimelineContentSizeLimit() > 0 {
+		opts = append(opts, WithTimelineContentSizeLimit(i.GetTimelineContentSizeLimit()))
+	}
+
+	if i.UserInteractLimit > 0 {
+		opts = append(opts, WithUserInteractiveLimitedTimes(i.UserInteractLimit))
 	}
 
 	return opts
@@ -225,6 +245,22 @@ func WithMaxIterations(max int) Option {
 	return func(cfg *ReActConfig) {
 		if max > 0 {
 			cfg.maxIterations = max
+		}
+	}
+}
+
+func WithTimelineLimit(limit int64) Option {
+	return func(cfg *ReActConfig) {
+		if limit > 0 {
+			cfg.timelineLimit = limit
+		}
+	}
+}
+
+func WithTimelineContentSizeLimit(limit int64) Option {
+	return func(cfg *ReActConfig) {
+		if limit > 0 {
+			cfg.timelineContentSizeLimit = limit
 		}
 	}
 }

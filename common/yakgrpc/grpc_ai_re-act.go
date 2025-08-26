@@ -2,6 +2,9 @@ package yakgrpc
 
 import (
 	"context"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
@@ -9,8 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
-	"time"
 )
 
 func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
@@ -31,6 +32,8 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 	defer cancel()
 
 	inputEvent := make(chan *ypb.AIInputEvent, 1000)
+
+	optsFromStartParams := aireact.ConvertYPBAIStartParamsToReActConfig(startParams)
 
 	var currentCoordinatorId = startParams.CoordinatorId
 	_ = currentCoordinatorId
@@ -59,6 +62,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aireact.WithBuiltinTools(),
 		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
 	}
+	reActOptions = append(reActOptions, optsFromStartParams...)
 
 	reAct, err := aireact.NewReAct(reActOptions...)
 	if err != nil {
