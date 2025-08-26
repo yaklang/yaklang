@@ -37,6 +37,8 @@ type SyntaxFlowScanTask struct {
 
 	Kind SyntaxflowResultKind `json:"kind"` // debug / scan / query
 
+	// 扫描批次
+	ScanBatch uint64 `gorm:"index"`
 	// query execute
 	FailedQuery  int64 // query failed
 	SkipQuery    int64 // language not match, skip this rule

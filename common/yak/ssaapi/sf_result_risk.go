@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"encoding/json"
 	"fmt"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -141,6 +140,20 @@ func buildSSARisk(
 			newSSARisk.Details = alertInfo.Msg
 		}
 	}
+
+	newSSARisk.RiskFeatureHash = utils.CalcSha1(
+		// SSA Feature
+		newSSARisk.FunctionName,
+		value.String(),
+		// SyntaxFlow Rule Feature
+		newSSARisk.FromRule,
+		newSSARisk.Variable,
+		string(newSSARisk.Severity),
+		newSSARisk.RiskType,
+		newSSARisk.Language,
+		newSSARisk.Title,
+	)
+
 	return newSSARisk
 }
 

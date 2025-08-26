@@ -127,6 +127,8 @@ func CreateSyntaxflowTaskById(
 	if err := m.initByConfig(stream); err != nil {
 		return nil, err
 	}
+
+	m.setScanBatch()
 	return m, nil
 }
 
@@ -144,6 +146,20 @@ func (m *SyntaxFlowScanManager) GetConcurrency() uint32 {
 		return 5
 	}
 	return m.concurrency
+}
+
+// setScanBatch 设置扫描批次号
+func (m *SyntaxFlowScanManager) setScanBatch() {
+	if m.taskRecorder == nil {
+		m.taskRecorder = &schema.SyntaxFlowScanTask{}
+	}
+
+	maxBatch, err := yakit.GetMaxScanBatch(ssadb.GetDB(), m.programs)
+	if err != nil {
+		m.taskRecorder.ScanBatch = 1
+	} else {
+		m.taskRecorder.ScanBatch = maxBatch + 1
+	}
 }
 
 // SaveTask save task info which is from manager to database

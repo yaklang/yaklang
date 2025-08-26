@@ -2,7 +2,6 @@ package schema
 
 import (
 	"fmt"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -58,6 +57,9 @@ type SSARisk struct {
 
 	// 最新处置状态
 	LatestDisposalStatus string `json:"latest_disposal_status" gorm:"index;default:'not_set'"`
+	// Risk 特征哈希，用于区分不同批次扫描的同一个漏洞
+	// 包含 SSA 信息(disam、function)、FileUrl、SfRule 信息(ruleId、variableName、level)
+	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
 }
 
 func (s *SSARisk) CalcHash() string {

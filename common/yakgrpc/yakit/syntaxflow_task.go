@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -60,4 +62,21 @@ func DeleteSyntaxFlowScanTask(db *gorm.DB, params *ypb.DeleteSyntaxFlowScanTaskR
 	db = FilterSyntaxFlowScanTask(db, params.Filter)
 	db = db.Unscoped().Delete(&schema.SyntaxFlowScanTask{})
 	return db.RowsAffected, db.Error
+}
+
+// GetMaxScanBatch 获取指定程序的最大扫描批次号
+func GetMaxScanBatch(db *gorm.DB, programs []string) (uint64, error) {
+	var result struct {
+		MaxBatch uint64 `json:"max_batch"`
+	}
+
+	programsStr := strings.Join(programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
+	err := db.Model(&schema.SyntaxFlowScanTask{}).
+		Where("programs = ?", programsStr).
+		Select("COALESCE(MAX(scan_batch), 0) as max_batch").
+		Scan(&result).Error
+	if err != nil {
+		return 0, err
+	}
+	return result.MaxBatch, nil
 }
