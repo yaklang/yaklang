@@ -38,7 +38,7 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 	targetFuncCallee := target.GetFunc()
 
 	fixCallVariadic := func(args []Value, callee *Function) []Value {
-		if utils.IsNil(callee) || !callee.hasEllipsis || callee.ParamLength <= 0 {
+		if utils.IsNil(callee) || !callee.hasEllipsis || callee.ParamLength <= 0 || args == nil {
 			return args
 		}
 
@@ -54,6 +54,10 @@ func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
 		variadicArgs := make([]Value, 0)
 		for i := fixedCount; i < len(args); i++ {
 			variadicArgs = append(variadicArgs, args[i])
+		}
+
+		if len(variadicArgs) == 0 { // 如果没有可变参数那就不要塞一个空的make进去了
+			return args
 		}
 
 		// 打包成 slice
