@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -38,11 +39,70 @@ var defaultInvalidSuffix = []string{
 	"\\.json",
 }
 
-var jsContentTypes = []string{
+var staticContentTypes = []string{
+	// JavaScript
 	"text/javascript",
 	"application/javascript",
 	"application/x-javascript",
 	"application/ecmascript",
+
+	// CSS
+	"text/css",
+
+	// Images
+	"image/jpeg",
+	"image/jpg",
+	"image/png",
+	"image/gif",
+	"image/webp",
+	"image/svg+xml",
+	"image/bmp",
+	"image/x-icon", // ICO 文件
+	"image/vnd.microsoft.icon",
+
+	// Fonts
+	"font/woff",
+	"font/woff2",
+	"font/ttf",
+	"font/otf",
+	"application/font-woff",
+	"application/font-woff2",
+	"application/x-font-ttf",
+	"application/x-font-otf",
+	"font/opentype",
+
+	// Media (Video & Audio)
+	"video/mp4",
+	"video/webm",
+	"video/ogg",
+	"video/x-msvideo",  // AVI
+	"video/x-matroska", // MKV
+	"audio/mpeg",
+	"audio/ogg",
+	"audio/wav",
+	"audio/webm",
+	"audio/x-wav",
+}
+
+var dynamicContentTypes = []string{
+	// JSON data formats
+	"application/json",         // JSON data, usually API responses
+	"application/vnd.api+json", // JSON:API format
+	"application/hal+json",     // HAL format
+	"application/stream+json",  // Streaming JSON
+
+	// XML data formats
+	"application/xml", // XML data
+	"text/xml",        // Alternative XML format
+
+	// Form and submission data
+	"application/x-www-form-urlencoded", // Form submission content type
+	"multipart/form-data",               // Form file upload content type
+
+	// Binary and stream data
+	"application/octet-stream", // Binary stream, usually file downloads, dynamically generated
+	"application/x-protobuf",   // Protobuf binary data
+	"application/grpc",         // gRPC communication content type
 }
 
 const (
@@ -386,16 +446,79 @@ func (c *MixPluginCaller) IsPassed(target string) bool {
 	return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
 }
 
-func (c *MixPluginCaller) IsStatic(target, request string) bool {
-	parts := strings.Split(target, "?")
-	basePath := parts[0]
-	if !utils.IncludeExcludeChecker(nil, defaultInvalidSuffix, basePath) {
+func (c *MixPluginCaller) IsStatic(rawUrl string, request []byte) bool {
+	if !utils.IncludeExcludeChecker(nil, defaultInvalidSuffix, strings.Split(rawUrl, "?")[0]) {
 		return true
 	}
-	if utils.IncludeExcludeChecker(jsContentTypes, nil, request) {
-		return true
+	contentType := lowhttp.GetHTTPPacketHeader(request, "Content-Type")
+	acceptHeader := lowhttp.GetHTTPPacketHeader(request, "Accept")
+
+	hasDynamicType := false
+	hasStaticType := false
+	if acceptHeader != "" {
+		contentTypes := parseAcceptHeader(acceptHeader)
+		if len(contentTypes) > 0 {
+			for _, ct := range contentTypes {
+				if isStaticContentType(ct) {
+					hasStaticType = true
+				}
+				if isDynamicContentType(ct) {
+					hasDynamicType = true
+				}
+			}
+		}
+		if hasDynamicType && hasStaticType {
+			return false
+		}
+		if hasStaticType && !hasDynamicType {
+			return true
+		}
 	}
 
+	if contentType != "" {
+		if isStaticContentType(contentType) {
+			return true
+		}
+		if isDynamicContentType(contentType) {
+			return false
+		}
+	}
+
+	return false
+}
+
+func parseAcceptHeader(acceptHeader string) []string {
+	var contentTypes []string
+
+	parts := strings.Split(acceptHeader, ",")
+	for _, part := range parts {
+		contentType := strings.TrimSpace(part)
+		if idx := strings.Index(contentType, ";"); idx != -1 {
+			contentType = strings.TrimSpace(contentType[:idx])
+		}
+		if contentType != "" {
+			contentTypes = append(contentTypes, contentType)
+		}
+	}
+
+	return contentTypes
+}
+
+func isDynamicContentType(contentType string) bool {
+	for _, dynamicType := range dynamicContentTypes {
+		if strings.Contains(contentType, dynamicType) {
+			return true
+		}
+	}
+	return false
+}
+
+func isStaticContentType(contentType string) bool {
+	for _, staticType := range staticContentTypes {
+		if strings.Contains(contentType, staticType) {
+			return true
+		}
+	}
 	return false
 }
 
@@ -912,7 +1035,7 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 	}
 
 	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
-		if m.IsStatic(u, string(req)) {
+		if m.IsStatic(u, req) {
 			return
 		}
 		callers.Call(HOOK_MirrorFilteredHTTPFlow,
