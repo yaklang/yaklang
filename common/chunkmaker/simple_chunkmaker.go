@@ -16,7 +16,7 @@ type SimpleChunkMaker struct {
 // NewSimpleStringerChunkMaker NewSimpleChunkMakerEx creates a SimpleChunkMaker from an input channel of fmt.Stringer.
 // It reads from the input channel, converts each fmt.Stringer to a BufferChunk,
 // is Simple , config chunk size or separator is not used.
-func NewSimpleStringerChunkMaker(src *chanx.UnlimitedChan[fmt.Stringer], opts ...Option) (*SimpleChunkMaker, error) {
+func NewSimpleStringerChunkMaker(src chan fmt.Stringer, opts ...Option) (*SimpleChunkMaker, error) {
 	cfg := NewConfig(opts...)
 
 	ctx, cancel := cfg.ctx, cfg.cancel
@@ -26,7 +26,7 @@ func NewSimpleStringerChunkMaker(src *chanx.UnlimitedChan[fmt.Stringer], opts ..
 		var preChunk *BufferChunk
 		for {
 			select {
-			case simpleData, ok := <-src.OutputChannel():
+			case simpleData, ok := <-src:
 				if !ok {
 					log.Info("SimpleChunkMaker closed")
 					return
@@ -47,7 +47,7 @@ func NewSimpleStringerChunkMaker(src *chanx.UnlimitedChan[fmt.Stringer], opts ..
 	}, nil
 }
 
-func NewSimpleChunkMaker(src *chanx.UnlimitedChan[Chunk], opts ...Option) (*SimpleChunkMaker, error) {
+func NewSimpleChunkMaker[T any](src <-chan T, handle func(T) Chunk, opts ...Option) (*SimpleChunkMaker, error) {
 	cfg := NewConfig(opts...)
 
 	ctx, cancel := cfg.ctx, cfg.cancel
@@ -57,12 +57,12 @@ func NewSimpleChunkMaker(src *chanx.UnlimitedChan[Chunk], opts ...Option) (*Simp
 		var preChunk Chunk
 		for {
 			select {
-			case ch, ok := <-src.OutputChannel():
+			case ch, ok := <-src:
 				if !ok {
 					log.Info("SimpleChunkMaker closed")
 					return
 				}
-				currentChunk := ch
+				currentChunk := handle(ch)
 				currentChunk.SetPreviousChunk(preChunk)
 				dst.SafeFeed(currentChunk)
 				preChunk = currentChunk
