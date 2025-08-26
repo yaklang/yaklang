@@ -58,6 +58,7 @@ func NewPromptManager(react *ReAct) *PromptManager {
 // LoopPromptData contains data for the main loop prompt template
 type LoopPromptData struct {
 	AllowAskForClarification       bool
+	AllowPlan                      bool
 	AskForClarificationCurrentTime int64
 	AstForClarificationMaxTimes    int64
 
@@ -120,21 +121,16 @@ type AIReviewPromptData struct {
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
 func (pm *PromptManager) GenerateLoopPrompt(
 	userQuery string,
-	allowUserInteractive bool,
+	allowUserInteractive, allowPlan bool,
 	currentUserInteractiveCount,
 	userInteractiveLimitedTimes int64,
 	tools []*aitool.Tool,
 ) (string, error) {
-	var loopSchema string
-	if allowUserInteractive {
-		loopSchema = loopSchemaJSON
-	} else {
-		loopSchema = loopSchemaWithoutAskForClarificationJSON
-	}
-
+	var loopSchema = getLoopSchema(!allowUserInteractive, !allowPlan)
 	// Build template data
 	data := &LoopPromptData{
 		AllowAskForClarification:       allowUserInteractive,
+		AllowPlan:                      allowPlan,
 		AskForClarificationCurrentTime: currentUserInteractiveCount,
 		AstForClarificationMaxTimes:    userInteractiveLimitedTimes,
 		CurrentTime:                    time.Now().Format("2006-01-02 15:04:05"),

@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"context"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sync"
 	"time"
@@ -21,6 +22,9 @@ const (
 
 // each single query/input create a task
 type Task struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+
 	emitter *aicommon.Emitter
 	*sync.RWMutex
 
@@ -28,6 +32,20 @@ type Task struct {
 	UserInput string
 	Status    string
 	CreatedAt time.Time
+}
+
+func (t *Task) GetContext() context.Context {
+	if t == nil {
+		return context.Background()
+	}
+	return t.ctx
+}
+
+func (t *Task) Cancel() {
+	if t == nil {
+		return
+	}
+	t.cancel()
 }
 
 func (t *Task) IsFinished() bool {
