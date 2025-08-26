@@ -3,14 +3,15 @@ package aid
 import (
 	"bytes"
 	"context"
+	"sync"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"sync"
-	"time"
 )
 
-func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolicy AgreePolicyType, ep *aicommon.Endpoint) {
+func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolicy aicommon.AgreePolicyType, ep *aicommon.Endpoint) {
 	if ep.GetCheckpoint() != nil && ep.GetCheckpoint().Finished { // check ep finished, is recover task or not
 		return
 	}
@@ -26,9 +27,9 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 	}()
 
 	switch doWaitAgreeWithPolicy {
-	case AgreePolicyYOLO:
+	case aicommon.AgreePolicyYOLO:
 		c.EmitInfo("yolo policy auto agree all")
-	case AgreePolicyAuto:
+	case aicommon.AgreePolicyAuto:
 		if c.agreeInterval <= 0 {
 			c.EmitError("auto agree interval is not set")
 			c.agreeInterval = 10 * time.Second
@@ -36,7 +37,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 		if ep.WaitTimeout(c.agreeInterval) {
 			c.EmitInfo("auto agree timeout, use default action: pass")
 		}
-	case AgreePolicyManual:
+	case aicommon.AgreePolicyManual:
 		manualCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		if c.agreeManualCallback != nil { // if agreeManualCallback is not nil, use it help manual agree
@@ -54,7 +55,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 			}()
 		}
 		ep.WaitContext(ctx)
-	case AgreePolicyAI:
+	case aicommon.AgreePolicyAI:
 		if !c.agreeRiskCtrl.enabled() {
 			c.EmitInfo("policy[ai]: ai agree risk control is not enabled, use manual agree (risk control is disabled)")
 			ep.WaitContext(ctx)
@@ -90,7 +91,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 		ep.WaitContext(ctx)
 		cancel()
 		wg.Wait()
-	case AgreePolicyAIAuto:
+	case aicommon.AgreePolicyAIAuto:
 		if c.agreeInterval <= 0 {
 			c.EmitError("auto agree interval is not set")
 			c.agreeInterval = 10 * time.Second

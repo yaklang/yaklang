@@ -36,20 +36,6 @@ var _ aicommon.AICaller = &planRequest{}
 var _ aicommon.AICaller = &AiTask{}
 var _ aicommon.AICallerConfigIf = &Config{}
 
-type AgreePolicyType string
-
-const (
-	AgreePolicyYOLO AgreePolicyType = "yolo"
-	// auto: auto agree, should with interval at least 10 seconds
-	AgreePolicyAuto AgreePolicyType = "auto"
-	// manual: block until user agree
-	AgreePolicyManual AgreePolicyType = "manual"
-	// ai: use ai to agree, is ai is not agree, will use manual
-	AgreePolicyAI AgreePolicyType = "ai"
-	// ai-auto: use ai to agree, if ai is not agree, will use auto in auto interval
-	AgreePolicyAIAuto AgreePolicyType = "ai-auto"
-)
-
 type Config struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
@@ -108,7 +94,7 @@ type Config struct {
 	allowRequireForUserInteract bool
 
 	// do not use it directly, use doAgree() instead
-	agreePolicy         AgreePolicyType
+	agreePolicy         aicommon.AgreePolicyType
 	agreeInterval       time.Duration
 	agreeAIScore        float64
 	agreeRiskCtrl       *riskControl
@@ -312,7 +298,7 @@ func (c *Config) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, erro
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
-func (c *Config) setAgreePolicy(policy AgreePolicyType) {
+func (c *Config) setAgreePolicy(policy aicommon.AgreePolicyType) {
 	c.agreePolicy = policy
 }
 
@@ -431,7 +417,7 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		agreePolicy:                 AgreePolicyManual,
+		agreePolicy:                 aicommon.AgreePolicyManual,
 		agreeAIScore:                0.5,
 		agreeRiskCtrl:               new(riskControl),
 		agreeInterval:               10 * time.Second,
@@ -532,18 +518,18 @@ func WithAgreeYOLO(i ...bool) Option {
 		defer config.m.Unlock()
 		if len(i) > 0 {
 			if i[0] {
-				config.setAgreePolicy(AgreePolicyYOLO)
+				config.setAgreePolicy(aicommon.AgreePolicyYOLO)
 			} else {
-				config.setAgreePolicy(AgreePolicyManual)
+				config.setAgreePolicy(aicommon.AgreePolicyManual)
 			}
 		} else {
-			config.setAgreePolicy(AgreePolicyYOLO)
+			config.setAgreePolicy(aicommon.AgreePolicyYOLO)
 		}
 		return nil
 	}
 }
 
-func WithAgreePolicy(policy AgreePolicyType) Option {
+func WithAgreePolicy(policy aicommon.AgreePolicyType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -556,7 +542,7 @@ func WithAIAgree() Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.setAgreePolicy(AgreePolicyAI)
+		config.setAgreePolicy(aicommon.AgreePolicyAI)
 		return nil
 	}
 }
@@ -565,7 +551,7 @@ func WithAgreeManual(cb ...func(context.Context, *Config) (aitool.InvokeParams, 
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.setAgreePolicy(AgreePolicyManual)
+		config.setAgreePolicy(aicommon.AgreePolicyManual)
 		if len(cb) > 0 {
 			config.agreeManualCallback = cb[0]
 		}
@@ -578,7 +564,7 @@ func WithAgreeAuto(interval time.Duration) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.setAgreePolicy(AgreePolicyAIAuto)
+		config.setAgreePolicy(aicommon.AgreePolicyAIAuto)
 		config.agreeInterval = interval
 		return nil
 	}

@@ -2,9 +2,10 @@ package aid
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -95,7 +96,7 @@ func (c *Config) RequireUserPromptWithEndpointResultEx(ctx context.Context, prom
 		Options: opts,
 	}
 	c.EmitRequireUserInteractive(req, ep.GetId())
-	c.doWaitAgreeWithPolicy(ctx, AgreePolicyManual, ep)
+	c.doWaitAgreeWithPolicy(ctx, aicommon.AgreePolicyManual, ep)
 	params := ep.GetParams()
 	c.ReleaseInteractiveEvent(ep.GetId(), params)
 	return params, ep, nil
