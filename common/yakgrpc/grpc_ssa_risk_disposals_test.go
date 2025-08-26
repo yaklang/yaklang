@@ -3,6 +3,7 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -612,48 +613,76 @@ alert $result for {
 	// 执行两次独立的扫描，生成具有相同 RiskFeatureHash 的风险
 	riskCount := 2
 	risks := make([]*schema.SSARisk, riskCount)
-	programNames := make([]string, riskCount)
+	programName := "inheritance_test_" + uuid.NewString() // 使用相同的程序名，这样会有不同的批次号
 
 	for i := 0; i < riskCount; i++ {
-		programNames[i] = "inheritance_test_" + uuid.NewString()
 
+		// 使用现有的扫描模式，创建程序并扫描
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("test.yak", testCode)
 
-		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programNames[i]))
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
-		prog := programs[0]
 
-		result, err := prog.SyntaxFlowWithError(testRule, ssaapi.QueryWithEnableDebug(true))
-		require.NoError(t, err)
-		_, err = result.Save(schema.SFResultKindDebug)
+		// 使用 gRPC 调用进行扫描，这样会自动产生扫描批次
+		stream, err := client.SyntaxFlowScan(context.Background())
 		require.NoError(t, err)
 
+		// 发送开始扫描请求
+		err = stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			ProgramName: []string{programName},
+			RuleInput: &ypb.SyntaxFlowRuleInput{
+				Content:  testRule,
+				Language: "yak",
+			},
+		})
+		require.NoError(t, err)
+
+		// 等待扫描完成
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+			}
+			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
+				break
+			}
+		}
+
+		// 查询生成的 Risk
 		_, queryRisk, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
-			ProgramName: []string{programNames[i]},
+			ProgramName: []string{programName},
 		}, nil)
+		require.NoError(t, err)
+		require.NotEmpty(t, queryRisk)
 		risks[i] = queryRisk[0]
-		// 添加延迟确保 TaskName 不同
+
+		// 添加延迟确保下次扫描的时间戳不同
 		time.Sleep(1 * time.Second)
 	}
 
 	// 清理测试数据
 	defer func() {
-		for _, programName := range programNames {
-			ssadb.DeleteProgram(ssadb.GetDB(), programName)
-		}
+		ssadb.DeleteProgram(ssadb.GetDB(), programName)
 		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
-			ProgramName: programNames,
+			ProgramName: []string{programName},
 		})
 	}()
 
 	require.Len(t, risks, riskCount)
-	// 验证 RiskFeatureHash 相同但 TaskName 不同
+	// 验证 RiskFeatureHash 相同
 	require.Equal(t, risks[0].RiskFeatureHash, risks[1].RiskFeatureHash, "RiskFeatureHash 应该相同")
-	require.NotEqual(t, risks[0].TaskName, risks[1].TaskName, "TaskName 应该不同")
 	require.NotEmpty(t, risks[0].RiskFeatureHash, "RiskFeatureHash 不应该为空")
 	require.NotEmpty(t, risks[1].RiskFeatureHash, "RiskFeatureHash 不应该为空")
+
+	// 添加调试信息
+	t.Logf("Risk1: ID=%d, RiskFeatureHash=%s, RuntimeId=%s", risks[0].ID, risks[0].RiskFeatureHash, risks[0].RuntimeId)
+	t.Logf("Risk2: ID=%d, RiskFeatureHash=%s, RuntimeId=%s", risks[1].ID, risks[1].RiskFeatureHash, risks[1].RuntimeId)
 
 	ctx := context.Background()
 	testUUID := uuid.NewString()
@@ -732,22 +761,16 @@ alert $result for {
 				i+1, disposal.Id, disposal.RiskId, disposal.TaskName, disposal.Status, disposal.Comment, disposal.CreatedAt)
 		}
 
-		// 返回结果先按照TaskCreatedAt降序排列,再按照CreatedAt降序排列
-		// 也就是新扫描的项目处置信息会排在前面
+		// 新扫描的项目处置信息会排在前面
 		rspData := getResp.Data
 		require.Equal(t, len(rspData), 2)
 		require.Equal(t, rspData[0].Status, "is_issue", "应该包含 not_issue 状态")
 		require.Equal(t, rspData[1].Status, "not_issue", "应该包含 is_issue 状态")
 		require.Equal(t, rspData[0].Comment, "第二次扫描的处置-"+testUUID, "应该包含第二次扫描的备注")
 		require.Equal(t, rspData[1].Comment, "第一次扫描的处置-"+testUUID, "应该包含第一次扫描的备注")
-		// 任务创建时间
-		layout := "2006-01-02 15:04:05"
-		t1, err := time.Parse(layout, rspData[0].TaskName)
-		require.NoError(t, err)
-		t2, err := time.Parse(layout, rspData[1].TaskName)
-		require.NoError(t, err)
-		// 确保第二次扫描的处置记录在前面
-		require.True(t, t1.After(t2), "第二次扫描的处置记录应该在前面")
+		// 验证TaskName格式（应该是"程序名_批次X"的格式）
+		require.Contains(t, rspData[0].TaskName, "批次2", "TaskName应该包含批次信息")
+		require.Contains(t, rspData[1].TaskName, "批次1", "TaskName应该包含批次信息")
 		t.Logf("第一个Risk继承查询验证通过: 共 %d 条处置记录", len(getResp.Data))
 	})
 }
@@ -797,7 +820,6 @@ alert $sink3 for {
 	programsToClean := make([]string, 0)
 	// 在所有子测试完成后统一清理处置记录
 	defer func() {
-		// 清理所有相关的处置记录
 		yakit.DeleteSSARiskDisposals(ssadb.GetDB(), &ypb.DeleteSSARiskDisposalsRequest{
 			Filter: &ypb.SSARiskDisposalsFilter{
 				Search: testUUID,
@@ -809,22 +831,48 @@ alert $sink3 for {
 	// === 第一次扫描 A ===
 	t.Run("扫描A: 产生Risk11和Risk12", func(t *testing.T) {
 		programName := "complex_test_scan_A_" + uuid.NewString()
+		programsToClean = append(programsToClean, programName)
 
-		testCodeA := `
-sink1(a)
-sink2(a)
-	`
+		testCode := `
+sink1()  
+sink2() 
+`
+
+		// 创建虚拟文件系统并解析项目
 		vf := filesys.NewVirtualFs()
-		vf.AddFile("test.yak", testCodeA)
+		vf.AddFile("test.yak", testCode)
 
 		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
 
-		result, err := programs.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
+		// 使用 gRPC 调用进行扫描，这样会自动产生扫描批次
+		stream, err := client.SyntaxFlowScan(context.Background())
 		require.NoError(t, err)
-		_, err = result.Save(schema.SFResultKindDebug)
+
+		err = stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			ProgramName: []string{programName},
+			RuleInput: &ypb.SyntaxFlowRuleInput{
+				Content:  rule,
+				Language: "yak",
+			},
+		})
 		require.NoError(t, err)
+
+		// 等待扫描完成
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+			}
+			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
+				break
+			}
+		}
 
 		// 查询生成的 Risk
 		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
@@ -835,8 +883,8 @@ sink2(a)
 
 		t.Logf("=== 扫描A生成的Risk ===")
 		for i, risk := range risks {
-			t.Logf("Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s, TaskName=%s",
-				i+1, risk.ID, risk.Title, risk.RiskFeatureHash, risk.TaskName)
+			t.Logf("Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s",
+				i+1, risk.ID, risk.Title, risk.RiskFeatureHash)
 		}
 
 		// 为 Risk11 和 Risk12 创建处置信息
@@ -848,7 +896,6 @@ sink2(a)
 		require.NoError(t, err)
 		require.Len(t, createResp.Data, 2)
 
-		// 等待一秒确保下次扫描的时间戳不同
 		time.Sleep(1 * time.Second)
 	})
 
@@ -857,24 +904,45 @@ sink2(a)
 	t.Run("扫描B: 产生Risk21、Risk22、Risk23", func(t *testing.T) {
 		programName := "complex_test_scan_B_" + uuid.NewString()
 		programsToClean = append(programsToClean, programName)
-		testCode2 := `
-sink1(a)
-sink2(a)
-sink3(a)
+
+		testCode := `
+sink1()  
+sink2()  
+sink3()  
 `
+
 		vf := filesys.NewVirtualFs()
-		vf.AddFile("test.yak", testCode2)
+		vf.AddFile("test.yak", testCode)
 
 		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
-		prog := programs[0]
 
-		// 产生 Risk21、Risk22、Risk23
-		result, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
+		stream, err := client.SyntaxFlowScan(context.Background())
 		require.NoError(t, err)
-		_, err = result.Save(schema.SFResultKindDebug)
+
+		err = stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			ProgramName: []string{programName},
+			RuleInput: &ypb.SyntaxFlowRuleInput{
+				Content:  rule,
+				Language: "yak",
+			},
+		})
 		require.NoError(t, err)
+
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+			}
+			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
+				break
+			}
+		}
 
 		// 查询生成的 Risk
 		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
@@ -886,8 +954,8 @@ sink3(a)
 
 		t.Logf("=== 扫描B生成的Risk ===")
 		for i, risk := range risks {
-			t.Logf("Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s, TaskName=%s",
-				i+1, risk.ID, risk.Title, risk.RiskFeatureHash, risk.TaskName)
+			t.Logf("Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s",
+				i+1, risk.ID, risk.Title, risk.RiskFeatureHash)
 		}
 
 		// 验证 Risk21 和 Risk22 继承了扫描A的处置信息
@@ -927,7 +995,6 @@ sink3(a)
 		})
 		require.NoError(t, err)
 
-		// 等待一秒确保下次扫描的时间戳不同
 		time.Sleep(1 * time.Second)
 	})
 
@@ -968,22 +1035,43 @@ sink3(a)
 		programName := "complex_test_scan_C_" + uuid.NewString()
 		programsToClean = append(programsToClean, programName)
 
-		vf := filesys.NewVirtualFs()
-		testCode3 := `
-sink2(a)
-sink3(a)
+		testCode := `
+sink2()  
+sink3()  
 `
-		vf.AddFile("test.yak", testCode3)
+
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("test.yak", testCode)
 
 		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.Yak), ssaapi.WithProgramName(programName))
 		require.NoError(t, err)
 		require.NotEmpty(t, programs)
-		prog := programs[0]
 
-		result, err := prog.SyntaxFlowWithError(rule, ssaapi.QueryWithEnableDebug(true))
+		stream, err := client.SyntaxFlowScan(context.Background())
 		require.NoError(t, err)
-		_, err = result.Save(schema.SFResultKindDebug)
+
+		err = stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			ProgramName: []string{programName},
+			RuleInput: &ypb.SyntaxFlowRuleInput{
+				Content:  rule,
+				Language: "yak",
+			},
+		})
 		require.NoError(t, err)
+
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+			}
+			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
+				break
+			}
+		}
 
 		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
 			ProgramName: []string{programName},
@@ -993,8 +1081,8 @@ sink3(a)
 
 		t.Logf("=== 扫描C生成的Risk ===")
 		for i, risk := range risks {
-			t.Logf("Risk3%d: ID=%d, Title=%s, RiskFeatureHash=%s, TaskName=%s",
-				i+2, risk.ID, risk.Title, risk.RiskFeatureHash, risk.TaskName)
+			t.Logf("Risk3%d: ID=%d, Title=%s, RiskFeatureHash=%s",
+				i+2, risk.ID, risk.Title, risk.RiskFeatureHash)
 		}
 
 		// 验证 Risk32 和 Risk33 继承了扫描B的处置信息
