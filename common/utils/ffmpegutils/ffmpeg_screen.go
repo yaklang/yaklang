@@ -74,8 +74,10 @@ func captureScreenMacOS(o *options) (*FfmpegStreamResult, error) {
 	}
 
 	if len(displays) <= 1 {
-		// 只有一个屏幕，直接截图
-		return captureSingleScreenMacOS(outputPath, o)
+		if len(displays) == 1 && displays[0].ID == 0 {
+			// 只有一个屏幕，直接截图
+			return captureSingleScreenMacOS(outputPath, o)
+		}
 	}
 
 	// 多屏幕处理
@@ -274,7 +276,7 @@ func detectDisplaysMacOSSimple() []DisplayInfo {
 	displays := []DisplayInfo{}
 
 	// 正则表达式：匹配 [数字] Capture screen 数字
-	re := regexp.MustCompile(`\[(\d+)\] Capture screen (\d+)`)
+	re := regexp.MustCompile(`(?i)\[(\d+)\] Capture screen (\d+)`)
 	matches := re.FindAllStringSubmatch(outputStr, -1)
 
 	for _, match := range matches {
@@ -400,10 +402,6 @@ func detectDisplaysLinux() ([]DisplayInfo, error) {
 
 // captureMultipleScreensMacOS 多屏幕截图并拼接 (macOS)
 func captureMultipleScreensMacOS(displays []DisplayInfo, outputPath string, o *options) (*FfmpegStreamResult, error) {
-	if len(displays) <= 1 {
-		return captureSingleScreenMacOS(outputPath, o)
-	}
-
 	// 创建临时目录存储单个屏幕截图
 	tempDir, err := ioutil.TempDir(consts.GetDefaultYakitBaseTempDir(), "multi-screen-*")
 	if err != nil {
