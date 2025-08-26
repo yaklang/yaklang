@@ -3,8 +3,6 @@ package ssaapi
 import (
 	"encoding/json"
 	"fmt"
-	"time"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -82,7 +80,7 @@ func buildSSARisk(
 	if progName == "" {
 		return nil
 	}
-	riskCodeRange, CodeFragment := CoverCodeRange(value.GetRange())
+	riskCodeRange, CodeFragment := CoverCodeRange(progName, value.GetRange())
 	rule := result.rule
 	newSSARisk := &schema.SSARisk{
 		CodeSourceUrl: utils.EscapeInvalidUTF8Byte([]byte(riskCodeRange.URL)),
@@ -156,10 +154,6 @@ func buildSSARisk(
 		newSSARisk.Language,
 		newSSARisk.Title,
 	)
-
-	// 设置任务名称
-	// TODO: 可能后面发起扫描任务用户可以自己设置扫描名称
-	newSSARisk.TaskName = time.Now().Format("2006-01-02 15:04:05")
 
 	return newSSARisk
 }
