@@ -15,7 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed liteforge_image.schema.json
+//go:embed liteforge_schema/liteforge_image.schema.json
 var IMAGE_OUTPUT_SCHEMA string
 
 // TemporalQualifier represents the temporal nature of a relationship
