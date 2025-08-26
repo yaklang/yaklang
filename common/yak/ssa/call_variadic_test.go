@@ -50,3 +50,33 @@ println(getPacketPipeline("123", func(){
 		}
 	}
 }
+
+func TestVariadicParameterInClosure(t *testing.T) {
+	code := `
+(op...) => {
+    wg = sync.NewSizedWaitGroup(20)
+    wg.Add()
+    wg.Wait()
+}
+`
+
+	programName := uuid.NewString()
+	prog, err := ssaapi.Parse(code,
+		ssaapi.WithLanguage(ssaapi.Yak),
+	)
+	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 检查是否有错误
+	errors := prog.GetErrors()
+	for _, err := range errors {
+		t.Logf("Error: %s", err.String())
+		// 检查是否包含我们期望修复的错误 对于不包含variadic param的函数调用，不应该将函数调用传参中额外封装make
+		if err.String() == "[]any" {
+			t.Errorf("Bug still exists: %s", err.String())
+		}
+	}
+}
