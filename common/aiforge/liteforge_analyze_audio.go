@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-//go:embed liteforge_audio.schema.json
+//go:embed liteforge_schema/liteforge_audio.schema.json
 var AUDIO_OUTPUT_SCHEMA string
 
 type TimelineSegment struct {

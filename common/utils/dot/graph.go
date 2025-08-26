@@ -1,6 +1,7 @@
 package dot
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/samber/lo"
 	"io"
@@ -365,6 +366,12 @@ func (g *Graph) drawIndent(w io.Writer, indent int) io.Writer {
 
 func (g *Graph) GenerateDOT(w io.Writer) {
 	g.generateDot(0, w)
+}
+
+func (g *Graph) GenerateDOTString() string {
+	var buf bytes.Buffer
+	g.GenerateDOT(&buf)
+	return buf.String()
 }
 
 type attributes struct {

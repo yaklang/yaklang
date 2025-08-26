@@ -5,16 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/embedding"
-	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/aiforge/knowledgalchemist"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/schema"
 	"math/rand"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -533,54 +527,5 @@ func TestAITaskForgeTriage(t *testing.T) {
 				InteractiveJSONInput: `{"suggestion": "xss"}`,
 			})
 		}
-	}
-}
-
-func TestRefine_Smoke(t *testing.T) {
-	if utils.InGithubActions() {
-		t.SkipNow()
-	}
-	// Setup in-memory sqlite DB
-	db, err := gorm.Open("sqlite3", filepath.Join(consts.GetDefaultYakitBaseTempDir(), "test_knowledge_alchemist.db"))
-	if err != nil {
-		t.Fatalf("failed to open in-memory db: %v", err)
-	}
-	db = db.AutoMigrate(&schema.KnowledgeBaseEntry{}, &schema.KnowledgeBaseInfo{}, &schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
-	defer db.Close()
-
-	baseUrl := "http://127.0.0.1:8080"
-	apikey := "none"
-	modelName := "Qwen3-Embedding-0.6B-Q4_K_M.gguf"
-
-	ka := knowledgalchemist.NewKnowledgeAlchemist(
-		knowledgalchemist.WithTimeTriggerInterval(10),
-		knowledgalchemist.WithChunkSize(32),
-		knowledgalchemist.WithConcurrent(20),
-		knowledgalchemist.WithExtendVectorEmbeddingOptions([]any{
-			rag.WithEmbeddingClient(
-				embedding.NewOpenaiEmbeddingClient(
-					aispec.WithBaseURL(baseUrl),
-					aispec.WithAPIKey(apikey),
-					aispec.WithModel(modelName))),
-		}),
-	)
-
-	ctx := context.Background()
-
-	ragSys, err := ka.Refine(ctx, db, "../../vtestdata/zwb.pdf")
-	if err != nil {
-		t.Fatal(err)
-	} else {
-		t.Log("Refine completed successfully")
-	}
-	_ = ragSys
-
-	results, err := ragSys.QueryWithPage("第三方管理", 1, 1000)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for _, result := range results {
-		fmt.Println(result.Document.Metadata["knowledge_title"])
 	}
 }

@@ -14,10 +14,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-//go:embed liteforge_refine.schema.json
+//go:embed liteforge_schema/liteforge_refine.schema.json
 var refineSchema string
 
-//go:embed liteforge_refine_prompt.txt
+//go:embed liteforge_prompt/liteforge_refine_prompt.txt
 var refinePrompt string
 
 func Refine(path string, option ...any) (*knowledgebase.KnowledgeBase, error) {
@@ -29,10 +29,15 @@ func Refine(path string, option ...any) (*knowledgebase.KnowledgeBase, error) {
 		return nil, utils.Errorf("failed to start analyze video: %v", err)
 	}
 
-	return RefineEx(analyzeResult, consts.GetGormProfileDatabase(), option...)
+	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option)
+	if err != nil {
+		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
+	}
+
+	return RefineEx(ermResult, consts.GetGormProfileDatabase(), option...)
 }
 
-func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowledgebase.KnowledgeBase, error) {
+func RefineEx(input <-chan *ERMAnalysisResult, db *gorm.DB, options ...any) (*knowledgebase.KnowledgeBase, error) {
 	refineConfig := NewRefineConfig(options...)
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
 
@@ -52,6 +57,7 @@ func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowle
 	count := 0
 	wg := sync.WaitGroup{}
 	startOnce := &sync.Once{}
+
 	for v := range input {
 		startOnce.Do(func() {
 			refineConfig.AnalyzeStatusCard("Refine", "refining chunks")
