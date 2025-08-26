@@ -69,6 +69,8 @@ func ConvertYBPAIStartParamsToReActOptions(i *ypb.AIStartParams) []Option {
 	} else {
 		opts = append(opts, WithUserInteractive(true))
 	}
+
+	return opts
 }
 
 type ReActConfig struct {
@@ -105,7 +107,6 @@ type ReActConfig struct {
 	debugPrompt  bool
 
 	// Tool review and interaction
-	enableToolReview   bool // Enable tool use review
 	enableUserInteract bool // Enable user interaction for tool review
 	enablePlanAndExec  bool // Enable plan and execution mode
 
@@ -113,8 +114,7 @@ type ReActConfig struct {
 	epm *aicommon.EndpointManager
 
 	// Auto approve tool usage in non-interactive mode
-	reviewPolicy string
-	autoAIReview bool // Enable automatic AI review for tool usage
+	reviewPolicy aicommon.AgreePolicyType
 
 	// ReAct specific settings
 	maxIterations int
@@ -162,12 +162,6 @@ func WithContext(ctx context.Context) Option {
 		if ctx != nil {
 			cfg.ctx = ctx
 		}
-	}
-}
-
-func WithAutoAIReview(enabled bool) Option {
-	return func(cfg *ReActConfig) {
-		cfg.autoAIReview = enabled
 	}
 }
 
@@ -250,19 +244,24 @@ func WithLanguage(lang string) Option {
 	}
 }
 
+func WithReviewPolicy(policy aicommon.AgreePolicyType) Option {
+	return func(cfg *ReActConfig) {
+		switch policy {
+		case aicommon.AgreePolicyYOLO, aicommon.AgreePolicyAuto, aicommon.AgreePolicyAI, aicommon.AgreePolicyAIAuto, aicommon.AgreePolicyManual:
+			cfg.reviewPolicy = policy
+		default:
+			log.Warnf("Invalid review policy: %s, defaulting to manual", policy)
+			cfg.reviewPolicy = aicommon.AgreePolicyManual
+		}
+	}
+}
+
 // WithTopToolsCount sets the number of top tools to display in prompt
 func WithTopToolsCount(count int) Option {
 	return func(cfg *ReActConfig) {
 		if count > 0 {
 			cfg.topToolsCount = count
 		}
-	}
-}
-
-// WithToolReview enables tool use review functionality
-func WithToolReview(enabled bool) Option {
-	return func(cfg *ReActConfig) {
-		cfg.enableToolReview = enabled
 	}
 }
 
@@ -436,7 +435,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		reviewPolicy:                "manual",
+		reviewPolicy:                aicommon.AgreePolicyManual,
 		maxIterations:               100,
 		memory:                      aid.GetDefaultMemory(), // Initialize with default memory
 		language:                    "zh",                   // Default to Chinese
@@ -450,7 +449,6 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		userInteractiveLimitedTimes: 3, // Default to 3 times
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
-		enableToolReview:            true,
 	}
 
 	// Initialize emitter
@@ -487,13 +485,6 @@ func NewReActConfig(ctx context.Context, opts ...Option) *ReActConfig {
 	}
 
 	return config
-}
-
-// WithAutoApproveTools enables automatic tool approval (for non-interactive mode)
-func WithAutoApproveTools() Option {
-	return func(cfg *ReActConfig) {
-		cfg.autoApproveTools = true
-	}
 }
 
 func WithGuardianEventTrigger(i schema.EventType, callback aicommon.GuardianEventTrigger) Option {

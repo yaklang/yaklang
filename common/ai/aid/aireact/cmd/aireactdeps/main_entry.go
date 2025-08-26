@@ -254,21 +254,11 @@ func buildReActOptions(ctx context.Context, aiCallback aicommon.AICallbackType, 
 		aireact.WithMaxIterations(5),
 		aireact.WithLanguage(config.Language),
 		aireact.WithTopToolsCount(100),
-		aireact.WithAutoAIReview(true),
+		aireact.WithReviewPolicy(aicommon.AgreePolicyAI),
 		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
 		aireact.WithBuiltinTools(),
 	}
-
-	// 根据交互模式配置工具审核
-	if config.InteractiveMode {
-		log.Info("Configuring interactive tool review mode")
-		options = append(options, aireact.WithToolReview(true))
-	} else {
-		log.Info("Configuring non-interactive mode")
-		options = append(options, aireact.WithAutoApproveTools())
-	}
-
 	return options
 }
