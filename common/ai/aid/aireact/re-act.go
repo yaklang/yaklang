@@ -45,12 +45,30 @@ type ReAct struct {
 	promptManager *PromptManager
 
 	// 任务队列相关
-	currentTask          *Task      // 当前正在处理的任务
+	currentTask          *Task // 当前正在处理的任务
+	currentPlanExecution *Task
 	taskQueue            *TaskQueue // 任务队列
 	queueProcessor       sync.Once  // 确保队列处理器只启动一次
 	timeline             *aicommon.Timeline
 	mirrorMutex          sync.RWMutex
 	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
+}
+
+func (r *ReAct) SetCurrentPlanExecutionTask(t *Task) {
+	if r == nil {
+		return
+	}
+	r.currentPlanExecution = t
+}
+
+func (r *ReAct) GetCurrentPlanExecutionTask() *Task {
+	if r == nil {
+		return nil
+	}
+	if r.currentPlanExecution == nil {
+		return nil
+	}
+	return r.currentPlanExecution
 }
 
 func (r *ReAct) RegisterMirrorOfAIInputEvent(id string, f func(*ypb.AIInputEvent)) {

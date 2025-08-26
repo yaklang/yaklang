@@ -71,8 +71,8 @@ func (r *ReAct) generateMainLoopPrompt(
 	tools []*aitool.Tool,
 ) string {
 	// Generate prompt for main loop
-	var enableUserInteractive bool = true
-	if r.currentUserInteractiveCount >= r.config.userInteractiveLimitedTimes {
+	var enableUserInteractive = r.config.enableUserInteract
+	if enableUserInteractive && (r.currentUserInteractiveCount >= r.config.userInteractiveLimitedTimes) {
 		enableUserInteractive = false
 	}
 
@@ -80,6 +80,7 @@ func (r *ReAct) generateMainLoopPrompt(
 	prompt, err := r.promptManager.GenerateLoopPrompt(
 		userQuery,
 		enableUserInteractive,
+		r.config.enablePlanAndExec,
 		r.currentUserInteractiveCount,
 		r.config.userInteractiveLimitedTimes,
 		tools,
@@ -95,6 +96,14 @@ func (r *ReAct) generateMainLoopPrompt(
 // executeMainLoop executes the main ReAct loop
 func (r *ReAct) executeMainLoop(userQuery string) error {
 	currentTask := r.GetCurrentTask()
+
+	skipContextCancel := utils.NewAtomicBool()
+	defer func() {
+		if skipContextCancel.IsSet() {
+			return
+		}
+		currentTask.Cancel()
+	}()
 
 	// Reset iteration state for new conversation
 	r.currentIteration = 0
@@ -167,8 +176,8 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			if !directlyAnswerRequired {
 				payload.WriteString(toolcallResult.StringWithoutID())
 			} else {
-				// handle directly answer requred
-				// force
+				// handle directly answer required
+				// forcely set satisfied to true
 			}
 
 			// Tool executed successfully, now verify if user needs are satisfied
@@ -187,9 +196,24 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			}
 		case ActionRequestPlanExecution:
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
+			if r.GetCurrentPlanExecutionTask() != nil {
+				// ask user to determine kill or wait
+			}
+			r.SetCurrentPlanExecutionTask(currentTask)
 			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)
-			if err := r.invokePlanAndExecute(planPayload); err != nil {
-				log.Errorf("Plan execution failed: %v", err)
+			skipContextCancel.SetTo(true) // Plan execution will manage the context
+			taskStarted := make(chan struct{})
+			go func() {
+				defer func() {
+					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
+					r.SetCurrentPlanExecutionTask(nil)
+				}()
+				if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), planPayload); err != nil {
+					log.Errorf("Plan execution failed: %v", err)
+				}
+			}()
+			select {
+			case <-taskStarted:
 			}
 		case ActionAskForClarification:
 			suggestion := r.invokeAskForClarification(action)

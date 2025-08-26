@@ -59,6 +59,18 @@ func (t *ReactTask) GetName() string {
 	return t.name
 }
 
+func ConvertYBPAIStartParamsToReActOptions(i *ypb.AIStartParams) []Option {
+	opts := make([]Option, 0)
+	if i == nil {
+		return opts
+	}
+	if i.DisallowRequireForUserPrompt {
+		opts = append(opts, WithUserInteractive(false))
+	} else {
+		opts = append(opts, WithUserInteractive(true))
+	}
+}
+
 type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
@@ -93,14 +105,16 @@ type ReActConfig struct {
 	debugPrompt  bool
 
 	// Tool review and interaction
-	enableToolReview bool // Enable tool use review
+	enableToolReview   bool // Enable tool use review
+	enableUserInteract bool // Enable user interaction for tool review
+	enablePlanAndExec  bool // Enable plan and execution mode
 
 	// Interactive features
 	epm *aicommon.EndpointManager
 
 	// Auto approve tool usage in non-interactive mode
-	autoApproveTools bool
-	autoAIReview     bool // Enable automatic AI review for tool usage
+	reviewPolicy string
+	autoAIReview bool // Enable automatic AI review for tool usage
 
 	// ReAct specific settings
 	maxIterations int
@@ -422,7 +436,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		autoApproveTools:            false,
+		reviewPolicy:                "manual",
 		maxIterations:               100,
 		memory:                      aid.GetDefaultMemory(), // Initialize with default memory
 		language:                    "zh",                   // Default to Chinese
@@ -434,6 +448,9 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		timelineContentSizeLimit:    50 * 1024, // Default limit for 50k
 		guardian:                    aicommon.NewAsyncGuardian(ctx, id),
 		userInteractiveLimitedTimes: 3, // Default to 3 times
+		enablePlanAndExec:           true,
+		enableUserInteract:          true,
+		enableToolReview:            true,
 	}
 
 	// Initialize emitter
@@ -501,6 +518,25 @@ func WithUserInteractiveLimitedTimes(times int64) Option {
 			cfg.userInteractiveLimitedTimes = times
 		} else {
 			cfg.userInteractiveLimitedTimes = 3 // Default to 3 if not set
+		}
+	}
+}
+
+func WithUserInteractive(enabled ...bool) Option {
+	return func(cfg *ReActConfig) {
+		cfg.enableUserInteract = true
+		if len(enabled) > 0 {
+			cfg.enableUserInteract = enabled[0]
+		}
+	}
+}
+
+func WithReActAllowPlanAndExec(enabled ...bool) Option {
+	return func(cfg *ReActConfig) {
+		// This is a placeholder for future implementation
+		cfg.enablePlanAndExec = true
+		if len(enabled) > 0 {
+			cfg.enablePlanAndExec = enabled[0]
 		}
 	}
 }
