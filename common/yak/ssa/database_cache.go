@@ -131,6 +131,7 @@ func (c *ProgramCache) AddVariable(name string, inst Instruction) {
 			member, _ = strings.CutSuffix(memberKey, "]")
 		}
 	}
+	name = strings.TrimPrefix(name, "$")
 	if member != "" {
 		c.MemberIndex.Add(member, inst)
 	} else {
@@ -150,7 +151,7 @@ func (c *ProgramCache) RemoveVariable(name string, inst Instruction) {
 			member, _ = strings.CutSuffix(memberKey, "]")
 		}
 	}
-
+	name = strings.TrimPrefix(name, "$")
 	if member != "" {
 		c.MemberIndex.Delete(member, inst)
 	} else {
