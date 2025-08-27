@@ -308,6 +308,19 @@ func (r *Report) Save() int {
 	return int(record.ID)
 }
 
+func (r *Report) SaveForIRify() int {
+	db := GetDefaultSSADatabase()
+
+	record, err := r.ToRecord()
+	if err != nil {
+		return 0
+	}
+	if db != nil {
+		db.Save(record)
+	}
+	return int(record.ID)
+}
+
 type ReportItem struct {
 	Type    string `json:"type"`
 	Content string `json:"content"`

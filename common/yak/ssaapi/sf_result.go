@@ -224,6 +224,36 @@ func (r *SyntaxFlowResult) GetProgramName() string {
 	return ""
 }
 
+func (r *SyntaxFlowResult) GetProgramLang() string {
+	if r == nil {
+		return ""
+	}
+	if r.program != nil {
+		return r.program.GetLanguage()
+	}
+	return ""
+}
+
+func (r *SyntaxFlowResult) GetFileCount() int {
+	if r == nil {
+		return 0
+	}
+	if r.program != nil {
+		return len(r.program.Program.FileList)
+	}
+	return 0
+}
+
+func (r *SyntaxFlowResult) GetLineCount() int {
+	if r == nil {
+		return 0
+	}
+	if r.program != nil {
+		return r.program.Program.LineCount
+	}
+	return 0
+}
+
 func (r *SyntaxFlowResult) GetRule() *schema.SyntaxFlowRule {
 	return r.rule
 }
