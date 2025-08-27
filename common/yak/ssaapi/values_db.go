@@ -7,7 +7,6 @@ import (
 	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/graph"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -113,19 +112,24 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if saveValueConfig.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
-	// log.Infof("SaveValue: %v: %v", ctx, value)
-	err := graph.BuildGraphWithDFS[*ssadb.AuditNode, *Value](
-		saveValueConfig.ctx,
-		value,
-		saveValueConfig.SaveNode,
-		saveValueConfig.getNeighbors,
-		saveValueConfig.SaveEdge,
-	)
+	err := value.GenerateGraph(NewDBGraph(saveValueConfig))
 	return err
 }
 
-func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
-	if node, ok := s.visitedNode[value]; ok {
+type DBGraph struct {
+	*saveValueCtx
+}
+
+var _ Graph = (*DBGraph)(nil)
+
+func NewDBGraph(ctx *saveValueCtx) *DBGraph {
+	return &DBGraph{
+		saveValueCtx: ctx,
+	}
+}
+
+func (g *DBGraph) createNode(value *Value) (*ssadb.AuditNode, error) {
+	if node, ok := g.visitedNode[value]; ok {
 		return node, nil
 	}
 	if value == nil {
@@ -133,8 +137,8 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 	}
 
 	an := &ssadb.AuditNode{
-		AuditNodeStatus: s.AuditNodeStatus,
-		IsEntryNode:     value == s.entryValue,
+		AuditNodeStatus: g.AuditNodeStatus,
+		IsEntryNode:     ValueCompare(value, g.entryValue),
 		IRCodeID:        value.GetId(),
 		TmpStartOffset:  -1,
 		TmpEndOffset:    -1,
@@ -154,126 +158,33 @@ func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
 			an.TmpEndOffset = R.GetEndOffset()
 		}
 	}
-	if ret := s.db.Save(an).Error; ret != nil {
+	if ret := g.db.Save(an).Error; ret != nil {
 		return nil, utils.Wrap(ret, "save AuditNode")
 	}
-	s.visitedNode[value] = an
+	g.visitedNode[value] = an
 	return an, nil
 }
 
-func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
-	if value == nil {
-		return nil
+func (g *DBGraph) CreateEdge(edge Edge) error {
+	fromNode, err := g.createNode(edge.From)
+	if err != nil {
+		return utils.Errorf("create from node failed: %v", err)
+	}
+	toNode, err := g.createNode(edge.To)
+	if err != nil {
+		return utils.Errorf("create to node failed: %v", err)
 	}
 
-	var res []*graph.Neighbor[*Value]
-	for _, pred := range value.GetPredecessors() {
-		if pred.Node == nil {
-			continue
-		}
-		label := pred.Info.Label
-		if IsDataFlowLabel(label) {
-			var neighbor *graph.Neighbor[*Value]
-			if s.saveDataFlow(pred.Node, value, label) {
-				neighbor = graph.NewNeighbor(pred.Node, "") // ignore this edge in dot graph
-			} else {
-				neighbor = graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
-			}
-			neighbor.AddExtraMsg("label", pred.Info.Label)
-			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
-			res = append(res, neighbor)
-		} else {
-			neighbor := graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
-			neighbor.AddExtraMsg("label", pred.Info.Label)
-			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
-			res = append(res, neighbor)
-		}
-	}
-	return res
-}
-
-// from is the source node, to is the target node, from -> xxx -> to
-func (s *saveValueCtx) saveDataFlow(from *Value, to *Value, label string) bool {
-	var getNext func(v *Value) []*Value
-	var saveNode func(from, to *ssadb.AuditNode)
-
-	switch label {
-	case Predecessors_TopDefLabel:
-		getNext = func(v *Value) []*Value {
-			return v.GetDependOn()
-		}
-		saveNode = func(from, to *ssadb.AuditNode) {
-			s.SaveEdge(from, to, EdgeTypeDependOn, nil)
-			s.SaveEdge(to, from, EdgeTypeEffectOn, nil)
-		}
-	case Predecessors_BottomUseLabel:
-		getNext = func(v *Value) []*Value {
-			return v.GetEffectOn()
-		}
-		saveNode = func(from, to *ssadb.AuditNode) {
-			s.SaveEdge(from, to, EdgeTypeEffectOn, nil)
-			s.SaveEdge(to, from, EdgeTypeDependOn, nil)
-		}
-	default:
-		return false
-	}
-
-	var paths [][]*Value
-	ctx, cancel := context.WithTimeout(context.Background(), MAXTime)
-	_ = cancel
-	paths = graph.GraphPathWithTarget(ctx, from, to, func(v *Value) []*Value {
-		return getNext(v)
-	})
-
-	totalElements := 0
-	for _, innerSlice := range paths {
-		totalElements += len(innerSlice) // 累加所有内层切片长度
-	}
-
-	if totalElements == 0 {
-		log.Warnf("saveDataFlow:  paths is empty, maybe timeout")
-		return false
-	}
-	if totalElements > MaxPathElements {
-		log.Warnf("saveDataFlow:  paths is too many: %v", totalElements)
-		return false
-	}
-
-	for _, path := range paths {
-		// log.Infof("saveDataFlow: %v", path)
-		// save dataflow path
-		for i := 0; i < len(path)-1; i++ {
-			fromNode, err := s.SaveNode(path[i])
-			if err != nil {
-				log.Errorf("failed to save node: %v", err)
-				continue
-			}
-
-			toNode, err := s.SaveNode(path[i+1])
-			if err != nil {
-				log.Errorf("failed to save node: %v", err)
-				continue
-			}
-			saveNode(fromNode, toNode)
-		}
-	}
-
-	return true
-}
-
-func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edgeType string, extraMsg map[string]interface{}) {
-	if from == nil || to == nil {
-		return
-	}
-	switch ValidEdgeType(edgeType) {
+	msg := edge.Msg
+	switch edge.Kind {
 	case EdgeTypeDependOn:
-		edge := from.CreateDependsOnEdge(s.ProgramName, to.ID)
-		if err := s.db.Save(edge).Error; err != nil {
+		edge := fromNode.CreateDependsOnEdge(g.ProgramName, toNode.ID)
+		if err := g.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	case EdgeTypeEffectOn:
-		edge := from.CreateEffectsOnEdge(s.ProgramName, to.ID)
-		if err := s.db.Save(edge).Error; err != nil {
+		edge := fromNode.CreateEffectsOnEdge(g.ProgramName, toNode.ID)
+		if err := g.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	case EdgeTypePredecessor:
@@ -281,13 +192,18 @@ func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edge
 			label string
 			step  int64
 		)
-		if extraMsg != nil {
-			label = extraMsg["label"].(string)
-			step = extraMsg["step"].(int64)
+		if msg != nil {
+			if l, ok := msg["label"].(string); ok {
+				label = l
+			}
+			if s, ok := msg["step"].(int64); ok {
+				step = s
+			}
 		}
-		edge := from.CreatePredecessorEdge(s.ProgramName, to.ID, step, label)
-		if err := s.db.Save(edge).Error; err != nil {
+		edge := fromNode.CreatePredecessorEdge(g.ProgramName, toNode.ID, step, label)
+		if err := g.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	}
+	return nil
 }
