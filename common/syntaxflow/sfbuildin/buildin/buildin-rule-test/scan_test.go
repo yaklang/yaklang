@@ -57,7 +57,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
 	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
-	ruleName := "检测Java Cipher使用不安全或有风险的加密算法"
+	ruleName := "检测Java拼接SQL字符串漏洞"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {

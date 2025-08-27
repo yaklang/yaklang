@@ -95,6 +95,9 @@ func (g *DotGraph) NodeName(v *Value) string {
 	return dot.NodeName(id)
 }
 
+func (g *DotGraph) NodeCount() int {
+	return len(g.value2Node)
+}
 func (g *DotGraph) ForEach(f func(string, *Value)) {
 	for value, id := range g.value2Node {
 		idStr := dot.NodeName(id)

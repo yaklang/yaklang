@@ -527,7 +527,7 @@ func checkFunctionEx(
 	return nil
 }
 
-func checkResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult, isStrict bool) (errs error) {
+func checkRuleResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult, isStrict bool) (errs error) {
 	defer func() {
 		if errs != nil {
 			fs := verifyFs.GetVirtualFs()
@@ -676,7 +676,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 			if err != nil {
 				return utils.Errorf("syntax flow content failed: %v", err)
 			}
-			if err := checkResult(f, rule, result, isStrict); err != nil {
+			if err := checkRuleResult(f, rule, result, isStrict); err != nil {
 				errs = utils.JoinErrors(errs, err)
 			}
 
@@ -685,7 +685,7 @@ func EvaluateVerifyFilesystemWithRule(rule *schema.SyntaxFlowRule, t require.Tes
 			if err != nil {
 				return utils.Errorf("syntax flow rule failed: %v", err)
 			}
-			if err := checkResult(f, rule, result2, isStrict); err != nil {
+			if err := checkRuleResult(f, rule, result2, isStrict); err != nil {
 				errs = utils.JoinErrors(errs, err)
 			}
 
@@ -748,48 +748,4 @@ func EvaluateVerifyFilesystem(i string, t require.TestingT, isStrict bool) error
 	}
 
 	return EvaluateVerifyFilesystemWithRule(frame.GetRule(), t, isStrict)
-}
-
-// EdgeInfo represents information about an edge in dot graph
-type EdgeInfo struct {
-	From  string
-	To    string
-	Label string
-}
-
-// CheckSyntaxFlowDotGraph checks if the SyntaxFlow result contains dot graphs with specified edges
-func CheckSyntaxFlowDotGraph(
-	t *testing.T,
-	code string,
-	sfRule string,
-	showDot bool,
-	wants map[string][]EdgeInfo,
-	opt ...ssaapi.Option,
-) {
-	Check(t, code, func(prog *ssaapi.Program) error {
-		values, err := prog.SyntaxFlowWithError(sfRule)
-		require.NoError(t, err)
-
-		for variableName, expectedEdges := range wants {
-			result := values.GetValues(variableName)
-			require.Greater(t, result.Len(), 0)
-			result.Show()
-			dotGraph := ssaapi.NewValuesGraph(
-				result,
-				ssaapi.WithValueGraphEdgeMode(ssaapi.EdgeModeOnlyDependOn), // 为了方便测试，路径统一了方向
-			)
-			if showDot {
-				fmt.Printf("------VariableName:%s-------\n", variableName)
-				dotGraph.ShowDot()
-			}
-
-			for _, expectedEdge := range expectedEdges {
-				hasEdge := dotGraph.HasEdgeContainLabel(expectedEdge.From, expectedEdge.To, expectedEdge.Label)
-				require.True(t, hasEdge,
-					"Should find edge from '%s' to '%s' with label '%s' in at least one dot graph",
-					expectedEdge.From, expectedEdge.To, expectedEdge.Label)
-			}
-		}
-		return nil
-	}, opt...)
 }

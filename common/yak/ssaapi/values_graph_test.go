@@ -5,19 +5,33 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
-
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
+
+func TestAnalyzeGraph(t *testing.T) {
+	code := `
+f0 = (a0) => a0 + 1
+f1 = (a1) => f(a1) + 2 
+
+a = f1(3)
+`
+
+	rule := `a as $a; $a #->?{have:"3"} as $target`
+	ssatest.CheckSyntaxFlowGraph(t, code, rule, map[string]func(g *ssatest.GraphInTest){
+		"target": func(g *ssatest.GraphInTest) {
+			g.Check(t, "f1(3)", "(a1) => f(a1) + 2")
+			g.Check(t, "f(a1)", "3")
+		},
+	})
+}
 
 func TestGraph(t *testing.T) {
 	vf := filesys.NewVirtualFs()
@@ -255,7 +269,7 @@ func login(w http.ResponseWriter, r *http.Request) {
         password := r.FormValue("password")
 
         // 不安全的 SQL 查询
-		// depth > 10 
+		// depth > 10
         query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
 		query = fmt.Sprintf(query)
 		query = fmt.Sprintf(query)
@@ -325,7 +339,7 @@ func login(w http.ResponseWriter, r *http.Request) {
         password := r.FormValue("password")
 
         // 不安全的 SQL 查询
-		// depth > 10 
+		// depth > 10
         query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
         err = db.QueryRow(query).Scan(&userID)
         if err != nil {
