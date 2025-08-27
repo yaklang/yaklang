@@ -282,6 +282,14 @@ func (m *Memory) Timeline() string {
 	return m.timeline.Dump()
 }
 
+func (m *Memory) GetTimelineInstance() *aicommon.Timeline {
+	return m.timeline
+}
+
+func (m *Memory) PushText(id int64, i any) {
+	m.timeline.PushText(id, utils.InterfaceToString(i))
+}
+
 func (m *Memory) TimelineWithout(n ...any) string {
 	defer func() {
 		if r := recover(); r != nil {

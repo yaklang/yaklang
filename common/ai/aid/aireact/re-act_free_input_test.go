@@ -46,7 +46,7 @@ func TestReAct_FreeInput(t *testing.T) {
 	}
 	_ = ins
 	go func() {
-		for i := 0; i < 3; i++ {
+		for i := 0; i < 1; i++ {
 			in <- &ypb.AIInputEvent{
 				IsFreeInput: true,
 				FreeInput:   "abc",
@@ -67,6 +67,11 @@ LOOP:
 				result := jsonpath.FindFirst(e.GetContent(), "$..result")
 				if strings.Contains(utils.InterfaceToString(result), flag) {
 					haveResult = true
+				}
+			}
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
 					break LOOP
 				}
 			}
@@ -78,6 +83,11 @@ LOOP:
 	if !haveResult {
 		t.Fatal("Expected to have at least one result event, but got none")
 	}
+	timeline := ins.DumpTimeline()
+	if !strings.Contains(timeline, flag) {
+		t.Fatal("timeline does not contain flag", flag)
+	}
+	fmt.Println(timeline)
 }
 
 func TestReAct_FreeInput_MultiCalls(t *testing.T) {
@@ -136,5 +146,5 @@ LOOP:
 		t.Fatal("Expected to have at least one result event, but got none")
 	}
 
-	fmt.Println(ins.timeline.Dump())
+	fmt.Println(ins.DumpTimeline())
 }

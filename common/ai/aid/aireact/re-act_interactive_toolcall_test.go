@@ -34,6 +34,15 @@ func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, too
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied", "reasoning") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "abc-mocked-reason"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	fmt.Println("Unexpected prompt:", prompt)
+
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
@@ -65,7 +74,6 @@ func TestReAct_ToolUse(t *testing.T) {
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
-		WithDebug(true),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
@@ -114,7 +122,13 @@ LOOP:
 
 			if e.Type == string(schema.EVENT_TOOL_CALL_DONE) {
 				toolCallOutputEvent = true
-				break LOOP
+			}
+
+			if e.NodeId == "react_task_status_changed" {
+				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
+				if utils.InterfaceToString(result) == "completed" {
+					break LOOP
+				}
 			}
 		case <-after:
 			break LOOP
@@ -137,4 +151,9 @@ LOOP:
 	if !toolCallOutputEvent {
 		t.Fatal("Expected to have at least one output event, but got none")
 	}
+
+	fmt.Println("--------------------------------------")
+	tl := ins.DumpTimeline()
+	fmt.Println(tl)
+	fmt.Println("--------------------------------------")
 }

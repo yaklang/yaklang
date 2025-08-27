@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"sync"
@@ -49,9 +50,15 @@ type ReAct struct {
 	currentPlanExecution *Task
 	taskQueue            *TaskQueue // 任务队列
 	queueProcessor       sync.Once  // 确保队列处理器只启动一次
-	timeline             *aicommon.Timeline
 	mirrorMutex          sync.RWMutex
 	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
+}
+
+func (r *ReAct) DumpTimeline() string {
+	if r == nil || r.config == nil || r.config.memory == nil {
+		return ""
+	}
+	return r.config.memory.Timeline()
 }
 
 func (r *ReAct) SetCurrentPlanExecutionTask(t *Task) {
@@ -98,7 +105,6 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
 		taskQueue:            NewTaskQueue("react-main-queue"),
-		timeline:             aicommon.NewTimeline(cfg.timelineLimit, cfg, nil),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 	}
 
@@ -156,21 +162,31 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) (ret error) {
 }
 
 // addToTimeline 添加条目到时间线
-func (r *ReAct) addToTimeline(entryType, content, taskID string) {
-	r.timeline.PushText(
-		r.config.AcquireId(),
-		"[type:%v] [id:%v] content: %v",
-		entryType, taskID, content,
-	)
+func (r *ReAct) addToTimeline(entryType, content string) {
+	msg := new(bytes.Buffer)
+	if entryType != "" {
+		msg.WriteString(fmt.Sprintf("[%s]", entryType))
+	} else {
+		msg.WriteString("[note]")
+	}
+
+	t := r.GetCurrentTask()
+	if t != nil {
+		msg.WriteString(fmt.Sprintf(" [task:%s]:\n", t.GetId()))
+	} else {
+		msg.WriteString(":\n")
+	}
+	msg.WriteString(utils.PrefixLines(content, "  "))
+	r.config.memory.PushText(r.config.AcquireId(), msg.String())
 }
 
 // getTimeline 获取时间线信息（可选择限制数量）
 func (r *ReAct) getTimeline(lastN int) []*aicommon.TimelineItemOutput {
-	return r.timeline.ToTimelineItemOutputLastN(lastN)
+	return r.config.memory.GetTimelineInstance().ToTimelineItemOutputLastN(lastN)
 }
 
 func (r *ReAct) getTimelineTotal() int {
-	return r.timeline.GetIdToTimelineItem().Len()
+	return r.config.memory.GetTimelineInstance().GetIdToTimelineItem().Len()
 }
 
 // startQueueProcessor 启动任务队列处理器
