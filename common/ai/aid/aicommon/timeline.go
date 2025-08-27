@@ -180,7 +180,15 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 		now = time.Now()
 		ts = now.UnixMilli()
 	}
-	m.idToTs.Set(toolResult.GetID(), ts)
+	id := toolResult.GetID()
+	if id <= 0 {
+		log.Warnf("push tool result to timeline but id is invalid, id: %v", id)
+		return
+	}
+	if m.idToTs.Have(id) {
+		log.Warnf("push tool result to timeline but id already exist, id: %v", id)
+	}
+	m.idToTs.Set(id, ts)
 
 	item := &TimelineItem{
 		createdAt: now,

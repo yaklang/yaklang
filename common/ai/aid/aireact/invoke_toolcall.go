@@ -39,6 +39,10 @@ func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, er
 		return nil, false, utils.Errorf("tool call failed: %v", err)
 	}
 
+	if result.GetID() <= 0 {
+		result.ID = r.config.AcquireId()
+	}
+
 	// Handle the result
 	if directlyAnswer {
 		r.EmitInfo("AI suggests answering directly without using additional tools")

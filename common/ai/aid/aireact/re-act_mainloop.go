@@ -112,6 +112,14 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		currentTask.Cancel()
 	}()
 
+	// show start of iteration in timeline
+	iterationTimelineInfo := utils.NewAtomicBool()
+	defer func() {
+		if iterationTimelineInfo.IsSet() {
+			r.addToTimeline("iteration", "======= ReAct loop finished END["+fmt.Sprint(r.currentIteration)+"] =======")
+		}
+	}()
+
 	// Reset iteration state for new conversation
 	r.currentIteration = 0
 	for r.currentIteration < r.config.maxIterations {
@@ -155,8 +163,9 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			log.Errorf("AI transaction failed (内置错误学习功能): %v", transactionErr)
 			continue
 		}
+		thought := action.GetString("human_readable_thought")
 		// Emit human readable thought
-		r.EmitThought(action.GetString("human_readable_thought"))
+		r.EmitThought(thought)
 		newSummary := action.GetString("cumulative_summary")
 		if newSummary != "" {
 			r.cumulativeSummary = newSummary
@@ -178,6 +187,13 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			currentTask.SetStatus(string(TaskStatus_Completed))
 			continue
 		case ActionRequireTool:
+			// allow iteration info to be added to timeline
+			r.addToTimeline("iteration", fmt.Sprintf(
+				"======== ReAct iteration %d ========\n"+
+					"%v", r.currentIteration, thought,
+			))
+			iterationTimelineInfo.SetTo(true)
+
 			toolPayload := nextAction.GetString("tool_require_payload")
 			log.Infof("Requesting tool: %s", toolPayload)
 			toolcallResult, directlyAnswerRequired, err := r.handleRequireTool(toolPayload)
