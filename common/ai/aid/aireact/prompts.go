@@ -24,12 +24,6 @@ func nonce() string {
 //go:embed prompts/loop/loop.txt
 var loopPromptTemplate string
 
-//go:embed prompts/loop/loop.json
-var loopSchemaJSON string
-
-//go:embed prompts/loop/loop_without_ask_for_clarification.json
-var loopSchemaWithoutAskForClarificationJSON string
-
 //go:embed prompts/tool-params/tool-params.txt
 var toolParamsPromptTemplate string
 
@@ -44,6 +38,9 @@ var aiReviewPromptTemplate string
 
 //go:embed prompts/review/ai-review-tool-call.json
 var aiReviewSchemaJSON string
+
+//go:embed prompts/answer/directly.txt
+var directlyAnswerPromptTemplate string
 
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
@@ -114,6 +111,26 @@ type AIReviewPromptData struct {
 	UserQuery          string
 	ToolToCall         string
 	ToolParams         string
+	Language           string
+	Schema             string
+}
+
+// DirectlyAnswerPromptData contains data for directly answer prompt template
+type DirectlyAnswerPromptData struct {
+	AllowPlan          bool
+	CurrentTime        string
+	OSArch             string
+	WorkingDir         string
+	WorkingDirGlance   string
+	Tools              []*aitool.Tool
+	ToolsCount         int
+	TopTools           []*aitool.Tool
+	TopToolsCount      int
+	HasMoreTools       bool
+	ConversationMemory string
+	Timeline           string
+	UserQuery          string
+	Nonce              string
 	Language           string
 	Schema             string
 }
@@ -243,6 +260,49 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolName, toolParams 
 	}
 
 	return pm.executeTemplate("ai-review", aiReviewPromptTemplate, data)
+}
+
+// GenerateDirectlyAnswerPrompt generates directly answer prompt using template
+func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool) (string, error) {
+	var directlyAnswerSchema = getDirectlyAnswer()
+
+	// Build template data
+	data := &DirectlyAnswerPromptData{
+		AllowPlan:     false,
+		CurrentTime:   time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:        fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:     userQuery,
+		Nonce:         utils.RandStringBytes(4),
+		Language:      pm.react.config.language,
+		Schema:        directlyAnswerSchema,
+		Tools:         tools,
+		ToolsCount:    len(tools),
+		TopToolsCount: pm.react.config.topToolsCount,
+	}
+
+	// Set working directory
+	if cwd, err := os.Getwd(); err == nil {
+		data.WorkingDir = cwd
+		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	}
+
+	// Get prioritized tools
+	if len(tools) > 0 {
+		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
+		data.HasMoreTools = len(tools) > len(data.TopTools)
+	}
+
+	// Set conversation memory
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	return pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data

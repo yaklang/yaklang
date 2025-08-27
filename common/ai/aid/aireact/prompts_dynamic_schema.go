@@ -2,6 +2,33 @@ package aireact
 
 import "github.com/yaklang/yaklang/common/ai/aid/aitool"
 
+func getDirectlyAnswer() string {
+	var opts []any
+
+	actionFields := []aitool.ToolOption{
+		aitool.WithStringParam(
+			"type",
+			aitool.WithParam_Description("You MUST use 'directly_answer' as the action type."),
+			aitool.WithParam_Enum(ActionDirectlyAnswer),
+			aitool.WithParam_Required(true),
+		),
+		aitool.WithStringParam("answer_payload", aitool.WithParam_Description("Provide the final, complete answer for the user here. The content should be self-contained and ready to be displayed."), aitool.WithParam_Required(true)),
+	}
+
+	opts = append(opts, aitool.WithStructParam(
+		"next_action",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Description("Contains the direct answer action."),
+		},
+		actionFields...,
+	), aitool.WithStringParam(
+		"cumulative_summary",
+		aitool.WithParam_Required(true),
+		aitool.WithParam_Description("An evolving summary of the conversation. Update this field to include key information from the current interaction that should be remembered for future responses. Include topics discussed, user preferences, important context, and relevant details. If this is the first interaction, create a new summary. If there's existing context, build upon it."),
+	))
+	return aitool.NewObjectSchemaWithAction(opts...)
+}
+
 func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bool) string {
 	var opts []any
 	mode := []any{
@@ -26,6 +53,11 @@ func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bo
 		actionFields,
 		aitool.WithStringParam("answer_payload", aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'directly_answer'. Provide the final, complete answer for the user here. The content should be self-contained and ready to be displayed.")),
 		aitool.WithStringParam("tool_require_payload", aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'web_search', 'database_query'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here.")),
+		aitool.WithBoolParam(
+			"middle_step",
+			aitool.WithParam_Description("CRUCIAL for multi-tool tasks. Use ONLY with 'tool_require_payload'. Set to 'true' if this tool call is an intermediate step in a sequence to solve a complex task. Set to 'false' if this is the FINAL tool call needed before you can provide the complete answer. Before starting, you should outline your multi-step plan in 'cumulative_summary'."),
+			aitool.WithParam_Required(true),
+		),
 	)
 	if !disallowPlanAndExecution {
 		actionFields = append(
