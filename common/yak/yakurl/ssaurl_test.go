@@ -21,7 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -471,7 +470,7 @@ HOOK
 
 			found := false
 			var node string
-			graphInfoMap := make(map[string]*yakurl.NodeInfo)
+			graphInfoMap := make(map[string]*ssaapi.NodeInfo)
 			for _, extra := range res[0].Extra {
 				if extra.Key == "node_id" {
 					log.Infof("graph: %v", extra.Value)
@@ -485,7 +484,7 @@ HOOK
 
 				if extra.Key == "graph_info" {
 					log.Infof("graph info: %v", extra.Value)
-					var graphInfo []*yakurl.NodeInfo
+					var graphInfo []*ssaapi.NodeInfo
 					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
 						t.Error(err)
 					}
@@ -619,7 +618,7 @@ func main() {
 
 			found := false
 			var node string
-			graphInfoMap := make(map[string]*yakurl.NodeInfo)
+			graphInfoMap := make(map[string]*ssaapi.NodeInfo)
 			for _, extra := range res[0].Extra {
 				if extra.Key == "node_id" {
 					log.Infof("graph: %v", extra.Value)
@@ -633,7 +632,7 @@ func main() {
 
 				if extra.Key == "graph_info" {
 					log.Infof("graph info: %v", extra.Value)
-					var graphInfo []*yakurl.NodeInfo
+					var graphInfo []*ssaapi.NodeInfo
 					if err := json.Unmarshal([]byte(extra.Value), &graphInfo); err != nil {
 						t.Error(err)
 					}

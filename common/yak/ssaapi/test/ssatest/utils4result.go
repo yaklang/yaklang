@@ -42,16 +42,17 @@ func CheckResult(t *testing.T, code string, rule string, handler func(*ssaapi.Sy
 		require.NoError(t, err)
 
 		// memory
-		log.Infof("only in memory")
 		handler(res)
 
 		// database
-		id, err := res.Save(schema.SFResultKindDebug)
-		require.NoError(t, err)
-		res, err = ssaapi.LoadResultByID(id)
-		require.NoError(t, err)
-		log.Infof("with database")
-		handler(res)
+		if p.GetProgramName() != "" {
+			id, err := res.Save(schema.SFResultKindDebug)
+			require.NoError(t, err)
+			res, err = ssaapi.LoadResultByID(id)
+			require.NoError(t, err)
+			log.Infof("with database")
+			handler(res)
+		}
 
 		return nil
 	}, opt...)
@@ -60,6 +61,12 @@ func CheckResult(t *testing.T, code string, rule string, handler func(*ssaapi.Sy
 type GraphInTest struct {
 	*ssaapi.DotGraph
 	edgeStr []string
+}
+
+type PathInTest struct {
+	From  string
+	To    string
+	Label string
 }
 
 func NewTestGraph() *GraphInTest {
@@ -95,16 +102,43 @@ func (g *GraphInTest) CreateEdge(edge ssaapi.Edge) error {
 	return nil
 }
 
-func (g *GraphInTest) Check(t *testing.T, from, to string) {
+func (g *GraphInTest) Check(t *testing.T, from, to string, label ...string) {
+	want := pathStr(from, to)
+	checkEdge := func(edge string) bool {
+		if !strings.Contains(edge, want) {
+			return false
+		}
+
+		if len(label) > 0 {
+			for _, l := range label {
+				if !strings.Contains(edge, l) {
+					return false
+				}
+			}
+		}
+		return true
+	}
 	match := false
 	for _, edge := range g.edgeStr {
-		want := pathStr(from, to)
-		if strings.Contains(edge, want) {
+		// check path
+		if checkEdge(edge) {
 			match = true
 			break
 		}
 	}
 	require.True(t, match)
+}
+
+func CheckSyntaxFlowGraphEdge(t *testing.T, code string, sfRule string, paths map[string][]PathInTest, opt ...ssaapi.Option) {
+	checkMap := make(map[string]func(g *GraphInTest))
+	for variable, path := range paths {
+		checkMap[variable] = func(g *GraphInTest) {
+			for _, path := range path {
+				g.Check(t, path.From, path.To, path.Label)
+			}
+		}
+	}
+	CheckSyntaxFlowGraph(t, code, sfRule, checkMap, opt...)
 }
 
 func CheckSyntaxFlowGraph(

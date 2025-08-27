@@ -1,7 +1,7 @@
 package ssaapi
 
 type GraphInfo struct {
-	NodeId    string
+	NodeID    string
 	Graph     string
 	GraphInfo []*NodeInfo
 	GraphPath [][]string
@@ -25,7 +25,7 @@ func (v *Value) GetGraphInfo(graphs ...*DotGraph) *GraphInfo {
 	}
 
 	ret := &GraphInfo{
-		NodeId:    graph.NodeName(v),
+		NodeID:    graph.NodeName(v),
 		Graph:     graph.String(),
 		GraphInfo: make([]*NodeInfo, 0),
 		GraphPath: make([][]string, 0),

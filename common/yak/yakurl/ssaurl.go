@@ -377,7 +377,7 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
 	graphInfo := value.GetGraphInfo()
 	res := createNewRes(url, 0, []extra{
-		{"node_id", graphInfo.NodeId},
+		{"node_id", graphInfo.NodeID},
 		{"graph", graphInfo.Graph},
 		{"graph_info", graphInfo.GraphInfo},
 		{"message", msg},

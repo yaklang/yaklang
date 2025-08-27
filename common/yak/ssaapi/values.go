@@ -6,6 +6,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -1265,8 +1266,35 @@ func (v Values) GetOperands() Values {
 	})
 	return ret
 }
+func (v *Value) ShowDot() {
+	dotStr := v.DotGraph()
+	dot.ShowDotGraphToAsciiArt(dotStr)
+}
 
-func (v Values) DotGraph() string {
-	vg := NewValuesGraph(v)
-	return vg.Dot()
+func (vs Values) ShowDot() Values {
+	dotStr := vs.DotGraph()
+	dot.ShowDotGraphToAsciiArt(dotStr)
+	return vs
+}
+
+func (v *Value) DotGraph() string {
+	dotGraph := v.NewDotGraph()
+	return dotGraph.String()
+}
+
+func (v *Value) NewDotGraph() *DotGraph {
+	dotGraph := NewDotGraph()
+	v.GenerateGraph(dotGraph)
+	return dotGraph
+}
+func (vs Values) NewDotGraph() *DotGraph {
+	dotGraph := NewDotGraph()
+	for _, v := range vs {
+		v.GenerateGraph(dotGraph)
+	}
+	return dotGraph
+}
+func (vs Values) DotGraph() string {
+	dotGraph := vs.NewDotGraph()
+	return dotGraph.String()
 }

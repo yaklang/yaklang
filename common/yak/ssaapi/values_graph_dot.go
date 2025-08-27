@@ -113,3 +113,15 @@ func (g *DotGraph) DeepFirstGraphPrev(value *Value) [][]string {
 		return true
 	})
 }
+
+func (g *DotGraph) DeepFirstGraphNext(value *Value) [][]string {
+	nodeID, ok := g.value2Node[value]
+	if !ok {
+		return nil
+	}
+	return dot.GraphPathNext(g.Graph, nodeID)
+}
+
+func (g *DotGraph) Show() {
+	dot.ShowDotGraphToAsciiArt(g.String())
+}

@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -99,8 +100,8 @@ func TestGraph(t *testing.T) {
 		require.NotNil(t, valueMem)
 		require.Equal(t, len(valueMem), 1)
 		value := valueMem[0]
-		graph := ssaapi.NewValueGraph(value)
-		dotStr := graph.Dot()
+		graph := value.NewDotGraph()
+		dotStr := graph.String()
 		since := time.Since(start)
 		log.Infof("memory graph time: %v", since)
 		log.Infof("memory graph time: %d", since)
@@ -117,8 +118,8 @@ func TestGraph(t *testing.T) {
 		valueDB := result.GetValues("para_top_def")
 		require.Equal(t, len(valueDB), 1)
 		value := valueDB[0]
-		graphDB := ssaapi.NewValueGraph(value)
-		dotStrDB := graphDB.Dot()
+		graphDB := value.NewDotGraph()
+		dotStrDB := graphDB.String()
 		since := time.Since(start)
 		log.Infof("db graph time: %v", since)
 		log.Infof("db graph time: %d", since)
@@ -178,7 +179,7 @@ public interface RemoteLogService
 	entrys := res.GetValues("entry")
 	require.Greater(t, len(entrys), 0)
 	entry := entrys[0]
-	graph := ssaapi.NewValueGraph(entry)
+	graph := entry.NewDotGraph()
 	path := graph.DeepFirstGraphPrev(entry)
 	log.Infof("path: %v", path)
 	memDot := entry.DotGraph()
@@ -193,7 +194,7 @@ public interface RemoteLogService
 	entrysDB := result.GetValues("entry")
 	require.Greater(t, len(entrysDB), 0)
 	entryDB := entrysDB[0]
-	graphDB := ssaapi.NewValueGraph(entryDB)
+	graphDB := entryDB.NewDotGraph()
 	pathDB := graphDB.DeepFirstGraphPrev(entryDB)
 	require.Equal(t, len(pathDB), 1)
 
@@ -217,12 +218,11 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		value1.AppendDependOn(value3_2)
 		value3_2.AppendDependOn(value4)
 
-		graph := ssaapi.NewValueGraph(value1)
-		graph.ShowDot()
+		graph := ssaapi.NewDotGraph()
 
 		result := graph.DeepFirstGraphNext(value1)
 		require.Equal(t, 2, len(result))
-		require.Equal(t, strings.Count(graph.Dot(), "t3: 3"), 2)
+		require.Equal(t, strings.Count(graph.String(), "t3: 3"), 2)
 	})
 
 	t.Run("test dfs with predecessor", func(t *testing.T) {
@@ -241,12 +241,14 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		value1.AppendPredecessor(value2, sfvm.WithAnalysisContext_Label("Test1"), sfvm.WithAnalysisContext_Step(1))
 		value1.AppendPredecessor(value3, sfvm.WithAnalysisContext_Label("Test2"), sfvm.WithAnalysisContext_Step(2))
 		value3.AppendPredecessor(value4, sfvm.WithAnalysisContext_Label("Test3"), sfvm.WithAnalysisContext_Step(-1))
-		graph := ssaapi.NewValueGraph(value1)
-		graph.ShowDot()
+		// graph := ssaapi.NewValueGraph(value1)
+		graph := ssaapi.NewDotGraph()
+		value1.GenerateGraph(graph)
+		graph.Show()
 
-		require.Contains(t, graph.Dot(), "step[1]: Test1")
-		require.Contains(t, graph.Dot(), "step[2]: Test2")
-		require.Contains(t, graph.Dot(), "Test3")
+		require.Contains(t, graph.String(), "step[1]: Test1")
+		require.Contains(t, graph.String(), "step[2]: Test2")
+		require.Contains(t, graph.String(), "Test3")
 	})
 }
 
@@ -298,7 +300,7 @@ func main() {
 
 	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
 
-	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+	ssatest.CheckResultWithFS(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
 		sfr.Show()
 
 		value := sfr.GetValues("para_top_def")
@@ -358,7 +360,7 @@ func main() {
 
 	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
 
-	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+	ssatest.CheckResultWithFS(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
 		sfr.Show()
 
 		value := sfr.GetValues("para_top_def")
