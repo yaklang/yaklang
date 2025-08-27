@@ -143,6 +143,7 @@ func initYakitDatabase() {
 		if err != nil {
 			log.Errorf("init ssa-db[%s %s] failed: %s", ssaDatabaseRaw, ssaDatabaseDialect, err)
 		}
+		schema.SetDefaultSSADatabase(ssaprojectDatabase)
 		SetGormSSAProjectDatabase(ssaprojectDatabase)
 	})
 }

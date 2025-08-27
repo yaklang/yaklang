@@ -35,6 +35,8 @@ var SSAProjectTables = []any{
 	&schema.SSADiffResult{},
 
 	&schema.ProjectGeneralStorage{},
+
+	&schema.ReportRecord{},
 }
 
 func init() {

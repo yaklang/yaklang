@@ -3,13 +3,42 @@ package sfreport
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+
+	"github.com/google/uuid"
+	logger "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
 	"io"
 )
 
 var _ IReport = (*Report)(nil)
+
+func (r *Report) Save() error {
+	ssaReport := r.ToSSAProjectReport()
+	// 创建yakit报告实例
+	reportInstance := yakit.NewReport()
+	reportInstance.From("ssa-scan")
+	reportInstance.Title(fmt.Sprintf("%s-%s", ssaReport.ProgramName, uuid.NewString()))
+
+	// 生成报告内容
+	err := GenerateYakitReportContent(reportInstance, ssaReport)
+	if err != nil {
+		logger.Errorf("generate yakit report content failed: %v", err)
+		return utils.Wrapf(err, "generate yakit report content failed")
+	}
+
+	// 保存报告
+	reportID := reportInstance.SaveForIRify()
+	if reportID == 0 {
+		return utils.Errorf("save report failed")
+	}
+	return nil
+}
 
 func (r *Report) PrettyWrite(w io.Writer) error {
 	jsonData, err := json.MarshalIndent(r, "", "  ")
@@ -24,6 +53,13 @@ func (r *Report) PrettyWrite(w io.Writer) error {
 }
 
 func (r *Report) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
+	if r.ProgramName == "" {
+		r.SetProgramName(result.GetProgramName())
+		r.SetProgramLang(result.GetProgramLang())
+		r.SetFileCount(result.GetFileCount())
+		r.SetCodeLineCount(result.GetLineCount())
+	}
+
 	for risk := range result.YieldRisk() {
 		r.ConvertSSARiskToReport(risk)
 	}

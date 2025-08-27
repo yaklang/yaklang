@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"errors"
 	"io"
 
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -15,6 +16,10 @@ import (
 
 type SarifReport struct {
 	report *sarif.Report
+}
+
+func (r *SarifReport) Save() error {
+	return errors.New("sarif report type not support save")
 }
 
 func (r *SarifReport) AddSyntaxFlowRisks(risks []*schema.SSARisk) {
