@@ -517,6 +517,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 	// Initialize endpoint manager
 	config.epm = aicommon.NewEndpointManagerContext(ctx)
 	config.epm.SetConfig(config)
+	config.memory.GetTimelineInstance().BindConfig(config, config)
 
 	return config
 }

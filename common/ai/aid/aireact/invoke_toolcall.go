@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -39,15 +40,14 @@ func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, er
 		return nil, false, utils.Errorf("tool call failed: %v", err)
 	}
 
-	if result.GetID() <= 0 {
-		result.ID = r.config.AcquireId()
-	}
-
 	// Handle the result
 	if directlyAnswer {
 		r.EmitInfo("AI suggests answering directly without using additional tools")
 	}
 	if result != nil {
+		if result.GetID() <= 0 {
+			result.ID = r.config.AcquireId()
+		}
 		// Store the result in memory
 		r.config.memory.PushToolCallResults(result)
 		// Emit the result
