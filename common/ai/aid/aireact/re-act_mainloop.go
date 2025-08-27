@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -198,6 +199,32 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
 			if r.GetCurrentPlanExecutionTask() != nil {
 				// ask user to determine kill or wait
+				ep := r.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
+				ep.SetDefaultSuggestionContinue()
+				result := map[string]any{
+					"id":       ep.GetId(),
+					"question": "An existed plan execution task is running, do you want to terminate it and start a new one?",
+					"options": []map[string]any{
+						{"index": 1, "prompt_title": "中断正在执行的规划任务，开始新的规划任务"},
+						{"index": 2, "prompt_title": "保留正在执行的规划任务，放弃本次规划请求"},
+						{"index": 3, "prompt_title": "等待任务执行完再执行这个任务"},
+					},
+				}
+				ep.SetReviewMaterials(result)
+				r.config.EmitInteractiveJSON(
+					ep.GetId(),
+					schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE,
+					"require-user-interact",
+					result,
+				)
+				ctx := r.config.GetContext()
+				ctx = utils.SetContextKey(ctx, SKIP_AI_REVIEW, true)
+				r.config.DoWaitAgree(ctx, ep)
+				params := ep.GetParams()
+				r.config.EmitInteractiveRelease(ep.GetId(), params)
+				r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+				suggestion := params.GetAnyToString("suggestion")
+				_ = suggestion
 			}
 			r.SetCurrentPlanExecutionTask(currentTask)
 			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)

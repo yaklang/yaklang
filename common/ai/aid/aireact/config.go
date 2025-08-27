@@ -59,40 +59,6 @@ func (t *ReactTask) GetName() string {
 	return t.name
 }
 
-func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []Option {
-	opts := make([]Option, 0)
-	if i == nil {
-		return opts
-	}
-	if i.DisallowRequireForUserPrompt {
-		opts = append(opts, WithUserInteractive(false))
-	} else {
-		opts = append(opts, WithUserInteractive(true))
-	}
-
-	if i.ReviewPolicy != "" {
-		opts = append(opts, WithReviewPolicy(aicommon.AgreePolicyType(i.ReviewPolicy)))
-	}
-
-	if i.ReActMaxIteration > 0 {
-		opts = append(opts, WithMaxIterations(int(i.ReActMaxIteration)))
-	}
-
-	if i.GetTimelineItemLimit() > 0 {
-		opts = append(opts, WithTimelineLimit(i.GetTimelineItemLimit()))
-	}
-
-	if i.GetTimelineContentSizeLimit() > 0 {
-		opts = append(opts, WithTimelineContentSizeLimit(i.GetTimelineContentSizeLimit()))
-	}
-
-	if i.UserInteractLimit > 0 {
-		opts = append(opts, WithUserInteractiveLimitedTimes(i.UserInteractLimit))
-	}
-
-	return opts
-}
-
 type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
@@ -117,7 +83,10 @@ type ReActConfig struct {
 	// AI callback for handling LLM calls
 	aiCallback AICallbackType
 
+	toolKeywords []string // Keywords for tool suggestions
+
 	// Tool management
+	disableToolUse      bool
 	aiToolManager       *buildinaitools.AiToolManager
 	aiToolManagerOption []buildinaitools.ToolManagerOption
 
@@ -292,12 +261,52 @@ func WithReviewPolicy(policy aicommon.AgreePolicyType) Option {
 	}
 }
 
+func WithDisableToolUse(i ...bool) Option {
+	return func(cfg *ReActConfig) {
+		disable := true
+		if len(i) > 0 {
+			disable = i[0]
+		}
+		cfg.disableToolUse = disable
+	}
+}
+
 // WithTopToolsCount sets the number of top tools to display in prompt
 func WithTopToolsCount(count int) Option {
 	return func(cfg *ReActConfig) {
 		if count > 0 {
 			cfg.topToolsCount = count
 		}
+	}
+}
+
+func WithAiToolsSearchTool() Option {
+	return func(cfg *ReActConfig) {
+		if cfg.aiToolManagerOption == nil {
+			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
+		}
+		// Enable tool search functionality
+		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
+			buildinaitools.WithSearchEnabled(true),
+		)
+	}
+}
+
+func WithEnableToolsName(toolsName ...string) Option {
+	return func(cfg *ReActConfig) {
+		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption, buildinaitools.WithEnabledTools(toolsName))
+	}
+}
+
+func WithToolKeywords(keywords ...string) Option {
+	return func(cfg *ReActConfig) {
+		cfg.toolKeywords = append(cfg.toolKeywords, keywords...)
+	}
+}
+
+func WithDisableToolsName(toolsName ...string) Option {
+	return func(config *ReActConfig) {
+		config.aiToolManagerOption = append(config.aiToolManagerOption, buildinaitools.WithDisableTools(toolsName))
 	}
 }
 
@@ -481,7 +490,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		maxIterations:               100,
 		memory:                      aid.GetDefaultMemory(), // Initialize with default memory
 		language:                    "zh",                   // Default to Chinese
-		topToolsCount:               20,                     // Default to show top 20 tools
+		topToolsCount:               40,                     //
 		inputConsumption:            new(int64),
 		outputConsumption:           new(int64),
 		aiTransactionAutoRetry:      5,
