@@ -45,9 +45,7 @@ func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, er
 	}
 	if result != nil {
 		// Store the result in memory
-		if r.config.memory != nil {
-			r.config.memory.PushToolCallResults(result)
-		}
+		r.config.memory.PushToolCallResults(result)
 		// Emit the result
 		r.EmitInfo("Tool execution completed: %s", result.Name)
 	}

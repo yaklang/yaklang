@@ -153,14 +153,14 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 	handleDone := func() {
 		t.done.Do(func() {
-			emitter.EmitToolCallStatus(t.callToolId, "done")
-			emitter.EmitToolCallDone(callToolId)
 			t.m.Lock()
 			defer t.m.Unlock()
 
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
 			}
+			emitter.EmitToolCallStatus(t.callToolId, "done")
+			emitter.EmitToolCallDone(callToolId)
 		})
 	}
 

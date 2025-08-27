@@ -50,7 +50,6 @@ func (r *ReAct) invokeAskForClarification(action *aicommon.Action) string {
 		"ask_for_clarification",
 		fmt.Sprintf("User clarification requested: %s result: %v",
 			action.GetString("human_readable_thought"), suggestion),
-		ep.GetId(),
 	)
 	return suggestion
 }
