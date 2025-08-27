@@ -564,6 +564,15 @@ func WithAgreeManual(cb ...func(context.Context, *Config) (aitool.InvokeParams, 
 	}
 }
 
+func WithToolManagerOptions(i ...buildinaitools.ToolManagerOption) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.aiToolManagerOption = append(config.aiToolManagerOption, i...)
+		return nil
+	}
+}
+
 func WithAgreeAuto(interval time.Duration) Option {
 	return func(config *Config) error {
 		config.m.Lock()
