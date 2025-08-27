@@ -1,4 +1,4 @@
-package knowledgebase
+package integration
 
 import (
 	"path/filepath"
@@ -9,6 +9,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
@@ -28,7 +29,7 @@ func TestIntegrationWithRealEmbedding(t *testing.T) {
 
 	// 步骤1: 创建知识库
 	t.Log("步骤1: 创建知识库")
-	kb, err := NewKnowledgeBase(db, kbName, kbDescription, kbType)
+	kb, err := knowledgebase.NewKnowledgeBase(db, kbName, kbDescription, kbType)
 	assert.NoError(t, err)
 	assert.NotNil(t, kb)
 
@@ -195,7 +196,7 @@ func TestIntegrationWithRealEmbedding(t *testing.T) {
 	firstEntry.KnowledgeTitle = "Yaklang 编程语言介绍 (已更新)"
 	firstEntry.KnowledgeDetails += "\n\n这是更新后的内容。"
 
-	err = kb.UpdateKnowledgeEntry(firstEntry)
+	err = kb.UpdateKnowledgeEntry(int64(firstEntry.ID), firstEntry)
 	assert.NoError(t, err)
 
 	// 验证更新后的数据
@@ -240,7 +241,7 @@ func TestIntegrationWithRealEmbedding(t *testing.T) {
 	t.Log("步骤7: 测试跨知识库搜索")
 
 	// 创建第二个知识库进行跨库搜索测试
-	kb2, err := NewKnowledgeBase(db, "test-kb-2", "第二个测试知识库", "test")
+	kb2, err := knowledgebase.NewKnowledgeBase(db, "test-kb-2", "第二个测试知识库", "test")
 	assert.NoError(t, err)
 
 	// 在第二个知识库中添加一个条目

@@ -1,11 +1,14 @@
 package depinjector
 
 import (
+	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
+	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/ai/rag/plugins_rag"
 	"github.com/yaklang/yaklang/common/mcp"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
+	"github.com/yaklang/yaklang/common/yak/depinjector/aiforge"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
@@ -24,4 +27,6 @@ func DependencyInject() {
 		return v, nil
 	})
 	yakit.SearchPluginIdsFunc = plugins_rag.SearchPluginIds
+	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
+	knowledgebase.Simpleliteforge = aiforge.SimpleAiForgeIns
 }

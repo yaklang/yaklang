@@ -6,8 +6,12 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -18,6 +22,9 @@ const (
 
 	// BigTextPlanChunkTextAndAvgPooling 将大文本分割后生成多个嵌入向量，然后平均池化成一个文档存储
 	BigTextPlanChunkTextAndAvgPooling = "chunkTextAndAvgPooling"
+
+	// DocumentTypeCollectionInfo 表示集合信息
+	DocumentTypeCollectionInfo = "__collection_info__"
 )
 
 // Document 表示可以被检索的文档
@@ -46,6 +53,8 @@ type VectorStore interface {
 
 	// Search 根据查询文本检索相关文档
 	Search(query string, page, limit int) ([]SearchResult, error)
+
+	SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error)
 
 	// Delete 根据 ID 删除文档
 	Delete(ids ...string) error
@@ -461,6 +470,25 @@ func (r *RAGSystem) QueryWithPage(query string, page, limit int) ([]SearchResult
 	return r.VectorStore.Search(query, page, limit)
 }
 
+func (r *RAGSystem) QueryWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("failed to query with page query: %s: %v", query, err)
+			fmt.Println(utils.ErrorStack(err))
+		}
+	}()
+	results, err := r.VectorStore.SearchWithFilter(query, page, limit, func(key string, getDoc func() *Document) bool {
+		if filter != nil {
+			return filter(key, getDoc)
+		}
+		return true
+	})
+	if err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // Query is short for QueryTopN
 func (r *RAGSystem) Query(query string, topN int, limits ...float64) ([]SearchResult, error) {
 	return r.QueryTopN(query, topN, limits...)
@@ -540,6 +568,90 @@ func (r *RAGSystem) ListDocuments() ([]Document, error) {
 // CountDocuments 获取文档总数
 func (r *RAGSystem) CountDocuments() (int, error) {
 	return r.VectorStore.Count()
+}
+
+func QueryCollection(db *gorm.DB, query string, opts ...aispec.AIConfigOption) ([]*SearchResult, error) {
+	log.Infof("searching for collections matching query: %s", query)
+
+	// 1. 首先查找所有集合信息文档
+	var collectionDocs []*schema.VectorStoreDocument
+	err := db.Model(&schema.VectorStoreDocument{}).Where("document_id = ?", DocumentTypeCollectionInfo).Find(&collectionDocs).Error
+	if err != nil {
+		return nil, utils.Errorf("failed to query collection documents: %v", err)
+	}
+
+	if len(collectionDocs) == 0 {
+		log.Warnf("no collections found in database")
+		return []*SearchResult{}, nil
+	}
+
+	log.Infof("found %d collection info documents", len(collectionDocs))
+
+	// 2. 获取嵌入服务
+	embedder, err := GetDefaultEmbedder()
+	if err != nil {
+		return nil, utils.Errorf("failed to get default embedder: %v", err)
+	}
+
+	// 3. 为查询生成嵌入向量
+	queryEmbedding, err := embedder.Embedding(query)
+	if err != nil {
+		return nil, utils.Errorf("failed to generate embedding for query: %v", err)
+	}
+
+	// 4. 计算每个集合文档与查询的相似度
+	var results []*SearchResult
+	for _, doc := range collectionDocs {
+		if len(doc.Embedding) == 0 {
+			log.Warnf("collection document %s has no embedding, skipping", doc.DocumentID)
+			continue
+		}
+
+		// 计算余弦相似度
+		similarity, err := hnsw.CosineSimilarity(queryEmbedding, []float32(doc.Embedding))
+		if err != nil {
+			log.Warnf("failed to calculate similarity for collection document %s: %v", doc.DocumentID, err)
+			continue
+		}
+
+		// 转换为Document结构
+		document := Document{
+			ID:        doc.DocumentID,
+			Content:   "", // 从metadata中获取集合信息
+			Metadata:  map[string]any(doc.Metadata),
+			Embedding: []float32(doc.Embedding),
+		}
+
+		// 构建集合内容描述
+		if collectionName, ok := doc.Metadata["collection_name"].(string); ok {
+			collectionID := doc.Metadata["collection_id"]
+			document.Content = fmt.Sprintf("collection_name: %s\ncollection_id: %v", collectionName, collectionID)
+
+			// 查找对应的集合详细信息
+			var collections []*schema.VectorStoreCollection
+			if collectionIDInt, ok := collectionID.(float64); ok {
+				db.Model(&schema.VectorStoreCollection{}).Where("id = ?", uint(collectionIDInt)).Find(&collections)
+			}
+			if len(collections) > 0 {
+				collection := collections[0]
+				document.Content = fmt.Sprintf("collection_name: %s\ncollection_description: %s\nmodel_name: %s\ndimension: %d",
+					collection.Name, collection.Description, collection.ModelName, collection.Dimension)
+			}
+		}
+
+		results = append(results, &SearchResult{
+			Document: document,
+			Score:    similarity,
+		})
+	}
+
+	// 5. 按相似度降序排序
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Score > results[j].Score
+	})
+
+	log.Infof("found %d matching collection results", len(results))
+	return results, nil
 }
 
 // GetDefaultEmbedder 获取默认的嵌入服务客户端

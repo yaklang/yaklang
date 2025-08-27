@@ -530,7 +530,12 @@ const (
 	Yak_IsSearchVectorDatabaseReady_FullMethodName                = "/ypb.Yak/IsSearchVectorDatabaseReady"
 	Yak_InitSearchVectorDatabase_FullMethodName                   = "/ypb.Yak/InitSearchVectorDatabase"
 	Yak_GetAllVectorStoreCollections_FullMethodName               = "/ypb.Yak/GetAllVectorStoreCollections"
+	Yak_GetAllVectorStoreCollectionsWithFilter_FullMethodName     = "/ypb.Yak/GetAllVectorStoreCollectionsWithFilter"
 	Yak_DeleteSearchVectorDatabase_FullMethodName                 = "/ypb.Yak/DeleteSearchVectorDatabase"
+	Yak_UpdateVectorStoreCollection_FullMethodName                = "/ypb.Yak/UpdateVectorStoreCollection"
+	Yak_ListVectorStoreEntries_FullMethodName                     = "/ypb.Yak/ListVectorStoreEntries"
+	Yak_CreateVectorStoreEntry_FullMethodName                     = "/ypb.Yak/CreateVectorStoreEntry"
+	Yak_GetDocumentByVectorStoreEntryID_FullMethodName            = "/ypb.Yak/GetDocumentByVectorStoreEntryID"
 	Yak_ListThirdPartyBinary_FullMethodName                       = "/ypb.Yak/ListThirdPartyBinary"
 	Yak_InstallThirdPartyBinary_FullMethodName                    = "/ypb.Yak/InstallThirdPartyBinary"
 	Yak_UninstallThirdPartyBinary_FullMethodName                  = "/ypb.Yak/UninstallThirdPartyBinary"
@@ -538,6 +543,7 @@ const (
 	Yak_StartThirdPartyBinary_FullMethodName                      = "/ypb.Yak/StartThirdPartyBinary"
 	Yak_PluginTrace_FullMethodName                                = "/ypb.Yak/PluginTrace"
 	Yak_GetKnowledgeBaseNameList_FullMethodName                   = "/ypb.Yak/GetKnowledgeBaseNameList"
+	Yak_GetKnowledgeBase_FullMethodName                           = "/ypb.Yak/GetKnowledgeBase"
 	Yak_DeleteKnowledgeBase_FullMethodName                        = "/ypb.Yak/DeleteKnowledgeBase"
 	Yak_CreateKnowledgeBase_FullMethodName                        = "/ypb.Yak/CreateKnowledgeBase"
 	Yak_UpdateKnowledgeBase_FullMethodName                        = "/ypb.Yak/UpdateKnowledgeBase"
@@ -545,6 +551,8 @@ const (
 	Yak_CreateKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/CreateKnowledgeBaseEntry"
 	Yak_UpdateKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/UpdateKnowledgeBaseEntry"
 	Yak_SearchKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/SearchKnowledgeBaseEntry"
+	Yak_SearchKnowledgeBaseEntryV2_FullMethodName                 = "/ypb.Yak/SearchKnowledgeBaseEntryV2"
+	Yak_QueryKnowledgeBaseByAI_FullMethodName                     = "/ypb.Yak/QueryKnowledgeBaseByAI"
 	Yak_BuildVectorIndexForKnowledgeBase_FullMethodName           = "/ypb.Yak/BuildVectorIndexForKnowledgeBase"
 	Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName      = "/ypb.Yak/BuildVectorIndexForKnowledgeBaseEntry"
 )
@@ -1202,7 +1210,12 @@ type YakClient interface {
 	IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearchVectorDatabaseReadyRequest, opts ...grpc.CallOption) (*IsSearchVectorDatabaseReadyResponse, error)
 	InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	GetAllVectorStoreCollections(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsResponse, error)
+	GetAllVectorStoreCollectionsWithFilter(ctx context.Context, in *GetAllVectorStoreCollectionsWithFilterRequest, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsWithFilterResponse, error)
 	DeleteSearchVectorDatabase(ctx context.Context, in *DeleteSearchVectorDatabaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	UpdateVectorStoreCollection(ctx context.Context, in *UpdateVectorStoreCollectionRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	ListVectorStoreEntries(ctx context.Context, in *ListVectorStoreEntriesRequest, opts ...grpc.CallOption) (*ListVectorStoreEntriesResponse, error)
+	CreateVectorStoreEntry(ctx context.Context, in *CreateVectorStoreEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	GetDocumentByVectorStoreEntryID(ctx context.Context, in *GetDocumentByVectorStoreEntryIDRequest, opts ...grpc.CallOption) (*GetDocumentByVectorStoreEntryIDResponse, error)
 	// 第三方应用管理
 	ListThirdPartyBinary(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListThirdPartyBinaryResponse, error)
 	InstallThirdPartyBinary(ctx context.Context, in *InstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
@@ -1213,6 +1226,7 @@ type YakClient interface {
 	PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error)
 	// Knowledge Base
 	GetKnowledgeBaseNameList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseNameListResponse, error)
+	GetKnowledgeBase(ctx context.Context, in *GetKnowledgeBaseRequest, opts ...grpc.CallOption) (*GetKnowledgeBaseResponse, error)
 	DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	UpdateKnowledgeBase(ctx context.Context, in *UpdateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
@@ -1220,6 +1234,8 @@ type YakClient interface {
 	CreateKnowledgeBaseEntry(ctx context.Context, in *CreateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	UpdateKnowledgeBaseEntry(ctx context.Context, in *UpdateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	SearchKnowledgeBaseEntry(ctx context.Context, in *SearchKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*SearchKnowledgeBaseEntryResponse, error)
+	SearchKnowledgeBaseEntryV2(ctx context.Context, in *SearchKnowledgeBaseEntryV2Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SearchKnowledgeBaseEntryV2Response], error)
+	QueryKnowledgeBaseByAI(ctx context.Context, in *QueryKnowledgeBaseByAIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse], error)
 	BuildVectorIndexForKnowledgeBase(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 }
@@ -7107,10 +7123,60 @@ func (c *yakClient) GetAllVectorStoreCollections(ctx context.Context, in *Empty,
 	return out, nil
 }
 
+func (c *yakClient) GetAllVectorStoreCollectionsWithFilter(ctx context.Context, in *GetAllVectorStoreCollectionsWithFilterRequest, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsWithFilterResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllVectorStoreCollectionsWithFilterResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAllVectorStoreCollectionsWithFilter_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) DeleteSearchVectorDatabase(ctx context.Context, in *DeleteSearchVectorDatabaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GeneralResponse)
 	err := c.cc.Invoke(ctx, Yak_DeleteSearchVectorDatabase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateVectorStoreCollection(ctx context.Context, in *UpdateVectorStoreCollectionRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateVectorStoreCollection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListVectorStoreEntries(ctx context.Context, in *ListVectorStoreEntriesRequest, opts ...grpc.CallOption) (*ListVectorStoreEntriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListVectorStoreEntriesResponse)
+	err := c.cc.Invoke(ctx, Yak_ListVectorStoreEntries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) CreateVectorStoreEntry(ctx context.Context, in *CreateVectorStoreEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateVectorStoreEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetDocumentByVectorStoreEntryID(ctx context.Context, in *GetDocumentByVectorStoreEntryIDRequest, opts ...grpc.CallOption) (*GetDocumentByVectorStoreEntryIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDocumentByVectorStoreEntryIDResponse)
+	err := c.cc.Invoke(ctx, Yak_GetDocumentByVectorStoreEntryID_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7208,6 +7274,16 @@ func (c *yakClient) GetKnowledgeBaseNameList(ctx context.Context, in *Empty, opt
 	return out, nil
 }
 
+func (c *yakClient) GetKnowledgeBase(ctx context.Context, in *GetKnowledgeBaseRequest, opts ...grpc.CallOption) (*GetKnowledgeBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetKnowledgeBaseResponse)
+	err := c.cc.Invoke(ctx, Yak_GetKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GeneralResponse)
@@ -7277,6 +7353,44 @@ func (c *yakClient) SearchKnowledgeBaseEntry(ctx context.Context, in *SearchKnow
 	}
 	return out, nil
 }
+
+func (c *yakClient) SearchKnowledgeBaseEntryV2(ctx context.Context, in *SearchKnowledgeBaseEntryV2Request, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SearchKnowledgeBaseEntryV2Response], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[98], Yak_SearchKnowledgeBaseEntryV2_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SearchKnowledgeBaseEntryV2Request, SearchKnowledgeBaseEntryV2Response]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SearchKnowledgeBaseEntryV2Client = grpc.ServerStreamingClient[SearchKnowledgeBaseEntryV2Response]
+
+func (c *yakClient) QueryKnowledgeBaseByAI(ctx context.Context, in *QueryKnowledgeBaseByAIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[99], Yak_QueryKnowledgeBaseByAI_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueryKnowledgeBaseByAIRequest, QueryKnowledgeBaseByAIResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_QueryKnowledgeBaseByAIClient = grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse]
 
 func (c *yakClient) BuildVectorIndexForKnowledgeBase(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -7951,7 +8065,12 @@ type YakServer interface {
 	IsSearchVectorDatabaseReady(context.Context, *IsSearchVectorDatabaseReadyRequest) (*IsSearchVectorDatabaseReadyResponse, error)
 	InitSearchVectorDatabase(*InitSearchVectorDatabaseRequest, grpc.ServerStreamingServer[ExecResult]) error
 	GetAllVectorStoreCollections(context.Context, *Empty) (*GetAllVectorStoreCollectionsResponse, error)
+	GetAllVectorStoreCollectionsWithFilter(context.Context, *GetAllVectorStoreCollectionsWithFilterRequest) (*GetAllVectorStoreCollectionsWithFilterResponse, error)
 	DeleteSearchVectorDatabase(context.Context, *DeleteSearchVectorDatabaseRequest) (*GeneralResponse, error)
+	UpdateVectorStoreCollection(context.Context, *UpdateVectorStoreCollectionRequest) (*GeneralResponse, error)
+	ListVectorStoreEntries(context.Context, *ListVectorStoreEntriesRequest) (*ListVectorStoreEntriesResponse, error)
+	CreateVectorStoreEntry(context.Context, *CreateVectorStoreEntryRequest) (*GeneralResponse, error)
+	GetDocumentByVectorStoreEntryID(context.Context, *GetDocumentByVectorStoreEntryIDRequest) (*GetDocumentByVectorStoreEntryIDResponse, error)
 	// 第三方应用管理
 	ListThirdPartyBinary(context.Context, *Empty) (*ListThirdPartyBinaryResponse, error)
 	InstallThirdPartyBinary(*InstallThirdPartyBinaryRequest, grpc.ServerStreamingServer[ExecResult]) error
@@ -7962,6 +8081,7 @@ type YakServer interface {
 	PluginTrace(grpc.BidiStreamingServer[PluginTraceRequest, PluginTraceResponse]) error
 	// Knowledge Base
 	GetKnowledgeBaseNameList(context.Context, *Empty) (*GetKnowledgeBaseNameListResponse, error)
+	GetKnowledgeBase(context.Context, *GetKnowledgeBaseRequest) (*GetKnowledgeBaseResponse, error)
 	DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*GeneralResponse, error)
 	CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*GeneralResponse, error)
 	UpdateKnowledgeBase(context.Context, *UpdateKnowledgeBaseRequest) (*GeneralResponse, error)
@@ -7969,6 +8089,8 @@ type YakServer interface {
 	CreateKnowledgeBaseEntry(context.Context, *CreateKnowledgeBaseEntryRequest) (*GeneralResponse, error)
 	UpdateKnowledgeBaseEntry(context.Context, *UpdateKnowledgeBaseEntryRequest) (*GeneralResponse, error)
 	SearchKnowledgeBaseEntry(context.Context, *SearchKnowledgeBaseEntryRequest) (*SearchKnowledgeBaseEntryResponse, error)
+	SearchKnowledgeBaseEntryV2(*SearchKnowledgeBaseEntryV2Request, grpc.ServerStreamingServer[SearchKnowledgeBaseEntryV2Response]) error
+	QueryKnowledgeBaseByAI(*QueryKnowledgeBaseByAIRequest, grpc.ServerStreamingServer[QueryKnowledgeBaseByAIResponse]) error
 	BuildVectorIndexForKnowledgeBase(context.Context, *BuildVectorIndexForKnowledgeBaseRequest) (*GeneralResponse, error)
 	BuildVectorIndexForKnowledgeBaseEntry(context.Context, *BuildVectorIndexForKnowledgeBaseEntryRequest) (*GeneralResponse, error)
 	mustEmbedUnimplementedYakServer()
@@ -9514,8 +9636,23 @@ func (UnimplementedYakServer) InitSearchVectorDatabase(*InitSearchVectorDatabase
 func (UnimplementedYakServer) GetAllVectorStoreCollections(context.Context, *Empty) (*GetAllVectorStoreCollectionsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllVectorStoreCollections not implemented")
 }
+func (UnimplementedYakServer) GetAllVectorStoreCollectionsWithFilter(context.Context, *GetAllVectorStoreCollectionsWithFilterRequest) (*GetAllVectorStoreCollectionsWithFilterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllVectorStoreCollectionsWithFilter not implemented")
+}
 func (UnimplementedYakServer) DeleteSearchVectorDatabase(context.Context, *DeleteSearchVectorDatabaseRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteSearchVectorDatabase not implemented")
+}
+func (UnimplementedYakServer) UpdateVectorStoreCollection(context.Context, *UpdateVectorStoreCollectionRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateVectorStoreCollection not implemented")
+}
+func (UnimplementedYakServer) ListVectorStoreEntries(context.Context, *ListVectorStoreEntriesRequest) (*ListVectorStoreEntriesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListVectorStoreEntries not implemented")
+}
+func (UnimplementedYakServer) CreateVectorStoreEntry(context.Context, *CreateVectorStoreEntryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateVectorStoreEntry not implemented")
+}
+func (UnimplementedYakServer) GetDocumentByVectorStoreEntryID(context.Context, *GetDocumentByVectorStoreEntryIDRequest) (*GetDocumentByVectorStoreEntryIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDocumentByVectorStoreEntryID not implemented")
 }
 func (UnimplementedYakServer) ListThirdPartyBinary(context.Context, *Empty) (*ListThirdPartyBinaryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListThirdPartyBinary not implemented")
@@ -9538,6 +9675,9 @@ func (UnimplementedYakServer) PluginTrace(grpc.BidiStreamingServer[PluginTraceRe
 func (UnimplementedYakServer) GetKnowledgeBaseNameList(context.Context, *Empty) (*GetKnowledgeBaseNameListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetKnowledgeBaseNameList not implemented")
 }
+func (UnimplementedYakServer) GetKnowledgeBase(context.Context, *GetKnowledgeBaseRequest) (*GetKnowledgeBaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetKnowledgeBase not implemented")
+}
 func (UnimplementedYakServer) DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteKnowledgeBase not implemented")
 }
@@ -9558,6 +9698,12 @@ func (UnimplementedYakServer) UpdateKnowledgeBaseEntry(context.Context, *UpdateK
 }
 func (UnimplementedYakServer) SearchKnowledgeBaseEntry(context.Context, *SearchKnowledgeBaseEntryRequest) (*SearchKnowledgeBaseEntryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SearchKnowledgeBaseEntry not implemented")
+}
+func (UnimplementedYakServer) SearchKnowledgeBaseEntryV2(*SearchKnowledgeBaseEntryV2Request, grpc.ServerStreamingServer[SearchKnowledgeBaseEntryV2Response]) error {
+	return status.Errorf(codes.Unimplemented, "method SearchKnowledgeBaseEntryV2 not implemented")
+}
+func (UnimplementedYakServer) QueryKnowledgeBaseByAI(*QueryKnowledgeBaseByAIRequest, grpc.ServerStreamingServer[QueryKnowledgeBaseByAIResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method QueryKnowledgeBaseByAI not implemented")
 }
 func (UnimplementedYakServer) BuildVectorIndexForKnowledgeBase(context.Context, *BuildVectorIndexForKnowledgeBaseRequest) (*GeneralResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BuildVectorIndexForKnowledgeBase not implemented")
@@ -18059,6 +18205,24 @@ func _Yak_GetAllVectorStoreCollections_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAllVectorStoreCollectionsWithFilter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllVectorStoreCollectionsWithFilterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllVectorStoreCollectionsWithFilter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAllVectorStoreCollectionsWithFilter_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllVectorStoreCollectionsWithFilter(ctx, req.(*GetAllVectorStoreCollectionsWithFilterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_DeleteSearchVectorDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteSearchVectorDatabaseRequest)
 	if err := dec(in); err != nil {
@@ -18073,6 +18237,78 @@ func _Yak_DeleteSearchVectorDatabase_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).DeleteSearchVectorDatabase(ctx, req.(*DeleteSearchVectorDatabaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateVectorStoreCollection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateVectorStoreCollectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateVectorStoreCollection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateVectorStoreCollection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateVectorStoreCollection(ctx, req.(*UpdateVectorStoreCollectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListVectorStoreEntries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListVectorStoreEntriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListVectorStoreEntries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListVectorStoreEntries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListVectorStoreEntries(ctx, req.(*ListVectorStoreEntriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreateVectorStoreEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateVectorStoreEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateVectorStoreEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateVectorStoreEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateVectorStoreEntry(ctx, req.(*CreateVectorStoreEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetDocumentByVectorStoreEntryID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDocumentByVectorStoreEntryIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetDocumentByVectorStoreEntryID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetDocumentByVectorStoreEntryID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetDocumentByVectorStoreEntryID(ctx, req.(*GetDocumentByVectorStoreEntryIDRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -18174,6 +18410,24 @@ func _Yak_GetKnowledgeBaseNameList_Handler(srv interface{}, ctx context.Context,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).GetKnowledgeBaseNameList(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetKnowledgeBase(ctx, req.(*GetKnowledgeBaseRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -18303,6 +18557,28 @@ func _Yak_SearchKnowledgeBaseEntry_Handler(srv interface{}, ctx context.Context,
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _Yak_SearchKnowledgeBaseEntryV2_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SearchKnowledgeBaseEntryV2Request)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).SearchKnowledgeBaseEntryV2(m, &grpc.GenericServerStream[SearchKnowledgeBaseEntryV2Request, SearchKnowledgeBaseEntryV2Response]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SearchKnowledgeBaseEntryV2Server = grpc.ServerStreamingServer[SearchKnowledgeBaseEntryV2Response]
+
+func _Yak_QueryKnowledgeBaseByAI_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueryKnowledgeBaseByAIRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).QueryKnowledgeBaseByAI(m, &grpc.GenericServerStream[QueryKnowledgeBaseByAIRequest, QueryKnowledgeBaseByAIResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_QueryKnowledgeBaseByAIServer = grpc.ServerStreamingServer[QueryKnowledgeBaseByAIResponse]
 
 func _Yak_BuildVectorIndexForKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(BuildVectorIndexForKnowledgeBaseRequest)
@@ -20012,8 +20288,28 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_GetAllVectorStoreCollections_Handler,
 		},
 		{
+			MethodName: "GetAllVectorStoreCollectionsWithFilter",
+			Handler:    _Yak_GetAllVectorStoreCollectionsWithFilter_Handler,
+		},
+		{
 			MethodName: "DeleteSearchVectorDatabase",
 			Handler:    _Yak_DeleteSearchVectorDatabase_Handler,
+		},
+		{
+			MethodName: "UpdateVectorStoreCollection",
+			Handler:    _Yak_UpdateVectorStoreCollection_Handler,
+		},
+		{
+			MethodName: "ListVectorStoreEntries",
+			Handler:    _Yak_ListVectorStoreEntries_Handler,
+		},
+		{
+			MethodName: "CreateVectorStoreEntry",
+			Handler:    _Yak_CreateVectorStoreEntry_Handler,
+		},
+		{
+			MethodName: "GetDocumentByVectorStoreEntryID",
+			Handler:    _Yak_GetDocumentByVectorStoreEntryID_Handler,
 		},
 		{
 			MethodName: "ListThirdPartyBinary",
@@ -20030,6 +20326,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetKnowledgeBaseNameList",
 			Handler:    _Yak_GetKnowledgeBaseNameList_Handler,
+		},
+		{
+			MethodName: "GetKnowledgeBase",
+			Handler:    _Yak_GetKnowledgeBase_Handler,
 		},
 		{
 			MethodName: "DeleteKnowledgeBase",
@@ -20574,6 +20874,16 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _Yak_PluginTrace_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "SearchKnowledgeBaseEntryV2",
+			Handler:       _Yak_SearchKnowledgeBaseEntryV2_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "QueryKnowledgeBaseByAI",
+			Handler:       _Yak_QueryKnowledgeBaseByAI_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "yakgrpc.proto",

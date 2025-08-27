@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"errors"
 	"sort"
 	"sync"
 
@@ -152,6 +153,10 @@ func (s *SQLiteVectorStore) Add(docs ...Document) error {
 
 	// 提交事务
 	return tx.Commit().Error
+}
+
+func (m *SQLiteVectorStore) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
+	return nil, errors.New("not implemented")
 }
 
 // Search 根据查询文本检索相关文档
