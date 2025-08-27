@@ -471,8 +471,10 @@ func (m *Timeline) DumpBefore(id int64) string {
 				val, ok := m.reducers.Get(reduceredStartId)
 				if ok {
 					reducerOnce.Do(func() {
-						buf.WriteString(fmt.Sprint("├─...\n"))
-						buf.WriteString(fmt.Sprintf("├─[%s] id: %v reducer-memory: %v\n", timeStr, item.GetID(), val.Value()))
+						// buf.WriteString(fmt.Sprint("├─...\n"))
+						buf.WriteString(fmt.Sprint("  ...\n"))
+						//buf.WriteString(fmt.Sprintf("├─[%s] id: %v reducer-memory: %v\n", timeStr, item.GetID(), val.Value()))
+						buf.WriteString(fmt.Sprintf("--[%s] id: %v reducer-memory: %v\n", timeStr, item.GetID(), val.Value()))
 					})
 					return true
 				}
@@ -484,7 +486,8 @@ func (m *Timeline) DumpBefore(id int64) string {
 		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
 			val, ok := m.summary.Get(shrinkStartId)
 			if ok && !val.Value().deleted {
-				buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
+				//buf.WriteString(fmt.Sprintf("├─[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
+				buf.WriteString(fmt.Sprintf("--[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
 			}
 			return true
 		}
@@ -493,10 +496,12 @@ func (m *Timeline) DumpBefore(id int64) string {
 			return true
 		}
 
-		buf.WriteString(fmt.Sprintf("├─[%s]\n", timeStr))
+		//buf.WriteString(fmt.Sprintf("├─[%s]\n", timeStr))
+		buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
 		raw := item.String()
 		for _, line := range utils.ParseStringToRawLines(raw) {
-			buf.WriteString(fmt.Sprintf("│    %s\n", line))
+			//buf.WriteString(fmt.Sprintf("│    %s\n", line))
+			buf.WriteString(fmt.Sprintf("     %s\n", line))
 		}
 		count++
 		return true

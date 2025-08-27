@@ -46,7 +46,12 @@ func (r *ReAct) processReActTask(task *Task) {
 		if err := recover(); err != nil {
 			log.Errorf("ReAct task processing panic: %v", err)
 			task.SetStatus(string(TaskStatus_Aborted))
-			r.addToTimeline("error", fmt.Sprintf("Task processing panic: %v", err), task.GetId())
+			r.addToTimeline("error", fmt.Sprintf("Task processing panic: %v", err))
+		} else {
+			if r.config.debugEvent {
+				log.Infof("Finished processing task: %s", task.GetId())
+			}
+			task.SetStatus(string(TaskStatus_Completed))
 		}
 	}()
 
@@ -61,16 +66,9 @@ func (r *ReAct) processReActTask(task *Task) {
 	if err != nil {
 		log.Errorf("Task execution failed: %v", err)
 		task.SetStatus(string(TaskStatus_Aborted))
-		r.addToTimeline("error", fmt.Sprintf("Task execution failed: %v", err), task.GetId())
+		r.addToTimeline("error", fmt.Sprintf("Task execution failed: %v", err))
 	} else {
 		task.SetStatus(string(TaskStatus_Completed))
-		r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
-			"    %s\n"+
-			"ai directly answer:\n"+
-			"    %v",
-			task.GetUserInput(),
-			task.GetResult(),
-		), task.GetId())
 	}
 }
 
@@ -169,8 +167,15 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		case ActionDirectlyAnswer:
 			answerPayload := nextAction.GetString("answer_payload")
 			r.EmitResult(answerPayload)
-			currentTask.SetStatus(string(TaskStatus_Completed))
 			currentTask.SetResult(strings.TrimSpace(answerPayload))
+			r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
+				"%s\n"+
+				"ai directly answer:\n"+
+				"%v",
+				utils.PrefixLines(currentTask.GetUserInput(), "> "),
+				utils.PrefixLines(answerPayload, "| "),
+			))
+			currentTask.SetStatus(string(TaskStatus_Completed))
 			continue
 		case ActionRequireTool:
 			toolPayload := nextAction.GetString("tool_require_payload")
@@ -188,6 +193,10 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			} else {
 				// handle directly answer required
 				// forcely set satisfied to true
+				r.addToTimeline(
+					"directly_answer_required",
+					"ai call-tool step is aborted due user requirement",
+				)
 				result, err := r.requireDirectlyAnswer(
 					userQuery+
 						"\n===========\n"+
@@ -229,7 +238,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 					"reason",
 					fmt.Sprintf("User needs not fully satisfied after tool call, continuing analysis...\n"+
 						"%v", finalResult,
-					), currentTask.GetId())
+					))
 			}
 		case ActionRequestPlanExecution:
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")

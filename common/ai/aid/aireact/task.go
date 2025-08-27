@@ -98,7 +98,6 @@ func (t *Task) SetStatus(status string) {
 	// 输出调试日志记录状态变化
 	if oldStatus != status {
 		log.Debugf("Task %s status changed: %s -> %s", t.Id, oldStatus, status)
-	} else {
 		if t.emitter != nil {
 			t.emitter.EmitStructured("react_task_status_changed", map[string]any{
 				"react_task_id":         t.Id,
