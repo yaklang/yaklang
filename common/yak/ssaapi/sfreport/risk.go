@@ -21,13 +21,16 @@ type Risk struct {
 	RiskType     string    `json:"risk_type"`
 	Details      string    `json:"details"`
 	CVE          string    `json:"cve"`
+	CWE          []string  `json:"cwe"`
 	Time         time.Time `json:"time"`
 	Language     string    `json:"language"`
 	// code info
 	CodeSourceURL string `json:"code_source_url"`
 	Line          int64  `json:"line"`
 	// for select code range
-	CodeRange string `json:"code_range"`
+	CodeRange    string `json:"code_range"`
+	CodeFragment string `json:"code_fragment"`
+	FunctionName string `json:"function_name"`
 
 	// rule
 	RuleName string `json:"rule_name"`
@@ -71,10 +74,6 @@ func NewRisk(risk *schema.SSARisk) *Risk {
 		return &Risk{}
 	}
 
-	if risk == nil {
-		return &Risk{}
-	}
-
 	ret := &Risk{
 		ID:   risk.ID,
 		Hash: risk.Hash,
@@ -90,12 +89,17 @@ func NewRisk(risk *schema.SSARisk) *Risk {
 		CVE:          risk.CVE,
 		Language:     risk.Language,
 
-		CodeRange: risk.CodeRange,
-		Line:      risk.Line,
+		CodeRange:    risk.CodeRange,
+		CodeFragment: risk.CodeFragment,
+		FunctionName: risk.FunctionName,
+		Line:         risk.Line,
 
 		ProgramName:          risk.ProgramName,
 		LatestDisposalStatus: risk.LatestDisposalStatus,
 	}
+
+	// 自动从CVE填充CWE信息
+	PopulateCWEFromCVE(ret)
 
 	// Generate data flow paths if available
 	if risk.ResultID != 0 && risk.Variable != "" {
@@ -156,6 +160,18 @@ func (r *Risk) GetLine() int64 {
 
 func (r *Risk) GetCodeRange() string {
 	return r.CodeRange
+}
+
+func (r *Risk) GetCodeFragment() string {
+	return r.CodeRange
+}
+
+func (r *Risk) GetFunctionName() string {
+	return r.FunctionName
+}
+
+func (r *Risk) GetCWE() []string {
+	return r.CWE
 }
 
 func (r *Risk) GetProgramName() string {

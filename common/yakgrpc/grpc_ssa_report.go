@@ -3,13 +3,13 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfreport"
 	"strconv"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -41,7 +41,7 @@ func (s *Server) GenerateSSAReport(ctx context.Context, req *ypb.GenerateSSARepo
 		return nil, utils.Wrapf(err, "generate ssa project report failed")
 	}
 
-	// 创建yakit报告实例
+	// 创建IRify报告实例
 	reportInstance := yakit.NewReport()
 	reportInstance.From("ssa-scan")
 	reportInstance.Title(reportName)
@@ -54,7 +54,7 @@ func (s *Server) GenerateSSAReport(ctx context.Context, req *ypb.GenerateSSARepo
 	}
 
 	// 保存报告
-	reportID := reportInstance.Save()
+	reportID := reportInstance.SaveForIRify()
 	if reportID == 0 {
 		return nil, utils.Errorf("save report failed")
 	}

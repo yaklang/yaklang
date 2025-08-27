@@ -230,6 +230,17 @@ func ShowRisk(format sfreport.ReportType, ch chan *ssaapi.SyntaxFlowResult, writ
 		ssaprofile.ProfileAdd(true, "convert result to report", f1)
 		log.Infof("cover result[%d] add run to report %d done", result.GetResultID(), count)
 	}
+	if format == sfreport.IRifyReactReportType {
+		if count <= 0 {
+			log.Infof("no risk skip save")
+			return
+		}
+		err = reportInstance.Save()
+		if err != nil {
+			log.Errorf("save report failed: %s", err)
+		}
+		return
+	}
 	log.Infof("write report ... ")
 	reportInstance.PrettyWrite(writer)
 	log.Infof("write report done")

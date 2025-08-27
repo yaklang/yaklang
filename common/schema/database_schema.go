@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	projectDataBase *gorm.DB
-	profileDatabase *gorm.DB
+	projectDataBase    *gorm.DB
+	profileDatabase    *gorm.DB
+	defaultSSADataBase *gorm.DB
 )
 
 func init() {
@@ -145,10 +146,18 @@ func SetGormProfileDatabase(d *gorm.DB) {
 	profileDatabase = d
 }
 
+func SetDefaultSSADatabase(d *gorm.DB) {
+	defaultSSADataBase = d
+}
+
 func GetGormProfileDatabase() *gorm.DB {
 	return profileDatabase
 }
 
 func GetGormProjectDatabase() *gorm.DB {
 	return projectDataBase
+}
+
+func GetDefaultSSADatabase() *gorm.DB {
+	return defaultSSADataBase
 }
