@@ -135,4 +135,6 @@ LOOP:
 	if !haveResult {
 		t.Fatal("Expected to have at least one result event, but got none")
 	}
+
+	fmt.Println(ins.timeline.Dump())
 }
