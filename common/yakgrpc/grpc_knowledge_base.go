@@ -3,26 +3,17 @@ package yakgrpc
 import (
 	"context"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-//   // Knowledge Base
-//   rpc GetKnowledgeBaseNameList(Empty) returns(GetKnowledgeBaseNameListResponse);
-//   rpc DeleteKnowledgeBase(DeleteKnowledgeBaseRequest) returns(DbOperateMessage);
-//   rpc CreateKnowledgeBase(CreateKnowledgeBaseRequest) returns(DbOperateMessage);
-//   rpc UpdateKnowledgeBase(UpdateKnowledgeBaseRequest) returns(DbOperateMessage);
-
-// rpc DeleteKnowledgeBaseEntry(DeleteKnowledgeBaseEntryRequest) returns(DbOperateMessage);
-// rpc CreateKnowledgeBaseEntry(CreateKnowledgeBaseEntryRequest) returns(DbOperateMessage);
-// rpc UpdateKnowledgeBaseEntry(UpdateKnowledgeBaseEntryRequest) returns(DbOperateMessage);
-// rpc SearchKnowledgeBaseEntry(SearchKnowledgeBaseEntryRequest) returns(SearchKnowledgeBaseEntryResponse);
 func (s *Server) GetKnowledgeBaseNameList(ctx context.Context, req *ypb.Empty) (*ypb.GetKnowledgeBaseNameListResponse, error) {
 	db := consts.GetGormProfileDatabase()
 	knowledgeBaseNameList, err := yakit.GetKnowledgeBaseNameList(db)
@@ -35,12 +26,71 @@ func (s *Server) GetKnowledgeBaseNameList(ctx context.Context, req *ypb.Empty) (
 	return response, nil
 }
 
+// GetKnowledgeBase 获取知识库信息和条目列表
+func (s *Server) GetKnowledgeBase(ctx context.Context, req *ypb.GetKnowledgeBaseRequest) (*ypb.GetKnowledgeBaseResponse, error) {
+	db := consts.GetGormProfileDatabase()
+	var knowledgeBases []*schema.KnowledgeBaseInfo
+	query := db.Model(&schema.KnowledgeBaseInfo{})
+
+	// 实现关键词和ID的二选一逻辑
+	if req.GetKeyword() != "" {
+		// 如果关键词不为空，忽略ID，使用关键词搜索
+		query = bizhelper.FuzzSearchEx(query, []string{"knowledge_base_name", "knowledge_base_description"}, req.GetKeyword(), false)
+	} else if req.GetKnowledgeBaseId() > 0 {
+		// 如果ID不为空，搜索指定ID
+		query = query.Where("id = ?", req.GetKnowledgeBaseId())
+	}
+	// 如果都为空，进行分页搜索（无过滤条件）
+
+	// 使用 bizhelper.Paging 实现分页功能
+	pagination := req.GetPagination()
+	page := 1
+	limit := 10
+	if pagination != nil {
+		page = int(pagination.GetPage())
+		limit = int(pagination.GetLimit())
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+
+	p, db := bizhelper.Paging(query, page, limit, &knowledgeBases)
+	if db.Error != nil {
+		return nil, utils.Errorf("获取知识库列表失败: %v", db.Error)
+	}
+
+	// 转换为protobuf格式
+	pbKnowledgeBases := make([]*ypb.KnowledgeBaseInfo, len(knowledgeBases))
+	for i, kb := range knowledgeBases {
+		pbKnowledgeBases[i] = &ypb.KnowledgeBaseInfo{
+			ID:                       int64(kb.ID),
+			KnowledgeBaseName:        kb.KnowledgeBaseName,
+			KnowledgeBaseDescription: kb.KnowledgeBaseDescription,
+			KnowledgeBaseType:        kb.KnowledgeBaseType,
+		}
+	}
+
+	return &ypb.GetKnowledgeBaseResponse{
+		KnowledgeBases: pbKnowledgeBases,
+		Pagination:     pagination,
+		Total:          int64(p.TotalRecord),
+	}, nil
+}
+
 func (s *Server) DeleteKnowledgeBase(ctx context.Context, req *ypb.DeleteKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	err := yakit.DeleteKnowledgeBase(db, req.KnowledgeBaseId)
+	kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseId())
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("获取知识库信息失败: %v", err)
 	}
+	err = kb.Drop()
+	if err != nil {
+		return nil, utils.Errorf("删除知识库失败: %v", err)
+	}
+
 	return &ypb.GeneralResponse{
 		Ok: true,
 	}, nil
@@ -48,14 +98,16 @@ func (s *Server) DeleteKnowledgeBase(ctx context.Context, req *ypb.DeleteKnowled
 
 func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	err := yakit.CreateKnowledgeBase(db, &schema.KnowledgeBaseInfo{
-		KnowledgeBaseName:        req.GetKnowledgeBaseName(),
-		KnowledgeBaseDescription: req.GetKnowledgeBaseDescription(),
-		KnowledgeBaseType:        req.GetKnowledgeBaseType(),
-	})
+
+	// 使用knowledgebase包创建知识库
+	_, err := knowledgebase.CreateKnowledgeBase(db,
+		req.GetKnowledgeBaseName(),
+		req.GetKnowledgeBaseDescription(),
+		req.GetKnowledgeBaseType())
 	if err != nil {
 		return nil, err
 	}
+
 	return &ypb.GeneralResponse{
 		Ok: true,
 	}, nil
@@ -63,14 +115,16 @@ func (s *Server) CreateKnowledgeBase(ctx context.Context, req *ypb.CreateKnowled
 
 func (s *Server) UpdateKnowledgeBase(ctx context.Context, req *ypb.UpdateKnowledgeBaseRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	err := yakit.UpdateKnowledgeBaseInfo(db, req.GetKnowledgeBaseId(), &schema.KnowledgeBaseInfo{
-		KnowledgeBaseName:        req.GetKnowledgeBaseName(),
-		KnowledgeBaseDescription: req.GetKnowledgeBaseDescription(),
-		KnowledgeBaseType:        req.GetKnowledgeBaseType(),
-	})
+
+	kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseId())
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("获取知识库信息失败: %v", err)
 	}
+	err = kb.UpdateKnowledgeBaseInfo(req.GetKnowledgeBaseName(), req.GetKnowledgeBaseDescription(), req.GetKnowledgeBaseType())
+	if err != nil {
+		return nil, utils.Errorf("更新知识库信息失败: %v", err)
+	}
+
 	return &ypb.GeneralResponse{
 		Ok: true,
 	}, nil
@@ -78,9 +132,14 @@ func (s *Server) UpdateKnowledgeBase(ctx context.Context, req *ypb.UpdateKnowled
 
 func (s *Server) DeleteKnowledgeBaseEntry(ctx context.Context, req *ypb.DeleteKnowledgeBaseEntryRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	err := yakit.DeleteKnowledgeBaseEntry(db, req.GetKnowledgeBaseEntryId())
+
+	kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseId())
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("获取知识库信息失败: %v", err)
+	}
+	err = kb.DeleteKnowledgeEntry(req.GetKnowledgeBaseEntryId())
+	if err != nil {
+		return nil, utils.Errorf("删除知识库条目失败: %v", err)
 	}
 	return &ypb.GeneralResponse{
 		Ok: true,
@@ -89,7 +148,15 @@ func (s *Server) DeleteKnowledgeBaseEntry(ctx context.Context, req *ypb.DeleteKn
 
 func (s *Server) CreateKnowledgeBaseEntry(ctx context.Context, req *ypb.CreateKnowledgeBaseEntryRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	err := yakit.CreateKnowledgeBaseEntry(db, &schema.KnowledgeBaseEntry{
+
+	// 加载知识库
+	kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseID())
+	if err != nil {
+		return nil, utils.Errorf("加载知识库失败: %v", err)
+	}
+
+	// 创建知识库条目
+	entry := &schema.KnowledgeBaseEntry{
 		KnowledgeBaseID:          req.GetKnowledgeBaseID(),
 		KnowledgeTitle:           req.GetKnowledgeTitle(),
 		KnowledgeType:            req.GetKnowledgeType(),
@@ -100,10 +167,14 @@ func (s *Server) CreateKnowledgeBaseEntry(ctx context.Context, req *ypb.CreateKn
 		SourcePage:               int(req.GetSourcePage()),
 		PotentialQuestions:       req.GetPotentialQuestions(),
 		PotentialQuestionsVector: req.GetPotentialQuestionsVector(),
-	})
+	}
+
+	// 使用知识库实例添加条目
+	err = kb.AddKnowledgeEntry(entry)
 	if err != nil {
 		return nil, err
 	}
+
 	return &ypb.GeneralResponse{
 		Ok: true,
 	}, nil
@@ -111,8 +182,13 @@ func (s *Server) CreateKnowledgeBaseEntry(ctx context.Context, req *ypb.CreateKn
 
 func (s *Server) UpdateKnowledgeBaseEntry(ctx context.Context, req *ypb.UpdateKnowledgeBaseEntryRequest) (*ypb.GeneralResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	err := yakit.UpdateKnowledgeBaseEntry(db, &schema.KnowledgeBaseEntry{
-		Model:              gorm.Model{ID: uint(req.GetKnowledgeBaseEntryID())},
+
+	kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseID())
+	if err != nil {
+		return nil, utils.Errorf("获取知识库信息失败: %v", err)
+	}
+
+	err = kb.UpdateKnowledgeEntry(req.GetKnowledgeBaseEntryID(), &schema.KnowledgeBaseEntry{
 		KnowledgeTitle:     req.GetKnowledgeTitle(),
 		KnowledgeType:      req.GetKnowledgeType(),
 		ImportanceScore:    int(req.GetImportanceScore()),
@@ -123,8 +199,9 @@ func (s *Server) UpdateKnowledgeBaseEntry(ctx context.Context, req *ypb.UpdateKn
 		PotentialQuestions: req.GetPotentialQuestions(),
 	})
 	if err != nil {
-		return nil, err
+		return nil, utils.Errorf("更新知识库条目失败: %v", err)
 	}
+
 	return &ypb.GeneralResponse{
 		Ok: true,
 	}, nil
@@ -133,6 +210,30 @@ func (s *Server) UpdateKnowledgeBaseEntry(ctx context.Context, req *ypb.UpdateKn
 func (s *Server) SearchKnowledgeBaseEntry(ctx context.Context, req *ypb.SearchKnowledgeBaseEntryRequest) (*ypb.SearchKnowledgeBaseEntryResponse, error) {
 	reqPagination := req.GetPagination()
 	db := consts.GetGormProfileDatabase()
+
+	// 如果有关键字搜索，尝试使用知识库的向量搜索功能
+	if req.GetKeyword() != "" {
+		kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseId())
+		if err == nil {
+			// 使用知识库的搜索功能
+			limit := 50 // 默认限制
+			if reqPagination != nil && reqPagination.Limit > 0 {
+				limit = int(reqPagination.Limit)
+			}
+
+			entries, err := kb.SearchKnowledgeEntries(req.GetKeyword(), limit)
+			if err == nil {
+				return &ypb.SearchKnowledgeBaseEntryResponse{
+					Total:                int64(len(entries)),
+					Pagination:           reqPagination,
+					KnowledgeBaseEntries: KnowledgeBaseEntryListToGrpcModel(entries),
+				}, nil
+			}
+			// 如果向量搜索失败，回退到传统搜索
+		}
+	}
+
+	// 回退到传统的数据库搜索
 	_, entries, err := yakit.GetKnowledgeBaseEntryByFilter(db, req.GetKnowledgeBaseId(), req.GetKeyword(), reqPagination)
 	if err != nil {
 		return nil, err
@@ -230,11 +331,20 @@ func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req 
 	for _, opt := range ragOpts {
 		opts = append(opts, opt)
 	}
-	_, err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseEntryId(), opts...)
+	_, err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), req.GetKnowledgeBaseEntryId(), opts...)
 	if err != nil {
 		return nil, err
 	}
 	return &ypb.GeneralResponse{
 		Ok: true,
 	}, nil
+}
+
+func (s *Server) SearchKnowledgeBaseEntryV2(req *ypb.SearchKnowledgeBaseEntryV2Request, stream ypb.Yak_SearchKnowledgeBaseEntryV2Server) error {
+	return nil
+}
+
+// rpc QueryKnowledgeBaseByAI(QueryKnowledgeBaseByAIRequest) returns(stream QueryKnowledgeBaseByAIResponse);
+func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, stream ypb.Yak_QueryKnowledgeBaseByAIServer) error {
+	return nil
 }

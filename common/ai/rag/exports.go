@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/google/uuid"
@@ -34,6 +35,8 @@ type KnowledgeBaseConfig struct {
 	AIOptions []aispec.AIConfigOption
 
 	EmbeddingClient aispec.EmbeddingCaller
+
+	LazyLoadEmbeddingClient bool
 }
 
 func NewKnowledgeBaseConfig(options ...any) *KnowledgeBaseConfig {
@@ -67,6 +70,12 @@ type RAGOption func(config *KnowledgeBaseConfig)
 func WithEmbeddingClient(client aispec.EmbeddingCaller) RAGOption {
 	return func(config *KnowledgeBaseConfig) {
 		config.EmbeddingClient = client
+	}
+}
+
+func WithLazyLoadEmbeddingClient() RAGOption {
+	return func(config *KnowledgeBaseConfig) {
+		config.LazyLoadEmbeddingClient = true
 	}
 }
 
@@ -135,6 +144,7 @@ func CollectionIsExists(db *gorm.DB, name string) bool {
 
 // CreateCollection 创建知识库
 func CreateCollection(db *gorm.DB, name string, description string, opts ...any) (*RAGSystem, error) {
+	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 	// 创建知识库配置
 	cfg := NewKnowledgeBaseConfig(opts...)
 
@@ -161,10 +171,26 @@ func CreateCollection(db *gorm.DB, name string, description string, opts ...any)
 	if res.Error != nil {
 		return nil, utils.Errorf("创建集合失败: %v", res.Error)
 	}
+	var ragSystem *RAGSystem
+	var err error
 	if cfg.EmbeddingClient != nil {
-		return LoadCollectionWithEmbeddingClient(db, name, cfg.EmbeddingClient, cfg.AIOptions...)
+		ragSystem, err = LoadCollectionWithEmbeddingClient(db, name, cfg.EmbeddingClient, cfg.AIOptions...)
+	} else {
+		ragSystem, err = LoadCollection(db, name, cfg.AIOptions...)
 	}
-	return LoadCollection(db, name, cfg.AIOptions...)
+	if err != nil {
+		return nil, utils.Errorf("创建集合失败: %v", err)
+	}
+	ragSystem.addDocuments(Document{
+		ID:      DocumentTypeCollectionInfo,
+		Content: fmt.Sprintf("collection_name: %s\ncollection_description: %s", name, description),
+		Metadata: map[string]any{
+			"collection_name": name,
+			"collection_id":   collection.ID,
+		},
+		Embedding: nil,
+	})
+	return ragSystem, nil
 }
 
 func LoadCollectionWithEmbeddingClient(db *gorm.DB, name string, client aispec.EmbeddingCaller, opts ...aispec.AIConfigOption) (*RAGSystem, error) {

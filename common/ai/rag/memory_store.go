@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"errors"
 	"sort"
 	"sync"
 
@@ -43,6 +44,10 @@ func (m *MemoryVectorStore) Add(docs ...Document) error {
 	}
 
 	return nil
+}
+
+func (m *MemoryVectorStore) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
+	return nil, errors.New("not implemented")
 }
 
 // Search 根据查询文本检索相关文档

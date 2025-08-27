@@ -211,7 +211,7 @@ func TestTransactionOperations(t *testing.T) {
 
 	// 测试更新操作（事务）
 	entry.KnowledgeDetails = "更新后的详细内容"
-	err = kb.UpdateKnowledgeEntry(entry)
+	err = kb.UpdateKnowledgeEntry(int64(entry.ID), entry)
 	assert.NoError(t, err)
 
 	// 验证更新成功

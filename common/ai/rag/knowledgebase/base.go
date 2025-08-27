@@ -6,21 +6,32 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/aiforge/contracts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+var Simpleliteforge contracts.LiteForge
+
 // KnowledgeBase 知识库结构体，提供对知识库的操作接口
 type KnowledgeBase struct {
 	db        *gorm.DB
 	name      string
 	ragSystem *rag.RAGSystem
+	id        int64
+}
+
+func AutoMigrate(db *gorm.DB) error {
+	return db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{}, &schema.VectorStoreDocument{}, &schema.VectorStoreCollection{}).Error
 }
 
 // NewKnowledgeBase 创建新的知识库实例（先获取，获取不到则创建）
 func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any) (*KnowledgeBase, error) {
+	if err := AutoMigrate(db); err != nil {
+		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
+	}
 	// 先检查 KnowledgeBaseInfo 是否存在
 	var knowledgeBaseInfo schema.KnowledgeBaseInfo
 	err := db.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ?", name).First(&knowledgeBaseInfo).Error
@@ -53,7 +64,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 		}
 
 		// 创建 RAG Collection
-		ragSystem, err := rag.CreateCollection(db, name, description, opts...)
+		ragSystem, err := rag.CreateCollection(db, name, description, append(opts, rag.WithLazyLoadEmbeddingClient())...)
 		if err != nil {
 			// 如果 RAG 创建失败，删除已创建的 KnowledgeBaseInfo
 			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -66,12 +77,13 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 			db:        db,
 			name:      name,
 			ragSystem: ragSystem,
+			id:        int64(knowledgeBaseInfo.ID),
 		}, nil
 	}
 
 	// 如果知识库信息存在但 RAG Collection 不存在，创建 RAG Collection
 	if !needCreateInfo && !collectionExists {
-		ragSystem, err := rag.CreateCollection(db, name, knowledgeBaseInfo.KnowledgeBaseDescription, opts...)
+		ragSystem, err := rag.CreateCollection(db, name, knowledgeBaseInfo.KnowledgeBaseDescription, append(opts, rag.WithLazyLoadEmbeddingClient())...)
 		if err != nil {
 			return nil, utils.Errorf("创建RAG集合失败: %v", err)
 		}
@@ -80,6 +92,7 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 			db:        db,
 			name:      name,
 			ragSystem: ragSystem,
+			id:        int64(knowledgeBaseInfo.ID),
 		}, nil
 	}
 
@@ -108,11 +121,15 @@ func NewKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any
 		db:        db,
 		name:      name,
 		ragSystem: ragSystem,
+		id:        int64(knowledgeBaseInfo.ID),
 	}, nil
 }
 
 // CreateKnowledgeBase 创建全新的知识库（如果已存在会返回错误）
 func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...any) (*KnowledgeBase, error) {
+	if err := AutoMigrate(db); err != nil {
+		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
+	}
 	// 检查是否已存在
 	var existingInfo schema.KnowledgeBaseInfo
 	err := db.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ?", name).First(&existingInfo).Error
@@ -156,18 +173,23 @@ func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...
 		db:        db,
 		name:      name,
 		ragSystem: ragSystem,
+		id:        int64(knowledgeBaseInfo.ID),
 	}, nil
 }
 
 // LoadKnowledgeBase 加载已存在的知识库
 func LoadKnowledgeBase(db *gorm.DB, name string, opts ...any) (*KnowledgeBase, error) {
-	// 检查知识库是否存在
-	if !rag.CollectionIsExists(db, name) {
-		return nil, utils.Errorf("知识库 %s 不存在", name)
+	if err := AutoMigrate(db); err != nil {
+		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
+	}
+	var knowledgeBaseInfo schema.KnowledgeBaseInfo
+	err := db.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ?", name).First(&knowledgeBaseInfo).Error
+	if err != nil {
+		return nil, utils.Errorf("获取知识库信息失败: %v", err)
 	}
 
 	// 加载 RAG 系统
-	ragSystem, err := rag.LoadCollection(db, name)
+	ragSystem, err := rag.CreateOrLoadCollection(db, name, "")
 	if err != nil {
 		return nil, utils.Errorf("加载知识库失败: %v", err)
 	}
@@ -176,45 +198,66 @@ func LoadKnowledgeBase(db *gorm.DB, name string, opts ...any) (*KnowledgeBase, e
 		db:        db,
 		name:      name,
 		ragSystem: ragSystem,
+		id:        int64(knowledgeBaseInfo.ID),
 	}, nil
+}
+func LoadKnowledgeBaseByID(db *gorm.DB, id int64, opts ...any) (*KnowledgeBase, error) {
+	if err := AutoMigrate(db); err != nil {
+		return nil, utils.Errorf("自动迁移知识库表失败: %v", err)
+	}
+	var knowledgeBaseInfo schema.KnowledgeBaseInfo
+	err := db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", id).First(&knowledgeBaseInfo).Error
+	if err != nil {
+		return nil, utils.Errorf("获取知识库信息失败: %v", err)
+	}
+
+	return LoadKnowledgeBase(db, knowledgeBaseInfo.KnowledgeBaseName, opts...)
 }
 
 // AddKnowledgeEntry 添加知识条目到知识库（使用事务）
 func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry) error {
-	// 先添加到数据库（使用事务）
-	err := utils.GormTransaction(kb.db, func(tx *gorm.DB) error {
-		return yakit.CreateKnowledgeBaseEntry(tx, entry)
-	})
+	err := yakit.CreateKnowledgeBaseEntry(kb.db, entry)
 	if err != nil {
 		return utils.Errorf("创建知识库条目失败: %v", err)
 	}
 
-	// 然后添加到向量索引（事务外进行，避免数据库锁定）
 	if err := kb.addEntryToVectorIndex(entry); err != nil {
-		// 如果向量索引添加失败，回滚数据库操作
-		_ = utils.GormTransaction(kb.db, func(tx *gorm.DB) error {
-			return yakit.DeleteKnowledgeBaseEntry(tx, int64(entry.ID))
-		})
 		return utils.Errorf("添加向量索引失败: %v", err)
 	}
 
 	return nil
 }
 
-// UpdateKnowledgeEntry 更新知识条目（使用事务）
-func (kb *KnowledgeBase) UpdateKnowledgeEntry(entry *schema.KnowledgeBaseEntry) error {
-	// 先更新数据库（使用事务）
-	var oldEntry *schema.KnowledgeBaseEntry
-	err := utils.GormTransaction(kb.db, func(tx *gorm.DB) error {
-		// 获取旧的条目信息用于回滚
-		var err error
-		oldEntry, err = yakit.GetKnowledgeBaseEntryById(tx, int64(entry.ID))
-		if err != nil {
-			return err
-		}
-
-		return yakit.UpdateKnowledgeBaseEntry(tx, entry)
+func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType string) error {
+	err := yakit.UpdateKnowledgeBaseInfo(kb.db, kb.id, &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        name,
+		KnowledgeBaseDescription: description,
+		KnowledgeBaseType:        kbType,
 	})
+	if err != nil {
+		return utils.Errorf("更新知识库信息失败: %v", err)
+	}
+	return nil
+}
+
+// Drop 删除当前知识库
+func (kb *KnowledgeBase) Drop() error {
+	err := kb.ClearDocuments()
+	if err != nil {
+		return utils.Errorf("清空知识库文档失败: %v", err)
+	}
+	err = kb.db.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", kb.id).Unscoped().Delete(&schema.KnowledgeBaseInfo{}).Error
+	if err != nil {
+		return utils.Errorf("删除知识库信息失败: %v", err)
+	}
+	rag.DeleteCollection(kb.db, kb.name)
+	return nil
+}
+
+// UpdateKnowledgeEntry 更新知识条目（使用事务）
+func (kb *KnowledgeBase) UpdateKnowledgeEntry(id int64, entry *schema.KnowledgeBaseEntry) error {
+	entry.ID = uint(id)
+	err := yakit.UpdateKnowledgeBaseEntry(kb.db, entry)
 	if err != nil {
 		return utils.Errorf("更新知识库条目失败: %v", err)
 	}
@@ -224,124 +267,29 @@ func (kb *KnowledgeBase) UpdateKnowledgeEntry(entry *schema.KnowledgeBaseEntry) 
 
 	// 删除旧的向量索引
 	if err := kb.ragSystem.DeleteDocuments(documentID); err != nil {
-		// 如果删除失败，回滚数据库操作
-		_ = utils.GormTransaction(kb.db, func(tx *gorm.DB) error {
-			return yakit.UpdateKnowledgeBaseEntry(tx, oldEntry)
-		})
 		return utils.Errorf("删除旧向量索引失败: %v", err)
 	}
 
 	// 添加新的向量索引
 	if err := kb.addEntryToVectorIndex(entry); err != nil {
-		// 如果添加失败，回滚数据库操作
-		_ = utils.GormTransaction(kb.db, func(tx *gorm.DB) error {
-			return yakit.UpdateKnowledgeBaseEntry(tx, oldEntry)
-		})
 		return utils.Errorf("更新向量索引失败: %v", err)
 	}
-
 	return nil
 }
 
 // DeleteKnowledgeEntry 删除知识条目（使用事务）
 func (kb *KnowledgeBase) DeleteKnowledgeEntry(entryID int64) error {
-	// 先获取条目信息用于回滚
-	entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
-	if err != nil {
-		return utils.Errorf("获取知识库条目失败: %v", err)
-	}
-
 	// 先从向量索引中删除（事务外进行）
 	documentID := utils.InterfaceToString(entryID)
 	if err := kb.ragSystem.DeleteDocuments(documentID); err != nil {
 		return utils.Errorf("删除向量索引失败: %v", err)
 	}
 
-	// 然后从数据库中删除（使用事务）
-	err = utils.GormTransaction(kb.db, func(tx *gorm.DB) error {
-		return yakit.DeleteKnowledgeBaseEntry(tx, entryID)
-	})
+	err := yakit.DeleteKnowledgeBaseEntry(kb.db, entryID)
 	if err != nil {
-		// 如果数据库删除失败，恢复向量索引
-		_ = kb.addEntryToVectorIndex(entry)
 		return utils.Errorf("删除数据库条目失败: %v", err)
 	}
-
 	return nil
-}
-
-// SearchKnowledgeEntries 搜索知识条目，返回知识库条目对象
-func (kb *KnowledgeBase) SearchKnowledgeEntries(query string, limit int) ([]*schema.KnowledgeBaseEntry, error) {
-	// 先通过RAG系统进行向量搜索
-	searchResults, err := kb.ragSystem.QueryWithPage(query, 1, limit+5)
-	if err != nil {
-		return nil, utils.Errorf("RAG搜索失败: %v", err)
-	}
-
-	// 通过搜索结果中的文档ID查询对应的知识库条目
-	var entries []*schema.KnowledgeBaseEntry
-	docIDs := make(map[string]bool)
-	for _, result := range searchResults {
-		var docID string
-		if result.Document.Metadata["original_doc_id"] != nil {
-			docID = result.Document.Metadata["original_doc_id"].(string)
-		} else {
-			docID = result.Document.ID
-		}
-
-		if docID != "" && !docIDs[docID] {
-			docIDs[docID] = true
-			// 文档ID就是知识库条目的ID
-			entryID, err := strconv.ParseInt(docID, 10, 64)
-			if err != nil {
-				// 如果ID解析失败，跳过这个结果
-				continue
-			}
-
-			entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
-			if err != nil {
-				// 如果查询失败，跳过这个结果
-				continue
-			}
-
-			entries = append(entries, entry)
-		}
-	}
-
-	return entries, nil
-}
-
-// SearchKnowledgeEntriesWithScore 搜索知识条目并返回相似度分数
-func (kb *KnowledgeBase) SearchKnowledgeEntriesWithScore(query string, limit int) ([]*KnowledgeEntryWithScore, error) {
-	// 先通过RAG系统进行向量搜索
-	searchResults, err := kb.ragSystem.QueryWithPage(query, 1, limit)
-	if err != nil {
-		return nil, utils.Errorf("RAG搜索失败: %v", err)
-	}
-
-	// 通过搜索结果中的文档ID查询对应的知识库条目，并保留分数
-	var entriesWithScore []*KnowledgeEntryWithScore
-	for _, result := range searchResults {
-		// 文档ID就是知识库条目的ID
-		entryID, err := strconv.ParseInt(result.Document.ID, 10, 64)
-		if err != nil {
-			// 如果ID解析失败，跳过这个结果
-			continue
-		}
-
-		entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
-		if err != nil {
-			// 如果查询失败，跳过这个结果
-			continue
-		}
-
-		entriesWithScore = append(entriesWithScore, &KnowledgeEntryWithScore{
-			Entry: entry,
-			Score: float64(result.Score),
-		})
-	}
-
-	return entriesWithScore, nil
 }
 
 // KnowledgeEntryWithScore 带相似度分数的知识库条目
@@ -405,7 +353,9 @@ func (kb *KnowledgeBase) CountDocuments() (int, error) {
 
 // ClearDocuments 清空所有文档
 func (kb *KnowledgeBase) ClearDocuments() error {
-	return kb.ragSystem.ClearDocuments()
+	kb.ragSystem.ClearDocuments()
+	kb.db.Model(&schema.KnowledgeBaseEntry{}).Where("knowledge_base_id = ?", kb.id).Unscoped().Delete(&schema.KnowledgeBaseEntry{})
+	return nil
 }
 
 // GetName 获取知识库名称
@@ -616,4 +566,17 @@ func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []int64) (*SyncResult, error)
 	}
 
 	return result, nil
+}
+
+func (kb *KnowledgeBase) EmbedKnowledgeBaseEntry(id int64) error {
+	entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, id)
+	if err != nil {
+		return utils.Errorf("获取知识库条目失败: %v", err)
+	}
+	return kb.addEntryToVectorIndex(entry)
+}
+
+func (kb *KnowledgeBase) EmbedKnowledgeBase() error {
+	_, err := rag.BuildVectorIndexForKnowledgeBase(kb.db, kb.id)
+	return err
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, id int64, opts ...any) (*RAGSystem, error) {
+func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId, id int64, opts ...any) (*RAGSystem, error) {
 
-	knowledgeBase, err := yakit.GetKnowledgeBase(db, id)
+	knowledgeBase, err := yakit.GetKnowledgeBase(db, knowledgeBaseId)
 	if err != nil {
 		return nil, err
 	}

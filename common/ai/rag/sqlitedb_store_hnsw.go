@@ -257,6 +257,11 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 
 // Search 根据查询文本检索相关文档
 func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchResult, error) {
+	return s.SearchWithFilter(query, page, limit, nil)
+}
+
+// SearchWithFilter 根据查询文本检索相关文档，并根据过滤函数过滤结果
+func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
 	pageSize := 10
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -270,7 +275,21 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 	}
 	log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
 
-	resultNodes := s.hnsw.SearchWithDistance(queryEmbedding, (page-1)*pageSize+limit)
+	resultNodes := s.hnsw.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
+		if filter != nil {
+			return filter(key, func() *Document {
+				var docs []*schema.VectorStoreDocument
+				s.db.Where("document_id = ?", key).Find(&docs)
+				if len(docs) == 0 {
+					return nil
+				}
+				doc := docs[0]
+				res := s.toDocument(doc)
+				return &res
+			})
+		}
+		return true
+	})
 	resultIds := make([]string, len(resultNodes))
 	for i, result := range resultNodes {
 		resultIds[i] = result.Key
