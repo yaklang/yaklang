@@ -64,10 +64,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		r.UnregisterMirrorOfAIInputEvent(uid)
 	}()
 
-	cod, err := aid.NewCoordinatorContext(
-		planCtx,
-		planPayload,
-		aid.WithCoordinatorId(uid),
+	baseOpts := ConvertReActConfigToAIDConfigOptions(r.config)
+	baseOpts = append(baseOpts, aid.WithCoordinatorId(uid),
 		aid.WithMemory(r.config.memory),
 		aid.WithAICallback(r.config.aiCallback),
 		aid.WithAllowPlanUserInteract(true),
@@ -80,8 +78,8 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 				log.Errorf("Failed to emit event: %v", emitErr)
 			}
 		}),
-		aid.WithDisallowRequireForUserPrompt(),
 	)
+	cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)
 	if err != nil {
 		r.finished = true
 		log.Errorf("Failed to create coordinator for plan execution: %v", err)
