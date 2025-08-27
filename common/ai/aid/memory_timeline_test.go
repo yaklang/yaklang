@@ -29,7 +29,7 @@ func TestMemoryTimelineOrdinary(t *testing.T) {
 	result := memoryTimeline.Dump()
 	t.Log(result)
 	require.True(t, strings.Contains(result, "test"))
-	require.True(t, strings.Contains(result, "├─["))
+	require.True(t, strings.Contains(result, "--["))
 }
 
 type mockedAI struct {
@@ -63,7 +63,7 @@ func TestMemoryTimelineWithSummary(t *testing.T) {
 	result := memoryTimeline.Dump()
 	t.Log(result)
 	require.True(t, strings.Contains(result, "test"))
-	require.True(t, strings.Contains(result, "├─["))
+	require.True(t, strings.Contains(result, "--["))
 	require.True(t, strings.Contains(result, "summary via ai"))
 	require.Equal(t, strings.Count(result, `summary via ai`), 7)
 }
@@ -110,7 +110,7 @@ func TestMemoryTimelineWithReachLimitSummary(t *testing.T) {
 	result := memoryTimeline.Dump()
 	t.Log(result)
 	require.True(t, strings.Contains(result, "test"))
-	require.True(t, strings.Contains(result, "├─["))
+	require.True(t, strings.Contains(result, "--["))
 	require.True(t, strings.Contains(result, "summary via ai"))
 	require.Equal(t, strings.Count(result, `summary via ai`), 4)
 	require.True(t, strings.Contains(result, "高度压缩的内容"))
