@@ -12,6 +12,7 @@ type Interactivable interface {
 	GetEndpointManager() *EndpointManager
 	DoWaitAgree(ctx context.Context, endpoint *Endpoint)
 	CallAfterInteractiveEventReleased(string, aitool.InvokeParams)
+	CallAfterReview(seq int64, reviewQuestion string, userInput aitool.InvokeParams)
 }
 
 // BaseInteractiveHandler 基础交互处理器
@@ -35,4 +36,8 @@ func (h *BaseInteractiveHandler) DoWaitAgree(ctx context.Context, endpoint *Endp
 
 func (h *BaseInteractiveHandler) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
 	// save user interactive params
+}
+
+func (h *BaseInteractiveHandler) CallAfterReview(seq int64, reviewQuestion string, userInput aitool.InvokeParams) {
+	// save user review input
 }

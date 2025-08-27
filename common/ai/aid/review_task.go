@@ -78,6 +78,7 @@ func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
 			"root_task": t.getCurrentTaskPlan(),
 		})
+
 		return t.aiTaskRuntime.executeSubTask(1, t)
 	case "inaccurate":
 		t.EmitInfo("inaccurate")

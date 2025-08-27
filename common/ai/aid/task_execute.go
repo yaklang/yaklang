@@ -281,6 +281,7 @@ func (t *AiTask) executeTask() error {
 	t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
 	t.EmitInfo("start to handle review task event: %v", ep.GetId())
 	err := t.handleReviewResult(reviewResult)
+	t.CallAfterReview(ep.GetSeq(), "请审查当前任务的执行结果", reviewResult)
 	if err != nil {
 		log.Warnf("error handling review result: %v", err)
 	}
