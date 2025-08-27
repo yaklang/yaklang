@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
+	"strings"
 	"testing"
 	"time"
 )
@@ -92,7 +93,12 @@ func TestReAct_ToolUse(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(5 * time.Second)
+
+	du := time.Duration(50)
+	if utils.InGithubActions() {
+		du = time.Duration(5)
+	}
+	after := time.After(du * time.Second)
 
 	reviewed := false
 	reviewReleased := false
@@ -155,5 +161,14 @@ LOOP:
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
+	if !strings.Contains(tl, `mocked thought for tool calling`) {
+		t.Fatal("timeline does not contain mocked thought")
+	}
+	if !utils.MatchAllOfSubString(tl, `system-question`, "user-answer", "when review") {
+		t.Fatal("timeline does not contain system-question")
+	}
+	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct loop finished END[1]`) {
+		t.Fatal("timeline does not contain ReAct iteration")
+	}
 	fmt.Println("--------------------------------------")
 }
