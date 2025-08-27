@@ -3,19 +3,20 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"testing"
-	"time"
 )
 
 func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
-	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool", "ask_for_clarification") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "ask_for_clarification", "ask_for_clarification_payload": {"question": "...mocked question...", "options": ["` + flag + `", "option2", "option3"]} },
@@ -24,6 +25,9 @@ func mockedClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, f
 		rsp.Close()
 		return rsp, nil
 	}
+
+	fmt.Println("Unexpected prompt:", prompt)
+
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
@@ -38,7 +42,7 @@ func TestReAct_AskForClarification(t *testing.T) {
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedClarification(i, r, flag)
 		}),
-		WithDebug(true),
+		WithDebug(false),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()

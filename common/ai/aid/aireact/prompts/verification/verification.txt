@@ -7,9 +7,11 @@
 {{ .OriginalQuery }}
 <|USER_ORIGINAL_QUERY_END_{{.Nonce}}|>
 
-<|INPUT_{{.Nonce}}|>
-{{ if .IsToolCall }}# Tool Execution Context
-Tool executed: {{ .Payload }}
+<|INPUT_{{.Nonce}}|>{{ if .IsToolCall }}
+# Tool Execution Context
+Tool executed: {{ .Payload }}{{ else }}
+User Raw INPUT/ReAction Thought/Observation:
+{{ .Payload }}
 {{ end }}<|INPUT_END_{{.Nonce}}|>
 
 {{ if .Timeline }}<|TIMELINE_{{ .Nonce }}|>

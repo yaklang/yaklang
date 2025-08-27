@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -45,6 +46,7 @@ func (r *ReAct) processReActTask(task *Task) {
 		r.setCurrentTask(nil) // 处理完成后清除当前任务
 		if err := recover(); err != nil {
 			log.Errorf("ReAct task processing panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
 			task.SetStatus(string(TaskStatus_Aborted))
 			r.addToTimeline("error", fmt.Sprintf("Task processing panic: %v", err))
 		} else {
@@ -114,10 +116,17 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 
 	// show start of iteration in timeline
 	iterationTimelineInfo := utils.NewAtomicBool()
-	defer func() {
+	openIterationRecordingOnce := new(sync.Once)
+	endIterationRecordingOnce := new(sync.Once)
+	endIterationCall := func() {
 		if iterationTimelineInfo.IsSet() {
-			r.addToTimeline("iteration", "======= ReAct loop finished END["+fmt.Sprint(r.currentIteration)+"] =======")
+			endIterationRecordingOnce.Do(func() {
+				r.addToTimeline("iteration", "======= ReAct loop finished END["+fmt.Sprint(r.currentIteration)+"] =======")
+			})
 		}
+	}
+	defer func() {
+		endIterationCall()
 	}()
 
 	// Reset iteration state for new conversation
@@ -164,6 +173,18 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			continue
 		}
 		thought := action.GetString("human_readable_thought")
+
+		saveIterationInfoIntoTimeline := func() {
+			// allow iteration info to be added to timeline
+			r.addToTimeline("iteration", fmt.Sprintf(
+				"======== ReAct iteration %d ========\n"+
+					"%v", r.currentIteration, thought,
+			))
+			openIterationRecordingOnce.Do(func() {
+				iterationTimelineInfo.SetTo(true)
+			})
+		}
+
 		// Emit human readable thought
 		r.EmitThought(thought)
 		newSummary := action.GetString("cumulative_summary")
@@ -181,23 +202,20 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 				"%s\n"+
 				"ai directly answer:\n"+
 				"%v",
-				utils.PrefixLines(currentTask.GetUserInput(), "> "),
-				utils.PrefixLines(answerPayload, "| "),
+				utils.PrefixLines(currentTask.GetUserInput(), "  > "),
+				utils.PrefixLines(answerPayload, "  | "),
 			))
+			endIterationCall()
 			currentTask.SetStatus(string(TaskStatus_Completed))
 			continue
 		case ActionRequireTool:
-			// allow iteration info to be added to timeline
-			r.addToTimeline("iteration", fmt.Sprintf(
-				"======== ReAct iteration %d ========\n"+
-					"%v", r.currentIteration, thought,
-			))
-			iterationTimelineInfo.SetTo(true)
+			saveIterationInfoIntoTimeline()
 
 			toolPayload := nextAction.GetString("tool_require_payload")
 			log.Infof("Requesting tool: %s", toolPayload)
 			toolcallResult, directlyAnswerRequired, err := r.handleRequireTool(toolPayload)
 			if err != nil {
+				r.addToTimeline("error-calling-tool", fmt.Sprintf("Failed to handle require tool[%v]: %v", toolPayload, err))
 				currentTask.SetStatus(string(TaskStatus_Processing))
 				log.Errorf("Failed to handle require tool: %v, retry it", err)
 				continue
@@ -218,16 +236,19 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 						"\n===========\n"+
 						"**用户要求 AI 直接回答，所以在本次回答中，不允许使用工具和其他复杂方法手段回答**", tools)
 				if err != nil {
+					endIterationCall()
 					currentTask.SetStatus(string(TaskStatus_Aborted))
 					log.Errorf("Failed to require directly answer: %v", err)
 					continue
 				}
 				if result == "" {
+					endIterationCall()
 					currentTask.SetStatus(string(TaskStatus_Aborted))
 					log.Errorf("Failed to require directly answer: %v", err)
 					continue
 				}
 				currentTask.SetResult(strings.TrimSpace(result) + " (force directly answer)")
+				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Completed))
 				continue
 			}
@@ -241,10 +262,12 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			// Temporarily release the lock before calling verification to avoid deadlock
 			satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, true, toolPayload)
 			if err != nil {
+				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))
 				continue
 			} else if satisfied {
 				r.EmitResult(finalResult)
+				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Completed))
 				continue
 			} else {
@@ -257,6 +280,8 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 					))
 			}
 		case ActionRequestPlanExecution:
+			saveIterationInfoIntoTimeline()
+
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
 			if r.GetCurrentPlanExecutionTask() != nil {
 				// ask user to determine kill or wait
@@ -304,16 +329,19 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			case <-taskStarted:
 			}
 		case ActionAskForClarification:
+			saveIterationInfoIntoTimeline()
 			suggestion := r.invokeAskForClarification(action)
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}
 			satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, false, suggestion)
 			if err != nil {
+				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))
 				continue
 			} else if satisfied {
 				r.EmitResult(finalResult)
+				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Completed))
 				continue
 			} else {
