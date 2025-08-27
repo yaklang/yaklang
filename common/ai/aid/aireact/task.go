@@ -1,8 +1,11 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"time"
 
@@ -30,8 +33,17 @@ type Task struct {
 
 	Id        string
 	UserInput string
+	result    *bytes.Buffer
 	Status    string
 	CreatedAt time.Time
+}
+
+func (t *Task) SetResult(i string) {
+	t.result.WriteString(fmt.Sprintf("[%v]: %v\n", utils.DatetimePretty2(), i))
+}
+
+func (t *Task) GetResult() string {
+	return t.result.String()
 }
 
 func (t *Task) GetContext() context.Context {
@@ -113,6 +125,7 @@ func NewTask(id string, userInput string, emitter *aicommon.Emitter) *Task {
 		Id:        id,
 		UserInput: userInput,
 		Status:    string(TaskStatus_Created),
+		result:    new(bytes.Buffer),
 		CreatedAt: time.Now(),
 		emitter:   emitter,
 	}

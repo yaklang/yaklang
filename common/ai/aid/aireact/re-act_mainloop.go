@@ -3,6 +3,8 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
@@ -62,7 +64,13 @@ func (r *ReAct) processReActTask(task *Task) {
 		r.addToTimeline("error", fmt.Sprintf("Task execution failed: %v", err), task.GetId())
 	} else {
 		task.SetStatus(string(TaskStatus_Completed))
-		r.addToTimeline("completed", fmt.Sprintf("Task completed: %s", task.GetUserInput()), task.GetId())
+		r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
+			"    %s\n"+
+			"ai directly answer:\n"+
+			"    %v",
+			task.GetUserInput(),
+			task.GetResult(),
+		), task.GetId())
 	}
 }
 
@@ -162,6 +170,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			answerPayload := nextAction.GetString("answer_payload")
 			r.EmitResult(answerPayload)
 			currentTask.SetStatus(string(TaskStatus_Completed))
+			currentTask.SetResult(strings.TrimSpace(answerPayload))
 			continue
 		case ActionRequireTool:
 			toolPayload := nextAction.GetString("tool_require_payload")
@@ -179,6 +188,28 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			} else {
 				// handle directly answer required
 				// forcely set satisfied to true
+				result, err := r.requireDirectlyAnswer(
+					userQuery+
+						"\n===========\n"+
+						"**用户要求 AI 直接回答，所以在本次回答中，不允许使用工具和其他复杂方法手段回答**", tools)
+				if err != nil {
+					currentTask.SetStatus(string(TaskStatus_Aborted))
+					log.Errorf("Failed to require directly answer: %v", err)
+					continue
+				}
+				if result == "" {
+					currentTask.SetStatus(string(TaskStatus_Aborted))
+					log.Errorf("Failed to require directly answer: %v", err)
+					continue
+				}
+				currentTask.SetResult(strings.TrimSpace(result) + " (force directly answer)")
+				currentTask.SetStatus(string(TaskStatus_Completed))
+				continue
+			}
+
+			if nextAction.GetBool("middle_step") {
+				r.EmitInfo("middle step, tool")
+				continue
 			}
 
 			// Tool executed successfully, now verify if user needs are satisfied
@@ -194,6 +225,11 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			} else {
 				// User needs not satisfied, continue loop
 				log.Infof("User needs not fully satisfied, continuing analysis...")
+				r.addToTimeline(
+					"reason",
+					fmt.Sprintf("User needs not fully satisfied after tool call, continuing analysis...\n"+
+						"%v", finalResult,
+					), currentTask.GetId())
 			}
 		case ActionRequestPlanExecution:
 			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
