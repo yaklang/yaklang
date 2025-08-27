@@ -12,6 +12,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aireducer"
@@ -222,7 +223,7 @@ func TestReducerIntentRecognition(t *testing.T) {
 					//spew.Dump(param)
 				}
 			}()
-			memory.PushUserInteraction(aid.aicommon.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
+			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
 			return nil
 		}),
 		aireducer.WithSeparatorTrigger("\n\n"),

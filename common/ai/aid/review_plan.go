@@ -72,6 +72,8 @@ func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 }
 
 func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.InvokeParams) (*PlanResponse, error) {
+	reviewQuestion := "请审查当前的任务计划"
+
 	if utils.IsNil(rsp) {
 		return nil, utils.Error("plan response is nil")
 	}
@@ -117,6 +119,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
+		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
 		return p.handleReviewPlanResponse(newPlan, params)
 	case "incomplete":
 		p.config.EmitInfo("plan is incomplete")
@@ -142,6 +145,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
+		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
 		return p.handleReviewPlanResponse(newPlan, params)
 	case "create-subtask":
 		p.config.EmitError("create-subtask required via user suggestion")
@@ -178,6 +182,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
+		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
 		return p.handleReviewPlanResponse(newPlan, params)
 	case "freedom-review":
 		p.config.EmitInfo("user uses freedom review mode to review the plan")
@@ -205,6 +210,7 @@ func (p *planRequest) handleReviewPlanResponse(rsp *PlanResponse, param aitool.I
 			p.config.EmitError("user review params is nil, plan failed")
 			return newPlan, nil
 		}
+		p.config.CallAfterReview(ep.GetSeq(), reviewQuestion, params)
 		return p.handleReviewPlanResponse(newPlan, params)
 	default:
 		p.config.EmitError("unknown review suggestion: %s", suggestion)
