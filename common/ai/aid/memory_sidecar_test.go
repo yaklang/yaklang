@@ -188,7 +188,7 @@ func memoryTestBasic(t *testing.T) *Memory {
 
 	timelienShrinkApplyCount := 0
 
-	tokenPersistent := utils.RandStringBytes(100)
+	tokenShrink := utils.RandStringBytes(100)
 
 	m := GetDefaultMemory()
 	token1 := "memory-timeline-sidecar+" + utils.RandStringBytes(100)
@@ -223,12 +223,12 @@ func memoryTestBasic(t *testing.T) *Memory {
 				haveSidecarMem = true
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), tokenPersistent) {
+			if utils.MatchAllOfSubString(request.GetPrompt(), tokenShrink) {
 				timelienShrinkApplyCount++
 			}
 
 			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-shrink"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-shrink", "persistent": "` + tokenPersistent + `"}`))
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-shrink", "persistent": "` + tokenShrink + `"}`))
 				log.Info("timeline shrink triggered")
 				timeshrinkTrigger = true
 				return rsp, nil
@@ -334,6 +334,7 @@ LOOP:
 			}
 
 			if useToolReview && useToolReviewPass && timeshrinkTrigger {
+
 				break LOOP
 			}
 			fmt.Println("review task result:" + result.String())
@@ -352,8 +353,23 @@ LOOP:
 		t.Fatal("sidecar memory failed")
 	}
 
-	if !utils.MatchAllOfSubString(m.timeline.Dump(), token1, token2, noexistedfileToken) {
+	passed := false
+	// 由于异步处理原因，时间线检查给 3 * 500 ms 的宽容度
+	for i := 0; i < 3; i++ {
+		if utils.MatchAllOfSubString(m.timeline.Dump(), token2, tokenShrink, noexistedfileToken) {
+			passed = true
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	if !passed {
+		fmt.Println(m.timeline.Dump())
+		fmt.Println("--------------------------------------------------------")
+		fmt.Println(token1)
+		fmt.Println(token2)
+		fmt.Println(tokenShrink)
 		t.Fatal("timeline not right")
 	}
+
 	return m.CopyReducibleMemory()
 }

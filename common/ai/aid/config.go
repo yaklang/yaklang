@@ -146,6 +146,10 @@ func (c *Config) Feed(endpointId string, params aitool.InvokeParams) {
 	}
 }
 
+func (c *Config) CallAfterReview(seq int64, reviewQuestion string, userInput aitool.InvokeParams) {
+	c.memory.PushUserInteraction(aicommon.UserInteractionStage_Review, seq, reviewQuestion, string(utils.Jsonify(userInput)))
+}
+
 func (c *Config) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
 	c.memory.StoreInteractiveUserInput(eventID, invoke)
 }

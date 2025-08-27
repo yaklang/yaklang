@@ -258,6 +258,7 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 		params := ep.GetParams()
 		emitter.EmitInteractiveRelease(ep.GetId(), params)
 		config.CallAfterInteractiveEventReleased(ep.GetId(), params)
+		config.CallAfterReview(ep.GetSeq(), "tool use review", params)
 		if params == nil {
 			emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
 			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))

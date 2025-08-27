@@ -408,6 +408,12 @@ func (cfg *ReActConfig) GetEndpointManager() *aicommon.EndpointManager {
 	return cfg.epm
 }
 
+func (cfg *ReActConfig) CallAfterReview(seq int64, reviewQuestion string, userInput aitool.InvokeParams) {
+	if cfg.memory != nil {
+		cfg.memory.PushUserInteraction(aicommon.UserInteractionStage_Review, seq, reviewQuestion, string(utils.Jsonify(userInput)))
+	}
+}
+
 func (cfg *ReActConfig) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
 	// Store interactive user input
 	if cfg.memory != nil {
