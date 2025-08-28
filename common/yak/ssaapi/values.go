@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -37,6 +38,7 @@ type Value struct {
 
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
+	DataFlowPath []*Value
 	DescInfo     map[string]string
 	// value from database
 	auditNode *ssadb.AuditNode
@@ -59,6 +61,16 @@ func (v *Value) getInstruction() ssa.Instruction {
 		return v.innerUser
 	}
 	return nil
+}
+
+func (v *Value) hasDataFlow(target *Value) bool {
+	if v == nil {
+		return false
+	}
+	if v.DataFlowPath == nil {
+		return false
+	}
+	return slices.Contains(v.DataFlowPath, target)
 }
 
 func (v *Value) hasDependOn(target *Value) bool {
@@ -1076,6 +1088,22 @@ func (v *Value) GetDependOn() Values {
 		}
 	}
 	return v.safeMapToValues(v.DependOn)
+}
+
+func (v *Value) GetDataFlow() Values {
+	if len(v.DataFlowPath) == 0 {
+		// load from db
+		if auditNode := v.auditNode; auditNode != nil {
+			nodeIds := ssadb.GetDataFlowEdgeByToNodeId(auditNode.ID)
+			for _, id := range nodeIds {
+				d := v.NewValueFromAuditNode(id)
+				if d != nil {
+					v.DataFlowPath = append(v.DataFlowPath, d)
+				}
+			}
+		}
+	}
+	return v.DataFlowPath
 }
 
 func (v *Value) GetEffectOn() Values {

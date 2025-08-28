@@ -9,6 +9,7 @@ type EdgeType string
 const (
 	EdgeTypeDependOn    = "depend_on"
 	EdgeTypeEffectOn    = "effect_on"
+	EdgeTypeDataflow    = "dataflow"
 	EdgeTypePredecessor = "predecessor"
 )
 
@@ -28,51 +29,33 @@ func (v *Value) GenerateGraph(g Graph) error {
 		next := make([]*Value, 0, len(prevs))
 		for _, prev := range prevs {
 			switch prev.Info.Label {
-			case Predecessors_BottomUseLabel:
-				// value(prev) --effectOn--> user(v)
-				dfs(v, func(v *Value) (Values, error) {
-					dependOn := v.GetDependOn()
-					for _, d := range dependOn {
+			case Predecessors_BottomUseLabel, Predecessors_TopDefLabel:
+				dfs(prev.Node, func(v *Value) (Values, error) {
+					nexts := v.GetDataFlow()
+					for _, next := range nexts {
 						if err := g.CreateEdge(Edge{
 							From: v,
-							To:   d,
-							Kind: EdgeTypeDependOn,
+							To:   next,
+							Kind: EdgeTypeDataflow,
 						}); err != nil {
 							return nil, err
 						}
 					}
-					return dependOn, nil
-				})
-			case Predecessors_TopDefLabel:
-				// value(prev) --dependOn--> def (v)
-				// def(v)      --effectOn--> value(prev)
-				dfs(v, func(v *Value) (Values, error) {
-					effectOn := v.GetEffectOn()
-					for _, e := range effectOn {
-						if err := g.CreateEdge(Edge{
-							From: e,
-							To:   v,
-							Kind: EdgeTypeDependOn,
-						}); err != nil {
-							return nil, err
-						}
-					}
-					return effectOn, nil
+					return nexts, nil
 				})
 			default:
-				// add predecessor edge
-				if err := g.CreateEdge(Edge{
-					From: prev.Node,
-					To:   v,
-					Kind: EdgeTypePredecessor,
-					Msg: map[string]any{
-						"label": prev.Info.Label,
-						"step":  prev.Info.Step,
-					},
-				}); err != nil {
-					return nil, err
-				}
-				next = append(next, prev.Node)
+			}
+			// add predecessor edge
+			if err := g.CreateEdge(Edge{
+				From: prev.Node,
+				To:   v,
+				Kind: EdgeTypePredecessor,
+				Msg: map[string]any{
+					"label": prev.Info.Label,
+					"step":  prev.Info.Step,
+				},
+			}); err != nil {
+				return nil, err
 			}
 		}
 		return next, nil

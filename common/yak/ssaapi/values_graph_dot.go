@@ -60,21 +60,21 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 		edgeLabel string
 		step      int64
 	)
+	edgeLabel = string(edge.Kind)
 	if edge.Msg != nil {
-		edgeLabel = edge.Msg["label"].(string)
-		step = int64(edge.Msg["step"].(int))
+		if label, ok := edge.Msg["label"].(string); ok {
+			edgeLabel = label
+		}
+		if s, ok := edge.Msg["step"].(int); ok {
+			step = int64(s)
+		}
 	}
 	if step > 0 {
 		edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
 	}
-	switch edge.Kind {
-	case EdgeTypePredecessor:
+	if edge.Kind == EdgeTypePredecessor {
 		g.EdgeAttribute(dotEdge, "color", "red")
 		g.EdgeAttribute(dotEdge, "fontcolor", "red")
-	case EdgeTypeDependOn:
-		edgeLabel = "dependOn"
-	case EdgeTypeEffectOn:
-		edgeLabel = "effectOn"
 	}
 	g.EdgeAttribute(dotEdge, "penwidth", "3.0")
 	g.EdgeAttribute(dotEdge, "label", edgeLabel)

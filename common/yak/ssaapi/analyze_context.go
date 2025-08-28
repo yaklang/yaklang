@@ -38,6 +38,9 @@ type AnalyzeContext struct {
 
 	// Use for recursive depth limit
 	recursiveCounter int64
+
+	// savedPath map[*Value]struct{}
+	recursiveStatusIsLeaf *utils.Stack[bool]
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
@@ -47,6 +50,7 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 		config:                 NewOperations(opt...),
 		depth:                  -1,
 		callStack:              utils.NewStack[*ssa.Call](),
+		recursiveStatusIsLeaf:  utils.NewStack[bool](),
 	}
 	return actx
 }
@@ -58,6 +62,10 @@ func (a *AnalyzeContext) popCall() *ssa.Call {
 }
 func (a *AnalyzeContext) peekCall(index int) *ssa.Call {
 	return a.callStack.PeekN(index)
+}
+
+func (a *AnalyzeContext) ShouldSavePath() bool {
+	return a.recursiveStatusIsLeaf.Peek()
 }
 
 // check determines whether to switch the analysis stack based on cross-process and intra-process analysis.
@@ -162,6 +170,9 @@ func (a *AnalyzeContext) getRecursiveCounter() int64 {
 
 func (a *AnalyzeContext) enterRecursive() {
 	atomic.AddInt64(&a.recursiveCounter, 1)
+	a.recursiveStatusIsLeaf.Pop()
+	a.recursiveStatusIsLeaf.Push(false) // prev status is false, because it have next recursive
+	a.recursiveStatusIsLeaf.Push(true)  // current status is true
 }
 
 // ========================================== OBJECT STACK ==========================================
