@@ -164,7 +164,11 @@ func (eb *EntityBase) addEntityToVectorIndex(entry *schema.ERModelEntity) error 
 
 	documentID := utils.InterfaceToString(entry.ID)
 
-	return eb.GetRAGSystem().Add(documentID, entry.String(), rag.WithDocumentRawMetadata(metadata))
+	err := eb.GetRAGSystem().Add(documentID, entry.String(), rag.WithDocumentRawMetadata(metadata))
+	if err != nil {
+		return err
+	}
+	return eb.GetRAGSystem().Add(documentID, entry.EntityName, rag.WithDocumentRawMetadata(metadata))
 }
 
 func (eb *EntityBase) UpdateEntity(id uint, e *schema.ERModelEntity) error {
@@ -218,84 +222,94 @@ func (eb *EntityBase) AddRelation(sourceID uint, targetID uint, relationType str
 }
 
 // --- ER Model Operations ---
-
-func (eb *EntityBase) GetSubERModel(entityName string, deeps ...int) (*ERModelGraph, error) {
+func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERModelGraph, error) {
 	allEntities := make([]*schema.ERModelEntity, 0)
 	allRelations := make([]*schema.ERModelRelation, 0)
-	entityFilterMap := make(map[uint]struct{})
-	relationFilterMap := make(map[uint]struct{})
 
 	appendEntity := func(entityList ...*schema.ERModelEntity) {
-		for _, e := range entityList {
-			if _, exists := entityFilterMap[e.ID]; !exists {
-				entityFilterMap[e.ID] = struct{}{}
-				allEntities = append(allEntities, e)
-			}
-		}
+		allEntities = append(allEntities, entityList...)
 	}
 
 	appendRelation := func(relationList ...*schema.ERModelRelation) {
-		for _, relation := range relationList {
-			if _, exists := relationFilterMap[relation.ID]; !exists {
-				relationFilterMap[relation.ID] = struct{}{}
-				allRelations = append(allRelations, relation)
-			}
-		}
+		allRelations = append(allRelations, relationList...)
 	}
 
-	deep := 2
-	if len(deeps) > 0 {
-		deep = deeps[0]
+	maxDepth := 2
+	if len(maxDepths) > 0 {
+		maxDepth = maxDepths[0]
 	}
 
-	centerEntity, _, err := eb.MatchEntities(&schema.ERModelEntity{
+	startEntity, _, err := eb.MatchEntities(&schema.ERModelEntity{
 		EntityName: entityName,
 	})
 	if err != nil {
 		return nil, err
 	}
-	if centerEntity == nil {
+	if startEntity == nil {
 		return nil, utils.Errorf("实体 %s 不存在", entityName)
 	}
 
-	appendEntity(centerEntity)
-	appendRelation(centerEntity.IncomingRelations...)
-	appendRelation(centerEntity.OutgoingRelations...)
-
-	for i := 0; i < deep; i++ {
-		var newEntities []*schema.ERModelEntity
-		for _, relation := range allRelations {
-			if relation.SourceEntityID != 0 {
-				sourceEntity, err := yakit.GetEntity(eb.db, relation.SourceEntityID)
-				if err != nil {
-					return nil, nil, err
-				}
-				if sourceEntity != nil {
-					newEntities = append(newEntities, sourceEntity)
-				}
-			}
-			if relation.TargetEntityID != 0 {
-				targetEntity, err := yakit.GetEntity(eb.db, relation.TargetEntityID)
-				if err != nil {
-					return nil, nil, err
-				}
-				if targetEntity != nil {
-					newEntities = append(newEntities, targetEntity)
-				}
-			}
-		}
-
-		appendEntity(newEntities...)
-
-		var newRelations []*schema.ERModelRelation
-		for _, entity := range newEntities {
-			newRelations = append(newRelations, entity.IncomingRelations...)
-			newRelations = append(newRelations, entity.OutgoingRelations...)
-		}
-
-		appendRelation(newRelations...)
+	type queueItem struct {
+		entityID uint
+		depth    int
+		e        *schema.ERModelEntity
 	}
 
+	queue := []queueItem{
+		{
+			entityID: startEntity.ID,
+			depth:    0,
+			e:        startEntity,
+		},
+	}
+	visited := map[uint]bool{startEntity.ID: true}
+	visitedRelations := map[uint]bool{}
+
+	head := 0
+	for head < len(queue) {
+		currentItem := queue[head]
+		head++
+		currentEntity := currentItem.e
+		if maxDepth > 0 && currentItem.depth >= maxDepth {
+			continue
+		}
+		// 准备要遍历的关系列表
+		relationsToExplore := make([]*schema.ERModelRelation, 0)
+		if currentEntity.OutgoingRelations != nil {
+			relationsToExplore = append(relationsToExplore, currentEntity.OutgoingRelations...)
+		}
+		if currentEntity.IncomingRelations != nil {
+			relationsToExplore = append(relationsToExplore, currentEntity.IncomingRelations...)
+		}
+
+		for _, relation := range relationsToExplore {
+			if visitedRelations[relation.ID] {
+				continue
+			}
+			visitedRelations[relation.ID] = true
+			appendRelation(relation)
+			var neighborID uint
+			if relation.SourceEntityID == currentItem.entityID {
+				neighborID = relation.TargetEntityID
+			} else {
+				neighborID = relation.SourceEntityID
+			}
+			if !visited[neighborID] {
+				neighbor, err := yakit.GetEntityByID(eb.db, neighborID)
+				if err != nil {
+					return nil, err
+				}
+				visited[neighborID] = true
+				appendEntity(currentEntity)
+				queue = append(queue, queueItem{entityID: neighborID, depth: currentItem.depth + 1, e: neighbor})
+			}
+		}
+	}
+
+	return &ERModelGraph{
+		Entities:  allEntities,
+		Relations: allRelations,
+	}, nil
 }
 
 func NewEntityBase(db *gorm.DB, name, description string, opts ...any) (*EntityBase, error) {
