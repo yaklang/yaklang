@@ -30,13 +30,14 @@ type SSARisk struct {
 	IsPotential bool `json:"is_potential"`
 
 	// risk info
-	CVE                 string `json:"cve"`
-	IsRead              bool   `json:"is_read"`
-	Ignore              bool   `json:"ignore"`
-	UploadOnline        bool   `json:"upload_online"`
-	CveAccessVector     string `json:"cve_access_vector"`
-	CveAccessComplexity string `json:"cve_access_complexity"`
-	Tags                string `json:"tags"`
+	CVE                 string      `json:"cve"`
+	CWE                 StringArray `gorm:"type:text" json:"cwe"`
+	IsRead              bool        `json:"is_read"`
+	Ignore              bool        `json:"ignore"`
+	UploadOnline        bool        `json:"upload_online"`
+	CveAccessVector     string      `json:"cve_access_vector"`
+	CveAccessComplexity string      `json:"cve_access_complexity"`
+	Tags                string      `json:"tags"`
 
 	// 来源于哪个规则
 	FromRule string `json:"from_rule"`
@@ -105,6 +106,7 @@ func (s *SSARisk) ToGRPCModel() *ypb.SSARisk {
 		RuntimeID:            s.RuntimeId,
 		IsPotential:          s.IsPotential,
 		CVE:                  s.CVE,
+		CWE:                  s.CWE,
 		CveAccessVector:      s.CveAccessVector,
 		CveAccessComplexity:  s.CveAccessComplexity,
 		Tags:                 s.Tags,

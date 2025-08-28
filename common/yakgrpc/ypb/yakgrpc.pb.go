@@ -28616,13 +28616,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -37847,8 +37847,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -53227,6 +53227,7 @@ type SSARisk struct {
 	RuntimeID           string                 `protobuf:"bytes,16,opt,name=RuntimeID,proto3" json:"RuntimeID,omitempty"`
 	IsPotential         bool                   `protobuf:"varint,17,opt,name=IsPotential,proto3" json:"IsPotential,omitempty"`
 	CVE                 string                 `protobuf:"bytes,18,opt,name=CVE,proto3" json:"CVE,omitempty"`
+	CWE                 []string               `protobuf:"bytes,31,rep,name=CWE,proto3" json:"CWE,omitempty"`
 	CveAccessVector     string                 `protobuf:"bytes,19,opt,name=CveAccessVector,proto3" json:"CveAccessVector,omitempty"`
 	CveAccessComplexity string                 `protobuf:"bytes,20,opt,name=CveAccessComplexity,proto3" json:"CveAccessComplexity,omitempty"`
 	Tags                string                 `protobuf:"bytes,21,opt,name=Tags,proto3" json:"Tags,omitempty"`
@@ -53398,6 +53399,13 @@ func (x *SSARisk) GetCVE() string {
 		return x.CVE
 	}
 	return ""
+}
+
+func (x *SSARisk) GetCWE() []string {
+	if x != nil {
+		return x.CWE
+	}
+	return nil
 }
 
 func (x *SSARisk) GetCveAccessVector() string {
@@ -63446,7 +63454,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18FuzzTagSuggestionRequest\x12\"\n" +
 	"\fHotPatchCode\x18\x01 \x01(\tR\fHotPatchCode\x12 \n" +
 	"\vFuzztagCode\x18\x02 \x01(\tR\vFuzztagCode\x12 \n" +
-	"\vInspectType\x18\x03 \x01(\tR\vInspectType\"\x97\a\n" +
+	"\vInspectType\x18\x03 \x01(\tR\vInspectType\"\xa9\a\n" +
 	"\aSSARisk\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tCreatedAt\x18\x02 \x01(\x03R\tCreatedAt\x12\x1c\n" +
@@ -63466,7 +63474,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bFromRule\x18\x0f \x01(\tR\bFromRule\x12\x1c\n" +
 	"\tRuntimeID\x18\x10 \x01(\tR\tRuntimeID\x12 \n" +
 	"\vIsPotential\x18\x11 \x01(\bR\vIsPotential\x12\x10\n" +
-	"\x03CVE\x18\x12 \x01(\tR\x03CVE\x12(\n" +
+	"\x03CVE\x18\x12 \x01(\tR\x03CVE\x12\x10\n" +
+	"\x03CWE\x18\x1f \x03(\tR\x03CWE\x12(\n" +
 	"\x0fCveAccessVector\x18\x13 \x01(\tR\x0fCveAccessVector\x120\n" +
 	"\x13CveAccessComplexity\x18\x14 \x01(\tR\x13CveAccessComplexity\x12\x12\n" +
 	"\x04Tags\x18\x15 \x01(\tR\x04Tags\x12\x16\n" +

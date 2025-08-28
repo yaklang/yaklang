@@ -13,17 +13,17 @@ type Risk struct {
 	Hash string `json:"hash"`
 
 	// info
-	Title        string    `json:"title"`
-	TitleVerbose string    `json:"title_verbose"`
-	Description  string    `json:"description"`
-	Solution     string    `json:"solution"`
-	Severity     string    `json:"severity"`
-	RiskType     string    `json:"risk_type"`
-	Details      string    `json:"details"`
-	CVE          string    `json:"cve"`
-	CWE          []string  `json:"cwe"`
-	Time         time.Time `json:"time"`
-	Language     string    `json:"language"`
+	Title        string             `json:"title"`
+	TitleVerbose string             `json:"title_verbose"`
+	Description  string             `json:"description"`
+	Solution     string             `json:"solution"`
+	Severity     string             `json:"severity"`
+	RiskType     string             `json:"risk_type"`
+	Details      string             `json:"details"`
+	CVE          string             `json:"cve"`
+	CWE          schema.StringArray `json:"cwe"`
+	Time         time.Time          `json:"time"`
+	Language     string             `json:"language"`
 	// code info
 	CodeSourceURL string `json:"code_source_url"`
 	Line          int64  `json:"line"`
@@ -87,19 +87,18 @@ func NewRisk(risk *schema.SSARisk) *Risk {
 		RiskType:     risk.RiskType,
 		Details:      risk.Details,
 		CVE:          risk.CVE,
+		CWE:          risk.CWE,
 		Language:     risk.Language,
 
-		CodeRange:    risk.CodeRange,
-		CodeFragment: risk.CodeFragment,
-		FunctionName: risk.FunctionName,
-		Line:         risk.Line,
+		CodeRange:     risk.CodeRange,
+		CodeFragment:  risk.CodeFragment,
+		CodeSourceURL: risk.CodeSourceUrl,
+		FunctionName:  risk.FunctionName,
+		Line:          risk.Line,
 
 		ProgramName:          risk.ProgramName,
 		LatestDisposalStatus: risk.LatestDisposalStatus,
 	}
-
-	// 自动从CVE填充CWE信息
-	PopulateCWEFromCVE(ret)
 
 	// Generate data flow paths if available
 	if risk.ResultID != 0 && risk.Variable != "" {
@@ -163,7 +162,7 @@ func (r *Risk) GetCodeRange() string {
 }
 
 func (r *Risk) GetCodeFragment() string {
-	return r.CodeRange
+	return r.CodeFragment
 }
 
 func (r *Risk) GetFunctionName() string {
@@ -191,5 +190,6 @@ func (r *Risk) SetRule(rule *Rule) {
 }
 
 func (r *Risk) SetFile(file *File) {
-	r.CodeSourceURL = file.Path
+	// 不覆盖 CodeSourceURL，因为它已经从 SSARisk 中正确设置
+	// r.CodeSourceURL = file.Path
 }

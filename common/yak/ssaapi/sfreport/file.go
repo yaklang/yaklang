@@ -8,18 +8,20 @@ import (
 )
 
 type File struct {
-	Path    string            `json:"path"`    // file path
-	Length  int64             `json:"length"`  // length of the code
-	Hash    map[string]string `json:"hash"`    // hash of the code
-	Content string            `json:"content"` // long text
+	Path      string            `json:"path"`    // file path
+	Length    int64             `json:"length"`  // length of the code
+	Hash      map[string]string `json:"hash"`    // hash of the code
+	Content   string            `json:"content"` // long text
+	LineCount int               `json:"line_count"`
 
 	Risks []string `json:"risks"` // risk hash list
 }
 
 func NewFile(reportType ReportType, editor *memedit.MemEditor) *File {
 	ret := &File{
-		Path:   editor.GetFilename(),
-		Length: int64(editor.GetLength()),
+		Path:      editor.GetFilename(),
+		Length:    int64(editor.GetLength()),
+		LineCount: editor.GetLineCount(),
 		Hash: map[string]string{
 			"md5":    editor.SourceCodeMd5(),
 			"sha1":   editor.SourceCodeSha1(),
