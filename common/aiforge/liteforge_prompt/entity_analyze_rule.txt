@@ -27,5 +27,8 @@
     *   `HAS_CONDITION` (Rule A `HAS_CONDITION` Condition C): 规则的前提。
     *   `IMPOSES` (Rule A `IMPOSES` Obligation B): 规则施加了某项义务。
     *   `GRANTS` (Rule A `GRANTS` Right B): 规则授予了某项权利。
+
+## **注意事项**
+请保留实体在输入中的语言格式，不要进行翻译。
 # **任务**
 分析 `<|INPUT|>` 的规则文本，并严格按照统一的 JSON Schema 格式输出提取的实体和关系。

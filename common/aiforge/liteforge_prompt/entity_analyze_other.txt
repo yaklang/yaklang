@@ -23,5 +23,8 @@
     *   `CAUSED_BY`, `LEADS_TO`: 因果关系。
     *   `STATES` (e.g., Person A `STATES` Claim B): 观点归属。
     *   `LOCATED_IN`, `OCCURRED_ON`: 时空关系。
+
+## **注意事项**
+请保留实体在输入中的语言格式，不要进行翻译。
 # **任务**
 分析 `<|INPUT|>` 内容，并严格按照统一的 JSON Schema 格式输出你提取的实体和关系。

@@ -64,7 +64,7 @@ func (c *BufferChunk) SetIsTheLastChunk(isLast bool) {
 var _ Chunk = (*BufferChunk)(nil)
 
 func NewBufferChunk(buffer []byte) *BufferChunk {
-	return NewBufferChunkEx(buffer, nil, "")
+	return NewBufferChunkEx(buffer, mimetype.Detect(buffer), "")
 }
 
 func NewBufferChunkEx(buffer []byte, mimeType *mimetype.MIME, verbose string) *BufferChunk {
