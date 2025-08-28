@@ -3,12 +3,13 @@ package aireact
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestReAct_QueueEnqueue(t *testing.T) {
@@ -110,7 +111,7 @@ LOOP:
 		t.Fatal("task not enqueue")
 	}
 	if count <= 1 {
-		t.Fatal("task enqueue count is less than 2")
+		t.Fatal("task enqueue count is less than 2, got " + fmt.Sprint(count))
 	}
 }
 
