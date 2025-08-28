@@ -3993,8 +3993,9 @@ type AIOutputEvent struct {
 	Timestamp       int64                  `protobuf:"varint,10,opt,name=Timestamp,proto3" json:"Timestamp,omitempty"`
 	TaskIndex       string                 `protobuf:"bytes,11,opt,name=TaskIndex,proto3" json:"TaskIndex,omitempty"`
 	DisableMarkdown bool                   `protobuf:"varint,13,opt,name=DisableMarkdown,proto3" json:"DisableMarkdown,omitempty"`
-	IsSync          bool                   `protobuf:"varint,12,opt,name=IsSync,proto3" json:"IsSync,omitempty"` // 是否是同步消息
-	SyncID          string                 `protobuf:"bytes,14,opt,name=SyncID,proto3" json:"SyncID,omitempty"`  // 用于同步消息的 ID
+	IsSync          bool                   `protobuf:"varint,12,opt,name=IsSync,proto3" json:"IsSync,omitempty"`      // 是否是同步消息
+	SyncID          string                 `protobuf:"bytes,14,opt,name=SyncID,proto3" json:"SyncID,omitempty"`       // 用于同步消息的 ID
+	EventUUID       string                 `protobuf:"bytes,16,opt,name=EventUUID,proto3" json:"EventUUID,omitempty"` // 事件的唯一ID, used via stream stream-finished
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -4130,6 +4131,13 @@ func (x *AIOutputEvent) GetIsSync() bool {
 func (x *AIOutputEvent) GetSyncID() string {
 	if x != nil {
 		return x.SyncID
+	}
+	return ""
+}
+
+func (x *AIOutputEvent) GetEventUUID() string {
+	if x != nil {
+		return x.EventUUID
 	}
 	return ""
 }
@@ -58078,7 +58086,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12$\n" +
-	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xbb\x03\n" +
+	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xd9\x03\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -58095,7 +58103,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tTaskIndex\x18\v \x01(\tR\tTaskIndex\x12(\n" +
 	"\x0fDisableMarkdown\x18\r \x01(\bR\x0fDisableMarkdown\x12\x16\n" +
 	"\x06IsSync\x18\f \x01(\bR\x06IsSync\x12\x16\n" +
-	"\x06SyncID\x18\x0e \x01(\tR\x06SyncID\"\xda\x03\n" +
+	"\x06SyncID\x18\x0e \x01(\tR\x06SyncID\x12\x1c\n" +
+	"\tEventUUID\x18\x10 \x01(\tR\tEventUUID\"\xda\x03\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x10IsConfigHotpatch\x18\b \x01(\bR\x10IsConfigHotpatch\x12\"\n" +
