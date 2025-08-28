@@ -383,14 +383,9 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 				f()
 			}
 		}()
-		firstByte := new(sync.Once)
-		skipFinished := utils.NewAtomicBool()
-		io.Copy(producer, utils.ReaderOnFirstByte(e.reader, func() {
-			firstByte.Do(func() {
-				skipFinished.SetTo(true)
-			})
-		}))
-		if !skipFinished.IsSet() {
+		n, _ := io.Copy(producer, e.reader)
+		if n > 0 {
+			du := time.Since(e.startTime)
 			r.EmitStructured("stream-finished", map[string]any{
 				"node_id":         e.nodeId,
 				"coordinator_id":  r.id,
@@ -399,6 +394,7 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 				"start_timestamp": startTS,
 				"task_index":      e.taskIndex,
 				"event_writer_id": ewid,
+				"duration_ms":     du.Milliseconds(),
 			})
 		}
 	}()
