@@ -74,10 +74,11 @@ func TestReAct_QueueEnqueueCount(t *testing.T) {
 		WithDebug(true),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
+			fmt.Println("===============================")
 			fmt.Println("Event: ", e.String())
+			fmt.Println("===============================")
 			if e.NodeId == "react_task_enqueue" {
-				atomic.AddInt32(atomicCount, 1)
-				if atomic.LoadInt32(atomicCount) >= 3 {
+				if atomic.AddInt32(atomicCount, 1) >= 3 {
 					cancel()
 				}
 			}
