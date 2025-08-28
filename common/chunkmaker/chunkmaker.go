@@ -2,8 +2,9 @@ package chunkmaker
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type ChunkMaker interface {
@@ -55,7 +56,7 @@ func WithCtx(ctx context.Context) Option {
 
 func NewConfig(opts ...Option) *Config {
 	c := &Config{
-		chunkSize: 1024,
+		chunkSize: 1024 * 4,
 	}
 
 	for _, opt := range opts {

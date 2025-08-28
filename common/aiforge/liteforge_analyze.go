@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/mimetype"
 )
 
@@ -19,7 +20,7 @@ func AnalyzeFile(path string, option ...any) (<-chan AnalysisResult, error) {
 		analyzeConfig.AnalyzeLog("file is video: %s", path)
 		return AnalyzeVideo(path, option...)
 	} else {
-		analyzeConfig.AnalyzeLog("file not video: %s", path)
+		analyzeConfig.AnalyzeLog("file not video, try doc or txt: %s", path)
 		return AnalyzeSingleMedia(path, option...)
 	}
 }
