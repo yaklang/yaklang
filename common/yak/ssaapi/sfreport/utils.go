@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
@@ -188,76 +186,4 @@ func generateEdgeDescription(edgeLabel string) string {
 // nodeId converts node ID to string format
 func nodeId(i int) string {
 	return fmt.Sprintf("n%d", i)
-}
-
-// GetCWEsByCVE 通过CVE字符串查询相关的CWE列表
-func GetCWEsByCVE(cveStr string) ([]string, error) {
-	if cveStr == "" {
-		return nil, nil
-	}
-
-	// 获取CVE数据库连接
-	db := consts.GetGormCVEDatabase()
-	if db == nil {
-		log.Warnf("CVE database not available, cannot query CWE for CVE: %s", cveStr)
-		return nil, utils.Errorf("CVE database not available")
-	}
-
-	// 查询CVE详情
-	cve, err := cveresources.GetCVE(db, cveStr)
-	if err != nil {
-		log.Errorf("get CVE %s failed: %v", cveStr, err)
-		return nil, utils.Wrapf(err, "get CVE %s failed", cveStr)
-	}
-
-	if cve == nil || cve.CWE == "" {
-		log.Warnf("CVE %s has no associated CWE information", cveStr)
-		return nil, nil
-	}
-
-	// 解析CWE字符串，支持多种分隔符
-	cwes := utils.PrettifyListFromStringSplitEx(cve.CWE, "|", ",")
-	if len(cwes) == 0 {
-		return nil, nil
-	}
-
-	// 清理和标准化CWE格式
-	var result []string
-	for _, cwe := range cwes {
-		cwe = strings.TrimSpace(cwe)
-		if cwe == "" {
-			continue
-		}
-
-		// 确保CWE格式正确（以CWE-开头）
-		if !strings.HasPrefix(strings.ToUpper(cwe), "CWE-") {
-			// 如果只是数字，添加CWE-前缀
-			if strings.TrimSpace(cwe) != "" {
-				cwe = "CWE-" + cwe
-			}
-		}
-
-		result = append(result, cwe)
-	}
-
-	log.Debugf("Found %d CWE(s) for CVE %s: %v", len(result), cveStr, result)
-	return result, nil
-}
-
-// PopulateCWEFromCVE 从CVE字符串填充CWE信息到Risk结构体
-func PopulateCWEFromCVE(risk *Risk) {
-	if risk == nil || risk.CVE == "" {
-		return
-	}
-
-	cwes, err := GetCWEsByCVE(risk.CVE)
-	if err != nil {
-		log.Errorf("populate CWE from CVE %s failed: %v", risk.CVE, err)
-		return
-	}
-
-	if len(cwes) > 0 {
-		risk.CWE = cwes
-		log.Debugf("Populated %d CWE(s) for risk %s from CVE %s", len(cwes), risk.Hash, risk.CVE)
-	}
 }

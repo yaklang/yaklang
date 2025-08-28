@@ -223,9 +223,8 @@ func (ssr *SSAProjectReport) convertFiles(files []*File, riskHashMap map[string]
 		ssaFile := &SSAReportFile{
 			FilePath:  file.Path,
 			Language:  ssr.Language, // 使用报告的语言信息
-			LineCount: 0,            // 原结构体中没有行数信息
+			LineCount: file.LineCount,
 			RiskCount: len(file.Risks),
-			// 风险等级统计需要根据风险哈希来计算
 		}
 
 		// 根据文件关联的风险计算各等级数量
@@ -239,9 +238,9 @@ func (ssr *SSAProjectReport) convertRules(rules []*Rule) {
 	for _, rule := range rules {
 		ssaRule := &SSAReportRule{
 			RuleName:    rule.RuleName,
-			Title:       "", // 原结构体中没有对应字段
-			TitleZh:     "", // 原结构体中没有对应字段
-			Severity:    "", // 原结构体中没有对应字段
+			Title:       rule.Title,
+			TitleZh:     rule.TitleZh,
+			Severity:    rule.Severity,
 			Description: rule.Description,
 			RiskCount:   len(rule.Risks),
 		}

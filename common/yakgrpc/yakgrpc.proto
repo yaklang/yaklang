@@ -7213,6 +7213,7 @@ message SSARisk {
   bool IsPotential = 17;
 
   string CVE = 18;
+  repeated string CWE = 31;
   string CveAccessVector = 19;
   string CveAccessComplexity = 20;
   string Tags = 21;
