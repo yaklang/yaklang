@@ -2,8 +2,10 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -61,8 +63,9 @@ LOOP:
 }
 
 func TestReAct_QueueEnqueueCount(t *testing.T) {
-	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
+	in := make(chan *ypb.AIInputEvent, 100)
+	ctx, cancel := context.WithCancel(context.Background())
+	atomicCount := new(int32)
 	ins, err := NewReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			time.Sleep(20 * time.Second)
@@ -71,7 +74,13 @@ func TestReAct_QueueEnqueueCount(t *testing.T) {
 		WithDebug(true),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
-			out <- e.ToGRPC()
+			fmt.Println("Event: ", e.String())
+			if e.NodeId == "react_task_enqueue" {
+				atomic.AddInt32(atomicCount, 1)
+				if atomic.LoadInt32(atomicCount) >= 3 {
+					cancel()
+				}
+			}
 		}),
 	)
 	if err != nil {
@@ -88,28 +97,17 @@ func TestReAct_QueueEnqueueCount(t *testing.T) {
 		close(in)
 	}()
 	after := time.After(10 * time.Second)
-	haveTaskEnqueue := false
-	count := 0
 LOOP:
 	for {
 		select {
-		case e := <-out:
-			fmt.Println(e.String())
-			if e.GetNodeId() == "react_task_enqueue" {
-				haveTaskEnqueue = true
-				count++
-				if count >= 3 {
-					break LOOP
-				}
-			}
+		case <-ctx.Done():
+			break LOOP
 		case <-after:
 			break LOOP
 		}
 	}
 
-	if !haveTaskEnqueue {
-		t.Fatal("task not enqueue")
-	}
+	count := atomic.LoadInt32(atomicCount)
 	if count <= 2 {
 		t.Fatal("task enqueue count is less than 2, got " + fmt.Sprint(count))
 	}

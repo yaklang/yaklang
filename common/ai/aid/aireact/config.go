@@ -502,10 +502,13 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		enableUserInteract:          true,
 	}
 
+	emitMutex := new(sync.Mutex)
 	// Initialize emitter
 	config.Emitter = aicommon.NewEmitter(id, func(e *schema.AiOutputEvent) error {
 		config.guardian.Feed(e)
 		if config.eventHandler != nil {
+			emitMutex.Lock()
+			defer emitMutex.Unlock()
 			config.eventHandler(e)
 		}
 		return nil
