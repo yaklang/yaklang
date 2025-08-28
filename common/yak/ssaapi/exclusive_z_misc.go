@@ -136,7 +136,7 @@ func (i *Value) AppendDataFlow(vs ...*Value) *Value {
 			continue
 		}
 
-		i.DataFlowPath = append(i.DataFlowPath, v)
+		i.PrevDataFlow = append(i.PrevDataFlow, v)
 	}
 	return i
 }

@@ -38,7 +38,7 @@ type Value struct {
 
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
-	DataFlowPath []*Value
+	PrevDataFlow []*Value
 	DescInfo     map[string]string
 	// value from database
 	auditNode *ssadb.AuditNode
@@ -67,10 +67,10 @@ func (v *Value) hasDataFlow(target *Value) bool {
 	if v == nil {
 		return false
 	}
-	if v.DataFlowPath == nil {
+	if v.PrevDataFlow == nil {
 		return false
 	}
-	return slices.Contains(v.DataFlowPath, target)
+	return slices.Contains(v.PrevDataFlow, target)
 }
 
 func (v *Value) hasDependOn(target *Value) bool {
@@ -1091,19 +1091,19 @@ func (v *Value) GetDependOn() Values {
 }
 
 func (v *Value) GetDataFlow() Values {
-	if len(v.DataFlowPath) == 0 {
+	if len(v.PrevDataFlow) == 0 {
 		// load from db
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetDataFlowEdgeByToNodeId(auditNode.ID)
 			for _, id := range nodeIds {
 				d := v.NewValueFromAuditNode(id)
 				if d != nil {
-					v.DataFlowPath = append(v.DataFlowPath, d)
+					v.PrevDataFlow = append(v.PrevDataFlow, d)
 				}
 			}
 		}
 	}
-	return v.DataFlowPath
+	return v.PrevDataFlow
 }
 
 func (v *Value) GetEffectOn() Values {
@@ -1296,6 +1296,7 @@ func (v Values) GetOperands() Values {
 }
 func (v *Value) ShowDot() {
 	dotStr := v.DotGraph()
+	fmt.Println(dotStr)
 	dot.ShowDotGraphToAsciiArt(dotStr)
 }
 

@@ -71,45 +71,6 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 }
 
 func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
-	defer func() {
-		for _, ret := range result {
-			if actx.ShouldSavePath() {
-				// if len(ret.PrevDataflowPath) == 0 {
-				// log.Error("========================")
-				{
-					// log.Errorf("Ret [%v] StackValue: %v", ret, actx.nodeStack.Values())
-					size := actx.nodeStack.Len()       // [current, ..... , origin]
-					current := actx.nodeStack.PeekN(0) // current
-					if !ValueCompare(current, ret) {
-						// ret.AppendDataFlow(current)
-						current.AppendDataFlow(ret)
-					}
-					for i := 0; i < size; i++ {
-						prev := actx.nodeStack.PeekN(i) //
-						// log.Errorf("Value[%v] effect-on [%v]", current, next)
-						// current.AppendDataFlow(prev)
-						prev.AppendDataFlow(current)
-						current = prev
-					}
-				}
-				// log.Error("========================")
-
-				// log.Errorf("node: %v", node)
-				// cause
-				// cause := actx.causeStack.Values()
-				// _ = cause
-				// log.Errorf("cause: %v", cause)
-
-				// call stack
-				// callStack := actx.callStack.Values()
-				// _ = callStack
-				// log.Errorf("call stack : %v", callStack)
-
-				// ret.PrevDataflowPath = append(ret.PrevDataflowPath, node...)
-				// ret.SetDataflowPath = true
-			}
-		}
-	}()
 
 	if v == nil {
 		return nil
@@ -133,6 +94,10 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	shouldExit, recoverStack := actx.check(v)
 
 	defer recoverStack()
+	defer func() {
+		actx.SavePath(result)
+	}()
+
 	if shouldExit {
 		return Values{v}
 	}

@@ -157,7 +157,7 @@ type AuditEdgeType string
 const (
 	EdgeType_DependsOn AuditEdgeType = "depends_on"
 	EdgeType_EffectsOn AuditEdgeType = "effects_on"
-	EdgeType_DataFlow  AuditEdgeType = "dataflow"
+	EdgeType_DataFlow  AuditEdgeType = "prev_dataflow"
 
 	// EdgeType_Predecessor 记录审计过程
 	EdgeType_Predecessor AuditEdgeType = "predecessor"
@@ -213,8 +213,8 @@ func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
 func (n *AuditNode) CreateDataFlowEdge(progName string, to uint) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName: progName,
-		FromNode:    n.ID,
-		ToNode:      to,
+		FromNode:    to,
+		ToNode:      n.ID,
 		EdgeType:    EdgeType_DataFlow,
 		TaskId:      n.TaskId,
 		ResultId:    n.ResultId,

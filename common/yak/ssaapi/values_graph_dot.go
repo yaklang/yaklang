@@ -11,6 +11,7 @@ import (
 type DotGraph struct {
 	*dot.Graph
 	value2Node map[*Value]int // ssaapi.Value -> node-id
+	dot        string
 }
 
 func NewDotGraph() *DotGraph {
@@ -82,9 +83,13 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 }
 
 func (g *DotGraph) String() string {
+	if g.dot != "" {
+		return g.dot
+	}
 	var buf bytes.Buffer
 	g.GenerateDOT(&buf)
-	return buf.String()
+	g.dot = buf.String()
+	return g.dot
 }
 
 func (g *DotGraph) NodeName(v *Value) string {
@@ -124,4 +129,5 @@ func (g *DotGraph) DeepFirstGraphNext(value *Value) [][]string {
 
 func (g *DotGraph) Show() {
 	dot.ShowDotGraphToAsciiArt(g.String())
+	fmt.Println(g.String())
 }

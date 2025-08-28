@@ -64,8 +64,47 @@ func (a *AnalyzeContext) peekCall(index int) *ssa.Call {
 	return a.callStack.PeekN(index)
 }
 
-func (a *AnalyzeContext) ShouldSavePath() bool {
-	return a.recursiveStatusIsLeaf.Peek()
+func (a *AnalyzeContext) SavePath(result Values) {
+
+	shouldSave := func() bool {
+		return a.recursiveStatusIsLeaf.Peek()
+	}
+	for _, ret := range result {
+		if shouldSave() {
+			// if len(ret.PrevDataflowPath) == 0 {
+			// log.Error("========================")
+			{
+				// log.Errorf("Ret [%v] StackValue: %v", ret, actx.nodeStack.Values())
+				size := a.nodeStack.Len()       // [current, ..... , origin]
+				current := a.nodeStack.PeekN(0) // current
+				if !ValueCompare(current, ret) {
+					return
+				}
+				for i := 0; i < size; i++ {
+					prev := a.nodeStack.PeekN(i) //
+					// log.Errorf("Value[%v] effect-on [%v]", current, next)
+					current.AppendDataFlow(prev)
+					current = prev
+				}
+			}
+			// log.Error("========================")
+
+			// log.Errorf("node: %v", node)
+			// cause
+			// cause := actx.causeStack.Values()
+			// _ = cause
+			// log.Errorf("cause: %v", cause)
+
+			// call stack
+			// callStack := actx.callStack.Values()
+			// _ = callStack
+			// log.Errorf("call stack : %v", callStack)
+
+			// ret.PrevDataflowPath = append(ret.PrevDataflowPath, node...)
+			// ret.SetDataflowPath = true
+		}
+	}
+
 }
 
 // check determines whether to switch the analysis stack based on cross-process and intra-process analysis.
@@ -83,11 +122,15 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 		return true, recoverCrossProcess
 	}
 	// 过程内分析
+	a.recursiveStatusIsLeaf.Pop()
+	a.recursiveStatusIsLeaf.Push(false) // prev status is false, because it have next recursive
+	a.recursiveStatusIsLeaf.Push(true)  // current status is true
 
 	needVisited, recoverIntraProcess := a.valueShould(v)
 	recoverStack = func() {
 		recoverCrossProcess()
 		recoverIntraProcess()
+		a.recursiveStatusIsLeaf.Pop()
 	}
 	if !needVisited {
 		return true, recoverStack
@@ -170,9 +213,7 @@ func (a *AnalyzeContext) getRecursiveCounter() int64 {
 
 func (a *AnalyzeContext) enterRecursive() {
 	atomic.AddInt64(&a.recursiveCounter, 1)
-	a.recursiveStatusIsLeaf.Pop()
-	a.recursiveStatusIsLeaf.Push(false) // prev status is false, because it have next recursive
-	a.recursiveStatusIsLeaf.Push(true)  // current status is true
+
 }
 
 // ========================================== OBJECT STACK ==========================================

@@ -28,20 +28,22 @@ func (v *Value) GenerateGraph(g Graph) error {
 		prevs := v.GetPredecessors()
 		next := make([]*Value, 0, len(prevs))
 		for _, prev := range prevs {
+			// log.Errorf("%v prev: %v", v, prev.Node)
 			switch prev.Info.Label {
 			case Predecessors_BottomUseLabel, Predecessors_TopDefLabel:
-				dfs(prev.Node, func(v *Value) (Values, error) {
-					nexts := v.GetDataFlow()
-					for _, next := range nexts {
+				dfs(v, func(v *Value) (Values, error) {
+					prev := v.GetDataFlow()
+					// log.Errorf("%v next: %v", v, prev)
+					for _, prev := range prev {
 						if err := g.CreateEdge(Edge{
-							From: v,
-							To:   next,
+							From: prev,
+							To:   v,
 							Kind: EdgeTypeDataflow,
 						}); err != nil {
 							return nil, err
 						}
 					}
-					return nexts, nil
+					return prev, nil
 				})
 			default:
 			}

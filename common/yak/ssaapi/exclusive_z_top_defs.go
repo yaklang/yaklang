@@ -68,39 +68,6 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 }
 
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
-	defer func() {
-		for _, ret := range result {
-			if actx.ShouldSavePath() {
-				// if len(ret.PrevDataflowPath) == 0 {
-				// log.Error("========================")
-				_ = ret
-				{
-					// log.Errorf("Ret [%v] StackValue: %v", ret, actx.nodeStack.Values())
-					size := actx.nodeStack.Len()       // [current, ..... , origin]
-					current := actx.nodeStack.PeekN(0) // current
-					for i := 0; i < size; i++ {
-						// current(def) --effectOn--> prev(user)
-						prev := actx.nodeStack.PeekN(i) //
-						// log.Errorf("Value[%v] effect-on [%v]", current, next)
-						prev.AppendDataFlow(current)
-						current = prev
-					}
-				}
-				// log.Error("========================")
-
-				// log.Errorf("node: %v", node)
-				// cause
-				// cause := actx.causeStack.Values()
-				// _ = cause
-				// log.Errorf("cause: %v", cause)
-
-				// call stack
-				// callStack := actx.callStack.Values()
-				// _ = callStack
-				// log.Errorf("call stack : %v", callStack)
-			}
-		}
-	}()
 
 	if i == nil {
 		return nil
@@ -127,6 +94,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	var recoverStack func()
 	shouldExit, recoverStack = actx.check(i)
 	defer recoverStack()
+	defer func() {
+		actx.SavePath(result)
+	}()
+
 	if shouldExit {
 		return Values{i}
 	}
