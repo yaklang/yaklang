@@ -20,8 +20,8 @@ const (
 )
 
 type ERModel struct {
-	Entities  []*schema.ERModelEntity
-	Relations []*schema.ERModelRelation
+	Entities      []*schema.ERModelEntity
+	Relationships []*schema.ERModelRelationship
 }
 
 func (model *ERModel) Dump() string {
@@ -39,18 +39,24 @@ func (model *ERModel) Dump() string {
 		}
 		if len(entity.Attributes) > 0 {
 			sb.WriteString("  Attributes:\n")
-			for _, attr := range entity.Attributes {
-				sb.WriteString(fmt.Sprintf("    - %s: %s\n", attr.AttributeName, utils.ShrinkString(attr.AttributeValue, 100)))
+			for key, value := range entity.Attributes {
+				sb.WriteString(fmt.Sprintf("    - %s: %s\n", key, utils.ShrinkString(value, 100)))
 			}
 		}
 	}
-	sb.WriteString("Relations:\n")
-	for _, relation := range model.Relations {
-		sb.WriteString(fmt.Sprintf("- Source: %d\n", relation.SourceEntityID))
-		sb.WriteString(fmt.Sprintf("  Target: %d\n", relation.TargetEntityID))
-		sb.WriteString(fmt.Sprintf("  Type: %s\n", relation.RelationType))
-		if relation.DecisionRationale != "" {
-			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(relation.DecisionRationale, 100)))
+	sb.WriteString("Relationships:\n")
+	for _, relationship := range model.Relationships {
+		sb.WriteString(fmt.Sprintf("- Source: %d\n", relationship.SourceEntityID))
+		sb.WriteString(fmt.Sprintf("  Target: %d\n", relationship.TargetEntityID))
+		sb.WriteString(fmt.Sprintf("  Type: %s\n", relationship.RelationshipType))
+		if relationship.DecisionRationale != "" {
+			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(relationship.DecisionRationale, 100)))
+		}
+		if len(relationship.Attributes) > 0 {
+			sb.WriteString("  Attributes:\n")
+			for key, value := range relationship.Attributes {
+				sb.WriteString(fmt.Sprintf("    - %s: %s\n", key, utils.ShrinkString(value, 100)))
+			}
 		}
 	}
 	return sb.String()
@@ -64,43 +70,43 @@ func (model *ERModel) Dot() *dot.Graph {
 
 	for _, entity := range model.Entities {
 		n := G.AddNode(entity.EntityName)
-		for _, attribute := range entity.Attributes {
-			G.NodeAttribute(n, attribute.AttributeName, attribute.AttributeValue)
+		for key, value := range entity.Attributes {
+			G.NodeAttribute(n, key, utils.InterfaceToString(value))
 		}
 		rMap[entity.ID] = n
 	}
 
-	for _, relation := range model.Relations {
-		sid, ok := rMap[relation.SourceEntityID]
-		tid, ok2 := rMap[relation.TargetEntityID]
+	for _, Relationship := range model.Relationships {
+		sid, ok := rMap[Relationship.SourceEntityID]
+		tid, ok2 := rMap[Relationship.TargetEntityID]
 		if !ok || !ok2 {
 			continue
 		}
-		G.AddEdge(sid, tid, relation.RelationType)
+		G.AddEdge(sid, tid, Relationship.RelationshipType)
 	}
 	return G
 }
 
-type EntityBase struct {
+type EntityRepository struct {
 	db        *gorm.DB
 	baseInfo  *schema.EntityBaseInfo
 	ragSystem *rag.RAGSystem
 }
 
-func (eb *EntityBase) GetInfo() (*schema.EntityBaseInfo, error) {
+func (eb *EntityRepository) GetInfo() (*schema.EntityBaseInfo, error) {
 	if eb.baseInfo == nil {
 		return nil, utils.Errorf("entity base info is nil")
 	}
 	return eb.baseInfo, nil
 }
 
-func (eb *EntityBase) GetRAGSystem() *rag.RAGSystem {
+func (eb *EntityRepository) GetRAGSystem() *rag.RAGSystem {
 	return eb.ragSystem
 }
 
 //--- Entity Operations ---
 
-func (eb *EntityBase) MatchEntities(entity *schema.ERModelEntity) (matchEntity *schema.ERModelEntity, accurate bool, err error) {
+func (eb *EntityRepository) MatchEntities(entity *schema.ERModelEntity) (matchEntity *schema.ERModelEntity, accurate bool, err error) {
 	var results []*schema.ERModelEntity
 	results, err = eb.IdentifierSearchEntity(entity)
 	if err != nil {
@@ -123,7 +129,7 @@ func (eb *EntityBase) MatchEntities(entity *schema.ERModelEntity) (matchEntity *
 	return
 }
 
-func (eb *EntityBase) IdentifierSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
+func (eb *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
 	// name and type query
 	entities, err := eb.queryEntities(&yakit.EntityFilter{
 		Name: []string{entity.EntityName},
@@ -139,16 +145,16 @@ func (eb *EntityBase) IdentifierSearchEntity(entity *schema.ERModelEntity) ([]*s
 
 	// unique attribute query
 	var attributeIndexedId []uint
-	for _, attribute := range entity.Attributes {
+	for _, attribute := range entity.ExtendAttributes {
 		if attribute.UniqueIdentifier {
-			id, ok := yakit.UniqueAttributesIndexEntity(eb.db, eb.baseInfo.ID, attribute.AttributeName, attribute.AttributeValue)
+			id, ok := yakit.UniqueAttributesIndexEntity(eb.db, attribute.AttributeName, attribute.AttributeValue)
 			if ok {
-				attributeIndexedId = append(attributeIndexedId, id)
+				attributeIndexedId = append(attributeIndexedId, id...)
 			}
 		}
 	}
 
-	if attributeIndexedId == nil || len(attributeIndexedId) == 0 {
+	if len(attributeIndexedId) == 0 {
 		return nil, nil
 	}
 
@@ -157,7 +163,7 @@ func (eb *EntityBase) IdentifierSearchEntity(entity *schema.ERModelEntity) ([]*s
 	})
 }
 
-func (eb *EntityBase) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
+func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
 	if eb.ragSystem == nil {
 		return nil, utils.Errorf("RAG system is not initialized")
 	}
@@ -191,12 +197,12 @@ func (eb *EntityBase) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schem
 	})
 }
 
-func (eb *EntityBase) queryEntities(filter *yakit.EntityFilter) ([]*schema.ERModelEntity, error) {
+func (eb *EntityRepository) queryEntities(filter *yakit.EntityFilter) ([]*schema.ERModelEntity, error) {
 	filter.EntityBaseID = []uint{eb.baseInfo.ID}
 	return yakit.QueryEntities(eb.db, filter)
 }
 
-func (eb *EntityBase) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
+func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
 	metadata := map[string]any{
 		META_EntityID:     entry.ID,
 		META_EntityBaseID: entry.EntityBaseID,
@@ -212,19 +218,22 @@ func (eb *EntityBase) addEntityToVectorIndex(entry *schema.ERModelEntity) error 
 	return eb.GetRAGSystem().Add(documentID+"_detail", entry.String(), rag.WithDocumentRawMetadata(metadata))
 }
 
-func (eb *EntityBase) UpdateEntity(id uint, e *schema.ERModelEntity) error {
-	err := yakit.UpdateEntity(eb.db, id, e)
-	if err != nil {
-		return err
+func (eb *EntityRepository) SaveEntity(entity *schema.ERModelEntity) error {
+	if entity.ID == 0 {
+		return eb.CreateEntity(entity)
 	}
-	err = eb.AppendAttrs(id, e.Attributes)
+	return eb.UpdateEntity(entity.ID, entity)
+}
+
+func (eb *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error {
+	err := yakit.UpdateEntity(eb.db, id, e)
 	if err != nil {
 		return err
 	}
 	return eb.addEntityToVectorIndex(e)
 }
 
-func (eb *EntityBase) CreateEntity(entity *schema.ERModelEntity) error {
+func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	entity.EntityBaseID = eb.baseInfo.ID
 	err := yakit.CreateEntity(eb.db, entity)
 	if err != nil {
@@ -233,42 +242,23 @@ func (eb *EntityBase) CreateEntity(entity *schema.ERModelEntity) error {
 	return eb.addEntityToVectorIndex(entity)
 }
 
-//--- Attribute Operations ---
+//--- Relationship Operations ---
 
-func (eb *EntityBase) AppendAttrs(entityId uint, attrs []*schema.ERModelAttribute) error {
-	if len(attrs) == 0 {
-		return nil
-	}
-
-	return utils.GormTransaction(eb.db, func(tx *gorm.DB) error {
-		for _, attr := range attrs {
-			attr.ID = 0
-			attr.EntityID = entityId
-			if err := eb.db.Where("hash = ?", attr.CalcHash()).FirstOrCreate(attr).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-//--- Relation Operations ---
-
-func (eb *EntityBase) AddRelation(sourceID uint, targetID uint, relationType string, decisionRationale string) error {
-	return yakit.AddRelation(eb.db, sourceID, targetID, relationType, decisionRationale)
+func (eb *EntityRepository) AddRelationship(sourceID uint, targetID uint, RelationshipType string, decisionRationale string, attr map[string]any) error {
+	return yakit.AddRelationship(eb.db, sourceID, targetID, RelationshipType, decisionRationale, attr)
 }
 
 // --- ER Model Operations ---
-func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERModel, error) {
+func (eb *EntityRepository) GetSubERModel(keyword string, maxDepths ...int) (*ERModel, error) {
 	allEntities := make([]*schema.ERModelEntity, 0)
-	allRelations := make([]*schema.ERModelRelation, 0)
+	allRelationships := make([]*schema.ERModelRelationship, 0)
 
 	appendEntity := func(entityList ...*schema.ERModelEntity) {
 		allEntities = append(allEntities, entityList...)
 	}
 
-	appendRelation := func(relationList ...*schema.ERModelRelation) {
-		allRelations = append(allRelations, relationList...)
+	appendRelationship := func(RelationshipList ...*schema.ERModelRelationship) {
+		allRelationships = append(allRelationships, RelationshipList...)
 	}
 
 	maxDepth := 2
@@ -277,13 +267,13 @@ func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERMod
 	}
 
 	startEntity, _, err := eb.MatchEntities(&schema.ERModelEntity{
-		EntityName: entityName,
+		EntityName: keyword,
 	})
 	if err != nil {
 		return nil, err
 	}
 	if startEntity == nil {
-		return nil, utils.Errorf("实体 %s 不存在", entityName)
+		return nil, utils.Errorf("实体 %s 不存在", keyword)
 	}
 
 	type queueItem struct {
@@ -300,7 +290,7 @@ func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERMod
 		},
 	}
 	visited := map[uint]bool{startEntity.ID: true}
-	visitedRelations := map[uint]bool{}
+	visitedRelationships := map[uint]bool{}
 
 	head := 0
 	for head < len(queue) {
@@ -311,25 +301,25 @@ func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERMod
 			continue
 		}
 		// 准备要遍历的关系列表
-		relationsToExplore := make([]*schema.ERModelRelation, 0)
-		if currentEntity.OutgoingRelations != nil {
-			relationsToExplore = append(relationsToExplore, currentEntity.OutgoingRelations...)
+		RelationshipsToExplore := make([]*schema.ERModelRelationship, 0)
+		if currentEntity.OutgoingRelationship != nil {
+			RelationshipsToExplore = append(RelationshipsToExplore, currentEntity.OutgoingRelationship...)
 		}
-		if currentEntity.IncomingRelations != nil {
-			relationsToExplore = append(relationsToExplore, currentEntity.IncomingRelations...)
+		if currentEntity.IncomingRelationship != nil {
+			RelationshipsToExplore = append(RelationshipsToExplore, currentEntity.IncomingRelationship...)
 		}
 
-		for _, relation := range relationsToExplore {
-			if visitedRelations[relation.ID] {
+		for _, Relationship := range RelationshipsToExplore {
+			if visitedRelationships[Relationship.ID] {
 				continue
 			}
-			visitedRelations[relation.ID] = true
-			appendRelation(relation)
+			visitedRelationships[Relationship.ID] = true
+			appendRelationship(Relationship)
 			var neighborID uint
-			if relation.SourceEntityID == currentItem.entityID {
-				neighborID = relation.TargetEntityID
+			if Relationship.SourceEntityID == currentItem.entityID {
+				neighborID = Relationship.TargetEntityID
 			} else {
-				neighborID = relation.SourceEntityID
+				neighborID = Relationship.SourceEntityID
 			}
 			if !visited[neighborID] {
 				neighbor, err := yakit.GetEntityByID(eb.db, neighborID)
@@ -344,12 +334,12 @@ func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERMod
 	}
 
 	return &ERModel{
-		Entities:  allEntities,
-		Relations: allRelations,
+		Entities:      allEntities,
+		Relationships: allRelationships,
 	}, nil
 }
 
-func NewEntityBase(db *gorm.DB, name, description string, opts ...any) (*EntityBase, error) {
+func NewEntityBase(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
 	var entityBaseInfo schema.EntityBaseInfo
 	err := db.Model(&schema.EntityBaseInfo{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
 
@@ -384,7 +374,7 @@ func NewEntityBase(db *gorm.DB, name, description string, opts ...any) (*EntityB
 			return nil, utils.Errorf("创建RAG集合失败: %v", err)
 		}
 
-		return &EntityBase{
+		return &EntityRepository{
 			db:        db,
 			baseInfo:  &entityBaseInfo,
 			ragSystem: ragSystem,
@@ -398,7 +388,7 @@ func NewEntityBase(db *gorm.DB, name, description string, opts ...any) (*EntityB
 			return nil, utils.Errorf("创建RAG集合失败: %v", err)
 		}
 
-		return &EntityBase{
+		return &EntityRepository{
 			db:        db,
 			baseInfo:  &entityBaseInfo,
 			ragSystem: ragSystem,
@@ -425,7 +415,7 @@ func NewEntityBase(db *gorm.DB, name, description string, opts ...any) (*EntityB
 		return nil, utils.Errorf("加载RAG集合失败: %v", err)
 	}
 
-	return &EntityBase{
+	return &EntityRepository{
 		db:        db,
 		baseInfo:  &entityBaseInfo,
 		ragSystem: ragSystem,

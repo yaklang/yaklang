@@ -25,9 +25,12 @@ type ERModelEntity struct {
 	Rationale   string // 该实体存在的理由或依据
 	EntityType  string // 实体的类型或类别
 
-	Attributes        []*ERModelAttribute `gorm:"foreignkey:EntityID"`
-	OutgoingRelations []*ERModelRelation  `gorm:"foreignkey:SourceEntityID"`
-	IncomingRelations []*ERModelRelation  `gorm:"foreignkey:TargetEntityID"`
+	Attributes MetadataMap `gorm:"type:text" json:"attributes"`
+
+	ExtendAttributes []*ERModelAttribute `gorm:"foreignkey:OwnerID"`
+
+	OutgoingRelationship []*ERModelRelationship `gorm:"foreignkey:SourceEntityID"`
+	IncomingRelationship []*ERModelRelationship `gorm:"foreignkey:TargetEntityID"`
 }
 
 func (e *ERModelEntity) String() string {
@@ -52,9 +55,9 @@ func (e *ERModelEntity) Dump() string {
 	if len(e.Attributes) == 0 {
 		sb.WriteString("    (No attributes)\n")
 	} else {
-		for i, attr := range e.Attributes {
-			sb.WriteString(fmt.Sprintf("    [%d]:\n", i))
-			sb.WriteString(attr.Dump("      "))
+		for name, attr := range e.Attributes {
+			sb.WriteString(fmt.Sprintf("    AttributeName:    %s\n", name))
+			sb.WriteString(fmt.Sprintf("    sAttributeValue:    %s\n", attr))
 		}
 	}
 	sb.WriteString("--------------------------------\n")
@@ -64,7 +67,7 @@ func (e *ERModelEntity) Dump() string {
 // ERModelAttribute 记录了实体属性随时间的变化
 type ERModelAttribute struct {
 	ID             uint   `gorm:"primarykey"`
-	EntityID       uint   `gorm:"index;not null"` // 外键
+	OwnerID        uint   `gorm:"index;not null"` // 外键
 	AttributeName  string // 属性名称
 	AttributeValue string // 属性值
 
@@ -85,7 +88,7 @@ func (a *ERModelAttribute) Dump(prefix string) string {
 }
 
 func (a *ERModelAttribute) CalcHash() string {
-	return utils.CalcSha1(a.EntityID, a.AttributeName, a.AttributeValue)
+	return utils.CalcSha1(a.OwnerID, a.AttributeName, a.AttributeValue)
 }
 
 func (a *ERModelAttribute) BeforeSave() error {
@@ -93,27 +96,29 @@ func (a *ERModelAttribute) BeforeSave() error {
 	return nil
 }
 
-// ERModelRelation 记录了实体间关系随时间的变化
-type ERModelRelation struct {
+// ERModelRelationship 记录了实体间关系随时间的变化
+type ERModelRelationship struct {
 	ID                uint `gorm:"primarykey"`
 	EntityBaseID      uint
 	SourceEntityID    uint   // source 实体的id
-	RelationType      string // 关系的类型或类别
+	RelationshipType  string // 关系的类型或类别
 	TargetEntityID    uint   // target 实体的id
 	DecisionRationale string // 该关系存在的理由或依据
 	Hash              string
+
+	Attributes MetadataMap `gorm:"type:text" json:"attributes"`
 }
 
-func (r *ERModelRelation) CalcHash() string {
-	return utils.CalcSha1(r.SourceEntityID, r.RelationType, r.TargetEntityID)
+func (r *ERModelRelationship) CalcHash() string {
+	return utils.CalcSha1(r.SourceEntityID, r.RelationshipType, r.TargetEntityID, r.Attributes)
 }
 
-func (r *ERModelRelation) BeforeSave() error {
+func (r *ERModelRelationship) BeforeSave() error {
 	r.Hash = r.CalcHash()
 	return nil
 }
 
 func init() {
 	// 注册数据库表结构到系统中
-	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &EntityBaseInfo{}, &ERModelEntity{}, &ERModelAttribute{}, &ERModelRelation{})
+	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &EntityBaseInfo{}, &ERModelEntity{}, &ERModelAttribute{}, &ERModelRelationship{})
 }
