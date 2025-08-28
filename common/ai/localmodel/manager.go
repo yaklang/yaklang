@@ -1,7 +1,6 @@
 package localmodel
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,24 +8,17 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"regexp"
-	"runtime"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cybertunnel/ctxio"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/maps"
-	"golang.org/x/text/encoding/simplifiedchinese"
-	"golang.org/x/text/transform"
 )
 
 // ServiceStatus 服务状态
@@ -78,12 +70,11 @@ func (t ServiceType) String() string {
 
 // ServiceInfo 服务信息
 type ServiceInfo struct {
-	Name       string         `json:"name"`
-	Type       ServiceType    `json:"type"`
-	Status     ServiceStatus  `json:"status"`
-	Config     *ServiceConfig `json:"config"`
-	IsDetached bool           `json:"isDetached"`
-	ProcessID  int            `json:"processID"`
+	Name      string         `json:"name"`
+	Type      ServiceType    `json:"type"`
+	Status    ServiceStatus  `json:"status"`
+	Config    *ServiceConfig `json:"config"`
+	ProcessID int            `json:"processID"`
 
 	StartTime  time.Time `json:"startTime"`
 	Process    *exec.Cmd `json:"-"`
@@ -96,7 +87,6 @@ type ServiceInfo struct {
 type Manager struct {
 	mutex             sync.RWMutex
 	services          map[string]*ServiceInfo
-	cliMode           bool
 	currentBinaryPath string // 当前二进制文件路径（用于 Detached 模式）
 }
 
@@ -121,13 +111,6 @@ func GetManager() *Manager {
 // Deprecated: Use GetManager() instead
 func NewManager() *Manager {
 	return GetManager()
-}
-
-// SetCliMode 设置 CLI 模式
-func (m *Manager) SetCliMode(cliMode bool) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.cliMode = cliMode
 }
 
 // SetCurrentBinaryPath 设置当前二进制文件路径（用于 Detached 模式）
@@ -187,6 +170,7 @@ func (m *Manager) ListLocalModels() []string {
 
 // StartService 启动服务的通用方法
 func (m *Manager) StartService(address string, options ...Option) error {
+	m.refreshServiceListFromProcess()
 	// 解析地址
 	host, portStr, err := net.SplitHostPort(address)
 	if err != nil {
@@ -300,7 +284,6 @@ func (m *Manager) StartService(address string, options ...Option) error {
 		Config:     config,
 		StartTime:  time.Now(),
 		ctx:        ctx,
-		IsDetached: config.Detached,
 		cancelFunc: cancelFunc,
 	}
 
@@ -366,31 +349,9 @@ func (m *Manager) startServiceInternal(service *ServiceInfo, llamaServerPath str
 
 	var cmd *exec.Cmd
 
-	// 检查是否使用 Detached 模式
-	if service.Config.Detached {
-		// Detached 模式: 使用当前二进制文件启动 localmodel 命令
-		detachedArgs, err := m.buildDetachedArgs(service.Config)
-		if err != nil {
-			finished(fmt.Errorf("build detached args failed: %v", err))
-			return
-		}
-
-		// 获取当前二进制文件路径
-		yakEnginePath := m.GetCurrentBinaryPathFromManager()
-		if yakEnginePath == "" {
-			finished(fmt.Errorf("cannot find current binary: no path configured"))
-			return
-		}
-
-		log.Infof("Starting detached command: %s %s", yakEnginePath, strings.Join(detachedArgs, " "))
-		cmd = exec.CommandContext(service.ctx, yakEnginePath, detachedArgs...)
-	} else {
-		// 非 Detached 模式: 直接使用 llama-server
-		args := m.buildArgs(service.Config)
-		log.Infof("Starting command: %s %s", llamaServerPath, strings.Join(args, " "))
-		cmd = exec.CommandContext(service.ctx, llamaServerPath, args...)
-	}
-
+	args := m.buildArgs(service.Config)
+	log.Infof("Starting command: %s %s", llamaServerPath, strings.Join(args, " "))
+	cmd = exec.CommandContext(service.ctx, llamaServerPath, args...)
 	var reader, combinedOutput = utils.NewPipe()
 	defer func() {
 		combinedOutput.Close()
@@ -416,6 +377,7 @@ func (m *Manager) startServiceInternal(service *ServiceInfo, llamaServerPath str
 	m.mutex.Lock()
 	service.Process = cmd
 	service.Status = StatusRunning
+	service.ProcessID = cmd.Process.Pid
 	m.mutex.Unlock()
 
 	log.Infof("Service %s started with PID: %d", service.Name, cmd.Process.Pid)
@@ -491,63 +453,6 @@ func (m *Manager) buildArgs(config *ServiceConfig) []string {
 	return args
 }
 
-// buildDetachedArgs 构建 Detached 模式的启动参数
-func (m *Manager) buildDetachedArgs(config *ServiceConfig) ([]string, error) {
-	args := []string{
-		"localmodel", // 使用 localmodel 子命令
-		"--host", config.Host,
-		"--port", fmt.Sprintf("%d", config.Port),
-		"--context-size", fmt.Sprintf("%d", config.ContextSize),
-	}
-
-	// 模型相关参数
-	if config.Model != "" {
-		args = append(args, "--model", config.Model)
-	}
-
-	if config.ModelPath != "" {
-		args = append(args, "--model-path", config.ModelPath)
-	}
-
-	// 连续批处理
-	if config.ContBatching {
-		args = append(args, "--cont-batching")
-	}
-	// 注意：如果不需要显式禁用连续批处理，则不添加参数
-
-	// 批处理大小
-	if config.BatchSize > 0 {
-		args = append(args, "--batch-size", fmt.Sprintf("%d", config.BatchSize))
-	}
-
-	// 线程数
-	if config.Threads > 0 {
-		args = append(args, "--threads", fmt.Sprintf("%d", config.Threads))
-	}
-
-	// 调试模式
-	if config.Debug {
-		args = append(args, "--debug")
-	}
-
-	// 启动超时
-	if config.StartupTimeout > 0 {
-		timeoutSeconds := int(config.StartupTimeout.Seconds())
-		args = append(args, "--timeout", fmt.Sprintf("%d", timeoutSeconds))
-	}
-
-	// 添加 llama-server 路径
-	if config.LlamaServerPath != "" {
-		args = append(args, "--llama-server-path", config.LlamaServerPath)
-	}
-
-	if config.ModelType != "" {
-		args = append(args, "--service-type", config.ModelType)
-	}
-
-	return args, nil
-}
-
 // waitForService 等待服务启动完成
 func (m *Manager) waitForService(service *ServiceInfo) error {
 	address := fmt.Sprintf("%s:%d", service.Config.Host, service.Config.Port)
@@ -614,7 +519,7 @@ func (m *Manager) StopService(serviceName string) error {
 
 	log.Infof("Stopping service: %s", serviceName)
 
-	if service.IsDetached {
+	if service.Process == nil {
 		// 跨平台的进程终止
 		err := m.killDetachedService(service)
 		if err != nil {
@@ -702,37 +607,14 @@ func (m *Manager) GetServiceStatus(serviceName string) (*ServiceInfo, error) {
 // ListServices 列出所有服务
 func (m *Manager) ListServices() []*ServiceInfo {
 	// 先刷新服务列表，从进程中发现新的服务
-	discoveredServices := m.refreshServiceListFromProcess()
-
-	// 将发现的服务合并到内部服务列表中
-	m.mutex.Lock()
-	keys := maps.Keys(m.services)
-	for _, key := range keys {
-		if m.services[key].IsDetached {
-			delete(m.services, key)
-		}
-	}
-	for _, discoveredService := range discoveredServices {
-		// 强行刷新服务状态
-		m.services[discoveredService.Name] = discoveredService
-	}
-	m.mutex.Unlock()
+	m.refreshServiceListFromProcess()
 
 	// 现在获取完整的服务列表
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
 	services := make([]*ServiceInfo, 0, len(m.services))
-	newProcessMap := make(map[string]*ServiceInfo)
-	for k, service := range m.services {
-		if !service.IsDetached {
-			// 判断进程是否存在
-			if service.Process != nil && service.Process.ProcessState != nil {
-				service.Status = StatusStopped
-				continue
-			}
-		}
-		newProcessMap[k] = service
+	for _, service := range m.services {
 		services = append(services, &ServiceInfo{
 			Name:      service.Name,
 			Status:    service.Status,
@@ -741,7 +623,6 @@ func (m *Manager) ListServices() []*ServiceInfo {
 			LastError: service.LastError,
 		})
 	}
-	m.services = newProcessMap
 	sort.Slice(services, func(i, j int) bool {
 		return services[i].Name < services[j].Name
 	})
@@ -750,9 +631,9 @@ func (m *Manager) ListServices() []*ServiceInfo {
 
 // refreshServiceListFromProcess 从正在运行的进程中刷新服务列表
 func (m *Manager) refreshServiceListFromProcess() []*ServiceInfo {
-	processes, err := m.findYakLocalModelProcesses()
+	processes, err := m.findLlamaServerProcesses()
 	if err != nil {
-		log.Errorf("Failed to find yak localmodel processes: %v", err)
+		log.Errorf("Failed to find llama-server processes: %v", err)
 		return nil
 	}
 
@@ -764,242 +645,64 @@ func (m *Manager) refreshServiceListFromProcess() []*ServiceInfo {
 		}
 	}
 
+	m.mutex.Lock()
+	// 将发现的服务合并到内部服务列表中，通过process id匹配
+	idToService := make(map[int]*ServiceInfo)
+	for _, service := range m.services {
+		idToService[service.ProcessID] = service
+	}
+	allAliveProcessePid := []int{}
+	for _, discoveredService := range services {
+		if _, exists := idToService[discoveredService.ProcessID]; !exists {
+			allAliveProcessePid = append(allAliveProcessePid, discoveredService.ProcessID)
+			m.services[discoveredService.Name] = discoveredService
+		}
+	}
+	// 清理掉已经停止的进程
+	for _, service := range m.services {
+		if !slices.Contains(allAliveProcessePid, service.ProcessID) {
+			delete(m.services, service.Name)
+		}
+	}
+	m.mutex.Unlock()
 	return services
-}
-
-// ProcessInfo 进程信息结构
-type ProcessInfo struct {
-	PID     int
-	PPID    int
-	Command string
-	Args    []string
-	WorkDir string
-}
-
-// findYakLocalModelProcesses 查找所有 yak localmodel 进程
-func (m *Manager) findYakLocalModelProcesses() ([]*ProcessInfo, error) {
-	switch runtime.GOOS {
-	case "windows":
-		return m.findProcessesWindows()
-	case "darwin", "linux":
-		return m.findProcessesUnix()
-	default:
-		return nil, fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
-	}
-}
-
-// findProcessesWindows Windows 系统进程发现
-func (m *Manager) findProcessesWindows() ([]*ProcessInfo, error) {
-	// 使用 wmic 命令获取进程信息
-	cmd := exec.Command("wmic", "process", "where", "name='yak.exe'", "get", "ProcessId,ParentProcessId,CommandLine", "/format:csv")
-	output, err := cmd.Output()
-	if err != nil {
-		// 如果 wmic 失败，尝试使用 tasklist
-		return m.findProcessesWindowsTasklist()
-	}
-	return m.parseWmicOutput(toUTF8(output))
-}
-
-// findProcessesWindowsTasklist Windows tasklist 备用方案
-func (m *Manager) findProcessesWindowsTasklist() ([]*ProcessInfo, error) {
-	cmd := exec.Command("tasklist", "/fo", "csv", "/v")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute tasklist: %v", err)
-	}
-
-	return m.parseTasklistOutput(toUTF8(output))
-}
-
-// findProcessesUnix Unix 系统（Linux/macOS）进程发现
-func (m *Manager) findProcessesUnix() ([]*ProcessInfo, error) {
-	// 使用 ps 命令获取详细进程信息
-	cmd := exec.Command("ps", "axo", "pid,ppid,command")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute ps command: %v", err)
-	}
-
-	return m.parsePsOutput(toUTF8(output))
-}
-
-// parseWmicOutput 解析 wmic 命令输出
-func (m *Manager) parseWmicOutput(output string) ([]*ProcessInfo, error) {
-	var processes []*ProcessInfo
-	lines := strings.Split(output, "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "Node,") {
-			continue
-		}
-
-		// CSV 格式解析
-		parts := strings.Split(line, ",")
-		if len(parts) < 4 {
-			continue
-		}
-
-		commandLine := parts[1]
-		if !m.isYakLocalModelCommand(commandLine) {
-			continue
-		}
-
-		ppidStr := parts[2]
-		pidStr := parts[3]
-
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			continue
-		}
-
-		ppid, err := strconv.Atoi(ppidStr)
-		if err != nil {
-			ppid = 0
-		}
-
-		args := strings.Fields(commandLine)
-		processes = append(processes, &ProcessInfo{
-			PID:     pid,
-			PPID:    ppid,
-			Command: commandLine,
-			Args:    args,
-		})
-	}
-
-	return processes, nil
-}
-
-// parseTasklistOutput 解析 tasklist 命令输出
-func (m *Manager) parseTasklistOutput(output string) ([]*ProcessInfo, error) {
-	var processes []*ProcessInfo
-	lines := strings.Split(output, "\n")
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "\"Image Name\"") {
-			continue
-		}
-
-		// 简单的 CSV 解析，查找包含 yak 的进程
-		if strings.Contains(line, "yak") && strings.Contains(line, "localmodel") {
-			// 从 tasklist 输出中提取 PID
-			re := regexp.MustCompile(`"(\d+)"`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			if len(matches) >= 2 {
-				pidStr := matches[1][1] // 第二个数字通常是 PID
-				pid, err := strconv.Atoi(pidStr)
-				if err == nil {
-					processes = append(processes, &ProcessInfo{
-						PID:     pid,
-						Command: line,
-						Args:    []string{"yak", "localmodel"}, // 简化处理
-					})
-				}
-			}
-		}
-	}
-
-	return processes, nil
-}
-
-// parsePsOutput 解析 ps 命令输出
-func (m *Manager) parsePsOutput(output string) ([]*ProcessInfo, error) {
-	var processes []*ProcessInfo
-	lines := strings.Split(output, "\n")
-
-	for i, line := range lines {
-		if i == 0 { // 跳过头部
-			continue
-		}
-
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-
-		// ps 输出格式: PID PPID COMMAND
-		parts := strings.Fields(line)
-		if len(parts) < 3 {
-			continue
-		}
-
-		pidStr := parts[0]
-		ppidStr := parts[1]
-		command := strings.Join(parts[2:], " ")
-
-		if !m.isYakLocalModelCommand(command) {
-			continue
-		}
-
-		pid, err := strconv.Atoi(pidStr)
-		if err != nil {
-			continue
-		}
-
-		ppid, err := strconv.Atoi(ppidStr)
-		if err != nil {
-			ppid = 0
-		}
-
-		args := strings.Fields(command)
-		processes = append(processes, &ProcessInfo{
-			PID:     pid,
-			PPID:    ppid,
-			Command: command,
-			Args:    args,
-		})
-	}
-
-	return processes, nil
-}
-
-// isYakLocalModelCommand 检查是否是 yak localmodel 命令
-func (m *Manager) isYakLocalModelCommand(command string) bool {
-	// 检查命令是否包含 yak 和 localmodel
-	return strings.Contains(command, "yak") && strings.Contains(command, "localmodel")
 }
 
 // parseProcessToService 将进程信息转换为服务信息
 func (m *Manager) parseProcessToService(proc *ProcessInfo) *ServiceInfo {
-	if len(proc.Args) < 2 {
+	if len(proc.Args) < 1 {
 		return nil
 	}
 
-	// 查找 yak localmodel 在参数中的位置
-	yakIndex := -1
-	localmodelIndex := -1
+	// 查找 llama-server 在参数中的位置
+	llamaServerIndex := -1
 
 	for i, arg := range proc.Args {
-		if strings.Contains(arg, "yak") {
-			yakIndex = i
-		}
-		if arg == "localmodel" && yakIndex >= 0 && i > yakIndex {
-			localmodelIndex = i
+		if strings.Contains(arg, "llama-server") {
+			llamaServerIndex = i
 			break
 		}
 	}
 
-	if localmodelIndex == -1 {
+	if llamaServerIndex == -1 {
 		return nil
 	}
 
-	// 解析 localmodel 后面的参数
-	args := proc.Args[localmodelIndex+1:]
+	// 解析 llama-server 后面的参数
+	args := proc.Args[llamaServerIndex+1:]
 	config := m.parseArgsToConfig(args)
 	if config == nil {
 		return nil
 	}
 
 	// 生成服务名称
-	serviceName := fmt.Sprintf("%s-%s-%d", config.ModelType, config.Model, config.Port)
+	serviceName := fmt.Sprintf("%s-%s-%d-%d", config.ModelType, config.Model, config.Port, proc.PID)
 
 	return &ServiceInfo{
-		Name:       serviceName,
-		Status:     StatusRunning, // 进程存在说明正在运行
-		Config:     config,
-		IsDetached: true,
-		ProcessID:  proc.PID,
+		Name:      serviceName,
+		Status:    StatusRunning, // 进程存在说明正在运行
+		Config:    config,
+		ProcessID: proc.PID,
 	}
 }
 
@@ -1015,7 +718,6 @@ func (m *Manager) parseArgsToConfig(args []string) *ServiceConfig {
 		ContBatching:   false,
 		BatchSize:      0,
 		Threads:        0,
-		Detached:       false,
 		Debug:          false,
 		Pooling:        "",
 		StartupTimeout: 0,
@@ -1043,7 +745,7 @@ func (m *Manager) parseArgsToConfig(args []string) *ServiceConfig {
 				config.Model = args[i+1]
 				i++
 			}
-		case "--model-path":
+		case "--model-path", "-m":
 			if i+1 < len(args) {
 				config.ModelPath = args[i+1]
 				i++
@@ -1080,33 +782,8 @@ func (m *Manager) parseArgsToConfig(args []string) *ServiceConfig {
 			config.ContBatching = true
 		case "--debug":
 			config.Debug = true
-		case "--detached":
-			config.Detached = true
 		}
 	}
-
-	// 验证必要的配置
-	if config.Host == "" || config.Port == 0 {
-		return nil
-	}
-
-	// 为没有设置的字段设置合理的默认值
-	if config.ContextSize == 0 {
-		config.ContextSize = 4096
-	}
-	if config.BatchSize == 0 {
-		config.BatchSize = 1024
-	}
-	if config.Threads == 0 {
-		config.Threads = 8
-	}
-	if config.Pooling == "" {
-		config.Pooling = "last"
-	}
-	if config.StartupTimeout == 0 {
-		config.StartupTimeout = 30 * time.Second
-	}
-
 	return config
 }
 
@@ -1164,160 +841,15 @@ if err != nil {
 }
 */
 
-func toUTF8(data []byte) string {
-	// 先尝试判断是否是 UTF-8
-	if utf8.Valid(data) {
-		return string(data)
-	}
-	// 否则按 GBK 转 UTF-8
-	reader := transform.NewReader(bytes.NewReader(data), simplifiedchinese.GBK.NewDecoder())
-	utf8Data, _ := io.ReadAll(reader)
-	return string(utf8Data)
-}
-
-// killDetachedService 跨平台终止分离式服务进程
+// killDetachedService 直接使用进程ID终止服务进程
 func (m *Manager) killDetachedService(service *ServiceInfo) error {
-	if runtime.GOOS == "windows" {
-		return m.killDetachedServiceWindows(service)
-	}
-	return m.killDetachedServiceUnix(service)
-}
-
-// killDetachedServiceWindows Windows平台下终止分离式服务进程
-func (m *Manager) killDetachedServiceWindows(service *ServiceInfo) error {
-	// 1. 首先尝试终止当前服务进程
-	if service.ProcessID > 0 {
-		if err := m.killProcessWindows(service.ProcessID); err != nil {
-			log.Warnf("Failed to kill main service process %d: %v", service.ProcessID, err)
-		}
+	if service.ProcessID <= 0 {
+		return fmt.Errorf("invalid process ID: %d", service.ProcessID)
 	}
 
-	// 2. 查找并终止匹配的llama-server进程
-	llamaServerPIDs, err := m.findLlamaServerProcessesWindows(service.Config.Host, service.Config.Port)
-	if err != nil {
-		log.Warnf("Failed to find llama-server processes: %v", err)
-	} else {
-		for _, pid := range llamaServerPIDs {
-			if err := m.killProcessWindows(pid); err != nil {
-				log.Warnf("Failed to kill llama-server process %d: %v", pid, err)
-			} else {
-				log.Infof("Successfully killed llama-server process %d", pid)
-			}
-		}
-	}
-
-	return nil
-}
-
-// killDetachedServiceUnix Unix平台下终止分离式服务进程
-func (m *Manager) killDetachedServiceUnix(service *ServiceInfo) error {
-	// Unix系统保持原有逻辑
 	p, err := os.FindProcess(service.ProcessID)
 	if err != nil {
 		return fmt.Errorf("failed to find process %d: %v", service.ProcessID, err)
 	}
-
-	if err := p.Signal(syscall.SIGINT); err != nil {
-		return fmt.Errorf("failed to send SIGINT to process %d: %v", service.ProcessID, err)
-	}
-
-	return nil
-}
-
-// killProcessWindows Windows下终止指定PID的进程
-func (m *Manager) killProcessWindows(pid int) error {
-	cmd := exec.Command("taskkill", "/F", "/PID", fmt.Sprintf("%d", pid))
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("taskkill failed for PID %d: %v, output: %s", pid, err, string(output))
-	}
-	log.Infof("Successfully killed process %d on Windows", pid)
-	return nil
-}
-
-// findLlamaServerProcessesWindows 在Windows下查找匹配host和port的llama-server进程
-func (m *Manager) findLlamaServerProcessesWindows(host string, port int32) ([]int, error) {
-	var pids []int
-
-	// 使用wmic查找llama-server进程
-	cmd := exec.Command("wmic", "process", "where", "name='llama-server.exe'", "get", "ProcessId,CommandLine", "/format:csv")
-	output, err := cmd.Output()
-	if err != nil {
-		// 如果wmic失败，尝试使用tasklist
-		return m.findLlamaServerProcessesWindowsTasklist(host, port)
-	}
-
-	lines := strings.Split(toUTF8(output), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "Node,") {
-			continue
-		}
-
-		// CSV格式: Node,CommandLine,ProcessId
-		parts := strings.Split(line, ",")
-		if len(parts) < 3 {
-			continue
-		}
-
-		commandLine := parts[1]
-		pidStr := parts[2]
-
-		// 检查命令行是否包含匹配的host和port
-		if m.isLlamaServerCommandMatching(commandLine, host, port) {
-			if pid, err := strconv.Atoi(pidStr); err == nil {
-				pids = append(pids, pid)
-				log.Infof("Found matching llama-server process: PID=%d, Command=%s", pid, commandLine)
-			}
-		}
-	}
-
-	return pids, nil
-}
-
-// findLlamaServerProcessesWindowsTasklist 使用tasklist作为备用方案
-func (m *Manager) findLlamaServerProcessesWindowsTasklist(host string, port int32) ([]int, error) {
-	var pids []int
-
-	cmd := exec.Command("tasklist", "/fo", "csv", "/v")
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute tasklist: %v", err)
-	}
-
-	lines := strings.Split(toUTF8(output), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "\"Image Name\"") {
-			continue
-		}
-
-		// 查找包含llama-server的进程
-		if strings.Contains(line, "llama-server") {
-			// 这是一个简化版本，实际实现中可能需要更复杂的解析
-			// 因为tasklist不直接提供命令行参数
-			re := regexp.MustCompile(`"(\d+)"`)
-			matches := re.FindAllStringSubmatch(line, -1)
-			if len(matches) >= 2 {
-				pidStr := matches[1][1] // 第二个数字通常是PID
-				if pid, err := strconv.Atoi(pidStr); err == nil {
-					pids = append(pids, pid)
-					log.Infof("Found llama-server process (via tasklist): PID=%d", pid)
-				}
-			}
-		}
-	}
-
-	return pids, nil
-}
-
-// isLlamaServerCommandMatching 检查llama-server命令行是否匹配指定的host和port
-func (m *Manager) isLlamaServerCommandMatching(commandLine string, host string, port int32) bool {
-	// 检查命令行是否包含指定的host和port参数
-	hostPattern := fmt.Sprintf("--host %s", host)
-	portPattern := fmt.Sprintf("--port %d", port)
-
-	return strings.Contains(commandLine, "llama-server") &&
-		strings.Contains(commandLine, hostPattern) &&
-		strings.Contains(commandLine, portPattern)
+	return p.Kill()
 }

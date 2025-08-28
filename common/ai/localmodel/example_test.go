@@ -14,7 +14,6 @@ func ExampleManager_StartEmbeddingService() {
 	err := manager.StartEmbeddingService(
 		"127.0.0.1:11434",
 		WithModel("Qwen3-Embedding-0.6B-Q4_K_M"),
-		WithDetached(true),
 		WithDebug(true),
 		WithModelPath("/tmp/Qwen3-Embedding-0.6B-Q4_K_M.gguf"),
 		WithContextSize(4096),
@@ -94,7 +93,6 @@ func Example_withOptions() {
 		WithContBatching(false),
 		WithBatchSize(2048),
 		WithThreads(16),
-		WithDetached(true),
 		WithDebug(true),
 	}
 
@@ -106,7 +104,6 @@ func Example_withOptions() {
 	fmt.Printf("Host: %s, Port: %d\n", config.Host, config.Port)
 	fmt.Printf("Context Size: %d, Cont Batching: %t\n", config.ContextSize, config.ContBatching)
 	fmt.Printf("Batch Size: %d, Threads: %d\n", config.BatchSize, config.Threads)
-	fmt.Printf("Detached: %t, Debug: %t\n", config.Detached, config.Debug)
 }
 
 // ExampleServiceStatus 演示服务状态

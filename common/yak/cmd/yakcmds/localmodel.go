@@ -90,7 +90,6 @@ var LocalModelCommands = []*cli.Command{
 
 			// 获取管理器单例
 			manager := localmodel.GetManager()
-			manager.SetCliMode(true)
 			// 如果只是列出模型
 			if c.Bool("list-models") {
 				listSupportedModels(manager)
@@ -242,7 +241,6 @@ func startEmbeddingService(c *cli.Context, manager *localmodel.Manager) error {
 		localmodel.WithContBatching(contBatching),
 		localmodel.WithBatchSize(c.Int("batch-size")),
 		localmodel.WithThreads(c.Int("threads")),
-		localmodel.WithDetached(c.Bool("detached")),
 		localmodel.WithDebug(c.Bool("debug")),
 		localmodel.WithStartupTimeout(time.Duration(c.Int("timeout"))*time.Second),
 		localmodel.WithModelType(c.String("service-type")),
