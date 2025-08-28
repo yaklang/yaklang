@@ -2,40 +2,83 @@ package entitybase
 
 import (
 	"errors"
+	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strconv"
+	"strings"
 )
 
-type ERModelGraph struct {
+const (
+	META_EntityID     = "entity_id"
+	META_EntityBaseID = "entity_base_id"
+	META_EntityName   = "entity_name"
+	META_EntityType   = "entity_type"
+)
+
+type ERModel struct {
 	Entities  []*schema.ERModelEntity
 	Relations []*schema.ERModelRelation
 }
 
-func (e *ERModelGraph) Dot() *dot.Graph {
-	g := dot.New()
-
-	dbID2GraphID := make(map[uint]int)
-	for _, entity := range e.Entities {
-		label := entity.EntityName
-		if entity.EntityType != "" {
-			label += " (" + entity.EntityType + ")"
+func (model *ERModel) Dump() string {
+	var sb strings.Builder
+	sb.WriteString("Entities:\n")
+	for _, entity := range model.Entities {
+		sb.WriteString(fmt.Sprintf("- ID: %d\n", entity.ID))
+		sb.WriteString(fmt.Sprintf("  EntityName: %s\n", entity.EntityName))
+		sb.WriteString(fmt.Sprintf("  EntityType: %s\n", entity.EntityType))
+		if entity.Description != "" {
+			sb.WriteString(fmt.Sprintf("  Description: %s\n", utils.ShrinkString(entity.Description, 100)))
 		}
-		dbID2GraphID[entity.ID] = g.AddNode(label)
+		if entity.Rationale != "" {
+			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(entity.Rationale, 100)))
+		}
+		if len(entity.Attributes) > 0 {
+			sb.WriteString("  Attributes:\n")
+			for _, attr := range entity.Attributes {
+				sb.WriteString(fmt.Sprintf("    - %s: %s\n", attr.AttributeName, utils.ShrinkString(attr.AttributeValue, 100)))
+			}
+		}
+	}
+	sb.WriteString("Relations:\n")
+	for _, relation := range model.Relations {
+		sb.WriteString(fmt.Sprintf("- Source: %d\n", relation.SourceEntityID))
+		sb.WriteString(fmt.Sprintf("  Target: %d\n", relation.TargetEntityID))
+		sb.WriteString(fmt.Sprintf("  Type: %s\n", relation.RelationType))
+		if relation.DecisionRationale != "" {
+			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(relation.DecisionRationale, 100)))
+		}
+	}
+	return sb.String()
+}
+
+func (model *ERModel) Dot() *dot.Graph {
+	G := dot.New()
+	G.MakeDirected()
+
+	rMap := make(map[uint]int)
+
+	for _, entity := range model.Entities {
+		n := G.AddNode(entity.EntityName)
+		for _, attribute := range entity.Attributes {
+			G.NodeAttribute(n, attribute.AttributeName, attribute.AttributeValue)
+		}
+		rMap[entity.ID] = n
 	}
 
-	for _, relation := range e.Relations {
-		sID, ok1 := dbID2GraphID[relation.SourceEntityID]
-		tID, ok2 := dbID2GraphID[relation.TargetEntityID]
-		if ok1 && ok2 {
-			g.AddEdge(sID, tID, relation.RelationType)
+	for _, relation := range model.Relations {
+		sid, ok := rMap[relation.SourceEntityID]
+		tid, ok2 := rMap[relation.TargetEntityID]
+		if !ok || !ok2 {
+			continue
 		}
+		G.AddEdge(sid, tid, relation.RelationType)
 	}
-	return g
+	return G
 }
 
 type EntityBase struct {
@@ -130,14 +173,13 @@ func (eb *EntityBase) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schem
 
 	var entityIds []uint
 	for _, res := range results {
-		if res.Score <= 0.85 {
+		if res.Score <= 0.8 {
 			continue
 		}
-		id, err := strconv.Atoi(res.Document.ID)
-		if err != nil {
-			continue
+		id, ok := res.Document.Metadata[META_EntityID]
+		if ok {
+			entityIds = append(entityIds, uint(utils.InterfaceToInt(id)))
 		}
-		entityIds = append(entityIds, uint(id))
 	}
 
 	if len(entityIds) == 0 {
@@ -155,20 +197,19 @@ func (eb *EntityBase) queryEntities(filter *yakit.EntityFilter) ([]*schema.ERMod
 }
 
 func (eb *EntityBase) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
-
 	metadata := map[string]any{
-		"entity_base_id": entry.EntityBaseID,
-		"entity_name":    entry.EntityName,
-		"entity_type":    entry.EntityType,
+		META_EntityID:     entry.ID,
+		META_EntityBaseID: entry.EntityBaseID,
+		META_EntityName:   entry.EntityName,
+		META_EntityType:   entry.EntityType,
 	}
 
-	documentID := utils.InterfaceToString(entry.ID)
-
-	err := eb.GetRAGSystem().Add(documentID, entry.String(), rag.WithDocumentRawMetadata(metadata))
+	documentID := fmt.Sprintf("base_%d_entity_%d[%s]", eb.baseInfo.ID, entry.ID, entry.EntityName)
+	err := eb.GetRAGSystem().Add(documentID, entry.EntityName, rag.WithDocumentRawMetadata(metadata))
 	if err != nil {
 		return err
 	}
-	return eb.GetRAGSystem().Add(documentID, entry.EntityName, rag.WithDocumentRawMetadata(metadata))
+	return eb.GetRAGSystem().Add(documentID+"_detail", entry.String(), rag.WithDocumentRawMetadata(metadata))
 }
 
 func (eb *EntityBase) UpdateEntity(id uint, e *schema.ERModelEntity) error {
@@ -177,10 +218,6 @@ func (eb *EntityBase) UpdateEntity(id uint, e *schema.ERModelEntity) error {
 		return err
 	}
 	err = eb.AppendAttrs(id, e.Attributes)
-	if err != nil {
-		return err
-	}
-	err = eb.GetRAGSystem().DeleteDocuments(utils.InterfaceToString(e.ID))
 	if err != nil {
 		return err
 	}
@@ -207,7 +244,7 @@ func (eb *EntityBase) AppendAttrs(entityId uint, attrs []*schema.ERModelAttribut
 		for _, attr := range attrs {
 			attr.ID = 0
 			attr.EntityID = entityId
-			if err := eb.db.Where("hash = ?", attr.CalcHash()).FirstOrCreate(attrs).Error; err != nil {
+			if err := eb.db.Where("hash = ?", attr.CalcHash()).FirstOrCreate(attr).Error; err != nil {
 				return err
 			}
 		}
@@ -222,7 +259,7 @@ func (eb *EntityBase) AddRelation(sourceID uint, targetID uint, relationType str
 }
 
 // --- ER Model Operations ---
-func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERModelGraph, error) {
+func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERModel, error) {
 	allEntities := make([]*schema.ERModelEntity, 0)
 	allRelations := make([]*schema.ERModelRelation, 0)
 
@@ -300,13 +337,13 @@ func (eb *EntityBase) GetSubERModel(entityName string, maxDepths ...int) (*ERMod
 					return nil, err
 				}
 				visited[neighborID] = true
-				appendEntity(currentEntity)
+				appendEntity(neighbor)
 				queue = append(queue, queueItem{entityID: neighborID, depth: currentItem.depth + 1, e: neighbor})
 			}
 		}
 	}
 
-	return &ERModelGraph{
+	return &ERModel{
 		Entities:  allEntities,
 		Relations: allRelations,
 	}, nil

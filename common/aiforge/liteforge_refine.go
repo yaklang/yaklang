@@ -29,15 +29,10 @@ func Refine(path string, option ...any) (*knowledgebase.KnowledgeBase, error) {
 		return nil, utils.Errorf("failed to start analyze video: %v", err)
 	}
 
-	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option)
-	if err != nil {
-		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
-	}
-
-	return RefineEx(ermResult, consts.GetGormProfileDatabase(), option...)
+	return RefineEx(analyzeResult, consts.GetGormProfileDatabase(), option...)
 }
 
-func RefineEx(input <-chan *ERMAnalysisResult, db *gorm.DB, options ...any) (*knowledgebase.KnowledgeBase, error) {
+func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowledgebase.KnowledgeBase, error) {
 	refineConfig := NewRefineConfig(options...)
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
 

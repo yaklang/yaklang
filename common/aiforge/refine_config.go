@@ -9,6 +9,7 @@ type RefineConfig struct {
 	KnowledgeBaseType    string
 	KnowledgeEntryLength int
 	Strict               bool
+	EnableERMEnhance     bool
 
 	*AnalysisConfig
 }
@@ -19,6 +20,7 @@ func NewRefineConfig(opts ...any) *RefineConfig {
 		KnowledgeBaseName:    uuid.New().String(),
 		KnowledgeEntryLength: 1000,
 		Strict:               false,
+		EnableERMEnhance:     true,
 	}
 	otherOption := make([]any, 0)
 	for _, opt := range opts {
