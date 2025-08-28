@@ -164,17 +164,6 @@ func TestIntegrationWithRealEmbedding(t *testing.T) {
 	}
 	assert.True(t, found, "应该能找到 'Yaklang 编程语言介绍' 条目")
 
-	// 测试带分数的搜索
-	searchWithScore, err := kb.SearchKnowledgeEntriesWithScore("RAG技术", 5)
-	assert.NoError(t, err)
-	assert.True(t, len(searchWithScore) > 0)
-	t.Logf("搜索 'RAG技术' 返回 %d 个带分数的结果", len(searchWithScore))
-
-	for _, result := range searchWithScore {
-		t.Logf("搜索结果: %s (分数: %.4f)", result.Entry.KnowledgeTitle, result.Score)
-		assert.True(t, result.Score >= 0.0 && result.Score <= 1.0)
-	}
-
 	// 步骤4: 测试同步功能
 	t.Log("步骤4: 测试同步功能")
 

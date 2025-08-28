@@ -2,11 +2,13 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -340,11 +342,48 @@ func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req 
 	}, nil
 }
 
-func (s *Server) SearchKnowledgeBaseEntryV2(req *ypb.SearchKnowledgeBaseEntryV2Request, stream ypb.Yak_SearchKnowledgeBaseEntryV2Server) error {
-	return nil
-}
-
 // rpc QueryKnowledgeBaseByAI(QueryKnowledgeBaseByAIRequest) returns(stream QueryKnowledgeBaseByAIResponse);
 func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, stream ypb.Yak_QueryKnowledgeBaseByAIServer) error {
+	db := consts.GetGormProfileDatabase()
+	if req.GetQueryAllCollections() {
+		kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseID())
+		if err != nil {
+			return err
+		}
+		res, err := kb.SearchKnowledgeEntriesWithEnhance(req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()))
+		if err != nil {
+			return err
+		}
+		for result := range res {
+			jsonData, err := json.Marshal(result.Data)
+			if err != nil {
+				log.Errorf("marshal query result data failed: %v", err)
+				continue
+			}
+			stream.Send(&ypb.QueryKnowledgeBaseByAIResponse{
+				Message:     result.Message,
+				Data:        string(jsonData),
+				MessageType: result.Type,
+			})
+		}
+		return nil
+	}
+
+	res, err := knowledgebase.Query(db, req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()), knowledgebase.WithEnableAISummary(true))
+	if err != nil {
+		return err
+	}
+	for result := range res {
+		jsonData, err := json.Marshal(result.Data)
+		if err != nil {
+			log.Errorf("marshal query result data failed: %v", err)
+			continue
+		}
+		stream.Send(&ypb.QueryKnowledgeBaseByAIResponse{
+			Message:     result.Message,
+			Data:        string(jsonData),
+			MessageType: result.Type,
+		})
+	}
 	return nil
 }

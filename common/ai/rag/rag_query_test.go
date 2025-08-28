@@ -236,7 +236,7 @@ func TestRAGQuery(t *testing.T) {
 		WithRAGCtx(ctx),
 		WithRAGLimit(5),
 		WithRAGCollectionLimit(3), // 最多搜索3个集合
-		WithRAGEnhance(false),     // 禁用增强搜索以加快测试
+		WithRAGEnhance(""),        // 禁用增强搜索以加快测试
 		WithRAGMsgCallBack(func(result *RAGSearchResult) {
 			t.Logf("Query callback - Type: %s, Message: %s", result.Type, result.Message)
 		}),
