@@ -446,62 +446,56 @@ func (c *MixPluginCaller) IsPassed(target string) bool {
 	return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
 }
 
-func (c *MixPluginCaller) IsStatic(rawUrl string, request []byte) bool {
+func (c *MixPluginCaller) IsStatic(rawUrl string, req, rsp []byte) bool {
 	if !utils.IncludeExcludeChecker(nil, defaultInvalidSuffix, strings.Split(rawUrl, "?")[0]) {
 		return true
 	}
-	contentType := lowhttp.GetHTTPPacketHeader(request, "Content-Type")
-	acceptHeader := lowhttp.GetHTTPPacketHeader(request, "Accept")
+	contentTypeReq := lowhttp.GetHTTPPacketHeader(req, "Content-Type")
+	contentTypeRsp := lowhttp.GetHTTPPacketHeader(rsp, "Content-Type")
+	// acceptHeader := lowhttp.GetHTTPPacketHeader(request, "Accept")
 
-	hasDynamicType := false
-	hasStaticType := false
-	if acceptHeader != "" {
-		contentTypes := parseAcceptHeader(acceptHeader)
-		if len(contentTypes) > 0 {
-			for _, ct := range contentTypes {
-				if isStaticContentType(ct) {
-					hasStaticType = true
-				}
-				if isDynamicContentType(ct) {
-					hasDynamicType = true
-				}
+	// hasDynamicType := false
+	// hasStaticType := false
+	// if acceptHeader != "" {
+	// 	contentTypes := lowhttp.SplitContentTypesFromAcceptHeader(acceptHeader)
+	// 	if len(contentTypes) > 0 {
+	// 		for _, ct := range contentTypes {
+	// 			if isStaticContentType(ct) {
+	// 				hasStaticType = true
+	// 			}
+	// 			if isDynamicContentType(ct) {
+	// 				hasDynamicType = true
+	// 			}
+	// 		}
+	// 	}
+	// 	if hasDynamicType && hasStaticType {
+	// 		return false
+	// 	}
+	// 	if hasStaticType && !hasDynamicType {
+	// 		return true
+	// 	}
+	// }
+
+	check := func(contentType string) bool {
+		if contentType != "" {
+			if isDynamicContentType(contentType) {
+				return false
+			}
+			if isStaticContentType(contentType) {
+				return true
 			}
 		}
-		if hasDynamicType && hasStaticType {
-			return false
-		}
-		if hasStaticType && !hasDynamicType {
-			return true
-		}
+		return false
 	}
 
-	if contentType != "" {
-		if isStaticContentType(contentType) {
-			return true
-		}
-		if isDynamicContentType(contentType) {
-			return false
-		}
+	if check(contentTypeReq) {
+		return true
+	}
+	if check(contentTypeRsp) {
+		return true
 	}
 
 	return false
-}
-
-func parseAcceptHeader(acceptHeader string) []string {
-	var contentTypes []string
-
-	parts := strings.Split(acceptHeader, ",")
-	for _, part := range parts {
-		contentType := strings.TrimSpace(part)
-		if idx := strings.Index(contentType, ";"); idx != -1 {
-			contentType = strings.TrimSpace(contentType[:idx])
-		}
-		if contentType != "" {
-			contentTypes = append(contentTypes, contentType)
-		}
-	}
-
-	return contentTypes
 }
 
 func isDynamicContentType(contentType string) bool {
@@ -1035,7 +1029,7 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 	}
 
 	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
-		if m.IsStatic(u, req) {
+		if m.IsStatic(u, req, rsp) {
 			return
 		}
 		callers.Call(HOOK_MirrorFilteredHTTPFlow,
