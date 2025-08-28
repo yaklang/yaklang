@@ -24,5 +24,7 @@
     *   `PART_OF_TRACE` (Log A `PART_OF_TRACE` TraceID B): 日志条目属于哪个链路。
     *   `COMMUNICATES_WITH` (Service A `COMMUNICATES_WITH` Service B): 服务间通信。
     *   `ORIGINATES_FROM` (Log A `ORIGINATES_FROM` IP B): 日志来源。
+## **注意事项**
+请保留实体在输入中的语言格式，不要进行翻译。
 # **任务**
 分析 `<|INPUT|>` 的日志片段，并严格按照统一的 JSON Schema 格式输出提取的实体和关系。

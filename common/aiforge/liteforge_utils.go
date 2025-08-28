@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
+	"strings"
 	"text/template"
 )
 
@@ -42,10 +43,10 @@ func LiteForgeQueryFromChunk(prompt string, chunk chunkmaker.Chunk, overlapSize 
 	return buf.String(), nil
 }
 
-func quickQueryBuild(prompt string, input string) string {
+func quickQueryBuild(prompt string, input ...string) string {
 	param := map[string]interface{}{
 		"PROMPT": prompt,
-		"INPUT":  input,
+		"INPUT":  strings.Join(input, "\n"),
 	}
 	queryTemplate, err := template.New("query").Parse(queryPrompt)
 	if err != nil {
