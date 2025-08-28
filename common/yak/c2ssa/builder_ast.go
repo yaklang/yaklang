@@ -1,6 +1,7 @@
 package c2ssa
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -386,6 +387,8 @@ func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext) (*s
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
+	fmt.Printf("%s\n", ast.GetText())
+
 	if d := ast.Declarator(); d != nil {
 		left, right, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), VARIABLE_KIND)
 		if e := ast.Initializer(); e != nil {
@@ -546,6 +549,8 @@ func (b *astbuilder) buildEnumeratorList(ast *cparser.EnumeratorListContext) {
 func (b *astbuilder) buildEnumerator(ast *cparser.EnumeratorContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
+
+	fmt.Printf("%s\n", ast.GetText())
 
 	if id := ast.Identifier(); id != nil {
 		if e := ast.Expression(); e != nil {
