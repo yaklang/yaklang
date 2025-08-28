@@ -377,6 +377,7 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 	results.Show(sfvm.WithShowAll())
 	for name, want := range wants {
 		gotVs := results.GetValues(name)
+		// gotVs.ShowDot()
 		if contain {
 			require.GreaterOrEqual(t, len(gotVs), len(want), "key[%s] not found", name)
 		} else {
@@ -407,124 +408,23 @@ func CompareResult(t *testing.T, contain bool, results *ssaapi.SyntaxFlowResult,
 	}
 }
 
-func CheckBottomUser_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {
-	return func(p *ssaapi.Program) error {
-		checkLength := false
-		if len(forceCheckLength) > 0 && forceCheckLength[0] {
-			checkLength = true
-		}
-		p.Show()
-		return checkFunctionEx(
-			func() ssaapi.Values {
-				return p.Ref(variable).Show()
-			},
-			func(v *ssaapi.Value) ssaapi.Values { return v.GetBottomUses().Show() },
-			checkLength, want,
-			func(v1 *ssaapi.Value, v2 string) bool {
-				return strings.Contains(v1.String(), v2)
-			},
-		)
-	}
+func CheckBottomUser(t *testing.T, code, variable string, want []string, contain bool, opt ...ssaapi.Option) {
+	rule := fmt.Sprintf("%s as $start; $start --> as $target", variable)
+	CheckResult(t, code, rule, func(result *ssaapi.SyntaxFlowResult) {
+		CompareResult(t, contain, result, map[string][]string{
+			"target": want,
+		})
+	}, opt...)
 }
 
-func CheckBottomUserCall_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {
-	return func(p *ssaapi.Program) error {
-		checkLength := false
-		if len(forceCheckLength) > 0 && forceCheckLength[0] {
-			checkLength = true
-		}
-		return checkFunctionEx(
-			func() ssaapi.Values {
-				lastIndex := strings.LastIndex(variable, ".")
-				if lastIndex != -1 {
-					member := variable[:lastIndex]
-					key := variable[lastIndex+1:]
-					return p.Ref(member).Ref(key)
-				} else {
-					return p.Ref(variable)
-				}
-			},
-			func(v *ssaapi.Value) ssaapi.Values { return v.GetBottomUses() },
-			checkLength, want,
-			func(v1 *ssaapi.Value, v2 string) bool {
-				return strings.Contains(v1.String(), v2)
-			},
-		)
-	}
-}
-
-func CheckTopDef_Contain(variable string, want []string, forceCheckLength ...bool) checkFunction {
-	return func(p *ssaapi.Program) error {
-		checkLength := false
-		if len(forceCheckLength) > 0 && forceCheckLength[0] {
-			checkLength = true
-		}
-		return checkFunctionEx(
-			func() ssaapi.Values {
-				return p.Ref(variable)
-			},
-			func(v *ssaapi.Value) ssaapi.Values { return v.GetTopDefs() },
-			checkLength, want,
-			func(v1 *ssaapi.Value, v2 string) bool {
-				return strings.Contains(v1.String(), v2)
-			},
-		)
-	}
-}
-
-func CheckTopDef_Equal(variable string, want []string, forceCheckLength ...bool) checkFunction {
-	return func(p *ssaapi.Program) error {
-		checkLength := false
-		if len(forceCheckLength) > 0 && forceCheckLength[0] {
-			checkLength = true
-		}
-		return checkFunctionEx(
-			func() ssaapi.Values {
-				return p.Ref(variable)
-			},
-			func(v *ssaapi.Value) ssaapi.Values { return v.GetTopDefs() },
-			checkLength, want,
-			func(v1 *ssaapi.Value, v2 string) bool {
-				return v1.String() == v2
-			},
-		)
-	}
-}
-
-func checkFunctionEx(
-	variable func() ssaapi.Values, // variable  for test
-	get func(*ssaapi.Value) ssaapi.Values, // getTop / getBottom
-	checkLength bool,
-	want []string,
-	compare func(*ssaapi.Value, string) bool,
-) error {
-	values := variable()
-	if len(values) != 1 {
-		return fmt.Errorf("variable[%s] not len(1): %d", values, len(values))
-	}
-	value := values[0]
-	vs := get(value)
-	vs = lo.UniqBy(vs, func(v *ssaapi.Value) int64 { return v.GetId() })
-	if checkLength {
-		if len(vs) != len(want) {
-			err := fmt.Errorf("variable[%v] got:%d: %v vs want: %d:%v", values, len(vs), vs, len(want), want)
-			log.Info(err)
-			return err
-		}
-	}
-	mark := make([]bool, len(want))
-	for _, value := range vs {
-		log.Infof("value: %s", value.String())
-		for j, w := range want {
-			mark[j] = mark[j] || compare(value, w)
-		}
-	}
-	for i, m := range mark {
-		if !m {
-			return fmt.Errorf("want[%d] %s not found", i, want[i])
-		}
-	}
-	return nil
+func CheckTopDef(t *testing.T, code, variable string, want []string, contain bool, opt ...ssaapi.Option) {
+	rule := fmt.Sprintf("%s as $start; $start #-> as $target", variable)
+	CheckResult(t, code, rule, func(result *ssaapi.SyntaxFlowResult) {
+		// result.GetValues("target").ShowDot()
+		CompareResult(t, contain, result, map[string][]string{
+			"target": want,
+		})
+	}, opt...)
 }
 
 func checkRuleResult(verifyFs *sfvm.VerifyFileSystem, rule *schema.SyntaxFlowRule, result *ssaapi.SyntaxFlowResult, isStrict bool) (errs error) {

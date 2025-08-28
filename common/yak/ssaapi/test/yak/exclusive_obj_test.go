@@ -68,25 +68,21 @@ func topDefCheckMustWithOpts(t *testing.T, code string, varName string, want []a
 }
 
 func TestBasic_BasicObject(t *testing.T) {
-	ssatest.Check(t, `
-	a = {}; 
-	a.b = 1; 
-	a.c = 3; 
-	d = a.c + a.b
-	`,
-		ssatest.CheckTopDef_Contain("d", []string{"3", "1"}),
-	)
+	ssatest.CheckTopDef(t, `
+       a = {}; 
+       a.b = 1; 
+       a.c = 3; 
+       d = a.c + a.b
+       `, "d", []string{"3", "1"}, true)
 }
 
 func TestBasic_BasicObject2(t *testing.T) {
-	ssatest.Check(t, `
-	a = ()=>{return {}}; 
-	a.b = 1; 
-	a.c = 3; 
-	d = a.c + a.b
-	`,
-		ssatest.CheckTopDef_Contain("d", []string{"3", "1"}),
-	)
+	ssatest.CheckTopDef(t, `
+       a = ()=>{return {}}; 
+       a.b = 1; 
+       a.c = 3; 
+       d = a.c + a.b
+       `, "d", []string{"3", "1"}, true)
 }
 
 func TestBasic_BasicObject_Trace(t *testing.T) {

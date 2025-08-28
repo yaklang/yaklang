@@ -1,9 +1,10 @@
 package ssaapi
 
 import (
-	"github.com/stretchr/testify/require"
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -21,53 +22,48 @@ func Test_Function_Parameter(t *testing.T) {
 	e=a.b;
 	dump(e)
 	`
-		ssatest.Check(t, code,
-			ssatest.CheckTopDef_Equal("e", []string{"1"}),
-		)
+		ssatest.CheckTopDef(t, code, "e", []string{"1"}, false)
+		// ssatest.Check(t, code,
+		// 	ssatest.CheckTopDef("e", []string{"1"}),
+		// )
 	})
 }
 
 func Test_Function_Return(t *testing.T) {
 	t.Run("multiple return first", func(t *testing.T) {
-		ssatest.Check(t, `
-		c = () => {return 1,2}; 
-		a,b=c();
-		`,
-			ssatest.CheckTopDef_Equal("a", []string{"1"}),
-		)
+		ssatest.CheckTopDef(t, `
+				c = () => {return 1,2};
+				a,b=c();
+				`, "a", []string{"1"}, false)
 	})
 
 	t.Run("multiple return second", func(t *testing.T) {
-		ssatest.Check(t, `
-		c = () => {return 1,2}
-		a,b=c();
-		`,
-			ssatest.CheckTopDef_Equal("b", []string{"2"}),
-		)
+		ssatest.CheckTopDef(t, `
+				c = () => {return 1,2}
+				a,b=c();
+				`, "b", []string{"2"}, false)
 	})
 
 	t.Run("multiple return unpack", func(t *testing.T) {
-		ssatest.Check(t, `
-		c = () => {return 1,2}
-		f=c();
-		a,b=f;
-		dump(b)
-		`,
-			ssatest.CheckTopDef_Equal("b", []string{"2"}),
-		)
+		ssatest.CheckTopDef(t, `
+				c = () => {return 1,2}
+				f=c();
+				a,b=f;
+				dump(b)
+				`, "b", []string{"2"}, false)
 	})
 }
 
 func Test_Function_FreeValue(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
-		ssatest.Check(t, `
-a = 1
-b = (c, d) => {
-	a = c + d
-	return d, c
-}
-f = b(2,3)
-		`, ssatest.CheckTopDef_Equal("f", []string{"2", "3"}))
+		ssatest.CheckTopDef(t, `
+		 a = 1
+		 b = (c, d) => {
+			 a = c + d
+			 return d, c
+		 }
+		 f = b(2,3)
+			`, "f", []string{"2", "3"}, false)
 	})
 
 }
