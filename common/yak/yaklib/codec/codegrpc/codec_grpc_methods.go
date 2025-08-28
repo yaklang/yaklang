@@ -14,12 +14,13 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"hash"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/jsonpath"
 
 	"github.com/samber/lo"
 	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
@@ -436,6 +437,71 @@ func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivT
 	if err != nil {
 		return err
 	}
+	flow.Text = dec
+	return nil
+}
+
+// Tag = "加密"
+// CodecName = "AES-GCM加密"
+// Desc = """AES-GCM (Galois/Counter Mode) 是一种认证加密模式，它同时提供数据的机密性和完整性保护。GCM模式结合了CTR模式的加密和GMAC的认证，是现代密码学中广泛使用的安全加密方式。输出格式为: nonce + ciphertext + tag (当nonce为空时自动生成并包含在输出中)。"""
+// Params = [
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "nonce", Type = "inputSelect", Required = false ,Label = "Nonce/IV", Connector ={ Name = "nonceType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "Nonce格式"} },
+// { Name = "nonceSize", Type = "select", DefaultValue = "12", Options = ["12", "16"], Required = true, Label = "Nonce长度"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
+// ]
+func (flow *CodecExecFlow) AESGCMEncrypt(key string, keyType string, nonce string, nonceType string, nonceSize string, output outputType) error {
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeNonce := decodeData([]byte(nonce), nonceType)
+
+	var nonceSizeInt int
+	switch nonceSize {
+	case "12":
+		nonceSizeInt = 12
+	case "16":
+		nonceSizeInt = 16
+	default:
+		nonceSizeInt = 12
+	}
+
+	data, err := codec.AESGCMEncryptWithNonceSize(decodeKey, flow.Text, decodeNonce, nonceSizeInt)
+	if err != nil {
+		return err
+	}
+
+	flow.Text = encodeData(data, output)
+	return nil
+}
+
+// Tag = "解密"
+// CodecName = "AES-GCM解密"
+// Desc = """AES-GCM (Galois/Counter Mode) 是一种认证加密模式，它同时提供数据的机密性和完整性保护。GCM模式结合了CTR模式的加密和GMAC的认证，是现代密码学中广泛使用的安全加密方式。输入格式应为: nonce + ciphertext + tag 或者单独的 ciphertext (如果nonce单独提供)。"""
+// Params = [
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "nonce", Type = "inputSelect", Required = false ,Label = "Nonce/IV", Connector ={ Name = "nonceType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "Nonce格式"} },
+// { Name = "nonceSize", Type = "select", DefaultValue = "12", Options = ["12", "16"], Required = true, Label = "Nonce长度"},
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"}
+// ]
+func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce string, nonceType string, nonceSize string, input outputType) error {
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeNonce := decodeData([]byte(nonce), nonceType)
+	inputText := decodeData(flow.Text, input)
+
+	var nonceSizeInt int
+	switch nonceSize {
+	case "12":
+		nonceSizeInt = 12
+	case "16":
+		nonceSizeInt = 16
+	default:
+		nonceSizeInt = 12
+	}
+
+	dec, err := codec.AESGCMDecryptWithNonceSize(decodeKey, inputText, decodeNonce, nonceSizeInt)
+	if err != nil {
+		return err
+	}
+
 	flow.Text = dec
 	return nil
 }
