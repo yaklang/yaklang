@@ -13,17 +13,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	// fmt.Printf("exp = %s\n", ast.GetText())
-
-	getVariable := func(single *cparser.ExpressionContext, i int) *ssa.Variable {
-		if s := single.Expression(i); s != nil {
-			_, leftv := b.buildExpression(s.(*cparser.ExpressionContext), true)
-			return leftv
-		} else {
-			b.NewError(ssa.Error, TAG, "can't get expression")
-			return b.CreateVariable("")
-		}
-	}
+	fmt.Printf("exp = %s\n", ast.GetText())
 
 	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value, name string) ssa.Value {
 		id := name
@@ -72,7 +62,7 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 					return b.GetOriginValue(expr), nil
 				}
 			case "&":
-				if op1Var := getVariable(ast.Expression(0).(*cparser.ExpressionContext), 0); op1Var != nil {
+				if _, op1Var := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), true); op1Var != nil {
 					return b.EmitConstPointer(op1Var), nil
 				}
 			}
@@ -238,6 +228,8 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 		}
 	}
 
+	fmt.Printf("%s\n", ast.GetText())
+
 	if a := ast.AssignmentOperator(); a != nil {
 		if left == nil {
 			getVariable()
@@ -311,11 +303,18 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 
 	// 2. 指针 *
 	if ast.Star() != nil {
-		if right.GetType().GetTypeKind() == ssa.PointerKind {
-			right = b.GetOriginValue(right)
-		} else {
-			b.NewError(ssa.Error, TAG, "unary '*' operator can only be used on pointer types")
-			right = b.EmitConstInst(0)
+		if right != nil {
+			if right.GetType().GetTypeKind() == ssa.PointerKind {
+				right = b.GetOriginValue(right)
+			} else {
+				b.NewError(ssa.Error, TAG, "unary '*' operator can only be used on pointer types")
+				right = b.EmitConstInst(0)
+			}
+		} else if left != nil {
+			v, _ := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), false)
+			if v.GetType().GetTypeKind() == ssa.PointerKind {
+				return nil, b.GetOriginPointer(v)
+			}
 		}
 	}
 
@@ -406,10 +405,16 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
 			if right != nil {
+				if t := right.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+					right = b.GetOriginValue(right)
+				}
 				right = b.ReadMemberCallValue(right, b.EmitConstInst(key))
 			}
 			if left != nil {
 				member := b.ReadValue(left.GetName())
+				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
+					member = b.GetOriginValue(member)
+				}
 				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
 			}
 		}
