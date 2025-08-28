@@ -1,26 +1,18 @@
 package yakit
 
 import (
-	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
-func CreateEntityBase(db *gorm.DB, entityBase *schema.EntityBaseInfo) error {
+func CreateEntityBaseInfo(db *gorm.DB, entityBase *schema.EntityBaseInfo) error {
 	return db.Create(entityBase).Error
 }
 
-func DeleteEntityBase(db *gorm.DB, id int64) error {
-	result := db.Delete(&schema.EntityBaseInfo{}, id)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return utils.Errorf("entity base not found to delete")
-	}
-	return nil
+func DeleteEntityBaseInfo(db *gorm.DB, id int64) error {
+	return db.Unscoped().Delete(&schema.EntityBaseInfo{}, id).Error
 }
 
 type EntityFilter struct {
@@ -51,25 +43,12 @@ func QueryEntities(db *gorm.DB, entityFilter *EntityFilter) ([]*schema.ERModelEn
 	return entities, err
 }
 
-func CreateEntity(db *gorm.DB, entity *schema.ERModelEntity) error {
-	return db.Create(entity).Error
+func UpdateEntity(db *gorm.DB, id uint, entity *schema.ERModelEntity) error {
+	return db.Model(&schema.ERModelEntity{}).Where("id = ?", id).Updates(entity).Error
 }
 
-// CreateEntityAndAttr 创建实体及其属性
-func CreateEntityAndAttr(db *gorm.DB, entity *schema.ERModelEntity) error {
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		if err := tx.Create(entity).Error; err != nil {
-			return fmt.Errorf("failed to create main entity: %w", err)
-		}
-		for _, attr := range entity.Attributes {
-			attr.EntityID = entity.ID
-			attr.EntityBaseID = entity.EntityBaseID
-			if err := tx.Create(attr).Error; err != nil {
-				return fmt.Errorf("failed to create attribute '%s': %w", attr.AttributeName, err)
-			}
-		}
-		return nil
-	})
+func CreateEntity(db *gorm.DB, entity *schema.ERModelEntity) error {
+	return db.Create(entity).Error
 }
 
 func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
@@ -133,20 +112,21 @@ func CreateAttribute(db *gorm.DB, attribute *schema.ERModelAttribute) error {
 	return db.Create(attribute).Error
 }
 
-func AddRelation(db *gorm.DB, sourceID, targetID uint, relationType string) error {
+func AddRelation(db *gorm.DB, sourceID, targetID uint, relationType, decisionRationale string) error {
 	relation := schema.ERModelRelation{
-		SourceEntityID: sourceID,
-		TargetEntityID: targetID,
-		RelationType:   relationType,
+		SourceEntityID:    sourceID,
+		TargetEntityID:    targetID,
+		RelationType:      relationType,
+		DecisionRationale: decisionRationale,
 	}
+	relation.Hash = relation.CalcHash()
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
 		findErr := tx.Where("hash = ?", relation.Hash).First(&relation).Error
 		if findErr == nil {
 			return nil // 事务成功结束
 		}
 		if gorm.IsRecordNotFoundError(findErr) {
-			createErr := tx.Create(&relation).Error
-			return createErr
+			return tx.Create(&relation).Error
 		}
 		return findErr
 	})

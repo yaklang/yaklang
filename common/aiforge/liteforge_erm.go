@@ -160,6 +160,68 @@ func DetectERMPrompt(input string, options ...any) (string, error) {
 	}
 }
 
+var entitySchema = []aitool.ToolOption{
+	aitool.WithStringParam(
+		"identifier",
+		aitool.WithParam_Description(`一个机器可读的、全局唯一的、可预测的实体ID。格式必须严格遵循 "类型:唯一限定名" 的规范。
+**格式示例 (Good Case):**
+- **代码:** "func:huff0.Decoder.Decompress4X", "type:huff0.Decoder", "package:huff0"
+- **规则:** "rule:gdpr.article_17.section_1", "term:gdpr.personal_data", "obligation:processor.ensure_security"
+- **日志:** "event:2023-10-27T10:00:01Z_login_failure", "ip:192.168.1.101", "user_id:john.doe"
+- **通用:** "person:elon_musk", "concept:artificial_intelligence", "location:paris"`),
+		aitool.WithParam_Required(true),
+	),
+	aitool.WithStringParam(
+		"qualified_name",
+		aitool.WithParam_Description(`人类可读的、在领域内完整的实体名称，应包含足够的上下文。
+**格式示例 (Good Case):**
+- **代码:** "func (d *Decoder) Decompress4X(dst, src []byte, dt *huffmanTable) (n int, err error)"
+- **规则:** "Article 17(1): The data subject shall have the right to obtain from the controller the erasure of personal data."
+- **日志:** "Login failed for user 'john.doe' from 192.168.1.101"
+- **通用:** "Elon Musk, CEO of SpaceX and Tesla"`),
+		aitool.WithParam_Required(true),
+	),
+	aitool.WithStringParam(
+		"decision_rationale",
+		aitool.WithParam_Description("Explain the reasoning behind the values assigned to the other fields in this JSON object. Justify the choices made."),
+	),
+	aitool.WithStructArrayParam(
+		"attributes",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Description("You're seeking to extract attributes from this entity. Your objective is to identify fundamental attributes for well-defined entities. For instance, in the case of a \"person\" entity, you would extract their name. Similarly, for a \"log\" entity, the occurrence time would be a crucial attribute."),
+		}, nil,
+		aitool.WithStringParam(
+			"attribute_name",
+			aitool.WithParam_Description("The name of the attribute"),
+		),
+		aitool.WithStringParam(
+			"attribute_value",
+			aitool.WithParam_Description("The value of the attribute"),
+		),
+		aitool.WithBoolParam(
+			"unique_identifier",
+			aitool.WithParam_Description("Determine whether this attribute serves as a latent primary key for the entity. That is, ascertain if the attribute could function as a unique identifier, such as a UUID, email address, or fully qualified name."),
+		),
+	),
+	aitool.WithStringParam(
+		"description",
+		aitool.WithParam_Description("A brief description of the entity providing additional context or details."),
+	),
+	aitool.WithStringParam(
+		"entity_type",
+		aitool.WithParam_Description(`The type of the entity, from the universal EntityType enum.`),
+		aitool.WithParam_Enum(
+			"PERSON", "ORGANIZATION", "LOCATION", "EVENT", "DOCUMENT", "SECTION", "CONCEPT",
+			"THEORY", "CLAIM", "QUOTE", "NUMERIC_DATA", "CODE_MODULE", "CODE_TYPE", "CODE_FUNCTION",
+			"CODE_VARIABLE", "DESIGN_PATTERN", "CONCURRENCY_PRIMITIVE", "ERROR_PATTERN", "DEPENDENCY",
+			"CONFIGURATION_ENTRY", "DATA_SOURCE", "LEGAL_RULE", "DEFINITION", "LEGAL_SUBJECT", "POLICY",
+			"OBLIGATION", "RIGHT", "PROHIBITION", "CONDITION", "CONSEQUENCE", "SCOPE_OF_APPLICABILITY",
+			"LOG_ENTRY", "SERVICE_COMPONENT", "TRACE_ID", "SESSION_ID", "USER_ID", "IP_ADDRESS",
+			"HOSTNAME", "STATUS_CODE", "PERFORMANCE_METRIC", "SECURITY_EVENT",
+		),
+	),
+}
+
 var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 	// 定义 entity_list，一个对象数组
 	aitool.WithStructArrayParam(
@@ -168,65 +230,7 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 			aitool.WithParam_Description("Represents a node in the knowledge graph, such as a person, a function, a concept, a veriable, an object/instance, a pure function, a definition"),
 		}, nil,
 		// 定义数组中每个对象的字段
-		aitool.WithStringParam(
-			"identifier",
-			aitool.WithParam_Description(`一个机器可读的、全局唯一的、可预测的实体ID。格式必须严格遵循 "类型:唯一限定名" 的规范。
-**格式示例 (Good Case):**
-- **代码:** "func:huff0.Decoder.Decompress4X", "type:huff0.Decoder", "package:huff0"
-- **规则:** "rule:gdpr.article_17.section_1", "term:gdpr.personal_data", "obligation:processor.ensure_security"
-- **日志:** "event:2023-10-27T10:00:01Z_login_failure", "ip:192.168.1.101", "user_id:john.doe"
-- **通用:** "person:elon_musk", "concept:artificial_intelligence", "location:paris"`),
-			aitool.WithParam_Required(true),
-		),
-		aitool.WithStringParam(
-			"qualified_name",
-			aitool.WithParam_Description(`人类可读的、在领域内完整的实体名称，应包含足够的上下文。
-**格式示例 (Good Case):**
-- **代码:** "func (d *Decoder) Decompress4X(dst, src []byte, dt *huffmanTable) (n int, err error)"
-- **规则:** "Article 17(1): The data subject shall have the right to obtain from the controller the erasure of personal data."
-- **日志:** "Login failed for user 'john.doe' from 192.168.1.101"
-- **通用:** "Elon Musk, CEO of SpaceX and Tesla"`),
-			aitool.WithParam_Required(true),
-		),
-		aitool.WithStringParam(
-			"decision_rationale",
-			aitool.WithParam_Description("Explain the reasoning behind the values assigned to the other fields in this JSON object. Justify the choices made."),
-		),
-		aitool.WithStringArrayParam(
-			"plausible_identifiers",
-			aitool.WithParam_Description(" **识别潜在主键**：在属性中，如果某个字段看起来像唯一标识符（如 id, uuid, email），请明确标注。这是最重要的线索。"),
-		),
-		aitool.WithStructArrayParam(
-			"attributes",
-			[]aitool.PropertyOption{
-				aitool.WithParam_Description("a list of attributes for this entity"),
-			}, nil,
-			aitool.WithStringParam(
-				"attribute_name",
-				aitool.WithParam_Description("The name of the attribute"),
-			),
-			aitool.WithStringParam(
-				"attribute_value",
-				aitool.WithParam_Description("The value of the attribute"),
-			),
-		),
-		aitool.WithStringParam(
-			"description",
-			aitool.WithParam_Description("A brief description of the entity providing additional context or details."),
-		),
-		aitool.WithStringParam(
-			"entity_type",
-			aitool.WithParam_Description(`The type of the entity, from the universal EntityType enum.`),
-			aitool.WithParam_Enum(
-				"PERSON", "ORGANIZATION", "LOCATION", "EVENT", "DOCUMENT", "SECTION", "CONCEPT",
-				"THEORY", "CLAIM", "QUOTE", "NUMERIC_DATA", "CODE_MODULE", "CODE_TYPE", "CODE_FUNCTION",
-				"CODE_VARIABLE", "DESIGN_PATTERN", "CONCURRENCY_PRIMITIVE", "ERROR_PATTERN", "DEPENDENCY",
-				"CONFIGURATION_ENTRY", "DATA_SOURCE", "LEGAL_RULE", "DEFINITION", "LEGAL_SUBJECT", "POLICY",
-				"OBLIGATION", "RIGHT", "PROHIBITION", "CONDITION", "CONSEQUENCE", "SCOPE_OF_APPLICABILITY",
-				"LOG_ENTRY", "SERVICE_COMPONENT", "TRACE_ID", "SESSION_ID", "USER_ID", "IP_ADDRESS",
-				"HOSTNAME", "STATUS_CODE", "PERFORMANCE_METRIC", "SECURITY_EVENT",
-			),
-		),
+		entitySchema...,
 	),
 	// 定义 relationship_list，另一个对象数组
 	aitool.WithStructArrayParam(
@@ -258,11 +262,37 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 	),
 )
 
+func normalizeEntityName(inputStr string) string {
+	if strings.TrimSpace(inputStr) == "" {
+		return ""
+	}
+	seps := []string{",", ";", "|", " "}
+	processedStr := strings.ToLower(inputStr)
+	for _, sep := range seps {
+		processedStr = strings.ReplaceAll(processedStr, sep, "_")
+	}
+	return processedStr
+}
+
 func invokeParams2ERMAttribute(params aitool.InvokeParams) *schema.ERModelAttribute {
 	return &schema.ERModelAttribute{
-		AttributeName:  params.GetString("attribute_name"),
-		AttributeValue: params.GetString("attribute_value"),
+		AttributeName:    params.GetString("attribute_name"),
+		AttributeValue:   params.GetString("attribute_value"),
+		UniqueIdentifier: params.GetBool("unique_identifier"),
 	}
+}
+
+func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEntity {
+	entity := &schema.ERModelEntity{
+		EntityName:  normalizeEntityName(entityParams.GetString("identifier")),
+		EntityType:  entityParams.GetString("entity_type"),
+		Description: entityParams.GetString("description"),
+		Rationale:   entityParams.GetString("decision_rationale"),
+	}
+	for _, relationshipParams := range entityParams.GetObjectArray("attributes") {
+		entity.Attributes = append(entity.Attributes, invokeParams2ERMAttribute(relationshipParams))
+	}
+	return entity
 }
 
 func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
@@ -271,16 +301,7 @@ func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 		Relations: make([]*TemporaryRelation, 0),
 	}
 	for _, entityParams := range ermResult.GetInvokeParamsArray("entity_list") {
-		entity := &schema.ERModelEntity{
-			EntityName:  entityParams.GetString("identifier"),
-			EntityType:  entityParams.GetString("entity_type"),
-			Description: entityParams.GetString("description"),
-			Rationale:   entityParams.GetString("decision_rationale"),
-		}
-		for _, relationshipParams := range entityParams.GetObjectArray("relationship_list") {
-			entity.Attributes = append(entity.Attributes, invokeParams2ERMAttribute(relationshipParams))
-		}
-		result.Entities[entityParams.GetString("identifier")] = entity
+		result.Entities[entityParams.GetString("identifier")] = invokeParams2ERMEntity(entityParams)
 	}
 
 	for _, relationParams := range ermResult.GetInvokeParamsArray("relationship_list") {
@@ -367,40 +388,110 @@ func AnalyzeERM(path string, option ...any) (*entitybase.EntityBase, error) {
 		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
 	}
 	db := consts.GetGormProfileDatabase()
-
-	eb, err := entitybase.CreateEntityBase(db, uuid.NewString(), "refine use")
+	baseName := uuid.NewString()
+	eb, err := entitybase.NewEntityBase(db, baseName, "refine use")
 	if err != nil {
 		return nil, err
 	}
+	analyzeConfig.AnalyzeStatusCard("ERM_ENTITY_BASE", baseName)
 
 	for erm := range ermResult {
-
 		for tempName, tempEntity := range erm.Entities {
-			searchEntity, err := eb.SearchEntity(tempEntity)
+			matchedEntity, accurate, err := eb.MatchEntities(tempEntity)
 			if err != nil {
 				log.Errorf("failed to search entity [%s]: %v", tempEntity.EntityName, err)
 				continue
 			}
-
-			if len(searchEntity) > 0 {
-				analyzeConfig.AnalyzeLog("entity exists: %s", tempName)
-				existsEntity := searchEntity[0]
-				err := eb.AppendEntityAttr(existsEntity.ID, tempEntity.Attributes)
-				if err != nil {
-					analyzeConfig.AnalyzeLog("failed to append entity [%s]: %v", tempEntity.EntityName, err)
-					continue
-				}
-				erm.Entities[tempName] = existsEntity
-			} else {
+			if matchedEntity == nil {
 				err = eb.CreateEntity(tempEntity)
 				if err != nil {
 					analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
 					continue
 				}
 				analyzeConfig.AnalyzeLog("entity created: %s", tempEntity.EntityName)
+				erm.Entities[tempName] = tempEntity
+			} else if accurate { // if search is accurate, just use the matched entity
+				analyzeConfig.AnalyzeLog("match entity exists: %s", tempName)
+				err = eb.AppendAttrs(matchedEntity.ID, tempEntity.Attributes)
+				if err != nil {
+					analyzeConfig.AnalyzeLog("failed to append entity [%s]: %v", tempEntity.EntityName, err)
+					continue
+				}
+				erm.Entities[tempName] = matchedEntity
+			} else {
+				resolvedEntity, sameEntity, err := ResolveEntity(matchedEntity, tempEntity, option...)
+				if err != nil {
+					analyzeConfig.AnalyzeLog("failed to resolve entity [%s]: %v", tempEntity.EntityName, err)
+					continue
+				}
+				if sameEntity { // if resolved as same entity, update the entity
+					err := eb.UpdateEntity(matchedEntity.ID, resolvedEntity)
+					if err != nil {
+						analyzeConfig.AnalyzeLog("failed to update entity [%s]: %v", tempEntity.EntityName, err)
+						return nil, err
+					}
+					analyzeConfig.AnalyzeLog("entity updated: %s", tempEntity.EntityName)
+				} else { // if resolved as different entity, create a new entity
+					err = eb.CreateEntity(resolvedEntity)
+					if err != nil {
+						analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
+						continue
+					}
+					analyzeConfig.AnalyzeLog("entity created: %s", resolvedEntity.EntityName)
+				}
+				erm.Entities[tempName] = resolvedEntity
 			}
+		}
+
+		for _, relation := range erm.Relations {
+			sourceEntity, ok1 := erm.Entities[relation.SourceTemporaryName]
+			targetEntity, ok2 := erm.Entities[relation.TargetTemporaryName]
+			if !ok1 || !ok2 {
+				analyzeConfig.AnalyzeLog("skip relation [%s -> %s]: source or target entity not found", relation.SourceTemporaryName, relation.TargetTemporaryName)
+				continue
+			}
+			err := eb.AddRelation(sourceEntity.ID, targetEntity.ID, relation.RelationType, relation.DecisionRationale)
+			if err != nil {
+				analyzeConfig.AnalyzeLog("failed to create relation [%s -> %s]: %v", sourceEntity.EntityName, targetEntity.EntityName, err)
+				continue
+			}
+			analyzeConfig.AnalyzeLog("relation created: %s -> %s", sourceEntity.EntityName, targetEntity.EntityName)
 		}
 
 	}
 	return nil, nil
+}
+
+var resolveEntitySchema = aitool.NewObjectSchemaWithAction(
+	aitool.WithBoolParam(
+		"same_entity",
+		aitool.WithParam_Description("是否是同一个实体"),
+	),
+	aitool.WithStructParam(
+		"entity",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Description("当实体是同一个实体时，重新综合返回实体的完整信息"),
+		},
+		entitySchema...,
+	),
+)
+
+//go:embed liteforge_prompt/resolve_same_entity.txt
+var resolveEntityPrompt string
+
+func ResolveEntity(oldEntity *schema.ERModelEntity, newEntity *schema.ERModelEntity, options ...any) (*schema.ERModelEntity, bool, error) {
+	analyzeConfig := NewAnalysisConfig(options...)
+	analyzeConfig.AnalyzeLog("start resolving entity: old:[%s] | new:[%s]", oldEntity.String(), newEntity.String())
+
+	options = append(options, _withOutputJSONSchema(resolveEntitySchema))
+	resolveResult, err := _executeLiteForgeTemp(quickQueryBuild(resolveEntityPrompt, oldEntity.Dump(), newEntity.Dump()), options...)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if resolveResult.GetBool("same_entity") {
+		return invokeParams2ERMEntity(resolveResult.GetInvokeParams("entity")), true, nil
+	} else {
+		return newEntity, false, nil
+	}
 }
