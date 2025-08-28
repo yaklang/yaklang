@@ -209,6 +209,7 @@ type SyntaxFlowRule struct {
 	Description string
 	Tag         string
 	AlertDesc   MapEx[string, *SyntaxFlowDescInfo] `gorm:"type:text"`
+	CWE         StringArray                        `gorm:"type:text" json:"cwe"`
 	CVE         string
 	// yak or sf
 	RiskType string

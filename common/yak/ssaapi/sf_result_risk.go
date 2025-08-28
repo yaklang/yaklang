@@ -94,6 +94,7 @@ func buildSSARisk(
 		RiskType:      rule.RiskType,
 		Severity:      rule.Severity,
 		CVE:           rule.CVE,
+		CWE:           rule.CWE,
 
 		FromRule:    rule.RuleName,
 		IsPotential: false,
