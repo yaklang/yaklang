@@ -62,7 +62,7 @@ LOOP:
 	}
 }
 
-func TestReAct_QueueEnqueueCount(t *testing.T) {
+func TestReAct_CounterForQueueEnqueueFlushed(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 100)
 	ctx, cancel := context.WithCancel(context.Background())
 	atomicCount := new(int32)
@@ -71,7 +71,7 @@ func TestReAct_QueueEnqueueCount(t *testing.T) {
 			time.Sleep(20 * time.Second)
 			return nil, nil
 		}),
-		WithDebug(true),
+		WithDebug(false),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			fmt.Println("===============================")
@@ -97,7 +97,7 @@ func TestReAct_QueueEnqueueCount(t *testing.T) {
 		}
 		close(in)
 	}()
-	after := time.After(10 * time.Second)
+	after := time.After(3 * time.Second)
 LOOP:
 	for {
 		select {
