@@ -174,7 +174,6 @@ func startEmbeddingService(manager *localmodel.Manager) {
 		localmodel.WithContBatching(*contBatching),
 		localmodel.WithBatchSize(*batchSize),
 		localmodel.WithThreads(*threads),
-		localmodel.WithDetached(*detached),
 		localmodel.WithDebug(*debug),
 		localmodel.WithStartupTimeout(time.Duration(*timeout)*time.Second),
 	)

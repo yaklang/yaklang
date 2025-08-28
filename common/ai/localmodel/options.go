@@ -86,13 +86,6 @@ func WithThreads(threads int) Option {
 	}
 }
 
-// WithDetached 设置是否分离模式
-func WithDetached(detached bool) Option {
-	return func(c *ServiceConfig) {
-		c.Detached = detached
-	}
-}
-
 // WithDebug 设置调试模式
 func WithDebug(debug bool) Option {
 	return func(c *ServiceConfig) {
