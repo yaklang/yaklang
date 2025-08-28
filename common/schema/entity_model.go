@@ -39,12 +39,10 @@ func (e *ERModelEntity) String() string {
 }
 
 func (e *ERModelEntity) Dump() string {
-	// 防御性编程：检查接收者是否为 nil
 	if e == nil {
 		return "<nil ERModelEntity>"
 	}
 	var sb strings.Builder
-	// 打印实体自身的信息
 	sb.WriteString(fmt.Sprintf("--- ERModelEntity ---\n"))
 	sb.WriteString(fmt.Sprintf("  EntityName:   %s\n", e.EntityName))
 	sb.WriteString(fmt.Sprintf("  EntityType:   %s\n", e.EntityType))
@@ -76,7 +74,6 @@ type ERModelAttribute struct {
 }
 
 func (a *ERModelAttribute) Dump(prefix string) string {
-	// 防御性编程：检查接收者是否为 nil
 	if a == nil {
 		return prefix + "<nil ERModelAttribute>\n"
 	}
