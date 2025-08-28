@@ -1133,11 +1133,11 @@ var ssaCodeScan = &cli.Command{
 			Usage: `set rule keyword for filter`,
 		},
 
-		// rule input // todo
-		// cli.StringFlag{
-		// 	Name:  "rule-dir,rdir",
-		// 	Usage: `set rule dir for file`,
-		// },
+		// rule group filter
+		cli.StringSliceFlag{
+			Name:  "rule-group,rg",
+			Usage: `set rule group names for filter (can be used multiple times)`,
+		},
 		// }}}
 
 		// output {{{
@@ -1196,6 +1196,11 @@ var ssaCodeScan = &cli.Command{
 			FilterLibRuleKind: yakit.FilterLibRuleFalse,
 		}
 		ruleFilter.Keyword = c.String("rule-keyword")
+
+		// Handle rule group filtering
+		if groupNames := c.StringSlice("rule-group"); len(groupNames) > 0 {
+			ruleFilter.GroupNames = groupNames
+		}
 
 		riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, c.Bool("memory"))
 		if err != nil {
