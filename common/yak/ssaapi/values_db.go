@@ -112,7 +112,7 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if saveValueConfig.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
-	err := value.GenerateGraph(NewDBGraph(saveValueConfig))
+	err := value.GenerateGraph(NewDBGraph(saveValueConfig), saveValueConfig.ctx)
 	return err
 }
 

@@ -1,7 +1,10 @@
 package ssaapi
 
 import (
+	"context"
+
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type EdgeType string
@@ -23,15 +26,19 @@ type Edge struct {
 	Msg      map[string]any
 }
 
-func (v *Value) GenerateGraph(g Graph) error {
-	dfs(v, func(v *Value) (Values, error) {
+func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
+	ctx := context.Background()
+	if len(ctxs) > 0 && !utils.IsNil(ctxs[0]) {
+		ctx = ctxs[0]
+	}
+	valueDFS(v, func(v *Value) (Values, error) {
 		prevs := v.GetPredecessors()
 		next := make([]*Value, 0, len(prevs))
 		for _, prev := range prevs {
 			// log.Errorf("%v prev: %v", v, prev.Node)
 			switch prev.Info.Label {
 			case Predecessors_BottomUseLabel, Predecessors_TopDefLabel:
-				dfs(v, func(v *Value) (Values, error) {
+				valueDFS(v, func(v *Value) (Values, error) {
 					prev := v.GetDataFlow()
 					// log.Errorf("%v next: %v", v, prev)
 					for _, prev := range prev {
@@ -44,9 +51,10 @@ func (v *Value) GenerateGraph(g Graph) error {
 						}
 					}
 					return prev, nil
-				})
+				}, ctx)
 			default:
 			}
+			next = append(next, prev.Node)
 			// add predecessor edge
 			if err := g.CreateEdge(Edge{
 				From: prev.Node,
@@ -61,24 +69,41 @@ func (v *Value) GenerateGraph(g Graph) error {
 			}
 		}
 		return next, nil
-	})
+	}, ctx)
 	return nil
 }
 
-func dfs(node *Value, handler func(*Value) (Values, error)) error {
+const MAXLevel = 1000
+
+func valueDFS(node *Value, handler func(*Value) (Values, error), ctx context.Context) error {
 	// Perform DFS traversal
-	stack := utils.NewStack[*Value]()
-	stack.Push(node)
-	for !stack.IsEmpty() {
-		curr := stack.Pop()
-		vs, err := handler(curr)
+	stack := omap.NewEmptyOrderedMap[string, *Value]()
+	level := 0
+	var dfs func(v *Value) error
+	dfs = func(v *Value) error {
+		if level++; level > MAXLevel {
+			return utils.Errorf("max level reached")
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if stack.Have(v.GetUUID()) {
+			return nil
+		}
+		stack.PushKey(v.GetUUID(), v)
+		defer stack.Pop()
+
+		vs, err := handler(v)
 		if err != nil {
 			return err
 		}
 		for _, v := range vs {
-			// Push the next node onto the stack
-			stack.Push(v)
+			if err := dfs(v); err != nil {
+				return err
+			}
 		}
+		return nil
 	}
-	return nil
+
+	return dfs(node)
 }

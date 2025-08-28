@@ -204,6 +204,7 @@ public interface RemoteLogService
 }
 
 func Test_Values_Graph_Dot(t *testing.T) {
+
 	t.Run("test dfs simple", func(t *testing.T) {
 		progName := uuid.NewString()
 		prog, err := ssaapi.Parse(``, ssaapi.WithProgramName(progName))
@@ -250,6 +251,27 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		require.Contains(t, graph.String(), "step[2]: Test2")
 		require.Contains(t, graph.String(), "Test3")
 	})
+
+	t.Run("test dfs with cycle", func(t *testing.T) {
+		prog, err := ssaapi.Parse("")
+		require.NoError(t, err)
+		value1 := CreateValue(prog, 1)
+		value2 := CreateValue(prog, 2)
+		value3 := CreateValue(prog, 3)
+		value4 := CreateValue(prog, 4)
+
+		// 1 -> 2 -> 3 -> 4 -> 1
+		value1.AppendPredecessor(value2)
+		value2.AppendPredecessor(value3)
+		value3.AppendPredecessor(value4)
+		value4.AppendPredecessor(value1)
+
+		graph := ssaapi.NewDotGraph()
+		value1.GenerateGraph(graph)
+		graph.Show()
+
+	})
+
 }
 
 func TestGraph_Limit(t *testing.T) {

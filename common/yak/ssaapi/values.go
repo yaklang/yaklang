@@ -7,7 +7,6 @@ import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -1297,12 +1296,13 @@ func (v Values) GetOperands() Values {
 func (v *Value) ShowDot() {
 	dotStr := v.DotGraph()
 	fmt.Println(dotStr)
-	dot.ShowDotGraphToAsciiArt(dotStr)
+	// dot.ShowDotGraphToAsciiArt(dotStr)
 }
 
 func (vs Values) ShowDot() Values {
 	dotStr := vs.DotGraph()
-	dot.ShowDotGraphToAsciiArt(dotStr)
+	fmt.Println(dotStr)
+	// dot.ShowDotGraphToAsciiArt(dotStr)
 	return vs
 }
 

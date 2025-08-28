@@ -55,7 +55,6 @@ func (g *DotGraph) createNode(value *Value) int {
 func (g *DotGraph) CreateEdge(edge Edge) error {
 	fromNode := g.createNode(edge.From)
 	toNode := g.createNode(edge.To)
-	dotEdge := g.AddEdge(fromNode, toNode, string(edge.Kind))
 
 	var (
 		edgeLabel string
@@ -73,12 +72,13 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 	if step > 0 {
 		edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
 	}
+
+	dotEdge := g.AddEdge(fromNode, toNode, edgeLabel)
 	if edge.Kind == EdgeTypePredecessor {
 		g.EdgeAttribute(dotEdge, "color", "red")
 		g.EdgeAttribute(dotEdge, "fontcolor", "red")
+		g.EdgeAttribute(dotEdge, "penwidth", "3.0")
 	}
-	g.EdgeAttribute(dotEdge, "penwidth", "3.0")
-	g.EdgeAttribute(dotEdge, "label", edgeLabel)
 	return nil
 }
 
