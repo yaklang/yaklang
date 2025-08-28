@@ -191,10 +191,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		case isFunc && !fun.IsExtern():
 			callee := i.NewTopDefValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-			// inherit return index
-			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
-			if ok {
-				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
+			if object := actx.CurrentObjectStack(); object != nil {
+				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, object.key)
 			}
 			return callee.getTopDefs(actx, opt...)
 		default:

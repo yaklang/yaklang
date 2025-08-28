@@ -32,7 +32,7 @@ type AnalyzeContext struct {
 	// cross process manager
 	*processAnalysisManager
 	//object
-	_objectStack *utils.Stack[objectItem]
+	_objectStack *utils.Stack[*objectItem]
 
 	callStack *utils.Stack[*ssa.Call]
 
@@ -46,7 +46,7 @@ type AnalyzeContext struct {
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 	actx := &AnalyzeContext{
 		processAnalysisManager: newAnalysisManager(),
-		_objectStack:           utils.NewStack[objectItem](),
+		_objectStack:           utils.NewStack[*objectItem](),
 		config:                 NewOperations(opt...),
 		depth:                  -1,
 		callStack:              utils.NewStack[*ssa.Call](),
@@ -226,7 +226,7 @@ func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
 	if !shouldVisited {
 		return utils.Errorf("This make object(%d) key(%d) member(%d) valueVisited, skip", obj.GetId(), key.GetId(), member.GetId())
 	}
-	g._objectStack.Push(objectItem{
+	g._objectStack.Push(&objectItem{
 		object:       obj,
 		key:          key,
 		member:       member,
@@ -258,6 +258,9 @@ func (g *AnalyzeContext) foreachObjectStack(f func(*Value, *Value, *Value) bool)
 			return
 		}
 	}
+}
+func (g *AnalyzeContext) CurrentObjectStack() *objectItem {
+	return g._objectStack.Peek()
 }
 
 func (a *AnalyzeContext) theObjectShouldBeVisited(object, key, member *Value) (bool, func()) {
