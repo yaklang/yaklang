@@ -87,7 +87,7 @@ func TestReAct_QueueEnqueueCount(t *testing.T) {
 		}
 		close(in)
 	}()
-	after := time.After(5 * time.Second)
+	after := time.After(10 * time.Second)
 	haveTaskEnqueue := false
 	count := 0
 LOOP:
@@ -98,7 +98,7 @@ LOOP:
 			if e.GetNodeId() == "react_task_enqueue" {
 				haveTaskEnqueue = true
 				count++
-				if count > 1 {
+				if count >= 3 {
 					break LOOP
 				}
 			}
@@ -110,7 +110,7 @@ LOOP:
 	if !haveTaskEnqueue {
 		t.Fatal("task not enqueue")
 	}
-	if count <= 1 {
+	if count <= 2 {
 		t.Fatal("task enqueue count is less than 2, got " + fmt.Sprint(count))
 	}
 }
