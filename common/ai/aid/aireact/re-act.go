@@ -131,10 +131,14 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	}
 
 	// Start the event loop in background
-	react.startEventLoop(cfg.ctx)
+	mainloopDone := make(chan struct{})
+	react.startEventLoop(cfg.ctx, mainloopDone)
+	<-mainloopDone // Ensure the event loop has started
 
 	// Start queue processor in background
-	react.startQueueProcessor(cfg.ctx)
+	done := make(chan struct{})
+	react.startQueueProcessor(cfg.ctx, done)
+	<-done // Ensure the queue processor has started
 
 	return react, nil
 }
@@ -190,9 +194,15 @@ func (r *ReAct) getTimelineTotal() int {
 }
 
 // startQueueProcessor 启动任务队列处理器
-func (r *ReAct) startQueueProcessor(ctx context.Context) {
+func (r *ReAct) startQueueProcessor(ctx context.Context, done chan struct{}) {
+	closeDoneOnce := new(sync.Once)
 	r.queueProcessor.Do(func() {
 		go func() {
+			defer func() {
+				closeDoneOnce.Do(func() {
+					close(done)
+				})
+			}()
 			if r.config.debugEvent {
 				log.Infof("Task queue processor started for ReAct instance: %s", r.config.id)
 			}
@@ -208,7 +218,9 @@ func (r *ReAct) startQueueProcessor(ctx context.Context) {
 
 			ticker := time.NewTicker(100 * time.Millisecond) // 每100ms检查一次队列
 			defer ticker.Stop()
-
+			closeDoneOnce.Do(func() {
+				close(done)
+			})
 			for {
 				select {
 				case <-ticker.C:
@@ -270,13 +282,27 @@ func (r *ReAct) processInputEvent(event *ypb.AIInputEvent) error {
 }
 
 // startEventLoop starts the background event processing loop
-func (r *ReAct) startEventLoop(ctx context.Context) {
+func (r *ReAct) startEventLoop(ctx context.Context, done chan struct{}) {
+	doneOnce := new(sync.Once)
+
 	r.config.startInputEventOnce.Do(func() {
 		go func() {
+			defer func() {
+				doneOnce.Do(func() {
+					if done != nil {
+						close(done)
+					}
+				})
+			}()
 			if r.config.debugEvent {
 				log.Infof("ReAct event loop started for instance: %s", r.config.id)
 			}
 
+			doneOnce.Do(func() {
+				if done != nil {
+					close(done)
+				}
+			})
 			for {
 				select {
 				case event, ok := <-r.config.eventInputChan.OutputChannel():
@@ -299,7 +325,6 @@ func (r *ReAct) startEventLoop(ctx context.Context) {
 							log.Errorf("ReAct event processing failed: %v", err)
 						}
 					}(event)
-
 				case <-ctx.Done():
 					if r.config.debugEvent {
 						log.Infof("ReAct event loop stopped for instance: %s", r.config.id)
