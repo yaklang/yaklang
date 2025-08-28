@@ -931,7 +931,6 @@ service Yak {
   rpc CreateKnowledgeBaseEntry(CreateKnowledgeBaseEntryRequest) returns(GeneralResponse);
   rpc UpdateKnowledgeBaseEntry(UpdateKnowledgeBaseEntryRequest) returns(GeneralResponse);
   rpc SearchKnowledgeBaseEntry(SearchKnowledgeBaseEntryRequest) returns(SearchKnowledgeBaseEntryResponse);
-  rpc SearchKnowledgeBaseEntryV2(SearchKnowledgeBaseEntryV2Request) returns(stream SearchKnowledgeBaseEntryV2Response);
   rpc QueryKnowledgeBaseByAI(QueryKnowledgeBaseByAIRequest) returns(stream QueryKnowledgeBaseByAIResponse);
 
   rpc BuildVectorIndexForKnowledgeBase(BuildVectorIndexForKnowledgeBaseRequest) returns(GeneralResponse);
@@ -1108,27 +1107,11 @@ message SearchKnowledgeBaseEntryRequest {
   Paging Pagination = 3;
 }
 
-message SearchKnowledgeBaseEntryV2Request {
-  bool AllCollections = 1;
-  string Keyword = 2;
-  int64 KnowledgeBaseId = 3;
-  Paging Pagination = 4;
-}
-
-message SearchKnowledgeBaseEntryV2Response {
-  KnowledgeBaseEntry KnowledgeBaseEntries = 1;
-  float Score = 2;
-  string CollectionName = 3;
-  int64 CollectionId = 4;
-  string Message = 5;
-  string Metadata = 6;
-  string UID = 7;
-  string MessageType = 8;
-}
-
 message QueryKnowledgeBaseByAIRequest {
   string Query = 1;
-  string KnowledgeBaseID = 2;
+  string EnhancePlan = 2;
+  int64 KnowledgeBaseID = 3;
+  bool QueryAllCollections = 4;
 }
 
 message QueryKnowledgeBaseByAIResponse {

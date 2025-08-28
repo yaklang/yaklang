@@ -4,10 +4,20 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
+	"github.com/yaklang/yaklang/common/utils"
+)
+
+// RAG 搜索结果类型常量
+const (
+	RAGResultTypeMessage   = "message"
+	RAGResultTypeMidResult = "mid_result"
+	RAGResultTypeResult    = "result"
+	RAGResultTypeError     = "error"
 )
 
 // RAGQueryConfig RAG查询配置
@@ -17,10 +27,18 @@ type RAGQueryConfig struct {
 	CollectionName       string
 	CollectionNumLimit   int
 	CollectionScoreLimit float32
-	EnableEnhance        bool // 是否启用增强搜索
+	EnhancePlan          string
 	Filter               func(key string, getDoc func() *Document) bool
+	Concurrent           int
 	MsgCallBack          func(*RAGSearchResult)
 }
+
+const (
+	EnhancePlanHypotheticalAnswer          = "hypothetical_answer"
+	EnhancePlanHypotheticalAnswerWithSplit = "hypothetical_answer_with_split"
+	EnhancePlanSplitQuery                  = "split_query"
+	EnhancePlanGeneralizeQuery             = "generalize_query"
+)
 
 // RAGQueryOption RAG查询选项
 type RAGQueryOption func(*RAGQueryConfig)
@@ -54,9 +72,9 @@ func WithRAGCollectionLimit(collectionLimit int) RAGQueryOption {
 }
 
 // WithRAGEnhance 启用或禁用增强搜索
-func WithRAGEnhance(enable bool) RAGQueryOption {
+func WithRAGEnhance(enhancePlan string) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
-		config.EnableEnhance = enable
+		config.EnhancePlan = enhancePlan
 	}
 }
 
@@ -81,6 +99,13 @@ func WithRAGCtx(ctx context.Context) RAGQueryOption {
 	}
 }
 
+// WithRAGConcurrent 设置并发数
+func WithRAGConcurrent(concurrent int) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.Concurrent = concurrent
+	}
+}
+
 // NewRAGQueryConfig 创建新的RAG查询配置
 func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 	config := &RAGQueryConfig{
@@ -89,7 +114,7 @@ func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 		MsgCallBack:          nil,
 		CollectionNumLimit:   5,
 		CollectionScoreLimit: 0.3,
-		EnableEnhance:        true,
+		EnhancePlan:          "hypothetical_answer",
 		Ctx:                  context.Background(),
 	}
 	for _, opt := range opts {
@@ -111,62 +136,57 @@ type RAGSearchResult struct {
 // Query 在RAG系统中搜索多个集合
 // 这个函数直接在RAG级别进行查询，不依赖于知识库结构
 func Query(db *gorm.DB, query string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
+	return _query(db, query, "1", opts...)
+}
+
+// _query 内部查询函数，用于对一些增强搜索的递归调用
+func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
 	config := NewRAGQueryConfig(opts...)
 	ctx := config.Ctx
 	resultCh := make(chan *RAGSearchResult)
 
-	sendMsg := func(msg string) {
-		msgResult := &RAGSearchResult{
-			Message:   msg,
-			Type:      "message",
-			Timestamp: time.Now().UnixMilli(),
-		}
+	sendRaw := func(msg *RAGSearchResult) {
 		if config.MsgCallBack != nil {
-			config.MsgCallBack(msgResult)
+			config.MsgCallBack(msg)
 		}
 		select {
-		case resultCh <- msgResult:
+		case resultCh <- msg:
 		case <-ctx.Done():
 			return
 		}
+	}
+
+	sendMsg := func(msg string) {
+		msgResult := &RAGSearchResult{
+			Message:   fmt.Sprintf("[%s] %s", queryId, msg),
+			Type:      RAGResultTypeMessage,
+			Timestamp: time.Now().UnixMilli(),
+		}
+		sendRaw(msgResult)
 	}
 
 	sendMidResult := func(doc *Document, score float32, source string) {
 		msgResult := &RAGSearchResult{
-			Message:   fmt.Sprintf("找到文档: %s", doc.ID),
+			Message:   fmt.Sprintf("[%s] 找到文档: %s", queryId, doc.ID),
 			Data:      doc,
-			Type:      "mid_result",
+			Type:      RAGResultTypeMidResult,
 			Score:     score,
 			Source:    source,
 			Timestamp: time.Now().UnixMilli(),
 		}
-		if config.MsgCallBack != nil {
-			config.MsgCallBack(msgResult)
-		}
-		select {
-		case resultCh <- msgResult:
-		case <-ctx.Done():
-			return
-		}
+		sendRaw(msgResult)
 	}
 
 	sendResult := func(doc *Document, score float32, source string) {
 		msgResult := &RAGSearchResult{
-			Message:   fmt.Sprintf("最终结果: %s", doc.ID),
+			Message:   fmt.Sprintf("[%s] 最终结果: %s", queryId, doc.ID),
 			Data:      doc,
-			Type:      "result",
+			Type:      RAGResultTypeResult,
 			Score:     score,
 			Source:    source,
 			Timestamp: time.Now().UnixMilli(),
 		}
-		if config.MsgCallBack != nil {
-			config.MsgCallBack(msgResult)
-		}
-		select {
-		case resultCh <- msgResult:
-		case <-ctx.Done():
-			return
-		}
+		sendRaw(msgResult)
 	}
 
 	go func() {
@@ -180,18 +200,75 @@ func Query(db *gorm.DB, query string, opts ...RAGQueryOption) (chan *RAGSearchRe
 		var searchQuery string = query
 
 		// 如果启用增强搜索，生成假设文档
-		if config.EnableEnhance {
-			sendMsg("开始生成增强查询")
-			if enhance, err := enhancesearch.HypotheticalAnswer(config.Ctx, query); err != nil {
-				sendMsg(fmt.Sprintf("增强搜索失败，使用原始查询: %v", err))
-			} else {
-				searchQuery = enhance
-				// 限制显示的增强查询长度
-				displayEnhance := enhance
-				if len(enhance) > 100 {
-					displayEnhance = enhance[:100] + "..."
+		if config.EnhancePlan != "" {
+			switch config.EnhancePlan {
+			case EnhancePlanHypotheticalAnswer:
+				sendMsg("开始生成假设文档")
+				if enhance, err := enhancesearch.HypotheticalAnswer(config.Ctx, query); err != nil {
+					sendMsg(fmt.Sprintf("生成假设文档失败，使用原始查询: %v", err))
+				} else {
+					searchQuery = enhance
+					displayEnhance := enhance
+					if len(displayEnhance) > 100 {
+						displayEnhance = displayEnhance[:100] + "..."
+					}
+					sendMsg(fmt.Sprintf("假设文档生成完成: %s", displayEnhance))
 				}
-				sendMsg(fmt.Sprintf("增强查询生成完成: %s", displayEnhance))
+			case EnhancePlanHypotheticalAnswerWithSplit:
+				sendMsg("开始生成假设文档")
+				if enhance, err := enhancesearch.HypotheticalAnswer(config.Ctx, query); err != nil {
+					sendMsg(fmt.Sprintf("生成假设文档失败，使用原始查询: %v", err))
+				} else {
+					searchQuery = enhance
+					displayEnhance := enhance
+					if len(displayEnhance) > 100 {
+						displayEnhance = displayEnhance[:100] + "..."
+					}
+					sendMsg(fmt.Sprintf("假设文档生成完成: %s", displayEnhance))
+				}
+				res, err := _query(db, searchQuery, queryId+"-"+strconv.Itoa(1), append(opts, WithRAGEnhance(EnhancePlanSplitQuery))...)
+				if err != nil {
+					sendMsg(fmt.Sprintf("查询失败: %v", err))
+				} else {
+					for result := range res {
+						sendRaw(result)
+					}
+				}
+			case EnhancePlanSplitQuery:
+				sendMsg("开始拆分查询")
+				if enhanceSentences, err := enhancesearch.SplitQuery(config.Ctx, query); err != nil {
+					sendMsg(fmt.Sprintf("拆分查询失败，使用原始查询: %v", err))
+				} else {
+					swg := utils.NewSizedWaitGroup(config.Concurrent)
+					for i, enhanceSentence := range enhanceSentences {
+						swg.Add(1)
+						go func() {
+							defer swg.Done()
+							res, err := _query(db, enhanceSentence, queryId+"-"+strconv.Itoa(i+1), append(opts, WithRAGEnhance(""))...)
+							if err != nil {
+								sendMsg(fmt.Sprintf("查询失败: %v", err))
+							} else {
+								for result := range res {
+									sendRaw(result)
+								}
+							}
+						}()
+					}
+					swg.Wait()
+				}
+			case EnhancePlanGeneralizeQuery:
+				sendMsg("开始泛化增强查询")
+				if enhance, err := enhancesearch.GeneralizeQuery(config.Ctx, query); err != nil {
+					sendMsg(fmt.Sprintf("增强搜索失败，使用原始查询: %v", err))
+				} else {
+					searchQuery = enhance
+					// 限制显示的增强查询长度
+					displayEnhance := enhance
+					if len(enhance) > 100 {
+						displayEnhance = enhance[:100] + "..."
+					}
+					sendMsg(fmt.Sprintf("增强查询生成完成: %s", displayEnhance))
+				}
 			}
 		}
 
@@ -320,7 +397,7 @@ func Query(db *gorm.DB, query string, opts ...RAGQueryOption) (chan *RAGSearchRe
 // SimpleQuery 简化的RAG查询接口，直接返回结果
 func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGQueryOption) ([]*SearchResult, error) {
 	// 添加限制选项
-	options := append(opts, WithRAGLimit(limit), WithRAGEnhance(false))
+	options := append(opts, WithRAGLimit(limit), WithRAGEnhance(EnhancePlanHypotheticalAnswer))
 
 	resultCh, err := Query(db, query, options...)
 	if err != nil {
@@ -329,7 +406,7 @@ func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGQueryOption) (
 
 	var results []*SearchResult
 	for result := range resultCh {
-		if result.Type == "result" && result.Data != nil {
+		if result.Type == RAGResultTypeResult && result.Data != nil {
 			if doc, ok := result.Data.(*Document); ok {
 				results = append(results, &SearchResult{
 					Document: *doc,
