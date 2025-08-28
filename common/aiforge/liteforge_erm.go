@@ -3,7 +3,6 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/entitybase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -12,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"strings"
 )
 
@@ -23,7 +23,7 @@ type TemporaryRelation struct {
 }
 
 type ERMAnalysisResult struct {
-	Entities     map[string]*schema.ERModelEntity
+	Entities     []*schema.ERModelEntity
 	Relations    []*TemporaryRelation
 	OriginalData []byte
 }
@@ -67,9 +67,8 @@ func (e *ERMAnalysisResult) Dump() string {
 func (e *ERMAnalysisResult) GenerateDotGraph() *dot.Graph {
 	G := dot.New()
 	G.MakeDirected()
-
-	for temporaryName, entity := range e.Entities {
-		n := G.AddNode(temporaryName)
+	for _, entity := range e.Entities {
+		n := G.AddNode(entity.EntityName)
 		for _, attribute := range entity.Attributes {
 			G.NodeAttribute(n, attribute.AttributeName, attribute.AttributeValue)
 		}
@@ -138,13 +137,13 @@ var ermLogPrompt string
 var ermOtherPrompt string
 
 func DetectERMPrompt(input string, options ...any) (string, error) {
+	analyzeConfig := NewAnalysisConfig(options...)
 	options = append(options, _withOutputJSONSchema(detectDomainSchema))
 	detectResut, err := _executeLiteForgeTemp(quickQueryBuild(DetectPrompt, input), options...)
 	if err != nil {
 		return "", err
 	}
-
-	fmt.Printf("Detected domain: %s\n", detectResut.GetString("domain_type"))
+	analyzeConfig.AnalyzeLog("chunk [%s] detected domain type: %s", utils.ShrinkString(detectResut, 800), detectResut.GetString("domain_type"))
 
 	switch detectResut.GetString("domain_type") {
 	case "code":
@@ -297,11 +296,11 @@ func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEnt
 
 func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 	result := &ERMAnalysisResult{
-		Entities:  make(map[string]*schema.ERModelEntity),
+		Entities:  make([]*schema.ERModelEntity, 0),
 		Relations: make([]*TemporaryRelation, 0),
 	}
 	for _, entityParams := range ermResult.GetInvokeParamsArray("entity_list") {
-		result.Entities[entityParams.GetString("identifier")] = invokeParams2ERMEntity(entityParams)
+		result.Entities = append(result.Entities, invokeParams2ERMEntity(entityParams))
 	}
 
 	for _, relationParams := range ermResult.GetInvokeParamsArray("relationship_list") {
@@ -333,7 +332,6 @@ func AnalyzeERMFromAnalysisResult(input <-chan AnalysisResult, options ...any) (
 
 func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERMAnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
-	analyzeConfig.AnalyzeLog("start analyzing ERM from reader")
 	return utils.OrderedParallelProcessSkipError(analyzeConfig.Ctx, cm.OutputChannel(),
 		func(i chunkmaker.Chunk) (*ERMAnalysisResult, error) {
 			return AnalyzeERMChunk(i, options...)
@@ -352,8 +350,7 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 
 func AnalyzeERMChunk(c chunkmaker.Chunk, options ...any) (*ERMAnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
-	analyzeConfig.AnalyzeLog("start analyzing ERM from reader")
-	prompt, err := DetectERMPrompt(string(c.Data()), options)
+	prompt, err := DetectERMPrompt(string(c.Data()), options...)
 	if err != nil {
 		analyzeConfig.AnalyzeLog("[detect ERM Prompt] error in analyzing ERM: %v ", err)
 		return nil, err
@@ -374,8 +371,82 @@ func AnalyzeERMChunk(c chunkmaker.Chunk, options ...any) (*ERMAnalysisResult, er
 	return result, nil
 }
 
+func SaveERMResult(eb *entitybase.EntityBase, erm *ERMAnalysisResult, options ...any) error {
+	analyzeConfig := NewAnalysisConfig(options...)
+	swg := utils.NewSizedWaitGroup(analyzeConfig.AnalyzeConcurrency)
+	currentEntities := omap.NewOrderedMap[string, *schema.ERModelEntity](map[string]*schema.ERModelEntity{})
+	for _, tempEntity := range erm.Entities {
+		swg.Add(1)
+		go func() {
+			defer swg.Done()
+			tempName := tempEntity.EntityName
+			matchedEntity, accurate, err := eb.MatchEntities(tempEntity)
+			if err != nil {
+				log.Errorf("failed to search entity [%s]: %v", tempEntity.EntityName, err)
+				return
+			}
+			if matchedEntity == nil {
+				err = eb.CreateEntity(tempEntity)
+				if err != nil {
+					analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
+					return
+				}
+				analyzeConfig.AnalyzeLog("entity created: %s", tempEntity.EntityName)
+				currentEntities.Set(tempName, tempEntity)
+			} else if accurate { // if search is accurate, just use the matched entity
+				analyzeConfig.AnalyzeLog("match entity exists: %s", tempName)
+				err = eb.AppendAttrs(matchedEntity.ID, tempEntity.Attributes)
+				if err != nil {
+					analyzeConfig.AnalyzeLog("failed to append entity [%s]: %v", tempEntity.EntityName, err)
+					return
+				}
+				currentEntities.Set(tempName, matchedEntity)
+			} else {
+				resolvedEntity, sameEntity, err := ResolveEntity(matchedEntity, tempEntity, options...)
+				if err != nil {
+					analyzeConfig.AnalyzeLog("failed to resolve entity [%s]: %v", tempEntity.EntityName, err)
+					return
+				}
+				if sameEntity { // if resolved as same entity, update the entity
+					err := eb.UpdateEntity(matchedEntity.ID, resolvedEntity)
+					if err != nil {
+						analyzeConfig.AnalyzeLog("failed to update entity [%s]: %v", tempEntity.EntityName, err)
+						return
+					}
+					analyzeConfig.AnalyzeLog("entity updated: %s", tempEntity.EntityName)
+				} else { // if resolved as different entity, create a new entity
+					err = eb.CreateEntity(resolvedEntity)
+					if err != nil {
+						analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
+						return
+					}
+					analyzeConfig.AnalyzeLog("entity created: %s", resolvedEntity.EntityName)
+				}
+				currentEntities.Set(tempName, resolvedEntity)
+			}
+		}()
+	}
+	swg.Wait()
+
+	for _, relation := range erm.Relations {
+		sourceEntity, ok1 := currentEntities.Get(relation.SourceTemporaryName)
+		targetEntity, ok2 := currentEntities.Get(relation.TargetTemporaryName)
+		if !ok1 || !ok2 {
+			analyzeConfig.AnalyzeLog("skip relation [%s -> %s]: source or target entity not found", relation.SourceTemporaryName, relation.TargetTemporaryName)
+			continue
+		}
+		err := eb.AddRelation(sourceEntity.ID, targetEntity.ID, relation.RelationType, relation.DecisionRationale)
+		if err != nil {
+			analyzeConfig.AnalyzeLog("failed to create relation [%s -> %s]: %v", sourceEntity.EntityName, targetEntity.EntityName, err)
+			continue
+		}
+		analyzeConfig.AnalyzeLog("relation created: %s -> %s", sourceEntity.EntityName, targetEntity.EntityName)
+	}
+	return nil
+}
+
 func AnalyzeERM(path string, option ...any) (*entitybase.EntityBase, error) {
-	analyzeConfig := NewAnalysisConfig(option...)
+	analyzeConfig := NewRefineConfig(option...)
 
 	analyzeConfig.AnalyzeLog("analyze video: %s", path)
 	analyzeResult, err := AnalyzeFile(path, option...)
@@ -383,83 +454,25 @@ func AnalyzeERM(path string, option ...any) (*entitybase.EntityBase, error) {
 		return nil, utils.Errorf("failed to start analyze video: %v", err)
 	}
 
-	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option)
+	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option...)
 	if err != nil {
 		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
 	}
 	db := consts.GetGormProfileDatabase()
-	baseName := uuid.NewString()
-	eb, err := entitybase.NewEntityBase(db, baseName, "refine use")
+	eb, err := entitybase.NewEntityBase(db, analyzeConfig.KnowledgeBaseName, analyzeConfig.KnowledgeBaseDesc)
 	if err != nil {
 		return nil, err
 	}
-	analyzeConfig.AnalyzeStatusCard("ERM_ENTITY_BASE", baseName)
+	analyzeConfig.AnalyzeStatusCard("ERM_ENTITY_BASE", analyzeConfig.KnowledgeBaseName)
 
 	for erm := range ermResult {
-		for tempName, tempEntity := range erm.Entities {
-			matchedEntity, accurate, err := eb.MatchEntities(tempEntity)
-			if err != nil {
-				log.Errorf("failed to search entity [%s]: %v", tempEntity.EntityName, err)
-				continue
-			}
-			if matchedEntity == nil {
-				err = eb.CreateEntity(tempEntity)
-				if err != nil {
-					analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
-					continue
-				}
-				analyzeConfig.AnalyzeLog("entity created: %s", tempEntity.EntityName)
-				erm.Entities[tempName] = tempEntity
-			} else if accurate { // if search is accurate, just use the matched entity
-				analyzeConfig.AnalyzeLog("match entity exists: %s", tempName)
-				err = eb.AppendAttrs(matchedEntity.ID, tempEntity.Attributes)
-				if err != nil {
-					analyzeConfig.AnalyzeLog("failed to append entity [%s]: %v", tempEntity.EntityName, err)
-					continue
-				}
-				erm.Entities[tempName] = matchedEntity
-			} else {
-				resolvedEntity, sameEntity, err := ResolveEntity(matchedEntity, tempEntity, option...)
-				if err != nil {
-					analyzeConfig.AnalyzeLog("failed to resolve entity [%s]: %v", tempEntity.EntityName, err)
-					continue
-				}
-				if sameEntity { // if resolved as same entity, update the entity
-					err := eb.UpdateEntity(matchedEntity.ID, resolvedEntity)
-					if err != nil {
-						analyzeConfig.AnalyzeLog("failed to update entity [%s]: %v", tempEntity.EntityName, err)
-						return nil, err
-					}
-					analyzeConfig.AnalyzeLog("entity updated: %s", tempEntity.EntityName)
-				} else { // if resolved as different entity, create a new entity
-					err = eb.CreateEntity(resolvedEntity)
-					if err != nil {
-						analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
-						continue
-					}
-					analyzeConfig.AnalyzeLog("entity created: %s", resolvedEntity.EntityName)
-				}
-				erm.Entities[tempName] = resolvedEntity
-			}
+		err := SaveERMResult(eb, erm, option...)
+		if err != nil {
+			analyzeConfig.AnalyzeLog("failed to save ERM_ENTITY_BASE: %v", err)
+			continue
 		}
-
-		for _, relation := range erm.Relations {
-			sourceEntity, ok1 := erm.Entities[relation.SourceTemporaryName]
-			targetEntity, ok2 := erm.Entities[relation.TargetTemporaryName]
-			if !ok1 || !ok2 {
-				analyzeConfig.AnalyzeLog("skip relation [%s -> %s]: source or target entity not found", relation.SourceTemporaryName, relation.TargetTemporaryName)
-				continue
-			}
-			err := eb.AddRelation(sourceEntity.ID, targetEntity.ID, relation.RelationType, relation.DecisionRationale)
-			if err != nil {
-				analyzeConfig.AnalyzeLog("failed to create relation [%s -> %s]: %v", sourceEntity.EntityName, targetEntity.EntityName, err)
-				continue
-			}
-			analyzeConfig.AnalyzeLog("relation created: %s -> %s", sourceEntity.EntityName, targetEntity.EntityName)
-		}
-
 	}
-	return nil, nil
+	return eb, nil
 }
 
 var resolveEntitySchema = aitool.NewObjectSchemaWithAction(

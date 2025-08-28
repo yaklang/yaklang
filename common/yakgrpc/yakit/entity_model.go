@@ -36,7 +36,7 @@ func FilterEntities(db *gorm.DB, entityFilter *EntityFilter) *gorm.DB {
 }
 
 func QueryEntities(db *gorm.DB, entityFilter *EntityFilter) ([]*schema.ERModelEntity, error) {
-	db = db.Model(&schema.ERModelEntity{}).Preload("Attributes")
+	db = db.Model(&schema.ERModelEntity{}).Preload("Attributes").Preload("IncomingRelations").Preload("OutgoingRelations")
 	db = FilterEntities(db, entityFilter)
 	var entities []*schema.ERModelEntity
 	err := db.Find(&entities).Error
@@ -53,6 +53,7 @@ func CreateEntity(db *gorm.DB, entity *schema.ERModelEntity) error {
 
 func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
+	db = db.Model(&schema.ERModelEntity{}).Preload("Attributes").Preload("IncomingRelations").Preload("OutgoingRelations")
 	if err := db.Where("id = ?", id).First(&entity).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil, utils.Errorf("entity not found")
