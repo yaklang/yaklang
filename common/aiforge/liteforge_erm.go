@@ -3,6 +3,9 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/entitybase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
@@ -12,14 +15,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"strings"
 )
 
 type TemporaryRelation struct {
-	SourceTemporaryName string
-	TargetTemporaryName string
-	RelationType        string
-	DecisionRationale   string
+	SourceTemporaryName  string
+	TargetTemporaryName  string
+	RelationType         string
+	DecorationAttributes string
+	DecisionRationale    string
 }
 
 type ERMAnalysisResult struct {
@@ -251,8 +254,14 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 		),
 		aitool.WithStringParam(
 			"relationship_type",
+			aitool.WithParam_Required(true),
 			aitool.WithParam_Description(`描述源实体与目标实体之间关系的“动词”。建议使用标准化的动词。
 **推荐值:** IMPORTS, DEFINES, CALLS, INSTANTIATES, ACCESSES_FIELD, HAS_PARAMETER, IMPLEMENTS, RETURNS_ERROR_FROM`),
+		),
+		aitool.WithStringParam(
+			"decoration_attributes",
+			aitool.WithParam_Description("Additional attributes that provide more context about the relationship."),
+			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringParam(
 			"decision_rationale",
@@ -305,10 +314,11 @@ func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 
 	for _, relationParams := range ermResult.GetInvokeParamsArray("relationship_list") {
 		relation := &TemporaryRelation{
-			SourceTemporaryName: relationParams.GetString("source"),
-			TargetTemporaryName: relationParams.GetString("target"),
-			RelationType:        relationParams.GetString("relationship_type"),
-			DecisionRationale:   relationParams.GetString("decision_rationale"),
+			SourceTemporaryName:  relationParams.GetString("source"),
+			TargetTemporaryName:  relationParams.GetString("target"),
+			RelationType:         relationParams.GetString("relationship_type"),
+			DecorationAttributes: relationParams.GetString("decoration_attributes"),
+			DecisionRationale:    relationParams.GetString("decision_rationale"),
 		}
 		result.Relations = append(result.Relations, relation)
 	}
@@ -332,9 +342,30 @@ func AnalyzeERMFromAnalysisResult(input <-chan AnalysisResult, options ...any) (
 
 func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERMAnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
+	var domainPrompt string
+	var err error
+	var detectERMPromptOnce = new(sync.Once)
+	var firstMutex = new(sync.Mutex)
 	return utils.OrderedParallelProcessSkipError(analyzeConfig.Ctx, cm.OutputChannel(),
 		func(i chunkmaker.Chunk) (*ERMAnalysisResult, error) {
-			return AnalyzeERMChunk(i, options...)
+			firstMutex.Lock()
+			unlockOnce := new(sync.Once)
+			detectERMPromptOnce.Do(func() {
+				defer func() {
+					unlockOnce.Do(func() {
+						firstMutex.Unlock()
+					})
+				}()
+				log.Infof("start to detect erm prompt for the first chunk: %s", utils.ShrinkString(string(i.Data()), 800))
+				domainPrompt, err = DetectERMPrompt(string(i.Data()), options...)
+				if err != nil {
+					log.Errorf("[detect ERM Prompt] error in analyzing ERM: %v ", err)
+				}
+			})
+			unlockOnce.Do(func() {
+				firstMutex.Unlock()
+			})
+			return AnalyzeERMChunk(domainPrompt, i, options...)
 		},
 		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency),
 		utils.WithParallelProcessStartCallback(func() {
@@ -348,14 +379,18 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 	), nil
 }
 
-func AnalyzeERMChunk(c chunkmaker.Chunk, options ...any) (*ERMAnalysisResult, error) {
+func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*ERMAnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
-	prompt, err := DetectERMPrompt(string(c.Data()), options...)
-	if err != nil {
-		analyzeConfig.AnalyzeLog("[detect ERM Prompt] error in analyzing ERM: %v ", err)
-		return nil, err
+	if domainPrompt == "" {
+		prompt, err := DetectERMPrompt(string(c.Data()), options...) // ？？？？？？？
+		if err != nil {
+			analyzeConfig.AnalyzeLog("[detect ERM Prompt] error in analyzing ERM: %v ", err)
+			return nil, err
+		}
+		domainPrompt = prompt
 	}
-	query, err := LiteForgeQueryFromChunk(prompt+analyzeConfig.ExtraPrompt, c, 200)
+
+	query, err := LiteForgeQueryFromChunk(domainPrompt+"\n"+analyzeConfig.ExtraPrompt, c, 200)
 	if err != nil {
 		analyzeConfig.AnalyzeLog("[build forge query] error in analyzing ERM: %v", err)
 		return nil, err
@@ -448,10 +483,10 @@ func SaveERMResult(eb *entitybase.EntityBase, erm *ERMAnalysisResult, options ..
 func AnalyzeERM(path string, option ...any) (*entitybase.EntityBase, error) {
 	analyzeConfig := NewRefineConfig(option...)
 
-	analyzeConfig.AnalyzeLog("analyze video: %s", path)
+	analyzeConfig.AnalyzeLog("analyze erm: %s", path)
 	analyzeResult, err := AnalyzeFile(path, option...)
 	if err != nil {
-		return nil, utils.Errorf("failed to start analyze video: %v", err)
+		return nil, utils.Errorf("failed to start analyze video/doc/txt: %v", err)
 	}
 
 	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option...)
