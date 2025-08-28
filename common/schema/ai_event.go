@@ -255,5 +255,6 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		TaskIndex:       e.TaskIndex,
 		DisableMarkdown: e.DisableMarkdown,
 		SyncID:          e.SyncID,
+		EventUUID:       e.EventUUID,
 	}
 }

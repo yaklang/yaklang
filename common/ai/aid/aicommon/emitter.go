@@ -383,16 +383,24 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 				f()
 			}
 		}()
-		io.Copy(producer, e.reader)
-		r.EmitStructured("stream-finished", map[string]any{
-			"node_id":          e.nodeId,
-			"coordinator_id":   r.id,
-			"is_system":        e.isSystem,
-			"is_reason":        e.isReason,
-			"start_timestamp":  startTS,
-			"task_index":       e.taskIndex,
-			"event_watcher_id": ewid,
-		})
+		firstByte := new(sync.Once)
+		skipFinished := utils.NewAtomicBool()
+		io.Copy(producer, utils.ReaderOnFirstByte(e.reader, func() {
+			firstByte.Do(func() {
+				skipFinished.SetTo(true)
+			})
+		}))
+		if !skipFinished.IsSet() {
+			r.EmitStructured("stream-finished", map[string]any{
+				"node_id":         e.nodeId,
+				"coordinator_id":  r.id,
+				"is_system":       e.isSystem,
+				"is_reason":       e.isReason,
+				"start_timestamp": startTS,
+				"task_index":      e.taskIndex,
+				"event_writer_id": ewid,
+			})
+		}
 	}()
 }
 
