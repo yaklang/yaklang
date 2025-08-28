@@ -32,7 +32,6 @@ type ServiceConfig struct {
 	ContBatching    bool          `json:"contBatching"` // 连续批处理
 	BatchSize       int           `json:"batchSize"`    // 批处理大小
 	Threads         int           `json:"threads"`      // 线程数
-	Detached        bool          `json:"detached"`
 	Debug           bool          `json:"debug"`
 	Pooling         string        `json:"pooling"` // 池化方式
 	StartupTimeout  time.Duration `json:"startupTimeout"`
@@ -48,7 +47,6 @@ func DefaultServiceConfig() *ServiceConfig {
 		ContBatching:    true, // 默认开启连续批处理
 		BatchSize:       1024, // 默认批处理大小
 		Threads:         8,    // 默认线程数
-		Detached:        false,
 		Debug:           false,
 		Pooling:         "last",
 		StartupTimeout:  30 * time.Second,

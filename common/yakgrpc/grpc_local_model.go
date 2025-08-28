@@ -149,7 +149,7 @@ func (s *Server) GetSupportedLocalModels(ctx context.Context, req *ypb.Empty) (*
 	statusesMap := map[string]*ypb.LocalModelStatus{}
 	for _, service := range services {
 		log.Infof("found local model service: %v, %v", service.Config.Model, service.Status)
-		statusesMap[service.Config.Model] = &ypb.LocalModelStatus{
+		statusesMap[service.Config.ModelPath] = &ypb.LocalModelStatus{
 			Status:          service.Status.String(),
 			Host:            service.Config.Host,
 			Port:            service.Config.Port,
@@ -160,7 +160,6 @@ func (s *Server) GetSupportedLocalModels(ctx context.Context, req *ypb.Empty) (*
 			ContBatching:    service.Config.ContBatching,
 			BatchSize:       int32(service.Config.BatchSize),
 			Threads:         int32(service.Config.Threads),
-			Detached:        service.Config.Detached,
 			Debug:           service.Config.Debug,
 			Pooling:         service.Config.Pooling,
 			StartupTimeout:  int32(service.Config.StartupTimeout.Seconds()),
@@ -184,7 +183,7 @@ func (s *Server) GetSupportedLocalModels(ctx context.Context, req *ypb.Empty) (*
 			IsReady:     model.IsReady,
 			Path:        model.Path,
 			DefaultPort: model.DefaultPort,
-			Status:      statusesMap[model.Name],
+			Status:      statusesMap[model.Path],
 		})
 	}
 	return &ypb.GetSupportedLocalModelsResponse{
@@ -346,7 +345,6 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 		localmodel.WithModelPath(modelPath),
 		localmodel.WithModel(modelName),
 		localmodel.WithLlamaServerPath(llamaServerPath),
-		localmodel.WithDetached(true),
 		localmodel.WithDebug(true),
 		localmodel.WithStartupTimeout(30 * time.Second),
 	}
@@ -408,10 +406,24 @@ func (s *Server) StartLocalModel(req *ypb.StartLocalModelRequest, stream ypb.Yak
 
 func (s *Server) StopLocalModel(ctx context.Context, req *ypb.StopLocalModelRequest) (*ypb.GeneralResponse, error) {
 	manager := localmodel.GetManager()
+	modelName := req.GetModelName()
+	var modelPath string
+	allModels := getSupportedModels()
+	for _, model := range allModels {
+		if model.Name == modelName {
+			modelPath = model.Path
+			break
+		}
+	}
+	if modelPath == "" {
+		return &ypb.GeneralResponse{
+			Ok: false,
+		}, utils.Errorf("未找到模型: %s", modelName)
+	}
 	services := manager.ListServices()
 	var service *localmodel.Service
 	for _, s := range services {
-		if s.Config.Model == req.GetModelName() {
+		if s.Config.ModelPath == modelPath {
 			service = s
 			break
 		}
