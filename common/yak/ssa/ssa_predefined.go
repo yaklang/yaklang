@@ -368,7 +368,7 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 		if !ok {
 			continue
 		}
-		lit, ok := i.(*ConstInst)
+		lit, ok := ToConstInst(i)
 		if !ok {
 			continue
 		}

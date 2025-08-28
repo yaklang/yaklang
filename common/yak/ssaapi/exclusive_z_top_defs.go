@@ -191,8 +191,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		case isFunc && !fun.IsExtern():
 			callee := i.NewTopDefValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-			if object := actx.CurrentObjectStack(); object != nil {
-				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, object.key)
+			if objectContext := actx.CurrentObjectStack(); objectContext != nil && ValueCompare(objectContext.object, i) {
+				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, objectContext.key)
 			}
 			return callee.getTopDefs(actx, opt...)
 		default:
@@ -286,17 +286,18 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 								traceRets = append(traceRets, topDefValue)
 							}
 							// trace mask ?
-							if len(inst.Blocks) > 0 {
-								name, ok := ssa.CombineMemberCallVariableName(traceValue, ssa.NewConst(retIndexRawStr))
-								if ok {
-									lastBlockRaw, _ := lo.Last(inst.Blocks)
-									lastBlock, ok := inst.GetBasicBlockByID(lastBlockRaw)
-									if ok && lastBlock != nil {
-										variableInstance := lastBlock.ScopeTable.ReadVariable(name)
-										_ = variableInstance.String()
-									}
-								}
-							}
+							// TODO: use scope when scope can load from database
+							// if len(inst.Blocks) > 0 {
+							// 	name, ok := ssa.CombineMemberCallVariableName(traceValue, ssa.NewConst(retIndexRawStr))
+							// 	if ok {
+							// 		lastBlockRaw, _ := lo.Last(inst.Blocks)
+							// 		lastBlock, ok := inst.GetBasicBlockByID(lastBlockRaw)
+							// 		if ok && lastBlock != nil {
+							// 			variableInstance := lastBlock.ScopeTable.ReadVariable(name)
+							// 			_ = variableInstance.String()
+							// 		}
+							// 	}
+							// }
 						}
 					}
 				}

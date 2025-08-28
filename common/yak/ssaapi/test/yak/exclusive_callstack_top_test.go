@@ -26,7 +26,25 @@ func Test_CallStack_Normal_Parameter(t *testing.T) {
 	t.Run("test undefined function", func(t *testing.T) {
 		ssatest.CheckTopDef(t, `a=f(333)`, "a", []string{"Undefined-f", "333"}, false)
 	})
-
+	t.Run("test level1 unpack", func(t *testing.T) {
+		ssatest.CheckTopDef(t, `
+	f = () => {
+		return 11, 22 
+	}
+	a, b := f() 
+	`, "a", []string{"11"}, false)
+	})
+	t.Run("test level1 object const", func(t *testing.T) {
+		ssatest.CheckTopDef(t, `
+		f=() => {
+			return {
+				"i": 111, 
+			}
+		}
+			obj = f() 
+			a = obj.i
+		`, "a", []string{"111"}, false)
+	})
 	t.Run("test level1 object", func(t *testing.T) {
 		ssatest.CheckTopDef(t, `
 			f = (i) => {
