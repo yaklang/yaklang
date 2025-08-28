@@ -413,6 +413,22 @@ func MergeCookies(cookies ...*http.Cookie) string {
 	return req.Header.Get("Cookie")
 }
 
+// func SplitContentTypesFromAcceptHeader(acceptHeader string) []string {
+// 	var contentTypes []string
+
+// 	parts := strings.Split(acceptHeader, ",")
+// 	for _, part := range parts {
+// 		contentType := strings.TrimSpace(part)
+// 		if idx := strings.Index(contentType, ";"); idx != -1 {
+// 			contentType = strings.TrimSpace(contentType[:idx])
+// 		}
+// 		if contentType != "" {
+// 			contentTypes = append(contentTypes, contentType)
+// 		}
+// 	}
+// 	return contentTypes
+// }
+
 func SplitHTTPHeadersAndBodyFromPacketEx(raw []byte, mf func(method string, requestUri string, proto string) error, hook ...func(line string)) (string, []byte) {
 	if len(hook) > 0 {
 		return SplitHTTPPacket(raw, mf, nil, func(line string) (ret string) {
