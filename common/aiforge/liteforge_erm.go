@@ -17,18 +17,18 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-type TemporaryRelation struct {
+type TemporaryRelationship struct {
 	SourceTemporaryName  string
 	TargetTemporaryName  string
-	RelationType         string
+	RelationshipType     string
 	DecorationAttributes string
 	DecisionRationale    string
 }
 
 type ERMAnalysisResult struct {
-	Entities     []*schema.ERModelEntity
-	Relations    []*TemporaryRelation
-	OriginalData []byte
+	Entities      []*schema.ERModelEntity
+	Relationships []*TemporaryRelationship
+	OriginalData  []byte
 }
 
 func (e *ERMAnalysisResult) GetCumulativeSummary() string {
@@ -39,7 +39,7 @@ func (e *ERMAnalysisResult) Dump() string {
 	var sb strings.Builder
 	sb.WriteString("Entities:\n")
 	for name, entity := range e.Entities {
-		sb.WriteString(fmt.Sprintf("- ID: %s\n", name))
+		sb.WriteString(fmt.Sprintf("- ID: %d\n", name))
 		sb.WriteString(fmt.Sprintf("  QualifiedName: %s\n", entity.EntityName))
 		sb.WriteString(fmt.Sprintf("  EntityType: %s\n", entity.EntityType))
 		if entity.Description != "" {
@@ -50,18 +50,18 @@ func (e *ERMAnalysisResult) Dump() string {
 		}
 		if len(entity.Attributes) > 0 {
 			sb.WriteString("  Attributes:\n")
-			for _, attr := range entity.Attributes {
-				sb.WriteString(fmt.Sprintf("    - %s: %s\n", attr.AttributeName, utils.ShrinkString(attr.AttributeValue, 100)))
+			for key, value := range entity.Attributes {
+				sb.WriteString(fmt.Sprintf("    - %s: %s\n", key, utils.ShrinkString(value, 100)))
 			}
 		}
 	}
-	sb.WriteString("Relations:\n")
-	for _, relation := range e.Relations {
-		sb.WriteString(fmt.Sprintf("- Source: %s\n", relation.SourceTemporaryName))
-		sb.WriteString(fmt.Sprintf("  Target: %s\n", relation.TargetTemporaryName))
-		sb.WriteString(fmt.Sprintf("  Type: %s\n", relation.RelationType))
-		if relation.DecisionRationale != "" {
-			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(relation.DecisionRationale, 100)))
+	sb.WriteString("Relationships:\n")
+	for _, Relationship := range e.Relationships {
+		sb.WriteString(fmt.Sprintf("- Source: %s\n", Relationship.SourceTemporaryName))
+		sb.WriteString(fmt.Sprintf("  Target: %s\n", Relationship.TargetTemporaryName))
+		sb.WriteString(fmt.Sprintf("  Type: %s\n", Relationship.RelationshipType))
+		if Relationship.DecisionRationale != "" {
+			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(Relationship.DecisionRationale, 100)))
 		}
 	}
 	return sb.String()
@@ -72,13 +72,13 @@ func (e *ERMAnalysisResult) GenerateDotGraph() *dot.Graph {
 	G.MakeDirected()
 	for _, entity := range e.Entities {
 		n := G.AddNode(entity.EntityName)
-		for _, attribute := range entity.Attributes {
-			G.NodeAttribute(n, attribute.AttributeName, attribute.AttributeValue)
+		for key, value := range entity.Attributes {
+			G.NodeAttribute(n, key, utils.InterfaceToString(value))
 		}
 	}
 
-	for _, relation := range e.Relations {
-		G.AddEdgeByLabel(relation.SourceTemporaryName, relation.TargetTemporaryName, relation.RelationType)
+	for _, Relationship := range e.Relationships {
+		G.AddEdgeByLabel(Relationship.SourceTemporaryName, Relationship.TargetTemporaryName, Relationship.RelationshipType)
 	}
 
 	return G
@@ -234,9 +234,9 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 		// 定义数组中每个对象的字段
 		entitySchema...,
 	),
-	// 定义 relationship_list，另一个对象数组
+	// 定义 Relationship_list，另一个对象数组
 	aitool.WithStructArrayParam(
-		"relationship_list",
+		"Relationship_list",
 		[]aitool.PropertyOption{
 			aitool.WithParam_Description(`Represents a directed edge between two entities in the knowledge graph.`),
 		},
@@ -244,23 +244,23 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 		// 定义数组中每个对象的字段
 		aitool.WithStringParam(
 			"source",
-			aitool.WithParam_Description("the entity(identifier) where the relationship originates."),
+			aitool.WithParam_Description("the entity(identifier) where the Relationship originates."),
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringParam(
 			"target",
-			aitool.WithParam_Description("The entity(identifier) where the relationship terminates"),
+			aitool.WithParam_Description("The entity(identifier) where the Relationship terminates"),
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringParam(
-			"relationship_type",
+			"Relationship_type",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description(`描述源实体与目标实体之间关系的“动词”。建议使用标准化的动词。
 **推荐值:** IMPORTS, DEFINES, CALLS, INSTANTIATES, ACCESSES_FIELD, HAS_PARAMETER, IMPLEMENTS, RETURNS_ERROR_FROM`),
 		),
 		aitool.WithStringParam(
 			"decoration_attributes",
-			aitool.WithParam_Description("Additional attributes that provide more context about the relationship."),
+			aitool.WithParam_Description("Additional attributes that provide more context about the Relationship."),
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringParam(
@@ -297,30 +297,34 @@ func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEnt
 		Description: entityParams.GetString("description"),
 		Rationale:   entityParams.GetString("decision_rationale"),
 	}
-	for _, relationshipParams := range entityParams.GetObjectArray("attributes") {
-		entity.Attributes = append(entity.Attributes, invokeParams2ERMAttribute(relationshipParams))
+	for _, RelationshipParams := range entityParams.GetObjectArray("attributes") {
+		attr := invokeParams2ERMAttribute(RelationshipParams)
+		if attr.UniqueIdentifier {
+			entity.ExtendAttributes = append(entity.ExtendAttributes, attr)
+		}
+		entity.Attributes[attr.AttributeName] = attr.AttributeValue
 	}
 	return entity
 }
 
 func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 	result := &ERMAnalysisResult{
-		Entities:  make([]*schema.ERModelEntity, 0),
-		Relations: make([]*TemporaryRelation, 0),
+		Entities:      make([]*schema.ERModelEntity, 0),
+		Relationships: make([]*TemporaryRelationship, 0),
 	}
 	for _, entityParams := range ermResult.GetInvokeParamsArray("entity_list") {
 		result.Entities = append(result.Entities, invokeParams2ERMEntity(entityParams))
 	}
 
-	for _, relationParams := range ermResult.GetInvokeParamsArray("relationship_list") {
-		relation := &TemporaryRelation{
-			SourceTemporaryName:  relationParams.GetString("source"),
-			TargetTemporaryName:  relationParams.GetString("target"),
-			RelationType:         relationParams.GetString("relationship_type"),
-			DecorationAttributes: relationParams.GetString("decoration_attributes"),
-			DecisionRationale:    relationParams.GetString("decision_rationale"),
+	for _, RelationshipParams := range ermResult.GetInvokeParamsArray("Relationship_list") {
+		Relationship := &TemporaryRelationship{
+			SourceTemporaryName:  RelationshipParams.GetString("source"),
+			TargetTemporaryName:  RelationshipParams.GetString("target"),
+			RelationshipType:     RelationshipParams.GetString("Relationship_type"),
+			DecorationAttributes: RelationshipParams.GetString("decoration_attributes"),
+			DecisionRationale:    RelationshipParams.GetString("decision_rationale"),
 		}
-		result.Relations = append(result.Relations, relation)
+		result.Relationships = append(result.Relationships, Relationship)
 	}
 	return result
 }
@@ -406,7 +410,7 @@ func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*
 	return result, nil
 }
 
-func SaveERMResult(eb *entitybase.EntityBase, erm *ERMAnalysisResult, options ...any) error {
+func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, options ...any) error {
 	analyzeConfig := NewAnalysisConfig(options...)
 	swg := utils.NewSizedWaitGroup(analyzeConfig.AnalyzeConcurrency)
 	currentEntities := omap.NewOrderedMap[string, *schema.ERModelEntity](map[string]*schema.ERModelEntity{})
@@ -428,59 +432,74 @@ func SaveERMResult(eb *entitybase.EntityBase, erm *ERMAnalysisResult, options ..
 				}
 				analyzeConfig.AnalyzeLog("entity created: %s", tempEntity.EntityName)
 				currentEntities.Set(tempName, tempEntity)
-			} else if accurate { // if search is accurate, just use the matched entity
-				analyzeConfig.AnalyzeLog("match entity exists: %s", tempName)
-				err = eb.AppendAttrs(matchedEntity.ID, tempEntity.Attributes)
-				if err != nil {
-					analyzeConfig.AnalyzeLog("failed to append entity [%s]: %v", tempEntity.EntityName, err)
-					return
+				return
+			}
+
+			var current = tempEntity
+			if accurate { // if search is accurate, just use the matched entity
+				for s, i := range tempEntity.Attributes {
+					matchedEntity.Attributes[s] = i
 				}
-				currentEntities.Set(tempName, matchedEntity)
+				current = matchedEntity
 			} else {
 				resolvedEntity, sameEntity, err := ResolveEntity(matchedEntity, tempEntity, options...)
 				if err != nil {
 					analyzeConfig.AnalyzeLog("failed to resolve entity [%s]: %v", tempEntity.EntityName, err)
 					return
 				}
-				if sameEntity { // if resolved as same entity, update the entity
-					err := eb.UpdateEntity(matchedEntity.ID, resolvedEntity)
-					if err != nil {
-						analyzeConfig.AnalyzeLog("failed to update entity [%s]: %v", tempEntity.EntityName, err)
-						return
-					}
-					analyzeConfig.AnalyzeLog("entity updated: %s", tempEntity.EntityName)
-				} else { // if resolved as different entity, create a new entity
-					err = eb.CreateEntity(resolvedEntity)
-					if err != nil {
-						analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
-						return
-					}
-					analyzeConfig.AnalyzeLog("entity created: %s", resolvedEntity.EntityName)
+				if sameEntity {
+					current = resolvedEntity
 				}
-				currentEntities.Set(tempName, resolvedEntity)
 			}
+			err = eb.SaveEntity(current) // create or update entity
+			if err != nil {
+				analyzeConfig.AnalyzeLog("failed to update entity [%s]: %v", current.EntityName, err)
+				return
+			}
+			currentEntities.Set(tempName, current)
 		}()
 	}
 	swg.Wait()
 
-	for _, relation := range erm.Relations {
-		sourceEntity, ok1 := currentEntities.Get(relation.SourceTemporaryName)
-		targetEntity, ok2 := currentEntities.Get(relation.TargetTemporaryName)
-		if !ok1 || !ok2 {
-			analyzeConfig.AnalyzeLog("skip relation [%s -> %s]: source or target entity not found", relation.SourceTemporaryName, relation.TargetTemporaryName)
-			continue
+	for _, tempShip := range erm.Relationships {
+		sourceEntity, ok := currentEntities.Get(tempShip.SourceTemporaryName)
+		if !ok {
+			analyzeConfig.AnalyzeLog("not found entity [%s], create it", tempShip.SourceTemporaryName)
+			sourceEntity = &schema.ERModelEntity{
+				EntityName: tempShip.SourceTemporaryName,
+			}
+			err := eb.CreateEntity(sourceEntity)
+			if err != nil {
+				analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempShip.SourceTemporaryName, err)
+				return err
+			}
+
 		}
-		err := eb.AddRelation(sourceEntity.ID, targetEntity.ID, relation.RelationType, relation.DecisionRationale)
+		targetEntity, ok := currentEntities.Get(tempShip.TargetTemporaryName)
+		if !ok {
+			analyzeConfig.AnalyzeLog("not found entity [%s], create it", tempShip.SourceTemporaryName)
+			targetEntity = &schema.ERModelEntity{
+				EntityName: tempShip.SourceTemporaryName,
+			}
+			err := eb.CreateEntity(targetEntity)
+			if err != nil {
+				analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempShip.SourceTemporaryName, err)
+				return err
+			}
+		}
+		err := eb.AddRelationship(sourceEntity.ID, targetEntity.ID, tempShip.RelationshipType, tempShip.DecisionRationale, map[string]any{
+			"decoration_attr": tempShip.DecorationAttributes,
+		})
 		if err != nil {
-			analyzeConfig.AnalyzeLog("failed to create relation [%s -> %s]: %v", sourceEntity.EntityName, targetEntity.EntityName, err)
+			analyzeConfig.AnalyzeLog("failed to create Relationship [%s -> %s]: %v", sourceEntity.EntityName, targetEntity.EntityName, err)
 			continue
 		}
-		analyzeConfig.AnalyzeLog("relation created: %s -> %s", sourceEntity.EntityName, targetEntity.EntityName)
+		analyzeConfig.AnalyzeLog("Relationship created: %s -> %s", sourceEntity.EntityName, targetEntity.EntityName)
 	}
 	return nil
 }
 
-func AnalyzeERM(path string, option ...any) (*entitybase.EntityBase, error) {
+func AnalyzeERM(path string, option ...any) (*entitybase.EntityRepository, error) {
 	analyzeConfig := NewRefineConfig(option...)
 
 	analyzeConfig.AnalyzeLog("analyze erm: %s", path)
