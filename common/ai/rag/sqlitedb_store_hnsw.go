@@ -417,7 +417,7 @@ func (s *SQLiteVectorStoreHNSW) List() ([]Document, error) {
 	defer s.mu.RUnlock()
 
 	var docs []schema.VectorStoreDocument
-	if err := s.db.Where("collection_id = ?", s.collection.ID).Find(&docs).Error; err != nil {
+	if err := s.db.Where("collection_id = ?", s.collection.ID).Where("document_id <> ?", DocumentTypeCollectionInfo).Find(&docs).Error; err != nil {
 		return nil, utils.Errorf("查询文档失败: %v", err)
 	}
 
@@ -435,7 +435,7 @@ func (s *SQLiteVectorStoreHNSW) Count() (int, error) {
 	defer s.mu.RUnlock()
 
 	var count int
-	if err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collection.ID).Count(&count).Error; err != nil {
+	if err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collection.ID).Where("document_id <> ?", DocumentTypeCollectionInfo).Count(&count).Error; err != nil {
 		return 0, utils.Errorf("计算文档数量失败: %v", err)
 	}
 
