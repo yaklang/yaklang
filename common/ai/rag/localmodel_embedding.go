@@ -133,7 +133,6 @@ func startEmbeddingServiceInternal() (*LocalModelEmbedding, error) {
 	// 启动嵌入服务，使用端口 11435，开启 Detach
 	err = manager.StartEmbeddingService(
 		address,
-		localmodel.WithDetached(true),   // 开启分离模式
 		localmodel.WithModel(modelName), // 使用默认嵌入模型
 		localmodel.WithModelType("embedding"),
 		localmodel.WithContextSize(4096),
