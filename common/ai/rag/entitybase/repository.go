@@ -366,7 +366,7 @@ func (eb *EntityRepository) GetSubERModel(keyword string, maxDepths ...int) (*ER
 	}, nil
 }
 
-func NewEntityBase(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
+func NewEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
 	var entityBaseInfo schema.EntityBaseInfo
 	err := db.Model(&schema.EntityBaseInfo{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
 
