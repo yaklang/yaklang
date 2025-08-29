@@ -66,8 +66,12 @@ func glance(i filesys_interface.FileSystem) string {
 		} else {
 			fileCount++
 		}
+		if dirCount+fileCount > 10000 {
+			return errors.New("too many files, stop counting")
+		}
 		return nil
 	}), WithFileSystem(i))
+	_ = err // ignore error
 
 	// 获取当前工作目录的绝对路径
 	currentDir := "."
