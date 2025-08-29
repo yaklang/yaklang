@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/ollama"
 	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/ai/tongyi"
+	"github.com/yaklang/yaklang/common/ai/volcengine"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -39,6 +40,9 @@ func init() {
 	})
 	aispec.Register("tongyi", func() aispec.AIClient {
 		return &tongyi.GetawayClient{}
+	})
+	aispec.Register("volcengine", func() aispec.AIClient {
+		return &volcengine.GetawayClient{}
 	})
 	aispec.Register("comate", func() aispec.AIClient {
 		return &comate.Client{}
@@ -233,13 +237,21 @@ func Moonshot(opts ...aispec.AIConfigOption) aispec.AIClient {
 	return agent
 }
 
+func Volcengine(opts ...aispec.AIConfigOption) aispec.AIClient {
+	agent := createAIGateway("volcengine")
+	if agent != nil {
+		agent.LoadOption(opts...)
+	}
+	return agent
+}
+
 func GetPrimaryAgent() aispec.AIClient {
 	var agent aispec.AIClient
 
 	t := consts.GetAIPrimaryType()
 	if t == "" {
 		for _, defaultType := range []string{
-			"openai", "chatglm", "moonshot", "tongyi", "comate",
+			"openai", "chatglm", "moonshot", "tongyi", "volcengine", "comate",
 		} {
 			agent = createAIGateway(defaultType)
 			if agent == nil {
