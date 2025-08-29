@@ -128,8 +128,10 @@ func (r *RecursiveConfig) compileAndRun(value sf.ValueOperator) map[sf.Recursive
 		if isMatch(s) {
 			ret[sf.RecursiveConfigKey(item.Key)] = struct{}{}
 		}
+		r.config.Mutex.Lock()
 		clearSymbolTable(sfres)
 		r.contextResult.MergeByResult(sfres)
+		r.config.Mutex.Unlock()
 	}
 	return ret
 }
