@@ -1,10 +1,15 @@
 package yakit
 
 import (
+	"fmt"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/dot"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strings"
 )
 
 func CreateEntityBaseInfo(db *gorm.DB, entityBase *schema.EntityBaseInfo) error {
@@ -15,32 +20,37 @@ func DeleteEntityBaseInfo(db *gorm.DB, id int64) error {
 	return db.Unscoped().Delete(&schema.EntityBaseInfo{}, id).Error
 }
 
-type EntityFilter struct {
-	Name         []string
-	Type         []string
-	ID           []uint
-	EntityBaseID []uint
-}
-
-func FilterEntities(db *gorm.DB, entityFilter *EntityFilter) *gorm.DB {
+func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	if entityFilter == nil {
 		return db
 	}
 	db = db.Model(&schema.ERModelEntity{})
-	db = bizhelper.ExactQueryUIntArrayOr(db, "id", entityFilter.ID)
-	db = bizhelper.ExactQueryUIntArrayOr(db, "entity_base_id", entityFilter.EntityBaseID)
-	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Name)
-	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Type)
+	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", entityFilter.IDs)
+	db = bizhelper.ExactExcludeQueryUInt64Array(db, "entity_base_id", []uint64{entityFilter.BaseID})
+	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Names)
+	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
 
 	return db
 }
 
-func QueryEntities(db *gorm.DB, entityFilter *EntityFilter) ([]*schema.ERModelEntity, error) {
+func QueryEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) ([]*schema.ERModelEntity, error) {
 	db = db.Model(&schema.ERModelEntity{})
 	db = FilterEntities(db, entityFilter)
 	var entities []*schema.ERModelEntity
 	err := db.Find(&entities).Error
 	return entities, err
+}
+
+func QueryEntitiesPaging(db *gorm.DB, entityFilter *ypb.EntityFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.ERModelEntity, error) {
+	db = db.Model(&schema.ERModelEntity{})
+	db = FilterEntities(db, entityFilter)
+	db = bizhelper.OrderByPaging(db, paging)
+	ret := make([]*schema.ERModelEntity, 0)
+	pag, db := bizhelper.YakitPagingQuery(db, paging, &ret)
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+	return pag, ret, nil
 }
 
 func UpdateEntity(db *gorm.DB, id uint, entity *schema.ERModelEntity) error {
@@ -149,6 +159,46 @@ func AddRelationship(db *gorm.DB, sourceID, targetID uint, RelationshipType, dec
 	})
 }
 
+func GetOutgoingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
+	var relationships []*schema.ERModelRelationship
+	if err := db.Model(&schema.ERModelRelationship{}).Where("source_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+		return nil, err
+	}
+	return relationships, nil
+}
+
+func GetIncomingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
+	var relationships []*schema.ERModelRelationship
+	if err := db.Model(&schema.ERModelRelationship{}).Where("target_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+		return nil, err
+	}
+	return relationships, nil
+}
+
+func FilterRelationships(db *gorm.DB, relationshipFilter *ypb.RelationshipFilter) *gorm.DB {
+	db = db.Model(&schema.ERModelRelationship{})
+	if relationshipFilter == nil {
+		return db
+	}
+	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", relationshipFilter.IDs)
+	db = bizhelper.ExactQueryMultipleUInt64ArrayOr(db, []string{"source_entity_id", "target_entity_id"}, relationshipFilter.AboutEntityIDs)
+	db = bizhelper.ExactQueryUInt64ArrayOr(db, "source_entity_id", relationshipFilter.SourceEntityIDs)
+	db = bizhelper.ExactQueryUInt64ArrayOr(db, "target_entity_id", relationshipFilter.TargetEntityIDs)
+	db = bizhelper.ExactQueryStringArrayOr(db, "relationship_type", relationshipFilter.Types)
+	return db
+}
+
+func QueryRelationshipPaging(db *gorm.DB, entityFilter *ypb.RelationshipFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.ERModelRelationship, error) {
+	db = FilterRelationships(db, entityFilter)
+	db = bizhelper.OrderByPaging(db, paging)
+	ret := make([]*schema.ERModelRelationship, 0)
+	pag, db := bizhelper.YakitPagingQuery(db, paging, &ret)
+	if db.Error != nil {
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
+	}
+	return pag, ret, nil
+}
+
 // RemoveRelationship 删除两个实体之间的永久关系。
 func RemoveRelationship(db *gorm.DB, sourceID, targetID uint, RelationshipType string) error {
 	result := db.Where("source_entity_id = ? AND target_entity_id = ? AND relationship_type = ?",
@@ -160,4 +210,170 @@ func RemoveRelationship(db *gorm.DB, sourceID, targetID uint, RelationshipType s
 		return utils.Errorf("Relationship not found to remove")
 	}
 	return nil
+}
+
+func QueryEntityWithDepth(db *gorm.DB, entityFilter *ypb.EntityFilter, maxDepth int) (*ERModel, error) {
+	entities, err := QueryEntities(db, entityFilter)
+	if err != nil {
+		return nil, err
+	}
+	if len(entities) == 0 {
+		return nil, utils.Errorf("Entity not found")
+	}
+
+	return EntityRelationshipFind(db, entities, maxDepth)
+}
+
+func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxDepth int) (*ERModel, error) {
+	allEntities := make([]*schema.ERModelEntity, 0)
+	allRelationships := make([]*schema.ERModelRelationship, 0)
+
+	appendEntity := func(entityList ...*schema.ERModelEntity) {
+		allEntities = append(allEntities, entityList...)
+	}
+
+	appendRelationship := func(RelationshipList ...*schema.ERModelRelationship) {
+		allRelationships = append(allRelationships, RelationshipList...)
+	}
+	type queueItem struct {
+		entityID uint
+		depth    int
+		e        *schema.ERModelEntity
+	}
+
+	var queue []*queueItem
+	var visited = make(map[uint]bool)
+	for _, startEntity := range startList {
+		queue = append(queue, &queueItem{
+			entityID: startEntity.ID,
+			depth:    0,
+			e:        startEntity,
+		},
+		)
+		appendEntity(startEntity)
+		visited[startEntity.ID] = true
+	}
+
+	visitedRelationships := map[uint]bool{}
+
+	head := 0
+	for head < len(queue) {
+		currentItem := queue[head]
+		head++
+		currentEntity := currentItem.e
+		if maxDepth > 0 && currentItem.depth >= maxDepth {
+			continue
+		}
+		// 准备要遍历的关系列表
+		RelationshipsToExplore := make([]*schema.ERModelRelationship, 0)
+
+		// query outgoing and incoming relationships
+		if outgoings, err := GetOutgoingRelationships(db, currentEntity); err == nil {
+			RelationshipsToExplore = append(RelationshipsToExplore, outgoings...)
+		} else {
+			log.Errorf("query outgoing failed: %v", err)
+		}
+
+		if incomings, err := GetIncomingRelationships(db, currentEntity); err == nil {
+			RelationshipsToExplore = append(RelationshipsToExplore, incomings...)
+		} else {
+			log.Errorf("query incoming failed: %v", err)
+		}
+
+		for _, Relationship := range RelationshipsToExplore {
+			if visitedRelationships[Relationship.ID] {
+				continue
+			}
+			visitedRelationships[Relationship.ID] = true
+			appendRelationship(Relationship)
+			var neighborID uint
+			if Relationship.SourceEntityID == currentItem.entityID {
+				neighborID = Relationship.TargetEntityID
+			} else {
+				neighborID = Relationship.SourceEntityID
+			}
+			if !visited[neighborID] {
+				neighbor, err := GetEntityByID(db, neighborID)
+				if err != nil {
+					return nil, err
+				}
+				visited[neighborID] = true
+				appendEntity(neighbor)
+				queue = append(queue, &queueItem{entityID: neighborID, depth: currentItem.depth + 1, e: neighbor})
+			}
+		}
+	}
+
+	return &ERModel{
+		Entities:      allEntities,
+		Relationships: allRelationships,
+	}, nil
+}
+
+type ERModel struct {
+	Entities      []*schema.ERModelEntity
+	Relationships []*schema.ERModelRelationship
+}
+
+func (model *ERModel) Dump() string {
+	var sb strings.Builder
+	sb.WriteString("Entities:\n")
+	for _, entity := range model.Entities {
+		sb.WriteString(fmt.Sprintf("- ID: %d\n", entity.ID))
+		sb.WriteString(fmt.Sprintf("  EntityName: %s\n", entity.EntityName))
+		sb.WriteString(fmt.Sprintf("  EntityType: %s\n", entity.EntityType))
+		if entity.Description != "" {
+			sb.WriteString(fmt.Sprintf("  Description: %s\n", utils.ShrinkString(entity.Description, 100)))
+		}
+		if entity.Rationale != "" {
+			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(entity.Rationale, 100)))
+		}
+		if len(entity.Attributes) > 0 {
+			sb.WriteString("  Attributes:\n")
+			for key, value := range entity.Attributes {
+				sb.WriteString(fmt.Sprintf("    - %s: %s\n", key, utils.ShrinkString(value, 100)))
+			}
+		}
+	}
+	sb.WriteString("Relationships:\n")
+	for _, relationship := range model.Relationships {
+		sb.WriteString(fmt.Sprintf("- Source: %d\n", relationship.SourceEntityID))
+		sb.WriteString(fmt.Sprintf("  Target: %d\n", relationship.TargetEntityID))
+		sb.WriteString(fmt.Sprintf("  Type: %s\n", relationship.RelationshipType))
+		if relationship.DecisionRationale != "" {
+			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(relationship.DecisionRationale, 100)))
+		}
+		if len(relationship.Attributes) > 0 {
+			sb.WriteString("  Attributes:\n")
+			for key, value := range relationship.Attributes {
+				sb.WriteString(fmt.Sprintf("    - %s: %s\n", key, utils.ShrinkString(value, 100)))
+			}
+		}
+	}
+	return sb.String()
+}
+
+func (model *ERModel) Dot() *dot.Graph {
+	G := dot.New()
+	G.MakeDirected()
+
+	rMap := make(map[uint]int)
+
+	for _, entity := range model.Entities {
+		n := G.AddNode(entity.EntityName)
+		for key, value := range entity.Attributes {
+			G.NodeAttribute(n, key, utils.InterfaceToString(value))
+		}
+		rMap[entity.ID] = n
+	}
+
+	for _, Relationship := range model.Relationships {
+		sid, ok := rMap[Relationship.SourceEntityID]
+		tid, ok2 := rMap[Relationship.TargetEntityID]
+		if !ok || !ok2 {
+			continue
+		}
+		G.AddEdge(sid, tid, Relationship.RelationshipType)
+	}
+	return G
 }

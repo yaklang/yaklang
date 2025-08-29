@@ -2,6 +2,8 @@ package schema
 
 import (
 	"fmt"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -12,6 +14,14 @@ type EntityBaseInfo struct {
 	gorm.Model
 	EntityBaseName string
 	Description    string
+}
+
+func (e *EntityBaseInfo) ToGRPC() *ypb.EntityRepository {
+	return &ypb.EntityRepository{
+		ID:          int64(e.ID),
+		Name:        e.EntityBaseName,
+		Description: e.Description,
+	}
 }
 
 // ERModelEntity 是知识库中所有事物的基本单元
@@ -31,6 +41,23 @@ type ERModelEntity struct {
 	// ExtendAttributes []*ERModelAttribute `gorm:"foreignkey:OwnerID"`
 	// OutgoingRelationship []*ERModelRelationship `gorm:"foreignkey:SourceEntityID"`
 	// IncomingRelationship []*ERModelRelationship `gorm:"foreignkey:TargetEntityID"`
+}
+
+func (e *ERModelEntity) ToGRPC() *ypb.Entity {
+	return &ypb.Entity{
+		ID:          uint64(e.ID),
+		BaseID:      uint64(e.EntityBaseID),
+		Name:        e.EntityName,
+		Type:        e.EntityType,
+		Description: e.Description,
+		Rationale:   e.Rationale,
+		Attributes: lo.MapToSlice(e.Attributes, func(key string, value any) *ypb.KVPair {
+			return &ypb.KVPair{
+				Key:   key,
+				Value: utils.InterfaceToString(value),
+			}
+		}),
+	}
 }
 
 func (e *ERModelEntity) String() string {
@@ -103,6 +130,22 @@ type ERModelRelationship struct {
 	DecisionRationale string      // 该关系存在的理由或依据
 	Hash              string      `gorm:"unique_index"`
 	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
+}
+
+func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
+	return &ypb.Relationship{
+		ID:             uint64(r.ID),
+		Type:           r.RelationshipType,
+		SourceEntityID: uint64(r.SourceEntityID),
+		TargetEntityID: uint64(r.TargetEntityID),
+		Rationale:      r.DecisionRationale,
+		Attributes: lo.MapToSlice(r.Attributes, func(key string, value any) *ypb.KVPair {
+			return &ypb.KVPair{
+				Key:   key,
+				Value: utils.InterfaceToString(value),
+			}
+		}),
+	}
 }
 
 func (r *ERModelRelationship) CalcHash() string {
