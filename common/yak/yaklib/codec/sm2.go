@@ -328,11 +328,13 @@ func SM2SignWithSM3WithPassword(priKeyBytes []byte, data interface{}, password [
 // signature, _ := codec.Sm2SignWithSM3(priKey, data)
 // err := codec.Sm2VerifyWithSM3(pubKey, data, signature)
 //
-// if err == nil {
-//    println("签名验证成功")
-// }else {
-//    println("签名验证失败:", err.Error())
-// }
+//	if err == nil {
+//	   println("签名验证成功")
+//	}else {
+//
+//	   println("签名验证失败:", err.Error())
+//	}
+//
 // ```
 func SM2VerifyWithSM3(pubKeyBytes []byte, originData interface{}, sign []byte) error {
 	// 检查数据是否为nil，如果是则报错
@@ -353,4 +355,101 @@ func SM2VerifyWithSM3(pubKeyBytes []byte, originData interface{}, sign []byte) e
 	}
 
 	return errors.New("SM2 signature verification failed")
+}
+
+// SM2KeyExchange 执行SM2密钥交换算法
+//
+// 参数说明：
+//   - keyLength: 期望的共享密钥长度（字节）
+//   - idA: A方标识（[]byte）
+//   - idB: B方标识（[]byte）
+//   - priKey: 调用方私钥（[]byte，支持PEM、HEX、原始字节）
+//   - pubKey: 对方公钥（[]byte，支持PEM、HEX、原始字节）
+//   - tempPriKey: 调用方临时私钥（[]byte，支持PEM、HEX、原始字节）
+//   - tempPubKey: 对方临时公钥（[]byte，支持PEM、HEX、原始字节）
+//   - thisIsA: 如果是A方调用设置为true，B方调用设置为false
+//
+// 返回值：
+//   - sharedKey: 协商得到的共享密钥（[]byte）
+//   - s1: 验证值S1，用于A验证B的身份（[]byte）
+//   - s2: 验证值S2，用于B验证A的身份（[]byte）
+//   - error: 错误信息
+//
+// Example:
+// ```
+// // A方和B方各自生成长期密钥对
+// priKeyA, pubKeyA, _ := codec.Sm2GenerateHexKeyPair()
+// priKeyB, pubKeyB, _ := codec.Sm2GenerateHexKeyPair()
+//
+// // A方和B方各自生成临时密钥对
+// tempPriKeyA, tempPubKeyA, _ := codec.Sm2GenerateHexKeyPair()
+// tempPriKeyB, tempPubKeyB, _ := codec.Sm2GenerateHexKeyPair()
+//
+// // A方执行密钥交换
+// sharedKeyA, s1A, s2A, err := codec.Sm2KeyExchange(32, []byte("Alice"), []byte("Bob"),
+//
+//	priKeyA, pubKeyB, tempPriKeyA, tempPubKeyB, true)
+//
+// die(err)
+//
+// // B方执行密钥交换
+// sharedKeyB, s1B, s2B, err := codec.Sm2KeyExchange(32, []byte("Alice"), []byte("Bob"),
+//
+//	priKeyB, pubKeyA, tempPriKeyB, tempPubKeyA, false)
+//
+// die(err)
+//
+// println("A方协商密钥:", codec.EncodeToHex(sharedKeyA))
+// println("B方协商密钥:", codec.EncodeToHex(sharedKeyB))
+// ```
+func SM2KeyExchange(keyLength int, idA, idB, priKey, pubKey, tempPriKey, tempPubKey []byte, thisIsA bool) ([]byte, []byte, []byte, error) {
+	// 解析私钥
+	pri, err := parsePrivateKey(priKey, nil)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "parse private key failed")
+	}
+
+	// 解析对方公钥
+	pub, err := parsePublicKey(pubKey)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "parse peer public key failed")
+	}
+
+	// 解析临时私钥
+	tempPri, err := parsePrivateKey(tempPriKey, nil)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "parse temporary private key failed")
+	}
+
+	// 解析对方临时公钥
+	tempPub, err := parsePublicKey(tempPubKey)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "parse peer temporary public key failed")
+	}
+
+	// 调用底层密钥交换函数
+	sharedKey, s1, s2, err := sm2.KeyExchange(keyLength, idA, idB, pri, pub, tempPri, tempPub, thisIsA)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "SM2 key exchange failed")
+	}
+
+	return sharedKey, s1, s2, nil
+}
+
+// SM2GenerateTemporaryKeyPair 生成用于密钥交换的临时密钥对
+//
+// 返回值：
+//   - []byte: 临时私钥（HEX格式）
+//   - []byte: 临时公钥（HEX格式）
+//   - error: 错误信息
+//
+// Example:
+// ```
+// tempPriKey, tempPubKey, err := codec.Sm2GenerateTemporaryKeyPair()
+// die(err)
+// println("临时私钥:", string(tempPriKey))
+// println("临时公钥:", string(tempPubKey))
+// ```
+func SM2GenerateTemporaryKeyPair() ([]byte, []byte, error) {
+	return GenerateSM2PrivateKeyHEX()
 }
