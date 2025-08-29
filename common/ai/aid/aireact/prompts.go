@@ -4,9 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"os"
 	"runtime"
+	"sync"
 	"text/template"
 	"time"
 
@@ -45,12 +44,20 @@ var directlyAnswerPromptTemplate string
 
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
-	react *ReAct
+	workdir              string
+	glanceWorkdir        string
+	genWorkdirGlanceOnce sync.Once
+	react                *ReAct
 }
 
 // NewPromptManager creates a new prompt manager
-func NewPromptManager(react *ReAct) *PromptManager {
-	return &PromptManager{react: react}
+func NewPromptManager(react *ReAct, workdir string) *PromptManager {
+	return &PromptManager{
+		workdir:              workdir,
+		glanceWorkdir:        "",
+		react:                react,
+		genWorkdirGlanceOnce: sync.Once{},
+	}
 }
 
 // LoopPromptData contains data for the main loop prompt template
@@ -136,6 +143,13 @@ type DirectlyAnswerPromptData struct {
 	Schema             string
 }
 
+func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
+	pm.genWorkdirGlanceOnce.Do(func() {
+		pm.glanceWorkdir = filesys.Glance(wd)
+	})
+	return pm.glanceWorkdir
+}
+
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
 func (pm *PromptManager) GenerateLoopPrompt(
 	userQuery string,
@@ -162,11 +176,9 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		TopToolsCount:                  pm.react.config.topToolsCount,
 	}
 
-	// Set working directory
-	if cwd, err := os.Getwd(); err == nil {
-		log.Infof("start to get working dir: %s", cwd)
-		data.WorkingDir = cwd
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
 	// Get prioritized tools
@@ -246,9 +258,9 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolName, toolParams 
 	}
 
 	// Set working directory
-	if cwd, err := os.Getwd(); err == nil {
-		data.WorkingDir = cwd
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
 	// Set conversation memory
@@ -283,9 +295,9 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	}
 
 	// Set working directory
-	if cwd, err := os.Getwd(); err == nil {
-		data.WorkingDir = cwd
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
 	// Get prioritized tools
