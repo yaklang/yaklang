@@ -112,7 +112,9 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 	if saveValueConfig.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
-	err := value.GenerateGraph(NewDBGraph(saveValueConfig), saveValueConfig.ctx)
+	graph := NewDBGraph(saveValueConfig)
+	graph.getOrCreateNode(value, true)
+	err := value.GenerateGraph(graph, saveValueConfig.ctx)
 	return err
 }
 
@@ -128,7 +130,11 @@ func NewDBGraph(ctx *saveValueCtx) *DBGraph {
 	}
 }
 
-func (g *DBGraph) createNode(value *Value) (*ssadb.AuditNode, error) {
+func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNode, error) {
+	entry := false
+	if len(isEntry) > 0 {
+		entry = isEntry[0]
+	}
 	if node, ok := g.visitedNode[value]; ok {
 		return node, nil
 	}
@@ -138,10 +144,11 @@ func (g *DBGraph) createNode(value *Value) (*ssadb.AuditNode, error) {
 
 	an := &ssadb.AuditNode{
 		AuditNodeStatus: g.AuditNodeStatus,
-		IsEntryNode:     ValueCompare(value, g.entryValue),
-		IRCodeID:        value.GetId(),
-		TmpStartOffset:  -1,
-		TmpEndOffset:    -1,
+		// IsEntryNode:     ValueCompare(value, g.entryValue),
+		IsEntryNode:    entry,
+		IRCodeID:       value.GetId(),
+		TmpStartOffset: -1,
+		TmpEndOffset:   -1,
 	}
 	if value.GetId() == -1 {
 		R := value.GetRange()
@@ -166,11 +173,11 @@ func (g *DBGraph) createNode(value *Value) (*ssadb.AuditNode, error) {
 }
 
 func (g *DBGraph) CreateEdge(edge Edge) error {
-	fromNode, err := g.createNode(edge.From)
+	fromNode, err := g.getOrCreateNode(edge.From)
 	if err != nil {
 		return utils.Errorf("create from node failed: %v", err)
 	}
-	toNode, err := g.createNode(edge.To)
+	toNode, err := g.getOrCreateNode(edge.To)
 	if err != nil {
 		return utils.Errorf("create to node failed: %v", err)
 	}
