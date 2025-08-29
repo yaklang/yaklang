@@ -192,6 +192,10 @@ var CodecExports = map[string]interface{}{
 	"Sm2SignWithSM3WithPassword": codec.SM2SignWithSM3WithPassword,
 	"Sm2VerifyWithSM3":           codec.SM2VerifyWithSM3,
 
+	// SM2 密钥交换函数
+	"Sm2KeyExchange":              codec.SM2KeyExchange,
+	"Sm2GenerateTemporaryKeyPair": codec.SM2GenerateTemporaryKeyPair,
+
 	"SignSHA256WithRSA":       tlsutils.PemSignSha256WithRSA,
 	"SignVerifySHA256WithRSA": tlsutils.PemVerifySignSha256WithRSA,
 }

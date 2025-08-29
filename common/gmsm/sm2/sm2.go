@@ -121,6 +121,10 @@ func KeyExchangeA(klen int, ida, idb []byte, priA *PrivateKey, pubB *PublicKey, 
 	return keyExchange(klen, ida, idb, priA, pubB, rpri, rpubB, true)
 }
 
+func KeyExchange(klen int, ida, idb []byte, pri *PrivateKey, pub *PublicKey, rpri *PrivateKey, rpub *PublicKey, thisIsA bool) (k, s1, s2 []byte, err error) {
+	return keyExchange(klen, ida, idb, pri, pub, rpri, rpub, thisIsA)
+}
+
 //****************************************************************************//
 
 func Sm2Sign(priv *PrivateKey, msg, uid []byte, random io.Reader) (r, s *big.Int, err error) {
