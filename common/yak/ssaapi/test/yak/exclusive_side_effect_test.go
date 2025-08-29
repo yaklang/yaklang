@@ -20,11 +20,11 @@ b = () => {
 b()
 c = a;
 `
-		ssatest.CheckBottomUser(t, code, "c", []string{"2"}, true)
+		ssatest.CheckTopDef(t, code, "c", []string{"2"}, true)
 	})
 
 	t.Run("phi side-effect", func(t *testing.T) {
-		ssatest.CheckBottomUser(t, `
+		ssatest.CheckTopDef(t, `
 a = 1
 b = () => {
 	a = 2
@@ -47,7 +47,7 @@ c = a;
 		b = a
 
 		`
-		ssatest.CheckBottomUser(t, code, "b", []string{
+		ssatest.CheckTopDef(t, code, "b", []string{
 			"1",
 			"2",
 			"Undefined-foo",
@@ -57,7 +57,7 @@ c = a;
 	})
 
 	t.Run("simple if else-if phi side-effect ", func(t *testing.T) {
-		ssatest.CheckBottomUser(t, `
+		ssatest.CheckTopDef(t, `
 		a = 3
 		if c{
 			a= 1
@@ -76,7 +76,7 @@ c = a;
 	})
 
 	t.Run("complex if else-if phi side-effect", func(t *testing.T) {
-		ssatest.CheckBottomUser(t, `
+		ssatest.CheckTopDef(t, `
 		a = 1
 
 		ok = false

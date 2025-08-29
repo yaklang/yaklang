@@ -10,7 +10,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
@@ -24,14 +23,15 @@ func CheckResultWithFS(t *testing.T, fs filesys_interface.FileSystem, rule strin
 		log.Infof("only in memory")
 		handler(res)
 
-		// database
-		id, err := res.Save(schema.SFResultKindDebug)
-		require.NoError(t, err)
-		res, err = ssaapi.LoadResultByID(id)
-		require.NoError(t, err)
-		log.Infof("with database")
-		handler(res)
-
+		//
+		if len(p) == 1 && p[0].GetProgramName() != "" {
+			id, err := res.Save(schema.SFResultKindDebug)
+			require.NoError(t, err)
+			res, err = ssaapi.LoadResultByID(id)
+			require.NoError(t, err)
+			log.Infof("with database")
+			handler(res)
+		}
 		return nil
 	}, opt...)
 }
@@ -79,11 +79,6 @@ func (g *GraphInTest) String() string {
 	str := ""
 	dotStr := g.DotGraph.String()
 	str += dotStr
-	if graph, err := dot.DotGraphToAsciiArt(dotStr); err == nil {
-		str += graph + "\n"
-	} else {
-		str += err.Error() + "\n"
-	}
 	str += strings.Join(g.edgeStr, "\n")
 	return str
 }
@@ -92,11 +87,15 @@ func pathStr(from, to string) string {
 	return fmt.Sprintf("[%s] -> [%s]", from, to)
 }
 func (g *GraphInTest) CreateEdge(edge ssaapi.Edge) error {
-	g.DotGraph.CreateEdge(edge)
+	err := g.DotGraph.CreateEdge(edge)
+	if err != nil {
+		return err
+	}
+
 	g.edgeStr = append(g.edgeStr,
-		fmt.Sprintf("%s %v",
-			pathStr(edge.From.GetRange().GetWordText(), edge.To.GetRange().GetWordText()),
-			edge.Msg,
+		fmt.Sprintf("%s %v %v",
+			pathStr(edge.From.GetRange().GetText(), edge.To.GetRange().GetText()),
+			edge.Msg, edge.Kind,
 		),
 	)
 	return nil
@@ -104,14 +103,16 @@ func (g *GraphInTest) CreateEdge(edge ssaapi.Edge) error {
 
 func (g *GraphInTest) Check(t *testing.T, from, to string, label ...string) {
 	want := pathStr(from, to)
-	checkEdge := func(edge string) bool {
+	checkEdge := func(edge string) (ret bool) {
 		if !strings.Contains(edge, want) {
+			log.Infof("edge not found: `%s` vs `%v`", edge, want)
 			return false
 		}
 
 		if len(label) > 0 {
 			for _, l := range label {
 				if !strings.Contains(edge, l) {
+					log.Infof("label not found: `%s` vs `%v`", edge, l)
 					return false
 				}
 			}
@@ -156,6 +157,7 @@ func CheckSyntaxFlowGraph(
 				v.GenerateGraph(graph)
 			}
 			log.Infof("graph: \n%v", graph.String())
+			// dot.ShowDotGraphToAsciiArt(graph.DotGraph.String())
 			checkFunc(graph)
 		}
 	}, opt...)

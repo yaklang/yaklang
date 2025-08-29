@@ -130,8 +130,8 @@ func TestGraph(t *testing.T) {
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	require.Equal(t, 1, len(memPath))
-	require.Equal(t, 1, len(dbPath))
+	require.Equal(t, 3, len(memPath))
+	require.Equal(t, 3, len(dbPath))
 }
 
 func TestGraph2(t *testing.T) {
@@ -214,14 +214,17 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		value3_1 := CreateValue(prog, 3)
 		value3_2 := CreateValue(prog, 3)
 		value4 := CreateValue(prog, 4)
-		value1.AppendDependOn(value2)
-		value2.AppendDependOn(value3_1)
-		value1.AppendDependOn(value3_2)
-		value3_2.AppendDependOn(value4)
+		value1.AppendPredecessor(value2)
+		value2.AppendPredecessor(value3_1)
+		value1.AppendPredecessor(value3_2)
+		value3_2.AppendPredecessor(value4)
 
 		graph := ssaapi.NewDotGraph()
+		value1.GenerateGraph(graph)
+		graph.Show()
 
-		result := graph.DeepFirstGraphNext(value1)
+		result := graph.DeepFirstGraphPrev(value1)
+		log.Infof("result: %v", result)
 		require.Equal(t, 2, len(result))
 		require.Equal(t, strings.Count(graph.String(), "t3: 3"), 2)
 	})
@@ -330,17 +333,8 @@ func main() {
 		dot := value.DotGraph()
 		log.Infof("dot : \n%s", dot)
 
-		if sfr.IsDatabase() {
-			// database
-			log.Infof("in database")
-			require.Contains(t, dot, "db.QueryRow(query") // contain path
-			require.NotContains(t, dot, "r.FormValue")    // contain dataflow path
-		} else {
-			log.Infof("in memory ")
-			// contain all edge
-			require.Contains(t, dot, "db.QueryRow(query") // contain path
-			require.Contains(t, dot, "r.FormValue")       // contain dataflow path
-		}
+		require.Contains(t, dot, "db.QueryRow(query") // contain path
+		require.Contains(t, dot, "r.FormValue")       // contain dataflow path
 	})
 }
 

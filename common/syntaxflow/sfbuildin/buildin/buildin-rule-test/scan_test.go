@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
-
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -54,8 +52,8 @@ func TestVerify_DEBUG(t *testing.T) {
 		return
 	}
 	yakit.InitialDatabase()
-	err := sfbuildin.SyncEmbedRule()
-	require.NoError(t, err)
+	// err := sfbuildin.SyncEmbedRule()
+	// require.NoError(t, err)
 	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
 	ruleName := "检测Java拼接SQL字符串漏洞"
 

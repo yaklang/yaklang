@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -101,7 +100,7 @@ g=d+a;`)
 		if strings.Contains(value.DotGraph(), `phi`) {
 			// checkDotPhi = true
 		}
-		dot.ShowDotGraphToAsciiArt(value.DotGraph())
+		// dot.ShowDotGraphToAsciiArt(value.DotGraph())
 	})
 	if !checkPhi {
 		t.Fatal("checkPhi failed")
@@ -177,7 +176,7 @@ f = b(2,3,4)`
 	check3 := false
 	prog.Ref("f").FullUseDefChain(func(value *ssaapi.Value) {
 		value.ShowDot()
-		dot.ShowDotGraphToAsciiArt(value.DotGraph())
+		// dot.ShowDotGraphToAsciiArt(value.DotGraph())
 		value.GetTopDefs().ForEach(func(value *ssaapi.Value) {
 			ret := value.GetConstValue()
 			if ret == 2 && value.EffectOn.Count() == 1 {

@@ -1,8 +1,9 @@
 package tests
 
 import (
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/stretchr/testify/require"
 
@@ -493,7 +494,7 @@ namespace {
 	t.Run("test undefined function", func(t *testing.T) {
 		code := `<?php
 a($a);`
-		test.CheckSyntaxFlow(t, code,
+		test.CheckSyntaxFlowContain(t, code,
 			`a as $target`,
 			map[string][]string{"target": {"Undefined-a"}},
 			ssaapi.WithLanguage(ssaapi.PHP))

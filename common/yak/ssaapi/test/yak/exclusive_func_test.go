@@ -8,8 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-
-	"github.com/yaklang/yaklang/common/utils/dot"
 )
 
 func Test_Function_Parameter(t *testing.T) {
@@ -212,7 +210,7 @@ d = c + f;
 			checkAdef = true
 		}
 	}).FullUseDefChain(func(value *ssaapi.Value) {
-		dot.ShowDotGraphToAsciiArt(value.DotGraph())
+		// dot.ShowDotGraphToAsciiArt(value.DotGraph())
 	})
 	if !checkAdef {
 		t.Fatal("checkAdef failed")
@@ -232,17 +230,17 @@ a --> b(a,2) --> i ---> return --> binaryOp
 		t.Fatal(err)
 	}
 	var vals string
-	prog.Ref("a").GetBottomUses().ForEach(func(value *ssaapi.Value) {
-		value.ShowDot()
-		vals = value.DotGraph()
-	})
+	res, err := prog.SyntaxFlowWithError("a --> as $target")
+	require.NoError(t, err)
+	vals = res.GetValues("target").DotGraph()
+
 	var count = 0
-	regexp.MustCompile(`n\d -> n\d `).ReplaceAllStringFunc(vals, func(s string) string {
+	regexp.MustCompile(`n\d+ -> n\d+ `).ReplaceAllStringFunc(vals, func(s string) string {
 		count++
 		return s
 	})
 	if count < 5 {
-		t.Fatal("count edge failed")
+		t.Fatalf("count edge failed %v ", count)
 	}
 }
 
