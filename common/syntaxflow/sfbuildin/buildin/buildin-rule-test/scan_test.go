@@ -32,7 +32,7 @@ func TestVerifiedRule(t *testing.T) {
 		if len(f.VerifyFsInfo) == 0 {
 			continue
 		}
-		t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
+		success := t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
 			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
@@ -40,6 +40,9 @@ func TestVerifiedRule(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+		if !success {
+			t.FailNow()
+		}
 	}
 	for _, name := range failedRules {
 		println(name)
