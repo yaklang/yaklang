@@ -68,13 +68,6 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 }
 
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
-	//defer func() {
-	//	for _, ret := range result {
-	//		if ret.GetDependOn() != nil {
-	//			log.Errorf("BUG:(topdef's result is not a tree node:%s have depend on %s)", ret.String(), ret.GetDependOn().String())
-	//		}
-	//	}
-	//}()
 
 	if i == nil {
 		return nil
@@ -101,6 +94,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	var recoverStack func()
 	shouldExit, recoverStack = actx.check(i)
 	defer recoverStack()
+	defer func() {
+		actx.SavePath(result)
+	}()
+
 	if shouldExit {
 		return Values{i}
 	}
@@ -156,11 +153,6 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				ret.AppendEffectOn(i)
 			}
 			return results
-			// TODO:这个拼接数据流关系会导致速度很慢
-			//for _, ret := range results {
-			//	ret.AppendEffectOn(i)
-			//}
-			return results
 		}
 		return i.visitedDefs(actx, opt...)
 	}
@@ -199,10 +191,8 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		case isFunc && !fun.IsExtern():
 			callee := i.NewTopDefValue(fun)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
-			// inherit return index
-			val, ok := i.GetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX)
-			if ok {
-				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, val)
+			if objectContext := actx.CurrentObjectStack(); objectContext != nil && ValueCompare(objectContext.object, i) {
+				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, objectContext.key)
 			}
 			return callee.getTopDefs(actx, opt...)
 		default:
@@ -296,17 +286,18 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 								traceRets = append(traceRets, topDefValue)
 							}
 							// trace mask ?
-							if len(inst.Blocks) > 0 {
-								name, ok := ssa.CombineMemberCallVariableName(traceValue, ssa.NewConst(retIndexRawStr))
-								if ok {
-									lastBlockRaw, _ := lo.Last(inst.Blocks)
-									lastBlock, ok := inst.GetBasicBlockByID(lastBlockRaw)
-									if ok && lastBlock != nil {
-										variableInstance := lastBlock.ScopeTable.ReadVariable(name)
-										_ = variableInstance.String()
-									}
-								}
-							}
+							// TODO: use scope when scope can load from database
+							// if len(inst.Blocks) > 0 {
+							// 	name, ok := ssa.CombineMemberCallVariableName(traceValue, ssa.NewConst(retIndexRawStr))
+							// 	if ok {
+							// 		lastBlockRaw, _ := lo.Last(inst.Blocks)
+							// 		lastBlock, ok := inst.GetBasicBlockByID(lastBlockRaw)
+							// 		if ok && lastBlock != nil {
+							// 			variableInstance := lastBlock.ScopeTable.ReadVariable(name)
+							// 			_ = variableInstance.String()
+							// 		}
+							// 	}
+							// }
 						}
 					}
 				}

@@ -24,6 +24,10 @@ go test -timeout 30s ./common/yak/go2ssa/...
 go test -timeout 30s ./common/yak/antlr4go/...
 go test -timeout 2m ./common/yak/ssaapi/test/golang
 
+echo "Start to Test C" 
+go test -timeout 30s ./common/yak/c2ssa/...
+go test -timeout 2m ./common/yak/ssaapi/test/c
+
 
 echo "Start to Test SSAAPI"
 # SSA

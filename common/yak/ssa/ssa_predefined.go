@@ -363,12 +363,13 @@ func (n *anValue) GetIndexMember(i int) (Value, bool) {
 }
 
 func (n *anValue) GetStringMember(key string) (Value, bool) {
-	for _, id := range n.member.Keys() {
-		i, ok := n.GetValueById(id)
+	keys := n.member.Keys()
+	for index := len(keys) - 1; index >= 0; index-- {
+		i, ok := n.GetValueById(keys[index])
 		if !ok {
 			continue
 		}
-		lit, ok := i.(*ConstInst)
+		lit, ok := ToConstInst(i)
 		if !ok {
 			continue
 		}

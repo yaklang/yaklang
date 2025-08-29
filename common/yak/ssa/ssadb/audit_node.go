@@ -124,6 +124,15 @@ func GetDependEdgeOnByFromNodeId(id uint) []uint {
 	return dependOns
 }
 
+func GetDataFlowEdgeByToNodeId(fromId uint) []uint {
+	db := GetDB()
+	var edges []uint
+	db.Model(&AuditEdge{}).
+		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_DataFlow).
+		Pluck("to_node", &edges)
+	return edges
+}
+
 func GetPredecessorEdgeByFromID(fromId uint) []*AuditEdge {
 	db := GetDB()
 	var edges []*AuditEdge
@@ -148,6 +157,7 @@ type AuditEdgeType string
 const (
 	EdgeType_DependsOn AuditEdgeType = "depends_on"
 	EdgeType_EffectsOn AuditEdgeType = "effects_on"
+	EdgeType_DataFlow  AuditEdgeType = "prev_dataflow"
 
 	// EdgeType_Predecessor 记录审计过程
 	EdgeType_Predecessor AuditEdgeType = "predecessor"
@@ -200,11 +210,23 @@ func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
 	return ae
 }
 
+func (n *AuditNode) CreateDataFlowEdge(progName string, to uint) *AuditEdge {
+	ae := &AuditEdge{
+		ProgramName: progName,
+		FromNode:    to,
+		ToNode:      n.ID,
+		EdgeType:    EdgeType_DataFlow,
+		TaskId:      n.TaskId,
+		ResultId:    n.ResultId,
+	}
+	return ae
+}
+
 func (n *AuditNode) CreatePredecessorEdge(progName string, to uint, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName:   progName,
-		FromNode:      n.ID,
-		ToNode:        to,
+		FromNode:      to,
+		ToNode:        n.ID,
 		EdgeType:      EdgeType_Predecessor,
 		AnalysisStep:  step,
 		AnalysisLabel: label,

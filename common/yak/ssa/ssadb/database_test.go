@@ -5,6 +5,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -262,16 +263,19 @@ func TestAuditResult(t *testing.T) {
 	value := prog.NewConstValue("print", codeRange)
 	require.NoError(t, err)
 
-	// save result
-	result := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})
-	result.SymbolTable.Set("print", value)
-	query := ssaapi.CreateResultWithProg(prog, result)
-	resultId, err := query.Save(schema.SFResultKindSearch, taskId)
+	// save memResult
+	memResult := sfvm.NewSFResult(&schema.SyntaxFlowRule{}, &sfvm.Config{})
+	memResult.SymbolTable.Set("print", value)
+	result := ssaapi.CreateResultWithProg(prog, memResult)
+	result.Show()
+	resultId, err := result.Save(schema.SFResultKindSearch, taskId)
 	require.NoError(t, err)
 
+	log.Infof("resultId: %d", resultId)
 	// load result and check template value
 	dbResult, err := ssaapi.LoadResultByID(resultId)
 	require.NoError(t, err)
+	dbResult.Show()
 	values := dbResult.GetValues("print")
 	values.Show()
 	require.True(t, len(values) != 0)

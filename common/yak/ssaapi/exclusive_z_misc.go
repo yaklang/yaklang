@@ -121,6 +121,26 @@ func (i *Value) AppendEffectOn(vs ...*Value) *Value {
 	return i
 }
 
+func (i *Value) AppendDataFlow(vs ...*Value) *Value {
+	if i == nil {
+		return i
+	}
+	for _, v := range vs {
+		if v == nil {
+			continue
+		}
+		if i.GetUUID() == v.GetUUID() {
+			continue
+		}
+		if i.hasDataFlow(v) {
+			continue
+		}
+
+		i.PrevDataFlow = append(i.PrevDataFlow, v)
+	}
+	return i
+}
+
 func (i *Value) RemoveDependOn(vs ...*Value) {
 	if i == nil {
 		return

@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -36,6 +37,7 @@ type Value struct {
 
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
+	PrevDataFlow []*Value
 	DescInfo     map[string]string
 	// value from database
 	auditNode *ssadb.AuditNode
@@ -58,6 +60,16 @@ func (v *Value) getInstruction() ssa.Instruction {
 		return v.innerUser
 	}
 	return nil
+}
+
+func (v *Value) hasDataFlow(target *Value) bool {
+	if v == nil {
+		return false
+	}
+	if v.PrevDataFlow == nil {
+		return false
+	}
+	return slices.Contains(v.PrevDataFlow, target)
 }
 
 func (v *Value) hasDependOn(target *Value) bool {
@@ -1077,6 +1089,22 @@ func (v *Value) GetDependOn() Values {
 	return v.safeMapToValues(v.DependOn)
 }
 
+func (v *Value) GetDataFlow() Values {
+	if len(v.PrevDataFlow) == 0 {
+		// load from db
+		if auditNode := v.auditNode; auditNode != nil {
+			nodeIds := ssadb.GetDataFlowEdgeByToNodeId(auditNode.ID)
+			for _, id := range nodeIds {
+				d := v.NewValueFromAuditNode(id)
+				if d != nil {
+					v.PrevDataFlow = append(v.PrevDataFlow, d)
+				}
+			}
+		}
+	}
+	return v.PrevDataFlow
+}
+
 func (v *Value) GetEffectOn() Values {
 	if v.EffectOn == nil || v.EffectOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
@@ -1265,8 +1293,37 @@ func (v Values) GetOperands() Values {
 	})
 	return ret
 }
+func (v *Value) ShowDot() {
+	dotStr := v.DotGraph()
+	fmt.Println(dotStr)
+	// dot.ShowDotGraphToAsciiArt(dotStr)
+}
 
-func (v Values) DotGraph() string {
-	vg := NewValuesGraph(v)
-	return vg.Dot()
+func (vs Values) ShowDot() Values {
+	dotStr := vs.DotGraph()
+	fmt.Println(dotStr)
+	// dot.ShowDotGraphToAsciiArt(dotStr)
+	return vs
+}
+
+func (v *Value) DotGraph() string {
+	dotGraph := v.NewDotGraph()
+	return dotGraph.String()
+}
+
+func (v *Value) NewDotGraph() *DotGraph {
+	dotGraph := NewDotGraph()
+	v.GenerateGraph(dotGraph)
+	return dotGraph
+}
+func (vs Values) NewDotGraph() *DotGraph {
+	dotGraph := NewDotGraph()
+	for _, v := range vs {
+		v.GenerateGraph(dotGraph)
+	}
+	return dotGraph
+}
+func (vs Values) DotGraph() string {
+	dotGraph := vs.NewDotGraph()
+	return dotGraph.String()
 }
