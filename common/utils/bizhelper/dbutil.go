@@ -477,6 +477,24 @@ func ExactQueryUIntArrayOr(db *gorm.DB, field string, s []uint) *gorm.DB {
 	return ExactQueryUInt64ArrayOr(db, field, raw)
 }
 
+func ExactQueryMultipleUInt64ArrayOr(db *gorm.DB, field []string, s []uint64) *gorm.DB {
+	if len(s) <= 0 || len(field) <= 0 {
+		return db
+	}
+
+	var (
+		querys []string
+		items  []interface{}
+	)
+
+	for _, f := range field {
+		querys = append(querys, fmt.Sprintf("( %v IN (?) )", f))
+		items = append(items, s)
+	}
+
+	return db.Where(strings.Join(querys, " OR "), items...)
+}
+
 func ExactQueryUInt64ArrayOr(db *gorm.DB, field string, s []uint64) *gorm.DB {
 	if len(s) <= 0 {
 		return db
