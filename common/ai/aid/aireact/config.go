@@ -526,7 +526,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		userInteractiveLimitedTimes: 3, // Default to 3 times
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
-		workdir:                     consts.GetDefaultBaseHomeDir(),
+		workdir:                     consts.GetDefaultYakitBaseDir(),
 	}
 
 	emitMutex := new(sync.Mutex)
