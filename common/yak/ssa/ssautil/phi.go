@@ -1,10 +1,5 @@
 package ssautil
 
-import (
-	"fmt"
-	"regexp"
-)
-
 // ForEachCapturedVariable call the handler for each captured by base scope Variable
 func ForEachCapturedVariable[T versionedValue](
 	scope ScopedVersionedTableIF[T],
@@ -103,7 +98,7 @@ func (base *ScopedVersionedTable[T]) Merge(
 		return variable
 	}
 
-	pointerCheck := make(map[string]T)
+	// pointerCheck := make(map[string]T)
 	generatePhi := func(ver VersionedIF[T], m []T, canCapture bool) {
 		var v VersionedIF[T]
 		name := ver.GetName()
@@ -137,38 +132,38 @@ func (base *ScopedVersionedTable[T]) Merge(
 		//	log.Infof("merge phi %s: edges count: %v", name, len(m))
 		//}
 
-		rev := regexp.MustCompile(`#(\d+)\.@value`)
-		idvs := rev.FindStringSubmatch(name)
+		// rev := regexp.MustCompile(`#(\d+)\.@value`)
+		// idvs := rev.FindStringSubmatch(name)
 
 		ret := merge(name, m)
-		if len(idvs) > 0 {
-			pointerCheck[fmt.Sprintf("#%s.@pointer", idvs[1])] = ret
-		}
+		// if len(idvs) > 0 {
+		// 	pointerCheck[fmt.Sprintf("#%s.@pointer", idvs[1])] = ret
+		// }
 
 		if base.GetParent().GetParent() == variable.GetScope() && setLocal {
 			v = base.CreateVariable(name, variable.GetLocal())
 		} else {
 			v = base.CreateVariable(name, false)
 		}
-		v.SetPointHandle(variable.GetPointHandle())
+		// v.SetPointHandler(variable.GetPointHandler())
 		v.SetKind(variable.GetKind())
 		if canCapture {
 			// 在当前scope中尝试修改外部的某个variable
 			tmpPhiCapture[v] = ret
 		}
-		if variable.GetCaptured().GetScope() == ver.GetScope() {
+		if variable.GetCaptured().GetScope().Compare(ver.GetScope()) {
 			tmpPhiScope[v] = ret
 		}
 	}
 
 	defer func() {
 		for v, ret := range tmpPhiScope {
-			if v.GetKind() == PointerVariable {
-				v.PointHandle(pointerCheck[v.GetName()], base)
-			} else {
-				base.AssignVariable(v, ret)
-				base.tryRegisterCapturedVariable(v.GetName(), v)
-			}
+			// if v.GetKind() == PointerVariable {
+
+			// } else {
+			base.AssignVariable(v, ret)
+			base.tryRegisterCapturedVariable(v.GetName(), v)
+			// }
 		}
 		for v, ret := range tmpPhiCapture {
 			err := v.Assign(ret)

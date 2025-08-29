@@ -214,7 +214,7 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 	var rightv ssa.Value = nil
 	var handleObjectType func(ssa.Value, *ssa.ObjectType)
 
-	// fmt.Printf("exp = %v\n", exp.GetText())
+	fmt.Printf("exp = %v\n", exp.GetText())
 
 	if IslValue {
 		rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false)
