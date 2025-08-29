@@ -236,7 +236,7 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 	),
 	// 定义 Relationship_list，另一个对象数组
 	aitool.WithStructArrayParam(
-		"Relationship_list",
+		"relationship_list",
 		[]aitool.PropertyOption{
 			aitool.WithParam_Description(`Represents a directed edge between two entities in the knowledge graph.`),
 		},
@@ -253,7 +253,7 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringParam(
-			"Relationship_type",
+			"relationship_type",
 			aitool.WithParam_Required(true),
 			aitool.WithParam_Description(`描述源实体与目标实体之间关系的“动词”。建议使用标准化的动词。
 **推荐值:** IMPORTS, DEFINES, CALLS, INSTANTIATES, ACCESSES_FIELD, HAS_PARAMETER, IMPLEMENTS, RETURNS_ERROR_FROM`),
@@ -282,13 +282,13 @@ func normalizeEntityName(inputStr string) string {
 	return processedStr
 }
 
-func invokeParams2ERMAttribute(params aitool.InvokeParams) *schema.ERModelAttribute {
-	return &schema.ERModelAttribute{
-		AttributeName:    params.GetString("attribute_name"),
-		AttributeValue:   params.GetString("attribute_value"),
-		UniqueIdentifier: params.GetBool("unique_identifier"),
-	}
-}
+//func invokeParams2ERMAttribute(params aitool.InvokeParams) *schema.ERModelAttribute {
+//	return &schema.ERModelAttribute{
+//		AttributeName:    params.GetString("attribute_name"),
+//		AttributeValue:   params.GetString("attribute_value"),
+//		UniqueIdentifier: params.GetBool("unique_identifier"),
+//	}
+//}
 
 func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEntity {
 	entity := &schema.ERModelEntity{
@@ -296,13 +296,12 @@ func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEnt
 		EntityType:  entityParams.GetString("entity_type"),
 		Description: entityParams.GetString("description"),
 		Rationale:   entityParams.GetString("decision_rationale"),
+		Attributes:  map[string]interface{}{},
 	}
-	for _, RelationshipParams := range entityParams.GetObjectArray("attributes") {
-		attr := invokeParams2ERMAttribute(RelationshipParams)
-		if attr.UniqueIdentifier {
-			entity.ExtendAttributes = append(entity.ExtendAttributes, attr)
-		}
-		entity.Attributes[attr.AttributeName] = attr.AttributeValue
+	for _, attrs := range entityParams.GetObjectArray("attributes") {
+		key, value, unique := attrs.GetString("attribute_name"), attrs.GetString("attribute_value"), attrs.GetBool("unique_identifier")
+		_ = unique
+		entity.Attributes[key] = value
 	}
 	return entity
 }
@@ -316,15 +315,15 @@ func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 		result.Entities = append(result.Entities, invokeParams2ERMEntity(entityParams))
 	}
 
-	for _, RelationshipParams := range ermResult.GetInvokeParamsArray("Relationship_list") {
-		Relationship := &TemporaryRelationship{
+	for _, RelationshipParams := range ermResult.GetInvokeParamsArray("relationship_list") {
+		r := &TemporaryRelationship{
 			SourceTemporaryName:  RelationshipParams.GetString("source"),
 			TargetTemporaryName:  RelationshipParams.GetString("target"),
-			RelationshipType:     RelationshipParams.GetString("Relationship_type"),
+			RelationshipType:     RelationshipParams.GetString("relationship_type"),
 			DecorationAttributes: RelationshipParams.GetString("decoration_attributes"),
 			DecisionRationale:    RelationshipParams.GetString("decision_rationale"),
 		}
-		result.Relationships = append(result.Relationships, Relationship)
+		result.Relationships = append(result.Relationships, r)
 	}
 	return result
 }
@@ -361,7 +360,16 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 					})
 				}()
 				log.Infof("start to detect erm prompt for the first chunk: %s", utils.ShrinkString(string(i.Data()), 800))
-				domainPrompt, err = DetectERMPrompt(string(i.Data()), options...)
+				firstChunk := i
+				count := 0
+				for firstChunk.HaveLastChunk() {
+					count++
+					firstChunk = firstChunk.LastChunk()
+					if count > 10 {
+						break
+					}
+				}
+				domainPrompt, err = DetectERMPrompt(string(firstChunk.Data()), options...)
 				if err != nil {
 					log.Errorf("[detect ERM Prompt] error in analyzing ERM: %v ", err)
 				}
@@ -386,7 +394,7 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*ERMAnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
 	if domainPrompt == "" {
-		prompt, err := DetectERMPrompt(string(c.Data()), options...) // ？？？？？？？
+		prompt, err := DetectERMPrompt(string(c.Data()), options...)
 		if err != nil {
 			analyzeConfig.AnalyzeLog("[detect ERM Prompt] error in analyzing ERM: %v ", err)
 			return nil, err
@@ -415,6 +423,7 @@ func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, opti
 	swg := utils.NewSizedWaitGroup(analyzeConfig.AnalyzeConcurrency)
 	currentEntities := omap.NewOrderedMap[string, *schema.ERModelEntity](map[string]*schema.ERModelEntity{})
 	for _, tempEntity := range erm.Entities {
+		log.Infof("start to handle raw entity: %v", tempEntity)
 		swg.Add(1)
 		go func() {
 			defer swg.Done()
@@ -425,6 +434,7 @@ func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, opti
 				return
 			}
 			if matchedEntity == nil {
+				log.Infof("start to create entity: %s", tempEntity.EntityName)
 				err = eb.CreateEntity(tempEntity)
 				if err != nil {
 					analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
