@@ -67,8 +67,7 @@ func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool, toolName string) (st
 	}
 
 	// Use PromptManager to generate the prompt
-	promptManager := NewPromptManager(r)
-	prompt, err := promptManager.GenerateToolParamsPrompt(tool)
+	prompt, err := r.config.promptManager.GenerateToolParamsPrompt(tool)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate tool params prompt: %w", err)
 	}

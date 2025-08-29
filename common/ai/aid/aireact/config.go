@@ -3,6 +3,7 @@ package aireact
 import (
 	"context"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -126,6 +127,31 @@ type ReActConfig struct {
 	guardian *aicommon.AsyncGuardian
 
 	userInteractiveLimitedTimes int64
+
+	workdir string
+}
+
+func WithReActWorkdir(dir string) Option {
+	return func(opt *ReActConfig) {
+		existedDir := utils.IsDir(dir)
+		if !existedDir {
+			log.Warnf("%s is not a directory", dir)
+			return
+		}
+		if filepath.IsAbs(dir) {
+			opt.workdir = dir
+			return
+		}
+
+		dir, err := filepath.Abs(dir)
+		if err != nil {
+			log.Warnf("%s is not a directory", dir)
+			return
+		}
+		if dir != "" {
+			opt.workdir = dir
+		}
+	}
 }
 
 func (cfg *ReActConfig) GetUserInteractiveLimitedTimes() int64 {
@@ -500,6 +526,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		userInteractiveLimitedTimes: 3, // Default to 3 times
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
+		workdir:                     consts.GetDefaultBaseHomeDir(),
 	}
 
 	emitMutex := new(sync.Mutex)
