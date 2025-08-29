@@ -4,6 +4,7 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"os"
 	"runtime"
 	"text/template"
@@ -163,6 +164,7 @@ func (pm *PromptManager) GenerateLoopPrompt(
 
 	// Set working directory
 	if cwd, err := os.Getwd(); err == nil {
+		log.Infof("start to get working dir: %s", cwd)
 		data.WorkingDir = cwd
 		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
 	}

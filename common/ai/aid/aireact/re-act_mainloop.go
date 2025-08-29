@@ -144,6 +144,7 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			log.Errorf("Failed to get available tools: %v", err)
 			return utils.Errorf("failed to get available tools: %v", err)
 		}
+		log.Infof("start to generate main loop prompt with %d tools", len(tools))
 		prompt := r.generateMainLoopPrompt(userQuery, tools)
 		// Use aid.CallAITransaction for robust AI calling with retry and error handling
 		var action *aicommon.Action
