@@ -53,7 +53,7 @@ func CreateEntity(db *gorm.DB, entity *schema.ERModelEntity) error {
 
 func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
-	db = db.Model(&schema.ERModelEntity{}).Preload("Attributes").Preload("IncomingRelationships").Preload("OutgoingRelationships")
+	db = db.Model(&schema.ERModelEntity{})
 	if err := db.Where("id = ?", id).First(&entity).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil, utils.Errorf("entity not found")
