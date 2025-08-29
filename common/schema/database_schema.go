@@ -109,6 +109,9 @@ var ProjectTables = []interface{}{
 	// Note
 	&Note{},
 
+	// Custom Code Signing
+	&CustomCodeSigning{},
+
 	// AI
 	&AiCoordinatorRuntime{},
 	&AiCheckpoint{},

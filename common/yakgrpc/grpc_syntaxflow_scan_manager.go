@@ -163,7 +163,7 @@ func (m *SyntaxFlowScanManager) SaveTask() error {
 	m.taskRecorder.Config, _ = json.Marshal(m.config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
 
-	if m.status == schema.SYNTAXFLOWSCAN_DONE {
+	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
 		levelCounts, err := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},
 		})
