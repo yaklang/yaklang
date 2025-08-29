@@ -1,13 +1,11 @@
 package sfreport
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -89,19 +87,16 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk) (*DataFlowPath, error) {
 		return nil, utils.Errorf("get value by risk failed: %v", err)
 	}
 
-	vg := ssaapi.NewValueGraph(value)
-	nodes, edges := coverNodeAndEdgeInfos(vg, risk.ProgramName, risk)
-
-	var buf bytes.Buffer
-	vg.GenerateDOT(&buf)
-	dotGraph := buf.String()
+	dotGraph := ssaapi.NewDotGraph()
+	value.GenerateGraph(dotGraph)
+	nodes, edges := coverNodeAndEdgeInfos(dotGraph, risk.ProgramName, risk)
 
 	path := &DataFlowPath{
 		PathID:      fmt.Sprintf("path_%d", risk.ID),
 		Description: generatePathDescription(risk),
 		Nodes:       nodes,
 		Edges:       edges,
-		DotGraph:    dotGraph,
+		DotGraph:    dotGraph.String(),
 	}
 
 	return path, nil
@@ -113,23 +108,21 @@ func generatePathDescription(risk *schema.SSARisk) string {
 }
 
 // coverNodeAndEdgeInfos converts graph nodes and edges to NodeInfo and EdgeInfo
-func coverNodeAndEdgeInfos(graph *ssaapi.ValueGraph, programName string, risk *schema.SSARisk) ([]*NodeInfo, []*EdgeInfo) {
-	nodes := make([]*NodeInfo, 0, len(graph.Node2Value))
+func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, programName string, risk *schema.SSARisk) ([]*NodeInfo, []*EdgeInfo) {
+	nodes := make([]*NodeInfo, 0, graph.NodeCount())
 	edges := make([]*EdgeInfo, 0)
 
-	nodeMap := make(map[int]*NodeInfo)
-	for id, node := range graph.Node2Value {
-		codeRange, source := ssaapi.CoverCodeRange(programName, node.GetRange())
+	graph.ForEach(func(s string, v *ssaapi.Value) {
+		codeRange, source := ssaapi.CoverCodeRange(v.GetRange())
 		nodeInfo := &NodeInfo{
-			NodeID:          dot.NodeName(id),
-			IRCode:          node.String(),
+			NodeID:          s,
+			IRCode:          v.String(),
 			SourceCode:      source,
 			SourceCodeStart: 0,
 			CodeRange:       codeRange,
 		}
 		nodes = append(nodes, nodeInfo)
-		nodeMap[id] = nodeInfo
-	}
+	})
 
 	edgeCache := make(map[string]struct{})
 	for edgeID, edge := range graph.Graph.GetAllEdges() {

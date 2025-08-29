@@ -26,7 +26,8 @@ $entry.*Builder().parse(* #-> as $source);
 check $source then "XXE Attack" else "XXE Safe";
 `
 	check := func(t *testing.T, result *ssaapi.SyntaxFlowResult) {
-		source := result.GetValues("source")
+		source := result.GetValues("source").Show()
+		fmt.Println(source.DotGraph())
 		if !utils.MatchAllOfSubString(
 			source.DotGraph(),
 			"fontcolor", "color",
@@ -38,13 +39,13 @@ check $source then "XXE Attack" else "XXE Safe";
 			"search-glob:*Builder",
 			"newInstance",
 		) {
-			//source.ShowDot()
 			t.Fatal("failed to match all of the substring, bad dot graph")
 		}
 
-		entry := result.GetValues("entry")
+		entry := result.GetValues("entry").Show()
 		require.NotNil(t, entry)
 		entryDot := entry.DotGraph()
+		fmt.Println(entryDot)
 		if !utils.MatchAllOfSubString(
 			entryDot,
 			"newInstance",
@@ -52,7 +53,6 @@ check $source then "XXE Attack" else "XXE Safe";
 			"newInstance",
 			"search-exact:newInstance",
 		) {
-			fmt.Println(entryDot)
 			t.Fatal("failed to match all of the substring, bad dot graph")
 		}
 	}

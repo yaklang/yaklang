@@ -212,6 +212,10 @@ func needCrossProcess(from *Value, to *Value) bool {
 	return from.GetFunction().GetId() != to.GetFunction().GetId()
 }
 
+func (c *processAnalysisManager) Path() []*Value {
+	return c.nodeStack.Values()
+}
+
 func (c *processAnalysisManager) pushNode(value *Value) {
 	c.nodeStack.Push(value)
 }

@@ -21,6 +21,18 @@ func NewStack[T any]() *Stack[T] {
 func (this *Stack[T]) Len() int {
 	return this.length
 }
+
+func (this *Stack[T]) Values(sizes ...int) []T {
+	size := this.Len()
+	if len(sizes) > 0 {
+		size = sizes[0]
+	}
+	ret := make([]T, 0, size)
+	for i := 0; i < size; i++ {
+		ret = append(ret, this.PeekN(i))
+	}
+	return ret
+}
 func (this *Stack[T]) Free() {
 	this.top = nil
 	this.last = nil

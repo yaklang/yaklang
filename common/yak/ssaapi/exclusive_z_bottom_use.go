@@ -71,13 +71,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 }
 
 func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
-	//defer func() {
-	//	for _, ret := range result {
-	//		if ret.GetEffectOn() != nil {
-	//			log.Errorf("BUG:(bottom-use's result is not a tree node,%s have depend on %s", ret.String(), ret.GetDependOn().String())
-	//		}
-	//	}
-	//}()
+
 	if v == nil {
 		return nil
 	}
@@ -100,6 +94,10 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	shouldExit, recoverStack := actx.check(v)
 
 	defer recoverStack()
+	defer func() {
+		actx.SavePath(result)
+	}()
+
 	if shouldExit {
 		return Values{v}
 	}
