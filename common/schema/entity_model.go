@@ -2,9 +2,10 @@ package schema
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 type EntityBaseInfo struct {
@@ -15,7 +16,7 @@ type EntityBaseInfo struct {
 
 // ERModelEntity 是知识库中所有事物的基本单元
 type ERModelEntity struct {
-	ID uint `gorm:"primarykey"`
+	gorm.Model
 
 	EntityBaseID uint // 外键，指向实体基础信息表
 
@@ -27,18 +28,13 @@ type ERModelEntity struct {
 
 	Attributes MetadataMap `gorm:"type:text" json:"attributes"`
 
-	ExtendAttributes []*ERModelAttribute `gorm:"foreignkey:OwnerID"`
-
-	OutgoingRelationship []*ERModelRelationship `gorm:"foreignkey:SourceEntityID"`
-	IncomingRelationship []*ERModelRelationship `gorm:"foreignkey:TargetEntityID"`
+	// ExtendAttributes []*ERModelAttribute `gorm:"foreignkey:OwnerID"`
+	// OutgoingRelationship []*ERModelRelationship `gorm:"foreignkey:SourceEntityID"`
+	// IncomingRelationship []*ERModelRelationship `gorm:"foreignkey:TargetEntityID"`
 }
 
 func (e *ERModelEntity) String() string {
-	content := e.EntityName
-	if e.Description != "" {
-		content += "\n\n" + e.Description
-	}
-	return content
+	return e.Dump()
 }
 
 func (e *ERModelEntity) Dump() string {
@@ -65,52 +61,58 @@ func (e *ERModelEntity) Dump() string {
 }
 
 // ERModelAttribute 记录了实体属性随时间的变化
-type ERModelAttribute struct {
-	ID             uint   `gorm:"primarykey"`
-	OwnerID        uint   `gorm:"index;not null"` // 外键
-	AttributeName  string // 属性名称
-	AttributeValue string // 属性值
-
-	UniqueIdentifier bool // 是否该属性是唯一标识符（如身份证号、社保号等）
-
-	Hash string
-}
-
-func (a *ERModelAttribute) Dump(prefix string) string {
-	if a == nil {
-		return prefix + "<nil ERModelAttribute>\n"
-	}
-	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("%sAttributeName:    %s\n", prefix, a.AttributeName))
-	sb.WriteString(fmt.Sprintf("%sAttributeValue:   %s\n", prefix, a.AttributeValue))
-	sb.WriteString(fmt.Sprintf("%sUniqueIdentifier: %t\n", prefix, a.UniqueIdentifier))
-	return sb.String()
-}
-
-func (a *ERModelAttribute) CalcHash() string {
-	return utils.CalcSha1(a.OwnerID, a.AttributeName, a.AttributeValue)
-}
-
-func (a *ERModelAttribute) BeforeSave() error {
-	a.Hash = a.CalcHash()
-	return nil
-}
+//type ERModelAttribute struct {
+//	ID             uint   `gorm:"primarykey"`
+//	OwnerID        uint   `gorm:"index;not null"` // 外键
+//	AttributeName  string // 属性名称
+//	AttributeValue string // 属性值
+//
+//	UniqueIdentifier bool // 是否该属性是唯一标识符（如身份证号、社保号等）
+//
+//	Hash string
+//}
+//
+//func (a *ERModelAttribute) Dump(prefix string) string {
+//	if a == nil {
+//		return prefix + "<nil ERModelAttribute>\n"
+//	}
+//	var sb strings.Builder
+//	sb.WriteString(fmt.Sprintf("%sAttributeName:    %s\n", prefix, a.AttributeName))
+//	sb.WriteString(fmt.Sprintf("%sAttributeValue:   %s\n", prefix, a.AttributeValue))
+//	sb.WriteString(fmt.Sprintf("%sUniqueIdentifier: %t\n", prefix, a.UniqueIdentifier))
+//	return sb.String()
+//}
+//
+//func (a *ERModelAttribute) CalcHash() string {
+//	return utils.CalcSha1(a.OwnerID, a.AttributeName, a.AttributeValue)
+//}
+//
+//func (a *ERModelAttribute) BeforeSave() error {
+//	a.Hash = a.CalcHash()
+//	return nil
+//}
 
 // ERModelRelationship 记录了实体间关系随时间的变化
 type ERModelRelationship struct {
-	ID                uint `gorm:"primarykey"`
-	EntityBaseID      uint
-	SourceEntityID    uint   // source 实体的id
-	RelationshipType  string // 关系的类型或类别
-	TargetEntityID    uint   // target 实体的id
-	DecisionRationale string // 该关系存在的理由或依据
-	Hash              string
+	gorm.Model
 
-	Attributes MetadataMap `gorm:"type:text" json:"attributes"`
+	EntityBaseID      uint        `gorm:"index;not null"`
+	SourceEntityID    uint        `gorm:"index"`
+	RelationshipType  string      `gorm:"index"`
+	TargetEntityID    uint        `gorm:"index"`
+	DecisionRationale string      // 该关系存在的理由或依据
+	Hash              string      `gorm:"unique_index"`
+	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
 }
 
 func (r *ERModelRelationship) CalcHash() string {
-	return utils.CalcSha1(r.SourceEntityID, r.RelationshipType, r.TargetEntityID, r.Attributes)
+	return utils.CalcSha1(
+		r.EntityBaseID,
+		r.SourceEntityID,
+		r.RelationshipType,
+		r.TargetEntityID,
+		r.Attributes,
+	)
 }
 
 func (r *ERModelRelationship) BeforeSave() error {
@@ -120,5 +122,10 @@ func (r *ERModelRelationship) BeforeSave() error {
 
 func init() {
 	// 注册数据库表结构到系统中
-	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE, &EntityBaseInfo{}, &ERModelEntity{}, &ERModelAttribute{}, &ERModelRelationship{})
+	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE,
+		&EntityBaseInfo{},
+		&ERModelEntity{},
+		//&ERModelAttribute{},
+		&ERModelRelationship{},
+	)
 }

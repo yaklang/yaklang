@@ -3,13 +3,15 @@ package entitybase
 import (
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"strings"
 )
 
 const (
@@ -143,24 +145,26 @@ func (eb *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity)
 		return entities, nil
 	}
 
+	return nil, nil
+
 	// unique attribute query
-	var attributeIndexedId []uint
-	for _, attribute := range entity.ExtendAttributes {
-		if attribute.UniqueIdentifier {
-			id, ok := yakit.UniqueAttributesIndexEntity(eb.db, attribute.AttributeName, attribute.AttributeValue)
-			if ok {
-				attributeIndexedId = append(attributeIndexedId, id...)
-			}
-		}
-	}
+	//var attributeIndexedId []uint
+	//for _, attribute := range entity.ExtendAttributes {
+	//	if attribute.UniqueIdentifier {
+	//		id, ok := yakit.UniqueAttributesIndexEntity(eb.db, attribute.AttributeName, attribute.AttributeValue)
+	//		if ok {
+	//			attributeIndexedId = append(attributeIndexedId, id...)
+	//		}
+	//	}
+	//}
 
-	if len(attributeIndexedId) == 0 {
-		return nil, nil
-	}
-
-	return eb.queryEntities(&yakit.EntityFilter{
-		ID: attributeIndexedId,
-	})
+	//if len(attributeIndexedId) == 0 {
+	//	return nil, nil
+	//}
+	//
+	//return eb.queryEntities(&yakit.EntityFilter{
+	//	ID: attributeIndexedId,
+	//})
 }
 
 func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
@@ -248,6 +252,22 @@ func (eb *EntityRepository) AddRelationship(sourceID uint, targetID uint, Relati
 	return yakit.AddRelationship(eb.db, sourceID, targetID, RelationshipType, decisionRationale, attr)
 }
 
+func (eb *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
+	var relationships []*schema.ERModelRelationship
+	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("source_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+		return nil, err
+	}
+	return relationships, nil
+}
+
+func (eb *EntityRepository) QueryIncomingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
+	var relationships []*schema.ERModelRelationship
+	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("target_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+		return nil, err
+	}
+	return relationships, nil
+}
+
 // --- ER Model Operations ---
 func (eb *EntityRepository) GetSubERModel(keyword string, maxDepths ...int) (*ERModel, error) {
 	allEntities := make([]*schema.ERModelEntity, 0)
@@ -302,11 +322,18 @@ func (eb *EntityRepository) GetSubERModel(keyword string, maxDepths ...int) (*ER
 		}
 		// 准备要遍历的关系列表
 		RelationshipsToExplore := make([]*schema.ERModelRelationship, 0)
-		if currentEntity.OutgoingRelationship != nil {
-			RelationshipsToExplore = append(RelationshipsToExplore, currentEntity.OutgoingRelationship...)
+
+		// query outgoing and incoming relationships
+		if outgoings, err := eb.QueryOutgoingRelationships(currentEntity); err == nil {
+			RelationshipsToExplore = append(RelationshipsToExplore, outgoings...)
+		} else {
+			log.Errorf("query outgoing failed: %v", err)
 		}
-		if currentEntity.IncomingRelationship != nil {
-			RelationshipsToExplore = append(RelationshipsToExplore, currentEntity.IncomingRelationship...)
+
+		if incomings, err := eb.QueryIncomingRelationships(currentEntity); err == nil {
+			RelationshipsToExplore = append(RelationshipsToExplore, incomings...)
+		} else {
+			log.Errorf("query incoming failed: %v", err)
 		}
 
 		for _, Relationship := range RelationshipsToExplore {
