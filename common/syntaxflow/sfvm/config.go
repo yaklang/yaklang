@@ -2,6 +2,7 @@ package sfvm
 
 import (
 	"context"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -10,6 +11,7 @@ func NewConfig(opts ...Option) *Config {
 	c := &Config{
 		ctx:      context.Background(),
 		FailFast: true,
+		Mutex:    sync.Mutex{},
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -27,6 +29,7 @@ type Config struct {
 	onResultCapturedCallbacks []ResultCapturedCallback
 	ctx                       context.Context
 	processCallback           func(idx int, msg string)
+	Mutex                     sync.Mutex
 }
 
 func (c *Config) GetContext() context.Context {
