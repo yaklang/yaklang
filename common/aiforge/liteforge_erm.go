@@ -317,8 +317,8 @@ func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 
 	for _, RelationshipParams := range ermResult.GetInvokeParamsArray("relationship_list") {
 		r := &TemporaryRelationship{
-			SourceTemporaryName:  RelationshipParams.GetString("source"),
-			TargetTemporaryName:  RelationshipParams.GetString("target"),
+			SourceTemporaryName:  normalizeEntityName(RelationshipParams.GetString("source")),
+			TargetTemporaryName:  normalizeEntityName(RelationshipParams.GetString("target")),
 			RelationshipType:     RelationshipParams.GetString("relationship_type"),
 			DecorationAttributes: RelationshipParams.GetString("decoration_attributes"),
 			DecisionRationale:    RelationshipParams.GetString("decision_rationale"),
@@ -471,33 +471,34 @@ func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, opti
 	}
 	swg.Wait()
 
-	for _, tempShip := range erm.Relationships {
-		sourceEntity, ok := currentEntities.Get(tempShip.SourceTemporaryName)
+	getOrCreateEntity := func(name string) (*schema.ERModelEntity, error) {
+		e, ok := currentEntities.Get(name)
 		if !ok {
-			analyzeConfig.AnalyzeLog("not found entity [%s], create it", tempShip.SourceTemporaryName)
-			sourceEntity = &schema.ERModelEntity{
-				EntityName: tempShip.SourceTemporaryName,
+			analyzeConfig.AnalyzeLog("not found entity [%s], create it", name)
+			e = &schema.ERModelEntity{
+				EntityName: name,
 			}
-			err := eb.CreateEntity(sourceEntity)
+			err := eb.CreateEntity(e)
 			if err != nil {
-				analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempShip.SourceTemporaryName, err)
-				return err
+				return nil, utils.Errorf("failed to create entity [%s]: %v", name, err)
 			}
+			currentEntities.Set(name, e)
+		}
+		return e, nil
+	}
 
+	for _, tempShip := range erm.Relationships {
+		targetEntity, err := getOrCreateEntity(tempShip.SourceTemporaryName)
+		if err != nil {
+			analyzeConfig.AnalyzeLog("failed to get entity [%s]: %v", tempShip.SourceTemporaryName, err)
+			continue
 		}
-		targetEntity, ok := currentEntities.Get(tempShip.TargetTemporaryName)
-		if !ok {
-			analyzeConfig.AnalyzeLog("not found entity [%s], create it", tempShip.SourceTemporaryName)
-			targetEntity = &schema.ERModelEntity{
-				EntityName: tempShip.SourceTemporaryName,
-			}
-			err := eb.CreateEntity(targetEntity)
-			if err != nil {
-				analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempShip.SourceTemporaryName, err)
-				return err
-			}
+		sourceEntity, err := getOrCreateEntity(tempShip.TargetTemporaryName)
+		if err != nil {
+			analyzeConfig.AnalyzeLog("failed to get entity [%s]: %v", tempShip.TargetTemporaryName, err)
+			continue
 		}
-		err := eb.AddRelationship(sourceEntity.ID, targetEntity.ID, tempShip.RelationshipType, tempShip.DecisionRationale, map[string]any{
+		err = eb.AddRelationship(sourceEntity.ID, targetEntity.ID, tempShip.RelationshipType, tempShip.DecisionRationale, map[string]any{
 			"decoration_attr": tempShip.DecorationAttributes,
 		})
 		if err != nil {
@@ -523,7 +524,7 @@ func AnalyzeERM(path string, option ...any) (*entitybase.EntityRepository, error
 		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
 	}
 	db := consts.GetGormProfileDatabase()
-	eb, err := entitybase.NewEntityBase(db, analyzeConfig.KnowledgeBaseName, analyzeConfig.KnowledgeBaseDesc)
+	eb, err := entitybase.NewEntityRepository(db, analyzeConfig.KnowledgeBaseName, analyzeConfig.KnowledgeBaseDesc)
 	if err != nil {
 		return nil, err
 	}
