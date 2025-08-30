@@ -336,13 +336,13 @@ func WithDisableToolsName(toolsName ...string) Option {
 	}
 }
 
-func WithTools(tool *aitool.Tool) Option {
+func WithTools(tool ...*aitool.Tool) Option {
 	return func(cfg *ReActConfig) {
 		if cfg.aiToolManagerOption == nil {
 			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
 		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
-			buildinaitools.WithExtendTools([]*aitool.Tool{tool}, true))
+			buildinaitools.WithExtendTools(tool, true))
 	}
 }
 
