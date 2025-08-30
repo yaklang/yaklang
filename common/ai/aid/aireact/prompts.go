@@ -158,6 +158,7 @@ type ToolReSelectPromptData struct {
 	Nonce              string
 	OldTool            *aitool.Tool
 	ToolList           []*aitool.Tool
+	Schema             string
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -337,7 +338,7 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 }
 
 // GenerateToolReSelectPrompt generates tool reselection prompt using template
-func (pm *PromptManager) GenerateToolReSelectPrompt(oldTool *aitool.Tool, toolList []*aitool.Tool) (string, error) {
+func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool) (string, error) {
 	data := &ToolReSelectPromptData{
 		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
@@ -345,6 +346,7 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(oldTool *aitool.Tool, toolLi
 		Nonce:       utils.RandStringBytes(4),
 		OldTool:     oldTool,
 		ToolList:    toolList,
+		Schema:      getReSelectTool(noUserInteract),
 	}
 
 	if r := pm.react.GetCurrentTask(); r != nil {

@@ -34,23 +34,5 @@ OS/Arch: {{ .OSArch }}
 如果你决定使用某个工具，请按照以下Schema的要求输出JSON
 
 ```schema
-{
-    "$schema": "http://json-schema.org/draft-07/schema#"
-    "type": "object",
-    "required": [ "tool", "@action" ],
-    "properties": {
-        "@action": {
-            "type": "string",
-            "enum": ["require-tool", "abandon"],
-            "x-rules": [
-                "如果你决定使用某个工具，请选择require-tool，设置tool为你选择的工具名称",
-                "如果你认为当前任务不需要工具，请选择abandon，设置tool为空字符串",
-            ]
-        },
-        "tool": {
-            "type": "string",
-            "description": "工具名称"
-        }
-    }
-}
+{{ .Schema }}
 ```
