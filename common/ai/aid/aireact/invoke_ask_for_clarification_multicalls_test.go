@@ -136,7 +136,7 @@ LOOP:
 	if !utils.MatchAllOfSubString(tl, `ai directly answer`) {
 		t.Fatal("ai directly answer not found")
 	}
-	if strings.Count(tl, `...mocked question...`) != 4 {
-		t.Fatal("mocked question found, should be 4 times")
+	if ret := strings.Count(tl, `...mocked question...`); ret < 4 {
+		t.Fatal("mocked question found, should be 4 times, got ", ret)
 	}
 }

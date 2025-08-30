@@ -17,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+func mockedToolCallingWrongTool_Abandon(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
@@ -38,7 +38,7 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 
 	if utils.MatchAllOfSubString(prompt, "require-tool", "abandon") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "require-tool", "tool": "echo"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "abandon", "abandon_reason": "[mocked] cannot found proper tool, abandon it"}`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -66,7 +66,7 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
-func TestReAct_ToolUse_WrongTool(t *testing.T) {
+func TestReAct_ToolUse_WrongTool_Abondon(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -108,7 +108,7 @@ func TestReAct_ToolUse_WrongTool(t *testing.T) {
 
 	ins, err := NewReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCallingWrongTool(i, r, "sleep")
+			return mockedToolCallingWrongTool_Abandon(i, r, "sleep")
 		}),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -141,7 +141,7 @@ func TestReAct_ToolUse_WrongTool(t *testing.T) {
 	reActFinished := false
 	var iid string
 
-	wrongToolDone := false
+	wrongToolAbandon := false
 LOOP:
 	for {
 		select {
@@ -151,13 +151,13 @@ LOOP:
 				reviewed = true
 				fmt.Println(string(e.Content))
 				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
-				if !wrongToolDone {
+				if !wrongToolAbandon {
 					in <- &ypb.AIInputEvent{
 						IsInteractiveMessage: true,
 						InteractiveId:        utils.InterfaceToString(iid),
 						InteractiveJSONInput: `{"suggestion": "wrong_tool"}`,
 					}
-					wrongToolDone = true
+					wrongToolAbandon = true
 				} else {
 					in <- &ypb.AIInputEvent{
 						IsInteractiveMessage: true,
@@ -203,8 +203,8 @@ LOOP:
 		t.Fatal("Tool was called, but should have been rejected")
 	}
 
-	if !echoCalled {
-		t.Fatal("Expected echo to be called, but it wasn't")
+	if echoCalled {
+		t.Fatal("Expected echo not to be called, but it was")
 	}
 
 	if !toolCallOutputEvent {
@@ -227,7 +227,7 @@ LOOP:
 	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct loop finished END[1]`) {
 		t.Fatal("timeline does not contain ReAct iteration")
 	}
-	if !utils.MatchAllOfSubString(tl, `mocked-echo-params`) {
+	if !utils.MatchAllOfSubString(tl, `[mocked] cannot found proper tool, abandon it`) {
 		t.Fatal("timeline does not contain mocked-echo-params")
 	}
 	fmt.Println("--------------------------------------")

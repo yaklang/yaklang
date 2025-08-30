@@ -17,7 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
+func mockedToolCallingWrongTool_AskForClarification(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
@@ -36,9 +36,16 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(prompt, "require-tool", "abandon", "ask-for-clarification") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "ask-for-clarification", "clarification_payload": { "question": "need information [mocked]" }}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	if utils.MatchAllOfSubString(prompt, "require-tool", "abandon") {
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "require-tool", "tool": "echo"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "require-tool", "tool": "echo" }`))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -66,7 +73,7 @@ func mockedToolCallingWrongTool(i aicommon.AICallerConfigIf, req *aicommon.AIReq
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
-func TestReAct_ToolUse_WrongTool(t *testing.T) {
+func TestReAct_ToolUse_WrongTool_AskForClarification(t *testing.T) {
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)
@@ -108,7 +115,7 @@ func TestReAct_ToolUse_WrongTool(t *testing.T) {
 
 	ins, err := NewReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedToolCallingWrongTool(i, r, "sleep")
+			return mockedToolCallingWrongTool_AskForClarification(i, r, "sleep")
 		}),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -141,23 +148,37 @@ func TestReAct_ToolUse_WrongTool(t *testing.T) {
 	reActFinished := false
 	var iid string
 
-	wrongToolDone := false
+	wrongToolAbandon := false
+	userInteractTrigger := false
+	_ = userInteractTrigger
+	userInteractFlag := utils.RandStringBytes(10)
 LOOP:
 	for {
 		select {
 		case e := <-out:
 			fmt.Println(e.String())
+			if e.Type == string(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE) {
+				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
+				userInteractTrigger = true
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        utils.InterfaceToString(iid),
+					InteractiveJSONInput: `{"suggestion": "` + userInteractFlag + `"}`,
+				}
+				continue
+			}
+
 			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
 				reviewed = true
 				fmt.Println(string(e.Content))
 				iid = utils.InterfaceToString(jsonpath.FindFirst(string(e.Content), "$.id"))
-				if !wrongToolDone {
+				if !wrongToolAbandon {
 					in <- &ypb.AIInputEvent{
 						IsInteractiveMessage: true,
 						InteractiveId:        utils.InterfaceToString(iid),
 						InteractiveJSONInput: `{"suggestion": "wrong_tool"}`,
 					}
-					wrongToolDone = true
+					wrongToolAbandon = true
 				} else {
 					in <- &ypb.AIInputEvent{
 						IsInteractiveMessage: true,
@@ -226,6 +247,12 @@ LOOP:
 	}
 	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct loop finished END[1]`) {
 		t.Fatal("timeline does not contain ReAct iteration")
+	}
+	if !utils.MatchAllOfSubString(tl, `need information [mocked]`) {
+		t.Fatal("timeline does not contain mocked-echo-params")
+	}
+	if !utils.MatchAllOfSubString(tl, userInteractFlag) {
+		t.Fatal("timeline does not contain user-interact-flag")
 	}
 	if !utils.MatchAllOfSubString(tl, `mocked-echo-params`) {
 		t.Fatal("timeline does not contain mocked-echo-params")
