@@ -9,6 +9,82 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func (r *ReAct) _invokeToolCall_ReviewWrongParam(tool *aitool.Tool, old aitool.InvokeParams, extraPrompt string) (aitool.InvokeParams, error) {
+	return nil, nil
+}
+
+func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, error) {
+	manager := r.config.aiToolManager
+
+	var tools []*aitool.Tool
+	if suggestionToolName != "" {
+		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
+			toolins, err := manager.GetToolByName(item)
+			if err != nil || utils.IsNil(toolins) {
+				if err != nil {
+					r.EmitError("error searching tool: %v", err)
+				} else {
+					r.EmitInfo("suggestion tool: %v but not found it.", suggestionToolName)
+				}
+			}
+			tools = append(tools, toolins)
+		}
+	}
+
+	var err error
+	if suggestionKeyword != "" {
+		searched, err := manager.SearchTools("", suggestionKeyword)
+		if err != nil {
+			r.EmitError("error searching tool: %v", err)
+		}
+		tools = append(tools, searched...)
+	}
+
+	if len(tools) <= 0 {
+		return oldTool, utils.Error("tool not found via user prompt")
+	}
+
+	prompt, err := r.config.promptManager(__prompt_toolReSelect, map[string]any{
+		"OldTool":  oldTool,
+		"ToolList": tools,
+	})
+	if err != nil {
+		return oldTool, err
+	}
+
+	var selecteddTool *aitool.Tool
+	transErr := t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+		request.SetTaskIndex(t.Index)
+		return t.CallAI(request)
+	}, func(rsp *aicommon.AIResponse) error {
+		action, err := aicommon.ExtractActionFromStream(
+			rsp.GetOutputStreamReader("call-tools", true, t.GetEmitter()),
+			"require-tool", "abandon")
+		if err != nil {
+			return err
+		}
+		switch action.ActionType() {
+		case "require-tool":
+			toolName := action.GetString("tool")
+			selecteddTool, err = t.aiToolManager.GetToolByName(toolName)
+			if err != nil {
+				return utils.Errorf("error searching tool: %v", err)
+			}
+		case "abandon":
+		default:
+			return utils.Errorf("unknown action type: %s", action.ActionType())
+		}
+		return nil
+	})
+	if transErr != nil {
+		return oldTool, transErr
+	}
+	if selecteddTool == nil {
+		return oldTool, nil
+	}
+	return selecteddTool, nil
+}
+
 // handleRequireTool handles tool requirement action using aicommon.ToolCaller
 func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, error) {
 	// Find the required tool
@@ -29,6 +105,8 @@ func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, er
 		aicommon.WithToolCaller_GenerateToolParamsBuilder(func(tool *aitool.Tool, toolName string) (string, error) {
 			return r.generateToolParamsPrompt(tool, toolName)
 		}),
+		aicommon.WithToolCaller_ReviewWrongTool(r._invokeToolCall_ReviewWrongTool),
+		aicommon.WithToolCaller_ReviewWrongParam(r._invokeToolCall_ReviewWrongParam),
 	)
 	if err != nil {
 		return nil, false, utils.Errorf("failed to create tool caller: %v", err)
