@@ -13,7 +13,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(tool *aitool.Tool, old aitool.I
 	return nil, nil
 }
 
-func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, error) {
+func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestionToolName, suggestionKeyword string) (*aitool.Tool, bool, error) {
 	manager := r.config.aiToolManager
 
 	var tools []*aitool.Tool
@@ -49,31 +49,63 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 
 	if len(tools) <= 0 {
 		r.addToTimeline("re-select-tool", "No tools available for selection, no enabled tools, skip tool re-selection.")
-		return nil, utils.Error("tool not found or no tools allowed next")
+		return nil, true, nil
 	}
 
-	prompt, err := r.config.promptManager.GenerateToolReSelectPrompt(oldTool, tools)
+	var redo bool
+	var selectedTool *aitool.Tool
+	var answerDirectly bool
+	noUserInteract := r.config.enableUserInteract
+REDO:
+	redo = false
+	prompt, err := r.config.promptManager.GenerateToolReSelectPrompt(noUserInteract, oldTool, tools)
 	if err != nil {
-		return oldTool, err
+		return oldTool, true, err
 	}
-
-	var selecteddTool *aitool.Tool
 	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			action, err := aicommon.ExtractActionFromStream(
 				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
-				"require-tool", "abandon")
+				"require-tool", "abandon", "ask-for-clarification")
 			if err != nil {
 				return err
 			}
 			switch action.ActionType() {
+			case "ask-for-clarification":
+				payloads := action.GetInvokeParams(`clarification_payload`)
+				question := payloads.GetString("question")
+				options := payloads.GetStringSlice("options", []string{})
+				suggestion, extra, err := r.RequireUserInteract(question, options)
+				if err != nil {
+					answerDirectly = true
+					return nil
+				}
+				redo = true
+				r.addToTimeline(
+					"user-suggestion-after-clarification",
+					"Question: "+question+"\nAnswer: "+suggestion+"\n"+extra,
+				)
+				noUserInteract = true
+				return nil
 			case "require-tool":
 				toolName := action.GetString("tool")
-				selecteddTool, err = manager.GetToolByName(toolName)
+				selectedTool, err = manager.GetToolByName(toolName)
 				if err != nil {
+					r.addToTimeline("re-select-tool-failed", fmt.Sprintf("error searching tool[%v]: %v", toolName, err))
 					return utils.Errorf("error searching tool: %v", err)
 				}
+				r.addToTimeline("re-select-tool", fmt.Sprintf("AI Auto Re-Selected tool: %s", toolName))
 			case "abandon":
+				reason := action.GetString("abandon_reason")
+				r.addToTimeline(
+					"re-select-tool-abandoned",
+					fmt.Sprintf(
+						"AI Abandoned tool selection, no tool will be used. \nReason: %v",
+						reason,
+					),
+				)
+				r.EmitInfo("AI Abandoned tool selection, no tool will be used. Reason: %v", reason)
+				answerDirectly = true
 				return nil
 			default:
 				return utils.Errorf("unknown action type: %s", action.ActionType())
@@ -81,12 +113,18 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 			return nil
 		})
 	if transErr != nil {
-		return oldTool, transErr
+		return oldTool, true, transErr
 	}
-	if selecteddTool == nil {
-		return oldTool, nil
+
+	if redo {
+		noUserInteract = false
+		goto REDO
 	}
-	return selecteddTool, nil
+
+	if selectedTool == nil {
+		return oldTool, answerDirectly, nil
+	}
+	return selectedTool, answerDirectly, nil
 }
 
 // handleRequireTool handles tool requirement action using aicommon.ToolCaller

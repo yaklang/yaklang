@@ -100,7 +100,7 @@ type HandleToolUseNext string
 //	}
 //}
 
-func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, error) {
+func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionToolName string, suggestionKeyword string) (*aitool.Tool, bool, error) {
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
@@ -126,7 +126,11 @@ func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 	}
 
 	if len(tools) <= 0 {
-		return oldTool, utils.Error("tool not found via user prompt")
+		tools, _ = t.aiToolManager.GetEnableTools()
+	}
+
+	if len(tools) <= 0 {
+		return oldTool, true, utils.Error("tool not found via user prompt")
 	}
 
 	prompt, err := t.quickBuildPrompt(__prompt_toolReSelect, map[string]any{
@@ -134,10 +138,11 @@ func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 		"ToolList": tools,
 	})
 	if err != nil {
-		return oldTool, err
+		return oldTool, true, err
 	}
 
 	var selecteddTool *aitool.Tool
+	var directlyAnswer bool
 	transErr := t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
 		return t.CallAI(request)
@@ -156,18 +161,20 @@ func (t *AiTask) toolReviewPolicy_wrongTool(oldTool *aitool.Tool, suggestionTool
 				return utils.Errorf("error searching tool: %v", err)
 			}
 		case "abandon":
+			directlyAnswer = true
+			return nil
 		default:
 			return utils.Errorf("unknown action type: %s", action.ActionType())
 		}
 		return nil
 	})
 	if transErr != nil {
-		return oldTool, transErr
+		return oldTool, true, transErr
 	}
 	if selecteddTool == nil {
-		return oldTool, nil
+		return oldTool, directlyAnswer, nil
 	}
-	return selecteddTool, nil
+	return selecteddTool, directlyAnswer, nil
 }
 
 func (t *AiTask) toolReviewPolicy_wrongParam(tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error) {

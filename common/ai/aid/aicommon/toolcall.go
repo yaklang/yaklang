@@ -27,14 +27,14 @@ type ToolCaller struct {
 	onCallToolStart func(callToolId string)
 	onCallToolEnd   func(callToolId string)
 
-	reviewWrongToolHandler  func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, error)
+	reviewWrongToolHandler  func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error)
 	reviewWrongParamHandler func(tool *aitool.Tool, oldParam aitool.InvokeParams, suggestion string) (aitool.InvokeParams, error)
 }
 
 type ToolCallerOption func(tc *ToolCaller)
 
 func WithToolCaller_ReviewWrongTool(
-	handler func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, error),
+	handler func(tool *aitool.Tool, newToolName, keyword string) (*aitool.Tool, bool, error),
 ) ToolCallerOption {
 	return func(tc *ToolCaller) {
 		tc.reviewWrongToolHandler = handler
@@ -258,7 +258,11 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 		params := ep.GetParams()
 		emitter.EmitInteractiveRelease(ep.GetId(), params)
 		config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-		config.CallAfterReview(ep.GetSeq(), "tool use review", params)
+		config.CallAfterReview(
+			ep.GetSeq(),
+			fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name),
+			params,
+		)
 		if params == nil {
 			emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
 			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))
