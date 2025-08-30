@@ -44,38 +44,34 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 		return oldTool, utils.Error("tool not found via user prompt")
 	}
 
-	prompt, err := r.config.promptManager(__prompt_toolReSelect, map[string]any{
-		"OldTool":  oldTool,
-		"ToolList": tools,
-	})
+	prompt, err := r.config.promptManager.GenerateToolReSelectPrompt(oldTool, tools)
 	if err != nil {
 		return oldTool, err
 	}
 
 	var selecteddTool *aitool.Tool
-	transErr := t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-		request.SetTaskIndex(t.Index)
-		return t.CallAI(request)
-	}, func(rsp *aicommon.AIResponse) error {
-		action, err := aicommon.ExtractActionFromStream(
-			rsp.GetOutputStreamReader("call-tools", true, t.GetEmitter()),
-			"require-tool", "abandon")
-		if err != nil {
-			return err
-		}
-		switch action.ActionType() {
-		case "require-tool":
-			toolName := action.GetString("tool")
-			selecteddTool, err = t.aiToolManager.GetToolByName(toolName)
+	transErr := aicommon.CallAITransaction(r.config, prompt, r.config.CallAI,
+		func(rsp *aicommon.AIResponse) error {
+			action, err := aicommon.ExtractActionFromStream(
+				rsp.GetOutputStreamReader("call-tools", true, r.Emitter),
+				"require-tool", "abandon")
 			if err != nil {
-				return utils.Errorf("error searching tool: %v", err)
+				return err
 			}
-		case "abandon":
-		default:
-			return utils.Errorf("unknown action type: %s", action.ActionType())
-		}
-		return nil
-	})
+			switch action.ActionType() {
+			case "require-tool":
+				toolName := action.GetString("tool")
+				selecteddTool, err = manager.GetToolByName(toolName)
+				if err != nil {
+					return utils.Errorf("error searching tool: %v", err)
+				}
+			case "abandon":
+				return nil
+			default:
+				return utils.Errorf("unknown action type: %s", action.ActionType())
+			}
+			return nil
+		})
 	if transErr != nil {
 		return oldTool, transErr
 	}
