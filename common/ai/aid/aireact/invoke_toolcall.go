@@ -18,6 +18,8 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
+		r.addToTimeline("User Suggested Tools: %s", suggestionToolName)
+		log.Infof("User Suggested Tools: %s", suggestionToolName)
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
 			toolins, err := manager.GetToolByName(item)
 			if err != nil || utils.IsNil(toolins) {
@@ -33,6 +35,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 
 	var err error
 	if suggestionKeyword != "" {
+		r.addToTimeline("User Suggested Tool Keywords: %s", suggestionKeyword)
 		searched, err := manager.SearchTools("", suggestionKeyword)
 		if err != nil {
 			r.EmitError("error searching tool: %v", err)
@@ -41,7 +44,12 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 	}
 
 	if len(tools) <= 0 {
-		return oldTool, utils.Error("tool not found via user prompt")
+		tools, _ = manager.GetEnableTools()
+	}
+
+	if len(tools) <= 0 {
+		r.addToTimeline("re-select-tool", "No tools available for selection, no enabled tools, skip tool re-selection.")
+		return nil, utils.Error("tool not found or no tools allowed next")
 	}
 
 	prompt, err := r.config.promptManager.GenerateToolReSelectPrompt(oldTool, tools)

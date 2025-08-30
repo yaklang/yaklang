@@ -42,6 +42,9 @@ var aiReviewSchemaJSON string
 //go:embed prompts/answer/directly.txt
 var directlyAnswerPromptTemplate string
 
+//go:embed prompts/tool/wrong-tool.txt
+var wrongToolPromptTemplate string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
 	workdir              string
@@ -141,6 +144,20 @@ type DirectlyAnswerPromptData struct {
 	Nonce              string
 	Language           string
 	Schema             string
+}
+
+// ToolReSelectPromptData contains data for tool reselection prompt template
+type ToolReSelectPromptData struct {
+	CurrentTime        string
+	OSArch             string
+	WorkingDir         string
+	WorkingDirGlance   string
+	ConversationMemory string
+	Timeline           string
+	UserQuery          string
+	Nonce              string
+	OldTool            *aitool.Tool
+	ToolList           []*aitool.Tool
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -317,6 +334,40 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	}
 
 	return pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
+}
+
+// GenerateToolReSelectPrompt generates tool reselection prompt using template
+func (pm *PromptManager) GenerateToolReSelectPrompt(oldTool *aitool.Tool, toolList []*aitool.Tool) (string, error) {
+	data := &ToolReSelectPromptData{
+		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:   "",
+		Nonce:       utils.RandStringBytes(4),
+		OldTool:     oldTool,
+		ToolList:    toolList,
+	}
+
+	if r := pm.react.GetCurrentTask(); r != nil {
+		data.UserQuery = r.GetUserInput()
+	}
+
+	// Set working directory
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	}
+
+	// Set conversation memory
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data
