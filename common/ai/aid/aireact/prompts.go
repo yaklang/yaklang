@@ -4,9 +4,8 @@ import (
 	"bytes"
 	_ "embed"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"os"
 	"runtime"
+	"sync"
 	"text/template"
 	"time"
 
@@ -43,14 +42,25 @@ var aiReviewSchemaJSON string
 //go:embed prompts/answer/directly.txt
 var directlyAnswerPromptTemplate string
 
+//go:embed prompts/tool/wrong-tool.txt
+var wrongToolPromptTemplate string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
-	react *ReAct
+	workdir              string
+	glanceWorkdir        string
+	genWorkdirGlanceOnce sync.Once
+	react                *ReAct
 }
 
 // NewPromptManager creates a new prompt manager
-func NewPromptManager(react *ReAct) *PromptManager {
-	return &PromptManager{react: react}
+func NewPromptManager(react *ReAct, workdir string) *PromptManager {
+	return &PromptManager{
+		workdir:              workdir,
+		glanceWorkdir:        "",
+		react:                react,
+		genWorkdirGlanceOnce: sync.Once{},
+	}
 }
 
 // LoopPromptData contains data for the main loop prompt template
@@ -136,6 +146,28 @@ type DirectlyAnswerPromptData struct {
 	Schema             string
 }
 
+// ToolReSelectPromptData contains data for tool reselection prompt template
+type ToolReSelectPromptData struct {
+	CurrentTime        string
+	OSArch             string
+	WorkingDir         string
+	WorkingDirGlance   string
+	ConversationMemory string
+	Timeline           string
+	UserQuery          string
+	Nonce              string
+	OldTool            *aitool.Tool
+	ToolList           []*aitool.Tool
+	Schema             string
+}
+
+func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
+	pm.genWorkdirGlanceOnce.Do(func() {
+		pm.glanceWorkdir = filesys.Glance(wd)
+	})
+	return pm.glanceWorkdir
+}
+
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
 func (pm *PromptManager) GenerateLoopPrompt(
 	userQuery string,
@@ -162,11 +194,9 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		TopToolsCount:                  pm.react.config.topToolsCount,
 	}
 
-	// Set working directory
-	if cwd, err := os.Getwd(); err == nil {
-		log.Infof("start to get working dir: %s", cwd)
-		data.WorkingDir = cwd
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
 	// Get prioritized tools
@@ -246,9 +276,9 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolName, toolParams 
 	}
 
 	// Set working directory
-	if cwd, err := os.Getwd(); err == nil {
-		data.WorkingDir = cwd
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
 	// Set conversation memory
@@ -283,9 +313,9 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	}
 
 	// Set working directory
-	if cwd, err := os.Getwd(); err == nil {
-		data.WorkingDir = cwd
-		data.WorkingDirGlance = filesys.Glance(data.WorkingDir)
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
 	}
 
 	// Get prioritized tools
@@ -305,6 +335,41 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	}
 
 	return pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
+}
+
+// GenerateToolReSelectPrompt generates tool reselection prompt using template
+func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool) (string, error) {
+	data := &ToolReSelectPromptData{
+		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:   "",
+		Nonce:       utils.RandStringBytes(4),
+		OldTool:     oldTool,
+		ToolList:    toolList,
+		Schema:      getReSelectTool(noUserInteract),
+	}
+
+	if r := pm.react.GetCurrentTask(); r != nil {
+		data.UserQuery = r.GetUserInput()
+	}
+
+	// Set working directory
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	}
+
+	// Set conversation memory
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data

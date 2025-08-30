@@ -3,6 +3,7 @@ package aireact
 import (
 	"context"
 	"io"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -126,6 +127,31 @@ type ReActConfig struct {
 	guardian *aicommon.AsyncGuardian
 
 	userInteractiveLimitedTimes int64
+
+	workdir string
+}
+
+func WithReActWorkdir(dir string) Option {
+	return func(opt *ReActConfig) {
+		existedDir := utils.IsDir(dir)
+		if !existedDir {
+			log.Warnf("%s is not a directory", dir)
+			return
+		}
+		if filepath.IsAbs(dir) {
+			opt.workdir = dir
+			return
+		}
+
+		dir, err := filepath.Abs(dir)
+		if err != nil {
+			log.Warnf("%s is not a directory", dir)
+			return
+		}
+		if dir != "" {
+			opt.workdir = dir
+		}
+	}
 }
 
 func (cfg *ReActConfig) GetUserInteractiveLimitedTimes() int64 {
@@ -310,13 +336,13 @@ func WithDisableToolsName(toolsName ...string) Option {
 	}
 }
 
-func WithTools(tool *aitool.Tool) Option {
+func WithTools(tool ...*aitool.Tool) Option {
 	return func(cfg *ReActConfig) {
 		if cfg.aiToolManagerOption == nil {
 			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
 		cfg.aiToolManagerOption = append(cfg.aiToolManagerOption,
-			buildinaitools.WithExtendTools([]*aitool.Tool{tool}, true))
+			buildinaitools.WithExtendTools(tool, true))
 	}
 }
 
@@ -500,6 +526,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		userInteractiveLimitedTimes: 3, // Default to 3 times
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
+		workdir:                     consts.GetDefaultYakitBaseDir(),
 	}
 
 	emitMutex := new(sync.Mutex)

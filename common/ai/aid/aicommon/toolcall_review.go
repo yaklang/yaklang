@@ -1,9 +1,11 @@
 package aicommon
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 type ToolUseReviewSuggestion struct {
@@ -73,15 +75,21 @@ func (t *ToolCaller) review(
 			e.EmitError("no review wrong tool handler defined")
 			return targetTool, param, nil, HandleToolUseNext_Default, nil
 		}
-		newTool, err := t.reviewWrongToolHandler(
+		newTool, directlyAnswer, err := t.reviewWrongToolHandler(
 			targetTool,
 			userInput.GetString("suggestion_tool"),
 			userInput.GetString("suggestion_tool_keyword"),
 		)
 		if err != nil {
+			userCancelHandler(fmt.Sprintf("tool directly answer for review-wrong-tool failed: %v", err))
 			e.EmitError("error handling tool review: %v", err)
-			return targetTool, param, nil, HandleToolUseNext_Default, nil
+			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 		}
+		if directlyAnswer {
+			userCancelHandler("tool directly answer (user 's choice)")
+			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+		}
+
 		targetTool = newTool
 		result, directlyAnswer, err := t.CallTool(newTool)
 		if directlyAnswer {
