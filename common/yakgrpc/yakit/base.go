@@ -30,7 +30,7 @@ func init() {
 				err := f(consts.GetGormProjectDatabase())
 				elapsed := time.Since(start)
 				if elapsed > 2*time.Second {
-					log.Warnf("SQL execution took too long: %v", elapsed)
+					log.Warnf("SQL execution took too long: %v, function: %+v", elapsed, f)
 				}
 				count++
 				if count%1000 == 0 {
