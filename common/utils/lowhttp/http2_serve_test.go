@@ -35,6 +35,7 @@ func TestH2_Serve(t *testing.T) {
 		for {
 			conn, err := lis.Accept()
 			if err != nil {
+				t.Fatal(err)
 				return
 			}
 			err = serveH2(conn, conn, withH2Handler(func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {

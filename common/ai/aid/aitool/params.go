@@ -1,12 +1,40 @@
 package aitool
 
 import (
+	"bytes"
+	"reflect"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
-	"reflect"
 )
 
 type InvokeParams map[string]any
+
+func (r InvokeParams) Dump() string {
+	if r == nil || len(r) == 0 {
+		return ""
+	}
+
+	var buf bytes.Buffer
+	for k, v := range r {
+		buf.WriteString(utils.InterfaceToString(k))
+		buf.WriteString(":")
+		vStr := utils.EscapeInvalidUTF8Byte([]byte(utils.InterfaceToString(v)))
+		if vStr == "" {
+			buf.WriteString(` ""`)
+		} else if strings.Contains(vStr, `\n`) {
+			buf.WriteString(`\n`)
+			buf.WriteString(utils.PrefixLines(vStr, `  `))
+		} else {
+			buf.WriteString(" ")
+			buf.WriteString(vStr)
+		}
+		buf.WriteString("\n")
+	}
+
+	return buf.String()
+}
 
 func (p InvokeParams) GetObject(key string) InvokeParams {
 	if !utils.IsNil(p) {

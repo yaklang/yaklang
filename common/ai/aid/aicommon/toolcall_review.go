@@ -98,7 +98,8 @@ func (t *ToolCaller) review(
 		}
 		if err != nil {
 			e.EmitError("error handling tool review: %v", err)
-			return targetTool, param, nil, HandleToolUseNext_Default, nil
+			userCancelHandler("tool directly answer(recursive call tool failed)")
+			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 		}
 		return targetTool, param, result, HandleToolUseNext_Override, nil
 	case "wrong_params":
@@ -109,7 +110,8 @@ func (t *ToolCaller) review(
 		newParam, err := t.reviewWrongParamHandler(targetTool, param, userInput.GetString("extra_prompt"))
 		if err != nil {
 			e.EmitError("error handling tool review: %v", err)
-			return targetTool, param, nil, HandleToolUseNext_Default, nil
+			userCancelHandler("tool directly answer (err in review-wrong-params)")
+			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 		}
 		return targetTool, newParam, nil, HandleToolUseNext_Default, nil
 	case "direct_answer":
