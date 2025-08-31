@@ -273,6 +273,19 @@ func (h2Conn *http2ClientConn) readLoop() {
 
 // do request
 func (cs *http2ClientStream) doRequest() error {
+	// Check if h2Conn is nil to prevent panic
+	if cs.h2Conn == nil {
+		return utils.Error("h2 connection is nil")
+	}
+
+	// Check connection state before proceeding
+	cs.h2Conn.closeCond.L.Lock()
+	if cs.h2Conn.closed {
+		cs.h2Conn.closeCond.L.Unlock()
+		return utils.Error("h2 connection already closed")
+	}
+	cs.h2Conn.closeCond.L.Unlock()
+
 	cs.h2Conn.idleTimer.Reset(cs.h2Conn.idleTimeout) // new request reset timer
 	fr := cs.h2Conn.fr
 	if fr == nil {
@@ -367,9 +380,18 @@ func (cs *http2ClientStream) doRequest() error {
 	}
 
 	cs.h2Conn.frWriteMutex.Lock()
+	// Double check connection state while holding write mutex
+	if cs.h2Conn.closed {
+		cs.h2Conn.frWriteMutex.Unlock()
+		return utils.Error("h2 connection closed during write")
+	}
 	err := h2HeaderWriter(fr, cs.ID, false, cs.h2Conn.maxFrameSize, hPackBuf.Bytes())
 	cs.h2Conn.frWriteMutex.Unlock()
 	if err != nil {
+		// Check if error is due to closed connection, which should trigger retry
+		if strings.Contains(err.Error(), "use of closed connection") || strings.Contains(err.Error(), "broken pipe") {
+			return CreateStreamAfterGoAwayErr // This will trigger retry logic
+		}
 		cs.h2Conn.setClose()
 		return utils.Errorf("yak.h2 framer write headers failed: %s", err)
 	}
@@ -404,6 +426,14 @@ func (cs *http2ClientStream) doRequest() error {
 }
 
 func (cs *http2ClientStream) waitResponse(timeout time.Duration) (http.Response, []byte, error) {
+	// Check if h2Conn is nil to prevent panic
+	if cs.h2Conn == nil {
+		return http.Response{}, nil, utils.Error("h2 connection is nil")
+	}
+	if cs.h2Conn.conn == nil {
+		return http.Response{}, nil, utils.Error("h2 underlying connection is nil")
+	}
+
 	flow := fmt.Sprintf("%v->%v", cs.h2Conn.conn.LocalAddr(), cs.h2Conn.conn.RemoteAddr())
 	closeFlag := make(chan struct{}, 10) // get read frame err
 	go func() {

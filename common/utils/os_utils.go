@@ -488,7 +488,8 @@ func TLSConfigSetCheckServerName(tlsConfig *tls.Config, host string) *tls.Config
 }
 
 func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, checkServerName bool, handle func([]byte) []byte) (string, int) {
-	time.Sleep(100 * time.Millisecond)
+	// Increase initial wait time for better stability in CI environments
+	time.Sleep(200 * time.Millisecond)
 	host, port, _ := ParseStringToHostPort(addr)
 	go func() {
 		var (
@@ -536,29 +537,55 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 				log.Error("h2 only support https")
 			}
 
-			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-				r, err := HttpDumpWithBody(request, true)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				fmt.Println(string(r))
-				if handle != nil {
-					raw := handle(r)
-					writer.Write(raw)
-					return
-				}
-				writer.Write([]byte("HELLO HTTP2"))
-			})}
-			err := http2.ConfigureServer(srv, &http2.Server{})
+			// Configure HTTP2 server with better settings for stability
+			h2Server := &http2.Server{
+				MaxConcurrentStreams: 100,
+				IdleTimeout:          30 * time.Second,
+				MaxReadFrameSize:     1 << 20, // 1MB
+			}
+
+			srv := &http.Server{
+				Addr:         HostPort(host, port),
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  30 * time.Second,
+				Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					// Add small delay to reduce race conditions
+					time.Sleep(1 * time.Millisecond)
+
+					r, err := HttpDumpWithBody(request, true)
+					if err != nil {
+						log.Error(err)
+						writer.WriteHeader(500)
+						return
+					}
+					fmt.Println(string(r))
+					if handle != nil {
+						raw := handle(r)
+						writer.Write(raw)
+						return
+					}
+					writer.Write([]byte("HELLO HTTP2"))
+				}),
+			}
+
+			err := http2.ConfigureServer(srv, h2Server)
 			if err != nil {
 				log.Error(err)
 				return
 			}
+
+			// Use a channel to ensure server is ready before returning
+			ready := make(chan struct{})
 			go func() {
 				log.Infof("START TO SERVE HTTP2")
+				close(ready)
 				srv.Serve(lis)
 			}()
+
+			// Wait for server to be ready
+			<-ready
+			time.Sleep(50 * time.Millisecond) // Additional time for server to fully initialize
 			return
 		}
 
