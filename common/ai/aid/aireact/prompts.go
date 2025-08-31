@@ -45,6 +45,9 @@ var directlyAnswerPromptTemplate string
 //go:embed prompts/tool/wrong-tool.txt
 var wrongToolPromptTemplate string
 
+//go:embed prompts/tool/wrong-params.txt
+var wrongParamsPromptTemplate string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
 	workdir              string
@@ -158,6 +161,20 @@ type ToolReSelectPromptData struct {
 	Nonce              string
 	OldTool            *aitool.Tool
 	ToolList           []*aitool.Tool
+	Schema             string
+}
+
+// ReGenerateToolParamsPromptData contains data for tool parameter regeneration prompt template
+type ReGenerateToolParamsPromptData struct {
+	CurrentTime        string
+	OSArch             string
+	WorkingDir         string
+	WorkingDirGlance   string
+	ConversationMemory string
+	Timeline           string
+	UserQuery          string
+	Nonce              string
+	OldParams          string
 	Schema             string
 }
 
@@ -370,6 +387,36 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	}
 
 	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
+}
+
+// GenerateReGenerateToolParamsPrompt generates tool parameter regeneration prompt using template
+func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (string, error) {
+	data := &ReGenerateToolParamsPromptData{
+		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:   userQuery,
+		Nonce:       utils.RandStringBytes(4),
+		OldParams:   oldParams.Dump(),
+		Schema:      oldTool.ToJSONSchemaString(),
+	}
+
+	// Set working directory
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	}
+
+	// Set conversation memory
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	return pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data
