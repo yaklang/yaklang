@@ -21,14 +21,41 @@ var (
 
 func GetDefaultDocumentHelper() *yakdoc.DocumentHelper {
 	once.Do(func() {
+		if len(embedDocument) == 0 {
+			log.Warnf("embed document is empty, creating empty document helper")
+			defaultDocumentHelper = &yakdoc.DocumentHelper{
+				Libs:                make(map[string]*yakdoc.ScriptLib),
+				Functions:           make(map[string]*yakdoc.FuncDecl),
+				Instances:           make(map[string]*yakdoc.LibInstance),
+				StructMethods:       make(map[string]*yakdoc.ScriptLib),
+				DeprecatedFunctions: make([]*yakdoc.DeprecateFunction, 0),
+			}
+			return
+		}
+
 		buf, err := utils.GzipDeCompress(embedDocument)
 		if err != nil {
-			log.Warnf("load embed yak document error: %v", err)
+			log.Warnf("load embed yak document error: %v, creating empty document helper", err)
+			defaultDocumentHelper = &yakdoc.DocumentHelper{
+				Libs:                make(map[string]*yakdoc.ScriptLib),
+				Functions:           make(map[string]*yakdoc.FuncDecl),
+				Instances:           make(map[string]*yakdoc.LibInstance),
+				StructMethods:       make(map[string]*yakdoc.ScriptLib),
+				DeprecatedFunctions: make([]*yakdoc.DeprecateFunction, 0),
+			}
+			return
 		}
 
 		decoder := gob.NewDecoder(bytes.NewReader(buf))
 		if err := decoder.Decode(&defaultDocumentHelper); err != nil {
-			log.Warnf("load embed yak document error: %v", err)
+			log.Warnf("load embed yak document error: %v, creating empty document helper", err)
+			defaultDocumentHelper = &yakdoc.DocumentHelper{
+				Libs:                make(map[string]*yakdoc.ScriptLib),
+				Functions:           make(map[string]*yakdoc.FuncDecl),
+				Instances:           make(map[string]*yakdoc.LibInstance),
+				StructMethods:       make(map[string]*yakdoc.ScriptLib),
+				DeprecatedFunctions: make([]*yakdoc.DeprecateFunction, 0),
+			}
 		}
 	})
 	return defaultDocumentHelper
@@ -80,4 +107,10 @@ func GetDocumentInstance(libName, instanceName string) *yakdoc.LibInstance {
 		return nil
 	}
 	return lib.Instances[instanceName]
+}
+
+// IsDocumentAvailable returns true if the embedded document data is available
+func IsDocumentAvailable() bool {
+	helper := GetDefaultDocumentHelper()
+	return helper != nil && len(helper.Libs) > 0
 }
