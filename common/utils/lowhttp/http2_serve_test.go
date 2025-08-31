@@ -35,26 +35,28 @@ func TestH2_Serve(t *testing.T) {
 		for {
 			conn, err := lis.Accept()
 			if err != nil {
-				t.Fatal(err)
 				return
 			}
-			err = serveH2(conn, conn, withH2Handler(func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
-				spew.Dump(header)
-				if strings.Contains(string(header), "GET /"+token1+" HTTP/2") {
-					checkPass = true
-				}
-				resp := []byte(`HTTP/2 200 OK
+			go func() {
+				err = serveH2(conn, conn, withH2Handler(func(header []byte, body io.ReadCloser) ([]byte, io.ReadCloser, error) {
+					spew.Dump(header)
+					if strings.Contains(string(header), "GET /"+token1+" HTTP/2") {
+						checkPass = true
+					}
+					resp := []byte(`HTTP/2 200 OK
 Content-Type: text/plain
 Content-Length: 3
 
 abc`)
-				return resp, io.NopCloser(bytes.NewBufferString(token2)), nil
-			}))
-			if err != nil {
-				return
-			}
+					return resp, io.NopCloser(bytes.NewBufferString(token2)), nil
+				}))
+				if err != nil {
+					return
+				}
+			}()
 		}
 	}()
+
 	err = utils.WaitConnect(utils.HostPort("127.0.0.1", port), 5)
 	if err != nil {
 		t.Fatal(err)
