@@ -2,10 +2,11 @@ package chunkmaker
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/mimetype"
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )

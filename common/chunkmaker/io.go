@@ -21,7 +21,10 @@ func NewSimpleChunkWriter(dst *chanx.UnlimitedChan[Chunk]) *SimpleChunkWriter {
 var _ io.WriteCloser = (*SimpleChunkWriter)(nil)
 
 func (w *SimpleChunkWriter) Write(p []byte) (n int, err error) {
-	chunk := NewBufferChunk(p)
+	// Create a copy of the data to avoid sharing the underlying buffer
+	data := make([]byte, len(p))
+	copy(data, p)
+	chunk := NewBufferChunk(data)
 	w.dst.SafeFeed(chunk)
 	return len(p), nil
 }
