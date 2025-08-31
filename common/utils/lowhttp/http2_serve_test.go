@@ -2,22 +2,33 @@ package lowhttp
 
 import (
 	"bytes"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"net"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestH2_Serve(t *testing.T) {
-	port := utils.GetRandomAvailableTCPPort()
-	lis, err := net.Listen("tcp", utils.HostPort("127.0.0.1", port))
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
+	var port int
+	var lis net.Listener
+	var err error
+	for i := 0; i < 10; i++ {
+		port = utils.GetRandomAvailableTCPPort()
+		lis, err = net.Listen("tcp", utils.HostPort("127.0.0.1", port))
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+		break
+	}
+	if lis == nil {
+		t.Fatal("lis is nil")
 	}
 	defer lis.Close()
+
 	token1, token2 := utils.RandStringBytes(20), utils.RandStringBytes(200)
 	checkPass := false
 	go func() {
@@ -43,11 +54,15 @@ abc`)
 			}
 		}
 	}()
+	err = utils.WaitConnect(utils.HostPort("127.0.0.1", port), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	rsp, err := HTTPWithoutRedirect(WithHttps(false), WithHttp2(true), WithPacketBytes([]byte(`GET /`+token1+` HTTP/2
 Host: www.example.com
 
-abc`)), WithHost("127.0.0.1"), WithPort(port))
+abc`)), WithHost("127.0.0.1"), WithPort(port), WithRetryTimes(5))
 	if err != nil {
 		panic(err)
 	}
