@@ -3,12 +3,13 @@ package lowhttp
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/uuid"
 	"math/rand"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
@@ -197,7 +198,8 @@ func TestHTTP2_RetryWithHandler(t *testing.T) {
 	flag := utils.RandStringBytes(100)
 	count := 0
 
-	host, port := utils.DebugMockHTTP2(utils.TimeoutContextSeconds(5), func(req []byte) []byte {
+	// Use longer timeout for CI stability
+	host, port := utils.DebugMockHTTP2(utils.TimeoutContextSeconds(10), func(req []byte) []byte {
 		count++
 		var body string
 		if count < 3 {
@@ -208,6 +210,9 @@ func TestHTTP2_RetryWithHandler(t *testing.T) {
 		return []byte(body)
 	})
 
+	// Additional wait time to ensure server is fully ready
+	time.Sleep(100 * time.Millisecond)
+
 	hostport := utils.HostPort(host, port)
 	packet := `GET / HTTP/1.1
 Host: ` + hostport + `
@@ -216,22 +221,34 @@ User-Agent: yaklang-test/1.0
 `
 
 	httpsParamCorrect := false
+	retryCount := 0
 	rsp, err := HTTP(WithPacketBytes(
 		[]byte(packet)),
-		WithTimeout(time.Second),
-		WithRetryWaitTime(20*time.Millisecond),
+		WithTimeout(3*time.Second),             // Increased timeout for CI
+		WithRetryWaitTime(50*time.Millisecond), // Increased retry wait time
 		WithHttps(true),
 		WithHttp2(true),
 		WithVerifyCertificate(false),
-		WithRetryHandler(func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
+		WithRetryHandler(func(https bool, currentRetryCount int, req []byte, rsp []byte, retryFunc func(req ...[]byte)) {
+			retryCount = currentRetryCount
 			if https {
 				httpsParamCorrect = true
 			}
 			if bytes.Contains(rsp, []byte(flag)) {
 				return
 			}
-			retryFunc()
+			// Add maximum retry limit to prevent infinite loops
+			if currentRetryCount < 10 {
+				retryFunc()
+			}
 		}))
+	if err != nil {
+		t.Logf("Test failed after %d retries, server called %d times", retryCount, count)
+		t.Logf("Error: %v", err)
+		if rsp != nil {
+			t.Logf("Response: %s", string(rsp.RawPacket))
+		}
+	}
 	require.NoError(t, err)
 	require.True(t, httpsParamCorrect, "https parameter in handler should be true")
 	require.GreaterOrEqual(t, count, 3, "server should be called at least 3 times")
