@@ -205,7 +205,6 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 	}
 
 	invokeParams := aitool.InvokeParams{}
-	invokeParams.Set("runtime_id", t.runtimeId)
 
 	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
 		request.SetTaskIndex(t.task.GetIndex())

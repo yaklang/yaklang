@@ -96,6 +96,11 @@ func (a *ToolCaller) invoke(
 		}
 	}()
 
+	noRuntimeId := !params.Has("runtime_id")
+	if noRuntimeId {
+		params.Set("runtime_id", a.runtimeId)
+	}
+
 	execResult, execErr := tool.InvokeWithParams(
 		params,
 		aitool.WithStdout(stdoutWriter),
@@ -116,5 +121,14 @@ func (a *ToolCaller) invoke(
 	reqs := map[string]any{"suggestion": "finish"}
 	e.EmitInteractiveRelease(ep.GetId(), reqs)
 	c.CallAfterInteractiveEventReleased(ep.GetId(), reqs)
+
+	if execResult != nil && noRuntimeId {
+		if r, ok := execResult.Param.(aitool.InvokeParams); ok {
+			if r.Has("runtime_id") {
+				delete(r, "runtime_id")
+			}
+		}
+	}
+
 	return execResult, execErr
 }
