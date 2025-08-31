@@ -44,6 +44,8 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	program := mainProgram.createSubProgram(editor.GetPureSourceHash(), Library)
 	builder := program.GetAndCreateFunctionBuilder("", string(MainFunctionName))
 	//模拟编译，编译两次
+	origin := program.PreHandler()
+	defer program.SetPreHandler(origin)
 	program.SetPreHandler(true)
 	languageBuilder := languageConfig.LanguageBuilder
 	if languageBuilder == nil {
