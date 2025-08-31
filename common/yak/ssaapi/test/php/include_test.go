@@ -2,11 +2,15 @@ package php
 
 import (
 	_ "embed"
-	"github.com/stretchr/testify/require"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -49,4 +53,32 @@ include('files/'.$action.'.php'); //载入相应文件
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
+}
+
+func TestPHPIncludeOtherFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	writeFile := func(name, content string) {
+		fullPath := filepath.Join(tmpDir, name)
+		err := os.MkdirAll(filepath.Dir(fullPath), 0755)
+		require.NoError(t, err)
+		err = os.WriteFile(fullPath, []byte(content), 0644)
+		require.NoError(t, err)
+	}
+	writeFile("a.php", `<?php
+	if( !defined( 'DVWA_WEB_PAGE_TO_ROOT' ) ) {`)
+
+	writeFile("src/b.php", `<?php 
+include "../a.php";
+`)
+	writeFile("src/c.php", `<?php
+shell_exec("ls -la");
+`)
+
+	fs := filesys.NewRelLocalFs(filepath.Join(tmpDir, "src"))
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `
+shell_exec(* as $target )
+`, map[string][]string{
+		"target": {`"ls -la"`},
+	}, false, ssaapi.WithLanguage(ssaapi.PHP))
 }
