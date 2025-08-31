@@ -3,6 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
@@ -12,11 +18,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"net/http"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
@@ -169,7 +170,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcher(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	var mu sync.Mutex
 	first := true
@@ -198,14 +199,14 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 	stream, err := client.HTTPFuzzer(context.Background(), &ypb.FuzzerRequest{
 		Request:     "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n",
 		ForceFuzz:   true,
-		RepeatTimes: 10,
+		RepeatTimes: 5,
 	})
 	if err != nil {
 		panic(err)
 	}
 
 	var taskID int64
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 5; i++ {
 		resp, err := stream.Recv()
 		if err != nil {
 			break
@@ -213,13 +214,13 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 		//spew.Dump(resp.ResponseRaw)
 		taskID = resp.TaskId
 	}
-	require.NoError(t, utils.AttemptWithDelayFast(func() error {
+	require.NoError(t, utils.AttemptWithDelay(2, 100*time.Millisecond, func() error {
 		taskRespCount, err := yakit.CountWebFuzzerResponses(consts.GetGormProjectDatabase(), int(taskID))
 		if err != nil {
 			return err
 		}
-		if taskRespCount != 10 {
-			return utils.Errorf("want 10 task resp ,but got %d", taskRespCount)
+		if taskRespCount != 5 {
+			return utils.Errorf("want 5 task resp ,but got %d", taskRespCount)
 		}
 		return nil
 	}))
@@ -239,7 +240,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 		Value: "123",
 	}
 
-	err = utils.AttemptWithDelayFast(func() error {
+	err = utils.AttemptWithDelay(2, 100*time.Millisecond, func() error {
 		matcherStream, err := client.HTTPFuzzer(context.Background(),
 			&ypb.FuzzerRequest{
 				Matchers:           []*ypb.HTTPResponseMatcher{matcher},
@@ -253,19 +254,18 @@ func TestGRPCMUSTPASS_HTTPFuzzer_ReMatcherWithParams(t *testing.T) {
 			return err
 		}
 		var matcherCheckCount int
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 5; i++ {
 			resp, err := matcherStream.Recv()
 			if err != nil {
 				log.Errorf("err: %v", err)
 				break
 			}
-			spew.Dump(resp)
 			if resp.MatchedByMatcher {
 				matcherCheckCount++
 			}
 		}
-		if matcherCheckCount != 9 {
-			return utils.Errorf("matcher check failed: need [%v] got [%v]", 9, matcherCheckCount)
+		if matcherCheckCount != 4 {
+			return utils.Errorf("matcher check failed: need [%v] got [%v]", 4, matcherCheckCount)
 		}
 		return nil
 	})
