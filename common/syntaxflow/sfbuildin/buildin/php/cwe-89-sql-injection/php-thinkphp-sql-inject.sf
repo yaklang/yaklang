@@ -101,6 +101,8 @@ REFERENCE
 
 
 ./find|select|where|update|execute|exec/ as $function
+./^prepare$/ as $function
+
 <include('php-tp-all-extern-variable-param-source')> as $params
 
 $function(,* as $allParams,)
