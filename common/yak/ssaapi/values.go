@@ -1313,6 +1313,7 @@ func (v *Value) DotGraph() string {
 
 func (v *Value) NewDotGraph() *DotGraph {
 	dotGraph := NewDotGraph()
+	dotGraph.createNode(v, true)
 	v.GenerateGraph(dotGraph)
 	return dotGraph
 }

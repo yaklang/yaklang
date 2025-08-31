@@ -32,22 +32,29 @@ func removeEscapes(s string) string {
 	return s
 }
 
-func (g *DotGraph) createNode(value *Value) int {
+func (g *DotGraph) createNode(value *Value, isEntry ...bool) int {
 	if node, ok := g.value2Node[value]; ok {
 		return node
 	}
-	nodeId := 0
+	entry := false
+	if len(isEntry) > 0 {
+		entry = isEntry[0]
+	}
+	// nodeId := 0
+	code := ""
 	if r := value.GetRange(); r != nil {
-		code := r.GetText()
+		code = r.GetText()
 		if len(code) > 100 {
 			code = code[:100] + "..."
 		}
 		code = removeEscapes(code)
-		nodeId = g.AddNode(code)
 	} else {
-		nodeId = g.AddNode(value.GetVerboseName())
+		code = value.GetVerboseName()
 	}
-
+	if entry {
+		code = fmt.Sprintf("<entry>%s</entry>", code)
+	}
+	nodeId := g.AddNode(code)
 	g.value2Node[value] = nodeId
 	return nodeId
 }
