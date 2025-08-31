@@ -230,5 +230,9 @@ LOOP:
 	if !utils.MatchAllOfSubString(tl, `mocked-echo-params`) {
 		t.Fatal("timeline does not contain mocked-echo-params")
 	}
+	if utils.MatchAllOfSubString(tl, "runtime_id") {
+		t.Fatal("timeline does not contain runtime_id")
+	}
+
 	fmt.Println("--------------------------------------")
 }
