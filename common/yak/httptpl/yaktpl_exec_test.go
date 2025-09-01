@@ -1999,6 +1999,8 @@ func item_testMockTest_interactsh(t *testing.T) bool {
 		return "127.0.0.1"
 	})
 
+	utils.WaitConnect(dnsServer, 3)
+
 	httpServerHost, httpServerPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		reqStr := string(req)
 		if strings.Contains(reqStr, token) {
