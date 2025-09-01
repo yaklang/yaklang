@@ -192,6 +192,11 @@ func ConvertAIInputEventToAIDInputEvent(event *ypb.AIInputEvent) (*InputEvent, e
 		err := json.Unmarshal([]byte(event.GetSyncJsonInput()), &params)
 		if err != nil {
 			log.Errorf("unmarshal interactive json input failed: %v", err)
+			if utils.IsNil(params) {
+				params = make(aitool.InvokeParams)
+			}
+			params.Set("suggestion", "continue")
+			params.Set("extra_prompt", event.GetSyncJsonInput())
 		}
 		return &InputEvent{
 			IsSyncInfo: true,
