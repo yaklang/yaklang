@@ -3,14 +3,12 @@ package cve
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/log"
@@ -101,56 +99,57 @@ func _migrateTable() error {
 var transLock = sync.Mutex{}
 
 func MakeOpenAITranslateCWE(cwe *cveresources.CWE, apiKey string, proxies ...string) (*cveresources.CWE, error) {
-	db := consts.GetGormCVEDescriptionDatabase()
-	if db == nil {
-		return nil, utils.Errorf("no database found")
-	}
+	return nil, utils.Error("deprecated")
+	//db := consts.GetGormCVEDescriptionDatabase()
+	//if db == nil {
+	//	return nil, utils.Errorf("no database found")
+	//}
+	//
+	//var proxy string
+	//if len(proxies) > 0 {
+	//	proxy = proxies[0]
+	//}
 
-	var proxy string
-	if len(proxies) > 0 {
-		proxy = proxies[0]
-	}
-
-	client := openai.NewOpenAIClient(openai.WithAPIKey(apiKey), openai.WithProxy(proxy))
-	if cwe.NameZh == "" {
-		data, err := client.TranslateToChinese(cwe.Name)
-		if err != nil {
-			log.Errorf("translate cwe name failed: %s", err)
-		}
-		cwe.NameZh = data
-	}
-	if cwe.NameZh != "" {
-		log.Infof("translating cwe: %v", cwe.NameZh)
-	}
-
-	log.Infof("start to translate description: %s", cwe.CWEString())
-	if cwe.DescriptionZh == "" && cwe.Description != "" {
-		desc, err := client.TranslateToChinese(cwe.Description)
-		if err != nil {
-			log.Errorf("translate desc failed: %s", err)
-		}
-		cwe.DescriptionZh = desc
-	}
-
-	log.Infof("start to translate extended description: %v", cwe.CWEString())
-	if cwe.ExtendedDescriptionZh == "" && cwe.ExtendedDescription != "" {
-		desc, err := client.TranslateToChinese(cwe.ExtendedDescription)
-		if err != nil {
-			log.Errorf("translate desc ex failed: %s", err)
-		}
-		cwe.ExtendedDescriptionZh = desc
-	}
-
-	log.Infof("start to generate cwe solution: %v", cwe.CWEString())
-	if cwe.CWESolution == "" && cwe.NameZh != "" {
-		solution, err := client.Chat(fmt.Sprintf("请给出 %v 的100字以内的安全建议或修复方案", strconv.Quote(cwe.NameZh)))
-		if err != nil {
-			log.Errorf("generate solution failed: %s", err)
-		}
-		cwe.CWESolution = solution
-	}
-
-	return cwe, nil
+	//client := openai.NewOpenAIClient(openai.WithAPIKey(apiKey), openai.WithProxy(proxy))
+	//if cwe.NameZh == "" {
+	//	data, err := client.TranslateToChinese(cwe.Name)
+	//	if err != nil {
+	//		log.Errorf("translate cwe name failed: %s", err)
+	//	}
+	//	cwe.NameZh = data
+	//}
+	//if cwe.NameZh != "" {
+	//	log.Infof("translating cwe: %v", cwe.NameZh)
+	//}
+	//
+	//log.Infof("start to translate description: %s", cwe.CWEString())
+	//if cwe.DescriptionZh == "" && cwe.Description != "" {
+	//	desc, err := client.TranslateToChinese(cwe.Description)
+	//	if err != nil {
+	//		log.Errorf("translate desc failed: %s", err)
+	//	}
+	//	cwe.DescriptionZh = desc
+	//}
+	//
+	//log.Infof("start to translate extended description: %v", cwe.CWEString())
+	//if cwe.ExtendedDescriptionZh == "" && cwe.ExtendedDescription != "" {
+	//	desc, err := client.TranslateToChinese(cwe.ExtendedDescription)
+	//	if err != nil {
+	//		log.Errorf("translate desc ex failed: %s", err)
+	//	}
+	//	cwe.ExtendedDescriptionZh = desc
+	//}
+	//
+	//log.Infof("start to generate cwe solution: %v", cwe.CWEString())
+	//if cwe.CWESolution == "" && cwe.NameZh != "" {
+	//	solution, err := client.Chat(fmt.Sprintf("请给出 %v 的100字以内的安全建议或修复方案", strconv.Quote(cwe.NameZh)))
+	//	if err != nil {
+	//		log.Errorf("generate solution failed: %s", err)
+	//	}
+	//	cwe.CWESolution = solution
+	//}
+	//
+	//return cwe, nil
 }
 
 func MakeOpenAIWorking(src *cveresources.CVE, gateway aispec.AIClient) error {

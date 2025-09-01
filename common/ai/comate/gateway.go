@@ -159,10 +159,6 @@ func (c *Client) Chat(s string, function ...any) (string, error) {
 	return buf.String(), nil
 }
 
-func (c *Client) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, utils.Error("not implemented: comate is not supported openai style chat ex")
-}
-
 func (c *Client) ChatStream(s string) (io.Reader, error) {
 	return c.question(s)
 }

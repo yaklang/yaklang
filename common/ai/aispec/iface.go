@@ -10,7 +10,6 @@ type GeneralChatter func(string, ...AIConfigOption) (string, error)
 
 type Chatter interface {
 	Chat(string, ...any) (string, error)
-	ChatEx([]ChatDetail, ...any) ([]ChatChoice, error)
 	ChatStream(string) (io.Reader, error)
 }
 

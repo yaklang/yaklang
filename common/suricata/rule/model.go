@@ -2,10 +2,11 @@ package rule
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"strconv"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/suricata/data/modifier"
@@ -56,24 +57,22 @@ type Rule struct {
 	CVE                string `json:"cve"`
 }
 
-func (r *Rule) AIDecoration(opts ...openai.ConfigOption) {
-	client := openai.NewOpenAIClient(opts...)
-	fmt.Println(string(r.Raw))
+func (r *Rule) AIDecoration(opts ...aispec.AIConfigOption) {
 	if r.MessageChinese == "" {
 		msg := r.Message
 		if strings.HasPrefix(r.Message, "ET ") {
 			msg = r.Message[3:]
 		}
-		result, err := client.Chat(`我在翻译网络安全领域的规则的名称(Suricata)，帮我翻译下规则的内容，输入在当前消息的 json 中
+		result, err := ai.Chat(`我在翻译网络安全领域的规则的名称(Suricata)，帮我翻译下规则的内容，输入在当前消息的 json 中
 
-{"input": ` + strconv.Quote(msg) + `}
+{"input": `+strconv.Quote(msg)+`}
 
 把结果放在 json 中, json 的 key 为 result, 以方便我提取，翻译过程中尽量使用网络安全术语，注重可读性，不要太晦涩。注意，我有一些翻译偏好，希望能遵守：
 
 Hash 是一个专有名词，不要翻译；"可能" 使用 "潜在" 代替；按习惯来说你认为是产品名或专有名字可以不翻译;糟糕/恶劣声誉等词汇，使用 "恶意黑名单" 代替；
 Poor Reputation 翻译为"恶意"。Observed 翻译为 "检测到"。 "CINS Active"是专有名词 
 
-`)
+`, opts...)
 		if err != nil {
 			log.Warnf("openai failed: %s", err)
 		} else {
