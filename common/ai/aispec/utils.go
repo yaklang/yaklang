@@ -8,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -98,7 +97,7 @@ func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string,
 func fixDomain(c *AIConfig) {
 	// 修复domain配置
 	fixedDomain := c.Domain
-	originDomain := c.Domain
+	//originDomain := c.Domain
 	if fixedDomain != "" {
 		// 检查domain是否包含协议前缀
 		if strings.HasPrefix(fixedDomain, "http://") || strings.HasPrefix(fixedDomain, "https://") {
@@ -127,8 +126,8 @@ func fixDomain(c *AIConfig) {
 				c.Domain = fixedDomain
 			}
 
-			log.Warnf("检测到不标准的domain配置: %s，已自动解析为 Domain: %s, NoHttps: %v, BaseURL: %s",
-				originDomain, c.Domain, c.NoHttps, c.BaseURL)
+			//log.Debugf("检测到不标准的domain配置: %s，已自动解析为 Domain: %s, NoHttps: %v, BaseURL: %s",
+			//	originDomain, c.Domain, c.NoHttps, c.BaseURL)
 		} else {
 			// 标准的domain配置，不包含协议
 			c.Domain = fixedDomain
