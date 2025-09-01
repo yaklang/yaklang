@@ -1,8 +1,8 @@
 desc(
-    title:"Content Security Policy (CSP) Security Assessment",
-    title_zh:"内容安全策略 (CSP) 安全评估",
-    level:"info", // 全局描述本身为信息级别，具体的等级由子规则决定
-    desc:<<<DESC
+	title:"Content Security Policy (CSP) Security Assessment"
+	title_zh:"内容安全策略 (CSP) 安全评估",
+	level:"info"
+	desc:<<<DESC
 本报告提供了对应用 Content-Security-Policy (CSP) 配置的安全性评估结果。CSP 是一个重要的安全机制，旨在减轻跨站脚本 (XSS) 和其他客户端代码注入攻击。它通过限制浏览器可以从哪些源加载资源（如脚本、样式、图片、字体等），以及限制内联或动态代码的执行，来为网站提供一层额外的安全防护。
  
 对 CSP 的不当配置可能导致其失效，甚至引入新的安全风险。本评估全面检查了您的 CSP 配置中可能存在的高风险、中风险和低风险漏洞，包括对 'unsafe-inline'、通配符 '*'、'unsafe-eval' 等高危指令的使用，对 'frame-ancestors' 指令的缺失或宽松配置，以及缺少报告机制等问题。
@@ -13,6 +13,7 @@ desc(
  
 强烈建议审查所有报告的问题，并根据建议的解决方案进行修复和加固，以确保您的应用享受到 CSP 提供的最大安全保护。一个精心设计的 CSP 是现代 Web 应用安全不可或缺的一部分。
 DESC
+	rule_id: "30e74fdd-c346-4db2-a124-f0b04dfd55e1"
 )
 
 header(* as $headContent)
@@ -49,10 +50,10 @@ $CSPContent?{have:/(script-src|default-src)\s+[^;]*?data:/} as $high_csp_data_ur
 $high_csp_unsafe_inline + $high_csp_wildcard_src + $high_csp_protocol_wildcard + $high_csp_unsafe_eval + $high_csp_data_uri as $CSP_HIGH_RISK 
 
 alert $CSP_HIGH_RISK for {
-    title:"High Risk CSP Issues",
-    title_zh:"高风险 CSP 问题",
-    level:"high",
-    desc:<<<DESC
+	title: "High Risk CSP Issues",
+	title_zh: "高风险 CSP 问题",
+	level: "high",
+	desc: <<<DESC
 当前应用的 Content-Security-Policy (CSP) 配置存在严重漏洞，它包含了以下任一可能导致直接绕过 CSP 防御机制的高风险指令：
 - **'unsafe-inline'**: 允许执行内联脚本。恶意攻击者可以通过注入内联脚本来执行跨站脚本 (XSS) 攻击，绕过 CSP 的核心XSS保护。
 - **'*' 通配符**: 在 script-src, default-src 或 object-src 等指令中使用通配符。这使得浏览器可以从任何源（包括恶意源）加载脚本、插件或媒体，完全失去了 CSP 的源限制作用。
@@ -61,8 +62,8 @@ alert $CSP_HIGH_RISK for {
 - **'data:' URI**: 允许使用 Data URI 作为脚本源。攻击者可以构造包含恶意 JavaScript 的 data URI 并将其注入页面，即使没有外部服务器也能执行攻击。
 
 这些配置的存在，极大地增加了应用遭受跨站脚本 (XSS) 攻击的风险，可能导致敏感数据泄露、会话劫持甚至网站篡改。
-DESC,
-    solution:<<<SOLUTION
+DESC
+	solution: <<<SOLUTION
 务必审查并移除 CSP 中所有高风险的配置项。遵循以下最佳实践来加固 CSP：
 1. **移除 'unsafe-inline'**: 避免在 HTML 中直接书写内联脚本和样式。将所有 JavaScript 移至外部文件，并使用哈希值 (hash) 或 Nonce (一次性随机数) 来验证内联样式块的安全性。
    - 对于内联脚本，考虑使用 `script-src 'nonce-RANDOM_BASE64_VALUE'`。
@@ -73,8 +74,8 @@ DESC,
 5. **移除 'data:' URI**: 除非有明确的业务需求且能严格控制其内容，否则禁止使用 data URI 作为可执行资源的来源。
 6. **实施严格的 CSP**: 优先使用 `'self'` 和哈希/Nonce，结合严格的允许列表来限制所有资源的加载源。
 7. **配置 report-uri/report-to**: 即使在严格的 CSP 下，也应配置报告机制来监控和发现潜在的绕过尝试或配置错误。
-SOLUTION,
-    reference:<<<REFERENCE
+SOLUTION
+	reference: <<<REFERENCE
 - **OWASP Cheat Sheet Series - Content Security Policy**: https://cheatsheetseries.owasp.org/cheatsheets/Content_Security_Policy_Cheat_Sheet.html
 - **Google Developers - A strong, impenetrable defense against XSS**: https://web.dev/articles/strict-csp
 - **CWE-693: Protection Mechanism Failure**: https://cwe.mitre.org/data/definitions/693.html
@@ -102,18 +103,18 @@ $CSPContent?{have:/(frame-ancestors)\s+[^;]*?\*/} as $medium_csp_wildcard_frame_
 // 如果以上任一独立中危模式被匹配，则标记为中危 CSP 问题。
 $medium_csp_static_nonce + $medium_csp_missing_frame_ancestors_directive + $medium_csp_wildcard_frame_ancestors as $CSP_MEDIUM_RISK 
 alert $CSP_MEDIUM_RISK for {
-    title:"Medium Risk CSP Issues",
-    title_zh:"中风险 CSP 问题",
-    level:"medium",
-    desc:<<<DESC
+	title: "Medium Risk CSP Issues",
+	title_zh: "中风险 CSP 问题",
+	level: "medium",
+	desc: <<<DESC
 当前应用的 Content-Security-Policy (CSP) 配置存在中等风险漏洞，它包含了以下任一可能降低安全防护等级的指令：
 - **可预测或硬编码的 'nonce-'**: 如果 CSP 使用 'nonce-' 机制来允许特定内联脚本或样式，但其 nonce 值不是充分随机、每次请求唯一生成或被硬编码，攻击者可能预测或篡改 nonce，从而绕过其保护，注入并执行恶意脚本。虽然比 'unsafe-inline' 安全，但其有效性依赖于 nonce 的随机性。
 - **'frame-ancestors' 指令缺失**: 在 CSP 中未定义 'frame-ancestors' 指令。这允许任何网站通过 <iframe>、<frame> 或 <object> 等标签将您的页面嵌入到他们的网站中。这可能导致点击劫持（Clickjacking）攻击，诱导用户在不知情的情况下点击页面上的按钮或链接，从而执行恶意操作。
 - **'frame-ancestors' 允许 '*'**: 'frame-ancestors' 指令被配置为允许所有源 ('*')。这与指令缺失的效果类似，依然允许任何网站嵌入您的页面，存在点击劫持风险。
 
 这些配置虽然不像高危问题那样直接导致 XSS 执行，但它们为攻击者提供了可乘之机，可能利用它们进行会话劫持、点击劫持或绕过部分安全限制。
-DESC,
-    solution:<<<SOLUTION
+DESC
+	solution: <<<SOLUTION
 为了缓解中等风险的 CSP 问题，请采取以下措施：
 1. **确保 Nonce 的随机性与唯一性**: 如果使用 'nonce-' 来允许内联资源，务必确保 Nonce 值是加密安全的随机数，并且对于每个 HTTP 响应都是唯一的。它不能被复用，也不能被泄露到其他地方。后端代码应负责在每次请求时重新生成并嵌入到 HTML 和 CSP 头中。
 2. **正确配置 'frame-ancestors'**: 针对点击劫持攻击，应该明确配置 'frame-ancestors' 指令：
@@ -121,8 +122,8 @@ DESC,
    - 如果只允许特定域名嵌套，请设置为 `frame-ancestors 'self' https://trusted-example.com;`。
    - **绝不允许**设置为 `frame-ancestors *;` 或不设置该指令。
 3. **结合 X-Frame-Options (可选)**: 除了 'frame-ancestors'，也可以考虑同时设置 `X-Frame-Options: DENY` 或 `X-Frame-Options: SAMEORIGIN` 作为额外的防御层，尽管 CSP 的 'frame-ancestors' 功能更强大且更具推荐性。
-SOLUTION,
-    reference:<<<REFERENCE
+SOLUTION
+	reference: <<<REFERENCE
 - **MDN Web Docs - CSP: frame-ancestors**: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Content-Security-Policy/frame-ancestors
 - **MDN Web Docs - CSP: nonce**: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Content-Security-Policy#nonce
 - **OWASP Cheat Sheet Series - Clickjacking Defense**: https://cheatsheetseries.owasp.org/cheatsheets/Clickjacking_Defense_Cheat_Sheet.html
@@ -147,10 +148,10 @@ $CSPContent?{have:/(img-src|font-src|style-src|media-src)\s+[^;]*?\*/} as $low_c
 $low_csp_missing_report_uri + $low_csp_loose_resource_src as $CSP_LOW_RISK 
 
 alert $CSP_LOW_RISK for {
-    title:"Low Risk CSP Issues",
-    title_zh:"低风险 CSP 问题",
-    level:"low",
-    desc:<<<DESC
+	title: "Low Risk CSP Issues",
+	title_zh: "低风险 CSP 问题",
+	level: "low",
+	desc: <<<DESC
 当前应用的 Content-Security-Policy (CSP) 配置存在低风险问题，它包含了以下任一可能影响监控或次要防御的指令：
 - **缺少 'report-uri' 或 'report-to' 指令**: CSP 未配置任何报告机制 ('report-uri' 或 'report-to')。这意味着当浏览器检测到 CSP 违规时，不会将违规报告发送到指定的端点。这导致安全团队无法及时了解和监控潜在的 CSP 绕过尝试、浏览器兼容性问题或策略配置错误，从而错失改进 CSP 策略的机会。
 - **非脚本资源指令允许 '*' (如 img-src, font-src, style-src, media-src)**: CSP 中非脚本相关的指令（例如 `img-src`、`font-src`、`style-src`、`media-src` 等）被配置为允许从任何源（'*'）加载资源。虽然这些指令通常不会直接导致可执行脚本的注入，但在某些特定场景下，过于宽松的资源加载策略可能导致：
@@ -160,8 +161,8 @@ alert $CSP_LOW_RISK for {
     - **性能问题**: 无法限制第三方资源的加载导致页面加载缓慢。
 
 这些配置虽然通常不会直接导致严重的安全漏洞，但它们削弱了整体的安全态势，阻碍了对攻击的监控，或增加了其他次要形式的攻击面。
-DESC,
-    solution:<<<SOLUTION
+DESC
+	solution: <<<SOLUTION
 为提升整体安全性并增强 CSP 的有效性，建议优化以下低风险配置：
 1. **配置 CSP 报告机制**: 强烈建议配置 `report-uri` (旧版) 或 `report-to` (新版，推荐) 指令。这将使您能够收集 CSP 违规报告，从而帮助您：
    - 识别和修复 CSP 策略中的错误。
@@ -173,8 +174,8 @@ DESC,
    - 避免在这些指令中使用 '*' 通配符。
    - 考虑对内联样式使用哈希值或 Nonce，而不是 `style-src 'unsafe-inline'`。
 3. **定期审查 CSP 策略**: 随着应用和依赖库的更新，CSP 策略也需要定期审查和更新，以确保其始终保持最佳防御状态。
-SOLUTION,
-    reference:<<<REFERENCE
+SOLUTION
+	reference: <<<REFERENCE
 - **MDN Web Docs - CSP: report-uri**: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Content-Security-Policy/report-uri
 - **MDN Web Docs - CSP: report-to**: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Content-Security-Policy/report-to
 - **MDN Web Docs - CSP Directive Reference**: https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Content-Security-Policy#指令
