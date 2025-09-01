@@ -568,14 +568,14 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 }
 
 func TestGRPCMUSTPASS_MITMV2_Static_Filter(t *testing.T) {
-	var shouldFilter bool
-	var notFilter, notFilter2 bool
-
 	shouldFilterToken := utils.RandStringBytes(10)
 	notFilterToken := utils.RandStringBytes(10)
 	notFilterToken2 := utils.RandStringBytes(10)
 
 	t.Run("url", func(t *testing.T) {
+		var shouldFilter bool
+		var notFilter bool
+
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == shouldFilterToken {
@@ -631,7 +631,68 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 		require.False(t, shouldFilter)
 	})
 
+	t.Run("url extend", func(t *testing.T) {
+		var notFilter, notFilter2 bool
+
+		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
+			if token == notFilterToken {
+				notFilter = true
+			}
+			if token == notFilterToken2 {
+				notFilter2 = true
+			}
+			return []byte("HTTP/1.1 200 OK\r\nContent-length: 0\r\n\r\n")
+		})
+		packet := []byte(fmt.Sprintf(`GET /abc.jsp HTTP/1.1
+Host: 127.0.0.1:%d`, mockPort))
+
+		code := fmt.Sprintf(`
+mirrorFilteredHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+	poc.HTTP(req,poc.replaceQueryParam("token", "%s"))
+}
+
+mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
+   poc.HTTP(req,poc.replaceQueryParam("token", "%s"))	 
+}
+`, notFilterToken, notFilterToken2)
+		client, err := NewLocalClient()
+		if err != nil {
+			panic(err)
+		}
+		mitmPort := utils.GetRandomAvailableTCPPort()
+		proxy := "http://" + utils.HostPort("127.0.0.1", mitmPort)
+		ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+		defer cancel()
+
+		RunMITMV2TestServer(client, ctx, &ypb.MITMV2Request{
+			Host: "127.0.0.1",
+			Port: uint32(mitmPort),
+		}, func(stream ypb.Yak_MITMV2Client) {
+			stream.Send(&ypb.MITMV2Request{
+				SetYakScript:     true,
+				YakScriptContent: code,
+			})
+			stream.Recv()
+			stream.Send(&ypb.MITMV2Request{
+				UpdateFilter: true,
+				FilterData:   &ypb.MITMFilterData{},
+			})
+			stream.Recv()
+			defer GetMITMFilterManager(consts.GetGormProjectDatabase(), consts.GetGormProfileDatabase()).Recover()
+			_, err := lowhttp.HTTPWithoutRedirect(lowhttp.WithPacketBytes(packet), lowhttp.WithProxy(proxy))
+			require.NoError(t, err)
+			time.Sleep(3 * time.Second)
+			cancel()
+		})
+		require.True(t, notFilter)
+		require.True(t, notFilter2)
+	})
+
 	t.Run("content-type", func(t *testing.T) {
+		var shouldFilter bool
+		var notFilter bool
+
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == shouldFilterToken {
@@ -691,6 +752,8 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 	})
 
 	t.Run("content-type and accept", func(t *testing.T) {
+		var notFilter, notFilter2 bool
+
 		_, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 			token := lowhttp.GetHTTPRequestQueryParam(req, "token")
 			if token == notFilterToken {
