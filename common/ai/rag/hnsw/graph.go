@@ -205,6 +205,9 @@ func (n *LayerNode[K]) replenish(m int) {
 func (n *LayerNode[K]) isolate(m int) {
 	for _, neighbor := range n.Neighbors {
 		delete(neighbor.Neighbors, n.Key)
+	}
+
+	for _, neighbor := range n.Neighbors {
 		neighbor.replenish(m)
 	}
 }
