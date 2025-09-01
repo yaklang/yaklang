@@ -13,6 +13,8 @@ import (
 type GetawayClient struct {
 	config *aispec.AIConfig
 
+	ExtraOptions []aispec.AIConfigOption
+
 	targetUrl string
 }
 
@@ -39,18 +41,23 @@ func (g *GetawayClient) GetModelList() ([]*aispec.ModelMeta, error) {
 }
 
 func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
-	return aispec.ChatBase(g.targetUrl, g.config.Model, s,
+	opts := []aispec.ChatBaseOption{
 		aispec.WithChatBase_Function(function),
 		aispec.WithChatBase_PoCOptions(g.BuildHTTPOptions),
 		aispec.WithChatBase_StreamHandler(g.config.StreamHandler),
 		aispec.WithChatBase_ReasonStreamHandler(g.config.ReasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
-	)
+		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
+	}
+	return aispec.ChatBase(g.targetUrl, g.config.Model, s, opts...)
 }
 
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
-	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
+	return aispec.ChatWithStream(
+		g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions,
+		aispec.WithChatBase_EnableThinkingEx(g.config.EnableThinking, g.config.EnableThinkingField, g.config.EnableThinkingValue),
+	)
 }
 
 func (g *GetawayClient) ExtractData(data string, desc string, fields map[string]any) (map[string]any, error) {
@@ -58,7 +65,9 @@ func (g *GetawayClient) ExtractData(data string, desc string, fields map[string]
 }
 
 func (g *GetawayClient) newLoadOption(opt ...aispec.AIConfigOption) {
-	config := aispec.NewDefaultAIConfig(opt...)
+	extra := g.ExtraOptions
+	extra = append(extra, opt...)
+	config := aispec.NewDefaultAIConfig(extra...)
 
 	log.Debug("load option for volcengine ai")
 	g.config = config
