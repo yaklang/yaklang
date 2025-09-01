@@ -67,10 +67,6 @@ func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
 	return "", errors.New("invalid")
 }
 
-func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, nil
-}
-
 func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
 	return g.functionCallHandle(msg)
 }

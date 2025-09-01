@@ -151,10 +151,6 @@ func (t *TestGateway) Chat(s string, function ...any) (string, error) {
 	return "ok", nil
 }
 
-func (t *TestGateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, nil
-}
-
 func (t *TestGateway) ChatStream(s string) (io.Reader, error) {
 	return nil, nil
 }
