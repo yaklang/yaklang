@@ -113,7 +113,18 @@ func (t *ToolCaller) review(
 			userCancelHandler("tool directly answer (err in review-wrong-params)")
 			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
 		}
-		return targetTool, newParam, nil, HandleToolUseNext_Default, nil
+
+		result, directlyAnswer, err := t.CallToolWithExistedParams(targetTool, true, newParam)
+		if err != nil {
+			e.EmitError("error handling tool review: %v", err)
+			userCancelHandler("tool directly answer (err in call tool with new params)")
+			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+		}
+		if directlyAnswer {
+			userCancelHandler("tool directly answer (after param re-generation)")
+			return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
+		}
+		return targetTool, newParam, result, HandleToolUseNext_Override, nil
 	case "direct_answer":
 		userCancelHandler("direct answer without tool")
 		return targetTool, param, nil, HandleToolUseNext_DirectlyAnswer, nil
