@@ -26,7 +26,7 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	}
 	db = db.Model(&schema.ERModelEntity{})
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", entityFilter.IDs)
-	db = bizhelper.ExactExcludeQueryUInt64Array(db, "entity_base_id", []uint64{entityFilter.BaseID})
+	db = bizhelper.ExactQueryInt64(db, "entity_base_id", int64(entityFilter.BaseID))
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Names)
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
 
