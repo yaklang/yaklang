@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -31,12 +32,8 @@ func checkProcess(vf filesys_interface.FileSystem, t *testing.T, opt ...ssaapi.O
 			if process == 1 {
 				matchFinish++
 			}
-			if process > 1 {
-				t.Fatal("process greater than 1")
-			}
-			if process < prevProcess {
-				t.Fatal("process reduce")
-			}
+			require.LessOrEqual(t, process, float64(1.0), "process should be less than or equal to 1")
+			require.GreaterOrEqual(t, process, prevProcess, "process should be greater than or equal to previous process")
 			prevProcess = process
 			msgs = append(msgs, message{msg, process})
 		}),
