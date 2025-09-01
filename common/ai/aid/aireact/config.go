@@ -129,6 +129,9 @@ type ReActConfig struct {
 	userInteractiveLimitedTimes int64
 
 	workdir string
+
+	// Plan and execute hijack function for advanced usage/testing
+	hijackPlanRequest func(ctx context.Context, planPayload string) error
 }
 
 func WithReActWorkdir(dir string) Option {
@@ -610,6 +613,14 @@ func WithReActAllowPlanAndExec(enabled ...bool) Option {
 		cfg.enablePlanAndExec = true
 		if len(enabled) > 0 {
 			cfg.enablePlanAndExec = enabled[0]
+		}
+	}
+}
+
+func WithReActHijackPlanRequest(f func(ctx context.Context, planPayload string) error) Option {
+	return func(cfg *ReActConfig) {
+		if f != nil {
+			cfg.hijackPlanRequest = f
 		}
 	}
 }
