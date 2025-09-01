@@ -142,6 +142,7 @@ func TestReAct_ToolUse_WrongParams(t *testing.T) {
 	var iid string
 
 	wrongParamDone := false
+	normalReview := false
 LOOP:
 	for {
 		select {
@@ -159,6 +160,7 @@ LOOP:
 					}
 					wrongParamDone = true
 				} else {
+					normalReview = true
 					in <- &ypb.AIInputEvent{
 						IsInteractiveMessage: true,
 						InteractiveId:        utils.InterfaceToString(iid),
@@ -213,6 +215,10 @@ LOOP:
 
 	if !reActFinished {
 		t.Fatal("Expected to have at least one re-act terminal event, but got none")
+	}
+
+	if !normalReview {
+		t.Fatal("Expected to have normal review after wrong param, but got none")
 	}
 
 	fmt.Println("--------------------------------------")

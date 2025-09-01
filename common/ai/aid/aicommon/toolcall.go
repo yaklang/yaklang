@@ -132,6 +132,42 @@ func (t *ToolCaller) GetParamGeneratingPrompt(tool *aitool.Tool, toolName string
 }
 
 func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
+	return t.CallToolWithExistedParams(tool, false, make(aitool.InvokeParams))
+}
+
+func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) (aitool.InvokeParams, error) {
+	emitter := t.emitter
+	paramsPrompt, err := t.GetParamGeneratingPrompt(tool, tool.Name)
+	if err != nil {
+		emitter.EmitError("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
+		handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
+		return nil, err
+	}
+	invokeParams := aitool.InvokeParams{}
+	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
+		request.SetTaskIndex(t.task.GetIndex())
+		return t.ai.CallAI(request)
+	}, func(rsp *AIResponse) error {
+		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
+		callToolAction, err := ExtractActionFromStream(stream, "call-tool")
+		if err != nil {
+			emitter.EmitError("error extract tool params: %v", err)
+			return utils.Errorf("error extracting action params: %v", err)
+		}
+		for k, v := range callToolAction.GetInvokeParams("params") {
+			invokeParams.Set(k, v)
+		}
+		return nil
+	})
+	if err != nil {
+		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
+		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))
+		return nil, err
+	}
+	return invokeParams, nil
+}
+
+func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams bool, presetInvokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
 	emitter := t.emitter
 	if emitter == nil {
 		emitter = t.config.GetEmitter()
@@ -197,38 +233,23 @@ func (t *ToolCaller) CallTool(tool *aitool.Tool) (result *aitool.ToolResult, dir
 
 	defer handleDone()
 
-	paramsPrompt, err := t.GetParamGeneratingPrompt(tool, tool.Name)
-	if err != nil {
-		emitter.EmitError("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
-		handleError(fmt.Sprintf("error generate tool[%v] params in task: %v", tool.Name, t.task.GetName()))
-		return nil, false, err
-	}
-
-	invokeParams := aitool.InvokeParams{}
-
-	err = CallAITransaction(t.config, paramsPrompt, func(request *AIRequest) (*AIResponse, error) {
-		request.SetTaskIndex(t.task.GetIndex())
-		return t.ai.CallAI(request)
-	}, func(rsp *AIResponse) error {
-		stream := rsp.GetOutputStreamReader("call-tools", true, emitter)
-		callToolAction, err := ExtractActionFromStream(stream, "call-tool")
+	// generate params
+	var invokeParams = make(aitool.InvokeParams)
+	if presetParams {
+		invokeParams = presetInvokeParams
+		emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
+	} else {
+		generatedParams, err := t.generateParams(tool, handleError)
 		if err != nil {
-			emitter.EmitError("error extract tool params: %v", err)
-			return utils.Errorf("error extracting action params: %v", err)
+			return nil, false, utils.Errorf("error generating params for tool[%v]: %v", tool.Name, err)
 		}
-		for k, v := range callToolAction.GetInvokeParams("params") {
-			invokeParams.Set(k, v)
-		}
-		return nil
-	})
-	if err != nil {
-		emitter.EmitError("error calling AI for tool[%v] params: %v", tool.Name, err)
-		handleError(fmt.Sprintf("error calling AI for tool[%v] params: %v", tool.Name, err))
-		return nil, false, err
+		invokeParams = generatedParams
+	}
+	if utils.IsNil(invokeParams) {
+		invokeParams = make(aitool.InvokeParams)
 	}
 
 	emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
-
 	epm := t.config.GetEndpointManager()
 	config := t.config
 	// DANGER: NoNeedUserReview
