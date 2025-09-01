@@ -395,22 +395,29 @@ func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 	keys := []Value{f.EmitConstInstPlaceholder("@pointer"), f.EmitConstInstPlaceholder("@value")}
 	values := []Value{f.EmitConstInstPlaceholder(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), o.GetValue()}
 
-	pointer := f.InterfaceAddFieldBuild(2, func(i int) Value {
+	obj := f.InterfaceAddFieldBuild(2, func(i int) Value {
 		return keys[i]
 	}, func(i int) Value {
 		return values[i]
 	})
+	p := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
+	p.SetKind(ssautil.PointerVariable)
 
 	t := NewObjectType()
 	t.SetName("Pointer")
 	t.SetTypeKind(PointerKind)
-	pointer.SetType(t)
+	obj.SetType(t)
 
-	return pointer
+	return obj
 }
 
-func (f *FunctionBuilder) GetOriginPointer(p Value) *Variable {
-	o := f.CreateMemberCallVariable(p, f.EmitConstInstPlaceholder("@pointer"), true)
+func (f *FunctionBuilder) GetOriginPointer(obj Value) *Variable {
+	o := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
+	if o.GetValue() == nil {
+		p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
+		f.AssignVariable(o, p)
+	}
+
 	o.SetKind(ssautil.PointerVariable)
 
 	return o

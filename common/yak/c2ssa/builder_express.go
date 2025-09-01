@@ -13,8 +13,6 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	fmt.Printf("exp = %s\n", ast.GetText())
-
 	handlerJumpExpression := func(cond func(string) ssa.Value, trueExpr, falseExpr func() ssa.Value, name string) ssa.Value {
 		id := name
 		variable := b.CreateVariable(id)
@@ -228,8 +226,6 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 		}
 	}
 
-	fmt.Printf("%s\n", ast.GetText())
-
 	if a := ast.AssignmentOperator(); a != nil {
 		if left == nil {
 			getVariable()
@@ -344,8 +340,6 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 
 	var right ssa.Value
 	var left *ssa.Variable
-
-	// fmt.Printf("postfix = %s\n", ast.GetText())
 
 	// 1. primaryExpression | malloc
 	if p := ast.PrimaryExpression(); p != nil {

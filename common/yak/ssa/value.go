@@ -198,7 +198,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	scope := b.CurrentBlock.ScopeTable
 	if variable.IsPointer() {
-		variable.SetPointHandle(func(value Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
+		variable.SetPointHandler(func(valueTmp Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
 			tmp := b.CurrentBlock.ScopeTable
 			defer func() {
 				b.CurrentBlock.ScopeTable = tmp
@@ -217,40 +217,19 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 
 			n := strings.TrimPrefix(variable.GetValue().String(), "&")
 			originName, originGlobalId := SplitName(n)
+			_ = originGlobalId
 
 			newValue := b.CopyValue(value)
 			newValue.SetName(originName)
 			newValue.SetVerboseName(originName)
 
-			if ret := GetFristLocalVariableFromScope(scopet, originName); ret != nil && ret.GetGlobalIndex() != originGlobalId {
-
-			} else {
+			if ret := GetFristLocalVariableFromScopeAndParent(scopet, originName); ret != nil && ret.GetGlobalIndex() == originGlobalId {
 				scopet.AssignVariable(b.CreateVariable(originName), newValue)
+			} else {
+				p.SetPointHandler(variable.GetPointHandler())
 			}
-
-			p.SetPointHandle(func(value Value, scopett ssautil.ScopedVersionedTableIF[Value]) {
-				tmp := b.CurrentBlock.ScopeTable
-				defer func() {
-					b.CurrentBlock.ScopeTable = tmp
-				}()
-				b.CurrentBlock.ScopeTable = scopet
-
-				v := b.ReadMemberCallValue(obj, b.EmitConstInstPlaceholder("@value"))
-				p := b.ReadMemberCallValue(obj, b.EmitConstInstPlaceholder("@pointer"))
-
-				n := strings.TrimPrefix(p.String(), "&")
-				originName, _ := SplitName(n)
-
-				b.CurrentBlock.ScopeTable = scopett
-
-				variable := b.CreateVariable(originName)
-				newValue := b.CopyValue(v)
-				newValue.SetName(originName)
-				newValue.SetVerboseName(originName)
-				b.AssignVariable(variable, newValue)
-			})
 		})
-		variable.PointHandle(value, scope)
+		variable.PointHandler(value, scope)
 	} else {
 		scope.AssignVariable(variable, value)
 	}

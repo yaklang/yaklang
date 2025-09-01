@@ -84,7 +84,7 @@ func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder
 		specialTypes:    SpecialTypes,
 		pkgNameCurrent:  "",
 	}
-	log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
+	// log.Infof("ast: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	astBuilder.build(ast)
 	fmt.Printf("Program: %v done\n", astBuilder.pkgNameCurrent)
 	return nil

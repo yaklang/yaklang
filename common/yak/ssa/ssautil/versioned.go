@@ -68,9 +68,9 @@ type VersionedIF[T versionedValue] interface {
 	GetKind() VariableKind
 	SetKind(VariableKind)
 
-	PointHandle(T, ScopedVersionedTableIF[T])
-	SetPointHandle(f func(T, ScopedVersionedTableIF[T]))
-	GetPointHandle() func(T, ScopedVersionedTableIF[T])
+	PointHandler(T, ScopedVersionedTableIF[T])
+	SetPointHandler(f func(T, ScopedVersionedTableIF[T]))
+	GetPointHandler() func(T, ScopedVersionedTableIF[T])
 }
 
 type VariableKind int
@@ -96,8 +96,8 @@ type Versioned[T versionedValue] struct {
 	isAssigned *utils.AtomicBool
 	Value      T
 
-	kind        VariableKind
-	pointHandle func(T, ScopedVersionedTableIF[T])
+	kind         VariableKind
+	pointHandler func(T, ScopedVersionedTableIF[T])
 }
 
 func (v *Versioned[T]) GetId() int64 {
@@ -203,24 +203,24 @@ func NewVersioned[T versionedValue](globalIndex int, name string, local bool, sc
 	return ret
 }
 
-func (v *Versioned[T]) SetPointHandle(f func(T, ScopedVersionedTableIF[T])) {
-	v.pointHandle = f
+func (v *Versioned[T]) SetPointHandler(f func(T, ScopedVersionedTableIF[T])) {
+	v.pointHandler = f
 }
 
-func (v *Versioned[T]) GetPointHandle() func(T, ScopedVersionedTableIF[T]) {
-	return v.pointHandle
+func (v *Versioned[T]) GetPointHandler() func(T, ScopedVersionedTableIF[T]) {
+	return v.pointHandler
 }
 
-func (v *Versioned[T]) PointHandle(value T, scope ScopedVersionedTableIF[T]) {
-	if v.pointHandle != nil {
-		v.pointHandle(value, scope)
+func (v *Versioned[T]) PointHandler(value T, scope ScopedVersionedTableIF[T]) {
+	if v.pointHandler != nil {
+		v.pointHandler(value, scope)
 	}
 }
 
 func (v *Versioned[T]) PointHandleOnce(value T, scope ScopedVersionedTableIF[T]) {
-	if v.pointHandle != nil {
-		v.pointHandle(value, scope)
-		v.pointHandle = nil
+	if v.pointHandler != nil {
+		v.pointHandler(value, scope)
+		v.pointHandler = nil
 	}
 }
 
