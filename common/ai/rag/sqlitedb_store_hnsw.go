@@ -190,10 +190,12 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	tx := s.db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
-			tx.Rollback()
+			log.Errorf("recover from panic when adding docs: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
 		}
 	}()
 
+	var updateIds []string
 	for _, doc := range docs {
 		// 确保文档有 ID
 		if doc.ID == "" {
@@ -223,6 +225,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 				tx.Rollback()
 				return utils.Errorf("更新文档失败: %v", err)
 			}
+			updateIds = append(updateIds, doc.ID)
 		} else if result.Error == gorm.ErrRecordNotFound {
 			// 创建新文档
 			if err := tx.Create(schemaDoc).Error; err != nil {
@@ -248,6 +251,9 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	err := tx.Commit().Error
 	if err != nil {
 		return err
+	}
+	for _, id := range updateIds {
+		s.hnsw.Delete(id)
 	}
 	s.hnsw.Add(nodes...)
 
@@ -367,24 +373,13 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	tx := s.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
+	utils.GormTransactionReturnDb(s.db, func(tx *gorm.DB) {
+		for _, id := range ids {
+			if err := tx.Where("document_id = ?", id).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
+				log.Errorf("删除文档 %s 失败: %v", id, err)
+			}
 		}
-	}()
-
-	for _, id := range ids {
-		if err := tx.Where("document_id = ?", id).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
-			tx.Rollback()
-			return utils.Errorf("删除文档 %s 失败: %v", id, err)
-		}
-	}
-
-	err := tx.Commit().Error
-	if err != nil {
-		return err
-	}
+	})
 
 	for _, id := range ids {
 		s.hnsw.Delete(id)

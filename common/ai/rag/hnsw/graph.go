@@ -9,6 +9,8 @@ import (
 	"slices"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
 )
 
@@ -479,6 +481,10 @@ func ptr[T any](v T) *T {
 // If another node with the same ID exists, it is replaced.
 func (g *Graph[K]) Add(nodes ...Node[K]) {
 	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("recover from panic when adding nodes: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
 		if g.OnLayersChange != nil {
 			g.OnLayersChange(g.Layers)
 		}
