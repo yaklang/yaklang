@@ -170,6 +170,8 @@ type ImageDescription struct {
 type ChatBaseContext struct {
 	PoCOptionGenerator  func() ([]poc.PocConfigOption, error)
 	EnableThinking      bool
+	EnableThinkingField string
+	EnableThinkingValue any
 	ThinkingBudget      int64
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
@@ -188,6 +190,14 @@ func WithChatBase_ThinkingBudget(budget int64) ChatBaseOption {
 func WithChatBase_EnableThinking(b bool) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.EnableThinking = b
+	}
+}
+
+func WithChatBase_EnableThinkingEx(b bool, key string, value any) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.EnableThinking = b
+		c.EnableThinkingField = key
+		c.EnableThinkingValue = value
 	}
 }
 
@@ -263,13 +273,28 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		msgs = append(msgs, NewUserChatDetailEx(contents))
 	}
 	msgIns := NewChatMessage(model, msgs)
-
 	handleStream := streamHandler != nil
 	if handleStream {
 		msgIns.Stream = true
 	}
 
-	raw, err := json.Marshal(msgIns)
+	var msgResult any = msgIns
+	var raw []byte
+	if ctx.EnableThinkingField != "" {
+		raw, err = json.Marshal(msgIns)
+		if err != nil {
+			return "", utils.Errorf("marshal msg[%v] to json failed: %s", spew.Sdump(msgIns), err)
+		}
+		msgMap := make(map[string]any)
+		err = json.Unmarshal(raw, &msgMap)
+		if err != nil {
+			return "", utils.Errorf("unmarshal msg[%v] to map failed: %s", string(raw), err)
+		}
+		msgMap[ctx.EnableThinkingField] = ctx.EnableThinkingValue
+		msgResult = msgMap
+	}
+
+	raw, err = json.Marshal(msgResult)
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}

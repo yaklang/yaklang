@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"os"
 	"strings"
@@ -45,6 +46,69 @@ type AIConfig struct {
 	HTTPErrorHandler func(error)
 
 	Images []*ImageDescription
+
+	Headers             []*ypb.HTTPHeader
+	EnableThinking      bool
+	EnableThinkingField string
+	EnableThinkingValue any
+}
+
+func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Headers = append(c.Headers, headers...)
+	}
+}
+
+func WithExtraHeaderString(key string, value string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Headers = append(c.Headers, &ypb.HTTPHeader{
+			Header: key,
+			Value:  value,
+		})
+	}
+}
+
+func WithEnableThinkingEx(thinkField string, thinkValue any) AIConfigOption {
+	return func(config *AIConfig) {
+		if thinkField != "" && thinkValue != nil {
+			config.EnableThinkingField = thinkField
+			config.EnableThinkingValue = thinkValue
+		}
+	}
+}
+
+func WithEnableThinking(t any) AIConfigOption {
+	return func(config *AIConfig) {
+		if utils.IsNil(t) {
+			return
+		}
+		switch t.(type) {
+		case bool:
+			config.EnableThinking = t.(bool)
+			return
+		}
+
+		switch utils.InterfaceToString(t) {
+		case "yes", "y", "true", "1", "enable", "on", "auto", "a", "enabled":
+			config.EnableThinking = true
+		default:
+			config.EnableThinking = false
+		}
+
+		switch config.Type {
+		case "volcengine":
+			config.EnableThinkingField = "thinking"
+			if config.EnableThinking {
+				config.EnableThinkingValue = map[string]any{
+					"type": "enabled",
+				}
+			} else {
+				config.EnableThinkingValue = map[string]any{
+					"type": "disabled",
+				}
+			}
+		}
+	}
 }
 
 func WithHost(h string) AIConfigOption {

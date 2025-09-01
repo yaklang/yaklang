@@ -257,11 +257,12 @@ func ChatWithStream(
 	httpErrHandler func(err error),
 	reasonStream func(io.Reader),
 	opt func() ([]poc.PocConfigOption, error),
+	opts ...ChatBaseOption,
 ) (io.Reader, error) {
 	pr, pw := utils.NewBufPipe(nil)
 	reasonPr, reasonPw := utils.NewBufPipe(nil)
-	go func() {
-		_, _ = ChatBase(url, model, msg, WithChatBase_PoCOptions(opt), WithChatBase_StreamHandler(func(reader io.Reader) {
+	baseOpt := []ChatBaseOption{
+		WithChatBase_PoCOptions(opt), WithChatBase_StreamHandler(func(reader io.Reader) {
 			defer func() {
 				reasonPw.Close()
 				pw.Close()
@@ -273,7 +274,12 @@ func ChatWithStream(
 			}
 		}), WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
 			io.Copy(pw, reader)
-		}), WithChatBase_ErrHandler(httpErrHandler))
+		}), WithChatBase_ErrHandler(httpErrHandler),
+	}
+
+	baseOpt = append(baseOpt, opts...)
+	go func() {
+		_, _ = ChatBase(url, model, msg, baseOpt...)
 	}()
 	return mergeReasonIntoOutputStream(reasonPr, pr), nil
 }

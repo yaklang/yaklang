@@ -42,7 +42,13 @@ func init() {
 		return &tongyi.GetawayClient{}
 	})
 	aispec.Register("volcengine", func() aispec.AIClient {
-		return &volcengine.GetawayClient{}
+		return &volcengine.GetawayClient{
+			ExtraOptions: []aispec.AIConfigOption{
+				aispec.WithEnableThinkingEx("thinking", map[string]any{
+					"type": "disabled",
+				}),
+			},
+		}
 	})
 	aispec.Register("comate", func() aispec.AIClient {
 		return &comate.Client{}
@@ -261,29 +267,6 @@ func GetPrimaryAgent() aispec.AIClient {
 	return agent
 }
 
-func ChatStream(msg string, opts ...aispec.AIConfigOption) (io.Reader, error) {
-	config := aispec.NewDefaultAIConfig(opts...)
-	var responseStream io.Reader
-	var err error
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
-		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
-		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
-			return false
-		}
-		responseStream, err = gateway.ChatStream(msg)
-		if err != nil {
-			log.Warnf("chat stream by %s failed: %s", typ, err)
-			return false
-		}
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-	return responseStream, nil
-}
-
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp string
@@ -291,9 +274,10 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
+			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false
 		}
+		log.Infof("start to chat completions by %v", typ)
 		responseRsp, err = gateway.Chat(msg)
 		if err != nil {
 			log.Warnf("chat by %s failed: %s", typ, err)
@@ -411,6 +395,7 @@ var Exports = map[string]any{
 	"ListModels":              ListModels,
 	"ListModelByProviderType": ListModelByProviderType,
 
+	"thinking":           aispec.WithEnableThinking,
 	"timeout":            aispec.WithTimeout,
 	"proxy":              aispec.WithProxy,
 	"model":              aispec.WithModel,
