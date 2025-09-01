@@ -38,7 +38,6 @@ func NewCoolDownContext(d time.Duration, ctx context.Context) *CoolDown {
 			case cd.coreChan <- nil:
 			case <-cd.ctx.Done():
 				return
-			default:
 			}
 		}
 	}()
