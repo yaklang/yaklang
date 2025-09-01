@@ -12,10 +12,11 @@ import (
 )
 
 type ChatMessage struct {
-	Model          string       `json:"model"`
-	Messages       []ChatDetail `json:"messages"`
-	Stream         bool         `json:"stream"`
-	EnableThinking bool         `json:"enable_thinking,omitempty"`
+	Model              string       `json:"model"`
+	Messages           []ChatDetail `json:"messages"`
+	Stream             bool         `json:"stream"`
+	EnableThinking     bool         `json:"enable_thinking,omitempty"`
+	VolcengineThinking any          `json:"thinking,omitempty"`
 }
 
 type ChatDetail struct {
