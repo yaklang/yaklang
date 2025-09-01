@@ -86,7 +86,12 @@ func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, 
 		if err != nil {
 			return nil, false, utils.Errorf("SyntaxFlow compile error: %v", err)
 		}
-		return frame, true, nil
+		// compile only with rule.Content will lose original rule schema info
+		// so set it back here
+		newFrame := newSfFrameEx(s.vars, rule.Content, frame.Codes, rule, s.config)
+		newFrame.config = s.config
+		newFrame.vm = s
+		return newFrame, true, nil
 	}
 }
 
