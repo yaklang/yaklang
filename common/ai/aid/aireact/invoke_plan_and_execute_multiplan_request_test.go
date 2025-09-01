@@ -4,15 +4,17 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/segmentio/ksuid"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"testing"
 	"time"
+
+	"github.com/segmentio/ksuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func mockedRequestPlanAndExecuting_MultiPlans(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
@@ -22,6 +24,16 @@ func mockedRequestPlanAndExecuting_MultiPlans(i aicommon.AICallerConfigIf, req *
 		rsp.EmitOutputStream(bytes.NewBufferString(`
 {"@action": "object", "next_action": { "type": "request_plan_and_execution", "plan_request_payload": "` + flag + `" },
 "human_readable_thought": "mocked thought for plan-exec", "cumulative_summary": "..cumulative-mocked for plan and exec.."}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(prompt, "directly_answer", "require_tool") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "object", "next_action": { "type": "directly_answer", "answer_payload": "` + "mocked answer directly after plan" + `" },
+"human_readable_thought": "mocked thought for answer", "cumulative_summary": "..cumulative-mocked for answer after plan and exec.."}
 `))
 		rsp.Close()
 		return rsp, nil
@@ -106,6 +118,8 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 	planEnd := false
 	var iid string
 	_ = iid
+	var processCount = 0
+	directlyAnswer := false
 LOOP:
 	for {
 		select {
@@ -119,11 +133,20 @@ LOOP:
 				planStart = true
 			}
 
+			if e.Type == string(schema.EVENT_TYPE_STRUCTURED) {
+				resultRaw := jsonpath.FindFirst(e.Content, `$..react_task_now_status`)
+				result := utils.InterfaceToString(resultRaw)
+				if result == "processing" {
+					processCount++
+				}
+			}
+
 			if e.Type == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
 				planEnd = true
 			}
 
-			if e.Type == string(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE) {
+			if e.Type == string(schema.EVENT_TYPE_RESULT) {
+				directlyAnswer = true
 				break LOOP
 			}
 		case <-after:
@@ -150,6 +173,10 @@ LOOP:
 
 	if !planMatchFlag {
 		t.Fatal("Expected planMatchFlag to be true")
+	}
+
+	if !directlyAnswer {
+		t.Fatal("Expected directly answer to be true")
 	}
 
 	fmt.Println("--------------------------------------")
