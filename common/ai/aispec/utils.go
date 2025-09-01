@@ -46,8 +46,24 @@ func ShrinkAndSafeToFile(i any) string {
 var EnableNewLoadOption = true
 
 func GetBaseURLFromConfig(config *AIConfig, defaultRootUrl, defaultUri string) string {
+	return GetBaseURLFromConfigEx(config, defaultRootUrl, defaultUri, true)
+}
+
+func GetBaseURLFromConfigEx(config *AIConfig, defaultRootUrl, defaultUri string, openaiMode bool) string {
 	fixDomain(config)
+
+	keepChatCompletionsSuffix := func(s string) string {
+		if !strings.HasSuffix(s, "/chat/completions") {
+			trimSlash := strings.TrimRight(s, "/")
+			s = trimSlash + "/chat/completions"
+		}
+		return s
+	}
+
 	if config.BaseURL != "" {
+		if openaiMode {
+			config.BaseURL = keepChatCompletionsSuffix(config.BaseURL)
+		}
 		return config.BaseURL
 	}
 	// 按照NoHttps修改defaultRootUrl的scheme
@@ -66,7 +82,14 @@ func GetBaseURLFromConfig(config *AIConfig, defaultRootUrl, defaultUri string) s
 	}
 	urlPath, err := url.JoinPath(rootUrl, defaultUri)
 	if err != nil {
-		return rootUrl + defaultUri
+		result := rootUrl + defaultUri
+		if openaiMode {
+			result = keepChatCompletionsSuffix(result)
+		}
+		return result
+	}
+	if openaiMode {
+		urlPath = keepChatCompletionsSuffix(urlPath)
 	}
 	return urlPath
 }
