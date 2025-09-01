@@ -54,7 +54,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			log.Infof("Received AI input event: %v", event)
 			result, err := aid.ConvertAIInputEventToAIDInputEvent(event)
 			if err != nil {
-				log.Errorf("Failed to convert AI input event to AID input event: %v", err)
+				log.Errorf("Failed to convert AI input event to AID input event: %v, data: %v", err, event)
 				return
 			}
 			inputChannel <- result
