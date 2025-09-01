@@ -845,7 +845,7 @@ func coverType(ityp, iwantTyp ssa.Type) {
 		})
 	}
 	for n, a := range wantTyp.AnonymousField {
-		// TODO: 匿名结构体应该是一个指针，修改时应该要连带父类一起修改
+		// TODO: 匿名结构体可能是一个指针，修改时应该要连带父类一起修改
 		typ.AnonymousField[n] = a
 	}
 }

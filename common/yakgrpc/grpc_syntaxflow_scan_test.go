@@ -908,7 +908,6 @@ alert $high for {
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffProg(t *testing.T) {
-	t.Skip()
 	progID := uuid.NewString()
 	ruleName1 := uuid.NewString()
 	ruleName2 := uuid.NewString()
