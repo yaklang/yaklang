@@ -67,18 +67,12 @@ func JoinErrors(errs ...error) error {
 		return nil
 	}
 
-	msg := ""
 	var st *stack = &stack{st: make([]uintptr, 0, 1)}
 	st.appendCurrentFrame()
 
 	newErrs := make([]error, 0, len(errs))
 
-	lenOfErrors := len(errs)
-	for i, err := range errs {
-		msg += err.Error()
-		if i < lenOfErrors-1 {
-			msg += " | "
-		}
+	for _, err := range errs {
 		if yakError, ok := err.(*YakError); ok {
 			newErrs = append(newErrs, yakError.originalErrors...)
 			st.appendEmptyFrame()
@@ -89,7 +83,7 @@ func JoinErrors(errs ...error) error {
 	}
 
 	return &YakError{
-		msg:            msg,
+		msg:            "", // msg will be built on demand in Error()
 		originalErrors: errs,
 		stack:          st,
 	}
@@ -143,6 +137,26 @@ func (err *YakError) Cause() []error {
 }
 
 func (err *YakError) Error() string {
+	if err == nil {
+		return "<nil>"
+	}
+	if err.msg != "" {
+		return err.msg
+	}
+	if len(err.originalErrors) > 0 {
+		var sb strings.Builder
+		for i, e := range err.originalErrors {
+			if e == nil {
+				continue
+			}
+			sb.WriteString(e.Error())
+			if i < len(err.originalErrors)-1 {
+				sb.WriteString(" | ")
+			}
+		}
+		err.msg = sb.String()
+		return err.msg
+	}
 	return err.msg
 }
 
