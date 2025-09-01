@@ -23,7 +23,7 @@ func ToOpCodes(code string) (*OpCodes, bool) {
 		return nil, false
 	}
 	// check version
-	if opcodes.Version != "dev" && opcodes.Version != consts.GetYakVersion() {
+	if consts.GetYakVersion() != "dev" && opcodes.Version != "dev" && opcodes.Version != consts.GetYakVersion() {
 		return nil, false
 	}
 
