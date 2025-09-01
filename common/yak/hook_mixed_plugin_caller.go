@@ -26,17 +26,17 @@ import (
 )
 
 var defaultInvalidSuffix = []string{
-	"\\.js",
-	"\\.css",
-	"\\.xml",
-	"\\.jpg", "\\.jpeg", "\\.png",
-	"\\.mp3", "\\.mp4", "\\.ico", "\\.bmp",
-	"\\.flv", "\\.aac", "\\.ogg", "\\.avi",
-	"\\.svg", "\\.gif", "\\.woff", "\\.woff2",
-	"\\.doc", "\\.docx", "\\.pptx",
-	"\\.ppt", "\\.pdf",
-	"\\.swf",
-	"\\.json",
+	".js",
+	".css",
+	".xml",
+	".jpg", ".jpeg", ".png",
+	".mp3", ".mp4", ".ico", ".bmp",
+	".flv", ".aac", ".ogg", ".avi",
+	".svg", ".gif", ".woff", ".woff2",
+	".doc", ".docx", ".pptx",
+	".ppt", ".pdf",
+	".swf",
+	".json",
 }
 
 var staticContentTypes = []string{
@@ -447,9 +447,12 @@ func (c *MixPluginCaller) IsPassed(target string) bool {
 }
 
 func (c *MixPluginCaller) IsStatic(rawUrl string, req, rsp []byte) bool {
-	if !utils.IncludeExcludeChecker(nil, defaultInvalidSuffix, strings.Split(rawUrl, "?")[0]) {
-		return true
+	for _, d := range defaultInvalidSuffix {
+		if strings.HasSuffix(strings.Split(rawUrl, "?")[0], d) {
+			return true
+		}
 	}
+
 	contentTypeReq := lowhttp.GetHTTPPacketHeader(req, "Content-Type")
 	contentTypeRsp := lowhttp.GetHTTPPacketHeader(rsp, "Content-Type")
 	// acceptHeader := lowhttp.GetHTTPPacketHeader(request, "Accept")
