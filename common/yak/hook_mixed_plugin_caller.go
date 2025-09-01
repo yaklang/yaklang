@@ -448,7 +448,7 @@ func (c *MixPluginCaller) IsPassed(target string) bool {
 
 func (c *MixPluginCaller) IsStatic(rawUrl string, req, rsp []byte) bool {
 	for _, d := range defaultInvalidSuffix {
-		if strings.HasSuffix(strings.Split(rawUrl, "?")[0], d) {
+		if strings.HasSuffix(strings.Split(strings.ToLower(rawUrl), "?")[0], d) {
 			return true
 		}
 	}
