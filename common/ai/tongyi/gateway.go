@@ -41,10 +41,6 @@ func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
 	)
 }
 
-func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
-}
-
 func (g *GetawayClient) ChatStream(s string) (io.Reader, error) {
 	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
 }

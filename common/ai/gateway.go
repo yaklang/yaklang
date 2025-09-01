@@ -110,10 +110,6 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 	)
 }
 
-func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.TargetUrl, g.Config.Model, details, function, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler)
-}
-
 func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
 	return aispec.ChatBasedExtractData(g.TargetUrl, g.Config.Model, msg, fields, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler, g.Config.ReasonStreamHandler, g.Config.HTTPErrorHandler)
 }
@@ -309,27 +305,6 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		return "", err
 	}
 	return responseRsp, nil
-}
-
-func ChatEx(details []aispec.ChatDetail, opts ...aispec.AIConfigOption) (responseChoice []aispec.ChatChoice, err error) {
-	config := aispec.NewDefaultAIConfig(opts...)
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
-		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
-		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
-			return false
-		}
-		responseChoice, err = gateway.ChatEx(details)
-		if err != nil {
-			log.Debugf("chat by %s failed: %s", typ, err)
-			return false
-		}
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-	return
 }
 
 func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec.StructuredData, error) {

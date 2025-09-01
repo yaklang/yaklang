@@ -58,10 +58,6 @@ func (d *DashScopeGateway) Chat(s string, function ...any) (string, error) {
 	return buf.String(), nil
 }
 
-func (d *DashScopeGateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, utils.Error("not implemented: dashscope is not supported openai style chat ex")
-}
-
 func (d *DashScopeGateway) ChatStream(s string) (io.Reader, error) {
 	ch, err := d.StructuredStream(s)
 	if err != nil {
