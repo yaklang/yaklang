@@ -1400,8 +1400,8 @@
   {
     "rule_id": "7138efeb-bd0b-4dd1-a728-a5d84c3bfa61",
     "rule_name": "检测PHP不安全的文件上传漏洞",
-    "hash": "2a68c22c9aa5291727d195da9706c4d1cd7eadc575a7905b1e1b658cdd6d8826",
-    "version": "20250820.0001"
+    "hash": "be510178974b3823d80ff508cdf4e02949775a107ca6672e806e351868483bdf",
+    "version": "20250901.0001"
   },
   {
     "rule_id": "1265a300-b3a3-4f8f-acac-731ec80c5906",
@@ -1438,6 +1438,12 @@
     "rule_name": "检测PHP变量覆盖漏洞",
     "hash": "d80e63a532f3cfe047bb6d22d9ba011dd022399bdf81ad3243f481bed2403118",
     "version": "20250820.0001"
+  },
+  {
+    "rule_id": "30e74fdd-c346-4db2-a124-f0b04dfd55e1",
+    "rule_name": "内容安全策略 (CSP) 安全评估",
+    "hash": "d8efe53468428fcb5c2130f681cb756cb5fec331607fbb3709e2eb0cc81bb198",
+    "version": "20250901.0001"
   },
   {
     "rule_id": "a6f3be4b-5f16-46d8-8e0b-9182e5078345",
@@ -1496,8 +1502,8 @@
   {
     "rule_id": "d54faf3f-f4a3-4d19-a882-c29abf9b7901",
     "rule_name": "检测PHP跨站脚本漏洞",
-    "hash": "8ed09f1c1b10148ecae21ccb07350859d271f278349f25abef3e250d0b3c14b8",
-    "version": "20250820.0001"
+    "hash": "04ae00dac2fccc8f1614487ecd9eb29edea4016a3de03ac01bcbe534a6de70fa",
+    "version": "20250901.0001"
   },
   {
     "rule_id": "746fdb55-f824-4633-a6f4-4d71fb471ea3",
@@ -1514,8 +1520,8 @@
   {
     "rule_id": "df78b6fe-a4ca-4ef0-91ee-d9f23b651e3f",
     "rule_name": "检测PHP ThinkPHP SQL注入漏洞",
-    "hash": "5923051b9ad1373ada1274bf58cc88838c6342b55938c0f6e828da0489395810",
-    "version": "20250822.0001"
+    "hash": "b2de30138dee3a180f8571c793422061e7b90759bb27ad5d9af90c7ce92b40b1",
+    "version": "20250901.0001"
   },
   {
     "rule_id": "c773c9e1-71f1-4aed-b71f-68b8e468786f",
@@ -1582,5 +1588,11 @@
     "rule_name": "检测PHP Cookie安全设置",
     "hash": "a44863b81c5129d7ad2e9b9bd6c6a041211111daebe79c7c0d6ef9133ce43068",
     "version": "20250820.0001"
+  },
+  {
+    "rule_id": "b072f796-18df-495b-b705-68be589a0e2c",
+    "rule_name": "可预测的Cookie值（伪随机）",
+    "hash": "1f4791c16cca0cfd8a562f04f17dbb2d947dd3509caf4a8b514180c2434b3152",
+    "version": "20250901.0001"
   }
 ]
