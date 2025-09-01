@@ -135,6 +135,11 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 		if currentTask.IsFinished() {
 			break
 		}
+
+		if planTask := r.GetCurrentPlanExecutionTask(); (!utils.IsNil(planTask)) && planTask.GetId() == currentTask.GetId() {
+			break
+		}
+
 		r.currentIteration++
 		r.EmitIteration(r.currentIteration, r.config.maxIterations)
 
@@ -328,6 +333,8 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			}()
 			select {
 			case <-taskStarted:
+				r.addToTimeline("plan_execution", fmt.Sprintf("plan: %v is started", planPayload))
+				log.Infof("Plan execution task started")
 			}
 		case ActionAskForClarification:
 			saveIterationInfoIntoTimeline()

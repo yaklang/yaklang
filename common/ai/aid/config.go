@@ -916,6 +916,15 @@ func WithDisableToolUse(i ...bool) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 
+		if config == nil {
+			log.Error("BUG: config cannot be empty in aid.Config Option")
+			return nil
+		}
+
+		if config.memory == nil {
+			config.memory = GetDefaultMemory()
+		}
+
 		if len(i) <= 0 {
 			config.memory.DisableTools = true
 		} else {
