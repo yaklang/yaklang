@@ -439,7 +439,7 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 	return right, left
 }
 
-func (b *astbuilder) buildInitializerList(ast *cparser.InitializerListContext) ssa.Value {
+func (b *astbuilder) buildInitializerList(ast *cparser.InitializerListContext, ssatype ...ssa.Type) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -447,8 +447,14 @@ func (b *astbuilder) buildInitializerList(ast *cparser.InitializerListContext) s
 	for _, d := range ast.AllDesignation() {
 		keys = append(keys, b.buildDesignation(d.(*cparser.DesignationContext))...)
 	}
+	if len(ssatype) > 0 && len(keys) == 0 {
+		if objType, ok := ssa.ToObjectType(ssatype[0]); ok {
+			keys = append(keys, objType.Keys...)
+		}
+	}
+
 	for _, i := range ast.AllInitializer() {
-		values = append(values, b.buildInitializer(i.(*cparser.InitializerContext)))
+		values = append(values, b.buildInitializer(i.(*cparser.InitializerContext), ssatype...))
 	}
 	obj := b.InterfaceAddFieldBuild(len(values), func(i int) ssa.Value {
 		if i >= len(keys) {
@@ -458,11 +464,13 @@ func (b *astbuilder) buildInitializerList(ast *cparser.InitializerListContext) s
 	}, func(i int) ssa.Value {
 		return values[i]
 	})
-
+	if len(ssatype) > 0 {
+		coverType(obj.GetType(), ssatype[0])
+	}
 	return obj
 }
 
-func (b *astbuilder) buildInitializer(ast *cparser.InitializerContext) ssa.Value {
+func (b *astbuilder) buildInitializer(ast *cparser.InitializerContext, ssatype ...ssa.Type) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
@@ -470,7 +478,7 @@ func (b *astbuilder) buildInitializer(ast *cparser.InitializerContext) ssa.Value
 		value, _ := b.buildExpression(a.(*cparser.ExpressionContext), false)
 		return value
 	} else if i := ast.InitializerList(); i != nil {
-		return b.buildInitializerList(i.(*cparser.InitializerListContext))
+		return b.buildInitializerList(i.(*cparser.InitializerListContext), ssatype...)
 	}
 	return b.EmitConstInst(0)
 }
@@ -688,4 +696,34 @@ func isCFloatLiteral(text string) bool {
 
 func parseCFloat(text string) (float64, error) {
 	return strconv.ParseFloat(text, 64)
+}
+
+func coverType(ityp, iwantTyp ssa.Type) {
+	typ, ok := ityp.(*ssa.ObjectType)
+	if !ok {
+		return
+	}
+	wantTyp, ok := iwantTyp.(*ssa.ObjectType)
+	if !ok {
+		return
+	}
+
+	typ.SetTypeKind(wantTyp.GetTypeKind())
+	switch wantTyp.GetTypeKind() {
+	case ssa.SliceTypeKind:
+		typ.FieldType = wantTyp.FieldType
+	case ssa.MapTypeKind:
+		typ.FieldType = wantTyp.FieldType
+		typ.KeyTyp = wantTyp.KeyTyp
+	case ssa.StructTypeKind:
+		typ.FieldType = wantTyp.FieldType
+		typ.KeyTyp = wantTyp.KeyTyp
+		wantTyp.RangeMethod(func(s string, f *ssa.Function) {
+			typ.AddMethod(s, f)
+		})
+	}
+	for n, a := range wantTyp.AnonymousField {
+		// TODO: 匿名结构体可能是一个指针，修改时应该要连带父类一起修改
+		typ.AnonymousField[n] = a
+	}
 }

@@ -340,7 +340,7 @@ func (b *astbuilder) buildDeclaration(ast *cparser.DeclarationContext) {
 	if d := ast.DeclarationSpecifier(); d != nil {
 		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
 		if init := ast.InitDeclaratorList(); init != nil {
-			lefts, indexs := b.buildInitDeclaratorList(init.(*cparser.InitDeclaratorListContext))
+			lefts, indexs := b.buildInitDeclaratorList(init.(*cparser.InitDeclaratorListContext), ssatype)
 			for i, l := range lefts {
 				if l.GetValue() == nil {
 					right := b.GetDefaultValue(ssatype)
@@ -368,28 +368,28 @@ func (b *astbuilder) buildStaticAssertDeclaration(ast *cparser.StaticAssertDecla
 	}
 }
 
-func (b *astbuilder) buildInitDeclaratorList(ast *cparser.InitDeclaratorListContext) ([]*ssa.Variable, []int) {
+func (b *astbuilder) buildInitDeclaratorList(ast *cparser.InitDeclaratorListContext, ssatype ...ssa.Type) ([]*ssa.Variable, []int) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	var lefts []*ssa.Variable
 	var indexs []int
 	for _, i := range ast.AllInitDeclarator() {
-		left, index := b.buildInitDeclarator(i.(*cparser.InitDeclaratorContext))
+		left, index := b.buildInitDeclarator(i.(*cparser.InitDeclaratorContext), ssatype...)
 		lefts = append(lefts, left)
 		indexs = append(indexs, index)
 	}
 	return lefts, indexs
 }
 
-func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext) (*ssa.Variable, int) {
+func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext, ssatype ...ssa.Type) (*ssa.Variable, int) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
 	if d := ast.Declarator(); d != nil {
 		left, right, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), VARIABLE_KIND)
 		if e := ast.Initializer(); e != nil {
-			initial := b.buildInitializer(e.(*cparser.InitializerContext))
+			initial := b.buildInitializer(e.(*cparser.InitializerContext), ssatype...)
 			b.AssignVariable(left, initial)
 			return left, -1
 		}
