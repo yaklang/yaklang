@@ -42,6 +42,7 @@ func (r *ReAct) processReActFromQueue() {
 
 // processReActTask 处理单个 Task
 func (r *ReAct) processReActTask(task *Task) {
+	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
 		r.setCurrentTask(nil) // 处理完成后清除当前任务
 		if err := recover(); err != nil {
@@ -53,7 +54,9 @@ func (r *ReAct) processReActTask(task *Task) {
 			if r.config.debugEvent {
 				log.Infof("Finished processing task: %s", task.GetId())
 			}
-			task.SetStatus(string(TaskStatus_Completed))
+			if !skipStatusFallback.IsSet() {
+				task.SetStatus(string(TaskStatus_Completed))
+			}
 		}
 	}()
 
@@ -64,14 +67,17 @@ func (r *ReAct) processReActTask(task *Task) {
 
 	r.finished = false
 	r.currentIteration = 0
-	err := r.executeMainLoop(userInput)
+	skipStatus, err := r.executeMainLoop(userInput)
 	if err != nil {
 		log.Errorf("Task execution failed: %v", err)
 		task.SetStatus(string(TaskStatus_Aborted))
 		r.addToTimeline("error", fmt.Sprintf("Task execution failed: %v", err))
-	} else {
+		return
+	}
+	if !skipStatus {
 		task.SetStatus(string(TaskStatus_Completed))
 	}
+	skipStatusFallback.SetTo(skipStatus)
 }
 
 // generateMainLoopPrompt generates the prompt for the main ReAct loop
@@ -103,7 +109,7 @@ func (r *ReAct) generateMainLoopPrompt(
 }
 
 // executeMainLoop executes the main ReAct loop
-func (r *ReAct) executeMainLoop(userQuery string) error {
+func (r *ReAct) executeMainLoop(userQuery string) (skipTaskStatusChange bool, err error) {
 	currentTask := r.GetCurrentTask()
 
 	skipContextCancel := utils.NewAtomicBool()
@@ -131,6 +137,8 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 
 	// Reset iteration state for new conversation
 	r.currentIteration = 0
+	skipTaskStatusChange = false
+
 LOOP:
 	for r.currentIteration < r.config.maxIterations {
 		if currentTask.IsFinished() {
@@ -144,7 +152,7 @@ LOOP:
 		tools, err := r.config.aiToolManager.GetEnableTools()
 		if err != nil {
 			log.Errorf("Failed to get available tools: %v", err)
-			return utils.Errorf("failed to get available tools: %v", err)
+			return false, utils.Errorf("failed to get available tools: %v", err)
 		}
 		log.Infof("start to generate main loop prompt with %d tools", len(tools))
 		prompt := r.generateMainLoopPrompt(userQuery, tools)
@@ -338,7 +346,8 @@ LOOP:
 			case <-taskStarted:
 				r.addToTimeline("plan_execution", fmt.Sprintf("plan: %v is started", planPayload))
 				close(timelineStartPlanChan)
-				log.Infof("Plan execution task started")
+				log.Infof("plan execution task started")
+				skipTaskStatusChange = true
 				break LOOP
 			}
 		case ActionAskForClarification:
@@ -370,5 +379,5 @@ LOOP:
 	if r.currentIteration >= r.config.maxIterations {
 		r.EmitWarning("Too many iterations[%v] is reached, stopping ReAct loop, max: %v", r.currentIteration, r.config.maxIterations)
 	}
-	return nil
+	return skipTaskStatusChange, nil
 }

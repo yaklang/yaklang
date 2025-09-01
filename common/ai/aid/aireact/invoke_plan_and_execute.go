@@ -53,6 +53,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	if r.config.hijackPlanRequest != nil {
 		r.EmitAction("hijack plan and execute in re-act mode")
 		log.Infof("hijack plan and execute in re-act mode with payload: %v", utils.ShrinkString(planPayload, 200))
+		done()
 		return r.config.hijackPlanRequest(planCtx, planPayload)
 	}
 
