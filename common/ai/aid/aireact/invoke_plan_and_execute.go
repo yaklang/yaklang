@@ -48,6 +48,14 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	planCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// if hijackPlanRequest is set, use it to handle the plan request
+	// this is useful for testing/mocking and advanced usage
+	if r.config.hijackPlanRequest != nil {
+		r.EmitAction("hijack plan and execute in re-act mode")
+		log.Infof("hijack plan and execute in re-act mode with payload: %v", utils.ShrinkString(planPayload, 200))
+		return r.config.hijackPlanRequest(planCtx, planPayload)
+	}
+
 	inputChannel := make(chan *aid.InputEvent, 100)
 	r.RegisterMirrorOfAIInputEvent(uid, func(event *ypb.AIInputEvent) {
 		go func() {
