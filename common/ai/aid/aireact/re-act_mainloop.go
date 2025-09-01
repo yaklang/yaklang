@@ -131,13 +131,10 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 
 	// Reset iteration state for new conversation
 	r.currentIteration = 0
+LOOP:
 	for r.currentIteration < r.config.maxIterations {
 		if currentTask.IsFinished() {
-			break
-		}
-
-		if planTask := r.GetCurrentPlanExecutionTask(); (!utils.IsNil(planTask)) && planTask.GetId() == currentTask.GetId() {
-			break
+			break LOOP
 		}
 
 		r.currentIteration++
@@ -322,9 +319,15 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)
 			skipContextCancel.SetTo(true) // Plan execution will manage the context
 			taskStarted := make(chan struct{})
+			timelineStartPlanChan := make(chan struct{})
 			go func() {
 				defer func() {
+					select {
+					case <-timelineStartPlanChan:
+						r.addToTimeline("plan_execution", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
+					}
 					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
+					currentTask.SetStatus(string(TaskStatus_Completed))
 					r.SetCurrentPlanExecutionTask(nil)
 				}()
 				if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), planPayload); err != nil {
@@ -334,7 +337,9 @@ func (r *ReAct) executeMainLoop(userQuery string) error {
 			select {
 			case <-taskStarted:
 				r.addToTimeline("plan_execution", fmt.Sprintf("plan: %v is started", planPayload))
+				close(timelineStartPlanChan)
 				log.Infof("Plan execution task started")
+				break LOOP
 			}
 		case ActionAskForClarification:
 			saveIterationInfoIntoTimeline()
