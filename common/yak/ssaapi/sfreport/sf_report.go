@@ -552,7 +552,7 @@ func (r *RiskTypeOverview) ToMarkdownTable() string {
 `
 
 	// 应该展示的风险级别
-	severityLevels := []string{severityCritical, severityHigh, severityMiddle, severityLow}
+	severityLevels := []string{severityCritical, severityHigh, severityMiddle, severityLow, severityInfo}
 
 	// 获取所有风险类型并排序，确保输出一致性
 	riskTypes := make([]string, 0, len(r.RiskMap))
@@ -591,14 +591,13 @@ func (r *RiskTypeOverview) ToEChartsStackedBar() *EChartsOption {
 	}
 	sort.Strings(riskTypes)
 
-	// 过滤掉只有info级别或没有数据的风险类型
+	// 过滤掉没有数据的风险类型
 	validRiskTypes := make([]string, 0, len(riskTypes))
 	for _, riskType := range riskTypes {
 		severityMap := r.RiskMap[riskType]
 		hasValidData := false
-		// 检查是否有除info之外的风险级别
-		for severity, count := range severityMap {
-			if count > 0 && severity != severityInfo {
+		for _, count := range severityMap {
+			if count > 0 {
 				hasValidData = true
 				break
 			}
@@ -622,6 +621,7 @@ func (r *RiskTypeOverview) ToEChartsStackedBar() *EChartsOption {
 		{severityHigh, getSeverityInfo(severityHigh).Text, getSeverityInfo(severityHigh).Color},
 		{severityMiddle, getSeverityInfo(severityMiddle).Text, getSeverityInfo(severityMiddle).Color},
 		{severityLow, getSeverityInfo(severityLow).Text, getSeverityInfo(severityLow).Color},
+		{severityInfo, getSeverityInfo(severityInfo).Text, getSeverityInfo(severityInfo).Color},
 	}
 
 	// 计算每个风险类型的总数，用于计算该类型内部的占比
@@ -629,10 +629,8 @@ func (r *RiskTypeOverview) ToEChartsStackedBar() *EChartsOption {
 	for _, riskType := range validRiskTypes {
 		severityMap := r.RiskMap[riskType]
 		total := 0
-		for riskLevel, count := range severityMap {
-			if riskLevel != severityInfo {
-				total += count
-			}
+		for _, count := range severityMap {
+			total += count
 		}
 		riskTypeTotals[riskType] = total
 	}
