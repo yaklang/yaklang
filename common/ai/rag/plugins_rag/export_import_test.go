@@ -24,7 +24,7 @@ func TestMUSTPASS_ExportVectorData(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 2. 创建向量存储并添加测试数据
-	store, err := rag.NewSQLiteVectorStore(db, PLUGIN_RAG_COLLECTION_NAME, "text-embedding-3-small", 1536, nil)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +108,7 @@ func TestMUSTPASS_ImportVectorData_ExistingCollection(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 创建初始的Collection和Document
-	store, err := rag.NewSQLiteVectorStore(db, PLUGIN_RAG_COLLECTION_NAME, "text-embedding-3-small", 1536, nil)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +170,7 @@ func TestMUSTPASS_ImportVectorData_ExistingDocument(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 创建初始的Collection和Document
-	store, err := rag.NewSQLiteVectorStore(db, PLUGIN_RAG_COLLECTION_NAME, "text-embedding-3-small", 1536, nil)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func TestMUSTPASS_ImportVectorDataFullUpdate(t *testing.T) {
 
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
-	store, err := rag.NewSQLiteVectorStore(db, PLUGIN_RAG_COLLECTION_NAME, "text-embedding-3-small", 1536, nil)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -292,7 +292,7 @@ func TestMUSTPASS_ImportVectorDataFullUpdate(t *testing.T) {
 	var newCollection schema.VectorStoreCollection
 	err = db.Where("name = ?", PLUGIN_RAG_COLLECTION_NAME).First(&newCollection).Error
 	assert.NoError(t, err)
-	assert.Equal(t, "Created by SQLiteVectorStore", newCollection.Description)
+	assert.Equal(t, "test", newCollection.Description)
 
 	var newDocs []*schema.VectorStoreDocument
 	err = db.Model(&schema.VectorStoreDocument{}).Find(&newDocs).Error
