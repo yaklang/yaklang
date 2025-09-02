@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -102,13 +103,6 @@ func WithSSARiskFilterCompare(taskID1, taskID2 string) SSARiskFilterOption {
 		if taskID1 == "" || taskID2 == "" {
 			return
 		}
-		res, err := DoRiskDiff(context.Background(), &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1}, &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2})
-		if err != nil {
-			return
-		}
-		for re := range res {
-			_ = re
-		}
 		sf.SSARiskDiffRequest = &ypb.SSARiskDiffRequest{
 			BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
 			Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
@@ -122,6 +116,16 @@ func WithSSARiskFilterTaskID(taskID string) SSARiskFilterOption {
 			return
 		}
 		sf.RuntimeID = append(sf.RuntimeID, taskID)
+	}
+}
+
+func WithSSARiskFilterIncremental(taskId string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		if taskId == "" {
+			return
+		}
+		sf.IncrementalQuery = true
+		sf.RuntimeID = []string{taskId}
 	}
 }
 
@@ -147,33 +151,65 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 		return db
 	}
 
-	// db = db.Debug()
-	// 新增：处理SSARiskDiffRequest，只查新增风险
-	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
-		// 只查diff表中Status为"add"的CompareRiskHash
-		var diffResults []*schema.SSADiffResult
-		query := db.New().Model(&schema.SSADiffResult{})
-		if dr.GetBaseLine() != nil && dr.GetBaseLine().GetRiskRuntimeId() != "" {
-			query = query.Where("base_line = ?", dr.GetBaseLine().GetRiskRuntimeId())
-		}
-		if dr.GetCompare() != nil && dr.GetCompare().GetRiskRuntimeId() != "" {
-			query = query.Where("compare = ?", dr.GetCompare().GetRiskRuntimeId())
-		}
-		query = query.Where("status = ?", Add)
-		if err := query.Find(&diffResults).Error; err == nil && len(diffResults) > 0 {
-			hashes := make([]string, 0, len(diffResults))
-			for _, d := range diffResults {
-				if d.CompareRiskHash != "" {
-					hashes = append(hashes, d.CompareRiskHash)
+	// 增量查询
+	if filter.GetIncrementalQuery() {
+		currentTaskIDs := filter.GetRuntimeID()
+		if len(currentTaskIDs) > 0 {
+			currentTaskID := currentTaskIDs[0]
+			currentTaskInfo := &schema.SyntaxFlowScanTask{}
+
+			currentTaskQuery := db.New().Model(&schema.SyntaxFlowScanTask{}).
+				Where("task_id = ?", currentTaskID).
+				First(&currentTaskInfo)
+
+			if currentTaskQuery.Error != nil {
+				log.Errorf("Failed to query current task info: %v", currentTaskQuery.Error)
+				return db
+			}
+			// 查找同一程序中，在当前任务创建时间之前最近的一次任务
+			var lastTaskIDs []string
+			lastTaskQuery := db.New().Model(&schema.SyntaxFlowScanTask{}).
+				Where("created_at < ?", currentTaskInfo.CreatedAt).
+				Where("task_id != ?", currentTaskID).
+				Order("created_at DESC").
+				Limit(1).
+				Pluck("task_id", &lastTaskIDs)
+
+			if lastTaskQuery.Error == nil && len(lastTaskIDs) == 1 {
+				// 使用下面的对比查询
+				filter.SSARiskDiffRequest = &ypb.SSARiskDiffRequest{
+					BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: currentTaskID},
+					Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: lastTaskIDs[0]},
 				}
 			}
-			if len(hashes) > 0 {
-				// 合并到现有hash过滤条件
-				allHashes := append(filter.GetHash(), hashes...)
-				db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", allHashes)
+		}
+	}
+	// 对比查询
+	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
+		baselineTaskID := dr.GetBaseLine().GetRiskRuntimeId()
+		compareTaskID := dr.GetCompare().GetRiskRuntimeId()
+
+		if baselineTaskID != "" && compareTaskID != "" {
+			var compareHash []string
+			compareQuery := db.Model(&schema.SSARisk{}).
+				Where("runtime_id = ?", compareTaskID).
+				Where("risk_feature_hash != ''").
+				Pluck("risk_feature_hash", &compareHash)
+
+			if compareQuery.Error == nil {
+				if len(compareHash) > 0 {
+					db = db.Where("runtime_id = ?", baselineTaskID).
+						Where("risk_feature_hash NOT IN (?)", compareHash)
+				} else {
+					db = db.Where("runtime_id = ?", baselineTaskID)
+				}
+			} else {
+				log.Errorf("Failed to query baseline task hashes: %v", compareQuery.Error)
+				db = db.Where("1 = 0")
+				return db
 			}
 		} else {
-			// 如果不存在新增risk, 则不会返回任何值
+			// 如果任务ID不完整，返回空结果
 			db = db.Where("1 = 0")
 			return db
 		}
