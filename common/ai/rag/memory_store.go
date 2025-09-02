@@ -5,6 +5,7 @@ import (
 	"sort"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -70,7 +71,7 @@ func (m *MemoryVectorStore) Search(query string, page, limit int) ([]SearchResul
 	var results []SearchResult
 	for _, doc := range m.documents {
 		// 计算余弦相似度
-		similarity, err := utils.CosineSimilarity(queryEmbedding, doc.Embedding)
+		similarity, err := hnsw.CosineSimilarity(queryEmbedding, doc.Embedding)
 		if err != nil {
 			return nil, utils.Errorf("failed to calculate similarity: %v", err)
 		}
