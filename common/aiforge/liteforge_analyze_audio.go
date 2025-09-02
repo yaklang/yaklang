@@ -76,7 +76,7 @@ func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, e
 	}
 
 	var analyzeConfig = NewAnalysisConfig(opts...)
-	analyzeConfig.fallbackOptions = append(analyzeConfig.fallbackOptions, _withOutputJSONSchema(AUDIO_OUTPUT_SCHEMA))
+	analyzeConfig.fallbackOptions = append(analyzeConfig.fallbackOptions, WithOutputJSONSchema(AUDIO_OUTPUT_SCHEMA))
 
 	analyzeConfig.AnalyzeStatusCard("Audio Analysis", "cover audio file to srt")
 	analyzeConfig.AnalyzeLog("start to analyze audio file: %s", audio)

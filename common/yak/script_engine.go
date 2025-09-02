@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/utils/pandocutils"
 
 	"github.com/pkg/errors"
@@ -381,7 +380,7 @@ func initYaklangLib() {
 
 	yaklang.Import("toolbox", thirdparty_bin.Exports)
 
-	yaklang.Import("rag", rag.Exports)
+	yaklang.Import("rag", RagExports)
 }
 
 type ScriptEngine struct {

@@ -52,7 +52,7 @@ func SplitText(text string, maxLength int, opts ...any) ([]string, error) {
 		return nil, utils.Errorf("template execute failed: %v", err)
 	}
 
-	opts = append(opts, _withOutputJSONSchema(splitSchema))
+	opts = append(opts, WithOutputJSONSchema(splitSchema))
 
 	result, err := _executeLiteForgeTemp(buf.String(), opts...)
 	if err != nil {
