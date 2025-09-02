@@ -318,7 +318,7 @@ func TestMTLS_MITM(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = netx.LoadP12Bytes(p12Bytes, "")
+	err = netx.LoadP12Bytes(p12Bytes, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +435,7 @@ func TestGMMTLS_MITM(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = netx.LoadP12Bytes(p12Bytes, "")
+	err = netx.LoadP12Bytes(p12Bytes, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

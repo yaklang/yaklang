@@ -2,17 +2,18 @@ package mustpass
 
 import (
 	"crypto/tls"
+	"io"
+	"net"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
-	"io"
-	"net"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestTLSConfigAuth(t *testing.T) {
@@ -189,7 +190,7 @@ func TestTLSConfigAuth2(t *testing.T) {
 		t.Fatal(err)
 	}
 	p12Bytes, _ := tlsutils.BuildP12(cCert, cKey, tokenSecret, ca)
-	err = netx.LoadP12Bytes(p12Bytes, tokenSecret)
+	err = netx.LoadP12Bytes(p12Bytes, tokenSecret, "")
 	if err != nil {
 		t.Fatal(err)
 	}

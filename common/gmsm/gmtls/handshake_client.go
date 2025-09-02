@@ -34,6 +34,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 type clientHandshakeState struct {
@@ -967,10 +968,19 @@ func (c *Conn) getCertificate(certReq *certificateRequestMsg) (*Certificate, err
 			signatureSchemes = certReq.supportedSignatureAlgorithms
 		}
 
-		return c.config.GetClientCertificate(&CertificateRequestInfo{
+		cert, err := c.config.GetClientCertificate(&CertificateRequestInfo{
 			AcceptableCAs:    certReq.certificateAuthorities,
 			SignatureSchemes: signatureSchemes,
 		})
+		// If GetClientCertificate returns an error, the handshake will be
+		// aborted and that error will be returned. Otherwise
+		// GetClientCertificate must return a non-nil Certificate.
+		if err != nil {
+			return nil, err
+		}
+		if !funk.IsEmpty(cert) {
+			return cert, nil
+		}
 	}
 
 	// RFC 4346 on the certificateAuthorities field: A list of the
@@ -1032,7 +1042,13 @@ findCert:
 
 func (c *Conn) getClientCertificate(cri *CertificateRequestInfo) (*Certificate, error) {
 	if c.config.GetClientCertificate != nil {
-		return c.config.GetClientCertificate(cri)
+		cert, err := c.config.GetClientCertificate(cri)
+		if err != nil {
+			return nil, err
+		}
+		if !funk.IsEmpty(cert) {
+			return cert, nil
+		}
 	}
 
 	for _, chain := range c.config.Certificates {

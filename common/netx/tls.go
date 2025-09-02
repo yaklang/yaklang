@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
-
 	"github.com/davecgh/go-spew/spew"
 	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -23,6 +23,14 @@ type HandshakeConn interface {
 	net.Conn
 	HandshakeContext(ctx context.Context) error
 }
+
+type HostCertMapping struct {
+	HostPattern  string // 支持glob: *.example.com, api-*.com
+	Certificate  gmtls.Certificate
+	UCertificate utls.Certificate
+}
+
+var hostCertMappings []HostCertMapping
 
 var (
 	// tls Conn
@@ -149,7 +157,15 @@ var (
 	clientRootCA              = x509.NewCertPool()
 )
 
-func LoadP12Bytes(p12bytes []byte, password string) error {
+func LoadP12Bytes(p12bytes []byte, password string, hostPattern string) error {
+	hostCertMapping := HostCertMapping{
+		HostPattern: hostPattern,
+	}
+	defer func() {
+		if hostCertMapping.HostPattern != "" && (!funk.IsEmpty(hostCertMapping.Certificate) || !funk.IsEmpty(hostCertMapping.UCertificate)) {
+			hostCertMappings = append(hostCertMappings, hostCertMapping)
+		}
+	}()
 	cCert, cKey, ca, err := tlsutils.LoadP12ToPEM(p12bytes, password)
 	if err != nil {
 		return err
@@ -166,6 +182,7 @@ func LoadP12Bytes(p12bytes []byte, password string) error {
 			}
 		}
 		presetClientCertificates = append(presetClientCertificates, client)
+		hostCertMapping.Certificate = client
 	}
 	{
 		client, err := utls.X509KeyPair(cCert, cKey)
@@ -182,6 +199,7 @@ func LoadP12Bytes(p12bytes []byte, password string) error {
 			}
 		}
 		presetUClientCertificates = append(presetUClientCertificates, client)
+		hostCertMapping.UCertificate = client
 	}
 
 	return nil
@@ -211,6 +229,11 @@ func LoadCertificatesConfig(i any) error {
 				return nil
 			}
 			ret.GetClientCertificate = func(info *utls.CertificateRequestInfo) (*utls.Certificate, error) {
+				for _, certMap := range hostCertMappings {
+					if utils.MatchAnyOfGlob(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.UCertificate) {
+						return &certMap.UCertificate, nil
+					}
+				}
 				for _, cert := range presetUClientCertificates {
 					err := info.SupportsCertificate(&cert)
 					if err != nil {
@@ -261,7 +284,15 @@ func LoadCertificatesConfig(i any) error {
 			//		}
 			//		return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(presetClientCertificates), info.Version)
 			//	}
-			ret.Certificates = append(ret.Certificates, presetClientCertificates...)
+			ret.Certificates = presetClientCertificates
+			ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
+				for _, certMap := range hostCertMappings {
+					if utils.MatchAnyOfGlob(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.Certificate) {
+						return &certMap.Certificate, nil
+					}
+				}
+				return new(gmtls.Certificate), nil
+			}
 		}
 		return nil
 	case *tls.Config:
@@ -270,4 +301,11 @@ func LoadCertificatesConfig(i any) error {
 		log.Warnf("invalid tlsConfig type %T", i)
 		return nil
 	}
+}
+
+func ResetPresetCertificates() {
+	presetClientCertificates = presetClientCertificates[:0]
+	presetUClientCertificates = presetUClientCertificates[:0]
+	hostCertMappings = hostCertMappings[:0]
+	clientRootCA = x509.NewCertPool()
 }
