@@ -2,7 +2,6 @@ package aiforge
 
 import (
 	_ "embed"
-	"fmt"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -64,7 +63,29 @@ func RefineEx(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowle
 			refineConfig.AnalyzeLog("skip refine chunk [%d]: no knowledge data could be converted", count)
 			continue
 		}
-		query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` \nextract prompt:\n%s ", refinePrompt, knowledgeRawData, refineConfig.RefinePrompt)
+		// query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` \nextract prompt:\n%s ", refinePrompt, knowledgeRawData, refineConfig.RefinePrompt)
+		query, err := utils.RenderTemplate(
+			`<|MAIN_ANALYSIS_{{ .Nonce }}|>
+{{.RefinePrompt}}
+<|MAIN_ANALYSIS_{{ .Nonce }}|>
+<|KNOWLEDGE_RAW_{{ .Nonce }}|>
+{{ .KnowledgeRaw }}
+<|KNOWLEDGE_RAW_END_{{ .Nonce }}|>
+{{ if .ExtraPrompt }}<|EXTRA_PROMPT_{{ .Nonce }}|>
+{{ .ExtraPrompt }}
+<|EXTRA_PROMPT_END_{{ .Nonce }}|>{{ end }}`,
+			map[string]any{
+				"Nonce":        utils.RandStringBytes(4),
+				`RefinePrompt`: refinePrompt,
+				`KnowledgeRaw`: string(knowledgeRawData),
+				`ExtraPrompt`:  string(refineConfig.ExtraPrompt),
+			})
+		if err != nil {
+			log.Errorf("render refine prompt failed: %v", err)
+			refineConfig.AnalyzeLog("skip refine chunk [%d]: render refine prompt failed: %v", count, err)
+			continue
+		}
+
 		refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, _withOutputJSONSchema(refineSchema))...)
 		if err != nil {
 			if refineConfig.Strict {
