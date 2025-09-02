@@ -54,6 +54,7 @@ RightShiftArithmeticAssign:     '>>=';
 LeftShiftArithmeticAssign:     '<<=';
 
 Break:                          'break';
+Var:                            'var';
 LocalVar:                       'local_var';
 GlobalVar:                      'global_var';
 Else:                           'else';
@@ -66,7 +67,6 @@ Function_:                      'function';
 Repeat:                         'repeat';
 While:                          'while';
 Until:                          'until';
-Exit:                           'exit';
 StringLiteral:                 ('"' ~["]* '"') | ('\'' SingleStringCharacter* '\'');
 fragment SingleStringCharacter
     : ~['\\]
