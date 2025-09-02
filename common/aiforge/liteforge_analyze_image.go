@@ -459,7 +459,7 @@ func AnalyzeImageFile(image string, opts ...any) (*ImageAnalysisResult, error) {
 func AnalyzeImage(image any, opts ...any) (*ImageAnalysisResult, error) {
 	var imgCfg = NewAnalysisConfig(opts...)
 	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withImageCompress(image), _withForceImage(true))
-	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, _withOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
+	imgCfg.fallbackOptions = append(imgCfg.fallbackOptions, WithOutputJSONSchema(IMAGE_OUTPUT_SCHEMA))
 	// 构建详细的分析提示
 	prompt := `Your primary task is to perform a comprehensive, multi-modal analysis of the provided inputs. You will receive an **image** and, optionally, **supplementary text** (such as a title, user description, or speech-to-text transcript). Your analysis must holistically synthesize information from both sources to generate a detailed JSON output.
 

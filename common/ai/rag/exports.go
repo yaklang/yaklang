@@ -2,9 +2,6 @@ package rag
 
 import (
 	"fmt"
-	"path/filepath"
-
-	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
@@ -469,49 +466,4 @@ func WithDocumentRawMetadata(i map[string]any) DocumentOption {
 			document.Metadata = make(map[string]any)
 		}
 	}
-}
-
-// 导出的公共函数
-var Exports = map[string]interface{}{
-	"GetCollection": Get,
-	"DeleteCollection": func(name string) error {
-		return DeleteCollection(consts.GetGormProfileDatabase(), name)
-	},
-	"ListCollection": func() []string {
-		return ListCollections(consts.GetGormProfileDatabase())
-	},
-	"GetCollectionInfo": func(name string) (*CollectionInfo, error) {
-		return GetCollectionInfo(consts.GetGormProfileDatabase(), name)
-	},
-
-	"AddDocument": func(knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...any) error {
-		return AddDocument(consts.GetGormProfileDatabase(), knowledgeBaseName, documentName, document, metadata, opts...)
-	},
-	"DeleteDocument": func(knowledgeBaseName, documentName string, opts ...any) error {
-		return DeleteDocument(consts.GetGormProfileDatabase(), knowledgeBaseName, documentName, opts...)
-	},
-	"QueryDocuments": func(knowledgeBaseName, query string, limit int, opts ...any) ([]SearchResult, error) {
-		return QueryDocuments(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
-	},
-	"QueryDocumentsWithAISummary": func(knowledgeBaseName, query string, limit int, opts ...any) (string, error) {
-		return QueryDocumentsWithAISummary(consts.GetGormProfileDatabase(), knowledgeBaseName, query, limit, opts...)
-	},
-
-	"ragForceNew":       WithForceNew,
-	"ragDescription":    WithDescription,
-	"ragEmbeddingModel": WithEmbeddingModel,
-	"ragModelDimension": WithModelDimension,
-	"ragCosineDistance": WithCosineDistance,
-	"ragHNSWParameters": WithHNSWParameters,
-
-	"docMetadata":    WithDocumentMetadataKeyValue,
-	"docRawMetadata": WithDocumentRawMetadata,
-	"NewRagDatabase": NewRagDatabase,
-	"NewTempRagDatabase": func() (*gorm.DB, error) {
-		path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
-		return NewRagDatabase(path)
-	},
-	"EnableMockMode": func() {
-		IsMockMode = true
-	},
 }

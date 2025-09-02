@@ -1,10 +1,12 @@
 package aiforge
 
 import (
+	"bytes"
 	_ "embed"
 	"github.com/yaklang/yaklang/common/ai/rag/entitybase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"io"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -25,7 +27,38 @@ var refinePrompt string
 //go:embed liteforge_prompt/liteforge_refine_erm.txt
 var refineERMPrompt string
 
-func BuildKnowledge(input any, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+func BuildKnowledgeFromFile(kbName string, path string, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	analyzeResult, err := AnalyzeFile(path, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze file: %v", err)
+	}
+	option = append(option, RefineWithKnowledgeBaseName(kbName))
+	return _buildKnowledge(analyzeResult, option...)
+}
+
+func BuildKnowledgeFromBytes(kbName string, content []byte, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	return BuildKnowledgeFromReader(kbName, bytes.NewReader(content), option...)
+}
+
+func BuildKnowledgeFromReader(kbName string, reader io.Reader, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	analyzeResult, err := AnalyzeReader(reader, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze reader: %v", err)
+	}
+	option = append(option, RefineWithKnowledgeBaseName(kbName))
+	return _buildKnowledge(analyzeResult, option...)
+}
+
+func BuildKnowledge(kbName string, input any, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	analyzeResult, err := Analyze(input, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze input: %v", err)
+	}
+	option = append(option, RefineWithKnowledgeBaseName(kbName))
+	return _buildKnowledge(analyzeResult, option...)
+}
+
+func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
 	refineConfig.AnalyzeStatusCard("BuildKnowledge", "start analyzing input")
 
@@ -42,13 +75,8 @@ func BuildKnowledge(input any, option ...any) (<-chan *schema.KnowledgeBaseEntry
 		return nil, err
 	}
 
-	analyzeResult, err := Analyze(input, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start analyze input: %v", err)
-	}
-
 	refineConfig.AnalyzeStatusCard("BuildKnowledge", "start building erm")
-	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option...)
+	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeChannel, option...)
 	if err != nil {
 		return nil, utils.Errorf("failed to start build erm from input: %v", err)
 	}
@@ -111,7 +139,7 @@ func BuildKnowledgeFromERM(erm *ERMAnalysisResult, kb *knowledgebase.KnowledgeBa
 		return nil, err
 	}
 
-	refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, _withOutputJSONSchema(refineSchema))...)
+	refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, WithOutputJSONSchema(refineSchema))...)
 	if err != nil {
 		refineConfig.AnalyzeLog("refine ERM chunk failed: %v", err)
 		return nil, err
@@ -177,7 +205,7 @@ func RefineFromAnalysisResult(input <-chan AnalysisResult, db *gorm.DB, options 
 			continue
 		}
 
-		refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, _withOutputJSONSchema(refineSchema))...)
+		refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, WithOutputJSONSchema(refineSchema))...)
 		if err != nil {
 			if refineConfig.Strict {
 				return nil, utils.Errorf("failed to execute liteforge: %v", err)

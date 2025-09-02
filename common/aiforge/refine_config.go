@@ -36,13 +36,13 @@ func NewRefineConfig(opts ...any) *RefineConfig {
 
 type RefineOption func(*RefineConfig)
 
-func _refine_WithKnowledgeBaseDesc(desc string) RefineOption {
+func RefineWithKnowledgeBaseDesc(desc string) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.KnowledgeBaseDesc = desc
 	}
 }
 
-func _refine_WithKnowledgeBaseType(typ string) RefineOption {
+func RefineWithKnowledgeBaseType(typ string) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.KnowledgeBaseType = typ
 	}
@@ -54,13 +54,13 @@ func _refine_WithRefinePrompt(prompt string) RefineOption {
 	}
 }
 
-func _refine_WithKnowledgeBaseName(name string) RefineOption {
+func RefineWithKnowledgeBaseName(name string) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.KnowledgeBaseName = name
 	}
 }
 
-func _refine_WithKnowledgeEntryLength(length int) RefineOption {
+func RefineWithKnowledgeEntryLength(length int) RefineOption {
 	return func(cfg *RefineConfig) {
 		cfg.KnowledgeEntryLength = length
 	}

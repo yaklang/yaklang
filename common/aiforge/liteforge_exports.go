@@ -30,8 +30,8 @@ var LiteForgeExport = map[string]interface{}{
 	"analyzeCtx":        WithAnalyzeContext,    // use for analyzeContext
 	"analyzeLog":        WithAnalyzeLog,        // use for analyzeLog
 	"analyzeStatusCard": WithAnalyzeStatusCard, // use for analyzeStatusCard
-	"output":            _withOutputJSONSchema,
-	"action":            _withOutputAction,
+	"output":            WithOutputJSONSchema,
+	"action":            WithOutputAction,
 	"image":             _withImage,
 	"imageFile":         _withImageFile,
 	"id":                _withID,
@@ -39,11 +39,10 @@ var LiteForgeExport = map[string]interface{}{
 	"verboseName":       _withVerboseName,
 	"forceImage":        _withForceImage,
 
-	"BuildKnowledge":       BuildKnowledge,
-	"knowledgeBaseName":    _refine_WithKnowledgeBaseName,
-	"knowledgeBaseDesc":    _refine_WithKnowledgeBaseDesc,
-	"knowledgeBaseType":    _refine_WithKnowledgeBaseType,
-	"knowledgeEntryLength": _refine_WithKnowledgeEntryLength,
+	"knowledgeBaseName":    RefineWithKnowledgeBaseName,
+	"knowledgeBaseDesc":    RefineWithKnowledgeBaseDesc,
+	"knowledgeBaseType":    RefineWithKnowledgeBaseType,
+	"knowledgeEntryLength": RefineWithKnowledgeEntryLength,
 	"refinePrompt":         _refine_WithRefinePrompt,
 	"strictRefine":         _refine_WithStrict,
 }
@@ -72,7 +71,7 @@ type LiteForgeExecOption func(*liteforgeConfig)
 // SOME_CONTENTN
 // PROMPT, liteforge.output(jsonschema.ActionObject(jsonschema.paramString("value"))),
 // ```
-func _withOutputJSONSchema(output string) LiteForgeExecOption {
+func WithOutputJSONSchema(output string) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.output = output
 	}
@@ -106,7 +105,7 @@ func _withForceImage(force ...bool) LiteForgeExecOption {
 // SOME_CONTENT
 // PROMPT, liteforge.action("analyze"))
 // ```
-func _withOutputAction(action string) LiteForgeExecOption {
+func WithOutputAction(action string) LiteForgeExecOption {
 	return func(cfg *liteforgeConfig) {
 		cfg.action = action
 	}
