@@ -47,4 +47,10 @@ type Vuln struct {
 	TitleVerbose    string `json:"title_verbose"`
 	ReverseToken    string `json:"reverse_token"`
 	Url             string `json:"url"`
+
+	Description     string `json:"description"`
+	Solution        string `json:"solution"`
+
+	Request         string `json:"request"`
+	Response        string `json:"response"`
 }

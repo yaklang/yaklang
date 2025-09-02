@@ -147,6 +147,10 @@ func (r *ScannerAgentReporter) ReportRisk(
 		vul.Title = utils.MapGetString(v, "Title")
 		vul.ReverseToken = utils.MapGetString(v, "ReverseToken")
 		vul.Url = utils.MapGetString(v, "Url")
+		vul.Description = utils.MapGetString(v, "Description")
+		vul.Solution = utils.MapGetString(v, "Solution")
+		vul.Request = utils.MapGetString(v, "Request")
+		vul.Response = utils.MapGetString(v, "Response")
 	}
 	res, err := NewVulnResult(vul)
 	if err != nil {
