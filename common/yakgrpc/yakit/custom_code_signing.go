@@ -1,0 +1,312 @@
+package yakit
+
+import (
+	"errors"
+
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+)
+
+// CreateCustomCodeSigning 创建自定义代码签名
+func CreateCustomCodeSigning(db *gorm.DB, customCode *schema.CustomCodeSigning) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	if customCode == nil {
+		return utils.Errorf("custom code signing is nil")
+	}
+	if customCode.CustomCodeName == "" {
+		return utils.Errorf("custom code name cannot be empty")
+	}
+	customCode.CustomCodeId = uuid.NewString()
+
+	var existing schema.CustomCodeSigning
+	if err := db.Where("custom_code_name = ?", customCode.CustomCodeName).First(&existing).Error; err == nil {
+		return utils.Errorf("custom code name already exists")
+	}
+
+	return db.Create(customCode).Error
+}
+
+// GetCustomCodeSignings 根据过滤器获取自定义代码签名
+func GetCustomCodeSignings(db *gorm.DB, filter *ypb.CustomCodeFilter) ([]*schema.CustomCodeSigning, error) {
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+	if filter == nil {
+		return nil, utils.Errorf("filter cannot be nil")
+	}
+
+	var data []*schema.CustomCodeSigning
+
+	db = db.Model(&schema.CustomCodeSigning{})
+	if filter.GetName() != nil {
+		db = bizhelper.ExactQueryStringArrayOr(db, "custom_code_name", filter.GetName())
+	}
+	if err := db.Find(&data).Error; err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// GetCustomCodeSigningByName 根据名称获取自定义代码签名
+func GetCustomCodeSigningByName(db *gorm.DB, name string) (*schema.CustomCodeSigning, error) {
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+	if name == "" {
+		return nil, utils.Errorf("custom code name cannot be empty")
+	}
+
+	var customCode schema.CustomCodeSigning
+	if err := db.Where("custom_code_name = ?", name).First(&customCode).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.Errorf("custom code signing not found")
+		}
+		return nil, err
+	}
+
+	return &customCode, nil
+}
+
+// GetCustomCodeSigningByID 根据ID获取自定义代码签名
+func GetCustomCodeSigningByID(db *gorm.DB, id uint) (*schema.CustomCodeSigning, error) {
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+	if id == 0 {
+		return nil, utils.Errorf("custom code ID cannot be zero")
+	}
+
+	var customCode schema.CustomCodeSigning
+	if err := db.First(&customCode, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.Errorf("custom code signing not found")
+		}
+		return nil, err
+	}
+
+	return &customCode, nil
+}
+
+// GetAllCustomCodeSignings 获取所有自定义代码签名
+func GetAllCustomCodeSignings(db *gorm.DB) ([]schema.CustomCodeSigning, error) {
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+
+	var customCodes []schema.CustomCodeSigning
+	if err := db.Find(&customCodes).Error; err != nil {
+		return nil, err
+	}
+
+	return customCodes, nil
+}
+
+// GetCustomCodeSigningsWithPagination 分页获取自定义代码签名
+func GetCustomCodeSigningsWithPagination(db *gorm.DB, page, pageSize int) ([]schema.CustomCodeSigning, int64, error) {
+	if db == nil {
+		return nil, 0, utils.Errorf("database connection is nil")
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	var total int64
+	if err := db.Model(&schema.CustomCodeSigning{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	var customCodes []schema.CustomCodeSigning
+	offset := (page - 1) * pageSize
+	if err := db.Offset(offset).Limit(pageSize).Find(&customCodes).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return customCodes, total, nil
+}
+
+// UpdateCustomCodeSigning 更新自定义代码签名
+func UpdateCustomCodeSigning(db *gorm.DB, target string, customCode *schema.CustomCodeSigning) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	if customCode == nil {
+		return utils.Errorf("custom code signing is nil")
+	}
+
+	var existing schema.CustomCodeSigning
+	if err := db.Where("custom_code_name = ?", target).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.Errorf("custom code signing not found")
+		}
+		return err
+	}
+
+	if customCode.CustomCodeName != "" && customCode.CustomCodeName != target {
+		var data []*schema.CustomCodeSigning
+		db := bizhelper.ExactQueryString(db, "custom_code_name", customCode.CustomCodeName)
+		if err := db.Find(&data).Error; err != nil {
+			return err
+		}
+		if len(data) > 0 {
+			return utils.Errorf("new custom code signing is found")
+		}
+	}
+
+	customCode.ID = existing.ID
+	customCode.CreatedAt = existing.CreatedAt
+	customCode.CustomCodeId = existing.CustomCodeId
+	return db.Save(customCode).Error
+}
+
+// DeleteCustomCodeSignings 根据过滤器删除自定义代码签名
+func DeleteCustomCodeSignings(db *gorm.DB, filter *ypb.CustomCodeFilter) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	if filter == nil {
+		return utils.Errorf("filter cannot be nil")
+	}
+
+	if len(filter.Name) == 0 {
+		return db.Delete(&schema.CustomCodeSigning{}).Error
+	}
+	db = db.Model(&schema.CustomCodeSigning{})
+	db = bizhelper.ExactQueryStringArrayOr(db, "custom_code_name", filter.GetName())
+
+	return db.Unscoped().Delete(&schema.CustomCodeSigning{}).Error
+}
+
+// DeleteCustomCodeSigningByName 根据名称删除自定义代码签名
+func DeleteCustomCodeSigningByName(db *gorm.DB, name string) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	if name == "" {
+		return utils.Errorf("custom code name cannot be empty")
+	}
+
+	var customCode schema.CustomCodeSigning
+	if err := db.Where("custom_code_name = ?", name).First(&customCode).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.Errorf("custom code signing not found")
+		}
+		return err
+	}
+
+	return db.Delete(&customCode).Error
+}
+
+// GetCustomCodeSigningsCount 获取自定义代码签名总数
+func GetCustomCodeSigningsCount(db *gorm.DB) (int64, error) {
+	if db == nil {
+		return 0, utils.Errorf("database connection is nil")
+	}
+
+	var count int64
+	if err := db.Model(&schema.CustomCodeSigning{}).Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// BulkCreateCustomCodeSignings 批量创建自定义代码签名
+func BulkCreateCustomCodeSignings(db *gorm.DB, customCodes []schema.CustomCodeSigning) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	if len(customCodes) == 0 {
+		return utils.Errorf("custom codes cannot be empty")
+	}
+
+	for _, customCode := range customCodes {
+		if customCode.CustomCodeName == "" {
+			return utils.Errorf("custom code name cannot be empty")
+		}
+	}
+
+	names := make(map[string]bool)
+	for _, customCode := range customCodes {
+		if names[customCode.CustomCodeName] {
+			return utils.Errorf("duplicate custom code name found in batch")
+		}
+		names[customCode.CustomCodeName] = true
+	}
+
+	var existingNames []string
+	if err := db.Model(&schema.CustomCodeSigning{}).Where("custom_code_name IN ?", names).Pluck("custom_code_name", &existingNames).Error; err != nil {
+		return err
+	}
+
+	if len(existingNames) > 0 {
+		return utils.Errorf("some custom code names already exist in database")
+	}
+
+	tx := db.Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	for _, customCode := range customCodes {
+		if err := tx.Create(&customCode).Error; err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	return tx.Commit().Error
+}
+
+// BulkDeleteCustomCodeSignings 批量删除自定义代码签名
+func BulkDeleteCustomCodeSignings(db *gorm.DB, names []string) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	if len(names) == 0 {
+		return utils.Errorf("names cannot be empty")
+	}
+
+	for _, name := range names {
+		if name == "" {
+			return utils.Errorf("custom code name cannot be empty")
+		}
+	}
+
+	var count int64
+	if err := db.Model(&schema.CustomCodeSigning{}).Where("custom_code_name IN ?", names).Count(&count).Error; err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return utils.Errorf("no custom code signings found to delete")
+	}
+
+	return db.Where("custom_code_name IN ?", names).Delete(&schema.CustomCodeSigning{}).Error
+}
+
+// SearchCustomCodeSignings 搜索自定义代码签名
+func SearchCustomCodeSignings(db *gorm.DB, query string) ([]schema.CustomCodeSigning, error) {
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+	if query == "" {
+		return GetAllCustomCodeSignings(db)
+	}
+
+	var customCodes []schema.CustomCodeSigning
+	searchQuery := "%" + query + "%"
+	if err := db.Where("custom_code_name LIKE ? OR custom_code_data LIKE ?", searchQuery, searchQuery).Find(&customCodes).Error; err != nil {
+		return nil, err
+	}
+
+	return customCodes, nil
+}

@@ -131,6 +131,10 @@ const (
 	Yak_ConvertFuzzerResponseToHTTPFlow_FullMethodName            = "/ypb.Yak/ConvertFuzzerResponseToHTTPFlow"
 	Yak_StringFuzzer_FullMethodName                               = "/ypb.Yak/StringFuzzer"
 	Yak_HTTPRequestAnalyzer_FullMethodName                        = "/ypb.Yak/HTTPRequestAnalyzer"
+	Yak_CreateCustomCode_FullMethodName                           = "/ypb.Yak/CreateCustomCode"
+	Yak_UpdateCustomCode_FullMethodName                           = "/ypb.Yak/UpdateCustomCode"
+	Yak_DeleteCustomCode_FullMethodName                           = "/ypb.Yak/DeleteCustomCode"
+	Yak_QueryCustomCode_FullMethodName                            = "/ypb.Yak/QueryCustomCode"
 	Yak_Codec_FullMethodName                                      = "/ypb.Yak/Codec"
 	Yak_NewCodec_FullMethodName                                   = "/ypb.Yak/NewCodec"
 	Yak_GetAllCodecMethods_FullMethodName                         = "/ypb.Yak/GetAllCodecMethods"
@@ -699,6 +703,11 @@ type YakClient interface {
 	StringFuzzer(ctx context.Context, in *StringFuzzerRequest, opts ...grpc.CallOption) (*StringFuzzerResponse, error)
 	// 分析一个 HTTP 请求详情
 	HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnalysisMaterial, opts ...grpc.CallOption) (*HTTPRequestAnalysis, error)
+	// 用户自定义代码补全
+	CreateCustomCode(ctx context.Context, in *CustomCodeRequest, opts ...grpc.CallOption) (*Empty, error)
+	UpdateCustomCode(ctx context.Context, in *EditCustomCodeRequest, opts ...grpc.CallOption) (*Empty, error)
+	DeleteCustomCode(ctx context.Context, in *QueryCustomCodeRequest, opts ...grpc.CallOption) (*Empty, error)
+	QueryCustomCode(ctx context.Context, in *QueryCustomCodeRequest, opts ...grpc.CallOption) (*CustomCodeResponse, error)
 	// 编码解码
 	Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error)
 	NewCodec(ctx context.Context, in *CodecRequestFlow, opts ...grpc.CallOption) (*CodecResponse, error)
@@ -2540,6 +2549,46 @@ func (c *yakClient) HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnal
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HTTPRequestAnalysis)
 	err := c.cc.Invoke(ctx, Yak_HTTPRequestAnalyzer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) CreateCustomCode(ctx context.Context, in *CustomCodeRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_CreateCustomCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateCustomCode(ctx context.Context, in *EditCustomCodeRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_UpdateCustomCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteCustomCode(ctx context.Context, in *QueryCustomCodeRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_DeleteCustomCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryCustomCode(ctx context.Context, in *QueryCustomCodeRequest, opts ...grpc.CallOption) (*CustomCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CustomCodeResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryCustomCode_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7591,6 +7640,11 @@ type YakServer interface {
 	StringFuzzer(context.Context, *StringFuzzerRequest) (*StringFuzzerResponse, error)
 	// 分析一个 HTTP 请求详情
 	HTTPRequestAnalyzer(context.Context, *HTTPRequestAnalysisMaterial) (*HTTPRequestAnalysis, error)
+	// 用户自定义代码补全
+	CreateCustomCode(context.Context, *CustomCodeRequest) (*Empty, error)
+	UpdateCustomCode(context.Context, *EditCustomCodeRequest) (*Empty, error)
+	DeleteCustomCode(context.Context, *QueryCustomCodeRequest) (*Empty, error)
+	QueryCustomCode(context.Context, *QueryCustomCodeRequest) (*CustomCodeResponse, error)
 	// 编码解码
 	Codec(context.Context, *CodecRequest) (*CodecResponse, error)
 	NewCodec(context.Context, *CodecRequestFlow) (*CodecResponse, error)
@@ -8485,6 +8539,18 @@ func (UnimplementedYakServer) StringFuzzer(context.Context, *StringFuzzerRequest
 }
 func (UnimplementedYakServer) HTTPRequestAnalyzer(context.Context, *HTTPRequestAnalysisMaterial) (*HTTPRequestAnalysis, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HTTPRequestAnalyzer not implemented")
+}
+func (UnimplementedYakServer) CreateCustomCode(context.Context, *CustomCodeRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateCustomCode not implemented")
+}
+func (UnimplementedYakServer) UpdateCustomCode(context.Context, *EditCustomCodeRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCustomCode not implemented")
+}
+func (UnimplementedYakServer) DeleteCustomCode(context.Context, *QueryCustomCodeRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteCustomCode not implemented")
+}
+func (UnimplementedYakServer) QueryCustomCode(context.Context, *QueryCustomCodeRequest) (*CustomCodeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryCustomCode not implemented")
 }
 func (UnimplementedYakServer) Codec(context.Context, *CodecRequest) (*CodecResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Codec not implemented")
@@ -11629,6 +11695,78 @@ func _Yak_HTTPRequestAnalyzer_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).HTTPRequestAnalyzer(ctx, req.(*HTTPRequestAnalysisMaterial))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreateCustomCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CustomCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateCustomCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateCustomCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateCustomCode(ctx, req.(*CustomCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateCustomCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EditCustomCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateCustomCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateCustomCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateCustomCode(ctx, req.(*EditCustomCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteCustomCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryCustomCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteCustomCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteCustomCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteCustomCode(ctx, req.(*QueryCustomCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryCustomCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryCustomCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryCustomCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryCustomCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryCustomCode(ctx, req.(*QueryCustomCodeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -19120,6 +19258,22 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HTTPRequestAnalyzer",
 			Handler:    _Yak_HTTPRequestAnalyzer_Handler,
+		},
+		{
+			MethodName: "CreateCustomCode",
+			Handler:    _Yak_CreateCustomCode_Handler,
+		},
+		{
+			MethodName: "UpdateCustomCode",
+			Handler:    _Yak_UpdateCustomCode_Handler,
+		},
+		{
+			MethodName: "DeleteCustomCode",
+			Handler:    _Yak_DeleteCustomCode_Handler,
+		},
+		{
+			MethodName: "QueryCustomCode",
+			Handler:    _Yak_QueryCustomCode_Handler,
 		},
 		{
 			MethodName: "Codec",
