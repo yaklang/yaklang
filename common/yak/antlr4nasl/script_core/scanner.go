@@ -90,9 +90,12 @@ func NaslScan(hosts, ports string, opts ...NaslScriptConfigOptFunc) chan *NaslKB
 	//})
 	resultCh := engine.Scan(hosts, ports)
 	res := make(chan *NaslKBs)
-	for r := range resultCh {
-		res <- r.Kbs
-	}
+	go func() {
+		defer close(res)
+		for r := range resultCh {
+			res <- r.Kbs
+		}
+	}()
 	return res
 }
 

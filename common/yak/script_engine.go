@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aiforge"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/aiforge"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils/pandocutils"
@@ -68,6 +69,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/comparer"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/xhtml"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
@@ -91,12 +93,7 @@ import (
 var (
 	CRYPTO_KEY_SIZE    = 16
 	initYaklangLibOnce sync.Once
-	naslExports        interface{}
 )
-
-func SetNaslExports(lib map[string]interface{}) {
-	naslExports = lib
-}
 
 func init() {
 	initYaklangLib()
@@ -227,7 +224,7 @@ func initYaklangLib() {
 	yaklang.Import("dyn", EvalExports)
 	// nuclei
 	yaklang.Import("nuclei", httptpl.Exports)
-	yaklang.Import("nasl", naslExports)
+	yaklang.Import("nasl", antlr4nasl.Exports)
 
 	// jwt
 	yaklang.Import("jwt", authhack.JWTExports)

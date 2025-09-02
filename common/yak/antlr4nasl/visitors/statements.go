@@ -5,7 +5,6 @@ import (
 	nasl "github.com/yaklang/yaklang/common/yak/antlr4nasl/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
-	"strconv"
 )
 
 func (c *Compiler) VisitStatementList(i nasl.IStatementListContext) {
@@ -57,12 +56,15 @@ func (c *Compiler) VisitStatement(i nasl.IStatementContext) {
 	if variableDeclarationStatement := statement.VariableDeclarationStatement(); variableDeclarationStatement != nil {
 		c.VisitVariableDeclarationStatement(variableDeclarationStatement)
 	}
+	if variableAssignStatement := statement.VariableAssignStatement(); variableAssignStatement != nil {
+		c.VisitVariableAssignStatement(variableAssignStatement)
+	}
 	if functionDeclarationStatement := statement.FunctionDeclarationStatement(); functionDeclarationStatement != nil {
 		c.VisitFunctionDeclarationStatement(functionDeclarationStatement)
 	}
-	if exitStatement := statement.ExitStatement(); exitStatement != nil {
-		c.VisitExitStatement(exitStatement)
-	}
+	// if exitStatement := statement.ExitStatement(); exitStatement != nil {
+	// 	c.VisitExitStatement(exitStatement)
+	// }
 }
 
 func (c *Compiler) VisitBlock(i nasl.IBlockContext) {
@@ -212,6 +214,35 @@ func (c *Compiler) VisitVariableDeclarationStatement(i nasl.IVariableDeclaration
 	}
 }
 
+func (c *Compiler) VisitVariableAssignStatement(i nasl.IVariableAssignStatementContext) {
+	if i == nil {
+		return
+	}
+	c.visitHook(c, i)
+
+	variableAssignStatement, ok := i.(*nasl.VariableAssignStatementContext)
+	if !ok {
+		return
+	}
+
+	var isGlobal = variableAssignStatement.GlobalVar() != nil
+
+	id := variableAssignStatement.Identifier().GetText()
+
+	c.pushLeftRef(id)
+	if isGlobal {
+		c.pushGlobalDeclare()
+	} else {
+		c.pushDeclare()
+	}
+
+	if exp := variableAssignStatement.SingleExpression(); exp != nil {
+		c.pushLeftRef(id)
+		c.VisitSingleExpression(exp)
+		c.pushAssigin()
+	}
+}
+
 func (c *Compiler) VisitFunctionDeclarationStatement(i nasl.IFunctionDeclarationStatementContext) {
 	if i == nil {
 		return
@@ -260,21 +291,22 @@ func (c *Compiler) VisitFunctionDeclarationStatement(i nasl.IFunctionDeclaration
 	})
 	c.pushAssigin()
 }
-func (c *Compiler) VisitExitStatement(i nasl.IExitStatementContext) {
-	if i == nil {
-		return
-	}
-	c.visitHook(c, i)
-	exitExp := i.(*nasl.ExitStatementContext)
-	c.VisitSingleExpression(exitExp.SingleExpression())
-	code := c.pushOpcodeFlag(yakvm.OpExit)
-	var sourcePath string
-	if code.SourceCodeFilePath != nil {
-		sourcePath = *code.SourceCodeFilePath
-	}
-	code.Op1 = yakvm.NewAutoValue(map[string]string{
-		"file name":   sourcePath,
-		"line number": strconv.Itoa(code.StartLineNumber),
-	})
 
-}
+// func (c *Compiler) VisitExitStatement(i nasl.IExitStatementContext) {
+// 	if i == nil {
+// 		return
+// 	}
+// 	c.visitHook(c, i)
+// 	exitExp := i.(*nasl.ExitStatementContext)
+// 	c.VisitSingleExpression(exitExp.SingleExpression())
+// 	code := c.pushOpcodeFlag(yakvm.OpExit)
+// 	var sourcePath string
+// 	if code.SourceCodeFilePath != nil {
+// 		sourcePath = *code.SourceCodeFilePath
+// 	}
+// 	code.Op1 = yakvm.NewAutoValue(map[string]string{
+// 		"file name":   sourcePath,
+// 		"line number": strconv.Itoa(code.StartLineNumber),
+// 	})
+
+// }

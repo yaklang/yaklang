@@ -2,17 +2,17 @@ package script_core
 
 import (
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils"
-	_ "github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"net"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
 //func BuildInMethodCheck(engine *ScriptEngine) {

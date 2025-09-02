@@ -5,6 +5,22 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// ScriptLoadMode 脚本加载方式
+type ScriptLoadMode string
+
+const (
+	// LoadModeAuto 自动加载模式（默认），使用 tryLoadScript 的完整逻辑
+	LoadModeAuto ScriptLoadMode = "auto"
+	// LoadModeFileOnly 仅从文件加载
+	LoadModeFileOnly ScriptLoadMode = "file_only"
+	// LoadModeDBOnly 仅从数据库加载
+	LoadModeDBOnly ScriptLoadMode = "db_only"
+	// LoadModeFileFirst 优先文件，失败后数据库
+	LoadModeFileFirst ScriptLoadMode = "file_first"
+	// LoadModeDBFirst 优先数据库，失败后文件
+	LoadModeDBFirst ScriptLoadMode = "db_first"
+)
+
 type NaslScriptConfig struct {
 	plugins                 []string
 	family                  string
@@ -14,6 +30,8 @@ type NaslScriptConfig struct {
 	preference              map[string]any
 	autoLoadDependencies    bool
 	ignoreRequirementsError bool
+	sourcePath              []string
+	loadMode                ScriptLoadMode
 }
 
 func NewNaslScriptConfig() *NaslScriptConfig {
@@ -22,6 +40,7 @@ func NewNaslScriptConfig() *NaslScriptConfig {
 		autoLoadDependencies:    true,
 		preference:              make(map[string]any),
 		conditions:              make(map[string]any),
+		loadMode:                LoadModeAuto, // 默认使用自动模式
 	}
 }
 
@@ -73,5 +92,17 @@ func WithFamily(family string) NaslScriptConfigOptFunc {
 func WithPlugins(plugins ...string) NaslScriptConfigOptFunc {
 	return func(c *NaslScriptConfig) {
 		c.plugins = plugins
+	}
+}
+
+func WithSourcePath(sourcePath ...string) NaslScriptConfigOptFunc {
+	return func(c *NaslScriptConfig) {
+		c.sourcePath = append(c.sourcePath, sourcePath...)
+	}
+}
+
+func WithLoadMode(mode ScriptLoadMode) NaslScriptConfigOptFunc {
+	return func(c *NaslScriptConfig) {
+		c.loadMode = mode
 	}
 }
