@@ -6311,6 +6311,7 @@ message Certificate {
   // pkcs12path need a .p12 or .pfx file
   bytes Pkcs12Bytes = 4;
   bytes Pkcs12Password = 5;
+  string Host = 6;
 }
 
 message MITMContentReplacer {

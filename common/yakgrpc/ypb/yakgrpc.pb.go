@@ -45460,6 +45460,7 @@ type Certificate struct {
 	// pkcs12path need a .p12 or .pfx file
 	Pkcs12Bytes    []byte `protobuf:"bytes,4,opt,name=Pkcs12Bytes,proto3" json:"Pkcs12Bytes,omitempty"`
 	Pkcs12Password []byte `protobuf:"bytes,5,opt,name=Pkcs12Password,proto3" json:"Pkcs12Password,omitempty"`
+	Host           string `protobuf:"bytes,6,opt,name=Host,proto3" json:"Host,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -45527,6 +45528,13 @@ func (x *Certificate) GetPkcs12Password() []byte {
 		return x.Pkcs12Password
 	}
 	return nil
+}
+
+func (x *Certificate) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
 }
 
 type MITMContentReplacer struct {
@@ -63939,13 +63947,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"ExcludeUri\x18\x06 \x03(\v2\x13.ypb.FilterDataItemR\n" +
 	"ExcludeUri\x12;\n" +
 	"\x0eExcludeMethods\x18\a \x03(\v2\x13.ypb.FilterDataItemR\x0eExcludeMethods\x125\n" +
-	"\vExcludeMIME\x18\b \x03(\v2\x13.ypb.FilterDataItemR\vExcludeMIME\"\xaf\x01\n" +
+	"\vExcludeMIME\x18\b \x03(\v2\x13.ypb.FilterDataItemR\vExcludeMIME\"\xc3\x01\n" +
 	"\vCertificate\x12\x16\n" +
 	"\x06CrtPem\x18\x01 \x01(\fR\x06CrtPem\x12\x16\n" +
 	"\x06KeyPem\x18\x02 \x01(\fR\x06KeyPem\x12&\n" +
 	"\x0eCaCertificates\x18\x03 \x03(\fR\x0eCaCertificates\x12 \n" +
 	"\vPkcs12Bytes\x18\x04 \x01(\fR\vPkcs12Bytes\x12&\n" +
-	"\x0ePkcs12Password\x18\x05 \x01(\fR\x0ePkcs12Password\"\xa2\x05\n" +
+	"\x0ePkcs12Password\x18\x05 \x01(\fR\x0ePkcs12Password\x12\x12\n" +
+	"\x04Host\x18\x06 \x01(\tR\x04Host\"\xa2\x05\n" +
 	"\x13MITMContentReplacer\x12\x12\n" +
 	"\x04Rule\x18\x01 \x01(\tR\x04Rule\x12\x1c\n" +
 	"\tNoReplace\x18\x02 \x01(\bR\tNoReplace\x12\x16\n" +

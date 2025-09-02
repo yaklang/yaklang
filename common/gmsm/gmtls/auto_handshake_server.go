@@ -155,12 +155,19 @@ func processClientHelloGM(c *Conn, hs *serverHandshakeStateGM) (isResume bool, e
 	// Edit:
 	//		通过获取证书方法获取 签名证书(含私钥)
 	//		通过获取证书方法获取 加密证书(含私钥)
-	sigCert, err := c.config.getCertificate(hs.clientHelloInfo())
+	var sigCert, encCert *Certificate
+	sigCert, err = c.config.getCertificate(hs.clientHelloInfo())
 	if err != nil {
 		_ = c.sendAlert(alertInternalError)
 		return false, err
 	}
-	encCert, err := c.config.GetKECertificate(hs.clientHelloInfo())
+	if len(c.config.Certificates) > 1 {
+		encCert = &c.config.Certificates[1]
+	}
+	if c.config.GetKECertificate != nil {
+		encCert, err = c.config.GetKECertificate(hs.clientHelloInfo())
+	}
+
 	if err != nil {
 		_ = c.sendAlert(alertInternalError)
 		return false, err
