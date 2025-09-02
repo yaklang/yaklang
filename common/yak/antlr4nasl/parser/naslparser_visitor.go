@@ -23,6 +23,9 @@ type NaslParserVisitor interface {
 	// Visit a parse tree produced by NaslParser#variableDeclarationStatement.
 	VisitVariableDeclarationStatement(ctx *VariableDeclarationStatementContext) interface{}
 
+	// Visit a parse tree produced by NaslParser#variableAssignStatement.
+	VisitVariableAssignStatement(ctx *VariableAssignStatementContext) interface{}
+
 	// Visit a parse tree produced by NaslParser#expressionStatement.
 	VisitExpressionStatement(ctx *ExpressionStatementContext) interface{}
 
@@ -49,9 +52,6 @@ type NaslParserVisitor interface {
 
 	// Visit a parse tree produced by NaslParser#returnStatement.
 	VisitReturnStatement(ctx *ReturnStatementContext) interface{}
-
-	// Visit a parse tree produced by NaslParser#exitStatement.
-	VisitExitStatement(ctx *ExitStatementContext) interface{}
 
 	// Visit a parse tree produced by NaslParser#argumentList.
 	VisitArgumentList(ctx *ArgumentListContext) interface{}

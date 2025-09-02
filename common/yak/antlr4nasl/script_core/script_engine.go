@@ -4,14 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
-	"os"
-	"path"
-	"strings"
 )
 
 type ExecContext struct {
@@ -69,6 +70,7 @@ func NewScriptEngineWithConfig(cfg *NaslScriptConfig) *ScriptEngine {
 		scriptFilter: func(script *NaslScriptInfo) bool {
 			return true
 		},
+		MethodHook: make(map[string]func(origin NaslBuildInMethod, engine *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error)),
 		//scriptExecMutexsLock: &sync.Mutex{},
 		//scriptExecMutexs:     make(map[string]*sync.Mutex),
 		config:            NewNaslScriptConfig(),
@@ -132,180 +134,324 @@ func (engine *ScriptEngine) AddExcludeScripts(names ...string) {
 		engine.excludeScripts[name] = struct{}{}
 	}
 }
+
+// loadScriptWithDependencies 加载脚本并处理其依赖关系和偏好设置
+func (engine *ScriptEngine) loadScriptWithDependencies(script *NaslScriptInfo, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	if _, ok := loadedScript[script.OriginFileName]; ok {
+		return nil
+	}
+
+	if !engine.scriptFilter(script) {
+		return fmt.Errorf("script filtered")
+	}
+
+	scriptInstances := utils.NewSet[*NaslScriptInfo]()
+
+	// 处理依赖加载
+	if engine.config.autoLoadDependencies {
+		dependencies := []string{}
+		for _, dependency := range script.Dependencies {
+			if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
+				continue
+			}
+			if _, ok := engine.scripts[dependency]; ok {
+				continue
+			}
+			dependencies = append(dependencies, path.Join(engine.dependenciesPath, dependency))
+		}
+		if len(dependencies) > 0 {
+			scripts, err := engine.tryLoadScript(dependencies, cache, loadedScript)
+			if err != nil {
+				return fmt.Errorf("load `%s` dependencies failed: %s", script.OriginFileName, err)
+			}
+			scriptInstances.AddList(scripts)
+			for _, info := range scripts {
+				engine.dependencyScripts[info.OriginFileName] = struct{}{}
+			}
+		}
+	}
+
+	// 处理偏好设置
+	if script.Preferences != nil && engine.config.preference != nil {
+		for k, v := range engine.config.preference {
+			if _, ok := script.Preferences[k]; ok {
+				val := map[string]interface{}{}
+				val["name"] = k
+				switch ret := v.(type) {
+				case bool:
+					if ret {
+						val["value"] = "yes"
+						val["type"] = "checkbox"
+					} else {
+						val["value"] = "no"
+						val["type"] = "checkbox"
+					}
+				default:
+					val["value"] = v
+					val["type"] = "entry"
+				}
+				script.Preferences[k] = val
+			}
+		}
+	}
+
+	scriptInstances.Add(script)
+	loadedScripts.AddList(scriptInstances.List())
+	loadedScript[script.OriginFileName] = struct{}{}
+	return nil
+}
+
+// loadScriptFromAbsolutePath 从绝对路径加载脚本
+func (engine *ScriptEngine) loadScriptFromAbsolutePath(fileName string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	if utils.IsDir(fileName) {
+		raw, err := utils.ReadFilesRecursively(fileName)
+		if err != nil {
+			return fmt.Errorf("Load script from dir `%s` failed: %v", fileName, err)
+		}
+		scripts, err := engine.tryLoadScript(raw, cache, loadedScript)
+		if err != nil {
+			return err
+		}
+		loadedScripts.AddList(scripts)
+		return nil
+	} else if utils.IsFile(fileName) {
+		script, err := engine.loadScriptFromSource(false, fileName)
+		if err != nil {
+			return fmt.Errorf("Load script from file `%s` failed: %v", fileName, err)
+		}
+		cache[script.OriginFileName] = script
+		return engine.loadScriptWithDependencies(script, cache, loadedScript, loadedScripts)
+	} else {
+		return fmt.Errorf("Load script `%s` failed: file not exists", fileName)
+	}
+}
+
+// loadScriptFromRelativePath 从相对路径加载脚本，按优先级尝试：1.本地文件 2.sourcePath路径 3.数据库
+func (engine *ScriptEngine) loadScriptFromRelativePath(fileName string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	// 1. 优先从当前目录的相对路径加载
+	if utils.IsFile(fileName) {
+		script, err := engine.loadScriptFromSource(false, fileName)
+		if err != nil {
+			return fmt.Errorf("Load script from file `%s` failed: %v", fileName, err)
+		}
+		cache[script.OriginFileName] = script
+		return engine.loadScriptWithDependencies(script, cache, loadedScript, loadedScripts)
+	}
+
+	// 2. 尝试从 sourcePath 路径加载
+	for _, sourcePath := range engine.config.sourcePath {
+		sourcePathFile := path.Join(sourcePath, fileName)
+		if utils.IsFile(sourcePathFile) {
+			script, err := engine.loadScriptFromSource(false, sourcePathFile)
+			if err != nil {
+				return fmt.Errorf("Load script from source path `%s` failed: %v", sourcePathFile, err)
+			}
+			cache[script.OriginFileName] = script
+			return engine.loadScriptWithDependencies(script, cache, loadedScript, loadedScripts)
+		}
+	}
+
+	// 3. 最后从数据库加载
+	script, err := engine.loadScriptFromSource(true, fileName)
+	if err != nil {
+		return fmt.Errorf("Load script `%s` from local file, source path and db all failed", fileName)
+	}
+	cache[script.OriginFileName] = script
+	return engine.loadScriptWithDependencies(script, cache, loadedScript, loadedScripts)
+}
+
+// loadScriptsFromStringArray 从字符串数组批量加载脚本
+func (engine *ScriptEngine) loadScriptsFromStringArray(scriptNames []string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	cachedScript := []*NaslScriptInfo{}
+	unLoadedScript := []string{}
+
+	// 分离已缓存和未加载的脚本
+	for _, fileName := range scriptNames {
+		if v, ok := cache[fileName]; ok {
+			cachedScript = append(cachedScript, v)
+		} else {
+			unLoadedScript = append(unLoadedScript, fileName)
+		}
+	}
+
+	scripts := cachedScript
+
+	// 从数据库加载未缓存的脚本
+	if len(unLoadedScript) > 0 {
+		db := consts.GetGormProfileDatabase()
+		scriptsModel := []*schema.NaslScript{}
+		if err := db.Where("origin_file_name in (?)", unLoadedScript).Unscoped().Find(&scriptsModel).Error; err != nil {
+			return err
+		}
+
+		// 检查是否所有脚本都找到了
+		if len(scriptsModel) != len(unLoadedScript) {
+			failedScript := []any{}
+			for _, script := range unLoadedScript {
+				found := false
+				for _, scriptModel := range scriptsModel {
+					if scriptModel.OriginFileName == script {
+						found = true
+						break
+					}
+				}
+				if !found {
+					failedScript = append(failedScript, script)
+				}
+			}
+			if len(failedScript) > 0 {
+				return fmt.Errorf("load scripts `%v` from db failed: not found", failedScript)
+			}
+		}
+
+		// 加载脚本模型
+		for _, scriptModel := range scriptsModel {
+			script, err := engine.loadScriptFromSource(true, scriptModel.OriginFileName)
+			if err != nil {
+				return fmt.Errorf("load script `%s` from db failed: %v", scriptModel.OriginFileName, err)
+			}
+			scripts = append(scripts, script)
+		}
+	}
+
+	// 缓存所有脚本
+	for _, script := range scripts {
+		cache[script.OriginFileName] = script
+	}
+
+	// 加载所有脚本及其依赖
+	for _, script := range scripts {
+		if err := engine.loadScriptWithDependencies(script, cache, loadedScript, loadedScripts); err != nil {
+			return fmt.Errorf("load script `%s` failed: %v", script.OriginFileName, err)
+		}
+	}
+
+	return nil
+}
+
+// loadScriptFromInfo 从 NaslScriptInfo 对象加载脚本
+func (engine *ScriptEngine) loadScriptFromInfo(scriptInfo *NaslScriptInfo, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	cache[scriptInfo.OriginFileName] = scriptInfo
+	return engine.loadScriptWithDependencies(scriptInfo, cache, loadedScript, loadedScripts)
+}
+
+// loadScriptWithMode 根据配置的加载模式加载脚本
+func (engine *ScriptEngine) loadScriptWithMode(fileName string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	switch engine.config.loadMode {
+	case LoadModeFileOnly:
+		return engine.loadScriptFileOnly(fileName, cache, loadedScript, loadedScripts)
+	case LoadModeDBOnly:
+		return engine.loadScriptDBOnly(fileName, cache, loadedScript, loadedScripts)
+	case LoadModeFileFirst:
+		return engine.loadScriptFileFirst(fileName, cache, loadedScript, loadedScripts)
+	case LoadModeDBFirst:
+		return engine.loadScriptDBFirst(fileName, cache, loadedScript, loadedScripts)
+	case LoadModeAuto:
+		fallthrough
+	default:
+		// 使用原有的加载逻辑
+		if path.IsAbs(fileName) {
+			return engine.loadScriptFromAbsolutePath(fileName, cache, loadedScript, loadedScripts)
+		} else {
+			return engine.loadScriptFromRelativePath(fileName, cache, loadedScript, loadedScripts)
+		}
+	}
+}
+
+// loadScriptFileOnly 仅从文件加载脚本
+func (engine *ScriptEngine) loadScriptFileOnly(fileName string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	var scriptPath string
+	if path.IsAbs(fileName) {
+		scriptPath = fileName
+	} else {
+		// 对于相对路径，首先尝试当前目录
+		if utils.IsFile(fileName) {
+			scriptPath = fileName
+		} else if len(engine.config.sourcePath) > 0 {
+			// 尝试 sourcePath
+			for _, sourcePath := range engine.config.sourcePath {
+				sourcePathFile := path.Join(sourcePath, fileName)
+				if utils.IsFile(sourcePathFile) {
+					scriptPath = sourcePathFile
+					break
+				}
+			}
+		}
+	}
+
+	if scriptPath == "" || !utils.IsFile(scriptPath) {
+		return fmt.Errorf("script file `%s` not found in file system", fileName)
+	}
+
+	script, err := engine.loadScriptFromSource(false, scriptPath)
+	if err != nil {
+		return fmt.Errorf("load script from file `%s` failed: %v", scriptPath, err)
+	}
+	cache[script.OriginFileName] = script
+	return engine.loadScriptWithDependencies(script, cache, loadedScript, loadedScripts)
+}
+
+// loadScriptDBOnly 仅从数据库加载脚本
+func (engine *ScriptEngine) loadScriptDBOnly(fileName string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	script, err := engine.loadScriptFromSource(true, fileName)
+	if err != nil {
+		return fmt.Errorf("load script `%s` from database failed: %v", fileName, err)
+	}
+	cache[script.OriginFileName] = script
+	return engine.loadScriptWithDependencies(script, cache, loadedScript, loadedScripts)
+}
+
+// loadScriptFileFirst 优先文件，失败后数据库
+func (engine *ScriptEngine) loadScriptFileFirst(fileName string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	// 尝试文件加载
+	err := engine.loadScriptFileOnly(fileName, cache, loadedScript, loadedScripts)
+	if err == nil {
+		return nil
+	}
+
+	// 文件加载失败，尝试数据库
+	return engine.loadScriptDBOnly(fileName, cache, loadedScript, loadedScripts)
+}
+
+// loadScriptDBFirst 优先数据库，失败后文件
+func (engine *ScriptEngine) loadScriptDBFirst(fileName string, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}, loadedScripts *utils.Set[*NaslScriptInfo]) error {
+	// 尝试数据库加载
+	err := engine.loadScriptDBOnly(fileName, cache, loadedScript, loadedScripts)
+	if err == nil {
+		return nil
+	}
+
+	// 数据库加载失败，尝试文件
+	return engine.loadScriptFileOnly(fileName, cache, loadedScript, loadedScripts)
+}
+
+// tryLoadScript 根据不同的输入类型和配置的加载模式分发到对应的加载函数
 func (engine *ScriptEngine) tryLoadScript(script any, cache map[string]*NaslScriptInfo, loadedScript map[string]struct{}) ([]*NaslScriptInfo, error) {
 	loadedScripts := utils.NewSet[*NaslScriptInfo]()
-	var loadWithDepError error
-	loadWithDep := func(script *NaslScriptInfo) error {
-		if _, ok := loadedScript[script.OriginFileName]; ok {
-			return nil
-		}
-		if engine.scriptFilter(script) {
-			scriptInstances := utils.NewSet[*NaslScriptInfo]()
-			if engine.config.autoLoadDependencies {
-				dependencies := []string{}
-				for _, dependency := range script.Dependencies {
-					if dependency == "toolcheck.nasl" { // 不使用nasl内置的工具，所以跳过
-						continue
-					}
-					//if dependency == "snmp_default_communities.nasl" { // 太慢了，先跳过
-					//	continue
-					//}
-					if _, ok := engine.scripts[dependency]; ok {
-						continue
-					}
-					dependencies = append(dependencies, path.Join(engine.dependenciesPath, dependency))
-				}
-				if len(dependencies) > 0 {
-					scripts, err := engine.tryLoadScript(dependencies, cache, loadedScript)
-					if err != nil {
-						err = fmt.Errorf("load `%s` dependencies failed: %s", script.OriginFileName, err)
-						loadWithDepError = err
-						return err
-					}
-					scriptInstances.AddList(scripts)
-					for _, info := range scripts {
-						engine.dependencyScripts[info.OriginFileName] = struct{}{}
-					}
-				}
-			}
-			if script.Preferences != nil && engine.config.preference != nil {
-				for k, v := range engine.config.preference {
-					if _, ok := script.Preferences[k]; ok {
-						val := map[string]interface{}{}
-						val["name"] = k
-						switch ret := v.(type) {
-						case bool:
-							if ret {
-								val["value"] = "yes"
-								val["type"] = "checkbox"
-							} else {
-								val["value"] = "no"
-								val["type"] = "checkbox"
-							}
-						default:
-							val["value"] = v
-							val["type"] = "entry"
-						}
-						script.Preferences[k] = val
-					}
-				}
-			}
 
-			scriptInstances.Add(script)
-			loadedScripts.AddList(scriptInstances.List())
-			loadedScript[script.OriginFileName] = struct{}{}
-			return nil
-		}
-		err := fmt.Errorf("script filtered")
-		loadWithDepError = err
-		return err
-	}
 	switch ret := script.(type) {
 	case string:
 		fileName := ret
-		if path.IsAbs(fileName) { // 绝对路径则尝试从文件加载
-			if utils.IsDir(fileName) {
-				raw, err := utils.ReadFilesRecursively(fileName)
-				if err != nil {
-					return nil, fmt.Errorf("Load script from dir `%s` failed: %v", fileName, err)
-				} else {
-					return engine.tryLoadScript(raw, cache, loadedScript)
-				}
-			} else if utils.IsFile(fileName) {
-
-				script, err := engine.loadScriptFromSource(false, fileName)
-				if err != nil {
-					return nil, fmt.Errorf("Load script from file `%s` failed: %v", fileName, err)
-				} else {
-					cache[script.OriginFileName] = script
-					loadWithDep(script)
-				}
-			} else {
-				return nil, fmt.Errorf("Load script `%s` failed: file not exists", fileName)
-			}
-		} else { // 优先从本地文件加载
-			loadOk := false
-			if utils.IsFile(fileName) {
-				script, err := engine.loadScriptFromSource(false, fileName)
-				if err != nil {
-					return nil, fmt.Errorf("Load script from file `%s` failed: %v", fileName, err)
-				} else {
-					loadOk = true
-					cache[script.OriginFileName] = script
-					loadWithDep(script)
-				}
-			}
-			if !loadOk {
-				script, err := engine.loadScriptFromSource(true, fileName)
-				if err != nil {
-					return nil, fmt.Errorf("Load script `%s` from db and file failed", fileName)
-				} else {
-					cache[script.OriginFileName] = script
-					loadWithDep(script)
-				}
-			}
+		// 使用配置的加载模式
+		if err := engine.loadScriptWithMode(fileName, cache, loadedScript, loadedScripts); err != nil {
+			return nil, err
 		}
 	case []string:
-		cachedScript := []*NaslScriptInfo{}
-		unLoadedScript := []string{}
+		// 字符串数组批量加载 - 对每个脚本应用加载模式
 		for _, fileName := range ret {
-			if v, ok := cache[fileName]; ok {
-				cachedScript = append(cachedScript, v)
-			} else {
-				unLoadedScript = append(unLoadedScript, fileName)
-			}
-		}
-		db := consts.GetGormProfileDatabase()
-		scriptsModel := []*schema.NaslScript{}
-		scripts := cachedScript
-		if len(unLoadedScript) > 0 {
-			if err := db.Where("origin_file_name in (?)", unLoadedScript).Unscoped().Find(&scriptsModel).Error; err != nil {
-				return nil, err
-			}
-			if len(scriptsModel) != len(unLoadedScript) {
-				failedSript := []any{}
-				for _, script := range unLoadedScript {
-					found := false
-					for _, scriptModel := range scriptsModel {
-						if scriptModel.OriginFileName == script {
-							found = true
-							break
-						}
-					}
-					if !found {
-						failedSript = append(failedSript, script)
-					}
-				}
-				if len(failedSript) > 0 {
-					return nil, fmt.Errorf("load scripts `%v` from db failed: not found", failedSript)
-				}
-			}
-			for _, scriptModel := range scriptsModel {
-				script, err := engine.loadScriptFromSource(true, scriptModel.OriginFileName)
-				if err != nil {
-					return nil, fmt.Errorf("load script `%s` from db failed: %v", scriptModel.OriginFileName, err)
-				}
-				scripts = append(scripts, script)
-			}
-		}
-
-		for _, script := range scripts {
-			cache[script.OriginFileName] = script
-		}
-		for _, script := range scripts {
-			if err := loadWithDep(script); err != nil {
-				return nil, fmt.Errorf("load script `%s` failed: %v", script.OriginFileName, err)
+			if err := engine.loadScriptWithMode(fileName, cache, loadedScript, loadedScripts); err != nil {
+				return nil, fmt.Errorf("load script `%s` failed: %v", fileName, err)
 			}
 		}
 	case *NaslScriptInfo:
-		cache[ret.OriginFileName] = ret
-		loadWithDep(ret)
+		// 脚本对象加载
+		if err := engine.loadScriptFromInfo(ret, cache, loadedScript, loadedScripts); err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("invalid script type")
 	}
-	if loadWithDepError != nil {
-		return nil, loadWithDepError
-	}
+
 	return loadedScripts.List(), nil
 }
 func (e *ScriptEngine) loadScriptFromSource(fromDb bool, name string) (*NaslScriptInfo, error) {
@@ -396,7 +542,7 @@ func (engine *ScriptEngine) DescriptionExec(code, name string) (*NaslScriptInfo,
 func (engine *ScriptEngine) LoadScript(script any) error {
 	scriptIns, err := engine.tryLoadScript(script, engine.scriptCache, map[string]struct{}{})
 	if err != nil {
-		return err
+		log.Errorf("load script %s failed: %v", script, err)
 	}
 	for _, script := range scriptIns {
 		engine.Debugf("loaded script: %s", script.OriginFileName)

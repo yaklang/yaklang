@@ -2,11 +2,12 @@ package script_core
 
 import (
 	"encoding/json"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"sync"
 )
 
 type NaslKBs struct {
@@ -88,19 +89,22 @@ func LoadPreferenceFromMap(prefs map[string]any) (res []*Preference) {
 }
 
 type NaslScriptInfo struct {
-	naslScript     *schema.NaslScript
-	OriginFileName string
-	Hash           string
-	OID            string
-	CVE            []string
-	ScriptName     string
-	Script         string
-	Tags           map[string]interface{}
-	Version        string
-	Category       string
-	Family         string
-	Copyright      string
-	Dependencies   []string // 依赖脚本
+	naslScript       *schema.NaslScript
+	OriginFileName   string
+	Hash             string
+	OID              string
+	CVE              []string
+	ScriptName       string
+	ScriptID         int64
+	ScriptAttributes map[string]interface{}
+	Script           string
+	Summary          string
+	Tags             map[string]interface{}
+	Version          string
+	Category         string
+	Family           string
+	Copyright        string
+	Dependencies     []string // 依赖脚本
 
 	Xrefs           map[string]string
 	Preferences     map[string]interface{}
@@ -118,10 +122,11 @@ type NaslScriptInfo struct {
 
 func NewNaslScriptObject() *NaslScriptInfo {
 	return &NaslScriptInfo{
-		naslScript:  yakit.NewEmptyNaslScript(),
-		Tags:        make(map[string]interface{}),
-		Xrefs:       make(map[string]string),
-		Preferences: make(map[string]interface{}),
+		naslScript:       yakit.NewEmptyNaslScript(),
+		Tags:             make(map[string]interface{}),
+		Xrefs:            make(map[string]string),
+		Preferences:      make(map[string]interface{}),
+		ScriptAttributes: make(map[string]interface{}),
 	}
 }
 

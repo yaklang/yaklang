@@ -28,6 +28,10 @@ func (v *BaseNaslParserVisitor) VisitVariableDeclarationStatement(ctx *VariableD
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseNaslParserVisitor) VisitVariableAssignStatement(ctx *VariableAssignStatementContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseNaslParserVisitor) VisitExpressionStatement(ctx *ExpressionStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
@@ -61,10 +65,6 @@ func (v *BaseNaslParserVisitor) VisitBreakStatement(ctx *BreakStatementContext) 
 }
 
 func (v *BaseNaslParserVisitor) VisitReturnStatement(ctx *ReturnStatementContext) interface{} {
-	return v.VisitChildren(ctx)
-}
-
-func (v *BaseNaslParserVisitor) VisitExitStatement(ctx *ExitStatementContext) interface{} {
 	return v.VisitChildren(ctx)
 }
 

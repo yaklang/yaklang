@@ -3,6 +3,10 @@ package executor
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
+	"strings"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/visitors"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"os"
-	"path"
-	"strings"
 )
 
 //	func (e *ExecContext) CallNativeFunction(name string, mapParam map[string]interface{}, sliceParam []interface{}) (interface{}, error) {
@@ -243,7 +244,10 @@ func (e *Executor) Exec(code, fileName string) error {
 	defer func() {
 		if err := recover(); err != nil {
 			if data, ok := err.(*yakvm.VMPanicSignal); ok {
-				e.logger.Infof("script [%s] exit with value: %v", fileName, data.Info)
+				info := data.AdditionalInfo.(map[string]string)
+				code := info["code"]
+				msg := info["msg"]
+				e.logger.Infof("script [%s] exit with code: %v, msg: %v", fileName, code, msg)
 				if e.debug {
 					e.logger.Infof("script additional info: %v", data.AdditionalInfo)
 				}

@@ -20,13 +20,16 @@ statement
     | returnStatement eos
     | expressionStatement eos
     | variableDeclarationStatement eos
+    | variableAssignStatement eos
     | functionDeclarationStatement
-    | exitStatement eos
     ;
 block
     : '{' eos? statementList? '}'
     ;
 variableDeclarationStatement: ( GlobalVar | LocalVar ) identifier (',' identifier)*;
+
+variableAssignStatement: (GlobalVar | LocalVar | Var) identifier ('=' singleExpression)?;
+
 expressionStatement
     : expressionSequence
     ;
@@ -53,9 +56,7 @@ breakStatement
 returnStatement
     : Return ('(' singleExpression ')' | singleExpression)?
     ;
-exitStatement
-    : Exit '(' singleExpression ')'
-    ;
+
 argumentList
     : argument (',' argument)*
     ;

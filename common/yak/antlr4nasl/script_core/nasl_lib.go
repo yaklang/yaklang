@@ -6,17 +6,6 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/netx"
-	"github.com/yaklang/yaklang/common/utils/lowhttp"
-	"github.com/yaklang/yaklang/common/utils/netutil"
-	"github.com/yaklang/yaklang/common/utils/pingutil"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
-	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
-	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
-	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"math/rand"
 	"net"
 	"net/http"
@@ -28,6 +17,17 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/mutate"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/netutil"
+	"github.com/yaklang/yaklang/common/utils/pingutil"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl/executor/nasl_type"
+	utils2 "github.com/yaklang/yaklang/common/yak/antlr4nasl/lib"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/log"
@@ -72,6 +72,21 @@ func init() {
 		//	n := params.GetParamByNumber(0, 0)
 		//	time.Sleep(time.Duration(n) * time.Second)
 		//},
+		"script_id": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
+			ctx.ScriptObj.ScriptID = params.GetParamByNumber(0).Int64()
+			return nil, nil
+		},
+		"script_set_attribute": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
+			ctx.ScriptObj.ScriptAttributes[params.GetParamByNumber(0).AsString()] = params.GetParamByNumber(1).AsString()
+			return nil, nil
+		},
+		"script_end_attributes": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
+			return nil, nil
+		},
+		"script_summary": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
+			ctx.ScriptObj.Summary = params.GetParamByNumber(0).AsString()
+			return nil, nil
+		},
 		"script_name": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
 			ctx.ScriptObj.ScriptName = params.GetParamByNumber(0).AsString()
 			return nil, nil
@@ -1694,7 +1709,10 @@ func init() {
 					args = append(args, value.Value)
 				}
 			})
-			yakEngine := yaklang.New()
+			if YakScriptEngineGetter == nil {
+				return nil, utils.Errorf("yak script engine getter is not set")
+			}
+			yakEngine := YakScriptEngineGetter()
 			yakEngine.SetVars(map[string]any{
 				"params": args,
 			})
@@ -1997,6 +2015,12 @@ func init() {
 			}
 			_, ok := array.Hash_elt[search]
 			return ok, nil
+		},
+		"exit": func(ctx *ExecContext, params *executor.NaslBuildInMethodParam) (interface{}, error) {
+			code := params.GetParamByNumber(0).Int()
+			msg := params.GetParamByNumber(1, "").String()
+			panic(yakvm.NewVMPanic(&yakvm.VMPanicSignal{Info: code, AdditionalInfo: map[string]string{"code": strconv.Itoa(code), "msg": msg}}))
+			return nil, nil
 		},
 	}
 }

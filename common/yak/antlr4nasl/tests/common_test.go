@@ -1,9 +1,10 @@
 package tests
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script_core"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
-	"testing"
 )
 
 func TestOperator(t *testing.T) {
@@ -193,13 +194,20 @@ print(111,b:"123",d:"d");
 `)
 }
 
-func TestExit(t *testing.T) {
+func TestExit1(t *testing.T) {
 	Exec(`
-
 dump(1);
 exit(99);
 a = 0/0;
 `)
+}
+func TestExit2(t *testing.T) {
+	Exec(`
+dump(1);
+exit(99,"exit with code 99");
+a = 0/0;
+`)
+
 }
 func TestXOperator(t *testing.T) {
 	Exec(`
@@ -286,5 +294,22 @@ assert(a[0]==1,"a[0]!=1");
 a = "1";
 assert(a[0]=="1","a[0]!=1");
 assert(a[1]==NULL,"a[1]!=NULL");
+`)
+}
+
+func TestVariableAssign(t *testing.T) {
+	DebugExec(`
+var a = 1;
+assert(a==1,"a!=1");
+
+var b;
+b = 2;
+assert(b==2,"b!=2");
+
+local_var c = 3;
+assert(c==3,"c!=3");
+
+global_var d = 4;
+assert(d==4,"d!=4");
 `)
 }
