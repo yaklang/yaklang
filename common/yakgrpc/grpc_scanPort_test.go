@@ -5,14 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"os"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
@@ -56,6 +57,8 @@ func TestServer_CustomFingerprint(t *testing.T) {
 	require.Nil(t, err)
 
 	host, port := utils.DebugMockHTTP([]byte("test CustomFingerprint1,test CustomFingerprint2"))
+
+	utils.WaitConnect(utils.HostPort(host, port), 3)
 
 	fpFiles := []string{}
 	f, err := os.CreateTemp(os.TempDir(), "yakit-test-fingerprint-*.yaml")

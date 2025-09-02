@@ -353,7 +353,7 @@ func (m *PluginsRagManager) indexSinglePluginOnce(meta *PluginMetadata) error {
 
 type PluginSearchResult struct {
 	Script *ypb.YakScript
-	Score  float32
+	Score  float64
 }
 
 func (m *PluginsRagManager) SearchPluginsIds(query string, page, limit int) (int, []string, error) {
@@ -395,7 +395,7 @@ func (m *PluginsRagManager) SearchPlugins(query string, limit int) ([]*PluginSea
 
 	// 提取插件 ID 并查询完整插件信息
 	var scriptNames []string
-	var idToScore = make(map[string]float32)
+	var idToScore = make(map[string]float64)
 	for _, result := range results {
 		scriptNames = append(scriptNames, result.Document.ID)
 		idToScore[result.Document.ID] = result.Score

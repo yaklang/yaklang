@@ -489,7 +489,7 @@ func (s *Server) DeleteSearchVectorDatabase(ctx context.Context, req *ypb.Delete
 	collectionNames := req.GetCollectionNames()
 	errs := []error{}
 	for _, collectionName := range collectionNames {
-		err := rag.RemoveCollection(consts.GetGormProfileDatabase(), collectionName)
+		err := rag.RemoveCollectionHNSW(consts.GetGormProfileDatabase(), collectionName)
 		if err != nil {
 			errs = append(errs, err)
 		}
