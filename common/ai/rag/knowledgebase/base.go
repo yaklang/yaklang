@@ -23,6 +23,10 @@ type KnowledgeBase struct {
 	id        int64
 }
 
+func (kb *KnowledgeBase) GetID() int64 {
+	return kb.id
+}
+
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(&schema.KnowledgeBaseInfo{}, &schema.KnowledgeBaseEntry{}, &schema.VectorStoreDocument{}, &schema.VectorStoreCollection{}).Error
 }
