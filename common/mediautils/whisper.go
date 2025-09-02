@@ -75,7 +75,7 @@ func _whisperConvertAudioToSRTFile(i string) (string, error) {
 		return "", utils.Errorf("call whisper-cli failed: %v", err)
 	}
 	for line := range result {
-		log.Infof("recognized line: %v", line.Text)
+		log.Infof("recognized line %.02f->%.02f: %v", line.StartTime.Seconds(), line.EndTime.Seconds(), line.Text)
 	}
 	if !utils.FileExists(outputFilename) {
 		return "", utils.Errorf("(utils.FileExists) srt output file is not created: %v", outputFilename)
