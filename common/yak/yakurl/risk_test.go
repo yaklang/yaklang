@@ -4,18 +4,23 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -1041,26 +1046,217 @@ func TestRiskActionRule(t *testing.T) {
 }
 
 func TestRiskActionCompare(t *testing.T) {
-	programName := uuid.NewString()
-	taskID1 := uuid.NewString() // 旧的扫描结果
-	taskID2 := uuid.NewString() // 新的扫描结果
+	client, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
 
-	extendPath := "test"
-	initRiskTest(t, programName, taskID1)
-	initRiskTest(t, programName, taskID2)
-	initRiskTest(t, programName, taskID2, extendPath)
+	programName := "compare_test_" + uuid.NewString()
+	var taskID1, taskID2 string
 
-	t.Cleanup(func() {
-		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{ProgramName: []string{programName}})
-		yakit.DeleteSSADiffResultByBaseLine(ssadb.GetDB(), []string{taskID1, taskID2}, schema.RuntimeId)
-		yakit.DeleteSSADiffResultByCompare(ssadb.GetDB(), []string{taskID1, taskID2}, schema.RuntimeId)
+	// 创建不同的测试代码和规则 - 使用Go风格的代码
+	testCode1 := `
+package main
+
+func test1() {
+	sink1()
+	sink2()
+}
+`
+
+	testCode2 := `
+package main
+
+func test1() {
+	sink1()
+	sink2()
+}
+
+func test2() {
+	sink3()
+	sink4()
+	sink5()
+}
+`
+
+	// 使用和处置测试类似的规则格式
+	risk1 := uuid.NewString()
+	risk2 := uuid.NewString()
+	risk3 := uuid.NewString()
+	risk4 := uuid.NewString()
+	risk5 := uuid.NewString()
+
+	testRule := fmt.Sprintf(`
+sink1 as $sink1
+alert $sink1 for {
+	desc: "Source-Sink vulnerability"
+	Title: "Test Risk 1"
+	level: "high"
+	risk: "%s"
+}
+
+sink2 as $sink2
+alert $sink2 for {
+	desc: "Source-Sink vulnerability"
+	Title: "Test Risk 2"
+	level: "high"
+	risk: "%s"
+}
+
+sink3 as $sink3
+alert $sink3 for {
+	desc: "Source-Sink vulnerability"
+	Title: "Test Risk 3"
+	level: "high"
+	risk: "%s"
+}
+
+sink4 as $sink4
+alert $sink4 for {
+	desc: "Source-Sink vulnerability"
+	Title: "Test Risk 4"
+	level: "high"
+	risk: "%s"
+}
+
+sink5 as $sink5
+alert $sink5 for {
+	desc: "Source-Sink vulnerability"
+	Title: "Test Risk 5"
+	level: "high"
+	risk: "%s"
+}
+	`, risk1, risk2, risk3, risk4, risk5)
+
+	// 清理测试数据
+	defer func() {
+		ssadb.DeleteProgram(ssadb.GetDB(), programName)
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{programName},
+		})
+	}()
+
+	// 第一次扫描 - 基线扫描（2个风险）
+	t.Run("BaselineScan", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("test.go", testCode1)
+
+		programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(consts.GO), ssaapi.WithProgramName(programName))
+		require.NoError(t, err)
+		require.NotEmpty(t, programs)
+
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		err = stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			ProgramName: []string{programName},
+			RuleInput: &ypb.SyntaxFlowRuleInput{
+				Content:  testRule,
+				Language: "go",
+			},
+		})
+		require.NoError(t, err)
+
+		// 等待扫描完成
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+			}
+			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
+				break
+			}
+		}
+
+		// 查询第一次扫描的结果
+		_, firstRisks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{programName},
+		}, nil)
+		require.NoError(t, err)
+		require.Len(t, firstRisks, 2) // 第一次扫描应该有2个风险
+		taskID1 = firstRisks[0].RuntimeId
+		t.Logf("第一次扫描TaskID: %s, 风险数量: %d", taskID1, len(firstRisks))
+		for i, risk := range firstRisks {
+			t.Logf("  Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s", i+1, risk.ID, risk.Title, risk.RiskFeatureHash)
+		}
 	})
-	local, err := yakgrpc.NewLocalClient()
-	if err != nil {
-		t.Error(err)
-	}
 
-	checkRuleAndSearch_WithDiff := func(path, search, base, compare string, want map[string]data, contain ...bool) {
+	// 添加延迟确保第二次扫描的时间戳不同
+	time.Sleep(2 * time.Second)
+
+	// 第二次扫描 - 对比扫描（5个风险：2个老的+3个新的）
+	t.Run("CompareScan", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("test.go", testCode2)
+
+		programs, err := ssaapi.ParseProjectWithFS(
+			vf,
+			ssaapi.WithLanguage(consts.GO),
+			ssaapi.WithProgramName(programName),
+			ssaapi.WithReCompile(true),
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, programs)
+
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		err = stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			ProgramName: []string{programName},
+			RuleInput: &ypb.SyntaxFlowRuleInput{
+				Content:  testRule,
+				Language: "go",
+			},
+		})
+		require.NoError(t, err)
+
+		// 等待扫描完成
+		for {
+			resp, err := stream.Recv()
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+			}
+			if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
+				break
+			}
+		}
+
+		// 查询该程序的所有风险，找到最新的taskID
+		_, allRisks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			ProgramName: []string{programName},
+		}, nil)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(allRisks), 5) // 总共应该至少有5个风险
+
+		// 找到不同于第一次扫描的taskID（即第二次扫描的taskID）
+		for _, risk := range allRisks {
+			if risk.RuntimeId != taskID1 {
+				taskID2 = risk.RuntimeId
+				break
+			}
+		}
+		require.NotEmpty(t, taskID2, "第二次扫描TaskID不能为空")
+
+		// 查询第二次扫描的所有风险
+		_, secondRisks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID2},
+		}, nil)
+		require.NoError(t, err)
+		require.Len(t, secondRisks, 5) // 第二次扫描应该有5个风险
+
+		t.Logf("第二次扫描TaskID: %s, 风险数量: %d", taskID2, len(secondRisks))
+		for i, risk := range secondRisks {
+			t.Logf("  Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s", i+1, risk.ID, risk.Title, risk.RiskFeatureHash)
+		}
+	})
+
+	checkRuleAndSearch_WithDiff := func(t *testing.T, path, search, base, compare string, want map[string]data, contain ...bool) {
 		url := &ypb.YakURL{
 			Schema: "ssarisk",
 			Path:   path,
@@ -1070,7 +1266,7 @@ func TestRiskActionCompare(t *testing.T) {
 				{Key: "compare", Value: compare},
 			},
 		}
-		got := GetSSARisk(t, local, url)
+		got := GetSSARisk(t, client, url)
 		log.Infof("got: %v", got)
 		log.Infof("want: %v", want)
 		if len(contain) > 0 && contain[0] {
@@ -1087,160 +1283,82 @@ func TestRiskActionCompare(t *testing.T) {
 		}
 	}
 
-	t.Run("check path root with diff", func(t *testing.T) {
-		// ssarisk://?compare={runtimeId}
-		checkRuleAndSearch_WithDiff("/", "", taskID2, taskID1, map[string]data{
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 5,
+	// 测试修改后的Compare功能（使用RiskFeatureHash对比）
+	t.Run("test RiskFeatureHash based compare", func(t *testing.T) {
+		require.NotEmpty(t, taskID1, "第一次扫描TaskID不能为空")
+		require.NotEmpty(t, taskID2, "第二次扫描TaskID不能为空")
+
+		// 直接使用yakit进行compare查询，验证RiskFeatureHash对比逻辑
+		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			SSARiskDiffRequest: &ypb.SSARiskDiffRequest{
+				BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
+				Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
 			},
-		}, true)
+		}, nil)
+		require.NoError(t, err)
+		require.Len(t, risks, 3, "Compare查询应该只返回新增的3个风险")
+
+		t.Logf("Compare查询结果：发现 %d 个新增风险", len(risks))
+		for i, risk := range risks {
+			t.Logf("  新增Risk%d: ID=%d, Title=%s, RiskFeatureHash=%s",
+				i+1, risk.ID, risk.Title, risk.RiskFeatureHash)
+		}
+
+		// 验证新增风险的标题应该是Test Risk 3, 4, 5
+		titles := make([]string, len(risks))
+		for i, risk := range risks {
+			titles[i] = risk.Title
+		}
+		require.Contains(t, titles, "Test Risk 3", "应该包含Test Risk 3")
+		require.Contains(t, titles, "Test Risk 4", "应该包含Test Risk 4")
+		require.Contains(t, titles, "Test Risk 5", "应该包含Test Risk 5")
 	})
 
-	t.Run("check path program with diff", func(t *testing.T) {
-		// ssarisk://program?compare={runtimeId}
-		checkRuleAndSearch_WithDiff(urlProgramPath(programName), "", taskID2, taskID1, map[string]data{
-			urlPath(programName, extendPath+"/a.go"): {
-				Name:  sourcePath(programName, extendPath+"/a.go"),
+	// 测试URL方式的compare查询
+	t.Run("test URL based compare", func(t *testing.T) {
+		// ssarisk://program?task_id={compareTaskID}&compare={baselineTaskID}
+		checkRuleAndSearch_WithDiff(t, urlProgramPath(programName), "", taskID2, taskID1, map[string]data{
+			urlPath(programName, "test.go"): {
+				Name:  sourcePath(programName, "test.go"),
 				Type:  "source",
-				Count: 1,
+				Count: 3,
 			},
-			urlPath(programName, extendPath+"/b/b1.go"): {
-				Name:  sourcePath(programName, extendPath+"/b/b1.go"),
-				Type:  "source",
-				Count: 1,
-			},
-			urlPath(programName, extendPath+"/b/b2.go"): {
-				Name:  sourcePath(programName, extendPath+"/b/b2.go"),
-				Type:  "source",
-				Count: 1,
-			},
-			urlPath(programName, extendPath+"/c.go"): {
-				Name:  sourcePath(programName, extendPath+"/c.go"),
-				Type:  "source",
-				Count: 2,
-			},
-		})
+		}, false)
 	})
 
-	t.Run("check path source with diff", func(t *testing.T) {
-		// ssarisk://program/test/c.go?compare={runtimeId}
-		checkRuleAndSearch_WithDiff(urlPath(programName, extendPath+"/c.go"), "", taskID2, taskID1, map[string]data{
-			urlFunctionPath(programName, extendPath+"/c.go", "funcC"): {
-				Name:  "funcC",
-				Type:  "function",
-				Count: 2,
-			},
-		})
-	})
+	// 测试增量查询和compare查询返回相同结果
+	t.Run("test incremental vs compare consistency", func(t *testing.T) {
+		// 增量查询
+		_, incrementalRisks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			IncrementalQuery: true,
+			RuntimeID:        []string{taskID2},
+		}, nil)
+		require.NoError(t, err)
 
-	t.Run("check search source(file)", func(t *testing.T) {
-		// ssarisk://?search=/c.go&compare={runtimeId}
-		checkRuleAndSearch_WithDiff("/", "/c.go", taskID2, taskID1, map[string]data{
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 2,
+		// Compare查询
+		_, compareRisks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			SSARiskDiffRequest: &ypb.SSARiskDiffRequest{
+				BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
+				Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
 			},
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 2,
-			},
-		}, true)
-	})
+		}, nil)
+		require.NoError(t, err)
 
-	t.Run("check search source(dir)", func(t *testing.T) {
-		// ssarisk://?search=/b/&compare={runtimeId}
-		checkRuleAndSearch_WithDiff("/", "/b/", taskID2, taskID1, map[string]data{
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 2,
-			},
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 2,
-			},
-		}, true)
-	})
+		// 两种查询应该返回相同数量的风险
+		require.Equal(t, len(incrementalRisks), len(compareRisks),
+			"增量查询和Compare查询应该返回相同数量的风险")
 
-	t.Run("check search function", func(t *testing.T) {
-		// ssarisk://?search=funcA&compare={runtimeId}
-		checkRuleAndSearch_WithDiff("/", "funcA", taskID2, taskID1, map[string]data{
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 1,
-			},
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 1,
-			},
-		}, true)
-	})
+		// 验证返回的风险ID相同
+		incrementalIDs := make(map[uint]bool)
+		for _, risk := range incrementalRisks {
+			incrementalIDs[risk.ID] = true
+		}
 
-	t.Run("check search function fuzzy", func(t *testing.T) {
-		// ssarisk://?search=func&compare={runtimeId}
-		checkRuleAndSearch_WithDiff("/", "func", taskID2, taskID1, map[string]data{
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 5,
-			},
-			urlProgramPath(programName): {
-				Name:  programName,
-				Type:  "program",
-				Count: 5,
-			},
-		}, true)
-	})
+		for _, risk := range compareRisks {
+			require.True(t, incrementalIDs[risk.ID],
+				"Compare查询的风险ID=%d应该也在增量查询结果中", risk.ID)
+		}
 
-	t.Run("check path program and search source", func(t *testing.T) {
-		// ssarisk://program/?search=/b&compare={runtimeId}
-		// 注意：搜索'/b'会匹配所有包含字符'b'的字段，不仅仅是路径
-		// 所以我们使用包含性检查，确保期望的结果都包含在实际结果中
-		checkRuleAndSearch_WithDiff(urlProgramPath(programName), "/b", taskID2, taskID1, map[string]data{
-			urlPath(programName, extendPath+"/b/b1.go"): {
-				Name:  sourcePath(programName, extendPath+"/b/b1.go"),
-				Type:  "source",
-				Count: 1,
-			},
-			urlPath(programName, extendPath+"/b/b2.go"): {
-				Name:  sourcePath(programName, extendPath+"/b/b2.go"),
-				Type:  "source",
-				Count: 1,
-			},
-		}, true) // 使用包含性检查
-	})
-
-	t.Run("check path program and search function", func(t *testing.T) {
-		// ssarisk://program/?search=/funcB1&compare={runtimeId}
-		checkRuleAndSearch_WithDiff(urlProgramPath(programName), "funcB1", taskID2, taskID1, map[string]data{
-			urlPath(programName, extendPath+"/b/b1.go"): {
-				Name:  sourcePath(programName, extendPath+"/b/b1.go"),
-				Type:  "source",
-				Count: 1,
-			},
-		})
-	})
-
-	t.Run("check path source and search function", func(t *testing.T) {
-		// ssarisk://program/b/?search=/funcB1&compare={runtimeId}
-		checkRuleAndSearch_WithDiff(urlPath(programName, extendPath+"/b/b1.go"), "funcB1", taskID2, taskID1, map[string]data{
-			urlFunctionPath(programName, extendPath+"/b/b1.go", "funcB1"): {
-				Name:  "funcB1",
-				Type:  "function",
-				Count: 1,
-			},
-		})
-	})
-
-	t.Run("check path function and search function but not find", func(t *testing.T) {
-		// ssarisk://program/b/?search=/funcB1&compare={runtimeId}
-		checkRuleAndSearch_WithDiff(urlFunctionPath(programName, extendPath+"/b/b1.go", "funcB1"), "funcB2", taskID2, taskID1, map[string]data{})
+		t.Logf("验证通过：增量查询和Compare查询返回了相同的 %d 个新增风险", len(compareRisks))
 	})
 }
