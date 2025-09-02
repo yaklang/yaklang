@@ -287,3 +287,316 @@ func TestCoolDownLongRunning(t *testing.T) {
 
 	t.Logf("长时间运行执行次数: %d, 期望最少: %d", actualCount, expectedMin)
 }
+
+// TestCoolDownConcurrentDoExclusive 测试并发调用Do时的排他性
+// 确保在并发环境中，只有一个goroutine能执行主函数，其他会被阻塞
+func TestCoolDownConcurrentDoExclusive(t *testing.T) {
+	cd := NewCoolDown(500 * time.Millisecond) // 较长的冷却时间
+	defer cd.cancel()
+
+	var (
+		executeCount    int32
+		executingFlag   int32 // 标记当前是否有函数正在执行
+		concurrentCount int32 // 记录并发执行的数量
+	)
+
+	numGoroutines := 10
+	var wg sync.WaitGroup
+
+	// 启动多个goroutine同时调用Do
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			cd.Do(func() {
+				// 检查是否有其他函数同时执行
+				if !atomic.CompareAndSwapInt32(&executingFlag, 0, 1) {
+					atomic.AddInt32(&concurrentCount, 1)
+					t.Errorf("检测到并发执行：goroutine %d", id)
+				}
+
+				atomic.AddInt32(&executeCount, 1)
+
+				// 模拟一些工作
+				time.Sleep(100 * time.Millisecond)
+
+				// 释放执行标记
+				atomic.StoreInt32(&executingFlag, 0)
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证结果
+	actualExecutions := atomic.LoadInt32(&executeCount)
+	concurrentExecutions := atomic.LoadInt32(&concurrentCount)
+
+	if concurrentExecutions > 0 {
+		t.Errorf("检测到 %d 次并发执行，应该为0", concurrentExecutions)
+	}
+
+	if actualExecutions != 1 {
+		t.Errorf("期望执行1次，实际执行 %d 次", actualExecutions)
+	}
+
+	t.Logf("成功：%d个goroutine中只有1个执行了主函数", numGoroutines)
+}
+
+// TestCoolDownConcurrentDoOrExclusive 测试并发调用DoOr时的行为
+// 确保只有一个goroutine执行主函数，其他执行回调函数
+func TestCoolDownConcurrentDoOrExclusive(t *testing.T) {
+	cd := NewCoolDown(500 * time.Millisecond) // 较长的冷却时间
+	defer cd.cancel()
+
+	var (
+		mainExecuteCount     int32
+		fallbackExecuteCount int32
+		executingMainFlag    int32 // 标记当前是否有主函数正在执行
+		concurrentMainCount  int32 // 记录主函数并发执行的数量
+	)
+
+	numGoroutines := 10
+	var wg sync.WaitGroup
+
+	// 启动多个goroutine同时调用DoOr
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			cd.DoOr(func() {
+				// 检查是否有其他主函数同时执行
+				if !atomic.CompareAndSwapInt32(&executingMainFlag, 0, 1) {
+					atomic.AddInt32(&concurrentMainCount, 1)
+					t.Errorf("检测到主函数并发执行：goroutine %d", id)
+				}
+
+				atomic.AddInt32(&mainExecuteCount, 1)
+
+				// 模拟一些工作
+				time.Sleep(100 * time.Millisecond)
+
+				// 释放执行标记
+				atomic.StoreInt32(&executingMainFlag, 0)
+			}, func() {
+				// 回调函数
+				atomic.AddInt32(&fallbackExecuteCount, 1)
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证结果
+	actualMainExecutions := atomic.LoadInt32(&mainExecuteCount)
+	actualFallbackExecutions := atomic.LoadInt32(&fallbackExecuteCount)
+	concurrentMainExecutions := atomic.LoadInt32(&concurrentMainCount)
+
+	if concurrentMainExecutions > 0 {
+		t.Errorf("检测到主函数 %d 次并发执行，应该为0", concurrentMainExecutions)
+	}
+
+	if actualMainExecutions != 1 {
+		t.Errorf("期望主函数执行1次，实际执行 %d 次", actualMainExecutions)
+	}
+
+	if actualFallbackExecutions != int32(numGoroutines-1) {
+		t.Errorf("期望回调函数执行 %d 次，实际执行 %d 次", numGoroutines-1, actualFallbackExecutions)
+	}
+
+	t.Logf("成功：%d个goroutine中1个执行主函数，%d个执行回调函数", numGoroutines, actualFallbackExecutions)
+}
+
+// TestCoolDownInitializationPattern 测试初始化模式
+// 模拟并发环境下的安全初始化场景
+func TestCoolDownInitializationPattern(t *testing.T) {
+	cd := NewCoolDown(100 * time.Millisecond)
+	defer cd.cancel()
+
+	var (
+		initialized         int32
+		initializerID       int32 = -1
+		resourceValue       int32
+		accessCount         int32
+		concurrentInitCount int32 // 记录并发初始化的数量
+		initComplete        int32 // 标记初始化是否完全完成
+	)
+
+	numGoroutines := 20
+	var wg sync.WaitGroup
+
+	// 模拟多个goroutine需要访问一个需要初始化的资源
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			cd.DoOr(func() {
+				// 初始化函数 - 只有一个goroutine能执行
+				if !atomic.CompareAndSwapInt32(&initialized, 0, 1) {
+					atomic.AddInt32(&concurrentInitCount, 1)
+					t.Errorf("检测到重复初始化：goroutine %d", id)
+					return
+				}
+
+				atomic.StoreInt32(&initializerID, int32(id))
+
+				// 模拟初始化工作
+				time.Sleep(50 * time.Millisecond)
+				atomic.StoreInt32(&resourceValue, 42) // 设置资源值
+
+				// 标记初始化完全完成
+				atomic.StoreInt32(&initComplete, 1)
+
+				t.Logf("资源由 goroutine %d 初始化", id)
+			}, func() {
+				// 等待初始化完全完成并使用资源
+				for atomic.LoadInt32(&initComplete) == 0 {
+					time.Sleep(5 * time.Millisecond)
+				}
+
+				// 访问已初始化的资源
+				value := atomic.LoadInt32(&resourceValue)
+				if value != 42 {
+					t.Errorf("goroutine %d: 资源值不正确，期望42，得到%d", id, value)
+				}
+				atomic.AddInt32(&accessCount, 1)
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证结果
+	isInitialized := atomic.LoadInt32(&initialized)
+	finalResourceValue := atomic.LoadInt32(&resourceValue)
+	totalAccess := atomic.LoadInt32(&accessCount)
+	concurrentInits := atomic.LoadInt32(&concurrentInitCount)
+	initID := atomic.LoadInt32(&initializerID)
+
+	if concurrentInits > 0 {
+		t.Errorf("检测到 %d 次并发初始化，应该为0", concurrentInits)
+	}
+
+	if isInitialized != 1 {
+		t.Error("资源未正确初始化")
+	}
+
+	if finalResourceValue != 42 {
+		t.Errorf("资源值不正确，期望42，得到%d", finalResourceValue)
+	}
+
+	if totalAccess != int32(numGoroutines-1) {
+		t.Errorf("期望 %d 次资源访问，实际 %d 次", numGoroutines-1, totalAccess)
+	}
+
+	t.Logf("成功：资源由 goroutine %d 初始化，其他 %d 个goroutine正确访问了资源", initID, totalAccess)
+}
+
+// TestCoolDownLongRunningTaskWithQueue 测试长时间运行的任务，其他调用者排队等待
+func TestCoolDownLongRunningTaskWithQueue(t *testing.T) {
+	cd := NewCoolDown(100 * time.Millisecond)
+	defer cd.cancel()
+
+	var (
+		executeCount    int32
+		queuedCount     int32
+		completionOrder []int32
+		orderMutex      sync.Mutex
+		executingFlag   int32
+		concurrentCount int32
+	)
+
+	numGoroutines := 5
+	var wg sync.WaitGroup
+
+	// 第一个goroutine执行长时间任务
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		cd.DoOr(func() {
+			if !atomic.CompareAndSwapInt32(&executingFlag, 0, 1) {
+				atomic.AddInt32(&concurrentCount, 1)
+				t.Error("检测到并发执行长时间任务")
+			}
+
+			atomic.AddInt32(&executeCount, 1)
+
+			// 模拟长时间工作
+			time.Sleep(300 * time.Millisecond)
+
+			orderMutex.Lock()
+			completionOrder = append(completionOrder, 0) // 主任务ID为0
+			orderMutex.Unlock()
+
+			atomic.StoreInt32(&executingFlag, 0)
+		}, func() {
+			// 不应该进入这里
+			t.Error("主任务goroutine不应该执行回调")
+		})
+	}()
+
+	// 稍后启动其他goroutine，它们应该执行回调函数
+	time.Sleep(50 * time.Millisecond)
+
+	for i := 1; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+
+			cd.DoOr(func() {
+				// 不应该进入这里，因为主任务还在运行
+				t.Errorf("goroutine %d 不应该执行主函数", id)
+			}, func() {
+				// 应该执行这里
+				atomic.AddInt32(&queuedCount, 1)
+
+				orderMutex.Lock()
+				completionOrder = append(completionOrder, int32(id))
+				orderMutex.Unlock()
+			})
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证结果
+	actualExecutions := atomic.LoadInt32(&executeCount)
+	actualQueued := atomic.LoadInt32(&queuedCount)
+	concurrentExecutions := atomic.LoadInt32(&concurrentCount)
+
+	if concurrentExecutions > 0 {
+		t.Errorf("检测到 %d 次并发执行，应该为0", concurrentExecutions)
+	}
+
+	if actualExecutions != 1 {
+		t.Errorf("期望主任务执行1次，实际执行 %d 次", actualExecutions)
+	}
+
+	if actualQueued != int32(numGoroutines-1) {
+		t.Errorf("期望 %d 个goroutine执行回调，实际 %d 个", numGoroutines-1, actualQueued)
+	}
+
+	// 验证执行顺序：主任务应该最先完成（但由于并发性，这个检查可能不总是可靠）
+	orderMutex.Lock()
+	if len(completionOrder) > 0 {
+		t.Logf("完成顺序: %v", completionOrder)
+		// 主任务(ID=0)应该存在于顺序中
+		foundMainTask := false
+		for _, id := range completionOrder {
+			if id == 0 {
+				foundMainTask = true
+				break
+			}
+		}
+		if !foundMainTask {
+			t.Error("主任务未在完成顺序中找到")
+		}
+	}
+	orderMutex.Unlock()
+
+	t.Logf("成功：长时间主任务执行完成，%d 个等待的goroutine执行了回调", actualQueued)
+}
