@@ -379,7 +379,11 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 		return nil, err
 	}
 
-	diffResults, err := GetSSADiffResult(consts.GetGormDefaultSSADataBase(), base.GetRiskRuntimeId(), compare.GetRiskRuntimeId())
+	diffResults, err := GetSSADiffResult(
+		consts.GetGormDefaultSSADataBase(),
+		base.GetRiskRuntimeId(),
+		compare.GetRiskRuntimeId(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -449,12 +453,7 @@ func DoRiskDiff(context context.Context, base, compare *ypb.SSARiskDiffItem) (<-
 			originHash string,
 			diffHash string,
 		) {
-			// 使用规则、代码片段和变量名作为对比的依据
-			return risk.FromRule, risk.Hash, utils.CalcMd5(
-				risk.FromRule,
-				risk.CodeRange,
-				risk.Variable,
-			)
+			return risk.FromRule, risk.Hash, risk.RiskFeatureHash
 		}),
 	)
 	return res, nil

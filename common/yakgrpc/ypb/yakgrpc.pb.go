@@ -54648,6 +54648,7 @@ type SSARisksFilter struct {
 	AfterCreatedAt       int64                  `protobuf:"varint,16,opt,name=AfterCreatedAt,proto3" json:"AfterCreatedAt,omitempty"`
 	LatestDisposalStatus []string               `protobuf:"bytes,17,rep,name=LatestDisposalStatus,proto3" json:"LatestDisposalStatus,omitempty"` // not_set | is_issue | not_issue | suspicious
 	SSARiskDiffRequest   *SSARiskDiffRequest    `protobuf:"bytes,18,opt,name=SSARiskDiffRequest,proto3" json:"SSARiskDiffRequest,omitempty"`
+	IncrementalQuery     bool                   `protobuf:"varint,19,opt,name=IncrementalQuery,proto3" json:"IncrementalQuery,omitempty"` // 是否启用增量查询
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -54806,6 +54807,13 @@ func (x *SSARisksFilter) GetSSARiskDiffRequest() *SSARiskDiffRequest {
 		return x.SSARiskDiffRequest
 	}
 	return nil
+}
+
+func (x *SSARisksFilter) GetIncrementalQuery() bool {
+	if x != nil {
+		return x.IncrementalQuery
+	}
+	return false
 }
 
 type QuerySSARisksRequest struct {
@@ -55328,6 +55336,7 @@ type SSARiskDisposalData struct {
 	Status        string                 `protobuf:"bytes,4,opt,name=Status,proto3" json:"Status,omitempty"`
 	Comment       string                 `protobuf:"bytes,5,opt,name=Comment,proto3" json:"Comment,omitempty"`
 	RiskId        int64                  `protobuf:"varint,6,opt,name=RiskId,proto3" json:"RiskId,omitempty"`
+	TaskName      string                 `protobuf:"bytes,7,opt,name=TaskName,proto3" json:"TaskName,omitempty"` // 任务名称，追踪处置来自哪次扫描任务
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -55402,6 +55411,13 @@ func (x *SSARiskDisposalData) GetRiskId() int64 {
 		return x.RiskId
 	}
 	return 0
+}
+
+func (x *SSARiskDisposalData) GetTaskName() string {
+	if x != nil {
+		return x.TaskName
+	}
+	return ""
 }
 
 type SSARiskDisposalsFilter struct {
@@ -64714,7 +64730,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Line\x18\x1b \x01(\x03R\x04Line\x12\x1a\n" +
 	"\bSolution\x18\x1c \x01(\tR\bSolution\x12 \n" +
 	"\vDescription\x18\x1d \x01(\tR\vDescription\x122\n" +
-	"\x14LatestDisposalStatus\x18\x1e \x01(\tR\x14LatestDisposalStatus\"\xd7\x04\n" +
+	"\x14LatestDisposalStatus\x18\x1e \x01(\tR\x14LatestDisposalStatus\"\x83\x05\n" +
 	"\x0eSSARisksFilter\x12\x0e\n" +
 	"\x02ID\x18\x01 \x03(\x03R\x02ID\x12\x16\n" +
 	"\x06Search\x18\x02 \x01(\tR\x06Search\x12 \n" +
@@ -64734,7 +64750,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fBeforeCreatedAt\x18\x0f \x01(\x03R\x0fBeforeCreatedAt\x12&\n" +
 	"\x0eAfterCreatedAt\x18\x10 \x01(\x03R\x0eAfterCreatedAt\x122\n" +
 	"\x14LatestDisposalStatus\x18\x11 \x03(\tR\x14LatestDisposalStatus\x12G\n" +
-	"\x12SSARiskDiffRequest\x18\x12 \x01(\v2\x17.ypb.SSARiskDiffRequestR\x12SSARiskDiffRequest\"p\n" +
+	"\x12SSARiskDiffRequest\x18\x12 \x01(\v2\x17.ypb.SSARiskDiffRequestR\x12SSARiskDiffRequest\x12*\n" +
+	"\x10IncrementalQuery\x18\x13 \x01(\bR\x10IncrementalQuery\"p\n" +
 	"\x14QuerySSARisksRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
@@ -64767,14 +64784,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x16NewSSARiskReadResponse\"c\n" +
 	"\x1eSSARiskFeedbackToOnlineRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x12+\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x13.ypb.SSARisksFilterR\x06Filter\"\xab\x01\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x13.ypb.SSARisksFilterR\x06Filter\"\xc7\x01\n" +
 	"\x13SSARiskDisposalData\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tCreatedAt\x18\x02 \x01(\x03R\tCreatedAt\x12\x1c\n" +
 	"\tUpdatedAt\x18\x03 \x01(\x03R\tUpdatedAt\x12\x16\n" +
 	"\x06Status\x18\x04 \x01(\tR\x06Status\x12\x18\n" +
 	"\aComment\x18\x05 \x01(\tR\aComment\x12\x16\n" +
-	"\x06RiskId\x18\x06 \x01(\x03R\x06RiskId\"p\n" +
+	"\x06RiskId\x18\x06 \x01(\x03R\x06RiskId\x12\x1a\n" +
+	"\bTaskName\x18\a \x01(\tR\bTaskName\"p\n" +
 	"\x16SSARiskDisposalsFilter\x12\x0e\n" +
 	"\x02ID\x18\x01 \x03(\x03R\x02ID\x12\x16\n" +
 	"\x06Status\x18\x02 \x03(\tR\x06Status\x12\x16\n" +
