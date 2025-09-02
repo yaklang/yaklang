@@ -6,19 +6,19 @@ import (
 )
 
 // DistanceFunc is a function that computes the distance between two vectors.
-type DistanceFunc func(a, b Vector) float32
+type DistanceFunc func(a, b Vector) float64
 
 // EuclideanDistance computes the Euclidean distance between two vectors.
-func EuclideanDistance(af, bf Vector) float32 {
+func EuclideanDistance(af, bf Vector) float64 {
 	a := af()
 	b := bf()
 	// TODO: can we speedup with vek?
-	var sum float32 = 0
+	var sum float64 = 0
 	for i := range a {
 		diff := a[i] - b[i]
-		sum += diff * diff
+		sum += float64(diff) * float64(diff)
 	}
-	return float32(math.Sqrt(float64(sum)))
+	return math.Sqrt(sum)
 }
 
 var distanceFuncs = map[string]DistanceFunc{

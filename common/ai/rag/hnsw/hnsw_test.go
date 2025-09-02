@@ -2,6 +2,7 @@ package hnsw
 
 import (
 	"encoding/json"
+	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -143,7 +144,7 @@ func TestSearchWithDistanceAndFilter(t *testing.T) {
 
 	// Check that distances are returned
 	for _, res := range result {
-		require.Greater(t, res.Distance, float32(0))
+		require.Greater(t, res.Distance, float64(0))
 	}
 }
 
@@ -213,14 +214,17 @@ func BenchmarkSearchWithFilter(b *testing.B) {
 
 func TestDeleteNodeNeighborCleanup(t *testing.T) {
 	g := NewGraph[int]()
-
-	// Add multiple nodes to create a connected graph
+	g.Rng = rand.New(rand.NewSource(1))
+	// Add multiple nodes to create a connected graph with varied distances
 	g.Add(
-		MakeNode(1, []float32{0.1, 0.1, 0.1}), // Node 1
-		MakeNode(2, []float32{0.2, 0.2, 0.2}), // Node 2 - will be deleted
-		MakeNode(3, []float32{0.3, 0.3, 0.3}), // Node 3
-		MakeNode(4, []float32{0.4, 0.4, 0.4}), // Node 4
-		MakeNode(5, []float32{0.5, 0.5, 0.5}), // Node 5
+		MakeNode(1, []float32{0.1, 0.8, 0.3}), // Node 1 - diverse vector
+		MakeNode(2, []float32{0.5, 0.2, 0.7}), // Node 2 - will be deleted, positioned strategically
+		MakeNode(3, []float32{0.9, 0.1, 0.2}), // Node 3 - different quadrant
+		MakeNode(4, []float32{0.3, 0.6, 0.8}), // Node 4 - close to node 2
+		MakeNode(5, []float32{0.7, 0.4, 0.1}), // Node 5 - another diverse position
+		MakeNode(6, []float32{0.2, 0.9, 0.5}), // Node 6 - fixed duplicate ID issue
+		// MakeNode(4, []float32{0.3, 0.6, 0.8}), // Node 7 - duplicate ID issue
+		// MakeNode(4, []float32{0.3, 0.6, 0.9}), // Node 8 - update vector
 	)
 
 	// Verify that the graph is properly connected initially
@@ -271,7 +275,101 @@ func TestDeleteNodeNeighborCleanup(t *testing.T) {
 	}
 
 	// Verify that the graph is still functional after deletion
-	queryVec := []float32{0.25, 0.25, 0.25} // Close to where node 2 was
+	queryVec := []float32{0.4, 0.3, 0.6} // Close to where node 2 was
+	result := g.Search(queryVec, 3)
+	require.NotEmpty(t, result, "Search should still return results after deletion")
+
+	// Ensure no result contains the deleted node
+	for _, res := range result {
+		require.NotEqual(t, 2, res.Key, "Search results should not contain deleted node")
+	}
+
+	// Verify the remaining nodes are still properly connected
+	// (optional check to ensure graph connectivity is maintained)
+	remainingNodeCount := 0
+	for _, layer := range g.Layers {
+		remainingNodeCount += len(layer.Nodes)
+	}
+	require.Greater(t, remainingNodeCount, 0, "Graph should still have nodes after deletion")
+}
+
+func TestAddNodeWithDuplicateID(t *testing.T) {
+	g := NewGraph[int]()
+	g.Rng = rand.New(rand.NewSource(1))
+	g.Add(
+		MakeNode(1, []float32{0.1, 0.8, 0.3}),
+		MakeNode(1, []float32{0.5, 0.2, 0.7}),
+	)
+
+	require.Greater(t, len(g.Layers), 0, "Graph should have at least one layer")
+	require.Equal(t, 1, len(g.Layers[0].Nodes))
+	require.Equal(t, 1, g.Layers[0].Nodes[1].Key)
+	require.Equal(t, float32(0.5), g.Layers[0].Nodes[1].Value()[0])
+}
+func TestDeleteNodeNeighborCleanupWithDuplicateID(t *testing.T) {
+	g := NewGraph[int]()
+	g.Rng = rand.New(rand.NewSource(1))
+	// Add multiple nodes to create a connected graph with varied distances
+	g.Add(
+		MakeNode(1, []float32{0.1, 0.8, 0.3}), // Node 1 - diverse vector
+		MakeNode(2, []float32{0.5, 0.2, 0.7}), // Node 2 - will be deleted, positioned strategically
+		MakeNode(3, []float32{0.9, 0.1, 0.2}), // Node 3 - different quadrant
+		MakeNode(4, []float32{0.3, 0.6, 0.8}), // Node 4 - close to node 2
+		MakeNode(5, []float32{0.7, 0.4, 0.1}), // Node 5 - another diverse position
+		MakeNode(6, []float32{0.2, 0.9, 0.5}), // Node 6 - fixed duplicate ID issue
+		MakeNode(4, []float32{0.3, 0.6, 0.8}), // Node 7 - duplicate ID issue
+		// MakeNode(4, []float32{0.3, 0.6, 0.9}), // Node 8 - update vector
+	)
+
+	// Verify that the graph is properly connected initially
+	require.Greater(t, len(g.Layers), 0, "Graph should have at least one layer")
+
+	// Count total connections before deletion
+	var totalConnectionsBefore int
+	var connectionsToNode2Before int
+	for _, layer := range g.Layers {
+		for nodeKey, node := range layer.Nodes {
+			totalConnectionsBefore += len(node.Neighbors)
+			if nodeKey != 2 {
+				// Check if this node has node 2 as a neighbor
+				if _, hasNode2AsNeighbor := node.Neighbors[2]; hasNode2AsNeighbor {
+					connectionsToNode2Before++
+				}
+			}
+		}
+	}
+
+	// Verify that node 2 exists before deletion
+	var node2ExistsBefore bool
+	for _, layer := range g.Layers {
+		if _, exists := layer.Nodes[2]; exists {
+			node2ExistsBefore = true
+			break
+		}
+	}
+	require.True(t, node2ExistsBefore, "Node 2 should exist before deletion")
+
+	// Delete node 2
+	deleted := g.Delete(2)
+	require.True(t, deleted, "Delete should return true when node exists")
+
+	// Verify that node 2 no longer exists in any layer
+	for _, layer := range g.Layers {
+		_, exists := layer.Nodes[2]
+		require.False(t, exists, "Node 2 should not exist in any layer after deletion")
+	}
+
+	// Critical test: Verify that no remaining node has the deleted node (2) as a neighbor
+	for _, layer := range g.Layers {
+		for nodeKey, node := range layer.Nodes {
+			_, hasDeletedNeighbor := node.Neighbors[2]
+			require.False(t, hasDeletedNeighbor,
+				"Node %d in layer should not have deleted node 2 as neighbor", nodeKey)
+		}
+	}
+
+	// Verify that the graph is still functional after deletion
+	queryVec := []float32{0.4, 0.3, 0.6} // Close to where node 2 was
 	result := g.Search(queryVec, 3)
 	require.NotEmpty(t, result, "Search should still return results after deletion")
 

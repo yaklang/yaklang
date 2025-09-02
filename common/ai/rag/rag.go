@@ -38,7 +38,7 @@ type Document struct {
 // SearchResult 表示检索结果
 type SearchResult struct {
 	Document Document `json:"document"` // 检索到的文档
-	Score    float32  `json:"score"`    // 相似度得分 (-1 到 1 之间)
+	Score    float64  `json:"score"`    // 相似度得分 (-1 到 1 之间)
 }
 
 // EmbeddingClient 接口定义了嵌入向量生成的操作
@@ -525,7 +525,7 @@ func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]Sear
 
 	var filteredResults []SearchResult
 	for _, result := range results {
-		if limit < 0 || result.Score >= float32(limit) {
+		if limit < 0 || result.Score >= limit {
 			filteredResults = append(filteredResults, result)
 		}
 	}

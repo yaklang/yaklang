@@ -206,8 +206,8 @@ func TestMUSTPASS_FilterResults(t *testing.T) {
 
 	filtered := FilterResults(results, 0.6)
 	assert.Equal(t, 2, len(filtered))
-	assert.Equal(t, float32(0.9), filtered[0].Score)
-	assert.Equal(t, float32(0.7), filtered[1].Score)
+	assert.Equal(t, 0.9, filtered[0].Score)
+	assert.Equal(t, 0.7, filtered[1].Score)
 }
 
 type VectorStoreDocument struct {

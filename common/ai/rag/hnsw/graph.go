@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -57,7 +58,7 @@ func (n *LayerNode[K]) addNeighbor(newNode *LayerNode[K], m int, dist DistanceFu
 
 	// Find the neighbor with the worst distance.
 	var (
-		worstDist = float32(math.Inf(-1))
+		worstDist = math.Inf(-1)
 		worst     *LayerNode[K]
 	)
 	for _, neighbor := range n.Neighbors {
@@ -78,7 +79,7 @@ func (n *LayerNode[K]) addNeighbor(newNode *LayerNode[K], m int, dist DistanceFu
 
 type searchCandidate[K cmp.Ordered] struct {
 	node *LayerNode[K]
-	dist float32
+	dist float64
 }
 
 func (s searchCandidate[K]) Less(o searchCandidate[K]) bool {
@@ -493,6 +494,7 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 		key := node.Key
 		vec := node.Value
 
+		g.Delete(key)
 		g.assertDims(vec)
 		insertLevel := g.randomLevel()
 		// Create layers that don't exist yet.
@@ -549,9 +551,6 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 			elevator = ptr(neighborhood[0].node.Key)
 
 			if insertLevel >= i {
-				if _, ok := layer.Nodes[key]; ok {
-					g.Delete(key)
-				}
 				// Insert the new node into the layer.
 				layer.Nodes[key] = newNode
 				for _, node := range neighborhood {
@@ -607,7 +606,7 @@ func (h *Graph[K]) SearchWithDistanceAndFilter(near []float32, k int, filter Fil
 
 type SearchResult[T cmp.Ordered] struct {
 	Node[T]
-	Distance float32
+	Distance float64
 }
 
 func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResult[K] {
@@ -847,4 +846,100 @@ func (h *Graph[K]) Import(r io.Reader) error {
 	}
 
 	return nil
+}
+
+func (h *Graph[K]) DebugDumpByDot() []string {
+	var result []string
+
+	for layerIdx, layer := range h.Layers {
+		if layer == nil || len(layer.Nodes) == 0 {
+			continue
+		}
+
+		var lines []string
+		lines = append(lines, fmt.Sprintf("digraph layer_%d {", layerIdx))
+		lines = append(lines, "  rankdir=LR;")
+		lines = append(lines, "  node [shape=circle];")
+		lines = append(lines, "")
+
+		// Add nodes with their vector information as labels
+		for nodeKey, node := range layer.Nodes {
+			if node == nil {
+				continue
+			}
+			vec := node.Value()
+			if len(vec) >= 3 {
+				// Show first 3 dimensions for readability
+				label := fmt.Sprintf("%v\\n[%.2f,%.2f,%.2f]", nodeKey, vec[0], vec[1], vec[2])
+				lines = append(lines, fmt.Sprintf("  \"%v\" [label=\"%s\"];", nodeKey, label))
+			} else {
+				label := fmt.Sprintf("%v\\n%v", nodeKey, vec)
+				lines = append(lines, fmt.Sprintf("  \"%v\" [label=\"%s\"];", nodeKey, label))
+			}
+		}
+
+		lines = append(lines, "")
+
+		// Add edges (neighbors)
+		for nodeKey, node := range layer.Nodes {
+			if node == nil || node.Neighbors == nil {
+				continue
+			}
+			for neighborKey := range node.Neighbors {
+				lines = append(lines, fmt.Sprintf("  \"%v\" -> \"%v\";", nodeKey, neighborKey))
+			}
+		}
+
+		lines = append(lines, "}")
+
+		// Join lines for this layer
+		result = append(result, strings.Join(lines, "\n"))
+	}
+
+	return result
+}
+
+func (h *Graph[K]) DumpByDot() []string {
+	var result []string
+
+	for layerIdx, layer := range h.Layers {
+		if layer == nil || len(layer.Nodes) == 0 {
+			continue
+		}
+
+		var lines []string
+		lines = append(lines, fmt.Sprintf("graph layer_%d {", layerIdx))
+		lines = append(lines, "  layout=neato;")
+		lines = append(lines, "  node [shape=circle];")
+
+		// Add edges (neighbors) - avoid duplicate edges in undirected graph
+		addedEdges := make(map[string]bool)
+		for nodeKey, node := range layer.Nodes {
+			if node == nil || node.Neighbors == nil {
+				continue
+			}
+			for neighborKey := range node.Neighbors {
+				// Create edge key in a consistent order to avoid duplicates
+				var edgeKey string
+				if nodeKey < neighborKey {
+					edgeKey = fmt.Sprintf("%v--%v", nodeKey, neighborKey)
+				} else {
+					edgeKey = fmt.Sprintf("%v--%v", neighborKey, nodeKey)
+				}
+
+				// Only add the edge if we haven't added it before
+				if !addedEdges[edgeKey] {
+					lines = append(lines, fmt.Sprintf("  \"%v\" -- \"%v\";", nodeKey, neighborKey))
+					addedEdges[edgeKey] = true
+				}
+			}
+		}
+
+		lines = append(lines, "}")
+
+		// Join lines for this layer
+		result = append(result, strings.Join(lines, "\n"))
+	}
+
+	return result
 }
