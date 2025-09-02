@@ -18,6 +18,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
 	"github.com/yaklang/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/go-funk"
 )
 
 type clientHandshakeStateGM struct {
@@ -605,10 +606,19 @@ func (hs *clientHandshakeStateGM) getCertificate(certReq *certificateRequestMsgG
 	if c.config.GetClientCertificate != nil {
 		var signatureSchemes []SignatureScheme
 
-		return c.config.GetClientCertificate(&CertificateRequestInfo{
+		cert, err := c.config.GetClientCertificate(&CertificateRequestInfo{
 			AcceptableCAs:    certReq.certificateAuthorities,
 			SignatureSchemes: signatureSchemes,
 		})
+		// If GetClientCertificate returns an error, the handshake will be
+		// aborted and that error will be returned. Otherwise
+		// GetClientCertificate must return a non-nil Certificate.
+		if err != nil {
+			return nil, err
+		}
+		if !funk.IsEmpty(cert) {
+			return cert, nil
+		}
 	}
 
 	// RFC 4346 on the certificateAuthorities field: A list of the

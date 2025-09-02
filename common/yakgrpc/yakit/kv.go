@@ -388,7 +388,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 
 	for _, certs := range c.GetClientCertificates() {
 		if len(certs.GetPkcs12Bytes()) > 0 {
-			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()))
+			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()), certs.GetHost())
 			if err != nil {
 				log.Errorf("load p12 bytes failed: %s", err)
 			}
@@ -398,7 +398,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 				log.Errorf("build p12 bytes failed: %s", err)
 				continue
 			}
-			err = netx.LoadP12Bytes(p12bytes, "")
+			err = netx.LoadP12Bytes(p12bytes, "", certs.GetHost())
 			if err != nil {
 				log.Errorf("load p12 bytes failed: %s", err)
 			}
