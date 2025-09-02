@@ -13,7 +13,7 @@ func TestMUSTPASS_SQLiteVectorStoreHNSW(t *testing.T) {
 
 	db := consts.GetGormProfileDatabase()
 	// 创建 SQLite 向量存储
-	store, err := NewSQLiteVectorStore(db, "test_collection", "Qwen3-Embedding-0.6B-Q4_K_M", 1024, mockEmbed)
+	store, err := NewSQLiteVectorStoreHNSW("test_collection", "test", "Qwen3-Embedding-0.6B-Q4_K_M", 1024, mockEmbed, db)
 	assert.NoError(t, err)
 	defer store.Remove()
 

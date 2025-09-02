@@ -142,7 +142,7 @@ func FormatRagPrompt(query string, results []SearchResult, promptTemplate string
 }
 
 // FilterResults 根据相似度阈值过滤搜索结果
-func FilterResults(results []SearchResult, threshold float32) []SearchResult {
+func FilterResults(results []SearchResult, threshold float64) []SearchResult {
 	var filtered []SearchResult
 	for _, result := range results {
 		if result.Score >= threshold {

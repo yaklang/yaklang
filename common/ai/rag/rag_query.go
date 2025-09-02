@@ -26,7 +26,7 @@ type RAGQueryConfig struct {
 	Limit                int
 	CollectionName       string
 	CollectionNumLimit   int
-	CollectionScoreLimit float32
+	CollectionScoreLimit float64
 	EnhancePlan          string
 	Filter               func(key string, getDoc func() *Document) bool
 	Concurrent           int
@@ -58,7 +58,7 @@ func WithRAGCollectionName(collectionName string) RAGQueryOption {
 }
 
 // WithRAGCollectionScoreLimit 设置集合搜索分数阈值
-func WithRAGCollectionScoreLimit(scoreLimit float32) RAGQueryOption {
+func WithRAGCollectionScoreLimit(scoreLimit float64) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
 		config.CollectionScoreLimit = scoreLimit
 	}
@@ -128,7 +128,7 @@ type RAGSearchResult struct {
 	Message   string      `json:"message"`
 	Data      interface{} `json:"data"`
 	Type      string      `json:"type"`      // message, mid_result, result
-	Score     float32     `json:"score"`     // 相似度分数
+	Score     float64     `json:"score"`     // 相似度分数
 	Source    string      `json:"source"`    // 结果来源（集合名称）
 	Timestamp int64       `json:"timestamp"` // 时间戳
 }
@@ -165,7 +165,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
-	sendMidResult := func(doc *Document, score float32, source string) {
+	sendMidResult := func(doc *Document, score float64, source string) {
 		msgResult := &RAGSearchResult{
 			Message:   fmt.Sprintf("[%s] 找到文档: %s", queryId, doc.ID),
 			Data:      doc,
@@ -177,7 +177,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
-	sendResult := func(doc *Document, score float32, source string) {
+	sendResult := func(doc *Document, score float64, source string) {
 		msgResult := &RAGSearchResult{
 			Message:   fmt.Sprintf("[%s] 最终结果: %s", queryId, doc.ID),
 			Data:      doc,
@@ -322,7 +322,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		// 收集所有结果
 		type ScoredResult struct {
 			Document *Document
-			Score    float32
+			Score    float64
 			Source   string
 		}
 
