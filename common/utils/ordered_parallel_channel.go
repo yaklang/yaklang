@@ -17,6 +17,9 @@ type ParallelProcessConfig struct {
 	Concurrency    int
 	StartCallback  func()
 	FinishCallback func()
+
+	StartTask func()
+	DeferTask func()
 }
 
 func newParallelProcessConfig(opts ...ParallelProcessOption) *ParallelProcessConfig {
@@ -39,6 +42,18 @@ func WithParallelProcessConcurrency(concurrency int) ParallelProcessOption {
 		if concurrency > 0 {
 			cfg.Concurrency = concurrency
 		}
+	}
+}
+
+func WithParallelProcessStartTask(h func()) ParallelProcessOption {
+	return func(cfg *ParallelProcessConfig) {
+		cfg.StartTask = h
+	}
+}
+
+func WithParallelProcessDeferTask(h func()) ParallelProcessOption {
+	return func(cfg *ParallelProcessConfig) {
+		cfg.DeferTask = h
 	}
 }
 
@@ -76,8 +91,16 @@ func OrderedParallelProcess[I any, O any](
 			startOnce.Do(config.StartCallback)
 			swg.Add(1)
 			currentIndex := index
+			if config.StartTask != nil {
+				config.StartTask()
+			}
 			go func() {
 				defer swg.Done()
+				defer func() {
+					if config.DeferTask != nil {
+						config.DeferTask()
+					}
+				}()
 				output, err := processFunc(data)
 				// 将处理结果（包含原始索引）发送到 resultsCh
 				resultsCh.SafeFeed(Result[O]{

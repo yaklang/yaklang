@@ -25,12 +25,6 @@ action.Get("obj")
 
 var LiteForgeExport = map[string]interface{}{
 	"Execute":          _executeLiteForgeTemp,
-	"AnalyzeImage":     AnalyzeImage,
-	"AnalyzeImageFile": AnalyzeImageFile,
-	"AnalyzeAudioFile": AnalyzeAudioFile,
-	"AnalyzeVideo":     AnalyzeVideo,
-	"AnalyzeFile":      AnalyzeFile,
-	"AnalyzeERM":       AnalyzeERM,
 	"imageExtraPrompt": WithExtraPrompt, // use for analyzeImage and analyzeImageFile
 
 	"analyzeCtx":        WithAnalyzeContext,    // use for analyzeContext
@@ -45,7 +39,7 @@ var LiteForgeExport = map[string]interface{}{
 	"verboseName":       _withVerboseName,
 	"forceImage":        _withForceImage,
 
-	"Refine":               Refine,
+	"BuildKnowledge":       BuildKnowledge,
 	"knowledgeBaseName":    _refine_WithKnowledgeBaseName,
 	"knowledgeBaseDesc":    _refine_WithKnowledgeBaseDesc,
 	"knowledgeBaseType":    _refine_WithKnowledgeBaseType,

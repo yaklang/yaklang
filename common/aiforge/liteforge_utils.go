@@ -4,28 +4,37 @@ import (
 	"bytes"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"text/template"
 )
 
 var queryPrompt = `{{.PROMPT}}
 
+{{ if .EXTRA }}
+<|EXTRA_{{ .Nonce }}|>
+{{.EXTRA}}
+<|EXTRA_END_{{ .Nonce }}|>
+{{ end }}
+
 {{ if .OVERLAP }}
-<|OVERLAP|>
+<|OVERLAP_{{ .Nonce }}|>
 {{.OVERLAP}}
-<|OVERLAP END|>
+<|OVERLAP_END_{{ .Nonce }}|>
 {{ end }}
 
 
-<|INPUT|>
+<|INPUT_{{ .Nonce }}|>
 {{.INPUT}}
-<|INPUT END|>
+<|INPUT_END_{{ .Nonce }}|>
 `
 
-func LiteForgeQueryFromChunk(prompt string, chunk chunkmaker.Chunk, overlapSize int) (string, error) {
+func LiteForgeQueryFromChunk(prompt string, extraPrompt string, chunk chunkmaker.Chunk, overlapSize int) (string, error) {
 	param := map[string]interface{}{
 		"PROMPT": prompt,
 		"INPUT":  string(chunk.Data()),
+		"EXTRA":  extraPrompt,
+		"Nonce":  utils.RandStringBytes(4),
 	}
 
 	if overlapSize > 0 || chunk.HaveLastChunk() {
