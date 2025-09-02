@@ -141,7 +141,7 @@ var ermOtherPrompt string
 
 func DetectERMPrompt(input string, options ...any) (string, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
-	options = append(options, _withOutputJSONSchema(detectDomainSchema))
+	options = append(options, WithOutputJSONSchema(detectDomainSchema))
 	detectResut, err := _executeLiteForgeTemp(quickQueryBuild(DetectPrompt, input), options...)
 	if err != nil {
 		return "", err
@@ -414,7 +414,7 @@ func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*
 		return nil, err
 	}
 
-	ermResult, err := _executeLiteForgeTemp(query, append(analyzeConfig.fallbackOptions, _withOutputJSONSchema(ermOutputSchema))...)
+	ermResult, err := _executeLiteForgeTemp(query, append(analyzeConfig.fallbackOptions, WithOutputJSONSchema(ermOutputSchema))...)
 	if err != nil {
 		analyzeConfig.AnalyzeLog("[analyze erm] error in analyzing ERM: %v", err)
 		return nil, err
@@ -566,7 +566,7 @@ func ResolveEntity(oldEntity *schema.ERModelEntity, newEntity *schema.ERModelEnt
 	analyzeConfig := NewAnalysisConfig(options...)
 	analyzeConfig.AnalyzeLog("start resolving entity: old:[%s] | new:[%s]", oldEntity.String(), newEntity.String())
 
-	options = append(options, _withOutputJSONSchema(resolveEntitySchema))
+	options = append(options, WithOutputJSONSchema(resolveEntitySchema))
 	resolveResult, err := _executeLiteForgeTemp(quickQueryBuild(resolveEntityPrompt, oldEntity.Dump(), newEntity.Dump()), options...)
 	if err != nil {
 		return nil, false, err
