@@ -349,6 +349,8 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 	var err error
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
+
+	count := 0
 	return utils.OrderedParallelProcessSkipError(analyzeConfig.Ctx, cm.OutputChannel(),
 		func(i chunkmaker.Chunk) (*ERMAnalysisResult, error) {
 			firstMutex.Lock()
@@ -379,6 +381,10 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 			})
 			return AnalyzeERMChunk(domainPrompt, i, options...)
 		},
+		utils.WithParallelProcessDeferTask(func() {
+			count++
+			analyzeConfig.AnalyzeStatusCard("[ERM_ANALYSIS]: analyzed frames", count)
+		}),
 		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency),
 		utils.WithParallelProcessStartCallback(func() {
 			analyzeConfig.AnalyzeStatusCard("ERM_ANALYSIS", "start analyzing ERM")
@@ -402,7 +408,7 @@ func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*
 		domainPrompt = prompt
 	}
 
-	query, err := LiteForgeQueryFromChunk(domainPrompt+"\n"+analyzeConfig.ExtraPrompt, c, 200)
+	query, err := LiteForgeQueryFromChunk(domainPrompt, analyzeConfig.ExtraPrompt, c, 200)
 	if err != nil {
 		analyzeConfig.AnalyzeLog("[build forge query] error in analyzing ERM: %v", err)
 		return nil, err
@@ -423,7 +429,6 @@ func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, opti
 	swg := utils.NewSizedWaitGroup(analyzeConfig.AnalyzeConcurrency)
 	currentEntities := omap.NewOrderedMap[string, *schema.ERModelEntity](map[string]*schema.ERModelEntity{})
 	for _, tempEntity := range erm.Entities {
-		log.Infof("start to handle raw entity: %v", tempEntity)
 		swg.Add(1)
 		go func() {
 			defer swg.Done()

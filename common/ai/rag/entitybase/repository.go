@@ -24,6 +24,13 @@ type EntityRepository struct {
 	ragSystem *rag.RAGSystem
 }
 
+func (eb *EntityRepository) GetID() int64 {
+	if eb.baseInfo == nil {
+		return 0
+	}
+	return int64(eb.baseInfo.ID)
+}
+
 func (eb *EntityRepository) GetInfo() (*schema.EntityBaseInfo, error) {
 	if eb.baseInfo == nil {
 		return nil, utils.Errorf("entity base info is nil")
