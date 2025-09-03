@@ -14,7 +14,7 @@ type anInstruction struct {
 	fun   Value
 	prog  *Program
 	block Instruction
-	R     memedit.RangeIf
+	R     *memedit.Range
 	// scope *Scope
 
 	name        string
@@ -198,14 +198,14 @@ func (a *anInstruction) GetBlock() *BasicBlock {
 }
 
 // source code position
-func (c *anInstruction) GetRange() memedit.RangeIf {
+func (c *anInstruction) GetRange() *memedit.Range {
 	if c.R != nil {
 		return c.R
 	}
 	return nil
 }
 
-func (c *anInstruction) SetRange(pos memedit.RangeIf) {
+func (c *anInstruction) SetRange(pos *memedit.Range) {
 	// if c.Pos == nil {
 	c.R = pos
 	// }

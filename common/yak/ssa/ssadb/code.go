@@ -196,7 +196,7 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 	return results
 }
 
-func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
+func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
 	editor, err := GetIrSourceFromHash(r.SourceCodeHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)

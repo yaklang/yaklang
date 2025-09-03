@@ -24,7 +24,7 @@ const (
 
 type LanguageServerAnalyzerResult struct {
 	Program      *ssaapi.Program
-	Range        memedit.RangeIf
+	Range        *memedit.Range
 	Value        *ssaapi.Value
 	Editor       *memedit.MemEditor
 	Word         string
@@ -189,7 +189,7 @@ func languageServerAnalyzeFromSource(req *ypb.YaklangLanguageSuggestionRequest) 
 	return result, err
 }
 
-func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) memedit.RangeIf {
+func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) *memedit.Range {
 	e := memedit.NewMemEditor(sourceCode)
 	return e.GetRangeByPosition(
 		e.GetPositionByLine(int(r.StartLine), int(r.StartColumn)),
@@ -197,7 +197,7 @@ func GrpcRangeToSSARange(sourceCode string, r *ypb.Range) memedit.RangeIf {
 	)
 }
 
-func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng memedit.RangeIf, skipNum int) *ssaapi.Value {
+func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng *memedit.Range, skipNum int) *ssaapi.Value {
 	// use editor instead of prog.Program.Editor because of ssa cache
 	var value ssa.Value
 	offset := rng.GetEndOffset()
@@ -215,7 +215,7 @@ func getFrontValueByOffset(prog *ssaapi.Program, editor *memedit.MemEditor, rng 
 }
 
 // Deprecated: now can get the closest value
-func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
+func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position *memedit.Range) *ssaapi.Value {
 	var values ssaapi.Values
 	for i, word := range strings.Split(sourceCode, ".") {
 		if i == 0 {
@@ -238,7 +238,7 @@ func getSSAValueByPosition(prog *ssaapi.Program, sourceCode string, position mem
 }
 
 // Deprecated: now can get the closest value
-func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position memedit.RangeIf) *ssaapi.Value {
+func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, position *memedit.Range) *ssaapi.Value {
 	word := strings.Split(sourceCode, ".")[0]
 	values := prog.Ref(word).Filter(func(v *ssaapi.Value) bool {
 		position2 := v.GetRange()
@@ -257,7 +257,7 @@ func getSSAParentValueByPosition(prog *ssaapi.Program, sourceCode string, positi
 	return values[0].GetSelf()
 }
 
-func sortValuesByPosition(values ssaapi.Values, position memedit.RangeIf) ssaapi.Values {
+func sortValuesByPosition(values ssaapi.Values, position *memedit.Range) ssaapi.Values {
 	// todo: 需要修改SSA，需要真正的RefLocation
 	values = values.Filter(func(v *ssaapi.Value) bool {
 		position2 := v.GetRange()

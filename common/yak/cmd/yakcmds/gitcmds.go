@@ -5,6 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/diff"
@@ -21,11 +27,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"io/fs"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var GitCommands = []*cli.Command{
@@ -461,12 +462,12 @@ var GitCommands = []*cli.Command{
 							switch chunked.Type() {
 							case diff.Equal: // eq
 								action = " "
-								editor.FindStringRangeIndexFirst(editorOffset, chunked.Content(), func(rangeIf memedit.RangeIf) {
+								editor.FindStringRangeIndexFirst(editorOffset, chunked.Content(), func(rangeIf *memedit.Range) {
 									editorOffset = editor.GetOffsetByPosition(rangeIf.GetEnd())
 								})
 							case diff.Add: //
 								action = "+"
-								editor.FindStringRangeIndexFirst(editorOffset, chunked.Content(), func(rangeIf memedit.RangeIf) {
+								editor.FindStringRangeIndexFirst(editorOffset, chunked.Content(), func(rangeIf *memedit.Range) {
 									editorOffset = editor.GetOffsetByPosition(rangeIf.GetEnd())
 									suffix = ` (` + fmt.Sprintf(
 										"%v:%v-%v:%v",

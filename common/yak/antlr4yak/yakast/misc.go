@@ -129,13 +129,13 @@ func (y *YakCompiler) SetRange(b canStartStopToken) func() {
 	}
 }
 
-func (y *YakCompiler) _setCurrentStartPosition(t antlr.Token) memedit.PositionIf {
+func (y *YakCompiler) _setCurrentStartPosition(t antlr.Token) *memedit.Position {
 	origin := y.currentStartPosition
 	y.currentStartPosition = memedit.NewPosition(t.GetLine(), t.GetColumn())
 	return origin
 }
 
-func (y *YakCompiler) _setCurrentEndPosition(t antlr.Token) memedit.PositionIf {
+func (y *YakCompiler) _setCurrentEndPosition(t antlr.Token) *memedit.Position {
 	origin := y.currentEndPosition
 	line, column := GetEndPosition(t)
 	if column > 0 {

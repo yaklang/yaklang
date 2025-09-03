@@ -30,7 +30,7 @@ type LuaTranslator struct {
 	currentLabeltbl *infrastructure.LabelTable
 	programCounter  int
 
-	currentStartPosition, currentEndPosition memedit.PositionIf
+	currentStartPosition, currentEndPosition *memedit.Position
 
 	AntlrTokenStream antlr.TokenStream
 	lexer            *lua.LuaLexer

@@ -70,7 +70,7 @@ func (v *ValueList) CompareConst(comparator *ConstComparator) []bool {
 	return res
 }
 
-func (v *ValueList) NewConst(i any, rng ...memedit.RangeIf) ValueOperator {
+func (v *ValueList) NewConst(i any, rng ...*memedit.Range) ValueOperator {
 	var result ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
 		result = operator.NewConst(i, rng...)
