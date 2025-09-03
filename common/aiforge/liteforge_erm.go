@@ -383,15 +383,15 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 		},
 		utils.WithParallelProcessDeferTask(func() {
 			count++
-			analyzeConfig.AnalyzeStatusCard("[ERM_ANALYSIS]: analyzed frames", count)
+			analyzeConfig.AnalyzeStatusCard("[ERM]: processed frames", count)
 		}),
 		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency),
 		utils.WithParallelProcessStartCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("ERM_ANALYSIS", "start analyzing ERM")
-			analyzeConfig.AnalyzeLog("start analyzing ERM concurrency")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "build ERM")
+			analyzeConfig.AnalyzeLog("start build ERM concurrency")
 		}),
 		utils.WithParallelProcessFinishCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("ERM_ANALYSIS", "finish analyzing ERM")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "finish build ERM")
 			analyzeConfig.AnalyzeLog("finish analyzing ERM concurrency")
 		}),
 	), nil
@@ -533,7 +533,7 @@ func AnalyzeERM(path string, option ...any) (*entitybase.EntityRepository, error
 	if err != nil {
 		return nil, err
 	}
-	analyzeConfig.AnalyzeStatusCard("ERM_ENTITY_BASE", analyzeConfig.KnowledgeBaseName)
+	analyzeConfig.AnalyzeStatusCard("实体库｜知识库名", analyzeConfig.KnowledgeBaseName)
 
 	for erm := range ermResult {
 		err := SaveERMResult(eb, erm, option...)

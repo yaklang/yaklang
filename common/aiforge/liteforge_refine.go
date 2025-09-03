@@ -60,11 +60,8 @@ func BuildKnowledge(kbName string, input any, option ...any) (<-chan *schema.Kno
 
 func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
-	refineConfig.AnalyzeStatusCard("BuildKnowledge", "start analyzing input")
-
 	db := consts.GetGormProfileDatabase()
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
-	refineConfig.AnalyzeStatusCard("Refine", "creating knowledge base")
 	kb, err := knowledgebase.NewKnowledgeBase(db, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
 	if err != nil {
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
@@ -75,15 +72,13 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-cha
 		return nil, err
 	}
 
-	refineConfig.AnalyzeStatusCard("BuildKnowledge", "start building erm")
 	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeChannel, option...)
 	if err != nil {
 		return nil, utils.Errorf("failed to start build erm from input: %v", err)
 	}
 
-	refineConfig.AnalyzeStatusCard("BuildKnowledge", "start building knowledge base from erm")
 	output := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
-
+	count := 0
 	go func() {
 		dbwg := sync.WaitGroup{}
 		defer dbwg.Wait()
@@ -120,6 +115,8 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-cha
 					}
 				}()
 
+				count++
+				refineConfig.AnalyzeStatusCard("[build knowledge]: processed count", count)
 				for _, entry := range entries {
 					output.SafeFeed(entry)
 				}

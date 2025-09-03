@@ -24,7 +24,7 @@ func (v VideoAnalysisResult) Dump() string {
 func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
 
-	analyzeConfig.AnalyzeStatusCard("Video Analysis", "start analyzing audio")
+	analyzeConfig.AnalyzeStatusCard("Analysis", "start analyzing audio")
 	audioResults, err := AnalyzeAudioFile(video, options...)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 		ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithTimestampOverlay(true))
 		ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithIgnoreBottomPaddingInSceneDetection(true)) // 默认启用智能场景检测
 
-		analyzeConfig.AnalyzeStatusCard("Video Analysis", "ffmpeg extract image")
+		analyzeConfig.AnalyzeStatusCard("Analysis", "ffmpeg extract image")
 		totalCount := 0
 		ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithSceneThreshold(0.05))
 		for audioRes := range audioResults {
@@ -69,7 +69,7 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 				})
 				count++
 				totalCount++
-				analyzeConfig.AnalyzeStatusCard("[analyze video]:extract frames", totalCount)
+				analyzeConfig.AnalyzeStatusCard("[video]:extract frames", totalCount)
 			}
 			analyzeConfig.AnalyzeLog("Extracted %d video frames for segment: %s", count, segment.String())
 		}
@@ -87,7 +87,7 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 					ImageData: fResult,
 				})
 				totalCount++
-				analyzeConfig.AnalyzeStatusCard("[analyze video]:extract frames", totalCount)
+				analyzeConfig.AnalyzeStatusCard("[video]:extract frames", totalCount)
 			}
 		}
 	}()
@@ -106,16 +106,16 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 
 		analyzeConfig.AnalyzeLog("Finish to analyze video frame %d, current CumulativeSummary is [%s] ", frameCount, utils.ShrinkString(cumulativeSummary, 100))
 		frameCount++
-		analyzeConfig.AnalyzeStatusCard("[analyze video]:analysed frames", frameCount)
+		analyzeConfig.AnalyzeStatusCard("[video]:analysed frames", frameCount)
 		return imageResult, nil
 	},
 		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency), utils.WithParallelProcessFinishCallback(func() {
 			analyzeConfig.AnalyzeLog("Finish to analyze video frame %d", frameCount)
-			analyzeConfig.AnalyzeStatusCard("Video Analysis", "finish")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "Video finish")
 		}),
 		utils.WithParallelProcessStartCallback(func() {
 			analyzeConfig.AnalyzeLog("Finish to analyze video frames; total %d", frameCount)
-			analyzeConfig.AnalyzeStatusCard("Video Analysis", "analyzing video frame")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "analyzing video frame")
 		}),
 	), nil
 }
