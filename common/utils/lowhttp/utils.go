@@ -145,14 +145,17 @@ func ExtractURLFromHTTPRequest(r *http.Request, https bool) (*url.URL, error) {
 	}
 
 	if utils.IsHttpOrHttpsUrl(r.RequestURI) {
-		return url.Parse(r.RequestURI)
+		uIns, err := url.Parse(r.RequestURI)
+		if err != nil {
+			return nil, err
+		}
+		if https {
+			uIns.Scheme = "https" // 强制修正https
+		}
+		return uIns, nil
 	}
 
 	if utils.IsWebsocketUrl(r.RequestURI) {
-		return url.Parse(r.RequestURI)
-	}
-
-	if strings.HasPrefix(r.RequestURI, "http://") || strings.HasPrefix(r.RequestURI, "https://") {
 		return url.Parse(r.RequestURI)
 	}
 

@@ -6,12 +6,18 @@ import (
 	"strings"
 )
 
-func BuildLegacyProxyRequest(req []byte) ([]byte, error) {
+func BuildLegacyProxyRequest(req []byte, connectHTTPS ...bool) ([]byte, error) {
 	var packetRequest bytes.Buffer
 	var writePath bool
 	var headerBytes bytes.Buffer
 	var originPath string
 	var originProto string
+
+	schema := "http://"
+	if len(connectHTTPS) > 0 && connectHTTPS[0] {
+		schema = "https://"
+	}
+
 	_, body := SplitHTTPPacket(req, func(method, path, proto string) error {
 		packetRequest.WriteString(method)
 		originProto = proto
@@ -37,7 +43,7 @@ func BuildLegacyProxyRequest(req []byte) ([]byte, error) {
 			if utils.IsHttpOrHttpsUrl(value) {
 				packetRequest.WriteString(value)
 			} else {
-				packetRequest.WriteString("http://")
+				packetRequest.WriteString(schema)
 				packetRequest.WriteString(value)
 			}
 			if strings.HasSuffix(value, "/") || strings.HasPrefix(originPath, "/") {
