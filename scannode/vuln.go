@@ -48,9 +48,16 @@ type Vuln struct {
 	ReverseToken    string `json:"reverse_token"`
 	Url             string `json:"url"`
 
-	Description     string `json:"description"`
-	Solution        string `json:"solution"`
+	Description string `json:"description"`
+	Solution    string `json:"solution"`
 
-	Request         string `json:"request"`
-	Response        string `json:"response"`
+	Request  string `json:"request"`
+	Response string `json:"response"`
+
+	Parameter string `json:"parameter"`
+
+	IsPotential         bool   `json:"is_potential"`
+	CVE                 string `json:"cve"`
+	CveAccessVector     string `json:"cve_access_vector"`
+	CveAccessComplexity string `json:"cve_access_complexity"`
 }

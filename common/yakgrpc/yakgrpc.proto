@@ -4332,6 +4332,7 @@ message Risk {
   uint64 ResultID = 30;
   string SyntaxFlowVariable = 31;
   string ProgramName = 32;
+  bool IsPotential = 33;
 }
 
 message QueryRisksRequest {
