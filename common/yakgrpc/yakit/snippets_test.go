@@ -12,8 +12,8 @@ import (
 )
 
 // Create test custom code signing data
-func createTestCustomCodeSigning() *schema.CustomCodeSigning {
-	return &schema.CustomCodeSigning{
+func createTestSnippets() *schema.Snippets {
+	return &schema.Snippets{
 		CustomCodeName:  uuid.NewString(),
 		CustomCodeData:  uuid.NewString(),
 		CustomCodeDesc:  uuid.NewString(),
@@ -22,14 +22,14 @@ func createTestCustomCodeSigning() *schema.CustomCodeSigning {
 	}
 }
 
-func TestCreateCustomCodeSigning(t *testing.T) {
+func TestCreateSnippets(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 
 	t.Run("Successfully create custom code signing", func(t *testing.T) {
-		customCode := createTestCustomCodeSigning()
-		defer DeleteCustomCodeSigningByName(db, customCode.CustomCodeName)
+		customCode := createTestSnippets()
+		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
 
-		err := CreateCustomCodeSigning(db, customCode)
+		err := CreateSnippet(db, customCode)
 		require.NoError(t, err)
 		assert.NotZero(t, customCode.ID)
 		assert.NotZero(t, customCode.CreatedAt)
@@ -37,54 +37,54 @@ func TestCreateCustomCodeSigning(t *testing.T) {
 	})
 
 	t.Run("Creating custom code signing with duplicate name should fail", func(t *testing.T) {
-		customCode1 := createTestCustomCodeSigning()
-		customCode2 := &schema.CustomCodeSigning{
+		customCode1 := createTestSnippets()
+		customCode2 := &schema.Snippets{
 			CustomCodeName:  customCode1.CustomCodeName,
 			CustomCodeData:  uuid.NewString(),
 			CustomCodeDesc:  "",
 			CustomCodeState: "none",
 		}
-		defer DeleteCustomCodeSigningByName(db, customCode1.CustomCodeName)
-		defer DeleteCustomCodeSigningByName(db, customCode2.CustomCodeName)
+		defer DeleteSnippetsByName(db, customCode1.CustomCodeName)
+		defer DeleteSnippetsByName(db, customCode2.CustomCodeName)
 
 		// Create the first one first
-		err := CreateCustomCodeSigning(db, customCode1)
+		err := CreateSnippet(db, customCode1)
 		require.NoError(t, err)
 
 		// Try to create the second one with the same name
-		err = CreateCustomCodeSigning(db, customCode2)
+		err = CreateSnippet(db, customCode2)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 	})
 
 	t.Run("Creating custom code signing with empty name should fail", func(t *testing.T) {
-		customCode := &schema.CustomCodeSigning{
+		customCode := &schema.Snippets{
 			CustomCodeName:  "",
 			CustomCodeData:  uuid.NewString(),
 			CustomCodeDesc:  "",
 			CustomCodeState: "none",
 		}
-		defer DeleteCustomCodeSigningByName(db, customCode.CustomCodeName)
+		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
 
-		err := CreateCustomCodeSigning(db, customCode)
+		err := CreateSnippet(db, customCode)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot be empty")
 	})
 }
 
-func TestGetCustomCodeSigningByName(t *testing.T) {
+func TestGetSnippetsByName(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 
 	t.Run("Successfully get custom code signing by name", func(t *testing.T) {
 		// Create one first
-		customCode := createTestCustomCodeSigning()
-		defer DeleteCustomCodeSigningByName(db, customCode.CustomCodeName)
+		customCode := createTestSnippets()
+		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
 
-		err := CreateCustomCodeSigning(db, customCode)
+		err := CreateSnippet(db, customCode)
 		require.NoError(t, err)
 
 		// Get by name
-		retrieved, err := GetCustomCodeSigningByName(db, customCode.CustomCodeName)
+		retrieved, err := GetSnippetsByName(db, customCode.CustomCodeName)
 		require.NoError(t, err)
 		assert.NotNil(t, retrieved)
 		assert.Equal(t, customCode.CustomCodeName, retrieved.CustomCodeName)
@@ -92,67 +92,67 @@ func TestGetCustomCodeSigningByName(t *testing.T) {
 	})
 
 	t.Run("Getting non-existent name should fail", func(t *testing.T) {
-		retrieved, err := GetCustomCodeSigningByName(db, uuid.NewString())
+		retrieved, err := GetSnippetsByName(db, uuid.NewString())
 		require.Error(t, err)
 		assert.Nil(t, retrieved)
 		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("Passing empty name should fail", func(t *testing.T) {
-		retrieved, err := GetCustomCodeSigningByName(db, "")
+		retrieved, err := GetSnippetsByName(db, "")
 		require.Error(t, err)
 		assert.Nil(t, retrieved)
 		assert.Contains(t, err.Error(), "cannot be empty")
 	})
 }
 
-func TestUpdateCustomCodeSigning(t *testing.T) {
+func TestUpdateSnippets(t *testing.T) {
 	db := consts.GetGormProjectDatabase()
 
 	t.Run("Successfully update custom code signing", func(t *testing.T) {
 		// Create one first
-		customCode := createTestCustomCodeSigning()
-		defer DeleteCustomCodeSigningByName(db, customCode.CustomCodeName)
-		err := CreateCustomCodeSigning(db, customCode)
+		customCode := createTestSnippets()
+		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
+		err := CreateSnippet(db, customCode)
 		require.NoError(t, err)
 
 		// Update data
 		customCode.CustomCodeData = uuid.NewString()
-		err = UpdateCustomCodeSigning(db, customCode.CustomCodeName, customCode)
+		err = UpdateSnippet(db, customCode.CustomCodeName, customCode)
 		require.NoError(t, err)
 
 		// Verify update
-		retrieved, err := GetCustomCodeSigningByName(db, customCode.CustomCodeName)
+		retrieved, err := GetSnippetsByName(db, customCode.CustomCodeName)
 		require.NoError(t, err)
 		assert.Equal(t, customCode.CustomCodeData, retrieved.CustomCodeData)
 	})
 
 	t.Run("Updating non-existent record should fail", func(t *testing.T) {
-		customCode := createTestCustomCodeSigning()
-		err := UpdateCustomCodeSigning(db, customCode.CustomCodeName, customCode)
+		customCode := createTestSnippets()
+		err := UpdateSnippet(db, customCode.CustomCodeName, customCode)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
 }
 
-func TestGetAllCustomCodeSignings(t *testing.T) {
+func TestGetAllSnippetss(t *testing.T) {
 	t.Skip()
 	db := consts.GetGormProjectDatabase()
 
 	t.Run("Get all custom code signings", func(t *testing.T) {
 		// Create a few first
-		customCode1 := createTestCustomCodeSigning()
-		customCode2 := createTestCustomCodeSigning()
-		defer DeleteCustomCodeSigningByName(db, customCode1.CustomCodeName)
-		defer DeleteCustomCodeSigningByName(db, customCode2.CustomCodeName)
+		customCode1 := createTestSnippets()
+		customCode2 := createTestSnippets()
+		defer DeleteSnippetsByName(db, customCode1.CustomCodeName)
+		defer DeleteSnippetsByName(db, customCode2.CustomCodeName)
 
-		err := CreateCustomCodeSigning(db, customCode1)
+		err := CreateSnippet(db, customCode1)
 		require.NoError(t, err)
-		err = CreateCustomCodeSigning(db, customCode2)
+		err = CreateSnippet(db, customCode2)
 		require.NoError(t, err)
 
 		// Get all
-		all, err := GetAllCustomCodeSignings(db)
+		all, err := GetAllSnippetss(db)
 		require.NoError(t, err)
 		assert.Len(t, all, 2)
 
@@ -166,44 +166,44 @@ func TestGetAllCustomCodeSignings(t *testing.T) {
 	})
 
 	t.Run("Should return empty slice when database is empty", func(t *testing.T) {
-		all, err := GetAllCustomCodeSignings(db)
+		all, err := GetAllSnippetss(db)
 		require.NoError(t, err)
 		assert.Len(t, all, 0)
 	})
 }
 
-func TestGetCustomCodeSigningsWithPagination(t *testing.T) {
+func TestGetSnippetssWithPagination(t *testing.T) {
 	t.Skip()
 	db := consts.GetGormProjectDatabase()
 
 	t.Run("Get custom code signings with pagination", func(t *testing.T) {
 		// Create multiple test data
 		for i := 1; i <= 25; i++ {
-			customCode := &schema.CustomCodeSigning{
+			customCode := &schema.Snippets{
 				CustomCodeName:  fmt.Sprintf("test_code_%s", uuid.NewString()),
 				CustomCodeData:  fmt.Sprintf("test_data_%s", uuid.NewString()),
 				CustomCodeDesc:  "",
 				CustomCodeState: "none",
 			}
-			err := CreateCustomCodeSigning(db, customCode)
-			defer DeleteCustomCodeSigningByName(db, customCode.CustomCodeName)
+			err := CreateSnippet(db, customCode)
+			defer DeleteSnippetsByName(db, customCode.CustomCodeName)
 			require.NoError(t, err)
 		}
 
 		// Test first page
-		page1, total, err := GetCustomCodeSigningsWithPagination(db, 1, 10)
+		page1, total, err := GetSnippetssWithPagination(db, 1, 10)
 		require.NoError(t, err)
 		assert.Equal(t, int64(25), total)
 		assert.Len(t, page1, 10)
 
 		// Test second page
-		page2, total, err := GetCustomCodeSigningsWithPagination(db, 2, 10)
+		page2, total, err := GetSnippetssWithPagination(db, 2, 10)
 		require.NoError(t, err)
 		assert.Equal(t, int64(25), total)
 		assert.Len(t, page2, 10)
 
 		// Test last page
-		page3, total, err := GetCustomCodeSigningsWithPagination(db, 3, 10)
+		page3, total, err := GetSnippetssWithPagination(db, 3, 10)
 		require.NoError(t, err)
 		assert.Equal(t, int64(25), total)
 		assert.Len(t, page3, 5)
@@ -211,16 +211,16 @@ func TestGetCustomCodeSigningsWithPagination(t *testing.T) {
 
 	t.Run("Pagination parameter boundary cases", func(t *testing.T) {
 		// Test invalid page number
-		_, _, err := GetCustomCodeSigningsWithPagination(db, 0, 10)
+		_, _, err := GetSnippetssWithPagination(db, 0, 10)
 		require.NoError(t, err) // Function will correct to 1 internally
 
 		// Test invalid page size
-		_, _, err = GetCustomCodeSigningsWithPagination(db, 1, 0)
+		_, _, err = GetSnippetssWithPagination(db, 1, 0)
 		require.NoError(t, err) // Function will correct to 10 internally
 	})
 
 	t.Run("Passing nil database connection should fail", func(t *testing.T) {
-		_, _, err := GetCustomCodeSigningsWithPagination(nil, 1, 10)
+		_, _, err := GetSnippetssWithPagination(nil, 1, 10)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "database connection is nil")
 	})
