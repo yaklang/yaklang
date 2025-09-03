@@ -199,24 +199,30 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		case ch <- result:
 		}
 	}
-	errCh := make(chan error, 1)
+	var execError error
+	var execErrorLock sync.Mutex
 	getter := func() (*FuzzResult, error) {
-		return <-ch, <-errCh
+		execErrorLock.Lock()
+		defer execErrorLock.Unlock()
+		return <-ch, execError
 	}
 
 	go func() {
+		var err error
 		defer func() {
 			if e := recover(); e != nil {
-				errCh <- utils.Error(e)
+				err = utils.Error(e)
 			}
 			close(ch)
-			close(errCh)
+			execErrorLock.Lock()
+			execError = err
+			execErrorLock.Unlock()
 			execCtxCancel()
 		}()
 		if f.data.IsFlowControl() {
-			errCh <- f.data.Exec(execCtx, s, func(result *FuzzResult) {}, f.methodCtx.methodTable)
+			err = f.data.Exec(execCtx, s, func(result *FuzzResult) {}, f.methodCtx.methodTable)
 		} else {
-			errCh <- f.data.Exec(execCtx, s, receiver, f.methodCtx.methodTable)
+			err = f.data.Exec(execCtx, s, receiver, f.methodCtx.methodTable)
 		}
 	}()
 
