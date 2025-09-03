@@ -660,7 +660,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	}
 
 	analyzeConfig := NewAnalysisConfig(opts...)
-	analyzeConfig.AnalyzeStatusCard("Media Analysis", "extracting images from media")
+	analyzeConfig.AnalyzeStatusCard("Analysis", "extracting images from media")
 	chunkOption := []chunkmaker.Option{chunkmaker.WithCtx(analyzeConfig.Ctx)}
 	chunkOption = append(chunkOption, analyzeConfig.chunkOption...)
 
@@ -676,7 +676,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 			analyzeConfig.AnalyzeLog("chunk index[%d] size:%v Analyzing media type [%s]", count, utils.ByteSize(uint64(chunk.BytesSize())), chunk.MIMEType().String())
 			indexedChannel.SafeFeed(chunk)
 			count++
-			analyzeConfig.AnalyzeStatusCard("[analyze media]:extract chunk", count)
+			analyzeConfig.AnalyzeStatusCard("[media]:extract chunk", count)
 			return nil
 		}),
 		aireducer.WithContext(analyzeConfig.Ctx),
@@ -699,7 +699,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	return utils.OrderedParallelProcessSkipError[chunkmaker.Chunk, AnalysisResult](analyzeConfig.Ctx, indexedChannel.OutputChannel(), func(chunk chunkmaker.Chunk) (AnalysisResult, error) {
 		defer func() {
 			processedCount++
-			analyzeConfig.AnalyzeStatusCard("[analyze media]:analysed chunk ", processedCount)
+			analyzeConfig.AnalyzeStatusCard("[media]:analysed chunk ", processedCount)
 		}()
 		if chunk.MIMEType().IsImage() {
 			return AnalyzeImage(chunk.Data(), opts)
@@ -709,9 +709,9 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	},
 		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency),
 		utils.WithParallelProcessStartCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("Media Analysis", "processing media chunk")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "processing media chunk")
 		}),
 		utils.WithParallelProcessFinishCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("Media Analysis", "finished analysis")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "finished preliminary analysis")
 		})), nil
 }
