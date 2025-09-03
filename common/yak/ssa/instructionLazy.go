@@ -817,14 +817,14 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
-				handler(&p.anValue)
+				handler(p.anValue)
 			}
 		}
 	}
 	if u, ok := ToUndefined(lz.Value); ok {
-		handler(&u.anValue)
+		handler(u.anValue)
 	} else if e, ok := ToExternLib(lz.Value); ok {
-		handler(&e.anValue)
+		handler(e.anValue)
 	}
 
 	return ret
