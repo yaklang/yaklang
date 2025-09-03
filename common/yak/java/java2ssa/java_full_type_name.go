@@ -237,6 +237,9 @@ func TypeAddBracketLevel(typ ssa.Type, level int) ssa.Type {
 	if level == 0 {
 		return typ
 	}
+	if utils.IsNil(typ) {
+		return typ
+	}
 
 	// Get the base element type's full type names once
 	baseElementFullTypeNames := typ.GetFullTypeNames()
