@@ -178,9 +178,16 @@ type ChatBaseContext struct {
 	ReasonStreamHandler func(reader io.Reader)
 	ErrHandler          func(err error)
 	ImageUrls           []*ImageDescription
+	DisableStream       bool
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
+
+func WithChatBase_DisableStream(b bool) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.DisableStream = b
+	}
+}
 
 func WithChatBase_ThinkingBudget(budget int64) ChatBaseOption {
 	return func(c *ChatBaseContext) {
@@ -255,16 +262,6 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	reasonStreamHandler := ctx.ReasonStreamHandler
 	errHandler := ctx.ErrHandler
 
-	if streamHandler == nil {
-		// default stream handler: read all and discard
-		streamHandler = func(reader io.Reader) {
-			utils.Debug(func() {
-				reader = io.TeeReader(reader, os.Stdout)
-			})
-			io.Copy(io.Discard, reader)
-		}
-	}
-
 	opts, err := opt()
 	if err != nil {
 		return "", utils.Errorf("build config failed: %v", err)
@@ -284,10 +281,8 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		msgs = append(msgs, NewUserChatDetailEx(contents))
 	}
 	msgIns := NewChatMessage(model, msgs)
-	handleStream := streamHandler != nil
-	if handleStream {
-		msgIns.Stream = true
-	}
+	msgIns.Stream = !ctx.DisableStream
+	handleStream := msgIns.Stream
 
 	var msgResult any = msgIns
 	var raw []byte
@@ -331,14 +326,19 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 				if err := recover(); err != nil {
 					log.Warnf("reasonStreamHandler panic: %v", err)
 				}
+
+				var restedBuffer bytes.Buffer
+				n, _ := io.Copy(io.Discard, io.TeeReader(reasonPr, &restedBuffer))
+				if n > 0 {
+					log.Warnf("reasonPr has unread data, maybe reasonStreamHandler exited early, recovered data length: %d, data: %v", n, utils.ShrinkString(restedBuffer.String(), 400))
+				}
 			}()
 			reasonStreamHandler(reasonPr)
 		}()
 	}
 
 	// 设置流式处理handler（如果需要）
-	var body *bytes.Buffer
-	body = bytes.NewBufferString("")
+	var body bytes.Buffer
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -350,18 +350,29 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 
 		var streamReader io.Reader
 		if noMerge {
-			streamReader = io.TeeReader(pr, body)
+			streamReader = io.TeeReader(pr, &body)
 		} else {
 			// 合并模式：将reasoning包装为<think>标签
 			result := mergeReasonIntoOutputStream(reasonPr, pr)
-			streamReader = io.TeeReader(result, body)
+			streamReader = io.TeeReader(result, &body)
 		}
+
+		defer func() {
+			// if cancel is not nil, call it
+			var recoveredBuffer bytes.Buffer
+			n, _ := io.Copy(io.Discard, io.TeeReader(streamReader, &recoveredBuffer))
+			if n > 0 {
+				log.Warnf("streamReader has unread data, maybe streamHandler exited early, recovered data: %v", utils.ShrinkString(recoveredBuffer.String(), 400))
+			}
+		}()
+
 		if streamHandler != nil {
 			streamHandler(streamReader)
 		} else {
 			utils.Debug(func() {
-				io.Copy(io.Discard, streamReader)
+				streamReader = io.TeeReader(streamReader, os.Stdout)
 			})
+			io.Copy(io.Discard, streamReader)
 		}
 	}()
 

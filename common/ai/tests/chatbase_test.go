@@ -513,7 +513,6 @@ func TestChatBaseStability_HandlerPanics(t *testing.T) {
 			aispec.WithChatBase_ReasonStreamHandler(func(reader io.Reader) {
 				panic("reason handler panic")
 			}))
-
 		assert.NoError(t, err, "ChatBase should handle reason handler panic gracefully")
 		assert.Equal(t, "你好", res, "Response should still be correct despite panic")
 	})
