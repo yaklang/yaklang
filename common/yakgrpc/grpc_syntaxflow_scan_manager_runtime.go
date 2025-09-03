@@ -1,6 +1,7 @@
 package yakgrpc
 
 import (
+	"encoding/json"
 	"fmt"
 	"sync/atomic"
 
@@ -110,7 +111,8 @@ func (m *SyntaxFlowScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.
 		ssaapi.QueryWithContext(m.ctx),
 		ssaapi.QueryWithTaskID(m.taskID),
 		ssaapi.QueryWithProcessCallback(func(f float64, s string) {
-			m.client.StatusCard("当前执行规则进度", fmt.Sprintf("%.2f%%", f*100), "规则执行进度")
+			//m.client.StatusCard("当前执行规则进度", fmt.Sprintf("%.2f%%", f*100), "规则执行进度")
+			m.notifyRuleProcess(prog.GetProgramName(), rule.RuleName, f)
 		}),
 		ssaapi.QueryWithSave(m.kind),
 	)
@@ -160,13 +162,31 @@ func (m *SyntaxFlowScanManager) notifyStatus(ruleName string) {
 	m.client.StatusCard("检出漏洞/风险个数", riskCount, "漏洞/风险状态")
 
 	// current rule  status
-	if finishQuery == m.totalQuery {
-		m.status = schema.SYNTAXFLOWSCAN_DONE
-		m.client.StatusCard("当前执行规则", "已执行完毕", "规则执行进度")
-	} else {
-		if ruleName != "" {
-			m.client.StatusCard("当前执行规则", ruleName, "规则执行进度")
-		}
-	}
+	//if finishQuery == m.totalQuery {
+	//	m.status = schema.SYNTAXFLOWSCAN_DONE
+	//	m.client.StatusCard("当前执行规则", "已执行完毕", "规则执行进度")
+	//} else {
+	//	if ruleName != "" {
+	//		m.client.StatusCard("当前执行规则", ruleName, "规则执行进度")
+	//	}
+	//}
+	//m.client.YakitInfo("规则[%s]执行进度：")
 	m.client.YakitSetProgress(float64(finishQuery) / float64(m.totalQuery))
+}
+
+func (m *SyntaxFlowScanManager) notifyRuleProcess(progName, ruleName string, f float64) {
+	output := struct {
+		ProgName string `json:"项目名称"`
+		RuleName string `json:"规则名称"`
+		Progress string `json:"执行进度"`
+	}{
+		ProgName: progName,
+		RuleName: ruleName,
+		Progress: fmt.Sprintf("%.2f%%", f*100),
+	}
+	marshal, err := json.Marshal(output)
+	if err != nil {
+		return
+	}
+	m.client.Output(marshal)
 }
