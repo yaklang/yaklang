@@ -56,7 +56,7 @@ func TestJS_ASTLargeText(t *testing.T) {
 }
 
 func TestRealJsFrontEnd(t *testing.T) {
-	ast, err := js2ssa.Frontend(largeJS, false)
+	ast, err := js2ssa.Frontend(largeJS)
 	require.Nil(t, err)
 	_ = ast
 }

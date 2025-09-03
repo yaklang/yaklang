@@ -83,7 +83,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 }
 
 func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src)
+	return Frontend(src, s)
 }
 
 func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder) error {
@@ -138,13 +138,18 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func Frontend(src string) (*gol.SourceFileContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuilder) (*gol.SourceFileContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := gol.NewGoLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := gol.NewGoParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
