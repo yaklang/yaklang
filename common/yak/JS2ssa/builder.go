@@ -7,7 +7,6 @@ import (
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 
-	"github.com/yaklang/yaklang/common/utils"
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -27,8 +26,8 @@ type SSABuild struct {
 // 	}
 // }
 
-func (*SSABuild) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
+func (*SSABuild) Build(src string, builder *ssa.FunctionBuilder) error {
+	ast, err := Frontend(src)
 	if err != nil {
 		return err
 	}
@@ -57,13 +56,18 @@ type astbuilder struct {
 	cmap map[string]struct{}
 }
 
-func Frontend(src string, must bool) (*JS.ProgramContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuild) (*JS.ProgramContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := JS.NewJavaScriptParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

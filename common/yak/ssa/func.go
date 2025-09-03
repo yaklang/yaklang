@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (p *Program) NewFunction(name string) *Function {
@@ -88,7 +89,7 @@ func (f *Function) AddThrow(vs ...Value) {
 }
 
 func (f *Function) SetType(t Type) {
-	if t == nil {
+	if utils.IsNil(f) || utils.IsNil(t) {
 		return
 	}
 

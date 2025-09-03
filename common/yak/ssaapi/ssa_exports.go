@@ -276,8 +276,8 @@ func WithLanguage(language consts.Language) Option {
 			return nil
 		}
 		c.language = language
-		if parser, ok := LanguageBuilders[language]; ok {
-			c.LanguageBuilder = parser()
+		if create, ok := LanguageBuilderCreater[language]; ok {
+			c.LanguageBuilder = create()
 		} else {
 			log.Errorf("SSA not support language %s", language)
 			c.LanguageBuilder = nil

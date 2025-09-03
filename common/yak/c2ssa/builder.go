@@ -99,8 +99,8 @@ func (*SSABuilder) FilterFile(path string) bool {
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.C
 }
-func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src)
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, s)
 }
 
 type astbuilder struct {
@@ -116,13 +116,18 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func Frontend(src string) (*cparser.CompilationUnitContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuilder) (*cparser.CompilationUnitContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := cparser.NewCLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := cparser.NewCParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

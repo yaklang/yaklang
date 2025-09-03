@@ -154,9 +154,12 @@ func (c *config) parseProjectWithFS(
 		prog.SetPreHandler(true)
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 		start = time.Now()
-		for fileContent := range c.getFileHandler(
+		ch := c.getFileHandler(
 			filesystem, preHandlerFiles, handlerFilesMap,
-		) {
+		)
+		defer c.LanguageBuilder.Clearup()
+		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
+		for fileContent := range ch {
 			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
 
 			fileContent.Editor = editor

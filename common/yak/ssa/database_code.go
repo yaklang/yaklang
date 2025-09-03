@@ -59,6 +59,7 @@ func Instruction2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode)
 func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, cache *ProgramCache) Instruction {
 	defer func() {
 		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
 			log.Errorf("err: %v", err)
 		}
 	}()

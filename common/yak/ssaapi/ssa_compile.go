@@ -26,7 +26,7 @@ const (
 	C    = consts.C
 )
 
-var LanguageBuilders = map[consts.Language]ssa.CreateBuilder{
+var LanguageBuilderCreater = map[consts.Language]ssa.CreateBuilder{
 	Yak:  yak2ssa.CreateBuilder,
 	JS:   js2ssa.CreateBuilder,
 	PHP:  php2ssa.CreateBuilder,
@@ -91,7 +91,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	}()
 	// path is empty, use language or YakLang as default
 	if c.LanguageBuilder == nil {
-		c.LanguageBuilder = LanguageBuilders[Yak]()
+		c.LanguageBuilder = LanguageBuilderCreater[Yak]()
 		log.Debugf("use default language [%s] for empty path", Yak)
 	}
 
@@ -103,6 +103,7 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		return nil, err
 	}
 	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode())
+	defer c.LanguageBuilder.Clearup()
 	if !c.ignoreSyntaxErr && err != nil {
 		return nil, utils.Errorf("parse file error: %v", err)
 	}
@@ -150,7 +151,7 @@ func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 		languageBuilder, err = processBuilders(languageBuilder)
 	} else {
 		log.Warn("no language builder specified, try to use all language builders, but it may cause some error and extra file analyzing disabled")
-		for _, builder := range LanguageBuilders {
+		for _, builder := range LanguageBuilderCreater {
 			languageBuilder, err = processBuilders(builder())
 			if err == nil {
 				break
