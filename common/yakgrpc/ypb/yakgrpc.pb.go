@@ -37717,27 +37717,27 @@ func (x *TagsAndType) GetTotal() int32 {
 	return 0
 }
 
-type CustomCodeFilter struct {
+type SnippetsFilter struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          []string               `protobuf:"bytes,1,rep,name=Name,proto3" json:"Name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CustomCodeFilter) Reset() {
-	*x = CustomCodeFilter{}
+func (x *SnippetsFilter) Reset() {
+	*x = SnippetsFilter{}
 	mi := &file_yakgrpc_proto_msgTypes[540]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CustomCodeFilter) String() string {
+func (x *SnippetsFilter) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CustomCodeFilter) ProtoMessage() {}
+func (*SnippetsFilter) ProtoMessage() {}
 
-func (x *CustomCodeFilter) ProtoReflect() protoreflect.Message {
+func (x *SnippetsFilter) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[540]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -37749,19 +37749,19 @@ func (x *CustomCodeFilter) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CustomCodeFilter.ProtoReflect.Descriptor instead.
-func (*CustomCodeFilter) Descriptor() ([]byte, []int) {
+// Deprecated: Use SnippetsFilter.ProtoReflect.Descriptor instead.
+func (*SnippetsFilter) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{540}
 }
 
-func (x *CustomCodeFilter) GetName() []string {
+func (x *SnippetsFilter) GetName() []string {
 	if x != nil {
 		return x.Name
 	}
 	return nil
 }
 
-type CustomCodeRequest struct {
+type SnippetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
 	Code          string                 `protobuf:"bytes,2,opt,name=Code,proto3" json:"Code,omitempty"`
@@ -37772,20 +37772,20 @@ type CustomCodeRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CustomCodeRequest) Reset() {
-	*x = CustomCodeRequest{}
+func (x *SnippetsRequest) Reset() {
+	*x = SnippetsRequest{}
 	mi := &file_yakgrpc_proto_msgTypes[541]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CustomCodeRequest) String() string {
+func (x *SnippetsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CustomCodeRequest) ProtoMessage() {}
+func (*SnippetsRequest) ProtoMessage() {}
 
-func (x *CustomCodeRequest) ProtoReflect() protoreflect.Message {
+func (x *SnippetsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[541]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -37797,47 +37797,47 @@ func (x *CustomCodeRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CustomCodeRequest.ProtoReflect.Descriptor instead.
-func (*CustomCodeRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use SnippetsRequest.ProtoReflect.Descriptor instead.
+func (*SnippetsRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{541}
 }
 
-func (x *CustomCodeRequest) GetName() string {
+func (x *SnippetsRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *CustomCodeRequest) GetCode() string {
+func (x *SnippetsRequest) GetCode() string {
 	if x != nil {
 		return x.Code
 	}
 	return ""
 }
 
-func (x *CustomCodeRequest) GetDescription() string {
+func (x *SnippetsRequest) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
 	return ""
 }
 
-func (x *CustomCodeRequest) GetState() string {
+func (x *SnippetsRequest) GetState() string {
 	if x != nil {
 		return x.State
 	}
 	return ""
 }
 
-func (x *CustomCodeRequest) GetLevel() string {
+func (x *SnippetsRequest) GetLevel() string {
 	if x != nil {
 		return x.Level
 	}
 	return ""
 }
 
-type EditCustomCodeRequest struct {
+type EditSnippetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Target        string                 `protobuf:"bytes,1,opt,name=Target,proto3" json:"Target,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
@@ -37849,20 +37849,20 @@ type EditCustomCodeRequest struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *EditCustomCodeRequest) Reset() {
-	*x = EditCustomCodeRequest{}
+func (x *EditSnippetsRequest) Reset() {
+	*x = EditSnippetsRequest{}
 	mi := &file_yakgrpc_proto_msgTypes[542]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *EditCustomCodeRequest) String() string {
+func (x *EditSnippetsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*EditCustomCodeRequest) ProtoMessage() {}
+func (*EditSnippetsRequest) ProtoMessage() {}
 
-func (x *EditCustomCodeRequest) ProtoReflect() protoreflect.Message {
+func (x *EditSnippetsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[542]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -37874,74 +37874,74 @@ func (x *EditCustomCodeRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use EditCustomCodeRequest.ProtoReflect.Descriptor instead.
-func (*EditCustomCodeRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use EditSnippetsRequest.ProtoReflect.Descriptor instead.
+func (*EditSnippetsRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{542}
 }
 
-func (x *EditCustomCodeRequest) GetTarget() string {
+func (x *EditSnippetsRequest) GetTarget() string {
 	if x != nil {
 		return x.Target
 	}
 	return ""
 }
 
-func (x *EditCustomCodeRequest) GetName() string {
+func (x *EditSnippetsRequest) GetName() string {
 	if x != nil {
 		return x.Name
 	}
 	return ""
 }
 
-func (x *EditCustomCodeRequest) GetCode() string {
+func (x *EditSnippetsRequest) GetCode() string {
 	if x != nil {
 		return x.Code
 	}
 	return ""
 }
 
-func (x *EditCustomCodeRequest) GetDescription() string {
+func (x *EditSnippetsRequest) GetDescription() string {
 	if x != nil {
 		return x.Description
 	}
 	return ""
 }
 
-func (x *EditCustomCodeRequest) GetState() string {
+func (x *EditSnippetsRequest) GetState() string {
 	if x != nil {
 		return x.State
 	}
 	return ""
 }
 
-func (x *EditCustomCodeRequest) GetLevel() string {
+func (x *EditSnippetsRequest) GetLevel() string {
 	if x != nil {
 		return x.Level
 	}
 	return ""
 }
 
-type QueryCustomCodeRequest struct {
+type QuerySnippetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Filter        *CustomCodeFilter      `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
+	Filter        *SnippetsFilter        `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *QueryCustomCodeRequest) Reset() {
-	*x = QueryCustomCodeRequest{}
+func (x *QuerySnippetsRequest) Reset() {
+	*x = QuerySnippetsRequest{}
 	mi := &file_yakgrpc_proto_msgTypes[543]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *QueryCustomCodeRequest) String() string {
+func (x *QuerySnippetsRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*QueryCustomCodeRequest) ProtoMessage() {}
+func (*QuerySnippetsRequest) ProtoMessage() {}
 
-func (x *QueryCustomCodeRequest) ProtoReflect() protoreflect.Message {
+func (x *QuerySnippetsRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[543]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -37953,19 +37953,19 @@ func (x *QueryCustomCodeRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use QueryCustomCodeRequest.ProtoReflect.Descriptor instead.
-func (*QueryCustomCodeRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use QuerySnippetsRequest.ProtoReflect.Descriptor instead.
+func (*QuerySnippetsRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{543}
 }
 
-func (x *QueryCustomCodeRequest) GetFilter() *CustomCodeFilter {
+func (x *QuerySnippetsRequest) GetFilter() *SnippetsFilter {
 	if x != nil {
 		return x.Filter
 	}
 	return nil
 }
 
-type CustomCodeResponse struct {
+type SnippetsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Names         []string               `protobuf:"bytes,1,rep,name=Names,proto3" json:"Names,omitempty"`
 	Codes         []string               `protobuf:"bytes,2,rep,name=Codes,proto3" json:"Codes,omitempty"`
@@ -37976,20 +37976,20 @@ type CustomCodeResponse struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *CustomCodeResponse) Reset() {
-	*x = CustomCodeResponse{}
+func (x *SnippetsResponse) Reset() {
+	*x = SnippetsResponse{}
 	mi := &file_yakgrpc_proto_msgTypes[544]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CustomCodeResponse) String() string {
+func (x *SnippetsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CustomCodeResponse) ProtoMessage() {}
+func (*SnippetsResponse) ProtoMessage() {}
 
-func (x *CustomCodeResponse) ProtoReflect() protoreflect.Message {
+func (x *SnippetsResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[544]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -38001,40 +38001,40 @@ func (x *CustomCodeResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CustomCodeResponse.ProtoReflect.Descriptor instead.
-func (*CustomCodeResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use SnippetsResponse.ProtoReflect.Descriptor instead.
+func (*SnippetsResponse) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{544}
 }
 
-func (x *CustomCodeResponse) GetNames() []string {
+func (x *SnippetsResponse) GetNames() []string {
 	if x != nil {
 		return x.Names
 	}
 	return nil
 }
 
-func (x *CustomCodeResponse) GetCodes() []string {
+func (x *SnippetsResponse) GetCodes() []string {
 	if x != nil {
 		return x.Codes
 	}
 	return nil
 }
 
-func (x *CustomCodeResponse) GetDescriptions() []string {
+func (x *SnippetsResponse) GetDescriptions() []string {
 	if x != nil {
 		return x.Descriptions
 	}
 	return nil
 }
 
-func (x *CustomCodeResponse) GetStates() []string {
+func (x *SnippetsResponse) GetStates() []string {
 	if x != nil {
 		return x.States
 	}
 	return nil
 }
 
-func (x *CustomCodeResponse) GetLevels() []string {
+func (x *SnippetsResponse) GetLevels() []string {
 	if x != nil {
 		return x.Levels
 	}
@@ -63107,25 +63107,25 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Group\x18\x03 \x03(\v2\x10.ypb.TagsAndTypeR\x05Group\"9\n" +
 	"\vTagsAndType\x12\x14\n" +
 	"\x05Value\x18\x01 \x01(\tR\x05Value\x12\x14\n" +
-	"\x05Total\x18\x02 \x01(\x05R\x05Total\"&\n" +
-	"\x10CustomCodeFilter\x12\x12\n" +
-	"\x04Name\x18\x01 \x03(\tR\x04Name\"\x89\x01\n" +
-	"\x11CustomCodeRequest\x12\x12\n" +
+	"\x05Total\x18\x02 \x01(\x05R\x05Total\"$\n" +
+	"\x0eSnippetsFilter\x12\x12\n" +
+	"\x04Name\x18\x01 \x03(\tR\x04Name\"\x87\x01\n" +
+	"\x0fSnippetsRequest\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
 	"\x04Code\x18\x02 \x01(\tR\x04Code\x12 \n" +
 	"\vDescription\x18\x03 \x01(\tR\vDescription\x12\x14\n" +
 	"\x05State\x18\x04 \x01(\tR\x05State\x12\x14\n" +
-	"\x05Level\x18\x05 \x01(\tR\x05Level\"\xa5\x01\n" +
-	"\x15EditCustomCodeRequest\x12\x16\n" +
+	"\x05Level\x18\x05 \x01(\tR\x05Level\"\xa3\x01\n" +
+	"\x13EditSnippetsRequest\x12\x16\n" +
 	"\x06Target\x18\x01 \x01(\tR\x06Target\x12\x12\n" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +
 	"\x04Code\x18\x03 \x01(\tR\x04Code\x12 \n" +
 	"\vDescription\x18\x04 \x01(\tR\vDescription\x12\x14\n" +
 	"\x05State\x18\x05 \x01(\tR\x05State\x12\x14\n" +
-	"\x05Level\x18\x06 \x01(\tR\x05Level\"G\n" +
-	"\x16QueryCustomCodeRequest\x12-\n" +
-	"\x06Filter\x18\x01 \x01(\v2\x15.ypb.CustomCodeFilterR\x06Filter\"\x94\x01\n" +
-	"\x12CustomCodeResponse\x12\x14\n" +
+	"\x05Level\x18\x06 \x01(\tR\x05Level\"C\n" +
+	"\x14QuerySnippetsRequest\x12+\n" +
+	"\x06Filter\x18\x01 \x01(\v2\x13.ypb.SnippetsFilterR\x06Filter\"\x92\x01\n" +
+	"\x10SnippetsResponse\x12\x14\n" +
 	"\x05Names\x18\x01 \x03(\tR\x05Names\x12\x14\n" +
 	"\x05Codes\x18\x02 \x03(\tR\x05Codes\x12\"\n" +
 	"\fDescriptions\x18\x03 \x03(\tR\fDescriptions\x12\x16\n" +
@@ -65110,7 +65110,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAesBase64\x10\x03\x12\n" +
 	"\n" +
 	"\x06XorRaw\x10\x04\x12\r\n" +
-	"\tXorBase64\x10\x052\xb9\xc3\x02\n" +
+	"\tXorBase64\x10\x052\xa5\xc3\x02\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -65262,14 +65262,14 @@ const file_yakgrpc_proto_rawDesc = "" +
 	".ypb.Empty\x12E\n" +
 	"\x1fConvertFuzzerResponseToHTTPFlow\x12\x13.ypb.FuzzerResponse\x1a\r.ypb.HTTPFlow\x12C\n" +
 	"\fStringFuzzer\x12\x18.ypb.StringFuzzerRequest\x1a\x19.ypb.StringFuzzerResponse\x12Q\n" +
-	"\x13HTTPRequestAnalyzer\x12 .ypb.HTTPRequestAnalysisMaterial\x1a\x18.ypb.HTTPRequestAnalysis\x126\n" +
-	"\x10CreateCustomCode\x12\x16.ypb.CustomCodeRequest\x1a\n" +
-	".ypb.Empty\x12:\n" +
-	"\x10UpdateCustomCode\x12\x1a.ypb.EditCustomCodeRequest\x1a\n" +
-	".ypb.Empty\x12;\n" +
-	"\x10DeleteCustomCode\x12\x1b.ypb.QueryCustomCodeRequest\x1a\n" +
-	".ypb.Empty\x12G\n" +
-	"\x0fQueryCustomCode\x12\x1b.ypb.QueryCustomCodeRequest\x1a\x17.ypb.CustomCodeResponse\x12.\n" +
+	"\x13HTTPRequestAnalyzer\x12 .ypb.HTTPRequestAnalysisMaterial\x1a\x18.ypb.HTTPRequestAnalysis\x121\n" +
+	"\rCreateSnippet\x12\x14.ypb.SnippetsRequest\x1a\n" +
+	".ypb.Empty\x125\n" +
+	"\rUpdateSnippet\x12\x18.ypb.EditSnippetsRequest\x1a\n" +
+	".ypb.Empty\x127\n" +
+	"\x0eDeleteSnippets\x12\x19.ypb.QuerySnippetsRequest\x1a\n" +
+	".ypb.Empty\x12A\n" +
+	"\rQuerySnippets\x12\x19.ypb.QuerySnippetsRequest\x1a\x15.ypb.SnippetsResponse\x12.\n" +
 	"\x05Codec\x12\x11.ypb.CodecRequest\x1a\x12.ypb.CodecResponse\x125\n" +
 	"\bNewCodec\x12\x15.ypb.CodecRequestFlow\x1a\x12.ypb.CodecResponse\x123\n" +
 	"\x12GetAllCodecMethods\x12\n" +
@@ -66430,11 +66430,11 @@ var file_yakgrpc_proto_goTypes = []any{
 	(*SetGroupRequest)(nil),                                   // 541: ypb.SetGroupRequest
 	(*GetYakScriptTagsAndTypeResponse)(nil),                   // 542: ypb.GetYakScriptTagsAndTypeResponse
 	(*TagsAndType)(nil),                                       // 543: ypb.TagsAndType
-	(*CustomCodeFilter)(nil),                                  // 544: ypb.CustomCodeFilter
-	(*CustomCodeRequest)(nil),                                 // 545: ypb.CustomCodeRequest
-	(*EditCustomCodeRequest)(nil),                             // 546: ypb.EditCustomCodeRequest
-	(*QueryCustomCodeRequest)(nil),                            // 547: ypb.QueryCustomCodeRequest
-	(*CustomCodeResponse)(nil),                                // 548: ypb.CustomCodeResponse
+	(*SnippetsFilter)(nil),                                    // 544: ypb.SnippetsFilter
+	(*SnippetsRequest)(nil),                                   // 545: ypb.SnippetsRequest
+	(*EditSnippetsRequest)(nil),                               // 546: ypb.EditSnippetsRequest
+	(*QuerySnippetsRequest)(nil),                              // 547: ypb.QuerySnippetsRequest
+	(*SnippetsResponse)(nil),                                  // 548: ypb.SnippetsResponse
 	(*CodecRequest)(nil),                                      // 549: ypb.CodecRequest
 	(*CodecWork)(nil),                                         // 550: ypb.CodecWork
 	(*CodecRequestFlow)(nil),                                  // 551: ypb.CodecRequestFlow
@@ -67029,7 +67029,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	543,  // 284: ypb.GetYakScriptTagsAndTypeResponse.Type:type_name -> ypb.TagsAndType
 	543,  // 285: ypb.GetYakScriptTagsAndTypeResponse.Tag:type_name -> ypb.TagsAndType
 	543,  // 286: ypb.GetYakScriptTagsAndTypeResponse.Group:type_name -> ypb.TagsAndType
-	544,  // 287: ypb.QueryCustomCodeRequest.Filter:type_name -> ypb.CustomCodeFilter
+	544,  // 287: ypb.QuerySnippetsRequest.Filter:type_name -> ypb.SnippetsFilter
 	642,  // 288: ypb.CodecRequest.Params:type_name -> ypb.ExecParamItem
 	642,  // 289: ypb.CodecWork.Params:type_name -> ypb.ExecParamItem
 	550,  // 290: ypb.CodecRequestFlow.WorkFlow:type_name -> ypb.CodecWork
@@ -67385,10 +67385,10 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	587,  // 640: ypb.Yak.ConvertFuzzerResponseToHTTPFlow:input_type -> ypb.FuzzerResponse
 	563,  // 641: ypb.Yak.StringFuzzer:input_type -> ypb.StringFuzzerRequest
 	565,  // 642: ypb.Yak.HTTPRequestAnalyzer:input_type -> ypb.HTTPRequestAnalysisMaterial
-	545,  // 643: ypb.Yak.CreateCustomCode:input_type -> ypb.CustomCodeRequest
-	546,  // 644: ypb.Yak.UpdateCustomCode:input_type -> ypb.EditCustomCodeRequest
-	547,  // 645: ypb.Yak.DeleteCustomCode:input_type -> ypb.QueryCustomCodeRequest
-	547,  // 646: ypb.Yak.QueryCustomCode:input_type -> ypb.QueryCustomCodeRequest
+	545,  // 643: ypb.Yak.CreateSnippet:input_type -> ypb.SnippetsRequest
+	546,  // 644: ypb.Yak.UpdateSnippet:input_type -> ypb.EditSnippetsRequest
+	547,  // 645: ypb.Yak.DeleteSnippets:input_type -> ypb.QuerySnippetsRequest
+	547,  // 646: ypb.Yak.QuerySnippets:input_type -> ypb.QuerySnippetsRequest
 	549,  // 647: ypb.Yak.Codec:input_type -> ypb.CodecRequest
 	551,  // 648: ypb.Yak.NewCodec:input_type -> ypb.CodecRequestFlow
 	4,    // 649: ypb.Yak.GetAllCodecMethods:input_type -> ypb.Empty
@@ -67929,10 +67929,10 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	612,  // 1184: ypb.Yak.ConvertFuzzerResponseToHTTPFlow:output_type -> ypb.HTTPFlow
 	564,  // 1185: ypb.Yak.StringFuzzer:output_type -> ypb.StringFuzzerResponse
 	567,  // 1186: ypb.Yak.HTTPRequestAnalyzer:output_type -> ypb.HTTPRequestAnalysis
-	4,    // 1187: ypb.Yak.CreateCustomCode:output_type -> ypb.Empty
-	4,    // 1188: ypb.Yak.UpdateCustomCode:output_type -> ypb.Empty
-	4,    // 1189: ypb.Yak.DeleteCustomCode:output_type -> ypb.Empty
-	548,  // 1190: ypb.Yak.QueryCustomCode:output_type -> ypb.CustomCodeResponse
+	4,    // 1187: ypb.Yak.CreateSnippet:output_type -> ypb.Empty
+	4,    // 1188: ypb.Yak.UpdateSnippet:output_type -> ypb.Empty
+	4,    // 1189: ypb.Yak.DeleteSnippets:output_type -> ypb.Empty
+	548,  // 1190: ypb.Yak.QuerySnippets:output_type -> ypb.SnippetsResponse
 	556,  // 1191: ypb.Yak.Codec:output_type -> ypb.CodecResponse
 	556,  // 1192: ypb.Yak.NewCodec:output_type -> ypb.CodecResponse
 	557,  // 1193: ypb.Yak.GetAllCodecMethods:output_type -> ypb.CodecMethods

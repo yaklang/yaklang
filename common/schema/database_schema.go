@@ -110,7 +110,7 @@ var ProjectTables = []interface{}{
 	&Note{},
 
 	// Custom Code Signing
-	&CustomCodeSigning{},
+	&Snippets{},
 
 	// AI
 	&AiCoordinatorRuntime{},
