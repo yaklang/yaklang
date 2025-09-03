@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	test.SetLanguage("c", c2ssa.Builder)
+	test.SetLanguage("c", c2ssa.CreateBuilder)
 }

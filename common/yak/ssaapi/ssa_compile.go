@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/c2ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
+	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/go2ssa"
@@ -14,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
-	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
 const (
@@ -26,22 +26,13 @@ const (
 	C    = consts.C
 )
 
-var LanguageBuilders = map[consts.Language]ssa.Builder{
-	Yak:  yak2ssa.Builder,
-	JS:   js2ssa.Builder,
-	PHP:  php2ssa.Builder,
-	JAVA: java2ssa.Builder,
-	GO:   go2ssa.Builder,
-	C:    c2ssa.Builder,
-}
-
-var AllLanguageBuilders = []ssa.Builder{
-	php2ssa.Builder,
-	java2ssa.Builder,
-
-	yak2ssa.Builder,
-	js2ssa.Builder,
-	go2ssa.Builder,
+var LanguageBuilders = map[consts.Language]ssa.CreateBuilder{
+	Yak:  yak2ssa.CreateBuilder,
+	JS:   js2ssa.CreateBuilder,
+	PHP:  php2ssa.CreateBuilder,
+	JAVA: java2ssa.CreateBuilder,
+	GO:   go2ssa.CreateBuilder,
+	C:    c2ssa.CreateBuilder,
 }
 
 func (c *config) isStop() bool {
@@ -99,13 +90,11 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		}
 	}()
 	// path is empty, use language or YakLang as default
-	if c.SelectedLanguageBuilder == nil {
-		c.LanguageBuilder = LanguageBuilders[Yak]
+	if c.LanguageBuilder == nil {
+		c.LanguageBuilder = LanguageBuilders[Yak]()
 		log.Debugf("use default language [%s] for empty path", Yak)
-	} else {
-		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}
-	c.LanguageBuilder = c.LanguageBuilder.Create()
+
 	prog, builder, err := c.init(c.fs, 1)
 	prog.SetPreHandler(true)
 	c.LanguageBuilder.InitHandler(builder)
@@ -156,16 +145,21 @@ func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 	// TODO: whether to use the same programName for all program ?? when call ParseProject
 	// programName += "-" + path
 	var err error
-	LanguageBuilder := c.SelectedLanguageBuilder
-	if LanguageBuilder != nil {
-		LanguageBuilder, err = processBuilders(LanguageBuilder)
+	languageBuilder := c.LanguageBuilder
+	if languageBuilder != nil {
+		languageBuilder, err = processBuilders(languageBuilder)
 	} else {
 		log.Warn("no language builder specified, try to use all language builders, but it may cause some error and extra file analyzing disabled")
-		LanguageBuilder, err = processBuilders(AllLanguageBuilders...)
+		for _, builder := range LanguageBuilders {
+			languageBuilder, err = processBuilders(builder())
+			if err == nil {
+				break
+			}
+		}
 	}
 	if err != nil {
 		return err
 	}
-	c.LanguageBuilder = LanguageBuilder.Create()
+	c.LanguageBuilder = languageBuilder
 	return nil
 }

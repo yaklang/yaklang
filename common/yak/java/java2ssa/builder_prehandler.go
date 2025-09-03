@@ -19,18 +19,6 @@ import (
 
 var _ ssa.PreHandlerAnalyzer = &SSABuilder{}
 
-func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
-			ssa.WithLanguageConfigBind(true),
-			ssa.WithLanguageConfigSupportClass(true),
-			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
-			ssa.WithLanguageConfigVirtualImport(true),
-			ssa.WithLanguageBuilder(s),
-		),
-	}
-}
-
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	fileList := []string{".jpg", ".png", ".gif", ".jpeg", ".css", ".js", ".avi", ".mp4", ".mp3", ".pdf", ".doc", ".php", ".go"}

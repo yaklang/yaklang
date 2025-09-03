@@ -42,9 +42,8 @@ type config struct {
 	ProgramDescription string
 
 	// language
-	language                consts.Language
-	SelectedLanguageBuilder ssa.Builder
-	LanguageBuilder         ssa.Builder
+	language        consts.Language
+	LanguageBuilder ssa.Builder
 
 	// other compile options
 	feedCode        bool
@@ -94,7 +93,7 @@ type config struct {
 func defaultConfig(opts ...Option) (*config, error) {
 	c := &config{
 		language:                   "",
-		SelectedLanguageBuilder:    nil,
+		LanguageBuilder:            nil,
 		originEditor:               memedit.NewMemEditor(""),
 		fs:                         filesys.NewLocalFs(),
 		programPath:                ".",
@@ -278,10 +277,10 @@ func WithLanguage(language consts.Language) Option {
 		}
 		c.language = language
 		if parser, ok := LanguageBuilders[language]; ok {
-			c.SelectedLanguageBuilder = parser
+			c.LanguageBuilder = parser()
 		} else {
 			log.Errorf("SSA not support language %s", language)
-			c.SelectedLanguageBuilder = nil
+			c.LanguageBuilder = nil
 		}
 		return nil
 	}
@@ -500,7 +499,7 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 }
 
 func (p *Program) Feed(code io.Reader) error {
-	if p.config == nil || !p.config.feedCode || p.config.SelectedLanguageBuilder == nil {
+	if p.config == nil || !p.config.feedCode || p.config.LanguageBuilder == nil {
 		return utils.Errorf("not support language %s", p.config.language)
 	}
 
