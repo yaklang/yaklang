@@ -23,9 +23,16 @@ type SSEServer struct {
 
 // sseSession represents an active SSE connection.
 type sseSession struct {
-	writer  http.ResponseWriter
-	flusher http.Flusher
-	done    chan struct{}
+	writer    http.ResponseWriter
+	flusher   http.Flusher
+	closeOnce sync.Once
+	done      chan struct{}
+}
+
+func (s *sseSession) Close() {
+	s.closeOnce.Do(func() {
+		close(s.done)
+	})
 }
 
 // NewSSEServer creates a new SSE server instance with the given MCP server and base URL.
@@ -80,7 +87,7 @@ func (s *SSEServer) Shutdown(ctx context.Context) error {
 	if s.srv != nil {
 		s.sessions.Range(func(key, value interface{}) bool {
 			if session, ok := value.(*sseSession); ok {
-				close(session.done)
+				session.Close()
 			}
 			s.sessions.Delete(key)
 			return true
@@ -112,9 +119,10 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 
 	sessionID := uuid.New().String()
 	session := &sseSession{
-		writer:  w,
-		flusher: flusher,
-		done:    make(chan struct{}),
+		writer:    w,
+		flusher:   flusher,
+		done:      make(chan struct{}),
+		closeOnce: sync.Once{},
 	}
 
 	s.sessions.Store(sessionID, session)
@@ -149,7 +157,7 @@ func (s *SSEServer) handleSSE(w http.ResponseWriter, r *http.Request) {
 	flusher.Flush()
 
 	<-r.Context().Done()
-	close(session.done)
+	session.Close()
 }
 
 // handleMessage processes incoming JSON-RPC messages from clients and sends responses
