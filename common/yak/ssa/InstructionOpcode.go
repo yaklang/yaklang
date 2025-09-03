@@ -78,7 +78,7 @@ var SSAOpcode2Name = map[Opcode]string{
 
 func (i *Function) GetOpcode() Opcode   { return SSAOpcodeFunction }
 func (i *BasicBlock) GetOpcode() Opcode { return SSAOpcodeBasicBlock }
-func (i *BasicBlock) _GetRange() memedit.RangeIf {
+func (i *BasicBlock) _GetRange() *memedit.Range {
 	if i == nil || i.anValue.id <= 0 {
 		return nil
 	}
@@ -99,7 +99,7 @@ func (i *BasicBlock) _GetRange() memedit.RangeIf {
 	return nil
 }
 
-// func (i *BasicBlock) GetRange() memedit.RangeIf {
+// func (i *BasicBlock) GetRange() *memedit.Range {
 // 	result := i._GetRange()
 // 	if result != nil && i.anValue.R == nil {
 // 		i.SetRange(result)
@@ -107,7 +107,7 @@ func (i *BasicBlock) _GetRange() memedit.RangeIf {
 // 	return result
 // }
 
-func (i *Function) _GetRange() memedit.RangeIf {
+func (i *Function) _GetRange() *memedit.Range {
 	if i == nil || i.anValue.id <= 0 {
 		return nil
 	}
@@ -129,7 +129,7 @@ func (i *Function) _GetRange() memedit.RangeIf {
 	return nil
 }
 
-// func (i *Function) GetRange() memedit.RangeIf {
+// func (i *Function) GetRange() *memedit.Range {
 // result := i._GetRange()
 // if result != nil && i.anValue.R == nil {
 // 	i.SetRange(result)

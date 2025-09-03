@@ -168,11 +168,11 @@ func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
 	return iv.AppendDependOn(v)
 }
 
-func (v *Value) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
+func (v *Value) NewConstValue(i any, rng ...*memedit.Range) *Value {
 	return v.ParentProgram.NewConstValue(i, rng...)
 }
 
-func (p *Program) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
+func (p *Program) NewConstValue(i any, rng ...*memedit.Range) *Value {
 	value := ssa.NewConst(i)
 	if len(rng) > 0 {
 		value.SetRange(rng[0])
@@ -272,7 +272,7 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 	}
 	// if auditNode is -1,check it.
 	if auditNode.IRCodeID == -1 {
-		var rangeIf memedit.RangeIf
+		var rangeIf *memedit.Range
 		var memEditor *memedit.MemEditor
 		if auditNode.TmpValueFileHash != "" {
 			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)

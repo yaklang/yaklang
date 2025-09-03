@@ -35,7 +35,7 @@ func ConvertVariable2Offset(v *Variable, variableName string, valueID int64) []*
 		return nil
 	}
 	ret := make([]*ssadb.IrOffset, 0, 10)
-	createOffset := func(rng memedit.RangeIf) {
+	createOffset := func(rng *memedit.Range) {
 		if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
 			return
 		}

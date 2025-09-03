@@ -1,9 +1,10 @@
 package memedit
 
 import (
-	"github.com/stretchr/testify/require"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFindStringRange(t *testing.T) {
@@ -26,7 +27,7 @@ func TestFindStringRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var results []string
-			err := editor.FindStringRange(tt.feature, func(r RangeIf) error {
+			err := editor.FindStringRange(tt.feature, func(r *Range) error {
 				start, end := r.GetStart(), r.GetEnd()
 				results = append(results, editor.GetTextFromPosition(start, end))
 				return nil
@@ -48,7 +49,7 @@ func TestFindStringRangeShort(t *testing.T) {
 	editor := NewMemEditor("a")
 	feature := "abc"
 	var results []string
-	err := editor.FindStringRange(feature, func(r RangeIf) error {
+	err := editor.FindStringRange(feature, func(r *Range) error {
 		start, end := r.GetStart(), r.GetEnd()
 		results = append(results, editor.GetTextFromPosition(start, end))
 		return nil
@@ -83,7 +84,7 @@ func TestFindRegexpRange_Edge(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var results []string
-			err := editor.FindRegexpRange(tt.pattern, func(r RangeIf) error {
+			err := editor.FindRegexpRange(tt.pattern, func(r *Range) error {
 				start, end := r.GetStart(), r.GetEnd()
 				// Assuming GetTextFromPosition(start, end) retrieves the text between start and end position
 				results = append(results, editor.GetTextFromPosition(start, end))
@@ -121,7 +122,7 @@ func TestFindRegexpRange(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var results []string
-			err := editor.FindRegexpRange(tt.pattern, func(r RangeIf) error {
+			err := editor.FindRegexpRange(tt.pattern, func(r *Range) error {
 				start, end := r.GetStart(), r.GetEnd()
 				results = append(results, editor.GetTextFromPosition(start, end))
 				return nil
@@ -147,8 +148,8 @@ func TestGetContextAroundRange(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		startPos PositionIf
-		endPos   PositionIf
+		startPos *Position
+		endPos   *Position
 		n        int
 		expected string
 		wantErr  bool

@@ -1,9 +1,10 @@
 package templateLanguage
 
 import (
+	"strings"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"strings"
 )
 
 type CanStartStopToken interface {
@@ -28,7 +29,7 @@ func (y *Visitor) SetRange(token CanStartStopToken) func() {
 	}
 }
 
-func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeIf {
+func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *memedit.Range {
 	startToken := token.GetStart()
 	endToken := token.GetStop()
 	if startToken == nil || endToken == nil {

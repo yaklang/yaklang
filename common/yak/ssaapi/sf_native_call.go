@@ -1012,7 +1012,7 @@ func init() {
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
 			var tmpMap = make(map[string]struct{})
-			addVals := func(val *Value, typ string, rangeIf memedit.RangeIf) {
+			addVals := func(val *Value, typ string, rangeIf *memedit.Range) {
 				if typ == "" {
 					return
 				}

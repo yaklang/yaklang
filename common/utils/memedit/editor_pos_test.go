@@ -314,14 +314,14 @@ func TestGetPositionByOffset(t *testing.T) {
 		offset           int
 		expectedLine     int
 		expectedColumn   int
-		expectedPosition *position
+		expectedPosition *Position
 	}{
 		{
 			name:           "Start of file",
 			offset:         0,
 			expectedLine:   1,
 			expectedColumn: 0,
-			expectedPosition: &position{
+			expectedPosition: &Position{
 				line:   1,
 				column: 0,
 			},
@@ -331,7 +331,7 @@ func TestGetPositionByOffset(t *testing.T) {
 			offset:         26,
 			expectedLine:   3,
 			expectedColumn: 14,
-			expectedPosition: &position{
+			expectedPosition: &Position{
 				line:   4,
 				column: 14,
 			},
@@ -341,21 +341,21 @@ func TestGetPositionByOffset(t *testing.T) {
 			offset:           -1,
 			expectedLine:     1,
 			expectedColumn:   0,
-			expectedPosition: &position{line: 1, column: 0},
+			expectedPosition: &Position{line: 1, column: 0},
 		},
 		{
 			name:             "Offset beyond EOF",
 			offset:           100,
 			expectedLine:     3,
 			expectedColumn:   14,
-			expectedPosition: &position{line: 4, column: 14},
+			expectedPosition: &Position{line: 4, column: 14},
 		},
 		{
 			name:           "Middle of line",
 			offset:         7,
 			expectedLine:   2,
 			expectedColumn: 1,
-			expectedPosition: &position{
+			expectedPosition: &Position{
 				line:   2,
 				column: 1,
 			},
@@ -365,7 +365,7 @@ func TestGetPositionByOffset(t *testing.T) {
 			offset:         5,
 			expectedLine:   1,
 			expectedColumn: 5,
-			expectedPosition: &position{
+			expectedPosition: &Position{
 				line:   1,
 				column: 5,
 			},
@@ -388,7 +388,7 @@ func TestGetPositionByOffsetWithError(t *testing.T) {
 	tests := []struct {
 		name    string
 		offset  int
-		wantPos PositionIf
+		wantPos *Position
 		wantErr bool
 	}{
 		{"Start of file", 0, NewPosition(1, 0), false},
@@ -420,6 +420,6 @@ func TestGetPositionByOffsetWithError(t *testing.T) {
 	}
 }
 
-func positionsEqual(got, want PositionIf) bool {
+func positionsEqual(got, want *Position) bool {
 	return got.GetLine() == want.GetLine() && got.GetColumn() == want.GetColumn()+1
 }
