@@ -26,6 +26,7 @@ func HypotheticalAnswer(ctx context.Context, query string) (string, error) {
 4. 如果涉及技术概念，请提供准确的定义和解释
 5. 段落长度适中，信息密度合理
 6. 使用陈述句，避免疑问句或感叹句
+7. 如问题包含缩写/简称，请先还原为规范全称；必要时在首次出现处采用“全称（简称）”的表述，以确保理解与表达准确
 
 问题: %s
 
@@ -54,7 +55,11 @@ func SplitQuery(ctx context.Context, query string) ([]string, error) {
 
 问题: %s
 
-请生成多个子问题，每个子问题应该某个维度视角的代表性问题，并且提问需要详细准确专业。
+拆分规则：
+1. 若原问题本身包含多个子问题或涉及多个领域/主题，请直接按这些自然边界进行拆分。
+2. 若原问题为单一问题，请从不同维度/视角进行细化（如：原因、影响、原理、步骤、风险、对策、最佳实践、实例、边界条件、对比等），形成具代表性的子问题。
+3. 子问题需相互独立、表述清晰，可直接用于检索或回答。
+4. 若问题中出现缩写/简称，请优先使用规范全称，并在必要时在首次出现处采用“全称（简称）”的方式提升可读性。
 `
 	prompt = fmt.Sprintf(prompt, query)
 
@@ -80,7 +85,7 @@ func GeneralizeQuery(ctx context.Context, query string) (string, error) {
 
 问题: %s
 
-请生成一个泛化后的问题，问题需要详细准确专业。`
+请生成一个泛化后的问题，问题需要详细准确专业。若存在缩写/简称，请先统一为规范全称；必要时在首次出现处使用“全称（简称）”的表述以提升清晰度。`
 	prompt = fmt.Sprintf(prompt, query)
 
 	inputPrompt := prompt
