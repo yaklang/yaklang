@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 type BlueprintFieldKind int
@@ -85,7 +86,7 @@ type Blueprint struct {
 	// _container is an inner ssa.Valueorigin cls container
 	_container Value
 
-	Tokenizer CanStartStopToken // 标记blueprint声明的位置
+	Range *memedit.Range
 
 	ParentBlueprints    []*Blueprint
 	InterfaceBlueprints []*Blueprint
@@ -93,7 +94,7 @@ type Blueprint struct {
 	fullTypeName []string
 
 	// lazy
-	lazyBuilder
+	LazyBuilder
 }
 
 func (b *Blueprint) GetId() int64 {
