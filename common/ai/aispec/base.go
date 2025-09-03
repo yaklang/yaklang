@@ -361,8 +361,6 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		}
 	}()
 
-	defer wg.Wait()
-
 	_, _, err = poc.DoPOST(url, opts...)
 	if err != nil {
 		if errHandler != nil {
@@ -371,8 +369,12 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		if !utils.IsNil(cancel) {
 			cancel()
 		}
+		wg.Wait() // 确保在错误情况下也等待goroutine完成
 		return body.String(), utils.Errorf("request post to %v：%v", url, err)
 	}
+
+	// 等待所有goroutine完成数据写入，确保body.Buffer中有完整数据
+	wg.Wait()
 	return body.String(), nil
 }
 
