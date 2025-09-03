@@ -273,6 +273,9 @@ func setMemberVerboseName(member Value) {
 }
 
 func GetKeyString(key Value) string {
+	if key == nil {
+		return ""
+	}
 	text := ""
 	if ci, ok := ToConstInst(key); ok {
 		text = ci.String()

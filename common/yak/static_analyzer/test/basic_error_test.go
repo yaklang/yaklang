@@ -3,6 +3,8 @@ package test
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
@@ -320,5 +322,31 @@ results.discard.Header = make([]string, 0)
 results.discard.Header = append(results.discard.Header, "1")
 `
 		check(t, code, []string{"map literal not have map pairs"})
+	})
+
+	t.Run("panic: keywords cause freevalue fail generation", func(t *testing.T) {
+		check(t, `
+func assignParam(Packet,Pname,Pvalue,funcname){
+    pap := "ReplaceHTTPPacketQueryParam"
+    for k,v := range ParamsFull {
+        if k == Pname {
+            // 爆红没事
+            Packet = poc[pap](Packet,Pname,Pvalue/*type: map[string]string*/)
+            break
+        }else{
+            // 爆红没事
+            Packet = poc[pap](Packet,Pname,Pvalue)
+            break
+        }
+    }
+    return Packet
+}
+p = ""
+println(assignParam(p,"_method","123","当前方法"))
+		`, []string{
+			ssa.InvalidField("any", ""),
+			ssa.BindingNotFoundInCall("ParamsFull"),
+			ssa.BindingNotFound("ParamsFull", memedit.NewRange(memedit.NewPosition(18, 9), memedit.NewPosition(18, 46))),
+		})
 	})
 }
