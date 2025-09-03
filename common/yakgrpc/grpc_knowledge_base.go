@@ -345,12 +345,12 @@ func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req 
 // rpc QueryKnowledgeBaseByAI(QueryKnowledgeBaseByAIRequest) returns(stream QueryKnowledgeBaseByAIResponse);
 func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, stream ypb.Yak_QueryKnowledgeBaseByAIServer) error {
 	db := consts.GetGormProfileDatabase()
-	if req.GetQueryAllCollections() {
+	if !req.GetQueryAllCollections() {
 		kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseID())
 		if err != nil {
 			return err
 		}
-		res, err := kb.SearchKnowledgeEntriesWithEnhance(req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()))
+		res, err := kb.SearchKnowledgeEntriesWithEnhance(req.GetQuery(), knowledgebase.WithEnhancePlan(req.GetEnhancePlan()), knowledgebase.WithEnableAISummary(true))
 		if err != nil {
 			return err
 		}
@@ -361,8 +361,8 @@ func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, 
 				continue
 			}
 			stream.Send(&ypb.QueryKnowledgeBaseByAIResponse{
-				Message:     result.Message,
-				Data:        string(jsonData),
+				Message:     utils.EscapeInvalidUTF8Byte([]byte(result.Message)),
+				Data:        utils.EscapeInvalidUTF8Byte(jsonData),
 				MessageType: result.Type,
 			})
 		}
@@ -380,8 +380,8 @@ func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, 
 			continue
 		}
 		stream.Send(&ypb.QueryKnowledgeBaseByAIResponse{
-			Message:     result.Message,
-			Data:        string(jsonData),
+			Message:     utils.EscapeInvalidUTF8Byte([]byte(result.Message)),
+			Data:        utils.EscapeInvalidUTF8Byte(jsonData),
 			MessageType: result.Type,
 		})
 	}
