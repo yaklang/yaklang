@@ -180,7 +180,7 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 	// 构造RAG查询选项
 	ragOpts := []rag.RAGQueryOption{
 		rag.WithRAGLimit(config.Limit),
-		rag.WithRAGEnhance(rag.EnhancePlanHypotheticalAnswer),
+		rag.WithRAGEnhance(config.EnhancePlan),
 		rag.WithRAGCtx(config.Ctx),
 	}
 
@@ -245,6 +245,13 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 		knowledgeBaseMsgCallback(kbResult)
 	}
 
+	kbNames, err := yakit.GetKnowledgeBaseNameList(db)
+	if err != nil {
+		return nil, utils.Errorf("get knowledge base name list failed: %v", err)
+	}
+
+	ragOpts = append(ragOpts, rag.WithRAGCollectionNames(kbNames...))
+
 	ragOpts = append(ragOpts, rag.WithRAGMsgCallBack(ragMsgCallback))
 
 	// 调用rag.Query进行搜索
@@ -270,13 +277,25 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 				}
 			}
 			docStr := strings.Join(docStrs, "\n\n")
-			prompt := `请根据以下知识库条目，回答问题：
+			prompt := `你是一名严谨的知识助手。请仅基于下方“知识库条目”的内容回答“用户问题”，不要引入外部知识或主观推断；若无法从条目中得到答案，请直接回复“未在知识库中找到相关信息”。
+
+作答要求：
+- 优先给出简明结论，其后用要点说明依据；
+- 多条目信息需去重、合并，避免冲突；如存在冲突，说明取舍依据；
+- 严禁编造、兜圈或输出与问题无关的内容；
+
 知识库条目：
 %s
-问题：
+
+用户问题：
 %s
 	`
 			prompt = fmt.Sprintf(prompt, docStr, query)
+			knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{
+				Message: prompt,
+				Type:    SearchResultTypeMessage,
+				Data:    nil,
+			})
 			answer, err := Simpleliteforge.SimpleExecute(config.Ctx, prompt, []aitool.ToolOption{aitool.WithStringParam("answer")})
 			if err != nil {
 				knowledgeBaseMsgCallback(&SearchKnowledgebaseResult{

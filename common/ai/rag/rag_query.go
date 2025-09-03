@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -24,8 +26,8 @@ const (
 type RAGQueryConfig struct {
 	Ctx                  context.Context
 	Limit                int
-	CollectionName       string
 	CollectionNumLimit   int
+	CollectionNames      []string
 	CollectionScoreLimit float64
 	EnhancePlan          string
 	Filter               func(key string, getDoc func() *Document) bool
@@ -53,7 +55,13 @@ func WithRAGLimit(limit int) RAGQueryOption {
 // WithRAGCollectionName 指定搜索的集合名称
 func WithRAGCollectionName(collectionName string) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
-		config.CollectionName = collectionName
+		config.CollectionNames = append(config.CollectionNames, collectionName)
+	}
+}
+
+func WithRAGCollectionNames(collectionNames ...string) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.CollectionNames = append(config.CollectionNames, collectionNames...)
 	}
 }
 
@@ -241,9 +249,12 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				} else {
 					swg := utils.NewSizedWaitGroup(config.Concurrent)
 					for i, enhanceSentence := range enhanceSentences {
+						i := i
+						enhanceSentence := enhanceSentence
 						swg.Add(1)
 						go func() {
 							defer swg.Done()
+							sendMsg(fmt.Sprintf("开始查询拆分后的子问题: %s", enhanceSentence))
 							res, err := _query(db, enhanceSentence, queryId+"-"+strconv.Itoa(i+1), append(opts, WithRAGEnhance(""))...)
 							if err != nil {
 								sendMsg(fmt.Sprintf("查询失败: %v", err))
@@ -275,19 +286,28 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		var targetCollections []string
 
 		// 确定要搜索的集合
-		if config.CollectionName != "" {
+		if len(config.CollectionNames) == 1 {
 			// 指定了集合名称，只搜索该集合
-			targetCollections = []string{config.CollectionName}
-			sendMsg(fmt.Sprintf("指定搜索集合: %s", config.CollectionName))
+			targetCollections = config.CollectionNames
+			sendMsg(fmt.Sprintf("指定搜索集合: %s", strings.Join(config.CollectionNames, ", ")))
 		} else {
+			if len(config.CollectionNames) == 0 {
+				sendMsg(fmt.Sprintf("未指定集合名称，将搜索最相关的 %d 个集合", config.CollectionNumLimit))
+			} else {
+				sendMsg(fmt.Sprintf("指定了 %d 个集合，开始根据相关度对集合进行排序", len(config.CollectionNames)))
+			}
 			// 自动发现相关集合
-			sendMsg(fmt.Sprintf("未指定集合名称，将搜索最相关的 %d 个集合", config.CollectionNumLimit))
 			collectionResults, err := QueryCollection(db, query)
 			if err != nil {
 				sendMsg(fmt.Sprintf("搜索集合失败: %v", err))
 				return
 			}
 
+			if len(config.CollectionNames) > 0 {
+				collectionResults = lo.Filter(collectionResults, func(result *SearchResult, _ int) bool {
+					return lo.Contains(config.CollectionNames, result.Document.Metadata["collection_name"].(string))
+				})
+			}
 			sendMsg(fmt.Sprintf("共发现 %d 个相关集合", len(collectionResults)))
 
 			// 根据分数阈值和数量限制筛选集合
@@ -298,10 +318,14 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				}
 			}
 
+			sendMsg(fmt.Sprintf("通过分数阈值 %v 过滤后共发现 %d 个相关集合", config.CollectionScoreLimit, len(filteredCollections)))
+
 			// 限制集合数量
 			if len(filteredCollections) > config.CollectionNumLimit {
 				filteredCollections = filteredCollections[:config.CollectionNumLimit]
 			}
+
+			sendMsg(fmt.Sprintf("通过数量限制 %v 过滤后共发现 %d 个相关集合", config.CollectionNumLimit, len(filteredCollections)))
 
 			// 提取集合名称
 			for _, result := range filteredCollections {
