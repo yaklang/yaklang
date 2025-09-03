@@ -3,6 +3,7 @@ package aispec
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http/httputil"
@@ -25,12 +26,18 @@ func mergeReasonIntoOutputStream(reason io.Reader, out io.Reader) io.Reader {
 	pr, pw := utils.NewBufPipe(nil)
 	go func() {
 		defer pw.Close()
-		var firstByte = make([]byte, 1)
-		n, _ := io.ReadFull(reason, firstByte)
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic in mergeReasonIntoOutputStream: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			}
+		}()
+		reasonBuf := bufio.NewReader(reason)
+		runeResult, n, _ := reasonBuf.ReadRune()
 		if n > 0 {
 			pw.WriteString("<think>")
-			pw.Write(firstByte)
-			io.Copy(pw, reason)
+			pw.WriteString(string([]rune{runeResult}))
+			reasonBuf.WriteTo(pw)
 			pw.WriteString("</think>\n")
 		}
 		io.Copy(pw, out)
@@ -44,15 +51,11 @@ func appendStreamHandlerPoCOption(opts []poc.PocConfigOption) (io.Reader, []poc.
 	return pr, opts
 }
 
-// processStreamResponse 处理流式响应
-func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer) {
+// processAIResponse 处理流式响应
+func processAIResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer) {
 	defer func() {
-		if w, ok := outWriter.(io.Closer); ok {
-			w.Close()
-		}
-		if w, ok := reasonWriter.(io.Closer); ok {
-			w.Close()
-		}
+		utils.CallGeneralClose(reasonWriter)
+		utils.CallGeneralClose(outWriter)
 	}()
 
 	var chunked bool
@@ -88,6 +91,8 @@ func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, 
 	var chunkedErrorMirror bytes.Buffer
 	if chunked {
 		ioReader = httputil.NewChunkedReader(io.MultiReader(bytes.NewBufferString(string(firstbuf)), ioReader))
+	} else {
+		ioReader = io.MultiReader(bytes.NewBufferString(string(firstbuf)), ioReader)
 	}
 
 	lineReader := bufio.NewReader(ioReader)
@@ -96,6 +101,8 @@ func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, 
 	onceStartReason := sync.Once{}
 	onceEndReason := sync.Once{}
 
+	checkOnceNonStream := utils.NewOnce()
+	skipStream := utils.NewAtomicBool()
 	for {
 		line, err := utils.BufioReadLine(lineReader)
 		if err != nil && string(line) == "" {
@@ -108,6 +115,60 @@ func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, 
 		if string(line) == "" {
 			continue
 		}
+
+		checkOnceNonStream.Do(func() {
+			if strings.HasPrefix(string(line), "{") || strings.HasPrefix(string(line), "[") {
+				skipStream.SetTo(true)
+			}
+		})
+		if skipStream.IsSet() {
+			// withdraw stream handler, switch to non-stream handler
+			multireader := io.MultiReader(bytes.NewBufferString(string(line)+"\n"), lineReader)
+			handleResponseErr := jsonextractor.ExtractStructuredJSONFromStream(
+				multireader, jsonextractor.WithObjectKeyValue(func(key string, data any) {
+					if key != "message" {
+						return
+					}
+					result := utils.InterfaceToGeneralMap(data)
+					reasonContent := utils.InterfaceToString(utils.MapGetString(result, "reasoning_content"))
+					content := utils.InterfaceToString(utils.MapGetString(result, "content"))
+					reasonWriter.Write([]byte(reasonContent))
+					outWriter.Write([]byte(content))
+					if toolcallRaw, ok := result["tool_calls"]; ok {
+						toolcallList := utils.InterfaceToSliceInterface(toolcallRaw)
+						for _, toolcall := range toolcallList {
+							toolcallMap := utils.InterfaceToGeneralMap(toolcall)
+							funcMap := utils.MapGetMapRaw(toolcallMap, "function")
+							name := utils.MapGetString(funcMap, "name")
+							if name == "" {
+								continue
+							}
+							funcMapRaw, err := json.Marshal(funcMap)
+							if err != nil {
+								continue
+							}
+							callData, err := utils.RenderTemplate(`
+<|TOOL_CALL_{{ .Nonce }}|>
+{{ .Data }}
+<|TOOL_CALL_END{{ .Nonce }}|>
+`, map[string]any{
+								"Nonce": utils.RandStringBytes(4),
+								"Data":  string(funcMapRaw),
+							})
+							if err != nil {
+								continue
+							}
+							outWriter.Write([]byte(callData))
+						}
+					}
+				}),
+			)
+			if handleResponseErr != nil {
+				log.Errorf("error in non-stream json extraction: %v", handleResponseErr)
+			}
+			return
+		}
+
 		lineStr := string(line)
 		jsonIdentifiers := jsonextractor.ExtractStandardJSON(lineStr)
 		for _, j := range jsonIdentifiers {
@@ -166,72 +227,6 @@ func processStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, 
 	}
 }
 
-// processNonStreamResponse 处理非流式响应
-func processNonStreamResponse(r []byte, closer io.ReadCloser, outWriter io.Writer, reasonWriter io.Writer) {
-	defer func() {
-		if w, ok := outWriter.(io.Closer); ok {
-			w.Close()
-		}
-		if w, ok := reasonWriter.(io.Closer); ok {
-			w.Close()
-		}
-	}()
-
-	if lowhttp.GetStatusCodeFromResponse(r) > 299 {
-		log.Warnf("response status code: %v", lowhttp.GetStatusCodeFromResponse(r))
-	}
-
-	// 读取完整响应体
-	bodyBytes, err := io.ReadAll(closer)
-	if err != nil {
-		log.Errorf("failed to read response body: %v", err)
-		return
-	}
-
-	if len(bodyBytes) == 0 {
-		log.Debugf("no body read")
-		return
-	}
-
-	// 解析 JSON 响应
-	jsonIdentifiers := jsonextractor.ExtractStandardJSON(string(bodyBytes))
-	for _, j := range jsonIdentifiers {
-		// 处理 reasoning content
-		reasonContent := jsonpath.Find(j, `$..choices[*].message.reasoning_content`)
-		if reasonContent != nil {
-			reasonStrs := lo.Map(utils.InterfaceToSliceInterface(reasonContent), func(reason any, idx int) string {
-				if utils.IsNil(reason) {
-					return ""
-				}
-				return fmt.Sprint(reason)
-			})
-			reasonText := strings.Join(reasonStrs, "")
-			if reasonText != "" {
-				reasonWriter.Write([]byte(reasonText))
-			}
-		}
-
-		// 处理 content
-		results := jsonpath.Find(j, `$..choices[*].message.content`)
-		wordList := utils.InterfaceToSliceInterface(results)
-		if len(wordList) <= 0 {
-			log.Debugf("cannot identifier content, try to fetch arguments for: %v", j)
-			wordList = utils.InterfaceToSliceInterface(jsonpath.Find(j, `$..choices[*].message.tool_calls[*].function.arguments`))
-		}
-		for _, raw := range wordList {
-			data := codec.AnyToBytes(raw)
-			if len(data) > 0 {
-				outWriter.Write(data)
-			}
-		}
-
-		// 处理错误
-		if errorMsg := strings.TrimRight(codec.AnyToString(jsonpath.Find(j, `$..error`)), "[]\"'"); errorMsg != "" {
-			log.Errorf("error for non-stream fetching: %v", j)
-		}
-	}
-}
-
 func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption) (io.Reader, io.Reader, []poc.PocConfigOption, func()) {
 	outReader, outWriter := utils.NewBufPipe(nil)
 	reasonReader, reasonWriter := utils.NewBufPipe(nil)
@@ -242,11 +237,12 @@ func appendStreamHandlerPoCOptionEx(isStream bool, opts []poc.PocConfigOption) (
 	}
 
 	opts = append(opts, poc.WithBodyStreamReaderHandler(func(r []byte, closer io.ReadCloser) {
-		if isStream {
-			processStreamResponse(r, closer, outWriter, reasonWriter)
-		} else {
-			processNonStreamResponse(r, closer, outWriter, reasonWriter)
-		}
+		processAIResponse(r, closer, outWriter, reasonWriter)
+
+		//if isStream {
+		//} else {
+		//	processNonStreamResponse(r, closer, outWriter, reasonWriter)
+		//}
 	}))
 
 	return outReader, reasonReader, opts, cancelFunc
