@@ -31,7 +31,7 @@ type YakCompiler struct {
 	// 语法错误的问题处理
 
 	// 新增语句绑定起止位置
-	currentStartPosition, currentEndPosition memedit.PositionIf
+	currentStartPosition, currentEndPosition *memedit.Position
 
 	// 格式化
 	formatted         *bytes.Buffer
@@ -137,14 +137,14 @@ func NewYakCompilerWithSymbolTable(rootSymbol *yakvm.SymbolTable, options ...Com
 	}
 	compiler.lexerErrorListener = antlr4util.NewErrorListener(
 		antlr4util.SimpleSyntaxErrorHandler(
-			func(msg string, start, end memedit.PositionIf) {
+			func(msg string, start, end *memedit.Position) {
 				compiler.lexerErrors.Push(antlr4util.NewSourceCodeError(msg, start, end))
 			},
 		),
 	)
 	compiler.parserErrorListener = antlr4util.NewErrorListener(
 		antlr4util.SimpleSyntaxErrorHandler(
-			func(msg string, start, end memedit.PositionIf) {
+			func(msg string, start, end *memedit.Position) {
 				compiler.parserErrors.Push(antlr4util.NewSourceCodeError(msg, start, end))
 			},
 		),

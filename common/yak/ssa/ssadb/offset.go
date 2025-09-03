@@ -20,7 +20,7 @@ type IrOffset struct {
 	ValueID int64 `json:"value_id" gorm:"index"` // this id will set
 }
 
-func CreateOffset(rng memedit.RangeIf, projectName string) *IrOffset {
+func CreateOffset(rng *memedit.Range, projectName string) *IrOffset {
 	ret := &IrOffset{}
 	ret.FileHash = rng.GetEditor().GetIrSourceHash()
 	ret.ProgramName = projectName
@@ -43,7 +43,7 @@ func GetOffsetByVariable(name string, valueID int64) []*IrOffset {
 	return ir
 }
 
-func GetValueBeforeEndOffset(DB *gorm.DB, rng memedit.RangeIf) (int64, error) {
+func GetValueBeforeEndOffset(DB *gorm.DB, rng *memedit.Range) (int64, error) {
 	// get the last ir code before the end offset, and the source code hash must be the same
 	hash := rng.GetEditor().GetIrSourceHash()
 	db := DB.Model(&IrOffset{})
@@ -55,7 +55,7 @@ func GetValueBeforeEndOffset(DB *gorm.DB, rng memedit.RangeIf) (int64, error) {
 	return int64(ir.ValueID), nil
 }
 
-func (r *IrOffset) GetStartAndEndPositions() (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
+func (r *IrOffset) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
 	editor, err := GetIrSourceFromHash(r.FileHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)

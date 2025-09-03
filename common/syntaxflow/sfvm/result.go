@@ -183,7 +183,7 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 			idx = fmt.Sprintf("t%v", raw.GetId())
 		}
 		buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
-		rangeIns, ok := v.(interface{ GetRange() memedit.RangeIf })
+		rangeIns, ok := v.(interface{ GetRange() *memedit.Range })
 		if !ok {
 			continue
 		}

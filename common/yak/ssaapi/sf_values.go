@@ -240,7 +240,7 @@ func (vs Values) FileFilter(path string, match string, rule map[string]string, r
 	return sfvm.NewValues(res), nil
 }
 
-func (v Values) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+func (v Values) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	var result sfvm.ValueOperator
 	v.Recursive(func(operator sfvm.ValueOperator) error {
 		result = operator.NewConst(i, rng...)

@@ -375,7 +375,7 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 	return ssa.AnyTypeKind
 }
 
-func (v *Value) GetRange() memedit.RangeIf {
+func (v *Value) GetRange() *memedit.Range {
 	if v.IsNil() {
 		return nil
 	}

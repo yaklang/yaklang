@@ -14,8 +14,8 @@ import (
 type (
 	SourceCodeErrors []*SourceCodeError
 	SourceCodeError  struct {
-		StartPos memedit.PositionIf
-		EndPos   memedit.PositionIf
+		StartPos *memedit.Position
+		EndPos   *memedit.Position
 		Message  string
 	}
 )
@@ -48,7 +48,7 @@ func (e *SourceCodeError) Error() string {
 	return fmt.Sprintf("line %d:%d-%d:%d %s", e.StartPos.GetLine(), e.StartPos.GetColumn(), e.EndPos.GetLine(), e.EndPos.GetColumn(), e.Message)
 }
 
-func NewSourceCodeError(msg string, start, end memedit.PositionIf) *SourceCodeError {
+func NewSourceCodeError(msg string, start, end *memedit.Position) *SourceCodeError {
 	return &SourceCodeError{
 		StartPos: start,
 		EndPos:   end,
@@ -94,16 +94,16 @@ func NewErrorListener(handlers ...handlerFunc) *ErrorListener {
 	}
 }
 
-func SimpleSyntaxErrorHandler(simpleHandler func(msg string, start, end memedit.PositionIf)) handlerFunc {
+func SimpleSyntaxErrorHandler(simpleHandler func(msg string, start, end *memedit.Position)) handlerFunc {
 	return func(el *ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
 		if el.handler != nil {
-			token, ok := offendingSymbol.(*antlr.CommonToken)
-			if ok {
-				simpleHandler(msg, token, token)
-			} else {
-				position := memedit.NewPosition(line, column)
-				simpleHandler(msg, position, position)
-			}
+			// token, ok := offendingSymbol.(*antlr.CommonToken)
+			// if ok {
+			// 	simpleHandler(msg, token, token)
+			// } else {
+			position := memedit.NewPosition(line, column)
+			simpleHandler(msg, position, position)
+			// }
 		}
 	}
 }

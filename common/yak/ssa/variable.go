@@ -8,8 +8,8 @@ import (
 
 type Variable struct {
 	*ssautil.Versioned[Value]
-	DefRange memedit.RangeIf
-	UseRange map[memedit.RangeIf]struct{}
+	DefRange *memedit.Range
+	UseRange map[*memedit.Range]struct{}
 
 	// for object.member variable  access
 	object      Value
@@ -23,7 +23,7 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 	ret := &Variable{
 		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
 		DefRange:  nil,
-		UseRange:  map[memedit.RangeIf]struct{}{},
+		UseRange:  map[*memedit.Range]struct{}{},
 	}
 	return ret
 }
@@ -88,7 +88,7 @@ func (b *Variable) GetMemberCall() (Value, Value) {
 	return b.object, b.key
 }
 
-func (v *Variable) SetDefRange(r memedit.RangeIf) {
+func (v *Variable) SetDefRange(r *memedit.Range) {
 	if r == nil {
 		log.Error("SetDefRange: range is nil use fallback")
 		return
@@ -97,8 +97,8 @@ func (v *Variable) SetDefRange(r memedit.RangeIf) {
 	v.verboseName = r.GetText()
 }
 
-func (v *Variable) AddRange(r memedit.RangeIf, force bool) {
-	if r == nil {
+func (v *Variable) AddRange(r *memedit.Range, force bool) {
+	if utils.IsNil(r) {
 		log.Error("AddRange: range is nil")
 	}
 	//if force || len(*p.SourceCode) == len(v.GetName()) {

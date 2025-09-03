@@ -27,6 +27,6 @@ type TemplateGeneratedInfo interface {
 	GetContent() string
 	GetClassName() string
 	GetPkgName() string
-	GetTemplateServerName() string        // run template server's method name
-	GetRangeMap() map[int]memedit.RangeIf // generated code offset -> template language range
+	GetTemplateServerName() string       // run template server's method name
+	GetRangeMap() map[int]*memedit.Range // generated code offset -> template language range
 }

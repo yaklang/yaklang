@@ -111,7 +111,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 			frame = nil
 		}
 	}()
-	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end memedit.PositionIf) {
+	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end *memedit.Position) {
 		s.compileErrors = append(s.compileErrors, antlr4util.NewSourceCodeError(msg, start, end))
 	})
 	errLis := antlr4util.NewErrorListener(func(self *antlr4util.ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {

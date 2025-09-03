@@ -417,11 +417,11 @@ func (lz *LazyInstruction) SetId(id int64) {
 	lz.Instruction.SetId(id)
 }
 
-func (lz *LazyInstruction) GetRange() memedit.RangeIf {
+func (lz *LazyInstruction) GetRange() *memedit.Range {
 	lz.check()
 	return lz.getRange(lz.Self())
 }
-func (lz *LazyInstruction) getRange(inst Instruction) memedit.RangeIf {
+func (lz *LazyInstruction) getRange(inst Instruction) *memedit.Range {
 	if utils.IsNil(inst) {
 		return nil
 	}
@@ -431,7 +431,7 @@ func (lz *LazyInstruction) getRange(inst Instruction) memedit.RangeIf {
 			switch ret := inst.(type) {
 			case *BasicBlock:
 				// check if block has no instruction
-				var startRng memedit.RangeIf
+				var startRng *memedit.Range
 				if len(ret.Insts) > 0 {
 					for _, startId := range ret.Insts {
 						startInst, ok := lz.prog.GetInstructionById(startId)
@@ -456,7 +456,7 @@ func (lz *LazyInstruction) getRange(inst Instruction) memedit.RangeIf {
 					}
 				}
 
-				var endRng memedit.RangeIf
+				var endRng *memedit.Range
 				if len(ret.Insts) > 0 {
 					// Iterate from the last instruction to find the end range
 					for i := len(ret.Insts) - 1; i >= 0; i-- {
@@ -510,7 +510,7 @@ func (lz *LazyInstruction) getRange(inst Instruction) memedit.RangeIf {
 	return inst.GetRange()
 }
 
-func (lz *LazyInstruction) SetRange(r memedit.RangeIf) {
+func (lz *LazyInstruction) SetRange(r *memedit.Range) {
 	lz.check()
 	if utils.IsNil(lz.Instruction) {
 		return

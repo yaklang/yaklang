@@ -95,7 +95,7 @@ func SearchNoteContent(db *gorm.DB, keyword string, paging *ypb.Paging) (*bizhel
 		editor := memedit.NewMemEditor(content)
 		lineMap := make(map[int]struct{})
 
-		editor.FindStringRange(keyword, func(ri memedit.RangeIf) error {
+		editor.FindStringRange(keyword, func(ri *memedit.Range) error {
 			start := ri.GetStart()
 			startLine := start.GetLine()
 			line, err := editor.GetLine(startLine)

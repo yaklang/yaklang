@@ -12,7 +12,7 @@ type VisitorCreator interface {
 
 type Visitor struct {
 	Instructions Instructions
-	CurrentRange memedit.RangeIf
+	CurrentRange *memedit.Range
 	Editor       *memedit.MemEditor
 }
 

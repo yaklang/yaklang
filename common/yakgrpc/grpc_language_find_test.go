@@ -11,14 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func GrpcRangeToRangeIf(r *ypb.Range) memedit.RangeIf {
+func GrpcRangeToRangeIf(r *ypb.Range) *memedit.Range {
 	return memedit.NewRange(
 		memedit.NewPosition(int(r.StartLine), int(r.StartColumn)),
 		memedit.NewPosition(int(r.EndLine), int(r.EndColumn)),
 	)
 }
 
-func newRangeFromText(text string) memedit.RangeIf {
+func newRangeFromText(text string) *memedit.Range {
 	splited := strings.Split(text, " ")
 	if len(splited) != 2 {
 		return nil
@@ -60,7 +60,7 @@ func getFindDefinition(local ypb.YakClient, pluginType string, t *testing.T, cod
 	return getFind(local, "definition", pluginType, t, code, Range, id)
 }
 
-func RangeIfToGrpcRangeRaw(rng memedit.RangeIf) *ypb.Range {
+func RangeIfToGrpcRangeRaw(rng *memedit.Range) *ypb.Range {
 	start, end := rng.GetStart(), rng.GetEnd()
 	return &ypb.Range{
 		StartLine:   int64(start.GetLine()),
@@ -70,7 +70,7 @@ func RangeIfToGrpcRangeRaw(rng memedit.RangeIf) *ypb.Range {
 	}
 }
 
-func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange memedit.RangeIf, wantRanges ...memedit.RangeIf) {
+func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange *memedit.Range, wantRanges ...*memedit.Range) {
 	t.Helper()
 
 	rsp := getFindDefinition(local, pluginType, t, sourceCode, RangeIfToGrpcRangeRaw(selectRange), "")
@@ -82,7 +82,7 @@ func checkDefinition(t *testing.T, local ypb.YakClient, sourceCode, pluginType s
 	}
 }
 
-func checkReferences(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange memedit.RangeIf, wantRanges []memedit.RangeIf) {
+func checkReferences(t *testing.T, local ypb.YakClient, sourceCode, pluginType string, selectRange *memedit.Range, wantRanges []*memedit.Range) {
 	t.Helper()
 
 	rsp := getFindReferences(local, pluginType, t, sourceCode, RangeIfToGrpcRangeRaw(selectRange), "")
@@ -149,7 +149,7 @@ a`
 			code,
 			"yak",
 			newRangeFromText("2:1 2:2"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("1:5 1:6"),
 				newRangeFromText("2:1 2:2"),
 			},
@@ -165,7 +165,7 @@ println(m.a)`
 			code,
 			"yak",
 			newRangeFromText("3:9 3:12"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("2:1 2:4"),
 				newRangeFromText("3:9 3:12"),
 			},
@@ -182,7 +182,7 @@ a = Error()`
 			code,
 			"yak",
 			newRangeFromText("4:5 4:10"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("1:6 1:11"),
 				newRangeFromText("4:5 4:10"),
 			},
@@ -200,7 +200,7 @@ return err
 			code,
 			"yak",
 			newRangeFromText("2:1 2:4"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("2:1 2:4"),
 				newRangeFromText("3:8 3:11"),
 			},
@@ -216,7 +216,7 @@ ssa.Parse("")`
 			code,
 			"yak",
 			newRangeFromText("1:1 1:10"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("1:1 1:10"),
 				newRangeFromText("2:1 2:10"),
 			},
@@ -232,7 +232,7 @@ println(2)`
 			code,
 			"yak",
 			newRangeFromText("1:1 1:8"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("1:1 1:8"),
 				newRangeFromText("2:1 2:8"),
 			},
@@ -254,7 +254,7 @@ println(4)
 			code,
 			"yak",
 			newRangeFromText("1:1 1:8"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("1:1 1:8"),
 				newRangeFromText("2:1 2:8"),
 				newRangeFromText("4:1 4:8"),
@@ -317,7 +317,7 @@ println(a) // 3
 			code,
 			"yak",
 			print1,
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				a1, print1, print3,
 			},
 		)
@@ -328,7 +328,7 @@ println(a) // 3
 			code,
 			"yak",
 			print2,
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				a2, print2, print3,
 			},
 		)
@@ -339,7 +339,7 @@ println(a) // 3
 			code,
 			"yak",
 			print3,
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				a1, print1, a2, print2, print3,
 			},
 		)
@@ -378,7 +378,7 @@ println(a)
 	t.Run("use  1", func(t *testing.T) {
 		checkReferences(t, local, code, "yak",
 			a1,
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				a1, println,
 			},
 		)
@@ -387,7 +387,7 @@ println(a)
 	t.Run("use  2", func(t *testing.T) {
 		checkReferences(t, local, code, "yak",
 			a2,
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				a2, println,
 			},
 		)
@@ -427,7 +427,7 @@ return a
 			code,
 			"yak",
 			newRangeFromText("5:8 5:9"),
-			[]memedit.RangeIf{
+			[]*memedit.Range{
 				newRangeFromText("1:1 1:2"),
 				newRangeFromText("3:5 3:6"),
 				newRangeFromText("4:5 4:6"),
@@ -467,7 +467,7 @@ a()
 	})
 
 	t.Run("ref", func(t *testing.T) {
-		wants := []memedit.RangeIf{
+		wants := []*memedit.Range{
 			newRangeFromText("1:1 1:2"),
 			newRangeFromText("3:1 3:2"),
 		}
@@ -516,7 +516,7 @@ println(a)
 	})
 
 	t.Run("ref", func(t *testing.T) {
-		wants := []memedit.RangeIf{
+		wants := []*memedit.Range{
 			newRangeFromText("1:1 1:2"),
 			newRangeFromText("3:1 3:2"),
 			newRangeFromText("3:12 3:13"),
@@ -525,7 +525,7 @@ println(a)
 		for i, want := range wants {
 			wants := wants
 			if i == 1 { // append return a can only find itself
-				wants = []memedit.RangeIf{
+				wants = []*memedit.Range{
 					want,
 				}
 			}

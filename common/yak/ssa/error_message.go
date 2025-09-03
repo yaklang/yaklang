@@ -6,7 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-func BindingNotFound(v string, r memedit.RangeIf) string {
+func BindingNotFound(v string, r *memedit.Range) string {
 	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the calling location [%s--%s].", v, r.GetStart(), r.GetEnd())
 }
 
@@ -14,7 +14,7 @@ func BindingNotFoundInCall(v string) string {
 	return fmt.Sprintf("The closure function expects to capture variable [%s], but it was not found at the call", v)
 }
 
-func ValueNotMember(op Opcode, name, key string, r memedit.RangeIf) string {
+func ValueNotMember(op Opcode, name, key string, r *memedit.Range) string {
 	return fmt.Sprintf(
 		"The %s %s unable to access the member with name or index {%s} at the calling location [%s--%s].",
 		SSAOpcode2Name[op], name, key, r.GetStart(), r.GetEnd(),
