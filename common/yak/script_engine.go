@@ -15,6 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils/pandocutils"
+	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 
 	"github.com/pkg/errors"
 	"github.com/tevino/abool"
@@ -378,6 +379,7 @@ func initYaklangLib() {
 	yaklang.Import("toolbox", thirdparty_bin.Exports)
 
 	yaklang.Import("rag", RagExports)
+	yaklang.Import("diff", yakdiff.Exports)
 }
 
 type ScriptEngine struct {

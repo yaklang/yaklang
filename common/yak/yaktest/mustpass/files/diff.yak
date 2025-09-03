@@ -1,0 +1,132 @@
+// 测试 diff.Diff 基础功能
+// 文本字符串差异测试
+
+// 基础字符串比较测试
+result = diff.Diff("ABC", "ACC")~
+assert result != "", "diff should return non-empty string"
+assert result.Contains("main/main.txt"), "diff should contain file path"
+assert result.Contains("-ABC"), "diff should show removed ABC"
+assert result.Contains("+ACC"), "diff should show added ACC"
+
+// 多行文本比较测试
+oldCode = `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello World")
+}`
+
+newCode = `package main
+
+import (
+    "fmt" 
+    "os"
+)
+
+func main() {
+    fmt.Println("Hello Yaklang")
+    os.Exit(0)
+}`
+
+result = diff.Diff(oldCode, newCode)~
+assert result != "", "multiline diff should return result"
+assert result.Contains("package main"), "diff should contain context"
+assert result.Contains("-    fmt.Println(\"Hello World\")"), "diff should show old line"
+assert result.Contains("+    fmt.Println(\"Hello Yaklang\")"), "diff should show new line"
+assert result.Contains("+    os.Exit(0)"), "diff should show added exit"
+
+// 空字符串测试
+result = diff.Diff("", "Hello")~
+assert result != "", "empty to content diff should work"
+assert result.Contains("+Hello"), "should show added content"
+
+result = diff.Diff("Hello", "")~
+assert result != "", "content to empty diff should work"
+assert result.Contains("-Hello"), "should show removed content"
+
+// 相同内容测试
+result = diff.Diff("same", "same")~
+// 相同内容可能返回表示文件被删除重建的diff，这是git的行为
+
+// JSON配置文件比较测试
+config1 = `{
+    "server": {
+        "port": 8080,
+        "host": "localhost"
+    },
+    "debug": false
+}`
+
+config2 = `{
+    "server": {
+        "port": 9090,
+        "host": "0.0.0.0"
+    },
+    "debug": true,
+    "timeout": 30
+}`
+
+result = diff.Diff(config1, config2)~
+assert result != "", "config diff should work"
+assert result.Contains("-        \"port\": 8080"), "should show port change"
+assert result.Contains("+        \"port\": 9090"), "should show new port"
+assert result.Contains("-        \"host\": \"localhost\""), "should show host change"
+assert result.Contains("+        \"host\": \"0.0.0.0\""), "should show new host"
+
+// 二进制数据测试
+binary1 = [0x01, 0x02, 0x03]
+binary2 = [0x01, 0x04, 0x03]
+result = diff.Diff(binary1, binary2)~
+assert result != "", "binary diff should work"
+
+// 数据类型转换测试
+slice1 = ["apple", "banana"]
+slice2 = ["apple", "orange", "banana"]
+result = diff.Diff(slice1, slice2)~
+assert result != "", "slice diff should work"
+
+// 简单的重复测试确保稳定性
+for i in 10 {
+    result := diff.Diff(sprintf("text%d", i), sprintf("text%d_modified", i))~
+    assert result != "", "repeated diff calls should work"
+    assert result.Contains("main/main.txt"), "each diff should contain file path"
+}
+
+// 错误处理测试
+result = diff.Diff(nil, "test")~
+assert result != "", "nil input should be handled"
+
+// 大文本测试
+bigText1 = ""
+bigText2 = ""
+for i in 100 {
+    bigText1 += sprintf("line %d content\n", i)
+    if i == 50 {
+        bigText2 += sprintf("line %d modified content\n", i)
+    } else {
+        bigText2 += sprintf("line %d content\n", i)
+    }
+}
+
+result = diff.Diff(bigText1, bigText2)~
+assert result != "", "big text diff should work"
+assert result.Contains("line 50"), "should show line 50 changes"
+assert result.Contains("-line 50 content"), "should show old line 50"
+assert result.Contains("+line 50 modified content"), "should show new line 50"
+
+// Unicode和特殊字符测试
+text1 = "Hello 世界"
+text2 = "Hello 世界！"
+result = diff.Diff(text1, text2)~
+assert result != "", "unicode diff should work"
+assert result.Contains("-Hello 世界"), "should show old unicode text"
+assert result.Contains("+Hello 世界！"), "should show new unicode text"
+
+// 空白字符测试
+whitespace1 = "line1\nline2 \nline3"
+whitespace2 = "line1\n line2\nline3"
+result = diff.Diff(whitespace1, whitespace2)~
+assert result != "", "whitespace diff should work"
+
+println("All diff.Diff tests passed!")
