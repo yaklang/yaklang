@@ -103,7 +103,9 @@ func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
 		if f != nil {
 			if err := f(); err != nil {
 				log.Errorf("ProfileAdd %s error: %v", name, err)
-				syncAtomic.AddUint64(&p.ErrorCount, 1)
+				if p != nil {
+					syncAtomic.AddUint64(&p.ErrorCount, 1)
+				}
 				return err
 			}
 		}
