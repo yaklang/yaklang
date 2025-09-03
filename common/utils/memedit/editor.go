@@ -240,16 +240,16 @@ func (ve *MemEditor) GetCurrentLine() (string, error) {
 	return "", errors.New("current position is out of the source code range")
 }
 
-func (ve *MemEditor) GetPositionByOffset(offset int) PositionIf {
+func (ve *MemEditor) GetPositionByOffset(offset int) *Position {
 	result, _ := ve.GetPositionByOffsetWithError(offset)
 	return result
 }
 
-func (ve *MemEditor) GetPositionByLine(line, column int) PositionIf {
+func (ve *MemEditor) GetPositionByLine(line, column int) *Position {
 	return NewPosition(line, column)
 }
 
-func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error) {
+func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (*Position, error) {
 	if offset < 0 {
 		// 偏移量为负，返回最初位置
 		return NewPosition(1, 1), errors.New("offset is negative")
@@ -290,24 +290,24 @@ func (ve *MemEditor) GetPositionByOffsetWithError(offset int) (PositionIf, error
 	return NewPosition(1, 1), errors.New("position not found")
 }
 
-func (ve *MemEditor) GetRangeOffset(start, end int) RangeIf {
+func (ve *MemEditor) GetRangeOffset(start, end int) *Range {
 	ret := NewRange(ve.GetPositionByOffset(start), ve.GetPositionByOffset(end))
 	ret.SetEditor(ve)
 	return ret
 }
 
-func (ve *MemEditor) GetRangeByPosition(start, end PositionIf) RangeIf {
+func (ve *MemEditor) GetRangeByPosition(start, end *Position) *Range {
 	ret := NewRange(start, end)
 	ret.SetEditor(ve)
 	return ret
 }
 
-func (ve *MemEditor) GetFullRange() RangeIf {
+func (ve *MemEditor) GetFullRange() *Range {
 	return ve.GetRangeOffset(0, ve.safeSourceCode.Len())
 }
 
 // GetTextFromRangeWithError 根据Range获取文本，优先使用Offset，其次使用Line和Column
-func (ve *MemEditor) GetTextFromRangeWithError(r RangeIf) (string, error) {
+func (ve *MemEditor) GetTextFromRangeWithError(r *Range) (string, error) {
 	start := r.GetStart()
 	end := r.GetEnd()
 
@@ -330,7 +330,7 @@ func (ve *MemEditor) GetTextFromRangeWithError(r RangeIf) (string, error) {
 }
 
 // UpdateTextByRange 根据Range更新文本，优先使用Offset，其次使用Line和Column
-func (ve *MemEditor) UpdateTextByRange(r RangeIf, newText string) error {
+func (ve *MemEditor) UpdateTextByRange(r *Range, newText string) error {
 	start := r.GetStart()
 	end := r.GetEnd()
 
@@ -418,11 +418,11 @@ func (ve *MemEditor) GetTextFromOffset(offset1, offset2 int) string {
 	return ve.safeSourceCode.Slice2(start, end)
 }
 
-func (ve *MemEditor) GetOffsetByPosition(p PositionIf) int {
+func (ve *MemEditor) GetOffsetByPosition(p *Position) int {
 	return ve.GetOffsetByPositionRaw(p.GetLine(), p.GetColumn())
 }
 
-func (ve *MemEditor) GetTextFromPosition(p1, p2 PositionIf) string {
+func (ve *MemEditor) GetTextFromPosition(p1, p2 *Position) string {
 	return ve.GetTextFromOffset(ve.GetOffsetByPositionRaw(p1.GetLine(), p1.GetColumn()), ve.GetOffsetByPositionRaw(p2.GetLine(), p2.GetColumn()))
 }
 
@@ -430,7 +430,7 @@ func (ve *MemEditor) GetTextFromPositionInt(startLine, startCol, endLine, endCol
 	return ve.GetTextFromOffset(ve.GetOffsetByPositionRaw(startLine, startCol), ve.GetOffsetByPositionRaw(endLine, endCol))
 }
 
-func (ve *MemEditor) GetTextFromRange(i RangeIf) string {
+func (ve *MemEditor) GetTextFromRange(i *Range) string {
 	return ve.GetTextFromPosition(i.GetEnd(), i.GetStart())
 }
 
@@ -453,7 +453,7 @@ func (ve *MemEditor) ExpandWordTextOffset(startOffset, endOffset int) (int, int)
 	return startWordOffset, endWordOffset
 }
 
-func (ve *MemEditor) ExpandWordTextRange(i RangeIf) RangeIf {
+func (ve *MemEditor) ExpandWordTextRange(i *Range) *Range {
 	startPos := i.GetStart()
 	endPos := i.GetEnd()
 
@@ -471,7 +471,7 @@ func (ve *MemEditor) GetWordTextFromOffset(start, end int) string {
 	return ve.GetTextFromOffset(start, end)
 }
 
-func (ve *MemEditor) GetWordTextFromRange(i RangeIf) string {
+func (ve *MemEditor) GetWordTextFromRange(i *Range) string {
 	i = ve.ExpandWordTextRange(i)
 
 	return ve.GetTextFromRange(i)
@@ -492,7 +492,7 @@ func (ve *MemEditor) IsValidPosition(line, col int) bool {
 	return col <= ve.lineLensMap[adjustedLine]
 }
 
-func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) error) error {
+func (ve *MemEditor) FindStringRange(feature string, callback func(*Range) error) error {
 	startIndex := 0
 	for {
 		featureRunes := []rune(feature)
@@ -515,9 +515,9 @@ func (ve *MemEditor) FindStringRange(feature string, callback func(RangeIf) erro
 	return nil
 }
 
-func (ve *MemEditor) FindStringRangeIndexFirst(startIndex int, feature string, callback func(RangeIf)) (end int, ok bool) {
-	var r RangeIf
-	ve.FindStringRange(feature, func(ri RangeIf) error {
+func (ve *MemEditor) FindStringRangeIndexFirst(startIndex int, feature string, callback func(*Range)) (end int, ok bool) {
+	var r *Range
+	ve.FindStringRange(feature, func(ri *Range) error {
 		r = ri
 		ok = true
 		callback(ri)
@@ -529,7 +529,7 @@ func (ve *MemEditor) FindStringRangeIndexFirst(startIndex int, feature string, c
 	return r.GetEndOffset(), true
 }
 
-func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) error) error {
+func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(*Range) error) error {
 	pattern, err := regexp2.Compile(patternStr, regexp2.None)
 	if err != nil {
 		return err // 处理正则表达式编译错误
@@ -561,7 +561,7 @@ func (ve *MemEditor) FindRegexpRange(patternStr string, callback func(RangeIf) e
 	return nil
 }
 
-func (ve *MemEditor) GetMinAndMaxOffset(pos ...PositionIf) (int, int) {
+func (ve *MemEditor) GetMinAndMaxOffset(pos ...*Position) (int, int) {
 	minOffset := ve.safeSourceCode.Len()
 	maxOffset := 0
 	for _, p := range pos {
@@ -572,7 +572,7 @@ func (ve *MemEditor) GetMinAndMaxOffset(pos ...PositionIf) (int, int) {
 	return minOffset, maxOffset
 }
 
-func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int, prefix ...func(i int) string) (string, error) {
+func (ve *MemEditor) GetContextAroundRange(startPos, endPos *Position, n int, prefix ...func(i int) string) (string, error) {
 	var prefixFunc func(i int) string
 	if len(prefix) > 0 && prefix[0] != nil {
 		prefixFunc = prefix[0]
@@ -580,7 +580,7 @@ func (ve *MemEditor) GetContextAroundRange(startPos, endPos PositionIf, n int, p
 	return ve.GetContextAroundRangeEx(startPos, endPos, n, prefixFunc, nil)
 }
 
-func (ve *MemEditor) GetContextAroundRangeEx(startPos, endPos PositionIf, n int, prefix func(i int) string, suffix func(i int) string) (string, error) {
+func (ve *MemEditor) GetContextAroundRangeEx(startPos, endPos *Position, n int, prefix func(i int) string, suffix func(i int) string) (string, error) {
 	start, end := ve.GetMinAndMaxOffset(startPos, endPos)
 	if start < 0 || end > ve.safeSourceCode.Len() || start > end {
 		return "", errors.New("invalid range")
@@ -608,7 +608,7 @@ func (ve *MemEditor) GetContextAroundRangeEx(startPos, endPos PositionIf, n int,
 	return contextBuilder.String(), nil
 }
 
-func (ve *MemEditor) GetTextFromRangeContext(i RangeIf, lineNum int) string {
+func (ve *MemEditor) GetTextFromRangeContext(i *Range, lineNum int) string {
 	startPos := i.GetStart()
 	endPos := i.GetEnd()
 	context, _ := ve.GetContextAroundRange(startPos, endPos, lineNum)
@@ -661,7 +661,7 @@ func (ve *MemEditor) GetSourceCode(index ...int) string {
 	}
 }
 
-func (e *MemEditor) GetTextContextWithPrompt(p RangeIf, n int, msg ...string) string {
+func (e *MemEditor) GetTextContextWithPrompt(p *Range, n int, msg ...string) string {
 	start := p.GetStart()
 	end := p.GetEnd()
 

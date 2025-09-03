@@ -72,7 +72,7 @@ func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, c
 	return inst
 }
 
-func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
+func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range) {
 	if utils.IsNil(rangeIns) || utils.IsNil(rangeIns.GetEditor()) {
 		log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
 		return
@@ -103,7 +103,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// --- Section 2 Start ---
 	// start2 := time.Now()
-	var codeRange memedit.RangeIf
+	var codeRange *memedit.Range
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
 	} else if ret := inst.GetBlock(); ret != nil {

@@ -260,6 +260,6 @@ func (v *Value) FileFilter(path string, match string, rule map[string]string, ru
 	return v.ParentProgram.FileFilter(path, match, rule, rule2)
 }
 
-func (v *Value) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+func (v *Value) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return v.NewConstValue(i, rng...)
 }

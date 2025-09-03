@@ -46,11 +46,11 @@ func (b *FunctionBuilder) SetRangeWithCommonTokenLoc(loc CommonTokenLoc) func() 
 	}
 }
 
-func (b *FunctionBuilder) GetRangesByText(searchText string) []memedit.RangeIf {
+func (b *FunctionBuilder) GetRangesByText(searchText string) []*memedit.Range {
 	return GetRangesByText(b.GetEditor(), searchText)
 }
 
-func (b *FunctionBuilder) SetRangeByRangeIf(rng memedit.RangeIf) {
+func (b *FunctionBuilder) SetRangeByRangeIf(rng *memedit.Range) {
 	if b == nil {
 		return
 	}
@@ -80,7 +80,7 @@ func (b *FunctionBuilder) SetEmptyRange() {
 // 	b.CurrentRange = NewRange(p, fullRange.GetStart(), fullRange.GetEnd())
 // }
 
-func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) memedit.RangeIf {
+func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) *memedit.Range {
 	if b.CurrentRange != nil {
 		return b.CurrentRange
 	}
@@ -93,7 +93,7 @@ func (b *FunctionBuilder) GetCurrentRange(fallback CanStartStopToken) memedit.Ra
 	// return NewRange(b.GetEditor(), NewPosition(1, 1), NewPosition(1000, 1))
 }
 
-func (b *FunctionBuilder) GetRangeByToken(r CanStartStopToken) memedit.RangeIf {
+func (b *FunctionBuilder) GetRangeByToken(r CanStartStopToken) *memedit.Range {
 	return GetRange(b.GetEditor(), r)
 }
 
@@ -135,7 +135,7 @@ func GetEndPosition(t antlr.Token) (int, int) {
 	return line, column
 }
 
-func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeIf {
+func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *memedit.Range {
 	startToken := token.GetStart()
 	endToken := token.GetStop()
 	if startToken == nil || endToken == nil {
@@ -149,26 +149,26 @@ func GetRange(editor *memedit.MemEditor, token CanStartStopToken) memedit.RangeI
 	)
 }
 
-func GetRangeWithCommonTokenLoc(editor *memedit.MemEditor, loc CommonTokenLoc) memedit.RangeIf {
+func GetRangeWithCommonTokenLoc(editor *memedit.MemEditor, loc CommonTokenLoc) *memedit.Range {
 	return editor.GetRangeByPosition(
 		editor.GetPositionByLine(loc.startLine+1, loc.startCol+1),
 		editor.GetPositionByLine(loc.endLine+1, loc.endCol+1),
 	)
 }
 
-func GetRangesByText(editor *memedit.MemEditor, searchText string) []memedit.RangeIf {
+func GetRangesByText(editor *memedit.MemEditor, searchText string) []*memedit.Range {
 	if editor == nil || searchText == "" {
 		return nil
 	}
-	var ranges []memedit.RangeIf
-	editor.FindStringRange(searchText, func(rangeIf memedit.RangeIf) error {
+	var ranges []*memedit.Range
+	editor.FindStringRange(searchText, func(rangeIf *memedit.Range) error {
 		ranges = append(ranges, rangeIf)
 		return nil
 	})
 	return ranges
 }
 
-func GetFirstRangeByText(editor *memedit.MemEditor, searchText string) memedit.RangeIf {
+func GetFirstRangeByText(editor *memedit.MemEditor, searchText string) *memedit.Range {
 	if editor == nil {
 		return nil
 	}

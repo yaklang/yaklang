@@ -2,9 +2,10 @@ package sfvm
 
 import (
 	"fmt"
+	"testing"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
-	"testing"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/syntaxflow/sf"
@@ -14,7 +15,7 @@ import (
 
 func compileSyntaxFlow(text string) *SyntaxFlowVisitor {
 	var errs antlr4util.SourceCodeErrors
-	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end memedit.PositionIf) {
+	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end *memedit.Position) {
 		errs = append(errs, antlr4util.NewSourceCodeError(msg, start, end))
 	})
 	errLis := antlr4util.NewErrorListener(func(self *antlr4util.ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {

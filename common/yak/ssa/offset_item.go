@@ -49,7 +49,7 @@ func (prog *Program) ShowOffsetMap() {
 	}
 }
 
-func (prog *Program) SetOffsetVariable(v *Variable, r memedit.RangeIf) {
+func (prog *Program) SetOffsetVariable(v *Variable, r *memedit.Range) {
 	if r == nil {
 		return
 	}
@@ -68,15 +68,15 @@ func (prog *Program) SetOffsetVariable(v *Variable, r memedit.RangeIf) {
 	}
 }
 
-func (prog *Program) ForceSetOffsetValue(v Value, r memedit.RangeIf) {
+func (prog *Program) ForceSetOffsetValue(v Value, r *memedit.Range) {
 	prog.SetOffsetValueEx(v, r, true)
 }
 
-func (prog *Program) SetOffsetValue(v Value, r memedit.RangeIf) {
+func (prog *Program) SetOffsetValue(v Value, r *memedit.Range) {
 	prog.SetOffsetValueEx(v, r, false)
 }
 
-func (prog *Program) SetOffsetValueEx(v Value, r memedit.RangeIf, force bool) {
+func (prog *Program) SetOffsetValueEx(v Value, r *memedit.Range, force bool) {
 	if r == nil {
 		return
 	}

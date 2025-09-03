@@ -123,7 +123,7 @@ func FormatRule(ruleContent string, opts ...RuleFormatOption) (rule string, err 
 		}
 	}()
 	compileErrors := make([]error, 0)
-	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end memedit.PositionIf) {
+	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end *memedit.Position) {
 		compileErrors = append(compileErrors, antlr4util.NewSourceCodeError(msg, start, end))
 	})
 	errLis := antlr4util.NewErrorListener(func(self *antlr4util.ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {

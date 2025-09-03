@@ -101,8 +101,8 @@ func languageServerFind(prog *ssaapi.Program, word string, containPoint bool, v 
 	return variables, parameter
 }
 
-func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value, isReference bool) []memedit.RangeIf {
-	ranges := make([]memedit.RangeIf, 0)
+func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange *memedit.Range, v *ssaapi.Value, isReference bool) []*memedit.Range {
+	ranges := make([]*memedit.Range, 0)
 	if isReference {
 		ranges = append(ranges, ssaRange)
 	}
@@ -163,15 +163,15 @@ func onFind(prog *ssaapi.Program, word string, containPoint bool, ssaRange memed
 	return ranges
 }
 
-func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) []memedit.RangeIf {
+func OnFindDefinition(prog *ssaapi.Program, word string, containPoint bool, ssaRange *memedit.Range, v *ssaapi.Value) []*memedit.Range {
 	return onFind(prog, word, containPoint, ssaRange, v, false)
 }
 
-func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange memedit.RangeIf, v *ssaapi.Value) []memedit.RangeIf {
+func OnFindReferences(prog *ssaapi.Program, word string, containPoint bool, ssaRange *memedit.Range, v *ssaapi.Value) []*memedit.Range {
 	return onFind(prog, word, containPoint, ssaRange, v, true)
 }
 
-func RangeIfToGrpcRange(rng memedit.RangeIf) *ypb.Range {
+func RangeIfToGrpcRange(rng *memedit.Range) *ypb.Range {
 	start, end := rng.GetStart(), rng.GetEnd()
 	return &ypb.Range{
 		StartLine:   int64(start.GetLine()),
@@ -183,7 +183,7 @@ func RangeIfToGrpcRange(rng memedit.RangeIf) *ypb.Range {
 
 func (s *Server) YaklangLanguageFind(ctx context.Context, req *ypb.YaklangLanguageSuggestionRequest) (*ypb.YaklangLanguageFindResponse, error) {
 	var (
-		ranges []memedit.RangeIf
+		ranges []*memedit.Range
 		err    error
 
 		ret = &ypb.YaklangLanguageFindResponse{}
