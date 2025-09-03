@@ -1596,3 +1596,130 @@ func generateFinalMessage(total, success, error int) (string, string) {
 		return fmt.Sprintf("部分成功: %d 成功, %d 失败", success, error), "warning"
 	}
 }
+
+func countFileLines(path string) (int, error) {
+	lineC, err := utils.FileLineReader(path)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for range lineC {
+		n++
+	}
+	return n, nil
+}
+
+func (s *Server) ExportBatchPayload(req *ypb.ExportBatchPayloadRequest, stream ypb.Yak_ExportAllPayloadServer) error {
+	groups := req.GetGroups()
+	saveDir := req.GetSavePath()
+
+	if len(groups) == 0 {
+		return utils.Errorf("export error: groups is empty")
+	}
+	if saveDir == "" {
+		return utils.Errorf("export error: save dir is empty")
+	}
+
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	payloads, err := yakit.GetPayload(s.GetProfileDatabase(), groups)
+	if err != nil {
+		return utils.Wrap(err, "get payloads failed")
+	}
+
+	// 统计总数
+	totalCount := 0
+	for _, p := range payloads {
+		if *p.IsFile {
+			if p.Content == nil {
+				return utils.Errorf("file payload content is nil for group %s", p.Group)
+			}
+			lc, err := countFileLines(*p.Content)
+			if err != nil {
+				return utils.Wrapf(err, "count file lines failed for %s", *p.Content)
+			}
+			totalCount += lc
+		} else {
+			// 数据库型 group
+			var count int64
+			if err := s.GetProfileDatabase().Model(&schema.Payload{}).
+				Where("`group` = ?", p.Group).Count(&count).Error; err != nil {
+				return utils.Wrapf(err, "count db payloads failed for group %s", p.Group)
+			}
+			totalCount += int(count)
+		}
+	}
+
+	if totalCount == 0 {
+		return utils.Errorf("no payloads found")
+	}
+
+	written := 0
+
+	for _, p := range payloads {
+		if *p.IsFile {
+			// --- 文件型 group txt ---
+			src := *p.Content
+			dst := filepath.Join(saveDir, fmt.Sprintf("%s.txt", p.Group))
+			writer, _ := utils.NewFileLineWriter(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+
+			lineC, _ := utils.FileLineReader(src)
+			bomHandled := false
+			for line := range lineC {
+				if !bomHandled {
+					line = utils.RemoveBOM(line)
+					bomHandled = true
+				}
+				lineStr := string(line)
+				if unquoted, err := strconv.Unquote(lineStr); err == nil {
+					lineStr = unquoted
+				}
+				writer.WriteLineString(lineStr)
+
+				written++
+				stream.Send(&ypb.GetAllPayloadResponse{
+					Progress: float64(written) / float64(totalCount),
+				})
+			}
+
+			writer.Close()
+		} else {
+			// --- 数据库型 group csv ---
+			dst := filepath.Join(saveDir, fmt.Sprintf("%s.csv", p.Group))
+			writer, _ := utils.NewFileLineWriter(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+			writer.WriteLineString("content,hit_count")
+
+			gen := yakit.YieldPayloads(
+				s.GetProfileDatabase().Where("`group` = ?", p.Group),
+				ctx,
+			)
+
+			bomHandled := false
+			for item := range gen {
+				content := item.GetContent()
+				if content == "" {
+					continue
+				}
+				if !bomHandled {
+					content = utils.RemoveBOMForString(content)
+					bomHandled = true
+				}
+				hitCount := int64(0)
+				if item.HitCount != nil {
+					hitCount = *item.HitCount
+				}
+				writer.WriteLineString(fmt.Sprintf("%s,%d", content, hitCount))
+
+				written++
+				stream.Send(&ypb.GetAllPayloadResponse{
+					Progress: float64(written) / float64(totalCount),
+				})
+			}
+			writer.Close()
+		}
+	}
+
+	stream.Send(&ypb.GetAllPayloadResponse{Progress: 1})
+	return nil
+}
