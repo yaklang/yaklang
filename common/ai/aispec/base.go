@@ -366,8 +366,32 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		return "", utils.Errorf("request post to %v：%v", url, err)
 	}
 
-	reader := mergeReasonIntoOutputStream(reasonPr, pr)
-	bodyRaw, err := io.ReadAll(reader)
+	var reader io.Reader
+	if noMerge {
+		// 如果设置了ReasonStreamHandler，应该分离处理reasoning和normal content
+		// 这里我们只返回normal content，reasoning content通过ReasonStreamHandler处理
+		reader = pr
+		// 启动goroutine处理reasoning content
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Warnf("reasonStreamHandler panic: %v", err)
+				}
+			}()
+			if reasonStreamHandler != nil {
+				reasonStreamHandler(reasonPr)
+			}
+		}()
+	} else {
+		reader = mergeReasonIntoOutputStream(reasonPr, pr)
+	}
+	bodyRaw, readErr := io.ReadAll(reader)
+	wg.Wait()
+	if readErr != nil {
+		return "", utils.Errorf("read response body failed: %v", readErr)
+	}
 	return string(bodyRaw), nil
 }
 
