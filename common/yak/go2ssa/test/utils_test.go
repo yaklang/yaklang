@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	test.SetLanguage("go", go2ssa.Builder)
+	test.SetLanguage("go", go2ssa.CreateBuilder)
 }

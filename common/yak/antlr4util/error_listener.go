@@ -75,6 +75,12 @@ func (el *ErrorListener) SyntaxError(recognizer antlr.Recognizer, offendingSymbo
 func (el *ErrorListener) GetErrorString() string {
 	return strings.Join(el.err, "\n")
 }
+func (el *ErrorListener) Error() error {
+	if len(el.err) == 0 {
+		return nil
+	}
+	return fmt.Errorf("syntax errors found:\n%s", el.GetErrorString())
+}
 
 func (el *ErrorListener) GetErrors() []string {
 	return el.err

@@ -19,19 +19,21 @@ import (
 )
 
 type SSABuilder struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
 var Builder = &SSABuilder{}
 
-func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
-			ssa.WithLanguageConfigBind(true),
-			ssa.WithLanguageConfigVirtualImport(true),
-			ssa.WithLanguageBuilder(s),
-		),
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
 	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
@@ -147,10 +149,7 @@ func Frontend(src string) (*gol.SourceFileContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.SourceFile().(*gol.SourceFileContext)
-	if len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return ast, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 func (b *astbuilder) AddToCmap(key string) {

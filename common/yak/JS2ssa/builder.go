@@ -14,7 +14,7 @@ import (
 )
 
 type SSABuild struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
 // var Builder ssa.Builder = &SSABuild{}
@@ -68,10 +68,7 @@ func Frontend(src string, must bool) (*JS.ProgramContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Program().(*JS.ProgramContext)
-	if must || len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 func (b *astbuilder) AddToCmap(key string) {

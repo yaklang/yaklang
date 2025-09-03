@@ -18,14 +18,29 @@ var INNER_CLASS_SPLIT = "$"
 // ========================================== For SSAAPI ==========================================
 
 type SSABuilder struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
-var Builder ssa.Builder = &SSABuilder{}
+var _ ssa.Builder = (*SSABuilder)(nil)
 
-func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src, false)
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(),
+	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigSupportClass(true),
+		ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
+
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, true)
+}
+
 func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
 	ast, ok := raw.(javaparser.ICompilationUnitContext)
 	if !ok {
@@ -79,10 +94,7 @@ func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.CompilationUnit()
-	if force || len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return ast, utils.Errorf("parse AST FrontEnd error: %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {

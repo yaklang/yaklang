@@ -22,9 +22,10 @@ type PreHandlerAnalyzer interface {
 type FrontAST interface {
 }
 
+type CreateBuilder func() Builder
+
 type Builder interface {
 	// create a new builder
-	Create() Builder
 	BuildFromAST(FrontAST, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
@@ -33,36 +34,36 @@ type Builder interface {
 
 type initHanlderFunc func(*FunctionBuilder)
 
-type PreHandlerInit struct {
+type PreHandlerBase struct {
 	InitHandlerOnce       sync.Once
 	initHandlerFunc       []initHanlderFunc
 	beforeInitHandlerFunc []initHanlderFunc
 	languageConfigOpts    []LanguageConfigOpt
 }
 
-func (d *PreHandlerInit) AfterPreHandlerProject(builder *FunctionBuilder) {
+func (d *PreHandlerBase) AfterPreHandlerProject(builder *FunctionBuilder) {
 	d.InitHandler(builder)
 }
 
-func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
-	return &PreHandlerInit{
+func NewPreHandlerBase(fs ...initHanlderFunc) *PreHandlerBase {
+	return &PreHandlerBase{
 		InitHandlerOnce: sync.Once{},
 		initHandlerFunc: fs,
 	}
 }
 
-func (d *PreHandlerInit) WithLanguageConfigOpts(opts ...LanguageConfigOpt) *PreHandlerInit {
+func (d *PreHandlerBase) WithLanguageConfigOpts(opts ...LanguageConfigOpt) *PreHandlerBase {
 	d.languageConfigOpts = opts
 	return d
 }
-func (d *PreHandlerInit) WithPreInitHandler(fs ...initHanlderFunc) *PreHandlerInit {
+func (d *PreHandlerBase) WithPreInitHandler(fs ...initHanlderFunc) *PreHandlerBase {
 	d.beforeInitHandlerFunc = fs
 	return d
 }
 
 var ProjectConfigVariable = "__projectConfig__"
 
-func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
+func (d *PreHandlerBase) InitHandler(b *FunctionBuilder) {
 	d.InitHandlerOnce.Do(func() {
 		// build the global dependency scope
 		b.SetEmptyRange()
@@ -84,13 +85,13 @@ func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 	})
 }
 
-func (d *PreHandlerInit) PreHandlerFile(ast FrontAST, editor *memedit.MemEditor, builder *FunctionBuilder) {
+func (d *PreHandlerBase) PreHandlerFile(ast FrontAST, editor *memedit.MemEditor, builder *FunctionBuilder) {
 }
 
-func (d *PreHandlerInit) FilterPreHandlerFile(string) bool {
+func (d *PreHandlerBase) FilterPreHandlerFile(string) bool {
 	return false
 }
 
-func (d *PreHandlerInit) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error {
+func (d *PreHandlerBase) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error {
 	return nil
 }
