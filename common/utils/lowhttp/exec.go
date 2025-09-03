@@ -835,7 +835,7 @@ RECONNECT:
 			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
 		if oldVersionProxyChecking {
-			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
+			requestPacket, err = BuildLegacyProxyRequest(requestPacket, https)
 			if err != nil {
 				return nil, err
 			}
@@ -896,7 +896,7 @@ RECONNECT:
 		currentRPS.Add(1)
 
 		if oldVersionProxyChecking {
-			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
+			requestPacket, err = BuildLegacyProxyRequest(requestPacket, https)
 			if err != nil {
 				return response, err
 			}
