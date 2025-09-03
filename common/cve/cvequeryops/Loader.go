@@ -5,13 +5,14 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
 	"time"
+
+	"github.com/pkg/errors"
 
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/go-funk"
@@ -21,39 +22,37 @@ import (
 )
 
 const (
-	// https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json.gz
-	LatestCveModifiedDataFeed = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-modified.json.gz"
-	// https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz
-	LatestCveRecentDataFeed = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz"
+	LatestCveModifiedDataFeed = "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-modified.json.gz"
+	LatestCveRecentDataFeed   = "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-recent.json.gz"
 )
 
 var CveDataFeed = map[string]string{
-	"CVE-2002.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2002.json.gz",
-	"CVE-2003.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2003.json.gz",
-	"CVE-2004.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2004.json.gz",
-	"CVE-2005.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2005.json.gz",
-	"CVE-2006.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2006.json.gz",
-	"CVE-2007.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2007.json.gz",
-	"CVE-2008.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2008.json.gz",
-	"CVE-2009.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2009.json.gz",
-	"CVE-2010.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2010.json.gz",
-	"CVE-2011.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2011.json.gz",
-	"CVE-2012.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2012.json.gz",
-	"CVE-2013.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2013.json.gz",
-	"CVE-2014.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2014.json.gz",
-	"CVE-2015.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2015.json.gz",
-	"CVE-2016.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2016.json.gz",
-	"CVE-2017.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2017.json.gz",
-	"CVE-2018.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2018.json.gz",
-	"CVE-2019.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2019.json.gz",
-	"CVE-2020.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2020.json.gz",
-	"CVE-2021.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2021.json.gz",
-	"CVE-2022.json": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-2022.json.gz",
+	"CVE-2002.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2002.json.gz",
+	"CVE-2003.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2003.json.gz",
+	"CVE-2004.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2004.json.gz",
+	"CVE-2005.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2005.json.gz",
+	"CVE-2006.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2006.json.gz",
+	"CVE-2007.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2007.json.gz",
+	"CVE-2008.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2008.json.gz",
+	"CVE-2009.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2009.json.gz",
+	"CVE-2010.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2010.json.gz",
+	"CVE-2011.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2011.json.gz",
+	"CVE-2012.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2012.json.gz",
+	"CVE-2013.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2013.json.gz",
+	"CVE-2014.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2014.json.gz",
+	"CVE-2015.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2015.json.gz",
+	"CVE-2016.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2016.json.gz",
+	"CVE-2017.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2017.json.gz",
+	"CVE-2018.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2018.json.gz",
+	"CVE-2019.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2019.json.gz",
+	"CVE-2020.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2020.json.gz",
+	"CVE-2021.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2021.json.gz",
+	"CVE-2022.json": "https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-2022.json.gz",
 }
 
 func init() {
 	for i := 2001; i < time.Now().Year()+1; i++ {
-		CveDataFeed[fmt.Sprintf("CVE-%d.json", i)] = fmt.Sprintf("https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-%d.json.gz", i)
+		CveDataFeed[fmt.Sprintf("CVE-%d.json", i)] = fmt.Sprintf("https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-%d.json.gz", i)
 	}
 }
 
@@ -95,8 +94,9 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 		return false, err
 	}
 
-	var cveFile cveresources.CVEYearFile
-	err = json.Unmarshal(CVEContext, &cveFile)
+	// 解析CVE 2.0格式
+	var cveFileV2 cveresources.CVEYearFileV2
+	err = json.Unmarshal(CVEContext, &cveFileV2)
 	if err != nil {
 		var tail string
 		if len(CVEContext) > 20 {
@@ -104,15 +104,16 @@ func LoadCVEByFileName(fileName string, manager *cveresources.SqliteManager) (sh
 		} else {
 			tail = string(CVEContext)
 		}
-		err = errors.Errorf("tail of [%v] context: %#v, with err: %v", fileName, tail, err)
+		err = errors.Errorf("解析CVE 2.0格式失败 [%v] context: %#v, with err: %v", fileName, tail, err)
 		os.Remove(fileName)
 		return false, err
-
 	}
 
-	for _, record := range cveFile.CVERecords {
-		manager.SaveCVERecord(&record)
+	// 处理CVE 2.0格式
+	for _, vuln := range cveFileV2.Vulnerabilities {
+		manager.SaveCVEVulnerability(&vuln)
 	}
+	log.Infof("成功加载CVE 2.0格式文件: %v, 记录数: %d", fileName, len(cveFileV2.Vulnerabilities))
 
 	return false, nil
 }

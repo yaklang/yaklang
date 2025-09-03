@@ -1,0 +1,1701 @@
+{
+	"resultsPerPage": 942,
+	"startIndex": 0,
+	"totalResults": 942,
+	"format": "NVD_CVE",
+	"version": "2.0",
+	"timestamp": "2025-09-03T01:00:00.5159376",
+	"vulnerabilities": [
+		{
+			"cve": {
+				"id": "CVE-2025-9172",
+				"sourceIdentifier": "security@wordfence.com",
+				"published": "2025-08-26T04:15:49.197",
+				"lastModified": "2025-08-26T13:41:58.950",
+				"vulnStatus": "Awaiting Analysis",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "The Vibes plugin for WordPress is vulnerable to time-based SQL Injection via the ‘resource’ parameter in all versions up to, and including, 2.2.0 due to insufficient escaping on the user supplied parameter and lack of sufficient preparation on the existing SQL query.  This makes it possible for unauthenticated attackers to append additional SQL queries into already existing queries that can be used to extract sensitive information from the database."
+					},
+					{
+						"lang": "es",
+						"value": "El complemento Vibes para WordPress es vulnerable a la inyección SQL basada en tiempo a través del parámetro \"resource\" en todas las versiones hasta la 2.2.0 incluida, debido a un escape insuficiente del parámetro proporcionado por el usuario y a la falta de preparación de la consulta SQL existente. Esto permite a atacantes no autenticados añadir consultas SQL adicionales a las consultas ya existentes, que pueden utilizarse para extraer información confidencial de la base de datos."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": null,
+					"cvssMetricV31": [
+						{
+							"source": "security@wordfence.com",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+								"baseScore": 7.5,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "NONE",
+								"availabilityImpact": "NONE"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 3.6
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": null
+				},
+				"weaknesses": [
+					{
+						"source": "security@wordfence.com",
+						"type": "Primary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-89"
+							}
+						]
+					}
+				],
+				"configurations": null,
+				"references": [
+					{
+						"url": "https://plugins.trac.wordpress.org/browser/vibes/tags/2.2.0",
+						"source": "security@wordfence.com",
+						"tags": null
+					},
+					{
+						"url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/786b1b8f-7f63-4ac4-a808-668b38bf0fb4?source=cve",
+						"source": "security@wordfence.com",
+						"tags": null
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-9468",
+				"sourceIdentifier": "cna@vuldb.com",
+				"published": "2025-08-26T04:15:56.863",
+				"lastModified": "2025-09-02T18:04:46.610",
+				"vulnStatus": "Analyzed",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "A security vulnerability has been detected in itsourcecode Apartment Management System 1.0. Affected by this vulnerability is an unknown functionality of the file /bill/add_bill.php. Such manipulation of the argument ID leads to sql injection. The attack can be launched remotely. The exploit has been disclosed publicly and may be used."
+					},
+					{
+						"lang": "es",
+						"value": "Se ha detectado una vulnerabilidad de seguridad en itsourcecode Apartment Management System 1.0. Esta vulnerabilidad afecta a una funcionalidad desconocida del archivo /bill/add_bill.php. Esta manipulación del ID del argumento provoca una inyección SQL. El ataque puede ejecutarse en remoto. Se ha hecho público el exploit y puede que sea utilizado."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "4.0",
+								"vectorString": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+								"baseScore": 6.9,
+								"baseSeverity": "MEDIUM",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"attackRequirements": "NONE",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"vulnConfidentialityImpact": "LOW",
+								"vulnIntegrityImpact": "LOW",
+								"vulnAvailabilityImpact": "LOW",
+								"subConfidentialityImpact": "NONE",
+								"subIntegrityImpact": "NONE",
+								"subAvailabilityImpact": "NONE",
+								"exploitMaturity": "PROOF_OF_CONCEPT",
+								"confidentialityRequirement": "NOT_DEFINED",
+								"integrityRequirement": "NOT_DEFINED",
+								"availabilityRequirement": "NOT_DEFINED",
+								"modifiedAttackVector": "NOT_DEFINED",
+								"modifiedAttackComplexity": "NOT_DEFINED",
+								"modifiedAttackRequirements": "NOT_DEFINED",
+								"modifiedPrivilegesRequired": "NOT_DEFINED",
+								"modifiedUserInteraction": "NOT_DEFINED",
+								"modifiedVulnConfidentialityImpact": "NOT_DEFINED",
+								"modifiedVulnIntegrityImpact": "NOT_DEFINED",
+								"modifiedVulnAvailabilityImpact": "NOT_DEFINED",
+								"modifiedSubConfidentialityImpact": "NOT_DEFINED",
+								"modifiedSubIntegrityImpact": "NOT_DEFINED",
+								"modifiedSubAvailabilityImpact": "NOT_DEFINED",
+								"Safety": "NOT_DEFINED",
+								"Automatable": "NOT_DEFINED",
+								"Recovery": "NOT_DEFINED",
+								"valueDensity": "NOT_DEFINED",
+								"vulnerabilityResponseEffort": "NOT_DEFINED",
+								"providerUrgency": "NOT_DEFINED"
+							}
+						}
+					],
+					"cvssMetricV31": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+								"baseScore": 7.3,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "LOW",
+								"integrityImpact": "LOW",
+								"availabilityImpact": "LOW"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 3.4
+						},
+						{
+							"source": "nvd@nist.gov",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 9.8,
+								"baseSeverity": "CRITICAL",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "2.0",
+								"vectorString": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+								"baseScore": 7.5,
+								"accessVector": "NETWORK",
+								"accessComplexity": "LOW",
+								"authentication": "NONE",
+								"confidentialityImpact": "PARTIAL",
+								"integrityImpact": "PARTIAL",
+								"availabilityImpact": "PARTIAL"
+							},
+							"baseSeverity": "HIGH",
+							"exploitabilityScore": 10,
+							"impactScore": 6.4,
+							"acInsufInfo": false,
+							"obtainAllPrivilege": false,
+							"obtainUserPrivilege": false,
+							"obtainOtherPrivilege": false,
+							"userInteractionRequired": false
+						}
+					]
+				},
+				"weaknesses": [
+					{
+						"source": "cna@vuldb.com",
+						"type": "Secondary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-74"
+							},
+							{
+								"lang": "en",
+								"value": "CWE-89"
+							}
+						]
+					}
+				],
+				"configurations": [
+					{
+						"nodes": [
+							{
+								"operator": "OR",
+								"negate": false,
+								"cpeMatch": [
+									{
+										"vulnerable": true,
+										"criteria": "cpe:2.3:a:admerc:apartment_management_system:1.0:*:*:*:*:*:*:*",
+										"matchCriteriaId": "E6F8C88F-91E0-4310-9F20-B02336255520",
+										"versionStartExcluding": "",
+										"versionEndExcluding": "",
+										"versionStartIncluding": "",
+										"versionEndIncluding": ""
+									}
+								]
+							}
+						]
+					}
+				],
+				"references": [
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/15",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					},
+					{
+						"url": "https://itsourcecode.com/",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Product"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?ctiid.321333",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Permissions Required",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?id.321333",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?submit.634079",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/15",
+						"source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-9469",
+				"sourceIdentifier": "cna@vuldb.com",
+				"published": "2025-08-26T04:15:57.827",
+				"lastModified": "2025-09-02T18:05:07.840",
+				"vulnStatus": "Analyzed",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "A vulnerability was detected in itsourcecode Apartment Management System 1.0. Affected by this issue is some unknown functionality of the file /fund/add_fund.php. Performing manipulation of the argument ID results in sql injection. The attack may be initiated remotely. The exploit is now public and may be used."
+					},
+					{
+						"lang": "es",
+						"value": "Se detectó una vulnerabilidad en itsourcecode Apartment Management System 1.0. Este problema afecta a una funcionalidad desconocida del archivo /fund/add_fund.php. La manipulación del ID del argumento provoca una inyección SQL. El ataque puede ejecutarse en remoto. Se ha hecho público el exploit y puede que sea utilizado."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "4.0",
+								"vectorString": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+								"baseScore": 6.9,
+								"baseSeverity": "MEDIUM",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"attackRequirements": "NONE",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"vulnConfidentialityImpact": "LOW",
+								"vulnIntegrityImpact": "LOW",
+								"vulnAvailabilityImpact": "LOW",
+								"subConfidentialityImpact": "NONE",
+								"subIntegrityImpact": "NONE",
+								"subAvailabilityImpact": "NONE",
+								"exploitMaturity": "PROOF_OF_CONCEPT",
+								"confidentialityRequirement": "NOT_DEFINED",
+								"integrityRequirement": "NOT_DEFINED",
+								"availabilityRequirement": "NOT_DEFINED",
+								"modifiedAttackVector": "NOT_DEFINED",
+								"modifiedAttackComplexity": "NOT_DEFINED",
+								"modifiedAttackRequirements": "NOT_DEFINED",
+								"modifiedPrivilegesRequired": "NOT_DEFINED",
+								"modifiedUserInteraction": "NOT_DEFINED",
+								"modifiedVulnConfidentialityImpact": "NOT_DEFINED",
+								"modifiedVulnIntegrityImpact": "NOT_DEFINED",
+								"modifiedVulnAvailabilityImpact": "NOT_DEFINED",
+								"modifiedSubConfidentialityImpact": "NOT_DEFINED",
+								"modifiedSubIntegrityImpact": "NOT_DEFINED",
+								"modifiedSubAvailabilityImpact": "NOT_DEFINED",
+								"Safety": "NOT_DEFINED",
+								"Automatable": "NOT_DEFINED",
+								"Recovery": "NOT_DEFINED",
+								"valueDensity": "NOT_DEFINED",
+								"vulnerabilityResponseEffort": "NOT_DEFINED",
+								"providerUrgency": "NOT_DEFINED"
+							}
+						}
+					],
+					"cvssMetricV31": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+								"baseScore": 7.3,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "LOW",
+								"integrityImpact": "LOW",
+								"availabilityImpact": "LOW"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 3.4
+						},
+						{
+							"source": "nvd@nist.gov",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 9.8,
+								"baseSeverity": "CRITICAL",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "2.0",
+								"vectorString": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+								"baseScore": 7.5,
+								"accessVector": "NETWORK",
+								"accessComplexity": "LOW",
+								"authentication": "NONE",
+								"confidentialityImpact": "PARTIAL",
+								"integrityImpact": "PARTIAL",
+								"availabilityImpact": "PARTIAL"
+							},
+							"baseSeverity": "HIGH",
+							"exploitabilityScore": 10,
+							"impactScore": 6.4,
+							"acInsufInfo": false,
+							"obtainAllPrivilege": false,
+							"obtainUserPrivilege": false,
+							"obtainOtherPrivilege": false,
+							"userInteractionRequired": false
+						}
+					]
+				},
+				"weaknesses": [
+					{
+						"source": "cna@vuldb.com",
+						"type": "Secondary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-74"
+							},
+							{
+								"lang": "en",
+								"value": "CWE-89"
+							}
+						]
+					}
+				],
+				"configurations": [
+					{
+						"nodes": [
+							{
+								"operator": "OR",
+								"negate": false,
+								"cpeMatch": [
+									{
+										"vulnerable": true,
+										"criteria": "cpe:2.3:a:admerc:apartment_management_system:1.0:*:*:*:*:*:*:*",
+										"matchCriteriaId": "E6F8C88F-91E0-4310-9F20-B02336255520",
+										"versionStartExcluding": "",
+										"versionEndExcluding": "",
+										"versionStartIncluding": "",
+										"versionEndIncluding": ""
+									}
+								]
+							}
+						]
+					}
+				],
+				"references": [
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/14",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					},
+					{
+						"url": "https://itsourcecode.com/",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Product"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?ctiid.321334",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Permissions Required",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?id.321334",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?submit.634080",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/14",
+						"source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-9470",
+				"sourceIdentifier": "cna@vuldb.com",
+				"published": "2025-08-26T04:16:00.637",
+				"lastModified": "2025-09-02T18:05:31.020",
+				"vulnStatus": "Analyzed",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "A flaw has been found in itsourcecode Apartment Management System 1.0. This affects an unknown part of the file /management/add_m_committee.php. Executing manipulation of the argument ID can lead to sql injection. The attack may be launched remotely. The exploit has been published and may be used."
+					},
+					{
+						"lang": "es",
+						"value": "Se ha encontrado una falla en el itsourcecode Apartment Management System 1.0. Esta afecta a una parte desconocida del archivo /management/add_m_committee.php. La manipulación del ID del argumento puede provocar una inyección SQL. El ataque puede ejecutarse en remoto. Se ha hecho público el exploit y puede que sea utilizado."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "4.0",
+								"vectorString": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+								"baseScore": 6.9,
+								"baseSeverity": "MEDIUM",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"attackRequirements": "NONE",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"vulnConfidentialityImpact": "LOW",
+								"vulnIntegrityImpact": "LOW",
+								"vulnAvailabilityImpact": "LOW",
+								"subConfidentialityImpact": "NONE",
+								"subIntegrityImpact": "NONE",
+								"subAvailabilityImpact": "NONE",
+								"exploitMaturity": "PROOF_OF_CONCEPT",
+								"confidentialityRequirement": "NOT_DEFINED",
+								"integrityRequirement": "NOT_DEFINED",
+								"availabilityRequirement": "NOT_DEFINED",
+								"modifiedAttackVector": "NOT_DEFINED",
+								"modifiedAttackComplexity": "NOT_DEFINED",
+								"modifiedAttackRequirements": "NOT_DEFINED",
+								"modifiedPrivilegesRequired": "NOT_DEFINED",
+								"modifiedUserInteraction": "NOT_DEFINED",
+								"modifiedVulnConfidentialityImpact": "NOT_DEFINED",
+								"modifiedVulnIntegrityImpact": "NOT_DEFINED",
+								"modifiedVulnAvailabilityImpact": "NOT_DEFINED",
+								"modifiedSubConfidentialityImpact": "NOT_DEFINED",
+								"modifiedSubIntegrityImpact": "NOT_DEFINED",
+								"modifiedSubAvailabilityImpact": "NOT_DEFINED",
+								"Safety": "NOT_DEFINED",
+								"Automatable": "NOT_DEFINED",
+								"Recovery": "NOT_DEFINED",
+								"valueDensity": "NOT_DEFINED",
+								"vulnerabilityResponseEffort": "NOT_DEFINED",
+								"providerUrgency": "NOT_DEFINED"
+							}
+						}
+					],
+					"cvssMetricV31": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+								"baseScore": 7.3,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "LOW",
+								"integrityImpact": "LOW",
+								"availabilityImpact": "LOW"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 3.4
+						},
+						{
+							"source": "nvd@nist.gov",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 9.8,
+								"baseSeverity": "CRITICAL",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "2.0",
+								"vectorString": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+								"baseScore": 7.5,
+								"accessVector": "NETWORK",
+								"accessComplexity": "LOW",
+								"authentication": "NONE",
+								"confidentialityImpact": "PARTIAL",
+								"integrityImpact": "PARTIAL",
+								"availabilityImpact": "PARTIAL"
+							},
+							"baseSeverity": "HIGH",
+							"exploitabilityScore": 10,
+							"impactScore": 6.4,
+							"acInsufInfo": false,
+							"obtainAllPrivilege": false,
+							"obtainUserPrivilege": false,
+							"obtainOtherPrivilege": false,
+							"userInteractionRequired": false
+						}
+					]
+				},
+				"weaknesses": [
+					{
+						"source": "cna@vuldb.com",
+						"type": "Secondary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-74"
+							},
+							{
+								"lang": "en",
+								"value": "CWE-89"
+							}
+						]
+					}
+				],
+				"configurations": [
+					{
+						"nodes": [
+							{
+								"operator": "OR",
+								"negate": false,
+								"cpeMatch": [
+									{
+										"vulnerable": true,
+										"criteria": "cpe:2.3:a:admerc:apartment_management_system:1.0:*:*:*:*:*:*:*",
+										"matchCriteriaId": "E6F8C88F-91E0-4310-9F20-B02336255520",
+										"versionStartExcluding": "",
+										"versionEndExcluding": "",
+										"versionStartIncluding": "",
+										"versionEndIncluding": ""
+									}
+								]
+							}
+						]
+					}
+				],
+				"references": [
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/13",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					},
+					{
+						"url": "https://itsourcecode.com/",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Product"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?ctiid.321335",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Permissions Required",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?id.321335",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?submit.634081",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/13",
+						"source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-9471",
+				"sourceIdentifier": "cna@vuldb.com",
+				"published": "2025-08-26T04:16:01.500",
+				"lastModified": "2025-09-02T18:05:37.840",
+				"vulnStatus": "Analyzed",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "A vulnerability has been found in itsourcecode Apartment Management System 1.0. This vulnerability affects unknown code of the file /maintenance/add_maintenance_cost.php. The manipulation of the argument ID leads to sql injection. Remote exploitation of the attack is possible. The exploit has been disclosed to the public and may be used."
+					},
+					{
+						"lang": "es",
+						"value": "Se ha encontrado una vulnerabilidad en itsourcecode Apartment Management System 1.0. Esta vulnerabilidad afecta al código desconocido del archivo /maintenance/add_maintenance_cost.php. La manipulación del ID del argumento provoca una inyección SQL. El ataque puede ejecutarse en remoto. Se ha hecho público el exploit y puede que sea utilizado."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "4.0",
+								"vectorString": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+								"baseScore": 6.9,
+								"baseSeverity": "MEDIUM",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"attackRequirements": "NONE",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"vulnConfidentialityImpact": "LOW",
+								"vulnIntegrityImpact": "LOW",
+								"vulnAvailabilityImpact": "LOW",
+								"subConfidentialityImpact": "NONE",
+								"subIntegrityImpact": "NONE",
+								"subAvailabilityImpact": "NONE",
+								"exploitMaturity": "PROOF_OF_CONCEPT",
+								"confidentialityRequirement": "NOT_DEFINED",
+								"integrityRequirement": "NOT_DEFINED",
+								"availabilityRequirement": "NOT_DEFINED",
+								"modifiedAttackVector": "NOT_DEFINED",
+								"modifiedAttackComplexity": "NOT_DEFINED",
+								"modifiedAttackRequirements": "NOT_DEFINED",
+								"modifiedPrivilegesRequired": "NOT_DEFINED",
+								"modifiedUserInteraction": "NOT_DEFINED",
+								"modifiedVulnConfidentialityImpact": "NOT_DEFINED",
+								"modifiedVulnIntegrityImpact": "NOT_DEFINED",
+								"modifiedVulnAvailabilityImpact": "NOT_DEFINED",
+								"modifiedSubConfidentialityImpact": "NOT_DEFINED",
+								"modifiedSubIntegrityImpact": "NOT_DEFINED",
+								"modifiedSubAvailabilityImpact": "NOT_DEFINED",
+								"Safety": "NOT_DEFINED",
+								"Automatable": "NOT_DEFINED",
+								"Recovery": "NOT_DEFINED",
+								"valueDensity": "NOT_DEFINED",
+								"vulnerabilityResponseEffort": "NOT_DEFINED",
+								"providerUrgency": "NOT_DEFINED"
+							}
+						}
+					],
+					"cvssMetricV31": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+								"baseScore": 7.3,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "LOW",
+								"integrityImpact": "LOW",
+								"availabilityImpact": "LOW"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 3.4
+						},
+						{
+							"source": "nvd@nist.gov",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 9.8,
+								"baseSeverity": "CRITICAL",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "2.0",
+								"vectorString": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+								"baseScore": 7.5,
+								"accessVector": "NETWORK",
+								"accessComplexity": "LOW",
+								"authentication": "NONE",
+								"confidentialityImpact": "PARTIAL",
+								"integrityImpact": "PARTIAL",
+								"availabilityImpact": "PARTIAL"
+							},
+							"baseSeverity": "HIGH",
+							"exploitabilityScore": 10,
+							"impactScore": 6.4,
+							"acInsufInfo": false,
+							"obtainAllPrivilege": false,
+							"obtainUserPrivilege": false,
+							"obtainOtherPrivilege": false,
+							"userInteractionRequired": false
+						}
+					]
+				},
+				"weaknesses": [
+					{
+						"source": "cna@vuldb.com",
+						"type": "Secondary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-74"
+							},
+							{
+								"lang": "en",
+								"value": "CWE-89"
+							}
+						]
+					}
+				],
+				"configurations": [
+					{
+						"nodes": [
+							{
+								"operator": "OR",
+								"negate": false,
+								"cpeMatch": [
+									{
+										"vulnerable": true,
+										"criteria": "cpe:2.3:a:admerc:apartment_management_system:1.0:*:*:*:*:*:*:*",
+										"matchCriteriaId": "E6F8C88F-91E0-4310-9F20-B02336255520",
+										"versionStartExcluding": "",
+										"versionEndExcluding": "",
+										"versionStartIncluding": "",
+										"versionEndIncluding": ""
+									}
+								]
+							}
+						]
+					}
+				],
+				"references": [
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/12",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					},
+					{
+						"url": "https://itsourcecode.com/",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Product"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?ctiid.321336",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Permissions Required",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?id.321336",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?submit.634082",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/12",
+						"source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-5931",
+				"sourceIdentifier": "security@wordfence.com",
+				"published": "2025-08-26T05:15:32.453",
+				"lastModified": "2025-08-26T13:41:58.950",
+				"vulnStatus": "Awaiting Analysis",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "The Dokan Pro plugin for WordPress is vulnerable to privilege escalation via account takeover in all versions up to, and including, 4.0.5. This is due to the plugin not properly validating a user's identity prior to updating their password during a staff password reset. This makes it possible for authenticated attackers, with vendor-level access and above, to elevate their privilege to the level of a staff member and then change arbitrary user passwords, including those of administrators in order to gain access to their accounts. By default, the plugin allows customers to become vendors."
+					},
+					{
+						"lang": "es",
+						"value": "El complemento Dokan Pro para WordPress es vulnerable a la escalada de privilegios mediante la apropiación de cuentas en todas las versiones hasta la 4.0.5 incluida. Esto se debe a que el complemento no valida correctamente la identidad del usuario antes de actualizar su contraseña durante un restablecimiento de contraseña de personal. Esto permite que atacantes autenticados, con acceso de proveedor o superior, eleven sus privilegios al nivel de miembro del personal y luego cambien las contraseñas de usuarios arbitrarias, incluidas las de administradores, para acceder a sus cuentas. De forma predeterminada, el complemento permite a los clientes convertirse en proveedores."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": null,
+					"cvssMetricV31": [
+						{
+							"source": "security@wordfence.com",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 8.8,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "LOW",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 2.8,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": null
+				},
+				"weaknesses": [
+					{
+						"source": "security@wordfence.com",
+						"type": "Primary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-269"
+							}
+						]
+					}
+				],
+				"configurations": null,
+				"references": [
+					{
+						"url": "https://dokan.co/wordpress/",
+						"source": "security@wordfence.com",
+						"tags": null
+					},
+					{
+						"url": "https://www.wordfence.com/threat-intel/vulnerabilities/id/f3664a96-4ce7-4561-9b4b-dff91cd49384?source=cve",
+						"source": "security@wordfence.com",
+						"tags": null
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-9472",
+				"sourceIdentifier": "cna@vuldb.com",
+				"published": "2025-08-26T05:15:32.650",
+				"lastModified": "2025-09-02T18:05:44.193",
+				"vulnStatus": "Analyzed",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "A vulnerability was found in itsourcecode Apartment Management System 1.0. This issue affects some unknown processing of the file /owner_utility/add_owner_utility.php. The manipulation of the argument ID results in sql injection. The attack can be executed remotely. The exploit has been made public and could be used."
+					},
+					{
+						"lang": "es",
+						"value": "Se encontró una vulnerabilidad en itsourcecode Apartment Management System 1.0. Este problema afecta a un procesamiento desconocido del archivo /owner_utility/add_owner_utility.php. La manipulación del ID del argumento provoca una inyección SQL. El ataque puede ejecutarse en remoto. Se ha hecho público el exploit y puede que sea utilizado."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "4.0",
+								"vectorString": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+								"baseScore": 6.9,
+								"baseSeverity": "MEDIUM",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"attackRequirements": "NONE",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"vulnConfidentialityImpact": "LOW",
+								"vulnIntegrityImpact": "LOW",
+								"vulnAvailabilityImpact": "LOW",
+								"subConfidentialityImpact": "NONE",
+								"subIntegrityImpact": "NONE",
+								"subAvailabilityImpact": "NONE",
+								"exploitMaturity": "PROOF_OF_CONCEPT",
+								"confidentialityRequirement": "NOT_DEFINED",
+								"integrityRequirement": "NOT_DEFINED",
+								"availabilityRequirement": "NOT_DEFINED",
+								"modifiedAttackVector": "NOT_DEFINED",
+								"modifiedAttackComplexity": "NOT_DEFINED",
+								"modifiedAttackRequirements": "NOT_DEFINED",
+								"modifiedPrivilegesRequired": "NOT_DEFINED",
+								"modifiedUserInteraction": "NOT_DEFINED",
+								"modifiedVulnConfidentialityImpact": "NOT_DEFINED",
+								"modifiedVulnIntegrityImpact": "NOT_DEFINED",
+								"modifiedVulnAvailabilityImpact": "NOT_DEFINED",
+								"modifiedSubConfidentialityImpact": "NOT_DEFINED",
+								"modifiedSubIntegrityImpact": "NOT_DEFINED",
+								"modifiedSubAvailabilityImpact": "NOT_DEFINED",
+								"Safety": "NOT_DEFINED",
+								"Automatable": "NOT_DEFINED",
+								"Recovery": "NOT_DEFINED",
+								"valueDensity": "NOT_DEFINED",
+								"vulnerabilityResponseEffort": "NOT_DEFINED",
+								"providerUrgency": "NOT_DEFINED"
+							}
+						}
+					],
+					"cvssMetricV31": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+								"baseScore": 7.3,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "LOW",
+								"integrityImpact": "LOW",
+								"availabilityImpact": "LOW"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 3.4
+						},
+						{
+							"source": "nvd@nist.gov",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 9.8,
+								"baseSeverity": "CRITICAL",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "2.0",
+								"vectorString": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+								"baseScore": 7.5,
+								"accessVector": "NETWORK",
+								"accessComplexity": "LOW",
+								"authentication": "NONE",
+								"confidentialityImpact": "PARTIAL",
+								"integrityImpact": "PARTIAL",
+								"availabilityImpact": "PARTIAL"
+							},
+							"baseSeverity": "HIGH",
+							"exploitabilityScore": 10,
+							"impactScore": 6.4,
+							"acInsufInfo": false,
+							"obtainAllPrivilege": false,
+							"obtainUserPrivilege": false,
+							"obtainOtherPrivilege": false,
+							"userInteractionRequired": false
+						}
+					]
+				},
+				"weaknesses": [
+					{
+						"source": "cna@vuldb.com",
+						"type": "Secondary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-74"
+							},
+							{
+								"lang": "en",
+								"value": "CWE-89"
+							}
+						]
+					}
+				],
+				"configurations": [
+					{
+						"nodes": [
+							{
+								"operator": "OR",
+								"negate": false,
+								"cpeMatch": [
+									{
+										"vulnerable": true,
+										"criteria": "cpe:2.3:a:admerc:apartment_management_system:1.0:*:*:*:*:*:*:*",
+										"matchCriteriaId": "E6F8C88F-91E0-4310-9F20-B02336255520",
+										"versionStartExcluding": "",
+										"versionEndExcluding": "",
+										"versionStartIncluding": "",
+										"versionEndIncluding": ""
+									}
+								]
+							}
+						]
+					}
+				],
+				"references": [
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/11",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					},
+					{
+						"url": "https://itsourcecode.com/",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Product"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?ctiid.321337",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Permissions Required",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?id.321337",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?submit.634083",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://github.com/zhuyi-hz/cve/issues/11",
+						"source": "134c704f-9b21-4f2e-91b3-4a467353bcc0",
+						"tags": [
+							"Exploit",
+							"Issue Tracking",
+							"Third Party Advisory"
+						]
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-9473",
+				"sourceIdentifier": "cna@vuldb.com",
+				"published": "2025-08-26T05:15:32.873",
+				"lastModified": "2025-09-02T18:05:55.963",
+				"vulnStatus": "Analyzed",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "A security vulnerability has been detected in SourceCodester Online Bank Management System 1.0. This impacts an unknown function of the file /feedback.php. The manipulation of the argument msg leads to sql injection. The attack can be initiated remotely. The exploit has been disclosed publicly and may be used."
+					},
+					{
+						"lang": "es",
+						"value": "Se ha detectado una vulnerabilidad de seguridad en SourceCodester Online Bank Management System 1.0. Esta afecta a una función desconocida del archivo /feedback.php. La manipulación del argumento \"msg\" provoca una inyección SQL. El ataque puede ejecutarse en remoto. Se ha hecho público el exploit y puede que sea utilizado."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "4.0",
+								"vectorString": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+								"baseScore": 6.9,
+								"baseSeverity": "MEDIUM",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"attackRequirements": "NONE",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"vulnConfidentialityImpact": "LOW",
+								"vulnIntegrityImpact": "LOW",
+								"vulnAvailabilityImpact": "LOW",
+								"subConfidentialityImpact": "NONE",
+								"subIntegrityImpact": "NONE",
+								"subAvailabilityImpact": "NONE",
+								"exploitMaturity": "PROOF_OF_CONCEPT",
+								"confidentialityRequirement": "NOT_DEFINED",
+								"integrityRequirement": "NOT_DEFINED",
+								"availabilityRequirement": "NOT_DEFINED",
+								"modifiedAttackVector": "NOT_DEFINED",
+								"modifiedAttackComplexity": "NOT_DEFINED",
+								"modifiedAttackRequirements": "NOT_DEFINED",
+								"modifiedPrivilegesRequired": "NOT_DEFINED",
+								"modifiedUserInteraction": "NOT_DEFINED",
+								"modifiedVulnConfidentialityImpact": "NOT_DEFINED",
+								"modifiedVulnIntegrityImpact": "NOT_DEFINED",
+								"modifiedVulnAvailabilityImpact": "NOT_DEFINED",
+								"modifiedSubConfidentialityImpact": "NOT_DEFINED",
+								"modifiedSubIntegrityImpact": "NOT_DEFINED",
+								"modifiedSubAvailabilityImpact": "NOT_DEFINED",
+								"Safety": "NOT_DEFINED",
+								"Automatable": "NOT_DEFINED",
+								"Recovery": "NOT_DEFINED",
+								"valueDensity": "NOT_DEFINED",
+								"vulnerabilityResponseEffort": "NOT_DEFINED",
+								"providerUrgency": "NOT_DEFINED"
+							}
+						}
+					],
+					"cvssMetricV31": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L",
+								"baseScore": 7.3,
+								"baseSeverity": "HIGH",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "LOW",
+								"integrityImpact": "LOW",
+								"availabilityImpact": "LOW"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 3.4
+						},
+						{
+							"source": "nvd@nist.gov",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 9.8,
+								"baseSeverity": "CRITICAL",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "2.0",
+								"vectorString": "AV:N/AC:L/Au:N/C:P/I:P/A:P",
+								"baseScore": 7.5,
+								"accessVector": "NETWORK",
+								"accessComplexity": "LOW",
+								"authentication": "NONE",
+								"confidentialityImpact": "PARTIAL",
+								"integrityImpact": "PARTIAL",
+								"availabilityImpact": "PARTIAL"
+							},
+							"baseSeverity": "HIGH",
+							"exploitabilityScore": 10,
+							"impactScore": 6.4,
+							"acInsufInfo": false,
+							"obtainAllPrivilege": false,
+							"obtainUserPrivilege": false,
+							"obtainOtherPrivilege": false,
+							"userInteractionRequired": false
+						}
+					]
+				},
+				"weaknesses": [
+					{
+						"source": "cna@vuldb.com",
+						"type": "Primary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-74"
+							},
+							{
+								"lang": "en",
+								"value": "CWE-89"
+							}
+						]
+					}
+				],
+				"configurations": [
+					{
+						"nodes": [
+							{
+								"operator": "OR",
+								"negate": false,
+								"cpeMatch": [
+									{
+										"vulnerable": true,
+										"criteria": "cpe:2.3:a:oretnom23:online_bank_management_system:1.0:*:*:*:*:*:*:*",
+										"matchCriteriaId": "ABBA1FA6-5C99-4BE2-B748-53ED203CD5DD",
+										"versionStartExcluding": "",
+										"versionEndExcluding": "",
+										"versionStartIncluding": "",
+										"versionEndIncluding": ""
+									}
+								]
+							}
+						]
+					}
+				],
+				"references": [
+					{
+						"url": "https://github.com/August829/Yu/blob/main/58ead8e7e08bfb0e2.md",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Exploit",
+							"Third Party Advisory"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?ctiid.321342",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Permissions Required",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?id.321342",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://vuldb.com/?submit.634362",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Third Party Advisory",
+							"VDB Entry"
+						]
+					},
+					{
+						"url": "https://www.sourcecodester.com/",
+						"source": "cna@vuldb.com",
+						"tags": [
+							"Product"
+						]
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-9474",
+				"sourceIdentifier": "cna@vuldb.com",
+				"published": "2025-08-26T05:15:33.173",
+				"lastModified": "2025-08-26T13:41:58.950",
+				"vulnStatus": "Awaiting Analysis",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "A vulnerability was detected in Mihomo Party up to 1.8.1 on macOS. Affected is the function enableSysProxy of the file src/main/sys/sysproxy.ts of the component Socket Handler. The manipulation results in creation of temporary file with insecure permissions. The attack requires a local approach. This attack is characterized by high complexity. The exploitability is told to be difficult. The exploit is now public and may be used."
+					},
+					{
+						"lang": "es",
+						"value": "Se detectó una vulnerabilidad en Mihomo Party hasta la versión 1.8.1 en macOS. La función enableSysProxy del archivo src/main/sys/sysproxy.ts del componente Socket Handler se ve afectada. La manipulación da como resultado la creación de un archivo temporal con permisos inseguros. El ataque requiere un enfoque local. Es un ataque de complejidad bastante alta. Parece difícil de explotar. Se ha hecho público el exploit y puede que sea utilizado."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "4.0",
+								"vectorString": "CVSS:4.0/AV:L/AC:H/AT:N/PR:L/UI:N/VC:L/VI:L/VA:L/SC:N/SI:N/SA:N/E:P/CR:X/IR:X/AR:X/MAV:X/MAC:X/MAT:X/MPR:X/MUI:X/MVC:X/MVI:X/MVA:X/MSC:X/MSI:X/MSA:X/S:X/AU:X/R:X/V:X/RE:X/U:X",
+								"baseScore": 2,
+								"baseSeverity": "LOW",
+								"attackVector": "LOCAL",
+								"attackComplexity": "HIGH",
+								"attackRequirements": "NONE",
+								"privilegesRequired": "LOW",
+								"userInteraction": "NONE",
+								"vulnConfidentialityImpact": "LOW",
+								"vulnIntegrityImpact": "LOW",
+								"vulnAvailabilityImpact": "LOW",
+								"subConfidentialityImpact": "NONE",
+								"subIntegrityImpact": "NONE",
+								"subAvailabilityImpact": "NONE",
+								"exploitMaturity": "PROOF_OF_CONCEPT",
+								"confidentialityRequirement": "NOT_DEFINED",
+								"integrityRequirement": "NOT_DEFINED",
+								"availabilityRequirement": "NOT_DEFINED",
+								"modifiedAttackVector": "NOT_DEFINED",
+								"modifiedAttackComplexity": "NOT_DEFINED",
+								"modifiedAttackRequirements": "NOT_DEFINED",
+								"modifiedPrivilegesRequired": "NOT_DEFINED",
+								"modifiedUserInteraction": "NOT_DEFINED",
+								"modifiedVulnConfidentialityImpact": "NOT_DEFINED",
+								"modifiedVulnIntegrityImpact": "NOT_DEFINED",
+								"modifiedVulnAvailabilityImpact": "NOT_DEFINED",
+								"modifiedSubConfidentialityImpact": "NOT_DEFINED",
+								"modifiedSubIntegrityImpact": "NOT_DEFINED",
+								"modifiedSubAvailabilityImpact": "NOT_DEFINED",
+								"Safety": "NOT_DEFINED",
+								"Automatable": "NOT_DEFINED",
+								"Recovery": "NOT_DEFINED",
+								"valueDensity": "NOT_DEFINED",
+								"vulnerabilityResponseEffort": "NOT_DEFINED",
+								"providerUrgency": "NOT_DEFINED"
+							}
+						}
+					],
+					"cvssMetricV31": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:L/AC:H/PR:L/UI:N/S:U/C:L/I:L/A:L",
+								"baseScore": 4.5,
+								"baseSeverity": "MEDIUM",
+								"attackVector": "LOCAL",
+								"attackComplexity": "HIGH",
+								"privilegesRequired": "LOW",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "LOW",
+								"integrityImpact": "LOW",
+								"availabilityImpact": "LOW"
+							},
+							"exploitabilityScore": 1,
+							"impactScore": 3.4
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": [
+						{
+							"source": "cna@vuldb.com",
+							"type": "Secondary",
+							"cvssData": {
+								"version": "2.0",
+								"vectorString": "AV:L/AC:H/Au:S/C:P/I:P/A:P",
+								"baseScore": 3.5,
+								"accessVector": "LOCAL",
+								"accessComplexity": "HIGH",
+								"authentication": "SINGLE",
+								"confidentialityImpact": "PARTIAL",
+								"integrityImpact": "PARTIAL",
+								"availabilityImpact": "PARTIAL"
+							},
+							"baseSeverity": "LOW",
+							"exploitabilityScore": 1.5,
+							"impactScore": 6.4,
+							"acInsufInfo": false,
+							"obtainAllPrivilege": false,
+							"obtainUserPrivilege": false,
+							"obtainOtherPrivilege": false,
+							"userInteractionRequired": false
+						}
+					]
+				},
+				"weaknesses": [
+					{
+						"source": "cna@vuldb.com",
+						"type": "Primary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-377"
+							},
+							{
+								"lang": "en",
+								"value": "CWE-378"
+							}
+						]
+					}
+				],
+				"configurations": null,
+				"references": [
+					{
+						"url": "https://github.com/SwayZGl1tZyyy/n-days/blob/main/mihomo-party/README.md",
+						"source": "cna@vuldb.com",
+						"tags": null
+					},
+					{
+						"url": "https://github.com/SwayZGl1tZyyy/n-days/blob/main/mihomo-party/README.md#proof-of-concept-1",
+						"source": "cna@vuldb.com",
+						"tags": null
+					},
+					{
+						"url": "https://vuldb.com/?ctiid.321343",
+						"source": "cna@vuldb.com",
+						"tags": null
+					},
+					{
+						"url": "https://vuldb.com/?id.321343",
+						"source": "cna@vuldb.com",
+						"tags": null
+					},
+					{
+						"url": "https://vuldb.com/?submit.634656",
+						"source": "cna@vuldb.com",
+						"tags": null
+					}
+				]
+			}
+		},
+		{
+			"cve": {
+				"id": "CVE-2025-41702",
+				"sourceIdentifier": "info@cert.vde.com",
+				"published": "2025-08-26T06:15:32.923",
+				"lastModified": "2025-08-26T13:41:58.950",
+				"vulnStatus": "Awaiting Analysis",
+				"cveTags": [],
+				"descriptions": [
+					{
+						"lang": "en",
+						"value": "The JWT secret key is embedded in the egOS WebGUI backend and is readable to the default user. An unauthenticated remote attacker can generate valid HS256 tokens and bypass authentication/authorization due to the use of hard-coded cryptographic key."
+					},
+					{
+						"lang": "es",
+						"value": "La clave secreta JWT está integrada en el backend de egOS WebGUI y es legible para el usuario predeterminado. Un atacante remoto no autenticado puede generar tokens HS256 válidos y eludir la autenticación/autorización mediante el uso de una clave criptográfica codificada."
+					}
+				],
+				"metrics": {
+					"cvssMetricV40": null,
+					"cvssMetricV31": [
+						{
+							"source": "info@cert.vde.com",
+							"type": "Primary",
+							"cvssData": {
+								"version": "3.1",
+								"vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+								"baseScore": 9.8,
+								"baseSeverity": "CRITICAL",
+								"attackVector": "NETWORK",
+								"attackComplexity": "LOW",
+								"privilegesRequired": "NONE",
+								"userInteraction": "NONE",
+								"scope": "UNCHANGED",
+								"confidentialityImpact": "HIGH",
+								"integrityImpact": "HIGH",
+								"availabilityImpact": "HIGH"
+							},
+							"exploitabilityScore": 3.9,
+							"impactScore": 5.9
+						}
+					],
+					"cvssMetricV30": null,
+					"cvssMetricV2": null
+				},
+				"weaknesses": [
+					{
+						"source": "info@cert.vde.com",
+						"type": "Primary",
+						"description": [
+							{
+								"lang": "en",
+								"value": "CWE-321"
+							}
+						]
+					}
+				],
+				"configurations": null,
+				"references": [
+					{
+						"url": "https://certvde.com/de/advisories/VDE-2025-076",
+						"source": "info@cert.vde.com",
+						"tags": null
+					}
+				]
+			}
+		}
+	]
+}
