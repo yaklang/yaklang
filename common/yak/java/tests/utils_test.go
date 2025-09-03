@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	test.SetLanguage("java", java2ssa.Builder)
+	test.SetLanguage("java", java2ssa.CreateBuilder)
 }
 
 func CheckJavaTestCase(t *testing.T, tc test.TestCase) {

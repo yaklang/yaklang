@@ -20,7 +20,7 @@ import (
 )
 
 type SSABuild struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
 var Builder ssa.Builder = &SSABuild{}
@@ -30,22 +30,24 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	return extension == ".php" || extension == ".lock"
 }
 
-func (s *SSABuild) Create() ssa.Builder {
-	return &SSABuild{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
-			ssa.WithLanguageConfigSupportConstMethod(true),
-			ssa.WithLanguageConfigBind(true),
-			ssa.WithLanguageConfigTryBuildValue(true),
-			ssa.WithLanguageConfigSupportClass(true),
-			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
-			ssa.WithLanguageConfigVirtualImport(true),
-			ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
-				//php 默认应该include所有内容
-				return true
-			}),
-			ssa.WithLanguageBuilder(s),
-		),
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuild{
+		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
 	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigSupportConstMethod(true),
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigTryBuildValue(true),
+		ssa.WithLanguageConfigSupportClass(true),
+		ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
+			//php 默认应该include所有内容
+			return true
+		}),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
@@ -186,10 +188,7 @@ func FrondEnd(src string) (phpparser.IHtmlDocumentContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.HtmlDocument()
-	if len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return ast, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 func (b *builder) AssignConst(name string, value ssa.Value) bool {

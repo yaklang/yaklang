@@ -6,35 +6,40 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	yak "github.com/yaklang/yaklang/common/yak/antlr4yak/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-type singleFileBuilder struct {
-	*ssa.PreHandlerInit
+type SSABuilder struct {
+	*ssa.PreHandlerBase
 }
 
-var _ ssa.Builder = (*singleFileBuilder)(nil)
-var Builder = &singleFileBuilder{}
+var _ ssa.Builder = (*SSABuilder)(nil)
 
-func (s *singleFileBuilder) Create() ssa.Builder {
-	return &singleFileBuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit().WithLanguageConfigOpts(
-			ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
-				return true
-			}),
-			ssa.WithLanguageBuilder(s),
-		),
+// var Builder = &singleFileBuilder{}
+func Biulder() *SSABuilder {
+	return &SSABuilder{}
+}
+
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(),
 	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
+			return true
+		}),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
 
-func (*singleFileBuilder) ParseAST(src string) (ssa.FrontAST, error) {
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
 	return FrontEnd(src)
 }
 
-func (*singleFileBuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder) error {
+func (*SSABuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder) error {
 	b.SupportClosure = true
 	astBuilder := &astbuilder{
 		FunctionBuilder: b,
@@ -43,16 +48,16 @@ func (*singleFileBuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder)
 	return nil
 }
 
-func (*singleFileBuilder) FilterFile(path string) bool {
+func (*SSABuilder) FilterFile(path string) bool {
 	a := filepath.Ext(path)
 	_ = a
 	return filepath.Ext(path) == ".yak"
 }
-func (*singleFileBuilder) FilterPreHandlerFile(path string) bool {
+func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return filepath.Ext(path) == ".yak" || filepath.Ext(path) == ".yaklang"
 }
 
-func (*singleFileBuilder) GetLanguage() consts.Language {
+func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.Yak
 }
 
@@ -71,9 +76,5 @@ func FrontEnd(src string) (yak.IProgramContext, error) {
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.Program()
-	var err error
-	if len(errListener.GetErrors()) != 0 {
-		err = utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
-	}
-	return ast, err
+	return ast, errListener.Error()
 }
