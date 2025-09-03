@@ -18,6 +18,7 @@ func (c *config) getFileHandler(
 	filesystem filesys_interface.FileSystem,
 	preHandlerFiles []string,
 	handlerFilesMap map[string]struct{},
+	concurrency int,
 ) <-chan *ssareducer.FileContent {
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
@@ -38,5 +39,6 @@ func (c *config) getFileHandler(
 			}
 			return nil, utils.Errorf("not select language %s", c.language)
 		},
+		concurrency,
 	)
 }

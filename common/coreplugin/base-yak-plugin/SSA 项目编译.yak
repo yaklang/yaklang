@@ -318,6 +318,11 @@ reCompile := cli.Bool("re-compile",
     cli.setCliGroup("compile"),
     cli.setDefault(true),
 )
+concurrency := cli.Int("concurrency",
+    cli.setVerboseName("并发数"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(10),
+)
 // }}
 
 // {{ 项目额外信息
@@ -361,6 +366,7 @@ opts = [
     ssa.withConfigInfo(info),
     ssa.withPeepholeSize(peepholeSize),
     ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~,
+    ssa.withConcurrency(concurrency),
 ]
 if len(entry) != 0{
     opts = append(opts, ssa.withEntryFile(entry...))

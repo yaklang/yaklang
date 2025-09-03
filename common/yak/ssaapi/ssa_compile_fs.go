@@ -155,7 +155,7 @@ func (c *config) parseProjectWithFS(
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 		start = time.Now()
 		for fileContent := range c.getFileHandler(
-			filesystem, preHandlerFiles, handlerFilesMap,
+			filesystem, preHandlerFiles, handlerFilesMap, c.concurrency,
 		) {
 			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
 
