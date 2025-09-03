@@ -286,7 +286,7 @@ func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopTo
 }
 
 func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopToken) *Variable {
-	if variable := b.getCrossScopeVariable(name); variable != nil {
+	if variable, ok := b.getCrossScopeVariable(name); ok {
 		if value := variable.GetValue(); value != nil {
 			return variable
 		}
@@ -295,7 +295,7 @@ func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopTo
 }
 
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
-	if variable := b.getCurrentScopeVariable(name); variable != nil {
+	if variable, ok := b.getCurrentScopeVariable(name); ok {
 		if value := variable.GetValue(); value != nil {
 			if _, ok := ToConstInst(value); ok {
 				return variable
@@ -432,18 +432,18 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	return nil, false
 }
 
-func (b *FunctionBuilder) getCurrentScopeVariable(name string) *Variable {
+func (b *FunctionBuilder) getCurrentScopeVariable(name string) (*Variable, bool) {
 	scope := b.CurrentBlock.ScopeTable
 	if variable := ReadVariableFromScope(scope, name); variable != nil {
-		return variable
+		return variable, true
 	}
-	return nil
+	return nil, false
 }
 
-func (b *FunctionBuilder) getCrossScopeVariable(name string) *Variable {
+func (b *FunctionBuilder) getCrossScopeVariable(name string) (*Variable, bool) {
 	scope := b.CurrentBlock.ScopeTable
 	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
-		return variable
+		return variable, true
 	}
-	return nil
+	return nil, false
 }
