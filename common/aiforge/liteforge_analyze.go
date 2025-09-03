@@ -48,7 +48,6 @@ func AnalyzeFile(path string, option ...any) (<-chan AnalysisResult, error) {
 		return nil, fmt.Errorf("connot detect mime type '%s': %w", path, err)
 	}
 
-	analyzeConfig.AnalyzeStatusCard("Auto Analysis file type", mime.String())
 	if mime.IsVideo() {
 		analyzeConfig.AnalyzeLog("file is video: %s", path)
 		return AnalyzeVideo(path, option...)
@@ -60,7 +59,7 @@ func AnalyzeFile(path string, option ...any) (<-chan AnalysisResult, error) {
 
 func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, error) {
 	analyzeConfig := NewAnalysisConfig(opts...)
-	analyzeConfig.AnalyzeStatusCard("Raw Analysis", "make chunks from raw data")
+	analyzeConfig.AnalyzeStatusCard("Analysis", "make chunks from raw data")
 	chunkOption := []chunkmaker.Option{chunkmaker.WithCtx(analyzeConfig.Ctx)}
 	chunkOption = append(chunkOption, analyzeConfig.chunkOption...)
 
@@ -76,7 +75,7 @@ func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, err
 			analyzeConfig.AnalyzeLog("chunk index[%d] size:%v ", count, utils.ByteSize(uint64(chunk.BytesSize())))
 			indexedChannel.SafeFeed(chunk)
 			count++
-			analyzeConfig.AnalyzeStatusCard("[analyze media]:extract chunk", count)
+			analyzeConfig.AnalyzeStatusCard("[raw]:extract chunk", count)
 			return nil
 		}),
 		aireducer.WithContext(analyzeConfig.Ctx),
@@ -109,9 +108,9 @@ func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, err
 	},
 		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency),
 		utils.WithParallelProcessStartCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("Raw Analysis", "processing raw chunk")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "processing raw chunk")
 		}),
 		utils.WithParallelProcessFinishCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("Raw Analysis", "finished analysis")
+			analyzeConfig.AnalyzeStatusCard("Analysis", "finished preliminary analysis")
 		})), nil
 }

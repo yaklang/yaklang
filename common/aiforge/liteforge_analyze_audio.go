@@ -78,7 +78,7 @@ func AnalyzeAudioFile(audio string, opts ...any) (<-chan *AudioAnalysisResult, e
 	var analyzeConfig = NewAnalysisConfig(opts...)
 	analyzeConfig.fallbackOptions = append(analyzeConfig.fallbackOptions, WithOutputJSONSchema(AUDIO_OUTPUT_SCHEMA))
 
-	analyzeConfig.AnalyzeStatusCard("Audio Analysis", "cover audio file to srt")
+	analyzeConfig.AnalyzeStatusCard("Analysis", "cover audio file to srt")
 	analyzeConfig.AnalyzeLog("start to analyze audio file: %s", audio)
 	srtPath, err := mediautils.ConvertMediaToSRT(audio)
 	if err != nil {
@@ -210,14 +210,14 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 
 	go func() {
 		defer resultChan.Close()
-		analyzeConfig.AnalyzeStatusCard("Audio Analysis", "analyzing rst file")
+		analyzeConfig.AnalyzeStatusCard("Analysis", "analyzing rst file")
 		analyzeConfig.AnalyzeLog("start analyzing srt file: %s", srtPath)
 		err = srtReducer.Run()
 		if err != nil {
 			analyzeConfig.AnalyzeLog("analyze srt file error: %s", err.Error())
 			return
 		}
-		analyzeConfig.AnalyzeStatusCard("Audio Analysis", "finish")
+		analyzeConfig.AnalyzeStatusCard("Analysis", "Audio finish")
 		analyzeConfig.AnalyzeLog("analyzing srt file finish")
 	}()
 	return resultChan.OutputChannel(), nil
