@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
@@ -25,6 +26,9 @@ func (b *FunctionBuilder) SetRange(token CanStartStopToken) func() {
 	if r == nil {
 		return func() {}
 	}
+	return b.SetRangePure(r)
+}
+func (b *FunctionBuilder) SetRangePure(r *memedit.Range) func() {
 	backup := b.CurrentRange
 	b.CurrentRange = r
 
@@ -136,6 +140,9 @@ func GetEndPosition(t antlr.Token) (int, int) {
 }
 
 func GetRange(editor *memedit.MemEditor, token CanStartStopToken) *memedit.Range {
+	if utils.IsNil(token) {
+		return nil
+	}
 	startToken := token.GetStart()
 	endToken := token.GetStop()
 	if startToken == nil || endToken == nil {
