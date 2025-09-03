@@ -223,6 +223,7 @@ func (c *config) parseProjectWithFS(
 			}
 			path := fileContent.Path
 			ast := fileContent.AST
+			fileContent.AST = nil // clear AST
 			defer func() {
 				if r := recover(); r != nil {
 					log.Errorf("parse [%s] error %v  ", path, r)
@@ -236,6 +237,7 @@ func (c *config) parseProjectWithFS(
 				continue
 			}
 		}
+		fileContents = make([]*ssareducer.FileContent, 0)
 		parseTime = time.Since(start)
 		if c.isStop() {
 			return ErrContextCancel

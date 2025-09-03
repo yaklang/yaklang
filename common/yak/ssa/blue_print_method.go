@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils"
 
 	"golang.org/x/exp/slices"
@@ -74,9 +75,12 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 		}
 	})
 	if utils.IsNil(_method) {
-		if c.Tokenizer != nil {
-			recoverRng := fb.SetRange(c.Tokenizer)
-			defer recoverRng()
+		if c.Range != nil {
+			backup := fb.CurrentRange
+			fb.CurrentRange = c.Range
+			defer func() {
+				fb.CurrentRange = backup
+			}()
 		}
 
 		switch name {
