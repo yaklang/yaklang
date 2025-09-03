@@ -16,7 +16,7 @@ var codeFs embed.FS
 
 func validateSource(t *testing.T, filename string, src string) {
 	t.Run(fmt.Sprintf("syntax file: %v", filename), func(t *testing.T) {
-		_, err := java2ssa.Frontend(src, false)
+		_, err := java2ssa.Frontend(src)
 		require.Nil(t, err, "parse AST FrontEnd error : %v", err)
 	})
 }

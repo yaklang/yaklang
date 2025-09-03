@@ -111,7 +111,7 @@ var JavaDecompilerSelfChecking = &cli.Command{
 			//vfs := filesys.NewVirtualFs()
 			//vfs.AddFile("origin.java", results)
 
-			_, err = java2ssa.Frontend(results, false)
+			_, err = java2ssa.Frontend(results)
 			if err != nil {
 				atomic.AddInt64(decompilerSyntaxErrorCount, 1)
 				if c.Bool("verbose") {

@@ -281,6 +281,7 @@ func (c *config) parseProjectWithFS(
 		return nil
 	}
 	f6 := func() error {
+		c.LanguageBuilder.Clearup()
 		wg.Wait()
 		return nil
 	}
