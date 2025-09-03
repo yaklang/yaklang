@@ -1,0 +1,62 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+query := cli.String("query", cli.setVerboseName("查询问题"),cli.setRequired(true))
+
+enhancePlan := cli.StringSlice("enhancePlan", cli.setVerboseName("增强搜索方案"),
+cli.setSelectOption("假设回答", "hypothetical_answer" ),
+cli.setSelectOption("假设并多次查询","hypothetical_answer_with_split" ),
+cli.setSelectOption("多次查询", "split_query" ),
+cli.setSelectOption("泛化回答", "generalize_query" ),
+   )
+kbName := cli.String("kbName", cli.setVerboseName("知识库名"))
+limit := cli.Int("limit", cli.setVerboseName("结果数量限制"),cli.setDefault(20))
+concurrent := cli.Int("concurrent", cli.setVerboseName("并发数"),cli.setDefault(20))
+score := cli.Float("score", cli.setVerboseName("结果分数限制"))
+cli.check()
+
+
+option := [
+rag.queryCtx(context.Background()),
+rag.queryLimit(limit),
+rag.queryConcurrent(concurrent),
+]
+
+if len(enhancePlan) > 0 {
+    option = append(option, rag.queryEnhance(enhancePlan[0]))
+}
+
+if kbName != "" {
+    option = append(option, rag.queryCollection(kbName))
+}
+
+if score > 0 {
+    option = append(option, rag.queryScoreLimit(score))
+}
+
+
+tablename := "检索结果"
+columnContent := "内容"
+columnScore := "分数"
+columnSource := "来源"
+columnTime := "时间"
+
+yakit.EnableTable(tablename, [columnContent,columnScore,columnSource,columnTime])
+
+addData = func(data,score,source,timeString) {
+    yakit.TableData(tablename, {
+        columnContent:data,
+        columnScore:score,
+        columnSource:source,
+        columnTime:timeString
+    })
+}
+
+for i in rag.Query(query, option...)~ {
+    if i.Type == "message" {
+        yakit.Info(i.Message)
+        continue
+    }
+    addData(json.dumps(i.Data),i.Score,i.Source,timestampToDatetime(i.Timestamp))
+}

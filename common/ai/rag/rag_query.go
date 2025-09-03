@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"sort"
 	"strconv"
 	"strings"
@@ -139,6 +140,10 @@ type RAGSearchResult struct {
 	Score     float64     `json:"score"`     // 相似度分数
 	Source    string      `json:"source"`    // 结果来源（集合名称）
 	Timestamp int64       `json:"timestamp"` // 时间戳
+}
+
+func QueryYakitProfile(query string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
+	return Query(consts.GetGormProfileDatabase(), query, opts...)
 }
 
 // Query 在RAG系统中搜索多个集合
