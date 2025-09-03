@@ -326,12 +326,6 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 				if err := recover(); err != nil {
 					log.Warnf("reasonStreamHandler panic: %v", err)
 				}
-
-				var restedBuffer bytes.Buffer
-				n, _ := io.Copy(io.Discard, io.TeeReader(reasonPr, &restedBuffer))
-				if n > 0 {
-					log.Warnf("reasonPr has unread data, maybe reasonStreamHandler exited early, recovered data length: %d, data: %v", n, utils.ShrinkString(restedBuffer.String(), 400))
-				}
 			}()
 			reasonStreamHandler(reasonPr)
 		}()
@@ -356,15 +350,6 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 			result := mergeReasonIntoOutputStream(reasonPr, pr)
 			streamReader = io.TeeReader(result, &body)
 		}
-
-		defer func() {
-			// if cancel is not nil, call it
-			var recoveredBuffer bytes.Buffer
-			n, _ := io.Copy(io.Discard, io.TeeReader(streamReader, &recoveredBuffer))
-			if n > 0 {
-				log.Warnf("streamReader has unread data, maybe streamHandler exited early, recovered data: %v", utils.ShrinkString(recoveredBuffer.String(), 400))
-			}
-		}()
 
 		if streamHandler != nil {
 			streamHandler(streamReader)
