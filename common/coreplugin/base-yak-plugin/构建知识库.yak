@@ -1,0 +1,23 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+filePath := cli.FileNames("files", cli.setVerboseName("分析文件"),cli.setRequired(true))
+kbName := cli.String("kbName", cli.setVerboseName("知识库名"),cli.setDefault("default"),cli.setRequired(true))
+prompt := cli.String("prompt", cli.setVerboseName("补充提示词"))
+entryLength := cli.Int("entrylen", cli.setVerboseName("知识条目长度限制"),cli.setDefault(1000))
+cli.check()
+
+
+for path in filePath {
+    yakit.StatusCard("building target", path)
+    for i in rag.BuildCollectionFromFile(kbName, path,
+        rag.ctx(context.Background()),
+        rag.statusCard(yakit.StatusCard),
+        rag.entryLength(entryLength),
+        rag.extraPrompt(prompt),
+        rag.log(yakit.Info)
+    )~ {
+        yakit.Output(i.KnowledgeTitle)
+    }
+}
