@@ -19,7 +19,7 @@ func TestProcessNonStreamResponse(t *testing.T) {
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processNonStreamResponse(mockResponse, mockCloser, outBuffer, reasonBuffer)
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer)
 
 	expectedContent := "Hello World"
 	expectedReason := "This is my reasoning process"
@@ -49,7 +49,7 @@ data: [DONE]`
 	outBuffer := &bytes.Buffer{}
 	reasonBuffer := &bytes.Buffer{}
 
-	processStreamResponse(mockResponse, mockCloser, outBuffer, reasonBuffer)
+	processAIResponse(mockResponse, mockCloser, outBuffer, reasonBuffer)
 
 	t.Logf("流式内容输出: %s", outBuffer.String())
 	t.Logf("流式推理输出: %s", reasonBuffer.String())
