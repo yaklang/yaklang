@@ -11,7 +11,7 @@ import (
 )
 
 func checkJavaFront(t *testing.T, code string) {
-	_, err := java2ssa.Frontend(code, false)
+	_, err := java2ssa.Frontend(code)
 	require.NoError(t, err)
 }
 

@@ -36,7 +36,7 @@ func CreateBuilder() ssa.Builder {
 }
 
 func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return FrontEnd(src)
+	return FrontEnd(src, s)
 }
 
 func (*SSABuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder) error {
@@ -65,13 +65,18 @@ type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
-func FrontEnd(src string) (yak.IProgramContext, error) {
+func FrontEnd(src string, ssabuilder ...*SSABuilder) (yak.IProgramContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := yak.NewYaklangParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

@@ -38,7 +38,7 @@ func CreateBuilder() ssa.Builder {
 }
 
 func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src, true)
+	return Frontend(src, s)
 }
 
 func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
@@ -83,13 +83,18 @@ type singleFileBuilder struct {
 	isInController bool
 }
 
-func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuilder) (javaparser.ICompilationUnitContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

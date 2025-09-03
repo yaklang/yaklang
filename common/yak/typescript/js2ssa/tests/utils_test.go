@@ -6,5 +6,5 @@ import (
 )
 
 func init() {
-	test.SetLanguage("js", js2ssa.Builder)
+	test.SetLanguage("js", js2ssa.CreateBuilder)
 }

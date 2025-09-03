@@ -100,7 +100,7 @@ func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, b
 	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 func (s *SSABuild) ParseAST(src string) (ssa.FrontAST, error) {
-	return FrondEnd(src)
+	return Frontend(src, s)
 }
 
 // func (s *ssa.BasicBlock) BuildFromAst()
@@ -177,13 +177,18 @@ type builder struct {
 	currentInclude map[string]struct{}
 }
 
-func FrondEnd(src string) (phpparser.IHtmlDocumentContext, error) {
+func Frontend(src string, builders ...*SSABuild) (phpparser.IHtmlDocumentContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(builders) > 0 {
+		builder = builders[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := phpparser.NewPHPParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
