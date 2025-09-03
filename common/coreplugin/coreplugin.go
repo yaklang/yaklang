@@ -304,6 +304,12 @@ func init() {
 			withPluginHelp("将指定文件构建成知识库，支持多种文件格式"),
 			withPluginEnableGenerateParam(true),
 		)
+
+		registerBuildInPlugin(
+			"yak", "检索知识",
+			withPluginHelp("从知识库中语义检索相关知识，返回相关内容"),
+			withPluginEnableGenerateParam(true),
+		)
 		return nil
 	})
 
