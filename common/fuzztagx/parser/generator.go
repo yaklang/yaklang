@@ -97,6 +97,7 @@ type TagExecNode struct {
 	cache           []*FuzzResult
 	getter          func() (*FuzzResult, error)
 	finished        bool
+	finishedMutex   sync.RWMutex
 	isRep           bool
 	isDyn           bool
 	isFlowControl   bool
@@ -198,17 +199,24 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 		case ch <- result:
 		}
 	}
-	var err error
+	var execError error
+	var execErrorLock sync.Mutex
 	getter := func() (*FuzzResult, error) {
-		return <-ch, err
+		execErrorLock.Lock()
+		defer execErrorLock.Unlock()
+		return <-ch, execError
 	}
 
 	go func() {
+		var err error
 		defer func() {
 			if e := recover(); e != nil {
 				err = utils.Error(e)
 			}
 			close(ch)
+			execErrorLock.Lock()
+			execError = err
+			execErrorLock.Unlock()
 			execCtxCancel()
 		}()
 		if f.data.IsFlowControl() {
@@ -221,7 +229,9 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 	newGetter := func() (*FuzzResult, error) {
 		r, err := getter()
 		if r == nil {
+			f.finishedMutex.Lock()
 			f.finished = true
+			f.finishedMutex.Unlock()
 			return nil, err
 		}
 		f.methodCtx.UpdateLabels(f)
@@ -238,19 +248,13 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 	//
 	//}
 
-	if !f.config.AssertError {
-		err = nil
-	}
-	if err != nil {
-		return err
-	}
-	//f.methodCtx.UpdateLabels(f)
-	//f.cache = &res
 	return nil
 }
 func (f *TagExecNode) Exec() (bool, error) {
 	if f.isDyn && f.index >= 1 {
+		f.finishedMutex.Lock()
 		f.finished = true
+		f.finishedMutex.Unlock()
 		f.cache = nil
 		return false, nil
 	}
@@ -281,7 +285,9 @@ func (f *TagExecNode) Exec() (bool, error) {
 }
 func (s *TagExecNode) Reset() {
 	s.index = 0
+	s.finishedMutex.Lock()
 	s.finished = false
+	s.finishedMutex.Unlock()
 	var bp func() error
 	for _, param := range s.params {
 		param.Reset()
@@ -514,11 +520,16 @@ func (g *Generator) generate() (bool, error) {
 			}
 			var execAllFirst func(t ExecNode)
 			execAllFirst = func(t ExecNode) {
-				if v1, ok := t.(*TagExecNode); ok && (v1.isDyn || v1.finished) {
-					for _, param := range v1.params {
-						execAllFirst(param)
+				if v1, ok := t.(*TagExecNode); ok {
+					v1.finishedMutex.RLock()
+					isFinished := v1.finished
+					v1.finishedMutex.RUnlock()
+					if v1.isDyn || isFinished {
+						for _, param := range v1.params {
+							execAllFirst(param)
+						}
+						v1.FirstExec(false, true, true) //在这个节点第一次执行时已经判断了err，这里不用判断了
 					}
-					v1.FirstExec(false, true, true) //在这个节点第一次执行时已经判断了err，这里不用判断了
 				}
 			}
 			for tag, _ := range failedTag {

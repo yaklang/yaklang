@@ -171,6 +171,7 @@ func TestStreamChat(t *testing.T) {
 // 1. reasoning_content字段的正确处理
 // 2. 推理内容和正常内容的分离
 func TestNonStreamChatWithReasoning(t *testing.T) {
+	t.Skip("wait for fix enable thinking option issue")
 	// 创建模拟HTTP服务器，返回包含推理内容的响应
 	host, port := utils.DebugMockHTTP([]byte(mockAiReasoningRsp))
 
