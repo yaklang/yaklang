@@ -308,25 +308,32 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts)
 	wg := new(sync.WaitGroup)
 
-	noMerge := false
-	// handle out and reason
-	if reasonStreamHandler != nil {
-		noMerge = true
-		// reason is not empty, not merge output
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					log.Warnf("reasonStreamHandler panic: %v", err)
-				}
+	// 统一处理reasoning stream handler
+	noMerge := reasonStreamHandler != nil
+
+	// 启动reasoning处理协程（如果需要）
+	startReasonHandler := func() {
+		if reasonStreamHandler != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer func() {
+					if err := recover(); err != nil {
+						log.Warnf("reasonStreamHandler panic: %v", err)
+					}
+				}()
+				reasonStreamHandler(reasonPr)
 			}()
-			reasonStreamHandler(reasonPr)
-		}()
+		}
 	}
 
+	// 统一启动reasoning handler
+	startReasonHandler()
+
+	// 设置流式处理handler（如果需要）
+	var body *bytes.Buffer
 	if streamHandler != nil {
-		var body = bytes.NewBufferString("")
+		body = bytes.NewBufferString("")
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -335,15 +342,20 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 					log.Warnf("streamHandler panic: %v", err)
 				}
 			}()
-			if streamHandler != nil && noMerge {
+			if noMerge {
+				// 分离模式：只处理普通content
 				streamHandler(io.TeeReader(pr, body))
 			} else {
+				// 合并模式：将reasoning包装为<think>标签
 				result := mergeReasonIntoOutputStream(reasonPr, pr)
 				streamHandler(io.TeeReader(result, body))
 			}
 		}()
-		rsp, _, err := poc.DoPOST(url, opts...)
-		_ = rsp
+	}
+
+	// 统一执行HTTP请求
+	doPostErr := func() error {
+		_, _, err := poc.DoPOST(url, opts...)
 		if err != nil {
 			if errHandler != nil {
 				errHandler(err)
@@ -351,48 +363,39 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 			if !utils.IsNil(cancel) {
 				cancel()
 			}
-			wg.Wait()
-			return "", utils.Errorf("request post to %v：%v", url, err)
+			return utils.Errorf("request post to %v：%v", url, err)
 		}
+		return nil
+	}()
+
+	if doPostErr != nil {
+		wg.Wait()
+		return "", doPostErr
+	}
+
+	// 根据处理模式返回结果
+	if streamHandler != nil {
+		// 流式处理：等待所有goroutine完成，返回缓冲的内容
 		wg.Wait()
 		return body.String(), nil
-	}
-
-	_, _, err = poc.DoPOST(url, opts...)
-	if err != nil {
-		if errHandler != nil {
-			errHandler(err)
-		}
-		return "", utils.Errorf("request post to %v：%v", url, err)
-	}
-
-	var reader io.Reader
-	if noMerge {
-		// 如果设置了ReasonStreamHandler，应该分离处理reasoning和normal content
-		// 这里我们只返回normal content，reasoning content通过ReasonStreamHandler处理
-		reader = pr
-		// 启动goroutine处理reasoning content
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					log.Warnf("reasonStreamHandler panic: %v", err)
-				}
-			}()
-			if reasonStreamHandler != nil {
-				reasonStreamHandler(reasonPr)
-			}
-		}()
 	} else {
-		reader = mergeReasonIntoOutputStream(reasonPr, pr)
+		// 非流式处理：直接从reader读取内容
+		var reader io.Reader
+		if noMerge {
+			// 分离模式：只返回普通content，reasoning通过handler处理
+			reader = pr
+		} else {
+			// 合并模式：将reasoning包装为<think>标签
+			reader = mergeReasonIntoOutputStream(reasonPr, pr)
+		}
+
+		bodyRaw, readErr := io.ReadAll(reader)
+		wg.Wait()
+		if readErr != nil {
+			return "", utils.Errorf("read response body failed: %v", readErr)
+		}
+		return string(bodyRaw), nil
 	}
-	bodyRaw, readErr := io.ReadAll(reader)
-	wg.Wait()
-	if readErr != nil {
-		return "", utils.Errorf("read response body failed: %v", readErr)
-	}
-	return string(bodyRaw), nil
 }
 
 func ExtractFromResult(result string, fields map[string]any) (map[string]any, error) {
