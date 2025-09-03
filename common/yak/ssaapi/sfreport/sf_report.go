@@ -1104,8 +1104,6 @@ func loadProjectInfo(report *SSAProjectReport, programName string) error {
 	} else {
 		report.Description = program.Description
 	}
-	report.ScanStartTime = program.CreatedAt
-	report.ScanEndTime = program.UpdatedAt
 	report.EngineVersion = program.EngineVersion
 
 	// 统计文件数量和代码行数
