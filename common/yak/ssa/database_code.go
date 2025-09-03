@@ -221,15 +221,15 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 
 	// user
 	ir.Users = anValue.userList
-
 	// occulatation
 	ir.Occulatation = anValue.occultation
 
 	// object
 	ir.IsObject = anValue.IsObject()
 	if ir.IsObject {
-		ir.ObjectMembers = make(ssadb.Int64Map, 0, anValue.member.Len())
-		anValue.member.ForEach(func(i, v int64) bool {
+		member := anValue.getMemberMap()
+		ir.ObjectMembers = make(ssadb.Int64Map, 0, member.Len())
+		member.ForEach(func(i, v int64) bool {
 			ir.ObjectMembers.Append(i, v)
 			return true
 		})
@@ -243,8 +243,9 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	}
 	// variable
 
-	ir.Variable = make(ssadb.StringSlice, 0, anValue.variables.Len())
-	anValue.variables.ForEach(func(i string, v *Variable) bool {
+	variable := anValue.getVariablesMap()
+	ir.Variable = make(ssadb.StringSlice, 0, variable.Len())
+	variable.ForEach(func(i string, v *Variable) bool {
 		ir.Variable = append(ir.Variable, i)
 		if v.GetValue() == nil {
 			log.Errorf("aa")
@@ -253,7 +254,7 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	})
 
 	// mask
-	anValue.mask.ForEach(func(i string, v int64) bool {
+	anValue.getMaskMap().ForEach(func(i int64, v int64) bool {
 		ir.MaskedCodes = append(ir.MaskedCodes, v)
 		return true
 	})
@@ -286,7 +287,7 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// object
 	ir.ObjectMembers.ForEach(func(key, value int64) {
-		anValue.member.Set(key, value)
+		anValue.getMemberMap(true).Set(key, value)
 	})
 
 	// object member
@@ -302,7 +303,7 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// mask
 	for _, m := range ir.MaskedCodes {
-		anValue.mask.Add(m)
+		anValue.getMaskMap(true).Set(m, m)
 	}
 
 	// reference

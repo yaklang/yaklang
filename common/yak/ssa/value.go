@@ -313,7 +313,9 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 
 func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
 	scope := b.CurrentBlock.ScopeTable
-
+	if utils.IsNil(scope) {
+		return nil
+	}
 	ret := scope.CreateVariable(name, isLocal)
 	variable := ret.(*Variable)
 

@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -11,9 +12,9 @@ import (
 )
 
 type anInstruction struct {
-	fun   Value
+	fun   *Function
 	prog  *Program
-	block Instruction
+	block *BasicBlock
 	R     *memedit.Range
 	// scope *Scope
 
@@ -25,9 +26,9 @@ type anInstruction struct {
 	isExtern     bool
 	isFromDB     bool
 
-	str               string
-	readableName      string
-	readableNameShort string
+	// str               string
+	// readableName      string
+	// readableNameShort string
 }
 
 var _ Instruction = (*anInstruction)(nil)
@@ -38,13 +39,13 @@ func (v *anInstruction) RefreshString() {
 		return
 	}
 	if op := inst.GetOpcode(); op == SSAOpcodeFunction || op == SSAOpcodeBasicBlock {
-		v.str = fmt.Sprintf("[%s]%s", inst.GetOpcode().String(), inst.GetName())
+		// v.str = "[" + inst.GetOpcode().String() + "]" + inst.GetName()
 	} else {
-		v.str = inst.String()
-		v.readableName = LineDisASM(inst)
+		// v.str = inst.String()
+		// v.readableName = LineDisASM(inst)
 	}
 
-	v.readableNameShort = LineShortDisASM(inst)
+	// v.readableNameShort = LineShortDisASM(inst)
 }
 
 func (v *anInstruction) GetSourceCode() string {
@@ -135,8 +136,8 @@ func (i *anInstruction) SetVerboseName(verbose string) {
 	i.verboseName = verbose
 }
 
-func NewInstruction() anInstruction {
-	return anInstruction{
+func NewInstruction() *anInstruction {
+	return &anInstruction{
 		id: -1,
 	}
 }
@@ -270,7 +271,7 @@ func (a *anInstruction) String() string {
 var _ Instruction = (*anInstruction)(nil)
 
 type anValue struct {
-	anInstruction
+	*anInstruction
 
 	typ      Type
 	userList []int64
@@ -283,7 +284,7 @@ type anValue struct {
 
 	// mask is a map, key is variable name, value is variable value
 	// it record the variable is masked by closure function or some scope changed
-	mask *omap.OrderedMap[string, int64]
+	mask *omap.OrderedMap[int64, int64]
 
 	pointer   []int64 // the pointer is point to this value
 	reference int64   // the value is pointed by this value
@@ -293,15 +294,10 @@ type anValue struct {
 
 var defaultAnyType = CreateAnyType()
 
-func NewValue() anValue {
-	return anValue{
+func NewValue() *anValue {
+	return &anValue{
 		anInstruction: NewInstruction(),
 		typ:           defaultAnyType,
-		userList:      make([]int64, 0),
-		member:        omap.NewOrderedMap(map[int64]int64{}),
-
-		variables: omap.NewOrderedMap(map[string]*Variable{}),
-		mask:      omap.NewOrderedMap(map[string]int64{}),
 	}
 }
 
@@ -327,25 +323,46 @@ func (n *anValue) GetKey() Value {
 	return key
 }
 
+var lock = sync.Mutex{}
+
+func (n *anValue) getMemberMap(create ...bool) *omap.OrderedMap[int64, int64] {
+	shouldCreate := false
+	if len(create) > 0 {
+		shouldCreate = create[0]
+	}
+	lock.Lock()
+	defer lock.Unlock()
+	if n.member == nil && shouldCreate {
+		n.member = omap.NewOrderedMap(map[int64]int64{})
+	}
+	return n.member
+}
+
 func (n *anValue) IsObject() bool {
-	if n.member == nil {
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
 		return false
 	}
-	return n.member.Len() != 0
+	return memberMap.Len() != 0
 }
 
 func (n *anValue) AddMember(k, v Value) {
-	// n.member = append(n.member, v)
-	// n.member[k] = v
-	n.member.Set(k.GetId(), v.GetId())
+	n.getMemberMap(true).Set(k.GetId(), v.GetId())
 }
 
 func (n *anValue) DeleteMember(k Value) {
-	n.member.Delete(k.GetId())
+	memberMap := n.getMemberMap()
+	if memberMap != nil {
+		memberMap.Delete(k.GetId())
+	}
 }
 
 func (n *anValue) GetMember(key Value) (Value, bool) {
-	ret, ok := n.member.Get(key.GetId())
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return nil, false
+	}
+	ret, ok := memberMap.Get(key.GetId())
 	if !ok {
 		return nil, false
 	}
@@ -354,7 +371,11 @@ func (n *anValue) GetMember(key Value) (Value, bool) {
 }
 
 func (n *anValue) GetIndexMember(i int) (Value, bool) {
-	id, ok := n.member.GetByIndex(i)
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return nil, false
+	}
+	id, ok := memberMap.GetByIndex(i)
 	if !ok {
 		return nil, false
 	}
@@ -363,7 +384,11 @@ func (n *anValue) GetIndexMember(i int) (Value, bool) {
 }
 
 func (n *anValue) GetStringMember(key string) (Value, bool) {
-	keys := n.member.Keys()
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return nil, false
+	}
+	keys := memberMap.Keys()
 	for index := len(keys) - 1; index >= 0; index-- {
 		i, ok := n.GetValueById(keys[index])
 		if !ok {
@@ -381,7 +406,11 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 }
 
 func (n *anValue) SetStringMember(key string, v Value) {
-	for _, id := range n.member.Keys() {
+	memberMap := n.getMemberMap(true)
+	if memberMap == nil {
+		return
+	}
+	for _, id := range memberMap.Keys() {
 		i, ok := n.GetValueById(id)
 		if !ok {
 			continue
@@ -397,8 +426,12 @@ func (n *anValue) SetStringMember(key string, v Value) {
 }
 
 func (n *anValue) GetAllMember() map[Value]Value {
-	ret := make(map[Value]Value, n.member.Len())
-	for key, value := range n.member.GetMap() {
+	m := n.getMemberMap()
+	if m == nil {
+		return make(map[Value]Value)
+	}
+	ret := make(map[Value]Value, m.Len())
+	for key, value := range m.GetMap() {
 		k, ok1 := n.GetValueById(key)
 		v, ok2 := n.GetValueById(value)
 		if !ok1 || !ok2 {
@@ -411,7 +444,11 @@ func (n *anValue) GetAllMember() map[Value]Value {
 }
 
 func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
-	n.member.ForEach(func(i, v int64) bool {
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return
+	}
+	memberMap.ForEach(func(i, v int64) bool {
 		val1, ok1 := n.GetValueById(i)
 		val2, ok2 := n.GetValueById(v)
 		if !ok1 || !ok2 {
@@ -424,8 +461,15 @@ func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
 func (n *anValue) String() string { return "" }
 
 // has/get user and value
-func (n *anValue) HasUsers() bool  { return len(n.userList) != 0 }
-func (n *anValue) GetUsers() Users { return n.GetUsersByIDs(n.userList) }
+func (n *anValue) HasUsers() bool {
+	return n.userList != nil && len(n.userList) != 0
+}
+func (n *anValue) GetUsers() Users {
+	if len(n.userList) == 0 {
+		return nil
+	}
+	return n.GetUsersByIDs(n.userList)
+}
 
 // for Value
 func (n *anValue) AddUser(u User) {
@@ -436,6 +480,9 @@ func (n *anValue) AddUser(u User) {
 }
 
 func (n *anValue) RemoveUser(u User) {
+	if len(n.userList) == 0 {
+		return
+	}
 	n.userList = utils.RemoveSliceItem(n.userList, u.GetId())
 }
 
@@ -486,44 +533,86 @@ func (n *anValue) SetType(typ Type) {
 	}
 }
 
+func (a *anValue) getVariablesMap(create ...bool) *omap.OrderedMap[string, *Variable] {
+	shouldCreate := false
+	if len(create) > 0 {
+		shouldCreate = create[0]
+	}
+	if a.variables == nil && shouldCreate {
+		a.variables = omap.NewOrderedMap(map[string]*Variable{})
+	}
+	return a.variables
+}
+
 func (a *anValue) GetVariable(name string) *Variable {
-	if ret, ok := a.variables.Get(name); ok {
-		return ret
-	} else {
-		if a.IsFromDB() {
-			v := GetVariableFromDB(a.GetId(), name)
-			a.AddVariable(v)
-			return v
+	variablesMap := a.getVariablesMap()
+	if variablesMap != nil {
+		if ret, ok := variablesMap.Get(name); ok {
+			return ret
 		}
+	}
+	if a.IsFromDB() {
+		v := GetVariableFromDB(a.GetId(), name)
+		a.AddVariable(v)
+		return v
 	}
 	return nil
 }
 
 func (a *anValue) GetLastVariable() *Variable {
-	_, v, _ := a.variables.Last()
+	variablesMap := a.getVariablesMap()
+	if variablesMap == nil {
+		return nil
+	}
+	_, v, _ := variablesMap.Last()
 	return v
 }
 
 func (a *anValue) GetAllVariables() map[string]*Variable {
-	return a.variables.GetMap()
+	variablesMap := a.getVariablesMap()
+	if variablesMap == nil {
+		return make(map[string]*Variable)
+	}
+	return variablesMap.GetMap()
 }
 
 func (a *anValue) AddVariable(v *Variable) {
 	name := v.GetName()
-	a.variables.Set(name, v)
-	a.variables.BringKeyToLastOne(name)
+	m := a.getVariablesMap(true)
+	m.Set(name, v)
+	m.BringKeyToLastOne(name)
+}
+
+func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {
+	shouldCreate := false
+	if len(create) > 0 {
+		shouldCreate = create[0]
+	}
+	if i.mask == nil && shouldCreate {
+		i.mask = omap.NewOrderedMap(map[int64]int64{})
+	}
+	return i.mask
 }
 
 func (i *anValue) AddMask(v Value) {
-	i.mask.Add(v.GetId())
+	id := v.GetId()
+	i.getMaskMap(true).Set(id, id)
 }
 
 func (i *anValue) GetMask() []Value {
-	return i.GetValuesByIDs(i.mask.Values())
+	maskMap := i.getMaskMap()
+	if maskMap == nil {
+		return nil
+	}
+	return i.GetValuesByIDs(maskMap.Values())
 }
 
 func (i *anValue) Masked() bool {
-	return i.mask.Len() != 0
+	maskMap := i.getMaskMap()
+	if maskMap == nil {
+		return false
+	}
+	return maskMap.Len() != 0
 }
 
 func (i *anValue) SetReference(v Value) {
@@ -563,7 +652,7 @@ func (i *anValue) FlatOccultation() []Value {
 			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
-				handler(&p.anValue)
+				handler(p.anValue)
 			}
 		}
 	}
