@@ -169,6 +169,18 @@ func (m *SqliteManager) SaveCVERecord(record *CVERecord) {
 	}
 }
 
+func (m *SqliteManager) SaveCVEVulnerability(vuln *CVEVulnerability) {
+	c, err := vuln.ToCVE(m.DB)
+	if err != nil {
+		log.Error(err)
+	}
+	if c != nil {
+		if db := m.DB.Save(c); db.Error != nil {
+			fmt.Printf("save cve %s failed: %s", c.CVE, db.Error)
+		}
+	}
+}
+
 func (n Nodes) insertProducts(db *gorm.DB) []string {
 	var Vendors []string
 	if len(n.Children) > 0 {

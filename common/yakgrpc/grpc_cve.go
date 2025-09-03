@@ -207,22 +207,24 @@ func (s *Server) UpdateCVEDatabase(req *ypb.UpdateCVEDatabaseRequest, stream ypb
 			if err != nil {
 				return err
 			}
-			var recentData cveresources.CVEYearFile
-			err = json.Unmarshal(raw, &recentData)
+			// 解析CVE 2.0格式
+			var recentDataV2 cveresources.CVEYearFileV2
+			err = json.Unmarshal(raw, &recentDataV2)
 			if err != nil {
-				info(10, "解压最新数据失败: Decompress Latest CVE Data Failed: %s", err.Error())
+				info(10, "解压CVE 2.0数据失败: Failed to parse CVE 2.0 format: %s", err.Error())
 				return err
 			}
-			for _, i := range recentData.CVERecords {
 
-				cve, err := i.ToCVE(db)
+			// 处理CVE 2.0格式
+			for _, vuln := range recentDataV2.Vulnerabilities {
+				cve, err := vuln.ToCVE(db)
 				if err != nil {
 					log.Error(err)
 				}
 				if cve != nil {
 					count++
 					if count%100 == 0 {
-						info(progress, "正在更新最新数据: Updating Latest CVE Data: %d", count)
+						info(progress, "正在更新最新数据(CVE 2.0): Updating Latest CVE Data: %d", count)
 					}
 					err := cveresources.CreateOrUpdateCVE(db, cve.CVE, cve)
 					if err != nil {
