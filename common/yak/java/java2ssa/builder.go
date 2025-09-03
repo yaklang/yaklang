@@ -33,7 +33,6 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	}
 	build := &singleFileBuilder{
 		FunctionBuilder:   b,
-		ast:               ast,
 		constMap:          make(map[string]ssa.Value),
 		fullTypeNameMap:   make(map[string][]string),
 		allImportPkgSlice: make([][]string, 0),
@@ -57,7 +56,6 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 type singleFileBuilder struct {
 	*ssa.FunctionBuilder
-	ast      javaparser.ICompilationUnitContext
 	constMap map[string]ssa.Value
 
 	// for full type name
