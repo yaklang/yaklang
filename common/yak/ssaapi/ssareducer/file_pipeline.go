@@ -25,6 +25,7 @@ func FilesHandler(
 	filesystem filesys_interface.FileSystem,
 	paths []string,
 	handler func(path string, content []byte) (ssa.FrontAST, error),
+	concurrency int,
 ) <-chan *FileContent {
 	bufSize := len(paths)
 	readFilePipe := pipeline.NewPipe[string, *FileContent](
@@ -38,6 +39,7 @@ func FilesHandler(
 				Content: content,
 			}, nil
 		},
+		concurrency,
 	)
 	readFilePipe.FeedSlice(paths)
 
@@ -48,6 +50,7 @@ func FilesHandler(
 			fileContent.Err = err
 			return fileContent, nil
 		},
+		concurrency,
 	)
 	parseASTPipe.FeedChannel(readFilePipe.Out())
 
