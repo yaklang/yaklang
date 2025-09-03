@@ -298,6 +298,12 @@ func init() {
 			withPluginAuthors("intSheep"),
 			withPluginHelp("SQL注入检测，针对高风险的HTTP Header(如X-Forwarded-For、Referer)进行SQL注入检测"),
 		)
+
+		registerBuildInPlugin(
+			"yak", "构建知识库",
+			withPluginHelp("将指定文件构建成知识库，支持多种文件格式"),
+			withPluginEnableGenerateParam(true),
+		)
 		return nil
 	})
 
