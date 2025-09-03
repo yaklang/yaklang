@@ -982,4 +982,96 @@ func TestPayload(t *testing.T) {
 		}
 	})
 
+	t.Run("ExportBatchPayload", func(t *testing.T) {
+		data := "123\n456\n"
+		// 文件型 group
+		groupFile1, groupFile2 := uuid.NewString(), uuid.NewString()
+		save2file(local, t, groupFile1, "", data)
+		save2file(local, t, groupFile2, "", data)
+
+		// 数据库型 group
+		groupDB1, groupDB2 := uuid.NewString(), uuid.NewString()
+		save2database(local, t, groupDB1, "", data)
+		save2database(local, t, groupDB2, "", data)
+
+		saveDir, err := os.MkdirTemp("", "temp-payload")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			deleteGroup(local, t, groupFile1)
+			deleteGroup(local, t, groupFile2)
+			deleteGroup(local, t, groupDB1)
+			deleteGroup(local, t, groupDB2)
+			os.RemoveAll(saveDir)
+		}()
+
+		groups := []string{groupFile1, groupFile2, groupDB1, groupDB2}
+		results := exportBatchPayload(local, t, groups, saveDir)
+
+		// 校验文件型 group
+		for _, g := range []string{groupFile1, groupFile2} {
+			content, ok := results[g+".txt"]
+			if !ok {
+				t.Fatalf("expected txt result for group %s", g)
+			}
+			comparePayload(content, data, t)
+		}
+
+		// 校验数据库型 group
+		for _, g := range []string{groupDB1, groupDB2} {
+			content, ok := results[g+".csv"]
+			if !ok {
+				t.Fatalf("expected csv result for group %s", g)
+			}
+			// csv 应该有 header + 数据
+			lines := strings.Split(strings.TrimSpace(content), "\n")
+			if len(lines) != 1+len(strings.Split(strings.TrimSpace(data), "\n")) {
+				t.Fatalf("unexpected csv line count for group %s: got %d", g, len(lines))
+			}
+			if lines[0] != "content,hit_count" {
+				t.Fatalf("expected csv header in group %s, got %s", g, lines[0])
+			}
+		}
+	})
+
+}
+
+func exportBatchPayload(local ypb.YakClient, t *testing.T, groups []string, saveDir string) map[string]string {
+	t.Helper()
+	client, err := local.ExportBatchPayload(context.Background(), &ypb.ExportBatchPayloadRequest{
+		Groups:   groups,
+		SavePath: saveDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for {
+		re, err := client.Recv()
+		if err != nil {
+			t.Log("batch export stream end:", err)
+			break
+		}
+		t.Log("progress:", re.Progress)
+	}
+
+	// 读取导出结果
+	results := make(map[string]string)
+	for _, g := range groups {
+		// 文件型 group → txt，数据库型 group → csv
+		txtPath := filepath.Join(saveDir, fmt.Sprintf("%s.txt", g))
+		csvPath := filepath.Join(saveDir, fmt.Sprintf("%s.csv", g))
+
+		if _, err := os.Stat(txtPath); err == nil {
+			content, _ := os.ReadFile(txtPath)
+			results[g+".txt"] = string(content)
+		} else if _, err := os.Stat(csvPath); err == nil {
+			content, _ := os.ReadFile(csvPath)
+			results[g+".csv"] = string(content)
+		} else {
+			t.Fatalf("no exported file found for group %s", g)
+		}
+	}
+	return results
 }
