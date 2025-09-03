@@ -478,3 +478,12 @@ func GetAllPayloadGroupName(db *gorm.DB) ([]string, error) {
 	})
 	return groups, nil
 }
+
+func GetPayload(db *gorm.DB, groups []string) ([]*schema.Payload, error) {
+	var req []*schema.Payload
+	if db := db.Model(&schema.Payload{}).Where("`group` in (?) ", groups).Scan(&req); db.Error != nil {
+		return nil, utils.Wrapf(db.Error, "get Payload by groups  failed: %s", db.Error)
+	} else {
+		return req, nil
+	}
+}
