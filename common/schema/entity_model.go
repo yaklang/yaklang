@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 
@@ -16,7 +15,11 @@ type EntityBaseInfo struct {
 	gorm.Model
 	EntityBaseName string
 	Description    string
-	HiddenIndex    string
+	HiddenIndex    string `gorm:"unique_index"`
+}
+
+func (e *EntityBaseInfo) TableName() string {
+	return "entity_base_info"
 }
 
 func (e *EntityBaseInfo) ToGRPC() *ypb.EntityRepository {
@@ -24,6 +27,7 @@ func (e *EntityBaseInfo) ToGRPC() *ypb.EntityRepository {
 		ID:          int64(e.ID),
 		Name:        e.EntityBaseName,
 		Description: e.Description,
+		HiddenIndex: e.HiddenIndex,
 	}
 }
 
@@ -42,7 +46,11 @@ type ERModelEntity struct {
 
 	Attributes MetadataMap `gorm:"type:text" json:"attributes"`
 
-	HiddenIndex string
+	HiddenIndex string `gorm:"unique_index"`
+}
+
+func (e *ERModelEntity) TableName() string {
+	return "er_model_entity"
 }
 
 func (e *ERModelEntity) BeforeSave() error {
@@ -56,6 +64,7 @@ func (e *ERModelEntity) ToGRPC() *ypb.Entity {
 	return &ypb.Entity{
 		ID:          uint64(e.ID),
 		BaseID:      uint64(e.EntityBaseID),
+		BaseIndex:   e.EntityBaseIndex,
 		Name:        e.EntityName,
 		Type:        e.EntityType,
 		Description: e.Description,
@@ -150,17 +159,6 @@ func (r *ERModelRelationship) BeforeSave() error {
 	return nil
 }
 
-func ERMPatch(db *gorm.DB) {
-	if err := db.Model(&EntityBaseInfo{}).AddUniqueIndex("base_index", "hidden_index").Error; err != nil {
-		log.Errorf("failed to add unique index on entity_base_info.hidden_index: %v", err)
-	}
-
-	if err := db.Model(&ERModelEntity{}).AddUniqueIndex("entity_index", "hidden_index").Error; err != nil {
-		log.Errorf("failed to add unique index on er_model_entity.hidden_index: %v", err)
-	}
-
-}
-
 func init() {
 	// 注册数据库表结构到系统中
 	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE,
@@ -169,7 +167,5 @@ func init() {
 		//&ERModelAttribute{},
 		&ERModelRelationship{},
 	)
-
-	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE)
 
 }

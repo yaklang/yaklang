@@ -3,7 +3,6 @@ package schema
 import (
 	"database/sql/driver"
 	"encoding/json"
-	"github.com/google/uuid"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -298,15 +297,6 @@ type KnowledgeBaseEntry struct {
 
 	// 潜在问题向量，用于快速搜索潜在问题
 	PotentialQuestionsVector FloatArray `gorm:"type:text" json:"potential_questions_vector"`
-
-	HiddenIndex string `gorm:"index;unique;"`
-}
-
-func (e *KnowledgeBaseEntry) BeforeSave() error {
-	if e.HiddenIndex == "" {
-		e.HiddenIndex = uuid.NewString()
-	}
-	return nil
 }
 
 func init() {

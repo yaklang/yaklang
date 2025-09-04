@@ -27,7 +27,9 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	db = db.Model(&schema.ERModelEntity{})
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", entityFilter.IDs)
 	db = bizhelper.ExactQueryString(db, "entity_base_index", entityFilter.BaseIndex)
-	db = bizhelper.ExactQueryInt64(db, "entity_base_id", int64(entityFilter.BaseID))
+	if entityFilter.BaseID > 0 {
+		db = bizhelper.ExactQueryInt64(db, "entity_base_id", int64(entityFilter.BaseID))
+	}
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Names)
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "hidden_index", entityFilter.HiddenIndex)
@@ -151,13 +153,14 @@ type AttributeFilter struct {
 //	return db.Create(attribute).Error
 //}
 
-func AddRelationship(db *gorm.DB, sourceIndex, targetIndex string, RelationshipType, decisionRationale string, attrs map[string]any) error {
+func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, RelationshipType, decisionRationale string, attrs map[string]any) error {
 	Relationship := schema.ERModelRelationship{
 		SourceEntityIndex: sourceIndex,
 		TargetEntityIndex: targetIndex,
 		RelationshipType:  RelationshipType,
 		DecisionRationale: decisionRationale,
 		Attributes:        attrs,
+		EntityBaseIndex:   baseIndex,
 	}
 	Relationship.Hash = Relationship.CalcHash()
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -193,7 +196,10 @@ func FilterRelationships(db *gorm.DB, relationshipFilter *ypb.RelationshipFilter
 	if relationshipFilter == nil {
 		return db
 	}
-	db = bizhelper.PrefixQueryString(db, "entity_base_index", relationshipFilter.BaseIndex)
+	if relationshipFilter.BaseID > 0 {
+		db = bizhelper.ExactQueryInt64(db, "entity_base_id", int64(relationshipFilter.BaseID))
+	}
+	db = bizhelper.ExactQueryString(db, "entity_base_index", relationshipFilter.BaseIndex)
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", relationshipFilter.IDs)
 	db = bizhelper.ExactQueryMultipleStringArrayOr(db, []string{"source_entity_index", "target_entity_index"}, relationshipFilter.AboutEntityIndex)
 	db = bizhelper.ExactQueryStringArrayOr(db, "source_entity_index", relationshipFilter.SourceEntityIndex)

@@ -166,7 +166,7 @@ func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 //--- Relationship Operations ---
 
 func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, RelationshipType string, decisionRationale string, attr map[string]any) error {
-	return yakit.AddRelationship(eb.db, sourceIndex, targetIndex, RelationshipType, decisionRationale, attr)
+	return yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.baseInfo.HiddenIndex, RelationshipType, decisionRationale, attr)
 }
 
 func (eb *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {

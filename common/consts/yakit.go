@@ -32,8 +32,7 @@ func CreateProjectDatabase(path string) (*gorm.DB, error) {
 		return nil, err
 	}
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
-	doHTTPFlowPatch(db)
-	doDBRiskPatch(db)
+	schema.ApplyPatches(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 	return db, nil
 }
 
@@ -43,6 +42,7 @@ func CreateProfileDatabase(path string) (*gorm.DB, error) {
 		return nil, err
 	}
 	schema.AutoMigrate(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
+	schema.ApplyPatches(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
 	return db, nil
 }
 
@@ -146,6 +146,11 @@ func initYakitDatabase() {
 		schema.SetDefaultSSADatabase(ssaprojectDatabase)
 		SetGormSSAProjectDatabase(ssaprojectDatabase)
 	})
+}
+
+func init() {
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_YAKIT_DATABASE, doHTTPFlowPatch)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_YAKIT_DATABASE, doDBRiskPatch)
 }
 
 func doHTTPFlowPatch(db *gorm.DB) {

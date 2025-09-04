@@ -49,12 +49,15 @@ func setupTestData(t *testing.T) (entityBaseIndex, entityBaseName string, entity
 	}
 
 	// 创建关系
-	relationshipType = "relType"
+	relationshipType = uuid.NewString()
 	r := &schema.ERModelRelationship{
 		EntityBaseID:      entityBaseID,
+		EntityBaseIndex:   entityBaseIndex,
 		SourceEntityID:    entities[0].ID,
-		RelationshipType:  relationshipType,
 		TargetEntityID:    entities[1].ID,
+		SourceEntityIndex: entities[0].HiddenIndex,
+		TargetEntityIndex: entities[1].HiddenIndex,
+		RelationshipType:  relationshipType,
 		DecisionRationale: "Test Relationship",
 		Attributes:        schema.MetadataMap{"relAttr": "relVal"},
 	}
