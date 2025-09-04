@@ -64,7 +64,7 @@ jobs:
           # - name: "These Testcase Need to Improve"
           #   run: |
           #     go test -timeout 20s ./common/utils/pprofutils/...
-          - name: "Test in 2min"
+          - name: "Test gRPC in 2min"
             run: |
               # these tests are very quick
               go test -timeout 20s ./common/chunkmaker/...
@@ -322,6 +322,9 @@ jobs:
 
       - name: ${{ matrix.name }}
         run: |
+          echo "Running test: ${{ matrix.name }}"
+          set -o pipefail
+          set -e
           ${{ matrix.run }}
 
       - name: Upload failure grpc log
