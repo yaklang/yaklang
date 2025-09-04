@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
+	"github.com/yaklang/yaklang/common/ai/rag/pq"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"golang.org/x/exp/maps"
@@ -17,68 +19,34 @@ import (
 
 type Vector = func() []float32
 
+// InputNode 输入节点，用于接收外部输入数据
+type InputNode[K cmp.Ordered] struct {
+	Key   K
+	Value []float32
+}
+
+// MakeInputNode 创建输入节点
+func MakeInputNode[K cmp.Ordered](key K, vec []float32) InputNode[K] {
+	return InputNode[K]{Key: key, Value: vec}
+}
+
+// MakeInputNodeFromVector 从Vector函数创建输入节点
+func MakeInputNodeFromVector[K cmp.Ordered](key K, vec Vector) InputNode[K] {
+	return InputNode[K]{Key: key, Value: vec()}
+}
+
+// ToVector 将输入节点转换为Vector函数
+func (n InputNode[K]) ToVector() Vector {
+	return func() []float32 { return n.Value }
+}
+
 // FilterFunc is a callback function used to filter nodes during search.
 // It returns true if the node should be included in the results, false otherwise.
 type FilterFunc[K cmp.Ordered] func(key K, vector Vector) bool
 
-// Node is a node in the graph.
-type Node[K cmp.Ordered] struct {
-	Key   K
-	Value Vector
-}
-
-func MakeNode[K cmp.Ordered](key K, vec []float32) Node[K] {
-	return Node[K]{Key: key, Value: func() []float32 { return vec }}
-}
-func MakeNodeFuncVec[K cmp.Ordered](key K, vec Vector) Node[K] {
-	return Node[K]{Key: key, Value: vec}
-}
-
-// LayerNode is a node in a layer of the graph.
-type LayerNode[K cmp.Ordered] struct {
-	Node[K]
-
-	// Neighbors is map of neighbor keys to neighbor nodes.
-	// It is a map and not a slice to allow for efficient deletes, esp.
-	// when M is high.
-	Neighbors map[K]*LayerNode[K]
-}
-
-// addNeighbor adds a o neighbor to the node, replacing the neighbor
-// with the worst distance if the neighbor set is full.
-func (n *LayerNode[K]) addNeighbor(newNode *LayerNode[K], m int, dist DistanceFunc) {
-	if n.Neighbors == nil {
-		n.Neighbors = make(map[K]*LayerNode[K], m)
-	}
-
-	n.Neighbors[newNode.Key] = newNode
-	if len(n.Neighbors) <= m {
-		return
-	}
-
-	// Find the neighbor with the worst distance.
-	var (
-		worstDist = math.Inf(-1)
-		worst     *LayerNode[K]
-	)
-	for _, neighbor := range n.Neighbors {
-		d := dist(neighbor.Value, n.Value)
-		// d > worstDist may always be false if the distance function
-		// returns NaN, e.g., when the embeddings are zero.
-		if d > worstDist || worst == nil {
-			worstDist = d
-			worst = neighbor
-		}
-	}
-
-	delete(n.Neighbors, worst.Key)
-	// Delete backlink from the worst neighbor.
-	delete(worst.Neighbors, n.Key)
-	worst.replenish(m)
-}
-
+// These methods are now implemented in hnswspec.LayerNode interface
 type searchCandidate[K cmp.Ordered] struct {
-	node *LayerNode[K]
+	node hnswspec.LayerNode[K]
 	dist float64
 }
 
@@ -87,23 +55,29 @@ func (s searchCandidate[K]) Less(o searchCandidate[K]) bool {
 }
 
 // search returns the layer node closest to the target node
-// within the same layer.
-func (n *LayerNode[K]) search(
-	// k is the number of candidates in the result set.
+// within the same layer using the new interface-based approach
+func search[K cmp.Ordered](
+	entryNode hnswspec.LayerNode[K],
 	k int,
 	efSearch int,
 	target Vector,
-	distance DistanceFunc,
+	distance hnswspec.DistanceFunc[K],
 	filter FilterFunc[K],
 ) []searchCandidate[K] {
+	// Create a temporary standard node for distance calculation with target
+	targetNode := hnswspec.NewStandardLayerNode[K](
+		entryNode.GetKey(), // dummy key, not used
+		target,
+	)
+
 	// This is a basic greedy algorithm to find the entry point at the given level
 	// that is closest to the target node.
 	candidates := NewHeap[searchCandidate[K]]()
 	candidates.Init(make([]searchCandidate[K], 0, efSearch))
 	candidates.Push(
 		searchCandidate[K]{
-			node: n,
-			dist: distance(n.Value, target),
+			node: entryNode,
+			dist: distance(entryNode, targetNode),
 		},
 	)
 	var (
@@ -115,11 +89,11 @@ func (n *LayerNode[K]) search(
 	// Begin with the entry node in the result set (if it passes the filter).
 	if candidates.Len() > 0 {
 		entryCandidate := candidates.Min()
-		if filter == nil || filter(entryCandidate.node.Key, entryCandidate.node.Value) {
+		if filter == nil || filter(entryCandidate.node.GetKey(), entryCandidate.node.GetVector()) {
 			result.Push(entryCandidate)
 		}
 	}
-	visited[n.Key] = true
+	visited[entryNode.GetKey()] = true
 
 	for candidates.Len() > 0 {
 		var (
@@ -127,23 +101,23 @@ func (n *LayerNode[K]) search(
 			improved = false
 		)
 
-		// We iterate the map in a sorted, deterministic fashion for
-		// tests.
-		neighborKeys := maps.Keys(current.Neighbors)
+		// We iterate the map in a sorted, deterministic fashion for tests.
+		neighbors := current.GetNeighbors()
+		neighborKeys := maps.Keys(neighbors)
 		slices.Sort(neighborKeys)
 		for _, neighborID := range neighborKeys {
-			neighbor := current.Neighbors[neighborID]
+			neighbor := neighbors[neighborID]
 			if visited[neighborID] {
 				continue
 			}
 			visited[neighborID] = true
 
 			// Apply filter if provided
-			if filter != nil && !filter(neighbor.Key, neighbor.Value) {
+			if filter != nil && !filter(neighbor.GetKey(), neighbor.GetVector()) {
 				continue
 			}
 
-			dist := distance(neighbor.Value, target)
+			dist := distance(neighbor, targetNode)
 			if result.Len() > 0 {
 				improved = improved || dist < result.Min().dist
 			} else {
@@ -178,42 +152,7 @@ func (n *LayerNode[K]) search(
 	return result.Slice()
 }
 
-func (n *LayerNode[K]) replenish(m int) {
-	if len(n.Neighbors) >= m {
-		return
-	}
-
-	// Restore connectivity by adding new neighbors.
-	// This is a naive implementation that could be improved by
-	// using a priority queue to find the best candidates.
-	for _, neighbor := range n.Neighbors {
-		for key, candidate := range neighbor.Neighbors {
-			if _, ok := n.Neighbors[key]; ok {
-				// do not add duplicates
-				continue
-			}
-			if candidate == n {
-				continue
-			}
-			n.addNeighbor(candidate, m, CosineDistance)
-			if len(n.Neighbors) >= m {
-				return
-			}
-		}
-	}
-}
-
-// isolates remove the node from the graph by removing all connections
-// to neighbors.
-func (n *LayerNode[K]) isolate(m int) {
-	for _, neighbor := range n.Neighbors {
-		delete(neighbor.Neighbors, n.Key)
-	}
-
-	for _, neighbor := range n.Neighbors {
-		neighbor.replenish(m)
-	}
-}
+// Old LayerNode methods removed - now implemented in hnswspec interface
 
 type Layer[K cmp.Ordered] struct {
 	// Nodes is a map of Nodes IDs to Nodes.
@@ -221,14 +160,14 @@ type Layer[K cmp.Ordered] struct {
 	// property of the graph.
 	//
 	// Nodes is exported for interop with encoding/gob.
-	Nodes map[K]*LayerNode[K]
+	Nodes map[K]hnswspec.LayerNode[K]
 }
 
 // entry returns the entry node of the layer.
 // It doesn't matter which node is returned, even that the
 // entry node is consistent, so we just return the first node
 // in the map to avoid tracking extra state.
-func (l *Layer[K]) entry() *LayerNode[K] {
+func (l *Layer[K]) entry() hnswspec.LayerNode[K] {
 	if l == nil {
 		return nil
 	}
@@ -275,6 +214,16 @@ type Graph[K cmp.Ordered] struct {
 
 	// OnLayersChange is called when the layers change.
 	OnLayersChange func(Layers []*Layer[K])
+
+	// PQ optimization fields
+	// pqCodebook PQ码表，如果不为nil则启用PQ优化
+	pqCodebook *pq.Codebook
+
+	// pqQuantizer PQ量化器
+	pqQuantizer *pq.Quantizer
+
+	// nodeDistance 节点距离函数（基于接口）
+	nodeDistance hnswspec.DistanceFunc[K]
 }
 
 func defaultRand() *rand.Rand {
@@ -301,6 +250,9 @@ type GraphConfig[K cmp.Ordered] struct {
 	// Rng is used for level generation. It may be set to a deterministic value for reproducibility
 	// Note: deterministic number generation can lead to degenerate graphs when exposed to adversarial inputs
 	Rng *rand.Rand
+
+	// PQCodebook PQ码表，如果设置则启用PQ优化
+	PQCodebook *pq.Codebook
 }
 
 // GraphOption defines the configuration option function type
@@ -376,6 +328,13 @@ func WithHNSWParameters[K cmp.Ordered](m int, ml float64, efSearch int) GraphOpt
 	}
 }
 
+// WithPQCodebook 启用PQ优化，使用预训练的码表
+func WithPQCodebook[K cmp.Ordered](codebook *pq.Codebook) GraphOption[K] {
+	return func(config *GraphConfig[K]) {
+		config.PQCodebook = codebook
+	}
+}
+
 // NewGraphWithConfig creates a new HNSW graph with the specified configuration
 func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 	config := DefaultGraphConfig[K]()
@@ -402,13 +361,29 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 		config.Rng = defaultRand()
 	}
 
-	return &Graph[K]{
+	graph := &Graph[K]{
 		M:        config.M,
 		Ml:       config.Ml,
 		Distance: config.Distance,
 		EfSearch: config.EfSearch,
 		Rng:      config.Rng,
 	}
+
+	// 设置节点距离函数为基于接口的版本
+	graph.nodeDistance = hnswspec.CosineDistance[K]
+	// 使用函数名来判断距离函数类型
+	distName, ok := distanceFuncToName(config.Distance)
+	if ok && distName == "euclidean" {
+		graph.nodeDistance = hnswspec.EuclideanDistance[K]
+	}
+
+	// 初始化PQ优化
+	if config.PQCodebook != nil {
+		graph.pqCodebook = config.PQCodebook
+		graph.pqQuantizer = pq.NewQuantizer(config.PQCodebook)
+	}
+
+	return graph
 }
 
 // maxLevel returns an upper-bound on the number of levels in the graph
@@ -471,7 +446,21 @@ func (g *Graph[K]) Dims() int {
 	if len(g.Layers) == 0 {
 		return 0
 	}
-	return len(g.Layers[0].entry().Value())
+
+	// 如果是PQ优化图，从PQ quantizer获取维度
+	if g.IsPQEnabled() && g.pqQuantizer != nil {
+		return g.pqQuantizer.SubVectorDim() * g.pqQuantizer.M()
+	}
+
+	// 对于标准图，从节点获取维度
+	entry := g.Layers[0].entry()
+	if entry == nil {
+		return 0
+	}
+	if !entry.IsPQEnabled() {
+		return len(entry.GetVector()())
+	}
+	return 0 // 这种情况不应该发生
 }
 
 func ptr[T any](v T) *T {
@@ -480,7 +469,7 @@ func ptr[T any](v T) *T {
 
 // Add inserts nodes into the graph.
 // If another node with the same ID exists, it is replaced.
-func (g *Graph[K]) Add(nodes ...Node[K]) {
+func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("recover from panic when adding nodes: %v", r)
@@ -492,14 +481,15 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 	}()
 	for _, node := range nodes {
 		key := node.Key
-		vec := node.Value
+		vec := node.ToVector()
 
 		g.Delete(key)
 		g.assertDims(vec)
+
 		insertLevel := g.randomLevel()
 		// Create layers that don't exist yet.
 		for insertLevel >= len(g.Layers) {
-			g.Layers = append(g.Layers, &Layer[K]{})
+			g.Layers = append(g.Layers, &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K])})
 		}
 
 		if insertLevel < 0 {
@@ -507,22 +497,32 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 		}
 
 		var elevator *K
-
 		preLen := g.Len()
 
 		// Insert node at each layer, beginning with the highest.
 		for i := len(g.Layers) - 1; i >= 0; i-- {
 			layer := g.Layers[i]
-			newNode := &LayerNode[K]{
-				Node: Node[K]{
-					Key:   key,
-					Value: vec,
-				},
+
+			// 根据是否启用PQ优化创建不同类型的节点
+			var newNode hnswspec.LayerNode[K]
+			var err error
+
+			if g.IsPQEnabled() {
+				// 创建PQ节点
+				newNode, err = hnswspec.NewPQLayerNode(key, vec, g.pqQuantizer)
+				if err != nil {
+					log.Errorf("Failed to create PQ node: %v", err)
+					// 回退到标准节点
+					newNode = hnswspec.NewStandardLayerNode(key, vec)
+				}
+			} else {
+				// 创建标准节点
+				newNode = hnswspec.NewStandardLayerNode(key, vec)
 			}
 
 			// Insert the new node into the layer.
 			if layer.entry() == nil {
-				layer.Nodes = map[K]*LayerNode[K]{key: newNode}
+				layer.Nodes = map[K]hnswspec.LayerNode[K]{key: newNode}
 				continue
 			}
 
@@ -536,11 +536,11 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 				searchPoint = layer.Nodes[*elevator]
 			}
 
-			if g.Distance == nil {
-				panic("(*Graph).Distance must be set")
+			if g.nodeDistance == nil {
+				panic("(*Graph).nodeDistance must be set")
 			}
 
-			neighborhood := searchPoint.search(g.M, g.EfSearch, vec, g.Distance, nil)
+			neighborhood := search(searchPoint, g.M, g.EfSearch, vec, g.nodeDistance, nil)
 			if len(neighborhood) == 0 {
 				// This should never happen because the searchPoint itself
 				// should be in the result set.
@@ -548,15 +548,15 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 			}
 
 			// Re-set the elevator node for the next layer.
-			elevator = ptr(neighborhood[0].node.Key)
+			elevator = ptr(neighborhood[0].node.GetKey())
 
 			if insertLevel >= i {
 				// Insert the new node into the layer.
 				layer.Nodes[key] = newNode
-				for _, node := range neighborhood {
+				for _, candidate := range neighborhood {
 					// Create a bi-directional edge between the new node and the best node.
-					node.node.addNeighbor(newNode, g.M, g.Distance)
-					newNode.addNeighbor(node.node, g.M, g.Distance)
+					candidate.node.AddNeighbor(newNode, g.M, g.nodeDistance)
+					newNode.AddNeighbor(candidate.node, g.M, g.nodeDistance)
 				}
 			}
 		}
@@ -571,11 +571,14 @@ func (g *Graph[K]) Add(nodes ...Node[K]) {
 }
 
 // Search finds the k nearest neighbors from the target node.
-func (h *Graph[K]) Search(near []float32, k int) []Node[K] {
+func (h *Graph[K]) Search(near []float32, k int) []InputNode[K] {
 	sr := h.search(func() []float32 { return near }, k, nil)
-	out := make([]Node[K], len(sr))
-	for i, node := range sr {
-		out[i] = node.Node
+	out := make([]InputNode[K], len(sr))
+	for i, result := range sr {
+		out[i] = InputNode[K]{
+			Key:   result.Key,
+			Value: result.Value, // 对于PQ节点这将是nil
+		}
 	}
 	return out
 }
@@ -589,11 +592,14 @@ func (h *Graph[K]) SearchWithDistance(near []float32, k int) []SearchResult[K] {
 // SearchWithFilter finds the k nearest neighbors from the target node with a filter function.
 // The filter function is called for each candidate node and should return true if the node
 // should be included in the results.
-func (h *Graph[K]) SearchWithFilter(near []float32, k int, filter FilterFunc[K]) []Node[K] {
+func (h *Graph[K]) SearchWithFilter(near []float32, k int, filter FilterFunc[K]) []InputNode[K] {
 	sr := h.search(func() []float32 { return near }, k, filter)
-	out := make([]Node[K], len(sr))
-	for i, node := range sr {
-		out[i] = node.Node
+	out := make([]InputNode[K], len(sr))
+	for i, result := range sr {
+		out[i] = InputNode[K]{
+			Key:   result.Key,
+			Value: result.Value, // 对于PQ节点这将是nil
+		}
 	}
 	return out
 }
@@ -605,8 +611,10 @@ func (h *Graph[K]) SearchWithDistanceAndFilter(near []float32, k int, filter Fil
 }
 
 type SearchResult[T cmp.Ordered] struct {
-	Node[T]
+	Key      T
+	Value    []float32 // 对于PQ节点，这将是nil
 	Distance float64
+	IsPQ     bool // 标识是否为PQ节点
 }
 
 func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResult[K] {
@@ -617,7 +625,6 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 
 	var (
 		efSearch = h.EfSearch
-
 		elevator *K
 	)
 
@@ -629,19 +636,31 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 
 		// Descending hierarchies
 		if layer > 0 {
-			nodes := searchPoint.search(1, efSearch, near, h.Distance, nil)
-			elevator = ptr(nodes[0].node.Key)
+			nodes := search(searchPoint, 1, efSearch, near, h.nodeDistance, nil)
+			elevator = ptr(nodes[0].node.GetKey())
 			continue
 		}
 
-		nodes := searchPoint.search(k, efSearch, near, h.Distance, filter)
+		nodes := search(searchPoint, k, efSearch, near, h.nodeDistance, filter)
 		out := make([]SearchResult[K], 0, len(nodes))
 
-		for _, node := range nodes {
-			out = append(out, SearchResult[K]{
-				Node:     node.node.Node,
-				Distance: node.dist,
-			})
+		for _, candidate := range nodes {
+			// 创建SearchResult，处理PQ节点的特殊情况
+			result := SearchResult[K]{
+				Key:      candidate.node.GetKey(),
+				Distance: candidate.dist,
+				IsPQ:     candidate.node.IsPQEnabled(),
+			}
+
+			if !candidate.node.IsPQEnabled() {
+				// 标准节点可以获取原始向量
+				result.Value = candidate.node.GetVector()()
+			} else {
+				// PQ节点不提供原始向量
+				result.Value = nil
+			}
+
+			out = append(out, result)
 		}
 
 		return out
@@ -682,7 +701,7 @@ func (h *Graph[K]) Delete(key K) bool {
 		if len(layer.Nodes) == 0 {
 			deleteLayer[i] = struct{}{}
 		}
-		node.isolate(h.M)
+		node.Isolate(h.M, h.nodeDistance)
 		deleted = true
 	}
 
@@ -711,7 +730,36 @@ func (h *Graph[K]) Lookup(key K) (Vector, bool) {
 	if !ok {
 		return nil, false
 	}
-	return node.Value, ok
+	// 注意：对于PQ节点，这可能会panic
+	return node.GetVector(), ok
+}
+
+// IsPQEnabled 检查是否启用了PQ优化
+func (h *Graph[K]) IsPQEnabled() bool {
+	return h.pqCodebook != nil && h.pqQuantizer != nil
+}
+
+// GetPQCodes 获取指定键的PQ编码（如果启用PQ优化）
+func (h *Graph[K]) GetPQCodes(key K) ([]byte, bool) {
+	if !h.IsPQEnabled() {
+		return nil, false
+	}
+
+	if len(h.Layers) == 0 {
+		return nil, false
+	}
+
+	node, ok := h.Layers[0].Nodes[key]
+	if !ok {
+		return nil, false
+	}
+
+	return node.GetPQCodes()
+}
+
+// GetCodebook 获取PQ码表
+func (h *Graph[K]) GetCodebook() *pq.Codebook {
+	return h.pqCodebook
 }
 
 // Export writes the graph to a writer.
@@ -743,12 +791,13 @@ func (h *Graph[K]) Export(w io.Writer) error {
 			return fmt.Errorf("encode number of nodes: %w", err)
 		}
 		for _, node := range layer.Nodes {
-			_, err = multiBinaryWrite(w, node.Key, node.Value, len(node.Neighbors))
+			neighbors := node.GetNeighbors()
+			_, err = multiBinaryWrite(w, node.GetKey(), node.GetVector(), len(neighbors))
 			if err != nil {
 				return fmt.Errorf("encode node data: %w", err)
 			}
 
-			for neighbor := range node.Neighbors {
+			for neighbor := range neighbors {
 				_, err = binaryWrite(w, neighbor)
 				if err != nil {
 					return fmt.Errorf("encode neighbor %v: %w", neighbor, err)
@@ -803,7 +852,9 @@ func (h *Graph[K]) Import(r io.Reader) error {
 			return err
 		}
 
-		nodes := make(map[K]*LayerNode[K], nNodes)
+		nodes := make(map[K]hnswspec.LayerNode[K], nNodes)
+		neighborMap := make(map[K][]K) // 临时存储邻居信息
+
 		for j := 0; j < nNodes; j++ {
 			var key K
 			var vec Vector
@@ -823,25 +874,31 @@ func (h *Graph[K]) Import(r io.Reader) error {
 				neighbors[k] = neighbor
 			}
 
-			node := &LayerNode[K]{
-				Node: Node[K]{
-					Key:   key,
-					Value: vec,
-				},
-				Neighbors: make(map[K]*LayerNode[K]),
+			// 创建节点（根据是否启用PQ优化）
+			var node hnswspec.LayerNode[K]
+			if h.IsPQEnabled() {
+				node, err = hnswspec.NewPQLayerNode(key, vec, h.pqQuantizer)
+				if err != nil {
+					// 回退到标准节点
+					node = hnswspec.NewStandardLayerNode(key, vec)
+				}
+			} else {
+				node = hnswspec.NewStandardLayerNode(key, vec)
 			}
 
 			nodes[key] = node
-			for _, neighbor := range neighbors {
-				node.Neighbors[neighbor] = nil
+			neighborMap[key] = neighbors
+		}
+
+		// 建立邻居连接
+		for key, node := range nodes {
+			for _, neighborKey := range neighborMap[key] {
+				if neighborNode, exists := nodes[neighborKey]; exists {
+					node.AddNeighbor(neighborNode, h.M, h.nodeDistance)
+				}
 			}
 		}
-		// Fill in neighbor pointers
-		for _, node := range nodes {
-			for key := range node.Neighbors {
-				node.Neighbors[key] = nodes[key]
-			}
-		}
+
 		h.Layers[i] = &Layer[K]{Nodes: nodes}
 	}
 
@@ -867,13 +924,19 @@ func (h *Graph[K]) DebugDumpByDot() []string {
 			if node == nil {
 				continue
 			}
-			vec := node.Value()
-			if len(vec) >= 3 {
-				// Show first 3 dimensions for readability
-				label := fmt.Sprintf("%v\\n[%.2f,%.2f,%.2f]", nodeKey, vec[0], vec[1], vec[2])
-				lines = append(lines, fmt.Sprintf("  \"%v\" [label=\"%s\"];", nodeKey, label))
+			if !node.IsPQEnabled() {
+				vec := node.GetVector()()
+				if len(vec) >= 3 {
+					// Show first 3 dimensions for readability
+					label := fmt.Sprintf("%v\\n[%.2f,%.2f,%.2f]", nodeKey, vec[0], vec[1], vec[2])
+					lines = append(lines, fmt.Sprintf("  \"%v\" [label=\"%s\"];", nodeKey, label))
+				} else {
+					label := fmt.Sprintf("%v\\n%v", nodeKey, vec)
+					lines = append(lines, fmt.Sprintf("  \"%v\" [label=\"%s\"];", nodeKey, label))
+				}
 			} else {
-				label := fmt.Sprintf("%v\\n%v", nodeKey, vec)
+				// PQ节点只显示键
+				label := fmt.Sprintf("%v\\n[PQ]", nodeKey)
 				lines = append(lines, fmt.Sprintf("  \"%v\" [label=\"%s\"];", nodeKey, label))
 			}
 		}
@@ -882,10 +945,11 @@ func (h *Graph[K]) DebugDumpByDot() []string {
 
 		// Add edges (neighbors)
 		for nodeKey, node := range layer.Nodes {
-			if node == nil || node.Neighbors == nil {
+			if node == nil {
 				continue
 			}
-			for neighborKey := range node.Neighbors {
+			neighbors := node.GetNeighbors()
+			for neighborKey := range neighbors {
 				lines = append(lines, fmt.Sprintf("  \"%v\" -> \"%v\";", nodeKey, neighborKey))
 			}
 		}
@@ -915,10 +979,11 @@ func (h *Graph[K]) DumpByDot() []string {
 		// Add edges (neighbors) - avoid duplicate edges in undirected graph
 		addedEdges := make(map[string]bool)
 		for nodeKey, node := range layer.Nodes {
-			if node == nil || node.Neighbors == nil {
+			if node == nil {
 				continue
 			}
-			for neighborKey := range node.Neighbors {
+			neighbors := node.GetNeighbors()
+			for neighborKey := range neighbors {
 				// Create edge key in a consistent order to avoid duplicates
 				var edgeKey string
 				if nodeKey < neighborKey {

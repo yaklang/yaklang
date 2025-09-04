@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
@@ -184,13 +185,15 @@ func ConvertLayersInfoToGraph(layers []*hnsw.Layer[string], saveVectorByKey func
 			}
 
 			// 保存节点的向量数据
-			if saveVectorByKey != nil {
-				saveVectorByKey(nodeKey, layerNode.Value())
+			if saveVectorByKey != nil && !layerNode.IsPQEnabled() {
+				// 只有标准节点才能获取原始向量
+				saveVectorByKey(nodeKey, layerNode.GetVector()())
 			}
 
 			// 收集邻居键
-			neighbors := make([]string, 0, len(layerNode.Neighbors))
-			for neighborKey := range layerNode.Neighbors {
+			neighborMap := layerNode.GetNeighbors()
+			neighbors := make([]string, 0, len(neighborMap))
+			for neighborKey := range neighborMap {
 				neighbors = append(neighbors, neighborKey)
 			}
 
@@ -212,34 +215,56 @@ func ConvertLayersInfoToGraph(layers []*hnsw.Layer[string], saveVectorByKey func
 }
 
 func ParseLayersInfo(graphInfos *schema.GroupInfos, loadVectorByKey func(string) []float32) []*hnsw.Layer[string] {
+	if graphInfos == nil || len(*graphInfos) == 0 {
+		return nil
+	}
+
+	// 注意：当前只支持恢复标准HNSW图（非PQ优化）
+	// 如果需要PQ优化支持，需要额外的序列化信息
+
 	layers := make([]*hnsw.Layer[string], 0)
 	layerMap := make(map[int]*hnsw.Layer[string])
+
+	// 第一步：创建所有节点的映射，但不建立邻居关系
+	nodeMap := make(map[string]hnswspec.LayerNode[string])
+
 	for _, graphInfo := range *graphInfos {
-		graphInfo := graphInfo
 		if _, ok := layerMap[graphInfo.LayerLevel]; !ok {
 			layerMap[graphInfo.LayerLevel] = &hnsw.Layer[string]{
-				Nodes: make(map[string]*hnsw.LayerNode[string]),
+				Nodes: make(map[string]hnswspec.LayerNode[string]),
 			}
 		}
-		neighbors := make(map[string]*hnsw.LayerNode[string])
-		for _, neighbor := range graphInfo.Neighbors {
-			neighbors[neighbor] = &hnsw.LayerNode[string]{
-				Node: hnsw.Node[string]{
-					Key:   neighbor,
-					Value: func() []float32 { return loadVectorByKey(neighbor) },
-				},
-			}
+
+		// 为每个节点创建StandardLayerNode（非PQ模式）
+		if _, exists := nodeMap[graphInfo.Key]; !exists {
+			nodeMap[graphInfo.Key] = hnswspec.NewStandardLayerNode(
+				graphInfo.Key,
+				func() []float32 { return loadVectorByKey(graphInfo.Key) },
+			)
 		}
-		layerMap[graphInfo.LayerLevel].Nodes[graphInfo.Key] = &hnsw.LayerNode[string]{
-			Node: hnsw.Node[string]{
-				Key:   graphInfo.Key,
-				Value: func() []float32 { return loadVectorByKey(graphInfo.Key) },
-			},
-			Neighbors: neighbors,
+
+		layerMap[graphInfo.LayerLevel].Nodes[graphInfo.Key] = nodeMap[graphInfo.Key]
+	}
+
+	// 第二步：建立邻居关系
+	for _, graphInfo := range *graphInfos {
+		currentNode := nodeMap[graphInfo.Key]
+		if currentNode == nil {
+			continue
+		}
+
+		// 创建邻居节点并建立连接
+		for _, neighborKey := range graphInfo.Neighbors {
+			if neighborNode, exists := nodeMap[neighborKey]; exists {
+				// 这里使用默认的距离函数，实际应该从图配置中获取
+				// 但由于我们只是恢复结构，不重新计算邻居，所以使用任意距离函数
+				currentNode.AddNeighbor(neighborNode, 16, hnswspec.CosineDistance[string])
+			}
 		}
 	}
-	// layerMap 按层数排序
-	keys := make([]int, 0)
+
+	// 按层数排序
+	keys := make([]int, 0, len(layerMap))
 	for key := range layerMap {
 		keys = append(keys, key)
 	}
@@ -247,6 +272,7 @@ func ParseLayersInfo(graphInfos *schema.GroupInfos, loadVectorByKey func(string)
 	for _, key := range keys {
 		layers = append(layers, layerMap[key])
 	}
+
 	return layers
 }
 

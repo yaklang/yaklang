@@ -43,11 +43,21 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		hnsw.WithDeterministicRng[string](0), // 使用固定的随机数生成器，便于调试，不影响结果
 	)
 
-	hnswGraph.Layers = ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
+	// 尝试恢复HNSW图结构
+	layers := ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
 		var doc schema.VectorStoreDocument
 		db.Where("document_id = ?", key).First(&doc)
 		return []float32(doc.Embedding)
 	})
+
+	// 检查是否成功恢复了图结构
+	// 如果GroupInfos不为空但layers为nil，可能是不支持的格式
+	if layers == nil && len(collections[0].GroupInfos) > 0 {
+		// 图信息存在但无法恢复，可能是PQ模式或其他不支持的格式
+		log.Warnf("无法从数据库恢复HNSW图结构，将使用空图开始")
+	}
+
+	hnswGraph.Layers = layers
 	vectorStore := &SQLiteVectorStoreHNSW{
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
@@ -239,13 +249,11 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 		}
 	}
 
-	nodes := make([]hnsw.Node[string], len(docs))
+	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
-		nodes[i] = hnsw.Node[string]{
-			Key: doc.ID,
-			Value: func() []float32 {
-				return doc.Embedding
-			},
+		nodes[i] = hnsw.InputNode[string]{
+			Key:   doc.ID,
+			Value: doc.Embedding,
 		}
 	}
 	err := tx.Commit().Error
