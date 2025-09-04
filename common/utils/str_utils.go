@@ -118,6 +118,15 @@ func RemoveRepeatUintSlice(slc []uint) []uint {
 	}
 }
 
+// 元素去重
+func RemoveRepeatIntSlice(slc []int) []int {
+	if len(slc) < 1024 {
+		return RemoveRepeatIntSliceByLoop(slc)
+	} else {
+		return RemoveRepeatIntSliceByMap(slc)
+	}
+}
+
 func RemoveRepeatStringSliceByLoop(slc []string) []string {
 	result := []string{}
 	for i := range slc {
@@ -168,6 +177,36 @@ func RemoveRepeatUintSliceByLoop(slc []uint) []uint {
 func RemoveRepeatUintSliceByMap(slc []uint) []uint {
 	result := []uint{}
 	tempMap := map[uint]byte{}
+	for _, e := range slc {
+		l := len(tempMap)
+		tempMap[e] = 0
+		if len(tempMap) != l {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+func RemoveRepeatIntSliceByLoop(slc []int) []int {
+	result := []int{}
+	for i := range slc {
+		flag := true
+		for j := range result {
+			if slc[i] == result[j] {
+				flag = false
+				break
+			}
+		}
+		if flag {
+			result = append(result, slc[i])
+		}
+	}
+	return result
+}
+
+func RemoveRepeatIntSliceByMap(slc []int) []int {
+	result := []int{}
+	tempMap := map[int]byte{}
 	for _, e := range slc {
 		l := len(tempMap)
 		tempMap[e] = 0
