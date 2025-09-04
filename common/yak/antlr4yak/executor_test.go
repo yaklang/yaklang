@@ -135,6 +135,15 @@ func init() {
 	})
 }
 
+func TestBoolEqualityComparison(t *testing.T) {
+	code := `
+assert !("true" == true)
+`
+	if err := NewExecutor(code).VM.SafeExec(); err != nil {
+		panic(err)
+	}
+}
+
 func TestRangeString(t *testing.T) {
 	code := `
 for index, i := range "abc" {

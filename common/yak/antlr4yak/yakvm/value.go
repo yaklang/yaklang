@@ -1173,7 +1173,7 @@ func (_v *Value) Equal(value *Value) bool {
 		return _v.Float64() == value.Float64()
 	}
 
-	if value.IsBool() && value.IsBool() {
+	if value.IsBool() && _v.IsBool() {
 		return _v.True() == value.True()
 	}
 
