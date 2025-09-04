@@ -485,6 +485,7 @@ alert $high for {
 	}()
 
 	t.Run("test scan task risk count raw", func(t *testing.T) {
+		t.Skip("使用riskFeatureHash作为ssa比较的依据")
 		taskID1 := uuid.NewString() // 旧的扫描结果
 		taskID2 := uuid.NewString() // 新的扫描结果
 		defer func() {

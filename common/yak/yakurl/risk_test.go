@@ -378,67 +378,72 @@ func initRiskTest(t *testing.T, programName, RuntimeId string, extendPaths ...st
 	}
 
 	err := yakit.CreateSSARisk(db, &schema.SSARisk{
-		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s%s/a.go", programName, extendPath),
-		FunctionName:  "funcA",
-		Title:         "test1",
-		FromRule:      "rule1",
-		RuntimeId:     RuntimeId,
-		ResultID:      1,
-		Variable:      "a",
-		Index:         1,
+		ProgramName:     programName,
+		CodeSourceUrl:   fmt.Sprintf("/%s%s/a.go", programName, extendPath),
+		FunctionName:    "funcA",
+		Title:           "test1",
+		FromRule:        "rule1",
+		RuntimeId:       RuntimeId,
+		ResultID:        1,
+		Variable:        "a",
+		Index:           1,
+		RiskFeatureHash: fmt.Sprintf("%s-test1-hash", programName), // 伪造RiskFeatureHash
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
-		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s%s/b/b1.go", programName, extendPath),
-		FunctionName:  "funcB1",
-		Title:         "test2",
-		FromRule:      "rule2",
-		RuntimeId:     RuntimeId,
-		ResultID:      2,
-		Variable:      "b1",
-		Index:         2,
+		ProgramName:     programName,
+		CodeSourceUrl:   fmt.Sprintf("/%s%s/b/b1.go", programName, extendPath),
+		FunctionName:    "funcB1",
+		Title:           "test2",
+		FromRule:        "rule2",
+		RuntimeId:       RuntimeId,
+		ResultID:        2,
+		Variable:        "b1",
+		Index:           2,
+		RiskFeatureHash: fmt.Sprintf("%s-test2-hash", programName), // 伪造RiskFeatureHash
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
-		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s%s/b/b2.go", programName, extendPath),
-		FunctionName:  "funcB2",
-		Title:         "test3",
-		FromRule:      "rule3",
-		RuntimeId:     RuntimeId,
-		ResultID:      3,
-		Variable:      "b2",
-		Index:         3,
+		ProgramName:     programName,
+		CodeSourceUrl:   fmt.Sprintf("/%s%s/b/b2.go", programName, extendPath),
+		FunctionName:    "funcB2",
+		Title:           "test3",
+		FromRule:        "rule3",
+		RuntimeId:       RuntimeId,
+		ResultID:        3,
+		Variable:        "b2",
+		Index:           3,
+		RiskFeatureHash: fmt.Sprintf("%s-test3-hash", programName), // 伪造RiskFeatureHash
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
-		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s%s/c.go", programName, extendPath),
-		FunctionName:  "funcC",
-		Title:         "test4",
-		FromRule:      "rule2",
-		RuntimeId:     RuntimeId,
-		ResultID:      4,
-		Variable:      "c",
-		Index:         4,
+		ProgramName:     programName,
+		CodeSourceUrl:   fmt.Sprintf("/%s%s/c.go", programName, extendPath),
+		FunctionName:    "funcC",
+		Title:           "test4",
+		FromRule:        "rule2",
+		RuntimeId:       RuntimeId,
+		ResultID:        4,
+		Variable:        "c",
+		Index:           4,
+		RiskFeatureHash: fmt.Sprintf("%s-test4-hash", programName), // 伪造RiskFeatureHash
 	})
 	require.NoError(t, err)
 
 	err = yakit.CreateSSARisk(db, &schema.SSARisk{
-		ProgramName:   programName,
-		CodeSourceUrl: fmt.Sprintf("/%s%s/c.go", programName, extendPath),
-		FunctionName:  "funcC",
-		Title:         "test5",
-		FromRule:      "",
-		RuntimeId:     RuntimeId,
-		ResultID:      5,
-		Variable:      "c",
-		Index:         5,
+		ProgramName:     programName,
+		CodeSourceUrl:   fmt.Sprintf("/%s%s/c.go", programName, extendPath),
+		FunctionName:    "funcC",
+		Title:           "test5",
+		FromRule:        "",
+		RuntimeId:       RuntimeId,
+		ResultID:        5,
+		Variable:        "c",
+		Index:           5,
+		RiskFeatureHash: fmt.Sprintf("%s-test5-hash", programName), // 伪造RiskFeatureHash
 	})
 	require.NoError(t, err)
 }
@@ -809,22 +814,186 @@ func TestRiskAction(t *testing.T) {
 }
 
 func TestRiskActionRule(t *testing.T) {
+	/*
+		测试架构图 - Program、Task、RiskFeatureHash 关系：
+
+		Program1 (旧扫描)              Program2 (新扫描)
+		├─ TaskID1                     ├─ TaskID2
+		│  ├─ Risk1: hash-test1  ──────┼─→ Risk1: hash-test1  (相同Hash)
+		│  ├─ Risk2: hash-test2  ──────┼─→ Risk2: hash-test2  (相同Hash)
+		│  ├─ Risk3: hash-test3  ──────┼─→ Risk3: hash-test3  (相同Hash)
+		│  ├─ Risk4: hash-test4  ──────┼─→ Risk4: hash-test4  (相同Hash)
+		│  └─ Risk5: hash-test5  ──────┼─→ Risk5: hash-test5  (相同Hash)
+		                               └─→ Risk6: hash-test6-new  (新增)
+
+		Diff对比逻辑：
+		- 基于RiskFeatureHash进行对比
+		- 相同Hash的风险被过滤（认为是已存在的）
+		- 只返回新增的风险：Risk6 (Count=1)
+	*/
+
 	programName1 := uuid.NewString()
 	programName2 := uuid.NewString()
 	taskID1 := uuid.NewString() // 旧的扫描结果
 	taskID2 := uuid.NewString() // 新的扫描结果
-	initRiskTest(t, programName1, taskID1)
-	initRiskTest(t, programName2, taskID2)
+
+	// 创建相同的基础数据，使用相同的RiskFeatureHash（模拟相同的代码基础）
+	baseHash := "common-base-hash" // 使用相同的Hash前缀
+
+	// 为程序1创建基础风险（旧版本）
 	err := yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
-		ProgramName:   programName2,
-		CodeSourceUrl: fmt.Sprintf("/%s/d.go", programName2),
-		FunctionName:  "funcD",
-		Title:         "test6",
-		FromRule:      "rule4",
-		RuntimeId:     taskID2,
-		ResultID:      6,
-		Variable:      "d",
-		Index:         6,
+		ProgramName:     programName1,
+		CodeSourceUrl:   fmt.Sprintf("/%s/a.go", programName1),
+		FunctionName:    "funcA",
+		Title:           "test1",
+		FromRule:        "rule1",
+		RuntimeId:       taskID1,
+		ResultID:        1,
+		Variable:        "a",
+		Index:           1,
+		RiskFeatureHash: baseHash + "-test1", // 相同的Hash
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName1,
+		CodeSourceUrl:   fmt.Sprintf("/%s/b/b1.go", programName1),
+		FunctionName:    "funcB1",
+		Title:           "test2",
+		FromRule:        "rule2",
+		RuntimeId:       taskID1,
+		ResultID:        2,
+		Variable:        "b1",
+		Index:           2,
+		RiskFeatureHash: baseHash + "-test2", // 相同的Hash
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName1,
+		CodeSourceUrl:   fmt.Sprintf("/%s/b/b2.go", programName1),
+		FunctionName:    "funcB2",
+		Title:           "test3",
+		FromRule:        "rule3",
+		RuntimeId:       taskID1,
+		ResultID:        3,
+		Variable:        "b2",
+		Index:           3,
+		RiskFeatureHash: baseHash + "-test3", // 相同的Hash
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName1,
+		CodeSourceUrl:   fmt.Sprintf("/%s/c.go", programName1),
+		FunctionName:    "funcC",
+		Title:           "test4",
+		FromRule:        "rule2",
+		RuntimeId:       taskID1,
+		ResultID:        4,
+		Variable:        "c",
+		Index:           4,
+		RiskFeatureHash: baseHash + "-test4", // 相同的Hash
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName1,
+		CodeSourceUrl:   fmt.Sprintf("/%s/c.go", programName1),
+		FunctionName:    "funcC",
+		Title:           "test5",
+		FromRule:        "",
+		RuntimeId:       taskID1,
+		ResultID:        5,
+		Variable:        "c",
+		Index:           5,
+		RiskFeatureHash: baseHash + "-test5", // 相同的Hash
+	})
+	require.NoError(t, err)
+
+	// 为程序2创建相同的基础风险（新版本）+ 一个新增风险
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName2,
+		CodeSourceUrl:   fmt.Sprintf("/%s/a.go", programName2),
+		FunctionName:    "funcA",
+		Title:           "test1",
+		FromRule:        "rule1",
+		RuntimeId:       taskID2,
+		ResultID:        1,
+		Variable:        "a",
+		Index:           1,
+		RiskFeatureHash: baseHash + "-test1", // 相同的Hash，diff时会被过滤
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName2,
+		CodeSourceUrl:   fmt.Sprintf("/%s/b/b1.go", programName2),
+		FunctionName:    "funcB1",
+		Title:           "test2",
+		FromRule:        "rule2",
+		RuntimeId:       taskID2,
+		ResultID:        2,
+		Variable:        "b1",
+		Index:           2,
+		RiskFeatureHash: baseHash + "-test2", // 相同的Hash，diff时会被过滤
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName2,
+		CodeSourceUrl:   fmt.Sprintf("/%s/b/b2.go", programName2),
+		FunctionName:    "funcB2",
+		Title:           "test3",
+		FromRule:        "rule3",
+		RuntimeId:       taskID2,
+		ResultID:        3,
+		Variable:        "b2",
+		Index:           3,
+		RiskFeatureHash: baseHash + "-test3", // 相同的Hash，diff时会被过滤
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName2,
+		CodeSourceUrl:   fmt.Sprintf("/%s/c.go", programName2),
+		FunctionName:    "funcC",
+		Title:           "test4",
+		FromRule:        "rule2",
+		RuntimeId:       taskID2,
+		ResultID:        4,
+		Variable:        "c",
+		Index:           4,
+		RiskFeatureHash: baseHash + "-test4", // 相同的Hash，diff时会被过滤
+	})
+	require.NoError(t, err)
+
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName2,
+		CodeSourceUrl:   fmt.Sprintf("/%s/c.go", programName2),
+		FunctionName:    "funcC",
+		Title:           "test5",
+		FromRule:        "",
+		RuntimeId:       taskID2,
+		ResultID:        5,
+		Variable:        "c",
+		Index:           5,
+		RiskFeatureHash: baseHash + "-test5", // 相同的Hash，diff时会被过滤
+	})
+	require.NoError(t, err)
+
+	// 新增的风险（只在程序2中存在，diff时会被识别）
+	err = yakit.CreateSSARisk(ssadb.GetDB(), &schema.SSARisk{
+		ProgramName:     programName2,
+		CodeSourceUrl:   fmt.Sprintf("/%s/d.go", programName2),
+		FunctionName:    "funcD",
+		Title:           "test6",
+		FromRule:        "rule4",
+		RuntimeId:       taskID2,
+		ResultID:        6,
+		Variable:        "d",
+		Index:           6,
+		RiskFeatureHash: baseHash + "-test6-new", // 新增风险的独特Hash
 	})
 	require.NoError(t, err)
 
