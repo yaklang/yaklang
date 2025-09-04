@@ -58,5 +58,5 @@ for i in rag.Query(query, option...)~ {
         yakit.Info(i.Message)
         continue
     }
-    addData(json.dumps(i.Data),i.Score,i.Source,timestampToDatetime(i.Timestamp))
+    addData(json.dumps(i.Data),i.Score,i.Source,timestampToDatetime(i.Timestamp/1000))
 }
