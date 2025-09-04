@@ -139,7 +139,7 @@ func (s *Server) DeleteKnowledgeBaseEntry(ctx context.Context, req *ypb.DeleteKn
 	if err != nil {
 		return nil, utils.Errorf("获取知识库信息失败: %v", err)
 	}
-	err = kb.DeleteKnowledgeEntry(req.GetKnowledgeBaseEntryId())
+	err = kb.DeleteKnowledgeEntry(req.GetKnowledgeBaseEntryHiddenIndex())
 	if err != nil {
 		return nil, utils.Errorf("删除知识库条目失败: %v", err)
 	}
@@ -190,7 +190,7 @@ func (s *Server) UpdateKnowledgeBaseEntry(ctx context.Context, req *ypb.UpdateKn
 		return nil, utils.Errorf("获取知识库信息失败: %v", err)
 	}
 
-	err = kb.UpdateKnowledgeEntry(req.GetKnowledgeBaseEntryID(), &schema.KnowledgeBaseEntry{
+	err = kb.UpdateKnowledgeEntry(req.GetKnowledgeBaseEntryHiddenIndex(), &schema.KnowledgeBaseEntry{
 		KnowledgeTitle:     req.GetKnowledgeTitle(),
 		KnowledgeType:      req.GetKnowledgeType(),
 		ImportanceScore:    int(req.GetImportanceScore()),
@@ -334,7 +334,7 @@ func (s *Server) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, req 
 	for _, opt := range ragOpts {
 		opts = append(opts, opt)
 	}
-	_, err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), req.GetKnowledgeBaseEntryId(), opts...)
+	_, err := rag.BuildVectorIndexForKnowledgeBaseEntry(consts.GetGormProfileDatabase(), req.GetKnowledgeBaseId(), req.GetKnowledgeBaseEntryHiddenIndex(), opts...)
 	if err != nil {
 		return nil, err
 	}

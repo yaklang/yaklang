@@ -1,7 +1,6 @@
 package integration
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/jinzhu/gorm"
@@ -153,7 +152,7 @@ func testKnowledgeEntryAdditionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 	t.Logf("Knowledge entry added: %s (ID: %d)", entry.KnowledgeTitle, entry.ID)
 
 	// 4. 验证知识条目在数据库中已创建
-	retrievedEntry, err := kb.GetKnowledgeEntry(int64(entry.ID))
+	retrievedEntry, err := kb.GetKnowledgeEntry(entry.HiddenIndex)
 	if err != nil {
 		t.Fatalf("Failed to retrieve knowledge entry: %v", err)
 	}
@@ -177,8 +176,7 @@ func testKnowledgeEntryAdditionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 
 	// 6. 验证向量内容
 	ragSystem := kb.GetRAGSystem()
-	docID := fmt.Sprintf("%d", entry.ID)
-	doc, exists, err := ragSystem.GetDocument(docID)
+	doc, exists, err := ragSystem.GetDocument(entry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to get document from vector store: %v", err)
 	} else if !exists {
@@ -220,13 +218,13 @@ func testKnowledgeEntryUpdateAndVectorSync(t *testing.T, db *gorm.DB, kbName str
 	entry.KnowledgeDetails = "Advanced machine learning covers deep learning, neural networks, reinforcement learning, and other sophisticated algorithms that can learn complex patterns from large datasets."
 	entry.Summary = "Advanced ML techniques including deep learning and neural networks"
 
-	err = kb.UpdateKnowledgeEntry(int64(entry.ID), entry)
+	err = kb.UpdateKnowledgeEntry(entry.HiddenIndex, entry)
 	if err != nil {
 		t.Fatalf("Failed to update knowledge entry: %v", err)
 	}
 
 	// 4. 验证数据库中的更新
-	updatedEntry, err := kb.GetKnowledgeEntry(int64(entry.ID))
+	updatedEntry, err := kb.GetKnowledgeEntry(entry.HiddenIndex)
 	if err != nil {
 		t.Fatalf("Failed to retrieve updated entry: %v", err)
 	}
@@ -243,8 +241,7 @@ func testKnowledgeEntryUpdateAndVectorSync(t *testing.T, db *gorm.DB, kbName str
 
 	// 5. 验证向量已同步更新
 	ragSystem := kb.GetRAGSystem()
-	docID := fmt.Sprintf("%d", entry.ID)
-	doc, exists, err := ragSystem.GetDocument(docID)
+	doc, exists, err := ragSystem.GetDocument(entry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to get updated document from vector store: %v", err)
 	} else if !exists {
@@ -296,8 +293,7 @@ func testKnowledgeEntryDeletionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 
 	// 4. 验证向量存在
 	ragSystem := kb.GetRAGSystem()
-	docID := fmt.Sprintf("%d", tempEntry.ID)
-	_, exists, err := ragSystem.GetDocument(docID)
+	_, exists, err := ragSystem.GetDocument(tempEntry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to check document existence: %v", err)
 	} else if !exists {
@@ -305,7 +301,7 @@ func testKnowledgeEntryDeletionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 	}
 
 	// 5. 删除知识条目
-	err = kb.DeleteKnowledgeEntry(int64(tempEntry.ID))
+	err = kb.DeleteKnowledgeEntry(tempEntry.HiddenIndex)
 	if err != nil {
 		t.Fatalf("Failed to delete knowledge entry: %v", err)
 	}
@@ -313,7 +309,7 @@ func testKnowledgeEntryDeletionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 	t.Logf("Entry deleted: %s", tempEntry.KnowledgeTitle)
 
 	// 6. 验证数据库中的删除
-	_, err = kb.GetKnowledgeEntry(int64(tempEntry.ID))
+	_, err = kb.GetKnowledgeEntry(tempEntry.HiddenIndex)
 	if err == nil {
 		t.Error("Knowledge entry should have been deleted from database")
 	}
@@ -332,7 +328,7 @@ func testKnowledgeEntryDeletionAndVectorSync(t *testing.T, db *gorm.DB, kbName s
 	}
 
 	// 8. 验证具体向量已删除
-	_, exists, err = ragSystem.GetDocument(docID)
+	_, exists, err = ragSystem.GetDocument(tempEntry.HiddenIndex)
 	if err != nil {
 		t.Errorf("Failed to check document after deletion: %v", err)
 	} else if exists {

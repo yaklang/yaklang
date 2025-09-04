@@ -2,7 +2,6 @@ package knowledgebase
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -259,15 +258,15 @@ func (kb *KnowledgeBase) Drop() error {
 }
 
 // UpdateKnowledgeEntry 更新知识条目（使用事务）
-func (kb *KnowledgeBase) UpdateKnowledgeEntry(id int64, entry *schema.KnowledgeBaseEntry) error {
-	entry.ID = uint(id)
-	err := yakit.UpdateKnowledgeBaseEntry(kb.db, entry)
+func (kb *KnowledgeBase) UpdateKnowledgeEntry(id string, entry *schema.KnowledgeBaseEntry) error {
+	entry.HiddenIndex = id
+	err := yakit.UpdateKnowledgeBaseEntryByHiddenIndex(kb.db, id, entry)
 	if err != nil {
 		return utils.Errorf("更新知识库条目失败: %v", err)
 	}
 
 	// 然后更新向量索引（事务外进行）
-	documentID := utils.InterfaceToString(entry.ID)
+	documentID := utils.InterfaceToString(entry.HiddenIndex)
 
 	// 删除旧的向量索引
 	if err := kb.ragSystem.DeleteDocuments(documentID); err != nil {
@@ -282,14 +281,12 @@ func (kb *KnowledgeBase) UpdateKnowledgeEntry(id int64, entry *schema.KnowledgeB
 }
 
 // DeleteKnowledgeEntry 删除知识条目（使用事务）
-func (kb *KnowledgeBase) DeleteKnowledgeEntry(entryID int64) error {
-	// 先从向量索引中删除（事务外进行）
-	documentID := utils.InterfaceToString(entryID)
-	if err := kb.ragSystem.DeleteDocuments(documentID); err != nil {
+func (kb *KnowledgeBase) DeleteKnowledgeEntry(entryID string) error {
+	if err := kb.ragSystem.DeleteDocuments(entryID); err != nil {
 		return utils.Errorf("删除向量索引失败: %v", err)
 	}
 
-	err := yakit.DeleteKnowledgeBaseEntry(kb.db, entryID)
+	err := yakit.DeleteKnowledgeBaseEntryByHiddenIndex(kb.db, entryID)
 	if err != nil {
 		return utils.Errorf("删除数据库条目失败: %v", err)
 	}
@@ -303,8 +300,8 @@ type KnowledgeEntryWithScore struct {
 }
 
 // GetKnowledgeEntry 根据ID获取知识条目
-func (kb *KnowledgeBase) GetKnowledgeEntry(entryID int64) (*schema.KnowledgeBaseEntry, error) {
-	return yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
+func (kb *KnowledgeBase) GetKnowledgeEntry(entryID string) (*schema.KnowledgeBaseEntry, error) {
+	return yakit.GetKnowledgeBaseEntryByHiddenIndex(kb.db, entryID)
 }
 
 // ListKnowledgeEntries 分页获取知识条目列表
@@ -395,7 +392,7 @@ func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry)
 	}
 
 	// 使用条目ID作为文档ID
-	documentID := utils.InterfaceToString(entry.ID)
+	documentID := utils.InterfaceToString(entry.HiddenIndex)
 
 	// 添加文档到RAG系统
 	return kb.ragSystem.Add(documentID, content, rag.WithDocumentRawMetadata(metadata))
@@ -404,7 +401,7 @@ func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry)
 // SyncKnowledgeBaseWithRAG 同步知识库和RAG，以知识库为准
 func (kb *KnowledgeBase) SyncKnowledgeBaseWithRAG() (*SyncResult, error) {
 	result := &SyncResult{
-		AddedToRAG:     []int64{},
+		AddedToRAG:     []string{},
 		DeletedFromRAG: []string{},
 		SyncErrors:     []string{},
 	}
@@ -428,9 +425,8 @@ func (kb *KnowledgeBase) SyncKnowledgeBaseWithRAG() (*SyncResult, error) {
 	dbEntryIDs := make(map[string]bool)
 	dbEntryMap := make(map[string]*schema.KnowledgeBaseEntry)
 	for _, entry := range dbEntries {
-		entryIDStr := utils.InterfaceToString(entry.ID)
-		dbEntryIDs[entryIDStr] = true
-		dbEntryMap[entryIDStr] = entry
+		dbEntryIDs[entry.HiddenIndex] = true
+		dbEntryMap[entry.HiddenIndex] = entry
 	}
 
 	// 获取RAG中的所有文档
@@ -446,15 +442,13 @@ func (kb *KnowledgeBase) SyncKnowledgeBaseWithRAG() (*SyncResult, error) {
 	}
 
 	// 查找知识库中有但RAG中没有的条目，添加到RAG
-	for entryIDStr, entry := range dbEntryMap {
-		if !ragDocumentIDs[entryIDStr] {
+	for entryID, entry := range dbEntryMap {
+		if !ragDocumentIDs[entryID] {
 			if err := kb.addEntryToVectorIndex(entry); err != nil {
 				result.SyncErrors = append(result.SyncErrors,
-					fmt.Sprintf("添加条目 %s 到RAG失败: %v", entryIDStr, err))
+					fmt.Sprintf("添加条目 %s 到RAG失败: %v", entryID, err))
 			} else {
-				if entryID, err := strconv.ParseInt(entryIDStr, 10, 64); err == nil {
-					result.AddedToRAG = append(result.AddedToRAG, entryID)
-				}
+				result.AddedToRAG = append(result.AddedToRAG, entryID)
 			}
 		}
 	}
@@ -481,7 +475,7 @@ func (kb *KnowledgeBase) SyncKnowledgeBaseWithRAG() (*SyncResult, error) {
 type SyncResult struct {
 	TotalDBEntries    int      `json:"total_db_entries"`    // 数据库中的总条目数
 	TotalRAGDocuments int      `json:"total_rag_documents"` // RAG中的总文档数
-	AddedToRAG        []int64  `json:"added_to_rag"`        // 添加到RAG的条目ID列表
+	AddedToRAG        []string `json:"added_to_rag"`        // 添加到RAG的条目ID列表
 	DeletedFromRAG    []string `json:"deleted_from_rag"`    // 从RAG删除的文档ID列表
 	SyncErrors        []string `json:"sync_errors"`         // 同步过程中的错误列表
 }
@@ -526,28 +520,28 @@ type SyncStatus struct {
 }
 
 // BatchSyncEntries 批量同步指定的知识条目
-func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []int64) (*SyncResult, error) {
+func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []string) (*SyncResult, error) {
 	result := &SyncResult{
-		AddedToRAG:     []int64{},
+		AddedToRAG:     []string{},
 		DeletedFromRAG: []string{},
 		SyncErrors:     []string{},
 	}
 
 	for _, entryID := range entryIDs {
 		// 获取知识条目
-		entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
+		entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(kb.db, entryID)
 		if err != nil {
 			result.SyncErrors = append(result.SyncErrors,
-				fmt.Sprintf("获取条目 %d 失败: %v", entryID, err))
+				fmt.Sprintf("获取条目 %s 失败: %v", entryID, err))
 			continue
 		}
 
 		// 检查RAG中是否已存在
-		documentID := utils.InterfaceToString(entryID)
+		documentID := entryID
 		_, exists, err := kb.ragSystem.GetDocument(documentID)
 		if err != nil {
 			result.SyncErrors = append(result.SyncErrors,
-				fmt.Sprintf("检查RAG文档 %d 失败: %v", entryID, err))
+				fmt.Sprintf("检查RAG文档 %s 失败: %v", entryID, err))
 			continue
 		}
 
@@ -555,7 +549,7 @@ func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []int64) (*SyncResult, error)
 			// 如果存在，先删除再添加（更新）
 			if err := kb.ragSystem.DeleteDocuments(documentID); err != nil {
 				result.SyncErrors = append(result.SyncErrors,
-					fmt.Sprintf("删除RAG文档 %d 失败: %v", entryID, err))
+					fmt.Sprintf("删除RAG文档 %s 失败: %v", entryID, err))
 				continue
 			}
 		}
@@ -563,7 +557,7 @@ func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []int64) (*SyncResult, error)
 		// 添加到RAG
 		if err := kb.addEntryToVectorIndex(entry); err != nil {
 			result.SyncErrors = append(result.SyncErrors,
-				fmt.Sprintf("添加条目 %d 到RAG失败: %v", entryID, err))
+				fmt.Sprintf("添加条目 %s 到RAG失败: %v", entryID, err))
 		} else {
 			result.AddedToRAG = append(result.AddedToRAG, entryID)
 		}
@@ -572,8 +566,8 @@ func (kb *KnowledgeBase) BatchSyncEntries(entryIDs []int64) (*SyncResult, error)
 	return result, nil
 }
 
-func (kb *KnowledgeBase) EmbedKnowledgeBaseEntry(id int64) error {
-	entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, id)
+func (kb *KnowledgeBase) EmbedKnowledgeBaseEntry(id string) error {
+	entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(kb.db, id)
 	if err != nil {
 		return utils.Errorf("获取知识库条目失败: %v", err)
 	}

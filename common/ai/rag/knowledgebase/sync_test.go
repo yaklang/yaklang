@@ -158,7 +158,7 @@ func TestBatchSyncEntries(t *testing.T) {
 	}
 
 	// 批量同步指定条目
-	entryIDs := []int64{int64(entries[0].ID), int64(entries[1].ID)}
+	entryIDs := []string{entries[0].HiddenIndex, entries[1].HiddenIndex}
 	syncResult, err := kb.BatchSyncEntries(entryIDs)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(syncResult.AddedToRAG))
@@ -211,7 +211,7 @@ func TestTransactionOperations(t *testing.T) {
 
 	// 测试更新操作（事务）
 	entry.KnowledgeDetails = "更新后的详细内容"
-	err = kb.UpdateKnowledgeEntry(int64(entry.ID), entry)
+	err = kb.UpdateKnowledgeEntry(entry.HiddenIndex, entry)
 	assert.NoError(t, err)
 
 	// 验证更新成功
@@ -220,7 +220,7 @@ func TestTransactionOperations(t *testing.T) {
 	assert.Equal(t, 1, count) // 数量不变，但内容已更新
 
 	// 测试删除操作（事务）
-	err = kb.DeleteKnowledgeEntry(int64(entry.ID))
+	err = kb.DeleteKnowledgeEntry(entry.HiddenIndex)
 	assert.NoError(t, err)
 
 	// 验证删除成功
