@@ -17,8 +17,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -447,54 +445,18 @@ func handleListenError(addr string, originalErr error) error {
 		return utils.Errorf("listen port: %v failed: %s", addr, originalErr)
 	}
 
-	var ports []int
-	// 检查附近端口 (±10)
-	start := port - 10
-	if start < 1 {
-		start = 1
-	}
-	end := port + 10
-	if end > 65535 {
-		end = 65535
-	}
-
-	for p := start; p <= end; p++ {
-		if p != port && utils.IsPortAvailable(host, p) {
-			ports = append(ports, p)
-			if len(ports) >= 5 { // 最多建议5个附近端口
-				break
-			}
-		}
-	}
-
-	// 如果没有附近端口，检查高位端口 (50000-65535)
-	if len(ports) == 0 {
-		for i := 0; i < 10 && len(ports) < 3; i++ {
-			if highPort, err := utils.GetRangeAvailableTCPPort(50000, 65535, 10); err == nil {
-				ports = append(ports, highPort)
-			}
-		}
-	}
-
-	uniquePorts := utils.RemoveRepeatIntSlice(ports)
+	availablePort := utils.FindNearestAvailablePortWithTimeout(host, port, 3*time.Second)
 	var suggestionMsg string
-	if len(uniquePorts) == 0 {
-		suggestionMsg = "端口被占用，可能由于系统限制，建议尝试重启电脑或使用管理员权限运行"
+	if availablePort == 0 {
+		suggestionMsg = "端口被占用，3秒内未找到可用端口，建议尝试重启电脑或使用管理员权限运行"
 	} else {
-		var portStrs []string
-		for _, p := range uniquePorts {
-			portStrs = append(portStrs, strconv.Itoa(p))
+		// 判断是附近端口还是系统分配端口
+		if availablePort >= port-10 && availablePort <= port+10 {
+			suggestionMsg = fmt.Sprintf("端口被占用，建议尝试附近可用端口：%d", availablePort)
+		} else {
+			suggestionMsg = fmt.Sprintf("端口被占用，建议尝试系统分配的可用端口：%d", availablePort)
 		}
-
-		// 判断是附近端口还是高位端口
-		portType := "高位可用端口"
-		if len(uniquePorts) > 0 && uniquePorts[0] >= port-10 && uniquePorts[0] <= port+10 {
-			portType = "附近可用端口"
-		}
-
-		suggestionMsg = fmt.Sprintf("端口被占用，建议尝试以下%s：%s", portType, strings.Join(portStrs, ", "))
 	}
-
 	return utils.Errorf("listen port: %v failed: %s\n\n%s", addr, originalErr, suggestionMsg)
 }
 
