@@ -193,6 +193,30 @@ func (q *Quantizer) GetCompressionRatio() float64 {
 	return float64(originalSize) / float64(compressedSize)
 }
 
+// M 返回子向量数量
+func (q *Quantizer) M() int {
+	if q.codebook == nil {
+		return 0
+	}
+	return q.codebook.M
+}
+
+// K 返回每个子空间的聚类中心数量
+func (q *Quantizer) K() int {
+	if q.codebook == nil {
+		return 0
+	}
+	return q.codebook.K
+}
+
+// SubVectorDim 返回每个子向量的维度
+func (q *Quantizer) SubVectorDim() int {
+	if q.codebook == nil {
+		return 0
+	}
+	return q.codebook.SubVectorDim
+}
+
 // GetCodebookInfo 获取码本信息
 func (q *Quantizer) GetCodebookInfo() map[string]interface{} {
 	if q.codebook == nil {
