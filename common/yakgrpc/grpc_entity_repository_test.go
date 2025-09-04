@@ -11,35 +11,39 @@ import (
 	"testing"
 )
 
-func setupTestData(t *testing.T) (entityBaseID uint, entityBaseName string, entityIDs []uint, entityNames []string, relationshipIDs []uint, relationshipType string) {
+func setupTestData(t *testing.T) (entityBaseIndex, entityBaseName string, entityIndex, entityNames []string, relationshipIDs []uint, relationshipType string, clearFunc func()) {
 	db := consts.GetGormProfileDatabase()
 	// 创建 EntityBase
 	entityBaseName = fmt.Sprintf("TestBase_%s", uuid.New().String())
 	entityBase := &schema.EntityBaseInfo{
 		EntityBaseName: entityBaseName,
 		Description:    "Test Description",
+		HiddenIndex:    uuid.NewString(),
 	}
 	if err := db.Create(entityBase).Error; err != nil {
 		t.Fatalf("setupTestData: create EntityBaseInfo failed: %v", err)
 	}
-	entityBaseID = entityBase.ID
-
+	entityBaseID := entityBase.ID
+	entityBaseIndex = entityBase.HiddenIndex
 	// 创建实体
 	var entities []*schema.ERModelEntity
+	var entityIDs []uint
 	for i := 0; i < 2; i++ {
 		name := fmt.Sprintf("Entity_%d_%s", i, uuid.New().String())
 		e := &schema.ERModelEntity{
-			EntityBaseID: entityBaseID,
-			EntityName:   name,
-			EntityType:   "TypeA",
-			Description:  "Test Entity",
-			Rationale:    "Test Rationale",
-			Attributes:   schema.MetadataMap{"attr": fmt.Sprintf("val_%d", i)},
+			EntityBaseID:    entityBaseID,
+			EntityBaseIndex: entityBaseIndex,
+			EntityName:      name,
+			EntityType:      "TypeA",
+			Description:     "Test Entity",
+			Rationale:       "Test Rationale",
+			Attributes:      schema.MetadataMap{"attr": fmt.Sprintf("val_%d", i)},
 		}
 		if err := db.Create(e).Error; err != nil {
 			t.Fatalf("setupTestData: create ERModelEntity failed: %v", err)
 		}
 		entities = append(entities, e)
+		entityIndex = append(entityIndex, e.HiddenIndex)
 		entityIDs = append(entityIDs, e.ID)
 		entityNames = append(entityNames, name)
 	}
@@ -60,25 +64,22 @@ func setupTestData(t *testing.T) (entityBaseID uint, entityBaseName string, enti
 	}
 	relationshipIDs = append(relationshipIDs, r.ID)
 
-	return entityBaseID, entityBaseName, entityIDs, entityNames, relationshipIDs, relationshipType
-}
+	clearFunc = func() {
+		for _, rid := range relationshipIDs {
+			db.Unscoped().Delete(&schema.ERModelRelationship{}, rid)
+		}
+		for _, eid := range entityIDs {
+			db.Unscoped().Delete(&schema.ERModelEntity{}, eid)
+		}
+		db.Unscoped().Delete(&schema.EntityBaseInfo{}, entityBaseID)
+	}
 
-func cleanupTestData(t *testing.T, entityBaseID uint, entityIDs []uint, relationshipIDs []uint) {
-	db := consts.GetGormProfileDatabase()
-	for _, rid := range relationshipIDs {
-		db.Unscoped().Delete(&schema.ERModelRelationship{}, rid)
-	}
-	for _, eid := range entityIDs {
-		db.Unscoped().Delete(&schema.ERModelEntity{}, eid)
-	}
-	db.Unscoped().Delete(&schema.EntityBaseInfo{}, entityBaseID)
+	return entityBaseIndex, entityBaseName, entityIndex, entityNames, relationshipIDs, relationshipType, clearFunc
 }
 
 func TestListEntityRepository(t *testing.T) {
-	entityBaseID, entityBaseName, entityIDs, _, relationshipIDs, _ := setupTestData(t)
-	t.Cleanup(func() {
-		cleanupTestData(t, entityBaseID, entityIDs, relationshipIDs)
-	})
+	entityBaseIndex, entityBaseName, _, _, _, _, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
 
 	client, err := NewLocalClient()
 	if err != nil {
@@ -94,7 +95,7 @@ func TestListEntityRepository(t *testing.T) {
 	// 严格检查：是否包含刚插入的 entityBaseName
 	found := false
 	for _, repo := range resp.EntityRepositories {
-		if repo.Name == entityBaseName {
+		if repo.Name == entityBaseName && repo.HiddenIndex == entityBaseIndex {
 			found = true
 			if repo.Description != "Test Description" {
 				t.Errorf("EntityRepository description mismatch: got %s", repo.Description)
@@ -108,17 +109,15 @@ func TestListEntityRepository(t *testing.T) {
 }
 
 func TestQueryEntity(t *testing.T) {
-	entityBaseID, _, entityIDs, entityNames, relationshipIDs, _ := setupTestData(t)
-	t.Cleanup(func() {
-		cleanupTestData(t, entityBaseID, entityIDs, relationshipIDs)
-	})
+	entityBaseIndex, _, entityIndex, entityNames, _, _, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
 
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatalf("Failed to create local gRPC client: %v", err)
 	}
 	req := &ypb.QueryEntityRequest{
-		Filter:     &ypb.EntityFilter{BaseID: uint64(entityBaseID)},
+		Filter:     &ypb.EntityFilter{BaseIndex: entityBaseIndex},
 		Pagination: &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id"},
 	}
 	resp, err := client.QueryEntity(context.Background(), req)
@@ -130,14 +129,17 @@ func TestQueryEntity(t *testing.T) {
 	}
 	// 检查内容
 	for i, e := range resp.Entities {
-		if e.BaseID != uint64(entityBaseID) {
-			t.Errorf("Entity BaseID mismatch: got %d, want %d", e.BaseID, entityBaseID)
+		if e.BaseIndex != entityBaseIndex {
+			t.Errorf("Entity Base mismatch: got %s, want %s", e.BaseIndex, entityBaseIndex)
 		}
 		if e.Type != "TypeA" {
 			t.Errorf("Entity Type mismatch: got %s, want TypeA", e.Type)
 		}
 		if e.Name != entityNames[i] {
 			t.Errorf("Entity Name mismatch: got %s, want %s", e.Name, entityNames[i])
+		}
+		if e.HiddenIndex != entityIndex[i] {
+			t.Errorf("Entity BaseIndex mismatch: got %s, want %s", e.HiddenIndex, entityIndex[i])
 		}
 		if len(e.Attributes) != 1 || e.Attributes[0].Key != "attr" {
 			t.Errorf("Entity Attributes mismatch: got %+v", e.Attributes)
@@ -150,17 +152,16 @@ func TestQueryEntity(t *testing.T) {
 }
 
 func TestQueryRelationship(t *testing.T) {
-	entityBaseID, _, entityIDs, _, relationshipIDs, relationshipType := setupTestData(t)
-	t.Cleanup(func() {
-		cleanupTestData(t, entityBaseID, entityIDs, relationshipIDs)
-	})
+	entityBaseIndex, _, entityIndex, _, _, relationshipType, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
 
 	client, err := NewLocalClient()
 	if err != nil {
+
 		t.Fatalf("Failed to create local gRPC client: %v", err)
 	}
 	req := &ypb.QueryRelationshipRequest{
-		Filter:     &ypb.RelationshipFilter{BaseID: uint64(entityBaseID)},
+		Filter:     &ypb.RelationshipFilter{BaseIndex: entityBaseIndex},
 		Pagination: &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id"},
 	}
 	resp, err := client.QueryRelationship(context.Background(), req)
@@ -174,26 +175,26 @@ func TestQueryRelationship(t *testing.T) {
 	if rel.Type != relationshipType {
 		t.Errorf("Relationship Type mismatch: got %s, want %s", rel.Type, relationshipType)
 	}
-	if rel.SourceEntityID != uint64(entityIDs[0]) || rel.TargetEntityID != uint64(entityIDs[1]) {
-		t.Errorf("Relationship entity IDs mismatch: got %d->%d, want %d->%d", rel.SourceEntityID, rel.TargetEntityID, entityIDs[0], entityIDs[1])
+
+	if rel.SourceEntityIndex != entityIndex[0] || rel.TargetEntityIndex != entityIndex[1] {
+		t.Errorf("Relationship EntityIndex mismatch: got %s -> %s, want %s -> %s", rel.SourceEntityIndex, rel.TargetEntityIndex, entityIndex[0], entityIndex[1])
 	}
+
 	if len(rel.Attributes) != 1 || rel.Attributes[0].Key != "relAttr" {
 		t.Errorf("Relationship Attributes mismatch: got %+v", rel.Attributes)
 	}
 }
 
 func TestGenerateERMDot(t *testing.T) {
-	entityBaseID, _, entityIDs, entityNames, relationshipIDs, relationshipType := setupTestData(t)
-	t.Cleanup(func() {
-		cleanupTestData(t, entityBaseID, entityIDs, relationshipIDs)
-	})
+	entityBaseIndex, _, _, entityNames, _, relationshipType, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
 
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatalf("Failed to create local gRPC client: %v", err)
 	}
 	req := &ypb.GenerateERMDotRequest{
-		Filter: &ypb.EntityFilter{BaseID: uint64(entityBaseID)},
+		Filter: &ypb.EntityFilter{BaseIndex: entityBaseIndex},
 		Depth:  2,
 	}
 	resp, err := client.GenerateERMDot(context.Background(), req)

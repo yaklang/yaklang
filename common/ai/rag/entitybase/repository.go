@@ -12,9 +12,7 @@ import (
 )
 
 const (
-	META_EntityID     = "entity_id"
 	META_EntityBaseID = "entity_base_id"
-	META_EntityName   = "entity_name"
 	META_EntityType   = "entity_type"
 )
 
@@ -82,25 +80,6 @@ func (eb *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity)
 	}
 
 	return nil, nil
-
-	// unique attribute query
-	//var attributeIndexedId []uint
-	//for _, attribute := range entity.ExtendAttributes {
-	//	if attribute.UniqueIdentifier {
-	//		id, ok := yakit.UniqueAttributesIndexEntity(eb.db, attribute.AttributeName, attribute.AttributeValue)
-	//		if ok {
-	//			attributeIndexedId = append(attributeIndexedId, id...)
-	//		}
-	//	}
-	//}
-
-	//if len(attributeIndexedId) == 0 {
-	//	return nil, nil
-	//}
-	//
-	//return eb.queryEntities(&yakit.EntityFilter{
-	//	ID: attributeIndexedId,
-	//})
 }
 
 func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
@@ -117,23 +96,23 @@ func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]
 		return nil, nil
 	}
 
-	var entityIds []uint64
+	var entityIndex []string
 	for _, res := range results {
 		if res.Score <= 0.8 {
 			continue
 		}
-		id, ok := res.Document.Metadata[META_EntityID]
+		index, ok := res.Document.Metadata.GetDocIndex()
 		if ok {
-			entityIds = append(entityIds, uint64(utils.InterfaceToInt(id)))
+			entityIndex = append(entityIndex, utils.InterfaceToString(index))
 		}
 	}
 
-	if len(entityIds) == 0 {
+	if len(entityIndex) == 0 {
 		return nil, nil
 	}
 
 	return eb.queryEntities(&ypb.EntityFilter{
-		IDs: entityIds,
+		HiddenIndex: entityIndex,
 	})
 }
 
@@ -144,10 +123,11 @@ func (eb *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.E
 
 func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
 	metadata := map[string]any{
-		META_EntityID:     entry.ID,
-		META_EntityBaseID: entry.EntityBaseID,
-		META_EntityName:   entry.EntityName,
-		META_EntityType:   entry.EntityType,
+		schema.META_Doc_Index:  entry.HiddenIndex,
+		schema.META_Doc_Name:   entry.EntityName,
+		schema.META_Base_Index: entry.EntityBaseIndex,
+		META_EntityBaseID:      entry.EntityBaseID,
+		META_EntityType:        entry.EntityType,
 	}
 
 	documentID := fmt.Sprintf("base_%d_entity_%d[%s]", eb.baseInfo.ID, entry.ID, entry.EntityName)
@@ -175,6 +155,7 @@ func (eb *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error
 
 func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	entity.EntityBaseID = eb.baseInfo.ID
+	entity.EntityBaseIndex = eb.baseInfo.HiddenIndex
 	err := yakit.CreateEntity(eb.db, entity)
 	if err != nil {
 		return err
@@ -184,13 +165,13 @@ func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 
 //--- Relationship Operations ---
 
-func (eb *EntityRepository) AddRelationship(sourceID uint, targetID uint, RelationshipType string, decisionRationale string, attr map[string]any) error {
-	return yakit.AddRelationship(eb.db, sourceID, targetID, RelationshipType, decisionRationale, attr)
+func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, RelationshipType string, decisionRationale string, attr map[string]any) error {
+	return yakit.AddRelationship(eb.db, sourceIndex, targetIndex, RelationshipType, decisionRationale, attr)
 }
 
 func (eb *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("source_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
@@ -198,7 +179,7 @@ func (eb *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEnt
 
 func (eb *EntityRepository) QueryIncomingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("target_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
