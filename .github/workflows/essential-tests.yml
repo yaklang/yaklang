@@ -198,10 +198,6 @@ jobs:
               go test -timeout 30s ./common/yak/antlr4c/...
               go test -timeout 2m ./common/yak/ssaapi/test/c
 
-          - name: Test SyntaxFlow Web Server
-            run: |
-              go test -timeout 4m ./common/sfweb/...
-
           - name: Test lowhttp / DNSX
             run: |
               # lowhttp
@@ -236,6 +232,7 @@ jobs:
             run: |
               go test -v -timeout 5m -run TestGRPCMUSTPASS_SyntaxFlow* ./common/yakgrpc/... 2>&1 | tee /tmp/syntaxflow_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/syntaxflow_test.log; }
               go test -v -timeout 5m -run TestGRPCMUSTPASS_SSA* ./common/yakgrpc/... 2>&1 | tee /tmp/ssa_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/ssa_test.log; }
+              go test -v -timeout 4m ./common/sfweb/... 2>&1 | tee /tmp/sfweb_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/sfweb_test.log; }
 
           - name: Test gRPC In 2m
             run: |
@@ -302,6 +299,8 @@ jobs:
         id: go
 
       - name: GRPC
+        env: 
+          SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
         run: |
           # 只要测试名称或测试内容包含 grpc (不区分大小写) 就启动 GRPC 服务
           echo "${{ matrix.name }}" > /tmp/test_name.txt
