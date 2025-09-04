@@ -152,7 +152,6 @@ jobs:
               
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
-              go test -timeout 1m -run TestMUSTPASS ./common/yakgrpc/yakit
 
           - name: Test SSA / SSAAPI
             run: |
@@ -216,66 +215,63 @@ jobs:
           - name: Test MustPass - full yak scripts
             run: go test -timeout 3m ./common/yak/yaktest/mustpass
 
-          - name: Test gRPC MUSTPASS HTTP
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_HTTP_* ./common/yakgrpc/...
-
           - name: Test gRPC MUSTPASS MITM
             run: |
+              go test -v -timeout 1m -run TestMUSTPASS ./common/yakgrpc/yakit 2>&1 | tee /tmp/yakit_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/yakit_test.log; }
               # Test gRPC MUSTPASS MITM
-              go test -timeout 5m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc/...
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_MITM_* ./common/yakgrpc/... 2>&1 | tee /tmp/mitm_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/mitm_test.log; }
               # Test gRPC MUSTPASS MITM V2
-              go test -timeout 5m -run TestGRPCMUSTPASS_MITMV2_* ./common/yakgrpc/...
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_MITMV2_* ./common/yakgrpc/... 2>&1 | tee /tmp/mitmv2_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/mitmv2_test.log; }
 
           - name: Test gRPC MUSTPASS Fuzzer
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_HTTPFuzzer* ./common/yakgrpc/...
+            run: |
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_HTTPFuzzer ./common/yakgrpc/... 2>&1 | tee /tmp/fuzzer_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/fuzzer_test.log; }
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_HTTP_ ./common/yakgrpc/... 2>&1 | tee /tmp/http_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/http_test.log; }
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_PluginTrace ./common/yakgrpc/... 2>&1 | tee /tmp/plugin_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/plugin_test.log; }
 
           - name: Test gRPC MUSTPASS Language
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc/...
+            run: go test -v -timeout 5m -run TestGRPCMUSTPASS_LANGUAGE* ./common/yakgrpc/... 2>&1 | tee /tmp/language_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/language_test.log; }
 
           - name: Test gRPC MUSTPASS SyntaxFlow | SSA
             run: |
-              go test -timeout 5m -run TestGRPCMUSTPASS_SyntaxFlow* ./common/yakgrpc/...
-              go test -timeout 5m -run TestGRPCMUSTPASS_SSA* ./common/yakgrpc/...
-
-          - name: Test gRPC MUSTPASS PluginTrace
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_PluginTrace* ./common/yakgrpc/...
-
-          - name: Test AI Task
-            run: go test -timeout 1m -run TestAITaskWith ./common/yakgrpc/...
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_SyntaxFlow* ./common/yakgrpc/... 2>&1 | tee /tmp/syntaxflow_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/syntaxflow_test.log; }
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_SSA* ./common/yakgrpc/... 2>&1 | tee /tmp/ssa_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/ssa_test.log; }
 
           - name: Test gRPC In 2m
             run: |
               # Test gRPC MUSTPASS AnalyzeHTTPFlow
-              go test -timeout 2m -run TestGRPCMUSTPASS_AnalyzeHTTPFlow* ./common/yakgrpc/...
+              go test -v -timeout 2m -run TestGRPCMUSTPASS_AnalyzeHTTPFlow* ./common/yakgrpc/... 2>&1 | tee /tmp/analyze_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/analyze_test.log; }
               # Test gRPC MUSTPASS Fingerprint
-              go test -timeout 2m -run TestGRPCMUSTPASS_Fingerprint* ./common/yakgrpc/...
+              go test -v -timeout 2m -run TestGRPCMUSTPASS_Fingerprint* ./common/yakgrpc/... 2>&1 | tee /tmp/fingerprint_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/fingerprint_test.log; }
               # Test gRPC gRPC(LIST)MUSTPASS
-              go test -timeout 2m -run TestLARGEGRPCMUSTPASS* ./common/yakgrpc/...
+              go test -v -timeout 2m -run TestLARGEGRPCMUSTPASS* ./common/yakgrpc/... 2>&1 | tee /tmp/large_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/large_test.log; }
               # Test gRPC MUSTPASS COMMON
-              go test -timeout 5m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc/...
+              go test -v -timeout 5m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc/... 2>&1 | tee /tmp/common_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/common_test.log; }
+              # Test AI gRPC
+              go test -v -timeout 1m -run TestAITaskWith ./common/yakgrpc/... 2>&1 | tee /tmp/ai_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/ai_test.log; }
 
           - name: Test gRPC Other
             run:  |
-              go test -v -timeout 10m -skip "^(TestGRPCMUSTPASS_PluginTrace*|TestGRPCMUSTPASS_AnalyzeHTTPFlow*|TestGRPCMUSTPASS_Fingerprint*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_*|TestAITaskWith*|TestGRPCMUSTPASS_MITM_*|TestGRPCMUSTPASS_HTTPFuzzer*|TestGRPCMUSTPASS_LANGUAGE*|TestGRPCMUSTPASS_COMMON*|TestLARGEGRPCMUSTPASS*|TestGRPCMUSTPASS_SyntaxFlow*|TestGRPCMUSTPASS_SSA*)" ./common/yakgrpc/...
+              go test -v -timeout 10m -skip "^(TestGRPCMUSTPASS_PluginTrace*|TestGRPCMUSTPASS_AnalyzeHTTPFlow*|TestGRPCMUSTPASS_Fingerprint*|TestGRPC_Ai_List_Model|TestGRPCMUSTPASS_HTTP_*|TestAITaskWith*|TestGRPCMUSTPASS_MITM_*|TestGRPCMUSTPASS_HTTPFuzzer*|TestGRPCMUSTPASS_LANGUAGE*|TestGRPCMUSTPASS_COMMON*|TestLARGEGRPCMUSTPASS*|TestGRPCMUSTPASS_SyntaxFlow*|TestGRPCMUSTPASS_SSA*)" ./common/yakgrpc/... 2>&1 | tee /tmp/grpc_other_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/grpc_other_test.log; }
 
           - name: Test Integration MITM / SyntaxFlow
             run: |
               #  integration MITM
-              go test -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin
+              go test -v -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin 2>&1 | tee /tmp/integration_mitm_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/integration_mitm_test.log; }
               # SyntaxFlow
               go test -timeout 20s  ./common/syntaxflow/tests
               go test -timeout 20s  ./common/syntaxflow/sfdb/...
               go test -timeout 20s  ./common/syntaxflow/sfvm/...
 
           - name: Test Vulinbox Coreplugin Fastjson
-            run: go test -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin
+            run: go test -v -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin 2>&1 | tee /tmp/fastjson_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/fastjson_test.log; }
 
           - name: Test Vulinbox Coreplugin SQL Injection
-            run: go test -timeout 5m -run TestGRPCMUSTPASS_SQL ./common/coreplugin
+            run: go test -v -timeout 5m -run TestGRPCMUSTPASS_SQL ./common/coreplugin 2>&1 | tee /tmp/sql_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/sql_test.log; }
 
           - name: Test Vulinbox Coreplugin (XSS/Shiro/SSRF/SSTI/SMUGGLE/CSRF/OPEN_REDIRECT)
             run: |
-              go test -timeout 6m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSRF|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin
+              go test -v -timeout 6m -run "^(TestGRPCMUSTPASS_XSS|TestGRPCMUSTPASS_Shiro|TestGRPCMUSTPASS_SSRF|TestGRPCMUSTPASS_SSTI|TestGRPCMUSTPASS_Smuggle|TestGRPCMUSTPASS_CSRF|TestGRPCMUSTPASS_OPEN_REDIRECT)$" ./common/coreplugin 2>&1 | tee /tmp/vuln_test.log | { grep -E -A3 -B3 "(FAIL|--- FAIL)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate)" /tmp/vuln_test.log; }
 
           - name: Test Crawler / Crawlerx (chromium based crawler)
             run: |
@@ -307,8 +303,8 @@ jobs:
 
       - name: GRPC
         run: |
-          # 只有当测试名称包含 grpc (不区分大小写) 时才启动 GRPC 服务
-          if echo "${{ matrix.name }}" | grep -qi grpc; then
+          # 只有当测试名称和 run 都包含 grpc (不区分大小写) 时才启动 GRPC 服务
+          if echo "${{ matrix.name }}" | grep -qi grpc && echo "${{ matrix.run }}" | grep -qi grpc; then
             echo "Starting GRPC server for test: ${{ matrix.name }}"
             nohup ./yak grpc > /tmp/grpc.log 2>&1 < /dev/null &
             echo "Waiting for GRPC server to start on port 8087..."
