@@ -142,7 +142,7 @@ func AutoMigrate(db *gorm.DB, key uint8) {
 			log.Errorf("Database schema [%v] is empty", KeySchemaToName(key))
 			return
 		}
-		db.Debug().AutoMigrate(schemas...)
+		db.AutoMigrate(schemas...)
 	} else {
 		log.Errorf("Database schema key: %v is %v", key, KeySchemaToName(key))
 	}
