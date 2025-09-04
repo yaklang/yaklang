@@ -999,6 +999,7 @@ type EntityRepository struct {
 	ID            int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=Name,proto3" json:"Name,omitempty"`
 	Description   string                 `protobuf:"bytes,3,opt,name=Description,proto3" json:"Description,omitempty"`
+	HiddenIndex   string                 `protobuf:"bytes,4,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1054,6 +1055,13 @@ func (x *EntityRepository) GetDescription() string {
 	return ""
 }
 
+func (x *EntityRepository) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
+}
+
 type ListEntityRepositoryResponse struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	EntityRepositories []*EntityRepository    `protobuf:"bytes,1,rep,name=EntityRepositories,proto3" json:"EntityRepositories,omitempty"`
@@ -1105,8 +1113,10 @@ type Entity struct {
 	Name          string                 `protobuf:"bytes,3,opt,name=Name,proto3" json:"Name,omitempty"`
 	Description   string                 `protobuf:"bytes,4,opt,name=Description,proto3" json:"Description,omitempty"`
 	BaseID        uint64                 `protobuf:"varint,5,opt,name=BaseID,proto3" json:"BaseID,omitempty"`
+	BaseIndex     string                 `protobuf:"bytes,9,opt,name=BaseIndex,proto3" json:"BaseIndex,omitempty"`
 	Attributes    []*KVPair              `protobuf:"bytes,6,rep,name=Attributes,proto3" json:"Attributes,omitempty"`
 	Rationale     string                 `protobuf:"bytes,7,opt,name=Rationale,proto3" json:"Rationale,omitempty"`
+	HiddenIndex   string                 `protobuf:"bytes,8,opt,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1176,6 +1186,13 @@ func (x *Entity) GetBaseID() uint64 {
 	return 0
 }
 
+func (x *Entity) GetBaseIndex() string {
+	if x != nil {
+		return x.BaseIndex
+	}
+	return ""
+}
+
 func (x *Entity) GetAttributes() []*KVPair {
 	if x != nil {
 		return x.Attributes
@@ -1190,12 +1207,21 @@ func (x *Entity) GetRationale() string {
 	return ""
 }
 
+func (x *Entity) GetHiddenIndex() string {
+	if x != nil {
+		return x.HiddenIndex
+	}
+	return ""
+}
+
 type EntityFilter struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BaseID        uint64                 `protobuf:"varint,1,opt,name=BaseID,proto3" json:"BaseID,omitempty"`
+	BaseIndex     string                 `protobuf:"bytes,6,opt,name=BaseIndex,proto3" json:"BaseIndex,omitempty"`
 	IDs           []uint64               `protobuf:"varint,2,rep,packed,name=IDs,proto3" json:"IDs,omitempty"`
 	Types         []string               `protobuf:"bytes,3,rep,name=Types,proto3" json:"Types,omitempty"`
 	Names         []string               `protobuf:"bytes,4,rep,name=Names,proto3" json:"Names,omitempty"`
+	HiddenIndex   []string               `protobuf:"bytes,5,rep,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1237,6 +1263,13 @@ func (x *EntityFilter) GetBaseID() uint64 {
 	return 0
 }
 
+func (x *EntityFilter) GetBaseIndex() string {
+	if x != nil {
+		return x.BaseIndex
+	}
+	return ""
+}
+
 func (x *EntityFilter) GetIDs() []uint64 {
 	if x != nil {
 		return x.IDs
@@ -1254,6 +1287,13 @@ func (x *EntityFilter) GetTypes() []string {
 func (x *EntityFilter) GetNames() []string {
 	if x != nil {
 		return x.Names
+	}
+	return nil
+}
+
+func (x *EntityFilter) GetHiddenIndex() []string {
+	if x != nil {
+		return x.HiddenIndex
 	}
 	return nil
 }
@@ -1371,15 +1411,17 @@ func (x *QueryEntityResponse) GetTotal() uint64 {
 }
 
 type Relationship struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ID             uint64                 `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
-	Type           string                 `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
-	SourceEntityID uint64                 `protobuf:"varint,3,opt,name=SourceEntityID,proto3" json:"SourceEntityID,omitempty"`
-	TargetEntityID uint64                 `protobuf:"varint,4,opt,name=TargetEntityID,proto3" json:"TargetEntityID,omitempty"`
-	Attributes     []*KVPair              `protobuf:"bytes,5,rep,name=Attributes,proto3" json:"Attributes,omitempty"`
-	Rationale      string                 `protobuf:"bytes,6,opt,name=Rationale,proto3" json:"Rationale,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	ID                uint64                 `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	Type              string                 `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
+	SourceEntityID    uint64                 `protobuf:"varint,3,opt,name=SourceEntityID,proto3" json:"SourceEntityID,omitempty"`
+	TargetEntityID    uint64                 `protobuf:"varint,4,opt,name=TargetEntityID,proto3" json:"TargetEntityID,omitempty"`
+	Attributes        []*KVPair              `protobuf:"bytes,5,rep,name=Attributes,proto3" json:"Attributes,omitempty"`
+	Rationale         string                 `protobuf:"bytes,6,opt,name=Rationale,proto3" json:"Rationale,omitempty"`
+	SourceEntityIndex string                 `protobuf:"bytes,7,opt,name=SourceEntityIndex,proto3" json:"SourceEntityIndex,omitempty"`
+	TargetEntityIndex string                 `protobuf:"bytes,8,opt,name=TargetEntityIndex,proto3" json:"TargetEntityIndex,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Relationship) Reset() {
@@ -1454,16 +1496,34 @@ func (x *Relationship) GetRationale() string {
 	return ""
 }
 
+func (x *Relationship) GetSourceEntityIndex() string {
+	if x != nil {
+		return x.SourceEntityIndex
+	}
+	return ""
+}
+
+func (x *Relationship) GetTargetEntityIndex() string {
+	if x != nil {
+		return x.TargetEntityIndex
+	}
+	return ""
+}
+
 type RelationshipFilter struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	BaseID          uint64                 `protobuf:"varint,1,opt,name=BaseID,proto3" json:"BaseID,omitempty"`
-	IDs             []uint64               `protobuf:"varint,2,rep,packed,name=IDs,proto3" json:"IDs,omitempty"`
-	Types           []string               `protobuf:"bytes,3,rep,name=Types,proto3" json:"Types,omitempty"`
-	SourceEntityIDs []uint64               `protobuf:"varint,4,rep,packed,name=SourceEntityIDs,proto3" json:"SourceEntityIDs,omitempty"`
-	TargetEntityIDs []uint64               `protobuf:"varint,5,rep,packed,name=TargetEntityIDs,proto3" json:"TargetEntityIDs,omitempty"`
-	AboutEntityIDs  []uint64               `protobuf:"varint,6,rep,packed,name=AboutEntityIDs,proto3" json:"AboutEntityIDs,omitempty"` // Source or Target
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	BaseID            uint64                 `protobuf:"varint,1,opt,name=BaseID,proto3" json:"BaseID,omitempty"`
+	BaseIndex         string                 `protobuf:"bytes,10,opt,name=BaseIndex,proto3" json:"BaseIndex,omitempty"`
+	IDs               []uint64               `protobuf:"varint,2,rep,packed,name=IDs,proto3" json:"IDs,omitempty"`
+	Types             []string               `protobuf:"bytes,3,rep,name=Types,proto3" json:"Types,omitempty"`
+	SourceEntityIDs   []uint64               `protobuf:"varint,4,rep,packed,name=SourceEntityIDs,proto3" json:"SourceEntityIDs,omitempty"`
+	TargetEntityIDs   []uint64               `protobuf:"varint,5,rep,packed,name=TargetEntityIDs,proto3" json:"TargetEntityIDs,omitempty"`
+	AboutEntityIDs    []uint64               `protobuf:"varint,6,rep,packed,name=AboutEntityIDs,proto3" json:"AboutEntityIDs,omitempty"` // Source or Target
+	SourceEntityIndex []string               `protobuf:"bytes,7,rep,name=SourceEntityIndex,proto3" json:"SourceEntityIndex,omitempty"`
+	TargetEntityIndex []string               `protobuf:"bytes,8,rep,name=TargetEntityIndex,proto3" json:"TargetEntityIndex,omitempty"`
+	AboutEntityIndex  []string               `protobuf:"bytes,9,rep,name=AboutEntityIndex,proto3" json:"AboutEntityIndex,omitempty"` // Source or Target
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RelationshipFilter) Reset() {
@@ -1503,6 +1563,13 @@ func (x *RelationshipFilter) GetBaseID() uint64 {
 	return 0
 }
 
+func (x *RelationshipFilter) GetBaseIndex() string {
+	if x != nil {
+		return x.BaseIndex
+	}
+	return ""
+}
+
 func (x *RelationshipFilter) GetIDs() []uint64 {
 	if x != nil {
 		return x.IDs
@@ -1534,6 +1601,27 @@ func (x *RelationshipFilter) GetTargetEntityIDs() []uint64 {
 func (x *RelationshipFilter) GetAboutEntityIDs() []uint64 {
 	if x != nil {
 		return x.AboutEntityIDs
+	}
+	return nil
+}
+
+func (x *RelationshipFilter) GetSourceEntityIndex() []string {
+	if x != nil {
+		return x.SourceEntityIndex
+	}
+	return nil
+}
+
+func (x *RelationshipFilter) GetTargetEntityIndex() []string {
+	if x != nil {
+		return x.TargetEntityIndex
+	}
+	return nil
+}
+
+func (x *RelationshipFilter) GetAboutEntityIndex() []string {
+	if x != nil {
+		return x.AboutEntityIndex
 	}
 	return nil
 }
@@ -29428,13 +29516,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -38983,8 +39071,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -60053,28 +60141,33 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bOnlineID\x18\x02 \x01(\x03R\bOnlineID\"O\n" +
 	"\x1fVerifySystemCertificateResponse\x12\x14\n" +
 	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x16\n" +
-	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"X\n" +
+	"\x06Reason\x18\x02 \x01(\tR\x06Reason\"z\n" +
 	"\x10EntityRepository\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x12\n" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12 \n" +
-	"\vDescription\x18\x03 \x01(\tR\vDescription\"e\n" +
+	"\vDescription\x18\x03 \x01(\tR\vDescription\x12 \n" +
+	"\vHiddenIndex\x18\x04 \x01(\tR\vHiddenIndex\"e\n" +
 	"\x1cListEntityRepositoryResponse\x12E\n" +
-	"\x12EntityRepositories\x18\x01 \x03(\v2\x15.ypb.EntityRepositoryR\x12EntityRepositories\"\xc5\x01\n" +
+	"\x12EntityRepositories\x18\x01 \x03(\v2\x15.ypb.EntityRepositoryR\x12EntityRepositories\"\x85\x02\n" +
 	"\x06Entity\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x04R\x02ID\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x12\n" +
 	"\x04Name\x18\x03 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x04 \x01(\tR\vDescription\x12\x16\n" +
-	"\x06BaseID\x18\x05 \x01(\x04R\x06BaseID\x12+\n" +
+	"\x06BaseID\x18\x05 \x01(\x04R\x06BaseID\x12\x1c\n" +
+	"\tBaseIndex\x18\t \x01(\tR\tBaseIndex\x12+\n" +
 	"\n" +
 	"Attributes\x18\x06 \x03(\v2\v.ypb.KVPairR\n" +
 	"Attributes\x12\x1c\n" +
-	"\tRationale\x18\a \x01(\tR\tRationale\"d\n" +
+	"\tRationale\x18\a \x01(\tR\tRationale\x12 \n" +
+	"\vHiddenIndex\x18\b \x01(\tR\vHiddenIndex\"\xa4\x01\n" +
 	"\fEntityFilter\x12\x16\n" +
-	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x10\n" +
+	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x1c\n" +
+	"\tBaseIndex\x18\x06 \x01(\tR\tBaseIndex\x12\x10\n" +
 	"\x03IDs\x18\x02 \x03(\x04R\x03IDs\x12\x14\n" +
 	"\x05Types\x18\x03 \x03(\tR\x05Types\x12\x14\n" +
-	"\x05Names\x18\x04 \x03(\tR\x05Names\"l\n" +
+	"\x05Names\x18\x04 \x03(\tR\x05Names\x12 \n" +
+	"\vHiddenIndex\x18\x05 \x03(\tR\vHiddenIndex\"l\n" +
 	"\x12QueryEntityRequest\x12)\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x11.ypb.EntityFilterR\x06Filter\x12+\n" +
 	"\n" +
@@ -60085,7 +60178,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x02 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x04R\x05Total\"\xcd\x01\n" +
+	"\x05Total\x18\x03 \x01(\x04R\x05Total\"\xa9\x02\n" +
 	"\fRelationship\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x04R\x02ID\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12&\n" +
@@ -60094,14 +60187,21 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Attributes\x18\x05 \x03(\v2\v.ypb.KVPairR\n" +
 	"Attributes\x12\x1c\n" +
-	"\tRationale\x18\x06 \x01(\tR\tRationale\"\xd0\x01\n" +
+	"\tRationale\x18\x06 \x01(\tR\tRationale\x12,\n" +
+	"\x11SourceEntityIndex\x18\a \x01(\tR\x11SourceEntityIndex\x12,\n" +
+	"\x11TargetEntityIndex\x18\b \x01(\tR\x11TargetEntityIndex\"\xf6\x02\n" +
 	"\x12RelationshipFilter\x12\x16\n" +
-	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x10\n" +
+	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x1c\n" +
+	"\tBaseIndex\x18\n" +
+	" \x01(\tR\tBaseIndex\x12\x10\n" +
 	"\x03IDs\x18\x02 \x03(\x04R\x03IDs\x12\x14\n" +
 	"\x05Types\x18\x03 \x03(\tR\x05Types\x12(\n" +
 	"\x0fSourceEntityIDs\x18\x04 \x03(\x04R\x0fSourceEntityIDs\x12(\n" +
 	"\x0fTargetEntityIDs\x18\x05 \x03(\x04R\x0fTargetEntityIDs\x12&\n" +
-	"\x0eAboutEntityIDs\x18\x06 \x03(\x04R\x0eAboutEntityIDs\"x\n" +
+	"\x0eAboutEntityIDs\x18\x06 \x03(\x04R\x0eAboutEntityIDs\x12,\n" +
+	"\x11SourceEntityIndex\x18\a \x03(\tR\x11SourceEntityIndex\x12,\n" +
+	"\x11TargetEntityIndex\x18\b \x03(\tR\x11TargetEntityIndex\x12*\n" +
+	"\x10AboutEntityIndex\x18\t \x03(\tR\x10AboutEntityIndex\"x\n" +
 	"\x18QueryRelationshipRequest\x12/\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x17.ypb.RelationshipFilterR\x06Filter\x12+\n" +
 	"\n" +

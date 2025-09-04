@@ -2,7 +2,9 @@ package schema
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 
@@ -14,6 +16,7 @@ type EntityBaseInfo struct {
 	gorm.Model
 	EntityBaseName string
 	Description    string
+	HiddenIndex    string
 }
 
 func (e *EntityBaseInfo) ToGRPC() *ypb.EntityRepository {
@@ -28,7 +31,8 @@ func (e *EntityBaseInfo) ToGRPC() *ypb.EntityRepository {
 type ERModelEntity struct {
 	gorm.Model
 
-	EntityBaseID uint // 外键，指向实体基础信息表
+	EntityBaseID    uint // 外键，指向实体基础信息表
+	EntityBaseIndex string
 
 	EntityName string // 实体名称
 
@@ -38,9 +42,14 @@ type ERModelEntity struct {
 
 	Attributes MetadataMap `gorm:"type:text" json:"attributes"`
 
-	// ExtendAttributes []*ERModelAttribute `gorm:"foreignkey:OwnerID"`
-	// OutgoingRelationship []*ERModelRelationship `gorm:"foreignkey:SourceEntityID"`
-	// IncomingRelationship []*ERModelRelationship `gorm:"foreignkey:TargetEntityID"`
+	HiddenIndex string
+}
+
+func (e *ERModelEntity) BeforeSave() error {
+	if e.HiddenIndex == "" {
+		e.HiddenIndex = uuid.NewString()
+	}
+	return nil
 }
 
 func (e *ERModelEntity) ToGRPC() *ypb.Entity {
@@ -51,6 +60,7 @@ func (e *ERModelEntity) ToGRPC() *ypb.Entity {
 		Type:        e.EntityType,
 		Description: e.Description,
 		Rationale:   e.Rationale,
+		HiddenIndex: e.HiddenIndex,
 		Attributes: lo.MapToSlice(e.Attributes, func(key string, value any) *ypb.KVPair {
 			return &ypb.KVPair{
 				Key:   key,
@@ -87,46 +97,19 @@ func (e *ERModelEntity) Dump() string {
 	return sb.String()
 }
 
-// ERModelAttribute 记录了实体属性随时间的变化
-//type ERModelAttribute struct {
-//	ID             uint   `gorm:"primarykey"`
-//	OwnerID        uint   `gorm:"index;not null"` // 外键
-//	AttributeName  string // 属性名称
-//	AttributeValue string // 属性值
-//
-//	UniqueIdentifier bool // 是否该属性是唯一标识符（如身份证号、社保号等）
-//
-//	Hash string
-//}
-//
-//func (a *ERModelAttribute) Dump(prefix string) string {
-//	if a == nil {
-//		return prefix + "<nil ERModelAttribute>\n"
-//	}
-//	var sb strings.Builder
-//	sb.WriteString(fmt.Sprintf("%sAttributeName:    %s\n", prefix, a.AttributeName))
-//	sb.WriteString(fmt.Sprintf("%sAttributeValue:   %s\n", prefix, a.AttributeValue))
-//	sb.WriteString(fmt.Sprintf("%sUniqueIdentifier: %t\n", prefix, a.UniqueIdentifier))
-//	return sb.String()
-//}
-//
-//func (a *ERModelAttribute) CalcHash() string {
-//	return utils.CalcSha1(a.OwnerID, a.AttributeName, a.AttributeValue)
-//}
-//
-//func (a *ERModelAttribute) BeforeSave() error {
-//	a.Hash = a.CalcHash()
-//	return nil
-//}
-
-// ERModelRelationship 记录了实体间关系随时间的变化
 type ERModelRelationship struct {
 	gorm.Model
 
-	EntityBaseID      uint        `gorm:"index;not null"`
-	SourceEntityID    uint        `gorm:"index"`
-	RelationshipType  string      `gorm:"index"`
-	TargetEntityID    uint        `gorm:"index"`
+	EntityBaseID    uint `gorm:"index;not null"`
+	EntityBaseIndex string
+
+	SourceEntityID uint
+	TargetEntityID uint
+
+	SourceEntityIndex string
+	TargetEntityIndex string
+	RelationshipType  string
+
 	DecisionRationale string      // 该关系存在的理由或依据
 	Hash              string      `gorm:"unique_index"`
 	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
@@ -134,11 +117,13 @@ type ERModelRelationship struct {
 
 func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
 	return &ypb.Relationship{
-		ID:             uint64(r.ID),
-		Type:           r.RelationshipType,
-		SourceEntityID: uint64(r.SourceEntityID),
-		TargetEntityID: uint64(r.TargetEntityID),
-		Rationale:      r.DecisionRationale,
+		ID:                uint64(r.ID),
+		Type:              r.RelationshipType,
+		SourceEntityID:    uint64(r.SourceEntityID),
+		TargetEntityID:    uint64(r.TargetEntityID),
+		SourceEntityIndex: r.SourceEntityIndex,
+		TargetEntityIndex: r.TargetEntityIndex,
+		Rationale:         r.DecisionRationale,
 		Attributes: lo.MapToSlice(r.Attributes, func(key string, value any) *ypb.KVPair {
 			return &ypb.KVPair{
 				Key:   key,
@@ -155,12 +140,25 @@ func (r *ERModelRelationship) CalcHash() string {
 		r.RelationshipType,
 		r.TargetEntityID,
 		r.Attributes,
+		r.SourceEntityIndex,
+		r.TargetEntityIndex,
 	)
 }
 
 func (r *ERModelRelationship) BeforeSave() error {
 	r.Hash = r.CalcHash()
 	return nil
+}
+
+func ERMPatch(db *gorm.DB) {
+	if err := db.Model(&EntityBaseInfo{}).AddUniqueIndex("base_index", "hidden_index").Error; err != nil {
+		log.Errorf("failed to add unique index on entity_base_info.hidden_index: %v", err)
+	}
+
+	if err := db.Model(&ERModelEntity{}).AddUniqueIndex("entity_index", "hidden_index").Error; err != nil {
+		log.Errorf("failed to add unique index on er_model_entity.hidden_index: %v", err)
+	}
+
 }
 
 func init() {
@@ -171,4 +169,7 @@ func init() {
 		//&ERModelAttribute{},
 		&ERModelRelationship{},
 	)
+
+	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE)
+
 }

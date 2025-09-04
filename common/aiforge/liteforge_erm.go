@@ -3,6 +3,7 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
+	"github.com/google/uuid"
 	"strings"
 	"sync"
 
@@ -296,6 +297,7 @@ func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEnt
 		EntityType:  entityParams.GetString("entity_type"),
 		Description: entityParams.GetString("description"),
 		Rationale:   entityParams.GetString("decision_rationale"),
+		HiddenIndex: uuid.NewString(),
 		Attributes:  map[string]interface{}{},
 	}
 	for _, attrs := range entityParams.GetObjectArray("attributes") {
@@ -481,7 +483,8 @@ func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, opti
 		if !ok {
 			analyzeConfig.AnalyzeLog("not found entity [%s], create it", name)
 			e = &schema.ERModelEntity{
-				EntityName: name,
+				EntityName:  name,
+				HiddenIndex: uuid.NewString(),
 			}
 			err := eb.CreateEntity(e)
 			if err != nil {
@@ -503,7 +506,7 @@ func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, opti
 			analyzeConfig.AnalyzeLog("failed to get entity [%s]: %v", tempShip.TargetTemporaryName, err)
 			continue
 		}
-		err = eb.AddRelationship(sourceEntity.ID, targetEntity.ID, tempShip.RelationshipType, tempShip.DecisionRationale, map[string]any{
+		err = eb.AddRelationship(sourceEntity.HiddenIndex, targetEntity.HiddenIndex, tempShip.RelationshipType, tempShip.DecisionRationale, map[string]any{
 			"decoration_attr": tempShip.DecorationAttributes,
 		})
 		if err != nil {

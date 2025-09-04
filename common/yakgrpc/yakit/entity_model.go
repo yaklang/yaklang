@@ -26,10 +26,11 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	}
 	db = db.Model(&schema.ERModelEntity{})
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", entityFilter.IDs)
+	db = bizhelper.ExactQueryString(db, "entity_base_index", entityFilter.BaseIndex)
 	db = bizhelper.ExactQueryInt64(db, "entity_base_id", int64(entityFilter.BaseID))
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Names)
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
-
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "hidden_index", entityFilter.HiddenIndex)
 	return db
 }
 
@@ -65,6 +66,18 @@ func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
 	db = db.Model(&schema.ERModelEntity{})
 	if err := db.Where("id = ?", id).First(&entity).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return nil, utils.Errorf("entity not found")
+		}
+		return nil, err
+	}
+	return &entity, nil
+}
+
+func GetEntityByIndex(db *gorm.DB, index string) (*schema.ERModelEntity, error) {
+	var entity schema.ERModelEntity
+	db = db.Model(&schema.ERModelEntity{})
+	if err := db.Where("hidden_index = ?", index).First(&entity).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil, utils.Errorf("entity not found")
 		}
@@ -138,10 +151,10 @@ type AttributeFilter struct {
 //	return db.Create(attribute).Error
 //}
 
-func AddRelationship(db *gorm.DB, sourceID, targetID uint, RelationshipType, decisionRationale string, attrs map[string]any) error {
+func AddRelationship(db *gorm.DB, sourceIndex, targetIndex string, RelationshipType, decisionRationale string, attrs map[string]any) error {
 	Relationship := schema.ERModelRelationship{
-		SourceEntityID:    sourceID,
-		TargetEntityID:    targetID,
+		SourceEntityIndex: sourceIndex,
+		TargetEntityIndex: targetIndex,
 		RelationshipType:  RelationshipType,
 		DecisionRationale: decisionRationale,
 		Attributes:        attrs,
@@ -161,7 +174,7 @@ func AddRelationship(db *gorm.DB, sourceID, targetID uint, RelationshipType, dec
 
 func GetOutgoingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := db.Model(&schema.ERModelRelationship{}).Where("source_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+	if err := db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
@@ -169,7 +182,7 @@ func GetOutgoingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*sch
 
 func GetIncomingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := db.Model(&schema.ERModelRelationship{}).Where("target_entity_id = ?", entity.ID).Find(&relationships).Error; err != nil {
+	if err := db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
@@ -180,10 +193,11 @@ func FilterRelationships(db *gorm.DB, relationshipFilter *ypb.RelationshipFilter
 	if relationshipFilter == nil {
 		return db
 	}
+	db = bizhelper.PrefixQueryString(db, "entity_base_index", relationshipFilter.BaseIndex)
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", relationshipFilter.IDs)
-	db = bizhelper.ExactQueryMultipleUInt64ArrayOr(db, []string{"source_entity_id", "target_entity_id"}, relationshipFilter.AboutEntityIDs)
-	db = bizhelper.ExactQueryUInt64ArrayOr(db, "source_entity_id", relationshipFilter.SourceEntityIDs)
-	db = bizhelper.ExactQueryUInt64ArrayOr(db, "target_entity_id", relationshipFilter.TargetEntityIDs)
+	db = bizhelper.ExactQueryMultipleStringArrayOr(db, []string{"source_entity_index", "target_entity_index"}, relationshipFilter.AboutEntityIndex)
+	db = bizhelper.ExactQueryStringArrayOr(db, "source_entity_index", relationshipFilter.SourceEntityIndex)
+	db = bizhelper.ExactQueryStringArrayOr(db, "target_entity_index", relationshipFilter.TargetEntityIndex)
 	db = bizhelper.ExactQueryStringArrayOr(db, "relationship_type", relationshipFilter.Types)
 	return db
 }
@@ -236,22 +250,22 @@ func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxD
 		allRelationships = append(allRelationships, RelationshipList...)
 	}
 	type queueItem struct {
-		entityID uint
-		depth    int
-		e        *schema.ERModelEntity
+		index string
+		depth int
+		e     *schema.ERModelEntity
 	}
 
 	var queue []*queueItem
-	var visited = make(map[uint]bool)
+	var visited = make(map[string]bool)
 	for _, startEntity := range startList {
 		queue = append(queue, &queueItem{
-			entityID: startEntity.ID,
-			depth:    0,
-			e:        startEntity,
+			index: startEntity.HiddenIndex,
+			depth: 0,
+			e:     startEntity,
 		},
 		)
 		appendEntity(startEntity)
-		visited[startEntity.ID] = true
+		visited[startEntity.HiddenIndex] = true
 	}
 
 	visitedRelationships := map[uint]bool{}
@@ -286,20 +300,20 @@ func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxD
 			}
 			visitedRelationships[Relationship.ID] = true
 			appendRelationship(Relationship)
-			var neighborID uint
-			if Relationship.SourceEntityID == currentItem.entityID {
-				neighborID = Relationship.TargetEntityID
+			var neighborIndex string
+			if Relationship.SourceEntityIndex == currentItem.index {
+				neighborIndex = Relationship.TargetEntityIndex
 			} else {
-				neighborID = Relationship.SourceEntityID
+				neighborIndex = Relationship.SourceEntityIndex
 			}
-			if !visited[neighborID] {
-				neighbor, err := GetEntityByID(db, neighborID)
+			if !visited[neighborIndex] {
+				neighbor, err := GetEntityByIndex(db, neighborIndex)
 				if err != nil {
 					return nil, err
 				}
-				visited[neighborID] = true
+				visited[neighborIndex] = true
 				appendEntity(neighbor)
-				queue = append(queue, &queueItem{entityID: neighborID, depth: currentItem.depth + 1, e: neighbor})
+				queue = append(queue, &queueItem{index: neighborIndex, depth: currentItem.depth + 1, e: neighbor})
 			}
 		}
 	}
@@ -337,8 +351,8 @@ func (model *ERModel) Dump() string {
 	}
 	sb.WriteString("Relationships:\n")
 	for _, relationship := range model.Relationships {
-		sb.WriteString(fmt.Sprintf("- Source: %d\n", relationship.SourceEntityID))
-		sb.WriteString(fmt.Sprintf("  Target: %d\n", relationship.TargetEntityID))
+		sb.WriteString(fmt.Sprintf("- Source: %s\n", relationship.SourceEntityIndex))
+		sb.WriteString(fmt.Sprintf("  Target: %s\n", relationship.TargetEntityIndex))
 		sb.WriteString(fmt.Sprintf("  Type: %s\n", relationship.RelationshipType))
 		if relationship.DecisionRationale != "" {
 			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(relationship.DecisionRationale, 100)))
@@ -357,19 +371,19 @@ func (model *ERModel) Dot() *dot.Graph {
 	G := dot.New()
 	G.MakeDirected()
 
-	rMap := make(map[uint]int)
+	rMap := make(map[string]int)
 
 	for _, entity := range model.Entities {
 		n := G.AddNode(entity.EntityName)
 		for key, value := range entity.Attributes {
 			G.NodeAttribute(n, key, utils.InterfaceToString(value))
 		}
-		rMap[entity.ID] = n
+		rMap[entity.HiddenIndex] = n
 	}
 
 	for _, Relationship := range model.Relationships {
-		sid, ok := rMap[Relationship.SourceEntityID]
-		tid, ok2 := rMap[Relationship.TargetEntityID]
+		sid, ok := rMap[Relationship.SourceEntityIndex]
+		tid, ok2 := rMap[Relationship.TargetEntityIndex]
 		if !ok || !ok2 {
 			continue
 		}
