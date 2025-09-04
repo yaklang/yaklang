@@ -3,6 +3,7 @@ package entitybase
 import (
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/schema"
@@ -224,6 +225,7 @@ func NewEntityRepository(db *gorm.DB, name, description string, opts ...any) (*E
 			entityBaseInfo = schema.EntityBaseInfo{
 				EntityBaseName: name,
 				Description:    description,
+				HiddenIndex:    entityBaseInfo.HiddenIndex,
 			}
 			return yakit.CreateEntityBaseInfo(tx, &entityBaseInfo)
 		})
@@ -266,6 +268,7 @@ func NewEntityRepository(db *gorm.DB, name, description string, opts ...any) (*E
 			entityBaseInfo = schema.EntityBaseInfo{
 				EntityBaseName: name,
 				Description:    description,
+				HiddenIndex:    uuid.NewString(),
 			}
 			return yakit.CreateEntityBaseInfo(tx, &entityBaseInfo)
 		})

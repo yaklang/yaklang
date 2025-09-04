@@ -18,6 +18,13 @@ type EntityBaseInfo struct {
 	HiddenIndex    string `gorm:"unique_index"`
 }
 
+func (e *EntityBaseInfo) BeforeSave() error {
+	if e.HiddenIndex == "" {
+		e.HiddenIndex = uuid.NewString()
+	}
+	return nil
+}
+
 func (e *EntityBaseInfo) TableName() string {
 	return "entity_base_info"
 }
