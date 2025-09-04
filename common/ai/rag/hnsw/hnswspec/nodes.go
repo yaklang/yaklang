@@ -112,7 +112,6 @@ func (n *StandardLayerNode[K]) GetPQCodes() ([]byte, bool) {
 type PQLayerNode[K cmp.Ordered] struct {
 	key       K
 	pqCodes   []byte // PQ编码
-	quantizer *pq.Quantizer
 	neighbors map[K]LayerNode[K]
 }
 
@@ -133,7 +132,6 @@ func NewPQLayerNode[K cmp.Ordered](key K, vector Vector, quantizer *pq.Quantizer
 	node := &PQLayerNode[K]{
 		key:       key,
 		pqCodes:   pqCodes,
-		quantizer: quantizer,
 		neighbors: make(map[K]LayerNode[K]),
 	}
 
