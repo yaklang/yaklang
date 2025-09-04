@@ -14,12 +14,12 @@ func setMemberCallRelationship(obj, key, member Value) {
 		return
 	}
 	obj.AddMember(key, member)
-	if !member.IsMember() {
-		//todo：fix one value for more object-key
-		member.SetObject(obj)
-		member.SetKey(key)
-		key.AddUser(obj.(User))
-	}
+	// if !member.IsMember() {
+	//todo：fix one value for more object-key
+	member.SetObject(obj)
+	member.SetKey(key)
+	key.AddUser(obj.(User))
+	// }
 
 	handlerMemberCall := func(obj Value) {
 		for _, edgeID := range obj.(*Phi).Edge {
@@ -41,7 +41,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 		}
 	}
 
-	if phi, ok := obj.(*Phi); ok {
+	if phi, ok := ToPhi(obj); ok {
 		for _, edgeId := range phi.Edge {
 			edgeValue, ok := obj.GetValueById(edgeId)
 			if !ok || edgeValue == nil {
