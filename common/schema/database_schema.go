@@ -79,6 +79,15 @@ var databaseSchemas = map[uint8][]any{
 	KEY_SCHEMA_SSA_DATABASE:             nil,
 }
 
+var databasePatches = map[uint8][]func(db *gorm.DB){
+	KEY_SCHEMA_YAKIT_DATABASE:           nil,
+	KEY_SCHEMA_PROFILE_DATABASE:         nil,
+	KEY_SCHEMA_CVE_DATABASE:             nil,
+	KEY_SCHEMA_CVE_DESCRIPTION_DATABASE: nil,
+	KEY_SCHEMA_VULINBOX_DATABASE:        nil,
+	KEY_SCHEMA_SSA_DATABASE:             nil,
+}
+
 // ProjectTables 这些表是和项目关联的，导出项目可以直接复制给用户
 var ProjectTables = []interface{}{
 	&WebsocketFlow{},
@@ -133,9 +142,28 @@ func AutoMigrate(db *gorm.DB, key uint8) {
 			log.Errorf("Database schema [%v] is empty", KeySchemaToName(key))
 			return
 		}
-		db.AutoMigrate(schemas...)
+		db.Debug().AutoMigrate(schemas...)
 	} else {
 		log.Errorf("Database schema key: %v is %v", key, KeySchemaToName(key))
+	}
+}
+
+func RegisterDatabasePatch(key uint8, patch func(db *gorm.DB)) {
+	if _, ok := databasePatches[key]; !ok {
+		panic("Database schema key invalid")
+	}
+
+	databasePatches[key] = append(databasePatches[key], patch)
+}
+
+func ApplyPatches(db *gorm.DB, key uint8) {
+	if patches, ok := databasePatches[key]; ok {
+		for _, patch := range patches {
+			if patch == nil {
+				continue
+			}
+			patch(db)
+		}
 	}
 }
 
