@@ -160,7 +160,9 @@ func (m *SyntaxFlowScanManager) notifyStatus(ruleName string) {
 	m.client.StatusCard("执行失败个数", failedQuery, "规则执行状态")
 	// risk status
 	m.client.StatusCard("检出漏洞/风险个数", riskCount, "漏洞/风险状态")
-
+	if finishQuery == m.totalQuery {
+		m.status = schema.SYNTAXFLOWSCAN_DONE
+	}
 	// current rule  status
 	//if finishQuery == m.totalQuery {
 	//	m.status = schema.SYNTAXFLOWSCAN_DONE
