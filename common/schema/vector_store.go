@@ -3,10 +3,17 @@ package schema
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"github.com/google/uuid"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+)
+
+const (
+	META_Doc_Index  = "meta_document_index"
+	META_Doc_Name   = "meta_document_name"
+	META_Base_Index = "meta_base_index"
 )
 
 // FloatArray 用于在数据库中存储浮点数数组的自定义类型
@@ -43,6 +50,16 @@ func (f *FloatArray) Scan(value interface{}) error {
 // MetadataMap 用于存储文档元数据的自定义类型
 // 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储 map 类型数据
 type MetadataMap map[string]interface{}
+
+func (m MetadataMap) GetDocIndex() (string, bool) {
+	index, ok := m[META_Doc_Index]
+	return utils.InterfaceToString(index), ok
+}
+
+func (m MetadataMap) GetBaseIndex() (string, bool) {
+	index, ok := m[META_Base_Index]
+	return utils.InterfaceToString(index), ok
+}
 
 // Value 实现 driver.Valuer 接口，用于将 map 转换为数据库可以存储的值
 func (m MetadataMap) Value() (driver.Value, error) {
@@ -281,6 +298,15 @@ type KnowledgeBaseEntry struct {
 
 	// 潜在问题向量，用于快速搜索潜在问题
 	PotentialQuestionsVector FloatArray `gorm:"type:text" json:"potential_questions_vector"`
+
+	HiddenIndex string `gorm:"index;unique;"`
+}
+
+func (e *KnowledgeBaseEntry) BeforeSave() error {
+	if e.HiddenIndex == "" {
+		e.HiddenIndex = uuid.NewString()
+	}
+	return nil
 }
 
 func init() {
