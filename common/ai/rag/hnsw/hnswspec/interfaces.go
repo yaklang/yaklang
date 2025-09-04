@@ -2,6 +2,8 @@ package hnswspec
 
 import (
 	"cmp"
+
+	"github.com/yaklang/yaklang/common/ai/rag/pq"
 )
 
 // Vector 向量类型定义
@@ -39,3 +41,6 @@ type LayerNode[K cmp.Ordered] interface {
 
 // DistanceFunc 距离计算函数，基于节点接口
 type DistanceFunc[K cmp.Ordered] func(a, b LayerNode[K]) float64
+
+// PQAwareDistanceFunc PQ感知的距离计算函数，可以访问quantizer
+type PQAwareDistanceFunc[K cmp.Ordered] func(a, b LayerNode[K], quantizer *pq.Quantizer) float64
