@@ -153,16 +153,7 @@ jobs:
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
 
-          - name: Test SSA / SSAAPI
-            run: |
-              # SSA
-              go test -timeout 20s ./common/yak/ssa/...
-              # SSAAPI
-              go test -timeout 1m ./common/yak/ssaapi
-              go test -timeout 1m ./common/yak/ssaapi/ssareducer
-              go test -timeout 1m ./common/yak/ssaapi/test/ssatest
-
-          - name: Test StaticAnalyze / BuildIn SyntaxFlow Rule
+          - name: Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API
             run: |
               # SSA plugin rule/option
               go test -timeout 20s ./common/yak/static_analyzer/test/...
@@ -173,8 +164,14 @@ jobs:
               go test -timeout 1m ./common/yak/ssaapi/test/syntaxflow
               # SyntaxFlowRule Evaluation
               go test -timeout 20s ./common/syntaxflow/sfanalyzer/...
+              # SSA
+              go test -timeout 20s ./common/yak/ssa/...
+              # SSAAPI
+              go test -timeout 1m ./common/yak/ssaapi
+              go test -timeout 1m ./common/yak/ssaapi/ssareducer
+              go test -timeout 1m ./common/yak/ssaapi/test/ssatest
 
-          - name: Test SSA Frontend Yak  / JavaScript
+          - name: Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Golang | C | Java
             run: |
               # yak ssa
               go test -timeout 20s ./common/yak/yak2ssa/test/...
@@ -182,9 +179,6 @@ jobs:
               # Test js
               # go test -timeout 60s ./common/yak/JS2ssa/... // remove this frontend 
               go test -timeout 1m ./common/yak/ssaapi/test/javascript
-
-          - name: Test SSA Frontend TypeScript | PHP | Golang | C | Java
-            run: |
               go test -timeout 5m ./common/yak/java/...
               go test -timeout 3m ./common/yak/ssaapi/test/java
               go test -timeout 1m ./common/yak/typescript/frontend/tests/...
