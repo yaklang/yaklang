@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"embed"
-	_ "embed"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -18,6 +17,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -439,10 +440,68 @@ func (m *MITMServer) initConfig() error {
 	return nil
 }
 
+// handleListenError 处理端口监听失败的错误，提供端口建议
+func handleListenError(addr string, originalErr error) error {
+	host, port, err := utils.ParseStringToHostPort(addr)
+	if err != nil {
+		return utils.Errorf("listen port: %v failed: %s", addr, originalErr)
+	}
+
+	var ports []int
+	// 检查附近端口 (±10)
+	start := port - 10
+	if start < 1 {
+		start = 1
+	}
+	end := port + 10
+	if end > 65535 {
+		end = 65535
+	}
+
+	for p := start; p <= end; p++ {
+		if p != port && utils.IsPortAvailable(host, p) {
+			ports = append(ports, p)
+			if len(ports) >= 5 { // 最多建议5个附近端口
+				break
+			}
+		}
+	}
+
+	// 如果没有附近端口，检查高位端口 (50000-65535)
+	if len(ports) == 0 {
+		for i := 0; i < 10 && len(ports) < 3; i++ {
+			if highPort, err := utils.GetRangeAvailableTCPPort(50000, 65535, 10); err == nil {
+				ports = append(ports, highPort)
+			}
+		}
+	}
+
+	uniquePorts := utils.RemoveRepeatIntSlice(ports)
+	var suggestionMsg string
+	if len(uniquePorts) == 0 {
+		suggestionMsg = "端口被占用，可能由于系统限制，建议尝试重启电脑或使用管理员权限运行"
+	} else {
+		var portStrs []string
+		for _, p := range uniquePorts {
+			portStrs = append(portStrs, strconv.Itoa(p))
+		}
+
+		// 判断是附近端口还是高位端口
+		portType := "高位可用端口"
+		if len(uniquePorts) > 0 && uniquePorts[0] >= port-10 && uniquePorts[0] <= port+10 {
+			portType = "附近可用端口"
+		}
+
+		suggestionMsg = fmt.Sprintf("端口被占用，建议尝试以下%s：%s", portType, strings.Join(portStrs, ", "))
+	}
+
+	return utils.Errorf("listen port: %v failed: %s\n\n%s", addr, originalErr, suggestionMsg)
+}
+
 func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		return utils.Errorf("listen port: %v failed: %s", addr, err)
+		return handleListenError(addr, err)
 	}
 	defer lis.Close()
 
