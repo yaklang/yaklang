@@ -54264,7 +54264,6 @@ type SSARisksFilter struct {
 	AfterCreatedAt       int64                  `protobuf:"varint,16,opt,name=AfterCreatedAt,proto3" json:"AfterCreatedAt,omitempty"`
 	LatestDisposalStatus []string               `protobuf:"bytes,17,rep,name=LatestDisposalStatus,proto3" json:"LatestDisposalStatus,omitempty"` // not_set | is_issue | not_issue | suspicious
 	SSARiskDiffRequest   *SSARiskDiffRequest    `protobuf:"bytes,18,opt,name=SSARiskDiffRequest,proto3" json:"SSARiskDiffRequest,omitempty"`
-	IncrementalQuery     bool                   `protobuf:"varint,19,opt,name=IncrementalQuery,proto3" json:"IncrementalQuery,omitempty"` // 是否启用增量查询
 	unknownFields        protoimpl.UnknownFields
 	sizeCache            protoimpl.SizeCache
 }
@@ -54423,13 +54422,6 @@ func (x *SSARisksFilter) GetSSARiskDiffRequest() *SSARiskDiffRequest {
 		return x.SSARiskDiffRequest
 	}
 	return nil
-}
-
-func (x *SSARisksFilter) GetIncrementalQuery() bool {
-	if x != nil {
-		return x.IncrementalQuery
-	}
-	return false
 }
 
 type QuerySSARisksRequest struct {
@@ -64319,7 +64311,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04Line\x18\x1b \x01(\x03R\x04Line\x12\x1a\n" +
 	"\bSolution\x18\x1c \x01(\tR\bSolution\x12 \n" +
 	"\vDescription\x18\x1d \x01(\tR\vDescription\x122\n" +
-	"\x14LatestDisposalStatus\x18\x1e \x01(\tR\x14LatestDisposalStatus\"\x83\x05\n" +
+	"\x14LatestDisposalStatus\x18\x1e \x01(\tR\x14LatestDisposalStatus\"\xd7\x04\n" +
 	"\x0eSSARisksFilter\x12\x0e\n" +
 	"\x02ID\x18\x01 \x03(\x03R\x02ID\x12\x16\n" +
 	"\x06Search\x18\x02 \x01(\tR\x06Search\x12 \n" +
@@ -64339,8 +64331,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x0fBeforeCreatedAt\x18\x0f \x01(\x03R\x0fBeforeCreatedAt\x12&\n" +
 	"\x0eAfterCreatedAt\x18\x10 \x01(\x03R\x0eAfterCreatedAt\x122\n" +
 	"\x14LatestDisposalStatus\x18\x11 \x03(\tR\x14LatestDisposalStatus\x12G\n" +
-	"\x12SSARiskDiffRequest\x18\x12 \x01(\v2\x17.ypb.SSARiskDiffRequestR\x12SSARiskDiffRequest\x12*\n" +
-	"\x10IncrementalQuery\x18\x13 \x01(\bR\x10IncrementalQuery\"p\n" +
+	"\x12SSARiskDiffRequest\x18\x12 \x01(\v2\x17.ypb.SSARiskDiffRequestR\x12SSARiskDiffRequest\"p\n" +
 	"\x14QuerySSARisksRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

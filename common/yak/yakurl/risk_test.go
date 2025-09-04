@@ -1052,7 +1052,6 @@ func TestRiskActionCompare(t *testing.T) {
 	programName := "compare_test_" + uuid.NewString()
 	var taskID1, taskID2 string
 
-	// 创建不同的测试代码和规则 - 使用Go风格的代码
 	testCode1 := `
 package main
 
@@ -1077,7 +1076,6 @@ func test2() {
 }
 `
 
-	// 使用和处置测试类似的规则格式
 	risk1 := uuid.NewString()
 	risk2 := uuid.NewString()
 	risk3 := uuid.NewString()
@@ -1324,41 +1322,5 @@ alert $sink5 for {
 				Count: 3,
 			},
 		}, false)
-	})
-
-	// 测试增量查询和compare查询返回相同结果
-	t.Run("test incremental vs compare consistency", func(t *testing.T) {
-		// 增量查询
-		_, incrementalRisks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
-			IncrementalQuery: true,
-			RuntimeID:        []string{taskID2},
-		}, nil)
-		require.NoError(t, err)
-
-		// Compare查询
-		_, compareRisks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
-			SSARiskDiffRequest: &ypb.SSARiskDiffRequest{
-				BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
-				Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
-			},
-		}, nil)
-		require.NoError(t, err)
-
-		// 两种查询应该返回相同数量的风险
-		require.Equal(t, len(incrementalRisks), len(compareRisks),
-			"增量查询和Compare查询应该返回相同数量的风险")
-
-		// 验证返回的风险ID相同
-		incrementalIDs := make(map[uint]bool)
-		for _, risk := range incrementalRisks {
-			incrementalIDs[risk.ID] = true
-		}
-
-		for _, risk := range compareRisks {
-			require.True(t, incrementalIDs[risk.ID],
-				"Compare查询的风险ID=%d应该也在增量查询结果中", risk.ID)
-		}
-
-		t.Logf("验证通过：增量查询和Compare查询返回了相同的 %d 个新增风险", len(compareRisks))
 	})
 }
