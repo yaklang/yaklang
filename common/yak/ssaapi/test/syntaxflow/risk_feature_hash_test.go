@@ -275,16 +275,14 @@ alert $result for {
 			risk1 := risks1[0]
 			risk2 := risks2[0]
 
-			log.Infof("Risk1: ID=%d, ProgramName=%s, FunctionName=%s, RiskFeatureHash=%s, TaskName=%s",
-				risk1.ID, risk1.ProgramName, risk1.FunctionName, risk1.RiskFeatureHash, risk1.TaskName)
-			log.Infof("Risk2: ID=%d, ProgramName=%s, FunctionName=%s, RiskFeatureHash=%s, TaskName=%s",
-				risk2.ID, risk2.ProgramName, risk2.FunctionName, risk2.RiskFeatureHash, risk2.TaskName)
+			log.Infof("Risk1: ID=%d, ProgramName=%s, FunctionName=%s, RiskFeatureHash=%s, ",
+				risk1.ID, risk1.ProgramName, risk1.FunctionName, risk1.RiskFeatureHash)
+			log.Infof("Risk2: ID=%d, ProgramName=%s, FunctionName=%s, RiskFeatureHash=%s,",
+				risk2.ID, risk2.ProgramName, risk2.FunctionName, risk2.RiskFeatureHash)
 
 			// 验证基本属性
 			require.NotEmpty(t, risk1.RiskFeatureHash, "Risk1 应该有 RiskFeatureHash")
 			require.NotEmpty(t, risk2.RiskFeatureHash, "Risk2 应该有 RiskFeatureHash")
-			require.NotEmpty(t, risk1.TaskName, "Risk1 应该有 TaskName")
-			require.NotEmpty(t, risk2.TaskName, "Risk2 应该有 TaskName")
 
 			// 验证 RiskFeatureHash 是否符合预期
 			if tc.expectSame {

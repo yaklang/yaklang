@@ -119,16 +119,6 @@ func WithSSARiskFilterTaskID(taskID string) SSARiskFilterOption {
 	}
 }
 
-func WithSSARiskFilterIncremental(taskId string) SSARiskFilterOption {
-	return func(sf *ypb.SSARisksFilter) {
-		if taskId == "" {
-			return
-		}
-		sf.IncrementalQuery = true
-		sf.RuntimeID = []string{taskId}
-	}
-}
-
 func WithSSARiskResultID(resultID uint64) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
 		if resultID == 0 {
@@ -149,40 +139,6 @@ func NewSSARiskFilter(opts ...SSARiskFilterOption) *ypb.SSARisksFilter {
 func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if filter == nil {
 		return db
-	}
-
-	// 增量查询
-	if filter.GetIncrementalQuery() {
-		currentTaskIDs := filter.GetRuntimeID()
-		if len(currentTaskIDs) > 0 {
-			currentTaskID := currentTaskIDs[0]
-			currentTaskInfo := &schema.SyntaxFlowScanTask{}
-
-			currentTaskQuery := db.New().Model(&schema.SyntaxFlowScanTask{}).
-				Where("task_id = ?", currentTaskID).
-				First(&currentTaskInfo)
-
-			if currentTaskQuery.Error != nil {
-				log.Errorf("Failed to query current task info: %v", currentTaskQuery.Error)
-				return db
-			}
-			// 查找同一程序中，在当前任务创建时间之前最近的一次任务
-			var lastTaskIDs []string
-			lastTaskQuery := db.New().Model(&schema.SyntaxFlowScanTask{}).
-				Where("created_at < ?", currentTaskInfo.CreatedAt).
-				Where("task_id != ?", currentTaskID).
-				Order("created_at DESC").
-				Limit(1).
-				Pluck("task_id", &lastTaskIDs)
-
-			if lastTaskQuery.Error == nil && len(lastTaskIDs) == 1 {
-				// 使用下面的对比查询
-				filter.SSARiskDiffRequest = &ypb.SSARiskDiffRequest{
-					BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: currentTaskID},
-					Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: lastTaskIDs[0]},
-				}
-			}
-		}
 	}
 	// 对比查询
 	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
