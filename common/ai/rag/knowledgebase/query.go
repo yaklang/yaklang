@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -138,13 +137,7 @@ func (kb *KnowledgeBase) SearchKnowledgeEntries(query string, limit int) ([]*sch
 		if docID != "" && !docIDs[docID] {
 			docIDs[docID] = true
 			// 文档ID就是知识库条目的ID
-			entryID, err := strconv.ParseInt(docID, 10, 64)
-			if err != nil {
-				// 如果ID解析失败，跳过这个结果
-				continue
-			}
-
-			entry, err := yakit.GetKnowledgeBaseEntryById(kb.db, entryID)
+			entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(kb.db, docID)
 			if err != nil {
 				// 如果查询失败，跳过这个结果
 				continue
@@ -231,11 +224,9 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 					docID = doc.ID
 				}
 
-				if entryID, err := strconv.ParseInt(docID, 10, 64); err == nil {
-					if entry, err := yakit.GetKnowledgeBaseEntryById(db, entryID); err == nil {
-						kbResult.Data = entry
-						kbResult.Message = entry.KnowledgeTitle
-					}
+				if entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(db, docID); err == nil {
+					kbResult.Data = entry
+					kbResult.Message = entry.KnowledgeTitle
 				}
 			}
 		}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -297,6 +298,20 @@ type KnowledgeBaseEntry struct {
 
 	// 潜在问题向量，用于快速搜索潜在问题
 	PotentialQuestionsVector FloatArray `gorm:"type:text" json:"potential_questions_vector"`
+
+	// 唯一标识符，用于在向量索引中唯一标识该知识条目
+	HiddenIndex string `gorm:"unique_index"`
+}
+
+func (e *KnowledgeBaseEntry) TableName() string {
+	return "knowledge_base_entries_v2"
+}
+
+func (e *KnowledgeBaseEntry) BeforeSave() error {
+	if e.HiddenIndex == "" {
+		e.HiddenIndex = uuid.NewString()
+	}
+	return nil
 }
 
 func init() {

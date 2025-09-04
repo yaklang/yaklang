@@ -185,11 +185,11 @@ func TestIntegrationWithRealEmbedding(t *testing.T) {
 	firstEntry.KnowledgeTitle = "Yaklang 编程语言介绍 (已更新)"
 	firstEntry.KnowledgeDetails += "\n\n这是更新后的内容。"
 
-	err = kb.UpdateKnowledgeEntry(int64(firstEntry.ID), firstEntry)
+	err = kb.UpdateKnowledgeEntry(firstEntry.HiddenIndex, firstEntry)
 	assert.NoError(t, err)
 
 	// 验证更新后的数据
-	updatedEntry, err := kb.GetKnowledgeEntry(int64(firstEntry.ID))
+	updatedEntry, err := kb.GetKnowledgeEntry(firstEntry.HiddenIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, "Yaklang 编程语言介绍 (已更新)", updatedEntry.KnowledgeTitle)
 	assert.Contains(t, updatedEntry.KnowledgeDetails, "这是更新后的内容")
@@ -202,7 +202,7 @@ func TestIntegrationWithRealEmbedding(t *testing.T) {
 	lastEntry := &dbEntries[len(dbEntries)-1]
 	deletedTitle := lastEntry.KnowledgeTitle
 
-	err = kb.DeleteKnowledgeEntry(int64(lastEntry.ID))
+	err = kb.DeleteKnowledgeEntry(lastEntry.HiddenIndex)
 	assert.NoError(t, err)
 	t.Logf("删除条目: %s", deletedTitle)
 

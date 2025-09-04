@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
@@ -309,31 +308,10 @@ func (s *Server) GetDocumentByVectorStoreEntryID(ctx context.Context, req *ypb.G
 
 	// 从文档ID解析知识库条目ID
 	// 如果文档ID是知识库条目ID的字符串形式，尝试解析
-	entryID, err := strconv.Atoi(doc.DocumentID)
-	if err != nil {
-		// 如果不是数字，可能是其他类型的文档，从元数据中查找
-		if doc.Metadata != nil {
-			if knowledgeBaseEntryID, exists := doc.Metadata["knowledge_base_entry_id"]; exists {
-				if idFloat, ok := knowledgeBaseEntryID.(float64); ok {
-					entryID = int(idFloat)
-				} else if idInt, ok := knowledgeBaseEntryID.(int); ok {
-					entryID = idInt
-				} else if idStr, ok := knowledgeBaseEntryID.(string); ok {
-					entryID, err = strconv.Atoi(idStr)
-					if err != nil {
-						return nil, utils.Errorf("无法解析知识库条目ID: %v", err)
-					}
-				}
-			}
-		}
-
-		if entryID == 0 {
-			return nil, utils.Errorf("无法确定对应的知识库条目ID")
-		}
-	}
+	entryID := doc.DocumentID
 
 	// 获取知识库条目
-	entry, err := yakit.GetKnowledgeBaseEntryById(db, int64(entryID))
+	entry, err := yakit.GetKnowledgeBaseEntryByHiddenIndex(db, entryID)
 	if err != nil {
 		return nil, utils.Errorf("获取知识库条目失败: %v", err)
 	}
