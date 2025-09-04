@@ -1140,6 +1140,7 @@ message StartThirdPartyBinaryRequest {
 
 message BuildVectorIndexForKnowledgeBaseEntryRequest {
   int64 KnowledgeBaseEntryId = 1;
+  string KnowledgeBaseEntryHiddenIndex = 13;
   int64 KnowledgeBaseId = 12;
   
   string BaseUrl = 2;
@@ -1208,6 +1209,7 @@ message UpdateKnowledgeBaseRequest {
 
 message DeleteKnowledgeBaseEntryRequest {
   int64 KnowledgeBaseEntryId = 1;
+  string KnowledgeBaseEntryHiddenIndex = 3;
   int64 KnowledgeBaseId = 2;
 }
 
@@ -1252,6 +1254,7 @@ message CreateKnowledgeBaseEntryRequest {
 message UpdateKnowledgeBaseEntryRequest {
   int64 KnowledgeBaseID = 1;
   int64 KnowledgeBaseEntryID = 2;
+  string KnowledgeBaseEntryHiddenIndex = 11;
   string KnowledgeTitle = 3;
   string KnowledgeType = 4;
   int32 ImportanceScore = 5;

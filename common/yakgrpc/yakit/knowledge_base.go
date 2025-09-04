@@ -73,15 +73,14 @@ func GetKnowledgeBaseNameList(db *gorm.DB) ([]string, error) {
 	return knowledgeBaseNames, nil
 }
 
-// UpdateKnowledgeBaseEntry 更新知识库条目信息
-func UpdateKnowledgeBaseEntry(db *gorm.DB, knowledgeBase *schema.KnowledgeBaseEntry) error {
+func UpdateKnowledgeBaseEntryByHiddenIndex(db *gorm.DB, hiddenIndex string, knowledgeBase *schema.KnowledgeBaseEntry) error {
 	db = db.Model(&schema.KnowledgeBaseEntry{})
 	count := 0
-	db.Where("id = ?", knowledgeBase.ID).Count(&count)
+	db.Where("hidden_index = ?", hiddenIndex).Count(&count)
 	if count == 0 {
 		return utils.Errorf("knowledge base entry not found")
 	} else {
-		err := db.Where("id = ?", knowledgeBase.ID).Updates(knowledgeBase).Error
+		err := db.Where("hidden_index = ?", hiddenIndex).Updates(knowledgeBase).Error
 		if err != nil {
 			return utils.Errorf("update KnowledgeBase failed: %s", err)
 		}
@@ -99,21 +98,20 @@ func CreateKnowledgeBaseEntry(db *gorm.DB, knowledgeBase *schema.KnowledgeBaseEn
 	return nil
 }
 
-// DeleteKnowledgeBaseEntry 删除知识库条目
-func DeleteKnowledgeBaseEntry(db *gorm.DB, id int64) error {
+func DeleteKnowledgeBaseEntryByHiddenIndex(db *gorm.DB, hiddenIndex string) error {
 	db = db.Model(&schema.KnowledgeBaseEntry{})
-	err := db.Where("id = ?", id).Unscoped().Delete(&schema.KnowledgeBaseEntry{}).Error
+	err := db.Where("hidden_index = ?", hiddenIndex).Unscoped().Delete(&schema.KnowledgeBaseEntry{}).Error
 	if err != nil {
 		return utils.Errorf("delete KnowledgeBase failed: %s", err)
 	}
 	return nil
 }
 
-// GetKnowledgeBaseEntryById 根据ID获取知识库条目
-func GetKnowledgeBaseEntryById(db *gorm.DB, id int64) (*schema.KnowledgeBaseEntry, error) {
+// GetKnowledgeBaseEntryByHiddenIndex 根据ID获取知识库条目
+func GetKnowledgeBaseEntryByHiddenIndex(db *gorm.DB, hiddenIndex string) (*schema.KnowledgeBaseEntry, error) {
 	db = db.Model(&schema.KnowledgeBaseEntry{})
 	var knowledgeBase schema.KnowledgeBaseEntry
-	err := db.Where("id = ?", id).First(&knowledgeBase).Error
+	err := db.Where("hidden_index = ?", hiddenIndex).First(&knowledgeBase).Error
 	if err != nil {
 		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
 	}

@@ -3,6 +3,7 @@ package rag
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -144,7 +145,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	err = db.Where("knowledge_base_id = ?", knowledgeBaseID).First(&firstEntry).Error
 	assert.NoError(t, err)
 
-	err = yakit.DeleteKnowledgeBaseEntry(db, int64(firstEntry.ID))
+	err = yakit.DeleteKnowledgeBaseEntryByHiddenIndex(db, firstEntry.HiddenIndex)
 	assert.NoError(t, err)
 
 	// 重新构建索引
@@ -291,7 +292,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	var savedEntry schema.KnowledgeBaseEntry
 	err = db.Where("knowledge_title = ?", "Go语言基础").First(&savedEntry).Error
 	assert.NoError(t, err)
-	entryID := int64(savedEntry.ID)
+	entryID := savedEntry.HiddenIndex
 
 	// 5. 构建单个条目的向量索引（核心测试功能）
 	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, savedEntry.KnowledgeBaseID, entryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(NewMockEmbedder(testEmbedder)))
@@ -341,11 +342,11 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	// 8. 测试更新条目后重新索引
 	// 更新知识库条目
 	savedEntry.KnowledgeDetails = "Go语言（又称Golang）是Google开发的一种静态强类型、编译型的程序设计语言。Go语言有着简洁的语法和高效的性能，特别适合云计算和微服务开发。"
-	err = yakit.UpdateKnowledgeBaseEntry(db, &savedEntry)
+	err = yakit.UpdateKnowledgeBaseEntryByHiddenIndex(db, savedEntry.HiddenIndex, &savedEntry)
 	assert.NoError(t, err)
 
 	// 重新为该条目构建索引
-	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, savedEntry.KnowledgeBaseID, entryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(NewMockEmbedder(testEmbedder)))
+	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, savedEntry.KnowledgeBaseID, savedEntry.HiddenIndex, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(NewMockEmbedder(testEmbedder)))
 	assert.NoError(t, err)
 
 	// 验证更新后的内容
@@ -388,7 +389,7 @@ func TestMUSTPASS_BuildVectorIndexForNonExistentEntry(t *testing.T) {
 	)
 
 	// 尝试为不存在的知识库条目构建索引
-	nonExistentEntryID := int64(99999)
+	nonExistentEntryID := uuid.NewString()
 	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, 0, nonExistentEntryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(NewMockEmbedder(testEmbedder)))
 	assert.Error(t, err) // 应该返回错误
 }
