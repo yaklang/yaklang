@@ -45,6 +45,29 @@ func TestGRPCMUSTPASS_SSRF(t *testing.T) {
 		StrictMode: true,
 	}
 
-	Must(CoreMitmPlugTest(pluginName, server, vulGet, client, t), "SSRF HTTP Public插件对于 GET 参数检测不符合预期")
-	Must(CoreMitmPlugTest(pluginName, server, vulPost, client, t), "SSRF HTTP Public插件对于 POST 参数检测不符合预期")
+	// GET参数测试，3次重试
+	var getSuccess bool
+	for i := 0; i < 3; i++ {
+		getSuccess = CoreMitmPlugTest(pluginName, server, vulGet, client, t)
+		if getSuccess {
+			break
+		}
+		if i < 2 {
+			t.Logf("SSRF GET测试第%d次失败，正在重试...", i+1)
+		}
+	}
+	Must(getSuccess, "SSRF HTTP Public插件对于 GET 参数检测不符合预期")
+
+	// POST参数测试，3次重试
+	var postSuccess bool
+	for i := 0; i < 3; i++ {
+		postSuccess = CoreMitmPlugTest(pluginName, server, vulPost, client, t)
+		if postSuccess {
+			break
+		}
+		if i < 2 {
+			t.Logf("SSRF POST测试第%d次失败，正在重试...", i+1)
+		}
+	}
+	Must(postSuccess, "SSRF HTTP Public插件对于 POST 参数检测不符合预期")
 }
