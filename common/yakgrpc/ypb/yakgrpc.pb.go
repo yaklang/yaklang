@@ -19643,28 +19643,28 @@ func (x *DeletePluginByUserIDRequest) GetOnlineBaseUrl() string {
 	return ""
 }
 
-type ExportBatchPayloadRequest struct {
+type ExportPayloadDBAndFileRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Groups        []string               `protobuf:"bytes,1,rep,name=groups,proto3" json:"groups,omitempty"`
+	Groups        []string               `protobuf:"bytes,1,rep,name=Groups,proto3" json:"Groups,omitempty"`
 	SavePath      string                 `protobuf:"bytes,2,opt,name=SavePath,proto3" json:"SavePath,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ExportBatchPayloadRequest) Reset() {
-	*x = ExportBatchPayloadRequest{}
+func (x *ExportPayloadDBAndFileRequest) Reset() {
+	*x = ExportPayloadDBAndFileRequest{}
 	mi := &file_yakgrpc_proto_msgTypes[273]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ExportBatchPayloadRequest) String() string {
+func (x *ExportPayloadDBAndFileRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ExportBatchPayloadRequest) ProtoMessage() {}
+func (*ExportPayloadDBAndFileRequest) ProtoMessage() {}
 
-func (x *ExportBatchPayloadRequest) ProtoReflect() protoreflect.Message {
+func (x *ExportPayloadDBAndFileRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_yakgrpc_proto_msgTypes[273]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -19676,19 +19676,19 @@ func (x *ExportBatchPayloadRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ExportBatchPayloadRequest.ProtoReflect.Descriptor instead.
-func (*ExportBatchPayloadRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use ExportPayloadDBAndFileRequest.ProtoReflect.Descriptor instead.
+func (*ExportPayloadDBAndFileRequest) Descriptor() ([]byte, []int) {
 	return file_yakgrpc_proto_rawDescGZIP(), []int{273}
 }
 
-func (x *ExportBatchPayloadRequest) GetGroups() []string {
+func (x *ExportPayloadDBAndFileRequest) GetGroups() []string {
 	if x != nil {
 		return x.Groups
 	}
 	return nil
 }
 
-func (x *ExportBatchPayloadRequest) GetSavePath() string {
+func (x *ExportPayloadDBAndFileRequest) GetSavePath() string {
 	if x != nil {
 		return x.SavePath
 	}
@@ -61641,9 +61641,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vMessageType\x18\x03 \x01(\tR\vMessageType\"[\n" +
 	"\x1bDeletePluginByUserIDRequest\x12\x16\n" +
 	"\x06UserID\x18\x01 \x01(\x03R\x06UserID\x12$\n" +
-	"\rOnlineBaseUrl\x18\x02 \x01(\tR\rOnlineBaseUrl\"O\n" +
-	"\x19ExportBatchPayloadRequest\x12\x16\n" +
-	"\x06groups\x18\x01 \x03(\tR\x06groups\x12\x1a\n" +
+	"\rOnlineBaseUrl\x18\x02 \x01(\tR\rOnlineBaseUrl\"S\n" +
+	"\x1dExportPayloadDBAndFileRequest\x12\x16\n" +
+	"\x06Groups\x18\x01 \x03(\tR\x06Groups\x12\x1a\n" +
 	"\bSavePath\x18\x02 \x01(\tR\bSavePath\"\xc4\x01\n" +
 	" DeleteLocalPluginsByWhereRequest\x12\x1a\n" +
 	"\bKeywords\x18\x01 \x01(\tR\bKeywords\x12\x12\n" +
@@ -65165,7 +65165,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tAesBase64\x10\x03\x12\n" +
 	"\n" +
 	"\x06XorRaw\x10\x04\x12\r\n" +
-	"\tXorBase64\x10\x052\xf9\xc3\x02\n" +
+	"\tXorBase64\x10\x052\x81\xc4\x02\n" +
 	"\x03Yak\x12+\n" +
 	"\aVersion\x12\n" +
 	".ypb.Empty\x1a\x14.ypb.VersionResponse\x12H\n" +
@@ -65378,8 +65378,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	".ypb.Empty\x1a\x18.ypb.SavePayloadProgress0\x01\x12R\n" +
 	"\x12ExportPayloadBatch\x12\x1e.ypb.ExportPayloadBatchRequest\x1a\x1a.ypb.GetAllPayloadResponse0\x01\x12S\n" +
 	"\x15UploadPayloadToOnline\x12!.ypb.UploadPayloadToOnlineRequest\x1a\x15.ypb.DownloadProgress0\x01\x12G\n" +
-	"\x0fDownloadPayload\x12\x1b.ypb.DownloadPayloadRequest\x1a\x15.ypb.DownloadProgress0\x01\x12R\n" +
-	"\x12ExportBatchPayload\x12\x1e.ypb.ExportBatchPayloadRequest\x1a\x1a.ypb.GetAllPayloadResponse0\x01\x12D\n" +
+	"\x0fDownloadPayload\x12\x1b.ypb.DownloadPayloadRequest\x1a\x15.ypb.DownloadProgress0\x01\x12Z\n" +
+	"\x16ExportPayloadDBAndFile\x12\".ypb.ExportPayloadDBAndFileRequest\x1a\x1a.ypb.GetAllPayloadResponse0\x01\x12D\n" +
 	"\x15GetYakitCompletionRaw\x12\n" +
 	".ypb.Empty\x1a\x1f.ypb.YakitCompletionRawResponse\x12|\n" +
 	"\x1fGetYakVMBuildInMethodCompletion\x12+.ypb.GetYakVMBuildInMethodCompletionRequest\x1a,.ypb.GetYakVMBuildInMethodCompletionResponse\x12U\n" +
@@ -66219,7 +66219,7 @@ var file_yakgrpc_proto_goTypes = []any{
 	(*DownloadPayloadRequest)(nil),                            // 274: ypb.DownloadPayloadRequest
 	(*DownloadProgress)(nil),                                  // 275: ypb.DownloadProgress
 	(*DeletePluginByUserIDRequest)(nil),                       // 276: ypb.DeletePluginByUserIDRequest
-	(*ExportBatchPayloadRequest)(nil),                         // 277: ypb.ExportBatchPayloadRequest
+	(*ExportPayloadDBAndFileRequest)(nil),                     // 277: ypb.ExportPayloadDBAndFileRequest
 	(*DeleteLocalPluginsByWhereRequest)(nil),                  // 278: ypb.DeleteLocalPluginsByWhereRequest
 	(*DownloadOnlinePluginProgress)(nil),                      // 279: ypb.DownloadOnlinePluginProgress
 	(*DownloadOnlinePluginByTokenRequest)(nil),                // 280: ypb.DownloadOnlinePluginByTokenRequest
@@ -67482,7 +67482,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	272,  // 680: ypb.Yak.ExportPayloadBatch:input_type -> ypb.ExportPayloadBatchRequest
 	273,  // 681: ypb.Yak.UploadPayloadToOnline:input_type -> ypb.UploadPayloadToOnlineRequest
 	274,  // 682: ypb.Yak.DownloadPayload:input_type -> ypb.DownloadPayloadRequest
-	277,  // 683: ypb.Yak.ExportBatchPayload:input_type -> ypb.ExportBatchPayloadRequest
+	277,  // 683: ypb.Yak.ExportPayloadDBAndFile:input_type -> ypb.ExportPayloadDBAndFileRequest
 	4,    // 684: ypb.Yak.GetYakitCompletionRaw:input_type -> ypb.Empty
 	494,  // 685: ypb.Yak.GetYakVMBuildInMethodCompletion:input_type -> ypb.GetYakVMBuildInMethodCompletionRequest
 	266,  // 686: ypb.Yak.StaticAnalyzeError:input_type -> ypb.StaticAnalyzeErrorRequest
@@ -68027,7 +68027,7 @@ var file_yakgrpc_proto_depIdxs = []int32{
 	515,  // 1225: ypb.Yak.ExportPayloadBatch:output_type -> ypb.GetAllPayloadResponse
 	275,  // 1226: ypb.Yak.UploadPayloadToOnline:output_type -> ypb.DownloadProgress
 	275,  // 1227: ypb.Yak.DownloadPayload:output_type -> ypb.DownloadProgress
-	515,  // 1228: ypb.Yak.ExportBatchPayload:output_type -> ypb.GetAllPayloadResponse
+	515,  // 1228: ypb.Yak.ExportPayloadDBAndFile:output_type -> ypb.GetAllPayloadResponse
 	493,  // 1229: ypb.Yak.GetYakitCompletionRaw:output_type -> ypb.YakitCompletionRawResponse
 	497,  // 1230: ypb.Yak.GetYakVMBuildInMethodCompletion:output_type -> ypb.GetYakVMBuildInMethodCompletionResponse
 	270,  // 1231: ypb.Yak.StaticAnalyzeError:output_type -> ypb.StaticAnalyzeErrorResponse

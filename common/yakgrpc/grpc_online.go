@@ -239,9 +239,8 @@ func (s *Server) DownloadOnlinePluginBatch(ctx context.Context, req *ypb.Downloa
 			successCount++
 		}
 	}
-
-	if len(req.UUID) > 0 && (len(req.UUID)-successCount) > 0 {
-		return nil, utils.Errorf("插件下载成功: %v个, 失败: %v个", successCount, len(req.UUID)-successCount)
+	if len(req.UUID) > 0 && int(plugins.Total) != len(req.UUID) {
+		return nil, utils.Errorf("查询到插件: %v个, 下载成功: %v个", plugins.Total, successCount)
 	}
 
 	return &ypb.Empty{}, nil

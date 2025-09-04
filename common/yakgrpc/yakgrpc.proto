@@ -339,7 +339,7 @@ service Yak {
   rpc UploadPayloadToOnline(UploadPayloadToOnlineRequest) returns (stream DownloadProgress);
   rpc DownloadPayload(DownloadPayloadRequest) returns (stream DownloadProgress);
   // 批量导payload所有
-  rpc ExportBatchPayload(ExportBatchPayloadRequest) returns (stream GetAllPayloadResponse);
+  rpc ExportPayloadDBAndFile(ExportPayloadDBAndFileRequest) returns (stream GetAllPayloadResponse);
 
 
   // 自动生成补全
@@ -3208,8 +3208,8 @@ message DeletePluginByUserIDRequest {
   string OnlineBaseUrl = 2;
 }
 
-message ExportBatchPayloadRequest {
-  repeated string groups = 1;
+message ExportPayloadDBAndFileRequest {
+  repeated string Groups = 1;
   string SavePath = 2;
 }
 

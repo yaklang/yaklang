@@ -982,7 +982,7 @@ func TestPayload(t *testing.T) {
 		}
 	})
 
-	t.Run("ExportBatchPayload", func(t *testing.T) {
+	t.Run("ExportPayloadDBAndFile", func(t *testing.T) {
 		data := "123\n456\n"
 		// 文件型 group
 		groupFile1, groupFile2 := uuid.NewString(), uuid.NewString()
@@ -1024,7 +1024,6 @@ func TestPayload(t *testing.T) {
 			if !ok {
 				t.Fatalf("expected csv result for group %s", g)
 			}
-			// csv 应该有 header + 数据
 			lines := strings.Split(strings.TrimSpace(content), "\n")
 			if len(lines) != 1+len(strings.Split(strings.TrimSpace(data), "\n")) {
 				t.Fatalf("unexpected csv line count for group %s: got %d", g, len(lines))
@@ -1039,7 +1038,7 @@ func TestPayload(t *testing.T) {
 
 func exportBatchPayload(local ypb.YakClient, t *testing.T, groups []string, saveDir string) map[string]string {
 	t.Helper()
-	client, err := local.ExportBatchPayload(context.Background(), &ypb.ExportBatchPayloadRequest{
+	client, err := local.ExportPayloadDBAndFile(context.Background(), &ypb.ExportPayloadDBAndFileRequest{
 		Groups:   groups,
 		SavePath: saveDir,
 	})
