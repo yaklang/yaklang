@@ -65,10 +65,10 @@ func FilesHandler(
 		indexA := pathIndex[a.Path]
 		indexB := pathIndex[b.Path]
 		if indexA < indexB {
-			return -1
+			return 1
 		}
 		if indexA > indexB {
-			return 1
+			return -1
 		}
 		return 0
 	})

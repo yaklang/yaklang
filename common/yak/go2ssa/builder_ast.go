@@ -69,8 +69,9 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				lib.VisitAst(ast)
 			}()
 			lib.PushEditor(prog.GetCurrentEditor())
-			lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
-
+			if lib.GlobalScope == nil {
+				lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
+			}
 			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
@@ -95,9 +96,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			for i, name := range names {
 				pathl := strings.Split(paths[i], "/")
 				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
-				if lib, _ := b.GetImportPackage(name); lib != nil {
-					b.GetProgram().ImportAll(lib)
-				}
 			}
 		}
 
@@ -173,7 +171,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				}, false)
 			}
 		}
-
 		exportHandler()
 	} else {
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
@@ -187,6 +184,15 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			defer func() {
 				lib.VisitAst(ast)
 			}()
+
+			for _, impo := range ast.AllImportDecl() {
+				names, _ := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+				for _, name := range names {
+					if lib, _ := b.GetImportPackage(name); lib != nil {
+						b.GetProgram().ImportAll(lib)
+					}
+				}
+			}
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
 
 			if builder != nil {
@@ -1112,23 +1118,11 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 		return
 	}
 
-	handleGlobal := func() {
-		if global := b.GetProgram().GlobalScope; global != nil && !b.SetGlobal {
-			b.SetGlobal = true
-			for i, m := range global.GetAllMember() {
-				variable := b.CreateLocalVariable(i.String())
-				b.AssignVariable(variable, m)
-			}
-		}
-	}
-
 	if syntaxBlock {
 		b.BuildSyntaxBlock(func() {
-			handleGlobal()
 			b.buildStatementList(s)
 		})
 	} else {
-		handleGlobal()
 		b.buildStatementList(s)
 	}
 }

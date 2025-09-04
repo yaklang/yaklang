@@ -77,20 +77,21 @@ func TestPackage_lazybuild(t *testing.T) {
 }
 
 func TestPackage_muti_file_init(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main/go/go.mod", `
+	t.Run("normol init", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
 
 	go 1.20
 	`)
-	vf.AddFile("src/main/go/A/test1.go", `
+		vf.AddFile("src/main/go/A/test1.go", `
 	package A
 
 	func init() int { // 特殊函数init可能会导致当前block提前finish
 		return 0
 	}
 	`)
-	vf.AddFile("src/main/go/A/test2.go", `
+		vf.AddFile("src/main/go/A/test2.go", `
 	package A
 
 	var str = []string{
@@ -105,23 +106,22 @@ func TestPackage_muti_file_init(t *testing.T) {
 		}
 	}
 	`)
-
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"\"hello world\""},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
-	)
-}
+			"a": {"\"hello world\""},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 
-func Test_Package_muti_file_meminit(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main/go/go.mod", `
+	t.Run("member init", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
 
 	go 1.20
 	`)
-	vf.AddFile("src/main/go/A/test1.go", `
+		vf.AddFile("src/main/go/A/test1.go", `
 	package A
 
 	type T struct {
@@ -132,7 +132,7 @@ func Test_Package_muti_file_meminit(t *testing.T) {
 		return 0
 	}
 	`)
-	vf.AddFile("src/main/go/A/test2.go", `
+		vf.AddFile("src/main/go/A/test2.go", `
 	package A
 
 	var str = []string{
@@ -148,12 +148,45 @@ func Test_Package_muti_file_meminit(t *testing.T) {
 	}
 	`)
 
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"\"hello world\""},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
-	)
+			"a": {"\"hello world\""},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+}
+
+func TestPackage_global_value(t *testing.T) {
+	t.Run("cross file", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+		vf.AddFile("src/main/go/A/test1.go", `
+	package A
+
+	var str = []string{
+		"hello world",
+	}
+	`)
+		vf.AddFile("src/main/go/A/test2.go", `
+	package A
+
+	func main() {
+		println(str[0])
+	}
+	`)
+
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		println(* #-> as $a)
+		`, map[string][]string{
+			"a": {"\"hello world\""},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 }
 
 func TestFileName_muti_package(t *testing.T) {
