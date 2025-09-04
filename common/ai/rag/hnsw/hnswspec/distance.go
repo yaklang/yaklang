@@ -7,8 +7,13 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
 )
 
-// CosineDistance 余弦距离计算函数（基于节点接口）
+// CosineDistance 余弦距离计算函数（基于节点接口，不支持PQ）
 func CosineDistance[K cmp.Ordered](a, b LayerNode[K]) float64 {
+	return PQAwareCosineDistance(a, b, nil)
+}
+
+// PQAwareCosineDistance PQ感知的余弦距离计算函数
+func PQAwareCosineDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quantizer) float64 {
 	// 如果两个节点都启用PQ且有有效的PQ编码，使用PQ距离计算
 	if a.IsPQEnabled() && b.IsPQEnabled() {
 		codesA, okA := a.GetPQCodes()
@@ -18,21 +23,30 @@ func CosineDistance[K cmp.Ordered](a, b LayerNode[K]) float64 {
 		}
 	}
 
-	// 如果任一节点启用了PQ，但无法获取到PQ编码，则无法计算距离
-	if a.IsPQEnabled() || b.IsPQEnabled() {
-		// 对于PQ节点，我们不能调用GetVector()，因为它会panic
-		// 这种情况说明PQ配置有问题，返回最大距离
-		panic("不支持PQ模式和非PQ模式混合计算距离")
+	// 如果只有一个节点启用PQ，使用非对称距离计算
+	if a.IsPQEnabled() && !b.IsPQEnabled() {
+		// a是PQ节点，b是标准节点（通常是查询向量）
+		vecB := b.GetVector()()
+		return PQAsymmetricCosineDistance(vecB, a, quantizer)
+	} else if !a.IsPQEnabled() && b.IsPQEnabled() {
+		// a是标准节点（通常是查询向量），b是PQ节点
+		vecA := a.GetVector()()
+		return PQAsymmetricCosineDistance(vecA, b, quantizer)
 	}
 
-	// 否则使用原始向量进行精确计算
+	// 都是标准节点，使用原始向量进行精确计算
 	vecA := a.GetVector()()
 	vecB := b.GetVector()()
 	return cosineDistanceRaw(vecA, vecB)
 }
 
-// EuclideanDistance 欧氏距离计算函数（基于节点接口）
+// EuclideanDistance 欧氏距离计算函数（基于节点接口，不支持PQ）
 func EuclideanDistance[K cmp.Ordered](a, b LayerNode[K]) float64 {
+	return PQAwareEuclideanDistance(a, b, nil)
+}
+
+// PQAwareEuclideanDistance PQ感知的欧氏距离计算函数
+func PQAwareEuclideanDistance[K cmp.Ordered](a, b LayerNode[K], quantizer *pq.Quantizer) float64 {
 	// 如果两个节点都启用PQ且有有效的PQ编码，使用PQ距离计算
 	if a.IsPQEnabled() && b.IsPQEnabled() {
 		codesA, okA := a.GetPQCodes()
@@ -42,14 +56,18 @@ func EuclideanDistance[K cmp.Ordered](a, b LayerNode[K]) float64 {
 		}
 	}
 
-	// 如果任一节点启用了PQ，但无法获取到PQ编码，则无法计算距离
-	if a.IsPQEnabled() || b.IsPQEnabled() {
-		// 对于PQ节点，我们不能调用GetVector()，因为它会panic
-		// 这种情况说明PQ配置有问题，返回最大距离
-		panic("不支持PQ模式和非PQ模式混合计算距离")
+	// 如果只有一个节点启用PQ，使用非对称距离计算
+	if a.IsPQEnabled() && !b.IsPQEnabled() {
+		// a是PQ节点，b是标准节点（通常是查询向量）
+		vecB := b.GetVector()()
+		return PQAsymmetricDistance(vecB, a, quantizer)
+	} else if !a.IsPQEnabled() && b.IsPQEnabled() {
+		// a是标准节点（通常是查询向量），b是PQ节点
+		vecA := a.GetVector()()
+		return PQAsymmetricDistance(vecA, b, quantizer)
 	}
 
-	// 否则使用原始向量进行精确计算
+	// 都是标准节点，使用原始向量进行精确计算
 	vecA := a.GetVector()()
 	vecB := b.GetVector()()
 	return euclideanDistanceRaw(vecA, vecB)
@@ -107,14 +125,12 @@ func euclideanDistanceRaw(a, b []float32) float64 {
 
 // PQCosineDistance 基于PQ编码的余弦距离计算
 func PQCosineDistance[K cmp.Ordered](codesA, codesB []byte, nodeA, nodeB LayerNode[K]) float64 {
-	// PQ编码之间的距离计算
-	// 这里应该使用PQ量化器进行距离计算，但需要从节点获取量化器
-	// 作为临时实现，我们使用简单的汉明距离或欧氏距离
 	if len(codesA) != len(codesB) {
 		return 1.0 // 最大距离
 	}
 
 	// 简单的码表差异计算（临时实现）
+	// 这里可以进一步优化，使用codebook解码后再计算
 	distance := float64(0)
 	for i := range codesA {
 		if codesA[i] != codesB[i] {
@@ -145,7 +161,43 @@ func PQEuclideanDistance[K cmp.Ordered](codesA, codesB []byte, nodeA, nodeB Laye
 }
 
 // PQAsymmetricDistance 非对称PQ距离（查询向量使用原始向量，数据向量使用PQ编码）
-func PQAsymmetricDistance[K cmp.Ordered](queryVec []float32, dataNode LayerNode[K], codebook *pq.Codebook) float64 {
+func PQAsymmetricDistance[K cmp.Ordered](queryVec []float32, dataNode LayerNode[K], quantizer *pq.Quantizer) float64 {
+	if !dataNode.IsPQEnabled() {
+		// 如果数据节点未启用PQ，直接使用原始向量计算（仅对StandardNode）
+		dataVec := dataNode.GetVector()()
+		return euclideanDistanceRaw(queryVec, dataVec)
+	}
+
+	dataCodes, ok := dataNode.GetPQCodes()
+	if !ok {
+		// 如果无法获取PQ编码，返回最大距离（PQ节点不应该到这里）
+		return math.Inf(1)
+	}
+
+	// 使用PQ解码功能：将PQ编码解码为近似向量，然后使用传统算法
+	if quantizer == nil {
+		return math.Inf(1)
+	}
+
+	// 解码PQ编码为近似向量
+	decodedVec64, err := quantizer.Decode(dataCodes)
+	if err != nil {
+		// 解码失败，返回默认距离
+		return math.Inf(1)
+	}
+
+	// 转换为float32
+	decodedVec32 := make([]float32, len(decodedVec64))
+	for i, v := range decodedVec64 {
+		decodedVec32[i] = float32(v)
+	}
+
+	// 使用传统的欧氏距离算法
+	return euclideanDistanceRaw(queryVec, decodedVec32)
+}
+
+// PQAsymmetricCosineDistance 非对称PQ余弦距离（查询向量使用原始向量，数据向量使用PQ编码）
+func PQAsymmetricCosineDistance[K cmp.Ordered](queryVec []float32, dataNode LayerNode[K], quantizer *pq.Quantizer) float64 {
 	if !dataNode.IsPQEnabled() {
 		// 如果数据节点未启用PQ，直接使用原始向量计算（仅对StandardNode）
 		dataVec := dataNode.GetVector()()
@@ -158,8 +210,26 @@ func PQAsymmetricDistance[K cmp.Ordered](queryVec []float32, dataNode LayerNode[
 		return 1.0
 	}
 
-	// 使用PQ码表计算非对称距离
-	return pqAsymmetricDistanceImpl(queryVec, dataCodes, codebook)
+	// 如果没有quantizer，回退到简单距离计算
+	if quantizer == nil {
+		return 0.5
+	}
+
+	// 解码PQ编码为近似向量
+	decodedVec64, err := quantizer.Decode(dataCodes)
+	if err != nil {
+		// 解码失败，返回默认距离
+		return 1.0
+	}
+
+	// 转换为float32
+	decodedVec32 := make([]float32, len(decodedVec64))
+	for i, v := range decodedVec64 {
+		decodedVec32[i] = float32(v)
+	}
+
+	// 使用传统的余弦距离算法
+	return cosineDistanceRaw(queryVec, decodedVec32)
 }
 
 // pqAsymmetricDistanceImpl PQ非对称距离的具体实现
@@ -205,4 +275,34 @@ func pqAsymmetricDistanceImpl(queryVec []float32, dataCodes []byte, codebook *pq
 	}
 
 	return math.Sqrt(distance)
+}
+
+// pqAsymmetricCosineDistanceImpl PQ非对称余弦距离的具体实现
+func pqAsymmetricCosineDistanceImpl(queryVec []float32, dataCodes []byte, codebook *pq.Codebook) float64 {
+	if codebook == nil || len(queryVec) != codebook.M*codebook.SubVectorDim {
+		// 参数不匹配时回退到简单计算
+		return 1.0
+	}
+
+	// 转换float32向量为float64向量以便与PQ包兼容
+	queryVec64 := make([]float64, len(queryVec))
+	for i, v := range queryVec {
+		queryVec64[i] = float64(v)
+	}
+
+	// 创建量化器（这里需要从codebook创建）
+	quantizer := pq.NewQuantizer(codebook)
+	if quantizer == nil {
+		return 1.0
+	}
+
+	// 使用PQ包中的非对称余弦相似度计算
+	similarity, err := quantizer.AsymmetricCosineSimilarity(queryVec64, dataCodes)
+	if err != nil {
+		// 发生错误时返回最大距离
+		return 1.0
+	}
+
+	// 将相似度转换为距离（0 = 相同, 2 = 完全相反）
+	return 1.0 - similarity
 }

@@ -224,6 +224,9 @@ type Graph[K cmp.Ordered] struct {
 
 	// nodeDistance 节点距离函数（基于接口）
 	nodeDistance hnswspec.DistanceFunc[K]
+
+	// pqAwareDistance PQ感知的距离函数
+	pqAwareDistance hnswspec.PQAwareDistanceFunc[K]
 }
 
 func defaultRand() *rand.Rand {
@@ -371,16 +374,24 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 
 	// 设置节点距离函数为基于接口的版本
 	graph.nodeDistance = hnswspec.CosineDistance[K]
+	graph.pqAwareDistance = hnswspec.PQAwareCosineDistance[K]
+
 	// 使用函数名来判断距离函数类型
 	distName, ok := distanceFuncToName(config.Distance)
 	if ok && distName == "euclidean" {
 		graph.nodeDistance = hnswspec.EuclideanDistance[K]
+		graph.pqAwareDistance = hnswspec.PQAwareEuclideanDistance[K]
 	}
 
 	// 初始化PQ优化
 	if config.PQCodebook != nil {
 		graph.pqCodebook = config.PQCodebook
 		graph.pqQuantizer = pq.NewQuantizer(config.PQCodebook)
+
+		// 创建一个包装函数，将quantizer传给距离函数
+		graph.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
+			return graph.pqAwareDistance(a, b, graph.pqQuantizer)
+		}
 	}
 
 	return graph
