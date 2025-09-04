@@ -307,20 +307,26 @@ jobs:
 
       - name: GRPC
         run: |
-          nohup ./yak grpc > /tmp/grpc.log 2>&1 < /dev/null &
-          echo "Waiting for GRPC server to start on port 8087..."
-          for i in {1..15}; do
-            if nc -z localhost 8087; then
-              echo "GRPC server is ready on port 8087"
-              break
+          # 只有当测试名称包含 grpc (不区分大小写) 时才启动 GRPC 服务
+          if echo "${{ matrix.name }}" | grep -qi grpc; then
+            echo "Starting GRPC server for test: ${{ matrix.name }}"
+            nohup ./yak grpc > /tmp/grpc.log 2>&1 < /dev/null &
+            echo "Waiting for GRPC server to start on port 8087..."
+            for i in {1..30}; do
+              if nc -z localhost 8087; then
+                echo "GRPC server is ready on port 8087"
+                break
+              fi
+              echo "Waiting... ($i/30)"
+              sleep 1
+            done
+            if ! nc -z localhost 8087; then
+              echo "GRPC server failed to start within 30 seconds"
+              cat /tmp/grpc.log
+              exit 1
             fi
-            echo "Waiting... ($i/15)"
-            sleep 1
-          done
-          if ! nc -z localhost 8087; then
-            echo "GRPC server failed to start within 15 seconds"
-            cat /tmp/grpc.log
-            exit 1
+          else
+            echo "Skipping GRPC server start for test: ${{ matrix.name }}"
           fi
 
       - name: ${{ matrix.name }}
