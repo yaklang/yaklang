@@ -31,7 +31,7 @@ jobs:
 
       - name: Build yak 
         run: |
-          go build -o ./yak common/cmd/yak.go
+          go build -o ./yak ./common/yak/cmd/yak.go
           chmod +x ./yak
 
       - name: LoadCVE-Description
