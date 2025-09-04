@@ -308,7 +308,20 @@ jobs:
       - name: GRPC
         run: |
           nohup ./yak grpc > /tmp/grpc.log 2>&1 < /dev/null &
-          sleep 1
+          echo "Waiting for GRPC server to start on port 8087..."
+          for i in {1..15}; do
+            if nc -z localhost 8087; then
+              echo "GRPC server is ready on port 8087"
+              break
+            fi
+            echo "Waiting... ($i/15)"
+            sleep 1
+          done
+          if ! nc -z localhost 8087; then
+            echo "GRPC server failed to start within 15 seconds"
+            cat /tmp/grpc.log
+            exit 1
+          fi
 
       - name: ${{ matrix.name }}
         run: |
