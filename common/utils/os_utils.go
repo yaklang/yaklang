@@ -54,6 +54,27 @@ RESET:
 	}
 }
 
+func GetRandomAvailableTCPPortWithCtx(ctx context.Context, host string) int {
+	portChan := make(chan int, 1)
+	go func() {
+		lis, err := net.Listen("tcp", host+":0")
+		if err == nil {
+			port := lis.Addr().(*net.TCPAddr).Port
+			_ = lis.Close()
+			portChan <- port
+		} else {
+			portChan <- 0
+		}
+	}()
+
+	select {
+	case port := <-portChan:
+		return port
+	case <-ctx.Done():
+		return 0
+	}
+}
+
 func GetRangeAvailableTCPPort(startPort, endPort, maxRetries int) (int, error) {
 	if startPort > endPort {
 		return 0, Errorf("start port must be less than end port")
@@ -99,6 +120,60 @@ func IsPortAvailable(host string, p int) bool {
 	}
 	_ = lis.Close()
 	return true
+}
+
+// IsPortAvailableWithTimeout 使用超时检查端口是否可用
+func IsPortAvailableWithTimeout(host string, port int, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	resultChan := make(chan bool, 1)
+	go func() {
+		addr := HostPort(host, port)
+		lis, err := net.Listen("tcp", addr)
+		if err != nil {
+			resultChan <- false
+			return
+		}
+		_ = lis.Close()
+		resultChan <- true
+	}()
+
+	select {
+	case result := <-resultChan:
+		return result
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func FindNearestAvailablePortWithTimeout(host string, originalPort int, timeout time.Duration) int {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	portCheckTimeout := 100 * time.Millisecond
+	start := originalPort - 10
+	if start < 1 {
+		start = 1
+	}
+	end := originalPort + 10
+	if end > 65535 {
+		end = 65535
+	}
+	for p := start; p <= end; p++ {
+		select {
+		case <-ctx.Done():
+			return 0
+		default:
+		}
+
+		if p != originalPort && IsPortAvailableWithTimeout(host, p, portCheckTimeout) {
+			return p
+		}
+	}
+
+	// 系统随机分配的端口
+	return GetRandomAvailableTCPPortWithCtx(ctx, host)
 }
 
 func IsTCPPortOpen(host string, p int) bool {
