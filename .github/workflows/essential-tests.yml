@@ -303,8 +303,10 @@ jobs:
 
       - name: GRPC
         run: |
-          # 只有当测试名称和 run 都包含 grpc (不区分大小写) 时才启动 GRPC 服务
-          if echo "${{ matrix.name }}" | grep -qi grpc && echo "${{ matrix.run }}" | grep -qi grpc; then
+          # 只要测试名称或测试内容包含 grpc (不区分大小写) 就启动 GRPC 服务
+          TEST_NAME="${{ matrix.name }}"
+          TEST_RUN="${{ matrix.run }}"
+          if echo "$TEST_NAME" | grep -qi grpc || echo "$TEST_RUN" | grep -qi grpc; then
             echo "Starting GRPC server for test: ${{ matrix.name }}"
             nohup ./yak grpc > /tmp/grpc.log 2>&1 < /dev/null &
             echo "Waiting for GRPC server to start on port 8087..."
