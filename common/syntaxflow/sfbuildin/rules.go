@@ -4,6 +4,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"os"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -106,7 +107,10 @@ func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		if utils.InGithubActions() {
 			// only in github actions, will sync embed rule.
-			return SyncEmbedRule()
+			if os.Getenv("SKIP_SYNC_EMBED_RULE_IN_GITHUB") == "" {
+				return SyncEmbedRule()
+			}
+			return nil
 		}
 		// in default frontend this rule will be sync by grpc
 		return nil
