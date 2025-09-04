@@ -171,7 +171,7 @@ const (
 	Yak_ExportPayloadBatch_FullMethodName                         = "/ypb.Yak/ExportPayloadBatch"
 	Yak_UploadPayloadToOnline_FullMethodName                      = "/ypb.Yak/UploadPayloadToOnline"
 	Yak_DownloadPayload_FullMethodName                            = "/ypb.Yak/DownloadPayload"
-	Yak_ExportBatchPayload_FullMethodName                         = "/ypb.Yak/ExportBatchPayload"
+	Yak_ExportPayloadDBAndFile_FullMethodName                     = "/ypb.Yak/ExportPayloadDBAndFile"
 	Yak_GetYakitCompletionRaw_FullMethodName                      = "/ypb.Yak/GetYakitCompletionRaw"
 	Yak_GetYakVMBuildInMethodCompletion_FullMethodName            = "/ypb.Yak/GetYakVMBuildInMethodCompletion"
 	Yak_StaticAnalyzeError_FullMethodName                         = "/ypb.Yak/StaticAnalyzeError"
@@ -761,7 +761,7 @@ type YakClient interface {
 	UploadPayloadToOnline(ctx context.Context, in *UploadPayloadToOnlineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error)
 	DownloadPayload(ctx context.Context, in *DownloadPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error)
 	// 批量导payload所有
-	ExportBatchPayload(ctx context.Context, in *ExportBatchPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error)
+	ExportPayloadDBAndFile(ctx context.Context, in *ExportPayloadDBAndFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error)
 	// 自动生成补全
 	GetYakitCompletionRaw(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakitCompletionRawResponse, error)
 	GetYakVMBuildInMethodCompletion(ctx context.Context, in *GetYakVMBuildInMethodCompletionRequest, opts ...grpc.CallOption) (*GetYakVMBuildInMethodCompletionResponse, error)
@@ -3076,13 +3076,13 @@ func (c *yakClient) DownloadPayload(ctx context.Context, in *DownloadPayloadRequ
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_DownloadPayloadClient = grpc.ServerStreamingClient[DownloadProgress]
 
-func (c *yakClient) ExportBatchPayload(ctx context.Context, in *ExportBatchPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error) {
+func (c *yakClient) ExportPayloadDBAndFile(ctx context.Context, in *ExportPayloadDBAndFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[35], Yak_ExportBatchPayload_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[35], Yak_ExportPayloadDBAndFile_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[ExportBatchPayloadRequest, GetAllPayloadResponse]{ClientStream: stream}
+	x := &grpc.GenericClientStream[ExportPayloadDBAndFileRequest, GetAllPayloadResponse]{ClientStream: stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -3093,7 +3093,7 @@ func (c *yakClient) ExportBatchPayload(ctx context.Context, in *ExportBatchPaylo
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_ExportBatchPayloadClient = grpc.ServerStreamingClient[GetAllPayloadResponse]
+type Yak_ExportPayloadDBAndFileClient = grpc.ServerStreamingClient[GetAllPayloadResponse]
 
 func (c *yakClient) GetYakitCompletionRaw(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakitCompletionRawResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -7720,7 +7720,7 @@ type YakServer interface {
 	UploadPayloadToOnline(*UploadPayloadToOnlineRequest, grpc.ServerStreamingServer[DownloadProgress]) error
 	DownloadPayload(*DownloadPayloadRequest, grpc.ServerStreamingServer[DownloadProgress]) error
 	// 批量导payload所有
-	ExportBatchPayload(*ExportBatchPayloadRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error
+	ExportPayloadDBAndFile(*ExportPayloadDBAndFileRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error
 	// 自动生成补全
 	GetYakitCompletionRaw(context.Context, *Empty) (*YakitCompletionRawResponse, error)
 	GetYakVMBuildInMethodCompletion(context.Context, *GetYakVMBuildInMethodCompletionRequest) (*GetYakVMBuildInMethodCompletionResponse, error)
@@ -8686,8 +8686,8 @@ func (UnimplementedYakServer) UploadPayloadToOnline(*UploadPayloadToOnlineReques
 func (UnimplementedYakServer) DownloadPayload(*DownloadPayloadRequest, grpc.ServerStreamingServer[DownloadProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadPayload not implemented")
 }
-func (UnimplementedYakServer) ExportBatchPayload(*ExportBatchPayloadRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error {
-	return status.Errorf(codes.Unimplemented, "method ExportBatchPayload not implemented")
+func (UnimplementedYakServer) ExportPayloadDBAndFile(*ExportPayloadDBAndFileRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method ExportPayloadDBAndFile not implemented")
 }
 func (UnimplementedYakServer) GetYakitCompletionRaw(context.Context, *Empty) (*YakitCompletionRawResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetYakitCompletionRaw not implemented")
@@ -12357,16 +12357,16 @@ func _Yak_DownloadPayload_Handler(srv interface{}, stream grpc.ServerStream) err
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_DownloadPayloadServer = grpc.ServerStreamingServer[DownloadProgress]
 
-func _Yak_ExportBatchPayload_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(ExportBatchPayloadRequest)
+func _Yak_ExportPayloadDBAndFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportPayloadDBAndFileRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(YakServer).ExportBatchPayload(m, &grpc.GenericServerStream[ExportBatchPayloadRequest, GetAllPayloadResponse]{ServerStream: stream})
+	return srv.(YakServer).ExportPayloadDBAndFile(m, &grpc.GenericServerStream[ExportPayloadDBAndFileRequest, GetAllPayloadResponse]{ServerStream: stream})
 }
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type Yak_ExportBatchPayloadServer = grpc.ServerStreamingServer[GetAllPayloadResponse]
+type Yak_ExportPayloadDBAndFileServer = grpc.ServerStreamingServer[GetAllPayloadResponse]
 
 func _Yak_GetYakitCompletionRaw_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
@@ -20902,8 +20902,8 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "ExportBatchPayload",
-			Handler:       _Yak_ExportBatchPayload_Handler,
+			StreamName:    "ExportPayloadDBAndFile",
+			Handler:       _Yak_ExportPayloadDBAndFile_Handler,
 			ServerStreams: true,
 		},
 		{

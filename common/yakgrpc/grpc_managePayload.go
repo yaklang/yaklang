@@ -1609,7 +1609,7 @@ func countFileLines(path string) (int, error) {
 	return n, nil
 }
 
-func (s *Server) ExportBatchPayload(req *ypb.ExportBatchPayloadRequest, stream ypb.Yak_ExportAllPayloadServer) error {
+func (s *Server) ExportPayloadDBAndFile(req *ypb.ExportPayloadDBAndFileRequest, stream ypb.Yak_ExportPayloadDBAndFileServer) error {
 	groups := req.GetGroups()
 	saveDir := req.GetSavePath()
 
@@ -1628,7 +1628,6 @@ func (s *Server) ExportBatchPayload(req *ypb.ExportBatchPayloadRequest, stream y
 		return utils.Wrap(err, "get payloads failed")
 	}
 
-	// 统计总数
 	totalCount := 0
 	for _, p := range payloads {
 		if *p.IsFile {
@@ -1641,7 +1640,6 @@ func (s *Server) ExportBatchPayload(req *ypb.ExportBatchPayloadRequest, stream y
 			}
 			totalCount += lc
 		} else {
-			// 数据库型 group
 			var count int64
 			if err := s.GetProfileDatabase().Model(&schema.Payload{}).
 				Where("`group` = ?", p.Group).Count(&count).Error; err != nil {
