@@ -1,5 +1,6 @@
 {
 	"name": "pimatrix",
+    "verbose_name": "风险评估矩阵",
 	"description": "根据用户输入评估任务风险等级，并判断是否需要人工审核，输出风险概率、影响和原因。",
 	"actions": "riskscore,pimatrix",
 	"tags": "风险评估,风险等级,人工审核,概率,影响,风险分析"

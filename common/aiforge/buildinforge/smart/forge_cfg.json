@@ -1,5 +1,6 @@
 {
 	"name": "smart",
+    "verbose_name": "SMART原则评估",
 	"description": "该forge用于评估任务或计划是否符合SMART原则（Specific、Measurable、Achievable、Relevant、Time-bound），并针对不符合之处提供改进建议。",
 	"actions": "smart",
 	"tags": "smart原则,任务评估,计划评估,改进建议,目标设定,效果评估"

@@ -1,5 +1,6 @@
 {
 	"name": "sqlinject",
+    "verbose_name": "SQL注入漏洞检测",
 	"tool_keywords": "fs,http",
 	"tools": "do_http,grep,read_file_chunk,read_file_lines,cybersecurity-risk",
 	"description": "该forge用于SQL注入漏洞的检测，通过分析用户提供的数据包和参数，规划并执行SQL注入测试，识别潜在的注入点，并判断注入类型，最终检测目标是否存在SQL注入漏洞。",

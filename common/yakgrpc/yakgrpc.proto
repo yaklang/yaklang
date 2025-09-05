@@ -1654,6 +1654,7 @@ message AIForgeFilter {
   // tag
   repeated string Tag = 4;
   int64 Id = 5;
+  bool ShowTemporary = 6; // 是否展示临时 forge，默认不展示
 }
 
 message AIForge {

@@ -160,12 +160,13 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 	}
 
 	return &schema.AIForge{
-		ForgeName:      scriptMetadata.Name,
-		Description:    scriptMetadata.Description,
-		Tags:           strings.Join(scriptMetadata.Keywords, ","),
-		ForgeContent:   string(codeBytes),
-		ParamsUIConfig: uiParamsConfig,
-		ForgeType:      schema.FORGE_TYPE_YAK,
+		ForgeName:        scriptMetadata.Name,
+		ForgeVerboseName: scriptMetadata.VerboseName,
+		Description:      scriptMetadata.Description,
+		Tags:             strings.Join(scriptMetadata.Keywords, ","),
+		ForgeContent:     string(codeBytes),
+		ParamsUIConfig:   uiParamsConfig,
+		ForgeType:        schema.FORGE_TYPE_YAK,
 	}, nil
 }
 
@@ -224,6 +225,7 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 			cfg.ForgeContent = string(codeContent)
 		}
 		forge.ForgeName = cfg.Name
+		forge.ForgeVerboseName = cfg.VerboseName
 		forge.ToolKeywords = cfg.ToolKeywords
 		forge.Tools = cfg.Tools
 		forge.Description = cfg.Description
