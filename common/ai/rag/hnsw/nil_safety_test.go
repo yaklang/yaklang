@@ -57,15 +57,18 @@ func TestGraphWithEmptyLayers(t *testing.T) {
 
 	graph := NewGraph[string]()
 
+	// First add a node to establish dimension
+	graph.Add(MakeInputNode("first", []float32{1.0, 2.0, 3.0}))
+
 	// Create empty layers manually to test edge cases
 	graph.Layers = append(graph.Layers, &Layer[string]{Nodes: make(map[string]hnswspec.LayerNode[string])})
 
-	// Try to add a node when there are empty layers
-	graph.Add(MakeInputNode("test", []float32{1.0, 2.0, 3.0}))
+	// Try to add another node when there are empty layers
+	graph.Add(MakeInputNode("test", []float32{4.0, 5.0, 6.0}))
 
 	// Should not panic and should add the node successfully
-	if graph.Len() != 1 {
-		t.Errorf("Expected 1 node after adding to graph with empty layers, got %d", graph.Len())
+	if graph.Len() != 2 {
+		t.Errorf("Expected 2 nodes after adding to graph with empty layers, got %d", graph.Len())
 	}
 }
 
