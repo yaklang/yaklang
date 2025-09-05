@@ -371,9 +371,7 @@ func Test_Pointer_cfg(t *testing.T) {
 		`, []string{"phi(p.@value)[2,3,1]", "phi(a)[2,3,1]"}, t)
 	})
 
-	// TODO: pointer in phi
 	t.Run("pointer cfg if local", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		func main(){
@@ -395,8 +393,69 @@ func Test_Pointer_cfg(t *testing.T) {
 		`, []string{"phi(a)[4,5]", "phi(p.@value)[4,5]"}, t)
 	})
 
+	// Todo: 等待pr: https://github.com/yaklang/yaklang/pull/3176
+	t.Skip()
+	t.Run("pointer cfg for", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			var p *int
+
+			for p = &a; ; {
+				*p = 2 
+			}
+
+			println(*p) // Undefined-p.@value
+			println(a)	// phi(a)[1,2]
+		}
+			
+		`, []string{"Undefined-p.@value", "phi(a)[1,2]"}, t)
+	})
+
+	t.Run("pointer cfg for local", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			var p *int
+
+			for p = &a; ; {
+				a := 2
+				*p = 2 
+			}
+
+			println(*p) // Undefined-p.@value
+			println(a)	// phi(a)[1,2]
+		}
+			
+		`, []string{"Undefined-p.@value", "phi(a)[1,2]"}, t)
+	})
+
+	t.Run("pointer cfg for address", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			a := 1
+			b := 2
+			var p *int
+
+			for p = &a; ; {
+				p = &b
+			}
+			*p = 3
+
+			println(*p) // 3
+			println(a)	// phi(a)[1,3]
+			println(b)	// phi(b)[2,3]
+		}
+			
+		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
+	})
+
+	// WIP: cannot achieve this function
+	t.Skip()
 	t.Run("pointer cfg if address", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		func main(){
@@ -420,7 +479,6 @@ func Test_Pointer_cfg(t *testing.T) {
 	})
 
 	t.Run("pointer cfg switch address", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		func main(){
@@ -443,73 +501,12 @@ func Test_Pointer_cfg(t *testing.T) {
 			
 		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
 	})
-
-	t.Run("pointer cfg for", func(t *testing.T) {
-		t.Skip()
-		test.CheckPrintlnValue(`package main
-
-		func main(){
-			a := 1
-			var p *int
-
-			for p = &a; ; {
-				*p = 2 
-			}
-
-			println(*p) // Undefined-p.@value
-			println(a)	// phi(a)[1,2]
-		}
-			
-		`, []string{"Undefined-p.@value", "phi(a)[1,2]"}, t)
-	})
-
-	t.Run("pointer cfg for local", func(t *testing.T) {
-		t.Skip()
-		test.CheckPrintlnValue(`package main
-
-		func main(){
-			a := 1
-			var p *int
-
-			for p = &a; ; {
-				a := 2
-				*p = 2 
-			}
-
-			println(*p) // Undefined-p.@value
-			println(a)	// phi(a)[1,2]
-		}
-			
-		`, []string{"Undefined-p.@value", "phi(a)[1,2]"}, t)
-	})
-
-	t.Run("pointer cfg for address", func(t *testing.T) {
-		t.Skip()
-		test.CheckPrintlnValue(`package main
-
-		func main(){
-			a := 1
-			b := 2
-			var p *int
-
-			for p = &a; ; {
-				p = &b
-			}
-			*p = 3
-
-			println(*p) // 3
-			println(a)	// phi(a)[1,3]
-			println(b)	// phi(b)[2,3]
-		}
-			
-		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
-	})
 }
 
 func Test_Pointer_sideEffect(t *testing.T) {
 	// TODO: pointer in phi
+	t.Skip()
 	t.Run("pointer side-effect", func(t *testing.T) {
-		t.Skip()
 		test.CheckPrintlnValue(`package main
 
 		func main(){

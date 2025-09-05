@@ -299,8 +299,8 @@ func (v *Versioned[T]) CaptureInScope(base ScopedVersionedTableIF[T]) (Versioned
 		// just skip
 		return nil, false
 	}
-	if baseVariable.GetCaptured() != v.GetCaptured() {
-		return nil, false
+	if baseVariable.GetCaptured() != v.GetCaptured() { // 指针跨作用域写
+		return baseVariable, true
 	}
 
 	return baseVariable, true
