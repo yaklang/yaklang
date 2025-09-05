@@ -1,5 +1,5 @@
 __DESC__ = "一个用于将Markdown文件转换为Word文档(.docx)的工具，基于pandoc进行文档格式转换，支持指定输出目录和自定义输出文件名，适用于文档处理、报告生成和格式转换等场景。"
-
+__VERBOSE_NAME__ = "Markdown转DOCX工具"
 __KEYWORDS__ = "markdown转换,docx文档,文档转换,pandoc,word文档,document conversion,markdown to docx,file conversion,报告生成,文档处理,格式转换,文档导出"
 
 yakit.AutoInitYakit()

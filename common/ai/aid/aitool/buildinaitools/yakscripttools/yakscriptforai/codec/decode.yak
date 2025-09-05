@@ -1,5 +1,5 @@
 __DESC__ = "一个多功能的解码工具，支持对多种编码格式（如base64, url编码, double url编码, base32, hex, ascii, html实体, unicode等）的文本进行解码，并输出解码结果。"
-
+__VERBOSE_NAME__ = "多格式文本解码"
 __KEYWORDS__ = "数据处理,格式转换,base64解码,数据解码,解码工具,base32解码,decode,double url,encoding schemes,data transformation,text processing,hex解码,编码转换,文本解码,url解码,base64,url encoding,base32,format conversion,decoding tools"
 
 tn := cli.String("type", cli.setRequired(true), cli.setHelp("decode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))

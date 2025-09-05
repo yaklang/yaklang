@@ -1,5 +1,5 @@
 __DESC__ = "一个基于指纹名称查找相关插件的工具，通过计算指纹名称与插件名称的相似度来匹配和排序最相关的插件，支持模糊匹配和相似度计算。"
-
+__VERBOSE_NAME__ = "插件指纹查询工具"
 __KEYWORDS__ = "插件查询,指纹匹配,相似度计算,插件搜索,数据库查询,模糊匹配,plugin query,fingerprint matching,similarity calculation,plugin search,database query,fuzzy matching,yak plugin,script search"
 
 fpNames = cli.String("fingerprints", cli.setVerboseName("指纹名列表"),cli.setHelp("用于查找插件的指纹名列表，多个指纹名之间使用逗号分隔"),cli.setRequired(true))

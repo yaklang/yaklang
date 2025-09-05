@@ -8,7 +8,9 @@ import (
 type AIYakTool struct {
 	gorm.Model
 
-	Name        string `json:"name" gorm:"unique_index"`
+	Name string `json:"name" gorm:"unique_index"`
+	// 展示给用户的名称
+	VerboseName string `json:"verbose_name"`
 	Description string `json:"description" gorm:"type:text;index"`
 	Keywords    string `json:"keywords" gorm:"type:text;index"`
 	Content     string `json:"content" gorm:"type:text"`

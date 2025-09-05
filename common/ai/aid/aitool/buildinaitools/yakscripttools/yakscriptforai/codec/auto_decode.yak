@@ -1,5 +1,5 @@
 __DESC__ = "一个自动尝试多种解码方法来处理给定文本的工具，它会遍历所有可能的解码结果并显示原始文本、解码类型和解码后的结果。"
-
+__VERBOSE_NAME__ = "文本自动解码"
 __KEYWORDS__ = "文本解码,自动解码,编码识别,文本处理,解码工具,数据处理"
 
 text = cli.String("text", cli.setRequired(true), cli.setHelp("target text"))

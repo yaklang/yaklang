@@ -1,5 +1,5 @@
 __DESC__ = "一个强大的Windows CMD命令执行工具，允许用户在受控环境中执行任意Windows命令行指令，支持超时控制和输出捕获，适用于Windows系统管理、自动化脚本执行和运维操作。"
-
+__VERBOSE_NAME__ = "Windows命令执行"
 __KEYWORDS__ = "cmd command,windows命令,命令行工具,系统管理,自动化脚本,运维工具,batch script,command execution,系统操作,cmd脚本,终端命令,system administration,automation tools,操作系统,windows命令"
 
 yakit.AutoInitYakit()

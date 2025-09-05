@@ -1,5 +1,5 @@
 __DESC__ = "一个强大的PowerShell命令执行工具，允许用户在受控环境中执行任意PowerShell脚本和命令，支持超时控制和输出捕获，适用于Windows高级系统管理、自动化脚本执行和DevOps操作。"
-
+__VERBOSE_NAME__ = "Windows PowerShell命令执行"
 __KEYWORDS__ = "powershell command,ps1脚本,windows管理,命令行工具,系统管理,自动化脚本,运维工具,powershell script,command execution,系统操作,ps脚本,终端命令,system administration,automation tools,操作系统,windows高级命令,devops工具"
 
 yakit.AutoInitYakit()

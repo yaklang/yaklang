@@ -1,5 +1,5 @@
 __DESC__ = "一个通过指定地点名称查询该地点实时天气信息的工具，用于获取并展示给定位置的当前天气情况。"
-
+__VERBOSE_NAME__ = "高德：实时天气查询"
 __KEYWORDS__ = "天气查询,实时天气,天气信息,天气工具,地点天气,地理信息,天气数据"
 
 location = cli.String("location", cli.setHelp("Location Name"),cli.setRequired(true))

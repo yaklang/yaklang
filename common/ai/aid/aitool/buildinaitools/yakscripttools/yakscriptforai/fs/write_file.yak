@@ -1,5 +1,5 @@
 __DESC__ = "一个用于创建和写入文件的工具，支持将指定内容安全地写入到目标文件中，包括创建新文件或覆盖现有文件。适用于文件创建、配置文件生成、日志文件写入等场景。"
-
+__VERBOSE_NAME__ = "文件写入工具"
 __KEYWORDS__ = "file write,文件写入,文件创建,file creation,content writing,文件操作,file operations,text file,binary file,file save,保存文件,创建文件,写入内容,文件处理"
 
 yakit.AutoInitYakit()

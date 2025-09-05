@@ -1,5 +1,5 @@
 __DESC__ = "一个用于解析Office文档（PPT、DOC、Excel）为纯文本的工具，支持提取文档内容并转换为可读文本格式，适用于文档内容分析、文本提取和数据处理等场景。"
-
+__VERBOSE_NAME__ = "Office文档解析为文本"
 __KEYWORDS__ = "office文档解析,文本提取,ppt解析,doc解析,excel解析,文档内容提取,office parser,document parsing,text extraction,文件解析,内容分析,数据提取"
 
 yakit.AutoInitYakit()

@@ -1,5 +1,5 @@
 __DESC__ = "发送基础HTTP请求的工具，允许用户指定请求方法（默认为GET）和完整的URL。工具执行请求并打印原始请求和响应数据包。"
-
+__VERBOSE_NAME__ = "基础HTTP请求工具(URL)"
 __KEYWORDS__ = "http请求,网络工具,web通信,请求工具,响应查看,基础请求,网络调试"
 
 yakit.AutoInitYakit()
