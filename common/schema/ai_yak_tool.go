@@ -3,6 +3,7 @@ package schema
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type AIYakTool struct {
@@ -18,6 +19,19 @@ type AIYakTool struct {
 	Path        string `json:"path" gorm:"type:text;index"`
 	Hash        string `json:"hash"`
 	IsFavorite  bool   `json:"is_favorite" gorm:"default:false;index"`
+}
+
+func (a *AIYakTool) ToGRPC() *ypb.AITool {
+	return &ypb.AITool{
+		Name:        a.Name,
+		Description: a.Description,
+		Content:     a.Content,
+		ToolPath:    a.Path,
+		Keywords:    utils.PrettifyListFromStringSplitEx(a.Keywords, ",", "|"),
+		IsFavorite:  a.IsFavorite,
+		ID:          int64(a.ID),
+		VerboseName: a.VerboseName,
+	}
 }
 
 func (*AIYakTool) TableName() string {

@@ -38,17 +38,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 
 		// Convert single tool to response format
 		return &ypb.GetAIToolListResponse{
-			Tools: []*ypb.AITool{
-				{
-					ID:          int64(tool.ID),
-					Name:        tool.Name,
-					Description: tool.Description,
-					Content:     tool.Content,
-					ToolPath:    tool.Path,
-					Keywords:    strings.Split(tool.Keywords, ","),
-					IsFavorite:  tool.IsFavorite,
-				},
-			},
+			Tools: []*ypb.AITool{tool.ToGRPC()},
 		}, nil
 	}
 
@@ -61,17 +51,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 			}, nil
 		}
 		return &ypb.GetAIToolListResponse{
-			Tools: []*ypb.AITool{
-				{
-					ID:          int64(tool.ID),
-					Name:        tool.Name,
-					Description: tool.Description,
-					Content:     tool.Content,
-					ToolPath:    tool.Path,
-					Keywords:    strings.Split(tool.Keywords, ","),
-					IsFavorite:  tool.IsFavorite,
-				},
-			},
+			Tools: []*ypb.AITool{tool.ToGRPC()},
 		}, nil
 	}
 
@@ -87,15 +67,7 @@ func (s *Server) GetAIToolList(ctx context.Context, req *ypb.GetAIToolListReques
 	// Convert tools to response format
 	var result []*ypb.AITool
 	for _, tool := range tools {
-		result = append(result, &ypb.AITool{
-			ID:          int64(tool.ID),
-			Name:        tool.Name,
-			Description: tool.Description,
-			Content:     tool.Content,
-			ToolPath:    tool.Path,
-			Keywords:    strings.Split(tool.Keywords, ","),
-			IsFavorite:  tool.IsFavorite,
-		})
+		result = append(result, tool.ToGRPC())
 	}
 
 	// Prepare response with pagination info
@@ -169,15 +141,7 @@ func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (
 	return &ypb.SaveAIToolV2Response{
 		IsSuccess: true,
 		Message:   "AI tool created successfully",
-		AITool: &ypb.AITool{
-			Name:        tool.Name,
-			Description: tool.Description,
-			Content:     tool.Content,
-			ToolPath:    tool.Path,
-			Keywords:    strings.Split(tool.Keywords, ","),
-			IsFavorite:  tool.IsFavorite,
-			ID:          int64(tool.ID),
-		},
+		AITool:    tool.ToGRPC(),
 	}, nil
 
 }
