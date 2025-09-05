@@ -58,7 +58,7 @@ SOLUTION
 [OWASP Session Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 [CWE-614: Sensitive Cookie in HTTPS Session Without 'Secure' Attribute](https://cwe.mitre.org/data/definitions/614.html)
 REFERENCE
-	cwe: "cwe-614", 
+	cwe: "cwe-614"
 	cwe: "cwe-1004"
 )
 
