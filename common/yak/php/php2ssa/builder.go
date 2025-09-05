@@ -139,7 +139,13 @@ func (s *SSABuild) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	if mainApp.CurrentIncludingStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
-		startParse(functionBuilder)
+		functionBuilder.AddLazyBuilder(func() {
+			// b.GetProgram().SetPreHandler(false)
+			startParse(functionBuilder)
+		}, true)
+		if b.GetProgram().PreHandler() {
+			startParse(functionBuilder)
+		}
 	} else {
 		//模拟preHandler和正式handler
 		b.GetProgram().SetPreHandler(true)
