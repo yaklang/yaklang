@@ -64,6 +64,12 @@ func search[K cmp.Ordered](
 	distance hnswspec.DistanceFunc[K],
 	filter FilterFunc[K],
 ) []searchCandidate[K] {
+	// Check for nil entryNode to prevent panic
+	if entryNode == nil {
+		log.Errorf("search called with nil entryNode")
+		return []searchCandidate[K]{}
+	}
+
 	// Create a temporary standard node for distance calculation with target
 	targetNode := hnswspec.NewStandardLayerNode[K](
 		entryNode.GetKey(), // dummy key, not used
@@ -544,11 +550,20 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			// On subsequent layers, we use the elevator node to enter the graph
 			// at the best point.
 			if elevator != nil {
-				searchPoint = layer.Nodes[*elevator]
+				if elevatorNode, exists := layer.Nodes[*elevator]; exists && elevatorNode != nil {
+					searchPoint = elevatorNode
+				}
+				// If elevator node doesn't exist in this layer, keep using the entry point
 			}
 
 			if g.nodeDistance == nil {
 				panic("(*Graph).nodeDistance must be set")
+			}
+
+			// Ensure searchPoint is not nil before calling search
+			if searchPoint == nil {
+				log.Errorf("searchPoint is nil, unable to search in layer %d", i)
+				continue
 			}
 
 			neighborhood := search(searchPoint, g.M, g.EfSearch, vec, g.nodeDistance, nil)
