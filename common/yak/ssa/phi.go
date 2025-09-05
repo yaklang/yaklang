@@ -201,3 +201,14 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 }
 
 var _ ssautil.MergeHandle[Value] = generatePhi(nil, nil, nil)
+
+func isEmptyPhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Value) func(Value) bool {
+	return func(in Value) bool {
+		if p, ok := ToPhi(in); ok {
+			if len(p.Edge) == 0 {
+				return true
+			}
+		}
+		return false
+	}
+}
