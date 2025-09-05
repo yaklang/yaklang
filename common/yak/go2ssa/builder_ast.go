@@ -64,14 +64,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 			if lib == nil {
 				lib = prog.NewLibrary(pkgPath[0], pkgPath)
+				lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
 			}
 			defer func() {
 				lib.VisitAst(ast)
 			}()
 			lib.PushEditor(prog.GetCurrentEditor())
-			if lib.GlobalScope == nil {
-				lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
-			}
 			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
@@ -715,7 +713,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 
 		b.SetGlobal = false
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block)
+			b.buildBlock(block, true)
 		}
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
@@ -853,7 +851,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 
 		b.SetGlobal = false
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block)
+			b.buildBlock(block, true)
 		}
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
@@ -1099,7 +1097,7 @@ func (b *astbuilder) buildResultParameterDecl(para *gol.ParameterDeclContext) ([
 	return []ssa.Value{zero}, []ssa.Type{ssatyp}
 }
 
-func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
+func (b *astbuilder) buildBlock(block *gol.BlockContext, buildGlobal bool, syntaxBlocks ...bool) {
 	syntaxBlock := false
 	if len(syntaxBlocks) > 0 {
 		syntaxBlock = syntaxBlocks[0]
@@ -1123,6 +1121,9 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 			b.buildStatementList(s)
 		})
 	} else {
+		if buildGlobal {
+			b.LoadGlobalVariable()
+		}
 		b.buildStatementList(s)
 	}
 }
@@ -1182,7 +1183,7 @@ func (b *astbuilder) buildStatement(stmt *gol.StatementContext) {
 	}
 
 	if s, ok := stmt.Block().(*gol.BlockContext); ok {
-		b.buildBlock(s, true)
+		b.buildBlock(s, false, true)
 	}
 
 	if s, ok := stmt.BreakStmt().(*gol.BreakStmtContext); ok {
@@ -1683,7 +1684,7 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	//  build body
 	loop.SetBody(func() {
 		if block, ok := stmt.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block)
+			b.buildBlock(block, false)
 		}
 	})
 
@@ -1751,7 +1752,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 					return rvalue
 				},
 				func() {
-					b.buildBlock(stmt.Block(0).(*gol.BlockContext))
+					b.buildBlock(stmt.Block(0).(*gol.BlockContext), false)
 				},
 			)
 		}
@@ -1759,7 +1760,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 		if stmt.ELSE() != nil {
 			if elseBlock, ok := stmt.Block(1).(*gol.BlockContext); ok {
 				return func() {
-					b.buildBlock(elseBlock)
+					b.buildBlock(elseBlock, false)
 				}
 			} else if elifstmt, ok := stmt.IfStmt().(*gol.IfStmtContext); ok {
 				build := build(elifstmt)

@@ -208,13 +208,17 @@ func (b *astbuilder) GetGlobalVariableL(name string) (*ssa.Variable, bool) {
 	return variable, false
 }
 
+func (b *astbuilder) LoadGlobalVariable() {
+	global := b.GetProgram().GlobalScope
+	for i, m := range global.GetAllMember() {
+		variable := b.CreateVariableCross(i.String())
+		b.AssignVariable(variable, m)
+	}
+}
+
 func (b *astbuilder) GetGlobalVariableR(name string) ssa.Value {
 	global := b.GetProgram().GlobalScope
 	member, _ := global.GetStringMember(name)
-	for i, m := range global.GetAllMember() {
-		variable := b.CreateVariable(i.String())
-		b.AssignVariable(variable, m)
-	}
 	return member
 }
 
@@ -247,6 +251,13 @@ func (b *astbuilder) SetImportPackage(useName, trueName string, path string, pos
 		Pos:  pos,
 	}
 	b.importMap[useName] = p
+}
+
+func (b *astbuilder) CheckImportPackage(n string) bool {
+	if _, ok := b.importMap[n]; ok {
+		return true
+	}
+	return false
 }
 
 func (b *astbuilder) GetImportPackage(n string) (*ssa.Program, string) {
