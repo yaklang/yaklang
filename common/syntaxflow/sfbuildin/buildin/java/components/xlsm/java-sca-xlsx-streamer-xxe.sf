@@ -42,6 +42,7 @@ DESC
 [CWE-611](https://cwe.mitre.org/data/definitions/611.html)
 [OWASP XXE Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/XML_External_Entity_Prevention_Cheat_Sheet.html)
 REFERENCE
+    cwe: 611, 
 )
 
 <include('java-spring-mvc-param')> as $entry;

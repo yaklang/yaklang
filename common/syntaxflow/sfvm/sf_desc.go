@@ -16,6 +16,7 @@ const (
 	SFDescKeyType_Level     SFDescKeyType = "level"
 	SFDescKeyType_Lang      SFDescKeyType = "language"
 	SFDescKeyType_CVE       SFDescKeyType = "cve"
+	SFDescKeyType_CWE       SFDescKeyType = "cwe"
 	SFDescKeyType_Risk      SFDescKeyType = "risk"
 	SFDescKeyType_Solution  SFDescKeyType = "solution"
 	SFDescKeyType_Rule_Id   SFDescKeyType = "rule_id"
@@ -42,6 +43,8 @@ func ValidDescItemKeyType(key string) SFDescKeyType {
 		return SFDescKeyType_Lang
 	case "cve":
 		return SFDescKeyType_CVE
+	case "cwe":
+		return SFDescKeyType_CWE
 	case "risk_type", "risk":
 		return SFDescKeyType_Risk
 	case "solution", "fix":

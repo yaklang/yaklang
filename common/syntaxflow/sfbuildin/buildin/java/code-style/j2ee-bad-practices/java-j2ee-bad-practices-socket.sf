@@ -73,6 +73,7 @@ resp.getWriter().println("Status Code: " + response.getStatusLine().getStatusCod
 对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
 SOLUTION
 	rule_id: "a6d1d49b-6bd2-4097-a3c9-dfaabe042d54"
+    cwe: 676, 
 )
 
 *Socket*?{<typeName>?{have:'javax.net'}}  as $weak;

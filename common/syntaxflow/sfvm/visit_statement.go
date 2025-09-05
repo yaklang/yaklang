@@ -22,6 +22,17 @@ func mustUnquoteSyntaxFlowString(text string) string {
 	return text
 }
 
+func formatCWE(value string) string {
+	if strings.HasPrefix(value, "CWE-") {
+		return value
+		// y.rule.CWE = append(y.rule.CWE, value)
+	} else if strings.HasPrefix(value, "cwe-") {
+		return "CWE-" + strings.TrimPrefix(value, "cwe-")
+	} else {
+		return "CWE-" + (value)
+	}
+}
+
 func (y *SyntaxFlowVisitor) VisitCheckStatement(raw sf.ICheckStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
@@ -108,6 +119,8 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 			extraDesc.language = value
 		case SFDescKeyType_CVE:
 			y.rule.CVE = value
+		case SFDescKeyType_CWE:
+			y.rule.CWE = append(y.rule.CWE, formatCWE(value))
 		case SFDescKeyType_Risk:
 			y.rule.RiskType = value
 		case SFDescKeyType_Solution:
@@ -192,6 +205,8 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 						extra.Severity = schema.ValidSeverityType(value)
 					case SFDescKeyType_Message:
 						extra.Msg = value
+					case SFDescKeyType_CWE:
+						extra.CWE = append(extra.CWE, formatCWE(value))
 					case SFDescKeyType_CVE:
 						extra.CVE = value
 					case SFDescKeyType_Risk:
