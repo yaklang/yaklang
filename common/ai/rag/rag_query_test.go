@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -300,4 +301,39 @@ func TestRAGQuery(t *testing.T) {
 	if !foundNLPDoc {
 		t.Logf("Warning: Expected NLP document not found in final results")
 	}
+}
+
+func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
+	db, _ := utils.CreateTempTestDatabaseInMemory()
+	if db == nil {
+		t.Skip("database not available")
+		return
+	}
+
+	ragSystem, err := CreateCollection(db, "test", "test", WithEmbeddingModel("test"))
+	if err != nil {
+		t.Errorf("Failed to create collection: %v", err)
+		return
+	}
+
+	ragSystem.Add("test", "test", WithDocumentRawMetadata(map[string]any{
+		"type": "test",
+	}))
+
+	results, err := ragSystem.Query("test", 10)
+	if err != nil {
+		t.Errorf("Failed to query: %v", err)
+		return
+	}
+
+	assert.Equal(t, 1, len(results))
+
+	Query(db, "test", WithRAGLimit(10))
+	if err != nil {
+		t.Errorf("Failed to query: %v", err)
+		return
+	}
+
+	assert.Equal(t, 1, len(results))
+	assert.Equal(t, "test", results[0].Document.ID)
 }
