@@ -516,30 +516,35 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		var elevator *K
 		preLen := g.Len()
 
-		// Insert node at each layer, beginning with the highest.
+		// Phase 1: Search from highest layer down to insertLevel+1 (search only, no insertion)
+		// Phase 2: Search and insert from insertLevel down to layer 0
 		for i := len(g.Layers) - 1; i >= 0; i-- {
 			layer := g.Layers[i]
 
-			// 根据是否启用PQ优化创建不同类型的节点
+			// Only create node if we're going to insert it (i <= insertLevel)
 			var newNode hnswspec.LayerNode[K]
 			var err error
 
-			if g.IsPQEnabled() {
-				// 创建PQ节点
-				newNode, err = hnswspec.NewPQLayerNode(key, vec, g.pqQuantizer)
-				if err != nil {
-					log.Errorf("Failed to create PQ node: %v", err)
-					// 回退到标准节点
+			if i <= insertLevel {
+				if g.IsPQEnabled() {
+					// 创建PQ节点
+					newNode, err = hnswspec.NewPQLayerNode(key, vec, g.pqQuantizer)
+					if err != nil {
+						log.Errorf("Failed to create PQ node: %v", err)
+						// 回退到标准节点
+						newNode = hnswspec.NewStandardLayerNode(key, vec)
+					}
+				} else {
+					// 创建标准节点
 					newNode = hnswspec.NewStandardLayerNode(key, vec)
 				}
-			} else {
-				// 创建标准节点
-				newNode = hnswspec.NewStandardLayerNode(key, vec)
 			}
 
-			// Insert the new node into the layer.
+			// Handle empty layer case - only insert if i <= insertLevel
 			if layer.entry() == nil {
-				layer.Nodes = map[K]hnswspec.LayerNode[K]{key: newNode}
+				if i <= insertLevel {
+					layer.Nodes = map[K]hnswspec.LayerNode[K]{key: newNode}
+				}
 				continue
 			}
 
@@ -566,7 +571,20 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 				continue
 			}
 
-			neighborhood := search(searchPoint, g.M, g.EfSearch, vec, g.nodeDistance, nil)
+			// Use different search parameters based on layer and phase
+			searchK := 1 // For search-only layers (above insertLevel), only need 1 best result
+			searchEf := g.EfSearch
+
+			if i <= insertLevel {
+				// For insertion layers, search for more candidates
+				searchK = g.M
+				if i == 0 {
+					// Use larger ef for layer 0 to ensure good connectivity
+					searchEf = max(g.EfSearch, g.M*2)
+				}
+			}
+
+			neighborhood := search(searchPoint, searchK, searchEf, vec, g.nodeDistance, nil)
 			if len(neighborhood) == 0 {
 				// This should never happen because the searchPoint itself
 				// should be in the result set.
@@ -576,11 +594,11 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			// Re-set the elevator node for the next layer.
 			elevator = ptr(neighborhood[0].node.GetKey())
 
-			if insertLevel >= i {
+			if i <= insertLevel {
 				// Insert the new node into the layer.
 				layer.Nodes[key] = newNode
 				for _, candidate := range neighborhood {
-					// Create a bi-directional edge between the new node and the best node.
+					// Create connections between the new node and the best nodes
 					candidate.node.AddNeighbor(newNode, g.M, g.nodeDistance)
 					newNode.AddNeighbor(candidate.node, g.M, g.nodeDistance)
 				}
