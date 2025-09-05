@@ -148,6 +148,40 @@ func (s *Server) SaveAITool(ctx context.Context, req *ypb.SaveAIToolRequest) (*y
 	}, nil
 }
 
+func (s *Server) SaveAIToolV2(ctx context.Context, req *ypb.SaveAIToolRequest) (*ypb.SaveAIToolV2Response, error) {
+	db := consts.GetGormProfileDatabase()
+	if db == nil {
+		return nil, utils.Errorf("database not initialized")
+	}
+
+	tool := &schema.AIYakTool{
+		Name:        req.GetName(),
+		Description: req.GetDescription(),
+		Content:     req.GetContent(),
+		Path:        req.GetToolPath(),
+		Keywords:    strings.Join(req.GetKeywords(), ","),
+	}
+
+	_, err := yakit.CreateAIYakTool(db, tool)
+	if err != nil {
+		return nil, utils.Errorf("failed to create AI tool: %s", err)
+	}
+	return &ypb.SaveAIToolV2Response{
+		IsSuccess: true,
+		Message:   "AI tool created successfully",
+		AITool: &ypb.AITool{
+			Name:        tool.Name,
+			Description: tool.Description,
+			Content:     tool.Content,
+			ToolPath:    tool.Path,
+			Keywords:    strings.Split(tool.Keywords, ","),
+			IsFavorite:  tool.IsFavorite,
+			ID:          int64(tool.ID),
+		},
+	}, nil
+
+}
+
 func (s *Server) UpdateAITool(ctx context.Context, req *ypb.UpdateAIToolRequest) (*ypb.DbOperateMessage, error) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
