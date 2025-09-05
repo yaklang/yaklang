@@ -27,8 +27,8 @@ public class Example {
 ```
 SOLUTION
 	rule_id: "e1315696-3f1e-404c-9906-06c1db41a6b0"
-	cwe: 532, 
-	cwe: 215, 
+	cwe: 532
+	cwe: 215
 )
 
 System.out.print*() as $out;

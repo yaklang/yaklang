@@ -67,8 +67,8 @@ SOLUTION
 	reference: <<<REFERENCE
 [Spring Boot Actuator文档](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html)
 REFERENCE
-  cwe: 200, 
-  cwe: 16, 
+	cwe: 200
+	cwe: 16
 )
 
 ${*.properties}.re(/management\.security\.enabled=false/) as $weak;

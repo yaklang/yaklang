@@ -174,7 +174,7 @@ SOLUTION
 	risk: "身份验证绕过",
 	message_zh: "JWT 使用了不安全的 parse 方法",
 	name: "riskParse",
-    cwe: 347, 
+	cwe: "347",
 }
 
 .signWith?{<typeName>?{have:'io.jsonwebtoken'}}(,,*  as $key)
@@ -234,7 +234,7 @@ private static final String JWT_PASSWORD = "bm5n3SkxCX4kKRy4"; // 硬编码的JW
 DESC
 	type: "vuln",
 	name: "hardcodedKey",
-    cwe: 798, 
+	cwe: "798",
 }
 
 alert $sink for {
@@ -276,8 +276,7 @@ DESC
 	message_zh: "JWT 使用了不安全的密钥",
 	title: "Check Java JWT Insecure Key Usage",
 	name: "sink",
-    cwe: 312, 
-    cwe: 522, 
+	cwe: "522",
 }
 
 desc(

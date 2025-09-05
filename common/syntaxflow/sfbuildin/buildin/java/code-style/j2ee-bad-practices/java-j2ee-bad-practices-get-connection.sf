@@ -104,7 +104,7 @@ e.printStackTrace();
 #### 3. 避免硬编码数据库连接信息
 应将数据库连接URL、用户名、密码等敏感信息从代码中移除，配置在应用服务器、properties文件或环境变量中，通过配置方式获取。
 SOLUTION
-    cwe: 676, 
+	cwe: 676
 )
 
 DriverManager?{<typeName>?{have:'java.sql.DriverManager'}}.getConnection() as $get;
