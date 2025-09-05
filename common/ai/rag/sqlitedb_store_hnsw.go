@@ -290,6 +290,9 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 	log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
 
 	resultNodes := s.hnsw.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
+		if key == DocumentTypeCollectionInfo {
+			return false
+		}
 		if filter != nil {
 			return filter(key, func() *Document {
 				var docs []*schema.VectorStoreDocument
