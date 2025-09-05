@@ -83,18 +83,56 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 		return
 	}
 
-	// 通过添加新邻居恢复连接性
+	// 收集候选节点（避免在迭代过程中修改map）
+	candidates := make([]LayerNode[K], 0)
+	visited := make(map[K]bool)
+	visited[n.key] = true
+
+	// 通过邻居的邻居找到候选连接
 	for _, neighbor := range n.neighbors {
-		for key, candidate := range neighbor.GetNeighbors() {
-			if _, ok := n.neighbors[key]; ok {
-				continue // 不添加重复项
+		visited[neighbor.GetKey()] = true
+		for _, candidate := range neighbor.GetNeighbors() {
+			candidateKey := candidate.GetKey()
+			if visited[candidateKey] {
+				continue // 避免重复和自连接
 			}
-			if candidate.GetKey() == n.key {
-				continue
+			visited[candidateKey] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	// 如果没有足够的候选者，直接返回
+	if len(candidates) == 0 {
+		return
+	}
+
+	// 按距离排序候选者
+	for i := 0; i < len(candidates)-1; i++ {
+		for j := i + 1; j < len(candidates); j++ {
+			distI := distFunc(candidates[i], n)
+			distJ := distFunc(candidates[j], n)
+			if distI > distJ {
+				candidates[i], candidates[j] = candidates[j], candidates[i]
 			}
-			n.AddNeighbor(candidate, m, distFunc)
-			if len(n.neighbors) >= m {
-				return
+		}
+	}
+
+	// 添加最近的候选者直到达到m个邻居（但避免递归调用AddNeighbor）
+	for _, candidate := range candidates {
+		if len(n.neighbors) >= m {
+			break
+		}
+		// 直接添加到neighbors map，避免递归调用AddNeighbor
+		n.neighbors[candidate.GetKey()] = candidate
+
+		// 确保双向连接：让候选者也添加我们作为邻居
+		// 但要小心避免无限递归
+		candidateNeighbors := candidate.GetNeighbors()
+		if candidateNeighbors != nil && len(candidateNeighbors) < m {
+			// 只有在不会超过限制时才添加反向连接
+			if _, exists := candidateNeighbors[n.key]; !exists {
+				// 直接修改候选者的neighbors map，避免递归
+				candidateNeighbors[n.key] = n
 			}
 		}
 	}
@@ -202,18 +240,56 @@ func (n *PQLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 		return
 	}
 
-	// 通过添加新邻居恢复连接性
+	// 收集候选节点（避免在迭代过程中修改map）
+	candidates := make([]LayerNode[K], 0)
+	visited := make(map[K]bool)
+	visited[n.key] = true
+
+	// 通过邻居的邻居找到候选连接
 	for _, neighbor := range n.neighbors {
-		for key, candidate := range neighbor.GetNeighbors() {
-			if _, ok := n.neighbors[key]; ok {
-				continue // 不添加重复项
+		visited[neighbor.GetKey()] = true
+		for _, candidate := range neighbor.GetNeighbors() {
+			candidateKey := candidate.GetKey()
+			if visited[candidateKey] {
+				continue // 避免重复和自连接
 			}
-			if candidate.GetKey() == n.key {
-				continue
+			visited[candidateKey] = true
+			candidates = append(candidates, candidate)
+		}
+	}
+
+	// 如果没有足够的候选者，直接返回
+	if len(candidates) == 0 {
+		return
+	}
+
+	// 按距离排序候选者
+	for i := 0; i < len(candidates)-1; i++ {
+		for j := i + 1; j < len(candidates); j++ {
+			distI := distFunc(candidates[i], n)
+			distJ := distFunc(candidates[j], n)
+			if distI > distJ {
+				candidates[i], candidates[j] = candidates[j], candidates[i]
 			}
-			n.AddNeighbor(candidate, m, distFunc)
-			if len(n.neighbors) >= m {
-				return
+		}
+	}
+
+	// 添加最近的候选者直到达到m个邻居（但避免递归调用AddNeighbor）
+	for _, candidate := range candidates {
+		if len(n.neighbors) >= m {
+			break
+		}
+		// 直接添加到neighbors map，避免递归调用AddNeighbor
+		n.neighbors[candidate.GetKey()] = candidate
+
+		// 确保双向连接：让候选者也添加我们作为邻居
+		// 但要小心避免无限递归
+		candidateNeighbors := candidate.GetNeighbors()
+		if candidateNeighbors != nil && len(candidateNeighbors) < m {
+			// 只有在不会超过限制时才添加反向连接
+			if _, exists := candidateNeighbors[n.key]; !exists {
+				// 直接修改候选者的neighbors map，避免递归
+				candidateNeighbors[n.key] = n
 			}
 		}
 	}
