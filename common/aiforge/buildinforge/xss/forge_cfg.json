@@ -1,5 +1,6 @@
 {
 	"name": "xss",
+    "verbose_name": "XSS漏洞检测",
 	"tool_keywords": "fs,http",
 	"tools": "do_http,http,packet,grep,read_file_chunk,read_file_lines,cybersecurity-risk",
 	"description": "该forge用于检测XSS漏洞。它可以接收URL、数据包或IP地址作为输入，通过分析输入点，注入XSS payload，并检测响应来判断是否存在XSS漏洞。",

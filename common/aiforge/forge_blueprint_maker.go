@@ -3,8 +3,9 @@ package aiforge
 import (
 	"encoding/json"
 	"errors"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -50,6 +51,7 @@ func (c *YakForgeBlueprintAIDOptionsConfig) ToOptions() []aid.Option {
 type YakForgeBlueprintConfig struct {
 	// prompt
 	Name             string `json:"name,omitempty"`
+	VerboseName      string `json:"verbose_name"`
 	InitPrompt       string `json:"init_prompt,omitempty"`
 	PersistentPrompt string `json:"persistent_prompt,omitempty"`
 	PlanPrompt       string `json:"plan_prompt,omitempty"`

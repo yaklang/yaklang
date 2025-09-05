@@ -1,5 +1,6 @@
 {
 	"name": "hostscan",
+    "verbose_name": "主机体检",
 	"description": "专业的主机体检AI助手，能够执行全面的主机健康状态扫描，包括系统资源监控、端口服务检查、配置安全分析、进程状态监控等。通过调用多种系统检查工具，自动化发现和识别主机系统的健康问题、安全风险和性能瓶颈。",
 	"tool_keywords": "主机体检,系统监控,资源检查,端口扫描,服务检查,配置分析,进程监控,安全评估,性能分析,健康检查,系统诊断,网络连接,磁盘使用,内存监控,CPU监控,系统状态",
 	"tools": "scan_tcp_port,syn_scan_tcp_port,match_fingerprint_by_packet,send_http_request_by_url,send_http_request_packet,simple_crawler,cybersecurity-risk,call_yak_plugin,query_plugin_by_fp,brute,whois,find_file,bash,grep,head_by_bytes,head_by_lines,query_file_meta,read_file_chunk,read_file_lines,ostype",

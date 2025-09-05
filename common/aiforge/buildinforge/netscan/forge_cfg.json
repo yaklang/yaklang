@@ -1,5 +1,6 @@
 {
 	"name": "netscan",
+    "verbose_name": "基础网络扫描",
 	"tools": "http,pentest,net,fs,dns,codec,risk,tls",
 	"description": "对目标进行渗透测试，通过信息收集、漏洞扫描等手段发现潜在的安全风险，并提供详细的风险报告。",
 	"tags": "渗透测试,安全风险,漏洞扫描,信息收集,弱口令,端口扫描,web安全,网络安全"

@@ -2,10 +2,11 @@ package aibp
 
 import (
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/go-rod/rod/lib/utils"
 	"github.com/google/uuid"
@@ -69,6 +70,7 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 
 func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag string) (any, error) {
 	db := consts.GetGormProfileDatabase()
+	forge.IsTemporary = true
 	err := yakit.CreateOrUpdateAIForgeByName(db, forge.ForgeName, forge)
 	if err != nil {
 		return nil, err

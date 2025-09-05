@@ -1,5 +1,6 @@
 {
 	"name": "vulscan",
+    "verbose_name": "基础漏洞扫描",
 	"description": "专业的漏洞扫描AI助手，能够执行全面的漏洞扫描任务，包括端口扫描、服务识别、指纹匹配、子域名发现、Web应用扫描等。通过调用多种扫描工具和插件，自动化发现和识别目标系统的安全漏洞。",
 	"cli_parameter_rule_yaklang_code": "query = cli.String(\"query\", cli.setHelp(\"目标\"))",
 	"tool_keywords": "漏洞扫描,端口扫描,服务识别,指纹识别,Web扫描,子域名扫描,安全检测,渗透测试,漏洞发现,网络扫描,风险评估,暴力破解,域名查询,信息收集,网络侦察",
