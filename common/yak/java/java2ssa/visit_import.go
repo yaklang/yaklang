@@ -28,9 +28,7 @@ func (y *singleFileBuilder) VisitAllImport(i *javaparser.CompilationUnitContext)
 			}
 		}
 		_, _, _ = pkgNames, static, all
-		if y.PreHandler() {
-			continue
-		}
+
 		var prog *ssa.Program
 		var className string
 		// found package
@@ -40,10 +38,12 @@ func (y *singleFileBuilder) VisitAllImport(i *javaparser.CompilationUnitContext)
 			valName := pkgNames[len(pkgNames)-1]
 			if library, _ := y.GetProgram().GetLibrary(strings.Join(pkg, ".")); library != nil {
 				prog = library
-				if all {
-					_ = y.GetProgram().ImportTypeStaticAll(prog, className)
-				} else {
-					_ = y.GetProgram().ImportTypeStaticMemberFromLib(prog, className, valName)
+				if !y.PreHandler() {
+					if all {
+						_ = y.GetProgram().ImportTypeStaticAll(prog, className)
+					} else {
+						_ = y.GetProgram().ImportTypeStaticMemberFromLib(prog, className, valName)
+					}
 				}
 			}
 		} else {
