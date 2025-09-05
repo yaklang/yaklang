@@ -14,8 +14,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "90ab22ed8579d821324b8a444c4b0e0de96f92c9951442899005a3761d4c6e09",
-    "version": "20250820.0001"
+    "hash": "d7b04890d19c8f851988a68a623ce49516a3b0ffecc9ccd9d1ff130c32565a0b",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "017cae33-9b73-4470-9e98-adbdd10dbc3a",
@@ -428,44 +428,44 @@
   {
     "rule_id": "219b8265-213b-474f-8a71-a86bfb3d3929",
     "rule_name": "检测Java J2EE 使用DriverManager getConnection",
-    "hash": "9291d2534452ba77d80558916262892202cdf38c6d24947c8ea02d9eb2e11fe0",
-    "version": "20250820.0001"
+    "hash": "cb97cae4f2af00a24deb82f20c66d053dd7a2138468bb62b2a329dd777f5564b",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "a6d1d49b-6bd2-4097-a3c9-dfaabe042d54",
     "rule_name": "审计Java J2EE 使用socket",
-    "hash": "286775b0e0334696e2608ed3de31e292aec0f480bdbd4fb377af8c1ca63b32a9",
-    "version": "20250820.0001"
+    "hash": "d02ddaa3e47221fce0e75dcc0a64362e96309d7c454b8bd4e1108dfc1730032a",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "8e009f30-c716-4c22-b4c4-9d394e88c824",
     "rule_name": "审计Java J2EE 标准使用线程规则",
-    "hash": "718d3251882d5c4f2c607d753b4f87f159e3930f8f763a0aba8891094bbd6c94",
-    "version": "20250820.0001"
+    "hash": "504d305339aa6aa43fd26149f4555d23dd997e11d41e06298663987f2264293b",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "e1315696-3f1e-404c-9906-06c1db41a6b0",
     "rule_name": "审计Java 使用System.out输出流",
-    "hash": "4adc79327ebb9047901711028ef0f4b0503b2e53f2abfe98d1580ff4c98d45c5",
-    "version": "20250820.0001"
+    "hash": "419c9040bc2cb139840e9cea4ce5b440d9f1351074e99f8dab65c5d5072f3f62",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "084c0adc-69ef-42ed-aeb4-5c24603634af",
     "rule_name": "检查Java Spring Boot Actuator配置",
-    "hash": "3a4cac3045597548950fc7a32a372742e6738e66486bec7081504ef036d87227",
-    "version": "20250820.0001"
+    "hash": "36eecf1a69a516ae020b8c6f37d593931971d8fb153d65d4c996b3a338447304",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "a4abf901-de0e-4959-a310-5b0adbef046b",
-    "rule_name": "SCA: 检测Java FastJson依赖漏洞",
-    "hash": "2f9b6c2dc7e4458cdbb2c7546cbdfc42ed875f163be358e6d11fe0741f4ff781",
-    "version": "20250820.0001"
+    "rule_name": "检测Java FastJson依赖漏洞",
+    "hash": "b34000db26430a1def6da97eb045be2844e666cb5df72a29c765821ae634b818",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "98a8cf55-3355-463f-ad5d-9bbe8349e6c6",
     "rule_name": "检查 Java JWT 安全问题",
-    "hash": "4f78e7eb9b60e1fc57a003d58fd295e4a167adbd44edd80baf9929550a01f65f",
-    "version": "20250820.0001"
+    "hash": "2582ebe6daabe93f62bcd65166395032eb083ff0ad0d7087444faf3e3cdc1179",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "815144fa-b327-4842-b75d-a7bcc9e6ea6a",
@@ -500,8 +500,8 @@
   {
     "rule_id": "cd3632dd-a25c-49c4-bf53-7f53fc7610ae",
     "rule_name": "SCA: 检测Java xlsx-streamer依赖漏洞",
-    "hash": "e41de965f8a45f99a1e43e1996688b61d2e927b7a97d54f5fd514841271ec588",
-    "version": "20250820.0001"
+    "hash": "2cc607050b444e3ab6cc5e620c566f1459765c3028abb9284daf89db08957d5f",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "e0e6ed1e-aa60-4522-a5c0-ae8f0b121b7e",
@@ -1586,13 +1586,13 @@
   {
     "rule_id": "51cb7fc1-9432-40d3-86ec-cb4c14cd52fc",
     "rule_name": "检测PHP Cookie安全设置",
-    "hash": "a44863b81c5129d7ad2e9b9bd6c6a041211111daebe79c7c0d6ef9133ce43068",
-    "version": "20250820.0001"
+    "hash": "5384dce647815e4812b4b0b5a32fa2eb9c5f986723ca1ff0fdb6013e898ae1b9",
+    "version": "20250905.0001"
   },
   {
     "rule_id": "b072f796-18df-495b-b705-68be589a0e2c",
     "rule_name": "可预测的Cookie值（伪随机）",
-    "hash": "1f4791c16cca0cfd8a562f04f17dbb2d947dd3509caf4a8b514180c2434b3152",
-    "version": "20250901.0001"
+    "hash": "29322722cc8c3beeef14dd6240e9f504cc7de03878004dbbbad1d7c66505e1c6",
+    "version": "20250905.0001"
   }
 ]
