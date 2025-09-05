@@ -1445,6 +1445,7 @@ message AITool {
   repeated string Keywords = 5;
   bool IsFavorite = 6;
   int64 ID = 7;
+  string VerboseName = 8; // 给用户看的展示名称
 }
 
 message GetAIToolListResponse {
@@ -1674,6 +1675,7 @@ message AIForge {
   string PersistentPrompt = 14; // 持久化提示语
   string PlanPrompt = 15; // 计划提示语
   string ResultPrompt = 16; // 结果提示语
+  string ForgeVerboseName = 17; // 给用户看的展示名称
 }
 
 message QueryAIForgeRequest {

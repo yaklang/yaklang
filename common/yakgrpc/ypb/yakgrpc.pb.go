@@ -5620,6 +5620,7 @@ type AITool struct {
 	Keywords      []string               `protobuf:"bytes,5,rep,name=Keywords,proto3" json:"Keywords,omitempty"`
 	IsFavorite    bool                   `protobuf:"varint,6,opt,name=IsFavorite,proto3" json:"IsFavorite,omitempty"`
 	ID            int64                  `protobuf:"varint,7,opt,name=ID,proto3" json:"ID,omitempty"`
+	VerboseName   string                 `protobuf:"bytes,8,opt,name=VerboseName,proto3" json:"VerboseName,omitempty"` // 给用户看的展示名称
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5701,6 +5702,13 @@ func (x *AITool) GetID() int64 {
 		return x.ID
 	}
 	return 0
+}
+
+func (x *AITool) GetVerboseName() string {
+	if x != nil {
+		return x.VerboseName
+	}
+	return ""
 }
 
 type GetAIToolListResponse struct {
@@ -7151,6 +7159,7 @@ type AIForge struct {
 	PersistentPrompt   string                 `protobuf:"bytes,14,opt,name=PersistentPrompt,proto3" json:"PersistentPrompt,omitempty"` // 持久化提示语
 	PlanPrompt         string                 `protobuf:"bytes,15,opt,name=PlanPrompt,proto3" json:"PlanPrompt,omitempty"`             // 计划提示语
 	ResultPrompt       string                 `protobuf:"bytes,16,opt,name=ResultPrompt,proto3" json:"ResultPrompt,omitempty"`         // 结果提示语
+	ForgeVerboseName   string                 `protobuf:"bytes,17,opt,name=ForgeVerboseName,proto3" json:"ForgeVerboseName,omitempty"` // 给用户看的展示名称
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -7293,6 +7302,13 @@ func (x *AIForge) GetPlanPrompt() string {
 func (x *AIForge) GetResultPrompt() string {
 	if x != nil {
 		return x.ResultPrompt
+	}
+	return ""
+}
+
+func (x *AIForge) GetForgeVerboseName() string {
+	if x != nil {
+		return x.ForgeVerboseName
 	}
 	return ""
 }
@@ -60608,7 +60624,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"IsFavorite\x18\x01 \x01(\bR\n" +
 	"IsFavorite\x12\x18\n" +
-	"\aMessage\x18\x02 \x01(\tR\aMessage\"\xc0\x01\n" +
+	"\aMessage\x18\x02 \x01(\tR\aMessage\"\xe2\x01\n" +
 	"\x06AITool\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12 \n" +
 	"\vDescription\x18\x02 \x01(\tR\vDescription\x12\x18\n" +
@@ -60618,7 +60634,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"IsFavorite\x18\x06 \x01(\bR\n" +
 	"IsFavorite\x12\x0e\n" +
-	"\x02ID\x18\a \x01(\x03R\x02ID\"}\n" +
+	"\x02ID\x18\a \x01(\x03R\x02ID\x12 \n" +
+	"\vVerboseName\x18\b \x01(\tR\vVerboseName\"}\n" +
 	"\x15GetAIToolListResponse\x12!\n" +
 	"\x05Tools\x18\x01 \x03(\v2\v.ypb.AIToolR\x05Tools\x12+\n" +
 	"\n" +
@@ -60754,7 +60771,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aKeyword\x18\x03 \x01(\tR\aKeyword\x12\x10\n" +
 	"\x03Tag\x18\x04 \x03(\tR\x03Tag\x12\x0e\n" +
 	"\x02Id\x18\x05 \x01(\x03R\x02Id\x12$\n" +
-	"\rShowTemporary\x18\x06 \x01(\bR\rShowTemporary\"\x87\x04\n" +
+	"\rShowTemporary\x18\x06 \x01(\bR\rShowTemporary\"\xb3\x04\n" +
 	"\aAIForge\x12\x0e\n" +
 	"\x02Id\x18\x01 \x01(\x03R\x02Id\x12\x1c\n" +
 	"\tForgeName\x18\x02 \x01(\tR\tForgeName\x12\"\n" +
@@ -60776,7 +60793,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"PlanPrompt\x18\x0f \x01(\tR\n" +
 	"PlanPrompt\x12\"\n" +
-	"\fResultPrompt\x18\x10 \x01(\tR\fResultPrompt\"n\n" +
+	"\fResultPrompt\x18\x10 \x01(\tR\fResultPrompt\x12*\n" +
+	"\x10ForgeVerboseName\x18\x11 \x01(\tR\x10ForgeVerboseName\"n\n" +
 	"\x13QueryAIForgeRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
