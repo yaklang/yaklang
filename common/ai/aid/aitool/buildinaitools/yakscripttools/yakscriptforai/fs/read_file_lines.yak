@@ -1,5 +1,5 @@
 __DESC__ = "一个用于安全读取大型文件的工具，可以指定起始行偏移量、读取的行数以及每行的最大长度，以分段读取文件内容。"
-
+__VERBOSE_NAME__ = "分段读取大文件"
 __KEYWORDS__ = "buffer,文件读取,文件工具,文本处理,large file,streaming,performance,文件处理,数据读取,file handling,reading,data processing,memory management,大文件处理,分段读取,lines size,offset"
 
 yakit.AutoInitYakit()

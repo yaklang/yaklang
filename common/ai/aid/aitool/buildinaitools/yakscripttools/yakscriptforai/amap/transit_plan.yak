@@ -1,5 +1,5 @@
 __DESC__ = "一个用于公共交通导航路径规划的工具，根据起点和终点（可选指定城市）查找公共交通线路，并返回包含多个出行方案的详细信息，包括总距离、时间、步行距离、费用以及每个方案的具体步骤（步行和公交线路）。"
-
+__VERBOSE_NAME__ = "高德：公共交通路径规划"
 __KEYWORDS__ = "公共交通,导航,路径规划,出行方案,公交查询,高德地图,交通工具,地图工具"
 
 ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))

@@ -1,5 +1,5 @@
 __DESC__ = "一个用于执行多种DNS查询的工具，包括A、AAAA、NS、AXFR和TXT记录，根据提供的域名进行查询并显示结果。"
-
+__VERBOSE_NAME__ = "DNS查询工具"
 __KEYWORDS__ = "domain name,域名解析,a记录,dns查询,dns helper,aaaa record,ns record,txt record,network tools,internet protocols,aaaa记录,dns queries,网络工具,ns记录,txt记录,域名信息,dns lookup,a record,axfr记录"
 
 target = cli.String("domain", cli.setRequired(true), cli.setHelp("the target domain u want to check")) //"www.example.com"

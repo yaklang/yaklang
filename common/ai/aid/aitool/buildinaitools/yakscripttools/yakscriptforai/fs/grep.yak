@@ -1,5 +1,5 @@
 __DESC__ = "一个文本查找工具，用于在指定文件或目录下查找匹配特定模式的文本。支持子串（区分大小写和不区分大小写）和正则表达式模式。可指定查找的路径、模式、最大结果数量、跳过的匹配次数以及显示匹配文本周围的上下文。"
-
+__VERBOSE_NAME__ = "文本查找工具"
 __KEYWORDS__ = "pattern matching,regexp,file path,模式匹配,查找替换,文件路径,context text,文本查找,文本工具,directory search,text tool,文件搜索,正则表达式,目录搜索,grep,text finder,file search"
 
 yakit.AutoInitYakit()

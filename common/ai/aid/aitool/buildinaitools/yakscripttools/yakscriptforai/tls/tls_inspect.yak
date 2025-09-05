@@ -1,5 +1,5 @@
 __DESC__ = "用于检查指定域名的TLS证书信息，尝试不同的协议版本进行扫描，并打印证书详情。"
-
+__VERBOSE_NAME__ = "TLS证书检查"
 __KEYWORDS__ = "security,https,ssl,加密,网络安全,证书详情,安全工具,certificate validation,encryption,certificate authority,domain verification,tls证书,域名扫描,tls certificates,domain inspection,network security,web security,证书检查"
 
 // domain := "www.example.com"

@@ -1,5 +1,5 @@
 __DESC__ = "一个用于执行Git blame操作的工具，可以指定目标Git仓库、文件名以及引用名称（如分支、标签或提交）。工具支持指定结果的起始偏移量和限制数量，以便分块读取 blames 信息。"
-
+__VERBOSE_NAME__ = "Git Blame工具"
 __KEYWORDS__ = "git blame,代码溯源,提交记录,代码归属,版本控制,git工具,仓库管理,文件历史"
 
 yakit.AutoInitYakit()

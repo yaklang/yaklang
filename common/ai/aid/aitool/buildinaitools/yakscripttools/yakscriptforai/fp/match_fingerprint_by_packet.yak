@@ -1,5 +1,5 @@
 __DESC__ = "一个数据包指纹匹配工具，可以对输入的网络数据包进行指纹识别和匹配，用于识别数据包中包含的服务、协议或应用特征，帮助进行网络流量分析和安全检测。支持直接传入数据包内容或指定文件路径读取文件内容进行匹配。"
-
+__VERBOSE_NAME__ = "数据包指纹匹配"
 __KEYWORDS__ = "数据包分析,指纹匹配,网络分析,协议识别,服务识别,流量分析,安全检测,packet analysis,fingerprint matching,network analysis,protocol identification,service identification,traffic analysis,security detection,response matching,文件读取,file reading"
 
 packet = cli.Text("packet", cli.setVerboseName("数据包"), cli.setHelp("需要指纹匹配的数据包原文(packet 和 file_path 必须二选一)"))

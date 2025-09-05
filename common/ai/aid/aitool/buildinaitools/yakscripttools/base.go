@@ -93,7 +93,7 @@ func loadAllYakScriptFromEmbedFS() []*schema.AIYakTool {
 }
 
 func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
-	metadata, err := metadata.ParseYakScriptMetadata(name, string(content))
+	ins, err := metadata.ParseYakScriptMetadata(name, string(content))
 	if err != nil {
 		log.Warnf("parse yak script metadata failed: %v", err)
 		return nil
@@ -107,8 +107,9 @@ func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	params, _ := json.Marshal(tool.InputSchema.ToMap())
 	return &schema.AIYakTool{
 		Name:        name,
-		Description: metadata.Description,
-		Keywords:    strings.Join(metadata.Keywords, ","),
+		VerboseName: ins.VerboseName,
+		Description: ins.Description,
+		Keywords:    strings.Join(ins.Keywords, ","),
 		Content:     string(content),
 		Params:      string(params),
 	}

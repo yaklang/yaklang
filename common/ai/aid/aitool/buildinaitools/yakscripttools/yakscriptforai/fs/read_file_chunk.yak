@@ -1,5 +1,5 @@
 __DESC__ = "一个用于安全读取大文件的工具，通过指定文件路径、分块大小和偏移量，可以按块读取文件特定位置的数据。尤其适用于处理内存受限或需要流式处理的场景。"
-
+__VERBOSE_NAME__ = "大文件分块读取"
 __KEYWORDS__ = "memory management,文件读取,大文件处理,file handling,reading,data processing,buffer,performance,内存安全,偏移读取,chunk size,offset,streaming,文件分块,数据块,文件处理,流式读取,large file"
 
 yakit.AutoInitYakit()
