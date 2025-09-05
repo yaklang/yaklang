@@ -265,6 +265,7 @@ func KnowledgeBaseEntryToGrpcModel(entry *schema.KnowledgeBaseEntry) *ypb.Knowle
 		ImportanceScore:          int32(entry.ImportanceScore),
 		Keywords:                 entry.Keywords,
 		KnowledgeDetails:         entry.KnowledgeDetails,
+		HiddenIndex:              entry.HiddenIndex,
 		Summary:                  entry.Summary,
 		SourcePage:               int32(entry.SourcePage),
 		PotentialQuestions:       entry.PotentialQuestions,
