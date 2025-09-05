@@ -314,7 +314,7 @@ func TestMUSTPASS_GetKnowledgeBaseEntryById(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 测试获取条目
-	retrievedEntry, err := GetKnowledgeBaseEntryById(db, int64(originalEntry.ID))
+	retrievedEntry, err := GetKnowledgeBaseEntryByHiddenIndex(db, originalEntry.HiddenIndex)
 	assert.NoError(t, err)
 	assert.NotNil(t, retrievedEntry)
 	assert.Equal(t, originalEntry.KnowledgeTitle, retrievedEntry.KnowledgeTitle)
@@ -322,7 +322,7 @@ func TestMUSTPASS_GetKnowledgeBaseEntryById(t *testing.T) {
 	assert.Equal(t, originalEntry.ImportanceScore, retrievedEntry.ImportanceScore)
 
 	// 测试获取不存在的条目
-	_, err = GetKnowledgeBaseEntryById(db, 99999)
+	_, err = GetKnowledgeBaseEntryByHiddenIndex(db, utils.RandStringBytes(10))
 	assert.Error(t, err)
 }
 
@@ -366,11 +366,11 @@ func TestMUSTPASS_UpdateKnowledgeBaseEntry(t *testing.T) {
 	originalEntry.KnowledgeDetails = "JavaScript是一种功能强大的动态编程语言，不仅用于前端开发，也广泛应用于后端开发（Node.js）。"
 	originalEntry.Keywords = schema.StringArray{"JavaScript", "前端", "后端", "Node.js", "编程"}
 
-	err = UpdateKnowledgeBaseEntry(db, originalEntry)
+	err = UpdateKnowledgeBaseEntryByHiddenIndex(db, originalEntry.HiddenIndex, originalEntry)
 	assert.NoError(t, err)
 
 	// 验证更新是否成功
-	retrievedEntry, err := GetKnowledgeBaseEntryById(db, int64(originalEntry.ID))
+	retrievedEntry, err := GetKnowledgeBaseEntryByHiddenIndex(db, originalEntry.HiddenIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, "JavaScript高级编程", retrievedEntry.KnowledgeTitle)
 	assert.Equal(t, 9, retrievedEntry.ImportanceScore)
@@ -413,11 +413,11 @@ func TestMUSTPASS_DeleteKnowledgeBaseEntry(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 删除条目
-	err = DeleteKnowledgeBaseEntry(db, int64(testEntry.ID))
+	err = DeleteKnowledgeBaseEntryByHiddenIndex(db, testEntry.HiddenIndex)
 	assert.NoError(t, err)
 
 	// 验证条目已被删除
-	_, err = GetKnowledgeBaseEntryById(db, int64(testEntry.ID))
+	_, err = GetKnowledgeBaseEntryByHiddenIndex(db, testEntry.HiddenIndex)
 	assert.Error(t, err)
 }
 
@@ -659,21 +659,21 @@ func TestMUSTPASS_KnowledgeBaseCompleteWorkflow(t *testing.T) {
 	firstEntry := allEntries[0]
 	firstEntry.ImportanceScore = 10
 	firstEntry.KnowledgeDetails += " 云计算已成为现代IT基础设施的核心。"
-	err = UpdateKnowledgeBaseEntry(db, firstEntry)
+	err = UpdateKnowledgeBaseEntryByHiddenIndex(db, firstEntry.HiddenIndex, firstEntry)
 	assert.NoError(t, err)
 
 	// 验证更新
-	updatedEntry, err := GetKnowledgeBaseEntryById(db, int64(firstEntry.ID))
+	updatedEntry, err := GetKnowledgeBaseEntryByHiddenIndex(db, firstEntry.HiddenIndex)
 	assert.NoError(t, err)
 	assert.Equal(t, 10, updatedEntry.ImportanceScore)
 	assert.Contains(t, updatedEntry.KnowledgeDetails, "云计算已成为现代IT基础设施的核心")
 
 	// 6. 删除一个条目
-	err = DeleteKnowledgeBaseEntry(db, int64(allEntries[1].ID))
+	err = DeleteKnowledgeBaseEntryByHiddenIndex(db, allEntries[1].HiddenIndex)
 	assert.NoError(t, err)
 
 	// 验证删除
-	_, err = GetKnowledgeBaseEntryById(db, int64(allEntries[1].ID))
+	_, err = GetKnowledgeBaseEntryByHiddenIndex(db, allEntries[1].HiddenIndex)
 	assert.Error(t, err)
 
 	// 7. 获取知识库名称列表

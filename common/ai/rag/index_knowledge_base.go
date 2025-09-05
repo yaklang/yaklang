@@ -45,7 +45,7 @@ func BuildVectorIndexForKnowledgeBaseEntry(db *gorm.DB, knowledgeBaseId int64, i
 	}
 
 	// 使用条目ID作为文档ID
-	documentID := utils.InterfaceToString(entry.ID)
+	documentID := utils.InterfaceToString(entry.HiddenIndex)
 
 	// 添加文档到RAG系统
 	doc := Document{
