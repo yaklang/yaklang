@@ -1259,6 +1259,7 @@ message KnowledgeBaseEntry {
   int32 SourcePage = 9;
   repeated string PotentialQuestions = 10;
   repeated float PotentialQuestionsVector = 11;
+  string HiddenIndex = 12;
 }
 
 message DeleteKnowledgeBaseRequest {
