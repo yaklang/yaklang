@@ -19,7 +19,7 @@ type File struct {
 
 func NewFile(reportType ReportType, editor *memedit.MemEditor) *File {
 	ret := &File{
-		Path:      editor.GetFilename(),
+		Path:      editor.GetUrl(),
 		Length:    int64(editor.GetLength()),
 		LineCount: editor.GetLineCount(),
 		Hash: map[string]string{
