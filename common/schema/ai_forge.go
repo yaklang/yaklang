@@ -1,10 +1,11 @@
 package schema
 
 import (
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type AIForge struct {
@@ -27,6 +28,8 @@ type AIForge struct {
 	PersistentPrompt string
 	PlanPrompt       string
 	ResultPrompt     string
+
+	IsTemporary bool // for temporary use, will be cleaned up later
 }
 
 func (a *AIForge) GetName() string {

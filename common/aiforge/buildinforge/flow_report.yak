@@ -1,5 +1,5 @@
 __DESC__ = "该forge根据提供的流量文本，利用AI模型生成详细的WEB告警分析报告。报告内容包括告警概述、初步分析、真实性判断、攻击原理分析、潜在影响评估、解决方案建议和应急策略。生成的报告为Markdown格式，并可选择转换为Word文档，方便用户查阅和分享，解决网络安全分析中告警报告生成和管理效率低下的问题。"
-
+__VERBOSE_NAME__ = "流量日志分析生成报告"
 __KEYWORDS__ = "告警分析,安全报告,流量分析,web告警,markdown转word,安全审计"
 
 // flowtext = cli.Text("flowText", cli.setRequired(true), cli.setHelp("需要分析的日志文本"))

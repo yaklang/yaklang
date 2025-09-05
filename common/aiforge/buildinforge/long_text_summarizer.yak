@@ -1,5 +1,5 @@
 __DESC__ = "该forge接收长文本或文本文件，将其分割成片段后，利用fragment_summarizer对每个片段进行摘要，然后将摘要结果再次进行摘要，最终输出长文本的总结。"
-
+__VERBOSE_NAME__ = "长文本总结"
 __KEYWORDS__ = "文本摘要,长文本处理,文本总结,片段摘要,文本分割,内容提炼"
 
 text = cli.String("text", cli.setHelp("直接输入的长文本"))
