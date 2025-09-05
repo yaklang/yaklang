@@ -124,12 +124,12 @@ func TestStmt_spin(t *testing.T) {
 
 
 	func main() {
-		var str = []string{
+		var strg = []string{
 			"hello world",
 		}
 
 		for true {
-			println(str[0])
+			println(strg[0])
 		}
 	}
 		`, []string{"\"hello world\""}, t)
@@ -347,13 +347,13 @@ func TestStmt_spin(t *testing.T) {
 
 	t.Run("for Spin array global", func(t *testing.T) {
 		test.CheckPrintlnValue(`package  A
-	var str = []string{
+	var strg = []string{
 		"hello world",
 	}
 
 	func main() {
 		for true {
-			println(str[0])
+			println(strg[0])
 		}
 	}
 		`, []string{"\"hello world\""}, t)
@@ -366,11 +366,11 @@ func TestStmt_spin(t *testing.T) {
 	    s string
 	}
 
-	var str = A{s: "hello world"}
+	var strg = A{s: "hello world"}
 	
 	func main() {
 		for true {
-			println(str.s)
+			println(strg.s)
 		}
 	}
 		`, []string{"\"hello world\""}, t)

@@ -209,7 +209,12 @@ func (b *astbuilder) GetGlobalVariableL(name string) (*ssa.Variable, bool) {
 }
 
 func (b *astbuilder) GetGlobalVariableR(name string) ssa.Value {
-	member, _ := b.GetProgram().GlobalScope.GetStringMember(name)
+	global := b.GetProgram().GlobalScope
+	member, _ := global.GetStringMember(name)
+	for i, m := range global.GetAllMember() {
+		variable := b.CreateVariable(i.String())
+		b.AssignVariable(variable, m)
+	}
 	return member
 }
 
