@@ -63,13 +63,13 @@ var _ Cache[Type] = (*memoryCache[Type])(nil)
 
 type memoryCache[T databasex.MemoryItem] struct {
 	*utils.SafeMapWithKey[int64, T]
-	id atomic.Int64
+	id *atomic.Int64
 }
 
 func newmemoryCache[T databasex.MemoryItem]() *memoryCache[T] {
 	return &memoryCache[T]{
 		SafeMapWithKey: utils.NewSafeMapWithKey[int64, T](),
-		id:             atomic.Int64{},
+		id:             atomic.NewInt64(0),
 	}
 }
 

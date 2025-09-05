@@ -18,14 +18,29 @@ var INNER_CLASS_SPLIT = "$"
 // ========================================== For SSAAPI ==========================================
 
 type SSABuilder struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
-var Builder ssa.Builder = &SSABuilder{}
+var _ ssa.Builder = (*SSABuilder)(nil)
 
-func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src, false)
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(),
+	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigSupportClass(true),
+		ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
+
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, s)
+}
+
 func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
 	ast, ok := raw.(javaparser.ICompilationUnitContext)
 	if !ok {
@@ -33,7 +48,6 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 	}
 	build := &singleFileBuilder{
 		FunctionBuilder:   b,
-		ast:               ast,
 		constMap:          make(map[string]ssa.Value),
 		fullTypeNameMap:   make(map[string][]string),
 		allImportPkgSlice: make([][]string, 0),
@@ -57,7 +71,6 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 type singleFileBuilder struct {
 	*ssa.FunctionBuilder
-	ast      javaparser.ICompilationUnitContext
 	constMap map[string]ssa.Value
 
 	// for full type name
@@ -70,21 +83,23 @@ type singleFileBuilder struct {
 	isInController bool
 }
 
-func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuilder) (javaparser.ICompilationUnitContext, error) {
+	var builder *SSABuilder
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0]
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
+	builder.ParserSetAntlrCache(parser.BaseParser)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.CompilationUnit()
-	if force || len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return ast, utils.Errorf("parse AST FrontEnd error: %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {

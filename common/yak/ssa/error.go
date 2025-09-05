@@ -32,7 +32,7 @@ const (
 	SSANoCheck ErrorCommentId = "// @ssa-nocheck"
 )
 
-func (ec ErrorComment) Skip(pos memedit.RangeIf) bool {
+func (ec ErrorComment) Skip(pos *memedit.Range) bool {
 	if ec.noCheck {
 		return true
 	}
@@ -63,7 +63,7 @@ func (f *Function) AddErrorComment(str string, line int) error {
 }
 
 type SSAError struct {
-	Pos     memedit.RangeIf
+	Pos     *memedit.Range
 	Tag     ErrorTag
 	Message string
 	Kind    ErrorKind
@@ -71,7 +71,7 @@ type SSAError struct {
 
 type SSAErrors []*SSAError
 
-func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos memedit.RangeIf, message string) {
+func (f *Function) NewErrorWithPos(kind ErrorKind, tag ErrorTag, Pos *memedit.Range, message string) {
 	if Pos == nil {
 		return
 	}

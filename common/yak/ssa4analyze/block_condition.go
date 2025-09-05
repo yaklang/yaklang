@@ -160,9 +160,9 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		newEdge(sw.DefaultBlock, fromBlock, defaultCond)
 	}
 
-	fixupBlockPos := func(b *ssa.BasicBlock) memedit.RangeIf {
-		var start memedit.PositionIf
-		var end memedit.PositionIf
+	fixupBlockPos := func(b *ssa.BasicBlock) *memedit.Range {
+		var start *memedit.Position
+		var end *memedit.Position
 		for _, instId := range b.Insts {
 			inst, ok := b.GetInstructionById(instId)
 			if !ok {

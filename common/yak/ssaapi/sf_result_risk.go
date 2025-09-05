@@ -38,7 +38,7 @@ func (c *CodeRange) JsonString() string {
 
 const CodeContextLine = 3
 
-func CoverCodeRange(r memedit.RangeIf) (*CodeRange, string) {
+func CoverCodeRange(r *memedit.Range) (*CodeRange, string) {
 	// url := ""
 	source := ""
 	ret := &CodeRange{

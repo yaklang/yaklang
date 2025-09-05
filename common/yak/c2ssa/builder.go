@@ -17,19 +17,21 @@ import (
 )
 
 type SSABuilder struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
 var Builder ssa.Builder = &SSABuilder{}
 
-func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
-			ssa.WithLanguageConfigBind(true),
-			ssa.WithLanguageConfigVirtualImport(true),
-			ssa.WithLanguageBuilder(s),
-		),
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
 	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
@@ -97,8 +99,8 @@ func (*SSABuilder) FilterFile(path string) bool {
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.C
 }
-func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src)
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, s)
 }
 
 type astbuilder struct {
@@ -114,21 +116,23 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func Frontend(src string) (*cparser.CompilationUnitContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuilder) (*cparser.CompilationUnitContext, error) {
+	var builder *SSABuilder
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0]
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := cparser.NewCLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := cparser.NewCParser(tokenStream)
+	builder.ParserSetAntlrCache(parser.BaseParser)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.CompilationUnit().(*cparser.CompilationUnitContext)
-	if len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return ast, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 type PackageInfo struct {

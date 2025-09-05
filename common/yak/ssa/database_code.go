@@ -72,7 +72,7 @@ func (c *ProgramCache) IrCodeToInstruction(inst Instruction, ir *ssadb.IrCode, c
 	return inst
 }
 
-func fitRange(c *ssadb.IrCode, rangeIns memedit.RangeIf) {
+func fitRange(c *ssadb.IrCode, rangeIns *memedit.Range) {
 	if utils.IsNil(rangeIns) || utils.IsNil(rangeIns.GetEditor()) {
 		log.Warnf("(BUG or in DEBUG MODE) Range not found for %s", c.Name)
 		return
@@ -103,7 +103,7 @@ func instruction2IrCode(inst Instruction, ir *ssadb.IrCode) {
 
 	// --- Section 2 Start ---
 	// start2 := time.Now()
-	var codeRange memedit.RangeIf
+	var codeRange *memedit.Range
 	if ret := inst.GetRange(); ret != nil {
 		codeRange = ret
 	} else if ret := inst.GetBlock(); ret != nil {
@@ -220,15 +220,15 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 
 	// user
 	ir.Users = anValue.userList
-
 	// occulatation
 	ir.Occulatation = anValue.occultation
 
 	// object
 	ir.IsObject = anValue.IsObject()
 	if ir.IsObject {
-		ir.ObjectMembers = make(ssadb.Int64Map, 0, anValue.member.Len())
-		anValue.member.ForEach(func(i, v int64) bool {
+		member := anValue.getMemberMap()
+		ir.ObjectMembers = make(ssadb.Int64Map, 0, member.Len())
+		member.ForEach(func(i, v int64) bool {
 			ir.ObjectMembers.Append(i, v)
 			return true
 		})
@@ -242,8 +242,9 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	}
 	// variable
 
-	ir.Variable = make(ssadb.StringSlice, 0, anValue.variables.Len())
-	anValue.variables.ForEach(func(i string, v *Variable) bool {
+	variable := anValue.getVariablesMap()
+	ir.Variable = make(ssadb.StringSlice, 0, variable.Len())
+	variable.ForEach(func(i string, v *Variable) bool {
 		ir.Variable = append(ir.Variable, i)
 		if v.GetValue() == nil {
 			log.Errorf("aa")
@@ -252,7 +253,7 @@ func value2IrCode(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	})
 
 	// mask
-	anValue.mask.ForEach(func(i string, v int64) bool {
+	anValue.getMaskMap().ForEach(func(i int64, v int64) bool {
 		ir.MaskedCodes = append(ir.MaskedCodes, v)
 		return true
 	})
@@ -285,7 +286,7 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// object
 	ir.ObjectMembers.ForEach(func(key, value int64) {
-		anValue.member.Set(key, value)
+		anValue.getMemberMap(true).Set(key, value)
 	})
 
 	// object member
@@ -301,7 +302,7 @@ func (c *ProgramCache) valueFromIrCode(cache *ProgramCache, inst Instruction, ir
 
 	// mask
 	for _, m := range ir.MaskedCodes {
-		anValue.mask.Add(m)
+		anValue.getMaskMap(true).Add(m)
 	}
 
 	// reference

@@ -40,7 +40,7 @@ type mybatisXMLQuery struct {
 
 type checkParam struct {
 	name string
-	rng  memedit.RangeIf
+	rng  *memedit.Range
 }
 
 func newMybatisXMLQuery(mapper *mybatisXMLMapper, id string) *mybatisXMLQuery {
@@ -51,7 +51,7 @@ func newMybatisXMLQuery(mapper *mybatisXMLMapper, id string) *mybatisXMLQuery {
 	}
 }
 
-func (m *mybatisXMLQuery) AddCheckParam(name string, rng memedit.RangeIf) {
+func (m *mybatisXMLQuery) AddCheckParam(name string, rng *memedit.Range) {
 	m.CheckParams = append(m.CheckParams, &checkParam{
 		name: name,
 		rng:  rng,
@@ -68,7 +68,7 @@ func (m *mybatisXMLQuery) Check() []sfvm.ValueOperator {
 	return res
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng memedit.RangeIf) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng *memedit.Range) sfvm.ValueOperator {
 	if m.mapper == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng memedit.RangeIf) sfvm
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFinal(rng memedit.RangeIf) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) SyntaxFlowFinal(rng *memedit.Range) sfvm.ValueOperator {
 	if m.mapper == nil {
 		return nil
 	}
@@ -98,7 +98,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFinal(rng memedit.RangeIf) sfvm.ValueOperato
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
-func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng memedit.RangeIf) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng *memedit.Range) sfvm.ValueOperator {
 	if m == nil || m.mapper == nil {
 		return nil
 	}

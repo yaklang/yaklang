@@ -709,7 +709,7 @@ func trimSourceCode(sourceCode string) (code string, containPoint bool, pointSuf
 	return strings.TrimSpace(sourceCode), containPoint, pointSuffix
 }
 
-func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng *memedit.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	ret = append(ret, &ypb.SuggestionDescription{
 		Label: getDescFromSSAValue(word, containPoint, prog, v),
 	})
@@ -717,7 +717,7 @@ func OnHover(prog *ssaapi.Program, word string, containPoint bool, rng memedit.R
 	return ret
 }
 
-func OnSignature(prog *ssaapi.Program, word string, containPoint bool, rng memedit.RangeIf, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
+func OnSignature(prog *ssaapi.Program, word string, containPoint bool, rng *memedit.Range, v *ssaapi.Value) (ret []*ypb.SuggestionDescription) {
 	ret = make([]*ypb.SuggestionDescription, 0)
 
 	label, doc := getFuncLabelAndDocBySSAValue(word, v)
@@ -746,7 +746,7 @@ func completionYakLanguageBasicType() (ret []*ypb.SuggestionDescription) {
 	return getLanguageBasicTypeSuggestions()
 }
 
-func completionUserDefinedVariable(prog *ssaapi.Program, rng memedit.RangeIf, filterMap map[string]struct{}) (ret []*ypb.SuggestionDescription) {
+func completionUserDefinedVariable(prog *ssaapi.Program, rng *memedit.Range, filterMap map[string]struct{}) (ret []*ypb.SuggestionDescription) {
 	if prog == nil || prog.Program == nil {
 		return
 	}
@@ -877,7 +877,7 @@ func completionYakStandardLibraryChildren(v *ssaapi.Value, word string) (ret []*
 	return
 }
 
-func completionYakTypeBuiltinMethod(rng memedit.RangeIf, v *ssaapi.Value, realTyp ...ssa.Type) (ret []*ypb.SuggestionDescription) {
+func completionYakTypeBuiltinMethod(rng *memedit.Range, v *ssaapi.Value, realTyp ...ssa.Type) (ret []*ypb.SuggestionDescription) {
 	var bareTyp ssa.Type
 	if len(realTyp) > 0 {
 		bareTyp = realTyp[0]
@@ -1073,7 +1073,7 @@ func fixCompletionFunctionParams(suggestions []*ypb.SuggestionDescription, v *ss
 	return suggestions
 }
 
-func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ssaapi.Program, rng memedit.RangeIf, v *ssaapi.Value) []*ypb.SuggestionDescription {
+func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ssaapi.Program, rng *memedit.Range, v *ssaapi.Value) []*ypb.SuggestionDescription {
 	// fix completion, for text before paren, we should complete function name instead of function signature
 	// e.g. callable(app()) -> callable(append()), not callable(append(a, vals...)())
 	editor, ok := prog.Program.GetEditor("")
@@ -1097,7 +1097,7 @@ func fixCompletionBeforeParen(suggestions []*ypb.SuggestionDescription, prog *ss
 
 func OnCompletion(
 	prog *ssaapi.Program, word string, containPoint bool, pointSuffix bool,
-	rng memedit.RangeIf, scriptType string, v *ssaapi.Value,
+	rng *memedit.Range, scriptType string, v *ssaapi.Value,
 ) (ret []*ypb.SuggestionDescription) {
 	defer func() {
 		if r := recover(); r != nil {

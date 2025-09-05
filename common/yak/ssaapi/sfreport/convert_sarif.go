@@ -200,7 +200,7 @@ func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *ssaapi.Value) {
 	s.createCodeFlowsFromPredecessor(v)
 }
 
-func (s *SarifContext) CreateLocation(artifactId int, rg memedit.RangeIf) *sarif.Location {
+func (s *SarifContext) CreateLocation(artifactId int, rg *memedit.Range) *sarif.Location {
 	return sarif.NewLocation().
 		WithPhysicalLocation(
 			sarif.NewPhysicalLocation().WithArtifactLocation(

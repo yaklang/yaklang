@@ -55,7 +55,7 @@ func TestCodeCompile(t *testing.T) {
 	// 		if relfs.Ext(s) == ".java" {
 	// 			data, err := relfs.ReadFile(s)
 	// 			require.NoError(t, err)
-	// 			java2ssa.Frontend(string(data), false)
+	// 			java2ssa.Frontend(string(data))
 	// 		}
 	// 		return nil
 	// 	}),

@@ -25,7 +25,7 @@ func (p *Program) CompareConst(comparator *sfvm.ConstComparator) []bool {
 	return []bool{false}
 }
 
-func (p *Program) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return p.NewConstValue(i, rng...)
 }
 

@@ -13,7 +13,21 @@ import (
 )
 
 type SSABuilder struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
+}
+
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(),
+	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigBind(true), // 设置处理语言闭包的副作用的策略
+		ssa.WithLanguageConfigSupportClass(true),
+		ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+		ssa.WithLanguageBuilder(builder),
+		ssa.WithLanguageConfigTryBuildValue(true),
+	)
+	return builder
 }
 
 type builder struct {

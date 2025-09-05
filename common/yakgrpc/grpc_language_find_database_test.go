@@ -28,8 +28,8 @@ func initProgram(t *testing.T, fs filesys_interface.FileSystem, opts ...ssaapi.O
 
 func check(
 	local ypb.YakClient, t *testing.T,
-	programName, rawFileName string, selectedRange memedit.RangeIf,
-	wantRanges []memedit.RangeIf,
+	programName, rawFileName string, selectedRange *memedit.Range,
+	wantRanges []*memedit.Range,
 ) {
 	frontEndFileName := fmt.Sprintf("/%s/%s", programName, rawFileName)
 	rsp, err := local.YaklangLanguageFind(context.Background(), &ypb.YaklangLanguageSuggestionRequest{
@@ -80,7 +80,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			a1,
-			[]memedit.RangeIf{a1, println1, println2},
+			[]*memedit.Range{a1, println1, println2},
 		)
 	})
 	t.Run("find from assign by variable: a2", func(t *testing.T) {
@@ -88,7 +88,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			a2,
-			[]memedit.RangeIf{a2, println2},
+			[]*memedit.Range{a2, println2},
 		)
 	})
 
@@ -97,7 +97,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			num1,
-			[]memedit.RangeIf{num1},
+			[]*memedit.Range{num1},
 		)
 	})
 	t.Run("find from assign by value: num2", func(t *testing.T) {
@@ -105,7 +105,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			num2,
-			[]memedit.RangeIf{num2},
+			[]*memedit.Range{num2},
 		)
 	})
 
@@ -114,7 +114,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			println1,
-			[]memedit.RangeIf{a1, println1, println2},
+			[]*memedit.Range{a1, println1, println2},
 		)
 	})
 	t.Run("find from user: println2", func(t *testing.T) {
@@ -122,7 +122,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			println2,
-			[]memedit.RangeIf{a1, println1, a2, println2},
+			[]*memedit.Range{a1, println1, a2, println2},
 		)
 	})
 
@@ -131,7 +131,7 @@ class A {
 		check(local, t, programID,
 			"src/main/java/A.java",
 			c,
-			[]memedit.RangeIf{c},
+			[]*memedit.Range{c},
 		)
 	})
 
@@ -140,7 +140,7 @@ class A {
 		check(local, t, programID,
 			"src/this_file_not_found/b.java",
 			a1,
-			[]memedit.RangeIf{a1},
+			[]*memedit.Range{a1},
 		)
 	})
 

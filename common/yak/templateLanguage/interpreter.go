@@ -1,9 +1,10 @@
 package templateLanguage
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
-	"strings"
 )
 
 type Interpreter struct {
@@ -13,14 +14,14 @@ type Interpreter struct {
 	templateTyp   TemplateTyp
 	generatedCode string
 	// for fix  range
-	rangeMap  map[int]memedit.RangeIf // generated code line -> template range
+	rangeMap  map[int]*memedit.Range // generated code line -> template range
 	startLine int
 }
 
 func NewInterpreter(instructions Instructions) *Interpreter {
 	return &Interpreter{
 		Instructions: instructions,
-		rangeMap:     map[int]memedit.RangeIf{},
+		rangeMap:     map[int]*memedit.Range{},
 	}
 }
 
@@ -50,7 +51,7 @@ func (i *Interpreter) GetTemplate() TemplateRender {
 	return i.template
 }
 
-func (i *Interpreter) GetRangeMap() map[int]memedit.RangeIf {
+func (i *Interpreter) GetRangeMap() map[int]*memedit.Range {
 	return i.rangeMap
 }
 

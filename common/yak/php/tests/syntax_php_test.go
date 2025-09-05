@@ -67,7 +67,7 @@ func validateSource(t *testing.T, filename string, src string) {
 		}
 		spew.Dump(errListener.GetErrors())
 
-		_, err := php2ssa.FrondEnd(src)
+		_, err := php2ssa.Frontend(src)
 		require.Nil(t, err, "parse AST FrontEnd error: %v", err)
 	})
 }

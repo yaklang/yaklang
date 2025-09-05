@@ -1,8 +1,10 @@
 package ssa
 
 import (
+	"runtime"
 	"sync"
 
+	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -17,14 +19,17 @@ type PreHandlerAnalyzer interface {
 	PreHandlerFile(FrontAST, *memedit.MemEditor, *FunctionBuilder)
 
 	AfterPreHandlerProject(builder *FunctionBuilder)
+
+	Clearup()
 }
 
 type FrontAST interface {
 }
 
+type CreateBuilder func() Builder
+
 type Builder interface {
 	// create a new builder
-	Create() Builder
 	BuildFromAST(FrontAST, *FunctionBuilder) error
 	FilterFile(string) bool
 	GetLanguage() consts.Language
@@ -33,36 +38,42 @@ type Builder interface {
 
 type initHanlderFunc func(*FunctionBuilder)
 
-type PreHandlerInit struct {
+type PreHandlerBase struct {
 	InitHandlerOnce       sync.Once
 	initHandlerFunc       []initHanlderFunc
 	beforeInitHandlerFunc []initHanlderFunc
 	languageConfigOpts    []LanguageConfigOpt
+
+	// antlr cache
+	antlrOnce              sync.Once
+	DfaCache               []*antlr.DFA
+	PredictionContextCache *antlr.PredictionContextCache
 }
 
-func (d *PreHandlerInit) AfterPreHandlerProject(builder *FunctionBuilder) {
+func (d *PreHandlerBase) AfterPreHandlerProject(builder *FunctionBuilder) {
 	d.InitHandler(builder)
 }
 
-func NewPreHandlerInit(fs ...initHanlderFunc) *PreHandlerInit {
-	return &PreHandlerInit{
+func NewPreHandlerBase(fs ...initHanlderFunc) *PreHandlerBase {
+	return &PreHandlerBase{
 		InitHandlerOnce: sync.Once{},
 		initHandlerFunc: fs,
+		antlrOnce:       sync.Once{},
 	}
 }
 
-func (d *PreHandlerInit) WithLanguageConfigOpts(opts ...LanguageConfigOpt) *PreHandlerInit {
+func (d *PreHandlerBase) WithLanguageConfigOpts(opts ...LanguageConfigOpt) *PreHandlerBase {
 	d.languageConfigOpts = opts
 	return d
 }
-func (d *PreHandlerInit) WithPreInitHandler(fs ...initHanlderFunc) *PreHandlerInit {
+func (d *PreHandlerBase) WithPreInitHandler(fs ...initHanlderFunc) *PreHandlerBase {
 	d.beforeInitHandlerFunc = fs
 	return d
 }
 
 var ProjectConfigVariable = "__projectConfig__"
 
-func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
+func (d *PreHandlerBase) InitHandler(b *FunctionBuilder) {
 	d.InitHandlerOnce.Do(func() {
 		// build the global dependency scope
 		b.SetEmptyRange()
@@ -84,13 +95,55 @@ func (d *PreHandlerInit) InitHandler(b *FunctionBuilder) {
 	})
 }
 
-func (d *PreHandlerInit) PreHandlerFile(ast FrontAST, editor *memedit.MemEditor, builder *FunctionBuilder) {
+func (d *PreHandlerBase) PreHandlerFile(ast FrontAST, editor *memedit.MemEditor, builder *FunctionBuilder) {
 }
 
-func (d *PreHandlerInit) FilterPreHandlerFile(string) bool {
+func (d *PreHandlerBase) FilterPreHandlerFile(string) bool {
 	return false
 }
 
-func (d *PreHandlerInit) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error {
+func (d *PreHandlerBase) PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error {
 	return nil
+}
+
+func (d *PreHandlerBase) Clearup() {
+	d.DfaCache = nil
+	d.PredictionContextCache = nil
+	runtime.GC()
+}
+
+func (builder *PreHandlerBase) ParserSetAntlrCache(parser *antlr.BaseParser) *antlr.BaseParser {
+	atn := parser.GetATN()
+
+	var decisionToDFA []*antlr.DFA
+	var predictionContextCache *antlr.PredictionContextCache
+	if builder != nil {
+		builder.antlrOnce.Do(func() {
+			// dfa cache
+			if len(builder.DfaCache) == 0 {
+				decisionToDFA = make([]*antlr.DFA, len(atn.DecisionToState))
+				for i := range decisionToDFA {
+					decisionToDFA[i] = antlr.NewDFA(atn.DecisionToState[i], i)
+				}
+				builder.DfaCache = decisionToDFA
+			}
+			// prediction context cache
+			if builder.PredictionContextCache == nil {
+				predictionContextCache = antlr.NewPredictionContextCache()
+				builder.PredictionContextCache = predictionContextCache
+			}
+		})
+		decisionToDFA = builder.DfaCache
+		predictionContextCache = builder.PredictionContextCache
+	} else {
+		decisionToDFA = make([]*antlr.DFA, len(atn.DecisionToState))
+		for i := range decisionToDFA {
+			decisionToDFA[i] = antlr.NewDFA(atn.DecisionToState[i], i)
+		}
+		predictionContextCache = antlr.NewPredictionContextCache()
+	}
+	parser.Interpreter = antlr.NewParserATNSimulator(
+		parser, atn, decisionToDFA, predictionContextCache,
+	)
+	return parser
 }

@@ -273,7 +273,7 @@ func setMemberVerboseName(member Value) {
 }
 
 func GetKeyString(key Value) string {
-	if key == nil {
+	if utils.IsNil(key) {
 		return ""
 	}
 	text := ""

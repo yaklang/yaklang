@@ -24,10 +24,10 @@ type GeneratedJavaInfo struct {
 	pkgName       string
 	className     string
 	content       string
-	java2Template map[int]memedit.RangeIf // java code line -> template token
+	java2Template map[int]*memedit.Range // java code line -> template token
 }
 
-func (g *GeneratedJavaInfo) GetRangeMap() map[int]memedit.RangeIf {
+func (g *GeneratedJavaInfo) GetRangeMap() map[int]*memedit.Range {
 	if g == nil {
 		return nil
 	}

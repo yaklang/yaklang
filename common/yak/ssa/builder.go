@@ -59,9 +59,9 @@ type FunctionBuilder struct {
 	// defer function call
 
 	// for build
-	CurrentBlock *BasicBlock     // current block to build
-	CurrentRange memedit.RangeIf // current position in source code
-	CurrentFile  string          // current file name
+	CurrentBlock *BasicBlock    // current block to build
+	CurrentRange *memedit.Range // current position in source code
+	CurrentFile  string         // current file name
 
 	parentScope *ParentScope
 
@@ -312,24 +312,24 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		return
 	}
 
-	getMinOffsetRng := func(rs1, rs2 []memedit.RangeIf) memedit.RangeIf {
+	getMinOffsetRng := func(rs1, rs2 []*memedit.Range) *memedit.Range {
 		if len(rs1) == 0 || len(rs2) == 0 {
 			return nil
 		}
 
 		var offsetSlice1 []int
-		offsetMap1 := lo.SliceToMap(rs1, func(item memedit.RangeIf) (int, memedit.RangeIf) {
+		offsetMap1 := lo.SliceToMap(rs1, func(item *memedit.Range) (int, *memedit.Range) {
 			offsetSlice1 = append(offsetSlice1, item.GetStartOffset())
 			return item.GetStartOffset(), item
 		})
 
-		offsetSlice2 := lo.Map(rs2, func(item memedit.RangeIf, index int) int {
+		offsetSlice2 := lo.Map(rs2, func(item *memedit.Range, index int) int {
 			return item.GetStartOffset()
 		})
 		sort.Ints(offsetSlice2)
 
 		minDist := -1
-		var minRng memedit.RangeIf
+		var minRng *memedit.Range
 		for _, offset1 := range offsetSlice1 {
 			// 在offsetSlice2中找距离offset1最近的offset2
 			for _, offset2 := range offsetSlice2 {
@@ -346,7 +346,7 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		return minRng
 	}
 
-	getDependencyRangeByName := func(name string) memedit.RangeIf {
+	getDependencyRangeByName := func(name string) *memedit.Range {
 		id := strings.Split(name, ":")
 		if len(id) != 2 {
 			return nil

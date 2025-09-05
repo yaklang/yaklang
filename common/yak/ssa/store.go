@@ -28,8 +28,8 @@ func (b *FunctionBuilder) LoadFunctionBuilder(s *FunctionBuilder) {
 func (b *FunctionBuilder) StoreFunctionBuilder() *StoredFunctionBuilder {
 	fb := &FunctionBuilder{
 		Function: &Function{
-			anValue: anValue{
-				anInstruction: anInstruction{
+			anValue: &anValue{
+				anInstruction: &anInstruction{
 					// fun:          b.anInstruction.fun,
 					prog: b.anInstruction.prog,
 					// block:        b.anInstruction.block,

@@ -189,8 +189,8 @@ func TestTextByRangeGetEditor(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		startPos *position
-		endPos   *position
+		startPos *Position
+		endPos   *Position
 		want     string
 		wantErr  bool
 	}{
