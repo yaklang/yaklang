@@ -169,7 +169,9 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 		}
 	}
 
-	rule.CWE = cweList
+	rule.CWE = append(rule.CWE, cweList...)
+	// 去重CWE列表
+	rule.CWE = lo.Uniq(rule.CWE)
 
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
