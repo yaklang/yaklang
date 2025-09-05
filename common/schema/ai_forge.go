@@ -67,6 +67,7 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 	return &ypb.AIForge{
 		Id:                 int64(a.ID),
 		ForgeName:          a.ForgeName,
+		ForgeVerboseName:   a.ForgeVerboseName,
 		ForgeContent:       a.ForgeContent,
 		ForgeType:          a.ForgeType,
 		ParamsUIConfig:     a.ParamsUIConfig,
