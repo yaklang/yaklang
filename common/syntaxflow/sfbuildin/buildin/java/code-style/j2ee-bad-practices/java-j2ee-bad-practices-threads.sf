@@ -62,6 +62,8 @@ public class AnotherServlet extends HttpServlet {
 #### 3. 避免使用 ThreadLocal
 在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
 SOLUTION
+    cwe: 668, 
+    cwe: 362, 
 )
 
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;

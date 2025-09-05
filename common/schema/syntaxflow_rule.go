@@ -148,9 +148,10 @@ type SyntaxFlowDescInfo struct {
 	// audit / vuln / config / security / information
 	Purpose SyntaxFlowRulePurposeType `json:"purpose"`
 
-	OnlyMsg   bool   `json:"only_msg"`
-	Msg       string `json:"msg"`
-	CVE       string `json:"cve"`
+	OnlyMsg   bool        `json:"only_msg"`
+	Msg       string      `json:"msg"`
+	CVE       string      `json:"cve"`
+	CWE       StringArray `json:"cwe"`
 	RiskType  string
 	ExtraInfo map[string]string `json:"extra_info"`
 }

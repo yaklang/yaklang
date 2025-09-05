@@ -7,6 +7,8 @@ desc(
 - **OWASP Top 10 (2021) - A07: Identification and Authentication Failures** - 身份认证或会话管理机制中的缺陷可能导致未经授权的访问。
 REFERENCE
 	rule_id: "b072f796-18df-495b-b705-68be589a0e2c"
+	cwe: "cwe-330", 
+	cwe: "cwe-338"
 )
 
 setcookie(, * as $cookieValue, ) 
