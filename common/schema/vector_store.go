@@ -170,7 +170,7 @@ type VectorStoreCollection struct {
 	Description string `gorm:"type:text" json:"description"`
 
 	// 使用的嵌入模型名称
-	ModelName string `gorm:"index:idx_model_name" json:"model_name"`
+	ModelName string `gorm:"index" json:"model_name"`
 
 	// 向量维度，所有文档的嵌入向量必须具有相同的维度
 	Dimension int `gorm:"not null" json:"dimension"`
@@ -261,7 +261,7 @@ type KnowledgeBaseInfo struct {
 	KnowledgeBaseDescription string `gorm:"type:text" json:"knowledge_base_description"`
 
 	// 知识库类型
-	KnowledgeBaseType string `gorm:"index:idx_knowledge_base_type;not null" json:"knowledge_base_type"`
+	KnowledgeBaseType string `gorm:"index;not null" json:"knowledge_base_type"`
 }
 
 // KnowledgeBase 表示知识库条目
@@ -276,10 +276,10 @@ type KnowledgeBaseEntry struct {
 	KnowledgeTitle string `gorm:"not null" json:"knowledge_title"`
 
 	// 知识类型（如：CoreConcept、Standard、Guideline等）
-	KnowledgeType string `gorm:"index:idx_knowledge_type;not null" json:"knowledge_type"`
+	KnowledgeType string `gorm:"index;not null" json:"knowledge_type"`
 
 	// 重要性评分（1-10）
-	ImportanceScore int `gorm:"index:idx_importance_score" json:"importance_score"`
+	ImportanceScore int `gorm:"index" json:"importance_score"`
 
 	// 关键词列表，用于快速搜索和分类
 	Keywords StringArray `gorm:"type:text" json:"keywords"`
@@ -291,7 +291,7 @@ type KnowledgeBaseEntry struct {
 	Summary string `gorm:"type:text" json:"summary"`
 
 	// 来源页码或章节编号
-	SourcePage int `gorm:"index:idx_source_page" json:"source_page"`
+	SourcePage int `gorm:"index" json:"source_page"`
 
 	// 潜在问题列表，这些问题可能与该知识条目相关
 	PotentialQuestions StringArray `gorm:"type:text" json:"potential_questions"`
