@@ -1,5 +1,5 @@
 __DESC__ = "一个用于显示指定文件前几行内容的工具，支持设置显示的行数、每行的最大长度以及是否显示行号。"
-
+__VERBOSE_NAME__ = "文件前几行查看工具"
 __KEYWORDS__ = "file,unix,first lines,linux,terminal,head命令,文本处理,文件工具,内容预览,head,command,show,文件查看,文件读取,前几行"
 
 filename = cli.String("filename", cli.setRequired(true), cli.setHelp("which file you want to check?"))

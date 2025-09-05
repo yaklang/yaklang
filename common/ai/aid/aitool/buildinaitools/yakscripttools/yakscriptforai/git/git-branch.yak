@@ -1,5 +1,5 @@
 __DESC__ = "一个获取Git仓库分支列表的工具，支持指定仓库路径，并可设置偏移量和数量（limit）来分批读取分支信息。"
-
+__VERBOSE_NAME__ = "Git分支列表工具"
 __KEYWORDS__ = "git工具,仓库管理,分支列表,代码分支,分批读取,git信息查询,版本控制,代码管理"
 
 yakit.AutoInitYakit()

@@ -1,5 +1,5 @@
 __DESC__ = "一个Yak插件调用器，可以通过指定插件名称来执行插件，可以指定多个插件名，使用逗号分隔，支持传递HTTP请求包等参数，并提供反馈机制来显示插件执行结果（调用时url参数和requestPacket必须传入其中一个）。"
-
+__VERBOSE_NAME__ = "Yak插件调用器"
 __KEYWORDS__ = "插件调用,MITM插件,插件执行,HTTP请求,插件管理,反馈机制,plugin caller,mitm plugin,plugin execution,http request,plugin management,feedback mechanism,yak plugin,hook manager"
 
 pluginNames = cli.String("names", cli.setVerboseName("插件名列表"),cli.setHelp("插件名列表，多个插件之间使用逗号分隔"),cli.setRequired(true))

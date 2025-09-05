@@ -1,5 +1,5 @@
 __DESC__ = "不使用浏览器的基本简易爬虫，开销低，速度快，可控性好，适合初步探查使用"
-
+__VERBOSE_NAME__ = "简易爬虫"
 __KEYWORDS__ = "爬虫,网络抓取,网页采集,http请求,http响应,无头爬虫,数据抓取,轻量级爬虫"
 
 startUrl := cli.String("urls", cli.setHelp("开始简单爬虫的起始页面"), cli.setRequired(true))

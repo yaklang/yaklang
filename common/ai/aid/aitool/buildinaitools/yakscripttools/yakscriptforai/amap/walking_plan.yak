@@ -1,5 +1,5 @@
 __DESC__ = "一个基于高德地图API进行步行路径规划的工具，用户可以指定起点、终点和城市，工具将返回规划的多条步行路线及每条路线的总距离、总时长以及分步指南。"
-
+__VERBOSE_NAME__ = "高德：步行路径规划"
 __KEYWORDS__ = "步行导航,路径规划,高德地图,地图工具,导航工具,路线查询,出行助手"
 
 ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))

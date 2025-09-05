@@ -1,5 +1,5 @@
 __DESC__ = "一个通过向IANA网站发送HTTP请求来查询指定域名的WHOIS信息的工具。它获取页面内容并提取WHOIS数据进行显示。"
-
+__VERBOSE_NAME__ = "IANA WHOIS域名信息查询"
 __KEYWORDS__ = "whois查询,域名信息,域名管理,网络侦察,信息收集,iana,域名注册信息"
 
 domainString = cli.String("domain", cli.setRequired(true), cli.setHelp("whois target domain"))

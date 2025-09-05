@@ -1,5 +1,5 @@
 __DESC__ = "获取当前运行环境的操作系统类型信息，返回操作系统的名称和版本，用于系统环境识别和后续工具选择。"
-
+__VERBOSE_NAME__ = "操作系统类型识别"
 __KEYWORDS__ = "操作系统类型,os type,系统识别,system identification,操作系统检测,os detection,系统环境,operating system,platform detection,系统平台,环境检测"
 
 yakit.AutoInitYakit()

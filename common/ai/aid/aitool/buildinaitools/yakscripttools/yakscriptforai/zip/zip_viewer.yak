@@ -1,5 +1,5 @@
 __DESC__ = "一个用于查看ZIP压缩包内部文件列表的工具，支持通过设置偏移量(offset)和限制数量(limit)进行分页阅览，适合处理包含大量文件的压缩包。"
-
+__VERBOSE_NAME__ = "ZIP文件列表查看器"
 __KEYWORDS__ = "file management,限制数量,zip,pagination,data retrieval,view files,文件列表,分页查询,file list,limit,archive,文件阅览,offset,files,zip解压,压缩文件管理,偏移量"
 
 yakit.AutoInitYakit()

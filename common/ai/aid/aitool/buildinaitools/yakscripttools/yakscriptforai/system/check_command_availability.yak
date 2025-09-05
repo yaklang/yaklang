@@ -1,5 +1,5 @@
 __DESC__ = "检测环境变量PATH中是否存在指定的命令，用于确认系统工具的可用性。支持检测单个命令或多个命令的存在状态，可指定是否显示详细的PATH信息。适用于脚本执行前的环境检查、依赖工具验证和自动化部署。"
-
+__VERBOSE_NAME__ = "命令可用性检测"
 __KEYWORDS__ = "command availability,path检测,环境变量,命令存在性,系统工具,dependency check,依赖检查,环境检查,工具验证,command validation,executable check,PATH环境变量,系统命令,which命令,where命令"
 
 yakit.AutoInitYakit()
