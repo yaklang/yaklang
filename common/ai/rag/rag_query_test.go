@@ -310,7 +310,9 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 		return
 	}
 
-	ragSystem, err := CreateCollection(db, "test", "test", WithEmbeddingModel("test"))
+	mockEmbed := NewMockEmbedder(testEmbedder)
+
+	ragSystem, err := CreateCollection(db, "test", "test", WithEmbeddingClient(mockEmbed))
 	if err != nil {
 		t.Errorf("Failed to create collection: %v", err)
 		return
