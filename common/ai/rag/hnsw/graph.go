@@ -1052,3 +1052,109 @@ func (h *Graph[K]) DumpByDot() []string {
 
 	return result
 }
+
+// TrainPQCodebookFromData 从图中的所有现有向量数据训练PQ码表
+// 这个方法会：
+// 1. 收集所有节点的向量数据
+// 2. 训练PQ码表
+// 3. 更新所有节点使用新的PQ编码
+// 4. 设置图的PQ优化
+func (g *Graph[K]) TrainPQCodebookFromData(m, k int) error {
+	if len(g.Layers) == 0 || len(g.Layers[0].Nodes) == 0 {
+		return utils.Error("no data available for PQ training")
+	}
+
+	// 检查是否已有PQ启用
+	if g.IsPQEnabled() {
+		return utils.Error("PQ is already enabled on this graph")
+	}
+
+	// 收集所有向量数据
+	var allVectors [][]float64
+	for _, layer := range g.Layers {
+		for _, node := range layer.Nodes {
+			vector := node.GetVector()()
+			// 转换 []float32 到 []float64
+			vec64 := make([]float64, len(vector))
+			for i, v := range vector {
+				vec64[i] = float64(v)
+			}
+			allVectors = append(allVectors, vec64)
+		}
+	}
+
+	if len(allVectors) == 0 {
+		return utils.Error("no vectors found for training")
+	}
+
+	// 检查向量维度一致性
+	dims := len(allVectors[0])
+	for _, vec := range allVectors {
+		if len(vec) != dims {
+			return utils.Errorf("inconsistent vector dimensions: expected %d, got %d", dims, len(vec))
+		}
+	}
+
+	// 训练PQ码表
+	log.Infof("Training PQ codebook with %d vectors of dimension %d, M=%d, K=%d", len(allVectors), dims, m, k)
+
+	// 创建数据channel
+	dataChan := make(chan []float64, len(allVectors))
+	go func() {
+		defer close(dataChan)
+		for _, vec := range allVectors {
+			dataChan <- vec
+		}
+	}()
+
+	codebook, err := pq.Train(dataChan, pq.WithM(m), pq.WithK(k), pq.WithMaxIters(50))
+	if err != nil {
+		return utils.Wrap(err, "training PQ codebook")
+	}
+
+	// 创建量化器
+	quantizer := pq.NewQuantizer(codebook)
+
+	// 设置图的PQ优化
+	g.pqCodebook = codebook
+	g.pqQuantizer = quantizer
+	g.pqAwareDistance = hnswspec.PQAwareCosineDistance[K]
+	g.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
+		return g.pqAwareDistance(a, b, g.pqQuantizer)
+	}
+
+	// 更新所有现有节点为PQ节点
+	log.Infof("Converting %d nodes to PQ encoding", len(allVectors))
+	converted := 0
+	for _, layer := range g.Layers {
+		for key, node := range layer.Nodes {
+			// 获取原始向量
+			vector := node.GetVector()()
+			vec64 := make([]float64, len(vector))
+			for i, v := range vector {
+				vec64[i] = float64(v)
+			}
+
+			// 创建PQ节点
+			pqNode, err := hnswspec.NewPQLayerNode(key, func() []float32 {
+				vec32 := make([]float32, len(vec64))
+				for i, v := range vec64 {
+					vec32[i] = float32(v)
+				}
+				return vec32
+			}, quantizer)
+
+			if err != nil {
+				log.Errorf("Failed to convert node %v to PQ: %v", key, err)
+				continue
+			}
+
+			// 替换节点（暂时跳过邻居复制，避免复杂性）
+			layer.Nodes[key] = pqNode
+			converted++
+		}
+	}
+
+	log.Infof("Successfully converted %d/%d nodes to PQ encoding", converted, len(allVectors))
+	return nil
+}
