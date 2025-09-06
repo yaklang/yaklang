@@ -2,7 +2,6 @@ package hnsw
 
 import (
 	"cmp"
-	"math"
 
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -74,7 +73,16 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 	}
 
 	nodeStorage := make([]*PersistentNode[K], 1, total+1)
-	nodeStorage[0] = &PersistentNode[K]{} // reserve 0 offset
+	// reserve 0 offset with dummy data
+	var zeroKey K
+	if i.IsPQEnabled() {
+		pqCodeSize := i.pqCodebook.M
+		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: make([]byte, pqCodeSize)}
+	} else {
+		dims := i.Dims()
+		dummyVec := make([]float64, dims) // ToBinary expects []float64 for non-PQ mode
+		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: dummyVec}
+	}
 
 	pers := &Persistent[K]{
 		Total:       total,
@@ -93,7 +101,7 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 			K:            uint32(i.pqCodebook.K),
 			SubVectorDim: uint32(i.pqCodebook.SubVectorDim),
 			Centroids:    i.pqCodebook.Centroids,
-			PQCodeSize:   uint32(i.pqCodebook.M) * uint32(math.Log2(float64(i.pqCodebook.M))),
+			PQCodeSize:   uint32(i.pqCodebook.M),
 		}
 	}
 
@@ -110,7 +118,7 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 		if pers.PQMode {
 			codes, ok := i.GetPQCodes()
 			if !ok {
-				return 0, utils.Errorf("node does not have PQ codes")
+				return 0, utils.Errorf("node %v does not have PQ codes", i.GetKey())
 			}
 			if uint32(len(codes)) != pers.PQCodebook.PQCodeSize {
 				return 0, utils.Errorf("PQ code size mismatch: expected %d, got %d", pers.PQCodebook.PQCodeSize, len(codes))
@@ -124,8 +132,13 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 			if len(result) != int(pers.Dims) {
 				return 0, utils.Errorf("vector dimension mismatch: expected %d, got %d", pers.Dims, len(result))
 			}
+			// Convert []float32 to []float64 for ToBinary compatibility
+			float64Vec := make([]float64, len(result))
+			for j, v := range result {
+				float64Vec[j] = float64(v)
+			}
 			pers.OffsetToKey = append(pers.OffsetToKey, &PersistentNode[K]{
-				Code: result,
+				Code: float64Vec,
 				Key:  i.GetKey(),
 			})
 		}
