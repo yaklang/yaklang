@@ -8,11 +8,11 @@ import (
 )
 
 type PersistentPQCodebook struct {
-	M            uint32        `json:"m"` // 1024 维度一般来说选择 32
-	K            uint32        `json:"k"` // 子空间聚类中心量
-	PQCodeSize   uint32        `json:"PQCodeSize"`
-	SubVectorDim uint32        `json:"sub_vector_dim"`
-	Centroids    [][][]float64 `json:"centroids"`
+	M              uint32        `json:"m"` // 1024 维度一般来说选择 32
+	K              uint32        `json:"k"` // 子空间聚类中心量
+	PQCodeByteSize uint32        `json:"PQCodeByteSize"`
+	SubVectorDim   uint32        `json:"sub_vector_dim"`
+	Centroids      [][][]float64 `json:"centroids"`
 }
 
 type PersistentNode[K cmp.Ordered] struct {
@@ -97,11 +97,11 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 	if i.IsPQEnabled() {
 		pers.PQMode = true
 		pers.PQCodebook = &PersistentPQCodebook{
-			M:            uint32(i.pqCodebook.M),
-			K:            uint32(i.pqCodebook.K),
-			SubVectorDim: uint32(i.pqCodebook.SubVectorDim),
-			Centroids:    i.pqCodebook.Centroids,
-			PQCodeSize:   uint32(i.pqCodebook.M),
+			M:              uint32(i.pqCodebook.M),
+			K:              uint32(i.pqCodebook.K),
+			SubVectorDim:   uint32(i.pqCodebook.SubVectorDim),
+			Centroids:      i.pqCodebook.Centroids,
+			PQCodeByteSize: uint32(i.pqCodebook.M),
 		}
 	}
 
@@ -120,8 +120,8 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 			if !ok {
 				return 0, utils.Errorf("node %v does not have PQ codes", i.GetKey())
 			}
-			if uint32(len(codes)) != pers.PQCodebook.PQCodeSize {
-				return 0, utils.Errorf("PQ code size mismatch: expected %d, got %d", pers.PQCodebook.PQCodeSize, len(codes))
+			if uint32(len(codes)) != pers.PQCodebook.PQCodeByteSize {
+				return 0, utils.Errorf("PQ code size mismatch: expected %d, got %d", pers.PQCodebook.PQCodeByteSize, len(codes))
 			}
 			pers.OffsetToKey = append(pers.OffsetToKey, &PersistentNode[K]{
 				Code: codes,

@@ -155,10 +155,10 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		lenCentroids := uint64(lenCentroidsUint32)
 
 		p.PQCodebook = &PersistentPQCodebook{
-			M:            pqm,
-			K:            pqk,
-			SubVectorDim: subdim,
-			PQCodeSize:   codesize,
+			M:              pqm,
+			K:              pqk,
+			SubVectorDim:   subdim,
+			PQCodeByteSize: codesize,
 		}
 
 		// consume centroids
@@ -229,15 +229,19 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 	p.OffsetToKey = make([]*PersistentNode[K], offsetToKeyLen)
 	var zero K
 	for i := uint64(0); i < offsetToKeyLen; i++ {
+		// read key
+		// key is always string in binary format
+
 		var code any
 		if p.PQMode {
-			size := int(p.PQCodebook.PQCodeSize)
+			size := int(p.PQCodebook.PQCodeByteSize)
 			if offset+size > len(data) {
 				return nil, utils.Error("not enough data for pq code")
 			}
-			code = make([]byte, size)
-			copy(code.([]byte), data[offset:offset+size])
+			tempCode := make([]byte, size)
+			copy(tempCode, data[offset:offset+size])
 			offset += size
+			code = tempCode
 		} else {
 			vec := make([]float64, p.Dims)
 			for j := uint32(0); j < p.Dims; j++ {
@@ -348,8 +352,8 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 			if !ok {
 				return nil, utils.Errorf("expected []byte for pq code, got %T", node.Code)
 			}
-			if len(codes) != int(p.PQCodebook.PQCodeSize) {
-				return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", p.PQCodebook.PQCodeSize, len(codes))
+			if len(codes) != int(p.PQCodebook.PQCodeByteSize) {
+				return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", p.PQCodebook.PQCodeByteSize, len(codes))
 			}
 			// 对于 PQ 模式，我们需要创建一个有效的向量来初始化节点
 			// 由于我们只有编码，我们创建一个虚拟向量

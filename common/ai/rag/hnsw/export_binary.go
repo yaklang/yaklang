@@ -84,7 +84,7 @@ func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
 		if err := pbWriteUint32(buf, i.PQCodebook.SubVectorDim); err != nil {
 			return nil, utils.Errorf("write hnsw pq codebook sub vector dim: %v", err)
 		}
-		if err := pbWriteUint32(buf, i.PQCodebook.PQCodeSize); err != nil {
+		if err := pbWriteUint32(buf, i.PQCodebook.PQCodeByteSize); err != nil {
 			return nil, utils.Errorf("write hnsw pq codebook pq code size: %v", err)
 		}
 		if err := pbWriteUint32(buf, uint32(len(i.PQCodebook.Centroids))); err != nil {
@@ -120,13 +120,16 @@ func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
 	// nodes
 	pbWriteVarint(buf, uint64(len(i.OffsetToKey)))
 	for _, node := range i.OffsetToKey {
+		var keyAny = node.Key
+		s := utils.InterfaceToString(keyAny)
+		pbWriteBytes(buf, []byte(s))
 		switch ret := node.Code.(type) {
 		case []byte:
 			if !i.PQMode {
 				return nil, utils.Errorf("pq mode disabled but node code is []byte")
 			}
-			if len(ret) != int(i.PQCodebook.PQCodeSize) {
-				return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", i.PQCodebook.PQCodeSize, len(ret))
+			if len(ret) != int(i.PQCodebook.PQCodeByteSize) {
+				return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", i.PQCodebook.PQCodeByteSize, len(ret))
 			}
 			buf.Write(ret)
 		case []float64:
