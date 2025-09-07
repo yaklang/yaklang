@@ -1059,14 +1059,14 @@ func (h *Graph[K]) DumpByDot() []string {
 // 2. 训练PQ码表
 // 3. 更新所有节点使用新的PQ编码
 // 4. 设置图的PQ优化
-func (g *Graph[K]) TrainPQCodebookFromData(m, k int) error {
+func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
 	if len(g.Layers) == 0 || len(g.Layers[0].Nodes) == 0 {
-		return utils.Error("no data available for PQ training")
+		return nil, utils.Error("no data available for PQ training")
 	}
 
 	// 检查是否已有PQ启用
 	if g.IsPQEnabled() {
-		return utils.Error("PQ is already enabled on this graph")
+		return nil, utils.Error("PQ is already enabled on this graph")
 	}
 
 	// 收集所有向量数据
@@ -1084,14 +1084,14 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) error {
 	}
 
 	if len(allVectors) == 0 {
-		return utils.Error("no vectors found for training")
+		return nil, utils.Error("no vectors found for training")
 	}
 
 	// 检查向量维度一致性
 	dims := len(allVectors[0])
 	for _, vec := range allVectors {
 		if len(vec) != dims {
-			return utils.Errorf("inconsistent vector dimensions: expected %d, got %d", dims, len(vec))
+			return nil, utils.Errorf("inconsistent vector dimensions: expected %d, got %d", dims, len(vec))
 		}
 	}
 
@@ -1109,7 +1109,7 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) error {
 
 	codebook, err := pq.Train(dataChan, pq.WithM(m), pq.WithK(k), pq.WithMaxIters(50))
 	if err != nil {
-		return utils.Wrap(err, "training PQ codebook")
+		return nil, utils.Wrap(err, "training PQ codebook")
 	}
 
 	// 创建量化器
@@ -1156,5 +1156,5 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) error {
 	}
 
 	log.Infof("Successfully converted %d/%d nodes to PQ encoding", converted, len(allVectors))
-	return nil
+	return codebook, nil
 }
