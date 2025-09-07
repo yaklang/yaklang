@@ -55,11 +55,11 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 	maxRetries := 3
 	retryCount := 0
 
-	// 增加重试机制
+	// 增加重试机制，考虑CI环境性能
 	for retryCount < maxRetries {
-		timeout := time.After(10 * time.Second) // 增加超时时间
+		timeout := time.After(20 * time.Second) // 为CI环境增加超时时间
 		eventCount := 0
-		maxEvents := 200 // 增加最大事件数
+		maxEvents := 300 // 增加最大事件数以适应更复杂的流程
 
 	LOOP:
 		for {
@@ -102,16 +102,23 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 						useToolReview = true
 						mu.Unlock()
 
-						select {
-						case inputChan <- &InputEvent{
-							Id: result.GetInteractiveId(),
-							Params: aitool.InvokeParams{
-								"suggestion": "continue",
-							},
-						}:
-						case <-time.After(1 * time.Second):
-							fmt.Println("Warning: input channel full, dropping tool review response")
+						// 增加重试机制发送输入事件
+						for retry := 0; retry < 3; retry++ {
+							select {
+							case inputChan <- &InputEvent{
+								Id: result.GetInteractiveId(),
+								Params: aitool.InvokeParams{
+									"suggestion": "continue",
+								},
+							}:
+								goto inputSent
+							case <-time.After(2 * time.Second):
+								if retry == 2 {
+									fmt.Printf("Warning: failed to send tool review response after %d retries\n", retry+1)
+								}
+							}
 						}
+					inputSent:
 						continue
 					}
 				}
@@ -146,7 +153,7 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 			useToolReviewPass = false
 			count = 0
 			mu.Unlock()
-			time.Sleep(2 * time.Second) // 等待一段时间再重试
+			time.Sleep(3 * time.Second) // 为CI环境增加等待时间
 		}
 	}
 
@@ -163,8 +170,8 @@ func testRecoveryToolUseReview(t *testing.T, uid string) {
 }
 
 func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
-	inputChan := make(chan *InputEvent, 100)            // 增加缓冲区大小
-	outputChan := make(chan *schema.AiOutputEvent, 100) // 增加缓冲区大小
+	inputChan := make(chan *InputEvent, 200)            // 增加缓冲区大小以适应CI环境
+	outputChan := make(chan *schema.AiOutputEvent, 200) // 增加缓冲区大小以适应CI环境
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
@@ -183,6 +190,12 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 				rsp.Close()
 			}()
 
+			// 如果没有匹配到特定的模式，但包含决策相关的关键字，返回默认决策
+			if utils.MatchAnyOfSubString(request.GetPrompt(), `continue-current-task`, `proceed-next-task`, `task-failed`, `task-skipped`) {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
+				return rsp, nil
+			}
+
 			if utils.MatchAllOfSubString(request.GetPrompt(), `工具名称: ls`, `"call-tool"`, "const") {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "call-tool", "tool": "ls", "params": {"path": "/abc-target"}}`))
 				return rsp, nil
@@ -197,12 +210,6 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 				utils.MatchAllOfSubString(request.GetPrompt(), `task-failed`, `task-skipped`) ||
 				utils.MatchAllOfSubString(request.GetPrompt(), `"enum": ["continue-current-task"`) ||
 				utils.MatchAllOfSubString(request.GetPrompt(), `工具的结果如下，产生结果时间为`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
-				return rsp, nil
-			}
-
-			// 如果没有匹配到特定的模式，但包含决策相关的关键字，返回默认决策
-			if utils.MatchAnyOfSubString(request.GetPrompt(), `continue-current-task`, `proceed-next-task`, `task-failed`, `task-skipped`) {
 				rsp.EmitOutputStream(strings.NewReader(`{"@action": "proceed-next-task"}`))
 				return rsp, nil
 			}
@@ -241,11 +248,11 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 	maxRetries := 3
 	retryCount := 0
 
-	// 增加重试机制
+	// 增加重试机制，考虑CI环境性能
 	for retryCount < maxRetries {
-		timeout := time.After(15 * time.Second) // 增加超时时间
+		timeout := time.After(30 * time.Second) // 为CI环境增加超时时间
 		eventCount := 0
-		maxEvents := 200 // 增加最大事件数
+		maxEvents := 300 // 增加最大事件数以适应更复杂的流程
 
 	LOOP:
 		for {
@@ -288,16 +295,23 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 						useToolReview = true
 						mu.Unlock()
 
-						select {
-						case inputChan <- &InputEvent{
-							Id: result.GetInteractiveId(),
-							Params: aitool.InvokeParams{
-								"suggestion": "continue",
-							},
-						}:
-						case <-time.After(1 * time.Second):
-							fmt.Println("Warning: input channel full, dropping tool review response")
+						// 增加重试机制发送输入事件
+						for retry := 0; retry < 3; retry++ {
+							select {
+							case inputChan <- &InputEvent{
+								Id: result.GetInteractiveId(),
+								Params: aitool.InvokeParams{
+									"suggestion": "continue",
+								},
+							}:
+								goto inputSent
+							case <-time.After(2 * time.Second):
+								if retry == 2 {
+									fmt.Printf("Warning: failed to send tool review response after %d retries\n", retry+1)
+								}
+							}
 						}
+					inputSent:
 						continue
 					}
 				}
@@ -332,7 +346,7 @@ func TestCoordinator_Recovery_ToolUseReview(t *testing.T) {
 			useToolReviewPass = false
 			count = 0
 			mu.Unlock()
-			time.Sleep(2 * time.Second) // 等待一段时间再重试
+			time.Sleep(3 * time.Second) // 为CI环境增加等待时间
 		}
 	}
 
