@@ -3,6 +3,7 @@ package hnsw
 import (
 	"io"
 	"math"
+	"strconv"
 
 	"cmp"
 
@@ -66,6 +67,20 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 			return false, err
 		}
 		return v != 0, nil
+	}
+
+	consumeString := func() (string, error) {
+		// Read string length
+		strLen, err := consumeVarint()
+		if err != nil {
+			return "", utils.Wrap(err, "consume string length")
+		}
+		if offset+int(strLen) > len(data) {
+			return "", utils.Error("not enough data for string")
+		}
+		str := string(data[offset : offset+int(strLen)])
+		offset += int(strLen)
+		return str, nil
 	}
 
 	// version
@@ -227,10 +242,49 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		return nil, utils.Wrap(err, "offset to key len")
 	}
 	p.OffsetToKey = make([]*PersistentNode[K], offsetToKeyLen)
-	var zero K
 	for i := uint64(0); i < offsetToKeyLen; i++ {
-		// read key
-		// key is always string in binary format
+		// read key - key is always string in binary format
+		strKey, err := consumeString()
+		if err != nil {
+			return nil, utils.Wrap(err, "consume key string")
+		}
+
+		// convert string key to generic type K
+		var key K
+		switch any(key).(type) {
+		case string:
+			key = any(strKey).(K)
+		case int:
+			// Try to parse as int
+			if intVal, err := strconv.Atoi(strKey); err == nil {
+				key = any(intVal).(K)
+			} else {
+				return nil, utils.Errorf("cannot convert key %s to int", strKey)
+			}
+		case int64:
+			// Try to parse as int64
+			if int64Val, err := strconv.ParseInt(strKey, 10, 64); err == nil {
+				key = any(int64Val).(K)
+			} else {
+				return nil, utils.Errorf("cannot convert key %s to int64", strKey)
+			}
+		case uint64:
+			// Try to parse as uint64
+			if uint64Val, err := strconv.ParseUint(strKey, 10, 64); err == nil {
+				key = any(uint64Val).(K)
+			} else {
+				return nil, utils.Errorf("cannot convert key %s to uint64", strKey)
+			}
+		case uint32:
+			// Try to parse as uint32
+			if uint64Val, err := strconv.ParseUint(strKey, 10, 64); err == nil && uint64Val <= uint64(^uint32(0)) {
+				key = any(uint32(uint64Val)).(K)
+			} else {
+				return nil, utils.Errorf("cannot convert key %s to uint32", strKey)
+			}
+		default:
+			return nil, utils.Errorf("unsupported key type %T for conversion from string", key)
+		}
 
 		var code any
 		if p.PQMode {
@@ -254,7 +308,7 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 			code = vec
 		}
 		p.OffsetToKey[i] = &PersistentNode[K]{
-			Key:  zero,
+			Key:  key,
 			Code: code,
 		}
 	}

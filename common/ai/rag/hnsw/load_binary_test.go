@@ -294,3 +294,52 @@ func TestExportEmptyGraphToBinary(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "graph is nil")
 }
+
+func TestKeyRoundTripInBinary(t *testing.T) {
+	// 测试不同类型的Key在二进制序列化中的完整循环
+	testCases := []struct {
+		name  string
+		key   string
+		value []float32
+	}{
+		{"string_key", "test_key", []float32{1.0, 2.0, 3.0, 4.0}},
+		{"numeric_string_key", "42", []float32{5.0, 6.0, 7.0, 8.0}},
+		{"special_chars_key", "key-with_special.chars!", []float32{9.0, 10.0, 11.0, 12.0}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// 创建包含测试Key的Persistent对象
+			p := &Persistent[string]{
+				Total:    2,
+				Dims:     4,
+				M:        16,
+				Ml:       0.5,
+				EfSearch: 200,
+				PQMode:   false,
+				Layers: []*PersistentLayer{
+					{HNSWLevel: 0, Nodes: []uint32{1}},
+				},
+				OffsetToKey: []*PersistentNode[string]{
+					{Key: "", Code: []float64{0.0, 0.0, 0.0, 0.0}}, // 0 offset
+					{Key: tc.key, Code: []float64{float64(tc.value[0]), float64(tc.value[1]), float64(tc.value[2]), float64(tc.value[3])}},
+				},
+				Neighbors: map[uint32][]uint32{
+					1: {},
+				},
+			}
+
+			// 导出到二进制
+			ctx := context.Background()
+			reader, err := p.ToBinary(ctx)
+			require.NoError(t, err)
+
+			// 从二进制加载回来
+			loaded, err := LoadBinary[string](reader)
+			require.NoError(t, err)
+
+			// 验证Key被正确恢复
+			require.Equal(t, tc.key, loaded.OffsetToKey[1].Key)
+		})
+	}
+}
