@@ -81,11 +81,11 @@ func TestLoadBinaryRoundTripPQ(t *testing.T) {
 		EfSearch: 200,
 		PQMode:   true,
 		PQCodebook: &PersistentPQCodebook{
-			M:            2,
-			K:            256,
-			SubVectorDim: 2,
-			PQCodeSize:   2,
-			Centroids:    [][][]float64{{{1.0, 2.0}, {3.0, 4.0}}, {{5.0, 6.0}, {7.0, 8.0}}},
+			M:              2,
+			K:              256,
+			SubVectorDim:   2,
+			PQCodeByteSize: 2,
+			Centroids:      [][][]float64{{{1.0, 2.0}, {3.0, 4.0}}, {{5.0, 6.0}, {7.0, 8.0}}},
 		},
 		Layers: []*PersistentLayer{
 			{HNSWLevel: 0, Nodes: []uint32{1, 2}},
@@ -123,7 +123,7 @@ func TestLoadBinaryRoundTripPQ(t *testing.T) {
 	require.Equal(t, p.PQCodebook.M, loaded.PQCodebook.M)
 	require.Equal(t, p.PQCodebook.K, loaded.PQCodebook.K)
 	require.Equal(t, p.PQCodebook.SubVectorDim, loaded.PQCodebook.SubVectorDim)
-	require.Equal(t, p.PQCodebook.PQCodeSize, loaded.PQCodebook.PQCodeSize)
+	require.Equal(t, p.PQCodebook.PQCodeByteSize, loaded.PQCodebook.PQCodeByteSize)
 	require.Equal(t, p.PQCodebook.Centroids, loaded.PQCodebook.Centroids)
 
 	// 验证节点
@@ -220,8 +220,9 @@ func TestExportGraphToBinaryPQ(t *testing.T) {
 	require.True(t, len(graph.Layers[0].Nodes) >= 8)
 
 	// 从现有数据训练PQ码表
-	err := graph.TrainPQCodebookFromData(2, 4)
+	cookbook, err := graph.TrainPQCodebookFromData(2, 4)
 	require.NoError(t, err)
+	_ = cookbook
 
 	// 验证PQ训练成功
 	require.True(t, graph.IsPQEnabled())
