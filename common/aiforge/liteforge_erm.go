@@ -11,20 +11,18 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag/entitybase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dot"
-	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 type TemporaryRelationship struct {
-	SourceTemporaryName  string
-	TargetTemporaryName  string
-	RelationshipType     string
-	DecorationAttributes string
-	DecisionRationale    string
+	SourceTemporaryName     string
+	TargetTemporaryName     string
+	RelationshipType        string
+	RelationshipTypeVerbose string
+	DecorationAttributes    string
 }
 
 type ERMAnalysisResult struct {
@@ -62,9 +60,6 @@ func (e *ERMAnalysisResult) Dump() string {
 		sb.WriteString(fmt.Sprintf("- Source: %s\n", Relationship.SourceTemporaryName))
 		sb.WriteString(fmt.Sprintf("  Target: %s\n", Relationship.TargetTemporaryName))
 		sb.WriteString(fmt.Sprintf("  Type: %s\n", Relationship.RelationshipType))
-		if Relationship.DecisionRationale != "" {
-			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(Relationship.DecisionRationale, 100)))
-		}
 	}
 	return sb.String()
 }
@@ -185,10 +180,10 @@ var entitySchema = []aitool.ToolOption{
 - **通用:** "Elon Musk, CEO of SpaceX and Tesla"`),
 		aitool.WithParam_Required(true),
 	),
-	aitool.WithStringParam(
-		"decision_rationale",
-		aitool.WithParam_Description("Explain the reasoning behind the values assigned to the other fields in this JSON object. Justify the choices made."),
-	),
+	//aitool.WithStringParam(
+	//	"decision_rationale",
+	//	aitool.WithParam_Description("Explain the reasoning behind the values assigned to the other fields in this JSON object. Justify the choices made."),
+	//),
 	aitool.WithStructArrayParam(
 		"attributes",
 		[]aitool.PropertyOption{
@@ -202,17 +197,19 @@ var entitySchema = []aitool.ToolOption{
 			"attribute_value",
 			aitool.WithParam_Description("The value of the attribute"),
 		),
-		aitool.WithBoolParam(
-			"unique_identifier",
-			aitool.WithParam_Description("Determine whether this attribute serves as a latent primary key for the entity. That is, ascertain if the attribute could function as a unique identifier, such as a UUID, email address, or fully qualified name."),
-		),
+		//aitool.WithBoolParam(
+		//	"unique_identifier",
+		//	aitool.WithParam_Description("Determine whether this attribute serves as a latent primary key for the entity. That is, ascertain if the attribute could function as a unique identifier, such as a UUID, email address, or fully qualified name."),
+		//),
 	),
 	aitool.WithStringParam(
 		"description",
-		aitool.WithParam_Description("A brief description of the entity providing additional context or details."),
+		aitool.WithParam_Required(true),
+		aitool.WithParam_Description("A description of the entity providing additional context or details for RAG searching."),
 	),
 	aitool.WithStringParam(
 		"entity_type",
+		aitool.WithParam_Required(true),
 		aitool.WithParam_Description(`The type of the entity, from the universal EntityType enum.`),
 		aitool.WithParam_Enum(
 			"PERSON", "ORGANIZATION", "LOCATION", "EVENT", "DOCUMENT", "SECTION", "CONCEPT",
@@ -223,6 +220,11 @@ var entitySchema = []aitool.ToolOption{
 			"LOG_ENTRY", "SERVICE_COMPONENT", "TRACE_ID", "SESSION_ID", "USER_ID", "IP_ADDRESS",
 			"HOSTNAME", "STATUS_CODE", "PERFORMANCE_METRIC", "SECURITY_EVENT",
 		),
+	),
+	aitool.WithStringParam(
+		"entity_type_verbose",
+		aitool.WithParam_Required(true),
+		aitool.WithParam_Description(`Use RAG search friendly contextual text to describe the entity_type`),
 	),
 }
 
@@ -261,14 +263,19 @@ var ermOutputSchema = aitool.NewObjectSchemaWithAction(
 **推荐值:** IMPORTS, DEFINES, CALLS, INSTANTIATES, ACCESSES_FIELD, HAS_PARAMETER, IMPLEMENTS, RETURNS_ERROR_FROM`),
 		),
 		aitool.WithStringParam(
+			"relationship_type_verbose",
+			aitool.WithParam_Required(true),
+			aitool.WithParam_Description(`describe relationship_type as a human reading friendly text (RAG friendly)`),
+		),
+		aitool.WithStringParam(
 			"decoration_attributes",
 			aitool.WithParam_Description("Additional attributes that provide more context about the Relationship."),
 			aitool.WithParam_Required(true),
 		),
-		aitool.WithStringParam(
-			"decision_rationale",
-			aitool.WithParam_Description("Explain the reasoning behind the values assigned to the other fields in this JSON object. Justify the choices made."),
-		),
+		//aitool.WithStringParam(
+		//	"decision_rationale",
+		//	aitool.WithParam_Description("Explain the reasoning behind the values assigned to the other fields in this JSON object. Justify the choices made."),
+		//),
 	),
 )
 
@@ -294,16 +301,15 @@ func normalizeEntityName(inputStr string) string {
 
 func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEntity {
 	entity := &schema.ERModelEntity{
-		EntityName:  normalizeEntityName(entityParams.GetString("identifier")),
-		EntityType:  entityParams.GetString("entity_type"),
-		Description: entityParams.GetString("description"),
-		Rationale:   entityParams.GetString("decision_rationale"),
-		HiddenIndex: uuid.NewString(),
-		Attributes:  map[string]interface{}{},
+		EntityName:        normalizeEntityName(entityParams.GetString("identifier")),
+		EntityType:        entityParams.GetString("entity_type"),
+		EntityTypeVerbose: entityParams.GetString("entity_type_verbose"),
+		Description:       entityParams.GetString("description"),
+		Uuid:              uuid.NewString(),
+		Attributes:        map[string]interface{}{},
 	}
 	for _, attrs := range entityParams.GetObjectArray("attributes") {
-		key, value, unique := attrs.GetString("attribute_name"), attrs.GetString("attribute_value"), attrs.GetBool("unique_identifier")
-		_ = unique
+		key, value := attrs.GetString("attribute_name"), attrs.GetString("attribute_value")
 		entity.Attributes[key] = value
 	}
 	return entity
@@ -311,11 +317,11 @@ func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEnt
 
 func invokeParams2ERMRelationship(params aitool.InvokeParams) *TemporaryRelationship {
 	return &TemporaryRelationship{
-		SourceTemporaryName:  normalizeEntityName(params.GetString("source")),
-		TargetTemporaryName:  normalizeEntityName(params.GetString("target")),
-		RelationshipType:     params.GetString("relationship_type"),
-		DecorationAttributes: params.GetString("decoration_attributes"),
-		DecisionRationale:    params.GetString("decision_rationale"),
+		SourceTemporaryName:     normalizeEntityName(params.GetString("source")),
+		TargetTemporaryName:     normalizeEntityName(params.GetString("target")),
+		RelationshipType:        params.GetString("relationship_type"),
+		RelationshipTypeVerbose: params.GetString("relationship_type_verbose"),
+		DecorationAttributes:    params.GetString("decoration_attributes"),
 	}
 }
 
@@ -382,13 +388,15 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 				for firstChunk.HaveLastChunk() {
 					count++
 					firstChunk = firstChunk.LastChunk()
-					if count > 10 {
+					if count > 100 {
 						break
 					}
 				}
 				domainPrompt, err = DetectERMPrompt(string(firstChunk.Data()), options...)
 				if err != nil {
 					log.Errorf("[detect ERM Prompt] error in analyzing ERM: %v ", err)
+				} else {
+					log.Infof("detected erm prompt: %s", utils.ShrinkString(domainPrompt, 800))
 				}
 			})
 			unlockOnce.Do(func() {
@@ -416,7 +424,13 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 					go func() {
 						defer relationSwg.Done()
 						relationship := invokeParams2ERMRelationship(data)
-						err := endpoint.AddRelationship(relationship.SourceTemporaryName, relationship.TargetTemporaryName, relationship.RelationshipType, relationship.DecisionRationale, map[string]any{"decoration_attributes": relationship.DecorationAttributes})
+						err := endpoint.AddRelationship(
+							relationship.SourceTemporaryName,
+							relationship.TargetTemporaryName,
+							relationship.RelationshipType,
+							relationship.RelationshipTypeVerbose,
+							map[string]any{"decoration_attributes": relationship.DecorationAttributes},
+						)
 						if err != nil {
 							refineConfig.AnalyzeLog("failed to save relation [%s] -> [%s]: %v", relationship.SourceTemporaryName, relationship.TargetTemporaryName, err)
 						}
@@ -476,36 +490,6 @@ func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*
 	return result, nil
 }
 
-func AnalyzeERM(path string, option ...any) (*entitybase.EntityRepository, error) {
-	analyzeConfig := NewRefineConfig(option...)
-
-	analyzeConfig.AnalyzeLog("analyze erm: %s", path)
-	analyzeResult, err := AnalyzeFile(path, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start analyze video/doc/txt: %v", err)
-	}
-
-	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
-	}
-	db := consts.GetGormProfileDatabase()
-	eb, err := entitybase.NewEntityRepository(db, analyzeConfig.KnowledgeBaseName, analyzeConfig.KnowledgeBaseDesc)
-	if err != nil {
-		return nil, err
-	}
-	analyzeConfig.AnalyzeStatusCard("实体库｜知识库名", analyzeConfig.KnowledgeBaseName)
-
-	for erm := range ermResult {
-		err := SaveERMResult(eb, erm, option...)
-		if err != nil {
-			analyzeConfig.AnalyzeLog("failed to save ERM_ENTITY_BASE: %v", err)
-			continue
-		}
-	}
-	return eb, nil
-}
-
 var resolveEntitySchema = aitool.NewObjectSchemaWithAction(
 	aitool.WithBoolParam(
 		"same_entity",
@@ -538,96 +522,4 @@ func ResolveEntity(oldEntity *schema.ERModelEntity, newEntity *schema.ERModelEnt
 	} else {
 		return newEntity, false, nil
 	}
-}
-
-func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, options ...any) error {
-	analyzeConfig := NewAnalysisConfig(options...)
-	swg := utils.NewSizedWaitGroup(analyzeConfig.AnalyzeConcurrency)
-	currentEntities := omap.NewOrderedMap[string, *schema.ERModelEntity](map[string]*schema.ERModelEntity{})
-	for _, tempEntity := range erm.Entities {
-		swg.Add(1)
-		go func() {
-			defer swg.Done()
-			tempName := tempEntity.EntityName
-			matchedEntity, accurate, err := eb.MatchEntities(tempEntity)
-			if err != nil {
-				log.Errorf("failed to search entity [%s]: %v", tempEntity.EntityName, err)
-				return
-			}
-			if matchedEntity == nil {
-				log.Infof("start to create entity: %s", tempEntity.EntityName)
-				err = eb.CreateEntity(tempEntity)
-				if err != nil {
-					analyzeConfig.AnalyzeLog("failed to create entity [%s]: %v", tempEntity.EntityName, err)
-					return
-				}
-				analyzeConfig.AnalyzeLog("entity created: %s", tempEntity.EntityName)
-				currentEntities.Set(tempName, tempEntity)
-				return
-			}
-
-			var current = tempEntity
-			if accurate { // if search is accurate, just use the matched entity
-				for s, i := range tempEntity.Attributes {
-					matchedEntity.Attributes[s] = i
-				}
-				current = matchedEntity
-			} else {
-				resolvedEntity, sameEntity, err := ResolveEntity(matchedEntity, tempEntity, options...)
-				if err != nil {
-					analyzeConfig.AnalyzeLog("failed to resolve entity [%s]: %v", tempEntity.EntityName, err)
-					return
-				}
-				if sameEntity {
-					current = resolvedEntity
-				}
-			}
-			err = eb.SaveEntity(current) // create or update entity
-			if err != nil {
-				analyzeConfig.AnalyzeLog("failed to update entity [%s]: %v", current.EntityName, err)
-				return
-			}
-			currentEntities.Set(tempName, current)
-		}()
-	}
-	swg.Wait()
-
-	getOrCreateEntity := func(name string) (*schema.ERModelEntity, error) {
-		e, ok := currentEntities.Get(name)
-		if !ok {
-			analyzeConfig.AnalyzeLog("not found entity [%s], create it", name)
-			e = &schema.ERModelEntity{
-				EntityName:  name,
-				HiddenIndex: uuid.NewString(),
-			}
-			err := eb.CreateEntity(e)
-			if err != nil {
-				return nil, utils.Errorf("failed to create entity [%s]: %v", name, err)
-			}
-			currentEntities.Set(name, e)
-		}
-		return e, nil
-	}
-
-	for _, tempShip := range erm.Relationships {
-		targetEntity, err := getOrCreateEntity(tempShip.SourceTemporaryName)
-		if err != nil {
-			analyzeConfig.AnalyzeLog("failed to get entity [%s]: %v", tempShip.SourceTemporaryName, err)
-			continue
-		}
-		sourceEntity, err := getOrCreateEntity(tempShip.TargetTemporaryName)
-		if err != nil {
-			analyzeConfig.AnalyzeLog("failed to get entity [%s]: %v", tempShip.TargetTemporaryName, err)
-			continue
-		}
-		err = eb.AddRelationship(sourceEntity.HiddenIndex, targetEntity.HiddenIndex, tempShip.RelationshipType, tempShip.DecisionRationale, map[string]any{
-			"decoration_attr": tempShip.DecorationAttributes,
-		})
-		if err != nil {
-			analyzeConfig.AnalyzeLog("failed to create Relationship [%s -> %s]: %v", sourceEntity.EntityName, targetEntity.EntityName, err)
-			continue
-		}
-		analyzeConfig.AnalyzeLog("Relationship created: %s -> %s", sourceEntity.EntityName, targetEntity.EntityName)
-	}
-	return nil
 }

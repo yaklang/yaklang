@@ -1,9 +1,11 @@
 package schema
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
 
@@ -46,14 +48,13 @@ type ERModelEntity struct {
 	EntityBaseIndex string
 
 	EntityName string // 实体名称
+	Uuid       string `gorm:"unique_index"`
 
-	Description string // 对该实体的简要描述
-	Rationale   string // 该实体存在的理由或依据
-	EntityType  string // 实体的类型或类别
-
-	Attributes MetadataMap `gorm:"type:text" json:"attributes"`
-
-	HiddenIndex string `gorm:"unique_index"`
+	Description       string      // 对该实体的简要描述
+	Rationale         string      // 该实体存在的理由或依据
+	EntityType        string      // 实体的类型或类别
+	EntityTypeVerbose string      // 实体类型的详细描述
+	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
 }
 
 func (e *ERModelEntity) TableName() string {
@@ -61,8 +62,8 @@ func (e *ERModelEntity) TableName() string {
 }
 
 func (e *ERModelEntity) BeforeSave() error {
-	if e.HiddenIndex == "" {
-		e.HiddenIndex = uuid.NewString()
+	if e.Uuid == "" {
+		e.Uuid = uuid.NewString()
 	}
 	return nil
 }
@@ -76,7 +77,7 @@ func (e *ERModelEntity) ToGRPC() *ypb.Entity {
 		Type:        e.EntityType,
 		Description: e.Description,
 		Rationale:   e.Rationale,
-		HiddenIndex: e.HiddenIndex,
+		HiddenIndex: e.Uuid,
 		Attributes: lo.MapToSlice(e.Attributes, func(key string, value any) *ypb.KVPair {
 			return &ypb.KVPair{
 				Key:   key,
@@ -92,6 +93,29 @@ func (e *ERModelEntity) String() string {
 		attrString.WriteString(fmt.Sprintf("%s=%v;", name, attr))
 	}
 	return fmt.Sprintf("%s|%s|%s|%s", e.EntityName, e.EntityType, e.Description, attrString.String())
+}
+
+func (e *ERModelEntity) ToRAGContent() string {
+	attrString := strings.Builder{}
+	for name, attr := range e.Attributes {
+		attrString.WriteString(fmt.Sprintf("%s=%v;", name, attr))
+	}
+
+	result, err := utils.RenderTemplate(`
+Entity {{ .name }}[{{ .type }}{{ if .type_verbose }}({{ .type_verbose }}){{ end }}]
+{{ if .desc }}{{ .desc }}{{ end }}
+{{ if .attr }}{{ .attr }}{{ end }}
+`, map[string]any{
+		"name":         e.EntityName,
+		"type":         e.EntityType,
+		"type_verbose": e.EntityTypeVerbose,
+		"desc":         e.Description,
+		"attr":         attrString.String(),
+	})
+	if err != nil {
+		return strings.Trim(e.String(), "|")
+	}
+	return result
 }
 
 func (e *ERModelEntity) Dump() string {
@@ -123,20 +147,44 @@ type ERModelRelationship struct {
 	EntityBaseID    uint `gorm:"index;not null"`
 	EntityBaseIndex string
 
+	Uuid string `gorm:"unique_index"`
+
 	SourceEntityID uint
 	TargetEntityID uint
 
-	SourceEntityIndex string
-	TargetEntityIndex string
-	RelationshipType  string
+	SourceEntityIndex       string
+	TargetEntityIndex       string
+	RelationshipType        string
+	RelationshipTypeVerbose string
+	Hash                    string      `gorm:"unique_index"`
+	Attributes              MetadataMap `gorm:"type:text" json:"attributes"`
+}
 
-	DecisionRationale string      // 该关系存在的理由或依据
-	Hash              string      `gorm:"unique_index"`
-	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
+func (r *ERModelRelationship) ToRAGContent(src string, dst string) string {
+	var attr bytes.Buffer
+	for k, v := range r.Attributes {
+		attr.WriteString(fmt.Sprintf("%s=%v; ", k, v))
+	}
+
+	result, err := utils.RenderTemplate(`
+<|src|> {{ .src }} <|src|> --> {{ .relationship_type }}{{ if .type_verbose }}({{ .type_verbose }}){{ end }} --> <|dst|> {{ .dst }} <|dst|>
+{{ if .attr }}attrs: {{ .attr }}{{ end }}
+`, map[string]any{
+		"relationship_type": r.RelationshipType,
+		"type_verbose":      r.RelationshipTypeVerbose,
+		"src":               src,
+		"dst":               dst,
+		"attr":              attr.String(),
+	})
+	if err != nil {
+		log.Error("cannot build relationship RAG content:", err)
+		return string(utils.Jsonify(r))
+	}
+	return result
 }
 
 func (r *ERModelRelationship) String() string {
-	return fmt.Sprintf("%s [%s] %s", r.SourceEntityIndex, r.RelationshipType, r.TargetEntityIndex)
+	return fmt.Sprintf("%s [%s:%v] %s", r.SourceEntityIndex, r.RelationshipType, r.RelationshipTypeVerbose, r.TargetEntityIndex)
 }
 
 func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
@@ -147,7 +195,6 @@ func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
 		TargetEntityID:    uint64(r.TargetEntityID),
 		SourceEntityIndex: r.SourceEntityIndex,
 		TargetEntityIndex: r.TargetEntityIndex,
-		Rationale:         r.DecisionRationale,
 		Attributes: lo.MapToSlice(r.Attributes, func(key string, value any) *ypb.KVPair {
 			return &ypb.KVPair{
 				Key:   key,
@@ -171,6 +218,9 @@ func (r *ERModelRelationship) CalcHash() string {
 
 func (r *ERModelRelationship) BeforeSave() error {
 	r.Hash = r.CalcHash()
+	if r.Uuid == "" {
+		r.Uuid = uuid.NewString()
+	}
 	return nil
 }
 

@@ -43,7 +43,7 @@ func setupTestData(t *testing.T) (entityBaseIndex, entityBaseName string, entity
 			t.Fatalf("setupTestData: create ERModelEntity failed: %v", err)
 		}
 		entities = append(entities, e)
-		entityIndex = append(entityIndex, e.HiddenIndex)
+		entityIndex = append(entityIndex, e.Uuid)
 		entityIDs = append(entityIDs, e.ID)
 		entityNames = append(entityNames, name)
 	}
@@ -55,10 +55,9 @@ func setupTestData(t *testing.T) (entityBaseIndex, entityBaseName string, entity
 		EntityBaseIndex:   entityBaseIndex,
 		SourceEntityID:    entities[0].ID,
 		TargetEntityID:    entities[1].ID,
-		SourceEntityIndex: entities[0].HiddenIndex,
-		TargetEntityIndex: entities[1].HiddenIndex,
+		SourceEntityIndex: entities[0].Uuid,
+		TargetEntityIndex: entities[1].Uuid,
 		RelationshipType:  relationshipType,
-		DecisionRationale: "Test Relationship",
 		Attributes:        schema.MetadataMap{"relAttr": "relVal"},
 	}
 	r.Hash = r.CalcHash()

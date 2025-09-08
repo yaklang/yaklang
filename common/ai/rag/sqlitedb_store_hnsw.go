@@ -3,6 +3,7 @@ package rag
 import (
 	"math/rand"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -191,11 +192,14 @@ func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Docu
 // 将 Document 转换为 schema.VectorStoreDocument
 func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorStoreDocument {
 	return &schema.VectorStoreDocument{
-		DocumentID:   doc.ID,
-		CollectionID: s.collection.ID,
-		Metadata:     schema.MetadataMap(doc.Metadata),
-		Embedding:    schema.FloatArray(doc.Embedding),
-		Content:      doc.Content,
+		DocumentID:      doc.ID,
+		DocumentType:    doc.Type,
+		CollectionID:    s.collection.ID,
+		Metadata:        schema.MetadataMap(doc.Metadata),
+		Embedding:       schema.FloatArray(doc.Embedding),
+		Content:         doc.Content,
+		EntityID:        doc.EntityUUID,
+		RelatedEntities: strings.Join(doc.RelatedEntities, ","),
 	}
 }
 
@@ -238,6 +242,8 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			existingDoc.Metadata = schemaDoc.Metadata
 			existingDoc.Embedding = schemaDoc.Embedding
 			existingDoc.Content = schemaDoc.Content
+			existingDoc.EntityID = schemaDoc.EntityID
+			existingDoc.RelatedEntities = schemaDoc.RelatedEntities
 
 			if err := tx.Save(&existingDoc).Error; err != nil {
 				tx.Rollback()
@@ -320,7 +326,7 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 	for i, result := range resultNodes {
 		resultIds[i] = result.Key
 	}
-	log.Infof("hnsw search returned %d candidate documents", len(resultNodes))
+	//log.Infof("hnsw search returned %d candidate documents", len(resultNodes))
 
 	// 分批查询文档 (10个一组)
 	batchSize := 10
@@ -360,13 +366,13 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 		}
 	}
 
-	log.Infof("calculated similarity scores for %d documents", len(results))
+	//log.Infof("calculated similarity scores for %d documents", len(results))
 
 	// 按相似度分数降序排序
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
-	log.Infof("sorted results by similarity score")
+	//log.Infof("sorted results by similarity score")
 
 	if page < 1 {
 		page = 1
@@ -377,14 +383,14 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 	// 计算分页
 	offset := (page - 1) * pageSize
 	if offset >= len(results) {
-		log.Infof("page offset %d exceeds total results %d, returning empty", offset, len(results))
+		//log.Infof("page offset %d exceeds total results %d, returning empty", offset, len(results))
 		return []SearchResult{}, nil
 	}
 	if offset+limit > len(results) {
 		limit = len(results) - offset
 	}
 	results = results[offset : offset+limit]
-	log.Infof("returning %d results after pagination (offset: %d)", len(results), offset)
+	//log.Infof("returning %d results after pagination (offset: %d)", len(results), offset)
 	return results, nil
 }
 
