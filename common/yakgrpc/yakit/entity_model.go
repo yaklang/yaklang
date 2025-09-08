@@ -2,6 +2,8 @@ package yakit
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -10,15 +12,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
-func CreateEntityBaseInfo(db *gorm.DB, entityBase *schema.EntityBaseInfo) error {
+func CreateEntityBaseInfo(db *gorm.DB, entityBase *schema.EntityRepository) error {
 	return db.Create(entityBase).Error
 }
 
 func DeleteEntityBaseInfo(db *gorm.DB, id int64) error {
-	return db.Unscoped().Delete(&schema.EntityBaseInfo{}, id).Error
+	return db.Unscoped().Delete(&schema.EntityRepository{}, id).Error
 }
 
 func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
@@ -161,7 +162,7 @@ func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, Relations
 		RelationshipType:        RelationshipType,
 		RelationshipTypeVerbose: typeVerbose,
 		Attributes:              attrs,
-		EntityBaseIndex:         baseIndex,
+		RepositoryUUID:          baseIndex,
 		Uuid:                    uuid.New().String(),
 	}
 	Relationship.Hash = Relationship.CalcHash()
@@ -347,9 +348,6 @@ func (model *ERModel) Dump() string {
 		sb.WriteString(fmt.Sprintf("  EntityType: %s\n", entity.EntityType))
 		if entity.Description != "" {
 			sb.WriteString(fmt.Sprintf("  Description: %s\n", utils.ShrinkString(entity.Description, 100)))
-		}
-		if entity.Rationale != "" {
-			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(entity.Rationale, 100)))
 		}
 		if len(entity.Attributes) > 0 {
 			sb.WriteString("  Attributes:\n")

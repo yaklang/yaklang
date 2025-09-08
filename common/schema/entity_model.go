@@ -3,40 +3,42 @@ package schema
 import (
 	"bytes"
 	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type EntityBaseInfo struct {
+type EntityRepository struct {
 	gorm.Model
-	EntityBaseName string
+
+	Uuid           string `gorm:"unique_index"`
+	EntityBaseName string `gorm:"index"`
 	Description    string
-	HiddenIndex    string `gorm:"unique_index"`
 }
 
-func (e *EntityBaseInfo) BeforeSave() error {
-	if e.HiddenIndex == "" {
-		e.HiddenIndex = uuid.NewString()
+func (e *EntityRepository) BeforeSave() error {
+	if e.Uuid == "" {
+		e.Uuid = uuid.NewString()
 	}
 	return nil
 }
 
-func (e *EntityBaseInfo) TableName() string {
-	return "entity_base_info"
+func (e *EntityRepository) TableName() string {
+	return "rag_entity_repository_test"
 }
 
-func (e *EntityBaseInfo) ToGRPC() *ypb.EntityRepository {
+func (e *EntityRepository) ToGRPC() *ypb.EntityRepository {
 	return &ypb.EntityRepository{
 		ID:          int64(e.ID),
 		Name:        e.EntityBaseName,
 		Description: e.Description,
-		HiddenIndex: e.HiddenIndex,
+		HiddenIndex: e.Uuid,
 	}
 }
 
@@ -44,21 +46,17 @@ func (e *EntityBaseInfo) ToGRPC() *ypb.EntityRepository {
 type ERModelEntity struct {
 	gorm.Model
 
-	EntityBaseID    uint // 外键，指向实体基础信息表
-	EntityBaseIndex string
-
-	EntityName string // 实体名称
-	Uuid       string `gorm:"unique_index"`
-
+	RepositoryUUID    string      `gorm:"index"`
+	EntityName        string      `gorm:"index"`
+	Uuid              string      `gorm:"unique_index"`
 	Description       string      // 对该实体的简要描述
-	Rationale         string      // 该实体存在的理由或依据
 	EntityType        string      // 实体的类型或类别
 	EntityTypeVerbose string      // 实体类型的详细描述
 	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
 }
 
 func (e *ERModelEntity) TableName() string {
-	return "er_model_entity"
+	return "rag_entity_test"
 }
 
 func (e *ERModelEntity) BeforeSave() error {
@@ -71,12 +69,10 @@ func (e *ERModelEntity) BeforeSave() error {
 func (e *ERModelEntity) ToGRPC() *ypb.Entity {
 	return &ypb.Entity{
 		ID:          uint64(e.ID),
-		BaseID:      uint64(e.EntityBaseID),
-		BaseIndex:   e.EntityBaseIndex,
+		BaseIndex:   e.RepositoryUUID,
 		Name:        e.EntityName,
 		Type:        e.EntityType,
 		Description: e.Description,
-		Rationale:   e.Rationale,
 		HiddenIndex: e.Uuid,
 		Attributes: lo.MapToSlice(e.Attributes, func(key string, value any) *ypb.KVPair {
 			return &ypb.KVPair{
@@ -142,10 +138,8 @@ func (e *ERModelEntity) Dump() string {
 type ERModelRelationship struct {
 	gorm.Model
 
-	EntityBaseID    uint `gorm:"index;not null"`
-	EntityBaseIndex string
-
-	Uuid string `gorm:"unique_index"`
+	Uuid           string `gorm:"unique_index"`
+	RepositoryUUID string `gorm:"index"`
 
 	SourceEntityID uint
 	TargetEntityID uint
@@ -156,6 +150,10 @@ type ERModelRelationship struct {
 	RelationshipTypeVerbose string
 	Hash                    string      `gorm:"unique_index"`
 	Attributes              MetadataMap `gorm:"type:text" json:"attributes"`
+}
+
+func (r *ERModelRelationship) TableName() string {
+	return "rag_entity_relationship_test"
 }
 
 func (r *ERModelRelationship) ToRAGContent(src string, dst string) string {
@@ -189,8 +187,6 @@ func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
 	return &ypb.Relationship{
 		ID:                uint64(r.ID),
 		Type:              r.RelationshipType,
-		SourceEntityID:    uint64(r.SourceEntityID),
-		TargetEntityID:    uint64(r.TargetEntityID),
 		SourceEntityIndex: r.SourceEntityIndex,
 		TargetEntityIndex: r.TargetEntityIndex,
 		Attributes: lo.MapToSlice(r.Attributes, func(key string, value any) *ypb.KVPair {
@@ -204,10 +200,8 @@ func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
 
 func (r *ERModelRelationship) CalcHash() string {
 	return utils.CalcSha1(
-		r.EntityBaseID,
-		r.SourceEntityID,
+		r.RepositoryUUID,
 		r.RelationshipType,
-		r.TargetEntityID,
 		r.Attributes,
 		r.SourceEntityIndex,
 		r.TargetEntityIndex,
@@ -225,7 +219,7 @@ func (r *ERModelRelationship) BeforeSave() error {
 func init() {
 	// 注册数据库表结构到系统中
 	RegisterDatabaseSchema(KEY_SCHEMA_PROFILE_DATABASE,
-		&EntityBaseInfo{},
+		&EntityRepository{},
 		&ERModelEntity{},
 		//&ERModelAttribute{},
 		&ERModelRelationship{},

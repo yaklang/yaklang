@@ -3,13 +3,14 @@ package aiforge
 import (
 	_ "embed"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"strings"
 	"sync"
 
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/rag/entitybase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -44,9 +45,6 @@ func (e *ERMAnalysisResult) Dump() string {
 		sb.WriteString(fmt.Sprintf("  EntityType: %s\n", entity.EntityType))
 		if entity.Description != "" {
 			sb.WriteString(fmt.Sprintf("  Description: %s\n", utils.ShrinkString(entity.Description, 100)))
-		}
-		if entity.Rationale != "" {
-			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(entity.Rationale, 100)))
 		}
 		if len(entity.Attributes) > 0 {
 			sb.WriteString("  Attributes:\n")
@@ -363,7 +361,7 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
-	eb, err := entitybase.NewEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
 	if err != nil {
 		return nil, err
 	}
