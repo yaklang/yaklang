@@ -24,6 +24,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
+		LazyBuilder: NewLazyBuilder("Function:" + name),
 		anValue:     NewValue(),
 		Params:      make([]int64, 0),
 		hasEllipsis: false,

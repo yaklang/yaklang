@@ -161,6 +161,7 @@ func (c *config) parseProjectWithFS(
 		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
 		for fileContent := range ch {
 			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
+			// editor := prog.CreateEditor([]byte{}, fileContent.Path)
 
 			fileContent.Editor = editor
 			fileContents = append(fileContents, fileContent)
@@ -258,6 +259,13 @@ func (c *config) parseProjectWithFS(
 			since := time.Since(start)
 			log.Errorf("program %s save to database cost: %s", prog.Name, since)
 		}
+		// log.Errorf("Lazybuild :leak: check start")
+		ssa.LazyBuilderCount.ForEach(func(key string, value *ssa.LazyBuilder) bool {
+			log.Errorf("LazyBuild handler :Leak:  %s", key)
+			value.Build()
+			return true
+		})
+		ssa.LazyBuilderCount.Clear()
 		return nil
 	}
 

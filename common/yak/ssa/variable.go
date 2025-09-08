@@ -68,6 +68,9 @@ func (variable *Variable) Assign(value Value) error {
 }
 
 func (v *Variable) SetMemberCall(obj, key Value) {
+	if utils.IsNil(v) {
+		return
+	}
 	v.object = obj
 	v.key = key
 }
@@ -115,6 +118,9 @@ func (v *Variable) AddRange(r *memedit.Range, force bool) {
 
 func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	value := v.GetValue()
+	if utils.IsNil(value) {
+		return
+	}
 	value.GetFunc().NewErrorWithPos(kind, tag, v.DefRange, msg)
 	for rangePos := range v.UseRange {
 		value.GetFunc().NewErrorWithPos(kind, tag, rangePos, msg)
@@ -126,6 +132,9 @@ func (v *Variable) IsPointer() bool {
 }
 
 func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
+	if utils.IsNil(scope) {
+		return nil
+	}
 	if ret := scope.ReadVariable(name, true); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
 			return variable

@@ -189,6 +189,9 @@ func (b *FunctionBuilder) checkAndCreateDefaultMember(res checkMemberResult, obj
 
 	currentScope := b.CurrentBlock.ScopeTable
 	objectScope := object.GetBlock().ScopeTable
+	if utils.IsNil(currentScope) || utils.IsNil(objectScope) {
+		return
+	}
 	// is sub-scope and not same, just child scope
 	if currentScope.IsSameOrSubScope(objectScope) && !currentScope.Compare(objectScope) {
 		b.createDefaultMember(res, object, key, false)
