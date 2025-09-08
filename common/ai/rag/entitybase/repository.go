@@ -1,15 +1,19 @@
 package entitybase
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"sync"
 )
 
 const (
@@ -21,6 +25,9 @@ type EntityRepository struct {
 	db        *gorm.DB
 	baseInfo  *schema.EntityBaseInfo
 	ragSystem *rag.RAGSystem
+	ragMutex  sync.RWMutex
+
+	mergeEntityFunc func(old, new *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)
 }
 
 func (eb *EntityRepository) GetID() int64 {
@@ -39,6 +46,10 @@ func (eb *EntityRepository) GetInfo() (*schema.EntityBaseInfo, error) {
 
 func (eb *EntityRepository) GetRAGSystem() *rag.RAGSystem {
 	return eb.ragSystem
+}
+
+func (eb *EntityRepository) SetMergeEntityFunc(f func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)) {
+	eb.mergeEntityFunc = f
 }
 
 //--- Entity Operations ---
@@ -84,9 +95,19 @@ func (eb *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity)
 }
 
 func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
+	defer func() {
+		panicErr := recover()
+		if panicErr != nil {
+			log.Errorf("error in vector search entity: %v ", panicErr)
+		}
+	}()
+
 	if eb.ragSystem == nil {
 		return nil, utils.Errorf("RAG system is not initialized")
 	}
+
+	eb.ragMutex.RLock()
+	defer eb.ragMutex.RUnlock()
 
 	results, err := eb.GetRAGSystem().Query(entity.String(), 5)
 	if err != nil {
@@ -123,6 +144,9 @@ func (eb *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.E
 }
 
 func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
+	eb.ragMutex.Lock()
+	defer eb.ragMutex.Unlock()
+
 	metadata := map[string]any{
 		schema.META_Doc_Index:  entry.HiddenIndex,
 		schema.META_Doc_Name:   entry.EntityName,
@@ -139,6 +163,43 @@ func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) 
 	return eb.GetRAGSystem().Add(documentID+"_detail", entry.String(), rag.WithDocumentRawMetadata(metadata))
 }
 
+func (eb *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
+	matchedEntity, accurate, err := eb.MatchEntities(entity)
+	if err != nil { // not critical error
+		log.Errorf("failed to match entity [%s]: %v", entity.EntityName, err)
+	}
+	if matchedEntity == nil {
+		log.Infof("start to create entity: %s", entity.EntityName)
+		err = eb.CreateEntity(entity)
+		if err != nil {
+			return nil, utils.Errorf("failed to create entity [%s]: %v", entity.EntityName, err)
+		}
+		return entity, nil
+	}
+
+	mergeEntity := matchedEntity
+	if accurate { // if search is accurate, just use the matched entity
+		for s, i := range entity.Attributes {
+			matchedEntity.Attributes[s] = i
+		}
+	} else if eb.mergeEntityFunc != nil {
+		resolvedEntity, isSame, err := eb.mergeEntityFunc(matchedEntity, entity)
+		if err != nil {
+			return nil, utils.Errorf("failed to merge entity [%s]: %v", entity.EntityName, err)
+		}
+		if isSame {
+			mergeEntity = resolvedEntity
+		}
+	} else {
+		mergeEntity = entity
+	}
+	err = eb.SaveEntity(mergeEntity) // create or update entity
+	if err != nil {
+		return nil, utils.Errorf("failed to save entity [%s]: %v", entity.EntityName, err)
+	}
+	return mergeEntity, nil
+}
+
 func (eb *EntityRepository) SaveEntity(entity *schema.ERModelEntity) error {
 	if entity.ID == 0 {
 		return eb.CreateEntity(entity)
@@ -151,7 +212,13 @@ func (eb *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error
 	if err != nil {
 		return err
 	}
-	return eb.addEntityToVectorIndex(e)
+	go func() {
+		err := eb.addEntityToVectorIndex(e)
+		if err != nil {
+			log.Errorf("failed to add entity [%s] to vector index: %v", e.EntityName, err)
+		}
+	}()
+	return nil
 }
 
 func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
@@ -161,7 +228,13 @@ func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	if err != nil {
 		return err
 	}
-	return eb.addEntityToVectorIndex(entity)
+	go func() {
+		err := eb.addEntityToVectorIndex(entity)
+		if err != nil {
+			log.Errorf("failed to add entity [%s] to vector index: %v", entity.EntityName, err)
+		}
+	}()
+	return nil
 }
 
 //--- Relationship Operations ---
@@ -203,6 +276,17 @@ func (eb *EntityRepository) GetSubERModel(keyword string, maxDepths ...int) (*ya
 		return nil, utils.Errorf("实体 %s 不存在", keyword)
 	}
 	return yakit.EntityRelationshipFind(eb.db, []*schema.ERModelEntity{startEntity}, maxDepth)
+}
+
+func (eb *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
+	return &SaveEndpoint{
+		ctx:          ctx,
+		eb:           eb,
+		nameToIndex:  omap.NewOrderedMap[string, string](make(map[string]string)),
+		nameSig:      omap.NewOrderedMap[string, *endpointDataSignal](make(map[string]*endpointDataSignal)),
+		entityFinish: make(chan struct{}),
+		once:         sync.Once{},
+	}
 }
 
 func NewEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
