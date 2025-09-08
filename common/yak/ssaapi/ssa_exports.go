@@ -24,6 +24,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+type ASTSequenceType int
+
+const (
+	Order ASTSequenceType = iota
+	ReverseOrder
+	OutOfOrder
+)
+
 type ProcessFunc func(msg string, process float64)
 
 type config struct {
@@ -79,6 +87,8 @@ type config struct {
 	excludeFile func(path, filename string) bool
 
 	logLevel string
+
+	astSequence ASTSequenceType
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
@@ -146,6 +156,13 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 		c.process(msg, process)
 	} else {
 		log.Info(msg, process)
+	}
+}
+
+func WithASTOrder(sequence ASTSequenceType) Option {
+	return func(c *config) error {
+		c.astSequence = sequence
+		return nil
 	}
 }
 
