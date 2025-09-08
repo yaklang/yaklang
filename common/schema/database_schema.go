@@ -68,6 +68,8 @@ var ProfileTables = []interface{}{
 	&AiApiKeys{},    // for aibalance
 	&LoginSession{}, // for aibalance
 	&AIYakTool{},
+
+	&Snippets{}, // Snippets
 }
 
 var databaseSchemas = map[uint8][]any{
@@ -117,9 +119,6 @@ var ProjectTables = []interface{}{
 
 	// Note
 	&Note{},
-
-	// Custom Code Signing
-	&Snippets{},
 
 	// AI
 	&AiCoordinatorRuntime{},
