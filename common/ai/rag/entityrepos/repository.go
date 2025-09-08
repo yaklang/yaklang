@@ -22,7 +22,7 @@ const (
 
 type EntityRepository struct {
 	db        *gorm.DB
-	baseInfo  *schema.EntityRepository
+	info      *schema.EntityRepository
 	ragSystem *rag.RAGSystem
 	ragMutex  sync.RWMutex
 
@@ -30,17 +30,17 @@ type EntityRepository struct {
 }
 
 func (eb *EntityRepository) GetID() int64 {
-	if eb.baseInfo == nil {
+	if eb.info == nil {
 		return 0
 	}
-	return int64(eb.baseInfo.ID)
+	return int64(eb.info.ID)
 }
 
 func (eb *EntityRepository) GetInfo() (*schema.EntityRepository, error) {
-	if eb.baseInfo == nil {
+	if eb.info == nil {
 		return nil, utils.Errorf("entity base info is nil")
 	}
-	return eb.baseInfo, nil
+	return eb.info, nil
 }
 
 func (eb *EntityRepository) GetRAGSystem() *rag.RAGSystem {
@@ -138,7 +138,7 @@ func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]
 }
 
 func (eb *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ERModelEntity, error) {
-	filter.BaseID = uint64(eb.baseInfo.ID)
+	filter.BaseID = uint64(eb.info.ID)
 	return yakit.QueryEntities(eb.db, filter)
 }
 
@@ -188,7 +188,7 @@ func (e *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRel
 
 func (e *EntityRepository) GetEntityByUUID(uuid string) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
-	err := e.db.Model(&schema.ERModelEntity{}).Where("uuid = ? AND entity_base_id = ?", uuid, e.baseInfo.ID).First(&entity).Error
+	err := e.db.Model(&schema.ERModelEntity{}).Where("uuid = ? AND entity_base_id = ?", uuid, e.info.ID).First(&entity).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -257,7 +257,7 @@ func (eb *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error
 }
 
 func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
-	entity.RepositoryUUID = eb.baseInfo.Uuid
+	entity.RepositoryUUID = eb.info.Uuid
 	err := yakit.CreateEntity(eb.db, entity)
 	if err != nil {
 		return err
@@ -274,7 +274,7 @@ func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 //--- Relationship Operations ---
 
 func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, relationType string, typeVerbose string, attr map[string]any) error {
-	data, err := yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.baseInfo.Uuid, relationType, typeVerbose, attr)
+	data, err := yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.info.Uuid, relationType, typeVerbose, attr)
 	if err != nil {
 		log.Warnf("failed to add relation [%s] to vector [%s]: %v", relationType, sourceIndex, err)
 		return utils.Wrapf(err, "failed to add relation [%s] to vector [%s]", relationType, sourceIndex)
@@ -353,7 +353,7 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 	}
 	var repos = &EntityRepository{
 		db:        db,
-		baseInfo:  &entityBaseInfo,
+		info:      &entityBaseInfo,
 		ragSystem: ragSystem,
 	}
 
