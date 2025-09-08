@@ -164,7 +164,9 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		return typ
 	case ClassBluePrintTypeKind:
-		typ := &Blueprint{}
+		typ := &Blueprint{
+			LazyBuilder: NewLazyBuilder("Blueprint:" + getParamStr("name")),
+		}
 		typ.Name = getParamStr("name")
 		typ.fullTypeName = utils.InterfaceToStringSlice(params["fullTypeName"])
 		typ.Kind = ValidBlueprintKind(getParamStr("kind"))

@@ -94,7 +94,7 @@ type Blueprint struct {
 	fullTypeName []string
 
 	// lazy
-	LazyBuilder
+	*LazyBuilder
 }
 
 func (b *Blueprint) GetId() int64 {
@@ -118,6 +118,7 @@ func NewBlueprint(name string) *Blueprint {
 		MagicMethod:  make(map[BlueprintMagicMethodKind]Value),
 
 		fullTypeName: make([]string, 0),
+		LazyBuilder:  NewLazyBuilder("Blueprint:" + name),
 	}
 	return class
 }

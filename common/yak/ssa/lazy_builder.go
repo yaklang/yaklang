@@ -3,32 +3,41 @@ package ssa
 import (
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils"
+	"go.uber.org/atomic"
 )
+
+var LazyBuilderCount = utils.NewSafeMap[*LazyBuilder]()
 
 // lazyTask 将任务逻辑和任务数据分离开
 type lazyTask func()
 
-// type lazyTask struct {
-// 	work func(context interface{})
-// 	ctx  interface{}
-// }
-
 // LazyBuilder 是一个并发安全、内存安全的延迟执行器
 type LazyBuilder struct {
-	tasks []lazyTask
-	mu    sync.Mutex
-	build bool
+	_lazybuild_name string
+	tasks           []lazyTask
+	mu              sync.RWMutex
+	build           atomic.Bool
 }
 
 // NewLazyBuilder 创建一个新的 LazyBuilder 实例
-func NewLazyBuilder() *LazyBuilder {
-	return &LazyBuilder{}
+func NewLazyBuilder(name string) *LazyBuilder {
+	lz := &LazyBuilder{
+		_lazybuild_name: name + "||" + uuid.NewString(),
+		tasks:           make([]lazyTask, 0),
+	}
+	LazyBuilderCount.Set(lz._lazybuild_name, lz)
+	return lz
 }
 
 // Add 添加一个延迟执行的任务。
 // work 是要执行的函数，ctx 是要传递给该函数的上下文数据。
 func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
+	if l == nil {
+		log.Errorf("LazyBuilder is nil")
+		return
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -37,18 +46,26 @@ func (l *LazyBuilder) AddLazyBuilder(work func(), async ...bool) {
 
 // Build 执行所有已添加的任务，该方法在整个生命周期中只会有效执行一次。
 func (l *LazyBuilder) Build() {
-	if l.build {
+	if l == nil {
+		log.Errorf("LazyBuilder is nil")
+		return
+	}
+
+	if l.build.Load() {
+		// log.Errorf("LazyBuilder is nil or already built")
 		return // 已经构建过，直接返回
 	}
-	// 在 once.Do 内部，我们是线程安全的。
-	// 先将任务列表转移到局部变量，然后立即清空原始列表，
-	// 这样可以尽快释放引用，并防止在 Build 执行期间有新的 Add 调用。
-	l.build = true
+
+	l.build.Store(true)
+
+	LazyBuilderCount.Delete(l._lazybuild_name)
 
 	l.mu.Lock()
+	defer l.mu.Unlock()
+
 	tasksToRun := l.tasks
 	l.tasks = nil // 【关键】立即清空，释放对闭包和上下文的引用
-	l.mu.Unlock()
+	_ = tasksToRun
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -56,7 +73,7 @@ func (l *LazyBuilder) Build() {
 		}
 	}()
 
-	// 依次执行所有任务
+	// // 依次执行所有任务
 	for _, task := range tasksToRun {
 		if task != nil {
 			task()
