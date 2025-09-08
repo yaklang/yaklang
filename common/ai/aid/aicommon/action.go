@@ -186,3 +186,82 @@ func ExtractAllAction(i string) []*Action {
 	}
 	return acs
 }
+
+func ExtractActionEx(reader io.Reader, actionName string, callback ...jsonextractor.CallbackOption) (*Action, error) {
+	ac := &Action{
+		name:   actionName,
+		params: make(map[string]any),
+	}
+
+	actions := []string{actionName}
+	sigchan := make(chan struct{})
+	allFinished := make(chan struct{})
+	var err error
+	var buf bytes.Buffer
+	go func() {
+		defer func() {
+			utils.TryCloseChannel(allFinished)
+		}()
+		defer func() {
+			utils.TryCloseChannel(sigchan)
+		}()
+
+		stopped := utils.NewBool(false)
+		extractActionCallback := jsonextractor.WithObjectCallback(func(data map[string]any) {
+			if stopped.IsSet() {
+				return
+			}
+			dataParams := aitool.InvokeParams(data)
+			if !dataParams.Has("@action") {
+				return
+			}
+			targetString := dataParams.GetString("@action")
+			if targetString != "" {
+				if utils.StringArrayContains(actions, targetString) {
+					ac.name = targetString
+					ac.params = data
+					if ac.params == nil {
+						ac.params = make(map[string]any)
+					}
+					close(sigchan)
+					stopped.Set()
+					return
+				}
+			} else {
+				target := dataParams.GetObject("@action")
+				for _, v := range target {
+					targetString = utils.InterfaceToString(v)
+					if utils.StringArrayContains(actions, targetString) {
+						ac.name = targetString
+						ac.params = data
+						if ac.params == nil {
+							ac.params = make(map[string]any)
+						}
+						ac.params["@action"] = targetString
+						close(sigchan)
+						stopped.Set()
+						return
+					}
+				}
+			}
+		})
+
+		callback = append(callback, extractActionCallback)
+
+		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), callback...)
+		if err != nil {
+			log.Error("Failed to extract action", "action", buf.String(), "error", err)
+		}
+	}()
+	<-sigchan
+
+	if len(ac.params) > 0 {
+		return ac, nil
+	}
+
+	<-allFinished
+	if err != nil {
+		return nil, err
+	}
+	return nil, utils.Errorf("cannot extract action[%v] from: %v", actions, utils.ShrinkString(buf.String(), 100))
+}

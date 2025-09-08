@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"strings"
 	"sync"
 
@@ -308,6 +309,16 @@ func invokeParams2ERMEntity(entityParams aitool.InvokeParams) *schema.ERModelEnt
 	return entity
 }
 
+func invokeParams2ERMRelationship(params aitool.InvokeParams) *TemporaryRelationship {
+	return &TemporaryRelationship{
+		SourceTemporaryName:  normalizeEntityName(params.GetString("source")),
+		TargetTemporaryName:  normalizeEntityName(params.GetString("target")),
+		RelationshipType:     params.GetString("relationship_type"),
+		DecorationAttributes: params.GetString("decoration_attributes"),
+		DecisionRationale:    params.GetString("decision_rationale"),
+	}
+}
+
 func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 	result := &ERMAnalysisResult{
 		Entities:      make([]*schema.ERModelEntity, 0),
@@ -318,13 +329,7 @@ func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 	}
 
 	for _, RelationshipParams := range ermResult.GetInvokeParamsArray("relationship_list") {
-		r := &TemporaryRelationship{
-			SourceTemporaryName:  normalizeEntityName(RelationshipParams.GetString("source")),
-			TargetTemporaryName:  normalizeEntityName(RelationshipParams.GetString("target")),
-			RelationshipType:     RelationshipParams.GetString("relationship_type"),
-			DecorationAttributes: RelationshipParams.GetString("decoration_attributes"),
-			DecisionRationale:    RelationshipParams.GetString("decision_rationale"),
-		}
+		r := invokeParams2ERMRelationship(RelationshipParams)
 		result.Relationships = append(result.Relationships, r)
 	}
 	return result
@@ -346,14 +351,22 @@ func AnalyzeERMFromAnalysisResult(input <-chan AnalysisResult, options ...any) (
 }
 
 func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERMAnalysisResult, error) {
-	analyzeConfig := NewAnalysisConfig(options...)
+	refineConfig := NewRefineConfig(options...)
 	var domainPrompt string
 	var err error
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
+	eb, err := entitybase.NewEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
+	if err != nil {
+		return nil, err
+	}
+	eb.SetMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
+		return ResolveEntity(new, old, options...)
+	})
+
 	count := 0
-	return utils.OrderedParallelProcessSkipError(analyzeConfig.Ctx, cm.OutputChannel(),
+	return utils.OrderedParallelProcessSkipError(refineConfig.Ctx, cm.OutputChannel(),
 		func(i chunkmaker.Chunk) (*ERMAnalysisResult, error) {
 			firstMutex.Lock()
 			unlockOnce := new(sync.Once)
@@ -381,20 +394,57 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 			unlockOnce.Do(func() {
 				firstMutex.Unlock()
 			})
-			return AnalyzeERMChunk(domainPrompt, i, options...)
+
+			endpoint := eb.NewSaveEndpoint(refineConfig.Ctx)
+			entitySwg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+			relationSwg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+
+			chunkOptions := append(options, WithJsonExtractHook(
+				jsonextractor.WithRegisterConditionalObjectCallback([]string{"entity_type"}, func(data map[string]any) {
+					entity := invokeParams2ERMEntity(data)
+					entitySwg.Add(1)
+					go func() {
+						defer entitySwg.Done()
+						err := endpoint.SaveEntity(entity)
+						if err != nil {
+							refineConfig.AnalyzeLog("failed to save entity [%s]: %v", entity.EntityName, err)
+						}
+					}()
+				}),
+				jsonextractor.WithRegisterConditionalObjectCallback([]string{"relationship_type"}, func(data map[string]any) {
+					relationSwg.Add(1)
+					go func() {
+						defer relationSwg.Done()
+						relationship := invokeParams2ERMRelationship(data)
+						err := endpoint.AddRelationship(relationship.SourceTemporaryName, relationship.TargetTemporaryName, relationship.RelationshipType, relationship.DecisionRationale, map[string]any{"decoration_attributes": relationship.DecorationAttributes})
+						if err != nil {
+							refineConfig.AnalyzeLog("failed to save relation [%s] -> [%s]: %v", relationship.SourceTemporaryName, relationship.TargetTemporaryName, err)
+						}
+					}()
+				}),
+				jsonextractor.WithObjectKeyValue(func(key string, _ any) {
+					if key == "entity_list" {
+						go func() {
+							entitySwg.Wait()
+							endpoint.FinishEntitySave()
+						}()
+					}
+				})),
+			)
+			return AnalyzeERMChunk(domainPrompt, i, chunkOptions...)
 		},
 		utils.WithParallelProcessDeferTask(func() {
 			count++
-			analyzeConfig.AnalyzeStatusCard("[ERM]: processed frames", count)
+			refineConfig.AnalyzeStatusCard("[ERM]: processed frames", count)
 		}),
-		utils.WithParallelProcessConcurrency(analyzeConfig.AnalyzeConcurrency),
+		utils.WithParallelProcessConcurrency(refineConfig.AnalyzeConcurrency),
 		utils.WithParallelProcessStartCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("Analysis", "build ERM")
-			analyzeConfig.AnalyzeLog("start build ERM concurrency")
+			refineConfig.AnalyzeStatusCard("Analysis", "build ERM")
+			refineConfig.AnalyzeLog("start build ERM concurrency")
 		}),
 		utils.WithParallelProcessFinishCallback(func() {
-			analyzeConfig.AnalyzeStatusCard("Analysis", "finish build ERM")
-			analyzeConfig.AnalyzeLog("finish analyzing ERM concurrency")
+			refineConfig.AnalyzeStatusCard("Analysis", "finish build ERM")
+			refineConfig.AnalyzeLog("finish analyzing ERM concurrency")
 		}),
 	), nil
 }
@@ -424,6 +474,70 @@ func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*
 	result := Result2ERMAnalysisResult(ermResult)
 	result.OriginalData = c.Data()
 	return result, nil
+}
+
+func AnalyzeERM(path string, option ...any) (*entitybase.EntityRepository, error) {
+	analyzeConfig := NewRefineConfig(option...)
+
+	analyzeConfig.AnalyzeLog("analyze erm: %s", path)
+	analyzeResult, err := AnalyzeFile(path, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze video/doc/txt: %v", err)
+	}
+
+	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
+	}
+	db := consts.GetGormProfileDatabase()
+	eb, err := entitybase.NewEntityRepository(db, analyzeConfig.KnowledgeBaseName, analyzeConfig.KnowledgeBaseDesc)
+	if err != nil {
+		return nil, err
+	}
+	analyzeConfig.AnalyzeStatusCard("实体库｜知识库名", analyzeConfig.KnowledgeBaseName)
+
+	for erm := range ermResult {
+		err := SaveERMResult(eb, erm, option...)
+		if err != nil {
+			analyzeConfig.AnalyzeLog("failed to save ERM_ENTITY_BASE: %v", err)
+			continue
+		}
+	}
+	return eb, nil
+}
+
+var resolveEntitySchema = aitool.NewObjectSchemaWithAction(
+	aitool.WithBoolParam(
+		"same_entity",
+		aitool.WithParam_Description("是否是同一个实体"),
+	),
+	aitool.WithStructParam(
+		"entity",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Description("当实体是同一个实体时，重新综合返回实体的完整信息"),
+		},
+		entitySchema...,
+	),
+)
+
+//go:embed liteforge_prompt/resolve_same_entity.txt
+var resolveEntityPrompt string
+
+func ResolveEntity(oldEntity *schema.ERModelEntity, newEntity *schema.ERModelEntity, options ...any) (*schema.ERModelEntity, bool, error) {
+	analyzeConfig := NewAnalysisConfig(options...)
+	analyzeConfig.AnalyzeLog("start resolving entity: old:[%s] | new:[%s]", oldEntity.String(), newEntity.String())
+
+	options = append(options, WithOutputJSONSchema(resolveEntitySchema))
+	resolveResult, err := _executeLiteForgeTemp(quickQueryBuild(resolveEntityPrompt, oldEntity.Dump(), newEntity.Dump()), options...)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if resolveResult.GetBool("same_entity") {
+		return invokeParams2ERMEntity(resolveResult.GetInvokeParams("entity")), true, nil
+	} else {
+		return newEntity, false, nil
+	}
 }
 
 func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, options ...any) error {
@@ -516,68 +630,4 @@ func SaveERMResult(eb *entitybase.EntityRepository, erm *ERMAnalysisResult, opti
 		analyzeConfig.AnalyzeLog("Relationship created: %s -> %s", sourceEntity.EntityName, targetEntity.EntityName)
 	}
 	return nil
-}
-
-func AnalyzeERM(path string, option ...any) (*entitybase.EntityRepository, error) {
-	analyzeConfig := NewRefineConfig(option...)
-
-	analyzeConfig.AnalyzeLog("analyze erm: %s", path)
-	analyzeResult, err := AnalyzeFile(path, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start analyze video/doc/txt: %v", err)
-	}
-
-	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeResult, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to analyze erm from analysis result: %v", err)
-	}
-	db := consts.GetGormProfileDatabase()
-	eb, err := entitybase.NewEntityRepository(db, analyzeConfig.KnowledgeBaseName, analyzeConfig.KnowledgeBaseDesc)
-	if err != nil {
-		return nil, err
-	}
-	analyzeConfig.AnalyzeStatusCard("实体库｜知识库名", analyzeConfig.KnowledgeBaseName)
-
-	for erm := range ermResult {
-		err := SaveERMResult(eb, erm, option...)
-		if err != nil {
-			analyzeConfig.AnalyzeLog("failed to save ERM_ENTITY_BASE: %v", err)
-			continue
-		}
-	}
-	return eb, nil
-}
-
-var resolveEntitySchema = aitool.NewObjectSchemaWithAction(
-	aitool.WithBoolParam(
-		"same_entity",
-		aitool.WithParam_Description("是否是同一个实体"),
-	),
-	aitool.WithStructParam(
-		"entity",
-		[]aitool.PropertyOption{
-			aitool.WithParam_Description("当实体是同一个实体时，重新综合返回实体的完整信息"),
-		},
-		entitySchema...,
-	),
-)
-
-//go:embed liteforge_prompt/resolve_same_entity.txt
-var resolveEntityPrompt string
-
-func ResolveEntity(oldEntity *schema.ERModelEntity, newEntity *schema.ERModelEntity, options ...any) (*schema.ERModelEntity, bool, error) {
-	analyzeConfig := NewAnalysisConfig(options...)
-	analyzeConfig.AnalyzeLog("start resolving entity: old:[%s] | new:[%s]", oldEntity.String(), newEntity.String())
-
-	options = append(options, WithOutputJSONSchema(resolveEntitySchema))
-	resolveResult, err := _executeLiteForgeTemp(quickQueryBuild(resolveEntityPrompt, oldEntity.Dump(), newEntity.Dump()), options...)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if resolveResult.GetBool("same_entity") {
-		return invokeParams2ERMEntity(resolveResult.GetInvokeParams("entity")), true, nil
-	} else {
-		return newEntity, false, nil
-	}
 }

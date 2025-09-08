@@ -181,6 +181,25 @@ func (o *OrderedMap[T, V]) Get(key T) (V, bool) {
 	return v, ok
 }
 
+func (o *OrderedMap[T, V]) GetOrSet(key T, value V) V {
+	if o == nil {
+		return value
+	}
+	o.init()
+	o.lock.Lock()
+	defer o.lock.Unlock()
+
+	existValue, ok := o.m[key]
+	if !ok {
+		o.m[key] = value
+		o.keyChain = append(o.keyChain, key)
+		o.namedKey = true
+		return value
+	}
+	o.namedKey = true
+	return existValue
+}
+
 func (o *OrderedMap[T, V]) GetMust(key T) V {
 	if o == nil {
 		var zero V

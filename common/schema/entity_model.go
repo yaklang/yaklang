@@ -87,7 +87,11 @@ func (e *ERModelEntity) ToGRPC() *ypb.Entity {
 }
 
 func (e *ERModelEntity) String() string {
-	return e.Dump()
+	attrString := strings.Builder{}
+	for name, attr := range e.Attributes {
+		attrString.WriteString(fmt.Sprintf("%s=%v;", name, attr))
+	}
+	return fmt.Sprintf("%s|%s|%s|%s", e.EntityName, e.EntityType, e.Description, attrString.String())
 }
 
 func (e *ERModelEntity) Dump() string {
@@ -129,6 +133,10 @@ type ERModelRelationship struct {
 	DecisionRationale string      // 该关系存在的理由或依据
 	Hash              string      `gorm:"unique_index"`
 	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
+}
+
+func (r *ERModelRelationship) String() string {
+	return fmt.Sprintf("%s [%s] %s", r.SourceEntityIndex, r.RelationshipType, r.TargetEntityIndex)
 }
 
 func (r *ERModelRelationship) ToGRPC() *ypb.Relationship {
