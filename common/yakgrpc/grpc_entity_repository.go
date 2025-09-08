@@ -13,13 +13,13 @@ import (
 // ListEntityRepository 列出所有实体仓库
 func (s *Server) ListEntityRepository(ctx context.Context, req *ypb.Empty) (*ypb.ListEntityRepositoryResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	var repos []*schema.EntityBaseInfo
+	var repos []*schema.EntityRepository
 	if err := db.Find(&repos).Error; err != nil {
 		return nil, err
 	}
 
 	return &ypb.ListEntityRepositoryResponse{
-		EntityRepositories: lo.Map(repos, func(repo *schema.EntityBaseInfo, _ int) *ypb.EntityRepository {
+		EntityRepositories: lo.Map(repos, func(repo *schema.EntityRepository, _ int) *ypb.EntityRepository {
 			return repo.ToGRPC()
 		}),
 	}, nil
