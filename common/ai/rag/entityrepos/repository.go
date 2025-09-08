@@ -1,10 +1,11 @@
-package entitybase
+package entityrepos
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
+	"sync"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,17 +14,15 @@ import (
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"sync"
 )
 
 const (
-	META_EntityBaseID = "entity_base_id"
-	META_EntityType   = "entity_type"
+	META_EntityType = "entity_type"
 )
 
 type EntityRepository struct {
 	db        *gorm.DB
-	baseInfo  *schema.EntityBaseInfo
+	baseInfo  *schema.EntityRepository
 	ragSystem *rag.RAGSystem
 	ragMutex  sync.RWMutex
 
@@ -37,7 +36,7 @@ func (eb *EntityRepository) GetID() int64 {
 	return int64(eb.baseInfo.ID)
 }
 
-func (eb *EntityRepository) GetInfo() (*schema.EntityBaseInfo, error) {
+func (eb *EntityRepository) GetInfo() (*schema.EntityRepository, error) {
 	if eb.baseInfo == nil {
 		return nil, utils.Errorf("entity base info is nil")
 	}
@@ -150,8 +149,7 @@ func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) 
 	metadata := map[string]any{
 		schema.META_Doc_Index:  entry.Uuid,
 		schema.META_Doc_Name:   entry.EntityName,
-		schema.META_Base_Index: entry.EntityBaseIndex,
-		META_EntityBaseID:      entry.EntityBaseID,
+		schema.META_Base_Index: entry.RepositoryUUID,
 		META_EntityType:        entry.EntityType,
 	}
 
@@ -259,8 +257,7 @@ func (eb *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error
 }
 
 func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
-	entity.EntityBaseID = eb.baseInfo.ID
-	entity.EntityBaseIndex = eb.baseInfo.HiddenIndex
+	entity.RepositoryUUID = eb.baseInfo.Uuid
 	err := yakit.CreateEntity(eb.db, entity)
 	if err != nil {
 		return err
@@ -277,7 +274,7 @@ func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 //--- Relationship Operations ---
 
 func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, relationType string, typeVerbose string, attr map[string]any) error {
-	data, err := yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.baseInfo.HiddenIndex, relationType, typeVerbose, attr)
+	data, err := yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.baseInfo.Uuid, relationType, typeVerbose, attr)
 	if err != nil {
 		log.Warnf("failed to add relation [%s] to vector [%s]: %v", relationType, sourceIndex, err)
 		return utils.Wrapf(err, "failed to add relation [%s] to vector [%s]", relationType, sourceIndex)
@@ -306,25 +303,6 @@ func (eb *EntityRepository) QueryIncomingRelationships(entity *schema.ERModelEnt
 	return relationships, nil
 }
 
-// --- ER Model Operations ---
-func (eb *EntityRepository) GetSubERModel(keyword string, maxDepths ...int) (*yakit.ERModel, error) {
-	maxDepth := 2
-	if len(maxDepths) > 0 {
-		maxDepth = maxDepths[0]
-	}
-
-	startEntity, _, err := eb.MatchEntities(&schema.ERModelEntity{
-		EntityName: keyword,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if startEntity == nil {
-		return nil, utils.Errorf("实体 %s 不存在", keyword)
-	}
-	return yakit.EntityRelationshipFind(eb.db, []*schema.ERModelEntity{startEntity}, maxDepth)
-}
-
 func (eb *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
 	return &SaveEndpoint{
 		ctx:          ctx,
@@ -336,87 +314,48 @@ func (eb *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
 	}
 }
 
-func NewEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
-	var entityBaseInfo schema.EntityBaseInfo
-	err := db.Model(&schema.EntityBaseInfo{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
-
-	var needCreateInfo bool
+func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
+	var entityBaseInfo schema.EntityRepository
+	err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			needCreateInfo = true
-		} else {
-			return nil, utils.Errorf("查询实体库信息失败: %v", err)
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.Errorf("query entity repository failed: %v", err)
+		}
+		if createErr := utils.GormTransaction(db, func(tx *gorm.DB) error {
+			entityBaseInfo = schema.EntityRepository{
+				EntityBaseName: name,
+				Description:    description,
+				Uuid:           entityBaseInfo.Uuid,
+			}
+			return yakit.CreateEntityBaseInfo(tx, &entityBaseInfo)
+		}); createErr != nil {
+			return nil, utils.Errorf("create entity repository err: %v", err)
 		}
 	}
 
 	collectionExists := rag.CollectionIsExists(db, name)
 
-	if needCreateInfo && !collectionExists {
-		err = utils.GormTransaction(db, func(tx *gorm.DB) error {
-			entityBaseInfo = schema.EntityBaseInfo{
-				EntityBaseName: name,
-				Description:    description,
-				HiddenIndex:    entityBaseInfo.HiddenIndex,
-			}
-			return yakit.CreateEntityBaseInfo(tx, &entityBaseInfo)
-		})
-		if err != nil {
-			return nil, utils.Errorf("创建实体库信息失败: %v", err)
-		}
-
-		ragSystem, err := rag.CreateCollection(db, name, description, opts...)
+	var ragSystem *rag.RAGSystem
+	if !collectionExists {
+		ragSystem, err = rag.CreateCollection(db, name, description, opts...)
 		if err != nil {
 			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
 				return yakit.DeleteEntityBaseInfo(tx, int64(entityBaseInfo.ID))
 			})
-			return nil, utils.Errorf("创建RAG集合失败: %v", err)
+			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
-
-		return &EntityRepository{
-			db:        db,
-			baseInfo:  &entityBaseInfo,
-			ragSystem: ragSystem,
-		}, nil
-	}
-
-	// 如果实体库信息存在但 RAG Collection 不存在，创建 RAG Collection
-	if !needCreateInfo && !collectionExists {
-		ragSystem, err := rag.CreateCollection(db, name, entityBaseInfo.Description, opts...)
+	} else {
+		// 如果都存在，直接加载
+		ragSystem, err = rag.LoadCollection(db, name)
 		if err != nil {
-			return nil, utils.Errorf("创建RAG集合失败: %v", err)
-		}
-
-		return &EntityRepository{
-			db:        db,
-			baseInfo:  &entityBaseInfo,
-			ragSystem: ragSystem,
-		}, nil
-	}
-
-	// 如果实体库信息不存在但 RAG Collection 存在，创建实体库信息
-	if needCreateInfo && collectionExists {
-		err = utils.GormTransaction(db, func(tx *gorm.DB) error {
-			entityBaseInfo = schema.EntityBaseInfo{
-				EntityBaseName: name,
-				Description:    description,
-				HiddenIndex:    uuid.NewString(),
-			}
-			return yakit.CreateEntityBaseInfo(tx, &entityBaseInfo)
-		})
-		if err != nil {
-			return nil, utils.Errorf("创建实体库信息失败: %v", err)
+			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
 	}
-
-	// 如果都存在，直接加载
-	ragSystem, err := rag.LoadCollection(db, name)
-	if err != nil {
-		return nil, utils.Errorf("加载RAG集合失败: %v", err)
-	}
-
-	return &EntityRepository{
+	var repos = &EntityRepository{
 		db:        db,
 		baseInfo:  &entityBaseInfo,
 		ragSystem: ragSystem,
-	}, nil
+	}
+
+	return repos, nil
 }

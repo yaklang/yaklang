@@ -3,10 +3,11 @@ package aiforge
 import (
 	"bytes"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/chunkmaker"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/chunkmaker"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -43,15 +44,6 @@ func BuildKnowledgeFromReader(kbName string, reader io.Reader, option ...any) (<
 	analyzeResult, err := AnalyzeReader(reader, option...)
 	if err != nil {
 		return nil, utils.Errorf("failed to start analyze reader: %v", err)
-	}
-	option = append(option, RefineWithKnowledgeBaseName(kbName))
-	return _buildKnowledge(analyzeResult, option...)
-}
-
-func BuildKnowledge(kbName string, input any, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
-	analyzeResult, err := Analyze(input, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start analyze input: %v", err)
 	}
 	option = append(option, RefineWithKnowledgeBaseName(kbName))
 	return _buildKnowledge(analyzeResult, option...)

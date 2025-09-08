@@ -173,7 +173,7 @@ type VectorStoreCollection struct {
 	gorm.Model
 
 	// 集合名称，在系统中唯一
-	Name string `gorm:"unique_index;index:idx_name" json:"name"`
+	Name string `gorm:"unique_index;" json:"name"`
 
 	// 集合描述信息
 	Description string `gorm:"type:text" json:"description"`
@@ -193,6 +193,10 @@ type VectorStoreCollection struct {
 
 	// HNSW 图连接信息，存储为 JSON 格式
 	GroupInfos GroupInfos `gorm:"type:text" json:"group_infos"`
+}
+
+func (v *VectorStoreCollection) TableName() string {
+	return "rag_vector_collection_test"
 }
 
 // VectorStoreDocument 表示向量存储中的文档
@@ -222,6 +226,10 @@ type VectorStoreDocument struct {
 
 	// HNSW 算法中节点存在的最高层级
 	MaxLayer int `gorm:"default:0" json:"max_layer"`
+}
+
+func (v *VectorStoreDocument) TableName() string {
+	return "rag_vector_document_test"
 }
 
 // StringArray 用于存储字符串数组的自定义类型
@@ -278,6 +286,10 @@ type KnowledgeBaseInfo struct {
 	KnowledgeBaseType string `gorm:"index;not null" json:"knowledge_base_type"`
 }
 
+func (v *KnowledgeBaseInfo) TableName() string {
+	return "rag_knowledge_base_test"
+}
+
 // KnowledgeBase 表示知识库条目
 // 用于存储各种标准、指南等知识库信息
 type KnowledgeBaseEntry struct {
@@ -318,7 +330,7 @@ type KnowledgeBaseEntry struct {
 }
 
 func (e *KnowledgeBaseEntry) TableName() string {
-	return "knowledge_base_entries_v2"
+	return "rag_knowledge_entry_test"
 }
 
 func (e *KnowledgeBaseEntry) BeforeSave() error {

@@ -3,41 +3,40 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
 )
 
 func setupTestData(t *testing.T) (entityBaseIndex, entityBaseName string, entityIndex, entityNames []string, relationshipIDs []uint, relationshipType string, clearFunc func()) {
 	db := consts.GetGormProfileDatabase()
 	// 创建 EntityBase
 	entityBaseName = fmt.Sprintf("TestBase_%s", uuid.New().String())
-	entityBase := &schema.EntityBaseInfo{
+	entityBase := &schema.EntityRepository{
 		EntityBaseName: entityBaseName,
 		Description:    "Test Description",
-		HiddenIndex:    uuid.NewString(),
+		Uuid:           uuid.NewString(),
 	}
 	if err := db.Create(entityBase).Error; err != nil {
-		t.Fatalf("setupTestData: create EntityBaseInfo failed: %v", err)
+		t.Fatalf("setupTestData: create EntityRepository failed: %v", err)
 	}
 	entityBaseID := entityBase.ID
-	entityBaseIndex = entityBase.HiddenIndex
+	entityBaseIndex = entityBase.Uuid
 	// 创建实体
 	var entities []*schema.ERModelEntity
 	var entityIDs []uint
 	for i := 0; i < 2; i++ {
 		name := fmt.Sprintf("Entity_%d_%s", i, uuid.New().String())
 		e := &schema.ERModelEntity{
-			EntityBaseID:    entityBaseID,
-			EntityBaseIndex: entityBaseIndex,
-			EntityName:      name,
-			EntityType:      "TypeA",
-			Description:     "Test Entity",
-			Rationale:       "Test Rationale",
-			Attributes:      schema.MetadataMap{"attr": fmt.Sprintf("val_%d", i)},
+			RepositoryUUID: entityBaseIndex,
+			EntityName:     name,
+			EntityType:     "TypeA",
+			Description:    "Test Entity",
+			Attributes:     schema.MetadataMap{"attr": fmt.Sprintf("val_%d", i)},
 		}
 		if err := db.Create(e).Error; err != nil {
 			t.Fatalf("setupTestData: create ERModelEntity failed: %v", err)
@@ -51,10 +50,7 @@ func setupTestData(t *testing.T) (entityBaseIndex, entityBaseName string, entity
 	// 创建关系
 	relationshipType = uuid.NewString()
 	r := &schema.ERModelRelationship{
-		EntityBaseID:      entityBaseID,
-		EntityBaseIndex:   entityBaseIndex,
-		SourceEntityID:    entities[0].ID,
-		TargetEntityID:    entities[1].ID,
+		RepositoryUUID:    entityBaseIndex,
 		SourceEntityIndex: entities[0].Uuid,
 		TargetEntityIndex: entities[1].Uuid,
 		RelationshipType:  relationshipType,
@@ -73,7 +69,7 @@ func setupTestData(t *testing.T) (entityBaseIndex, entityBaseName string, entity
 		for _, eid := range entityIDs {
 			db.Unscoped().Delete(&schema.ERModelEntity{}, eid)
 		}
-		db.Unscoped().Delete(&schema.EntityBaseInfo{}, entityBaseID)
+		db.Unscoped().Delete(&schema.EntityRepository{}, entityBaseID)
 	}
 
 	return entityBaseIndex, entityBaseName, entityIndex, entityNames, relationshipIDs, relationshipType, clearFunc

@@ -1,4 +1,4 @@
-package entitybase
+package entityrepos
 
 import (
 	"context"
