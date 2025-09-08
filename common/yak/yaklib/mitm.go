@@ -35,6 +35,7 @@ var MitmExports = map[string]interface{}{
 	"gmtls":                mitmConfigGMTLS,
 	"gmtlsPrefer":          mitmConfigGMTLSPrefer,
 	"gmtlsOnly":            mitmConfigGMTLSOnly,
+	"randomJA3":            mitmConfigRandomJA3,
 }
 
 // Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
@@ -63,6 +64,7 @@ type mitmConfig struct {
 	gmtls                  bool
 	gmtlsPrefer            bool
 	gmtlsOnly              bool
+	randomJA3              bool
 	dialer                 func(timeout time.Duration, target string) (net.Conn, error)
 	tunMode                bool
 
@@ -286,6 +288,17 @@ func mitmMaxContentLength(i int) MitmConfigOpt {
 	}
 }
 
+// randomJA3 是一个选项函数，用于指定中间人代理服务器是否开启随机 JA3 劫持模式，默认为false
+// Example:
+// ```
+// mitm.Start(8080, mitm.randomJA3(true))
+// ```
+func mitmConfigRandomJA3(b bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.randomJA3 = b
+	}
+}
+
 var MITMConfigTunMode = mitmConfigTunMode
 
 // set tunmode ,not process proxy proto
@@ -393,6 +406,7 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),
+		crep.MITM_RandomJA3(config.randomJA3),
 		crep.MITM_SetWebsocketHijackMode(true),
 		crep.MITM_SetForceTextFrame(config.wsForceTextFrame),
 		crep.MITM_SetWebsocketRequestHijackRaw(func(req []byte, r *http.Request, rspIns *http.Response, t int64) []byte {
