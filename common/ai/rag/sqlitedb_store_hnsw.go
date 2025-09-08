@@ -29,32 +29,40 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	var collections []*schema.VectorStoreCollection
 	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections)
 	if dbErr.Error != nil {
-		return nil, utils.Errorf("查询集合失败: %v", dbErr.Error)
+		return nil, utils.Errorf("query rag collection [%#v] err: %v", collectionName, dbErr.Error)
 	}
 
 	if len(collections) == 0 {
-		return nil, utils.Errorf("集合 %s 不存在", collectionName)
+		return nil, utils.Errorf("rag collection[%v] not existed", collectionName)
 	}
 
 	config := collections[0]
+
 	hnswGraph := hnsw.NewGraph(
 		hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
 		hnsw.WithDeterministicRng[string](0), // 使用固定的随机数生成器，便于调试，不影响结果
 	)
 
+	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
+	var existed = make(map[string][]float32)
 	// 尝试恢复HNSW图结构
 	layers := ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
+		if _, ok := existed[key]; ok {
+			return existed[key]
+		}
+		log.Infof("start to query document_id: %v", key)
 		var doc schema.VectorStoreDocument
 		db.Where("document_id = ?", key).First(&doc)
-		return []float32(doc.Embedding)
+		existed[key] = doc.Embedding
+		return doc.Embedding
 	})
 
 	// 检查是否成功恢复了图结构
 	// 如果GroupInfos不为空但layers为nil，可能是不支持的格式
 	if layers == nil && len(collections[0].GroupInfos) > 0 {
 		// 图信息存在但无法恢复，可能是PQ模式或其他不支持的格式
-		log.Warnf("无法从数据库恢复HNSW图结构，将使用空图开始")
+		log.Warnf("cannot recover hnsw graph from db, maybe pq mode or unsupported format, collection name: %s", collectionName)
 	}
 
 	hnswGraph.Layers = layers
@@ -276,6 +284,7 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 
 // SearchWithFilter 根据查询文本检索相关文档，并根据过滤函数过滤结果
 func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
+	log.Infof("start to search with query: %s", query)
 	pageSize := 10
 	s.mu.RLock()
 	defer s.mu.RUnlock()

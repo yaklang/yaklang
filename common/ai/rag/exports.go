@@ -193,11 +193,13 @@ func CreateCollection(db *gorm.DB, name string, description string, opts ...any)
 
 func LoadCollectionWithEmbeddingClient(db *gorm.DB, name string, client aispec.EmbeddingCaller, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
 	// 创建 SQLite 向量存储
+	log.Infof("start to load sqlite vector store for collection %#v", name)
 	store, err := LoadSQLiteVectorStoreHNSW(db, name, client)
 	if err != nil {
-		return nil, utils.Errorf("创建 SQLite 向量存储失败: %v", err)
+		return nil, utils.Errorf("load SQLite vector storage err: %v", err)
 	}
 	// 创建 RAG 系统
+	log.Infof("start to create RAG system for collection %#v", name)
 	ragSystem := NewRAGSystem(client, store)
 
 	return ragSystem, nil

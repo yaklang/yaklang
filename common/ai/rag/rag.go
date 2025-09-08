@@ -518,6 +518,7 @@ func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]Sear
 		limit = -1
 	}
 
+	log.Infof("start to search in vector storage with query: %#v", query)
 	results, err := r.VectorStore.Search(query, page, topN)
 	if err != nil {
 		return nil, err

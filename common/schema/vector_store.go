@@ -191,6 +191,9 @@ type VectorStoreCollection struct {
 type VectorStoreDocument struct {
 	gorm.Model
 
+	// entity / relationship / knowledge
+	DocumentType string
+
 	// 文档唯一标识符，在整个系统中唯一
 	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"document_id"`
 
