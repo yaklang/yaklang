@@ -200,14 +200,13 @@ func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) er
 
 // AddDocuments 添加文档到 RAG 系统
 func (r *RAGSystem) addDocuments(docs ...Document) error {
-	log.Infof("adding %d documents to RAG system", len(docs))
+	//log.Infof("adding %d documents to RAG system", len(docs))
 
 	var finalDocs []Document
 
 	// 为每个文档生成嵌入向量
 	for i := range docs {
-		log.Infof("generating embedding for document %s (index %d)", docs[i].ID, i)
-
+		//log.Infof("generating embedding for document %s (index %d)", docs[i].ID, i)
 		// 首先尝试直接生成嵌入
 		embeddingData, err := r.Embedder.Embedding(docs[i].Content)
 		if err != nil {
@@ -232,19 +231,19 @@ func (r *RAGSystem) addDocuments(docs ...Document) error {
 			return utils.Errorf("failed to generate embedding for document (empty embedding) %s", docs[i].ID)
 		}
 
-		log.Infof("successfully generated embedding for document %s, dimension: %d", docs[i].ID, len(embeddingData))
+		//log.Infof("successfully generated embedding for document %s, dimension: %d", docs[i].ID, len(embeddingData))
 		docs[i].Embedding = embeddingData
 		finalDocs = append(finalDocs, docs[i])
 	}
 
-	log.Infof("adding %d processed documents with embeddings to vector store", len(finalDocs))
+	//log.Infof("adding %d processed documents with embeddings to vector store", len(finalDocs))
 	// 添加到向量存储
 	err := r.VectorStore.Add(finalDocs...)
 	if err != nil {
 		log.Errorf("failed to add documents to vector store: %v", err)
 		return err
 	}
-	log.Infof("successfully added %d documents to vector store", len(finalDocs))
+	//log.Infof("successfully added %d documents to vector store", len(finalDocs))
 	return nil
 }
 
