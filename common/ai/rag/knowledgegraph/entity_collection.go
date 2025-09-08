@@ -38,7 +38,7 @@ func NewEntityCollection(db *gorm.DB, collectionName string) (*EntityCollection,
 
 // AddEntities 批量导入实体到RAG集合
 func (ec *EntityCollection) AddEntities(entities ...*Entity) error {
-	log.Infof("importing %d entities to collection: %s", len(entities), ec.collectionName)
+	//log.Infof("importing %d entities to collection: %s", len(entities), ec.collectionName)
 
 	for _, entity := range entities {
 		// 转换为RAG文档
