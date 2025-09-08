@@ -182,19 +182,20 @@ func averagePooling(embeddings [][]float32) []float32 {
 }
 
 func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
-	log.Infof("adding document with id: %s, content length: %d", docId, len(content))
+	//log.Infof("adding document with id: %s, content length: %d", docId, len(content))
 	doc := &Document{
 		ID:        docId,
 		Content:   content,
 		Metadata:  make(map[string]any),
 		Embedding: nil,
 	}
-	log.Infof("applying %d document options", len(opts))
+	//log.Infof("applying %d document options", len(opts))
 	for i, opt := range opts {
-		log.Infof("applying document option %d", i+1)
+		_ = i
+		//log.Infof("applying document option %d", i+1)
 		opt(doc)
 	}
-	log.Infof("document metadata after options: %+v", doc.Metadata)
+	//log.Infof("document metadata after options: %+v", doc.Metadata)
 	return r.addDocuments(*doc)
 }
 

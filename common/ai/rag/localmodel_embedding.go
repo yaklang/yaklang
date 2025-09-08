@@ -54,7 +54,7 @@ func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
 		return nil, fmt.Errorf("embedding client not initialized")
 	}
 
-	log.Infof("generating embedding for text of length: %d", len(text))
+	//log.Infof("generating embedding for text of length: %d", len(text))
 
 	// 使用内部的嵌入客户端生成向量
 	result, err := l.embedding.Embedding(text)
@@ -63,7 +63,7 @@ func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
 		return nil, fmt.Errorf("failed to generate embedding: %w", err)
 	}
 
-	log.Infof("successfully generated embedding with dimension: %d", len(result))
+	//log.Infof("successfully generated embedding with dimension: %d", len(result))
 	return result, nil
 }
 

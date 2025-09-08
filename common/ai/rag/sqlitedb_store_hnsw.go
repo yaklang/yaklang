@@ -284,19 +284,19 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 
 // SearchWithFilter 根据查询文本检索相关文档，并根据过滤函数过滤结果
 func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
-	log.Infof("start to search with query: %s", query)
+	//log.Infof("start to search with query: %s", query)
 	pageSize := 10
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	log.Infof("starting search for query with length: %d, page: %d, limit: %d", len(query), page, limit)
+	//log.Infof("starting search for query with length: %d, page: %d, limit: %d", len(query), page, limit)
 
 	// 生成查询的嵌入向量
 	queryEmbedding, err := s.embedder.Embedding(query)
 	if err != nil {
-		return nil, utils.Errorf("为查询生成嵌入向量失败: %v", err)
+		return nil, utils.Errorf("generate embedding vector for %#v: %v", query, err)
 	}
-	log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
+	//log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
 
 	resultNodes := s.hnsw.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
 		if key == DocumentTypeCollectionInfo {
