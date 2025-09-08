@@ -212,6 +212,10 @@ func (c *callbackManager) kv(key, data any) {
 		if c.onObjectCallback != nil {
 			c.onObjectCallback(mapData)
 		}
+		for _, callback := range c.onConditionalObjectCallback {
+			callback.Feed(mapData)
+		}
+
 		if originKey == nil {
 			if c.onRootMapCallback != nil {
 				c.onRootMapCallback(mapData)

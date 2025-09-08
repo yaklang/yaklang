@@ -9,12 +9,34 @@ import (
 	"unicode"
 )
 
+type ConditionalCallback struct {
+	condition []string
+	callback  func(data map[string]any)
+}
+
+func (c *ConditionalCallback) Feed(data map[string]any) {
+	if c == nil || c.condition == nil || data == nil {
+		return
+	}
+
+	for _, v := range c.condition {
+		if _, existed := data[v]; !existed {
+			return
+		}
+	}
+	if c.callback == nil {
+		return
+	}
+	c.callback(data)
+}
+
 type callbackManager struct {
-	objectKeyValueCallback func(string string, data any)
-	arrayValueCallback     func(idx int, data any)
-	onRootMapCallback      func(i map[string]any)
-	onArrayCallback        func(data []any)
-	onObjectCallback       func(data map[string]any)
+	objectKeyValueCallback      func(string string, data any)
+	arrayValueCallback          func(idx int, data any)
+	onRootMapCallback           func(i map[string]any)
+	onArrayCallback             func(data []any)
+	onObjectCallback            func(data map[string]any)
+	onConditionalObjectCallback []*ConditionalCallback
 
 	rawKVCallback func(key, data any)
 }
@@ -36,6 +58,18 @@ func WithRawKeyValueCallback(callback func(key, data any)) CallbackOption {
 func WithArrayCallback(callback func(data []any)) CallbackOption {
 	return func(c *callbackManager) {
 		c.onArrayCallback = callback
+	}
+}
+
+func WithRegisterConditionalObjectCallback(key []string, callback func(data map[string]any)) CallbackOption {
+	return func(c *callbackManager) {
+		if c.onConditionalObjectCallback == nil {
+			c.onConditionalObjectCallback = make([]*ConditionalCallback, 0)
+		}
+		c.onConditionalObjectCallback = append(c.onConditionalObjectCallback, &ConditionalCallback{
+			condition: key,
+			callback:  callback,
+		})
 	}
 }
 

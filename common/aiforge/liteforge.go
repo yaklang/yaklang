@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
@@ -23,6 +24,8 @@ type LiteForge struct {
 	OutputSchema     string
 	OutputActionName string
 	ExtendAIDOptions []aid.Option
+
+	OutputJsonHook []jsonextractor.CallbackOption
 }
 
 type LiteForgeOption func(*LiteForge) error
@@ -52,6 +55,16 @@ func WithLiteForge_OutputSchemaRaw(actionName string, outputSchema string) LiteF
 	return func(l *LiteForge) error {
 		l.OutputActionName = actionName
 		l.OutputSchema = outputSchema
+		return nil
+	}
+}
+
+func WithLiteForge_OutputJsonHook(hook ...jsonextractor.CallbackOption) LiteForgeOption {
+	return func(l *LiteForge) error {
+		if l.OutputJsonHook == nil {
+			l.OutputJsonHook = make([]jsonextractor.CallbackOption, 0)
+		}
+		l.OutputJsonHook = append(l.OutputJsonHook, hook...)
 		return nil
 	}
 }
@@ -175,7 +188,7 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 			}
 			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
 			var mirrored bytes.Buffer
-			action, err = aicommon.ExtractActionFromStream(io.TeeReader(result, &mirrored), l.OutputActionName)
+			action, err = aicommon.ExtractActionEx(io.TeeReader(result, &mirrored), l.OutputActionName, l.OutputJsonHook...)
 			if err != nil {
 				return utils.Errorf("extract action failed: %v", err)
 			}

@@ -1,6 +1,10 @@
 package aiforge
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
+)
 
 type RefineConfig struct {
 	RefinePrompt         string
@@ -10,6 +14,8 @@ type RefineConfig struct {
 	KnowledgeEntryLength int
 	Strict               bool
 	EnableERMEnhance     bool
+
+	Database *gorm.DB
 
 	*AnalysisConfig
 }
@@ -21,6 +27,7 @@ func NewRefineConfig(opts ...any) *RefineConfig {
 		KnowledgeEntryLength: 1000,
 		Strict:               false,
 		EnableERMEnhance:     true,
+		Database:             consts.GetGormProfileDatabase(),
 	}
 	otherOption := make([]any, 0)
 	for _, opt := range opts {
@@ -35,6 +42,12 @@ func NewRefineConfig(opts ...any) *RefineConfig {
 }
 
 type RefineOption func(*RefineConfig)
+
+func RefineWithCustomizeDatabase(db *gorm.DB) RefineOption {
+	return func(cfg *RefineConfig) {
+		cfg.Database = db
+	}
+}
 
 func RefineWithKnowledgeBaseDesc(desc string) RefineOption {
 	return func(cfg *RefineConfig) {
