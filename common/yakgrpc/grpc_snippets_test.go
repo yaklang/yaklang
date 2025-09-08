@@ -37,11 +37,12 @@ func TestSnippetsServer(t *testing.T) {
 
 		for i := 0; i < len(res.GetNames()); i++ {
 			get[res.GetNames()[i]] = &schema.Snippets{
-				CustomCodeName:  res.GetNames()[i],
-				CustomCodeData:  res.GetCodes()[i],
-				CustomCodeDesc:  res.GetDescriptions()[i],
-				CustomCodeState: schema.SwitcSnippetsType(res.GetStates()[i]),
-				CustomCodeLevel: schema.SwitcSnippetsLevel(res.GetLevels()[i]),
+				SnippetName:   res.GetNames()[i],
+				SnippetBody:   res.GetCodes()[i],
+				SnippetDesc:   res.GetDescriptions()[i],
+				SnippetState:  schema.SwitcSnippetsType(res.GetStates()[i]),
+				SnippetLevel:  schema.SwitcSnippetsLevel(res.GetLevels()[i]),
+				SnippetPrefix: res.GetPrefixs()[i],
 			}
 		}
 		require.Equal(t, get, want)
@@ -64,16 +65,18 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Http),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name,
 		})
 		require.NoError(t, err)
 
 		checkCustomCode(map[string]*schema.Snippets{
 			name: {
-				CustomCodeName:  name,
-				CustomCodeData:  code,
-				CustomCodeDesc:  desc,
-				CustomCodeState: schema.Snippets_Type_Http,
-				CustomCodeLevel: schema.Snippets_Level_Method,
+				SnippetName:   name,
+				SnippetBody:   code,
+				SnippetDesc:   desc,
+				SnippetState:  schema.Snippets_Type_Http,
+				SnippetLevel:  schema.Snippets_Level_Method,
+				SnippetPrefix: name,
 			},
 		})
 		defer deleteCustomCode([]string{name})
@@ -98,6 +101,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Http),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name,
 		})
 		require.Error(t, err, utils.Errorf("custom code name already exists"))
 
@@ -114,6 +118,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Http),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name,
 		})
 		require.NoError(t, err)
 
@@ -147,6 +152,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Http),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name,
 		})
 		require.NoError(t, err)
 
@@ -157,16 +163,18 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Yak),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name,
 		})
 		require.NoError(t, err)
 
 		checkCustomCode(map[string]*schema.Snippets{
 			name: {
-				CustomCodeName:  name,
-				CustomCodeData:  code2,
-				CustomCodeDesc:  desc,
-				CustomCodeState: schema.Snippets_Type_Yak,
-				CustomCodeLevel: schema.Snippets_Level_Method,
+				SnippetName:   name,
+				SnippetBody:   code2,
+				SnippetDesc:   desc,
+				SnippetState:  schema.Snippets_Type_Yak,
+				SnippetLevel:  schema.Snippets_Level_Method,
+				SnippetPrefix: name,
 			},
 		})
 
@@ -184,6 +192,7 @@ func TestSnippetsServer(t *testing.T) {
 			Code:        code,
 			Description: desc,
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name,
 		})
 		require.Error(t, err, utils.Errorf("custom code signing not found"))
 
@@ -202,6 +211,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Http),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name1,
 		})
 		require.NoError(t, err)
 
@@ -212,6 +222,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Yak),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name2,
 		})
 		require.NoError(t, err)
 
@@ -225,11 +236,12 @@ func TestSnippetsServer(t *testing.T) {
 
 		checkCustomCode(map[string]*schema.Snippets{
 			name2: {
-				CustomCodeName:  name2,
-				CustomCodeData:  code,
-				CustomCodeDesc:  desc,
-				CustomCodeState: schema.Snippets_Type_Yak,
-				CustomCodeLevel: schema.Snippets_Level_Method,
+				SnippetName:   name2,
+				SnippetBody:   code,
+				SnippetDesc:   desc,
+				SnippetState:  schema.Snippets_Type_Yak,
+				SnippetLevel:  schema.Snippets_Level_Method,
+				SnippetPrefix: name2,
 			},
 		})
 
@@ -248,6 +260,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Http),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name1,
 		})
 
 		require.NoError(t, err)
@@ -257,6 +270,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Http),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name2,
 		})
 		require.NoError(t, err)
 
@@ -267,6 +281,7 @@ func TestSnippetsServer(t *testing.T) {
 			Description: desc,
 			State:       string(schema.Snippets_Type_Yak),
 			Level:       string(schema.Snippets_Level_Method),
+			Prefix:      name2,
 		})
 		require.Error(t, err, utils.Errorf("new custom code signing is found"))
 

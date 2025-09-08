@@ -9,13 +9,14 @@ import (
 
 type Snippets struct {
 	gorm.Model
-	CustomCodeId   string `gorm:"uniqueIndex;not null" json:"custom_code_id"`
-	CustomCodeName string `gorm:"type:text;not null" json:"custom_code_name"`
-	CustomCodeData string `gorm:"type:text;not null" json:"custom_code_data"`
-	CustomCodeDesc string `gorm:"type:text" json:"custom_code_desc"`
+	SnippetId   string `gorm:"uniqueIndex;not null" json:"snippet_id"`
+	SnippetName string `gorm:"type:text;not null" json:"snippet_name"`
+	SnippetBody string `gorm:"type:text;not null" json:"snippet_data"`
+	SnippetDesc string `gorm:"type:text" json:"snippet_desc"`
 
-	CustomCodeLevel SnippetsLevel `gorm:"type:text;not null" json:"custom_code_level"`
-	CustomCodeState SnippetsType  `gorm:"type:text;not null" json:"custom_code_state"`
+	SnippetLevel  SnippetsLevel `gorm:"type:text;not null" json:"snippet_level"`
+	SnippetState  SnippetsType  `gorm:"type:text;not null" json:"snippet_state"`
+	SnippetPrefix string        `gorm:"type:text;not null" json:"snippet_prefix"`
 }
 
 // TableName 指定表名
@@ -142,17 +143,13 @@ func SwitcSnippetsLevel(in string) SnippetsLevel {
 }
 
 func NewSnippets(req *ypb.SnippetsRequest) *Snippets {
-	customName := req.GetName()
-	customData := req.GetCode()
-	customDesc := req.GetDescription()
-	customState := req.GetState()
-	customLevel := req.GetLevel()
 
 	return &Snippets{
-		CustomCodeName:  customName,
-		CustomCodeData:  customData,
-		CustomCodeDesc:  customDesc,
-		CustomCodeState: SwitcSnippetsType(customState),
-		CustomCodeLevel: SwitcSnippetsLevel(customLevel),
+		SnippetName:   req.GetName(),
+		SnippetBody:   req.GetCode(),
+		SnippetDesc:   req.GetDescription(),
+		SnippetState:  SwitcSnippetsType(req.GetState()),
+		SnippetLevel:  SwitcSnippetsLevel(req.GetLevel()),
+		SnippetPrefix: req.GetPrefix(),
 	}
 }

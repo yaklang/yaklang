@@ -38024,6 +38024,7 @@ type SnippetsRequest struct {
 	Description   string                 `protobuf:"bytes,3,opt,name=Description,proto3" json:"Description,omitempty"`
 	State         string                 `protobuf:"bytes,4,opt,name=State,proto3" json:"State,omitempty"`
 	Level         string                 `protobuf:"bytes,5,opt,name=Level,proto3" json:"Level,omitempty"`
+	Prefix        string                 `protobuf:"bytes,6,opt,name=Prefix,proto3" json:"Prefix,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -38093,6 +38094,13 @@ func (x *SnippetsRequest) GetLevel() string {
 	return ""
 }
 
+func (x *SnippetsRequest) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
 type EditSnippetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Target        string                 `protobuf:"bytes,1,opt,name=Target,proto3" json:"Target,omitempty"`
@@ -38101,6 +38109,7 @@ type EditSnippetsRequest struct {
 	Description   string                 `protobuf:"bytes,4,opt,name=Description,proto3" json:"Description,omitempty"`
 	State         string                 `protobuf:"bytes,5,opt,name=State,proto3" json:"State,omitempty"`
 	Level         string                 `protobuf:"bytes,6,opt,name=Level,proto3" json:"Level,omitempty"`
+	Prefix        string                 `protobuf:"bytes,7,opt,name=Prefix,proto3" json:"Prefix,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -38177,6 +38186,13 @@ func (x *EditSnippetsRequest) GetLevel() string {
 	return ""
 }
 
+func (x *EditSnippetsRequest) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
 type QuerySnippetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Filter        *SnippetsFilter        `protobuf:"bytes,1,opt,name=Filter,proto3" json:"Filter,omitempty"`
@@ -38228,6 +38244,7 @@ type SnippetsResponse struct {
 	Descriptions  []string               `protobuf:"bytes,3,rep,name=Descriptions,proto3" json:"Descriptions,omitempty"`
 	States        []string               `protobuf:"bytes,4,rep,name=States,proto3" json:"States,omitempty"`
 	Levels        []string               `protobuf:"bytes,5,rep,name=Levels,proto3" json:"Levels,omitempty"`
+	Prefixs       []string               `protobuf:"bytes,6,rep,name=Prefixs,proto3" json:"Prefixs,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -38293,6 +38310,13 @@ func (x *SnippetsResponse) GetStates() []string {
 func (x *SnippetsResponse) GetLevels() []string {
 	if x != nil {
 		return x.Levels
+	}
+	return nil
+}
+
+func (x *SnippetsResponse) GetPrefixs() []string {
+	if x != nil {
+		return x.Prefixs
 	}
 	return nil
 }
@@ -63407,28 +63431,31 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Value\x18\x01 \x01(\tR\x05Value\x12\x14\n" +
 	"\x05Total\x18\x02 \x01(\x05R\x05Total\"$\n" +
 	"\x0eSnippetsFilter\x12\x12\n" +
-	"\x04Name\x18\x01 \x03(\tR\x04Name\"\x87\x01\n" +
+	"\x04Name\x18\x01 \x03(\tR\x04Name\"\x9f\x01\n" +
 	"\x0fSnippetsRequest\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
 	"\x04Code\x18\x02 \x01(\tR\x04Code\x12 \n" +
 	"\vDescription\x18\x03 \x01(\tR\vDescription\x12\x14\n" +
 	"\x05State\x18\x04 \x01(\tR\x05State\x12\x14\n" +
-	"\x05Level\x18\x05 \x01(\tR\x05Level\"\xa3\x01\n" +
+	"\x05Level\x18\x05 \x01(\tR\x05Level\x12\x16\n" +
+	"\x06Prefix\x18\x06 \x01(\tR\x06Prefix\"\xbb\x01\n" +
 	"\x13EditSnippetsRequest\x12\x16\n" +
 	"\x06Target\x18\x01 \x01(\tR\x06Target\x12\x12\n" +
 	"\x04Name\x18\x02 \x01(\tR\x04Name\x12\x12\n" +
 	"\x04Code\x18\x03 \x01(\tR\x04Code\x12 \n" +
 	"\vDescription\x18\x04 \x01(\tR\vDescription\x12\x14\n" +
 	"\x05State\x18\x05 \x01(\tR\x05State\x12\x14\n" +
-	"\x05Level\x18\x06 \x01(\tR\x05Level\"C\n" +
+	"\x05Level\x18\x06 \x01(\tR\x05Level\x12\x16\n" +
+	"\x06Prefix\x18\a \x01(\tR\x06Prefix\"C\n" +
 	"\x14QuerySnippetsRequest\x12+\n" +
-	"\x06Filter\x18\x01 \x01(\v2\x13.ypb.SnippetsFilterR\x06Filter\"\x92\x01\n" +
+	"\x06Filter\x18\x01 \x01(\v2\x13.ypb.SnippetsFilterR\x06Filter\"\xac\x01\n" +
 	"\x10SnippetsResponse\x12\x14\n" +
 	"\x05Names\x18\x01 \x03(\tR\x05Names\x12\x14\n" +
 	"\x05Codes\x18\x02 \x03(\tR\x05Codes\x12\"\n" +
 	"\fDescriptions\x18\x03 \x03(\tR\fDescriptions\x12\x16\n" +
 	"\x06States\x18\x04 \x03(\tR\x06States\x12\x16\n" +
-	"\x06Levels\x18\x05 \x03(\tR\x06Levels\"\xb6\x01\n" +
+	"\x06Levels\x18\x05 \x03(\tR\x06Levels\x12\x18\n" +
+	"\aPrefixs\x18\x06 \x03(\tR\aPrefixs\"\xb6\x01\n" +
 	"\fCodecRequest\x12\x12\n" +
 	"\x04Text\x18\x01 \x01(\tR\x04Text\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x12\n" +

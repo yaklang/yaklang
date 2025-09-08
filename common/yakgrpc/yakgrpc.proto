@@ -5282,6 +5282,7 @@ message SnippetsRequest {
   string Description = 3;
   string State = 4;
   string Level = 5;
+  string Prefix = 6;
 }
 
 message EditSnippetsRequest {
@@ -5291,6 +5292,7 @@ message EditSnippetsRequest {
   string Description = 4;
   string State = 5;
   string Level = 6;
+  string Prefix = 7;
 }
 
 message QuerySnippetsRequest {
@@ -5303,6 +5305,7 @@ message SnippetsResponse {
   repeated string Descriptions = 3;
   repeated string States = 4;
   repeated string Levels = 5;
+  repeated string Prefixs = 6;
 }
 
 message CodecRequest {

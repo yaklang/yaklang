@@ -9,25 +9,27 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // Create test custom code signing data
 func createTestSnippets() *schema.Snippets {
 	return &schema.Snippets{
-		CustomCodeName:  uuid.NewString(),
-		CustomCodeData:  uuid.NewString(),
-		CustomCodeDesc:  uuid.NewString(),
-		CustomCodeState: "none",
-		CustomCodeLevel: "none",
+		SnippetName:   uuid.NewString(),
+		SnippetBody:   uuid.NewString(),
+		SnippetDesc:   uuid.NewString(),
+		SnippetState:  "none",
+		SnippetLevel:  "none",
+		SnippetPrefix: uuid.NewString(),
 	}
 }
 
 func TestCreateSnippets(t *testing.T) {
-	db := consts.GetGormProjectDatabase()
+	db := consts.GetGormProfileDatabase()
 
 	t.Run("Successfully create custom code signing", func(t *testing.T) {
 		customCode := createTestSnippets()
-		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
+		defer DeleteSnippets(db, &ypb.SnippetsFilter{})
 
 		err := CreateSnippet(db, customCode)
 		require.NoError(t, err)
@@ -39,13 +41,12 @@ func TestCreateSnippets(t *testing.T) {
 	t.Run("Creating custom code signing with duplicate name should fail", func(t *testing.T) {
 		customCode1 := createTestSnippets()
 		customCode2 := &schema.Snippets{
-			CustomCodeName:  customCode1.CustomCodeName,
-			CustomCodeData:  uuid.NewString(),
-			CustomCodeDesc:  "",
-			CustomCodeState: "none",
+			SnippetName:  customCode1.SnippetName,
+			SnippetBody:  uuid.NewString(),
+			SnippetDesc:  "",
+			SnippetState: "none",
 		}
-		defer DeleteSnippetsByName(db, customCode1.CustomCodeName)
-		defer DeleteSnippetsByName(db, customCode2.CustomCodeName)
+		defer DeleteSnippets(db, &ypb.SnippetsFilter{})
 
 		// Create the first one first
 		err := CreateSnippet(db, customCode1)
@@ -59,12 +60,12 @@ func TestCreateSnippets(t *testing.T) {
 
 	t.Run("Creating custom code signing with empty name should fail", func(t *testing.T) {
 		customCode := &schema.Snippets{
-			CustomCodeName:  "",
-			CustomCodeData:  uuid.NewString(),
-			CustomCodeDesc:  "",
-			CustomCodeState: "none",
+			SnippetName:  "",
+			SnippetBody:  uuid.NewString(),
+			SnippetDesc:  "",
+			SnippetState: "none",
 		}
-		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
+		defer DeleteSnippets(db, &ypb.SnippetsFilter{})
 
 		err := CreateSnippet(db, customCode)
 		require.Error(t, err)
@@ -73,22 +74,22 @@ func TestCreateSnippets(t *testing.T) {
 }
 
 func TestGetSnippetsByName(t *testing.T) {
-	db := consts.GetGormProjectDatabase()
+	db := consts.GetGormProfileDatabase()
 
 	t.Run("Successfully get custom code signing by name", func(t *testing.T) {
 		// Create one first
 		customCode := createTestSnippets()
-		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
+		defer DeleteSnippets(db, &ypb.SnippetsFilter{})
 
 		err := CreateSnippet(db, customCode)
 		require.NoError(t, err)
 
 		// Get by name
-		retrieved, err := GetSnippetsByName(db, customCode.CustomCodeName)
+		retrieved, err := GetSnippetsByName(db, customCode.SnippetName)
 		require.NoError(t, err)
 		assert.NotNil(t, retrieved)
-		assert.Equal(t, customCode.CustomCodeName, retrieved.CustomCodeName)
-		assert.Equal(t, customCode.CustomCodeData, retrieved.CustomCodeData)
+		assert.Equal(t, customCode.SnippetName, retrieved.SnippetName)
+		assert.Equal(t, customCode.SnippetBody, retrieved.SnippetBody)
 	})
 
 	t.Run("Getting non-existent name should fail", func(t *testing.T) {
@@ -107,29 +108,29 @@ func TestGetSnippetsByName(t *testing.T) {
 }
 
 func TestUpdateSnippets(t *testing.T) {
-	db := consts.GetGormProjectDatabase()
+	db := consts.GetGormProfileDatabase()
 
 	t.Run("Successfully update custom code signing", func(t *testing.T) {
 		// Create one first
 		customCode := createTestSnippets()
-		defer DeleteSnippetsByName(db, customCode.CustomCodeName)
+		defer DeleteSnippets(db, &ypb.SnippetsFilter{})
 		err := CreateSnippet(db, customCode)
 		require.NoError(t, err)
 
 		// Update data
-		customCode.CustomCodeData = uuid.NewString()
-		err = UpdateSnippet(db, customCode.CustomCodeName, customCode)
+		customCode.SnippetBody = uuid.NewString()
+		err = UpdateSnippet(db, customCode.SnippetName, customCode)
 		require.NoError(t, err)
 
 		// Verify update
-		retrieved, err := GetSnippetsByName(db, customCode.CustomCodeName)
+		retrieved, err := GetSnippetsByName(db, customCode.SnippetName)
 		require.NoError(t, err)
-		assert.Equal(t, customCode.CustomCodeData, retrieved.CustomCodeData)
+		assert.Equal(t, customCode.SnippetBody, retrieved.SnippetBody)
 	})
 
 	t.Run("Updating non-existent record should fail", func(t *testing.T) {
 		customCode := createTestSnippets()
-		err := UpdateSnippet(db, customCode.CustomCodeName, customCode)
+		err := UpdateSnippet(db, customCode.SnippetName, customCode)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 	})
@@ -137,14 +138,14 @@ func TestUpdateSnippets(t *testing.T) {
 
 func TestGetAllSnippetss(t *testing.T) {
 	t.Skip()
-	db := consts.GetGormProjectDatabase()
+	db := consts.GetGormProfileDatabase()
 
 	t.Run("Get all custom code signings", func(t *testing.T) {
 		// Create a few first
 		customCode1 := createTestSnippets()
 		customCode2 := createTestSnippets()
-		defer DeleteSnippetsByName(db, customCode1.CustomCodeName)
-		defer DeleteSnippetsByName(db, customCode2.CustomCodeName)
+		defer DeleteSnippetsByName(db, customCode1.SnippetName)
+		defer DeleteSnippetsByName(db, customCode2.SnippetName)
 
 		err := CreateSnippet(db, customCode1)
 		require.NoError(t, err)
@@ -159,10 +160,10 @@ func TestGetAllSnippetss(t *testing.T) {
 		// Check if it contains the data we created
 		names := make(map[string]bool)
 		for _, code := range all {
-			names[code.CustomCodeName] = true
+			names[code.SnippetName] = true
 		}
-		assert.True(t, names[customCode1.CustomCodeName])
-		assert.True(t, names[customCode2.CustomCodeName])
+		assert.True(t, names[customCode1.SnippetName])
+		assert.True(t, names[customCode2.SnippetName])
 	})
 
 	t.Run("Should return empty slice when database is empty", func(t *testing.T) {
@@ -174,19 +175,19 @@ func TestGetAllSnippetss(t *testing.T) {
 
 func TestGetSnippetssWithPagination(t *testing.T) {
 	t.Skip()
-	db := consts.GetGormProjectDatabase()
+	db := consts.GetGormProfileDatabase()
 
 	t.Run("Get custom code signings with pagination", func(t *testing.T) {
 		// Create multiple test data
 		for i := 1; i <= 25; i++ {
 			customCode := &schema.Snippets{
-				CustomCodeName:  fmt.Sprintf("test_code_%s", uuid.NewString()),
-				CustomCodeData:  fmt.Sprintf("test_data_%s", uuid.NewString()),
-				CustomCodeDesc:  "",
-				CustomCodeState: "none",
+				SnippetName:  fmt.Sprintf("test_code_%s", uuid.NewString()),
+				SnippetBody:  fmt.Sprintf("test_data_%s", uuid.NewString()),
+				SnippetDesc:  "",
+				SnippetState: "none",
 			}
 			err := CreateSnippet(db, customCode)
-			defer DeleteSnippetsByName(db, customCode.CustomCodeName)
+			defer DeleteSnippetsByName(db, customCode.SnippetName)
 			require.NoError(t, err)
 		}
 
