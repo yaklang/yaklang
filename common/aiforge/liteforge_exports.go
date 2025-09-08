@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -57,9 +58,17 @@ type liteforgeConfig struct {
 	forceImage bool
 
 	aidOptions []aid.Option
+
+	jsonExtractHook []jsonextractor.CallbackOption
 }
 
 type LiteForgeExecOption func(*liteforgeConfig)
+
+func WithJsonExtractHook(opts ...jsonextractor.CallbackOption) LiteForgeExecOption {
+	return func(cfg *liteforgeConfig) {
+		cfg.jsonExtractHook = append(cfg.jsonExtractHook, opts...)
+	}
+}
 
 // liteforge.output is an option for liteforge.Execute
 // it can limit the output of the liteforge.Execute
@@ -215,7 +224,7 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		return nil, utils.Errorf("jsonschema output must have '@action' - const value '%s', lite: ..."+`.."@action": {"const": "`+cfg.action+`"}`+"..., found: %v, expect: %v", cfg.action, ret, cfg.action)
 	}
 
-	liteforgeIns, err := NewLiteForge(cfg.id, WithLiteForge_OutputSchemaRaw(cfg.action, cfg.output))
+	liteforgeIns, err := NewLiteForge(cfg.id, WithLiteForge_OutputSchemaRaw(cfg.action, cfg.output), WithLiteForge_OutputJsonHook(cfg.jsonExtractHook...))
 	if err != nil {
 		return nil, utils.Errorf("new liteforge failed: %s", err)
 	}

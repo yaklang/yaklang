@@ -3,7 +3,6 @@ package aiforge
 import (
 	"bytes"
 	_ "embed"
-	"github.com/yaklang/yaklang/common/ai/rag/entitybase"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"io"
@@ -60,16 +59,10 @@ func BuildKnowledge(kbName string, input any, option ...any) (<-chan *schema.Kno
 
 func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
-	db := consts.GetGormProfileDatabase()
 	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
-	kb, err := knowledgebase.NewKnowledgeBase(db, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
+	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
 	if err != nil {
 		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
-	}
-
-	eb, err := entitybase.NewEntityRepository(db, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
-	if err != nil {
-		return nil, err
 	}
 
 	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeChannel, option...)
@@ -90,15 +83,6 @@ func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-cha
 				if !ok {
 					return
 				}
-				dbwg.Add(1)
-				go func() {
-					defer dbwg.Done()
-					err := SaveERMResult(eb, erm, option...)
-					if err != nil {
-						refineConfig.AnalyzeLog("failed to save erm result: %v", err)
-						return
-					}
-				}()
 
 				entries, err := BuildKnowledgeFromERM(erm, nil, option...)
 				if err != nil {
