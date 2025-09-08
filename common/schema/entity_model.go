@@ -101,11 +101,9 @@ func (e *ERModelEntity) ToRAGContent() string {
 		attrString.WriteString(fmt.Sprintf("%s=%v;", name, attr))
 	}
 
-	result, err := utils.RenderTemplate(`
-Entity {{ .name }}[{{ .type }}{{ if .type_verbose }}({{ .type_verbose }}){{ end }}]
-{{ if .desc }}{{ .desc }}{{ end }}
-{{ if .attr }}{{ .attr }}{{ end }}
-`, map[string]any{
+	result, err := utils.RenderTemplate("{{ .name }}[{{ .type }}{{ if .type_verbose }}({{ .type_verbose }}){{ end }}]"+
+		"{{ if .desc }} DESC: {{ .desc }}{{ end }}"+
+		"{{ if .attr }} ATTR:{{ .attr }}{{ end }}", map[string]any{
 		"name":         e.EntityName,
 		"type":         e.EntityType,
 		"type_verbose": e.EntityTypeVerbose,
