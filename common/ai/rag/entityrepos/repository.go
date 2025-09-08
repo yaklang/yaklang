@@ -186,18 +186,6 @@ func (e *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRel
 	)
 }
 
-func (e *EntityRepository) GetEntityByUUID(uuid string) (*schema.ERModelEntity, error) {
-	var entity schema.ERModelEntity
-	err := e.db.Model(&schema.ERModelEntity{}).Where("uuid = ? AND entity_base_id = ?", uuid, e.info.ID).First(&entity).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-		return nil, err
-	}
-	return &entity, nil
-}
-
 func (eb *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
 	matchedEntity, accurate, err := eb.MatchEntities(entity)
 	if err != nil { // not critical error
