@@ -19,13 +19,13 @@ func CreateSnippet(db *gorm.DB, customCode *schema.Snippets) error {
 	if customCode == nil {
 		return utils.Errorf("custom code signing is nil")
 	}
-	if customCode.CustomCodeName == "" {
+	if customCode.SnippetName == "" {
 		return utils.Errorf("custom code name cannot be empty")
 	}
-	customCode.CustomCodeId = uuid.NewString()
+	customCode.SnippetId = uuid.NewString()
 
 	var existing schema.Snippets
-	if err := db.Where("custom_code_name = ?", customCode.CustomCodeName).First(&existing).Error; err == nil {
+	if err := db.Where("snippet_name = ?", customCode.SnippetName).First(&existing).Error; err == nil {
 		return utils.Errorf("custom code name already exists")
 	}
 
@@ -45,7 +45,7 @@ func QuerySnippets(db *gorm.DB, filter *ypb.SnippetsFilter) ([]*schema.Snippets,
 
 	db = db.Model(&schema.Snippets{})
 	if filter.GetName() != nil {
-		db = bizhelper.ExactQueryStringArrayOr(db, "custom_code_name", filter.GetName())
+		db = bizhelper.ExactQueryStringArrayOr(db, "snippet_name", filter.GetName())
 	}
 	if err := db.Find(&data).Error; err != nil {
 		return nil, err
@@ -63,7 +63,7 @@ func GetSnippetsByName(db *gorm.DB, name string) (*schema.Snippets, error) {
 	}
 
 	var customCode schema.Snippets
-	if err := db.Where("custom_code_name = ?", name).First(&customCode).Error; err != nil {
+	if err := db.Where("snippet_name = ?", name).First(&customCode).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.Errorf("custom code signing not found")
 		}
@@ -143,16 +143,16 @@ func UpdateSnippet(db *gorm.DB, target string, customCode *schema.Snippets) erro
 	}
 
 	var existing schema.Snippets
-	if err := db.Where("custom_code_name = ?", target).First(&existing).Error; err != nil {
+	if err := db.Where("snippet_name = ?", target).First(&existing).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.Errorf("custom code signing not found")
 		}
 		return err
 	}
 
-	if customCode.CustomCodeName != "" && customCode.CustomCodeName != target {
+	if customCode.SnippetName != "" && customCode.SnippetName != target {
 		var data []*schema.Snippets
-		db := bizhelper.ExactQueryString(db, "custom_code_name", customCode.CustomCodeName)
+		db := bizhelper.ExactQueryString(db, "snippet_name", customCode.SnippetName)
 		if err := db.Find(&data).Error; err != nil {
 			return err
 		}
@@ -163,7 +163,7 @@ func UpdateSnippet(db *gorm.DB, target string, customCode *schema.Snippets) erro
 
 	customCode.ID = existing.ID
 	customCode.CreatedAt = existing.CreatedAt
-	customCode.CustomCodeId = existing.CustomCodeId
+	customCode.SnippetId = existing.SnippetId
 	return db.Save(customCode).Error
 }
 
@@ -180,7 +180,9 @@ func DeleteSnippets(db *gorm.DB, filter *ypb.SnippetsFilter) error {
 		return db.Delete(&schema.Snippets{}).Error
 	}
 	db = db.Model(&schema.Snippets{})
-	db = bizhelper.ExactQueryStringArrayOr(db, "custom_code_name", filter.GetName())
+	if filter.GetName() != nil {
+		db = bizhelper.ExactQueryStringArrayOr(db, "snippet_name", filter.GetName())
+	}
 
 	return db.Unscoped().Delete(&schema.Snippets{}).Error
 }
@@ -195,7 +197,7 @@ func DeleteSnippetsByName(db *gorm.DB, name string) error {
 	}
 
 	var customCode schema.Snippets
-	if err := db.Where("custom_code_name = ?", name).First(&customCode).Error; err != nil {
+	if err := db.Where("snippet_name = ?", name).First(&customCode).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return utils.Errorf("custom code signing not found")
 		}
@@ -229,21 +231,21 @@ func BulkCreateSnippetss(db *gorm.DB, customCodes []schema.Snippets) error {
 	}
 
 	for _, customCode := range customCodes {
-		if customCode.CustomCodeName == "" {
+		if customCode.SnippetName == "" {
 			return utils.Errorf("custom code name cannot be empty")
 		}
 	}
 
 	names := make(map[string]bool)
 	for _, customCode := range customCodes {
-		if names[customCode.CustomCodeName] {
+		if names[customCode.SnippetName] {
 			return utils.Errorf("duplicate custom code name found in batch")
 		}
-		names[customCode.CustomCodeName] = true
+		names[customCode.SnippetName] = true
 	}
 
 	var existingNames []string
-	if err := db.Model(&schema.Snippets{}).Where("custom_code_name IN ?", names).Pluck("custom_code_name", &existingNames).Error; err != nil {
+	if err := db.Model(&schema.Snippets{}).Where("snippet_name IN ?", names).Pluck("snippet_name", &existingNames).Error; err != nil {
 		return err
 	}
 
@@ -282,7 +284,7 @@ func BulkDeleteSnippetss(db *gorm.DB, names []string) error {
 	}
 
 	var count int64
-	if err := db.Model(&schema.Snippets{}).Where("custom_code_name IN ?", names).Count(&count).Error; err != nil {
+	if err := db.Model(&schema.Snippets{}).Where("snippet_name IN ?", names).Count(&count).Error; err != nil {
 		return err
 	}
 
@@ -290,7 +292,7 @@ func BulkDeleteSnippetss(db *gorm.DB, names []string) error {
 		return utils.Errorf("no custom code signings found to delete")
 	}
 
-	return db.Where("custom_code_name IN ?", names).Delete(&schema.Snippets{}).Error
+	return db.Where("snippet_name IN ?", names).Delete(&schema.Snippets{}).Error
 }
 
 // SearchSnippetss 搜索自定义代码签名
@@ -304,7 +306,7 @@ func SearchSnippetss(db *gorm.DB, query string) ([]schema.Snippets, error) {
 
 	var customCodes []schema.Snippets
 	searchQuery := "%" + query + "%"
-	if err := db.Where("custom_code_name LIKE ? OR custom_code_data LIKE ?", searchQuery, searchQuery).Find(&customCodes).Error; err != nil {
+	if err := db.Where("snippet_name LIKE ? OR snippet_data LIKE ?", searchQuery, searchQuery).Find(&customCodes).Error; err != nil {
 		return nil, err
 	}
 

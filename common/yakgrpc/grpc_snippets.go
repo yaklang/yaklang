@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) CreateSnippet(ctx context.Context, req *ypb.SnippetsRequest) (*ypb.Empty, error) {
-	if err := yakit.CreateSnippet(s.GetProjectDatabase(), schema.NewSnippets(req)); err != nil {
+	if err := yakit.CreateSnippet(s.GetProfileDatabase(), schema.NewSnippets(req)); err != nil {
 		return nil, err
 	}
 	return &ypb.Empty{}, nil
@@ -19,13 +19,13 @@ func (s *Server) CreateSnippet(ctx context.Context, req *ypb.SnippetsRequest) (*
 func (s *Server) UpdateSnippet(ctx context.Context, req *ypb.EditSnippetsRequest) (*ypb.Empty, error) {
 	target := req.GetTarget()
 
-	if err := yakit.UpdateSnippet(s.GetProjectDatabase(), target, &schema.Snippets{
-		CustomCodeId:    "",
-		CustomCodeName:  req.GetName(),
-		CustomCodeData:  req.GetCode(),
-		CustomCodeDesc:  req.GetDescription(),
-		CustomCodeState: schema.SwitcSnippetsType(req.GetState()),
-		CustomCodeLevel: schema.SnippetsLevel(req.GetLevel()),
+	if err := yakit.UpdateSnippet(s.GetProfileDatabase(), target, &schema.Snippets{
+		SnippetId:    "",
+		SnippetName:  req.GetName(),
+		SnippetBody:  req.GetCode(),
+		SnippetDesc:  req.GetDescription(),
+		SnippetState: schema.SwitcSnippetsType(req.GetState()),
+		SnippetLevel: schema.SnippetsLevel(req.GetLevel()),
 	}); err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (s *Server) UpdateSnippet(ctx context.Context, req *ypb.EditSnippetsRequest
 func (s *Server) DeleteSnippets(ctx context.Context, req *ypb.QuerySnippetsRequest) (*ypb.Empty, error) {
 	filter := req.GetFilter()
 
-	if err := yakit.DeleteSnippets(s.GetProjectDatabase(), filter); err != nil {
+	if err := yakit.DeleteSnippets(s.GetProfileDatabase(), filter); err != nil {
 		return nil, err
 	}
 	return &ypb.Empty{}, nil
@@ -44,25 +44,25 @@ func (s *Server) DeleteSnippets(ctx context.Context, req *ypb.QuerySnippetsReque
 func (s *Server) QuerySnippets(ctx context.Context, req *ypb.QuerySnippetsRequest) (*ypb.SnippetsResponse, error) {
 	filter := req.GetFilter()
 
-	Snippetss, err := yakit.QuerySnippets(s.GetProjectDatabase(), filter)
+	Snippets, err := yakit.QuerySnippets(s.GetProfileDatabase(), filter)
 	if err != nil {
 		return nil, err
 	}
 	return &ypb.SnippetsResponse{
-		Names: lo.Map(Snippetss, func(c *schema.Snippets, _ int) string {
-			return c.CustomCodeName
+		Names: lo.Map(Snippets, func(c *schema.Snippets, _ int) string {
+			return c.SnippetName
 		}),
-		Codes: lo.Map(Snippetss, func(c *schema.Snippets, _ int) string {
-			return c.CustomCodeData
+		Codes: lo.Map(Snippets, func(c *schema.Snippets, _ int) string {
+			return c.SnippetBody
 		}),
-		Descriptions: lo.Map(Snippetss, func(c *schema.Snippets, _ int) string {
-			return c.CustomCodeDesc
+		Descriptions: lo.Map(Snippets, func(c *schema.Snippets, _ int) string {
+			return c.SnippetDesc
 		}),
-		States: lo.Map(Snippetss, func(c *schema.Snippets, _ int) string {
-			return string(c.CustomCodeState)
+		States: lo.Map(Snippets, func(c *schema.Snippets, _ int) string {
+			return string(c.SnippetState)
 		}),
-		Levels: lo.Map(Snippetss, func(c *schema.Snippets, _ int) string {
-			return string(c.CustomCodeLevel)
+		Levels: lo.Map(Snippets, func(c *schema.Snippets, _ int) string {
+			return string(c.SnippetLevel)
 		}),
 	}, nil
 }
