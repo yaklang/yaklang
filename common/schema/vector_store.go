@@ -47,6 +47,15 @@ func (f *FloatArray) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, f)
 }
 
+type RAGDocumentType string
+
+const (
+	RAGDocumentType_Entity       RAGDocumentType = "entity"
+	RAGDocumentType_Relationship RAGDocumentType = "relationship"
+	RAGDocumentType_Knowledge    RAGDocumentType = "knowledge"
+	RAGDocumentType_Unclassified RAGDocumentType = ""
+)
+
 // MetadataMap 用于存储文档元数据的自定义类型
 // 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储 map 类型数据
 type MetadataMap map[string]interface{}
@@ -192,7 +201,9 @@ type VectorStoreDocument struct {
 	gorm.Model
 
 	// entity / relationship / knowledge
-	DocumentType string
+	DocumentType    RAGDocumentType
+	EntityID        string `gorm:"index"`
+	RelatedEntities string // text split by ","
 
 	// 文档唯一标识符，在整个系统中唯一
 	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"document_id"`

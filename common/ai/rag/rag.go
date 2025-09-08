@@ -29,10 +29,13 @@ const (
 
 // Document 表示可以被检索的文档
 type Document struct {
-	ID        string             `json:"id"`       // 文档唯一标识符
-	Content   string             `json:"content"`  // 文档内容
-	Metadata  schema.MetadataMap `json:"metadata"` // 文档元数据
-	Embedding []float32          `json:"-"`        // 文档的嵌入向量，不参与 JSON 序列化
+	ID              string                 `json:"id"`   // 文档唯一标识符
+	Type            schema.RAGDocumentType `json:"type"` // 文档类型
+	EntityUUID      string                 `json:"entityUUID"`
+	RelatedEntities []string               `json:"relatedEntities"`
+	Content         string                 `json:"content"`  // 文档内容
+	Metadata        schema.MetadataMap     `json:"metadata"` // 文档元数据
+	Embedding       []float32              `json:"-"`        // 文档的嵌入向量，不参与 JSON 序列化
 }
 
 // SearchResult 表示检索结果

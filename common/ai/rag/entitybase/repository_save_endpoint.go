@@ -54,13 +54,13 @@ func (e *SaveEndpoint) SaveEntity(entity *schema.ERModelEntity) error {
 	if err != nil {
 		return utils.Errorf("merge entity failed, %v", err)
 	}
-	e.nameToIndex.Set(tempName, saveEntity.HiddenIndex)
+	e.nameToIndex.Set(tempName, saveEntity.Uuid)
 	sig := e.nameSig.GetOrSet(tempName, newEndpointSignal())
-	sig.SetDataReady(saveEntity.HiddenIndex)
+	sig.SetDataReady(saveEntity.Uuid)
 	return nil
 }
 
-func (e *SaveEndpoint) AddRelationship(sourceName, targetName, RelationshipType, decisionRationale string, attr map[string]any) error {
+func (e *SaveEndpoint) AddRelationship(sourceName, targetName, relationType, typeVerbose string, attr map[string]any) error {
 	sourceIndex, err := e.WaitIndex(sourceName)
 	if err != nil {
 		return utils.Errorf("wait source entity index failed, %v", err)
@@ -69,7 +69,7 @@ func (e *SaveEndpoint) AddRelationship(sourceName, targetName, RelationshipType,
 	if err != nil {
 		return utils.Errorf("wait target entity index failed, %v", err)
 	}
-	err = e.eb.AddRelationship(sourceIndex, targetIndex, RelationshipType, decisionRationale, attr)
+	err = e.eb.AddRelationship(sourceIndex, targetIndex, relationType, typeVerbose, attr)
 	if err != nil {
 		return err
 	}
@@ -85,8 +85,8 @@ func (e *SaveEndpoint) WaitIndex(name string) (string, error) {
 		var err error
 		if currentIndex == index { // 如果Set了，说明之前没有这个实体，需要创建
 			err = e.eb.CreateEntity(&schema.ERModelEntity{
-				EntityName:  name,
-				HiddenIndex: index,
+				EntityName: name,
+				Uuid:       index,
 			})
 		}
 
