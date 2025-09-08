@@ -487,3 +487,21 @@ func WithDocumentRawMetadata(i map[string]any) DocumentOption {
 		}
 	}
 }
+
+func WithDocumentType(i schema.RAGDocumentType) DocumentOption {
+	return func(document *Document) {
+		document.Type = i
+	}
+}
+
+func WithDocumentEntityID(entityUUID string) DocumentOption {
+	return func(document *Document) {
+		document.EntityUUID = entityUUID
+	}
+}
+
+func WithDocumentRelatedEntities(uuids ...string) DocumentOption {
+	return func(document *Document) {
+		document.RelatedEntities = uuids
+	}
+}

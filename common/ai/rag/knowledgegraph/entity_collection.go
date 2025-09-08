@@ -51,8 +51,6 @@ func (ec *EntityCollection) AddEntities(entities ...*Entity) error {
 			return utils.Errorf("failed to import entity %s: %v", entity.ID, err)
 		}
 	}
-
-	log.Infof("successfully imported %d entities", len(entities))
 	return nil
 }
 

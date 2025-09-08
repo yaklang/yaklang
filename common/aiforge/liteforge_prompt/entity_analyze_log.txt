@@ -8,7 +8,6 @@
     *   **性能瓶颈 (Performance Bottlenecks)**: 聚合和分析包含 `duration` 或 `latency` 的日志，找出慢速操作。
     *   **安全事件 (Security Events)**: 识别如登录失败、权限拒绝、潜在的SQL注入尝试等。
 3.  **数据结构化**: 将非结构化的日志消息（如 "request failed with status 500"）解析为结构化的 `attributes`。
-4.  **决策理由**: 必须在 `decision_rationale` 中解释你如何将多条日志关联到同一个 `trace_id` 或 `session_id`，以及你识别异常的依据。
 ## **精细化实体与关系焦点**
 *   **核心日志实体**:
     *   `LOG_ENTRY`: 一条独立的、有意义的日志记录。

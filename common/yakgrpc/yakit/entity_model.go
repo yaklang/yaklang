@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -32,7 +33,7 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	}
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Names)
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "hidden_index", entityFilter.HiddenIndex)
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "uuid", entityFilter.HiddenIndex)
 	return db
 }
 
@@ -153,17 +154,18 @@ type AttributeFilter struct {
 //	return db.Create(attribute).Error
 //}
 
-func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, RelationshipType, decisionRationale string, attrs map[string]any) error {
+func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, RelationshipType, typeVerbose string, attrs map[string]any) (*schema.ERModelRelationship, error) {
 	Relationship := schema.ERModelRelationship{
-		SourceEntityIndex: sourceIndex,
-		TargetEntityIndex: targetIndex,
-		RelationshipType:  RelationshipType,
-		DecisionRationale: decisionRationale,
-		Attributes:        attrs,
-		EntityBaseIndex:   baseIndex,
+		SourceEntityIndex:       sourceIndex,
+		TargetEntityIndex:       targetIndex,
+		RelationshipType:        RelationshipType,
+		RelationshipTypeVerbose: typeVerbose,
+		Attributes:              attrs,
+		EntityBaseIndex:         baseIndex,
+		Uuid:                    uuid.New().String(),
 	}
 	Relationship.Hash = Relationship.CalcHash()
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
 		findErr := tx.Where("hash = ?", Relationship.Hash).First(&Relationship).Error
 		if findErr == nil {
 			return nil // 事务成功结束
@@ -173,11 +175,12 @@ func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, Relations
 		}
 		return findErr
 	})
+	return &Relationship, err
 }
 
 func GetOutgoingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
+	if err := db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
@@ -185,7 +188,7 @@ func GetOutgoingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*sch
 
 func GetIncomingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
+	if err := db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
@@ -265,13 +268,13 @@ func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxD
 	var visited = make(map[string]bool)
 	for _, startEntity := range startList {
 		queue = append(queue, &queueItem{
-			index: startEntity.HiddenIndex,
+			index: startEntity.Uuid,
 			depth: 0,
 			e:     startEntity,
 		},
 		)
 		appendEntity(startEntity)
-		visited[startEntity.HiddenIndex] = true
+		visited[startEntity.Uuid] = true
 	}
 
 	visitedRelationships := map[uint]bool{}
@@ -359,10 +362,7 @@ func (model *ERModel) Dump() string {
 	for _, relationship := range model.Relationships {
 		sb.WriteString(fmt.Sprintf("- Source: %s\n", relationship.SourceEntityIndex))
 		sb.WriteString(fmt.Sprintf("  Target: %s\n", relationship.TargetEntityIndex))
-		sb.WriteString(fmt.Sprintf("  Type: %s\n", relationship.RelationshipType))
-		if relationship.DecisionRationale != "" {
-			sb.WriteString(fmt.Sprintf("  Rationale: %s\n", utils.ShrinkString(relationship.DecisionRationale, 100)))
-		}
+		sb.WriteString(fmt.Sprintf("  Type: %s[%v]\n", relationship.RelationshipType, relationship.RelationshipTypeVerbose))
 		if len(relationship.Attributes) > 0 {
 			sb.WriteString("  Attributes:\n")
 			for key, value := range relationship.Attributes {
@@ -384,7 +384,7 @@ func (model *ERModel) Dot() *dot.Graph {
 		for key, value := range entity.Attributes {
 			G.NodeAttribute(n, key, utils.InterfaceToString(value))
 		}
-		rMap[entity.HiddenIndex] = n
+		rMap[entity.Uuid] = n
 	}
 
 	for _, Relationship := range model.Relationships {

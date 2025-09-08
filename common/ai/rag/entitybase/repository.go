@@ -148,19 +148,56 @@ func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) 
 	defer eb.ragMutex.Unlock()
 
 	metadata := map[string]any{
-		schema.META_Doc_Index:  entry.HiddenIndex,
+		schema.META_Doc_Index:  entry.Uuid,
 		schema.META_Doc_Name:   entry.EntityName,
 		schema.META_Base_Index: entry.EntityBaseIndex,
 		META_EntityBaseID:      entry.EntityBaseID,
 		META_EntityType:        entry.EntityType,
 	}
 
-	documentID := fmt.Sprintf("base_%d_entity_%d[%s]", eb.baseInfo.ID, entry.ID, entry.EntityName)
-	err := eb.GetRAGSystem().Add(documentID, entry.EntityName, rag.WithDocumentRawMetadata(metadata))
+	var opts []rag.DocumentOption
+
+	opts = append(opts, rag.WithDocumentRawMetadata(metadata),
+		rag.WithDocumentType(schema.RAGDocumentType_Entity),
+		rag.WithDocumentEntityID(entry.Uuid), // let RAG system generate embedding
+	)
+	documentID := fmt.Sprintf("%v_entity", entry.Uuid)
+	content := entry.ToRAGContent()
+	return eb.GetRAGSystem().Add(documentID, content, opts...)
+}
+
+func (e *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRelationship) error {
+	e.ragMutex.Lock()
+	defer e.ragMutex.Unlock()
+
+	src, err := e.GetEntityByUUID(entry.SourceEntityIndex)
 	if err != nil {
-		return err
+		return utils.Errorf("failed to get source entity by uuid [%s]: %v", entry.SourceEntityIndex, err)
 	}
-	return eb.GetRAGSystem().Add(documentID+"_detail", entry.String(), rag.WithDocumentRawMetadata(metadata))
+	srcDoc := src.ToRAGContent()
+	dst, err := e.GetEntityByUUID(entry.TargetEntityIndex)
+	if err != nil {
+		return utils.Errorf("failed to get target entity by uuid [%s]: %v", entry.TargetEntityIndex, err)
+	}
+	dstDoc := dst.ToRAGContent()
+	content := entry.ToRAGContent(srcDoc, dstDoc)
+	return e.GetRAGSystem().Add(
+		entry.Uuid, content,
+		rag.WithDocumentType(schema.RAGDocumentType_Relationship),
+		rag.WithDocumentRelatedEntities(entry.SourceEntityIndex, entry.TargetEntityIndex),
+	)
+}
+
+func (e *EntityRepository) GetEntityByUUID(uuid string) (*schema.ERModelEntity, error) {
+	var entity schema.ERModelEntity
+	err := e.db.Model(&schema.ERModelEntity{}).Where("uuid = ? AND entity_base_id = ?", uuid, e.baseInfo.ID).First(&entity).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &entity, nil
 }
 
 func (eb *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
@@ -239,13 +276,23 @@ func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 
 //--- Relationship Operations ---
 
-func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, RelationshipType string, decisionRationale string, attr map[string]any) error {
-	return yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.baseInfo.HiddenIndex, RelationshipType, decisionRationale, attr)
+func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, relationType string, typeVerbose string, attr map[string]any) error {
+	data, err := yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.baseInfo.HiddenIndex, relationType, typeVerbose, attr)
+	if err != nil {
+		log.Warnf("failed to add relation [%s] to vector [%s]: %v", relationType, sourceIndex, err)
+		return utils.Wrapf(err, "failed to add relation [%s] to vector [%s]", relationType, sourceIndex)
+	}
+	err = eb.addRelationshipToVectorIndex(data)
+	if err != nil {
+		log.Warnf("failed to add relation [%s] to vector index: %v", relationType, err)
+		return utils.Wrapf(err, "failed to add relation [%s] to vector index", relationType)
+	}
+	return nil
 }
 
 func (eb *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
+	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
@@ -253,7 +300,7 @@ func (eb *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEnt
 
 func (eb *EntityRepository) QueryIncomingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.HiddenIndex).Find(&relationships).Error; err != nil {
+	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
