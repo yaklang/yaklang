@@ -37,11 +37,11 @@ func TestSnippetsServer(t *testing.T) {
 
 		for i := 0; i < len(res.GetNames()); i++ {
 			get[res.GetNames()[i]] = &schema.Snippets{
-				CustomCodeName:  res.GetNames()[i],
-				CustomCodeData:  res.GetCodes()[i],
-				CustomCodeDesc:  res.GetDescriptions()[i],
-				CustomCodeState: schema.SwitcSnippetsType(res.GetStates()[i]),
-				CustomCodeLevel: schema.SwitcSnippetsLevel(res.GetLevels()[i]),
+				SnippetName:  res.GetNames()[i],
+				SnippetBody:  res.GetCodes()[i],
+				SnippetDesc:  res.GetDescriptions()[i],
+				SnippetState: schema.SwitcSnippetsType(res.GetStates()[i]),
+				SnippetLevel: schema.SwitcSnippetsLevel(res.GetLevels()[i]),
 			}
 		}
 		require.Equal(t, get, want)
@@ -69,11 +69,11 @@ func TestSnippetsServer(t *testing.T) {
 
 		checkCustomCode(map[string]*schema.Snippets{
 			name: {
-				CustomCodeName:  name,
-				CustomCodeData:  code,
-				CustomCodeDesc:  desc,
-				CustomCodeState: schema.Snippets_Type_Http,
-				CustomCodeLevel: schema.Snippets_Level_Method,
+				SnippetName:  name,
+				SnippetBody:  code,
+				SnippetDesc:  desc,
+				SnippetState: schema.Snippets_Type_Http,
+				SnippetLevel: schema.Snippets_Level_Method,
 			},
 		})
 		defer deleteCustomCode([]string{name})
@@ -162,11 +162,11 @@ func TestSnippetsServer(t *testing.T) {
 
 		checkCustomCode(map[string]*schema.Snippets{
 			name: {
-				CustomCodeName:  name,
-				CustomCodeData:  code2,
-				CustomCodeDesc:  desc,
-				CustomCodeState: schema.Snippets_Type_Yak,
-				CustomCodeLevel: schema.Snippets_Level_Method,
+				SnippetName:  name,
+				SnippetBody:  code2,
+				SnippetDesc:  desc,
+				SnippetState: schema.Snippets_Type_Yak,
+				SnippetLevel: schema.Snippets_Level_Method,
 			},
 		})
 
@@ -225,11 +225,11 @@ func TestSnippetsServer(t *testing.T) {
 
 		checkCustomCode(map[string]*schema.Snippets{
 			name2: {
-				CustomCodeName:  name2,
-				CustomCodeData:  code,
-				CustomCodeDesc:  desc,
-				CustomCodeState: schema.Snippets_Type_Yak,
-				CustomCodeLevel: schema.Snippets_Level_Method,
+				SnippetName:  name2,
+				SnippetBody:  code,
+				SnippetDesc:  desc,
+				SnippetState: schema.Snippets_Type_Yak,
+				SnippetLevel: schema.Snippets_Level_Method,
 			},
 		})
 
