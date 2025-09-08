@@ -1,7 +1,6 @@
 package yakit
 
 import (
-	"fmt"
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/schema"
@@ -164,25 +163,22 @@ func DeleteSSARiskDisposals(db *gorm.DB, req *ypb.DeleteSSARiskDisposalsRequest)
 
 // GetSSARiskDisposalsWithTaskInfo 获取包含扫描任务信息的处置数据，支持继承逻辑
 func GetSSARiskDisposalsWithTaskInfo(db *gorm.DB, riskId int64) ([]*ypb.SSARiskDisposalData, error) {
-	// 首先获取风险信息
 	var risk schema.SSARisk
 	if err := db.Where("id = ?", riskId).First(&risk).Error; err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposalsWithTaskInfo failed to query risk: %v", err)
 	}
 
-	// 如果没有 RiskFeatureHash，则只返回该 Risk 的直接处置信息
 	if risk.RiskFeatureHash == "" {
 		return getDirectDisposalsWithTaskInfo(db, riskId)
 	}
 
-	// 通过 TaskId 获取当前风险的扫描任务信息
 	var currentTask schema.SyntaxFlowScanTask
 	if err := db.Where("task_id = ?", risk.RuntimeId).First(&currentTask).Error; err != nil {
-		// 如果找不到扫描任务，则只返回直接处置信息
+		// 没有taskId不使用审计携带
 		return getDirectDisposalsWithTaskInfo(db, riskId)
 	}
 
-	// 查询所有相同 RiskFeatureHash 的处置信息，但只包括早于或等于当前扫描批次号的记录
+	// 审计携带
 	var disposals []schema.SSARiskDisposals
 	if err := db.Model(&schema.SSARiskDisposals{}).
 		Joins("JOIN syntax_flow_scan_tasks ON ssa_risk_disposals.task_id = syntax_flow_scan_tasks.task_id").
@@ -196,7 +192,7 @@ func GetSSARiskDisposalsWithTaskInfo(db *gorm.DB, riskId int64) ([]*ypb.SSARiskD
 	return convertDisposalsToGRPCModel(db, disposals)
 }
 
-// getDirectDisposalsWithTaskInfo 获取直接处置信息（不包含继承）
+// getDirectDisposalsWithTaskInfo 获取直接处置信息，不使用审计携带
 func getDirectDisposalsWithTaskInfo(db *gorm.DB, riskId int64) ([]*ypb.SSARiskDisposalData, error) {
 	var disposals []schema.SSARiskDisposals
 	if err := db.Where("ssa_risk_id = ?", riskId).
@@ -206,28 +202,6 @@ func getDirectDisposalsWithTaskInfo(db *gorm.DB, riskId int64) ([]*ypb.SSARiskDi
 	}
 
 	return convertDisposalsToGRPCModel(db, disposals)
-}
-
-func convertDisposalsToGRPCModel(db *gorm.DB, disposals []schema.SSARiskDisposals) ([]*ypb.SSARiskDisposalData, error) {
-	var result []*ypb.SSARiskDisposalData
-	for _, disposal := range disposals {
-		var task schema.SyntaxFlowScanTask
-		taskName := disposal.TaskId
-
-		if err := db.Where("task_id = ?", disposal.TaskId).First(&task).Error; err == nil {
-			taskName = fmt.Sprintf("%s_批次%d", task.Programs, task.ScanBatch)
-		}
-		result = append(result, &ypb.SSARiskDisposalData{
-			Id:        int64(disposal.ID),
-			CreatedAt: disposal.CreatedAt.Unix(),
-			UpdatedAt: disposal.UpdatedAt.Unix(),
-			RiskId:    disposal.SSARiskID,
-			Status:    disposal.Status,
-			Comment:   disposal.Comment,
-			TaskName:  taskName,
-		})
-	}
-	return result, nil
 }
 
 func UpdateSSARiskDisposals(db *gorm.DB, req *ypb.UpdateSSARiskDisposalsRequest) ([]schema.SSARiskDisposals, error) {
@@ -252,4 +226,21 @@ func UpdateSSARiskDisposals(db *gorm.DB, req *ypb.UpdateSSARiskDisposalsRequest)
 		return nil
 	})
 	return toUpdate, err
+}
+
+func convertDisposalsToGRPCModel(db *gorm.DB, disposals []schema.SSARiskDisposals) ([]*ypb.SSARiskDisposalData, error) {
+	var result []*ypb.SSARiskDisposalData
+	for _, disposal := range disposals {
+		taskName := GetFormattedTaskName(db, disposal.TaskId)
+		result = append(result, &ypb.SSARiskDisposalData{
+			Id:        int64(disposal.ID),
+			CreatedAt: disposal.CreatedAt.Unix(),
+			UpdatedAt: disposal.UpdatedAt.Unix(),
+			RiskId:    disposal.SSARiskID,
+			Status:    disposal.Status,
+			Comment:   disposal.Comment,
+			TaskName:  taskName,
+		})
+	}
+	return result, nil
 }

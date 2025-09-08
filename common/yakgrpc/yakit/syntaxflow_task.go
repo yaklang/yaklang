@@ -1,7 +1,9 @@
 package yakit
 
 import (
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -79,4 +81,24 @@ func GetMaxScanBatch(db *gorm.DB, programs []string) (uint64, error) {
 		return 0, err
 	}
 	return result.MaxBatch, nil
+}
+
+// FormatTaskName 格式化任务名称
+// 例如: [批次8]JavaSecLab(2025-0905-16:25)<2025-09-05 16:25:00>
+func FormatTaskName(scanBatch uint64, programs string, time time.Time) string {
+	scanTime := time.Format("2006-01-02 15:04:05")
+	return fmt.Sprintf("[批次%d]%s<%s>", scanBatch, programs, scanTime)
+}
+
+// GetFormattedTaskName 根据任务ID获取格式化的任务名称
+// 如果任务不存在，返回任务ID本身
+func GetFormattedTaskName(db *gorm.DB, taskId string) string {
+	if taskId == "" {
+		return ""
+	}
+	var task schema.SyntaxFlowScanTask
+	if err := db.Where("task_id = ?", taskId).First(&task).Error; err != nil {
+		return taskId
+	}
+	return FormatTaskName(task.ScanBatch, task.Programs, task.CreatedAt)
 }

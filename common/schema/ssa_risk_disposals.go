@@ -74,7 +74,7 @@ func (s *SSARiskDisposals) ToGRPCModel() *ypb.SSARiskDisposalData {
 		RiskId:    s.SSARiskID,
 		Status:    s.Status,
 		Comment:   s.Comment,
-		TaskName:  s.TaskId, // TODO:暂时使用TaskId，后续可以通过数据库查询获取详细信息
+		TaskName:  s.TaskId,
 	}
 }
 
