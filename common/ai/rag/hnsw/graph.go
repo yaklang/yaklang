@@ -681,6 +681,10 @@ func (h *Graph[K]) search(near Vector, k int, filter FilterFunc[K]) []SearchResu
 		// Descending hierarchies
 		if layer > 0 {
 			nodes := search(searchPoint, 1, efSearch, near, h.nodeDistance, nil)
+			if len(nodes) == 0 {
+				log.Warnf("search returned no nodes at layer %d, this should not happen, continue to next layer directly", layer)
+				continue
+			}
 			elevator = ptr(nodes[0].node.GetKey())
 			continue
 		}

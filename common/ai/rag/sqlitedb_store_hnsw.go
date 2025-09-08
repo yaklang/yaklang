@@ -51,7 +51,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		if _, ok := existed[key]; ok {
 			return existed[key]
 		}
-		log.Infof("start to query document_id: %v", key)
+		// log.Infof("start to query document_id: %v", key)
 		var doc schema.VectorStoreDocument
 		db.Where("document_id = ?", key).First(&doc)
 		existed[key] = doc.Embedding
