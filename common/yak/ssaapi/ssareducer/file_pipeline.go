@@ -2,6 +2,7 @@ package ssareducer
 
 import (
 	"context"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -24,6 +25,7 @@ func FilesHandler(
 	filesystem filesys_interface.FileSystem,
 	paths []string,
 	handler func(path string, content []byte) (ssa.FrontAST, error),
+	orderType int,
 ) <-chan *FileContent {
 	bufSize := len(paths)
 	readFilePipe := pipeline.NewPipe[string, *FileContent](
@@ -48,36 +50,48 @@ func FilesHandler(
 			return fileContent, nil
 		},
 	)
-	parseASTPipe.FeedChannel(readFilePipe.Out())
 
-	out := make([]*FileContent, 0, len(paths))
-	for fc := range parseASTPipe.Out() {
-		out = append(out, fc)
-	}
-
-	pathIndex := make(map[string]int, len(paths))
-	for i, p := range paths {
-		pathIndex[p] = i
-	}
-
-	// slices.SortFunc(out, func(a, b *FileContent) int {
-	// 	indexA := pathIndex[a.Path]
-	// 	indexB := pathIndex[b.Path]
-	// 	if indexA < indexB {
-	// 		return -1
-	// 	}
-	// 	if indexA > indexB {
-	// 		return 1
-	// 	}
-	// 	return 0
-	// })
-	ch := make(chan *FileContent, bufSize)
-	go func() {
-		defer close(ch)
-		for _, fc := range out {
-			ch <- fc
+	sort := func(index int) <-chan *FileContent {
+		out := make([]*FileContent, 0, len(paths))
+		for fc := range parseASTPipe.Out() {
+			out = append(out, fc)
 		}
-	}()
-	return ch
-	// return parseASTPipe.Out()
+
+		pathIndex := make(map[string]int, len(paths))
+		for i, p := range paths {
+			pathIndex[p] = i
+		}
+
+		slices.SortFunc(out, func(a, b *FileContent) int {
+			indexA := pathIndex[a.Path]
+			indexB := pathIndex[b.Path]
+			if indexA < indexB {
+				return index
+			}
+			if indexA > indexB {
+				return -index
+			}
+			return 0
+		})
+		ch := make(chan *FileContent, bufSize)
+		go func() {
+			defer close(ch)
+			for _, fc := range out {
+				ch <- fc
+			}
+		}()
+		return ch
+	}
+
+	parseASTPipe.FeedChannel(readFilePipe.Out())
+	switch orderType {
+	case 0:
+		return sort(-1)
+	case 1:
+		return sort(1)
+	case 2:
+		return parseASTPipe.Out()
+	}
+
+	return parseASTPipe.Out()
 }
