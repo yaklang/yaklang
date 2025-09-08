@@ -38,5 +38,6 @@ func (c *config) getFileHandler(
 			}
 			return nil, utils.Errorf("not select language %s", c.language)
 		},
+		int(c.astSequence),
 	)
 }

@@ -42,12 +42,24 @@ const (
 func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
-		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
-		require.Nil(t, err)
+		var astSequence ssaapi.ASTSequenceType
+		for i := 0; i < 3; i++ {
+			switch i {
+			case 0:
+				astSequence = ssaapi.Order
+			case 1:
+				astSequence = ssaapi.ReverseOrder
+			case 2:
+				astSequence = ssaapi.OutOfOrder
+			}
 
-		log.Infof("only in memory ")
-		err = handler(prog)
-		require.Nil(t, err)
+			prog, err := ssaapi.ParseProjectWithFS(fs, append(opt, ssaapi.WithASTOrder(astSequence))...)
+			require.Nil(t, err)
+
+			log.Infof("only in memory ")
+			err = handler(prog)
+			require.Nil(t, err)
+		}
 	}
 
 	programID := uuid.NewString()
