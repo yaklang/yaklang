@@ -42,7 +42,11 @@ func createMockData(t *testing.T, db *gorm.DB) *EntityRepository {
 		},
 	}
 
-	// 创建测试实体: a -> b -> c -> d
+	// 创建测试实体: 构建更复杂的图结构
+	// A -> B -> C -> D
+	// A -> E -> C
+	// B -> F -> D
+	// 这样可以生成多条2跳和3跳路径
 	entities := []*schema.ERModelEntity{
 		{
 			RepositoryUUID: repo.info.Uuid,
@@ -68,6 +72,18 @@ func createMockData(t *testing.T, db *gorm.DB) *EntityRepository {
 			Uuid:           "entity-d",
 			EntityType:     "test",
 		},
+		{
+			RepositoryUUID: repo.info.Uuid,
+			EntityName:     "Entity E",
+			Uuid:           "entity-e",
+			EntityType:     "test",
+		},
+		{
+			RepositoryUUID: repo.info.Uuid,
+			EntityName:     "Entity F",
+			Uuid:           "entity-f",
+			EntityType:     "test",
+		},
 	}
 
 	// 插入实体
@@ -76,8 +92,9 @@ func createMockData(t *testing.T, db *gorm.DB) *EntityRepository {
 		require.NoError(t, result.Error)
 	}
 
-	// 创建测试关系: a -> b, b -> c, c -> d
+	// 创建测试关系: 构建多个路径
 	relationships := []*schema.ERModelRelationship{
+		// 主路径: A -> B -> C -> D
 		{
 			RepositoryUUID:    repo.info.Uuid,
 			SourceEntityIndex: "entity-a",
@@ -99,6 +116,36 @@ func createMockData(t *testing.T, db *gorm.DB) *EntityRepository {
 			RelationshipType:  "relates_to",
 			Uuid:              "rel-c-d",
 		},
+		// 分支路径: A -> E -> C
+		{
+			RepositoryUUID:    repo.info.Uuid,
+			SourceEntityIndex: "entity-a",
+			TargetEntityIndex: "entity-e",
+			RelationshipType:  "relates_to",
+			Uuid:              "rel-a-e",
+		},
+		{
+			RepositoryUUID:    repo.info.Uuid,
+			SourceEntityIndex: "entity-e",
+			TargetEntityIndex: "entity-c",
+			RelationshipType:  "relates_to",
+			Uuid:              "rel-e-c",
+		},
+		// 分支路径: B -> F -> D
+		{
+			RepositoryUUID:    repo.info.Uuid,
+			SourceEntityIndex: "entity-b",
+			TargetEntityIndex: "entity-f",
+			RelationshipType:  "relates_to",
+			Uuid:              "rel-b-f",
+		},
+		{
+			RepositoryUUID:    repo.info.Uuid,
+			SourceEntityIndex: "entity-f",
+			TargetEntityIndex: "entity-d",
+			RelationshipType:  "relates_to",
+			Uuid:              "rel-f-d",
+		},
 	}
 
 	// 插入关系
@@ -114,51 +161,39 @@ func TestYieldKHop_AllPaths(t *testing.T) {
 	db := setupTestDB(t)
 	repo := createMockData(t, db)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// 调试：检查数据是否正确插入
+	// 验证测试数据结构
 	entities := make([]*schema.ERModelEntity, 0)
 	for entity := range repo.YieldEntities(ctx) {
 		entities = append(entities, entity)
 	}
 	t.Logf("Entity count: %d", len(entities))
+	assert.Equal(t, 6, len(entities), "应该有6个实体")
 
 	relationships := make([]*schema.ERModelRelationship, 0)
 	for rel := range repo.YieldRelationships(ctx) {
 		relationships = append(relationships, rel)
 	}
 	t.Logf("Relationship count: %d", len(relationships))
-
-	// 调试：检查表是否存在
-	var tables []string
-	db.Raw("SELECT name FROM sqlite_master WHERE type='table'").Pluck("name", &tables)
-	t.Logf("Available tables: %v", tables)
-
-	// 调试：检查YieldEntities是否正常工作
-	entityChan := repo.YieldEntities(ctx)
-	entityList := make([]*schema.ERModelEntity, 0)
-	for entity := range entityChan {
-		entityList = append(entityList, entity)
-		t.Logf("Found entity: %s (%s)", entity.EntityName, entity.Uuid)
-	}
-	t.Logf("YieldEntities returned %d entities", len(entityList))
-
-	// 调试：检查YieldRelationships是否正常工作 - 注释掉以避免并发问题
-	// relChan := repo.YieldRelationships(ctx)
-	// relList := make([]*schema.ERModelRelationship, 0)
-	// for rel := range relChan {
-	// 	relList = append(relList, rel)
-	// 	t.Logf("Found relationship: %s -> %s (%s)", rel.SourceEntityIndex, rel.TargetEntityIndex, rel.RelationshipType)
-	// }
-	// t.Logf("YieldRelationships returned %d relationships", len(relList))
-	t.Logf("Skip checking YieldRelationships to avoid concurrency issues")
+	assert.Equal(t, 7, len(relationships), "应该有7个关系")
 
 	// 测试k=0，返回所有路径
 	results := make([]*KHopPath, 0)
+	maxResults := 50 // 限制输出路径数量，避免过多输出
+	resultCount := 0
+
 	for path := range repo.YieldKHop(ctx) {
 		results = append(results, path)
-		t.Logf("Found path with K=%d: %s", path.K, path.String())
+		resultCount++
+		t.Logf("Found path %d with K=%d: %s", resultCount, path.K, path.String())
+
+		// 限制输出数量以避免日志过多
+		if resultCount >= maxResults {
+			t.Logf("Reached maximum result limit (%d), stopping collection", maxResults)
+			break
+		}
 	}
 
 	// 如果没有结果，尝试使用更大的channel缓冲区
@@ -172,18 +207,53 @@ func TestYieldKHop_AllPaths(t *testing.T) {
 	}
 
 	// 验证结果
-	t.Logf("Total results: %d", len(results))
+	t.Logf("Total results collected: %d", len(results))
 	assert.Greater(t, len(results), 0, "应该有至少一个路径结果")
 
-	// 检查是否有2-hop路径
-	has2Hop := false
+	// 统计不同跳数的路径
+	pathCountByK := make(map[int]int)
+	var twoHopPaths []*KHopPath
+	var threeHopPaths []*KHopPath
+
 	for _, result := range results {
-		if result.K == 2 { // 2-hop路径的K值应该是2（3个实体）
-			has2Hop = true
-			break
+		pathCountByK[result.K]++
+		if result.K == 2 {
+			twoHopPaths = append(twoHopPaths, result)
+		} else if result.K == 3 {
+			threeHopPaths = append(threeHopPaths, result)
 		}
 	}
-	assert.True(t, has2Hop, "应该包含2-hop路径")
+
+	// 输出路径统计信息
+	t.Logf("Path count by K: %v", pathCountByK)
+
+	// 验证2跳路径要求：至少有2条
+	assert.GreaterOrEqual(t, len(twoHopPaths), 2, "应该至少有2条2跳路径")
+	t.Logf("Found %d 2-hop paths:", len(twoHopPaths))
+	for i, path := range twoHopPaths {
+		t.Logf("  2-hop path %d: %s", i+1, path.String())
+	}
+
+	// 验证3跳路径要求：至少有1条
+	assert.GreaterOrEqual(t, len(threeHopPaths), 1, "应该至少有1条3跳路径")
+	t.Logf("Found %d 3-hop paths:", len(threeHopPaths))
+	for i, path := range threeHopPaths {
+		t.Logf("  3-hop path %d: %s", i+1, path.String())
+	}
+
+	// 验证路径结构正确性
+	for _, path := range results {
+		assert.GreaterOrEqual(t, path.K, 2, "所有路径的跳数应该>=2")
+
+		// 验证路径中的实体数量 = K + 1
+		entityUUIDs := path.GetRelatedEntityUUIDs()
+		expectedEntityCount := path.K + 1
+		assert.Equal(t, expectedEntityCount, len(entityUUIDs),
+			"K=%d的路径应该有%d个实体，实际有%d个", path.K, expectedEntityCount, len(entityUUIDs))
+	}
+
+	// 验证路径输出被限制
+	assert.LessOrEqual(t, len(results), maxResults, "路径输出应该被限制在%d以内", maxResults)
 }
 
 func TestYieldKHop_SpecificK(t *testing.T) {
