@@ -3,6 +3,8 @@
 
 你的决策至关重要，将直接决定 Agent 是继续工作还是向用户报告任务完成。
 
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
+
 <|USER_ORIGINAL_QUERY_{{.Nonce}}|>
 {{ .OriginalQuery }}
 <|USER_ORIGINAL_QUERY_END_{{.Nonce}}|>
