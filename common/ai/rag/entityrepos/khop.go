@@ -225,7 +225,7 @@ func (r *EntityRepository) findAllPaths(ctx context.Context) []*HopBlock {
 	for relationship := range r.YieldRelationships(ctx) {
 		select {
 		case <-ctx.Done():
-			log.Infof("Context cancelled during path finding")
+			log.Debugf("Context cancelled during path finding")
 			return allPaths
 		default:
 		}
@@ -358,8 +358,8 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 func (r *EntityRepository) extractKHopSegments(ctx context.Context, path *HopBlock, k int, kMin int, resultCh chan<- *KHopPath) {
 	// 将路径转换为切片，方便处理
 	pathSlice := r.hopBlockToSlice(path)
-	log.Infof("Processing path with %d elements, k=%d, kMin=%d", len(pathSlice), k, kMin)
-	log.Infof("Path content: %s", r.pathToString(path))
+	log.Debugf("Processing path with %d elements, k=%d, kMin=%d", len(pathSlice), k, kMin)
+	log.Debugf("Path content: %s", r.pathToString(path))
 
 	if len(pathSlice) < kMin { // 使用KMin作为最小长度要求
 		log.Debugf("Path too short: %d < %d", len(pathSlice), kMin)
@@ -421,7 +421,7 @@ func (r *EntityRepository) extractSubPaths(pathSlice []*HopBlock, k int, resultC
 			K:    pathK,
 			Hops: subHopBlock,
 		}
-		log.Infof("Sending path: K=%d, path elements=%d, String=%s", pathK, len(subPath), khopPath.String())
+		log.Debugf("Sending path: K=%d, path elements=%d, String=%s", pathK, len(subPath), khopPath.String())
 
 		select {
 		case resultCh <- khopPath:
@@ -451,7 +451,7 @@ func (r *EntityRepository) buildHopBlockFromSlice(slice []*HopBlock) *HopBlock {
 		return nil
 	}
 
-	log.Infof("Building HopBlock from slice with %d elements", len(slice))
+	log.Debugf("Building HopBlock from slice with %d elements", len(slice))
 	for i, hop := range slice {
 		srcName := "nil"
 		dstName := "nil"
@@ -461,7 +461,7 @@ func (r *EntityRepository) buildHopBlockFromSlice(slice []*HopBlock) *HopBlock {
 		if hop.Dst != nil {
 			dstName = hop.Dst.EntityName
 		}
-		log.Infof("Slice[%d]: Src=%s, Dst=%s, IsEnd=%v", i, srcName, dstName, hop.IsEnd)
+		log.Debugf("Slice[%d]: Src=%s, Dst=%s, IsEnd=%v", i, srcName, dstName, hop.IsEnd)
 	}
 
 	// 对于K-hop路径，slice长度应该是K+1（K+1个实体）
@@ -497,7 +497,7 @@ func (r *EntityRepository) buildHopBlockFromSlice(slice []*HopBlock) *HopBlock {
 		}
 	}
 
-	log.Infof("Built HopBlock chain with length: %d", r.getPathLength(head))
+	log.Debugf("Built HopBlock chain with length: %d", r.getPathLength(head))
 	return head
 }
 
