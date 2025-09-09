@@ -138,6 +138,7 @@ func (c *config) parseProjectWithFS(
 		preHandlerFiles = handlerFiles
 	}
 	prog.ProcessInfof("calculate total size of project finish preHandler(len:%d) build(len:%d)", preHandlerTotal, handlerTotal)
+	defer c.LanguageBuilder.Clearup()
 
 	var AstErr error
 	fileContents := make([]*ssareducer.FileContent, 0, preHandlerTotal)
@@ -157,7 +158,6 @@ func (c *config) parseProjectWithFS(
 		ch := c.getFileHandler(
 			filesystem, preHandlerFiles, handlerFilesMap,
 		)
-		defer c.LanguageBuilder.Clearup()
 		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
 		for fileContent := range ch {
 			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
@@ -259,13 +259,6 @@ func (c *config) parseProjectWithFS(
 			since := time.Since(start)
 			log.Errorf("program %s save to database cost: %s", prog.Name, since)
 		}
-		// log.Errorf("Lazybuild :leak: check start")
-		ssa.LazyBuilderCount.ForEach(func(key string, value *ssa.LazyBuilder) bool {
-			log.Errorf("LazyBuild handler :Leak:  %s", key)
-			value.Build()
-			return true
-		})
-		ssa.LazyBuilderCount.Clear()
 		return nil
 	}
 
