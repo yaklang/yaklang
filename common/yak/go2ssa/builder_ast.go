@@ -121,16 +121,16 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
 				continue
 			}
-			if o, ok := s.(*ssa.ObjectType); ok {
-				for pn, _ := range o.AnonymousField {
-					pbp := b.GetBluePrint(pn)
-					if pbp == nil {
-						b.NewError(ssa.Warn, TAG, StructNotFind(n))
-						pbp = b.CreateBlueprint(pn)
-					}
-					bp.AddParentBlueprint(pbp)
-				}
-			}
+			// if o, ok := s.(*ssa.ObjectType); ok {
+			// 	for pn, _ := range o.AnonymousField {
+			// 		pbp := b.GetBluePrint(pn)
+			// 		if pbp == nil {
+			// 			b.NewError(ssa.Warn, TAG, StructNotFind(n))
+			// 			pbp = b.CreateBlueprint(pn)
+			// 		}
+			// 		bp.AddParentBlueprint(pbp)
+			// 	}
+			// }
 
 			if i, ok := s.(*ssa.InterfaceType); ok {
 				store := b.StoreFunctionBuilder()
