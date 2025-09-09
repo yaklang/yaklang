@@ -32,8 +32,8 @@
   {
     "rule_id": "4c742090-cd2c-456b-b8e5-4cb2740abbbd",
     "rule_name": "检测Golang FTP信息泄露",
-    "hash": "305e76413d3e7765f6b1f66e59c66e03c04935214386762f3b5fa19e3c098dd3",
-    "version": "20250820.0001"
+    "hash": "e679d699a0c2291b086ed790e07b212187b33187a5c8d2375b734b6d5153b207",
+    "version": "20250909.0001"
   },
   {
     "rule_id": "80849d1b-19fd-44ca-91be-9fdbd4af1fe3",
@@ -242,8 +242,8 @@
   {
     "rule_id": "25ad0819-cae4-408f-ab71-3174d8f1679c",
     "rule_name": "审计Golang fmt打印方法",
-    "hash": "2d0a6141e399ef9bad90a8c3b34e5a4118c168e5f65cfdffa0dc4cc6732d47fb",
-    "version": "20250820.0001"
+    "hash": "1ba12953125f64ff13cbad9b4c208ac1b04006685f440440b1299a09e64fea5e",
+    "version": "20250909.0001"
   },
   {
     "rule_id": "f52f9e0f-536d-42e1-ba70-93c89149b97b",
