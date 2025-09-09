@@ -259,6 +259,10 @@ func TestYieldKHop_PathStructure(t *testing.T) {
 		if current.Relationship != nil {
 			relationshipCount++
 		}
+		// 如果是终结节点且Dst不为nil，计算Dst
+		if current.IsEnd && current.Dst != nil && current.Next == nil {
+			entityCount++
+		}
 		lastNode = current
 		current = current.Next
 	}
