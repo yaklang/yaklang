@@ -8,8 +8,6 @@ import (
 	"go.uber.org/atomic"
 )
 
-var LazyBuilderCount = utils.NewSafeMap[*LazyBuilder]()
-
 // lazyTask 将任务逻辑和任务数据分离开
 type lazyTask func()
 
@@ -27,7 +25,6 @@ func NewLazyBuilder(name string) *LazyBuilder {
 		_lazybuild_name: name + "||" + uuid.NewString(),
 		tasks:           make([]lazyTask, 0),
 	}
-	LazyBuilderCount.Set(lz._lazybuild_name, lz)
 	return lz
 }
 
@@ -57,8 +54,6 @@ func (l *LazyBuilder) Build() {
 	}
 
 	l.build.Store(true)
-
-	LazyBuilderCount.Delete(l._lazybuild_name)
 
 	l.mu.Lock()
 	defer l.mu.Unlock()

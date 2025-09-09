@@ -56,10 +56,17 @@ func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizers ...
 		defer recoverRange()
 	}
 	prog := b.prog
-	blueprint := NewBlueprint(name)
+	if prog == nil {
+		return nil
+	}
 	if prog.Blueprint == nil {
 		prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
 	}
+	if blueprint, ok := prog.Blueprint.Get(name); ok {
+		return blueprint
+	}
+
+	blueprint := NewBlueprint(name)
 
 	blueprint.Range = codeRange
 
