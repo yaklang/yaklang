@@ -9,6 +9,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -50,6 +52,7 @@ var wrongParamsPromptTemplate string
 
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
+	cpm                  *aicommon.ContextProviderManager
 	workdir              string
 	glanceWorkdir        string
 	genWorkdirGlanceOnce sync.Once
@@ -59,6 +62,7 @@ type PromptManager struct {
 // NewPromptManager creates a new prompt manager
 func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 	return &PromptManager{
+		cpm:                  aicommon.NewContextProviderManager(),
 		workdir:              workdir,
 		glanceWorkdir:        "",
 		react:                react,
@@ -88,6 +92,7 @@ type LoopPromptData struct {
 	Nonce              string
 	Language           string
 	Schema             string
+	DynamicContext     string
 }
 
 // ToolParamsPromptData contains data for tool parameter generation prompt
@@ -100,17 +105,19 @@ type ToolParamsPromptData struct {
 	CurrentIteration  int
 	MaxIterations     int
 	Timeline          string
+	DynamicContext    string
 }
 
 // VerificationPromptData contains data for verification prompt
 type VerificationPromptData struct {
-	Nonce         string
-	OriginalQuery string
-	IsToolCall    bool
-	Payload       string
-	Timeline      string
-	Language      string
-	Schema        string
+	Nonce          string
+	OriginalQuery  string
+	IsToolCall     bool
+	Payload        string
+	Timeline       string
+	Language       string
+	Schema         string
+	DynamicContext string
 }
 
 // AIReviewPromptData contains data for AI tool call review prompt
@@ -147,6 +154,7 @@ type DirectlyAnswerPromptData struct {
 	Nonce              string
 	Language           string
 	Schema             string
+	DynamicContext     string
 }
 
 // ToolReSelectPromptData contains data for tool reselection prompt template
@@ -162,6 +170,7 @@ type ToolReSelectPromptData struct {
 	OldTool            *aitool.Tool
 	ToolList           []*aitool.Tool
 	Schema             string
+	DynamicContext     string
 }
 
 // ReGenerateToolParamsPromptData contains data for tool parameter regeneration prompt template
@@ -176,6 +185,7 @@ type ReGenerateToolParamsPromptData struct {
 	Nonce              string
 	OldParams          string
 	Schema             string
+	DynamicContext     string
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -209,6 +219,7 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		Tools:                          tools,
 		ToolsCount:                     len(tools),
 		TopToolsCount:                  pm.react.config.topToolsCount,
+		DynamicContext:                 pm.DynamicContext(),
 	}
 
 	data.WorkingDir = pm.workdir
@@ -240,6 +251,7 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 	data := &ToolParamsPromptData{
 		ToolName:        tool.Name,
 		ToolDescription: tool.Description,
+		DynamicContext:  pm.DynamicContext(),
 	}
 
 	// Set tool schema if available
@@ -262,13 +274,14 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 // GenerateVerificationPrompt generates verification prompt using template
 func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string) (string, error) {
 	data := &VerificationPromptData{
-		Nonce:         nonce(),
-		OriginalQuery: originalQuery,
-		IsToolCall:    isToolResult,
-		Payload:       payload,
-		Timeline:      pm.react.config.memory.Timeline(),
-		Language:      pm.react.config.language,
-		Schema:        verificationSchemaJSON,
+		Nonce:          nonce(),
+		OriginalQuery:  originalQuery,
+		IsToolCall:     isToolResult,
+		Payload:        payload,
+		Timeline:       pm.react.config.memory.Timeline(),
+		Language:       pm.react.config.language,
+		Schema:         verificationSchemaJSON,
+		DynamicContext: pm.DynamicContext(),
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)
@@ -317,16 +330,17 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 
 	// Build template data
 	data := &DirectlyAnswerPromptData{
-		AllowPlan:     false,
-		CurrentTime:   time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:        fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:     userQuery,
-		Nonce:         utils.RandStringBytes(4),
-		Language:      pm.react.config.language,
-		Schema:        directlyAnswerSchema,
-		Tools:         tools,
-		ToolsCount:    len(tools),
-		TopToolsCount: pm.react.config.topToolsCount,
+		AllowPlan:      false,
+		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:      userQuery,
+		Nonce:          utils.RandStringBytes(4),
+		Language:       pm.react.config.language,
+		Schema:         directlyAnswerSchema,
+		Tools:          tools,
+		ToolsCount:     len(tools),
+		TopToolsCount:  pm.react.config.topToolsCount,
+		DynamicContext: pm.DynamicContext(),
 	}
 
 	// Set working directory
@@ -357,13 +371,14 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 // GenerateToolReSelectPrompt generates tool reselection prompt using template
 func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool *aitool.Tool, toolList []*aitool.Tool) (string, error) {
 	data := &ToolReSelectPromptData{
-		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:   "",
-		Nonce:       utils.RandStringBytes(4),
-		OldTool:     oldTool,
-		ToolList:    toolList,
-		Schema:      getReSelectTool(noUserInteract),
+		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:      "",
+		Nonce:          utils.RandStringBytes(4),
+		OldTool:        oldTool,
+		ToolList:       toolList,
+		Schema:         getReSelectTool(noUserInteract),
+		DynamicContext: pm.DynamicContext(),
 	}
 
 	if r := pm.react.GetCurrentTask(); r != nil {
@@ -392,12 +407,13 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 // GenerateReGenerateToolParamsPrompt generates tool parameter regeneration prompt using template
 func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, oldParams aitool.InvokeParams, oldTool *aitool.Tool) (string, error) {
 	data := &ReGenerateToolParamsPromptData{
-		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:   userQuery,
-		Nonce:       utils.RandStringBytes(4),
-		OldParams:   oldParams.Dump(),
-		Schema:      oldTool.ToJSONSchemaString(),
+		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:      userQuery,
+		Nonce:          utils.RandStringBytes(4),
+		OldParams:      oldParams.Dump(),
+		Schema:         oldTool.ToJSONSchemaString(),
+		DynamicContext: pm.DynamicContext(),
 	}
 
 	// Set working directory
@@ -433,4 +449,8 @@ func (pm *PromptManager) executeTemplate(name, templateContent string, data inte
 	}
 
 	return buf.String(), nil
+}
+
+func (pm *PromptManager) DynamicContext() string {
+	return pm.cpm.Execute(pm.react.config, pm.react.config.Emitter)
 }
