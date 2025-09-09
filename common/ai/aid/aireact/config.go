@@ -26,6 +26,12 @@ import (
 
 type AICallbackType = aicommon.AICallbackType
 
+// contextProviderEntry holds pending context provider registration info
+type contextProviderEntry struct {
+	name     string
+	provider aicommon.ContextProvider
+}
+
 // ToolReviewInfo contains information needed for tool use review
 type ToolReviewInfo struct {
 	Tool            *aitool.Tool
@@ -64,7 +70,8 @@ type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
 
-	promptManager *PromptManager // Prompt manager for ReAct
+	promptManager           *PromptManager         // Prompt manager for ReAct
+	pendingContextProviders []contextProviderEntry // Pending context providers to register
 
 	// Task interface
 	task aicommon.AITask // prepared for toolcall
@@ -621,6 +628,23 @@ func WithReActHijackPlanRequest(f func(ctx context.Context, planPayload string) 
 	return func(cfg *ReActConfig) {
 		if f != nil {
 			cfg.hijackPlanRequest = f
+		}
+	}
+}
+
+func WithDynamicContextProvider(name string, provider aicommon.ContextProvider) Option {
+	return func(cfg *ReActConfig) {
+		if name != "" && provider != nil {
+			// If promptManager is already available, register directly
+			if cfg.promptManager != nil {
+				cfg.promptManager.cpm.Register(name, provider)
+			} else {
+				// Otherwise, add to pending list for later registration
+				cfg.pendingContextProviders = append(cfg.pendingContextProviders, contextProviderEntry{
+					name:     name,
+					provider: provider,
+				})
+			}
 		}
 	}
 }

@@ -7,6 +7,7 @@ Current Time: {{ .CurrentTime }}
 OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}{{ end }}
 {{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
 
 {{ if .ConversationMemory }}# Conversation Memory
 {{ .ConversationMemory }}

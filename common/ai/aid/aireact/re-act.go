@@ -112,6 +112,13 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	react.promptManager = NewPromptManager(react, cfg.workdir)
 	cfg.promptManager = react.promptManager
 
+	// Register pending context providers
+	for _, entry := range cfg.pendingContextProviders {
+		cfg.promptManager.cpm.Register(entry.name, entry.provider)
+	}
+	// Clear pending list after registration
+	cfg.pendingContextProviders = nil
+
 	// Initialize memory with AI capability
 	if cfg.memory != nil && cfg.aiCallback != nil {
 		// Set the AI instance for memory timeline

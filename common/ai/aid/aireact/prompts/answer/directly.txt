@@ -3,6 +3,7 @@ Current Time: {{ .CurrentTime }}
 OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}{{ end }}
 {{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
 
 {{ if .Tools }}# Available Tools
 You have access to {{ .ToolsCount }} built-in tools. Here are the top {{ .TopToolsCount }} most important tools:

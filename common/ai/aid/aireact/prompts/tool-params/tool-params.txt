@@ -1,5 +1,5 @@
 # Tool Parameter Generation
-
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
 You need to generate parameters for the tool '{{ .ToolName }}'.
 
 Tool Description: {{ .ToolDescription }}
