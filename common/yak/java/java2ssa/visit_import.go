@@ -65,11 +65,13 @@ func (y *singleFileBuilder) VisitAllImport(i *javaparser.CompilationUnitContext)
 			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
 			continue
 		}
+		prog.PushEditor(y.GetEditor())
 		// get class
 		if all {
 			_ = y.GetProgram().ImportAll(prog)
 		} else {
 			_ = y.GetProgram().ImportTypeFromLib(prog, className, pkgImport)
 		}
+		prog.PopEditor(false)
 	}
 }
