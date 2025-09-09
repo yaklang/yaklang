@@ -254,6 +254,7 @@ func (r *EntityRepository) findAllPaths(ctx context.Context) []*HopBlock {
 }
 
 // dfsFindPathsOptimized 优化的DFS算法，按需加载数据
+// 对于有向图，只沿着出边遍历，并使用路径级别的去重来避免环
 func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEntity *schema.ERModelEntity,
 	visited map[string]bool, allPaths *[]*HopBlock, currentPath *HopBlock) {
 
@@ -263,9 +264,6 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 	default:
 	}
 
-	// 将当前实体标记为已访问
-	visited[currentEntity.Uuid] = true
-
 	// 如果当前路径为空，说明这是路径的起点
 	if currentPath == nil {
 		currentPath = &HopBlock{
@@ -274,21 +272,24 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 		}
 	}
 
-	// 查找当前实体的邻居（按需查询数据库）
+	// 查找当前实体的出边关系（有向图）
 	hasUnvisitedNeighbors := false
 	relationships := r.GetRelationshipsByEntityUUID(ctx, currentEntity.Uuid)
 
 	log.Debugf("Exploring %d relationships for entity: %s", len(relationships), currentEntity.EntityName)
+
+	// 只处理从当前节点出发的出边（有向图）
 	for _, rel := range relationships {
-		var neighborUUID string
-		if rel.SourceEntityIndex == currentEntity.Uuid {
-			neighborUUID = rel.TargetEntityIndex
-		} else {
-			neighborUUID = rel.SourceEntityIndex
+		// 只处理当前节点作为源节点的出边
+		if rel.SourceEntityIndex != currentEntity.Uuid {
+			continue
 		}
 
-		if visited[neighborUUID] {
-			log.Debugf("Skipping visited neighbor: %s", neighborUUID)
+		neighborUUID := rel.TargetEntityIndex
+
+		// 检查是否已经在当前路径中（路径级别去重，避免环）
+		if r.isEntityInPath(currentPath, neighborUUID) {
+			log.Debugf("Skipping neighbor %s (already in current path)", neighborUUID)
 			continue
 		}
 
@@ -307,7 +308,7 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 			Src:          currentEntity,
 			Relationship: rel,
 			Dst:          neighborEntity,
-			IsEnd:        false, // 暂时设为false，后续会设置为true
+			IsEnd:        false,
 		}
 
 		// 将新节点添加到当前路径末尾
@@ -327,7 +328,7 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 			lastHop.IsEnd = false
 		}
 
-		// 递归探索
+		// 递归探索（不传递visited，因为我们使用路径级别去重）
 		r.dfsFindPathsOptimized(ctx, neighborEntity, visited, allPaths, currentPath)
 
 		// 回溯：恢复路径状态
@@ -349,9 +350,21 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 		pathCopy := r.copyHopBlock(currentPath)
 		*allPaths = append(*allPaths, pathCopy)
 	}
+}
 
-	// 回溯：标记当前实体为未访问
-	visited[currentEntity.Uuid] = false
+// isEntityInPath 检查实体是否已经在当前路径中
+func (r *EntityRepository) isEntityInPath(path *HopBlock, entityUUID string) bool {
+	current := path
+	for current != nil {
+		if current.Src != nil && current.Src.Uuid == entityUUID {
+			return true
+		}
+		if current.IsEnd && current.Dst != nil && current.Dst.Uuid == entityUUID {
+			return true
+		}
+		current = current.Next
+	}
+	return false
 }
 
 // extractKHopSegments 从路径中提取k-hop子路径
