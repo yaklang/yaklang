@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/gobwas/glob"
 
@@ -22,14 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-)
-
-type ASTSequenceType int
-
-const (
-	Order ASTSequenceType = iota
-	ReverseOrder
-	OutOfOrder
 )
 
 type ProcessFunc func(msg string, process float64)
@@ -87,7 +80,7 @@ type config struct {
 
 	logLevel string
 
-	astSequence ASTSequenceType
+	astSequence ssareducer.ASTSequenceType
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
@@ -107,7 +100,8 @@ func defaultConfig(opts ...Option) (*config, error) {
 		excludeFile: func(path, filename string) bool {
 			return false
 		},
-		logLevel: "error",
+		logLevel:    "error",
+		astSequence: ssareducer.OutOfOrder,
 	}
 
 	for _, opt := range opts {
@@ -158,7 +152,7 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 	}
 }
 
-func WithASTOrder(sequence ASTSequenceType) Option {
+func WithASTOrder(sequence ssareducer.ASTSequenceType) Option {
 	return func(c *config) error {
 		c.astSequence = sequence
 		return nil

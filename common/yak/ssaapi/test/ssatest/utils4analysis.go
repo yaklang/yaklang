@@ -14,6 +14,7 @@ import (
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -42,15 +43,15 @@ const (
 func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaapi.Option) {
 	// only in memory
 	{
-		var astSequence ssaapi.ASTSequenceType
+		var astSequence ssareducer.ASTSequenceType
 		for i := 0; i < 3; i++ {
 			switch i {
 			case 0:
-				astSequence = ssaapi.Order
+				astSequence = ssareducer.Order
 			case 1:
-				astSequence = ssaapi.ReverseOrder
+				astSequence = ssareducer.ReverseOrder
 			case 2:
-				astSequence = ssaapi.OutOfOrder
+				astSequence = ssareducer.OutOfOrder
 			}
 
 			prog, err := ssaapi.ParseProjectWithFS(fs, append(opt, ssaapi.WithASTOrder(astSequence))...)
