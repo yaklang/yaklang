@@ -473,6 +473,11 @@ const (
 	Yak_GetSSARiskDisposal_FullMethodName                         = "/ypb.Yak/GetSSARiskDisposal"
 	Yak_SSARiskFeedbackToOnline_FullMethodName                    = "/ypb.Yak/SSARiskFeedbackToOnline"
 	Yak_GenerateSSAReport_FullMethodName                          = "/ypb.Yak/GenerateSSAReport"
+	Yak_CreateSSAProject_FullMethodName                           = "/ypb.Yak/CreateSSAProject"
+	Yak_UpdateSSAProject_FullMethodName                           = "/ypb.Yak/UpdateSSAProject"
+	Yak_DeleteSSAProject_FullMethodName                           = "/ypb.Yak/DeleteSSAProject"
+	Yak_QuerySSAProject_FullMethodName                            = "/ypb.Yak/QuerySSAProject"
+	Yak_GetSSAProject_FullMethodName                              = "/ypb.Yak/GetSSAProject"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
 	Yak_CreatePluginEnv_FullMethodName                            = "/ypb.Yak/CreatePluginEnv"
@@ -1159,6 +1164,12 @@ type YakClient interface {
 	SSARiskFeedbackToOnline(ctx context.Context, in *SSARiskFeedbackToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
 	// SSA Report
 	GenerateSSAReport(ctx context.Context, in *GenerateSSAReportRequest, opts ...grpc.CallOption) (*GenerateSSAReportResponse, error)
+	// SSA Project CRUD
+	CreateSSAProject(ctx context.Context, in *CreateSSAProjectRequest, opts ...grpc.CallOption) (*CreateSSAProjectResponse, error)
+	UpdateSSAProject(ctx context.Context, in *UpdateSSAProjectRequest, opts ...grpc.CallOption) (*UpdateSSAProjectResponse, error)
+	DeleteSSAProject(ctx context.Context, in *DeleteSSAProjectRequest, opts ...grpc.CallOption) (*DeleteSSAProjectResponse, error)
+	QuerySSAProject(ctx context.Context, in *QuerySSAProjectRequest, opts ...grpc.CallOption) (*QuerySSAProjectResponse, error)
+	GetSSAProject(ctx context.Context, in *GetSSAProjectRequest, opts ...grpc.CallOption) (*GetSSAProjectResponse, error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
 	CreatePluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error)
@@ -6483,6 +6494,56 @@ func (c *yakClient) GenerateSSAReport(ctx context.Context, in *GenerateSSAReport
 	return out, nil
 }
 
+func (c *yakClient) CreateSSAProject(ctx context.Context, in *CreateSSAProjectRequest, opts ...grpc.CallOption) (*CreateSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateSSAProject(ctx context.Context, in *UpdateSSAProjectRequest, opts ...grpc.CallOption) (*UpdateSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSSAProject(ctx context.Context, in *DeleteSSAProjectRequest, opts ...grpc.CallOption) (*DeleteSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QuerySSAProject(ctx context.Context, in *QuerySSAProjectRequest, opts ...grpc.CallOption) (*QuerySSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuerySSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetSSAProject(ctx context.Context, in *GetSSAProjectRequest, opts ...grpc.CallOption) (*GetSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_GetSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PluginEnvData)
@@ -8151,6 +8212,12 @@ type YakServer interface {
 	SSARiskFeedbackToOnline(context.Context, *SSARiskFeedbackToOnlineRequest) (*Empty, error)
 	// SSA Report
 	GenerateSSAReport(context.Context, *GenerateSSAReportRequest) (*GenerateSSAReportResponse, error)
+	// SSA Project CRUD
+	CreateSSAProject(context.Context, *CreateSSAProjectRequest) (*CreateSSAProjectResponse, error)
+	UpdateSSAProject(context.Context, *UpdateSSAProjectRequest) (*UpdateSSAProjectResponse, error)
+	DeleteSSAProject(context.Context, *DeleteSSAProjectRequest) (*DeleteSSAProjectResponse, error)
+	QuerySSAProject(context.Context, *QuerySSAProjectRequest) (*QuerySSAProjectResponse, error)
+	GetSSAProject(context.Context, *GetSSAProjectRequest) (*GetSSAProjectResponse, error)
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
 	CreatePluginEnv(context.Context, *PluginEnvData) (*Empty, error)
@@ -9630,6 +9697,21 @@ func (UnimplementedYakServer) SSARiskFeedbackToOnline(context.Context, *SSARiskF
 }
 func (UnimplementedYakServer) GenerateSSAReport(context.Context, *GenerateSSAReportRequest) (*GenerateSSAReportResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateSSAReport not implemented")
+}
+func (UnimplementedYakServer) CreateSSAProject(context.Context, *CreateSSAProjectRequest) (*CreateSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSSAProject not implemented")
+}
+func (UnimplementedYakServer) UpdateSSAProject(context.Context, *UpdateSSAProjectRequest) (*UpdateSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSSAProject not implemented")
+}
+func (UnimplementedYakServer) DeleteSSAProject(context.Context, *DeleteSSAProjectRequest) (*DeleteSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSAProject not implemented")
+}
+func (UnimplementedYakServer) QuerySSAProject(context.Context, *QuerySSAProjectRequest) (*QuerySSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySSAProject not implemented")
+}
+func (UnimplementedYakServer) GetSSAProject(context.Context, *GetSSAProjectRequest) (*GetSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSSAProject not implemented")
 }
 func (UnimplementedYakServer) GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllPluginEnv not implemented")
@@ -17484,6 +17566,96 @@ func _Yak_GenerateSSAReport_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateSSAProject(ctx, req.(*CreateSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSSAProject(ctx, req.(*UpdateSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSSAProject(ctx, req.(*DeleteSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QuerySSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySSAProject(ctx, req.(*QuerySSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSSAProject(ctx, req.(*GetSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GetAllPluginEnv_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
 	if err := dec(in); err != nil {
@@ -20528,6 +20700,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateSSAReport",
 			Handler:    _Yak_GenerateSSAReport_Handler,
+		},
+		{
+			MethodName: "CreateSSAProject",
+			Handler:    _Yak_CreateSSAProject_Handler,
+		},
+		{
+			MethodName: "UpdateSSAProject",
+			Handler:    _Yak_UpdateSSAProject_Handler,
+		},
+		{
+			MethodName: "DeleteSSAProject",
+			Handler:    _Yak_DeleteSSAProject_Handler,
+		},
+		{
+			MethodName: "QuerySSAProject",
+			Handler:    _Yak_QuerySSAProject_Handler,
+		},
+		{
+			MethodName: "GetSSAProject",
+			Handler:    _Yak_GetSSAProject_Handler,
 		},
 		{
 			MethodName: "GetAllPluginEnv",
