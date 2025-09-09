@@ -71,5 +71,12 @@ func (r *ContextProviderManager) Execute(config AICallerConfigIf, emitter *Emitt
 		return true
 	})
 
-	return buf.String()
+	result := buf.String()
+	if len(result) > r.maxBytes {
+		shrinkSize := int(float64(r.maxBytes) * 0.8)
+		result = utils.ShrinkString(result, shrinkSize)
+		log.Warnf("context provider result exceeded maxBytes (%d), shrunk to %d characters", r.maxBytes, shrinkSize)
+	}
+
+	return result
 }
