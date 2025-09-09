@@ -79,9 +79,14 @@ REFERENCE
 
 <include('golang-fmt-print')> as $sink;
 
-$sink.List() as $low;
-$sink.CurrentDir() as $low;
-$sink.SystemType() as $low;
+ftp.ServerConn?{<fullTypeName>?{have: 'github.com/jlaffaye/ftp'}} as $conn
+$conn.List() as $key;
+$conn.CurrentDir() as $key;
+$conn.SystemType() as $key;
+
+$sink #{
+    until: `* & $key`
+}-> as $low;
 
 alert $low for {
 	title_zh: "检测到Golang FTP信息泄露",

@@ -188,6 +188,12 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			case "*":
 				if op1.GetType().GetTypeKind() == ssa.PointerKind {
 					return nil, b.GetOriginPointer(op1)
+				} else if p, ok := ssa.ToParameter(op1); ok {
+					p.IsFreeValue = true
+					if op1Var := getVariable(exp, 0); op1Var != nil {
+						b.ReferenceParameter(op1Var.GetName(), p.FormalParameterIndex)
+						b.AssignVariable(op1Var, op1)
+					}
 				}
 			}
 		}

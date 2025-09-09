@@ -483,7 +483,12 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) ssa.Type {
 	if strings.HasPrefix(text, "*") {
 		if p := stmt.PointerType(); p != nil {
 			if t := p.(*gol.PointerTypeContext).Type_(); t != nil {
-				return b.buildType(t.(*gol.Type_Context))
+				ssatyp := b.buildType(t.(*gol.Type_Context))
+				// newtyp := ssa.NewPointerType()
+				// newtyp.SetName("Pointer")
+				// newtyp.SetFullTypeNames(ssatyp.GetFullTypeNames())
+				// return newtyp
+				return ssatyp
 			}
 		}
 	}

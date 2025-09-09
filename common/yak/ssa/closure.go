@@ -142,9 +142,10 @@ func handleSideEffect(c *Call, funcTyp *FunctionType) {
 			// TODO: handle side effect in loop scope,
 			// will replace value in scope and create new phi
 			sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
-			if se.Variable != nil {
-				variable.SetCaptured(se.Variable)
+			if v := ReadVariableFromScopeAndParent(currentScope, se.Name); v != nil {
+				variable.SetCaptured(v)
 			}
+
 			builder.AssignVariable(variable, sideEffect)
 			sideEffect.SetVerboseName(se.VerboseName)
 			c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
