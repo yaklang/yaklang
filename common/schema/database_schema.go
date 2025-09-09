@@ -125,6 +125,9 @@ var ProjectTables = []interface{}{
 	&AiCheckpoint{},
 	&AiOutputEvent{},
 	&AiProcess{},
+
+	// SSA Projects Config Info
+	&SSAProject{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {
