@@ -299,7 +299,7 @@ func (v *Versioned[T]) CaptureInScope(base ScopedVersionedTableIF[T]) (Versioned
 		// just skip
 		return nil, false
 	}
-	if baseVariable.GetCaptured() != v.GetCaptured() {
+	if baseVariable.GetCaptured() != v.GetCaptured() && !baseVariable.GetCaptured().GetLocal() {
 		return nil, false
 	}
 

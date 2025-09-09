@@ -946,6 +946,12 @@ func NewStructType() *ObjectType {
 	return i
 }
 
+func NewPointerType() *ObjectType {
+	i := NewObjectType()
+	i.Kind = PointerKind
+	return i
+}
+
 func (itype *ObjectType) String() string {
 	if itype.Combination {
 		return strings.Join(

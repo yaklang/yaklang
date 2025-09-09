@@ -430,9 +430,6 @@ func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) Vers
 func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], value T, updateLinks ...bool) {
 	// assign
 	err := variable.Assign(value)
-	if variable.GetKind() == PointerVariable {
-		variable.PointHandler(value, scope)
-	}
 	if err != nil {
 		log.Warnf("BUG: variable.Assign error: %v", err)
 		return
@@ -452,8 +449,8 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
-		for _, variable := range scope.GetCurrentVariables(variable.GetName()) {
-			if variable.GetLocal() {
+		for _, find := range scope.GetCurrentVariables(variable.GetName()) {
+			if find.GetLocal() && variable.GetCaptured().GetGlobalIndex() == find.GetGlobalIndex() {
 				return
 			}
 		}
@@ -525,7 +522,7 @@ func (v *ScopedVersionedTable[T]) tryRegisterCapturedVariable(name string, ver V
 	if parentVariable == nil && !v.ForceCapture {
 		return
 	}
-	if parentVariable != nil {
+	if parentVariable != nil && ver.GetCaptured().GetGlobalIndex() == ver.GetGlobalIndex() {
 		ver.SetCaptured(parentVariable)
 	} else {
 		// variable := v.GetParent().CreateVariable(name, false)

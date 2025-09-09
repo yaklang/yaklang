@@ -102,7 +102,12 @@ func (b *FunctionBuilder) readValueEx(
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	program := b.GetProgram()
+	local := GetFristLocalVariableFromScopeAndParent(scope, name)
+
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
+		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetGlobalIndex() {
+			ret = local
+		}
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)
 			// set offset variable
@@ -198,38 +203,65 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	scope := b.CurrentBlock.ScopeTable
 	if variable.IsPointer() {
-		variable.SetPointHandler(func(valueTmp Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
-			tmp := b.CurrentBlock.ScopeTable
-			defer func() {
-				b.CurrentBlock.ScopeTable = tmp
-			}()
+		// variable.SetPointHandler(func(valueTmp Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
+		// 	tmp := b.CurrentBlock.ScopeTable
+		// 	defer func() {
+		// 		b.CurrentBlock.ScopeTable = tmp
+		// 	}()
 
-			b.CurrentBlock.ScopeTable = scopet
-			obj := variable.object
+		// 	b.CurrentBlock.ScopeTable = scopet
+		// 	obj := variable.object
 
-			v := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@value"))
-			p := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@pointer"))
-			p.SetKind(ssautil.PointerVariable)
-			scopet.AssignVariable(v, value)
-			if p.GetValue() == nil {
-				scopet.AssignVariable(p, variable.GetValue())
-			}
+		// 	v := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@value"))
+		// 	p := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@pointer"))
+		// 	p.SetKind(ssautil.PointerVariable)
+		// 	scopet.AssignVariable(v, value)
+		// 	if p.GetValue() == nil {
+		// 		scopet.AssignVariable(p, variable.GetValue())
+		// 	}
 
-			n := strings.TrimPrefix(variable.GetValue().String(), "&")
-			originName, originGlobalId := SplitName(n)
-			_ = originGlobalId
+		// 	n := strings.TrimPrefix(variable.GetValue().String(), "&")
+		// 	originName, originGlobalId := SplitName(n)
+		// 	_ = originGlobalId
 
-			newValue := b.CopyValue(value)
-			newValue.SetName(originName)
-			newValue.SetVerboseName(originName)
+		// 	newValue := b.CopyValue(value)
+		// 	newValue.SetName(originName)
+		// 	newValue.SetVerboseName(originName)
 
-			if ret := GetFristLocalVariableFromScopeAndParent(scopet, originName); ret != nil && ret.GetGlobalIndex() == originGlobalId {
-				scopet.AssignVariable(b.CreateVariable(originName), newValue)
-			} else {
-				p.SetPointHandler(variable.GetPointHandler())
-			}
-		})
-		variable.PointHandler(value, scope)
+		// 	// if ret := GetFristLocalVariableFromScopeAndParent(scopet, originName); ret != nil && ret.GetGlobalIndex() == originGlobalId {
+		// 	// 	scopet.AssignVariable(b.CreateVariable(originName), newValue)
+		// 	// } else {
+		// 	// 	p.SetPointHandler(variable.GetPointHandler())
+		// 	// }
+
+		// 	newVariable := b.CreateVariableById(originName)
+		// 	if v := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
+		// 		newVariable.SetCaptured(v)
+		// 	}
+		// 	scopet.AssignVariable(newVariable, newValue)
+		// })
+		// variable.PointHandler(value, scope)
+
+		obj := variable.object
+
+		v := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@value"))
+		p := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@pointer"))
+		p.SetKind(ssautil.PointerVariable)
+		scope.AssignVariable(v, value)
+		if p.GetValue() == nil {
+			scope.AssignVariable(p, variable.GetValue())
+		}
+
+		n := strings.TrimPrefix(variable.GetValue().String(), "&")
+		originName, originGlobalId := SplitName(n)
+
+		newValue := b.CopyValue(value)
+		newValue.SetName(originName)
+		newValue.SetVerboseName(originName)
+
+		if newVariable := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
+			scope.AssignVariable(newVariable, newValue)
+		}
 	} else {
 		scope.AssignVariable(variable, value)
 	}
@@ -292,6 +324,39 @@ func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopTo
 		}
 	}
 	return b.createVariableEx(name, false, pos...)
+}
+
+func (b *FunctionBuilder) CreateVariableGlobalIndex(name string, globalIndex int) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+
+	newVariable := b.CreateVariableById(name)
+	for _, v := range GetAllVariablesFromScopeAndParent(scope, name) {
+		if v.GetGlobalIndex() == globalIndex {
+			newVariable.SetCaptured(v)
+		}
+	}
+	return newVariable
+}
+
+func (b *FunctionBuilder) CreateVariableById(name string, pos ...CanStartStopToken) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+
+	ret := scope.CreateVariable(name, false)
+	variable := ret.(*Variable)
+
+	r := b.CurrentRange
+	if r == nil && len(pos) > 0 {
+		r = b.GetCurrentRange(pos[0])
+	}
+	if r != nil {
+		variable.SetDefRange(r)
+	}
+	// set offset variable for program
+	program := b.GetProgram()
+	if program != nil {
+		program.SetOffsetVariable(variable, b.CurrentRange)
+	}
+	return variable
 }
 
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {

@@ -226,14 +226,3 @@ func GetAllVariablesFromScopeAndParent(scope ScopeIF, name string) []*Variable {
 	}
 	return rets
 }
-
-func GetVariablesWithGlobalIndex(scope ScopeIF, name string, globalIndex int) *Variable {
-	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
-		for _, variable := range variables {
-			if ret, ok := variable.(*Variable); ok && variable.GetGlobalIndex() == globalIndex {
-				return ret
-			}
-		}
-	}
-	return nil
-}

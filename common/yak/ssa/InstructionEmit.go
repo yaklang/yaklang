@@ -392,8 +392,12 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
+	value := o.GetValue()
+	if value == nil {
+		value = f.ReadValue(o.GetName())
+	}
 	keys := []Value{f.EmitConstInstPlaceholder("@pointer"), f.EmitConstInstPlaceholder("@value")}
-	values := []Value{f.EmitConstInstPlaceholder(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), o.GetValue()}
+	values := []Value{f.EmitConstInstPlaceholder(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), value}
 
 	obj := f.InterfaceAddFieldBuild(2, func(i int) Value {
 		return keys[i]
@@ -403,9 +407,8 @@ func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 	p := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
 	p.SetKind(ssautil.PointerVariable)
 
-	t := NewObjectType()
+	t := NewPointerType()
 	t.SetName("Pointer")
-	t.SetTypeKind(PointerKind)
 	obj.SetType(t)
 
 	return obj
@@ -424,20 +427,29 @@ func (f *FunctionBuilder) GetOriginPointer(obj Value) *Variable {
 }
 
 func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
-	v := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
+	objectValue := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
 	p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
 
 	n := strings.TrimPrefix(p.String(), "&")
 	originName, originGlobalId := SplitName(n)
 
 	scope := f.CurrentBlock.ScopeTable
-	if variable := GetVariablesWithGlobalIndex(scope, originName, originGlobalId); variable != nil {
-		if value := variable.GetValue(); value != nil {
-			return value
+	if variable := GetFristLocalVariableFromScope(scope, originName); variable != nil {
+		if variable.GetGlobalIndex() != originGlobalId {
+			return objectValue
 		}
 	}
 
-	return v
+	if variable := GetFristVariableFromScopeAndParent(scope, originName); variable != nil {
+		if variable.GetCaptured().GetGlobalIndex() != originGlobalId {
+			return objectValue
+		}
+		if originValue := variable.GetValue(); originValue != nil {
+			return originValue
+		}
+	}
+
+	return objectValue
 }
 
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
