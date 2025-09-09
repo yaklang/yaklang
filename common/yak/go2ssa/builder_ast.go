@@ -1660,6 +1660,10 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 				}
 				return condition
 			})
+		} else {
+			loop.SetCondition(func() ssa.Value {
+				return b.EmitConstInst(true)
+			})
 		}
 
 		if third, ok := condition.GetPostStmt().(*gol.SimpleStmtContext); ok {

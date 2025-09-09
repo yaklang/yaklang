@@ -47,8 +47,8 @@ REFERENCE
 )
 
 fmt?{<fullTypeName>?{have: 'fmt'}} as $entry
-$entry.Println(* #-> as $output)
-$entry.Printf(* #-> as $output)
+$entry.Println(* as $output)
+$entry.Printf(* as $output)
 
 alert $output for {
 	title: "Audit Golang fmt Print Method",
