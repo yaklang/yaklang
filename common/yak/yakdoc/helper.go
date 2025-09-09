@@ -173,7 +173,7 @@ func (h *DocumentHelper) HelpInfo() string {
 	buffer.WriteString(fmt.Sprintf("\n%v\n", strings.Repeat("-", 48)))
 
 	t := tablewriter.NewWriter(buffer)
-	t.SetHeader([]string{"内置值", "值的类型", "值"})
+	// t.SetHeader([]string{"内置值", "值的类型", "值"})
 	for name, item := range h.Instances {
 		if item.ValueStr == "" {
 			t.Append([]string{name, item.Type, "-"})
@@ -186,7 +186,7 @@ func (h *DocumentHelper) HelpInfo() string {
 	buffer.WriteString(fmt.Sprintf("\n%v\n", strings.Repeat("-", 48)))
 
 	t = tablewriter.NewWriter(buffer)
-	t.SetHeader([]string{"可用依赖库", "依赖库可用元素(值/函数)"})
+	// t.SetHeader([]string{"可用依赖库", "依赖库可用元素(值/函数)"})
 	for libName, libs := range h.Libs {
 		t.Append([]string{libName, fmt.Sprint(len(libs.ElementDocs))})
 	}
