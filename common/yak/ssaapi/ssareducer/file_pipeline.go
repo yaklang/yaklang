@@ -10,6 +10,14 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+type ASTSequenceType int
+
+const (
+	OutOfOrder ASTSequenceType = iota
+	Order
+	ReverseOrder
+)
+
 type FileHandler func(path string, content []byte)
 
 type FileContent struct {
@@ -85,12 +93,12 @@ func FilesHandler(
 
 	parseASTPipe.FeedChannel(readFilePipe.Out())
 	switch orderType {
-	case 0:
-		return sort(-1)
-	case 1:
-		return sort(1)
-	case 2:
+	case int(OutOfOrder):
 		return parseASTPipe.Out()
+	case int(Order):
+		return sort(-1)
+	case int(ReverseOrder):
+		return sort(1)
 	}
 
 	return parseASTPipe.Out()
