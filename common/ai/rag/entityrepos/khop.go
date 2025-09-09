@@ -1,6 +1,7 @@
 package entityrepos
 
 import (
+	"bytes"
 	"context"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -50,6 +51,65 @@ type HopBlock struct {
 type KHopPath struct {
 	K    int
 	Hops *HopBlock
+}
+
+func (p *KHopPath) GetRelatedEntityUUIDs() []string {
+	if p == nil {
+		return nil
+	}
+	k := p.Hops
+	if k == nil {
+		return nil
+	}
+
+	var uuids []string
+	current := k
+	for current != nil {
+		if current.Src != nil {
+			uuids = append(uuids, current.Src.Uuid)
+		}
+		if current.IsEnd && current.Dst != nil {
+			uuids = append(uuids, current.Dst.Uuid)
+		}
+		current = current.Next
+	}
+	return uuids
+}
+
+// use *schema.ERModelEntity and *schema.ERModelRelationship to represent entities and relationships
+// their ToRAGContent() methods can be used to convert to RAGContent
+func (p *KHopPath) String() string {
+	if p == nil {
+		return ""
+	}
+
+	k := p.Hops
+	if k == nil {
+		return ""
+	}
+	var buf bytes.Buffer
+	var current = k
+	for current != nil {
+		if k.Src == nil || k.Relationship == nil {
+			return ""
+		}
+		buf.WriteString(current.Src.ToRAGContent())
+		buf.WriteString(" --[")
+		buf.WriteString(current.Relationship.RelationshipType)
+		if current.Relationship.RelationshipTypeVerbose != "" {
+			buf.WriteString(" (" + current.Relationship.RelationshipTypeVerbose + ")")
+		}
+		buf.WriteString("]--> ")
+
+		if current.IsEnd {
+			if ret := current.Dst.ToRAGContent(); ret != "" {
+				buf.WriteString(ret)
+			}
+			break
+		}
+		current = current.Next
+	}
+	return buf.String()
 }
 
 type KHopConfig struct {
