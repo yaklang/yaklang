@@ -92,6 +92,9 @@ func (e *ERModelEntity) String() string {
 }
 
 func (e *ERModelEntity) ToRAGContent() string {
+	if e == nil {
+		return ""
+	}
 	attrString := strings.Builder{}
 	for name, attr := range e.Attributes {
 		attrString.WriteString(fmt.Sprintf("%s=%v;", name, attr))
