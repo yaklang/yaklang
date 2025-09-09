@@ -103,7 +103,7 @@ var BruteUtil = cli.Command{
 		}
 
 		table := tablewriter.NewWriter(os.Stdout)
-		table.SetHeader([]string{
+		table.Header([]string{
 			"服务类型", "目标", "用户名", "密码",
 		})
 		for _, i := range succeedResult {

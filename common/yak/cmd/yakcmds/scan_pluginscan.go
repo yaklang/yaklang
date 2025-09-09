@@ -242,11 +242,11 @@ var hybridScanCommand = &cli.Command{
 
 			count := 0
 			table := tablewriter.NewWriter(os.Stdout)
-			table.SetHeader([]string{
+			table.Header([]string{
 				"Plugin Name", "Type", "Author",
 			})
-			table.SetAutoWrapText(false)
-			table.SetColMinWidth(0, 72)
+			// table.AutoWrapText(false)
+			// table.Width(0, 72)
 			for _, result := range pluginList.Values() {
 				name := []rune(result.ScriptName)
 				if len(name) > 64 {
