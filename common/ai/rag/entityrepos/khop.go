@@ -453,31 +453,48 @@ func (r *EntityRepository) buildHopBlockFromSlice(slice []*HopBlock) *HopBlock {
 
 	log.Infof("Building HopBlock from slice with %d elements", len(slice))
 	for i, hop := range slice {
-		log.Infof("Slice[%d]: Src=%s, Dst=%s, IsEnd=%v",
-			i,
-			hop.Src.EntityName,
-			hop.Dst.EntityName,
-			hop.IsEnd)
+		srcName := "nil"
+		dstName := "nil"
+		if hop.Src != nil {
+			srcName = hop.Src.EntityName
+		}
+		if hop.Dst != nil {
+			dstName = hop.Dst.EntityName
+		}
+		log.Infof("Slice[%d]: Src=%s, Dst=%s, IsEnd=%v", i, srcName, dstName, hop.IsEnd)
 	}
 
-	// 复制第一个节点
-	head := r.copyHopBlock(slice[0])
-	head.Next = nil
-	head.IsEnd = false
+	// 对于K-hop路径，slice长度应该是K+1（K+1个实体）
+	// 我们需要构建K个HopBlock，每个HopBlock包含Src、Relationship和Dst
+	// 最后一个HopBlock的IsEnd=true
 
-	current := head
-	for i := 1; i < len(slice); i++ {
-		copied := r.copyHopBlock(slice[i])
-		copied.Next = nil
-		if i == len(slice)-1 {
-			copied.IsEnd = true
-			// 对于子路径的最后一个节点，不要包含Dst（因为子路径到这里结束）
-			copied.Dst = nil
-		} else {
-			copied.IsEnd = false
+	var head *HopBlock
+	var current *HopBlock
+
+	for i := 0; i < len(slice)-1; i++ {
+		newHop := &HopBlock{
+			Src:          slice[i].Src,
+			Relationship: slice[i].Relationship,
+			Next:         nil,
+			IsEnd:        false,
+			Dst:          slice[i+1].Src, // 下一个实体的Src作为当前Dst
 		}
-		current.Next = copied
-		current = copied
+
+		if head == nil {
+			head = newHop
+			current = head
+		} else {
+			current.Next = newHop
+			current = newHop
+		}
+	}
+
+	// 设置最后一个HopBlock为终结节点，并设置其Dst为原始slice最后一个元素的Src
+	if current != nil {
+		current.IsEnd = true
+		if len(slice) > 1 {
+			current.Dst = slice[len(slice)-1].Src
+		}
 	}
 
 	log.Infof("Built HopBlock chain with length: %d", r.getPathLength(head))
@@ -490,22 +507,27 @@ func (r *EntityRepository) copyHopBlock(hop *HopBlock) *HopBlock {
 		return nil
 	}
 
-	// 复制第一个节点
+	// 如果只有一个HopBlock
+	if hop.Next == nil {
+		return &HopBlock{
+			Src:          hop.Src,
+			Relationship: hop.Relationship,
+			Next:         nil,
+			IsEnd:        hop.IsEnd,
+			Dst:          hop.Dst,
+		}
+	}
+
+	// 复制第一个HopBlock
 	head := &HopBlock{
 		Src:          hop.Src,
 		Relationship: hop.Relationship,
 		Next:         nil,
-		IsEnd:        false, // 暂时设为false
+		IsEnd:        false, // 第一个HopBlock不是终结节点
 		Dst:          hop.Dst,
 	}
 
-	// 如果原始路径只有一个节点
-	if hop.Next == nil {
-		head.IsEnd = hop.IsEnd
-		return head
-	}
-
-	// 复制剩余的路径
+	// 复制剩余的HopBlock
 	current := head
 	original := hop.Next
 	for original != nil {
@@ -513,16 +535,18 @@ func (r *EntityRepository) copyHopBlock(hop *HopBlock) *HopBlock {
 			Src:          original.Src,
 			Relationship: original.Relationship,
 			Next:         nil,
-			IsEnd:        false,
+			IsEnd:        false, // 暂时设为false
 			Dst:          original.Dst,
 		}
+
 		current.Next = newNode
 		current = newNode
 		original = original.Next
 	}
 
-	// 设置最后一个节点的IsEnd
+	// 设置最后一个HopBlock为终结节点
 	current.IsEnd = true
+
 	return head
 }
 
@@ -536,6 +560,10 @@ func (r *EntityRepository) getPathLength(hop *HopBlock) int {
 	current := hop
 	for current != nil {
 		if current.Src != nil {
+			count++
+		}
+		// 如果是终结节点且Dst不为nil，计算Dst
+		if current.IsEnd && current.Dst != nil && current.Next == nil {
 			count++
 		}
 		current = current.Next
