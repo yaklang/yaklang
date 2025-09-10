@@ -78,7 +78,7 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 				var score float64
 				var reason string
 				err = aicommon.CallAITransaction(r, prompt, r.CallAI, func(rsp *aicommon.AIResponse) error {
-					stream := rsp.GetOutputStreamReader("review", true, r.Emitter)
+					stream := rsp.GetOutputStreamReader("review", false, r.Emitter)
 					// stream = io.TeeReader(stream, os.Stdout)
 					action, err := aicommon.ExtractActionFromStream(stream, "review_tool_call", "object")
 					if err != nil {
