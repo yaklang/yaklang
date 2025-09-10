@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
-	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -168,35 +168,36 @@ func scan(ctx context.Context, progName string, ruleFilter *ypb.SyntaxFlowRuleFi
 	ch = make(chan *ssaapi.SyntaxFlowResult, 10)
 	go func() {
 		defer close(ch)
-		yakgrpc.SyntaxFlowScan(ctx, &ypb.SyntaxFlowScanRequest{
-			ControlMode: "start",
-			Filter:      ruleFilter,
-			ProgramName: []string{progName},
-			Memory:      memory,
-		}, func(res *ypb.SyntaxFlowScanResponse) error {
-			// taskId = res.GetTaskID()
-			// for _, risk := range res.GetResult() {
-			// ch <- schema.SSARiskFromGRPCModel(risk)
-			// }
-			ypbResult := res.GetResult()
-			if ypbResult == nil {
+		err := syntaxflow_scan.StartScan(ctx, func(result *syntaxflow_scan.ScanResult) error {
+			// 处理扫描结果
+			if result.Result == nil {
 				return nil
 			}
-			id := ypbResult.ResultID
-			_ = id
-			kind := ypbResult.SaveKind
-			// ch <-
-			result := ssaapi.CreateResultFromCache(ssaapi.ResultSaveKind(kind), id)
-			if result == nil {
+
+			id := result.Result.ResultID
+			kind := result.Result.SaveKind
+
+			// 从缓存中创建结果
+			ssaResult := ssaapi.CreateResultFromCache(ssaapi.ResultSaveKind(kind), id)
+			if ssaResult == nil {
 				return nil
 			}
-			if result.RiskCount() > 0 {
-				ch <- result
+
+			if ssaResult.RiskCount() > 0 {
+				ch <- ssaResult
 			} else {
 				log.Infof("no risk skip ")
 			}
 			return nil
-		})
+		},
+			syntaxflow_scan.WithProgramNames(progName),
+			syntaxflow_scan.WithRuleFilter(ruleFilter),
+			syntaxflow_scan.WithMemory(memory),
+		)
+
+		if err != nil {
+			log.Errorf("scan failed: %v", err)
+		}
 	}()
 	return ch, nil
 }
