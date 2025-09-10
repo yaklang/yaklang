@@ -77,7 +77,7 @@ func TestEdgeCases(t *testing.T) {
 			name:     "Empty strings",
 			input1:   "",
 			input2:   "",
-			expected: "Binary files", // git会认为空文件之间有差异
+			expected: "", // 内容相同，没有差异
 		},
 		{
 			name:     "Empty to content",
@@ -95,7 +95,7 @@ func TestEdgeCases(t *testing.T) {
 			name:     "Identical content",
 			input1:   "same content\nline2\nline3",
 			input2:   "same content\nline2\nline3",
-			expected: "deleted file", // git处理相同内容时会显示deleted file
+			expected: "", // 内容相同，没有差异
 		},
 		{
 			name:     "Nil vs string",
@@ -107,13 +107,13 @@ func TestEdgeCases(t *testing.T) {
 			name:     "Number vs string",
 			input1:   123,
 			input2:   "123",
-			expected: "deleted file", // git在处理相同内容时会显示deleted file
+			expected: "", // 内容相同（经过转换后），没有差异
 		},
 		{
 			name:     "Boolean vs string",
 			input1:   true,
 			input2:   "true",
-			expected: "deleted file", // git在处理相同内容时会显示deleted file
+			expected: "", // 内容相同（经过转换后），没有差异
 		},
 	}
 
