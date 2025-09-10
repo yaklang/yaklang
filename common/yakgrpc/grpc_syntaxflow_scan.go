@@ -2,10 +2,10 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"sync"
 
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
+
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -72,43 +72,4 @@ func (w *wrapperSyntaxFlowScanStream) Context() context.Context {
 
 func (s *syntaxFlowScanStreamImpl) Done() {
 	s.ctx.Done()
-}
-
-var _ syntaxflow_scan.ScanStream = (*syntaxFlowScanStreamImpl)(nil)
-
-func (s *syntaxFlowScanStreamImpl) Recv() (*ypb.SyntaxFlowScanRequest, error) {
-	select {
-	case <-s.ctx.Done():
-		return nil, utils.Error("context canceled")
-	default:
-		if s.request != nil {
-			return <-s.request, nil
-		}
-	}
-	return nil, utils.Error("no request")
-}
-
-func (s *syntaxFlowScanStreamImpl) Context() context.Context {
-	return s.ctx
-}
-
-func (s *syntaxFlowScanStreamImpl) Send(resp *ypb.SyntaxFlowScanResponse) error {
-	// log.Infof("resp : %v", resp)
-	select {
-	case <-s.ctx.Done():
-		// log.Infof("context canceled")
-		return utils.Error("context canceled")
-	default:
-		if s.stream != nil {
-			return s.stream(resp)
-		}
-	}
-	return nil
-}
-
-func SyntaxFlowScan(ctx context.Context, config *ypb.SyntaxFlowScanRequest, callBack syntaxFlowScanStreamCallback) {
-	stream := NewSyntaxFlowScanStream(ctx, callBack)
-	stream.request <- config
-	syntaxflow_scan.Scan(stream)
-	stream.Done()
 }
