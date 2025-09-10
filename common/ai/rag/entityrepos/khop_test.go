@@ -168,14 +168,14 @@ func TestYieldKHop_AllPaths(t *testing.T) {
 
 	// 验证测试数据结构
 	entities := make([]*schema.ERModelEntity, 0)
-	for entity := range repo.YieldEntities(ctx) {
+	for entity := range repo.YieldEntities(ctx, nil) {
 		entities = append(entities, entity)
 	}
 	t.Logf("Entity count: %d", len(entities))
 	assert.Equal(t, 6, len(entities), "应该有6个实体")
 
 	relationships := make([]*schema.ERModelRelationship, 0)
-	for rel := range repo.YieldRelationships(ctx) {
+	for rel := range repo.YieldRelationships(ctx, nil) {
 		relationships = append(relationships, rel)
 	}
 	t.Logf("Relationship count: %d", len(relationships))

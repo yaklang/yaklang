@@ -113,7 +113,7 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 		defer output.Close()
 		defer hopAnalyzeWg.Wait()
 
-		for hop := range er.YieldKHop(refineConfig.Ctx) {
+		for hop := range er.YieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
 			hopAnalyzeWg.Add(1)
 			go func() {
 				defer hopAnalyzeWg.Done()
@@ -175,7 +175,7 @@ func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.Kno
 	refineConfig := NewRefineConfig(options...)
 	for _, entry := range entries {
 		entry.KnowledgeBaseID = kb.GetID()
-		entry.RelatedEntityID = strings.Join(relationalEntityUUID, ",")
+		entry.RelatedEntityUUIDS = strings.Join(relationalEntityUUID, ",")
 		if len(entry.KnowledgeDetails) <= 0 {
 			continue
 		}
@@ -186,14 +186,14 @@ func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.Kno
 			}
 			for _, detail := range detailList {
 				err := kb.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
-					KnowledgeBaseID:  entry.KnowledgeBaseID,
-					KnowledgeTitle:   entry.KnowledgeTitle,
-					KnowledgeType:    entry.KnowledgeType,
-					KnowledgeDetails: detail,
-					Summary:          entry.Summary,
-					Keywords:         entry.Keywords,
-					ImportanceScore:  entry.ImportanceScore,
-					RelatedEntityID:  entry.RelatedEntityID,
+					KnowledgeBaseID:    entry.KnowledgeBaseID,
+					KnowledgeTitle:     entry.KnowledgeTitle,
+					KnowledgeType:      entry.KnowledgeType,
+					KnowledgeDetails:   detail,
+					Summary:            entry.Summary,
+					Keywords:           entry.Keywords,
+					ImportanceScore:    entry.ImportanceScore,
+					RelatedEntityUUIDS: entry.RelatedEntityUUIDS,
 				}, documentOption...)
 				if err != nil {
 					return utils.Errorf("failed to create knowledge base entry: %v", err)
