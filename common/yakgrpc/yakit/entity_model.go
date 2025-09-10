@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -43,6 +44,12 @@ func QueryEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) ([]*schema.ERMod
 	return entities, err
 }
 
+func YieldEntities(ctx context.Context, db *gorm.DB, filter *ypb.EntityFilter) chan *schema.ERModelEntity {
+	db = db.Model(&schema.ERModelEntity{})
+	db = FilterEntities(db, filter)
+	return bizhelper.YieldModel[*schema.ERModelEntity](ctx, db)
+}
+
 func QueryEntitiesPaging(db *gorm.DB, entityFilter *ypb.EntityFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.ERModelEntity, error) {
 	db = db.Model(&schema.ERModelEntity{})
 	db = FilterEntities(db, entityFilter)
@@ -78,7 +85,7 @@ func GetEntityByID(db *gorm.DB, id uint) (*schema.ERModelEntity, error) {
 func GetEntityByIndex(db *gorm.DB, index string) (*schema.ERModelEntity, error) {
 	var entity schema.ERModelEntity
 	db = db.Model(&schema.ERModelEntity{})
-	if err := db.Where("hidden_index = ?", index).First(&entity).Error; err != nil {
+	if err := db.Where("uuid = ?", index).First(&entity).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil, utils.Errorf("entity not found")
 		}
@@ -203,7 +210,20 @@ func FilterRelationships(db *gorm.DB, relationshipFilter *ypb.RelationshipFilter
 	db = bizhelper.ExactQueryStringArrayOr(db, "source_entity_index", relationshipFilter.SourceEntityIndex)
 	db = bizhelper.ExactQueryStringArrayOr(db, "target_entity_index", relationshipFilter.TargetEntityIndex)
 	db = bizhelper.ExactQueryStringArrayOr(db, "relationship_type", relationshipFilter.Types)
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "uuid", relationshipFilter.UUIDS)
 	return db
+}
+
+func YieldRelationships(ctx context.Context, db *gorm.DB, filter *ypb.RelationshipFilter) chan *schema.ERModelRelationship {
+	db = FilterRelationships(db, filter)
+	return bizhelper.YieldModel[*schema.ERModelRelationship](ctx, db)
+}
+
+func QueryRelationships(db *gorm.DB, entityFilter *ypb.RelationshipFilter) ([]*schema.ERModelRelationship, error) {
+	db = FilterRelationships(db, entityFilter)
+	var relationships []*schema.ERModelRelationship
+	err := db.Find(&relationships).Error
+	return relationships, err
 }
 
 func QueryRelationshipPaging(db *gorm.DB, entityFilter *ypb.RelationshipFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.ERModelRelationship, error) {

@@ -339,7 +339,7 @@ func Result2ERMAnalysisResult(ermResult *ForgeResult) *ERMAnalysisResult {
 	return result
 }
 
-func AnalyzeERMFromAnalysisResult(input <-chan AnalysisResult, options ...any) (<-chan *ERMAnalysisResult, error) {
+func AnalyzeERMFromAnalysisResult(input <-chan AnalysisResult, options ...any) (*entityrepos.EntityRepository, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
 	cm, err := chunkmaker.NewSimpleChunkMaker[AnalysisResult](
 		input,
@@ -351,7 +351,124 @@ func AnalyzeERMFromAnalysisResult(input <-chan AnalysisResult, options ...any) (
 		return nil, err
 	}
 
-	return AnalyzeERMChunkMaker(cm, options...)
+	return AnalyzeERMChunkMakerSync(cm, options...)
+}
+
+func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entityrepos.EntityRepository, error) {
+	refineConfig := NewRefineConfig(options...)
+	var domainPrompt string
+	var err error
+	var detectERMPromptOnce = new(sync.Once)
+	var firstMutex = new(sync.Mutex)
+
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
+	if err != nil {
+		return nil, err
+	}
+	eb.SetMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
+		return ResolveEntity(new, old, options...)
+	})
+
+	chunkBuildERM := func(i chunkmaker.Chunk) (*ERMAnalysisResult, error) {
+		firstMutex.Lock()
+		unlockOnce := new(sync.Once)
+		detectERMPromptOnce.Do(func() {
+			defer func() {
+				unlockOnce.Do(func() {
+					firstMutex.Unlock()
+				})
+			}()
+			log.Infof("start to detect erm prompt for the first chunk: %s", utils.ShrinkString(string(i.Data()), 800))
+			firstChunk := i
+			count := 0
+			for firstChunk.HaveLastChunk() {
+				count++
+				firstChunk = firstChunk.LastChunk()
+				if count > 100 {
+					break
+				}
+			}
+			domainPrompt, err = DetectERMPrompt(string(firstChunk.Data()), options...)
+			if err != nil {
+				log.Errorf("[detect ERM Prompt] error in analyzing ERM: %v ", err)
+			} else {
+				log.Infof("detected erm prompt: %s", utils.ShrinkString(domainPrompt, 800))
+			}
+		})
+		unlockOnce.Do(func() {
+			firstMutex.Unlock()
+		})
+
+		endpoint := eb.NewSaveEndpoint(refineConfig.Ctx)
+		entitySwg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+		relationSwg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+
+		chunkOptions := append(options, WithJsonExtractHook(
+			jsonextractor.WithRegisterConditionalObjectCallback([]string{"entity_type"}, func(data map[string]any) {
+				entity := invokeParams2ERMEntity(data)
+				entitySwg.Add(1)
+				go func() {
+					defer entitySwg.Done()
+					err := endpoint.SaveEntity(entity)
+					if err != nil {
+						refineConfig.AnalyzeLog("failed to save entity [%s]: %v", entity.EntityName, err)
+					}
+				}()
+			}),
+			jsonextractor.WithRegisterConditionalObjectCallback([]string{"relationship_type"}, func(data map[string]any) {
+				relationSwg.Add(1)
+				go func() {
+					defer relationSwg.Done()
+					relationship := invokeParams2ERMRelationship(data)
+					err := endpoint.AddRelationship(
+						relationship.SourceTemporaryName,
+						relationship.TargetTemporaryName,
+						relationship.RelationshipType,
+						relationship.RelationshipTypeVerbose,
+						map[string]any{"decoration_attributes": relationship.DecorationAttributes},
+					)
+					if err != nil {
+						refineConfig.AnalyzeLog("failed to save relation [%s] -> [%s]: %v", relationship.SourceTemporaryName, relationship.TargetTemporaryName, err)
+					}
+				}()
+			}),
+			jsonextractor.WithObjectKeyValue(func(key string, _ any) {
+				if key == "entity_list" {
+					go func() {
+						entitySwg.Wait()
+						endpoint.FinishEntitySave()
+					}()
+				}
+			})),
+		)
+		return AnalyzeERMChunk(domainPrompt, i, chunkOptions...)
+	}
+
+	count := 0
+	swg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+
+	refineConfig.AnalyzeStatusCard("Analysis", "build ERM")
+	refineConfig.AnalyzeLog("start build ERM concurrency")
+	for chunk := range cm.OutputChannel() {
+		swg.Add(1)
+		go func() {
+			defer swg.Done()
+			defer func() {
+				count++
+				refineConfig.AnalyzeStatusCard("[ERM]: processed frames", count)
+			}()
+			_, err := chunkBuildERM(chunk)
+			if err != nil {
+				refineConfig.AnalyzeLog("error in analyzing ERM: %v", err)
+				return
+			}
+		}()
+	}
+	swg.Wait()
+
+	refineConfig.AnalyzeStatusCard("Analysis", "finish build ERM")
+	refineConfig.AnalyzeLog("finish analyzing ERM concurrency")
+	return eb, nil
 }
 
 func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERMAnalysisResult, error) {

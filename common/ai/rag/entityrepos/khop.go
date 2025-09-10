@@ -3,24 +3,32 @@ package entityrepos
 import (
 	"bytes"
 	"context"
-
+	"fmt"
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *EntityRepository) YieldEntities(ctx context.Context) chan *schema.ERModelEntity {
-	db := r.db.Model(&schema.ERModelEntity{})
-	db = bizhelper.ExactQueryString(db, "repository_uuid", r.info.Uuid)
-	return bizhelper.YieldModel[*schema.ERModelEntity](ctx, db)
+func (r *EntityRepository) YieldEntities(ctx context.Context, filter *ypb.EntityFilter) chan *schema.ERModelEntity {
+	if filter == nil {
+		filter = &ypb.EntityFilter{}
+	}
+	filter.BaseIndex = r.info.Uuid
+	return yakit.YieldEntities(ctx, r.db, filter)
 }
 
-func (r *EntityRepository) YieldRelationships(ctx context.Context) chan *schema.ERModelRelationship {
-	db := r.db.Model(&schema.ERModelRelationship{})
-	db = bizhelper.ExactQueryString(db, "repository_uuid", r.info.Uuid)
-	return bizhelper.YieldModel[*schema.ERModelRelationship](ctx, db)
+func (r *EntityRepository) YieldRelationships(ctx context.Context, filter *ypb.RelationshipFilter) chan *schema.ERModelRelationship {
+	if filter == nil {
+		filter = &ypb.RelationshipFilter{}
+	}
+	filter.BaseIndex = r.info.Uuid
+	return yakit.YieldRelationships(ctx, r.db, filter)
 }
 
 // GetRelationshipsByEntityUUID 获取指定实体相关的所有关系
@@ -67,6 +75,27 @@ type HopBlock struct {
 	Dst          *schema.ERModelEntity
 }
 
+func (h *HopBlock) Hash() string {
+	if h == nil {
+		return ""
+	}
+	var parts []string
+	current := h
+	for current != nil {
+		if current.Src != nil {
+			parts = append(parts, current.Src.Uuid)
+		}
+		if current.Relationship != nil {
+			parts = append(parts, current.Relationship.Uuid)
+		}
+		if current.IsEnd && current.Dst != nil {
+			parts = append(parts, current.Dst.Uuid)
+		}
+		current = current.Next
+	}
+	return utils.CalcSha1(parts)
+}
+
 type KHopPath struct {
 	K    int
 	Hops *HopBlock
@@ -93,6 +122,35 @@ func (p *KHopPath) GetRelatedEntityUUIDs() []string {
 		current = current.Next
 	}
 	return uuids
+}
+
+func (p *KHopPath) GetRelatedUUIDs() []string {
+	if p == nil {
+		return nil
+	}
+	k := p.Hops
+	if k == nil {
+		return nil
+	}
+
+	var uuids []string
+	current := k
+	for current != nil {
+		if current.Src != nil {
+			uuids = append(uuids, current.Src.Uuid)
+		}
+		if current.IsEnd && current.Dst != nil {
+			uuids = append(uuids, current.Dst.Uuid)
+		}
+		uuids = append(uuids, current.Relationship.Uuid)
+		current = current.Next
+	}
+	return uuids
+}
+
+func (p *KHopPath) Hash() string {
+	uuidList := p.GetRelatedUUIDs()
+	return utils.CalcSha1(uuidList)
 }
 
 func (p *KHopPath) ToRAGContent() string {
@@ -176,28 +234,58 @@ func WithKHopKMin(kMin int) KHopQueryOption {
 	}
 }
 
-func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOption) chan *KHopPath {
+func NewKHopConfig(options ...any) *KHopConfig {
 	config := &KHopConfig{K: 0, KMin: 2} // 默认k=0，KMin=2，返回所有>=2-hop路径
-	for _, opt := range opts {
-		opt(config)
+	for _, opt := range options {
+		if optFunc, ok := opt.(KHopQueryOption); ok {
+			optFunc(config)
+		}
 	}
+	return config
+}
 
-	var ch = make(chan *KHopPath, 1000) // 更大的缓冲通道避免阻塞
+// todo:  yield k-hop with entity filter or rag search
+func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...any) <-chan *KHopPath {
+	config := NewKHopConfig(opts...)
 
+	var channel = chanx.NewUnlimitedChan[*KHopPath](ctx, 1000)
+
+	var input = chanx.NewUnlimitedChan[string](ctx, 1000)
 	go func() {
-		defer close(ch)
-
-		// 找到所有可能的路径片段
-		r.findAllPathSegments(ctx, config.K, config.KMin, ch)
+		defer input.Close()
+		for relationship := range r.YieldRelationships(ctx, nil) {
+			input.SafeFeed(relationship.SourceEntityIndex)
+		}
 	}()
 
-	return ch
+	go func() {
+		defer channel.Close()
+
+		// 找到所有可能的路径片段
+		r.findAllPathSegments(ctx, config.K, config.KMin, channel, input.OutputChannel())
+	}()
+
+	var hashMap = make(map[string]bool) // filter duplicate paths
+	var result = chanx.NewUnlimitedChan[*KHopPath](ctx, 1000)
+	go func() {
+		defer result.Close()
+
+		for path := range channel.OutputChannel() {
+			if !hashMap[path.Hash()] {
+				hashMap[path.Hash()] = true
+				result.SafeFeed(path)
+			} else {
+				log.Debug("find exist sub path: %s", path.String())
+			}
+		}
+	}()
+	return result.OutputChannel()
 }
 
 // findAllPathSegments 找到所有可能的路径片段
-func (r *EntityRepository) findAllPathSegments(ctx context.Context, k int, kMin int, resultCh chan<- *KHopPath) {
+func (r *EntityRepository) findAllPathSegments(ctx context.Context, k int, kMin int, resultCh *chanx.UnlimitedChan[*KHopPath], startUUID <-chan string) {
 	// 首先找到图中所有的路径
-	allPaths := r.findAllPaths(ctx)
+	allPaths := r.findAllPaths(ctx, startUUID)
 	if len(allPaths) == 0 {
 		return
 	}
@@ -215,14 +303,14 @@ func (r *EntityRepository) findAllPathSegments(ctx context.Context, k int, kMin 
 }
 
 // findAllPaths 使用DFS找到图中所有的路径（优化版本：直接在关系遍历中处理，只从源实体开始）
-func (r *EntityRepository) findAllPaths(ctx context.Context) []*HopBlock {
+func (r *EntityRepository) findAllPaths(ctx context.Context, startEntityChannel <-chan string) []*HopBlock {
 	var allPaths []*HopBlock
 
 	// 使用set来避免重复处理源实体（有向图）
 	processedEntities := make(map[string]bool)
 
 	// 直接在关系遍历中处理源实体（有向图）
-	for relationship := range r.YieldRelationships(ctx) {
+	for startUUID := range startEntityChannel {
 		select {
 		case <-ctx.Done():
 			log.Debugf("Context cancelled during path finding")
@@ -231,16 +319,16 @@ func (r *EntityRepository) findAllPaths(ctx context.Context) []*HopBlock {
 		}
 
 		// 只处理源实体（有向图中只需从有出边的实体开始）
-		if !processedEntities[relationship.SourceEntityIndex] {
-			processedEntities[relationship.SourceEntityIndex] = true
+		if !processedEntities[startUUID] {
+			processedEntities[startUUID] = true
 
-			log.Debugf("Starting DFS from source entity: %s", relationship.SourceEntityIndex)
+			log.Debugf("Starting DFS from source entity: %s", startUUID)
 			visited := make(map[string]bool)
 
 			// 按需加载起始实体
-			startEntity, err := r.GetEntityByUUID(relationship.SourceEntityIndex)
+			startEntity, err := r.GetEntityByUUID(startUUID)
 			if err != nil || startEntity == nil {
-				log.Debugf("Failed to load entity %s: %v", relationship.SourceEntityIndex, err)
+				log.Debugf("Failed to load entity %s: %v", startUUID, err)
 				continue
 			}
 
@@ -272,6 +360,10 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 		}
 	}
 
+	if currentEntity.Uuid == "6179511a-0c78-4228-896c-1d0e9ef53af7" {
+		log.Debugf("Skipping path %s (already in current path)", currentEntity.Uuid)
+	}
+
 	// 查找当前实体的出边关系（有向图）
 	hasUnvisitedNeighbors := false
 	relationships := r.GetRelationshipsByEntityUUID(ctx, currentEntity.Uuid)
@@ -293,8 +385,6 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 			continue
 		}
 
-		hasUnvisitedNeighbors = true
-
 		// 按需加载邻居实体
 		neighborEntity, err := r.GetEntityByUUID(neighborUUID)
 		if err != nil || neighborEntity == nil {
@@ -302,13 +392,15 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 			continue
 		}
 
+		hasUnvisitedNeighbors = true
+
 		log.Debugf("Creating path extension: %s -> %s", currentEntity.EntityName, neighborEntity.EntityName)
 
 		newHop := &HopBlock{
 			Src:          currentEntity,
 			Relationship: rel,
 			Dst:          neighborEntity,
-			IsEnd:        false,
+			IsEnd:        true,
 		}
 
 		// 将新节点添加到当前路径末尾
@@ -368,7 +460,7 @@ func (r *EntityRepository) isEntityInPath(path *HopBlock, entityUUID string) boo
 }
 
 // extractKHopSegments 从路径中提取k-hop子路径
-func (r *EntityRepository) extractKHopSegments(ctx context.Context, path *HopBlock, k int, kMin int, resultCh chan<- *KHopPath) {
+func (r *EntityRepository) extractKHopSegments(ctx context.Context, path *HopBlock, k int, kMin int, resultCh *chanx.UnlimitedChan[*KHopPath]) {
 	// 将路径转换为切片，方便处理
 	pathSlice := r.hopBlockToSlice(path)
 	log.Debugf("Processing path with %d elements, k=%d, kMin=%d", len(pathSlice), k, kMin)
@@ -399,7 +491,7 @@ func (r *EntityRepository) extractKHopSegments(ctx context.Context, path *HopBlo
 }
 
 // extractSubPaths 从路径切片中提取指定长度的子路径
-func (r *EntityRepository) extractSubPaths(pathSlice []*HopBlock, k int, resultCh chan<- *KHopPath) {
+func (r *EntityRepository) extractSubPaths(pathSlice []*HopBlock, k int, resultCh *chanx.UnlimitedChan[*KHopPath]) {
 	if len(pathSlice) < k {
 		log.Debugf("Path slice too short: %d < %d", len(pathSlice), k)
 		return
@@ -436,14 +528,7 @@ func (r *EntityRepository) extractSubPaths(pathSlice []*HopBlock, k int, resultC
 		}
 		log.Debugf("Sending path: K=%d, path elements=%d, String=%s", pathK, len(subPath), khopPath.String())
 
-		select {
-		case resultCh <- khopPath:
-			log.Debugf("Sent subpath %d (K=%d) to result channel", i, pathK)
-		default:
-			// 通道已满，跳过
-			log.Debugf("Channel full, skipping subpath %d", i)
-			return
-		}
+		resultCh.SafeFeed(khopPath)
 	}
 }
 
@@ -603,3 +688,27 @@ func (r *EntityRepository) pathToString(hop *HopBlock) string {
 	}
 	return result
 }
+
+func (r *EntityRepository) AddKHopToVectorIndex(kHop *KHopPath) error {
+	r.ragMutex.Lock()
+	defer r.ragMutex.Unlock()
+
+	metadata := map[string]any{
+		schema.META_Base_Index: r.info.Uuid,
+		META_K:                 kHop.K,
+	}
+
+	var opts []rag.DocumentOption
+
+	opts = append(opts, rag.WithDocumentRawMetadata(metadata),
+		rag.WithDocumentType(schema.RAGDocumentType_KHop),
+		rag.WithDocumentRelatedEntities(kHop.GetRelatedEntityUUIDs()...),
+	)
+	documentID := fmt.Sprintf("%s_khop", uuid.NewString())
+	content := kHop.ToRAGContent()
+	return r.GetRAGSystem().Add(documentID, content, opts...)
+}
+
+const (
+	META_K = "k"
+)
