@@ -2,14 +2,13 @@ package syntaxflow_scan
 
 import (
 	"context"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 // ScanOption 定义扫描选项类型，用于配置SyntaxFlow扫描任务的各种参数
-type ScanOption func(*ypb.SyntaxFlowScanRequest)
+type ScanOption func(*ScanConfig)
 
 // WithProgramNames 设置要扫描的程序名称，可以指定一个或多个程序进行扫描
 // Example:
@@ -27,8 +26,11 @@ type ScanOption func(*ypb.SyntaxFlowScanRequest)
 // )
 // ```
 func WithProgramNames(names ...string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		req.ProgramName = names
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.ScanRequest.ProgramName = names
 	}
 }
 
@@ -43,11 +45,14 @@ func WithProgramNames(names ...string) ScanOption {
 // )
 // ```
 func WithRuleNames(names ...string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.RuleNames = names
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.RuleNames = names
 	}
 }
 
@@ -62,11 +67,14 @@ func WithRuleNames(names ...string) ScanOption {
 // )
 // ```
 func WithLanguages(languages ...string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.Language = languages
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.Language = languages
 	}
 }
 
@@ -81,11 +89,14 @@ func WithLanguages(languages ...string) ScanOption {
 // )
 // ```
 func WithGroupNames(groups ...string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.GroupNames = groups
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.GroupNames = groups
 	}
 }
 
@@ -100,11 +111,14 @@ func WithGroupNames(groups ...string) ScanOption {
 // )
 // ```
 func WithSeverity(severity ...string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.Severity = severity
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.Severity = severity
 	}
 }
 
@@ -119,11 +133,14 @@ func WithSeverity(severity ...string) ScanOption {
 // )
 // ```
 func WithPurpose(purpose ...string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.Purpose = purpose
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.Purpose = purpose
 	}
 }
 
@@ -138,11 +155,14 @@ func WithPurpose(purpose ...string) ScanOption {
 // )
 // ```
 func WithTags(tags ...string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.Tag = tags
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.Tag = tags
 	}
 }
 
@@ -157,11 +177,14 @@ func WithTags(tags ...string) ScanOption {
 // )
 // ```
 func WithKeyword(keyword string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.Keyword = keyword
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.Keyword = keyword
 	}
 }
 
@@ -176,25 +199,37 @@ func WithKeyword(keyword string) ScanOption {
 // )
 // ```
 func WithIncludeLibraryRule(include bool) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		if req.Filter == nil {
-			req.Filter = &ypb.SyntaxFlowRuleFilter{}
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
-		req.Filter.IncludeLibraryRule = include
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter.IncludeLibraryRule = include
 	}
 }
 
 // withRuleInput 设置规则输入，用于调试模式时直接输入自定义规则内容（内部使用，不导出）
 func withRuleInput(input *ypb.SyntaxFlowRuleInput) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		req.RuleInput = input
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.ScanRequest.RuleInput = input
 	}
 }
 
 // WithRuleFilter 设置规则过滤器，直接传入过滤器结构体（内部使用，保持向后兼容）
 func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		req.Filter = filter
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		if sc.ScanRequest.Filter == nil {
+			sc.ScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		sc.ScanRequest.Filter = filter
 	}
 }
 
@@ -211,8 +246,11 @@ func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) ScanOption {
 // )
 // ```
 func WithIgnoreLanguage(ignore bool) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		req.IgnoreLanguage = ignore
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.ScanRequest.IgnoreLanguage = ignore
 	}
 }
 
@@ -229,8 +267,11 @@ func WithIgnoreLanguage(ignore bool) ScanOption {
 // )
 // ```
 func WithConcurrency(concurrency uint32) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		req.Concurrency = concurrency
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.ScanRequest.Concurrency = concurrency
 	}
 }
 
@@ -247,8 +288,11 @@ func WithConcurrency(concurrency uint32) ScanOption {
 // )
 // ```
 func WithMemory(memory bool) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		req.Memory = memory
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.ScanRequest.Memory = memory
 	}
 }
 
@@ -263,8 +307,51 @@ func WithMemory(memory bool) ScanOption {
 // )
 // ```
 func WithResumeTaskId(taskId string) ScanOption {
-	return func(req *ypb.SyntaxFlowScanRequest) {
-		req.ResumeTaskId = taskId
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.ScanRequest.ResumeTaskId = taskId
+	}
+}
+
+// WithProcessCallback 设置扫描进度回调函数
+// Example:
+// ```
+// syntaxflowscan.StartScan(context.New(), callback,
+//
+//	syntaxflowscan.withProcessCallback(func(progress float64) {
+//		println("扫描进度:", progress)
+//	}),
+//
+// )
+// ```
+func WithProcessCallback(callback ProcessCallback) ScanOption {
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.ProcessCallback = callback
+	}
+}
+
+// WithRuleProcessCallback 设置规则进度回调函数
+// Example:
+// ```
+// syntaxflowscan.StartScan(context.New(), callback,
+//
+//	syntaxflowscan.withRuleProcessCallback(func(progName, ruleName string, progress float64) {
+//		println("规则进度:", progName, ruleName, progress)
+//	}),
+//
+// )
+// ```
+func WithRuleProcessCallback(callback RuleProcessCallback) ScanOption {
+	return func(sc *ScanConfig) {
+		if sc.ScanRequest == nil {
+			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+		}
+		sc.RuleProcessCallback = callback
 	}
 }
 
@@ -288,7 +375,6 @@ type ScanStreamImpl struct {
 	ctx          context.Context
 	requestChan  chan *ypb.SyntaxFlowScanRequest
 	callbackFunc ScanCallback
-	sendMutex    *sync.Mutex
 }
 
 func newScanStreamImpl(ctx context.Context, callback ScanCallback) *ScanStreamImpl {
@@ -296,7 +382,6 @@ func newScanStreamImpl(ctx context.Context, callback ScanCallback) *ScanStreamIm
 		ctx:          ctx,
 		requestChan:  make(chan *ypb.SyntaxFlowScanRequest, 1),
 		callbackFunc: callback,
-		sendMutex:    new(sync.Mutex),
 	}
 }
 
@@ -310,13 +395,9 @@ func (s *ScanStreamImpl) Recv() (*ypb.SyntaxFlowScanRequest, error) {
 }
 
 func (s *ScanStreamImpl) Send(resp *ypb.SyntaxFlowScanResponse) error {
-	s.sendMutex.Lock()
-	defer s.sendMutex.Unlock()
-
 	if s.callbackFunc == nil {
 		return nil
 	}
-
 	result := &ScanResult{
 		TaskID:     resp.TaskID,
 		Status:     resp.Status,
@@ -386,10 +467,6 @@ func StartScan(ctx context.Context, callback ScanCallback, opts ...ScanOption) e
 		Concurrency: 5,
 	}
 
-	for _, opt := range opts {
-		opt(req)
-	}
-
 	if len(req.ProgramName) == 0 {
 		return utils.Error("program names are required")
 	}
@@ -397,11 +474,15 @@ func StartScan(ctx context.Context, callback ScanCallback, opts ...ScanOption) e
 		return utils.Error("either rule filter or rule input must be provided")
 	}
 
-	stream := newScanStreamImpl(ctx, callback)
+	sc := &ScanConfig{ScanRequest: req}
+	for _, opt := range opts {
+		opt(sc)
+	}
 
-	stream.requestChan <- req
+	stream := newScanStreamImpl(ctx, callback)
+	stream.requestChan <- sc.GetScanRequest()
 	close(stream.requestChan)
-	return Scan(stream)
+	return ScanWithConfig(stream, sc)
 }
 
 // ResumeScan 恢复之前暂停的扫描任务
@@ -432,9 +513,12 @@ func StartScan(ctx context.Context, callback ScanCallback, opts ...ScanOption) e
 // ```
 func ResumeScan(ctx context.Context, taskId string, callback ScanCallback) error {
 	return StartScan(ctx, callback,
-		func(req *ypb.SyntaxFlowScanRequest) {
-			req.ControlMode = "resume"
-			req.ResumeTaskId = taskId
+		func(sc *ScanConfig) {
+			if sc.ScanRequest == nil {
+				sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+			}
+			sc.ScanRequest.ControlMode = "resume"
+			sc.ScanRequest.ResumeTaskId = taskId
 		},
 	)
 }
@@ -468,9 +552,12 @@ func ResumeScan(ctx context.Context, taskId string, callback ScanCallback) error
 // ```
 func GetScanStatus(ctx context.Context, taskId string, callback ScanCallback) error {
 	return StartScan(ctx, callback,
-		func(req *ypb.SyntaxFlowScanRequest) {
-			req.ControlMode = "status"
-			req.ResumeTaskId = taskId
+		func(sc *ScanConfig) {
+			if sc.ScanRequest == nil {
+				sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
+			}
+			sc.ScanRequest.ControlMode = "status"
+			sc.ScanRequest.ResumeTaskId = taskId
 		},
 	)
 }

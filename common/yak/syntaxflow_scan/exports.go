@@ -23,4 +23,8 @@ var Exports = map[string]any{
 	"withTags":               WithTags,
 	"withKeyword":            WithKeyword,
 	"withIncludeLibraryRule": WithIncludeLibraryRule,
+
+	// 进度
+	"withProcessCallback":     WithProcessCallback,
+	"withRuleProcessCallback": WithRuleProcessCallback,
 }
