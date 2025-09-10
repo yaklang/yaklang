@@ -2,8 +2,8 @@ package syntaxflow_scan
 
 import (
 	"context"
-
 	"github.com/yaklang/yaklang/common/utils"
+
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -466,19 +466,17 @@ func StartScan(ctx context.Context, callback ScanCallback, opts ...ScanOption) e
 		ControlMode: "start",
 		Concurrency: 5,
 	}
-
-	if len(req.ProgramName) == 0 {
-		return utils.Error("program names are required")
-	}
-	if req.Filter == nil && req.RuleInput == nil {
-		return utils.Error("either rule filter or rule input must be provided")
-	}
-
 	sc := &ScanConfig{ScanRequest: req}
 	for _, opt := range opts {
 		opt(sc)
 	}
 
+	if len(sc.GetScanRequest().GetProgramName()) == 0 {
+		return utils.Error("program names are required")
+	}
+	if sc.GetScanRequest().GetFilter() == nil && sc.GetScanRequest().GetRuleInput() == nil {
+		return utils.Error("either rule filter or rule input must be provided")
+	}
 	stream := newScanStreamImpl(ctx, callback)
 	stream.requestChan <- sc.GetScanRequest()
 	close(stream.requestChan)
