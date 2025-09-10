@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -221,3 +222,307 @@ func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.
 
 	t.Log("Dynamic context provider correctly called during prompt generation")
 }
+
+func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
+	callCount := 0
+	var countMutex sync.Mutex
+
+	mockProvider := func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+		countMutex.Lock()
+		callCount++
+		countMutex.Unlock()
+		return fmt.Sprintf("Traced content call #%d at %s", callCount, time.Now().Format("15:04:05")), nil
+	}
+
+	react, err := NewReAct(
+		WithTracedDynamicContextProvider("traced_provider", mockProvider),
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	// First call - should not have diff
+	ctx1 := react.promptManager.DynamicContext()
+	if ctx1 == "" {
+		t.Fatal("Dynamic context should not be empty")
+	}
+
+	if !utils.MatchAllOfSubString(ctx1, "Traced content call #1", "traced_provider") {
+		t.Fatalf("First call context does not contain expected content. Got: %s", ctx1)
+	}
+
+	// Second call - should have diff
+	ctx2 := react.promptManager.DynamicContext()
+	if ctx2 == "" {
+		t.Fatal("Dynamic context should not be empty")
+	}
+
+	if !utils.MatchAllOfSubString(ctx2, "Traced content call #2", "traced_provider") {
+		t.Fatalf("Second call context does not contain expected content. Got: %s", ctx2)
+	}
+
+	// Second call should contain diff information
+	if !utils.MatchAllOfSubString(ctx2, "CHANGES_DIFF") {
+		t.Fatalf("Second call should contain diff information. Got: %s", ctx2)
+	}
+
+	t.Logf("First call context: %s", ctx1)
+	t.Logf("Second call context: %s", ctx2)
+}
+
+func TestPromptManager_WithTracedFileContext(t *testing.T) {
+	// Create a temporary file for testing
+	tempFile, err := os.CreateTemp("", "traced_file_test_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile.Name()) // Clean up
+
+	// Write initial content
+	initialContent := "Initial file content for testing"
+	if _, err := tempFile.WriteString(initialContent); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tempFile.Close()
+
+	react, err := NewReAct(
+		WithTracedFileContext("test_file", tempFile.Name()),
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	// First call - should read initial content
+	ctx1 := react.promptManager.DynamicContext()
+	if ctx1 == "" {
+		t.Fatal("Dynamic context should not be empty")
+	}
+
+	if !utils.MatchAllOfSubString(ctx1, "test_file", initialContent) {
+		t.Fatalf("First call should contain initial file content. Got: %s", ctx1)
+	}
+
+	// Modify file content
+	updatedContent := "Updated file content for testing"
+	if err := os.WriteFile(tempFile.Name(), []byte(updatedContent), 0644); err != nil {
+		t.Fatalf("Failed to update temp file: %v", err)
+	}
+
+	// Second call - should detect changes and show diff
+	ctx2 := react.promptManager.DynamicContext()
+	if ctx2 == "" {
+		t.Fatal("Dynamic context should not be empty")
+	}
+
+	if !utils.MatchAllOfSubString(ctx2, "test_file", updatedContent) {
+		t.Fatalf("Second call should contain updated file content. Got: %s", ctx2)
+	}
+
+	// Second call should contain diff information
+	if !utils.MatchAllOfSubString(ctx2, "CHANGES_DIFF") {
+		t.Fatalf("Second call should contain diff information. Got: %s", ctx2)
+	}
+
+	t.Logf("First call context: %s", ctx1)
+	t.Logf("Second call context: %s", ctx2)
+}
+
+func TestPromptManager_WithTracedFileContext_FileNotExist(t *testing.T) {
+	nonExistentFile := "/tmp/non_existent_file_12345.txt"
+
+	react, err := NewReAct(
+		WithTracedFileContext("non_existent", nonExistentFile),
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	ctx := react.promptManager.DynamicContext()
+	if ctx == "" {
+		t.Fatal("Dynamic context should not be empty")
+	}
+
+	// Should contain error message for non-existent file
+	if !utils.MatchAllOfSubString(ctx, "Error getting context", "failed to read file") {
+		t.Fatalf("Context should contain error message for non-existent file. Got: %s", ctx)
+	}
+
+	t.Logf("Context with file error: %s", ctx)
+}
+
+func TestPromptManager_WithMixedContextProviders(t *testing.T) {
+	regularCallCount := 0
+	tracedCallCount := 0
+	var regularMutex, tracedMutex sync.Mutex
+
+	regularProvider := func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+		regularMutex.Lock()
+		regularCallCount++
+		regularMutex.Unlock()
+		return "Regular provider content", nil
+	}
+
+	tracedProvider := func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+		tracedMutex.Lock()
+		tracedCallCount++
+		tracedMutex.Unlock()
+		return fmt.Sprintf("Traced provider content #%d", tracedCallCount), nil
+	}
+
+	react, err := NewReAct(
+		WithDynamicContextProvider("regular", regularProvider),
+		WithTracedDynamicContextProvider("traced", tracedProvider),
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	// First call
+	ctx1 := react.promptManager.DynamicContext()
+	if !utils.MatchAllOfSubString(ctx1, "Regular provider content", "Traced provider content #1") {
+		t.Fatalf("First call should contain content from both providers. Got: %s", ctx1)
+	}
+
+	// Second call
+	ctx2 := react.promptManager.DynamicContext()
+	if !utils.MatchAllOfSubString(ctx2, "Regular provider content", "Traced provider content #2") {
+		t.Fatalf("Second call should contain content from both providers. Got: %s", ctx2)
+	}
+
+	// Second call should contain diff for traced provider but not for regular provider
+	if !utils.MatchAllOfSubString(ctx2, "CHANGES_DIFF") {
+		t.Fatalf("Second call should contain diff information for traced provider. Got: %s", ctx2)
+	}
+
+	// Check call counts
+	regularMutex.Lock()
+	if regularCallCount != 2 {
+		t.Fatalf("Regular provider should be called twice, got %d", regularCallCount)
+	}
+	regularMutex.Unlock()
+
+	tracedMutex.Lock()
+	if tracedCallCount != 2 {
+		t.Fatalf("Traced provider should be called twice, got %d", tracedCallCount)
+	}
+	tracedMutex.Unlock()
+
+	t.Logf("First call context: %s", ctx1)
+	t.Logf("Second call context: %s", ctx2)
+}
+
+// Example usage of the new traced context providers
+func Example_WithTracedDynamicContextProvider() {
+	// This example shows how to use the new traced context provider features
+
+	// Create a ReAct instance with traced providers
+	react, err := NewReAct(
+		// Regular dynamic context provider (no tracing)
+		WithDynamicContextProvider("system_info", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+			return "System: Linux x86_64", nil
+		}),
+
+		// Traced dynamic context provider (tracks changes)
+		WithTracedDynamicContextProvider("user_session", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+			return fmt.Sprintf("Session active since %s", time.Now().Format("15:04:05")), nil
+		}),
+
+		// Traced file context provider (monitors file changes)
+		WithTracedFileContext("config_file", "/etc/config.yaml"),
+
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "Example completed"}, "cumulative_summary": "Example summary", "human_readable_thought": "Example thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+
+	if err != nil {
+		fmt.Printf("Failed to create ReAct instance: %v\n", err)
+		return
+	}
+
+	// First call - no diff information
+	_ = react.promptManager.DynamicContext()
+	fmt.Printf("First call includes system info and initial session time\n")
+
+	// Wait a moment to ensure different timestamps
+	time.Sleep(100 * time.Millisecond)
+
+	// Second call - will include diff for traced providers
+	_ = react.promptManager.DynamicContext()
+	fmt.Printf("Second call includes changes for traced providers\n")
+
+	// Output: First call includes system info and initial session time
+	// Output: Second call includes changes for traced providers
+}
+
+/*
+新功能说明：Traced Context Providers
+
+本更新为 AI ReAct 系统添加了 traced（跟踪）上下文提供者功能，支持：
+
+1. WithTracedDynamicContextProvider(name, provider)
+   - 注册带跟踪功能的动态上下文提供者
+   - 自动跟踪内容变化并生成差异信息
+   - 适用于需要监控状态变化的场景
+
+2. WithTracedFileContext(name, filePath)
+   - 监控指定文件的变更
+   - 文件内容变化时自动生成差异信息
+   - 适用于配置文件、日志文件等需要实时监控的文件
+
+3. 混合使用
+   - 可以同时使用普通和跟踪类型的上下文提供者
+   - 跟踪提供者会在内容变化时附加 <|CHANGES_DIFF_xxx|> 标记的差异信息
+
+使用示例：
+
+// 跟踪动态内容变化
+WithTracedDynamicContextProvider("user_status", func(...) (string, error) {
+    return fmt.Sprintf("User online: %v", getUserStatus()), nil
+})
+
+// 跟踪文件变化
+WithTracedFileContext("config", "/app/config.json")
+
+差异信息格式：
+<|CHANGES_DIFF_abc123|>
+--- a/content
++++ b/content
+@@ -1 +1 @@
+-old content
++new content
+<|CHANGES_DIFF_abc123|>
+
+优势：
+- 自动检测和报告变化
+- 减少重复数据传输
+- 提供详细的变更历史
+- 支持文件和动态内容的混合监控
+*/

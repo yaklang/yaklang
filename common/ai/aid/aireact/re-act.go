@@ -114,7 +114,11 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 
 	// Register pending context providers
 	for _, entry := range cfg.pendingContextProviders {
-		cfg.promptManager.cpm.Register(entry.name, entry.provider)
+		if entry.traced {
+			cfg.promptManager.cpm.RegisterTracedContent(entry.name, entry.provider)
+		} else {
+			cfg.promptManager.cpm.Register(entry.name, entry.provider)
+		}
 	}
 	// Clear pending list after registration
 	cfg.pendingContextProviders = nil

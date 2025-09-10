@@ -2,7 +2,9 @@ package aireact
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -30,6 +32,7 @@ type AICallbackType = aicommon.AICallbackType
 type contextProviderEntry struct {
 	name     string
 	provider aicommon.ContextProvider
+	traced   bool // Whether to register as traced provider
 }
 
 // ToolReviewInfo contains information needed for tool use review
@@ -643,6 +646,54 @@ func WithDynamicContextProvider(name string, provider aicommon.ContextProvider) 
 				cfg.pendingContextProviders = append(cfg.pendingContextProviders, contextProviderEntry{
 					name:     name,
 					provider: provider,
+				})
+			}
+		}
+	}
+}
+
+// WithTracedDynamicContextProvider registers a dynamic context provider with tracing capabilities
+// It tracks changes between calls and provides diff information
+func WithTracedDynamicContextProvider(name string, provider aicommon.ContextProvider) Option {
+	return func(cfg *ReActConfig) {
+		if name != "" && provider != nil {
+			// If promptManager is already available, register directly
+			if cfg.promptManager != nil {
+				cfg.promptManager.cpm.RegisterTracedContent(name, provider)
+			} else {
+				// Otherwise, add to pending list for later registration
+				cfg.pendingContextProviders = append(cfg.pendingContextProviders, contextProviderEntry{
+					name:     name,
+					provider: provider,
+					traced:   true, // Mark as traced
+				})
+			}
+		}
+	}
+}
+
+// WithTracedFileContext monitors a file and provides its content as context with change tracking
+func WithTracedFileContext(name string, filePath string) Option {
+	return func(cfg *ReActConfig) {
+		if name != "" && filePath != "" {
+			provider := func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
+				contentBytes, err := os.ReadFile(filePath)
+				if err != nil {
+					return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
+				}
+				content := string(contentBytes)
+				return fmt.Sprintf("File: %s\nContent:\n%s", filePath, content), nil
+			}
+
+			// If promptManager is already available, register directly
+			if cfg.promptManager != nil {
+				cfg.promptManager.cpm.RegisterTracedContent(name, provider)
+			} else {
+				// Otherwise, add to pending list for later registration
+				cfg.pendingContextProviders = append(cfg.pendingContextProviders, contextProviderEntry{
+					name:     name,
+					provider: provider,
+					traced:   true, // Mark as traced
 				})
 			}
 		}
