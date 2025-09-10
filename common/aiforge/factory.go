@@ -57,10 +57,11 @@ func (ForgeFactory) Query(ctx context.Context, opts ...ForgeQueryOption) ([]*sch
 	return data, nil
 }
 
-func (f *ForgeFactory) MergeAIForgeToString(forges []*schema.AIForge) (string, error) {
-	result, err := utils.RenderTemplate(`<|AI_PLAN_TEMPLATE_{{ .nonce }}_START summary=""|>
-
-<|AI_AGENTS_{{ .nonce }}_END|>`, map[string]any{
+func (f *ForgeFactory) GenerateAIForgeListForPrompt(forges []*schema.AIForge) (string, error) {
+	result, err := utils.RenderTemplate(`<|AI_BLUEPRINT_{{ .nonce }}_START|>`+
+		`{{range .forges}}
+* '{{ .ForgeName }}': {{ .Description }}{{ if .ForgeVerboseName }}(Short: {{ .ForgeVerboseName }}){{end}}{{end}}
+<|AI_BLUEPRINT_{{ .nonce }}_END|>`, map[string]any{
 		"forges": forges,
 		"nonce":  utils.RandStringBytes(4),
 	})
