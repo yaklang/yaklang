@@ -22,6 +22,9 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 	if r.reviewPolicy == "" {
 		r.reviewPolicy = aicommon.AgreePolicyManual
 	}
+
+	interactiveId := endpoint.GetId()
+
 	switch r.reviewPolicy {
 	case aicommon.AgreePolicyYOLO, aicommon.AgreePolicyAuto:
 		r.Emitter.EmitInfo("yolo policy auto agree all")
@@ -38,13 +41,16 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 		}
 		go func() {
 			go func() {
-				r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_START, "ai-reviewer", map[string]any{})
+				r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_START, "ai-reviewer", map[string]any{
+					"interactive_id": interactiveId,
+				})
 				endOnce := utils.NewOnce()
 				endNormally := func(score float64, reason string) {
 					endOnce.Do(func() {
 						r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_END, "ai-reviewer", map[string]any{
-							"score":  score,
-							"reason": reason,
+							"score":          score,
+							"reason":         reason,
+							"interactive_id": interactiveId,
 						})
 					})
 				}
@@ -101,8 +107,9 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 				if score <= 0.4 {
 					var duSec time.Duration = 1
 					r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN, "ai-reviewer", map[string]any{
-						"seconds": int(duSec),
-						"score":   score,
+						"seconds":        int(duSec),
+						"interactive_id": interactiveId,
+						"score":          score,
 					})
 					r.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
@@ -111,8 +118,9 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 				} else if score >= 0.7 {
 					var duSec time.Duration = 1
 					r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN, "ai-reviewer", map[string]any{
-						"seconds": int(duSec),
-						"score":   score,
+						"seconds":        int(duSec),
+						"interactive_id": interactiveId,
+						"score":          score,
 					})
 					r.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
