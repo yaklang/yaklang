@@ -29,6 +29,7 @@ var MCPCommand = &cli.Command{
 		cli.StringFlag{Name: "r,resource", Usage: "enable resource sets, split by ','"},
 		cli.StringFlag{Name: "dr,disable-resource", Usage: "disable resource sets, split by ','"},
 		cli.StringSliceFlag{Name: "script", Usage: "add the dynamic Yak script as a tool to the MCP server"},
+		cli.StringFlag{Name: "base-url", Usage: "if transport is sse, the base url of the MCP server"},
 	},
 	Action: func(c *cli.Context) error {
 		yakit.CallPostInitDatabase()
@@ -39,6 +40,7 @@ var MCPCommand = &cli.Command{
 		port := c.Int("port")
 		tool, disableTool := c.String("tool"), c.String("disable-tool")
 		script := c.StringSlice("script")
+		baseURL := c.String("base-url")
 		toolSets := lo.FilterMap(strings.Split(tool, ","), func(item string, _ int) (string, bool) {
 			item = strings.TrimSpace(item)
 			return item, item != ""
@@ -87,9 +89,12 @@ var MCPCommand = &cli.Command{
 				port = utils.GetRandomAvailableTCPPort()
 			}
 			hostPort := utils.HostPort(host, port)
-			urlStr := fmt.Sprintf("http://%s", hostPort)
-			log.Infof("start to listen reverse(mcp) on: %s", urlStr)
-			err = s.ServeSSE(hostPort, urlStr)
+			if baseURL == "" {
+				baseURL = fmt.Sprintf("http://%s", hostPort)
+			}
+			log.Infof("start to listen reverse(mcp) on: %s", hostPort)
+			log.Infof("mcp server endpoint: %s", baseURL)
+			err = s.ServeSSE(hostPort, baseURL)
 		default:
 			return utils.Errorf("invalid transport: %v", transport)
 		}
