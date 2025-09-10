@@ -1117,6 +1117,10 @@ var ssaCodeScan = &cli.Command{
 			Name:  "memory,mem",
 			Usage: "enable memory mode",
 		},
+		cli.StringFlag{
+			Name:  "database,db",
+			Usage: "database path",
+		},
 		// }}}
 
 		// result show option
@@ -1170,6 +1174,9 @@ var ssaCodeScan = &cli.Command{
 		_ = ruleTime
 		log.Infof("sync rule from embed to database success, cost %v", ruleTime)
 
+		if databaseRaw := c.String("database"); databaseRaw != "" {
+			consts.SetGormSSAProjectDatabaseByInfo(databaseRaw)
+		}
 		// Parse configuration
 		config, err := parseSFScanConfig(c)
 		if err != nil {
