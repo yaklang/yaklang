@@ -2,12 +2,9 @@ package yakgrpc
 
 import (
 	"context"
-	"strings"
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"sync"
 
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -19,83 +16,7 @@ type SyntaxFlowScanTaskConfig struct {
 
 func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 	wrapperStream := newWrapperSyntaxFlowScanStream(stream.Context(), stream)
-	return syntaxFlowScan(wrapperStream)
-}
-
-type SyntaxFlowScanStream interface {
-	Recv() (*ypb.SyntaxFlowScanRequest, error)
-	Send(*ypb.SyntaxFlowScanResponse) error
-	Context() context.Context
-}
-
-func syntaxFlowScan(stream SyntaxFlowScanStream) error {
-	config, err := stream.Recv()
-	if err != nil {
-		return err
-	}
-
-	streamCtx := stream.Context()
-
-	var taskId string
-	var m *SyntaxFlowScanManager
-	errC := make(chan error)
-	switch strings.ToLower(config.GetControlMode()) {
-	case "start":
-		taskId = uuid.New().String()
-		m, err = CreateSyntaxflowTaskById(taskId, streamCtx, config, stream)
-		if err != nil {
-			return err
-		}
-		log.Info("start to create syntaxflow scan")
-		go func() {
-			err := m.ScanNewTask()
-			if err != nil {
-				utils.TryWriteChannel(errC, err)
-			}
-			close(errC)
-		}()
-	case "status":
-		taskId = config.ResumeTaskId
-		m, err = LoadSyntaxflowTaskFromDB(taskId, streamCtx, stream)
-		if err != nil {
-			return err
-		}
-		err = m.StatusTask()
-		return err
-	case "resume":
-		taskId = config.GetResumeTaskId()
-		m, err = LoadSyntaxflowTaskFromDB(taskId, streamCtx, stream)
-		if err != nil {
-			return err
-		}
-		m.Resume()
-		go func() {
-			// err := s.syntaxFlowResumeTask(m, stream)
-			err := m.ResumeTask()
-			if err != nil {
-				utils.TryWriteChannel(errC, err)
-			}
-			close(errC)
-		}()
-	default:
-		return utils.Error("invalid syntaxFlow scan mode")
-	}
-
-	// wait result
-	select {
-	case err, ok := <-errC:
-		RemoveSyntaxFlowTaskByID(taskId)
-		if ok {
-			return err
-		}
-		return nil
-	case <-streamCtx.Done():
-		m.Stop()
-		RemoveSyntaxFlowTaskByID(taskId)
-		m.status = schema.SYNTAXFLOWSCAN_DONE
-		m.SaveTask()
-		return utils.Error("client canceled")
-	}
+	return syntaxflow_scan.Scan(wrapperStream)
 }
 
 type syntaxFlowScanStreamImpl struct {
@@ -119,7 +40,7 @@ func NewSyntaxFlowScanStream(ctx context.Context, callback syntaxFlowScanStreamC
 	return ret
 }
 
-var _ SyntaxFlowScanStream = (*wrapperSyntaxFlowScanStream)(nil)
+var _ syntaxflow_scan.ScanStream = (*wrapperSyntaxFlowScanStream)(nil)
 
 type wrapperSyntaxFlowScanStream struct {
 	ctx            context.Context
@@ -153,7 +74,7 @@ func (s *syntaxFlowScanStreamImpl) Done() {
 	s.ctx.Done()
 }
 
-var _ SyntaxFlowScanStream = (*syntaxFlowScanStreamImpl)(nil)
+var _ syntaxflow_scan.ScanStream = (*syntaxFlowScanStreamImpl)(nil)
 
 func (s *syntaxFlowScanStreamImpl) Recv() (*ypb.SyntaxFlowScanRequest, error) {
 	select {
@@ -188,6 +109,6 @@ func (s *syntaxFlowScanStreamImpl) Send(resp *ypb.SyntaxFlowScanResponse) error 
 func SyntaxFlowScan(ctx context.Context, config *ypb.SyntaxFlowScanRequest, callBack syntaxFlowScanStreamCallback) {
 	stream := NewSyntaxFlowScanStream(ctx, callBack)
 	stream.request <- config
-	syntaxFlowScan(stream)
+	syntaxflow_scan.Scan(stream)
 	stream.Done()
 }
