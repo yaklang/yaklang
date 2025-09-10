@@ -52,8 +52,8 @@ const (
 	SFR_SEVERITY_INFO     SyntaxFlowSeverity = "info"
 	SFR_SEVERITY_LOW      SyntaxFlowSeverity = "low"
 	SFR_SEVERITY_WARNING  SyntaxFlowSeverity = "middle"
-	SFR_SEVERITY_CRITICAL SyntaxFlowSeverity = "critical"
 	SFR_SEVERITY_HIGH     SyntaxFlowSeverity = "high"
+	SFR_SEVERITY_CRITICAL SyntaxFlowSeverity = "critical"
 )
 
 func GetAllSFSeverityTypes() []string {

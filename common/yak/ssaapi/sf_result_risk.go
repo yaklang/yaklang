@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -154,7 +155,7 @@ func buildSSARisk(
 		newSSARisk.Language,
 		newSSARisk.Title,
 	)
-
+	newSSARisk.Hash = newSSARisk.CalcHash()
 	return newSSARisk
 }
 
@@ -171,6 +172,7 @@ func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, sa
 	if ssaRisk == nil {
 		return ""
 	}
+
 	ssaRisk.RuntimeId = r.TaskID
 	ssaRisk.ResultID = uint64(r.GetResultID())
 	if save {
@@ -212,9 +214,6 @@ func (r *SyntaxFlowResult) GetRiskByValue(variable string, i int) *schema.SSARis
 	name := ssaRiskName(variable, i)
 	if r, ok := r.riskMap[name]; ok {
 		return r
-	}
-	if _, ok := r.GetAlertInfo(variable); ok {
-		r.CreateRisk()
 	}
 	// from db
 	if r.dbResult != nil {
