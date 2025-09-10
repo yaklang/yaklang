@@ -154,7 +154,7 @@ jobs:
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag
               go test -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...
 
-          - name: Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API
+          - name: Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan
             run: |
               # SSA plugin rule/option
               go test -timeout 20s ./common/yak/static_analyzer/test/...
@@ -171,6 +171,8 @@ jobs:
               go test -timeout 1m ./common/yak/ssaapi
               go test -timeout 1m ./common/yak/ssaapi/ssareducer
               go test -timeout 1m ./common/yak/ssaapi/test/ssatest
+              # SyntaxFlow Scan
+              go test -timoeout 1m ./common/yak/syntaxflow_scan/...
 
           - name: Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Golang | C | Java
             run: |
