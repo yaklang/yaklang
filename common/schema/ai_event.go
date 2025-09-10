@@ -13,8 +13,11 @@ import (
 type EventType string
 
 const (
-	EVENT_TYPE_STREAM     EventType = "stream"
-	EVENT_TYPE_STRUCTURED EventType = "structured"
+	EVENT_TYPE_STREAM              EventType = "stream"
+	EVENT_TYPE_STRUCTURED          EventType = "structured"
+	EVENT_TYPE_AI_REVIEW_START     EventType = "ai_review_start"
+	EVENT_TYPE_AI_REVIEW_COUNTDOWN EventType = "ai_review_countdown"
+	EVENT_TYPE_AI_REVIEW_END       EventType = "ai_review_end"
 
 	// Token 开销情况
 	EVENT_TYPE_CONSUMPTION EventType = "consumption" // token consumption include `{"input_"}`
