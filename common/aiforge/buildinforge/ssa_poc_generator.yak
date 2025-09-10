@@ -1,0 +1,323 @@
+# SSA POC 生成 Forge
+# 根据 SSA Risk ID 生成Python POC
+
+# 获取参数
+risk_id = cli.Int("risk_id")
+additional_context = cli.String("additional_context")
+cli.check()
+
+# 为POC生成高亮问题代码的函数
+func highlightProblemCodeForPOC(lines, problemLine) {
+    var result = []
+
+    for i = 0; i < len(lines); i++ {
+        lineNum = i + 1
+        line = lines[i]
+
+        # 在问题代码开始前添加标记
+        if lineNum == problemLine {
+            result = append(result, "// ⚠️ 漏洞位置 - POC需要重点关注此处\n")
+        }
+
+        # 如果是问题代码行，添加特殊标记
+        if lineNum == problemLine {
+            result = append(result, sprintf(">>> %s // ⚠️ 漏洞触发点\n", line))
+        } else {
+            result = append(result, line)
+            if i < len(lines) - 1 {
+                result = append(result, "\n")
+            }
+        }
+    }
+
+    return str.Join(result, "")
+}
+
+# 从大型代码文件中提取POC生成所需的关键上下文
+func extractKeyContextForPOC(fullCode, problemLine) {
+    if fullCode == "" {
+        return ""
+    }
+
+    lines = str.Split(fullCode, "\n")
+    if len(lines) == 0 {
+        return ""
+    }
+
+    if problemLine < 1 || problemLine > len(lines) {
+        return ""
+    }
+
+    var result = []
+    contextRadius = 50  # 在问题代码前后各提取50行作为上下文
+
+    # 确定提取范围
+    startLine = problemLine - contextRadius
+    if startLine < 1 {
+        startLine = 1
+    }
+
+    endLine = problemLine + contextRadius
+    if endLine > len(lines) {
+        endLine = len(lines)
+    }
+
+    # 尝试向上扩展以包含重要的上下文信息
+    startLine = expandContextForImportantInfo(lines, startLine, true)
+
+    # 尝试向下扩展以包含完整的函数或类结构
+    endLine = expandContextForImportantInfo(lines, endLine, false)
+
+    # 添加上下文信息标注
+    result = append(result, sprintf("// 关键上下文：第 %d-%d 行（问题代码在第 %d 行）\n", startLine, endLine, problemLine))
+
+    for i = startLine - 1; i < endLine && i < len(lines); i++ {
+        lineNum = i + 1
+        line = lines[i]
+
+        # 标注问题代码行
+        if lineNum == problemLine {
+            result = append(result, sprintf(">>> %s // ⚠️ 漏洞位置\n", line))
+        } else {
+            result = append(result, line)
+            result = append(result, "\n")
+        }
+    }
+
+    return str.Join(result, "")
+}
+
+# 扩展上下文以包含重要信息（注解、类声明、函数签名等）
+func expandContextForImportantInfo(lines, currentLine, expandUpward) {
+    if len(lines) == 0 {
+        return currentLine
+    }
+
+    # 重要关键字模式（用于识别需要保留的上下文）
+    importantPatterns = [
+        "@",                             # 注解
+        "class ", "interface ", "enum ", # 类声明
+        "public ", "private ", "protected ", # 访问修饰符
+        "static ", "final ", "abstract ", # 修饰符
+        "import ", "package ",           # 导入和包声明
+        "function ", "def ", "func ",    # 函数声明（多语言支持）
+        "router.", "app.", "server.",    # 路由相关
+        "@RequestMapping", "@GetMapping", "@PostMapping", "@PutMapping", "@DeleteMapping", # Spring注解
+        "@Path", "@GET", "@POST", "@PUT", "@DELETE", # JAX-RS注解
+        "@RestController", "@Controller", "@Service", "@Component", # Spring组件注解
+    ]
+
+    maxExpansion = 100  # 最大扩展行数
+    expansion = 0
+
+    if expandUpward {
+        # 向上扩展
+        for i = currentLine - 1; i >= 1 && expansion < maxExpansion; i-- {
+            lineContent = str.TrimSpace(lines[i-1])
+
+            # 检查是否包含重要信息
+            containsImportant = false
+            for _, pattern := range importantPatterns {
+                if str.Contains(lineContent, pattern) {
+                    containsImportant = true
+                    break
+                }
+            }
+
+            if containsImportant {
+                currentLine = i
+            } else {
+                expansion++
+            }
+
+            # 如果遇到类或函数的开始，停止扩展
+            if str.Contains(lineContent, "{") && (str.Contains(lineContent, "class ") || str.Contains(lineContent, "public ") || str.Contains(lineContent, "private ")) {
+                break
+            }
+        }
+    } else {
+        # 向下扩展
+        for i = currentLine + 1; i <= len(lines) && expansion < maxExpansion; i++ {
+            lineContent = str.TrimSpace(lines[i-1])
+
+            # 检查是否包含重要信息
+            containsImportant = false
+            for _, pattern := range importantPatterns {
+                if str.Contains(lineContent, pattern) {
+                    containsImportant = true
+                    break
+                }
+            }
+
+            if containsImportant {
+                currentLine = i
+            } else {
+                expansion++
+            }
+
+            # 如果遇到函数或类的结束，适当扩展以包含完整结构
+            if str.Contains(lineContent, "}") {
+                currentLine = i
+                break
+            }
+        }
+    }
+
+    return currentLine
+}
+
+# 构建 POC 生成提示词的函数
+func buildPOCGenerationPrompt(wrappedRisk, fullCode, fragment, hasFullCode, additionalContext) {
+    var result = []
+
+    result = append(result, "# POC（概念验证）生成请求\n\n")
+    result = append(result, "请为以下安全漏洞生成一个详细的POC（概念验证），包括漏洞利用步骤和示例代码。\n\n")
+
+    # 漏洞信息
+    result = append(result, "## 漏洞信息\n")
+    result = append(result, sprintf("- **漏洞名称**: %s\n", wrappedRisk.Title))
+    result = append(result, sprintf("- **漏洞类型**: %s\n", wrappedRisk.RiskType))
+    result = append(result, sprintf("- **严重程度**: %s\n", wrappedRisk.Severity))
+    result = append(result, sprintf("- **编程语言**: %s\n", wrappedRisk.Language))
+
+    # 漏洞描述
+    result = append(result, "\n## 漏洞描述\n")
+    result = append(result, wrappedRisk.Description)
+    result = append(result, "\n\n")
+
+    # 为POC生成提供尽可能多的上下文信息
+    if fullCode != "" {
+        codeLines = str.Split(fullCode, "\n")
+        shouldIncludeFullCode = len(fullCode) <= 10000 && len(codeLines) <= 500
+
+        if shouldIncludeFullCode {
+            result = append(result, "## 完整代码上下文（POC生成重要参考）\n")
+            result = append(result, "**注意**: 以下完整代码包含API注解、函数签名、类结构等POC生成所需的关键信息\n\n")
+
+            result = append(result, sprintf("```%s\n", str.ToLower(wrappedRisk.Language)))
+
+            # 尝试高亮问题代码位置
+            if wrappedRisk.Line > 0 && wrappedRisk.Line <= len(codeLines) {
+                highlightedCode = highlightProblemCodeForPOC(codeLines, wrappedRisk.Line)
+                result = append(result, highlightedCode)
+            } else {
+                result = append(result, fullCode)
+            }
+
+            result = append(result, "\n```\n\n")
+        } else {
+            # 即使代码很长，也要尝试提供关键上下文
+            result = append(result, "## 代码上下文信息\n")
+            result = append(result, sprintf("- **文件路径**: %s\n", wrappedRisk.CodeSourceURL))
+            result = append(result, sprintf("- **文件大小**: %d 字符 (%d 行)\n", len(fullCode), len(codeLines)))
+            result = append(result, sprintf("- **漏洞位置**: 第 %d 行\n", wrappedRisk.Line))
+
+            # 尝试提取关键上下文（函数、类、注解等）
+            keyContext = extractKeyContextForPOC(fullCode, wrappedRisk.Line)
+            if keyContext != "" {
+                result = append(result, "\n### 关键代码片段（包含API注解、函数签名等）\n")
+                result = append(result, sprintf("```%s\n", str.ToLower(wrappedRisk.Language)))
+                result = append(result, keyContext)
+                result = append(result, "\n```\n\n")
+            } else {
+                result = append(result, "\n**注意**: 由于文件过大，无法提供完整上下文，请根据问题代码片段进行POC构造。\n\n")
+            }
+        }
+    }
+
+    # 问题代码片段（如果与完整上下文不同）
+    if fragment != "" && fragment != fullCode {
+        result = append(result, "## 问题代码片段\n")
+        result = append(result, sprintf("**位置**: 第 %d 行\n\n", wrappedRisk.Line))
+        result = append(result, sprintf("```%s\n", str.ToLower(wrappedRisk.Language)))
+        result = append(result, fragment)
+        result = append(result, "\n```\n\n")
+    }
+
+    # 添加数据流信息用于POC生成
+    if len(wrappedRisk.DataFlowPaths) > 0 {
+        result = append(result, "## 攻击路径分析\n")
+        for i, path := range wrappedRisk.DataFlowPaths {
+            result = append(result, sprintf("### 攻击路径 %d\n", i+1))
+            if path.Description != "" {
+                result = append(result, sprintf("**路径描述**: %s\n\n", path.Description))
+            }
+
+            result = append(result, "**关键节点**:\n")
+            for j, node := range path.Nodes {
+                if node.SourceCode != "" {
+                    result = append(result, sprintf("%d. `%s`\n", j+1, node.SourceCode))
+                }
+            }
+            result = append(result, "\n")
+        }
+    }
+
+    # 详细信息
+    if wrappedRisk.Details != "" {
+        result = append(result, "## 详细信息\n")
+        result = append(result, wrappedRisk.Details)
+        result = append(result, "\n\n")
+    }
+
+    # 额外上下文
+    if additionalContext != "" {
+        result = append(result, "## 额外上下文\n")
+        result = append(result, additionalContext)
+        result = append(result, "\n\n")
+    }
+
+    # POC生成要求
+    result = append(result, "## POC生成要求\n")
+    result = append(result, "请提供以下内容：\n")
+    result = append(result, "1. **漏洞原理分析**: 详细解释漏洞的成因和机制\n")
+    result = append(result, "2. **数据流分析**: 基于代码上下文，分析漏洞的传播过程\n")
+    result = append(result, "3. **影响范围**: 说明漏洞可能造成的危害\n")
+    result = append(result, "4. **利用场景**: 描述攻击者如何利用此漏洞\n")
+    result = append(result, "5. **修复建议**: 提供具体的代码修复方案\n")
+    result = append(result, "6. **防护措施**: 建议相应的安全防护措施\n")
+    result = append(result, "7. **POC代码**: 基于上述代码上下文（特别是API注解、路由信息、函数签名），生成完整的Python POC脚本\n")
+    result = append(result, "8. **API端点识别**: 根据代码中的注解（如@RequestMapping、@GetMapping等）确定具体的API访问路径\n")
+    result = append(result, "9. **请求构造**: 说明如何构造恶意请求，包括HTTP方法、URL路径、参数位置等\n")
+    result = append(result, "10. **利用步骤**: 详细说明POC的执行步骤和预期结果\n")
+
+    result = append(result, "\n**POC生成重点提示**:\n")
+    result = append(result, "- 仔细分析代码中的API注解，确定正确的访问路径和HTTP方法\n")
+    result = append(result, "- 根据函数参数识别漏洞触发点的参数名称和位置\n")
+    result = append(result, "- 考虑认证、授权等安全机制对POC的影响\n")
+    result = append(result, "- 生成的POC应该是可执行的Python脚本，包含必要的导入和错误处理\n")
+
+    return str.Join(result, "")
+}
+
+
+
+if risk_id <= 0 {
+    die(sprintf("无效的 Risk ID: %d", risk_id))
+}
+
+# 获取包含数据流信息的 SSA Risk 数据
+wrappedRisk = risk.GetSSARiskWithDataFlow(risk_id)
+if wrappedRisk == nil {
+    die(sprintf("无法找到 Risk ID 为 %d 的 SSA 风险记录", risk_id))
+}
+
+# 获取完整源代码
+fullCode, fragment, hasFullCode = risk.GetSSARiskSourceCodeWithFragment(risk_id)
+
+# 构建 POC 生成提示词
+prompt = buildPOCGenerationPrompt(wrappedRisk, fullCode, fragment, hasFullCode, additional_context)
+
+println(prompt)
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObject("result",
+        jsonschema.paramString("output", jsonschema.description("经过分析后产生的POC")),
+    )
+)
+
+forgeHandle = func(params) {
+    res = liteforge.Execute(prompt, liteforge.output(schema))~
+    println(res.GetInvokeParams("result"))
+    return res.GetInvokeParams("result")
+}
