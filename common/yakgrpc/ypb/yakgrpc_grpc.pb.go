@@ -564,6 +564,7 @@ const (
 	Yak_ListEntityRepository_FullMethodName                       = "/ypb.Yak/ListEntityRepository"
 	Yak_QueryEntity_FullMethodName                                = "/ypb.Yak/QueryEntity"
 	Yak_QueryRelationship_FullMethodName                          = "/ypb.Yak/QueryRelationship"
+	Yak_QuerySubERM_FullMethodName                                = "/ypb.Yak/QuerySubERM"
 	Yak_GenerateERMDot_FullMethodName                             = "/ypb.Yak/GenerateERMDot"
 )
 
@@ -1262,6 +1263,7 @@ type YakClient interface {
 	ListEntityRepository(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListEntityRepositoryResponse, error)
 	QueryEntity(ctx context.Context, in *QueryEntityRequest, opts ...grpc.CallOption) (*QueryEntityResponse, error)
 	QueryRelationship(ctx context.Context, in *QueryRelationshipRequest, opts ...grpc.CallOption) (*QueryRelationshipResponse, error)
+	QuerySubERM(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (*QuerySubERMResponse, error)
 	GenerateERMDot(ctx context.Context, in *GenerateERMDotRequest, opts ...grpc.CallOption) (*GenerateERMDotResponse, error)
 }
 
@@ -7527,6 +7529,16 @@ func (c *yakClient) QueryRelationship(ctx context.Context, in *QueryRelationship
 	return out, nil
 }
 
+func (c *yakClient) QuerySubERM(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (*QuerySubERMResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuerySubERMResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySubERM_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) GenerateERMDot(ctx context.Context, in *GenerateERMDotRequest, opts ...grpc.CallOption) (*GenerateERMDotResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GenerateERMDotResponse)
@@ -8232,6 +8244,7 @@ type YakServer interface {
 	ListEntityRepository(context.Context, *Empty) (*ListEntityRepositoryResponse, error)
 	QueryEntity(context.Context, *QueryEntityRequest) (*QueryEntityResponse, error)
 	QueryRelationship(context.Context, *QueryRelationshipRequest) (*QueryRelationshipResponse, error)
+	QuerySubERM(context.Context, *QuerySubERMRequest) (*QuerySubERMResponse, error)
 	GenerateERMDot(context.Context, *GenerateERMDotRequest) (*GenerateERMDotResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
@@ -9877,6 +9890,9 @@ func (UnimplementedYakServer) QueryEntity(context.Context, *QueryEntityRequest) 
 }
 func (UnimplementedYakServer) QueryRelationship(context.Context, *QueryRelationshipRequest) (*QueryRelationshipResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryRelationship not implemented")
+}
+func (UnimplementedYakServer) QuerySubERM(context.Context, *QuerySubERMRequest) (*QuerySubERMResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySubERM not implemented")
 }
 func (UnimplementedYakServer) GenerateERMDot(context.Context, *GenerateERMDotRequest) (*GenerateERMDotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateERMDot not implemented")
@@ -18948,6 +18964,24 @@ func _Yak_QueryRelationship_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QuerySubERM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySubERMRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySubERM(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySubERM_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySubERM(ctx, req.(*QuerySubERMRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_GenerateERMDot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GenerateERMDotRequest)
 	if err := dec(in); err != nil {
@@ -20752,6 +20786,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryRelationship",
 			Handler:    _Yak_QueryRelationship_Handler,
+		},
+		{
+			MethodName: "QuerySubERM",
+			Handler:    _Yak_QuerySubERM_Handler,
 		},
 		{
 			MethodName: "GenerateERMDot",

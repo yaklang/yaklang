@@ -299,7 +299,7 @@ type KnowledgeBaseEntry struct {
 	// 知识库名称
 	KnowledgeBaseID int64 `gorm:"not null" json:"knowledge_base_id"`
 
-	RelatedEntityID string // split by ","
+	RelatedEntityUUIDS string // split by ","
 
 	// 知识标题(和知识库名称应该是联合唯一索引)
 	KnowledgeTitle string `gorm:"not null" json:"knowledge_title"`

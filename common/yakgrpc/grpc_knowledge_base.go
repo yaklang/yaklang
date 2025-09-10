@@ -270,6 +270,7 @@ func KnowledgeBaseEntryToGrpcModel(entry *schema.KnowledgeBaseEntry) *ypb.Knowle
 		SourcePage:               int32(entry.SourcePage),
 		PotentialQuestions:       entry.PotentialQuestions,
 		PotentialQuestionsVector: entry.PotentialQuestionsVector,
+		RelatedEntityUUIDS:       entry.RelatedEntityUUIDS,
 	}
 }
 
