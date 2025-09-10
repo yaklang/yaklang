@@ -65,8 +65,14 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					}
 					score = action.GetFloat("risk_score")
 					reason = action.GetString("reason")
-					if score <= 0 || reason == "" {
-						return utils.Errorf("invalid review score or reason: score=%f, reason=%s", score, reason)
+					if reason == "" {
+						return utils.Error("invalid review score or reason: empty reason")
+					}
+					if score < 0 {
+						score = 0.0
+					}
+					if score > 1 {
+						score = 1.0
 					}
 					log.Infof("Auto-review evaluating: score=%.2f, reason=%s", score, reason)
 					return nil
