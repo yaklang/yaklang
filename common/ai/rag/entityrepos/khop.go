@@ -210,6 +210,7 @@ func (p *KHopPath) String() string {
 type KHopConfig struct {
 	K    int // k=0表示返回所有路径，k>0表示返回k-hop路径，k>=2
 	KMin int // default 2 (minimum 2-hop paths)
+	KMax int
 }
 
 type KHopQueryOption func(*KHopConfig)
@@ -234,19 +235,19 @@ func WithKHopKMin(kMin int) KHopQueryOption {
 	}
 }
 
-func NewKHopConfig(options ...any) *KHopConfig {
-	config := &KHopConfig{K: 0, KMin: 2} // 默认k=0，KMin=2，返回所有>=2-hop路径
-	for _, opt := range options {
-		if optFunc, ok := opt.(KHopQueryOption); ok {
-			optFunc(config)
-		}
+// WithKHopKMin 设置最小路径长度，最小值为2
+func WithKHopKMax(kMax int) KHopQueryOption {
+	return func(config *KHopConfig) {
+		config.KMax = kMax
 	}
-	return config
 }
 
 // todo:  yield k-hop with entity filter or rag search
-func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...any) <-chan *KHopPath {
-	config := NewKHopConfig(opts...)
+func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOption) <-chan *KHopPath {
+	config := &KHopConfig{K: 0, KMin: 2} // 默认k=0，KMin=2，返回所有>=2-hop路径
+	for _, opt := range opts {
+		opt(config)
+	}
 
 	var channel = chanx.NewUnlimitedChan[*KHopPath](ctx, 1000)
 
@@ -262,7 +263,7 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...any) <-chan *K
 		defer channel.Close()
 
 		// 找到所有可能的路径片段
-		r.findAllPathSegments(ctx, config.K, config.KMin, channel, input.OutputChannel())
+		r.findAllPathSegments(ctx, config, channel, input.OutputChannel())
 	}()
 
 	var hashMap = make(map[string]bool) // filter duplicate paths
@@ -283,7 +284,7 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...any) <-chan *K
 }
 
 // findAllPathSegments 找到所有可能的路径片段
-func (r *EntityRepository) findAllPathSegments(ctx context.Context, k int, kMin int, resultCh *chanx.UnlimitedChan[*KHopPath], startUUID <-chan string) {
+func (r *EntityRepository) findAllPathSegments(ctx context.Context, queryConfig *KHopConfig, resultCh *chanx.UnlimitedChan[*KHopPath], startUUID <-chan string) {
 	// 首先找到图中所有的路径
 	allPaths := r.findAllPaths(ctx, startUUID)
 	if len(allPaths) == 0 {
@@ -298,7 +299,7 @@ func (r *EntityRepository) findAllPathSegments(ctx context.Context, k int, kMin 
 		default:
 		}
 
-		r.extractKHopSegments(ctx, path, k, kMin, resultCh)
+		r.extractKHopSegments(ctx, path, queryConfig, resultCh)
 	}
 }
 
@@ -358,10 +359,6 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 			Src:   currentEntity,
 			IsEnd: true,
 		}
-	}
-
-	if currentEntity.Uuid == "6179511a-0c78-4228-896c-1d0e9ef53af7" {
-		log.Debugf("Skipping path %s (already in current path)", currentEntity.Uuid)
 	}
 
 	// 查找当前实体的出边关系（有向图）
@@ -460,11 +457,15 @@ func (r *EntityRepository) isEntityInPath(path *HopBlock, entityUUID string) boo
 }
 
 // extractKHopSegments 从路径中提取k-hop子路径
-func (r *EntityRepository) extractKHopSegments(ctx context.Context, path *HopBlock, k int, kMin int, resultCh *chanx.UnlimitedChan[*KHopPath]) {
+func (r *EntityRepository) extractKHopSegments(ctx context.Context, path *HopBlock, queryConfig *KHopConfig, resultCh *chanx.UnlimitedChan[*KHopPath]) {
 	// 将路径转换为切片，方便处理
 	pathSlice := r.hopBlockToSlice(path)
-	log.Debugf("Processing path with %d elements, k=%d, kMin=%d", len(pathSlice), k, kMin)
+	log.Debugf("Processing path with %d elements, k=%d, kMin=%d, kMax=%d", len(pathSlice), queryConfig.K, queryConfig.KMin, queryConfig.KMax)
 	log.Debugf("Path content: %s", r.pathToString(path))
+
+	kMin := queryConfig.KMin
+	k := queryConfig.K
+	kMax := queryConfig.KMax
 
 	if len(pathSlice) < kMin { // 使用KMin作为最小长度要求
 		log.Debugf("Path too short: %d < %d", len(pathSlice), kMin)
@@ -474,17 +475,23 @@ func (r *EntityRepository) extractKHopSegments(ctx context.Context, path *HopBlo
 	// 计算路径中的实体数量（跳数 = 实体数 - 1）
 	pathLength := len(pathSlice)
 
-	if k == 0 {
+	if k != 0 {
+		entityCount := k + 1
+		log.Debugf("Extracting subpaths of length %d (K=%d hops) from path of length %d", entityCount, k, pathLength)
+		r.extractSubPaths(pathSlice, entityCount, resultCh)
+	} else if kMin < kMax {
+		maxlength := min(kMax, pathLength)
+		// 返回所有长度在KMin和KMax之间的子路径
+		log.Debugf("Extracting all subpaths >= %d from path of length %d", kMin, pathLength)
+		for subK := kMin; subK <= maxlength; subK++ {
+			r.extractSubPaths(pathSlice, subK, resultCh)
+		}
+	} else if kMax == 0 {
 		// 返回所有长度>=KMin的子路径
 		log.Debugf("Extracting all subpaths >= %d from path of length %d", kMin, pathLength)
 		for subK := kMin; subK <= pathLength; subK++ {
 			r.extractSubPaths(pathSlice, subK, resultCh)
 		}
-	} else if k >= kMin {
-		// 返回指定跳数k的子路径（k跳对应k+1个实体）
-		entityCount := k + 1
-		log.Debugf("Extracting subpaths of length %d (K=%d hops) from path of length %d", entityCount, k, pathLength)
-		r.extractSubPaths(pathSlice, entityCount, resultCh)
 	} else {
 		log.Debugf("Skipping: k=%d < kMin=%d", k, kMin)
 	}

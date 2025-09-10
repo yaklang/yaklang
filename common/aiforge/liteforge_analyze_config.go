@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
@@ -49,6 +50,16 @@ func (a *AnalysisConfig) ReducerOptions() []aireducer.Option {
 	var options []aireducer.Option
 	for _, opt := range a.fallbackOptions {
 		if optFunc, ok := opt.(aireducer.Option); ok {
+			options = append(options, optFunc)
+		}
+	}
+	return options
+}
+
+func (a *AnalysisConfig) KHopOption() []entityrepos.KHopQueryOption {
+	var options []entityrepos.KHopQueryOption
+	for _, opt := range a.fallbackOptions {
+		if optFunc, ok := opt.(entityrepos.KHopQueryOption); ok {
 			options = append(options, optFunc)
 		}
 	}
