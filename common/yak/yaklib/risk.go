@@ -3,11 +3,16 @@ package yaklib
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/url"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bot"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -196,6 +201,160 @@ func DeleteRiskByID(id int64) error {
 	return yakit.DeleteRiskByID(consts.GetGormProjectDatabase(), id)
 }
 
+// GetSSARiskByID 根据 SSA Risk ID 获取 SSA 风险记录
+// Example:
+// ```
+// ssaRisk = risk.GetSSARiskByID(123)
+//
+//	if ssaRisk != nil {
+//	    println("风险标题:", ssaRisk.Title)
+//	    println("代码片段:", ssaRisk.CodeFragment)
+//	}
+//
+// ```
+func GetSSARiskByID(id int64) *schema.SSARisk {
+	ssaRisk, err := yakit.GetSSARiskByID(consts.GetGormDefaultSSADataBase(), id)
+	if err != nil {
+		log.Errorf("获取SSARisk失败: %v", err)
+		return nil
+	}
+	return ssaRisk
+}
+
+// GetSSARiskSourceCode 根据 SSA Risk ID 获取完整的源代码,无法获取会返回相关代码片段CodeFragment
+// Example:
+// ```
+// sourceCode = risk.GetSSARiskSourceCode(123)
+//
+//	if sourceCode != "" {
+//	    println("完整源代码:", sourceCode)
+//	}
+//
+// ```
+func GetSSARiskSourceCode(id int64) string {
+	ssaRisk := GetSSARiskByID(id)
+	if ssaRisk == nil {
+		return ""
+	}
+
+	sourceCode, err := getSSARiskFullCode(ssaRisk)
+	if err != nil {
+		log.Errorf("获取SSARisk源代码失败: %v", err)
+		return ssaRisk.CodeFragment // 降级返回代码片段
+	}
+	return sourceCode
+}
+
+// GetSSARiskSourceCodeWithFragment 根据 SSA Risk ID 获取源代码，如果获取完整源码失败则返回代码片段CodeFragment
+// 返回: (完整源码, 代码片段, 是否成功获取完整源码)
+// Example:
+// ```
+// fullCode, fragment, isFullCode = risk.GetSSARiskSourceCodeWithFragment(123)
+//
+//	if isFullCode {
+//	    println("获取到完整源代码")
+//	} else {
+//
+//	    println("只获取到代码片段")
+//	}
+//
+// ```
+func GetSSARiskSourceCodeWithFragment(id int64) (string, string, bool) {
+	ssaRisk := GetSSARiskByID(id)
+	if ssaRisk == nil {
+		return "", "", false
+	}
+
+	fullCode, err := getSSARiskFullCode(ssaRisk)
+	if err != nil {
+		log.Debugf("获取完整源代码失败，使用代码片段: %v", err)
+		return ssaRisk.CodeFragment, ssaRisk.CodeFragment, false
+	}
+	return fullCode, ssaRisk.CodeFragment, true
+}
+
+// getSSARiskFullCode 内部函数：获取 SSA Risk 的完整源代码
+func getSSARiskFullCode(ssaRisk *schema.SSARisk) (string, error) {
+	if ssaRisk.CodeSourceUrl != "" {
+		fullCode, err := getFullCodeFromSSASourceUrl(ssaRisk.CodeSourceUrl)
+		if err == nil && fullCode != "" {
+			return fullCode, nil
+		}
+	}
+	return ssaRisk.CodeFragment, nil
+}
+
+// getFullCodeFromSSASourceUrl 通过 CodeSourceUrl 获取完整源码
+func getFullCodeFromSSASourceUrl(sourceUrl string) (string, error) {
+	if sourceUrl == "" {
+		return "", utils.Error("CodeSourceUrl为空")
+	}
+	return readFileFromSSAURL(sourceUrl)
+}
+
+// readFileFromSSAURL 从 SSA URL 读取文件内容
+func readFileFromSSAURL(fileURL string) (string, error) {
+	if fileURL == "" {
+		return "", utils.Error("文件URL为空")
+	}
+
+	// 解析URL
+	parsedURL, err := url.Parse(fileURL)
+	if err != nil {
+		return "", utils.Errorf("解析URL失败: %v", err)
+	}
+
+	// 获取文件路径
+	filePath := parsedURL.Path
+
+	content, err := readFileFromSSADB(filePath)
+	if err == nil && content != "" {
+		return content, nil
+	}
+
+	return "", utils.Errorf("无法从ssadb读取文件: %s", filePath)
+}
+
+// readFileFromSSADB 从 ssadb 文件系统读取文件
+func readFileFromSSADB(filePath string) (string, error) {
+	fs := ssadb.NewIrSourceFs()
+	fh, err := fs.Open(filePath)
+	if err != nil {
+		return "", utils.Errorf("从ssadb打开文件失败: %v", err)
+	}
+	defer fh.Close()
+
+	// 读取文件内容
+	content, err := io.ReadAll(fh)
+	if err != nil {
+		return "", utils.Errorf("从ssadb读取文件内容失败: %v", err)
+	}
+
+	return string(content), nil
+}
+
+// GetSSARiskWithDataFlow 根据 SSA Risk ID 获取包含数据流信息的风险记录
+// Example:
+// ```
+// wrappedRisk = risk.GetSSARiskWithDataFlow(123)
+//
+//	if wrappedRisk != nil {
+//	    println("风险标题:", wrappedRisk.Title)
+//	    println("数据流路径数量:", len(wrappedRisk.DataFlowPaths))
+//	}
+//
+// ```
+func GetSSARiskWithDataFlow(id int64) *sfreport.Risk {
+	ssaRisk := GetSSARiskByID(id)
+	if ssaRisk == nil {
+		return nil
+	}
+
+	// 使用 sfreport.NewRisk 进行封装，自动生成数据流信息
+	wrappedRisk := sfreport.NewRisk(ssaRisk)
+	return wrappedRisk
+}
+
 // NewPublicReverseRMIUrl 返回一个公网 Bridge 的反向 RMI URL
 // Example:
 // ```
@@ -253,56 +412,60 @@ func NewLocalReverseHTTPUrl() string {
 var (
 	botClient   *bot.Client
 	RiskExports = map[string]interface{}{
-		"CreateRisk":                yakit.CreateRisk,
-		"Save":                      YakitSaveRiskBuilder(GetYakitClientInstance()),
-		"QueryRisksByKeyword":       QueryRisksByKeyword,
-		"NewRisk":                   YakitNewRiskBuilder(GetYakitClientInstance()),
-		"RegisterBeforeRiskSave":    yakit.RegisterBeforeRiskSave,
-		"YieldRiskByTarget":         YieldRiskByTarget,
-		"YieldRiskByIds":            YieldRiskByIds,
-		"YieldRiskByRuntimeId":      YieldRiskByRuntimeId,
-		"YieldRiskByCreateAt":       YieldRiskByCreateAt,
-		"YieldRiskByScriptName":     YieldRiskByScriptName,
-		"DeleteRiskByTarget":        DeleteRiskByTarget,
-		"DeleteRiskByID":            DeleteRiskByID,
-		"NewUnverifiedRisk":         yakit.NewUnverifiedRisk,
-		"NewPublicReverseRMIUrl":    NewPublicReverseRMIUrl,
-		"NewPublicReverseHTTPSUrl":  NewPublicReverseHTTPSUrl,
-		"NewPublicReverseHTTPUrl":   NewPublicReverseHTTPUrl,
-		"NewLocalReverseRMIUrl":     NewLocalReverseRMIUrl,
-		"NewLocalReverseHTTPSUrl":   NewLocalReverseHTTPSUrl,
-		"NewLocalReverseHTTPUrl":    NewLocalReverseHTTPUrl,
-		"HaveReverseRisk":           yakit.HaveReverseRisk,
-		"NewRandomPortTrigger":      yakit.NewRandomPortTrigger,
-		"NewDNSLogDomain":           yakit.NewDNSLogDomain,
-		"NewHTTPLog":                yakit.NewHTTPLog,
-		"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(yakit.YakitPluginInfo{}),
-		"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(yakit.YakitPluginInfo{}),
-		"CheckRandomTriggerByToken": yakit.YakitNewCheckRandomTriggerByToken(yakit.YakitPluginInfo{}),
-		"CheckICMPTriggerByLength":  yakit.YakitNewCheckICMPTriggerByLength(yakit.YakitPluginInfo{}),
-		"CheckServerReachable":      yakit.CheckServerReachable,
-		"ExtractTokenFromUrl":       yakit.ExtractTokenFromUrl,
-		"payload":                   yakit.WithRiskParam_Payload,
-		"title":                     yakit.WithRiskParam_Title,
-		"type":                      yakit.WithRiskParam_RiskType,
-		"titleVerbose":              yakit.WithRiskParam_TitleVerbose,
-		"description":               yakit.WithRiskParam_Description,
-		"solution":                  yakit.WithRiskParam_Solution,
-		"typeVerbose":               yakit.WithRiskParam_RiskVerbose,
-		"parameter":                 yakit.WithRiskParam_Parameter,
-		"token":                     yakit.WithRiskParam_Token,
-		"details":                   yakit.WithRiskParam_Details,
-		"request":                   yakit.WithRiskParam_Request,
-		"response":                  yakit.WithRiskParam_Response,
-		"runtimeId":                 yakit.WithRiskParam_RuntimeId,
-		"potential":                 yakit.WithRiskParam_Potential,
-		"cve":                       yakit.WithRiskParam_CVE,
-		"severity":                  yakit.WithRiskParam_Severity,
-		"level":                     yakit.WithRiskParam_Severity,
-		"fromYakScript":             yakit.WithRiskParam_FromScript,
-		"ignore":                    yakit.WithRiskParam_Ignore,
-		"ip":                        yakit.WithRiskParam_IP,
-		"tag":                       yakit.WithRiskParam_Tags,
+		"CreateRisk":                       yakit.CreateRisk,
+		"Save":                             YakitSaveRiskBuilder(GetYakitClientInstance()),
+		"QueryRisksByKeyword":              QueryRisksByKeyword,
+		"NewRisk":                          YakitNewRiskBuilder(GetYakitClientInstance()),
+		"RegisterBeforeRiskSave":           yakit.RegisterBeforeRiskSave,
+		"YieldRiskByTarget":                YieldRiskByTarget,
+		"YieldRiskByIds":                   YieldRiskByIds,
+		"YieldRiskByRuntimeId":             YieldRiskByRuntimeId,
+		"YieldRiskByCreateAt":              YieldRiskByCreateAt,
+		"YieldRiskByScriptName":            YieldRiskByScriptName,
+		"DeleteRiskByTarget":               DeleteRiskByTarget,
+		"DeleteRiskByID":                   DeleteRiskByID,
+		"GetSSARiskByID":                   GetSSARiskByID,
+		"GetSSARiskSourceCode":             GetSSARiskSourceCode,
+		"GetSSARiskSourceCodeWithFragment": GetSSARiskSourceCodeWithFragment,
+		"GetSSARiskWithDataFlow":           GetSSARiskWithDataFlow,
+		"NewUnverifiedRisk":                yakit.NewUnverifiedRisk,
+		"NewPublicReverseRMIUrl":           NewPublicReverseRMIUrl,
+		"NewPublicReverseHTTPSUrl":         NewPublicReverseHTTPSUrl,
+		"NewPublicReverseHTTPUrl":          NewPublicReverseHTTPUrl,
+		"NewLocalReverseRMIUrl":            NewLocalReverseRMIUrl,
+		"NewLocalReverseHTTPSUrl":          NewLocalReverseHTTPSUrl,
+		"NewLocalReverseHTTPUrl":           NewLocalReverseHTTPUrl,
+		"HaveReverseRisk":                  yakit.HaveReverseRisk,
+		"NewRandomPortTrigger":             yakit.NewRandomPortTrigger,
+		"NewDNSLogDomain":                  yakit.NewDNSLogDomain,
+		"NewHTTPLog":                       yakit.NewHTTPLog,
+		"CheckDNSLogByToken":               yakit.YakitNewCheckDNSLogByToken(yakit.YakitPluginInfo{}),
+		"CheckHTTPLogByToken":              yakit.YakitNewCheckHTTPLogByToken(yakit.YakitPluginInfo{}),
+		"CheckRandomTriggerByToken":        yakit.YakitNewCheckRandomTriggerByToken(yakit.YakitPluginInfo{}),
+		"CheckICMPTriggerByLength":         yakit.YakitNewCheckICMPTriggerByLength(yakit.YakitPluginInfo{}),
+		"CheckServerReachable":             yakit.CheckServerReachable,
+		"ExtractTokenFromUrl":              yakit.ExtractTokenFromUrl,
+		"payload":                          yakit.WithRiskParam_Payload,
+		"title":                            yakit.WithRiskParam_Title,
+		"type":                             yakit.WithRiskParam_RiskType,
+		"titleVerbose":                     yakit.WithRiskParam_TitleVerbose,
+		"description":                      yakit.WithRiskParam_Description,
+		"solution":                         yakit.WithRiskParam_Solution,
+		"typeVerbose":                      yakit.WithRiskParam_RiskVerbose,
+		"parameter":                        yakit.WithRiskParam_Parameter,
+		"token":                            yakit.WithRiskParam_Token,
+		"details":                          yakit.WithRiskParam_Details,
+		"request":                          yakit.WithRiskParam_Request,
+		"response":                         yakit.WithRiskParam_Response,
+		"runtimeId":                        yakit.WithRiskParam_RuntimeId,
+		"potential":                        yakit.WithRiskParam_Potential,
+		"cve":                              yakit.WithRiskParam_CVE,
+		"severity":                         yakit.WithRiskParam_Severity,
+		"level":                            yakit.WithRiskParam_Severity,
+		"fromYakScript":                    yakit.WithRiskParam_FromScript,
+		"ignore":                           yakit.WithRiskParam_Ignore,
+		"ip":                               yakit.WithRiskParam_IP,
+		"tag":                              yakit.WithRiskParam_Tags,
 		// RandomPortTrigger
 
 	}
