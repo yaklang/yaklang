@@ -9,6 +9,7 @@ import (
 )
 
 type Report struct {
+	config Config `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
@@ -30,9 +31,9 @@ type Report struct {
 	File  []*File
 }
 
-func NewReport(reportType ReportType) *Report {
+func NewReport(reportType ReportType, opts ...Option) *Report {
 	now := time.Now()
-	return &Report{
+	report := &Report{
 		ReportType:    reportType,
 		EngineVersion: consts.GetYakVersion(),
 		ReportTime:    now,
@@ -47,6 +48,10 @@ func NewReport(reportType ReportType) *Report {
 		Risks: make(map[string]*Risk),
 		File:  make([]*File, 0),
 	}
+	for _, o := range opts {
+		o(&report.config)
+	}
+	return report
 }
 
 func (r *Report) SetProgramName(programName string) {

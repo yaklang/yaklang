@@ -1151,8 +1151,22 @@ var ssaCodeScan = &cli.Command{
 			Usage: "output file, default format is sarif",
 		},
 		cli.StringFlag{
-			Name:  "format",
-			Usage: "output file format, set with irify,irify-full,irify-react-report or sarif(default)",
+			Name: "format",
+			Usage: `output file format:
+	* sarif (default)
+	* irify (can config with --with-file-content and --with-dataflow-path)
+	* irify-full (with all info)
+	* irify-react-report (save database and generate react report in IRify frontend)
+		`,
+		},
+
+		cli.BoolFlag{
+			Name:  "with-file-content",
+			Usage: "include full file content in the output (only for irify format)",
+		},
+		cli.BoolFlag{
+			Name:  "with-dataflow-path",
+			Usage: "include dataflow path in the output (only for irify format)",
 		},
 		// }}}
 	},
@@ -1219,7 +1233,14 @@ var ssaCodeScan = &cli.Command{
 		// log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
 
 		// exportTimeStart := time.Now()
-		ShowRisk(config.Format, riskCh, config.OutputWriter)
+		opt := []sfreport.Option{}
+		if c.Bool("with-file-content") {
+			opt = append(opt, sfreport.WithFileContent(true))
+		}
+		if c.Bool("with-dataflow-path") {
+			opt = append(opt, sfreport.WithDataflowPath(true))
+		}
+		ShowRisk(config.Format, riskCh, config.OutputWriter, opt...)
 		// exportTime := time.Since(exportTimeStart)
 		// log.Infof("show result success, cost %v", exportTime)
 		// show echo  time
