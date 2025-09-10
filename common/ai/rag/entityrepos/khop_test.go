@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -378,11 +379,13 @@ func TestYieldKHop_Cancellation(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// 立即取消上下文
-	cancel()
+	once := sync.Once{}
 
 	results := make([]*KHopPath, 0)
 	for path := range repo.YieldKHop(ctx) {
+		once.Do(func() {
+			cancel()
+		})
 		results = append(results, path)
 	}
 
