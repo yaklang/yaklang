@@ -224,7 +224,6 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 	variable := query.variable
 	index := query.index
 	result := query.Result
-	programName := query.programName
 	url := params.GetUrl()
 	// page start from 1
 	if params.Page <= 1 {
@@ -291,7 +290,8 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 		}
 		value := vs[index]
 		msg, _ := result.GetAlertMsg(variable)
-		res := Value2Response(programName, value, msg, url)
+		riskHash := result.GetRiskHash(variable, int(index))
+		res := Value2Response(value, msg, url, riskHash)
 		resources = append(resources, res)
 	}
 
@@ -374,7 +374,7 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 	return resources
 }
 
-func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
+func Value2Response(value *ssaapi.Value, msg string, url *ypb.YakURL, riskHash string) *ypb.YakURLResource {
 	graphInfo := value.GetGraphInfo()
 	res := createNewRes(url, 0, []extra{
 		{"node_id", graphInfo.NodeID},
@@ -382,6 +382,7 @@ func Value2Response(programName string, value *ssaapi.Value, msg string, url *yp
 		{"graph_info", graphInfo.GraphInfo},
 		{"message", msg},
 		{"graph_line", graphInfo.GraphPath},
+		{"risk_hash", riskHash},
 	})
 
 	res.ResourceType = "information"
