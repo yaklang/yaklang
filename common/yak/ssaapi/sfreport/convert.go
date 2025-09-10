@@ -15,14 +15,14 @@ type IReport interface {
 	Save() error
 }
 
-func ConvertSyntaxFlowResultToReport(format ReportType) (IReport, error) {
+func ConvertSyntaxFlowResultToReport(format ReportType, opt ...Option) (IReport, error) {
 	switch format {
 	case SarifReportType:
 		return NewSarifReport()
 	case IRifyReportType, IRifyFullReportType:
-		return NewReport(format), nil
+		return NewReport(format, opt...), nil
 	case IRifyReactReportType:
-		return NewReport(format), nil
+		return NewReport(format, opt...), nil
 	default:
 		return nil, utils.Errorf("unsupported report format: %s", format)
 	}
