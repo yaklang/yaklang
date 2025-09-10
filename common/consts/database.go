@@ -89,6 +89,9 @@ func GetTempTestDatabase() (string, *gorm.DB, error) {
 }
 
 func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
+	if path == "" {
+		return nil, utils.Errorf("database path is empty")
+	}
 	// register sql-extend driver
 	RegisterDriverOnce.Do(registerDriver)
 
