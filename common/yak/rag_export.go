@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"path/filepath"
@@ -66,6 +67,9 @@ var RagExports = map[string]interface{}{
 	"statusCard":                aiforge.WithAnalyzeStatusCard, // use for analyzeStatusCard
 	"extraPrompt":               aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
 	"entryLength":               aiforge.RefineWithKnowledgeEntryLength,
+	"khopk":                     entityrepos.WithKHopK,
+	"khopkMin":                  entityrepos.WithKHopKMin,
+	"khopkMax":                  entityrepos.WithKHopKMax,
 	"BuildCollectionFromFile":   aiforge.BuildKnowledgeFromFile,
 	"BuildCollectionFromReader": aiforge.BuildKnowledgeFromReader,
 	"BuildCollectionFromRaw":    aiforge.BuildKnowledgeFromBytes,
