@@ -436,7 +436,7 @@ func TestPromptManager_WithMixedContextProviders(t *testing.T) {
 }
 
 // Example usage of the new traced context providers
-func Example_WithTracedDynamicContextProvider() {
+func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
 	// This example shows how to use the new traced context provider features
 
 	// Create a ReAct instance with traced providers
@@ -481,48 +481,3 @@ func Example_WithTracedDynamicContextProvider() {
 	// Output: First call includes system info and initial session time
 	// Output: Second call includes changes for traced providers
 }
-
-/*
-新功能说明：Traced Context Providers
-
-本更新为 AI ReAct 系统添加了 traced（跟踪）上下文提供者功能，支持：
-
-1. WithTracedDynamicContextProvider(name, provider)
-   - 注册带跟踪功能的动态上下文提供者
-   - 自动跟踪内容变化并生成差异信息
-   - 适用于需要监控状态变化的场景
-
-2. WithTracedFileContext(name, filePath)
-   - 监控指定文件的变更
-   - 文件内容变化时自动生成差异信息
-   - 适用于配置文件、日志文件等需要实时监控的文件
-
-3. 混合使用
-   - 可以同时使用普通和跟踪类型的上下文提供者
-   - 跟踪提供者会在内容变化时附加 <|CHANGES_DIFF_xxx|> 标记的差异信息
-
-使用示例：
-
-// 跟踪动态内容变化
-WithTracedDynamicContextProvider("user_status", func(...) (string, error) {
-    return fmt.Sprintf("User online: %v", getUserStatus()), nil
-})
-
-// 跟踪文件变化
-WithTracedFileContext("config", "/app/config.json")
-
-差异信息格式：
-<|CHANGES_DIFF_abc123|>
---- a/content
-+++ b/content
-@@ -1 +1 @@
--old content
-+new content
-<|CHANGES_DIFF_abc123|>
-
-优势：
-- 自动检测和报告变化
-- 减少重复数据传输
-- 提供详细的变更历史
-- 支持文件和动态内容的混合监控
-*/
