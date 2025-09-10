@@ -254,8 +254,15 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOptio
 	var input = chanx.NewUnlimitedChan[string](ctx, 1000)
 	go func() {
 		defer input.Close()
-		for relationship := range r.YieldRelationships(ctx, nil) {
+		relationInput := r.YieldRelationships(ctx, nil)
+		select {
+		case relationship, ok := <-relationInput:
+			if !ok {
+				return
+			}
 			input.SafeFeed(relationship.SourceEntityIndex)
+		case <-ctx.Done():
+			return
 		}
 	}()
 
@@ -276,7 +283,7 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOptio
 				hashMap[path.Hash()] = true
 				result.SafeFeed(path)
 			} else {
-				log.Debug("find exist sub path: %s", path.String())
+				log.Debugf("find exist sub path: %s", path.String())
 			}
 		}
 	}()
