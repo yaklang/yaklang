@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -37,6 +38,20 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 		}
 		go func() {
 			go func() {
+				r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_START, "ai-reviewer", map[string]any{})
+				endOnce := utils.NewOnce()
+				endNormally := func(score float64, reason string) {
+					endOnce.Do(func() {
+						r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_END, "ai-reviewer", map[string]any{
+							"score":  score,
+							"reason": reason,
+						})
+					})
+				}
+				defer func() {
+					endNormally(1.0, "review interrupted")
+				}()
+
 				// In auto-review mode, automatically approve the request
 				materials := endpoint.GetReviewMaterials()
 				params := materials.GetObject("params")
@@ -78,17 +93,29 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					return nil
 				})
 				if err != nil {
+					endNormally(1, "review failed: "+err.Error())
 					log.Errorf("error during auto-review: %v", err)
 					return
 				}
+				endNormally(score, reason)
 				if score <= 0.4 {
-					r.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in 3 seconds...")
-					time.Sleep(3 * time.Second) // Simulate a delay for user to read the message
+					var duSec time.Duration = 1
+					r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN, "ai-reviewer", map[string]any{
+						"seconds": int(duSec),
+						"score":   score,
+					})
+					r.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
+					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 				} else if score >= 0.7 {
-					r.Emitter.EmitInfo("Auto-review score is high, suggesting to proceed in 6 seconds...")
-					time.Sleep(6 * time.Second) // Simulate a delay for user to read the message
+					var duSec time.Duration = 1
+					r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN, "ai-reviewer", map[string]any{
+						"seconds": int(duSec),
+						"score":   score,
+					})
+					r.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
+					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 				} else {
