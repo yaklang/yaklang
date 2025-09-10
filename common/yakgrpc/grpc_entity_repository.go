@@ -79,3 +79,19 @@ func (s *Server) GenerateERMDot(ctx context.Context, req *ypb.GenerateERMDotRequ
 		Dot: ERM.Dot().GenerateDOTString(),
 	}, nil
 }
+
+func (s *Server) QuerySubERM(ctx context.Context, req *ypb.QuerySubERMRequest) (*ypb.QuerySubERMResponse, error) {
+	db := consts.GetGormProfileDatabase()
+	ERM, err := yakit.QueryEntityWithDepth(db, req.GetFilter(), int(req.GetDepth()))
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.QuerySubERMResponse{
+		Relationships: lo.Map(ERM.Relationships, func(r *schema.ERModelRelationship, _ int) *ypb.Relationship {
+			return r.ToGRPC()
+		}),
+		Entities: lo.Map(ERM.Entities, func(e *schema.ERModelEntity, _ int) *ypb.Entity {
+			return e.ToGRPC()
+		}),
+	}, nil
+}
