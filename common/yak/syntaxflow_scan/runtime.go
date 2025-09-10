@@ -184,7 +184,5 @@ func (m *ScanManager) notifyRuleProcess(progName, ruleName string, f float64) {
 	if m.ruleProcessCallback != nil {
 		m.ruleProcessCallback(progName, ruleName, f)
 	}
-	if m.ruleProcessCallback != nil {
-		m.ruleProcessCallback(progName, ruleName, f)
-	}
+
 }
