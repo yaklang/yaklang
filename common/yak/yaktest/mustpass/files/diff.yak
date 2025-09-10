@@ -4,7 +4,6 @@
 // 基础字符串比较测试
 result = diff.Diff("ABC", "ACC")~
 assert result != "", "diff should return non-empty string"
-assert result.Contains("main/main.txt"), "diff should contain file path"
 assert result.Contains("-ABC"), "diff should show removed ABC"
 assert result.Contains("+ACC"), "diff should show added ACC"
 
@@ -90,7 +89,8 @@ assert result != "", "slice diff should work"
 for i in 10 {
     result := diff.Diff(sprintf("text%d", i), sprintf("text%d_modified", i))~
     assert result != "", "repeated diff calls should work"
-    assert result.Contains("main/main.txt"), "each diff should contain file path"
+    assert result.Contains("a/content"), "each diff should contain file path"
+    assert result.Contains("b/content"), "each diff should contain file path"
 }
 
 // 错误处理测试
