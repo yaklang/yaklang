@@ -161,21 +161,36 @@ func DeleteSSARiskDisposals(db *gorm.DB, req *ypb.DeleteSSARiskDisposalsRequest)
 	return deletedCount, nil
 }
 
-// GetSSARiskDisposalsWithTaskInfo 获取包含扫描任务信息的处置数据，支持继承逻辑
-func GetSSARiskDisposalsWithTaskInfo(db *gorm.DB, riskId int64) ([]*ypb.SSARiskDisposalData, error) {
-	var risk schema.SSARisk
-	if err := db.Where("id = ?", riskId).First(&risk).Error; err != nil {
-		return nil, utils.Errorf("GetSSARiskDisposalsWithTaskInfo failed to query risk: %v", err)
+// GetSSARiskDisposalsWithTaskInfo 获取包含扫描任务信息的处置数据，携带审计信息
+func GetSSARiskDisposalsWithTaskInfo(db *gorm.DB, request *ypb.GetSSARiskDisposalRequest) ([]*ypb.SSARiskDisposalData, error) {
+	if request == nil {
+		return nil, utils.Error("GetSSARiskDisposalsWithTaskInfo failed: GetSSARiskDisposalRequest is nil")
 	}
 
+	riskId := request.GetRiskId()
+	riskHash := request.GetRiskHash()
+
+	var risk schema.SSARisk
+	if riskHash != "" {
+		if err := db.Where("hash= ?", riskHash).First(&risk).Error; err != nil {
+			return nil, utils.Errorf("GetSSARiskDisposalsWithTaskInfo failed to query risk by  hash: %v", err)
+		}
+	} else if riskId != 0 {
+		if err := db.Where(" id= ?", riskId).First(&risk).Error; err != nil {
+			return nil, utils.Errorf("GetSSARiskDisposalsWithTaskInfo failed to query risk by id: %v", err)
+		}
+	} else {
+		return nil, utils.Error("GetSSARiskDisposalsWithTaskInfo failed: both RiskId and RiskHash are empty")
+	}
+
+	queryRiskId := risk.ID
 	if risk.RiskFeatureHash == "" {
-		return getDirectDisposalsWithTaskInfo(db, riskId)
+		return getDirectDisposalsWithTaskInfo(db, queryRiskId)
 	}
 
 	var currentTask schema.SyntaxFlowScanTask
 	if err := db.Where("task_id = ?", risk.RuntimeId).First(&currentTask).Error; err != nil {
-		// 没有taskId不使用审计携带
-		return getDirectDisposalsWithTaskInfo(db, riskId)
+		return getDirectDisposalsWithTaskInfo(db, queryRiskId)
 	}
 
 	// 审计携带
@@ -188,12 +203,11 @@ func GetSSARiskDisposalsWithTaskInfo(db *gorm.DB, riskId int64) ([]*ypb.SSARiskD
 		Find(&disposals).Error; err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposalsWithTaskInfo failed: %v", err)
 	}
-
 	return convertDisposalsToGRPCModel(db, disposals)
 }
 
 // getDirectDisposalsWithTaskInfo 获取直接处置信息，不使用审计携带
-func getDirectDisposalsWithTaskInfo(db *gorm.DB, riskId int64) ([]*ypb.SSARiskDisposalData, error) {
+func getDirectDisposalsWithTaskInfo(db *gorm.DB, riskId uint) ([]*ypb.SSARiskDisposalData, error) {
 	var disposals []schema.SSARiskDisposals
 	if err := db.Where("ssa_risk_id = ?", riskId).
 		Order("updated_at DESC").

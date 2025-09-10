@@ -78,12 +78,8 @@ func (s *Server) GetSSARiskDisposal(ctx context.Context, req *ypb.GetSSARiskDisp
 	if req == nil {
 		return nil, utils.Error("GetSSARiskDisposal faild: req is nil")
 	}
-	riskId := req.GetRiskId()
-	if riskId <= 0 {
-		return nil, utils.Error("GetSSARiskDisposal faild: riskId is not valid")
-	}
 
-	disposal, err := yakit.GetSSARiskDisposalsWithTaskInfo(s.GetSSADatabase(), riskId)
+	disposal, err := yakit.GetSSARiskDisposalsWithTaskInfo(s.GetSSADatabase(), req)
 	if err != nil {
 		return nil, utils.Errorf("GetSSARiskDisposal failed: %v", err)
 	}
