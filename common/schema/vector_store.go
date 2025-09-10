@@ -53,6 +53,7 @@ const (
 	RAGDocumentType_Entity       RAGDocumentType = "entity"
 	RAGDocumentType_Relationship RAGDocumentType = "relationship"
 	RAGDocumentType_Knowledge    RAGDocumentType = "knowledge"
+	RAGDocumentType_KHop         RAGDocumentType = "khop"
 	RAGDocumentType_Unclassified RAGDocumentType = ""
 )
 
@@ -297,6 +298,8 @@ type KnowledgeBaseEntry struct {
 
 	// 知识库名称
 	KnowledgeBaseID int64 `gorm:"not null" json:"knowledge_base_id"`
+
+	RelatedEntityID string // split by ","
 
 	// 知识标题(和知识库名称应该是联合唯一索引)
 	KnowledgeTitle string `gorm:"not null" json:"knowledge_title"`

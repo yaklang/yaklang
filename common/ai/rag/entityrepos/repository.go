@@ -29,33 +29,33 @@ type EntityRepository struct {
 	mergeEntityFunc func(old, new *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)
 }
 
-func (eb *EntityRepository) GetID() int64 {
-	if eb.info == nil {
+func (r *EntityRepository) GetID() int64 {
+	if r.info == nil {
 		return 0
 	}
-	return int64(eb.info.ID)
+	return int64(r.info.ID)
 }
 
-func (eb *EntityRepository) GetInfo() (*schema.EntityRepository, error) {
-	if eb.info == nil {
+func (r *EntityRepository) GetInfo() (*schema.EntityRepository, error) {
+	if r.info == nil {
 		return nil, utils.Errorf("entity base info is nil")
 	}
-	return eb.info, nil
+	return r.info, nil
 }
 
-func (eb *EntityRepository) GetRAGSystem() *rag.RAGSystem {
-	return eb.ragSystem
+func (r *EntityRepository) GetRAGSystem() *rag.RAGSystem {
+	return r.ragSystem
 }
 
-func (eb *EntityRepository) SetMergeEntityFunc(f func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)) {
-	eb.mergeEntityFunc = f
+func (r *EntityRepository) SetMergeEntityFunc(f func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)) {
+	r.mergeEntityFunc = f
 }
 
 //--- Entity Operations ---
 
-func (eb *EntityRepository) MatchEntities(entity *schema.ERModelEntity) (matchEntity *schema.ERModelEntity, accurate bool, err error) {
+func (r *EntityRepository) MatchEntities(entity *schema.ERModelEntity) (matchEntity *schema.ERModelEntity, accurate bool, err error) {
 	var results []*schema.ERModelEntity
-	results, err = eb.IdentifierSearchEntity(entity)
+	results, err = r.IdentifierSearchEntity(entity)
 	if err != nil {
 		return
 	}
@@ -65,7 +65,7 @@ func (eb *EntityRepository) MatchEntities(entity *schema.ERModelEntity) (matchEn
 		return
 	}
 
-	results, err = eb.VectorSearchEntity(entity)
+	results, err = r.VectorSearchEntity(entity)
 	if err != nil {
 		return
 	}
@@ -76,9 +76,9 @@ func (eb *EntityRepository) MatchEntities(entity *schema.ERModelEntity) (matchEn
 	return
 }
 
-func (eb *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
+func (r *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
 	// name and type query
-	entities, err := eb.queryEntities(&ypb.EntityFilter{
+	entities, err := r.queryEntities(&ypb.EntityFilter{
 		Names: []string{entity.EntityName},
 		Types: []string{entity.EntityType},
 	})
@@ -93,7 +93,7 @@ func (eb *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity)
 	return nil, nil
 }
 
-func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
+func (r *EntityRepository) VectorSearch(query string, top int, scoreLimit ...float64) ([]*schema.ERModelEntity, []*schema.ERModelRelationship, error) {
 	defer func() {
 		panicErr := recover()
 		if panicErr != nil {
@@ -101,14 +101,89 @@ func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]
 		}
 	}()
 
-	if eb.ragSystem == nil {
+	if r.ragSystem == nil {
+		return nil, nil, utils.Errorf("RAG system is not initialized")
+	}
+
+	r.ragMutex.RLock()
+	defer r.ragMutex.RUnlock()
+
+	needSocreLimit := 0.0
+	if len(scoreLimit) > 0 {
+		needSocreLimit = scoreLimit[0]
+	}
+
+	results, err := r.GetRAGSystem().Query(query, top)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if len(results) == 0 {
+		return nil, nil, nil
+	}
+
+	var entityIndex []string
+	var relationshipIndex []string
+	for _, res := range results {
+		if res.Score < needSocreLimit {
+			continue
+		}
+		switch res.Document.Type {
+		case schema.RAGDocumentType_Entity:
+			index, ok := res.Document.Metadata.GetDocIndex()
+			if ok {
+				entityIndex = append(entityIndex, utils.InterfaceToString(index))
+			}
+		case schema.RAGDocumentType_Relationship:
+			index, ok := res.Document.Metadata.GetDocIndex()
+			if ok {
+				relationshipIndex = append(relationshipIndex, utils.InterfaceToString(index))
+			}
+		default:
+		}
+	}
+
+	var entityResults []*schema.ERModelEntity
+	var relationshipResults []*schema.ERModelRelationship
+	if len(entityIndex) > 0 {
+		entityResults, err = r.queryEntities(&ypb.EntityFilter{
+			HiddenIndex: entityIndex,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+
+	}
+
+	if len(relationshipIndex) > 0 {
+		relationshipResults, err = r.queryRelationship(&ypb.RelationshipFilter{
+			UUIDS: relationshipIndex,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return entityResults, relationshipResults, nil
+
+}
+
+func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
+	defer func() {
+		panicErr := recover()
+		if panicErr != nil {
+			log.Errorf("error in vector search entity: %v ", panicErr)
+		}
+	}()
+
+	if r.ragSystem == nil {
 		return nil, utils.Errorf("RAG system is not initialized")
 	}
 
-	eb.ragMutex.RLock()
-	defer eb.ragMutex.RUnlock()
+	r.ragMutex.RLock()
+	defer r.ragMutex.RUnlock()
 
-	results, err := eb.GetRAGSystem().Query(entity.String(), 5)
+	results, err := r.GetRAGSystem().Query(entity.String(), 5)
 	if err != nil {
 		return nil, err
 	}
@@ -122,9 +197,11 @@ func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]
 		if res.Score <= 0.8 {
 			continue
 		}
-		index, ok := res.Document.Metadata.GetDocIndex()
-		if ok {
-			entityIndex = append(entityIndex, utils.InterfaceToString(index))
+		if res.Document.Type == schema.RAGDocumentType_Entity {
+			index, ok := res.Document.Metadata.GetDocIndex()
+			if ok {
+				entityIndex = append(entityIndex, utils.InterfaceToString(index))
+			}
 		}
 	}
 
@@ -132,19 +209,19 @@ func (eb *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]
 		return nil, nil
 	}
 
-	return eb.queryEntities(&ypb.EntityFilter{
+	return r.queryEntities(&ypb.EntityFilter{
 		HiddenIndex: entityIndex,
 	})
 }
 
-func (eb *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ERModelEntity, error) {
-	filter.BaseID = uint64(eb.info.ID)
-	return yakit.QueryEntities(eb.db, filter)
+func (r *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ERModelEntity, error) {
+	filter.BaseIndex = r.info.Uuid
+	return yakit.QueryEntities(r.db, filter)
 }
 
-func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
-	eb.ragMutex.Lock()
-	defer eb.ragMutex.Unlock()
+func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
+	r.ragMutex.Lock()
+	defer r.ragMutex.Unlock()
 
 	metadata := map[string]any{
 		schema.META_Doc_Index:  entry.Uuid,
@@ -161,39 +238,39 @@ func (eb *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) 
 	)
 	documentID := fmt.Sprintf("%v_entity", entry.Uuid)
 	content := entry.ToRAGContent()
-	return eb.GetRAGSystem().Add(documentID, content, opts...)
+	return r.GetRAGSystem().Add(documentID, content, opts...)
 }
 
-func (e *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRelationship) error {
-	e.ragMutex.Lock()
-	defer e.ragMutex.Unlock()
+func (r *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRelationship) error {
+	r.ragMutex.Lock()
+	defer r.ragMutex.Unlock()
 
-	src, err := e.GetEntityByUUID(entry.SourceEntityIndex)
+	src, err := r.GetEntityByUUID(entry.SourceEntityIndex)
 	if err != nil {
 		return utils.Errorf("failed to get source entity by uuid [%s]: %v", entry.SourceEntityIndex, err)
 	}
 	srcDoc := src.ToRAGContent()
-	dst, err := e.GetEntityByUUID(entry.TargetEntityIndex)
+	dst, err := r.GetEntityByUUID(entry.TargetEntityIndex)
 	if err != nil {
 		return utils.Errorf("failed to get target entity by uuid [%s]: %v", entry.TargetEntityIndex, err)
 	}
 	dstDoc := dst.ToRAGContent()
 	content := entry.ToRAGContent(srcDoc, dstDoc)
-	return e.GetRAGSystem().Add(
+	return r.GetRAGSystem().Add(
 		entry.Uuid, content,
 		rag.WithDocumentType(schema.RAGDocumentType_Relationship),
 		rag.WithDocumentRelatedEntities(entry.SourceEntityIndex, entry.TargetEntityIndex),
 	)
 }
 
-func (eb *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
-	matchedEntity, accurate, err := eb.MatchEntities(entity)
+func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
+	matchedEntity, accurate, err := r.MatchEntities(entity)
 	if err != nil { // not critical error
 		log.Errorf("failed to match entity [%s]: %v", entity.EntityName, err)
 	}
 	if matchedEntity == nil {
 		log.Infof("start to create entity: %s", entity.EntityName)
-		err = eb.CreateEntity(entity)
+		err = r.CreateEntity(entity)
 		if err != nil {
 			return nil, utils.Errorf("failed to create entity [%s]: %v", entity.EntityName, err)
 		}
@@ -205,8 +282,8 @@ func (eb *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*s
 		for s, i := range entity.Attributes {
 			matchedEntity.Attributes[s] = i
 		}
-	} else if eb.mergeEntityFunc != nil {
-		resolvedEntity, isSame, err := eb.mergeEntityFunc(matchedEntity, entity)
+	} else if r.mergeEntityFunc != nil {
+		resolvedEntity, isSame, err := r.mergeEntityFunc(matchedEntity, entity)
 		if err != nil {
 			return nil, utils.Errorf("failed to merge entity [%s]: %v", entity.EntityName, err)
 		}
@@ -216,27 +293,27 @@ func (eb *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*s
 	} else {
 		mergeEntity = entity
 	}
-	err = eb.SaveEntity(mergeEntity) // create or update entity
+	err = r.SaveEntity(mergeEntity) // create or update entity
 	if err != nil {
 		return nil, utils.Errorf("failed to save entity [%s]: %v", entity.EntityName, err)
 	}
 	return mergeEntity, nil
 }
 
-func (eb *EntityRepository) SaveEntity(entity *schema.ERModelEntity) error {
+func (r *EntityRepository) SaveEntity(entity *schema.ERModelEntity) error {
 	if entity.ID == 0 {
-		return eb.CreateEntity(entity)
+		return r.CreateEntity(entity)
 	}
-	return eb.UpdateEntity(entity.ID, entity)
+	return r.UpdateEntity(entity.ID, entity)
 }
 
-func (eb *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error {
-	err := yakit.UpdateEntity(eb.db, id, e)
+func (r *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error {
+	err := yakit.UpdateEntity(r.db, id, e)
 	if err != nil {
 		return err
 	}
 	go func() {
-		err := eb.addEntityToVectorIndex(e)
+		err := r.addEntityToVectorIndex(e)
 		if err != nil {
 			log.Errorf("failed to add entity [%s] to vector index: %v", e.EntityName, err)
 		}
@@ -244,14 +321,14 @@ func (eb *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error
 	return nil
 }
 
-func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
-	entity.RepositoryUUID = eb.info.Uuid
-	err := yakit.CreateEntity(eb.db, entity)
+func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
+	entity.RepositoryUUID = r.info.Uuid
+	err := yakit.CreateEntity(r.db, entity)
 	if err != nil {
 		return err
 	}
 	go func() {
-		err := eb.addEntityToVectorIndex(entity)
+		err := r.addEntityToVectorIndex(entity)
 		if err != nil {
 			log.Errorf("failed to add entity [%s] to vector index: %v", entity.EntityName, err)
 		}
@@ -261,13 +338,13 @@ func (eb *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 
 //--- Relationship Operations ---
 
-func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, relationType string, typeVerbose string, attr map[string]any) error {
-	data, err := yakit.AddRelationship(eb.db, sourceIndex, targetIndex, eb.info.Uuid, relationType, typeVerbose, attr)
+func (r *EntityRepository) AddRelationship(sourceIndex, targetIndex string, relationType string, typeVerbose string, attr map[string]any) error {
+	data, err := yakit.AddRelationship(r.db, sourceIndex, targetIndex, r.info.Uuid, relationType, typeVerbose, attr)
 	if err != nil {
 		log.Warnf("failed to add relation [%s] to vector [%s]: %v", relationType, sourceIndex, err)
 		return utils.Wrapf(err, "failed to add relation [%s] to vector [%s]", relationType, sourceIndex)
 	}
-	err = eb.addRelationshipToVectorIndex(data)
+	err = r.addRelationshipToVectorIndex(data)
 	if err != nil {
 		log.Warnf("failed to add relation [%s] to vector index: %v", relationType, err)
 		return utils.Wrapf(err, "failed to add relation [%s] to vector index", relationType)
@@ -275,26 +352,31 @@ func (eb *EntityRepository) AddRelationship(sourceIndex, targetIndex string, rel
 	return nil
 }
 
-func (eb *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
+func (r *EntityRepository) QueryOutgoingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
+	if err := r.db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
 }
 
-func (eb *EntityRepository) QueryIncomingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
+func (r *EntityRepository) QueryIncomingRelationships(entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
-	if err := eb.db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
+	if err := r.db.Model(&schema.ERModelRelationship{}).Where("target_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
 		return nil, err
 	}
 	return relationships, nil
 }
 
-func (eb *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
+func (r *EntityRepository) queryRelationship(filter *ypb.RelationshipFilter) ([]*schema.ERModelRelationship, error) {
+	filter.BaseIndex = r.info.Uuid
+	return yakit.QueryRelationships(r.db, filter)
+}
+
+func (r *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
 	return &SaveEndpoint{
 		ctx:          ctx,
-		eb:           eb,
+		eb:           r,
 		nameToIndex:  omap.NewOrderedMap[string, string](make(map[string]string)),
 		nameSig:      omap.NewOrderedMap[string, *endpointDataSignal](make(map[string]*endpointDataSignal)),
 		entityFinish: make(chan struct{}),

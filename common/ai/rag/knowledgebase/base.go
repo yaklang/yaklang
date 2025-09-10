@@ -218,13 +218,13 @@ func LoadKnowledgeBaseByID(db *gorm.DB, id int64, opts ...any) (*KnowledgeBase, 
 }
 
 // AddKnowledgeEntry 添加知识条目到知识库（使用事务）
-func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry) error {
+func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
 	err := yakit.CreateKnowledgeBaseEntry(kb.db, entry)
 	if err != nil {
 		return utils.Errorf("创建知识库条目失败: %v", err)
 	}
 
-	if err := kb.addEntryToVectorIndex(entry); err != nil {
+	if err := kb.addEntryToVectorIndex(entry, options...); err != nil {
 		return utils.Errorf("添加向量索引失败: %v", err)
 	}
 
@@ -370,7 +370,7 @@ func (kb *KnowledgeBase) GetRAGSystem() *rag.RAGSystem {
 }
 
 // addEntryToVectorIndex 将知识条目添加到向量索引
-func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry) error {
+func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
 	// 构建文档内容
 	content := entry.KnowledgeTitle
 	if entry.Summary != "" {
@@ -393,9 +393,10 @@ func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry)
 
 	// 使用条目ID作为文档ID
 	documentID := utils.InterfaceToString(entry.HiddenIndex)
+	options = append(options, rag.WithDocumentRawMetadata(metadata))
 
 	// 添加文档到RAG系统
-	return kb.ragSystem.Add(documentID, content, rag.WithDocumentRawMetadata(metadata))
+	return kb.ragSystem.Add(documentID, content, options...)
 }
 
 // SyncKnowledgeBaseWithRAG 同步知识库和RAG，以知识库为准

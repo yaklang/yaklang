@@ -3,16 +3,15 @@ package aiforge
 import (
 	"bytes"
 	_ "embed"
-	"io"
-	"sync"
-
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"io"
+	"strings"
 
-	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -26,247 +25,6 @@ var refinePrompt string
 
 //go:embed liteforge_prompt/liteforge_refine_erm.txt
 var refineERMPrompt string
-
-func BuildKnowledgeFromFile(kbName string, path string, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
-	analyzeResult, err := AnalyzeFile(path, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start analyze file: %v", err)
-	}
-	option = append(option, RefineWithKnowledgeBaseName(kbName))
-	return _buildKnowledge(analyzeResult, option...)
-}
-
-func BuildKnowledgeFromBytes(kbName string, content []byte, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
-	return BuildKnowledgeFromReader(kbName, bytes.NewReader(content), option...)
-}
-
-func BuildKnowledgeFromReader(kbName string, reader io.Reader, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
-	analyzeResult, err := AnalyzeReader(reader, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start analyze reader: %v", err)
-	}
-	option = append(option, RefineWithKnowledgeBaseName(kbName))
-	return _buildKnowledge(analyzeResult, option...)
-}
-
-func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
-	refineConfig := NewRefineConfig(option...)
-	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
-	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
-	if err != nil {
-		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
-	}
-
-	ermResult, err := AnalyzeERMFromAnalysisResult(analyzeChannel, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start build erm from input: %v", err)
-	}
-
-	output := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
-	count := 0
-	go func() {
-		dbwg := sync.WaitGroup{}
-		defer dbwg.Wait()
-		defer output.Close()
-		for {
-			select {
-			case <-refineConfig.Ctx.Done():
-			case erm, ok := <-ermResult:
-				if !ok {
-					return
-				}
-
-				entries, err := BuildKnowledgeFromERM(erm, nil, option...)
-				if err != nil {
-					refineConfig.AnalyzeLog("failed to build knowledge from erm: %v", err)
-					continue
-				}
-				dbwg.Add(1)
-				go func() {
-					defer dbwg.Done()
-					err := SaveKnowledgeEntries(kb, entries, option...)
-					if err != nil {
-						refineConfig.AnalyzeLog("failed to save knowledge entries: %v", err)
-						return
-					}
-				}()
-
-				count++
-				refineConfig.AnalyzeStatusCard("[build knowledge]: processed count", count)
-				for _, entry := range entries {
-					output.SafeFeed(entry)
-				}
-			}
-		}
-	}()
-
-	return output.OutputChannel(), nil
-}
-
-func BuildKnowledgeFromERM(erm *ERMAnalysisResult, kb *knowledgebase.KnowledgeBase, option ...any) ([]*schema.KnowledgeBaseEntry, error) {
-	refineConfig := NewRefineConfig(option...)
-	input := erm.Dump()
-	query, err := LiteForgeQueryFromChunk(refineERMPrompt, refineConfig.ExtraPrompt, chunkmaker.NewBufferChunk([]byte(input)), 200)
-	if err != nil {
-		refineConfig.AnalyzeLog("refine ERM chunk : render refine prompt failed: %v", err)
-		return nil, err
-	}
-
-	refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, WithOutputJSONSchema(refineSchema))...)
-	if err != nil {
-		refineConfig.AnalyzeLog("refine ERM chunk failed: %v", err)
-		return nil, err
-	}
-
-	entries, err := Action2RagKnowledgeEntries(refineResult.Action, 0)
-	if err != nil {
-		log.Errorf("failed to convert action to knowledge base entries: %v", err)
-		return nil, err
-	}
-	return entries, nil
-}
-
-func Refine(path string, option ...any) (*knowledgebase.KnowledgeBase, error) {
-	refineConfig := NewAnalysisConfig(option...)
-
-	refineConfig.AnalyzeLog("analyze video: %s", path)
-	analyzeResult, err := AnalyzeFile(path, option...)
-	if err != nil {
-		return nil, utils.Errorf("failed to start analyze video: %v", err)
-	}
-
-	return RefineFromAnalysisResult(analyzeResult, consts.GetGormProfileDatabase(), option...)
-}
-
-func RefineFromAnalysisResult(input <-chan AnalysisResult, db *gorm.DB, options ...any) (*knowledgebase.KnowledgeBase, error) {
-	refineConfig := NewRefineConfig(options...)
-	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
-
-	refineConfig.AnalyzeStatusCard("Refine", "creating knowledge base")
-	kb, err := knowledgebase.NewKnowledgeBase(db, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
-	if err != nil {
-		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
-	}
-	baseInfo, err := kb.GetInfo()
-	if err != nil {
-		return nil, utils.Errorf("failed to get knowledge base info: %v", err)
-	}
-
-	refineConfig.AnalyzeLog("knowledge base created: %s", knowledgeDatabaseName)
-	refineConfig.AnalyzeStatusCard("Refine", "creating knowledge base collection")
-
-	count := 0
-	wg := sync.WaitGroup{}
-	startOnce := &sync.Once{}
-
-	for v := range input {
-		startOnce.Do(func() {
-			refineConfig.AnalyzeStatusCard("Refine", "refining chunks")
-		})
-		count++
-		knowledgeRawData := v.Dump()
-		if len(knowledgeRawData) <= 0 {
-			log.Errorf("no knowledge data could be converted")
-			refineConfig.AnalyzeLog("skip refine chunk [%d]: no knowledge data could be converted", count)
-			continue
-		}
-		// query := fmt.Sprintf("%s\n ```main_analysis\n%s\n``` \nextract prompt:\n%s ", refinePrompt, knowledgeRawData, refineConfig.RefinePrompt)
-		query, err := LiteForgeQueryFromChunk(refinePrompt, refineConfig.ExtraPrompt, chunkmaker.NewBufferChunk([]byte(knowledgeRawData)), 200)
-		if err != nil {
-			log.Errorf("render refine prompt failed: %v", err)
-			refineConfig.AnalyzeLog("skip refine chunk [%d]: render refine prompt failed: %v", count, err)
-			continue
-		}
-
-		refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, WithOutputJSONSchema(refineSchema))...)
-		if err != nil {
-			if refineConfig.Strict {
-				return nil, utils.Errorf("failed to execute liteforge: %v", err)
-			}
-			refineConfig.AnalyzeLog("refine chunk [%d] failed: %v", count, err)
-			log.Errorf("refine chunk [%d] failed: %v", count, err)
-			continue
-		}
-		refineConfig.AnalyzeStatusCard("refine chunk count", count)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			entries, err := Action2RagKnowledgeEntries(refineResult.Action, int64(baseInfo.ID))
-			if err != nil {
-				log.Errorf("failed to convert action to knowledge base entries: %v", err)
-				return
-			}
-			for _, entry := range entries {
-				if len(entry.KnowledgeDetails) <= 0 {
-					continue
-				}
-				if len(entry.KnowledgeDetails) > refineConfig.KnowledgeEntryLength {
-					detailList, err := SplitTextSafe(entry.KnowledgeDetails, refineConfig.KnowledgeEntryLength, options...)
-					if err != nil {
-						return
-					}
-					for _, detail := range detailList {
-						err := kb.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
-							KnowledgeBaseID:  entry.KnowledgeBaseID,
-							KnowledgeTitle:   entry.KnowledgeTitle,
-							KnowledgeType:    entry.KnowledgeType,
-							KnowledgeDetails: detail,
-							Summary:          entry.Summary,
-							Keywords:         entry.Keywords,
-						})
-						if err != nil {
-							log.Errorf("failed to create knowledge base entry: %v", err)
-							return
-						}
-					}
-				} else {
-					err := kb.AddKnowledgeEntry(entry)
-					if err != nil {
-						log.Errorf("failed to create knowledge base entry: %v", err)
-						return
-					}
-				}
-			}
-		}()
-	}
-	wg.Wait()
-	return kb, nil
-}
-
-func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.KnowledgeBaseEntry, options ...any) error {
-	refineConfig := NewRefineConfig(options...)
-	for _, entry := range entries {
-		entry.KnowledgeBaseID = kb.GetID()
-		if len(entry.KnowledgeDetails) <= 0 {
-			continue
-		}
-		if len(entry.KnowledgeDetails) > refineConfig.KnowledgeEntryLength {
-			detailList, err := SplitTextSafe(entry.KnowledgeDetails, refineConfig.KnowledgeEntryLength, options...)
-			if err != nil {
-				return utils.Errorf("fail to split knowledge details: %v", err)
-			}
-			for _, detail := range detailList {
-				err := kb.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
-					KnowledgeBaseID:  entry.KnowledgeBaseID,
-					KnowledgeTitle:   entry.KnowledgeTitle,
-					KnowledgeType:    entry.KnowledgeType,
-					KnowledgeDetails: detail,
-					Summary:          entry.Summary,
-					Keywords:         entry.Keywords,
-				})
-				if err != nil {
-					return utils.Errorf("failed to create knowledge base entry: %v", err)
-				}
-			}
-		} else {
-			err := kb.AddKnowledgeEntry(entry)
-			if err != nil {
-				return utils.Errorf("failed to create knowledge base entry: %v", err)
-			}
-		}
-	}
-	return nil
-}
 
 func Action2RagKnowledgeEntries(
 	action *aicommon.Action,
@@ -303,4 +61,150 @@ func Action2RagKnowledgeEntries(
 	}
 
 	return entries, nil
+}
+
+func BuildKnowledgeFromFile(kbName string, path string, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	analyzeResult, err := AnalyzeFile(path, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze file: %v", err)
+	}
+	option = append(option, RefineWithKnowledgeBaseName(kbName))
+	return _buildKnowledge(analyzeResult, option...)
+}
+
+func BuildKnowledgeFromBytes(kbName string, content []byte, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	return BuildKnowledgeFromReader(kbName, bytes.NewReader(content), option...)
+}
+
+func BuildKnowledgeFromReader(kbName string, reader io.Reader, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	analyzeResult, err := AnalyzeReader(reader, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start analyze reader: %v", err)
+	}
+	option = append(option, RefineWithKnowledgeBaseName(kbName))
+	return _buildKnowledge(analyzeResult, option...)
+}
+
+func _buildKnowledge(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	refineConfig := NewRefineConfig(option...)
+	knowledgeDatabaseName := refineConfig.KnowledgeBaseName
+	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, knowledgeDatabaseName, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
+	if err != nil {
+		return nil, utils.Errorf("fial to create knowledgDatabase: %v", err)
+	}
+
+	er, err := AnalyzeERMFromAnalysisResult(analyzeChannel, option...)
+	if err != nil {
+		return nil, utils.Errorf("failed to start build erm from input: %v", err)
+	}
+
+	return BuildKnowledgeFromEntityRepository(er, kb, option...)
+}
+
+func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *knowledgebase.KnowledgeBase, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	refineConfig := NewRefineConfig(option...)
+	refineConfig.AnalyzeLog("start build knowledge from entity repository use default qc")
+
+	output := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
+
+	go func() {
+		count := 0
+		hopAnalyzeWg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+		defer output.Close()
+		defer hopAnalyzeWg.Wait()
+
+		for hop := range er.YieldKHop(refineConfig.Ctx) {
+			hopAnalyzeWg.Add(1)
+			go func() {
+				defer hopAnalyzeWg.Done()
+				err := er.AddKHopToVectorIndex(hop)
+				if err != nil {
+					refineConfig.AnalyzeLog("failed to add khop to vector index: %v", err)
+				}
+
+				entries, err := BuildKnowledgeEntryFromKHop(hop, kb, option...)
+				if err != nil {
+					refineConfig.AnalyzeLog("failed to build knowledge entry: %v", err)
+					return
+				}
+
+				for _, entry := range entries {
+					output.SafeFeed(entry)
+				}
+
+				count++
+				refineConfig.AnalyzeStatusCard("[build knowledge]: processed count", count)
+
+				err = SaveKnowledgeEntries(kb, entries, hop.GetRelatedEntityUUIDs(), option...)
+				if err != nil {
+					refineConfig.AnalyzeLog("failed to save knowledge entries: %v", err)
+					return
+				}
+			}()
+		}
+	}()
+
+	return output.OutputChannel(), nil
+}
+
+func BuildKnowledgeEntryFromKHop(hop *entityrepos.KHopPath, kb *knowledgebase.KnowledgeBase, option ...any) ([]*schema.KnowledgeBaseEntry, error) {
+	refineConfig := NewRefineConfig(option...)
+
+	input := hop.String()
+	query, err := LiteForgeQueryFromChunk(refineERMPrompt, refineConfig.ExtraPrompt, chunkmaker.NewBufferChunk([]byte(input)), 200)
+	if err != nil {
+		return nil, err
+	}
+
+	refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, WithOutputJSONSchema(refineSchema))...)
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := Action2RagKnowledgeEntries(refineResult.Action, 0)
+	if err != nil {
+		log.Errorf("failed to convert action to knowledge base entries: %v", err)
+		return nil, err
+	}
+	return entries, nil
+}
+
+func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.KnowledgeBaseEntry, relationalEntityUUID []string, options ...any) error { //todo return knowledge uuid
+	documentOption := []rag.DocumentOption{rag.WithDocumentRelatedEntities(relationalEntityUUID...)}
+
+	refineConfig := NewRefineConfig(options...)
+	for _, entry := range entries {
+		entry.KnowledgeBaseID = kb.GetID()
+		entry.RelatedEntityID = strings.Join(relationalEntityUUID, ",")
+		if len(entry.KnowledgeDetails) <= 0 {
+			continue
+		}
+		if len(entry.KnowledgeDetails) > refineConfig.KnowledgeEntryLength {
+			detailList, err := SplitTextSafe(entry.KnowledgeDetails, refineConfig.KnowledgeEntryLength, options...)
+			if err != nil {
+				return utils.Errorf("fail to split knowledge details: %v", err)
+			}
+			for _, detail := range detailList {
+				err := kb.AddKnowledgeEntry(&schema.KnowledgeBaseEntry{
+					KnowledgeBaseID:  entry.KnowledgeBaseID,
+					KnowledgeTitle:   entry.KnowledgeTitle,
+					KnowledgeType:    entry.KnowledgeType,
+					KnowledgeDetails: detail,
+					Summary:          entry.Summary,
+					Keywords:         entry.Keywords,
+					ImportanceScore:  entry.ImportanceScore,
+					RelatedEntityID:  entry.RelatedEntityID,
+				}, documentOption...)
+				if err != nil {
+					return utils.Errorf("failed to create knowledge base entry: %v", err)
+				}
+			}
+		} else {
+			err := kb.AddKnowledgeEntry(entry, documentOption...)
+			if err != nil {
+				return utils.Errorf("failed to create knowledge base entry: %v", err)
+			}
+		}
+	}
+	return nil
 }
