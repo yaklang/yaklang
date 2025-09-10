@@ -134,7 +134,7 @@ func (r *Report) FirstOrCreateRule(rule *schema.SyntaxFlowRule) *Rule {
 }
 
 func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) *File {
-	if ret := r.GetFile(editor.GetFilename()); ret != nil {
+	if ret := r.GetFile(editor.GetUrl()); ret != nil {
 		return ret
 	}
 	ret := NewFile(editor, r)
