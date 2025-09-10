@@ -79,7 +79,7 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk) {
 	}
 
 	// create risk with detailed structure
-	risk := NewRisk(ssarisk)
+	risk := NewRisk(ssarisk, r)
 	r.AddRisks(risk)
 
 	r.RiskNums = len(r.Risks)
@@ -137,7 +137,7 @@ func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) *File {
 	if ret := r.GetFile(editor.GetFilename()); ret != nil {
 		return ret
 	}
-	ret := NewFile(r.ReportType, editor)
+	ret := NewFile(editor, r)
 	r.File = append(r.File, ret)
 	return ret
 }

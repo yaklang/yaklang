@@ -69,48 +69,50 @@ type EdgeInfo struct {
 	Description string `json:"description"` // 边描述，便于AI理解
 }
 
-func NewRisk(risk *schema.SSARisk) *Risk {
-	if risk == nil {
+func NewRisk(ssarisk *schema.SSARisk, r *Report) *Risk {
+	if ssarisk == nil {
 		return &Risk{}
 	}
 
-	ret := &Risk{
-		ID:   risk.ID,
-		Hash: risk.Hash,
-		Time: risk.CreatedAt,
+	risk := &Risk{
+		ID:   ssarisk.ID,
+		Hash: ssarisk.Hash,
+		Time: ssarisk.CreatedAt,
 
-		Title:        risk.Title,
-		TitleVerbose: risk.TitleVerbose,
-		Description:  risk.Description,
-		Solution:     risk.Solution,
-		Severity:     string(risk.Severity),
-		RiskType:     risk.RiskType,
-		Details:      risk.Details,
-		CVE:          risk.CVE,
-		CWE:          risk.CWE,
-		Language:     risk.Language,
+		Title:        ssarisk.Title,
+		TitleVerbose: ssarisk.TitleVerbose,
+		Description:  ssarisk.Description,
+		Solution:     ssarisk.Solution,
+		Severity:     string(ssarisk.Severity),
+		RiskType:     ssarisk.RiskType,
+		Details:      ssarisk.Details,
+		CVE:          ssarisk.CVE,
+		CWE:          ssarisk.CWE,
+		Language:     ssarisk.Language,
 
-		CodeRange:     risk.CodeRange,
-		CodeFragment:  risk.CodeFragment,
-		CodeSourceURL: risk.CodeSourceUrl,
-		FunctionName:  risk.FunctionName,
-		Line:          risk.Line,
+		CodeRange:     ssarisk.CodeRange,
+		CodeFragment:  ssarisk.CodeFragment,
+		CodeSourceURL: ssarisk.CodeSourceUrl,
+		FunctionName:  ssarisk.FunctionName,
+		Line:          ssarisk.Line,
 
-		ProgramName:          risk.ProgramName,
-		LatestDisposalStatus: risk.LatestDisposalStatus,
+		ProgramName:          ssarisk.ProgramName,
+		LatestDisposalStatus: ssarisk.LatestDisposalStatus,
 	}
 
 	// Generate data flow paths if available
-	if risk.ResultID != 0 && risk.Variable != "" {
-		dataFlowPath, err := GenerateDataFlowAnalysis(risk)
-		if err != nil {
-			log.Errorf("generate data flow paths failed for risk %d: %v", risk.ID, err)
-		} else {
-			ret.DataFlowPaths = []*DataFlowPath{dataFlowPath}
+	if r.ReportType == IRifyFullReportType || r.config.showDataflowPath {
+		if ssarisk.ResultID != 0 && ssarisk.Variable != "" {
+			dataFlowPath, err := GenerateDataFlowAnalysis(ssarisk)
+			if err != nil {
+				log.Errorf("generate data flow paths failed for risk %d: %v", ssarisk.ID, err)
+			} else {
+				risk.DataFlowPaths = []*DataFlowPath{dataFlowPath}
+			}
 		}
 	}
 
-	return ret
+	return risk
 }
 
 func (r *Risk) GetHash() string {

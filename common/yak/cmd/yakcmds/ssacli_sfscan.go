@@ -203,7 +203,7 @@ func scan(ctx context.Context, progName string, ruleFilter *ypb.SyntaxFlowRuleFi
 
 // ShowRisk displays scan results based on the provided configuration
 // TODO: should use `showRisk` not result
-func ShowRisk(format sfreport.ReportType, ch chan *ssaapi.SyntaxFlowResult, writer io.Writer) {
+func ShowRisk(format sfreport.ReportType, ch chan *ssaapi.SyntaxFlowResult, writer io.Writer, opt ...sfreport.Option) {
 	log.Infof("================= show result ================")
 	defer func() {
 		log.Infof("show sarif result done")
@@ -214,7 +214,7 @@ func ShowRisk(format sfreport.ReportType, ch chan *ssaapi.SyntaxFlowResult, writ
 	}()
 
 	// convert result to report
-	reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(format)
+	reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(format, opt...)
 	if err != nil {
 		log.Errorf("convert syntax flow result to report failed: %s", err)
 		return
