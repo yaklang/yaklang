@@ -65,6 +65,9 @@ type ScanManager struct {
 
 	concurrency uint32
 	//}}
+	// process
+	processCallback     ProcessCallback
+	ruleProcessCallback RuleProcessCallback
 }
 
 var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *ScanManager]()
@@ -116,6 +119,7 @@ func CreateSyntaxflowTaskById(
 	taskId string, ctx context.Context,
 	req *ypb.SyntaxFlowScanRequest,
 	stream ScanStream,
+	sc *ScanConfig,
 ) (*ScanManager, error) {
 	m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
 	if err != nil {
@@ -127,8 +131,9 @@ func CreateSyntaxflowTaskById(
 	if err := m.initByConfig(stream); err != nil {
 		return nil, err
 	}
-
+	// 设置扫描批次
 	m.setScanBatch()
+	// 设置进度回调
 	return m, nil
 }
 
@@ -310,7 +315,6 @@ func (m *ScanManager) initByConfig(stream ScanStream) error {
 	}
 	m.totalQuery = m.rulesCount * int64(len(m.programs))
 	m.SaveTask()
-
 	return nil
 }
 
@@ -373,7 +377,7 @@ func (m *ScanManager) ResumeTask() error {
 }
 
 func (m *ScanManager) StatusTask() error {
-	m.notifyStatus("")
+	m.notifyStatus()
 	return nil
 }
 

@@ -20,7 +20,7 @@ func TestManager(t *testing.T) {
 			ProgramName: []string{
 				"a", "b", "c",
 			},
-		}, nil)
+		}, nil, nil)
 		require.NoError(t, err)
 		log.Infof("m; %v", task)
 
@@ -59,7 +59,7 @@ func TestManager(t *testing.T) {
 				Language: []string{"java"},
 			},
 			ProgramName: []string{programName},
-		}, nil)
+		}, nil, nil)
 		require.NoError(t, err)
 
 		err = task1.SaveTask()
@@ -72,7 +72,7 @@ func TestManager(t *testing.T) {
 				Language: []string{"java"},
 			},
 			ProgramName: []string{programName},
-		}, nil)
+		}, nil, nil)
 		require.NoError(t, err)
 
 		err = task2.SaveTask()
@@ -90,7 +90,7 @@ func TestManager(t *testing.T) {
 				Language: []string{"java"},
 			},
 			ProgramName: []string{newProgramName},
-		}, nil)
+		}, nil, nil)
 		require.NoError(t, err)
 
 		err = task3.SaveTask()

@@ -2,12 +2,13 @@ package syntaxflow_scan
 
 import (
 	"context"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
 )
 
 type ScanTaskConfig struct {
@@ -22,6 +23,10 @@ type ScanStream interface {
 }
 
 func Scan(stream ScanStream) error {
+	return ScanWithConfig(stream, &ScanConfig{})
+}
+
+func ScanWithConfig(stream ScanStream, sc *ScanConfig) error {
 	config, err := stream.Recv()
 	if err != nil {
 		return err
@@ -35,7 +40,7 @@ func Scan(stream ScanStream) error {
 	switch strings.ToLower(config.GetControlMode()) {
 	case "start":
 		taskId = uuid.New().String()
-		m, err = CreateSyntaxflowTaskById(taskId, streamCtx, config, stream)
+		m, err = CreateSyntaxflowTaskById(taskId, streamCtx, config, stream, sc)
 		if err != nil {
 			return err
 		}
