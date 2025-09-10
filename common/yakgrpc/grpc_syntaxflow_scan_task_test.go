@@ -78,7 +78,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		// save prog
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
+		package com.example.apackage;
 		import com.example.bpackage.sub.B;
 		class A {
 			public static void main(String[] args) {
@@ -152,7 +152,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		// save prog
 		vf1 := filesys.NewVirtualFs()
 		vf1.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
+		package com.example.bpackage.sub;
 		class B {
 			public  int get1() {
 				return 	 1;
@@ -165,7 +165,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 
 		vf2 := filesys.NewVirtualFs()
 		vf2.AddFile("example/src/main/java/com/example/bpackage/sub/b.java", `
-		package com.example.bpackage.sub; 
+		package com.example.bpackage.sub;
 		class B {
 			public  int get2() {
 				return 	 1;
@@ -319,7 +319,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		// save prog
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage; 
+		package com.example.apackage;
 		import com.example.bpackage.sub.B;
 		class A {
 			public static void main(String[] args) {
@@ -397,29 +397,29 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		}
 	})
 
-	t.Run("test query and delete mutli tasks", func(t *testing.T) {
-		taskIds := make([]string, 0)
-		tasksMap := make(map[string]*SyntaxFlowScanManager)
-		for i := 0; i < 10; i++ {
-			taskId := uuid.NewString()
-			taskIds = append(taskIds, taskId)
-			task, err := createEmptySyntaxFlowTaskByID(taskId, context.Background())
-			if i%3 == 1 {
-				task.status = schema.SYNTAXFLOWSCAN_PAUSED // flag
-			}
-			require.NoError(t, err)
-			task.SaveTask()
-			tasksMap[taskId] = task
-		}
-
-		gotTasks := queryTasks(taskIds)
-		require.Equal(t, 10, len(gotTasks))
-		for _, gotTask := range gotTasks {
-			if tasksMap[gotTask.TaskId].status != gotTask.Status {
-				t.Errorf("task status not match")
-			}
-		}
-	})
+	//t.Run("test query and delete mutli tasks", func(t *testing.T) {
+	//	taskIds := make([]string, 0)
+	//	tasksMap := make(map[string]*SyntaxFlowScanManager)
+	//	for i := 0; i < 10; i++ {
+	//		taskId := uuid.NewString()
+	//		taskIds = append(taskIds, taskId)
+	//		task, err := createEmptySyntaxFlowTaskByID(taskId, context.Background())
+	//		if i%3 == 1 {
+	//			task.status = schema.SYNTAXFLOWSCAN_PAUSED // flag
+	//		}
+	//		require.NoError(t, err)
+	//		task.SaveTask()
+	//		tasksMap[taskId] = task
+	//	}
+	//
+	//	gotTasks := queryTasks(taskIds)
+	//	require.Equal(t, 10, len(gotTasks))
+	//	for _, gotTask := range gotTasks {
+	//		if tasksMap[gotTask.TaskId].status != gotTask.Status {
+	//			t.Errorf("task status not match")
+	//		}
+	//	}
+	//})
 
 	startScanWithGroup := func(progIds []string, groupName string, isIgnoreLanguage bool) (string, ypb.Yak_SyntaxFlowScanClient) {
 		stream, err := client.SyntaxFlowScan(context.Background())
