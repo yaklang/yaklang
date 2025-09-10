@@ -61,7 +61,7 @@ func (r *Report) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
 	}
 
 	for risk := range result.YieldRisk() {
-		r.ConvertSSARiskToReport(risk)
+		r.ConvertSSARiskToReport(risk, result)
 	}
 	return true
 }
@@ -72,7 +72,7 @@ func (r *Report) AddSyntaxFlowRisks(risks []*schema.SSARisk) {
 	}
 }
 
-func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk) {
+func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssaapi.SyntaxFlowResult) {
 	if r.GetRisk(ssarisk.Hash) != nil {
 		// already exists
 		return
@@ -84,12 +84,22 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk) {
 
 	r.RiskNums = len(r.Risks)
 	// get result
-	result, err := ssaapi.LoadResultByID(uint(ssarisk.ResultID))
-	if err != nil {
-		log.Errorf("load result by id %d error: %v", ssarisk.ResultID, err)
-		return
+	var result *ssaapi.SyntaxFlowResult = nil
+	if len(results) > 0 {
+		result = results[0]
+	} else {
+		var err error
+		result, err = ssaapi.LoadResultByID(uint(ssarisk.ResultID))
+		if err != nil {
+			log.Errorf("load result by id %d error: %v", ssarisk.ResultID, err)
+			return
+		}
 	}
 
+	if result == nil {
+		log.Errorf("result is nil for risk %s", ssarisk.Hash)
+		return
+	}
 	// get value
 	value, err := result.GetValue(ssarisk.Variable, int(ssarisk.Index))
 	if err != nil {
