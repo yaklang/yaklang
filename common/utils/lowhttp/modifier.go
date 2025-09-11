@@ -1006,7 +1006,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 // ```
 func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
-		isNew := false
+		keyExists := false
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1018,8 +1018,7 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 				var reader io.Reader = part
 				if part.FormName() == key {
 					reader = strings.NewReader(value)
-				} else {
-					isNew = true
+					keyExists = true
 				}
 				partWriter, err := multipartWriter.CreatePart(part.Header)
 				if err != nil {
@@ -1031,8 +1030,8 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 				}
 			}
 		}
-		if multipartWriter != nil && isNew {
-			// append form
+		if multipartWriter != nil && !keyExists {
+			// append form only if key doesn't exist
 			multipartWriter.WriteField(key, value)
 		}
 
