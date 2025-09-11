@@ -205,6 +205,7 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 	}
 	result, err := pm.react.config.aiBlueprintManager.GenerateAIForgeListForPrompt(forges)
 	if err != nil {
+		log.Warnf("cannot generate ai-forge list for prompt: %v", err)
 		return ""
 	}
 	return result
@@ -218,6 +219,8 @@ func (pm *PromptManager) GenerateLoopPrompt(
 	userInteractiveLimitedTimes int64,
 	tools []*aitool.Tool,
 ) (string, error) {
+	forges := pm.GetAvailableAIForgeBlueprints()
+
 	// Build template data
 	data := &LoopPromptData{
 		AllowAskForClarification:       allowUserInteractive,
@@ -229,7 +232,7 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		UserQuery:                      userQuery,
 		Nonce:                          utils.RandStringBytes(4),
 		Language:                       pm.react.config.language,
-		AIForgeList:                    pm.GetAvailableAIForgeBlueprints(),
+		AIForgeList:                    forges,
 		Tools:                          tools,
 		ToolsCount:                     len(tools),
 		TopToolsCount:                  pm.react.config.topToolsCount,

@@ -292,6 +292,40 @@ LOOP:
 						"%v", finalResult,
 					))
 			}
+		case ActionRequireAIBlueprintForge:
+			saveIterationInfoIntoTimeline()
+			forgeName := nextAction.GetString("require_ai_blueprint_payload")
+			ins, forgeParams, err := r.invokeBlueprint(forgeName)
+			if err != nil {
+				log.Errorf("Failed to invoke blueprint[%v]: %v", forgeName, err)
+			}
+
+			r.SetCurrentPlanExecutionTask(currentTask)
+			skipContextCancel.SetTo(true) // Plan execution will manage the context
+			taskStarted := make(chan struct{})
+			timelineStartPlanChan := make(chan struct{})
+			go func() {
+				defer func() {
+					select {
+					case <-timelineStartPlanChan:
+						r.addToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is finished", utils.ShrinkString(forgeName, 128)))
+					}
+					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
+					currentTask.SetStatus(string(TaskStatus_Completed))
+					r.SetCurrentPlanExecutionTask(nil)
+				}()
+				if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), "", ins.ForgeName, forgeParams); err != nil {
+					log.Errorf("Plan execution failed: %v", err)
+				}
+			}()
+			select {
+			case <-taskStarted:
+				r.addToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is started", forgeName))
+				close(timelineStartPlanChan)
+				log.Infof("plan execution task started")
+				skipTaskStatusChange = true
+				break LOOP
+			}
 		case ActionRequestPlanExecution:
 			saveIterationInfoIntoTimeline()
 
@@ -316,7 +350,7 @@ LOOP:
 					currentTask.SetStatus(string(TaskStatus_Completed))
 					r.SetCurrentPlanExecutionTask(nil)
 				}()
-				if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), planPayload); err != nil {
+				if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), planPayload, "", nil); err != nil {
 					log.Errorf("Plan execution failed: %v", err)
 				}
 			}()
@@ -349,12 +383,6 @@ LOOP:
 				log.Infof("User needs not fully satisfied, continuing analysis...")
 				continue
 			}
-		case ActionRequireAIBlueprintForge:
-			saveIterationInfoIntoTimeline()
-			forgeName := nextAction.GetString("require_ai_blueprint_payload")
-			r.invokeBlueprint(forgeName)
-			r.finished = true
-			continue
 		default:
 			r.EmitError("unknown action type: %v", actionType)
 			r.finished = true
