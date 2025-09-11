@@ -110,6 +110,10 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 	if phiIns, ok := ToPhi(key); ok {
 		if ret := b.tryBuildExternFieldForPhi(extern, phiIns, make(map[int64]struct{})); ret != nil {
 			return ret
+		} else {
+			if m, ok := extern.GetMember(key); ok {
+				return m
+			}
 		}
 	} else {
 		want := b.TryGetSimilarityKey(extern.GetName(), key.String())
