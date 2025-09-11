@@ -22,7 +22,7 @@ func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommo
 		rs := bytes.NewBufferString(`
 {"@action": "object", "next_action": {
 	"type": "require_ai_blueprint",
-	"require_ai_blueprint_payload": "xss",
+	"blueprint_payload": "xss",
 }, "human_readable_thought": "mocked thought` + flag + `", "cumulative_summary": "..cumulative-mocked` + flag + `.."}
 `)
 		rsp.EmitOutputStream(rs)

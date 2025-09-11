@@ -122,6 +122,14 @@ func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bo
 				),
 			),
 		)
+		if haveAIForgeList {
+			aitool.WithStringParam(
+				"blueprint_payload",
+				aitool.WithParam_Description(
+					"USE THIS FIELD ONLY IF type is 'require_ai_blueprint'. Provide a forge blueprint ID from the available AI blueprint list to execute the task.",
+				),
+			)
+		}
 	}
 	if !disallowAskForClarification {
 		actionFields = append(actionFields, aitool.WithStructParam(
