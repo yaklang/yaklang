@@ -294,7 +294,7 @@ LOOP:
 			}
 		case ActionRequireAIBlueprintForge:
 			saveIterationInfoIntoTimeline()
-			forgeName := nextAction.GetString("require_ai_blueprint_payload")
+			forgeName := nextAction.GetString("blueprint_payload")
 			r.addToTimeline("plan", fmt.Sprintf("ai-forge-name(blueprint): %v is requested", forgeName))
 
 			if havePlanExecuting {
