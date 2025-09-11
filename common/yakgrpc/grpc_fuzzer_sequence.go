@@ -237,11 +237,24 @@ func (s *Server) execFlow(senderMutex *sync.Mutex, flowMax int64, wg *sync.WaitG
 				log.Errorf("json unmarshal FuzzerRequest failed: %s", err)
 				return
 			}
+
+			copiedRsp := ypb.FuzzerResponse{}
+			raw, err = json.Marshal(response)
+			if err != nil {
+				log.Errorf("json marshal ypb.FuzzerRequest failed: %s", err)
+				return
+			}
+			err = json.Unmarshal(raw, &copiedRsp)
+			if err != nil {
+				log.Errorf("json unmarshal FuzzerRequest failed: %s", err)
+				return
+			}
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				swg.Add()
-				flow := NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(response)
+				flow := NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(&copiedRsp)
 				flow.next = f.next.next
 				err := s.execFlow(senderMutex, flowMax, wg, flow, stream)
 				swg.Done()
