@@ -100,6 +100,14 @@ slice1 = append(slice1, "a")
 slice2 = append(slice2, 1)
 		`, []string{})
 	})
+	t.Run("test append generic 2", func(t *testing.T) {
+		check(t, `
+slice1 = ["a"]
+slice2 = [1]
+slice1.Append("a")
+slice2.Append(1)
+		`, []string{})
+	})
 }
 
 func TestMakeByte(t *testing.T) {
