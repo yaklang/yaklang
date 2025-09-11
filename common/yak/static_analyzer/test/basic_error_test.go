@@ -91,6 +91,17 @@ func TestFunctionCallParameterLength(t *testing.T) {
 	})
 }
 
+func TestFunctionCallGeneric(t *testing.T) {
+	t.Run("test append generic", func(t *testing.T) {
+		check(t, `
+slice1 = []
+slice2 = []
+slice1 = append(slice1, "a")
+slice2 = append(slice2, 1)
+		`, []string{})
+	})
+}
+
 func TestMakeByte(t *testing.T) {
 	t.Run("make byte", func(t *testing.T) {
 		check(t, `
