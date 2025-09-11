@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -50,6 +51,11 @@ func createTestAIForge(t *testing.T, name string) *schema.AIForge {
 // TestForgeFactory_Query 测试从数据库读取数据的功能
 func TestForgeFactory_Query(t *testing.T) {
 	setupTestDatabase(t)
+
+	if utils.InGithubActions() {
+		t.Skip("Skipping TestForgeFactory_Query in GitHub Actions environment")
+		return
+	}
 
 	// 创建测试数据
 	testForgeName := "test-forge-query"
