@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -561,4 +562,162 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	}
 
 	t.Logf("Successfully verified AI Forge List contains hostscan forge")
+}
+
+// TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法
+func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
+	// 创建一个基本的 ReAct 实例来测试 GenerateAIBlueprintForgeParamsPrompt 方法
+	react, err := NewReAct(
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	// 创建测试用的 AIForge 实例
+	testAIForge := &schema.AIForge{
+		ForgeName:   "test-forge",
+		Description: "Test AI Forge for unit testing",
+	}
+
+	// 测试用例：基本功能测试
+	t.Run("BasicFunctionality", func(t *testing.T) {
+		// 定义一个简单的 schema
+		schema := `{
+			"type": "object",
+			"properties": {
+				"host": {
+					"type": "string",
+					"description": "目标主机地址"
+				},
+				"port": {
+					"type": "integer",
+					"description": "目标端口号"
+				}
+			},
+			"required": ["host"]
+		}`
+
+		// 调用 GenerateAIBlueprintForgeParamsPrompt 方法
+		prompt, err := react.promptManager.GenerateAIBlueprintForgeParamsPrompt(testAIForge, schema)
+		if err != nil {
+			t.Fatalf("Failed to generate AI blueprint forge params prompt: %v", err)
+		}
+
+		// 验证生成的内容不为空
+		if prompt == "" {
+			t.Fatal("Generated prompt should not be empty")
+		}
+
+		// 验证包含预期的模板内容
+		if !utils.MatchAllOfSubString(prompt, "AI Blueprint Parameter Generation") {
+			t.Fatal("Generated prompt should contain AI Blueprint Parameter Generation section")
+		}
+
+		if !utils.MatchAllOfSubString(prompt, "Blueprint Schema") {
+			t.Fatal("Generated prompt should contain Blueprint Schema section")
+		}
+
+		if !utils.MatchAllOfSubString(prompt, "call-ai-blueprint") {
+			t.Fatal("Generated prompt should contain call-ai-blueprint action")
+		}
+
+		// 验证包含传入的 schema
+		if !utils.MatchAllOfSubString(prompt, "目标主机地址") {
+			t.Fatal("Generated prompt should contain schema description")
+		}
+
+		// 验证包含 AIForge 的信息
+		if !utils.MatchAllOfSubString(prompt, "test-forge") {
+			t.Fatal("Generated prompt should contain forge name")
+		}
+
+		if !utils.MatchAllOfSubString(prompt, "Test AI Forge for unit testing") {
+			t.Fatal("Generated prompt should contain forge description")
+		}
+
+		t.Logf("Generated AI Blueprint Forge Params Prompt:\n%s", prompt)
+	})
+
+	// 测试用例：空 schema 测试
+	t.Run("EmptySchema", func(t *testing.T) {
+		prompt, err := react.promptManager.GenerateAIBlueprintForgeParamsPrompt(testAIForge, "")
+		if err != nil {
+			t.Fatalf("Failed to generate prompt with empty schema: %v", err)
+		}
+
+		if prompt == "" {
+			t.Fatal("Generated prompt with empty schema should not be empty")
+		}
+
+		// 验证仍然包含基本模板内容
+		if !utils.MatchAllOfSubString(prompt, "AI Blueprint Parameter Generation") {
+			t.Fatal("Generated prompt should contain AI Blueprint Parameter Generation section even with empty schema")
+		}
+
+		// 验证包含 AIForge 的信息
+		if !utils.MatchAllOfSubString(prompt, "test-forge") {
+			t.Fatal("Generated prompt should contain forge name even with empty schema")
+		}
+	})
+
+	// 测试用例：上下文信息集成测试
+	t.Run("ContextIntegration", func(t *testing.T) {
+		// 设置一些上下文信息
+		react.cumulativeSummary = "Previous task summary"
+		react.currentIteration = 2
+		react.config.maxIterations = 10
+
+		schema := `{"type": "object", "properties": {"test": {"type": "string"}}}`
+		prompt, err := react.promptManager.GenerateAIBlueprintForgeParamsPrompt(testAIForge, schema)
+		if err != nil {
+			t.Fatalf("Failed to generate prompt with context: %v", err)
+		}
+
+		// 验证包含上下文信息
+		if !utils.MatchAllOfSubString(prompt, "Previous task summary") {
+			t.Fatal("Generated prompt should contain cumulative summary")
+		}
+
+		if !utils.MatchAllOfSubString(prompt, "2/10") {
+			t.Fatal("Generated prompt should contain iteration information")
+		}
+
+		// 验证包含 AIForge 的信息
+		if !utils.MatchAllOfSubString(prompt, "test-forge") {
+			t.Fatal("Generated prompt should contain forge name in context test")
+		}
+
+		t.Logf("Generated prompt with context:\n%s", prompt)
+	})
+
+	// 测试用例：不同的 AIForge 实例
+	t.Run("DifferentAIForge", func(t *testing.T) {
+		differentAIForge := &schema.AIForge{
+			ForgeName:   "hostscan-forge",
+			Description: "专业的主机体检AI助手",
+		}
+
+		schema := `{"type": "object", "properties": {"target": {"type": "string"}}}`
+		prompt, err := react.promptManager.GenerateAIBlueprintForgeParamsPrompt(differentAIForge, schema)
+		if err != nil {
+			t.Fatalf("Failed to generate prompt with different AIForge: %v", err)
+		}
+
+		// 验证包含正确的 AIForge 信息
+		if !utils.MatchAllOfSubString(prompt, "hostscan-forge") {
+			t.Fatal("Generated prompt should contain the different forge name")
+		}
+
+		if !utils.MatchAllOfSubString(prompt, "专业的主机体检AI助手") {
+			t.Fatal("Generated prompt should contain the different forge description")
+		}
+
+		t.Logf("Generated prompt with different AIForge:\n%s", prompt)
+	})
 }

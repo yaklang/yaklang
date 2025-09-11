@@ -11,6 +11,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -50,6 +51,9 @@ var wrongToolPromptTemplate string
 
 //go:embed prompts/tool/wrong-params.txt
 var wrongParamsPromptTemplate string
+
+//go:embed prompts/tool-params/blueprint-params.txt
+var blueprintParamsPromptTemplate string
 
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
@@ -188,6 +192,19 @@ type ReGenerateToolParamsPromptData struct {
 	OldParams          string
 	Schema             string
 	DynamicContext     string
+}
+
+// AIBlueprintForgeParamsPromptData contains data for AI blueprint forge parameter generation prompt
+type AIBlueprintForgeParamsPromptData struct {
+	BlueprintName        string
+	BlueprintDescription string
+	BlueprintSchema      string
+	OriginalQuery        string
+	CumulativeSummary    string
+	CurrentIteration     int
+	MaxIterations        int
+	Timeline             string
+	DynamicContext       string
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -452,6 +469,27 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, ol
 	}
 
 	return pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
+}
+
+// GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
+func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForge, blueprintSchema string) (string, error) {
+	data := &AIBlueprintForgeParamsPromptData{
+		BlueprintName:        ins.ForgeName,
+		BlueprintDescription: ins.Description,
+		BlueprintSchema:      blueprintSchema,
+		DynamicContext:       pm.DynamicContext(),
+	}
+
+	// Extract context data from memory without lock (assume caller already holds lock)
+	if pm.react.config.memory != nil {
+		data.OriginalQuery = pm.react.config.memory.Query
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+	data.CumulativeSummary = pm.react.cumulativeSummary
+	data.CurrentIteration = pm.react.currentIteration
+	data.MaxIterations = pm.react.config.maxIterations
+
+	return pm.executeTemplate("blueprint-params", blueprintParamsPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data
