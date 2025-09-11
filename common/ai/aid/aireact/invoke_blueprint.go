@@ -17,7 +17,7 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 	if err != nil {
 		return nil, nil, utils.Errorf("generate ai json schema from schema ai forge failed: %v", err)
 	}
-	prompt, err := r.promptManager.GenerateAIBlueprintForgeParamsPrompt(schema)
+	prompt, err := r.promptManager.GenerateAIBlueprintForgeParamsPrompt(ins, schema)
 	if err != nil {
 		return nil, nil, utils.Errorf("generate prompt (for ai-forge) failed: %v", err)
 	}
