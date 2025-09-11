@@ -1,6 +1,8 @@
 package yaklib
 
 import (
+	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -64,134 +66,194 @@ func querySSAProjectByID(id int64) (*schema.SSAProject, error) {
 	return projects[0], nil
 }
 
-// SSAProject选项类型
-type SSAProjectParamsOpt func(*schema.SSAProject)
+// SSAProject配置构建器
+type ssaProjectConfigBuilder struct {
+	codeSource *schema.CodeSourceInfo
+	project    *schema.SSAProject
+}
 
-// 创建SSAProject的选项函数
+// SSAProject选项类型
+type SSAProjectParamsOpt func(*ssaProjectConfigBuilder)
+
+// 代码源配置选项函数
 func WithSourceKind(kind string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.SourceKind = schema.SSAProjectSourceKind(kind)
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		b.codeSource.Kind = schema.CodeSourceKind(kind)
 	}
 }
 
-func WithLocalPath(path string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.LocalPath = path
+func WithLocalFile(path string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		b.codeSource.LocalFile = path
 	}
 }
 
 func WithURL(url string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.URL = url
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		b.codeSource.URL = url
 	}
 }
 
 func WithBranch(branch string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.Branch = branch
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		b.codeSource.Branch = branch
 	}
 }
 
-func WithGitPath(path string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.GitPath = path
+func WithPath(path string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		b.codeSource.Path = path
 	}
 }
 
-func WithDescription(desc string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.Description = desc
-	}
-}
-
-func WithStrictMode(strict bool) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.StrictMode = strict
-	}
-}
-
-func WithPeepholeSize(size int) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.PeepholeSize = size
-	}
-}
-
-func WithExcludeFiles(files string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.ExcludeFiles = files
-	}
-}
-
-func WithReCompile(recompile bool) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.ReCompile = recompile
-	}
-}
-
-func WithScanConcurrency(concurrency int) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.ScanConcurrency = uint32(concurrency)
-	}
-}
-
-func WithMemoryScan(memory bool) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.MemoryScan = memory
-	}
-}
-
-func WithScanRuleGroups(groups string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.ScanRuleGroups = groups
-	}
-}
-
-func WithScanRuleNames(names string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.ScanRuleNames = names
-	}
-}
-
-func WithIgnoreLanguage(ignore bool) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.IgnoreLanguage = ignore
-	}
-}
-
-func WithProxyURL(proxy string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.ProxyURL = proxy
-	}
-}
-
-func WithProxyAuth(user, password string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.ProxyUser = user
-		p.ProxyPassword = password
-	}
-}
-
+// 认证配置选项函数
 func WithAuthKind(kind string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.AuthKind = kind
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		if b.codeSource.Auth == nil {
+			b.codeSource.Auth = &schema.AuthConfigInfo{}
+		}
+		b.codeSource.Auth.Kind = kind
 	}
 }
 
 func WithAuthUsername(username string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.AuthUsername = username
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		if b.codeSource.Auth == nil {
+			b.codeSource.Auth = &schema.AuthConfigInfo{}
+		}
+		b.codeSource.Auth.UserName = username
 	}
 }
 
 func WithAuthPassword(password string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.AuthPassword = password
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		if b.codeSource.Auth == nil {
+			b.codeSource.Auth = &schema.AuthConfigInfo{}
+		}
+		b.codeSource.Auth.Password = password
 	}
 }
 
 func WithAuthKeyPath(keyPath string) SSAProjectParamsOpt {
-	return func(p *schema.SSAProject) {
-		p.AuthKeyPath = keyPath
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		if b.codeSource.Auth == nil {
+			b.codeSource.Auth = &schema.AuthConfigInfo{}
+		}
+		b.codeSource.Auth.KeyPath = keyPath
+	}
+}
+
+// 代理配置选项函数
+func WithProxyURL(proxy string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		if b.codeSource.Proxy == nil {
+			b.codeSource.Proxy = &schema.ProxyConfigInfo{}
+		}
+		b.codeSource.Proxy.URL = proxy
+	}
+}
+
+func WithProxyAuth(user, password string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.codeSource == nil {
+			b.codeSource = &schema.CodeSourceInfo{}
+		}
+		if b.codeSource.Proxy == nil {
+			b.codeSource.Proxy = &schema.ProxyConfigInfo{}
+		}
+		b.codeSource.Proxy.User = user
+		b.codeSource.Proxy.Password = password
+	}
+}
+
+// 项目配置选项函数
+func WithDescription(desc string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.Description = desc
+	}
+}
+
+func WithStrictMode(strict bool) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.StrictMode = strict
+	}
+}
+
+func WithPeepholeSize(size int) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.PeepholeSize = size
+	}
+}
+
+func WithExcludeFiles(files string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.ExcludeFiles = files
+	}
+}
+
+func WithReCompile(recompile bool) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.ReCompile = recompile
+	}
+}
+
+func WithScanConcurrency(concurrency int) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.ScanConcurrency = uint32(concurrency)
+	}
+}
+
+func WithMemoryScan(memory bool) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.MemoryScan = memory
+	}
+}
+
+func WithScanRuleGroups(groups string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.ScanRuleGroups = groups
+	}
+}
+
+func WithScanRuleNames(names string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.ScanRuleNames = names
+	}
+}
+
+func WithIgnoreLanguage(ignore bool) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.IgnoreLanguage = ignore
 	}
 }
 
@@ -203,8 +265,21 @@ func _createSSAProject(projectName string, opts ...SSAProjectParamsOpt) *schema.
 		PeepholeSize:    100, // 默认窥孔大小
 	}
 
+	builder := &ssaProjectConfigBuilder{
+		project: project,
+	}
+
+	// 应用所有选项
 	for _, opt := range opts {
-		opt(project)
+		opt(builder)
+	}
+
+	// 如果有代码源配置，序列化为JSON
+	if builder.codeSource != nil {
+		configBytes, err := json.Marshal(builder.codeSource)
+		if err == nil {
+			project.CodeSourceConfig = string(configBytes)
+		}
 	}
 
 	return project
@@ -255,10 +330,10 @@ var SSAProjectExports = map[string]interface{}{
 
 	// 选项函数
 	"withSourceKind":      WithSourceKind,
-	"withLocalPath":       WithLocalPath,
+	"withLocalFile":       WithLocalFile,
 	"withURL":             WithURL,
 	"withBranch":          WithBranch,
-	"withGitPath":         WithGitPath,
+	"withPath":            WithPath,
 	"withDescription":     WithDescription,
 	"withStrictMode":      WithStrictMode,
 	"withPeepholeSize":    WithPeepholeSize,
