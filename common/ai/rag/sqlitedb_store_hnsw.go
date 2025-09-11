@@ -183,6 +183,7 @@ func (s *SQLiteVectorStoreHNSW) Remove() error {
 func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Document {
 	return Document{
 		ID:        doc.DocumentID,
+		Type:      doc.DocumentType,
 		Metadata:  map[string]any(doc.Metadata),
 		Embedding: []float32(doc.Embedding),
 		Content:   doc.Content,
