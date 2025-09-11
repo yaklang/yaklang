@@ -97,8 +97,6 @@ func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
 	db = db.Model(&schema.AIForge{})
 	if filter.GetShowTemporary() {
 		db = db.Where("is_temporary = ?", true)
-	} else {
-		db = db.Where("is_temporary = ?", false)
 	}
 	db = bizhelper.FuzzQueryLike(db, "forge_name", filter.GetForgeName())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "forge_name", filter.GetForgeNames())

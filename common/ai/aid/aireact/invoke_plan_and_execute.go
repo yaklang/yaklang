@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/yak"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -13,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, planPayload string) error {
+func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, planPayload string, forgeName string, forgeParams any) error {
 	doneOnce := new(sync.Once)
 	done := func() {
 		doneOnce.Do(func() {
@@ -88,20 +89,38 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			}
 		}),
 	)
-	cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)
-	if err != nil {
-		r.finished = true
-		log.Errorf("Failed to create coordinator for plan execution: %v", err)
-		return utils.Errorf("failed to create coordinator for plan execution: %v", err)
-	}
-	done()
-	if err := cod.Run(); err != nil {
-		r.finished = true
-		log.Errorf("Plan execution failed: %v", err)
-		return utils.Errorf("plan execution failed: %v", err)
-	}
-	// Emit the final result from the coordinator
-	r.finished = true
 
-	return nil
+	if forgeName != "" {
+		var opts []any = make([]any, len(baseOpts))
+		for i, o := range baseOpts {
+			opts[i] = o
+		}
+		done()
+		result, err := yak.ExecuteForge(forgeName, forgeParams, opts...)
+		if err != nil {
+			r.finished = true
+			log.Errorf("Failed to execute forge: %v", err)
+			return utils.Errorf("failed to execute forge %s: %v", forgeName, err)
+		}
+		r.finished = true
+		_ = result
+		return nil
+	} else {
+		cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)
+		if err != nil {
+			r.finished = true
+			log.Errorf("Failed to create coordinator for plan execution: %v", err)
+			return utils.Errorf("failed to create coordinator for plan execution: %v", err)
+		}
+		done()
+		if err := cod.Run(); err != nil {
+			r.finished = true
+			log.Errorf("Plan execution failed: %v", err)
+			return utils.Errorf("plan execution failed: %v", err)
+		}
+		// Emit the final result from the coordinator
+		r.finished = true
+
+		return nil
+	}
 }
