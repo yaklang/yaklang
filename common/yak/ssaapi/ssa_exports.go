@@ -81,6 +81,8 @@ type config struct {
 	logLevel string
 
 	astSequence ssareducer.ASTSequenceType
+	// for concurrency
+	concurrency int
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
@@ -404,6 +406,13 @@ func WithMemory(ttl ...time.Duration) Option {
 	}
 }
 
+func WithConcurrency(concurrency int) Option {
+	return func(c *config) error {
+		c.concurrency = concurrency
+		return nil
+	}
+}
+
 func WithDatabaseProgramCacheHitter(h func(i any)) Option {
 	return func(c *config) error {
 		c.DatabaseProgramCacheHitter = h
@@ -533,6 +542,7 @@ var Exports = map[string]any{
 	// "NewRiskCompare":     NewSSAComparator[*schema.SSARisk],
 	// "NewRiskCompareItem": NewSSARiskComparisonItem,
 
+	"withConcurrency":        WithConcurrency,
 	"withLanguage":           WithRawLanguage,
 	"withConfigInfo":         WithConfigInfo,
 	"withExternLib":          WithExternLib,
