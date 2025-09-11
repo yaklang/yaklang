@@ -99,29 +99,3 @@ func (s *Server) DeleteSSAProject(ctx context.Context, req *ypb.DeleteSSAProject
 		},
 	}, nil
 }
-
-func (s *Server) GetSSAProject(ctx context.Context, req *ypb.GetSSAProjectRequest) (*ypb.GetSSAProjectResponse, error) {
-	if req == nil {
-		return nil, utils.Errorf("get SSA project failed: request is nil")
-	}
-
-	queryReq := &ypb.QuerySSAProjectRequest{
-		Filter: &ypb.SSAProjectFilter{
-			ProjectNames: []string{req.GetProjectName()},
-			IDs:          []int64{req.GetID()},
-		},
-		Pagination: &ypb.Paging{
-			Limit: 1,
-		},
-	}
-	_, project, err := yakit.QuerySSAProject(consts.GetGormProfileDatabase(), queryReq)
-	if err != nil {
-		return nil, err
-	}
-	if len(project) == 0 {
-		return nil, utils.Errorf("SSA project not found")
-	}
-	return &ypb.GetSSAProjectResponse{
-		Project: project[0].ToGRPCModel(),
-	}, nil
-}

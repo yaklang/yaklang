@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/yaklang/yaklang/common/javaclassparser"
-
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -17,74 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 )
 
-type ConfigInfoKind string
-
-const (
-	Local       ConfigInfoKind = "local"
-	Compression ConfigInfoKind = "compression"
-	Jar         ConfigInfoKind = "jar"
-	Git         ConfigInfoKind = "git"
-	Svn         ConfigInfoKind = "svn"
-)
-
-type ConfigInfo struct {
-	Kind ConfigInfoKind `json:"kind"`
-	// The kind of the parse: "local", "compression"
-
-	/*
-		"local":
-			* "local_file":  path to the local directory
-		"compression":
-			* "local_file":  path to the local compressed file
-		"jar":
-			"local_file":  path to the local jar file
-		"git":
-			* "git_url":  git url
-			"git_branch":  git branch
-			auth
-			proxy
-		"svn":
-			* "svn_url":  svn url
-			"svn_branch":  svn branch
-			auth
-			proxy
-	*/
-
-	LocalFile string `json:"local_file"`
-	URL       string `json:"url"` //  for git/svn/tar/jar
-	// git or svn
-	Branch  string `json:"branch"`
-	GitPath string `json:"path"`
-	Auth    *auth  `json:"ce"`
-	Proxy   *Proxy `json:"proxy"`
-}
-
-func (c ConfigInfo) String() string {
-	b, _ := json.Marshal(c)
-	return string(b)
-}
-
-type auth struct {
-	Kind string `json:"kind"`
-	/*
-		"password":
-			password // password or token
-			username
-		"ssh_key":
-			*key_path // private key path
-			user_name
-			password
-	*/
-	UserName string `json:"user_name"`
-	Password string `json:"password"`
-	KeyPath  string `json:"key_path"`
-}
-
-type Proxy struct {
-	URL      string `json:"url"` // * require
-	User     string `json:"user"`
-	PassWord string `json:"password"`
-}
+type ConfigInfo = schema.CodeSourceInfo
 
 func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if raw == "" {
@@ -99,11 +32,11 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 		c.Processf(0, "parse info finish")
 	}()
 	switch info.Kind {
-	case Local:
+	case schema.CodeSourceLocal:
 		return filesys.NewRelLocalFs(info.LocalFile), nil
-	case Compression:
+	case schema.CodeSourceCompression:
 		return getZipFile(&info)
-	case Jar:
+	case schema.CodeSourceJar:
 		zipfs, err := getZipFile(&info)
 		if err != nil {
 			return nil, utils.Errorf("jar file error: %v", err)
@@ -112,9 +45,9 @@ func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 			filesys.WithUnifiedFsExtMap(".class", ".java"),
 		)
 		return fs, nil
-	case Git:
+	case schema.CodeSourceGit:
 		return gitFs(&info, c.Processf)
-	case Svn:
+	case schema.CodeSourceSvn:
 		return svnFs(&info)
 	}
 	return nil, utils.Errorf("unsupported kind: %s", info.Kind)
@@ -156,7 +89,7 @@ func gitFs(info *ConfigInfo, process func(float64, string, ...any)) (fi.FileSyst
 	opts := make([]yakgit.Option, 0)
 	opts = append(opts, yakgit.WithBranch(info.Branch))
 	if proxy := info.Proxy; proxy != nil && proxy.URL != "" {
-		opts = append(opts, yakgit.WithProxy(proxy.URL, proxy.User, proxy.PassWord))
+		opts = append(opts, yakgit.WithProxy(proxy.URL, proxy.User, proxy.Password))
 	}
 	if opt := parseAuth(info.Auth); opt != nil {
 		opts = append(opts, opt)
@@ -165,7 +98,7 @@ func gitFs(info *ConfigInfo, process func(float64, string, ...any)) (fi.FileSyst
 	if err := yakgit.Clone(info.URL, local, opts...); err != nil {
 		return nil, err
 	}
-	targetPath := filepath.Join(local, info.GitPath)
+	targetPath := filepath.Join(local, info.Path)
 	_, err := os.Stat(targetPath)
 	if err != nil {
 		log.Errorf("not found this path,start compile local path")
@@ -175,7 +108,7 @@ func gitFs(info *ConfigInfo, process func(float64, string, ...any)) (fi.FileSyst
 	return filesys.NewRelLocalFs(targetPath), nil
 }
 
-func parseAuth(auth *auth) yakgit.Option {
+func parseAuth(auth *schema.AuthConfigInfo) yakgit.Option {
 	if auth == nil {
 		return nil
 	}
