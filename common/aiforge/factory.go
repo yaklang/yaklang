@@ -54,7 +54,6 @@ func (ForgeFactory) Query(ctx context.Context, opts ...ForgeQueryOption) ([]*sch
 	}
 
 	log.Debugf("ForgeFactory.Query: keyword=%q limit=%d", filter.GetKeyword(), paging.GetLimit())
-
 	_, data, err := yakit.QueryAIForge(db, filter, paging)
 	if err != nil {
 		return nil, err
@@ -63,7 +62,7 @@ func (ForgeFactory) Query(ctx context.Context, opts ...ForgeQueryOption) ([]*sch
 }
 
 func (f *ForgeFactory) GenerateAIForgeListForPrompt(forges []*schema.AIForge) (string, error) {
-	if len(forges) == 0 {
+	if forges == nil || len(forges) == 0 {
 		return "", nil
 	}
 	result, err := utils.RenderTemplate(`<|AI_BLUEPRINT_{{ .nonce }}_START|>`+
