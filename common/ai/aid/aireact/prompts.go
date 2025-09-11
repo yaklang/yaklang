@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -81,6 +82,7 @@ type LoopPromptData struct {
 	OSArch             string
 	WorkingDir         string
 	WorkingDirGlance   string
+	AIForgeList        string
 	Tools              []*aitool.Tool
 	ToolsCount         int
 	TopTools           []*aitool.Tool
@@ -195,6 +197,19 @@ func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
 	return pm.glanceWorkdir
 }
 
+func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
+	forges, err := pm.react.config.aiForgeManager.Query(pm.react.config.GetContext())
+	if err != nil {
+		log.Warnf("cannot query any ai-forge manager: %v", err)
+		return ""
+	}
+	result, err := pm.react.config.aiForgeManager.GenerateAIForgeListForPrompt(forges)
+	if err != nil {
+		return ""
+	}
+	return result
+}
+
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
 func (pm *PromptManager) GenerateLoopPrompt(
 	userQuery string,
@@ -203,7 +218,6 @@ func (pm *PromptManager) GenerateLoopPrompt(
 	userInteractiveLimitedTimes int64,
 	tools []*aitool.Tool,
 ) (string, error) {
-	var loopSchema = getLoopSchema(!allowUserInteractive, !allowPlan)
 	// Build template data
 	data := &LoopPromptData{
 		AllowAskForClarification:       allowUserInteractive,
@@ -215,12 +229,14 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		UserQuery:                      userQuery,
 		Nonce:                          utils.RandStringBytes(4),
 		Language:                       pm.react.config.language,
-		Schema:                         loopSchema,
+		AIForgeList:                    pm.GetAvailableAIForgeBlueprints(),
 		Tools:                          tools,
 		ToolsCount:                     len(tools),
 		TopToolsCount:                  pm.react.config.topToolsCount,
 		DynamicContext:                 pm.DynamicContext(),
 	}
+
+	data.Schema = getLoopSchema(!allowUserInteractive, !allowPlan, data.AIForgeList != "")
 
 	data.WorkingDir = pm.workdir
 	if data.WorkingDir != "" {
