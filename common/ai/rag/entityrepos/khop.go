@@ -255,14 +255,16 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOptio
 	go func() {
 		defer input.Close()
 		relationInput := r.YieldRelationships(ctx, nil)
-		select {
-		case relationship, ok := <-relationInput:
-			if !ok {
+		for {
+			select {
+			case relationship, ok := <-relationInput:
+				if !ok {
+					return
+				}
+				input.SafeFeed(relationship.SourceEntityIndex)
+			case <-ctx.Done():
 				return
 			}
-			input.SafeFeed(relationship.SourceEntityIndex)
-		case <-ctx.Done():
-			return
 		}
 	}()
 
