@@ -198,12 +198,12 @@ func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
 }
 
 func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
-	forges, err := pm.react.config.aiForgeManager.Query(pm.react.config.GetContext())
+	forges, err := pm.react.config.aiBlueprintManager.Query(pm.react.config.GetContext())
 	if err != nil {
 		log.Warnf("cannot query any ai-forge manager: %v", err)
 		return ""
 	}
-	result, err := pm.react.config.aiForgeManager.GenerateAIForgeListForPrompt(forges)
+	result, err := pm.react.config.aiBlueprintManager.GenerateAIForgeListForPrompt(forges)
 	if err != nil {
 		return ""
 	}

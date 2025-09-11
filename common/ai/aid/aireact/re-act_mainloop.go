@@ -349,6 +349,12 @@ LOOP:
 				log.Infof("User needs not fully satisfied, continuing analysis...")
 				continue
 			}
+		case ActionRequireAIBlueprintForge:
+			saveIterationInfoIntoTimeline()
+			forgeName := nextAction.GetString("require_ai_blueprint_payload")
+			r.invokeBlueprint(forgeName)
+			r.finished = true
+			continue
 		default:
 			r.EmitError("unknown action type: %v", actionType)
 			r.finished = true
