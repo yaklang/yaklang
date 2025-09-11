@@ -2,11 +2,14 @@ package aitool
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 )
 
 func _withParamObject(objectName string, opts ...any) ToolOption {
@@ -169,6 +172,192 @@ func _withObjectArray(name string, opts ...any) ToolOption {
 		}
 	}
 	return WithStructArrayParam(name, nil, currentProperties, params...)
+}
+
+// ConvertYaklangCliCodeToToolOptions 将 Yaklang CLI 代码转换为 aitool.ToolOption
+func ConvertYaklangCliCodeToToolOptions(yakCode string) []ToolOption {
+	if yakCode == "" {
+		return []ToolOption{}
+	}
+
+	// 首先尝试直接解析，不依赖 ForgeBlueprint
+	prog, err := static_analyzer.SSAParse(yakCode, "yak")
+	if err != nil {
+		log.Warnf("failed to parse yaklang CLI code: %v", err)
+		return []ToolOption{}
+	}
+
+	cliInfo, _, _ := information.ParseCliParameter(prog)
+
+	// 如果没有解析到参数，尝试手动解析
+	if len(cliInfo) == 0 {
+		manualParams := parseYakCliCodeManually(yakCode)
+		return convertCliInfoToToolOptions(manualParams)
+	}
+
+	result := convertCliInfoToToolOptions(cliInfo)
+	return result
+}
+
+// parseYakCliCodeManually 手动解析 Yak CLI 代码
+func parseYakCliCodeManually(yakCode string) []*information.CliParameter {
+	var params []*information.CliParameter
+
+	lines := strings.Split(yakCode, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "cli.") && strings.Contains(line, "(") {
+			param := parseCliLine(line)
+			if param != nil {
+				params = append(params, param)
+			}
+		}
+	}
+
+	return params
+}
+
+// parseCliLine 解析单个 CLI 行
+func parseCliLine(line string) *information.CliParameter {
+	// 匹配 cli.String("name", ...) 格式
+	if strings.HasPrefix(line, "cli.String(") ||
+		strings.HasPrefix(line, "cli.Int(") ||
+		strings.HasPrefix(line, "cli.Bool(") ||
+		strings.HasPrefix(line, "cli.Float(") {
+
+		param := &information.CliParameter{}
+
+		// 提取参数名
+		start := strings.Index(line, `"`)
+		if start == -1 {
+			return nil
+		}
+		end := strings.Index(line[start+1:], `"`)
+		if end == -1 {
+			return nil
+		}
+		param.Name = line[start+1 : start+1+end]
+
+		// 设置参数类型
+		if strings.HasPrefix(line, "cli.String(") {
+			param.Type = "string"
+		} else if strings.HasPrefix(line, "cli.Int(") || strings.HasPrefix(line, "cli.Integer(") {
+			param.Type = "int"
+		} else if strings.HasPrefix(line, "cli.Bool(") {
+			param.Type = "boolean"
+		} else if strings.HasPrefix(line, "cli.Float(") || strings.HasPrefix(line, "cli.Double(") {
+			param.Type = "float"
+		}
+
+		// 解析选项
+		content := line[strings.Index(line, "(")+1 : strings.LastIndex(line, ")")]
+		parts := strings.Split(content, ",")
+
+		for i, part := range parts {
+			if i == 0 {
+				continue // 跳过参数名
+			}
+			part = strings.TrimSpace(part)
+
+			if strings.Contains(part, "setRequired(true)") {
+				param.Required = true
+			}
+
+			if strings.Contains(part, "setDefault(") {
+				start := strings.Index(part, `setDefault(`)
+				if start != -1 {
+					valueStart := start + len(`setDefault(`)
+					valueEnd := strings.Index(part[valueStart:], ")")
+					if valueEnd != -1 {
+						defaultValue := part[valueStart : valueStart+valueEnd]
+						param.Default = strings.Trim(defaultValue, `"`)
+					}
+				}
+			}
+
+			if strings.Contains(part, "setHelp(") {
+				start := strings.Index(part, `setHelp(`)
+				if start != -1 {
+					valueStart := start + len(`setHelp(`)
+					valueEnd := strings.Index(part[valueStart:], ")")
+					if valueEnd != -1 {
+						help := part[valueStart : valueStart+valueEnd]
+						param.Help = strings.Trim(help, `"`)
+					}
+				}
+			}
+
+			if strings.Contains(part, "setVerboseName(") {
+				start := strings.Index(part, `setVerboseName(`)
+				if start != -1 {
+					valueStart := start + len(`setVerboseName(`)
+					valueEnd := strings.Index(part[valueStart:], ")")
+					if valueEnd != -1 {
+						verboseName := part[valueStart : valueStart+valueEnd]
+						param.NameVerbose = strings.Trim(verboseName, `"`)
+					}
+				}
+			}
+		}
+
+		return param
+	}
+
+	return nil
+}
+
+// convertCliInfoToToolOptions 将 CLI 信息转换为 ToolOption
+func convertCliInfoToToolOptions(cliInfo []*information.CliParameter) []ToolOption {
+	var options []ToolOption
+
+	for _, param := range cliInfo {
+		if param == nil {
+			continue
+		}
+
+		// 构建参数选项
+		var opts []PropertyOption
+
+		// 添加描述
+		if param.Help != "" {
+			opts = append(opts, WithParam_Description(param.Help))
+		}
+
+		// 添加默认值
+		if param.Default != nil {
+			opts = append(opts, WithParam_Default(param.Default))
+		}
+
+		// 添加标题
+		if param.NameVerbose != "" {
+			opts = append(opts, WithParam_Title(param.NameVerbose))
+		}
+
+		// 如果是必需参数
+		if param.Required {
+			opts = append(opts, WithParam_Required(true))
+		}
+
+		// 根据参数类型创建相应的 ToolOption
+		var option ToolOption
+		switch param.Type {
+		case "string":
+			option = WithStringParam(param.Name, opts...)
+		case "int", "int64", "int32":
+			option = WithIntegerParam(param.Name, opts...)
+		case "float", "float64", "float32":
+			option = WithNumberParam(param.Name, opts...)
+		case "bool", "boolean":
+			option = WithBoolParam(param.Name, opts...)
+		default:
+			// 默认当作字符串处理
+			option = WithStringParam(param.Name, opts...)
+		}
+
+		options = append(options, option)
+	}
+
+	return options
 }
 
 var SchemaGeneratorExports = map[string]any{

@@ -2,12 +2,14 @@ package aiforge
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -436,6 +438,73 @@ func TestForgeFactory_Performance(t *testing.T) {
 	})
 }
 
+// TestForgeFactory_GetAIForge 测试 GetAIForge 方法
+func TestForgeFactory_GetAIForge(t *testing.T) {
+	setupTestDatabase(t)
+
+	// 创建测试数据
+	testForgeName := "test-get-forge"
+	testForge := createTestAIForge(t, testForgeName)
+	defer func() {
+		// 清理测试数据
+		db := consts.GetGormProfileDatabase()
+		yakit.DeleteAIForgeByName(db, testForgeName)
+	}()
+
+	factory := &ForgeFactory{}
+
+	t.Run("GetAIForge with valid name", func(t *testing.T) {
+		forge, err := factory.GetAIForge(testForgeName)
+		assert.NoError(t, err, "GetAIForge should not return error")
+		assert.NotNil(t, forge, "should return valid forge")
+		assert.Equal(t, testForgeName, forge.ForgeName, "forge name should match")
+		assert.Equal(t, testForge.Description, forge.Description, "forge description should match")
+		assert.Equal(t, testForge.ForgeType, forge.ForgeType, "forge type should match")
+	})
+
+	t.Run("GetAIForge with empty name", func(t *testing.T) {
+		forge, err := factory.GetAIForge("")
+		assert.Error(t, err, "GetAIForge with empty name should return error")
+		assert.Nil(t, forge, "should return nil forge when error")
+		assert.Contains(t, err.Error(), "cannot be empty", "error should mention empty name")
+	})
+
+	t.Run("GetAIForge with non-existent name", func(t *testing.T) {
+		nonExistentName := "non-existent-forge-name-12345"
+		forge, err := factory.GetAIForge(nonExistentName)
+		assert.Error(t, err, "GetAIForge with non-existent name should return error")
+		assert.Nil(t, forge, "should return nil forge when error")
+		// GORM 会返回 record not found 错误
+		assert.Contains(t, strings.ToLower(err.Error()), "record not found", "error should indicate record not found")
+	})
+
+	t.Run("GetAIForge with special characters in name", func(t *testing.T) {
+		specialNames := []string{
+			"test-forge-with-dashes",
+			"test_forge_with_underscores",
+			"test.forge.with.dots",
+			"test123",
+		}
+
+		for _, name := range specialNames {
+			t.Run(fmt.Sprintf("name=%s", name), func(t *testing.T) {
+				// 创建特殊名称的测试 forge
+				specialForge := createTestAIForge(t, name)
+				defer func() {
+					db := consts.GetGormProfileDatabase()
+					yakit.DeleteAIForgeByName(db, name)
+				}()
+
+				forge, err := factory.GetAIForge(name)
+				assert.NoError(t, err, "GetAIForge should handle special characters: %s", name)
+				assert.NotNil(t, forge, "should return valid forge for name: %s", name)
+				assert.Equal(t, name, forge.ForgeName, "forge name should match: %s", name)
+				assert.Equal(t, specialForge.Description, forge.Description, "description should match")
+			})
+		}
+	})
+}
+
 // TestForgeFactory_ConcurrentAccess 测试并发访问
 func TestForgeFactory_ConcurrentAccess(t *testing.T) {
 	setupTestDatabase(t)
@@ -519,5 +588,181 @@ func TestForgeFactory_ConcurrentAccess(t *testing.T) {
 			err := <-results
 			assert.NoError(t, err, "concurrent generation should not fail")
 		}
+	})
+}
+
+// TestForgeFactory_GenerateAIJSONSchemaFromSchemaAIForge 测试 JSON Schema 生成功能
+func TestForgeFactory_GenerateAIJSONSchemaFromSchemaAIForge(t *testing.T) {
+	factory := &ForgeFactory{}
+
+	t.Run("GenerateAIJSONSchemaFromSchemaAIForge with nil forge", func(t *testing.T) {
+		schema, err := factory.GenerateAIJSONSchemaFromSchemaAIForge(nil)
+		assert.Error(t, err, "should return error for nil forge")
+		assert.Empty(t, schema, "should return empty schema")
+		assert.Contains(t, err.Error(), "cannot be nil", "error should mention nil forge")
+	})
+
+	t.Run("GenerateAIJSONSchemaFromSchemaAIForge with empty Params", func(t *testing.T) {
+		forge := &schema.AIForge{
+			ForgeName:   "test-forge",
+			Description: "Test forge with empty params",
+			Params:      "",
+		}
+		schema, err := factory.GenerateAIJSONSchemaFromSchemaAIForge(forge)
+		assert.NoError(t, err, "should not return error for empty Params")
+		assert.NotEmpty(t, schema, "should return valid schema")
+
+		// 验证 JSON Schema 结构
+		assert.Contains(t, schema, `"$schema"`, "should contain JSON Schema identifier")
+		assert.Contains(t, schema, `"type": "object"`, "should be object type")
+		assert.Contains(t, schema, `"properties"`, "should contain properties")
+		assert.Contains(t, schema, `"@action"`, "should contain action field")
+		assert.Contains(t, schema, `"params"`, "should contain params field")
+		assert.Contains(t, schema, `"query"`, "should contain query parameter when params is empty")
+	})
+
+	t.Run("Test ConvertYaklangCliCodeToToolOptions directly", func(t *testing.T) {
+		yakCode := `
+cli.String("input_file", cli.setRequired(true), cli.setVerboseName("输入文件"), cli.setHelp("输入文件的路径"))
+cli.Int("count", cli.setDefault(10), cli.setVerboseName("数量"), cli.setHelp("处理的数量"))
+cli.Bool("verbose", cli.setDefault(false), cli.setVerboseName("详细模式"), cli.setHelp("是否显示详细信息"))
+cli.check()
+`
+
+		// 直接测试 ConvertYaklangCliCodeToToolOptions
+		toolOptions := aitool.ConvertYaklangCliCodeToToolOptions(yakCode)
+		assert.NotEmpty(t, toolOptions, "should return tool options for valid Yak code")
+
+		// 验证生成的工具选项
+		assert.GreaterOrEqual(t, len(toolOptions), 3, "should have at least 3 tool options")
+	})
+
+	t.Run("GenerateAIJSONSchemaFromSchemaAIForge with valid Yak CLI code", func(t *testing.T) {
+		// 创建包含 Yak CLI 参数定义的 forge
+		yakCode := `
+cli.String("input_file", cli.setRequired(true), cli.setVerboseName("输入文件"), cli.setHelp("输入文件的路径"))
+cli.Int("count", cli.setDefault(10), cli.setVerboseName("数量"), cli.setHelp("处理的数量"))
+cli.Bool("verbose", cli.setDefault(false), cli.setVerboseName("详细模式"), cli.setHelp("是否显示详细信息"))
+cli.check()
+`
+
+		forge := &schema.AIForge{
+			ForgeName:        "test-cli-forge",
+			ForgeVerboseName: "测试 CLI Forge",
+			Description:      "用于测试 CLI 参数解析的 forge",
+			Params:           yakCode,
+		}
+
+		schema, err := factory.GenerateAIJSONSchemaFromSchemaAIForge(forge)
+		assert.NoError(t, err, "should not return error for valid Yak code")
+		assert.NotEmpty(t, schema, "should return valid schema")
+
+		// 验证 JSON Schema 结构
+		assert.Contains(t, schema, `"$schema"`, "should contain JSON Schema identifier")
+		assert.Contains(t, schema, `"type": "object"`, "should be object type")
+		assert.Contains(t, schema, `"properties"`, "should contain properties")
+		assert.Contains(t, schema, `"@action"`, "should contain action field")
+		assert.Contains(t, schema, `"call-ai-blueprint"`, "should contain correct action value")
+		assert.Contains(t, schema, `"params"`, "should contain params field")
+		assert.Contains(t, schema, `"input_file"`, "should contain input_file parameter")
+		assert.Contains(t, schema, `"count"`, "should contain count parameter")
+		assert.Contains(t, schema, `"verbose"`, "should contain verbose parameter")
+		assert.Contains(t, schema, `"required"`, "should contain required array")
+		assert.Contains(t, schema, `"input_file"`, "input_file should be required")
+	})
+
+	t.Run("GenerateAIJSONSchemaFromSchemaAIForge with invalid Yak code", func(t *testing.T) {
+		forge := &schema.AIForge{
+			ForgeName:   "test-forge",
+			Description: "Test forge with invalid Yak code",
+			Params:      "invalid yak code {{{",
+		}
+		schema, err := factory.GenerateAIJSONSchemaFromSchemaAIForge(forge)
+		assert.NoError(t, err, "should not return error for invalid Yak code (gracefully handled)")
+		assert.NotEmpty(t, schema, "should return valid schema")
+
+		// 应该返回基本的 schema 结构
+		assert.Contains(t, schema, `"$schema"`, "should contain JSON Schema identifier")
+		assert.Contains(t, schema, `"type": "object"`, "should be object type")
+		assert.Contains(t, schema, `"properties"`, "should contain properties")
+	})
+
+	t.Run("GenerateAIJSONSchemaFromSchemaAIForge with complex Yak code", func(t *testing.T) {
+		yakCode := `
+cli.String("target", cli.setRequired(true), cli.setVerboseName("目标"), cli.setHelp("扫描目标"))
+cli.Int("port", cli.setDefault(80), cli.setVerboseName("端口"), cli.setHelp("目标端口"))
+cli.Float("timeout", cli.setDefault(5.0), cli.setVerboseName("超时"), cli.setHelp("连接超时时间"))
+cli.Bool("ssl", cli.setDefault(true), cli.setVerboseName("SSL"), cli.setHelp("是否使用SSL"))
+cli.check()
+`
+
+		forge := &schema.AIForge{
+			ForgeName:   "complex-test-forge",
+			Description: "复杂参数测试",
+			Params:      yakCode,
+		}
+
+		schema, err := factory.GenerateAIJSONSchemaFromSchemaAIForge(forge)
+		assert.NoError(t, err, "should not return error")
+		assert.NotEmpty(t, schema, "should return valid schema")
+
+		// 验证所有参数类型都被正确处理
+		assert.Contains(t, schema, `"target"`, "should contain target parameter")
+		assert.Contains(t, schema, `"port"`, "should contain port parameter")
+		assert.Contains(t, schema, `"timeout"`, "should contain timeout parameter")
+		assert.Contains(t, schema, `"ssl"`, "should contain ssl parameter")
+		assert.Contains(t, schema, `"required"`, "should contain required array")
+		assert.Contains(t, schema, `"target"`, "target should be required")
+	})
+
+	t.Run("GenerateAIJSONSchemaFromSchemaAIForge validates JSON structure", func(t *testing.T) {
+		yakCode := `
+cli.String("name", cli.setRequired(true), cli.setVerboseName("名称"), cli.setHelp("用户名称"))
+cli.Int("age", cli.setDefault(18), cli.setVerboseName("年龄"), cli.setHelp("用户年龄"))
+cli.check()
+`
+
+		forge := &schema.AIForge{
+			ForgeName:   "validation-test-forge",
+			Description: "JSON Schema 结构验证测试",
+			Params:      yakCode,
+		}
+
+		schema, err := factory.GenerateAIJSONSchemaFromSchemaAIForge(forge)
+		assert.NoError(t, err, "should not return error")
+		assert.NotEmpty(t, schema, "should return valid schema")
+
+		// 验证生成的字符串是有效的 JSON
+		var jsonSchema map[string]any
+		err = json.Unmarshal([]byte(schema), &jsonSchema)
+		assert.NoError(t, err, "generated schema should be valid JSON")
+
+		// 验证必要的字段存在
+		assert.Contains(t, jsonSchema, "$schema", "should have $schema field")
+		assert.Contains(t, jsonSchema, "type", "should have type field")
+		assert.Contains(t, jsonSchema, "properties", "should have properties field")
+
+		properties, ok := jsonSchema["properties"].(map[string]any)
+		assert.True(t, ok, "properties should be a map")
+
+		// 验证 @action 字段
+		actionField, exists := properties["@action"]
+		assert.True(t, exists, "should have @action field")
+		actionMap, ok := actionField.(map[string]any)
+		assert.True(t, ok, "@action should be a map")
+		assert.Equal(t, "call-ai-blueprint", actionMap["const"], "@action should have correct const value")
+
+		// 验证 params 字段
+		paramsField, exists := properties["params"]
+		assert.True(t, exists, "should have params field")
+		paramsMap, ok := paramsField.(map[string]any)
+		assert.True(t, ok, "params should be a map")
+
+		paramsProps, ok := paramsMap["properties"].(map[string]any)
+		assert.True(t, ok, "params should have properties")
+
+		// 验证具体的参数
+		assert.Contains(t, paramsProps, "name", "should contain name parameter")
+		assert.Contains(t, paramsProps, "age", "should contain age parameter")
 	})
 }
