@@ -175,6 +175,8 @@ func (c *Call) handlerGeneric() {
 	instanceTypeMap := make(map[string]Type, len(genericTypes))
 	paramsType := slices.Clone(fType.Parameter)
 	returnType := fType.ReturnType
+	// variadicType用于参与泛型cache的key计算
+	var variadicType Type
 
 	hasError := false
 	for i, id := range c.Args {
@@ -184,16 +186,21 @@ func (c *Call) handlerGeneric() {
 		}
 		index := i
 		argTyp := arg.GetType()
-		if isVariadic && i > fType.ParameterLen-1 {
+
+		switch {
+		case isVariadic && i > fType.ParameterLen-1:
+			// 有多个可变长参数
 			index = fType.ParameterLen - 1
-		} else if isVariadic && i == fType.ParameterLen-1 {
+			variadicType = arg.GetType()
+		case isVariadic && i == fType.ParameterLen-1:
+			// 可变参数只有一个
 			argType := arg.GetType()
 			if argType.GetTypeKind() != SliceTypeKind {
 				argType = NewSliceType(argType)
 			}
 			paramsType[i] = argType
-		} else {
-			// variadic should not set new paramsType
+			variadicType = argType
+		default:
 			paramsType[i] = arg.GetType()
 		}
 
@@ -237,6 +244,11 @@ func (c *Call) handlerGeneric() {
 		nameBuilder.WriteRune('-')
 		nameBuilder.WriteString(instanceTypeMap[k].String())
 	}
+	// for variadic function, we need to include the argument types of the variadic parameter
+	if isVariadic && variadicType != nil {
+		nameBuilder.WriteRune('-')
+		nameBuilder.WriteString(variadicType.String())
+	}
 	name := nameBuilder.String()
 
 	prog := c.GetProgram()
@@ -257,6 +269,7 @@ func (c *Call) handlerGeneric() {
 	} else {
 		newMethod = value
 	}
+
 	c.Method = newMethod.GetId()
 	if c.Method <= 0 {
 		log.Infof("ab")
