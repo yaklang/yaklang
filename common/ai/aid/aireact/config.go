@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/google/uuid"
@@ -100,6 +101,7 @@ type ReActConfig struct {
 	disableToolUse      bool
 	aiToolManager       *buildinaitools.AiToolManager
 	aiToolManagerOption []buildinaitools.ToolManagerOption
+	aiForgeManager      *aiforge.ForgeFactory
 
 	// Event handling
 	eventHandler func(e *schema.AiOutputEvent)
@@ -540,6 +542,9 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
 		workdir:                     consts.GetDefaultYakitBaseDir(),
+
+		// aiforge manager
+		aiForgeManager: aiforge.NewForgeFactory(),
 	}
 
 	emitMutex := new(sync.Mutex)
