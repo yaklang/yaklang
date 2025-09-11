@@ -79,13 +79,16 @@ func getDirectlyAnswer() string {
 	return aitool.NewObjectSchemaWithAction(opts...)
 }
 
-func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bool) string {
+func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bool, haveAIForgeList bool) string {
 	var opts []any
 	mode := []any{
 		ActionDirectlyAnswer, ActionRequireTool,
 	}
 	if !disallowPlanAndExecution {
 		mode = append(mode, ActionRequestPlanExecution)
+		if haveAIForgeList {
+			mode = append(mode, ActionUseAIBlueprintForge)
+		}
 	}
 	if !disallowAskForClarification {
 		mode = append(mode, ActionAskForClarification)

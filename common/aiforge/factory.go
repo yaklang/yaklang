@@ -16,6 +16,10 @@ import (
 // ForgeFactory 负责基于 schema.AIForge 的检索与执行
 type ForgeFactory struct{}
 
+func NewForgeFactory() *ForgeFactory {
+	return &ForgeFactory{}
+}
+
 // ForgeQueryOption 定义 Query 的可选项
 type ForgeQueryOption func(*ypb.AIForgeFilter, *ypb.Paging)
 
@@ -58,6 +62,9 @@ func (ForgeFactory) Query(ctx context.Context, opts ...ForgeQueryOption) ([]*sch
 }
 
 func (f *ForgeFactory) GenerateAIForgeListForPrompt(forges []*schema.AIForge) (string, error) {
+	if len(forges) == 0 {
+		return "", nil
+	}
 	result, err := utils.RenderTemplate(`<|AI_BLUEPRINT_{{ .nonce }}_START|>`+
 		`{{range .forges}}
 * '{{ .ForgeName }}': {{ .Description }}{{ if .ForgeVerboseName }}(Short: {{ .ForgeVerboseName }}){{end}}{{end}}

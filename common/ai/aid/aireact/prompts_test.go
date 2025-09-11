@@ -481,3 +481,84 @@ func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
 	// Output: First call includes system info and initial session time
 	// Output: Second call includes changes for traced providers
 }
+
+// TestPromptManager_AIForgeList 测试 AIForgeList 功能
+// 该测试验证：
+// 1. AIForgeList 能够正确获取内置的 Forge 列表
+// 2. 生成的循环提示包含 Prompt loop.txt 中的内容
+// 3. 特别验证 hostscan 作为内置 aiforge 的代表
+func TestPromptManager_AIForgeList(t *testing.T) {
+	// 创建一个基本的 ReAct 实例来测试 AIForgeList 功能
+	react, err := NewReAct(
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	if err != nil {
+		t.Fatalf("Failed to create ReAct instance: %v", err)
+	}
+
+	// 获取可用的 AI Forge 列表
+	forgeList := react.promptManager.GetAvailableAIForgeBlueprints()
+
+	// 验证 Forge 列表不为空
+	if forgeList == "" {
+		t.Fatal("AI Forge List should not be empty")
+	}
+
+	// 生成包含 Forge 列表的循环提示
+	prompt, err := react.promptManager.GenerateLoopPrompt("test query", true, true, 0, 5, nil)
+	if err != nil {
+		t.Fatalf("Failed to generate loop prompt: %v", err)
+	}
+
+	// 记录 Forge 列表内容，用于调试和了解有哪些 Forge
+	t.Logf("Prompt Include AI Forge List:\n%s", prompt)
+
+	// 记录生成的完整提示，用于调试
+	t.Logf("Generated prompt length: %d", len(prompt))
+
+	// 验证生成的提示包含 Forge 列表相关的文本
+	if !utils.MatchAllOfSubString(prompt, "AI Bluprint(AI Forge)") {
+		t.Fatal("Generated prompt should contain AI Forge section")
+	}
+
+	// 验证生成的提示包含 Forge 列表内容的关键部分
+	if !utils.MatchAllOfSubString(prompt, "hostscan") {
+		t.Fatal("Generated prompt should contain hostscan forge")
+	}
+
+	// 验证生成的提示包含多个 Forge
+	if !utils.MatchAllOfSubString(prompt, "xss", "sqlinject") {
+		t.Fatal("Generated prompt should contain multiple forges")
+	}
+
+	// 验证生成的提示包含 loop.txt 中的 Forge 相关文本
+	if !utils.MatchAllOfSubString(prompt, "You have access to AI Forge") {
+		t.Fatal("Generated prompt should contain AI Forge introduction text from loop.txt")
+	}
+
+	if !utils.MatchAllOfSubString(prompt, "repository of AI blueprints") {
+		t.Fatal("Generated prompt should contain AI Forge description from loop.txt")
+	}
+
+	// 专门测试 hostscan Forge（作为内置 aiforge 的代表）
+	if !utils.MatchAllOfSubString(forgeList, "hostscan") {
+		t.Fatal("AI Forge list should contain hostscan forge")
+	}
+
+	// 验证 hostscan 的描述信息
+	if !utils.MatchAllOfSubString(forgeList, "主机体检") {
+		t.Fatal("AI Forge list should contain hostscan verbose name '主机体检'")
+	}
+
+	// 验证 hostscan 的功能描述
+	if !utils.MatchAllOfSubString(forgeList, "专业的主机体检AI助手") {
+		t.Fatal("AI Forge list should contain hostscan description")
+	}
+
+	t.Logf("Successfully verified AI Forge List contains hostscan forge")
+}
