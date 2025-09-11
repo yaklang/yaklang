@@ -20,13 +20,46 @@ const (
 	META_EntityType = "entity_type"
 )
 
+type EntityRepositoryRuntimeConfig struct {
+	similarityThreshold float64
+	mergeEntityFunc     func(old, new *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)
+}
+
+type RuntimeConfigOption func(config *EntityRepositoryRuntimeConfig)
+
+func WithSimilarityThreshold(threshold float64) RuntimeConfigOption {
+	return func(config *EntityRepositoryRuntimeConfig) {
+		config.similarityThreshold = threshold
+	}
+}
+
+func WithMergeEntityFunc(f func(old, new *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)) RuntimeConfigOption {
+	return func(config *EntityRepositoryRuntimeConfig) {
+		config.mergeEntityFunc = f
+	}
+}
+
+func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
+	config := &EntityRepositoryRuntimeConfig{
+		similarityThreshold: 0.8,
+		mergeEntityFunc:     nil,
+	}
+	for _, opt := range opts {
+		switch configOpt := opt.(type) {
+		case RuntimeConfigOption:
+			configOpt(config)
+		}
+	}
+	return config
+}
+
 type EntityRepository struct {
 	db        *gorm.DB
 	info      *schema.EntityRepository
 	ragSystem *rag.RAGSystem
 	ragMutex  sync.RWMutex
 
-	mergeEntityFunc func(old, new *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)
+	runtimeConfig *EntityRepositoryRuntimeConfig
 }
 
 func (r *EntityRepository) GetID() int64 {
@@ -45,10 +78,6 @@ func (r *EntityRepository) GetInfo() (*schema.EntityRepository, error) {
 
 func (r *EntityRepository) GetRAGSystem() *rag.RAGSystem {
 	return r.ragSystem
-}
-
-func (r *EntityRepository) SetMergeEntityFunc(f func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)) {
-	r.mergeEntityFunc = f
 }
 
 //--- Entity Operations ---
@@ -194,7 +223,7 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 
 	var entityIndex []string
 	for _, res := range results {
-		if res.Score <= 0.8 {
+		if res.Score < r.runtimeConfig.similarityThreshold {
 			continue
 		}
 		if res.Document.Type == schema.RAGDocumentType_Entity {
@@ -282,8 +311,8 @@ func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*sc
 		for s, i := range entity.Attributes {
 			matchedEntity.Attributes[s] = i
 		}
-	} else if r.mergeEntityFunc != nil {
-		resolvedEntity, isSame, err := r.mergeEntityFunc(matchedEntity, entity)
+	} else if r.runtimeConfig.mergeEntityFunc != nil {
+		resolvedEntity, isSame, err := r.runtimeConfig.mergeEntityFunc(matchedEntity, entity)
 		if err != nil {
 			return nil, utils.Errorf("failed to merge entity [%s]: %v", entity.EntityName, err)
 		}
@@ -337,6 +366,51 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 }
 
 //--- Relationship Operations ---
+
+func (r *EntityRepository) MergeAndSaveRelationship(newRelationship *schema.ERModelRelationship) error {
+	oldRelationships, err := r.queryRelationship(&ypb.RelationshipFilter{
+		SourceEntityIndex: []string{newRelationship.SourceEntityIndex},
+		TargetEntityIndex: []string{newRelationship.TargetEntityIndex},
+		Types:             []string{newRelationship.RelationshipType},
+	})
+	if err != nil {
+		return utils.Errorf("failed to query relationship: %v", err)
+	}
+	similarCheck := func(old string, new string) bool {
+		if old == new {
+			return true
+		}
+		score, err := r.GetRAGSystem().VectorSimilarity(old, new)
+		if err != nil {
+			log.Errorf("failed to calculate relationship similarity: %v", err)
+		}
+		if score > r.runtimeConfig.similarityThreshold {
+			return true
+		}
+		return false
+	}
+	for _, relationship := range oldRelationships { // 关系相对于实体来说相对明确，可以简单地通过语义相似度做合并
+		if similarCheck(relationship.RelationshipType, relationship.RelationshipType) {
+			relationship.Attributes = utils.MergeGeneralMap(newRelationship.Attributes, relationship.Attributes)
+			return r.UpdateRelationship(relationship.Uuid, relationship)
+		}
+	}
+	return r.AddRelationship(newRelationship.SourceEntityIndex, newRelationship.TargetEntityIndex, newRelationship.RelationshipType, newRelationship.RelationshipTypeVerbose, newRelationship.Attributes)
+}
+
+func (r *EntityRepository) UpdateRelationship(uuid string, relationship *schema.ERModelRelationship) error {
+	err := yakit.UpdateRelationship(r.db, uuid, relationship)
+	if err != nil {
+		return err
+	}
+
+	err = r.addRelationshipToVectorIndex(relationship)
+	if err != nil {
+		log.Warnf("failed to add relation [%s] to vector index: %v", relationship.RelationshipType, err)
+		return utils.Wrapf(err, "failed to add relation [%s] to vector index", relationship.RelationshipType)
+	}
+	return nil
+}
 
 func (r *EntityRepository) AddRelationship(sourceIndex, targetIndex string, relationType string, typeVerbose string, attr map[string]any) error {
 	data, err := yakit.AddRelationship(r.db, sourceIndex, targetIndex, r.info.Uuid, relationType, typeVerbose, attr)
@@ -422,9 +496,10 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 		}
 	}
 	var repos = &EntityRepository{
-		db:        db,
-		info:      &entityBaseInfo,
-		ragSystem: ragSystem,
+		db:            db,
+		info:          &entityBaseInfo,
+		ragSystem:     ragSystem,
+		runtimeConfig: NewRuntimeConfig(opts...),
 	}
 
 	return repos, nil

@@ -361,13 +361,12 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
-	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc, entityrepos.WithMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
+		return ResolveEntity(new, old, options...)
+	}))
 	if err != nil {
 		return nil, err
 	}
-	eb.SetMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
-		return ResolveEntity(new, old, options...)
-	})
 
 	chunkBuildERM := func(i chunkmaker.Chunk) (*ERMAnalysisResult, error) {
 		firstMutex.Lock()
@@ -478,13 +477,12 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
-	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc, entityrepos.WithMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
+		return ResolveEntity(new, old, options...)
+	}))
 	if err != nil {
 		return nil, err
 	}
-	eb.SetMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
-		return ResolveEntity(new, old, options...)
-	})
 
 	count := 0
 	return utils.OrderedParallelProcessSkipError(refineConfig.Ctx, cm.OutputChannel(),

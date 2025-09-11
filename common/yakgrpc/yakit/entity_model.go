@@ -159,6 +159,24 @@ type AttributeFilter struct {
 //	return db.Create(attribute).Error
 //}
 
+func CreateOrUpdateRelationship(db *gorm.DB, relationship *schema.ERModelRelationship) error {
+	db = db.Model(&schema.ERModelRelationship{})
+
+	var existingRelationship schema.ERModelRelationship
+	if err := db.Where("uuid = ?", relationship.Uuid).First(&existingRelationship).Error; err != nil {
+		if gorm.IsRecordNotFoundError(err) {
+			return db.Create(relationship).Error
+		}
+		return err
+	}
+
+	return db.Model(&existingRelationship).Updates(relationship).Error
+}
+
+func UpdateRelationship(db *gorm.DB, uuid string, relationship *schema.ERModelRelationship) error {
+	return db.Model(&schema.ERModelRelationship{}).Where("uuid = ?", uuid).Updates(relationship).Error
+}
+
 func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, RelationshipType, typeVerbose string, attrs map[string]any) (*schema.ERModelRelationship, error) {
 	Relationship := schema.ERModelRelationship{
 		SourceEntityIndex:       sourceIndex,
