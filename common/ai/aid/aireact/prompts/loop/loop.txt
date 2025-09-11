@@ -86,7 +86,7 @@ Use 'tools_search' to discover additional tools for specific tasks.
 - MEMORY: 在每次交互后，都要在 `cumulative_summary` 中记录本次交互的关键结论、解决的问题和未解决的难题，这将作为你长期记忆的一部分。
 {{ if .AIForgeList }}{{ if .AllowPlan}}## AI Blueprint(Forge) 使用指南
 如果你想用 AI Blueprint Forge 来完成预设的复杂任务模版，你需要遵循以下步骤：
-1. 选择合适的蓝图 (Select the Right Blueprint): 使用 {"@action": "object", "next_action": {"type": "require_blueprint_forge", "blueprint_payload": "...[your-blueprint-name]..."}...} 来选择一个与你的任务最相关的蓝图。
+1. 选择合适的蓝图 (Select the Right Blueprint): 使用 {"@action": "object", "next_action": {"type": "require_ai_blueprint", "blueprint_payload": "...[your-blueprint-name]..."}...} 来选择一个与你的任务最相关的蓝图。
 2. 在你选择蓝图后，系统会自动加载蓝图的使用参数，类似工具调用的功能，你需要经历申请蓝图->查看参数+生成参数->执行蓝图的过程。
 3. 蓝图执行后，你会得到一个结果输出，你需要在 `thought` 的“观察”阶段对其进行总结和提炼，提取出回答用户问题所必需的关键信息，然后再决定下一步行动或生成最终答案。
 {{end}}{{end}}

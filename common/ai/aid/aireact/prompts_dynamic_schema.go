@@ -87,7 +87,7 @@ func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bo
 	if !disallowPlanAndExecution {
 		mode = append(mode, ActionRequestPlanExecution)
 		if haveAIForgeList {
-			mode = append(mode, ActionUseAIBlueprintForge)
+			mode = append(mode, ActionRequireAIBlueprintForge)
 		}
 	}
 	if !disallowAskForClarification {

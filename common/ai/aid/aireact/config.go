@@ -101,7 +101,7 @@ type ReActConfig struct {
 	disableToolUse      bool
 	aiToolManager       *buildinaitools.AiToolManager
 	aiToolManagerOption []buildinaitools.ToolManagerOption
-	aiForgeManager      *aiforge.ForgeFactory
+	aiBlueprintManager  *aiforge.ForgeFactory
 
 	// Event handling
 	eventHandler func(e *schema.AiOutputEvent)
@@ -544,7 +544,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		workdir:                     consts.GetDefaultYakitBaseDir(),
 
 		// aiforge manager
-		aiForgeManager: aiforge.NewForgeFactory(),
+		aiBlueprintManager: aiforge.NewForgeFactory(),
 	}
 
 	emitMutex := new(sync.Mutex)
