@@ -266,6 +266,7 @@ for i in infos {
 		`, []string{})
 	})
 }
+
 func TestHandlerError(t *testing.T) {
 	t.Run("test handler1", func(t *testing.T) {
 		code := `func c(){
@@ -343,7 +344,7 @@ results.discard.Header = append(results.discard.Header, "1")
 		check(t, code, []string{"map literal not have map pairs"})
 	})
 
-	t.Run("panic: keywords cause freevalue fail generation", func(t *testing.T) {
+	t.Run("panic: keywords cause freevalue fail generation in loop", func(t *testing.T) {
 		check(t, `
 func assignParam(Packet,Pname,Pvalue,funcname){
     pap := "ReplaceHTTPPacketQueryParam"
@@ -363,7 +364,6 @@ func assignParam(Packet,Pname,Pvalue,funcname){
 p = ""
 println(assignParam(p,"_method","123","当前方法"))
 		`, []string{
-			ssa.InvalidField("any", ""),
 			ssa.BindingNotFoundInCall("ParamsFull"),
 			ssa.BindingNotFound("ParamsFull", memedit.NewRange(memedit.NewPosition(18, 9), memedit.NewPosition(18, 46))),
 		})
