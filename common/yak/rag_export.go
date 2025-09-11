@@ -23,13 +23,15 @@ var RagExports = map[string]interface{}{
 		return rag.GetCollectionInfo(consts.GetGormProfileDatabase(), name)
 	},
 
-	"Query":           rag.QueryYakitProfile,
-	"queryLimit":      rag.WithRAGLimit,
-	"queryCollection": rag.WithRAGCollectionName,
-	"queryEnhance":    rag.WithRAGEnhance,
-	"queryCtx":        rag.WithRAGCtx,
-	"queryConcurrent": rag.WithRAGConcurrent,
-	"queryScoreLimit": rag.WithRAGCollectionScoreLimit,
+	"Query":                   rag.QueryYakitProfile,
+	"queryLimit":              rag.WithRAGLimit,
+	"queryCollection":         rag.WithRAGCollectionName,
+	"queryEnhance":            rag.WithRAGEnhance,
+	"queryCtx":                rag.WithRAGCtx,
+	"queryConcurrent":         rag.WithRAGConcurrent,
+	"queryScoreLimit":         rag.WithRAGCollectionScoreLimit,
+	"queryDuplicateFilter":    rag.WithRAGEnableResultDuplicatesFilter,
+	"queryFilterSimilarLimit": rag.WithRAGResultSimilarityLimit,
 
 	"AddDocument": func(knowledgeBaseName, documentName string, document string, metadata map[string]any, opts ...any) error {
 		return rag.AddDocument(consts.GetGormProfileDatabase(), knowledgeBaseName, documentName, document, metadata, opts...)

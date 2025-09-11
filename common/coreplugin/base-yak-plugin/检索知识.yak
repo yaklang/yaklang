@@ -14,6 +14,9 @@ kbName := cli.String("kbName", cli.setVerboseName("知识库名"))
 limit := cli.Int("limit", cli.setVerboseName("结果数量限制"),cli.setDefault(20))
 concurrent := cli.Int("concurrent", cli.setVerboseName("并发数"),cli.setDefault(20))
 score := cli.Float("score", cli.setVerboseName("结果分数限制"))
+
+enableFilter = cli.Bool("enablefilter",cli.setVerboseName("重复去重"),cli.setDefault(true))
+similarlimit = cli.Float("similarlimit", cli.setVerboseName("语义相似度去重限制"))
 cli.check()
 
 
@@ -21,6 +24,7 @@ option := [
 rag.queryCtx(context.Background()),
 rag.queryLimit(limit),
 rag.queryConcurrent(concurrent),
+rag.queryDuplicateFilter(enableFilter)
 ]
 
 if len(enhancePlan) > 0 {
@@ -33,6 +37,10 @@ if kbName != "" {
 
 if score > 0 {
     option = append(option, rag.queryScoreLimit(score))
+}
+
+if similarlimit > 0 {
+    option = append(option, rag.queryFilterSimilarLimit(similarlimit))
 }
 
 
