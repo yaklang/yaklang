@@ -295,10 +295,25 @@ LOOP:
 		case ActionRequireAIBlueprintForge:
 			saveIterationInfoIntoTimeline()
 			forgeName := nextAction.GetString("require_ai_blueprint_payload")
+			r.addToTimeline("plan", fmt.Sprintf("ai-forge-name(blueprint): %v is requested", forgeName))
+
+			if havePlanExecuting {
+				r.Emitter.EmitWarning("existed plan execution task is running, cannot start a new one")
+				r.addToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
+				return false, utils.Errorf("a plan execution task is already running, cannot start a new one (even through ai-blueprint is requested)")
+			}
+
 			ins, forgeParams, err := r.invokeBlueprint(forgeName)
 			if err != nil {
-				log.Errorf("Failed to invoke blueprint[%v]: %v", forgeName, err)
+				r.finished = true
+				r.addToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
+				return false, utils.Errorf("failed to invoke ai-blueprint[%v]: %v", forgeName, err)
 			}
+
+			r.addToTimeline("ai-blueprint", fmt.Sprintf(
+				`ai-blueprint: %v is invoked with params: %v`,
+				forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 256),
+			))
 
 			r.SetCurrentPlanExecutionTask(currentTask)
 			skipContextCancel.SetTo(true) // Plan execution will manage the context

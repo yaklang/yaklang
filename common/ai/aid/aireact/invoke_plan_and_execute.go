@@ -53,9 +53,15 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 	// this is useful for testing/mocking and advanced usage
 	if r.config.hijackPlanRequest != nil {
 		r.EmitAction("hijack plan and execute in re-act mode")
+		var payload string
+		if planPayload == "" {
+			payload = utils.InterfaceToString(forgeParams)
+		} else {
+			payload = planPayload
+		}
 		log.Infof("hijack plan and execute in re-act mode with payload: %v", utils.ShrinkString(planPayload, 200))
 		done()
-		return r.config.hijackPlanRequest(planCtx, planPayload)
+		return r.config.hijackPlanRequest(planCtx, payload)
 	}
 
 	inputChannel := make(chan *aid.InputEvent, 100)
