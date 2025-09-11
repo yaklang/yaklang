@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/pipeline"
@@ -21,11 +22,12 @@ const (
 type FileHandler func(path string, content []byte)
 
 type FileContent struct {
-	Path    string
-	Content []byte
-	AST     ssa.FrontAST
-	Err     error
-	Editor  *memedit.MemEditor
+	Path        string
+	Content     []byte
+	AST         ssa.FrontAST
+	IsPlainText bool
+	Err         error
+	Editor      *memedit.MemEditor
 }
 
 func FilesHandler(
@@ -39,12 +41,13 @@ func FilesHandler(
 	readFilePipe := pipeline.NewPipe[string, *FileContent](
 		ctx, bufSize, func(path string) (*FileContent, error) {
 			content, err := filesystem.ReadFile(path)
-			if err != nil {
-				return nil, err
-			}
+			var fileErr error = err
+			// Check if content is a text file
 			return &FileContent{
-				Path:    path,
-				Content: content,
+				Path:        path,
+				Content:     content,
+				Err:         fileErr,
+				IsPlainText: utils.IsPlainText(content),
 			}, nil
 		},
 	)
@@ -52,6 +55,9 @@ func FilesHandler(
 
 	parseASTPipe := pipeline.NewPipe[*FileContent, *FileContent](
 		ctx, bufSize, func(fileContent *FileContent) (*FileContent, error) {
+			if fileContent.Err != nil || !fileContent.IsPlainText {
+				return fileContent, nil
+			}
 			ast, err := handler(fileContent.Path, fileContent.Content)
 			fileContent.AST = ast
 			fileContent.Err = err
