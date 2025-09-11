@@ -9,11 +9,11 @@ import (
 type ActionType string
 
 const (
-	ActionDirectlyAnswer       ActionType = "directly_answer"
-	ActionRequireTool          ActionType = "require_tool"
-	ActionUseAIBlueprintForge  ActionType = "require_blueprint_forge"
-	ActionRequestPlanExecution ActionType = "request_plan_and_execution"
-	ActionAskForClarification  ActionType = "ask_for_clarification"
+	ActionDirectlyAnswer          ActionType = "directly_answer"
+	ActionRequireTool             ActionType = "require_tool"
+	ActionRequireAIBlueprintForge ActionType = "require_ai_blueprint"
+	ActionRequestPlanExecution    ActionType = "request_plan_and_execution"
+	ActionAskForClarification     ActionType = "ask_for_clarification"
 )
 
 // ReAct actions available
@@ -44,14 +44,14 @@ func (r *ReAct) parseReActAction(response string) (*aicommon.Action, error) {
 		string(ActionRequireTool),
 		string(ActionRequestPlanExecution),
 		string(ActionAskForClarification),
-		string(ActionUseAIBlueprintForge),
+		string(ActionRequireAIBlueprintForge),
 	}, actionType) {
 		return nil, utils.Errorf("invalid action type '%s', must be one of: %v", actionType, []any{
 			ActionDirectlyAnswer,
 			ActionRequireTool,
 			ActionRequestPlanExecution,
 			ActionAskForClarification,
-			ActionUseAIBlueprintForge,
+			ActionRequireAIBlueprintForge,
 		})
 	}
 	return action, nil
