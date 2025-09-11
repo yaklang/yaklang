@@ -829,7 +829,6 @@ service Yak {
   rpc UpdateSSAProject(UpdateSSAProjectRequest) returns (UpdateSSAProjectResponse);
   rpc DeleteSSAProject(DeleteSSAProjectRequest) returns (DeleteSSAProjectResponse);
   rpc QuerySSAProject(QuerySSAProjectRequest) returns (QuerySSAProjectResponse);
-  rpc GetSSAProject(GetSSAProjectRequest) returns (GetSSAProjectResponse);
 
   rpc GetAllPluginEnv(Empty) returns (PluginEnvData);
   rpc QueryPluginEnv(QueryPluginEnvRequest) returns (PluginEnvData);
@@ -8067,37 +8066,22 @@ message SSAProject {
   int64 UpdatedAt = 3;
   string ProjectName = 4;
   
-  // 源码获取方式配置
-  string SourceKind = 5;
-  string LocalPath = 6;
-  string URL = 7;
-  string Branch = 8;
-  string GitPath = 9;
-  
-  // 认证信息
-  string AuthKind = 10;
-  string AuthUsername = 11;
-  string AuthPassword = 12;
-  string AuthKeyPath = 13;
-  
-  // 代理配置
-  string ProxyURL = 14;
-  string ProxyUser = 15;
-  string ProxyPassword = 16;
+  // 源码获取方式配置 - 参考ssa_compile_info.go，使用JSON格式存储
+  string CodeSourceConfig = 5;
   
   // 编译配置选项
-  string Description = 17;
-  bool StrictMode = 18;
-  int32 PeepholeSize = 19;
-  string ExcludeFiles = 20;
-  bool ReCompile = 21;
+  string Description = 6;
+  bool StrictMode = 7;
+  int32 PeepholeSize = 8;
+  string ExcludeFiles = 9;
+  bool ReCompile = 10;
   
   // 扫描配置选项
-  uint32 ScanConcurrency = 22;
-  bool MemoryScan = 23;
-  string ScanRuleGroups = 24;
-  string ScanRuleNames = 25;
-  bool IgnoreLanguage = 26;
+  uint32 ScanConcurrency = 11;
+  bool MemoryScan = 12;
+  string ScanRuleGroups = 13;
+  string ScanRuleNames = 14;
+  bool IgnoreLanguage = 15;
 }
 
 message SSAProjectFilter {
@@ -8144,14 +8128,7 @@ message QuerySSAProjectResponse {
   int64 Total = 3;
 }
 
-message GetSSAProjectRequest {
-  int64 ID = 1;
-  string ProjectName = 2;
-}
 
-message GetSSAProjectResponse {
-  SSAProject Project = 1;
-}
 
 message ValidateSSAProjectRequest {
   SSAProject Project = 1;
