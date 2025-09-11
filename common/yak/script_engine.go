@@ -319,6 +319,7 @@ func initYaklangLib() {
 	yaklang.Import("ssa", ssaapi.Exports)
 	yaklang.Import("syntaxflow", syntaxflow.Exports)
 	yaklang.Import("syntaxflowscan", syntaxflow_scan.Exports)
+	yaklang.Import("ssaproject", yaklib.SSAProjectExports)
 
 	// openapi
 	yaklang.Import("openapi", openapi.Exports)

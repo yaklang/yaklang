@@ -57,7 +57,7 @@ type SSAProject struct {
 	IgnoreLanguage  bool   `json:"ignore_language" gorm:"default:false;comment:是否忽略语言检查"`
 }
 
-func (p *SSAProject) ToConfigInfoRaw() (string, error) {
+func (p *SSAProject) GetSourceCodeInfo() (map[string]interface{}, error) {
 	configInfo := map[string]interface{}{
 		"kind": string(p.SourceKind),
 	}
@@ -65,7 +65,7 @@ func (p *SSAProject) ToConfigInfoRaw() (string, error) {
 	switch p.SourceKind {
 	case SSAProjectSourceLocal:
 		if p.LocalPath == "" {
-			return "", fmt.Errorf("local path is required for local source kind")
+			return nil, fmt.Errorf("local path is required for local source kind")
 		}
 		configInfo["local_file"] = p.LocalPath
 
@@ -75,12 +75,12 @@ func (p *SSAProject) ToConfigInfoRaw() (string, error) {
 		} else if p.URL != "" {
 			configInfo["url"] = p.URL
 		} else {
-			return "", fmt.Errorf("either local_file or url is required for %s source kind", p.SourceKind)
+			return nil, fmt.Errorf("either local_file or url is required for %s source kind", p.SourceKind)
 		}
 
 	case SSAProjectSourceGit, SSAProjectSourceSvn:
 		if p.URL == "" {
-			return "", fmt.Errorf("url is required for %s source kind", p.SourceKind)
+			return nil, fmt.Errorf("url is required for %s source kind", p.SourceKind)
 		}
 		configInfo["url"] = p.URL
 		if p.Branch != "" {
@@ -122,15 +122,10 @@ func (p *SSAProject) ToConfigInfoRaw() (string, error) {
 		}
 
 	default:
-		return "", fmt.Errorf("unsupported source kind: %s", p.SourceKind)
+		return nil, fmt.Errorf("unsupported source kind: %s", p.SourceKind)
 	}
 
-	raw, err := json.Marshal(configInfo)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal config info: %v", err)
-	}
-
-	return string(raw), nil
+	return configInfo, nil
 }
 
 func FromConfigInfoRaw(projectName, configRaw string) (*SSAProject, error) {
@@ -221,37 +216,33 @@ func (p *SSAProject) Validate() error {
 	return nil
 }
 
-func (p *SSAProject) ToCompileOptions() ([]interface{}, error) {
+func (p *SSAProject) GetCompileOptions() (map[string]interface{}, error) {
 	if err := p.Validate(); err != nil {
 		return nil, fmt.Errorf("project validation failed: %v", err)
 	}
 
-	var options []interface{}
-
-	configRaw, err := p.ToConfigInfoRaw()
+	configInfo, err := p.GetSourceCodeInfo()
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate config info: %v", err)
 	}
 
 	optionsMap := map[string]interface{}{
-		"configInfoRaw": configRaw,
-		"programName":   p.ProjectName,
-		"description":   p.Description,
-		"strictMode":    p.StrictMode,
-		"peepholeSize":  p.PeepholeSize,
-		"reCompile":     p.ReCompile,
-		"excludeFiles":  p.ExcludeFiles,
+		"configInfo":   configInfo,
+		"programName":  p.ProjectName,
+		"description":  p.Description,
+		"strictMode":   p.StrictMode,
+		"peepholeSize": p.PeepholeSize,
+		"reCompile":    p.ReCompile,
+		"excludeFiles": p.GetExcludeFilesList(),
 	}
 
-	options = append(options, optionsMap)
-	return options, nil
+	return optionsMap, nil
 }
 
-func (p *SSAProject) ToScanOptions() (map[string]interface{}, error) {
+func (p *SSAProject) GetScanOptions() (map[string]interface{}, error) {
 	if err := p.Validate(); err != nil {
 		return nil, fmt.Errorf("project validation failed: %v", err)
 	}
-
 	// 扫描相关的选项
 	scanOptions := map[string]interface{}{
 		"programName":    []string{p.ProjectName},
