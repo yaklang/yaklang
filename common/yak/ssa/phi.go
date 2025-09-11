@@ -46,7 +46,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			ReplaceAllValue(phiValue, header)
 			DeleteInst(phiValue)
 
-			for name, v := range ReplaceMemberCall(phiValue, header) {
+			for name, v := range ReplaceMemberCall(phiValue, phiValue, header) {
 				ret[name] = v
 			}
 
@@ -106,7 +106,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 				ret[name] = phi2
 				DeleteInst(phiValue)
 				ReplaceAllValue(phiValue, phi2)
-				for name, v := range ReplaceMemberCall(phiValue, phi2) {
+				for name, v := range ReplaceMemberCall(phiValue, phiValue, phi2) {
 					ret[name] = v
 				}
 				return

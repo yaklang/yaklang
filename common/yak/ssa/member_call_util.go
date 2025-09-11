@@ -41,7 +41,7 @@ func setMemberCallRelationship(obj, key, member Value) {
 		}
 	}
 
-	if phi, ok := obj.(*Phi); ok {
+	if phi, ok := ToPhi(obj); ok {
 		for _, edgeId := range phi.Edge {
 			edgeValue, ok := obj.GetValueById(edgeId)
 			if !ok || edgeValue == nil {
@@ -273,9 +273,9 @@ func setMemberVerboseName(member Value) {
 }
 
 func GetKeyString(key Value) string {
-	if utils.IsNil(key) {
-		return ""
-	}
+	// if utils.IsNil(key) {
+	// 	return ""
+	// }
 	text := ""
 	if ci, ok := ToConstInst(key); ok {
 		text = ci.String()
