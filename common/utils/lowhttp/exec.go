@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
@@ -61,6 +62,14 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	for _, opt := range opts {
 		opt(option)
 	}
+
+	if option.Session == nil {
+		sessionId := uuid.New().String()
+		option.Session = sessionId
+		opts = append(opts, WithSession(option.Session))
+		defer RemoveCookiejar(sessionId)
+	}
+
 	if option.WithConnPool && option.ConnPool == nil {
 		option.ConnPool = DefaultLowHttpConnPool
 	}
@@ -90,7 +99,6 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	if redirectTimes > 0 {
 		lastPacket := raw
-		method := GetHTTPRequestMethod(r)
 		statusCode := GetStatusCodeFromResponse(lastPacket.Response)
 
 		for i := 0; i < redirectTimes; i++ {
@@ -110,7 +118,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
 			// should not extract response cookie
-			r, err = UrlToRequestPacketEx(method, targetUrl, r, forceHttps, statusCode)
+			r, err = BuildRedirectRequest(targetUrl, r, lastPacket.IsHttps, statusCode)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
 				response.RawPacket = lastPacket.Response // 保留原始报文
@@ -1120,6 +1128,13 @@ RECONNECT:
 	// 更新cookiejar中的cookie
 	if session != nil && firstResponse != nil {
 		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
+		reqCookies := reqIns.Cookies()
+		for _, cookie := range reqCookies {
+			// 限制domain为当前域, path为当前路径
+			cookie.Domain = urlIns.Hostname()
+			cookie.Path = urlIns.Path
+		}
+		cookiejar.SetCookies(urlIns, reqCookies)
 	}
 
 	response.BareResponse = rawBytes

@@ -114,6 +114,103 @@ func UrlToRequestPacketEx(method string, targetURL string, originRequest []byte,
 	return FixHTTPRequest(raw), nil
 }
 
+// BuildRedirectRequest 用于生成重定向请求包
+func BuildRedirectRequest(targetUrl string, originRequest []byte, originRequestIsHttps bool, statusCode int) ([]byte, error) {
+	// 重写方法
+	rewriteMethod := statusCode == http.StatusSeeOther || statusCode == http.StatusFound || statusCode == http.StatusMovedPermanently
+	method := http.MethodGet
+	if !rewriteMethod {
+		method = GetHTTPRequestMethod(originRequest)
+	}
+
+	// 解析原始请求
+	originReqIns, err := ParseBytesToHttpRequest(originRequest)
+	if err != nil && err != io.EOF {
+		raw := NewRequestPacketFromMethod(method, targetUrl, nil, originReqIns, false)
+		return FixHTTPRequest(raw), nil
+	}
+	copyedUrl := *originReqIns.URL
+	if originRequestIsHttps {
+		copyedUrl.Scheme = "https"
+	} else {
+		copyedUrl.Scheme = "http"
+	}
+	// 判断同源，如果同源，则允许保留Authorization头
+	isSameOrigin, err := isSameOrigin(copyedUrl.String(), targetUrl)
+	if err != nil {
+		log.Errorf("is same origin error: %v", err)
+		isSameOrigin = false
+	}
+
+	// 生成重定向请求包
+	raw := NewRequestPacketFromMethod(method, targetUrl, nil, originReqIns, false)
+	raw = ReplaceHTTPPacketBodyFast(raw, nil)
+	allowHeaders := []string{"User-Agent", "Accept", "Accept-Encoding", "Accept-Language"}
+	if isSameOrigin {
+		allowHeaders = append(allowHeaders, "Authorization")
+	}
+	for _, header := range allowHeaders {
+		headerValue := GetHTTPPacketHeader(originRequest, header)
+		if headerValue != "" {
+			raw = ReplaceHTTPPacketHeader(raw, header, headerValue)
+		}
+	}
+
+	if originReqIns != nil && originReqIns.URL != nil {
+		raw = ReplaceHTTPPacketHeader(raw, "Referer", originReqIns.URL.String())
+	}
+
+	return FixHTTPRequest(raw), nil
+}
+
+func isSameOrigin(originUrl, targetUrl string) (bool, error) {
+	// 同源判定：scheme、host、port 一致
+	// - 端口：空端口按默认端口归一化（http=80，https=443）
+	// - 相对/协议相对 URL：先基于 originUrl 解析为绝对 URL 再比较
+	originUrlIns, err := url.Parse(originUrl)
+	if err != nil {
+		return false, err
+	}
+	targetUrlIns, err := url.Parse(targetUrl)
+	if err != nil {
+		return false, err
+	}
+	if originUrlIns.Scheme != targetUrlIns.Scheme {
+		return false, nil
+	}
+
+	// scheme/host 比较（大小写不敏感）
+	if !strings.EqualFold(originUrlIns.Scheme, targetUrlIns.Scheme) {
+		return false, nil
+	}
+	if !strings.EqualFold(originUrlIns.Hostname(), targetUrlIns.Hostname()) {
+		return false, nil
+	}
+
+	// 端口归一化：仅对 http/https 赋默认端口，其它保持原样
+	originPort := originUrlIns.Port()
+	targetPort := targetUrlIns.Port()
+	if originPort == "" {
+		if strings.EqualFold(originUrlIns.Scheme, "https") {
+			originPort = "443"
+		} else if strings.EqualFold(originUrlIns.Scheme, "http") {
+			originPort = "80"
+		}
+	}
+	if targetPort == "" {
+		if strings.EqualFold(targetUrlIns.Scheme, "https") {
+			targetPort = "443"
+		} else if strings.EqualFold(targetUrlIns.Scheme, "http") {
+			targetPort = "80"
+		}
+	}
+
+	if originPort != targetPort {
+		return false, nil
+	}
+	return true, nil
+}
+
 func UrlToHTTPRequest(text string) ([]byte, error) {
 	var r *http.Request
 	if !(strings.HasPrefix(text, "http://") || strings.HasPrefix(text, "https://")) {
