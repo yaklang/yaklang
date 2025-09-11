@@ -69,7 +69,14 @@ func (e *SaveEndpoint) AddRelationship(sourceName, targetName, relationType, typ
 	if err != nil {
 		return utils.Errorf("wait target entity index failed, %v", err)
 	}
-	err = e.eb.AddRelationship(sourceIndex, targetIndex, relationType, typeVerbose, attr)
+
+	err = e.eb.MergeAndSaveRelationship(&schema.ERModelRelationship{
+		SourceEntityIndex:       sourceIndex,
+		TargetEntityIndex:       targetIndex,
+		RelationshipType:        relationType,
+		RelationshipTypeVerbose: typeVerbose,
+		Attributes:              attr,
+	})
 	if err != nil {
 		return err
 	}

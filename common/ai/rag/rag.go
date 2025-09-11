@@ -138,6 +138,21 @@ func (r *RAGSystem) SetBigTextPlan(plan string) {
 	log.Infof("set big text plan to: %s", plan)
 }
 
+// VectorSimilarity 快速计算两个文本的向量相似度
+func (r *RAGSystem) VectorSimilarity(text1, text2 string) (float64, error) {
+	embeddingData1, err := r.Embedder.Embedding(text1)
+	if err != nil {
+		return 0, err
+	}
+
+	embeddingData2, err := r.Embedder.Embedding(text2)
+	if err != nil {
+		return 0, err
+	}
+
+	return hnsw.CosineSimilarity(embeddingData1, embeddingData2)
+}
+
 // averagePooling 对多个嵌入向量进行平均池化
 func averagePooling(embeddings [][]float32) []float32 {
 	if len(embeddings) == 0 {
