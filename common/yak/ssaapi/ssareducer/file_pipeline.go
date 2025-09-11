@@ -38,6 +38,7 @@ func FilesHandler(
 	paths []string,
 	handler func(path string, content []byte) (ssa.FrontAST, error),
 	orderType int,
+	concurrency int,
 ) <-chan *FileContent {
 	bufSize := len(paths)
 	readFilePipe := pipeline.NewPipe[string, *FileContent](
@@ -69,6 +70,7 @@ func FilesHandler(
 				Skip:    utils.IsPlainText(content),
 			}, nil
 		},
+		concurrency,
 	)
 	readFilePipe.FeedSlice(paths)
 
@@ -82,6 +84,7 @@ func FilesHandler(
 			fileContent.Err = err
 			return fileContent, nil
 		},
+		concurrency,
 	)
 
 	sort := func(index int) <-chan *FileContent {

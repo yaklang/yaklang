@@ -2,9 +2,8 @@ package pipeline
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"sync"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
@@ -14,8 +13,7 @@ type Pipe[T, U any] struct {
 	in      *chanx.UnlimitedChan[T]
 	out     *chanx.UnlimitedChan[U]
 	err     error
-	feedWG  sync.WaitGroup
-	wg      sync.WaitGroup
+	swg     *utils.SizedWaitGroup
 	handler func(item T) (U, error)
 }
 
@@ -49,7 +47,12 @@ func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item
 
 const defaultPipeSize = 200
 
-func NewPipe[T, U any](ctx context.Context, initBufSize int, handler func(item T) (U, error)) *Pipe[T, U] {
+func NewPipe[T, U any](
+	ctx context.Context,
+	initBufSize int,
+	handler func(item T) (U, error),
+	concurrency ...int,
+) *Pipe[T, U] {
 	pipeSize := defaultPipeSize
 	if initBufSize > 0 {
 		pipeSize = initBufSize
@@ -60,10 +63,16 @@ func NewPipe[T, U any](ctx context.Context, initBufSize int, handler func(item T
 		out:     chanx.NewUnlimitedChan[U](ctx, pipeSize),
 		handler: handler,
 	}
-
-	ret.wg.Add(1)
+	var con int
+	if len(concurrency) > 0 && concurrency[0] > 0 {
+		con = concurrency[0]
+	} else {
+		con = 10 // 默认并发10
+	}
+	ret.swg = utils.NewSizedWaitGroup(con)
+	ret.swg.Add(1)
 	go func() {
-		defer ret.wg.Done()
+		defer ret.swg.Done()
 		ret.process()
 	}()
 
@@ -107,9 +116,9 @@ func (p *Pipe[T, U]) process() {
 			}
 			_ = item
 
-			p.wg.Add(1)
+			p.swg.Add(1)
 			go func(t T) {
-				defer p.wg.Done()
+				defer p.swg.Done()
 				if result, err := p.handler(t); err == nil {
 					p.out.SafeFeed(result)
 				} else {
@@ -122,7 +131,7 @@ func (p *Pipe[T, U]) process() {
 
 func (p *Pipe[T, U]) Close() {
 	p.in.Close()
-	p.wg.Wait() // wait for all processing goroutines to finish
+	p.swg.Wait() // wait for all processing goroutines to finish
 	p.out.Close()
 }
 

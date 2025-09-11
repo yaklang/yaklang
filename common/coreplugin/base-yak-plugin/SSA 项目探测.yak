@@ -18,6 +18,13 @@ memory := cli.Bool("memory",
     cli.setCliGroup("compile"),
 )
 
+concurrency := cli.Int("concurrency",
+    cli.setVerboseName("并发数"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(10),
+    cli.setHelp("编译时，同时进行编译的文件数量"),
+)
+
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3
 
@@ -371,6 +378,7 @@ opts = [
     ssa.withConfigInfo(params.info),
     ssa.withPeepholeSize(peepholeSize),
     ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~,
+    ssa.withConcurrency(concurrency),
 ]
 if memory{
     opts = append(opts, ssa.withMemory())
