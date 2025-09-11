@@ -320,13 +320,13 @@ func WithResumeTaskId(taskId string) ScanOption {
 // ```
 // syntaxflowscan.StartScan(context.New(), callback,
 //
-//	syntaxflowscan.withProcessCallback(func(progress float64) {
+//	syntaxflowscan.withProcessCallback(func(progress ) {
 //		println("扫描进度:", progress)
 //	}),
 //
 // )
 // ```
-func WithProcessCallback(callback ProcessCallback) ScanOption {
+func WithProcessCallback(callback func(progress float64)) ScanOption {
 	return func(sc *ScanConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
@@ -340,13 +340,13 @@ func WithProcessCallback(callback ProcessCallback) ScanOption {
 // ```
 // syntaxflowscan.StartScan(context.New(), callback,
 //
-//	syntaxflowscan.withRuleProcessCallback(func(progName, ruleName string, progress float64) {
+//	syntaxflowscan.withRuleProcessCallback(func(progName, ruleName , progress ) {
 //		println("规则进度:", progName, ruleName, progress)
 //	}),
 //
 // )
 // ```
-func WithRuleProcessCallback(callback RuleProcessCallback) ScanOption {
+func WithRuleProcessCallback(callback func(progName, ruleName string, progress float64)) ScanOption {
 	return func(sc *ScanConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
