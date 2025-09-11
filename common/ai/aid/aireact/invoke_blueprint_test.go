@@ -207,11 +207,10 @@ LOOP:
 				forgeStarted = true
 			}
 
-			if forgeStarted && e.GetType() == string(schema.EVENT_TYPE_STRUCTURED) {
+			if e.GetType() == string(schema.EVENT_TYPE_STRUCTURED) {
 				if e.GetNodeId() == "react_task_status_changed" {
 					if utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.react_task_now_status")) == "processing" {
 						reActProcessing = true
-						break LOOP
 					}
 				}
 			}
