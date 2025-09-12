@@ -419,7 +419,9 @@ func init() {
 			result = temp
 		}
 		if len(result) > 0 {
-			return true, sfvm.NewValues(result), nil
+			vs := sfvm.NewValues(result)
+			vs.AppendPredecessor(v, frame.WithPredecessorContext(fmt.Sprintf("getUsers(depth=%d)", depth)))
+			return true, vs, nil
 		}
 		return false, nil, nil
 	}), nc_desc("获取值的Users"))
