@@ -160,8 +160,8 @@ func (c *config) parseProjectWithFS(
 		)
 		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
 		for fileContent := range ch {
-			if !fileContent.IsPlainText {
-				prog.ProcessInfof("skip non-text file: %s", fileContent.Path)
+			if !fileContent.Skip {
+				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
 				continue
 			}
 			editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
@@ -220,14 +220,14 @@ func (c *config) parseProjectWithFS(
 		// 	c.ctx, filesystem, handlerFiles,
 		// 	func(path string, content []byte) {
 		for _, fileContent := range fileContents {
-			if !fileContent.IsPlainText {
-				prog.ProcessInfof("skip non-text file: %s", fileContent.Path)
-				continue
-			}
 			if _, needBuild := handlerFilesMap[fileContent.Path]; !needBuild {
 				continue // skip if not in handlerFilesMap
 			}
 			handlerProcess()
+			if !fileContent.Skip {
+				prog.ProcessInfof("skip  file: %s with %v", fileContent.Path, fileContent.Err)
+				continue
+			}
 			// log.Infof("visited file: ", prog.GetIncludeFiles())
 			if prog.ShouldVisit(fileContent.Editor.GetUrl()) {
 				log.Infof("parse file %s done skip in main build", fileContent.Path)
