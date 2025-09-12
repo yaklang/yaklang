@@ -23,10 +23,10 @@ type ScanStream interface {
 }
 
 func Scan(stream ScanStream) error {
-	return ScanWithConfig(stream, &ScanConfig{})
+	return ScanWithConfig(stream, &scanInputConfig{})
 }
 
-func ScanWithConfig(stream ScanStream, sc *ScanConfig) error {
+func ScanWithConfig(stream ScanStream, sc *scanInputConfig) error {
 	config, err := stream.Recv()
 	if err != nil {
 		return err
@@ -35,12 +35,12 @@ func ScanWithConfig(stream ScanStream, sc *ScanConfig) error {
 	streamCtx := stream.Context()
 
 	var taskId string
-	var m *ScanManager
+	var m *scanManager
 	errC := make(chan error)
 	switch strings.ToLower(config.GetControlMode()) {
 	case "start":
 		taskId = uuid.New().String()
-		m, err = CreateSyntaxflowTaskById(taskId, streamCtx, config, stream, sc)
+		m, err = createSyntaxflowTaskById(taskId, streamCtx, config, stream, sc)
 		if err != nil {
 			return err
 		}

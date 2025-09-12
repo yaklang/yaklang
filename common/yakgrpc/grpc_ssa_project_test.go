@@ -57,9 +57,12 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 				ScanConfig: &ypb.SSAProjectScanConfig{
 					Concurrency:    10,
 					Memory:         true,
-					RuleGroups:     []string{"security", "performance"},
-					RuleNames:      []string{"sql-injection", "xss"},
 					IgnoreLanguage: false,
+				},
+				RuleConfig: &ypb.SSAProjectScanRuleConfig{
+					RuleFilter: &ypb.SyntaxFlowRuleFilter{
+						RuleNames: []string{"sql-injection", "xss"},
+					},
 				},
 				Tags: []string{"test", "local"},
 			},
@@ -105,8 +108,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.False(t, project.CompileConfig.ReCompile)
 		require.Equal(t, uint32(10), project.ScanConfig.Concurrency)
 		require.True(t, project.ScanConfig.Memory)
-		require.Equal(t, []string{"security", "performance"}, project.ScanConfig.RuleGroups)
-		require.Equal(t, []string{"sql-injection", "xss"}, project.ScanConfig.RuleNames)
+		require.Equal(t, []string{"sql-injection", "xss"}, project.RuleConfig.RuleFilter.RuleNames)
 		require.False(t, project.ScanConfig.IgnoreLanguage)
 		require.Equal(t, []string{"test", "local"}, project.Tags)
 
@@ -149,11 +151,15 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 					ReCompile:    true,
 				},
 				ScanConfig: &ypb.SSAProjectScanConfig{
-					Concurrency:    5,
-					Memory:         false,
-					RuleGroups:     []string{"security"},
-					RuleNames:      []string{"sql-injection"},
+					Concurrency: 5,
+					Memory:      false,
+
 					IgnoreLanguage: true,
+				},
+				RuleConfig: &ypb.SSAProjectScanRuleConfig{
+					RuleFilter: &ypb.SyntaxFlowRuleFilter{
+						RuleNames: []string{"sql-injection"},
+					},
 				},
 				Tags: []string{newProjectName, "git"},
 			},
@@ -187,8 +193,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.True(t, updatedProject.CompileConfig.ReCompile)
 		require.Equal(t, uint32(5), updatedProject.ScanConfig.Concurrency)
 		require.False(t, updatedProject.ScanConfig.Memory)
-		require.Equal(t, []string{"security"}, updatedProject.ScanConfig.RuleGroups)
-		require.Equal(t, []string{"sql-injection"}, updatedProject.ScanConfig.RuleNames)
+		require.Equal(t, []string{"sql-injection"}, updatedProject.RuleConfig.RuleFilter.RuleNames)
 		require.True(t, updatedProject.ScanConfig.IgnoreLanguage)
 		require.Equal(t, []string{newProjectName, "git"}, updatedProject.Tags)
 	})

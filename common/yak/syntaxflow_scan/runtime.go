@@ -13,9 +13,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (m *ScanManager) StartQuerySF(startIndex ...int64) error {
+func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	if m == nil || m.stream == nil {
-		return utils.Errorf("ScanManager or stream is nil")
+		return utils.Errorf("scanManager or stream is nil")
 	}
 	defer func() {
 		if err := recover(); err != nil {
@@ -95,7 +95,7 @@ func (m *ScanManager) StartQuerySF(startIndex ...int64) error {
 	return errs
 }
 
-func (m *ScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
+func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	m.notifyStatus()
 	defer m.SaveTask()
 
@@ -127,7 +127,7 @@ func (m *ScanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 	}
 }
-func (m *ScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
+func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	if riskLen := len(res.GetGRPCModelRisk()); riskLen != 0 {
 		m.addRiskCount(int64(riskLen))
 	}
@@ -143,7 +143,7 @@ func (m *ScanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	})
 }
 
-func (m *ScanManager) notifyStatus() {
+func (m *scanManager) notifyStatus() {
 	finishQuery := atomic.LoadInt64(&m.finishedQuery)
 	successQuery := atomic.LoadInt64(&m.successQuery)
 	failedQuery := atomic.LoadInt64(&m.failedQuery)
@@ -166,7 +166,7 @@ func (m *ScanManager) notifyStatus() {
 	}
 }
 
-func (m *ScanManager) notifyRuleProcess(progName, ruleName string, f float64) {
+func (m *scanManager) notifyRuleProcess(progName, ruleName string, f float64) {
 	output := struct {
 		ProgName string `json:"项目名称"`
 		RuleName string `json:"规则名称"`
