@@ -141,7 +141,7 @@ func (y *builder) VisitFormalParameter(raw phpparser.IFormalParameterContext, in
 		param.SetType(typeHint)
 	}
 	if isRef {
-		y.ReferenceParameter(formalParams, index)
+		y.ReferenceParameter(formalParams, index, ssa.PointerSideEffect)
 	}
 	return
 }
