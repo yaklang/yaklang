@@ -68,12 +68,16 @@ func (n *StandardLayerNode[K]) RemoveNeighbor(key K) {
 	delete(n.neighbors, key)
 }
 
-func (n *StandardLayerNode[K]) Isolate(m int, distFunc DistanceFunc[K]) {
-	for _, neighbor := range n.neighbors {
-		neighbor.RemoveNeighbor(n.key)
+func (n *StandardLayerNode[K]) Isolate(layerNodes map[K]LayerNode[K], m int, distFunc DistanceFunc[K]) {
+	changedNodes := make(map[K]LayerNode[K], m)
+	for _, neighbor := range layerNodes {
+		if _, ok := neighbor.GetNeighbors()[n.key]; ok {
+			neighbor.RemoveNeighbor(n.key)
+			changedNodes[neighbor.GetKey()] = neighbor
+		}
 	}
 
-	for _, neighbor := range n.neighbors {
+	for _, neighbor := range changedNodes {
 		neighbor.Replenish(m, distFunc)
 	}
 }
@@ -225,12 +229,16 @@ func (n *PQLayerNode[K]) RemoveNeighbor(key K) {
 	delete(n.neighbors, key)
 }
 
-func (n *PQLayerNode[K]) Isolate(m int, distFunc DistanceFunc[K]) {
-	for _, neighbor := range n.neighbors {
-		neighbor.RemoveNeighbor(n.key)
+func (n *PQLayerNode[K]) Isolate(layerNodes map[K]LayerNode[K], m int, distFunc DistanceFunc[K]) {
+	changedNodes := make(map[K]LayerNode[K], m)
+	for _, neighbor := range layerNodes {
+		if _, ok := neighbor.GetNeighbors()[n.key]; ok {
+			neighbor.RemoveNeighbor(n.key)
+			changedNodes[neighbor.GetKey()] = neighbor
+		}
 	}
 
-	for _, neighbor := range n.neighbors {
+	for _, neighbor := range changedNodes {
 		neighbor.Replenish(m, distFunc)
 	}
 }

@@ -1,6 +1,7 @@
 package hnsw
 
 import (
+	"math/rand"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -12,15 +13,78 @@ func TestHNSWLayerStructure(t *testing.T) {
 
 	graph := NewGraph[int]()
 
+	checkAllLayer := func() {
+		t.Helper()
+		// 对于每一层的每个节点，确保其在所有更低的层中都存在
+		for hi := 1; hi < len(graph.Layers); hi++ {
+			upper := graph.Layers[hi]
+			for nodeKey, node := range upper.Nodes {
+				for lo := hi - 1; lo >= 0; lo-- {
+					if _, exists := graph.Layers[lo].Nodes[nodeKey]; !exists {
+						t.Errorf("Node %v exists in higher layer %d but not in lower layer %d", nodeKey, hi, lo)
+					}
+				}
+
+				// 校验该节点在本层的邻居在更低层同样存在
+				neighbors := node.GetNeighbors()
+				for neighborKey := range neighbors {
+					for lo := hi - 1; lo >= 0; lo-- {
+						if _, exists := graph.Layers[lo].Nodes[neighborKey]; !exists {
+							t.Errorf("Neighbor %v of node %v exists in higher layer %d but not in lower layer %d", neighborKey, nodeKey, hi, lo)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	rng := rand.New(rand.NewSource(1))
+	graph.Rng = rng
 	// Add many nodes to build a multi-layer structure
 	nodeCount := 100
 	for i := 0; i < nodeCount; i++ {
 		// Create diverse vectors to ensure good distribution
-		vec := make([]float32, 10)
-		for j := 0; j < 10; j++ {
-			vec[j] = float32(i*10+j) / 100.0
+		vec := make([]float32, 1024)
+		for j := 0; j < 1024; j++ {
+			vec[j] = rng.Float32()*2 - 1
 		}
 		graph.Add(MakeInputNode(i, vec))
+		checkAllLayer()
+	}
+	checkAllLayer()
+	// update random nodes
+	for i := 0; i < 20; i++ {
+		nodeId := rng.Intn(nodeCount)
+		vec := make([]float32, 1024)
+		for j := 0; j < 1024; j++ {
+			vec[j] = rng.Float32()*2 - 1
+		}
+		graph.Add(MakeInputNode(nodeId, vec))
+		checkAllLayer()
+	}
+	checkAllLayer()
+	// delete random nodes
+	for i := 0; i < 20; i++ {
+		nodeId := rng.Intn(nodeCount)
+		graph.Delete(nodeId)
+		checkAllLayer()
+	}
+	checkAllLayer()
+	// search random nodes
+	for i := 0; i < 20; i++ {
+		vec := make([]float32, 1024)
+		for j := 0; j < 1024; j++ {
+			vec[j] = rng.Float32()*2 - 1
+		}
+		graph.Search(vec, 1)
+		graph.SearchWithDistance(vec, 1)
+		graph.SearchWithFilter(vec, 1, nil)
+		graph.SearchWithDistanceAndFilter(vec, 1, func(key int, vector Vector) bool {
+			return key > 0
+		})
+		graph.SearchWithFilter(vec, 1, func(key int, vector Vector) bool {
+			return key > 0
+		})
 	}
 
 	t.Logf("Built graph with %d nodes across %d layers", graph.Len(), len(graph.Layers))
@@ -28,12 +92,6 @@ func TestHNSWLayerStructure(t *testing.T) {
 	// Verify layer structure properties
 	if len(graph.Layers) == 0 {
 		t.Fatal("Graph should have at least one layer")
-	}
-
-	// Layer 0 should have the most nodes (all nodes)
-	layer0Size := len(graph.Layers[0].Nodes)
-	if layer0Size != nodeCount {
-		t.Errorf("Layer 0 should have all %d nodes, but has %d", nodeCount, layer0Size)
 	}
 
 	// Higher layers should have fewer nodes (pyramid structure)
