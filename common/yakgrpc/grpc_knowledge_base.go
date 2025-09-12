@@ -389,3 +389,26 @@ func (s *Server) QueryKnowledgeBaseByAI(req *ypb.QueryKnowledgeBaseByAIRequest, 
 	}
 	return nil
 }
+
+func (s *Server) GetKnowledgeBaseTypeList(ctx context.Context, req *ypb.Empty) (*ypb.GetKnowledgeBaseTypeListResponse, error) {
+	types := []*ypb.KnowledgeBaseType{
+		{
+			Name:        "默认",
+			Description: "默认知识库类型",
+			Value:       "",
+		},
+		{
+			Name:        "AI",
+			Description: "AI 知识库类型， 用于 AI 上下文增强",
+			Value:       "ai",
+		},
+		{
+			Name:        "数据清洗",
+			Description: "用于储存清洗文档、视频、图片等数据的知识库，可以用于 AI 上下文增强或用于AI向量查询",
+			Value:       "data_cleaning",
+		},
+	}
+	return &ypb.GetKnowledgeBaseTypeListResponse{
+		KnowledgeBaseTypes: types,
+	}, nil
+}
