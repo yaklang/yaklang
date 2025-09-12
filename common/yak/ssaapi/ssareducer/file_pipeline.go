@@ -19,15 +19,17 @@ const (
 	ReverseOrder
 )
 
+const maxFileSize = 5 * 1024 * 1024 // 5MB
+
 type FileHandler func(path string, content []byte)
 
 type FileContent struct {
-	Path        string
-	Content     []byte
-	AST         ssa.FrontAST
-	IsPlainText bool
-	Err         error
-	Editor      *memedit.MemEditor
+	Path    string
+	Content []byte
+	AST     ssa.FrontAST
+	Skip    bool
+	Err     error
+	Editor  *memedit.MemEditor
 }
 
 func FilesHandler(
@@ -40,14 +42,31 @@ func FilesHandler(
 	bufSize := len(paths)
 	readFilePipe := pipeline.NewPipe[string, *FileContent](
 		ctx, bufSize, func(path string) (*FileContent, error) {
+			// check file size with maxFileSize
+			info, err := filesystem.Stat(path)
+			if err != nil {
+				return &FileContent{
+					Path: path,
+					Err:  err,
+					Skip: true,
+				}, nil
+			}
+			if info.Size() > maxFileSize {
+				return &FileContent{
+					Path: path,
+					Err:  utils.Errorf("file size %d exceeds max limit %d", info.Size(), maxFileSize),
+					Skip: true,
+				}, nil
+			}
+
 			content, err := filesystem.ReadFile(path)
 			var fileErr error = err
 			// Check if content is a text file
 			return &FileContent{
-				Path:        path,
-				Content:     content,
-				Err:         fileErr,
-				IsPlainText: utils.IsPlainText(content),
+				Path:    path,
+				Content: content,
+				Err:     fileErr,
+				Skip:    utils.IsPlainText(content),
 			}, nil
 		},
 	)
@@ -55,7 +74,7 @@ func FilesHandler(
 
 	parseASTPipe := pipeline.NewPipe[*FileContent, *FileContent](
 		ctx, bufSize, func(fileContent *FileContent) (*FileContent, error) {
-			if fileContent.Err != nil || !fileContent.IsPlainText {
+			if fileContent.Err != nil || !fileContent.Skip {
 				return fileContent, nil
 			}
 			ast, err := handler(fileContent.Path, fileContent.Content)

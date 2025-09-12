@@ -119,5 +119,3 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 	}
 	return nil
 }
-
-const maxFileSize = 10 * 1024 * 1024 // 10MB
