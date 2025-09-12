@@ -27,7 +27,7 @@ type LayerNode[K cmp.Ordered] interface {
 	RemoveNeighbor(key K)
 
 	// Isolate 从图中孤立节点
-	Isolate(m int, distFunc DistanceFunc[K])
+	Isolate(neighbors map[K]LayerNode[K], m int, distFunc DistanceFunc[K])
 
 	// Replenish 恢复连接性
 	Replenish(m int, distFunc DistanceFunc[K])

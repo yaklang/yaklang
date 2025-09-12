@@ -557,6 +557,8 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			if elevator != nil {
 				if elevatorNode, exists := layer.Nodes[*elevator]; exists && elevatorNode != nil {
 					searchPoint = elevatorNode
+				} else {
+					log.Warnf("elevator node doesn't exist in this layer, continue to use the entry point")
 				}
 				// If elevator node doesn't exist in this layer, keep using the entry point
 			}
@@ -749,7 +751,7 @@ func (h *Graph[K]) Delete(key K) bool {
 		if len(layer.Nodes) == 0 {
 			deleteLayer[i] = struct{}{}
 		}
-		node.Isolate(h.M, h.nodeDistance)
+		node.Isolate(layer.Nodes, h.M, h.nodeDistance)
 		deleted = true
 	}
 
