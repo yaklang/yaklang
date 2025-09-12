@@ -34,18 +34,22 @@ func (b *astbuilder) build(raw ssa.FrontAST) {
 	prog := b.GetProgram()
 	currentEditor := prog.GetCurrentEditor()
 	hasFile := func(p *ssa.Program) bool {
-		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
+		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
 			if hash == currentEditor.GetIrSourceHash() {
 				return true
 			}
 		}
 		return false
 	}
-
 	skip := hasFile(prog)
 	if skip {
 		return
 	}
+
+	// if prog.ProgramKind == ssa.Application {
+	// 	prog = prog.GetSubProgram(currentEditor.GetUrl())
+	// 	b.FunctionBuilder = prog.GetAndCreateFunctionBuilder(currentEditor.GetUrl(), string(ssa.MainFunctionName))
+	// }
 
 	for _, ws := range ast.AllWs() {
 		b.handlerWs(ws.(*yak.WsContext))

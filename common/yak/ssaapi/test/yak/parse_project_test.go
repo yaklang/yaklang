@@ -1,8 +1,9 @@
 package ssaapi
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -17,6 +18,7 @@ func TestParseInclude(t *testing.T) {
 		"sink": {"3"},
 	}, false, ssaapi.WithLanguage(ssaapi.Yak))
 }
+
 func TestParseInclude2(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("a/a.yak", `include "b/b.yak"; dump(b)`)
@@ -27,7 +29,9 @@ func TestParseInclude2(t *testing.T) {
 	valB := programs[0].Ref("b")
 	valB.Show()
 }
+
 func TestParseProject(t *testing.T) {
+	// for i := 0; i < 100; i++ {
 	vfs := filesys.NewVirtualFs()
 	vfs.AddFile("a/b", "c")
 	vfs.AddFile("a/a.yak", `include "b/b.yak"; dump(b)`)
@@ -44,7 +48,6 @@ func TestParseProject(t *testing.T) {
 		progs.Show()
 		require.NoError(t, err, "parse project failed")
 
-		// TODO: this parseProject will return one program
 		require.Len(t, progs, 1, "progs should be 1")
 		prog := progs[0]
 
@@ -55,5 +58,5 @@ func TestParseProject(t *testing.T) {
 		valueB := valuesB[0]
 		require.Contains(t, valueB.String(), "3", "valueB should be 3")
 	})
-
+	// }
 }
