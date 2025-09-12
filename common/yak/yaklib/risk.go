@@ -350,8 +350,40 @@ func GetSSARiskWithDataFlow(id int64) *sfreport.Risk {
 		return nil
 	}
 
-	// 使用 sfreport.NewRisk 进行封装，自动生成数据流信息
-	wrappedRisk := sfreport.NewRisk(ssaRisk)
+	wrappedRisk := &sfreport.Risk{
+		ID:   ssaRisk.ID,
+		Hash: ssaRisk.Hash,
+		Time: ssaRisk.CreatedAt,
+
+		Title:        ssaRisk.Title,
+		TitleVerbose: ssaRisk.TitleVerbose,
+		Description:  ssaRisk.Description,
+		Solution:     ssaRisk.Solution,
+		Severity:     string(ssaRisk.Severity),
+		RiskType:     ssaRisk.RiskType,
+		Details:      ssaRisk.Details,
+		CVE:          ssaRisk.CVE,
+		CWE:          ssaRisk.CWE,
+		Language:     ssaRisk.Language,
+
+		CodeRange:     ssaRisk.CodeRange,
+		CodeFragment:  ssaRisk.CodeFragment,
+		CodeSourceURL: ssaRisk.CodeSourceUrl,
+		FunctionName:  ssaRisk.FunctionName,
+		Line:          ssaRisk.Line,
+
+		ProgramName:          ssaRisk.ProgramName,
+		LatestDisposalStatus: ssaRisk.LatestDisposalStatus,
+	}
+
+	if ssaRisk.ResultID != 0 && ssaRisk.Variable != "" {
+		dataFlowPath, err := sfreport.GenerateDataFlowAnalysis(ssaRisk)
+		if err != nil {
+			log.Errorf("generate data flow paths failed for risk %d: %v", ssaRisk.ID, err)
+		} else {
+			wrappedRisk.DataFlowPaths = []*sfreport.DataFlowPath{dataFlowPath}
+		}
+	}
 	return wrappedRisk
 }
 
