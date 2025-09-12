@@ -66,7 +66,7 @@ func Test_ObjectFactor_Closure(t *testing.T) {
 		f(a)
 		println(a.b)
 		`, []string{
-			"side-effect(1, arg.b)",
+			"side-effect(1, a.b)",
 		}, t)
 	})
 
