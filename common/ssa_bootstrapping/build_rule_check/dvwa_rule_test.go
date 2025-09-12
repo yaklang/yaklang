@@ -4,15 +4,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 )
 
 func TestBuildInRule(t *testing.T) {
 	testCase := []RuleChecker{{
 		Name: "test git repo",
-		ConfigInfo: &ssaapi.ConfigInfo{
-			Kind:   ssaapi.Git,
+		ConfigInfo: &schema.CodeSourceInfo{
+			Kind:   schema.CodeSourceGit,
 			URL:    "https://github.com/digininja/DVWA",
 			Branch: "master",
 		},

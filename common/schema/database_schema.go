@@ -70,6 +70,8 @@ var ProfileTables = []interface{}{
 	&AIYakTool{},
 
 	&Snippets{}, // Snippets
+	// SSA Projects Config Info
+	&SSAProject{},
 }
 
 var databaseSchemas = map[uint8][]any{

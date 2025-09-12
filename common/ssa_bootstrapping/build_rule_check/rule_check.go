@@ -38,7 +38,7 @@ type InputRule struct {
 }
 type RuleChecker struct {
 	Name        string
-	ConfigInfo  *ssaapi.ConfigInfo
+	ConfigInfo  *schema.CodeSourceInfo
 	RiskInfo    []*RiskInfo
 	RuleNames   []string
 	InputRules  []*InputRule
