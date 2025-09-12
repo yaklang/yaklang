@@ -178,6 +178,17 @@ LOOP:
 				if actionType == "" {
 					return utils.Errorf("Invalid action type: %s", action.GetInvokeParams("type"))
 				}
+
+				if actionType == string(ActionRequireAIBlueprintForge) {
+					blueprintName := action.GetInvokeParams("next_action").GetString("blueprint_payload")
+					if blueprintName == "" {
+						return utils.Error("blueprint_payload is required for ActionRequireAIBlueprintForge but empty")
+					}
+					if ret, err := r.config.aiBlueprintManager.GetAIForge(blueprintName); ret == nil || err != nil {
+						return utils.Errorf("blueprint %s does not exist", blueprintName)
+					}
+				}
+
 				return nil
 			})
 
