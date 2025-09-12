@@ -1,6 +1,10 @@
 # SSA POC 生成 Forge
 # 根据 SSA Risk ID 生成Python POC
 
+__DESC__ = "这个forge通过接收一个SSA RiskID通过分析SSA Risk信息生成一个Python POC"
+__VERBOSE_NAME_ = "SSA Risk生成POC"
+__KEYWORDS__ = "SSA, POC生成, 漏洞利用, 概念验证"
+
 # 获取参数
 risk_id = cli.Int("risk_id")
 additional_context = cli.String("additional_context")
