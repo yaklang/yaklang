@@ -936,6 +936,7 @@ service Yak {
   // Knowledge Base
   rpc GetKnowledgeBaseNameList(Empty) returns(GetKnowledgeBaseNameListResponse);
   rpc GetKnowledgeBase(GetKnowledgeBaseRequest) returns(GetKnowledgeBaseResponse);
+  rpc GetKnowledgeBaseTypeList(Empty) returns(GetKnowledgeBaseTypeListResponse);
   rpc DeleteKnowledgeBase(DeleteKnowledgeBaseRequest) returns(GeneralResponse);
   rpc CreateKnowledgeBase(CreateKnowledgeBaseRequest) returns(GeneralResponse);
   rpc UpdateKnowledgeBase(UpdateKnowledgeBaseRequest) returns(GeneralResponse);
@@ -1190,6 +1191,16 @@ message BuildVectorIndexForKnowledgeBaseRequest {
 
 message GetKnowledgeBaseNameListResponse {
   repeated string KnowledgeBaseNames = 1;
+}
+
+message KnowledgeBaseType{
+  string Name = 1;
+  string Description = 2;
+  string Value = 3;
+}
+
+message GetKnowledgeBaseTypeListResponse{
+  repeated KnowledgeBaseType KnowledgeBaseTypes = 1;
 }
 
 message GetKnowledgeBaseRequest {
