@@ -10,7 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// querySSAProjectByName 根据项目名查询SSA项目
 func querySSAProjectByName(projectName string) (*schema.SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
@@ -38,7 +37,6 @@ func querySSAProjectByName(projectName string) (*schema.SSAProject, error) {
 	return projects[0], nil
 }
 
-// querySSAProjectByID 根据ID查询SSA项目
 func querySSAProjectByID(id int64) (*schema.SSAProject, error) {
 	db := consts.GetGormProfileDatabase()
 	if db == nil {
@@ -66,16 +64,13 @@ func querySSAProjectByID(id int64) (*schema.SSAProject, error) {
 	return projects[0], nil
 }
 
-// SSAProject配置构建器
 type ssaProjectConfigBuilder struct {
 	codeSource *schema.CodeSourceInfo
 	project    *schema.SSAProject
 }
 
-// SSAProject选项类型
 type SSAProjectParamsOpt func(*ssaProjectConfigBuilder)
 
-// 代码源配置选项函数
 func WithSourceKind(kind string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
 		if b.codeSource == nil {
@@ -121,7 +116,6 @@ func WithPath(path string) SSAProjectParamsOpt {
 	}
 }
 
-// 认证配置选项函数
 func WithAuthKind(kind string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
 		if b.codeSource == nil {
@@ -170,7 +164,6 @@ func WithAuthKeyPath(keyPath string) SSAProjectParamsOpt {
 	}
 }
 
-// 代理配置选项函数
 func WithProxyURL(proxy string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
 		if b.codeSource == nil {
@@ -196,7 +189,6 @@ func WithProxyAuth(user, password string) SSAProjectParamsOpt {
 	}
 }
 
-// 项目配置选项函数
 func WithDescription(desc string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
 		b.project.Description = desc
@@ -257,24 +249,21 @@ func WithIgnoreLanguage(ignore bool) SSAProjectParamsOpt {
 	}
 }
 
-// _createSSAProject 创建SSAProject对象（不保存到数据库）
 func _createSSAProject(projectName string, opts ...SSAProjectParamsOpt) *schema.SSAProject {
 	project := &schema.SSAProject{
 		ProjectName:     projectName,
-		ScanConcurrency: 5,   // 默认并发数
-		PeepholeSize:    100, // 默认窥孔大小
+		ScanConcurrency: 5,
+		PeepholeSize:    100,
 	}
 
 	builder := &ssaProjectConfigBuilder{
 		project: project,
 	}
 
-	// 应用所有选项
 	for _, opt := range opts {
 		opt(builder)
 	}
 
-	// 如果有代码源配置，序列化为JSON
 	if builder.codeSource != nil {
 		configBytes, err := json.Marshal(builder.codeSource)
 		if err == nil {
@@ -285,9 +274,7 @@ func _createSSAProject(projectName string, opts ...SSAProjectParamsOpt) *schema.
 	return project
 }
 
-// _saveSSAProject 保存SSAProject到数据库
 func _saveSSAProject(project *schema.SSAProject) error {
-	// 验证项目配置
 	if err := project.Validate(); err != nil {
 		return utils.Errorf("project validation failed: %s", err)
 	}
@@ -297,7 +284,6 @@ func _saveSSAProject(project *schema.SSAProject) error {
 		return utils.Error("no database connection")
 	}
 
-	// 如果有ID则更新，否则创建
 	if project.ID > 0 {
 		if err := db.Save(project).Error; err != nil {
 			return utils.Errorf("update SSA project failed: %s", err)
@@ -311,13 +297,11 @@ func _saveSSAProject(project *schema.SSAProject) error {
 	return nil
 }
 
-// NewSSAProject 创建新的SSA项目并保存到数据库
 func NewSSAProject(projectName string, opts ...SSAProjectParamsOpt) (*schema.SSAProject, error) {
 	project := _createSSAProject(projectName, opts...)
 	return project, _saveSSAProject(project)
 }
 
-// SaveSSAProject 保存SSAProject到数据库
 func SaveSSAProject(project *schema.SSAProject) error {
 	return _saveSSAProject(project)
 }
@@ -328,7 +312,6 @@ var SSAProjectExports = map[string]interface{}{
 	"NewSSAProject":         NewSSAProject,
 	"SaveSSAProject":        SaveSSAProject,
 
-	// 选项函数
 	"withSourceKind":      WithSourceKind,
 	"withLocalFile":       WithLocalFile,
 	"withURL":             WithURL,
