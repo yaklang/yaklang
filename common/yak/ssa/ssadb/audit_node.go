@@ -176,7 +176,7 @@ type AuditEdge struct {
 	ToNode   uint `json:"to_node" gorm:"index"`
 
 	// program
-	ProgramName string `json:"program_name"`
+	ProgramName string `json:"program_name" gorm:"index"`
 
 	// type
 	EdgeType AuditEdgeType `json:"edge_type" gorm:"index"`
