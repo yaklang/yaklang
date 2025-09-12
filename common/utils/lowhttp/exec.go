@@ -1128,6 +1128,10 @@ RECONNECT:
 	// 更新cookiejar中的cookie
 	if session != nil && firstResponse != nil {
 		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
+	}
+
+	// 将请求中的cookie更新到cookiejar中
+	if session != nil && reqIns != nil {
 		reqCookies := reqIns.Cookies()
 		for _, cookie := range reqCookies {
 			// 限制domain为当前域, path为当前路径
