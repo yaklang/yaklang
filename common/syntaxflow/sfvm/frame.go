@@ -1267,7 +1267,6 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			}
 			return utils.Errorf("get native call failed: %v", err)
 		}
-		ret.AppendPredecessor(value, s.WithPredecessorContext(fmt.Sprintf("native-call:[%s]", i.UnaryStr)))
 		s.debugSubLog("<< push: %v", ValuesLen(ret))
 		s.stack.Push(ret)
 	case OpFileFilterJsonPath, OpFileFilterReg, OpFileFilterXpath:
