@@ -72,6 +72,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			lib.PushEditor(prog.GetCurrentEditor())
 			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
+			// builder := lib.GetAndCreateFunctionBuilder(lib.GetCurrentEditor().GetUrl(), string(ssa.MainFunctionName))
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
 
 			if builder != nil {

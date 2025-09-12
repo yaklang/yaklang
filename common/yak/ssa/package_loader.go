@@ -39,11 +39,12 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	if !languageConfig.ShouldBuild(filename) {
 		return nil
 	}
-	//todo: modify config parse init build，fix main/@main
-	//目前代码仅仅为yak实现，因为yak不经过lazy build，并且yak的include过于特殊
-	program := mainProgram.createSubProgram(editor.GetPureSourceHash(), Library)
+	// todo: modify config parse init build，fix main/@main
+	// 目前代码仅仅为yak实现，因为yak不经过lazy build，并且yak的include过于特殊
+	// program := mainProgram.createSubProgram(editor.GetPureSourceHash(), Library)
+	program := mainProgram
 	builder := program.GetAndCreateFunctionBuilder("", string(MainFunctionName))
-	//模拟编译，编译两次
+	// 模拟编译，编译两次
 	origin := program.PreHandler()
 	defer program.SetPreHandler(origin)
 	program.SetPreHandler(true)
