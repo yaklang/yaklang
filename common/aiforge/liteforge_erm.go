@@ -361,9 +361,7 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
-	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc, entityrepos.WithMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
-		return ResolveEntity(new, old, options...)
-	}))
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
 	if err != nil {
 		return nil, err
 	}
@@ -399,8 +397,8 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 		})
 
 		endpoint := eb.NewSaveEndpoint(refineConfig.Ctx)
-		entitySwg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
-		relationSwg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+		entitySwg := sync.WaitGroup{}
+		relationSwg := sync.WaitGroup{}
 
 		chunkOptions := append(options, WithJsonExtractHook(
 			jsonextractor.WithRegisterConditionalObjectCallback([]string{"entity_type"}, func(data map[string]any) {
@@ -477,9 +475,7 @@ func AnalyzeERMChunkMaker(cm chunkmaker.ChunkMaker, options ...any) (<-chan *ERM
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
-	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc, entityrepos.WithMergeEntityFunc(func(new, old *schema.ERModelEntity) (*schema.ERModelEntity, bool, error) {
-		return ResolveEntity(new, old, options...)
-	}))
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
 	if err != nil {
 		return nil, err
 	}

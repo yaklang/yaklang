@@ -227,6 +227,8 @@ type VectorStoreDocument struct {
 
 	// HNSW 算法中节点存在的最高层级
 	MaxLayer int `gorm:"default:0" json:"max_layer"`
+
+	RuntimeID string
 }
 
 func (v *VectorStoreDocument) TableName() string {

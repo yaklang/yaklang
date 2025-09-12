@@ -209,6 +209,11 @@ var IsMockMode = false
 
 // LoadCollection 加载知识库
 func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
+	return LoadCollectionEx(db, name, true, opts...)
+}
+
+// LoadCollectionEx 加载运行时知识库,不尝试恢复layer
+func LoadCollectionEx(db *gorm.DB, name string, recoverLayer bool, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
 	log.Infof("loading collection '%s' with local embedding service", name)
 
 	// 使用本地嵌入服务
@@ -233,7 +238,14 @@ func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*R
 		embeddingService = localEmbedder
 	}
 
-	return LoadCollectionWithEmbeddingClient(db, name, embeddingService, opts...)
+	log.Infof("start to load sqlite vector store for collection %#v", name)
+	store, err := LoadSQLiteVectorStoreHNSWEx(db, name, embeddingService, recoverLayer)
+	if err != nil {
+		return nil, utils.Errorf("load SQLite vector storage err: %v", err)
+	}
+	log.Infof("start to create RAG system for collection %#v", name)
+
+	return NewRAGSystem(embeddingService, store), nil
 }
 
 // LoadCollectionWithCustomEmbedding 使用自定义嵌入服务加载知识库
@@ -503,5 +515,11 @@ func WithDocumentEntityID(entityUUID string) DocumentOption {
 func WithDocumentRelatedEntities(uuids ...string) DocumentOption {
 	return func(document *Document) {
 		document.RelatedEntities = uuids
+	}
+}
+
+func WithDocumentRuntimeID(runtimeID string) DocumentOption {
+	return func(document *Document) {
+		document.RuntimeID = runtimeID
 	}
 }

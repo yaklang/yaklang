@@ -1222,6 +1222,7 @@ type EntityFilter struct {
 	Types         []string               `protobuf:"bytes,3,rep,name=Types,proto3" json:"Types,omitempty"`
 	Names         []string               `protobuf:"bytes,4,rep,name=Names,proto3" json:"Names,omitempty"`
 	HiddenIndex   []string               `protobuf:"bytes,5,rep,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
+	RuntimeID     []string               `protobuf:"bytes,7,rep,name=RuntimeID,proto3" json:"RuntimeID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1294,6 +1295,13 @@ func (x *EntityFilter) GetNames() []string {
 func (x *EntityFilter) GetHiddenIndex() []string {
 	if x != nil {
 		return x.HiddenIndex
+	}
+	return nil
+}
+
+func (x *EntityFilter) GetRuntimeID() []string {
+	if x != nil {
+		return x.RuntimeID
 	}
 	return nil
 }
@@ -1523,6 +1531,7 @@ type RelationshipFilter struct {
 	TargetEntityIndex []string               `protobuf:"bytes,8,rep,name=TargetEntityIndex,proto3" json:"TargetEntityIndex,omitempty"`
 	AboutEntityIndex  []string               `protobuf:"bytes,9,rep,name=AboutEntityIndex,proto3" json:"AboutEntityIndex,omitempty"` // Source or Target
 	UUIDS             []string               `protobuf:"bytes,11,rep,name=UUIDS,proto3" json:"UUIDS,omitempty"`
+	RuntimeID         []string               `protobuf:"bytes,12,rep,name=RuntimeID,proto3" json:"RuntimeID,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1630,6 +1639,13 @@ func (x *RelationshipFilter) GetAboutEntityIndex() []string {
 func (x *RelationshipFilter) GetUUIDS() []string {
 	if x != nil {
 		return x.UUIDS
+	}
+	return nil
+}
+
+func (x *RelationshipFilter) GetRuntimeID() []string {
+	if x != nil {
+		return x.RuntimeID
 	}
 	return nil
 }
@@ -60507,14 +60523,15 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Attributes\x18\x06 \x03(\v2\v.ypb.KVPairR\n" +
 	"Attributes\x12\x1c\n" +
 	"\tRationale\x18\a \x01(\tR\tRationale\x12 \n" +
-	"\vHiddenIndex\x18\b \x01(\tR\vHiddenIndex\"\xa4\x01\n" +
+	"\vHiddenIndex\x18\b \x01(\tR\vHiddenIndex\"\xc2\x01\n" +
 	"\fEntityFilter\x12\x16\n" +
 	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x1c\n" +
 	"\tBaseIndex\x18\x06 \x01(\tR\tBaseIndex\x12\x10\n" +
 	"\x03IDs\x18\x02 \x03(\x04R\x03IDs\x12\x14\n" +
 	"\x05Types\x18\x03 \x03(\tR\x05Types\x12\x14\n" +
 	"\x05Names\x18\x04 \x03(\tR\x05Names\x12 \n" +
-	"\vHiddenIndex\x18\x05 \x03(\tR\vHiddenIndex\"l\n" +
+	"\vHiddenIndex\x18\x05 \x03(\tR\vHiddenIndex\x12\x1c\n" +
+	"\tRuntimeID\x18\a \x03(\tR\tRuntimeID\"l\n" +
 	"\x12QueryEntityRequest\x12)\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x11.ypb.EntityFilterR\x06Filter\x12+\n" +
 	"\n" +
@@ -60536,7 +60553,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Attributes\x12\x1c\n" +
 	"\tRationale\x18\x06 \x01(\tR\tRationale\x12,\n" +
 	"\x11SourceEntityIndex\x18\a \x01(\tR\x11SourceEntityIndex\x12,\n" +
-	"\x11TargetEntityIndex\x18\b \x01(\tR\x11TargetEntityIndex\"\x8c\x03\n" +
+	"\x11TargetEntityIndex\x18\b \x01(\tR\x11TargetEntityIndex\"\xaa\x03\n" +
 	"\x12RelationshipFilter\x12\x16\n" +
 	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x1c\n" +
 	"\tBaseIndex\x18\n" +
@@ -60549,7 +60566,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x11SourceEntityIndex\x18\a \x03(\tR\x11SourceEntityIndex\x12,\n" +
 	"\x11TargetEntityIndex\x18\b \x03(\tR\x11TargetEntityIndex\x12*\n" +
 	"\x10AboutEntityIndex\x18\t \x03(\tR\x10AboutEntityIndex\x12\x14\n" +
-	"\x05UUIDS\x18\v \x03(\tR\x05UUIDS\"x\n" +
+	"\x05UUIDS\x18\v \x03(\tR\x05UUIDS\x12\x1c\n" +
+	"\tRuntimeID\x18\f \x03(\tR\tRuntimeID\"x\n" +
 	"\x18QueryRelationshipRequest\x12/\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x17.ypb.RelationshipFilterR\x06Filter\x12+\n" +
 	"\n" +

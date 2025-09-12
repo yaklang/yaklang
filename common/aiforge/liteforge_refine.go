@@ -113,14 +113,16 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 		defer output.Close()
 		defer hopAnalyzeWg.Wait()
 
-		for hop := range er.YieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
+		for hop := range er.RuntimeYieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
 			hopAnalyzeWg.Add(1)
 			go func() {
 				defer hopAnalyzeWg.Done()
-				err := er.AddKHopToVectorIndex(hop)
-				if err != nil {
-					refineConfig.AnalyzeLog("failed to add khop to vector index: %v", err)
-				}
+				go func() {
+					err := er.AddKHopToVectorIndex(hop)
+					if err != nil {
+						refineConfig.AnalyzeLog("failed to add khop to vector index: %v", err)
+					}
+				}()
 
 				entries, err := BuildKnowledgeEntryFromKHop(hop, kb, option...)
 				if err != nil {
