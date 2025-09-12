@@ -8064,25 +8064,34 @@ message SSAProject {
   int64 ID = 1;
   int64 CreatedAt = 2;
   int64 UpdatedAt = 3;
+  // 项目基础信息
   string ProjectName = 4;
-  
-  // 源码获取方式配置 - 参考ssa_compile_info.go，使用JSON格式存储
-  string CodeSourceConfig = 5;
-  
+  string Description = 5;
+  repeated string Tags = 6;
+  // 源代码来源
+  string CodeSourceConfig = 7;
   // 编译配置选项
-  string Description = 6;
-  bool StrictMode = 7;
-  int32 PeepholeSize = 8;
-  string ExcludeFiles = 9;
-  bool ReCompile = 10;
-  
+  SSAProjectCompileConfig CompileConfig = 8;
   // 扫描配置选项
-  uint32 ScanConcurrency = 11;
-  bool MemoryScan = 12;
-  string ScanRuleGroups = 13;
-  string ScanRuleNames = 14;
-  bool IgnoreLanguage = 15;
+  SSAProjectScanConfig ScanConfig=9;
 }
+
+message SSAProjectCompileConfig{
+  bool StrictMode = 1;
+  int64 PeepholeSize = 2;
+  repeated string ExcludeFiles = 3;
+  bool ReCompile = 4;
+  bool Memory = 5;
+}
+
+message SSAProjectScanConfig{
+  uint32 Concurrency = 1;
+  bool Memory = 2;
+  repeated  string RuleGroups= 3;
+  repeated string ruleNames = 4;
+  bool IgnoreLanguage = 5;
+}
+
 
 message SSAProjectFilter {
   repeated int64 IDs = 1;

@@ -113,19 +113,27 @@ func FilterSSAProject(db *gorm.DB, filter *ypb.SSAProjectFilter) *gorm.DB {
 }
 
 func ProtoToSchemaSSAProject(proto *ypb.SSAProject) *schema.SSAProject {
+	if proto == nil {
+		return nil
+	}
 	project := &schema.SSAProject{
 		ProjectName:      proto.ProjectName,
 		CodeSourceConfig: proto.CodeSourceConfig,
 		Description:      proto.Description,
-		StrictMode:       proto.StrictMode,
-		PeepholeSize:     int(proto.PeepholeSize),
-		ExcludeFiles:     proto.ExcludeFiles,
-		ReCompile:        proto.ReCompile,
-		ScanConcurrency:  proto.ScanConcurrency,
-		MemoryScan:       proto.MemoryScan,
-		ScanRuleGroups:   proto.ScanRuleGroups,
-		ScanRuleNames:    proto.ScanRuleNames,
-		IgnoreLanguage:   proto.IgnoreLanguage,
+	}
+	project.SetTagsList(proto.Tags)
+	if proto.CompileConfig != nil {
+		project.StrictMode = proto.CompileConfig.StrictMode
+		project.PeepholeSize = int(proto.CompileConfig.PeepholeSize)
+		project.SetExcludeFilesList(proto.CompileConfig.ExcludeFiles)
+		project.ReCompile = proto.CompileConfig.ReCompile
+	}
+	if proto.ScanConfig != nil {
+		project.ScanConcurrency = proto.ScanConfig.Concurrency
+		project.MemoryScan = proto.ScanConfig.Memory
+		project.SetScanRuleGroupsList(proto.ScanConfig.RuleGroups)
+		project.SetScanRuleNamesList(proto.ScanConfig.RuleNames)
+		project.IgnoreLanguage = proto.ScanConfig.IgnoreLanguage
 	}
 	if proto.ID > 0 {
 		project.ID = uint(proto.ID)
