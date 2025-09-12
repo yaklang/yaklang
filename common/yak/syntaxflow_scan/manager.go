@@ -312,6 +312,21 @@ func (m *ScanManager) initByConfig(stream ScanStream) error {
 		)
 		m.rulesCount = int64(len(config.RuleNames))
 		m.kind = schema.SFResultKindScan
+	} else if config.GetSSAProjectId() != 0 {
+		db := consts.GetGormProfileDatabase()
+		count, err := yakit.GetRuleCountBySSAProjectId(db, config.GetSSAProjectId())
+		if err != nil {
+			return utils.Errorf("get rule count by ssa project id failed: %s", err)
+		}
+		m.rulesCount = count
+
+		m.ruleChan = yakit.YieldSyntaxFlowRulesBySSAProjectId(
+			db,
+			m.ctx,
+			config.GetSSAProjectId(),
+		)
+		m.rulesCount = count
+		m.kind = schema.SFResultKindScan
 	} else {
 		return utils.Errorf("config is invalid")
 	}

@@ -2,6 +2,7 @@ package yakit
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -112,6 +113,20 @@ func FilterSSAProject(db *gorm.DB, filter *ypb.SSAProjectFilter) *gorm.DB {
 	return db
 }
 
+func QuerySSAProjectById(id uint64) (*schema.SSAProject, error) {
+	if id == 0 {
+		return nil, utils.Errorf("get SSA project failed: id is required")
+	}
+	db := consts.GetGormProfileDatabase()
+	db = db.Model(&schema.SSAProject{})
+	var project *schema.SSAProject
+	db = db.Where("id = ?", id).First(&project)
+	if db.Error != nil {
+		return nil, utils.Errorf("get SSA project failed: %s", db.Error)
+	}
+	return project, nil
+}
+
 func ProtoToSchemaSSAProject(proto *ypb.SSAProject) *schema.SSAProject {
 	if proto == nil {
 		return nil
@@ -125,15 +140,15 @@ func ProtoToSchemaSSAProject(proto *ypb.SSAProject) *schema.SSAProject {
 	if proto.CompileConfig != nil {
 		project.StrictMode = proto.CompileConfig.StrictMode
 		project.PeepholeSize = int(proto.CompileConfig.PeepholeSize)
-		project.SetExcludeFilesList(proto.CompileConfig.ExcludeFiles)
 		project.ReCompile = proto.CompileConfig.ReCompile
 	}
 	if proto.ScanConfig != nil {
 		project.ScanConcurrency = proto.ScanConfig.Concurrency
 		project.MemoryScan = proto.ScanConfig.Memory
-		project.SetScanRuleGroupsList(proto.ScanConfig.RuleGroups)
-		project.SetScanRuleNamesList(proto.ScanConfig.RuleNames)
 		project.IgnoreLanguage = proto.ScanConfig.IgnoreLanguage
+	}
+	if proto.RuleConfig != nil {
+		project.SetRuleFilter(proto.RuleConfig.RuleFilter)
 	}
 	if proto.ID > 0 {
 		project.ID = uint(proto.ID)
