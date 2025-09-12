@@ -52,7 +52,10 @@ type FunctionBuilder struct {
 	Included bool
 	IsReturn bool
 
-	RefParameter map[string]struct{ Index int }
+	RefParameter map[string]struct {
+		Index int
+		Kind  SideEffectKind
+	}
 
 	target *target // for break and continue
 	labels map[string]*BasicBlock
@@ -84,14 +87,17 @@ type FunctionBuilder struct {
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
-		_editor:              editor,
-		Function:             f,
-		target:               &target{},
-		labels:               make(map[string]*BasicBlock),
-		CurrentBlock:         nil,
-		CurrentRange:         nil,
-		parentBuilder:        parent,
-		RefParameter:         make(map[string]struct{ Index int }),
+		_editor:       editor,
+		Function:      f,
+		target:        &target{},
+		labels:        make(map[string]*BasicBlock),
+		CurrentBlock:  nil,
+		CurrentRange:  nil,
+		parentBuilder: parent,
+		RefParameter: make(map[string]struct {
+			Index int
+			Kind  SideEffectKind
+		}),
 		SyntaxIncludingStack: utils.NewStack[string](),
 		includeStack:         utils.NewStack[*Program](),
 		captureFreeValue:     make(map[string]struct{}),
@@ -280,9 +286,16 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 	return b.MarkedFuncType
 }
 
-func (b *FunctionBuilder) ReferenceParameter(name string, index int) {
-	b.RefParameter[name] = struct{ Index int }{Index: index}
+func (b *FunctionBuilder) ReferenceParameter(name string, index int, kind SideEffectKind) {
+	b.RefParameter[name] = struct {
+		Index int
+		Kind  SideEffectKind
+	}{
+		Index: index,
+		Kind:  kind,
+	}
 }
+
 func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) Value {
 	method := bluePrint.GetMagicMethod(Constructor, b)
 	constructor := b.NewCall(method, args)

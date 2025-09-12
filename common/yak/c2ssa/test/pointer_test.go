@@ -450,3 +450,208 @@ int main(){
 		`, []string{"3", "phi(a)[1,3]", "phi(b)[2,3]"}, t)
 	})
 }
+
+func Test_Pointer_sideEffect(t *testing.T) {
+	t.Run("pointer side-effect", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void pointer(int* a) {
+	*a = 2;
+}
+
+int main() {
+	int a = 1;
+
+	println(a); // 1
+	pointer(&a);
+	println(a); // side-effect(2, a)
+}
+
+		`, []string{"1", "side-effect(2, a)"}, t)
+	})
+
+	t.Run("pointer side-effect cross block", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void pointer(int* a) {
+	*a = 2;
+}
+
+int main() {
+	int a = 1;
+	{
+		println(a); // 1
+		pointer(&a);
+		println(a); // side-effect(2, a)
+	}
+}
+
+		`, []string{"1", "side-effect(2, a)"}, t)
+	})
+
+	t.Run("pointer side-effect cross block and local", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void pointer(int* a) {
+	*a = 3;
+}
+
+int main() {
+	int a = 1;
+	{
+		int a = 2;
+		println(a); // 2
+		pointer(&a);
+		println(a); // side-effect(3, a)
+	}
+	println(a); // 1
+	pointer(&a);
+	println(a); // side-effect(3, a)
+}
+
+		`, []string{
+			"2", "side-effect(3, a)",
+			"1", "side-effect(3, a)"}, t)
+	})
+
+	t.Run("pointer side-effect with struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+struct Data {
+	int value;
+};
+
+void modify_data(struct Data* d) {
+	d->value = 42;
+}
+
+int main() {
+	struct Data data = { .value = 10 };
+	
+	println(data.value); // 10
+	modify_data(&data);
+	println(data.value); // side-effect(42, data.value)
+}
+
+		`, []string{"10", "side-effect(42, data.value)"}, t)
+	})
+
+	// TODO
+	t.Skip()
+
+	t.Run("pointer side-effect with nested struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+struct Inner {
+	int x;
+};
+
+struct Outer {
+	struct Inner inner;
+};
+
+void modify_nested(struct Outer* outer) {
+	outer->inner.x = 99;
+}
+
+int main() {
+	struct Outer outer = { .inner = { .x = 5 } };
+	
+	println(outer.inner.x); // 5
+	modify_nested(&outer);
+	println(outer.inner.x); // side-effect(99, outer.inner.x)
+}
+
+		`, []string{"5", "side-effect(99, outer.inner.x)"}, t)
+	})
+
+	t.Run("pointer side-effect with array", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void modify_array(int* arr) {
+	arr[0] = 100;
+	arr[1] = 200;
+}
+
+int main() {
+	int arr[3] = {1, 2, 3};
+	
+	println(arr[0]); // 1
+	println(arr[1]); // 2
+	modify_array(arr);
+	println(arr[0]); // side-effect(FreeValue-arr, arr[0])
+	println(arr[1]); // side-effect(FreeValue-arr, arr[1])
+}
+
+		`, []string{"1", "2", "side-effect(FreeValue-arr, arr[0])", "side-effect(FreeValue-arr, arr[1])"}, t)
+	})
+
+	t.Run("pointer side-effect with double pointer", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void modify_through_double_pointer(int** pp) {
+	**pp = 77;
+}
+
+int main() {
+	int a = 10;
+	int* p = &a;
+	
+	println(a); // 10
+	modify_through_double_pointer(&p);
+	println(a); // side-effect(77, a)
+}
+
+		`, []string{"10", "side-effect(77, a)"}, t)
+	})
+
+	t.Run("pointer side-effect multiple parameters", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void modify_multiple(int* a, int* b, int* c) {
+	*a = 11;
+	*b = 22;
+	*c = 33;
+}
+
+int main() {
+	int x = 1, y = 2, z = 3;
+	
+	println(x); // 1
+	println(y); // 2
+	println(z); // 3
+	modify_multiple(&x, &y, &z);
+	println(x); // side-effect(11, x)
+	println(y); // side-effect(22, y)
+	println(z); // side-effect(33, z)
+}
+
+		`, []string{
+			"1", "2", "3",
+			"side-effect(11, x)",
+			"side-effect(22, y)",
+			"side-effect(33, z)"}, t)
+	})
+
+	t.Run("pointer side-effect with conditional", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void conditional_modify(int* a, int condition) {
+	if (condition > 0) {
+		*a = 50;
+	} else {
+		*a = 60;
+	}
+}
+
+int main() {
+	int a = 1;
+	
+	println(a); // 1
+	conditional_modify(&a, 1);
+	println(a); // side-effect(phi(a)[50,60], a)
+}
+
+		`, []string{"1", "side-effect(phi(a)[50,60], a)"}, t)
+	})
+}

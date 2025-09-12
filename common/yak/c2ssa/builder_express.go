@@ -227,11 +227,11 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 	}
 
 	if a := ast.AssignmentOperator(); a != nil {
-		if left == nil {
-			getVariable()
-		}
 		if right == nil {
 			getValue()
+		}
+		if left == nil {
+			getVariable()
 		}
 		if e := ast.Initializer(); e != nil {
 			newRight = b.buildInitializer(e.(*cparser.InitializerContext))
@@ -307,9 +307,14 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 				right = b.EmitConstInst(0)
 			}
 		} else if left != nil {
-			v, _ := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), false)
-			if v.GetType().GetTypeKind() == ssa.PointerKind {
-				return nil, b.GetOriginPointer(v)
+			op1, _ := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), false)
+			if op1.GetType().GetTypeKind() == ssa.PointerKind {
+				return nil, b.GetAndCreateOriginPointer(op1)
+			} else if p, ok := ssa.ToParameter(op1); ok && !p.IsFreeValue {
+				if _, op1Var := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), true); op1Var != nil {
+					b.ReferenceParameter(op1Var.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+					// b.AssignVariable(op1Var, op1)
+				}
 			}
 		}
 	}
@@ -395,7 +400,7 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 	}
 
 	// 5. 结构体成员：primaryExpression '.' Identifier 或 '->' Identifier
-	buildDotArrow := func() {
+	buildDotArrow := func(isPointer bool) {
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
 			if right != nil {
@@ -408,16 +413,20 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 				member := b.ReadValue(left.GetName())
 				if t := member.GetType(); t != nil && t.GetTypeKind() == ssa.PointerKind {
 					member = b.GetOriginValue(member)
+				} else if p, ok := ssa.ToParameter(member); isPointer && ok && !p.IsFreeValue {
+					left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
+					b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+					return
 				}
 				left = b.CreateMemberCallVariable(member, b.EmitConstInst(key))
 			}
 		}
 	}
 	if ast.Dot() != nil {
-		buildDotArrow()
+		buildDotArrow(false)
 	}
 	if ast.Arrow() != nil {
-		buildDotArrow()
+		buildDotArrow(true)
 	}
 
 	// 6. 后缀 ++/--

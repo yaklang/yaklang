@@ -45,6 +45,7 @@ type VersionedIF[T versionedValue] interface {
 
 	// local
 	GetLocal() bool
+	GetCross() bool
 
 	// capture
 	CaptureInScope(ScopedVersionedTableIF[T]) (VersionedIF[T], bool)
@@ -89,6 +90,7 @@ type Versioned[T versionedValue] struct {
 	lexicalName     string
 
 	local bool
+	cross bool
 
 	// the version of variable in current scope
 	scope ScopedVersionedTableIF[T]
@@ -292,6 +294,14 @@ func (v *Versioned[T]) GetLocal() bool {
 	return v.local
 }
 
+func (v *Versioned[T]) SetCross(c bool) {
+	v.cross = c
+}
+
+func (v *Versioned[T]) GetCross() bool {
+	return v.cross
+}
+
 func (v *Versioned[T]) CaptureInScope(base ScopedVersionedTableIF[T]) (VersionedIF[T], bool) {
 	baseVariable := base.ReadVariable(v.GetName())
 	if baseVariable == nil {
@@ -299,7 +309,10 @@ func (v *Versioned[T]) CaptureInScope(base ScopedVersionedTableIF[T]) (Versioned
 		// just skip
 		return nil, false
 	}
-	if baseVariable.GetCaptured() != v.GetCaptured() && !baseVariable.GetCaptured().GetLocal() {
+	if baseVariable.GetCaptured().GetGlobalIndex() != v.GetCaptured().GetGlobalIndex() {
+		if v.GetCross() {
+			return nil, true
+		}
 		return nil, false
 	}
 

@@ -187,12 +187,12 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			switch op.GetText() {
 			case "*":
 				if op1.GetType().GetTypeKind() == ssa.PointerKind {
-					return nil, b.GetOriginPointer(op1)
-				} else if p, ok := ssa.ToParameter(op1); ok {
-					p.IsFreeValue = true
+					return nil, b.GetAndCreateOriginPointer(op1)
+				} else if p, ok := ssa.ToParameter(op1); ok && !p.IsFreeValue {
 					if op1Var := getVariable(exp, 0); op1Var != nil {
-						b.ReferenceParameter(op1Var.GetName(), p.FormalParameterIndex)
-						b.AssignVariable(op1Var, op1)
+						b.ReferenceParameter(op1Var.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+						// b.AssignVariable(op1Var, op1)
+						return nil, op1Var
 					}
 				}
 			}
@@ -239,6 +239,13 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 						handleObjectType(rv, typ)
 					}
 					return
+				} else if p, ok := ssa.ToParameter(rv); ok && !p.IsFreeValue {
+					if key := typ.GetKeybyName(text); key != nil {
+						leftv = b.CreateMemberCallVariable(rv, key)
+						b.ReferenceParameter(leftv.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+						// TODO: 匿名结构体指针使用其他逻辑实现，需要兼容
+						return
+					}
 				}
 
 				if key := typ.GetKeybyName(text); key != nil {

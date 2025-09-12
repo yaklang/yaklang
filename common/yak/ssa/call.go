@@ -450,16 +450,16 @@ func (c *Call) handleCalleeFunction() {
 	if builder.isBindLanguage() {
 		handleSideEffectBind(c, funcTyp)
 	} else {
-		handleSideEffect(c, funcTyp)
+		handleSideEffect(c, funcTyp, false)
 	}
+	handleSideEffect(c, funcTyp, true)
 
 	// only handler in method call
 	if !funcTyp.IsMethod {
 		return
 	}
 
-	is := method.IsMember()
-	if !is {
+	if !method.IsMember() {
 		// this function is method Function, but no member call get this.
 		// error
 		return
