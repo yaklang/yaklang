@@ -339,3 +339,79 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "test", results[0].Document.ID)
 }
+
+func TestRAGQueryResultSimilarityLimit(t *testing.T) {
+	db, _ := utils.CreateTempTestDatabaseInMemory()
+	if db == nil {
+		t.Skip("database not available")
+		return
+	}
+	result := make([]float32, 1024)
+	for i := 0; i < 1024; i++ {
+		result[i] = float32(i)
+	}
+
+	duplicateFunc := func(text string) ([]float32, error) {
+		return result, nil
+	}
+
+	mockEmbed := NewMockEmbedder(duplicateFunc)
+	ragSystem, err := CreateCollection(db, "sim_test", "test", WithEmbeddingClient(mockEmbed))
+	assert.NoError(t, err)
+
+	// 添加两个内容高度相似的文档, mock 情况下两者向量完全相同
+	doc1 := Document{
+		ID:      "doc1",
+		Content: "机器学习是一种人工智能方法。",
+	}
+	doc2 := Document{
+		ID:      "doc2",
+		Content: "机器学习是一种人工智能方法",
+	}
+	assert.NoError(t, ragSystem.Add(doc1.ID, doc1.Content))
+	assert.NoError(t, ragSystem.Add(doc2.ID, doc2.Content))
+
+	results, err := SimpleQuery(db, "机器学习", 10, WithRAGCollectionName("sim_test"), WithRAGResultSimilarityLimit(0.99))
+	assert.NoError(t, err)
+	assert.True(t, len(results) == 1, "Should filter out highly similar results")
+
+	results, err = SimpleQuery(db, "机器学习", 10, WithRAGCollectionName("sim_test"), WithRAGEnableResultDuplicatesFilter(false))
+	assert.NoError(t, err)
+	assert.True(t, len(results) == 2, "Should return all results when duplicate filter is disabled")
+}
+
+func TestRAGQueryEnableResultDuplicatesFilterDefaultLimit(t *testing.T) {
+	db, _ := utils.CreateTempTestDatabaseInMemory()
+	if db == nil {
+		t.Skip("database not available")
+		return
+	}
+
+	result := make([]float32, 1024)
+	for i := 0; i < 1024; i++ {
+		result[i] = float32(i)
+	}
+
+	duplicateFunc := func(text string) ([]float32, error) {
+		return result, nil
+	}
+	mockEmbed := NewMockEmbedder(duplicateFunc)
+	ragSystem, err := CreateCollection(db, "dup_test", "test", WithEmbeddingClient(mockEmbed))
+	assert.NoError(t, err)
+
+	// 添加两个内容高度相似的文档
+	doc1 := Document{
+		ID:      "docA",
+		Content: "深度学习是一种机器学习方法。",
+	}
+	doc2 := Document{
+		ID:      "docB",
+		Content: "深度学习是一种机器学习方法。",
+	}
+	assert.NoError(t, ragSystem.Add(doc1.ID, doc1.Content, WithDocumentRelatedEntities("AI", "ML")))
+	assert.NoError(t, ragSystem.Add(doc2.ID, doc2.Content, WithDocumentRelatedEntities("AI", "ML")))
+
+	results, err := SimpleQuery(db, "机器学习", 10, WithRAGCollectionName("dup_test"), WithRAGEnableResultDuplicatesFilter(true))
+	assert.NoError(t, err)
+	assert.True(t, len(results) == 1, "Should filter out duplicates with default similarity limit")
+}
