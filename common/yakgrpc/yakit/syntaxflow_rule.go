@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"context"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -260,4 +261,50 @@ func AllSyntaxFlowRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.Sy
 		return nil, utils.Errorf("query failed: %s", err)
 	}
 	return ret, nil
+}
+
+func YieldSyntaxFlowRulesBySSAProjectId(db *gorm.DB, ctx context.Context, ssaProjectId uint64) chan *schema.SyntaxFlowRule {
+	if ssaProjectId == 0 {
+		return nil
+	}
+	project, err := QuerySSAProjectById(ssaProjectId)
+	if err != nil {
+		return nil
+	}
+	if project == nil {
+		return nil
+	}
+	filter, err := project.GetRuleFilter()
+	if err != nil {
+		return nil
+	}
+	if filter == nil {
+		return nil
+	}
+	db = FilterSyntaxFlowRule(db, filter)
+	return sfdb.YieldSyntaxFlowRules(db, ctx)
+}
+
+func GetRuleCountBySSAProjectId(db *gorm.DB, ssaProjectId uint64) (int64, error) {
+	if ssaProjectId == 0 {
+		return 0, utils.Errorf("get rule count by ssa project id failed: ssa project id is 0")
+	}
+	project, err := QuerySSAProjectById(ssaProjectId)
+	if err != nil {
+		return 0, utils.Errorf("get rule count by ssa project id failed: %s", err)
+	}
+	if project == nil {
+		return 0, utils.Errorf("get rule count by ssa project id failed: project is nil")
+	}
+	filter, err := project.GetRuleFilter()
+	if err != nil {
+		return 0, utils.Errorf("get rule count by ssa project id failed: %s", err)
+	}
+	if filter == nil {
+		return 0, utils.Errorf("get rule count by ssa project id failed: filter is nil")
+	}
+	db = FilterSyntaxFlowRule(db, filter)
+	var count int64
+	db.Count(&count)
+	return count, nil
 }

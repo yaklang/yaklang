@@ -27,9 +27,9 @@ type SSAProject struct {
 	// 扫描配置选项
 	ScanConcurrency uint32 `json:"scan_concurrency" gorm:"comment:扫描并发数"`
 	MemoryScan      bool   `json:"memory_scan" gorm:"comment:是否使用内存扫描"`
-	ScanRuleGroups  string `json:"scan_rule_groups,omitempty" gorm:"comment:扫描规则组,逗号分隔"`
-	ScanRuleNames   string `json:"scan_rule_names,omitempty" gorm:"comment:扫描规则名称,逗号分隔"`
 	IgnoreLanguage  bool   `json:"ignore_language" gorm:"comment:是否忽略语言检查"`
+	// 扫描策略配置
+	RuleFilter []byte `json:"rule_filter,omitempty" gorm:"comment:扫描规则过滤配置"`
 }
 
 // GetSourceCodeInfo 获取源码配置信息
@@ -125,8 +125,6 @@ func (p *SSAProject) GetScanOptions() (map[string]interface{}, error) {
 		"concurrency":    p.ScanConcurrency,
 		"memory":         p.MemoryScan,
 		"ignoreLanguage": p.IgnoreLanguage,
-		"ruleGroups":     p.GetScanRuleGroupsList(),
-		"ruleNames":      p.GetScanRuleNamesList(),
 	}
 	return scanOptions, nil
 }
@@ -135,36 +133,37 @@ func (p *SSAProject) GetExcludeFilesList() []string {
 	return strings.Split(p.ExcludeFiles, ",")
 }
 
-func (p *SSAProject) GetScanRuleGroupsList() []string {
-	return strings.Split(p.ScanRuleGroups, ",")
-}
-
-func (p *SSAProject) GetScanRuleNamesList() []string {
-	return strings.Split(p.ScanRuleNames, ",")
-}
-
 func (p *SSAProject) GetTagsList() []string {
 	return strings.Split(p.Tags, ",")
-}
-
-func (p *SSAProject) SetExcludeFilesList(files []string) {
-	p.ExcludeFiles = strings.Join(files, ",")
-}
-
-func (p *SSAProject) SetScanRuleGroupsList(groups []string) {
-	p.ScanRuleGroups = strings.Join(groups, ",")
-}
-
-func (p *SSAProject) SetScanRuleNamesList(names []string) {
-	p.ScanRuleNames = strings.Join(names, ",")
 }
 
 func (p *SSAProject) SetTagsList(tags []string) {
 	p.Tags = strings.Join(tags, ",")
 }
 
+func (p *SSAProject) GetRuleFilter() (*ypb.SyntaxFlowRuleFilter, error) {
+	if p.RuleFilter == nil {
+		return nil, fmt.Errorf("rule filter is required")
+	}
+	var filter *ypb.SyntaxFlowRuleFilter
+	err := json.Unmarshal(p.RuleFilter, &filter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal rule filter: %v", err)
+	}
+	return filter, nil
+}
+
+func (p *SSAProject) SetRuleFilter(filter *ypb.SyntaxFlowRuleFilter) error {
+	filterBytes, err := json.Marshal(filter)
+	if err != nil {
+		return fmt.Errorf("failed to marshal rule filter: %v", err)
+	}
+	p.RuleFilter = filterBytes
+	return nil
+}
+
 func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
-	return &ypb.SSAProject{
+	result := &ypb.SSAProject{
 		ID:               int64(p.ID),
 		CreatedAt:        p.CreatedAt.Unix(),
 		UpdatedAt:        p.UpdatedAt.Unix(),
@@ -181,9 +180,17 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 			Concurrency:    p.ScanConcurrency,
 			Memory:         p.MemoryScan,
 			IgnoreLanguage: p.IgnoreLanguage,
-			RuleGroups:     p.GetScanRuleGroupsList(),
-			RuleNames:      p.GetScanRuleNamesList(),
 		},
 		Tags: p.GetTagsList(),
 	}
+	filter, err := p.GetRuleFilter()
+	if err != nil {
+		return nil
+	}
+	if filter != nil {
+		result.RuleConfig = &ypb.SSAProjectScanRuleConfig{
+			RuleFilter: filter,
+		}
+	}
+	return result
 }

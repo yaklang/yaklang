@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"encoding/json"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -209,7 +210,7 @@ func WithPeepholeSize(size int) SSAProjectParamsOpt {
 
 func WithExcludeFiles(files []string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
-		b.project.SetExcludeFilesList(files)
+		b.project.ExcludeFiles = strings.Join(files, ",")
 	}
 }
 
@@ -230,19 +231,6 @@ func WithMemoryScan(memory bool) SSAProjectParamsOpt {
 		b.project.MemoryScan = memory
 	}
 }
-
-func WithScanRuleGroups(groups []string) SSAProjectParamsOpt {
-	return func(b *ssaProjectConfigBuilder) {
-		b.project.SetScanRuleGroupsList(groups)
-	}
-}
-
-func WithScanRuleNames(names []string) SSAProjectParamsOpt {
-	return func(b *ssaProjectConfigBuilder) {
-		b.project.SetScanRuleNamesList(names)
-	}
-}
-
 func WithIgnoreLanguage(ignore bool) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
 		b.project.IgnoreLanguage = ignore
@@ -324,8 +312,6 @@ var SSAProjectExports = map[string]interface{}{
 	"withReCompile":       WithReCompile,
 	"withScanConcurrency": WithScanConcurrency,
 	"withMemoryScan":      WithMemoryScan,
-	"withScanRuleGroups":  WithScanRuleGroups,
-	"withScanRuleNames":   WithScanRuleNames,
 	"withIgnoreLanguage":  WithIgnoreLanguage,
 	"withProxyURL":        WithProxyURL,
 	"withProxyAuth":       WithProxyAuth,

@@ -18,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type ScanManager struct {
+type scanManager struct {
 	// task info
 	taskID       string
 	status       string
@@ -70,9 +70,9 @@ type ScanManager struct {
 	ruleProcessCallback RuleProcessCallback
 }
 
-var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *ScanManager]()
+var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
 
-func LoadSyntaxflowTaskFromDB(taskId string, ctx context.Context, stream ScanStream) (*ScanManager, error) {
+func LoadSyntaxflowTaskFromDB(taskId string, ctx context.Context, stream ScanStream) (*scanManager, error) {
 	if manager, ok := syntaxFlowScanManagerMap.Get(taskId); ok {
 		ctx, cancel := context.WithCancel(ctx)
 		manager.ctx = ctx
@@ -96,13 +96,13 @@ func LoadSyntaxflowTaskFromDB(taskId string, ctx context.Context, stream ScanStr
 
 func createEmptySyntaxFlowTaskByID(
 	taskId string, ctx context.Context,
-) (*ScanManager, error) {
+) (*scanManager, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
 	var rootctx, cancel = context.WithCancel(ctx)
-	m := &ScanManager{
+	m := &scanManager{
 		taskID:       taskId,
 		ctx:          rootctx,
 		status:       schema.SYNTAXFLOWSCAN_EXECUTING,
@@ -115,12 +115,12 @@ func createEmptySyntaxFlowTaskByID(
 	return m, nil
 }
 
-func CreateSyntaxflowTaskById(
+func createSyntaxflowTaskById(
 	taskId string, ctx context.Context,
 	req *ypb.SyntaxFlowScanRequest,
 	stream ScanStream,
-	sc *ScanConfig,
-) (*ScanManager, error) {
+	sc *scanInputConfig,
+) (*scanManager, error) {
 	m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,7 @@ func RemoveSyntaxFlowTaskByID(id string) {
 	syntaxFlowScanManagerMap.Delete(id)
 }
 
-func (m *ScanManager) GetConcurrency() uint32 {
+func (m *scanManager) GetConcurrency() uint32 {
 	if m.concurrency == 0 {
 		return 5
 	}
@@ -158,7 +158,7 @@ func (m *ScanManager) GetConcurrency() uint32 {
 }
 
 // setScanBatch 设置扫描批次号
-func (m *ScanManager) setScanBatch() {
+func (m *scanManager) setScanBatch() {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
@@ -172,7 +172,7 @@ func (m *ScanManager) setScanBatch() {
 }
 
 // SaveTask save task info which is from manager to database
-func (m *ScanManager) SaveTask() error {
+func (m *scanManager) SaveTask() error {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
@@ -214,7 +214,7 @@ func (m *ScanManager) SaveTask() error {
 	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
 }
 
-func (m *ScanManager) RestoreTask(stream ScanStream) error {
+func (m *scanManager) RestoreTask(stream ScanStream) error {
 	task, err := schema.GetSyntaxFlowScanTaskById(ssadb.GetDB(), m.TaskId())
 	if err != nil {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by is failed")
@@ -243,22 +243,35 @@ func (m *ScanManager) RestoreTask(stream ScanStream) error {
 	return nil
 }
 
-func (m *ScanManager) initByConfig(stream ScanStream) error {
+func (m *scanManager) initByConfig(stream ScanStream) error {
 	config := m.config
 	if config == nil {
 		return utils.Errorf("config is nil")
 	}
-	// init by config
-	if len(config.GetProgramName()) == 0 {
-		return utils.Errorf("program name is empty")
-	}
-	m.programs = config.GetProgramName()
-	m.ignoreLanguage = config.GetIgnoreLanguage()
-	m.memory = config.GetMemory()
-	// init by stream
-	taskId := m.TaskId()
-	if config.GetConcurrency() != 0 {
-		m.concurrency = config.GetConcurrency()
+
+	taskId := m.taskID
+	projectId := config.GetSSAProjectId()
+	if projectId != 0 && len(config.GetProgramName()) == 0 {
+		// init by project info in db
+		project, err := yakit.QuerySSAProjectById(projectId)
+		if err != nil || project == nil {
+			return utils.Errorf("query ssa project by id failed: %s", err)
+		}
+		m.programs = []string{project.ProjectName}
+		m.ignoreLanguage = project.IgnoreLanguage
+		m.memory = project.MemoryScan
+		m.concurrency = project.ScanConcurrency
+	} else {
+		// init by stream config
+		if len(config.GetProgramName()) == 0 {
+			return utils.Errorf("program name is empty")
+		}
+		m.programs = config.GetProgramName()
+		m.ignoreLanguage = config.GetIgnoreLanguage()
+		m.memory = config.GetMemory()
+		if config.GetConcurrency() != 0 {
+			m.concurrency = config.GetConcurrency()
+		}
 	}
 
 	m.stream = stream
@@ -314,23 +327,39 @@ func (m *ScanManager) initByConfig(stream ScanStream) error {
 		)
 		m.rulesCount = int64(len(config.RuleNames))
 		m.kind = schema.SFResultKindScan
+	} else if projectId != 0 {
+		db := consts.GetGormProfileDatabase()
+		count, err := yakit.GetRuleCountBySSAProjectId(db, config.GetSSAProjectId())
+		if err != nil {
+			return utils.Errorf("get rule count by ssa project id failed: %s", err)
+		}
+		m.rulesCount = count
+
+		m.ruleChan = yakit.YieldSyntaxFlowRulesBySSAProjectId(
+			db,
+			m.ctx,
+			config.GetSSAProjectId(),
+		)
+		m.rulesCount = count
+		m.kind = schema.SFResultKindScan
 	} else {
 		return utils.Errorf("config is invalid")
 	}
+
 	m.totalQuery = m.rulesCount * int64(len(m.programs))
 	m.SaveTask()
 	return nil
 }
 
-func (m *ScanManager) TaskId() string {
+func (m *scanManager) TaskId() string {
 	return m.taskID
 }
 
-func (m *ScanManager) Stop() {
+func (m *scanManager) Stop() {
 	m.cancel()
 }
 
-func (m *ScanManager) IsStop() bool {
+func (m *scanManager) IsStop() bool {
 	select {
 	case <-m.ctx.Done():
 		return true
@@ -339,22 +368,22 @@ func (m *ScanManager) IsStop() bool {
 	}
 }
 
-func (m *ScanManager) Resume() {
+func (m *scanManager) Resume() {
 	m.isPaused.UnSet()
 }
-func (m *ScanManager) Pause() {
+func (m *scanManager) Pause() {
 	m.isPaused.Set()
 }
 
-func (m *ScanManager) IsPause() bool {
+func (m *scanManager) IsPause() bool {
 	return m.isPaused.IsSet()
 }
 
-func (m *ScanManager) CurrentTaskIndex() int64 {
+func (m *scanManager) CurrentTaskIndex() int64 {
 	return atomic.LoadInt64(&m.finishedQuery)
 }
 
-func (m *ScanManager) ScanNewTask() error {
+func (m *scanManager) ScanNewTask() error {
 	defer m.Stop()
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
 	// start task
@@ -365,7 +394,7 @@ func (m *ScanManager) ScanNewTask() error {
 	return nil
 }
 
-func (m *ScanManager) ResumeTask() error {
+func (m *scanManager) ResumeTask() error {
 	taskIndex := m.CurrentTaskIndex()
 	if taskIndex > m.totalQuery {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
@@ -380,39 +409,39 @@ func (m *ScanManager) ResumeTask() error {
 	return nil
 }
 
-func (m *ScanManager) StatusTask() error {
+func (m *scanManager) StatusTask() error {
 	m.notifyStatus()
 	return nil
 }
 
 // 规则执行成功
-func (m *ScanManager) markRuleSuccess() {
+func (m *scanManager) markRuleSuccess() {
 	atomic.AddInt64(&m.successQuery, 1)
 	atomic.AddInt64(&m.finishedQuery, 1)
 }
 
 // 规则执行失败
-func (m *ScanManager) markRuleFailed() {
+func (m *scanManager) markRuleFailed() {
 	atomic.AddInt64(&m.failedQuery, 1)
 	atomic.AddInt64(&m.finishedQuery, 1)
 }
 
 // 规则跳过
-func (m *ScanManager) markRuleSkipped() {
+func (m *scanManager) markRuleSkipped() {
 	atomic.AddInt64(&m.skipQuery, 1)
 	atomic.AddInt64(&m.finishedQuery, 1)
 }
 
 // 添加风险计数（不影响完成计数）
-func (m *ScanManager) addRiskCount(count int64) {
+func (m *scanManager) addRiskCount(count int64) {
 	atomic.AddInt64(&m.riskCount, count)
 }
 
 // 获取当前完成进度（用于调试）
-func (m *ScanManager) getProgress() (finished, total int64) {
+func (m *scanManager) getProgress() (finished, total int64) {
 	return atomic.LoadInt64(&m.finishedQuery), m.totalQuery
 }
 
-func (m *ScanManager) GetRiskCountMap() *utils.SafeMap[int64] {
+func (m *scanManager) GetRiskCountMap() *utils.SafeMap[int64] {
 	return m.riskCountMap
 }
