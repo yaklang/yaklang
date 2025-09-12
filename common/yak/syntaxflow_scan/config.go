@@ -6,20 +6,26 @@ type ProcessCallback func(progress float64)
 
 type RuleProcessCallback func(progName, ruleName string, progress float64)
 
-type ScanConfig struct {
+type scanInputConfig struct {
 	ScanRequest         *ypb.SyntaxFlowScanRequest
 	ProcessCallback     ProcessCallback
 	RuleProcessCallback RuleProcessCallback
 }
 
-func (sc *ScanConfig) GetScanRequest() *ypb.SyntaxFlowScanRequest {
+func (sc *scanInputConfig) GetScanRequest() *ypb.SyntaxFlowScanRequest {
 	return sc.ScanRequest
 }
 
-func (sc *ScanConfig) GetProcessCallback() ProcessCallback {
+func (sc *scanInputConfig) GetProcessCallback() ProcessCallback {
+	if sc == nil {
+		return nil
+	}
 	return sc.ProcessCallback
 }
 
-func (sc *ScanConfig) GetRuleProcessCallback() RuleProcessCallback {
+func (sc *scanInputConfig) GetRuleProcessCallback() RuleProcessCallback {
+	if sc == nil {
+		return nil
+	}
 	return sc.RuleProcessCallback
 }

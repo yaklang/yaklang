@@ -8,7 +8,7 @@ import (
 )
 
 // ScanOption 定义扫描选项类型，用于配置SyntaxFlow扫描任务的各种参数
-type ScanOption func(*ScanConfig)
+type ScanOption func(*scanInputConfig)
 
 // WithProgramNames 设置要扫描的程序名称，可以指定一个或多个程序进行扫描
 // Example:
@@ -26,7 +26,7 @@ type ScanOption func(*ScanConfig)
 // )
 // ```
 func WithProgramNames(names ...string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -45,7 +45,7 @@ func WithProgramNames(names ...string) ScanOption {
 // )
 // ```
 func WithRuleNames(names ...string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -67,7 +67,7 @@ func WithRuleNames(names ...string) ScanOption {
 // )
 // ```
 func WithLanguages(languages ...string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -89,7 +89,7 @@ func WithLanguages(languages ...string) ScanOption {
 // )
 // ```
 func WithGroupNames(groups ...string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -111,7 +111,7 @@ func WithGroupNames(groups ...string) ScanOption {
 // )
 // ```
 func WithSeverity(severity ...string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -133,7 +133,7 @@ func WithSeverity(severity ...string) ScanOption {
 // )
 // ```
 func WithPurpose(purpose ...string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -155,7 +155,7 @@ func WithPurpose(purpose ...string) ScanOption {
 // )
 // ```
 func WithTags(tags ...string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -177,7 +177,7 @@ func WithTags(tags ...string) ScanOption {
 // )
 // ```
 func WithKeyword(keyword string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -199,7 +199,7 @@ func WithKeyword(keyword string) ScanOption {
 // )
 // ```
 func WithIncludeLibraryRule(include bool) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -212,7 +212,7 @@ func WithIncludeLibraryRule(include bool) ScanOption {
 
 // withRuleInput 设置规则输入，用于调试模式时直接输入自定义规则内容（内部使用，不导出）
 func withRuleInput(input *ypb.SyntaxFlowRuleInput) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -222,7 +222,7 @@ func withRuleInput(input *ypb.SyntaxFlowRuleInput) ScanOption {
 
 // WithRuleFilter 设置规则过滤器，直接传入过滤器结构体（内部使用，保持向后兼容）
 func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -246,7 +246,7 @@ func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) ScanOption {
 // )
 // ```
 func WithIgnoreLanguage(ignore bool) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -267,7 +267,7 @@ func WithIgnoreLanguage(ignore bool) ScanOption {
 // )
 // ```
 func WithConcurrency(concurrency uint32) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -288,7 +288,7 @@ func WithConcurrency(concurrency uint32) ScanOption {
 // )
 // ```
 func WithMemory(memory bool) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -307,7 +307,7 @@ func WithMemory(memory bool) ScanOption {
 // )
 // ```
 func WithResumeTaskId(taskId string) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -327,7 +327,7 @@ func WithResumeTaskId(taskId string) ScanOption {
 // )
 // ```
 func WithProcessCallback(callback func(progress float64)) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -347,7 +347,7 @@ func WithProcessCallback(callback func(progress float64)) ScanOption {
 // )
 // ```
 func WithRuleProcessCallback(callback func(progName, ruleName string, progress float64)) ScanOption {
-	return func(sc *ScanConfig) {
+	return func(sc *scanInputConfig) {
 		if sc.ScanRequest == nil {
 			sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
@@ -466,7 +466,7 @@ func StartScan(ctx context.Context, callback ScanCallback, opts ...ScanOption) e
 		ControlMode: "start",
 		Concurrency: 5,
 	}
-	sc := &ScanConfig{ScanRequest: req}
+	sc := &scanInputConfig{ScanRequest: req}
 	for _, opt := range opts {
 		opt(sc)
 	}
@@ -511,7 +511,7 @@ func StartScan(ctx context.Context, callback ScanCallback, opts ...ScanOption) e
 // ```
 func ResumeScan(ctx context.Context, taskId string, callback ScanCallback) error {
 	return StartScan(ctx, callback,
-		func(sc *ScanConfig) {
+		func(sc *scanInputConfig) {
 			if sc.ScanRequest == nil {
 				sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 			}
@@ -550,7 +550,7 @@ func ResumeScan(ctx context.Context, taskId string, callback ScanCallback) error
 // ```
 func GetScanStatus(ctx context.Context, taskId string, callback ScanCallback) error {
 	return StartScan(ctx, callback,
-		func(sc *ScanConfig) {
+		func(sc *scanInputConfig) {
 			if sc.ScanRequest == nil {
 				sc.ScanRequest = &ypb.SyntaxFlowScanRequest{}
 			}

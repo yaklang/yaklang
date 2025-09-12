@@ -7186,6 +7186,8 @@ message SyntaxFlowScanRequest{
 
   // compile data only in memory 
   bool Memory = 8;
+  // 根据项目扫描
+  uint64 SSAProjectId = 9;
 }
 
 message QuerySyntaxFlowScanTaskRequest{
@@ -8074,6 +8076,8 @@ message SSAProject {
   SSAProjectCompileConfig CompileConfig = 8;
   // 扫描配置选项
   SSAProjectScanConfig ScanConfig=9;
+  // 规则策略配置
+  SSAProjectScanRuleConfig RuleConfig =10;
 }
 
 message SSAProjectCompileConfig{
@@ -8087,17 +8091,17 @@ message SSAProjectCompileConfig{
 message SSAProjectScanConfig{
   uint32 Concurrency = 1;
   bool Memory = 2;
-  repeated  string RuleGroups= 3;
-  repeated string ruleNames = 4;
-  bool IgnoreLanguage = 5;
+  bool IgnoreLanguage = 3;
 }
 
+message SSAProjectScanRuleConfig{
+    SyntaxFlowRuleFilter RuleFilter =1;
+}
 
 message SSAProjectFilter {
   repeated int64 IDs = 1;
   repeated string ProjectNames = 2;
-  repeated string SourceKinds = 3;
-  string SearchKeyword = 4;
+  string SearchKeyword = 3;
 }
 
 message CreateSSAProjectRequest {
