@@ -207,9 +207,9 @@ func WithPeepholeSize(size int) SSAProjectParamsOpt {
 	}
 }
 
-func WithExcludeFiles(files string) SSAProjectParamsOpt {
+func WithExcludeFiles(files []string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
-		b.project.ExcludeFiles = files
+		b.project.SetExcludeFilesList(files)
 	}
 }
 
@@ -231,15 +231,15 @@ func WithMemoryScan(memory bool) SSAProjectParamsOpt {
 	}
 }
 
-func WithScanRuleGroups(groups string) SSAProjectParamsOpt {
+func WithScanRuleGroups(groups []string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
-		b.project.ScanRuleGroups = groups
+		b.project.SetScanRuleGroupsList(groups)
 	}
 }
 
-func WithScanRuleNames(names string) SSAProjectParamsOpt {
+func WithScanRuleNames(names []string) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
-		b.project.ScanRuleNames = names
+		b.project.SetScanRuleNamesList(names)
 	}
 }
 

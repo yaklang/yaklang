@@ -62,3 +62,11 @@ func (c *CodeSourceInfo) ValidateSourceConfig() error {
 
 	return nil
 }
+
+func isValidCodeSourceKind(kind CodeSourceKind) bool {
+	switch kind {
+	case CodeSourceLocal, CodeSourceCompression, CodeSourceJar, CodeSourceGit, CodeSourceSvn:
+		return true
+	}
+	return false
+}

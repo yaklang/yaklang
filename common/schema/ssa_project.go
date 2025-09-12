@@ -12,18 +12,18 @@ import (
 // SSAProject 用于配置SSA的项目信息，包括项目名称、源码获取方式以及编译、扫描选项等
 type SSAProject struct {
 	gorm.Model
+	// 项目基础信息
 	ProjectName string `json:"project_name" gorm:"unique_index;not null;comment:项目名称"`
-
+	Description string `json:"description,omitempty" gorm:"comment:项目描述"`
+	Tags        string `json:"tags,omitempty" gorm:"comment:项目标签"`
 	// 源码获取方式配置
 	CodeSourceConfig string `json:"code_source_config" gorm:"type:text;not null;comment:源码获取配置"`
-
 	// 编译配置选项
-	Description  string `json:"description,omitempty" gorm:"comment:项目描述"`
-	StrictMode   bool   `json:"strict_mode" gorm:"comment:是否启用严格模式"`
-	PeepholeSize int    `json:"peephole_size" gorm:"comment:窥孔编译大小"`
-	ExcludeFiles string `json:"exclude_files,omitempty" gorm:"comment:排除文件列表,逗号分隔"`
-	ReCompile    bool   `json:"re_compile" gorm:"comment:是否重新编译"`
-
+	StrictMode    bool   `json:"strict_mode" gorm:"comment:是否启用严格模式"`
+	PeepholeSize  int    `json:"peephole_size" gorm:"comment:窥孔编译大小"`
+	ExcludeFiles  string `json:"exclude_files,omitempty" gorm:"comment:排除文件列表,逗号分隔"`
+	ReCompile     bool   `json:"re_compile" gorm:"comment:是否重新编译"`
+	MemoryCompile bool   `json:"memory_compile" gorm:"comment:是否使用内存编译"`
 	// 扫描配置选项
 	ScanConcurrency uint32 `json:"scan_concurrency" gorm:"comment:扫描并发数"`
 	MemoryScan      bool   `json:"memory_scan" gorm:"comment:是否使用内存扫描"`
@@ -86,13 +86,9 @@ func (p *SSAProject) Validate() error {
 	if err != nil {
 		return fmt.Errorf("invalid source config: %v", err)
 	}
-	switch config.Kind {
-	case CodeSourceLocal, CodeSourceCompression, CodeSourceJar, CodeSourceGit, CodeSourceSvn:
-		// 支持的类型
-	default:
-		return fmt.Errorf("unsupported SSA project source kind: %s", config.Kind)
+	if !isValidCodeSourceKind(config.Kind) {
+		return fmt.Errorf("invalid source kind: %s", config.Kind)
 	}
-
 	return config.ValidateSourceConfig()
 }
 
@@ -107,13 +103,14 @@ func (p *SSAProject) GetCompileOptions() (map[string]interface{}, error) {
 	}
 
 	optionsMap := map[string]interface{}{
-		"configInfo":   configInfo,
-		"programName":  p.ProjectName,
-		"description":  p.Description,
-		"strictMode":   p.StrictMode,
-		"peepholeSize": p.PeepholeSize,
-		"reCompile":    p.ReCompile,
-		"excludeFiles": p.GetExcludeFilesList(),
+		"configInfo":    configInfo,
+		"programName":   p.ProjectName,
+		"description":   p.Description,
+		"strictMode":    p.StrictMode,
+		"peepholeSize":  p.PeepholeSize,
+		"reCompile":     p.ReCompile,
+		"memoryCompile": p.MemoryCompile,
+		"excludeFiles":  p.GetExcludeFilesList(),
 	}
 	return optionsMap, nil
 }
@@ -128,82 +125,42 @@ func (p *SSAProject) GetScanOptions() (map[string]interface{}, error) {
 		"concurrency":    p.ScanConcurrency,
 		"memory":         p.MemoryScan,
 		"ignoreLanguage": p.IgnoreLanguage,
+		"ruleGroups":     p.GetScanRuleGroupsList(),
+		"ruleNames":      p.GetScanRuleNamesList(),
 	}
-
-	if p.ScanRuleGroups != "" {
-		scanOptions["ruleGroups"] = p.GetScanRuleGroupsList()
-	}
-
-	if p.ScanRuleNames != "" {
-		scanOptions["ruleNames"] = p.GetScanRuleNamesList()
-	}
-
 	return scanOptions, nil
 }
 
 func (p *SSAProject) GetExcludeFilesList() []string {
-	if p.ExcludeFiles == "" {
-		return nil
-	}
-	files := make([]string, 0)
-	for _, file := range strings.Split(p.ExcludeFiles, ",") {
-		file = strings.TrimSpace(file)
-		if file != "" {
-			files = append(files, file)
-		}
-	}
-	return files
+	return strings.Split(p.ExcludeFiles, ",")
+}
+
+func (p *SSAProject) GetScanRuleGroupsList() []string {
+	return strings.Split(p.ScanRuleGroups, ",")
+}
+
+func (p *SSAProject) GetScanRuleNamesList() []string {
+	return strings.Split(p.ScanRuleNames, ",")
+}
+
+func (p *SSAProject) GetTagsList() []string {
+	return strings.Split(p.Tags, ",")
 }
 
 func (p *SSAProject) SetExcludeFilesList(files []string) {
 	p.ExcludeFiles = strings.Join(files, ",")
 }
 
-func (p *SSAProject) GetScanRuleGroupsList() []string {
-	if p.ScanRuleGroups == "" {
-		return nil
-	}
-	groups := make([]string, 0)
-	for _, group := range strings.Split(p.ScanRuleGroups, ",") {
-		group = strings.TrimSpace(group)
-		if group != "" {
-			groups = append(groups, group)
-		}
-	}
-	return groups
-}
-
 func (p *SSAProject) SetScanRuleGroupsList(groups []string) {
 	p.ScanRuleGroups = strings.Join(groups, ",")
-}
-
-func (p *SSAProject) GetScanRuleNamesList() []string {
-	if p.ScanRuleNames == "" {
-		return nil
-	}
-	names := make([]string, 0)
-	for _, name := range strings.Split(p.ScanRuleNames, ",") {
-		name = strings.TrimSpace(name)
-		if name != "" {
-			names = append(names, name)
-		}
-	}
-	return names
 }
 
 func (p *SSAProject) SetScanRuleNamesList(names []string) {
 	p.ScanRuleNames = strings.Join(names, ",")
 }
 
-func (p *SSAProject) HasScanRules() bool {
-	return p.ScanRuleGroups != "" || p.ScanRuleNames != ""
-}
-
-func (p *SSAProject) GetScanConcurrency() uint32 {
-	if p.ScanConcurrency == 0 {
-		return 5 // 默认并发数
-	}
-	return p.ScanConcurrency
+func (p *SSAProject) SetTagsList(tags []string) {
+	p.Tags = strings.Join(tags, ",")
 }
 
 func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
@@ -214,14 +171,19 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 		ProjectName:      p.ProjectName,
 		CodeSourceConfig: p.CodeSourceConfig,
 		Description:      p.Description,
-		StrictMode:       p.StrictMode,
-		PeepholeSize:     int32(p.PeepholeSize),
-		ExcludeFiles:     p.ExcludeFiles,
-		ReCompile:        p.ReCompile,
-		ScanConcurrency:  p.ScanConcurrency,
-		MemoryScan:       p.MemoryScan,
-		ScanRuleGroups:   p.ScanRuleGroups,
-		ScanRuleNames:    p.ScanRuleNames,
-		IgnoreLanguage:   p.IgnoreLanguage,
+		CompileConfig: &ypb.SSAProjectCompileConfig{
+			StrictMode:   p.StrictMode,
+			PeepholeSize: int64(p.PeepholeSize),
+			ExcludeFiles: p.GetExcludeFilesList(),
+			ReCompile:    p.ReCompile,
+		},
+		ScanConfig: &ypb.SSAProjectScanConfig{
+			Concurrency:    p.ScanConcurrency,
+			Memory:         p.MemoryScan,
+			IgnoreLanguage: p.IgnoreLanguage,
+			RuleGroups:     p.GetScanRuleGroupsList(),
+			RuleNames:      p.GetScanRuleNamesList(),
+		},
+		Tags: p.GetTagsList(),
 	}
 }

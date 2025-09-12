@@ -3,8 +3,10 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -38,21 +40,28 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 	configJSON := string(configBytes)
 
 	// 1. 测试创建SSA项目
+	projectName := fmt.Sprintf("test-project-%v", uuid.NewString())
+
 	t.Run("CreateSSAProject", func(t *testing.T) {
 		req := &ypb.CreateSSAProjectRequest{
 			Project: &ypb.SSAProject{
-				ProjectName:      "test-local-project",
+				ProjectName:      projectName,
 				CodeSourceConfig: configJSON,
 				Description:      "测试本地项目",
-				StrictMode:       true,
-				PeepholeSize:     200,
-				ExcludeFiles:     "*.test.go,*.mock.go",
-				ReCompile:        false,
-				ScanConcurrency:  10,
-				MemoryScan:       true,
-				ScanRuleGroups:   "security,performance",
-				ScanRuleNames:    "sql-injection,xss",
-				IgnoreLanguage:   false,
+				CompileConfig: &ypb.SSAProjectCompileConfig{
+					StrictMode:   true,
+					PeepholeSize: 200,
+					ExcludeFiles: []string{"*.test.go", "*.mock.go"},
+					ReCompile:    false,
+				},
+				ScanConfig: &ypb.SSAProjectScanConfig{
+					Concurrency:    10,
+					Memory:         true,
+					RuleGroups:     []string{"security", "performance"},
+					RuleNames:      []string{"sql-injection", "xss"},
+					IgnoreLanguage: false,
+				},
+				Tags: []string{"test", "local"},
 			},
 		}
 
@@ -70,7 +79,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 	t.Run("QuerySSAProject", func(t *testing.T) {
 		req := &ypb.QuerySSAProjectRequest{
 			Filter: &ypb.SSAProjectFilter{
-				ProjectNames: []string{"test-local-project"},
+				ProjectNames: []string{projectName},
 			},
 			Pagination: &ypb.Paging{
 				Page:    1,
@@ -87,11 +96,19 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 
 		// 验证项目信息
 		project := resp.Projects[0]
-		require.Equal(t, "test-local-project", project.ProjectName)
+		require.Equal(t, projectName, project.ProjectName)
 		require.Equal(t, configJSON, project.CodeSourceConfig)
 		require.Equal(t, "测试本地项目", project.Description)
-		require.True(t, project.StrictMode)
-		require.Equal(t, int32(200), project.PeepholeSize)
+		require.True(t, project.CompileConfig.StrictMode)
+		require.Equal(t, int64(200), project.CompileConfig.PeepholeSize)
+		require.Equal(t, []string{"*.test.go", "*.mock.go"}, project.CompileConfig.ExcludeFiles)
+		require.False(t, project.CompileConfig.ReCompile)
+		require.Equal(t, uint32(10), project.ScanConfig.Concurrency)
+		require.True(t, project.ScanConfig.Memory)
+		require.Equal(t, []string{"security", "performance"}, project.ScanConfig.RuleGroups)
+		require.Equal(t, []string{"sql-injection", "xss"}, project.ScanConfig.RuleNames)
+		require.False(t, project.ScanConfig.IgnoreLanguage)
+		require.Equal(t, []string{"test", "local"}, project.Tags)
 
 		// 保存项目ID用于后续测试
 		projectID = uint64(project.ID)
@@ -118,21 +135,27 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.NoError(t, err)
 		gitConfigJSON := string(gitConfigBytes)
 
+		newProjectName := fmt.Sprintf("test-git-project-updated-%v", uuid.NewString())
 		req := &ypb.UpdateSSAProjectRequest{
 			Project: &ypb.SSAProject{
 				ID:               int64(projectID),
-				ProjectName:      "test-git-project-updated",
+				ProjectName:      newProjectName,
 				CodeSourceConfig: gitConfigJSON,
 				Description:      "更新为Git项目",
-				StrictMode:       false,
-				PeepholeSize:     300,
-				ExcludeFiles:     "*.test.go",
-				ReCompile:        true,
-				ScanConcurrency:  5,
-				MemoryScan:       false,
-				ScanRuleGroups:   "security",
-				ScanRuleNames:    "sql-injection",
-				IgnoreLanguage:   true,
+				CompileConfig: &ypb.SSAProjectCompileConfig{
+					StrictMode:   false,
+					PeepholeSize: 300,
+					ExcludeFiles: []string{"*.test.go"},
+					ReCompile:    true,
+				},
+				ScanConfig: &ypb.SSAProjectScanConfig{
+					Concurrency:    5,
+					Memory:         false,
+					RuleGroups:     []string{"security"},
+					RuleNames:      []string{"sql-injection"},
+					IgnoreLanguage: true,
+				},
+				Tags: []string{newProjectName, "git"},
 			},
 		}
 
@@ -155,11 +178,19 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.Equal(t, 1, len(queryResp.Projects))
 
 		updatedProject := queryResp.Projects[0]
-		require.Equal(t, "test-git-project-updated", updatedProject.ProjectName)
+
 		require.Equal(t, gitConfigJSON, updatedProject.CodeSourceConfig)
 		require.Equal(t, "更新为Git项目", updatedProject.Description)
-		require.False(t, updatedProject.StrictMode)
-		require.Equal(t, int32(300), updatedProject.PeepholeSize)
+		require.False(t, updatedProject.CompileConfig.StrictMode)
+		require.Equal(t, int64(300), updatedProject.CompileConfig.PeepholeSize)
+		require.Equal(t, []string{"*.test.go"}, updatedProject.CompileConfig.ExcludeFiles)
+		require.True(t, updatedProject.CompileConfig.ReCompile)
+		require.Equal(t, uint32(5), updatedProject.ScanConfig.Concurrency)
+		require.False(t, updatedProject.ScanConfig.Memory)
+		require.Equal(t, []string{"security"}, updatedProject.ScanConfig.RuleGroups)
+		require.Equal(t, []string{"sql-injection"}, updatedProject.ScanConfig.RuleNames)
+		require.True(t, updatedProject.ScanConfig.IgnoreLanguage)
+		require.Equal(t, []string{newProjectName, "git"}, updatedProject.Tags)
 	})
 
 	// 4. 测试删除SSA项目
@@ -208,7 +239,7 @@ func TestSSAProjectValidation(t *testing.T) {
 
 		req := &ypb.CreateSSAProjectRequest{
 			Project: &ypb.SSAProject{
-				ProjectName:      "invalid-project",
+				ProjectName:      fmt.Sprintf("invalid-project-%v", uuid.NewString()),
 				CodeSourceConfig: string(configBytes),
 			},
 		}
@@ -221,11 +252,13 @@ func TestSSAProjectValidation(t *testing.T) {
 	t.Run("CreateWithUnsupportedKind", func(t *testing.T) {
 		// 测试不支持的源码类型
 		unsupportedConfig := `{"kind":"unsupported","local_file":"/tmp/test"}`
+		unsupportedConfigBytes, err := json.Marshal(unsupportedConfig)
+		require.NoError(t, err)
 
 		req := &ypb.CreateSSAProjectRequest{
 			Project: &ypb.SSAProject{
-				ProjectName:      "unsupported-project",
-				CodeSourceConfig: unsupportedConfig,
+				ProjectName:      fmt.Sprintf("unsupported-project-%v", uuid.NewString()),
+				CodeSourceConfig: string(unsupportedConfigBytes),
 			},
 		}
 
@@ -282,7 +315,7 @@ func TestSSAProjectDifferentSourceTypes(t *testing.T) {
 
 			req := &ypb.CreateSSAProjectRequest{
 				Project: &ypb.SSAProject{
-					ProjectName:      tc.name + "-project",
+					ProjectName:      fmt.Sprintf("%s-project-%v", tc.name, uuid.NewString()),
 					CodeSourceConfig: string(configBytes),
 					Description:      "测试" + tc.name,
 				},
