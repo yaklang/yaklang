@@ -2,8 +2,8 @@ package base
 
 import (
 	"net/http"
+	"net/url"
 
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -15,7 +15,7 @@ type BaseSpaceEngineConfig struct {
 }
 type BaseSpaceEngineClient struct {
 	Key     string
-	APIHost string
+	BaseUrl string
 }
 
 type SpaceEngineResponse struct {
@@ -29,12 +29,12 @@ type SpaceEngineResponse struct {
 func NewBaseSpaceEngineClient(key string, host string) *BaseSpaceEngineClient {
 	return &BaseSpaceEngineClient{
 		Key:     key,
-		APIHost: lowhttp.FixURLScheme(host),
+		BaseUrl: lowhttp.FixURLScheme(host),
 	}
 }
 
 func (c *BaseSpaceEngineClient) Do(method, path string, opts ...poc.PocConfigOption) (*SpaceEngineResponse, error) {
-	urlStr, err := utils.UrlJoin(c.APIHost, path)
+	urlStr, err := url.JoinPath(c.BaseUrl, path)
 	if err != nil {
 		return nil, err
 	}
