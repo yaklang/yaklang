@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"sync"
 
 	"github.com/jinzhu/gorm"
@@ -22,7 +23,7 @@ const (
 
 type EntityRepositoryRuntimeConfig struct {
 	similarityThreshold float64
-	mergeEntityFunc     func(old, new *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)
+	runtimeID           string
 }
 
 type RuntimeConfigOption func(config *EntityRepositoryRuntimeConfig)
@@ -33,16 +34,10 @@ func WithSimilarityThreshold(threshold float64) RuntimeConfigOption {
 	}
 }
 
-func WithMergeEntityFunc(f func(old, new *schema.ERModelEntity) (*schema.ERModelEntity, bool, error)) RuntimeConfigOption {
-	return func(config *EntityRepositoryRuntimeConfig) {
-		config.mergeEntityFunc = f
-	}
-}
-
 func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 	config := &EntityRepositoryRuntimeConfig{
 		similarityThreshold: 0.8,
-		mergeEntityFunc:     nil,
+		runtimeID:           uuid.NewString(),
 	}
 	for _, opt := range opts {
 		switch configOpt := opt.(type) {
@@ -54,10 +49,10 @@ func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 }
 
 type EntityRepository struct {
-	db        *gorm.DB
-	info      *schema.EntityRepository
-	ragSystem *rag.RAGSystem
-	ragMutex  sync.RWMutex
+	db                *gorm.DB
+	info              *schema.EntityRepository
+	ragSystem         *rag.RAGSystem
+	entityVectorMutex sync.RWMutex
 
 	runtimeConfig *EntityRepositoryRuntimeConfig
 }
@@ -82,27 +77,17 @@ func (r *EntityRepository) GetRAGSystem() *rag.RAGSystem {
 
 //--- Entity Operations ---
 
-func (r *EntityRepository) MatchEntities(entity *schema.ERModelEntity) (matchEntity *schema.ERModelEntity, accurate bool, err error) {
+func (r *EntityRepository) MatchEntities(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, bool, error) {
 	var results []*schema.ERModelEntity
-	results, err = r.IdentifierSearchEntity(entity)
+	results, err := r.IdentifierSearchEntity(entity)
 	if err != nil {
-		return
+		return nil, false, err
 	}
 	if len(results) > 0 {
-		matchEntity = results[0]
-		accurate = true
-		return
+		return results, true, nil
 	}
-
 	results, err = r.VectorSearchEntity(entity)
-	if err != nil {
-		return
-	}
-	if len(results) > 0 {
-		matchEntity = results[0]
-		return
-	}
-	return
+	return results, false, err
 }
 
 func (r *EntityRepository) IdentifierSearchEntity(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, error) {
@@ -134,8 +119,8 @@ func (r *EntityRepository) VectorSearch(query string, top int, scoreLimit ...flo
 		return nil, nil, utils.Errorf("RAG system is not initialized")
 	}
 
-	r.ragMutex.RLock()
-	defer r.ragMutex.RUnlock()
+	r.entityVectorMutex.RLock()
+	defer r.entityVectorMutex.RUnlock()
 
 	needSocreLimit := 0.0
 	if len(scoreLimit) > 0 {
@@ -209,8 +194,8 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 		return nil, utils.Errorf("RAG system is not initialized")
 	}
 
-	r.ragMutex.RLock()
-	defer r.ragMutex.RUnlock()
+	r.entityVectorMutex.RLock()
+	defer r.entityVectorMutex.RUnlock()
 
 	results, err := r.GetRAGSystem().Query(entity.String(), 5)
 	if err != nil {
@@ -245,12 +230,13 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 
 func (r *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ERModelEntity, error) {
 	filter.BaseIndex = r.info.Uuid
+	filter.RuntimeID = []string{r.runtimeConfig.runtimeID}
 	return yakit.QueryEntities(r.db, filter)
 }
 
 func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
-	r.ragMutex.Lock()
-	defer r.ragMutex.Unlock()
+	r.entityVectorMutex.Lock()
+	defer r.entityVectorMutex.Unlock()
 
 	metadata := map[string]any{
 		schema.META_Doc_Index:  entry.Uuid,
@@ -264,6 +250,7 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 	opts = append(opts, rag.WithDocumentRawMetadata(metadata),
 		rag.WithDocumentType(schema.RAGDocumentType_Entity),
 		rag.WithDocumentEntityID(entry.Uuid), // let RAG system generate embedding
+		rag.WithDocumentRuntimeID(entry.RuntimeID),
 	)
 	documentID := fmt.Sprintf("%v_entity", entry.Uuid)
 	content := entry.ToRAGContent()
@@ -271,9 +258,6 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 }
 
 func (r *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRelationship) error {
-	r.ragMutex.Lock()
-	defer r.ragMutex.Unlock()
-
 	src, err := r.GetEntityByUUID(entry.SourceEntityIndex)
 	if err != nil {
 		return utils.Errorf("failed to get source entity by uuid [%s]: %v", entry.SourceEntityIndex, err)
@@ -289,15 +273,16 @@ func (r *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRel
 		entry.Uuid, content,
 		rag.WithDocumentType(schema.RAGDocumentType_Relationship),
 		rag.WithDocumentRelatedEntities(entry.SourceEntityIndex, entry.TargetEntityIndex),
+		rag.WithDocumentRuntimeID(entry.RuntimeID),
 	)
 }
 
 func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
-	matchedEntity, accurate, err := r.MatchEntities(entity)
+	matchedEntity, _, err := r.MatchEntities(entity)
 	if err != nil { // not critical error
 		log.Errorf("failed to match entity [%s]: %v", entity.EntityName, err)
 	}
-	if matchedEntity == nil {
+	if len(matchedEntity) <= 0 {
 		log.Infof("start to create entity: %s", entity.EntityName)
 		err = r.CreateEntity(entity)
 		if err != nil {
@@ -306,27 +291,19 @@ func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*sc
 		return entity, nil
 	}
 
-	mergeEntity := matchedEntity
-	if accurate { // if search is accurate, just use the matched entity
-		for s, i := range entity.Attributes {
-			matchedEntity.Attributes[s] = i
+	var firstEntity = matchedEntity[0]
+	for _, m := range matchedEntity {
+		if m.CreatedAt.Before(firstEntity.CreatedAt) {
+			firstEntity = m
 		}
-	} else if r.runtimeConfig.mergeEntityFunc != nil {
-		resolvedEntity, isSame, err := r.runtimeConfig.mergeEntityFunc(matchedEntity, entity)
+		m.Attributes = utils.MergeGeneralMap(m.Attributes, entity.Attributes)
+		err = r.UpdateEntity(m.ID, m)
 		if err != nil {
-			return nil, utils.Errorf("failed to merge entity [%s]: %v", entity.EntityName, err)
+			log.Errorf("failed to update entity [%s]: %v", entity.EntityName, err)
 		}
-		if isSame {
-			mergeEntity = resolvedEntity
-		}
-	} else {
-		mergeEntity = entity
 	}
-	err = r.SaveEntity(mergeEntity) // create or update entity
-	if err != nil {
-		return nil, utils.Errorf("failed to save entity [%s]: %v", entity.EntityName, err)
-	}
-	return mergeEntity, nil
+
+	return firstEntity, nil // 返回最早创建的实体，用于将关系集中联系在一个实体上，用于维护无目的质量中心
 }
 
 func (r *EntityRepository) SaveEntity(entity *schema.ERModelEntity) error {
@@ -352,6 +329,7 @@ func (r *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error 
 
 func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	entity.RepositoryUUID = r.info.Uuid
+	entity.RuntimeID = r.runtimeConfig.runtimeID
 	err := yakit.CreateEntity(r.db, entity)
 	if err != nil {
 		return err
@@ -413,7 +391,7 @@ func (r *EntityRepository) UpdateRelationship(uuid string, relationship *schema.
 }
 
 func (r *EntityRepository) AddRelationship(sourceIndex, targetIndex string, relationType string, typeVerbose string, attr map[string]any) error {
-	data, err := yakit.AddRelationship(r.db, sourceIndex, targetIndex, r.info.Uuid, relationType, typeVerbose, attr)
+	data, err := yakit.AddRelationship(r.db, sourceIndex, targetIndex, r.info.Uuid, relationType, typeVerbose, attr, r.runtimeConfig.runtimeID)
 	if err != nil {
 		log.Warnf("failed to add relation [%s] to vector [%s]: %v", relationType, sourceIndex, err)
 		return utils.Wrapf(err, "failed to add relation [%s] to vector [%s]", relationType, sourceIndex)
@@ -490,7 +468,7 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 		}
 	} else {
 		// 如果都存在，直接加载
-		ragSystem, err = rag.LoadCollection(db, name)
+		ragSystem, err = rag.LoadCollectionEx(db, name, false)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}

@@ -53,6 +53,8 @@ type ERModelEntity struct {
 	EntityType        string      // 实体的类型或类别
 	EntityTypeVerbose string      // 实体类型的详细描述
 	Attributes        MetadataMap `gorm:"type:text" json:"attributes"`
+
+	RuntimeID string
 }
 
 func (e *ERModelEntity) TableName() string {
@@ -153,6 +155,8 @@ type ERModelRelationship struct {
 	RelationshipTypeVerbose string
 	Hash                    string      `gorm:"unique_index"`
 	Attributes              MetadataMap `gorm:"type:text" json:"attributes"`
+
+	RuntimeID string
 }
 
 func (r *ERModelRelationship) TableName() string {

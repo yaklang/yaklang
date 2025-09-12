@@ -33,6 +33,7 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Names)
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "uuid", entityFilter.HiddenIndex)
+	db = bizhelper.ExactQueryStringArrayOr(db, "runtime_id", entityFilter.RuntimeID)
 	return db
 }
 
@@ -177,7 +178,7 @@ func UpdateRelationship(db *gorm.DB, uuid string, relationship *schema.ERModelRe
 	return db.Model(&schema.ERModelRelationship{}).Where("uuid = ?", uuid).Updates(relationship).Error
 }
 
-func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, RelationshipType, typeVerbose string, attrs map[string]any) (*schema.ERModelRelationship, error) {
+func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, RelationshipType, typeVerbose string, attrs map[string]any, runtimeID string) (*schema.ERModelRelationship, error) {
 	Relationship := schema.ERModelRelationship{
 		SourceEntityIndex:       sourceIndex,
 		TargetEntityIndex:       targetIndex,
@@ -186,6 +187,7 @@ func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, Relations
 		Attributes:              attrs,
 		RepositoryUUID:          baseIndex,
 		Uuid:                    uuid.New().String(),
+		RuntimeID:               runtimeID,
 	}
 	Relationship.Hash = Relationship.CalcHash()
 	err := utils.GormTransaction(db, func(tx *gorm.DB) error {
@@ -229,6 +231,7 @@ func FilterRelationships(db *gorm.DB, relationshipFilter *ypb.RelationshipFilter
 	db = bizhelper.ExactQueryStringArrayOr(db, "target_entity_index", relationshipFilter.TargetEntityIndex)
 	db = bizhelper.ExactQueryStringArrayOr(db, "relationship_type", relationshipFilter.Types)
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "uuid", relationshipFilter.UUIDS)
+	db = bizhelper.ExactQueryStringArrayOr(db, "runtime_id", relationshipFilter.RuntimeID)
 	return db
 }
 

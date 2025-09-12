@@ -27,6 +27,10 @@ type SQLiteVectorStoreHNSW struct {
 }
 
 func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder EmbeddingClient) (*SQLiteVectorStoreHNSW, error) {
+	return LoadSQLiteVectorStoreHNSWEx(db, collectionName, embedder, true)
+}
+
+func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder EmbeddingClient, recoverLayer bool) (*SQLiteVectorStoreHNSW, error) {
 	var collections []*schema.VectorStoreCollection
 	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections)
 	if dbErr.Error != nil {
@@ -48,25 +52,26 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
 	var existed = make(map[string][]float32)
 	// 尝试恢复HNSW图结构
-	layers := ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
-		if _, ok := existed[key]; ok {
-			return existed[key]
+	if recoverLayer {
+		layers := ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
+			if _, ok := existed[key]; ok {
+				return existed[key]
+			}
+			// log.Infof("start to query document_id: %v", key)
+			var doc schema.VectorStoreDocument
+			db.Where("document_id = ?", key).First(&doc)
+			existed[key] = doc.Embedding
+			return doc.Embedding
+		})
+		// 检查是否成功恢复了图结构
+		// 如果GroupInfos不为空但layers为nil，可能是不支持的格式
+		if layers == nil && len(collections[0].GroupInfos) > 0 {
+			// 图信息存在但无法恢复，可能是PQ模式或其他不支持的格式
+			log.Warnf("cannot recover hnsw graph from db, maybe pq mode or unsupported format, collection name: %s", collectionName)
 		}
-		// log.Infof("start to query document_id: %v", key)
-		var doc schema.VectorStoreDocument
-		db.Where("document_id = ?", key).First(&doc)
-		existed[key] = doc.Embedding
-		return doc.Embedding
-	})
-
-	// 检查是否成功恢复了图结构
-	// 如果GroupInfos不为空但layers为nil，可能是不支持的格式
-	if layers == nil && len(collections[0].GroupInfos) > 0 {
-		// 图信息存在但无法恢复，可能是PQ模式或其他不支持的格式
-		log.Warnf("cannot recover hnsw graph from db, maybe pq mode or unsupported format, collection name: %s", collectionName)
+		hnswGraph.Layers = layers
 	}
 
-	hnswGraph.Layers = layers
 	vectorStore := &SQLiteVectorStoreHNSW{
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
@@ -201,6 +206,7 @@ func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorSto
 		Content:         doc.Content,
 		EntityID:        doc.EntityUUID,
 		RelatedEntities: strings.Join(doc.RelatedEntities, ","),
+		RuntimeID:       doc.RuntimeID,
 	}
 }
 

@@ -36,6 +36,7 @@ type Document struct {
 	Content         string                 `json:"content"`  // 文档内容
 	Metadata        schema.MetadataMap     `json:"metadata"` // 文档元数据
 	Embedding       []float32              `json:"-"`        // 文档的嵌入向量，不参与 JSON 序列化
+	RuntimeID       string                 `json:"runtimeID"`
 }
 
 // SearchResult 表示检索结果
