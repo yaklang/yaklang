@@ -1,8 +1,6 @@
 package syntaxflow_scan
 
-// Exports 用于导出到yak脚本引擎的函数映射
 var Exports = map[string]any{
-	// 主要扫描API
 	"StartScan":     StartScan,
 	"ResumeScan":    ResumeScan,
 	"GetScanStatus": GetScanStatus,
