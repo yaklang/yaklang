@@ -242,8 +242,15 @@ func WithKHopKMax(kMax int) KHopQueryOption {
 	}
 }
 
-// todo:  yield k-hop with entity filter or rag search
 func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOption) <-chan *KHopPath {
+	return r.YieldKHopEx(ctx, nil, opts...)
+}
+
+func (r *EntityRepository) RuntimeYieldKHop(ctx context.Context, opts ...KHopQueryOption) <-chan *KHopPath {
+	return r.YieldKHopEx(ctx, &ypb.RelationshipFilter{RuntimeID: []string{r.runtimeConfig.runtimeID}}, opts...)
+}
+
+func (r *EntityRepository) YieldKHopEx(ctx context.Context, relationshipFilter *ypb.RelationshipFilter, opts ...KHopQueryOption) <-chan *KHopPath {
 	config := &KHopConfig{K: 0, KMin: 2} // 默认k=0，KMin=2，返回所有>=2-hop路径
 	for _, opt := range opts {
 		opt(config)
@@ -254,7 +261,7 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOptio
 	var input = chanx.NewUnlimitedChan[string](ctx, 1000)
 	go func() {
 		defer input.Close()
-		relationInput := r.YieldRelationships(ctx, nil)
+		relationInput := r.YieldRelationships(ctx, relationshipFilter)
 		for {
 			select {
 			case relationship, ok := <-relationInput:
@@ -289,72 +296,72 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOptio
 			}
 		}
 	}()
+
 	return result.OutputChannel()
 }
 
 // findAllPathSegments 找到所有可能的路径片段
 func (r *EntityRepository) findAllPathSegments(ctx context.Context, queryConfig *KHopConfig, resultCh *chanx.UnlimitedChan[*KHopPath], startUUID <-chan string) {
-	// 首先找到图中所有的路径
 	allPaths := r.findAllPaths(ctx, startUUID)
-	if len(allPaths) == 0 {
-		return
-	}
 
-	// 从每条路径中提取k-hop子路径
-	for _, path := range allPaths {
+	for {
 		select {
 		case <-ctx.Done():
 			return
-		default:
+		case path, ok := <-allPaths:
+			if !ok {
+				return
+			}
+			r.extractKHopSegments(ctx, path, queryConfig, resultCh)
 		}
-
-		r.extractKHopSegments(ctx, path, queryConfig, resultCh)
 	}
 }
 
 // findAllPaths 使用DFS找到图中所有的路径（优化版本：直接在关系遍历中处理，只从源实体开始）
-func (r *EntityRepository) findAllPaths(ctx context.Context, startEntityChannel <-chan string) []*HopBlock {
-	var allPaths []*HopBlock
+func (r *EntityRepository) findAllPaths(ctx context.Context, startEntityChannel <-chan string) <-chan *HopBlock {
+	var allPaths = chanx.NewUnlimitedChan[*HopBlock](ctx, 1000)
 
 	// 使用set来避免重复处理源实体（有向图）
 	processedEntities := make(map[string]bool)
 
-	// 直接在关系遍历中处理源实体（有向图）
-	for startUUID := range startEntityChannel {
-		select {
-		case <-ctx.Done():
-			log.Debugf("Context cancelled during path finding")
-			return allPaths
-		default:
-		}
+	go func() {
+		defer allPaths.Close()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case startUUID, ok := <-startEntityChannel:
+				if !ok {
+					return
+				}
+				if !processedEntities[startUUID] {
+					processedEntities[startUUID] = true
 
-		// 只处理源实体（有向图中只需从有出边的实体开始）
-		if !processedEntities[startUUID] {
-			processedEntities[startUUID] = true
+					log.Debugf("Starting DFS from source entity: %s", startUUID)
+					visited := make(map[string]bool)
 
-			log.Debugf("Starting DFS from source entity: %s", startUUID)
-			visited := make(map[string]bool)
+					// 按需加载起始实体
+					startEntity, err := r.GetEntityByUUID(startUUID)
+					if err != nil || startEntity == nil {
+						log.Debugf("Failed to load entity %s: %v", startUUID, err)
+						continue
+					}
 
-			// 按需加载起始实体
-			startEntity, err := r.GetEntityByUUID(startUUID)
-			if err != nil || startEntity == nil {
-				log.Debugf("Failed to load entity %s: %v", startUUID, err)
-				continue
+					// 创建一个空的初始路径，第一个实体会在DFS中添加
+					r.dfsFindPathsOptimized(ctx, startEntity, visited, allPaths, nil)
+				}
 			}
-
-			// 创建一个空的初始路径，第一个实体会在DFS中添加
-			r.dfsFindPathsOptimized(ctx, startEntity, visited, &allPaths, nil)
 		}
-	}
 
-	log.Debugf("Processed %d entities, found %d paths total", len(processedEntities), len(allPaths))
-	return allPaths
+	}()
+
+	return allPaths.OutputChannel()
 }
 
 // dfsFindPathsOptimized 优化的DFS算法，按需加载数据
 // 对于有向图，只沿着出边遍历，并使用路径级别的去重来避免环
 func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEntity *schema.ERModelEntity,
-	visited map[string]bool, allPaths *[]*HopBlock, currentPath *HopBlock) {
+	visited map[string]bool, allPaths *chanx.UnlimitedChan[*HopBlock], currentPath *HopBlock) {
 
 	select {
 	case <-ctx.Done():
@@ -446,7 +453,7 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 	if !hasUnvisitedNeighbors {
 		log.Debugf("Reached path end for entity: %s, path length: %d", currentEntity.EntityName, r.getPathLength(currentPath))
 		pathCopy := r.copyHopBlock(currentPath)
-		*allPaths = append(*allPaths, pathCopy)
+		allPaths.SafeFeed(pathCopy)
 	}
 }
 
@@ -706,19 +713,16 @@ func (r *EntityRepository) pathToString(hop *HopBlock) string {
 }
 
 func (r *EntityRepository) AddKHopToVectorIndex(kHop *KHopPath) error {
-	r.ragMutex.Lock()
-	defer r.ragMutex.Unlock()
-
 	metadata := map[string]any{
 		schema.META_Base_Index: r.info.Uuid,
 		META_K:                 kHop.K,
 	}
 
 	var opts []rag.DocumentOption
-
 	opts = append(opts, rag.WithDocumentRawMetadata(metadata),
 		rag.WithDocumentType(schema.RAGDocumentType_KHop),
 		rag.WithDocumentRelatedEntities(kHop.GetRelatedEntityUUIDs()...),
+		rag.WithDocumentRuntimeID(r.runtimeConfig.runtimeID),
 	)
 	documentID := fmt.Sprintf("%s_khop", uuid.NewString())
 	content := kHop.ToRAGContent()

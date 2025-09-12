@@ -989,6 +989,7 @@ message EntityFilter {
   repeated string Types = 3;
   repeated string Names = 4;
   repeated string HiddenIndex = 5;
+  repeated string RuntimeID = 7;
 }
 
 message QueryEntityRequest {
@@ -1030,6 +1031,8 @@ message RelationshipFilter {
   repeated string AboutEntityIndex = 9; // Source or Target
 
   repeated string UUIDS = 11;
+
+  repeated string RuntimeID = 12;
 }
 
 message QueryRelationshipRequest {
