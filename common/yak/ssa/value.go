@@ -228,12 +228,6 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		// 	newValue.SetName(originName)
 		// 	newValue.SetVerboseName(originName)
 
-		// 	// if ret := GetFristLocalVariableFromScopeAndParent(scopet, originName); ret != nil && ret.GetGlobalIndex() == originGlobalId {
-		// 	// 	scopet.AssignVariable(b.CreateVariable(originName), newValue)
-		// 	// } else {
-		// 	// 	p.SetPointHandler(variable.GetPointHandler())
-		// 	// }
-
 		// 	newVariable := b.CreateVariableById(originName)
 		// 	if v := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
 		// 		newVariable.SetCaptured(v)
@@ -260,12 +254,16 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		newValue.SetVerboseName(originName)
 
 		if newVariable := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
-			scope.AssignVariable(newVariable, newValue)
+			b.AssignVariable(newVariable, newValue)
+			newVariable.SetCross(true)
 		}
 	} else {
 		scope.AssignVariable(variable, value)
 	}
 
+	if val, ok := b.RefParameter[variable.GetName()]; ok {
+		b.AddForceSideEffect(variable, value, val.Index, val.Kind)
+	}
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
 			return
@@ -294,10 +292,9 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			parentValue.AddOccultation(para)
 		}
 	}
-	if val, ok := b.RefParameter[variable.GetName()]; ok {
-		b.AddForceSideEffect(variable.GetName(), value, val.Index)
+	if _, ok := b.RefParameter[variable.GetName()]; !ok {
+		b.CheckMemberSideEffect(variable, value)
 	}
-	b.CheckAndSetSideEffect(variable, value)
 
 	if !value.IsExtern() || value.GetName() != variable.GetName() {
 		// if value not extern instance

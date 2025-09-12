@@ -124,6 +124,7 @@ func marshalExtraInformation(cache *ProgramCache, raw Instruction) map[string]an
 				"verbose_name": se.VerboseName,
 				"modify":       se.Modify,
 				"forceCreate":  se.forceCreate,
+				"kind":         se.Kind,
 			}
 			if se.parameterMemberInner != nil {
 				element["object_name"] = se.ObjectName
@@ -458,6 +459,7 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 				ins.VerboseName = utils.MapGetString(extra, "verbose_name")
 				ins.Modify = utils.MapGetInt64(extra, "modify")
 				ins.forceCreate = utils.MapGetBool(extra, "forceCreate")
+				ins.Kind = SwitchSideEffectKind(utils.MapGetString(extra, "kind"))
 				ins.ObjectName = utils.MapGetString(extra, "object_name")
 				ins.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(extra, "member_call_kind"))
 				ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")

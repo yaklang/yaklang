@@ -182,6 +182,7 @@ func handlerReturnType(rs []*Return, functionType *FunctionType) Type {
 							VerboseName: getMemberVerboseName(result, key),
 							Variable:    variable,
 							Modify:      value.GetId(),
+							Kind:        NormalSideEffect,
 							parameterMemberInner: &parameterMemberInner{
 								MemberCallKind: CallMemberCall,
 								MemberCallKey:  key.GetId(),

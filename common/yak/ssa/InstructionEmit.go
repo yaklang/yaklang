@@ -396,6 +396,9 @@ func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 	if value == nil {
 		value = f.ReadValue(o.GetName())
 	}
+	verboseName := value.GetVerboseName()
+	defer value.SetVerboseName(verboseName)
+
 	keys := []Value{f.EmitConstInstPlaceholder("@pointer"), f.EmitConstInstPlaceholder("@value")}
 	values := []Value{f.EmitConstInstPlaceholder(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), value}
 
@@ -414,7 +417,7 @@ func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 	return obj
 }
 
-func (f *FunctionBuilder) GetOriginPointer(obj Value) *Variable {
+func (f *FunctionBuilder) GetAndCreateOriginPointer(obj Value) *Variable {
 	o := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
 	if o.GetValue() == nil {
 		p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
@@ -424,6 +427,14 @@ func (f *FunctionBuilder) GetOriginPointer(obj Value) *Variable {
 	o.SetKind(ssautil.PointerVariable)
 
 	return o
+}
+
+func (f *FunctionBuilder) GetOriginPointerName(obj Value) string {
+	p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
+
+	n := strings.TrimPrefix(p.String(), "&")
+	originName, _ := SplitName(n)
+	return originName
 }
 
 func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
@@ -588,6 +599,7 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 			Modify:               se.Modify,
 			forceCreate:          se.forceCreate,
 			Variable:             se.Variable,
+			Kind:                 se.Kind,
 			parameterMemberInner: se.parameterMemberInner,
 		}
 

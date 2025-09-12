@@ -504,31 +504,296 @@ func Test_Pointer_cfg(t *testing.T) {
 }
 
 func Test_Pointer_sideEffect(t *testing.T) {
-	// TODO: pointer in phi
-	t.Skip()
 	t.Run("pointer side-effect", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 
+		func pointer(b *int){
+			*b = 2
+		}
+
 		func main(){
-			var a int = 1
-			var b int = 2
-			var p *int = &a
+			a := 1
 
-			f := func() {
-				p = &b
-			}
-
-			*p = 3
-			println(a) // 3
-			println(b) // 2
-
-			f()
-
-			*p = 4
-			println(a) // 3
-			println(b) // 4
+			println(a) // 1
+			pointer(&a)
+			println(a) // side-effect(2, a)
 		}
 			
-		`, []string{"3", "2", "3", "4"}, t)
+		`, []string{"1", "side-effect(2, a)"}, t)
+	})
+
+	t.Run("pointer side-effect cross block", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func pointer(a *int){
+			*a = 2
+		}
+
+		func main(){
+			a := 1
+			{
+				println(a) // 1
+				pointer(&a)
+				println(a) // side-effect(2, a)
+			}
+		}
+			
+		`, []string{"1", "side-effect(2, a)"}, t)
+	})
+
+	t.Run("pointer side-effect cross block and local", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func pointer(a *int){
+			*a = 3
+		}
+
+		func main(){
+            a := 1
+            {
+                a := 2
+                println(a) // 2
+                pointer(&a)
+                println(a) // side-effect(3, a)
+            }
+            println(a) // 1
+            pointer(&a)
+            println(a) // side-effect(3, a)
+		}
+			
+		`, []string{
+			"2", "side-effect(3, a)",
+			"1", "side-effect(3, a)"}, t)
+	})
+
+	t.Run("pointer side-effect with struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type Data struct {
+			value int
+		}
+
+		func modifyData(d *Data) {
+			d.value = 42
+		}
+
+		func main() {
+			data := Data{value: 10}
+			
+			println(data.value) // 10
+			modifyData(&data)
+			println(data.value) // side-effect(42, data.value)
+		}
+
+		`, []string{"10", "side-effect(42, data.value)"}, t)
+	})
+
+	// TODO
+	t.Skip()
+
+	t.Run("pointer side-effect with nested struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type Inner struct {
+			x int
+		}
+
+		type Outer struct {
+			inner Inner
+		}
+
+		func modifyNested(outer *Outer) {
+			outer.inner.x = 99
+		}
+
+		func main() {
+			outer := Outer{inner: Inner{x: 5}}
+			
+			println(outer.inner.x) // 5
+			modifyNested(&outer)
+			println(outer.inner.x) // side-effect(99, outer.inner.x)
+		}
+
+		`, []string{"5", "side-effect(99, outer.inner.x)"}, t)
+	})
+
+	t.Run("pointer side-effect with slice", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func modifySlice(s []int) {
+			s[0] = 100
+			s[1] = 200
+		}
+
+		func main() {
+			arr := []int{1, 2, 3}
+			
+			println(arr[0]) // 1
+			println(arr[1]) // 2
+			modifySlice(arr)
+			println(arr[0]) // side-effect(100, arr[0])
+			println(arr[1]) // side-effect(200, arr[1])
+		}
+
+		`, []string{"1", "2", "side-effect(100, arr[0])", "side-effect(200, arr[1])"}, t)
+	})
+
+	t.Run("pointer side-effect with double pointer", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func modifyThroughDoublePointer(pp **int) {
+			**pp = 77
+		}
+
+		func main() {
+			a := 10
+			p := &a
+			
+			println(a) // 10
+			modifyThroughDoublePointer(&p)
+			println(a) // side-effect(77, a)
+		}
+
+		`, []string{"10", "side-effect(77, a)"}, t)
+	})
+
+	t.Run("pointer side-effect multiple parameters", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func modifyMultiple(a, b, c *int) {
+			*a = 11
+			*b = 22
+			*c = 33
+		}
+
+		func main() {
+			x, y, z := 1, 2, 3
+			
+			println(x) // 1
+			println(y) // 2
+			println(z) // 3
+			modifyMultiple(&x, &y, &z)
+			println(x) // side-effect(11, x)
+			println(y) // side-effect(22, y)
+			println(z) // side-effect(33, z)
+		}
+
+		`, []string{
+			"1", "2", "3",
+			"side-effect(11, x)",
+			"side-effect(22, y)",
+			"side-effect(33, z)"}, t)
+	})
+
+	t.Run("pointer side-effect with conditional", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func conditionalModify(a *int, condition int) {
+			if condition > 0 {
+				*a = 50
+			} else {
+				*a = 60
+			}
+		}
+
+		func main() {
+			a := 1
+			
+			println(a) // 1
+			conditionalModify(&a, 1)
+			println(a) // side-effect(phi(a)[50,60], a)
+		}
+
+		`, []string{"1", "side-effect(phi(a)[50,60], a)"}, t)
+	})
+
+	t.Run("pointer side-effect with loop", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func modifyInLoop(a *int, count int) {
+			for i := 0; i < count; i++ {
+				*a = *a + 1
+			}
+		}
+
+		func main() {
+			a := 0
+			
+			println(a) // 0
+			modifyInLoop(&a, 3)
+			println(a) // side-effect(FreeValue-a, a)
+		}
+
+		`, []string{"0", "side-effect(FreeValue-a, a)"}, t)
+	})
+
+	t.Run("pointer side-effect with map", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func modifyMap(m map[string]int) {
+			m["key1"] = 100
+			m["key2"] = 200
+		}
+
+		func main() {
+			m := map[string]int{"key1": 1, "key2": 2}
+			
+			println(m["key1"]) // 1
+			println(m["key2"]) // 2
+			modifyMap(m)
+			println(m["key1"]) // side-effect(100, m["key1"])
+			println(m["key2"]) // side-effect(200, m["key2"])
+		}
+
+		`, []string{"1", "2", "side-effect(100, m[\"key1\"])", "side-effect(200, m[\"key2\"])"}, t)
+	})
+
+	t.Run("pointer side-effect with interface", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		type Modifier interface {
+			Modify()
+		}
+
+		type Data struct {
+			value int
+		}
+
+		func (d *Data) Modify() {
+			d.value = 42
+		}
+
+		func callModify(m Modifier) {
+			m.Modify()
+		}
+
+		func main() {
+			data := &Data{value: 10}
+			
+			println(data.value) // 10
+			callModify(data)
+			println(data.value) // side-effect(42, data.value)
+		}
+
+		`, []string{"10", "side-effect(42, data.value)"}, t)
+	})
+
+	t.Run("pointer side-effect with channel", func(t *testing.T) {
+		test.CheckPrintlnValue(`package main
+
+		func modifyThroughChannel(ch chan int) {
+			ch <- 99
+		}
+
+		func main() {
+			ch := make(chan int, 1)
+			ch <- 1
+			
+			println(<-ch) // 1
+			modifyThroughChannel(ch)
+			println(<-ch) // side-effect(99, <-ch)
+		}
+
+		`, []string{"1", "side-effect(99, <-ch)"}, t)
 	})
 }
