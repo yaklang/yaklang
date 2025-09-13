@@ -217,6 +217,19 @@ func RemoveRepeatIntSliceByMap(slc []int) []int {
 	return result
 }
 
+func StringArrayContainsAll(array []string, elements ...string) bool {
+	lookupSet := make(map[string]struct{}, len(array))
+	for _, s := range array {
+		lookupSet[s] = struct{}{}
+	}
+	for _, e := range elements {
+		if _, ok := lookupSet[e]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func StringArrayContains(array []string, element string) bool {
 	for _, s := range array {
 		if element == s {

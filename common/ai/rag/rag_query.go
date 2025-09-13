@@ -3,10 +3,13 @@ package rag
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -34,6 +37,9 @@ type RAGQueryConfig struct {
 	Filter               func(key string, getDoc func() *Document) bool
 	Concurrent           int
 	MsgCallBack          func(*RAGSearchResult)
+
+	enableResultDuplicatesFilter bool    // 是否启用结果相似度过滤
+	resultSimilarityLimit        float64 // 结果相似度限制，避免返回大量语义相似的结果 ，default 0.9
 }
 
 const (
@@ -115,6 +121,24 @@ func WithRAGConcurrent(concurrent int) RAGQueryOption {
 	}
 }
 
+// WithRAGResultSimilarityLimit 设置结果相似度限制，避免返回大量语义相似的结果
+func WithRAGResultSimilarityLimit(similarityLimit float64) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.enableResultDuplicatesFilter = true
+		config.resultSimilarityLimit = similarityLimit
+	}
+}
+
+// WithRAGEnableResultDuplicatesFilter 启用或禁用结果重复过滤
+func WithRAGEnableResultDuplicatesFilter(enable bool) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.enableResultDuplicatesFilter = enable
+		if enable && config.resultSimilarityLimit <= 0 {
+			config.resultSimilarityLimit = 0.9
+		}
+	}
+}
+
 // NewRAGQueryConfig 创建新的RAG查询配置
 func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 	config := &RAGQueryConfig{
@@ -190,7 +214,33 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
+	resultList := make([]*Document, 0)
+	resultListMtx := sync.Mutex{}
 	sendResult := func(doc *Document, score float64, source string) {
+		resultListMtx.Lock()
+		defer resultListMtx.Unlock()
+		if config.enableResultDuplicatesFilter {
+			for _, document := range resultList {
+				if utils.StringArrayContainsAll(document.RelatedEntities, doc.RelatedEntities...) {
+					sendMsg(fmt.Sprintf("跳过重复文档: %s ｜ 原因: 关联实体相同", doc.ID))
+					return
+				}
+
+				similarity, err := hnsw.CosineSimilarity(document.Embedding, doc.Embedding)
+				if err != nil {
+					log.Errorf("计算余弦相似度失败: %v", err)
+					continue
+				}
+
+				if similarity >= config.resultSimilarityLimit {
+					sendMsg(fmt.Sprintf("跳过重复文档: %s ｜ 原因: 文档相似度太高", doc.ID))
+					return
+				}
+			}
+		}
+
+		resultList = append(resultList, doc)
+
 		msgResult := &RAGSearchResult{
 			Message:   fmt.Sprintf("[%s] 最终结果: %s", queryId, doc.ID),
 			Data:      doc,
