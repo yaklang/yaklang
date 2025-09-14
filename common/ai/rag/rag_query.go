@@ -210,14 +210,17 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
-	sendResult := func(doc *Document, score float64, source string) {
+	sendResult := func(idx int64, queryMethod string, query string, doc *Document, score float64, source string) {
 		msgResult := &RAGSearchResult{
-			Message:   fmt.Sprintf("[%s] 最终结果: %s", queryId, doc.ID),
-			Data:      doc,
-			Type:      RAGResultTypeResult,
-			Score:     score,
-			Source:    source,
-			Timestamp: time.Now().UnixMilli(),
+			Message:     fmt.Sprintf("[%s] 最终结果: %s", queryId, doc.ID),
+			Data:        doc,
+			Type:        RAGResultTypeResult,
+			Score:       score,
+			Source:      source,
+			Timestamp:   time.Now().UnixMilli(),
+			Index:       idx,
+			QueryMethod: queryMethod,
+			QueryOrigin: query,
 		}
 		sendRaw(msgResult)
 	}
@@ -378,7 +381,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 					allResults = append(allResults, ScoredResult{
 						Index:       idx,
 						QueryMethod: subquery.Method,
-						QueryOrigin: utils.ShrinkString(subquery.Query, 256),
+						QueryOrigin: subquery.Query,
 						Document:    &result.Document,
 						Score:       result.Score,
 						Source:      ragSystem.Name,
@@ -405,7 +408,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		// 发送最终结果
 		for i := 0; i < finalCount; i++ {
 			result := allResults[i]
-			sendResult(result.Document, result.Score, result.Source)
+			sendResult(result.Index, result.QueryMethod, result.QueryOrigin, result.Document, result.Score, result.Source)
 		}
 
 		sendMsg(fmt.Sprintf("查询完成，返回 %d 个最佳结果", finalCount))
