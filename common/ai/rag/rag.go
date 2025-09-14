@@ -91,6 +91,7 @@ func NewRAGSystem(embedder EmbeddingClient, store VectorStore) *RAGSystem {
 
 func NewRAGSystemWithName(name string, embedder EmbeddingClient, store VectorStore) *RAGSystem {
 	return &RAGSystem{
+		Name:         name,
 		Embedder:     embedder,
 		VectorStore:  store,
 		BigTextPlan:  BigTextPlanChunkText, // 默认使用分块策略

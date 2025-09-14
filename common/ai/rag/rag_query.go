@@ -12,13 +12,16 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // RAG 搜索结果类型常量
 const (
 	RAGResultTypeMessage   = "message"
+	RAGResultEntity        = "entity"
 	RAGResultTypeMidResult = "mid_result"
 	RAGResultTypeResult    = "result"
 	RAGResultTypeError     = "error"
@@ -210,6 +213,16 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
+	sendEntityResult := func(i *schema.ERModelEntity) {
+		msgResult := &RAGSearchResult{
+			Message:   fmt.Sprintf("[%s] 找到知识实体: %s", queryId, i.Uuid),
+			Data:      i,
+			Type:      RAGResultEntity,
+			Timestamp: time.Now().UnixMilli(),
+		}
+		sendRaw(msgResult)
+	}
+
 	sendResult := func(idx int64, queryMethod string, query string, doc *Document, score float64, source string) {
 		msgResult := &RAGSearchResult{
 			Message:     fmt.Sprintf("[%s] 最终结果: %s", queryId, doc.ID),
@@ -250,7 +263,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		}
 		cols = append(cols, r)
 	}
-	status("RAG预加载", fmt.Sprintf("cost: %v", time.Since(start).String()))
+	status("RAG预加载用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
 
 	type subQuery struct {
 		Method string
@@ -356,6 +369,12 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		var offset int64 = 0
 		var allResults []ScoredResult
 		var enhanceSubQuery int64 = 0
+		var ragQueryCostSum float64 = 0
+		var ragAtomicQueryCount int64 = 0
+		var resultRecorder = map[string]float64{}
+
+		var nodesRecorder = make(map[string]struct{})
+
 		for subquery := range chans.OutputChannel() {
 			enhanceSubQuery++
 			status("强化查询", fmt.Sprint(enhanceSubQuery))
@@ -364,6 +383,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			for _, ragSystem := range cols {
 				// 在该集合中执行搜索
 				log.Infof("start to query %v with subquery: %v", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
+				queryStart := time.Now()
 				searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit+5, func(key string, getDoc func() *Document) bool {
 					if key == DocumentTypeCollectionInfo {
 						return false
@@ -378,6 +398,17 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 					continue
 				}
 
+				if len(searchResults) > 0 {
+					cost := time.Since(queryStart).Seconds()
+					ragQueryCostSum += cost
+					ragAtomicQueryCount++
+					avgCost := 0.0
+					if ragAtomicQueryCount > 0 {
+						avgCost = ragQueryCostSum / float64(ragAtomicQueryCount)
+					}
+					status("RAG原子查询平均用时", fmt.Sprintf("%.2fs", avgCost))
+				}
+
 				if searchResults != nil {
 					log.Infof("query ragsystem[%v] with subquery: %v got %d results", ragSystem.Name, utils.ShrinkString(subquery.Query, 100), len(searchResults))
 				} else {
@@ -386,6 +417,15 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 				// 收集结果并标记来源
 				for _, result := range searchResults {
+					docId := result.Document.ID
+					if score, ok := resultRecorder[docId]; ok {
+						if score < result.Score {
+							resultRecorder[docId] = result.Score
+						}
+						continue
+					}
+					resultRecorder[docId] = result.Score
+
 					currentSearchCount++
 					idx := atomic.AddInt64(&offset, 1)
 					allResults = append(allResults, ScoredResult{
@@ -398,6 +438,20 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 					})
 					// 发送中间结果
 					sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
+
+					// send nodes from erm
+					if ret := result.Document.EntityUUID; ret != "" {
+						if _, ok := nodesRecorder[ret]; !ok {
+							nodesRecorder[ret] = struct{}{}
+						}
+					}
+					if ret := result.Document.RelatedEntities; len(ret) > 0 {
+						for _, id := range ret {
+							if _, ok := nodesRecorder[id]; !ok {
+								nodesRecorder[id] = struct{}{}
+							}
+						}
+					}
 				}
 			}
 
@@ -422,7 +476,23 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		// 发送最终结果
 		for i := 0; i < finalCount; i++ {
 			result := allResults[i]
-			sendResult(result.Index, result.QueryMethod, result.QueryOrigin, result.Document, result.Score, result.Source)
+			score := result.Score
+			if storedScore, ok := resultRecorder[result.QueryMethod]; ok {
+				if storedScore > score {
+					score = storedScore
+				}
+			}
+			sendResult(result.Index, result.QueryMethod, result.QueryOrigin, result.Document, score, result.Source)
+		}
+
+		status("RAG-to-Entity", fmt.Sprintf("关联到%d个知识实体", len(nodesRecorder)))
+		for nodeId := range nodesRecorder {
+			entity, err := yakit.GetEntityByIndex(db, nodeId)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			sendEntityResult(entity)
 		}
 
 		sendMsg(fmt.Sprintf("查询完成，返回 %d 个最佳结果", finalCount))

@@ -187,11 +187,14 @@ func (s *SQLiteVectorStoreHNSW) Remove() error {
 // 将 schema.VectorStoreDocument 转换为 Document
 func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Document {
 	return Document{
-		ID:        doc.DocumentID,
-		Type:      doc.DocumentType,
-		Metadata:  map[string]any(doc.Metadata),
-		Embedding: []float32(doc.Embedding),
-		Content:   doc.Content,
+		ID:              doc.DocumentID,
+		Type:            doc.DocumentType,
+		Metadata:        map[string]any(doc.Metadata),
+		Embedding:       []float32(doc.Embedding),
+		Content:         doc.Content,
+		EntityUUID:      doc.EntityID,
+		RelatedEntities: utils.PrettifyListFromStringSplitEx(doc.RelatedEntities, ",", "|"),
+		RuntimeID:       doc.RuntimeID,
 	}
 }
 
