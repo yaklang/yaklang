@@ -87,7 +87,7 @@ addEntityData = func(uuid, entityName, entityType, description, ragContent) {
 
     yakit.TableData(
         entityTableName,
-        {"UUID": id, "类型": entityType, "名称": entityName, "描述": description, "RAG内容": ragContent},
+        {"UUID": uuid, "类型": entityType, "名称": entityName, "描述": description, "RAG内容": ragContent},
     )
 }
 
