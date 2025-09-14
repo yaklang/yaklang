@@ -240,6 +240,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 	status("STATUS", "初始化RAG查询配置")
 	var cols []*RAGSystem
+	start := time.Now()
 	for _, name := range ListCollections(db) {
 		log.Infof("start to load collection %v", name)
 		r, err := LoadCollection(db, name)
@@ -249,6 +250,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		}
 		cols = append(cols, r)
 	}
+	status("RAG预加载", fmt.Sprintf("cost: %v", time.Since(start).String()))
 
 	type subQuery struct {
 		Method string
@@ -265,11 +267,13 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			wg.Done()
 		}()
 		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+		start := time.Now()
 		result, err := enhancesearch.HypotheticalAnswer(config.Ctx, query)
 		if err != nil {
 			log.Warnf("enhance [HypotheticalAnswer] query failed: %v", err)
 			return
 		}
+		status("HyDE强化用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
 		if result != "" {
 			startSubQuery(EnhancePlanHypotheticalAnswer, result)
 			chans.FeedBlock(&subQuery{
@@ -286,11 +290,13 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			wg.Done()
 		}()
 		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+		start := time.Now()
 		results, err := enhancesearch.GeneralizeQuery(config.Ctx, query)
 		if err != nil {
 			log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
 			return
 		}
+		status("泛化查询用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
 		for _, result := range results {
 			if result != "" {
 				startSubQuery(EnhancePlanGeneralizeQuery, result)
@@ -309,11 +315,13 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			wg.Done()
 		}()
 		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+		start := time.Now()
 		results, err := enhancesearch.SplitQuery(config.Ctx, query)
 		if err != nil {
 			log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
 			return
 		}
+		status("拆分子查询用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
 		for _, result := range results {
 			if result != "" {
 				startSubQuery(EnhancePlanSplitQuery, result)
@@ -352,6 +360,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			enhanceSubQuery++
 			status("强化查询", fmt.Sprint(enhanceSubQuery))
 
+			currentSearchCount := 0
 			for _, ragSystem := range cols {
 				// 在该集合中执行搜索
 				log.Infof("start to query %v with subquery: %v", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
@@ -377,6 +386,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 				// 收集结果并标记来源
 				for _, result := range searchResults {
+					currentSearchCount++
 					idx := atomic.AddInt64(&offset, 1)
 					allResults = append(allResults, ScoredResult{
 						Index:       idx,
@@ -389,6 +399,10 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 					// 发送中间结果
 					sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
 				}
+			}
+
+			if currentSearchCount > 0 {
+				status(subquery.Method+"结果数", fmt.Sprint(currentSearchCount))
 			}
 		}
 
