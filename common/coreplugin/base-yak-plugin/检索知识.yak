@@ -35,7 +35,8 @@ if score > 0 {
 }
 
 
-tablename := "检索结果"
+middleResultTable := "中间检索结果（调试）"
+finalResultTable := "最终检索结果（按分数排序）"
 columnType := "类型"
 columnContent := "内容"
 columnScore := "分数"
@@ -44,14 +45,32 @@ columnSource := "来源"
 columnTime := "时间"
 columnQuery := "查询语句"
 
-yakit.EnableTable(
-    tablename,
-    [columnContent, columnQueryMethod, columnQuery, columnType, columnScore, columnSource, columnTime],
-)
+midResultOnce := sync.NewOnce()
+addMidResultData = func(typeName, data, score, source, timeString, queryMethod, query) {
+    midResultOnce.Do(() => {
+        yakit.EnableTable(
+            middleResultTable,
+            [columnContent, columnQueryMethod, columnQuery, columnType, columnScore, columnSource, columnTime],
+        )
+    })
 
-addData = func(typeName, data, score, source, timeString, queryMethod, query) {
     yakit.TableData(
-        tablename,
+        middleResultTable,
+        {columnType: typeName, columnContent: data, columnScore: score, columnSource: source, columnTime: timeString, columnQueryMethod: queryMethod, columnQuery: query},
+    )
+}
+
+resultOnce := sync.NewOnce()
+addResultData = func(typeName, data, score, source, timeString, queryMethod, query) {
+    resultOnce.Do(() => {
+        yakit.EnableTable(
+            finalResultTable,
+            [columnContent, columnQueryMethod, columnQuery, columnType, columnScore, columnSource, columnTime],
+        )
+    })
+
+    yakit.TableData(
+        finalResultTable,
         {columnType: typeName, columnContent: data, columnScore: score, columnSource: source, columnTime: timeString, columnQueryMethod: queryMethod, columnQuery: query},
     )
 }
@@ -62,8 +81,9 @@ for i in rag.Query(query, option...)~ {
         continue
     }
 
-    if i.Type != "mid_result" {
-        addData(
+
+    if i.Type == "mid_result" {
+        addMidResultData(
             i.Data.Type,
             string(i.Data.Content),
             "%.4f" % i.Score,
@@ -72,5 +92,16 @@ for i in rag.Query(query, option...)~ {
             i.QueryMethod,
             i.QueryOrigin,
         )
+        continue
     }
+
+    addResultData(
+        i.Data.Type,
+        string(i.Data.Content),
+        "%.4f" % i.Score,
+        i.Source,
+        timestampToDatetime(i.Timestamp / 1000),
+        i.QueryMethod,
+        i.QueryOrigin,
+    )
 }
