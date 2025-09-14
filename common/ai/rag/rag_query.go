@@ -3,16 +3,17 @@ package rag
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
 	"sort"
-	"strconv"
-	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 )
 
 // RAG 搜索结果类型常量
@@ -34,6 +35,8 @@ type RAGQueryConfig struct {
 	Filter               func(key string, getDoc func() *Document) bool
 	Concurrent           int
 	MsgCallBack          func(*RAGSearchResult)
+	OnSubQueryStart      func(method string, query string)
+	OnStatus             func(label string, value string)
 }
 
 const (
@@ -57,6 +60,17 @@ func WithRAGLimit(limit int) RAGQueryOption {
 func WithRAGCollectionName(collectionName string) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
 		config.CollectionNames = append(config.CollectionNames, collectionName)
+	}
+}
+
+func WithRAGQueryStatus(i func(label string, i any, tags ...string)) RAGQueryOption {
+	return func(c *RAGQueryConfig) {
+		c.OnStatus = func(label string, value string) {
+			if i == nil {
+				return
+			}
+			i(label, value)
+		}
 	}
 }
 
@@ -134,12 +148,15 @@ func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 
 // RAGSearchResult RAG搜索结果
 type RAGSearchResult struct {
-	Message   string      `json:"message"`
-	Data      interface{} `json:"data"`
-	Type      string      `json:"type"`      // message, mid_result, result
-	Score     float64     `json:"score"`     // 相似度分数
-	Source    string      `json:"source"`    // 结果来源（集合名称）
-	Timestamp int64       `json:"timestamp"` // 时间戳
+	Message     string      `json:"message"`
+	Data        interface{} `json:"data"`
+	Type        string      `json:"type"`      // message, mid_result, result
+	Score       float64     `json:"score"`     // 相似度分数
+	Source      string      `json:"source"`    // 结果来源（集合名称）
+	Timestamp   int64       `json:"timestamp"` // 时间戳
+	QueryMethod string      `json:"query_method"`
+	QueryOrigin string      `json:"query_origin"`
+	Index       int64       `json:"index"`
 }
 
 func QueryYakitProfile(query string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
@@ -178,14 +195,17 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
-	sendMidResult := func(doc *Document, score float64, source string) {
+	sendMidResult := func(idx int64, queryMethod string, query string, doc *Document, score float64, source string) {
 		msgResult := &RAGSearchResult{
-			Message:   fmt.Sprintf("[%s] 找到文档: %s", queryId, doc.ID),
-			Data:      doc,
-			Type:      RAGResultTypeMidResult,
-			Score:     score,
-			Source:    source,
-			Timestamp: time.Now().UnixMilli(),
+			Message:     fmt.Sprintf("[%s] 找到文档: %s", queryId, doc.ID),
+			Data:        doc,
+			Type:        RAGResultTypeMidResult,
+			Score:       score,
+			Source:      source,
+			Timestamp:   time.Now().UnixMilli(),
+			QueryMethod: queryMethod,
+			QueryOrigin: query,
+			Index:       idx,
 		}
 		sendRaw(msgResult)
 	}
@@ -202,199 +222,170 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
+	startSubQuery := func(method string, query string) {
+		log.Infof("start to sub query, method: %s, query: %s", method, query)
+		if config.OnSubQueryStart != nil {
+			config.OnSubQueryStart(method, query)
+		}
+	}
+
+	status := func(label string, value string) {
+		if config.OnStatus != nil {
+			config.OnStatus(label, value)
+		}
+	}
+
+	status("STATUS", "初始化RAG查询配置")
+	var cols []*RAGSystem
+	for _, name := range ListCollections(db) {
+		log.Infof("start to load collection %v", name)
+		r, err := LoadCollection(db, name)
+		if err != nil {
+			log.Warnf("load collection %s failed: %v", name, err)
+			continue
+		}
+		cols = append(cols, r)
+	}
+
+	type subQuery struct {
+		Method string
+		Query  string
+	}
+
+	chans := chanx.NewUnlimitedChan[*subQuery](config.Ctx, 10)
+	status("STATUS", "开始创建子查询（强化）")
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
 	go func() {
 		defer func() {
-			if r := recover(); r != nil {
-				sendMsg(fmt.Sprintf("查询过程中发生错误: %v", r))
-			}
-			close(resultCh)
+			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
+			wg.Done()
 		}()
-
-		var searchQuery string = query
-
-		// 如果启用增强搜索，生成假设文档
-		if config.EnhancePlan != "" {
-			switch config.EnhancePlan {
-			case EnhancePlanHypotheticalAnswer:
-				sendMsg("开始生成假设文档")
-				if enhance, err := enhancesearch.HypotheticalAnswer(config.Ctx, query); err != nil {
-					sendMsg(fmt.Sprintf("生成假设文档失败，使用原始查询: %v", err))
-				} else {
-					searchQuery = enhance
-					displayEnhance := enhance
-					if len(displayEnhance) > 100 {
-						displayEnhance = displayEnhance[:100] + "..."
-					}
-					sendMsg(fmt.Sprintf("假设文档生成完成: %s", displayEnhance))
-				}
-			case EnhancePlanHypotheticalAnswerWithSplit:
-				sendMsg("开始生成假设文档")
-				if enhance, err := enhancesearch.HypotheticalAnswer(config.Ctx, query); err != nil {
-					sendMsg(fmt.Sprintf("生成假设文档失败，使用原始查询: %v", err))
-				} else {
-					searchQuery = enhance
-					displayEnhance := enhance
-					if len(displayEnhance) > 100 {
-						displayEnhance = displayEnhance[:100] + "..."
-					}
-					sendMsg(fmt.Sprintf("假设文档生成完成: %s", displayEnhance))
-				}
-				res, err := _query(db, searchQuery, queryId+"-"+strconv.Itoa(1), append(opts, WithRAGEnhance(EnhancePlanSplitQuery))...)
-				if err != nil {
-					sendMsg(fmt.Sprintf("查询失败: %v", err))
-				} else {
-					for result := range res {
-						sendRaw(result)
-					}
-				}
-			case EnhancePlanSplitQuery:
-				sendMsg("开始拆分查询")
-				if enhanceSentences, err := enhancesearch.SplitQuery(config.Ctx, query); err != nil {
-					sendMsg(fmt.Sprintf("拆分查询失败，使用原始查询: %v", err))
-				} else {
-					swg := utils.NewSizedWaitGroup(config.Concurrent)
-					for i, enhanceSentence := range enhanceSentences {
-						i := i
-						enhanceSentence := enhanceSentence
-						swg.Add(1)
-						go func() {
-							defer swg.Done()
-							sendMsg(fmt.Sprintf("开始查询拆分后的子问题: %s", enhanceSentence))
-							res, err := _query(db, enhanceSentence, queryId+"-"+strconv.Itoa(i+1), append(opts, WithRAGEnhance(""))...)
-							if err != nil {
-								sendMsg(fmt.Sprintf("查询失败: %v", err))
-							} else {
-								for result := range res {
-									sendRaw(result)
-								}
-							}
-						}()
-					}
-					swg.Wait()
-				}
-			case EnhancePlanGeneralizeQuery:
-				sendMsg("开始泛化增强查询")
-				if enhance, err := enhancesearch.GeneralizeQuery(config.Ctx, query); err != nil {
-					sendMsg(fmt.Sprintf("增强搜索失败，使用原始查询: %v", err))
-				} else {
-					searchQuery = enhance
-					// 限制显示的增强查询长度
-					displayEnhance := enhance
-					if len(enhance) > 100 {
-						displayEnhance = enhance[:100] + "..."
-					}
-					sendMsg(fmt.Sprintf("增强查询生成完成: %s", displayEnhance))
-				}
-			}
-		}
-
-		var targetCollections []string
-
-		// 确定要搜索的集合
-		if len(config.CollectionNames) == 1 {
-			// 指定了集合名称，只搜索该集合
-			targetCollections = config.CollectionNames
-			sendMsg(fmt.Sprintf("指定搜索集合: %s", strings.Join(config.CollectionNames, ", ")))
-		} else {
-			if len(config.CollectionNames) == 0 {
-				sendMsg(fmt.Sprintf("未指定集合名称，将搜索最相关的 %d 个集合", config.CollectionNumLimit))
-			} else {
-				sendMsg(fmt.Sprintf("指定了 %d 个集合，开始根据相关度对集合进行排序", len(config.CollectionNames)))
-			}
-			// 自动发现相关集合
-			collectionResults, err := QueryCollection(db, query)
-			if err != nil {
-				sendMsg(fmt.Sprintf("搜索集合失败: %v", err))
-				return
-			}
-
-			if len(config.CollectionNames) > 0 {
-				collectionResults = lo.Filter(collectionResults, func(result *SearchResult, _ int) bool {
-					return lo.Contains(config.CollectionNames, result.Document.Metadata["collection_name"].(string))
-				})
-			}
-			sendMsg(fmt.Sprintf("共发现 %d 个相关集合", len(collectionResults)))
-
-			// 根据分数阈值和数量限制筛选集合
-			var filteredCollections []*SearchResult
-			for _, result := range collectionResults {
-				if result.Score >= config.CollectionScoreLimit {
-					filteredCollections = append(filteredCollections, result)
-				}
-			}
-
-			sendMsg(fmt.Sprintf("通过分数阈值 %v 过滤后共发现 %d 个相关集合", config.CollectionScoreLimit, len(filteredCollections)))
-
-			// 限制集合数量
-			if len(filteredCollections) > config.CollectionNumLimit {
-				filteredCollections = filteredCollections[:config.CollectionNumLimit]
-			}
-
-			sendMsg(fmt.Sprintf("通过数量限制 %v 过滤后共发现 %d 个相关集合", config.CollectionNumLimit, len(filteredCollections)))
-
-			// 提取集合名称
-			for _, result := range filteredCollections {
-				if collectionName, ok := result.Document.Metadata["collection_name"].(string); ok {
-					targetCollections = append(targetCollections, collectionName)
-					sendMsg(fmt.Sprintf("选择集合: %s (相似度: %.3f)", collectionName, result.Score))
-				}
-			}
-		}
-
-		if len(targetCollections) == 0 {
-			sendMsg("没有找到符合条件的集合")
+		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+		result, err := enhancesearch.HypotheticalAnswer(config.Ctx, query)
+		if err != nil {
+			log.Warnf("enhance [HypotheticalAnswer] query failed: %v", err)
 			return
 		}
+		if result != "" {
+			startSubQuery(EnhancePlanHypotheticalAnswer, result)
+			chans.FeedBlock(&subQuery{
+				Method: EnhancePlanHypotheticalAnswer,
+				Query:  result,
+			})
+		}
+	}()
 
-		sendMsg(fmt.Sprintf("开始在 %d 个集合中搜索，查询限制: %d", len(targetCollections), config.Limit))
+	wg.Add(1)
+	go func() {
+		defer func() {
+			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
+			wg.Done()
+		}()
+		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+		results, err := enhancesearch.GeneralizeQuery(config.Ctx, query)
+		if err != nil {
+			log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
+			return
+		}
+		for _, result := range results {
+			if result != "" {
+				startSubQuery(EnhancePlanGeneralizeQuery, result)
+				chans.FeedBlock(&subQuery{
+					Method: EnhancePlanGeneralizeQuery,
+					Query:  result,
+				})
+			}
+		}
+	}()
 
+	wg.Add(1)
+	go func() {
+		defer func() {
+			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
+			wg.Done()
+		}()
+		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+		results, err := enhancesearch.SplitQuery(config.Ctx, query)
+		if err != nil {
+			log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
+			return
+		}
+		for _, result := range results {
+			if result != "" {
+				startSubQuery(EnhancePlanSplitQuery, result)
+				chans.FeedBlock(&subQuery{
+					Method: EnhancePlanSplitQuery,
+					Query:  result,
+				})
+			}
+		}
+	}()
+
+	go func() {
+		wg.Wait()
+		log.Info("end to create sub query")
+		chans.Close()
+	}()
+
+	go func() {
+		defer func() {
+			close(resultCh)
+		}()
 		// 收集所有结果
 		type ScoredResult struct {
-			Document *Document
-			Score    float64
-			Source   string
+			Index       int64
+			QueryMethod string
+			QueryOrigin string
+			Document    *Document
+			Score       float64
+			Source      string
 		}
 
+		var offset int64 = 0
 		var allResults []ScoredResult
+		var enhanceSubQuery int64 = 0
+		for subquery := range chans.OutputChannel() {
+			enhanceSubQuery++
+			status("强化查询", fmt.Sprint(enhanceSubQuery))
 
-		// 在每个集合中搜索
-		for _, collectionName := range targetCollections {
-			sendMsg(fmt.Sprintf("正在搜索集合: %s", collectionName))
-
-			// 加载集合对应的RAG系统
-			ragSystem, err := LoadCollection(db, collectionName)
-			if err != nil {
-				sendMsg(fmt.Sprintf("加载集合 %s 失败: %v", collectionName, err))
-				continue
-			}
-
-			// 在该集合中执行搜索
-			searchResults, err := ragSystem.QueryWithFilter(searchQuery, 1, config.Limit+5, func(key string, getDoc func() *Document) bool {
-				if key == DocumentTypeCollectionInfo {
-					return false
-				}
-				if config.Filter != nil {
-					return config.Filter(key, getDoc)
-				}
-				return true
-			})
-			if err != nil {
-				sendMsg(fmt.Sprintf("在集合 %s 中搜索失败: %v", collectionName, err))
-				continue
-			}
-
-			sendMsg(fmt.Sprintf("在集合 %s 中找到 %d 个结果", collectionName, len(searchResults)))
-
-			// 收集结果并标记来源
-			for _, result := range searchResults {
-				allResults = append(allResults, ScoredResult{
-					Document: &result.Document,
-					Score:    result.Score,
-					Source:   collectionName,
+			for _, ragSystem := range cols {
+				// 在该集合中执行搜索
+				log.Infof("start to query %v with subquery: %v", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
+				searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit+5, func(key string, getDoc func() *Document) bool {
+					if key == DocumentTypeCollectionInfo {
+						return false
+					}
+					if config.Filter != nil {
+						return config.Filter(key, getDoc)
+					}
+					return true
 				})
+				if err != nil {
+					log.Infof("start to query ragsystem[%v] failed: %v", ragSystem.Name, err)
+					continue
+				}
 
-				// 发送中间结果
-				sendMidResult(&result.Document, result.Score, collectionName)
+				if searchResults != nil {
+					log.Infof("query ragsystem[%v] with subquery: %v got %d results", ragSystem.Name, utils.ShrinkString(subquery.Query, 100), len(searchResults))
+				} else {
+					log.Infof("query ragsystem[%v] with subquery: %v got 0 result", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
+				}
+
+				// 收集结果并标记来源
+				for _, result := range searchResults {
+					idx := atomic.AddInt64(&offset, 1)
+					allResults = append(allResults, ScoredResult{
+						Index:       idx,
+						QueryMethod: subquery.Method,
+						QueryOrigin: utils.ShrinkString(subquery.Query, 256),
+						Document:    &result.Document,
+						Score:       result.Score,
+						Source:      ragSystem.Name,
+					})
+					// 发送中间结果
+					sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
+				}
 			}
 		}
 
@@ -419,7 +410,6 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 		sendMsg(fmt.Sprintf("查询完成，返回 %d 个最佳结果", finalCount))
 	}()
-
 	return resultCh, nil
 }
 

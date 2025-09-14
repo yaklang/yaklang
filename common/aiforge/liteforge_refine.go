@@ -3,12 +3,15 @@ package aiforge
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
+	"io"
+	"strings"
+	"sync/atomic"
+
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"io"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag/knowledgebase"
@@ -108,13 +111,18 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 	output := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
 
 	go func() {
-		count := 0
 		hopAnalyzeWg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
 		defer output.Close()
 		defer hopAnalyzeWg.Wait()
 
+		var total int64 = 0
+		var done int64 = 0
 		for hop := range er.RuntimeYieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
+			atomic.AddInt64(&total, 1)
 			hopAnalyzeWg.Add(1)
+			if refineConfig.Ctx != nil && refineConfig.Ctx.Err() != nil {
+				break
+			}
 			go func() {
 				defer hopAnalyzeWg.Done()
 				go func() {
@@ -123,6 +131,14 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 						refineConfig.AnalyzeLog("failed to add khop to vector index: %v", err)
 					}
 				}()
+
+				if refineConfig.Ctx != nil {
+					select {
+					case <-refineConfig.Ctx.Done():
+						return
+					default:
+					}
+				}
 
 				entries, err := BuildKnowledgeEntryFromKHop(hop, kb, option...)
 				if err != nil {
@@ -134,8 +150,8 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 					output.SafeFeed(entry)
 				}
 
-				count++
-				refineConfig.AnalyzeStatusCard("[build knowledge]: processed count", count)
+				count := atomic.AddInt64(&done, 1)
+				refineConfig.AnalyzeStatusCard("[multi-hops]: knowledge", fmt.Sprintf("%v/%v", count, total))
 
 				err = SaveKnowledgeEntries(kb, entries, hop.GetRelatedEntityUUIDs(), option...)
 				if err != nil {
