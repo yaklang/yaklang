@@ -75,6 +75,22 @@ addResultData = func(typeName, data, score, source, timeString, queryMethod, que
     )
 }
 
+entityTableName = "知识实体列表"
+entityTableOnce := sync.NewOnce()
+addEntityData = func(uuid, entityName, entityType, description, ragContent) {
+    entityTableOnce.Do(() => {
+        yakit.EnableTable(
+            entityTableName,
+            ["UUID", "类型", "名称", "描述", "RAG内容"],
+        )
+    })
+
+    yakit.TableData(
+        entityTableName,
+        {"UUID": id, "类型": entityType, "名称": entityName, "描述": description, "RAG内容": ragContent},
+    )
+}
+
 for i in rag.Query(query, option...)~ {
     if i.Type == "message" {
         yakit.Info(i.Message)
@@ -92,6 +108,11 @@ for i in rag.Query(query, option...)~ {
             i.QueryMethod,
             i.QueryOrigin,
         )
+        continue
+    }
+
+    if i.Type == "entity" {
+        addEntityData(i.Data.Uuid, i.Data.EntityName, i.Data.EntityType, i.Data.Description, string(i.Data.ToRAGContent()))
         continue
     }
 
