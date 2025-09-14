@@ -245,7 +245,7 @@ func LoadCollectionEx(db *gorm.DB, name string, recoverLayer bool, opts ...aispe
 	}
 	log.Infof("start to create RAG system for collection %#v", name)
 
-	return NewRAGSystem(embeddingService, store), nil
+	return NewRAGSystemWithName(name, embeddingService, store), nil
 }
 
 // LoadCollectionWithCustomEmbedding 使用自定义嵌入服务加载知识库

@@ -1,13 +1,14 @@
 package yak
 
 import (
+	"path/filepath"
+
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
-	"path/filepath"
 )
 
 // 导出的公共函数
@@ -26,6 +27,7 @@ var RagExports = map[string]interface{}{
 	"Query":           rag.QueryYakitProfile,
 	"queryLimit":      rag.WithRAGLimit,
 	"queryCollection": rag.WithRAGCollectionName,
+	"queryStatus":     rag.WithRAGQueryStatus,
 	"queryEnhance":    rag.WithRAGEnhance,
 	"queryCtx":        rag.WithRAGCtx,
 	"queryConcurrent": rag.WithRAGConcurrent,

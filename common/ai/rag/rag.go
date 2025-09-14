@@ -81,10 +81,15 @@ type RAGSystem struct {
 	Concurrent   int             // 并发数
 	MaxChunkSize int             // 最大块大小
 	ChunkOverlap int             // 块重叠
+	Name         string
 }
 
 // NewRAGSystem 创建一个新的 RAG 系统
 func NewRAGSystem(embedder EmbeddingClient, store VectorStore) *RAGSystem {
+	return NewRAGSystemWithName("", embedder, store)
+}
+
+func NewRAGSystemWithName(name string, embedder EmbeddingClient, store VectorStore) *RAGSystem {
 	return &RAGSystem{
 		Embedder:     embedder,
 		VectorStore:  store,
