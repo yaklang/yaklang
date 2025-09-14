@@ -91,6 +91,8 @@ addEntityData = func(uuid, entityName, entityType, description, ragContent) {
     )
 }
 
+text = ""
+
 for i in rag.Query(query, option...)~ {
     if i.Type == "message" {
         yakit.Info(i.Message)
@@ -125,4 +127,11 @@ for i in rag.Query(query, option...)~ {
         i.QueryMethod,
         i.QueryOrigin,
     )
+    text += string(i.Data.Content) + "\n"
+}
+
+if text != "" {
+    resultLabel = "筛选结果（文本）"
+    yakit.EnableText(resultLabel)
+    yakit.TextTabData(resultLabel, text)
 }
