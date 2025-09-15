@@ -54,6 +54,7 @@ func (prog *Program) UpdateToDatabaseWithWG(wg *sync.WaitGroup) {
 		ir.ProgramKind = prog.ProgramKind
 		ir.ProgramName = prog.Name
 		ir.Version = prog.Version
+		ir.ProjectName = prog.ProjectName
 		ir.FileList = prog.FileList
 		ir.LineCount = prog.LineCount
 		ir.ExtraFile = prog.ExtraFile
