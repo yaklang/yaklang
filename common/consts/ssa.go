@@ -129,6 +129,8 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 		return err
 	}
 	ssaDatabase = db
+	// 同步更新 schema 包中的默认 SSA 数据库
+	schema.SetDefaultSSADatabase(db)
 	return nil
 }
 
@@ -149,6 +151,8 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 
 func SetGormSSAProjectDatabase(db *gorm.DB) {
 	ssaDatabase = db
+	// 同步更新 schema 包中的默认 SSA 数据库
+	schema.SetDefaultSSADatabase(db)
 }
 
 func GetGormDefaultSSADataBase() *gorm.DB {
