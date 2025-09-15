@@ -196,8 +196,12 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 		tools = yakscripttools.GetYakScriptAiTools(strings.Split(config.Tools, ",")...)
 	}
 	name := config.Name
+	cliCode := config.CLIParameterRuleYaklangCode
+	if cliCode == "" {
+		cliCode = config.ForgeContent
+	}
 	blueprint := NewForgeBlueprint(name,
-		WithOriginYaklangCliCode(config.CLIParameterRuleYaklangCode),
+		WithOriginYaklangCliCode(cliCode),
 		WithToolKeywords(strings.Split(config.ToolKeywords, ",")),
 		WithTools(tools...),
 		WithInitializePrompt(config.InitPrompt),
