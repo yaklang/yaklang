@@ -47,6 +47,7 @@ const (
 	EnhancePlanHypotheticalAnswerWithSplit = "hypothetical_answer_with_split"
 	EnhancePlanSplitQuery                  = "split_query"
 	EnhancePlanGeneralizeQuery             = "generalize_query"
+	EnhancePlanExactKeywordSearch          = "exact_keyword_search"
 )
 
 // RAGQueryOption RAG查询选项
@@ -266,8 +267,9 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 	status("RAG预加载用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
 
 	type subQuery struct {
-		Method string
-		Query  string
+		Method      string
+		Query       string
+		ExactSearch bool
 	}
 
 	chans := chanx.NewUnlimitedChan[*subQuery](config.Ctx, 10)
@@ -298,8 +300,9 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 	wg.Add(1)
 	go func() {
+		method := EnhancePlanGeneralizeQuery
 		defer func() {
-			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
+			log.Infof("end to sub query, method: %s, query: %s", method, query)
 			wg.Done()
 		}()
 		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
@@ -323,8 +326,9 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 	wg.Add(1)
 	go func() {
+		method := EnhancePlanSplitQuery
 		defer func() {
-			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
+			log.Infof("end to sub query, method: %s, query: %s", method, query)
 			wg.Done()
 		}()
 		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
@@ -341,6 +345,34 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				chans.FeedBlock(&subQuery{
 					Method: EnhancePlanSplitQuery,
 					Query:  result,
+				})
+			}
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		method := EnhancePlanExactKeywordSearch
+		defer func() {
+			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
+			wg.Done()
+		}()
+		log.Infof("start to create sub query for enhance plan: %s", method)
+		start := time.Now()
+		// 直接使用原始查询作为精确关键词搜索
+		results, err := enhancesearch.ExtractKeywords(config.Ctx, query)
+		if err != nil {
+			log.Warnf("enhance [ExtractKeywords] query failed: %v", err)
+			return
+		}
+		status("关键词提取用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
+		for _, result := range results {
+			if result != "" {
+				startSubQuery(method, result)
+				chans.FeedBlock(&subQuery{
+					Method:      method,
+					Query:       result,
+					ExactSearch: true,
 				})
 			}
 		}
@@ -384,6 +416,12 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				// 在该集合中执行搜索
 				log.Infof("start to query %v with subquery: %v", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
 				queryStart := time.Now()
+
+				if subquery.ExactSearch {
+					status("[TODO]精确关键词搜索", "TODO")
+					continue
+				}
+
 				searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit+5, func(key string, getDoc func() *Document) bool {
 					if key == DocumentTypeCollectionInfo {
 						return false
