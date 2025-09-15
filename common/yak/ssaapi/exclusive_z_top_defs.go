@@ -28,6 +28,7 @@ func (v Values) GetTopDefs(opts ...OperationOption) Values {
 
 func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
 	var vals Values
+	saveGraph := actx.config.saveGraph
 	if i.innerValue == nil {
 		return vals
 	}
@@ -35,7 +36,7 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 		if utils.IsNil(def) {
 			continue
 		}
-		if ret := i.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
+		if ret := i.NewTopDefValue(def, saveGraph).getTopDefs(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	}
@@ -54,12 +55,12 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 		// 用以作为下个topdef的effecton的边
 		// 而不影响i作为结果result有多出来的边
 		if last != nil {
-			shadow = last.NewTopDefValue(i.innerValue)
+			shadow = last.NewTopDefValue(i.innerValue, saveGraph)
 		} else {
 			shadow = i.NewValue(i.innerValue)
 		}
 		for _, def := range maskable.GetMask() {
-			if ret := shadow.NewTopDefValue(def).getTopDefs(actx, opt...); len(ret) > 0 {
+			if ret := shadow.NewTopDefValue(def, saveGraph).getTopDefs(actx, opt...); len(ret) > 0 {
 				vals = append(vals, ret...)
 			}
 		}
@@ -75,6 +76,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
+	saveGraph := actx.config.saveGraph
 
 	actx.depth--
 	defer func() {
@@ -143,7 +145,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 				return i.visitedDefs(actx, opt...)
 			}
 
-			obj.AppendEffectOn(apiValue)
+			obj.AppendEffectOn(apiValue, saveGraph)
 			results := obj.getTopDefs(actx, opt...)
 			if len(results) == 0 && !ValueCompare(i, actx.Self) {
 				results = append(results, i)
@@ -164,7 +166,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		conds := inst.GetControlFlowConditions()
 		result := getMemberCall(i, inst, actx)
 		for _, cond := range conds {
-			ret := i.NewTopDefValue(cond).getTopDefs(actx, opt...)
+			ret := i.NewTopDefValue(cond, saveGraph).getTopDefs(actx, opt...)
 			result = append(result, ret...)
 		}
 		return result
@@ -185,19 +187,19 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 
 		switch {
 		case isFunc && !fun.IsExtern():
-			callee := i.NewTopDefValue(fun)
+			callee := i.NewTopDefValue(fun, saveGraph)
 			callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY, i)
 			if objectContext := actx.CurrentObjectStack(); objectContext != nil && ValueCompare(objectContext.object, i) {
 				callee.SetContextValue(ANALYZE_RUNTIME_CTX_TOPDEF_CALL_ENTRY_TRACE_INDEX, objectContext.key)
 			}
 			return callee.getTopDefs(actx, opt...)
 		default:
-			callee := i.NewTopDefValue(calleeInst)
+			callee := i.NewTopDefValue(calleeInst, saveGraph)
 			nodes := Values{callee}
 			for _, val := range inst.Args {
 				val, ok := inst.GetValueById(val)
 				if ok && val != nil {
-					arg := i.NewTopDefValue(val)
+					arg := i.NewTopDefValue(val, saveGraph)
 					if arg != nil {
 						nodes = append(nodes, arg)
 					}
@@ -206,7 +208,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			for _, value := range inst.Binding {
 				value, ok := inst.GetValueById(value)
 				if ok && value != nil {
-					arg := i.NewTopDefValue(value)
+					arg := i.NewTopDefValue(value, saveGraph)
 					if arg != nil {
 						nodes = append(nodes, arg)
 					}
@@ -246,7 +248,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						if idx == targetIdx {
 							traceVal, ok := inst.GetValueById(traceId)
 							if ok && traceVal != nil {
-								topDefValue := i.NewTopDefValue(traceVal)
+								topDefValue := i.NewTopDefValue(traceVal, saveGraph)
 								if topDefValue != nil {
 									traceRets = append(traceRets, topDefValue)
 								}
@@ -277,7 +279,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						}
 						val, ok := traceValue.GetStringMember(retIndexRawStr)
 						if ok && val != nil {
-							topDefValue := i.NewTopDefValue(val)
+							topDefValue := i.NewTopDefValue(val, saveGraph)
 							if topDefValue != nil {
 								traceRets = append(traceRets, topDefValue)
 							}
@@ -314,7 +316,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					continue
 				}
 				for _, subVal := range retInst.GetValues() {
-					if ret := value.NewTopDefValue(subVal).getTopDefs(actx, opt...); len(ret) > 0 {
+					if ret := value.NewTopDefValue(subVal, saveGraph).getTopDefs(actx, opt...); len(ret) > 0 {
 						vals = append(vals, ret...)
 					}
 				}
@@ -327,7 +329,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		// handler child-class function
 		for _, child := range inst.GetPointer() {
-			handlerReturn(i.NewTopDefValue(child))
+			handlerReturn(i.NewTopDefValue(child, saveGraph))
 		}
 		return vals
 	case *ssa.ParameterMember:
@@ -337,7 +339,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if fun == nil {
 				return Values{i}
 			}
-			fun.AppendEffectOn(i)
+			fun.AppendEffectOn(i, saveGraph)
 			switch inst.MemberCallKind {
 			case ssa.MoreParameterMember:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
@@ -346,7 +348,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						memberKey = nil
 					}
 					actx.pushObject(para, i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
-					return para.AppendEffectOn(fun).getTopDefs(actx, opt...)
+					return para.AppendEffectOn(fun, saveGraph).getTopDefs(actx, opt...)
 				}
 			case ssa.ParameterMemberCall:
 				if para := fun.GetParameter(inst.MemberCallObjectIndex); para != nil {
@@ -355,7 +357,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 						memberKey = nil
 					}
 					actx.pushObject(para, i.NewValue(memberKey), i.NewValue(ssa.NewConst("")))
-					return para.AppendEffectOn(fun).getTopDefs(actx, opt...)
+					return para.AppendEffectOn(fun, saveGraph).getTopDefs(actx, opt...)
 				}
 			case ssa.FreeValueMemberCall:
 				if fv := fun.GetFreeValue(inst.MemberCallObjectName); fv != nil {
@@ -385,7 +387,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if !ok {
 				actualParam = nil
 			}
-			traced := i.NewTopDefValue(actualParam)
+			traced := i.NewTopDefValue(actualParam, saveGraph)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
@@ -408,7 +410,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
-				call2fun.AppendEffectOn(fun)
+				call2fun.AppendEffectOn(fun, saveGraph)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call)
 					vals = append(vals, val...)
@@ -459,7 +461,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 					actualParam = nil
 				}
 			}
-			traced := i.NewTopDefValue(actualParam)
+			traced := i.NewTopDefValue(actualParam, saveGraph)
 			if !actx.needCrossProcess(i, traced) {
 				return Values{}
 			}
@@ -482,7 +484,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
-				call2fun.AppendEffectOn(fun)
+				call2fun.AppendEffectOn(fun, saveGraph)
 				call2fun.ForEach(func(call *Value) {
 					val := getCalledByValue(call, true)
 					vals = append(vals, val...)
@@ -492,7 +494,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 
 		if len(vals) == 0 {
 			if i.IsFreeValue() && inst.GetDefault() != nil {
-				vals = append(vals, i.NewTopDefValue(inst.GetDefault()))
+				vals = append(vals, i.NewTopDefValue(inst.GetDefault(), saveGraph))
 			} else {
 				vals = append(vals, i)
 			}
@@ -505,7 +507,7 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 			if !ok {
 				v = nil
 			}
-			topDefValue := i.NewTopDefValue(v)
+			topDefValue := i.NewTopDefValue(v, saveGraph)
 			return topDefValue.getTopDefs(actx, opt...)
 		} else {
 			log.Errorf("side effect: %v is not created from call instruction", i.String())
