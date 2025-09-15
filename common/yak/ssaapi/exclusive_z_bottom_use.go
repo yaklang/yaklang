@@ -123,14 +123,9 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		}
 		existed := map[int64]struct{}{}
 		var vals Values
-		v.ForEachDependOn(func(value *Value) {
-			existed[value.GetId()] = struct{}{}
-		})
-		checkVal := func(vs []int64, get func(index int, arg int64)) {
-			for index, value := range vs {
-				get(index, value)
-			}
-		}
+
+		existed[actx.nodeStack.PeekN(1).GetId()] = struct{}{}
+
 		var getRealMethod func(ssa.Value, int) ssa.Value
 		getRealMethod = func(method ssa.Value, callIndex int) ssa.Value {
 			if _, isFunction := ssa.ToFunction(method); isFunction {
@@ -155,22 +150,22 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				return method
 			}
 			var val int64
-			checkVal(toFunction.Params, func(index int, arg int64) {
+			for index, arg := range toFunction.Params {
 				if index >= len(call.Args) {
-					return
+					continue
 				}
 				if arg == methodId {
 					val = call.Args[index]
 				}
-			})
-			checkVal(toFunction.ParameterMembers, func(index int, arg int64) {
+			}
+			for index, arg := range toFunction.ParameterMembers {
 				if index >= len(call.ArgMember) {
-					return
+					continue
 				}
 				if arg == methodId {
 					val = call.ArgMember[index]
 				}
-			})
+			}
 			if val <= 0 {
 				return method
 			}
@@ -188,40 +183,40 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		}
 
 		if isFunc {
-			checkVal(inst.Args, func(index int, arg int64) {
+			for index, arg := range inst.Args {
 				if index >= len(fun.Params) {
-					return
+					continue
 				}
 				_, ok := existed[arg]
 				if !ok {
-					return
+					continue
 				}
 				paramValue, ok := fun.GetValueById(fun.Params[index])
 				if !ok || paramValue == nil {
-					return
+					continue
 				}
 				val := v.NewBottomUseValue(paramValue)
 				if val != nil {
 					vals = append(vals, val.getBottomUses(actx, opt...)...)
 				}
-			})
-			checkVal(inst.ArgMember, func(index int, arg int64) {
+			}
+			for index, arg := range inst.ArgMember {
 				if index >= len(fun.ParameterMembers) {
-					return
+					continue
 				}
 				_, ok := existed[arg]
 				if !ok {
-					return
+					continue
 				}
 				memberValue, ok := fun.GetValueById(fun.ParameterMembers[index])
 				if !ok || memberValue == nil {
-					return
+					continue
 				}
 				val := v.NewBottomUseValue(memberValue)
 				if val != nil {
 					vals = append(vals, val.getBottomUses(actx, opt...)...)
 				}
-			})
+			}
 		}
 		if vals.Len() > 0 {
 			return vals
@@ -249,9 +244,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 			return vals
 		}
 		exists := make(map[int64]struct{})
-		v.ForEachDependOn(func(value *Value) {
-			exists[value.GetId()] = struct{}{}
-		})
+		exists[actx.nodeStack.PeekN(1).GetId()] = struct{}{}
 
 		getReturnIndex := -1
 		for index, result := range inst.Results {

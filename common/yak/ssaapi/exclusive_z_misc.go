@@ -132,11 +132,10 @@ func (i *Value) AppendDataFlow(vs ...*Value) *Value {
 		if i.GetUUID() == v.GetUUID() {
 			continue
 		}
-		if i.hasDataFlow(v) {
-			continue
+		if i.PrevDataFlow == nil {
+			i.PrevDataFlow = utils.NewSafeMap[*Value]()
 		}
-
-		i.PrevDataFlow = append(i.PrevDataFlow, v)
+		i.PrevDataFlow.Set(v.GetUUID(), v)
 	}
 	return i
 }
@@ -193,12 +192,12 @@ func MergeValues(allVs ...Values) Values {
 			templateValue = append(templateValue, v)
 			return
 		}
-		if val, exist := tmp.Get(v.GetId()); exist {
-			// merge v to existValue
+		if existValue, exist := tmp.Get(v.GetId()); exist {
+			// merge v to exist value
 			if v.EffectOn != nil {
 				v.EffectOn.ForEach(func(key string, effect *Value) bool {
 					effect.RemoveDependOn(v)
-					val.AppendEffectOn(effect)
+					existValue.AppendEffectOn(effect)
 					return true
 				})
 			}
@@ -206,12 +205,15 @@ func MergeValues(allVs ...Values) Values {
 			if v.DependOn != nil {
 				v.DependOn.ForEach(func(key string, depend *Value) bool {
 					depend.RemoveEffectOn(v)
-					val.AppendDependOn(depend)
+					existValue.AppendDependOn(depend)
 					return true
 				})
 			}
 			for _, pred := range v.Predecessors {
-				val.Predecessors = utils.AppendSliceItemWhenNotExists(val.Predecessors, pred)
+				existValue.Predecessors = utils.AppendSliceItemWhenNotExists(existValue.Predecessors, pred)
+			}
+			for _, prev := range v.GetDataFlow() {
+				existValue.AppendDataFlow(prev)
 			}
 		} else {
 			// set v is exist
