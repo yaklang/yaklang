@@ -14,6 +14,7 @@ type SSAProject struct {
 	gorm.Model
 	// 项目基础信息
 	ProjectName string `json:"project_name" gorm:"unique_index;not null;comment:项目名称"`
+	Language    string `json:"language" gorm:"comment:项目语言"`
 	Description string `json:"description,omitempty" gorm:"comment:项目描述"`
 	Tags        string `json:"tags,omitempty" gorm:"comment:项目标签"`
 	// 源码获取方式配置
@@ -141,6 +142,10 @@ func (p *SSAProject) SetTagsList(tags []string) {
 	p.Tags = strings.Join(tags, ",")
 }
 
+func (p *SSAProject) SetExcludeFilesList(files []string) {
+	p.ExcludeFiles = strings.Join(files, ",")
+}
+
 func (p *SSAProject) GetRuleFilter() (*ypb.SyntaxFlowRuleFilter, error) {
 	if p.RuleFilter == nil {
 		return nil, fmt.Errorf("rule filter is required")
@@ -168,6 +173,7 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 		CreatedAt:        p.CreatedAt.Unix(),
 		UpdatedAt:        p.UpdatedAt.Unix(),
 		ProjectName:      p.ProjectName,
+		Language:         p.Language,
 		CodeSourceConfig: p.CodeSourceConfig,
 		Description:      p.Description,
 		CompileConfig: &ypb.SSAProjectCompileConfig{

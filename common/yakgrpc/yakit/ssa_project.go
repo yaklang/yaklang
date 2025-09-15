@@ -103,6 +103,7 @@ func FilterSSAProject(db *gorm.DB, filter *ypb.SSAProjectFilter) *gorm.DB {
 
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetIDs())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "project_name", filter.GetProjectNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguages())
 
 	if filter.GetSearchKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
@@ -132,6 +133,7 @@ func ProtoToSchemaSSAProject(proto *ypb.SSAProject) *schema.SSAProject {
 	}
 	project := &schema.SSAProject{
 		ProjectName:      proto.ProjectName,
+		Language:         proto.Language,
 		CodeSourceConfig: proto.CodeSourceConfig,
 		Description:      proto.Description,
 	}
@@ -140,6 +142,7 @@ func ProtoToSchemaSSAProject(proto *ypb.SSAProject) *schema.SSAProject {
 		project.StrictMode = proto.CompileConfig.StrictMode
 		project.PeepholeSize = int(proto.CompileConfig.PeepholeSize)
 		project.ReCompile = proto.CompileConfig.ReCompile
+		project.SetExcludeFilesList(proto.CompileConfig.ExcludeFiles)
 	}
 	if proto.ScanConfig != nil {
 		project.ScanConcurrency = proto.ScanConfig.Concurrency
