@@ -3,9 +3,10 @@ package dot
 import (
 	"bytes"
 	"fmt"
-	"github.com/samber/lo"
 	"io"
 	"strings"
+
+	"github.com/samber/lo"
 )
 
 // Graph represents a set of nodes, edges and attributes that can be
@@ -262,6 +263,9 @@ func (g *Graph) DrawMultipleEdges() {
 // NodeAttribute sets an attribute for the specified node.
 func (g *Graph) NodeAttribute(id int, name, value string) {
 	// TODO: check for errors (id out of range)
+	if name == "" {
+		name = "key"
+	}
 	g.nodes[id].attributes.set(name, value)
 }
 
