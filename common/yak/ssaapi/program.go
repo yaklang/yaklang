@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"context"
 	"fmt"
-	"runtime"
 	"sort"
 	"time"
 
@@ -196,9 +195,10 @@ func (v *Value) NewValue(value ssa.Instruction) *Value {
 
 func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	if utils.IsNil(inst) {
-		var raw = make([]byte, 2048)
-		runtime.Stack(raw, false)
-		return nil, utils.Errorf("instruction is nil: %s", string(raw))
+		// var raw = make([]byte, 2048)
+		// runtime.Stack(raw, false)
+		// return nil, utils.Errorf("instruction is nil: %s", string(raw))
+		return nil, utils.Errorf("isntruction is nil ")
 	}
 	var v *Value
 	var uuidStr string
