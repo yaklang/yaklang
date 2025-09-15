@@ -101,7 +101,7 @@ func Test_SideEffect(t *testing.T) {
 		println(t.a)// 2 会被side-effect影响
 	}
 		`, []string{
-			"side-effect(Parameter-a, t.a)",
+			"side-effect(2, t.a)",
 		}, t)
 	})
 

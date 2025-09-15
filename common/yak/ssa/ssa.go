@@ -206,6 +206,14 @@ const (
 	VirtualFunctionName FunctionName = "@virtual"
 )
 
+type SideEffectType int64
+
+const (
+	NotSideEffect SideEffectType = iota
+	SideEffectIn
+	SideEffectOut
+)
+
 // both instruction and value
 type Program struct {
 	// package list
@@ -291,6 +299,7 @@ type Program struct {
 	externType              map[string]Type
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
 	ExternInstance          map[string]any
+	ExternSideEffect        map[string][]uint
 	ExternLib               map[string]map[string]any
 
 	PkgName           string

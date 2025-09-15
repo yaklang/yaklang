@@ -369,6 +369,6 @@ int main() {
 	println(head);
     return 0;
 }
-`, []string{"10", "Undefined-malloc(make(struct {number,Node}))"}, t)
+`, []string{"10", "Function-malloc"}, t)
 	})
 }
