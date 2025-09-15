@@ -273,18 +273,15 @@ c,d,e = a(f,2,3);
 }
 
 func TestBottomUse_ReturnUnpack2(t *testing.T) {
-	prog, err := ssaapi.Parse(`a = (i, j, k) => {
+	code := `
+a = (i, j, k) => {
 	return i, i+1, k
 }
 c,d,e = a(f,2,3);
-`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	prog.Show()
-	vals := prog.Ref("f").GetBottomUses()
-	vals.Show()
-	if len(vals) != 2 {
-		t.Fatal("bottom use failed")
-	}
+`
+	ssatest.CheckBottomUser(t, code, "f",
+		[]string{
+			"Undefined-c(valid)", "Undefined-d(valid)",
+		}, false, ssaapi.WithLanguage(ssaapi.Yak),
+	)
 }

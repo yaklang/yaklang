@@ -74,7 +74,7 @@ func (a *AnalyzeContext) SavePath(result Values) {
 			// if len(ret.PrevDataflowPath) == 0 {
 			// log.Error("========================")
 			{
-				// log.Errorf("Ret [%v] StackValue: %v", ret, actx.nodeStack.Values())
+				// log.Errorf("Ret [%v] StackValue: %v", ret, a.nodeStack.Values())
 				size := a.nodeStack.Len()       // [current, ..... , origin]
 				current := a.nodeStack.PeekN(0) // current
 				if !ValueCompare(current, ret) {
@@ -83,6 +83,7 @@ func (a *AnalyzeContext) SavePath(result Values) {
 				for i := 0; i < size; i++ {
 					prev := a.nodeStack.PeekN(i) //
 					// log.Errorf("Value[%v] effect-on [%v]", current, next)
+					// log.Errorf("%v(%v) prev %v(%v)", current, current.GetUUID(), prev, prev.GetUUID())
 					current.AppendDataFlow(prev)
 					current = prev
 				}
