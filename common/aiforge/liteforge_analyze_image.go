@@ -676,7 +676,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 			analyzeConfig.AnalyzeLog("chunk index[%d] size:%v Analyzing media type [%s]", count, utils.ByteSize(uint64(chunk.BytesSize())), chunk.MIMEType().String())
 			indexedChannel.SafeFeed(chunk)
 			count++
-			analyzeConfig.AnalyzeStatusCard("[media]:extract chunk", count)
+			analyzeConfig.AnalyzeStatusCard("多模态切片(Multimodels-Chunk)", count)
 			return nil
 		}),
 		aireducer.WithContext(analyzeConfig.Ctx),
@@ -699,7 +699,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	return utils.OrderedParallelProcessSkipError[chunkmaker.Chunk, AnalysisResult](analyzeConfig.Ctx, indexedChannel.OutputChannel(), func(chunk chunkmaker.Chunk) (AnalysisResult, error) {
 		defer func() {
 			processedCount++
-			analyzeConfig.AnalyzeStatusCard("[media]:analysed chunk ", processedCount)
+			analyzeConfig.AnalyzeStatusCard("知识实体分析(Entity Analyzing)", processedCount)
 		}()
 		if chunk.MIMEType().IsImage() {
 			return AnalyzeImage(chunk.Data(), opts)
