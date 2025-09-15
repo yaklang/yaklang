@@ -107,6 +107,25 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 		Output(tableData)
 		return nil
 	}
+
+	exports["EnableDotGraphTab"] = func(tabName string) {
+		Output(&YakitFeature{
+			Feature: "dot-graph-tab",
+			Params: map[string]interface{}{
+				"tab_name": tabName,
+			},
+		})
+	}
+
+	exports["OutputDotGraph"] = func(tabName string, data string) *YakitDotGraphData {
+		tabData := &YakitDotGraphData{
+			TabName: tabName,
+			Data:    data,
+		}
+		Output(tabData)
+		return tabData
+	}
+
 	exports["StatusCard"] = func(id string, data interface{}, tags ...string) {
 		Output(&YakitStatusCard{
 			Id: id, Data: fmt.Sprint(data), Tags: tags,
@@ -397,6 +416,8 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 		return "json-httpflow-risk", string(raw)
 	case *YakitFixedTableData:
 		return "feature-table-data", string(raw)
+	case *YakitDotGraphData:
+		return "dot-graph-data", string(raw)
 	case *YakitTextTabData:
 		return "feature-text-data", string(raw)
 	case *YakitStatusCard:
