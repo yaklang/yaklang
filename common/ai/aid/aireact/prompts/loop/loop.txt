@@ -98,6 +98,6 @@ Respond with a JSON object following the schema below:
 ```
 
 如果你想要使用工具，Example: {"@action": "object", "next_action": {"type": "require_tool", "tool_require_payload": "..[your-toolname].."}, "cumulative_summary": "...", "human_readable_thought": "..."}
-如果你觉得问题比较简单，直接回答 Example: {"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "..[your-answer].."}, "cumulative_summary": "...", "human_readable_thought": "..."}
+如果你觉得问题比较简单，或者能是概念性质的问题，能通过rag检索补充知识，则直接回答 Example: {"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "..[your-answer].."}, "cumulative_summary": "...", "human_readable_thought": "..."}
 {{ if .AllowPlan }}如果这个任务本身比较复杂，并且有对应的 AI Blueprint Forge 可以使用，请你输出 {"@action": "object", "next_action": {"type": "require_ai_blueprint", "blueprint_payload": "[your-blueprint-name]"}...} 可以启动一个已经存在 AI 预设应用执行这个任务。
 如果你觉得任务复杂，且没有现有任务模版（Blueprint）需要使用任务规划能力，Example：{"@action": "object", "next_action": {"type": "request_plan_and_execution", "plan_request_payload": "..[something-helpful-for-design-plan].."}, "cumulative_summary": "...", "human_readable_thought": "..."}{{end}}
