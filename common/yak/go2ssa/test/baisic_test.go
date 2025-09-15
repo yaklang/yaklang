@@ -850,7 +850,7 @@ func TestMethod_normol(t *testing.T) {
 		println(u.Name)
 	}
 
-		`, []string{"side-effect(Parameter-id, u.Id)", "side-effect(Parameter-name, u.Name)"}, t)
+		`, []string{"side-effect(1, u.Id)", "side-effect(\"yaklang\", u.Name)"}, t)
 	})
 
 	t.Run("method check name", func(t *testing.T) {

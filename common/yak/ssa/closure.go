@@ -157,6 +157,15 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 		if !ok || modify == nil {
 			continue
 		}
+		if p, ok := ToParameter(modify); ok && !p.IsFreeValue {
+			id := c.Args[p.FormalParameterIndex]
+			if id > 0 && se.Kind == PointerSideEffect {
+				if v, ok := c.GetValueById(id); ok {
+					modify = v
+				}
+			}
+		}
+
 		var variable *Variable
 		modifyScope := modify.GetBlock().ScopeTable
 
