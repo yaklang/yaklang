@@ -80,12 +80,17 @@ func WithRuntimeGC(enable ...bool) dumpHeapOption {
 
 func DumpHeapProfile(opts ...dumpHeapOption) {
 	cfg := NewHeapConfig(opts...)
+	dump(cfg, true)
+}
+
+func dump(cfg dumpHeapConfig, saveFile bool) bool {
 	count := 0
+	saved := false
 	save := func() {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
 		log.Printf("Memory usage exceeds threshold (%d MB) | %s\n", bToMb(m.Alloc), cfg.name)
-		if cfg.disable {
+		if cfg.disable || !saveFile {
 			return
 		}
 		if m.Alloc > cfg.memThreshold {
@@ -116,8 +121,9 @@ func DumpHeapProfile(opts ...dumpHeapOption) {
 				}
 				os.Remove(tmpFile) // Clean up temporary file
 			}
+			saved = true
 		} else {
-			log.Printf("Current memory usage: %d MB, below threshold (%d MB)\n", bToMb(m.Alloc), bToMb(cfg.memThreshold))
+			// log.Printf("Current memory usage: %d MB, below threshold (%d MB)\n", bToMb(m.Alloc), bToMb(cfg.memThreshold))
 		}
 	}
 	save()
@@ -125,16 +131,26 @@ func DumpHeapProfile(opts ...dumpHeapOption) {
 		runtime.GC()
 		save()
 	}
+	return saved
 }
 
 func DumpHeapProfileWithInterval(dumpInterval time.Duration, opts ...dumpHeapOption) {
 	log.Printf("Memory usage exceeds threshold, dumping heap profile every %v\n", dumpInterval)
 	// 定期dump heap profile
 	go func() {
+		cfg := NewHeapConfig(opts...)
 		ticker := time.NewTicker(dumpInterval)
 		defer ticker.Stop()
+		count := 0
 		for range ticker.C {
-			DumpHeapProfile(opts...)
+			save := true
+			if cfg.count != 0 && count >= cfg.count {
+				save = false
+			}
+
+			if dump(cfg, save) {
+				count++
+			}
 		}
 	}()
 }
