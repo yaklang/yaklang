@@ -140,6 +140,10 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 					}
 				}
 
+				if !refineConfig.AllowMultiHopAIRefine {
+					return
+				}
+
 				entries, err := BuildKnowledgeEntryFromKHop(hop, kb, option...)
 				if err != nil {
 					refineConfig.AnalyzeLog("failed to build knowledge entry: %v", err)
