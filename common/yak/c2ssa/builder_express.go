@@ -346,6 +346,8 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 	var right ssa.Value
 	var left *ssa.Variable
 
+	// log.Infof("exp = %s\n", ast.GetText())
+
 	// 1. primaryExpression | malloc
 	if p := ast.PrimaryExpression(); p != nil {
 		right, left = b.buildPrimaryExpression(p.(*cparser.PrimaryExpressionContext), isLeft)
@@ -384,17 +386,17 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 			args = b.buildArgumentExpressionList(a.(*cparser.ArgumentExpressionListContext))
 		}
 
-		// if right != nil && right.GetName() == "malloc" {
-		// 	if tv, ok := ssa.ToTypeValue(args[0]); ok {
-		// 		right = b.EmitMakeBuildWithType(tv.GetType(), nil, nil)
-		// 	} else if c, ok := ssa.ToConstInst(args[0]); ok {
-		// 		index, _ := strconv.Atoi(c.String())
-		// 		newtype := ssa.NewSliceType(ssa.CreateByteType())
-		// 		newtype.Len = index
-		// 		right = b.EmitMakeBuildWithType(newtype, nil, nil)
-		// 	}
-		// 	return right, left
-		// }
+		if right != nil && right.GetName() == "malloc" {
+			if tv, ok := ssa.ToTypeValue(args[0]); ok {
+				right = b.EmitMakeBuildWithType(tv.GetType(), nil, nil)
+			} else if c, ok := ssa.ToConstInst(args[0]); ok {
+				index, _ := strconv.Atoi(c.String())
+				newtype := ssa.NewSliceType(ssa.CreateByteType())
+				newtype.Len = index
+				right = b.EmitMakeBuildWithType(newtype, nil, nil)
+			}
+			return right, left
+		}
 		right = b.EmitCall(b.NewCall(right, args))
 		return right, left
 	}

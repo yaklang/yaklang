@@ -14,6 +14,16 @@ const (
 	MAXTYPELEVEL = 15
 )
 
+func (b *FunctionBuilder) WithExternSideEffect(es map[string][]uint) {
+	m := make(map[string]func(b *FunctionBuilder, id string, v any) (value Value))
+
+	b.GetProgram().ExternSideEffect = es
+	for n, _ := range es {
+		m[n] = BuildFunctionWithSideEffect
+	}
+	b.WithExternBuildValueHandler(m)
+}
+
 func (b *FunctionBuilder) WithExternValue(vs map[string]any) {
 	b.GetProgram().ExternInstance = vs
 }
@@ -254,8 +264,8 @@ func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (va
 	} else {
 		switch itype.Kind() {
 		case reflect.Func:
-			f := NewFunctionWithType(str, prog.CoverReflectFunctionType(itype, 0))
-			value = f
+			funcType := prog.CoverReflectFunctionType(itype, 0)
+			value = NewFunctionWithType(str, funcType)
 		default:
 			value = NewUndefined(str)
 			value.SetType(prog.handlerType(itype, 0))
@@ -342,6 +352,9 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 		case reflect.Func:
 			ret = prog.CoverReflectFunctionType(typ, level)
 		case reflect.Pointer:
+			// t := NewPointerType()
+			// t.SetName("Pointer")
+			// return t
 			ret = prog.handlerType(typ.Elem(), level)
 			return ret
 		case reflect.UnsafePointer:
@@ -423,4 +436,52 @@ func (b *FunctionBuilder) TryBuildValueWithoutParent(name string, value Value) {
 		variable := head.CreateVariable(name, false)
 		head.AssignVariable(variable, value)
 	}
+}
+
+func BuildFunctionWithSideEffect(b *FunctionBuilder, id string, v any) (value Value) {
+	itype := reflect.TypeOf(v)
+	prog := b.GetProgram()
+	str := id
+
+	switch itype.Kind() {
+	case reflect.Func:
+		funcType := prog.CoverReflectFunctionType(itype, 0)
+		value = NewFunctionWithType(str, funcType)
+		if se, ok := prog.ExternSideEffect[str]; ok {
+			var modify Value
+			for i, k := range se {
+				switch k {
+				case uint(SideEffectIn):
+					p := b.NewParam("in")
+					p.FormalParameterIndex = i
+					modify = p
+				}
+			}
+			for i, k := range se {
+				if modify == nil {
+					modify = b.EmitMakeBuildWithType(CreateAnyType(), nil, nil)
+				}
+				switch k {
+				case uint(SideEffectOut):
+					funcType.SideEffects = append(funcType.SideEffects, &FunctionSideEffect{
+						Name:        "out",
+						VerboseName: "",
+						Modify:      modify.GetId(),
+						Variable:    b.CreateVariable("out"),
+						forceCreate: true,
+						Kind:        PointerSideEffect,
+						parameterMemberInner: &parameterMemberInner{
+							MemberCallKind:        ParameterCall,
+							MemberCallObjectIndex: i,
+						},
+					},
+					)
+				}
+			}
+		}
+	}
+	if b != nil {
+		value.SetRange(b.CurrentRange)
+	}
+	return
 }

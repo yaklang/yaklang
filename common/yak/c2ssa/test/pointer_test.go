@@ -191,7 +191,7 @@ int main(){
 	})
 }
 
-func Test_Pointer_muti(t *testing.T) {
+func Test_Pointer_Muti(t *testing.T) {
 	t.Run("basic muti pointer", func(t *testing.T) {
 		test.CheckPrintlnValue(`#include <stdio.h>
 
@@ -234,7 +234,7 @@ int main(){
 	})
 }
 
-func Test_Pointer_cfg(t *testing.T) {
+func Test_Pointer_Cfg(t *testing.T) {
 	t.Run("pointer cfg block", func(t *testing.T) {
 		test.CheckPrintlnValue(`#include <stdio.h>
 
@@ -451,7 +451,7 @@ int main(){
 	})
 }
 
-func Test_Pointer_sideEffect(t *testing.T) {
+func Test_Pointer_SideEffect(t *testing.T) {
 	t.Run("pointer side-effect", func(t *testing.T) {
 		test.CheckPrintlnValue(`#include <stdio.h>
 
@@ -654,4 +654,75 @@ int main() {
 
 		`, []string{"1", "side-effect(phi(a)[50,60], a)"}, t)
 	})
+}
+
+func Test_Pointer_SideEffect_Parameter(t *testing.T) {
+	t.Run("parameter", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+void pointer(int* b, int c) {
+	*b = c;
+}
+
+int main() {
+	int a = 1;
+
+	println(a); // 1
+	pointer(&a, 3);
+	println(a); // side-effect(3, a)
+}
+
+		`, []string{"1", "side-effect(3, a)"}, t)
+	})
+
+	t.Run("parameter with struct", func(t *testing.T) {
+		test.CheckPrintlnValue(`#include <stdio.h>
+
+struct Data {
+	int value;
+};
+
+void modify_data(struct Data* d,int e) {
+	d->value = e;
+}
+
+int main() {
+	struct Data data = { .value = 10 };
+	
+	println(data.value); // 10
+	modify_data(&data, 44);
+	println(data.value); // side-effect(44, data.value)
+}
+
+		`, []string{"10", "side-effect(44, data.value)"}, t)
+	})
+
+	t.Run("lib-gets paramete", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void vulnerable_file_list(const char *directory) {
+    char command[256];
+    gets(&command);
+    println(command);
+}
+		`, []string{"side-effect(make(any), command)"}, t)
+	})
+
+	t.Run("lib-sprintf parameter", func(t *testing.T) {
+		test.CheckPrintlnValue(`
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void vulnerable_file_list(const char *directory) {
+    char command[256];
+    sprintf(command, "ls -la %s", directory);
+    println(command);
+}
+		`, []string{"side-effect(Parameter-directory, command)"}, t)
+	})
+
 }
