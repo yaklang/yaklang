@@ -9,11 +9,12 @@ import (
 )
 
 type AnalysisConfig struct {
-	Ctx                context.Context
-	ExtraPrompt        string
-	AnalyzeLog         func(format string, args ...interface{})
-	AnalyzeStatusCard  func(id string, data interface{}, tags ...string)
-	AnalyzeConcurrency int
+	Ctx                   context.Context
+	ExtraPrompt           string
+	AnalyzeLog            func(format string, args ...interface{})
+	AnalyzeStatusCard     func(id string, data interface{}, tags ...string)
+	AnalyzeConcurrency    int
+	AllowMultiHopAIRefine bool
 
 	chunkOption     []chunkmaker.Option
 	fallbackOptions []any
@@ -80,6 +81,15 @@ func WithAnalyzeLog(handler func(format string, args ...interface{})) AnalysisOp
 			log.Infof(format, args...)
 			handler(format, args...)
 		}
+	}
+}
+
+func WithAllowMultiHopAIRefine(allow ...bool) AnalysisOption {
+	return func(config *AnalysisConfig) {
+		if len(allow) == 0 {
+			allow = []bool{true}
+		}
+		config.AllowMultiHopAIRefine = allow[0]
 	}
 }
 
