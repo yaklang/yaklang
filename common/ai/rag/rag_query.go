@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -62,171 +61,213 @@ func (e *SimpleERMAnalysisResult) GenerateDotGraph() *dot.Graph {
 func (e *SimpleERMAnalysisResult) GenerateDotGraphWithDirection(direction string) *dot.Graph {
 	G := dot.New()
 	G.MakeDirected()
+
 	// 设置布局方向，默认从上到下
 	if direction == "" {
 		direction = "TB"
 	}
 	G.GraphAttribute("rankdir", direction)
-	// 优化全局布局
-	G.GraphAttribute("splines", "true")
+	G.GraphAttribute("splines", "true") // 使用true而不是ortho，避免兼容性问题
 	G.GraphAttribute("concentrate", "true")
-	G.GraphAttribute("nodesep", "0.5")
-	G.GraphAttribute("ranksep", "1.0 equally")
+	G.GraphAttribute("nodesep", "0.3")
+	G.GraphAttribute("ranksep", "0.8") // 增加层级间距，确保TB效果明显
 	G.GraphAttribute("compound", "true")
+	G.GraphAttribute("clusterrank", "local")
+	G.GraphAttribute("packmode", "cluster")
+	// 强制TB布局的额外设置
+	G.GraphAttribute("ordering", "out")
+	G.GraphAttribute("newrank", "true")
 
-	// 用于生成唯一名称的计数器
-	nameCounter := 1
-	nameMap := make(map[string]string)
+	// 核心策略：使用UUID作为节点的唯一标识符
+	// UUID -> 实体映射
+	entityMap := make(map[string]*schema.ERModelEntity)
+	// UUID -> 节点ID映射（用于DOT图中的节点引用）
+	nodeMap := make(map[string]int)
 
-	// 清理名称，确保是有效的 dot 标识符
-	cleanName := func(name string) string {
-		if name == "" {
-			// 如果名称为空，使用 a1, a2, a3... 格式
-			cleaned := fmt.Sprintf("a%d", nameCounter)
-			nameCounter++
-			return cleaned
-		}
-
-		// 清理特殊字符，只保留字母、数字、下划线
-		cleaned := ""
-		for _, r := range name {
-			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
-				cleaned += string(r)
-			} else {
-				cleaned += "_"
-			}
-		}
-
-		// 确保以字母开头
-		if len(cleaned) == 0 || (cleaned[0] >= '0' && cleaned[0] <= '9') {
-			cleaned = fmt.Sprintf("a%d_%s", nameCounter, cleaned)
-			nameCounter++
-		}
-
-		return cleaned
+	// 建立实体映射（UUID -> 实体）
+	for _, entity := range e.Entities {
+		entityMap[entity.Uuid] = entity
 	}
 
-	// 获取或创建唯一名称
-	getUniqueName := func(originalName string) string {
-		cleaned := cleanName(originalName)
-		if _, exists := nameMap[cleaned]; exists {
-			// 如果名称冲突，添加后缀
-			counter := 1
-			for {
-				newName := fmt.Sprintf("%s_%d", cleaned, counter)
-				if _, exists := nameMap[newName]; !exists {
-					nameMap[newName] = originalName
-					return newName
-				}
-				counter++
-			}
-		} else {
-			nameMap[cleaned] = originalName
-			return cleaned
-		}
-	}
-
-	// UUID-like 检测
-	uuidLike := regexp.MustCompile(`(?i)[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12}`)
+	// 辅助函数：判断字符串是否像 UUID
 	isUUIDish := func(s string) bool {
-		// 直接 UUID 或者前缀+UUID
-		if uuidLike.MatchString(s) {
-			return true
-		}
-		// 类似 a12_xxx_uuid 这种
-		return strings.Count(s, "_") >= 4 && uuidLike.MatchString(strings.TrimPrefix(s, strings.SplitN(s, "_", 2)[0]+"_"))
+		match, _ := regexp.MatchString("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", s)
+		return match
 	}
 
-	// 选择友好展示名称
-	pickDisplayName := func(ent *schema.ERModelEntity) string {
-		candidates := []string{
-			utils.InterfaceToString(ent.Attributes["label"]),
-			utils.InterfaceToString(ent.Attributes["title"]),
-			utils.InterfaceToString(ent.Attributes["section_title"]),
-			utils.InterfaceToString(ent.Attributes["english_title"]),
-			utils.InterfaceToString(ent.Attributes["standard_number"]),
-			utils.InterfaceToString(ent.Attributes["name"]),
-			utils.InterfaceToString(ent.Attributes["qualified_name"]),
-			utils.InterfaceToString(ent.Attributes["qualifiedName"]),
+	// 辅助函数：从实体中选择一个合适的显示名称
+	pickDisplayName := func(entity *schema.ERModelEntity) string {
+		// 优先使用 label 属性
+		if label, ok := entity.Attributes["label"].(string); ok && label != "" && !isUUIDish(label) {
+			return label
 		}
-		for _, v := range candidates {
-			v = strings.TrimSpace(v)
-			if v != "" {
-				return utils.ShrinkString(v, 120)
-			}
+		// 其次使用 title 属性
+		if title, ok := entity.Attributes["title"].(string); ok && title != "" && !isUUIDish(title) {
+			return title
 		}
-		return ent.EntityName
+		// 再次使用 section_title 属性
+		if sectionTitle, ok := entity.Attributes["section_title"].(string); ok && sectionTitle != "" && !isUUIDish(sectionTitle) {
+			return sectionTitle
+		}
+		// 再次使用 english_title 属性
+		if englishTitle, ok := entity.Attributes["english_title"].(string); ok && englishTitle != "" && !isUUIDish(englishTitle) {
+			return englishTitle
+		}
+		// 再次使用 standard_number 属性
+		if standardNumber, ok := entity.Attributes["standard_number"].(string); ok && standardNumber != "" && !isUUIDish(standardNumber) {
+			return standardNumber
+		}
+		// 再次使用 name 属性
+		if name, ok := entity.Attributes["name"].(string); ok && name != "" && !isUUIDish(name) {
+			return name
+		}
+		// 如果EntityName也是UUID格式，使用EntityType
+		if isUUIDish(entity.EntityName) {
+			return entity.EntityType
+		}
+		// 最后使用 EntityName
+		return entity.EntityName
 	}
 
-	// 按实体类型分子图，并收集节点用于 same-rank 分组
+	// 按实体类型分子图
 	subgraphMap := make(map[string]*dot.Graph)
-	subgraphNodes := make(map[*dot.Graph][]int)
-	getSubgraph := func(label string) *dot.Graph {
-		if label == "" {
-			label = "UNKNOWN"
+	subgraphNodes := make(map[string][]string) // 子图类型 -> UUID列表
+
+	getSubgraph := func(entityType string) *dot.Graph {
+		if entityType == "" {
+			entityType = "UNKNOWN"
 		}
-		if sg, ok := subgraphMap[label]; ok {
+		if sg, exists := subgraphMap[entityType]; exists {
 			return sg
 		}
-		sg := G.CreateSubGraph(label)
-		sg.GraphAttribute("label", label)
-		subgraphMap[label] = sg
+		sg := G.CreateSubGraph(fmt.Sprintf("cluster_%s", entityType))
+		sg.GraphAttribute("label", entityType)
+		sg.GraphAttribute("style", "filled")
+		sg.GraphAttribute("fillcolor", "lightgray")
+		// 为子图也设置TB布局
+		sg.GraphAttribute("rankdir", "TB")
+		sg.GraphAttribute("rank", "same") // 子图内节点尽量保持在同一层级
+		subgraphMap[entityType] = sg
 		return sg
 	}
 
+	// 需要查询缺失节点的函数
+	ensureNodeExists := func(uuid string) bool {
+		if _, exists := entityMap[uuid]; exists {
+			return true
+		}
+
+		// 如果UUID找不到对应的实体，尝试从数据库加载
+		db := consts.GetGormProfileDatabase()
+		if db != nil {
+			loadedEntity, err := yakit.GetEntityByIndex(db, uuid)
+			if err == nil && loadedEntity != nil {
+				entityMap[uuid] = loadedEntity
+				log.Infof("动态加载实体: %s (%s)", uuid, loadedEntity.EntityType)
+				return true
+			}
+		}
+		log.Warnf("无法找到UUID对应的实体: %s", uuid)
+		return false
+	}
+
+	// 创建节点 - 使用UUID作为节点标识符
 	for _, entity := range e.Entities {
-		nodeName := getUniqueName(entity.EntityName)
+		uuid := entity.Uuid
 		sg := getSubgraph(entity.EntityType)
-		n := sg.AddNode(nodeName)
-		subgraphNodes[sg] = append(subgraphNodes[sg], n)
 
-		// 合理的可读 label（避免 UUID）
+		// 显示名称作为label，直接传给AddNode，避免重复设置
 		display := pickDisplayName(entity)
-		if isUUIDish(display) {
-			// 若仍像 UUID，退回 entity type
-			display = entity.EntityType
-		}
-		sg.NodeAttribute(n, "label", display)
+		nodeID := sg.AddNode(display)
+		nodeMap[uuid] = nodeID
 
-		for key, value := range entity.Attributes {
-			// 将数组/切片安全地规整为一个字符串
-			values := utils.InterfaceToStringSlice(value)
-			var attrVal string
-			if len(values) > 1 {
-				attrVal = strings.Join(values, "; ")
-			} else if len(values) == 1 {
-				attrVal = values[0]
-			} else {
-				attrVal = utils.InterfaceToString(value)
+		// 不再额外设置label，因为AddNode已经设置了
+
+		// 记录到子图节点列表
+		subgraphNodes[entity.EntityType] = append(subgraphNodes[entity.EntityType], uuid)
+
+		// 暂时禁用额外属性添加，专注解决重复label问题
+		// TODO: 重新设计属性添加逻辑
+		/*
+			importantAttrs := []string{"content", "term", "english_term", "standard_number"}
+			attrCount := 0
+			for _, key := range importantAttrs {
+				if attrCount >= 1 {
+					break
+				}
+				// 严格过滤可能导致重复label的属性
+				keyLower := strings.ToLower(strings.TrimSpace(key))
+				if keyLower == "label" || keyLower == "title" || keyLower == "section_title" ||
+					keyLower == "english_title" || keyLower == "name" {
+					continue
+				}
+				if value, ok := entity.Attributes[key]; ok {
+					strValue := utils.InterfaceToString(value)
+					if strValue != "" && len(strValue) < 80 && !isUUIDish(strValue) {
+						sg.NodeAttribute(nodeID, key, strValue)
+						attrCount++
+					}
+				}
 			}
-			// 避免覆盖我们设置的友好 label
-			if strings.EqualFold(key, "label") {
-				continue
-			}
-			sg.NodeAttribute(n, key, attrVal)
-		}
+		*/
 	}
 
-	// same-rank：每行尽量 10 个
-	for sg, nodes := range subgraphNodes {
-		for i := 0; i < len(nodes); i += 10 {
-			end := i + 10
-			if end > len(nodes) {
-				end = len(nodes)
-			}
-			if end-i >= 2 {
-				n1 := nodes[i]
-				n2 := nodes[i+1]
-				others := nodes[i+2 : end]
-				sg.MakeSameRank(n1, n2, others...)
+	// 暂时禁用 same rank 功能，避免索引越界问题
+	// TODO: 需要重新设计nodeID管理机制
+	/*
+		for entityType, uuids := range subgraphNodes {
+			sg := subgraphMap[entityType]
+			nodesPerRow := 4
+			for i := 0; i < len(uuids); i += nodesPerRow {
+				end := i + nodesPerRow
+				if end > len(uuids) {
+					end = len(uuids)
+				}
+				if end-i >= 2 {
+					var nodeIDs []int
+					for _, uuid := range uuids[i:end] {
+						if nodeID, exists := nodeMap[uuid]; exists {
+							nodeIDs = append(nodeIDs, nodeID)
+						}
+					}
+					if len(nodeIDs) >= 2 {
+						sg.MakeSameRank(nodeIDs[0], nodeIDs[1], nodeIDs[2:]...)
+					}
+				}
 			}
 		}
-	}
+	*/
 
-	for _, relationship := range e.Relationships {
-		sourceName := getUniqueName(relationship.SourceTemporaryName)
-		targetName := getUniqueName(relationship.TargetTemporaryName)
-		G.AddEdgeByLabel(sourceName, targetName, relationship.RelationshipType)
+	// 添加关系边 - 使用UUID确保连接稳定性
+	for _, rel := range e.Relationships {
+		sourceUUID := rel.SourceTemporaryName
+		targetUUID := rel.TargetTemporaryName
+
+		// 确保源节点和目标节点都存在
+		if !ensureNodeExists(sourceUUID) || !ensureNodeExists(targetUUID) {
+			log.Warnf("跳过关系：找不到节点 %s -> %s (%s)", sourceUUID, targetUUID, rel.RelationshipType)
+			continue
+		}
+
+		// 如果是新加载的节点，需要创建对应的DOT节点
+		if _, exists := nodeMap[sourceUUID]; !exists {
+			entity := entityMap[sourceUUID]
+			sg := getSubgraph(entity.EntityType)
+			display := pickDisplayName(entity)
+			nodeID := sg.AddNode(display) // 直接使用display作为label，不再额外设置
+			nodeMap[sourceUUID] = nodeID
+		}
+
+		if _, exists := nodeMap[targetUUID]; !exists {
+			entity := entityMap[targetUUID]
+			sg := getSubgraph(entity.EntityType)
+			display := pickDisplayName(entity)
+			nodeID := sg.AddNode(display) // 直接使用display作为label，不再额外设置
+			nodeMap[targetUUID] = nodeID
+		}
+
+		// 添加边
+		G.AddEdge(nodeMap[sourceUUID], nodeMap[targetUUID], rel.RelationshipType)
 	}
 
 	return G
