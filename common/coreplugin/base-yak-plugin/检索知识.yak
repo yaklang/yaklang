@@ -99,6 +99,19 @@ for i in rag.Query(query, option...)~ {
         continue
     }
 
+    if i.Type == "erm_analysis" {
+        yakit.Info("收到 ERM 分析结果: %s" % i.Message)
+        // TODO: 后续可以在这里添加更详细的 ERM 分析结果处理
+        continue
+    }
+
+    if i.Type == "dot_graph" {
+        yakit.Info("收到知识图 Dot 图: %s" % i.Message)
+        dotGraphLabel = "知识图 Dot 图"
+        yakit.EnableText(dotGraphLabel)
+        yakit.TextTabData(dotGraphLabel, i.Data)
+        continue
+    }
 
     if i.Type == "mid_result" {
         addMidResultData(
