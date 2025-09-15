@@ -3,8 +3,6 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 func (v *Value) LoadFullUseDefChain() *Value {
@@ -58,21 +56,6 @@ func (v *Value) SetContextValue(i ContextID, values *Value) *Value {
 	}
 	v.runtimeCtx.Set(i, values)
 	return v
-}
-
-func (v *Value) SetDepth(i int) {
-	if v.runtimeCtx == nil {
-		v.runtimeCtx = NewRuntimeContext()
-	}
-	v.runtimeCtx.Set("depth", v.NewValue(ssa.NewConst(i)))
-}
-
-func (v *Value) GetDepth() int {
-	i, ok := v.runtimeCtx.Get("depth")
-	if ok {
-		return codec.Atoi(i.innerValue.String())
-	}
-	return 0
 }
 
 func (i *Value) AppendDependOn(v *Value, saves ...bool) (ret *Value) {
