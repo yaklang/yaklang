@@ -119,6 +119,7 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 		var done int64 = 0
 		for hop := range er.RuntimeYieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
 			atomic.AddInt64(&total, 1)
+			refineConfig.AnalyzeStatusCard("多跳知识构建(Multi-Hops Knowledge)", total)
 			hopAnalyzeWg.Add(1)
 			if refineConfig.Ctx != nil && refineConfig.Ctx.Err() != nil {
 				break
