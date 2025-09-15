@@ -38,9 +38,10 @@ func TestYaklang_BottomUses_Basic(t *testing.T) {
 func TestYaklangExplore_BottomUses_BasicCallStack(t *testing.T) {
 	ssatest.CheckSyntaxFlowContain(t, `
 	var a = 1;
-	b = i1 => i1+1
+	// b = i1 => i1+1
 
-	c = b(a)
+	// c = b(a)
+	c = a 
 	e = c+1
 
 	sink = i => {

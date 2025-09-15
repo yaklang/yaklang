@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -37,7 +36,7 @@ type Value struct {
 
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
-	PrevDataFlow []*Value
+	PrevDataFlow *utils.SafeMap[*Value] // data flow to me
 	DescInfo     map[string]string
 	// value from database
 	auditNode *ssadb.AuditNode
@@ -69,7 +68,7 @@ func (v *Value) hasDataFlow(target *Value) bool {
 	if v.PrevDataFlow == nil {
 		return false
 	}
-	return slices.Contains(v.PrevDataFlow, target)
+	return v.PrevDataFlow.Have(target.GetUUID())
 }
 
 func (v *Value) hasDependOn(target *Value) bool {
@@ -1090,19 +1089,24 @@ func (v *Value) GetDependOn() Values {
 }
 
 func (v *Value) GetDataFlow() Values {
-	if len(v.PrevDataFlow) == 0 {
-		// load from db
+	if v == nil {
+		return nil
+	}
+	if v.PrevDataFlow == nil || v.PrevDataFlow.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetDataFlowEdgeByToNodeId(auditNode.ID)
 			for _, id := range nodeIds {
 				d := v.NewValueFromAuditNode(id)
 				if d != nil {
-					v.PrevDataFlow = append(v.PrevDataFlow, d)
+					v.AppendDataFlow(d)
 				}
 			}
 		}
 	}
-	return v.PrevDataFlow
+	if v == nil || v.PrevDataFlow == nil {
+		return nil
+	}
+	return v.PrevDataFlow.Values()
 }
 
 func (v *Value) GetEffectOn() Values {
@@ -1151,6 +1155,16 @@ func (v *Value) ForEachEffectOn(f func(value *Value)) {
 		return
 	}
 	v.EffectOn.ForEach(func(key string, value *Value) bool {
+		f(value)
+		return true
+	})
+}
+
+func (v *Value) ForEachDataFlow(f func(value *Value)) {
+	if v == nil || v.PrevDataFlow == nil {
+		return
+	}
+	v.PrevDataFlow.ForEach(func(key string, value *Value) bool {
 		f(value)
 		return true
 	})

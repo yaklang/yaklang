@@ -43,6 +43,19 @@ func (sm *SafeMapWithKey[K, V]) Set(key K, value V) {
 	sm.m[key] = value
 }
 
+func (sm *SafeMapWithKey[K, V]) Values() []V {
+	if sm == nil {
+		return nil
+	}
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+	values := make([]V, 0, len(sm.m))
+	for _, v := range sm.m {
+		values = append(values, v)
+	}
+	return values
+}
+
 func (sm *SafeMapWithKey[K, V]) Delete(key K) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
@@ -77,6 +90,9 @@ func (sm *SafeMapWithKey[K, V]) GetAll() map[K]V {
 }
 
 func (sm *SafeMapWithKey[K, V]) Count() int {
+	if sm == nil {
+		return 0
+	}
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	return len(sm.m)

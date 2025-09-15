@@ -191,6 +191,9 @@ func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 }
 
 func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
+	if utils.IsNil(scope) {
+		return nil
+	}
 	if variables := scope.GetAllVariablesByName(name); variables != nil {
 		for _, variable := range variables {
 			if variable.GetLocal() {
