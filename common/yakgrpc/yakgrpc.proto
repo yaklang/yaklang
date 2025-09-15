@@ -8068,16 +8068,17 @@ message SSAProject {
   int64 UpdatedAt = 3;
   // 项目基础信息
   string ProjectName = 4;
-  string Description = 5;
-  repeated string Tags = 6;
+  string Language = 5;
+  string Description = 6;
+  repeated string Tags = 7;
   // 源代码来源
-  string CodeSourceConfig = 7;
+  string CodeSourceConfig = 8;
   // 编译配置选项
-  SSAProjectCompileConfig CompileConfig = 8;
+  SSAProjectCompileConfig CompileConfig = 9;
   // 扫描配置选项
-  SSAProjectScanConfig ScanConfig=9;
+  SSAProjectScanConfig ScanConfig=10;
   // 规则策略配置
-  SSAProjectScanRuleConfig RuleConfig =10;
+  SSAProjectScanRuleConfig RuleConfig =11;
 }
 
 message SSAProjectCompileConfig{
@@ -8102,6 +8103,7 @@ message SSAProjectFilter {
   repeated int64 IDs = 1;
   repeated string ProjectNames = 2;
   string SearchKeyword = 3;
+  repeated string Languages = 4;
 }
 
 message CreateSSAProjectRequest {

@@ -60460,16 +60460,17 @@ type SSAProject struct {
 	UpdatedAt int64                  `protobuf:"varint,3,opt,name=UpdatedAt,proto3" json:"UpdatedAt,omitempty"`
 	// 项目基础信息
 	ProjectName string   `protobuf:"bytes,4,opt,name=ProjectName,proto3" json:"ProjectName,omitempty"`
-	Description string   `protobuf:"bytes,5,opt,name=Description,proto3" json:"Description,omitempty"`
-	Tags        []string `protobuf:"bytes,6,rep,name=Tags,proto3" json:"Tags,omitempty"`
+	Language    string   `protobuf:"bytes,5,opt,name=Language,proto3" json:"Language,omitempty"`
+	Description string   `protobuf:"bytes,6,opt,name=Description,proto3" json:"Description,omitempty"`
+	Tags        []string `protobuf:"bytes,7,rep,name=Tags,proto3" json:"Tags,omitempty"`
 	// 源代码来源
-	CodeSourceConfig string `protobuf:"bytes,7,opt,name=CodeSourceConfig,proto3" json:"CodeSourceConfig,omitempty"`
+	CodeSourceConfig string `protobuf:"bytes,8,opt,name=CodeSourceConfig,proto3" json:"CodeSourceConfig,omitempty"`
 	// 编译配置选项
-	CompileConfig *SSAProjectCompileConfig `protobuf:"bytes,8,opt,name=CompileConfig,proto3" json:"CompileConfig,omitempty"`
+	CompileConfig *SSAProjectCompileConfig `protobuf:"bytes,9,opt,name=CompileConfig,proto3" json:"CompileConfig,omitempty"`
 	// 扫描配置选项
-	ScanConfig *SSAProjectScanConfig `protobuf:"bytes,9,opt,name=ScanConfig,proto3" json:"ScanConfig,omitempty"`
+	ScanConfig *SSAProjectScanConfig `protobuf:"bytes,10,opt,name=ScanConfig,proto3" json:"ScanConfig,omitempty"`
 	// 规则策略配置
-	RuleConfig    *SSAProjectScanRuleConfig `protobuf:"bytes,10,opt,name=RuleConfig,proto3" json:"RuleConfig,omitempty"`
+	RuleConfig    *SSAProjectScanRuleConfig `protobuf:"bytes,11,opt,name=RuleConfig,proto3" json:"RuleConfig,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -60528,6 +60529,13 @@ func (x *SSAProject) GetUpdatedAt() int64 {
 func (x *SSAProject) GetProjectName() string {
 	if x != nil {
 		return x.ProjectName
+	}
+	return ""
+}
+
+func (x *SSAProject) GetLanguage() string {
+	if x != nil {
+		return x.Language
 	}
 	return ""
 }
@@ -60759,6 +60767,7 @@ type SSAProjectFilter struct {
 	IDs           []int64                `protobuf:"varint,1,rep,packed,name=IDs,proto3" json:"IDs,omitempty"`
 	ProjectNames  []string               `protobuf:"bytes,2,rep,name=ProjectNames,proto3" json:"ProjectNames,omitempty"`
 	SearchKeyword string                 `protobuf:"bytes,3,opt,name=SearchKeyword,proto3" json:"SearchKeyword,omitempty"`
+	Languages     []string               `protobuf:"bytes,4,rep,name=Languages,proto3" json:"Languages,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -60812,6 +60821,13 @@ func (x *SSAProjectFilter) GetSearchKeyword() string {
 		return x.SearchKeyword
 	}
 	return ""
+}
+
+func (x *SSAProjectFilter) GetLanguages() []string {
+	if x != nil {
+		return x.Languages
+	}
+	return nil
 }
 
 type CreateSSAProjectRequest struct {
@@ -66533,23 +66549,24 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\aMessage\x18\x02 \x01(\tR\aMessage\x12\x1e\n" +
 	"\n" +
 	"ReportData\x18\x03 \x01(\tR\n" +
-	"ReportData\"\x9a\x03\n" +
+	"ReportData\"\xb6\x03\n" +
 	"\n" +
 	"SSAProject\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
 	"\tCreatedAt\x18\x02 \x01(\x03R\tCreatedAt\x12\x1c\n" +
 	"\tUpdatedAt\x18\x03 \x01(\x03R\tUpdatedAt\x12 \n" +
-	"\vProjectName\x18\x04 \x01(\tR\vProjectName\x12 \n" +
-	"\vDescription\x18\x05 \x01(\tR\vDescription\x12\x12\n" +
-	"\x04Tags\x18\x06 \x03(\tR\x04Tags\x12*\n" +
-	"\x10CodeSourceConfig\x18\a \x01(\tR\x10CodeSourceConfig\x12B\n" +
-	"\rCompileConfig\x18\b \x01(\v2\x1c.ypb.SSAProjectCompileConfigR\rCompileConfig\x129\n" +
+	"\vProjectName\x18\x04 \x01(\tR\vProjectName\x12\x1a\n" +
+	"\bLanguage\x18\x05 \x01(\tR\bLanguage\x12 \n" +
+	"\vDescription\x18\x06 \x01(\tR\vDescription\x12\x12\n" +
+	"\x04Tags\x18\a \x03(\tR\x04Tags\x12*\n" +
+	"\x10CodeSourceConfig\x18\b \x01(\tR\x10CodeSourceConfig\x12B\n" +
+	"\rCompileConfig\x18\t \x01(\v2\x1c.ypb.SSAProjectCompileConfigR\rCompileConfig\x129\n" +
 	"\n" +
-	"ScanConfig\x18\t \x01(\v2\x19.ypb.SSAProjectScanConfigR\n" +
+	"ScanConfig\x18\n" +
+	" \x01(\v2\x19.ypb.SSAProjectScanConfigR\n" +
 	"ScanConfig\x12=\n" +
 	"\n" +
-	"RuleConfig\x18\n" +
-	" \x01(\v2\x1d.ypb.SSAProjectScanRuleConfigR\n" +
+	"RuleConfig\x18\v \x01(\v2\x1d.ypb.SSAProjectScanRuleConfigR\n" +
 	"RuleConfig\"\xb7\x01\n" +
 	"\x17SSAProjectCompileConfig\x12\x1e\n" +
 	"\n" +
@@ -66566,11 +66583,12 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x18SSAProjectScanRuleConfig\x129\n" +
 	"\n" +
 	"RuleFilter\x18\x01 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\n" +
-	"RuleFilter\"n\n" +
+	"RuleFilter\"\x8c\x01\n" +
 	"\x10SSAProjectFilter\x12\x10\n" +
 	"\x03IDs\x18\x01 \x03(\x03R\x03IDs\x12\"\n" +
 	"\fProjectNames\x18\x02 \x03(\tR\fProjectNames\x12$\n" +
-	"\rSearchKeyword\x18\x03 \x01(\tR\rSearchKeyword\"D\n" +
+	"\rSearchKeyword\x18\x03 \x01(\tR\rSearchKeyword\x12\x1c\n" +
+	"\tLanguages\x18\x04 \x03(\tR\tLanguages\"D\n" +
 	"\x17CreateSSAProjectRequest\x12)\n" +
 	"\aProject\x18\x01 \x01(\v2\x0f.ypb.SSAProjectR\aProject\"v\n" +
 	"\x18CreateSSAProjectResponse\x12)\n" +

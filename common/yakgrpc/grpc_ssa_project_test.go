@@ -48,6 +48,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 				ProjectName:      projectName,
 				CodeSourceConfig: configJSON,
 				Description:      "测试本地项目",
+				Language:         "go",
 				CompileConfig: &ypb.SSAProjectCompileConfig{
 					StrictMode:   true,
 					PeepholeSize: 200,
@@ -102,6 +103,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 		require.Equal(t, projectName, project.ProjectName)
 		require.Equal(t, configJSON, project.CodeSourceConfig)
 		require.Equal(t, "测试本地项目", project.Description)
+		require.Equal(t, "go", project.Language)
 		require.True(t, project.CompileConfig.StrictMode)
 		require.Equal(t, int64(200), project.CompileConfig.PeepholeSize)
 		require.Equal(t, []string{"*.test.go", "*.mock.go"}, project.CompileConfig.ExcludeFiles)
@@ -144,6 +146,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 				ProjectName:      newProjectName,
 				CodeSourceConfig: gitConfigJSON,
 				Description:      "更新为Git项目",
+				Language:         "java",
 				CompileConfig: &ypb.SSAProjectCompileConfig{
 					StrictMode:   false,
 					PeepholeSize: 300,
@@ -187,6 +190,7 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 
 		require.Equal(t, gitConfigJSON, updatedProject.CodeSourceConfig)
 		require.Equal(t, "更新为Git项目", updatedProject.Description)
+		require.Equal(t, "java", updatedProject.Language)
 		require.False(t, updatedProject.CompileConfig.StrictMode)
 		require.Equal(t, int64(300), updatedProject.CompileConfig.PeepholeSize)
 		require.Equal(t, []string{"*.test.go"}, updatedProject.CompileConfig.ExcludeFiles)
@@ -246,6 +250,7 @@ func TestSSAProjectValidation(t *testing.T) {
 			Project: &ypb.SSAProject{
 				ProjectName:      fmt.Sprintf("invalid-project-%v", uuid.NewString()),
 				CodeSourceConfig: string(configBytes),
+				Language:         "go",
 			},
 		}
 
@@ -264,6 +269,7 @@ func TestSSAProjectValidation(t *testing.T) {
 			Project: &ypb.SSAProject{
 				ProjectName:      fmt.Sprintf("unsupported-project-%v", uuid.NewString()),
 				CodeSourceConfig: string(unsupportedConfigBytes),
+				Language:         "go",
 			},
 		}
 
@@ -323,6 +329,7 @@ func TestSSAProjectDifferentSourceTypes(t *testing.T) {
 					ProjectName:      fmt.Sprintf("%s-project-%v", tc.name, uuid.NewString()),
 					CodeSourceConfig: string(configBytes),
 					Description:      "测试" + tc.name,
+					Language:         "go",
 				},
 			}
 
