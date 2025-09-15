@@ -93,6 +93,7 @@ addEntityData = func(uuid, entityName, entityType, description, ragContent) {
 
 text = ""
 
+graphDotId := 0
 for i in rag.Query(query, option...)~ {
     if i.Type == "message" {
         yakit.Info(i.Message)
@@ -106,10 +107,16 @@ for i in rag.Query(query, option...)~ {
     }
 
     if i.Type == "dot_graph" {
+        graphDotId++
+        id := "%v" % graphDotId
         yakit.Info("收到知识图 Dot 图: %s" % i.Message)
         dotGraphLabel = "知识图 Dot 图"
-        yakit.EnableText(dotGraphLabel)
-        yakit.TextTabData(dotGraphLabel, i.Data)
+        textLabel = dotGraphLabel + ("_%s" % id)
+        graphLabel = "关联实体知识图" + ("_%s" % id)
+        yakit.EnableText(textLabel)
+        yakit.TextTabData(textLabel, i.Data)
+        yakit.EnableDotGraphTab(graphLabel)
+        yakit.OutputDotGraph(graphLabel, i.Data)
         continue
     }
 
