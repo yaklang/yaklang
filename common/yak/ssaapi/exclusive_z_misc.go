@@ -8,8 +8,8 @@ import (
 )
 
 func (v *Value) LoadFullUseDefChain() *Value {
-	v.GetTopDefs()
-	v.GetBottomUses()
+	v.GetTopDefs(WithGraphSave())
+	v.GetBottomUses(WithGraphSave())
 	return v
 }
 
@@ -19,20 +19,16 @@ func (v Values) FullUseDefChain(h func(*Value)) {
 	}
 }
 
-func (i Values) AppendEffectOn(vs ...*Value) Values {
-	for _, v := range vs {
-		for _, node := range i {
-			node.AppendEffectOn(v)
-		}
+func (i Values) AppendEffectOn(vs *Value, saves ...bool) Values {
+	for _, node := range i {
+		node.AppendEffectOn(vs, saves...)
 	}
 	return i
 }
 
-func (i Values) AppendDependOn(vs ...*Value) Values {
-	for _, v := range vs {
-		for _, node := range i {
-			node.AppendDependOn(v)
-		}
+func (i Values) AppendDependOn(v *Value, saves ...bool) Values {
+	for _, node := range i {
+		node.AppendDependOn(v, saves...)
 	}
 	return i
 }
@@ -79,44 +75,48 @@ func (v *Value) GetDepth() int {
 	return 0
 }
 
-func (i *Value) AppendDependOn(vs ...*Value) *Value {
+func (i *Value) AppendDependOn(v *Value, saves ...bool) (ret *Value) {
+	ret = i
+	if len(saves) == 0 || !saves[0] {
+		return
+	}
 	if i == nil {
 		return i
 	}
-	for _, v := range vs {
-		if v == nil {
-			continue
-		}
-		if i.GetUUID() == v.GetUUID() {
-			continue
-		}
-		if i.hasDependOn(v) {
-			continue
-		} else {
-			i.setDependOn(v)
-			v.setEffectOn(i)
-		}
+	if v == nil {
+		return
+	}
+	if i.GetUUID() == v.GetUUID() {
+		return
+	}
+	if i.hasDependOn(v) {
+		return
+	} else {
+		i.setDependOn(v)
+		v.setEffectOn(i)
 	}
 	return i
 }
 
-func (i *Value) AppendEffectOn(vs ...*Value) *Value {
+func (i *Value) AppendEffectOn(v *Value, saves ...bool) (ret *Value) {
+	ret = i
+	if len(saves) == 0 || !saves[0] {
+		return
+	}
 	if i == nil {
 		return i
 	}
-	for _, v := range vs {
-		if v == nil {
-			continue
-		}
-		if i.GetUUID() == v.GetUUID() {
-			continue
-		}
-		if i.hasEffectOn(v) {
-			continue
-		} else {
-			i.setEffectOn(v)
-			v.setDependOn(i)
-		}
+	if v == nil {
+		return
+	}
+	if i.GetUUID() == v.GetUUID() {
+		return
+	}
+	if i.hasEffectOn(v) {
+
+	} else {
+		i.setEffectOn(v)
+		v.setDependOn(i)
 	}
 	return i
 }
