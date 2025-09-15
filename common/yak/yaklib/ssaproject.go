@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -68,6 +70,7 @@ func querySSAProjectByID(id int64) (*schema.SSAProject, error) {
 type ssaProjectConfigBuilder struct {
 	codeSource *schema.CodeSourceInfo
 	project    *schema.SSAProject
+	ruleFilter *ypb.SyntaxFlowRuleFilter
 }
 
 type SSAProjectParamsOpt func(*ssaProjectConfigBuilder)
@@ -237,6 +240,96 @@ func WithIgnoreLanguage(ignore bool) SSAProjectParamsOpt {
 	}
 }
 
+func WithTags(tags []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.Tags = strings.Join(tags, ",")
+	}
+}
+
+func WithLanguage(language string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.Language = language
+	}
+}
+
+func WithRuleFilterLanguage(languages []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		b.ruleFilter.Language = languages
+	}
+}
+
+func WithRuleFilterSeverity(severities []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		b.ruleFilter.Severity = severities
+	}
+}
+
+func WithRuleFilterKind(types []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		// FilterRuleKind 字段是单个字符串，需要转换
+		if len(types) > 0 {
+			b.ruleFilter.FilterRuleKind = strings.Join(types, ",")
+		}
+	}
+}
+
+func WithRuleFilterPurpose(purposes []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		b.ruleFilter.Purpose = purposes
+	}
+}
+
+func WithRuleFilterKeyword(keywords []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		// Keyword 字段是单个字符串，不是数组
+		if len(keywords) > 0 {
+			b.ruleFilter.Keyword = strings.Join(keywords, " ")
+		}
+	}
+}
+
+func WithRuleFilterGroupNames(groupNames []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		b.ruleFilter.GroupNames = groupNames
+	}
+}
+
+func WithRuleFilterRuleNames(ruleNames []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		b.ruleFilter.RuleNames = ruleNames
+	}
+}
+
+func WithRuleFilterTag(tags []string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		if b.ruleFilter == nil {
+			b.ruleFilter = &ypb.SyntaxFlowRuleFilter{}
+		}
+		b.ruleFilter.Tag = tags
+	}
+}
+
 func _createSSAProject(projectName string, opts ...SSAProjectParamsOpt) *schema.SSAProject {
 	project := &schema.SSAProject{
 		ProjectName:     projectName,
@@ -256,6 +349,13 @@ func _createSSAProject(projectName string, opts ...SSAProjectParamsOpt) *schema.
 		configBytes, err := json.Marshal(builder.codeSource)
 		if err == nil {
 			project.CodeSourceConfig = string(configBytes)
+		}
+	}
+
+	if builder.ruleFilter != nil {
+		err := project.SetRuleFilter(builder.ruleFilter)
+		if err != nil {
+			log.Errorf("set rule filter failed: %s", err)
 		}
 	}
 
@@ -300,6 +400,8 @@ var SSAProjectExports = map[string]interface{}{
 	"NewSSAProject":         NewSSAProject,
 	"SaveSSAProject":        SaveSSAProject,
 
+	"withLanguage":        WithLanguage,
+	"withTags":            WithTags,
 	"withSourceKind":      WithSourceKind,
 	"withLocalFile":       WithLocalFile,
 	"withURL":             WithURL,
@@ -319,4 +421,14 @@ var SSAProjectExports = map[string]interface{}{
 	"withAuthUsername":    WithAuthUsername,
 	"withAuthPassword":    WithAuthPassword,
 	"withAuthKeyPath":     WithAuthKeyPath,
+
+	// 规则过滤器选项
+	"withRuleFilterLanguage":   WithRuleFilterLanguage,
+	"withRuleFilterSeverity":   WithRuleFilterSeverity,
+	"withRuleFilterKind":       WithRuleFilterKind,
+	"withRuleFilterPurpose":    WithRuleFilterPurpose,
+	"withRuleFilterKeyword":    WithRuleFilterKeyword,
+	"withRuleFilterGroupNames": WithRuleFilterGroupNames,
+	"withRuleFilterRuleNames":  WithRuleFilterRuleNames,
+	"withRuleFilterTag":        WithRuleFilterTag,
 }
