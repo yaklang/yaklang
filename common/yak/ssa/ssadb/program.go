@@ -16,6 +16,8 @@ type IrProgram struct {
 	gorm.Model
 
 	ProgramName string `json:"program_name" gorm:"unique_index"`
+	ProjectName string `json:"project_name" gorm:"index"`
+
 	Description string `json:"description" gorm:"type:text"`
 
 	Version       string `json:"package_version" gorm:"index"`

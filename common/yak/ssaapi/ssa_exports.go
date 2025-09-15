@@ -30,6 +30,8 @@ type ProcessFunc func(msg string, process float64)
 type config struct {
 	databaseKind   ssa.ProgramCacheKind
 	programSaveTTL time.Duration
+	// project
+	ProjectName string
 	// program
 	ProgramName        string
 	ProgramDescription string
@@ -396,6 +398,15 @@ func WithProgramName(name string) Option {
 		return nil
 	}
 }
+
+func WithProjectName(name string) Option {
+	return func(c *config) error {
+		c.ProjectName = name
+		c.databaseKind = ssa.ProgramCacheDBWrite
+		return nil
+	}
+}
+
 func WithMemory(ttl ...time.Duration) Option {
 	return func(c *config) error {
 		c.databaseKind = ssa.ProgramCacheMemory
@@ -541,6 +552,8 @@ var Exports = map[string]any{
 	"NewProgramFromDB":   FromDatabase,
 	// "NewRiskCompare":     NewSSAComparator[*schema.SSARisk],
 	// "NewRiskCompareItem": NewSSARiskComparisonItem,
+
+	"withProjectName": WithProjectName,
 
 	"withConcurrency":        WithConcurrency,
 	"withLanguage":           WithRawLanguage,

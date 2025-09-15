@@ -14,7 +14,7 @@ func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 	programName := c.ProgramName
 	application := ssa.NewProgram(programName, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
 	application.Language = string(c.language)
-
+	application.ProjectName = c.ProjectName
 	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
