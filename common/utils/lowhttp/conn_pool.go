@@ -275,6 +275,7 @@ type persistConn struct {
 	dialOption      []netx.DialXOption        // dial 选项
 	br              *bufio.Reader             // from conn
 	bw              *bufio.Writer             // to conn
+	h2br            *bufio.Reader             // dedicated bufio.Reader for HTTP/2
 	reqCh           chan requestAndResponseCh // 读取管道
 	writeCh         chan writeRequest         // 写入管道
 	writeErrCh      chan error                // 写入错误信号
@@ -470,6 +471,14 @@ func newPersistConn(key *connectKey, pool *LowHttpConnPool, opt ...netx.DialXOpt
 }
 
 func (pc *persistConn) h2Conn() {
+	// 复用或创建专用的HTTP/2 bufio.Reader
+	if pc.h2br == nil {
+		pc.h2br = bufio.NewReaderSize(pc.conn, 32*1024) // 使用较大的缓冲区
+	} else {
+		// 重置Reader以复用缓冲区
+		pc.h2br.Reset(pc.conn)
+	}
+
 	newH2Conn := &http2ClientConn{
 		conn:              pc.conn,
 		ctx:               pc.p.ctx,
@@ -482,11 +491,12 @@ func (pc *persistConn) h2Conn() {
 		headerListMaxSize: defaultHeaderTableSize,
 		connWindowControl: newControl(defaultStreamReceiveWindowSize),
 		maxStreamsCount:   defaultMaxConcurrentStreamSize,
-		fr:                http2.NewFramer(pc.conn, bufio.NewReader(pc.conn)),
+		fr:                http2.NewFramer(pc.conn, pc.h2br), // 使用复用的Reader
 		frWriteMutex:      new(sync.Mutex),
 		hDec:              hpack.NewDecoder(defaultHeaderTableSize, nil),
 		closeCond:         sync.NewCond(new(sync.Mutex)),
 		clientPrefaceOk:   utils.NewAtomicBool(),
+		resourceCleaned:   utils.NewAtomicBool(), // 初始化资源清理标记
 		http2StreamPool: &sync.Pool{
 			New: func() interface{} {
 				return new(http2ClientStream)
@@ -687,6 +697,12 @@ func (pc *persistConn) removeConn() {
 func (pc *persistConn) closeNetConn() error {
 	if pc.IsH2Conn() && pc.alt != nil {
 		pc.alt.setClose()
+		// 清理HTTP/2专用的bufio.Reader
+		if pc.h2br != nil {
+			// 重置Reader以释放内部缓冲区引用
+			pc.h2br.Reset(nil)
+			pc.h2br = nil
+		}
 		return nil
 	}
 	return pc.conn.Close()
