@@ -1,0 +1,416 @@
+yakit.AutoInitYakit()
+
+// {{ 基础信息
+projectName := cli.String("projectName", 
+    cli.setRequired(true),
+    cli.setVerboseName("项目名称"),
+    cli.setHelp("SSA项目的唯一标识名称"),
+    cli.setCliGroup("基础信息")
+)
+
+description := cli.Text("description", 
+    cli.setVerboseName("项目描述"),
+    cli.setHelp("项目的详细描述信息"),
+    cli.setCliGroup("基础信息")
+)
+
+tags := cli.String("tags", 
+    cli.setVerboseName("项目标签"),
+    cli.setHelp("项目的标签，用于分类和搜索"),
+    cli.setCliGroup("基础信息")
+)
+// }}
+
+// {{ 源代码选项
+sourceKind := cli.StringSlice("sourceKind",
+    cli.setRequired(true),
+    cli.setVerboseName("源码类型"),
+    cli.setSelectOption("本地目录", "local"),
+    cli.setSelectOption("压缩包", "compression"),
+    cli.setSelectOption("Jar包", "jar"),
+    cli.setSelectOption("Git仓库", "git"),
+    cli.setSelectOption("SVN仓库", "svn"),
+    cli.setHelp("指定源码的获取方式"),
+    cli.setCliGroup("源代码选项")
+)
+
+localFile := cli.String("localFile",
+    cli.setVerboseName("本地路径"),
+    cli.setHelp("本地文件或目录路径（sourceKind为local/compression/jar时使用）"),
+    cli.setCliGroup("源代码选项")
+)
+
+url := cli.String("url",
+    cli.setVerboseName("远程URL"),
+    cli.setHelp("远程仓库或文件的URL（sourceKind为git/svn时使用）"),
+    cli.setCliGroup("源代码选项")
+)
+
+branch := cli.String("branch",
+    cli.setVerboseName("分支名称"),
+    cli.setHelp("Git或SVN的分支名称"),
+    cli.setCliGroup("源代码选项")
+)
+
+subPath := cli.String("subPath",
+    cli.setVerboseName("子路径"),
+    cli.setHelp("仓库中的子路径"),
+    cli.setCliGroup("源代码选项")
+)
+
+// 认证配置
+authKind := cli.String("authKind",
+    cli.setVerboseName("认证方式"),
+    cli.setSelectOption("无需认证", "none"),
+    cli.setSelectOption("用户名密码", "password"),
+    cli.setSelectOption("SSH密钥", "ssh_key"),
+    cli.setSelectOption("Token", "token"),
+    cli.setDefault("none"),
+    cli.setHelp("远程仓库的认证方式"),
+    cli.setCliGroup("源代码选项")
+)
+
+authUsername := cli.String("authUsername",
+    cli.setVerboseName("用户名"),
+    cli.setHelp("认证用户名"),
+    cli.setCliGroup("源代码选项")
+)
+
+authPassword := cli.String("authPassword",
+    cli.setVerboseName("密码/Token"),
+    cli.setHelp("认证密码或访问令牌"),
+    cli.setCliGroup("源代码选项")
+)
+
+authKeyPath := cli.String("authKeyPath",
+    cli.setVerboseName("SSH密钥路径"),
+    cli.setHelp("SSH私钥文件路径"),
+    cli.setCliGroup("源代码选项")
+)
+
+// 代理配置
+proxyURL := cli.String("proxyURL",
+    cli.setVerboseName("代理URL"),
+    cli.setHelp("代理服务器URL"),
+    cli.setCliGroup("源代码选项")
+)
+
+proxyUser := cli.String("proxyUser",
+    cli.setVerboseName("代理用户名"),
+    cli.setHelp("代理服务器用户名"),
+    cli.setCliGroup("源代码选项")
+)
+
+proxyPassword := cli.String("proxyPassword",
+    cli.setVerboseName("代理密码"),
+    cli.setHelp("代理服务器密码"),
+    cli.setCliGroup("源代码选项")
+)
+// }}
+
+// {{ 编译选项
+language := cli.StringSlice("language",
+    cli.setVerboseName("编程语言"),
+    cli.setSelectOption("Java", "java"),
+    cli.setSelectOption("PHP", "php"),
+    cli.setSelectOption("JavaScript", "js"),
+    cli.setSelectOption("Go", "go"),
+    cli.setSelectOption("Yaklang", "yak"),
+    cli.setDefault("java"),
+    cli.setHelp("项目使用的主要编程语言"),
+    cli.setCliGroup("编译选项")
+)
+
+strictMode := cli.Bool("strictMode",
+    cli.setVerboseName("严格模式"),
+    cli.setDefault(true),
+    cli.setHelp("是否启用严格模式，禁用时会忽略编译错误的文件"),
+    cli.setCliGroup("编译选项")
+)
+
+peepholeSize := cli.Int("peepholeSize",
+    cli.setVerboseName("分片大小"),
+    cli.setDefault(100),
+    cli.setHelp("项目分片大小，用于提高编译速度"),
+    cli.setCliGroup("编译选项")
+)
+
+excludeFiles := cli.StringSlice("excludeFiles",
+    cli.setVerboseName("排除文件"),
+    cli.setDefault(["**/vendor/**", "vendor/**", "**/classes/**", "**/target/**", "**include/**", "**caches/**", "**cache/**", "**tmp/**", "**temp/**"]),
+    cli.setHelp("编译时需要排除的文件或目录模式"),
+    cli.setCliGroup("编译选项")
+)
+
+reCompile := cli.Bool("reCompile",
+    cli.setVerboseName("重新编译"),
+    cli.setDefault(false),
+    cli.setHelp("是否强制重新编译项目"),
+    cli.setCliGroup("编译选项")
+)
+
+memoryCompile := cli.Bool("memoryCompile",
+    cli.setVerboseName("内存编译"),
+    cli.setDefault(false),
+    cli.setHelp("是否使用内存编译模式"),
+    cli.setCliGroup("编译选项")
+)
+// }}
+
+// {{ 扫描选项
+scanConcurrency := cli.Int("scanConcurrency",
+    cli.setVerboseName("扫描并发数"),
+    cli.setDefault(5),
+    cli.setHelp("扫描时的并发线程数"),
+    cli.setCliGroup("扫描选项")
+)
+
+memoryScan := cli.Bool("memoryScan",
+    cli.setVerboseName("内存扫描"),
+    cli.setDefault(false),
+    cli.setHelp("是否使用内存扫描模式"),
+    cli.setCliGroup("扫描选项")
+)
+
+ignoreLanguage := cli.Bool("ignoreLanguage",
+    cli.setVerboseName("忽略语言检查"),
+    cli.setDefault(false),
+    cli.setHelp("是否忽略编程语言检查"),
+    cli.setCliGroup("扫描选项")
+)
+// }}
+
+// {{ 扫描规则过滤选项
+ruleLanguages := cli.StringSlice("ruleLanguages",
+    cli.setVerboseName("规则语言"),
+    cli.setSelectOption("Java", "java"),
+    cli.setSelectOption("PHP", "php"),
+    cli.setSelectOption("JavaScript", "js"),
+    cli.setSelectOption("Go", "go"),
+    cli.setSelectOption("Python", "python"),
+    cli.setHelp("扫描规则适用的编程语言"),
+    cli.setCliGroup("扫描规则过滤选项")
+)
+
+ruleSeverities := cli.StringSlice("ruleSeverities",
+    cli.setVerboseName("规则严重程度"),
+    cli.setSelectOption("严重", "critical"),
+    cli.setSelectOption("高危", "high"),
+    cli.setSelectOption("中危", "medium"),
+    cli.setSelectOption("低危", "low"),
+    cli.setSelectOption("信息", "info"),
+    cli.setHelp("扫描规则的严重程度筛选"),
+    cli.setCliGroup("扫描规则过滤选项")
+)
+
+ruleTypes := cli.StringSlice("ruleTypes",
+    cli.setVerboseName("规则类型"),
+    cli.setSelectOption("审计", "audit"),
+    cli.setSelectOption("检测", "detect"),
+    cli.setSelectOption("修复", "fix"),
+    cli.setHelp("扫描规则的类型筛选"),
+    cli.setCliGroup("扫描规则过滤选项")
+)
+
+rulePurposes := cli.StringSlice("rulePurposes",
+    cli.setVerboseName("规则用途"),
+    cli.setSelectOption("安全审计", "security"),
+    cli.setSelectOption("代码质量", "quality"),
+    cli.setSelectOption("性能优化", "performance"),
+    cli.setSelectOption("合规检查", "compliance"),
+    cli.setHelp("扫描规则的用途筛选"),
+    cli.setCliGroup("扫描规则过滤选项")
+)
+
+ruleKeywordsStr := cli.String("ruleKeywords",
+    cli.setVerboseName("规则关键词"),
+    cli.setHelp("规则关键词筛选，多个用逗号分隔"),
+    cli.setCliGroup("扫描规则过滤选项")
+)
+// }}
+
+
+cli.check()
+
+// 参数验证
+if sourceKind == "local" || sourceKind == "compression" || sourceKind == "jar" {
+    if localFile == "" {
+        yakit.Error("当源码类型为 %s 时，localFile 参数是必需的", sourceKind)
+        return
+    }
+} else if sourceKind == "git" || sourceKind == "svn" {
+    if url == "" {
+        yakit.Error("当源码类型为 %s 时，url 参数是必需的", sourceKind)
+        return
+    }
+}
+
+if authKind == "password" || authKind == "token" {
+    if authUsername == "" || authPassword == "" {
+        yakit.Error("当认证方式为 %s 时，authUsername 和 authPassword 参数是必需的", authKind)
+        return
+    }
+} else if authKind == "ssh_key" {
+    if authKeyPath == "" || authUsername == "" {
+        yakit.Error("当认证方式为 ssh_key 时，authKeyPath 和 authUsername 参数是必需的")
+        return
+    }
+}
+
+yakit.Info("开始配置SSA项目: %s", projectName)
+
+// 处理规则关键词参数 - 将字符串分割成数组
+var ruleKeywords = []
+if ruleKeywordsStr != "" {
+    ruleKeywords = str.Split(ruleKeywordsStr, ",")
+    // 去除空白
+    for i, keyword := range ruleKeywords {
+        ruleKeywords[i] = str.TrimSpace(keyword)
+    }
+}
+
+// 构建配置选项
+var opts = []
+
+// 基础信息
+opts = append(opts, ssaproject.withDescription(description))
+
+// 源码配置
+if len(sourceKind) == 0{
+    yakit.Error("需要配置源码类型")
+    return 
+}
+opts = append(opts, ssaproject.withSourceKind(sourceKind[0]))
+
+if localFile != "" {
+    opts = append(opts, ssaproject.withLocalFile(localFile))
+}
+
+if tags != ""{
+    opts = append(opts, ssaproject.withTags(str.Split(tags, ",")))
+}
+
+if url != "" {
+    opts = append(opts, ssaproject.withURL(url))
+}
+
+if branch != "" {
+    opts = append(opts, ssaproject.withBranch(branch))
+}
+
+if subPath != "" {
+    opts = append(opts, ssaproject.withPath(subPath))
+}
+
+// 认证配置
+if authKind != "none" {
+    opts = append(opts, ssaproject.withAuthKind(authKind))
+    
+    if authUsername != "" {
+        opts = append(opts, ssaproject.withAuthUsername(authUsername))
+    }
+    
+    if authPassword != "" {
+        opts = append(opts, ssaproject.withAuthPassword(authPassword))
+    }
+    
+    if authKeyPath != "" {
+        opts = append(opts, ssaproject.withAuthKeyPath(authKeyPath))
+    }
+}
+
+// 代理配置
+if proxyURL != "" {
+    opts = append(opts, ssaproject.withProxyURL(proxyURL))
+    
+    if proxyUser != "" && proxyPassword != "" {
+        opts = append(opts, ssaproject.withProxyAuth(proxyUser, proxyPassword))
+    }
+}
+
+// 编译配置
+if len(language) == 0{
+    yakit.Error("需要填入语言")
+    return
+} 
+opts = append(opts, ssaproject.withLanguage(language[0]))
+opts = append(opts, ssaproject.withStrictMode(strictMode))
+opts = append(opts, ssaproject.withPeepholeSize(peepholeSize))
+opts = append(opts, ssaproject.withReCompile(reCompile))
+
+if len(excludeFiles) > 0 {
+    opts = append(opts, ssaproject.withExcludeFiles(excludeFiles))
+}
+
+// 扫描配置
+opts = append(opts, ssaproject.withScanConcurrency(scanConcurrency))
+opts = append(opts, ssaproject.withMemoryScan(memoryScan))
+opts = append(opts, ssaproject.withIgnoreLanguage(ignoreLanguage))
+
+// 规则过滤配置 - 使用细粒度选项
+if len(ruleLanguages) > 0 {
+    opts = append(opts, ssaproject.withRuleFilterLanguage(ruleLanguages))
+}
+if len(ruleSeverities) > 0 {
+    opts = append(opts, ssaproject.withRuleFilterSeverity(ruleSeverities))
+}
+if len(ruleTypes) > 0 {
+    opts = append(opts, ssaproject.withRuleFilterKind(ruleTypes))
+}
+if len(rulePurposes) > 0 {
+    opts = append(opts, ssaproject.withRuleFilterPurpose(rulePurposes))
+}
+if len(ruleKeywords) > 0 {
+    opts = append(opts, ssaproject.withRuleFilterKeyword(ruleKeywords))
+}
+
+yakit.Info("配置选项构建完成，准备保存到数据库")
+
+// 创建新项目
+yakit.Info("开始创建新SSA项目: %s", projectName)
+project, err := ssaproject.NewSSAProject(projectName, opts...)
+if err != nil {
+    yakit.Error("创建SSA项目失败: %s", err)
+    return
+}
+
+err = ssaproject.SaveSSAProject(project)
+if err != nil {
+    yakit.Error("保存标签失败: %s", err)
+    return
+}
+
+yakit.Info("SSA项目创建成功: %s", projectName)
+
+// 输出项目信息
+yakit.Info("SSA项目配置完成")
+yakit.Info("项目名称: %s", project.ProjectName)
+yakit.Info("项目描述: %s", project.Description)
+yakit.Info("项目ID: %d", project.ID)
+
+
+yakit.Info("源码类型: %s", sourceKind)
+if localFile != "" {
+    yakit.Info("本地路径: %s", localFile)
+}
+if url != "" {
+    yakit.Info("远程URL: %s", url)
+}
+
+yakit.Info("编译配置:")
+yakit.Info("  编程语言: %s", language)
+yakit.Info("  严格模式: %t", strictMode)
+yakit.Info("  分片大小: %d", peepholeSize)
+yakit.Info("  重新编译: %t", reCompile)
+yakit.Info("  内存编译: %t", memoryCompile)
+
+yakit.Info("扫描配置:")
+yakit.Info("  扫描并发数: %d", scanConcurrency)
+yakit.Info("  内存扫描: %t", memoryScan)
+yakit.Info("  忽略语言检查: %t", ignoreLanguage)
+
+if len(excludeFiles) > 0 {
+    yakit.Info("排除文件: %s", str.Join(excludeFiles, ", "))
+}
+
+yakit.Success("SSA项目配置操作完成！")
