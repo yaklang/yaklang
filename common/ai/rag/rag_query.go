@@ -3,7 +3,9 @@ package rag
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -25,7 +28,209 @@ const (
 	RAGResultTypeMidResult = "mid_result"
 	RAGResultTypeResult    = "result"
 	RAGResultTypeError     = "error"
+	RAGResultTypeERM       = "erm_analysis"
+	RAGResultTypeDotGraph  = "dot_graph"
 )
+
+// SimpleERMAnalysisResult 简化的 ERM 分析结果结构体，避免导入循环
+type SimpleERMAnalysisResult struct {
+	Entities      []*schema.ERModelEntity `json:"entities"`
+	Relationships []*SimpleRelationship   `json:"relationships"`
+	OriginalData  []byte                  `json:"original_data"`
+}
+
+// SimpleRelationship 简化的关系结构体
+type SimpleRelationship struct {
+	SourceTemporaryName     string `json:"source_temporary_name"`
+	TargetTemporaryName     string `json:"target_temporary_name"`
+	RelationshipType        string `json:"relationship_type"`
+	RelationshipTypeVerbose string `json:"relationship_type_verbose"`
+	DecorationAttributes    string `json:"decoration_attributes"`
+}
+
+// GenerateDotGraph 生成 Dot 图 (默认从上到下布局)
+func (e *SimpleERMAnalysisResult) GenerateDotGraph() *dot.Graph {
+	return e.GenerateDotGraphWithDirection("TB")
+}
+
+// GenerateDotGraphWithDirection 生成指定方向的 Dot 图
+// 支持的方向：
+// - "TB": 从上到下 (Top to Bottom)
+// - "BT": 从下到上 (Bottom to Top)
+// - "LR": 从左到右 (Left to Right)
+// - "RL": 从右到左 (Right to Left)
+func (e *SimpleERMAnalysisResult) GenerateDotGraphWithDirection(direction string) *dot.Graph {
+	G := dot.New()
+	G.MakeDirected()
+	// 设置布局方向，默认从上到下
+	if direction == "" {
+		direction = "TB"
+	}
+	G.GraphAttribute("rankdir", direction)
+	// 优化全局布局
+	G.GraphAttribute("splines", "true")
+	G.GraphAttribute("concentrate", "true")
+	G.GraphAttribute("nodesep", "0.5")
+	G.GraphAttribute("ranksep", "1.0 equally")
+	G.GraphAttribute("compound", "true")
+
+	// 用于生成唯一名称的计数器
+	nameCounter := 1
+	nameMap := make(map[string]string)
+
+	// 清理名称，确保是有效的 dot 标识符
+	cleanName := func(name string) string {
+		if name == "" {
+			// 如果名称为空，使用 a1, a2, a3... 格式
+			cleaned := fmt.Sprintf("a%d", nameCounter)
+			nameCounter++
+			return cleaned
+		}
+
+		// 清理特殊字符，只保留字母、数字、下划线
+		cleaned := ""
+		for _, r := range name {
+			if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' {
+				cleaned += string(r)
+			} else {
+				cleaned += "_"
+			}
+		}
+
+		// 确保以字母开头
+		if len(cleaned) == 0 || (cleaned[0] >= '0' && cleaned[0] <= '9') {
+			cleaned = fmt.Sprintf("a%d_%s", nameCounter, cleaned)
+			nameCounter++
+		}
+
+		return cleaned
+	}
+
+	// 获取或创建唯一名称
+	getUniqueName := func(originalName string) string {
+		cleaned := cleanName(originalName)
+		if _, exists := nameMap[cleaned]; exists {
+			// 如果名称冲突，添加后缀
+			counter := 1
+			for {
+				newName := fmt.Sprintf("%s_%d", cleaned, counter)
+				if _, exists := nameMap[newName]; !exists {
+					nameMap[newName] = originalName
+					return newName
+				}
+				counter++
+			}
+		} else {
+			nameMap[cleaned] = originalName
+			return cleaned
+		}
+	}
+
+	// UUID-like 检测
+	uuidLike := regexp.MustCompile(`(?i)[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12}`)
+	isUUIDish := func(s string) bool {
+		// 直接 UUID 或者前缀+UUID
+		if uuidLike.MatchString(s) {
+			return true
+		}
+		// 类似 a12_xxx_uuid 这种
+		return strings.Count(s, "_") >= 4 && uuidLike.MatchString(strings.TrimPrefix(s, strings.SplitN(s, "_", 2)[0]+"_"))
+	}
+
+	// 选择友好展示名称
+	pickDisplayName := func(ent *schema.ERModelEntity) string {
+		candidates := []string{
+			utils.InterfaceToString(ent.Attributes["label"]),
+			utils.InterfaceToString(ent.Attributes["title"]),
+			utils.InterfaceToString(ent.Attributes["section_title"]),
+			utils.InterfaceToString(ent.Attributes["english_title"]),
+			utils.InterfaceToString(ent.Attributes["standard_number"]),
+			utils.InterfaceToString(ent.Attributes["name"]),
+			utils.InterfaceToString(ent.Attributes["qualified_name"]),
+			utils.InterfaceToString(ent.Attributes["qualifiedName"]),
+		}
+		for _, v := range candidates {
+			v = strings.TrimSpace(v)
+			if v != "" {
+				return utils.ShrinkString(v, 120)
+			}
+		}
+		return ent.EntityName
+	}
+
+	// 按实体类型分子图，并收集节点用于 same-rank 分组
+	subgraphMap := make(map[string]*dot.Graph)
+	subgraphNodes := make(map[*dot.Graph][]int)
+	getSubgraph := func(label string) *dot.Graph {
+		if label == "" {
+			label = "UNKNOWN"
+		}
+		if sg, ok := subgraphMap[label]; ok {
+			return sg
+		}
+		sg := G.CreateSubGraph(label)
+		sg.GraphAttribute("label", label)
+		subgraphMap[label] = sg
+		return sg
+	}
+
+	for _, entity := range e.Entities {
+		nodeName := getUniqueName(entity.EntityName)
+		sg := getSubgraph(entity.EntityType)
+		n := sg.AddNode(nodeName)
+		subgraphNodes[sg] = append(subgraphNodes[sg], n)
+
+		// 合理的可读 label（避免 UUID）
+		display := pickDisplayName(entity)
+		if isUUIDish(display) {
+			// 若仍像 UUID，退回 entity type
+			display = entity.EntityType
+		}
+		sg.NodeAttribute(n, "label", display)
+
+		for key, value := range entity.Attributes {
+			// 将数组/切片安全地规整为一个字符串
+			values := utils.InterfaceToStringSlice(value)
+			var attrVal string
+			if len(values) > 1 {
+				attrVal = strings.Join(values, "; ")
+			} else if len(values) == 1 {
+				attrVal = values[0]
+			} else {
+				attrVal = utils.InterfaceToString(value)
+			}
+			// 避免覆盖我们设置的友好 label
+			if strings.EqualFold(key, "label") {
+				continue
+			}
+			sg.NodeAttribute(n, key, attrVal)
+		}
+	}
+
+	// same-rank：每行尽量 10 个
+	for sg, nodes := range subgraphNodes {
+		for i := 0; i < len(nodes); i += 10 {
+			end := i + 10
+			if end > len(nodes) {
+				end = len(nodes)
+			}
+			if end-i >= 2 {
+				n1 := nodes[i]
+				n2 := nodes[i+1]
+				others := nodes[i+2 : end]
+				sg.MakeSameRank(n1, n2, others...)
+			}
+		}
+	}
+
+	for _, relationship := range e.Relationships {
+		sourceName := getUniqueName(relationship.SourceTemporaryName)
+		targetName := getUniqueName(relationship.TargetTemporaryName)
+		G.AddEdgeByLabel(sourceName, targetName, relationship.RelationshipType)
+	}
+
+	return G
+}
 
 // RAGQueryConfig RAG查询配置
 type RAGQueryConfig struct {
@@ -219,6 +424,27 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			Message:   fmt.Sprintf("[%s] 找到知识实体: %s", queryId, i.Uuid),
 			Data:      i,
 			Type:      RAGResultEntity,
+			Timestamp: time.Now().UnixMilli(),
+		}
+		sendRaw(msgResult)
+	}
+
+	sendERMAnalysisResult := func(ermResult *SimpleERMAnalysisResult) {
+		msgResult := &RAGSearchResult{
+			Message:   fmt.Sprintf("[%s] ERM 分析结果: %d 个实体, %d 个关系", queryId, len(ermResult.Entities), len(ermResult.Relationships)),
+			Data:      ermResult,
+			Type:      RAGResultTypeERM,
+			Timestamp: time.Now().UnixMilli(),
+		}
+		sendRaw(msgResult)
+	}
+
+	sendDotGraphResult := func(dotGraph *dot.Graph) {
+		dotString := dotGraph.GenerateDOTString()
+		msgResult := &RAGSearchResult{
+			Message:   fmt.Sprintf("[%s] 知识图 Dot 图", queryId),
+			Data:      dotString,
+			Type:      RAGResultTypeDotGraph,
 			Timestamp: time.Now().UnixMilli(),
 		}
 		sendRaw(msgResult)
@@ -524,13 +750,148 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		}
 
 		status("RAG-to-Entity", fmt.Sprintf("关联到%d个知识实体", len(nodesRecorder)))
+
+		// 收集所有实体
+		var entities []*schema.ERModelEntity
+		entityMap := make(map[string]*schema.ERModelEntity)
+
 		for nodeId := range nodesRecorder {
 			entity, err := yakit.GetEntityByIndex(db, nodeId)
 			if err != nil {
 				log.Error(err)
 				continue
 			}
+			entities = append(entities, entity)
+			entityMap[entity.Uuid] = entity
 			sendEntityResult(entity)
+		}
+
+		// 生成 ERM 分析结果
+		if len(entities) > 0 {
+			sendMsg(fmt.Sprintf("开始生成 ERM 分析结果，共 %d 个实体", len(entities)))
+
+			// 收集实体之间的关系（BFS 最多 4 层）
+			var relationships []*SimpleRelationship
+			relationshipSet := make(map[string]bool) // 避免重复关系
+
+			// 建立便捷函数：确保实体已加载
+			ensureEntity := func(uuid string) *schema.ERModelEntity {
+				if e, ok := entityMap[uuid]; ok {
+					return e
+				}
+				ent, err := yakit.GetEntityByIndex(db, uuid)
+				if err != nil || ent == nil {
+					log.Warnf("load entity by uuid[%s] failed: %v", uuid, err)
+					return nil
+				}
+				entityMap[uuid] = ent
+				entities = append(entities, ent)
+				return ent
+			}
+
+			type qItem struct {
+				uuid  string
+				depth int
+			}
+			var queue []qItem
+			visited := make(map[string]bool)
+			const maxDepth = 4
+
+			for _, e := range entities {
+				queue = append(queue, qItem{uuid: e.Uuid, depth: 0})
+			}
+
+			for len(queue) > 0 {
+				item := queue[0]
+				queue = queue[1:]
+				if visited[item.uuid] {
+					continue
+				}
+				visited[item.uuid] = true
+				if item.depth >= maxDepth {
+					continue
+				}
+
+				cur := ensureEntity(item.uuid)
+				if cur == nil {
+					continue
+				}
+
+				// 传出关系
+				if outgoingRels, err := yakit.GetOutgoingRelationships(db, cur); err == nil {
+					for _, rel := range outgoingRels {
+						sid := rel.SourceEntityIndex
+						tid := rel.TargetEntityIndex
+						src := ensureEntity(sid)
+						tgt := ensureEntity(tid)
+						if src == nil || tgt == nil {
+							continue
+						}
+						relKey := fmt.Sprintf("%s-%s-%s", sid, tid, rel.RelationshipType)
+						if !relationshipSet[relKey] {
+							relationshipSet[relKey] = true
+							relationships = append(relationships, &SimpleRelationship{
+								SourceTemporaryName:     sid,
+								TargetTemporaryName:     tid,
+								RelationshipType:        rel.RelationshipType,
+								RelationshipTypeVerbose: rel.RelationshipTypeVerbose,
+								DecorationAttributes:    fmt.Sprintf("source:%s,target:%s", src.EntityName, tgt.EntityName),
+							})
+						}
+						if !visited[tid] {
+							queue = append(queue, qItem{uuid: tid, depth: item.depth + 1})
+						}
+					}
+				} else {
+					log.Errorf("获取实体 %s 的传出关系失败: %v", cur.Uuid, err)
+				}
+
+				// 传入关系
+				if incomingRels, err := yakit.GetIncomingRelationships(db, cur); err == nil {
+					for _, rel := range incomingRels {
+						sid := rel.SourceEntityIndex
+						tid := rel.TargetEntityIndex
+						src := ensureEntity(sid)
+						tgt := ensureEntity(tid)
+						if src == nil || tgt == nil {
+							continue
+						}
+						relKey := fmt.Sprintf("%s-%s-%s", sid, tid, rel.RelationshipType)
+						if !relationshipSet[relKey] {
+							relationshipSet[relKey] = true
+							relationships = append(relationships, &SimpleRelationship{
+								SourceTemporaryName:     sid,
+								TargetTemporaryName:     tid,
+								RelationshipType:        rel.RelationshipType,
+								RelationshipTypeVerbose: rel.RelationshipTypeVerbose,
+								DecorationAttributes:    fmt.Sprintf("source:%s,target:%s", src.EntityName, tgt.EntityName),
+							})
+						}
+						if !visited[sid] {
+							queue = append(queue, qItem{uuid: sid, depth: item.depth + 1})
+						}
+					}
+				} else {
+					log.Errorf("获取实体 %s 的传入关系失败: %v", cur.Uuid, err)
+				}
+			}
+
+			// 创建 ERMAnalysisResult
+			ermResult := &SimpleERMAnalysisResult{
+				Entities:      entities,
+				Relationships: relationships,
+				OriginalData:  []byte(fmt.Sprintf("Query: %s", query)),
+			}
+
+			// 发送 ERM 分析结果
+			sendERMAnalysisResult(ermResult)
+
+			// 生成并发送 Dot 图
+			sendMsg(fmt.Sprintf("生成知识图 Dot 图，共 %d 个实体，%d 个关系", len(entities), len(relationships)))
+			dotGraph := ermResult.GenerateDotGraph()
+			sendDotGraphResult(dotGraph)
+
+			sendMsg(fmt.Sprintf("ERM 分析完成，生成 %d 个实体和 %d 个关系的知识图", len(entities), len(relationships)))
 		}
 
 		sendMsg(fmt.Sprintf("查询完成，返回 %d 个最佳结果", finalCount))
