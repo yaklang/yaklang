@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/rag"
 	"io"
 	"strings"
 	"sync"
@@ -245,9 +246,13 @@ LOOP:
 			return action.WaitString("cumulative_summary")
 		})
 		actionType := ActionType(nextAction.GetString("type"))
+		actionType = ActionDirectlyAnswer
 		switch actionType {
 		case ActionDirectlyAnswer:
 			answerPayload := nextAction.GetString("answer_payload")
+			if answerPayload == "" {
+				answerPayload = "my test"
+			}
 			r.EmitResult(answerPayload)
 			currentTask.SetResult(strings.TrimSpace(answerPayload))
 			r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
@@ -257,6 +262,11 @@ LOOP:
 				utils.PrefixLines(currentTask.GetUserInput(), "  > "),
 				utils.PrefixLines(answerPayload, "  | "),
 			))
+			answer, err := r.RagEnhanceDirectlyAnswer(userQuery)
+			if err != nil {
+				return false, err
+			}
+			r.EmitResult(answer)
 			endIterationCall()
 			currentTask.SetStatus(string(TaskStatus_Completed))
 			continue
@@ -446,4 +456,44 @@ LOOP:
 		r.EmitWarning("Too many iterations[%v] is reached, stopping ReAct loop, max: %v", r.currentIteration, r.config.maxIterations)
 	}
 	return skipTaskStatusChange, nil
+}
+
+func (r *ReAct) RagEnhanceDirectlyAnswer(userQuery string) (string, error) {
+	result, err := rag.QueryYakitProfile(userQuery, rag.WithRAGLimit(5), rag.WithRAGDocumentType("knowledge"))
+	if err != nil {
+		log.Errorf("Failed to query yakit profile rag: %v", err)
+		return "", err
+	}
+	var ragEnhanceData []string
+	for res := range result {
+		if res.Type == "result" {
+			ragEnhanceData = append(ragEnhanceData, utils.InterfaceToString(res.Data))
+		}
+	}
+
+	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, ragEnhanceData...)
+	if err != nil {
+		return "", err
+	}
+
+	var finalResult string
+	err = aicommon.CallAITransaction(
+		r.config,
+		queryPrompt,
+		r.config.CallAI,
+		func(rsp *aicommon.AIResponse) error {
+			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
+			action, err := aicommon.ExtractActionFromStream(stream, "object")
+			if err != nil {
+				return err
+			}
+			result := action.GetInvokeParams("next_action").GetString("answer_payload")
+			if result != "" {
+				finalResult = result
+				return nil
+			}
+			return utils.Error("answer_payload is required but empty in action")
+		},
+	)
+	return finalResult, err
 }
