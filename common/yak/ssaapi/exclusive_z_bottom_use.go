@@ -58,9 +58,9 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 			actx.popObject()
 		}
 	}
-	log.Infof("current Value: %s", v)
+	// log.Infof("current Value: %s", v)
 	v.GetUsers().ForEach(func(value *Value) {
-		log.Infof("value %s", value)
+		// log.Infof("value %s", value)
 		if ret := value.AppendDependOn(v, saveGraph).getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
@@ -103,7 +103,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	if shouldExit {
 		return Values{v}
 	}
-	v.SetDepth(actx.depth)
 	err := actx.hook(v)
 	if err != nil {
 		return Values{v}

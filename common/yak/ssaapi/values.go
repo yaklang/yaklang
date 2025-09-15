@@ -1170,10 +1170,6 @@ func (v *Value) ForEachDataFlow(f func(value *Value)) {
 	})
 }
 
-func (v *Value) AnalyzeDepth() int {
-	return v.GetDepth()
-}
-
 type Values []*Value
 
 func (value Values) Hash() (string, bool) {

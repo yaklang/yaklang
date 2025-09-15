@@ -40,6 +40,7 @@ check $concat; check $info; $info<show>
 		if err != nil {
 			t.Fatal(err)
 		}
+		result.Show()
 		results := result.GetValues("info")
 		assert.Equal(t, results.Len(), 3)
 		return nil

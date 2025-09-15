@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -198,13 +197,13 @@ func (v *Value) ShowBacktrack() {
 		return
 	}
 
-	for index, track := range om.Values() {
-		if track == nil {
-			continue
-		}
-		indent := strings.Repeat(" ", index*2) + fmt.Sprintf("[depth:%2d]->", track.GetDepth())
-		buf.WriteString(indent + track.String() + "\n")
-	}
+	// for index, track := range om.Values() {
+	// 	if track == nil {
+	// 		continue
+	// 	}
+	// 	indent := strings.Repeat(" ", index*2) + fmt.Sprintf("[depth:%2d]->", track.GetDepth())
+	// 	buf.WriteString(indent + track.String() + "\n")
+	// }
 	fmt.Println(buf.String())
 }
 
