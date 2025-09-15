@@ -161,6 +161,7 @@ type DirectlyAnswerPromptData struct {
 	Language           string
 	Schema             string
 	DynamicContext     string
+	EnhanceData        []string
 }
 
 // ToolReSelectPromptData contains data for tool reselection prompt template
@@ -361,7 +362,7 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolName, toolParams 
 }
 
 // GenerateDirectlyAnswerPrompt generates directly answer prompt using template
-func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool) (string, error) {
+func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool, enhanceData ...string) (string, error) {
 	var directlyAnswerSchema = getDirectlyAnswer()
 
 	// Build template data
@@ -377,6 +378,7 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 		ToolsCount:     len(tools),
 		TopToolsCount:  pm.react.config.topToolsCount,
 		DynamicContext: pm.DynamicContext(),
+		EnhanceData:    enhanceData,
 	}
 
 	// Set working directory
