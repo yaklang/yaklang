@@ -795,5 +795,6 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			pushState(state_data)
 		}
 	}
+
 	return nil
 }
