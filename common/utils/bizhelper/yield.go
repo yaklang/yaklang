@@ -14,6 +14,7 @@ type YieldModelConfig struct {
 	Size          int
 	IndexField    string
 	CountCallback func(int)
+	Limit         int
 }
 
 func NewYieldModelConfig() *YieldModelConfig {
@@ -43,6 +44,12 @@ func WithYieldModel_PageSize(size int) YieldModelOpts {
 	}
 }
 
+func WithYieldModel_Limit(l int) YieldModelOpts {
+	return func(c *YieldModelConfig) {
+		c.Limit = l
+	}
+}
+
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
 
 	var t T
@@ -54,7 +61,7 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 	}
 
 	outC := make(chan T)
-
+	total := 0
 	go func() {
 		defer close(outC)
 
@@ -99,6 +106,10 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 				case <-ctx.Done():
 					return
 				case outC <- d:
+					total++
+					if cfg.Limit > 0 && total >= cfg.Limit {
+						return
+					}
 				}
 			}
 		}

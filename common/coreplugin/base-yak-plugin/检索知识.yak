@@ -7,21 +7,36 @@ query := cli.String("query", cli.setVerboseName("查询问题"), cli.setRequired
 enhancePlan := cli.StringSlice(
     "enhancePlan",
     cli.setVerboseName("增强搜索方案"),
+    cli.setMultipleSelect(true),
     cli.setSelectOption("假设回答", "hypothetical_answer"),
     cli.setSelectOption("假设并多次查询", "hypothetical_answer_with_split"),
     cli.setSelectOption("多次查询", "split_query"),
     cli.setSelectOption("泛化回答", "generalize_query"),
+    cli.setSelectOption("AI关键词模糊搜索(非语义)", "exact_keyword_search")
 )
 kbName := cli.String("kbName", cli.setVerboseName("知识库名"))
 limit := cli.Int("limit", cli.setVerboseName("结果数量限制"), cli.setDefault(20))
 concurrent := cli.Int("concurrent", cli.setVerboseName("并发数"), cli.setDefault(20))
 score := cli.Float("score", cli.setVerboseName("结果分数限制"))
+types := cli.StringSlice(
+    "queryType",
+    cli.setVerboseName("查询数据类型限制"),
+    cli.setMultipleSelect(true),
+    cli.setSelectOption("知识", "knowledge"),
+    cli.setSelectOption("实体", "entity"),
+    cli.setSelectOption("关系", "relationship"),
+    cli.setSelectOption("实体关系子图", "khop"),
+)
 cli.check()
 
 option := [rag.queryCtx(context.Background()), rag.queryLimit(limit), rag.queryConcurrent(concurrent), rag.queryStatus(yakit.StatusCard)]
 
+if len(types) > 0 {
+    option = append(option, rag.queryType(types...))
+}
+
 if len(enhancePlan) > 0 {
-    option = append(option, rag.queryEnhance(enhancePlan[0]))
+    option = append(option, rag.queryEnhance(enhancePlan...))
 }
 
 
