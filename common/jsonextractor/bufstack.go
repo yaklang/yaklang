@@ -20,13 +20,14 @@ type bufStack struct {
 	kv           func(key any, val any)
 	currentStack *vmstack.Stack
 	recorders    []*bufStackKv
+	// 字段流写入器，绑定到当前栈层级
+	fieldWriters []io.WriteCloser
 }
 
 type bufStackManager struct {
-	stack              *vmstack.Stack
-	base               *bufStack
-	callbackManager    *callbackManager
-	pendingFieldWriter io.WriteCloser // 当前待处理的字段流写入器
+	stack           *vmstack.Stack
+	base            *bufStack
+	callbackManager *callbackManager
 }
 
 func newBufStackManager(kv func(key any, val any)) *bufStackManager {
@@ -59,27 +60,30 @@ func (m *bufStackManager) PushKey(v any) {
 	case []byte:
 		keyStr := string(ret)
 		m.base.PushKey(keyStr)
-		// 检查是否需要开始字段流处理
+		// 检查是否需要开始字段流处理，将写入器绑定到当前栈
 		if m.callbackManager != nil {
-			m.pendingFieldWriter = m.callbackManager.handleFieldStreamStart(keyStr, m)
+			writers := m.callbackManager.handleFieldStreamStart(keyStr, m)
+			m.base.fieldWriters = writers
 		}
 	case string:
 		m.base.PushKey(ret)
-		// 检查是否需要开始字段流处理
+		// 检查是否需要开始字段流处理，将写入器绑定到当前栈
 		if m.callbackManager != nil {
-			m.pendingFieldWriter = m.callbackManager.handleFieldStreamStart(ret, m)
+			writers := m.callbackManager.handleFieldStreamStart(ret, m)
+			m.base.fieldWriters = writers
 		}
 	case int:
 		m.base.PushKey(ret)
 		// 数组索引不需要字段流处理
-		m.pendingFieldWriter = nil
+		m.base.fieldWriters = nil
 	}
 }
 
 // activatePendingFieldWriter 激活待处理的字段写入器
 func (m *bufStackManager) activatePendingFieldWriter() {
-	if m.pendingFieldWriter != nil && m.callbackManager != nil {
-		m.callbackManager.currentFieldWriter = m.pendingFieldWriter
+	if len(m.base.fieldWriters) > 0 && m.callbackManager != nil {
+		m.callbackManager.activeWriters = make([]io.WriteCloser, len(m.base.fieldWriters))
+		copy(m.callbackManager.activeWriters, m.base.fieldWriters)
 	}
 }
 
@@ -121,9 +125,9 @@ func (m *bufStackManager) getParentPath() []string {
 
 func (m *bufStackManager) PushValue(v string) {
 	// 字符级流式写入现在在状态机中处理，这里不再写入
-	// 清理待处理的字段写入器（如果有的话）
-	if m.pendingFieldWriter != nil {
-		m.pendingFieldWriter = nil
+	// 清理当前栈的字段写入器（如果有的话）
+	if len(m.base.fieldWriters) > 0 {
+		m.base.fieldWriters = nil
 	}
 	m.base.PushValue(v)
 }
@@ -140,6 +144,8 @@ func (m *bufStackManager) PushContainer() {
 		kv:           m.base.kv,
 		currentStack: vmstack.New(),
 		recorders:    []*bufStackKv{},
+		// 继承父栈的字段写入器
+		fieldWriters: m.base.fieldWriters,
 	}
 	m.base = sub
 	m.stack.Push(sub)
