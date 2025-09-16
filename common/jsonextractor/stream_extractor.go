@@ -3,10 +3,15 @@ package jsonextractor
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 	"io"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"unicode"
+
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm/vmstack"
 )
 
 type ConditionalCallback struct {
@@ -30,6 +35,27 @@ func (c *ConditionalCallback) Feed(data map[string]any) {
 	c.callback(data)
 }
 
+// FieldMatchType 字段匹配类型
+type FieldMatchType int
+
+const (
+	FieldMatchExact  FieldMatchType = iota // 精确匹配
+	FieldMatchMulti                        // 多字段匹配（任意一个匹配即可）
+	FieldMatchRegexp                       // 正则表达式匹配
+	FieldMatchGlob                         // Glob模式匹配
+)
+
+// FieldStreamHandler 字段流处理器
+type FieldStreamHandler struct {
+	// 匹配相关
+	matchType  FieldMatchType // 匹配类型
+	pattern    string         // 匹配模式：可以是字段名、正则表达式或glob模式
+	fieldNames []string       // 多字段匹配时使用
+
+	// 统一的回调函数
+	handler func(key string, reader io.Reader, parents []string) // 回调函数，包含字段名和父路径
+}
+
 type callbackManager struct {
 	objectKeyValueCallback      func(string string, data any)
 	arrayValueCallback          func(idx int, data any)
@@ -37,8 +63,13 @@ type callbackManager struct {
 	onArrayCallback             func(data []any)
 	onObjectCallback            func(data map[string]any)
 	onConditionalObjectCallback []*ConditionalCallback
+	fieldStreamHandlers         []*FieldStreamHandler
 
 	rawKVCallback func(key, data any)
+
+	// 字段流处理相关
+	activeFieldStreams map[string]io.WriteCloser // 当前活跃的字段流 写入器
+	currentFieldWriter io.WriteCloser            // 当前正在处理的字段流写入器
 }
 
 type CallbackOption func(*callbackManager)
@@ -82,6 +113,216 @@ func WithObjectCallback(callback func(data map[string]any)) CallbackOption {
 func WithRootMapCallback(callback func(data map[string]any)) CallbackOption {
 	return func(c *callbackManager) {
 		c.onRootMapCallback = callback
+	}
+}
+
+// WithRegisterFieldStreamHandler 注册字段流处理器
+func WithRegisterFieldStreamHandler(fieldName string, handler func(key string, reader io.Reader, parents []string)) CallbackOption {
+	return func(c *callbackManager) {
+		if c.fieldStreamHandlers == nil {
+			c.fieldStreamHandlers = make([]*FieldStreamHandler, 0)
+		}
+		c.fieldStreamHandlers = append(c.fieldStreamHandlers, &FieldStreamHandler{
+			matchType: FieldMatchExact,
+			pattern:   fieldName,
+			handler:   handler,
+		})
+	}
+}
+
+// WithRegisterMultiFieldStreamHandler 注册多字段流处理器
+func WithRegisterMultiFieldStreamHandler(fieldNames []string, handler func(key string, reader io.Reader, parents []string)) CallbackOption {
+	return func(c *callbackManager) {
+		if c.fieldStreamHandlers == nil {
+			c.fieldStreamHandlers = make([]*FieldStreamHandler, 0)
+		}
+		c.fieldStreamHandlers = append(c.fieldStreamHandlers, &FieldStreamHandler{
+			matchType:  FieldMatchMulti,
+			fieldNames: fieldNames,
+			handler:    handler,
+		})
+	}
+}
+
+// WithRegisterRegexpFieldStreamHandler 注册正则表达式字段流处理器
+func WithRegisterRegexpFieldStreamHandler(pattern string, handler func(key string, reader io.Reader, parents []string)) CallbackOption {
+	return func(c *callbackManager) {
+		if c.fieldStreamHandlers == nil {
+			c.fieldStreamHandlers = make([]*FieldStreamHandler, 0)
+		}
+		c.fieldStreamHandlers = append(c.fieldStreamHandlers, &FieldStreamHandler{
+			matchType: FieldMatchRegexp,
+			pattern:   pattern,
+			handler:   handler,
+		})
+	}
+}
+
+// WithRegisterGlobFieldStreamHandler 注册Glob模式字段流处理器
+func WithRegisterGlobFieldStreamHandler(pattern string, handler func(key string, reader io.Reader, parents []string)) CallbackOption {
+	return func(c *callbackManager) {
+		if c.fieldStreamHandlers == nil {
+			c.fieldStreamHandlers = make([]*FieldStreamHandler, 0)
+		}
+		c.fieldStreamHandlers = append(c.fieldStreamHandlers, &FieldStreamHandler{
+			matchType: FieldMatchGlob,
+			pattern:   pattern,
+			handler:   handler,
+		})
+	}
+}
+
+// handleFieldStreamStart 开始字段流处理
+func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *bufStackManager) io.WriteCloser {
+	// 清理字段名中的引号和空格
+	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
+
+	// 从stack获取父路径
+	var parents []string
+	if bufManager != nil {
+		parents = bufManager.getParentPath()
+	}
+
+	// 初始化活跃字段流 map
+	if c.activeFieldStreams == nil {
+		c.activeFieldStreams = make(map[string]io.WriteCloser)
+	}
+
+	// 检查所有字段处理器
+	if c.fieldStreamHandlers != nil {
+		for _, handler := range c.fieldStreamHandlers {
+			if c.isFieldMatch(cleanFieldName, handler) {
+				return c.createFieldStream(cleanFieldName, handler, parents)
+			}
+		}
+	}
+
+	return nil
+}
+
+// isFieldMatch 检查字段是否匹配处理器
+func (c *callbackManager) isFieldMatch(fieldName string, handler *FieldStreamHandler) bool {
+	switch handler.matchType {
+	case FieldMatchExact:
+		return handler.pattern == fieldName
+	case FieldMatchMulti:
+		return matchAnyOfSubString(fieldName, handler.fieldNames...)
+	case FieldMatchRegexp:
+		return matchRegexp(fieldName, handler.pattern)
+	case FieldMatchGlob:
+		return matchGlob(fieldName, handler.pattern)
+	default:
+		return false
+	}
+}
+
+// matchAnyOfSubString 检查字符串是否包含任意一个子串
+func matchAnyOfSubString(s string, subStrings ...string) bool {
+	s = strings.ToLower(s)
+	for _, sub := range subStrings {
+		if strings.Contains(s, strings.ToLower(sub)) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchRegexp 检查字符串是否匹配正则表达式
+func matchRegexp(s string, pattern string) bool {
+	matched, err := regexp.MatchString(pattern, s)
+	if err != nil {
+		return false
+	}
+	return matched
+}
+
+// matchGlob 检查字符串是否匹配Glob模式
+func matchGlob(s string, pattern string) bool {
+	matched, err := filepath.Match(pattern, s)
+	if err != nil {
+		return false
+	}
+	return matched
+}
+
+// createFieldStream 创建字段流
+func (c *callbackManager) createFieldStream(fieldName string, handler *FieldStreamHandler, parents []string) io.WriteCloser {
+	// 创建管道
+	reader, writer := bufpipe.NewPipe()
+
+	// 保存写入器，用于后续写入数据
+	c.activeFieldStreams[fieldName] = writer
+
+	// 在新的 goroutine 中调用处理函数
+	go func(h *FieldStreamHandler, r io.Reader, key string, parentPath []string) {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("field stream handler panic: %v", err)
+			}
+		}()
+
+		// 调用统一的回调函数
+		if h.handler != nil {
+			h.handler(key, r, parentPath)
+		}
+	}(handler, reader, fieldName, parents)
+
+	log.Infof("started field stream for: %s", fieldName)
+	return writer
+}
+
+// handleFieldStreamData 写入字段流数据
+func (c *callbackManager) handleFieldStreamData(fieldName string, data []byte) {
+	if c.activeFieldStreams == nil {
+		return
+	}
+
+	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
+	if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
+		_, err := writer.Write(data)
+		if err != nil {
+			log.Errorf("failed to write field stream data for %s: %v", cleanFieldName, err)
+		}
+	}
+}
+
+// handleFieldStreamEnd 结束字段流处理
+func (c *callbackManager) handleFieldStreamEnd(fieldName string) {
+	if c.activeFieldStreams == nil {
+		return
+	}
+
+	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
+	if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
+		writer.Close()
+		delete(c.activeFieldStreams, cleanFieldName)
+		log.Infof("ended field stream for: %s", cleanFieldName)
+
+		// 如果这是当前字段写入器，清除它
+		if c.currentFieldWriter == writer {
+			c.currentFieldWriter = nil
+		}
+	}
+}
+
+// setCurrentFieldWriter 设置当前字段写入器
+func (c *callbackManager) setCurrentFieldWriter(fieldName string) {
+	if c.activeFieldStreams == nil {
+		return
+	}
+
+	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
+	if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
+		c.currentFieldWriter = writer
+	} else {
+		c.currentFieldWriter = nil
+	}
+}
+
+// clearCurrentFieldWriter 清除当前字段写入器
+func (c *callbackManager) clearCurrentFieldWriter() {
+	if c.currentFieldWriter != nil {
+		c.currentFieldWriter = nil
 	}
 }
 
@@ -149,6 +390,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 	bufManager := newBufStackManager(func(key any, val any) {
 		callbackManager.kv(key, val)
 	})
+	bufManager.setCallbackManager(callbackManager)
 
 	pushStateWithIdx := func(i string, idx int) {
 		//log.Infof("push state: %v, with index: %v", i, index)
@@ -215,6 +457,12 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				case state_jsonArray:
 					bufManager.PopContainer()
 				case state_jsonObj:
+					// 在弹出容器前，结束当前对象中的所有字段流
+					if bufManager.callbackManager != nil {
+						for fieldName := range callbackManager.activeFieldStreams {
+							callbackManager.handleFieldStreamEnd(fieldName)
+						}
+					}
 					bufManager.PopContainer()
 					// 记录结果
 					ret, ok := objectDepthIndexTable[objectDepth]
@@ -270,6 +518,16 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		popState := func() {
 			popStateWithIdx(index)
 		}
+
+		// 处理字符级流式写入
+		writeToFieldStream := func() {
+			if callbackManager.currentFieldWriter != nil {
+				_, err := callbackManager.currentFieldWriter.Write([]byte{ch})
+				if err != nil {
+					log.Errorf("failed to write character to field stream: %v", err)
+				}
+			}
+		}
 	RETRY:
 		switch currentState() {
 		case state_arrayItem:
@@ -322,11 +580,18 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				if ret := currentStateIns(); ret != nil {
 					if ret.objectValueHandledString {
 						// 处理过了
+						writeToFieldStream() // 写入引号字符
 						continue
 					} else {
 						ret.objectValueHandledString = true
+						// 激活待处理的字段流写入器
+						bufManager.activatePendingFieldWriter()
+						writeToFieldStream() // 写入开始引号
+						pushState(state_DoubleQuoteString)
+						continue
 					}
 				}
+				// 如果没有激活字段流写入器，正常处理
 				pushState(state_DoubleQuoteString)
 				continue
 			case '}':
@@ -427,13 +692,20 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		case state_DoubleQuoteString:
 			switch ch {
 			case '\\':
+				writeToFieldStream() // 写入转义字符
 				pushState(state_quote)
 				continue
 			case '"':
+				writeToFieldStream() // 写入结束引号
+				// 清除当前字段写入器
+				callbackManager.clearCurrentFieldWriter()
 				popStateWithIdx(index + 1)
 				continue
+			default:
+				writeToFieldStream() // 写入普通字符
 			}
 		case state_quote:
+			writeToFieldStream() // 写入被转义的字符
 			popState()
 			continue
 		//case state_BacktickString:

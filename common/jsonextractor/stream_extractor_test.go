@@ -2,10 +2,14 @@ package jsonextractor
 
 import (
 	"fmt"
+	"io"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
-	"io"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 )
@@ -349,4 +353,650 @@ func TestStreamExtractor_BASIC9(t *testing.T) {
 		spew.Dump(data)
 	}))
 
+}
+
+func TestWithRegisterFieldStreamHandler(t *testing.T) {
+	jsonData := `{
+		"name": "John Doe",
+		"data": "This is some streaming data content that should be passed to the handler",
+		"age": 30
+	}`
+
+	var receivedData []byte
+	dataReceived := false
+
+	err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("data", func(key string, reader io.Reader, parents []string) {
+		data, readErr := io.ReadAll(reader)
+		require.NoError(t, readErr)
+		receivedData = data
+		dataReceived = true
+	}))
+
+	require.NoError(t, err)
+	assert.True(t, dataReceived, "Data should have been received through stream handler")
+	assert.Contains(t, string(receivedData), "This is some streaming data content", "Received data should contain expected content")
+}
+
+func TestWithRegisterFieldStreamHandler_MultipleFields(t *testing.T) {
+	jsonData := `{
+		"field1": "Data for field 1",
+		"field2": "Data for field 2",
+		"field3": "Data for field 3"
+	}`
+
+	var field1Data, field2Data string
+	var field1Received, field2Received bool
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+
+	wg.Add(2) // 等待两个字段处理完成
+
+	err := ExtractStructuredJSON(jsonData,
+		WithRegisterFieldStreamHandler("field1", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
+			data, readErr := io.ReadAll(reader)
+			require.NoError(t, readErr)
+			mu.Lock()
+			field1Data = string(data)
+			field1Received = true
+			mu.Unlock()
+			fmt.Printf("Field1 received: %s\n", field1Data)
+		}),
+		WithRegisterFieldStreamHandler("field2", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
+			data, readErr := io.ReadAll(reader)
+			require.NoError(t, readErr)
+			mu.Lock()
+			field2Data = string(data)
+			field2Received = true
+			mu.Unlock()
+			fmt.Printf("Field2 received: %s\n", field2Data)
+		}),
+	)
+
+	require.NoError(t, err)
+
+	// 等待goroutines完成
+	done := make(chan bool)
+	go func() {
+		wg.Wait()
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		// 所有goroutines完成
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for field stream handlers")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.True(t, field1Received, "Field1 should have been received")
+	assert.True(t, field2Received, "Field2 should have been received")
+	assert.Contains(t, field1Data, "Data for field 1")
+	assert.Contains(t, field2Data, "Data for field 2")
+}
+
+func TestWithRegisterFieldStreamHandler_LargeData(t *testing.T) {
+	// 测试大数据量的流式处理
+	largeContent := strings.Repeat("Large streaming content data ", 1000)
+	jsonData := fmt.Sprintf(`{"large_field": "%s"}`, largeContent)
+
+	receivedSize := 0
+
+	err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("large_field", func(key string, reader io.Reader, parents []string) {
+		buffer := make([]byte, 1024)
+		for {
+			n, readErr := reader.Read(buffer)
+			if n > 0 {
+				receivedSize += n
+			}
+			if readErr == io.EOF {
+				break
+			}
+			require.NoError(t, readErr)
+		}
+	}))
+
+	require.NoError(t, err)
+	assert.Greater(t, receivedSize, 1000, "Should have received substantial amount of data")
+}
+
+func TestWithRegisterFieldStreamHandler_CharacterByCharacter(t *testing.T) {
+	// 测试字符级流式处理，验证数据是逐字符写入的
+	jsonData := `{"streaming_field": "Hello World 123"}`
+
+	var receivedChars []byte
+	var timestamps []time.Time
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+
+	err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("streaming_field", func(key string, reader io.Reader, parents []string) {
+		defer wg.Done()
+		buffer := make([]byte, 1)
+		for {
+			n, readErr := reader.Read(buffer)
+			if n > 0 {
+				mu.Lock()
+				receivedChars = append(receivedChars, buffer[0])
+				timestamps = append(timestamps, time.Now())
+				mu.Unlock()
+			}
+			if readErr == io.EOF {
+				break
+			}
+			require.NoError(t, readErr)
+		}
+	}))
+
+	require.NoError(t, err)
+
+	// 等待处理完成
+	done := make(chan bool)
+	go func() {
+		wg.Wait()
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		// 处理完成
+	case <-time.After(1 * time.Second):
+		t.Fatal("Timeout waiting for stream processing")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// 验证收到的数据
+	expectedContent := `"Hello World 123"`
+	assert.Equal(t, expectedContent, string(receivedChars), "Should receive complete field content character by character")
+	assert.Greater(t, len(timestamps), 10, "Should have multiple character write timestamps")
+
+	// 验证是流式处理（每个字符都有时间戳记录）
+	assert.Equal(t, len(receivedChars), len(timestamps), "Each character should have a timestamp")
+}
+
+func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
+	// 测试流式处理的时序
+	jsonData := `{"field1": "ABCDEFGHIJKLMNOP", "field2": "1234567890"}`
+
+	var field1Chars []byte
+	var field2Chars []byte
+	var field1Times []time.Time
+	var field2Times []time.Time
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(2)
+
+	err := ExtractStructuredJSON(jsonData,
+		WithRegisterFieldStreamHandler("field1", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
+			buffer := make([]byte, 1)
+			for {
+				n, readErr := reader.Read(buffer)
+				if n > 0 {
+					mu.Lock()
+					field1Chars = append(field1Chars, buffer[0])
+					field1Times = append(field1Times, time.Now())
+					mu.Unlock()
+				}
+				if readErr == io.EOF {
+					break
+				}
+				require.NoError(t, readErr)
+			}
+		}),
+		WithRegisterFieldStreamHandler("field2", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
+			buffer := make([]byte, 1)
+			for {
+				n, readErr := reader.Read(buffer)
+				if n > 0 {
+					mu.Lock()
+					field2Chars = append(field2Chars, buffer[0])
+					field2Times = append(field2Times, time.Now())
+					mu.Unlock()
+				}
+				if readErr == io.EOF {
+					break
+				}
+				require.NoError(t, readErr)
+			}
+		}),
+	)
+
+	require.NoError(t, err)
+
+	// 等待处理完成
+	done := make(chan bool)
+	go func() {
+		wg.Wait()
+		done <- true
+	}()
+
+	select {
+	case <-done:
+		// 处理完成
+	case <-time.After(2 * time.Second):
+		t.Fatal("Timeout waiting for stream processing")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
+	// 验证数据完整性
+	assert.Equal(t, `"ABCDEFGHIJKLMNOP"`, string(field1Chars))
+	assert.Equal(t, `"1234567890"`, string(field2Chars))
+
+	// 验证field1在field2之前开始（因为在JSON中field1出现在前面）
+	if len(field1Times) > 0 && len(field2Times) > 0 {
+		assert.True(t, field1Times[0].Before(field2Times[0]) || field1Times[0].Equal(field2Times[0]),
+			"Field1 should start before or at the same time as field2")
+	}
+}
+
+// === 边界情况和错误处理测试 ===
+
+func TestWithRegisterFieldStreamHandler_BoundaryConditions(t *testing.T) {
+	t.Run("Empty JSON", func(t *testing.T) {
+		handlerCalled := false
+		err := ExtractStructuredJSON(`{}`, WithRegisterFieldStreamHandler("nonexistent", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+		}))
+		require.NoError(t, err)
+		assert.False(t, handlerCalled, "Handler should not be called for non-existent field")
+	})
+
+	t.Run("Empty Field Value", func(t *testing.T) {
+		var receivedData []byte
+		handlerCalled := false
+
+		err := ExtractStructuredJSON(`{"empty": ""}`, WithRegisterFieldStreamHandler("empty", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+			data, readErr := io.ReadAll(reader)
+			require.NoError(t, readErr)
+			receivedData = data
+		}))
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled, "Handler should be called for empty field")
+		assert.Equal(t, `""`, string(receivedData))
+	})
+
+	t.Run("Null Field Value", func(t *testing.T) {
+		handlerCalled := false
+		var receivedData []byte
+
+		err := ExtractStructuredJSON(`{"nullfield": null}`, WithRegisterFieldStreamHandler("nullfield", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+			data, _ := io.ReadAll(reader)
+			receivedData = data
+		}))
+		require.NoError(t, err)
+
+		// 字段流会被创建，但由于null不是字符串，所以不会写入数据
+		if handlerCalled {
+			assert.Empty(t, receivedData, "Should receive empty data for null field")
+		}
+	})
+
+	t.Run("Numeric Field Value", func(t *testing.T) {
+		handlerCalled := false
+		var receivedData []byte
+
+		err := ExtractStructuredJSON(`{"number": 12345}`, WithRegisterFieldStreamHandler("number", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+			data, _ := io.ReadAll(reader)
+			receivedData = data
+		}))
+		require.NoError(t, err)
+
+		// 字段流会被创建，但由于数字不是字符串，所以不会写入数据
+		if handlerCalled {
+			assert.Empty(t, receivedData, "Should receive empty data for numeric field")
+		}
+	})
+
+	t.Run("Boolean Field Value", func(t *testing.T) {
+		handlerCalled := false
+		var receivedData []byte
+
+		err := ExtractStructuredJSON(`{"flag": true}`, WithRegisterFieldStreamHandler("flag", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+			data, _ := io.ReadAll(reader)
+			receivedData = data
+		}))
+		require.NoError(t, err)
+
+		// 字段流会被创建，但由于布尔值不是字符串，所以不会写入数据
+		if handlerCalled {
+			assert.Empty(t, receivedData, "Should receive empty data for boolean field")
+		}
+	})
+}
+
+func TestWithRegisterFieldStreamHandler_MalformedJSON(t *testing.T) {
+	t.Run("Incomplete JSON", func(t *testing.T) {
+		incompleteJSON := `{"field": "start`
+		handlerCalled := false
+
+		err := ExtractStructuredJSON(incompleteJSON, WithRegisterFieldStreamHandler("field", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+		}))
+
+		// 解析可能失败或成功，但不应该panic
+		if handlerCalled {
+			// 如果handler被调用了，说明部分数据被处理了
+			t.Log("Handler was called with incomplete data")
+		}
+		t.Logf("Parse result: %v", err)
+	})
+
+	t.Run("Broken String Escape", func(t *testing.T) {
+		brokenJSON := `{"field": "value with \\invalid escape"}`
+		var receivedData string
+		handlerCalled := false
+
+		err := ExtractStructuredJSON(brokenJSON, WithRegisterFieldStreamHandler("field", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+			data, _ := io.ReadAll(reader)
+			receivedData = string(data)
+		}))
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled, "Handler should be called even with escape issues")
+		assert.Contains(t, receivedData, "invalid escape")
+	})
+
+	t.Run("Very Long Field Name", func(t *testing.T) {
+		longFieldName := strings.Repeat("a", 10000)
+		jsonData := fmt.Sprintf(`{"%s": "value"}`, longFieldName)
+
+		handlerCalled := false
+		err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler(longFieldName, func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+		}))
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled, "Handler should work with very long field names")
+	})
+}
+
+func TestWithRegisterFieldStreamHandler_ConcurrencyStress(t *testing.T) {
+	t.Run("High Concurrency Field Processing", func(t *testing.T) {
+		// 创建包含多个字段的JSON
+		numFields := 50
+		fieldData := make(map[string]string)
+		jsonParts := []string{"{"}
+
+		for i := 0; i < numFields; i++ {
+			fieldName := fmt.Sprintf("field%d", i)
+			fieldValue := strings.Repeat(fmt.Sprintf("data%d", i), 100)
+			fieldData[fieldName] = fieldValue
+
+			if i > 0 {
+				jsonParts = append(jsonParts, ",")
+			}
+			jsonParts = append(jsonParts, fmt.Sprintf(`"%s": "%s"`, fieldName, fieldValue))
+		}
+		jsonParts = append(jsonParts, "}")
+		jsonData := strings.Join(jsonParts, "")
+
+		// 创建回调选项
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		results := make(map[string]string)
+		callbacks := make([]CallbackOption, 0, numFields)
+
+		for i := 0; i < numFields; i++ {
+			fieldName := fmt.Sprintf("field%d", i)
+			wg.Add(1)
+			callbacks = append(callbacks, WithRegisterFieldStreamHandler(fieldName, func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
+				data, err := io.ReadAll(reader)
+				require.NoError(t, err)
+
+				mu.Lock()
+				results[fieldName] = string(data)
+				mu.Unlock()
+			}))
+		}
+
+		// 执行解析
+		err := ExtractStructuredJSON(jsonData, callbacks...)
+		require.NoError(t, err)
+
+		// 等待所有处理完成
+		done := make(chan bool)
+		go func() {
+			wg.Wait()
+			done <- true
+		}()
+
+		select {
+		case <-done:
+			// 验证结果
+			mu.Lock()
+			defer mu.Unlock()
+
+			assert.Equal(t, numFields, len(results), "All fields should be processed")
+			for fieldName, expectedValue := range fieldData {
+				receivedValue := results[fieldName]
+				assert.Equal(t, fmt.Sprintf(`"%s"`, expectedValue), receivedValue,
+					"Field %s should have correct value", fieldName)
+			}
+
+		case <-time.After(10 * time.Second):
+			t.Fatal("Timeout waiting for concurrent processing")
+		}
+	})
+}
+
+func TestWithRegisterFieldStreamHandler_StreamInterruption(t *testing.T) {
+	t.Run("Reader Closes Prematurely", func(t *testing.T) {
+		// 创建一个会提前关闭的reader
+		pr, pw := io.Pipe()
+
+		go func() {
+			// 写入部分数据后关闭
+			pw.Write([]byte(`{"field": "partial`))
+			time.Sleep(100 * time.Millisecond)
+			pw.Close() // 提前关闭
+		}()
+
+		handlerCalled := false
+		var handlerError error
+
+		err := ExtractStructuredJSONFromStream(pr, WithRegisterFieldStreamHandler("field", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+			// 尝试读取所有数据
+			_, handlerError = io.ReadAll(reader)
+		}))
+
+		// 解析可能会失败，但不应该panic
+		t.Logf("Parse error: %v", err)
+		t.Logf("Handler called: %v", handlerCalled)
+		t.Logf("Handler error: %v", handlerError)
+	})
+
+	t.Run("Slow Reader", func(t *testing.T) {
+		// 模拟慢速数据源
+		pr, pw := io.Pipe()
+
+		go func() {
+			defer pw.Close()
+			data := `{"slowfield": "` + strings.Repeat("slow data ", 1000) + `"}`
+
+			// 逐字节慢速写入
+			for _, b := range []byte(data) {
+				pw.Write([]byte{b})
+				time.Sleep(1 * time.Millisecond) // 模拟慢速
+			}
+		}()
+
+		var receivedSize int
+		handlerCalled := false
+
+		err := ExtractStructuredJSONFromStream(pr, WithRegisterFieldStreamHandler("slowfield", func(key string, reader io.Reader, parents []string) {
+			handlerCalled = true
+			buffer := make([]byte, 100)
+
+			for {
+				n, err := reader.Read(buffer)
+				if n > 0 {
+					receivedSize += n
+				}
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Logf("Read error: %v", err)
+					break
+				}
+			}
+		}))
+
+		require.NoError(t, err)
+		assert.True(t, handlerCalled, "Handler should be called")
+		assert.Greater(t, receivedSize, 1000, "Should receive substantial data")
+	})
+}
+
+func TestWithRegisterFieldStreamHandler_MemoryStress(t *testing.T) {
+	t.Run("Very Large Field", func(t *testing.T) {
+		// 创建一个非常大的字段
+		largeData := strings.Repeat("X", 1024*1024) // 1MB
+		jsonData := fmt.Sprintf(`{"huge": "%s"}`, largeData)
+
+		var totalReceived int
+		var chunkCount int
+
+		err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("huge", func(key string, reader io.Reader, parents []string) {
+			buffer := make([]byte, 4096) // 4KB缓冲区
+
+			for {
+				n, err := reader.Read(buffer)
+				if n > 0 {
+					totalReceived += n
+					chunkCount++
+				}
+				if err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+			}
+		}))
+
+		require.NoError(t, err)
+		// 总接收量应该包括引号
+		assert.Equal(t, len(largeData)+2, totalReceived, "Should receive all data including quotes")
+		assert.Greater(t, chunkCount, 1, "Should receive data in multiple chunks")
+
+		t.Logf("Processed %d bytes in %d chunks", totalReceived, chunkCount)
+	})
+}
+
+func TestWithRegisterFieldStreamHandler_ErrorHandling(t *testing.T) {
+	t.Run("Handler Panic Recovery", func(t *testing.T) {
+		// 测试handler中的panic是否会被正确处理
+		jsonData := `{"panic_field": "trigger panic"}`
+
+		err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("panic_field", func(key string, reader io.Reader, parents []string) {
+			panic("intentional panic for testing")
+		}))
+
+		// 主解析过程不应该因为handler的panic而崩溃
+		require.NoError(t, err)
+	})
+
+	t.Run("Multiple Field Handlers with Some Failing", func(t *testing.T) {
+		jsonData := `{
+			"good1": "normal data 1",
+			"bad": "trigger error",
+			"good2": "normal data 2"
+		}`
+
+		var good1Data, good2Data string
+		var good1Called, good2Called, badCalled bool
+
+		err := ExtractStructuredJSON(jsonData,
+			WithRegisterFieldStreamHandler("good1", func(key string, reader io.Reader, parents []string) {
+				good1Called = true
+				data, _ := io.ReadAll(reader)
+				good1Data = string(data)
+			}),
+			WithRegisterFieldStreamHandler("bad", func(key string, reader io.Reader, parents []string) {
+				badCalled = true
+				panic("handler error")
+			}),
+			WithRegisterFieldStreamHandler("good2", func(key string, reader io.Reader, parents []string) {
+				good2Called = true
+				data, _ := io.ReadAll(reader)
+				good2Data = string(data)
+			}),
+		)
+
+		require.NoError(t, err)
+		assert.True(t, good1Called, "Good1 handler should be called")
+		assert.True(t, badCalled, "Bad handler should be called")
+		assert.True(t, good2Called, "Good2 handler should be called")
+		assert.Equal(t, `"normal data 1"`, good1Data)
+		assert.Equal(t, `"normal data 2"`, good2Data)
+	})
+}
+
+func TestWithRegisterFieldStreamHandler_CombinedWithOtherCallbacks(t *testing.T) {
+	t.Run("Mixed Callback Types", func(t *testing.T) {
+		jsonData := `{
+			"stream_field": "streaming data",
+			"regular_field": "regular data",
+			"nested": {
+				"inner": "value"
+			},
+			"array": [1, 2, 3]
+		}`
+
+		var streamData string
+		var objects []map[string]any
+		var arrays [][]any
+		var rawKVs []struct{ key, value any }
+
+		var streamCalled, objectCalled, arrayCalled, kvCalled bool
+
+		err := ExtractStructuredJSON(jsonData,
+			WithRegisterFieldStreamHandler("stream_field", func(key string, reader io.Reader, parents []string) {
+				streamCalled = true
+				data, _ := io.ReadAll(reader)
+				streamData = string(data)
+			}),
+			WithObjectCallback(func(data map[string]any) {
+				objectCalled = true
+				objects = append(objects, data)
+			}),
+			WithArrayCallback(func(data []any) {
+				arrayCalled = true
+				arrays = append(arrays, data)
+			}),
+			WithRawKeyValueCallback(func(key, data any) {
+				kvCalled = true
+				rawKVs = append(rawKVs, struct{ key, value any }{key, data})
+			}),
+		)
+
+		require.NoError(t, err)
+		assert.True(t, streamCalled, "Stream handler should be called")
+		assert.True(t, objectCalled, "Object callback should be called")
+		assert.True(t, arrayCalled, "Array callback should be called")
+		assert.True(t, kvCalled, "KV callback should be called")
+
+		assert.Equal(t, `"streaming data"`, streamData)
+		assert.Greater(t, len(objects), 0)
+		assert.Greater(t, len(arrays), 0)
+		assert.Greater(t, len(rawKVs), 0)
+	})
 }
