@@ -40,7 +40,7 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 			case Predecessors_BottomUseLabel, Predecessors_TopDefLabel:
 				valueDFS(v, func(v *Value) (Values, error) {
 					prev := v.GetDataFlow()
-					log.Errorf("%v prev: %v", v, prev)
+					// log.Errorf("%v prev: %v", v, prev)
 					for _, prev := range prev {
 						if err := g.CreateEdge(Edge{
 							From: prev,
