@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -166,7 +167,23 @@ LOOP:
 			r.config, prompt, r.config.CallAI,
 			func(resp *aicommon.AIResponse) error {
 				stream := resp.GetOutputStreamReader("re-act-loop", false, r.config.Emitter)
-				action, actionErr = aicommon.ExtractActionFromStream(stream, ReActActionObject)
+				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
+					stream,
+					ReActActionObject,
+					[]string{},
+					[]jsonextractor.CallbackOption{
+						//jsonextractor.WithRegisterFieldStreamHandler(
+						//	"human_readable_thought",
+						//	func(key string, reader io.Reader, parents []string) {
+						//		r.Emitter.EmitStreamEvent(
+						//			"thought",
+						//			time.Now(),
+						//			reader,
+						//			currentTask.GetId(),
+						//		)
+						//	},
+						//),
+					})
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)
 				}
