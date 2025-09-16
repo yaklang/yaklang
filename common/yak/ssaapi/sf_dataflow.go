@@ -33,19 +33,12 @@ func DataFlowWithSFConfig(
 	analysisType AnalysisType,
 	opts ...*sf.RecursiveConfigItem,
 ) Values {
-	handlerResult := make([]func(v Values) Values, 0)
+	filterCondition := make([]*filterCondition, 0)
 	addHandler := func(key sf.RecursiveConfigKey, code string) {
-		handlerResult = append(handlerResult, func(v Values) Values {
-			return dataFlowFilter(
-				v,
-				sfResult, config,
-				nil,
-				withFilterCondition(key, code),
-			)
-		})
+		filterCondition = append(filterCondition, withFilterCondition(key, code))
 	}
 	options := make([]OperationOption, 0)
-	configItems := make([]*sf.RecursiveConfigItem, 0)
+	untilConfig := make([]*sf.RecursiveConfigItem, 0)
 
 	for _, item := range opts {
 		switch item.Key {
@@ -62,11 +55,10 @@ func DataFlowWithSFConfig(
 				options = append(options, WithMaxDepth(ret))
 			}
 		case sf.RecursiveConfig_Until:
-			configItems = append(configItems, item)
+			untilConfig = append(untilConfig, item)
 			addHandler(sf.RecursiveConfig_Include, item.Value)
 		case sf.RecursiveConfig_Hook:
-			configItems = append(configItems, item)
-
+			untilConfig = append(untilConfig, item)
 		case sf.RecursiveConfig_Exclude:
 			addHandler(sf.RecursiveConfig_Exclude, item.Value)
 		case sf.RecursiveConfig_Include:
@@ -75,10 +67,12 @@ func DataFlowWithSFConfig(
 	}
 
 	{
-		recursiveConfig := CreateRecursiveConfigFromItems(sfResult, config, configItems...)
+		untilCheck := CreateCheck(sfResult, config, untilConfig...)
 		options = append(options, WithHookEveryNode(func(value *Value) error {
-			matchedConfigs := recursiveConfig.compileAndRun(value)
-			if _, ok := matchedConfigs[sf.RecursiveConfig_Until]; ok {
+			if untilCheck.Empty() {
+				return nil
+			}
+			if untilCheck.CheckUntil(value) {
 				return utils.Error("abort")
 			}
 			return nil
@@ -93,10 +87,11 @@ func DataFlowWithSFConfig(
 		dataflowRecursiveFunc = value.GetBottomUses
 	}
 
+	// dataflow analysis
 	result := dataflowRecursiveFunc(options...)
-	for _, handler := range handlerResult {
-		result = handler(result)
-	}
+	// filter the result
+	result = dataFlowFilter(result, sfResult, config, nil, filterCondition...)
+	// set predecessor label
 	result.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
 	return result
 }
@@ -140,6 +135,7 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	if len(exclude) != 0 {
 		condition = append(condition, withFilterExcludeCondition(exclude))
 	}
+	log.Errorf("nativecall ")
 	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, condition...)
 
 	if len(ret) > 0 {
@@ -177,46 +173,30 @@ func dataFlowFilter(
 	end sf.ValueOperator,
 	condition ...*filterCondition,
 ) Values {
-	for _, f := range condition {
-		if f.configKey != sf.RecursiveConfig_Include && f.configKey != sf.RecursiveConfig_Exclude {
-			return vs
-		}
-	}
-	if len(vs) == 0 {
+	// for _, f := range condition {
+	// 	if f.configKey != sf.RecursiveConfig_Include && f.configKey != sf.RecursiveConfig_Exclude {
+	// 		return vs
+	// 	}
+	// }
+	if len(vs) == 0 || len(condition) == 0 {
 		return vs
 	}
-	var recursiveConfigs []*RecursiveConfig
+
+	pathCheck := CreateCheck(contextResult, config)
+
 	for _, f := range condition {
-		recursiveConfigs = append(recursiveConfigs, CreateRecursiveConfigFromItems(contextResult, config, &sf.RecursiveConfigItem{
+		item := &sf.RecursiveConfigItem{
 			Key:            string(f.configKey),
 			Value:          f.code,
 			SyntaxFlowRule: true,
-		}))
+		}
+		pathCheck.AppendItems(item)
 	}
 
 	//foreach every path,A-> B-> C-> D-> E
 	//if E start dataflow. include: A && exclude:D this path is not match
-	checkMatch := func(values Values) bool {
-		for _, recursiveConfig := range recursiveConfigs {
-			result := recursiveConfig.compileAndRun(values)
-			if _, ok := result[sf.RecursiveConfig_Exclude]; ok {
-				return false
-			}
-			if _, ok := result[sf.RecursiveConfig_Include]; ok {
-				continue
-			}
-			if len(recursiveConfig.configItems) == 0 {
-				return false
-			}
-			item := recursiveConfig.configItems[0]
-			switch item.Key {
-			case sfvm.RecursiveConfig_Exclude:
-				return true
-			default:
-				return false
-			}
-		}
-		return true
+	checkMatch := func(path Values) bool {
+		return pathCheck.CheckMatch(path)
 	}
 	var ret []*Value
 	all := make(map[*Value]struct{})
