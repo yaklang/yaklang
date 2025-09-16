@@ -3,6 +3,7 @@ package synscanx
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/netstackvm"
 	"net"
 	"os"
 	"sync"
@@ -399,17 +400,13 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 		}
 	}
 
-	wCtx, wCancel := context.WithCancel(context.Background())
-	// 异步执行扫描流程
 	go func() {
-		s.initHandlerStart(wCtx)
 		defer func() {
 			if err := recover(); err != nil {
 				utils.PrintCurrentGoroutineRuntimeStack()
 			}
 		}()
 		defer func() {
-			wCancel()
 			close(resultCh)
 			close(s.PacketChan)
 			close(s.LoopPacket)
@@ -419,14 +416,49 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 			s.arpScan()
 			time.Sleep(1 * time.Second)
 		}
-		s.sendPacket(targetCh)
-		time.Sleep(s.config.waiting)
-		log.Debugf("waiting for all packet in %0.2fs", s.config.waiting.Seconds())
-		countOnce.Do(func() {
-			log.Infof("alive host count: %d open port count: %d cost: %v", len(ipCountMap), openPortCount, time.Since(s.startTime))
-		})
+		option := netstackvm.DefaultSYNScanOption()
+		option = append(option, netstackvm.WithSelectedDeviceName(s.config.netInterface))
+		vm, err := netstackvm.NewSystemNetStackVMWithoutDHCP(option...)
+		if err != nil {
+			log.Errorf("create netstack vm failed: %v", err)
+			return
+		}
+		err = s.NetStackScan(vm, targetCh)
+		if err != nil {
+			log.Error(err)
+			return
+		}
 	}()
 	return resultCh, nil
+}
+
+func (s *Scannerx) NetStackScan(vm *netstackvm.NetStackVirtualMachine, targetCh <-chan *SynxTarget) error {
+	wg := sync.WaitGroup{}
+	for target := range targetCh {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			addr := utils.HostPort(target.Host, target.Port)
+			switch target.Mode {
+			case TCP:
+				conn, err := vm.DialTCP(s.config.waiting, addr)
+				if err != nil || conn == nil {
+					return
+				}
+				conn.Close()
+				s.OpenPortHandlers(net.ParseIP(target.Host), target.Port)
+			case UDP:
+			case ICMP:
+				//todo
+			case ARP:
+				//todo
+			default:
+				log.Errorf("unsupported protocol: %v", target.Mode)
+			}
+		}()
+	}
+	wg.Wait()
+	return nil
 }
 
 func (s *Scannerx) sendPacket(targetCh <-chan *SynxTarget) {
