@@ -830,12 +830,12 @@ func TestWithRegisterFieldStreamHandler_StreamInterruption(t *testing.T) {
 
 		go func() {
 			defer pw.Close()
-			data := `{"slowfield": "` + strings.Repeat("slow data ", 1000) + `"}`
+			data := `{"slowfield": "` + strings.Repeat("slow data ", 100) + `"}`
 
 			// 逐字节慢速写入
 			for _, b := range []byte(data) {
 				pw.Write([]byte{b})
-				time.Sleep(1 * time.Millisecond) // 模拟慢速
+				time.Sleep(100 * time.Microsecond) // 减少延迟，保持在1-2秒内
 			}
 		}()
 
