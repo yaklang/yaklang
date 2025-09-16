@@ -2,7 +2,6 @@ package aireact
 
 import (
 	"fmt"
-	"io"
 )
 
 // EmitThought emits a thought event using the embedded Emitter
@@ -29,28 +28,4 @@ func (r *ReAct) EmitIteration(iteration int, maxIterations int) {
 // EmitResult emits a final result event using the embedded Emitter
 func (r *ReAct) EmitResult(result interface{}) {
 	r.Emitter.EmitResult("result", result, true)
-}
-
-// ReAct 可以直接使用嵌入的 Emitter 的通用方法：
-// r.EmitStructured(nodeId, data) 用于结构化数据
-// r.EmitStream(nodeId, content) 用于流式数据
-// r.EmitInfo(message), r.EmitError(message), r.EmitWarning(message) 用于日志
-
-// EmitStreamReader emits streaming content from a reader using embedded Emitter
-func (r *ReAct) EmitStreamReader(nodeId string, reader io.Reader) {
-	go func() {
-		buffer := make([]byte, 1024)
-		for {
-			n, err := reader.Read(buffer)
-			if n > 0 {
-				r.Emitter.EmitStream(nodeId, string(buffer[:n]))
-			}
-			if err != nil {
-				if err != io.EOF {
-					r.Emitter.EmitError(fmt.Sprintf("Stream read error: %v", err))
-				}
-				break
-			}
-		}
-	}()
 }
