@@ -67,6 +67,7 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 		edgeLabel string
 		step      int64
 	)
+
 	edgeLabel = string(edge.Kind)
 	if edge.Msg != nil {
 		if label, ok := edge.Msg["label"].(string); ok {
@@ -78,6 +79,12 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 	}
 	if step > 0 {
 		edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
+	}
+
+	if IsDataFlowLabel(edgeLabel) {
+		// skip top-def bottom-use  edge label
+		// have dataflow edge already
+		return nil
 	}
 
 	dotEdge := g.AddEdge(fromNode, toNode, edgeLabel)
