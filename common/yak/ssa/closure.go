@@ -100,6 +100,9 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
 	var bind *Variable = variable
 
+	if f.builder == nil{
+		return
+	}
 	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
 		parentScope := p.CurrentBlock.ScopeTable
 		if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
