@@ -27,8 +27,11 @@ func TestFieldStreamHandler_UnifiedAPI(t *testing.T) {
 		var receivedKey string
 		var receivedData string
 		var receivedParents []string
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("key4", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			receivedKey = key
 			data, _ := io.ReadAll(reader)
 			receivedData = string(data)
@@ -37,6 +40,7 @@ func TestFieldStreamHandler_UnifiedAPI(t *testing.T) {
 		}))
 
 		require.NoError(t, err)
+		wg.Wait()
 		assert.Equal(t, "key4", receivedKey)
 		assert.Equal(t, `"simple value"`, receivedData)
 		assert.Empty(t, receivedParents) // key4在根级别，没有父路径
@@ -46,8 +50,11 @@ func TestFieldStreamHandler_UnifiedAPI(t *testing.T) {
 		var receivedKey string
 		var receivedData string
 		var receivedParents []string
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("key3", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			receivedKey = key
 			data, _ := io.ReadAll(reader)
 			receivedData = string(data)
@@ -56,6 +63,7 @@ func TestFieldStreamHandler_UnifiedAPI(t *testing.T) {
 		}))
 
 		require.NoError(t, err)
+		wg.Wait()
 		assert.Equal(t, "key3", receivedKey)
 		assert.Equal(t, `"abc123"`, receivedData)
 		// key3的父路径应该是: key1 -> key2 -> [0]
@@ -227,6 +235,7 @@ func TestFieldStreamHandler_ComplexNestingWithParents(t *testing.T) {
 	}`
 
 	var mu sync.Mutex
+	var wg sync.WaitGroup
 	type result struct {
 		key     string
 		data    string
@@ -234,8 +243,12 @@ func TestFieldStreamHandler_ComplexNestingWithParents(t *testing.T) {
 	}
 	var results []result
 
+	// 预期有2个 "target" 字段：deep nested target 和 array target （root_target 是不同的key）
+	wg.Add(2)
+
 	err := ExtractStructuredJSON(jsonData,
 		WithRegisterFieldStreamHandler("target", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			data, _ := io.ReadAll(reader)
 			mu.Lock()
 			parentsCopy := make([]string, len(parents))
@@ -249,9 +262,7 @@ func TestFieldStreamHandler_ComplexNestingWithParents(t *testing.T) {
 		}))
 
 	require.NoError(t, err)
-
-	// 等待一下确保所有处理完成
-	time.Sleep(100 * time.Millisecond)
+	wg.Wait()
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -289,9 +300,12 @@ func TestFieldStreamHandler_LargeDataStreaming(t *testing.T) {
 
 	var receivedSize int
 	var chunkCount int
+	var wg sync.WaitGroup
+	wg.Add(1)
 
 	err := ExtractStructuredJSON(jsonData,
 		WithRegisterFieldStreamHandler("large_field", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			buffer := make([]byte, 4096) // 4KB缓冲区
 
 			for {
@@ -308,6 +322,7 @@ func TestFieldStreamHandler_LargeDataStreaming(t *testing.T) {
 		}))
 
 	require.NoError(t, err)
+	wg.Wait()
 	// 总接收量应该包括引号
 	expectedSize := len(largeData) + 2
 	assert.Equal(t, expectedSize, receivedSize)

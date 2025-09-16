@@ -365,7 +365,11 @@ func TestWithRegisterFieldStreamHandler(t *testing.T) {
 	var receivedData []byte
 	dataReceived := false
 
+	var wg sync.WaitGroup
+	wg.Add(1)
+
 	err := ExtractStructuredJSON(jsonData, WithRegisterFieldStreamHandler("data", func(key string, reader io.Reader, parents []string) {
+		defer wg.Done()
 		data, readErr := io.ReadAll(reader)
 		require.NoError(t, readErr)
 		receivedData = data
@@ -373,6 +377,7 @@ func TestWithRegisterFieldStreamHandler(t *testing.T) {
 	}))
 
 	require.NoError(t, err)
+	wg.Wait() // 等待流处理完成
 	assert.True(t, dataReceived, "Data should have been received through stream handler")
 	assert.Contains(t, string(receivedData), "This is some streaming data content", "Received data should contain expected content")
 }
@@ -603,6 +608,7 @@ func TestWithRegisterFieldStreamHandler_StreamingOrder(t *testing.T) {
 // === 边界情况和错误处理测试 ===
 
 func TestWithRegisterFieldStreamHandler_BoundaryConditions(t *testing.T) {
+	t.Parallel()
 	t.Run("Empty JSON", func(t *testing.T) {
 		handlerCalled := false
 		err := ExtractStructuredJSON(`{}`, WithRegisterFieldStreamHandler("nonexistent", func(key string, reader io.Reader, parents []string) {
@@ -615,8 +621,11 @@ func TestWithRegisterFieldStreamHandler_BoundaryConditions(t *testing.T) {
 	t.Run("Empty Field Value", func(t *testing.T) {
 		var receivedData []byte
 		handlerCalled := false
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		err := ExtractStructuredJSON(`{"empty": ""}`, WithRegisterFieldStreamHandler("empty", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			handlerCalled = true
 			data, readErr := io.ReadAll(reader)
 			require.NoError(t, readErr)
@@ -624,6 +633,7 @@ func TestWithRegisterFieldStreamHandler_BoundaryConditions(t *testing.T) {
 		}))
 
 		require.NoError(t, err)
+		wg.Wait() // 等待流处理完成
 		assert.True(t, handlerCalled, "Handler should be called for empty field")
 		assert.Equal(t, `""`, string(receivedData))
 	})
@@ -631,51 +641,61 @@ func TestWithRegisterFieldStreamHandler_BoundaryConditions(t *testing.T) {
 	t.Run("Null Field Value", func(t *testing.T) {
 		handlerCalled := false
 		var receivedData []byte
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		err := ExtractStructuredJSON(`{"nullfield": null}`, WithRegisterFieldStreamHandler("nullfield", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			handlerCalled = true
 			data, _ := io.ReadAll(reader)
 			receivedData = data
 		}))
 		require.NoError(t, err)
+		wg.Wait() // 等待流处理完成
 
-		// 字段流会被创建，但由于null不是字符串，所以不会写入数据
+		// 字段流会被创建，null值应该被写入原始JSON数据
 		if handlerCalled {
-			assert.Empty(t, receivedData, "Should receive empty data for null field")
+			assert.Equal(t, "null", string(receivedData), "Should receive 'null' for null field")
 		}
 	})
 
 	t.Run("Numeric Field Value", func(t *testing.T) {
 		handlerCalled := false
 		var receivedData []byte
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		err := ExtractStructuredJSON(`{"number": 12345}`, WithRegisterFieldStreamHandler("number", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			handlerCalled = true
 			data, _ := io.ReadAll(reader)
 			receivedData = data
 		}))
 		require.NoError(t, err)
-
-		// 字段流会被创建，但由于数字不是字符串，所以不会写入数据
+		wg.Wait() // 等待流处理完成
+		// 字段流会被创建，数字值应该被写入原始JSON数据
 		if handlerCalled {
-			assert.Empty(t, receivedData, "Should receive empty data for numeric field")
+			assert.Equal(t, "12345", string(receivedData), "Should receive '12345' for numeric field")
 		}
 	})
 
 	t.Run("Boolean Field Value", func(t *testing.T) {
 		handlerCalled := false
 		var receivedData []byte
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		err := ExtractStructuredJSON(`{"flag": true}`, WithRegisterFieldStreamHandler("flag", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			handlerCalled = true
 			data, _ := io.ReadAll(reader)
 			receivedData = data
 		}))
 		require.NoError(t, err)
-
-		// 字段流会被创建，但由于布尔值不是字符串，所以不会写入数据
+		wg.Wait() // 等待流处理完成
+		// 字段流会被创建，布尔值应该被写入原始JSON数据
 		if handlerCalled {
-			assert.Empty(t, receivedData, "Should receive empty data for boolean field")
+			assert.Equal(t, "true", string(receivedData), "Should receive 'true' for boolean field")
 		}
 	})
 }
@@ -702,13 +722,18 @@ func TestWithRegisterFieldStreamHandler_MalformedJSON(t *testing.T) {
 		var receivedData string
 		handlerCalled := false
 
+		var wg sync.WaitGroup
+		wg.Add(1)
+
 		err := ExtractStructuredJSON(brokenJSON, WithRegisterFieldStreamHandler("field", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			handlerCalled = true
 			data, _ := io.ReadAll(reader)
 			receivedData = string(data)
 		}))
 
 		require.NoError(t, err)
+		wg.Wait() // 等待流处理完成
 		assert.True(t, handlerCalled, "Handler should be called even with escape issues")
 		assert.Contains(t, receivedData, "invalid escape")
 	})
@@ -942,6 +967,24 @@ func TestWithRegisterFieldStreamHandler_ErrorHandling(t *testing.T) {
 		)
 
 		require.NoError(t, err)
+
+		// 等待所有处理器完成
+		timeout := time.After(1 * time.Second)
+		ticker := time.NewTicker(10 * time.Millisecond)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-timeout:
+				t.Fatal("Timeout waiting for handlers to complete")
+			case <-ticker.C:
+				if good1Called && good2Called {
+					goto done
+				}
+			}
+		}
+	done:
+
 		assert.True(t, good1Called, "Good1 handler should be called")
 		assert.True(t, badCalled, "Bad handler should be called")
 		assert.True(t, good2Called, "Good2 handler should be called")
