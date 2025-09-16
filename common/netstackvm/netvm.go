@@ -117,21 +117,26 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 	}
 	m.stack = s
 
+	// 启动原则 ： 如果用户指定了需要启动的网卡则添加指定的网卡，如果没有则只启动localhost和默认路由网卡，除非开启option open
 	// find public interface
 	publicIfaceName, _ := netutil.GetPublicRouteIfaceName()
 	allNic, err := net.Interfaces()
 	if err != nil {
 		return nil, err
 	}
-
 	for _, nic := range allNic {
 		if nic.Flags&net.FlagRunning == 0 { // just get the running interface
 			continue
 		}
+
+		if nic.Flags&net.FlagLoopback == 0 && nic.Name != publicIfaceName && nic.Name != config.selectedDeviceName && !config.openAllPcapDevice { // if not loopback and not public interface, skip it
+			continue
+		}
+
 		vm, err := NewNetStackVirtualMachineEntry(append(opts, WithPcapDevice(nic.Name), WithNetStack(s))...)
 		if err != nil {
 			log.Errorf("failed to build netStackVM: %v", err)
-			return nil, err
+			continue
 		}
 
 		if publicIfaceName == nic.Name { // if the interface is the public interface, start dhcp, make sure gateway can use
