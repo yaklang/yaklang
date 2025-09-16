@@ -17,6 +17,7 @@ import (
 
 // TestEmptyAndNilInputs 测试空输入和nil输入的边界情况
 func TestEmptyAndNilInputs(t *testing.T) {
+	t.Parallel() // 并行执行以提高效率
 	tests := []struct {
 		name     string
 		input    string
@@ -84,6 +85,7 @@ func TestEmptyAndNilInputs(t *testing.T) {
 
 // TestLargeDataBoundary 测试大数据量的边界情况
 func TestLargeDataBoundary(t *testing.T) {
+	t.Parallel() // 并行执行以提高效率
 	// 创建中等大小的数据（约1MB），确保在3秒内完成
 	dataSize := 1024 * 1024 // 1MB
 	largeData := strings.Repeat("x", dataSize)
@@ -94,9 +96,11 @@ func TestLargeDataBoundary(t *testing.T) {
 
 		var fieldReceived bool
 		var dataSizeReceived int
-
+		var wg sync.WaitGroup
+		wg.Add(1)
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterFieldStreamHandler("largeField", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, readErr := io.ReadAll(reader)
 				require.NoError(t, readErr)
 				dataSizeReceived = len(data)
@@ -104,6 +108,7 @@ func TestLargeDataBoundary(t *testing.T) {
 			}))
 
 		require.NoError(t, err)
+		wg.Wait()
 		assert.True(t, fieldReceived)
 		assert.Greater(t, dataSizeReceived, dataSize) // 包含引号
 
@@ -806,6 +811,7 @@ func TestFieldValueTypes_PrimitiveTypes(t *testing.T) {
 	}`
 
 	t.Run("all primitive types via raw key-value callback", func(t *testing.T) {
+		t.Parallel() // 并行执行以提高效率
 		start := time.Now()
 
 		var processedCount int
@@ -836,16 +842,20 @@ func TestFieldValueTypes_PrimitiveTypes(t *testing.T) {
 	})
 
 	t.Run("string types via stream handler", func(t *testing.T) {
+		t.Parallel() // 并行执行以提高效率
 		start := time.Now()
 
 		results := make(map[string]string)
 		var processedCount int
+		var mutex sync.Mutex
 
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterRegexpFieldStreamHandler("stringField|emptyStringField", func(key string, reader io.Reader, parents []string) {
 				data, _ := io.ReadAll(reader)
+				mutex.Lock()
 				results[key] = string(data)
 				processedCount++
+				mutex.Unlock()
 			}),
 		)
 
@@ -862,6 +872,7 @@ func TestFieldValueTypes_PrimitiveTypes(t *testing.T) {
 	})
 
 	t.Run("non-string types trigger stream handler with empty data", func(t *testing.T) {
+		t.Parallel() // 并行执行以提高效率
 		start := time.Now()
 
 		var streamHandlerCallCount int
