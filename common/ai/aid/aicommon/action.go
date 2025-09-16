@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"strings"
 )
 
 type Action struct {
@@ -81,7 +82,12 @@ func (q *Action) GetInvokeParamsArray(key string) []aitool.InvokeParams {
 	return q.params.GetObjectArray(key)
 }
 
-func ExtractActionFromStream(reader io.Reader, actionName string, alias ...string) (*Action, error) {
+func ExtractActionFromStreamWithJSONExtractOptions(
+	reader io.Reader,
+	actionName string,
+	alias []string,
+	options []jsonextractor.CallbackOption,
+) (*Action, error) {
 	ac := &Action{
 		name:   actionName,
 		params: make(map[string]any),
@@ -100,9 +106,10 @@ func ExtractActionFromStream(reader io.Reader, actionName string, alias ...strin
 		defer func() {
 			utils.TryCloseChannel(sigchan)
 		}()
-
 		stopped := utils.NewBool(false)
-		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), jsonextractor.WithObjectCallback(func(data map[string]any) {
+
+		opts := options
+		opts = append(opts, jsonextractor.WithObjectCallback(func(data map[string]any) {
 			if stopped.IsSet() {
 				return
 			}
@@ -140,6 +147,8 @@ func ExtractActionFromStream(reader io.Reader, actionName string, alias ...strin
 				}
 			}
 		}))
+
+		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), options...)
 		if err != nil {
 			log.Error("Failed to extract action", "action", buf.String(), "error", err)
 		}
@@ -155,6 +164,10 @@ func ExtractActionFromStream(reader io.Reader, actionName string, alias ...strin
 		return nil, err
 	}
 	return nil, utils.Errorf("cannot extract action[%v] from: %v", actions, utils.ShrinkString(buf.String(), 100))
+}
+
+func ExtractActionFromStream(reader io.Reader, actionName string, alias ...string) (*Action, error) {
+	return ExtractActionFromStreamWithJSONExtractOptions(reader, actionName, alias, nil)
 }
 
 func ExtractAction(i string, actionName string, alias ...string) (*Action, error) {
