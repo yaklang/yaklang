@@ -283,6 +283,14 @@ func (v *BaseCParserVisitor) VisitForCondition(ctx *ForConditionContext) interfa
 	return v.VisitChildren(ctx)
 }
 
+func (v *BaseCParserVisitor) VisitAssignmentExpressions(ctx *AssignmentExpressionsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
+func (v *BaseCParserVisitor) VisitForDeclarations(ctx *ForDeclarationsContext) interface{} {
+	return v.VisitChildren(ctx)
+}
+
 func (v *BaseCParserVisitor) VisitForDeclaration(ctx *ForDeclarationContext) interface{} {
 	return v.VisitChildren(ctx)
 }

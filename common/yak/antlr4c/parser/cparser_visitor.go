@@ -214,6 +214,12 @@ type CParserVisitor interface {
 	// Visit a parse tree produced by CParser#forCondition.
 	VisitForCondition(ctx *ForConditionContext) interface{}
 
+	// Visit a parse tree produced by CParser#assignmentExpressions.
+	VisitAssignmentExpressions(ctx *AssignmentExpressionsContext) interface{}
+
+	// Visit a parse tree produced by CParser#forDeclarations.
+	VisitForDeclarations(ctx *ForDeclarationsContext) interface{}
+
 	// Visit a parse tree produced by CParser#forDeclaration.
 	VisitForDeclaration(ctx *ForDeclarationContext) interface{}
 

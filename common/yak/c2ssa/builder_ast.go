@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -240,7 +241,7 @@ func (b *astbuilder) buildDirectDeclarator(ast *cparser.DirectDeclaratorContext,
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
-	return nil, b.EmitConstInst(0), nil
+	return b.CreateVariable(""), b.EmitConstInst(0), nil
 }
 
 func (b *astbuilder) buildDeclarator(ast *cparser.DeclaratorContext, kinds ...ConstKind) (*ssa.Variable, ssa.Value, ssa.Types) {
@@ -307,15 +308,26 @@ func (b *astbuilder) buildParameterDeclaration(ast *cparser.ParameterDeclaration
 
 	if d := ast.DeclarationSpecifier(); d != nil {
 		ssatyp := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
-		_, param, _ := b.buildDeclarator(ast.Declarator().(*cparser.DeclaratorContext), PARAM_KIND)
-		if ssatyp != nil {
-			param.SetType(ssatyp)
+		if d := ast.Declarator(); d != nil {
+			_, param, _ := b.buildDeclarator(d.(*cparser.DeclaratorContext), PARAM_KIND)
+			if ssatyp != nil && param != nil {
+				param.SetType(ssatyp)
+			}
+			return param, ssatyp
+		} else if a := ast.AbstractDeclarator(); a != nil {
+			b.buildAbstractDeclarator(a.(*cparser.AbstractDeclaratorContext))
 		}
-		return param, ssatyp
+
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())
 	return b.EmitConstInst(0), ssa.CreateAnyType()
+}
+
+func (b *astbuilder) buildAbstractDeclarator(ast *cparser.AbstractDeclaratorContext) {
+	// TODO
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
 }
 
 func (b *astbuilder) buildGccDeclaratorExtension(ast *cparser.GccDeclaratorExtensionContext) {
@@ -759,32 +771,32 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 		var condition ssa.Value
 		cond := e
 		loop.SetCondition(func() ssa.Value {
-			if cond == nil {
+			if utils.IsNil(cond) {
 				condition = b.EmitConstInst(true)
 			} else {
 				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 				// defer recoverRange()
 				condition, _ = b.buildExpression(cond.(*cparser.ExpressionContext), false)
-				if condition == nil {
-					condition = b.EmitConstInst(true)
-					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-				}
+			}
+			if utils.IsNil(condition) {
+				condition = b.EmitConstInst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 			}
 			return condition
 		})
 	} else if condition, ok := ast.ForCondition().(*cparser.ForConditionContext); ok {
-		if first, ok := condition.ForDeclaration().(*cparser.ForDeclarationContext); ok {
+		if first, ok := condition.ForDeclarations().(*cparser.ForDeclarationsContext); ok {
 			// first expression is initialization, in enter block
 			loop.SetFirst(func() []ssa.Value {
 				recoverRange := b.SetRange(first.BaseParserRuleContext)
 				defer recoverRange()
-				return b.buildForDeclaration(first)
+				return b.buildForDeclarations(first)
 			})
-		} else if first, ok := condition.AssignmentExpression().(*cparser.AssignmentExpressionContext); ok {
+		} else if first, ok := condition.AssignmentExpressions().(*cparser.AssignmentExpressionsContext); ok {
 			loop.SetFirst(func() []ssa.Value {
 				recoverRange := b.SetRange(first.BaseParserRuleContext)
 				defer recoverRange()
-				return ssa.Values{b.buildAssignmentExpression(first)}
+				return b.buildAssignmentExpressions(first)
 			})
 		}
 		if expr, ok := condition.ForExpression(0).(*cparser.ForExpressionContext); ok {
@@ -792,7 +804,7 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 			cond := expr
 			loop.SetCondition(func() ssa.Value {
 				var condition ssa.Value
-				if cond == nil {
+				if utils.IsNil(cond) {
 					condition = b.EmitConstInst(true)
 				} else {
 					// recoverRange := b.SetRange(cond.BaseParserRuleContext)
@@ -801,10 +813,10 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 					for _, c := range conditions {
 						condition = c
 					}
-					if conditions == nil {
-						condition = b.EmitConstInst(true)
-						// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-					}
+				}
+				if utils.IsNil(condition) {
+					condition = b.EmitConstInst(true)
+					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 				}
 				return condition
 			})
@@ -826,6 +838,17 @@ func (b *astbuilder) buildIterationStatement(ast *cparser.IterationStatementCont
 		}
 	})
 	loop.Finish()
+}
+
+func (b *astbuilder) buildForDeclarations(ast *cparser.ForDeclarationsContext) ssa.Values {
+	recoverRange := b.SetRange(ast.BaseParserRuleContext)
+	defer recoverRange()
+	var ret ssa.Values
+
+	for _, f := range ast.AllForDeclaration() {
+		ret = append(ret, b.buildForDeclaration(f.(*cparser.ForDeclarationContext))...)
+	}
+	return ret
 }
 
 func (b *astbuilder) buildForDeclaration(ast *cparser.ForDeclarationContext) ssa.Values {
@@ -982,13 +1005,22 @@ func (b *astbuilder) buildSelectionStatement(ast *cparser.SelectionStatementCont
 	}
 }
 
-func (b *astbuilder) buildExpressionStatement(ast *cparser.ExpressionStatementContext) {
+func (b *astbuilder) buildExpressionStatement(ast *cparser.ExpressionStatementContext) ssa.Values {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
-	for _, a := range ast.AllAssignmentExpression() {
-		b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext))
+	if a := ast.AssignmentExpressions(); a != nil {
+		return b.buildAssignmentExpressions(a.(*cparser.AssignmentExpressionsContext))
 	}
+	return nil
+}
+
+func (b *astbuilder) buildAssignmentExpressions(ast *cparser.AssignmentExpressionsContext) ssa.Values {
+	var ret ssa.Values
+	for _, a := range ast.AllAssignmentExpression() {
+		ret = append(ret, b.buildAssignmentExpression(a.(*cparser.AssignmentExpressionContext)))
+	}
+	return ret
 }
 
 func (b *astbuilder) handlerGoto(labelName string, isBreak ...bool) {

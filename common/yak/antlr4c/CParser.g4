@@ -88,12 +88,13 @@ postfixExpression
     ;
 
 argumentExpressionList
-    : expression (',' expression)*
+    : expression (','? expression)*
     ;
 
 unaryExpression
     : ('++' | '--' | '*') unaryExpression
-    | ('sizeof' | '_Alignof') '(' typeName ')'
+    | ('sizeof' | '_Alignof') '(' '*'* typeName ')'
+    | ('sizeof' | '_Alignof') '(' postfixExpression ')'
     | '&&' unaryExpression
     | postfixExpression
     ;
@@ -133,7 +134,7 @@ statementsExpression
     ;
 
 expression
-    : unary_op = (Plus | Minus | Not | Caret | Star | And) expression
+    : unary_op = (Tilde | Plus | Minus | Not | Caret | Star | And) expression
     | expression mul_op = (Star | Div | Mod | LeftShift | RightShift | And) expression
     | expression add_op = (Plus | Minus | Or | Caret) expression
     | expression rel_op = (Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual) expression
@@ -165,7 +166,7 @@ declarationSpecifier
     : (storageClassSpecifier | typeQualifier | functionSpecifier)* structOrUnion? (
         typeSpecifier
         | Identifier
-    ) '*'?
+    ) '*'*
     | alignmentSpecifier
     ;
 
@@ -308,6 +309,7 @@ vcSpecificModifer
 gccDeclaratorExtension
     : Asm
     | gccAttributeSpecifier
+    | Identifier ('(' gccAttributeList ')')?
     ;
 
 gccAttributeSpecifier
@@ -442,7 +444,7 @@ blockItem
     ;
 
 expressionStatement
-    : assignmentExpression (',' assignmentExpression)* ';'
+    : assignmentExpressions ';'
     ;
 
 selectionStatement
@@ -457,7 +459,15 @@ iterationStatement
     ;
 
 forCondition
-    : (forDeclaration | assignmentExpression?) ';' forExpression? ';' forExpression?
+    : (forDeclarations | assignmentExpressions?) ';' forExpression? ';' forExpression?
+    ;
+
+assignmentExpressions
+    : assignmentExpression (',' assignmentExpression)*
+    ;
+
+forDeclarations
+    : forDeclaration (',' forDeclaration)*
     ;
 
 forDeclaration
