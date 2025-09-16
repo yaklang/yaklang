@@ -1,6 +1,10 @@
 package rag
 
 import (
+	"context"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"math/rand"
 	"sort"
 	"strings"
@@ -22,15 +26,47 @@ type SQLiteVectorStoreHNSW struct {
 	mu         sync.RWMutex // 用于并发安全的互斥锁
 	collection *schema.VectorStoreCollection
 	// 是否自动更新 graph_infos
+	hnsw *hnsw.Graph[string]
+
 	EnableAutoUpdateGraphInfos bool
-	hnsw                       *hnsw.Graph[string]
+	buildGraphFilter           *yakit.VectorDocumentFilter
+	buildGraphPolicy           string
+	ctx                        context.Context
 }
 
-func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder EmbeddingClient) (*SQLiteVectorStoreHNSW, error) {
-	return LoadSQLiteVectorStoreHNSWEx(db, collectionName, embedder, true)
+const (
+	Policy_UseDBCanche = "DB_Cache"
+	Policy_UseFilter   = "Filter"
+	Policy_None        = "None"
+)
+
+type SQLiteVectorStoreHNSWOption func(*SQLiteVectorStoreHNSW)
+
+func WithBuildGraphPolicy(policy string) SQLiteVectorStoreHNSWOption {
+	return func(s *SQLiteVectorStoreHNSW) {
+		s.buildGraphPolicy = policy
+	}
 }
 
-func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder EmbeddingClient, recoverLayer bool) (*SQLiteVectorStoreHNSW, error) {
+func WithBuildGraphFilter(filter *yakit.VectorDocumentFilter) SQLiteVectorStoreHNSWOption {
+	return func(s *SQLiteVectorStoreHNSW) {
+		s.buildGraphFilter = filter
+	}
+}
+
+func WithEnableAutoUpdateGraphInfos(enable bool) SQLiteVectorStoreHNSWOption {
+	return func(s *SQLiteVectorStoreHNSW) {
+		s.EnableAutoUpdateGraphInfos = enable
+	}
+}
+
+func WithContext(ctx context.Context) SQLiteVectorStoreHNSWOption {
+	return func(s *SQLiteVectorStoreHNSW) {
+		s.ctx = ctx
+	}
+}
+
+func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder EmbeddingClient, opts ...SQLiteVectorStoreHNSWOption) (*SQLiteVectorStoreHNSW, error) {
 	var collections []*schema.VectorStoreCollection
 	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections)
 	if dbErr.Error != nil {
@@ -41,18 +77,44 @@ func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder Em
 		return nil, utils.Errorf("rag collection[%v] not existed", collectionName)
 	}
 
-	config := collections[0]
+	vectorStore := &SQLiteVectorStoreHNSW{
+		db:                         db,
+		EnableAutoUpdateGraphInfos: true,
+		embedder:                   embedder,
+		collection:                 collections[0],
+		buildGraphPolicy:           Policy_UseDBCanche,
+		ctx:                        context.Background(),
+	}
 
+	for _, opt := range opts {
+		opt(vectorStore)
+	}
+
+	collectionConfig := collections[0]
 	hnswGraph := hnsw.NewGraph(
-		hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
-		hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
+		hnsw.WithHNSWParameters[string](collectionConfig.M, collectionConfig.Ml, collectionConfig.EfSearch),
+		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
 		hnsw.WithDeterministicRng[string](0), // 使用固定的随机数生成器，便于调试，不影响结果
 	)
 
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
 	var existed = make(map[string][]float32)
-	// 尝试恢复HNSW图结构
-	if recoverLayer {
+	switch vectorStore.buildGraphPolicy {
+	case Policy_UseFilter: // 选择性加载子图
+		vectorStore.buildGraphFilter.CollectionUUID = collections[0].UUID
+		log.Info("build graph with filter policy, load existed vectors from db with filter")
+		for document := range yakit.YieldVectorDocument(vectorStore.ctx, db, vectorStore.buildGraphFilter) {
+			hnswGraph.Add(hnsw.InputNode[string]{
+				Key:   document.DocumentID,
+				Value: document.Embedding,
+			})
+		}
+	case Policy_None:
+		log.Info("build graph with no policy, skip load existed vectors")
+	case Policy_UseDBCanche:
+		fallthrough
+	default:
+		log.Info("build graph with db cache policy, load existed vectors from db")
 		layers := ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
 			if _, ok := existed[key]; ok {
 				return existed[key]
@@ -72,18 +134,12 @@ func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder Em
 		hnswGraph.Layers = layers
 	}
 
-	vectorStore := &SQLiteVectorStoreHNSW{
-		db:                         db,
-		EnableAutoUpdateGraphInfos: true,
-		embedder:                   embedder,
-		collection:                 collections[0],
-		hnsw:                       hnswGraph,
-	}
 	hnswGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
 			vectorStore.UpdateAutoUpdateGraphInfos()
 		}
 	}
+	vectorStore.hnsw = hnswGraph
 
 	return vectorStore, nil
 }
@@ -204,6 +260,7 @@ func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorSto
 		DocumentID:      doc.ID,
 		DocumentType:    doc.Type,
 		CollectionID:    s.collection.ID,
+		CollectionUUID:  s.collection.UUID,
 		Metadata:        schema.MetadataMap(doc.Metadata),
 		Embedding:       schema.FloatArray(doc.Embedding),
 		Content:         doc.Content,
@@ -291,6 +348,24 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 
 	// 提交事务
 	return nil
+}
+
+func (s *SQLiteVectorStoreHNSW) FuzzSearch(ctx context.Context, query string, limit int) (<-chan SearchResult, error) {
+	filter := &yakit.VectorDocumentFilter{
+		CollectionUUID: s.collection.UUID,
+		Keywords:       query,
+	}
+	var results = chanx.NewUnlimitedChan[SearchResult](ctx, 100)
+	go func() {
+		defer results.Close()
+		for doc := range yakit.YieldVectorDocument(ctx, s.db, filter, bizhelper.WithYieldModel_Limit(limit)) {
+			results.SafeFeed(SearchResult{
+				Document: s.toDocument(doc),
+				Score:    1,
+			})
+		}
+	}()
+	return results.OutputChannel(), nil
 }
 
 // Search 根据查询文本检索相关文档

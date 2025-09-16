@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"context"
 	"errors"
 	"sort"
 	"sync"
@@ -45,6 +46,10 @@ func (m *MemoryVectorStore) Add(docs ...Document) error {
 	}
 
 	return nil
+}
+
+func (m *MemoryVectorStore) FuzzSearch(ctx context.Context, query string, limit int) (<-chan SearchResult, error) {
+	return nil, errors.New("not implemented")
 }
 
 func (m *MemoryVectorStore) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {

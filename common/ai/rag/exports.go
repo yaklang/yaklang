@@ -207,14 +207,45 @@ func LoadCollectionWithEmbeddingClient(db *gorm.DB, name string, client aispec.E
 
 var IsMockMode = false
 
-// LoadCollection 加载知识库
-func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
-	return LoadCollectionEx(db, name, true, opts...)
+type CommonConfig struct {
+	opt []any
 }
 
-// LoadCollectionEx 加载运行时知识库,不尝试恢复layer
-func LoadCollectionEx(db *gorm.DB, name string, recoverLayer bool, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
+func NewCommonConfig(opt ...any) *CommonConfig {
+	return &CommonConfig{opt: opt}
+}
+
+func (c *CommonConfig) AIConfigOption() []aispec.AIConfigOption {
+	var options []aispec.AIConfigOption
+	for _, opt := range c.opt {
+		switch opt := opt.(type) {
+		case aispec.AIConfigOption:
+			options = append(options, opt)
+		default:
+		}
+	}
+	return options
+}
+
+func (c *CommonConfig) SQLiteVectorStoreHNSWOptions() []SQLiteVectorStoreHNSWOption {
+	var options []SQLiteVectorStoreHNSWOption
+	for _, opt := range c.opt {
+		switch opt := opt.(type) {
+		case SQLiteVectorStoreHNSWOption:
+			options = append(options, opt)
+		default:
+		}
+	}
+	return options
+}
+
+func LoadCollection(db *gorm.DB, name string, opts ...aispec.AIConfigOption) (*RAGSystem, error) {
+	return LoadCollectionEx(db, name, utils.InterfaceToSliceInterface(opts)...)
+}
+
+func LoadCollectionEx(db *gorm.DB, name string, opts ...any) (*RAGSystem, error) {
 	log.Infof("loading collection '%s' with local embedding service", name)
+	commonConfig := NewCommonConfig(opts...)
 
 	// 使用本地嵌入服务
 	var embeddingService EmbeddingClient
@@ -239,7 +270,7 @@ func LoadCollectionEx(db *gorm.DB, name string, recoverLayer bool, opts ...aispe
 	}
 
 	log.Infof("start to load sqlite vector store for collection %#v", name)
-	store, err := LoadSQLiteVectorStoreHNSWEx(db, name, embeddingService, recoverLayer)
+	store, err := LoadSQLiteVectorStoreHNSW(db, name, embeddingService, commonConfig.SQLiteVectorStoreHNSWOptions()...)
 	if err != nil {
 		return nil, utils.Errorf("load SQLite vector storage err: %v", err)
 	}

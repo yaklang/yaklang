@@ -467,8 +467,8 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		// 如果都存在，直接加载
-		ragSystem, err = rag.LoadCollectionEx(db, name, false)
+		// todo 需要rag优化图恢复速度
+		ragSystem, err = rag.LoadCollectionEx(db, name)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
