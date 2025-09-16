@@ -14,12 +14,12 @@ type SSAProject struct {
 	gorm.Model
 	// 项目基础信息
 	ProjectName string `json:"project_name" gorm:"unique_index;not null;comment:项目名称"`
-	Language    string `json:"language" gorm:"comment:项目语言"`
 	Description string `json:"description,omitempty" gorm:"comment:项目描述"`
 	Tags        string `json:"tags,omitempty" gorm:"comment:项目标签"`
 	// 源码获取方式配置
 	CodeSourceConfig string `json:"code_source_config" gorm:"type:text;not null;comment:源码获取配置"`
 	// 编译配置选项
+	Language      string `json:"language" gorm:"comment:项目语言"`
 	StrictMode    bool   `json:"strict_mode" gorm:"comment:是否启用严格模式"`
 	PeepholeSize  int    `json:"peephole_size" gorm:"comment:窥孔编译大小"`
 	ExcludeFiles  string `json:"exclude_files,omitempty" gorm:"comment:排除文件列表,逗号分隔"`
@@ -33,8 +33,7 @@ type SSAProject struct {
 	RuleFilter []byte `json:"rule_filter,omitempty" gorm:"comment:扫描规则过滤配置"`
 }
 
-// GetSourceCodeInfo 获取源码配置信息
-func (p *SSAProject) GetSourceCodeInfo() (map[string]interface{}, error) {
+func (p *SSAProject) GetSourceCodeInfo() (*CodeSourceInfo, error) {
 	if p.CodeSourceConfig == "" {
 		return nil, fmt.Errorf("source config is required")
 	}
@@ -43,18 +42,7 @@ func (p *SSAProject) GetSourceCodeInfo() (map[string]interface{}, error) {
 	if err := json.Unmarshal([]byte(p.CodeSourceConfig), &configInfo); err != nil {
 		return nil, fmt.Errorf("failed to parse source config JSON: %v", err)
 	}
-
-	configBytes, err := json.Marshal(configInfo)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal config info: %v", err)
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(configBytes, &result); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal to map: %v", err)
-	}
-
-	return result, nil
+	return &configInfo, nil
 }
 
 func (p *SSAProject) SetSourceConfig(config *CodeSourceInfo) error {
@@ -70,12 +58,38 @@ func (p *SSAProject) GetSourceConfig() (*CodeSourceInfo, error) {
 	if p.CodeSourceConfig == "" {
 		return nil, fmt.Errorf("source config is required")
 	}
-
 	var config CodeSourceInfo
 	if err := json.Unmarshal([]byte(p.CodeSourceConfig), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse source config JSON: %v", err)
 	}
 	return &config, nil
+}
+
+func (p *SSAProject) GetSourceConfigInfo() (string, error) {
+	config, err := p.GetSourceConfig()
+	if err != nil {
+		return "", err
+	}
+	configBytes, err := json.Marshal(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal source config: %v", err)
+	}
+	return string(configBytes), nil
+}
+
+func (p *SSAProject) GetSourceConfigInfoMap() (map[string]any, error) {
+	config, err := p.GetSourceConfig()
+	if err != nil {
+		return nil, err
+	}
+	configMap := make(map[string]any)
+	configMap["kind"] = config.Kind
+	configMap["url"] = config.URL
+	configMap["path"] = config.Path
+	configMap["branch"] = config.Branch
+	configMap["auth"] = config.Auth
+	configMap["proxy"] = config.Proxy
+	return configMap, nil
 }
 
 // Validate 验证SSAProject配置的有效性
@@ -93,41 +107,43 @@ func (p *SSAProject) Validate() error {
 	return config.ValidateSourceConfig()
 }
 
-func (p *SSAProject) GetCompileOptions() (map[string]interface{}, error) {
+func (p *SSAProject) GetCompileConfigInfo() (string, error) {
 	if err := p.Validate(); err != nil {
-		return nil, fmt.Errorf("project validation failed: %v", err)
+		return "", fmt.Errorf("project validation failed: %v", err)
 	}
 
-	configInfo, err := p.GetSourceCodeInfo()
+	compileConfig := &SSACompileConfig{
+		Language:      p.Language,
+		StrictMode:    p.StrictMode,
+		PeepholeSize:  p.PeepholeSize,
+		ExcludeFiles:  p.GetExcludeFilesList(),
+		ReCompile:     p.ReCompile,
+		MemoryCompile: p.MemoryCompile,
+	}
+
+	configBytes, err := json.Marshal(compileConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to generate config info: %v", err)
+		return "", fmt.Errorf("failed to marshal compile config: %v", err)
 	}
-
-	optionsMap := map[string]interface{}{
-		"configInfo":    configInfo,
-		"programName":   p.ProjectName,
-		"description":   p.Description,
-		"strictMode":    p.StrictMode,
-		"peepholeSize":  p.PeepholeSize,
-		"reCompile":     p.ReCompile,
-		"memoryCompile": p.MemoryCompile,
-		"excludeFiles":  p.GetExcludeFilesList(),
-	}
-	return optionsMap, nil
+	return string(configBytes), nil
 }
 
-func (p *SSAProject) GetScanOptions() (map[string]interface{}, error) {
+func (p *SSAProject) GetScanConfigInfo() (string, error) {
 	if err := p.Validate(); err != nil {
-		return nil, fmt.Errorf("project validation failed: %v", err)
+		return "", fmt.Errorf("project validation failed: %v", err)
 	}
-	// 扫描相关的选项
-	scanOptions := map[string]interface{}{
-		"programName":    []string{p.ProjectName},
-		"concurrency":    p.ScanConcurrency,
-		"memory":         p.MemoryScan,
-		"ignoreLanguage": p.IgnoreLanguage,
+
+	scanOptions := &SSAScanConfig{
+		Concurrency:    p.ScanConcurrency,
+		Memory:         p.MemoryScan,
+		IgnoreLanguage: p.IgnoreLanguage,
 	}
-	return scanOptions, nil
+
+	configBytes, err := json.Marshal(scanOptions)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal scan config: %v", err)
+	}
+	return string(configBytes), nil
 }
 
 func (p *SSAProject) GetExcludeFilesList() []string {
@@ -165,6 +181,22 @@ func (p *SSAProject) SetRuleFilter(filter *ypb.SyntaxFlowRuleFilter) error {
 	}
 	p.RuleFilter = filterBytes
 	return nil
+}
+
+type SSACompileConfig struct {
+	Language      string   `json:"language"`
+	ConfigInfo    string   `json:"config_info"`
+	StrictMode    bool     `json:"strict_mode"`
+	PeepholeSize  int      `json:"peephole_size"`
+	ExcludeFiles  []string `json:"exclude_files"`
+	ReCompile     bool     `json:"re_compile"`
+	MemoryCompile bool     `json:"memory_compile"`
+}
+
+type SSAScanConfig struct {
+	Concurrency    uint32 `json:"concurrency"`
+	Memory         bool   `json:"memory"`
+	IgnoreLanguage bool   `json:"ignore_language"`
 }
 
 func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {

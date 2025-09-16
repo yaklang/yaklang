@@ -330,15 +330,37 @@ func WithRuleFilterTag(tags []string) SSAProjectParamsOpt {
 	}
 }
 
+func WithCompileConfigInfo(configInfo string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		var compileConfig schema.SSACompileConfig
+		json.Unmarshal([]byte(configInfo), &compileConfig)
+		b.project.Language = compileConfig.Language
+		b.project.StrictMode = compileConfig.StrictMode
+		b.project.PeepholeSize = compileConfig.PeepholeSize
+		b.project.SetExcludeFilesList(compileConfig.ExcludeFiles)
+		b.project.ReCompile = compileConfig.ReCompile
+		b.project.MemoryCompile = compileConfig.MemoryCompile
+	}
+}
+
+func WithScanConfigInfo(configInfo string) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		var scanConfig schema.SSAScanConfig
+		json.Unmarshal([]byte(configInfo), &scanConfig)
+		b.project.ScanConcurrency = scanConfig.Concurrency
+		b.project.MemoryScan = scanConfig.Memory
+		b.project.IgnoreLanguage = scanConfig.IgnoreLanguage
+	}
+}
+
 func _createSSAProject(projectName string, opts ...SSAProjectParamsOpt) *schema.SSAProject {
 	project := &schema.SSAProject{
-		ProjectName:     projectName,
-		ScanConcurrency: 5,
-		PeepholeSize:    100,
+		ProjectName: projectName,
 	}
 
 	builder := &ssaProjectConfigBuilder{
-		project: project,
+		project:    project,
+		ruleFilter: &ypb.SyntaxFlowRuleFilter{},
 	}
 
 	for _, opt := range opts {
@@ -351,7 +373,6 @@ func _createSSAProject(projectName string, opts ...SSAProjectParamsOpt) *schema.
 			project.CodeSourceConfig = string(configBytes)
 		}
 	}
-
 	if builder.ruleFilter != nil {
 		err := project.SetRuleFilter(builder.ruleFilter)
 		if err != nil {
@@ -431,4 +452,7 @@ var SSAProjectExports = map[string]interface{}{
 	"withRuleFilterGroupNames": WithRuleFilterGroupNames,
 	"withRuleFilterRuleNames":  WithRuleFilterRuleNames,
 	"withRuleFilterTag":        WithRuleFilterTag,
+
+	"withCompileConfigInfo": WithCompileConfigInfo,
+	"withScanConfigInfo":    WithScanConfigInfo,
 }

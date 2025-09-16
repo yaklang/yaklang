@@ -284,11 +284,6 @@ func init() {
 			withPluginAuthors("intSheep"),
 			withPluginEnableGenerateParam(true),
 		)
-		registerBuildInPlugin("yak", "SSA 项目配置",
-			withPluginHelp("配置SSA项目信息，用于后续SSA项目编译和扫描"),
-			withPluginAuthors("intSheep"),
-			withPluginEnableGenerateParam(true),
-		)
 		registerBuildInPlugin(
 			"yak",
 			"SyntaxFlow 查询项目信息",
