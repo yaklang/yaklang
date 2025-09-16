@@ -26,6 +26,7 @@ var RagExports = map[string]interface{}{
 
 	"Query":           rag.QueryYakitProfile,
 	"queryLimit":      rag.WithRAGLimit,
+	"queryType":       rag.WithRAGDocumentType,
 	"queryCollection": rag.WithRAGCollectionName,
 	"queryStatus":     rag.WithRAGQueryStatus,
 	"queryEnhance":    rag.WithRAGEnhance,

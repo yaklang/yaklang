@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
@@ -60,6 +61,9 @@ type VectorStore interface {
 
 	SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error)
 
+	// 非语义 模糊搜1
+	FuzzSearch(ctx context.Context, query string, limit int) (<-chan SearchResult, error)
+
 	// Delete 根据 ID 删除文档
 	Delete(ids ...string) error
 
@@ -82,6 +86,7 @@ type RAGSystem struct {
 	MaxChunkSize int             // 最大块大小
 	ChunkOverlap int             // 块重叠
 	Name         string
+	UUID         string
 }
 
 // NewRAGSystem 创建一个新的 RAG 系统
@@ -512,6 +517,17 @@ func (r *RAGSystem) QueryWithFilter(query string, page, limit int, filter func(k
 		return nil, err
 	}
 	return results, nil
+}
+
+// FuzzRawSearch Sql 文本模糊搜索（非语义）
+func (r *RAGSystem) FuzzRawSearch(ctx context.Context, keywords string, limit int) (<-chan SearchResult, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("failed to query with page query: %s: %v", keywords, err)
+			fmt.Println(utils.ErrorStack(err))
+		}
+	}()
+	return r.VectorStore.FuzzSearch(ctx, keywords, limit)
 }
 
 // Query is short for QueryTopN

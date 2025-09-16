@@ -194,6 +194,15 @@ type VectorStoreCollection struct {
 
 	// HNSW 图连接信息，存储为 JSON 格式
 	GroupInfos GroupInfos `gorm:"type:text" json:"group_infos"`
+
+	UUID string
+}
+
+func (v *VectorStoreCollection) BeforeSave() error {
+	if v.UUID == "" {
+		v.UUID = uuid.NewString()
+	}
+	return nil
 }
 
 func (v *VectorStoreCollection) TableName() string {
@@ -215,6 +224,9 @@ type VectorStoreDocument struct {
 
 	// 所属集合的ID，建立外键关系
 	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"collection_id"`
+
+	// 所属集合的 UUID，唯一值
+	CollectionUUID string `gorm:"uniqueIndex"`
 
 	// 文档元数据，以 JSON 格式存储，包含原始文本、来源等信息
 	Metadata MetadataMap `gorm:"type:text" json:"metadata"`

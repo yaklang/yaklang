@@ -280,12 +280,14 @@ type RAGQueryConfig struct {
 	CollectionNumLimit   int
 	CollectionNames      []string
 	CollectionScoreLimit float64
-	EnhancePlan          string
+	EnhancePlan          []string
 	Filter               func(key string, getDoc func() *Document) bool
 	Concurrent           int
 	MsgCallBack          func(*RAGSearchResult)
 	OnSubQueryStart      func(method string, query string)
 	OnStatus             func(label string, value string)
+
+	LoadConfig []SQLiteVectorStoreHNSWOption
 }
 
 const (
@@ -303,6 +305,19 @@ type RAGQueryOption func(*RAGQueryConfig)
 func WithRAGLimit(limit int) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
 		config.Limit = limit
+	}
+}
+
+// todo 这里暂时使用临时构建图的方式处理，等待恢复图速度优化
+func WithRAGDocumentType(documentType ...string) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		if config.LoadConfig == nil {
+			config.LoadConfig = make([]SQLiteVectorStoreHNSWOption, 0)
+		}
+		config.LoadConfig = append(config.LoadConfig, WithBuildGraphPolicy(Policy_UseFilter))
+		config.LoadConfig = append(config.LoadConfig, WithBuildGraphFilter(&yakit.VectorDocumentFilter{
+			DocumentTypes: documentType,
+		}))
 	}
 }
 
@@ -345,7 +360,7 @@ func WithRAGCollectionLimit(collectionLimit int) RAGQueryOption {
 }
 
 // WithRAGEnhance 启用或禁用增强搜索
-func WithRAGEnhance(enhancePlan string) RAGQueryOption {
+func WithRAGEnhance(enhancePlan ...string) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
 		config.EnhancePlan = enhancePlan
 	}
@@ -387,7 +402,7 @@ func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 		MsgCallBack:          nil,
 		CollectionNumLimit:   5,
 		CollectionScoreLimit: 0.3,
-		EnhancePlan:          "hypothetical_answer",
+		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery, EnhancePlanExactKeywordSearch},
 		Ctx:                  context.Background(),
 	}
 	for _, opt := range opts {
@@ -524,7 +539,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 	start := time.Now()
 	for _, name := range ListCollections(db) {
 		log.Infof("start to load collection %v", name)
-		r, err := LoadCollection(db, name)
+		r, err := LoadCollectionEx(db, name, utils.InterfaceToSliceInterface(config.LoadConfig)...)
 		if err != nil {
 			log.Warnf("load collection %s failed: %v", name, err)
 			continue
@@ -539,111 +554,121 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		ExactSearch bool
 	}
 
-	chans := chanx.NewUnlimitedChan[*subQuery](config.Ctx, 10)
+	chans := chanx.NewUnlimitedChan[*subQuery](ctx, 10)
 	status("STATUS", "开始创建子查询（强化）")
 	wg := new(sync.WaitGroup)
-	wg.Add(1)
-	go func() {
-		defer func() {
-			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
-			wg.Done()
-		}()
-		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
-		start := time.Now()
-		result, err := enhancesearch.HypotheticalAnswer(config.Ctx, query)
-		if err != nil {
-			log.Warnf("enhance [HypotheticalAnswer] query failed: %v", err)
-			return
-		}
-		status("HyDE强化用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
-		if result != "" {
-			startSubQuery(EnhancePlanHypotheticalAnswer, result)
-			chans.FeedBlock(&subQuery{
-				Method: EnhancePlanHypotheticalAnswer,
-				Query:  result,
-			})
-		}
-	}()
 
-	wg.Add(1)
-	go func() {
-		method := EnhancePlanGeneralizeQuery
-		defer func() {
-			log.Infof("end to sub query, method: %s, query: %s", method, query)
-			wg.Done()
-		}()
-		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
-		start := time.Now()
-		results, err := enhancesearch.GeneralizeQuery(config.Ctx, query)
-		if err != nil {
-			log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
-			return
-		}
-		status("泛化查询用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
-		for _, result := range results {
+	if utils.StringArrayContains(config.EnhancePlan, EnhancePlanHypotheticalAnswer) {
+		wg.Add(1)
+		go func() {
+			method := EnhancePlanHypotheticalAnswer
+			defer func() {
+				log.Infof("end to sub query, method: %s, query: %s", method, query)
+				wg.Done()
+			}()
+			log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+			start := time.Now()
+			result, err := enhancesearch.HypotheticalAnswer(ctx, query)
+			if err != nil {
+				log.Warnf("enhance [HypotheticalAnswer] query failed: %v", err)
+				return
+			}
+			status("HyDE强化用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
 			if result != "" {
-				startSubQuery(EnhancePlanGeneralizeQuery, result)
+				startSubQuery(EnhancePlanHypotheticalAnswer, result)
 				chans.FeedBlock(&subQuery{
-					Method: EnhancePlanGeneralizeQuery,
+					Method: EnhancePlanHypotheticalAnswer,
 					Query:  result,
 				})
 			}
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		method := EnhancePlanSplitQuery
-		defer func() {
-			log.Infof("end to sub query, method: %s, query: %s", method, query)
-			wg.Done()
 		}()
-		log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
-		start := time.Now()
-		results, err := enhancesearch.SplitQuery(config.Ctx, query)
-		if err != nil {
-			log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
-			return
-		}
-		status("拆分子查询用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
-		for _, result := range results {
-			if result != "" {
-				startSubQuery(EnhancePlanSplitQuery, result)
-				chans.FeedBlock(&subQuery{
-					Method: EnhancePlanSplitQuery,
-					Query:  result,
-				})
-			}
-		}
-	}()
+	}
 
-	wg.Add(1)
-	go func() {
-		method := EnhancePlanExactKeywordSearch
-		defer func() {
-			log.Infof("end to sub query, method: %s, query: %s", queryId, query)
-			wg.Done()
-		}()
-		log.Infof("start to create sub query for enhance plan: %s", method)
-		start := time.Now()
-		// 直接使用原始查询作为精确关键词搜索
-		results, err := enhancesearch.ExtractKeywords(config.Ctx, query)
-		if err != nil {
-			log.Warnf("enhance [ExtractKeywords] query failed: %v", err)
-			return
-		}
-		status("关键词提取用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
-		for _, result := range results {
-			if result != "" {
-				startSubQuery(method, result)
-				chans.FeedBlock(&subQuery{
-					Method:      method,
-					Query:       result,
-					ExactSearch: true,
-				})
+	if utils.StringArrayContains(config.EnhancePlan, EnhancePlanGeneralizeQuery) {
+		wg.Add(1)
+		go func() {
+			method := EnhancePlanGeneralizeQuery
+			defer func() {
+				log.Infof("end to sub query, method: %s, query: %s", method, query)
+				wg.Done()
+			}()
+			log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+			start := time.Now()
+			results, err := enhancesearch.GeneralizeQuery(ctx, query)
+			if err != nil {
+				log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
+				return
 			}
-		}
-	}()
+			status("泛化查询用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
+			for _, result := range results {
+				if result != "" {
+					startSubQuery(EnhancePlanGeneralizeQuery, result)
+					chans.FeedBlock(&subQuery{
+						Method: EnhancePlanGeneralizeQuery,
+						Query:  result,
+					})
+				}
+			}
+		}()
+	}
+
+	if utils.StringArrayContains(config.EnhancePlan, EnhancePlanSplitQuery) {
+		wg.Add(1)
+		go func() {
+			method := EnhancePlanSplitQuery
+			defer func() {
+				log.Infof("end to sub query, method: %s, query: %s", method, query)
+				wg.Done()
+			}()
+			log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
+			start := time.Now()
+			results, err := enhancesearch.SplitQuery(ctx, query)
+			if err != nil {
+				log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
+				return
+			}
+			status("拆分子查询用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
+			for _, result := range results {
+				if result != "" {
+					startSubQuery(EnhancePlanSplitQuery, result)
+					chans.FeedBlock(&subQuery{
+						Method: EnhancePlanSplitQuery,
+						Query:  result,
+					})
+				}
+			}
+		}()
+	}
+
+	if utils.StringArrayContains(config.EnhancePlan, EnhancePlanExactKeywordSearch) {
+		wg.Add(1)
+		go func() {
+			method := EnhancePlanExactKeywordSearch
+			defer func() {
+				log.Infof("end to sub query, method: %s, query: %s", queryId, query)
+				wg.Done()
+			}()
+			log.Infof("start to create sub query for enhance plan: %s", method)
+			start := time.Now()
+			// 直接使用原始查询作为精确关键词搜索
+			results, err := enhancesearch.ExtractKeywords(ctx, query)
+			if err != nil {
+				log.Warnf("enhance [ExtractKeywords] query failed: %v", err)
+				return
+			}
+			status("关键词提取用时", fmt.Sprintf("%.2fs", time.Since(start).Seconds()))
+			for _, result := range results {
+				if result != "" {
+					startSubQuery(method, result)
+					chans.FeedBlock(&subQuery{
+						Method:      method,
+						Query:       result,
+						ExactSearch: true,
+					})
+				}
+			}
+		}()
+	}
 
 	go func() {
 		wg.Wait()
@@ -685,75 +710,106 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				queryStart := time.Now()
 
 				if subquery.ExactSearch {
-					status("[TODO]精确关键词搜索", "TODO")
-					continue
-				}
-
-				searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit+5, func(key string, getDoc func() *Document) bool {
-					if key == DocumentTypeCollectionInfo {
-						return false
+					searchResults, err := ragSystem.FuzzRawSearch(ctx, subquery.Query, config.Limit)
+					if err != nil {
+						return
 					}
-					if config.Filter != nil {
-						return config.Filter(key, getDoc)
-					}
-					return true
-				})
-				if err != nil {
-					log.Infof("start to query ragsystem[%v] failed: %v", ragSystem.Name, err)
-					continue
-				}
 
-				if len(searchResults) > 0 {
-					cost := time.Since(queryStart).Seconds()
-					ragQueryCostSum += cost
-					ragAtomicQueryCount++
-					avgCost := 0.0
-					if ragAtomicQueryCount > 0 {
-						avgCost = ragQueryCostSum / float64(ragAtomicQueryCount)
-					}
-					status("RAG原子查询平均用时", fmt.Sprintf("%.2fs", avgCost))
-				}
+					for result := range searchResults {
+						idx := atomic.AddInt64(&offset, 1)
+						allResults = append(allResults, ScoredResult{
+							Index:       idx,
+							QueryMethod: subquery.Method,
+							QueryOrigin: subquery.Query,
+							Document:    &result.Document,
+							Score:       result.Score,
+							Source:      ragSystem.Name,
+						})
+						// 发送中间结果
+						sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
 
-				if searchResults != nil {
-					log.Infof("query ragsystem[%v] with subquery: %v got %d results", ragSystem.Name, utils.ShrinkString(subquery.Query, 100), len(searchResults))
-				} else {
-					log.Infof("query ragsystem[%v] with subquery: %v got 0 result", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
-				}
-
-				// 收集结果并标记来源
-				for _, result := range searchResults {
-					docId := result.Document.ID
-					if score, ok := resultRecorder[docId]; ok {
-						if score < result.Score {
-							resultRecorder[docId] = result.Score
+						// send nodes from erm
+						if ret := result.Document.EntityUUID; ret != "" {
+							if _, ok := nodesRecorder[ret]; !ok {
+								nodesRecorder[ret] = struct{}{}
+							}
 						}
+						if ret := result.Document.RelatedEntities; len(ret) > 0 {
+							for _, id := range ret {
+								if _, ok := nodesRecorder[id]; !ok {
+									nodesRecorder[id] = struct{}{}
+								}
+							}
+						}
+					}
+
+				} else {
+					searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit+5, func(key string, getDoc func() *Document) bool {
+						if key == DocumentTypeCollectionInfo {
+							return false
+						}
+						if config.Filter != nil {
+							return config.Filter(key, getDoc)
+						}
+						return true
+					})
+					if err != nil {
+						log.Infof("start to query ragsystem[%v] failed: %v", ragSystem.Name, err)
 						continue
 					}
-					resultRecorder[docId] = result.Score
 
-					currentSearchCount++
-					idx := atomic.AddInt64(&offset, 1)
-					allResults = append(allResults, ScoredResult{
-						Index:       idx,
-						QueryMethod: subquery.Method,
-						QueryOrigin: subquery.Query,
-						Document:    &result.Document,
-						Score:       result.Score,
-						Source:      ragSystem.Name,
-					})
-					// 发送中间结果
-					sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
-
-					// send nodes from erm
-					if ret := result.Document.EntityUUID; ret != "" {
-						if _, ok := nodesRecorder[ret]; !ok {
-							nodesRecorder[ret] = struct{}{}
+					if len(searchResults) > 0 {
+						cost := time.Since(queryStart).Seconds()
+						ragQueryCostSum += cost
+						ragAtomicQueryCount++
+						avgCost := 0.0
+						if ragAtomicQueryCount > 0 {
+							avgCost = ragQueryCostSum / float64(ragAtomicQueryCount)
 						}
+						status("RAG原子查询平均用时", fmt.Sprintf("%.2fs", avgCost))
 					}
-					if ret := result.Document.RelatedEntities; len(ret) > 0 {
-						for _, id := range ret {
-							if _, ok := nodesRecorder[id]; !ok {
-								nodesRecorder[id] = struct{}{}
+
+					if searchResults != nil {
+						log.Infof("query ragsystem[%v] with subquery: %v got %d results", ragSystem.Name, utils.ShrinkString(subquery.Query, 100), len(searchResults))
+					} else {
+						log.Infof("query ragsystem[%v] with subquery: %v got 0 result", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
+					}
+
+					// 收集结果并标记来源
+					for _, result := range searchResults {
+						docId := result.Document.ID
+						if score, ok := resultRecorder[docId]; ok {
+							if score < result.Score {
+								resultRecorder[docId] = result.Score
+							}
+							continue
+						}
+						resultRecorder[docId] = result.Score
+
+						currentSearchCount++
+						idx := atomic.AddInt64(&offset, 1)
+						allResults = append(allResults, ScoredResult{
+							Index:       idx,
+							QueryMethod: subquery.Method,
+							QueryOrigin: subquery.Query,
+							Document:    &result.Document,
+							Score:       result.Score,
+							Source:      ragSystem.Name,
+						})
+						// 发送中间结果
+						sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
+
+						// send nodes from erm
+						if ret := result.Document.EntityUUID; ret != "" {
+							if _, ok := nodesRecorder[ret]; !ok {
+								nodesRecorder[ret] = struct{}{}
+							}
+						}
+						if ret := result.Document.RelatedEntities; len(ret) > 0 {
+							for _, id := range ret {
+								if _, ok := nodesRecorder[id]; !ok {
+									nodesRecorder[id] = struct{}{}
+								}
 							}
 						}
 					}
