@@ -101,6 +101,7 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	} else {
 	}
 
+	purePath := path
 	if driver == SQLiteExtend || driver == SQLite {
 		path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
 	} else {
@@ -109,7 +110,8 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 
 	db, err := gorm.Open(driver, path)
 	if err != nil && (driver == SQLite || driver == SQLiteExtend) {
-		err = checkAndTryFixDatabase(path)
+		log.Warnf("open database[%s] with driver[%s] failed: %s, try to check and fix it", purePath, driver, err)
+		err = checkAndTryFixDatabase(purePath)
 		if err != nil {
 			return nil, err
 		}
