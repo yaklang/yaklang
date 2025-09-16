@@ -318,32 +318,31 @@ class A{
 }
 
 func TestNativeCall_DataFlow(t *testing.T) {
-	rule := `/^create_function|eval|assert$/ as $evalFunction;
+	rule := `
+/^create_function|eval|assert$/ as $evalFunction;
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
 <include('php-filter-function')> as $filter;
-$evalFunction(*?{<self> #{include: <<<CODE
-<self> & $params
+
+$evalFunction(* #{include: <<<CODE
+	<self> & $params
 CODE
-}->} as $all)
+}-> as $all)
+
 $all<dataflow(include=<<<CODE
-<self> & $params as $__next__
+	<self> & $params as $__next__
 CODE,exclude=<<<CODE
-<self>?{opcode: call} as $__next__
+	<self>?{opcode: call} as $__next__
 CODE)> as $high
+
 	`
 	t.Run("not found high", func(t *testing.T) {
 		code := `<?php
 $input = addslashes($_GET['cmd']);
 eval("echo $input;");
 `
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			result, err := prog.SyntaxFlowWithError(rule)
-			require.NoError(t, err)
-			result.Show()
-			values := result.GetValues("high")
-			require.True(t, values.Len() == 0)
-			return nil
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"high": {},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 	t.Run("check high", func(t *testing.T) {
@@ -351,13 +350,8 @@ eval("echo $input;");
 $input = $_GET[1];
 eval("echo $input");
 `
-		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-			result, err := prog.SyntaxFlowWithError(rule)
-			require.NoError(t, err)
-			result.Show()
-			values := result.GetValues("high")
-			require.True(t, values.Len() != 0)
-			return nil
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"high": {`Undefined-_GET`},
 		}, ssaapi.WithLanguage(ssaapi.PHP))
 	})
 }
