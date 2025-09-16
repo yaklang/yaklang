@@ -148,7 +148,7 @@ func ExtractActionFromStreamWithJSONExtractOptions(
 			}
 		}))
 
-		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), options...)
+		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), opts...)
 		if err != nil {
 			log.Error("Failed to extract action", "action", buf.String(), "error", err)
 		}

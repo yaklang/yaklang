@@ -3,8 +3,11 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -172,17 +175,19 @@ LOOP:
 					ReActActionObject,
 					[]string{},
 					[]jsonextractor.CallbackOption{
-						//jsonextractor.WithRegisterFieldStreamHandler(
-						//	"human_readable_thought",
-						//	func(key string, reader io.Reader, parents []string) {
-						//		r.Emitter.EmitStreamEvent(
-						//			"thought",
-						//			time.Now(),
-						//			reader,
-						//			currentTask.GetId(),
-						//		)
-						//	},
-						//),
+						jsonextractor.WithRegisterFieldStreamHandler(
+							"human_readable_thought",
+							func(key string, reader io.Reader, parents []string) {
+								reader = io.TeeReader(reader, os.Stdout)
+								r.EmitStreamEventEx(
+									"thought",
+									time.Now(),
+									reader,
+									currentTask.GetId(),
+									false,
+								)
+							},
+						),
 					})
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)
