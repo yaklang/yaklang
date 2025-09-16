@@ -171,7 +171,7 @@ jobs:
               go test -timeout 1m ./common/yak/ssaapi/ssareducer
               go test -timeout 1m ./common/yak/ssaapi/test/ssatest
               # SyntaxFlow Scan
-              go test -timoeout 1m ./common/yak/syntaxflow_scan/...
+              go test -timeout 1m ./common/yak/syntaxflow_scan/...
 
           - name: Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Golang | C | Java
             run: |
