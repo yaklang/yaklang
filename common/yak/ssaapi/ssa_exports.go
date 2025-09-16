@@ -255,6 +255,21 @@ func WithConfigInfo(input map[string]any) Option {
 	}
 }
 
+func WithCompileConfigInfo(configInfo string) Option {
+	return func(c *config) error {
+		var compileConfig schema.SSACompileConfig
+		if err := json.Unmarshal([]byte(configInfo), &compileConfig); err != nil {
+			return err
+		}
+		WithLanguage(consts.Language(compileConfig.Language))(c)
+		WithStrictMode(compileConfig.StrictMode)(c)
+		WithPeepholeSize(compileConfig.PeepholeSize)(c)
+		WithReCompile(compileConfig.ReCompile)(c)
+		WithConfigInfoRaw(compileConfig.ConfigInfo)(c)
+		return nil
+	}
+}
+
 func WithRawLanguage(input_language string) Option {
 	if input_language == "" {
 		return func(*config) error { return nil }
@@ -571,6 +586,8 @@ var Exports = map[string]any{
 	"withExcludeFile":        WithExcludeFile,
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
 	"withMemory":             WithMemory,
+
+	"withCompileConfigInfo": WithCompileConfigInfo,
 
 	//diff compare
 	// "withDiffProgName":          DiffWithProgram,
