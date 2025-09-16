@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -1621,16 +1622,16 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 		cond := e
 		loop.SetCondition(func() ssa.Value {
 			var condition ssa.Value
-			if cond == nil {
+			if utils.IsNil(cond) {
 				condition = b.EmitConstInst(true)
 			} else {
 				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 				// defer recoverRange()
 				condition, _ = b.buildExpression(cond, false)
-				if condition == nil {
-					condition = b.EmitConstInst(true)
-					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-				}
+			}
+			if utils.IsNil(condition) {
+				condition = b.EmitConstInst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 			}
 			return condition
 		})
@@ -1648,16 +1649,16 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 			cond := expr
 			loop.SetCondition(func() ssa.Value {
 				var condition ssa.Value
-				if cond == nil {
+				if utils.IsNil(cond) {
 					condition = b.EmitConstInst(true)
 				} else {
 					// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 					// defer recoverRange()
 					condition, _ = b.buildExpression(cond, false)
-					if condition == nil {
-						condition = b.EmitConstInst(true)
-						// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-					}
+				}
+				if utils.IsNil(condition) {
+					condition = b.EmitConstInst(true)
+					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 				}
 				return condition
 			})
@@ -1682,8 +1683,7 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	} else {
 		// for range
 		loop.SetCondition(func() ssa.Value {
-			condition := b.EmitConstInst(true)
-			return condition
+			return b.EmitConstInst(true)
 		})
 	}
 	//  build body

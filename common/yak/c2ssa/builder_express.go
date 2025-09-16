@@ -44,20 +44,22 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 	// 1. 一元运算符: unary_op = (Plus | Minus | Not | Caret | Star | And) expression
 	if ast.GetUnary_op() != nil && ast.Expression(0) != nil {
 		op := ast.GetUnary_op().GetText()
-		expr, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
-		if expr != nil {
+		right, left := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
+		if right != nil {
 			switch op {
 			case "+":
-				return b.EmitUnOp(ssa.OpPlus, expr), nil
+				return b.EmitUnOp(ssa.OpPlus, right), nil
 			case "-":
-				return b.EmitUnOp(ssa.OpNeg, expr), nil
+				return b.EmitUnOp(ssa.OpNeg, right), nil
 			case "!":
-				return b.EmitUnOp(ssa.OpNot, expr), nil
+				return b.EmitUnOp(ssa.OpNot, right), nil
 			case "~":
-				return b.EmitUnOp(ssa.OpBitwiseNot, expr), nil
+				return b.EmitUnOp(ssa.OpBitwiseNot, right), nil
 			case "*":
-				if expr.GetType().GetTypeKind() == ssa.PointerKind {
-					return b.GetOriginValue(expr), nil
+				if right.GetType().GetTypeKind() == ssa.PointerKind {
+					return b.GetOriginValue(right), left
+				} else {
+					return right, left
 				}
 			case "&":
 				if _, op1Var := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), true); op1Var != nil {
@@ -65,75 +67,75 @@ func (b *astbuilder) buildExpression(ast *cparser.ExpressionContext, isLeft bool
 				}
 			}
 		}
-		return expr, nil
+		return right, nil
 	}
 
 	// 2. 乘法/除法/取模/位移/按位与: expression mul_op = (Star | Div | Mod | LeftShift | RightShift | And) expression
 	if ast.GetMul_op() != nil && len(ast.AllExpression()) >= 2 {
 		op := ast.GetMul_op().GetText()
-		left, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
-		right, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
-		if left != nil && right != nil {
+		op1, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
+		op2, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
+		if op1 != nil && op2 != nil {
 			switch op {
 			case "*":
-				return b.EmitBinOp(ssa.OpMul, left, right), nil
+				return b.EmitBinOp(ssa.OpMul, op1, op2), nil
 			case "/":
-				return b.EmitBinOp(ssa.OpDiv, left, right), nil
+				return b.EmitBinOp(ssa.OpDiv, op1, op2), nil
 			case "%":
-				return b.EmitBinOp(ssa.OpMod, left, right), nil
+				return b.EmitBinOp(ssa.OpMod, op1, op2), nil
 			case "<<":
-				return b.EmitBinOp(ssa.OpShl, left, right), nil
+				return b.EmitBinOp(ssa.OpShl, op1, op2), nil
 			case ">>":
-				return b.EmitBinOp(ssa.OpShr, left, right), nil
+				return b.EmitBinOp(ssa.OpShr, op1, op2), nil
 			case "&":
-				return b.EmitBinOp(ssa.OpAnd, left, right), nil
+				return b.EmitBinOp(ssa.OpAnd, op1, op2), nil
 			}
 		}
-		return left, nil
+		return op1, nil
 	}
 
 	// 3. 加法/减法/按位或/按位异或: expression add_op = (Plus | Minus | Or | Caret) expression
 	if ast.GetAdd_op() != nil && len(ast.AllExpression()) >= 2 {
 		op := ast.GetAdd_op().GetText()
-		left, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
-		right, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
-		if left != nil && right != nil {
+		op1, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
+		op2, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
+		if op1 != nil && op2 != nil {
 			switch op {
 			case "+":
-				return b.EmitBinOp(ssa.OpAdd, left, right), nil
+				return b.EmitBinOp(ssa.OpAdd, op1, op2), nil
 			case "-":
-				return b.EmitBinOp(ssa.OpSub, left, right), nil
+				return b.EmitBinOp(ssa.OpSub, op1, op2), nil
 			case "|":
-				return b.EmitBinOp(ssa.OpOr, left, right), nil
+				return b.EmitBinOp(ssa.OpOr, op1, op2), nil
 			case "^":
-				return b.EmitBinOp(ssa.OpXor, left, right), nil
+				return b.EmitBinOp(ssa.OpXor, op1, op2), nil
 			}
 		}
-		return left, nil
+		return op1, nil
 	}
 
 	// 4. 关系运算符: expression rel_op = (Equal | NotEqual | Less | LessEqual | Greater | GreaterEqual) expression
 	if ast.GetRel_op() != nil && len(ast.AllExpression()) >= 2 {
 		op := ast.GetRel_op().GetText()
-		left, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
-		right, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
-		if left != nil && right != nil {
+		op1, _ := b.buildExpression(ast.Expression(0).(*cparser.ExpressionContext), false)
+		op2, _ := b.buildExpression(ast.Expression(1).(*cparser.ExpressionContext), false)
+		if op1 != nil && op2 != nil {
 			switch op {
 			case "==":
-				return b.EmitBinOp(ssa.OpEq, left, right), nil
+				return b.EmitBinOp(ssa.OpEq, op1, op2), nil
 			case "!=":
-				return b.EmitBinOp(ssa.OpNotEq, left, right), nil
+				return b.EmitBinOp(ssa.OpNotEq, op1, op2), nil
 			case "<":
-				return b.EmitBinOp(ssa.OpLt, left, right), nil
+				return b.EmitBinOp(ssa.OpLt, op1, op2), nil
 			case "<=":
-				return b.EmitBinOp(ssa.OpLtEq, left, right), nil
+				return b.EmitBinOp(ssa.OpLtEq, op1, op2), nil
 			case ">":
-				return b.EmitBinOp(ssa.OpGt, left, right), nil
+				return b.EmitBinOp(ssa.OpGt, op1, op2), nil
 			case ">=":
-				return b.EmitBinOp(ssa.OpGtEq, left, right), nil
+				return b.EmitBinOp(ssa.OpGtEq, op1, op2), nil
 			}
 		}
-		return left, nil
+		return op1, nil
 	}
 
 	// 5. 逻辑与: expression AndAnd expression
@@ -286,43 +288,47 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 		right = b.EmitBinOp(ssa.OpAdd, right, b.EmitConstInst(1))
 		if left == nil {
 			_, left = b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), true)
-			b.AssignVariable(left, right)
 		}
+		b.AssignVariable(left, right)
 	}
 	if ast.MinusMinus() != nil && right != nil {
 		right = b.EmitBinOp(ssa.OpSub, right, b.EmitConstInst(1))
 		if left == nil {
 			_, left = b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), true)
-			b.AssignVariable(left, right)
 		}
+		b.AssignVariable(left, right)
 	}
 
 	// 2. 指针 *
-	if ast.Star() != nil {
-		if right != nil {
+	for i, _ := range ast.AllStar() {
+		_ = i
+		if !isLeft {
 			if right.GetType().GetTypeKind() == ssa.PointerKind {
 				right = b.GetOriginValue(right)
 			} else {
 				b.NewError(ssa.Error, TAG, "unary '*' operator can only be used on pointer types")
 				right = b.EmitConstInst(0)
 			}
-		} else if left != nil {
-			op1, _ := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), false)
-			if op1.GetType().GetTypeKind() == ssa.PointerKind {
-				return nil, b.GetAndCreateOriginPointer(op1)
-			} else if p, ok := ssa.ToParameter(op1); ok && !p.IsFreeValue {
-				if _, op1Var := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), true); op1Var != nil {
-					b.ReferenceParameter(op1Var.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+		} else {
+			right, _ := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), false)
+			if right.GetType().GetTypeKind() == ssa.PointerKind {
+				return nil, b.GetAndCreateOriginPointer(right)
+			} else if p, ok := ssa.ToParameter(right); ok && !p.IsFreeValue {
+				if _, left = b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), true); left != nil {
+					b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
 					// b.AssignVariable(op1Var, op1)
 				}
 			}
 		}
 	}
 
-	// 3. ('sizeof' | '_Alignof') '(' typeName ')'
-	if t := ast.TypeName(); t != nil {
+	// 3. ('sizeof' | '_Alignof') '(' typeName | postfixExpression ')'
+	if t := ast.TypeName(); t != nil && ast.Sizeof() != nil {
 		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
 		return b.GetDefaultValue(ssatype), nil
+	} else if p := ast.PostfixExpression(); p != nil && ast.Sizeof() != nil {
+		// return b.buildPostfixExpression(p.(*cparser.PostfixExpressionContext), false)
+		return b.EmitConstInst(0), nil
 	}
 
 	// 4. '&&' unaryExpression
@@ -370,7 +376,7 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 		right, left = b.buildPostfixExpression(p.(*cparser.PostfixExpressionContext), isLeft)
 	}
 
-	// 3. 数组下标：primaryExpression '[' expression ']'
+	// 3. 数组下标：postfixExpression '[' expression ']'
 	if right != nil {
 		if e := ast.Expression(); e != nil {
 			index, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
@@ -379,7 +385,7 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 		}
 	}
 
-	// 4. 函数调用：primaryExpression '(' argumentExpressionList? ')'
+	// 4. 函数调用：postfixExpression '(' argumentExpressionList? ')'
 	if right != nil && ast.LeftParen() != nil {
 		var args ssa.Values
 		if a := ast.ArgumentExpressionList(); a != nil {
@@ -401,7 +407,7 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 		return right, left
 	}
 
-	// 5. 结构体成员：primaryExpression '.' Identifier 或 '->' Identifier
+	// 5. 结构体成员：postfixExpression '.' Identifier 或 '->' Identifier
 	buildDotArrow := func(isPointer bool) {
 		if id := ast.Identifier(); id != nil {
 			key := id.GetText()
@@ -436,15 +442,15 @@ func (b *astbuilder) buildPostfixExpression(ast *cparser.PostfixExpressionContex
 		right = b.EmitBinOp(ssa.OpAdd, right, b.EmitConstInst(1))
 		if left == nil {
 			_, left = b.buildPostfixExpression(ast, true)
-			b.AssignVariable(left, right)
 		}
+		b.AssignVariable(left, right)
 	}
 	if right != nil && ast.MinusMinus() != nil {
 		right = b.EmitBinOp(ssa.OpSub, right, b.EmitConstInst(1))
 		if left == nil {
 			_, left = b.buildPostfixExpression(ast, true)
-			b.AssignVariable(left, right)
 		}
+		b.AssignVariable(left, right)
 	}
 
 	return right, left
@@ -555,25 +561,22 @@ func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 
 	// 1. Identifier
 	if id := ast.Identifier(); id != nil {
-		if isLeft {
-			left := b.CreateVariable(id.GetText())
-			return nil, left
-		} else {
-			text := id.GetText()
-			right := b.PeekValue(text)
-			if right != nil {
-				return right, nil
-			}
-			if right, ok := b.getSpecialValue(text); ok {
-				return right, nil
-			}
-			right = b.GetFunc(text, "")
-			if right.(*ssa.Function) == nil {
-				b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
-				right = b.ReadValue(text)
-			}
-			return right, nil
+		text := id.GetText()
+
+		left := b.CreateVariable(text)
+		right := b.PeekValue(text)
+		if right != nil {
+			return right, left
 		}
+		if right, ok := b.getSpecialValue(text); ok {
+			return right, left
+		}
+		right = b.GetFunc(text, "")
+		if right.(*ssa.Function) == nil {
+			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
+			right = b.ReadValue(text)
+		}
+		return right, left
 	}
 	// 2. Constant
 	if c := ast.Constant(); c != nil {
