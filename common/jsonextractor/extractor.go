@@ -68,10 +68,11 @@ const (
 	state_quote = "quote"
 
 	// ex state
-	state_objectKey   = "object-key"
-	state_objectValue = "object-value"
-	state_jsonArray   = "json-array"
-	state_arrayItem   = `json-array-item`
+	state_objectKey      = "object-key"
+	state_objectValue    = "object-value"
+	state_jsonArray      = "json-array"
+	state_arrayItem      = `json-array-item`
+	state_primitiveValue = "primitive-value"
 )
 
 func ExtractObjectIndexes(c string) [][2]int {

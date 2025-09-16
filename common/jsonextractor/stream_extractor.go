@@ -69,7 +69,7 @@ type callbackManager struct {
 
 	// 字段流处理相关
 	activeFieldStreams map[string]io.WriteCloser // 当前活跃的字段流 写入器
-	currentFieldWriter io.WriteCloser            // 当前正在处理的字段流写入器
+	activeWriters      []io.WriteCloser          // 当前活跃的写入器列表，支持多字段同时写入
 }
 
 type CallbackOption func(*callbackManager)
@@ -173,7 +173,7 @@ func WithRegisterGlobFieldStreamHandler(pattern string, handler func(key string,
 }
 
 // handleFieldStreamStart 开始字段流处理
-func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *bufStackManager) io.WriteCloser {
+func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *bufStackManager) []io.WriteCloser {
 	// 清理字段名中的引号和空格
 	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
 
@@ -188,16 +188,29 @@ func (c *callbackManager) handleFieldStreamStart(fieldName string, bufManager *b
 		c.activeFieldStreams = make(map[string]io.WriteCloser)
 	}
 
+	var writers []io.WriteCloser
+
 	// 检查所有字段处理器
 	if c.fieldStreamHandlers != nil {
 		for _, handler := range c.fieldStreamHandlers {
 			if c.isFieldMatch(cleanFieldName, handler) {
-				return c.createFieldStream(cleanFieldName, handler, parents)
+				// 如果已经有这个字段的流在运行，就不再创建新的
+				if _, exists := c.activeFieldStreams[cleanFieldName]; !exists {
+					writer := c.createFieldStream(cleanFieldName, handler, parents)
+					if writer != nil {
+						writers = append(writers, writer)
+					}
+				} else {
+					// 如果已存在，添加到活跃写入器列表
+					if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
+						writers = append(writers, writer)
+					}
+				}
 			}
 		}
 	}
 
-	return nil
+	return writers
 }
 
 // isFieldMatch 检查字段是否匹配处理器
@@ -298,32 +311,24 @@ func (c *callbackManager) handleFieldStreamEnd(fieldName string) {
 		delete(c.activeFieldStreams, cleanFieldName)
 		log.Infof("ended field stream for: %s", cleanFieldName)
 
-		// 如果这是当前字段写入器，清除它
-		if c.currentFieldWriter == writer {
-			c.currentFieldWriter = nil
+		// 从活跃写入器列表中移除这个写入器
+		for i, activeWriter := range c.activeWriters {
+			if activeWriter == writer {
+				c.activeWriters = append(c.activeWriters[:i], c.activeWriters[i+1:]...)
+				break
+			}
 		}
 	}
 }
 
-// setCurrentFieldWriter 设置当前字段写入器
+// setCurrentFieldWriter 设置当前字段写入器（已废弃，保留兼容性）
 func (c *callbackManager) setCurrentFieldWriter(fieldName string) {
-	if c.activeFieldStreams == nil {
-		return
-	}
-
-	cleanFieldName := strings.Trim(strings.TrimSpace(fieldName), `"`)
-	if writer, exists := c.activeFieldStreams[cleanFieldName]; exists {
-		c.currentFieldWriter = writer
-	} else {
-		c.currentFieldWriter = nil
-	}
+	// 在新的多写入器架构中，此方法不再需要
 }
 
-// clearCurrentFieldWriter 清除当前字段写入器
+// clearCurrentFieldWriter 清除当前字段写入器（已废弃，保留兼容性）
 func (c *callbackManager) clearCurrentFieldWriter() {
-	if c.currentFieldWriter != nil {
-		c.currentFieldWriter = nil
-	}
+	// 在新的多写入器架构中，此方法不再需要
 }
 
 func ExtractStructuredJSON(c string, options ...CallbackOption) error {
@@ -454,8 +459,16 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					if !raw.isObject && !raw.isArray {
 						bufManager.PushValue(sliceValue)
 					}
+					// 字段值处理完成，清理当前活跃的写入器
+					if bufManager.callbackManager != nil {
+						bufManager.callbackManager.activeWriters = nil
+					}
 				case state_jsonArray:
 					bufManager.PopContainer()
+					// 数组处理完成，清理当前活跃的写入器
+					if bufManager.callbackManager != nil {
+						bufManager.callbackManager.activeWriters = nil
+					}
 				case state_jsonObj:
 					// 在弹出容器前，结束当前对象中的所有字段流
 					if bufManager.callbackManager != nil {
@@ -464,6 +477,10 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 						}
 					}
 					bufManager.PopContainer()
+					// 对象处理完成，清理当前活跃的写入器
+					if bufManager.callbackManager != nil {
+						bufManager.callbackManager.activeWriters = nil
+					}
 					// 记录结果
 					ret, ok := objectDepthIndexTable[objectDepth]
 					if ok && ret >= 0 {
@@ -521,10 +538,15 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 
 		// 处理字符级流式写入
 		writeToFieldStream := func() {
-			if callbackManager.currentFieldWriter != nil {
-				_, err := callbackManager.currentFieldWriter.Write([]byte{ch})
-				if err != nil {
-					log.Errorf("failed to write character to field stream: %v", err)
+			if len(callbackManager.activeWriters) > 0 {
+				data := []byte{ch}
+				for _, writer := range callbackManager.activeWriters {
+					if writer != nil {
+						_, err := writer.Write(data)
+						if err != nil {
+							log.Errorf("failed to write character to field stream: %v", err)
+						}
+					}
 				}
 			}
 		}
@@ -547,8 +569,10 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			s := currentStateIns()
 			switch ch {
 			case ']':
+				writeToFieldStream() // 写入结束括号
 				popState()
 			case ',': // if get ',' means has new array item, should push state
+				writeToFieldStream()             // 写入逗号
 				if s.arrayCurrentKeyIndex == 0 { // if get ',' and index == 0 ,should consume it. push 0:""
 					bufManager.PushKey(s.arrayCurrentKeyIndex)
 					s.arrayCurrentKeyIndex++
@@ -559,6 +583,7 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				pushStateWithIdx(state_arrayItem, index+1) // item should not contains this comma
 			default:
 				if unicode.IsSpace(rune(ch)) {
+					writeToFieldStream() // 写入空白字符
 					continue
 				}
 				bufManager.PushKey(s.arrayCurrentKeyIndex)
@@ -570,9 +595,15 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 			switch ch {
 			case '[':
 				currentStateIns().isArray = true
+				// 激活待处理的字段流写入器，用于处理数组类型的值
+				bufManager.activatePendingFieldWriter()
+				writeToFieldStream() // 写入开始括号
 				pushState(state_jsonArray)
 			case '{':
 				currentStateIns().isObject = true
+				// 激活待处理的字段流写入器，用于处理对象类型的值
+				bufManager.activatePendingFieldWriter()
+				writeToFieldStream() // 写入开始大括号
 				pushState(state_jsonObj)
 				pushStateWithIdx(state_objectKey, index+1)
 				continue
@@ -626,6 +657,16 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 					pushStateWithIdx(state_objectKey, index+1)
 				}
 				continue
+			default:
+				// 处理数字、布尔值、null等其他类型
+				if unicode.IsDigit(rune(ch)) || ch == '-' || ch == 't' || ch == 'f' || ch == 'n' {
+					// 激活待处理的字段流写入器，用于处理数字、布尔值、null等类型的值
+					bufManager.activatePendingFieldWriter()
+					writeToFieldStream() // 写入当前字符
+					pushState(state_primitiveValue)
+					continue
+				}
+				continue
 			case ']':
 				if currentStateIns().objectValueInArray {
 					popStateWithIdx(index)
@@ -655,6 +696,16 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 				}
 				continue
 			}
+		case state_primitiveValue:
+			// 处理数字、布尔值、null等基本类型的值
+			switch ch {
+			case ',', '}', ']', '\n', '\r', '\t', ' ':
+				// 遇到结束符，退出基本值处理状态
+				popState()
+				goto RETRY
+			default:
+				writeToFieldStream() // 写入当前字符
+			}
 		case state_data:
 			switch ch {
 			case '{':
@@ -671,16 +722,25 @@ func ExtractStructuredJSONFromStream(jsonReader io.Reader, options ...CallbackOp
 		case state_jsonObj:
 			switch ch {
 			case '{':
+				writeToFieldStream() // 写入嵌套对象开始大括号
 				pushState(state_jsonObj)
 				continue
 			case '"':
+				writeToFieldStream() // 写入引号
 				pushState(state_DoubleQuoteString)
 				continue
 			//case '`':
 			//	pushState(state_esExpr)
 			//	continue
 			case '}':
+				writeToFieldStream() // 写入结束大括号
 				popState()
+				continue
+			case ',', ':', ' ', '\t', '\n', '\r':
+				writeToFieldStream() // 写入分隔符和空白字符
+				continue
+			default:
+				writeToFieldStream() // 写入其他字符
 				continue
 			}
 		//case state_esExpr:
