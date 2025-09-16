@@ -5,6 +5,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func autoAutomigrateVectorStoreDocument(db *gorm.DB) error {
@@ -13,6 +14,8 @@ func autoAutomigrateVectorStoreDocument(db *gorm.DB) error {
 }
 
 func init() {
-	db := consts.GetGormProfileDatabase()
-	autoAutomigrateVectorStoreDocument(db)
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())
+		return nil
+	})
 }
