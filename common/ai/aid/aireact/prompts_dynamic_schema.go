@@ -147,7 +147,11 @@ func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bo
 		))
 	}
 
-	opts = append(opts, aitool.WithStructParam(
+	opts = append(opts, aitool.WithStringParam(
+		"human_readable_thought",
+		aitool.WithParam_Required(true),
+		aitool.WithParam_Description("Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. Examples: 'Okay, I understand. Searching for the requested information now...', 'I need to use a tool to get the current stock price.', 'This is a complex request, I will try to execute tool step by step.'"),
+	), aitool.WithStructParam(
 		"next_action",
 		[]aitool.PropertyOption{
 			aitool.WithParam_Description("Contains the specific action the AI has decided to take. You must choose one action type and provide its corresponding payload."),
@@ -157,10 +161,6 @@ func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bo
 		"cumulative_summary",
 		aitool.WithParam_Required(true),
 		aitool.WithParam_Description("An evolving summary of the conversation. Update this field to include key information from the current interaction that should be remembered for future responses. Include topics discussed, user preferences, important context, and relevant details. If this is the first interaction, create a new summary. If there's existing context, build upon it."),
-	), aitool.WithStringParam(
-		"human_readable_thought",
-		aitool.WithParam_Required(true),
-		aitool.WithParam_Description("Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. Examples: 'Okay, I understand. Searching for the requested information now...', 'I need to use a tool to get the current stock price.', 'This is a complex request, I will try to execute tool step by step.'"),
 	))
 	return aitool.NewObjectSchemaWithAction(opts...)
 }
