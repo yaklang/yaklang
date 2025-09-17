@@ -225,8 +225,8 @@ func (n *AuditNode) CreateDataFlowEdge(progName string, to uint) *AuditEdge {
 func (n *AuditNode) CreatePredecessorEdge(progName string, to uint, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName:   progName,
-		FromNode:      to,
-		ToNode:        n.ID,
+		FromNode:      n.ID,
+		ToNode:        to,
 		EdgeType:      EdgeType_Predecessor,
 		AnalysisStep:  step,
 		AnalysisLabel: label,

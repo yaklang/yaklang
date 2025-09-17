@@ -32,6 +32,10 @@ func removeEscapes(s string) string {
 	return s
 }
 
+func (g *DotGraph) GetGraphKind() GraphKind {
+	return GraphKindShow
+}
+
 func (g *DotGraph) createNode(value *Value, isEntry ...bool) int {
 	if node, ok := g.value2Node[value]; ok {
 		return node
@@ -81,11 +85,11 @@ func (g *DotGraph) CreateEdge(edge Edge) error {
 		edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
 	}
 
-	if IsDataFlowLabel(edgeLabel) {
-		// skip top-def bottom-use  edge label
-		// have dataflow edge already
-		return nil
-	}
+	// if IsDataFlowLabel(edgeLabel) {
+	// 	// skip top-def bottom-use  edge label
+	// 	// have dataflow edge already
+	// 	return nil
+	// }
 
 	dotEdge := g.AddEdge(fromNode, toNode, edgeLabel)
 	if edge.Kind == EdgeTypePredecessor {

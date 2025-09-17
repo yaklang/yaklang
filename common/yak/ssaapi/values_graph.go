@@ -15,8 +15,16 @@ const (
 	EdgeTypePredecessor = "predecessor"
 )
 
+type GraphKind string
+
+const (
+	GraphKindShow = "Show" // show graph, show from(prev) -> to(v) , not show duplicate edge
+	GraphKindDump = "Dump" // dump and save graph, save from(v) -> to(prev) raw point. and save all edge
+)
+
 type Graph interface {
 	CreateEdge(Edge) error
+	GetGraphKind() GraphKind
 }
 
 type Edge struct {
@@ -30,6 +38,32 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 	if len(ctxs) > 0 && !utils.IsNil(ctxs[0]) {
 		ctx = ctxs[0]
 	}
+
+	sendRawEdge := func(from, to *Value, kind EdgeType, msg map[string]any) error {
+		switch g.GetGraphKind() {
+		case GraphKindShow:
+			from, to = to, from // show graph, show from(prev) -> to(v)
+			// this two kind is reverse
+			if kind == EdgeTypeEffectOn {
+				kind = EdgeTypeDependOn // effect on is depend on
+			} else if kind == EdgeTypeDependOn {
+				kind = EdgeTypeEffectOn // depend on is effect on
+			}
+		case GraphKindDump: // dump raw graph, save from(v) -> to(prev) prev point
+		default:
+			return utils.Errorf("unknown graph kind: %v", g.GetGraphKind())
+		}
+		err := g.CreateEdge(Edge{
+			From: from,
+			To:   to,
+			Kind: kind,
+			Msg:  msg,
+		})
+		if err != nil {
+			return err
+		}
+		return nil
+	}
 	valueDFS(v, func(v *Value) (Values, error) {
 		prevs := v.GetPredecessors()
 		next := make([]*Value, 0, len(prevs))
@@ -38,62 +72,33 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 			switch prev.Info.Label {
 			case Predecessors_BottomUseLabel:
 				valueDFS(v, func(v *Value) (Values, error) {
-					prev := v.GetEffectOn()
+					depende := v.GetDependOn()
 					// log.Errorf("%v prev: %v", v, prev)
-					for _, prev := range prev {
-						if err := g.CreateEdge(Edge{
-							From: prev,
-							To:   v,
-							Kind: EdgeTypeEffectOn,
-						}); err != nil {
+					for _, d := range depende {
+						if err := sendRawEdge(v, d, EdgeTypeDependOn, nil); err != nil {
 							return nil, err
 						}
 					}
-					return prev, nil
+					return depende, nil
 				}, ctx)
 			case Predecessors_TopDefLabel:
 				valueDFS(v, func(v *Value) (Values, error) {
-					// from(user) -effect-> to(def) (v)
-					// (v) -depend-> (prev)
-					prev := v.GetDependOn()
+					effect := v.GetEffectOn()
 					// log.Errorf("%v prev: %v", v, prev)
-					for _, prev := range prev {
-						if err := g.CreateEdge(Edge{
-							From: prev,
-							To:   v,
-							Kind: EdgeTypeDependOn,
-						}); err != nil {
+					for _, e := range effect {
+						if err := sendRawEdge(v, e, EdgeTypeEffectOn, nil); err != nil {
 							return nil, err
 						}
 					}
-					return prev, nil
-				}, ctx)
-				valueDFS(v, func(v *Value) (Values, error) {
-					prev := v.GetEffectOn()
-					// log.Errorf("%v prev: %v", v, prev)
-					for _, prev := range prev {
-						if err := g.CreateEdge(Edge{
-							From: prev,
-							To:   v,
-							Kind: EdgeTypeEffectOn,
-						}); err != nil {
-							return nil, err
-						}
-					}
-					return prev, nil
+					return effect, nil
 				}, ctx)
 			default:
 			}
 			next = append(next, prev.Node)
 			// add predecessor edge
-			if err := g.CreateEdge(Edge{
-				From: prev.Node,
-				To:   v,
-				Kind: EdgeTypePredecessor,
-				Msg: map[string]any{
-					"label": prev.Info.Label,
-					"step":  prev.Info.Step,
-				},
+			if err := sendRawEdge(v, prev.Node, EdgeTypePredecessor, map[string]any{
+				"label": prev.Info.Label,
+				"step":  prev.Info.Step,
 			}); err != nil {
 				return nil, err
 			}

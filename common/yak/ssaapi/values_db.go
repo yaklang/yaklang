@@ -130,6 +130,10 @@ func NewDBGraph(ctx *saveValueCtx) *DBGraph {
 	}
 }
 
+func (g *DBGraph) GetGraphKind() GraphKind {
+	return GraphKindDump
+}
+
 func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNode, error) {
 	entry := false
 	if len(isEntry) > 0 {
