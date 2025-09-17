@@ -1,0 +1,241 @@
+desc(
+	title: "Check C Buffer Overflow Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   缓冲区溢出漏洞是由于程序未对输入数据的长度进行有效校验，导致数据写入超出预定缓冲区的边界，覆盖相邻内存区域。在C语言中，使用不安全字符串处理函数（如`strcpy`、`strcat`、`sprintf`等）是常见原因。攻击者可利用此漏洞执行任意代码、导致程序崩溃或泄露敏感信息。
+
+2. **触发场景**
+   ```c
+   #include <string.h>
+   void vulnerable_function(const char *input) {
+       char buffer[64];
+       strcpy(buffer, input);  // 未校验输入长度的不安全拷贝
+   }
+   ```
+   攻击者输入超过64字节的数据时，将覆盖栈上的返回地址或重要变量，可能导致控制流劫持。
+
+3. **潜在影响**
+   - 程序崩溃（拒绝服务）。
+   - 任意代码执行（通过覆盖返回地址或函数指针）。
+   - 敏感信息泄露（如栈中的密码或密钥）。
+DESC
+	rule_id: "0cd61cd7-0085-4152-80e9-9d934386e27c"
+	title_zh: "检测C语言缓冲区溢出漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全字符串函数
+   替换`strcpy`、`strcat`、`sprintf`为带长度限制的函数（如`strncpy`、`strncat`、`snprintf`），并显式设置目标缓冲区大小。
+   ```c
+   void safe_function(const char *input) {
+       char buffer[64];
+       strncpy(buffer, input, sizeof(buffer) - 1);
+       buffer[sizeof(buffer) - 1] = '\0';  // 确保终止符
+   }
+   ```
+
+#### 2. 输入长度校验
+   在处理用户输入前先检查长度是否超过缓冲区容量。
+   ```c
+   if (strlen(user_input) >= sizeof(buffer)) {
+       fprintf(stderr, "Input too long");
+       return;
+   }
+   ```
+
+#### 3. 启用编译器防护
+   开启栈保护选项（如GCC的`-fstack-protector`）和地址随机化（ASLR）。
+
+#### 4. 使用现代安全库
+   采用如`libsafe`或静态分析工具（如Coverity）检测潜在溢出。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-119: Buffer Overflow](https://cwe.mitre.org/data/definitions/119.html)
+[OWASP Buffer Overflow Prevention](https://cheatsheetseries.owasp.org/cheatsheets/Buffer_Overflow_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+strcpy(*<slice(index=1)> #-> as $unsafe_str);
+strcat(*<slice(index=1)> #-> as $unsafe_str);
+sprintf(*<slice(index=2)> #-> as $unsafe_str);
+
+<include('c-user-input')> as $user_input;
+
+$user_input & $unsafe_str as $high;
+$user_input & $unsafe_str as $high;
+$user_input & $unsafe_str as $high;
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "C Buffer Overflow Vulnerability Was Detected",
+	title_zh: "检测到C语言缓冲区溢出漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   由于应用程序未对用户输入进行严格的长度检查或使用不安全的字符串操作函数（如strcpy、strcat、sprintf等），攻击者可通过构造超长输入覆盖相邻内存区域，导致程序崩溃或执行任意代码。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   void vulnerable_function(const char *input) {
+     char buffer[64];
+     strcpy(buffer, input);  // 直接拷贝用户输入到固定长度缓冲区
+     printf("Buffer content: %s\n", buffer);
+   }
+   ```
+   攻击者输入超过64字节的数据（如shellcode或恶意指令）可覆盖返回地址，控制程序执行流。
+
+3. **潜在影响**
+   - 程序崩溃导致拒绝服务（DoS）。
+   - 执行任意代码获取系统权限。
+   - 绕过安全机制（如栈保护）。
+DESC
+	message: "检测到C语言缓冲区溢出漏洞，用户输入直接用于不安全的字符串操作函数（strcpy/strcat/sprintf）",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用长度受限的字符串函数
+替换危险函数为安全版本（如strncpy、strncat、snprintf等），并始终指定目标缓冲区大小。
+```c
+// 修复示例：strncpy
+char buffer[64];
+strncpy(buffer, input, sizeof(buffer) - 1);
+buffer[sizeof(buffer) - 1] = '\0';
+```
+
+#### 2. 输入长度验证
+在拷贝前检查输入长度是否超过目标缓冲区容量。
+```c
+if (strlen(input) >= sizeof(buffer)) {
+    fprintf(stderr, "Input too long!\n");
+    return;
+}
+```
+
+#### 3. 启用编译器保护机制
+编译时添加保护选项（如StackGuard、ASLR、DEP）：
+```bash
+gcc -fstack-protector-all -pie -fPIE -D_FORTIFY_SOURCE=2 -O2 program.c
+```
+SOLUTION
+	risk: "缓冲区溢出",
+	name: "high",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_buffer.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+
+void vulnerable_function(const char *input) {
+    char buffer[64];
+    
+    strcpy(buffer, input);
+    
+    printf("Buffer content: %s\n", buffer);
+}
+
+void vulnerable_concatenation(const char *str1, const char *str2) {
+    char buffer[128];
+    
+    strcpy(buffer, str1);
+    strcat(buffer, str2);
+    
+    printf("Concatenated: %s\n", buffer);
+}
+
+void vulnerable_formatting(const char *format, const char *value) {
+    char buffer[64];
+    
+    sprintf(buffer, format, value);
+    
+    printf("Formatted: %s\n", buffer);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <input_string>\n", argv[0]);
+        return 1;
+    }
+    
+    vulnerable_function(argv[1]);
+    
+    char *env_str = getenv("TEST_STRING");
+    if (env_str) {
+        vulnerable_concatenation(argv[1], env_str);
+    }
+    
+    vulnerable_formatting("%s", argv[1]);
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_buffer.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+
+void safe_function(const char *input) {
+    char buffer[64];
+    
+    strncpy(buffer, input, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';  // 确保字符串结束
+    
+    printf("Buffer content: %s\n", buffer);
+}
+
+void safe_concatenation(const char *str1, const char *str2) {
+    char buffer[128];
+    size_t remaining = sizeof(buffer);
+    
+    strncpy(buffer, str1, remaining - 1);
+    buffer[remaining - 1] = '\0';
+    
+    remaining -= strlen(buffer);
+    if (remaining > 1) {
+        strncat(buffer, str2, remaining - 1);
+    }
+    
+    printf("Concatenated: %s\n", buffer);
+}
+
+void safe_formatting(const char *value) {
+    char buffer[64];
+    
+    snprintf(buffer, sizeof(buffer), "Value: %s", value);
+    
+    printf("Formatted: %s\n", buffer);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <input_string>\n", argv[0]);
+        return 1;
+    }
+    
+    if (strlen(argv[1]) > 63) {
+        printf("Input too long, maximum 63 characters allowed\n");
+        return 1;
+    }
+    
+    safe_function(argv[1]);
+    
+    char *env_str = getenv("TEST_STRING");
+    if (env_str) {
+        safe_concatenation(argv[1], env_str);
+    }
+    
+    safe_formatting(argv[1]);
+    
+    return 0;
+}
+SAFE
+)

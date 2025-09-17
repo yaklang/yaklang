@@ -7,7 +7,7 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   在C语言中，许多标准库函数（如`gets()`、`scanf()`等）在处理用户输入时未对输入数据长度进行检查，可能导致缓冲区溢出。攻击者通过提供超出预期大小的输入数据，可以覆盖相邻的内存区域，从而导致程序崩溃或执行任意代码。
+   缓冲区溢出漏洞是由于C语言中使用不安全的输入函数（如`gets()`、`scanf()`系列函数）时，未对输入数据的长度进行有效限制，导致攻击者可以输入超出目标缓冲区大小的数据，覆盖相邻内存区域。这种漏洞可能被利用来执行任意代码、劫持程序流程或导致程序崩溃。
 
 2. **触发场景**
    ```c
@@ -15,7 +15,7 @@ desc(
    void vulnerable_function() {
        char buffer[64];
        printf("Enter your input: ");
-       scanf("%s", buffer); // 危险函数，未限制输入长度
+       scanf("%s", buffer);
        printf("Buffer contents: %s\n", buffer);
    }
    int main() {
@@ -23,59 +23,53 @@ desc(
        return 0;
    }
    ```
-   上述代码中，`scanf()`函数未对输入数据进行长度限制。如果攻击者输入超过64字节的数据，将覆盖堆栈上的其他变量甚至返回地址，可能导致程序崩溃或执行恶意代码。
+   攻击者输入超过64个字符的数据时，将导致缓冲区溢出，可能覆盖返回地址或其他关键数据。
 
 3. **潜在影响**
-   - 攻击者可以通过缓冲区溢出完全控制程序执行流程。
-   - 可能导致信息泄露或系统权限提升。
-   - 程序崩溃或拒绝服务（DoS），影响业务运行。
-
-### 规则目的
-该规则用于审计C语言中可能引发缓冲区溢出的危险输入函数，识别未经验证的输入操作，降低缓冲区溢出的风险。
+   - 远程代码执行：攻击者可能通过精心构造的输入数据覆盖返回地址，执行任意代码。
+   - 程序崩溃：导致服务不可用。
+   - 信息泄露：覆盖敏感数据或内存布局信息。
 DESC
 	rule_id: "49b36a64-d6d1-4a78-a5a7-c97fbb9c8bfa"
 	solution: <<<SOLUTION
 ### 修复建议
 
-#### 1. 使用更安全的替代函数
-避免使用危险的输入函数（如`gets()`、`scanf()`等），改用具有长度限制的安全函数。
-```c
-#include <stdio.h>
-#include <string.h>
-void safer_function() {
-    char buffer[64];
-    printf("Enter your input: ");
-    fgets(buffer, sizeof(buffer), stdin); // 安全函数，限制输入长度
-    buffer[strcspn(buffer, "\n")] = '\0'; // 移除换行符
-    printf("Buffer contents: %s\n", buffer);
-}
-int main() {
-    safer_function();
-    return 0;
-}
-```
+#### 1. 使用安全的输入函数
+   替换`gets()`、`scanf()`等危险函数为`fgets()`等安全替代品。
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   void safer_function() {
+       char buffer[64];
+       printf("Enter your input: ");
+       fgets(buffer, sizeof(buffer), stdin);
+       buffer[strcspn(buffer, "\n")] = '\0';
+       printf("Buffer contents: %s\n", buffer);
+   }
+   int main() {
+       safer_function();
+       return 0;
+   }
+   ```
 
-#### 2. 输入校验
-对所有用户输入实施严格的长度和格式校验，确保输入符合预期。
-```c
-// 示例：校验输入长度是否合法
-if (strlen(userInput) > MAX_LENGTH) {
-    fprintf(stderr, "Error: Input too long\n");
-    exit(EXIT_FAILURE);
-}
-```
+#### 2. 输入长度检查
+   在使用不安全函数时，严格限制输入长度。
+   ```c
+   char buffer[64];
+   if (scanf("%63s", buffer) != 1) {
+       // 处理错误
+   }
+   ```
 
-#### 3. 启用编译器保护机制
-现代编译器提供了多种保护机制（如栈保护、地址空间布局随机化等），可以有效缓解缓冲区溢出带来的危害。
-- 使用编译选项启用栈保护（如`-fstack-protector`）。
-- 配置链接器启用地址空间布局随机化（ASLR）。
+#### 3. 使用现代C库
+   考虑使用现代C库或框架，如glibc的安全函数或第三方安全库。
 
-#### 4. 使用静态代码分析工具
-通过静态代码分析工具扫描源码，提前发现潜在的缓冲区溢出问题，并及时修复。
+#### 4. 编译器保护
+   启用编译器的缓冲区溢出保护选项（如GCC的`-fstack-protector`）。
 SOLUTION
 	reference: <<<REFERENCE
-[CWE-120](https://cwe.mitre.org/data/definitions/120.html)
-[Buffer Overflow](https://owasp.org/www-community/vulnerabilities/Buffer_Overflow)
+[CWE-120: Buffer Copy without Checking Size of Input ('Classic Buffer Overflow')](https://cwe.mitre.org/data/definitions/120.html)
+[OWASP Buffer Overflow](https://owasp.org/www-community/vulnerabilities/Buffer_Overflow)
 REFERENCE
 )
 
@@ -94,8 +88,10 @@ alert $high for {
 	title_zh: "检测到C语言中的危险输入函数漏洞",
 	desc: <<<DESC
 ### 漏洞描述
+
 1. **漏洞原理**
-   由于使用了危险的输入函数（如`gets()`、`scanf()`等），未对用户输入长度进行检查，可能导致缓冲区溢出。攻击者通过构造超长输入覆盖内存中的关键数据（如返回地址），从而执行任意代码或导致程序崩溃。
+   由于应用程序直接使用了不安全的输入函数（如`gets()`、`scanf()`等），这些函数不会检查输入的长度，容易导致缓冲区溢出。攻击者可以构造超长输入覆盖相邻内存区域，从而执行任意代码或导致程序崩溃。
+
 2. **触发场景**
    // 存在漏洞的代码示例
    ```c
@@ -103,7 +99,7 @@ alert $high for {
    void vulnerable_function() {
        char buffer[64];
        printf("Enter your input: ");
-       scanf("%s", buffer);  // 直接读取用户输入，未限制长度
+       scanf("%s", buffer);
        printf("Buffer contents: %s\n", buffer);
    }
    int main() {
@@ -111,27 +107,28 @@ alert $high for {
        return 0;
    }
    ```
-   攻击者输入超过64字节的数据时，可能覆盖堆栈上的其他变量或返回地址。
+   攻击者输入超过64字节的数据可导致缓冲区溢出，可能覆盖返回地址或关键变量。
+
 3. **潜在影响**
-   - 执行任意代码，完全控制目标系统。
-   - 导致程序崩溃，造成拒绝服务。
-   - 泄露内存中的敏感信息。
+   - 程序崩溃（拒绝服务）。
+   - 执行任意代码（远程代码执行）。
+   - 泄露敏感信息（如内存内容）。
 DESC
 	name: "high",
 	message: "检测到C语言中使用危险的输入函数（如`gets()`、`scanf()`等）可能导致缓冲区溢出漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 	solution: <<<SOLUTION
 ### 修复建议
-#### 1. 使用安全的替代函数
-避免使用危险的输入函数（如`gets()`、`scanf()`等），改用安全性更高的函数。
+
+#### 1. 使用安全的输入函数
+替换`gets()`、`scanf()`等危险函数为安全的替代品，如`fgets()`、`getline()`等。
 ```c
-// 修复代码示例
 #include <stdio.h>
 #include <string.h>
 void safer_function() {
     char buffer[64];
     printf("Enter your input: ");
-    fgets(buffer, sizeof(buffer), stdin);  // 使用fgets限制输入长度
-    buffer[strcspn(buffer, "\n")] = '\0';  // 去除尾部换行符
+    fgets(buffer, sizeof(buffer), stdin);
+    buffer[strcspn(buffer, "\n")] = '\0';
     printf("Buffer contents: %s\n", buffer);
 }
 int main() {
@@ -139,24 +136,24 @@ int main() {
     return 0;
 }
 ```
-#### 2. 输入合法性校验
-对用户输入实施长度和格式限制，拒绝非法输入。
+
+#### 2. 输入长度限制
+对用户输入实施严格的长度限制，确保不会超过目标缓冲区大小。
 ```c
-// 示例：校验输入长度
 #include <stdio.h>
-#include <string.h>
-void validate_input(const char* input) {
-    if (strlen(input) >= 64) {
-        fprintf(stderr, "Input too long!\n");
-        exit(1);
+#define MAX_INPUT 64
+void safe_input() {
+    char buffer[MAX_INPUT + 1];
+    printf("Enter your input (max %d chars): ", MAX_INPUT);
+    if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+        buffer[strcspn(buffer, "\n")] = '\0';
+        printf("Safe buffer: %s\n", buffer);
     }
 }
 ```
-#### 3. 启用编译器保护机制
-现代编译器提供了多种保护机制（如栈保护、地址空间布局随机化等），确保启用了这些选项。
-```bash
-gcc -o program program.c -fstack-protector-all -Wl,-z,relro,-z,now
-```
+
+#### 3. 使用现代C库
+考虑使用现代C库（如Safe C）或高级语言（如Rust）减少此类风险。
 SOLUTION
 	risk: "缓冲区溢出",
 }

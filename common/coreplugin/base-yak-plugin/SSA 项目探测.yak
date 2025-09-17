@@ -9,6 +9,7 @@ languages = cli.StringSlice(
     cli.setSelectOption("Yaklang", "yak"),
     cli.setSelectOption("JavaScript", "js"),
     cli.setSelectOption("Golang", "go"),
+    cli.setSelectOption("C", "c"),
 )
 
 

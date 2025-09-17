@@ -1,0 +1,239 @@
+desc(
+	title: "Check C Memory Leak Vulnerability"
+	type: audit
+	severity: low
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   内存泄漏发生在程序动态分配内存（如通过`malloc`、`calloc`或`realloc`）后，未正确释放（使用`free`函数）这些内存。这会导致程序运行时占用的内存持续增加，最终可能耗尽系统资源，引发性能下降或程序崩溃。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <stdlib.h>
+   #include <string.h>
+   
+   char* vulnerable_function(const char *input) {
+       char *buffer = malloc(strlen(input) + 1);
+       if (buffer == NULL) {
+           return NULL;
+       }
+       strcpy(buffer, input);
+       return buffer;
+   }
+   
+   int main() {
+       char *result = vulnerable_function("test");
+       if (result) {
+           printf("Result: %s\n", result);
+       }
+       // 未调用 free(result)
+       return 0;
+   }
+   ```
+   在上述代码中，`vulnerable_function`动态分配了内存并返回指针，但调用者`main`函数未释放该内存，导致泄漏。
+
+3. **潜在影响**
+   - 长时间运行的进程可能因内存耗尽而崩溃。
+   - 系统整体性能下降，尤其在资源受限的环境（如嵌入式系统）中更为明显。
+   - 可能被攻击者利用进行拒绝服务攻击（DoS）。
+DESC
+	rule_id: "f3464649-d789-464e-8394-82135485717e"
+	title_zh: "检测C语言内存泄漏漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 显式释放动态分配的内存
+   确保每个`malloc`/`calloc`/`realloc`调用都有对应的`free`，尤其是在函数返回指针给调用者时，需明确内存所有权。
+   ```c
+   #include <stdio.h>
+   #include <stdlib.h>
+   #include <string.h>
+   
+   char* safe_function(const char *input) {
+       char *buffer = malloc(strlen(input) + 1);
+       if (buffer == NULL) {
+           return NULL;
+       }
+       strcpy(buffer, input);
+       return buffer;
+   }
+   
+   int main() {
+       char *result = safe_function("test");
+       if (result) {
+           printf("Result: %s\n", result);
+           free(result); // 明确释放内存
+       }
+       return 0;
+   }
+   ```
+
+#### 2. 使用静态分析工具
+   集成工具如Valgrind、AddressSanitizer（ASan）定期检测内存泄漏。
+   ```bash
+   # 使用Valgrind检测示例
+   valgrind --leak-check=full ./your_program
+   ```
+
+#### 3. 采用RAII模式（C++适用）
+   若使用C++，可通过智能指针（如`std::unique_ptr`）自动管理内存生命周期。
+   ```cpp
+   #include <memory>
+   #include <cstring>
+   
+   std::unique_ptr<char[]> safe_function(const char *input) {
+       auto buffer = std::make_unique<char[]>(strlen(input) + 1);
+       strcpy(buffer.get(), input);
+       return buffer;
+   }
+   ```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-401: Improper Release of Memory Before Removing Last Reference](https://cwe.mitre.org/data/definitions/401.html)
+[Valgrind Documentation](https://valgrind.org/docs/manual/quick-start.html)
+REFERENCE
+)
+
+malloc as $alloc;
+calloc as $alloc;
+realloc as $alloc;
+
+free(* #-> as $safe);
+$alloc - $safe as $low
+
+alert $low for {
+	level: "low",
+	type: "vuln",
+	title: "C Memory Leak Vulnerability Was Detected",
+	title_zh: "检测到C语言内存泄漏漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   由于程序在分配内存后未正确释放，导致内存泄漏。随着时间的推移，泄漏的内存会累积，最终可能导致应用程序内存耗尽，引发性能下降或崩溃。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <stdlib.h>
+   #include <string.h>
+   char* vulnerable_function(const char *input) {
+     char *buffer = malloc(strlen(input) + 1);
+     if (buffer == NULL) {
+       return NULL;
+     }
+     strcpy(buffer, input);
+     return buffer;
+   }
+   int main() {
+     char *result = vulnerable_function("test");
+     if (result) {
+       printf("Result: %s\n", result);
+     }
+     return 0;
+   }
+   ```
+   在此示例中，`vulnerable_function`返回了通过`malloc`分配的内存，但在`main`函数中没有调用`free`来释放它。
+
+3. **潜在影响**
+   - 应用程序内存使用量不断增加，可能导致性能下降。
+   - 长时间运行可能导致系统内存耗尽，引发程序崩溃或系统不稳定。
+DESC
+	message: "检测到C语言代码中存在未释放的内存分配操作，可能导致内存泄漏风险",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 确保每次内存分配后都有对应的释放操作
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+char* vulnerable_function(const char *input) {
+  char *buffer = malloc(strlen(input) + 1);
+  if (buffer == NULL) {
+    return NULL;
+  }
+  strcpy(buffer, input);
+  return buffer;
+}
+int main() {
+  char *result = vulnerable_function("test");
+  if (result) {
+    printf("Result: %s\n", result);
+    free(result);  // 确保释放内存
+  }
+  return 0;
+}
+```
+
+#### 2. 使用RAII模式（如C++）或智能指针自动管理内存
+```cpp
+#include <memory>
+#include <string.h>
+std::unique_ptr<char[]> safe_function(const char *input) {
+  auto buffer = std::make_unique<char[]>(strlen(input) + 1);
+  strcpy(buffer.get(), input);
+  return buffer;
+}
+```
+
+#### 3. 使用静态分析工具定期检查内存泄漏
+建议使用Valgrind、AddressSanitizer等工具定期检查应用程序中的内存泄漏问题。
+SOLUTION
+	risk: "内存泄漏",
+	name: "low",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_memory.c': <<<UNSAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char* vulnerable_function(const char *input) {
+    char *buffer = malloc(strlen(input) + 1);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    
+    strcpy(buffer, input);
+    return buffer;
+}
+
+int main() {
+    char *result = vulnerable_function("test");
+    if (result) {
+        printf("Result: %s\n", result);
+    }
+    return 0;
+}
+UNSAFE
+	'safefile://safe_memory.c': <<<SAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+char* vulnerable_function(const char *input) {
+    char *buffer = malloc(strlen(input) + 1);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    
+    strcpy(buffer, input);
+    return buffer;
+}
+
+int main() {
+    char *result = vulnerable_function("test");
+    if (result) {
+        printf("Result: %s\n", result);
+    }
+    free(result);
+    return 0;
+}
+SAFE
+)
