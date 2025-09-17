@@ -147,5 +147,5 @@ func (g *DotGraph) DeepFirstGraphNext(value *Value) [][]string {
 
 func (g *DotGraph) Show() {
 	// dot.ShowDotGraphToAsciiArt(g.String())
-	fmt.Println(g.String())
+	log.Infof(g.String())
 }
