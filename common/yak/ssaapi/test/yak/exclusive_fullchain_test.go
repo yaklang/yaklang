@@ -150,6 +150,7 @@ f = b(2,3,4)`
 		results = append(results, prog.Ref("d")...)
 		results = append(results, value)
 		ret := ssaapi.FindStrictCommonDepends(results)
+		ret.Show()
 		if len(ret) != 2 {
 			t.Fatal("the literal 2 trace failed")
 		}

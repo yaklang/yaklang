@@ -64,10 +64,12 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 		}
 		return nil
 	}
+	show := false
 	valueDFS(v, func(v *Value) (Values, error) {
 		prevs := v.GetPredecessors()
 		next := make([]*Value, 0, len(prevs))
 		for _, prev := range prevs {
+			show = true
 			// log.Errorf("%v prev: %v", v, prev.Node)
 			switch prev.Info.Label {
 			case Predecessors_BottomUseLabel:
@@ -105,6 +107,32 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 		}
 		return next, nil
 	}, ctx)
+	if !show {
+		if v.GetDependOn().Len() > 0 {
+			valueDFS(v, func(v *Value) (Values, error) {
+				dependon := v.GetDependOn()
+				// log.Errorf("%v prev: %v", v, prev)
+				for _, depend := range dependon {
+					if err := sendRawEdge(v, depend, EdgeTypeDependOn, nil); err != nil {
+						return nil, err
+					}
+				}
+				return dependon, nil
+			}, ctx)
+		}
+		if v.GetEffectOn().Len() > 0 {
+			valueDFS(v, func(v *Value) (Values, error) {
+				effecton := v.GetEffectOn()
+				// log.Errorf("%v prev: %v", v, prev)
+				for _, effect := range effecton {
+					if err := sendRawEdge(v, effect, EdgeTypeEffectOn, nil); err != nil {
+						return nil, err
+					}
+				}
+				return effecton, nil
+			}, ctx)
+		}
+	}
 	return nil
 }
 
