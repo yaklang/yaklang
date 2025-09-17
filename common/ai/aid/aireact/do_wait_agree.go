@@ -45,17 +45,18 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					"interactive_id": interactiveId,
 				})
 				endOnce := utils.NewOnce()
-				endNormally := func(score float64, reason string) {
+				endNormally := func(score float64, level string, reason string) {
 					endOnce.Do(func() {
 						r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_END, "ai-reviewer", map[string]any{
 							"score":          score,
 							"reason":         reason,
 							"interactive_id": interactiveId,
+							"level":          level,
 						})
 					})
 				}
 				defer func() {
-					endNormally(1.0, "review interrupted")
+					endNormally(1.0, "high", "review interrupted")
 				}()
 
 				// In auto-review mode, automatically approve the request
@@ -99,35 +100,39 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					return nil
 				})
 				if err != nil {
-					endNormally(1, "review failed: "+err.Error())
+					endNormally(1, "high", "review failed: "+err.Error())
 					log.Errorf("error during auto-review: %v", err)
 					return
 				}
-				endNormally(score, reason)
 				if score <= 0.4 {
 					var duSec time.Duration = 1
 					r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN, "ai-reviewer", map[string]any{
 						"seconds":        int(duSec),
 						"interactive_id": interactiveId,
 						"score":          score,
+						"level":          "low",
 					})
 					r.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
+					endNormally(score, "low", reason)
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
-				} else if score >= 0.7 {
-					var duSec time.Duration = 1
+				} else if score > 0.4 && score <= 0.7 {
+					var duSec time.Duration = 6
 					r.Emitter.EmitJSON(schema.EVENT_TYPE_AI_REVIEW_COUNTDOWN, "ai-reviewer", map[string]any{
 						"seconds":        int(duSec),
 						"interactive_id": interactiveId,
 						"score":          score,
+						"level":          "middle",
 					})
+					endNormally(score, "middle", reason)
 					r.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
 				} else {
 					r.Emitter.EmitInfo("Auto-review score is high, suggesting to handled by user")
+					endNormally(score, "high", reason)
 				}
 			}()
 		}()
