@@ -8,8 +8,6 @@ type OperationConfig struct {
 	MaxDepth int
 	MinDepth int
 
-	saveGraph bool // save effect-on/depend-on graph
-
 	// Hook
 	HookEveryNode        []func(*Value) error
 	AllowIgnoreCallStack bool
@@ -24,15 +22,6 @@ type OperationOption func(*OperationConfig)
 func WithMaxDepth(maxDepth int) OperationOption {
 	return func(operationConfig *OperationConfig) {
 		operationConfig.MaxDepth = maxDepth
-	}
-}
-func WithGraphSave(saves ...bool) OperationOption {
-	return func(operationConfig *OperationConfig) {
-		save := true
-		if len(saves) > 0 {
-			save = saves[0]
-		}
-		operationConfig.saveGraph = save
 	}
 }
 

@@ -25,6 +25,7 @@ const (
 type AnalyzeContext struct {
 	// Self
 	Self   *Value
+	direct AnalysisType
 	config *OperationConfig
 	// recursive depth limited
 	depth               int
@@ -64,8 +65,18 @@ func (a *AnalyzeContext) peekCall(index int) *ssa.Call {
 	return a.callStack.PeekN(index)
 }
 
-func (a *AnalyzeContext) SavePath(result Values) {
+func saveDataflowPath(direct AnalysisType, from, to *Value) {
+	switch direct {
+	case TopDefAnalysis:
+		// from(user) -> to(def)
+		from.AppendDependOn(to)
+	case BottomUseAnalysis:
+		// from(def) -> to(user)
+		from.AppendEffectOn(to)
+	}
+}
 
+func (a *AnalyzeContext) SavePath(result Values) {
 	shouldSave := func() bool {
 		return a.recursiveStatusIsLeaf.Peek()
 	}
@@ -84,7 +95,7 @@ func (a *AnalyzeContext) SavePath(result Values) {
 					prev := a.nodeStack.PeekN(i) //
 					// log.Errorf("Value[%v] effect-on [%v]", current, next)
 					// log.Errorf("%v(%v) prev %v(%v)", current, current.GetUUID(), prev, prev.GetUUID())
-					current.AppendDataFlow(prev)
+					saveDataflowPath(a.direct, prev, current)
 					current = prev
 				}
 			}

@@ -111,7 +111,7 @@ func FindFlexibleCommonDepends(val Values) Values {
 	for _, v := range val {
 		if (v.DependOn == nil || v.DependOn.Count() == 0) &&
 			(v.EffectOn == nil || v.EffectOn.Count() == 0) {
-			v.GetTopDefs(WithGraphSave())
+			v.GetTopDefs()
 		}
 	}
 	results, err := cartesian.Product([][]*Value{val, val})
@@ -129,7 +129,7 @@ func FindFlexibleCommonDepends(val Values) Values {
 		}
 
 		// rebuild the top defs
-		from.GetTopDefs(WithGraphSave())
+		from.GetTopDefs()
 		from.RecursiveDepends(func(value *Value) error {
 			if value.GetId() == to.GetId() {
 				common = append(common, value)

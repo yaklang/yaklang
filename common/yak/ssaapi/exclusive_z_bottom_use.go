@@ -9,6 +9,7 @@ func (v *Value) GetBottomUses(opt ...OperationOption) Values {
 	var ret Values
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
+	actx.direct = BottomUseAnalysis
 	ret = v.getBottomUses(actx, opt...)
 	return MergeValues(ret)
 }
@@ -22,7 +23,6 @@ func (v Values) GetBottomUses(opts ...OperationOption) Values {
 }
 
 func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) Values {
-	saveGraph := actx.config.saveGraph
 	var vals Values
 	if v.IsObject() {
 		exist := false
@@ -36,7 +36,7 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		if !exist {
 			v.GetAllMember().ForEach(func(value *Value) {
 				_ = actx.pushObject(v, value.GetKey(), value)
-				vals = append(vals, value.AppendDependOn(v, saveGraph).getBottomUses(actx, opt...)...)
+				vals = append(vals, value.getBottomUses(actx, opt...)...)
 				actx.popObject()
 			})
 		}
@@ -54,14 +54,14 @@ func (v *Value) visitUserFallback(actx *AnalyzeContext, opt ...OperationOption) 
 		})
 		if !exist {
 			_ = actx.pushObject(currentObject, currentKey, v)
-			vals = append(vals, currentObject.AppendDependOn(v, saveGraph).getBottomUses(actx, opt...)...)
+			vals = append(vals, currentObject.getBottomUses(actx, opt...)...)
 			actx.popObject()
 		}
 	}
 	// log.Infof("current Value: %s", v)
 	v.GetUsers().ForEach(func(value *Value) {
 		// log.Infof("value %s", value)
-		if ret := value.AppendDependOn(v, saveGraph).getBottomUses(actx, opt...); len(ret) > 0 {
+		if ret := value.getBottomUses(actx, opt...); len(ret) > 0 {
 			vals = append(vals, ret...)
 		}
 	})
@@ -79,7 +79,6 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	if actx == nil {
 		actx = NewAnalyzeContext(opt...)
 	}
-	saveGraph := actx.config.saveGraph
 	actx.depth++
 	defer func() {
 		actx.depth--
@@ -196,7 +195,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok || paramValue == nil {
 					continue
 				}
-				val := v.NewBottomUseValue(paramValue, saveGraph)
+				val := v.NewValue(paramValue)
 				if val != nil {
 					vals = append(vals, val.getBottomUses(actx, opt...)...)
 				}
@@ -213,7 +212,7 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 				if !ok || memberValue == nil {
 					continue
 				}
-				val := v.NewBottomUseValue(memberValue, saveGraph)
+				val := v.NewValue(memberValue)
 				if val != nil {
 					vals = append(vals, val.getBottomUses(actx, opt...)...)
 				}
@@ -237,8 +236,8 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		}
 		call := actx.getLastCauseCall(BottomUseAnalysis)
 		if call == nil {
-			callee := v.NewBottomUseValue(function, saveGraph)
-			called := callee.GetCalledBy().AppendDependOn(callee, saveGraph)
+			callee := v.NewValue(function)
+			called := callee.GetCalledBy()
 			called.ForEach(func(value *Value) {
 				vals = append(vals, value.getBottomUses(actx, opt...)...)
 			})
@@ -263,13 +262,13 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 					if i == 0 {
 						actx.pushObject(call, member.GetKey(), member)
 					}
-					vals = append(vals, member.AppendDependOn(v, saveGraph).getBottomUses(actx, opt...)...)
+					vals = append(vals, member.getBottomUses(actx, opt...)...)
 					actx.popObject()
 				}
 			}
 		}
 		if vals.Len() == 0 {
-			vals = append(vals, v.NewBottomUseValue(call.innerValue, saveGraph).getBottomUses(actx, opt...)...)
+			vals = append(vals, v.NewValue(call.innerValue).getBottomUses(actx, opt...)...)
 		}
 		return vals
 	}

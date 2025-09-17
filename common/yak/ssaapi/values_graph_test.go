@@ -330,11 +330,12 @@ func main() {
 
 		value := sfr.GetValues("para_top_def")
 
-		dot := value.DotGraph()
+		dot := value.NewDotGraph()
 		log.Infof("dot : \n%s", dot)
+		dot.Show()
 
-		require.Contains(t, dot, "db.QueryRow(query") // contain path
-		require.Contains(t, dot, "r.FormValue")       // contain dataflow path
+		require.Contains(t, dot.String(), "db.QueryRow(query") // contain path
+		require.Contains(t, dot.String(), "r.FormValue")       // contain dataflow path
 	})
 }
 

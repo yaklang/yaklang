@@ -6,8 +6,8 @@ import (
 )
 
 func (v *Value) LoadFullUseDefChain() *Value {
-	v.GetTopDefs(WithGraphSave())
-	v.GetBottomUses(WithGraphSave())
+	v.GetTopDefs()
+	v.GetBottomUses()
 	return v
 }
 
@@ -17,16 +17,16 @@ func (v Values) FullUseDefChain(h func(*Value)) {
 	}
 }
 
-func (i Values) AppendEffectOn(vs *Value, saves ...bool) Values {
+func (i Values) AppendEffectOn(vs *Value) Values {
 	for _, node := range i {
-		node.AppendEffectOn(vs, saves...)
+		node.AppendEffectOn(vs)
 	}
 	return i
 }
 
-func (i Values) AppendDependOn(v *Value, saves ...bool) Values {
+func (i Values) AppendDependOn(v *Value) Values {
 	for _, node := range i {
-		node.AppendDependOn(v, saves...)
+		node.AppendDependOn(v)
 	}
 	return i
 }
@@ -58,11 +58,8 @@ func (v *Value) SetContextValue(i ContextID, values *Value) *Value {
 	return v
 }
 
-func (i *Value) AppendDependOn(v *Value, saves ...bool) (ret *Value) {
+func (i *Value) AppendDependOn(v *Value) (ret *Value) {
 	ret = i
-	if len(saves) == 0 || !saves[0] {
-		return
-	}
 	if i == nil {
 		return i
 	}
@@ -81,11 +78,8 @@ func (i *Value) AppendDependOn(v *Value, saves ...bool) (ret *Value) {
 	return i
 }
 
-func (i *Value) AppendEffectOn(v *Value, saves ...bool) (ret *Value) {
+func (i *Value) AppendEffectOn(v *Value) (ret *Value) {
 	ret = i
-	if len(saves) == 0 || !saves[0] {
-		return
-	}
 	if i == nil {
 		return i
 	}
@@ -100,25 +94,6 @@ func (i *Value) AppendEffectOn(v *Value, saves ...bool) (ret *Value) {
 	} else {
 		i.setEffectOn(v)
 		v.setDependOn(i)
-	}
-	return i
-}
-
-func (i *Value) AppendDataFlow(vs ...*Value) *Value {
-	if i == nil {
-		return i
-	}
-	for _, v := range vs {
-		if v == nil {
-			continue
-		}
-		if i.GetUUID() == v.GetUUID() {
-			continue
-		}
-		if i.PrevDataFlow == nil {
-			i.PrevDataFlow = utils.NewSafeMap[*Value]()
-		}
-		i.PrevDataFlow.Set(v.GetUUID(), v)
 	}
 	return i
 }
@@ -194,9 +169,6 @@ func MergeValues(allVs ...Values) Values {
 			}
 			for _, pred := range v.Predecessors {
 				existValue.Predecessors = utils.AppendSliceItemWhenNotExists(existValue.Predecessors, pred)
-			}
-			for _, prev := range v.GetDataFlow() {
-				existValue.AppendDataFlow(prev)
 			}
 		} else {
 			// set v is exist

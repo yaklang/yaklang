@@ -177,11 +177,7 @@ func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) (result *Val
 		if !ok {
 			return nil
 		}
-		if typ == TopDefAnalysis {
-			result = value.NewTopDefValue(callSide)
-		} else if typ == BottomUseAnalysis {
-			result = value.NewBottomUseValue(callSide)
-		}
+		result = value.NewValue(callSide)
 	}
 	return result
 }

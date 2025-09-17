@@ -12,7 +12,6 @@ type EdgeType string
 const (
 	EdgeTypeDependOn    = "depend_on"
 	EdgeTypeEffectOn    = "effect_on"
-	EdgeTypeDataflow    = "dataflow"
 	EdgeTypePredecessor = "predecessor"
 )
 
@@ -37,15 +36,46 @@ func (v *Value) GenerateGraph(g Graph, ctxs ...context.Context) error {
 		for _, prev := range prevs {
 			// log.Errorf("%v prev: %v", v, prev.Node)
 			switch prev.Info.Label {
-			case Predecessors_BottomUseLabel, Predecessors_TopDefLabel:
+			case Predecessors_BottomUseLabel:
 				valueDFS(v, func(v *Value) (Values, error) {
-					prev := v.GetDataFlow()
+					prev := v.GetEffectOn()
 					// log.Errorf("%v prev: %v", v, prev)
 					for _, prev := range prev {
 						if err := g.CreateEdge(Edge{
 							From: prev,
 							To:   v,
-							Kind: EdgeTypeDataflow,
+							Kind: EdgeTypeEffectOn,
+						}); err != nil {
+							return nil, err
+						}
+					}
+					return prev, nil
+				}, ctx)
+			case Predecessors_TopDefLabel:
+				valueDFS(v, func(v *Value) (Values, error) {
+					// from(user) -effect-> to(def) (v)
+					// (v) -depend-> (prev)
+					prev := v.GetDependOn()
+					// log.Errorf("%v prev: %v", v, prev)
+					for _, prev := range prev {
+						if err := g.CreateEdge(Edge{
+							From: prev,
+							To:   v,
+							Kind: EdgeTypeDependOn,
+						}); err != nil {
+							return nil, err
+						}
+					}
+					return prev, nil
+				}, ctx)
+				valueDFS(v, func(v *Value) (Values, error) {
+					prev := v.GetEffectOn()
+					// log.Errorf("%v prev: %v", v, prev)
+					for _, prev := range prev {
+						if err := g.CreateEdge(Edge{
+							From: prev,
+							To:   v,
+							Kind: EdgeTypeEffectOn,
 						}); err != nil {
 							return nil, err
 						}
