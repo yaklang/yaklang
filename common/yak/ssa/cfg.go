@@ -223,6 +223,9 @@ func (lb *LoopBuilder) Finish() {
 		if lb.condition != nil {
 			conditionValue = lb.condition()
 		}
+		if conditionValue == nil {
+			conditionValue = SSABuild.EmitConstInst(true)
+		}
 		// SSABuild.EmitJump(body)
 		SSABuild.EmitLoop(body, exit, conditionValue)
 	})

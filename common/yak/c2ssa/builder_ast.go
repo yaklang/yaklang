@@ -847,16 +847,18 @@ func (b *astbuilder) buildForDeclaration(ast *cparser.ForDeclarationContext) ssa
 
 	if d := ast.DeclarationSpecifier(); d != nil {
 		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
-		lefts, indexs := b.buildInitDeclaratorList(ast.InitDeclaratorList().(*cparser.InitDeclaratorListContext))
-		for i, l := range lefts {
-			if l.GetValue() == nil {
-				right := b.GetDefaultValue(ssatype)
-				if indexs[i] != -1 {
-					newtype := ssa.NewSliceType(ssatype)
-					newtype.Len = indexs[i]
-					right = b.GetDefaultValue(newtype)
+		if l := ast.InitDeclaratorList().(*cparser.InitDeclaratorListContext); l != nil {
+			lefts, indexs := b.buildInitDeclaratorList(l)
+			for i, l := range lefts {
+				if l.GetValue() == nil {
+					right := b.GetDefaultValue(ssatype)
+					if indexs[i] != -1 {
+						newtype := ssa.NewSliceType(ssatype)
+						newtype.Len = indexs[i]
+						right = b.GetDefaultValue(newtype)
+					}
+					b.AssignVariable(l, right)
 				}
-				b.AssignVariable(l, right)
 			}
 		}
 	}

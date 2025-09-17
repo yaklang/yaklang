@@ -1,0 +1,176 @@
+desc(
+	title: "Audit C File Operation Functions"
+	type: audit
+	level: info
+	lib: 'c-file-path'
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计C语言代码中与文件操作相关的函数调用。它通过识别常见的文件操作函数（如`fopen`、`open`、`creat`等），定位潜在的高风险文件操作点，防止因不当的文件操作导致的安全漏洞，如路径遍历、文件覆盖、权限泄露等。
+
+### 2.规则详细
+1. **函数覆盖范围**
+   规则检测以下C语言文件操作函数：
+   `fopen`, `open`, `creat`, `access`, `stat`, `lstat`, `chmod`, `chown`, `unlink`, `rename`, `link`, `symlink`, `readlink`, `utime`。
+
+2. **潜在风险场景**
+   - **路径遍历漏洞**：当文件路径参数直接或间接来源于用户输入时，可能通过构造特殊路径参数（如`../`）访问未授权文件。
+   - **文件权限问题**：如`chmod`或`chown`函数可能被滥用，导致敏感文件权限被修改。
+   - **竞争条件**：如`unlink`和`rename`函数可能在多线程/进程环境下引发TOCTOU（Time-of-Check Time-of-Use）问题。
+
+3. **示例代码**
+   以下代码展示了一个可能引发路径遍历漏洞的`fopen`调用：
+   ```c
+   char *user_input = getenv("USER_FILE");
+   FILE *file = fopen(user_input, "r"); // 风险点：未验证user_input内容
+   ```
+DESC
+	rule_id: "a9784e29-29cd-44eb-992b-fe914e58476e"
+	title_zh: "审计C语言文件操作函数"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 路径输入验证
+对文件路径参数实施严格的合法性校验，拒绝包含特殊字符（如`../`）或绝对路径的输入。
+```c
+// 示例：校验路径仅包含允许的字符
+int is_valid_path(const char *path) {
+    const char *forbidden = "../";
+    return (strstr(path, forbidden) == NULL);
+}
+
+if (!is_valid_path(user_input)) {
+    fprintf(stderr, "Invalid path detected");
+    exit(EXIT_FAILURE);
+}
+```
+
+#### 2. 使用安全函数替代
+优先使用限制性更强的函数版本（如`fopen_s`或`open`的`O_NOFOLLOW`标志）。
+```c
+// 示例：使用O_NOFOLLOW防止符号链接攻击
+int fd = open(user_input, O_RDONLY | O_NOFOLLOW);
+if (fd == -1) {
+    perror("open failed");
+}
+```
+
+#### 3. 最小权限原则
+确保文件操作仅使用必要的权限（如`chmod`设置合理的访问模式）。
+```c
+// 示例：限制文件权限为所有者可读写
+if (chmod(path, S_IRUSR | S_IWUSR) == -1) {
+    perror("chmod failed");
+}
+```
+
+#### 4. 规范化路径
+使用`realpath`等函数将路径解析为绝对路径后校验。
+```c
+// 示例：规范化路径并校验是否在允许目录内
+char resolved_path[PATH_MAX];
+if (realpath(user_input, resolved_path) == NULL) {
+    perror("realpath failed");
+}
+if (strncmp(resolved_path, "/safe/directory/", 16) != 0) {
+    fprintf(stderr, "Access denied");
+    exit(EXIT_FAILURE);
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
+)
+
+fopen(* #-> as $file_sink);
+open(* #-> as $file_sink);
+creat(* #-> as $file_sink);
+access(* #-> as $file_sink);
+stat(* #-> as $file_sink);
+lstat(* #-> as $file_sink);
+chmod(* #-> as $file_sink);
+chown(* #-> as $file_sink);
+unlink(* #-> as $file_sink);
+rename(* #-> as $file_sink);
+link(* #-> as $file_sink);
+symlink(* #-> as $file_sink);
+readlink(* #-> as $file_sink);
+utime(* #-> as $file_sink);
+
+
+alert $output for {
+	level: "info",
+	title: "Audit C Language File Operation Functions",
+	title_zh: "审计C语言文件操作函数",
+	name: "output",
+	message: "发现C语言文件操作函数信息",
+	solution: <<<SOLUTION
+### 安全建议
+1. **审计文件操作函数的使用**
+   确保所有文件操作函数（如`fopen`、`open`、`creat`等）都正确地处理文件路径，避免使用不受信任的用户输入直接作为文件路径。
+2. **输入验证**
+   对用户提供的文件路径进行严格的验证，确保路径符合预期格式并且指向合法位置。
+3. **使用安全函数**
+   考虑使用更安全的函数替代例如，使用`openat`等相对安全的函数来避免路径遍历问题。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计C语言代码中与文件操作相关的函数调用。它通过识别常见的文件操作函数，帮助发现可能存在的路径遍历或其他相关安全问题。
+
+### 2.规则详细
+1. **作为基础检测库**
+   属于`c-file-path`库规则（`lib`类型），提供文件操作函数的识别能力。
+
+2. **覆盖高危文件操作函数**
+   检测以下函数：
+   `fopen`, `open`, `creat`, `access`, `stat`, `lstat`, `chmod`, `chown`, `unlink`, `rename`, `link`, `symlink`, `readlink`, `utime`
+DESC
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://user_input.c': <<<PARAM
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+
+int main(int argc, char **argv) {
+    char buffer[1024];
+    char *env_var;
+    
+    // 命令行参数输入
+    if (argc > 1) {
+        strcpy(buffer, argv[1]);
+    }
+    
+    // 环境变量输入
+    env_var = getenv("USER_INPUT");
+    if (env_var) {
+        strcat(buffer, env_var);
+    }
+    
+    // 标准输入
+    fgets(buffer, sizeof(buffer), stdin);
+    
+    // 文件输入
+    FILE *file = fopen("input.txt", "r");
+    if (file) {
+        fgets(buffer, sizeof(buffer), file);
+        fclose(file);
+    }
+    
+    // 网络输入
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock >= 0) {
+        recv(sock, buffer, sizeof(buffer), 0);
+        close(sock);
+    }
+    
+    return 0;
+}
+PARAM
+)

@@ -100,7 +100,7 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
 	var bind *Variable = variable
 
-	if f.builder == nil{
+	if f.builder == nil {
 		return
 	}
 	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
@@ -181,17 +181,19 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			}
 			variable = builder.CreateVariableForce(se.Name)
 		case ParameterCall:
-			val, exists := se.Get(c)
-			if !exists || utils.IsNil(val) {
+			v, exists := se.Get(c)
+			if !exists || utils.IsNil(v) {
 				continue
 			}
-			if val.GetType().GetTypeKind() == PointerKind {
-				se.Name = builder.GetOriginPointerName(val)
+			if v.GetType().GetTypeKind() == PointerKind {
+				se.Name = builder.GetOriginPointerName(v)
 			} else {
-				if val.GetName() != "" {
-					se.Name = val.GetName()
+				if v.GetName() != "" {
+					se.Name = v.GetName()
 				} else {
-					se.Name = val.GetLastVariable().GetName()
+					if lva := v.GetLastVariable(); lva != nil {
+						se.Name = lva.GetName()
+					}
 				}
 			}
 			if v := currentScope.ReadVariable(se.Name); v != nil {
@@ -292,17 +294,19 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 			variable = builder.CreateVariableForce(se.Name)
 		case ParameterCall:
-			val, exists := se.Get(c)
-			if !exists || utils.IsNil(val) {
+			v, exists := se.Get(c)
+			if !exists || utils.IsNil(v) {
 				continue
 			}
-			if val.GetType().GetTypeKind() == PointerKind {
-				se.Name = builder.GetOriginPointerName(val)
+			if v.GetType().GetTypeKind() == PointerKind {
+				se.Name = builder.GetOriginPointerName(v)
 			} else {
-				if val.GetName() != "" {
-					se.Name = val.GetName()
+				if v.GetName() != "" {
+					se.Name = v.GetName()
 				} else {
-					se.Name = val.GetLastVariable().GetName()
+					if lva := v.GetLastVariable(); lva != nil {
+						se.Name = lva.GetName()
+					}
 				}
 			}
 			if v := currentScope.ReadVariable(se.Name); v != nil {
