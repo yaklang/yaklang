@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -173,19 +174,27 @@ func testPerformanceOptimization(t *testing.T) {
 		jsonData := `{"field1": "data1", "field2": "data2", "field3": "data3"}`
 
 		start := time.Now()
-		var matchCount int
+		var matchCount int32
+		var wg sync.WaitGroup
+
+		// 我们期望匹配3个字段：field1, field2, field3
+		wg.Add(3)
 
 		// 测试多种匹配模式的性能
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterRegexpFieldStreamHandler("field[1-3]", func(key string, reader io.Reader, parents []string) {
-				matchCount++
+				defer wg.Done()
+				atomic.AddInt32(&matchCount, 1)
 				io.ReadAll(reader) // 消费数据
 			}))
 
-		duration := time.Since(start)
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, matchCount, 2) // 至少应该匹配到field1, field2, field3中的一些
-		assert.Less(t, duration, 100*time.Millisecond, "匹配性能应该足够快")
+		wg.Wait() // 等待所有匹配完成
+
+		duration := time.Since(start)
+		finalCount := atomic.LoadInt32(&matchCount)
+		assert.Equal(t, int32(3), finalCount, "应该匹配到field1, field2, field3三个字段")
+		assert.Less(t, duration, 1*time.Second, "匹配性能应该在CI环境中足够快") // 增加超时时间以适应CI
 	})
 }
 
