@@ -13,19 +13,6 @@ languages = cli.StringSlice(
 )
 
 
-memory := cli.Bool("memory", 
-    cli.setDefault(false), 
-    cli.setVerboseName("内存编译，将会保存10分钟"),
-    cli.setCliGroup("compile"),
-)
-
-concurrency := cli.Int("concurrency",
-    cli.setVerboseName("并发数"),
-    cli.setCliGroup("compile"),
-    cli.setDefault(10),
-    cli.setHelp("编译时，同时进行编译的文件数量"),
-)
-
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3
 
@@ -41,9 +28,31 @@ peepholeSizes := cli.StringSlice(
 
 programName := cli.String("programName", cli.setVerboseName("项目名"), cli.setCliGroup("information"))
 description := cli.Text("description", cli.setVerboseName("项目描述"), cli.setCliGroup("information"))
-excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"))
 
 // {{ compile option
+
+onlySaveProjectInfo := cli.Bool(
+    "only-save",
+    cli.setVerboseName("是否仅存储项目信息"),
+    cli.setHelp("如果勾选，那么就不会进行编译，只会进行项目探测然后存储项目信息"),
+    cli.setDefault(false),
+     cli.setCliGroup("compile")
+)
+
+
+memory := cli.Bool("memory",
+    cli.setDefault(false),
+    cli.setVerboseName("内存编译，将会保存10分钟"),
+    cli.setCliGroup("compile"),
+)
+
+concurrency := cli.Int("concurrency",
+    cli.setVerboseName("并发数"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(10),
+    cli.setHelp("编译时，同时进行编译的文件数量"),
+)
+
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
 strictMode = cli.Bool(
     "StrictMode",
@@ -54,8 +63,8 @@ strictMode = cli.Bool(
 )
 reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
 
-// 是否编译项目
-compileProject := cli.Bool("compile", cli.setVerboseName("是否进行编译,如果不便宜,那么就只存储项目信息"), cli.setCliGroup("compile"), cli.setDefault(true))
+excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"))
+
 
 cli.check()
 target = target.Trim(" ", "\n", "\t")
@@ -415,18 +424,18 @@ if excludeFile != "" {
 }
 
 // 扫描配置
-saveOpts = append(saveOpts, ssaproject.withScanConcurrency(concurrency))
+saveOpts = append(saveOpts, ssaproject.withCompileConcurrency(concurrency))
 saveOpts = append(saveOpts, ssaproject.withMemoryScan(memory))
 
 // 检查是否已存在同名项目
-existingProject, err = ssaproject.QuerySSAProjectByName(programName)
+existingProject, err = ssaproject.QuerySSAProjectByName(target)
 if err == nil && existingProject != nil {
-    yakit.Info("发现同名项目，将进行更新: %s", programName)
-    
+    yakit.Info("发现同名项目，将进行更新: %s", target)
+
     // 更新现有项目的配置
     existingProject.Description = params.description
     existingProject.Language = language
-    
+
     // 构建新的CodeSourceInfo
     codeSourceInfo = {
         "kind": params.info.kind,
@@ -435,20 +444,20 @@ if err == nil && existingProject != nil {
         "branch": params.info.branch,
         "path": params.info.path,
     }
-    
+
     // 添加代理配置
     if params.info.proxy.proxy {
         codeSourceInfo["proxy"] = {
             "url": params.info.proxy.url,
         }
     }
-    
+
     // 序列化配置信息
     codeSourceConfigJSON, err = json.Marshal(codeSourceInfo)
     if err == nil {
         existingProject.CodeSourceConfig = string(codeSourceConfigJSON)
     }
-    
+
     // 更新编译和扫描配置
     existingProject.StrictMode = strictMode
     existingProject.PeepholeSize = peepholeSize
@@ -456,7 +465,7 @@ if err == nil && existingProject != nil {
     existingProject.ExcludeFiles = excludeFile
     existingProject.ScanConcurrency = uint32(concurrency)
     existingProject.MemoryScan = memory
-    
+
     err = ssaproject.SaveSSAProject(existingProject)
     if err != nil {
         yakit.Error("更新项目配置失败: %v", err)
@@ -465,9 +474,9 @@ if err == nil && existingProject != nil {
         yakit.Code(existingProject)
     }
 } else {
-    yakit.Info("创建新项目: %s", programName)
-    
-    savedProject, err = ssaproject.NewSSAProject(programName, saveOpts...)
+    yakit.Info("创建新项目: %s", target)
+
+    savedProject, err = ssaproject.NewSSAProject(target, saveOpts...)
     if err != nil {
         yakit.Error("保存项目配置失败: %v", err)
     } else {
@@ -477,7 +486,7 @@ if err == nil && existingProject != nil {
 }
 
 // 如果不需要编译，则直接返回
-if !compileProject {
+if onlySaveProjectInfo{
     yakit.Info("项目配置已保存，跳过编译步骤")
     return
 }
