@@ -185,9 +185,6 @@ LOOP:
 									reader,
 									resp.GetTaskIndex(),
 									false,
-									func() {
-										r.EmitResult(output.String())
-									},
 								)
 							},
 						),
