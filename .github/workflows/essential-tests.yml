@@ -66,18 +66,18 @@ jobs:
           - name: "Test Utils/Misc in 2min USE gRPC "
             run: |
               # these tests are very quick
-              go test -timeout 20s ./common/chunkmaker/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
-              go test -timeout 20s ./common/jsonextractor    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
-              go test -timeout 20s ./common/markdownextractor    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
-              go test -timeout 20s ./common/yak/yaklib/codec   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
-              go test -timeout 20s ./common/yak/cartesian    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
-              go test -timeout 20s ./common/jsonpath    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
-              go test -timeout 20s ./common/domainextractor    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/chunkmaker/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/jsonextractor    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/markdownextractor    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/yak/yaklib/codec   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/yak/cartesian    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/jsonpath    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/domainextractor    | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # --- OMAP with race detection ---
-              go test -timeout 30s -race ./common/utils/omap/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s -race ./common/utils/omap/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # -----------------------------
               go test -timeout 1m ./common/utils
-              go test -timeout 20s ./common/utils/imageutils/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/utils/imageutils/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               go test -timeout 10s ./common/utils/xml2
               go test -timeout 20s ./common/utils/tlsutils/... 
               go test -timeout 10s ./common/utils/linktable/...  
