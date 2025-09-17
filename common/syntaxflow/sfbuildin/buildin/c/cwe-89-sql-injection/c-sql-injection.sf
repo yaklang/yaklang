@@ -1,0 +1,311 @@
+desc(
+	title: "Check C SQL Injection Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL注入是一种常见的安全漏洞，产生于应用程序未对用户输入进行充分的验证和过滤，导致攻击者能够通过在用户输入中插入恶意SQL代码，改变原始SQL查询的逻辑。在C语言中，当直接使用诸如`mysql_query()`、`mysql_real_query()`、`sqlite3_exec()`等函数并直接将用户输入拼接到SQL语句中时，极易受到SQL注入攻击。攻击者可以通过精心构造的输入，执行非授权的数据库操作，如删除表、窃取数据或提升权限等。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   #include <mysql/mysql.h>
+   void vulnerable_login(MYSQL *conn, const char *username, const char *password) {
+       char query[1024];
+       // 不安全的 SQL 查询 - 直接拼接用户输入
+       sprintf(query, "SELECT * FROM users WHERE username='%s' AND password='%s'",
+               username, password);
+       if (mysql_query(conn, query) != 0) {
+           printf("Query failed: %s\n", mysql_error(conn));
+           return;
+       }
+       MYSQL_RES *result = mysql_store_result(conn);
+       if (result) {
+           MYSQL_ROW row = mysql_fetch_row(result);
+           if (row) {
+               printf("Login successful for user: %s\n", username);
+           } else {
+               printf("Login failed\n");
+           }
+           mysql_free_result(result);
+       }
+   }
+   ```
+   在上述代码中，`username`和`password`直接拼接到SQL查询字符串中，如果攻击者输入`admin' -- `作为用户名，则可以绕过密码验证，直接登录为admin用户。
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被泄露。
+   - 数据库表被恶意删除或修改。
+   - 攻击者可能通过数据库提权进一步渗透系统。
+DESC
+	rule_id: "a83edb46-428e-481d-af2b-e5ac45db032e"
+	title_zh: "检测C语言SQL注入漏洞"
+	risk: "sqli"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用参数化查询（Prepared Statements）
+   参数化查询是防止SQL注入的最有效方法之一。通过预编译SQL语句并绑定用户输入，可以确保用户输入不会被解释为SQL代码的一部分。
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   #include <mysql/mysql.h>
+   void safe_login(MYSQL *conn, const char *username, const char *password) {
+       MYSQL_STMT *stmt;
+       MYSQL_BIND bind[2];
+       // 使用参数化查询
+       const char *query = "SELECT * FROM users WHERE username=? AND password=?";
+       stmt = mysql_stmt_init(conn);
+       if (!stmt) {
+           printf("Could not initialize statement\n");
+           return;
+       }
+       if (mysql_stmt_prepare(stmt, query, strlen(query)) != 0) {
+           printf("Could not prepare statement\n");
+           mysql_stmt_close(stmt);
+           return;
+       }
+       // 绑定参数
+       memset(bind, 0, sizeof(bind));
+       bind[0].buffer_type = MYSQL_TYPE_STRING;
+       bind[0].buffer = (void *)username;
+       bind[0].buffer_length = strlen(username);
+       bind[1].buffer_type = MYSQL_TYPE_STRING;
+       bind[1].buffer = (void *)password;
+       bind[1].buffer_length = strlen(password);
+       mysql_stmt_bind_param(stmt, bind);
+       if (mysql_stmt_execute(stmt) != 0) {
+           printf("Statement execution failed: %s\n", mysql_stmt_error(stmt));
+       } else {
+           printf("Query executed successfully\n");
+       }
+       mysql_stmt_close(stmt);
+   }
+   ```
+
+#### 2. 输入验证和过滤
+   对用户的输入进行严格的验证和过滤，拒绝非法输入。例如，确保用户名和密码只包含允许的字符。
+   ```c
+   #include <ctype.h>
+   #include <stdbool.h>
+   bool is_valid_input(const char *input) {
+       for (int i = 0; input[i] != '\0'; i++) {
+           if (!isalnum(input[i])) {
+               return false;
+           }
+       }
+       return true;
+   }
+   ```
+
+#### 3. 使用ORM框架
+   考虑使用ORM（对象关系映射）框架，这些框架通常内置了防止SQL注入的机制，能够自动处理参数化查询。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
+[OWASP SQL Injection Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+mysql_query(*<slice(index=1)> #-> as $sink);
+mysql_real_query(*<slice(index=1)> #-> as $sink);
+sqlite3_exec(*<slice(index=1)> #-> as $sink);
+sqlite3_prepare_v2(*<slice(index=1)> #-> as $sink);
+
+<include('c-user-input')> as $user_input;
+$sink?{!opcode:const} as $sql_exec;
+
+$user_input & $sql_exec as $high;
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "C SQL Injection Vulnerability Was Detected",
+	title_zh: "检测到C语言SQL注入漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+
+2. **触发场景**
+   检测到用户输入直接用于SQL查询构建或执行，可能存在SQL注入风险。攻击者输入恶意SQL片段可绕过业务逻辑，泄露所有用户数据；或执行任意SQL语句删除数据表等。
+
+3. **潜在影响**
+   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
+	name: "high",
+	message: "检测到C语言SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用参数化查询（PreparedStatement）
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
+
+```c
+// 修复代码示例
+MYSQL_STMT *stmt;
+MYSQL_BIND bind[2];
+const char *query = "SELECT * FROM users WHERE username=? AND password=?";
+stmt = mysql_stmt_init(conn);
+if (mysql_stmt_prepare(stmt, query, strlen(query)) != 0) {
+    printf("Could not prepare statement\n");
+    return;
+}
+// 绑定参数
+memset(bind, 0, sizeof(bind));
+bind[0].buffer_type = MYSQL_TYPE_STRING;
+bind[0].buffer = (void *)username;
+bind[0].buffer_length = strlen(username);
+bind[1].buffer_type = MYSQL_TYPE_STRING;
+bind[1].buffer = (void *)password;
+bind[1].buffer_length = strlen(password);
+mysql_stmt_bind_param(stmt, bind);
+mysql_stmt_execute(stmt);
+```
+
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+
+```c
+// 示例：校验输入长度
+if (strlen(username) > 100 || strlen(password) > 100) {
+    printf("Input too long\n");
+    return;
+}
+```
+SOLUTION
+	risk: "SQL注入",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_sql.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+#include <mysql/mysql.h>
+
+void vulnerable_login(MYSQL *conn, const char *username, const char *password) {
+    char query[1024];
+    
+    // 不安全的 SQL 查询 - 直接拼接用户输入
+    sprintf(query, "SELECT * FROM users WHERE username='%s' AND password='%s'", 
+            username, password);
+    
+    if (mysql_query(conn, query) != 0) {
+        printf("Query failed: %s\n", mysql_error(conn));
+        return;
+    }
+    
+    MYSQL_RES *result = mysql_store_result(conn);
+    if (result) {
+        MYSQL_ROW row = mysql_fetch_row(result);
+        if (row) {
+            printf("Login successful for user: %s\n", username);
+        } else {
+            printf("Login failed\n");
+        }
+        mysql_free_result(result);
+    }
+}
+
+int main(int argc, char **argv) {
+    if (argc != 3) {
+        printf("Usage: %s <username> <password>\n", argv[0]);
+        return 1;
+    }
+    
+    MYSQL *conn = mysql_init(NULL);
+    if (!conn) {
+        printf("Failed to initialize MySQL\n");
+        return 1;
+    }
+    
+    if (mysql_real_connect(conn, "localhost", "user", "pass", "db", 0, NULL, 0) == NULL) {
+        printf("Failed to connect to MySQL: %s\n", mysql_error(conn));
+        mysql_close(conn);
+        return 1;
+    }
+    
+    vulnerable_login(conn, argv[1], argv[2]);
+    
+    mysql_close(conn);
+    return 0;
+}
+UNSAFE
+	'safefile://safe_sql.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+#include <mysql/mysql.h>
+
+void safe_login(MYSQL *conn, const char *username, const char *password) {
+    MYSQL_STMT *stmt;
+    MYSQL_BIND bind[2];
+    
+    // 使用参数化查询
+    const char *query = "SELECT * FROM users WHERE username=? AND password=?";
+    
+    stmt = mysql_stmt_init(conn);
+    if (!stmt) {
+        printf("Could not initialize statement\n");
+        return;
+    }
+    
+    if (mysql_stmt_prepare(stmt, query, strlen(query)) != 0) {
+        printf("Could not prepare statement\n");
+        mysql_stmt_close(stmt);
+        return;
+    }
+    
+    // 绑定参数
+    memset(bind, 0, sizeof(bind));
+    bind[0].buffer_type = MYSQL_TYPE_STRING;
+    bind[0].buffer = (void *)username;
+    bind[0].buffer_length = strlen(username);
+    
+    bind[1].buffer_type = MYSQL_TYPE_STRING;
+    bind[1].buffer = (void *)password;
+    bind[1].buffer_length = strlen(password);
+    
+    mysql_stmt_bind_param(stmt, bind);
+    
+    if (mysql_stmt_execute(stmt) != 0) {
+        printf("Statement execution failed: %s\n", mysql_stmt_error(stmt));
+    } else {
+        printf("Query executed successfully\n");
+    }
+    
+    mysql_stmt_close(stmt);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 3) {
+        printf("Usage: %s <username> <password>\n", argv[0]);
+        return 1;
+    }
+    
+    MYSQL *conn = mysql_init(NULL);
+    if (!conn) {
+        printf("Failed to initialize MySQL\n");
+        return 1;
+    }
+    
+    if (mysql_real_connect(conn, "localhost", "user", "pass", "db", 0, NULL, 0) == NULL) {
+        printf("Failed to connect to MySQL: %s\n", mysql_error(conn));
+        mysql_close(conn);
+        return 1;
+    }
+    
+    safe_login(conn, argv[1], argv[2]);
+    
+    mysql_close(conn);
+    return 0;
+}
+SAFE
+)
