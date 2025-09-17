@@ -4,6 +4,7 @@ import (
 	"context"
 	"reflect"
 	"sync"
+	"sync/atomic"
 )
 
 /*
@@ -86,21 +87,25 @@ type Barrier struct {
 
 // Done 减少屏障计数，当计数为0时标记该屏障条件已完成
 func (b *Barrier) Done() {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	// 使用原子操作减少计数
+	newCount := atomic.AddInt64(&b.counter, -1)
 
-	if b.counter <= 0 {
-		return // 防止重复调用
+	if newCount < 0 {
+		// 防止计数器变成负数
+		atomic.StoreInt64(&b.counter, 0)
+		return
 	}
 
-	b.counter--
-	if b.counter == 0 {
+	if newCount == 0 {
+		// 需要完成屏障
 		select {
 		case <-b.done:
 			// channel已经关闭，不需要再次关闭
 		default:
 			close(b.done)
 		}
+
+		// 更新完成状态
 		b.cb.mutex.Lock()
 		b.cb.completedBarriers[b.name] = true
 		b.cb.mutex.Unlock()
@@ -109,32 +114,48 @@ func (b *Barrier) Done() {
 
 // Add 增加屏障计数（重入功能）
 func (b *Barrier) Add(delta int) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
+	for {
+		oldCount := atomic.LoadInt64(&b.counter)
+		newCount := oldCount + int64(delta)
 
-	if b.counter == 0 && delta > 0 {
-		// 如果之前已经完成，需要重置状态
-		b.cb.mutex.Lock()
-		delete(b.cb.completedBarriers, b.name)
-		b.done = make(chan struct{})
-		b.cb.mutex.Unlock()
-	}
-
-	b.counter += int64(delta)
-	if b.counter < 0 {
-		b.counter = 0
-	}
-
-	if b.counter == 0 {
-		select {
-		case <-b.done:
-			// 已经关闭，不需要再次关闭
-		default:
-			close(b.done)
-			b.cb.mutex.Lock()
-			b.cb.completedBarriers[b.name] = true
-			b.cb.mutex.Unlock()
+		if newCount < 0 {
+			newCount = 0
 		}
+
+		// 使用 CAS 操作确保原子性
+		if atomic.CompareAndSwapInt64(&b.counter, oldCount, newCount) {
+			wasZero := oldCount == 0
+			shouldComplete := newCount == 0
+			shouldReset := wasZero && delta > 0
+
+			if shouldReset {
+				// 需要重置状态 - 这里仍需要锁保护，因为涉及到 channel 重新创建
+				b.mutex.Lock()
+				b.done = make(chan struct{})
+				b.mutex.Unlock()
+
+				// 如果之前已经完成，需要重置 completedBarriers 状态
+				b.cb.mutex.Lock()
+				delete(b.cb.completedBarriers, b.name)
+				b.cb.mutex.Unlock()
+			}
+
+			if shouldComplete && !shouldReset {
+				select {
+				case <-b.done:
+					// 已经关闭，不需要再次关闭
+				default:
+					close(b.done)
+				}
+
+				b.cb.mutex.Lock()
+				b.cb.completedBarriers[b.name] = true
+				b.cb.mutex.Unlock()
+			}
+
+			break
+		}
+		// CAS 失败，重试
 	}
 }
 
@@ -179,7 +200,6 @@ func NewCondBarrierContext(ctx context.Context) *CondBarrier {
 // CreateBarrier 创建一个命名的屏障条件
 func (cb *CondBarrier) CreateBarrier(name string) *Barrier {
 	cb.mutex.Lock()
-	defer cb.mutex.Unlock()
 
 	// 如果已经取消，返回一个已完成的屏障
 	if cb.cancelled {
@@ -191,12 +211,16 @@ func (cb *CondBarrier) CreateBarrier(name string) *Barrier {
 		}
 		close(barrier.done)
 		cb.completedBarriers[name] = true
+		cb.mutex.Unlock()
 		return barrier
 	}
 
 	// 如果已经存在同名屏障，增加计数并返回现有的
 	if barrier, exists := cb.barriers[name]; exists {
-		barrier.Add(1)
+		// 先释放 cb.mutex，完全避免嵌套锁
+		cb.mutex.Unlock()
+		// 使用原子操作增加计数，避免锁竞争
+		atomic.AddInt64(&barrier.counter, 1)
 		return barrier
 	}
 
@@ -218,6 +242,7 @@ func (cb *CondBarrier) CreateBarrier(name string) *Barrier {
 		delete(cb.waiters, name) // 清理等待列表
 	}
 
+	cb.mutex.Unlock()
 	return barrier
 }
 
