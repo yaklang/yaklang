@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,6 +22,8 @@ import (
 
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
+	err := sfbuildin.SyncEmbedRule()
+	require.NoError(t, err)
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("is_build_in_rule = ? ", true)
 	failedRules := make([]string, 0)
@@ -55,10 +58,10 @@ func TestVerify_DEBUG(t *testing.T) {
 		return
 	}
 	yakit.InitialDatabase()
-	// err := sfbuildin.SyncEmbedRule()
-	// require.NoError(t, err)
+	err := sfbuildin.SyncEmbedRule()
+	require.NoError(t, err)
 	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
-	ruleName := "检测Java拼接SQL字符串漏洞"
+	ruleName := "检测PHP反序列化漏洞"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
