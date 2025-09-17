@@ -175,3 +175,37 @@ CODE)>
 		"value1": {"1"},
 	})
 }
+
+func TestUntil(t *testing.T) {
+	rule := `
+a as $source
+b(* as $sink)
+$sink #{
+    until: "* & $source"
+}-> as $target 
+`
+
+	t.Run("test until", func(t *testing.T) {
+		code := `
+a = 12344
+cc = [1, 2 , a]
+b(cc)
+    `
+
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"target": {"12344"},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+
+	})
+
+	t.Run("test until not match", func(t *testing.T) {
+		code := `
+a = 12344
+cc = [1, 2 , 3]
+b(cc)
+`
+		ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+			"target": {},
+		}, ssaapi.WithLanguage(ssaapi.Yak))
+	})
+}
