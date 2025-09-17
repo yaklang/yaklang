@@ -138,8 +138,8 @@ func TestUTF8Reader_PerformanceStability(t *testing.T) {
 					result = append(result, buf[:n]...)
 
 					// 在CI环境下，验证每次读取的内容都是有效的UTF-8
-					// 除非是1字节缓冲区（UTF8Reader失效）
-					if bufSize > 1 && !utf8.Valid(buf[:n]) {
+					// 除非是小缓冲区（1-3字节），这些情况下允许字符分割
+					if bufSize >= 4 && !utf8.Valid(buf[:n]) {
 						t.Errorf("Invalid UTF-8 in chunk with buffer size %d: %v", bufSize, buf[:n])
 					}
 				}
