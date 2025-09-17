@@ -37,6 +37,9 @@ type LayerNode[K cmp.Ordered] interface {
 
 	// GetPQCodes 获取PQ编码（仅PQ节点有效）
 	GetPQCodes() ([]byte, bool)
+
+	// GetData 获取节点数据
+	GetData() any
 }
 
 // DistanceFunc 距离计算函数，基于节点接口

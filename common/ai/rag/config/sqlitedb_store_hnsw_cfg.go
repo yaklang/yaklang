@@ -13,6 +13,8 @@ type SQLiteVectorStoreHNSWConfig struct {
 	EfSearch         int     `json:"ef_search"`          // 搜索时的候选节点数
 	EfConstruct      int     `json:"ef_construct"`       // 构建时的候选节点数
 	DistanceFuncType string  `json:"distance_func_type"` // 距离函数类型（cosine、euclidean等）
+
+	EnablePQMode bool `json:"enable_pq_mode"`
 }
 
 // SQLiteVectorStoreHNSWOption 定义配置选项函数类型
@@ -26,6 +28,7 @@ func NewSQLiteVectorStoreHNSWConfig() *SQLiteVectorStoreHNSWConfig {
 		EfSearch:         20,       // 搜索时的候选节点数
 		EfConstruct:      200,      // 构建时的候选节点数
 		DistanceFuncType: "cosine", // 默认使用余弦距离
+		EnablePQMode:     false,    // 默认不启用PQ模式
 	}
 }
 
@@ -59,6 +62,13 @@ func (c *SQLiteVectorStoreHNSWConfig) ValidateConfig() error {
 	}
 
 	return nil
+}
+
+// WithEnablePQMode 设置是否启用PQ模式
+func WithEnablePQMode(enablePQMode bool) SQLiteVectorStoreHNSWOption {
+	return func(config *SQLiteVectorStoreHNSWConfig) {
+		config.EnablePQMode = enablePQMode
+	}
 }
 
 // WithMaxNeighbors 设置最大邻居数 (M 参数)
@@ -114,6 +124,11 @@ func WithManhattanDistance() SQLiteVectorStoreHNSWOption {
 // WithDotDistance 设置使用点积距离
 func WithDotDistance() SQLiteVectorStoreHNSWOption {
 	return WithDistanceFunction("dot")
+}
+
+// WithPQMode 设置使用PQ模式
+func WithPQMode() SQLiteVectorStoreHNSWOption {
+	return WithEnablePQMode(true)
 }
 
 // WithHNSWParameters 批量设置 HNSW 参数

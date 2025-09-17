@@ -61,14 +61,6 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		return v, nil
 	}
 
-	consumeBool := func() (bool, error) {
-		v, err := consumeVarint()
-		if err != nil {
-			return false, err
-		}
-		return v != 0, nil
-	}
-
 	consumeString := func() (string, error) {
 		// Read string length
 		strLen, err := consumeVarint()
@@ -81,6 +73,20 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		str := string(data[offset : offset+int(strLen)])
 		offset += int(strLen)
 		return str, nil
+	}
+
+	consumeBytes := func() ([]byte, error) {
+		// Read string length
+		strLen, err := consumeVarint()
+		if err != nil {
+			return nil, utils.Wrap(err, "consume string length")
+		}
+		if offset+int(strLen) > len(data) {
+			return nil, utils.Error("not enough data for string")
+		}
+		data := data[offset : offset+int(strLen)]
+		offset += int(strLen)
+		return data, nil
 	}
 
 	// version
@@ -122,22 +128,22 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		return nil, utils.Wrap(err, "efsearch")
 	}
 
-	// pqmode
-	pqmode, err := consumeBool()
+	// export mode
+	exportMode, err := consumeVarint()
 	if err != nil {
-		return nil, utils.Wrap(err, "pqmode")
+		return nil, utils.Wrap(err, "export mode")
 	}
 
 	p := &Persistent[K]{
-		Total:    total,
-		Dims:     dims,
-		M:        m,
-		Ml:       ml,
-		EfSearch: efsearch,
-		PQMode:   pqmode,
+		Total:      total,
+		Dims:       dims,
+		M:          m,
+		Ml:         ml,
+		EfSearch:   efsearch,
+		ExportMode: byte(exportMode),
 	}
 
-	if pqmode {
+	if p.ExportMode == ExportModePQ {
 		// pq m
 		pqm, err := consumeUint32()
 		if err != nil {
@@ -287,7 +293,8 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 		}
 
 		var code any
-		if p.PQMode {
+		switch p.ExportMode {
+		case ExportModePQ:
 			size := int(p.PQCodebook.PQCodeByteSize)
 			if offset+size > len(data) {
 				return nil, utils.Error("not enough data for pq code")
@@ -296,7 +303,7 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 			copy(tempCode, data[offset:offset+size])
 			offset += size
 			code = tempCode
-		} else {
+		case ExportModeStandard:
 			vec := make([]float64, p.Dims)
 			for j := uint32(0); j < p.Dims; j++ {
 				f, err := consumeFloat64()
@@ -306,6 +313,24 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 				vec[j] = f
 			}
 			code = vec
+		case ExportModeUID:
+			data, err := consumeBytes()
+			if err != nil {
+				return nil, utils.Wrap(err, "core info node code")
+			}
+			code = hnswspec.LazyNodeID(data)
+		case ExportModeIntUID:
+			data, err := consumeVarint()
+			if err != nil {
+				return nil, utils.Wrap(err, "core info node code")
+			}
+			code = hnswspec.LazyNodeID(data)
+		case ExportModeStrUID:
+			data, err := consumeBytes()
+			if err != nil {
+				return nil, utils.Wrap(err, "core info node code")
+			}
+			code = hnswspec.LazyNodeID(data)
 		}
 		p.OffsetToKey[i] = &PersistentNode[K]{
 			Key:  key,
@@ -346,8 +371,12 @@ func LoadBinary[K cmp.Ordered](r io.Reader) (*Persistent[K], error) {
 	return p, nil
 }
 
-// BuildGraph 从 Persistent 构建 Graph[K]
 func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
+	return p.BuildLazyGraph(nil)
+}
+
+// BuildGraph 从 Persistent 构建 Graph[K]
+func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error)) (*Graph[K], error) {
 	if p.Total <= 0 {
 		return nil, utils.Error("cannot build graph from empty persistent")
 	}
@@ -368,7 +397,7 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 		return nil, utils.Error("invalid hnsw.EfSearch")
 	}
 
-	if p.PQMode && p.PQCodebook == nil {
+	if p.ExportMode == ExportModePQ && p.PQCodebook == nil {
 		return nil, utils.Error("pq mode enabled but pq codebook is nil")
 	}
 
@@ -381,7 +410,7 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 	g.Ml = float64(p.Ml)
 	g.EfSearch = int(p.EfSearch)
 
-	if p.PQMode {
+	if p.ExportMode == ExportModePQ {
 		g.pqCodebook = &pq.Codebook{
 			M:            int(p.PQCodebook.M),
 			K:            int(p.PQCodebook.K),
@@ -401,7 +430,8 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 		key := node.Key
 		var vec Vector
 
-		if p.PQMode {
+		switch p.ExportMode {
+		case ExportModePQ:
 			codes, ok := node.Code.([]byte)
 			if !ok {
 				return nil, utils.Errorf("expected []byte for pq code, got %T", node.Code)
@@ -428,7 +458,7 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 			// 注意：这里我们使用构造函数创建的节点，它的 PQ codes 已经根据输入向量计算
 			// 如果需要使用原始的 codes，我们需要在 hnswspec 中添加设置方法
 			nodes[uint32(offset)] = nodeObj
-		} else {
+		case ExportModeStandard:
 			vecFloat64, ok := node.Code.([]float64)
 			if !ok {
 				return nil, utils.Errorf("expected []float64 for vector, got %T", node.Code)
@@ -442,6 +472,23 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 			}
 			vec = func() []float32 { return vecFloat32 }
 			nodes[uint32(offset)] = hnswspec.NewStandardLayerNode(key, vec)
+		case ExportModeUID:
+			if dataLoader == nil {
+				return nil, utils.Error("data loader is nil")
+			}
+			id, ok := node.Code.(hnswspec.LazyNodeID)
+			if !ok {
+				return nil, utils.Errorf("expected []byte for uid, got %T", node.Code)
+			}
+			nodes[uint32(offset)] = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(id), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
+				data, err := dataLoader(uid)
+				if err != nil {
+					return nil, utils.Wrap(err, "data loader")
+				}
+				return data, nil
+			})
+		default:
+			return nil, utils.Errorf("unsupported node code type %T", node.Code)
 		}
 	}
 

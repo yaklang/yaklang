@@ -17,12 +17,12 @@ import (
 func TestLoadBinaryRoundTrip(t *testing.T) {
 	// 创建一个简单的 Persistent 对象
 	p := &Persistent[string]{
-		Total:    3,
-		Dims:     4,
-		M:        16,
-		Ml:       0.5,
-		EfSearch: 200,
-		PQMode:   false,
+		Total:      3,
+		Dims:       4,
+		M:          16,
+		Ml:         0.5,
+		EfSearch:   200,
+		ExportMode: ExportModeStandard,
 		Layers: []*PersistentLayer{
 			{HNSWLevel: 0, Nodes: []uint32{1, 2, 3}},
 			{HNSWLevel: 1, Nodes: []uint32{1, 2}},
@@ -55,7 +55,7 @@ func TestLoadBinaryRoundTrip(t *testing.T) {
 	require.Equal(t, p.M, loaded.M)
 	require.Equal(t, p.Ml, loaded.Ml)
 	require.Equal(t, p.EfSearch, loaded.EfSearch)
-	require.Equal(t, p.PQMode, loaded.PQMode)
+	require.Equal(t, p.ExportMode, loaded.ExportMode)
 
 	// 验证层
 	require.Len(t, loaded.Layers, len(p.Layers))
@@ -80,12 +80,12 @@ func TestLoadBinaryRoundTrip(t *testing.T) {
 func TestLoadBinaryRoundTripPQ(t *testing.T) {
 	// 创建一个带 PQ 的 Persistent 对象
 	p := &Persistent[string]{
-		Total:    2,
-		Dims:     4,
-		M:        16,
-		Ml:       0.5,
-		EfSearch: 200,
-		PQMode:   true,
+		Total:      2,
+		Dims:       4,
+		M:          16,
+		Ml:         0.5,
+		EfSearch:   200,
+		ExportMode: ExportModePQ,
 		PQCodebook: &PersistentPQCodebook{
 			M:              2,
 			K:              256,
@@ -122,7 +122,7 @@ func TestLoadBinaryRoundTripPQ(t *testing.T) {
 	require.Equal(t, p.M, loaded.M)
 	require.Equal(t, p.Ml, loaded.Ml)
 	require.Equal(t, p.EfSearch, loaded.EfSearch)
-	require.Equal(t, p.PQMode, loaded.PQMode)
+	require.Equal(t, p.ExportMode, loaded.ExportMode)
 
 	// 验证 PQ 码本
 	require.NotNil(t, loaded.PQCodebook)
@@ -178,7 +178,7 @@ func TestExportGraphToBinaryStandard(t *testing.T) {
 	require.NotNil(t, pers)
 	require.True(t, pers.Total >= uint32(3)) // 可能包含额外的节点
 	require.Equal(t, uint32(4), pers.Dims)
-	require.False(t, pers.PQMode)
+	require.Equal(t, ExportModeStandard, pers.ExportMode)
 
 	// 导出到二进制
 	ctx := context.Background()
@@ -195,7 +195,7 @@ func TestExportGraphToBinaryStandard(t *testing.T) {
 	require.Equal(t, pers.M, loaded.M)
 	require.Equal(t, pers.Ml, loaded.Ml)
 	require.Equal(t, pers.EfSearch, loaded.EfSearch)
-	require.Equal(t, pers.PQMode, loaded.PQMode)
+	require.Equal(t, pers.ExportMode, loaded.ExportMode)
 }
 
 func TestExportGraphToBinaryPQ(t *testing.T) {
@@ -254,7 +254,7 @@ func TestExportGraphToBinaryPQ(t *testing.T) {
 	pers, err := ExportHNSWGraph(graph)
 	require.NoError(t, err)
 	require.NotNil(t, pers)
-	require.True(t, pers.PQMode)
+	require.Equal(t, ExportModePQ, pers.ExportMode)
 	require.NotNil(t, pers.PQCodebook)
 	require.Equal(t, uint32(2), pers.PQCodebook.M)
 	require.Equal(t, uint32(4), pers.PQCodebook.K)
@@ -276,7 +276,7 @@ func TestExportGraphToBinaryPQ(t *testing.T) {
 	// 验证加载的结果
 	require.Equal(t, pers.Total, loaded.Total)
 	require.Equal(t, pers.Dims, loaded.Dims)
-	require.True(t, loaded.PQMode)
+	require.Equal(t, ExportModePQ, loaded.ExportMode)
 	require.NotNil(t, loaded.PQCodebook)
 	require.Equal(t, pers.PQCodebook.M, loaded.PQCodebook.M)
 	require.Equal(t, pers.PQCodebook.K, loaded.PQCodebook.K)
@@ -324,12 +324,12 @@ func TestKeyRoundTripInBinary(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// 创建包含测试Key的Persistent对象
 			p := &Persistent[string]{
-				Total:    2,
-				Dims:     4,
-				M:        16,
-				Ml:       0.5,
-				EfSearch: 200,
-				PQMode:   false,
+				Total:      2,
+				Dims:       4,
+				M:          16,
+				Ml:         0.5,
+				EfSearch:   200,
+				ExportMode: ExportModeStandard,
 				Layers: []*PersistentLayer{
 					{HNSWLevel: 0, Nodes: []uint32{1}},
 				},
@@ -362,12 +362,12 @@ func TestKeyConversionErrors(t *testing.T) {
 	t.Run("int_type_conversion", func(t *testing.T) {
 		// 创建一个int类型的Persistent
 		p := &Persistent[int]{
-			Total:    2,
-			Dims:     4,
-			M:        16,
-			Ml:       0.5,
-			EfSearch: 200,
-			PQMode:   false,
+			Total:      2,
+			Dims:       4,
+			M:          16,
+			Ml:         0.5,
+			EfSearch:   200,
+			ExportMode: ExportModeStandard,
 			Layers: []*PersistentLayer{
 				{HNSWLevel: 0, Nodes: []uint32{1}},
 			},
@@ -390,12 +390,12 @@ func TestKeyConversionErrors(t *testing.T) {
 	t.Run("int64_type_conversion", func(t *testing.T) {
 		// 创建一个int64类型的Persistent
 		p := &Persistent[int64]{
-			Total:    2,
-			Dims:     4,
-			M:        16,
-			Ml:       0.5,
-			EfSearch: 200,
-			PQMode:   false,
+			Total:      2,
+			Dims:       4,
+			M:          16,
+			Ml:         0.5,
+			EfSearch:   200,
+			ExportMode: ExportModeStandard,
 			Layers: []*PersistentLayer{
 				{HNSWLevel: 0, Nodes: []uint32{1}},
 			},
@@ -418,12 +418,12 @@ func TestKeyConversionErrors(t *testing.T) {
 	t.Run("uint32_type_conversion", func(t *testing.T) {
 		// 创建一个uint32类型的Persistent
 		p := &Persistent[uint32]{
-			Total:    2,
-			Dims:     4,
-			M:        16,
-			Ml:       0.5,
-			EfSearch: 200,
-			PQMode:   false,
+			Total:      2,
+			Dims:       4,
+			M:          16,
+			Ml:         0.5,
+			EfSearch:   200,
+			ExportMode: ExportModeStandard,
 			Layers: []*PersistentLayer{
 				{HNSWLevel: 0, Nodes: []uint32{1}},
 			},
@@ -446,12 +446,12 @@ func TestKeyConversionErrors(t *testing.T) {
 	t.Run("uint64_type_conversion", func(t *testing.T) {
 		// 创建一个uint64类型的Persistent
 		p := &Persistent[uint64]{
-			Total:    2,
-			Dims:     4,
-			M:        16,
-			Ml:       0.5,
-			EfSearch: 200,
-			PQMode:   false,
+			Total:      2,
+			Dims:       4,
+			M:          16,
+			Ml:         0.5,
+			EfSearch:   200,
+			ExportMode: ExportModeStandard,
 			Layers: []*PersistentLayer{
 				{HNSWLevel: 0, Nodes: []uint32{1}},
 			},
@@ -477,12 +477,12 @@ func TestKeyEdgeCases(t *testing.T) {
 		// 测试非常长的key
 		longKey := strings.Repeat("a", 10000)
 		p := &Persistent[string]{
-			Total:    2,
-			Dims:     4,
-			M:        16,
-			Ml:       0.5,
-			EfSearch: 200,
-			PQMode:   false,
+			Total:      2,
+			Dims:       4,
+			M:          16,
+			Ml:         0.5,
+			EfSearch:   200,
+			ExportMode: ExportModeStandard,
 			Layers: []*PersistentLayer{
 				{HNSWLevel: 0, Nodes: []uint32{1}},
 			},
@@ -506,12 +506,12 @@ func TestKeyEdgeCases(t *testing.T) {
 		// 测试包含null字节的key
 		keyWithNull := "key\x00with\x00null"
 		p := &Persistent[string]{
-			Total:    2,
-			Dims:     4,
-			M:        16,
-			Ml:       0.5,
-			EfSearch: 200,
-			PQMode:   false,
+			Total:      2,
+			Dims:       4,
+			M:          16,
+			Ml:         0.5,
+			EfSearch:   200,
+			ExportMode: ExportModeStandard,
 			Layers: []*PersistentLayer{
 				{HNSWLevel: 0, Nodes: []uint32{1}},
 			},
@@ -535,12 +535,12 @@ func TestKeyEdgeCases(t *testing.T) {
 		// 测试包含二进制数据的key（非UTF-8）
 		binaryKey := string([]byte{0x00, 0x01, 0x02, 0xFF, 0xFE, 0xFD})
 		p := &Persistent[string]{
-			Total:    2,
-			Dims:     4,
-			M:        16,
-			Ml:       0.5,
-			EfSearch: 200,
-			PQMode:   false,
+			Total:      2,
+			Dims:       4,
+			M:          16,
+			Ml:         0.5,
+			EfSearch:   200,
+			ExportMode: ExportModeStandard,
 			Layers: []*PersistentLayer{
 				{HNSWLevel: 0, Nodes: []uint32{1}},
 			},
