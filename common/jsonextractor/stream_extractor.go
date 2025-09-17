@@ -65,7 +65,8 @@ type callbackManager struct {
 	onConditionalObjectCallback []*ConditionalCallback
 	fieldStreamHandlers         []*FieldStreamHandler
 
-	rawKVCallback func(key, data any)
+	rawKVCallback    func(key, data any)
+	formatKVCallback func(key, value any)
 
 	// 字段流处理相关
 	activeFieldStreams map[string]io.WriteCloser // 当前活跃的字段流 写入器
@@ -83,6 +84,12 @@ func WithObjectKeyValue(callback func(string string, data any)) CallbackOption {
 func WithRawKeyValueCallback(callback func(key, data any)) CallbackOption {
 	return func(c *callbackManager) {
 		c.rawKVCallback = callback
+	}
+}
+
+func WithFormatKeyValueCallback(callback func(key, data any)) CallbackOption {
+	return func(c *callbackManager) {
+		c.formatKVCallback = callback
 	}
 }
 

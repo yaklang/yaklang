@@ -191,6 +191,10 @@ func (c *callbackManager) kv(key, data any) {
 		autoData = anyData
 	}
 
+	if c.formatKVCallback != nil {
+		c.formatKVCallback(rawKeyFormatted(key), autoData)
+	}
+
 	switch key.(type) {
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		keyInt, _ := strconv.ParseInt(fmt.Sprintf("%d", key), 10, 64)

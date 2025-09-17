@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -80,6 +81,46 @@ func (q *Action) GetInvokeParams(key string) aitool.InvokeParams {
 
 func (q *Action) GetInvokeParamsArray(key string) []aitool.InvokeParams {
 	return q.params.GetObjectArray(key)
+}
+
+func ExtractWaitableActionFromStream(ctx context.Context,
+	reader io.Reader,
+	actionName string,
+	alias ...string) (*WaitableAction, error) {
+	waitAction := NewWaitableAction(ctx, actionName)
+
+	actions := []string{actionName}
+	actions = append(actions, alias...)
+	actionStart := utils.NewBool(false)
+	var err error
+	var buf bytes.Buffer
+	go func() {
+		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf),
+			jsonextractor.WithFormatKeyValueCallback(func(key, data any) {
+				if !actionStart.IsSet() {
+					if utils.InterfaceToString(key) == "@action" {
+						if utils.StringArrayContains(actions, utils.InterfaceToString(data)) {
+							actionStart.Set()
+						} else if mapData, ok := data.(map[string]any); ok {
+							for _, v := range mapData {
+								if utils.StringArrayContains(actions, utils.InterfaceToString(v)) {
+									actionStart.Set()
+									break
+								}
+							}
+						}
+					}
+					return
+				}
+				keyString := utils.InterfaceToString(key)
+				waitAction.Set(keyString, data)
+			}),
+		)
+		if err != nil {
+			log.Error("Failed to extract action", "action", buf.String(), "error", err)
+		}
+	}()
+	return waitAction, nil
 }
 
 func ExtractActionFromStreamWithJSONExtractOptions(
