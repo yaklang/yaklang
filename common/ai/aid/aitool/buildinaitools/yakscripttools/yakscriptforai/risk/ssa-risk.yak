@@ -1,0 +1,18 @@
+__DESC__ = "接收一个SSA RiskID获取SSA Risk"
+__VERBOSE_NAME_ = "通过SSA Risk ID获取SSA Risk"
+__KEYWORDS__ = "SSA, Risk, SSA Risk"
+
+# 获取参数
+risk_id = cli.Int("risk_id", cli.setRequired(true))
+cli.check()
+
+if risk_id <= 0 {
+    die(sprintf("无效的 Risk ID: %d", risk_id))
+}
+
+# 获取包含数据流信息的 SSA Risk 数据
+wrappedRisk = risk.GetSSARiskWithDataFlow(risk_id)
+if wrappedRisk == nil {
+    die(sprintf("无法找到 Risk ID 为 %d 的 SSA 风险记录", risk_id))
+}
+yakit.Info(json.Marshal(wrappedRisk)~)

