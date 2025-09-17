@@ -1208,7 +1208,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return nil
 		}
 		s.debugLog(">> pop")
-		m1 := make(map[int64]ValueOperator)
+		m1 := make(map[int64]ValueOperator, ValuesLen(vs))
 		_ = vs.Recursive(func(operator ValueOperator) error {
 			id, ok := fetchId(operator)
 			if ok {
