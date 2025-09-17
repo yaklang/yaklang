@@ -264,6 +264,8 @@ func (cb *CondBarrier) Cancel() {
 	// 完成所有未完成的屏障
 	for name, barrier := range cb.barriers {
 		if !cb.completedBarriers[name] {
+			// 使用原子操作设置计数器为0，确保屏障完成
+			atomic.StoreInt64(&barrier.counter, 0)
 			select {
 			case <-barrier.done:
 				// 已经关闭
