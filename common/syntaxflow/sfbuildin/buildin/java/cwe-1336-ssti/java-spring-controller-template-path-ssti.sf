@@ -103,9 +103,9 @@ REFERENCE
 Controller.__ref__<getMembers>?{.annotation.*Mapping && !.annotation.ResponseBody} as $entryMethods;
 $entryMethods<getReturns>?{<typeName>?{have: String}} as $sink;
 $sink #{
-    until: `* & $params as $source`,
+    until: `* & $params `,
     exclude: `*?{opcode: phi}`,
-}->;
+}-> as $source;
 $source<dataflow(<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $haveCall;

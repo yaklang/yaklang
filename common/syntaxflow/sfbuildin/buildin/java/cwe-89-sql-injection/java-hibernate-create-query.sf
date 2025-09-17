@@ -88,14 +88,14 @@ REFERENCE
 .create*Query(,* as $query,);
 $query?{!opcode: const} as $mixQuery;<delete(query)>
 $mixQuery #{
-    until: `*?{opcode: param && !<typeName>?{any: /(?i)bool/,/(?i)float/,/(?i)double/,/(?i)int/} } as $params`,
-}->;
+    until: `*?{opcode: param && !<typeName>?{any: /(?i)bool/,/(?i)float/,/(?i)double/,/(?i)int/} } `,
+}-> as $params;
 $params<dataflow(<<<CODE
-*?{opcode: add} as $op;
-$op-> as $opParam;
-$op#> as $opParam;
-$opParam?{opcode: const} as $__next__;
-<delete(opParam)><delete(op)>
+    *?{opcode: add} as $op;
+    $op-> as $opParam;
+    $op#> as $opParam;
+    $opParam?{opcode: const} as $__next__;
+    <delete(opParam)><delete(op)>
 CODE)> as $unsafeParams;
 
 alert $unsafeParams for {
@@ -275,6 +275,9 @@ public class UserManager {
     }
 }
 CODE
+)
+desc(
+    lang: java
 	"safefile://SafeUserSearch.java": <<<CODE
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
