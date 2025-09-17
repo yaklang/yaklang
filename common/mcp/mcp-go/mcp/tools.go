@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/samber/lo"
 )
@@ -84,9 +85,9 @@ type Tool struct {
 }
 
 type ToolInputSchema struct {
-	Type       string         `json:"type"`
-	Properties map[string]any `json:"properties,omitempty"`
-	Required   []string       `json:"required,omitempty"`
+	Type       string                        `json:"type"`
+	Properties *omap.OrderedMap[string, any] `json:"properties,omitempty"`
+	Required   []string                      `json:"required,omitempty"`
 }
 
 // ToolOption is a function that configures a Tool.
@@ -109,7 +110,7 @@ func NewTool(name string, opts ...ToolOption) *Tool {
 		Name: name,
 		InputSchema: ToolInputSchema{
 			Type:       "object",
-			Properties: make(map[string]any),
+			Properties: omap.NewEmptyOrderedMap[string, any](),
 			Required:   nil, // Will be omitted from JSON if empty
 		},
 	}
@@ -327,8 +328,11 @@ func WithStructArray(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 		"items": items,
 	}
 	temp := NewTool("", itemsOpt...)
-	for k, v := range temp.InputSchema.Properties {
-		items[k] = v
+	if temp.InputSchema.Properties != nil {
+		temp.InputSchema.Properties.ForEach(func(k string, v any) bool {
+			items[k] = v
+			return true
+		})
 	}
 	items["required"] = temp.InputSchema.Required
 	return WithRaw(name, schema, opts...)
@@ -438,28 +442,37 @@ func WithRaw(name string, object map[string]any, opts ...PropertyOption) ToolOpt
 			}
 		}
 
-		t.InputSchema.Properties[name] = object
+		t.InputSchema.Properties.Set(name, object)
 	}
 }
 
 // ToMap converts the ToolInputSchema to a map[string]any.
-func (s *ToolInputSchema) ToMap() map[string]any {
-	copiedProps := utils.CopyMapInterface(s.Properties)
-	required := lo.Map(s.Required, func(item string, _ int) any { return item })
-	for k, v := range s.Properties {
-		m := utils.InterfaceToGeneralMap(v)
-		if _, ok := m["required"]; ok {
-			delete(m, "required")
-			copiedProps[k] = m
-		}
+// Note: This method preserves order using OrderedMap for the result
+func (s *ToolInputSchema) ToMap() *omap.OrderedMap[string, any] {
+	result := omap.NewEmptyOrderedMap[string, any]()
+	result.Set("type", s.Type)
+
+	if s.Properties != nil && s.Properties.Len() > 0 {
+		// Create an ordered copy of properties with required field processing
+		orderedProps := omap.NewEmptyOrderedMap[string, any]()
+		s.Properties.ForEach(func(k string, v any) bool {
+			m := utils.InterfaceToGeneralMap(v)
+			if _, ok := m["required"]; ok {
+				delete(m, "required")
+				orderedProps.Set(k, m)
+			} else {
+				orderedProps.Set(k, v)
+			}
+			return true
+		})
+		result.Set("properties", orderedProps)
 	}
-	result := map[string]any{
-		"type":       s.Type,
-		"properties": copiedProps,
+
+	if len(s.Required) > 0 {
+		required := lo.Map(s.Required, func(item string, _ int) any { return item })
+		result.Set("required", required)
 	}
-	if len(required) > 0 {
-		result["required"] = required
-	}
+
 	return result
 }
 
@@ -476,7 +489,11 @@ func (s *ToolInputSchema) FromMap(m map[string]any) error {
 	if !ok {
 		return fmt.Errorf("properties is not a map[string]any")
 	}
-	s.Properties = properties
+	// Convert regular map to OrderedMap
+	s.Properties = omap.NewEmptyOrderedMap[string, any]()
+	for k, v := range properties {
+		s.Properties.Set(k, v)
+	}
 
 	// required
 	if v, ok := m["required"]; ok {

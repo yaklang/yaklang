@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func TestMCPServer_NewMCPServer(t *testing.T) {
@@ -429,7 +430,7 @@ func TestMCPServer_HandleUndefinedHandlers(t *testing.T) {
 		Description: "Test tool",
 		InputSchema: mcp.ToolInputSchema{
 			Type:       "object",
-			Properties: map[string]interface{}{},
+			Properties: omap.NewEmptyOrderedMap[string, any](),
 		},
 	}, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return &mcp.CallToolResult{}, nil

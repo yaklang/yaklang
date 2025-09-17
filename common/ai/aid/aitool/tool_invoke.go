@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/davecgh/go-spew/spew"
 
@@ -50,6 +51,87 @@ func (t *Tool) InvokeWithJSON(jsonStr string, opts ...ToolInvokeOptions) (*ToolR
 
 	// 使用参数调用工具
 	return t.InvokeWithParams(params.Params, opts...)
+}
+
+// InvokeWithOrderedJSON 使用JSON字符串调用工具，并保持参数顺序
+func (t *Tool) InvokeWithOrderedJSON(jsonStr string, opts ...ToolInvokeOptions) (*ToolResult, error) {
+	// 使用 OrderedMap 解析 JSON 以保持顺序
+	orderedParams := omap.NewEmptyOrderedMap[string, any]()
+	err := orderedParams.UnmarshalJSON([]byte(jsonStr))
+	if err != nil {
+		return &ToolResult{
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       nil,
+			Success:     false,
+			Error:       fmt.Sprintf("JSON解析失败: %v", err),
+		}, fmt.Errorf("JSON解析失败: %v", err)
+	}
+
+	// 提取工具名称
+	toolVal, hasTool := orderedParams.Get("tool")
+	if !hasTool {
+		return &ToolResult{
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       nil,
+			Success:     false,
+			Error:       "缺少 tool 字段",
+		}, fmt.Errorf("缺少 tool 字段")
+	}
+
+	toolName, ok := toolVal.(string)
+	if !ok {
+		return &ToolResult{
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       nil,
+			Success:     false,
+			Error:       "tool 字段类型错误",
+		}, fmt.Errorf("tool 字段类型错误")
+	}
+
+	// 验证工具名称
+	if toolName != t.Name {
+		return &ToolResult{
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       nil,
+			Success:     false,
+			Error:       fmt.Sprintf("工具名称不匹配: 期望 %s, 实际 %s", t.Name, toolName),
+		}, fmt.Errorf("工具名称不匹配: 期望 %s, 实际 %s", t.Name, toolName)
+	}
+
+	// 提取参数
+	paramsVal, hasParams := orderedParams.Get("params")
+	if !hasParams {
+		// 如果没有 params 字段，使用空的 OrderedMap
+		return t.InvokeWithOrderedParams(omap.NewEmptyOrderedMap[string, any](), opts...)
+	}
+
+	// 尝试将参数转换为 OrderedMap
+	var toolParams *omap.OrderedMap[string, any]
+	switch p := paramsVal.(type) {
+	case *omap.OrderedMap[string, any]:
+		toolParams = p
+	case map[string]any:
+		// 如果是普通 map，转换为 OrderedMap（会丢失顺序，但至少能工作）
+		toolParams = omap.NewEmptyOrderedMap[string, any]()
+		for k, v := range p {
+			toolParams.Set(k, v)
+		}
+	default:
+		return &ToolResult{
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       nil,
+			Success:     false,
+			Error:       "params 字段类型错误",
+		}, fmt.Errorf("params 字段类型错误")
+	}
+
+	// 使用有序参数调用工具
+	return t.InvokeWithOrderedParams(toolParams, opts...)
 }
 
 func (t *Tool) InvokeWithRaw(raw string, opts ...ToolInvokeOptions) (*ToolResult, error) {
@@ -140,6 +222,41 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 	}, nil
 }
 
+// InvokeWithOrderedParams 使用 OrderedMap 参数调用工具
+func (t *Tool) InvokeWithOrderedParams(params *omap.OrderedMap[string, any], opts ...ToolInvokeOptions) (*ToolResult, error) {
+	// 验证参数
+	valid, validationErrors := t.ValidateOrderedParams(params)
+	if !valid {
+		// 转换为普通 map 用于结果显示
+		paramMap := make(map[string]any)
+		if params != nil {
+			params.ForEach(func(k string, v any) bool {
+				paramMap[k] = v
+				return true
+			})
+		}
+		return &ToolResult{
+			Name:        t.Name,
+			Description: t.Description,
+			Param:       paramMap,
+			Success:     false,
+			Error:       fmt.Sprintf("参数验证失败: %v", validationErrors),
+		}, fmt.Errorf("参数验证失败: %v", validationErrors)
+	}
+
+	// 转换为普通 map 用于执行
+	paramMap := make(map[string]any)
+	if params != nil {
+		params.ForEach(func(k string, v any) bool {
+			paramMap[k] = v
+			return true
+		})
+	}
+
+	// 调用已有的实现
+	return t.InvokeWithParams(paramMap, opts...)
+}
+
 // handleLargeContent 处理大文本内容，将其截断并保存到临时文件
 // content: 要处理的内容指针
 // contentType: 内容类型(stdout/stderr/json)
@@ -179,8 +296,24 @@ func handleLargeContentToFile(content string, contentType string) string {
 	return filename
 }
 
-// ValidateParams 验证参数
-func (t *Tool) validate(iSchema any, params map[string]any) (valid bool, errs []string) {
+// ValidateParams 验证参数 - 内部方法支持两种参数类型
+func (t *Tool) validate(iSchema any, params any) (valid bool, errs []string) {
+	// 将参数转换为普通 map 用于验证
+	var paramMap map[string]any
+	switch p := params.(type) {
+	case *omap.OrderedMap[string, any]:
+		paramMap = make(map[string]any)
+		if p != nil {
+			p.ForEach(func(k string, v any) bool {
+				paramMap[k] = v
+				return true
+			})
+		}
+	case map[string]any:
+		paramMap = p
+	default:
+		return false, []string{fmt.Sprintf("unsupported params type: %T", params)}
+	}
 	trimErrorFirstLine := func(err string) string {
 		lines := strings.Split(err, "\n")
 		if len(lines) > 0 && strings.HasPrefix(lines[0], "jsonschema validation ") {
@@ -198,9 +331,9 @@ func (t *Tool) validate(iSchema any, params map[string]any) (valid bool, errs []
 		spew.Dump(err)
 		return false, []string{fmt.Sprintf("JSON Schema Compile: %v", trimErrorFirstLine(err.Error()))}
 	}
-	applyDefault(schema, params)
+	applyDefault(schema, paramMap)
 
-	err = schema.Validate(params)
+	err = schema.Validate(paramMap)
 	valid = err == nil
 	if !valid {
 		validationError := err.(*jsonschema.ValidationError)
@@ -211,8 +344,33 @@ func (t *Tool) validate(iSchema any, params map[string]any) (valid bool, errs []
 	return valid, errs
 }
 
+// ValidateParams 验证普通 map 参数
 func (t *Tool) ValidateParams(params map[string]any) (bool, []string) {
-	return t.validate(t.Tool.InputSchema.ToMap(), params)
+	return t.validateWithSchema(params)
+}
+
+// ValidateOrderedParams 验证 OrderedMap 参数
+func (t *Tool) ValidateOrderedParams(params *omap.OrderedMap[string, any]) (bool, []string) {
+	return t.validateWithSchema(params)
+}
+
+// validateWithSchema 内部通用验证方法
+func (t *Tool) validateWithSchema(params any) (bool, []string) {
+	// Convert OrderedMap to regular map for JSON schema validation
+	// First serialize to JSON then deserialize to get plain Go structures
+	schemaMap := t.Tool.InputSchema.ToMap()
+	jsonBytes, err := json.Marshal(schemaMap)
+	if err != nil {
+		return false, []string{fmt.Sprintf("Failed to marshal schema: %v", err)}
+	}
+
+	var plainSchema any
+	err = json.Unmarshal(jsonBytes, &plainSchema)
+	if err != nil {
+		return false, []string{fmt.Sprintf("Failed to unmarshal schema: %v", err)}
+	}
+
+	return t.validate(plainSchema, params)
 }
 
 func (t *Tool) Validate(params map[string]any) (bool, []string) {
@@ -255,7 +413,7 @@ func NewToolFromJSON(jsonStr string, callback func(params InvokeParams, stdout i
 
 	for _, paramDef := range toolDef.Params {
 		name := utils.MapGetString(paramDef, "name")
-		tool.Tool.InputSchema.Properties[name] = paramDef
+		tool.Tool.InputSchema.Properties.Set(name, paramDef)
 		if required, ok := paramDef["required"].(bool); ok && required {
 			delete(paramDef, "required")
 			tool.Tool.InputSchema.Required = append(tool.Tool.InputSchema.Required, name)
