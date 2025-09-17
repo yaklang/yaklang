@@ -56,5 +56,5 @@ func showUserDefChainEx(flag int, v *Value) {
 			ret += show("Member", -1, value)
 		}
 	}
-	fmt.Println(ret)
+	log.Infof(ret)
 }

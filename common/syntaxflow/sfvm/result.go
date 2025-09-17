@@ -109,7 +109,7 @@ func WithShowAll(show ...bool) ShowOption {
 	}
 }
 func (s *SFFrameResult) Show(opts ...ShowOption) {
-	fmt.Println(s.String(opts...))
+	log.Infof(s.String(opts...))
 }
 func (s *SFFrameResult) String(opts ...ShowOption) string {
 	cfg := new(showConfig)

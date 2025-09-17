@@ -193,7 +193,7 @@ func (v *Value) ShowBacktrack() {
 	buf.WriteString("===================== Backtrack from [t" + fmt.Sprint(v.GetId()) + "]`" + v.String() + "` =====================: \n\n")
 	if om == nil || om.Len() <= 0 {
 		buf.WriteString("empty parent\n")
-		fmt.Println(buf.String())
+		log.Infof(buf.String())
 		return
 	}
 
@@ -204,7 +204,7 @@ func (v *Value) ShowBacktrack() {
 	// 	indent := strings.Repeat(" ", index*2) + fmt.Sprintf("[depth:%2d]->", track.GetDepth())
 	// 	buf.WriteString(indent + track.String() + "\n")
 	// }
-	fmt.Println(buf.String())
+	log.Infof(buf.String())
 }
 
 // FlexibleDepends is used to get all the dependencies of the value

@@ -119,6 +119,12 @@ func (p *Pipe[T, U]) process() {
 			p.swg.Add(1)
 			go func(t T) {
 				defer p.swg.Done()
+				defer func() {
+					if r := recover(); r != nil {
+						log.Errorf("Pipe process panic: %v", r)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+				}()
 				if result, err := p.handler(t); err == nil {
 					p.out.SafeFeed(result)
 				} else {
