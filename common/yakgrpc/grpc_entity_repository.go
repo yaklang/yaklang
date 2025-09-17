@@ -3,10 +3,9 @@ package yakgrpc
 import (
 	"context"
 	"github.com/samber/lo"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -70,7 +69,7 @@ func (s *Server) QueryRelationship(ctx context.Context, req *ypb.QueryRelationsh
 // GenerateERMDot 生成 ER 图 DOT 格式
 func (s *Server) GenerateERMDot(ctx context.Context, req *ypb.GenerateERMDotRequest) (*ypb.GenerateERMDotResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	ERM, err := yakit.QueryEntityWithDepth(db, req.GetFilter(), int(req.GetDepth()))
+	ERM, err := yakit.QueryERModel(db, yakit.WithERMQueryContext(ctx), yakit.WithERMQueryDepth(int(req.GetDepth())), yakit.WithERMQueryStartFilter(req.GetFilter()))
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +81,7 @@ func (s *Server) GenerateERMDot(ctx context.Context, req *ypb.GenerateERMDotRequ
 
 func (s *Server) QuerySubERM(ctx context.Context, req *ypb.QuerySubERMRequest) (*ypb.QuerySubERMResponse, error) {
 	db := consts.GetGormProfileDatabase()
-	ERM, err := yakit.QueryEntityWithDepth(db, req.GetFilter(), int(req.GetDepth()))
+	ERM, err := yakit.QueryERModel(db, yakit.WithERMQueryContext(ctx), yakit.WithERMQueryDepth(int(req.GetDepth())), yakit.WithERMQueryStartFilter(req.GetFilter()))
 	if err != nil {
 		return nil, err
 	}
@@ -94,4 +93,28 @@ func (s *Server) QuerySubERM(ctx context.Context, req *ypb.QuerySubERMRequest) (
 			return e.ToGRPC()
 		}),
 	}, nil
+}
+
+func (s *Server) QuerySubERMStream(req *ypb.QuerySubERMRequest, stream ypb.Yak_QuerySubERMStreamServer) error {
+	db := consts.GetGormProfileDatabase()
+	_, err := yakit.QueryERModel(db,
+		yakit.WithERMQueryContext(stream.Context()),
+		yakit.WithERMQueryDepth(int(req.GetDepth())),
+		yakit.WithERMQueryStartFilter(req.GetFilter()),
+		yakit.WithERMQueryRelationshipCallback(func(r ...*schema.ERModelRelationship) {
+			stream.Send(&ypb.QuerySubERMResponse{
+				Relationships: lo.Map(r, func(r *schema.ERModelRelationship, _ int) *ypb.Relationship {
+					return r.ToGRPC()
+				}),
+			})
+		}),
+		yakit.WithERMQueryEntityCallback(func(e ...*schema.ERModelEntity) {
+			stream.Send(&ypb.QuerySubERMResponse{
+				Entities: lo.Map(e, func(e *schema.ERModelEntity, _ int) *ypb.Entity {
+					return e.ToGRPC()
+				}),
+			})
+		}),
+	)
+	return err
 }

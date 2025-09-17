@@ -212,3 +212,46 @@ func TestGenerateERMDot(t *testing.T) {
 		t.Errorf("DOT output missing relationship type: %s", relationshipType)
 	}
 }
+
+func TestGenerateERMStream(t *testing.T) {
+	entityBaseIndex, _, _, entityNames, _, relationshipType, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatalf("Failed to create local gRPC client: %v", err)
+	}
+	req := &ypb.QuerySubERMRequest{
+		Filter: &ypb.EntityFilter{BaseIndex: entityBaseIndex},
+		Depth:  2,
+	}
+	stream, err := client.QuerySubERMStream(context.Background(), req)
+	if err != nil {
+		t.Fatalf("GenerateERMDot failed: %v", err)
+	}
+
+	hitEntityMap := make(map[string]bool)
+	hitRelationshipMap := make(map[string]bool)
+	for {
+		message, err := stream.Recv()
+		if err != nil {
+			break
+		}
+		for _, entity := range message.Entities {
+			hitEntityMap[entity.Name] = true
+		}
+		for _, relationship := range message.Relationships {
+			hitRelationshipMap[relationship.Type] = true
+		}
+	}
+
+	// 检查 DOT 内容包含实体和关系
+	for _, name := range entityNames {
+		if !hitEntityMap[name] {
+			t.Fatalf("erm output missing entity name: %s", name)
+		}
+	}
+	if hitEntityMap[relationshipType] {
+		t.Fatalf("erm output missing relationship type: %s", relationshipType)
+	}
+}

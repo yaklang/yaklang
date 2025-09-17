@@ -566,6 +566,7 @@ const (
 	Yak_QueryEntity_FullMethodName                                = "/ypb.Yak/QueryEntity"
 	Yak_QueryRelationship_FullMethodName                          = "/ypb.Yak/QueryRelationship"
 	Yak_QuerySubERM_FullMethodName                                = "/ypb.Yak/QuerySubERM"
+	Yak_QuerySubERMStream_FullMethodName                          = "/ypb.Yak/QuerySubERMStream"
 	Yak_GenerateERMDot_FullMethodName                             = "/ypb.Yak/GenerateERMDot"
 )
 
@@ -1266,6 +1267,7 @@ type YakClient interface {
 	QueryEntity(ctx context.Context, in *QueryEntityRequest, opts ...grpc.CallOption) (*QueryEntityResponse, error)
 	QueryRelationship(ctx context.Context, in *QueryRelationshipRequest, opts ...grpc.CallOption) (*QueryRelationshipResponse, error)
 	QuerySubERM(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (*QuerySubERMResponse, error)
+	QuerySubERMStream(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QuerySubERMResponse], error)
 	GenerateERMDot(ctx context.Context, in *GenerateERMDotRequest, opts ...grpc.CallOption) (*GenerateERMDotResponse, error)
 }
 
@@ -7551,6 +7553,25 @@ func (c *yakClient) QuerySubERM(ctx context.Context, in *QuerySubERMRequest, opt
 	return out, nil
 }
 
+func (c *yakClient) QuerySubERMStream(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QuerySubERMResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[100], Yak_QuerySubERMStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QuerySubERMRequest, QuerySubERMResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_QuerySubERMStreamClient = grpc.ServerStreamingClient[QuerySubERMResponse]
+
 func (c *yakClient) GenerateERMDot(ctx context.Context, in *GenerateERMDotRequest, opts ...grpc.CallOption) (*GenerateERMDotResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GenerateERMDotResponse)
@@ -8258,6 +8279,7 @@ type YakServer interface {
 	QueryEntity(context.Context, *QueryEntityRequest) (*QueryEntityResponse, error)
 	QueryRelationship(context.Context, *QueryRelationshipRequest) (*QueryRelationshipResponse, error)
 	QuerySubERM(context.Context, *QuerySubERMRequest) (*QuerySubERMResponse, error)
+	QuerySubERMStream(*QuerySubERMRequest, grpc.ServerStreamingServer[QuerySubERMResponse]) error
 	GenerateERMDot(context.Context, *GenerateERMDotRequest) (*GenerateERMDotResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
@@ -9909,6 +9931,9 @@ func (UnimplementedYakServer) QueryRelationship(context.Context, *QueryRelations
 }
 func (UnimplementedYakServer) QuerySubERM(context.Context, *QuerySubERMRequest) (*QuerySubERMResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySubERM not implemented")
+}
+func (UnimplementedYakServer) QuerySubERMStream(*QuerySubERMRequest, grpc.ServerStreamingServer[QuerySubERMResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method QuerySubERMStream not implemented")
 }
 func (UnimplementedYakServer) GenerateERMDot(context.Context, *GenerateERMDotRequest) (*GenerateERMDotResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateERMDot not implemented")
@@ -19016,6 +19041,17 @@ func _Yak_QuerySubERM_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_QuerySubERMStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QuerySubERMRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).QuerySubERMStream(m, &grpc.GenericServerStream[QuerySubERMRequest, QuerySubERMResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_QuerySubERMStreamServer = grpc.ServerStreamingServer[QuerySubERMResponse]
+
 func _Yak_GenerateERMDot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GenerateERMDotRequest)
 	if err := dec(in); err != nil {
@@ -21349,6 +21385,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "QueryKnowledgeBaseByAI",
 			Handler:       _Yak_QueryKnowledgeBaseByAI_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "QuerySubERMStream",
+			Handler:       _Yak_QuerySubERMStream_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -271,27 +271,96 @@ func RemoveRelationship(db *gorm.DB, sourceID, targetID uint, RelationshipType s
 	return nil
 }
 
-func QueryEntityWithDepth(db *gorm.DB, entityFilter *ypb.EntityFilter, maxDepth int) (*ERModel, error) {
-	entities, err := QueryEntities(db, entityFilter)
+type ERMQueryConfig struct {
+	Depth                int
+	Ctx                  context.Context
+	RelationshipCallback func(relationship ...*schema.ERModelRelationship)
+	EntityCallback       func(entity ...*schema.ERModelEntity)
+	StartFilter          *ypb.EntityFilter
+}
+
+type ERMQueryOption func(cfg *ERMQueryConfig)
+
+func WithERMQueryDepth(depth int) ERMQueryOption {
+	return func(cfg *ERMQueryConfig) {
+		cfg.Depth = depth
+	}
+}
+
+func WithERMQueryContext(ctx context.Context) ERMQueryOption {
+	return func(cfg *ERMQueryConfig) {
+		cfg.Ctx = ctx
+	}
+}
+
+func WithERMQueryRelationshipCallback(callback func(relationship ...*schema.ERModelRelationship)) ERMQueryOption {
+	return func(cfg *ERMQueryConfig) {
+		cfg.RelationshipCallback = callback
+	}
+}
+
+func WithERMQueryEntityCallback(callback func(entity ...*schema.ERModelEntity)) ERMQueryOption {
+	return func(cfg *ERMQueryConfig) {
+		cfg.EntityCallback = callback
+	}
+}
+
+func WithERMQueryStartFilter(filter *ypb.EntityFilter) ERMQueryOption {
+	return func(cfg *ERMQueryConfig) {
+		cfg.StartFilter = filter
+	}
+}
+
+func NewERMQueryConfig(opts ...ERMQueryOption) *ERMQueryConfig {
+	config := &ERMQueryConfig{
+		Depth:       1,
+		Ctx:         context.Background(),
+		StartFilter: &ypb.EntityFilter{},
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+	return config
+}
+
+func (c *ERMQueryConfig) Done() bool {
+	if c.Ctx != nil {
+		select {
+		case <-c.Ctx.Done():
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+func QueryERModel(db *gorm.DB, opts ...ERMQueryOption) (*ERModel, error) {
+	config := NewERMQueryConfig(opts...)
+	startList, err := QueryEntities(db, config.StartFilter)
 	if err != nil {
 		return nil, err
 	}
-	if len(entities) == 0 {
+	if len(startList) == 0 {
 		return nil, utils.Errorf("Entity not found")
 	}
 
-	return EntityRelationshipFind(db, entities, maxDepth)
-}
+	maxDepth := config.Depth
 
-func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxDepth int) (*ERModel, error) {
 	allEntities := make([]*schema.ERModelEntity, 0)
 	allRelationships := make([]*schema.ERModelRelationship, 0)
 
 	appendEntity := func(entityList ...*schema.ERModelEntity) {
+		if config.EntityCallback != nil {
+			config.EntityCallback(entityList...)
+		}
 		allEntities = append(allEntities, entityList...)
 	}
 
 	appendRelationship := func(RelationshipList ...*schema.ERModelRelationship) {
+		if config.RelationshipCallback != nil {
+			config.RelationshipCallback(RelationshipList...)
+		}
 		allRelationships = append(allRelationships, RelationshipList...)
 	}
 	type queueItem struct {
@@ -317,6 +386,9 @@ func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxD
 
 	head := 0
 	for head < len(queue) {
+		if config.Done() {
+			return nil, utils.Errorf("context done")
+		}
 		currentItem := queue[head]
 		head++
 		currentEntity := currentItem.e
@@ -340,6 +412,9 @@ func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxD
 		}
 
 		for _, Relationship := range RelationshipsToExplore {
+			if config.Done() {
+				return nil, utils.Errorf("context done")
+			}
 			if visitedRelationships[Relationship.ID] {
 				continue
 			}
@@ -367,6 +442,7 @@ func EntityRelationshipFind(db *gorm.DB, startList []*schema.ERModelEntity, maxD
 		Entities:      allEntities,
 		Relationships: allRelationships,
 	}, nil
+
 }
 
 type ERModel struct {
