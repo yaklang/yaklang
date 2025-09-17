@@ -1169,6 +1169,16 @@ var ssaCodeScan = &cli.Command{
 			Usage: "include dataflow path in the output (only for irify format)",
 		},
 		// }}}
+
+		cli.StringFlag{
+			Name:  "pprof",
+			Usage: `enable pprof and save pprof file to the given path`,
+		},
+
+		cli.StringFlag{
+			Name:  "log-level,loglevel",
+			Usage: `set log level, default is info, optional value: debug, info, warn, error`,
+		},
 	},
 	Action: func(c *cli.Context) (e error) {
 		defer func() {
@@ -1182,6 +1192,20 @@ var ssaCodeScan = &cli.Command{
 		}()
 		ctx := context.Background()
 		log.Infof("============= start to scan code ==============")
+
+		if pprofFile := c.String("pprof"); pprofFile != "" {
+			ssaprofile.DumpHeapProfileWithInterval(30*time.Second, ssaprofile.WithFileName(pprofFile))
+		}
+
+		if logLevel := c.String("log-level"); logLevel != "" {
+			level, err := log.ParseLevel(logLevel)
+			if err != nil {
+				log.Warnf("parse log level %s failed: %v, use info level", logLevel, err)
+				level = log.InfoLevel
+			}
+			log.SetLevel(level)
+		}
+
 		ruleTimeStart := time.Now()
 		SyncEmbedRule()
 		ruleTime := time.Since(ruleTimeStart)
@@ -1229,10 +1253,7 @@ var ssaCodeScan = &cli.Command{
 			// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
 			return err
 		}
-		// scanTime := time.Since(scanTimeStart)
-		// log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
 
-		// exportTimeStart := time.Now()
 		opt := []sfreport.Option{}
 		if c.Bool("with-file-content") {
 			opt = append(opt, sfreport.WithFileContent(true))
@@ -1241,14 +1262,6 @@ var ssaCodeScan = &cli.Command{
 			opt = append(opt, sfreport.WithDataflowPath(true))
 		}
 		ShowRisk(config.Format, riskCh, config.OutputWriter, opt...)
-		// exportTime := time.Since(exportTimeStart)
-		// log.Infof("show result success, cost %v", exportTime)
-		// show echo  time
-		// log.Infof("finish all time cost:")
-		// log.Infof("rule sync: %v", ruleTime)
-		// log.Infof("compile: %v", compileTime)
-		// log.Infof("scan: %v", scanTime)
-		// log.Infof("export: %v", exportTime)
 		ssaprofile.ShowCacheCost()
 		return nil
 	},
