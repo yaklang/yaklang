@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -996,7 +997,7 @@ func TestWithRegisterFieldStreamHandler_ErrorHandling(t *testing.T) {
 func TestWithRegisterFieldStreamHandler_CombinedWithOtherCallbacks(t *testing.T) {
 	t.Run("Mixed Callback Types", func(t *testing.T) {
 		jsonData := `{
-			"stream_field": "streaming data",
+			"stream_field": "streaming data", 
 			"regular_field": "regular data",
 			"nested": {
 				"inner": "value"
@@ -1009,33 +1010,83 @@ func TestWithRegisterFieldStreamHandler_CombinedWithOtherCallbacks(t *testing.T)
 		var arrays [][]any
 		var rawKVs []struct{ key, value any }
 
-		var streamCalled, objectCalled, arrayCalled, kvCalled bool
+		var streamCalled, objectCalled, arrayCalled, kvCalled atomic.Bool
+
+		// 创建带缓冲的channel来收集信号
+		streamDone := make(chan struct{}, 1)
+		objectDone := make(chan struct{}, 1)
+		arrayDone := make(chan struct{}, 1)
+		kvDone := make(chan struct{}, 1)
 
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterFieldStreamHandler("stream_field", func(key string, reader io.Reader, parents []string) {
-				streamCalled = true
 				data, _ := io.ReadAll(reader)
+				streamCalled.Store(true)
 				streamData = string(data)
+				select {
+				case streamDone <- struct{}{}:
+				default:
+				}
 			}),
 			WithObjectCallback(func(data map[string]any) {
-				objectCalled = true
+				objectCalled.Store(true)
 				objects = append(objects, data)
+				select {
+				case objectDone <- struct{}{}:
+				default:
+				}
 			}),
 			WithArrayCallback(func(data []any) {
-				arrayCalled = true
+				arrayCalled.Store(true)
 				arrays = append(arrays, data)
+				select {
+				case arrayDone <- struct{}{}:
+				default:
+				}
 			}),
 			WithRawKeyValueCallback(func(key, data any) {
-				kvCalled = true
+				kvCalled.Store(true)
 				rawKVs = append(rawKVs, struct{ key, value any }{key, data})
+				select {
+				case kvDone <- struct{}{}:
+				default:
+				}
 			}),
 		)
 
 		require.NoError(t, err)
-		assert.True(t, streamCalled, "Stream handler should be called")
-		assert.True(t, objectCalled, "Object callback should be called")
-		assert.True(t, arrayCalled, "Array callback should be called")
-		assert.True(t, kvCalled, "KV callback should be called")
+
+		// 等待关键回调完成，设置超时
+		timeout := time.After(1 * time.Second)
+
+		select {
+		case <-streamDone:
+		case <-timeout:
+			t.Fatal("Stream handler timeout")
+		}
+
+		select {
+		case <-objectDone:
+		case <-timeout:
+			t.Fatal("Object callback timeout")
+		}
+
+		select {
+		case <-arrayDone:
+		case <-timeout:
+			t.Fatal("Array callback timeout")
+		}
+
+		select {
+		case <-kvDone:
+		case <-timeout:
+			t.Fatal("KV callback timeout")
+		}
+
+		assert.True(t, streamCalled.Load(), "Stream handler should be called")
+		assert.True(t, objectCalled.Load(), "Object callback should be called")
+		assert.True(t, arrayCalled.Load(), "Array callback should be called")
+		assert.True(t, kvCalled.Load(), "KV callback should be called")
 
 		assert.Equal(t, `"streaming data"`, streamData)
 		assert.Greater(t, len(objects), 0)
