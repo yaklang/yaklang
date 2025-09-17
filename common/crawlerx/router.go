@@ -197,7 +197,7 @@ func (hijack *CrawlerHijack) ContinueRequest(cq *proto.FetchContinueRequest) {
 }
 
 func (hijack *CrawlerHijack) LoadResponse(opts []lowhttp.LowhttpOpt, loadBody bool) error {
-	opts = append(opts, lowhttp.WithRequest(hijack.Request.req))
+	opts = append(opts, lowhttp.WithRequest(hijack.Request.req), lowhttp.WithRedirectTimes(0))
 	lowHttpResponse, err := lowhttp.HTTP(
 		opts...,
 	)
