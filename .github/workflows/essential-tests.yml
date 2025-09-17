@@ -76,7 +76,7 @@ jobs:
               # --- OMAP with race detection ---
               go test -v -timeout 30s -race ./common/utils/omap/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # -----------------------------
-              go test -timeout 1m ./common/utils
+              go test -v -timeout 1m ./common/utils | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               go test -v -timeout 20s ./common/utils/imageutils/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               go test -v -timeout 10s ./common/utils/xml2 | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               go test -v -timeout 20s ./common/utils/tlsutils/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
