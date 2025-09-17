@@ -95,8 +95,8 @@ REFERENCE
 check $upload;
 Files.write(*?{!opcode: param} as $sink);
 $sink #{
-  until: `*?{<typeName>?{have: MultipartFile}} & $upload as $inter`
-}->
+  until: `*?{<typeName>?{have: MultipartFile}} & $upload `
+}-> as $inter
 
 check $inter then "Upload and Write Files directly" else "No Upload and Files.write"
 alert $inter for {
