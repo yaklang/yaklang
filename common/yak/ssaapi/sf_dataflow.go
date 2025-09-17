@@ -39,6 +39,7 @@ func DataFlowWithSFConfig(
 	}
 	options := make([]OperationOption, 0)
 	untilConfig := make([]*sf.RecursiveConfigItem, 0)
+	untilCheck := false
 
 	for _, item := range opts {
 		switch item.Key {
@@ -56,7 +57,7 @@ func DataFlowWithSFConfig(
 			}
 		case sf.RecursiveConfig_Until:
 			untilConfig = append(untilConfig, item)
-			addHandler(sf.RecursiveConfig_Include, item.Value)
+			untilCheck = true
 		case sf.RecursiveConfig_Hook:
 			untilConfig = append(untilConfig, item)
 		case sf.RecursiveConfig_Exclude:
@@ -66,6 +67,7 @@ func DataFlowWithSFConfig(
 		}
 	}
 
+	untilMatch := make(map[*Value]struct{})
 	{
 		untilCheck := CreateCheck(sfResult, config, untilConfig...)
 		options = append(options, WithHookEveryNode(func(value *Value) error {
@@ -73,6 +75,7 @@ func DataFlowWithSFConfig(
 				return nil
 			}
 			if untilCheck.CheckUntil(value) {
+				untilMatch[value] = struct{}{}
 				return utils.Error("abort")
 			}
 			return nil
@@ -89,11 +92,19 @@ func DataFlowWithSFConfig(
 
 	// dataflow analysis
 	result := dataflowRecursiveFunc(options...)
+	ret := make(Values, 0, len(result))
+	if untilCheck {
+		for v := range untilMatch {
+			ret = append(ret, v)
+		}
+	} else {
+		ret = result
+	}
 	// filter the result
-	result = dataFlowFilter(result, sfResult, config, nil, filterCondition...)
+	ret = dataFlowFilter(ret, sfResult, config, nil, filterCondition...)
 	// set predecessor label
-	result.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
-	return result
+	ret.AppendPredecessor(value, sf.WithAnalysisContext_Label(DataFlowLabel(analysisType)))
+	return ret
 }
 
 var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
