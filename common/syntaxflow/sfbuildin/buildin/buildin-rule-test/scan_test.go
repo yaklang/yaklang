@@ -36,6 +36,7 @@ func TestVerifiedRule(t *testing.T) {
 			continue
 		}
 		success := t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
+			t.Parallel()
 			t.Log("Start to verify: " + rule.RuleName)
 			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
