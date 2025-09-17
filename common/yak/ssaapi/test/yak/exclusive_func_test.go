@@ -229,13 +229,15 @@ a --> b(a,2) --> i ---> return --> binaryOp
 	if err != nil {
 		t.Fatal(err)
 	}
-	var vals string
 	res, err := prog.SyntaxFlowWithError("a --> as $target")
 	require.NoError(t, err)
-	vals = res.GetValues("target").DotGraph()
+	res.Show()
+	graph := res.GetValues("target").NewDotGraph()
+	graph.Show()
+	dot := graph.String()
 
 	var count = 0
-	regexp.MustCompile(`n\d+ -> n\d+ `).ReplaceAllStringFunc(vals, func(s string) string {
+	regexp.MustCompile(`n\d+ -> n\d+ `).ReplaceAllStringFunc(dot, func(s string) string {
 		count++
 		return s
 	})
