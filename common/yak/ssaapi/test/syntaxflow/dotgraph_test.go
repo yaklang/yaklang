@@ -137,8 +137,8 @@ func TestBottomUseGraphEdgeLabel(t *testing.T) {
 			`c --> as $result`,
 			map[string][]ssatest.PathInTest{
 				"result": {
-					{From: "bbb", To: "55 + c", Label: "dataflow"},
-					{From: "55 + c", To: "funcA(a)", Label: "dataflow"},
+					{From: "bbb", To: "55 + c", Label: ""},
+					{From: "55 + c", To: "funcA(a)", Label: ""},
 				},
 			},
 		},
@@ -155,9 +155,9 @@ func TestBottomUseGraphEdgeLabel(t *testing.T) {
 			`a --> as $result`,
 			map[string][]ssatest.PathInTest{
 				"result": {
-					{From: "11", To: "return a", Label: "dataflow"},
-					{From: "return a", To: "f()", Label: "dataflow"},
-					{From: "f()", To: "println(t)", Label: "dataflow"},
+					{From: "11", To: "return a", Label: ""},
+					{From: "return a", To: "f()", Label: ""},
+					{From: "f()", To: "println(t)", Label: ""},
 				},
 			},
 		},
@@ -177,11 +177,11 @@ func TestBottomUseGraphEdgeLabel(t *testing.T) {
 			`a --> as $result`,
 			map[string][]ssatest.PathInTest{
 				"result": {
-					{From: "11", To: "return a", Label: "dataflow"},
-					{From: "return a", To: "f()", Label: "dataflow"},
-					{From: "f()", To: "f2(t)", Label: "dataflow"},
-					{From: "f2(t)", To: "i", Label: "dataflow"},
-					{From: "i", To: "println(i)", Label: "dataflow"},
+					{From: "11", To: "return a", Label: ""},
+					{From: "return a", To: "f()", Label: ""},
+					{From: "f()", To: "f2(t)", Label: ""},
+					{From: "f2(t)", To: "i", Label: ""},
+					{From: "i", To: "println(i)", Label: ""},
 				},
 			},
 		},
@@ -198,9 +198,9 @@ func TestBottomUseGraphEdgeLabel(t *testing.T) {
 			`a?{=11}-->  as $result`,
 			map[string][]ssatest.PathInTest{
 				"result": {
-					{From: "11", To: "a = 22", Label: "dataflow"},
-					{From: "11", To: "b()", Label: "dataflow"},
-					{From: "b()", To: "println(a)", Label: "dataflow"},
+					{From: "11", To: "a = 22", Label: ""},
+					{From: "11", To: "b()", Label: ""},
+					{From: "b()", To: "println(a)", Label: ""},
 				},
 			},
 		},
@@ -219,8 +219,8 @@ func TestBottomUseGraphEdgeLabel(t *testing.T) {
 			map[string][]ssatest.PathInTest{
 				"result": {
 					// phi
-					{From: "if e {b()}", To: "a+1", Label: "dataflow"},
-					{From: "if e {b()}", To: "a+1", Label: "dataflow"},
+					{From: "if e {b()}", To: "a+1", Label: ""},
+					{From: "if e {b()}", To: "a+1", Label: ""},
 				},
 			},
 		},
@@ -246,8 +246,8 @@ func TestTopDefGraphEdgeLabel(t *testing.T) {
 			`a #-> as $result`,
 			map[string][]ssatest.PathInTest{
 				"result": {
-					{From: "f(333333)", To: "(i) => {return i}", Label: "dataflow"},
-					{From: "(i) => {return i}", To: "333333", Label: "dataflow"},
+					{From: "f(333333)", To: "(i) => {return i}", Label: ""},
+					{From: "i", To: "333333", Label: ""},
 				},
 			},
 		},
@@ -259,9 +259,9 @@ func TestTopDefGraphEdgeLabel(t *testing.T) {
 			`a #-> as $result`,
 			map[string][]ssatest.PathInTest{
 				"result": {
-					{From: ".key", To: "f()", Label: "dataflow"},
-					{From: "f()", To: "() => {return {\"key\":\"value\"}}", Label: "dataflow"},
-					{From: "() => {return {\"key\":\"value\"}}", To: "\"value\"", Label: "dataflow"},
+					{From: ".key", To: "f()", Label: ""},
+					{From: "f()", To: "() => {return {\"key\":\"value\"}}", Label: ""},
+					{From: "() => {return {\"key\":\"value\"}}", To: "\"value\"", Label: ""},
 				},
 			},
 		},
@@ -277,9 +277,9 @@ func TestTopDefGraphEdgeLabel(t *testing.T) {
 			`a #-> as $result`,
 			map[string][]ssatest.PathInTest{
 				"result": {
-					{From: "f1()", To: "() => {return i}", Label: "dataflow"},
-					{From: "() => {return i}", To: "i", Label: "dataflow"},
-					{From: "i", To: "333333", Label: "dataflow"},
+					{From: "f1()", To: "() => {return i}", Label: ""},
+					{From: "() => {return i}", To: "i", Label: ""},
+					{From: "i", To: "333333", Label: ""},
 				},
 			},
 		},

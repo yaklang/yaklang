@@ -151,22 +151,6 @@ func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 	)
 }
 
-func (v *Value) NewTopDefValue(value ssa.Value, saves ...bool) *Value {
-	iv := v.NewValue(value)
-	if iv == nil {
-		return nil
-	}
-	return iv.AppendEffectOn(v, saves...)
-}
-
-func (v *Value) NewBottomUseValue(value ssa.Value, saves ...bool) *Value {
-	iv := v.NewValue(value)
-	if iv == nil {
-		return nil
-	}
-	return iv.AppendDependOn(v, saves...)
-}
-
 func (v *Value) NewConstValue(i any, rng ...*memedit.Range) *Value {
 	return v.ParentProgram.NewConstValue(i, rng...)
 }
