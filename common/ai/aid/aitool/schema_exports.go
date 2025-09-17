@@ -6,7 +6,6 @@ import (
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
@@ -49,11 +48,17 @@ func NewObjectSchema(opts ...any) string {
 		}
 	}
 	t := newTool(ksuid.New().String(), params...)
-	if utils.IsNil(t.InputSchema.Properties) {
-		t.InputSchema.Properties = make(map[string]any)
+	if t.InputSchema.Properties == nil {
+		t.InputSchema.Properties = omap.NewEmptyOrderedMap[string, any]()
 	}
+	// Create a temp map for properties to apply PropertyOptions
+	tempProps := make(map[string]any)
 	for _, i := range props {
-		i(t.InputSchema.Properties)
+		i(tempProps)
+	}
+	// Copy properties to OrderedMap
+	for k, v := range tempProps {
+		t.InputSchema.Properties.Set(k, v)
 	}
 
 	paramActually := t.Params()
@@ -91,11 +96,17 @@ func newObjectArraySchema(opts ...any) string {
 	}
 	t := newTool(ksuid.New().String(), params...)
 
-	if utils.IsNil(t.InputSchema.Properties) {
-		t.InputSchema.Properties = make(map[string]any)
+	if t.InputSchema.Properties == nil {
+		t.InputSchema.Properties = omap.NewEmptyOrderedMap[string, any]()
 	}
+	// Create a temp map for properties to apply PropertyOptions
+	tempProps := make(map[string]any)
 	for _, i := range props {
-		i(t.InputSchema.Properties)
+		i(tempProps)
+	}
+	// Copy properties to OrderedMap
+	for k, v := range tempProps {
+		t.InputSchema.Properties.Set(k, v)
 	}
 
 	paramActually := t.Params()

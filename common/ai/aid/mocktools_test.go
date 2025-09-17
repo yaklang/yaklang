@@ -38,8 +38,8 @@ func TestWeatherTool(t *testing.T) {
 	}
 
 	// 验证参数数量
-	if len(tool.Params()) != 2 {
-		t.Errorf("参数数量错误，期望 2，实际 %d", len(tool.Params()))
+	if tool.Params().Len() != 2 {
+		t.Errorf("参数数量错误，期望 2，实际 %d", tool.Params().Len())
 	}
 
 	// 准备测试数据

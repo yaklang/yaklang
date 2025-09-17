@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	// "github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/utils"
@@ -358,8 +360,11 @@ func WithArrayParamEx(name string, opts []PropertyOption, itemsOpt ToolOption) T
 		"type": "array",
 	}
 	temp := newTool("", itemsOpt)
-	for _, v := range temp.InputSchema.Properties {
-		schema["items"] = v
+	if temp.InputSchema.Properties != nil {
+		temp.InputSchema.Properties.ForEach(func(k string, v any) bool {
+			schema["items"] = v
+			return false // 只取第一个值
+		})
 	}
 	if len(temp.InputSchema.Required) > 0 {
 		schema["required"] = temp.InputSchema.Required
@@ -373,7 +378,7 @@ func WithStructParam(name string, opts []PropertyOption, itemsOpt ...ToolOption)
 		"type": "object",
 	}
 	temp := newTool("", itemsOpt...)
-	if len(temp.InputSchema.Properties) > 0 {
+	if temp.InputSchema.Properties != nil && temp.InputSchema.Properties.Len() > 0 {
 		schema["properties"] = temp.InputSchema.Properties
 	}
 	if len(temp.InputSchema.Required) > 0 {
@@ -483,7 +488,7 @@ func WithRawParam(name string, object map[string]any, opts ...PropertyOption) To
 			}
 		}
 
-		t.InputSchema.Properties[name] = object
+		t.InputSchema.Properties.Set(name, object)
 	}
 }
 
@@ -499,8 +504,17 @@ func (t *Tool) GetKeywords() []string {
 	return t.Keywords
 }
 
-func (t *Tool) Params() map[string]any {
-	return t.Tool.InputSchema.Properties
+func (t *Tool) Params() *omap.OrderedMap[string, any] {
+	if t.Tool.InputSchema.Properties == nil {
+		return omap.NewEmptyOrderedMap[string, any]()
+	}
+	// Return a copy of the OrderedMap to preserve order
+	result := omap.NewEmptyOrderedMap[string, any]()
+	t.Tool.InputSchema.Properties.ForEach(func(k string, v any) bool {
+		result.Set(k, v)
+		return true
+	})
+	return result
 }
 
 func (t *Tool) ParamsJsonSchemaString() string {
@@ -515,51 +529,48 @@ func (t *Tool) ParamsJsonSchemaString() string {
 }
 
 // ToJSONSchema 将整个Tool转换为符合JSON Schema Draft-07规范的格式
-func (t *Tool) ToJSONSchema() map[string]any {
-	// 构建工具参数的properties
-	properties := make(map[string]any)
+func (t *Tool) ToJSONSchema() *omap.OrderedMap[string, any] {
+	// 构建工具参数的properties - 使用 OrderedMap 保证顺序
+	properties := omap.NewEmptyOrderedMap[string, any]()
 
-	// 添加@action字段
-	properties["@action"] = map[string]any{
+	// 添加@action字段 (第一个)
+	properties.Set("@action", map[string]any{
 		"const":       "call-tool",
 		"description": "标识当前操作的具体类型",
-	}
+	})
 
-	// 添加tool字段
-	properties["tool"] = map[string]any{
+	// 添加tool字段 (第二个)
+	properties.Set("tool", map[string]any{
 		"type":        "string",
 		"description": "你想要选择的工具名",
 		"const":       t.Name,
-	}
+	})
 
 	paramProperties := t.Tool.InputSchema.Properties
-	// 将参数添加到params字段
-	if len(paramProperties) > 0 {
-		properties["params"] = map[string]any{
+	// 将参数添加到params字段 (第三个)
+	if paramProperties != nil && paramProperties.Len() > 0 {
+		properties.Set("params", map[string]any{
 			"type":        "object",
 			"description": "工具的参数",
 			"properties":  paramProperties,
 			"required":    t.InputSchema.Required,
-		}
+		})
 	}
 
-	finalRequires := []string{"tool", "@action"}
-	if _, ok := properties["params"]; ok {
-		finalRequires = append(finalRequires, "params")
-	}
+	// 构建最终的JSON Schema - 使用 OrderedMap 保证顺序
+	schema := omap.NewEmptyOrderedMap[string, any]()
 
-	// 构建最终的JSON Schema
-	schema := map[string]any{
-		"$schema":              "http://json-schema.org/draft-07/schema#",
-		"type":                 "object",
-		"properties":           properties,
-		"required":             []string{"tool", "@action", "params"},
-		"additionalProperties": false,
-	}
+	// 按照固定顺序添加字段
+	schema.Set("$schema", "http://json-schema.org/draft-07/schema#")
+	schema.Set("type", "object")
 
 	if t.Description != "" {
-		schema["description"] = t.Description
+		schema.Set("description", t.Description)
 	}
+
+	schema.Set("properties", properties)
+	schema.Set("required", []string{"tool", "@action", "params"})
+	schema.Set("additionalProperties", false)
 
 	return schema
 }
