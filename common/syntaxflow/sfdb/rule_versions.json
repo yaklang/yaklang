@@ -1368,12 +1368,6 @@
     "version": "20250820.0001"
   },
   {
-    "rule_id": "7e2c4412-9a6f-4095-a84f-beb680e56fbf",
-    "rule_name": "检测PHP不安全的文件操作",
-    "hash": "2632289b628b003093b00e66d7e7e56a67243f9af3e6712b7c1e627cfcfa2a0d",
-    "version": "20250820.0001"
-  },
-  {
     "rule_id": "4e4aa781-f02e-48f2-9d71-2e17b89b218c",
     "rule_name": "检测PHP未验证FTP参数",
     "hash": "83d25f55dadbea3e3101fdbf65634cbf762c24870b4ecb8234826eb6dbed362d",
@@ -1462,6 +1456,12 @@
     "rule_name": "检测PHP未过滤目录读取漏洞",
     "hash": "6826f3b6cc8de63860bbb476ea45b2994bb35bef307dd51ffaba468436c063c0",
     "version": "20250820.0001"
+  },
+  {
+    "rule_id": "7e2c4412-9a6f-4095-a84f-beb680e56fbf",
+    "rule_name": "检测PHP不安全的文件操作",
+    "hash": "2bb513b84cdec70fef5c7115d5d9bade24253217f395ef24c1abaff6454cd12c",
+    "version": "20250917.0001"
   },
   {
     "rule_id": "7962164f-28ca-4570-9660-07a2a274a0c7",

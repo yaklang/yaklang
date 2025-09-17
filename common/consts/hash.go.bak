@@ -5,7 +5,7 @@ package consts
 // ExistedCorePluginEmbedFSHash contains the SHA256 hash of the embedded core plugin filesystem.
 // This hash is used to verify the integrity of core plugins and detect changes in the plugin bundle.
 // The hash is automatically generated during the build process and should not be manually modified.
-const ExistedCorePluginEmbedFSHash string = "2a8a707c6f40250464a00423c490a548986b40c49ad6f1252ac9e0afbb1d1b81"
+const ExistedCorePluginEmbedFSHash string = "00b01ac7152128dc4e3ca31dc7c3c36528b83b3e403fe83322afb55e844ad414"
 
 // ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
 // This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
