@@ -27,10 +27,10 @@ func (c *config) parseProjectWithFS(
 
 	var calculateTime, preHandlerTime, parseTime, saveTime time.Duration
 	defer func() {
-		log.Errorf("calculate time: %v", calculateTime)
-		log.Errorf("pre-handler time: %v", preHandlerTime)
-		log.Errorf("parse time: %v", parseTime)
-		log.Errorf("save time: %v", saveTime)
+		log.Debugf("calculate time: %v", calculateTime)
+		log.Debugf("pre-handler time: %v", preHandlerTime)
+		log.Debugf("parse time: %v", parseTime)
+		log.Debugf("save time: %v", saveTime)
 	}()
 
 	defer func() {

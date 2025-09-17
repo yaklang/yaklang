@@ -10,13 +10,20 @@ import (
 )
 
 // GetTopDefs desc all of 'Defs' is not used by any other value
-func (i *Value) GetTopDefs(opt ...OperationOption) Values {
-	var ret Values
+func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Value GetTopDefs panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+			ret = nil
+		}
+	}()
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = i
 	actx.direct = TopDefAnalysis
 	ret = i.getTopDefs(actx, opt...)
-	return MergeValues(ret)
+	ret = MergeValues(ret)
+	return
 }
 
 func (v Values) GetTopDefs(opts ...OperationOption) Values {

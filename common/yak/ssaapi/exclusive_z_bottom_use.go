@@ -5,13 +5,20 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (v *Value) GetBottomUses(opt ...OperationOption) Values {
-	var ret Values
+func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Value GetBottomUses panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+			ret = nil
+		}
+	}()
 	actx := NewAnalyzeContext(opt...)
 	actx.Self = v
 	actx.direct = BottomUseAnalysis
 	ret = v.getBottomUses(actx, opt...)
-	return MergeValues(ret)
+	ret = MergeValues(ret)
+	return
 }
 
 func (v Values) GetBottomUses(opts ...OperationOption) Values {

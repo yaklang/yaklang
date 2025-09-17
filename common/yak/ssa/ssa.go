@@ -545,7 +545,7 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 			}
 			return nil, false
 		default:
-			log.Warnf("unsupoorted CFG Entry Instruction: %T", ret)
+			log.Debugf("unsupoorted CFG Entry Instruction: %T", ret)
 		}
 		return nil, false
 	default:
