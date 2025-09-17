@@ -44,7 +44,7 @@ require (
 	github.com/go-git/go-git/v5 v5.13.0
 	github.com/go-ldap/ldap v3.0.3+incompatible
 	github.com/go-pg/pg/v10 v10.14.0
-	github.com/go-rod/rod v0.112.9
+	github.com/go-rod/rod v0.116.2
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/gobwas/glob v0.2.3
@@ -120,7 +120,7 @@ require (
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
-	github.com/ysmood/leakless v0.8.0
+	github.com/ysmood/leakless v0.9.0
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.33.0
@@ -230,8 +230,9 @@ require (
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	github.com/ysmood/fetchup v0.2.2 // indirect
+	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
+	github.com/ysmood/got v0.40.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect

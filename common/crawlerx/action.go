@@ -3,16 +3,56 @@
 package crawlerx
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"regexp"
 	"strings"
 	"time"
+)
+
+type ElementInfo struct {
+	Tag        string             `json:"tag"`
+	Attributes []ElementAttribute `json:"types"`
+}
+
+type ElementAttribute struct {
+	Name string   `json:"attribute"`
+	Info []string `json:"info"`
+}
+
+var (
+	clickElementTemplate = []ElementInfo{
+		{
+			Tag: "input", Attributes: []ElementAttribute{
+				{Name: "type", Info: []string{"submit"}},
+			},
+		},
+		{Tag: "button"},
+		{Tag: "[onclick]"},
+	}
+	submitElementTemplate = []ElementInfo{
+		{
+			Tag: "input", Attributes: []ElementAttribute{
+				{Name: "type", Info: []string{"submit"}},
+			},
+		}, {
+			Tag: "button", Attributes: []ElementAttribute{
+				{Name: "type", Info: []string{"submit"}},
+			},
+		},
+	}
 )
 
 var invalidUrl = []string{"", "#", "javascript:;", "#/"}
@@ -154,19 +194,7 @@ func (starter *BrowserStarter) vueCheck(page *rod.Page) (bool, error) {
 			return false, nil
 		}
 	}
-	submitInfo := map[string]map[string][]string{
-		"input": {
-			"type": {
-				"submit",
-			},
-		},
-		"button": {
-			"type": {
-				"submit",
-			},
-		},
-	}
-	submitElements, err := customizedGetElement(page, submitInfo)
+	submitElements, err := customizedGetElement(page, submitElementTemplate)
 	if err != nil {
 		return false, utils.Errorf(`get submit elements error: %s`, err)
 	}
@@ -254,17 +282,8 @@ func (starter *BrowserStarter) generateGetUrls() func(*rod.Page) ([]string, erro
 
 func (starter *BrowserStarter) generateGetClickElements() func(*rod.Page) ([]string, error) {
 	return func(page *rod.Page) ([]string, error) {
-		searchInfo := map[string]map[string][]string{
-			"input": {
-				"type": {
-					"submit",
-					"button",
-				},
-			},
-			"button": {},
-		}
 		selectors := make([]string, 0)
-		clickElements, err := customizedGetElement(page, searchInfo)
+		clickElements, err := customizedGetElement(page, clickElementTemplate)
 		if err != nil {
 			return selectors, utils.Errorf(`Page %s get click elements error: %s`, page, err)
 		}
@@ -272,16 +291,16 @@ func (starter *BrowserStarter) generateGetClickElements() func(*rod.Page) ([]str
 		elementObj, err := EvalOnPage(page, getOnClickAction)
 		if err != nil {
 			log.Errorf(`page eval check onclick element code error: %v`, err)
-		} else {
-			elementArr := elementObj.Value.Arr()
-			for _, elementGson := range elementArr {
-				elementStr := elementGson.String()
-				if elementStr == "" {
-					continue
-				}
-				if !StringArrayContains(selectors, elementStr) {
-					selectors = append(selectors, elementStr)
-				}
+			return selectors, nil
+		}
+		elementArr := elementObj.Value.Arr()
+		for _, elementGson := range elementArr {
+			elementStr := elementGson.String()
+			if elementStr == "" {
+				continue
+			}
+			if !StringArrayContains(selectors, elementStr) {
+				selectors = append(selectors, elementStr)
 			}
 		}
 		return selectors, nil
@@ -710,4 +729,205 @@ func getBaseInfo(page *rod.Page) (string, error) {
 		return "", err
 	}
 	return info.Title, nil
+}
+
+const (
+	selectorPrompt = `你是一个网页结构识别助手，你的任务是对于给出的html内容，识别用户名、密码和点击登陆的按钮对应的selector。
+如果有验证码，也需要把验证码输入框和验证码图片的selector返回。
+识别结果格式为JSON格式，具体格式如下：
+{"username":"#username","password":"#password","captcha":"#captcha","captcha_img":"#img","login":"#button"}
+`
+	captchaPrompt = `你是一个验证码识别助手，你的任务是识别验证码，并返回识别结果。
+如果图片是一个算式 就返回算式结果。
+识别结果格式为JSON格式，具体格式如下：
+{"result":"123F"}
+`
+)
+
+type CaptchaResult struct {
+	Result string `json:"result"`
+}
+
+type LoginSelector struct {
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	Captcha    string `json:"captcha"`
+	CaptchaImg string `json:"captcha_img"`
+	Login      string `json:"login"`
+}
+
+type loginFailError struct {
+	err string
+}
+
+func (e *loginFailError) Error() string {
+	return e.err
+}
+
+func NewLoginFailError(info string) error {
+	return &loginFailError{
+		err: info,
+	}
+}
+
+func (starter *BrowserStarter) Login(page *rod.Page) error {
+	var err error
+	for i := 0; i < 3; i++ {
+		err = starter.doLogin(page)
+		var loginErr *loginFailError
+		if !errors.As(err, &loginErr) || err == nil {
+			break
+		}
+	}
+	return err
+}
+
+func (starter *BrowserStarter) doLogin(page *rod.Page) error {
+	html, err := page.HTML()
+	if err != nil {
+		return err
+	}
+	if html == "" || html == "<html><head></head><body></body></html>" {
+		return NewLoginFailError("null html info")
+	}
+	//screenshot before login
+	originScreenShotBytes, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+	})
+	if err != nil {
+		return err
+	}
+	originScreenShot := "data:image/png;base64," + base64.StdEncoding.EncodeToString(originScreenShotBytes)
+	var (
+		details   string
+		selectors LoginSelector
+	)
+	details, err = ai.OpenAI(
+		aispec.WithDomain(starter.aiDomain),
+		aispec.WithModel("qwen-plus"),
+		aispec.WithAPIKey(starter.aiApiKey),
+	).Chat(fmt.Sprintf("%s\n%s", selectorPrompt, html))
+	if err != nil {
+		return err
+	}
+	selectorJsonStrs, _ := jsonextractor.ExtractJSONWithRaw(details)
+	if len(selectorJsonStrs) == 0 {
+		return NewLoginFailError("selectors not found")
+	}
+	log.Debugf("selectors: %v", selectorJsonStrs)
+	err = json.Unmarshal([]byte(selectorJsonStrs[0]), &selectors)
+	if err != nil {
+		return err
+	}
+	if selectors.Username == "" {
+		return nil
+	}
+	var captchaResult CaptchaResult
+	if selectors.Captcha != "" {
+		captchaElements, _ := page.Elements(selectors.CaptchaImg)
+		if len(captchaElements) == 0 {
+			return NewLoginFailError("captcha not found")
+		}
+		captchaElement := captchaElements.First()
+		var captchaElementBytes []byte
+		captchaElementBytes, err = captchaElement.Screenshot(proto.PageCaptureScreenshotFormatPng, 0)
+		if err != nil {
+			return err
+		}
+		captchaBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(captchaElementBytes)
+		captchaResult = starter.getCaptcha(captchaBase64)
+	}
+	// input
+	usernameElements, err := page.Elements(selectors.Username)
+	if err != nil {
+		return err
+	}
+	if len(usernameElements) != 0 {
+		err = elementInput(usernameElements.First(), starter.loginUsername)
+		if err != nil {
+			return err
+		}
+	}
+	passwordElements, err := page.Elements(selectors.Password)
+	if err != nil {
+		return err
+	}
+	if len(passwordElements) != 0 {
+		err = elementInput(passwordElements.First(), starter.loginPassword)
+		if err != nil {
+			return err
+		}
+	}
+	if captchaResult.Result != "" {
+		var captchaElements rod.Elements
+		captchaElements, err = page.Elements(selectors.Captcha)
+		if err != nil {
+			return err
+		}
+		err = elementInput(captchaElements.First(), captchaResult.Result)
+		if err != nil {
+			return err
+		}
+	}
+	time.Sleep(500 * time.Millisecond)
+	loginButtons, err := page.Elements(selectors.Login)
+	if err != nil {
+		return err
+	}
+	if len(loginButtons) != 0 {
+		err = loginButtons.First().Click(proto.InputMouseButtonLeft, 1)
+		if err != nil {
+			return err
+		}
+	}
+	err = page.WaitLoad()
+	if err != nil {
+		return err
+	}
+	time.Sleep(time.Duration(starter.extraWaitLoadTime+1000) * time.Millisecond)
+	// screenshot after login & png compare
+	currentScreenshotBytes, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+	})
+	if err != nil {
+		return err
+	}
+	currentScreenshot := "data:image/png;base64," + base64.StdEncoding.EncodeToString(currentScreenshotBytes)
+	similarity := tools.GetImgSimilarity(originScreenShot, currentScreenshot)
+	if similarity > 0.7 {
+		return NewLoginFailError(fmt.Sprintf("page similarity too large: %f", similarity))
+	}
+	return nil
+}
+
+func (starter *BrowserStarter) getCaptcha(imgBase64 string) CaptchaResult {
+	var captchaResult CaptchaResult
+	result, err := ai.OpenAI(
+		aispec.WithDomain(starter.aiDomain),
+		aispec.WithModel("qwen-vl-plus"),
+		aispec.WithAPIKey(starter.aiApiKey),
+		aispec.WithChatImageContent(imgBase64),
+	).Chat(captchaPrompt)
+	if err != nil {
+		return captchaResult
+	}
+	results, _ := jsonextractor.ExtractJSONWithRaw(result)
+	if len(results) == 0 {
+		return captchaResult
+	}
+	log.Debugf("captcha: %v", results)
+	_ = json.Unmarshal([]byte(results[0]), &captchaResult)
+	return captchaResult
+}
+
+func elementInput(ele *rod.Element, inputStr string) error {
+	err := ele.SelectAllText()
+	if err != nil {
+		return err
+	}
+	err = ele.Type(input.Backspace)
+	if err != nil {
+		return err
+	}
+	return ele.Input(inputStr)
 }
