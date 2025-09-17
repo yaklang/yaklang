@@ -243,7 +243,7 @@ func (r *Runner) WaitLoad() {
 
 func (r *Runner) WaitRequestIdle() func() {
 	// wait := r.page.MustWaitRequestIdle()
-	wait := r.page.WaitRequestIdle(time.Second, nil, nil)
+	wait := r.page.WaitRequestIdle(time.Second, nil, nil, nil)
 	return wait
 	// r.page.WaitRequestIdle(time.Second, nil, nil)
 }
