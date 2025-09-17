@@ -178,9 +178,10 @@ LOOP:
 							"human_readable_thought",
 							func(key string, reader io.Reader, parents []string) {
 								var output bytes.Buffer
+								reader = utils.UTF8Reader(reader)
 								reader = io.TeeReader(reader, &output)
 								r.config.Emitter.EmitStreamEventEx(
-									"thought",
+									"re-act-loop",
 									time.Now(),
 									reader,
 									resp.GetTaskIndex(),
