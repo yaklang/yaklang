@@ -41,7 +41,12 @@ type AnalyzeContext struct {
 	recursiveCounter int64
 
 	// savedPath map[*Value]struct{}
-	recursiveStatusIsLeaf *utils.Stack[bool]
+	recursiveStatusIsLeaf *utils.Stack[node]
+}
+
+type node struct {
+	leaf bool
+	node *Value
 }
 
 func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
@@ -51,7 +56,7 @@ func NewAnalyzeContext(opt ...OperationOption) *AnalyzeContext {
 		config:                 NewOperations(opt...),
 		depth:                  -1,
 		callStack:              utils.NewStack[*ssa.Call](),
-		recursiveStatusIsLeaf:  utils.NewStack[bool](),
+		recursiveStatusIsLeaf:  utils.NewStack[node](),
 	}
 	return actx
 }
@@ -78,23 +83,22 @@ func saveDataflowPath(direct AnalysisType, from, to *Value) {
 
 func (a *AnalyzeContext) SavePath(result Values) {
 	shouldSave := func() bool {
-		return a.recursiveStatusIsLeaf.Peek()
+		return a.recursiveStatusIsLeaf.Peek().leaf
 	}
 	for _, ret := range result {
 		if shouldSave() {
 			// if len(ret.PrevDataflowPath) == 0 {
 			// log.Error("========================")
 			{
-				// log.Errorf("Ret [%v] StackValue: %v", ret, a.nodeStack.Values())
-				size := a.nodeStack.Len()       // [current, ..... , origin]
-				current := a.nodeStack.PeekN(0) // current
+				// log.Errorf("Ret [%v] StackValue: %v", ret, a.recursiveStatusIsLeaf.Values())
+				size := a.recursiveStatusIsLeaf.Len()            // [current, ..... , origin]
+				current := a.recursiveStatusIsLeaf.PeekN(0).node // current
 				if !ValueCompare(current, ret) {
 					return
 				}
 				for i := 0; i < size; i++ {
-					prev := a.nodeStack.PeekN(i) //
-					// log.Errorf("Value[%v] effect-on [%v]", current, next)
-					// log.Errorf("%v(%v) prev %v(%v)", current, current.GetUUID(), prev, prev.GetUUID())
+					prev := a.recursiveStatusIsLeaf.PeekN(i).node //
+					// log.Errorf("Value[%v] prev [%v]", current, prev)
 					saveDataflowPath(a.direct, prev, current)
 					current = prev
 				}
@@ -134,9 +138,10 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 		return true, recoverCrossProcess
 	}
 	// 过程内分析
-	a.recursiveStatusIsLeaf.Pop()
-	a.recursiveStatusIsLeaf.Push(false) // prev status is false, because it have next recursive
-	a.recursiveStatusIsLeaf.Push(true)  // current status is true
+	prev := a.recursiveStatusIsLeaf.Pop()
+	prev.leaf = false
+	a.recursiveStatusIsLeaf.Push(prev)          // prev status is false, because it have next recursive
+	a.recursiveStatusIsLeaf.Push(node{true, v}) // current status is true
 
 	needVisited, recoverIntraProcess := a.valueShould(v)
 	recoverStack = func() {
