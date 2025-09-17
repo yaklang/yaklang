@@ -74,8 +74,8 @@ $param<getFunc><getReturns> as $returns;
 $returns?{<typeName>?{have: "ModelAndView"}} as $result;
 $result.addObject(,,* as $sourceEntry);
 $sourceEntry<show> #{
-    until: `* & $param as $source`,
-}->;
+    until: `* & $param `,
+}-> as $source;
 $source<dataflow(exclude=<<<CODE
 *?{opcode: call}
 CODE)> as $filteredSource

@@ -72,8 +72,8 @@ ResponseBody.__ref__?{.annotation.*Mapping} as $entryMethods;
 
 $entryMethods<getReturns> as $sink;
 $sink #{
-    until: `* & $params as $source`,
-}->;
+    until: `* & $params `,
+}-> as $source;
 $source<dataflow(<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $haveCall;
