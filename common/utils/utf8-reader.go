@@ -72,12 +72,16 @@ func (r *utf8Reader) findLastValidUTF8Boundary(data []byte, maxLen int) int {
 	}
 
 	// 特殊情况：如果缓冲区长度小于UTF-8字符最大长度，保证分开读
+	// 但仍要尝试保持字符完整性
 	if maxLen < 4 {
-		// 对于小缓冲区，只返回能装下的字节数，即使可能在字符中间分割
-		if checkLen <= maxLen {
-			return checkLen
+		// 检查能否放入完整字符
+		for i := checkLen; i > 0; i-- {
+			if utf8.Valid(data[:i]) {
+				return i
+			}
 		}
-		return maxLen
+		// 如果没有完整字符，则允许分开读取（按字节）
+		return checkLen
 	}
 
 	// 从后往前检查，找到最后一个有效的UTF-8字符边界
