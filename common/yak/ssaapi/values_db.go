@@ -194,11 +194,11 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		if err := g.db.Save(edge).Error; err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
-	case EdgeTypeDataflow:
-		edge := fromNode.CreateDataFlowEdge(g.ProgramName, toNode.ID)
-		if err := g.db.Save(edge).Error; err != nil {
-			log.Errorf("save AuditEdge failed: %v", err)
-		}
+	// case EdgeTypeDataflow:
+	// 	edge := fromNode.CreateDataFlowEdge(g.ProgramName, toNode.ID)
+	// 	if err := g.db.Save(edge).Error; err != nil {
+	// 		log.Errorf("save AuditEdge failed: %v", err)
+	// 	}
 	case EdgeTypePredecessor:
 		var (
 			label string

@@ -36,7 +36,6 @@ type Value struct {
 
 	// for syntaxflow vm
 	Predecessors []*PredecessorValue
-	PrevDataFlow *utils.SafeMap[*Value] // data flow to me
 	DescInfo     map[string]string
 	// value from database
 	auditNode *ssadb.AuditNode
@@ -59,16 +58,6 @@ func (v *Value) getInstruction() ssa.Instruction {
 		return v.innerUser
 	}
 	return nil
-}
-
-func (v *Value) hasDataFlow(target *Value) bool {
-	if v == nil {
-		return false
-	}
-	if v.PrevDataFlow == nil {
-		return false
-	}
-	return v.PrevDataFlow.Have(target.GetUUID())
 }
 
 func (v *Value) hasDependOn(target *Value) bool {
@@ -1088,27 +1077,6 @@ func (v *Value) GetDependOn() Values {
 	return v.safeMapToValues(v.DependOn)
 }
 
-func (v *Value) GetDataFlow() Values {
-	if v == nil {
-		return nil
-	}
-	if v.PrevDataFlow == nil || v.PrevDataFlow.Count() == 0 {
-		if auditNode := v.auditNode; auditNode != nil {
-			nodeIds := ssadb.GetDataFlowEdgeByToNodeId(auditNode.ID)
-			for _, id := range nodeIds {
-				d := v.NewValueFromAuditNode(id)
-				if d != nil {
-					v.AppendDataFlow(d)
-				}
-			}
-		}
-	}
-	if v == nil || v.PrevDataFlow == nil {
-		return nil
-	}
-	return v.PrevDataFlow.Values()
-}
-
 func (v *Value) GetEffectOn() Values {
 	if v.EffectOn == nil || v.EffectOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
@@ -1155,16 +1123,6 @@ func (v *Value) ForEachEffectOn(f func(value *Value)) {
 		return
 	}
 	v.EffectOn.ForEach(func(key string, value *Value) bool {
-		f(value)
-		return true
-	})
-}
-
-func (v *Value) ForEachDataFlow(f func(value *Value)) {
-	if v == nil || v.PrevDataFlow == nil {
-		return
-	}
-	v.PrevDataFlow.ForEach(func(key string, value *Value) bool {
 		f(value)
 		return true
 	})
