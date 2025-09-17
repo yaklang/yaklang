@@ -78,66 +78,66 @@ jobs:
               # -----------------------------
               go test -timeout 1m ./common/utils
               go test -v -timeout 20s ./common/utils/imageutils/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
-              go test -timeout 10s ./common/utils/xml2
-              go test -timeout 20s ./common/utils/tlsutils/... 
-              go test -timeout 10s ./common/utils/linktable/...  
-              go test -timeout 20s -run TestQueryCVEWithFixName ./common/cve
-              go test -timeout 20s ./common/sca/...
-              go test -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib
-              go test -timeout 20s -run TestMUSTPASS_Common ./common/yak/yaklib
-              go test -timeout 1m -run TestMUSTPASS_Fp ./common/yak/yaklib/tools
-              go test -timeout 30s ./common/openapi/...
-              go test -timeout 10s ./common/utils/dot/... ./common/utils/filesys/...
-              go test -timeout 15s ./common/utils/bruteutils/.
-              go test -timeout 15s ./common/utils/memedit/.
-              go test -timeout 15s ./common/pcapx/pcaputil/...
-              go test -timeout 15s ./common/yak/yakurl/...
+              go test -v -timeout 10s ./common/utils/xml2 | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/utils/tlsutils/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 10s ./common/utils/linktable/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s -run TestQueryCVEWithFixName ./common/cve | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/sca/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s -run TestMUSTPASS_Common ./common/yak/yaklib | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 1m -run TestMUSTPASS_Fp ./common/yak/yaklib/tools | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s ./common/openapi/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 10s ./common/utils/dot/... ./common/utils/filesys/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 15s ./common/utils/bruteutils/. | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 15s ./common/utils/memedit/. | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"  
+              go test -v -timeout 15s ./common/pcapx/pcaputil/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 15s ./common/yak/yakurl/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # yso
-              go test -timeout 20s ./common/yso/...
-              go test -timeout 20s ./common/yserx
+              go test -v -timeout 20s ./common/yso/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/yserx | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # totp
-              go test -timeout 20s ./common/twofa/...
+              go test -v -timeout 20s ./common/twofa/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # cybertunnel http trigger
-              go test ./common/cybertunnel/...
+              go test -v ./common/cybertunnel/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # YAK GIT
-              go test ./common/utils/yakgit/...
+              go test -v ./common/utils/yakgit/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # YAK suspect tools
-              go test ./common/utils/suspect
-              go test ./common/javaclassparser/jarwar/...
-              go test --timeout 1m ./common/bin-parser/...
-              go test --timeout 1m ./common/yak/antlr4nasl/tests/...
-              go test --timeout 30s ./common/fp/...
-              go test --timeout 30s ./common/utils/gzip_embed/test/...
-              go test --timeout 30s ./common/yak/cmd/...
-              go test --timeout 30s ./common/javaclassparser/tests/...
+              go test -v ./common/utils/suspect | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v ./common/javaclassparser/jarwar/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 1m ./common/bin-parser/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 1m ./common/yak/antlr4nasl/tests/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s ./common/fp/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s ./common/utils/gzip_embed/test/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s ./common/yak/cmd/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s ./common/javaclassparser/tests/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
 
               # suricate generate && match
-              go test -timeout 20s -run TestMUSTPASS* ./common/suricata/...
-              go test -timeout 20s -run TestMUSTPASS* ./common/chaosmaker
+              go test -v -timeout 20s -run TestMUSTPASS* ./common/suricata/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s -run TestMUSTPASS* ./common/chaosmaker | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # pcapx
-              go test -timeout 20s -run TestSmoking_* ./common/pcapx
-              go test -timeout 20s ./common/netx/mustpass
-              go test -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil
-              go test -timeout 20s ./common/mutate_tests ./common/fuzztag  
-              go test -timeout 20s ./common/fuzztagx 
-              go test -timeout 30s ./common/mutate
-              go test -timeout 30s ./common/fuzzx
-              go test -timeout 20s ./common/utils/bizhelper/...
+              go test -v -timeout 20s -run TestSmoking_* ./common/pcapx | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/netx/mustpass | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/mutate_tests ./common/fuzztag   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/fuzztagx  | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s ./common/mutate | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 30s ./common/fuzzx | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/utils/bizhelper/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               
                # cli
-              go test --timeout 1m ./common/utils/cli
+              go test -v --timeout 1m ./common/utils/cli | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # mcp
-              go test --timeout 1m ./common/mcp/yakcliconvert
+              go test -v --timeout 1m ./common/mcp/yakcliconvert | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # doc
-              go test --timeout 3m  ./common/yak/yakdoc/...
+              go test -v -timeout 3m  ./common/yak/yakdoc/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
               # jwt
-              go test --timeout 1m ./common/authhack/...
+              go test -v --timeout 1m ./common/authhack/... | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
 
               # vulinbox agent client
-              go test -timeout 1m -run TestMUSTPASS ./common/vulinboxagentclient
+              go test -v -timeout 1m -run TestMUSTPASS ./common/vulinboxagentclient | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
 
               # yakdiff
-              go test -timeout 20s ./common/utils/yakgit/yakdiff/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
+              go test -v -timeout 20s ./common/utils/yakgit/yakdiff/...   | grep -E "(PASS|FAIL|RUN|FAIL|=== RUN|--- PASS|--- FAIL|TestTemplate)"
 
           - name: Test AI Infra / RAG / Knowledge
             run: |
