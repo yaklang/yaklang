@@ -146,7 +146,6 @@ var nativeCallDataFlow sfvm.NativeCallFunc = func(v sfvm.ValueOperator, frame *s
 	if len(exclude) != 0 {
 		condition = append(condition, withFilterExcludeCondition(exclude))
 	}
-	log.Errorf("nativecall ")
 	ret = dataFlowFilter(ret, contextResult, frame.GetVM().GetConfig(), end, condition...)
 
 	if len(ret) > 0 {

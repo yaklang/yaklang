@@ -102,7 +102,7 @@ func ProfileAddWithError(enable bool, name string, fs ...func() error) error {
 		start := time.Now()
 		if f != nil {
 			if err := f(); err != nil {
-				log.Errorf("ProfileAdd %s error: %v", name, err)
+				log.Debugf("ProfileAdd %s error: %v", name, err)
 				if p != nil {
 					syncAtomic.AddUint64(&p.ErrorCount, 1)
 				}
@@ -143,11 +143,11 @@ func ShowCacheCost(pprof ...*utils.SafeMap[*Profile]) {
 			}
 			return 0
 		})
-		log.Errorf("----------------------------------------[%d]--------------------------------------", index)
+		log.Debugf("----------------------------------------[%d]--------------------------------------", index)
 		for _, profile := range profiles {
-			log.Errorf(profile.String())
+			log.Debug(profile.String())
 		}
-		log.Errorf("-------------------------------------------------------------------------------")
+		log.Debug("-------------------------------------------------------------------------------")
 	}
 
 	if len(pprof) > 0 {
@@ -181,24 +181,24 @@ func ShowDiffCacheCost(databaseCost, memoryCost *utils.SafeMap[*Profile]) {
 		key := database.Name
 		memory, memory_have := memoryCost.Get(key)
 		if !memory_have {
-			log.Errorf("Profile [%s] not found in memory cost", key)
-			log.Error(database.String())
+			log.Debugf("Profile [%s] not found in memory cost", key)
+			log.Debug(database.String())
 			continue
 		}
 
 		if database.Count > memory.Count*5 {
-			log.Errorf("Profile [%s] count mismatch: database %d, memory %d", key, database.Count, memory.Count)
-			log.Error(database.String())
-			log.Error(memory.String())
+			log.Debugf("Profile [%s] count mismatch: database %d, memory %d", key, database.Count, memory.Count)
+			log.Debug(database.String())
+			log.Debug(memory.String())
 		}
 
 		if database.TotalTime > memory.TotalTime*2 {
-			log.Errorf("------------------------------------------------------")
-			log.Errorf("Profile [%s] total time mismatch: database %v, memory %v", key, time.Duration(database.TotalTime), time.Duration(memory.TotalTime))
+			log.Debugf("------------------------------------------------------")
+			log.Debugf("Profile [%s] total time mismatch: database %v, memory %v", key, time.Duration(database.TotalTime), time.Duration(memory.TotalTime))
 			for index, databaseTime := range database.Times {
 				if index >= len(memory.Times) {
-					log.Errorf("Profile %s time mismatch at index %d: database %v, memory not found", key, index, time.Duration(databaseTime))
-					log.Errorf("%s-%-4d\t database Time: %v\tConut: %v\t Avg: %v",
+					log.Debugf("Profile %s time mismatch at index %d: database %v, memory not found", key, index, time.Duration(databaseTime))
+					log.Debugf("%s-%-4d\t database Time: %v\tConut: %v\t Avg: %v",
 						key, index+1,
 						time.Duration(databaseTime),
 						database.Count,
@@ -209,14 +209,14 @@ func ShowDiffCacheCost(databaseCost, memoryCost *utils.SafeMap[*Profile]) {
 
 				memoryTime := memory.Times[index]
 				if databaseTime > memoryTime*2 || databaseTime > uint64(1*time.Second) {
-					log.Errorf("Profile %s time mismatch at index %d: database %v, memory %v", key, index, time.Duration(databaseTime), time.Duration(memory.Times[index]))
-					log.Errorf("%s-%-4d\t database Time: %v\tCount: %v\tAvg: %v",
+					log.Debugf("Profile %s time mismatch at index %d: database %v, memory %v", key, index, time.Duration(databaseTime), time.Duration(memory.Times[index]))
+					log.Debugf("%s-%-4d\t database Time: %v\tCount: %v\tAvg: %v",
 						key, index+1,
 						time.Duration(databaseTime),
 						database.Count,
 						time.Duration(databaseTime)/time.Duration(database.Count),
 					)
-					log.Errorf("%s-%-4d\t memory  Time: %v\tCount: %v\t Avg: %v",
+					log.Debugf("%s-%-4d\t memory  Time: %v\tCount: %v\t Avg: %v",
 						key, index+1,
 						time.Duration(memoryTime),
 						memory.Count,

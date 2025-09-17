@@ -236,8 +236,11 @@ func (a *AnalyzeContext) enterRecursive() {
 // ========================================== OBJECT STACK ==========================================
 
 func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
+	if utils.IsNil(obj) || utils.IsNil(key) || utils.IsNil(member) {
+		return utils.Errorf("objectStack cannot push nil value")
+	}
 	if !obj.IsObject() {
-		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.innerValue)
+		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv")
 	}
 	shouldVisited, recoverIntra := g.theObjectShouldBeVisited(obj, key, member)
 	if !shouldVisited {

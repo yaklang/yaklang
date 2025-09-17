@@ -914,7 +914,7 @@ func init() {
 		idx := 0
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 			if ret, ok := operator.(*Value); ok {
-				fmt.Printf("-%3d: %v\n", idx, ret.String())
+				log.Debugf("-%3d: %v\n", idx, ret.String())
 				idx++
 			}
 			return nil

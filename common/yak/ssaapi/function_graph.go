@@ -127,7 +127,7 @@ func (g *FunctionCFG) Dot() string {
 
 // ShowDot 打印DOT格式的控制流图
 func (g *FunctionCFG) ShowDot() {
-	fmt.Println(g.Dot())
+	log.Infof(g.Dot())
 }
 
 // FunctionDotGraph 为指定函数生成DOT格式的控制流图
