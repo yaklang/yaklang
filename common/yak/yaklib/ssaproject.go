@@ -223,6 +223,12 @@ func WithReCompile(recompile bool) SSAProjectParamsOpt {
 	}
 }
 
+func WithCompileConcurrency(concurrency int) SSAProjectParamsOpt {
+	return func(b *ssaProjectConfigBuilder) {
+		b.project.CompileConcurrency = uint32(concurrency)
+	}
+}
+
 func WithScanConcurrency(concurrency int) SSAProjectParamsOpt {
 	return func(b *ssaProjectConfigBuilder) {
 		b.project.ScanConcurrency = uint32(concurrency)
@@ -421,27 +427,28 @@ var SSAProjectExports = map[string]interface{}{
 	"NewSSAProject":         NewSSAProject,
 	"SaveSSAProject":        SaveSSAProject,
 
-	"withLanguage":        WithLanguage,
-	"withTags":            WithTags,
-	"withSourceKind":      WithSourceKind,
-	"withLocalFile":       WithLocalFile,
-	"withURL":             WithURL,
-	"withBranch":          WithBranch,
-	"withPath":            WithPath,
-	"withDescription":     WithDescription,
-	"withStrictMode":      WithStrictMode,
-	"withPeepholeSize":    WithPeepholeSize,
-	"withExcludeFiles":    WithExcludeFiles,
-	"withReCompile":       WithReCompile,
-	"withScanConcurrency": WithScanConcurrency,
-	"withMemoryScan":      WithMemoryScan,
-	"withIgnoreLanguage":  WithIgnoreLanguage,
-	"withProxyURL":        WithProxyURL,
-	"withProxyAuth":       WithProxyAuth,
-	"withAuthKind":        WithAuthKind,
-	"withAuthUsername":    WithAuthUsername,
-	"withAuthPassword":    WithAuthPassword,
-	"withAuthKeyPath":     WithAuthKeyPath,
+	"withLanguage":           WithLanguage,
+	"withTags":               WithTags,
+	"withSourceKind":         WithSourceKind,
+	"withLocalFile":          WithLocalFile,
+	"withURL":                WithURL,
+	"withBranch":             WithBranch,
+	"withPath":               WithPath,
+	"withDescription":        WithDescription,
+	"withStrictMode":         WithStrictMode,
+	"withPeepholeSize":       WithPeepholeSize,
+	"withExcludeFiles":       WithExcludeFiles,
+	"withReCompile":          WithReCompile,
+	"withCompileConcurrency": WithCompileConcurrency,
+	"withScanConcurrency":    WithScanConcurrency,
+	"withMemoryScan":         WithMemoryScan,
+	"withIgnoreLanguage":     WithIgnoreLanguage,
+	"withProxyURL":           WithProxyURL,
+	"withProxyAuth":          WithProxyAuth,
+	"withAuthKind":           WithAuthKind,
+	"withAuthUsername":       WithAuthUsername,
+	"withAuthPassword":       WithAuthPassword,
+	"withAuthKeyPath":        WithAuthKeyPath,
 
 	// 规则过滤器选项
 	"withRuleFilterLanguage":   WithRuleFilterLanguage,
