@@ -31,6 +31,10 @@ func (n *StandardLayerNode[K]) GetVector() Vector {
 	return n.vector
 }
 
+func (n *StandardLayerNode[K]) GetData() any {
+	return n.vector
+}
+
 func (n *StandardLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {
 	return n.neighbors
 }
@@ -190,6 +194,10 @@ func (n *PQLayerNode[K]) GetVector() Vector {
 	return func() []float32 {
 		panic("PQ node does not store original vector data. Use PQ codes for distance calculation.")
 	}
+}
+
+func (n *PQLayerNode[K]) GetData() any {
+	return n.pqCodes
 }
 
 func (n *PQLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {

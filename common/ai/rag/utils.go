@@ -1,15 +1,20 @@
 package rag
 
 import (
+	"crypto/md5"
+	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // ChunkText 将长文本分割成多个小块，以便于处理和嵌入
@@ -169,51 +174,6 @@ func SplitDocumentsByMetadata(docs []Document, metadataKey string) map[any][]Doc
 	return groups
 }
 
-func ConvertLayersInfoToGraph(layers []*hnsw.Layer[string], saveVectorByKey func(string, []float32)) *schema.GroupInfos {
-	groupInfos := make(schema.GroupInfos, 0)
-
-	// 遍历每一层
-	for layerLevel, layer := range layers {
-		if layer == nil || layer.Nodes == nil {
-			continue
-		}
-
-		// 遍历该层的每个节点
-		for nodeKey, layerNode := range layer.Nodes {
-			if layerNode == nil {
-				continue
-			}
-
-			// 保存节点的向量数据
-			if saveVectorByKey != nil && !layerNode.IsPQEnabled() {
-				// 只有标准节点才能获取原始向量
-				saveVectorByKey(nodeKey, layerNode.GetVector()())
-			}
-
-			// 收集邻居键
-			neighborMap := layerNode.GetNeighbors()
-			neighbors := make([]string, 0, len(neighborMap))
-			for neighborKey := range neighborMap {
-				neighbors = append(neighbors, neighborKey)
-			}
-
-			// 对邻居键排序以确保一致性
-			slices.Sort(neighbors)
-
-			// 创建 GroupInfo
-			groupInfo := schema.GroupInfo{
-				LayerLevel: layerLevel,
-				Key:        nodeKey,
-				Neighbors:  neighbors,
-			}
-
-			groupInfos = append(groupInfos, groupInfo)
-		}
-	}
-
-	return &groupInfos
-}
-
 func ParseLayersInfo(graphInfos *schema.GroupInfos, loadVectorByKey func(string) []float32) []*hnsw.Layer[string] {
 	if graphInfos == nil || len(*graphInfos) == 0 {
 		return nil
@@ -290,4 +250,159 @@ func NewMockEmbedder(f func(text string) ([]float32, error)) EmbeddingClient {
 // Embedding 模拟实现 EmbeddingClient 接口
 func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 	return m.MockEmbedderFunc(text)
+}
+
+type NodeOffsetToVectorFunc func(offset uint32) []float32
+
+func ParseHNSWGraphFromBinary(graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, cacheMaxSize int) (*hnsw.Graph[string], error) {
+	cache := map[hnswspec.LazyNodeID]hnswspec.LayerNode[string]{}
+	clearCache := func() {
+		if len(cache) > cacheMaxSize {
+			clearNum := len(cache) - cacheMinSize
+			clearKeys := []hnswspec.LazyNodeID{}
+			for key := range cache {
+				clearKeys = append(clearKeys, key)
+				clearNum--
+				if clearNum <= 0 {
+					break
+				}
+			}
+			for _, key := range clearKeys {
+				delete(cache, key)
+			}
+		}
+	}
+	return hnsw.LoadGraphFromBinary(graphBinaryReader, func(key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+		return hnswspec.NewLazyLayerNode(key, func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+			if node, ok := cache[uid]; ok {
+				return node, nil
+			}
+			doc, err := getVectorDocumentByLazyNodeID(db, uid)
+			if err != nil {
+				return nil, err
+			}
+			clearCache()
+			node := hnswspec.NewStandardLayerNode(doc.DocumentID, func() []float32 { return doc.Embedding })
+			cache[uid] = node
+			return node, nil
+		}), nil
+	})
+}
+
+func getVectorDocumentByLazyNodeID(db *gorm.DB, id hnswspec.LazyNodeID) (*schema.VectorStoreDocument, error) {
+	var doc schema.VectorStoreDocument
+	var err error
+	switch ret := id.(type) {
+	case []byte:
+		err = db.Where("uid = ?", ret).First(&doc).Error
+	case string:
+		err = db.Where("document_id = ?", ret).First(&doc).Error
+	case int:
+		err = db.Where("id = ?", ret).First(&doc).Error
+	case int64:
+		err = db.Where("id = ?", ret).First(&doc).Error
+	case int32:
+		err = db.Where("id = ?", ret).First(&doc).Error
+	case uint32:
+		err = db.Where("id = ?", ret).First(&doc).Error
+	case uint64:
+		err = db.Where("id = ?", ret).First(&doc).Error
+	}
+	return &doc, err
+}
+
+func ExportHNSWGraphToBinary(graph *hnsw.Graph[string]) (io.Reader, error) {
+	return hnsw.ExportGraphToBinary(graph)
+}
+
+const (
+	uidTypeMd5        = "md5"
+	uidTypeID         = "id"
+	uidTypeDocumentID = "document_id"
+)
+
+func getLazyNodeUIDByMd5(collectionName string, key string) []byte {
+	m := md5.Sum([]byte(collectionName + key))
+	return m[:]
+}
+
+func getLazyNodeUID(uidType string, collectionName string, doc *schema.VectorStoreDocument) (hnswspec.LazyNodeID, error) {
+	switch uidType {
+	case uidTypeMd5:
+		return getLazyNodeUIDByMd5(collectionName, doc.DocumentID), nil
+	case uidTypeID:
+		return hnswspec.LazyNodeID(doc.ID), nil
+	case uidTypeDocumentID:
+		return hnswspec.LazyNodeID(doc.DocumentID), nil
+	}
+	return "", utils.Errorf("unsupported uid type: %s", uidType)
+}
+
+var defaultUidType = uidTypeMd5
+
+func NewHNSWGraph(db *gorm.DB, collectionName string, opts ...hnsw.GraphOption[string]) *hnsw.Graph[string] {
+	allOpts := []hnsw.GraphOption[string]{
+		hnsw.WithNodeType[string](hnsw.InputNodeTypeLazy),
+		hnsw.WithConvertToUIDFunc[string](func(node hnswspec.LayerNode[string]) (hnswspec.LazyNodeID, error) {
+			return hnswspec.LazyNodeID(getLazyNodeUIDByMd5(collectionName, node.GetKey())), nil
+		}),
+		hnsw.WithDeterministicRng[string](0),
+	}
+	return hnsw.NewGraph(append(allOpts, opts...)...)
+}
+
+var graphNodesIsEmpty = errors.New("hnsw graph nodes is empty")
+
+func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) error {
+	hnswGraph := NewHNSWGraph(db, collection.Name)
+
+	// 分页查询向量节点
+	pageSize := 1000
+
+	getVectorByID := func(id hnswspec.LazyNodeID) ([]float32, error) {
+		doc, err := getVectorDocumentByLazyNodeID(db, id)
+		if err != nil {
+			return nil, err
+		}
+		return doc.Embedding, nil
+	}
+
+	for page := 1; ; page++ {
+		var docs []schema.VectorStoreDocument
+		err := db.Where("collection_id = ?", collection.ID).Offset((page - 1) * pageSize).Limit(pageSize).Find(&docs).Error
+		if err != nil {
+			return utils.Wrap(err, "get docs")
+		}
+
+		if len(docs) == 0 {
+			break
+		}
+
+		for _, doc := range docs {
+			doc := doc
+			doc.UID = getLazyNodeUIDByMd5(collection.Name, doc.DocumentID)
+			db.Save(doc)
+			hnswGraph.Add(hnsw.MakeInputNodeFromID(doc.DocumentID, hnswspec.LazyNodeID(doc.UID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
+				return getVectorByID(uid)
+			}))
+		}
+	}
+
+	if len(hnswGraph.Layers) == 0 || len(hnswGraph.Layers[0].Nodes) == 0 {
+		return graphNodesIsEmpty
+	}
+	graphBinaryReader, err := ExportHNSWGraphToBinary(hnswGraph)
+	if err != nil {
+		return utils.Wrap(err, "export hnsw graph to binary")
+	}
+	binaryBytes, err := io.ReadAll(graphBinaryReader)
+	if err != nil {
+		return utils.Wrap(err, "read graph binary")
+	}
+	err = db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collection.ID).Update("graph_binary", binaryBytes).Error
+	if err != nil {
+		return utils.Wrap(err, "update graph binary")
+	}
+	collection.GraphBinary = binaryBytes
+	return nil
 }

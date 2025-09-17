@@ -53,20 +53,20 @@ func listCollection(c *cli.Context) error {
 		fmt.Printf("  EfSearch: %d\n", info.EfSearch)
 		fmt.Printf("  EfConstruct: %d\n", info.EfConstruct)
 		fmt.Printf("\n图结构统计:\n")
-		fmt.Printf("  层数: %d\n", info.LayerCount)
-		fmt.Printf("  总节点数: %d\n", info.NodeCount)
-		fmt.Printf("  最大邻居数: %d\n", info.MaxNeighbors)
-		fmt.Printf("  最小邻居数: %d\n", info.MinNeighbors)
-		fmt.Printf("  总连接数: %d\n", info.ConnectionCount)
+		// fmt.Printf("  层数: %d\n", info.LayerCount)
+		// fmt.Printf("  总节点数: %d\n", info.NodeCount)
+		// fmt.Printf("  最大邻居数: %d\n", info.MaxNeighbors)
+		// fmt.Printf("  最小邻居数: %d\n", info.MinNeighbors)
+		// fmt.Printf("  总连接数: %d\n", info.ConnectionCount)
 
-		if len(info.LayerNodeCountMap) > 0 {
-			fmt.Printf("\n各层节点分布:\n")
-			for layer := 0; layer < info.LayerCount; layer++ {
-				if count, exists := info.LayerNodeCountMap[layer]; exists {
-					fmt.Printf("  第%d层: %d个节点\n", layer, count)
-				}
-			}
-		}
+		// if len(info.LayerNodeCountMap) > 0 {
+		// 	fmt.Printf("\n各层节点分布:\n")
+		// 	for layer := 0; layer < info.LayerCount; layer++ {
+		// 		if count, exists := info.LayerNodeCountMap[layer]; exists {
+		// 			fmt.Printf("  第%d层: %d个节点\n", layer, count)
+		// 		}
+		// 	}
+		// }
 	}
 
 	fmt.Println(strings.Repeat("=", 80))
