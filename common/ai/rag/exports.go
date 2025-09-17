@@ -334,80 +334,22 @@ type CollectionInfo struct {
 	EfConstruct      int
 	DistanceFuncType string
 
-	LayerCount        int         // Layer数量
-	LayerNodeCountMap map[int]int // Layer节点数量
-	NodeCount         int         // 节点数量
-	MaxNeighbors      int         // 最大邻居数
-	MinNeighbors      int         // 最小邻居数
-	ConnectionCount   int         // 总连接数
+	// LayerCount        int         // Layer数量
+	// LayerNodeCountMap map[int]int // Layer节点数量
+	// NodeCount         int         // 节点数量
+	// MaxNeighbors      int         // 最大邻居数
+	// MinNeighbors      int         // 最小邻居数
+	// ConnectionCount   int         // 总连接数
 }
 
 // GetCollectionInfo 获取知识库信息
 func GetCollectionInfo(db *gorm.DB, name string) (*CollectionInfo, error) {
-	var collections []*schema.VectorStoreCollection
-	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).Find(&collections)
+	var collection schema.VectorStoreCollection
+	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).
+		Select("name, description, model_name, dimension, m, ml, ef_search, ef_construct, distance_func_type").
+		First(&collection)
 	if dbErr.Error != nil {
 		return nil, utils.Errorf("获取知识库信息失败: %v", dbErr.Error)
-	}
-	if len(collections) == 0 {
-		return nil, utils.Errorf("知识库 %s 不存在", name)
-	}
-	collection := collections[0]
-	// 暂时不支持从数据库恢复HNSW图结构
-	// 当前返回基本信息
-	layers := ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
-		var docs []schema.VectorStoreDocument
-		db.Where("document_id = ?", key).Find(&docs)
-		if len(docs) == 0 {
-			return nil
-		}
-		return []float32(docs[0].Embedding)
-	})
-
-	layerNodeCountMap := make(map[int]int)
-	nodeCount := 0
-	maxNeighbors := 0
-	minNeighbors := -1 // 初始化为-1，表示还没有找到任何节点
-	connectionCount := 0
-
-	// 如果layers为nil（不支持恢复），则只提供基本信息
-	if layers == nil {
-		// 获取文档数量作为基本信息
-		var docCount int64
-		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&docCount)
-		nodeCount = int(docCount)
-	} else {
-		for index, layer := range layers {
-			layerNodeCountMap[index] = len(layer.Nodes)
-			nodeCount += len(layer.Nodes)
-
-			// 遍历该层的所有节点，统计邻居信息
-			for _, node := range layer.Nodes {
-				if node == nil {
-					continue
-				}
-
-				neighborCount := len(node.GetNeighbors())
-
-				// 更新最大邻居数
-				if neighborCount > maxNeighbors {
-					maxNeighbors = neighborCount
-				}
-
-				// 更新最小邻居数
-				if minNeighbors == -1 || neighborCount < minNeighbors {
-					minNeighbors = neighborCount
-				}
-
-				// 累计连接数（每个邻居关系算作一个连接）
-				connectionCount += neighborCount
-			}
-		}
-	}
-
-	// 如果没有任何节点，将最小邻居数设为0
-	if minNeighbors == -1 {
-		minNeighbors = 0
 	}
 
 	return &CollectionInfo{
@@ -421,19 +363,6 @@ func GetCollectionInfo(db *gorm.DB, name string) (*CollectionInfo, error) {
 		EfSearch:         collection.EfSearch,
 		EfConstruct:      collection.EfConstruct,
 		DistanceFuncType: collection.DistanceFuncType,
-
-		LayerCount: func() int {
-			if layers == nil {
-				return 0
-			} else {
-				return len(layers)
-			}
-		}(),
-		LayerNodeCountMap: layerNodeCountMap,
-		NodeCount:         nodeCount,
-		MaxNeighbors:      maxNeighbors,
-		MinNeighbors:      minNeighbors,
-		ConnectionCount:   connectionCount,
 	}, nil
 }
 
