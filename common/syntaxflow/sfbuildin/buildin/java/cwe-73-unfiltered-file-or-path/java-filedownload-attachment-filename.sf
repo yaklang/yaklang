@@ -19,8 +19,8 @@ REFERENCE
 )
 
 File().get*() -{
-    until: `* #>?{<string>?{have: 'attachment;', 'filename='}} as $flag`
-}->
+    until: `* #>?{<string>?{have: 'attachment;', 'filename='}} `
+}-> as $flag 
 check $flag;
 $flag-> as $output;
 check $output;
