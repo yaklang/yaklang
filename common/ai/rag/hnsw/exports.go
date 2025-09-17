@@ -2,6 +2,7 @@ package hnsw
 
 import (
 	"cmp"
+	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -34,19 +35,28 @@ type Persistent[K cmp.Ordered] struct {
 	M           uint32                `json:"m"`
 	Ml          float32               `json:"ml"`
 	EfSearch    uint32                `json:"ef_search"`
-	PQMode      bool                  `json:"pq_mode"`
+	ExportMode  byte                  `json:"export_mode"` // pq mode: 1 / string mode: 2 / uid mode: 3
 	PQCodebook  *PersistentPQCodebook `json:"pq_codebook"`
 	Layers      []*PersistentLayer    `json:"layers"`
 	OffsetToKey []*PersistentNode[K]  `json:"offset_to_node"`
 	Neighbors   map[uint32][]uint32   `json:"neighbors"`
 }
 
+const (
+	ExportModePQ       byte = 1
+	ExportModeStandard byte = 2
+	ExportModeUID      byte = 3
+	ExportModeIntUID   byte = 4
+	ExportModeStrUID   byte = 5
+)
+
 func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 	if i == nil || len(i.Layers) == 0 || len(i.Layers[0].Nodes) == 0 {
 		return nil, utils.Errorf("graph is nil")
 	}
 	keyType := ""
-	for _k := range i.Layers[0].Nodes {
+	var exportMode byte
+	for _k, val := range i.Layers[0].Nodes {
 		var k any = _k
 		switch k.(type) {
 		case string:
@@ -60,11 +70,41 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 		case uint32:
 			keyType = "uint32"
 		}
+		switch ret := val.(type) {
+		case *hnswspec.PQLayerNode[K]:
+			exportMode = ExportModePQ
+		case *hnswspec.StandardLayerNode[K]:
+			exportMode = ExportModeStandard
+		case *hnswspec.LazyLayerNode[K]:
+			uid := ret.GetUID()
+			switch uid.(type) {
+			case string:
+				exportMode = ExportModeStrUID
+			case []byte:
+				exportMode = ExportModeUID
+			case int:
+				exportMode = ExportModeIntUID
+			case int64:
+				exportMode = ExportModeIntUID
+			case int32:
+				exportMode = ExportModeIntUID
+			case uint32:
+				exportMode = ExportModeIntUID
+			case uint64:
+				exportMode = ExportModeIntUID
+			default:
+				return nil, utils.Errorf("unsupported uid type: %T", uid)
+			}
+		}
 		break
 	}
 
 	if keyType == "" {
 		return nil, utils.Errorf("unsupported key type, should be string, int/int64, uint64, uint32")
+	}
+
+	if exportMode == 0 {
+		return nil, utils.Errorf("unsupported export mode")
 	}
 
 	var total uint32 = 0
@@ -75,13 +115,17 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 	nodeStorage := make([]*PersistentNode[K], 1, total+1)
 	// reserve 0 offset with dummy data
 	var zeroKey K
-	if i.IsPQEnabled() {
-		pqCodeSize := i.pqCodebook.M
-		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: make([]byte, pqCodeSize)}
+	if exportMode == ExportModeUID {
+		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: ""}
 	} else {
-		dims := i.Dims()
-		dummyVec := make([]float64, dims) // ToBinary expects []float64 for non-PQ mode
-		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: dummyVec}
+		if i.IsPQEnabled() {
+			pqCodeSize := i.pqCodebook.M
+			nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: make([]byte, pqCodeSize)}
+		} else {
+			dims := i.Dims()
+			dummyVec := make([]float64, dims) // ToBinary expects []float64 for non-PQ mode
+			nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: dummyVec}
+		}
 	}
 
 	pers := &Persistent[K]{
@@ -92,10 +136,10 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 		Dims:        uint32(i.Dims()),
 		OffsetToKey: nodeStorage, // 0 offset is reserved
 		Neighbors:   map[uint32][]uint32{},
+		ExportMode:  exportMode,
 	}
 
-	if i.IsPQEnabled() {
-		pers.PQMode = true
+	if exportMode == ExportModePQ {
 		pers.PQCodebook = &PersistentPQCodebook{
 			M:              uint32(i.pqCodebook.M),
 			K:              uint32(i.pqCodebook.K),
@@ -115,7 +159,11 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 
 		currentOffset++
 		k2idx[i.GetKey()] = currentOffset
-		if pers.PQMode {
+		switch pers.ExportMode {
+		case ExportModePQ:
+			if pers.ExportMode != ExportModePQ {
+				return 0, utils.Errorf("pq mode disabled but node data is []byte")
+			}
 			codes, ok := i.GetPQCodes()
 			if !ok {
 				return 0, utils.Errorf("node %v does not have PQ codes", i.GetKey())
@@ -127,7 +175,7 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 				Code: codes,
 				Key:  i.GetKey(),
 			})
-		} else {
+		case ExportModeStandard:
 			result := i.GetVector()()
 			if len(result) != int(pers.Dims) {
 				return 0, utils.Errorf("vector dimension mismatch: expected %d, got %d", pers.Dims, len(result))
@@ -141,6 +189,13 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 				Code: float64Vec,
 				Key:  i.GetKey(),
 			})
+		case ExportModeUID, ExportModeIntUID, ExportModeStrUID:
+			pers.OffsetToKey = append(pers.OffsetToKey, &PersistentNode[K]{
+				Code: i.GetData(),
+				Key:  i.GetKey(),
+			})
+		default:
+			return 0, utils.Errorf("unsupported node data type: %T", pers.ExportMode)
 		}
 		return currentOffset, nil
 	}
@@ -152,7 +207,13 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 			Nodes:     make([]uint32, 0, len(layer.Nodes)),
 		}
 		pers.Layers[level] = pl
-		for _, node := range layer.Nodes {
+		keys := make([]K, 0, len(layer.Nodes))
+		for key := range layer.Nodes {
+			keys = append(keys, key)
+		}
+		slices.Sort(keys)
+		for _, key := range keys {
+			node := layer.Nodes[key]
 			offset, err := loadOffset(node)
 			if err != nil {
 				return nil, err

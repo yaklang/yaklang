@@ -31,11 +31,11 @@ func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
 		return nil, utils.Error("invalid hnsw.EfSearch")
 	}
 
-	if i.PQMode && i.PQCodebook == nil {
+	if i.ExportMode == ExportModePQ && i.PQCodebook == nil {
 		return nil, utils.Error("pq mode enabled but pq codebook is nil")
 	}
 
-	if i.PQMode {
+	if i.ExportMode == ExportModePQ {
 		if i.PQCodebook.K <= 0 || i.PQCodebook.M <= 0 || i.PQCodebook.SubVectorDim <= 0 || len(i.PQCodebook.Centroids) == 0 {
 			return nil, utils.Errorf("invalid pq codebook, m:%v k:%v sub_vector_dim:%v centroids-length:%v", i.PQCodebook.M, i.PQCodebook.K, i.PQCodebook.SubVectorDim, len(i.PQCodebook.Centroids))
 		}
@@ -71,10 +71,10 @@ func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
 	if err := pbWriteUint32(buf, i.EfSearch); err != nil {
 		return nil, utils.Errorf("write hnsw ef search: %v", err)
 	}
-	if err := pbWriteBool(buf, i.PQMode); err != nil {
+	if err := pbWriteVarint(buf, uint64(i.ExportMode)); err != nil {
 		return nil, utils.Errorf("write hnsw pq mode: %v", err)
 	}
-	if i.PQMode {
+	if i.ExportMode == ExportModePQ {
 		if err := pbWriteUint32(buf, i.PQCodebook.M); err != nil {
 			return nil, utils.Errorf("write hnsw pq codebook m: %v", err)
 		}
@@ -123,27 +123,40 @@ func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
 		var keyAny = node.Key
 		s := utils.InterfaceToString(keyAny)
 		pbWriteBytes(buf, []byte(s))
-		switch ret := node.Code.(type) {
-		case []byte:
-			if !i.PQMode {
-				return nil, utils.Errorf("pq mode disabled but node code is []byte")
+		switch i.ExportMode {
+		case ExportModePQ:
+			data, ok := node.Code.([]byte)
+			if !ok {
+				return nil, utils.Errorf("expected []byte for pq code, got %T", node.Code)
 			}
-			if len(ret) != int(i.PQCodebook.PQCodeByteSize) {
-				return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", i.PQCodebook.PQCodeByteSize, len(ret))
+			if len(data) != int(i.PQCodebook.PQCodeByteSize) {
+				return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", i.PQCodebook.PQCodeByteSize, len(data))
 			}
-			buf.Write(ret)
-		case []float64:
-			if i.PQMode {
-				return nil, utils.Errorf("pq mode enabled but node code is []float64")
+			buf.Write(data)
+		case ExportModeStandard:
+			data, ok := node.Code.([]float64)
+			if !ok {
+				return nil, utils.Errorf("expected []float64 for vector, got %T", node.Code)
 			}
-			if len(ret) != int(i.Dims) {
-				return nil, utils.Errorf("vector dimension mismatch: expected %d, got %d", i.Dims, len(ret))
+			if len(data) != int(i.Dims) {
+				return nil, utils.Errorf("vector dimension mismatch: expected %d, got %d", i.Dims, len(data))
 			}
-			for _, f := range node.Code.([]float64) {
+			for _, f := range data {
 				pbWriteFloat64(buf, f)
 			}
+		case ExportModeUID, ExportModeIntUID, ExportModeStrUID:
+			switch ret := node.Code.(type) {
+			case []byte:
+				pbWriteBytes(buf, ret)
+			case string:
+				pbWriteBytes(buf, []byte(ret))
+			case uint64:
+				pbWriteVarint(buf, ret)
+			default:
+				return nil, utils.Errorf("unsupported node code type: %T", node.Code)
+			}
 		default:
-			return nil, utils.Errorf("unsupported node code type: %T", ret)
+			return nil, utils.Errorf("unsupported node code type: %T", node.Code)
 		}
 	}
 

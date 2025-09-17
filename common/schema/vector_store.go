@@ -193,7 +193,9 @@ type VectorStoreCollection struct {
 	DistanceFuncType string  `gorm:"default:'cosine'" json:"distance_func_type"` // 距离函数类型（cosine、euclidean等）
 
 	// HNSW 图连接信息，存储为 JSON 格式
-	GroupInfos GroupInfos `gorm:"type:text" json:"group_infos"`
+	GroupInfos  GroupInfos `gorm:"type:text" json:"group_infos"`
+	GraphBinary []byte     `gorm:"type:blob" json:"graph_binary"`
+	CodeBook    []byte     `gorm:"type:blob" json:"code_book"`
 }
 
 func (v *VectorStoreCollection) TableName() string {
@@ -212,6 +214,7 @@ type VectorStoreDocument struct {
 
 	// 文档唯一标识符，在整个系统中唯一
 	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"document_id"`
+	UID        []byte `gorm:"blob"`
 
 	// 所属集合的ID，建立外键关系
 	CollectionID uint `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"collection_id"`
@@ -220,6 +223,8 @@ type VectorStoreDocument struct {
 	Metadata MetadataMap `gorm:"type:text" json:"metadata"`
 
 	// 文档的嵌入向量，以 JSON 格式存储
+	PQMode    bool       `gorm:"default:false" json:"pq_mode"`
+	PQCode    []byte     `gorm:"type:text" json:"pq_code"`
 	Embedding FloatArray `gorm:"type:text;not null" json:"embedding"`
 
 	// 文档的原始文本

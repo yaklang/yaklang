@@ -19,24 +19,55 @@ import (
 
 type Vector = func() []float32
 
+type InputNodeType string
+
+const (
+	InputNodeTypeStandard InputNodeType = "standard"
+	InputNodeTypeLazy     InputNodeType = "lazy"
+	InputNodeTypeNone     InputNodeType = "none"
+)
+
 // InputNode 输入节点，用于接收外部输入数据
 type InputNode[K cmp.Ordered] struct {
-	Key   K
-	Value []float32
+	Key       K
+	Value     []float32
+	UID       hnswspec.LazyNodeID
+	LazyValue Vector
+	NodeType  InputNodeType
+}
+
+func (i *InputNode[K]) LoadValue() []float32 {
+	if i.NodeType == InputNodeTypeStandard {
+		return i.Value
+	}
+	return i.LazyValue()
 }
 
 // MakeInputNode 创建输入节点
 func MakeInputNode[K cmp.Ordered](key K, vec []float32) InputNode[K] {
-	return InputNode[K]{Key: key, Value: vec}
+	return InputNode[K]{Key: key, Value: vec, NodeType: InputNodeTypeStandard}
 }
 
 // MakeInputNodeFromVector 从Vector函数创建输入节点
 func MakeInputNodeFromVector[K cmp.Ordered](key K, vec Vector) InputNode[K] {
-	return InputNode[K]{Key: key, Value: vec()}
+	return InputNode[K]{Key: key, LazyValue: vec, NodeType: InputNodeTypeLazy}
+}
+
+func MakeInputNodeFromID[K cmp.Ordered](key K, uid hnswspec.LazyNodeID, loadByUID func(uid hnswspec.LazyNodeID) ([]float32, error)) InputNode[K] {
+	return InputNode[K]{Key: key, UID: hnswspec.LazyNodeID(uid), LazyValue: func() []float32 {
+		vec, err := loadByUID(uid)
+		if err != nil {
+			panic(err)
+		}
+		return vec
+	}, NodeType: InputNodeTypeLazy}
 }
 
 // ToVector 将输入节点转换为Vector函数
 func (n InputNode[K]) ToVector() Vector {
+	if n.NodeType == InputNodeTypeLazy {
+		return n.LazyValue
+	}
 	return func() []float32 { return n.Value }
 }
 
@@ -233,6 +264,12 @@ type Graph[K cmp.Ordered] struct {
 
 	// pqAwareDistance PQ感知的距离函数
 	pqAwareDistance hnswspec.PQAwareDistanceFunc[K]
+
+	// nodeType 节点类型
+	nodeType InputNodeType
+
+	// convertToUIDFunc 转换为UID函数
+	convertToUIDFunc func(node hnswspec.LayerNode[K]) (hnswspec.LazyNodeID, error)
 }
 
 func defaultRand() *rand.Rand {
@@ -262,6 +299,11 @@ type GraphConfig[K cmp.Ordered] struct {
 
 	// PQCodebook PQ码表，如果设置则启用PQ优化
 	PQCodebook *pq.Codebook
+
+	// nodeType 节点类型
+	NodeType InputNodeType
+
+	ConvertToUIDFunc func(node hnswspec.LayerNode[K]) (hnswspec.LazyNodeID, error)
 }
 
 // GraphOption defines the configuration option function type
@@ -282,6 +324,20 @@ func DefaultGraphConfig[K cmp.Ordered]() *GraphConfig[K] {
 func WithM[K cmp.Ordered](m int) GraphOption[K] {
 	return func(config *GraphConfig[K]) {
 		config.M = m
+	}
+}
+
+// WithConvertToUIDFunc sets the function to convert a node to a UID
+func WithConvertToUIDFunc[K cmp.Ordered](convertToUIDFunc func(node hnswspec.LayerNode[K]) (hnswspec.LazyNodeID, error)) GraphOption[K] {
+	return func(config *GraphConfig[K]) {
+		config.ConvertToUIDFunc = convertToUIDFunc
+	}
+}
+
+// WithNodeType sets the node type
+func WithNodeType[K cmp.Ordered](nodeType InputNodeType) GraphOption[K] {
+	return func(config *GraphConfig[K]) {
+		config.NodeType = nodeType
 	}
 }
 
@@ -371,11 +427,12 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 	}
 
 	graph := &Graph[K]{
-		M:        config.M,
-		Ml:       config.Ml,
-		Distance: config.Distance,
-		EfSearch: config.EfSearch,
-		Rng:      config.Rng,
+		M:                config.M,
+		Ml:               config.Ml,
+		Distance:         config.Distance,
+		EfSearch:         config.EfSearch,
+		Rng:              config.Rng,
+		convertToUIDFunc: config.ConvertToUIDFunc,
 	}
 
 	// 设置节点距离函数为基于接口的版本
@@ -484,6 +541,13 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
+func (g *Graph[K]) getNodeType() InputNodeType {
+	if g.nodeType == "" {
+		return InputNodeTypeNone
+	}
+	return g.nodeType
+}
+
 // Add inserts nodes into the graph.
 // If another node with the same ID exists, it is replaced.
 func (g *Graph[K]) Add(nodes ...InputNode[K]) {
@@ -496,7 +560,13 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			g.OnLayersChange(g.Layers)
 		}
 	}()
+	nodeType := g.getNodeType()
 	for _, node := range nodes {
+		if nodeType == InputNodeTypeNone {
+			nodeType = node.NodeType
+			g.nodeType = nodeType
+		}
+		originNode := node
 		key := node.Key
 		vec := node.ToVector()
 
@@ -534,9 +604,31 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 						// 回退到标准节点
 						newNode = hnswspec.NewStandardLayerNode(key, vec)
 					}
+					if nodeType == InputNodeTypeLazy {
+						uid, err := g.convertToUIDFunc(newNode)
+						if err != nil {
+							log.Errorf("Failed to convert to lazy node: %v, skip this node", err)
+							continue
+						} else {
+							newNode = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(uid), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
+								return hnswspec.NewStandardLayerNode(key, originNode.ToVector()), nil
+							})
+						}
+					}
 				} else {
 					// 创建标准节点
 					newNode = hnswspec.NewStandardLayerNode(key, vec)
+					if nodeType == InputNodeTypeLazy {
+						uid, err := g.convertToUIDFunc(newNode)
+						if err != nil {
+							log.Errorf("Failed to convert to lazy node: %v, skip this node", err)
+							continue
+						} else {
+							newNode = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(uid), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
+								return hnswspec.NewStandardLayerNode(key, originNode.ToVector()), nil
+							})
+						}
+					}
 				}
 			}
 

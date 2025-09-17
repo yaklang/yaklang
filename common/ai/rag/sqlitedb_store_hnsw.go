@@ -1,7 +1,8 @@
 package rag
 
 import (
-	"math/rand"
+	"bytes"
+	"errors"
 	"sort"
 	"strings"
 	"sync"
@@ -41,35 +42,37 @@ func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder Em
 		return nil, utils.Errorf("rag collection[%v] not existed", collectionName)
 	}
 
-	config := collections[0]
-
-	hnswGraph := hnsw.NewGraph(
-		hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
-		hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
-		hnsw.WithDeterministicRng[string](0), // 使用固定的随机数生成器，便于调试，不影响结果
-	)
-
+	var hnswGraph *hnsw.Graph[string]
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
-	var existed = make(map[string][]float32)
 	// 尝试恢复HNSW图结构
 	if recoverLayer {
-		layers := ParseLayersInfo(&collections[0].GroupInfos, func(key string) []float32 {
-			if _, ok := existed[key]; ok {
-				return existed[key]
+		var err error
+		var isEmpty bool
+		if len(collections[0].GraphBinary) == 0 {
+			// 检测到旧版向量库，开始迁移 HNSW Graph
+			log.Warnf("detect old version vector store, start to migrate to new version")
+			err := MigrateHNSWGraph(db, collections[0])
+			if err != nil {
+				if errors.Is(err, graphNodesIsEmpty) {
+					isEmpty = true
+				} else {
+					return nil, utils.Errorf("migrate hnsw graph err: %v", err)
+				}
 			}
-			// log.Infof("start to query document_id: %v", key)
-			var doc schema.VectorStoreDocument
-			db.Where("document_id = ?", key).First(&doc)
-			existed[key] = doc.Embedding
-			return doc.Embedding
-		})
-		// 检查是否成功恢复了图结构
-		// 如果GroupInfos不为空但layers为nil，可能是不支持的格式
-		if layers == nil && len(collections[0].GroupInfos) > 0 {
-			// 图信息存在但无法恢复，可能是PQ模式或其他不支持的格式
-			log.Warnf("cannot recover hnsw graph from db, maybe pq mode or unsupported format, collection name: %s", collectionName)
 		}
-		hnswGraph.Layers = layers
+		if isEmpty {
+			config := collections[0]
+			hnswGraph = NewHNSWGraph(db, collectionName,
+				hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
+				hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
+			)
+		} else {
+			graphBinaryReader := bytes.NewReader(collections[0].GraphBinary)
+			hnswGraph, err = ParseHNSWGraphFromBinary(graphBinaryReader, db, 1000, 1200)
+			if err != nil {
+				return nil, utils.Wrap(err, "parse hnsw graph from binary")
+			}
+		}
 	}
 
 	vectorStore := &SQLiteVectorStoreHNSW{
@@ -89,8 +92,15 @@ func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder Em
 }
 
 func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
-	graphInfos := ConvertLayersInfoToGraph(s.hnsw.Layers, func(key string, vec []float32) {})
-	resDb := s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("group_infos", graphInfos)
+	graphInfos, err := ExportHNSWGraphToBinary(s.hnsw)
+	if err != nil {
+		if errors.Is(err, graphNodesIsEmpty) {
+			graphInfos = nil
+		} else {
+			return utils.Wrap(err, "export hnsw graph to binary")
+		}
+	}
+	resDb := s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("graph_binary", graphInfos)
 	return resDb.Error
 }
 
@@ -133,7 +143,7 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   embedder,
 		collection:                 collection,
-		hnsw:                       hnsw.NewGraph(hnsw.WithRng[string](rand.New(rand.NewSource(0)))), // 使用固定的随机数生成器，便于调试，不影响结果
+		hnsw:                       NewHNSWGraph(db, collection.Name),
 	}
 	vectorStore.hnsw.OnLayersChange = func(layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
