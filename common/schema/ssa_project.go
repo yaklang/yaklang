@@ -19,12 +19,13 @@ type SSAProject struct {
 	// 源码获取方式配置
 	CodeSourceConfig string `json:"code_source_config" gorm:"type:text;not null;comment:源码获取配置"`
 	// 编译配置选项
-	Language      string `json:"language" gorm:"comment:项目语言"`
-	StrictMode    bool   `json:"strict_mode" gorm:"comment:是否启用严格模式"`
-	PeepholeSize  int    `json:"peephole_size" gorm:"comment:窥孔编译大小"`
-	ExcludeFiles  string `json:"exclude_files,omitempty" gorm:"comment:排除文件列表,逗号分隔"`
-	ReCompile     bool   `json:"re_compile" gorm:"comment:是否重新编译"`
-	MemoryCompile bool   `json:"memory_compile" gorm:"comment:是否使用内存编译"`
+	Language           string `json:"language" gorm:"comment:项目语言"`
+	StrictMode         bool   `json:"strict_mode" gorm:"comment:是否启用严格模式"`
+	PeepholeSize       int    `json:"peephole_size" gorm:"comment:窥孔编译大小"`
+	ExcludeFiles       string `json:"exclude_files,omitempty" gorm:"comment:排除文件列表,逗号分隔"`
+	ReCompile          bool   `json:"re_compile" gorm:"comment:是否重新编译"`
+	MemoryCompile      bool   `json:"memory_compile" gorm:"comment:是否使用内存编译"`
+	CompileConcurrency uint32 `json:"compile_concurrency" gorm:"comment:编译并发数"`
 	// 扫描配置选项
 	ScanConcurrency uint32 `json:"scan_concurrency" gorm:"comment:扫描并发数"`
 	MemoryScan      bool   `json:"memory_scan" gorm:"comment:是否使用内存扫描"`
@@ -113,12 +114,13 @@ func (p *SSAProject) GetCompileConfigInfo() (string, error) {
 	}
 
 	compileConfig := &SSACompileConfig{
-		Language:      p.Language,
-		StrictMode:    p.StrictMode,
-		PeepholeSize:  p.PeepholeSize,
-		ExcludeFiles:  p.GetExcludeFilesList(),
-		ReCompile:     p.ReCompile,
-		MemoryCompile: p.MemoryCompile,
+		Language:           p.Language,
+		StrictMode:         p.StrictMode,
+		PeepholeSize:       p.PeepholeSize,
+		ExcludeFiles:       p.GetExcludeFilesList(),
+		ReCompile:          p.ReCompile,
+		MemoryCompile:      p.MemoryCompile,
+		CompileConcurrency: p.CompileConcurrency,
 	}
 
 	configBytes, err := json.Marshal(compileConfig)
@@ -184,13 +186,14 @@ func (p *SSAProject) SetRuleFilter(filter *ypb.SyntaxFlowRuleFilter) error {
 }
 
 type SSACompileConfig struct {
-	Language      string   `json:"language"`
-	ConfigInfo    string   `json:"config_info"`
-	StrictMode    bool     `json:"strict_mode"`
-	PeepholeSize  int      `json:"peephole_size"`
-	ExcludeFiles  []string `json:"exclude_files"`
-	ReCompile     bool     `json:"re_compile"`
-	MemoryCompile bool     `json:"memory_compile"`
+	Language           string   `json:"language"`
+	ConfigInfo         string   `json:"config_info"`
+	StrictMode         bool     `json:"strict_mode"`
+	PeepholeSize       int      `json:"peephole_size"`
+	ExcludeFiles       []string `json:"exclude_files"`
+	ReCompile          bool     `json:"re_compile"`
+	MemoryCompile      bool     `json:"memory_compile"`
+	CompileConcurrency uint32   `json:"compile_concurrency"`
 }
 
 type SSAScanConfig struct {
