@@ -1,0 +1,28 @@
+{
+  "@action": "plan",
+  "query": "-",
+  "main_task": "根据用户输入的SSA RiskID智能生成Python POC代码",
+  "main_task_goal": "通过分析SSA风险详情、评估POC生成可行性、获取适当模板，最终生成可执行的Python POC代码，用于验证和演示安全漏洞。",
+  "tasks": [
+    {
+      "subtask_name": "SSA风险信息获取与分析",
+      "subtask_goal": "使用ssa-risk工具根据用户提供的RiskID，查询和获取详细的SSA风险信息，包括漏洞类型、影响组件、漏洞描述、代码位置、数据流路径等关键信息，为后续POC生成提供基础数据。重点关注代码上下文、API注解、函数签名等POC生成所需的技术细节。"
+    },
+    {
+      "subtask_name": "获取SSA风险信息关联项目源码上下文信息",
+      "subtask_goal": "使用ssa-risk-get-code-context工具根据用户提供的RiskID，获取Risk关联的风险代码上下文为后续POC生成中潜在的API路由信息或者POC生成所需信息做准备。"
+    },
+    {
+      "subtask_name": "漏洞类型分类与攻击向量分析",
+      "subtask_goal": "基于可行性评估结果，对确认可以生成POC的风险进行详细分类，识别具体的漏洞类型（如SQL注入、XSS、RCE、反序列化、文件包含、SSRF等），分析漏洞的利用原理、攻击向量、所需参数和条件。结合SSA分析结果中的数据流路径，确定POC的实现思路和技术路线。"
+    },
+    {
+      "subtask_name": "Python POC模板搜索与获取",
+      "subtask_goal": "使用poc_template_searcher工具根据识别的漏洞类型和攻击向量，搜索和获取相应的Python POC模板。模板包括请求构造、参数处理、响应解析、结果判断等通用代码结构，为POC生成提供代码框架参考。优先选择与目标编程语言和漏洞类型最匹配的模板。"
+    },
+    {
+      "subtask_name": "目标环境与API信息分析",
+      "subtask_goal": "基于SSA风险分析结果中的代码上下文，提取目标应用的关键信息，包括：1）API端点和路由信息（从注解如@RequestMapping、@GetMapping等提取）；2）函数参数和数据类型；3）认证和授权机制；4）框架类型（如Spring、JAX-RS等）。这些信息将用于生成更精确和可执行的POC代码。"
+    }
+  ]
+}
