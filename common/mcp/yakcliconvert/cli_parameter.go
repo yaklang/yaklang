@@ -6,6 +6,7 @@ import (
 	"maps"
 
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -184,6 +185,13 @@ func ConvertCliParameterToTool(toolName string, prog *ssaapi.Program) *mcp.Tool 
 	tool := mcp.NewTool(toolName)
 	tool.Description = description
 	tool.InputSchema.Required = requiredProperties
-	tool.InputSchema.Properties = properties
+
+	// 将 map[string]any 转换为 OrderedMap
+	orderedProps := omap.NewEmptyOrderedMap[string, any]()
+	for k, v := range properties {
+		orderedProps.Set(k, v)
+	}
+	tool.InputSchema.Properties = orderedProps
+
 	return tool
 }

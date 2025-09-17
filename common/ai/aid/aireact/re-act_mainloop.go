@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -178,13 +177,17 @@ LOOP:
 						jsonextractor.WithRegisterFieldStreamHandler(
 							"human_readable_thought",
 							func(key string, reader io.Reader, parents []string) {
-								reader = io.TeeReader(reader, os.Stdout)
-								r.EmitStreamEventEx(
+								var output bytes.Buffer
+								reader = io.TeeReader(reader, &output)
+								r.config.Emitter.EmitStreamEventEx(
 									"thought",
 									time.Now(),
 									reader,
-									currentTask.GetId(),
+									resp.GetTaskIndex(),
 									false,
+									func() {
+										r.EmitResult(output.String())
+									},
 								)
 							},
 						),

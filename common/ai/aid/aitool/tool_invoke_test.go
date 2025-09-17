@@ -428,25 +428,31 @@ func TestNewToolFromJSON(t *testing.T) {
 	}
 
 	params := tool.Params()
-	if len(params) != 3 {
-		t.Errorf("参数数量 = %d, want %d", len(params), 3)
+	if params.Len() != 3 {
+		t.Errorf("参数数量 = %d, want %d", params.Len(), 3)
 		return
 	}
 
 	// 验证第一个参数
-	query, ok := params["query"].(map[string]any)
+	queryVal, ok := params.Get("query")
 	require.True(t, ok, "query 参数不存在")
+	query, ok := queryVal.(map[string]any)
+	require.True(t, ok, "query 参数类型错误")
 	require.Equal(t, query["type"], "string", "query 参数类型错误")
 
 	// 验证第二个参数
-	limit, ok := params["limit"].(map[string]any)
+	limitVal, ok := params.Get("limit")
 	require.True(t, ok, "limit 参数不存在")
+	limit, ok := limitVal.(map[string]any)
+	require.True(t, ok, "limit 参数类型错误")
 	require.Equal(t, limit["type"], "number", "limit 参数类型错误")
 	require.Equal(t, limit["default"], float64(10), "limit 参数 default 错误")
 
 	// 验证第三个参数（数组类型）
-	tags, ok := params["tags"].(map[string]any)
+	tagsVal, ok := params.Get("tags")
 	require.True(t, ok, "tags 参数不存在")
+	tags, ok := tagsVal.(map[string]any)
+	require.True(t, ok, "tags 参数类型错误")
 	require.Equal(t, tags["type"], "array", "tags 参数类型错误")
 	tagItems, ok := tags["items"].(map[string]any)
 	require.True(t, ok, "tags 参数数组项不存在")
