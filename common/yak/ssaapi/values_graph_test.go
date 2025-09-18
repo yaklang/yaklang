@@ -29,7 +29,8 @@ a = f1(3)
 	ssatest.CheckSyntaxFlowGraph(t, code, rule, map[string]func(g *ssatest.GraphInTest){
 		"target": func(g *ssatest.GraphInTest) {
 			g.Check(t, "f1(3)", "(a1) => f(a1) + 2")
-			g.Check(t, "f(a1)", "3")
+			g.Check(t, "f(a1)", "a1")
+			g.Check(t, "a1", "3")
 		},
 	})
 }
@@ -130,8 +131,8 @@ func TestGraph(t *testing.T) {
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	require.Equal(t, 2, len(memPath))
-	require.Equal(t, 2, len(dbPath))
+	require.Equal(t, 4, len(memPath))
+	require.Equal(t, 4, len(dbPath))
 }
 
 func TestGraph2(t *testing.T) {
