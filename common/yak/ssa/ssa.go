@@ -654,6 +654,9 @@ func newMoreParameterMember(member *ParameterMember, key Value) *parameterMember
 }
 
 func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
+	if utils.IsNil(c) {
+		return nil, false
+	}
 
 	var id int64
 	switch p.MemberCallKind {

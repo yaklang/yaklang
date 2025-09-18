@@ -394,16 +394,16 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 
 	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
-		if cond == nil {
+		if utils.IsNil(cond) {
 			condition = b.EmitConstInst(true)
 		} else {
 			// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 			// defer recoverRange()
 			condition = b.buildExpression(cond)
-			if condition == nil {
-				condition = b.EmitConstInst(true)
-				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-			}
+		}
+		if utils.IsNil(condition) {
+			condition = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 		}
 		return condition
 	})
@@ -466,6 +466,10 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 				b.AssignVariable(lefts[0], key)
 				b.AssignVariable(lefts[1], field)
 			}
+		}
+		if utils.IsNil(ok) {
+			ok = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 		}
 		return ok
 	})

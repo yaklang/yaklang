@@ -3,6 +3,7 @@ package js2ssa
 import (
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	JS "github.com/yaklang/yaklang/common/yak/antlr4JS/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -1344,13 +1345,13 @@ func (b *astbuilder) buildDoStatement(stmt *JS.DoStatementContext) {
 
 	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
-		if cond == nil {
+		if utils.IsNil(cond) {
 			condition = b.EmitConstInst(true)
 		} else {
 			condition = b.buildExpressionSequence(cond)
-			if condition == nil {
-				condition = b.EmitConstInst(true)
-			}
+		}
+		if utils.IsNil(condition) {
+			condition = b.EmitConstInst(true)
 		}
 		return condition
 	})
@@ -1381,13 +1382,13 @@ func (b *astbuilder) buildwhileStatement(stmt *JS.WhileStatementContext) {
 
 	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
-		if cond == nil {
+		if utils.IsNil(cond) {
 			condition = b.EmitConstInst(true)
 		} else {
 			condition = b.buildExpressionSequence(cond)
-			if condition == nil {
-				condition = b.EmitConstInst(true)
-			}
+		}
+		if utils.IsNil(condition) {
+			condition = b.EmitConstInst(true)
 		}
 		return condition
 	})
@@ -1453,13 +1454,13 @@ func (b *astbuilder) buildForStatement(stmt *JS.ForStatementContext) {
 	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
 		// 没有条件就是永真
-		if cond == nil {
+		if utils.IsNil(cond) {
 			condition = b.EmitConstInst(true)
 		} else {
 			condition = b.buildExpressionSequence(cond)
-			if condition == nil {
-				condition = b.EmitConstInst(true)
-			}
+		}
+		if utils.IsNil(condition) {
+			condition = b.EmitConstInst(true)
 		}
 		return condition
 	})
@@ -1497,7 +1498,10 @@ func (b *astbuilder) buildForInStatement(stmt *JS.ForInStatementContext) {
 
 		key, _, ok := b.EmitNext(value, false)
 		b.AssignVariable(lv, key)
-
+		if utils.IsNil(ok) {
+			ok = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+		}
 		return ok
 	})
 
@@ -1535,6 +1539,10 @@ func (b *astbuilder) buildForOfStatement(stmt *JS.ForOfStatementContext) {
 
 		_, field, ok := b.EmitNext(value, true)
 		b.AssignVariable(lv, field)
+		if utils.IsNil(ok) {
+			ok = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+		}
 		return ok
 	})
 

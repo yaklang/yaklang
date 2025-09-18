@@ -161,10 +161,12 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			continue
 		}
 		if p, ok := ToParameter(modify); ok && !p.IsFreeValue {
-			id := c.Args[p.FormalParameterIndex]
-			if id > 0 && se.Kind == PointerSideEffect {
-				if v, ok := c.GetValueById(id); ok {
-					modify = v
+			if p.FormalParameterIndex < len(c.Args) {
+				id := c.Args[p.FormalParameterIndex]
+				if id > 0 && se.Kind == PointerSideEffect {
+					if v, ok := c.GetValueById(id); ok {
+						modify = v
+					}
 				}
 			}
 		}
