@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -255,21 +256,6 @@ func WithConfigInfo(input map[string]any) Option {
 	}
 }
 
-func WithCompileConfigInfo(configInfo string) Option {
-	return func(c *config) error {
-		var compileConfig schema.SSACompileConfig
-		if err := json.Unmarshal([]byte(configInfo), &compileConfig); err != nil {
-			return err
-		}
-		WithLanguage(consts.Language(compileConfig.Language))(c)
-		WithStrictMode(compileConfig.StrictMode)(c)
-		WithPeepholeSize(compileConfig.PeepholeSize)(c)
-		WithReCompile(compileConfig.ReCompile)(c)
-		WithConfigInfoRaw(compileConfig.ConfigInfo)(c)
-		return nil
-	}
-}
-
 func WithRawLanguage(input_language string) Option {
 	if input_language == "" {
 		return func(*config) error { return nil }
@@ -416,8 +402,26 @@ func WithProgramName(name string) Option {
 
 func WithProjectName(name string) Option {
 	return func(c *config) error {
-		c.ProjectName = name
-		c.databaseKind = ssa.ProgramCacheDBWrite
+		project, err := yakit.LoadSSAProjectBuilderByName(name)
+		if err != nil {
+			return err
+		}
+		cc := project.GetCompileConfig()
+		if cc == nil {
+			return utils.Errorf("projectName %s compile config is nil", name)
+		}
+		WithReCompile(cc.ReCompile)(c)
+		WithStrictMode(cc.StrictMode)(c)
+		WithPeepholeSize(cc.PeepholeSize)(c)
+		excludeOptions, err := DefaultExcludeFunc(cc.ExcludeFiles)
+		if err != nil {
+			return err
+		}
+		excludeOptions(c)
+		WithConcurrency(int(cc.Concurrency))(c)
+		if cc.MemoryCompile {
+			WithMemory()(c)
+		}
 		return nil
 	}
 }
@@ -586,8 +590,6 @@ var Exports = map[string]any{
 	"withExcludeFile":        WithExcludeFile,
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
 	"withMemory":             WithMemory,
-
-	"withCompileConfigInfo": WithCompileConfigInfo,
 
 	//diff compare
 	// "withDiffProgName":          DiffWithProgram,

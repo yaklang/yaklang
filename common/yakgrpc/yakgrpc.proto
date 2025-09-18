@@ -8087,6 +8087,7 @@ message SSAProjectCompileConfig{
   repeated string ExcludeFiles = 3;
   bool ReCompile = 4;
   bool Memory = 5;
+  uint32  Concurrency = 6;
 }
 
 message SSAProjectScanConfig{
@@ -8141,15 +8142,4 @@ message QuerySSAProjectResponse {
   repeated SSAProject Projects = 1;
   Paging Pagination = 2;
   int64 Total = 3;
-}
-
-
-
-message ValidateSSAProjectRequest {
-  SSAProject Project = 1;
-}
-
-message ValidateSSAProjectResponse {
-  bool Valid = 1;
-  repeated string Errors = 2;
 }
