@@ -82,20 +82,20 @@ none
 REFERENCE
 )
 
-fopen(* #-> as $file_sink);
-open(* #-> as $file_sink);
-creat(* #-> as $file_sink);
-access(* #-> as $file_sink);
-stat(* #-> as $file_sink);
-lstat(* #-> as $file_sink);
-chmod(* #-> as $file_sink);
-chown(* #-> as $file_sink);
-unlink(* #-> as $file_sink);
-rename(* #-> as $file_sink);
-link(* #-> as $file_sink);
-symlink(* #-> as $file_sink);
-readlink(* #-> as $file_sink);
-utime(* #-> as $file_sink);
+fopen(* #-> as $output);
+open(* #-> as $output);
+creat(* #-> as $output);
+access(* #-> as $output);
+stat(* #-> as $output);
+lstat(* #-> as $output);
+chmod(* #-> as $output);
+chown(* #-> as $output);
+unlink(* #-> as $output);
+rename(* #-> as $output);
+link(* #-> as $output);
+symlink(* #-> as $output);
+readlink(* #-> as $output);
+utime(* #-> as $output);
 
 
 alert $output for {

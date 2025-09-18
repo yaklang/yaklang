@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -223,7 +224,7 @@ func (lb *LoopBuilder) Finish() {
 		if lb.condition != nil {
 			conditionValue = lb.condition()
 		}
-		if conditionValue == nil {
+		if utils.IsNil(conditionValue) {
 			conditionValue = SSABuild.EmitConstInst(true)
 		}
 		// SSABuild.EmitJump(body)

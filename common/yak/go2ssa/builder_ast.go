@@ -1725,6 +1725,10 @@ func (b *astbuilder) buildForRangeStmt(stmt *gol.RangeClauseContext, loop *ssa.L
 				b.AssignVariable(lefts[1], field)
 			}
 		}
+		if utils.IsNil(ok) {
+			ok = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+		}
 		return ok
 	})
 }

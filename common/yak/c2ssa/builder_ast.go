@@ -847,8 +847,8 @@ func (b *astbuilder) buildForDeclaration(ast *cparser.ForDeclarationContext) ssa
 
 	if d := ast.DeclarationSpecifier(); d != nil {
 		ssatype := b.buildDeclarationSpecifier(d.(*cparser.DeclarationSpecifierContext))
-		if l := ast.InitDeclaratorList().(*cparser.InitDeclaratorListContext); l != nil {
-			lefts, indexs := b.buildInitDeclaratorList(l)
+		if l := ast.InitDeclaratorList(); l != nil {
+			lefts, indexs := b.buildInitDeclaratorList(l.(*cparser.InitDeclaratorListContext))
 			for i, l := range lefts {
 				if l.GetValue() == nil {
 					right := b.GetDefaultValue(ssatype)

@@ -1,6 +1,7 @@
 package php2ssa
 
 import (
+	"github.com/yaklang/yaklang/common/utils"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -197,6 +198,10 @@ func (y *builder) VisitForeachStatement(raw phpparser.IForeachStatementContext) 
 				y.AssignVariable(lefts[0], key)
 				y.AssignVariable(valueLeft, field)
 			}
+		}
+		if utils.IsNil(ok) {
+			ok = y.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 		}
 		return ok
 	})

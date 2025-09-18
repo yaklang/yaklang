@@ -96,9 +96,9 @@ SOLUTION
 REFERENCE
 )
 
-malloc as $alloc;
-calloc as $alloc;
-realloc as $alloc;
+malloc?{opcode: func} as $alloc;
+calloc?{opcode: func} as $alloc;
+realloc?{opcode: func} as $alloc;
 
 free(* #-> as $safe);
 $alloc - $safe as $low
