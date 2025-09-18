@@ -6,11 +6,11 @@
   "tasks": [
     {
       "subtask_name": "SSA风险信息获取与分析",
-      "subtask_goal": "使用ssa-risk工具根据用户提供的RiskID，查询和获取详细的SSA风险信息，包括漏洞类型、影响组件、漏洞描述、代码位置、数据流路径等关键信息，为后续POC生成提供基础数据。重点关注代码上下文、API注解、函数签名等POC生成所需的技术细节。"
+      "subtask_goal": "使用ssa-risk工具根据用户提供的RiskID，查询和获取详细的SSA风险信息，包括漏洞类型、影响组件、漏洞描述、代码位置、数据流路径等关键信息，为后续POC生成提供基础数据。*不需要获取完整问题代码*"
     },
     {
       "subtask_name": "获取SSA风险信息关联项目源码上下文信息",
-      "subtask_goal": "使用ssa-risk-get-code-context工具根据用户提供的RiskID，获取Risk关联的风险代码上下文为后续POC生成中潜在的API路由信息或者POC生成所需信息做准备。"
+      "subtask_goal": "使用ssa-risk工具根据用户提供的RiskID，获取Risk关联的风险代码上下文为后续POC生成中潜在的API路由信息或者POC生成所需信息做准备。重点关注代码上下文、API注解、函数签名等POC生成所需的技术细节。*需要获取完整问题代码*"
     },
     {
       "subtask_name": "漏洞类型分类与攻击向量分析",
