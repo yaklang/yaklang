@@ -96,6 +96,7 @@ func ExtractWaitableActionFromStream(ctx context.Context,
 	var err error
 	var buf bytes.Buffer
 	go func() {
+		defer waitAction.barrier.Cancel()
 		options = append(options, jsonextractor.WithFormatKeyValueCallback(func(key, data any) {
 			if !actionStart.IsSet() {
 				if utils.InterfaceToString(key) == "@action" {
