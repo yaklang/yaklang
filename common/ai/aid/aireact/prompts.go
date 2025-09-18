@@ -124,6 +124,7 @@ type VerificationPromptData struct {
 	Language       string
 	Schema         string
 	DynamicContext string
+	EnhanceData    []string
 }
 
 // AIReviewPromptData contains data for AI tool call review prompt
@@ -309,7 +310,7 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 }
 
 // GenerateVerificationPrompt generates verification prompt using template
-func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string) (string, error) {
+func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isToolResult bool, payload string, enhanceData ...string) (string, error) {
 	data := &VerificationPromptData{
 		Nonce:          nonce(),
 		OriginalQuery:  originalQuery,
@@ -319,6 +320,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		Language:       pm.react.config.language,
 		Schema:         verificationSchemaJSON,
 		DynamicContext: pm.DynamicContext(),
+		EnhanceData:    enhanceData,
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)

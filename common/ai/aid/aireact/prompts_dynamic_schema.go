@@ -82,7 +82,7 @@ func getDirectlyAnswer() string {
 func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bool, haveAIForgeList bool) string {
 	var opts []any
 	mode := []any{
-		ActionDirectlyAnswer, ActionRequireTool,
+		ActionDirectlyAnswer, ActionRequireTool, ActionKnowledgeEnhanceAnswer,
 	}
 	if !disallowPlanAndExecution {
 		mode = append(mode, ActionRequestPlanExecution)

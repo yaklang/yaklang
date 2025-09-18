@@ -475,3 +475,17 @@ func (e *Emitter) EmitResult(nodeId string, result interface{}, success bool) {
 		"timestamp": time.Now().Unix(),
 	})
 }
+
+// EmitKnowledge emits a knowledge enhancement data for AI processes
+func (e *Emitter) EmitKnowledge(nodeId string, enhanceID string, result EnhanceKnowledge) {
+	knowledgeMap := map[string]any{
+		"Content": result.GetContent(),
+		"Source":  result.GetSource(),
+		"Score":   result.GetScore(),
+	}
+	e.EmitJSON(schema.EVENT_TYPE_KNOWLEDGE, nodeId, map[string]any{
+		"data":      knowledgeMap,
+		"id":        enhanceID,
+		"timestamp": time.Now().Unix(),
+	})
+}

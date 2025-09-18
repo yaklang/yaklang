@@ -14,6 +14,7 @@ const (
 	ActionRequireAIBlueprintForge ActionType = "require_ai_blueprint"
 	ActionRequestPlanExecution    ActionType = "request_plan_and_execution"
 	ActionAskForClarification     ActionType = "ask_for_clarification"
+	ActionKnowledgeEnhanceAnswer  ActionType = "knowledge_enhance_answer"
 )
 
 // ReAct actions available
