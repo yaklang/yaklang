@@ -134,8 +134,10 @@ func CreateSyntaxflowTaskById(
 	// 设置扫描批次
 	m.setScanBatch()
 	// 设置进度回调
-	m.processCallback = sc.GetProcessCallback()
-	m.ruleProcessCallback = sc.GetRuleProcessCallback()
+	if sc != nil {
+		m.processCallback = sc.GetProcessCallback()
+		m.ruleProcessCallback = sc.GetRuleProcessCallback()
+	}
 	return m, nil
 }
 
