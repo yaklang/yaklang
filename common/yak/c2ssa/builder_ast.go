@@ -335,16 +335,6 @@ func (b *astbuilder) buildGccDeclaratorExtension(ast *cparser.GccDeclaratorExten
 	defer recoverRange()
 }
 
-func (b *astbuilder) CompoundStatement(ast *cparser.CompilationUnitContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
-	defer recoverRange()
-}
-
-func (b *astbuilder) DeclarationList(ast *cparser.DeclarationListContext) {
-	recoverRange := b.SetRange(ast.BaseParserRuleContext)
-	defer recoverRange()
-}
-
 func (b *astbuilder) buildDeclaration(ast *cparser.DeclarationContext) {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()

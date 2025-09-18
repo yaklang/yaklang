@@ -215,14 +215,14 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 
 	getValue := func() {
 		if u := ast.CastExpression(); u != nil {
-			right, _ = b.buildCastExpression(u.(*cparser.CastExpressionContext), false)
+			right, left = b.buildCastExpression(u.(*cparser.CastExpressionContext), false)
 		} else if d := ast.DigitSequence(); d != nil {
 			// TODO
 		}
 	}
 	getVariable := func() {
 		if u := ast.CastExpression(); u != nil {
-			_, left = b.buildCastExpression(u.(*cparser.CastExpressionContext), true)
+			right, left = b.buildCastExpression(u.(*cparser.CastExpressionContext), true)
 		} else if d := ast.DigitSequence(); d != nil {
 			// TODO
 		}
@@ -302,21 +302,16 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 	// 2. 指针 *
 	for i, _ := range ast.AllStar() {
 		_ = i
-		if !isLeft {
+		if isLeft {
+			right, left = b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), false)
+		}
+		if right != nil {
 			if right.GetType().GetTypeKind() == ssa.PointerKind {
+				left = b.GetAndCreateOriginPointer(right)
 				right = b.GetOriginValue(right)
-			} else {
-				b.NewError(ssa.Error, TAG, "unary '*' operator can only be used on pointer types")
-				right = b.EmitConstInst(0)
-			}
-		} else {
-			right, _ := b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), false)
-			if right.GetType().GetTypeKind() == ssa.PointerKind {
-				return nil, b.GetAndCreateOriginPointer(right)
 			} else if p, ok := ssa.ToParameter(right); ok && !p.IsFreeValue {
 				if _, left = b.buildUnaryExpression(ast.UnaryExpression().(*cparser.UnaryExpressionContext), true); left != nil {
 					b.ReferenceParameter(left.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
-					// b.AssignVariable(op1Var, op1)
 				}
 			}
 		}
