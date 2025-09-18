@@ -8,12 +8,13 @@
 ## 输出格式规范
 
 根据Agent多轮分析对Risk信息的汇总和POC生成结果总结成一份MarkDown格式的文档，按照以下Schema输出相应的JSON内容（只输出JSON，不需要额外解释）。
+*如果这个Risk被认为是可生成POC的，那你要确保在生成的MarkDown文档中包含这个POC代码*
 根据上面的算法和具体任务内容，按照下面Schema给出具体案例建议，一定要结合当前任务信息。
 ```schema
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["@action"],
+  "required": ["@action", "result"],
   "properties": {
     "@action": {
       "enum": ["ssa_poc_result", "poc_generation_result"]

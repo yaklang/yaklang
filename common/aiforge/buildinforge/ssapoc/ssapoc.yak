@@ -19,7 +19,7 @@ forgeHandle = func(params, opts...) {
     unquoteRes,_ = str.Unquote(string(result))
     fileName = "ssa-report-%s.md" % str.RandStr(8)
     savePath = file.Join(save_path,fileName)
-    file.Save(savePath, unquoteRes != "" ? unquoteRes : result)
+    file.Save(savePath, unquoteRes != "" ? unquoteRes : str.ReplaceAll(result, `\n`, "\n"))
     yakit.StatusCard("md报告保存路径", savePath)
     return unquoteRes
 }
