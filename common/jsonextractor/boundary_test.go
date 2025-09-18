@@ -460,8 +460,12 @@ func TestMemoryPressure(t *testing.T) {
 		jsonData := "{" + strings.Join(fields, ",") + "}"
 
 		var processedFields int32
+		var wg sync.WaitGroup
+		wg.Add(50) // 期望处理50个字段
+
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterRegexpFieldStreamHandler("field.*", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				atomic.AddInt32(&processedFields, 1)
 				// 读取并处理数据
 				data, _ := io.ReadAll(reader)
@@ -469,6 +473,7 @@ func TestMemoryPressure(t *testing.T) {
 			}))
 
 		require.NoError(t, err)
+		wg.Wait() // 等待所有处理器完成
 		assert.Equal(t, int32(50), processedFields)
 
 		finalMemStats := runtime.MemStats{}
@@ -518,13 +523,22 @@ func TestStreamBoundaryConditions(t *testing.T) {
 		reader := strings.NewReader(jsonData)
 
 		var fieldsReceived []string
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		wg.Add(3) // 期望处理3个字段
+
 		err := ExtractStructuredJSONFromStream(reader,
 			WithRegisterRegexpFieldStreamHandler("field.*", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
+				mu.Lock()
 				fieldsReceived = append(fieldsReceived, key)
+				mu.Unlock()
 				// 只读取部分数据，模拟中断
 				buffer := make([]byte, 1)
 				_, _ = reader.Read(buffer)
 			}))
+
+		wg.Wait() // 等待所有处理器完成
 
 		require.NoError(t, err)
 		assert.Greater(t, len(fieldsReceived), 0)
@@ -1031,17 +1045,24 @@ func TestFieldValueTypes_StreamVsRegularComparison(t *testing.T) {
 
 		streamResults := make(map[string]string)
 		var handlerCallCount int
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		wg.Add(3) // 期望处理3个字段
 
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterRegexpFieldStreamHandler(".*Data", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				streamResults[key] = string(data)
 				handlerCallCount++
+				mu.Unlock()
 				t.Logf("Stream handler called for %s with data: %s", key, string(data))
 			}),
 		)
 
 		require.NoError(t, err)
+		wg.Wait() // 等待所有处理器完成
 
 		elapsed := time.Since(start)
 		assert.Less(t, elapsed, 1*time.Second, "Stream processing should complete within 1 second")
@@ -1262,9 +1283,12 @@ func TestFieldStreamHandler_PrimitiveTypes(t *testing.T) {
 		parents []string
 	}
 	var results []result
+	var wg sync.WaitGroup
+	wg.Add(6) // 期望处理6个字段
 
 	err := ExtractStructuredJSON(jsonData,
 		WithRegisterRegexpFieldStreamHandler(".*Field", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			data, _ := io.ReadAll(reader)
 			mu.Lock()
 			parentsCopy := make([]string, len(parents))
@@ -1279,8 +1303,7 @@ func TestFieldStreamHandler_PrimitiveTypes(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// 等待一下确保所有处理完成
-	time.Sleep(100 * time.Millisecond)
+	wg.Wait() // 等待所有处理器完成
 
 	mu.Lock()
 	defer mu.Unlock()
