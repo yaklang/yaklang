@@ -1218,6 +1218,7 @@ type EntityFilter struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	BaseID        uint64                 `protobuf:"varint,1,opt,name=BaseID,proto3" json:"BaseID,omitempty"`
 	BaseIndex     string                 `protobuf:"bytes,6,opt,name=BaseIndex,proto3" json:"BaseIndex,omitempty"`
+	ReposName     string                 `protobuf:"bytes,8,opt,name=ReposName,proto3" json:"ReposName,omitempty"`
 	IDs           []uint64               `protobuf:"varint,2,rep,packed,name=IDs,proto3" json:"IDs,omitempty"`
 	Types         []string               `protobuf:"bytes,3,rep,name=Types,proto3" json:"Types,omitempty"`
 	Names         []string               `protobuf:"bytes,4,rep,name=Names,proto3" json:"Names,omitempty"`
@@ -1267,6 +1268,13 @@ func (x *EntityFilter) GetBaseID() uint64 {
 func (x *EntityFilter) GetBaseIndex() string {
 	if x != nil {
 		return x.BaseIndex
+	}
+	return ""
+}
+
+func (x *EntityFilter) GetReposName() string {
+	if x != nil {
+		return x.ReposName
 	}
 	return ""
 }
@@ -60523,10 +60531,11 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Attributes\x18\x06 \x03(\v2\v.ypb.KVPairR\n" +
 	"Attributes\x12\x1c\n" +
 	"\tRationale\x18\a \x01(\tR\tRationale\x12 \n" +
-	"\vHiddenIndex\x18\b \x01(\tR\vHiddenIndex\"\xc2\x01\n" +
+	"\vHiddenIndex\x18\b \x01(\tR\vHiddenIndex\"\xe0\x01\n" +
 	"\fEntityFilter\x12\x16\n" +
 	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x1c\n" +
-	"\tBaseIndex\x18\x06 \x01(\tR\tBaseIndex\x12\x10\n" +
+	"\tBaseIndex\x18\x06 \x01(\tR\tBaseIndex\x12\x1c\n" +
+	"\tReposName\x18\b \x01(\tR\tReposName\x12\x10\n" +
 	"\x03IDs\x18\x02 \x03(\x04R\x03IDs\x12\x14\n" +
 	"\x05Types\x18\x03 \x03(\tR\x05Types\x12\x14\n" +
 	"\x05Names\x18\x04 \x03(\tR\x05Names\x12 \n" +
