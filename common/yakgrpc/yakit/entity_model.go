@@ -28,8 +28,14 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 		return db
 	}
 	db = db.Model(&schema.ERModelEntity{})
+	if entityFilter.BaseIndex == "" && entityFilter.ReposName != "" {
+		var repos schema.EntityRepository
+		if err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", entityFilter.ReposName).First(&repos).Error; err == nil {
+			entityFilter.BaseIndex = repos.Uuid
+		}
+	}
+	db = bizhelper.ExactQueryString(db, "repository_uuid", entityFilter.BaseIndex) // 通过库UUID过滤
 	db = bizhelper.ExactQueryUInt64ArrayOr(db, "id", entityFilter.IDs)
-	db = bizhelper.ExactQueryString(db, "repository_uuid", entityFilter.BaseIndex)
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_name", entityFilter.Names)
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "uuid", entityFilter.HiddenIndex)
