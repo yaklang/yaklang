@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"strings"
 	"sync"
@@ -245,13 +246,9 @@ LOOP:
 			return action.WaitString("cumulative_summary")
 		})
 		actionType := ActionType(nextAction.GetString("type"))
-		actionType = ActionDirectlyAnswer
 		switch actionType {
 		case ActionDirectlyAnswer:
 			answerPayload := nextAction.GetString("answer_payload")
-			if answerPayload == "" {
-				answerPayload = "my test"
-			}
 			r.EmitResult(answerPayload)
 			currentTask.SetResult(strings.TrimSpace(answerPayload))
 			r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
@@ -261,14 +258,33 @@ LOOP:
 				utils.PrefixLines(currentTask.GetUserInput(), "  > "),
 				utils.PrefixLines(answerPayload, "  | "),
 			))
-			answer, err := r.EnhanceDirectlyAnswer(userQuery)
-			if err != nil {
-				return false, err
-			}
-			r.EmitResult(answer)
 			endIterationCall()
 			currentTask.SetStatus(string(TaskStatus_Completed))
 			continue
+		case ActionKnowledgeEnhanceAnswer:
+			enhanceResult, err := r.EnhanceDirectlyAnswer(currentTask.GetContext(), userQuery)
+			if err != nil {
+				return false, err
+			}
+			satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, false, enhanceResult)
+			if err != nil {
+				endIterationCall()
+				currentTask.SetStatus(string(TaskStatus_Aborted))
+				continue
+			} else if satisfied {
+				r.EmitResult(finalResult)
+				endIterationCall()
+				currentTask.SetStatus(string(TaskStatus_Completed))
+				continue
+			} else {
+				// User needs not satisfied, continue loop
+				log.Infof("User needs not fully satisfied, continuing analysis...")
+				r.addToTimeline(
+					"reason",
+					fmt.Sprintf("User needs not fully satisfied after tool call, continuing analysis...\n"+
+						"%v", finalResult,
+					))
+			}
 		case ActionRequireTool:
 			saveIterationInfoIntoTimeline()
 
@@ -457,18 +473,22 @@ LOOP:
 	return skipTaskStatusChange, nil
 }
 
-func (r *ReAct) EnhanceDirectlyAnswer(userQuery string) (string, error) {
+func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (string, error) {
+	currentTask := r.GetCurrentTask()
+	enhanceID := uuid.NewString()
 	enhanceData, err := r.config.directlyAnswerEnhanceHandle(r.config.ctx, userQuery)
 	if err != nil {
 		return "", err
 	}
 
-	allDataContent := make([]string, 0) // 零时这样些，需要增加满意度回测，以及查询知识的展示
+	allData := make([]aicommon.EnhanceKnowledge, 0)
 	for enhanceDatum := range enhanceData {
-		allDataContent = append(allDataContent, enhanceDatum.GetContent())
+		r.EmitKnowledge(enhanceID, enhanceDatum)
+		currentTask.AppendEnhanceData(enhanceDatum)
+		allData = append(allData, enhanceDatum)
 	}
 
-	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, allDataContent...)
+	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, currentTask.DumpEnhanceData())
 	if err != nil {
 		return "", err
 	}
@@ -480,16 +500,37 @@ func (r *ReAct) EnhanceDirectlyAnswer(userQuery string) (string, error) {
 		r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
 			stream := rsp.GetOutputStreamReader("directly_answer", true, r.Emitter)
-			action, err := aicommon.ExtractActionFromStream(stream, "object")
+			subCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+			waitAction, err := aicommon.ExtractWaitableActionFromStream(
+				subCtx,
+				stream, "object", []string{},
+				[]jsonextractor.CallbackOption{
+					jsonextractor.WithRegisterFieldStreamHandler(
+						"answer_payload",
+						func(key string, reader io.Reader, parents []string) {
+							var output bytes.Buffer
+							reader = utils.UTF8Reader(reader)
+							reader = io.TeeReader(reader, &output)
+							r.config.Emitter.EmitStreamEventEx(
+								"re-act-loop",
+								time.Now(),
+								reader,
+								rsp.GetTaskIndex(),
+								false,
+							)
+						},
+					),
+				})
 			if err != nil {
 				return err
 			}
-			result := action.GetInvokeParams("next_action").GetString("answer_payload")
-			if result != "" {
-				finalResult = result
-				return nil
+			nextAction := waitAction.WaitObject("next_action") // ensure next_action is fully received
+			if nextAction == nil || nextAction.GetString("answer_payload") == "" {
+				return utils.Error("answer_payload is required but empty in action")
 			}
-			return utils.Error("answer_payload is required but empty in action")
+			finalResult = nextAction.GetString("answer_payload")
+			return nil
 		},
 	)
 	return finalResult, err

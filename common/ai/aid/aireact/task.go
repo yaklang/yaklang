@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +37,25 @@ type Task struct {
 	result    *bytes.Buffer
 	Status    string
 	CreatedAt time.Time
+
+	EnhanceData []aicommon.EnhanceKnowledge
+}
+
+func (t *Task) AppendEnhanceData(data aicommon.EnhanceKnowledge) {
+	t.Lock()
+	defer t.Unlock()
+	t.EnhanceData = append(t.EnhanceData, data)
+}
+
+func (t *Task) DumpEnhanceData() string {
+	t.RLock()
+	defer t.RUnlock()
+
+	var sb strings.Builder
+	for _, ek := range t.EnhanceData {
+		sb.WriteString(fmt.Sprintf("- %s (Source: %s, Relevance: %.2f)\n", ek.GetContent(), ek.GetSource(), ek.GetScore()))
+	}
+	return sb.String()
 }
 
 func (t *Task) SetResult(i string) {

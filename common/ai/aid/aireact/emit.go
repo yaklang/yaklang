@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
 // EmitThought emits a thought event using the embedded Emitter
@@ -28,4 +29,9 @@ func (r *ReAct) EmitIteration(iteration int, maxIterations int) {
 // EmitResult emits a final result event using the embedded Emitter
 func (r *ReAct) EmitResult(result interface{}) {
 	r.Emitter.EmitResult("result", result, true)
+}
+
+// EmitKnowledge emits a knowledge event using the embedded Emitter
+func (r *ReAct) EmitKnowledge(enhanceID string, knowledge aicommon.EnhanceKnowledge) {
+	r.Emitter.EmitKnowledge("knowledge", enhanceID, knowledge)
 }
