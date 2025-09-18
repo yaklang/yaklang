@@ -61,6 +61,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aireact.WithContext(baseCtx),
 		aireact.WithBuiltinTools(),
 		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
+		aireact.WithKnowledgeEnhanceHandle(aireact.NewMockEnhanceHandler()),
 	}
 	reActOptions = append(reActOptions, optsFromStartParams...)
 

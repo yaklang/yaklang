@@ -74,6 +74,8 @@ type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
 
+	directlyAnswerEnhanceHandle func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error)
+
 	promptManager           *PromptManager         // Prompt manager for ReAct
 	pendingContextProviders []contextProviderEntry // Pending context providers to register
 
@@ -185,6 +187,12 @@ func (cfg *ReActConfig) GetTimelineContentSizeLimit() int64 {
 }
 
 type Option func(*ReActConfig)
+
+func WithKnowledgeEnhanceHandle(f func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error)) Option {
+	return func(cfg *ReActConfig) {
+		cfg.directlyAnswerEnhanceHandle = f
+	}
+}
 
 // WithContext sets the context for ReAct
 func WithContext(ctx context.Context) Option {

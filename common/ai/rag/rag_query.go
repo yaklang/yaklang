@@ -424,6 +424,18 @@ type RAGSearchResult struct {
 	Index       int64       `json:"index"`
 }
 
+func (R RAGSearchResult) GetContent() string {
+	return utils.InterfaceToString(R.Data)
+}
+
+func (R RAGSearchResult) GetSource() string {
+	return R.Source
+}
+
+func (R RAGSearchResult) GetScore() float64 {
+	return R.Score
+}
+
 func QueryYakitProfile(query string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
 	return Query(consts.GetGormProfileDatabase(), query, opts...)
 }
