@@ -501,8 +501,12 @@ func TestStreamBoundaryConditions(t *testing.T) {
 		}
 
 		var dataReceived bool
+		var wg sync.WaitGroup
+		wg.Add(1)
+
 		err := ExtractStructuredJSONFromStream(slowReader,
 			WithRegisterFieldStreamHandler("slowField", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
 				if len(data) > 0 {
 					dataReceived = true
@@ -510,6 +514,7 @@ func TestStreamBoundaryConditions(t *testing.T) {
 			}))
 
 		require.NoError(t, err)
+		wg.Wait()
 		assert.True(t, dataReceived)
 
 		elapsed := time.Since(start)
@@ -603,7 +608,9 @@ func TestProductionReadiness(t *testing.T) {
 			arrayCount       int32
 			fieldCount       int32
 			contentProcessed bool
+			wg               sync.WaitGroup
 		)
+		wg.Add(1) // 为 content 字段处理器添加同步
 
 		err := ExtractStructuredJSON(jsonData,
 			WithObjectCallback(func(data map[string]any) {
@@ -616,6 +623,7 @@ func TestProductionReadiness(t *testing.T) {
 				atomic.AddInt32(&fieldCount, 1)
 			}),
 			WithRegisterFieldStreamHandler("content", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
 				if len(data) > 1000 { // 确保接收到足够的内容
 					contentProcessed = true
@@ -624,6 +632,7 @@ func TestProductionReadiness(t *testing.T) {
 		)
 
 		require.NoError(t, err)
+		wg.Wait() // 等待 content 处理器完成
 		assert.Greater(t, objectCount, int32(0))
 		assert.Greater(t, arrayCount, int32(0))
 		assert.Greater(t, fieldCount, int32(0))
@@ -683,10 +692,13 @@ func TestFieldValueTypes_Object(t *testing.T) {
 
 		var streamHandlerCalled bool
 		var receivedData string
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		// 对象字段会触发流式处理器，但数据为空（因为它不是字符串）
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterFieldStreamHandler("objectField", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				streamHandlerCalled = true
 				data, _ := io.ReadAll(reader)
 				receivedData = string(data)
@@ -695,6 +707,7 @@ func TestFieldValueTypes_Object(t *testing.T) {
 		)
 
 		require.NoError(t, err)
+		wg.Wait()
 		// 对象字段会触发流式处理器，但返回空数据
 		assert.True(t, streamHandlerCalled, "Object field SHOULD trigger stream handler")
 		assert.NotEmpty(t, receivedData, "Object field should return data via stream handler")
@@ -754,10 +767,13 @@ func TestFieldValueTypes_Array(t *testing.T) {
 
 		var streamHandlerCalled bool
 		var receivedData string
+		var wg sync.WaitGroup
+		wg.Add(1)
 
 		// 数组字段会触发流式处理器，但数据为空（因为它不是字符串）
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterFieldStreamHandler("arrayField", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				streamHandlerCalled = true
 				data, _ := io.ReadAll(reader)
 				receivedData = string(data)
@@ -766,6 +782,7 @@ func TestFieldValueTypes_Array(t *testing.T) {
 		)
 
 		require.NoError(t, err)
+		wg.Wait()
 		// 数组字段会触发流式处理器，但返回空数据
 		assert.True(t, streamHandlerCalled, "Array field SHOULD trigger stream handler")
 		assert.NotEmpty(t, receivedData, "Array field should return data via stream handler")
@@ -781,23 +798,33 @@ func TestFieldValueTypes_Array(t *testing.T) {
 		var emptyArrayReceived bool
 		var numberArrayReceived bool
 		var emptyData, numberData string
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		wg.Add(2) // 两个处理器需要同步
 
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterFieldStreamHandler("emptyArray", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				emptyData = string(data)
 				emptyArrayReceived = true
+				mu.Unlock()
 				t.Logf("Empty array data: %s", emptyData)
 			}),
 			WithRegisterFieldStreamHandler("numberArray", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				numberData = string(data)
 				numberArrayReceived = true
+				mu.Unlock()
 				t.Logf("Number array data: %s", numberData)
 			}),
 		)
 
 		require.NoError(t, err)
+		wg.Wait()
 		// 简单数组会触发流式处理器，但返回空数据
 		assert.True(t, emptyArrayReceived, "Should trigger stream handler for empty array")
 		assert.True(t, numberArrayReceived, "Should trigger stream handler for number array")
@@ -960,41 +987,60 @@ func TestFieldValueTypes_NestedComplex(t *testing.T) {
 
 		var configReceived, featuresReceived, limitsReceived, versionReceived, enabledReceived bool
 		var configContent, featuresContent, limitsContent, versionContent, enabledContent string
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		wg.Add(5) // 5个处理器需要同步
 
 		err := ExtractStructuredJSON(jsonData,
 			WithRegisterFieldStreamHandler("config", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				configContent = string(data)
 				configReceived = true
+				mu.Unlock()
 				t.Logf("Config data: %s", configContent)
 			}),
 			WithRegisterFieldStreamHandler("features", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				featuresContent = string(data)
 				featuresReceived = true
+				mu.Unlock()
 				t.Logf("Features data: %s", featuresContent)
 			}),
 			WithRegisterFieldStreamHandler("limits", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				limitsContent = string(data)
 				limitsReceived = true
+				mu.Unlock()
 				t.Logf("Limits data: %s", limitsContent)
 			}),
 			WithRegisterFieldStreamHandler("version", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				versionContent = string(data)
 				versionReceived = true
+				mu.Unlock()
 				t.Logf("Version data: %s", versionContent)
 			}),
 			WithRegisterFieldStreamHandler("enabled", func(key string, reader io.Reader, parents []string) {
+				defer wg.Done()
 				data, _ := io.ReadAll(reader)
+				mu.Lock()
 				enabledContent = string(data)
 				enabledReceived = true
+				mu.Unlock()
 				t.Logf("Enabled data: %s", enabledContent)
 			}),
 		)
 
 		require.NoError(t, err)
+		wg.Wait()
 
 		// 验证所有字段都会触发流式处理器
 		assert.True(t, configReceived, "Should trigger stream handler for config object")
@@ -1131,9 +1177,12 @@ func TestFieldStreamHandler_Level2ObjectBytes(t *testing.T) {
 		parents []string
 	}
 	var results []result
+	var wg sync.WaitGroup
+	wg.Add(1)
 
 	err := ExtractStructuredJSON(jsonData,
 		WithRegisterFieldStreamHandler("level2", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			data, _ := io.ReadAll(reader)
 			mu.Lock()
 			parentsCopy := make([]string, len(parents))
@@ -1148,8 +1197,7 @@ func TestFieldStreamHandler_Level2ObjectBytes(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// 等待一下确保所有处理完成
-	time.Sleep(100 * time.Millisecond)
+	wg.Wait() // 等待处理器完成
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -1194,9 +1242,12 @@ func TestFieldStreamHandler_MultipleLevelObjects(t *testing.T) {
 		parents []string
 	}
 	var results []result
+	var wg sync.WaitGroup
+	wg.Add(2) // 两个处理器需要同步
 
 	err := ExtractStructuredJSON(jsonData,
 		WithRegisterFieldStreamHandler("level2", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			data, _ := io.ReadAll(reader)
 			mu.Lock()
 			parentsCopy := make([]string, len(parents))
@@ -1209,6 +1260,7 @@ func TestFieldStreamHandler_MultipleLevelObjects(t *testing.T) {
 			mu.Unlock()
 		}),
 		WithRegisterFieldStreamHandler("another_level2", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			data, _ := io.ReadAll(reader)
 			mu.Lock()
 			parentsCopy := make([]string, len(parents))
@@ -1223,8 +1275,7 @@ func TestFieldStreamHandler_MultipleLevelObjects(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// 等待一下确保所有处理完成
-	time.Sleep(100 * time.Millisecond)
+	wg.Wait() // 等待所有处理器完成
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -1362,9 +1413,12 @@ func TestFieldStreamHandler_NestedLevel2AndLevel3(t *testing.T) {
 		parents []string
 	}
 	var results []result
+	var wg sync.WaitGroup
+	wg.Add(2) // 两个处理器需要同步
 
 	err := ExtractStructuredJSON(jsonData,
 		WithRegisterFieldStreamHandler("level2", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			data, _ := io.ReadAll(reader)
 			mu.Lock()
 			parentsCopy := make([]string, len(parents))
@@ -1377,6 +1431,7 @@ func TestFieldStreamHandler_NestedLevel2AndLevel3(t *testing.T) {
 			mu.Unlock()
 		}),
 		WithRegisterFieldStreamHandler("level3", func(key string, reader io.Reader, parents []string) {
+			defer wg.Done()
 			data, _ := io.ReadAll(reader)
 			mu.Lock()
 			parentsCopy := make([]string, len(parents))
@@ -1391,8 +1446,7 @@ func TestFieldStreamHandler_NestedLevel2AndLevel3(t *testing.T) {
 
 	require.NoError(t, err)
 
-	// 等待一下确保所有处理完成
-	time.Sleep(100 * time.Millisecond)
+	wg.Wait() // 等待所有处理器完成
 
 	mu.Lock()
 	defer mu.Unlock()
