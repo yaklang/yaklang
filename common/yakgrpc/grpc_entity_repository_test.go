@@ -149,6 +149,49 @@ func TestQueryEntity(t *testing.T) {
 	}
 }
 
+func TestQueryEntityByName(t *testing.T) {
+	entityBaseIndex, entityBaseName, entityIndex, entityNames, _, _, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatalf("Failed to create local gRPC client: %v", err)
+	}
+	req := &ypb.QueryEntityRequest{
+		Filter:     &ypb.EntityFilter{ReposName: entityBaseName},
+		Pagination: &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id"},
+	}
+	resp, err := client.QueryEntity(context.Background(), req)
+	if err != nil {
+		t.Fatalf("QueryEntity failed: %v", err)
+	}
+	if len(resp.Entities) != 2 {
+		t.Fatalf("QueryEntity returned %d entities, expected 2", len(resp.Entities))
+	}
+	// 检查内容
+	for i, e := range resp.Entities {
+		if e.BaseIndex != entityBaseIndex {
+			t.Errorf("Entity Base mismatch: got %s, want %s", e.BaseIndex, entityBaseIndex)
+		}
+		if e.Type != "TypeA" {
+			t.Errorf("Entity Type mismatch: got %s, want TypeA", e.Type)
+		}
+		if e.Name != entityNames[i] {
+			t.Errorf("Entity Name mismatch: got %s, want %s", e.Name, entityNames[i])
+		}
+		if e.HiddenIndex != entityIndex[i] {
+			t.Errorf("Entity BaseIndex mismatch: got %s, want %s", e.HiddenIndex, entityIndex[i])
+		}
+		if len(e.Attributes) != 1 || e.Attributes[0].Key != "attr" {
+			t.Errorf("Entity Attributes mismatch: got %+v", e.Attributes)
+		}
+	}
+	// 检查分页
+	if resp.Pagination.Page != 1 || resp.Pagination.Limit != 10 {
+		t.Errorf("Pagination mismatch: %+v", resp.Pagination)
+	}
+}
+
 func TestQueryRelationship(t *testing.T) {
 	entityBaseIndex, _, entityIndex, _, _, relationshipType, clearFunc := setupTestData(t)
 	t.Cleanup(clearFunc)
