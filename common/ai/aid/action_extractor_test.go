@@ -77,6 +77,38 @@ func TestWaitAction_Extractor(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, action.WaitString("mytest"), token)
-	require.Equal(t, action.WaitString("mytest"), token)
+}
 
+func TestWaitAction_Extractor_MissingParam(t *testing.T) {
+	token := uuid.NewString()
+	raw := fmt.Sprintf(`{ "type": "object", "required": [ "@action", "main_task" ], "properties": { "@action": {"const": "plan"}, "main_task": {"type": "string"}, "mytest": "%s" } }`, token)
+
+	action, err := aicommon.ExtractWaitableActionFromStream(context.Background(), strings.NewReader(raw), "plan", nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, action.WaitString("mytest"), token)
+	require.Equal(t, action.WaitString("not_exist"), "")
+}
+
+func TestWaitAction_Extractor_NestedObject(t *testing.T) {
+	token := uuid.NewString()
+	raw := fmt.Sprintf(`{ "type": "object", "required": [ "@action", "main_task", "info" ], "properties": { "@action": {"const": "plan"}, "main_task": {"type": "string"}, "info": { "type": "object", "mytest": "%s", "age": 18 } } }`, token)
+
+	action, err := aicommon.ExtractWaitableActionFromStream(context.Background(), strings.NewReader(raw), "plan", nil, nil)
+	require.NoError(t, err)
+	info := action.WaitObject("info")
+	require.NotNil(t, info)
+	require.Equal(t, info["mytest"], token)
+	require.Equal(t, info["age"], 18)
+}
+
+func TestWaitAction_Extractor_ArrayParam(t *testing.T) {
+	raw := `{ "type": "object", "required": [ "@action", "items" ], "properties": { "@action": {"const": "plan"}, "items": ["a", "b", "c"] } }`
+
+	action, err := aicommon.ExtractWaitableActionFromStream(context.Background(), strings.NewReader(raw), "plan", nil, nil)
+	require.NoError(t, err)
+	items := action.WaitStringSlice("items")
+	require.Len(t, items, 3)
+	require.Contains(t, items, "a")
+	require.Contains(t, items, "b")
+	require.Contains(t, items, "c")
 }
