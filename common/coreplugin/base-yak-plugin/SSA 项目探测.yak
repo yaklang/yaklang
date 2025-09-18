@@ -387,31 +387,31 @@ saveOpts = append(saveOpts, ssaproject.withLanguage(language))
 // 根据探测到的源代码类型设置相应配置
 switch params.info.kind {
 case "local":
-    saveOpts = append(saveOpts, ssaproject.withSourceKind("local"))
-    saveOpts = append(saveOpts, ssaproject.withLocalFile(params.info.local_file))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("local"))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceLocalFile(params.info.local_file))
 
 case "compression":
-    saveOpts = append(saveOpts, ssaproject.withSourceKind("compression"))
-    saveOpts = append(saveOpts, ssaproject.withLocalFile(params.info.local_file))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("compression"))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceLocalFile(params.info.local_file))
 
 case "jar":
-    saveOpts = append(saveOpts, ssaproject.withSourceKind("jar"))
-    saveOpts = append(saveOpts, ssaproject.withLocalFile(params.info.local_file))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("jar"))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceLocalFile(params.info.local_file))
 
 case "git":
-    saveOpts = append(saveOpts, ssaproject.withSourceKind("git"))
-    saveOpts = append(saveOpts, ssaproject.withURL(params.info.url))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("git"))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceURL(params.info.url))
     if params.info.branch != "" {
-        saveOpts = append(saveOpts, ssaproject.withBranch(params.info.branch))
+        saveOpts = append(saveOpts, ssaproject.withCodeSourceBranch(params.info.branch))
     }
     if params.info.path != "" {
-        saveOpts = append(saveOpts, ssaproject.withPath(params.info.path))
+        saveOpts = append(saveOpts, ssaproject.withCodeSourcePath(params.info.path))
     }
 }
 
 // 代理配置
 if params.info.proxy.proxy && params.info.proxy.url != "" {
-    saveOpts = append(saveOpts, ssaproject.withProxyURL(params.info.proxy.url))
+    saveOpts = append(saveOpts, ssaproject.withCodeSourceProxyURL(params.info.proxy.url))
 }
 
 // 编译选项
@@ -427,60 +427,12 @@ if excludeFile != "" {
 saveOpts = append(saveOpts, ssaproject.withCompileConcurrency(concurrency))
 saveOpts = append(saveOpts, ssaproject.withMemoryScan(memory))
 
-// 检查是否已存在同名项目
-existingProject, err = ssaproject.QuerySSAProjectByName(target)
-if err == nil && existingProject != nil {
-    yakit.Info("发现同名项目，将进行更新: %s", target)
+project := ssaproject.NewSSAProject(programName, saveOpts...)
 
-    // 更新现有项目的配置
-    existingProject.Description = params.description
-    existingProject.Language = language
-
-    // 构建新的CodeSourceInfo
-    codeSourceInfo = {
-        "kind": params.info.kind,
-        "local_file": params.info.local_file,
-        "url": params.info.url,
-        "branch": params.info.branch,
-        "path": params.info.path,
-    }
-
-    // 添加代理配置
-    if params.info.proxy.proxy {
-        codeSourceInfo["proxy"] = {
-            "url": params.info.proxy.url,
-        }
-    }
-
-    // 序列化配置信息
-    codeSourceConfigJSON, err = json.Marshal(codeSourceInfo)
-    if err == nil {
-        existingProject.CodeSourceConfig = string(codeSourceConfigJSON)
-    }
-
-    // 更新编译和扫描配置
-    existingProject.StrictMode = strictMode
-    existingProject.PeepholeSize = peepholeSize
-    existingProject.ReCompile = reCompile
-    existingProject.ExcludeFiles = excludeFile
-    existingProject.ScanConcurrency = uint32(concurrency)
-    existingProject.MemoryScan = memory
-
-    err = ssaproject.SaveSSAProject(existingProject)
-    if err != nil {
-        yakit.Error("更新项目配置失败: %v", err)
-    } else {
-        yakit.Info("项目配置更新成功!")
-    }
-} else {
-    yakit.Info("创建新项目: %s", target)
-
-    savedProject, err = ssaproject.NewSSAProject(target, saveOpts...)
-    if err != nil {
-        yakit.Error("保存项目配置失败: %v", err)
-    } else {
-        yakit.Info("项目配置保存成功!")
-    }
+err = project.Save()
+if err != nil {
+    yakit.Error("保存项目失败: %s", err.Error())
+    return
 }
 
 // 如果不需要编译，则直接返回

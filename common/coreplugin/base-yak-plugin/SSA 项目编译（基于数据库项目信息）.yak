@@ -19,69 +19,26 @@ if projectName == "" {
 
 yakit.Info("开始从数据库加载SSA项目: %s", projectName)
 
-// 查询SSA项目
-project, err := ssaproject.QuerySSAProjectByName(projectName)
-if err != nil {
-    yakit.Error("查询SSA项目失败: %s", err)
-    return
+project,err = ssaproject.GetSSAProjectByName(projectName)
+if err !=nil {
+    yakit.Error("查找项目%s失败", err)
 }
 
-yakit.Info("找到SSA项目: %s", project.ProjectName)
-yakit.Info("项目描述: %s", project.Description)
-
-// 获取项目编译配置JSON
-compileConfigJSON, err := project.GetCompileConfigInfo()
-if err != nil {
-    yakit.Error("获取编译配置失败: %s", err)
-    return
-}
-
-// 获取源码配置
-sourceConfig, err := project.GetSourceConfigInfoMap()
-if err != nil {
-    yakit.Error("获取源码配置失败: %s", err)
-    return
-}
-
-// 使用项目配置设置参数，programName拼接当前时间
 var programName = sprintf("%s(%s)", projectName, time.Now().Format("2006-0102-15:04"))
-
-yakit.Info("使用数据库配置进行编译:")
-yakit.StatusCard("项目名", programName)
-yakit.StatusCard("语言", project.Language)
-yakit.StatusCard("编译配置", compileConfigJSON)
-
-// 构建编译选项
-opts := [
+opts = [
+    ssa.withProjectName(projectName),
     ssa.withProgramName(programName),
-    ssa.withDescription(project.Description),
-    ssa.withContext(context.Background()),
-    ssa.withConfigInfo(sourceConfig),
-    ssa.withProcess((msg, process) => {
+     ssa.withProcess((msg, process) => {
         yakit.SetProgress(process)
         yakit.SetProgressEx("compile", process)
         yakit.Info("%s: %.2f%%", msg, process * 100)
     }),
-    ssa.withProjectName(projectName),
-    ssa.withCompileConfigInfo(compileConfigJSON)
 ]
 
-
-
 yakit.Info("开始编译SSA项目...")
-
-// 执行编译
 progs, err := ssa.ParseProject(opts...)
 if err != nil {
     yakit.Error("编译失败: %s", err)
     yakit.Error("项目名: %s", programName)
-    yakit.Error("语言: %s", project.Language)
-    yakit.Error("源码配置: %v", sourceConfig)
     return
-}
-
-yakit.Success("SSA项目编译完成!")
-yakit.Info("编译的程序数量: %d", len(progs))
-for i, prog := range progs {
-    yakit.Info("程序 %d: %s", i+1, prog.GetProgramName())
 }

@@ -163,7 +163,12 @@ func ssaRiskName(variable string, index int) string {
 	return fmt.Sprintf("%s-%d", variable, index)
 }
 
-func (r *SyntaxFlowResult) SaveRisk(variable string, index int, value *Value, save bool) string {
+func (r *SyntaxFlowResult) SaveRisk(
+	variable string,
+	index int,
+	value *Value,
+	save bool,
+) string {
 	_, ok := r.GetAlertInfo(variable)
 	if !ok {
 		return ""

@@ -253,14 +253,18 @@ func (m *scanManager) initByConfig(stream ScanStream) error {
 	projectId := config.GetSSAProjectId()
 	if projectId != 0 && len(config.GetProgramName()) == 0 {
 		// init by project info in db
-		project, err := yakit.QuerySSAProjectById(projectId)
+		project, err := yakit.LoadSSAProjectBuilderByID(uint(projectId))
 		if err != nil || project == nil {
 			return utils.Errorf("query ssa project by id failed: %s", err)
 		}
 		m.programs = []string{project.ProjectName}
-		m.ignoreLanguage = project.IgnoreLanguage
-		m.memory = project.MemoryScan
-		m.concurrency = project.ScanConcurrency
+		scanConfig := project.GetScanConfig()
+		if scanConfig == nil {
+			return utils.Errorf("scan config is nil")
+		}
+		m.ignoreLanguage = scanConfig.IgnoreLanguage
+		m.memory = scanConfig.Memory
+		m.concurrency = scanConfig.Concurrency
 	} else {
 		// init by stream config
 		if len(config.GetProgramName()) == 0 {
@@ -329,7 +333,7 @@ func (m *scanManager) initByConfig(stream ScanStream) error {
 		m.kind = schema.SFResultKindScan
 	} else if projectId != 0 {
 		db := consts.GetGormProfileDatabase()
-		count, err := yakit.GetRuleCountBySSAProjectId(db, config.GetSSAProjectId())
+		count, err := yakit.GetRuleCountBySSAProjectId(db, uint(config.GetSSAProjectId()))
 		if err != nil {
 			return utils.Errorf("get rule count by ssa project id failed: %s", err)
 		}
@@ -338,7 +342,7 @@ func (m *scanManager) initByConfig(stream ScanStream) error {
 		m.ruleChan = yakit.YieldSyntaxFlowRulesBySSAProjectId(
 			db,
 			m.ctx,
-			config.GetSSAProjectId(),
+			uint(config.GetSSAProjectId()),
 		)
 		m.rulesCount = count
 		m.kind = schema.SFResultKindScan

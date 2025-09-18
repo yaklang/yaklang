@@ -1,6 +1,9 @@
 package schema
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // CodeSourceKind 源码获取方式枚举
 type CodeSourceKind string
@@ -35,6 +38,14 @@ type CodeSourceInfo struct {
 	Path      string           `json:"path,omitempty"`       // git仓库中的子路径
 	Auth      *AuthConfigInfo  `json:"auth,omitempty"`       // 认证信息
 	Proxy     *ProxyConfigInfo `json:"proxy,omitempty"`      // 代理配置
+}
+
+func (c *CodeSourceInfo) JsonString() string {
+	json, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	return string(json)
 }
 
 // ValidateSourceConfig 验证代码源配置的有效性
