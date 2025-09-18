@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"io"
 	"strings"
 	"sync"
@@ -262,7 +261,7 @@ LOOP:
 				utils.PrefixLines(currentTask.GetUserInput(), "  > "),
 				utils.PrefixLines(answerPayload, "  | "),
 			))
-			answer, err := r.RagEnhanceDirectlyAnswer(userQuery)
+			answer, err := r.EnhanceDirectlyAnswer(userQuery)
 			if err != nil {
 				return false, err
 			}
@@ -458,20 +457,18 @@ LOOP:
 	return skipTaskStatusChange, nil
 }
 
-func (r *ReAct) RagEnhanceDirectlyAnswer(userQuery string) (string, error) {
-	result, err := rag.QueryYakitProfile(userQuery, rag.WithRAGLimit(5), rag.WithRAGDocumentType("knowledge"))
+func (r *ReAct) EnhanceDirectlyAnswer(userQuery string) (string, error) {
+	enhanceData, err := r.config.directlyAnswerEnhanceHandle(r.config.ctx, userQuery)
 	if err != nil {
-		log.Errorf("Failed to query yakit profile rag: %v", err)
 		return "", err
 	}
-	var ragEnhanceData []string
-	for res := range result {
-		if res.Type == "result" {
-			ragEnhanceData = append(ragEnhanceData, utils.InterfaceToString(res.Data))
-		}
+
+	allDataContent := make([]string, 0) // 零时这样些，需要增加满意度回测，以及查询知识的展示
+	for enhanceDatum := range enhanceData {
+		allDataContent = append(allDataContent, enhanceDatum.GetContent())
 	}
 
-	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, ragEnhanceData...)
+	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, allDataContent...)
 	if err != nil {
 		return "", err
 	}
