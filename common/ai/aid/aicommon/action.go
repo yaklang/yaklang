@@ -86,7 +86,8 @@ func (q *Action) GetInvokeParamsArray(key string) []aitool.InvokeParams {
 func ExtractWaitableActionFromStream(ctx context.Context,
 	reader io.Reader,
 	actionName string,
-	alias ...string) (*WaitableAction, error) {
+	alias []string,
+	options []jsonextractor.CallbackOption) (*WaitableAction, error) {
 	waitAction := NewWaitableAction(ctx, actionName)
 
 	actions := []string{actionName}
@@ -95,27 +96,27 @@ func ExtractWaitableActionFromStream(ctx context.Context,
 	var err error
 	var buf bytes.Buffer
 	go func() {
-		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf),
-			jsonextractor.WithFormatKeyValueCallback(func(key, data any) {
-				if !actionStart.IsSet() {
-					if utils.InterfaceToString(key) == "@action" {
-						if utils.StringArrayContains(actions, utils.InterfaceToString(data)) {
-							actionStart.Set()
-						} else if mapData, ok := data.(map[string]any); ok {
-							for _, v := range mapData {
-								if utils.StringArrayContains(actions, utils.InterfaceToString(v)) {
-									actionStart.Set()
-									break
-								}
+		options = append(options, jsonextractor.WithFormatKeyValueCallback(func(key, data any) {
+			if !actionStart.IsSet() {
+				if utils.InterfaceToString(key) == "@action" {
+					if utils.StringArrayContains(actions, utils.InterfaceToString(data)) {
+						actionStart.Set()
+					} else if mapData, ok := data.(map[string]any); ok {
+						for _, v := range mapData {
+							if utils.StringArrayContains(actions, utils.InterfaceToString(v)) {
+								actionStart.Set()
+								break
 							}
 						}
 					}
-					return
 				}
-				keyString := utils.InterfaceToString(key)
-				waitAction.Set(keyString, data)
-			}),
-		)
+				return
+			}
+			keyString := utils.InterfaceToString(key)
+			waitAction.Set(keyString, data)
+		}))
+
+		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), options...)
 		if err != nil {
 			log.Error("Failed to extract action", "action", buf.String(), "error", err)
 		}
