@@ -31,6 +31,14 @@ func (w *WaitableAction) Name() string {
 	return w.name
 }
 
+func (w *WaitableAction) WaitAnyToString(key string) string {
+	err := w.barrier.Wait(key)
+	if err != nil {
+		return ""
+	}
+	return w.params.GetAnyToString(key)
+}
+
 func (w *WaitableAction) WaitObject(key string) aitool.InvokeParams {
 	err := w.barrier.Wait(key)
 	if err != nil {
