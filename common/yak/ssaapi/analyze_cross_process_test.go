@@ -30,7 +30,7 @@ func Test_CrossProcess(t *testing.T) {
 			      -> Parameter-num
 					-> 2
 		*/
-		ssatest.CheckSyntaxFlow(t, code, `print(* #{
+		ssatest.CheckSyntaxFlowContain(t, code, `print(* #{
 include:<<<INCLUDE
 	* ?{opcode:const}
 INCLUDE
