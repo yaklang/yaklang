@@ -72,6 +72,8 @@ const (
 	EVENT_TYPE_OBSERVATION EventType = "observation" // AI 观察结果（工具执行结果、环境反馈等）
 	EVENT_TYPE_ITERATION   EventType = "iteration"   // AI 迭代信息（循环推理、多轮对话等）
 	EVENT_TYPE_RESULT      EventType = "result"      // AI 最终结果（推理结论、任务完成等）
+
+	EVENT_TYPE_KNOWLEDGE EventType = "knowledge" // AI 知识增强（外部知识、上下文信息等）
 )
 
 type AiOutputEvent struct {

@@ -9,7 +9,9 @@ import (
 
 // verifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
 func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, payload string) (bool, string, error) {
-	verificationPrompt := r.generateVerificationPrompt(originalQuery, isToolCall, payload)
+	verificationPrompt := r.generateVerificationPrompt(
+		originalQuery, isToolCall, payload, r.GetCurrentTask().DumpEnhanceData(),
+	)
 	if r.config.debugPrompt {
 		log.Infof("Verification prompt: %s", verificationPrompt)
 	}
@@ -55,9 +57,9 @@ func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, pa
 }
 
 // generateVerificationPrompt generates a prompt for verifying user satisfaction
-func (r *ReAct) generateVerificationPrompt(originalQuery string, isToolCall bool, payload string) string {
+func (r *ReAct) generateVerificationPrompt(originalQuery string, isToolCall bool, payload string, enhanceData ...string) string {
 	// Use the prompt manager to generate the prompt
-	prompt, err := r.promptManager.GenerateVerificationPrompt(originalQuery, isToolCall, payload)
+	prompt, err := r.promptManager.GenerateVerificationPrompt(originalQuery, isToolCall, payload, enhanceData...)
 	if err != nil {
 		// Fallback to basic prompt if template fails
 		log.Errorf("Failed to generate verification prompt from template: %v", err)

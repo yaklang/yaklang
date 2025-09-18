@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
@@ -44,7 +45,27 @@ var mockEnhanceKnowledgeList = []*aicommon.BasicEnhanceKnowledge{
 	),
 }
 
-func NewMockEnhanceHandler() func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error) {
+func NewMockEnhanceHandlerAndToken() (func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error), string) {
+	tokenUUID := uuid.NewString()
+	checkData := aicommon.NewBasicEnhanceKnowledge(
+		tokenUUID,
+		"mock",
+		0.82,
+	)
+
+	return func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error) {
+		result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
+		go func() {
+			defer result.Close()
+			for _, k := range []aicommon.EnhanceKnowledge{checkData} {
+				result.SafeFeed(k)
+			}
+		}()
+		return result.OutputChannel(), nil
+	}, tokenUUID
+}
+
+func defaultMockEnhanceHandler() func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error) {
 	return func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error) {
 		result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
 		go func() {
