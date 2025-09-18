@@ -2,16 +2,15 @@ package aireact
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) invokeAskForClarification(action *aicommon.Action) string {
+func (r *ReAct) invokeAskForClarification(nextAction aitool.InvokeParams) string {
 	r.currentUserInteractiveCount++
-	nextAction := action.GetInvokeParams("next_action")
 	obj := nextAction.GetObject("ask_for_clarification_payload")
 	payloads := obj.GetStringSlice("options")
 	question := obj.GetString("question")

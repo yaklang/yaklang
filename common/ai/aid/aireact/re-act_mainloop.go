@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"strings"
@@ -162,14 +163,18 @@ LOOP:
 		log.Infof("start to generate main loop prompt with %d tools", len(tools))
 		prompt := r.generateMainLoopPrompt(userQuery, tools, havePlanExecuting)
 		// Use aid.CallAITransaction for robust AI calling with retry and error handling
-		var action *aicommon.Action
+		var action *aicommon.WaitableAction
+		var nextAction aitool.InvokeParams
 		var actionErr error
 		// Temporarily release lock for AI transaction to prevent deadlocks
 		transactionErr := aicommon.CallAITransaction(
 			r.config, prompt, r.config.CallAI,
 			func(resp *aicommon.AIResponse) error {
 				stream := resp.GetOutputStreamReader("re-act-loop", false, r.config.Emitter)
-				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
+				subCtx, cancel := context.WithCancel(r.config.ctx)
+				defer cancel()
+				action, actionErr = aicommon.ExtractWaitableActionFromStream(
+					subCtx,
 					stream,
 					ReActActionObject,
 					[]string{},
@@ -193,17 +198,19 @@ LOOP:
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)
 				}
-				humanRead := action.GetAnyToString("human_readable_thought")
+				humanRead := action.WaitAnyToString("human_readable_thought")
 				if humanRead == "" {
 					return utils.Error("human_readable_thought is required but empty in action")
 				}
-				actionType := action.GetInvokeParams("next_action").GetString("type")
+
+				nextAction = action.WaitObject("next_action")
+				actionType := nextAction.GetString("type")
 				if actionType == "" {
-					return utils.Errorf("Invalid action type: %s", action.GetInvokeParams("type"))
+					return utils.Errorf("Invalid action type: %s", actionType)
 				}
 
 				if actionType == string(ActionRequireAIBlueprintForge) {
-					blueprintName := action.GetInvokeParams("next_action").GetString("blueprint_payload")
+					blueprintName := nextAction.GetString("blueprint_payload")
 					if blueprintName == "" {
 						return utils.Error("blueprint_payload is required for ActionRequireAIBlueprintForge but empty")
 					}
@@ -219,7 +226,7 @@ LOOP:
 			log.Errorf("AI transaction failed (内置错误学习功能): %v", transactionErr)
 			continue
 		}
-		thought := action.GetString("human_readable_thought")
+		thought := action.WaitString("human_readable_thought")
 
 		saveIterationInfoIntoTimeline := func() {
 			// allow iteration info to be added to timeline
@@ -234,11 +241,9 @@ LOOP:
 
 		// Emit human readable thought
 		r.EmitThought(thought)
-		newSummary := action.GetString("cumulative_summary")
-		if newSummary != "" {
-			r.cumulativeSummary = newSummary
-		}
-		nextAction := action.GetInvokeParams("next_action")
+		r.PushCumulativeSummaryHandle(func() string {
+			return action.WaitString("cumulative_summary")
+		})
 		actionType := ActionType(nextAction.GetString("type"))
 		switch actionType {
 		case ActionDirectlyAnswer:
@@ -378,7 +383,7 @@ LOOP:
 		case ActionRequestPlanExecution:
 			saveIterationInfoIntoTimeline()
 
-			planPayload := action.GetInvokeParams("next_action").GetString("plan_request_payload")
+			planPayload := nextAction.GetString("plan_request_payload")
 			if havePlanExecuting {
 				r.Emitter.EmitWarning("existed plan execution task is running, cannot start a new one")
 				r.addToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
@@ -413,7 +418,7 @@ LOOP:
 			}
 		case ActionAskForClarification:
 			saveIterationInfoIntoTimeline()
-			suggestion := r.invokeAskForClarification(action)
+			suggestion := r.invokeAskForClarification(nextAction)
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}

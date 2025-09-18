@@ -73,9 +73,10 @@ func TestWaitAction_Extractor(t *testing.T) {
 }
 `, token)
 
-	action, err := aicommon.ExtractWaitableActionFromStream(context.Background(), strings.NewReader(raw), "plan")
+	action, err := aicommon.ExtractWaitableActionFromStream(context.Background(), strings.NewReader(raw), "plan", nil, nil)
 	require.NoError(t, err)
 
+	require.Equal(t, action.WaitString("mytest"), token)
 	require.Equal(t, action.WaitString("mytest"), token)
 
 }
