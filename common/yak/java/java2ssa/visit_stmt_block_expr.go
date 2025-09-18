@@ -1248,6 +1248,10 @@ func (y *singleFileBuilder) VisitForControl(raw javaparser.IForControlContext) *
 			}
 			_, field, ok := y.EmitNext(value, false)
 			y.AssignVariable(variable, field)
+			if utils.IsNil(ok) {
+				ok = y.EmitConstInst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+			}
 			return ok
 		})
 		return loop

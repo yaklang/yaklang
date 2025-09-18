@@ -416,7 +416,7 @@ func (b *builder) VisitWhileStatement(node *ast.WhileStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Expression != nil {
 			condition := b.VisitRightValueExpression(node.Expression)
-			if condition == nil {
+			if utils.IsNil(condition) {
 				return b.EmitConstInst(true)
 			}
 			return condition
@@ -493,7 +493,7 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Condition != nil {
 			condition := b.VisitRightValueExpression(node.Condition)
-			if condition == nil {
+			if utils.IsNil(condition) {
 				return b.EmitConstInst(true)
 			}
 			return condition
