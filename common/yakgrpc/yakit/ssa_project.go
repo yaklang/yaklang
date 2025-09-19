@@ -157,11 +157,7 @@ func newSSAProjectBuilderByProto(proto *ypb.SSAProject) *SSAProjectBuilder {
 		Tags:             proto.Tags,
 		Language:         proto.Language,
 		CodeSourceConfig: &schema.CodeSourceInfo{},
-		Config: &schema.SSAProjectConfig{
-			CompileConfig: &schema.SSACompileConfig{},
-			ScanConfig:    &schema.SSAScanConfig{},
-			RuleFilter:    &ypb.SyntaxFlowRuleFilter{},
-		},
+		Config:           schema.NewSSAProjectConfig(),
 	}
 	if proto.CodeSourceConfig != "" {
 		json.Unmarshal([]byte(proto.CodeSourceConfig), builder.CodeSourceConfig)
@@ -184,7 +180,7 @@ func newSSAProjectBuilderByProto(proto *ypb.SSAProject) *SSAProjectBuilder {
 		}
 	}
 	if rc := proto.RuleConfig; rc != nil && rc.RuleFilter != nil {
-		builder.Config.RuleFilter = rc.RuleFilter
+		builder.Config.RuleConfig.RuleFilter = rc.RuleFilter
 	}
 	return builder
 }
@@ -234,7 +230,7 @@ func (s *SSAProjectBuilder) Save() error {
 }
 
 func (s *SSAProjectBuilder) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
-	return s.Config.RuleFilter
+	return s.Config.GetRuleFilter()
 }
 
 func (s *SSAProjectBuilder) Validate() error {
@@ -282,11 +278,7 @@ func NewSSAProjectBuilder(projectName string, opts ...SSAProjectBuilderOption) *
 	builder := &SSAProjectBuilder{
 		ProjectName:      projectName,
 		CodeSourceConfig: &schema.CodeSourceInfo{},
-		Config: &schema.SSAProjectConfig{
-			CompileConfig: &schema.SSACompileConfig{},
-			ScanConfig:    &schema.SSAScanConfig{},
-			RuleFilter:    &ypb.SyntaxFlowRuleFilter{},
-		},
+		Config:           schema.NewSSAProjectConfig(),
 	}
 	for _, opt := range opts {
 		opt(builder)
@@ -302,11 +294,7 @@ func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProjectBuilder, err
 		Tags:             project.GetTagsList(),
 		Language:         project.Language,
 		CodeSourceConfig: project.GetSourceConfig(),
-		Config: &schema.SSAProjectConfig{
-			CompileConfig: &schema.SSACompileConfig{},
-			ScanConfig:    &schema.SSAScanConfig{},
-			RuleFilter:    &ypb.SyntaxFlowRuleFilter{},
-		},
+		Config:           schema.NewSSAProjectConfig(),
 	}
 	config, err := project.GetConfig()
 	if err != nil {
@@ -413,49 +401,49 @@ func WithSSAProjectDescription(description string) SSAProjectBuilderOption {
 // 规则配置
 func WithSSAProjectRuleFilterLanguage(language ...string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.Language = language
+		builder.Config.RuleConfig.RuleFilter.Language = language
 	}
 }
 
 func WithSSAProjectRuleFilterSeverity(severity ...string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.Severity = severity
+		builder.Config.RuleConfig.RuleFilter.Severity = severity
 	}
 }
 
 func WithSSAProjectRuleFilterKind(kind string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.FilterRuleKind = kind
+		builder.Config.RuleConfig.RuleFilter.FilterRuleKind = kind
 	}
 }
 
 func WithSSAProjectRuleFilterPurpose(purpose ...string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.Purpose = purpose
+		builder.Config.RuleConfig.RuleFilter.Purpose = purpose
 	}
 }
 
 func WithSSAProjectRuleFilterKeyword(keyword string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.Keyword = keyword
+		builder.Config.RuleConfig.RuleFilter.Keyword = keyword
 	}
 }
 
 func WithSSAProjectRuleFilterGroupNames(groupNames ...string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.GroupNames = groupNames
+		builder.Config.RuleConfig.RuleFilter.GroupNames = groupNames
 	}
 }
 
 func WithSSAProjectRuleFilterRuleNames(ruleNames ...string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.RuleNames = ruleNames
+		builder.Config.RuleConfig.RuleFilter.RuleNames = ruleNames
 	}
 }
 
 func WithSSAProjectRuleFilterTag(tag ...string) SSAProjectBuilderOption {
 	return func(builder *SSAProjectBuilder) {
-		builder.Config.RuleFilter.Tag = tag
+		builder.Config.RuleConfig.RuleFilter.Tag = tag
 	}
 }
 

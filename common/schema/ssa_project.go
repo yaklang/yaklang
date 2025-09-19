@@ -71,7 +71,7 @@ func (p *SSAProject) SetConfig(config *SSAProjectConfig) error {
 type SSAProjectConfig struct {
 	CompileConfig *SSACompileConfig
 	ScanConfig    *SSAScanConfig
-	RuleFilter    *ypb.SyntaxFlowRuleFilter
+	RuleConfig    *SSARuleConfig
 }
 type SSACompileConfig struct {
 	StrictMode    bool     `json:"strict_mode"`
@@ -85,6 +85,37 @@ type SSAScanConfig struct {
 	Concurrency    uint32 `json:"concurrency"`
 	Memory         bool   `json:"memory"`
 	IgnoreLanguage bool   `json:"ignore_language"`
+}
+
+type SSARuleConfig struct {
+	RuleFilter *ypb.SyntaxFlowRuleFilter
+}
+
+func NewSSAProjectConfig() *SSAProjectConfig {
+	return &SSAProjectConfig{
+		CompileConfig: &SSACompileConfig{},
+		ScanConfig:    &SSAScanConfig{},
+		RuleConfig: &SSARuleConfig{
+			RuleFilter: &ypb.SyntaxFlowRuleFilter{},
+		},
+	}
+}
+
+func (s *SSAProjectConfig) SetRuleFilter(filter *ypb.SyntaxFlowRuleFilter) {
+	if s == nil {
+		return
+	}
+	if s.RuleConfig == nil {
+		s.RuleConfig = &SSARuleConfig{}
+	}
+	s.RuleConfig.RuleFilter = filter
+}
+
+func (s *SSAProjectConfig) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
+	if s == nil || s.RuleConfig == nil {
+		return nil
+	}
+	return s.RuleConfig.RuleFilter
 }
 
 func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
@@ -122,9 +153,11 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 		}
 	}
 
-	if filter := config.RuleFilter; filter != nil {
-		result.RuleConfig = &ypb.SSAProjectScanRuleConfig{
-			RuleFilter: filter,
+	if rc := config.RuleConfig; rc != nil {
+		if filter := rc.RuleFilter; filter != nil {
+			result.RuleConfig = &ypb.SSAProjectScanRuleConfig{
+				RuleFilter: filter,
+			}
 		}
 	}
 	return result
