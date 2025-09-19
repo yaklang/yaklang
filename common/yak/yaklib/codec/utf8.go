@@ -87,8 +87,9 @@ func isUTF8FromReader(reader FileReader) (bool, error) {
 		}
 		sample = sample[:n]
 
-		// Fix UTF-8 boundaries
-		sample = fixUTF8Boundaries(sample)
+		// Fix UTF-8 boundaries only at the end (since we're reading from start)
+		// We only need to fix potential incomplete character at the end
+		sample = fixUTF8EndBoundary(sample)
 		return isValidUTF8(sample), nil
 	} else {
 		// Large file: sample strategy
@@ -130,8 +131,8 @@ func checkLargeFileUTF8FromReader(reader FileReader, fileSize int64) (bool, erro
 			return false, err
 		}
 
-		// Fix UTF-8 boundaries
-		sample = fixUTF8Boundaries(sample)
+		// Fix UTF-8 boundaries for sampling - only fix incomplete chars at ends
+		sample = fixUTF8SampleBoundaries(sample)
 
 		// Get approximately sampleSize runes
 		sample = limitToRunes(sample, sampleSize)
@@ -262,6 +263,83 @@ func findSafeEndPosition(data []byte, start int) int {
 	}
 
 	return end
+}
+
+// fixUTF8EndBoundary only fixes incomplete UTF-8 character at the end of data
+// This is used when we read from the beginning of a file and only need to handle
+// potential truncation at the end
+func fixUTF8EndBoundary(data []byte) []byte {
+	if len(data) == 0 {
+		return data
+	}
+
+	// Check if the last character might be incomplete by looking backwards
+	end := len(data)
+	for i := 1; i <= 4 && end-i >= 0; i++ {
+		pos := end - i
+		if utf8.RuneStart(data[pos]) {
+			// This could be the start of the last character
+			r, size := utf8.DecodeRune(data[pos:end])
+			if r == utf8.RuneError && size < i {
+				// This is an incomplete character, trim it
+				end = pos
+				log.Debugf("trimmed incomplete UTF-8 character at end: %d bytes", i)
+			}
+			break
+		}
+	}
+
+	return data[:end]
+}
+
+// fixUTF8SampleBoundaries 专门用于采样的边界修复
+// 只修复开头和结尾的不完整UTF-8字符，不删除中间的无效字节
+// 对于可能的二进制数据，保持更保守的策略
+func fixUTF8SampleBoundaries(data []byte) []byte {
+	if len(data) == 0 {
+		return data
+	}
+
+	start := 0
+	end := len(data)
+
+	// 对于开头：仅当明确检测到不完整的多字节UTF-8序列时才跳过
+	// 检查前几个字节是否是UTF-8序列的中间字节
+	if len(data) >= 4 {
+		consecutive_non_starts := 0
+		for i := 0; i < 4 && i < len(data); i++ {
+			if utf8.RuneStart(data[i]) {
+				// 找到UTF-8字符起始，停止搜索
+				if consecutive_non_starts > 0 {
+					start = i
+				}
+				break
+			} else {
+				consecutive_non_starts++
+			}
+		}
+		// 只有当连续多个非起始字节时才认为是不完整序列
+		if consecutive_non_starts < 2 {
+			start = 0 // 保守处理，保持原始数据
+		}
+	}
+
+	// 对于结尾：检查是否有不完整的UTF-8字符
+	for i := 1; i <= 4 && end-i >= start; i++ {
+		pos := end - i
+		if utf8.RuneStart(data[pos]) {
+			// 检查这是否是一个完整的字符
+			r, size := utf8.DecodeRune(data[pos:end])
+			expectedSize := end - pos
+			if r == utf8.RuneError && size == 1 && expectedSize > 1 {
+				// 这是一个不完整的多字节序列
+				end = pos
+			}
+			break
+		}
+	}
+
+	return data[start:end]
 }
 
 // limitToRunes limits the byte slice to approximately the specified number of runes
