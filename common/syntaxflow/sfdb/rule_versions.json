@@ -122,8 +122,8 @@
   {
     "rule_id": "e4420d8f-b1f9-4c46-8de7-f4998091d973",
     "rule_name": "检测Golang文件上传漏洞",
-    "hash": "cf54590d2b6a8d7ccb32512f9ddfac43e7023f4cb248a50f542583874a46ea32",
-    "version": "20250820.0001"
+    "hash": "ed1e00713fbf36e9b77cc7ac88f6cee76f72925aaa2f1d9d612c61537251e79b",
+    "version": "20250919.0001"
   },
   {
     "rule_id": "ca510247-27ae-4a3b-8048-9d6433b26653",
@@ -164,8 +164,8 @@
   {
     "rule_id": "594bc621-80a3-4f25-81f9-9b7840bdf4f9",
     "rule_name": "检测Golang未过滤文件路径漏洞",
-    "hash": "cc371094c1dedb0ca01573edad67b41a53bb5dcd075b7931509c27bebcacbb7e",
-    "version": "20250820.0001"
+    "hash": "66e74e9ddebb68639493470bd03901976f00b93db6218da4267d1c0ac7dcab4b",
+    "version": "20250919.0001"
   },
   {
     "rule_id": "c12cbcab-12de-4e6a-8715-4143224a36ed",
@@ -200,8 +200,8 @@
   {
     "rule_id": "838bdd38-5913-46ed-88f7-8eced02db2bd",
     "rule_name": "检测Golang路径穿越漏洞",
-    "hash": "01aa89a007e0c663812bb1d4dda0700e797300a281d56c06f94a7868d112583b",
-    "version": "20250820.0001"
+    "hash": "367973b9400d04e17531e70a5a4c93725049563d25dd8bda31d4d1b6f0a4125d",
+    "version": "20250919.0001"
   },
   {
     "rule_id": "278c2a17-1b81-49d1-a4a9-d881fba1a0e9",
