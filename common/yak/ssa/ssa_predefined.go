@@ -3,6 +3,7 @@ package ssa
 import (
 	"fmt"
 	"strings"
+
 	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -276,15 +277,18 @@ type anValue struct {
 	typ      Type
 	userList []int64
 
-	object int64
-	key    int64
-	member *omap.OrderedMap[int64, int64] // map[Value]Value
+	object     int64
+	key        int64
+	member     *omap.OrderedMap[int64, int64] // map[Value]Value
+	memberOnce sync.Once
 
-	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variables     *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variablesOnce sync.Once
 
 	// mask is a map, key is variable name, value is variable value
 	// it record the variable is masked by closure function or some scope changed
-	mask *omap.OrderedMap[int64, int64]
+	mask     *omap.OrderedMap[int64, int64]
+	maskOnce sync.Once
 
 	pointer   []int64 // the pointer is point to this value
 	reference int64   // the value is pointed by this value
@@ -323,17 +327,15 @@ func (n *anValue) GetKey() Value {
 	return key
 }
 
-var lock = sync.Mutex{}
-
 func (n *anValue) getMemberMap(create ...bool) *omap.OrderedMap[int64, int64] {
 	shouldCreate := false
 	if len(create) > 0 {
 		shouldCreate = create[0]
 	}
-	lock.Lock()
-	defer lock.Unlock()
 	if n.member == nil && shouldCreate {
-		n.member = omap.NewOrderedMap(map[int64]int64{})
+		n.memberOnce.Do(func() {
+			n.member = omap.NewOrderedMap(map[int64]int64{})
+		})
 	}
 	return n.member
 }
@@ -539,7 +541,9 @@ func (a *anValue) getVariablesMap(create ...bool) *omap.OrderedMap[string, *Vari
 		shouldCreate = create[0]
 	}
 	if a.variables == nil && shouldCreate {
-		a.variables = omap.NewOrderedMap(map[string]*Variable{})
+		a.variablesOnce.Do(func() {
+			a.variables = omap.NewOrderedMap(map[string]*Variable{})
+		})
 	}
 	return a.variables
 }
@@ -589,7 +593,9 @@ func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {
 		shouldCreate = create[0]
 	}
 	if i.mask == nil && shouldCreate {
-		i.mask = omap.NewOrderedMap(map[int64]int64{})
+		i.maskOnce.Do(func() {
+			i.mask = omap.NewOrderedMap(map[int64]int64{})
+		})
 	}
 	return i.mask
 }
