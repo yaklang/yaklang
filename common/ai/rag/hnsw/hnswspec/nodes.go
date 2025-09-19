@@ -23,6 +23,9 @@ func NewStandardLayerNode[K cmp.Ordered](key K, vector Vector) *StandardLayerNod
 	}
 }
 
+func (n *StandardLayerNode[K]) SetKey(key K) {
+	n.key = key
+}
 func (n *StandardLayerNode[K]) GetKey() K {
 	return n.key
 }
@@ -66,6 +69,10 @@ func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFun
 	// 删除反向链接
 	worst.RemoveNeighbor(n.key)
 	worst.Replenish(m, distFunc)
+}
+
+func (n *StandardLayerNode[K]) AddSingleNeighbor(neighbor LayerNode[K]) {
+	n.neighbors[neighbor.GetKey()] = neighbor
 }
 
 func (n *StandardLayerNode[K]) RemoveNeighbor(key K) {
@@ -159,6 +166,16 @@ type PQLayerNode[K cmp.Ordered] struct {
 	key       K
 	pqCodes   []byte // PQ编码
 	neighbors map[K]LayerNode[K]
+}
+
+// NewRawPQLayerNode 创建原始PQ编码的层节点
+func NewRawPQLayerNode[K cmp.Ordered](key K, pqCodes []byte) *PQLayerNode[K] {
+	node := &PQLayerNode[K]{
+		key:       key,
+		pqCodes:   pqCodes,
+		neighbors: make(map[K]LayerNode[K]),
+	}
+	return node
 }
 
 // NewPQLayerNode 创建PQ优化层节点
@@ -317,4 +334,8 @@ func (n *PQLayerNode[K]) IsPQEnabled() bool {
 
 func (n *PQLayerNode[K]) GetPQCodes() ([]byte, bool) {
 	return n.pqCodes, true
+}
+
+func (n *PQLayerNode[K]) AddSingleNeighbor(neighbor LayerNode[K]) {
+	n.neighbors[neighbor.GetKey()] = neighbor
 }

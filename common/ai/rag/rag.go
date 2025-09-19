@@ -312,6 +312,12 @@ func (r *RAGSystem) processBigText(doc Document) ([]Document, error) {
 		return r.processChunkText(doc, chunks)
 	}
 }
+func (r *RAGSystem) ConvertToPQMode() error {
+	if v, ok := r.VectorStore.(*SQLiteVectorStoreHNSW); ok {
+		return v.ConvertToPQMode()
+	}
+	return utils.Errorf("vector store is not a SQLiteVectorStoreHNSW")
+}
 
 // processChunkText 将文本分割成多个文档分别存储
 func (r *RAGSystem) processChunkText(originalDoc Document, chunks []string) ([]Document, error) {

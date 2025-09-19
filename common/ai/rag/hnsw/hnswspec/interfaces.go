@@ -23,6 +23,9 @@ type LayerNode[K cmp.Ordered] interface {
 	// AddNeighbor 添加邻居节点
 	AddNeighbor(neighbor LayerNode[K], m int, distFunc DistanceFunc[K])
 
+	// AddSingleNeighbor 添加单边邻居节点
+	AddSingleNeighbor(neighbor LayerNode[K])
+
 	// RemoveNeighbor 移除邻居节点
 	RemoveNeighbor(key K)
 

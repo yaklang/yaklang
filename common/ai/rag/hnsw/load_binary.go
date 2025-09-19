@@ -376,7 +376,7 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 }
 
 // BuildGraph 从 Persistent 构建 Graph[K]
-func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error)) (*Graph[K], error) {
+func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error), opts ...GraphOption[K]) (*Graph[K], error) {
 	if p.Total <= 0 {
 		return nil, utils.Error("cannot build graph from empty persistent")
 	}
@@ -405,7 +405,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 		return nil, utils.Error("offset to key mapping is nil")
 	}
 
-	g := NewGraph[K]()
+	g := NewGraph[K](opts...)
 	g.M = int(p.M)
 	g.Ml = float64(p.Ml)
 	g.EfSearch = int(p.EfSearch)
@@ -519,7 +519,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 			if !exists {
 				return nil, utils.Errorf("neighbor offset %d not found", neighborOffset)
 			}
-			node.AddNeighbor(neighbor, g.M, g.nodeDistance)
+			node.AddSingleNeighbor(neighbor)
 		}
 	}
 
