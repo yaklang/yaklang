@@ -194,12 +194,11 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		t.done.Do(func() {
 			t.m.Lock()
 			defer t.m.Unlock()
-
+			t.emitter.EmitToolCallStatus(t.callToolId, "done")
+			t.emitter.EmitToolCallDone(callToolId)
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
 			}
-			t.emitter.EmitToolCallStatus(t.callToolId, "done")
-			t.emitter.EmitToolCallDone(callToolId)
 		})
 	}
 
