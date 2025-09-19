@@ -111,6 +111,7 @@ REFERENCE
 
 <include('golang-file-path')> as $path;
 <include('golang-os-sink')> as $sink;
+<include('golang-user-input')> as $input;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
@@ -119,7 +120,7 @@ $path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
 $sink - $safe as $data;
-$data?{!opcode:const && !have:'ExternLib'} as $low;
+$data & $input as $low;
 
 alert $low for {
 	desc: <<<DESC

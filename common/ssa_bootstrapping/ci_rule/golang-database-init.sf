@@ -1,0 +1,138 @@
+desc(
+	title: "Audit Golang Database Operations in Init Function"
+	title_zh: "审计Golang中Init函数内的数据库操作"
+	type: audit
+	severity: high
+	rule_id: "5d658a56-db56-4973-85b2-e2ad06ed09e8"
+	risk: ""
+	desc: <<<DESC
+### 规则目的
+
+该规则用于审计Golang代码中在`init`函数内执行数据库操作的情况。`init`函数在Go程序启动时自动执行，如果在其中进行数据库操作可能导致程序启动失败或不可预期的行为，尤其是在依赖项未完全初始化时。
+
+### 规则详细
+
+1. **风险原理**
+   - `init`函数在Go程序启动时自动执行，且执行顺序依赖包导入顺序，难以控制。
+   - 若在`init`函数中进行数据库操作，可能在依赖项（如数据库连接池）未完全初始化时触发错误，导致程序崩溃。
+   - 此类操作还可能隐藏性能问题，因`init`函数阻塞会拖慢程序启动速度。
+
+2. **触发场景**
+   ```go
+   package main
+   import (
+       "github.com/yaklang/yaklang/common/consts"
+   )
+   func init() {
+       db := consts.GetGormProfileDatabase()
+       autoAutomigrateVectorStoreDocument(db) // 直接在此迁移数据库
+   }
+   ```
+   上述代码可能在数据库连接未建立时调用`GetGormProfileDatabase`，引发空指针异常。
+
+3. **潜在影响**
+   - 程序启动失败，影响服务可用性。
+   - 难以调试的初始化顺序问题。
+   - 隐藏的性能瓶颈。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用延迟初始化钩子
+通过注册回调函数，在数据库初始化完成后执行操作，避免直接依赖`init`函数。
+```go
+package main
+import (
+    "github.com/yaklang/yaklang/common/consts"
+)
+func init() {
+    yakit.RegisterPostInitDatabaseFunction(func() error {
+        autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())
+        return nil
+    })
+}
+```
+
+#### 2. 显式初始化控制
+将数据库操作移至主函数或显式初始化流程中，确保依赖项已就绪。
+```go
+package main
+import (
+    "github.com/yaklang/yaklang/common/consts"
+)
+func main() {
+    // 显式初始化数据库
+    if err := consts.InitializeDatabase(); err != nil {
+        panic(err)
+    }
+    // 安全执行迁移
+    autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())
+}
+```
+
+#### 3. 添加健康检查
+对`init`中的数据库操作添加重试机制和超时控制。
+```go
+func init() {
+    go func() {
+        for i := 0; i < 3; i++ {
+            if db := consts.GetGormProfileDatabase(); db != nil {
+                autoAutomigrateVectorStoreDocument(db)
+                return
+            }
+            time.Sleep(1 * time.Second)
+        }
+        log.Println("数据库初始化超时")
+    }()
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
+)
+
+consts?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
+$consts.*Database as $database;
+$database<getFunc>?{have: "init"} as $high;
+
+alert $high for {
+	title: "Audit Golang Database Operations in Init Function",
+	title_zh: "审计Golang中Init函数内的数据库操作",
+	level: "high",
+	type: "vuln",
+	risk: "",
+	name: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+	"github.com/yaklang/yaklang/common/consts"
+)
+
+func init() {
+	db := consts.GetGormProfileDatabase()
+	autoAutomigrateVectorStoreDocument(db)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"github.com/yaklang/yaklang/common/consts"
+)
+
+func init() {
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())
+		return nil
+	})
+}
+SAFE
+)
+

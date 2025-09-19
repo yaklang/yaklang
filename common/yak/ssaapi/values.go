@@ -558,10 +558,10 @@ func (v *Value) GetFreeValue(name string) *Value {
 	if v.IsNil(true) {
 		return nil
 	}
-	if variable := v.GetVariable(name); variable != nil {
-		if f, ok := ssa.ToFunction(v.innerValue); ok {
-			if fv, ok := f.FreeValues[variable]; ok {
-				fv, ok := f.GetValueById(fv)
+	if f, ok := ssa.ToFunction(v.innerValue); ok {
+		for ver, id := range f.FreeValues {
+			if ver.GetName() == name {
+				fv, ok := f.GetValueById(id)
 				if !ok {
 					return nil
 				}

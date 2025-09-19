@@ -441,8 +441,7 @@ func Test_ImportPackage_WithPhi(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 		template?{<fullTypeName>?{have: 'github.com/your/template'}} as $entry;
 		$entry.New() as $new;
-		$new.Parse() as $tmp 
-		// $tmp.*  as $parse;
+		$new.Parse()<getMembers> as $tmp 
 		$tmp.Execute(, * #-> as $sink);
 		`, map[string][]string{
 			"sink": {"Undefined-w", "Undefined-messages"},

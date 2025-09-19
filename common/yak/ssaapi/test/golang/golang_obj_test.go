@@ -211,3 +211,35 @@ func Cors1(c *gin.Context) {
 		)
 	})
 }
+
+func TestMutiReturn_TopDef_Syntaxflow(t *testing.T) {
+	t.Run("muti return topdef", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+func main() {
+    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+		file, handler, err := r.FormFile("file")
+		os.Create(handler.Filename)
+	})
+}
+
+		`, `
+os?{<fullTypeName>?{have: 'os'}} as $entry
+$entry.Create(* #-> as $sink) 
+			`,
+			map[string][]string{
+				"sink": {"Parameter-r"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+}

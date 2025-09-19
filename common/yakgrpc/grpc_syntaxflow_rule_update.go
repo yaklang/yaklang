@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -30,6 +31,7 @@ func (s *Server) ApplySyntaxFlowRuleUpdate(req *ypb.ApplySyntaxFlowRuleUpdateReq
 			Message: msg,
 		})
 	}
+	sfdb.DeleteBuildInRule()
 	err := sfbuildin.SyncEmbedRule(notify)
 	if err != nil {
 		return err

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -449,22 +450,47 @@ var syntaxFlowImport = &cli.Command{
 	Aliases: []string{"sf-import", "isf"},
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "file,f,i",
+			Name:  "file,f,input,i",
 			Usage: "file path",
+		},
+		cli.StringFlag{
+			Name: "format",
+			Usage: `input file format:
+	* json (default: json file)
+	* raw (syntaxflow file)
+		`,
 		},
 	},
 	Action: func(c *cli.Context) error {
-		if c.String("file") == "" {
+		file := c.String("file")
+		format := c.String("format")
+
+		if file == "" {
 			return utils.Error("file is required")
 		}
-		file, err := os.Open(c.String("file"))
+		if format == "" {
+			format = "json"
+		}
+		path, err := os.Open(file)
 		if err != nil {
 			return utils.Wrap(err, "open file failed")
 		}
-		defer file.Close()
-		err = sfdb.ImportDatabase(file)
-		if err != nil {
-			return err
+		defer path.Close()
+
+		switch format {
+		case "json":
+			err = sfdb.ImportDatabase(path)
+			if err != nil {
+				return err
+			}
+		case "raw":
+			rfs := filesys.NewRelLocalFs(file)
+			err := sfbuildin.SyncBuildRuleByFileSystem(rfs, false, func(process float64, ruleName string) {
+				log.Infof("sync input rule: %s, process: %f", ruleName, process)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	},

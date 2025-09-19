@@ -213,7 +213,7 @@ func TestImport_globals(t *testing.T) {
 	)
 }
 
-func TestImport_syntaxflow(t *testing.T) {
+func TestImport_Syntaxflow(t *testing.T) {
 	t.Run("import syntaxflow", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, `package main
 
@@ -239,23 +239,22 @@ func TestImport_syntaxflow(t *testing.T) {
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
-}
 
-func TestImport_syntaxflow_muti(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main/go/go.mod", `
+	t.Run("import syntaxflow muti", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
 
 	go 1.20
 	`)
-	vf.AddFile("src/main/go/A/test.go", `
+		vf.AddFile("src/main/go/A/test.go", `
 	package A
 
 	func function(a int) int {
 	    return a
 	}
 	`)
-	vf.AddFile("src/main/go/B/test.go", `
+		vf.AddFile("src/main/go/B/test.go", `
 	package B
 
 	import alias "github.com/yaklang/yaklang/A"
@@ -265,15 +264,16 @@ func TestImport_syntaxflow_muti(t *testing.T) {
 	}
 	`)
 
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		alias.function(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
-	)
+			"a": {"1"},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 }
 
-func TestFakeImport_syntaxflow(t *testing.T) {
+func TestFakeImport_Syntaxflow(t *testing.T) {
 	t.Run("fake import syntaxflow", func(t *testing.T) {
 		ssatest.CheckSyntaxFlowContain(t, `package main
 
@@ -350,20 +350,21 @@ func TestImport_unorder(t *testing.T) {
 }
 
 func TestImport_fulltypename(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main/go/go.mod", `
+	t.Run("fulltypename", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
 
 	go 1.20
 	`)
-	vf.AddFile("src/main/go/A/test.go", `
+		vf.AddFile("src/main/go/A/test.go", `
 	package A
 
 	func add(a,b int) int {
 	    return a + b
 	}
 	`)
-	vf.AddFile("src/main/go/B/test.go", `
+		vf.AddFile("src/main/go/B/test.go", `
 	package B
 
 	import "github.com/yaklang/yaklang/A"
@@ -373,24 +374,24 @@ func TestImport_fulltypename(t *testing.T) {
 	}
 	`)
 
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
-		have := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/A'}} as $have;`).Show()
-		nothave := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github1.com/yaklang/yaklang/A'}} as $nothave;`).Show()
-		assert.GreaterOrEqual(t, have.Len(), 1)
-		assert.GreaterOrEqual(t, nothave.Len(), 0)
-		return nil
-	}, ssaapi.WithLanguage(consts.GO))
-}
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			prog := programs[0]
+			have := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/A'}} as $have;`).Show()
+			nothave := prog.SyntaxFlowChain(`A?{<fullTypeName>?{have: 'github1.com/yaklang/yaklang/A'}} as $nothave;`).Show()
+			assert.GreaterOrEqual(t, have.Len(), 1)
+			assert.GreaterOrEqual(t, nothave.Len(), 0)
+			return nil
+		}, ssaapi.WithLanguage(consts.GO))
+	})
 
-func TestImport_fulltypename_lib(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main/go/go.mod", `
+	t.Run("fulltypename lib", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
 
 	go 1.20
 	`)
-	vf.AddFile("src/main/go/A/test.go", `
+		vf.AddFile("src/main/go/A/test.go", `
 	package A
 
 	import "github.com/stretchr/testify/assert"
@@ -400,12 +401,13 @@ func TestImport_fulltypename_lib(t *testing.T) {
 	}
 	`)
 
-	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-		prog := programs[0]
-		have := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github.com/stretchr/testify/assert'}} as $have;`).Show()
-		nothave := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github1.com/stretchr/testify/assert'}} as $nothave;`).Show()
-		assert.GreaterOrEqual(t, have.Len(), 1)
-		assert.GreaterOrEqual(t, nothave.Len(), 0)
-		return nil
-	}, ssaapi.WithLanguage(consts.GO))
+		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+			prog := programs[0]
+			have := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github.com/stretchr/testify/assert'}} as $have;`).Show()
+			nothave := prog.SyntaxFlowChain(`assert?{<fullTypeName>?{have: 'github1.com/stretchr/testify/assert'}} as $nothave;`).Show()
+			assert.GreaterOrEqual(t, have.Len(), 1)
+			assert.GreaterOrEqual(t, nothave.Len(), 0)
+			return nil
+		}, ssaapi.WithLanguage(consts.GO))
+	})
 }
