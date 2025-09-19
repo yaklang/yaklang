@@ -276,6 +276,14 @@ func defaultRand() *rand.Rand {
 	return rand.New(rand.NewSource(time.Now().UnixNano()))
 }
 
+func (g *Graph[K]) SetPQCodebook(codebook *pq.Codebook) {
+	g.pqCodebook = codebook
+}
+
+func (g *Graph[K]) SetPQQuantizer(quantizer *pq.Quantizer) {
+	g.pqQuantizer = quantizer
+}
+
 // GraphConfig defines the configuration parameters for creating an HNSW graph
 type GraphConfig[K cmp.Ordered] struct {
 	// M is the maximum number of neighbors each node maintains
@@ -436,7 +444,12 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 	}
 
 	// 设置节点距离函数为基于接口的版本
-	graph.nodeDistance = hnswspec.CosineDistance[K]
+	graph.nodeDistance = func(a, b hnswspec.LayerNode[K]) float64 {
+		if graph.IsPQEnabled() {
+			return hnswspec.PQAwareCosineDistance(a, b, graph.pqQuantizer)
+		}
+		return hnswspec.CosineDistance[K](a, b)
+	}
 	graph.pqAwareDistance = hnswspec.PQAwareCosineDistance[K]
 
 	// 使用函数名来判断距离函数类型
@@ -566,7 +579,6 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			nodeType = node.NodeType
 			g.nodeType = nodeType
 		}
-		originNode := node
 		key := node.Key
 		vec := node.ToVector()
 
@@ -610,8 +622,9 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 							log.Errorf("Failed to convert to lazy node: %v, skip this node", err)
 							continue
 						} else {
+							pqNode := newNode
 							newNode = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(uid), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
-								return hnswspec.NewStandardLayerNode(key, originNode.ToVector()), nil
+								return pqNode, nil
 							})
 						}
 					}
@@ -624,8 +637,9 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 							log.Errorf("Failed to convert to lazy node: %v, skip this node", err)
 							continue
 						} else {
+							standardNode := newNode
 							newNode = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(uid), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
-								return hnswspec.NewStandardLayerNode(key, originNode.ToVector()), nil
+								return standardNode, nil
 							})
 						}
 					}
@@ -1224,6 +1238,29 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
 	// 更新所有现有节点为PQ节点
 	log.Infof("Converting %d nodes to PQ encoding", len(allVectors))
 	converted := 0
+
+	// 第一阶段：备份所有节点的邻居关系
+	type neighborBackup struct {
+		nodeKey   K
+		neighbors map[K]hnswspec.LayerNode[K]
+	}
+	var allBackups []neighborBackup
+
+	for _, layer := range g.Layers {
+		for key, node := range layer.Nodes {
+			// 备份当前节点的邻居关系
+			neighbors := make(map[K]hnswspec.LayerNode[K])
+			for neighborKey, neighbor := range node.GetNeighbors() {
+				neighbors[neighborKey] = neighbor
+			}
+			allBackups = append(allBackups, neighborBackup{
+				nodeKey:   key,
+				neighbors: neighbors,
+			})
+		}
+	}
+
+	// 第二阶段：替换所有节点为PQ节点
 	for _, layer := range g.Layers {
 		for key, node := range layer.Nodes {
 			// 获取原始向量
@@ -1247,9 +1284,57 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
 				continue
 			}
 
-			// 替换节点（暂时跳过邻居复制，避免复杂性）
-			layer.Nodes[key] = pqNode
+			var newNode hnswspec.LayerNode[K]
+			if g.nodeType == InputNodeTypeLazy {
+				newNode = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(key), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
+					return pqNode, nil
+				})
+			} else {
+				newNode = pqNode
+			}
+
+			// 替换节点
+			layer.Nodes[key] = newNode
 			converted++
+		}
+	}
+
+	// 第三阶段：恢复邻居关系
+	log.Infof("Restoring neighbor relationships for %d nodes", len(allBackups))
+	for _, backup := range allBackups {
+		// 获取替换后的新节点
+		var currentNode hnswspec.LayerNode[K]
+		found := false
+		for _, layer := range g.Layers {
+			if node, exists := layer.Nodes[backup.nodeKey]; exists {
+				currentNode = node
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			log.Errorf("Failed to find replaced node with key %v", backup.nodeKey)
+			continue
+		}
+
+		// 恢复邻居关系
+		for neighborKey, _ := range backup.neighbors {
+			// 找到邻居节点的新版本
+			var neighborNode hnswspec.LayerNode[K]
+			neighborFound := false
+			for _, layer := range g.Layers {
+				if node, exists := layer.Nodes[neighborKey]; exists {
+					neighborNode = node
+					neighborFound = true
+					break
+				}
+			}
+
+			if neighborFound {
+				// 使用AddSingleNeighbor恢复单向邻居关系
+				currentNode.AddSingleNeighbor(neighborNode)
+			}
 		}
 	}
 
