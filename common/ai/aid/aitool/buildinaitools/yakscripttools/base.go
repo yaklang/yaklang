@@ -4,7 +4,9 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -36,9 +38,17 @@ func init() {
 				yakit.Set(key, hash)
 			}()
 		}
+
+		if result, ok := os.LookupEnv("SKIP_SYNC_BUILD_IN_AI_TOOL"); ok {
+			r, _ := strconv.ParseBool(result)
+			if r {
+				return nil
+			}
+		}
+
 		OverrideYakScriptAiTools()
 		return nil
-	})
+	}, "sync-ai-tool")
 }
 
 func BuildInAIToolHash() (string, error) {

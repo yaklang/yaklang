@@ -2,6 +2,7 @@ package chunkmaker
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"unicode/utf8"
 
@@ -14,6 +15,8 @@ import (
 type Chunk interface {
 	IsUTF8() bool
 	Data() []byte
+	Dump() string
+	DumpWithOverlap(i int) string
 	BytesSize() int64
 	RunesSize() int64
 	HaveLastChunk() bool
@@ -38,6 +41,28 @@ type BufferChunk struct {
 	mimeType       *mimetype.MIME
 	isTheLastChunk bool
 	verboseMessage string // 附加消息
+}
+
+func (c *BufferChunk) Dump() string {
+	return c.DumpWithOverlap(0)
+}
+
+func (c *BufferChunk) DumpWithOverlap(i int) string {
+	data := c.Data()
+	if c.HaveLastChunk() == false || i <= 0 {
+		return string(data)
+	}
+
+	overlapBytes := c.PrevNBytes(i)
+	b := bytes.Buffer{}
+	nonce := utils.RandStringBytes(4)
+	if len(overlapBytes) > 0 {
+		b.WriteString(fmt.Sprintf("<|OVERLAP[%v]|>\n", nonce))
+		b.WriteString(utils.EscapeInvalidUTF8Byte(overlapBytes))
+		b.WriteString(fmt.Sprintf("\n<|OVERLAP_END[%v]|>\n", nonce))
+	}
+	b.Write(data)
+	return b.String()
 }
 
 func (c *BufferChunk) SetPreviousChunk(prev Chunk) {

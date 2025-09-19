@@ -49,7 +49,7 @@ func init() {
 			yakit.ConfigureNetWork(config)
 			return nil
 		}
-	})
+	}, "sync-global-config-from-db")
 }
 
 func (s *Server) GetGlobalNetworkConfig(ctx context.Context, req *ypb.GetGlobalNetworkConfigRequest) (*ypb.GlobalNetworkConfig, error) {

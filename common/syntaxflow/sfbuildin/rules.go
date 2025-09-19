@@ -122,7 +122,7 @@ func init() {
 		}
 		// in default frontend this rule will be sync by grpc
 		return nil
-	})
+	}, "sync-syntaxflow-rules")
 }
 
 func SyntaxFlowRuleHash() (string, error) {
