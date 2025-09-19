@@ -13,6 +13,19 @@ languages = cli.StringSlice(
 )
 
 
+memory := cli.Bool("memory",
+    cli.setDefault(false),
+    cli.setVerboseName("内存编译，将会保存10分钟"),
+    cli.setCliGroup("compile"),
+)
+
+concurrency := cli.Int("concurrency",
+    cli.setVerboseName("并发数"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(10),
+    cli.setHelp("编译时，同时进行编译的文件数量"),
+)
+
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
 timeout = 3
 
@@ -28,31 +41,9 @@ peepholeSizes := cli.StringSlice(
 
 programName := cli.String("programName", cli.setVerboseName("项目名"), cli.setCliGroup("information"))
 description := cli.Text("description", cli.setVerboseName("项目描述"), cli.setCliGroup("information"))
+excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"))
 
 // {{ compile option
-
-onlySaveProjectInfo := cli.Bool(
-    "only-save",
-    cli.setVerboseName("是否仅存储项目信息"),
-    cli.setHelp("如果勾选，那么就不会进行编译，只会进行项目探测然后存储项目信息"),
-    cli.setDefault(false),
-     cli.setCliGroup("compile")
-)
-
-
-memory := cli.Bool("memory",
-    cli.setDefault(false),
-    cli.setVerboseName("内存编译，将会保存10分钟"),
-    cli.setCliGroup("compile"),
-)
-
-concurrency := cli.Int("concurrency",
-    cli.setVerboseName("并发数"),
-    cli.setCliGroup("compile"),
-    cli.setDefault(10),
-    cli.setHelp("编译时，同时进行编译的文件数量"),
-)
-
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
 strictMode = cli.Bool(
     "StrictMode",
@@ -62,9 +53,6 @@ strictMode = cli.Bool(
     cli.setDefault(false),
 )
 reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
-
-excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"))
-
 
 cli.check()
 target = target.Trim(" ", "\n", "\t")
@@ -376,72 +364,6 @@ generateDesc()
 
 programName = sprint(params.program_name)
 language = sprint(params.language)
-
-yakit.Info("保存项目配置到数据库...")
-// 构建保存选项
-saveOpts = []
-// 基础信息
-saveOpts = append(saveOpts, ssaproject.withDescription(params.description))
-saveOpts = append(saveOpts, ssaproject.withLanguage(language))
-
-// 根据探测到的源代码类型设置相应配置
-switch params.info.kind {
-case "local":
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("local"))
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceLocalFile(params.info.local_file))
-
-case "compression":
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("compression"))
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceLocalFile(params.info.local_file))
-
-case "jar":
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("jar"))
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceLocalFile(params.info.local_file))
-
-case "git":
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceKind("git"))
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceURL(params.info.url))
-    if params.info.branch != "" {
-        saveOpts = append(saveOpts, ssaproject.withCodeSourceBranch(params.info.branch))
-    }
-    if params.info.path != "" {
-        saveOpts = append(saveOpts, ssaproject.withCodeSourcePath(params.info.path))
-    }
-}
-
-// 代理配置
-if params.info.proxy.proxy && params.info.proxy.url != "" {
-    saveOpts = append(saveOpts, ssaproject.withCodeSourceProxyURL(params.info.proxy.url))
-}
-
-// 编译选项
-saveOpts = append(saveOpts, ssaproject.withStrictMode(strictMode))
-saveOpts = append(saveOpts, ssaproject.withPeepholeSize(peepholeSize))
-saveOpts = append(saveOpts, ssaproject.withReCompile(reCompile))
-if excludeFile != "" {
-    excludeFilesList = str.Split(excludeFile, ",")
-    saveOpts = append(saveOpts, ssaproject.withExcludeFiles(excludeFilesList))
-}
-
-// 扫描配置
-saveOpts = append(saveOpts, ssaproject.withCompileConcurrency(concurrency))
-saveOpts = append(saveOpts, ssaproject.withMemoryScan(memory))
-
-project := ssaproject.NewSSAProject(programName, saveOpts...)
-
-err = project.Save()
-if err != nil {
-    yakit.Error("保存项目失败: %s", err.Error())
-    return
-}
-
-// 如果不需要编译，则直接返回
-if onlySaveProjectInfo{
-    yakit.Info("项目配置已保存，跳过编译步骤")
-    return
-}
-
-yakit.Info("开始编译项目...")
 
 opts = [
     ssa.withProgramName(programName),
