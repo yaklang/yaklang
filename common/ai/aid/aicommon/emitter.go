@@ -2,12 +2,13 @@ package aicommon
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/google/uuid"
 	"github.com/segmentio/ksuid"
@@ -40,14 +41,20 @@ func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
 		event.Processes = append(event.Processes, newProcess)
 		return event
 	}
+
+	// push event processer to new emitter
 	return i.PushEventProcesser(callBack)
 }
 
 func (i *Emitter) PushEventProcesser(newHandler EventProcesser) *Emitter {
+	// copy emitter(deepcopy with event processer stack)
 	var copyEmitter = new(Emitter)
 	*copyEmitter = *i
-	if copyEmitter.eventProcesserStack == nil {
-		copyEmitter.eventProcesserStack = utils.NewStack[EventProcesser]()
+	copyEmitter.eventProcesserStack = utils.NewStack[EventProcesser]()
+	if i.eventProcesserStack != nil && i.eventProcesserStack.Len() > 0 {
+		for j := 0; j < i.eventProcesserStack.Len(); j++ {
+			copyEmitter.eventProcesserStack.Push(i.eventProcesserStack.PeekN(j))
+		}
 	}
 	copyEmitter.eventProcesserStack.Push(newHandler)
 	return copyEmitter

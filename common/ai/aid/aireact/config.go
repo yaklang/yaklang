@@ -24,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -78,6 +79,8 @@ type ReActConfig struct {
 
 	promptManager           *PromptManager         // Prompt manager for ReAct
 	pendingContextProviders []contextProviderEntry // Pending context providers to register
+
+	cfgMutex sync.Mutex
 
 	// Task interface
 	task aicommon.AITask // prepared for toolcall
@@ -555,15 +558,10 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		aiBlueprintManager: aiforge.NewForgeFactory(),
 	}
 
-	emitMutex := new(sync.Mutex)
 	// Initialize emitter
 	config.Emitter = aicommon.NewEmitter(id, func(e *schema.AiOutputEvent) error {
 		config.guardian.Feed(e)
-		if config.eventHandler != nil {
-			emitMutex.Lock()
-			defer emitMutex.Unlock()
-			config.eventHandler(e)
-		}
+		config.emitBaseHandler(e)
 		return nil
 	})
 
@@ -576,6 +574,50 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 	config.memory.GetTimelineInstance().BindConfig(config, config)
 
 	return config
+}
+
+func (c *ReActConfig) emitBaseHandler(e *schema.AiOutputEvent) {
+	select {
+	case <-c.ctx.Done():
+		return
+	default:
+	}
+	c.cfgMutex.Lock()
+	defer c.cfgMutex.Unlock()
+
+	if e.ShouldSave() {
+		err := yakit.CreateAIEvent(consts.GetGormProjectDatabase(), e)
+		if err != nil {
+			log.Errorf("create AI event failed: %v", err)
+		}
+	}
+
+	if c.guardian != nil {
+		c.guardian.Feed(e)
+	}
+
+	if c.eventHandler == nil {
+		if e.IsStream {
+			if c.debugEvent {
+				fmt.Print(string(e.StreamDelta))
+			}
+			return
+		}
+
+		if e.Type == schema.EVENT_TYPE_CONSUMPTION {
+			if c.debugEvent {
+				log.Info(e.String())
+			}
+			return
+		}
+		if c.debugEvent {
+			log.Info(e.String())
+		} else {
+			//log.Info(utils.ShrinkString(e.String(), 200))
+		}
+		return
+	}
+	c.eventHandler(e)
 }
 
 // NewReActConfig creates a new ReActConfig with options
