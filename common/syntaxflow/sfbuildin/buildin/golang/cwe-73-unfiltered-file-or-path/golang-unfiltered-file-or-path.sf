@@ -102,6 +102,7 @@ SOLUTION
 <include('golang-file-path')> as $path;
 <include('golang-file-read-path-sink')> as $sink;
 <include('golang-file-write-path-sink')> as $sink;
+<include('golang-user-input')> as $input;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
@@ -110,7 +111,7 @@ $path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
 $sink - $safe as $data;
-$data?{!opcode:const && !have:'ExternLib'} as $low;
+$data & $input as $low;
 
 alert $low for {
 	title: "Golang Unfiltered File Path Vulnerability Was Detected",

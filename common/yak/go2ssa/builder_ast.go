@@ -496,16 +496,16 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 		}
 
 		for i := range leftVariables {
-			if i >= length {
-				value := b.ReadValue(leftVariables[i].GetName())
-				b.AssignVariable(leftVariables[i], value)
-				continue
-			}
+			// if i >= length {
+			// 	value := b.ReadValue(leftVariables[i].GetName())
+			// 	b.AssignVariable(leftVariables[i], value)
+			// 	continue
+			// }
 
-			if length == 1 {
-				b.AssignVariable(leftVariables[i], c)
-				continue
-			}
+			// if length == 1 {
+			// 	b.AssignVariable(leftVariables[i], c)
+			// 	continue
+			// }
 			value := b.ReadMemberCallValue(c, b.EmitConstInstPlaceholder(i))
 			b.AssignVariable(leftVariables[i], value)
 		}
