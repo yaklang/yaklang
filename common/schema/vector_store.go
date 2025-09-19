@@ -192,6 +192,9 @@ type VectorStoreCollection struct {
 	EfConstruct      int     `gorm:"default:200" json:"ef_construct"`            // 构建时的候选节点数
 	DistanceFuncType string  `gorm:"default:'cosine'" json:"distance_func_type"` // 距离函数类型（cosine、euclidean等）
 
+	// PQ 算法参数配置
+	EnablePQMode bool `gorm:"default:false" json:"enable_pq_mode"`
+
 	// HNSW 图连接信息，存储为 JSON 格式
 	GroupInfos GroupInfos `gorm:"type:text" json:"group_infos"`
 

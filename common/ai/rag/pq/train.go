@@ -104,6 +104,11 @@ type Codebook struct {
 	Centroids    [][][]float64 // 码本，维度: [M][K][SubVectorDim]
 }
 
+const (
+	DefaultM = 16
+	DefaultK = 256
+)
+
 // Train 训练PQ模型，从输入通道读取向量数据并生成码本
 func Train(input <-chan []float64, opts ...TrainOption) (*Codebook, error) {
 	// 设置默认选项

@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"context"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -254,7 +256,7 @@ func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 
 type NodeOffsetToVectorFunc func(offset uint32) []float32
 
-func ParseHNSWGraphFromBinary(graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, cacheMaxSize int) (*hnsw.Graph[string], error) {
+func ParseHNSWGraphFromBinary(collectionName string, graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, cacheMaxSize int) (*hnsw.Graph[string], error) {
 	cache := map[hnswspec.LazyNodeID]hnswspec.LayerNode[string]{}
 	clearCache := func() {
 		if len(cache) > cacheMaxSize {
@@ -272,21 +274,39 @@ func ParseHNSWGraphFromBinary(graphBinaryReader io.Reader, db *gorm.DB, cacheMin
 			}
 		}
 	}
+	allOpts := getDefaultHNSWGraphOptions(collectionName)
 	return hnsw.LoadGraphFromBinary(graphBinaryReader, func(key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
-		return hnswspec.NewLazyLayerNode(key, func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
-			if node, ok := cache[uid]; ok {
-				return node, nil
-			}
-			doc, err := getVectorDocumentByLazyNodeID(db, uid)
-			if err != nil {
-				return nil, err
-			}
-			clearCache()
-			node := hnswspec.NewStandardLayerNode(doc.DocumentID, func() []float32 { return doc.Embedding })
-			cache[uid] = node
+		uidStr := fmt.Sprint(key)
+		if node, ok := cache[uidStr]; ok {
 			return node, nil
-		}), nil
-	})
+		}
+
+		doc, err := getVectorDocumentByLazyNodeID(db, key)
+		if err != nil {
+			return nil, err
+		}
+		var newNode hnswspec.LayerNode[string]
+		if doc.PQMode {
+			// TODO: 这里需要优化，不能直接捕获 doc 变量，会导致向量数据在内存中常驻
+			newNode = hnswspec.NewRawPQLayerNode(doc.DocumentID, doc.PQCode)
+		} else {
+			newNode = hnswspec.NewStandardLayerNode(doc.DocumentID, func() []float32 {
+				doc, err := getVectorDocumentByLazyNodeID(db, key)
+				if err != nil {
+					log.Errorf("get vector document by lazy node id err: %v", err)
+					return nil
+				}
+				return doc.Embedding
+			})
+		}
+
+		lazyNode := hnswspec.NewLazyLayerNode(key, func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+			return newNode, nil
+		})
+		clearCache()
+		cache[uidStr] = lazyNode
+		return lazyNode, nil
+	}, allOpts...)
 }
 
 func getVectorDocumentByLazyNodeID(db *gorm.DB, id hnswspec.LazyNodeID) (*schema.VectorStoreDocument, error) {
@@ -312,7 +332,12 @@ func getVectorDocumentByLazyNodeID(db *gorm.DB, id hnswspec.LazyNodeID) (*schema
 }
 
 func ExportHNSWGraphToBinary(graph *hnsw.Graph[string]) (io.Reader, error) {
-	return hnsw.ExportGraphToBinary(graph)
+	pers, err := hnsw.ExportHNSWGraph(graph)
+	if err != nil {
+		return nil, err
+	}
+	pers.Dims = 1024
+	return pers.ToBinary(context.Background())
 }
 
 const (
@@ -340,21 +365,25 @@ func getLazyNodeUID(uidType string, collectionName string, doc *schema.VectorSto
 
 var defaultUidType = uidTypeMd5
 
-func NewHNSWGraph(db *gorm.DB, collectionName string, opts ...hnsw.GraphOption[string]) *hnsw.Graph[string] {
-	allOpts := []hnsw.GraphOption[string]{
+func getDefaultHNSWGraphOptions(collectionName string) []hnsw.GraphOption[string] {
+	return []hnsw.GraphOption[string]{
 		hnsw.WithNodeType[string](hnsw.InputNodeTypeLazy),
 		hnsw.WithConvertToUIDFunc[string](func(node hnswspec.LayerNode[string]) (hnswspec.LazyNodeID, error) {
 			return hnswspec.LazyNodeID(getLazyNodeUIDByMd5(collectionName, node.GetKey())), nil
 		}),
 		hnsw.WithDeterministicRng[string](0),
 	}
+}
+
+func NewHNSWGraph(collectionName string, opts ...hnsw.GraphOption[string]) *hnsw.Graph[string] {
+	allOpts := getDefaultHNSWGraphOptions(collectionName)
 	return hnsw.NewGraph(append(allOpts, opts...)...)
 }
 
 var graphNodesIsEmpty = errors.New("hnsw graph nodes is empty")
 
 func MigrateHNSWGraph(db *gorm.DB, collection *schema.VectorStoreCollection) error {
-	hnswGraph := NewHNSWGraph(db, collection.Name)
+	hnswGraph := NewHNSWGraph(collection.Name)
 
 	// 分页查询向量节点
 	pageSize := 1000

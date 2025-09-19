@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type KnowledgeBaseConfig struct {
@@ -135,9 +136,8 @@ func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) RAGOption 
 
 // CollectionIsExists 检查知识库是否存在
 func CollectionIsExists(db *gorm.DB, name string) bool {
-	collections := []*schema.VectorStoreCollection{}
-	db.Model(&schema.VectorStoreCollection{}).Where("name = ?", name).Find(&collections)
-	return len(collections) > 0
+	col, err := yakit.QueryRAGCollectionByName(db, name)
+	return col != nil && err == nil
 }
 
 // CreateCollection 创建知识库
@@ -313,8 +313,10 @@ func DeleteCollection(db *gorm.DB, name string) error {
 
 // ListCollections 获取所有知识库列表
 func ListCollections(db *gorm.DB) []string {
-	collections := []*schema.VectorStoreCollection{}
-	db.Model(&schema.VectorStoreCollection{}).Find(&collections)
+	collections, err := yakit.QueryRAGCollections(db)
+	if err != nil {
+		return []string{}
+	}
 	names := []string{}
 	for _, collection := range collections {
 		names = append(names, collection.Name)
