@@ -50,26 +50,62 @@ const (
 	ExportModeStrUID   byte = 5
 )
 
+// getKeyType returns the string representation of the key type
+func getKeyType[K cmp.Ordered](key K) string {
+	var k any = key
+	switch k.(type) {
+	case string:
+		return "string"
+	case int:
+		return "int64"
+	case int64:
+		return "int64"
+	case uint64:
+		return "uint64"
+	case uint32:
+		return "uint32"
+	default:
+		return ""
+	}
+}
+
 func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
-	if i == nil || len(i.Layers) == 0 || len(i.Layers[0].Nodes) == 0 {
+	if i == nil {
 		return nil, utils.Errorf("graph is nil")
 	}
+
+	// Handle empty graph case
+	if len(i.Layers) == 0 {
+		var zeroKey K
+		keyType := getKeyType(zeroKey)
+		if keyType == "" {
+			return nil, utils.Errorf("unsupported key type, should be string, int/int64, uint64, uint32")
+		}
+
+		// Create empty persistent graph
+		pers := &Persistent[K]{
+			KeyType:     keyType,
+			Total:       0,
+			M:           uint32(i.M),
+			Ml:          float32(i.Ml),
+			EfSearch:    uint32(i.EfSearch),
+			Dims:        uint32(i.Dims()),
+			Layers:      []*PersistentLayer{},
+			OffsetToKey: []*PersistentNode[K]{},
+			Neighbors:   map[uint32][]uint32{},
+			ExportMode:  ExportModeStandard, // Default to standard mode for empty graph
+		}
+		return pers, nil
+	}
+
+	if len(i.Layers[0].Nodes) == 0 {
+		return nil, utils.Errorf("graph has no nodes")
+	}
+
 	keyType := ""
 	var exportMode byte
 	for _k, val := range i.Layers[0].Nodes {
-		var k any = _k
-		switch k.(type) {
-		case string:
-			keyType = "string"
-		case int:
-			keyType = "int64"
-		case int64:
-			keyType = "int64"
-		case uint64:
-			keyType = "uint64"
-		case uint32:
-			keyType = "uint32"
-		}
+		keyType = getKeyType(_k)
 		switch ret := val.(type) {
 		case *hnswspec.PQLayerNode[K]:
 			exportMode = ExportModePQ

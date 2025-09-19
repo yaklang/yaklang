@@ -3,6 +3,7 @@ package rag
 import (
 	"bytes"
 	"errors"
+	"io"
 	"sort"
 	"strings"
 	"sync"
@@ -11,9 +12,12 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/ai/rag/config"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
+	"github.com/yaklang/yaklang/common/ai/rag/pq"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // SQLiteVectorStore 是一个基于 SQLite 的向量存储实现
@@ -32,14 +36,9 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 }
 
 func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder EmbeddingClient, recoverLayer bool) (*SQLiteVectorStoreHNSW, error) {
-	var collections []*schema.VectorStoreCollection
-	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections)
-	if dbErr.Error != nil {
-		return nil, utils.Errorf("query rag collection [%#v] err: %v", collectionName, dbErr.Error)
-	}
-
-	if len(collections) == 0 {
-		return nil, utils.Errorf("rag collection[%v] not existed", collectionName)
+	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
+	if err != nil {
+		return nil, utils.Errorf("query rag collection [%#v] err: %v", collectionName, err)
 	}
 
 	var hnswGraph *hnsw.Graph[string]
@@ -48,29 +47,48 @@ func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder Em
 	if recoverLayer {
 		var err error
 		var isEmpty bool
-		if len(collections[0].GraphBinary) == 0 {
-			// 检测到旧版向量库，开始迁移 HNSW Graph
-			log.Warnf("detect old version vector store, start to migrate to new version")
-			err := MigrateHNSWGraph(db, collections[0])
-			if err != nil {
-				if errors.Is(err, graphNodesIsEmpty) {
-					isEmpty = true
-				} else {
-					return nil, utils.Errorf("migrate hnsw graph err: %v", err)
+		if len(collection.GraphBinary) == 0 {
+			// 检测是否存在向量
+			var count int64
+			db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Count(&count)
+			if count == 0 {
+				isEmpty = true
+			} else {
+				// 检测到旧版向量库，开始迁移 HNSW Graph
+				log.Warnf("detect old version vector store, start to migrate to new version")
+				err := MigrateHNSWGraph(db, collection)
+				if err != nil {
+					if errors.Is(err, graphNodesIsEmpty) {
+						isEmpty = true
+					} else {
+						return nil, utils.Errorf("migrate hnsw graph err: %v", err)
+					}
 				}
 			}
+
 		}
 		if isEmpty {
-			config := collections[0]
-			hnswGraph = NewHNSWGraph(db, collectionName,
+			config := collection
+			hnswGraph = NewHNSWGraph(collectionName,
 				hnsw.WithHNSWParameters[string](config.M, config.Ml, config.EfSearch),
 				hnsw.WithDistance[string](hnsw.GetDistanceFunc(config.DistanceFuncType)),
 			)
 		} else {
-			graphBinaryReader := bytes.NewReader(collections[0].GraphBinary)
-			hnswGraph, err = ParseHNSWGraphFromBinary(graphBinaryReader, db, 1000, 1200)
+			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
+			hnswGraph, err = ParseHNSWGraphFromBinary(collectionName, graphBinaryReader, db, 1000, 1200)
 			if err != nil {
 				return nil, utils.Wrap(err, "parse hnsw graph from binary")
+			}
+		}
+
+		if collection.EnablePQMode {
+			if len(collection.CodeBookBinary) != 0 {
+				codeBook, err := hnsw.ImportCodebook(bytes.NewReader(collection.CodeBookBinary))
+				if err != nil {
+					return nil, utils.Errorf("import codebook from binary err: %v", err)
+				}
+				hnswGraph.SetPQCodebook(codeBook)
+				hnswGraph.SetPQQuantizer(pq.NewQuantizer(codeBook))
 			}
 		}
 	}
@@ -79,7 +97,7 @@ func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder Em
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   embedder,
-		collection:                 collections[0],
+		collection:                 collection,
 		hnsw:                       hnswGraph,
 	}
 	hnswGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
@@ -91,6 +109,28 @@ func LoadSQLiteVectorStoreHNSWEx(db *gorm.DB, collectionName string, embedder Em
 	return vectorStore, nil
 }
 
+func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
+	var nodeNum int
+	if len(s.hnsw.Layers) > 0 && len(s.hnsw.Layers[0].Nodes) > 0 {
+		nodeNum = len(s.hnsw.Layers[0].Nodes)
+	}
+	k := 256
+	if nodeNum < k {
+		k = nodeNum
+	}
+	_, err := s.hnsw.TrainPQCodebookFromData(16, k)
+	if err != nil {
+		return utils.Wrap(err, "train pq codebook from data")
+	}
+	s.collection.EnablePQMode = true
+	err = s.db.Save(s.collection).Error
+	if err != nil {
+		return utils.Wrap(err, "save collection")
+	}
+	s.UpdateAutoUpdateGraphInfos()
+	return nil
+}
+
 func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
 	graphInfos, err := ExportHNSWGraphToBinary(s.hnsw)
 	if err != nil {
@@ -100,8 +140,29 @@ func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
 			return utils.Wrap(err, "export hnsw graph to binary")
 		}
 	}
-	resDb := s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("graph_binary", graphInfos)
-	return resDb.Error
+	graphInfosBytes, err := io.ReadAll(graphInfos)
+	if err != nil {
+		return utils.Wrap(err, "read graph infos")
+	}
+	err = s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("graph_binary", graphInfosBytes).Error
+	if err != nil {
+		return utils.Wrap(err, "update graph binary")
+	}
+	if s.collection.EnablePQMode {
+		codebook, err := hnsw.ExportCodebook(s.hnsw.GetCodebook())
+		if err != nil {
+			return utils.Wrap(err, "export codebook")
+		}
+		codebookBytes, err := io.ReadAll(codebook)
+		if err != nil {
+			return utils.Wrap(err, "read codebook")
+		}
+		err = s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("code_book_binary", codebookBytes).Error
+		if err != nil {
+			return utils.Wrap(err, "update codebook")
+		}
+	}
+	return nil
 }
 
 // NewSQLiteVectorStore 创建一个新的 SQLite 向量存储
@@ -111,15 +172,20 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 		option(cfg)
 	}
 
-	// 创建或获取集合
-	var collections []*schema.VectorStoreCollection
-	dbErr := db.Where("name = ?", name).Find(&collections)
-	if dbErr.Error != nil {
-		return nil, utils.Errorf("查询集合失败: %v", dbErr.Error)
-	}
+	vcolsNum := 0
+	db.Where("name = ?", name).Count(&vcolsNum)
 	var collection *schema.VectorStoreCollection
-	if len(collections) == 0 {
-		// 创建新集合
+	hnswGraph := NewHNSWGraph(name)
+	emptyGraphBinary, err := ExportHNSWGraphToBinary(hnswGraph)
+	if err != nil {
+		return nil, utils.Wrap(err, "export hnsw graph to binary")
+	}
+	emptyGraphData, err := io.ReadAll(emptyGraphBinary)
+	if err != nil {
+		return nil, utils.Wrap(err, "read empty graph binary")
+	}
+
+	if vcolsNum == 0 {
 		collection = &schema.VectorStoreCollection{
 			Name:             name,
 			Description:      description,
@@ -130,12 +196,17 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 			EfSearch:         cfg.EfSearch,
 			EfConstruct:      cfg.EfConstruct,
 			DistanceFuncType: cfg.DistanceFuncType,
+			EnablePQMode:     cfg.EnablePQMode,
+			GraphBinary:      emptyGraphData,
 		}
 		if err := db.Create(&collection).Error; err != nil {
 			return nil, utils.Errorf("创建集合失败: %v", err)
 		}
 	} else {
-		collection = collections[0]
+		collection, err = yakit.QueryRAGCollectionByName(db, name)
+		if err != nil {
+			return nil, utils.Errorf("查询集合失败: %v", err)
+		}
 	}
 
 	vectorStore := &SQLiteVectorStoreHNSW{
@@ -143,8 +214,9 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   embedder,
 		collection:                 collection,
-		hnsw:                       NewHNSWGraph(db, collection.Name),
+		hnsw:                       hnswGraph,
 	}
+
 	vectorStore.hnsw.OnLayersChange = func(layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
 			vectorStore.UpdateAutoUpdateGraphInfos()
@@ -154,14 +226,13 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 }
 func RemoveCollectionHNSW(db *gorm.DB, collectionName string) error {
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		var collections []schema.VectorStoreCollection
-		if err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error; err != nil {
+		collection, err := yakit.QueryRAGCollectionByName(tx, collectionName)
+		if err != nil {
 			return err
 		}
-		if len(collections) == 0 {
+		if collection == nil {
 			return utils.Errorf("集合 %s 不存在", collectionName)
 		}
-		collection := collections[0]
 
 		if err := tx.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
 			return err
@@ -212,6 +283,7 @@ func (s *SQLiteVectorStoreHNSW) toDocument(doc *schema.VectorStoreDocument) Docu
 func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorStoreDocument {
 	return &schema.VectorStoreDocument{
 		DocumentID:      doc.ID,
+		UID:             getLazyNodeUIDByMd5(s.collection.Name, doc.ID),
 		DocumentType:    doc.Type,
 		CollectionID:    s.collection.ID,
 		Metadata:        schema.MetadataMap(doc.Metadata),
@@ -285,18 +357,19 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 
 	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
-		nodes[i] = hnsw.InputNode[string]{
-			Key:   doc.ID,
-			Value: doc.Embedding,
-		}
+		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(getLazyNodeUIDByMd5(s.collection.Name, doc.ID)), func(uid hnswspec.LazyNodeID) ([]float32, error) {
+			dbDoc, err := getVectorDocumentByLazyNodeID(s.db, uid)
+			if err != nil {
+				return nil, utils.Wrap(err, "get vector document by lazy node uid")
+			}
+			return dbDoc.Embedding, nil
+		})
 	}
 	err := tx.Commit().Error
 	if err != nil {
 		return err
 	}
-	for _, id := range updateIds {
-		s.hnsw.Delete(id)
-	}
+
 	s.hnsw.Add(nodes...)
 
 	// 提交事务

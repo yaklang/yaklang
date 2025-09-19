@@ -52,6 +52,7 @@ var RagExports = map[string]interface{}{
 	"ragModelDimension": rag.WithModelDimension,
 	"ragCosineDistance": rag.WithCosineDistance,
 	"ragHNSWParameters": rag.WithHNSWParameters,
+	"ragPQMode":         rag.WithPQMode,
 
 	"docMetadata":    rag.WithDocumentMetadataKeyValue,
 	"docRawMetadata": rag.WithDocumentRawMetadata,

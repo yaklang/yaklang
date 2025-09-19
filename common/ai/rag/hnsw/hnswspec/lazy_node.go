@@ -5,7 +5,6 @@ import (
 )
 
 type LazyNodeID any
-
 type LazyLayerNode[K cmp.Ordered] struct {
 	uid          LazyNodeID
 	nodeCacheErr error
@@ -65,4 +64,8 @@ func (n *LazyLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 
 func (n *LazyLayerNode[K]) RemoveNeighbor(key K) {
 	n.LoadNode().RemoveNeighbor(key)
+}
+
+func (n *LazyLayerNode[K]) AddSingleNeighbor(neighbor LayerNode[K]) {
+	n.LoadNode().AddSingleNeighbor(neighbor)
 }

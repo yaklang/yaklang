@@ -11,10 +11,9 @@ import (
 )
 
 func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
-	if i.Total <= 0 {
-		return nil, utils.Error("cannot export empty graph")
-	}
+	// Allow exporting empty graphs (Total == 0)
 
+	// Basic validation for all graphs (including empty ones)
 	if i.Dims <= 0 {
 		return nil, utils.Error("invalid dimensions")
 	}
@@ -31,16 +30,18 @@ func (i *Persistent[K]) ToBinary(ctx context.Context) (io.Reader, error) {
 		return nil, utils.Error("invalid hnsw.EfSearch")
 	}
 
+	// PQ codebook validation (only if PQ mode is used)
 	if i.ExportMode == ExportModePQ && i.PQCodebook == nil {
 		return nil, utils.Error("pq mode enabled but pq codebook is nil")
 	}
 
-	if i.ExportMode == ExportModePQ {
+	if i.ExportMode == ExportModePQ && i.PQCodebook != nil {
 		if i.PQCodebook.K <= 0 || i.PQCodebook.M <= 0 || i.PQCodebook.SubVectorDim <= 0 || len(i.PQCodebook.Centroids) == 0 {
 			return nil, utils.Errorf("invalid pq codebook, m:%v k:%v sub_vector_dim:%v centroids-length:%v", i.PQCodebook.M, i.PQCodebook.K, i.PQCodebook.SubVectorDim, len(i.PQCodebook.Centroids))
 		}
 	}
 
+	// For empty graphs, OffsetToKey can be empty slice but not nil
 	if i.OffsetToKey == nil {
 		return nil, utils.Error("offset to key mapping is nil")
 	}
