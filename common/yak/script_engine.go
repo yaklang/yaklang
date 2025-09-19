@@ -75,7 +75,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
@@ -318,7 +317,6 @@ func initYaklangLib() {
 	// ssa
 	yaklang.Import("ssa", ssaapi.Exports)
 	yaklang.Import("syntaxflow", syntaxflow.Exports)
-	yaklang.Import("syntaxflowscan", syntaxflow_scan.Exports)
 
 	// openapi
 	yaklang.Import("openapi", openapi.Exports)
