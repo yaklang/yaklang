@@ -279,11 +279,6 @@ func init() {
 			withPluginAuthors("Q16G"),
 			withPluginEnableGenerateParam(true),
 		)
-		registerBuildInPlugin("yak", "SSA 项目编译（基于数据库项目信息）",
-			withPluginHelp("查询数据库中的SSA项目信息，并编译到SSA数据库内"),
-			withPluginAuthors("intSheep"),
-			withPluginEnableGenerateParam(true),
-		)
 		registerBuildInPlugin(
 			"yak",
 			"SyntaxFlow 查询项目信息",
