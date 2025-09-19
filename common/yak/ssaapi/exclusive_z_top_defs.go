@@ -13,6 +13,11 @@ import (
 func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 	defer func() {
 		if r := recover(); r != nil {
+			if r == recursiveError {
+				log.Warnf("Value GetTopDefs recursive call too deep, stop it: %s", i.String())
+				ret = nil
+				return
+			}
 			log.Errorf("Value GetTopDefs panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 			ret = nil
