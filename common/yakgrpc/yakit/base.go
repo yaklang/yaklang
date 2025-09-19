@@ -53,11 +53,21 @@ func RegisterPostInitDatabaseFunction(f func() error) {
 }
 
 func CallPostInitDatabase() error {
-	for _, f := range __initializingDatabase {
+	start := time.Now()
+	for idx, f := range __initializingDatabase {
+		currentFuncStart := time.Now()
 		err := f()
+		elapsed := time.Since(currentFuncStart)
+		if elapsed > 2*time.Second {
+			log.Warnf("call post function[%v] took too long: %v, function: %+v", idx, elapsed, f)
+		}
 		if err != nil {
 			return err
 		}
+	}
+	elapsed := time.Since(start)
+	if elapsed > 2*time.Second {
+		log.Warnf("call post functions took too long: %v", elapsed)
 	}
 	return nil
 }
