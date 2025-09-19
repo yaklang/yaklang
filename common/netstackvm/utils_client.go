@@ -47,10 +47,10 @@ var defaultSYNScanMutex sync.Mutex
 func GetDefaultSYNScanClient() *NetStackVirtualMachine {
 	defaultSYNScanMutex.Lock()
 	defer defaultSYNScanMutex.Unlock()
-	if defaultICMPClient != nil {
+	if defaultSYNScanClient != nil {
 		return defaultSYNScanClient
 	}
-	vm, err := NewSystemNetStackVMWithoutDHCP(defaultSYNScanOption()...)
+	vm, err := NewSystemNetStackVMWithoutDHCP(DefaultSYNScanOption()...)
 	if err != nil {
 		return nil
 	}
@@ -58,7 +58,7 @@ func GetDefaultSYNScanClient() *NetStackVirtualMachine {
 	return defaultSYNScanClient
 }
 
-func defaultSYNScanOption() []Option {
+func DefaultSYNScanOption() []Option {
 	return []Option{
 		WithPCAPInboundFilter(func(packet gopacket.Packet) bool {
 			tcpLayerRaw := packet.Layer(layers.LayerTypeTCP)
