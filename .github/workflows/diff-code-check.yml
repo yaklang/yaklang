@@ -8,6 +8,7 @@ on:
     branches: [ main ]
     types: [ opened, synchronize, reopened ]
     paths:
+      - "go.mod"
       - ".github/workflows/diff-code-check.yml"
       - "common/ssa_bootstrapping/ci_rule/**"
       - "common/syntaxflow/sfbuildin/buildin/golang/**"
@@ -67,32 +68,46 @@ jobs:
       - name: Init Module
         if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
-          go mod tidy
-          go build ./common/yak/cmd/yak.go
+          go mod tidy && go work vendor
+          ls -la $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
+          chmod +r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
+          cp -r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
+          tree ./vendor
+
+      - name: Init Project
+        if: steps.cache-project.outputs.cache-hit != 'true'
+        env: 
+          SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+        run: |
+          go build common/yak/cmd/yak.go 
+          ./yak --help
 
       - name: Generate Prog And Check With SyntaxFlow
-        if: steps.cache-project.outputs.cache-hit != 'true'
         run: |
           pwd && ls -al
-          ./yak -h
+          ./yak sync-rule 
+          ./yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
           MERGE_BASE=$(git merge-base main ${{ env.HEAD_SHA }})
           echo "Merge base is: $MERGE_BASE"
-          ./yak sync-rule
-          ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip
-          ./yak ssa -t ./fs.zip --program diffcode -l golang > log.txt 2>&1 || exit 1; 
-          grep -F "Current goroutine call stack:" log.txt && exit 1;
-          ./yak sf --program diffcode ./common/ssa_bootstrapping/ci_rule --save;
-          ./yak sf --program diffcode ./common/syntaxflow/sfbuildin/buildin/golang --save;
-          ./yak ssa-risk --program diffcode --json --output risk.json 
-          ./scripts/ssa-risk-format.sh 
-        # ./yak check --language go --file ./fs.zip --rules ./common/ssa_bootstrapping/ci_rule --exclude-file *.pb.go > log.txt 2>&1 || exit 1
-          
-      - name: Upload fail log
+          echo "Head base is: ${{ env.HEAD_SHA }}"
+          ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip 
+          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory
+          NUM=$(cat risk.json | jq .RiskNums)
+          echo "Find risk num is: $NUM"
+          if [  $NUM == 0 ]; then
+            echo "success" 
+          else
+            echo "fail"
+            exit 1
+          fi
+        # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
+
+      - name: Upload fs.zip
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: log.txt
-          path: log.txt
+          name: fs.zip
+          path: fs.zip
 
       - name: Upload risk log
         if: failure()
@@ -101,15 +116,35 @@ jobs:
           name: risk.json
           path: risk.json
 
-      - name: Upload database
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: default-yakssa.db
-          path: /home/runner/yakit-projects/default-yakssa.db
-
       - name: Workflows Fail
         if: failure()
         run: |
-          cat risk.json
+          cat risk.json | jq -r '
+            "=== Scan Report Summary ===",
+            "Scan Time: \(.report_time)",
+            "Program: \(.program_name)",
+            "Language: \(.program_lang)",
+            "Files Scanned: \(.file_count)",
+            "Lines of Code: \(.code_line_count)",
+            "Risks Found: \(.RiskNums)",
+            "",
+            "=== Risk Details ===",
+            (.Risks[] | 
+              "Risk ID: \(.hash)",
+              "Title: \(.title_verbose)",
+              "Severity: \(.severity)",
+              "Location: \(.code_source_url):\(.line)",
+              "Description: \(.description | split("\n")[0])",
+              "Solution: \(.solution | split("\n")[0])",
+              "Affected Code:",
+              (.code_fragment | split("\n")[] | "  \(.)"),
+              ""
+            ),
+            "=== Affected Files ===",
+            (.File[] | 
+              "File: \(.path)",
+              "Lines: \(.line_count)",
+              "Risk IDs: \(.risks | join(", "))",
+              ""
+            )'
           exit 1
