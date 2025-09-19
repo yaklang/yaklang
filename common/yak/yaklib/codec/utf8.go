@@ -128,7 +128,7 @@ func readSampleAtPosition(file *os.File, pos int64, size int) ([]byte, error) {
 }
 
 // fixUTF8Boundaries fixes UTF-8 character boundaries by trimming incomplete characters
-// at the start and end of the sample, while preserving invalid UTF-8 content for detection
+// ONLY at the start and end of the sample. It preserves ALL content in between, including invalid UTF-8.
 func fixUTF8Boundaries(data []byte) []byte {
 	if len(data) == 0 {
 		return data
@@ -140,25 +140,23 @@ func fixUTF8Boundaries(data []byte) []byte {
 		start++
 	}
 
-	// Find the end position - work backwards to find the last valid UTF-8 boundary
+	// Find the end position - work backwards to ensure we don't end in the middle of a UTF-8 character
 	end := len(data)
-	for end > start {
-		// Try validating from start to this end position
-		if utf8.Valid(data[start:end]) {
-			break
+	// Check if the last character might be incomplete
+	if end > 0 {
+		// Look at the last few bytes to see if we have an incomplete UTF-8 character
+		for i := 1; i <= 4 && end-i >= start; i++ {
+			pos := end - i
+			if utf8.RuneStart(data[pos]) {
+				// This could be the start of the last character
+				r, size := utf8.DecodeRune(data[pos:end])
+				if r == utf8.RuneError && size < i {
+					// This is an incomplete character, trim it
+					end = pos
+				}
+				break
+			}
 		}
-		// Move back one byte and try again
-		end--
-		// Make sure we don't end in the middle of a UTF-8 character
-		for end > start && !utf8.RuneStart(data[end]) {
-			end--
-		}
-	}
-
-	// If we couldn't find a valid range, return original data to preserve invalid content
-	if end <= start {
-		log.Debugf("could not establish valid UTF-8 boundaries, preserving original for detection")
-		return data
 	}
 
 	result := data[start:end]
