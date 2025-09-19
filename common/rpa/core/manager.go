@@ -23,9 +23,9 @@ import (
 )
 
 type Manager struct {
-	BrowserPool   rod.BrowserPool
+	BrowserPool   rod.Pool[rod.Browser]
 	Browser       *rod.Browser
-	PagePool      rod.PagePool
+	PagePool      rod.Pool[rod.Page]
 	hijackRouters *rod.HijackRouter
 	rootContext   context.Context
 	rootCancel    context.CancelFunc

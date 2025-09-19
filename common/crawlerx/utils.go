@@ -225,5 +225,8 @@ func EvalOnPage(page *rod.Page, evalJs string) (*proto.RuntimeRemoteObject, erro
 	if err != nil {
 		return nil, utils.Errorf(`page eval js code error: %v`, err)
 	}
+	if elementObj.Result == nil {
+		return nil, utils.Error(`page eval js code result null`)
+	}
 	return elementObj.Result, nil
 }

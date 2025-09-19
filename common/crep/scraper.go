@@ -34,7 +34,7 @@ func Snapshot(s string, timeout time.Duration) ([]byte, *types.Type, error) {
 			SameParty:    false,
 			SourceScheme: "",
 			SourcePort:   nil,
-			PartitionKey: "",
+			PartitionKey: nil,
 		},
 	})
 

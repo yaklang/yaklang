@@ -67,6 +67,13 @@ type BaseConfig struct {
 
 	aiInputUrl  string
 	aiInputInfo string
+
+	login    bool
+	username string
+	password string
+
+	domain string
+	key    string
 }
 
 type BrowserConfig struct {
@@ -702,5 +709,31 @@ func WithAIInputUrl(url string) ConfigOpt {
 func WithAIInputInf(info string) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.aiInputInfo = info
+	}
+}
+
+func WithLoginUsername(username string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.login = true
+		config.baseConfig.username = username
+	}
+}
+
+func WithLoginPassword(password string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.login = true
+		config.baseConfig.password = password
+	}
+}
+
+func WithAIDomain(domain string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.domain = domain
+	}
+}
+
+func WithAiKey(key string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.key = key
 	}
 }
