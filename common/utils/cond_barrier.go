@@ -85,6 +85,22 @@ type Barrier struct {
 	mutex   sync.Mutex
 }
 
+func (b *Barrier) safeCloseDone() { // 这里不使用once的原因是有reset行为
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	select {
+	case <-b.done:
+	default:
+		close(b.done)
+	}
+}
+
+func (b *Barrier) safeReset() {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	b.done = make(chan struct{})
+}
+
 // Done 减少屏障计数，当计数为0时标记该屏障条件已完成
 func (b *Barrier) Done() {
 	// 使用原子操作减少计数
@@ -98,12 +114,7 @@ func (b *Barrier) Done() {
 
 	if newCount == 0 {
 		// 需要完成屏障
-		select {
-		case <-b.done:
-			// channel已经关闭，不需要再次关闭
-		default:
-			close(b.done)
-		}
+		b.safeCloseDone()
 
 		// 更新完成状态
 		b.cb.mutex.Lock()
@@ -130,9 +141,7 @@ func (b *Barrier) Add(delta int) {
 
 			if shouldReset {
 				// 需要重置状态 - 这里仍需要锁保护，因为涉及到 channel 重新创建
-				b.mutex.Lock()
-				b.done = make(chan struct{})
-				b.mutex.Unlock()
+				b.safeReset()
 
 				// 如果之前已经完成，需要重置 completedBarriers 状态
 				b.cb.mutex.Lock()
@@ -141,12 +150,7 @@ func (b *Barrier) Add(delta int) {
 			}
 
 			if shouldComplete && !shouldReset {
-				select {
-				case <-b.done:
-					// 已经关闭，不需要再次关闭
-				default:
-					close(b.done)
-				}
+				b.safeCloseDone()
 
 				b.cb.mutex.Lock()
 				b.cb.completedBarriers[b.name] = true
@@ -209,7 +213,7 @@ func (cb *CondBarrier) CreateBarrier(name string) *Barrier {
 			done:    make(chan struct{}),
 			cb:      cb,
 		}
-		close(barrier.done)
+		barrier.safeCloseDone()
 		cb.completedBarriers[name] = true
 		cb.mutex.Unlock()
 		return barrier
@@ -266,12 +270,7 @@ func (cb *CondBarrier) Cancel() {
 		if !cb.completedBarriers[name] {
 			// 使用原子操作设置计数器为0，确保屏障完成
 			atomic.StoreInt64(&barrier.counter, 0)
-			select {
-			case <-barrier.done:
-				// 已经关闭
-			default:
-				close(barrier.done)
-			}
+			barrier.safeCloseDone()
 			cb.completedBarriers[name] = true
 		}
 	}
