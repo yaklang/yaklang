@@ -12,6 +12,15 @@ import (
 
 // handleRequireTool handles tool requirement action using aicommon.ToolCaller
 func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, error) {
+	r.config.Emitter = r.config.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event.TaskIndex == "" {
+			event.TaskIndex = r.currentTask.Id
+		}
+		return event
+	})
+	defer func() {
+		r.config.Emitter = r.config.Emitter.PopEventProcesser()
+	}()
 	// Find the required tool
 	tool, err := r.config.aiToolManager.GetToolByName(toolName)
 	if err != nil {
