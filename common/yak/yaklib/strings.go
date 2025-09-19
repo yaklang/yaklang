@@ -2,6 +2,7 @@ package yaklib
 
 import (
 	"encoding/json"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -579,7 +580,22 @@ var StringsExport = map[string]interface{}{
 	"TextReaderSplit": utils.DefaultTextSplitter.SplitReader,
 	"TextSplit":       utils.DefaultTextSplitter.Split,
 
-	"ShrinkString": _shrinkString,
+	"ShrinkString":                _shrinkString,
+	"AddPrefixLineNumber":         prefixLineNumber,
+	"AddPrefixLineNubmerToReader": prefixLineNumberReader,
+}
+
+func prefixLineNumberReader(i any) io.Reader {
+	switch ret := i.(type) {
+	case io.Reader:
+		return utils.PrefixLinesWithLineNumbersReader(ret)
+	}
+	result := utils.InterfaceToString(i)
+	return utils.PrefixLinesWithLineNumbersReader(strings.NewReader(result))
+}
+
+func prefixLineNumber(i any) string {
+	return utils.PrefixLinesWithLineNumbers(i)
 }
 
 // str.ShrinkString 将会把一个字符串压缩成一个设定一个长度下的较短的字符串

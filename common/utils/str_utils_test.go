@@ -732,14 +732,14 @@ func TestPrefixLinesWithLineNumbersReader(t *testing.T) {
 	}
 }
 
-func TestPrefixLinesWithLineNumbersReaderSimple(t *testing.T) {
+func TestPrefixLinesWithLineNumbersReaderStream(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
 		expected string
 	}{
 		{
-			name:     "single line string (always adds line numbers)",
+			name:     "single line string",
 			input:    "hello",
 			expected: "1 | hello",
 		},
@@ -756,14 +756,14 @@ func TestPrefixLinesWithLineNumbersReaderSimple(t *testing.T) {
 		{
 			name:     "empty string",
 			input:    "",
-			expected: "",
+			expected: "1 | ",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			input := strings.NewReader(tt.input)
-			resultReader := PrefixLinesWithLineNumbersReaderSimple(input)
+			resultReader := PrefixLinesWithLineNumbersReader(input)
 
 			resultData, err := io.ReadAll(resultReader)
 			require.NoError(t, err)

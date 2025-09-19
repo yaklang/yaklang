@@ -1829,7 +1829,7 @@ func PrefixLinesReaderSimple(input io.Reader, prefix string) io.Reader {
 }
 
 // PrefixLinesWithLineNumbersReader 为文本的每一行添加行号前缀，输入和输出都是 io.Reader
-// 对所有输入（包括单行和多行）都添加行号前缀，适合处理大文件或流式数据
+// 使用流式处理，逐行读取并添加行号前缀，适合处理大文件或流式数据
 // Example:
 // ```
 // reader := strings.NewReader("line1\nline2")
@@ -1842,51 +1842,40 @@ func PrefixLinesWithLineNumbersReader(input io.Reader) io.Reader {
 	go func() {
 		defer pw.Close()
 
-		// 读取所有内容
-		data, err := io.ReadAll(input)
-		if err != nil {
-			log.Errorf("PrefixLinesWithLineNumbersReader read error: %v", err)
-			return
-		}
-
-		content := string(data)
-
-		// 为所有行添加行号前缀
-		lines := strings.Split(content, "\n")
-		for i, line := range lines {
-			if i > 0 {
-				pw.Write([]byte("\n"))
-			}
-			pw.Write([]byte(fmt.Sprintf("%d | %s", i+1, line)))
-		}
-	}()
-
-	return pr
-}
-
-// PrefixLinesWithLineNumbersReaderSimple 简化版本，总是添加行号前缀，使用流式处理
-func PrefixLinesWithLineNumbersReaderSimple(input io.Reader) io.Reader {
-	pr, pw := io.Pipe()
-
-	go func() {
-		defer pw.Close()
-
 		scanner := bufio.NewScanner(input)
 		lineNumber := 1
 		isFirst := true
+		hasContent := false
 
 		for scanner.Scan() {
+			hasContent = true
 			line := scanner.Text()
 			if !isFirst {
-				pw.Write([]byte("\n"))
+				if _, err := pw.Write([]byte("\n")); err != nil {
+					log.Errorf("PrefixLinesWithLineNumbersReader write newline error: %v", err)
+					return
+				}
 			}
-			pw.Write([]byte(fmt.Sprintf("%d | %s", lineNumber, line)))
+
+			numberedLine := fmt.Sprintf("%d | %s", lineNumber, line)
+			if _, err := pw.Write([]byte(numberedLine)); err != nil {
+				log.Errorf("PrefixLinesWithLineNumbersReader write line error: %v", err)
+				return
+			}
+
 			lineNumber++
 			isFirst = false
 		}
 
+		// 如果没有内容（空输入），输出带行号的空行以保持兼容性
+		if !hasContent {
+			if _, err := pw.Write([]byte("1 | ")); err != nil {
+				log.Errorf("PrefixLinesWithLineNumbersReader write empty line error: %v", err)
+			}
+		}
+
 		if err := scanner.Err(); err != nil {
-			log.Errorf("PrefixLinesWithLineNumbersReaderSimple scanner error: %v", err)
+			log.Errorf("PrefixLinesWithLineNumbersReader scanner error: %v", err)
 		}
 	}()
 
