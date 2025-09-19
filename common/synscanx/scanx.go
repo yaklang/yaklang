@@ -3,6 +3,7 @@ package synscanx
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/netstackvm"
 	"net"
 	"os"
@@ -434,6 +435,11 @@ func (s *Scannerx) Scan(targetCh <-chan *SynxTarget) (chan *synscan.SynScanResul
 
 func (s *Scannerx) NetStackScan(vm *netstackvm.NetStackVirtualMachine, targetCh <-chan *SynxTarget) error {
 	wg := sync.WaitGroup{}
+	nmapRuleConfig := fp.NewConfig(
+		fp.WithActiveMode(true),
+		fp.WithTransportProtos(fp.UDP),
+		fp.WithProbesMax(3),
+	)
 	for target := range targetCh {
 		wg.Add(1)
 		go func() {
@@ -448,6 +454,26 @@ func (s *Scannerx) NetStackScan(vm *netstackvm.NetStackVirtualMachine, targetCh 
 				conn.Close()
 				s.OpenPortHandlers(net.ParseIP(target.Host), target.Port)
 			case UDP:
+				conn, err := vm.DialUDP(addr)
+				if err != nil || conn == nil {
+					return
+				}
+				var payload []byte
+				_, blocks, bestMode := fp.GetRuleBlockByConfig(target.Port, nmapRuleConfig)
+				if len(blocks) > 0 && bestMode {
+					payload = []byte(blocks[0].Probe.Payload)
+				}
+				_, err = conn.Write(payload)
+				if err != nil {
+					return
+				}
+				conn.SetReadDeadline(time.Now().Add(s.config.waiting))
+				_, err = conn.Read(make([]byte, 1))
+				if err != nil {
+					return
+				}
+				conn.Close()
+				s.OpenPortHandlers(net.ParseIP(target.Host), target.Port)
 			case ICMP:
 				//todo
 			case ARP:

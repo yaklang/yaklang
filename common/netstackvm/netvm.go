@@ -68,6 +68,35 @@ func (m *NetStackVirtualMachine) DialTCP(timeout time.Duration, target string) (
 	return entry.DialTCP(timeout, utils.HostPort(host, port))
 }
 
+func (m *NetStackVirtualMachine) DialUDP(target string) (net.Conn, error) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("panic: %v", err)
+		}
+	}()
+	host, port, err := utils.ParseStringToHostPort(target)
+	if err != nil {
+		return nil, err
+	}
+	if !utils.IsIPv4(host) {
+		host = netx.LookupFirst(host)
+	}
+
+	r, routeErr := m.stack.FindRoute(0, tcpip.Address{}, tcpip.AddrFrom4(netip.MustParseAddr(host).As4()), header.IPv4ProtocolNumber, false)
+	if routeErr != nil {
+		return nil, utils.Errorf("failed to find route: %v", routeErr)
+	}
+	defer r.Release()
+
+	dialEntryID := r.NICID()
+
+	entry, ok := m.GetEntry(dialEntryID)
+	if !ok {
+		return nil, utils.Errorf("failed to find vm: %d", dialEntryID)
+	}
+	return entry.DialUDP(utils.HostPort(host, port))
+}
+
 func (m *NetStackVirtualMachine) ListenTCP(addr string) (net.Listener, error) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -119,7 +148,11 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 
 	// 启动原则 ： 如果用户指定了需要启动的网卡则添加指定的网卡，如果没有则只启动localhost和默认路由网卡，除非开启option open
 	// find public interface
-	publicIfaceName, _ := netutil.GetPublicRouteIfaceName()
+	selectDevice := config.selectedDeviceName
+	if selectDevice == "" {
+		selectDevice, _ = netutil.GetPublicRouteIfaceName()
+	}
+
 	allNic, err := net.Interfaces()
 	if err != nil {
 		return nil, err
@@ -129,7 +162,7 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 			continue
 		}
 
-		if nic.Flags&net.FlagLoopback == 0 && nic.Name != publicIfaceName && nic.Name != config.selectedDeviceName && !config.openAllPcapDevice { // if not loopback and not public interface, skip it
+		if nic.Flags&net.FlagLoopback == 0 && nic.Name != config.selectedDeviceName && !config.openAllPcapDevice { // if not loopback and not public interface, skip it
 			continue
 		}
 
@@ -139,7 +172,7 @@ func NewSystemNetStackVM(opts ...Option) (*NetStackVirtualMachine, error) {
 			continue
 		}
 
-		if publicIfaceName == nic.Name { // if the interface is the public interface, start dhcp, make sure gateway can use
+		if selectDevice == nic.Name { // if the interface is the select interface, start dhcp, make sure gateway can use
 			if config.ForceSystemNetStack {
 				err = vm.InheritPcapInterfaceConfig()
 				if err != nil {
