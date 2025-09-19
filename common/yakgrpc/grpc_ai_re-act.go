@@ -72,7 +72,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 			go func() {
 				defer result.Close()
 				for k := range ragKnowledge {
-					if k.Type == "result" {
+					if k.Type == rag.RAGResultTypeResult {
 						result.SafeFeed(k)
 					}
 				}
