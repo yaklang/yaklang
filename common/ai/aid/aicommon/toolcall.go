@@ -123,6 +123,10 @@ func NewToolCaller(opts ...ToolCallerOption) (*ToolCaller, error) {
 	return caller, nil
 }
 
+func (t *ToolCaller) SetEmitter(e *Emitter) {
+	t.emitter = e
+}
+
 func (t *ToolCaller) GetParamGeneratingPrompt(tool *aitool.Tool, toolName string) (string, error) {
 	if t.generateToolParamsBuilder == nil {
 		return "", fmt.Errorf("generateToolParamsBuilder is nil")
@@ -168,19 +172,18 @@ func (t *ToolCaller) generateParams(tool *aitool.Tool, handleError func(i any)) 
 }
 
 func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams bool, presetInvokeParams aitool.InvokeParams) (result *aitool.ToolResult, directlyAnswer bool, err error) {
-	emitter := t.emitter
-	if emitter == nil {
-		emitter = t.config.GetEmitter()
+	if t.emitter == nil {
+		emitter := t.config.GetEmitter()
 		if emitter == nil {
 			return nil, false, fmt.Errorf("no emitter found in ToolCaller")
 		}
 		t.emitter = emitter
 	}
 
-	emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
+	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
 	callToolId := t.callToolId
 
-	emitter.EmitToolCallStart(callToolId, tool)
+	t.emitter.EmitToolCallStart(callToolId, tool)
 	t.m.Lock()
 	if t.onCallToolStart != nil {
 		t.onCallToolStart(callToolId)
@@ -195,15 +198,15 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			if t.onCallToolEnd != nil {
 				t.onCallToolEnd(callToolId)
 			}
-			emitter.EmitToolCallStatus(t.callToolId, "done")
-			emitter.EmitToolCallDone(callToolId)
+			t.emitter.EmitToolCallStatus(t.callToolId, "done")
+			t.emitter.EmitToolCallDone(callToolId)
 		})
 	}
 
 	handleUserCancel := func(reason any) {
 		t.done.Do(func() {
-			emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
-			emitter.EmitToolCallUserCancel(callToolId)
+			t.emitter.EmitToolCallStatus(t.callToolId, fmt.Sprintf("cancelled by reason: %v", reason))
+			t.emitter.EmitToolCallUserCancel(callToolId)
 			t.m.Lock()
 			defer t.m.Unlock()
 
@@ -215,7 +218,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 
 	handleError := func(err any) {
 		t.done.Do(func() {
-			emitter.EmitToolCallError(callToolId, err)
+			t.emitter.EmitToolCallError(callToolId, err)
 			t.m.Lock()
 			defer t.m.Unlock()
 
@@ -237,7 +240,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	var invokeParams = make(aitool.InvokeParams)
 	if presetParams {
 		invokeParams = presetInvokeParams
-		emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
+		t.emitter.EmitInfo("use preset params for tool[%v]: %v", tool.Name, invokeParams)
 	} else {
 		generatedParams, err := t.generateParams(tool, handleError)
 		if err != nil {
@@ -249,14 +252,14 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		invokeParams = make(aitool.InvokeParams)
 	}
 
-	emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
+	t.emitter.EmitInfo("start to invoke callback function for tool:%v", tool.Name)
 	epm := t.config.GetEndpointManager()
 	config := t.config
 	// DANGER: NoNeedUserReview
 	if tool.NoNeedUserReview {
-		emitter.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", tool.Name)
+		t.emitter.EmitInfo("tool[%v] (internal helper tool) no need user review, skip review", tool.Name)
 	} else {
-		emitter.EmitInfo("start to require review for tool use: %v", tool.Name)
+		t.emitter.EmitInfo("start to require review for tool use: %v", tool.Name)
 		ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE)
 		ep.SetDefaultSuggestionContinue()
 		reqs := map[string]any{
@@ -271,12 +274,12 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		if err != nil {
 			log.Errorf("submit request review to db for tool use failed: %v", err)
 		}
-		emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
+		t.emitter.EmitInteractiveJSON(ep.GetId(), schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE, "review-require", reqs)
 
 		// wait for agree
 		config.DoWaitAgree(nil, ep)
 		params := ep.GetParams()
-		emitter.EmitInteractiveRelease(ep.GetId(), params)
+		t.emitter.EmitInteractiveRelease(ep.GetId(), params)
 		config.CallAfterInteractiveEventReleased(ep.GetId(), params)
 		config.CallAfterReview(
 			ep.GetSeq(),
@@ -284,7 +287,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			params,
 		)
 		if params == nil {
-			emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
+			t.emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
 			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))
 			return nil, false, fmt.Errorf("tool use [%v] review params is nil", tool.Name)
 		}
@@ -294,7 +297,7 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 			tool, invokeParams, params, handleUserCancel,
 		)
 		if err != nil {
-			emitter.EmitError("error handling tool use review: %v", err)
+			t.emitter.EmitError("error handling tool use review: %v", err)
 			handleError(fmt.Sprintf("error handling tool use review: %v", err))
 			return nil, false, err
 		}
@@ -315,8 +318,8 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 	stderrReader, stderrWriter := utils.NewPipe()
 	defer stderrWriter.Close()
 
-	emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
-	emitter.EmitInfo("start to invoke tool: %v", tool.Name)
+	t.emitter.EmitToolCallStd(tool.Name, stdoutReader, stderrReader, t.task.GetIndex())
+	t.emitter.EmitInfo("start to invoke tool: %v", tool.Name)
 
 	toolResult, err := t.invoke(tool, invokeParams, handleUserCancel, handleError, stdoutWriter, stderrWriter)
 	if err != nil {
@@ -331,6 +334,6 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		toolResult.Error = fmt.Sprintf("error invoking tool[%v]: %v", tool.Name, err)
 		toolResult.Success = false
 	}
-	emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
+	t.emitter.EmitInfo("start to generate and feedback tool[%v] result in task: %#v", tool.Name, t.task.GetName())
 	return toolResult, false, nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -19,13 +20,23 @@ func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, er
 
 	log.Infof("preparing tool: %s - %s", tool.Name, tool.Description)
 
+	var toolCaller *aicommon.ToolCaller
 	// Create ToolCaller with parameter generation prompt builder
-	toolCaller, err := aicommon.NewToolCaller(
+	toolCaller, err = aicommon.NewToolCaller(
 		aicommon.WithToolCaller_AICallerConfig(r.config),
 		aicommon.WithToolCaller_AICaller(r.config),
 		aicommon.WithToolCaller_Task(r.config.task),
 		aicommon.WithToolCaller_RuntimeId(r.config.id),
 		aicommon.WithToolCaller_Emitter(r.config.Emitter),
+		aicommon.WithToolCaller_OnStart(func(callToolId string) {
+			toolCaller.SetEmitter(r.config.Emitter.AssociativeAIProcess(&schema.AiProcess{
+				ProcessId:   callToolId,
+				ProcessType: schema.AI_Call_Tool,
+			}))
+		}),
+		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
+			toolCaller.SetEmitter(r.config.Emitter.PopEventProcesser())
+		}),
 		aicommon.WithToolCaller_GenerateToolParamsBuilder(func(tool *aitool.Tool, toolName string) (string, error) {
 			return r.generateToolParamsPrompt(tool, toolName)
 		}),
