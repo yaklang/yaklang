@@ -1365,24 +1365,25 @@ func TestLineChunkMakerClose(t *testing.T) {
 	log.Info("Close method test completed")
 }
 
-// Test splitAndEmitChunk method
+// Test splitAndEmitChunk method via integration test
 func TestSplitAndEmitChunk(t *testing.T) {
-	config := NewConfig(WithLines(1), WithChunkSize(10))
-	lm, err := NewLineChunkMaker(strings.NewReader(""), config)
+	// 测试splitAndEmitChunk功能通过集成测试
+	// 创建一个包含长行的数据，这会触发splitAndEmitChunk
+	longLine := strings.Repeat("This is a very long line that exceeds chunk size ", 10)
+	testData := longLine + "\n" + "short line"
+
+	var chunks []string
+	var mu sync.Mutex
+
+	config := NewConfig(WithLines(1), WithChunkSize(50))
+	lm, err := NewLineChunkMaker(strings.NewReader(testData), config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer lm.Close()
 
-	// 创建需要分割的长数据
-	longData := "This is a very long piece of data that needs to be split into smaller chunks"
-
-	// 调用splitAndEmitChunk方法（通过触发需要分割的情况）
-	go lm.splitAndEmitChunk(longData, 15)
-
 	// 从输出通道读取chunks
-	var chunks []string
-	timeout := time.After(100 * time.Millisecond)
+	timeout := time.After(500 * time.Millisecond)
 
 	for {
 		select {
@@ -1390,25 +1391,38 @@ func TestSplitAndEmitChunk(t *testing.T) {
 			if !ok {
 				goto done
 			}
+			mu.Lock()
 			chunks = append(chunks, string(chunk.Data()))
+			mu.Unlock()
 		case <-timeout:
 			goto done
 		}
 	}
 
 done:
-	if len(chunks) == 0 {
+	mu.Lock()
+	actualChunks := make([]string, len(chunks))
+	copy(actualChunks, chunks)
+	mu.Unlock()
+
+	if len(actualChunks) == 0 {
 		t.Error("Expected splitAndEmitChunk to produce chunks")
 	}
 
 	// 验证chunks不超过指定大小
-	for i, chunk := range chunks {
-		if len(chunk) > 15 {
-			t.Errorf("Chunk %d exceeds size limit: %d > 15", i, len(chunk))
+	for i, chunk := range actualChunks {
+		if int64(len(chunk)) > 50 {
+			t.Errorf("Chunk %d exceeds size limit: %d > 50", i, len(chunk))
 		}
 	}
 
-	log.Infof("splitAndEmitChunk test: produced %d chunks", len(chunks))
+	// 验证数据完整性
+	combined := strings.Join(actualChunks, "")
+	if combined != testData {
+		t.Error("Combined chunks don't match original data")
+	}
+
+	log.Infof("splitAndEmitChunk test: produced %d chunks", len(actualChunks))
 }
 
 // Test Run method edge cases
