@@ -59,7 +59,7 @@ func CallPostInitDatabase() error {
 		err := f()
 		elapsed := time.Since(currentFuncStart)
 		if elapsed > 2*time.Second {
-			log.Warnf("call post function[%v] took too long: %v, function: %+v", idx, elapsed, f)
+			log.Warnf("call post function[%v] took too long: %v", idx, elapsed)
 		}
 		if err != nil {
 			return err
