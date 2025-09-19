@@ -8,6 +8,11 @@ import (
 func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 	defer func() {
 		if r := recover(); r != nil {
+			if r == recursiveError {
+				log.Warnf("Value GetBottomUses recursive call too deep, stop it: %s", v.String())
+				ret = nil
+				return
+			}
 			log.Errorf("Value GetBottomUses panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 			ret = nil
