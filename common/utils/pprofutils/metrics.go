@@ -284,5 +284,5 @@ func init() {
 			}
 		}()
 		return nil
-	})
+	}, "register-profile")
 }

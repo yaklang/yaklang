@@ -92,7 +92,7 @@ func init() {
 	// 一开始应该创建一个最基础的数据库
 	RegisterPostInitDatabaseFunction(func() error {
 		return InitializingProjectDatabase()
-	})
+	}, "init-project-db")
 }
 
 func filterType(db *gorm.DB, typ string) *gorm.DB {
