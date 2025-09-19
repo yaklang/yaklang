@@ -3,7 +3,6 @@ package ssa
 import (
 	"fmt"
 	"strings"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -323,15 +322,11 @@ func (n *anValue) GetKey() Value {
 	return key
 }
 
-var lock = sync.Mutex{}
-
 func (n *anValue) getMemberMap(create ...bool) *omap.OrderedMap[int64, int64] {
 	shouldCreate := false
 	if len(create) > 0 {
 		shouldCreate = create[0]
 	}
-	lock.Lock()
-	defer lock.Unlock()
 	if n.member == nil && shouldCreate {
 		n.member = omap.NewOrderedMap(map[int64]int64{})
 	}
