@@ -3,9 +3,10 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
-	"io"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -61,7 +62,8 @@ func (t *AiTask) getToolResultAction(response string) string {
 }
 
 func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, directlyAnswer bool, err error) {
-	caller, err := aicommon.NewToolCaller(
+	var caller *aicommon.ToolCaller
+	caller, err = aicommon.NewToolCaller(
 		aicommon.WithToolCaller_RuntimeId(t.GetRuntimeId()),
 		aicommon.WithToolCaller_Task(t),
 		aicommon.WithToolCaller_AICallerConfig(t),
@@ -69,13 +71,13 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 		aicommon.WithToolCaller_AICaller(t),
 		aicommon.WithToolCaller_GenerateToolParamsBuilder(t.generateRequireToolResponsePrompt),
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
-			t.Emitter = t.Emitter.AssociativeAIProcess(&schema.AiProcess{
+			caller.SetEmitter(t.Emitter.AssociativeAIProcess(&schema.AiProcess{
 				ProcessId:   callToolId,
 				ProcessType: schema.AI_Call_Tool,
-			})
+			}))
 		}),
 		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
-			t.Emitter = t.Emitter.PopEventProcesser()
+			caller.SetEmitter(t.Emitter.PopEventProcesser())
 		}),
 		aicommon.WithToolCaller_ReviewWrongTool(t.toolReviewPolicy_wrongTool),
 		aicommon.WithToolCaller_ReviewWrongParam(t.toolReviewPolicy_wrongParam),
