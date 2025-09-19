@@ -303,24 +303,49 @@ func fixUTF8SampleBoundaries(data []byte) []byte {
 	start := 0
 	end := len(data)
 
-	// 对于开头：仅当明确检测到不完整的多字节UTF-8序列时才跳过
-	// 检查前几个字节是否是UTF-8序列的中间字节
-	if len(data) >= 4 {
-		consecutive_non_starts := 0
-		for i := 0; i < 4 && i < len(data); i++ {
-			if utf8.RuneStart(data[i]) {
-				// 找到UTF-8字符起始，停止搜索
-				if consecutive_non_starts > 0 {
-					start = i
+	// 对于开头：检测真正的UTF-8边界问题
+	// 只有在确实是被截断的UTF-8序列时才修复
+	if len(data) >= 2 {
+		// 如果开头是UTF-8延续字节，需要区分是边界问题还是二进制数据
+		if data[0] >= 0x80 && data[0] < 0xC0 {
+			// 查找第一个有效的字符边界
+			foundValidUTF8Start := false
+			for i := 1; i < len(data) && i < 4; i++ {
+				if utf8.RuneStart(data[i]) {
+					if data[i] >= 0xC0 {
+						// 找到了真正的UTF-8起始字节，这可能是边界问题
+						foundValidUTF8Start = true
+						start = i
+						break
+					} else {
+						// 找到了ASCII字符，这不是UTF-8边界问题
+						// 如果是二进制数据(如PNG)，保持原样
+						break
+					}
 				}
-				break
-			} else {
-				consecutive_non_starts++
+				// 继续寻找
 			}
-		}
-		// 只有当连续多个非起始字节时才认为是不完整序列
-		if consecutive_non_starts < 2 {
-			start = 0 // 保守处理，保持原始数据
+			// 如果只找到连续的延续字节，可能是边界问题
+			if !foundValidUTF8Start && start == 0 {
+				// 检查是否有连续的延续字节
+				consecutiveContinuations := 1
+				for i := 1; i < len(data) && i < 4; i++ {
+					if data[i] >= 0x80 && data[i] < 0xC0 {
+						consecutiveContinuations++
+					} else {
+						break
+					}
+				}
+				// 如果有多个连续的延续字节，可能是真正的边界问题
+				if consecutiveContinuations >= 2 {
+					for i := 1; i < len(data) && i < 4; i++ {
+						if utf8.RuneStart(data[i]) {
+							start = i
+							break
+						}
+					}
+				}
+			}
 		}
 	}
 
