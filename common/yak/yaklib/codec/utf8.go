@@ -2,11 +2,41 @@ package codec
 
 import (
 	"io"
+	"io/fs"
 	"os"
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/memfile"
 )
+
+// FileReader 定义了统一的文件读取接口，os.File 和 memfile.File 都实现了这个接口
+type FileReader interface {
+	io.Reader
+	io.Seeker
+	Stat() (fs.FileInfo, error)
+}
+
+func IsUTF8(i any) (bool, error) {
+	switch ret := i.(type) {
+	case FileReader:
+		// 直接使用 FileReader 接口
+		return isUTF8FromReader(ret)
+	case io.Reader:
+		// 将 io.Reader 读取到内存后创建 memfile
+		bytes, err := io.ReadAll(ret)
+		if err != nil {
+			return false, err
+		}
+		mf := memfile.New(bytes)
+		return isUTF8FromReader(mf)
+	default:
+		// 其他类型转换为字节后创建 memfile
+		bytes := AnyToBytes(i)
+		mf := memfile.New(bytes)
+		return isUTF8FromReader(mf)
+	}
+}
 
 // IsUTF8File checks if a file is UTF-8 encoded using sampling strategy
 // For files < 0.5K: check entire content
@@ -21,33 +51,38 @@ func IsUTF8File(filename string) (bool, error) {
 	}
 	defer file.Close()
 
+	return isUTF8FromReader(file)
+}
+
+// isUTF8FromReader 使用统一的 FileReader 接口检查 UTF-8 编码
+func isUTF8FromReader(reader FileReader) (bool, error) {
 	// Get file size
-	stat, err := file.Stat()
+	stat, err := reader.Stat()
 	if err != nil {
-		log.Errorf("failed to get file stat for %s: %v", filename, err)
+		log.Errorf("failed to get file stat: %v", err)
 		return false, err
 	}
 
 	fileSize := stat.Size()
-	log.Debugf("checking UTF-8 for file %s, size: %d bytes", filename, fileSize)
+	log.Debugf("checking UTF-8 for file, size: %d bytes", fileSize)
 
 	const halfK = 512
 	const oneK = 1024
 
 	if fileSize < halfK {
 		// Small file: check entire content
-		content, err := io.ReadAll(file)
+		content, err := io.ReadAll(reader)
 		if err != nil {
-			log.Errorf("failed to read file %s: %v", filename, err)
+			log.Errorf("failed to read file: %v", err)
 			return false, err
 		}
 		return isValidUTF8(content), nil
 	} else if fileSize < oneK {
 		// Medium file: check one 0.5K sample
 		sample := make([]byte, halfK)
-		n, err := file.Read(sample)
+		n, err := reader.Read(sample)
 		if err != nil && err != io.EOF {
-			log.Errorf("failed to read sample from file %s: %v", filename, err)
+			log.Errorf("failed to read sample from file: %v", err)
 			return false, err
 		}
 		sample = sample[:n]
@@ -57,12 +92,12 @@ func IsUTF8File(filename string) (bool, error) {
 		return isValidUTF8(sample), nil
 	} else {
 		// Large file: sample strategy
-		return checkLargeFileUTF8(file, fileSize)
+		return checkLargeFileUTF8FromReader(reader, fileSize)
 	}
 }
 
-// checkLargeFileUTF8 handles sampling for large files (>1K)
-func checkLargeFileUTF8(file *os.File, fileSize int64) (bool, error) {
+// checkLargeFileUTF8FromReader handles sampling for large files (>1K) using FileReader interface
+func checkLargeFileUTF8FromReader(reader FileReader, fileSize int64) (bool, error) {
 	const oneK = 1024
 	const sampleSize = 256 // 256 runes per sample
 	const maxSamples = 8
@@ -89,7 +124,7 @@ func checkLargeFileUTF8(file *os.File, fileSize int64) (bool, error) {
 	for i, pos := range samplePositions {
 		log.Debugf("checking sample %d at position %d", i+1, pos)
 
-		sample, err := readSampleAtPosition(file, pos, sampleSize*4) // Read more bytes to account for multi-byte UTF-8
+		sample, err := readSampleAtPositionFromReader(reader, pos, sampleSize*4) // Read more bytes to account for multi-byte UTF-8
 		if err != nil {
 			log.Errorf("failed to read sample at position %d: %v", pos, err)
 			return false, err
@@ -111,15 +146,15 @@ func checkLargeFileUTF8(file *os.File, fileSize int64) (bool, error) {
 	return true, nil
 }
 
-// readSampleAtPosition reads a sample from the specified position
-func readSampleAtPosition(file *os.File, pos int64, size int) ([]byte, error) {
-	_, err := file.Seek(pos, io.SeekStart)
+// readSampleAtPositionFromReader reads a sample from the specified position using FileReader interface
+func readSampleAtPositionFromReader(reader FileReader, pos int64, size int) ([]byte, error) {
+	_, err := reader.Seek(pos, io.SeekStart)
 	if err != nil {
 		return nil, err
 	}
 
 	sample := make([]byte, size)
-	n, err := file.Read(sample)
+	n, err := reader.Read(sample)
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
@@ -128,36 +163,29 @@ func readSampleAtPosition(file *os.File, pos int64, size int) ([]byte, error) {
 }
 
 // fixUTF8Boundaries fixes UTF-8 character boundaries by trimming incomplete characters
-// ONLY at the start and end of the sample. It preserves ALL content in between, including invalid UTF-8.
+// at the start and end of the sample with enhanced error tolerance.
+// It provides better safety when cutting into UTF-8 sequences.
 func fixUTF8Boundaries(data []byte) []byte {
 	if len(data) == 0 {
 		return data
 	}
 
-	// Find the start position - skip incomplete UTF-8 sequences at the beginning
-	start := 0
-	for start < len(data) && !utf8.RuneStart(data[start]) {
-		start++
-	}
-
-	// Find the end position - work backwards to ensure we don't end in the middle of a UTF-8 character
-	end := len(data)
-	// Check if the last character might be incomplete
-	if end > 0 {
-		// Look at the last few bytes to see if we have an incomplete UTF-8 character
-		for i := 1; i <= 4 && end-i >= start; i++ {
-			pos := end - i
-			if utf8.RuneStart(data[pos]) {
-				// This could be the start of the last character
-				r, size := utf8.DecodeRune(data[pos:end])
-				if r == utf8.RuneError && size < i {
-					// This is an incomplete character, trim it
-					end = pos
-				}
-				break
+	// 容错：如果数据太小，直接返回
+	if len(data) < 4 {
+		if utf8.Valid(data) {
+			return data
+		}
+		// 尝试找到有效的UTF-8序列
+		for i := len(data) - 1; i >= 0; i-- {
+			if utf8.Valid(data[:i]) {
+				return data[:i]
 			}
 		}
+		return []byte{} // 如果没有有效序列，返回空
 	}
+
+	start := findSafeStartPosition(data)
+	end := findSafeEndPosition(data, start)
 
 	result := data[start:end]
 	if start > 0 || end < len(data) {
@@ -165,6 +193,75 @@ func fixUTF8Boundaries(data []byte) []byte {
 			len(data), len(result), start, len(data)-end)
 	}
 	return result
+}
+
+// findSafeStartPosition 找到安全的开始位置，跳过不完整的UTF-8序列
+func findSafeStartPosition(data []byte) int {
+	maxScan := 4 // UTF-8字符最多4字节
+	if maxScan > len(data) {
+		maxScan = len(data)
+	}
+
+	// 从开头扫描，找到第一个有效的rune起始位置
+	for i := 0; i < maxScan; i++ {
+		if utf8.RuneStart(data[i]) {
+			// 验证从这个位置开始是否能解码出有效的rune
+			if _, size := utf8.DecodeRune(data[i:]); size > 0 {
+				return i
+			}
+		}
+	}
+
+	// 如果前面都找不到，继续向后找
+	for i := maxScan; i < len(data); i++ {
+		if utf8.RuneStart(data[i]) {
+			return i
+		}
+	}
+
+	return len(data) // 如果找不到任何有效起始位置，返回数据长度
+}
+
+// findSafeEndPosition 找到安全的结束位置，避免截断UTF-8字符
+func findSafeEndPosition(data []byte, start int) int {
+	if start >= len(data) {
+		return start
+	}
+
+	// 从末尾向前扫描最多4个字节，寻找安全的截断点
+	maxScan := 4
+	end := len(data)
+
+	for i := 1; i <= maxScan && end-i >= start; i++ {
+		pos := end - i
+		if utf8.RuneStart(data[pos]) {
+			// 检查从这个位置到末尾是否是一个完整的UTF-8字符
+			remainingBytes := end - pos
+			r, size := utf8.DecodeRune(data[pos:end])
+
+			if r != utf8.RuneError && size == remainingBytes {
+				// 这是一个完整的字符，可以保留
+				return end
+			} else {
+				// 这是一个不完整的字符，应该截断
+				end = pos
+			}
+			break
+		}
+	}
+
+	// 验证结果的有效性
+	if start < end && !utf8.Valid(data[start:end]) {
+		// 如果结果仍然无效，尝试进一步向前截断
+		for end > start {
+			end--
+			if utf8.Valid(data[start:end]) {
+				break
+			}
+		}
+	}
+
+	return end
 }
 
 // limitToRunes limits the byte slice to approximately the specified number of runes

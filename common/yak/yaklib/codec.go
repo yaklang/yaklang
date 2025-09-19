@@ -215,4 +215,7 @@ var CodecExports = map[string]interface{}{
 
 	"SignSHA256WithRSA":       tlsutils.PemSignSha256WithRSA,
 	"SignVerifySHA256WithRSA": tlsutils.PemVerifySignSha256WithRSA,
+
+	"IsUTF8":     codec.IsUTF8,
+	"IsUTF8File": codec.IsUTF8File,
 }
