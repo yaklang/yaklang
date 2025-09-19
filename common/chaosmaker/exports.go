@@ -89,5 +89,5 @@ func init() {
 			return rc, nil
 		})
 		return nil
-	})
+	}, "register-suricata-rule-loader")
 }

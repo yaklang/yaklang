@@ -17,5 +17,5 @@ func init() {
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())
 		return nil
-	})
+	}, "auto migrate vector_store_documents")
 }

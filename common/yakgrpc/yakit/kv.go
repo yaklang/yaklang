@@ -99,10 +99,6 @@ func MigrateLegacyDatabase() error {
 	return nil
 }
 
-func init() {
-	// RegisterPostInitDatabaseFunction(MigrateLegacyDatabase)
-}
-
 func GetProcessEnvKey(db *gorm.DB) []*schema.GeneralStorage {
 	var keys []*schema.GeneralStorage
 
@@ -123,7 +119,7 @@ func init() {
 	RegisterPostInitDatabaseFunction(func() error {
 		RefreshProcessEnv(consts.GetGormProfileDatabase())
 		return nil
-	})
+	}, "refresh-process-env")
 }
 
 // RefreshProcessEnv 在数据库初始化的时候执行这个，可以快速更新本进程的环境变量

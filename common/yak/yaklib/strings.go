@@ -582,7 +582,7 @@ var StringsExport = map[string]interface{}{
 
 	"ShrinkString":                _shrinkString,
 	"AddPrefixLineNumber":         prefixLineNumber,
-	"AddPrefixLineNubmerToReader": prefixLineNumberReader,
+	"AddPrefixLineNumberToReader": prefixLineNumberReader,
 }
 
 func prefixLineNumberReader(i any) io.Reader {

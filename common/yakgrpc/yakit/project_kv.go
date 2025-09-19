@@ -28,7 +28,7 @@ func init() {
 			DelKey(consts.GetGormProfileDatabase(), "fuzzer-list-cache")
 		}
 		return nil
-	})
+	}, "check-yakit-fuzzer-list-cache")
 }
 
 func GetProjectKey(db *gorm.DB, key interface{}) string {
