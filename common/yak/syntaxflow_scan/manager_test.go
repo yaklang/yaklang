@@ -109,6 +109,7 @@ func TestManager(t *testing.T) {
 		testProject := &ypb.SSAProject{
 			ProjectName:      "test-project-" + uuid.NewString(),
 			Description:      "Test project for SSA configuration",
+			Language:         "java",
 			CodeSourceConfig: `{"kind":"local","local_file":"/test/path"}`,
 			CompileConfig: &ypb.SSAProjectCompileConfig{
 				StrictMode:   true,
@@ -152,10 +153,13 @@ func TestManager(t *testing.T) {
 		require.NotNil(t, task)
 
 		// 验证任务配置是否正确从项目中读取
+		config, err := schemaProject.GetConfig()
+		require.NoError(t, err)
+		sc := config.ScanConfig
 		require.Equal(t, []string{schemaProject.ProjectName}, task.programs)
-		require.Equal(t, schemaProject.IgnoreLanguage, task.ignoreLanguage)
-		require.Equal(t, schemaProject.MemoryScan, task.memory)
-		require.Equal(t, schemaProject.ScanConcurrency, task.concurrency)
+		require.Equal(t, sc.IgnoreLanguage, task.ignoreLanguage)
+		require.Equal(t, sc.Memory, task.memory)
+		require.Equal(t, sc.Concurrency, task.concurrency)
 
 		// 测试项目配置被正确覆盖
 		taskId2 := uuid.NewString()
@@ -205,6 +209,7 @@ func TestManager(t *testing.T) {
 			ProjectName:      "test-project-rules-" + uuid.NewString(),
 			Description:      "Test project for rule configuration",
 			CodeSourceConfig: `{"kind":"local","local_file":"/test/path"}`,
+			Language:         "java",
 			RuleConfig: &ypb.SSAProjectScanRuleConfig{
 				RuleFilter: &ypb.SyntaxFlowRuleFilter{
 					Language: []string{"java"},
