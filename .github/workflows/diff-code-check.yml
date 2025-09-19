@@ -82,7 +82,7 @@ jobs:
           go build common/yak/cmd/yak.go 
           ./yak --help
 
-      - name: Generate Prog And Check With SyntaxFlow
+      - name: Generate Prog
         run: |
           pwd && ls -al
           ./yak sync-rule 
@@ -91,7 +91,16 @@ jobs:
           echo "Merge base is: $MERGE_BASE"
           echo "Head base is: ${{ env.HEAD_SHA }}"
           ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip 
-          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory
+
+      - name: Upload fs.zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: fs.zip
+          path: fs.zip
+
+      - name: Check With SyntaxFlow
+        run: |
+          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level degug
           NUM=$(cat risk.json | jq .RiskNums)
           echo "Find risk num is: $NUM"
           if [  $NUM == 0 ]; then
@@ -101,13 +110,6 @@ jobs:
             exit 1
           fi
         # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
-
-      - name: Upload fs.zip
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: fs.zip
-          path: fs.zip
 
       - name: Upload risk log
         if: failure()
