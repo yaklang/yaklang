@@ -168,6 +168,7 @@ LOOP:
 		var action *aicommon.WaitableAction
 		var nextAction aitool.InvokeParams
 		var actionErr error
+
 		// Temporarily release lock for AI transaction to prevent deadlocks
 		transactionErr := aicommon.CallAITransaction(
 			r.config, prompt, r.config.CallAI,
@@ -249,18 +250,18 @@ LOOP:
 			log.Errorf("AI transaction failed (内置错误学习功能): %v", transactionErr)
 			continue
 		}
-		thought := action.WaitString("human_readable_thought")
 
 		saveIterationInfoIntoTimeline := func() {
 			// allow iteration info to be added to timeline
 			r.addToTimeline("iteration", fmt.Sprintf(
 				"======== ReAct iteration %d ========\n"+
-					"%v", r.currentIteration, thought,
+					"%v", r.currentIteration, action.WaitString("human_readable_thought"),
 			))
 			openIterationRecordingOnce.Do(func() {
 				iterationTimelineInfo.SetTo(true)
 			})
 		}
+
 		r.PushCumulativeSummaryHandle(func() string {
 			return action.WaitString("cumulative_summary")
 		})
@@ -268,7 +269,6 @@ LOOP:
 		switch actionType {
 		case ActionDirectlyAnswer:
 			answerPayload := nextAction.GetString("answer_payload")
-			r.EmitResult(answerPayload)
 			currentTask.SetResult(strings.TrimSpace(answerPayload))
 			r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
 				"%s\n"+
@@ -496,6 +496,9 @@ LOOP:
 func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (string, error) {
 	currentTask := r.GetCurrentTask()
 	enhanceID := uuid.NewString()
+	if r.config.directlyAnswerEnhanceHandle == nil {
+		return "", utils.Errorf("directlyAnswerEnhanceHandle is not configured")
+	}
 	enhanceData, err := r.config.directlyAnswerEnhanceHandle(r.config.ctx, userQuery)
 	if err != nil {
 		return "", err
