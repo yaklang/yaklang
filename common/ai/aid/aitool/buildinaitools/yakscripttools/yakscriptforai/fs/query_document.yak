@@ -1,0 +1,70 @@
+__DESC__ = "智能文档阅读和理解工具，支持多种文档格式的深度分析。通过自适应分块和上下文保持技术，能够理解长文档的语义结构，回答复杂问题，生成摘要，提取关键信息。支持个性化阅读策略和多种输出格式。Analyzes a local text-based document to answer a user's specific question. This tool processes the document in chunks, maintaining contextual understanding to handle long-form content. It is ideal for when an AI agent needs to find specific information, extract key details, or get a conclusive answer from within a file's content. If no question is provided, it will summarize the document."
+__VERBOSE_NAME__ = "文件内容分析器"
+__KEYWORDS__ = "file analysis, document qa, question answering, query, ask, find, search, retrieve, extract, RAG, retrieval augmented generation, contextual analysis, text chunking, semantic search, information extraction, document analysis, local file QA, content comprehension"
+
+filename := cli.String("filename", cli.setHelp("The path to the local document to be analyzed. This argument is required."), cli.setRequired(true))
+query := cli.String("question", cli.setHelp("The specific question to ask about the document's content. If omitted, the tool will default to generating a summary of the document."), cli.setDefault(`Provide a concise summary of the key points in this document.`))
+cli.check()
+
+
+schema := jsonschema.ActionObject(
+    jsonschema.paramString("cumulative_summary", jsonschema.description("结合'上文摘要'和'当前数据块'，生成一份新的摘要。这份新摘要必须只包含与回答用户最初问题相关的所有关键信息，用于传递给下一个数据块的处理。如果当前数据块完全不相关，则可以复用'上文摘要'。")),
+    jsonschema.paramString(
+        "answer",
+        jsonschema.description("如果当前数据块的信息已足够形成对用户问题的最终答案，请在此处提供完整答案。如果信息尚不完整，请将此字段留空。"),
+    ),
+)
+
+loadQuery := (data, cumulative) => {
+    return str.RenderTemplate(<<<PROMPT
+# 用户问题是
+{{ if .query }}{{ .query }}{{else}}描述材料中的内容是什么，保留重要支撑原文，保留重要内容{{end}}
+
+{{ if .summary }}<|CONTEXT_{{.nonce}}|>
+{{ .summary }}
+<|CONTEXT_END_{{.nonce}}|>{{end}}
+
+<|DATA_{{ .nonce }}|>
+{{ .data }}
+<|DATA_END{{ .nonce}}|>
+PROMPT, {
+    "summary": cumulative,
+    "data": data,
+    "nonce": randstr(4),
+    "query": query
+})
+}
+
+cumulativeSummary := ""
+haveAnswer := false
+err = aireducer.File(
+    filename,
+    chunk => {
+        data = chunk.DumpWithOverlap(128)
+        result, err := liteforge.Execute(loadQuery(data, cumulativeSummary), liteforge.output(schema), ai.debugStream(true))
+        if err != nil {
+            log.Warn("execute ai summary failed", err)
+            return
+        }
+        params = result.GetParams()
+        cumulativeSummary = params.GetString("cumulative_summary", cumulativeSummary)
+        answer := params.GetAnyToString("answer")
+        if answer != "" {
+            haveAnswer = true
+            yakit.Info("check %v 's get result: %v", filename, answer)
+        }
+    },
+    aireducer.lineNumber(true), aireducer.chunkSize(1024 * 10),
+)
+if err != nil {
+    yakit.Error("reducer handle file: %v failed: %v", filename, err)
+    return
+}
+if cumulativeSummary != "" && !haveAnswer {
+    yakit.Info("handle %v, result: %v", filename, cumulativeSummary)
+    return
+}
+
+if cumulativeSummary == "" {
+    yakit.Warn("handle file:%v failed, cannot find answer for %v", filename, query)
+}
