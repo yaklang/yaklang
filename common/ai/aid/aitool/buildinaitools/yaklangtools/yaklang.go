@@ -1,23 +1,24 @@
 package yaklangtools
 
 import (
+	"io"
+	"os"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"github.com/yaklang/yaklang/common/yak/yakurl"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"os"
 )
 
-var YaklangToolName_SyntaxCheck = "yaklang-syntax-check"
-var YaklangToolName_Document = "yak-document"
+const YaklangToolName_SyntaxCheck = "check-yaklang-syntax"
+const YaklangToolName_Document = "yak-document"
 
 func CreateYaklangTools() ([]*aitool.Tool, error) {
 	var err error
 	factory := aitool.NewFactory()
-	err = factory.RegisterTool("yaklang-syntax-check",
+	err = factory.RegisterTool(YaklangToolName_SyntaxCheck,
 		aitool.WithDescription("run yaklang code syntax check"),
 		aitool.WithStringParam("content", aitool.WithParam_Description("yaklang code content")),
 		aitool.WithStringParam("path", aitool.WithParam_Description("yaklang code file path")),

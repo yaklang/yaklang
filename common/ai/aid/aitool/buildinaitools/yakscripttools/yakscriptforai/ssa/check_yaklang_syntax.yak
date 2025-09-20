@@ -1,0 +1,54 @@
+__DESC__ = "Performs a syntax check on Yaklang code. The code can be provided directly as a string ('yaklang-code') or by specifying a file path ('path')."
+__VERBOSE_NAME__ = "Yaklang 语法检查"
+__KEYWORDS__ = "yaklang, syntax check, linter, static analysis, code validation, Yaklang, 语法检查, 静态分析, 代码验证, 脚本检查"
+
+code = cli.String(
+    "yaklang-code",
+    cli.setHelp(`A string containing the Yaklang code for syntax validation. If this parameter is provided, the 'path' parameter will be ignored.`),
+)
+filepath = cli.String(
+    "path",
+    cli.setHelp(`The local file path to a Yaklang script for syntax validation. This parameter is only used if the 'content' parameter is empty.`),
+)
+cli.check()
+
+if code == "" && filepath == "" {
+    yakit.Error("Empty yaklang-code and filepath")
+    return
+}
+
+
+if code != "" {
+    yakit.Info("===========start to check yaklang-code for string===========")
+    results := ssa.YaklangScriptChecking(code, "yak")
+    yakit.Info("origin code fetch %v checking results", results)
+    for result in results {
+        yakit.Warn(result.String())
+    }
+
+
+    yakit.Info("============end checking yaklang-code for string============")
+}
+
+
+if filepath != "" {
+    yakit.Info(
+        "============ start to check yak file: %v=========",
+        filepath,
+    )
+    code, err := file.ReadFile(filepath)
+    if err != nil {
+        yakit.Error("failed to read: %v, reason: %v", filepath, err)
+    }
+
+
+    if code != "" {
+        results := ssa.YaklangScriptChecking(code, "yak")
+        yakit.Info("origin code fetch %v checking results", results)
+        for result in results {
+            yakit.Warn(result.String())
+        }
+    }
+
+    yakit.Info("============end checking yak file============")
+}
