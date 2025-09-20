@@ -90,8 +90,8 @@ REFERENCE
 $param<getFunc><getReturns> as $returns;
 $returns?{<typeName>?{have: "ModelAndView"}} as $result;
 $returns #{
-    until: `* & $param as $source`,
-}->;
+    until: `* & $param `,
+}-> as $source;
 $source<dataflow(exclude=<<<CODE
 *<show>?{opcode: call && <getCallee><name>?{!have: "ModelAndView"}}
 CODE)> as $filteredSource

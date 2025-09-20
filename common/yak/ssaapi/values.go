@@ -333,9 +333,9 @@ func (v *Value) GetInnerValueVerboseName() string {
 	return inner.GetVerboseName()
 }
 
-func (i *Value) Show() *Value               { fmt.Println(i); return i }
-func (i *Value) ShowWithRange() *Value      { fmt.Println(i.StringWithRange()); return i }
-func (i *Value) ShowWithSourceCode() *Value { fmt.Println(i.StringWithSourceCode()); return i }
+func (i *Value) Show() *Value               { log.Info(i); return i }
+func (i *Value) ShowWithRange() *Value      { log.Info(i.StringWithRange()); return i }
+func (i *Value) ShowWithSourceCode() *Value { log.Info(i.StringWithSourceCode()); return i }
 
 func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
@@ -1184,7 +1184,7 @@ func (v Values) Show(b ...bool) Values {
 	if len(b) > 0 && !b[0] {
 		return v
 	}
-	fmt.Println(v.StringEx(0))
+	log.Info(v.StringEx(0))
 	return v
 }
 
@@ -1192,7 +1192,7 @@ func (v Values) ShowWithSource(b ...bool) Values {
 	if len(b) > 0 && !b[0] {
 		return v
 	}
-	fmt.Println(v.StringEx(1))
+	log.Info(v.StringEx(1))
 	return v
 }
 
@@ -1263,13 +1263,13 @@ func (v Values) GetOperands() Values {
 }
 func (v *Value) ShowDot() {
 	dotStr := v.DotGraph()
-	fmt.Println(dotStr)
+	log.Infof(dotStr)
 	// dot.ShowDotGraphToAsciiArt(dotStr)
 }
 
 func (vs Values) ShowDot() Values {
 	dotStr := vs.DotGraph()
-	fmt.Println(dotStr)
+	log.Infof(dotStr)
 	// dot.ShowDotGraphToAsciiArt(dotStr)
 	return vs
 }
@@ -1295,4 +1295,12 @@ func (vs Values) NewDotGraph() *DotGraph {
 func (vs Values) DotGraph() string {
 	dotGraph := vs.NewDotGraph()
 	return dotGraph.String()
+}
+
+func (vs Values) Count() int {
+	return len(vs)
+}
+
+func (v *Value) Count() int {
+	return 1
 }

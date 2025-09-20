@@ -99,12 +99,12 @@ func (f *Fetch[T]) fillBuffer() {
 
 func (f *Fetch[T]) Fetch() (T, error) {
 	if f.buffer.Len() == 0 {
-		log.Errorf("BUG: buffer is empty in Fetch.Fetch." + f.cfg.name)
+		log.Debug("BUG: buffer is empty in Fetch.Fetch." + f.cfg.name)
 	}
 	start := time.Now()
 	item := <-f.buffer.OutputChannel()
 	if time.Since(start) > time.Second {
-		log.Errorf("DATABASE: Fetch.Fetch.%s took too long: %v", f.cfg.name, time.Since(start))
+		log.Debug("DATABASE: Fetch.Fetch.%s took too long: %v", f.cfg.name, time.Since(start))
 	}
 	if utils.IsNil(item) {
 		return item, utils.Errorf("item is nil in Fetch.Fetch")

@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -21,6 +22,8 @@ const (
 	TopDefAnalysis    AnalysisType = "top_def"
 	BottomUseAnalysis AnalysisType = "bottom_use"
 )
+
+var recursiveError = fmt.Errorf("recursive call is over 10000, stop it")
 
 type AnalyzeContext struct {
 	// Self
@@ -82,6 +85,9 @@ func saveDataflowPath(direct AnalysisType, from, to *Value) {
 }
 
 func (a *AnalyzeContext) SavePath(result Values) {
+	if a.recursiveStatusIsLeaf.Len() > 1000 {
+		return
+	}
 	shouldSave := func() bool {
 		return a.recursiveStatusIsLeaf.Peek().leaf
 	}
@@ -164,7 +170,8 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	// if !utils.InGithubActions() {
 	if a.getRecursiveCounter() > 10000 {
 		log.Warnf("recursive call is over 10000, stop it")
-		return
+		panic(recursiveError)
+		// return
 	}
 	// }
 	if a.depth > 0 && a.config.MaxDepth > 0 && a.depth > a.config.MaxDepth {
@@ -236,8 +243,11 @@ func (a *AnalyzeContext) enterRecursive() {
 // ========================================== OBJECT STACK ==========================================
 
 func (g *AnalyzeContext) pushObject(obj, key, member *Value) error {
+	if utils.IsNil(obj) || utils.IsNil(key) || utils.IsNil(member) {
+		return utils.Errorf("objectStack cannot push nil value")
+	}
 	if !obj.IsObject() {
-		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv %T", obj.innerValue)
+		return utils.Errorf("BUG: (objectStack is not clean!) ObjectStack cannot recv")
 	}
 	shouldVisited, recoverIntra := g.theObjectShouldBeVisited(obj, key, member)
 	if !shouldVisited {

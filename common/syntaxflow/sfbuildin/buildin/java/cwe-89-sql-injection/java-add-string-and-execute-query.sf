@@ -97,8 +97,8 @@ g"select*" as $sqlConst;
 
 // 检测 SQL 字符串被传入到了某一个执行函数中，执行函数符合常见的 SQL 执行命名规范
 $sqlConst -{
-    until: `*?{opcode: call && <getCallee><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}}as $sink`
-}->;
+    until: `*?{opcode: call && <getCallee><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}}`
+}-> as $sink
 check $sink;
 
 // 检测 SQL 字符串是否被 add 操作拼接，add 操作是字符串拼接的常见操作

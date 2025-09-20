@@ -1208,7 +1208,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return nil
 		}
 		s.debugLog(">> pop")
-		m1 := make(map[int64]ValueOperator)
+		m1 := make(map[int64]ValueOperator, ValuesLen(vs))
 		_ = vs.Recursive(func(operator ValueOperator) error {
 			id, ok := fetchId(operator)
 			if ok {
@@ -1372,7 +1372,7 @@ func (s *SFFrame) debugLog(i string, item ...any) {
 	prefix := strings.Repeat("\t", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
 	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
-		fmt.Print(prefix + line + "\n")
+		log.Infof(prefix + line)
 	}
 }
 

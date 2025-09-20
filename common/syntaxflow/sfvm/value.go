@@ -14,6 +14,12 @@ func ValuesLen(i ValueOperator) int {
 	if utils.IsNil(i) {
 		return 0
 	}
+	if count, ok := i.(interface {
+		Count() int
+	}); ok {
+		return count.Count()
+	}
+
 	count := 0
 	i.Recursive(func(vo ValueOperator) error {
 		count++
