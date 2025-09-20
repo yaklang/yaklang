@@ -3,6 +3,7 @@ package aireducer
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -1659,10 +1660,13 @@ func TestEnableLineNumber(t *testing.T) {
 			return
 		}
 
-		// 验证第一个chunk包含行号
+		// 验证全局行号连续性
 		combined := strings.Join(actualChunks, "")
-		if !strings.Contains(combined, "1 | line1") {
-			t.Errorf("Expected line numbers in output, got: %q", combined)
+		expectedLines := []string{"1 | line1", "2 | line2", "3 | line3"}
+		for _, expectedLine := range expectedLines {
+			if !strings.Contains(combined, expectedLine) {
+				t.Errorf("Expected global line number %q in output, got: %q", expectedLine, combined)
+			}
 		}
 
 		log.Infof("Line number prefixing test: processed %d chunks", len(actualChunks))
@@ -1705,10 +1709,13 @@ func TestEnableLineNumber(t *testing.T) {
 			}
 		}
 
-		// 验证行号存在
+		// 验证全局行号连续性，即使在多个chunks中也应该保持连续
 		combined := strings.Join(actualChunks, "")
-		if !strings.Contains(combined, "1 | line1") {
-			t.Errorf("Expected line numbers in output")
+		expectedLines := []string{"1 | line1", "2 | line2", "3 | line3", "4 | line4", "5 | line5"}
+		for _, expectedLine := range expectedLines {
+			if !strings.Contains(combined, expectedLine) {
+				t.Errorf("Expected global line number %q in combined output, got: %q", expectedLine, combined)
+			}
 		}
 
 		log.Infof("Line numbers with ChunkSize constraint: created %d chunks", len(actualChunks))
@@ -1749,11 +1756,18 @@ func TestEnableLineNumber(t *testing.T) {
 			t.Errorf("Expected 3 chunks, got %d", len(actualChunks))
 		}
 
-		// 验证每个chunk都有行号
-		for i, chunk := range actualChunks {
-			if !strings.Contains(chunk, " | ") {
-				t.Errorf("Chunk %d missing line numbers: %q", i, chunk)
+		// 验证全局行号连续性跨越chunks
+		combined := strings.Join(actualChunks, "")
+		expectedLines := []string{"1 | line1", "2 | line2", "3 | line3", "4 | line4", "5 | line5", "6 | line6"}
+		for _, expectedLine := range expectedLines {
+			if !strings.Contains(combined, expectedLine) {
+				t.Errorf("Expected global line number %q across chunks, got: %q", expectedLine, combined)
 			}
+		}
+
+		// 验证行号不是从每个chunk重新开始
+		if strings.Count(combined, "1 | ") > 1 {
+			t.Errorf("Line number '1 |' appears multiple times, indicating non-global numbering")
 		}
 
 		log.Infof("Line numbers with Lines trigger: created %d chunks", len(actualChunks))
@@ -1871,6 +1885,80 @@ func TestEnableLineNumber(t *testing.T) {
 		log.Infof("File line numbers test: processed %d chunks", len(actualChunks))
 	})
 
+	t.Run("Global line numbering consistency across different chunking methods", func(t *testing.T) {
+		testContent := "Line One\nLine Two\nLine Three\nLine Four\nLine Five\nLine Six\nLine Seven\nLine Eight\n"
+
+		// Test with different chunking methods to ensure global line numbering is consistent
+		tests := []struct {
+			name string
+			opts []Option
+		}{
+			{
+				name: "Standard chunking with small size",
+				opts: []Option{WithEnableLineNumber(true), WithChunkSize(25)},
+			},
+			{
+				name: "Line-based chunking",
+				opts: []Option{WithEnableLineNumber(true), WithLines(2)},
+			},
+			{
+				name: "Mixed line and size constraints",
+				opts: []Option{WithEnableLineNumber(true), WithLines(3), WithChunkSize(30)},
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var chunks []string
+				var mu sync.Mutex
+
+				reducer, err := NewReducerFromString(testContent, append(tt.opts,
+					WithReducerCallback(func(config *Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+						mu.Lock()
+						chunks = append(chunks, string(chunk.Data()))
+						mu.Unlock()
+						return nil
+					}))...)
+
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				err = reducer.Run()
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				mu.Lock()
+				combined := strings.Join(chunks, "")
+				chunkCount := len(chunks)
+				mu.Unlock()
+
+				// 验证所有8行都有正确的全局行号
+				expectedLines := []string{
+					"1 | Line One", "2 | Line Two", "3 | Line Three", "4 | Line Four",
+					"5 | Line Five", "6 | Line Six", "7 | Line Seven", "8 | Line Eight",
+				}
+				for _, expectedLine := range expectedLines {
+					if !strings.Contains(combined, expectedLine) {
+						t.Errorf("Missing expected global line number %q in %s", expectedLine, tt.name)
+					}
+				}
+
+				// 验证行号的唯一性（每个行号只出现一次）
+				for i := 1; i <= 8; i++ {
+					lineMarker := fmt.Sprintf("%d | ", i)
+					count := strings.Count(combined, lineMarker)
+					if count != 1 {
+						t.Errorf("Line number %d appears %d times in %s, expected exactly 1", i, count, tt.name)
+					}
+				}
+
+				log.Infof("%s: processed %d chunks with global line numbering", tt.name, chunkCount)
+			})
+		}
+	})
+
 	t.Run("Disable line numbers (default behavior)", func(t *testing.T) {
 		testData := "line1\nline2\nline3"
 
@@ -1917,6 +2005,158 @@ func TestEnableLineNumber(t *testing.T) {
 		}
 
 		log.Infof("Disabled line numbers test: processed %d chunks", len(actualChunks))
+	})
+}
+
+// Test DumpWithOverlap functionality when chunks have overlap information
+func TestDumpWithOverlap(t *testing.T) {
+	testData := strings.Repeat("This is a test line that will be split across chunks.\n", 20)
+
+	t.Run("DumpWithOverlap with small chunk size", func(t *testing.T) {
+		var chunks []chunkmaker.Chunk
+		var mu sync.Mutex
+
+		reducer, err := NewReducerFromString(testData,
+			WithChunkSize(100), // Small chunk size to force splitting
+			WithReducerCallback(func(config *Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+				mu.Lock()
+				chunks = append(chunks, chunk)
+				mu.Unlock()
+				return nil
+			}))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = reducer.Run()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mu.Lock()
+		actualChunks := make([]chunkmaker.Chunk, len(chunks))
+		copy(actualChunks, chunks)
+		mu.Unlock()
+
+		if len(actualChunks) < 2 {
+			t.Errorf("Expected at least 2 chunks for overlap testing, got %d", len(actualChunks))
+			return
+		}
+
+		log.Infof("Testing DumpWithOverlap with %d chunks", len(actualChunks))
+
+		// Test DumpWithOverlap functionality
+		for i, chunk := range actualChunks {
+			if i == 0 {
+				// First chunk should not have overlap
+				normalDump := chunk.Dump()
+				overlapDump := chunk.DumpWithOverlap(50)
+				if normalDump != overlapDump {
+					t.Errorf("First chunk should have same output for Dump() and DumpWithOverlap(), got different")
+				}
+				log.Infof("Chunk %d (first): no overlap as expected", i)
+			} else {
+				// Subsequent chunks should have overlap if requested
+				if chunk.HaveLastChunk() {
+					overlapDump := chunk.DumpWithOverlap(50)
+					if !strings.Contains(overlapDump, "<|OVERLAP[") {
+						t.Errorf("Chunk %d should contain overlap markers when DumpWithOverlap(50) is called", i)
+					}
+					if !strings.Contains(overlapDump, "]|>") {
+						t.Errorf("Chunk %d should contain overlap end markers when DumpWithOverlap(50) is called", i)
+					}
+					if !strings.Contains(overlapDump, "<|OVERLAP_END[") {
+						t.Errorf("Chunk %d should contain overlap end markers when DumpWithOverlap(50) is called", i)
+					}
+					log.Infof("Chunk %d: contains overlap markers as expected", i)
+				} else {
+					t.Errorf("Chunk %d should have previous chunk reference", i)
+				}
+			}
+		}
+	})
+
+	t.Run("DumpWithOverlap with zero overlap request", func(t *testing.T) {
+		var chunks []chunkmaker.Chunk
+		var mu sync.Mutex
+
+		reducer, err := NewReducerFromString(testData,
+			WithChunkSize(100),
+			WithReducerCallback(func(config *Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+				mu.Lock()
+				chunks = append(chunks, chunk)
+				mu.Unlock()
+				return nil
+			}))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = reducer.Run()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mu.Lock()
+		actualChunks := make([]chunkmaker.Chunk, len(chunks))
+		copy(actualChunks, chunks)
+		mu.Unlock()
+
+		// When overlap is 0, DumpWithOverlap should behave like Dump
+		for i, chunk := range actualChunks {
+			normalDump := chunk.Dump()
+			zeroOverlapDump := chunk.DumpWithOverlap(0)
+			if normalDump != zeroOverlapDump {
+				t.Errorf("Chunk %d: DumpWithOverlap(0) should equal Dump(), but they differ", i)
+			}
+		}
+
+		log.Infof("Zero overlap test: all chunks behave correctly")
+	})
+
+	t.Run("DumpWithOverlap with line numbering", func(t *testing.T) {
+		var chunks []chunkmaker.Chunk
+		var mu sync.Mutex
+
+		// Test with line numbers enabled to ensure overlap works with numbered content
+		reducer, err := NewReducerFromString("line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\n",
+			WithEnableLineNumber(true),
+			WithChunkSize(30), // Small enough to split numbered lines
+			WithReducerCallback(func(config *Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+				mu.Lock()
+				chunks = append(chunks, chunk)
+				mu.Unlock()
+				return nil
+			}))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = reducer.Run()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		mu.Lock()
+		actualChunks := make([]chunkmaker.Chunk, len(chunks))
+		copy(actualChunks, chunks)
+		mu.Unlock()
+
+		if len(actualChunks) < 2 {
+			t.Errorf("Expected at least 2 chunks for line number overlap testing, got %d", len(actualChunks))
+			return
+		}
+
+		// Verify overlap contains line numbers
+		for i, chunk := range actualChunks {
+			if i > 0 && chunk.HaveLastChunk() {
+				overlapDump := chunk.DumpWithOverlap(20)
+				if !strings.Contains(overlapDump, " | ") {
+					t.Errorf("Chunk %d overlap should contain line numbers (format 'N | ')", i)
+				}
+				log.Infof("Chunk %d: overlap contains line numbers correctly", i)
+			}
+		}
 	})
 }
 
