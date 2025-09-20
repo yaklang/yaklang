@@ -8,6 +8,7 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/xhtml"
 
 	"github.com/yaklang/yaklang/common/domainextractor"
@@ -583,6 +584,19 @@ var StringsExport = map[string]interface{}{
 	"ShrinkString":                _shrinkString,
 	"AddPrefixLineNumber":         prefixLineNumber,
 	"AddPrefixLineNumberToReader": prefixLineNumberReader,
+	"RenderTemplate":              RenderTemplate,
+}
+
+func RenderTemplate(i string, m any) string {
+	result, err := utils.RenderTemplate(i, m)
+	if err != nil {
+		log.Warnf("failed to render template: %v", err)
+		if result == "" {
+			return i
+		}
+		return result
+	}
+	return result
 }
 
 func prefixLineNumberReader(i any) io.Reader {
