@@ -36,41 +36,14 @@ func (r *Reducer) Run() error {
 				return nil
 			}
 			if r.config.callback != nil {
-				// Apply line number prefixing if enabled
-				if r.config.EnableLineNumber {
-					chunkData := string(chunk.Data())
-					numberedData := utils.PrefixLinesWithLineNumbers(chunkData)
-
-					// Check if numbered chunk exceeds ChunkSize and split if necessary
-					if int64(len(numberedData)) > r.config.ChunkSize {
-						chunks := r.splitChunkBySize(numberedData, r.config.ChunkSize)
-						for i, splitChunk := range chunks {
-							splitChunkObj := chunkmaker.NewBufferChunk([]byte(splitChunk))
-							if i == len(chunks)-1 && chunk.IsTheLastChunk() {
-								splitChunkObj.SetIsTheLastChunk(true)
-							}
-							err := r.config.callback(r.config, r.config.Memory, splitChunkObj)
-							if err != nil {
-								return fmt.Errorf("reducer callback error: %w", err)
-							}
-						}
-						continue
-					} else {
-						chunk = chunkmaker.NewBufferChunk([]byte(numberedData))
-					}
-				}
-
 				err := r.config.callback(r.config, r.config.Memory, chunk)
 				if err != nil {
 					return fmt.Errorf("reducer callback error: %w", err)
 				}
 				continue
 			}
-			// Apply line number prefixing if enabled (for default behavior)
+			// Default behavior: dump chunk data
 			chunkData := string(chunk.Data())
-			if r.config.EnableLineNumber {
-				chunkData = utils.PrefixLinesWithLineNumbers(chunkData)
-			}
 			fmt.Println(spew.Sdump(chunkData))
 		}
 	}
@@ -146,18 +119,29 @@ func NewReducerFromInputChunk(chunk *chanx.UnlimitedChan[chunkmaker.Chunk], opts
 func NewReducerFromReader(r io.Reader, opts ...Option) (*Reducer, error) {
 	config := NewConfig(opts...)
 
+	// If line number is enabled, preprocess the data to add line numbers
+	var finalReader io.Reader = r
+	if config.EnableLineNumber {
+		// Read all data first, then apply line numbers globally
+		data, err := io.ReadAll(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read data for line numbering: %w", err)
+		}
+		numberedData := utils.PrefixLinesWithLineNumbers(string(data))
+		finalReader = strings.NewReader(numberedData)
+	}
+
 	// If line trigger is enabled, use line-based chunking
 	if config.LineTrigger > 0 {
-		cm, err := NewLineChunkMaker(r, config)
+		cm, err := NewLineChunkMaker(finalReader, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create line chunk maker: %w", err)
 		}
 		return NewReducerEx(cm, opts...)
 	}
 
-	// For standard chunking, don't apply line numbers at reader level
-	// Let the Run method handle it to respect ChunkSize constraints
-	cm, err := chunkmaker.NewTextChunkMaker(r, config.ChunkMakerOption()...)
+	// For standard chunking
+	cm, err := chunkmaker.NewTextChunkMaker(finalReader, config.ChunkMakerOption()...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create chunk maker: %w", err)
 	}
@@ -171,14 +155,20 @@ func NewReducerFromString(i string, opts ...Option) (*Reducer, error) {
 func NewReducerFromFile(filename string, opts ...Option) (*Reducer, error) {
 	config := NewConfig(opts...)
 
+	// Read the entire file content first for preprocessing if needed
+	content, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	// If line number is enabled, apply line numbers to the entire content
+	if config.EnableLineNumber {
+		numberedContent := utils.PrefixLinesWithLineNumbers(string(content))
+		content = []byte(numberedContent)
+	}
+
 	// If line trigger is enabled, use line-based chunking
 	if config.LineTrigger > 0 {
-		// Read the entire file content first, then process it
-		content, err := os.ReadFile(filename)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read file: %w", err)
-		}
-
 		cm, err := NewLineChunkMaker(bytes.NewReader(content), config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create line chunk maker: %w", err)
@@ -187,9 +177,9 @@ func NewReducerFromFile(filename string, opts ...Option) (*Reducer, error) {
 	}
 
 	// Otherwise use standard chunking
-	cm, err := chunkmaker.NewChunkMakerFromPath(filename, config.ChunkMakerOption()...)
+	cm, err := chunkmaker.NewTextChunkMaker(bytes.NewReader(content), config.ChunkMakerOption()...)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create chunk maker: %w", err)
 	}
 	return NewReducerEx(cm, opts...)
 }
@@ -239,12 +229,6 @@ func (lm *LineChunkMaker) processLines(r io.Reader, config *Config) {
 	}
 
 	inputString := string(data)
-
-	// Apply line number prefixing if enabled
-	if config.EnableLineNumber {
-		inputString = utils.PrefixLinesWithLineNumbers(inputString)
-	}
-
 	endsWithNewline := strings.HasSuffix(inputString, "\n")
 
 	lines := strings.Split(inputString, "\n")
