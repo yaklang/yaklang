@@ -196,7 +196,6 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 				FreeInput:   "abc",
 			}
 		}
-		close(in)
 	}()
 	after := time.After(60 * time.Second)
 
