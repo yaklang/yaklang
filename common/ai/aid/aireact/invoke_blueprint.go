@@ -27,7 +27,7 @@ var aiforgeReviewSelector = []*AIForgeReviewSuggestion{
 		SuggestionEnglish: "Modify the parameters",
 	},
 	{
-		Value:             "change_aiforge",
+		Value:             "change_blueprint",
 		Suggestion:        "更换AI应用",
 		SuggestionEnglish: "Change to another AI Forge",
 	},
@@ -36,6 +36,63 @@ var aiforgeReviewSelector = []*AIForgeReviewSuggestion{
 		Suggestion:        "取消执行",
 		SuggestionEnglish: "Cancel the execution",
 	},
+}
+
+func (r *ReAct) reviewAIForge(
+	ins *schema.AIForge,
+	invokeParams aitool.InvokeParams,
+) (*schema.AIForge, aitool.InvokeParams, bool, error) {
+	// reivew
+	epm := r.config.epm
+	ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE)
+	ep.SetDefaultSuggestionContinue()
+	reqs := map[string]any{
+		"id":                 ep.GetId(),
+		"forge_name":         ins.ForgeName,
+		"forge_desc":         ins.Description,
+		"forge_verbose_name": ins.ForgeVerboseName,
+		"forge_params":       invokeParams,
+		"selectors":          aiforgeReviewSelector,
+	}
+	ep.SetReviewMaterials(reqs)
+	r.Emitter.EmitInteractiveJSON(
+		ep.GetId(),
+		schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE,
+		"review-require", reqs,
+	)
+	r.config.DoWaitAgree(r.config.GetContext(), ep)
+	reviewParams := ep.GetParams()
+
+	releaseOnce := utils.NewOnce()
+	release := func() {
+		releaseOnce.Do(func() {
+			// continue
+			r.config.EmitInteractiveRelease(ep.GetId(), reviewParams)
+			r.config.CallAfterInteractiveEventReleased(ep.GetId(), reviewParams)
+			r.config.CallAfterReview(ep.GetSeq(), fmt.Sprintf(
+				"determite aiforge[%v]'s params is proper? why?",
+				ins.ForgeName,
+			), reviewParams)
+		})
+	}
+	defer func() {
+		release()
+	}()
+
+	suggestion := reviewParams.GetAnyToString("suggestion")
+	switch suggestion {
+	case "cancel":
+		r.Emitter.EmitWarning("AI Forge execution cancelled by user")
+		return nil, nil, false, utils.Error("ai forge execution cancelled by user")
+	case "modify_params":
+		return r.invokeBlueprintReviewModifyParams(ins, invokeParams, reviewParams, release)
+	case "change_blueprint":
+		return nil, nil, false, utils.Error("ai forge execution cancelled by user, todo: change aiforge not implemented yet")
+	case "continue":
+		return ins, invokeParams, false, nil
+	default:
+		return nil, nil, false, utils.Error("unknown suggestion from review: " + suggestion)
+	}
 }
 
 func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.InvokeParams, error) {
@@ -76,51 +133,13 @@ func (r *ReAct) invokeBlueprint(forgeName string) (*schema.AIForge, aitool.Invok
 		return nil, nil, err
 	}
 
-	// reivew
-	epm := r.config.epm
-	ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE)
-	ep.SetDefaultSuggestionContinue()
-	reqs := map[string]any{
-		"id":                 ep.GetId(),
-		"forge_name":         ins.ForgeName,
-		"forge_desc":         ins.Description,
-		"forge_verbose_name": ins.ForgeVerboseName,
-		"forge_params":       forgeParams,
-		"selectors":          aiforgeReviewSelector,
+	ins, forgeParams, _, err = r.reviewAIForge(ins, forgeParams)
+	if err != nil {
+		return nil, nil, err
 	}
-	ep.SetReviewMaterials(reqs)
-	r.Emitter.EmitInteractiveJSON(
-		ep.GetId(),
-		schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE,
-		"review-require", reqs,
-	)
-	r.config.DoWaitAgree(r.config.GetContext(), ep)
-
-	params := ep.GetParams()
-
-	suggestion := params.GetAnyToString("suggestion")
-	switch suggestion {
-	case "cancel":
-		r.Emitter.EmitInfo("AI Forge execution cancelled by user")
-		return nil, nil, utils.Error("ai forge execution cancelled by user")
-	case "modify_params":
-		return nil, nil, utils.Error("ai forge execution cancelled by user, todo: modify params not implemented yet")
-	case "change_aiforge":
-		return nil, nil, utils.Error("ai forge execution cancelled by user, todo: change aiforge not implemented yet")
-	case "continue":
-		r.config.EmitInteractiveRelease(ep.GetId(), params)
-		r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
-		r.config.CallAfterReview(ep.GetSeq(), fmt.Sprintf(
-			"determite aiforge[%v]'s params is proper? why?",
-			ins.ForgeName,
-		), params)
-		if utils.IsNil(params) {
-			r.Emitter.EmitError("ai-forge params is nil after review")
-			return nil, nil, utils.Errorf("ai-forge params is nil after review")
-		}
-
-		return ins, forgeParams, nil
-	default:
-		return nil, nil, utils.Error("unknown suggestion from review: " + suggestion)
+	if utils.IsNil(forgeParams) {
+		r.Emitter.EmitError("ai-forge params is nil after review")
+		return nil, nil, utils.Errorf("ai-forge params is nil after review")
 	}
+	return ins, forgeParams, nil
 }
