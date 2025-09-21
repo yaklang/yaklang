@@ -207,6 +207,8 @@ type AIBlueprintForgeParamsPromptData struct {
 	MaxIterations        int
 	Timeline             string
 	DynamicContext       string
+	OldParams            string
+	ExtraPrompt          string
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -475,13 +477,37 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, ol
 	return pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
 }
 
-// GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
-func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForge, blueprintSchema string) (string, error) {
+func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
+	ins *schema.AIForge,
+	forgeList string,
+	oldParams aitool.InvokeParams,
+	extraPrompt string,
+) (string, error) {
+	// todo: implement me
+	// intent: let user choose another ai-forge blueprint to continue
+	// hint: you can use the existing oldParams as context to help user choose a better ai-forge blueprint
+	// you can also use extraPrompt to give more context to user
+	return "", nil
+}
+
+func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
+	ins *schema.AIForge,
+	blueprintSchema string,
+	oldParams aitool.InvokeParams,
+	extraPrompt string,
+) (string, error) {
+
 	data := &AIBlueprintForgeParamsPromptData{
 		BlueprintName:        ins.ForgeName,
 		BlueprintDescription: ins.Description,
 		BlueprintSchema:      blueprintSchema,
 		DynamicContext:       pm.DynamicContext(),
+		ExtraPrompt:          extraPrompt,
+	}
+	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
+		data.OldParams = ""
+	} else {
+		data.OldParams = oldParams.Dump()
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
@@ -492,8 +518,12 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForg
 	data.CumulativeSummary = pm.react.cumulativeSummary
 	data.CurrentIteration = pm.react.currentIteration
 	data.MaxIterations = pm.react.config.maxIterations
-
 	return pm.executeTemplate("blueprint-params", blueprintParamsPromptTemplate, data)
+}
+
+// GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
+func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForge, blueprintSchema string) (string, error) {
+	return pm.GenerateAIBlueprintForgeParamsPromptEx(ins, blueprintSchema, nil, "")
 }
 
 // executeTemplate executes a template with the given data
