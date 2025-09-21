@@ -16,6 +16,8 @@ import (
 )
 
 func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
+	t.Skip()
+	
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)

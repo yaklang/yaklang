@@ -87,7 +87,7 @@ func (r *ReAct) reviewAIForge(
 	case "modify_params":
 		return r.invokeBlueprintReviewModifyParams(ins, invokeParams, reviewParams, release)
 	case "change_blueprint":
-		return nil, nil, false, utils.Error("ai forge execution cancelled by user, todo: change aiforge not implemented yet")
+		return r.invokeBlueprintReviewChangeBlueprint(ins, invokeParams, release)
 	case "continue":
 		return ins, invokeParams, false, nil
 	default:

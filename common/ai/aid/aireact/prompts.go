@@ -55,6 +55,9 @@ var wrongParamsPromptTemplate string
 //go:embed prompts/tool-params/blueprint-params.txt
 var blueprintParamsPromptTemplate string
 
+//go:embed prompts/change-blueprint/change-blueprint.txt
+var changeBlueprintPromptTemplate string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
 	cpm                  *aicommon.ContextProviderManager
@@ -209,6 +212,25 @@ type AIBlueprintForgeParamsPromptData struct {
 	DynamicContext       string
 	OldParams            string
 	ExtraPrompt          string
+	Nonce                string
+}
+
+// ChangeAIBlueprintPromptData contains data for changing AI blueprint prompt template
+type ChangeAIBlueprintPromptData struct {
+	CurrentTime        string
+	OSArch             string
+	WorkingDir         string
+	WorkingDirGlance   string
+	ConversationMemory string
+	Timeline           string
+	Nonce              string
+	UserQuery          string
+	CurrentBlueprint   *schema.AIForge
+	ForgeList          string
+	OldParams          string
+	ExtraPrompt        string
+	Language           string
+	DynamicContext     string
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -483,11 +505,41 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	oldParams aitool.InvokeParams,
 	extraPrompt string,
 ) (string, error) {
-	// todo: implement me
-	// intent: let user choose another ai-forge blueprint to continue
-	// hint: you can use the existing oldParams as context to help user choose a better ai-forge blueprint
-	// you can also use extraPrompt to give more context to user
-	return "", nil
+	data := &ChangeAIBlueprintPromptData{
+		CurrentTime:      time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:           fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		CurrentBlueprint: ins,
+		ForgeList:        forgeList,
+		ExtraPrompt:      extraPrompt,
+		Nonce:            utils.RandStringBytes(4),
+		Language:         pm.react.config.language,
+		DynamicContext:   pm.DynamicContext(),
+	}
+
+	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
+		data.OldParams = ""
+	} else {
+		data.OldParams = oldParams.Dump()
+	}
+
+	// Set working directory
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	}
+
+	// Set conversation memory
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+		data.UserQuery = pm.react.config.memory.Query
+	}
+
+	return pm.executeTemplate("change-blueprint", changeBlueprintPromptTemplate, data)
 }
 
 func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
@@ -503,6 +555,7 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 		BlueprintSchema:      blueprintSchema,
 		DynamicContext:       pm.DynamicContext(),
 		ExtraPrompt:          extraPrompt,
+		Nonce:                utils.RandStringBytes(4),
 	}
 	if utils.IsNil(oldParams) || len(oldParams) <= 0 {
 		data.OldParams = ""
