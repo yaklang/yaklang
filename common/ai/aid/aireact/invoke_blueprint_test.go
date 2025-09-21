@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func mockedRequireBlueprint_BASIC(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
@@ -91,7 +92,6 @@ func TestReAct_RequireBlueprint(t *testing.T) {
 				FreeInput:   "abc",
 			}
 		}
-		close(in)
 	}()
 	after := time.After(60 * time.Second)
 
@@ -107,6 +107,17 @@ LOOP:
 				if result > 20 {
 					break LOOP
 				}
+			}
+
+			if e.GetType() == string(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE) {
+				fmt.Println(string(e.GetContent()))
+				epid := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        epid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+				continue
 			}
 
 			if e.GetType() == string(schema.EVENT_TYPE_END_PLAN_AND_EXECUTION) {
@@ -205,6 +216,17 @@ LOOP:
 
 			if e.GetType() == string(schema.EVENT_TYPE_START_PLAN_AND_EXECUTION) {
 				forgeStarted = true
+			}
+
+			if e.GetType() == string(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE) {
+				fmt.Println(string(e.GetContent()))
+				epid := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.id"))
+				in <- &ypb.AIInputEvent{
+					IsInteractiveMessage: true,
+					InteractiveId:        epid,
+					InteractiveJSONInput: `{"suggestion": "continue"}`,
+				}
+				continue
 			}
 
 			if e.GetType() == string(schema.EVENT_TYPE_STRUCTURED) {
