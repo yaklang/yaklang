@@ -45,14 +45,14 @@ const (
 	EVENT_TOOL_CALL_ERROR       = "tool_call_error"       // tool call error event, used to emit the tool call error information
 	EVENT_TOOL_CALL_SUMMARY     = "tool_call_summary"     // tool call summary event, used to emit the tool call summary information
 
-	EVENT_TYPE_START_PLAN_AND_EXECUTION EventType = "start_plan_and_execution"
-	EVENT_TYPE_END_PLAN_AND_EXECUTION   EventType = "end_plan_and_execution"
-	EVENT_TYPE_PLAN                     EventType = "plan"
-	EVENT_TYPE_SELECT                   EventType = "select"
-	EVENT_TYPE_PERMISSION_REQUIRE       EventType = "permission_require"
-	EVENT_TYPE_TASK_REVIEW_REQUIRE      EventType = "task_review_require"
-	EVENT_TYPE_PLAN_REVIEW_REQUIRE      EventType = "plan_review_require"
-	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE  EventType = "tool_use_review_require"
+	EVENT_TYPE_START_PLAN_AND_EXECUTION    EventType = "start_plan_and_execution"
+	EVENT_TYPE_END_PLAN_AND_EXECUTION      EventType = "end_plan_and_execution"
+	EVENT_TYPE_PLAN                        EventType = "plan"
+	EVENT_TYPE_PERMISSION_REQUIRE          EventType = "permission_require"
+	EVENT_TYPE_TASK_REVIEW_REQUIRE         EventType = "task_review_require"
+	EVENT_TYPE_PLAN_REVIEW_REQUIRE         EventType = "plan_review_require"
+	EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE     EventType = "tool_use_review_require"
+	EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE EventType = "exec_aiforge_review_require"
 
 	EVENT_PLAN_TASK_ANALYSIS EventType = "plan_task_analysis" // plan task analysis event, used to emit the plan task analysis information
 
