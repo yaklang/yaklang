@@ -127,6 +127,10 @@ func (t *ToolCaller) SetEmitter(e *Emitter) {
 	t.emitter = e
 }
 
+func (t *ToolCaller) GetEmitter() *Emitter {
+	return t.emitter
+}
+
 func (t *ToolCaller) GetParamGeneratingPrompt(tool *aitool.Tool, toolName string) (string, error) {
 	if t.generateToolParamsBuilder == nil {
 		return "", fmt.Errorf("generateToolParamsBuilder is nil")
