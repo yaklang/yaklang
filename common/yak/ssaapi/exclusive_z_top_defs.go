@@ -13,7 +13,7 @@ import (
 func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 	defer func() {
 		if r := recover(); r != nil {
-			if r == recursiveError {
+			if r == errRecursiveDepth {
 				log.Warnf("Value GetTopDefs recursive call too deep, stop it: %s", i.String())
 				ret = nil
 				return
@@ -419,10 +419,16 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
-				call2fun.ForEach(func(call *Value) {
+				// if call2fun.Len() > 50 {
+				// }
+				for index, call := range call2fun {
+					if index > dataflowValueLimit {
+						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), call2fun.Len())
+						break
+					}
 					val := getCalledByValue(call)
 					vals = append(vals, val...)
-				})
+				}
 			}
 		}
 		if len(vals) == 0 {
@@ -492,10 +498,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if actx.config.AllowIgnoreCallStack && len(vals) == 0 {
 			if fun := i.GetFunction(); fun != nil {
 				call2fun := fun.GetCalledBy()
-				call2fun.ForEach(func(call *Value) {
+				for index, call := range call2fun {
+					if index > dataflowValueLimit {
+						log.Warnf("Function %s CalledBy too many: %d", fun.StringWithRange(), call2fun.Len())
+						break
+					}
 					val := getCalledByValue(call, true)
 					vals = append(vals, val...)
-				})
+				}
 			}
 		}
 
