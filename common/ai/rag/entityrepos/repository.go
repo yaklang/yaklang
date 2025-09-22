@@ -44,6 +44,7 @@ func WithQueryTop(top int) RuntimeConfigOption {
 func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 	config := &EntityRepositoryRuntimeConfig{
 		similarityThreshold: 0.8,
+		queryTop:            5,
 		runtimeID:           uuid.NewString(),
 	}
 	for _, opt := range opts {

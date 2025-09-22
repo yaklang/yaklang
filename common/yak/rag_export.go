@@ -71,6 +71,7 @@ var RagExports = map[string]interface{}{
 	"extraPrompt":               aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
 	"entryLength":               aiforge.RefineWithKnowledgeEntryLength,
 	"khopk":                     entityrepos.WithKHopK,
+	"khopLimit":                 entityrepos.WithKHopLimit,
 	"khopkMin":                  entityrepos.WithKHopKMin,
 	"khopkMax":                  entityrepos.WithKHopKMax,
 	"buildQuery":                entityrepos.WithRagQuery,

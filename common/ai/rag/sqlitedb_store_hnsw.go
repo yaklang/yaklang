@@ -361,7 +361,7 @@ func (s *SQLiteVectorStoreHNSW) FuzzSearch(ctx context.Context, query string, li
 		for doc := range yakit.YieldVectorDocument(ctx, s.db, filter, bizhelper.WithYieldModel_Limit(limit)) {
 			results.SafeFeed(SearchResult{
 				Document: s.toDocument(doc),
-				Score:    1,
+				Score:    0,
 			})
 		}
 	}()

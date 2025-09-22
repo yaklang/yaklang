@@ -6,6 +6,7 @@ filePath := cli.FileNames("files", cli.setVerboseName("分析文件"),cli.setReq
 kbName := cli.String("kbName", cli.setVerboseName("知识库名"),cli.setDefault("default"),cli.setRequired(true))
 prompt := cli.String("prompt", cli.setVerboseName("补充提示词"))
 entryLength := cli.Int("entrylen", cli.setVerboseName("知识条目长度限制"),cli.setDefault(1000))
+khoplimit := cli.Int("klimit", cli.setVerboseName("实体子图数量限制"),cli.setDefault(300))
 k := cli.Int("k", cli.setVerboseName("实体子图跳数"))
 kmin := cli.Int("kmin",cli.setVerboseName("实体子图最小跳数"),cli.setDefault(2))
 kmax := cli.Int("kmax", cli.setVerboseName("实体子图最大跳数"),cli.setDefault(4))
@@ -17,7 +18,8 @@ options := [
     rag.entryLength(entryLength),
     rag.extraPrompt(prompt),
     rag.log(yakit.Info),
-    rag.khopkMin(kmin)
+    rag.khopkMin(kmin),
+    rag.khopLimit(khoplimit),
 ]
 
 if kmax > kmin {

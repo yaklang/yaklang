@@ -1294,6 +1294,23 @@ func TestYieldKHop_PathQualityValidation(t *testing.T) {
 	}
 }
 
+func TestYieldKHop_KHopLimit(t *testing.T) {
+	db := setupTestDB(t)
+	repo := createMockData(t, db)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	limit := 3
+	results := make([]*KHopPath, 0)
+	for path := range repo.YieldKHop(ctx, WithKHopLimit(limit)) {
+		results = append(results, path)
+	}
+
+	t.Logf("KHopLimit test: collected %d paths (limit=%d)", len(results), limit)
+	assert.LessOrEqual(t, len(results), limit, "返回的路径数量应该不超过khoplimit")
+}
+
 // 辅助函数用于调试
 func printPath(path *KHopPath) string {
 	if path == nil || path.Hops == nil {

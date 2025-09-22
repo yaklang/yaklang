@@ -208,9 +208,10 @@ func (p *KHopPath) String() string {
 }
 
 type KHopConfig struct {
-	K    int // k=0表示返回所有路径，k>0表示返回k-hop路径，k>=2
-	KMin int // default 2 (minimum 2-hop paths)
-	KMax int
+	K         int // k=0表示返回所有路径，k>0表示返回k-hop路径，k>=2
+	KMin      int // default 2 (minimum 2-hop paths)
+	KMax      int
+	KHopLimit int
 
 	StartFilter    *ypb.EntityFilter
 	RagQuery       string
@@ -218,6 +219,15 @@ type KHopConfig struct {
 }
 
 type KHopQueryOption func(*KHopConfig)
+
+func WithKHopLimit(k int) KHopQueryOption {
+	return func(config *KHopConfig) {
+		if k < 0 {
+			k = 0
+		}
+		config.KHopLimit = k
+	}
+}
 
 // WithKHopK 设置k-hop的跳数，k>=2时返回k-hop路径，k=0返回所有路径
 func WithKHopK(k int) KHopQueryOption {
@@ -327,21 +337,29 @@ func (r *EntityRepository) YieldKHopEx(ctx context.Context, startInput <-chan st
 		opt(config)
 	}
 
-	var channel = chanx.NewUnlimitedChan[*KHopPath](ctx, 1000)
+	subCtx, cancel := context.WithCancel(ctx)
+
+	var channel = chanx.NewUnlimitedChan[*KHopPath](subCtx, 1000)
 
 	go func() {
 		defer channel.Close()
 
 		// 找到所有可能的路径片段
-		r.findAllPathSegments(ctx, config, channel, startInput)
+		r.findAllPathSegments(subCtx, config, channel, startInput)
 	}()
 
 	var hashMap = make(map[string]bool) // filter duplicate paths
-	var result = chanx.NewUnlimitedChan[*KHopPath](ctx, 1000)
+	var result = chanx.NewUnlimitedChan[*KHopPath](subCtx, 1000)
 	go func() {
 		defer result.Close()
 
+		total := 0
 		for path := range channel.OutputChannel() {
+			if total >= config.KHopLimit && config.KHopLimit > 0 {
+				log.Debugf("Reach k-hop limit: %d", config.KHopLimit)
+				cancel()
+				return
+			}
 			if !hashMap[path.Hash()] {
 				hashMap[path.Hash()] = true
 				result.SafeFeed(path)
