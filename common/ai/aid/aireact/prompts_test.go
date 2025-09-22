@@ -538,11 +538,11 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	}
 
 	// 验证生成的提示包含 loop.txt 中的 Forge 相关文本
-	if !utils.MatchAllOfSubString(prompt, "You have access to AI Forge") {
+	if !utils.MatchAllOfSubString(prompt, "AI 蓝图（也称应用体或 Forge）是一种强大的机制") {
 		t.Fatal("Generated prompt should contain AI Forge introduction text from loop.txt")
 	}
 
-	if !utils.MatchAllOfSubString(prompt, "repository of AI blueprints") {
+	if !utils.MatchAllOfSubString(prompt, "以下是本系统可以使用的AI蓝图列表") {
 		t.Fatal("Generated prompt should contain AI Forge description from loop.txt")
 	}
 
