@@ -60,6 +60,7 @@ func (r *ReAct) reviewAIForge(
 		schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE,
 		"review-require", reqs,
 	)
+	r.addToTimeline("review-ai-blueprint-params", aitool.InvokeParams(reqs).Dump())
 	r.config.DoWaitAgree(r.config.GetContext(), ep)
 	reviewParams := ep.GetParams()
 
