@@ -572,20 +572,20 @@
   {
     "rule_id": "4ada07d0-74e5-4d76-9d7d-4576610ee88e",
     "rule_name": "检测Spring控制器中未调用的SSTI漏洞",
-    "hash": "4b4c7e0c3a30256a3cbec3f95df87661f53badc302d0e455c6d502a4d1b34388",
-    "version": "20250820.0001"
+    "hash": "98b31d425ff7dd0eb8cb84a2c7a2b193659dcdb39261adf2e6fd8efb3c928029",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "0d552b29-dc8b-4f92-86f9-22badc7b5a87",
     "rule_name": "检测 Java Spring Framework ModelAndView SSTI 漏洞",
-    "hash": "90e7d3fbdc33842051559e2d4c09153ea1b5822d5b62e3f25c79e8a64a948bd6",
-    "version": "20250820.0001"
+    "hash": "702700d37fcc07e240bc95c093402551fc0c75afbb5cb702d4ba3e6bf40e6fbb",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "0257563a-689d-4f55-9aa7-6ffcbb4df95f",
     "rule_name": "审计 Java Spring Framework 处理 ModelAndView 时直接传入 String 参数",
-    "hash": "a26367529653098137969a8b5a2d60196d37adf54944174adf1639a40558a426",
-    "version": "20250820.0001"
+    "hash": "011f8319eb0351448a73ca065ebc09732f51371847cf2a1641d1957ac27ba740",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "09226a17-d449-4965-98c6-0ff02d802605",
@@ -902,8 +902,8 @@
   {
     "rule_id": "b381b01b-98e3-44f4-b046-7712dcacbe72",
     "rule_name": "检测Java路径遍历漏洞",
-    "hash": "ba040405c09967f361b6565af5cc1e8adbb5995ff80dfde89ff0684701cde02b",
-    "version": "20250820.0001"
+    "hash": "d2d74c39046326b7ae8e6b1a4116fe4ee5c6e68e4f5eaad2be0cd6969b073f07",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "df1af403-0bc8-4d7e-bcd6-6bb863559f02",
@@ -926,8 +926,8 @@
   {
     "rule_id": "15815212-0f58-413f-ad8e-a514778eea85",
     "rule_name": "检测Java MultipartFile路径穿越漏洞",
-    "hash": "3ebfe4292e25d7f9d4c819e2247345976fe40f9537dbd102e78188d30bfb8d34",
-    "version": "20250820.0001"
+    "hash": "b936e96fe0534b9f53c321e0b1be5ef19ed6f918185ecd76c8e651827e443214",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "718cb86d-8629-4382-be43-03ce36c07a3b",
@@ -1010,8 +1010,8 @@
   {
     "rule_id": "cad09b46-5b0f-4c43-9b43-2b786b9c625f",
     "rule_name": "检测Java SpringBoot RestController XSS漏洞",
-    "hash": "e631cdaacf3361fe98d0f9855903565b0d5a4f6c348a44fde63c8fbf9218266a",
-    "version": "20250820.0001"
+    "hash": "b44f78192d0dfca18d49a5c698d61ecadf1f4412634e72f555693abe1ad6a802",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "c44e3929-2379-46d2-ad00-b30fece5e2e1",
@@ -1028,8 +1028,8 @@
   {
     "rule_id": "21d79f98-a435-4c84-81be-055ac21b94ef",
     "rule_name": "检测 Java SQL 语句拼接漏洞",
-    "hash": "a31b3f218583edc9d0bc6b2a665ad9a44c694b9777a1f1d6630c9cf493be402b",
-    "version": "20250820.0001"
+    "hash": "0733e2f48e2ef7d2eeb7d0c6d318d8a5cbca25a009e9e90e56605c8b8fa20eab",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "b8ede24d-8ff0-4d81-ab97-903495a6cb61",
@@ -1046,8 +1046,8 @@
   {
     "rule_id": "3c87f027-8ccb-487d-8183-b2773ceba895",
     "rule_name": "检测Java Hibernate SQL注入漏洞",
-    "hash": "4f73ddc391479ea467ac557ed35d5a249ab80d72390e48e8a7522caa9951e219",
-    "version": "20250820.0001"
+    "hash": "9c087835e35affc59dc80194a87f7d5d343acf4ee85040ff046786a6fbd716e2",
+    "version": "20250922.0001"
   },
   {
     "rule_id": "5323c275-713f-4b22-a1cc-d22db1655fb2",
