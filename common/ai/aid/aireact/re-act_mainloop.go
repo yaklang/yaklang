@@ -188,7 +188,23 @@ LOOP:
 								reader = utils.UTF8Reader(reader)
 								reader = io.TeeReader(reader, &output)
 								r.config.Emitter.EmitStreamEventEx(
-									"re-act-loop",
+									"re-act-loop-thought",
+									time.Now(),
+									reader,
+									resp.GetTaskIndex(),
+									false,
+									func() {
+										r.addToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
+									},
+								)
+							},
+						),
+						jsonextractor.WithRegisterFieldStreamHandler(
+							"answer_payload", func(key string, reader io.Reader, parents []string) {
+								var o bytes.Buffer
+								reader = io.TeeReader(utils.UTF8Reader(reader), &o)
+								r.config.Emitter.EmitStreamEventEx(
+									"re-act-loop-answer-payload",
 									time.Now(),
 									reader,
 									resp.GetTaskIndex(),
@@ -199,10 +215,6 @@ LOOP:
 					})
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)
-				}
-				humanRead := action.WaitAnyToString("human_readable_thought")
-				if humanRead == "" {
-					return utils.Error("human_readable_thought is required but empty in action")
 				}
 
 				nextAction = action.WaitObject("next_action")
@@ -240,9 +252,6 @@ LOOP:
 				iterationTimelineInfo.SetTo(true)
 			})
 		}
-
-		// Emit human readable thought
-		r.EmitThought(thought)
 		r.PushCumulativeSummaryHandle(func() string {
 			return action.WaitString("cumulative_summary")
 		})
