@@ -865,6 +865,9 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 					score = storedScore
 				}
 			}
+			if score < config.CollectionScoreLimit {
+				continue
+			}
 			sendResult(result.Index, result.QueryMethod, result.QueryOrigin, result.Document, score, result.Source)
 		}
 
