@@ -1728,6 +1728,7 @@ message QueryAIForgeResponse {
 
 message GetAIForgeRequest {
   int64 ID = 1;
+  string ForgeName = 2;
 }
 
 message StartMcpServerRequest {
