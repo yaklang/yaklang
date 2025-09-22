@@ -194,7 +194,7 @@ func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.
 	}
 
 	// Test that DynamicContext is called during prompt generation
-	_, err = react.promptManager.GenerateLoopPrompt("test query", true, true, 0, 5, nil)
+	_, err = react.promptManager.GenerateLoopPrompt("test query", true, true, true, 0, 5, nil)
 	if err != nil {
 		t.Fatalf("Failed to generate loop prompt: %v", err)
 	}
@@ -511,7 +511,7 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	}
 
 	// 生成包含 Forge 列表的循环提示
-	prompt, err := react.promptManager.GenerateLoopPrompt("test query", true, true, 0, 5, nil)
+	prompt, err := react.promptManager.GenerateLoopPrompt("test query", true, true, true, 0, 5, nil)
 	if err != nil {
 		t.Fatalf("Failed to generate loop prompt: %v", err)
 	}
