@@ -100,6 +100,10 @@ func DataFlowWithSFConfig(
 	} else {
 		ret = result
 	}
+	if ret.Count() > dataflowValueLimit {
+		log.Errorf("Value %s %v too many: %d", analysisType, value.StringWithRange(), ret.Count())
+		return nil
+	}
 	// filter the result
 	ret = dataFlowFilter(ret, sfResult, config, nil, filterCondition...)
 	// set predecessor label
