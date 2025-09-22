@@ -150,7 +150,7 @@ func getLoopSchema(disallowAskForClarification bool, disallowPlanAndExecution bo
 	opts = append(opts, aitool.WithStringParam(
 		"human_readable_thought",
 		aitool.WithParam_Required(false),
-		aitool.WithParam_Description("[Not a must-being] Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. Examples: 'Okay, I understand. Searching for the requested information now...', 'I need to use a tool to get the current stock price.', 'This is a complex request, I will try to execute tool step by step.'"),
+		aitool.WithParam_Description("[Not a must-being] Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. Examples: 'Okay, I understand. Searching for the requested information now...', 'I need to use a tool to get the current stock price.', 'This is a complex request, I will try to execute tool step by step.' if direct-answer mode, no need to fill this field"),
 	), aitool.WithStructParam(
 		"next_action",
 		[]aitool.PropertyOption{
