@@ -257,7 +257,7 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
 func (pm *PromptManager) GenerateLoopPrompt(
 	userQuery string,
-	allowUserInteractive, allowPlan bool,
+	allowUserInteractive, allowPlan, allowKnowledgeEnhanceAnswer bool,
 	currentUserInteractiveCount,
 	userInteractiveLimitedTimes int64,
 	tools []*aitool.Tool,
@@ -282,7 +282,7 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		DynamicContext:                 pm.DynamicContext(),
 	}
 
-	data.Schema = getLoopSchema(!allowUserInteractive, !allowPlan, data.AIForgeList != "")
+	data.Schema = getLoopSchema(!allowUserInteractive, !allowPlan, !allowKnowledgeEnhanceAnswer, data.AIForgeList != "")
 
 	data.WorkingDir = pm.workdir
 	if data.WorkingDir != "" {
