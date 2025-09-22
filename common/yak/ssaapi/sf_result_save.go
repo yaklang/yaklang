@@ -175,6 +175,9 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 	if result == nil {
 		return utils.Error("result is nil")
 	}
+
+	database := newAuditDatabase(ctx, ssadb.GetDB())
+	defer database.Close() // wait for save finish
 	// values
 	var err error
 	opts := []SaveValueOption{
@@ -189,19 +192,37 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		OptionSaveValue_ProgramName(result.ProgramName),
 		// ctx
 		OptionSaveValue_Context(ctx),
+		// database
+		OptionSaveValue_Database(database),
 		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
-		// save un value variable
+
+		// save no value variable
 		if len(values) == 0 {
 			result.UnValueVariable = append(result.UnValueVariable, name)
 			return
 		}
-		//非search才存入到risk数据库中
-		if msg, ok := r.GetAlertMsg(name); ok && result.Kind != schema.SFResultKindSearch {
-			opts = append(opts, OptionSaveValue_ResultAlert(msg))
+
+		switch result.Kind {
+		case schema.SFResultKindDebug:
+			// debug模式下，所有变量都存数据库
+			if msg, ok := r.GetAlertMsg(name); ok {
+				opts = append(opts, OptionSaveValue_ResultAlert(msg))
+			}
+		case schema.SFResultKindSearch:
+			// search模式下，不保存到risk数据库
+		case schema.SFResultKindScan:
+			// scan模式下，只存有风险的变量
+			if msg, ok := r.GetAlertMsg(name); ok {
+				opts = append(opts, OptionSaveValue_ResultAlert(msg))
+			} else {
+				result.UnValueVariable = append(result.UnValueVariable, name)
+				return
+			}
 		}
+
 		// save variable that has value
 		for index, v := range values {
 			hash := r.SaveRisk(name, index, v, true)
@@ -209,6 +230,9 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 				opts = append(opts, OptionSaveValue_ResultRiskHash(hash))
 			}
 			opts = append(opts, OptionSaveValue_ResultIndex(uint(index)))
+
+			v.ShowDot()
+
 			e := SaveValue(v, opts...)
 			err = utils.JoinErrors(err, e)
 		}
