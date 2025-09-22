@@ -204,5 +204,8 @@ LOOP:
 	if !strings.Contains(timeline, flag) {
 		t.Fatal("timeline does not contain flag", flag)
 	}
+	if !strings.Contains(timeline, codec.Sha256(flag)) {
+		t.Fatal("timeline does not contain codec.Sha256(flag)", flag)
+	}
 	fmt.Println(timeline)
 }
