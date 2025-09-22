@@ -268,3 +268,11 @@ func (r *SyntaxFlowResult) IsDatabase() bool {
 func (r *SyntaxFlowResult) GetRiskCountMap() map[string]int64 {
 	return r.riskCountMap
 }
+
+// IsProgMemoryCompile 判断program是否是内存编译的
+func (r *SyntaxFlowResult) IsProgMemoryCompile() bool {
+	if r == nil || r.program == nil {
+		return false
+	}
+	return !r.program.IsFromDatabase()
+}
