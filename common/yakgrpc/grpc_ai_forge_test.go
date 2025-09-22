@@ -89,3 +89,34 @@ func TestAIForgeBaseCurd(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, forge, 0)
 }
+
+func TestGetAIForgeByName(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	name := uuid.New().String()
+	content := uuid.New().String()
+
+	_, err = client.CreateAIForge(ctx, &ypb.AIForge{
+		ForgeName:    name,
+		ForgeContent: content,
+	})
+	require.NoError(t, err)
+
+	// Test GetAIForge by name
+	forge, err := client.GetAIForge(ctx, &ypb.GetAIForgeRequest{
+		ForgeName: name,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, forge)
+	require.Equal(t, name, forge.ForgeName)
+	require.Equal(t, content, forge.ForgeContent)
+
+	// Clean up
+	_, err = client.DeleteAIForge(ctx, &ypb.AIForgeFilter{
+		ForgeName: name,
+	})
+	require.NoError(t, err)
+}

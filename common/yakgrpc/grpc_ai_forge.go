@@ -77,9 +77,19 @@ func (s *Server) CreateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOp
 }
 
 func (s *Server) GetAIForge(ctx context.Context, req *ypb.GetAIForgeRequest) (*ypb.AIForge, error) {
-	forge, err := yakit.GetAIForgeByID(s.GetProfileDatabase(), req.GetID())
-	if err != nil {
-		return nil, err
+	var forge *schema.AIForge
+	var err error
+	if req.GetID() > 0 {
+		forge, err = yakit.GetAIForgeByID(s.GetProfileDatabase(), req.GetID())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		forge, err = yakit.GetAIForgeByName(s.GetProfileDatabase(), req.GetForgeName())
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	return forge.ToGRPC(), nil
 }
