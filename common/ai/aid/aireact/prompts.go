@@ -140,8 +140,8 @@ type AIReviewPromptData struct {
 	Timeline           string
 	Nonce              string
 	UserQuery          string
-	ToolToCall         string
-	ToolParams         string
+	Title              string
+	Details            string
 	Language           string
 	Schema             string
 }
@@ -356,13 +356,13 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 }
 
 // GenerateAIReviewPrompt generates AI tool call review prompt using template
-func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolName, toolParams string) (string, error) {
+func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params string) (string, error) {
 	data := &AIReviewPromptData{
 		CurrentTime: time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:      fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:   userQuery,
-		ToolToCall:  toolName,
-		ToolParams:  toolParams,
+		Title:       toolOrTitle,
+		Details:     params,
 		Nonce:       utils.RandStringBytes(4),
 		Language:    pm.react.config.language,
 		Schema:      aiReviewSchemaJSON,
