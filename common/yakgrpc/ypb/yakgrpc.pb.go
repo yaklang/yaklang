@@ -7684,6 +7684,7 @@ func (x *QueryAIForgeResponse) GetTotal() int64 {
 type GetAIForgeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ID            int64                  `protobuf:"varint,1,opt,name=ID,proto3" json:"ID,omitempty"`
+	ForgeName     string                 `protobuf:"bytes,2,opt,name=ForgeName,proto3" json:"ForgeName,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7723,6 +7724,13 @@ func (x *GetAIForgeRequest) GetID() int64 {
 		return x.ID
 	}
 	return 0
+}
+
+func (x *GetAIForgeRequest) GetForgeName() string {
+	if x != nil {
+		return x.ForgeName
+	}
+	return ""
 }
 
 type StartMcpServerRequest struct {
@@ -61874,9 +61882,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12 \n" +
 	"\x04Data\x18\x02 \x03(\v2\f.ypb.AIForgeR\x04Data\x12\x14\n" +
-	"\x05Total\x18\x03 \x01(\x03R\x05Total\"#\n" +
+	"\x05Total\x18\x03 \x01(\x03R\x05Total\"A\n" +
 	"\x11GetAIForgeRequest\x12\x0e\n" +
-	"\x02ID\x18\x01 \x01(\x03R\x02ID\"\xf1\x01\n" +
+	"\x02ID\x18\x01 \x01(\x03R\x02ID\x12\x1c\n" +
+	"\tForgeName\x18\x02 \x01(\tR\tForgeName\"\xf1\x01\n" +
 	"\x15StartMcpServerRequest\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\x05R\x04Port\x12\x12\n" +
