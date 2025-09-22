@@ -1,7 +1,11 @@
 package aireact
 
 import (
+	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"io"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -33,7 +37,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 
 	release()
 
-	var selectedBlueprintName string
+	var selectedForge *schema.AIForge
 	err = aicommon.CallAITransaction(
 		r.config, prompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
@@ -42,44 +46,53 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 				false,
 				r.Emitter,
 			)
-			action, err := aicommon.ExtractActionFromStream(
-				reader, "change-ai-blueprint",
+			action, err := aicommon.ExtractWaitableActionFromStream(
+				r.config.ctx, reader,
+				"change-ai-blueprint",
+				[]string{}, []jsonextractor.CallbackOption{
+					jsonextractor.WithRegisterFieldStreamHandler(
+						"reasoning",
+						func(key string, reasonReader io.Reader, parents []string) {
+							var reasonBuf bytes.Buffer
+							var reason = io.TeeReader(reasonReader, &reasonBuf)
+							r.Emitter.EmitStreamEvent(
+								"change-blueprint-reasoning",
+								time.Now(),
+								reason,
+								r.GetCurrentTask().GetId(),
+								func() {
+									r.addToTimeline("blueprint-selection", "Reasoning: "+reasonBuf.String())
+								},
+							)
+						},
+					),
+				},
 			)
 			if err != nil {
 				return utils.Errorf("extract action from change-ai-blueprint failed: %v", err)
 			}
-			selectedBlueprintName = action.GetString("new_blueprint")
-			reasoning := action.GetString("reasoning")
-			r.addToTimeline("blueprint-selection",
-				fmt.Sprintf("Selected new blueprint '%s', reasoning: %s",
-					selectedBlueprintName, reasoning))
+			selectedBlueprintName := action.WaitString("new_blueprint")
+			if selectedBlueprintName == "" {
+				return utils.Error("selected blueprint name is empty, require non-empty")
+			}
+
+			selected, err := r.config.aiBlueprintManager.GetAIForge(selectedBlueprintName)
+			if err != nil {
+				return utils.Errorf("get selected blueprint '%s' info failed: %v", selectedBlueprintName, err)
+			}
+			if selected == nil {
+				return utils.Errorf("selected blueprint '%s' not found", selectedBlueprintName)
+			}
+			selectedForge = selected
 			return nil
 		},
 	)
 	if err != nil {
 		return nil, nil, false, err
 	}
-
-	release()
-
-	// Find the selected blueprint
-	forges, err := r.config.aiBlueprintManager.Query(r.config.GetContext())
-	if err != nil {
-		return nil, nil, false, utils.Errorf("query AI Forge blueprints failed: %v", err)
-	}
-
-	var selectedForge *schema.AIForge
-	for _, forge := range forges {
-		if forge.ForgeName == selectedBlueprintName {
-			selectedForge = forge
-			break
-		}
-	}
-
 	if selectedForge == nil {
-		return nil, nil, false, utils.Errorf("selected blueprint '%s' not found", selectedBlueprintName)
+		return nil, nil, false, utils.Error("selected blueprint is nil after ai call")
 	}
-
 	release()
 
 	// Generate new parameters for the selected blueprint
@@ -116,6 +129,9 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 		return nil, nil, false, err
 	}
 
+	r.addToTimeline(
+		"blueprint-selection",
+		fmt.Sprintf("Selected new blueprint: %v \nwith params: %v", selectedForge.ForgeName, newParams))
 	// Return the new blueprint with newly generated parameters
 	// The third parameter (bool) indicates whether further review is needed - false means we're done
 	return selectedForge, newParams, false, nil
