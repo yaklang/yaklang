@@ -1,6 +1,7 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strings"
@@ -12,24 +13,78 @@ import (
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func mockedRequireBlueprint_ModifyParams(config aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
+
+	rsp := config.NewAIResponse()
+	if utils.MatchAllOfSubString(req.GetPrompt(), `require_ai_blueprint`, `require_tool`, "USER_QUERY_NONCE", `directly_answer`, `ask_for_clarification`) {
+		rs := bytes.NewBufferString(`
+{"@action": "object", "next_action": {
+	"type": "require_ai_blueprint",
+	"blueprint_payload": "xss",
+}, "human_readable_thought": "mocked thought` + flag + `", "cumulative_summary": "..cumulative-mocked` + flag + `.."}
+`)
+		rsp.EmitOutputStream(rs)
+		rsp.Close()
+		return rsp, nil
+	}
+
+	prompt := req.GetPrompt()
+
+	if utils.MatchAllOfSubString(
+		req.GetPrompt(), `xss`,
+		"Blueprint Schema:", `Blueprint Description:`,
+		`call-ai-blueprint`,
+	) && !utils.MatchAllOfSubString(prompt, `<|OLD_PARAMS_`) {
+		rs := bytes.NewBufferString(`
+{"@action": "call-ai-blueprint", "params": {
+	"query": "...[` + flag + `]...",
+}, "human_readable_thought": "mocked thought` + flag + `", "cumulative_summary": "..cumulative-mocked` + flag + `.."}
+`)
+		rsp.EmitOutputStream(rs)
+		rsp.Close()
+		return rsp, nil
+	}
+
+	if utils.MatchAllOfSubString(
+		req.GetPrompt(), `xss`,
+		"Blueprint Schema:", `Blueprint Description:`,
+		`call-ai-blueprint`, "<|OLD_PARAMS_",
+	) {
+		rs := bytes.NewBufferString(`
+{"@action": "call-ai-blueprint", "params": {
+	"query": "...[` + codec.Sha256(flag) + `]...",
+}, "human_readable_thought": "mocked thought` + codec.Sha256(flag) + `", "cumulative_summary": "..cumulative-mocked` + codec.Sha256(flag) + `.."}
+`)
+		rsp.EmitOutputStream(rs)
+		rsp.Close()
+		return rsp, nil
+	}
+
+	fmt.Println(prompt)
+
+	return rsp, nil
+}
+
 func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
-	t.Skip()
-	
+	// t.Skip()
+
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
 	forgeExecute := false
 	forgeHaveFlag := false
+	forgeHaveOldFlag := false
 
 	abort, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	ins, err := NewReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			return mockedRequireBlueprint_BASIC(i, r, flag)
+			return mockedRequireBlueprint_ModifyParams(i, r, flag)
 		}),
 		WithDebug(false),
 		WithEventInputChan(in),
@@ -38,8 +93,11 @@ func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
 		}),
 		WithReActHijackPlanRequest(func(ctx context.Context, planPayload string) error {
 			forgeExecute = true
-			if strings.Contains(planPayload, flag) {
+			if strings.Contains(planPayload, codec.Sha256(flag)) {
 				forgeHaveFlag = true
+			}
+			if strings.Contains(planPayload, flag) {
+				forgeHaveOldFlag = true
 			}
 			go func() {
 				time.Sleep(time.Second * 3)
@@ -64,6 +122,8 @@ func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
 
 	endforge := false
 	reActFinished := false
+	reviewCount := 0
+	reviewed := false
 LOOP:
 	for {
 		select {
@@ -79,10 +139,20 @@ LOOP:
 			if e.GetType() == string(schema.EVENT_TYPE_EXEC_AIFORGE_REVIEW_REQUIRE) {
 				fmt.Println(string(e.GetContent()))
 				epid := utils.InterfaceToString(jsonpath.FindFirst(e.GetContent(), "$.id"))
-				in <- &ypb.AIInputEvent{
-					IsInteractiveMessage: true,
-					InteractiveId:        epid,
-					InteractiveJSONInput: `{"suggestion": "modify_params", "extra_prompt": "hhh"}`,
+				if reviewCount <= 0 {
+					in <- &ypb.AIInputEvent{
+						IsInteractiveMessage: true,
+						InteractiveId:        epid,
+						InteractiveJSONInput: `{"suggestion": "modify_params", "extra_prompt": "hhh"}`,
+					}
+					reviewCount++
+					reviewed = true
+				} else {
+					in <- &ypb.AIInputEvent{
+						IsInteractiveMessage: true,
+						InteractiveId:        epid,
+						InteractiveJSONInput: `{"suggestion": "continue", "extra_prompt": "hhh"}`,
+					}
 				}
 				continue
 			}
@@ -106,6 +176,10 @@ LOOP:
 		}
 	}
 
+	if !reviewed {
+		t.Fatal("no reviewed (modified params)")
+	}
+
 	if !forgeExecute {
 		t.Fatal("forged plan and execute not executed")
 	}
@@ -120,6 +194,10 @@ LOOP:
 
 	if !endforge {
 		t.Fatal("not receive end of forge")
+	}
+
+	if forgeHaveOldFlag {
+		t.Fatal("old params leaked")
 	}
 
 	timeline := ins.DumpTimeline()
