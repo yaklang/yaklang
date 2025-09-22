@@ -40,9 +40,6 @@ var verificationSchemaJSON string
 //go:embed prompts/review/ai-review-tool-call.txt
 var aiReviewPromptTemplate string
 
-//go:embed prompts/review/ai-review-tool-call.json
-var aiReviewSchemaJSON string
-
 //go:embed prompts/answer/directly.txt
 var directlyAnswerPromptTemplate string
 
@@ -143,7 +140,6 @@ type AIReviewPromptData struct {
 	Title              string
 	Details            string
 	Language           string
-	Schema             string
 }
 
 // DirectlyAnswerPromptData contains data for directly answer prompt template
@@ -365,7 +361,6 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 		Details:     params,
 		Nonce:       utils.RandStringBytes(4),
 		Language:    pm.react.config.language,
-		Schema:      aiReviewSchemaJSON,
 	}
 
 	// Set working directory
