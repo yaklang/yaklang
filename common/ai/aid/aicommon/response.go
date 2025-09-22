@@ -172,7 +172,6 @@ func (a *AIResponse) GetUnboundStreamReader(haveReason bool) io.Reader {
 }
 
 func (a *AIResponse) GetOutputStreamReader(nodeId string, system bool, emitter *Emitter) io.Reader {
-	system = false
 	pr, pw := utils.NewBufPipe(nil)
 	go func() {
 		cbBuffer := bytes.NewBuffer(make([]byte, 4096))
