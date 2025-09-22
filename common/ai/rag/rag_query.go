@@ -286,6 +286,7 @@ type RAGQueryConfig struct {
 	MsgCallBack          func(*RAGSearchResult)
 	OnSubQueryStart      func(method string, query string)
 	OnStatus             func(label string, value string)
+	OnlyResults          bool // 仅返回最终结果，忽略中间结果和消息
 
 	LoadConfig []SQLiteVectorStoreHNSWOption
 }
@@ -394,6 +395,12 @@ func WithRAGConcurrent(concurrent int) RAGQueryOption {
 	}
 }
 
+func WithRAGOnlyResults(onlyResults bool) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.OnlyResults = onlyResults
+	}
+}
+
 // NewRAGQueryConfig 创建新的RAG查询配置
 func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 	config := &RAGQueryConfig{
@@ -455,6 +462,9 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 	sendRaw := func(msg *RAGSearchResult) {
 		if config.MsgCallBack != nil {
 			config.MsgCallBack(msg)
+		}
+		if config.OnlyResults && msg.Type != RAGResultTypeResult {
+			return
 		}
 		select {
 		case resultCh <- msg:

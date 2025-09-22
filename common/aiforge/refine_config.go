@@ -13,7 +13,7 @@ type RefineConfig struct {
 	KnowledgeBaseType    string
 	KnowledgeEntryLength int
 	Strict               bool
-	EnableERMEnhance     bool
+	FocusQuery           string
 
 	Database *gorm.DB
 
@@ -26,7 +26,6 @@ func NewRefineConfig(opts ...any) *RefineConfig {
 		KnowledgeBaseName:    uuid.New().String(),
 		KnowledgeEntryLength: 1000,
 		Strict:               false,
-		EnableERMEnhance:     true,
 		Database:             consts.GetGormProfileDatabase(),
 	}
 	otherOption := make([]any, 0)

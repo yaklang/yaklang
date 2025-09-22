@@ -211,6 +211,10 @@ type KHopConfig struct {
 	K    int // k=0表示返回所有路径，k>0表示返回k-hop路径，k>=2
 	KMin int // default 2 (minimum 2-hop paths)
 	KMax int
+
+	StartFilter    *ypb.EntityFilter
+	RagQuery       string
+	IsRuntimeBuild bool // 是否只查询当前运行时的关系
 }
 
 type KHopQueryOption func(*KHopConfig)
@@ -242,15 +246,82 @@ func WithKHopKMax(kMax int) KHopQueryOption {
 	}
 }
 
+func WithStartEntityFilter(filter *ypb.EntityFilter) KHopQueryOption {
+	return func(config *KHopConfig) {
+		config.StartFilter = filter
+	}
+}
+
+func WithRuntimeBuildOnly(isRuntime bool) KHopQueryOption {
+	return func(config *KHopConfig) {
+		config.IsRuntimeBuild = isRuntime
+	}
+}
+
+func WithRagQuery(query string) KHopQueryOption {
+	return func(config *KHopConfig) {
+		config.RagQuery = query
+	}
+}
+
 func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOption) <-chan *KHopPath {
-	return r.YieldKHopEx(ctx, nil, opts...)
+	config := &KHopConfig{K: 0, KMin: 2} // 默认k=0，KMin=2，返回所有>=2-hop路径
+	for _, opt := range opts {
+		opt(config)
+	}
+	var input = chanx.NewUnlimitedChan[string](ctx, 1000)
+	go func() {
+		defer input.Close()
+		if config.RagQuery != "" {
+			ragResult, err := r.VectorYieldEntity(ctx, config.RagQuery)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case res, ok := <-ragResult:
+					if !ok {
+						return
+					}
+					if doc, ok := res.Data.(*rag.Document); ok {
+						if doc.Type == schema.RAGDocumentType_Entity {
+							log.Debugf("Yield entity from RAG query: %s", doc.EntityUUID)
+							input.SafeFeed(doc.EntityUUID)
+						} else {
+							log.Debugf("Skip non-entity document from RAG query: %s", doc.Type)
+						}
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		} else {
+			startFilter := config.StartFilter
+			if startFilter == nil {
+				startFilter = &ypb.EntityFilter{}
+			}
+			if config.IsRuntimeBuild {
+				startFilter.RuntimeID = []string{r.runtimeConfig.runtimeID}
+			}
+			entityInput := r.YieldEntities(ctx, config.StartFilter)
+			for {
+				select {
+				case entity, ok := <-entityInput:
+					if !ok {
+						return
+					}
+					input.SafeFeed(entity.Uuid)
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return r.YieldKHopEx(ctx, input.OutputChannel(), opts...)
 }
 
-func (r *EntityRepository) RuntimeYieldKHop(ctx context.Context, opts ...KHopQueryOption) <-chan *KHopPath {
-	return r.YieldKHopEx(ctx, &ypb.RelationshipFilter{RuntimeID: []string{r.runtimeConfig.runtimeID}}, opts...)
-}
-
-func (r *EntityRepository) YieldKHopEx(ctx context.Context, relationshipFilter *ypb.RelationshipFilter, opts ...KHopQueryOption) <-chan *KHopPath {
+func (r *EntityRepository) YieldKHopEx(ctx context.Context, startInput <-chan string, opts ...KHopQueryOption) <-chan *KHopPath {
 	config := &KHopConfig{K: 0, KMin: 2} // 默认k=0，KMin=2，返回所有>=2-hop路径
 	for _, opt := range opts {
 		opt(config)
@@ -258,28 +329,11 @@ func (r *EntityRepository) YieldKHopEx(ctx context.Context, relationshipFilter *
 
 	var channel = chanx.NewUnlimitedChan[*KHopPath](ctx, 1000)
 
-	var input = chanx.NewUnlimitedChan[string](ctx, 1000)
-	go func() {
-		defer input.Close()
-		relationInput := r.YieldRelationships(ctx, relationshipFilter)
-		for {
-			select {
-			case relationship, ok := <-relationInput:
-				if !ok {
-					return
-				}
-				input.SafeFeed(relationship.SourceEntityIndex)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-
 	go func() {
 		defer channel.Close()
 
 		// 找到所有可能的路径片段
-		r.findAllPathSegments(ctx, config, channel, input.OutputChannel())
+		r.findAllPathSegments(ctx, config, channel, startInput)
 	}()
 
 	var hashMap = make(map[string]bool) // filter duplicate paths

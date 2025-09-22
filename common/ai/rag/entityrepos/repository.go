@@ -24,6 +24,7 @@ const (
 type EntityRepositoryRuntimeConfig struct {
 	similarityThreshold float64
 	runtimeID           string
+	queryTop            int
 }
 
 type RuntimeConfigOption func(config *EntityRepositoryRuntimeConfig)
@@ -31,6 +32,12 @@ type RuntimeConfigOption func(config *EntityRepositoryRuntimeConfig)
 func WithSimilarityThreshold(threshold float64) RuntimeConfigOption {
 	return func(config *EntityRepositoryRuntimeConfig) {
 		config.similarityThreshold = threshold
+	}
+}
+
+func WithQueryTop(top int) RuntimeConfigOption {
+	return func(config *EntityRepositoryRuntimeConfig) {
+		config.queryTop = top
 	}
 }
 
@@ -197,7 +204,7 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 	r.entityVectorMutex.RLock()
 	defer r.entityVectorMutex.RUnlock()
 
-	results, err := r.GetRAGSystem().Query(entity.String(), 5)
+	results, err := r.GetRAGSystem().Query(entity.String(), r.runtimeConfig.queryTop) // need query fast so not use rag enhance query
 	if err != nil {
 		return nil, err
 	}
@@ -226,6 +233,15 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 	return r.queryEntities(&ypb.EntityFilter{
 		HiddenIndex: entityIndex,
 	})
+}
+
+func (r *EntityRepository) VectorYieldEntity(ctx context.Context, query string) (chan *rag.RAGSearchResult, error) {
+	return rag.Query(r.db, query,
+		rag.WithRAGLimit(r.runtimeConfig.queryTop),
+		rag.WithRAGCtx(ctx),
+		rag.WithRAGCollectionName(r.info.EntityBaseName),
+		rag.WithRAGCollectionScoreLimit(r.runtimeConfig.similarityThreshold),
+	)
 }
 
 func (r *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ERModelEntity, error) {
@@ -434,6 +450,41 @@ func (r *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
 		entityFinish: make(chan struct{}),
 		once:         sync.Once{},
 	}
+}
+
+func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRepository, error) {
+	var entityBaseInfo schema.EntityRepository
+	err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
+	if err != nil {
+		return nil, err
+	}
+
+	collectionExists := rag.CollectionIsExists(db, name)
+
+	var ragSystem *rag.RAGSystem
+	if !collectionExists {
+		ragSystem, err = rag.CreateCollection(db, name, entityBaseInfo.Description, opts...)
+		if err != nil {
+			_ = utils.GormTransaction(db, func(tx *gorm.DB) error {
+				return yakit.DeleteEntityBaseInfo(tx, int64(entityBaseInfo.ID))
+			})
+			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
+		}
+	} else {
+		// todo 需要rag优化图恢复速度
+		ragSystem, err = rag.LoadCollectionEx(db, name)
+		if err != nil {
+			return nil, utils.Errorf("加载RAG集合失败: %v", err)
+		}
+	}
+	var repos = &EntityRepository{
+		db:            db,
+		info:          &entityBaseInfo,
+		ragSystem:     ragSystem,
+		runtimeConfig: NewRuntimeConfig(opts...),
+	}
+
+	return repos, nil
 }
 
 func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...any) (*EntityRepository, error) {
