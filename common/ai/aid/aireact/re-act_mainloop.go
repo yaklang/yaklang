@@ -374,6 +374,7 @@ LOOP:
 				r.addToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
 				return false, utils.Errorf("failed to invoke ai-blueprint[%v]: %v", forgeName, err)
 			}
+			forgeName = ins.ForgeName // use the real name from schema manager
 
 			r.addToTimeline("ai-blueprint", fmt.Sprintf(
 				`ai-blueprint: %v is invoked with params: %v`,
