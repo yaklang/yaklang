@@ -102,6 +102,7 @@ func (r *ReAct) generateMainLoopPrompt(
 		userQuery,
 		enableUserInteractive,
 		r.config.enablePlanAndExec && !disablePlanAndExec,
+		r.config.directlyAnswerEnhanceHandle != nil && !r.config.disableEnhanceDirectlyAnswer,
 		r.currentUserInteractiveCount,
 		r.config.userInteractiveLimitedTimes,
 		tools,
@@ -497,7 +498,7 @@ func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (st
 	currentTask := r.GetCurrentTask()
 	enhanceID := uuid.NewString()
 	if r.config.directlyAnswerEnhanceHandle == nil {
-		return "", utils.Errorf("directlyAnswerEnhanceHandle is not configured")
+		return "", utils.Errorf("directlyAnswerEnhanceHandle is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
 	}
 	enhanceData, err := r.config.directlyAnswerEnhanceHandle(r.config.ctx, userQuery)
 	if err != nil {

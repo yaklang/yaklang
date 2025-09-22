@@ -75,7 +75,8 @@ type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
 
-	directlyAnswerEnhanceHandle func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error)
+	disableEnhanceDirectlyAnswer bool
+	directlyAnswerEnhanceHandle  func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error)
 
 	promptManager           *PromptManager         // Prompt manager for ReAct
 	pendingContextProviders []contextProviderEntry // Pending context providers to register
