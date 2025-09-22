@@ -277,7 +277,7 @@ public class UserManager {
 CODE
 )
 desc(
-    lang: java
+	lang: java
 	"safefile://SafeUserSearch.java": <<<CODE
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
