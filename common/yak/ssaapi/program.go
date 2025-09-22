@@ -286,3 +286,7 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 
 	return val
 }
+
+func (p *Program) HasSavedDB() bool {
+	return p.enableDatabase
+}

@@ -2,12 +2,12 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"time"
 
 	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -32,6 +32,8 @@ type saveValueCtx struct {
 	entryValue *Value
 
 	visitedNode map[*Value]*ssadb.AuditNode
+
+	isMemoryCompile bool
 }
 
 type SaveValueOption func(c *saveValueCtx)
@@ -54,6 +56,11 @@ func OptionSaveValue_ResultID(resultID uint) SaveValueOption {
 	}
 }
 
+func OptionSaveValue_IsMemoryCompile(bool2 bool) SaveValueOption {
+	return func(c *saveValueCtx) {
+		c.isMemoryCompile = bool2
+	}
+}
 func OptionSaveValue_ResultVariable(variable string) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.ResultVariable = variable
@@ -146,22 +153,14 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 		return nil, utils.Error("value is nil")
 	}
 
-	an := &ssadb.AuditNode{
-		AuditNodeStatus: g.AuditNodeStatus,
-		// IsEntryNode:     ValueCompare(value, g.entryValue),
-		IsEntryNode:    entry,
-		IRCodeID:       value.GetId(),
-		TmpStartOffset: -1,
-		TmpEndOffset:   -1,
-	}
-	if value.GetId() == -1 {
+	setTmpValue := func(an *ssadb.AuditNode, v *Value) {
 		R := value.GetRange()
 		an.TmpValue = yakunquote.TryUnquote(value.String())
 		if R != nil {
 			editor := R.GetEditor()
 			if editor == nil {
 				log.Errorf("%v: CreateOffset: rng or editor is nil", value.GetVerboseName())
-				return an, nil
+				return
 			}
 			hash := editor.GetIrSourceHash()
 			an.TmpValueFileHash = hash
@@ -169,6 +168,46 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 			an.TmpEndOffset = R.GetEndOffset()
 		}
 	}
+
+	saveIrSource := func(v *Value) {
+		inst := v.getInstruction()
+		if inst == nil {
+			return
+		}
+		r := inst.GetRange()
+		editor := r.GetEditor()
+		if editor == nil {
+			log.Errorf("%v: saveIrSource: rng or editor is nil", v.GetVerboseName())
+			return
+		}
+		irSource := ssadb.MarshalFile(editor)
+		if ret := g.db.Save(irSource).Error; ret != nil {
+			log.Errorf("%v: saveIrSource: save irSource failed: %v", v.GetVerboseName(), ret)
+		}
+	}
+
+	var an *ssadb.AuditNode
+	switch {
+	case g.isMemoryCompile:
+		an = &ssadb.AuditNode{
+			AuditNodeStatus: g.AuditNodeStatus,
+		}
+		setTmpValue(an, value)
+		saveIrSource(value)
+	default:
+		an = &ssadb.AuditNode{
+			AuditNodeStatus: g.AuditNodeStatus,
+			// IsEntryNode:     ValueCompare(value, g.entryValue),
+			IsEntryNode:    entry,
+			IRCodeID:       value.GetId(),
+			TmpStartOffset: -1,
+			TmpEndOffset:   -1,
+		}
+		if value.GetId() == -1 {
+			setTmpValue(an, value)
+		}
+	}
+
 	if ret := g.db.Save(an).Error; ret != nil {
 		return nil, utils.Wrap(ret, "save AuditNode")
 	}

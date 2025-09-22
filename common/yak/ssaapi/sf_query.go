@@ -178,8 +178,7 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
 		ret.program = config.program
-		//TODO:  now we not save result without program
-		// save ret
+
 		switch config.save {
 		case resultSaveDatabase:
 			process(float64(total-1)/float64(total), "save result")
@@ -188,7 +187,6 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			if err != nil {
 				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
 			}
-			// ret.set
 			setResultToCache(config.save, ret)
 		case resultSaveMemory:
 			// save to memory
