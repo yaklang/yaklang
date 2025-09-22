@@ -2,10 +2,10 @@ package aireact
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -62,15 +62,22 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 				// In auto-review mode, automatically approve the request
 				materials := endpoint.GetReviewMaterials()
 				params := materials.GetObject("params")
-				paramRaw, _ := json.MarshalIndent(params, "", "  ")
+				title := materials.GetString("tool")
+				if title != "" {
+					if desc := materials.GetString("tool_description"); desc != "" {
+						title = fmt.Sprintf("[%s]:%s", title, desc)
+					}
+				} else {
+					if materials.Has("selectors") {
+						delete(materials, "selectors")
+					}
+					params = materials
+				}
+
 				prompt, err := r.promptManager.GenerateAIReviewPrompt(
 					"ai request tool-call, start to review",
-					fmt.Sprintf(
-						`[%v]:%v`,
-						materials.GetString("tool"),
-						materials.GetString("tool_description"),
-					),
-					string(paramRaw),
+					title,
+					params.Dump(),
 				)
 				if err != nil {
 					log.Errorf("error generating AI review prompt: %v", err)
@@ -81,7 +88,7 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 				err = aicommon.CallAITransaction(r, prompt, r.CallAI, func(rsp *aicommon.AIResponse) error {
 					stream := rsp.GetOutputStreamReader("review", false, r.Emitter)
 					// stream = io.TeeReader(stream, os.Stdout)
-					action, err := aicommon.ExtractActionFromStream(stream, "review_tool_call", "object")
+					action, err := aicommon.ExtractActionFromStream(stream, "risk_assessment", "object")
 					if err != nil {
 						return utils.Errorf("error extracting action from stream: %v", err)
 					}
