@@ -43,12 +43,32 @@ Consider:
 
 {{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.{{ else }}LANGUAGE: Please respond in English unless specifically asked otherwise.{{ end }}
 
-RESPONSE FORMAT: Respond with a JSON object indicating your choice of new blueprint:
+**你必须严格按照下面的 Schema 输出一个 JSON 对象，不得包含任何其他文字。**
 
-```json
+```schema
 {
-  "@action": "change-ai-blueprint",
-  "reasoning": "brief explanation of why this blueprint is better suited"
-  "new_blueprint": "selected_blueprint_name",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "@action",
+    "reasoning",
+    "new_blueprint"
+  ],
+  "properties": {
+    "@action": {
+      "const": "change-ai-blueprint",
+      "description": "set '@action' can help the AI identify the output json object",
+      "type": "string"
+    },
+    "reasoning": {
+      "description": "切换这个新的 Blueprint/Forge 的原因",
+      "type": "string"
+    },
+    "new_blueprint": {
+      "description": "切换成新的 Blueprint 的名称",
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
 }
 ```
