@@ -8,7 +8,7 @@ import (
 func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 	defer func() {
 		if r := recover(); r != nil {
-			if r == recursiveError {
+			if r == errRecursiveDepth {
 				log.Warnf("Value GetBottomUses recursive call too deep, stop it: %s", v.String())
 				ret = nil
 				return
@@ -250,9 +250,17 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 		if call == nil {
 			callee := v.NewValue(function)
 			called := callee.GetCalledBy()
-			called.ForEach(func(value *Value) {
-				vals = append(vals, value.getBottomUses(actx, opt...)...)
-			})
+			for index, call := range called {
+				if index > dataflowValueLimit {
+					break
+				}
+				val := call.getBottomUses(actx, opt...)
+				vals = append(vals, val...)
+			}
+
+			// called.ForEach(func(value *Value) {
+			// 	vals = append(vals, value.getBottomUses(actx, opt...)...)
+			// })
 			return vals
 		}
 		exists := make(map[int64]struct{})

@@ -23,7 +23,12 @@ const (
 	BottomUseAnalysis AnalysisType = "bottom_use"
 )
 
-var recursiveError = fmt.Errorf("recursive call is over 10000, stop it")
+const (
+	recursiveStackLimit = 5000
+	dataflowValueLimit  = 100
+)
+
+var errRecursiveDepth = fmt.Errorf("recursive call is over 10000, stop it")
 
 type AnalyzeContext struct {
 	// Self
@@ -168,9 +173,9 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	a.enterRecursive()
 	// 1w recursive call check
 	// if !utils.InGithubActions() {
-	if a.getRecursiveCounter() > 10000 {
+	if a.IsRecursiveLimit() {
 		log.Warnf("recursive call is over 10000, stop it")
-		panic(recursiveError)
+		panic(errRecursiveDepth)
 		// return
 	}
 	// }
@@ -231,8 +236,8 @@ func (a *AnalyzeContext) hook(i *Value) error {
 
 // ========================================== Recursive Depth Limit ==========================================
 
-func (a *AnalyzeContext) getRecursiveCounter() int64 {
-	return atomic.LoadInt64(&a.recursiveCounter)
+func (a *AnalyzeContext) IsRecursiveLimit() bool {
+	return atomic.LoadInt64(&a.recursiveCounter) >= recursiveStackLimit
 }
 
 func (a *AnalyzeContext) enterRecursive() {

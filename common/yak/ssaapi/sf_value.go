@@ -248,6 +248,9 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 			for _, opt := range opts {
 				opt(ctx)
 			}
+			if len(v.Predecessors) > 30 {
+				log.Warnf("Value %s Predecessors too many: %d", v.StringWithRange(), len(v.Predecessors))
+			}
 			v.Predecessors = append(v.Predecessors, &PredecessorValue{
 				Node: result, Info: ctx,
 			})
