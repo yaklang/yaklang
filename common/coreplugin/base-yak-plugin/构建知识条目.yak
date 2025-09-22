@@ -1,0 +1,32 @@
+yakit.AutoInitYakit()
+
+# Input your code!
+
+kbName := cli.String("kbName", cli.setVerboseName("实体关系库名"),cli.setDefault("default"),cli.setRequired(true))
+query := cli.String("query", cli.setVerboseName("聚焦提示"),cli.setHelp("用于提示需要聚焦的知识目标"))
+entryLength := cli.Int("entrylen", cli.setVerboseName("知识条目长度限制"),cli.setDefault(1000))
+k := cli.Int("k", cli.setVerboseName("实体子图跳数"))
+kmin := cli.Int("kmin",cli.setVerboseName("实体子图最小跳数"),cli.setDefault(2))
+kmax := cli.Int("kmax", cli.setVerboseName("实体子图最大跳数"),cli.setDefault(4))
+cli.check()
+
+options := [
+    rag.ctx(context.Background()),
+    rag.statusCard(yakit.StatusCard),
+    rag.entryLength(entryLength),
+    rag.extraPrompt(query),
+    rag.log(yakit.Info),
+    rag.khopkMin(kmin)
+]
+
+if kmax > kmin {
+    options = append(options, rag.khopkMax(kmax))
+}
+
+if k > 0 {
+    options = append(options, rag.khopk(k))
+}
+yakit.StatusCard("building target", kbName)
+for i in rag.BuildKnowledgeFromEntityRepos(kbName, options...)~ {
+    yakit.Output(i.KnowledgeTitle)
+}

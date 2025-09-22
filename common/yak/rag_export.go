@@ -73,7 +73,11 @@ var RagExports = map[string]interface{}{
 	"khopk":                     entityrepos.WithKHopK,
 	"khopkMin":                  entityrepos.WithKHopKMin,
 	"khopkMax":                  entityrepos.WithKHopKMax,
+	"buildQuery":                entityrepos.WithRagQuery,
+	"buildFilter":               entityrepos.WithStartEntityFilter,
 	"BuildCollectionFromFile":   aiforge.BuildKnowledgeFromFile,
 	"BuildCollectionFromReader": aiforge.BuildKnowledgeFromReader,
 	"BuildCollectionFromRaw":    aiforge.BuildKnowledgeFromBytes,
+
+	"BuildKnowledgeFromEntityRepos": aiforge.BuildKnowledgeEntryFromEntityRepos,
 }

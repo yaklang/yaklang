@@ -117,7 +117,7 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 
 		var total int64 = 0
 		var done int64 = 0
-		for hop := range er.RuntimeYieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
+		for hop := range er.YieldKHop(refineConfig.Ctx, append(refineConfig.KHopOption(), entityrepos.WithRuntimeBuildOnly(true))...) {
 			atomic.AddInt64(&total, 1)
 			refineConfig.AnalyzeStatusCard("多跳知识构建(Multi-Hops Knowledge)", total)
 			hopAnalyzeWg.Add(1)
@@ -230,4 +230,89 @@ func SaveKnowledgeEntries(kb *knowledgebase.KnowledgeBase, entries []*schema.Kno
 		}
 	}
 	return nil
+}
+
+func BuildKnowledgeEntryFromEntityRepos(name string, option ...any) (<-chan *schema.KnowledgeBaseEntry, error) {
+	refineConfig := NewRefineConfig(option...)
+	refineConfig.AnalyzeLog("start build knowledge from entity repository use default qc")
+
+	er, err := entityrepos.GetEntityRepositoryByName(refineConfig.Database, name, option)
+	if err != nil {
+		return nil, utils.Errorf("failed to load entity repository: %v", err)
+	}
+	kb, err := knowledgebase.NewKnowledgeBase(refineConfig.Database, name, refineConfig.KnowledgeBaseDesc, refineConfig.KnowledgeBaseType)
+	if err != nil {
+		return nil, utils.Errorf("failed to create knowledge base: %v", err)
+	}
+
+	var knowledgeCount *int64 = new(int64)
+	var kHopCount *int64 = new(int64)
+	var finishedKHopCount *int64 = new(int64)
+	throttle := utils.NewThrottle(1)
+	updateEntityGraphStatus := func() {
+		throttle(func() {
+			refineConfig.AnalyzeStatusCard(
+				"知识条目/多跳知识片(KnowledgeEntries/KHop)",
+				fmt.Sprintf("%d/%d",
+					atomic.LoadInt64(knowledgeCount),
+					atomic.LoadInt64(kHopCount),
+				))
+		})
+	}
+
+	output := chanx.NewUnlimitedChan[*schema.KnowledgeBaseEntry](refineConfig.Ctx, 100)
+
+	go func() {
+		hopAnalyzeWg := utils.NewSizedWaitGroup(refineConfig.AnalyzeConcurrency)
+		defer output.Close()
+		defer hopAnalyzeWg.Wait()
+
+		for hop := range er.YieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
+			atomic.AddInt64(kHopCount, 1)
+			updateEntityGraphStatus()
+			hopAnalyzeWg.Add(1)
+			if refineConfig.Ctx != nil && refineConfig.Ctx.Err() != nil {
+				break
+			}
+			go func() {
+				defer hopAnalyzeWg.Done()
+				go func() {
+					err := er.AddKHopToVectorIndex(hop)
+					if err != nil {
+						refineConfig.AnalyzeLog("failed to add khop to vector index: %v", err)
+					}
+				}()
+
+				if refineConfig.Ctx != nil {
+					select {
+					case <-refineConfig.Ctx.Done():
+						return
+					default:
+					}
+				}
+
+				entries, err := BuildKnowledgeEntryFromKHop(hop, kb, option...)
+				if err != nil {
+					refineConfig.AnalyzeLog("failed to build knowledge entry: %v", err)
+					return
+				}
+
+				for _, entry := range entries {
+					output.SafeFeed(entry)
+					atomic.AddInt64(knowledgeCount, 1)
+					updateEntityGraphStatus()
+				}
+				atomic.AddInt64(finishedKHopCount, 1)
+				refineConfig.AnalyzeStatusCard("多跳知识进度(finished/total)", fmt.Sprintf("%d/%d", atomic.LoadInt64(finishedKHopCount), atomic.LoadInt64(kHopCount)))
+
+				err = SaveKnowledgeEntries(kb, entries, hop.GetRelatedEntityUUIDs(), option...)
+				if err != nil {
+					refineConfig.AnalyzeLog("failed to save knowledge entries: %v", err)
+					return
+				}
+			}()
+		}
+	}()
+
+	return output.OutputChannel(), nil
 }
