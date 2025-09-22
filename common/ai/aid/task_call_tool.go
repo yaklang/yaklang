@@ -77,7 +77,7 @@ func (t *AiTask) callTool(targetTool *aitool.Tool) (result *aitool.ToolResult, d
 			}))
 		}),
 		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
-			caller.SetEmitter(t.Emitter.PopEventProcesser())
+			caller.SetEmitter(caller.GetEmitter().PopEventProcesser())
 		}),
 		aicommon.WithToolCaller_ReviewWrongTool(t.toolReviewPolicy_wrongTool),
 		aicommon.WithToolCaller_ReviewWrongParam(t.toolReviewPolicy_wrongParam),

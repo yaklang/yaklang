@@ -3,9 +3,10 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/log"
@@ -87,6 +88,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		aid.WithAllowPlanUserInteract(true),
 		aid.WithAgreeManual(),
 		aid.WithEventInputChan(inputChannel),
+		aid.WithAgreePolicy(r.config.reviewPolicy),
 		aid.WithEventHandler(func(e *schema.AiOutputEvent) {
 			e.CoordinatorId = uid
 			emitErr := r.config.Emit(e)

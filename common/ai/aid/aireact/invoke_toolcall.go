@@ -44,7 +44,7 @@ func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, er
 			}))
 		}),
 		aicommon.WithToolCaller_OnEnd(func(callToolId string) {
-			toolCaller.SetEmitter(r.config.Emitter.PopEventProcesser())
+			toolCaller.SetEmitter(toolCaller.GetEmitter().PopEventProcesser())
 		}),
 		aicommon.WithToolCaller_GenerateToolParamsBuilder(func(tool *aitool.Tool, toolName string) (string, error) {
 			return r.generateToolParamsPrompt(tool, toolName)

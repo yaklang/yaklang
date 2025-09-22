@@ -63,9 +63,15 @@ func (i *Emitter) PushEventProcesser(newHandler EventProcesser) *Emitter {
 func (i *Emitter) PopEventProcesser() *Emitter {
 	var copyEmitter = new(Emitter)
 	*copyEmitter = *i
-	if copyEmitter.eventProcesserStack == nil {
-		return copyEmitter
+	copyEmitter.eventProcesserStack = utils.NewStack[EventProcesser]()
+
+	// copy event processer stack
+	if i.eventProcesserStack != nil && i.eventProcesserStack.Len() > 0 {
+		for j := 0; j < i.eventProcesserStack.Len(); j++ {
+			copyEmitter.eventProcesserStack.Push(i.eventProcesserStack.PeekN(j))
+		}
 	}
+	// pop event processer
 	copyEmitter.eventProcesserStack.Pop()
 	return copyEmitter
 }
