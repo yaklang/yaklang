@@ -271,12 +271,15 @@ func (m *Timeline) dumpSizeCheck() {
 	totalLastID, _, _ := m.idToTimelineItem.Last()
 	summaryLastID, _, _ := m.summary.Last()
 
+	var updated = false
+
 	// check everyone timeline item was shrunk
 	if totalLastID > summaryLastID {
 		m.idToTimelineItem.ForEach(func(k int64, v *TimelineItem) bool {
 			if k > summaryLastID {
 				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
 				m.shrink(v)
+				updated = true
 				return false
 			}
 			return true
@@ -290,12 +293,15 @@ func (m *Timeline) dumpSizeCheck() {
 			if k > reducerID {
 				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
 				m.reducer(k)
+				updated = true
 				return false
 			}
 			return true
 		})
 	}
-	m.dumpSizeCheck() // recursion check
+	if updated {
+		m.dumpSizeCheck() // recursion check
+	}
 }
 
 func (m *Timeline) reducer(beforeId int64) {
