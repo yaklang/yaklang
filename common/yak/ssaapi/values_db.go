@@ -2,13 +2,15 @@ package ssaapi
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"time"
 
-	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 const (
@@ -25,7 +27,7 @@ const (
 )
 
 type saveValueCtx struct {
-	db *gorm.DB
+	database *auditDatabase
 	ssadb.AuditNodeStatus
 
 	ctx        context.Context
@@ -36,7 +38,24 @@ type saveValueCtx struct {
 	isMemoryCompile bool
 }
 
+func newSaveValueCtx(opts ...SaveValueOption) *saveValueCtx {
+	saveValueConfig := &saveValueCtx{
+		visitedNode: make(map[*Value]*ssadb.AuditNode),
+		ctx:         context.Background(),
+	}
+	for _, o := range opts {
+		o(saveValueConfig)
+	}
+	return saveValueConfig
+}
+
 type SaveValueOption func(c *saveValueCtx)
+
+func OptionSaveValue_Database(db *auditDatabase) SaveValueOption {
+	return func(c *saveValueCtx) {
+		c.database = db
+	}
+}
 
 func OptionSaveValue_TaskID(taskID string) SaveValueOption {
 	return func(c *saveValueCtx) {
@@ -104,18 +123,21 @@ func OptionSaveValue_ProgramName(name string) SaveValueOption {
 }
 
 func SaveValue(value *Value, opts ...SaveValueOption) error {
-	db := ssadb.GetDB()
-	if db == nil {
-		return utils.Error("db is nil")
+	saveValueConfig := newSaveValueCtx(opts...)
+	saveValueConfig.entryValue = value
+
+	if saveValueConfig.database == nil {
+		db := ssadb.GetDB()
+		if db == nil {
+			return utils.Error("db is nil")
+		}
+		database := newAuditDatabase(saveValueConfig.ctx, db)
+		saveValueConfig.database = database
+		defer func() {
+			database.Close()
+		}()
 	}
-	saveValueConfig := &saveValueCtx{
-		db:          db,
-		entryValue:  value,
-		visitedNode: make(map[*Value]*ssadb.AuditNode),
-	}
-	for _, o := range opts {
-		o(saveValueConfig)
-	}
+
 	if saveValueConfig.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
@@ -168,6 +190,10 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 			an.TmpEndOffset = R.GetEndOffset()
 		}
 	}
+	an := g.database.GetNode()
+	if an == nil {
+		return nil, utils.Error("get AuditNode failed")
+	}
 
 	saveIrSource := func(v *Value) {
 		inst := v.getInstruction()
@@ -181,36 +207,22 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 			return
 		}
 		irSource := ssadb.MarshalFile(editor)
-		if ret := g.db.Save(irSource).Error; ret != nil {
-			log.Errorf("%v: saveIrSource: save irSource failed: %v", v.GetVerboseName(), ret)
-		}
+		g.database.SaveIrSource(irSource)
 	}
 
-	var an *ssadb.AuditNode
 	switch {
 	case g.isMemoryCompile:
-		an = &ssadb.AuditNode{
-			AuditNodeStatus: g.AuditNodeStatus,
-		}
 		setTmpValue(an, value)
 		saveIrSource(value)
 	default:
-		an = &ssadb.AuditNode{
-			AuditNodeStatus: g.AuditNodeStatus,
-			// IsEntryNode:     ValueCompare(value, g.entryValue),
-			IsEntryNode:    entry,
-			IRCodeID:       value.GetId(),
-			TmpStartOffset: -1,
-			TmpEndOffset:   -1,
-		}
+		an.AuditNodeStatus = g.AuditNodeStatus
+		an.IsEntryNode = entry
+		an.IRCodeID = value.GetId()
 		if value.GetId() == -1 {
 			setTmpValue(an, value)
 		}
 	}
-
-	if ret := g.db.Save(an).Error; ret != nil {
-		return nil, utils.Wrap(ret, "save AuditNode")
-	}
+	g.database.SaveNode(an)
 	g.visitedNode[value] = an
 	return an, nil
 }
@@ -225,21 +237,27 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 		return utils.Errorf("create to node failed: %v", err)
 	}
 
+	saveEdge := func(edge *ssadb.AuditEdge) error {
+		return ssaprofile.ProfileAddWithError(true, "dbgraph_create_edge", func() error {
+			g.database.SaveEdge(edge)
+			return nil
+		})
+	}
 	msg := edge.Msg
 	switch edge.Kind {
 	case EdgeTypeDependOn:
 		edge := fromNode.CreateDependsOnEdge(g.ProgramName, toNode.ID)
-		if err := g.db.Save(edge).Error; err != nil {
+		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	case EdgeTypeEffectOn:
 		edge := fromNode.CreateEffectsOnEdge(g.ProgramName, toNode.ID)
-		if err := g.db.Save(edge).Error; err != nil {
+		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	// case EdgeTypeDataflow:
 	// 	edge := fromNode.CreateDataFlowEdge(g.ProgramName, toNode.ID)
-	// 	if err := g.db.Save(edge).Error; err != nil {
+	// 	if err := saveEdge(edge); err != nil {
 	// 		log.Errorf("save AuditEdge failed: %v", err)
 	// 	}
 	case EdgeTypePredecessor:
@@ -256,9 +274,135 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 			}
 		}
 		edge := fromNode.CreatePredecessorEdge(g.ProgramName, toNode.ID, step, label)
-		if err := g.db.Save(edge).Error; err != nil {
+		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	}
 	return nil
+
+}
+
+type auditDatabase struct {
+	fetch      *databasex.Fetch[*ssadb.AuditNode]
+	nodeSave   *databasex.Save[*ssadb.AuditNode]
+	edgeSave   *databasex.Save[*ssadb.AuditEdge]
+	editorSave *databasex.Save[*ssadb.IrSource]
+}
+
+func (a *auditDatabase) GetNode() *ssadb.AuditNode {
+	// get node from fetch, if err retry 10 times
+	for i := 0; i < 10; i++ {
+		node, err := a.fetch.Fetch()
+		if err == nil {
+			return node
+		}
+		log.Warnf("fetch AuditNode failed: %v", err)
+		time.Sleep(time.Millisecond * 100)
+	}
+	return nil
+}
+
+func (a *auditDatabase) SaveNode(node *ssadb.AuditNode) {
+	if node == nil {
+		return
+	}
+	a.nodeSave.Save(node)
+}
+
+func (a *auditDatabase) SaveEdge(edge *ssadb.AuditEdge) {
+	if edge == nil {
+		return
+	}
+	a.edgeSave.Save(edge)
+}
+
+func (a *auditDatabase) SaveIrSource(editor *ssadb.IrSource) {
+	if editor == nil {
+		return
+	}
+	a.editorSave.Save(editor)
+}
+
+func (a *auditDatabase) Close() {
+	a.fetch.Close()
+	a.nodeSave.Close()
+	a.edgeSave.Close()
+	a.editorSave.Close()
+}
+
+func newAuditDatabase(ctx context.Context, db *gorm.DB) *auditDatabase {
+	ret := &auditDatabase{}
+	// opt := []databasex.Option{
+	// 	databasex.WithContext(ctx),
+	// 	databasex.WithFetchSize(100),
+	// }
+	size := 1000
+
+	ret.fetch = databasex.NewFetch[*ssadb.AuditNode](func(ctx context.Context, fetchSize int) <-chan *ssadb.AuditNode {
+		out := make(chan *ssadb.AuditNode, fetchSize)
+		go func() {
+			defer close(out)
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				i := 0
+				for i < fetchSize {
+					node := &ssadb.AuditNode{}
+					if ret := tx.Create(node).Error; ret != nil {
+						log.Errorf("create empty AuditNode failed: %v", ret)
+						continue
+					}
+					i++
+					out <- node
+				}
+				return nil
+			})
+		}()
+		return out
+	}, databasex.WithContext(ctx), databasex.WithFetchSize(size), databasex.WithName("AuditNode"))
+
+	ret.nodeSave = databasex.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
+		if len(ae) == 0 {
+			return
+		}
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, e := range ae {
+				if ret := tx.Save(e).Error; ret != nil {
+					log.Errorf("save AuditNode failed: %v", ret)
+				}
+			}
+			return nil
+		})
+		return
+	}, databasex.WithContext(ctx), databasex.WithSaveSize(size), databasex.WithName("AuditNode"))
+
+	ret.edgeSave = databasex.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
+		if len(ae) == 0 {
+			return
+		}
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, e := range ae {
+				if ret := tx.Save(e).Error; ret != nil {
+					log.Errorf("save AuditEdge failed: %v", ret)
+				}
+			}
+			return nil
+		})
+		return
+	}, databasex.WithContext(ctx), databasex.WithSaveSize(size), databasex.WithName("AuditEdge"))
+
+	ret.editorSave = databasex.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
+		if len(ae) == 0 {
+			return
+		}
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, e := range ae {
+				if ret := tx.Save(e).Error; ret != nil {
+					log.Errorf("save AuditEdge failed: %v", ret)
+				}
+			}
+			return nil
+		})
+		return
+	}, databasex.WithContext(ctx), databasex.WithSaveSize(size), databasex.WithName("SourceFile"))
+
+	return ret
 }
