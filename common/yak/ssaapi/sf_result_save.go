@@ -105,7 +105,11 @@ func (r *SyntaxFlowResult) SaveWithContext(ctx context.Context, kind schema.Synt
 	return r.save(ctx, kind, TaskIDs...)
 }
 
-func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResultKind, TaskIDs ...string) (uint, error) {
+func (r *SyntaxFlowResult) save(
+	ctx context.Context,
+	kind schema.SyntaxflowResultKind,
+	TaskIDs ...string,
+) (uint, error) {
 	if r == nil || r.memResult == nil || r.program == nil {
 		return 0, utils.Error("result or program  is nil")
 	}
@@ -185,10 +189,10 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		OptionSaveValue_ProgramName(result.ProgramName),
 		// ctx
 		OptionSaveValue_Context(ctx),
+		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
-
 		// save un value variable
 		if len(values) == 0 {
 			result.UnValueVariable = append(result.UnValueVariable, name)
