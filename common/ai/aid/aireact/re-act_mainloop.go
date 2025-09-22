@@ -172,7 +172,7 @@ LOOP:
 		transactionErr := aicommon.CallAITransaction(
 			r.config, prompt, r.config.CallAI,
 			func(resp *aicommon.AIResponse) error {
-				stream := resp.GetOutputStreamReader("re-act-loop", false, r.config.Emitter)
+				stream := resp.GetOutputStreamReader("re-act-loop", true, r.config.Emitter)
 				subCtx, cancel := context.WithCancel(r.config.ctx)
 				defer cancel()
 				action, actionErr = aicommon.ExtractWaitableActionFromStream(
@@ -185,14 +185,14 @@ LOOP:
 							"human_readable_thought",
 							func(key string, reader io.Reader, parents []string) {
 								var output bytes.Buffer
-								reader = utils.UTF8Reader(reader)
+								reader = utils.JSONStringReader(reader)
 								reader = io.TeeReader(reader, &output)
 								r.config.Emitter.EmitStreamEventEx(
 									"re-act-loop-thought",
 									time.Now(),
 									reader,
 									resp.GetTaskIndex(),
-									false,
+									true,
 									func() {
 										r.addToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
 									},
@@ -202,7 +202,7 @@ LOOP:
 						jsonextractor.WithRegisterFieldStreamHandler(
 							"answer_payload", func(key string, reader io.Reader, parents []string) {
 								var o bytes.Buffer
-								reader = io.TeeReader(utils.UTF8Reader(reader), &o)
+								reader = io.TeeReader(utils.JSONStringReader(reader), &o)
 								r.config.Emitter.EmitStreamEventEx(
 									"re-act-loop-answer-payload",
 									time.Now(),
@@ -230,6 +230,15 @@ LOOP:
 					}
 					if ret, err := r.config.aiBlueprintManager.GetAIForge(blueprintName); ret == nil || err != nil {
 						return utils.Errorf("blueprint %s does not exist", blueprintName)
+					}
+				} else if actionType == string(ActionRequireTool) {
+					toolName := nextAction.GetString("tool_require_payload")
+					if toolName == "" {
+						return utils.Error("tool_require_payload is required for ActionRequireTool but empty")
+					}
+					_, err := r.config.aiToolManager.GetToolByName(toolName)
+					if err != nil {
+						return utils.Errorf("tool[%s] does not exist try another one.", toolName)
 					}
 				}
 
