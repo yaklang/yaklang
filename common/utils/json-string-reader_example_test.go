@@ -74,3 +74,14 @@ func ExampleJSONStringReader_streaming() {
 	// Output:
 	// 流式读取输出: This is a long string that demonstrates streaming capabilities
 }
+
+func ExampleJSONStringReader_malformed() {
+	// 畸形数据自动回退示例
+	input := `"hello"world"test"`
+	reader := JSONStringReader(strings.NewReader(input))
+	result, _ := io.ReadAll(reader)
+	fmt.Printf("输入: %s\n输出: %s\n", input, string(result))
+	// Output:
+	// 输入: "hello"world"test"
+	// 输出: "hello"world"test"
+}
