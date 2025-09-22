@@ -310,6 +310,12 @@ func init() {
 			withPluginHelp("从知识库中语义检索相关知识，返回相关内容"),
 			withPluginEnableGenerateParam(true),
 		)
+
+		registerBuildInPlugin(
+			"yak", "构建知识条目",
+			withPluginHelp("从实体库中构建知识条目，支持目的性的知识条目构建"),
+			withPluginEnableGenerateParam(true),
+		)
 		return nil
 	}, "sync-core-plugin-for-yakit")
 
