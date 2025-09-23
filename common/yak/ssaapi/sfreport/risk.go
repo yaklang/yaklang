@@ -69,7 +69,7 @@ type EdgeInfo struct {
 	Description string `json:"description"` // 边描述，便于AI理解
 }
 
-func NewRisk(ssarisk *schema.SSARisk, r *Report) *Risk {
+func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
 	if ssarisk == nil {
 		return &Risk{}
 	}
@@ -103,7 +103,7 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report) *Risk {
 	// Generate data flow paths if available
 	if r.ReportType == IRifyFullReportType || r.config.showDataflowPath {
 		if ssarisk.ResultID != 0 && ssarisk.Variable != "" {
-			dataFlowPath, err := GenerateDataFlowAnalysis(ssarisk)
+			dataFlowPath, err := GenerateDataFlowAnalysis(ssarisk, value...)
 			if err != nil {
 				log.Errorf("generate data flow paths failed for risk %d: %v", ssarisk.ID, err)
 			} else {

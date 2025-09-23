@@ -88,10 +88,6 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 		return
 	}
 
-	// create risk with detailed structure
-	risk := NewRisk(ssarisk, r)
-	r.AddRisks(risk)
-
 	r.RiskNums = len(r.Risks)
 	// get result
 	var result *ssaapi.SyntaxFlowResult = nil
@@ -129,6 +125,10 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 		log.Errorf("editor is nil")
 		return
 	}
+
+	// create risk with detailed structure
+	risk := NewRisk(ssarisk, r, value)
+	r.AddRisks(risk)
 
 	// create report.file
 	file := r.FirstOrCreateFile(editor)
