@@ -32,9 +32,10 @@ var errRecursiveDepth = fmt.Errorf("recursive call is over 10000, stop it")
 
 type AnalyzeContext struct {
 	// Self
-	Self   *Value
-	direct AnalysisType
-	config *OperationConfig
+	Self       *Value
+	direct     AnalysisType
+	config     *OperationConfig
+	untilMatch Values
 	// recursive depth limited
 	depth               int
 	reachedDepthLimited bool
@@ -232,6 +233,22 @@ func (a *AnalyzeContext) hook(i *Value) error {
 		}
 	}
 	return nil
+}
+
+func (a *AnalyzeContext) isUntilNode(v *Value) bool {
+	if a.config.UntilNode != nil {
+		if a.config.UntilNode(v) {
+			a.untilMatch = append(a.untilMatch, v)
+			return true
+		} else {
+			return false
+		}
+	}
+	return false
+}
+
+func (a *AnalyzeContext) HasUntilNode() bool {
+	return a.config.UntilNode != nil
 }
 
 // ========================================== Recursive Depth Limit ==========================================

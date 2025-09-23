@@ -22,6 +22,13 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 	actx.Self = v
 	actx.direct = BottomUseAnalysis
 	ret = v.getBottomUses(actx, opt...)
+	if actx.HasUntilNode() {
+		ret = actx.untilMatch
+	}
+	if ret.Count() > dataflowValueLimit {
+		log.Errorf("Value BottomUse %v too many: %d", v.StringWithRange(), ret.Count())
+		return nil
+	}
 	ret = MergeValues(ret)
 	return
 }
@@ -118,6 +125,10 @@ func (v *Value) getBottomUses(actx *AnalyzeContext, opt ...OperationOption) (res
 	if err != nil {
 		return Values{v}
 	}
+	if actx.isUntilNode(v) {
+		return Values{v}
+	}
+
 	switch inst := v.GetSSAInst().(type) {
 	case *ssa.Phi:
 		return v.visitUserFallback(actx, opt...)
