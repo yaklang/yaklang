@@ -43,11 +43,9 @@ Content-Length: 5
 12321`)
 
 target = f`${host}:${port}`
-
+count := 0
 for range 3 {
-    println(1)
     result = nuclei.Scan(target, nuclei.rawTemplate(pocTpl))~
-    count := 0
     for r in result {
         count++
     }
