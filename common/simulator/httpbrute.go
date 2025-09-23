@@ -3,16 +3,17 @@
 package simulator
 
 import (
-	"github.com/go-rod/rod"
-	"github.com/go-rod/rod/lib/proto"
-	"github.com/yaklang/yaklang/common/crawlerx/preaction"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/crawlerx/preaction"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type HttpBruteForceCore struct {
@@ -133,7 +134,7 @@ func (bruteForce *HttpBruteForceCore) pageCreate() (err error) {
 	bruteForce.starter = starter
 	err = starter.Start()
 	if err != nil {
-		return
+		return utils.Errorf("browser starter start error: %v", err)
 	}
 	page, err := starter.CreatePage()
 	if err != nil {

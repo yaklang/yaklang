@@ -17,7 +17,7 @@ func TestMustPassDebug(t *testing.T) {
 
 	yakit.RegisterLowHTTPSaveCallback()
 
-	debugName := "rag.yak"
+	debugName := "mixcaller2.yak"
 	var debugCases [][]string
 	for k, v := range files {
 		if k == debugName {
