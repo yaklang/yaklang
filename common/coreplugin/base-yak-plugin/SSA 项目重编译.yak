@@ -1,30 +1,337 @@
 yakit.AutoInitYakit()
 
 // {{ 必填项
-programName := cli.String("programName", 
-    cli.setRequired(true),
-    cli.setVerboseName("项目名")
+programName := cli.String("programName", cli.setRequired(true), cli.setVerboseName("项目名"))
+languages = cli.StringSlice(
+    "language", 
+    cli.setMultipleSelect(false), 
+    cli.setSelectOption("Java", "java"), 
+    cli.setSelectOption("PHP", "php"), 
+    cli.setSelectOption("Yaklang", "yak"), 
+    cli.setSelectOption("JavaScript", "js"), 
+    cli.setSelectOption("Golang", "go"), 
+    cli.setSelectOption("C", "c"), 
+    cli.setRequired(true), 
 )
-// }}
-cli.check()
+excludeFile := cli.String(
+    "excludeFile", 
+    cli.setVerboseName("排除文件/文件夹"), 
+    cli.setCliGroup("compile"), 
+    cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**"), 
+)
 
-prog, err := ssa.NewProgramFromDB(programName)
-if err != nil {
-    yakit.Error("获取项目错误：%v", err)
-    return 
+info = cli.Json(
+    "info", 
+    cli.setVerboseName("项目信息"), 
+    cli.setJsonSchema(
+        <<<JSON
+{
+  "type": "object",
+  "properties": {
+    "kind": {
+      "title": "项目类型",
+      "type": "string",
+      "enum": [
+        "local",
+        "compression",
+        "jar",
+        "git"
+      ],
+      "default": "local"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "local"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_file": {
+            "title": "项目路径",
+            "yakit_type": "folder",
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_file"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "compression"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_file": {
+            "title": "压缩包路径",
+            "yakit_type": "file",
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_file"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "jar"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "local_file": {
+            "title": "Jar包路径",
+            "yakit_type": "file",
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_file"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "git"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "url": {
+            "title": "远程项目URL",
+            "type": "string"
+          },
+          "branch": {
+            "title": "项目分支",
+            "type": "string"
+          },
+          "auth": {
+            "properties": {
+              "auth": {
+                "title": "认证方式",
+                "type": "string",
+                "enum": [
+                  "none",
+                  "password",
+                  "ssh_key"
+                ],
+                "default": "none"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "auth": {
+                      "const": "password"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "user_name": {
+                      "title": "用户名",
+                      "type": "string"
+                    },
+                    "password": {
+                      "title": "密码或AK",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "user_name",
+                    "password"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "auth": {
+                      "const": "ssh_key"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "key_path": {
+                      "title": "私钥地址",
+                      "yakit_type": "file",
+                      "type": "string"
+                    },
+                    "user_name": {
+                      "title": "用户名",
+                      "type": "string"
+                    },
+                    "password": {
+                      "title": "密码",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "key_path",
+                    "user_name"
+                  ]
+                }
+              }
+            ]
+          },
+          "proxy": {
+            "properties": {
+              "proxy": {
+                "title": "是否启用代理",
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "proxy": {
+                      "const": true
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "url": {
+                      "title": "代理URL",
+                      "type": "string"
+                    },
+                    "user": {
+                      "title": "用户名",
+                      "type": "string"
+                    },
+                    "password": {
+                      "title": "密码",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    },
+    {
+      "required": [
+        "kind"
+      ]
+    }
+  ]
+}
+JSON, 
+        cli.setUISchema(
+            cli.uiGlobalFieldPosition(cli.uiPosHorizontal), 
+            cli.uiGroups(
+                cli.uiGroup(cli.uiField("kind", 1)), 
+                cli.uiGroup(cli.uiField("local_file", 1)), 
+                cli.uiGroup(cli.uiField("url", 1)), 
+                cli.uiGroup(cli.uiField("branch", 1)), 
+                cli.uiGroup(cli.uiField(
+                    "auth", 
+                    1, 
+                    cli.uiFieldGroups(
+                        cli.uiGroup(cli.uiField("auth", 1)), 
+                        cli.uiGroup(cli.uiField("key_path", 1, cli.uiFieldWidget(cli.uiWidgetFile))), 
+                        cli.uiGroup(cli.uiField("user_name", 1)), 
+                        cli.uiGroup(cli.uiField("password", 1, cli.uiFieldWidget(cli.uiWidgetPassword))), 
+                    ), 
+                )), 
+                cli.uiGroup(cli.uiField(
+                    "proxy", 
+                    1, 
+                    cli.uiFieldGroups(
+                        cli.uiGroup(cli.uiField("proxy", 1)), 
+                        cli.uiGroup(cli.uiField("url", 1)), 
+                        cli.uiGroup(cli.uiField("url", 1)), 
+                        cli.uiGroup(cli.uiField("password", 1, cli.uiFieldWidget(cli.uiWidgetPassword))), 
+                    ), 
+                )), 
+            ), 
+        ), 
+    ), 
+    cli.setRequired(true), 
+)
+
+peepholeSize := cli.Int("peepholeSize", cli.setVerboseName("文件分片大小"), cli.setCliGroup("compile"), cli.setDefault(0), cli.setHelp("0 表示禁用"))
+// {{ compile option
+entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
+strictMode = cli.Bool(
+    "StrictMode", 
+    cli.setVerboseName("严格模式"), 
+    cli.setHelp("如果取消严格模式将会忽略编译错误的文件。将可能导致编译结果缺失部分文件。"), 
+    cli.setCliGroup("compile"), 
+    cli.setDefault(false), 
+)
+reCompile := cli.Bool("re-compile", cli.setVerboseName("是否重新编译"), cli.setCliGroup("compile"), cli.setDefault(true))
+concurrency := cli.Int("concurrency", cli.setVerboseName("并发数"), cli.setCliGroup("compile"), cli.setDefault(10))
+// }}
+
+// {{ 项目额外信息
+description := cli.Text("description", cli.setVerboseName("项目描述"), cli.setCliGroup("information"))
+// }}
+
+// {{ database
+//dbPaths := cli.FileNames("dbPath",
+//    cli.setVerboseName("数据库路径"),
+//    cli.setCliGroup("database"),
+//)
+// }}
+
+cli.check()
+//dbPath  = ""
+//if len(dbPaths) > 0 {
+//    dbPath = dbPaths[0]
+//}
+
+language := ""
+if languages.Len() > 0 {
+    language = languages[0]
 }
 
 
-opts = [
-    ssa.withProcess((msg , process )=>{
-        yakit.SetProgressEx("complile", process)
-        yakit.Info("%s: %f",msg, process)
-    }), 
-    ssa.withContext(context.Background()),
-] 
+opts = [ssa.withProgramName(programName), ssa.withProcess((msg, process) => {
+    yakit.SetProgressEx("complile", process)
+    yakit.Info("%s: %f", msg, process)
+}), ssa.withLanguage(language), ssa.withReCompile(reCompile), ssa.withStrictMode(strictMode), ssa.withDescription(description), ssa.withContext(context.Background()), ssa.withConfigInfo(info), ssa.withPeepholeSize(peepholeSize), ssa.withDefaultExcludeFunc(str.Split(
+    excludeFile, 
+    ",", 
+))~, ssa.withConcurrency(concurrency)]
+if len(entry) != 0 {
+    opts = append(opts, ssa.withEntryFile(entry...))
+}
 
-err := prog.Recompile(opts...)
+
+progs, err := ssa.ParseProject(opts...)
 if err != nil {
     yakit.Text("编译错误信息:\n" + err.Error())
+    yakit.Error("语言： %s", language)
     yakit.Error("项目名：%s", programName)
+    yakit.Error("编译信息： %s", info)
 }

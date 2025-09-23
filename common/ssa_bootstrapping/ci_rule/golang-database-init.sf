@@ -93,7 +93,7 @@ REFERENCE
 
 consts?{have: ExternLib}?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
 $consts.*Database?{!have: ParameterMember} as $database;
-$database<getFunc>?{have: "init"} as $high;
+$database<getFunc>?{have: /\bFunction-init\b/} as $high;
 
 alert $high for {
 	title: "Audit Golang Database Operations in Init Function",
@@ -146,7 +146,7 @@ $level1 as $level
 $level2 as $level
 $level3 as $level
 $level4 as $level
-$level?{have: "init"} as $mid;
+$level?{have: /\bFunction-init\b/} as $mid;
 
 alert $mid for {
 	title: "Audit Golang Database Operations in Init Function",
