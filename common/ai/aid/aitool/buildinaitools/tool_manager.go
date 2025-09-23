@@ -195,11 +195,6 @@ func (m *AiToolManager) SearchTools(method string, query string) ([]*aitool.Tool
 	return m.searcher(query, m.safeToolsGetter())
 }
 
-//// IsToolEnabled 检查工具是否开启
-//func (m *AiToolManager) IsToolEnabled(name string) bool {
-//	return m.toolSuggested[name]
-//}
-
 // EnableTool 开启单个工具
 func (m *AiToolManager) EnableTool(name string) {
 	m.toolEnabled[name] = true
