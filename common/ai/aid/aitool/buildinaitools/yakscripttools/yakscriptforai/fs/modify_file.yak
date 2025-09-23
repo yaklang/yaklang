@@ -1,0 +1,196 @@
+__DESC__ = "一个用于修改现有文件内容的工具，支持在指定行号位置插入或替换内容。适用于文件内容编辑、配置修改等场景。"
+__VERBOSE_NAME__ = "文件内容修改工具"
+__KEYWORDS__ = "file modify,文件修改,文件编辑,file editing,content modification,行编辑,line editing,字符串替换,string replacement,文件处理,text processing,insert content,replace content"
+
+/*
+文件内容修改工具
+
+功能特点：
+1. 支持在指定行号位置修改文件内容
+   - line-number: 指定要修改的行号（从1开始）
+   - content: 要插入或替换的内容字符串
+   - mode: 修改模式，'insert'（插入）或 'replace'（替换）
+
+2. 修改模式说明：
+   - insert: 在指定行号后插入新内容，原内容向下移动
+   - replace: 替换指定行的内容
+
+3. 参数说明：
+   --file: 要修改的文件路径 (必需)
+   --line-number: 要修改的行号，从1开始计数 (必需)
+   --content: 要插入或替换的内容字符串 (必需)
+   --mode: 修改模式，'insert' 或 'replace'，默认 'replace' (可选)
+
+使用示例：
+1. 在第5行后插入新内容：
+   yak modify_file.yak --file test.txt --line-number 5 --content "新插入的行内容" --mode insert
+
+2. 替换第3行的内容：
+   yak modify_file.yak --file test.txt --line-number 3 --content "替换后的行内容" --mode replace
+
+3. 替换第10行的内容（默认模式）：
+   yak modify_file.yak --file test.txt --line-number 10 --content "新的内容"
+
+注意事项：
+- 行号从1开始计数，第一行是第1行
+- 如果指定的行号超出文件行数，会在文件末尾添加内容
+- insert模式会在指定行后插入内容
+- replace模式会完全替换指定行的内容
+- 支持多行内容的插入和替换
+- 修改操作会直接保存到原文件，请谨慎使用
+- 使用 memeditor 进行高效的文本编辑操作
+*/
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+filename := cli.String("file", cli.setRequired(true), cli.setHelp("target file path you want to modify"))
+lineNumber := cli.Int("line-number", cli.setRequired(true), cli.setHelp("line number to modify (starting from 1)"))
+content := cli.String("content", cli.setRequired(true), cli.setHelp("content string to insert or replace"))
+mode := cli.String("mode", cli.setDefault("replace"), cli.setHelp("modify mode: 'insert' or 'replace' (default: replace)"))
+
+cli.check()
+
+yakit.Info("Modifying file: %v at line %v, mode: %v", filename, lineNumber, mode)
+
+// 检查文件是否存在
+if !file.IsExisted(filename) {
+    yakit.Error("File %v does not exist", filename)
+    return
+}
+
+// 验证参数
+if lineNumber < 1 {
+    yakit.Error("line-number must be >= 1, got %v", lineNumber)
+    return
+}
+
+if mode != "insert" && mode != "replace" {
+    yakit.Error("mode must be 'insert' or 'replace', got %v", mode)
+    return
+}
+
+// 读取文件内容
+fileContent, err := file.ReadFile(filename)
+if err != nil {
+    yakit.Error("Failed to read file %v: %v", filename, err)
+    return
+}
+
+originalSize := len(fileContent)
+yakit.Info("Original file size: %v bytes", originalSize)
+
+// 使用 memeditor 创建编辑器
+editor := memeditor.New(string(fileContent))
+totalLines := editor.GetLineCount()
+
+yakit.Info("File has %v lines", totalLines)
+
+// 根据修改模式创建范围
+if lineNumber > totalLines {
+    // 如果行号超出文件范围，在文件末尾添加内容
+    if mode == "insert" {
+        // 获取最后一行末尾的位置作为插入点
+        lastLineStart, err := editor.GetStartOffsetByLine(totalLines)
+        if err != nil {
+            yakit.Error("Failed to get last line offset: %v", err)
+            return
+        }
+        lastLineText, err := editor.GetLine(totalLines)
+        if err != nil {
+            yakit.Error("Failed to get last line text: %v", err)
+            return
+        }
+        insertOffset := lastLineStart + len(lastLineText)
+        rangeToModify := editor.GetRangeOffset(insertOffset, insertOffset)
+        newContent := "\n" + content
+        err = editor.UpdateTextByRange(rangeToModify, newContent)
+        if err != nil {
+            yakit.Error("Failed to append content: %v", err)
+            return
+        }
+        yakit.Info("Line number %v exceeds file lines (%v), appending content at end", lineNumber, totalLines)
+    } else {
+        // replace 模式：直接在文件末尾添加
+        lastLineStart, err := editor.GetStartOffsetByLine(totalLines)
+        if err != nil {
+            yakit.Error("Failed to get last line offset: %v", err)
+            return
+        }
+        lastLineText, err := editor.GetLine(totalLines)
+        if err != nil {
+            yakit.Error("Failed to get last line text: %v", err)
+            return
+        }
+        insertOffset := lastLineStart + len(lastLineText)
+        rangeToModify := editor.GetRangeOffset(insertOffset, insertOffset)
+        newContent := "\n" + content
+        err = editor.UpdateTextByRange(rangeToModify, newContent)
+        if err != nil {
+            yakit.Error("Failed to append content: %v", err)
+            return
+        }
+        yakit.Info("Line number %v exceeds file lines (%v), appending content at end", lineNumber, totalLines)
+    }
+} else {
+    // 行号在有效范围内
+    if mode == "insert" {
+        // 在指定行后插入内容
+        // 获取指定行的结束位置
+        lineEndOffset, err := editor.GetEndOffsetByLine(lineNumber)
+        if err != nil {
+            yakit.Error("Failed to get line %v end offset: %v", lineNumber, err)
+            return
+        }
+        // 创建插入范围（0长度）
+        rangeToModify := editor.GetRangeOffset(lineEndOffset, lineEndOffset)
+        newContent := "\n" + content
+        err = editor.UpdateTextByRange(rangeToModify, newContent)
+        if err != nil {
+            yakit.Error("Failed to insert content after line %v: %v", lineNumber, err)
+            return
+        }
+        yakit.Info("Inserted content after line %v", lineNumber)
+    } else { // replace mode
+        // 替换指定行的内容
+        lineStartOffset, err := editor.GetStartOffsetByLine(lineNumber)
+        if err != nil {
+            yakit.Error("Failed to get line %v start offset: %v", lineNumber, err)
+            return
+        }
+        lineEndOffset, err := editor.GetEndOffsetByLine(lineNumber)
+        if err != nil {
+            yakit.Error("Failed to get line %v end offset: %v", lineNumber, err)
+            return
+        }
+        // 创建替换范围（整行）
+        rangeToModify := editor.GetRangeOffset(lineStartOffset, lineEndOffset)
+        err = editor.UpdateTextByRange(rangeToModify, content)
+        if err != nil {
+            yakit.Error("Failed to replace content at line %v: %v", lineNumber, err)
+            return
+        }
+        yakit.Info("Replaced content at line %v", lineNumber)
+    }
+}
+
+// 获取修改后的内容
+modifiedContent := editor.GetSourceCode()
+
+// 保存修改后的文件
+err = file.Save(filename, modifiedContent)
+if err != nil {
+    yakit.Error("Failed to save modified file %v: %v", filename, err)
+    return
+}
+
+// 获取修改后的文件信息
+info, err := file.Stat(filename)
+if err != nil {
+    yakit.Warn("File modified successfully but failed to get file info: %v", err)
+} else {
+    yakit.Info("File modified successfully. New size: %v bytes", info.Size())
+    yakit.File(filename, yakit.fileWriteAction(len(modifiedContent), "modify", modifiedContent))
+}
+
+yakit.Info("File %v modified successfully", filename)
