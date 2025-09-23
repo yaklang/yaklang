@@ -52,5 +52,6 @@ for range 3 {
 }
 
 dump(count)
-assert count >= 1;
+// nulcei scan 设计防止相同的漏洞被重复报告，因此 count 为 1
+assert count == 1;
 
