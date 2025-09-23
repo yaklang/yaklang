@@ -348,6 +348,14 @@ LOOP:
 				continue
 			}
 
+			if toolcallResult.Error != "" {
+				// 工具返回了错误信息
+				r.addToTimeline("error-calling-tool", fmt.Sprintf("Tool[%v] returned error: %v", toolPayload, toolcallResult.Error))
+				currentTask.SetStatus(string(TaskStatus_Processing))
+				log.Errorf("Tool[%v] returned error: %v", toolPayload, toolcallResult.Error)
+				continue
+			}
+
 			var payload bytes.Buffer
 			if !directlyAnswerRequired {
 				payload.WriteString(toolcallResult.StringWithoutID())
