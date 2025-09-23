@@ -450,14 +450,42 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode, autoAddContentType b
 	var isChunked bool
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
-	bodyString := string(bodyRaw)
-	u := ParseQueryParams(bodyString, WithDisableAutoEncode(noAutoEncode))
-	callback(u)
-	newBody := u.Encode()
+	contentType := GetHTTPPacketHeader(packet, "Content-Type")
 
-	newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), isChunked)
-	// auto add content-type if not exist
-	if autoAddContentType && GetHTTPPacketHeader(packet, "Content-Type") == "" {
+	// 使用 GetParamsFromBody 智能解析不同类型的POST数据
+	params, useRaw, err := GetParamsFromBody(contentType, bodyRaw)
+	if err != nil || useRaw {
+		// 如果解析失败或需要使用原始数据，回退到原有逻辑
+		bodyString := string(bodyRaw)
+		u := ParseQueryParams(bodyString, WithDisableAutoEncode(noAutoEncode))
+		callback(u)
+		newBody := u.Encode()
+		newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), isChunked)
+		return handleAutoContentType(newPacket, packet, newBody, autoAddContentType)
+	}
+
+	// 将解析出的参数转换为 QueryParams 格式
+	u := &QueryParams{Items: make([]*QueryParamItem, 0), NoAutoEncode: noAutoEncode}
+	for key, values := range params {
+		for _, value := range values {
+			u.Items = append(u.Items, &QueryParamItem{
+				Key:          key,
+				Value:        value,
+				NoAutoEncode: noAutoEncode,
+			})
+		}
+	}
+
+	// 调用回调函数进行参数修改
+	callback(u)
+
+	// 根据原始 Content-Type 重新构建响应体
+	return reconstructBody(headersRaw, contentType, u, autoAddContentType, packet)
+}
+
+// handleAutoContentType 处理自动添加Content-Type的逻辑
+func handleAutoContentType(newPacket []byte, originalPacket []byte, newBody string, autoAddContentType bool) []byte {
+	if autoAddContentType && GetHTTPPacketHeader(originalPacket, "Content-Type") == "" {
 		if strings.HasPrefix(newBody, "{") && strings.HasSuffix(newBody, "}") {
 			newPacket = ReplaceHTTPPacketHeader(newPacket, "Content-Type", "application/json")
 		} else if strings.HasPrefix(newBody, "<") && strings.HasSuffix(newBody, ">") {
@@ -467,6 +495,44 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode, autoAddContentType b
 		}
 	}
 	return newPacket
+}
+
+// reconstructBody 根据Content-Type重新构建响应体
+func reconstructBody(headersRaw, contentType string, u *QueryParams, autoAddContentType bool, originalPacket []byte) []byte {
+	if strings.Contains(strings.ToLower(contentType), "application/json") {
+		return reconstructJSONBody(headersRaw, u)
+	} else if strings.Contains(strings.ToLower(contentType), "application/xml") {
+		// 对于XML，暂时使用form-encoded格式，可以后续扩展
+		newBody := u.Encode()
+		newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), false)
+		return handleAutoContentType(newPacket, originalPacket, newBody, autoAddContentType)
+	} else {
+		// 默认使用form-encoded格式
+		newBody := u.Encode()
+		newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), false)
+		return handleAutoContentType(newPacket, originalPacket, newBody, autoAddContentType)
+	}
+}
+
+// reconstructJSONBody 重新构建JSON格式的响应体
+func reconstructJSONBody(headersRaw string, u *QueryParams) []byte {
+	jsonData := make(map[string]interface{})
+
+	// 将QueryParams转换为JSON对象
+	for _, item := range u.Items {
+		if item.Key != "" {
+			jsonData[item.Key] = item.Value
+		}
+	}
+
+	// 序列化为JSON
+	if jsonBytes, err := json.Marshal(jsonData); err == nil {
+		return ReplaceHTTPPacketBody([]byte(headersRaw), jsonBytes, false)
+	}
+
+	// 如果序列化失败，使用form-encoded格式
+	newBody := u.Encode()
+	return ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), false)
 }
 
 // ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
