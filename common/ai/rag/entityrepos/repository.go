@@ -236,6 +236,7 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 	})
 }
 
+// VectorYieldEntity 使用向量搜索实体，注意这里使用增强查询，不能在实时性高的过程调用！
 func (r *EntityRepository) VectorYieldEntity(ctx context.Context, query string) (chan *rag.RAGSearchResult, error) {
 	return rag.Query(r.db, query,
 		rag.WithRAGLimit(r.runtimeConfig.queryTop),

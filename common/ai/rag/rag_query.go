@@ -276,17 +276,19 @@ func (e *SimpleERMAnalysisResult) GenerateDotGraphWithDirection(direction string
 // RAGQueryConfig RAG查询配置
 type RAGQueryConfig struct {
 	Ctx                  context.Context
-	Limit                int
+	Limit                int // 返回结果限制，其限制的的不止是最终结果，还包括单次子查询的结果限制。
 	CollectionNumLimit   int
 	CollectionNames      []string
 	CollectionScoreLimit float64
-	EnhancePlan          []string
+	EnhancePlan          []string // 默认开启 HyDE 、 泛化查询 、拆分查询
 	Filter               func(key string, getDoc func() *Document) bool
 	Concurrent           int
 	MsgCallBack          func(*RAGSearchResult)
 	OnSubQueryStart      func(method string, query string)
 	OnStatus             func(label string, value string)
 	OnlyResults          bool // 仅返回最终结果，忽略中间结果和消息
+
+	RAGSimilarityThreshold float64 // RAG相似度限制
 
 	LoadConfig []SQLiteVectorStoreHNSWOption
 }
@@ -401,6 +403,12 @@ func WithRAGOnlyResults(onlyResults bool) RAGQueryOption {
 	}
 }
 
+func WithRAGSimilarityThreshold(threshold float64) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.RAGSimilarityThreshold = threshold
+	}
+}
+
 // NewRAGQueryConfig 创建新的RAG查询配置
 func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 	config := &RAGQueryConfig{
@@ -409,7 +417,7 @@ func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 		MsgCallBack:          nil,
 		CollectionNumLimit:   5,
 		CollectionScoreLimit: 0.3,
-		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery, EnhancePlanExactKeywordSearch},
+		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery},
 		Ctx:                  context.Background(),
 	}
 	for _, opt := range opts {
@@ -507,7 +515,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		sendRaw(msgResult)
 	}
 
-	sendERMAnalysisResult := func(ermResult *SimpleERMAnalysisResult) {
+	sendERMAnalysisResult := func(ermResult *yakit.ERModel) {
 		msgResult := &RAGSearchResult{
 			Message:   fmt.Sprintf("[%s] ERM 分析结果: %d 个实体, %d 个关系", queryId, len(ermResult.Entities), len(ermResult.Relationships)),
 			Data:      ermResult,
@@ -714,161 +722,193 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 		var offset int64 = 0
 		var allResults []ScoredResult
+		var storeMutex sync.Mutex
 		var enhanceSubQuery int64 = 0
-		var ragQueryCostSum float64 = 0
-		var ragAtomicQueryCount int64 = 0
 		var resultRecorder = map[string]float64{}
 
 		var nodesRecorder = make(map[string]struct{})
+
+		storeResults := func(source string, result SearchResult, query *subQuery) (int64, bool) {
+			storeMutex.Lock()
+			defer storeMutex.Unlock()
+
+			if ret := result.Document.EntityUUID; ret != "" {
+				if _, ok := nodesRecorder[ret]; !ok {
+					nodesRecorder[ret] = struct{}{}
+				}
+			}
+			if ret := result.Document.RelatedEntities; len(ret) > 0 {
+				for _, id := range ret {
+					if _, ok := nodesRecorder[id]; !ok {
+						nodesRecorder[id] = struct{}{}
+					}
+				}
+			}
+
+			mergeID := utils.CalcSha1(result.Document.ID, query.Method)
+			if score, exist := resultRecorder[mergeID]; exist {
+				if score < result.Score {
+					resultRecorder[mergeID] = result.Score // 分数聚合,一种查询方式查出来的相同文档聚合,取最高分
+				}
+				return 0, true
+			}
+			resultRecorder[mergeID] = result.Score
+
+			offset += 1
+			allResults = append(allResults, ScoredResult{
+				Index:       offset,
+				QueryMethod: query.Method,
+				QueryOrigin: query.Query,
+				Document:    &result.Document,
+				Score:       result.Score,
+				Source:      source,
+			})
+			return offset, false
+		}
+
+		var ragQueryCostSum float64 = 0
+		var ragAtomicQueryCount int64 = 0
+		var queryCostMutex sync.Mutex
+		updateQueryAvgCost := func(cost float64) {
+			queryCostMutex.Lock()
+			defer queryCostMutex.Unlock()
+			ragQueryCostSum += cost
+			ragAtomicQueryCount++
+			avgCost := 0.0
+			if ragAtomicQueryCount > 0 {
+				avgCost = ragQueryCostSum / float64(ragAtomicQueryCount)
+			}
+			status("RAG原子查询平均用时", fmt.Sprintf("%.2fs", avgCost))
+		}
 
 		for subquery := range chans.OutputChannel() {
 			enhanceSubQuery++
 			status("强化查询", fmt.Sprint(enhanceSubQuery))
 
-			currentSearchCount := 0
-			for _, ragSystem := range cols {
-				// 在该集合中执行搜索
-				log.Infof("start to query %v with subquery: %v", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
-				queryStart := time.Now()
+			currentSearchCount := int64(0)
+			var queryWg sync.WaitGroup
+			for _, ragSystem := range cols { // 一个子查询的不同集合查询至少是可以并行的，
+				queryWg.Add(1)
+				go func() {
+					defer queryWg.Done()
+					// 在该集合中执行搜索
+					log.Infof("start to query %v with subquery: %v", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
+					queryStart := time.Now()
 
-				if subquery.ExactSearch {
-					searchResults, err := ragSystem.FuzzRawSearch(ctx, subquery.Query, config.Limit)
-					if err != nil {
-						return
-					}
-
-					for result := range searchResults {
-						idx := atomic.AddInt64(&offset, 1)
-						allResults = append(allResults, ScoredResult{
-							Index:       idx,
-							QueryMethod: subquery.Method,
-							QueryOrigin: subquery.Query,
-							Document:    &result.Document,
-							Score:       result.Score,
-							Source:      ragSystem.Name,
-						})
-						// 发送中间结果
-						sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
-
-						// send nodes from erm
-						if ret := result.Document.EntityUUID; ret != "" {
-							if _, ok := nodesRecorder[ret]; !ok {
-								nodesRecorder[ret] = struct{}{}
+					if subquery.ExactSearch {
+						searchResultsChan, err := ragSystem.FuzzRawSearch(ctx, subquery.Query, config.Limit)
+						if err != nil {
+							log.Infof("start to keyword query [%v] failed: %v", ragSystem.Name, err)
+							return
+						}
+						for result := range searchResultsChan {
+							atomic.AddInt64(&currentSearchCount, 1)
+							idx, exist := storeResults(ragSystem.Name, result, subquery)
+							if exist {
+								continue
 							}
+							sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
 						}
-						if ret := result.Document.RelatedEntities; len(ret) > 0 {
-							for _, id := range ret {
-								if _, ok := nodesRecorder[id]; !ok {
-									nodesRecorder[id] = struct{}{}
-								}
-							}
-						}
-					}
-
-				} else {
-					searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit+5, func(key string, getDoc func() *Document) bool {
-						if key == DocumentTypeCollectionInfo {
-							return false
-						}
-						if config.Filter != nil {
-							return config.Filter(key, getDoc)
-						}
-						return true
-					})
-					if err != nil {
-						log.Infof("start to query ragsystem[%v] failed: %v", ragSystem.Name, err)
-						continue
-					}
-
-					if len(searchResults) > 0 {
-						cost := time.Since(queryStart).Seconds()
-						ragQueryCostSum += cost
-						ragAtomicQueryCount++
-						avgCost := 0.0
-						if ragAtomicQueryCount > 0 {
-							avgCost = ragQueryCostSum / float64(ragAtomicQueryCount)
-						}
-						status("RAG原子查询平均用时", fmt.Sprintf("%.2fs", avgCost))
-					}
-
-					if searchResults != nil {
-						log.Infof("query ragsystem[%v] with subquery: %v got %d results", ragSystem.Name, utils.ShrinkString(subquery.Query, 100), len(searchResults))
 					} else {
-						log.Infof("query ragsystem[%v] with subquery: %v got 0 result", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
-					}
-
-					// 收集结果并标记来源
-					for _, result := range searchResults {
-						docId := result.Document.ID
-						if score, ok := resultRecorder[docId]; ok {
-							if score < result.Score {
-								resultRecorder[docId] = result.Score
+						searchResults, err := ragSystem.QueryWithFilter(subquery.Query, 1, config.Limit, func(key string, getDoc func() *Document) bool {
+							if key == DocumentTypeCollectionInfo {
+								return false
 							}
-							continue
-						}
-						resultRecorder[docId] = result.Score
-
-						currentSearchCount++
-						idx := atomic.AddInt64(&offset, 1)
-						allResults = append(allResults, ScoredResult{
-							Index:       idx,
-							QueryMethod: subquery.Method,
-							QueryOrigin: subquery.Query,
-							Document:    &result.Document,
-							Score:       result.Score,
-							Source:      ragSystem.Name,
+							if config.Filter != nil {
+								return config.Filter(key, getDoc)
+							}
+							return true
 						})
-						// 发送中间结果
-						sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
-
-						// send nodes from erm
-						if ret := result.Document.EntityUUID; ret != "" {
-							if _, ok := nodesRecorder[ret]; !ok {
-								nodesRecorder[ret] = struct{}{}
-							}
+						if err != nil {
+							log.Infof("start to query ragsystem[%v] failed: %v", ragSystem.Name, err)
+							return
 						}
-						if ret := result.Document.RelatedEntities; len(ret) > 0 {
-							for _, id := range ret {
-								if _, ok := nodesRecorder[id]; !ok {
-									nodesRecorder[id] = struct{}{}
-								}
+
+						if searchResults != nil {
+							log.Infof("query ragsystem[%v] with subquery: %v got %d results", ragSystem.Name, utils.ShrinkString(subquery.Query, 100), len(searchResults))
+						} else {
+							log.Infof("query ragsystem[%v] with subquery: %v got 0 result", ragSystem.Name, utils.ShrinkString(subquery.Query, 100))
+						}
+
+						// 只要没报错，就记录时间
+						updateQueryAvgCost(time.Since(queryStart).Seconds())
+						for _, result := range searchResults {
+							if config.RAGSimilarityThreshold > 0 && result.Score < config.RAGSimilarityThreshold { // rag query 相似度过滤
+								continue
 							}
+							atomic.AddInt64(&currentSearchCount, 1)
+							idx, exist := storeResults(ragSystem.Name, result, subquery)
+							if exist {
+								continue
+							}
+							sendMidResult(idx, subquery.Method, subquery.Query, &result.Document, result.Score, ragSystem.Name)
 						}
 					}
-				}
-			}
 
+				}()
+			}
+			queryWg.Wait()
 			if currentSearchCount > 0 {
 				status(subquery.Method+"结果数", fmt.Sprint(currentSearchCount))
 			}
 		}
 
-		// 按分数排序所有结果
-		sort.Slice(allResults, func(i, j int) bool {
-			return allResults[i].Score > allResults[j].Score
-		})
+		type RankResult struct {
+			r            ScoredResult
+			rrfRankScore float64
+		}
+
+		rrfRank := func(results []ScoredResult, k int) []RankResult {
+			resultQueryMethodMap := make(map[string][]ScoredResult)
+
+			for _, result := range results {
+				if maxScore := resultRecorder[utils.CalcSha1(result.Document.ID, result.QueryMethod)]; maxScore > result.Score {
+					result.Score = maxScore
+				}
+				if resultList, ok := resultQueryMethodMap[result.QueryMethod]; ok {
+					resultQueryMethodMap[result.QueryMethod] = append(resultList, result)
+				} else {
+					resultQueryMethodMap[result.QueryMethod] = []ScoredResult{result}
+				}
+			}
+			rrfScores := make(map[string]float64)
+			resultMap := make(map[string]ScoredResult)
+			for _, resultsList := range resultQueryMethodMap {
+				sort.Slice(resultsList, func(i, j int) bool {
+					return resultsList[i].Score > resultsList[j].Score
+				})
+				for rank, result := range resultsList {
+					actualRank := rank + 1
+					resultMap[result.Document.ID] = result
+					rrfScores[result.Document.ID] += 1.0 / (float64(k) + float64(actualRank))
+				}
+			}
+			var sortedResults []RankResult
+			for docID, score := range rrfScores {
+				r := resultMap[docID]
+				sortedResults = append(sortedResults, RankResult{r: r, rrfRankScore: score})
+			}
+			sort.Slice(sortedResults, func(i, j int) bool {
+				return sortedResults[i].rrfRankScore > sortedResults[j].rrfRankScore
+			})
+			return sortedResults
+		}
+
+		// 使用 RRF 排名法对所有结果进行排序
+		sortedResults := rrfRank(allResults, 60)
 
 		sendMsg(fmt.Sprintf("共收集到 %d 个候选结果", len(allResults)))
 
 		// 限制最终结果数量
 		finalCount := config.Limit
-		if len(allResults) < finalCount {
-			finalCount = len(allResults)
+		if len(sortedResults) < finalCount {
+			finalCount = len(sortedResults)
 		}
 
 		// 发送最终结果
 		for i := 0; i < finalCount; i++ {
-			result := allResults[i]
-			score := result.Score
-			if storedScore, ok := resultRecorder[result.QueryMethod]; ok {
-				if storedScore > score {
-					score = storedScore
-				}
-			}
-			if score < config.CollectionScoreLimit {
-				continue
-			}
-			sendResult(result.Index, result.QueryMethod, result.QueryOrigin, result.Document, score, result.Source)
+			result := sortedResults[i].r
+			sendResult(result.Index, result.QueryMethod, result.QueryOrigin, result.Document, result.Score, result.Source)
 		}
 
 		status("RAG-to-Entity", fmt.Sprintf("关联到%d个知识实体", len(nodesRecorder)))
@@ -887,135 +927,22 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			entityMap[entity.Uuid] = entity
 			sendEntityResult(entity)
 		}
-
 		// 生成 ERM 分析结果
 		if len(entities) > 0 {
 			sendMsg(fmt.Sprintf("开始生成 ERM 分析结果，共 %d 个实体", len(entities)))
-
-			// 收集实体之间的关系（BFS 最多 4 层）
-			var relationships []*SimpleRelationship
-			relationshipSet := make(map[string]bool) // 避免重复关系
-
-			// 建立便捷函数：确保实体已加载
-			ensureEntity := func(uuid string) *schema.ERModelEntity {
-				if e, ok := entityMap[uuid]; ok {
-					return e
-				}
-				ent, err := yakit.GetEntityByIndex(db, uuid)
-				if err != nil || ent == nil {
-					log.Warnf("load entity by uuid[%s] failed: %v", uuid, err)
-					return nil
-				}
-				entityMap[uuid] = ent
-				entities = append(entities, ent)
-				return ent
+			ermResult, err := yakit.EntityRelationshipFind(db, entities, 4)
+			if err != nil {
+				return
 			}
-
-			type qItem struct {
-				uuid  string
-				depth int
-			}
-			var queue []qItem
-			visited := make(map[string]bool)
-			const maxDepth = 4
-
-			for _, e := range entities {
-				queue = append(queue, qItem{uuid: e.Uuid, depth: 0})
-			}
-
-			for len(queue) > 0 {
-				item := queue[0]
-				queue = queue[1:]
-				if visited[item.uuid] {
-					continue
-				}
-				visited[item.uuid] = true
-				if item.depth >= maxDepth {
-					continue
-				}
-
-				cur := ensureEntity(item.uuid)
-				if cur == nil {
-					continue
-				}
-
-				// 传出关系
-				if outgoingRels, err := yakit.GetOutgoingRelationships(db, cur); err == nil {
-					for _, rel := range outgoingRels {
-						sid := rel.SourceEntityIndex
-						tid := rel.TargetEntityIndex
-						src := ensureEntity(sid)
-						tgt := ensureEntity(tid)
-						if src == nil || tgt == nil {
-							continue
-						}
-						relKey := fmt.Sprintf("%s-%s-%s", sid, tid, rel.RelationshipType)
-						if !relationshipSet[relKey] {
-							relationshipSet[relKey] = true
-							relationships = append(relationships, &SimpleRelationship{
-								SourceTemporaryName:     sid,
-								TargetTemporaryName:     tid,
-								RelationshipType:        rel.RelationshipType,
-								RelationshipTypeVerbose: rel.RelationshipTypeVerbose,
-								DecorationAttributes:    fmt.Sprintf("source:%s,target:%s", src.EntityName, tgt.EntityName),
-							})
-						}
-						if !visited[tid] {
-							queue = append(queue, qItem{uuid: tid, depth: item.depth + 1})
-						}
-					}
-				} else {
-					log.Errorf("获取实体 %s 的传出关系失败: %v", cur.Uuid, err)
-				}
-
-				// 传入关系
-				if incomingRels, err := yakit.GetIncomingRelationships(db, cur); err == nil {
-					for _, rel := range incomingRels {
-						sid := rel.SourceEntityIndex
-						tid := rel.TargetEntityIndex
-						src := ensureEntity(sid)
-						tgt := ensureEntity(tid)
-						if src == nil || tgt == nil {
-							continue
-						}
-						relKey := fmt.Sprintf("%s-%s-%s", sid, tid, rel.RelationshipType)
-						if !relationshipSet[relKey] {
-							relationshipSet[relKey] = true
-							relationships = append(relationships, &SimpleRelationship{
-								SourceTemporaryName:     sid,
-								TargetTemporaryName:     tid,
-								RelationshipType:        rel.RelationshipType,
-								RelationshipTypeVerbose: rel.RelationshipTypeVerbose,
-								DecorationAttributes:    fmt.Sprintf("source:%s,target:%s", src.EntityName, tgt.EntityName),
-							})
-						}
-						if !visited[sid] {
-							queue = append(queue, qItem{uuid: sid, depth: item.depth + 1})
-						}
-					}
-				} else {
-					log.Errorf("获取实体 %s 的传入关系失败: %v", cur.Uuid, err)
-				}
-			}
-
-			// 创建 ERMAnalysisResult
-			ermResult := &SimpleERMAnalysisResult{
-				Entities:      entities,
-				Relationships: relationships,
-				OriginalData:  []byte(fmt.Sprintf("Query: %s", query)),
-			}
-
 			// 发送 ERM 分析结果
 			sendERMAnalysisResult(ermResult)
-
 			// 生成并发送 Dot 图
-			sendMsg(fmt.Sprintf("生成知识图 Dot 图，共 %d 个实体，%d 个关系", len(entities), len(relationships)))
-			dotGraph := ermResult.GenerateDotGraph()
+			sendMsg(fmt.Sprintf("生成知识图 Dot 图，共 %d 个实体，%d 个关系", len(ermResult.Entities), len(ermResult.Relationships)))
+			dotGraph := ermResult.Dot()
 			sendDotGraphResult(dotGraph)
 
-			sendMsg(fmt.Sprintf("ERM 分析完成，生成 %d 个实体和 %d 个关系的知识图", len(entities), len(relationships)))
+			sendMsg(fmt.Sprintf("ERM 分析完成，生成 %d 个实体和 %d 个关系的知识图", len(ermResult.Entities), len(ermResult.Relationships)))
 		}
-
 		sendMsg(fmt.Sprintf("查询完成，返回 %d 个最佳结果", finalCount))
 	}()
 	return resultCh, nil
