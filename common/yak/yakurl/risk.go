@@ -263,6 +263,8 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	if taskID := query.Get("task_id"); taskID != "" {
 		if compare := query.Get("compare"); compare != "" {
 			opts = append(opts, yakit.WithSSARiskFilterCompare(taskID, compare))
+		} else if increment := query.Get("increment"); increment != "" {
+			opts = append(opts, yakit.WithSSARiskIncremental())
 		}
 		opts = append(opts, yakit.WithSSARiskFilterTaskID(taskID))
 	}
