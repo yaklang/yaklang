@@ -1,0 +1,194 @@
+__DESC__ = "一个用于显示指定文件头部内容的工具。支持按字节数或按行数读取，支持显示行号、十六进制转储等功能。"
+__VERBOSE_NAME__ = "文件头部内容查看"
+__KEYWORDS__ = "file,head,bytes,lines,文件读取,文本处理,十六进制转储,行号显示,内容预览,first bytes,first lines"
+
+/*
+文件头部内容查看工具
+
+功能特点：
+1. 支持两种读取模式：
+   - lines: 按行数读取文件前几行内容（默认模式）
+   - bytes: 按字节数读取文件头部内容（最大 8K）
+
+2. 通用参数：
+   --filename: 指定要查看的文件路径 (必需)
+   --mode: 读取模式，bytes 或 lines (默认: lines)
+   --limit: 读取数量，lines 模式为行数，bytes 模式为字节数 (默认: 20)
+   --no-linenumber: 禁用行号显示 (默认启用行号)
+
+3. 按行模式特有参数：
+   --line-length: 限制每行的最大长度，默认 190 字符 (可选)
+
+4. 按字节模式特有参数：
+   --hexdump: 以十六进制格式显示内容 (可选)
+
+使用示例：
+1. 查看文件前 20 行（默认，带行号）：
+   yak head.yak --filename test.txt
+
+2. 查看文件前 10 行：
+   yak head.yak --filename test.txt --limit 10
+
+3. 查看文件前 100 字节：
+   yak head.yak --filename test.txt --mode bytes --limit 100
+
+4. 查看文件前 8192 字节（8K）：
+   yak head.yak --filename test.txt --mode bytes
+
+5. 查看文件前 5 行（不带行号）：
+   yak head.yak --filename test.txt --limit 5 --no-linenumber
+
+6. 查看文件前 100 字节的十六进制转储：
+   yak head.yak --filename test.txt --mode bytes --limit 100 --hexdump
+
+注意事项：
+- 默认模式为 lines 模式，读取 20 行
+- bytes 模式自动限制最大 8K (8192) 字节
+- 按行模式支持行长度截断，避免显示过长的行
+- 十六进制转储模式会同时显示 dump() 和 sdump() 的结果
+- 行号显示会自动计算合适的宽度对齐
+*/
+
+
+filename = cli.String("filename", cli.setRequired(true), cli.setHelp("which file you want to check?"))
+mode = cli.String("mode", cli.setDefault("lines"), cli.setHelp("read mode: 'bytes' for byte count, 'lines' for line count (default: lines)"))
+limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("how many bytes/lines you want to read (default: 20 for lines, 8192 for bytes)"))
+noLineNumber = cli.Bool("no-linenumber", cli.setHelp("disable line number display"))
+lineLength = cli.Int("line-length", cli.setDefault(190), cli.setHelp("if the line is so long, use it to limit context (only for lines mode)"))
+hexdumped = cli.Bool("hexdump", cli.setHelp("show result in hex dump (only for bytes mode)"))
+cli.check()
+
+// 默认启用行号显示
+showLineNumber = !noLineNumber
+
+// 设置默认值并处理模式
+if mode == "bytes" {
+    // bytes 模式限制最大 8K (8192) 字节
+    if limit <= 0 || limit > 8192 {
+        limit = 8192
+        yakit.Warn("bytes mode limit set to max 8K (8192 bytes)")
+    }
+} else {
+    // lines 模式默认 20 行
+    if limit <= 0 {
+        limit = 20
+        yakit.Warn("lines mode limit set to default 20 lines")
+    }
+}
+
+// 确保 lineLength 有一个合理的默认值
+if lineLength <= 0 || lineLength > 10000 {
+    lineLength = 190
+    yakit.Warn("line-length set to default 190")
+}
+
+
+
+fp, err = file.Open(filename)
+if err != nil {
+    yakit.Error("OPEN Err: %v", err)
+    return
+}
+defer fp.Close()
+
+if mode == "bytes" {
+    // 按字节数读取模式
+    raw, _ := io.ReadAll(io.LimitReader(fp, limit))
+    if hexdumped {
+        dump(raw)
+        yakit.Info(sdump(raw))
+        return
+    }
+
+    if showLineNumber {
+        // 使用 str.AddPrefixLineNumber 添加行号
+        content := string(raw)
+        if limit > 0 {
+            lines := str.ParseStringToLines(content)
+            if len(lines) > limit {
+                // 截取前 limit 行
+                buf = bufio.NewBuffer()
+                for i in limit {
+                    buf.WriteString(lines[i])
+                    if i < limit - 1 {
+                        buf.WriteByte('\n')~
+                    }
+                }
+                content = string(buf.String())
+            }
+        }
+        result := str.AddPrefixLineNumber(content)
+        yakit.Info(result)
+        yakit.File(filename, yakit.fileReadAction(0, limit, "byte", result))
+        return
+    }
+
+    yakit.File(filename, yakit.fileReadAction(0, limit, "byte", string(raw)))
+    yakit.Info("head %v bytes: \n%v", limit, string(raw))
+    return
+} else if mode == "lines" {
+    // 按行数读取模式
+    buf = bufio.NewBuffer()
+    for i in limit {
+        result, err = fp.ReadLine()
+        if err != nil {
+            break
+        }
+        if len(result) > lineLength && lineLength > 0 {
+            // 安全地处理截断逻辑
+            yakit.Info("DEBUG: lineLength=%v, len(result)=%v", lineLength, len(result))
+            try {
+                if len(result) >= lineLength {
+                    yakit.Info("DEBUG: Truncating to %v bytes", lineLength)
+                    // 直接使用字符串转换和截断，避免对 result 变量的直接操作
+                    resultStr := string(result)
+                    yakit.Info("DEBUG: resultStr len=%v", len(resultStr))
+                    if len(resultStr) >= lineLength {
+                        truncated := resultStr[:lineLength]
+                        yakit.Info("DEBUG: Successfully truncated to %v chars", len(truncated))
+                        buf.WriteString(truncated + "...(line-length truncated)")
+                    } else {
+                        yakit.Info("DEBUG: resultStr too short, using whole")
+                        buf.WriteString(resultStr)
+                    }
+                } else {
+                    yakit.Info("DEBUG: Using whole result (len < lineLength)")
+                    buf.WriteString(string(result))
+                }
+            } catch {
+                // 如果出现任何错误，直接使用整行
+                yakit.Info("DEBUG: Exception caught, using whole result as string")
+                buf.WriteString(string(result))
+            }
+        } else {
+            yakit.Info("DEBUG: Not truncating - len(result)=%v, lineLength=%v", len(result), lineLength)
+            buf.WriteString(result)
+        }
+        buf.WriteByte('\n')~
+    }
+    rawContent := string(buf.String())
+    if showLineNumber {
+        if limit > 0 {
+            lines := str.ParseStringToLines(rawContent)
+            if len(lines) > limit {
+                // 截取前 limit 行
+                buf = bufio.NewBuffer()
+                for i in limit {
+                    buf.WriteString(lines[i])
+                    if i < limit - 1 {
+                        buf.WriteByte('\n')~
+                    }
+                }
+                rawContent = string(buf.String())
+            }
+        }
+        rawContent = str.AddPrefixLineNumber(rawContent)
+    }
+    yakit.File(filename, yakit.fileReadAction(0, limit, "line", rawContent))
+    println(rawContent)
+    yakit.Info("head %v lines: \n%v", limit, rawContent)
+    return
+} else {
+    yakit.Error("invalid mode: %v, supported modes: bytes, lines", mode)
+    return
+}
