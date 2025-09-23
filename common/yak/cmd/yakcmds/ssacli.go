@@ -1045,78 +1045,76 @@ var syntaxFlowSave = &cli.Command{
 var ssaRisk = &cli.Command{
 	Name:    "ssa-risk",
 	Aliases: []string{"ssa-risk", "sr"},
-	Usage:   "output risk information from the database",
+	Usage:   "visualize and format risk report from JSON file",
 	Flags: []cli.Flag{
-
-		// Input {{{
-		// program name
 		cli.StringFlag{
-			Name:  "program,p",
-			Usage: "program name for ssa compiler in db",
+			Name:  "input,i",
+			Usage: "risk report JSON file to be imported",
 		},
-		// }}}
-
-		// output {{{
+		// 	cli.StringFlag{
+		// 		Name: "format",
+		// 		Usage: `output format:
+		// * sarif - SARIF format output
+		// * irify - IRify format (truncated file content)
+		// * irify-full - IRify format with full file content
+		// * irify-react-report - IRify React report format
+		// 	`,
+		// 	},
+		// TODO: 更详细的过滤器可能要和risk filter对接
 		cli.StringFlag{
-			Name:  "output,o",
-			Usage: "output file, use --format set output file format, default is sarif",
+			Name:  "severity",
+			Usage: "filter by severity level (critical, high, middle, low)",
 		},
-		// TODO: json format
-		// cli.StringFlag{
-		// 	Name:  "format",
-		// 	Usage: "output file format, set with json or sarif(default)",
-		// },
-		// }}}
-
-		// {{ risk
-		// TODO: risk query filter
-		// cli.StringFlag{
-		// 	Name:  "log",
-		// 	Usage: "log level",
-		// },
-		cli.StringSliceFlag{
-			Name:  "task-id,tid",
-			Usage: "task id for ssa compiler in db",
+		cli.StringFlag{
+			Name:  "rule",
+			Usage: "filter by rule name (partial match)",
 		},
-		// }}
+		cli.BoolFlag{
+			Name:  "with-code",
+			Usage: "include code fragments in output",
+		},
 	},
 	Action: func(c *cli.Context) (e error) {
-		defer func() {
-			log.Infof("code scan  done")
-			if err := recover(); err != nil {
-				log.Errorf("code scan failed: %s", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-				log.Infof("please use yak `ssa-risk` can export rest result")
-				e = utils.Errorf("code scan failed: %s", err)
-			}
-		}()
-		ctx := context.Background()
-
-		// Parse configuration
-		config, err := parseSFScanConfig(c)
-		if err != nil {
-			log.Errorf("parse config failed: %s", err)
-			return err
+		input := c.String("input")
+		if input == "" {
+			return utils.Error("input file is required")
 		}
-		// Ensure the file is closed after we're done
-		defer config.DeferFunc()
 
-		taskIds := c.StringSlice("task-id")
-
-		prog, err := getProgram(ctx, config)
-		if err != nil {
-			log.Errorf("get program failed: %s", err)
-			return err
+		if !utils.IsFile(input) {
+			return utils.Errorf("input file not found: %v", input)
 		}
-		_ = taskIds
-		_ = prog
 
-		// ShowRisk(config.Format, &ypb.SSARisksFilter{
-		// 	ProgramName: []string{prog.GetProgramName()},
-		// 	RuntimeID:   taskIds,
-		// }, config.OutputWriter)
-		return nil
+		content, err := os.ReadFile(input)
+		if err != nil {
+			return utils.Wrap(err, "failed to read input file")
+		}
 
+		var report sfreport.Report
+		if err := json.Unmarshal(content, &report); err != nil {
+			return utils.Wrap(err, "failed to parse JSON file")
+		}
+
+		// format := sfreport.ReportTypeFromString(c.String("format"))
+		severityFilter := c.String("severity-filter")
+		ruleFilter := c.String("rule-filter")
+		withCode := c.Bool("with-code")
+
+		writer := os.Stdout
+		return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
+
+		// switch format {
+		// case sfreport.SarifReportType:
+		// 	// TODO
+		// 	return outputSARIF(writer, &report)
+		// case sfreport.IRifyReportType:
+		// 	return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
+		// case sfreport.IRifyFullReportType:
+		// 	return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
+		// case sfreport.IRifyReactReportType:
+		// 	return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
+		// default:
+		// 	return utils.Errorf("unsupported output format: %s, supported formats: console, sarif, irify, irify-full, irify-react-report, json, summary", format)
+		// }
 	},
 }
 
@@ -1795,10 +1793,8 @@ func SyntaxFlowQuery(
 		return execError
 	}
 
-	if result != nil {
-		for _, c := range callbacks {
-			c(result)
-		}
+	for _, c := range callbacks {
+		c(result)
 	}
 
 	log.Infof("syntax flow query result:")
@@ -1808,4 +1804,109 @@ func SyntaxFlowQuery(
 		sfvm.WithShowDot(showDot),
 	)
 	return execError
+}
+
+func outputJSON(writer io.Writer, report *sfreport.Report) error {
+	jsonData, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return utils.Wrap(err, "failed to marshal JSON")
+	}
+	_, err = writer.Write(jsonData)
+	return err
+}
+
+func outputSARIF(writer io.Writer, report *sfreport.Report) error {
+	fmt.Fprintf(writer, "SARIF format output not fully implemented yet.\n")
+	fmt.Fprintf(writer, "Please use 'irify' or 'irify-full' format for now.\n")
+	return outputJSON(writer, report)
+}
+
+func outputConsole(writer io.Writer, report *sfreport.Report, severityFilter, ruleFilter string, withCode bool) error {
+	filteredRisks := filterRisks(report.Risks, severityFilter, ruleFilter)
+
+	fmt.Fprintf(writer, "=== Scan Report Summary ===\n")
+	fmt.Fprintf(writer, "Scan Time: %s\n", report.ReportTime.Format("2006-01-02T15:04:05-07:00"))
+	fmt.Fprintf(writer, "Program: %s\n", report.ProgramName)
+	fmt.Fprintf(writer, "Language: %s\n", report.ProgramLang)
+	fmt.Fprintf(writer, "Files Scanned: %d\n", report.FileCount)
+	fmt.Fprintf(writer, "Lines of Code: %d\n", report.CodeLineCount)
+	fmt.Fprintf(writer, "Risks Found: %d\n", len(filteredRisks))
+	fmt.Fprintf(writer, "\n")
+
+	fmt.Fprintf(writer, "=== Risk Details ===\n")
+	riskCount := 0
+	for hash, risk := range filteredRisks {
+		riskCount++
+		fmt.Fprintf(writer, "Risk ID: %s\n", hash)
+		fmt.Fprintf(writer, "Title: %s\n", risk.GetTitleVerbose())
+		fmt.Fprintf(writer, "Severity: %s\n", risk.GetSeverity())
+		fmt.Fprintf(writer, "Location: %s:%d\n", risk.GetCodeSourceURL(), risk.GetLine())
+
+		description := risk.GetDescription()
+		if description != "" {
+			cleanDesc := strings.TrimSpace(description)
+			fmt.Fprintf(writer, "Description: %s\n", cleanDesc)
+		}
+
+		solution := risk.GetSolution()
+		if solution != "" {
+			cleanSolution := strings.TrimSpace(solution)
+			if len(cleanSolution) > 200 {
+				cleanSolution = cleanSolution[:200] + "..."
+			}
+			fmt.Fprintf(writer, "Solution: %s\n", cleanSolution)
+		}
+
+		if withCode {
+			fmt.Fprintf(writer, "Affected Code:\n")
+			codeFragment := risk.GetCodeFragment()
+			if codeFragment != "" {
+				codeLines := strings.Split(codeFragment, "\n")
+				for _, line := range codeLines {
+					fmt.Fprintf(writer, "  %s\n", line)
+				}
+			}
+		}
+
+		fmt.Fprintf(writer, "\n")
+	}
+
+	fmt.Fprintf(writer, "=== Affected Files ===\n")
+	for _, file := range report.File {
+		hasFilteredRisks := false
+		filteredFileRisks := []string{}
+		for _, riskHash := range file.Risks {
+			if _, exists := filteredRisks[riskHash]; exists {
+				hasFilteredRisks = true
+				filteredFileRisks = append(filteredFileRisks, riskHash)
+			}
+		}
+
+		if hasFilteredRisks {
+			fmt.Fprintf(writer, "File: %s\n", file.Path)
+			fmt.Fprintf(writer, "Lines: %d\n", file.LineCount)
+			fmt.Fprintf(writer, "Risk IDs: %s\n", strings.Join(filteredFileRisks, ", "))
+			fmt.Fprintf(writer, "\n")
+		}
+	}
+
+	return nil
+}
+
+func filterRisks(risks map[string]*sfreport.Risk, severityFilter, ruleFilter string) map[string]*sfreport.Risk {
+	filtered := make(map[string]*sfreport.Risk)
+
+	for hash, risk := range risks {
+		if severityFilter != "" && !strings.EqualFold(risk.GetSeverity(), severityFilter) {
+			continue
+		}
+
+		if ruleFilter != "" && !strings.Contains(strings.ToLower(risk.GetRuleName()), strings.ToLower(ruleFilter)) {
+			continue
+		}
+
+		filtered[hash] = risk
+	}
+
+	return filtered
 }

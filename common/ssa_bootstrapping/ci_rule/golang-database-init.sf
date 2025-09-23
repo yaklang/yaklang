@@ -1,8 +1,7 @@
 desc(
 	title: "Audit Golang Database Operations in Init Function"
 	title_zh: "审计Golang中Init函数内的数据库操作"
-	type: audit
-	severity: high
+	type: vuln
 	rule_id: "5d658a56-db56-4973-85b2-e2ad06ed09e8"
 	risk: ""
 	desc: <<<DESC
@@ -92,8 +91,8 @@ none
 REFERENCE
 )
 
-consts?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
-$consts.*Database as $database;
+consts?{have: ExternLib}?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
+$consts.*Database?{!have: ParameterMember} as $database;
 $database<getFunc>?{have: "init"} as $high;
 
 alert $high for {
@@ -118,6 +117,61 @@ import (
 func init() {
 	db := consts.GetGormProfileDatabase()
 	autoAutomigrateVectorStoreDocument(db)
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"github.com/yaklang/yaklang/common/consts"
+)
+
+func init() {
+	yakit.RegisterPostInitDatabaseFunction(func() error {
+		autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())
+		return nil
+	})
+}
+SAFE
+)
+
+consts?{have: ExternLib}?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
+$consts.*Database?{have: ParameterMember} as $database;
+$database<getFunc> as $level1;
+$level1<getCall>?{!have: 'RegisterPostInitDatabaseFunction'}<getFunc> as $level2
+$level2<getCall>?{!have: 'RegisterPostInitDatabaseFunction'}<getFunc> as $level3
+$level3<getCall>?{!have: 'RegisterPostInitDatabaseFunction'}<getFunc> as $level4
+
+$level1 as $level
+$level2 as $level
+$level3 as $level
+$level4 as $level
+$level?{have: "init"} as $mid;
+
+alert $mid for {
+	title: "Audit Golang Database Operations in Init Function",
+	title_zh: "审计Golang中Init函数内的数据库操作",
+	level: "mid",
+	type: "vuln",
+	risk: "",
+	name: "mid",
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package main
+
+import (
+	"github.com/yaklang/yaklang/common/consts"
+)
+
+func init() {
+    go func() {
+    	db := consts.GetGormProfileDatabase()
+	    autoAutomigrateVectorStoreDocument(db)
+    }()
 }
 UNSAFE
 	'safefile://safe.go': <<<SAFE
