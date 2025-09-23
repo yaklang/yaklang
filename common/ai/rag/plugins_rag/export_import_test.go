@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // TestExportVectorData 测试向量数据的导出和导入功能的基础流程
@@ -75,8 +76,7 @@ func TestMUSTPASS_ExportVectorData(t *testing.T) {
 	assert.Equal(t, int64(0), count)
 
 	// 额外验证：确保能够正常查询空的集合表
-	collections := []*schema.VectorStoreCollection{}
-	err = db.Model(&schema.VectorStoreCollection{}).Find(&collections).Error
+	_, err = yakit.GetAllRAGCollectionInfos(db)
 	assert.NoError(t, err)
 
 	// 6. 执行数据导入操作

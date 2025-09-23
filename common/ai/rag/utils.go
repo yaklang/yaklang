@@ -257,7 +257,7 @@ func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 type NodeOffsetToVectorFunc func(offset uint32) []float32
 
 func ParseHNSWGraphFromBinary(collectionName string, graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, cacheMaxSize int) (*hnsw.Graph[string], error) {
-	cache := map[hnswspec.LazyNodeID]hnswspec.LayerNode[string]{}
+	cache := map[hnswspec.LazyNodeID]any{}
 	clearCache := func() {
 		if len(cache) > cacheMaxSize {
 			clearNum := len(cache) - cacheMinSize
@@ -277,35 +277,45 @@ func ParseHNSWGraphFromBinary(collectionName string, graphBinaryReader io.Reader
 	allOpts := getDefaultHNSWGraphOptions(collectionName)
 	return hnsw.LoadGraphFromBinary(graphBinaryReader, func(key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
 		uidStr := fmt.Sprint(key)
-		if node, ok := cache[uidStr]; ok {
-			return node, nil
-		}
 
-		doc, err := getVectorDocumentByLazyNodeID(db, key)
+		doc, err := getVectorDocumentByLazyNodeID(db.Select("document_id,pq_mode"), key)
 		if err != nil {
 			return nil, err
 		}
+		docId := doc.DocumentID
 		var newNode hnswspec.LayerNode[string]
 		if doc.PQMode {
-			// TODO: 这里需要优化，不能直接捕获 doc 变量，会导致向量数据在内存中常驻
-			newNode = hnswspec.NewRawPQLayerNode(doc.DocumentID, doc.PQCode)
+			newNode = hnswspec.NewLazyRawPQLayerNode(docId, func() ([]byte, error) {
+				if node, ok := cache[uidStr]; ok {
+					return node.([]byte), nil
+				}
+
+				doc, err := getVectorDocumentByLazyNodeID(db.Select("pq_code"), key)
+				if err != nil {
+					return nil, err
+				}
+				clearCache()
+				cache[uidStr] = doc.PQCode
+				return doc.PQCode, nil
+			})
 		} else {
-			newNode = hnswspec.NewStandardLayerNode(doc.DocumentID, func() []float32 {
-				doc, err := getVectorDocumentByLazyNodeID(db, key)
+			newNode = hnswspec.NewStandardLayerNode(docId, func() []float32 {
+				if node, ok := cache[uidStr]; ok {
+					return node.([]float32)
+				}
+
+				doc, err := getVectorDocumentByLazyNodeID(db.Select("embedding"), key)
 				if err != nil {
 					log.Errorf("get vector document by lazy node id err: %v", err)
 					return nil
 				}
+				clearCache()
+				cache[uidStr] = []float32(doc.Embedding)
 				return doc.Embedding
 			})
 		}
 
-		lazyNode := hnswspec.NewLazyLayerNode(key, func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
-			return newNode, nil
-		})
-		clearCache()
-		cache[uidStr] = lazyNode
-		return lazyNode, nil
+		return newNode, nil
 	}, allOpts...)
 }
 
@@ -351,16 +361,27 @@ func getLazyNodeUIDByMd5(collectionName string, key string) []byte {
 	return m[:]
 }
 
-func getLazyNodeUID(uidType string, collectionName string, doc *schema.VectorStoreDocument) (hnswspec.LazyNodeID, error) {
+func getLazyNodeUID(uidType string, collectionName string, data any) hnswspec.LazyNodeID {
 	switch uidType {
 	case uidTypeMd5:
-		return getLazyNodeUIDByMd5(collectionName, doc.DocumentID), nil
+		key, ok := data.(string)
+		if !ok {
+			log.Errorf("expected string for key, got %T", data)
+			return nil
+		}
+		return getLazyNodeUIDByMd5(collectionName, key)
 	case uidTypeID:
-		return hnswspec.LazyNodeID(doc.ID), nil
+		key := utils.InterfaceToInt(data)
+		return hnswspec.LazyNodeID(key)
 	case uidTypeDocumentID:
-		return hnswspec.LazyNodeID(doc.DocumentID), nil
+		key, ok := data.(string)
+		if !ok {
+			log.Errorf("expected string for key, got %T", data)
+			return nil
+		}
+		return hnswspec.LazyNodeID(key)
 	}
-	return "", utils.Errorf("unsupported uid type: %s", uidType)
+	return nil
 }
 
 var defaultUidType = uidTypeMd5

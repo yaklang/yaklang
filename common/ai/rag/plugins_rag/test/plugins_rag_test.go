@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // MockEmbedder 是一个模拟的嵌入客户端，用于测试
@@ -120,8 +121,8 @@ func TestCreatePluginsRagManager(t *testing.T) {
 // 辅助函数：列出向量存储集合
 func TestListVectorStore(t *testing.T) {
 	db := consts.GetGormProfileDatabase()
-	collections := []*schema.VectorStoreCollection{}
-	db.Find(&collections)
+	collections, err := yakit.GetAllRAGCollectionInfos(db)
+	assert.NoError(t, err)
 	t.Logf("共找到 %d 个向量存储集合", len(collections))
 
 	for i, collection := range collections {
