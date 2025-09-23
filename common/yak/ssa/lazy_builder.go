@@ -121,10 +121,37 @@ func (p *Program) LazyBuild() {
 		_ = ok
 		blueprint.Build()
 	}
+	visited := make(map[*Function]struct{})
+	var stack []*Function
 	for _, key := range p.Funcs.Keys() {
 		fun, ok := p.Funcs.Get(key)
-		_ = ok
+		if !ok || fun == nil {
+			continue
+		}
+		stack = append(stack, fun)
+	}
+
+	for len(stack) > 0 {
+		// 深度优先遍历函数与其子函数，确保所有 LazyBuilder 均被执行
+		fun := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if fun == nil {
+			continue
+		}
+		if _, ok := visited[fun]; ok {
+			continue
+		}
+		visited[fun] = struct{}{}
 		fun.Build()
+		for _, childID := range fun.ChildFuncs {
+			childValue, ok := fun.GetValueById(childID)
+			if !ok || childValue == nil {
+				continue
+			}
+			if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
+				stack = append(stack, childFunc)
+			}
+		}
 	}
 	for _, f := range p.fixImportCallback {
 		f()

@@ -2,9 +2,10 @@ package tests
 
 import (
 	_ "embed"
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/ssa"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,10 +13,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
 )
 
-//go:embed test.js
+//go:embed testdata/test.js
 var largeJS string
 
-//go:embed member_nil.js
+//go:embed testdata/member_nil.js
 var nilMemberJS string
 
 func TestJS_ASTLargeText(t *testing.T) {
