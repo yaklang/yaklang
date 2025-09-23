@@ -133,3 +133,155 @@ func TestExportWithEmptyLayers(t *testing.T) {
 		t.Fatalf("Failed to export empty uint32 graph: %v", err)
 	}
 }
+
+func TestExportNeighborRelationships(t *testing.T) {
+	// 创建一个简单的图，包含明确的邻居关系
+	keyToVector := map[string][]float32{
+		"node1": {1.0, 0.0},
+		"node2": {0.0, 1.0},
+		"node3": {1.0, 1.0},
+		"node4": {0.5, 0.5},
+	}
+
+	// 创建图
+	graph := NewGraph[string](WithDeterministicRng[string](0))
+
+	// 添加节点
+	keys := make([]string, 0, len(keyToVector))
+	for key := range keyToVector {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+
+	for _, key := range keys {
+		vec := keyToVector[key]
+		node := MakeInputNode(key, vec)
+		graph.Add(node)
+	}
+
+	// 验证每一层节点的邻居关系
+	verifyNeighbors := func(graph *Graph[string], testName string) {
+		t.Logf("Verifying neighbors for %s", testName)
+		for layerIdx, layer := range graph.Layers {
+			t.Logf("Layer %d has %d nodes", layerIdx, len(layer.Nodes))
+			for nodeKey, node := range layer.Nodes {
+				actualNeighbors := node.GetNeighbors()
+				var actualNeighborKeys []string
+				for neighborKey := range actualNeighbors {
+					actualNeighborKeys = append(actualNeighborKeys, neighborKey)
+				}
+				slices.Sort(actualNeighborKeys)
+
+				t.Logf("  Node %s in layer %d has neighbors: [%s]",
+					nodeKey, layerIdx, strings.Join(actualNeighborKeys, ", "))
+
+				// 验证每个邻居在同一层中确实存在
+				for _, neighborKey := range actualNeighborKeys {
+					if _, exists := layer.Nodes[neighborKey]; !exists {
+						t.Errorf("%s: Layer %d - Node %s has neighbor %s that doesn't exist in the same layer",
+							testName, layerIdx, nodeKey, neighborKey)
+					}
+				}
+
+				// 验证邻居关系的双向性（如果A是B的邻居，B也应该是A的邻居）
+				for _, neighborKey := range actualNeighborKeys {
+					if neighborNode, exists := layer.Nodes[neighborKey]; exists {
+						neighborNeighbors := neighborNode.GetNeighbors()
+						if _, hasReverse := neighborNeighbors[nodeKey]; !hasReverse {
+							t.Logf("Warning: %s: Layer %d - Neighbor relationship is not bidirectional between %s and %s",
+								testName, layerIdx, nodeKey, neighborKey)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 记录原始图的结构
+	t.Logf("Original graph has %d layers", len(graph.Layers))
+	verifyNeighbors(graph, "Original Graph")
+
+	// 导出图
+	persistent, err := ExportHNSWGraph(graph)
+	if err != nil {
+		t.Fatalf("Failed to export graph: %v", err)
+	}
+
+	// 转换为二进制并重新加载
+	binary, err := persistent.ToBinary(context.Background())
+	if err != nil {
+		t.Fatalf("Failed to convert to binary: %v", err)
+	}
+
+	reloadedPersistent, err := LoadBinary[string](binary)
+	if err != nil {
+		t.Fatalf("Failed to load from binary: %v", err)
+	}
+
+	// 重新构建图并验证邻居关系是否正确恢复
+	rebuiltGraph, err := reloadedPersistent.BuildGraph()
+	if err != nil {
+		t.Fatalf("Failed to rebuild graph: %v", err)
+	}
+
+	t.Logf("Rebuilt graph has %d layers", len(rebuiltGraph.Layers))
+
+	// 验证层数是否一致
+	if len(graph.Layers) != len(rebuiltGraph.Layers) {
+		t.Errorf("Layer count mismatch: original has %d layers, rebuilt has %d layers",
+			len(graph.Layers), len(rebuiltGraph.Layers))
+	}
+
+	// 验证每一层的节点数量是否一致
+	for layerIdx := 0; layerIdx < len(graph.Layers) && layerIdx < len(rebuiltGraph.Layers); layerIdx++ {
+		originalCount := len(graph.Layers[layerIdx].Nodes)
+		rebuiltCount := len(rebuiltGraph.Layers[layerIdx].Nodes)
+		if originalCount != rebuiltCount {
+			t.Errorf("Layer %d node count mismatch: original has %d nodes, rebuilt has %d nodes",
+				layerIdx, originalCount, rebuiltCount)
+		}
+	}
+
+	// 验证重建图的邻居关系
+	verifyNeighbors(rebuiltGraph, "Rebuilt Graph")
+
+	// 比较原始图和重建图的邻居关系一致性
+	compareGraphNeighbors := func(original, rebuilt *Graph[string]) {
+		for layerIdx := 0; layerIdx < len(original.Layers) && layerIdx < len(rebuilt.Layers); layerIdx++ {
+			originalLayer := original.Layers[layerIdx]
+			rebuiltLayer := rebuilt.Layers[layerIdx]
+
+			for nodeKey := range originalLayer.Nodes {
+				if rebuiltNode, exists := rebuiltLayer.Nodes[nodeKey]; exists {
+					originalNode := originalLayer.Nodes[nodeKey]
+
+					originalNeighbors := originalNode.GetNeighbors()
+					rebuiltNeighbors := rebuiltNode.GetNeighbors()
+
+					var originalKeys, rebuiltKeys []string
+					for key := range originalNeighbors {
+						originalKeys = append(originalKeys, key)
+					}
+					for key := range rebuiltNeighbors {
+						rebuiltKeys = append(rebuiltKeys, key)
+					}
+
+					slices.Sort(originalKeys)
+					slices.Sort(rebuiltKeys)
+
+					if strings.Join(originalKeys, ",") != strings.Join(rebuiltKeys, ",") {
+						t.Errorf("Layer %d - Node %s neighbor mismatch: original [%s], rebuilt [%s]",
+							layerIdx, nodeKey,
+							strings.Join(originalKeys, ", "),
+							strings.Join(rebuiltKeys, ", "))
+					}
+				} else {
+					t.Errorf("Layer %d - Node %s exists in original but not in rebuilt graph", layerIdx, nodeKey)
+				}
+			}
+		}
+	}
+
+	compareGraphNeighbors(graph, rebuiltGraph)
+	t.Logf("Successfully verified neighbor relationships through export/import cycle")
+}

@@ -8,16 +8,16 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // IsReadyCollection 检查集合是否存在
 func IsReadyCollection(db *gorm.DB, collectionName string) bool {
-	var collections []*schema.VectorStoreCollection
-	dbErr := db.Where("name = ?", collectionName).Find(&collections)
-	if dbErr.Error != nil {
+	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
+	if err != nil {
 		return false
 	}
-	return len(collections) > 0
+	return collection != nil
 }
 
 type ExportVectorStoreDocument struct {
@@ -59,16 +59,15 @@ func ImportVectorData(db *gorm.DB, filepath string) error {
 				return err
 			}
 
-			cs := []*schema.VectorStoreCollection{}
-			err = tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&cs).Error
+			collection, err := yakit.QueryRAGCollectionByName(tx, collectionName)
 			if err != nil {
 				return err
 			}
 
-			if len(cs) == 0 {
+			if collection == nil {
 				return utils.Errorf("save collection %s failed, collection not found", collectionName)
 			}
-			collectionId = cs[0].ID
+			collectionId = collection.ID
 			return nil
 		}), bizhelper.WithImportUniqueIndexField("DocumentID"), bizhelper.WithImportAllowOverwrite(true))
 	})
@@ -76,23 +75,22 @@ func ImportVectorData(db *gorm.DB, filepath string) error {
 }
 
 func ExportVectorData(db *gorm.DB, collectionName string, filepath string) error {
-	var collections []*schema.VectorStoreCollection
-	err := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error
+	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
 	if err != nil {
 		return utils.Errorf("failed to get %s collection: %v", collectionName, err)
 	}
 
-	if len(collections) == 0 {
+	if collection == nil {
 		return utils.Errorf("collection %s not found", collectionName)
 	}
 
 	metaData := make(bizhelper.MetaData)
-	metaData["collection_name"] = collections[0].Name
-	metaData["collection_description"] = collections[0].Description
-	metaData["collection_model_name"] = collections[0].ModelName
-	metaData["collection_dimension"] = collections[0].Dimension
+	metaData["collection_name"] = collection.Name
+	metaData["collection_description"] = collection.Description
+	metaData["collection_model_name"] = collection.ModelName
+	metaData["collection_dimension"] = collection.Dimension
 
-	exportDB := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collections[0].ID)
+	exportDB := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID)
 	opts := []bizhelper.ExportOption{
 		bizhelper.WithExportMetadata(metaData),
 	}
@@ -128,14 +126,16 @@ func ImportVectorDataFullUpdate(db *gorm.DB, filepath string) error {
 			collectionModelName := metaData["collection_model_name"].(string)
 			collectionDimension := metaData["collection_dimension"].(float64)
 
-			var collections []*schema.VectorStoreCollection
-			err := tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections).Error
+			collection, err := yakit.QueryRAGCollectionByName(tx, collectionName)
 			if err != nil {
 				return err
 			}
 
-			if len(collections) > 0 {
-				collectionId = collections[0].ID
+			if collection == nil {
+				return utils.Errorf("save collection %s failed, collection not found", collectionName)
+			}
+			if collection != nil {
+				collectionId = collection.ID
 				err = tx.Unscoped().Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collectionId).Delete(&schema.VectorStoreDocument{}).Error
 				if err != nil {
 					return err
@@ -157,16 +157,15 @@ func ImportVectorDataFullUpdate(db *gorm.DB, filepath string) error {
 				return err
 			}
 
-			cs := []*schema.VectorStoreCollection{}
-			err = tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&cs).Error
+			collection, err = yakit.QueryRAGCollectionByName(tx, collectionName)
 			if err != nil {
 				return err
 			}
 
-			if len(cs) == 0 {
+			if collection == nil {
 				return utils.Errorf("save collection %s failed, collection not found", collectionName)
 			}
-			collectionId = cs[0].ID
+			collectionId = collection.ID
 			return nil
 		}), bizhelper.WithImportUniqueIndexField("DocumentID"), bizhelper.WithImportAllowOverwrite(true))
 	})

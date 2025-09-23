@@ -7,7 +7,8 @@ import (
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func getListCollectionCommand() *cli.Command {
@@ -20,9 +21,10 @@ func getListCollectionCommand() *cli.Command {
 
 func listCollection(c *cli.Context) error {
 	db := consts.GetGormProfileDatabase()
-	var collections []*schema.VectorStoreCollection
-	db.Model(&schema.VectorStoreCollection{}).Find(&collections)
-
+	collections, err := yakit.GetAllRAGCollectionInfos(db)
+	if err != nil {
+		return utils.Errorf("获取知识库列表失败: %v", err)
+	}
 	if len(collections) == 0 {
 		fmt.Println("暂无知识库")
 		return nil

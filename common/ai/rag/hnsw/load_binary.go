@@ -7,6 +7,7 @@ import (
 
 	"cmp"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"google.golang.org/protobuf/encoding/protowire"
 
@@ -376,7 +377,13 @@ func (p *Persistent[K]) BuildGraph() (*Graph[K], error) {
 }
 
 // BuildGraph 从 Persistent 构建 Graph[K]
-func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error), opts ...GraphOption[K]) (*Graph[K], error) {
+func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error), opts ...GraphOption[K]) (g *Graph[K], err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("build lazy graph panic: %v", r)
+			err = utils.Errorf("build lazy graph panic: %v", r)
+		}
+	}()
 	if p.Total <= 0 {
 		return nil, utils.Error("cannot build graph from empty persistent")
 	}
@@ -405,7 +412,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 		return nil, utils.Error("offset to key mapping is nil")
 	}
 
-	g := NewGraph[K](opts...)
+	g = NewGraph[K](opts...)
 	g.M = int(p.M)
 	g.Ml = float64(p.Ml)
 	g.EfSearch = int(p.EfSearch)
@@ -420,75 +427,101 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 		g.pqQuantizer = pq.NewQuantizer(g.pqCodebook)
 	}
 
+	layerOffset := []uint32{}
+	preOffset := uint32(0)
+	for _, layer := range p.Layers {
+		layerOffset = append(layerOffset, preOffset)
+		preOffset += uint32(len(layer.Nodes))
+	}
+
+	parseOffsetWithLayer := func(offset uint32) (int, uint32) {
+		targetLevel := 0
+		for level, levelOffset := range layerOffset {
+			if offset > levelOffset {
+				targetLevel = level
+				continue
+			}
+			break
+		}
+		return targetLevel, offset - layerOffset[targetLevel]
+	}
+
 	// 创建节点映射
 	nodes := make(map[uint32]hnswspec.LayerNode[K])
-	for offset, node := range p.OffsetToKey {
-		if offset == 0 {
-			continue // 跳过 0 offset
-		}
+	for _, layer := range p.Layers {
+		for _, offset := range layer.Nodes {
+			_, offsetWithoutLayer := parseOffsetWithLayer(offset)
+			if offset == 0 {
+				continue // 跳过 0 offset
+			}
+			if offsetWithoutLayer >= uint32(len(p.OffsetToKey)) {
+				return nil, utils.Errorf("recovery node failed, offset %d not found", offsetWithoutLayer)
+			}
+			node := p.OffsetToKey[offsetWithoutLayer]
+			key := node.Key
+			var vec Vector
 
-		key := node.Key
-		var vec Vector
+			switch p.ExportMode {
+			case ExportModePQ:
+				codes, ok := node.Code.([]byte)
+				if !ok {
+					return nil, utils.Errorf("expected []byte for pq code, got %T", node.Code)
+				}
+				if len(codes) != int(p.PQCodebook.PQCodeByteSize) {
+					return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", p.PQCodebook.PQCodeByteSize, len(codes))
+				}
+				// 对于 PQ 模式，我们需要创建一个有效的向量来初始化节点
+				// 由于我们只有编码，我们创建一个虚拟向量
+				dummyVec := make([]float64, int(p.Dims))
+				for i := range dummyVec {
+					dummyVec[i] = 0.0 // 使用零向量作为占位符
+				}
+				dummyVec32 := make([]float32, len(dummyVec))
+				for i, v := range dummyVec {
+					dummyVec32[i] = float32(v)
+				}
+				vecFunc := func() []float32 { return dummyVec32 }
 
-		switch p.ExportMode {
-		case ExportModePQ:
-			codes, ok := node.Code.([]byte)
-			if !ok {
-				return nil, utils.Errorf("expected []byte for pq code, got %T", node.Code)
-			}
-			if len(codes) != int(p.PQCodebook.PQCodeByteSize) {
-				return nil, utils.Errorf("pq code size mismatch: expected %d, got %d", p.PQCodebook.PQCodeByteSize, len(codes))
-			}
-			// 对于 PQ 模式，我们需要创建一个有效的向量来初始化节点
-			// 由于我们只有编码，我们创建一个虚拟向量
-			dummyVec := make([]float64, int(p.Dims))
-			for i := range dummyVec {
-				dummyVec[i] = 0.0 // 使用零向量作为占位符
-			}
-			dummyVec32 := make([]float32, len(dummyVec))
-			for i, v := range dummyVec {
-				dummyVec32[i] = float32(v)
-			}
-			vecFunc := func() []float32 { return dummyVec32 }
-
-			nodeObj, err := hnswspec.NewPQLayerNode(key, vecFunc, g.pqQuantizer)
-			if err != nil {
-				return nil, utils.Wrap(err, "create pq layer node")
-			}
-			// 注意：这里我们使用构造函数创建的节点，它的 PQ codes 已经根据输入向量计算
-			// 如果需要使用原始的 codes，我们需要在 hnswspec 中添加设置方法
-			nodes[uint32(offset)] = nodeObj
-		case ExportModeStandard:
-			vecFloat64, ok := node.Code.([]float64)
-			if !ok {
-				return nil, utils.Errorf("expected []float64 for vector, got %T", node.Code)
-			}
-			if len(vecFloat64) != int(p.Dims) {
-				return nil, utils.Errorf("vector dimension mismatch: expected %d, got %d", p.Dims, len(vecFloat64))
-			}
-			vecFloat32 := make([]float32, len(vecFloat64))
-			for i, v := range vecFloat64 {
-				vecFloat32[i] = float32(v)
-			}
-			vec = func() []float32 { return vecFloat32 }
-			nodes[uint32(offset)] = hnswspec.NewStandardLayerNode(key, vec)
-		case ExportModeUID:
-			if dataLoader == nil {
-				return nil, utils.Error("data loader is nil")
-			}
-			id, ok := node.Code.(hnswspec.LazyNodeID)
-			if !ok {
-				return nil, utils.Errorf("expected []byte for uid, got %T", node.Code)
-			}
-			nodes[uint32(offset)] = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(id), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
-				data, err := dataLoader(uid)
+				nodeObj, err := hnswspec.NewPQLayerNode(key, vecFunc, g.pqQuantizer)
+				if err != nil {
+					return nil, utils.Wrap(err, "create pq layer node")
+				}
+				// 注意：这里我们使用构造函数创建的节点，它的 PQ codes 已经根据输入向量计算
+				// 如果需要使用原始的 codes，我们需要在 hnswspec 中添加设置方法
+				nodes[uint32(offset)] = nodeObj
+			case ExportModeStandard:
+				vecFloat64, ok := node.Code.([]float64)
+				if !ok {
+					return nil, utils.Errorf("expected []float64 for vector, got %T", node.Code)
+				}
+				if len(vecFloat64) != int(p.Dims) {
+					return nil, utils.Errorf("vector dimension mismatch: expected %d, got %d", p.Dims, len(vecFloat64))
+				}
+				vecFloat32 := make([]float32, len(vecFloat64))
+				for i, v := range vecFloat64 {
+					vecFloat32[i] = float32(v)
+				}
+				vec = func() []float32 { return vecFloat32 }
+				nodes[uint32(offset)] = hnswspec.NewStandardLayerNode(key, vec)
+			case ExportModeUID:
+				if dataLoader == nil {
+					return nil, utils.Error("data loader is nil")
+				}
+				id, ok := node.Code.(hnswspec.LazyNodeID)
+				if !ok {
+					return nil, utils.Errorf("expected []byte for uid, got %T", node.Code)
+				}
+				data, err := dataLoader(id)
 				if err != nil {
 					return nil, utils.Wrap(err, "data loader")
 				}
-				return data, nil
-			})
-		default:
-			return nil, utils.Errorf("unsupported node code type %T", node.Code)
+				nodes[uint32(offset)] = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(id), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
+					return data, nil
+				})
+			default:
+				return nil, utils.Errorf("unsupported node code type %T", node.Code)
+			}
+
 		}
 	}
 

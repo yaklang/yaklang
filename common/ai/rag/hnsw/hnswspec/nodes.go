@@ -163,17 +163,27 @@ func (n *StandardLayerNode[K]) GetPQCodes() ([]byte, bool) {
 
 // PQLayerNode PQ优化的HNSW层节点（不存储原始向量数据）
 type PQLayerNode[K cmp.Ordered] struct {
-	key       K
-	pqCodes   []byte // PQ编码
-	neighbors map[K]LayerNode[K]
+	key          K
+	pqCodeGetter func() ([]byte, error)
+	neighbors    map[K]LayerNode[K]
 }
 
 // NewRawPQLayerNode 创建原始PQ编码的层节点
 func NewRawPQLayerNode[K cmp.Ordered](key K, pqCodes []byte) *PQLayerNode[K] {
 	node := &PQLayerNode[K]{
-		key:       key,
-		pqCodes:   pqCodes,
-		neighbors: make(map[K]LayerNode[K]),
+		key:          key,
+		pqCodeGetter: func() ([]byte, error) { return pqCodes, nil },
+		neighbors:    make(map[K]LayerNode[K]),
+	}
+	return node
+}
+
+// NewRawPQLayerNode 创建原始PQ编码的层节点
+func NewLazyRawPQLayerNode[K cmp.Ordered](key K, pqCodeGetter func() ([]byte, error)) *PQLayerNode[K] {
+	node := &PQLayerNode[K]{
+		key:          key,
+		pqCodeGetter: pqCodeGetter,
+		neighbors:    make(map[K]LayerNode[K]),
 	}
 	return node
 }
@@ -193,9 +203,9 @@ func NewPQLayerNode[K cmp.Ordered](key K, vector Vector, quantizer *pq.Quantizer
 	}
 
 	node := &PQLayerNode[K]{
-		key:       key,
-		pqCodes:   pqCodes,
-		neighbors: make(map[K]LayerNode[K]),
+		key:          key,
+		pqCodeGetter: func() ([]byte, error) { return pqCodes, nil },
+		neighbors:    make(map[K]LayerNode[K]),
 	}
 
 	return node, nil
@@ -214,7 +224,11 @@ func (n *PQLayerNode[K]) GetVector() Vector {
 }
 
 func (n *PQLayerNode[K]) GetData() any {
-	return n.pqCodes
+	codes, err := n.pqCodeGetter()
+	if err != nil {
+		return nil
+	}
+	return codes
 }
 
 func (n *PQLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {
@@ -333,7 +347,11 @@ func (n *PQLayerNode[K]) IsPQEnabled() bool {
 }
 
 func (n *PQLayerNode[K]) GetPQCodes() ([]byte, bool) {
-	return n.pqCodes, true
+	codes, err := n.pqCodeGetter()
+	if err != nil {
+		return nil, false
+	}
+	return codes, true
 }
 
 func (n *PQLayerNode[K]) AddSingleNeighbor(neighbor LayerNode[K]) {

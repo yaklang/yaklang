@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // BigTextPlan 常量定义
@@ -676,12 +677,15 @@ func QueryCollection(db *gorm.DB, query string, opts ...aispec.AIConfigOption) (
 			document.Content = fmt.Sprintf("collection_name: %s\ncollection_id: %v", collectionName, collectionID)
 
 			// 查找对应的集合详细信息
-			var collections []*schema.VectorStoreCollection
+			var collection *schema.VectorStoreCollection
 			if collectionIDInt, ok := collectionID.(float64); ok {
-				db.Model(&schema.VectorStoreCollection{}).Where("id = ?", uint(collectionIDInt)).Find(&collections)
+				collection, err = yakit.QueryRAGCollectionByID(db, int64(collectionIDInt))
+				if err != nil {
+					log.Warnf("failed to query collection by id: %v", err)
+					continue
+				}
 			}
-			if len(collections) > 0 {
-				collection := collections[0]
+			if collection != nil {
 				document.Content = fmt.Sprintf("collection_name: %s\ncollection_description: %s\nmodel_name: %s\ndimension: %d",
 					collection.Name, collection.Description, collection.ModelName, collection.Dimension)
 			}

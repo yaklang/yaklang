@@ -236,6 +236,25 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 		return currentOffset, nil
 	}
 
+	layerOffset := []uint32{}
+	preOffset := uint32(0)
+	for _, layer := range i.Layers {
+		layerOffset = append(layerOffset, preOffset)
+		preOffset += uint32(len(layer.Nodes))
+	}
+
+	loadOffsetWithLevel := func(level uint32, node hnswspec.LayerNode[K]) (uint32, error) {
+		offset, err := loadOffset(node)
+		if err != nil {
+			return 0, err
+		}
+		if level == 0 {
+			return offset, nil
+		}
+		layerOffset := layerOffset[level]
+		return offset + layerOffset, nil
+	}
+
 	pers.Layers = make([]*PersistentLayer, len(i.Layers))
 	for level, layer := range i.Layers {
 		pl := &PersistentLayer{
@@ -250,7 +269,7 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 		slices.Sort(keys)
 		for _, key := range keys {
 			node := layer.Nodes[key]
-			offset, err := loadOffset(node)
+			offset, err := loadOffsetWithLevel(uint32(level), node)
 			if err != nil {
 				return nil, err
 			}
@@ -258,7 +277,7 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 			ns := node.GetNeighbors()
 			nsIdxs := make([]uint32, 0, len(ns))
 			for _, neighbor := range ns {
-				offsetFromNeighbor, err := loadOffset(neighbor)
+				offsetFromNeighbor, err := loadOffsetWithLevel(uint32(level), neighbor)
 				if err != nil {
 					return nil, err
 				}
