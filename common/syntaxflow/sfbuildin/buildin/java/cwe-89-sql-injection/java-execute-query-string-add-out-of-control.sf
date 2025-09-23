@@ -1,6 +1,5 @@
 desc(
 	title: "Detect Java SQL Injection Vulnerability"
-	title: "Detect Java SQL Injection Vulnerability"
 	type: audit
 	severity: mid
 	risk:sqli
