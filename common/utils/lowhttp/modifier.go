@@ -18,6 +18,7 @@ import (
 
 	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/samber/lo"
@@ -1399,17 +1400,28 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 	}
 
 	// try json
-	var tempMap map[string]any
 	if len(params) == 0 {
-		err = json.Unmarshal(body, &tempMap)
-		if err == nil {
-			params = handleUnmarshalResults(tempMap)
+		// 使用gjson判断是否为有效的JSON
+		if gjson.ValidBytes(body) {
+			parsed := gjson.ParseBytes(body)
+			if parsed.IsObject() {
+				// 只有JSON对象才尝试解析为参数
+				var tempMap map[string]any
+				err = json.Unmarshal(body, &tempMap)
+				if err == nil {
+					params = handleUnmarshalResults(tempMap)
+				}
+			} else {
+				// 对于有效JSON但不是对象的情况（如字符串、数组、数字等），直接返回错误，不继续后续解析
+				useRaw = true
+				return
+			}
 		}
 	}
 
 	// try xml
 	if len(params) == 0 {
-		tempMap = xml_tools.XmlLoads(body)
+		tempMap := xml_tools.XmlLoads(body)
 		if len(tempMap) > 0 {
 			params = handleUnmarshalResults(tempMap)
 		}
