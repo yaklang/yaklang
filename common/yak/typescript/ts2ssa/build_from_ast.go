@@ -1,14 +1,14 @@
-package js2ssa
+package ts2ssa
 
 import (
 	"fmt"
+	"path"
 	"strconv"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
@@ -17,7 +17,9 @@ import (
 )
 
 func (b *builder) GetRecoverRange(sourcefile *ast.SourceFile, node *core.TextRange, text string) func() {
-	startLine, startCol := scanner.GetLineAndCharacterOfPosition(sourcefile, node.Pos())
+	pos := node.Pos()
+	pos = scanner.SkipTrivia(sourcefile.Text(), pos)
+	startLine, startCol := scanner.GetLineAndCharacterOfPosition(sourcefile, pos)
 	endLine, endCol := scanner.GetLineAndCharacterOfPosition(sourcefile, node.End())
 	return b.SetRangeWithCommonTokenLoc(ssa.NewCommonTokenLoc(text, startLine, startCol, endLine, endCol))
 }
@@ -30,11 +32,107 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 	recoverRange := b.GetRecoverRange(sourcefile, &sourcefile.Loc, sourcefile.Text())
 	defer recoverRange()
 
-	// js暂时不需要处理prehandle阶段
-	if b.PreHandler() {
+	prog := b.GetProgram()
+	application := prog.Application
+	fileName := b.GetEditor().GetFilename()
+	folderPath := b.GetEditor().GetFolderPath()
+	fileUrl := path.Join([]string{folderPath, fileName}...)
+
+	ssaGlobal := application.GlobalVariablesBlueprint.Container()
+	if ssaGlobal == nil {
 		return nil
 	}
 
+	if b.PreHandler() {
+		lib, _ := prog.GetLibrary(fileUrl)
+		if lib == nil {
+			lib = prog.NewLibrary(fileUrl, []string{fileUrl})
+			variable := b.CreateMemberCallVariable(ssaGlobal, b.EmitConstInstPlaceholder(fileUrl))
+			emptyContainer := b.EmitEmptyContainer()
+			b.AssignVariable(variable, emptyContainer)
+			if lib.GlobalVariablesBlueprint != nil {
+				moduleScope := b.ReadMemberCallValue(ssaGlobal, b.EmitConstInstPlaceholder(fileUrl))
+				lib.GlobalVariablesBlueprint.InitializeWithContainer(moduleScope)
+			}
+		}
+		defer func() {
+			lib.VisitAst(sourcefile)
+		}()
+		lib.PushEditor(prog.GetCurrentEditor())
+
+		subBuilder := lib.GetAndCreateFunctionBuilder(fileName, string(ssa.MainFunctionName))
+
+		if subBuilder != nil {
+			subBuilder.SetBuildSupport(b.FunctionBuilder)
+			subBuilder.SetEditor(prog.GetApplication().GetCurrentEditor())
+			currentBuilder := b.FunctionBuilder
+			b.FunctionBuilder = subBuilder
+			defer func() {
+				for _, e := range subBuilder.GetProgram().GetErrors() {
+					currentBuilder.GetProgram().AddError(e)
+				}
+				b.FunctionBuilder = currentBuilder
+			}()
+		}
+
+		if sourcefile.Statements != nil {
+			for _, statement := range sourcefile.Statements.Nodes {
+				if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {
+					b.useStrict = true
+				}
+				if ast.IsImportDeclaration(statement) {
+					b.VisitStatement(statement)
+				}
+			}
+			for _, statement := range sourcefile.Statements.Nodes {
+				if ast.IsFunctionDeclaration(statement) || ast.IsVariableStatement(statement) || ast.IsEnumDeclaration(statement) || ast.IsClassDeclaration(statement) || ast.IsInterfaceDeclaration(statement) {
+					b.VisitStatement(statement)
+				}
+
+			}
+		}
+
+		for exportValueName, exportedObjectName := range b.namedValueExports {
+			exportedObjectVal := b.PeekValue(exportedObjectName)
+			if exportedObjectVal != nil {
+				lib.SetExportValue(exportValueName, exportedObjectVal)
+			}
+		}
+
+		for exportTypeName, exportedTypeName := range b.namedValueExports {
+			exportedObjectVal := b.PeekValue(exportedTypeName)
+			if exportedObjectVal != nil {
+				lib.SetExportType(exportTypeName, exportedObjectVal.GetType())
+			}
+		}
+		return nil
+	}
+
+	lib, _ := prog.GetLibrary(fileUrl)
+
+	if lib == nil {
+		b.NewError(ssa.Error, TAG, "no library found for file %s", fileUrl)
+		return nil
+	}
+
+	subBuilder := lib.GetAndCreateFunctionBuilder(fileName, string(ssa.MainFunctionName))
+
+	if subBuilder != nil {
+		subBuilder.SetBuildSupport(b.FunctionBuilder)
+		subBuilder.SetEditor(prog.GetApplication().GetCurrentEditor())
+		currentBuilder := b.FunctionBuilder
+		b.FunctionBuilder = subBuilder
+		defer func() {
+			for _, e := range subBuilder.GetProgram().GetErrors() {
+				currentBuilder.GetProgram().AddError(e)
+			}
+			b.FunctionBuilder = currentBuilder
+		}()
+	}
+
+	defer func() {
+		lib.VisitAst(sourcefile)
+	}()
 	if sourcefile.Statements != nil {
 		for _, statement := range sourcefile.Statements.Nodes {
 			if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {
@@ -42,7 +140,9 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 				break
 			}
 		}
-		b.VisitStatements(sourcefile.Statements)
+		for _, statement := range sourcefile.Statements.Nodes {
+			b.VisitStatement(statement)
+		}
 	}
 
 	return nil
@@ -125,6 +225,10 @@ func (b *builder) VisitStatement(node *ast.Node) interface{} {
 		b.VisitImportDeclaration(node.AsImportDeclaration())
 	case ast.KindExportAssignment:
 		b.VisitExportAssignment(node.AsExportAssignment())
+	case ast.KindEnumDeclaration:
+		b.VisitEnumDeclaration(node.AsEnumDeclaration())
+	case ast.KindInterfaceDeclaration:
+		b.VisitInterfaceDeclaration(node.AsInterfaceDeclaration())
 	default:
 		b.NewError(ssa.Error, TAG, UnhandledStatement())
 	}
@@ -139,8 +243,16 @@ func (b *builder) VisitVariableStatement(node *ast.VariableStatement) interface{
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	// 使用 AST 提供的辅助方法检查修饰符
+	nodePtr := node.AsNode()
+	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
+
+	if !ShouldVisit(b.PreHandler(), isExport) {
+		return nil
+	}
+
 	if decList := node.DeclarationList; decList != nil {
-		b.VisitVariableDeclarationList(decList)
+		b.VisitVariableDeclarationList(decList, isExport)
 	}
 	return nil
 }
@@ -198,7 +310,15 @@ func (b *builder) VisitNumericLiteral(node *ast.NumericLiteral) ssa.Value {
 	defer recoverRange()
 
 	// 创建数字常量
-	return b.EmitConstInst(codec.Atoi(text))
+	num, err := strconv.ParseInt(text, 0, 64)
+	if err == nil {
+		return b.EmitConstInst(num)
+	}
+	float, err := strconv.ParseFloat(text, 64)
+	if err == nil {
+		return b.EmitConstInst(float)
+	}
+	return b.EmitConstInst(utils.InterfaceToFloat64(text))
 }
 
 // VisitBooleanLiteral 访问布尔字面量
@@ -416,7 +536,7 @@ func (b *builder) VisitWhileStatement(node *ast.WhileStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Expression != nil {
 			condition := b.VisitRightValueExpression(node.Expression)
-			if utils.IsNil(condition) {
+			if condition == nil {
 				return b.EmitConstInst(true)
 			}
 			return condition
@@ -462,7 +582,7 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 			switch node.Initializer.Kind {
 			case ast.KindVariableDeclarationList:
 				// 变量声明初始化：for(let i = 0; ...)
-				b.VisitVariableDeclarationList(node.Initializer.AsVariableDeclarationList().AsNode())
+				b.VisitVariableDeclarationList(node.Initializer.AsVariableDeclarationList().AsNode(), false)
 				for _, varDecl := range node.Initializer.AsVariableDeclarationList().Declarations.Nodes {
 					name := varDecl.AsVariableDeclaration().Name()
 					switch {
@@ -493,7 +613,7 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Condition != nil {
 			condition := b.VisitRightValueExpression(node.Condition)
-			if utils.IsNil(condition) {
+			if condition == nil {
 				return b.EmitConstInst(true)
 			}
 			return condition
@@ -620,7 +740,13 @@ func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
 	// 如果有返回表达式，处理它并返回
 	if node.Expression != nil {
 		returnValue := b.VisitRightValueExpression(node.Expression)
-		b.EmitReturn([]ssa.Value{returnValue})
+		if returnValue != nil {
+			b.EmitReturn([]ssa.Value{returnValue})
+		} else {
+			b.EmitReturn([]ssa.Value{ssa.NewUndefined("ret")})
+			_ = b.VisitRightValueExpression(node.Expression)
+		}
+
 	} else {
 		// 如果没有返回表达式，返回undefined
 		b.EmitReturn([]ssa.Value{b.EmitUndefined("")})
@@ -779,14 +905,13 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 	var caseCount int
 	var commonCase []*ast.Node
 	var defaultCase *ast.Node
-
 	if caseBlock.Clauses != nil && caseBlock.Clauses.Nodes != nil {
-		lastCase := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1].AsCaseOrDefaultClause()
-		if lastCase.Expression == nil {
-			defaultCase = lastCase.AsNode()
-			commonCase = caseBlock.Clauses.Nodes[:len(caseBlock.Clauses.Nodes)-1]
-		} else {
-			commonCase = caseBlock.Clauses.Nodes
+		for _, caseClause := range caseBlock.Clauses.Nodes {
+			if caseClause.AsCaseOrDefaultClause().Expression == nil {
+				defaultCase = caseClause
+			} else {
+				commonCase = append(commonCase, caseClause)
+			}
 		}
 		if defaultCase != nil {
 			caseCount = len(caseBlock.Clauses.Nodes) - 1
@@ -796,6 +921,7 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 	} else {
 		caseCount = 0
 	}
+
 	switchBuilder.BuildCaseSize(caseCount)
 
 	switchBuilder.SetCase(func(i int) []ssa.Value {
@@ -883,6 +1009,26 @@ func (b *builder) VisitClassDeclaration(node *ast.ClassDeclaration) ssa.Value {
 	)
 
 	className := node.Name().AsIdentifier().Text
+
+	// 使用 AST 提供的辅助方法检查修饰符
+	nodePtr := node.AsNode()
+	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
+	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
+
+	if !ShouldVisit(b.PreHandler(), isExport) {
+		return nil
+	}
+
+	if isExport {
+		if !isDefault {
+			b.namedTypeExports[className] = className
+			b.namedValueExports[className] = className
+		} else {
+			b.namedTypeExports["default"] = className
+			b.namedValueExports["default"] = className
+		}
+	}
+
 	blueprint = b.CreateBlueprint(className)
 	blueprint.SetKind(ssa.BlueprintClass)
 
@@ -935,7 +1081,7 @@ func (b *builder) VisitHeritageClause(node *ast.HeritageClause) interface{} { re
 // ===== Declaration =====
 
 // VisitVariableDeclarationList 访问变量声明列表
-func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationListNode) interface{} {
+func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationListNode, isExport bool) interface{} {
 	if node == nil || b.IsStop() {
 		return nil
 	}
@@ -945,13 +1091,13 @@ func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationList
 
 	declList := node.AsVariableDeclarationList()
 	for _, varDecl := range declList.Declarations.Nodes {
-		b.VisitVariableDeclaration(varDecl.AsVariableDeclaration(), declList.Flags)
+		b.VisitVariableDeclaration(varDecl.AsVariableDeclaration(), declList.Flags, isExport)
 	}
 	return nil
 }
 
 // VisitVariableDeclaration 访问变量声明
-func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declType ast.NodeFlags) interface{} {
+func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declType ast.NodeFlags, isExport bool) interface{} {
 	if decl == nil || b.IsStop() {
 		return nil
 	}
@@ -983,6 +1129,12 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		let { x: y, z } = obj;        // ObjectBindingPattern
 	*/
 
+	// 获取显式类型注解（如果有的话）
+	var explicitType ssa.Type
+	if decl.Type != nil {
+		explicitType = b.VisitTypeNode(decl.Type)
+	}
+
 	// 获取声明的初始化值（如果有的话）
 	var initValue ssa.Value
 	if decl.Initializer != nil {
@@ -1002,7 +1154,9 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 	switch {
 	case ast.IsIdentifier(name): // 简单变量: let x = value
 		identifier := b.VisitIdentifier(name.AsIdentifier())
-
+		if isExport {
+			b.namedValueExports[identifier] = identifier
+		}
 		var variable *ssa.Variable
 		if isLocal {
 			variable = b.CreateLocalVariable(identifier)
@@ -1011,9 +1165,22 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		}
 
 		if decl.Initializer != nil { // 定义变量
+			if explicitType != nil {
+				mergedType := b.MergeTypeWithAnnotation(initValue.GetType(), explicitType)
+				initValue.SetType(mergedType)
+			}
 			b.AssignVariable(variable, initValue)
 		} else { // 仅声明变量
+			// 仅声明，使用显式类型或默认类型
+			var finalType ssa.Type
+			if explicitType != nil {
+				finalType = explicitType
+			} else {
+				finalType = ssa.CreateAnyType() // TypeScript的默认类型
+			}
+
 			undefinedValue := b.EmitValueOnlyDeclare(identifier)
+			undefinedValue.SetType(finalType)
 			b.AssignVariable(variable, undefinedValue)
 		}
 
@@ -1027,10 +1194,10 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		// 根据绑定模式类型处理
 		if ast.IsObjectBindingPattern(name) {
 			// 对象解构: let {a, b} = obj
-			b.ProcessObjectBindingPattern(name.AsBindingPattern(), initValue, isLocal)
+			b.ProcessObjectBindingPattern(name.AsBindingPattern(), initValue, isLocal, isExport)
 		} else if ast.IsArrayBindingPattern(name) {
 			// 数组解构: let [x, y] = arr
-			b.ProcessArrayBindingPattern(name.AsBindingPattern(), initValue, isLocal)
+			b.ProcessArrayBindingPattern(name.AsBindingPattern(), initValue, isLocal, isExport)
 		}
 
 	default:
@@ -1044,10 +1211,106 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 func (b *builder) VisitModuleBlock(node *ast.ModuleBlock) interface{} { return nil }
 
 // VisitImportDeclaration 访问导入声明
-func (b *builder) VisitImportDeclaration(node *ast.ImportDeclaration) interface{} { return nil }
+func (b *builder) VisitImportDeclaration(node *ast.ImportDeclaration) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 提取模块路径
+	modulePath := b.extractModuleSpecifierText(node.ModuleSpecifier)
+	if modulePath == "" {
+		b.NewError(ssa.Warn, TAG, "empty import module specifier")
+		return nil
+	}
+	// 解析导入路径
+	resolvedPath, isExternal := b.resolveImportLibPath(modulePath)
+	if resolvedPath == "" || isExternal {
+		return nil
+	}
+
+	// 处理导入子句
+	if node.ImportClause != nil {
+		b.VisitImportClause(node.ImportClause.AsImportClause(), resolvedPath, isExternal)
+	}
+
+	return nil
+}
 
 // VisitImportClause 访问导入子句
-func (b *builder) VisitImportClause(node *ast.ImportClause) interface{} { return nil }
+func (b *builder) VisitImportClause(node *ast.ImportClause, resolvedPath string, isExternal bool) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 跳过类型导入
+	if node.IsTypeOnly {
+		return nil
+	}
+
+	// 处理默认导入: import React from 'react'
+	if binding := node.Name(); binding != nil {
+		localName := b.getDeclarationNameText(binding)
+		if localName != "" {
+			b.assignImportedValue(localName, "default", resolvedPath, isExternal)
+		}
+	}
+
+	// 处理命名绑定
+	if node.NamedBindings != nil {
+		bindings := node.NamedBindings
+		switch {
+		case ast.IsNamespaceImport(bindings):
+			// 命名空间导入: import * as fs from 'fs'
+			namespace := bindings.AsNamespaceImport()
+			if namespace != nil && namespace.Name() != nil {
+				alias := b.getDeclarationNameText(namespace.Name())
+				if alias != "" {
+					b.bindNamespaceImport(alias, resolvedPath, isExternal)
+				}
+			}
+
+		case ast.IsNamedImports(bindings):
+			// 命名导入: import { a, b as c } from 'module'
+			named := bindings.AsNamedImports()
+			if named != nil && named.Elements != nil {
+				for _, specNode := range named.Elements.Nodes {
+					if specNode == nil {
+						continue
+					}
+					spec := specNode.AsImportSpecifier()
+					if spec == nil || spec.IsTypeOnly {
+						continue
+					}
+
+					localName := b.getDeclarationNameText(spec.Name())
+					if localName == "" {
+						continue
+					}
+
+					// 获取原始导出名（如果有别名的话）
+					originalName := localName
+					if spec.PropertyName != nil {
+						if ast.IsIdentifier(spec.PropertyName) {
+							originalName = spec.PropertyName.AsIdentifier().Text
+						} else if ast.IsStringLiteral(spec.PropertyName) {
+							originalName = strings.Trim(spec.PropertyName.AsStringLiteral().Text, `"'`)
+						}
+					}
+
+					b.assignImportedValue(localName, originalName, resolvedPath, isExternal)
+				}
+			}
+		}
+	}
+
+	return nil
+}
 
 // VisitNamespaceImport 访问命名空间导入
 func (b *builder) VisitNamespaceImport(node *ast.NamespaceImport) interface{} { return nil }
@@ -1058,14 +1321,128 @@ func (b *builder) VisitNamedImports(node *ast.NamedImports) interface{} { return
 // VisitImportSpecifier 访问导入说明符
 func (b *builder) VisitImportSpecifier(node *ast.ImportSpecifier) interface{} { return nil }
 
-// VisitNamedExports 访问命名导出
-func (b *builder) VisitNamedExports(node *ast.NamedExports) interface{} { return nil }
-
-// VisitExportSpecifier 访问导出说明符
-func (b *builder) VisitExportSpecifier(node *ast.ExportSpecifier) interface{} { return nil }
+func (b *builder) VisitImportEqualsDeclaration(node *ast.ImportEqualsDeclaration) interface{} {
+	return nil
+}
 
 // VisitExportAssignment 访问导出赋值
-func (b *builder) VisitExportAssignment(node *ast.ExportAssignment) interface{} { return nil }
+/*
+A. export default <表达式>;（IsExportEquals == false） export default 42;
+B. export = <实体名>;（IsExportEquals == true） 等价 CJS：module.exports = foo
+   这是 TypeScript 专有的 export-equals，用于兼容 CommonJS/AMD。右侧严格是 实体名（EntityName）：标识符或限定名（A.B.C）。不是任意表达式。
+
+不会命中的写法（列举以便区分）
+
+导出声明族（ExportDeclaration）：
+
+export { a, b as c };
+export { x as default };      // 这是“把具名导出重新导出为默认”，仍是 ExportDeclaration
+export * from "./mod";
+export { a } from "./mod";
+export { ChildNewApp as default } // convert named export to default export
+export * as ns from "./mod";
+
+
+带 default 的声明（声明节点本身）：
+
+export default function F() {}
+export default class C {}
+
+
+这些是 FunctionDeclaration / ClassDeclaration，带 Export+Default 修饰，不走 ExportAssignment。
+
+变量默认导出（不合法）：
+
+export default const x = 1;   // 语法非法
+*/
+func (b *builder) VisitExportAssignment(node *ast.ExportAssignment) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	if !node.IsExportEquals { // export default
+		if variable := b.VisitLeftValueExpression(node.Expression); variable != nil {
+			b.namedValueExports["default"] = variable.GetName()
+		}
+	} else {
+		if variable := b.VisitLeftValueExpression(node.Expression); variable != nil {
+			b.cjsExport = variable.GetName()
+		}
+	}
+	return nil
+}
+
+// VisitExportDeclaration 导出声明
+/*
+export { foo }
+export { foo as bar }
+export { foo } from './mod'
+*/
+func (b *builder) VisitExportDeclaration(decl *ast.ExportDeclaration) interface{} {
+	if decl == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &decl.Loc, "")
+	defer recoverRange()
+
+	if exportClause := decl.ExportClause; exportClause != nil {
+		if ast.IsNamedExports(exportClause) {
+			namedExports := exportClause.AsNamedExports()
+			b.VisitNamedExports(namedExports)
+		} else if ast.IsNamespaceExport(exportClause) {
+			namespaceExport := exportClause.AsNamespaceExport()
+			_ = namespaceExport
+			log.Warn("unimplemented Namespace export")
+		}
+	}
+	return nil
+}
+
+// VisitNamedExports 访问命名导出
+func (b *builder) VisitNamedExports(namedExports *ast.NamedExports) interface{} {
+	if namedExports == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &namedExports.Loc, "")
+	defer recoverRange()
+
+	var exportName, exportedItemName string
+	for _, element := range namedExports.Elements.Nodes {
+		if aliasName := element.AsExportSpecifier().PropertyName; aliasName != nil {
+			exportName = b.VisitModuleExportName(aliasName)
+		}
+		exportedItemName = b.VisitModuleExportName(element.AsExportSpecifier().Name())
+		if exportName == "" {
+			exportName = exportedItemName
+		}
+		if exportName == "default" { // export { ChildNewApp as default }
+			b.namedValueExports["default"] = exportedItemName
+		} else {
+			b.namedValueExports[exportName] = exportedItemName
+		}
+
+	}
+	return nil
+}
+
+func (b *builder) VisitModuleExportName(node *ast.ModuleExportName) string {
+	if node == nil || b.IsStop() {
+		return ""
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	if ast.IsIdentifier(node) {
+		return node.AsIdentifier().Text
+	}
+	return node.AsStringLiteral().Text
+}
 
 // VisitExternalModuleReference 访问外部模块引用
 func (b *builder) VisitExternalModuleReference(node *ast.ExternalModuleReference) interface{} {
@@ -1124,6 +1501,16 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			}
 		}
 
+		bp := b.GetBluePrint(identifierName)
+		if bp != nil {
+			return nil, bp.Container()
+		}
+		if importType, ok := b.GetProgram().TryReadImportDeclare(identifierName); ok {
+			if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+				return nil, blueprint.Container()
+			}
+		}
+
 		return nil, b.ReadValue(identifierName)
 	case ast.KindPropertyAccessExpression:
 		propertyAccessExp := node.AsPropertyAccessExpression()
@@ -1134,6 +1521,11 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		}
 
 		bp := b.GetBluePrint(objName) // 处理静态方法调用
+		if importType, ok := b.GetProgram().TryReadImportDeclare(objName); ok {
+			if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+				bp = blueprint
+			}
+		}
 		if (obj == nil && bp == nil) || propName == "" {
 			return nil, nil
 		}
@@ -1147,6 +1539,9 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 				return nil, val
 			}
 			return nil, nil
+		}
+		if b.IsPromiseType(obj.GetType()) && (propName == "then" || propName == "catch" || propName == "finally") {
+			return nil, obj // let call handle async call for Promise with Promise<T>.then()
 		}
 		return nil, b.ReadMemberCallMethodOrValue(obj, name)
 	case ast.KindElementAccessExpression:
@@ -1518,16 +1913,51 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 		}
 	}
 
+	var callee ssa.Value
+	callee = b.VisitRightValueExpression(node.Expression)
+	// 检查是否是 Promise 的特殊方法调用（then, catch, finally）
+	if ast.IsPropertyAccessExpression(node.Expression) {
+		propAccess := node.Expression.AsPropertyAccessExpression()
+		if propAccess.Name() != nil {
+			methodName := b.ProcessMemberName(propAccess.Name())
+			if methodName == "then" || methodName == "catch" || methodName == "finally" {
+				// 检查调用对象是否返回 Promise 类型
+				if b.IsPromiseType(callee.GetType()) {
+					// 确认是 Promise 类型，进行特殊处理
+					return b.HandlePromiseMethod(callee, methodName, args)
+				}
+				// 如果不是 Promise 类型，按普通方法调用处理
+			}
+		}
+	}
+
 	// 处理callee（被调用函数）
-	funcValue := b.VisitRightValueExpression(node.Expression)
-	if funcValue == nil {
+	if callee == nil {
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, InvalidFunctionCallee())
 		return b.EmitUndefined("")
 	}
+	if !utils.IsNil(callee.GetFunc()) {
+		for len(callee.GetFunc().Params) > len(args) {
+			args = append(args, b.EmitUndefined(""))
+		}
+		// 创建调用
+		// TODO: 函数调用导致实参发生改变如何处理?
+		call := b.EmitCall(b.NewCall(callee, args))
 
-	// 创建调用
-	// TODO: 函数调用导致实参发生改变如何处理?
-	return b.EmitCall(b.NewCall(funcValue, args))
+		// 根据被调用函数的类型设置 Call 指令的返回类型
+		// 这对于 Promise 等返回类型的正确传递非常重要
+		if funcType := callee.GetType(); funcType != nil {
+			if funcType.GetTypeKind() == ssa.FunctionTypeKind {
+				// 如果是函数类型，获取其返回类型
+				if ft, ok := funcType.(*ssa.FunctionType); ok && ft.ReturnType != nil {
+					call.SetType(ft.ReturnType)
+				}
+			}
+		}
+
+		return call
+	}
+	return nil
 }
 
 // VisitObjectLiteralExpression 访问对象字面量表达式
@@ -2049,32 +2479,60 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 		funcName = "anonymous_func_" + uuid.NewString()
 	}
 
+	// 使用 AST 提供的辅助方法检查修饰符
+	nodePtr := node.AsNode()
+	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
+	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
+	isAsync := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsAsync)
+	if !ShouldVisit(b.PreHandler(), isExport) {
+		return nil
+	}
+	if isExport {
+		if !isDefault {
+			b.namedValueExports[funcName] = funcName
+		} else {
+			b.namedValueExports["default"] = funcName
+		}
+
+	}
+
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
+	store := b.StoreFunctionBuilder()
+	log.Infof("add function funcName = %s", funcName)
+	newFunc.AddLazyBuilder(func() {
+		log.Infof("lazy-build function funcName = %s", funcName)
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		b.FunctionBuilder = b.PushFunction(newFunc)
 
-	// 切换到新函数的上下文
-	b.FunctionBuilder = b.PushFunction(newFunc)
-
-	// 处理函数参数
-	if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
-		b.ProcessFunctionParams(node.Parameters)
-	}
-
-	// 处理函数体
-	// 只有箭头函数的函数体可以是表达式
-	if node.Body != nil && node.Body.Kind == ast.KindBlock {
-		blockNode := node.Body.AsBlock()
-		if blockNode.Statements != nil {
-			b.VisitStatements(blockNode.Statements)
+		// 设置函数返回类型（如果有显式类型注解）
+		funcLikeData := node.FunctionLikeData()
+		if funcLikeData != nil && funcLikeData.Type != nil {
+			returnType := b.VisitTypeNode(funcLikeData.Type)
+			b.SetCurrentReturnType(returnType)
+		} else if isAsync {
+			// async 函数如果没有显式类型注解，自动包装为 Promise<any>
+			promiseType := ssa.NewObjectType()
+			promiseType.AddFullTypeName("Promise<any>")
+			b.SetCurrentReturnType(promiseType)
 		}
-	}
 
-	// 完成函数构建
-	b.Finish()
+		// 处理函数参数
+		if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
+			b.ProcessFunctionParams(node.Parameters)
+		}
 
-	// 恢复原来的函数上下文
-	b.FunctionBuilder = b.PopFunction()
-
+		// 处理函数体
+		// 只有箭头函数的函数体可以是表达式
+		if node.Body != nil && node.Body.Kind == ast.KindBlock {
+			blockNode := node.Body.AsBlock()
+			if blockNode.Statements != nil {
+				b.VisitStatements(blockNode.Statements)
+			}
+		}
+		b.FunctionBuilder = b.PopFunction()
+	})
 	// 在当前作用域中创建函数变量
 	variable := b.CreateJSVariable(funcName)
 	b.AssignVariable(variable, newFunc)
@@ -2100,12 +2558,28 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 		funcName = "anonymous_func_" + uuid.NewString()
 	}
 
+	// 使用 AST 提供的辅助方法检查是否是 async 函数
+	nodePtr := node.AsNode()
+	isAsync := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsAsync)
+
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
 
 	{
 		// 切换到新函数的上下文
 		b.FunctionBuilder = b.PushFunction(newFunc)
+
+		// 设置函数返回类型（如果有显式类型注解）
+		funcLikeData := node.FunctionLikeData()
+		if funcLikeData != nil && funcLikeData.Type != nil {
+			returnType := b.VisitTypeNode(funcLikeData.Type)
+			b.SetCurrentReturnType(returnType)
+		} else if isAsync {
+			// async 函数如果没有显式类型注解，自动包装为 Promise<any>
+			promiseType := ssa.NewObjectType()
+			promiseType.AddFullTypeName("Promise<any>")
+			b.SetCurrentReturnType(promiseType)
+		}
 
 		// 处理函数参数
 		if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
@@ -2154,12 +2628,28 @@ func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 		funcName = "arrow_func_" + uuid.NewString()
 	}
 
+	// 使用 AST 提供的辅助方法检查是否是 async 函数
+	nodePtr := node.AsNode()
+	isAsync := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsAsync)
+
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
 
 	{
 		// 切换到新函数的上下文
 		b.FunctionBuilder = b.PushFunction(newFunc)
+
+		// 设置函数返回类型（如果有显式类型注解）
+		funcLikeData := node.FunctionLikeData()
+		if funcLikeData != nil && funcLikeData.Type != nil {
+			returnType := b.VisitTypeNode(funcLikeData.Type)
+			b.SetCurrentReturnType(returnType)
+		} else if isAsync {
+			// async 箭头函数如果没有显式类型注解，自动包装为 Promise<any>
+			promiseType := ssa.NewObjectType()
+			promiseType.AddFullTypeName("Promise<any>")
+			b.SetCurrentReturnType(promiseType)
+		}
 
 		// 处理函数参数
 		if node.Parameters != nil && len(node.Parameters.Nodes) > 0 {
@@ -2425,7 +2915,306 @@ func (b *builder) VisitAwaitExpression(node *ast.AwaitExpression) ssa.Value {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	return nil
+	// 处理await表达式
+	// await 会等待 Promise 完成，并返回其解析的值
+	promiseValue := b.VisitRightValueExpression(node.Expression)
+	if promiseValue == nil {
+		return b.EmitUndefined("")
+	}
+
+	// 从 Promise<T> 中提取 T
+	resolvedValue := b.ExtractPromiseResolvedValue(promiseValue)
+	return resolvedValue
+}
+
+// VisitTypeNode 访问TypeScript类型节点
+func (b *builder) VisitTypeNode(typeNode *ast.TypeNode) ssa.Type {
+	if typeNode == nil || b.IsStop() {
+		return ssa.CreateAnyType()
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &typeNode.Loc, "")
+	defer recoverRange()
+
+	switch typeNode.Kind {
+	case ast.KindNumberKeyword:
+		return ssa.CreateNumberType()
+	case ast.KindStringKeyword:
+		return ssa.CreateStringType()
+	case ast.KindBooleanKeyword:
+		return ssa.CreateBooleanType()
+	case ast.KindAnyKeyword:
+		return ssa.CreateAnyType()
+	case ast.KindVoidKeyword:
+		return ssa.CreateUndefinedType()
+	case ast.KindNullKeyword:
+		return ssa.CreateNullType()
+	case ast.KindUndefinedKeyword:
+		return ssa.CreateUndefinedType()
+	case ast.KindNeverKeyword:
+		return ssa.CreateAnyType() // TypeScript的never类型，在运行时表现为any
+	case ast.KindObjectKeyword:
+		return ssa.NewObjectType()
+	case ast.KindArrayType:
+		// 处理数组类型: number[], string[]
+		elementType := b.VisitTypeNode(typeNode.AsArrayTypeNode().ElementType)
+		sliceType := ssa.NewSliceType(elementType)
+		// 设置数组类型的完整类型名
+		elementTypeNames := elementType.GetFullTypeNames()
+		for _, name := range elementTypeNames {
+			sliceType.AddFullTypeName(name + "[]")
+		}
+		return sliceType
+	case ast.KindTypeReference:
+		// 处理类型引用: MyClass, Array<string>, Promise<number>
+		return b.VisitTypeReference(typeNode.AsTypeReferenceNode())
+	case ast.KindUnionType:
+		// 处理联合类型: string | number
+		return b.VisitUnionType(typeNode.AsUnionTypeNode())
+	case ast.KindIntersectionType:
+		// 处理交叉类型: A & B
+		return b.VisitIntersectionType(typeNode.AsIntersectionTypeNode())
+	case ast.KindFunctionType:
+		// 处理函数类型: (x: number) => string
+		return b.VisitFunctionType(typeNode.AsFunctionTypeNode())
+	case ast.KindLiteralType:
+		// 处理字面量类型: "hello", 42, true
+		return b.VisitLiteralType(typeNode.AsLiteralTypeNode())
+	case ast.KindTupleType:
+		// 处理元组类型: [string, number]
+		return b.VisitTupleType(typeNode.AsTupleTypeNode())
+	case ast.KindOptionalType:
+		// 处理可选类型: string?
+		baseType := b.VisitTypeNode(typeNode.AsOptionalTypeNode().Type)
+		// 在TypeScript中，可选类型通常表示为联合类型 T | undefined
+		undefinedType := ssa.CreateUndefinedType()
+		return ssa.NewOrType(baseType, undefinedType)
+	case ast.KindParenthesizedType:
+		// 处理括号类型: (string | number)
+		return b.VisitTypeNode(typeNode.AsParenthesizedTypeNode().Type)
+	default:
+		// 未处理的类型，返回any类型
+		return ssa.CreateAnyType()
+	}
+}
+
+// VisitTypeReference 访问类型引用
+func (b *builder) VisitTypeReference(typeRef *ast.TypeReferenceNode) ssa.Type {
+	if typeRef == nil || b.IsStop() {
+		return ssa.CreateAnyType()
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &typeRef.Loc, "")
+	defer recoverRange()
+
+	// 获取类型名称
+	typeName := typeRef.TypeName.Text()
+
+	// 处理泛型参数
+	var typeArgs []ssa.Type
+	if typeRef.TypeArguments != nil {
+		for _, arg := range typeRef.TypeArguments.Nodes {
+			argType := b.VisitTypeNode(arg)
+			typeArgs = append(typeArgs, argType)
+		}
+	}
+
+	// 根据类型名称创建相应的类型
+	switch typeName {
+	case "Array":
+		if len(typeArgs) > 0 {
+			elementType := typeArgs[0]
+			sliceType := ssa.NewSliceType(elementType)
+			elementTypeNames := elementType.GetFullTypeNames()
+			for _, name := range elementTypeNames {
+				sliceType.AddFullTypeName("Array<" + name + ">")
+			}
+			return sliceType
+		}
+		return ssa.NewSliceType(ssa.CreateAnyType())
+	case "Promise":
+		if len(typeArgs) > 0 {
+			// Promise<T> 类型
+			returnType := typeArgs[0]
+			promiseType := ssa.NewObjectType()
+			promiseType.AddFullTypeName("Promise<" + returnType.String() + ">")
+			return promiseType
+		}
+		return ssa.NewObjectType()
+	case "Date":
+		return ssa.NewObjectType()
+	case "RegExp":
+		return ssa.NewObjectType()
+	case "Error":
+		return ssa.NewObjectType()
+	default:
+		// 自定义类型或类
+		objectType := ssa.NewObjectType()
+		objectType.AddFullTypeName(typeName)
+		return objectType
+	}
+}
+
+// VisitUnionType 访问联合类型
+func (b *builder) VisitUnionType(unionType *ast.UnionTypeNode) ssa.Type {
+	if unionType == nil || b.IsStop() {
+		return ssa.CreateAnyType()
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &unionType.Loc, "")
+	defer recoverRange()
+
+	var types []ssa.Type
+	for _, typeNode := range unionType.Types.Nodes {
+		typ := b.VisitTypeNode(typeNode)
+		types = append(types, typ)
+	}
+
+	if len(types) == 0 {
+		return ssa.CreateAnyType()
+	} else if len(types) == 1 {
+		return types[0]
+	} else {
+		return ssa.NewOrType(types...)
+	}
+}
+
+// VisitIntersectionType 访问交叉类型
+func (b *builder) VisitIntersectionType(intersectionType *ast.IntersectionTypeNode) ssa.Type {
+	if intersectionType == nil || b.IsStop() {
+		return ssa.CreateAnyType()
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &intersectionType.Loc, "")
+	defer recoverRange()
+
+	// 交叉类型在运行时通常表现为对象类型的合并
+	// 这里简化为返回第一个类型，实际实现可能需要更复杂的合并逻辑
+	if len(intersectionType.Types.Nodes) > 0 {
+		return b.VisitTypeNode(intersectionType.Types.Nodes[0])
+	}
+	return ssa.NewObjectType()
+}
+
+// VisitFunctionType 访问函数类型
+func (b *builder) VisitFunctionType(funcType *ast.FunctionTypeNode) ssa.Type {
+	if funcType == nil || b.IsStop() {
+		return ssa.CreateAnyType()
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &funcType.Loc, "")
+	defer recoverRange()
+
+	// 处理参数类型
+	var paramTypes []ssa.Type
+	if funcType.Parameters != nil {
+		for _, param := range funcType.Parameters.Nodes {
+			paramType := b.VisitTypeNode(param)
+			paramTypes = append(paramTypes, paramType)
+		}
+	}
+
+	// 处理返回类型
+	var returnType ssa.Type
+	if funcType.Type != nil {
+		returnType = b.VisitTypeNode(funcType.Type)
+	} else {
+		returnType = ssa.CreateAnyType()
+	}
+
+	// 创建函数类型
+	functionType := ssa.NewFunctionType("", paramTypes, returnType, false)
+
+	return functionType
+}
+
+// VisitLiteralType 访问字面量类型
+func (b *builder) VisitLiteralType(literalType *ast.LiteralTypeNode) ssa.Type {
+	if literalType == nil || b.IsStop() {
+		return ssa.CreateAnyType()
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &literalType.Loc, "")
+	defer recoverRange()
+
+	// 根据字面量类型创建相应的基础类型
+	switch literalType.Literal.Kind {
+	case ast.KindStringLiteral:
+		return ssa.CreateStringType()
+	case ast.KindNumericLiteral:
+		return ssa.CreateNumberType()
+	case ast.KindTrueKeyword, ast.KindFalseKeyword:
+		return ssa.CreateBooleanType()
+	case ast.KindNullKeyword:
+		return ssa.CreateNullType()
+	default:
+		return ssa.CreateAnyType()
+	}
+}
+
+// VisitTupleType 访问元组类型
+func (b *builder) VisitTupleType(tupleType *ast.TupleTypeNode) ssa.Type {
+	if tupleType == nil || b.IsStop() {
+		return ssa.CreateAnyType()
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &tupleType.Loc, "")
+	defer recoverRange()
+
+	// 元组类型在运行时表现为数组
+	// 这里简化为返回通用数组类型，实际实现可能需要更复杂的处理
+	return ssa.NewSliceType(ssa.CreateAnyType())
+}
+
+// MergeTypeWithAnnotation 合并推断类型和显式类型注解
+func (b *builder) MergeTypeWithAnnotation(inferredType, explicitType ssa.Type) ssa.Type {
+	if explicitType == nil {
+		return inferredType
+	}
+	if inferredType == nil {
+		return explicitType
+	}
+
+	// 如果显式类型是any，则使用推断类型
+	if explicitType.GetTypeKind() == ssa.AnyTypeKind {
+		return inferredType
+	}
+
+	// 如果推断类型是any，则使用显式类型
+	if inferredType.GetTypeKind() == ssa.AnyTypeKind {
+		return explicitType
+	}
+
+	// 如果两个类型相同，直接返回
+	if inferredType.GetTypeKind() == explicitType.GetTypeKind() {
+		// 合并完整类型名
+		mergedType := ssa.NewBasicType(explicitType.GetTypeKind(), explicitType.String())
+		mergedType.SetFullTypeNames(explicitType.GetFullTypeNames())
+
+		// 添加推断类型的类型名（如果不同）
+		for _, name := range inferredType.GetFullTypeNames() {
+			if !contains(mergedType.GetFullTypeNames(), name) {
+				mergedType.AddFullTypeName(name)
+			}
+		}
+
+		return mergedType
+	}
+
+	// 类型不匹配时，优先使用显式类型，但记录警告
+	b.NewError(ssa.Warn, TAG, "Type mismatch: inferred type %s vs explicit type %s",
+		inferredType.String(), explicitType.String())
+	return explicitType
+}
+
+// contains 检查字符串切片是否包含指定字符串
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 // VisitYieldExpression 访问yield表达式
@@ -2758,7 +3547,7 @@ func (b *builder) VisitPropertyName(propertyName *ast.PropertyName) ssa.Value {
 }
 
 // ProcessObjectBindingPattern 处理对象解构模式
-func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourceObj ssa.Value, isLocal bool) {
+func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourceObj ssa.Value, isLocal bool, isExport bool) {
 	if pattern == nil || sourceObj == nil || b.IsStop() {
 		return
 	}
@@ -2836,6 +3625,9 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 		case ast.IsIdentifier(bindingElement.Name()):
 			// 简单变量: let { a } = obj 或 let { a: b } = obj
 			varName := bindingElement.Name().AsIdentifier().Text
+			if isExport {
+				b.namedValueExports[varName] = varName
+			}
 			var variable *ssa.Variable
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
@@ -2846,20 +3638,26 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 
 		case ast.IsBindingPattern(bindingElement.Name()):
 			// 嵌套解构: let { a: { b, c } } = obj 或 let { a: [x, y] } = obj
+			/*
+				obj
+				└── a
+				    ├── b  → 绑定到变量 b
+				    └── c  → 绑定到变量 c
+			*/
 			nestedPattern := bindingElement.Name()
 
 			// 递归处理
 			if ast.IsObjectBindingPattern(nestedPattern) {
-				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal)
+				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal, isExport)
 			} else if ast.IsArrayBindingPattern(nestedPattern) {
-				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal)
+				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal, isExport)
 			}
 		}
 	}
 }
 
 // ProcessArrayBindingPattern 处理数组解构模式
-func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, sourceArr ssa.Value, isLocal bool) {
+func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, sourceArr ssa.Value, isLocal bool, isExport bool) {
 	if pattern == nil || sourceArr == nil || b.IsStop() {
 		return
 	}
@@ -2919,6 +3717,9 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 		case ast.IsIdentifier(bindingElement.Name()):
 			// 标识符: let [a] = arr
 			varName := bindingElement.Name().AsIdentifier().Text
+			if isExport {
+				b.namedValueExports[varName] = varName
+			}
 			var variable *ssa.Variable
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
@@ -2933,9 +3734,9 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 
 			// 递归处理
 			if ast.IsObjectBindingPattern(nestedPattern) {
-				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal)
+				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal, isExport)
 			} else if ast.IsArrayBindingPattern(nestedPattern) {
-				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal)
+				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal, isExport)
 			}
 		}
 	}
@@ -2968,6 +3769,12 @@ func (b *builder) ProcessFunctionParams(params *ast.NodeList) {
 		if paramName != "" {
 			// 创建参数
 			p := b.NewParam(paramName)
+
+			// 设置参数类型（如果有显式类型注解）
+			if paramNode.Type != nil {
+				paramType := b.VisitTypeNode(paramNode.Type)
+				p.SetType(paramType)
+			}
 
 			// 处理默认值
 			if paramNode.Initializer != nil {
@@ -3062,6 +3869,7 @@ func (b *builder) ProcessPropertyName(propertyName *ast.PropertyName) string {
 func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Blueprint) {
 	var methodName string
 	var params *ast.NodeList
+	var returnTypeNode *ast.TypeNode
 	// 只有箭头函数的函数体可以是表达式 箭头函数一般不出现在类内部作为方法
 	var bodyNode *ast.Block
 
@@ -3071,6 +3879,7 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 		getAccessor := member.AsGetAccessorDeclaration()
 		methodName = b.ProcessPropertyName(getAccessor.Name())
 		params = getAccessor.Parameters
+		returnTypeNode = getAccessor.Type
 		if !ast.IsBlock(getAccessor.Body) {
 			return
 		}
@@ -3079,6 +3888,7 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 		setAccessor := member.AsSetAccessorDeclaration()
 		methodName = b.ProcessPropertyName(setAccessor.Name())
 		params = setAccessor.Parameters
+		returnTypeNode = setAccessor.Type
 		if !ast.IsBlock(setAccessor.Body) {
 			return
 		}
@@ -3087,6 +3897,10 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 		methodDecl := member.AsMethodDeclaration()
 		methodName = b.ProcessPropertyName(methodDecl.Name())
 		params = methodDecl.Parameters
+		funcLikeData := methodDecl.FunctionLikeData()
+		if funcLikeData != nil {
+			returnTypeNode = funcLikeData.Type
+		}
 		if !ast.IsBlock(methodDecl.Body) {
 			return
 		}
@@ -3101,7 +3915,10 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 	newFunc := b.NewFunc(funcName)
 	newFunc.SetMethodName(methodName)
 
+	// 使用 AST 提供的辅助方法检查修饰符
 	isStatic := ast.HasStaticModifier(member)
+	isAsync := ast.HasSyntacticModifier(member, ast.ModifierFlagsAsync)
+
 	if isStatic {
 		class.RegisterStaticMethod(methodName, newFunc)
 	} else {
@@ -3135,6 +3952,17 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 			}
 		}
 
+		// 设置函数返回类型（如果有显式类型注解）
+		if returnTypeNode != nil {
+			returnType := b.VisitTypeNode(returnTypeNode)
+			b.SetCurrentReturnType(returnType)
+		} else if isAsync {
+			// async 方法如果没有显式类型注解，自动包装为 Promise<any>
+			promiseType := ssa.NewObjectType()
+			promiseType.AddFullTypeName("Promise<any>")
+			b.SetCurrentReturnType(promiseType)
+		}
+
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
 	})
@@ -3144,6 +3972,39 @@ func (b *builder) ProcessClassCtor(member *ast.ClassElement, class *ssa.Blueprin
 	ctor := member.AsConstructorDeclaration()
 	ctorName := fmt.Sprintf("%s_%s_%s", class.Name, "Custom-Constructor", uuid.NewString()[:4])
 	params := ctor.Parameters
+
+	// 预处理参数属性（Parameter Properties）
+	// 这是 TypeScript 的语法糖，带有访问修饰符的构造函数参数会自动成为类成员
+	var parameterProperties []*ast.ParameterDeclaration
+	if params != nil && len(params.Nodes) > 0 {
+		for _, paramNode := range params.Nodes {
+			paramDecl := paramNode.AsParameterDeclaration()
+			// 检查参数是否有参数属性修饰符 (public, private, protected, readonly)
+			modifierFlags := paramDecl.ModifierFlags()
+			if modifierFlags&ast.ModifierFlagsParameterPropertyModifier != ast.ModifierFlagsNone {
+				parameterProperties = append(parameterProperties, paramDecl)
+
+				// 为参数属性在类上创建成员
+				paramName := ""
+				if paramDecl.Name() != nil && ast.IsIdentifier(paramDecl.Name()) {
+					paramName = paramDecl.Name().AsIdentifier().Text
+				}
+
+				if paramName != "" {
+					// 注册为类成员（参数属性总是实例成员，不会是静态成员）
+					undefined := b.EmitUndefined(paramName)
+
+					// 设置成员类型（如果参数有类型注解）
+					if paramDecl.Type != nil {
+						paramType := b.VisitTypeNode(paramDecl.Type)
+						undefined.SetType(paramType)
+					}
+
+					class.RegisterNormalMember(paramName, undefined, false)
+				}
+			}
+		}
+	}
 
 	newFunc := b.NewFunc(ctorName)
 	newFunc.SetMethodName(ctorName)
@@ -3165,6 +4026,27 @@ func (b *builder) ProcessClassCtor(member *ast.ClassElement, class *ssa.Blueprin
 			// 处理函数参数
 			if params != nil && len(params.Nodes) > 0 {
 				b.ProcessFunctionParams(params)
+			}
+
+			// 处理参数属性：在构造函数开头自动添加 this.prop = param 赋值
+			for _, paramProp := range parameterProperties {
+				paramName := ""
+				if paramProp.Name() != nil && ast.IsIdentifier(paramProp.Name()) {
+					paramName = paramProp.Name().AsIdentifier().Text
+				}
+
+				if paramName != "" {
+					// 读取参数值
+					paramValue := b.ReadValue(paramName)
+
+					// 赋值给 this.paramName
+					thisValue := b.ReadValue("this")
+					if thisValue != nil && paramValue != nil {
+						memberKey := b.EmitConstInst(paramName)
+						memberVariable := b.CreateMemberCallVariable(thisValue, memberKey)
+						b.AssignVariable(memberVariable, paramValue)
+					}
+				}
 			}
 
 			// 处理函数体
@@ -3192,4 +4074,821 @@ func (b *builder) ProcessMemberName(name *ast.MemberName) string {
 		b.NewError(ssa.Error, TAG, UnhandledMemberNameType())
 	}
 	return fmt.Sprintf("UnexoectedMemberNameKind_%s", uuid.NewString()[:8])
+}
+
+// VisitEnumDeclaration 访问枚举声明
+func (b *builder) VisitEnumDeclaration(node *ast.EnumDeclaration) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 获取枚举名称
+	enumName := ""
+	if node.Name() != nil && ast.IsIdentifier(node.Name()) {
+		enumName = node.Name().AsIdentifier().Text
+	} else {
+		b.NewError(ssa.Error, TAG, "Enum declaration must have a name")
+		return nil
+	}
+
+	// 使用 AST 提供的辅助方法检查修饰符
+	nodePtr := node.AsNode()
+	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
+	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
+
+	if !ShouldVisit(b.PreHandler(), isExport) {
+		return nil
+	}
+	// PreHandle阶段：创建Blueprint和基础对象，立即设置导出
+	enumBlueprint := b.CreateBlueprint(enumName)
+	enumBlueprint.SetKind(ssa.BlueprintClass)
+
+	// 创建枚举对象实例
+	enumObj := b.EmitMakeWithoutType(nil, nil)
+	enumObj.SetType(enumBlueprint)
+
+	// 将枚举注册为变量
+	variable := b.CreateJSVariable(enumName)
+	b.AssignVariable(variable, enumObj)
+
+	// 处理导出 - 在PreHandle阶段就设置导出值
+	if isExport {
+		if !isDefault {
+			b.namedTypeExports[enumName] = enumName
+			b.namedValueExports[enumName] = enumName
+		} else {
+			b.namedTypeExports["default"] = enumName
+			b.namedValueExports["default"] = enumName
+		}
+	}
+
+	// 添加LazyBuilder来处理枚举成员
+	store := b.StoreFunctionBuilder()
+	enumBlueprint.AddLazyBuilder(func() {
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
+		if enumName == "Color" {
+			b.GetBluePrint("Palette")
+		}
+
+		// 处理枚举成员
+		if node.Members != nil && len(node.Members.Nodes) > 0 {
+			b.VisitEnumMembers(node.Members, enumBlueprint)
+		}
+	})
+
+	return enumObj
+}
+
+// VisitEnumMembers 访问枚举成员列表
+func (b *builder) VisitEnumMembers(members *ast.NodeList, enumBlueprint *ssa.Blueprint) {
+	if members == nil || len(members.Nodes) == 0 || b.IsStop() {
+		return
+	}
+
+	currentValue := 0 // TypeScript数字枚举的默认起始值
+
+	for _, memberNode := range members.Nodes {
+		if memberNode == nil {
+			continue
+		}
+
+		if ast.IsEnumMember(memberNode) {
+			currentValue = b.VisitEnumMember(memberNode.AsEnumMember(), enumBlueprint, currentValue)
+		}
+	}
+}
+
+// VisitEnumMember 访问单个枚举成员
+func (b *builder) VisitEnumMember(member *ast.EnumMember, enumBlueprint *ssa.Blueprint, defaultValue int) int {
+	if member == nil || b.IsStop() {
+		return defaultValue
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &member.Loc, "")
+	defer recoverRange()
+
+	// 获取枚举成员名称
+	memberName := ""
+	if member.Name() != nil {
+		memberName = b.ProcessPropertyName(member.Name())
+	}
+
+	if memberName == "" {
+		b.NewError(ssa.Error, TAG, "Enum member must have a name")
+		return defaultValue
+	}
+
+	var memberValue ssa.Value
+	var nextValue int
+
+	// 处理枚举成员的值
+	if member.Initializer != nil {
+		// 有显式初始化值
+		initValue := b.VisitRightValueExpression(member.Initializer)
+		memberValue = initValue
+
+		// 尝试获取数字值以确定下一个默认值
+		if constValue, ok := ssa.ToConstInst(initValue); ok {
+			rawValue := constValue.GetRawValue()
+			if numVal, ok := rawValue.(int); ok {
+				nextValue = numVal + 1
+			} else if numVal, ok := rawValue.(int64); ok {
+				nextValue = int(numVal) + 1
+			} else if numVal, ok := rawValue.(float64); ok {
+				nextValue = int(numVal) + 1
+			} else {
+				// 非数字值，下一个成员使用当前默认值
+				nextValue = defaultValue + 1
+			}
+		} else {
+			nextValue = defaultValue + 1
+		}
+	} else {
+		// 使用默认值（自动递增的数字）
+		memberValue = b.EmitConstInst(defaultValue)
+		nextValue = defaultValue + 1
+	}
+
+	// 注册枚举成员作为静态成员
+	// TypeScript枚举的成员既可以通过名称访问也可以通过值访问
+	enumBlueprint.RegisterStaticMember(memberName, memberValue)
+
+	// 对于数字枚举，还需要支持反向映射（通过值访问名称）
+	if constValue, ok := ssa.ToConstInst(memberValue); ok {
+		rawValue := constValue.GetRawValue()
+		if numVal, ok := rawValue.(int); ok {
+			reverseKey := fmt.Sprintf("%d", numVal)
+			reverseName := b.EmitConstInst(memberName)
+			enumBlueprint.RegisterStaticMember(reverseKey, reverseName)
+		} else if numVal, ok := rawValue.(int64); ok {
+			reverseKey := fmt.Sprintf("%d", numVal)
+			reverseName := b.EmitConstInst(memberName)
+			enumBlueprint.RegisterStaticMember(reverseKey, reverseName)
+		} else if numVal, ok := rawValue.(float64); ok {
+			reverseKey := fmt.Sprintf("%.0f", numVal)
+			reverseName := b.EmitConstInst(memberName)
+			enumBlueprint.RegisterStaticMember(reverseKey, reverseName)
+		}
+	}
+
+	return nextValue
+}
+
+// VisitInterfaceDeclaration 访问接口声明
+func (b *builder) VisitInterfaceDeclaration(node *ast.InterfaceDeclaration) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 获取接口名称
+	interfaceName := ""
+	if node.Name() != nil && ast.IsIdentifier(node.Name()) {
+		interfaceName = node.Name().AsIdentifier().Text
+	} else {
+		b.NewError(ssa.Error, TAG, "Interface declaration must have a name")
+		return nil
+	}
+
+	// 使用 AST 提供的辅助方法检查修饰符
+	nodePtr := node.AsNode()
+	isExport := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsExport)
+	isDefault := ast.HasSyntacticModifier(nodePtr, ast.ModifierFlagsDefault)
+
+	if !ShouldVisit(b.PreHandler(), isExport) {
+		return nil
+	}
+
+	// PreHandle阶段：创建Blueprint和基础对象，立即设置导出
+	interfaceBlueprint := b.CreateBlueprint(interfaceName)
+	interfaceBlueprint.SetKind(ssa.BlueprintInterface)
+
+	// 创建接口对象实例
+	interfaceObj := b.EmitMakeWithoutType(nil, nil)
+	interfaceObj.SetType(interfaceBlueprint)
+
+	// 将接口注册为变量
+	variable := b.CreateJSVariable(interfaceName)
+	b.AssignVariable(variable, interfaceObj)
+
+	// 处理导出 - 在PreHandle阶段就设置导出值
+	if isExport {
+		if !isDefault {
+			b.namedTypeExports[interfaceName] = interfaceName
+			b.namedValueExports[interfaceName] = interfaceName
+		} else {
+			b.namedTypeExports["default"] = interfaceName
+			b.namedValueExports["default"] = interfaceName
+		}
+	}
+
+	// 添加LazyBuilder来处理接口成员和继承
+	store := b.StoreFunctionBuilder()
+	interfaceBlueprint.AddLazyBuilder(func() {
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
+
+		// 处理继承的接口
+		if node.HeritageClauses != nil && len(node.HeritageClauses.Nodes) > 0 {
+			b.VisitInterfaceHeritageClauses(node.HeritageClauses, interfaceBlueprint)
+		}
+
+		// 处理接口成员
+		if node.Members != nil && len(node.Members.Nodes) > 0 {
+			b.VisitInterfaceMembers(node.Members, interfaceBlueprint)
+		}
+	})
+
+	return interfaceObj
+}
+
+// VisitInterfaceHeritageClauses 访问接口继承子句
+func (b *builder) VisitInterfaceHeritageClauses(heritageClauses *ast.NodeList, interfaceBlueprint *ssa.Blueprint) {
+	if heritageClauses == nil || len(heritageClauses.Nodes) == 0 || b.IsStop() {
+		return
+	}
+
+	for _, heritageNode := range heritageClauses.Nodes {
+		if heritageNode == nil {
+			continue
+		}
+
+		if ast.IsHeritageClause(heritageNode) {
+			b.VisitInterfaceHeritageClause(heritageNode.AsHeritageClause(), interfaceBlueprint)
+		}
+	}
+}
+
+// VisitInterfaceHeritageClause 访问单个接口继承子句
+func (b *builder) VisitInterfaceHeritageClause(heritageClause *ast.HeritageClause, interfaceBlueprint *ssa.Blueprint) {
+	if heritageClause == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &heritageClause.Loc, "")
+	defer recoverRange()
+
+	// 处理继承的接口类型
+	if heritageClause.Types != nil && len(heritageClause.Types.Nodes) > 0 {
+		for _, typeNode := range heritageClause.Types.Nodes {
+			if typeNode == nil {
+				continue
+			}
+
+			if ast.IsExpressionWithTypeArguments(typeNode) {
+				exprWithTypeArgs := typeNode.AsExpressionWithTypeArguments()
+				if ast.IsIdentifier(exprWithTypeArgs.Expression) {
+					parentInterfaceName := exprWithTypeArgs.Expression.AsIdentifier().Text
+
+					// 获取或创建父接口Blueprint
+					parentBlueprint := b.GetBluePrint(parentInterfaceName)
+					if parentBlueprint == nil {
+						parentBlueprint = b.CreateBlueprint(parentInterfaceName)
+					}
+					parentBlueprint.SetKind(ssa.BlueprintInterface)
+
+					// 添加父接口到当前接口
+					interfaceBlueprint.AddParentBlueprint(parentBlueprint)
+				}
+			}
+		}
+	}
+}
+
+// VisitInterfaceMembers 访问接口成员列表
+func (b *builder) VisitInterfaceMembers(members *ast.NodeList, interfaceBlueprint *ssa.Blueprint) {
+	if members == nil || len(members.Nodes) == 0 || b.IsStop() {
+		return
+	}
+
+	for _, memberNode := range members.Nodes {
+		if memberNode == nil {
+			continue
+		}
+
+		if ast.IsTypeElement(memberNode) {
+			b.VisitInterfaceMember(memberNode, interfaceBlueprint)
+		}
+	}
+}
+
+// VisitInterfaceMember 访问单个接口成员
+func (b *builder) VisitInterfaceMember(member *ast.TypeElement, interfaceBlueprint *ssa.Blueprint) {
+	if member == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &member.Loc, "")
+	defer recoverRange()
+
+	switch member.Kind {
+	case ast.KindPropertySignature:
+		b.VisitInterfacePropertySignature(member.AsPropertySignatureDeclaration(), interfaceBlueprint)
+	case ast.KindMethodSignature:
+		b.VisitInterfaceMethodSignature(member.AsMethodSignatureDeclaration(), interfaceBlueprint)
+	case ast.KindCallSignature:
+		b.VisitInterfaceCallSignature(member.AsCallSignatureDeclaration(), interfaceBlueprint)
+	case ast.KindConstructSignature:
+		b.VisitInterfaceConstructSignature(member.AsConstructSignatureDeclaration(), interfaceBlueprint)
+	case ast.KindIndexSignature:
+		b.VisitInterfaceIndexSignature(member.AsIndexSignatureDeclaration(), interfaceBlueprint)
+	default:
+		// 其他类型的接口成员暂时跳过
+		return
+	}
+}
+
+// VisitInterfacePropertySignature 访问接口属性签名
+func (b *builder) VisitInterfacePropertySignature(propSig *ast.PropertySignatureDeclaration, interfaceBlueprint *ssa.Blueprint) {
+	if propSig == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &propSig.Loc, "")
+	defer recoverRange()
+
+	// 获取属性名称
+	propName := b.ProcessPropertyName(propSig.Name())
+	if propName == "" {
+		return
+	}
+
+	// 获取属性类型
+	var propType ssa.Type
+	if propSig.Type != nil {
+		propType = b.VisitTypeNode(propSig.Type)
+	} else {
+		propType = ssa.CreateAnyType()
+	}
+
+	// 创建属性值（接口中的属性通常是undefined，因为接口不包含实现）
+	propValue := b.EmitUndefined(propName)
+	propValue.SetType(propType)
+
+	// 注册为接口的静态成员
+	interfaceBlueprint.RegisterStaticMember(propName, propValue)
+}
+
+// VisitInterfaceMethodSignature 访问接口方法签名
+func (b *builder) VisitInterfaceMethodSignature(methodSig *ast.MethodSignatureDeclaration, interfaceBlueprint *ssa.Blueprint) {
+	if methodSig == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &methodSig.Loc, "")
+	defer recoverRange()
+
+	// 获取方法名称
+	methodName := b.ProcessPropertyName(methodSig.Name())
+	if methodName == "" {
+		return
+	}
+
+	// 处理参数类型
+	var paramTypes []ssa.Type
+	if methodSig.Parameters != nil {
+		for _, param := range methodSig.Parameters.Nodes {
+			if param == nil {
+				continue
+			}
+			paramType := b.VisitTypeNode(param)
+			paramTypes = append(paramTypes, paramType)
+		}
+	}
+
+	// 处理返回类型
+	var returnType ssa.Type
+	if methodSig.Type != nil {
+		returnType = b.VisitTypeNode(methodSig.Type)
+	} else {
+		returnType = ssa.CreateAnyType()
+	}
+
+	// 创建方法类型
+	methodType := ssa.NewFunctionType(methodName, paramTypes, returnType, false)
+
+	// 创建方法值
+	methodValue := b.EmitUndefined(methodName)
+	methodValue.SetType(methodType)
+
+	// 注册为接口的静态成员
+	interfaceBlueprint.RegisterStaticMember(methodName, methodValue)
+}
+
+// VisitInterfaceCallSignature 访问接口调用签名
+func (b *builder) VisitInterfaceCallSignature(callSig *ast.CallSignatureDeclaration, interfaceBlueprint *ssa.Blueprint) {
+	if callSig == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &callSig.Loc, "")
+	defer recoverRange()
+
+	// 处理参数类型
+	var paramTypes []ssa.Type
+	if callSig.Parameters != nil {
+		for _, param := range callSig.Parameters.Nodes {
+			if param == nil {
+				continue
+			}
+			paramType := b.VisitTypeNode(param)
+			paramTypes = append(paramTypes, paramType)
+		}
+	}
+
+	// 处理返回类型
+	var returnType ssa.Type
+	if callSig.Type != nil {
+		returnType = b.VisitTypeNode(callSig.Type)
+	} else {
+		returnType = ssa.CreateAnyType()
+	}
+
+	// 创建调用签名类型
+	callSignatureType := ssa.NewFunctionType("", paramTypes, returnType, false)
+
+	// 创建调用签名值
+	callSignatureValue := b.EmitUndefined("")
+	callSignatureValue.SetType(callSignatureType)
+
+	// 注册为接口的静态成员（使用特殊名称表示调用签名）
+	interfaceBlueprint.RegisterStaticMember("__call__", callSignatureValue)
+}
+
+// VisitInterfaceConstructSignature 访问接口构造签名
+func (b *builder) VisitInterfaceConstructSignature(constructSig *ast.ConstructSignatureDeclaration, interfaceBlueprint *ssa.Blueprint) {
+	if constructSig == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &constructSig.Loc, "")
+	defer recoverRange()
+
+	// 处理参数类型
+	var paramTypes []ssa.Type
+	if constructSig.Parameters != nil {
+		for _, param := range constructSig.Parameters.Nodes {
+			if param == nil {
+				continue
+			}
+			paramType := b.VisitTypeNode(param)
+			paramTypes = append(paramTypes, paramType)
+		}
+	}
+
+	// 处理返回类型
+	var returnType ssa.Type
+	if constructSig.Type != nil {
+		returnType = b.VisitTypeNode(constructSig.Type)
+	} else {
+		returnType = ssa.CreateAnyType()
+	}
+
+	// 创建构造签名类型
+	constructSignatureType := ssa.NewFunctionType("", paramTypes, returnType, false)
+
+	// 创建构造签名值
+	constructSignatureValue := b.EmitUndefined("")
+	constructSignatureValue.SetType(constructSignatureType)
+
+	// 注册为接口的静态成员（使用特殊名称表示构造签名）
+	interfaceBlueprint.RegisterStaticMember("__construct__", constructSignatureValue)
+}
+
+// VisitInterfaceIndexSignature 访问接口索引签名
+func (b *builder) VisitInterfaceIndexSignature(indexSig *ast.IndexSignatureDeclaration, interfaceBlueprint *ssa.Blueprint) {
+	if indexSig == nil || b.IsStop() {
+		return
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &indexSig.Loc, "")
+	defer recoverRange()
+
+	// 处理索引参数类型
+	var indexParamType ssa.Type
+	if indexSig.Parameters != nil && len(indexSig.Parameters.Nodes) > 0 {
+		indexParamType = b.VisitTypeNode(indexSig.Parameters.Nodes[0])
+	} else {
+		indexParamType = ssa.CreateAnyType()
+	}
+
+	// 处理返回值类型
+	var returnType ssa.Type
+	if indexSig.Type != nil {
+		returnType = b.VisitTypeNode(indexSig.Type)
+	} else {
+		returnType = ssa.CreateAnyType()
+	}
+
+	// 创建索引签名类型
+	indexSignatureType := ssa.NewFunctionType("", []ssa.Type{indexParamType}, returnType, false)
+
+	// 创建索引签名值
+	indexSignatureValue := b.EmitUndefined("")
+	indexSignatureValue.SetType(indexSignatureType)
+
+	// 注册为接口的静态成员（使用特殊名称表示索引签名）
+	interfaceBlueprint.RegisterStaticMember("__index__", indexSignatureValue)
+}
+
+// HandlePromiseMethod 处理 Promise 的 then, catch, finally 方法
+// 这些方法的特点是接收一个回调函数，并将 Promise 的值作为参数传递给回调
+func (b *builder) HandlePromiseMethod(promiseValue ssa.Value, methodName string, args []ssa.Value) ssa.Value {
+	if b.IsStop() {
+		return nil
+	}
+
+	// 获取 Promise 对象（调用 getData() 的返回值）
+	if promiseValue == nil {
+		b.NewError(ssa.Error, TAG, "Promise object is nil")
+		return b.EmitUndefined("")
+	}
+
+	// 检查是否有回调参数
+	if len(args) == 0 {
+		b.NewError(ssa.Error, TAG, "Promise method requires a callback function")
+		return promiseValue
+	}
+
+	callback := args[0]
+	if callback == nil {
+		return promiseValue
+	}
+
+	// 根据不同的方法名处理
+	switch methodName {
+	case "then":
+		// then 方法：将 Promise 的解析值传递给回调函数
+		return b.HandlePromiseThen(promiseValue, callback)
+	case "catch":
+		// catch 方法：将 Promise 的拒绝原因传递给回调函数
+		return b.HandlePromiseCatch(promiseValue, callback)
+	case "finally":
+		// finally 方法：无论成功或失败都调用回调函数
+		return b.HandlePromiseFinally(promiseValue, callback)
+	default:
+		return promiseValue
+	}
+}
+
+// HandlePromiseThen 处理 Promise.then() 方法
+//
+// 处理流程：
+// 1. 从 promiseValue (Promise<T>) 中提取 T 类型
+// 2. 创建一个类型为 T 的值（代表 Promise 解析后的结果）
+// 3. 将这个值作为参数传递给回调函数
+// 4. 将回调的返回值包装成新的 Promise 并返回（支持链式调用）
+//
+// 例如：getData().then(data => processData(data))
+// - getData() 返回 Promise<string>
+// - 提取出 string 类型
+// - 创建一个 string 类型的值传给回调参数 data
+// - 回调返回结果，包装成新的 Promise
+func (b *builder) HandlePromiseThen(promiseValue ssa.Value, callback ssa.Value) ssa.Value {
+	if b.IsStop() {
+		return nil
+	}
+
+	// 从 Promise<T> 中提取 T 类型，并创建一个具有该类型的值
+	// 这个值代表 Promise 完成后传递给回调的实际数据
+	resolvedValue := b.ExtractPromiseResolvedValue(promiseValue)
+
+	// 调用回调函数，将解析的值作为参数
+	// 注意：这里我们在编译时模拟回调的调用，实际运行时这是异步的
+	callResult := b.EmitCall(b.NewCall(callback, []ssa.Value{resolvedValue}))
+
+	// then 方法返回一个新的 Promise
+	// 如果回调返回 Promise，则返回该 Promise
+	// 否则返回一个已解析的 Promise，值为回调的返回值
+	if callResult != nil && b.IsPromiseType(callResult.GetType()) {
+		// 回调本身返回 Promise，直接返回
+		return callResult
+	}
+
+	// 回调返回普通值，包装成 Promise
+	return b.WrapInPromise(callResult)
+}
+
+// HandlePromiseCatch 处理 Promise.catch() 方法
+func (b *builder) HandlePromiseCatch(promiseValue ssa.Value, callback ssa.Value) ssa.Value {
+	if b.IsStop() {
+		return nil
+	}
+
+	// catch 接收错误对象
+	errorValue := b.EmitUndefined("error")
+
+	// 调用回调函数，将错误作为参数
+	callResult := b.EmitCall(b.NewCall(callback, []ssa.Value{errorValue}))
+
+	// catch 方法也返回一个 Promise
+	return b.WrapInPromise(callResult)
+}
+
+// HandlePromiseFinally 处理 Promise.finally() 方法
+func (b *builder) HandlePromiseFinally(promiseValue ssa.Value, callback ssa.Value) ssa.Value {
+	if b.IsStop() {
+		return nil
+	}
+
+	// finally 不接收任何参数
+	b.EmitCall(b.NewCall(callback, []ssa.Value{}))
+
+	// finally 返回原来的 Promise
+	return promiseValue
+}
+
+// ExtractPromiseResolvedType 从 Promise<T> 类型中提取 T 类型
+func (b *builder) ExtractPromiseResolvedType(promiseType ssa.Type) ssa.Type {
+	if promiseType == nil {
+		return ssa.CreateAnyType()
+	}
+
+	// 尝试从类型名称中提取泛型参数
+	typeNames := promiseType.GetFullTypeNames()
+	for _, typeName := range typeNames {
+		// 如果类型名称是 "Promise<SomeType>"，提取 SomeType
+		if len(typeName) > 8 && typeName[:8] == "Promise<" {
+			innerTypeName := typeName[8 : len(typeName)-1]
+			// 根据内部类型名创建相应的类型
+			return b.CreateTypeByName(innerTypeName)
+		}
+	}
+
+	// 如果无法提取类型，返回 any 类型
+	return ssa.CreateAnyType()
+}
+
+// ExtractPromiseResolvedValue 从 Promise 值中提取解析后的值
+// 这个值代表 Promise 完成后的结果
+func (b *builder) ExtractPromiseResolvedValue(promiseValue ssa.Value) ssa.Value {
+	if promiseValue == nil {
+		return b.EmitUndefined("")
+	}
+
+	// 获取 Promise 的类型
+	promiseType := promiseValue.GetType()
+	if promiseType == nil {
+		return b.EmitUndefined("")
+	}
+
+	// 从 Promise<T> 类型中提取 T 类型
+	resolvedType := b.ExtractPromiseResolvedType(promiseType)
+
+	// 创建一个具有解析类型的值（代表 Promise 的解析结果）
+	resolvedValue := promiseValue
+	resolvedValue.SetType(resolvedType)
+
+	return resolvedValue
+}
+
+// WrapInPromise 将一个值包装成 Promise 类型
+func (b *builder) WrapInPromise(value ssa.Value) ssa.Value {
+	if value == nil {
+		value = b.EmitUndefined("")
+	}
+
+	// 创建 Promise 类型
+	promiseType := ssa.NewObjectType()
+	valueType := value.GetType()
+	if valueType != nil {
+		promiseType.AddFullTypeName("Promise<" + valueType.String() + ">")
+	} else {
+		promiseType.AddFullTypeName("Promise<any>")
+	}
+
+	// 创建 Promise 值
+	promiseValue := b.EmitUndefined("")
+	promiseValue.SetType(promiseType)
+
+	return promiseValue
+}
+
+// CreateTypeByName 根据类型名称字符串创建类型
+// 支持基本类型、泛型类型（如 Promise<string>、Array<number>）等
+func (b *builder) CreateTypeByName(typeName string) ssa.Type {
+	// 处理基本类型
+	switch typeName {
+	case "string":
+		return ssa.CreateStringType()
+	case "number", "bigint":
+		return ssa.CreateNumberType()
+	case "boolean":
+		return ssa.CreateBooleanType()
+	case "void", "undefined":
+		return ssa.CreateUndefinedType()
+	case "null":
+		return ssa.CreateNullType()
+	case "any", "unknown":
+		return ssa.CreateAnyType()
+	case "never":
+		// TypeScript 的 never 类型，表示永远不会发生的值
+		return ssa.CreateAnyType()
+	case "object":
+		return ssa.NewObjectType()
+	}
+
+	// 处理泛型类型（如 Promise<string>、Array<number>）
+	if len(typeName) > 0 {
+		// 查找泛型参数的起始位置
+		genericStart := -1
+		for i, ch := range typeName {
+			if ch == '<' {
+				genericStart = i
+				break
+			}
+		}
+
+		if genericStart > 0 && typeName[len(typeName)-1] == '>' {
+			// 提取基础类型名和泛型参数
+			baseTypeName := typeName[:genericStart]
+			genericParams := typeName[genericStart+1 : len(typeName)-1]
+
+			// 递归处理泛型参数
+			innerType := b.CreateTypeByName(genericParams)
+
+			// 根据基础类型名创建相应的类型
+			switch baseTypeName {
+			case "Array":
+				// Array<T> -> SliceType
+				sliceType := ssa.NewSliceType(innerType)
+				sliceType.AddFullTypeName(typeName)
+				return sliceType
+			case "Promise":
+				// Promise<T> -> ObjectType with full type name
+				promiseType := ssa.NewObjectType()
+				promiseType.AddFullTypeName(typeName)
+				return promiseType
+			case "Map":
+				// Map<K, V> -> MapType (简化处理，只使用值类型)
+				mapType := ssa.NewMapType(ssa.CreateStringType(), innerType)
+				mapType.AddFullTypeName(typeName)
+				return mapType
+			case "Set":
+				// Set<T> -> SliceType (简化为数组类型)
+				sliceType := ssa.NewSliceType(innerType)
+				sliceType.AddFullTypeName(typeName)
+				return sliceType
+			default:
+				// 其他泛型类型，作为对象类型处理
+				objType := ssa.NewObjectType()
+				objType.AddFullTypeName(typeName)
+				return objType
+			}
+		}
+
+		// 处理数组简写形式 (如 string[], number[])
+		if len(typeName) > 2 && typeName[len(typeName)-2:] == "[]" {
+			elementTypeName := typeName[:len(typeName)-2]
+			elementType := b.CreateTypeByName(elementTypeName)
+			sliceType := ssa.NewSliceType(elementType)
+			sliceType.AddFullTypeName(typeName)
+			return sliceType
+		}
+	}
+
+	// 尝试查找 Blueprint（类、接口、枚举等）
+	if blueprint := b.GetBluePrint(typeName); blueprint != nil {
+		return blueprint
+	}
+
+	// 处理常见的内置对象类型
+	switch typeName {
+	case "Date", "RegExp", "Error", "Function", "Symbol":
+		objType := ssa.NewObjectType()
+		objType.AddFullTypeName(typeName)
+		return objType
+	}
+
+	// 默认：创建对象类型并设置类型名
+	objType := ssa.NewObjectType()
+	objType.AddFullTypeName(typeName)
+	return objType
+}
+
+// IsPromiseType 检查给定类型是否是 Promise 类型
+func (b *builder) IsPromiseType(typ ssa.Type) bool {
+	if typ == nil {
+		return false
+	}
+
+	// 检查类型的完整类型名称
+	typeNames := typ.GetFullTypeNames()
+	for _, typeName := range typeNames {
+		// 检查是否以 "Promise" 开头
+		// 支持 "Promise<T>" 和 "Promise" 形式
+		if len(typeName) >= 7 {
+			if typeName == "Promise" || (len(typeName) > 8 && typeName[:8] == "Promise<") {
+				return true
+			}
+		}
+	}
+
+	return false
 }

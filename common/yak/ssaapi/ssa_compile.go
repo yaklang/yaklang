@@ -5,7 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/c2ssa"
-	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
+	"github.com/yaklang/yaklang/common/yak/typescript/ts2ssa"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
@@ -24,15 +24,17 @@ const (
 	JAVA = consts.JAVA
 	GO   = consts.GO
 	C    = consts.C
+	TS   = consts.TS
 )
 
 var LanguageBuilderCreater = map[consts.Language]ssa.CreateBuilder{
 	Yak:  yak2ssa.CreateBuilder,
-	JS:   js2ssa.CreateBuilder,
+	JS:   ts2ssa.CreateBuilder,
 	PHP:  php2ssa.CreateBuilder,
 	JAVA: java2ssa.CreateBuilder,
 	GO:   go2ssa.CreateBuilder,
 	C:    c2ssa.CreateBuilder,
+	TS:   ts2ssa.CreateBuilder,
 }
 
 func (c *Config) isStop() bool {
