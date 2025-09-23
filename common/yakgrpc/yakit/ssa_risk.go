@@ -110,6 +110,12 @@ func WithSSARiskFilterCompare(taskID1, taskID2 string) SSARiskFilterOption {
 	}
 }
 
+func WithSSARiskIncremental() SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		sf.Incremental = true
+	}
+}
+
 func WithSSARiskFilterTaskID(taskID string) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
 		if taskID == "" {
@@ -171,6 +177,97 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 		}
 	}
 
+	if filter.GetIncremental() {
+		// 增量模式：基于当前扫描产生的RiskFeatureHash，查找历史上相同特征但未处置的风险
+		// 逻辑：
+		// 1. 找到当前批次产生的所有RiskFeatureHash
+		// 2. 查找所有批次≤当前批次中，具有相同RiskFeatureHash但未处置的风险
+
+		runtimeIDs := filter.GetRuntimeID()
+		if len(runtimeIDs) > 0 {
+			baseTaskID := runtimeIDs[0]
+
+			// 获取基础任务的扫描批次
+			var baseTask schema.SyntaxFlowScanTask
+			if err := db.New().Where("task_id = ?", baseTaskID).First(&baseTask).Error; err == nil {
+				// 第一步：获取当前批次产生的所有RiskFeatureHash
+				var currentBatchFeatureHashes []string
+				err := db.New().Model(&schema.SSARisk{}).
+					Where("runtime_id = ? AND risk_feature_hash != ''", baseTaskID).
+					Pluck("DISTINCT risk_feature_hash", &currentBatchFeatureHashes).Error
+
+				if err != nil || len(currentBatchFeatureHashes) == 0 {
+					// 如果当前批次没有风险或查询失败，返回空结果
+					db = db.Where("1 = 0")
+				} else {
+					// 第二步：获取早于或等于基础批次的已被处置过的 risk_feature_hash
+					var disposedFeatureHashes []string
+					subQuery := db.New().Model(&schema.SSARiskDisposals{}).
+						Joins("JOIN syntax_flow_scan_tasks ON ssa_risk_disposals.task_id = syntax_flow_scan_tasks.task_id").
+						Where("ssa_risk_disposals.risk_feature_hash != '' AND ssa_risk_disposals.risk_feature_hash IN (?) AND syntax_flow_scan_tasks.scan_batch <= ?",
+							currentBatchFeatureHashes, baseTask.ScanBatch)
+
+					if err := subQuery.Pluck("DISTINCT ssa_risk_disposals.risk_feature_hash", &disposedFeatureHashes).Error; err == nil && len(disposedFeatureHashes) > 0 {
+						// 第三步：查找具有当前批次RiskFeatureHash但未处置的历史风险
+						// 条件：批次≤当前批次 && RiskFeatureHash在当前批次中 && 该特征未被处置
+						validFeatureHashes := make([]string, 0)
+						for _, hash := range currentBatchFeatureHashes {
+							found := false
+							for _, disposedHash := range disposedFeatureHashes {
+								if hash == disposedHash {
+									found = true
+									break
+								}
+							}
+							if !found {
+								validFeatureHashes = append(validFeatureHashes, hash)
+							}
+						}
+
+						if len(validFeatureHashes) > 0 {
+							// 查找具有有效特征的历史风险
+							db = db.Select("ssa_risks.*").
+								Joins("JOIN syntax_flow_scan_tasks ON ssa_risks.runtime_id = syntax_flow_scan_tasks.task_id").
+								Where("ssa_risks.risk_feature_hash IN (?) AND syntax_flow_scan_tasks.scan_batch <= ?",
+									validFeatureHashes, baseTask.ScanBatch)
+						} else {
+							// 所有特征都已处置，返回空结果
+							db = db.Where("1 = 0")
+						}
+					} else {
+						// 没有已处置的特征，查找所有具有当前批次RiskFeatureHash的历史风险
+						db = db.Select("ssa_risks.*").
+							Joins("JOIN syntax_flow_scan_tasks ON ssa_risks.runtime_id = syntax_flow_scan_tasks.task_id").
+							Where("ssa_risks.risk_feature_hash IN (?) AND syntax_flow_scan_tasks.scan_batch <= ?",
+								currentBatchFeatureHashes, baseTask.ScanBatch)
+					}
+				}
+			} else {
+				// 如果无法获取基础任务信息，回退到简单的未处置过滤
+				log.Errorf("Failed to get base task scan batch for incremental query: %v", err)
+				var disposedFeatureHashes []string
+				if err := db.New().Model(&schema.SSARiskDisposals{}).
+					Where("risk_feature_hash != ''").
+					Pluck("DISTINCT risk_feature_hash", &disposedFeatureHashes).Error; err == nil && len(disposedFeatureHashes) > 0 {
+					db = db.Where("risk_feature_hash != ''").
+						Where("risk_feature_hash NOT IN (?)", disposedFeatureHashes)
+				} else {
+					db = db.Where("risk_feature_hash != ''")
+				}
+			}
+		} else {
+			// 如果没有 RuntimeID，回退到简单的未处置过滤
+			var disposedFeatureHashes []string
+			if err := db.New().Model(&schema.SSARiskDisposals{}).
+				Where("risk_feature_hash != ''").
+				Pluck("DISTINCT risk_feature_hash", &disposedFeatureHashes).Error; err == nil && len(disposedFeatureHashes) > 0 {
+				db = db.Where("risk_feature_hash != ''").
+					Where("risk_feature_hash NOT IN (?)", disposedFeatureHashes)
+			} else {
+				db = db.Where("risk_feature_hash != ''")
+			}
+		}
+	}
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramName())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "function_name", filter.GetFunctionName())
