@@ -3,6 +3,8 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -68,6 +70,9 @@ type scanManager struct {
 	// process
 	processCallback     ProcessCallback
 	ruleProcessCallback RuleProcessCallback
+
+	reporter       sfreport.IReport
+	reporterWriter io.Writer
 }
 
 var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
@@ -137,6 +142,8 @@ func createSyntaxflowTaskById(
 	if sc != nil {
 		m.processCallback = sc.GetProcessCallback()
 		m.ruleProcessCallback = sc.GetRuleProcessCallback()
+		m.reporter = sc.Reporter
+		m.reporterWriter = sc.ReporterWriter
 	}
 	return m, nil
 }

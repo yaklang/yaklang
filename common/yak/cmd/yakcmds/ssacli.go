@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
@@ -1273,13 +1274,6 @@ var ssaCodeScan = &cli.Command{
 			ruleFilter.GroupNames = groupNames
 		}
 
-		riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, c.Bool("memory"))
-		if err != nil {
-			log.Errorf("scan failed: %s", err)
-			// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
-			return err
-		}
-
 		opt := []sfreport.Option{}
 		if c.Bool("with-file-content") {
 			opt = append(opt, sfreport.WithFileContent(true))
@@ -1287,7 +1281,20 @@ var ssaCodeScan = &cli.Command{
 		if c.Bool("with-dataflow-path") {
 			opt = append(opt, sfreport.WithDataflowPath(true))
 		}
-		ShowRisk(config.Format, riskCh, config.OutputWriter, opt...)
+		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format, opt...)
+		err = syntaxflow_scan.StartScan(
+			ctx,
+			nil,
+			syntaxflow_scan.WithProgramNames(prog.GetProgramName()),
+			syntaxflow_scan.WithRuleFilter(ruleFilter),
+			syntaxflow_scan.WithMemory(c.Bool("memory")),
+			syntaxflow_scan.WithReporter(reportInstance),
+			syntaxflow_scan.WithReporterWriter(config.OutputWriter),
+		)
+		if err != nil {
+			log.Errorf("scan failed: %s", err)
+			return err
+		}
 		ssaprofile.ShowCacheCost()
 		return nil
 	},
