@@ -1779,6 +1779,21 @@ a=1`,
 				"\r\n\r\na=1&b=2",
 			},
 		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/json
+
+{"a":1,"b":2}`,
+			key:   "c",
+			value: "3",
+			whitelists: []string{
+				"Content-Type: application/json",
+				`"a":"1"`,
+				`"b":"2"`,
+				`"c":"3"`,
+			},
+		},
 	}
 	for _, testcase := range testcases {
 
