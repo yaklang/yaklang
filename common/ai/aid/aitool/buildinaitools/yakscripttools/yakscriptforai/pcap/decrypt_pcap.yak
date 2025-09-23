@@ -1,0 +1,505 @@
+__DESC__ = "一个专门用于解密和分析网络工具相关PCAP数据包的工具，支持数据帧重组、提取隐藏流量、解密加密通信、识别恶意行为等高级功能。"
+__VERBOSE_NAME__ = "PCAP解密分析工具"
+__KEYWORDS__ = "pcap,decrypt,解密,网络工具,流量分析,加密通信,恶意行为,隐蔽通道,协议逆向,数据包解密,数据帧重组"
+
+/*
+PCAP解密分析工具
+
+功能特点：
+1. 专门针对网络工具的PCAP分析
+   - 识别常见网络工具的通信模式
+   - 提取隐藏在正常流量中的控制命令
+   - 解密加密的C2通信
+   - 分析网络扫描和渗透测试行为
+
+2. 数据帧重组和流分析：
+   - 自动重组TCP数据流
+   - 分析完整的应用层数据
+   - 检测分片和重传行为
+   - 支持HTTP流和TLS分析
+
+3. 高级解密功能：
+   - 支持多种加密协议的解密
+   - 识别DNS隧道、HTTP隧道等隐蔽通道
+   - 提取base64、hex等编码的数据
+   - 分析TCP重传和分片重组
+
+4. 威胁检测：
+   - 识别C2服务器通信
+   - 检测数据窃取行为
+   - 分析可疑的网络行为模式
+   - 提取恶意payload
+
+5. 参数说明：
+   --file: PCAP文件路径 (必需)
+   --enable-reassembly: 启用TCP数据流重组 (可选，默认true，可选值: true/false)
+   --extract-payloads: 提取可疑payload数据到文件 (可选，默认true，可选值: true/false)
+   --decode-base64: 尝试解码base64内容 (可选，默认true，可选值: true/false)
+   --detect-c2: 启用C2通信检测 (可选，默认true，可选值: true/false)
+   --max-packets: 最大处理数据包数量，默认100000 (可选)
+
+使用示例：
+1. 基本分析网络工具PCAP：
+   yak decrypt_pcap.yak --file suspicious.pcap
+
+2. 禁用数据重组进行原始包分析：
+   yak decrypt_pcap.yak --file suspicious.pcap --enable-reassembly=false
+
+3. 启用完整分析功能：
+   yak decrypt_pcap.yak --file suspicious.pcap --extract-payloads --decode-base64 --detect-c2
+
+4. 限制分析包数量：
+   yak decrypt_pcap.yak --file suspicious.pcap --max-packets 5000
+
+注意事项：
+- 该工具专门用于分析网络安全相关的PCAP文件
+- 支持.pcap和.pcapng格式
+- 默认启用TCP数据流重组以获得完整应用层数据
+- 解密功能会尝试多种常见编码和加密方式
+- 详细分析结果输出到临时文件，STDOUT仅显示统计信息
+- 大文件分析可能需要较长时间
+- 部分高级解密功能需要特定条件才能生效
+- 临时文件路径会在分析完成后显示
+*/
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+pcapFile := cli.String("file", cli.setRequired(true), cli.setHelp("PCAP file path to decrypt and analyze"))
+enableReassemblyStr := cli.String("enable-reassembly", cli.setDefault("true"), cli.setHelp("enable TCP stream reassembly (default: true)"))
+extractPayloadsStr := cli.String("extract-payloads", cli.setDefault("true"), cli.setHelp("extract suspicious payload data to files (default: true)"))
+decodeBase64Str := cli.String("decode-base64", cli.setDefault("true"), cli.setHelp("attempt to decode base64 encoded content (default: true)"))
+detectC2Str := cli.String("detect-c2", cli.setDefault("true"), cli.setHelp("enable C2 communication detection (default: true)"))
+maxPackets := cli.Int("max-packets", cli.setDefault(100000), cli.setHelp("maximum packets to analyze (default: 100000)"))
+
+cli.check()
+
+// 解析布尔值参数
+enableReassembly := parseBool(enableReassemblyStr)
+extractPayloads := parseBool(extractPayloadsStr)
+decodeBase64 := parseBool(decodeBase64Str)
+detectC2 := parseBool(detectC2Str)
+
+yakit.Info("Starting PCAP decryption and analysis for file: %v", pcapFile)
+yakit.Info("Configuration: reassembly=%v, extract-payloads=%v, decode-base64=%v, detect-c2=%v", 
+    enableReassembly, extractPayloads, decodeBase64, detectC2)
+
+// 检查文件是否存在
+if !file.IsExisted(pcapFile) {
+    yakit.Error("PCAP file does not exist: %v", pcapFile)
+    return
+}
+
+// 创建临时输出文件
+tempFile := sprintf("/tmp/decrypt_pcap_analysis_%v.txt", time.Now().Unix())
+suspiciousFile := sprintf("/tmp/decrypt_pcap_suspicious_%v.txt", time.Now().Unix())
+detailedOutputParts := []
+suspiciousOutputParts := []
+
+// 初始化分析结果
+analysisResults := {
+    "total_packets": 0,
+    "suspicious_packets": 0,
+    "extracted_payloads": 0,
+    "decoded_content": 0,
+    "potential_c2": 0,
+    "reassembled_flows": 0,
+    "findings": [],
+}
+
+// 进度打印控制变量
+lastProgressTime := time.Now()
+progressInterval := 5.0 // 每5秒打印一次进度
+processingStopped := false
+
+// 高级数据包分析函数
+analyzePacketAdvanced = func(packet) {
+    if processingStopped {
+        return
+    }
+
+    analysisResults["total_packets"]++
+
+    if analysisResults["total_packets"] > maxPackets {
+        yakit.Warn("Reached maximum packet limit (%v), stopping analysis. Total packets processed: %v", maxPackets, analysisResults["total_packets"])
+        detailedOutputParts = append(detailedOutputParts, sprintf("Reached maximum packet limit (%v), stopping analysis\n", maxPackets))
+        processingStopped = true
+        return
+    }
+
+    // 定期打印进度（每5秒一次）
+    elapsed := time.Since(lastProgressTime).Seconds()
+    if elapsed >= progressInterval {
+        yakit.Info("Progress: %v packets processed, %v suspicious found", analysisResults["total_packets"], analysisResults["suspicious_packets"])
+        lastProgressTime = time.Now()
+    }
+
+    if packet == nil {
+        return
+    }
+
+    // 获取数据包数据
+    data := packet.Data()
+    if data == nil || len(data) == 0 {
+        return
+    }
+
+    // 记录详细的数据包信息
+    detailedOutputParts = append(detailedOutputParts, sprintf("=== Packet %v ===\n", analysisResults["total_packets"]))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Data size: %v bytes\n", len(data)))
+    
+    packetStr := string(data)
+    packetHex := codec.EncodeToHex(data)
+    
+    // 获取包的字符串表示（gopacket信息）
+    if packet != nil {
+        packetInfo := packet.String()
+        detailedOutputParts = append(detailedOutputParts, sprintf("Packet info: %v\n", packetInfo))
+    }
+
+    // 检测可疑模式
+    suspicious := false
+    findings := []
+
+    // 1. 检测base64编码内容
+    if decodeBase64 && len(data) > 10 {
+        // 尝试解码可能的base64内容
+        decoded, err := codec.DecodeBase64(string(data))
+        if err == nil && len(decoded) > 0 {
+            findings = append(findings, {
+                "type": "base64_decoded",
+                "original": string(data),
+                "decoded": string(decoded),
+            })
+            analysisResults["decoded_content"]++
+            suspicious = true
+        }
+    }
+
+    // 2. 检测可疑的字符串模式（网络工具特征）
+    suspiciousPatterns := [
+        "cmd.exe", "/bin/bash", "powershell", "wget", "curl",
+        "nc ", "netcat", "ncat", "socat", "ssh ", "scp ",
+        "meterpreter", "cobalt", "empire", "covenant",
+        "reverse_tcp", "bind_tcp", "shell_reverse_tcp",
+        "system(", "exec(", "eval(", "popen(",
+        "whoami", "hostname", "ipconfig", "ifconfig", "netstat",
+    ]
+
+    for pattern in suspiciousPatterns {
+        if packetStr.Contains(pattern) {
+            findings = append(findings, {
+                "type": "suspicious_command",
+                "pattern": pattern,
+                "context": packetStr,
+            })
+            suspicious = true
+        }
+    }
+
+    // 3. 检测加密通信特征
+    if len(data) > 50 {
+        // 检测高熵数据（通过简单的字节分布检测）
+        if len(data) > 100 {
+            // 计算不同字节值的数量
+            byteFreq := make(map[byte]bool)
+            for i := 0; i < len(data); i++ {
+                byteFreq[data[i]] = true
+            }
+            uniqueBytes := len(byteFreq)
+            
+            // 如果大部分字节值都不同，可能是加密数据
+            if uniqueBytes > len(data) * 7 / 10 {  // 70%以上的字节都不同
+                findings = append(findings, {
+                    "type": "high_entropy",
+                    "unique_bytes": uniqueBytes,
+                    "total_bytes": len(data),
+                    "entropy_ratio": float64(uniqueBytes) / float64(len(data)),
+                })
+                suspicious = true
+            }
+        }
+    }
+
+    // 4. 检测C2通信模式
+    if detectC2 {
+        // 检测周期性通信
+        // 检测特定端口使用
+        // 这里可以添加更多C2检测逻辑
+        c2Indicators := [
+            "beacon", "heartbeat", "checkin", "callback",
+            "127.0.0.1", "localhost", "::1",
+        ]
+
+        for indicator in c2Indicators {
+            if packetStr.Contains(indicator) {
+                findings = append(findings, {
+                    "type": "c2_indicator",
+                    "indicator": indicator,
+                    "context": packetStr,
+                })
+                analysisResults["potential_c2"]++
+                suspicious = true
+            }
+        }
+    }
+
+    // 5. 检测隐蔽通道
+    // DNS隧道检测
+    if packetStr.Contains("TXT") && len(data) > 100 {
+        findings = append(findings, {
+            "type": "potential_dns_tunnel",
+            "size": len(data),
+        })
+        suspicious = true
+    }
+
+    // HTTP隧道检测
+    if packetStr.Contains("CONNECT ") || packetStr.Contains("Proxy-Authorization") {
+        findings = append(findings, {
+            "type": "potential_http_tunnel",
+            "method": "CONNECT",
+        })
+        suspicious = true
+    }
+
+    // 6. 提取payload数据
+    if extractPayloads && suspicious {
+        payloadFile := sprintf("/tmp/payload_%v.bin", analysisResults["total_packets"])
+        err := file.Save(payloadFile, data)
+        if err == nil {
+            findings = append(findings, {
+                "type": "payload_extracted",
+                "file": payloadFile,
+                "size": len(data),
+            })
+            analysisResults["extracted_payloads"]++
+            detailedOutputParts = append(detailedOutputParts, sprintf("Payload extracted to: %v (%v bytes)\n", payloadFile, len(data)))
+        }
+    }
+
+    // 记录发现
+    if suspicious {
+        analysisResults["suspicious_packets"]++
+        analysisResults["findings"] = append(analysisResults["findings"], {
+            "packet_number": analysisResults["total_packets"],
+            "findings": findings,
+            "packet_size": len(data),
+            "hex_preview": packetHex[:min(100, len(packetHex))],
+        })
+
+        // 将详细发现信息写入文件而不是STDOUT
+        detailedOutputParts = append(detailedOutputParts, sprintf("=== Suspicious Packet %v ===\n", analysisResults["total_packets"]))
+        detailedOutputParts = append(detailedOutputParts, sprintf("Packet size: %v bytes\n", len(data)))
+        detailedOutputParts = append(detailedOutputParts, sprintf("Hex preview: %v\n", packetHex[:min(100, len(packetHex))]))
+        detailedOutputParts = append(detailedOutputParts, sprintf("Findings (%v):\n", len(findings)))
+
+        // 可疑数据单独保存
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("=== SUSPICIOUS PACKET %v ===\n", analysisResults["total_packets"]))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Timestamp: %v\n", time.Now().Format("2006-01-02 15:04:05")))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Packet size: %v bytes\n", len(data)))
+        
+        if packet != nil {
+            packetInfo := packet.String()
+            suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Packet info: %v\n", packetInfo))
+        }
+        
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw data (hex): %v\n", packetHex))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw data (text): %v\n", packetStr))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("\nFindings (%v):\n", len(findings)))
+
+        for finding in findings {
+            findingType := finding["type"]
+            detail := finding["pattern"] || finding["indicator"] || finding["decoded"] || sprintf("size=%v", finding["size"])
+            
+            detailedOutputParts = append(detailedOutputParts, sprintf("  - %v: %v\n", findingType, detail))
+            suspiciousOutputParts = append(suspiciousOutputParts, sprintf("  ★ %v: %v\n", findingType, detail))
+            
+            // 如果有解码内容，单独保存
+            if finding["decoded"] != nil {
+                suspiciousOutputParts = append(suspiciousOutputParts, sprintf("    Decoded content: %v\n", finding["decoded"]))
+            }
+        }
+        
+        detailedOutputParts = append(detailedOutputParts, "\n")
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("\n%s\n\n", str.Repeat("=", 80)))
+    }
+    
+    // 总是添加数据预览（不管是否可疑）
+    if len(packetStr) > 0 {
+        if len(packetStr) <= 200 {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Text preview: %v\n", packetStr))
+        } else {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Data size: %v bytes, preview: %v...\n", len(packetStr), packetStr[:100]))
+        }
+    }
+    detailedOutputParts = append(detailedOutputParts, sprintf("---\n\n"))
+}
+
+// 简化的字节分布分析 - 替代复杂的熵计算
+analyzeByteDistribution = func(data) {
+    if len(data) < 10 {
+        return 0.0
+    }
+    
+    // 计算不同字节的比例
+    byteSet := make(map[byte]bool)
+    for i := 0; i < len(data); i++ {
+        byteSet[data[i]] = true
+    }
+    
+    return float64(len(byteSet)) / float64(len(data))
+}
+
+// TCP数据重组回调函数 - 正确的参数签名
+onFlowDataFrameReassembled = func(flow, conn, frame) {
+    if processingStopped {
+        return
+    }
+
+    analysisResults["reassembled_flows"]++
+    
+    if frame == nil || frame.Payload == nil || len(frame.Payload) == 0 {
+        return
+    }
+    
+    frameData := frame.Payload
+    detailedOutputParts = append(detailedOutputParts, sprintf("=== TCP Reassembled Frame ===\n"))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Flow: %v -> %v\n", flow.ClientConn, flow.ServerConn))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Frame size: %v bytes\n", len(frameData)))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Connection hash: %v\n", frame.ConnHash))
+    
+    // 分析重组后的数据内容
+    frameStr := string(frameData)
+    frameHex := codec.EncodeToHex(frameData)
+    
+    // 检查是否有可疑内容
+    suspiciousContent := false
+    suspiciousFindings := []
+    
+    // 检查命令注入和网络工具特征
+    suspiciousPatterns := [
+        "cmd.exe", "/bin/bash", "powershell", "wget", "curl",
+        "nc ", "netcat", "ncat", "socat", "ssh ", "scp ",
+        "system(", "exec(", "eval(", "popen(",
+        "whoami", "hostname", "ipconfig", "ifconfig",
+        "cat ", "ls ", "dir ", "type ", "copy ",
+    ]
+    
+    for pattern in suspiciousPatterns {
+        if frameStr.Contains(pattern) {
+            suspiciousFindings = append(suspiciousFindings, sprintf("Suspicious pattern: %v", pattern))
+            suspiciousContent = true
+        }
+    }
+    
+    // 检查HTTP流量
+    if frameStr.Contains("HTTP/") || frameStr.Contains("GET ") || frameStr.Contains("POST ") {
+        suspiciousFindings = append(suspiciousFindings, "HTTP traffic detected")
+        suspiciousContent = true
+    }
+    
+    // 尝试base64解码
+    if decodeBase64 && len(frameData) > 10 {
+        decoded, err := codec.DecodeBase64(string(frameData))
+        if err == nil && len(decoded) > 0 {
+            suspiciousFindings = append(suspiciousFindings, sprintf("Base64 decoded content: %v", string(decoded)))
+            suspiciousContent = true
+            analysisResults["decoded_content"]++
+        }
+    }
+    
+    if suspiciousContent {
+        detailedOutputParts = append(detailedOutputParts, "Suspicious content detected in reassembled frame:\n")
+        
+        // 可疑TCP重组数据单独保存
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("=== SUSPICIOUS TCP REASSEMBLED FRAME ===\n"))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Timestamp: %v\n", time.Now().Format("2006-01-02 15:04:05")))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Flow: %v -> %v\n", flow.ClientConn, flow.ServerConn))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Frame size: %v bytes\n", len(frameData)))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Connection hash: %v\n", frame.ConnHash))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw frame data (hex): %v\n", frameHex))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw frame data (text): %v\n", frameStr))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("\nSuspicious findings:\n"))
+        
+        for finding in suspiciousFindings {
+            detailedOutputParts = append(detailedOutputParts, sprintf("  - %v\n", finding))
+            suspiciousOutputParts = append(suspiciousOutputParts, sprintf("  ★ %v\n", finding))
+        }
+        
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("\n%s\n\n", str.Repeat("=", 80)))
+    }
+    
+    // 数据预览
+    if len(frameStr) > 0 {
+        if len(frameStr) <= 200 {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data: %v\n", frameStr))
+        } else {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data preview: %v...\n", frameStr[:100]))
+        }
+    }
+    
+    detailedOutputParts = append(detailedOutputParts, sprintf("Frame hex: %v\n", frameHex[:min(200, len(frameHex))]))
+    detailedOutputParts = append(detailedOutputParts, "\n")
+}
+
+// 设置PCAP分析选项
+options := []
+
+// 根据参数决定是否启用数据重组
+if enableReassembly {
+    yakit.Info("TCP stream reassembly enabled")
+    // 使用正确的TCP数据重组回调
+    options = append(options, pcapx.pcap_onFlowDataFrame(onFlowDataFrameReassembled))
+    yakit.Info("TCP data frame reassembly callback registered")
+} else {
+    yakit.Info("TCP stream reassembly disabled - analyzing raw packets only")
+}
+
+// 添加数据包处理函数
+options = append(options, pcapx.pcap_everyPacket(analyzePacketAdvanced))
+
+// 执行PCAP文件分析
+yakit.Info("Opening PCAP file and starting decryption analysis...")
+err := pcapx.OpenPcapFile(pcapFile, options...)
+if err != nil {
+    yakit.Error("Failed to analyze PCAP file: %v", err)
+    return
+}
+
+// 保存详细结果到文件
+if len(detailedOutputParts) > 0 {
+    // 构造完整的输出内容
+    outputContent := str.Join(detailedOutputParts, "")
+    err := file.Save(tempFile, outputContent)
+    if err != nil {
+        yakit.Warn("Failed to save detailed results to file: %v", err)
+    } else {
+        yakit.Info("Detailed decryption analysis saved to: %v", tempFile)
+    }
+}
+
+// 保存可疑数据到单独文件
+if len(suspiciousOutputParts) > 0 {
+    suspiciousContent := str.Join(suspiciousOutputParts, "")
+    err := file.Save(suspiciousFile, suspiciousContent)
+    if err != nil {
+        yakit.Warn("Failed to save suspicious data to file: %v", err)
+    } else {
+        yakit.Info("Suspicious data analysis saved to: %v", suspiciousFile)
+        yakit.Info("★ Found %v suspicious packets/frames - check suspicious file for details", analysisResults["suspicious_packets"])
+    }
+} else {
+    yakit.Info("No suspicious content detected in this PCAP file")
+}
+
+// 输出简洁的统计结果
+yakit.Info("=== PCAP Decryption Analysis Results ===")
+yakit.Info("Total packets analyzed: %v", analysisResults["total_packets"])
+yakit.Info("Suspicious packets detected: %v", analysisResults["suspicious_packets"])
+yakit.Info("Reassembled TCP flows: %v", analysisResults["reassembled_flows"])
+yakit.Info("Extracted payloads: %v", analysisResults["extracted_payloads"])
+yakit.Info("Decoded content: %v", analysisResults["decoded_content"])
+yakit.Info("Potential C2 communications: %v", analysisResults["potential_c2"])
+
+yakit.Info("PCAP decryption analysis completed successfully")

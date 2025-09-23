@@ -1,33 +1,185 @@
-__DESC__ = "一个从指定的Git仓库和提交/引用中提取文件系统内容并复制到本地临时目录的工具，支持分页读取，用于获取特定提交状态下的文件系统快照。"
-__VERBOSE_NAME__ = "Git提交文件系统提取工具"
-__KEYWORDS__ = "git,文件系统,提交提取,仓库管理,版本控制,代码管理,文件快照,git工具"
+__DESC__ = "一个强大的Git文件系统提取工具，支持从单个提交、提交范围、日期或日期范围中提取文件系统内容并复制到本地临时目录。适用于代码版本分析、历史快照查看、特定时间点代码恢复等场景。"
+__VERBOSE_NAME__ = "Git文件系统提取工具"
+__KEYWORDS__ = "git,文件系统,提交提取,日期范围,版本控制,代码管理,文件快照,git工具,commit range,date range"
+
+/*
+Git文件系统提取工具
+
+功能特点：
+1. 支持四种灵活的提取模式：
+   - single-commit: 从单个Git提交或引用（如HEAD、分支名、标签、提交哈希）提取文件系统快照
+   - commit-range: 从指定的提交范围（起始提交到结束提交）提取合并后的文件系统状态
+   - date: 从指定日期当天（00:00:00到23:59:59）的所有提交中提取文件系统
+   - date-range: 从日期范围（起始日期到结束日期）内的所有提交中提取文件系统
+
+2. 完整的参数选项：
+   --repos: Git仓库的本地路径，必须是有效的Git仓库目录 (必需参数)
+   --mode: 提取模式选择
+     * single-commit: 单个提交模式 (默认)
+     * commit-range: 提交范围模式
+     * date: 日期模式
+     * date-range: 日期范围模式
+   --ref: Git引用名称，用于single-commit模式
+     * 支持HEAD、分支名（如main、develop）、标签名、完整的提交哈希
+     * 示例: HEAD, main, v1.0.0, a1b2c3d4...
+   --start-ref: 起始提交引用，用于commit-range模式
+   --end-ref: 结束提交引用，用于commit-range模式
+   --date: 目标日期，用于date模式
+   --start-date: 起始日期，用于date-range模式
+   --end-date: 结束日期，用于date-range模式
+
+3. 智能文件系统处理：
+   - 自动将提取的文件系统复制到本地临时目录
+   - 提供完整的目录结构和文件统计信息
+   - 支持查看提取内容的详细树形结构
+   - 临时目录会在工具执行完成后保留，方便后续分析
+
+使用示例：
+
+基本用法：
+1. 提取当前HEAD的文件系统快照：
+   yak git-dump-fs-commit.yak --repos /path/to/project
+
+2. 提取指定分支的文件系统：
+   yak git-dump-fs-commit.yak --repos /path/to/project --ref main
+
+提交范围提取：
+3. 提取两个提交之间的文件系统变化：
+   yak git-dump-fs-commit.yak --repos /path/to/project --mode commit-range --start-ref v1.0 --end-ref v2.0
+
+4. 提取从某个提交到HEAD的文件系统：
+   yak git-dump-fs-commit.yak --repos /path/to/project --mode commit-range --start-ref abc123 --end-ref HEAD
+
+日期相关提取：
+5. 提取2024年1月15日当天的文件系统：
+   yak git-dump-fs-commit.yak --repos /path/to/project --mode date --date 2024-01-15
+
+6. 提取2024年1月份的文件系统：
+   yak git-dump-fs-commit.yak --repos /path/to/project --mode date-range --start-date 2024-01-01 --end-date 2024-01-31
+
+7. 提取最近一周的文件系统：
+   yak git-dump-fs-commit.yak --repos /path/to/project --mode date-range --start-date 2024-09-01 --end-date 2024-09-07
+
+高级用法：
+8. 使用完整的提交哈希：
+   yak git-dump-fs-commit.yak --repos /path/to/project --ref a1b2c3d4e5f6...
+
+9. 提取标签对应的文件系统：
+   yak git-dump-fs-commit.yak --repos /path/to/project --ref v2.1.0
+
+注意事项：
+- 日期格式灵活支持：YYYY-MM-DD、YYYY/MM/DD、MM/DD/YYYY、Jan 15, 2024等格式
+- 提交引用必须存在于Git仓库中，否则会报错
+- 大型仓库或长时间范围的提取可能需要更多时间
+- 提取的文件系统是只读的临时副本，不会影响原仓库
+- 工具会显示提取结果的临时目录路径，方便后续文件操作
+- 支持所有标准的Git引用格式（分支、标签、提交哈希等）
+- 日期范围提取会包含范围内的所有提交的合并结果
+*/
 
 yakit.AutoInitYakit()
 
-repos = cli.String("repos", cli.setRequired(true), cli.setHelp("target git repos"))
-refname = cli.String("ref", cli.setRequired(false), cli.setDefault("HEAD"), cli.setHelp("the commit hash or rev ref u want to dump filesystem from"))
+// 通用文件系统转储函数
+dumpFilesystem = func(fs, description) {
+    local := filesys.CopyToTemporary(fs)
+    localDirname, err := local.Getwd()
+    if err != nil {
+        yakit.Error("failed to dump to local temp directory: %v", err)
+        return
+    }
 
-// repos = `/Users/v1ll4n/Projects/yaklang`
-// refname = "HEAD"
-limit = cli.Int("limit", cli.setRequired(true), cli.setDefault(20), cli.setHelp("set limit for fetch branch, use offset at same time can read chunk"))
-offset = cli.Int("offset", cli.setRequired(true), cli.setDefault(0), cli.setHelp("offset from start index, use it can read chunk"))
+    yakit.Info("%v dumped to local filesystem: %v", description, localDirname)
+    yakit.Info("Directory structure:")
+    yakit.Info("===================")
+    yakit.Info(filesys.Glance(localDirname))
+}
+
+// 解析命令行参数
+repos := cli.String("repos", cli.setRequired(true), cli.setHelp("target git repository path"))
+mode := cli.String("mode", cli.setDefault("single-commit"), cli.setHelp("extraction mode: single-commit/commit-range/date/date-range"))
+ref := cli.String("ref", cli.setHelp("commit hash or ref for single-commit mode"))
+startRef := cli.String("start-ref", cli.setHelp("start commit hash or ref for commit-range mode"))
+endRef := cli.String("end-ref", cli.setHelp("end commit hash or ref for commit-range mode"))
+date := cli.String("date", cli.setHelp("date for date mode"))
+startDate := cli.String("start-date", cli.setHelp("start date for date-range mode"))
+endDate := cli.String("end-date", cli.setHelp("end date for date-range mode"))
+
 cli.check()
 
-hash, err = git.RevParse(repos, refname)
-if err != nil {
-    yakit.Error(err.Error())
+yakit.Info("Git filesystem extraction - Repository: %v, Mode: %v", repos, mode)
+
+// 根据模式验证必需参数并执行提取
+if mode == "single-commit" {
+    if ref == "" {
+        yakit.Error("--ref is required for single-commit mode")
+        return
+    }
+
+    yakit.Info("Extracting filesystem from single commit: %v", ref)
+
+    hash, err := git.RevParse(repos, ref)
+    if err != nil {
+        yakit.Error("failed to parse ref %v: %v", ref, err)
+        return
+    }
+
+    fs, err := git.FileSystemFromCommit(repos, hash)
+    if err != nil {
+        yakit.Error("failed to get filesystem from commit %v: %v", hash, err)
+        return
+    }
+
+    dumpFilesystem(fs, sprintf("commit %v", hash))
+
+} else if mode == "commit-range" {
+    if startRef == "" || endRef == "" {
+        yakit.Error("--start-ref and --end-ref are required for commit-range mode")
+        return
+    }
+
+    yakit.Info("Extracting filesystem from commit range: %v to %v", startRef, endRef)
+
+    fs, err := git.FileSystemFromCommitRange(repos, startRef, endRef)
+    if err != nil {
+        yakit.Error("failed to get filesystem from commit range %v to %v: %v", startRef, endRef, err)
+        return
+    }
+
+    dumpFilesystem(fs, sprintf("commit range %v to %v", startRef, endRef))
+
+} else if mode == "date" {
+    if date == "" {
+        yakit.Error("--date is required for date mode")
+        return
+    }
+
+    yakit.Info("Extracting filesystem from date: %v", date)
+
+    fs, err := git.FileSystemFromDate(repos, date)
+    if err != nil {
+        yakit.Error("failed to get filesystem from date %v: %v", date, err)
+        return
+    }
+
+    dumpFilesystem(fs, sprintf("date %v", date))
+
+} else if mode == "date-range" {
+    if startDate == "" || endDate == "" {
+        yakit.Error("--start-date and --end-date are required for date-range mode")
+        return
+    }
+
+    yakit.Info("Extracting filesystem from date range: %v to %v", startDate, endDate)
+
+    fs, err := git.FileSystemFromCommitDateRange(repos, startDate, endDate)
+    if err != nil {
+        yakit.Error("failed to get filesystem from date range %v to %v: %v", startDate, endDate, err)
+        return
+    }
+
+    dumpFilesystem(fs, sprintf("date range %v to %v", startDate, endDate))
+
+} else {
+    yakit.Error("invalid mode: %v, supported modes: single-commit, commit-range, date, date-range", mode)
     return
 }
-fs, err = git.FileSystemFromCommit(repos /*type: string*/, hash)
-if err != nil {
-    yakit.Error(err.Error())
-    return
-}
-local := filesys.CopyToTemporary(fs)
-localDirname, err = local.Getwd()
-if err != nil {
-    yakit.Error("dump to local temp file err: %v", err)
-    return
-}
-yakit.Info("commit %v in localfs: %v", hash, localDirname)
-yakit.Info(filesys.Glance(localDirname))

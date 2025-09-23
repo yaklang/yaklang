@@ -1,0 +1,91 @@
+__DESC__ = "一个用于克隆Git远程仓库的工具，支持指定本地路径、分支、深度等选项。适用于代码下载、仓库同步等场景。"
+__VERBOSE_NAME__ = "Git克隆工具"
+__KEYWORDS__ = "git clone,仓库克隆,代码下载,版本控制,git工具,仓库管理,代码同步,分支克隆,深度克隆"
+
+/*
+Git克隆工具
+
+功能特点：
+1. 支持克隆远程Git仓库到本地
+   - url: 远程仓库URL (必需)
+   - local-path: 本地存储路径 (必需)
+   - branch: 指定分支名称 (可选)
+
+2. 高级选项：
+   - depth: 克隆深度，限制历史记录数量 (可选)
+   - recursive: 是否递归克隆子模块 (可选)
+   - verify: 是否验证TLS证书 (默认true，可选)
+
+使用示例：
+1. 克隆整个仓库到本地：
+   yak git-clone.yak --url https://github.com/yaklang/yaklang --local-path ./yaklang
+
+2. 克隆指定分支：
+   yak git-clone.yak --url https://github.com/yaklang/yaklang --local-path ./yaklang --branch main
+
+3. 浅克隆（只获取最近的提交）：
+   yak git-clone.yak --url https://github.com/yaklang/yaklang --local-path ./yaklang --depth 1
+
+4. 递归克隆子模块：
+   yak git-clone.yak --url https://github.com/yaklang/yaklang --local-path ./yaklang --recursive
+
+5. 不验证TLS证书（用于自签名证书的情况）：
+   yak git-clone.yak --url https://example.com/repo.git --local-path ./repo --verify false
+
+注意事项：
+- 本地路径如果不存在会自动创建
+- 如果本地路径已存在且不为空，会报错
+- 克隆大型仓库可能需要较长时间
+- 支持HTTP/HTTPS协议的Git仓库
+- 使用 Yak 内置的 git.Clone 函数进行高效克隆
+*/
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+url := cli.String("url", cli.setRequired(true), cli.setHelp("remote git repository URL"))
+localPath := cli.String("local-path", cli.setRequired(true), cli.setHelp("local path to clone repository"))
+branch := cli.String("branch", cli.setHelp("branch name to clone (default: repository default branch)"))
+depth := cli.Int("depth", cli.setHelp("clone depth, limit history commits (0 means full clone)"))
+recursive := cli.Bool("recursive", cli.setHelp("recursively clone submodules"))
+verify := cli.Bool("verify", cli.setDefault(true), cli.setHelp("verify TLS certificates (default: true)"))
+
+cli.check()
+
+yakit.Info("Cloning repository: %v to %v", url, localPath)
+
+// 构建选项
+opts := []
+
+// 设置分支（如果指定）
+if branch != "" {
+    opts = append(opts, git.branch(branch))
+    yakit.Info("Using branch: %v", branch)
+}
+
+// 设置深度（如果指定）
+if depth > 0 {
+    opts = append(opts, git.depth(depth))
+    yakit.Info("Using depth: %v", depth)
+}
+
+// 设置递归子模块
+if recursive {
+    opts = append(opts, git.recursive(true))
+    yakit.Info("Recursive submodules enabled")
+}
+
+// 设置TLS验证
+if !verify {
+    opts = append(opts, git.verify(false))
+    yakit.Info("TLS verification disabled")
+}
+
+// 执行克隆
+err := git.Clone(url, localPath, opts...)
+if err != nil {
+    yakit.Error("Failed to clone repository: %v", err)
+    return
+}
+
+yakit.Info("Repository cloned successfully from %v to %v", url, localPath)
