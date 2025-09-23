@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -116,6 +117,49 @@ func TestWithPostParams(t *testing.T) {
 			}
 
 			t.Logf("✓ %s: %s", tt.name, tt.description)
+		})
+	}
+}
+
+func TestExtractPostParams(t *testing.T) {
+	type args struct {
+		raw []byte
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    map[string]string
+		wantErr bool
+	}{
+		{
+			name: "form_urlencoded_should_decode_plus",
+			args: args{
+				raw: []byte("POST /login HTTP/1.1\r\nHost: example.com\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 17\r\n\r\na=1&b=hello+world"),
+			},
+			want: map[string]string{
+				"a": "1",
+				"b": "hello world",
+			},
+		},
+		{
+			name: "json_string_should_not_parse_as_query",
+			args: args{
+				raw: []byte("HTTP/1.1 403 Forbidden\r\nContent-Type: application/json\r\nContent-Length: 13\r\n\r\n\"aaaaa+bbbbb\""),
+			},
+			want:    map[string]string{},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ExtractPostParams(tt.args.raw)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ExtractPostParams() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ExtractPostParams() got = %v, want %v", got, tt.want)
+			}
 		})
 	}
 }
