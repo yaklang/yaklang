@@ -39,7 +39,11 @@ include('files/'.$action.'.php'); //载入相应文件
 	})
 	t.Run("test-exec", func(t *testing.T) {
 		ssatest.Check(t, ExecCode, func(prog *ssaapi.Program) error {
-			results, err := prog.SyntaxFlowWithError(`exec(* #-> * as $param)`, ssaapi.QueryWithEnableDebug(true))
+			results, err := prog.SyntaxFlowWithError(`
+			request() as $request
+			exec(* as $exec_param) 
+			$exec_param #{until: "* & $request"}->  as $param
+			`, ssaapi.QueryWithEnableDebug(true))
 			require.NoError(t, err)
 			var flag bool
 			values := results.GetValues("param")

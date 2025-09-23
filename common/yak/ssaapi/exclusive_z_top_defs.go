@@ -27,6 +27,13 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 	actx.Self = i
 	actx.direct = TopDefAnalysis
 	ret = i.getTopDefs(actx, opt...)
+	if actx.HasUntilNode() {
+		ret = actx.untilMatch
+	}
+	if ret.Count() > dataflowValueLimit {
+		log.Errorf("Value TopDef %v too many: %d", i.StringWithRange(), ret.Count())
+		return nil
+	}
 	ret = MergeValues(ret)
 	return
 }
@@ -117,6 +124,10 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 	var err error
 	err = actx.hook(i)
 	if err != nil {
+		return Values{i}
+	}
+
+	if actx.isUntilNode(i) {
 		return Values{i}
 	}
 

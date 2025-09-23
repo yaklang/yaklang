@@ -10,6 +10,7 @@ type OperationConfig struct {
 
 	// Hook
 	HookEveryNode        []func(*Value) error
+	UntilNode            func(*Value) bool
 	AllowIgnoreCallStack bool
 	ctx                  context.Context
 
@@ -58,6 +59,12 @@ func WithDepthLimit(depth int) OperationOption {
 func WithHookEveryNode(hookNode func(*Value) error) OperationOption {
 	return func(operationConfig *OperationConfig) {
 		operationConfig.HookEveryNode = append(operationConfig.HookEveryNode, hookNode)
+	}
+}
+
+func WithUntilNode(untilNode func(*Value) bool) OperationOption {
+	return func(operationConfig *OperationConfig) {
+		operationConfig.UntilNode = untilNode
 	}
 }
 
