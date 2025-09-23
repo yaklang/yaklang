@@ -178,7 +178,6 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
 		ret.program = config.program
-
 		switch config.save {
 		case resultSaveDatabase:
 			process(float64(total-1)/float64(total), "save result")

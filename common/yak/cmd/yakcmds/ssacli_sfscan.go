@@ -2,6 +2,7 @@ package yakcmds
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"os"
 	"path/filepath"
@@ -15,7 +16,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func SyncEmbedRule(force ...bool) {

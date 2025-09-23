@@ -1,6 +1,10 @@
 package syntaxflow_scan
 
-import "github.com/yaklang/yaklang/common/yakgrpc/ypb"
+import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
+)
 
 type ProcessCallback func(progress float64)
 
@@ -10,6 +14,8 @@ type scanInputConfig struct {
 	ScanRequest         *ypb.SyntaxFlowScanRequest
 	ProcessCallback     ProcessCallback
 	RuleProcessCallback RuleProcessCallback
+	Reporter            sfreport.IReport
+	ReporterWriter      io.Writer
 }
 
 func (sc *scanInputConfig) GetScanRequest() *ypb.SyntaxFlowScanRequest {
