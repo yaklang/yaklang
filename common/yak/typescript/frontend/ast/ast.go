@@ -9794,6 +9794,10 @@ func (node *SourceFile) Text() string {
 	return node.text
 }
 
+func (node *SourceFile) GetText() string {
+	return node.text
+}
+
 func (node *SourceFile) FileName() string {
 	return node.fileName
 }

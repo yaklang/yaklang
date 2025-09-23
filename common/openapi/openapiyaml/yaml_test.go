@@ -28,12 +28,12 @@ func TestYaml_FlattenJson(t *testing.T) {
 }
 `)
 
-	t.Run("test flattenJSON", func(t *testing.T) {
+	t.Run("test FlattenJSON", func(t *testing.T) {
 		var jsonMap map[string]interface{}
 		err := json.Unmarshal(data, &jsonMap)
 		require.NoError(t, err)
 		result := make(map[string]string)
-		flattenJSON(jsonMap, "", result)
+		FlattenJSON(jsonMap, "", result)
 		haveResult1 := false
 		haveResult2 := false
 		for k, v := range result {

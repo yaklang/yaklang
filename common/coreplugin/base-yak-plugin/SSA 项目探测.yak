@@ -8,6 +8,7 @@ languages = cli.StringSlice(
     cli.setSelectOption("PHP", "php"),
     cli.setSelectOption("Yaklang", "yak"),
     cli.setSelectOption("JavaScript", "js"),
+    cli.setSelectOption("TypeScript", "ts"),
     cli.setSelectOption("Golang", "go"),
     cli.setSelectOption("C", "c"),
 )
@@ -65,7 +66,7 @@ proxy = str.TrimSpace(proxy.Lower())
 // jsFiles = ["package-lock.json","package.json","yarn.lock"]
 phpFiles = ["index.php", "composer.json", "composer.lock", "wp-config.php", "config.php"]
 javaFiles = ["web.xml", "pom.xml", "application.properties", "struts.xml", "application.yml", "log4j2.xml", "log4j.properties", "shiro.ini"]
-var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0}
+var countMap = map[string]int{"php": 0, "go": 0, "java": 0, "yak": 0, "js": 0, "ts": 0}
 
 params = {
     "program_name": "",

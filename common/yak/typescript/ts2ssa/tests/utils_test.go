@@ -2,9 +2,9 @@ package tests
 
 import (
 	test "github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
+	"github.com/yaklang/yaklang/common/yak/typescript/ts2ssa"
 )
 
 func init() {
-	test.SetLanguage("js", js2ssa.CreateBuilder)
+	test.SetLanguage("ts", ts2ssa.CreateBuilder)
 }

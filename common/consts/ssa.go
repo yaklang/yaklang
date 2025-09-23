@@ -51,7 +51,7 @@ func (l Language) GetFileExt() string {
 	}
 }
 func GetAllSupportedLanguages() []Language {
-	return []Language{Yak, JS, PHP, JAVA, GO, C}
+	return []Language{Yak, JS, PHP, JAVA, GO, C, TS}
 }
 
 func ValidateLanguage(language string) (Language, error) {
@@ -68,6 +68,8 @@ func ValidateLanguage(language string) (Language, error) {
 		return GO, nil
 	case "c", "clang":
 		return C, nil
+	case "ts", "typescript":
+		return TS, nil
 	}
 	return "", errors.Errorf("unsupported language: %s", language)
 }

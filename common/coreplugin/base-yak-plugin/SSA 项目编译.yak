@@ -11,6 +11,7 @@ languages = cli.StringSlice("language",
     cli.setSelectOption("PHP", "php"),
     cli.setSelectOption("Yaklang", "yak"),
     cli.setSelectOption("JavaScript", "js"),
+    cli.setSelectOption("TypeScript", "ts"),
     cli.setSelectOption("Golang", "go"),
     cli.setSelectOption("C", "c"),
     cli.setRequired(true)
