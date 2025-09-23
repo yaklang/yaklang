@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -24,6 +25,7 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 		}
 		m.StatusTask()
 		m.SaveTask()
+		m.saveReport()
 	}()
 
 	// wait for pause signal
@@ -134,7 +136,12 @@ func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	for key, count := range res.GetRiskCountMap() {
 		m.riskCountMap.Set(key, count)
 	}
-
+	if m.reporter != nil {
+		f1 := func() {
+			m.reporter.AddSyntaxFlowResult(res)
+		}
+		ssaprofile.ProfileAdd(true, "convert result to report", f1)
+	}
 	m.stream.Send(&ypb.SyntaxFlowScanResponse{
 		TaskID:   m.taskID,
 		Status:   m.status,
@@ -185,4 +192,20 @@ func (m *scanManager) notifyRuleProcess(progName, ruleName string, f float64) {
 		m.ruleProcessCallback(progName, ruleName, f)
 	}
 
+}
+
+func (m *scanManager) saveReport() {
+	if m == nil || m.reporter == nil {
+		return
+	}
+	err := m.reporter.Save()
+	if err != nil {
+		log.Errorf("save report failed: %v", err)
+	}
+	if m.reporter != nil {
+		err := m.reporter.PrettyWrite(m.reporterWriter)
+		if err != nil {
+			log.Errorf("write report failed: %v", err)
+		}
+	}
 }

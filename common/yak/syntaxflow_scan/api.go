@@ -3,8 +3,9 @@ package syntaxflow_scan
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/utils"
-
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"io"
 )
 
 // ScanOption 定义扫描选项类型，用于配置SyntaxFlow扫描任务的各种参数
@@ -296,6 +297,19 @@ func WithMemory(memory bool) ScanOption {
 	}
 }
 
+func WithReporter(reporter sfreport.IReport) ScanOption {
+	return func(config *scanInputConfig) {
+		config.Reporter = reporter
+	}
+}
+
+func WithReporterWriter(writer io.Writer) ScanOption {
+	return func(config *scanInputConfig) {
+		config.ReporterWriter = writer
+	}
+}
+
+// WithResumeTaskId 设置要恢复的任务ID，用于恢复之前暂停的扫描任
 // WithResumeTaskId 设置要恢复的任务ID，用于恢复之前暂停的扫描任务
 // Example:
 // ```
