@@ -1,0 +1,63 @@
+__DESC__ = "一个用于查看目录树形结构的工具，支持显示目录下的文件和子目录层级关系。适用于目录结构分析、项目概览等场景。"
+__VERBOSE_NAME__ = "目录树形结构查看工具"
+__KEYWORDS__ = "directory tree,目录结构,树形结构,文件系统浏览,directory listing,文件夹结构,文件树,file hierarchy,目录浏览,directory navigation"
+
+/*
+目录树形结构查看工具
+
+功能特点：
+1. 查看目录的树形结构
+   - 显示目录下的文件和子目录
+   - 层级关系清晰展示
+   - 包含文件和目录的统计信息
+
+2. 参数说明：
+   --path: 要查看的目录路径 (必需)
+
+使用示例：
+1. 查看当前目录结构：
+   yak tree.yak --path .
+
+2. 查看指定目录结构：
+   yak tree.yak --path /tmp
+
+3. 查看项目根目录结构：
+   yak tree.yak --path /path/to/project
+
+注意事项：
+- 支持绝对路径和相对路径
+- 自动限制深度和输出行数以提高性能
+- 显示文件数量和目录数量统计
+- 如果目录不存在会报错
+- 使用 Yak 内置的 filesys.Glance 函数进行高效的文件系统浏览
+*/
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+path := cli.String("path", cli.setRequired(true), cli.setHelp("directory path to display tree structure"))
+
+cli.check()
+
+yakit.Info("Viewing directory tree structure: %v", path)
+
+// 检查路径是否存在
+if !file.IsExisted(path) {
+    yakit.Error("Path does not exist: %v", path)
+    return
+}
+
+// 检查是否是目录
+if !file.IsDir(path) {
+    yakit.Error("Path is not a directory: %v", path)
+    return
+}
+
+// 使用 filesys.Glance 获取目录结构信息
+treeInfo := filesys.Glance(path)
+
+yakit.Info("Directory Tree Structure:")
+yakit.Info("========================")
+yakit.Info(treeInfo)
+
+yakit.Info("Directory tree view completed")
