@@ -50,6 +50,28 @@ func (p *Program) ReadImportType(name string) (Type, bool) {
 	return ret, ret != nil
 }
 
+func (p *Program) TryReadImportDeclare(name string) (Type, bool) {
+	var ret Type = nil
+	readImportDecl(p, func(idi *importDeclareItem) bool {
+		t, ok := idi.typ[name]
+		ret = t
+		if ret == nil {
+			for libName := range p.importDeclares.GetMap() {
+				lib, exist := p.GetLibrary(libName)
+				if lib != nil && exist {
+					ret, ok = lib.ExportType[name]
+				}
+				if ok && ret != nil {
+					break
+				}
+			}
+
+		}
+		return ok
+	})
+	return ret, ret != nil
+}
+
 func (p *Program) ReadImportValue(name string) (Value, bool) {
 	var ret Value = nil
 	readImportDecl(p, func(idi *importDeclareItem) bool {
