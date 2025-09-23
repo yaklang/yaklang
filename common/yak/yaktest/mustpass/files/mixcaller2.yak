@@ -47,7 +47,7 @@ handle = (result) => {
     defer l.Unlock()
     var key = f"${token}_5"
     db.SetKey(key, atoi(db.GetKey(key))~ + 1)
-    dump(result)
+    yakit.Info("[mixcaller2] result : %s", result.Target)
 }
 `)~
 defer db.DeleteYakScriptByName(name2)
@@ -61,6 +61,7 @@ host, port = str.ParseStringToHostPort(getParam("VULINBOX"))~
 addr = f"${host}:${port}"
 
 for url in [
+    f"https://www.xxxx.com/abc/14?a=2&&c=1",
     f"https://${addr}/abc/",
     f"https://${addr}/abc/12",
     f"https://${addr}/abc/13",
@@ -70,7 +71,6 @@ for url in [
     f"https://${addr}/abc/14?a=2",
     f"https://${addr}/abc/14?a=2&&c=1",
     f"https://${addr}/abc/14?a=2&&c=1",
-    f"https://localhost:${port}/abc/14?a=2&&c=1",
 ] {
     isHttps, req = poc.ParseUrlToHTTPRequestRaw("GET", url)~
     caller.MirrorHTTPFlow(isHttps, url, req, []byte(""), []byte(""))
@@ -79,11 +79,17 @@ for url in [
 
 caller.Wait()
 
+// 全部
 assert atoi(db.GetKey(f"${token}_1"))~ == 10,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_1`))~}"
-assert atoi(db.GetKey(f"${token}_2"))~ == 2,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_3`))~}"
-assert atoi(db.GetKey(f"${token}_3"))~ == 5,f"mirrorHTTPFlow: ${atoi(db.GetKey(f`${token}_3`))~}"
-v = atoi(db.GetKey(f`${token}_4`))~
-dump(v)
-assert v == 7, f"mirrorNewWebsitePathParams trigger ${v}"
-assert atoi(db.GetKey(f`${token}_5`))~ == 2, "portscan failed"
+// 新域名
+assert atoi(db.GetKey(f"${token}_2"))~ == 2,f"mirrorNewWebsite: ${atoi(db.GetKey(f`${token}_2`))~}"
+
+// 以“域名+路径”去重
+assert atoi(db.GetKey(f"${token}_3"))~ == 5,f"mirrorNewWebsitePath: ${atoi(db.GetKey(f`${token}_3`))~}"
+
+// path+query
+assert atoi(db.GetKey(f`${token}_4`))~ == 7, f"mirrorNewWebsitePathParams: ${atoi(db.GetKey(f`${token}_4`))~}"
+
+// target + port hash 过滤
+assert atoi(db.GetKey(f`${token}_5`))~ == 2, f"handle : ${atoi(db.GetKey(f`${token}_5`))~}"
 
