@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
@@ -249,4 +251,24 @@ func YieldAuditNodeByRuleName(DB *gorm.DB, ruleName string) chan *AuditNode {
 func yieldAuditNode(DB *gorm.DB, ctx context.Context) chan *AuditNode {
 	db := DB.Model(&AuditNode{}).Where("is_entry_node = true")
 	return bizhelper.YieldModel[*AuditNode](ctx, db)
+}
+
+func DeleteAuditNode(DB *gorm.DB, nodes ...*AuditNode) error {
+	if len(nodes) == 0 {
+		return utils.Errorf("delete type from database id is empty")
+	}
+	id := lo.Map(nodes, func(item *AuditNode, _ int) uint {
+		return item.ID
+	})
+	return utils.GormTransaction(DB, func(tx *gorm.DB) error {
+		// split each 999
+		for i := 0; i < len(id); i += 999 {
+			end := i + 999
+			if end > len(id) {
+				end = len(id)
+			}
+			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&IrCode{})
+		}
+		return nil
+	})
 }

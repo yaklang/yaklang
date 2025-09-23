@@ -33,6 +33,7 @@ type SyntaxFlowResult struct {
 	alertVariable []string
 	variable      *orderedmap.OrderedMap // string - int
 
+	size int // value size
 	// message info
 	checkMsg []string
 
@@ -101,8 +102,10 @@ func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowRes
 
 func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 	r.memResult = res
+	size := 0
 	sortFunc := func(vo sfvm.ValueOperator) sfvm.ValueOperator {
 		values := (SyntaxFlowVariableToValues(vo))
+		size += len(values)
 		sort.Slice(values, func(i, j int) bool {
 			// sort by file
 			valueI := values[i]
@@ -133,6 +136,7 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 		return s, sortFunc(vo), nil
 	})
 	res.UnNameValue = sortFunc(res.UnNameValue)
+	r.size = size
 }
 
 func (r *SyntaxFlowResult) GetSFResult() *sfvm.SFFrameResult {

@@ -122,6 +122,8 @@ func OptionSaveValue_ProgramName(name string) SaveValueOption {
 	}
 }
 
+var defaultSize = 100
+
 func SaveValue(value *Value, opts ...SaveValueOption) error {
 	saveValueConfig := newSaveValueCtx(opts...)
 	saveValueConfig.entryValue = value
@@ -131,7 +133,7 @@ func SaveValue(value *Value, opts ...SaveValueOption) error {
 		if db == nil {
 			return utils.Error("db is nil")
 		}
-		database := newAuditDatabase(saveValueConfig.ctx, db)
+		database := newAuditDatabase(saveValueConfig.ctx, db, defaultSize)
 		saveValueConfig.database = database
 		defer func() {
 			database.Close()
@@ -324,19 +326,23 @@ func (a *auditDatabase) SaveIrSource(editor *ssadb.IrSource) {
 }
 
 func (a *auditDatabase) Close() {
-	a.fetch.Close()
+	a.fetch.DeleteRest(func(an []*ssadb.AuditNode) {
+		if len(an) == 0 {
+			return
+		}
+		db := ssadb.GetDB()
+		ssadb.DeleteAuditNode(db, an...)
+	})
 	a.nodeSave.Close()
 	a.edgeSave.Close()
 	a.editorSave.Close()
 }
 
-func newAuditDatabase(ctx context.Context, db *gorm.DB) *auditDatabase {
+func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase {
 	ret := &auditDatabase{}
-	// opt := []databasex.Option{
-	// 	databasex.WithContext(ctx),
-	// 	databasex.WithFetchSize(100),
-	// }
-	size := 1000
+
+	fetchSize := size
+	saveSize := size * 2
 
 	ret.fetch = databasex.NewFetch[*ssadb.AuditNode](func(ctx context.Context, fetchSize int) <-chan *ssadb.AuditNode {
 		out := make(chan *ssadb.AuditNode, fetchSize)
@@ -357,7 +363,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB) *auditDatabase {
 			})
 		}()
 		return out
-	}, databasex.WithContext(ctx), databasex.WithFetchSize(size), databasex.WithName("AuditNode"))
+	}, databasex.WithContext(ctx), databasex.WithFetchSize(fetchSize), databasex.WithName("AuditNode"))
 
 	ret.nodeSave = databasex.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
 		if len(ae) == 0 {
@@ -372,7 +378,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB) *auditDatabase {
 			return nil
 		})
 		return
-	}, databasex.WithContext(ctx), databasex.WithSaveSize(size), databasex.WithName("AuditNode"))
+	}, databasex.WithContext(ctx), databasex.WithSaveSize(saveSize), databasex.WithName("AuditNode"))
 
 	ret.edgeSave = databasex.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
 		if len(ae) == 0 {
@@ -387,7 +393,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB) *auditDatabase {
 			return nil
 		})
 		return
-	}, databasex.WithContext(ctx), databasex.WithSaveSize(size), databasex.WithName("AuditEdge"))
+	}, databasex.WithContext(ctx), databasex.WithSaveSize(saveSize), databasex.WithName("AuditEdge"))
 
 	ret.editorSave = databasex.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
 		if len(ae) == 0 {
