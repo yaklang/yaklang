@@ -274,5 +274,5 @@ func (r *SyntaxFlowResult) IsProgMemoryCompile() bool {
 	if r == nil || r.program == nil {
 		return false
 	}
-	return !r.program.IsFromDatabase()
+	return !r.program.HasSavedDB()
 }
