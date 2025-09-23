@@ -1,0 +1,177 @@
+__DESC__ = "一个统一的用于安全读取文件的工具，支持按字节块读取和按行分段读取两种模式，适用于处理不同类型的文件读取需求。"
+__VERBOSE_NAME__ = "统一文件读取工具"
+__KEYWORDS__ = "memory management,文件读取,大文件处理,file handling,reading,data processing,buffer,performance,内存安全,偏移读取,chunk size,offset,streaming,文件分块,数据块,文件处理,流式读取,large file,分段读取,lines size,line reading,统一读取"
+
+/*
+统一文件读取工具
+
+功能特点：
+1. 支持两种读取模式：
+   - chunk: 按字节块读取文件指定位置的内容（支持偏移量）
+   - lines: 按行分段读取文件内容（支持行偏移量）
+
+2. 通用参数：
+   --file: 指定要读取的文件路径 (必需)
+   --mode: 读取模式，chunk 或 lines (默认: lines)
+   --offset: 读取偏移量，chunk 模式为字节偏移，lines 模式为行偏移 (默认: 0)
+
+3. chunk 模式特有参数：
+   --chunk-size: 每次读取的字节块大小，默认 200 字节，最大 1000 字节 (可选)
+
+4. lines 模式特有参数：
+   --lines: 读取的行数，默认 50 行 (可选)
+   --line-size: 每行的最大长度，默认 512 字符 (可选)
+
+使用示例：
+1. 按行读取文件前 50 行（默认模式）：
+   yak read_file.yak --file test.txt
+
+2. 按行读取文件前 20 行：
+   yak read_file.yak --file test.txt --lines 20
+
+3. 按字节块读取文件前 200 字节：
+   yak read_file.yak --file test.txt --mode chunk
+
+4. 按行读取文件从第 100 行开始的 20 行：
+   yak read_file.yak --file test.txt --mode lines --offset 100 --lines 20
+
+5. 按行读取文件，限制每行最大 256 字符：
+   yak read_file.yak --file test.txt --mode lines --line-size 256
+
+6. 测试边界情况 - 超大 chunk-size（会被限制为 1000）：
+   yak read_file.yak --file test.txt --mode chunk --chunk-size 2000
+
+7. 测试错误处理 - 无效模式：
+   yak read_file.yak --file test.txt --mode invalid
+
+8. 测试错误处理 - 文件不存在：
+   yak read_file.yak --file nonexistent.txt --mode chunk
+
+9. 测试参数验证 - 负数 chunk-size：
+   yak read_file.yak --file test.txt --mode chunk --chunk-size -1
+
+10. 测试参数验证 - 负数 lines：
+    yak read_file.yak --file test.txt --mode lines --lines -1
+
+注意事项：
+- 默认模式为 lines 模式，读取 50 行内容
+- chunk 模式支持精确的字节偏移读取，适合处理二进制文件或需要精确位置的文件
+- lines 模式按行读取，适合处理文本文件，支持行号显示和统计信息
+- chunk-size 最大限制为 1000 字节，以防止内存溢出
+- lines 模式会显示读取的字节百分比和详细统计信息
+- 所有参数都有合理的默认值和边界检查
+- 支持大文件的安全读取，不会一次性加载整个文件到内存
+*/
+
+yakit.AutoInitYakit()
+
+t := cli.String("file", cli.setRequired(true), cli.setHelp("target file you want to read"))
+mode := cli.String("mode", cli.setDefault("lines"), cli.setHelp("read mode: 'chunk' for byte chunks or 'lines' for line-based reading (default: lines)"))
+chunkSize := cli.Int("chunk-size", cli.setRequired(false), cli.setHelp("size for chunk read when mode=chunk, max: 1000"), cli.setDefault(200))
+offset := cli.Int("offset", cli.setRequired(false), cli.setDefault(0))
+lines := cli.Int("lines", cli.setRequired(false), cli.setHelp("how many lines you want to read when mode=lines"), cli.setDefault(50))
+lineSize := cli.Int("line-size", cli.setRequired(false), cli.setHelp("the max columns in a line when mode=lines, default 512"), cli.setDefault(512))
+cli.check()
+
+if !file.IsExisted(t) {
+    yakit.Warn("%v is not existed", t)
+    return
+}
+
+if mode != "chunk" && mode != "lines" {
+    yakit.Error("invalid mode: %v, must be 'chunk' or 'lines'", mode)
+    return
+}
+
+size = 0
+try {
+    size = file.Stat(t)~.Size()
+} catch e {
+    size = 0
+}
+
+if mode == "chunk" {
+    // 字节块读取模式
+    if chunkSize <= 0 {
+        yakit.Warn("chunksize should not be less than zero")
+        return
+    }
+
+    if chunkSize > 1000 {
+        yakit.Warn("chunksize you input is too large, override 1000, for save memory, shrink it.")
+        return
+    }
+
+    f, err := file.OpenFile(t, file.O_RDONLY, 0644)
+    if err != nil {
+        yakit.Error("openfile failed: %v", err)
+        return
+    }
+    defer f.Close()
+    _, err := f.Seek(offset, 0)
+    if err != nil {
+        yakit.Error("seek offset failed: %v", err)
+        return
+    }
+    raw, err := io.ReadAll(io.LimitReader(f, chunkSize))
+    _ = err
+    n := len(string(raw))
+    if n <= 0 && err != nil {
+        yakit.Error("MET ERR: %v", err)
+    }
+    if n > 0 {
+        yakit.Info("CHUNK[Total: %v]: %#v", size, string(raw))
+        yakit.File(t, yakit.fileReadAction(offset, n, "byte", string(raw)))
+    }
+} else {
+    // 按行读取模式
+    if lines <= 0 {
+        yakit.Warn("lines should not be less than zero, default set to 50")
+        lines = 50
+    }
+    if lineSize <= 0 {
+        yakit.Warn("line-size should not be less than zero, default set to 50")
+        lineSize = 512
+    }
+
+    f, err := file.OpenFile(t, file.O_RDONLY, 0644)
+    if err != nil {
+        yakit.Error("openfile failed: %v", err)
+        return
+    }
+    defer f.Close()
+
+    allContent := ""
+    formattedContent := ""
+    count=0
+    start = offset - 1
+    if start < 0 { start = 0 }
+    end = start + lines
+    bytesCount = 0
+    for {
+        count++
+        text, err := f.ReadLine()
+        if err != nil {
+            if len(text) <= 0 {
+                count--
+            }
+            break
+        }
+        bytesCount += len(text) + 1
+        if count <= start { continue }
+        if count > end { break }
+        if formattedContent != "" {
+            formattedContent += "\n"
+        }
+        formattedContent += sprintf("%3d | %s", count, text)
+        allContent += text
+        if count - start >= lines { break }
+    }
+    println(formattedContent)
+    yakit.File(t, yakit.fileReadAction(offset, lines, "line", allContent))
+    if formattedContent != "" {
+        yakit.Info("%s\n\ntotal-bytes: %v read-bytes: %v percent: %.2f%%", formattedContent, size, bytesCount, (float64(bytesCount) / float64(size)) * 100)
+    } else {
+        yakit.Info("No lines read from offset %v\ntotal-bytes: %v read-bytes: %v percent: %.2f%%", offset, size, bytesCount, (float64(bytesCount) / float64(size)) * 100)
+    }
+}

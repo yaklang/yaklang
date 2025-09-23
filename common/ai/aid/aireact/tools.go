@@ -15,7 +15,7 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 		"tools_search",
 		"now",
 		"bash",
-		"read_file_lines",
+		"read_file",
 		"grep",
 		"find_file",
 		"send_http_request_by_url",

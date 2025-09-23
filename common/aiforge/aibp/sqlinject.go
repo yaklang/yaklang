@@ -18,8 +18,8 @@ func _init_sqlinject() {
 	cfg.WithTools(
 		"do_http",
 		"grep",
-		"read_file_chunk",
-		"read_file_lines",
+		"read_file",
+		"read_file",
 		"cybersecurity-risk",
 	)
 	aiforge.RegisterYakAiForge(cfg)
