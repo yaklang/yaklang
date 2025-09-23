@@ -543,7 +543,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		maxIterations:               100,
 		memory:                      aid.GetDefaultMemory(), // Initialize with default memory
 		language:                    "zh",                   // Default to Chinese
-		topToolsCount:               40,                     //
+		topToolsCount:               100,                    //
 		inputConsumption:            new(int64),
 		outputConsumption:           new(int64),
 		aiTransactionAutoRetry:      5,

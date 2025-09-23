@@ -252,6 +252,11 @@ type YaklangCodeActionLoopPromptData struct {
 	Language           string
 	DynamicContext     string
 	Schema             string
+	Tools              []*aitool.Tool
+	ToolsCount         int
+	TopTools           []*aitool.Tool
+	TopToolsCount      int
+	HasMoreTools       bool
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -602,7 +607,7 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForg
 }
 
 // GenerateYaklangCodeActionLoop generates Yaklang code generation action loop prompt using template
-func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages, lastAction string, iterationCount, maxIterations int) (string, error) {
+func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages, lastAction string, iterationCount, maxIterations int, tools []*aitool.Tool) (string, error) {
 	data := &YaklangCodeActionLoopPromptData{
 		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
@@ -631,6 +636,15 @@ func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, e
 	// Set timeline memory
 	if pm.react.config.memory != nil {
 		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	// Get prioritized tools
+	data.Tools = tools
+	data.ToolsCount = len(tools)
+	data.TopToolsCount = pm.react.config.topToolsCount
+	if len(tools) > 0 {
+		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
+		data.HasMoreTools = len(tools) > len(data.TopTools)
 	}
 
 	// Set schema
