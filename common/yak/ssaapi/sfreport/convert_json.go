@@ -18,7 +18,17 @@ import (
 
 var _ IReport = (*Report)(nil)
 
-func (r *Report) Save() error {
+func (r *Report) Save(writer io.Writer) error {
+	switch r.ReportType {
+	case IRifyReportType, IRifyFullReportType:
+		return r.PrettyWrite(writer)
+	case IRifyReactReportType:
+		return r.SaveForIRify()
+	}
+	return utils.Errorf("unsupported report format: %s", r.ReportType)
+}
+
+func (r *Report) SaveForIRify() error {
 	ssaReport := r.ToSSAProjectReport()
 	// 创建yakit报告实例
 	reportInstance := yakit.NewReport()
