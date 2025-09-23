@@ -55,6 +55,9 @@ var blueprintParamsPromptTemplate string
 //go:embed prompts/change-blueprint/change-blueprint.txt
 var changeBlueprintPromptTemplate string
 
+//go:embed prompts/yaklang/codeloop.txt
+var yaklangCodeLoopPromptTemplate string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
 	cpm                  *aicommon.ContextProviderManager
@@ -229,6 +232,26 @@ type ChangeAIBlueprintPromptData struct {
 	ExtraPrompt        string
 	Language           string
 	DynamicContext     string
+}
+
+// YaklangCodeActionLoopPromptData contains data for Yaklang code generation action loop prompt
+type YaklangCodeActionLoopPromptData struct {
+	CurrentTime        string
+	OSArch             string
+	WorkingDir         string
+	WorkingDirGlance   string
+	ConversationMemory string
+	Timeline           string
+	Nonce              string
+	UserQuery          string
+	CurrentCode        string
+	IterationCount     int
+	MaxIterations      int
+	ErrorMessages      string
+	LastAction         string
+	Language           string
+	DynamicContext     string
+	Schema             string
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -576,6 +599,44 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 // GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
 func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForge, blueprintSchema string) (string, error) {
 	return pm.GenerateAIBlueprintForgeParamsPromptEx(ins, blueprintSchema, nil, "")
+}
+
+// GenerateYaklangCodeActionLoop generates Yaklang code generation action loop prompt using template
+func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages, lastAction string, iterationCount, maxIterations int) (string, error) {
+	data := &YaklangCodeActionLoopPromptData{
+		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:      userQuery,
+		CurrentCode:    currentCode,
+		IterationCount: iterationCount,
+		MaxIterations:  maxIterations,
+		ErrorMessages:  errorMessages,
+		LastAction:     lastAction,
+		Nonce:          utils.RandStringBytes(4),
+		Language:       pm.react.config.language,
+		DynamicContext: pm.DynamicContext(),
+	}
+
+	// Set working directory
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	}
+
+	// Set conversation memory
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	// Set schema
+	data.Schema = getYaklangCodeLoopSchema()
+
+	return pm.executeTemplate("yaklang-codeloop", yaklangCodeLoopPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data

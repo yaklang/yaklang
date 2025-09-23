@@ -185,3 +185,31 @@ func getLoopSchema(
 	))
 	return aitool.NewObjectSchemaWithAction(opts...)
 }
+
+func getYaklangCodeLoopSchema() string {
+	opts := []any{
+		aitool.WithStringParam(
+			"@action",
+			aitool.WithParam_Description("You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process."),
+			aitool.WithParam_EnumString(
+				"query_document",
+				"require_tool",
+				"write_code",
+			),
+			aitool.WithParam_Required(true),
+		),
+		aitool.WithStringParam(
+			"tool_require_payload",
+			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'check-yaklang-syntax', 'yak-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
+		),
+		aitool.WithStringParam(
+			"code",
+			aitool.WithParam_Description("If this action involves code modification (write_to_file or modify_file), provide the updated code content here. Leave empty for other actions."),
+		),
+		aitool.WithStringParam(
+			"query_document",
+			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'query_document'. Provide the exact name of the document you need to query (e.g., 'yaklang-syntax', 'yaklang-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
+		),
+	}
+	return aitool.NewObjectSchema(opts...)
+}
