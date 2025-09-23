@@ -104,7 +104,7 @@ func (f *Fetch[T]) Fetch() (T, error) {
 	start := time.Now()
 	item := <-f.buffer.OutputChannel()
 	if time.Since(start) > time.Second {
-		log.Debug("DATABASE: Fetch.Fetch.%s took too long: %v", f.cfg.name, time.Since(start))
+		log.Debugf("DATABASE: Fetch.Fetch.%s took too long: %v", f.cfg.name, time.Since(start))
 	}
 	if utils.IsNil(item) {
 		return item, utils.Errorf("item is nil in Fetch.Fetch")

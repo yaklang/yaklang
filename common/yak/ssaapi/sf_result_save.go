@@ -176,7 +176,7 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		return utils.Error("result is nil")
 	}
 
-	database := newAuditDatabase(ctx, ssadb.GetDB())
+	database := newAuditDatabase(ctx, ssadb.GetDB(), r.size*10)
 	defer database.Close() // wait for save finish
 	// values
 	var err error
@@ -230,9 +230,6 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 				opts = append(opts, OptionSaveValue_ResultRiskHash(hash))
 			}
 			opts = append(opts, OptionSaveValue_ResultIndex(uint(index)))
-
-			v.ShowDot()
-
 			e := SaveValue(v, opts...)
 			err = utils.JoinErrors(err, e)
 		}
