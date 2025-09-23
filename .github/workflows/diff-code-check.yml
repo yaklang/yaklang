@@ -85,7 +85,6 @@ jobs:
       - name: Generate Prog
         run: |
           pwd && ls -al
-          ./yak sync-rule 
           ./yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
           MERGE_BASE=$(git merge-base main ${{ env.HEAD_SHA }})
           echo "Merge base is: $MERGE_BASE"
@@ -118,35 +117,41 @@ jobs:
           name: risk.json
           path: risk.json
 
-      - name: Workflows Fail
+      - name: Workflows fail info
         if: failure()
         run: |
-          cat risk.json | jq -r '
-            "=== Scan Report Summary ===",
-            "Scan Time: \(.report_time)",
-            "Program: \(.program_name)",
-            "Language: \(.program_lang)",
-            "Files Scanned: \(.file_count)",
-            "Lines of Code: \(.code_line_count)",
-            "Risks Found: \(.RiskNums)",
-            "",
-            "=== Risk Details ===",
-            (.Risks[] | 
-              "Risk ID: \(.hash)",
-              "Title: \(.title_verbose)",
-              "Severity: \(.severity)",
-              "Location: \(.code_source_url):\(.line)",
-              "Description: \(.description | split("\n")[0])",
-              "Solution: \(.solution | split("\n")[0])",
-              "Affected Code:",
-              (.code_fragment | split("\n")[] | "  \(.)"),
-              ""
-            ),
-            "=== Affected Files ===",
-            (.File[] | 
-              "File: \(.path)",
-              "Lines: \(.line_count)",
-              "Risk IDs: \(.risks | join(", "))",
-              ""
-            )'
-          exit 1
+          ./yak ssa-risk --input ./risk.json --with-code --severity high
+
+      - name: Workflows fail info - full
+        if: failure()
+        run: |
+          ./yak ssa-risk --input ./risk.json --with-code 
+        # cat risk.json | jq -r '
+        #   "=== Scan Report Summary ===",
+        #   "Scan Time: \(.report_time)",
+        #   "Program: \(.program_name)",
+        #   "Language: \(.program_lang)",
+        #   "Files Scanned: \(.file_count)",
+        #   "Lines of Code: \(.code_line_count)",
+        #   "Risks Found: \(.RiskNums)",
+        #   "",
+        #   "=== Risk Details ===",
+        #   (.Risks[] | 
+        #     "Risk ID: \(.hash)",
+        #     "Title: \(.title_verbose)",
+        #     "Severity: \(.severity)",
+        #     "Location: \(.code_source_url):\(.line)",
+        #     "Description: \(.description | split("\n")[0])",
+        #     "Solution: \(.solution | split("\n")[0])",
+        #     "Affected Code:",
+        #     (.code_fragment | split("\n")[] | "  \(.)"),
+        #     ""
+        #   ),
+        #   "=== Affected Files ===",
+        #   (.File[] | 
+        #     "File: \(.path)",
+        #     "Lines: \(.line_count)",
+        #     "Risk IDs: \(.risks | join(", "))",
+        #     ""
+        #   )'
+        # exit 1
