@@ -21,11 +21,11 @@ import (
 var schemaFreedomReviewPlan string
 
 type PlanReviewSuggestion struct {
-	Id                string `json:"id"`
-	Value             string `json:"value"`
-	Suggestion        string `json:"prompt"`
-	SuggestionEnglish string `json:"prompt_english"`
-	AllowExtraPrompt  bool   `json:"allow_extra_prompt"`
+	Id               string `json:"id"`
+	Value            string `json:"value"`
+	Prompt           string `json:"prompt"`
+	PromptEnglish    string `json:"prompt_english"`
+	AllowExtraPrompt bool   `json:"allow_extra_prompt"`
 
 	PromptBuilder    func(plan *planRequest, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)               `json:"-"`
@@ -35,34 +35,34 @@ type PlanReviewSuggestion struct {
 func (c *Config) getPlanReviewSuggestion() []*PlanReviewSuggestion {
 	opt := []*PlanReviewSuggestion{
 		{
-			Value:             "freedom-review",
-			Suggestion:        "审阅模式",
-			SuggestionEnglish: "User freely review the plan, can add more details or modify the plan",
-			AllowExtraPrompt:  true,
-			ParamSchema:       schemaFreedomReviewPlan,
+			Value:            "freedom-review",
+			Prompt:           "审阅模式",
+			PromptEnglish:    "User freely review the plan, can add more details or modify the plan",
+			AllowExtraPrompt: true,
+			ParamSchema:      schemaFreedomReviewPlan,
 		},
 		{
-			Value:             "unclear",
-			Suggestion:        "目标不明确",
-			SuggestionEnglish: `The plan is too vague and fuzzy, needs more specific objectives and clearer definition`,
-			AllowExtraPrompt:  true,
+			Value:            "unclear",
+			Prompt:           "目标不明确",
+			PromptEnglish:    `The plan is too vague and fuzzy, needs more specific objectives and clearer definition`,
+			AllowExtraPrompt: true,
 		},
 		{
-			Value:             "incomplete",
-			Suggestion:        "有遗漏",
-			SuggestionEnglish: "The plan is not complete enough, more details need to be added",
-			AllowExtraPrompt:  true,
+			Value:            "incomplete",
+			Prompt:           "有遗漏",
+			PromptEnglish:    "The plan is not complete enough, more details need to be added",
+			AllowExtraPrompt: true,
 		},
 		{
-			Value:             "create-subtask",
-			Suggestion:        "需要拆分子任务",
-			SuggestionEnglish: "Create Subtask for current level task, if user not specified, auto evaluate how to modify the task",
-			AllowExtraPrompt:  true,
+			Value:            "create-subtask",
+			Prompt:           "需要拆分子任务",
+			PromptEnglish:    "Create Subtask for current level task, if user not specified, auto evaluate how to modify the task",
+			AllowExtraPrompt: true,
 		},
 		{
-			Value:             "continue",
-			Suggestion:        "计划合理，继续执行",
-			SuggestionEnglish: "The plan is reasonable, continue execution",
+			Value:         "continue",
+			Prompt:        "计划合理，继续执行",
+			PromptEnglish: "The plan is reasonable, continue execution",
 		},
 	}
 	for idx, o := range opt {

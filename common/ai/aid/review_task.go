@@ -13,10 +13,10 @@ import (
 var schemaRePlanSuggestion string
 
 type ReviewSuggestion struct {
-	Value             string `json:"value"`
-	Suggestion        string `json:"prompt"`
-	SuggestionEnglish string `json:"prompt_english"`
-	AllowExtraPrompt  bool   `json:"allow_extra_prompt"`
+	Value            string `json:"value"`
+	Prompt           string `json:"prompt"`
+	PromptEnglish    string `json:"prompt_english"`
+	AllowExtraPrompt bool   `json:"allow_extra_prompt"`
 
 	PromptBuilder    func(task *AiTask, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)          `json:"-"`
@@ -33,29 +33,29 @@ type ReviewSuggestion struct {
 // TaskReviewSuggestions 是任务审查时的建议(内置一些常见选项)
 var TaskReviewSuggestions = []*ReviewSuggestion{
 	{
-		Value:             "deeply_think",
-		Suggestion:        "思考不够深入，根据当前上下文，为当前任务拆分更多子任务",
-		SuggestionEnglish: "Not deep enough, split more sub-tasks for the current task according to the current context",
-		AllowExtraPrompt:  true,
-		ParamSchema:       schemaRePlanSuggestion,
+		Value:            "deeply_think",
+		Prompt:           "思考不够深入，根据当前上下文，为当前任务拆分更多子任务",
+		PromptEnglish:    "Not deep enough, split more sub-tasks for the current task according to the current context",
+		AllowExtraPrompt: true,
+		ParamSchema:      schemaRePlanSuggestion,
 	},
 	{
-		Value:             "inaccurate",
-		Suggestion:        "回答不够精准，存在未使用工具导致幻觉，或者工具参数不合适",
-		SuggestionEnglish: "The answer is not accurate enough, there is an illusion caused by not using the tool, or the tool parameters are not appropriate",
-		AllowExtraPrompt:  true,
+		Value:            "inaccurate",
+		Prompt:           "回答不够精准，存在未使用工具导致幻觉，或者工具参数不合适",
+		PromptEnglish:    "The answer is not accurate enough, there is an illusion caused by not using the tool, or the tool parameters are not appropriate",
+		AllowExtraPrompt: true,
 	},
 	{
-		Value:             "continue",
-		Suggestion:        "继续执行任务",
-		SuggestionEnglish: "Continue to execute the task",
+		Value:         "continue",
+		Prompt:        "继续执行任务",
+		PromptEnglish: "Continue to execute the task",
 	},
 	{
-		Value:             "adjust_plan",
-		Suggestion:        "任务需要调整，用户会输入更新后任务建议",
-		SuggestionEnglish: "The task needs to be adjusted, and the user will enter the updated task",
-		AllowExtraPrompt:  true,
-		ParamSchema:       schemaRePlanSuggestion,
+		Value:            "adjust_plan",
+		Prompt:           "任务需要调整，用户会输入更新后任务建议",
+		PromptEnglish:    "The task needs to be adjusted, and the user will enter the updated task",
+		AllowExtraPrompt: true,
+		ParamSchema:      schemaRePlanSuggestion,
 	},
 }
 
