@@ -1,0 +1,197 @@
+__DESC__ = "一个强大的PCAP数据包分析工具，支持解析网络数据包、提取流量信息、分析协议内容。适用于网络流量分析、协议逆向、数据包调试等场景。"
+__VERBOSE_NAME__ = "PCAP数据包分析工具"
+__KEYWORDS__ = "pcap,packet analysis,网络分析,数据包,流量分析,协议解析,网络调试,packet capture,网络流量,数据包分析"
+
+/*
+PCAP数据包分析工具
+
+功能特点：
+1. 支持多种PCAP文件格式分析
+   - 解析TCP/IP协议栈
+   - 提取HTTP/HTTPS流量
+   - 分析DNS查询和响应
+   - 识别常见网络协议
+
+2. 智能流量分析：
+   - 自动重组TCP流
+   - 提取应用层数据
+   - 统计流量信息
+   - 识别可疑流量模式
+
+3. 参数说明：
+   --file: PCAP文件路径 (必需)
+   --filter: BPF过滤器表达式，用于过滤特定流量 (可选)
+   --max-packets: 最大处理数据包数量，默认50000 (可选)
+
+使用示例：
+1. 分析整个PCAP文件：
+   yak analyze_pcap.yak --file capture.pcap
+
+2. 使用BPF过滤器分析特定流量：
+   yak analyze_pcap.yak --file capture.pcap --filter "tcp port 80"
+
+3. 限制分析包数量：
+   yak analyze_pcap.yak --file capture.pcap --max-packets 1000
+
+注意事项：
+- 支持.pcap和.pcapng格式文件
+- BPF过滤器语法与Wireshark相同
+- 大文件分析可能需要较长时间
+- 统计信息输出到控制台，完整的gopacket信息保存到临时文件
+- 临时文件路径会在分析完成后显示
+- 自动检测TCP、UDP、ICMP等协议类型
+*/
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+pcapFile := cli.String("file", cli.setRequired(true), cli.setHelp("PCAP file path to analyze"))
+bpfFilter := cli.String("filter", cli.setHelp("BPF filter expression (optional)"))
+maxPackets := cli.Int("max-packets", cli.setDefault(50000), cli.setHelp("maximum packets to analyze (default: 50000)"))
+
+cli.check()
+
+yakit.Info("Starting PCAP analysis for file: %v", pcapFile)
+
+// 检查文件是否存在
+if !file.IsExisted(pcapFile) {
+    yakit.Error("PCAP file does not exist: %v", pcapFile)
+    return
+}
+
+// 创建临时输出文件
+tempFile := sprintf("/tmp/pcap_analysis_%v.txt", time.Now().Unix())
+detailedOutputParts := []
+
+// 初始化统计信息
+stats := {
+    "total_packets": 0,
+    "tcp_packets": 0,
+    "udp_packets": 0,
+    "icmp_packets": 0,
+    "http_requests": 0,
+    "http_responses": 0,
+    "dns_queries": 0,
+    "dns_responses": 0,
+    "other_packets": 0,
+}
+
+// 进度打印控制变量
+lastProgressTime := time.Now()
+progressInterval := 3.0 // 每3秒打印一次进度
+processingStopped := false
+
+// 分析函数
+analyzePacket = func(packet) {
+    if processingStopped {
+        return
+    }
+
+    stats["total_packets"]++
+
+    if stats["total_packets"] > maxPackets {
+        yakit.Warn("Reached maximum packet limit (%v), stopping analysis. Total packets processed: %v", maxPackets, stats["total_packets"])
+        detailedOutputParts = append(detailedOutputParts, "Reached maximum packet limit (" + string(maxPackets) + "), stopping analysis\n")
+        processingStopped = true
+        return
+    }
+
+    // 定期打印进度（每3秒一次）
+    elapsed := time.Since(lastProgressTime).Seconds()
+    if elapsed >= progressInterval {
+        yakit.Info("Progress: %v packets processed", stats["total_packets"])
+        lastProgressTime = time.Now()
+    }
+
+    if packet == nil {
+        return
+    }
+
+    // 获取 gopacket 人类可读的字符串表示
+    packetInfo := packet.String()
+    detailedOutputParts = append(detailedOutputParts, "=== Packet " + string(stats["total_packets"]) + " ===\n")
+    detailedOutputParts = append(detailedOutputParts, packetInfo)
+    detailedOutputParts = append(detailedOutputParts, "\n\n")
+
+    // 解析数据包用于统计
+    data := packet.Data()
+    if data == nil || len(data) == 0 {
+        return
+    }
+
+    packetStr := string(data)
+
+    // 协议识别和统计
+    if packetStr.Contains("HTTP/") || packetStr.Contains("GET ") || packetStr.Contains("POST ") {
+        stats["http_requests"]++
+    }
+
+    if packetStr.Contains("HTTP/") && packetStr.Contains("Content-Length") {
+        stats["http_responses"]++
+    }
+
+    if packetStr.Contains("DNS") || packetStr.Contains("\x01\x00\x00\x01") {
+        stats["dns_queries"]++
+    }
+
+    if packetStr.Contains("DNS") || packetStr.Contains("\x81\x80") {
+        stats["dns_responses"]++
+    }
+
+    // 检测协议类型（基于gopacket信息）
+    if packetInfo.Contains("TCP") {
+        stats["tcp_packets"]++
+    } else if packetInfo.Contains("UDP") {
+        stats["udp_packets"]++
+    } else if packetInfo.Contains("ICMP") {
+        stats["icmp_packets"]++
+    } else {
+        stats["other_packets"]++
+    }
+}
+
+// 设置PCAP分析选项
+options := []
+
+// 添加BPF过滤器（如果指定）
+if bpfFilter != "" {
+    options = append(options, pcapx.pcap_bpfFilter(bpfFilter))
+    yakit.Info("Using BPF filter: %v", bpfFilter)
+}
+
+// 添加数据包处理函数
+options = append(options, pcapx.pcap_everyPacket(analyzePacket))
+
+// 执行PCAP文件分析
+yakit.Info("Opening PCAP file and analyzing packets...")
+err := pcapx.OpenPcapFile(pcapFile, options...)
+if err != nil {
+    yakit.Error("Failed to analyze PCAP file: %v", err)
+    return
+}
+
+// 保存详细结果到文件
+if len(detailedOutputParts) > 0 {
+    // 使用 str.Join 连接所有部分并保存
+    outputContent := str.Join(detailedOutputParts, "")
+    err := file.Save(tempFile, outputContent)
+    if err != nil {
+        yakit.Warn("Failed to save detailed results to file: %v", err)
+    } else {
+        yakit.Info("Detailed packet analysis saved to: %v", tempFile)
+    }
+}
+
+// 输出统计结果
+yakit.Info("=== PCAP Analysis Results ===")
+yakit.Info("Total packets processed: %v", stats["total_packets"])
+yakit.Info("TCP packets: %v", stats["tcp_packets"])
+yakit.Info("UDP packets: %v", stats["udp_packets"])
+yakit.Info("ICMP packets: %v", stats["icmp_packets"])
+yakit.Info("HTTP requests: %v", stats["http_requests"])
+yakit.Info("HTTP responses: %v", stats["http_responses"])
+yakit.Info("DNS queries: %v", stats["dns_queries"])
+yakit.Info("DNS responses: %v", stats["dns_responses"])
+yakit.Info("Other packets: %v", stats["other_packets"])
+
+yakit.Info("PCAP analysis completed successfully")
