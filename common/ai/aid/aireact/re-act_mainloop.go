@@ -103,6 +103,7 @@ func (r *ReAct) generateMainLoopPrompt(
 		enableUserInteractive,
 		r.config.enablePlanAndExec && !disablePlanAndExec,
 		r.config.directlyAnswerEnhanceHandle != nil && !r.config.disableEnhanceDirectlyAnswer,
+		true,
 		r.currentUserInteractiveCount,
 		r.config.userInteractiveLimitedTimes,
 		tools,
@@ -169,6 +170,7 @@ LOOP:
 		var action *aicommon.WaitableAction
 		var nextAction aitool.InvokeParams
 		var actionErr error
+		var writeYaklangCodeApproach string // for write_yaklang_code_approach in ActionWriteYaklangCode
 
 		// Temporarily release lock for AI transaction to prevent deadlocks
 		transactionErr := aicommon.CallAITransaction(
@@ -242,6 +244,11 @@ LOOP:
 					if err != nil {
 						return utils.Errorf("tool[%s] does not exist try another one.", toolName)
 					}
+				} else if actionType == string(ActionWriteYaklangCode) {
+					writeYaklangCodeApproach = nextAction.GetString("write_yaklang_code_approach")
+					if writeYaklangCodeApproach == "" {
+						return utils.Error("write_yaklang_code_approach is required for ActionWriteYaklangCode but empty")
+					}
 				}
 
 				return nil
@@ -267,6 +274,7 @@ LOOP:
 			return action.WaitString("cumulative_summary")
 		})
 		actionType := ActionType(nextAction.GetString("type"))
+
 		switch actionType {
 		case ActionDirectlyAnswer:
 			answerPayload := nextAction.GetString("answer_payload")
@@ -484,6 +492,13 @@ LOOP:
 				log.Infof("User needs not fully satisfied, continuing analysis...")
 				continue
 			}
+		case ActionWriteYaklangCode:
+			saveIterationInfoIntoTimeline()
+			err := r.invokeWriteYaklangCode(currentTask.GetContext(), writeYaklangCodeApproach)
+			if err != nil {
+				return false, err
+			}
+			r.finished = true
 		default:
 			r.EmitError("unknown action type: %v", actionType)
 			r.finished = true
