@@ -77,14 +77,22 @@ func GetValueByRisk(ssarisk *schema.SSARisk) (*ssaapi.Value, error) {
 }
 
 // GenerateDataFlowAnalysis generates comprehensive data flow analysis for a risk
-func GenerateDataFlowAnalysis(risk *schema.SSARisk) (*DataFlowPath, error) {
+func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*DataFlowPath, error) {
 	if risk.ResultID == 0 || risk.Variable == "" {
 		return nil, utils.Errorf("risk has no valid result ID or variable")
 	}
 
-	value, err := GetValueByRisk(risk)
-	if err != nil {
-		return nil, utils.Errorf("get value by risk failed: %v", err)
+	var value *ssaapi.Value
+	if len(values) > 0 {
+		value = values[0]
+	}
+
+	if utils.IsNil(value) {
+		var err error
+		value, err = GetValueByRisk(risk)
+		if err != nil {
+			return nil, utils.Errorf("get value by risk failed: %v", err)
+		}
 	}
 
 	dotGraph := ssaapi.NewDotGraph()
