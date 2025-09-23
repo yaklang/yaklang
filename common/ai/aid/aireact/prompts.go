@@ -79,6 +79,8 @@ func NewPromptManager(react *ReAct, workdir string) *PromptManager {
 type LoopPromptData struct {
 	AllowAskForClarification       bool
 	AllowPlan                      bool
+	AllowKnowledgeEnhanceAnswer    bool
+	AllowWriteYaklangCode          bool
 	AskForClarificationCurrentTime int64
 	AstForClarificationMaxTimes    int64
 
@@ -253,7 +255,7 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
 func (pm *PromptManager) GenerateLoopPrompt(
 	userQuery string,
-	allowUserInteractive, allowPlan, allowKnowledgeEnhanceAnswer bool,
+	allowUserInteractive, allowPlan, allowKnowledgeEnhanceAnswer, allowWriteYaklangCode bool,
 	currentUserInteractiveCount,
 	userInteractiveLimitedTimes int64,
 	tools []*aitool.Tool,
@@ -264,6 +266,8 @@ func (pm *PromptManager) GenerateLoopPrompt(
 	data := &LoopPromptData{
 		AllowAskForClarification:       allowUserInteractive,
 		AllowPlan:                      allowPlan,
+		AllowKnowledgeEnhanceAnswer:    allowKnowledgeEnhanceAnswer,
+		AllowWriteYaklangCode:          allowWriteYaklangCode,
 		AskForClarificationCurrentTime: currentUserInteractiveCount,
 		AstForClarificationMaxTimes:    userInteractiveLimitedTimes,
 		CurrentTime:                    time.Now().Format("2006-01-02 15:04:05"),
@@ -278,7 +282,7 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		DynamicContext:                 pm.DynamicContext(),
 	}
 
-	data.Schema = getLoopSchema(!allowUserInteractive, !allowPlan, !allowKnowledgeEnhanceAnswer, data.AIForgeList != "")
+	data.Schema = getLoopSchema(!allowUserInteractive, !allowPlan, !allowKnowledgeEnhanceAnswer, !allowWriteYaklangCode, data.AIForgeList != "")
 
 	data.WorkingDir = pm.workdir
 	if data.WorkingDir != "" {
