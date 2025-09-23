@@ -11,6 +11,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/jinzhu/gorm"
@@ -37,6 +38,8 @@ type SQLiteVectorStoreHNSW struct {
 	buildGraphFilter           *yakit.VectorDocumentFilter
 	buildGraphPolicy           string
 	ctx                        context.Context
+
+	UIDType string
 }
 
 const (
@@ -72,13 +75,12 @@ func WithContext(ctx context.Context) SQLiteVectorStoreHNSWOption {
 }
 
 func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder EmbeddingClient, opts ...SQLiteVectorStoreHNSWOption) (*SQLiteVectorStoreHNSW, error) {
-	var collections []*schema.VectorStoreCollection
-	dbErr := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Find(&collections)
-	if dbErr.Error != nil {
-		return nil, utils.Errorf("query rag collection [%#v] err: %v", collectionName, dbErr.Error)
+	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
+	if err != nil {
+		return nil, utils.Errorf("query rag collection [%#v] err: %v", collectionName, err)
 	}
 
-	if len(collections) == 0 {
+	if collection == nil {
 		return nil, utils.Errorf("rag collection[%v] not existed", collectionName)
 	}
 
@@ -86,7 +88,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
 		embedder:                   embedder,
-		collection:                 collections[0],
+		collection:                 collection,
 		buildGraphPolicy:           Policy_UseDBCanche,
 		ctx:                        context.Background(),
 	}
@@ -95,7 +97,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		opt(vectorStore)
 	}
 
-	collectionConfig := collections[0]
+	collectionConfig := collection
 	hnswGraph := hnsw.NewGraph(
 		hnsw.WithHNSWParameters[string](collectionConfig.M, collectionConfig.Ml, collectionConfig.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
@@ -103,10 +105,9 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	)
 
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
-	var existed = make(map[string][]float32)
 	switch vectorStore.buildGraphPolicy {
 	case Policy_UseFilter: // 选择性加载子图
-		vectorStore.buildGraphFilter.CollectionUUID = collections[0].UUID
+		vectorStore.buildGraphFilter.CollectionUUID = collection.UUID
 		log.Info("build graph with filter policy, load existed vectors from db with filter")
 		for document := range yakit.YieldVectorDocument(vectorStore.ctx, db, vectorStore.buildGraphFilter) {
 			hnswGraph.Add(hnsw.InputNode[string]{
@@ -167,13 +168,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		}
 	}
 
-	vectorStore := &SQLiteVectorStoreHNSW{
-		db:                         db,
-		EnableAutoUpdateGraphInfos: true,
-		embedder:                   embedder,
-		collection:                 collection,
-		hnsw:                       hnswGraph,
-	}
+	vectorStore.hnsw = hnswGraph
 	hnswGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
 			vectorStore.UpdateAutoUpdateGraphInfos()
@@ -385,7 +380,6 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 		}
 	}()
 
-	var updateIds []string
 	for _, doc := range docs {
 		// 确保文档有 ID
 		if doc.ID == "" {
@@ -399,26 +393,20 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			return utils.Errorf("文档 %s 必须有嵌入向量", doc.ID)
 		}
 
-		// 检查文档是否已存在
-		var existingDoc schema.VectorStoreDocument
-		result := tx.Where("document_id = ? and collection_id = ?", doc.ID, s.collection.ID).First(&existingDoc)
-
+		existingDoc, err := yakit.GetRAGDocumentByCollectionIDAndKey(tx, s.collection.ID, doc.ID)
 		schemaDoc := s.toSchemaDocument(doc)
-
-		if result.Error == nil {
+		if existingDoc != nil {
 			// 更新现有文档
 			existingDoc.Metadata = schemaDoc.Metadata
 			existingDoc.Embedding = schemaDoc.Embedding
 			existingDoc.Content = schemaDoc.Content
 			existingDoc.EntityID = schemaDoc.EntityID
 			existingDoc.RelatedEntities = schemaDoc.RelatedEntities
-
-			if err := tx.Save(&existingDoc).Error; err != nil {
+			if err := yakit.UpdateRAGDocument(tx, existingDoc); err != nil {
 				tx.Rollback()
 				return utils.Errorf("更新文档失败: %v", err)
 			}
-			updateIds = append(updateIds, doc.ID)
-		} else if result.Error == gorm.ErrRecordNotFound {
+		} else if err == gorm.ErrRecordNotFound {
 			// 创建新文档
 			if err := tx.Create(schemaDoc).Error; err != nil {
 				tx.Rollback()
@@ -497,12 +485,13 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 		}
 		if filter != nil {
 			return filter(key, func() *Document {
-				var docs []*schema.VectorStoreDocument
-				s.db.Where("document_id = ?", key).Find(&docs)
-				if len(docs) == 0 {
+				doc, err := yakit.GetRAGDocumentByID(s.db, s.collection.Name, key)
+				if err != nil {
 					return nil
 				}
-				doc := docs[0]
+				if doc == nil {
+					return nil
+				}
 				res := s.toDocument(doc)
 				return &res
 			})
@@ -586,6 +575,10 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	for _, id := range ids {
+		s.hnsw.Delete(id)
+	}
+
 	utils.GormTransactionReturnDb(s.db, func(tx *gorm.DB) {
 		for _, id := range ids {
 			if err := tx.Where("document_id = ?", id).Unscoped().Delete(&schema.VectorStoreDocument{}).Error; err != nil {
@@ -593,10 +586,6 @@ func (s *SQLiteVectorStoreHNSW) Delete(ids ...string) error {
 			}
 		}
 	})
-
-	for _, id := range ids {
-		s.hnsw.Delete(id)
-	}
 
 	return nil
 }
@@ -606,17 +595,15 @@ func (s *SQLiteVectorStoreHNSW) Get(id string) (Document, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var doc schema.VectorStoreDocument
-	result := s.db.Where("document_id = ?", id).First(&doc)
-
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			return Document{}, false, nil
-		}
-		return Document{}, false, utils.Errorf("查询文档失败: %v", result.Error)
+	doc, err := yakit.GetRAGDocumentByID(s.db, s.collection.Name, id)
+	if err != nil {
+		return Document{}, false, utils.Errorf("查询文档失败: %v", err)
+	}
+	if doc == nil {
+		return Document{}, false, nil
 	}
 
-	return s.toDocument(&doc), true, nil
+	return s.toDocument(doc), true, nil
 }
 
 // List 列出所有文档

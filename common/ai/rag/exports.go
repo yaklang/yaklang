@@ -313,15 +313,11 @@ func DeleteCollection(db *gorm.DB, name string) error {
 
 // ListCollections 获取所有知识库列表
 func ListCollections(db *gorm.DB) []string {
-	collections, err := yakit.QueryRAGCollections(db)
+	collectionNames, err := yakit.GetAllRAGCollectionNames(db)
 	if err != nil {
 		return []string{}
 	}
-	names := []string{}
-	for _, collection := range collections {
-		names = append(names, collection.Name)
-	}
-	return names
+	return collectionNames
 }
 
 type CollectionInfo struct {

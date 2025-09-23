@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"crypto/md5"
 	"database/sql/driver"
 	"encoding/json"
 	"strings"
@@ -200,8 +201,8 @@ type VectorStoreCollection struct {
 
 	UUID string
 
-	GraphBinary []byte `gorm:"type:blob" json:"graph_binary"`
-	CodeBook    []byte `gorm:"type:blob" json:"code_book"`
+	GraphBinary    []byte `gorm:"type:blob" json:"graph_binary"`
+	CodeBookBinary []byte `gorm:"type:blob" json:"code_book_binary"`
 }
 
 func (v *VectorStoreCollection) BeforeSave() error {
@@ -225,7 +226,6 @@ type VectorStoreDocument struct {
 	EntityID        string `gorm:"index"`
 	RelatedEntities string // text split by ","
 
-	// 文档唯一标识符，在整个系统中唯一
 	DocumentID string `gorm:"uniqueIndex:idx_document_id_collection_id;not null" json:"document_id"`
 	UID        []byte `gorm:"blob"`
 
@@ -250,6 +250,14 @@ type VectorStoreDocument struct {
 	MaxLayer int `gorm:"default:0" json:"max_layer"`
 
 	RuntimeID string
+}
+
+func (v *VectorStoreDocument) BeforeSave() error {
+	if len(v.UID) == 0 {
+		m := md5.Sum([]byte(v.CollectionUUID + v.DocumentID))
+		v.UID = m[:]
+	}
+	return nil
 }
 
 func (v *VectorStoreDocument) TableName() string {

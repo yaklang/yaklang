@@ -2,6 +2,7 @@ package rag
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,15 +14,22 @@ import (
 )
 
 func testEmbedder(text string) ([]float32, error) {
-	// 简单地生成一个固定的向量作为嵌入
-	// 在实际测试中，我们可以根据文本内容生成不同的向量
-	if text == "Yaklang介绍" || text == "什么是Yaklang" || text == "Yaklang是一种安全研究编程语言" {
+	switch text {
+	case "Yaklang介绍", "什么是Yaklang", "Yaklang是一种安全研究编程语言":
 		return []float32{1.0, 0.0, 0.0}, nil
-	} else if text == "RAG介绍" || text == "什么是RAG" || text == "RAG是一种结合检索和生成的AI技术" {
+	case "RAG介绍", "什么是RAG", "RAG是一种结合检索和生成的AI技术":
 		return []float32{0.0, 1.0, 0.0}, nil
-	} else if text == "AI技术" {
+	case "AI技术", "RAG技术原理":
 		return []float32{0.5, 0.5, 0.0}, nil
+	case "向量数据库应用":
+		return []float32{0.0, 0.0, 1.0}, nil
+	case "Yaklang基础概念":
+		return []float32{0.0, 0.0, 1.0}, nil
 	}
+	if strings.Contains(text, "RAG技术") || strings.Contains(text, "RAG技术原理") {
+		return []float32{0.0, 0.0, 1.0}, nil
+	}
+
 	return []float32{0.0, 0.0, 0.0}, nil
 }
 
