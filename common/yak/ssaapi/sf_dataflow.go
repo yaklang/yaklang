@@ -38,8 +38,8 @@ func DataFlowWithSFConfig(
 		filterCondition = append(filterCondition, withFilterCondition(key, code))
 	}
 	options := make([]OperationOption, 0)
-	untilConfig := make([]*sf.RecursiveConfigItem, 0)
-	untilCheck := false
+	untilCheck := CreateCheck(sfResult, config)
+	hookRunner := CreateCheck(sfResult, config)
 
 	for _, item := range opts {
 		switch item.Key {
@@ -56,10 +56,9 @@ func DataFlowWithSFConfig(
 				options = append(options, WithMaxDepth(ret))
 			}
 		case sf.RecursiveConfig_Until:
-			untilConfig = append(untilConfig, item)
-			untilCheck = true
+			untilCheck.AppendItems(item)
 		case sf.RecursiveConfig_Hook:
-			untilConfig = append(untilConfig, item)
+			hookRunner.AppendItems(item)
 		case sf.RecursiveConfig_Exclude:
 			addHandler(sf.RecursiveConfig_Exclude, item.Value)
 		case sf.RecursiveConfig_Include:
@@ -67,19 +66,18 @@ func DataFlowWithSFConfig(
 		}
 	}
 
-	untilMatch := make(map[*Value]struct{})
-	{
-		untilCheck := CreateCheck(sfResult, config, untilConfig...)
-		options = append(options, WithHookEveryNode(func(value *Value) error {
-			if untilCheck.Empty() {
-				return nil
-			}
-			if untilCheck.CheckUntil(value) {
-				untilMatch[value] = struct{}{}
-				return utils.Error("abort")
-			}
+	options = append(options,
+		WithHookEveryNode(func(value *Value) error {
+			hookRunner.CheckUntil(value)
 			return nil
-		}))
+		}),
+	)
+	if !untilCheck.Empty() {
+		options = append(options,
+			WithUntilNode(func(v *Value) bool {
+				return untilCheck.CheckUntil(v)
+			}),
+		)
 	}
 
 	options = append(options, WithExclusiveContext(config.GetContext()))
@@ -91,19 +89,7 @@ func DataFlowWithSFConfig(
 	}
 
 	// dataflow analysis
-	result := dataflowRecursiveFunc(options...)
-	ret := make(Values, 0, len(result))
-	if untilCheck {
-		for v := range untilMatch {
-			ret = append(ret, v)
-		}
-	} else {
-		ret = result
-	}
-	if ret.Count() > dataflowValueLimit {
-		log.Errorf("Value %s %v too many: %d", analysisType, value.StringWithRange(), ret.Count())
-		return nil
-	}
+	ret := dataflowRecursiveFunc(options...)
 	// filter the result
 	ret = dataFlowFilter(ret, sfResult, config, nil, filterCondition...)
 	// set predecessor label
