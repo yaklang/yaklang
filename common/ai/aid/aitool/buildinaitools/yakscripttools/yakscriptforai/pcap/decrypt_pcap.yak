@@ -305,7 +305,7 @@ analyzePacketAdvanced = func(packet) {
         }
         
         suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw data (hex): %v\n", packetHex))
-        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw data (text): %v\n", packetStr))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw data (text): %v\n", sdump(packetStr)))
         suspiciousOutputParts = append(suspiciousOutputParts, sprintf("\nFindings (%v):\n", len(findings)))
 
         for finding in findings {
@@ -328,9 +328,9 @@ analyzePacketAdvanced = func(packet) {
     // 总是添加数据预览（不管是否可疑）
     if len(packetStr) > 0 {
         if len(packetStr) <= 200 {
-            detailedOutputParts = append(detailedOutputParts, sprintf("Text preview: %v\n", packetStr))
+            detailedOutputParts = append(detailedOutputParts, sprintf("Text preview: %v\n", sdump(packetStr)))
         } else {
-            detailedOutputParts = append(detailedOutputParts, sprintf("Data size: %v bytes, preview: %v...\n", len(packetStr), packetStr[:100]))
+            detailedOutputParts = append(detailedOutputParts, sprintf("Data size: %v bytes, preview: %v...\n", len(packetStr), sdump(packetStr[:100])))
         }
     }
     detailedOutputParts = append(detailedOutputParts, sprintf("---\n\n"))
@@ -419,7 +419,7 @@ onFlowDataFrameReassembled = func(flow, conn, frame) {
         suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Frame size: %v bytes\n", len(frameData)))
         suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Connection hash: %v\n", frame.ConnHash))
         suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw frame data (hex): %v\n", frameHex))
-        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw frame data (text): %v\n", frameStr))
+        suspiciousOutputParts = append(suspiciousOutputParts, sprintf("Raw frame data (text): %v\n", sdump(frameStr)))
         suspiciousOutputParts = append(suspiciousOutputParts, sprintf("\nSuspicious findings:\n"))
         
         for finding in suspiciousFindings {
@@ -433,9 +433,9 @@ onFlowDataFrameReassembled = func(flow, conn, frame) {
     // 数据预览
     if len(frameStr) > 0 {
         if len(frameStr) <= 200 {
-            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data: %v\n", frameStr))
+            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data: %v\n", sdump(frameStr)))
         } else {
-            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data preview: %v...\n", frameStr[:100]))
+            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data preview: %v...\n", sdump(frameStr[:100])))
         }
     }
     
