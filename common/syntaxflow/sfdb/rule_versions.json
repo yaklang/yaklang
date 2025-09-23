@@ -1034,8 +1034,8 @@
   {
     "rule_id": "b8ede24d-8ff0-4d81-ab97-903495a6cb61",
     "rule_name": "检测Java SQL注入漏洞",
-    "hash": "c703774076f2221dd81ffaa46443fe4e64985c188399c45b373fa45bd5726f5a",
-    "version": "20250820.0001"
+    "hash": "462b52d9a2d7be4649b530458959615e82ea6d2a7a79677244bfc36ec36125ea",
+    "version": "20250923.0001"
   },
   {
     "rule_id": "e53aa369-2d16-445a-a9e9-fb2155791246",
