@@ -79,7 +79,13 @@ func getDirectlyAnswer() string {
 	return aitool.NewObjectSchemaWithAction(opts...)
 }
 
-func getLoopSchema(disallowAskForClarification, disableKnowledgeEnhanceAnswer, disallowPlanAndExecution bool, haveAIForgeList bool) string {
+func getLoopSchema(
+	disallowAskForClarification,
+	disableKnowledgeEnhanceAnswer,
+	disallowPlanAndExecution,
+	disallowWriteYaklangCode bool,
+	haveAIForgeList bool,
+) string {
 	var opts []any
 	mode := []any{
 		ActionDirectlyAnswer, ActionRequireTool,
@@ -96,6 +102,10 @@ func getLoopSchema(disallowAskForClarification, disableKnowledgeEnhanceAnswer, d
 
 	if !disableKnowledgeEnhanceAnswer {
 		mode = append(mode, ActionKnowledgeEnhanceAnswer)
+	}
+
+	if !disallowWriteYaklangCode {
+		mode = append(mode, ActionWriteYaklangCode)
 	}
 
 	actionFields := []aitool.ToolOption{
@@ -148,6 +158,13 @@ func getLoopSchema(disallowAskForClarification, disableKnowledgeEnhanceAnswer, d
 					`Optional additional context that may help the user understand what information is needed. This can include examples or explanations of why the clarification is necessary.`,
 				),
 			),
+		))
+	}
+
+	if !disallowWriteYaklangCode {
+		actionFields = append(actionFields, aitool.WithStringParam(
+			"write_yaklang_code_approach",
+			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'write_yaklang_code' 编写Yaklang代码的具体思路和策略。应该包含：1) 代码的核心逻辑设计思路和主要执行流程；2) 需要使用的Yaklang内置库和关键函数（如poc、synscan、servicescan、crawler、等安全库）；3) 数据处理方式和结果输出策略；4) 并发控制方案（是否使用go关键字、SizedWaitGroup限制并发数等）；5) 错误处理策略（优先使用~操作符进行简洁的错误处理）；6) 用户交互设计（如cli参数接收、进度显示等）。重点阐述如何充分利用Yaklang的安全特性、语法糖和内置能力来高效实现目标功能，确保代码既简洁又强大。"),
 		))
 	}
 
