@@ -10,8 +10,8 @@ import (
 
 type ToolUseReviewSuggestion struct {
 	Value                   string `json:"value"`
-	Suggestion              string `json:"prompt"`
-	SuggestionEnglish       string `json:"prompt_english"`
+	Prompt                  string `json:"prompt"`
+	PromptEnglish           string `json:"prompt_english"`
 	AllowExtraPrompt        bool   `json:"allow_extra_prompt"`
 	AllowParamsModification bool   `json:"allow_params_modification"`
 }
@@ -19,29 +19,29 @@ type ToolUseReviewSuggestion struct {
 // ToolUseReviewSuggestions 是工具使用审查时的建议(内置一些常见选项)
 var ToolUseReviewSuggestions = []*ToolUseReviewSuggestion{
 	{
-		Value:             "wrong_tool",
-		Suggestion:        "工具选择不当",
-		SuggestionEnglish: "Wrong tool used, need to change to a more appropriate tool",
-		AllowExtraPrompt:  true,
+		Value:            "wrong_tool",
+		Prompt:           "工具选择不当",
+		PromptEnglish:    "Wrong tool used, need to change to a more appropriate tool",
+		AllowExtraPrompt: true,
 	},
 	{
 		Value:                   "wrong_params",
-		Suggestion:              "参数不合理",
-		SuggestionEnglish:       "Tool parameters are not used properly, need to adjust parameters",
+		Prompt:                  "参数不合理",
+		PromptEnglish:           "Tool parameters are not used properly, need to adjust parameters",
 		AllowExtraPrompt:        true,
 		AllowParamsModification: true,
 	},
 	{
 		Value:                   "direct_answer",
-		Suggestion:              "要求AI直接回答",
-		SuggestionEnglish:       "Tool parameters are not used properly, need to adjust parameters",
+		Prompt:                  "要求AI直接回答",
+		PromptEnglish:           "Tool parameters are not used properly, need to adjust parameters",
 		AllowExtraPrompt:        true,
 		AllowParamsModification: true,
 	},
 	{
-		Value:             "continue",
-		Suggestion:        "同意工具使用",
-		SuggestionEnglish: "Tool usage is correct, continue execution",
+		Value:         "continue",
+		Prompt:        "同意工具使用",
+		PromptEnglish: "Tool usage is correct, continue execution",
 	},
 }
 

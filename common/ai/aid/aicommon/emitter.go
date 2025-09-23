@@ -252,9 +252,9 @@ func (r *Emitter) EmitErrorWithName(name string, fmtlog string, items ...any) {
 
 var ToolCallWatcher = []map[string]any{
 	{
-		"value":              "enough-cancel",
-		"suggestion":         "跳过",
-		"suggestion_english": "Tool output is sufficient, can cancel tool execution and continue with the next task",
+		"value":          "enough-cancel",
+		"prompt":         "跳过",
+		"prompt_english": "Tool output is sufficient, can cancel tool execution and continue with the next task",
 	},
 }
 
