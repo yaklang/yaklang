@@ -10,9 +10,8 @@ import (
 
 type IReport interface {
 	AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool
-	PrettyWrite(writer io.Writer) error
 	AddSyntaxFlowRisks(risks []*schema.SSARisk)
-	Save() error
+	Save(writer io.Writer) error
 }
 
 func ConvertSyntaxFlowResultToReport(format ReportType, opt ...Option) (IReport, error) {
