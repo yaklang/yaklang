@@ -213,6 +213,9 @@ func averagePooling(embeddings [][]float32) []float32 {
 }
 
 func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
+	if err := r.requireWriteCollection(); err != nil {
+		return utils.Wrap(err, "require write vector store")
+	}
 	//log.Infof("adding document with id: %s, content length: %d", docId, len(content))
 	doc := &Document{
 		ID:        docId,
@@ -279,6 +282,20 @@ func (r *RAGSystem) addDocuments(docs ...Document) error {
 	return nil
 }
 
+func (r *RAGSystem) SetArchived(archived bool) error {
+	if v, ok := r.VectorStore.(*SQLiteVectorStoreHNSW); ok {
+		return v.SetArchived(archived)
+	}
+	return utils.Errorf("current vector store is not support set archived")
+}
+
+func (r *RAGSystem) GetArchived() bool {
+	if v, ok := r.VectorStore.(*SQLiteVectorStoreHNSW); ok {
+		return v.GetArchived()
+	}
+	return false
+}
+
 // processBigText 处理大文本，根据BigTextPlan策略进行不同的处理
 func (r *RAGSystem) processBigText(doc Document) ([]Document, error) {
 	log.Infof("processing big text for document %s using plan: %s", doc.ID, r.BigTextPlan)
@@ -313,9 +330,17 @@ func (r *RAGSystem) processBigText(doc Document) ([]Document, error) {
 		return r.processChunkText(doc, chunks)
 	}
 }
+
 func (r *RAGSystem) ConvertToPQMode() error {
 	if v, ok := r.VectorStore.(*SQLiteVectorStoreHNSW); ok {
 		return v.ConvertToPQMode()
+	}
+	return utils.Errorf("vector store is not a SQLiteVectorStoreHNSW")
+}
+
+func (r *RAGSystem) ConvertToStandardMode() error {
+	if v, ok := r.VectorStore.(*SQLiteVectorStoreHNSW); ok {
+		return v.ConvertToStandardMode()
 	}
 	return utils.Errorf("vector store is not a SQLiteVectorStoreHNSW")
 }
@@ -584,11 +609,24 @@ func (r *RAGSystem) QueryTopN(query string, topN int, limits ...float64) ([]Sear
 
 // DeleteDocuments 删除文档
 func (r *RAGSystem) DeleteDocuments(ids ...string) error {
+	if err := r.requireWriteCollection(); err != nil {
+		return err
+	}
 	return r.VectorStore.Delete(ids...)
+}
+
+func (r *RAGSystem) requireWriteCollection() error {
+	if r.GetArchived() {
+		return utils.Errorf("current vector store is archived, please unarchive first")
+	}
+	return nil
 }
 
 // ClearDocuments 清空所有文档
 func (r *RAGSystem) ClearDocuments() error {
+	if err := r.requireWriteCollection(); err != nil {
+		return utils.Wrap(err, "require write vector store")
+	}
 	docs, err := r.ListDocuments()
 	if err != nil {
 		return err
@@ -617,6 +655,10 @@ func (r *RAGSystem) ListDocuments() ([]Document, error) {
 // CountDocuments 获取文档总数
 func (r *RAGSystem) CountDocuments() (int, error) {
 	return r.VectorStore.Count()
+}
+
+func (r *RAGSystem) DeleteEmbeddingData() error {
+	return r.VectorStore.(*SQLiteVectorStoreHNSW).DeleteEmbeddingData()
 }
 
 func QueryCollection(db *gorm.DB, query string, opts ...aispec.AIConfigOption) ([]*SearchResult, error) {
