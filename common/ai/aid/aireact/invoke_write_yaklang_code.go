@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"io"
 	"os"
@@ -124,15 +125,39 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			code := payload
 			err := os.WriteFile(filename, []byte(code), 0644)
 			if err != nil {
+				r.addToTimeline("error", "Failed to write code to file: "+err.Error())
 				return utils.Errorf("Failed to write code to file: %v", err)
 			}
+			currentCode = code
 			result := static_analyzer.YaklangScriptChecking(code, "yak")
 			var buf bytes.Buffer
 			for _, msg := range result {
 				buf.WriteString(msg.String())
 				buf.WriteString("\n")
 			}
+			r.addToTimeline("code_generated", utils.ShrinkString(code, 128))
+			errorMessages += buf.String()
+			r.addToTimeline("re-enter-code-generate-loop", "")
+			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
+		case "require_tool":
+			toolPayload := payload
+			toolcallResult, directlyAnswerRequired, err := r.handleRequireTool(
+				toolPayload,
+			)
+			if err != nil {
+				errorMessages += err.Error()
+				continue
+			}
+			if directlyAnswerRequired {
+				errorMessages += "Tool call resulted in direct answer"
+				continue
+			}
+			result := toolcallResult.StringWithoutID()
+			r.addToTimeline("tool_call", "Tool call result: "+result)
+			continue
+		case "query_document":
+			return utils.Errorf("query_document action not implemented yet")
 		}
 
 		// If satisfied, break the loop

@@ -236,25 +236,26 @@ type ChangeAIBlueprintPromptData struct {
 
 // YaklangCodeActionLoopPromptData contains data for Yaklang code generation action loop prompt
 type YaklangCodeActionLoopPromptData struct {
-	CurrentTime        string
-	OSArch             string
-	WorkingDir         string
-	WorkingDirGlance   string
-	ConversationMemory string
-	Timeline           string
-	Nonce              string
-	UserQuery          string
-	CurrentCode        string
-	IterationCount     int
-	ErrorMessages      string
-	Language           string
-	DynamicContext     string
-	Schema             string
-	Tools              []*aitool.Tool
-	ToolsCount         int
-	TopTools           []*aitool.Tool
-	TopToolsCount      int
-	HasMoreTools       bool
+	CurrentTime               string
+	OSArch                    string
+	WorkingDir                string
+	WorkingDirGlance          string
+	ConversationMemory        string
+	Timeline                  string
+	Nonce                     string
+	UserQuery                 string
+	CurrentCode               string
+	CurrentCodeWithLineNumber string
+	IterationCount            int
+	ErrorMessages             string
+	Language                  string
+	DynamicContext            string
+	Schema                    string
+	Tools                     []*aitool.Tool
+	ToolsCount                int
+	TopTools                  []*aitool.Tool
+	TopToolsCount             int
+	HasMoreTools              bool
 }
 
 func (pm *PromptManager) GetGlanceWorkdir(wd string) string {
@@ -607,15 +608,16 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForg
 // GenerateYaklangCodeActionLoop generates Yaklang code generation action loop prompt using template
 func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages string, iterationCount int, tools []*aitool.Tool) (string, error) {
 	data := &YaklangCodeActionLoopPromptData{
-		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:      userQuery,
-		CurrentCode:    currentCode,
-		IterationCount: iterationCount,
-		ErrorMessages:  errorMessages,
-		Nonce:          utils.RandStringBytes(4),
-		Language:       pm.react.config.language,
-		DynamicContext: pm.DynamicContext(),
+		CurrentTime:               time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:                    fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:                 userQuery,
+		CurrentCode:               currentCode,
+		CurrentCodeWithLineNumber: utils.PrefixLinesWithLineNumbers(currentCode),
+		IterationCount:            iterationCount,
+		ErrorMessages:             errorMessages,
+		Nonce:                     utils.RandStringBytes(4),
+		Language:                  pm.react.config.language,
+		DynamicContext:            pm.DynamicContext(),
 	}
 
 	// Set working directory
