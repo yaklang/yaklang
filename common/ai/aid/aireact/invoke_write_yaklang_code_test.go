@@ -34,6 +34,13 @@ func mockedYaklangWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(prompt, `"query_document"`, `"require_tool"`, `"write_code"`, `"@action"`) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "write_code", "code": "println(123)"}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	fmt.Println("Unexpected prompt:", prompt)
 
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
