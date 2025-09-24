@@ -10,9 +10,10 @@ import (
 )
 
 type AIForgeReviewSuggestion struct {
-	Value         string `json:"value"`
-	Prompt        string `json:"prompt"`
-	PromptEnglish string `json:"prompt_english"`
+	Value            string `json:"value"`
+	Prompt           string `json:"prompt"`
+	PromptEnglish    string `json:"prompt_english"`
+	AllowExtraPrompt bool   `json:"allow_extra_prompt"`
 }
 
 var aiforgeReviewSelector = []*AIForgeReviewSuggestion{
@@ -22,14 +23,16 @@ var aiforgeReviewSelector = []*AIForgeReviewSuggestion{
 		PromptEnglish: "Agree with the parameters, continue execution",
 	},
 	{
-		Value:         "modify_params",
-		Prompt:        "修改参数",
-		PromptEnglish: "Modify the parameters",
+		Value:            "modify_params",
+		Prompt:           "修改参数",
+		PromptEnglish:    "Modify the parameters",
+		AllowExtraPrompt: true,
 	},
 	{
-		Value:         "change_blueprint",
-		Prompt:        "更换AI应用",
-		PromptEnglish: "Change to another AI Forge",
+		Value:            "change_blueprint",
+		Prompt:           "更换AI应用",
+		PromptEnglish:    "Change to another AI Forge",
+		AllowExtraPrompt: true,
 	},
 	{
 		Value:         "cancel",
