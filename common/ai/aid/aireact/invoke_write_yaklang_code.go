@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -62,6 +63,8 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 
 		var actionName string
 		var payload string
+		var action *aicommon.WaitableAction
+		var actionErr error
 
 		transactionErr := aicommon.CallAITransaction(
 			r.config, prompt, r.config.CallAI,
@@ -69,7 +72,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 				stream := resp.GetOutputStreamReader("yaklang-code-loop", true, r.config.Emitter)
 				subCtx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				action, actionErr := aicommon.ExtractWaitableActionFromStream(
+				action, actionErr = aicommon.ExtractWaitableActionFromStream(
 					subCtx,
 					stream,
 					"write_code",
@@ -78,9 +81,50 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 						"require_tool",
 					},
 					[]jsonextractor.CallbackOption{
-						jsonextractor.WithRegisterFieldStreamHandler("query_document", func(key string, reader io.Reader, parents []string) {
+						jsonextractor.WithRegisterMultiFieldStreamHandler(
+							[]string{
+								"query_document",
+								"tool_require_payload",
+								"human_readable_thought",
+								"question", // only emit when parent is ask_for_clarification_payload
+							},
+							func(key string, reader io.Reader, parents []string) {
+								if key == "question" {
+									if ret := len(parents); !(ret > 0 && strings.Contains(parents[ret-1], "ask_for_clarification_payload")) {
+										return
+									}
+								}
+
+								pr, pw := utils.NewPipe()
+								go func() {
+									defer pw.Close()
+									switch key {
+									case "query_document":
+										pw.WriteString("查询文档：")
+									case "tool_require_payload":
+										pw.WriteString("调用工具：")
+									}
+									io.Copy(pw, utils.JSONStringReader(reader))
+								}()
+								r.Emitter.EmitStreamEvent(
+									"re-act-loop-thought",
+									time.Now(),
+									pr,
+									resp.GetTaskIndex(),
+								)
+							},
+						),
+						jsonextractor.WithRegisterFieldStreamHandler("tool_require_payload", func(key string, reader io.Reader, parents []string) {
 							r.Emitter.EmitStreamEvent(
-								"query-yaklang-document",
+								"tool-require-payload",
+								time.Now(),
+								reader,
+								resp.GetTaskIndex(),
+							)
+						}),
+						jsonextractor.WithRegisterFieldStreamHandler("code", func(key string, reader io.Reader, parents []string) {
+							r.Emitter.EmitStreamEvent(
+								"yaklang-code",
 								time.Now(),
 								reader,
 								resp.GetTaskIndex(),
@@ -107,6 +151,11 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 					payload = action.WaitString("tool_require_payload")
 					if payload == "" {
 						return utils.Error("require_tool action must have 'tool_require_payload' field")
+					}
+				case "ask_for_clarification":
+					result := action.WaitObject("ask_for_clarification_payload")
+					if result.GetString("question") == "" {
+						return utils.Error("ask_for_clarification action must have 'question' field in 'ask_for_clarification_payload'")
 					}
 				default:
 					// For other actions, we don't have specific payload requirements
@@ -156,6 +205,14 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			result := toolcallResult.StringWithoutID()
 			r.addToTimeline("tool_call", "Tool call result: "+result)
 			continue
+		case "ask_for_clarification":
+			result := action.WaitObject("ask_for_clarification_payload")
+			question := result.GetString("question")
+			options := result.GetStringSlice("options")
+			suggestion := r.invokeAskForClarification(question, options)
+			if suggestion == "" {
+				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
+			}
 		case "query_document":
 			return utils.Errorf("query_document action not implemented yet")
 		}

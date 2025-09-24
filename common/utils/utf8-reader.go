@@ -123,5 +123,10 @@ func (r *utf8Reader) findLastValidUTF8Boundary(data []byte, maxLen int) int {
 }
 
 func UTF8Reader(r io.Reader) io.Reader {
+	if _, ok := r.(*utf8Reader); ok {
+		// 已经是utf8Reader，直接返回
+		return r
+	}
+
 	return &utf8Reader{r: r, buffer: make([]byte, 0)}
 }
