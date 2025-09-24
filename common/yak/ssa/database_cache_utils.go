@@ -8,7 +8,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/utils/asyncdb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"go.uber.org/atomic"
 )
@@ -55,18 +55,18 @@ type Cache[T any] interface {
 	Close(...*sync.WaitGroup)
 }
 
-var _ Cache[Instruction] = (*databasex.Cache[Instruction, *ssadb.IrCode])(nil)
+var _ Cache[Instruction] = (*asyncdb.Cache[Instruction, *ssadb.IrCode])(nil)
 var _ Cache[Instruction] = (*memoryCache[Instruction])(nil)
 
-var _ Cache[Type] = (*databasex.Cache[Type, *ssadb.IrType])(nil)
+var _ Cache[Type] = (*asyncdb.Cache[Type, *ssadb.IrType])(nil)
 var _ Cache[Type] = (*memoryCache[Type])(nil)
 
-type memoryCache[T databasex.MemoryItem] struct {
+type memoryCache[T asyncdb.MemoryItem] struct {
 	*utils.SafeMapWithKey[int64, T]
 	id *atomic.Int64
 }
 
-func newmemoryCache[T databasex.MemoryItem]() *memoryCache[T] {
+func newmemoryCache[T asyncdb.MemoryItem]() *memoryCache[T] {
 	return &memoryCache[T]{
 		SafeMapWithKey: utils.NewSafeMapWithKey[int64, T](),
 		id:             atomic.NewInt64(0),
@@ -105,10 +105,10 @@ func createInstructionCache(
 		return inst, irCode, nil
 	}
 
-	var fetch databasex.FetchFunc[*ssadb.IrCode]
-	var delete databasex.DeleteFunc[*ssadb.IrCode]
-	var save databasex.SaveFunc[*ssadb.IrCode]
-	var marshal databasex.MarshalFunc[Instruction, *ssadb.IrCode]
+	var fetch asyncdb.FetchFunc[*ssadb.IrCode]
+	var delete asyncdb.DeleteFunc[*ssadb.IrCode]
+	var save asyncdb.SaveFunc[*ssadb.IrCode]
+	var marshal asyncdb.MarshalFunc[Instruction, *ssadb.IrCode]
 
 	if databaseKind == ProgramCacheDBWrite {
 		// init instruction fetchId and marshal and save
@@ -161,7 +161,7 @@ func createInstructionCache(
 					utils.PrintCurrentGoroutineRuntimeStack()
 				}
 			}()
-			log.Errorf("Databasex Channel: Save IR  : %d", len(t))
+			log.Errorf("asyncdb Channel: Save IR  : %d", len(t))
 			utils.GormTransaction(db, func(tx *gorm.DB) error {
 				// log.Errorf("DATABASE: Save IR: %d", len(t))
 				for _, irCode := range t {
@@ -184,13 +184,13 @@ func createInstructionCache(
 			}
 		}
 	}
-	opts := []databasex.Option{
-		databasex.WithFetchSize(fetchSize * 2),
-		databasex.WithSaveSize(saveSize),
-		databasex.WithSaveTimeout(saveTime),
-		databasex.WithName("Instruction"),
+	opts := []asyncdb.Option{
+		asyncdb.WithFetchSize(fetchSize * 2),
+		asyncdb.WithSaveSize(saveSize),
+		asyncdb.WithSaveTimeout(saveTime),
+		asyncdb.WithName("Instruction"),
 	}
-	return databasex.NewCache(
+	return asyncdb.NewCache(
 		cacheTTL, marshal, fetch, delete, save, load, opts...,
 	)
 }
@@ -213,10 +213,10 @@ func createTypeCache(
 		typ := GetTypeFromDB(prog.Cache, id)
 		return typ, irType, nil
 	}
-	var fetch databasex.FetchFunc[*ssadb.IrType]
-	var delete databasex.DeleteFunc[*ssadb.IrType]
-	var marshal databasex.MarshalFunc[Type, *ssadb.IrType]
-	var save databasex.SaveFunc[*ssadb.IrType]
+	var fetch asyncdb.FetchFunc[*ssadb.IrType]
+	var delete asyncdb.DeleteFunc[*ssadb.IrType]
+	var marshal asyncdb.MarshalFunc[Type, *ssadb.IrType]
+	var save asyncdb.SaveFunc[*ssadb.IrType]
 	if databaseKind == ProgramCacheDBWrite {
 		marshal = func(s Type, d *ssadb.IrType) {
 			// log.Infof("SAVE: marshal type: %v", d.ID)
@@ -287,15 +287,15 @@ func createTypeCache(
 		}
 	}
 
-	opts := []databasex.Option{
-		databasex.WithFetchSize(fetchSize),
-		databasex.WithSaveSize(saveSize),
-		databasex.WithSaveTimeout(saveTime),
-		databasex.WithEnableSave(true), // always enable save for type cache
-		databasex.WithName("Type"),
+	opts := []asyncdb.Option{
+		asyncdb.WithFetchSize(fetchSize),
+		asyncdb.WithSaveSize(saveSize),
+		asyncdb.WithSaveTimeout(saveTime),
+		asyncdb.WithEnableSave(true), // always enable save for type cache
+		asyncdb.WithName("Type"),
 	}
 
-	return databasex.NewCache(
+	return asyncdb.NewCache(
 		typeTTL, marshal, fetch, delete, save, load, opts...,
 	)
 }

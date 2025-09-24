@@ -1,4 +1,4 @@
-package databasex_test
+package asyncdb_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/utils/asyncdb"
 )
 
 // TestItem is a simple implementation of the Item interface for testing
@@ -24,7 +24,7 @@ func TestNewSaver(t *testing.T) {
 		savedItems = append(savedItems, items...)
 	}
 
-	saver := databasex.NewSave(saveFn)
+	saver := asyncdb.NewSave(saveFn)
 	require.NotNil(t, saver)
 	// We can't directly access internal fields of Saver from the test package
 	// Just verify that the saver is created successfully and can be closed
@@ -32,10 +32,10 @@ func TestNewSaver(t *testing.T) {
 
 	// Test with custom options
 	ctx := context.Background()
-	saver = databasex.NewSave(
+	saver = asyncdb.NewSave(
 		saveFn,
-		databasex.WithFetchSize(200),
-		databasex.WithContext(ctx),
+		asyncdb.WithFetchSize(200),
+		asyncdb.WithContext(ctx),
 	)
 	require.NotNil(t, saver)
 	// Can't access internal field wg
@@ -52,8 +52,8 @@ func TestSaver_Save(t *testing.T) {
 	}
 
 	ttl := 100 * time.Millisecond
-	saver := databasex.NewSave(saveFn,
-		databasex.WithSaveTimeout(ttl),
+	saver := asyncdb.NewSave(saveFn,
+		asyncdb.WithSaveTimeout(ttl),
 	)
 	defer saver.Close()
 
@@ -112,7 +112,7 @@ func TestSaver_Close(t *testing.T) {
 		savedItems = append(savedItems, items...)
 	}
 
-	saver := databasex.NewSave(saveFn)
+	saver := asyncdb.NewSave(saveFn)
 
 	// Save some items
 	items := []TestItem{
@@ -146,7 +146,7 @@ func TestSaver_WithCustomContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	saver := databasex.NewSave(saveFn, databasex.WithContext(ctx))
+	saver := asyncdb.NewSave(saveFn, asyncdb.WithContext(ctx))
 	defer saver.Close()
 
 	// Save an item
@@ -194,9 +194,9 @@ func TestSaveAutoSaveSize(t *testing.T) {
 		// Make a copy of the slice
 	}
 
-	save := databasex.NewSave(saveFn,
-		databasex.WithSaveSize(defaultSaveSize),
-		databasex.WithSaveTimeout(saveTimeout),
+	save := asyncdb.NewSave(saveFn,
+		asyncdb.WithSaveSize(defaultSaveSize),
+		asyncdb.WithSaveTimeout(saveTimeout),
 	)
 
 	for i := 0; i < 100; i++ {

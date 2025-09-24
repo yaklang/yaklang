@@ -1,4 +1,4 @@
-package databasex
+package asyncdb
 
 import (
 	"sync"
