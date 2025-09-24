@@ -24,12 +24,32 @@ const (
 	JS      Language = "js"
 	PHP     Language = "php"
 	JAVA    Language = "java"
-	GO      Language = "go"
+	GO      Language = "golang"
 	C       Language = "c"
 	TS      Language = "ts"
 	General Language = "general"
 )
 
+func (l Language) GetFileExt() string {
+	switch l {
+	case Yak:
+		return ".yak"
+	case JAVA:
+		return ".java"
+	case GO:
+		return ".go"
+	case TS:
+		return ".ts"
+	case JS:
+		return ".js"
+	case C:
+		return ".c"
+	case PHP:
+		return ".php"
+	default:
+		return ""
+	}
+}
 func GetAllSupportedLanguages() []Language {
 	return []Language{Yak, JS, PHP, JAVA, GO, C}
 }

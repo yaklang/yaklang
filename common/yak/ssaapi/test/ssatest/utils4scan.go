@@ -70,7 +70,7 @@ func NewSFScanTestRisk(id, title, sinkName string) SFScanTestRisk {
 func (suite *SFScanRiskTestSuite) InitProgram(code string, riskConfigs ...SFScanTestRisk) *SFScanRiskTestSuite {
 	suite.TestRisks = riskConfigs
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("test"+"."+string(suite.Language), code)
+	vf.AddFile("test"+suite.Language.GetFileExt(), code)
 	programs, err := ssaapi.ParseProjectWithFS(
 		vf,
 		ssaapi.WithLanguage(suite.Language),
