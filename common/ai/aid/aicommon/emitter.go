@@ -324,6 +324,8 @@ func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.
 }
 
 func (r *Emitter) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool, finishCallback ...func()) {
+	reader = utils.UTF8Reader(reader)
+
 	r.emitStreamEvent(&streamEvent{
 		disableMarkdown:    disableMarkdown,
 		startTime:          startTime,

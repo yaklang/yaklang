@@ -185,24 +185,38 @@ LOOP:
 					ReActActionObject,
 					[]string{},
 					[]jsonextractor.CallbackOption{
-						jsonextractor.WithRegisterFieldStreamHandler(
+						jsonextractor.WithRegisterMultiFieldStreamHandler([]string{
+							"plan_request_payload",
+							"blueprint_payload",
+							"tool_require_payload",
+							"write_yaklang_code_approach",
 							"human_readable_thought",
-							func(key string, reader io.Reader, parents []string) {
+						}, func(key string, reader io.Reader, parents []string) {
+							pr, pw := utils.NewPipe()
+							go func() {
+								defer pw.Close()
+
+								switch key {
+								case "plan_request_payload":
+									pw.WriteString("开始任务规划：")
+								case "blueprint_payload":
+									pw.WriteString("决定调用其他AI智能应用（智能体）：")
+								case "tool_require_payload":
+									pw.WriteString("决定调用工具：")
+								case "write_yaklang_code_approach":
+									pw.WriteString("决定编写Yaklang代码：")
+								}
 								var output bytes.Buffer
-								reader = utils.JSONStringReader(reader)
-								reader = io.TeeReader(reader, &output)
-								r.config.Emitter.EmitStreamEventEx(
-									"re-act-loop-thought",
-									time.Now(),
-									reader,
-									resp.GetTaskIndex(),
-									true,
-									func() {
-										r.addToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
-									},
-								)
-							},
-						),
+								io.Copy(pw, utils.JSONStringReader(io.TeeReader(reader, &output)))
+								r.addToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
+							}()
+							r.config.Emitter.EmitStreamEvent(
+								"re-act-loop-thought",
+								time.Now(),
+								pr,
+								resp.GetTaskIndex(),
+							)
+						}),
 						jsonextractor.WithRegisterFieldStreamHandler(
 							"answer_payload", func(key string, reader io.Reader, parents []string) {
 								var o bytes.Buffer
@@ -473,7 +487,10 @@ LOOP:
 			}
 		case ActionAskForClarification:
 			saveIterationInfoIntoTimeline()
-			suggestion := r.invokeAskForClarification(nextAction)
+			obj := nextAction.GetObject("ask_for_clarification_payload")
+			payloads := obj.GetStringSlice("options")
+			question := obj.GetString("question")
+			suggestion := r.invokeAskForClarification(question, payloads)
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}
