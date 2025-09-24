@@ -3,7 +3,7 @@ package ssa
 import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/utils/asyncdb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
@@ -62,7 +62,7 @@ type simpleCacheItem[T comparable] struct {
 	Value T
 }
 type simpleCacheDB[T comparable] struct {
-	save *databasex.Save[simpleCacheItem[T]]
+	save *asyncdb.Save[simpleCacheItem[T]]
 }
 
 const (
@@ -78,11 +78,11 @@ func NewSimpleCacheDB[T comparable](
 		saveSize = IndexSaveSize // Ensure minimum save size
 	}
 	return &simpleCacheDB[T]{
-		save: databasex.NewSave(
+		save: asyncdb.NewSave(
 			save,
-			databasex.WithName(name),
-			databasex.WithSaveSize(saveSize),
-			databasex.WithSaveTimeout(saveTime),
+			asyncdb.WithName(name),
+			asyncdb.WithSaveSize(saveSize),
+			asyncdb.WithSaveTimeout(saveTime),
 		),
 	}
 }
