@@ -2753,7 +2753,8 @@ Content-Disposition: form-data; name="b"
 	}
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
+			actualOrderedParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
+			actualParams := actualOrderedParams.ToMap()
 
 			require.Equalf(t, testcase.expected.params, actualParams, "[%s] GetParamsFromBody failed:", testcase.name)
 

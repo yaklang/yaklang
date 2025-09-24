@@ -1597,11 +1597,11 @@ func (flow *CodecExecFlow) HTTPRequestMutate(transform string) error {
 	// post params
 	postParams, _, _ := lowhttp.GetParamsFromBody(contentType, body)
 	if totalParams == nil {
-		totalParams = make(map[string][]string, len(postParams))
+		totalParams = make(map[string][]string)
 	}
-	if len(postParams) > 0 {
-		for k, v := range postParams {
-			totalParams[k] = append(totalParams[k], v...)
+	if len(postParams.Items) > 0 {
+		for _, param := range postParams.Items {
+			totalParams[param.Key] = append(totalParams[param.Key], param.Values...)
 		}
 	}
 
