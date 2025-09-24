@@ -70,36 +70,8 @@ func getKeyType[K cmp.Ordered](key K) string {
 }
 
 func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
-	if i == nil {
+	if i == nil || len(i.Layers) == 0 || len(i.Layers[0].Nodes) == 0 {
 		return nil, utils.Errorf("graph is nil")
-	}
-
-	// Handle empty graph case
-	if len(i.Layers) == 0 {
-		var zeroKey K
-		keyType := getKeyType(zeroKey)
-		if keyType == "" {
-			return nil, utils.Errorf("unsupported key type, should be string, int/int64, uint64, uint32")
-		}
-
-		// Create empty persistent graph
-		pers := &Persistent[K]{
-			KeyType:     keyType,
-			Total:       0,
-			M:           uint32(i.M),
-			Ml:          float32(i.Ml),
-			EfSearch:    uint32(i.EfSearch),
-			Dims:        uint32(i.Dims()),
-			Layers:      []*PersistentLayer{},
-			OffsetToKey: []*PersistentNode[K]{},
-			Neighbors:   map[uint32][]uint32{},
-			ExportMode:  ExportModeStandard, // Default to standard mode for empty graph
-		}
-		return pers, nil
-	}
-
-	if len(i.Layers[0].Nodes) == 0 {
-		return nil, utils.Errorf("graph has no nodes")
 	}
 
 	keyType := ""
@@ -151,17 +123,22 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 	nodeStorage := make([]*PersistentNode[K], 1, total+1)
 	// reserve 0 offset with dummy data
 	var zeroKey K
-	if exportMode == ExportModeUID {
+	switch exportMode {
+	case ExportModePQ:
+		pqCodeSize := i.pqCodebook.M
+		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: make([]byte, pqCodeSize)}
+	case ExportModeStandard:
+		dims := i.Dims()
+		dummyVec := make([]float64, dims) // ToBinary expects []float64 for non-PQ mode
+		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: dummyVec}
+	case ExportModeUID:
+		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: []byte{}}
+	case ExportModeIntUID:
+		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: uint64(0)}
+	case ExportModeStrUID:
 		nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: ""}
-	} else {
-		if i.IsPQEnabled() {
-			pqCodeSize := i.pqCodebook.M
-			nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: make([]byte, pqCodeSize)}
-		} else {
-			dims := i.Dims()
-			dummyVec := make([]float64, dims) // ToBinary expects []float64 for non-PQ mode
-			nodeStorage[0] = &PersistentNode[K]{Key: zeroKey, Code: dummyVec}
-		}
+	default:
+		return nil, utils.Errorf("unsupported export mode: %d", exportMode)
 	}
 
 	pers := &Persistent[K]{
