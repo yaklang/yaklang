@@ -71,6 +71,7 @@ func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handl
 		}
 		require.NoError(t, err)
 		log.Infof("resp %v", resp)
+		handlerStatus(resp.Status)
 		if resp.ExecResult != nil && resp.ExecResult.IsMessage {
 			rawMsg := resp.ExecResult.GetMessage()
 			var msg msg
@@ -80,7 +81,6 @@ func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handl
 				handlerProcess(msg.Content.Process)
 			}
 		}
-		handlerStatus(resp.Status)
 	}
 }
 
