@@ -102,11 +102,13 @@ func ExtractWaitableActionFromStream(ctx context.Context,
 				if utils.InterfaceToString(key) == "@action" {
 					value := utils.InterfaceToString(data)
 					if utils.StringArrayContains(actions, value) {
+						log.Infof("matched @action: %s", value)
 						waitAction.SetName(value)
 						actionStart.Set()
 					} else if mapData, ok := data.(map[string]any); ok {
 						for _, v := range mapData {
 							if utils.StringArrayContains(actions, utils.InterfaceToString(v)) {
+								waitAction.SetName(utils.InterfaceToString(v))
 								actionStart.Set()
 								break
 							}

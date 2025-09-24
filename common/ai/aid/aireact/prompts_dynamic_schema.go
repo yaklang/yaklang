@@ -193,8 +193,9 @@ func getYaklangCodeLoopSchema() string {
 			aitool.WithParam_Description("You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process."),
 			aitool.WithParam_EnumString(
 				"query_document",
-				"require_tool",
 				"write_code",
+				"modify_code",
+				"require_tool",
 				"ask_for_clarification",
 			),
 			aitool.WithParam_Required(true),
@@ -207,9 +208,17 @@ func getYaklangCodeLoopSchema() string {
 			"tool_require_payload",
 			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'check-yaklang-syntax', 'yak-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
 		),
+		aitool.WithNumberParam(
+			"modify_start_line",
+			aitool.WithParam_Description("If the action is 'modify_code', specify the starting line number (1-based index) of the code segment to be modified. This indicates where the changes should begin in the existing code."),
+		),
+		aitool.WithNumberParam(
+			"modify_end_line",
+			aitool.WithParam_Description("If the action is 'modify_code', specify the ending line number (1-based index) of the code segment to be modified. This indicates where the changes should end in the existing code. The lines from modify_start_line to modify_end_line (inclusive) will be replaced with the new code provided in the 'code' field."),
+		),
 		aitool.WithStringParam(
 			"code",
-			aitool.WithParam_Description("If this action involves code modification (write_to_file or modify_file), provide the updated code content here. Leave empty for other actions."),
+			aitool.WithParam_Description("If this action involves code modification (write_code or modify_code), provide the updated code content here. Leave empty for other actions."),
 		),
 		aitool.WithStringParam(
 			"query_document",
