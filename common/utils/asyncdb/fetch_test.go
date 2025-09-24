@@ -1,4 +1,4 @@
-package databasex_test
+package asyncdb_test
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/utils/asyncdb"
 )
 
 // FetchTestItem is a simple implementation of the Item interface for testing
@@ -37,7 +37,7 @@ func TestNewFetch(t *testing.T) {
 	// Test with default options
 	t.Run("DefaultOptions", func(t *testing.T) {
 
-		fetch := databasex.NewFetch(fetchFromDB)
+		fetch := asyncdb.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
 
 		// Close the fetch to clean up resources
@@ -47,8 +47,8 @@ func TestNewFetch(t *testing.T) {
 	// Test with custom buffer size
 	t.Run("CustomBufferSize", func(t *testing.T) {
 
-		fetch := databasex.NewFetch(fetchFromDB,
-			databasex.WithFetchSize(10),
+		fetch := asyncdb.NewFetch(fetchFromDB,
+			asyncdb.WithFetchSize(10),
 		)
 		assert.NotNil(t, fetch)
 
@@ -62,8 +62,8 @@ func TestNewFetch(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
-		fetch := databasex.NewFetch(fetchFromDB,
-			databasex.WithContext(ctx),
+		fetch := asyncdb.NewFetch(fetchFromDB,
+			asyncdb.WithContext(ctx),
 		)
 		assert.NotNil(t, fetch)
 
@@ -90,7 +90,7 @@ func TestFetchOperation(t *testing.T) {
 	}
 	t.Run("FetchItems", func(t *testing.T) {
 
-		fetch := databasex.NewFetch(fetchFromDB)
+		fetch := asyncdb.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
 
 		// Fetch items
@@ -106,7 +106,7 @@ func TestFetchOperation(t *testing.T) {
 	})
 
 	t.Run("EmptyFetch", func(t *testing.T) {
-		fetch := databasex.NewFetch(fetchFromDB)
+		fetch := asyncdb.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
 
 		// Wait a bit to ensure the buffer has had time to try filling
@@ -137,7 +137,7 @@ func TestCloseWithDelete(t *testing.T) {
 	t.Run("DeleteOnClose", func(t *testing.T) {
 		var deletedItems []FetchTestItem
 
-		fetch := databasex.NewFetch(fetchFromDB)
+		fetch := asyncdb.NewFetch(fetchFromDB)
 		assert.NotNil(t, fetch)
 
 		// Wait a bit to ensure the buffer is filled
@@ -172,7 +172,7 @@ func TestConcurrency(t *testing.T) {
 
 	t.Run("ConcurrentFetch", func(t *testing.T) {
 
-		fetch := databasex.NewFetch(fetchFromDB, databasex.WithFetchSize(100))
+		fetch := asyncdb.NewFetch(fetchFromDB, asyncdb.WithFetchSize(100))
 		assert.NotNil(t, fetch)
 
 		var wg sync.WaitGroup
@@ -210,7 +210,7 @@ func TestFetchAutoFetchSize(t *testing.T) {
 		}()
 		return ch
 	}
-	fetch := databasex.NewFetch(fetchFromDB, databasex.WithFetchSize(defaultFetchSize))
+	fetch := asyncdb.NewFetch(fetchFromDB, asyncdb.WithFetchSize(defaultFetchSize))
 	for i := 0; i < 5; i++ {
 		item, err := fetch.Fetch()
 		assert.NoError(t, err)

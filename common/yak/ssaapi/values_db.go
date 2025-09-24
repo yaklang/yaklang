@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/utils/asyncdb"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/jinzhu/gorm"
@@ -285,10 +285,10 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 }
 
 type auditDatabase struct {
-	fetch      *databasex.Fetch[*ssadb.AuditNode]
-	nodeSave   *databasex.Save[*ssadb.AuditNode]
-	edgeSave   *databasex.Save[*ssadb.AuditEdge]
-	editorSave *databasex.Save[*ssadb.IrSource]
+	fetch      *asyncdb.Fetch[*ssadb.AuditNode]
+	nodeSave   *asyncdb.Save[*ssadb.AuditNode]
+	edgeSave   *asyncdb.Save[*ssadb.AuditEdge]
+	editorSave *asyncdb.Save[*ssadb.IrSource]
 }
 
 func (a *auditDatabase) GetNode() *ssadb.AuditNode {
@@ -344,7 +344,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 	fetchSize := size
 	saveSize := size * 2
 
-	ret.fetch = databasex.NewFetch[*ssadb.AuditNode](func(ctx context.Context, fetchSize int) <-chan *ssadb.AuditNode {
+	ret.fetch = asyncdb.NewFetch[*ssadb.AuditNode](func(ctx context.Context, fetchSize int) <-chan *ssadb.AuditNode {
 		out := make(chan *ssadb.AuditNode, fetchSize)
 		go func() {
 			defer close(out)
@@ -363,9 +363,9 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			})
 		}()
 		return out
-	}, databasex.WithContext(ctx), databasex.WithFetchSize(fetchSize), databasex.WithName("AuditNode"))
+	}, asyncdb.WithContext(ctx), asyncdb.WithFetchSize(fetchSize), asyncdb.WithName("AuditNode"))
 
-	ret.nodeSave = databasex.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
+	ret.nodeSave = asyncdb.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
 		if len(ae) == 0 {
 			return
 		}
@@ -378,9 +378,9 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			return nil
 		})
 		return
-	}, databasex.WithContext(ctx), databasex.WithSaveSize(saveSize), databasex.WithName("AuditNode"))
+	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(saveSize), asyncdb.WithName("AuditNode"))
 
-	ret.edgeSave = databasex.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
+	ret.edgeSave = asyncdb.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
 		if len(ae) == 0 {
 			return
 		}
@@ -393,9 +393,9 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			return nil
 		})
 		return
-	}, databasex.WithContext(ctx), databasex.WithSaveSize(saveSize), databasex.WithName("AuditEdge"))
+	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(saveSize), asyncdb.WithName("AuditEdge"))
 
-	ret.editorSave = databasex.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
+	ret.editorSave = asyncdb.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
 		if len(ae) == 0 {
 			return
 		}
@@ -408,7 +408,7 @@ func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase
 			return nil
 		})
 		return
-	}, databasex.WithContext(ctx), databasex.WithSaveSize(size), databasex.WithName("SourceFile"))
+	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(size), asyncdb.WithName("SourceFile"))
 
 	return ret
 }

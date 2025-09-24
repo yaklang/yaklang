@@ -1,4 +1,4 @@
-package databasex_test
+package asyncdb_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/databasex"
+	"github.com/yaklang/yaklang/common/utils/asyncdb"
 )
 
 func TestDatabaseCache(t *testing.T) {
@@ -15,7 +15,7 @@ func TestDatabaseCache(t *testing.T) {
 	_ = database
 	ttl := time.Millisecond * 100
 
-	cache := databasex.NewDatabaseCacheWithKey[int, string](
+	cache := asyncdb.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -63,7 +63,7 @@ func TestDatabaseCache_WithDatabaseTime(t *testing.T) {
 
 	load := utils.NewSafeMapWithKey[int, struct{}]()
 
-	cache := databasex.NewDatabaseCacheWithKey[int, string](
+	cache := asyncdb.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -118,7 +118,7 @@ func TestDatabaseCache_ManualDelete(t *testing.T) {
 	ttl := time.Millisecond * 100
 	log.SetLevel(log.DebugLevel)
 
-	cache := databasex.NewDatabaseCacheWithKey[int, string](
+	cache := asyncdb.NewDatabaseCacheWithKey[int, string](
 		time.Second*10,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -157,7 +157,7 @@ func TestDatabaseCache_NoDatabase(t *testing.T) {
 	// just in memory
 	ttl := time.Millisecond * 100
 	log.SetLevel(log.DebugLevel)
-	cache := databasex.NewDatabaseCacheWithKey[int, string](
+	cache := asyncdb.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -190,7 +190,7 @@ func TestDatabaseCache_Close(t *testing.T) {
 	_ = database
 	ttl := time.Millisecond * 100
 
-	cache := databasex.NewDatabaseCacheWithKey[int, string](
+	cache := asyncdb.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
@@ -228,7 +228,7 @@ func TestDatabaseCache_DisableEnableSave(t *testing.T) {
 	database := utils.NewSafeMapWithKey[int, string]()
 	ttl := time.Millisecond * 100
 
-	cache := databasex.NewDatabaseCacheWithKey[int, string](
+	cache := asyncdb.NewDatabaseCacheWithKey[int, string](
 		ttl,
 		func(i int, s string, reason utils.EvictionReason) bool {
 			log.Infof("save to database, key: %v, value: %v", i, s)
