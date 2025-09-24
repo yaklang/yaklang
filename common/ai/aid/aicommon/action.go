@@ -100,7 +100,9 @@ func ExtractWaitableActionFromStream(ctx context.Context,
 		options = append(options, jsonextractor.WithFormatKeyValueCallback(func(key, data any) {
 			if !actionStart.IsSet() {
 				if utils.InterfaceToString(key) == "@action" {
-					if utils.StringArrayContains(actions, utils.InterfaceToString(data)) {
+					value := utils.InterfaceToString(data)
+					if utils.StringArrayContains(actions, value) {
+						waitAction.SetName(value)
 						actionStart.Set()
 					} else if mapData, ok := data.(map[string]any); ok {
 						for _, v := range mapData {
