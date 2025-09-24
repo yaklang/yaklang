@@ -24,7 +24,7 @@ const (
 	JS      Language = "js"
 	PHP     Language = "php"
 	JAVA    Language = "java"
-	GO      Language = "golang"
+	GO      Language = "go"
 	C       Language = "c"
 	TS      Language = "ts"
 	General Language = "general"
