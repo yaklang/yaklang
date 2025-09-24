@@ -101,10 +101,9 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	}
 
 	collectionConfig := collection
-	hnswGraph := hnsw.NewGraph(
+	hnswGraph := NewHNSWGraph(collectionName,
 		hnsw.WithHNSWParameters[string](collectionConfig.M, collectionConfig.Ml, collectionConfig.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
-		hnsw.WithDeterministicRng[string](0), // 使用固定的随机数生成器，便于调试，不影响结果
 	)
 
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
