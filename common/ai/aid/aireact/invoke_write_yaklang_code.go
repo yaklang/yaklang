@@ -3,13 +3,17 @@ package aireact
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer"
+	"fmt"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -60,25 +64,28 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			log.Errorf("Failed to generate prompt for yaklang code action loop: %v", err)
 			return err
 		}
+		errorMessages = ""
 
 		var actionName string
 		var payload string
-		var action *aicommon.WaitableAction
+		var action *aicommon.Action
 		var actionErr error
-
+		var modifyStartLine, modifyEndLine int
 		transactionErr := aicommon.CallAITransaction(
 			r.config, prompt, r.config.CallAI,
 			func(resp *aicommon.AIResponse) error {
 				stream := resp.GetOutputStreamReader("yaklang-code-loop", true, r.config.Emitter)
-				subCtx, cancel := context.WithCancel(ctx)
-				defer cancel()
-				action, actionErr = aicommon.ExtractWaitableActionFromStream(
-					subCtx,
+
+				// stream = io.TeeReader(stream, os.Stdout)
+				fmt.Println(prompt)
+				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
 					stream,
 					"write_code",
 					[]string{
 						"query_document",
 						"require_tool",
+						"modify_code",
+						"ask_for_clarification",
 					},
 					[]jsonextractor.CallbackOption{
 						jsonextractor.WithRegisterMultiFieldStreamHandler(
@@ -114,15 +121,9 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 								)
 							},
 						),
-						jsonextractor.WithRegisterFieldStreamHandler("tool_require_payload", func(key string, reader io.Reader, parents []string) {
-							r.Emitter.EmitStreamEvent(
-								"tool-require-payload",
-								time.Now(),
-								reader,
-								resp.GetTaskIndex(),
-							)
-						}),
 						jsonextractor.WithRegisterFieldStreamHandler("code", func(key string, reader io.Reader, parents []string) {
+							reader = utils.JSONStringReader(reader)
+							reader = io.TeeReader(reader, os.Stdout) // debug
 							r.Emitter.EmitStreamEvent(
 								"yaklang-code",
 								time.Now(),
@@ -135,25 +136,41 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 					return utils.Errorf("Failed to parse action: %v", actionErr)
 				}
 
+				fmt.Println("=================================================")
+				spew.Dump(action)
+				fmt.Println("=================================================")
+
 				actionName = action.Name()
 				switch actionName {
 				case "write_code":
-					payload = action.WaitString("code")
+					payload = action.GetString("code")
 					if payload == "" {
 						return utils.Error("code action must have 'code' field")
 					}
+				case "modify_code":
+					payload = action.GetString("code")
+					if payload == "" {
+						return utils.Error("modify_code action must have 'code' field")
+					}
+					start := action.GetInt("modify_start_line")
+					end := action.GetInt("modify_end_line")
+					if start <= 0 || end <= 0 || end < start {
+						return utils.Error("modify_code action must have valid 'modify_start_line' and 'modify_end_line' fields")
+					}
+					modifyStartLine = int(start)
+					modifyEndLine = int(end)
 				case "query_document":
-					payload = action.WaitString("query_document")
+					payload = action.GetString("query_document")
 					if payload == "" {
 						return utils.Error("query_document action must have 'query_document' field")
 					}
 				case "require_tool":
-					payload = action.WaitString("tool_require_payload")
+					payload = action.GetString("tool_require_payload")
 					if payload == "" {
 						return utils.Error("require_tool action must have 'tool_require_payload' field")
 					}
 				case "ask_for_clarification":
-					result := action.WaitObject("ask_for_clarification_payload")
+					result := action.GetInvokeParams("ask_for_clarification_payload")
 					if result.GetString("question") == "" {
 						return utils.Error("ask_for_clarification action must have 'question' field in 'ask_for_clarification_payload'")
 					}
@@ -169,6 +186,44 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 
 		// Handle different action types
 		switch actionName {
+		case "modify_code":
+			// Apply modification to current code
+			editor := memedit.NewMemEditor(currentCode)
+			startPos, err := editor.GetStartOffsetByLine(int(modifyStartLine))
+			if err != nil {
+				return utils.Errorf("Failed to get start offset by line: %v", err)
+			}
+			endPos, err := editor.GetEndOffsetByLine(modifyEndLine)
+			if err != nil {
+				return utils.Errorf("Failed to get end offset by line: %v", err)
+			}
+			err = editor.UpdateTextByRange(
+				editor.GetRangeOffset(startPos, endPos),
+				payload,
+			)
+			if err != nil {
+				return utils.Errorf("Failed to update text by range: %v", err)
+			}
+			fmt.Println("=================================================")
+			fmt.Println(string(payload))
+			fmt.Println("=================================================")
+			fullCode := editor.GetTextFromRange(editor.GetFullRange())
+			os.RemoveAll(filename)
+			os.WriteFile(filename, []byte(fullCode), 0644)
+			currentCode = fullCode
+
+			result := static_analyzer.YaklangScriptChecking(currentCode, "yak")
+			var buf bytes.Buffer
+			for _, msg := range result {
+				buf.WriteString(msg.String())
+				buf.WriteString("\n")
+			}
+			r.addToTimeline("code_generated", utils.ShrinkString(currentCode, 128))
+			errorMessages += buf.String()
+			r.addToTimeline("re-enter-code-generate-loop", "")
+			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
+			continue
+
 		case "write_code":
 			// Update current code
 			code := payload
@@ -206,7 +261,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			r.addToTimeline("tool_call", "Tool call result: "+result)
 			continue
 		case "ask_for_clarification":
-			result := action.WaitObject("ask_for_clarification_payload")
+			result := action.GetInvokeParams("ask_for_clarification_payload")
 			question := result.GetString("question")
 			options := result.GetStringSlice("options")
 			suggestion := r.invokeAskForClarification(question, options)
