@@ -110,10 +110,10 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		checkSfScanRecvMsg(t, stream, func(status string) {
 			finishStatus = status
 		}, func(process float64) {
+			finishProcess = process
 			if 0.5 < process {
 				pauseTask(stream)
 			}
-			finishProcess = process
 		})
 		require.LessOrEqual(t, finishProcess, 1.0)
 		require.GreaterOrEqual(t, finishProcess, 0.5)
@@ -136,10 +136,10 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		resumeStream := resumeTask(taskID)
 		haveExecute := false
 		checkSfScanRecvMsg(t, resumeStream, func(status string) {
+			finishStatus = status
 			if status == "executing" {
 				haveExecute = true
 			}
-			finishStatus = status
 		}, func(process float64) {
 			finishProcess = process
 		})
