@@ -57,7 +57,8 @@ func MakeInputNodeFromID[K cmp.Ordered](key K, uid hnswspec.LazyNodeID, loadByUI
 	return InputNode[K]{Key: key, UID: hnswspec.LazyNodeID(uid), LazyValue: func() []float32 {
 		vec, err := loadByUID(uid)
 		if err != nil {
-			panic(err)
+			log.Errorf("load by uid err: %v", err)
+			return nil
 		}
 		return vec
 	}, NodeType: InputNodeTypeLazy}
@@ -282,6 +283,9 @@ func (g *Graph[K]) SetPQCodebook(codebook *pq.Codebook) {
 
 func (g *Graph[K]) SetPQQuantizer(quantizer *pq.Quantizer) {
 	g.pqQuantizer = quantizer
+}
+func (g *Graph[K]) GetPQQuantizer() *pq.Quantizer {
+	return g.pqQuantizer
 }
 
 // GraphConfig defines the configuration parameters for creating an HNSW graph
@@ -545,7 +549,12 @@ func (g *Graph[K]) Dims() int {
 		return 0
 	}
 	if !entry.IsPQEnabled() {
-		return len(entry.GetVector()())
+		vec := entry.GetVector()()
+		if len(vec) == 0 {
+			log.Errorf("get dim failed, vec is nil")
+			return 0
+		}
+		return len(vec)
 	}
 	return 0 // 这种情况不应该发生
 }
@@ -1165,13 +1174,19 @@ func (h *Graph[K]) DumpByDot() []string {
 	return result
 }
 
+func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
+	return g.TrainPQCodebookFromDataWithCallback(m, k, func(key K, code []byte, vector []float64) (hnswspec.LayerNode[K], error) {
+		return hnswspec.NewRawPQLayerNode(key, code), nil
+	})
+}
+
 // TrainPQCodebookFromData 从图中的所有现有向量数据训练PQ码表
 // 这个方法会：
 // 1. 收集所有节点的向量数据
 // 2. 训练PQ码表
 // 3. 更新所有节点使用新的PQ编码
 // 4. 设置图的PQ优化
-func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
+func (g *Graph[K]) TrainPQCodebookFromDataWithCallback(m, k int, callback func(key K, code []byte, vector []float64) (hnswspec.LayerNode[K], error)) (*pq.Codebook, error) {
 	if len(g.Layers) == 0 || len(g.Layers[0].Nodes) == 0 {
 		return nil, utils.Error("no data available for PQ training")
 	}
@@ -1270,20 +1285,17 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
 				vec64[i] = float64(v)
 			}
 
-			// 创建PQ节点
-			pqNode, err := hnswspec.NewPQLayerNode(key, func() []float32 {
-				vec32 := make([]float32, len(vec64))
-				for i, v := range vec64 {
-					vec32[i] = float32(v)
-				}
-				return vec32
-			}, quantizer)
-
+			pqCodes, err := quantizer.Encode(vec64)
 			if err != nil {
-				log.Errorf("Failed to convert node %v to PQ: %v", key, err)
+				log.Errorf("Encode vector failed: %v", err)
 				continue
 			}
-
+			// 创建PQ节点
+			pqNode, err := callback(key, pqCodes, vec64)
+			if err != nil {
+				log.Errorf("Create PQ node failed: %v", err)
+				continue
+			}
 			var newNode hnswspec.LayerNode[K]
 			if g.nodeType == InputNodeTypeLazy {
 				newNode = hnswspec.NewLazyLayerNode(hnswspec.LazyNodeID(key), func(uid hnswspec.LazyNodeID) (hnswspec.LayerNode[K], error) {
@@ -1292,7 +1304,6 @@ func (g *Graph[K]) TrainPQCodebookFromData(m, k int) (*pq.Codebook, error) {
 			} else {
 				newNode = pqNode
 			}
-
 			// 替换节点
 			layer.Nodes[key] = newNode
 			converted++

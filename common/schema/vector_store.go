@@ -196,6 +196,8 @@ type VectorStoreCollection struct {
 	// PQ 算法参数配置
 	EnablePQMode bool `gorm:"default:false" json:"enable_pq_mode"`
 
+	Archived bool `gorm:"default:false" json:"archived"`
+
 	// HNSW 图连接信息，存储为 JSON 格式
 	GroupInfos GroupInfos `gorm:"type:text" json:"group_infos"`
 
@@ -239,9 +241,8 @@ type VectorStoreDocument struct {
 	Metadata MetadataMap `gorm:"type:text" json:"metadata"`
 
 	// 文档的嵌入向量，以 JSON 格式存储
-	PQMode    bool       `gorm:"default:false" json:"pq_mode"`
 	PQCode    []byte     `gorm:"type:text" json:"pq_code"`
-	Embedding FloatArray `gorm:"type:text;not null" json:"embedding"`
+	Embedding FloatArray `gorm:"type:text" json:"embedding"`
 
 	// 文档的原始文本
 	Content string `gorm:"type:text" json:"content"`
@@ -261,7 +262,7 @@ func (v *VectorStoreDocument) BeforeSave() error {
 }
 
 func (v *VectorStoreDocument) TableName() string {
-	return "rag_vector_document_test"
+	return "rag_vector_document_test_v1"
 }
 
 // StringArray 用于存储字符串数组的自定义类型

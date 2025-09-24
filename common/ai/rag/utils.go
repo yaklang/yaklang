@@ -8,6 +8,7 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -256,7 +257,7 @@ func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 
 type NodeOffsetToVectorFunc func(offset uint32) []float32
 
-func ParseHNSWGraphFromBinary(collectionName string, graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, cacheMaxSize int) (*hnsw.Graph[string], error) {
+func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, cacheMaxSize int, pqmode bool, wg *sync.WaitGroup) (*hnsw.Graph[string], error) {
 	cache := map[hnswspec.LazyNodeID]any{}
 	clearCache := func() {
 		if len(cache) > cacheMaxSize {
@@ -274,17 +275,18 @@ func ParseHNSWGraphFromBinary(collectionName string, graphBinaryReader io.Reader
 			}
 		}
 	}
+
 	allOpts := getDefaultHNSWGraphOptions(collectionName)
-	return hnsw.LoadGraphFromBinary(graphBinaryReader, func(key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
+	hnswGraph, err := hnsw.LoadGraphFromBinary(graphBinaryReader, func(key hnswspec.LazyNodeID) (hnswspec.LayerNode[string], error) {
 		uidStr := fmt.Sprint(key)
 
-		doc, err := getVectorDocumentByLazyNodeID(db.Select("document_id,pq_mode"), key)
+		doc, err := getVectorDocumentByLazyNodeID(db.Select("document_id"), key)
 		if err != nil {
 			return nil, err
 		}
 		docId := doc.DocumentID
 		var newNode hnswspec.LayerNode[string]
-		if doc.PQMode {
+		if pqmode {
 			newNode = hnswspec.NewLazyRawPQLayerNode(docId, func() ([]byte, error) {
 				if node, ok := cache[uidStr]; ok {
 					return node.([]byte), nil
@@ -317,6 +319,10 @@ func ParseHNSWGraphFromBinary(collectionName string, graphBinaryReader io.Reader
 
 		return newNode, nil
 	}, allOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return hnswGraph, nil
 }
 
 func getVectorDocumentByLazyNodeID(db *gorm.DB, id hnswspec.LazyNodeID) (*schema.VectorStoreDocument, error) {

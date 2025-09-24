@@ -1,6 +1,7 @@
 package rag
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -392,4 +393,231 @@ func TestMUSTPASS_BuildVectorIndexForNonExistentEntry(t *testing.T) {
 	nonExistentEntryID := uuid.NewString()
 	_, err = BuildVectorIndexForKnowledgeBaseEntry(db, 0, nonExistentEntryID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(NewMockEmbedder(testEmbedder)))
 	assert.Error(t, err) // 应该返回错误
+}
+
+// TestMUSTPASS_DeleteEmbeddingData 测试删除嵌入数据
+// 测试场景：在空白数据库环境下的完整删除嵌入数据周期
+// 测试步骤：
+// 1. 创建测试知识库
+// 2. 创建测试知识库条目
+// 3. 构建向量索引
+// 4. 转换为PQ模式
+// 5. 删除embedding数据
+// 6. 验证PQ模式下的查询功能
+// 7. 验证文档计数在删除embedding后保持一致
+// 8. 再次查询所有VectorStoreDocument文档，验证embedding字段已被删除
+// 9. 测试PQ模式下的查询功能
+func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
+	// 1. 创建临时测试数据库
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	assert.NoError(t, err)
+	defer db.Close()
+
+	// 2. 自动迁移数据库表结构
+	db.AutoMigrate(
+		&schema.KnowledgeBaseInfo{},
+		&schema.KnowledgeBaseEntry{},
+		&schema.VectorStoreCollection{},
+		&schema.VectorStoreDocument{},
+	)
+
+	// 3. 创建测试知识库
+	knowledgeBase := &schema.KnowledgeBaseInfo{
+		KnowledgeBaseName:        "test_delete_embedding_kb",
+		KnowledgeBaseDescription: "测试删除嵌入数据的知识库",
+		KnowledgeBaseType:        "test",
+	}
+	err = yakit.CreateKnowledgeBase(db, knowledgeBase)
+	assert.NoError(t, err)
+
+	// 获取创建的知识库ID
+	var savedKnowledgeBase schema.KnowledgeBaseInfo
+	err = db.Where("knowledge_base_name = ?", "test_delete_embedding_kb").First(&savedKnowledgeBase).Error
+	assert.NoError(t, err)
+	knowledgeBaseID := int64(savedKnowledgeBase.ID)
+
+	// 4. 创建测试知识库条目
+	testEntries := []*schema.KnowledgeBaseEntry{
+		{
+			KnowledgeBaseID:    knowledgeBaseID,
+			KnowledgeTitle:     "机器学习基础",
+			KnowledgeType:      "Technology",
+			ImportanceScore:    9,
+			Keywords:           schema.StringArray{"机器学习", "AI", "算法"},
+			KnowledgeDetails:   "机器学习是人工智能的一个分支，它是一种通过算法使计算机能够从数据中学习并做出决策或预测的技术。机器学习包括监督学习、无监督学习和强化学习等多种方法。",
+			Summary:            "机器学习是AI的重要分支",
+			SourcePage:         1,
+			PotentialQuestions: schema.StringArray{"什么是机器学习", "机器学习的分类", "机器学习的应用"},
+		},
+		{
+			KnowledgeBaseID:    knowledgeBaseID,
+			KnowledgeTitle:     "深度学习原理",
+			KnowledgeType:      "Technology",
+			ImportanceScore:    8,
+			Keywords:           schema.StringArray{"深度学习", "神经网络", "AI"},
+			KnowledgeDetails:   "深度学习是机器学习的一个子集，它使用多层神经网络来学习数据的复杂表示。深度学习在图像识别、自然语言处理、语音识别等领域取得了重大突破。",
+			Summary:            "深度学习使用多层神经网络学习复杂表示",
+			SourcePage:         2,
+			PotentialQuestions: schema.StringArray{"什么是深度学习", "深度学习和机器学习的区别", "深度学习的应用领域"},
+		},
+		{
+			KnowledgeBaseID:    knowledgeBaseID,
+			KnowledgeTitle:     "自然语言处理技术",
+			KnowledgeType:      "Technology",
+			ImportanceScore:    7,
+			Keywords:           schema.StringArray{"NLP", "自然语言处理", "文本处理"},
+			KnowledgeDetails:   "自然语言处理（NLP）是计算机科学和人工智能的一个分支，旨在让计算机能够理解、解释和生成人类语言。NLP技术包括分词、词性标注、命名实体识别、情感分析、机器翻译等。",
+			Summary:            "NLP让计算机理解和处理人类语言",
+			SourcePage:         3,
+			PotentialQuestions: schema.StringArray{"什么是NLP", "NLP的主要技术", "NLP的应用场景"},
+		},
+	}
+
+	// 添加知识库条目到数据库
+	for _, entry := range testEntries {
+		err = yakit.CreateKnowledgeBaseEntry(db, entry)
+		assert.NoError(t, err)
+	}
+
+	test1024Embedder := func(text string) ([]float32, error) {
+		embedding := make([]float32, 1024)
+		if strings.Contains(text, "机器学习") {
+			embedding[100] = 1.0
+			return embedding, nil
+		}
+		if strings.Contains(text, "自然语言处理") {
+			embedding[200] = 1.0
+			return embedding, nil
+		}
+		for i := range 1024 {
+			embedding[i] = float32(i)
+		}
+		return embedding, nil
+	}
+
+	// 5. 构建向量索引（核心测试功能）
+	// 使用模拟嵌入器配置
+	_, err = BuildVectorIndexForKnowledgeBase(db, knowledgeBaseID, WithEmbeddingModel("mock-model"), WithModelDimension(3), WithEmbeddingClient(NewMockEmbedder(test1024Embedder)))
+	assert.NoError(t, err)
+
+	// 6. 验证索引构建结果
+	// 检查RAG集合是否已创建
+	ragCollectionName := savedKnowledgeBase.KnowledgeBaseName
+	assert.True(t, CollectionIsExists(db, ragCollectionName))
+
+	// 7. 创建RAG系统来进行测试
+	mockEmbedder := NewMockEmbedder(test1024Embedder)
+	store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, mockEmbedder)
+	assert.NoError(t, err)
+	defer store.Remove()
+
+	ragSystem := NewRAGSystem(mockEmbedder, store)
+
+	// 验证初始文档数量
+	docCount, err := ragSystem.CountDocuments()
+	assert.NoError(t, err)
+	assert.Equal(t, 3, docCount) // 应该有3个文档
+
+	// 8. 转换为PQ模式
+	err = ragSystem.ConvertToPQMode()
+	assert.NoError(t, err)
+
+	// 9. 查询所有VectorStoreDocument文档，检查embedding字段是否存在
+	var vectorDocs []schema.VectorStoreDocument
+	// 通过collection name获取collection ID
+	var collection schema.VectorStoreCollection
+	err = db.Where("name = ?", ragCollectionName).First(&collection).Error
+	assert.NoError(t, err)
+	err = db.Where("collection_id = ?", collection.ID).Find(&vectorDocs).Error
+	assert.NoError(t, err)
+	assert.Equal(t, 4, len(vectorDocs)) // 应该有3个向量文档
+
+	// 验证转换为PQ模式前embedding字段不为空
+	for _, doc := range vectorDocs {
+		assert.NotEmpty(t, doc.Embedding, "转换为PQ模式前embedding字段应该不为空")
+	}
+
+	// 10. 删除embedding数据
+	err = ragSystem.DeleteEmbeddingData()
+	assert.NoError(t, err)
+
+	// 11. 再次查询所有VectorStoreDocument文档，验证embedding字段已被删除
+	var vectorDocsAfterDelete []schema.VectorStoreDocument
+	err = db.Where("collection_id = ?", collection.ID).Find(&vectorDocsAfterDelete).Error
+	assert.NoError(t, err)
+	assert.Equal(t, 4, len(vectorDocsAfterDelete)) // 文档数量应该保持不变
+
+	// 验证embedding字段已被删除（应该为空）
+	for _, doc := range vectorDocsAfterDelete {
+		assert.Empty(t, doc.Embedding, "删除embedding数据后embedding字段应该为空")
+		assert.NotEmpty(t, doc.PQCode, "PQ编码应该仍然存在")
+	}
+
+	// 12. 测试PQ模式下的查询功能
+	// 验证在删除embedding数据后，PQ模式查询仍然能正常工作
+	searchResults, err := ragSystem.QueryWithPage("什么是机器学习", 1, 5)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, searchResults, "PQ模式下应该能够正常进行查询")
+
+	// 验证搜索结果包含正确的内容
+	found := searchResults[0].Document.Metadata["knowledge_title"] == "机器学习基础"
+	assert.True(t, found, "PQ模式下应该能够找到机器学习相关的知识条目")
+
+	// 测试另一个查询
+	nlpSearchResults, err := ragSystem.QueryWithPage("自然语言处理", 1, 5)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, nlpSearchResults, "PQ模式下应该能够查询NLP相关内容")
+
+	// 验证NLP搜索结果
+	nlpFound := nlpSearchResults[0].Document.Metadata["knowledge_title"] == "自然语言处理技术"
+	assert.True(t, nlpFound, "PQ模式下应该能够找到NLP相关的知识条目")
+
+	// 13. 验证文档计数在删除embedding后保持一致
+	finalDocCount, err := ragSystem.CountDocuments()
+	assert.NoError(t, err)
+	assert.Equal(t, 3, finalDocCount, "删除embedding数据后文档数量应该保持不变")
+
+	// 14. 验证归档检查
+	err = ragSystem.SetArchived(true)
+	assert.NoError(t, err)
+	assert.True(t, ragSystem.GetArchived(), "归档检查应该返回true")
+
+	err = ragSystem.Add("test_document_id", "test_content")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "archived")
+
+	err = ragSystem.DeleteDocuments("test_document_id")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "archived")
+
+	// 15. 验证修复embedding数据
+	err = ragSystem.ConvertToStandardMode()
+	assert.NoError(t, err)
+
+	var vectorDocsAfterConvertToStandardMode []schema.VectorStoreDocument
+	err = db.Where("collection_id = ?", collection.ID).Find(&vectorDocsAfterConvertToStandardMode).Error
+	assert.NoError(t, err)
+	assert.Equal(t, 4, len(vectorDocsAfterConvertToStandardMode)) // 文档数量应该保持不变
+	for _, doc := range vectorDocsAfterConvertToStandardMode {
+		assert.NotEmpty(t, doc.Embedding, "修复embedding数据后embedding字段应该不为空")
+		assert.Len(t, doc.Embedding, 1024, "修复embedding数据后embedding字段应该为1024维")
+	}
+	// 16. 验证查询
+	store, err = LoadSQLiteVectorStoreHNSW(db, ragCollectionName, mockEmbedder)
+	assert.NoError(t, err)
+	defer store.Remove()
+
+	ragSystem = NewRAGSystem(mockEmbedder, store)
+
+	searchResults, err = ragSystem.QueryWithPage("什么是机器学习", 1, 5)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, searchResults, "标准模式下应该能够正常进行查询")
+
+	assert.Equal(t, "机器学习基础", searchResults[0].Document.Metadata["knowledge_title"], "标准模式下应该能够找到机器学习相关的知识条目")
+
+	searchResults, err = ragSystem.QueryWithPage("什么是自然语言处理", 1, 5)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, searchResults, "标准模式下应该能够正常进行查询")
+
+	assert.Equal(t, "自然语言处理技术", searchResults[0].Document.Metadata["knowledge_title"], "标准模式下应该能够找到自然语言处理相关的知识条目")
 }
