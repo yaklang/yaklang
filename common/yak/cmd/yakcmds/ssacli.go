@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 
 	"github.com/gobwas/glob"
@@ -1218,7 +1219,6 @@ var ssaCodeScan = &cli.Command{
 			}
 		}()
 		ctx := context.Background()
-		log.Infof("============= start to scan code ==============")
 
 		if pprofFile := c.String("pprof"); pprofFile != "" {
 			ssaprofile.DumpHeapProfileWithInterval(30*time.Second, ssaprofile.WithFileName(pprofFile))
@@ -1232,6 +1232,8 @@ var ssaCodeScan = &cli.Command{
 			}
 			log.SetLevel(level)
 		}
+
+		log.Infof("============= start to scan code ==============")
 
 		ruleTimeStart := time.Now()
 		SyncEmbedRule()

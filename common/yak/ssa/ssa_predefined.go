@@ -437,7 +437,7 @@ func (n *anValue) GetAllMember() map[Value]Value {
 		k, ok1 := n.GetValueById(key)
 		v, ok2 := n.GetValueById(value)
 		if !ok1 || !ok2 {
-			log.Errorf("BUG in anValue.GetAllMember(), is nil key[%d](%v) member[%d](%v)", key, k, value, v)
+			log.Warnf("BUG in anValue.GetAllMember(), is nil key[%d](%v) member[%d](%v)", key, k, value, v)
 			continue
 		}
 		ret[k] = v

@@ -89,7 +89,7 @@ func dump(cfg dumpHeapConfig, saveFile bool) bool {
 	save := func() {
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		log.Printf("Memory usage exceeds threshold (%d MB) | %s\n", bToMb(m.Alloc), cfg.name)
+		log.Infof("Memory usage exceeds threshold (%d MB) | %s\n", bToMb(m.Alloc), cfg.name)
 		if cfg.disable || !saveFile {
 			return
 		}
