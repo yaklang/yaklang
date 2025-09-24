@@ -118,7 +118,9 @@ func (kb *KnowledgeBase) SearchKnowledgeEntriesWithEnhance(query string, opts ..
 // SearchKnowledgeEntries 搜索知识条目，返回知识库条目对象
 func (kb *KnowledgeBase) SearchKnowledgeEntries(query string, limit int) ([]*schema.KnowledgeBaseEntry, error) {
 	// 先通过RAG系统进行向量搜索
-	searchResults, err := kb.ragSystem.QueryWithPage(query, 1, limit+5)
+	searchResults, err := kb.ragSystem.QueryWithFilter(query, 1, limit+5, func(key string, getDoc func() *rag.Document) bool {
+		return getDoc().Type == schema.RAGDocumentType_Knowledge
+	})
 	if err != nil {
 		return nil, utils.Errorf("RAG搜索失败: %v", err)
 	}
