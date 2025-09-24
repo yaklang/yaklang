@@ -195,8 +195,13 @@ func getYaklangCodeLoopSchema() string {
 				"query_document",
 				"require_tool",
 				"write_code",
+				"ask_for_clarification",
 			),
 			aitool.WithParam_Required(true),
+		),
+		aitool.WithStringParam(
+			"human_readable_thought",
+			aitool.WithParam_Description("Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. Examples: 'Okay, I understand. Searching for the requested information now...', 'I need to use a tool to get the current stock price.', 'This is a complex request, I will try to execute tool step by step.'"),
 		),
 		aitool.WithStringParam(
 			"tool_require_payload",
@@ -209,6 +214,19 @@ func getYaklangCodeLoopSchema() string {
 		aitool.WithStringParam(
 			"query_document",
 			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'query_document'. Provide the exact name of the document you need to query (e.g., 'yaklang-syntax', 'yaklang-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
+		),
+		aitool.WithStructParam(
+			"ask_for_clarification_payload",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("Use this action when user's intent is ambiguous or incomplete."),
+			},
+			aitool.WithStringParam("question", aitool.WithParam_Required(true), aitool.WithParam_Description("A clear, concise question to ask the user for more information. This should help clarify their intent or provide necessary details.")),
+			aitool.WithStringArrayParam(
+				"options",
+				aitool.WithParam_Description(
+					`Optional additional context that may help the user understand what information is needed. This can include examples or explanations of why the clarification is necessary.`,
+				),
+			),
 		),
 	}
 	return aitool.NewObjectSchema(opts...)
