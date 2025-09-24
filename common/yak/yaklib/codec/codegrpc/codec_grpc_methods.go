@@ -1636,14 +1636,20 @@ func (flow *CodecExecFlow) HTTPRequestMutate(transform string) error {
 			if !onlyUsePostParams {
 				opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
 			}
-			if len(totalParams) > 0 {
-				params := totalParams
+			if len(totalParams) > 0 || (onlyUsePostParams && len(postParams.Items) > 0) {
 				if onlyUsePostParams {
-					params = postParams
-				}
-				for k, values := range params {
-					for _, v := range values {
-						opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+					// 使用有序的 postParams
+					for _, param := range postParams.Items {
+						for _, v := range param.Values {
+							opts = append(opts, poc.WithAppendHttpPacketUploadFile(param.Key, "", v, ""))
+						}
+					}
+				} else {
+					// 使用 totalParams map
+					for k, values := range totalParams {
+						for _, v := range values {
+							opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+						}
 					}
 				}
 			} else {
