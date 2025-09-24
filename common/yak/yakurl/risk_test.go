@@ -1543,7 +1543,7 @@ func TestRiskActionIncremental(t *testing.T) {
 		├── hash2未处置 -> 保留所有批次≤2的Risk2实例
 		├── hash3已处置(Batch2) -> 过滤
 		├── hash4未处置 -> 保留所有批次≤2的Risk4实例
-		└── 返回: [Test Risk 2(Batch1), Test Risk 2(Batch2), Test Risk 4(Batch2)] (3个)
+		└── 返回: [Test Risk 2(Batch2), Test Risk 4(Batch2)] (2个)
 
 		查询C增量 (基于C的RiskFeatureHash: [hash1, hash2, hash3, hash4, hash5, hash6]):
 		├── 查找批次≤3中hash1, hash2, hash3, hash4, hash5, hash6的未处置风险
@@ -1553,9 +1553,9 @@ func TestRiskActionIncremental(t *testing.T) {
 		├── hash4未处置 -> 保留所有批次≤3的Risk4实例
 		├── hash5未处置 -> 保留所有批次≤3的Risk5实例
 		├── hash6未处置 -> 保留所有批次≤3的Risk6实例
-		└── 返回: [Test Risk 2(Batch1), Test Risk 2(Batch2), Test Risk 2(Batch3),
-		          Test Risk 4(Batch2), Test Risk 4(Batch3),
-		          Test Risk 5(Batch3), Test Risk 6(Batch3)] (7个)
+		└── 返回: [ Test Risk 2(Batch3),
+		           Test Risk 4(Batch3),
+		          Test Risk 5(Batch3), Test Risk 6(Batch3)] (4个)
 	*/
 
 	programName := "incremental_test_" + uuid.NewString()
@@ -1612,9 +1612,9 @@ func test1() {
 	// 第一次扫描
 	suite.InitProgram(testCode1, risk1, risk2, risk3, risk4, risk5, risk6).
 		Scan().
-		CheckRiskCount(2, 0).                                              // 检查第一次扫描产生2个风险
-		CheckRiskTitlesContain([]string{"Test Risk 1", "Test Risk 2"}, 0). // 检查第一次扫描的风险标题
-		Disposal("Test Risk 1", "is_issue", "已确认为问题")                      // 处置第一个风险
+		CheckRiskCount(t, 2, 0).                                              // 检查第一次扫描产生2个风险
+		CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2"}, 0). // 检查第一次扫描的风险标题
+		Disposal("Test Risk 1", "is_issue", "已确认为问题")                         // 处置第一个风险
 
 	// 添加延迟确保时间戳不同
 	time.Sleep(2 * time.Second)
@@ -1622,9 +1622,9 @@ func test1() {
 	// 第二次扫描
 	suite.InitProgram(testCode2, risk1, risk2, risk3, risk4, risk5, risk6).
 		Scan().
-		CheckRiskCount(4, 1).                                                                            // 检查第二次扫描产生4个风险
-		CheckRiskTitlesContain([]string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4"}, 1). // 检查第二次扫描的风险标题
-		Disposal("Test Risk 3", "not_issue", "误报")                                                       // 处置第三个风险
+		CheckRiskCount(t, 4, 1).                                                                            // 检查第二次扫描产生4个风险
+		CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4"}, 1). // 检查第二次扫描的风险标题
+		Disposal("Test Risk 3", "not_issue", "误报")                                                          // 处置第三个风险
 
 	// 添加延迟确保时间戳不同
 	time.Sleep(2 * time.Second)
@@ -1632,43 +1632,43 @@ func test1() {
 	// 第三次扫描
 	suite.InitProgram(testCode3, risk1, risk2, risk3, risk4, risk5, risk6).
 		Scan().
-		CheckRiskCount(6, 2).                                                                                                         // 检查第三次扫描产生6个风险
-		CheckRiskTitlesContain([]string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4", "Test Risk 5", "Test Risk 6"}, 2) // 检查第三次扫描的风险标题
+		CheckRiskCount(t, 6, 2).                                                                                                         // 检查第三次扫描产生6个风险
+		CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4", "Test Risk 5", "Test Risk 6"}, 2) // 检查第三次扫描的风险标题
 
 	// 子测试：验证各种查询功能
 	t.Run("FirstScanValidation", func(t *testing.T) {
 		// 验证第一次扫描的结果
-		suite.CheckRiskCount(2, 0)
-		suite.CheckRiskTitlesContain([]string{"Test Risk 1", "Test Risk 2"}, 0)
+		suite.CheckRiskCount(t, 2, 0)
+		suite.CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2"}, 0)
 	})
 
 	t.Run("SecondScanValidation", func(t *testing.T) {
 		// 验证第二次扫描的结果
-		suite.CheckRiskCount(4, 1)
-		suite.CheckRiskTitlesContain([]string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4"}, 1)
+		suite.CheckRiskCount(t, 4, 1)
+		suite.CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4"}, 1)
 	})
 
 	t.Run("ThirdScanValidation", func(t *testing.T) {
 		// 验证第三次扫描的结果
-		suite.CheckRiskCount(6, 2)
-		suite.CheckRiskTitlesContain([]string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4", "Test Risk 5", "Test Risk 6"}, 2)
+		suite.CheckRiskCount(t, 6, 2)
+		suite.CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4", "Test Risk 5", "Test Risk 6"}, 2)
 	})
 
 	t.Run("IncrementalQueries", func(t *testing.T) {
 		// 测试第一次扫描的增量查询 - 期望：1个风险 (Test Risk 2)
-		suite.CheckIncrementalResult(0, 1)
+		suite.CheckIncrementalResult(t, 0, 1)
 		// 验证增量查询返回的风险标题是否正确
-		suite.CheckRiskTitlesContain([]string{"Test Risk 2"})
+		suite.CheckRiskTitlesContain(t, []string{"Test Risk 2"})
 
 		// 测试第二次扫描的增量查询 - 期望：2个风险 (Test Risk 2 + Test Risk 4)
-		suite.CheckIncrementalResult(1, 2)
+		suite.CheckIncrementalResult(t, 1, 2)
 		// 验证增量查询返回的风险标题是否正确
-		suite.CheckRiskTitlesContain([]string{"Test Risk 2", "Test Risk 4"})
+		suite.CheckRiskTitlesContain(t, []string{"Test Risk 2", "Test Risk 4"})
 
 		// 测试第三次扫描的增量查询 - 期望：4个风险 (Test Risk 2 + Test Risk 4 + Test Risk 5 + Test Risk 6)
-		suite.CheckIncrementalResult(2, 4)
+		suite.CheckIncrementalResult(t, 2, 4)
 		// 验证增量查询返回的风险标题是否正确
-		suite.CheckRiskTitlesContain([]string{"Test Risk 2", "Test Risk 4", "Test Risk 5", "Test Risk 6"})
+		suite.CheckRiskTitlesContain(t, []string{"Test Risk 2", "Test Risk 4", "Test Risk 5", "Test Risk 6"})
 	})
 
 	t.Run("URLBasedIncrementalQueries", func(t *testing.T) {
@@ -1705,5 +1705,34 @@ func test1() {
 			totalCount += item.Count
 		}
 		require.Equal(t, 4, totalCount, "第三次扫描增量查询应该返回4个风险")
+	})
+
+	t.Run("search with yak url", func(t *testing.T) {
+		queryByUrl := func(taskIndex int) map[string]data {
+			require.GreaterOrEqual(t, len(suite.TaskIDs), taskIndex)
+			url := &ypb.YakURL{
+				Schema: "ssarisk",
+				Path:   urlProgramPath(programName) + "/test.go",
+				Query: []*ypb.KVPair{
+					{Key: "program", Value: programName},
+					{Key: "task_id", Value: suite.TaskIDs[taskIndex]},
+					{Key: "search", Value: ""},
+					{Key: "increment", Value: "true"},
+					{Key: "type", Value: string(yakurl.SSARiskTypeFile)},
+					{Key: "source", Value: "/test.go"},
+				},
+			}
+			got := GetSSARisk(t, suite.Client, url)
+			return got
+		}
+
+		got1 := queryByUrl(0)
+		require.Equal(t, 1, len(got1), "第一次扫描增量查询应该返回1个风险")
+
+		got2 := queryByUrl(1)
+		require.Equal(t, 2, len(got2), "第二次扫描增量查询应该返回2个风险")
+
+		got3 := queryByUrl(2)
+		require.Equal(t, 4, len(got3), "第三次扫描增量查询应该返回4个风险")
 	})
 }
