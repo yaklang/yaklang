@@ -74,6 +74,9 @@ const (
 	EVENT_TYPE_RESULT      EventType = "result"      // AI 最终结果（推理结论、任务完成等）
 
 	EVENT_TYPE_KNOWLEDGE EventType = "knowledge" // AI 知识增强（外部知识、上下文信息等）
+
+	// YakLang 代码编辑器事件
+	EVENT_TYPE_YAKLANG_CODE_EDITOR EventType = "yaklang_code_editor"
 )
 
 type AiOutputEvent struct {

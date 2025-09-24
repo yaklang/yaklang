@@ -99,14 +99,34 @@ Use 'tools_search' to discover additional tools for specific tasks.
 
 记住：在代码生成过程中，你是 Yaklang 专家，应该主动使用工具来确保代码的质量和正确性。每一轮循环都是为了让代码更接近完美实现。
 
-{{ if .CurrentCode }}<|CURRENT_CODE_{{ .Nonce }}|>
-{{ .CurrentCode }}
-<|CURRENT_CODE_{{ .Nonce }}|>{{ else }}<|NO_CURRENT_CODE_NOW|>{{ end }}
-{{ if .ErrorMessages }}<ERR_{{ .Nonce }}|>
-{{ .ErrorMessages }}
-<ERR_{{ .Nonce }}|>{{ end }}
+{{ if .CurrentCode }}
+## 代码块区域说明
 
-响应格式如下：
+* 如果代码内容不是特别大的话，请直接在下面的代码块中展示
+* 代码内容过大，会保存到临时文件中，你可以使用 `read_file` 或者 `grep` 等工具来查看
+* 下面的代码块儿为了方便展示，将会展示行列号，你需要正确读取并区分
+* 如果你要修改代码，请你使用 'modify_file' 工具来进行，精确修改到具体行
+
+<|CURRENT_CODE_{{ .Nonce }}|>
+{{ .CurrentCodeWithLineNumber }}
+<|CURRENT_CODE_{{ .Nonce }}|>{{ else }}
+## 当前没有代码块
+当前操作并不是对代码的修改，直接生成代码即可。
+<|NO_CURRENT_CODE_NOW|>{{ end }}
+
+{{ if .ErrorMessages }}
+## 警告与错误待评估
+针对上述代码，经过Yaklang编译器静态分析发现如下警告和错误，处理原则如下：
+* 语法错误类需要优先处理，保证不出现语法错误
+* 功能缺陷类调试可以通过 log.Info 或者 dump 函数来辅助调试，dump 函数可以打印变量值和类型到标准输出。
+* 如果是库使用错误，需要可以使用 'query_document' 来搜索修正
+
+<ERR/LINT_WARNING_{{ .Nonce }}|>
+{{ .ErrorMessages }}
+<ERR/LINT_WARNING_{{ .Nonce }}|>
+{{ end }}
+
+响应格式输出JSON，请遵守如下Schema ：
 
 ```schema
 {{ .Schema }}
