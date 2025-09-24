@@ -38,8 +38,10 @@ type SQLiteVectorStoreHNSW struct {
 	buildGraphFilter           *yakit.VectorDocumentFilter
 	buildGraphPolicy           string
 	ctx                        context.Context
+	wg                         sync.WaitGroup
+	UIDType                    string
 
-	UIDType string
+	opts []SQLiteVectorStoreHNSWOption
 }
 
 const (
@@ -91,6 +93,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		collection:                 collection,
 		buildGraphPolicy:           Policy_UseDBCanche,
 		ctx:                        context.Background(),
+		opts:                       opts,
 	}
 
 	for _, opt := range opts {
@@ -150,7 +153,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 			)
 		} else {
 			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-			hnswGraph, err = ParseHNSWGraphFromBinary(collectionName, graphBinaryReader, db, 1000, 1200)
+			hnswGraph, err = ParseHNSWGraphFromBinary(vectorStore.ctx, collectionName, graphBinaryReader, db, 1000, 1200, collection.EnablePQMode, &vectorStore.wg)
 			if err != nil {
 				return nil, utils.Wrap(err, "parse hnsw graph from binary")
 			}
@@ -179,6 +182,20 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	return vectorStore, nil
 }
 
+func (s *SQLiteVectorStoreHNSW) ConvertToStandardMode() error {
+	err := s.fixCollectionEmbeddingData()
+	if err != nil {
+		return utils.Wrap(err, "fix collection embedding data")
+	}
+
+	s.collection.EnablePQMode = false
+	err = s.db.Save(s.collection).Error
+	if err != nil {
+		return utils.Wrap(err, "save collection")
+	}
+	return nil
+}
+
 func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
 	var nodeNum int
 	if len(s.hnsw.Layers) > 0 && len(s.hnsw.Layers[0].Nodes) > 0 {
@@ -188,7 +205,13 @@ func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
 	if nodeNum < k {
 		k = nodeNum
 	}
-	_, err := s.hnsw.TrainPQCodebookFromData(16, k)
+	_, err := s.hnsw.TrainPQCodebookFromDataWithCallback(16, k, func(key string, code []byte, vector []float64) (hnswspec.LayerNode[string], error) {
+		err := s.db.Model(&schema.VectorStoreDocument{}).Where("document_id = ? and collection_id = ?", key, s.collection.ID).Update("pq_code", code).Error
+		if err != nil {
+			return nil, utils.Wrap(err, "update pq code")
+		}
+		return hnswspec.NewRawPQLayerNode(key, code), nil
+	})
 	if err != nil {
 		return utils.Wrap(err, "train pq codebook from data")
 	}
@@ -198,6 +221,55 @@ func (s *SQLiteVectorStoreHNSW) ConvertToPQMode() error {
 		return utils.Wrap(err, "save collection")
 	}
 	s.UpdateAutoUpdateGraphInfos()
+	return nil
+}
+
+func (s *SQLiteVectorStoreHNSW) GetArchived() bool {
+	var collection schema.VectorStoreCollection
+	err := s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Select("archived").First(&collection).Error
+	if err != nil {
+		return false
+	}
+	return collection.Archived
+}
+
+func (s *SQLiteVectorStoreHNSW) SetArchived(archived bool) error {
+	return s.db.Model(&schema.VectorStoreCollection{}).Where("id = ?", s.collection.ID).Update("archived", archived).Error
+}
+
+func (s *SQLiteVectorStoreHNSW) fixCollectionEmbeddingData() error {
+	if !s.collection.EnablePQMode {
+		return utils.Errorf("collection %s is not in pq mode", s.collection.Name)
+	}
+	pqQuantizer := s.hnsw.GetPQQuantizer()
+	docNum, err := s.Count()
+	if err != nil {
+		return utils.Wrap(err, "fix collection embedding data")
+	}
+	for i := 0; i < docNum+1; i++ {
+		var doc schema.VectorStoreDocument
+		err := s.db.Model(&schema.VectorStoreDocument{}).Where("embedding is null").First(&doc).Error
+		if err != nil {
+			return utils.Wrap(err, "fix collection embedding data")
+		}
+		if len(doc.PQCode) == 0 {
+			log.Errorf("document %s in collection %s has no pq code", doc.DocumentID, s.collection.Name)
+			continue
+		}
+		decodedVec64, err := pqQuantizer.Decode(doc.PQCode)
+		if err != nil {
+			return utils.Wrap(err, "fix collection embedding data")
+		}
+		vec32 := make([]float32, len(decodedVec64))
+		for i, v := range decodedVec64 {
+			vec32[i] = float32(v)
+		}
+		doc.Embedding = vec32
+		err = s.db.Model(&schema.VectorStoreDocument{}).Where("document_id = ?", doc.DocumentID).Update("embedding", doc.Embedding).Error
+		if err != nil {
+			return utils.Wrap(err, "fix collection embedding data")
+		}
+	}
 	return nil
 }
 
@@ -364,6 +436,18 @@ func (s *SQLiteVectorStoreHNSW) toSchemaDocument(doc Document) *schema.VectorSto
 		RelatedEntities: strings.Join(doc.RelatedEntities, ","),
 		RuntimeID:       doc.RuntimeID,
 	}
+}
+
+// DeleteEmbeddingData 删除嵌入数据
+func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
+	if !s.collection.EnablePQMode {
+		return errors.New("collection is not in pq mode")
+	}
+	err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collection.ID).Update("embedding", nil).Error
+	if err != nil {
+		return utils.Wrap(err, "delete embedding data")
+	}
+	return nil
 }
 
 // Add 添加文档到向量存储

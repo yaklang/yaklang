@@ -550,7 +550,8 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 		for _, neighborOffset := range neighbors {
 			neighbor, exists := nodes[neighborOffset]
 			if !exists {
-				return nil, utils.Errorf("neighbor offset %d not found", neighborOffset)
+				log.Warnf("neighbor offset %d not found", neighborOffset)
+				continue
 			}
 			node.AddSingleNeighbor(neighbor)
 		}
