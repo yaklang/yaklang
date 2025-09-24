@@ -108,7 +108,7 @@ func (b *BasicBlock) HaveSubBlock(sub Value) bool {
 	for {
 		subBlock, ok := ToBasicBlock(sub)
 		if !ok || utils.IsNil(subBlock) {
-			log.Errorf("BasicBlock.HaveSubBlock: sub %v is not a basic block", sub)
+			log.Warnf("BasicBlock.HaveSubBlock: sub %v is not a basic block", sub)
 			return false
 		}
 
