@@ -1,6 +1,5 @@
 # Background
-Current Time: {{ .CurrentTime }}
-OS/Arch: {{ .OSArch }}
+Current Time: {{ .CurrentTime }} OS/Arch: {{ .OSArch }}
 {{ if .WorkingDir }}working dir: {{ .WorkingDir }}{{ end }}
 {{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}
 {{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
@@ -99,6 +98,13 @@ Use 'tools_search' to discover additional tools for specific tasks.
 **注意：** 工具调用适用于需要执行具体操作或获取外部信息的场景。如果用户的需求可以通过简单的对话或已知信息直接回答，则无需调用工具，以避免不必要的复杂性。请根据任务的性质灵活判断是否需要工具支持。
 
 记住：在代码生成过程中，你是 Yaklang 专家，应该主动使用工具来确保代码的质量和正确性。每一轮循环都是为了让代码更接近完美实现。
+
+{{ if .CurrentCode }}<|CURRENT_CODE_{{ .Nonce }}|>
+{{ .CurrentCode }}
+<|CURRENT_CODE_{{ .Nonce }}|>{{ else }}<|NO_CURRENT_CODE_NOW|>{{ end }}
+{{ if .ErrorMessages }}<ERR_{{ .Nonce }}|>
+{{ .ErrorMessages }}
+<ERR_{{ .Nonce }}|>{{ end }}
 
 响应格式如下：
 
