@@ -1303,7 +1303,9 @@ var ssaCodeScan = &cli.Command{
 		log.Infof("sync rule from embed to database success, cost %v", ruleTime)
 
 		if databaseRaw := c.String("database"); databaseRaw != "" {
-			consts.SetGormSSAProjectDatabaseByInfo(databaseRaw)
+			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseRaw); err != nil {
+				return utils.Errorf("set database by info %s failed: %v", databaseRaw, err)
+			}
 		}
 		// Parse configuration
 		config, err := parseSFScanConfig(c)
