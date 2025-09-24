@@ -31,6 +31,10 @@ func (w *WaitableAction) Name() string {
 	return w.name
 }
 
+func (w *WaitableAction) SetName(i string) {
+	w.name = i
+}
+
 func (w *WaitableAction) WaitAnyToString(key string) string {
 	err := w.barrier.Wait(key)
 	if err != nil {
