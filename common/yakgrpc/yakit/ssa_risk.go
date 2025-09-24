@@ -190,10 +190,20 @@ func filterSSARiskByIncremental(db *gorm.DB, runtimeId string) (*gorm.DB, error)
 		hashs = currentBatchFeatureHashes
 	}
 
-	return db.Select("ssa_risks.*").
-		Joins("JOIN syntax_flow_scan_tasks ON ssa_risks.runtime_id = syntax_flow_scan_tasks.task_id").
-		Where("ssa_risks.risk_feature_hash IN (?) AND syntax_flow_scan_tasks.scan_batch <= ?",
-			hashs, baseTask.ScanBatch), nil
+	// 获取符合条件的 runtime_id 列表（scan_batch <= baseTask.ScanBatch）
+	var validRuntimeIDs []string
+	err = db.New().Model(&schema.SyntaxFlowScanTask{}).
+		Where("scan_batch <= ?", baseTask.ScanBatch).
+		Pluck("task_id", &validRuntimeIDs).Error
+	if err != nil {
+		return db, utils.Errorf("Failed to get valid runtime IDs: %v", err)
+	}
+
+	if len(validRuntimeIDs) == 0 {
+		return db, utils.Error("Failed to get valid runtime IDs")
+	}
+
+	return db.Where("risk_feature_hash IN (?) AND runtime_id IN (?)", hashs, validRuntimeIDs), nil
 }
 
 func filterSSARiskByCompare(db *gorm.DB, baselineTaskID, compareTaskID string) (*gorm.DB, error) {
@@ -222,7 +232,6 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if filter == nil {
 		return db
 	}
-
 	var err error
 	// 对比查询
 	if dr := filter.GetSSARiskDiffRequest(); dr != nil {

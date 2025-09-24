@@ -36,6 +36,13 @@ type SFScanTestRisk struct {
 	SinkName string
 }
 
+// SFScanRiskData 定义URL查询返回的风险数据结构
+type SFScanRiskData struct {
+	Name  string
+	Type  string
+	Count int
+}
+
 func NewSFScanRiskTestSuite(t *testing.T, programName string, language consts.Language) (*SFScanRiskTestSuite, func()) {
 	client, err := yakgrpc.NewLocalClient()
 	require.NoError(t, err)
@@ -142,7 +149,7 @@ func (suite *SFScanRiskTestSuite) Disposal(riskTitle, status, comment string) *S
 }
 
 // checkRiskCount 检查风险数量
-func (suite *SFScanRiskTestSuite) CheckRiskCount(expectedCount int, taskIndex ...int) *SFScanRiskTestSuite {
+func (suite *SFScanRiskTestSuite) CheckRiskCount(t *testing.T, expectedCount int, taskIndex ...int) *SFScanRiskTestSuite {
 	var filter *ypb.SSARisksFilter
 
 	if len(taskIndex) > 0 && taskIndex[0] < len(suite.TaskIDs) {
@@ -156,29 +163,29 @@ func (suite *SFScanRiskTestSuite) CheckRiskCount(expectedCount int, taskIndex ..
 	}
 
 	_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-	require.NoError(suite.t, err)
-	require.Len(suite.t, risks, expectedCount, "风险数量不符合预期")
+	require.NoError(t, err)
+	require.Len(t, risks, expectedCount, "风险数量不符合预期")
 
-	suite.t.Logf("风险数量检查通过: 期望 %d，实际 %d", expectedCount, len(risks))
+	t.Logf("风险数量检查通过: 期望 %d，实际 %d", expectedCount, len(risks))
 	return suite
 }
 
-func (suite *SFScanRiskTestSuite) CheckIncrementalResult(taskIndex, expectedCount int) *SFScanRiskTestSuite {
-	require.True(suite.t, taskIndex < len(suite.TaskIDs), "任务索引超出范围")
+func (suite *SFScanRiskTestSuite) CheckIncrementalResult(t *testing.T, taskIndex, expectedCount int) *SFScanRiskTestSuite {
+	require.True(t, taskIndex < len(suite.TaskIDs), "任务索引超出范围")
 
 	taskID := suite.TaskIDs[taskIndex]
 	_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
 		RuntimeID:   []string{taskID},
 		Incremental: true,
 	}, nil)
-	require.NoError(suite.t, err)
-	require.Len(suite.t, risks, expectedCount, "增量查询结果数量不符合预期")
+	require.NoError(t, err)
+	require.Len(t, risks, expectedCount, "增量查询结果数量不符合预期")
 
-	suite.t.Logf("增量查询检查通过: 任务=%s，未处置风险数量=%d", taskID, expectedCount)
+	t.Logf("增量查询检查通过: 任务=%s，未处置风险数量=%d", taskID, expectedCount)
 	return suite
 }
 
-func (suite *SFScanRiskTestSuite) CheckRiskTitlesContain(expectedTitles []string, taskIndex ...int) *SFScanRiskTestSuite {
+func (suite *SFScanRiskTestSuite) CheckRiskTitlesContain(t *testing.T, expectedTitles []string, taskIndex ...int) *SFScanRiskTestSuite {
 	var filter *ypb.SSARisksFilter
 
 	if len(taskIndex) > 0 && taskIndex[0] < len(suite.TaskIDs) {
@@ -192,7 +199,7 @@ func (suite *SFScanRiskTestSuite) CheckRiskTitlesContain(expectedTitles []string
 	}
 
 	_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), filter, nil)
-	require.NoError(suite.t, err)
+	require.NoError(t, err)
 
 	actualTitles := make([]string, len(risks))
 	titleSet := make(map[string]bool)
@@ -202,10 +209,10 @@ func (suite *SFScanRiskTestSuite) CheckRiskTitlesContain(expectedTitles []string
 	}
 
 	for _, expectedTitle := range expectedTitles {
-		require.True(suite.t, titleSet[expectedTitle], "未找到期望的风险标题: %s", expectedTitle)
+		require.True(t, titleSet[expectedTitle], "未找到期望的风险标题: %s", expectedTitle)
 	}
 
-	suite.t.Logf("风险标题包含检查通过: 期望包含标题=%v，实际标题=%v", expectedTitles, actualTitles)
+	t.Logf("风险标题包含检查通过: 期望包含标题=%v，实际标题=%v", expectedTitles, actualTitles)
 	return suite
 }
 
