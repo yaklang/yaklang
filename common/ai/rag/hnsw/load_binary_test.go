@@ -570,6 +570,7 @@ func TestSearchAfterSerializationRoundTrip(t *testing.T) {
 		WithMl[string](0.5),
 		WithEfSearch[string](20),
 		WithCosineDistance[string](),
+		WithDeterministicRng[string](0),
 	)
 
 	// 添加测试节点 - 使用不同的向量以便搜索

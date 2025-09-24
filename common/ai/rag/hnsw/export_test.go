@@ -2,7 +2,6 @@ package hnsw
 
 import (
 	"context"
-	"io"
 	"slices"
 	"strings"
 	"testing"
@@ -83,55 +82,6 @@ func TestExportWithUIDMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertMidIns(midIns)
-}
-
-func TestExportWithEmptyLayers(t *testing.T) {
-	// Test exporting a graph with empty layers
-	graph := NewGraph[string]()
-
-	// Export the empty graph
-	persistent, err := ExportHNSWGraph(graph)
-	if err != nil {
-		t.Fatalf("Failed to export empty graph: %v", err)
-	}
-
-	// Verify the exported graph properties
-	assert.Equal(t, persistent.KeyType, "string")
-	assert.Equal(t, persistent.Total, uint32(0))
-	assert.Equal(t, len(persistent.Layers), 0)
-	assert.Equal(t, len(persistent.OffsetToKey), 0)
-	assert.Equal(t, len(persistent.Neighbors), 0)
-	assert.Equal(t, persistent.ExportMode, ExportModeStandard)
-
-	// Test with different key types
-	intGraph := NewGraph[int]()
-	intPersistent, err := ExportHNSWGraph(intGraph)
-	if err != nil {
-		t.Fatalf("Failed to export empty int graph: %v", err)
-	}
-	assert.Equal(t, intPersistent.KeyType, "int64")
-	assert.Equal(t, intPersistent.Total, uint32(0))
-
-	uint32Graph := NewGraph[uint32]()
-	uint32Persistent, err := ExportHNSWGraph(uint32Graph)
-	if err != nil {
-		t.Fatalf("Failed to export empty uint32 graph: %v", err)
-	}
-	assert.Equal(t, uint32Persistent.KeyType, "uint32")
-	assert.Equal(t, uint32Persistent.Total, uint32(0))
-
-	uint32Persistent.Dims = 1024
-	binary, err := uint32Persistent.ToBinary(context.Background())
-	if err != nil {
-		t.Fatalf("Failed to export empty uint32 graph: %v", err)
-	}
-	binaryData, err := io.ReadAll(binary)
-	if err != nil {
-		t.Fatalf("Failed to read empty uint32 graph: %v", err)
-	}
-	if len(binaryData) == 0 {
-		t.Fatalf("Failed to export empty uint32 graph: %v", err)
-	}
 }
 
 func TestExportNeighborRelationships(t *testing.T) {

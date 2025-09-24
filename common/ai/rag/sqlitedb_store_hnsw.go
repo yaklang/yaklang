@@ -317,16 +317,8 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 	vcolsNum := 0
 	db.Where("name = ?", name).Count(&vcolsNum)
 	var collection *schema.VectorStoreCollection
+	var err error
 	hnswGraph := NewHNSWGraph(name)
-	emptyGraphBinary, err := ExportHNSWGraphToBinary(hnswGraph)
-	if err != nil {
-		return nil, utils.Wrap(err, "export hnsw graph to binary")
-	}
-	emptyGraphData, err := io.ReadAll(emptyGraphBinary)
-	if err != nil {
-		return nil, utils.Wrap(err, "read empty graph binary")
-	}
-
 	if vcolsNum == 0 {
 		collection = &schema.VectorStoreCollection{
 			Name:             name,
@@ -339,7 +331,6 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 			EfConstruct:      cfg.EfConstruct,
 			DistanceFuncType: cfg.DistanceFuncType,
 			EnablePQMode:     cfg.EnablePQMode,
-			GraphBinary:      emptyGraphData,
 		}
 		if err := db.Create(&collection).Error; err != nil {
 			return nil, utils.Errorf("创建集合失败: %v", err)
