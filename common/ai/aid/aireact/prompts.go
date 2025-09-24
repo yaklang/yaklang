@@ -246,9 +246,7 @@ type YaklangCodeActionLoopPromptData struct {
 	UserQuery          string
 	CurrentCode        string
 	IterationCount     int
-	MaxIterations      int
 	ErrorMessages      string
-	LastAction         string
 	Language           string
 	DynamicContext     string
 	Schema             string
@@ -607,16 +605,14 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForg
 }
 
 // GenerateYaklangCodeActionLoop generates Yaklang code generation action loop prompt using template
-func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages, lastAction string, iterationCount, maxIterations int, tools []*aitool.Tool) (string, error) {
+func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages string, iterationCount int, tools []*aitool.Tool) (string, error) {
 	data := &YaklangCodeActionLoopPromptData{
 		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:      userQuery,
 		CurrentCode:    currentCode,
 		IterationCount: iterationCount,
-		MaxIterations:  maxIterations,
 		ErrorMessages:  errorMessages,
-		LastAction:     lastAction,
 		Nonce:          utils.RandStringBytes(4),
 		Language:       pm.react.config.language,
 		DynamicContext: pm.DynamicContext(),
