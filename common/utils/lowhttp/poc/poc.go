@@ -1947,12 +1947,14 @@ func ExtractPostParams(raw []byte) (map[string]string, error) {
 	if useRaw && err == nil {
 		err = utils.Error("cannot extract post params")
 	}
-	params := lo.MapEntries(totalParams, func(key string, value []string) (string, string) {
-		if len(value) == 0 {
-			return key, ""
+	params := make(map[string]string)
+	for _, param := range totalParams.Items {
+		if len(param.Values) == 0 {
+			params[param.Key] = ""
+		} else {
+			params[param.Key] = param.Values[0]
 		}
-		return key, value[0]
-	})
+	}
 
 	return params, err
 }

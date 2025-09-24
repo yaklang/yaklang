@@ -29,6 +29,48 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+// OrderedParam 表示一个有序的参数项
+type OrderedParam struct {
+	Key    string
+	Values []string
+}
+
+// OrderedParams 保持参数的插入顺序
+type OrderedParams struct {
+	Items []OrderedParam
+}
+
+// NewOrderedParams 创建一个新的有序参数集合
+func NewOrderedParams() *OrderedParams {
+	return &OrderedParams{
+		Items: make([]OrderedParam, 0),
+	}
+}
+
+// Add 添加一个参数，如果参数已存在则追加值
+func (op *OrderedParams) Add(key, value string) {
+	for i := range op.Items {
+		if op.Items[i].Key == key {
+			op.Items[i].Values = append(op.Items[i].Values, value)
+			return
+		}
+	}
+	// 如果参数不存在，添加新参数
+	op.Items = append(op.Items, OrderedParam{
+		Key:    key,
+		Values: []string{value},
+	})
+}
+
+// ToMap 转换为传统的map格式（用于兼容性）
+func (op *OrderedParams) ToMap() map[string][]string {
+	result := make(map[string][]string)
+	for _, item := range op.Items {
+		result[item.Key] = item.Values
+	}
+	return result
+}
+
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
 func escapeQuotes(s string) string {
@@ -464,12 +506,12 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode, autoAddContentType b
 		return handleAutoContentType(newPacket, packet, newBody, autoAddContentType)
 	}
 
-	// 将解析出的参数转换为 QueryParams 格式
+	// 将解析出的参数转换为 QueryParams 格式，保持顺序
 	u := &QueryParams{Items: make([]*QueryParamItem, 0), NoAutoEncode: noAutoEncode}
-	for key, values := range params {
-		for _, value := range values {
+	for _, param := range params.Items {
+		for _, value := range param.Values {
 			u.Items = append(u.Items, &QueryParamItem{
-				Key:          key,
+				Key:          param.Key,
 				Value:        value,
 				NoAutoEncode: noAutoEncode,
 			})
@@ -1396,8 +1438,8 @@ func ParseMultiPartFormWithCallback(req []byte, callback func(part *multipart.Pa
 	return nil
 }
 
-func GetParamsFromBody(contentType string, body []byte) (params map[string][]string, useRaw bool, err error) {
-	params = make(map[string][]string)
+func GetParamsFromBody(contentType string, body []byte) (params *OrderedParams, useRaw bool, err error) {
+	params = NewOrderedParams()
 	// 这是为了处理复杂json/xml的情况
 	handleUnmarshalValues := func(v any) ([]string, []string) {
 		var keys, values []string
@@ -1425,24 +1467,22 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 		}
 		return []string{""}, []string{utils.InterfaceToString(v)}
 	}
-	handleUnmarshalResults := func(tempMap map[string]any) map[string][]string {
-		params := make(map[string][]string, len(tempMap))
+	handleUnmarshalResults := func(tempMap map[string]any, orderedParams *OrderedParams) {
 		for k, v := range tempMap {
 			extraKeys, extraValues := handleUnmarshalValues(v)
 			for i, key := range extraKeys {
 				if key == "" {
-					params[k] = append(params[k], extraValues[i])
+					orderedParams.Add(k, extraValues[i])
 					continue
 				}
 				finalKey := fmt.Sprintf("%s[%s]", k, key)
-				params[finalKey] = append(params[finalKey], extraValues[i])
+				orderedParams.Add(finalKey, extraValues[i])
 			}
 		}
-		return params
 	}
 
 	// try post form
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		mr := multipart.NewReader(bytes.NewReader(body))
 		for {
 			part, err := mr.NextPart()
@@ -1460,13 +1500,13 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 					return nil, false, err
 				}
 				key := part.FormName()
-				params[key] = append(params[key], string(content))
+				params.Add(key, string(content))
 			}
 		}
 	}
 
 	// try json
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		// 使用gjson判断是否为有效的JSON
 		if gjson.ValidBytes(body) {
 			parsed := gjson.ParseBytes(body)
@@ -1475,7 +1515,7 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 				var tempMap map[string]any
 				err = json.Unmarshal(body, &tempMap)
 				if err == nil {
-					params = handleUnmarshalResults(tempMap)
+					handleUnmarshalResults(tempMap, params)
 				}
 			} else {
 				// 对于有效JSON但不是对象的情况（如字符串、数组、数字等），直接返回错误，不继续后续解析
@@ -1486,33 +1526,33 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 	}
 
 	// try xml
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		tempMap := xml_tools.XmlLoads(body)
 		if len(tempMap) > 0 {
-			params = handleUnmarshalResults(tempMap)
+			handleUnmarshalResults(tempMap, params)
 		}
 	}
 
 	// try post values
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		queryParams := ParseQueryParams(string(body))
 		if len(queryParams.Items) > 0 {
 			for _, item := range queryParams.Items {
 				if len(item.Key) == 0 {
 					continue
 				}
-				// use raw values
-				params[item.Key] = append(params[item.Key], item.ValueRaw)
+				// use raw values, 保持 ParseQueryParams 的顺序
+				params.Add(item.Key, item.ValueRaw)
 			}
 		}
 	}
 
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		// 这个flag位用于标记是否调用者直接使用原始的body, 这用于默认情况
 		useRaw = true
 	}
 
-	if len(params) > 0 {
+	if len(params.Items) > 0 {
 		err = nil
 	}
 	return
