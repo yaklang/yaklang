@@ -434,27 +434,22 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 		preOffset += uint32(len(layer.Nodes))
 	}
 
-	parseOffsetWithLayer := func(offset uint32) (int, uint32) {
-		targetLevel := 0
-		for level, levelOffset := range layerOffset {
-			if offset > levelOffset {
-				targetLevel = level
-				continue
-			}
-			break
+	parseOffsetWithLayer := func(level int, offset uint32) uint32 {
+		if level == 0 {
+			return offset
 		}
-		return targetLevel, offset - layerOffset[targetLevel]
+		return offset - layerOffset[level]
 	}
 
 	// 创建节点映射
 	nodes := make(map[uint32]hnswspec.LayerNode[K])
-	for _, layer := range p.Layers {
+	for level, layer := range p.Layers {
 		for _, offset := range layer.Nodes {
-			_, offsetWithoutLayer := parseOffsetWithLayer(offset)
+			offsetWithoutLayer := parseOffsetWithLayer(level, offset)
 			if offset == 0 {
 				continue // 跳过 0 offset
 			}
-			if offsetWithoutLayer >= uint32(len(p.OffsetToKey)) {
+			if int(offsetWithoutLayer) >= len(p.OffsetToKey) {
 				return nil, utils.Errorf("recovery node failed, offset %d not found", offsetWithoutLayer)
 			}
 			node := p.OffsetToKey[offsetWithoutLayer]
