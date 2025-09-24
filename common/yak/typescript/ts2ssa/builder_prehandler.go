@@ -14,7 +14,7 @@ import (
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
-	return extension == ".js"
+	return extension == ".js" || extension == ".ts" || extension == ".tsx" || extension == ".d.ts" || extension == ".jsx"
 }
 
 func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {

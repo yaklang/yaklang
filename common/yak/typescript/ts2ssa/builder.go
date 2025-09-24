@@ -37,10 +37,12 @@ type builder struct {
 	useStrict         bool
 	contextLabelStack []string
 
-	esmStyleExports []string
-	cjsStyleExports []string
-
 	currentImportModule string
+	namedExports        map[string]string            // exportedName -> realName (exportedName may not be the same as realName in case of export alias)
+	defaultExport       string                       // only one default export per ts file
+	cjsExport           string                       // export equal + require syntax only support one export per ts file
+	reExports           map[string]map[string]string // re-exported name -> (path -> exportName)
+
 }
 
 var Builder ssa.Builder = &SSABuilder{}
@@ -60,8 +62,8 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 		sourceFile:        jsAST,
 		useStrict:         false,
 		contextLabelStack: make([]string, 0),
-		esmStyleExports:   make([]string, 0),
-		cjsStyleExports:   make([]string, 0),
+		namedExports:      make(map[string]string),
+		reExports:         make(map[string]map[string]string),
 	}
 	build.VisitSourceFile(jsAST)
 	return nil
@@ -72,7 +74,6 @@ func (*SSABuilder) FilterFile(path string) bool {
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
-	//TODO implement me
 	return consts.TS
 }
 
