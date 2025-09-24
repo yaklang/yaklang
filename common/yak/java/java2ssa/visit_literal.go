@@ -108,7 +108,7 @@ func (y *singleFileBuilder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralCo
 		resultInt64, err = strconv.ParseInt(intStr, 10, 64)
 	}
 	if err != nil {
-		log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("const parse %s as integer literal... is to large for int64: %v", originIntStr, err))
+		log.Warnf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("const parse %s as integer literal... is to large for int64: %v", originIntStr, err))
 		// big.NewInt(0).SetString()
 		// return nil
 		v := y.EmitConstInst(intStr)
