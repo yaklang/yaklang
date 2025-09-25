@@ -786,7 +786,8 @@ func (r *EntityRepository) pathToString(hop *HopBlock) string {
 
 func (r *EntityRepository) AddKHopToVectorIndex(kHop *KHopPath) error {
 	metadata := map[string]any{
-		schema.META_Base_Index: r.info.Uuid,
+		schema.META_Repos_UUID: r.info.Uuid,
+		schema.META_Data_Title: fmt.Sprintf("k-hop[%s] path (k=%d)", r.info.EntityBaseName, kHop.K),
 		META_K:                 kHop.K,
 	}
 

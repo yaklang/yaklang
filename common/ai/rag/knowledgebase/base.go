@@ -382,18 +382,20 @@ func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry,
 
 	// 构建元数据
 	metadata := map[string]any{
-		"knowledge_base_id":   entry.KnowledgeBaseID,
-		"knowledge_title":     entry.KnowledgeTitle,
-		"knowledge_type":      entry.KnowledgeType,
-		"importance_score":    entry.ImportanceScore,
-		"keywords":            entry.Keywords,
-		"source_page":         entry.SourcePage,
-		"potential_questions": entry.PotentialQuestions,
+		"knowledge_base_id":    entry.KnowledgeBaseID,
+		"knowledge_title":      entry.KnowledgeTitle,
+		"knowledge_type":       entry.KnowledgeType,
+		"importance_score":     entry.ImportanceScore,
+		"keywords":             entry.Keywords,
+		"source_page":          entry.SourcePage,
+		"potential_questions":  entry.PotentialQuestions,
+		schema.META_Data_Title: entry.KnowledgeTitle,
+		schema.META_Data_UUID:  entry.HiddenIndex,
 	}
 
 	// 使用条目ID作为文档ID
 	documentID := utils.InterfaceToString(entry.HiddenIndex)
-	options = append(options, rag.WithDocumentRawMetadata(metadata))
+	options = append(options, rag.WithDocumentRawMetadata(metadata), rag.WithDocumentType(schema.RAGDocumentType_Knowledge))
 
 	// 添加文档到RAG系统
 	return kb.ragSystem.Add(documentID, content, options...)
