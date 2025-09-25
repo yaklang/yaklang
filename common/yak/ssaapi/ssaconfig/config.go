@@ -8,8 +8,9 @@ import (
 type BaseInfo struct {
 	ProgramNames       []string `json:"program_names"`
 	ProjectName        string   `json:"project_name"`
-	ProgramDescription string   `json:"program_description"`
-	ProgramLanguage    string   `json:"program_language"`
+	ProjectDescription string   `json:"project_description"`
+	Language           string   `json:"language"`
+	Tags               []string `json:"tags"`
 }
 
 // SSACompileConfig 编译配置
@@ -40,6 +41,7 @@ type SyntaxFlowRuleConfig struct {
 type Config struct {
 	Mode           Mode
 	BaseInfo       *BaseInfo
+	CodeSource     *CodeSourceInfo
 	SSACompile     *SSACompileConfig
 	SyntaxFlow     *SyntaxFlowConfig
 	SyntaxFlowRule *SyntaxFlowRuleConfig
@@ -52,14 +54,21 @@ const (
 	ModeSSACompile     Mode = 1 << iota // 1 - 编译模式
 	ModeSyntaxFlow     Mode = 1 << iota // 2 - SyntaxFlow模式
 	ModeSyntaxFlowRule Mode = 1 << iota // 4 - 规则模式
+	ModeCodeSource     Mode = 1 << iota // 5 - 源码配置模式
 	ModeSyntaxFlowScan Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule
 	// all
-	ModeAll = ModeProjectBase | ModeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule
+	ModeAll = ModeProjectBase | ModeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource
 )
 
 func New(mode Mode, opts ...Option) (*Config, error) {
 	cfg := &Config{}
 	cfg.Mode = mode
+	if mode&ModeCodeSource != 0 {
+		cfg.CodeSource = &CodeSourceInfo{
+			Auth:  &AuthConfigInfo{},
+			Proxy: &ProxyConfigInfo{},
+		}
+	}
 	if mode&ModeSSACompile != 0 {
 		cfg.SSACompile = &SSACompileConfig{
 			StrictMode:    false,
@@ -239,16 +248,101 @@ func (c *Config) GetProjectName() string {
 	return c.BaseInfo.ProjectName
 }
 
-func (c *Config) GetProgramDescription() string {
+func (c *Config) GetProjectDescription() string {
 	if c == nil || c.BaseInfo == nil {
 		return ""
 	}
-	return c.BaseInfo.ProgramDescription
+	return c.BaseInfo.ProjectDescription
 }
 
-func (c *Config) GetProgramLanguage() string {
+func (c *Config) GetLanguage() string {
 	if c == nil || c.BaseInfo == nil {
 		return ""
 	}
-	return c.BaseInfo.ProgramLanguage
+	return c.BaseInfo.Language
+}
+
+func (c *Config) GetTags() []string {
+	if c == nil || c.BaseInfo == nil {
+		return nil
+	}
+	return c.BaseInfo.Tags
+}
+
+// 代码源配置
+func (c *Config) GetCodeSourceKind() CodeSourceKind {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Kind
+}
+
+func (c *Config) GetCodeSourceLocalFile() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.LocalFile
+}
+
+func (c *Config) GetCodeSourceURL() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.URL
+}
+
+func (c *Config) GetCodeSourceBranch() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Branch
+}
+
+func (c *Config) GetCodeSourcePath() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Path
+}
+
+func (c *Config) GetCodeSourceAuthKind() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Auth.Kind
+}
+
+func (c *Config) GetCodeSourceAuthUserName() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Auth.UserName
+}
+
+func (c *Config) GetCodeSourceAuthPassword() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Auth.Password
+}
+
+func (c *Config) GetCodeSourceProxyURL() string {
+	if c == nil || c.CodeSource == nil {
+		return ""
+	}
+	return c.CodeSource.Proxy.URL
+}
+
+func (c *Config) GetCodeSourceProxyAuth() (string, string) {
+	if c == nil || c.CodeSource == nil {
+		return "", ""
+	}
+	return c.CodeSource.Proxy.User, c.CodeSource.Proxy.Password
+}
+
+func (c *Config) GetCodeSourceAuth() *AuthConfigInfo {
+	if c == nil || c.CodeSource == nil {
+		return nil
+	}
+	return c.CodeSource.Auth
 }

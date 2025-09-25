@@ -1,6 +1,8 @@
 package ssaconfig
 
 import (
+	"encoding/json"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -276,7 +278,7 @@ func WithProgramDescription(description string) Option {
 		if c.BaseInfo == nil {
 			return utils.Errorf("Config: Program Description can only be set in Base mode")
 		}
-		c.BaseInfo.ProgramDescription = description
+		c.BaseInfo.ProjectDescription = description
 		return nil
 	}
 }
@@ -286,7 +288,7 @@ func WithProgramLanguage(language string) Option {
 		if c.BaseInfo == nil {
 			return utils.Errorf("Config: Program Language can only be set in Base mode")
 		}
-		c.BaseInfo.ProgramLanguage = language
+		c.BaseInfo.Language = language
 		return nil
 	}
 }
@@ -297,6 +299,136 @@ func WithProjectName(projectName string) Option {
 			return utils.Errorf("Config: Project Name can only be set in Base mode")
 		}
 		c.BaseInfo.ProjectName = projectName
+		return nil
+	}
+}
+
+// ---代码源配置 Options ---
+
+// WithCodeSourceKind 设置代码源类型
+func WithCodeSourceKind(kind CodeSourceKind) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Kind can only be set in Code Source mode")
+		}
+		c.CodeSource.Kind = kind
+		return nil
+	}
+}
+
+func WithCodeSourceLocalFile(localFile string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Local File can only be set in Code Source mode")
+		}
+		c.CodeSource.LocalFile = localFile
+		return nil
+	}
+}
+
+func WithCodeSourceURL(url string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source URL can only be set in Code Source mode")
+		}
+		c.CodeSource.URL = url
+		return nil
+	}
+}
+
+func WithCodeSourceBranch(branch string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Branch can only be set in Code Source mode")
+		}
+		c.CodeSource.Branch = branch
+		return nil
+	}
+}
+
+func WithCodeSourcePath(path string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Path can only be set in Code Source mode")
+		}
+		c.CodeSource.Path = path
+		return nil
+	}
+}
+
+func WithCodeSourceAuthKind(kind string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Auth Kind can only be set in Code Source mode")
+		}
+		c.CodeSource.Auth.Kind = kind
+		return nil
+	}
+}
+
+func WithCodeSourceAuthUserName(userName string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Auth User Name can only be set in Code Source mode")
+		}
+		c.CodeSource.Auth.UserName = userName
+		return nil
+	}
+}
+
+func WithCodeSourceAuthPassword(password string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Auth Password can only be set in Code Source mode")
+		}
+		c.CodeSource.Auth.Password = password
+		return nil
+	}
+}
+
+func WithSSAProjectCodeSourceAuthKeyPath(keyPath string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Auth Key Path can only be set in Code Source mode")
+		}
+		c.CodeSource.Auth.KeyPath = keyPath
+		return nil
+	}
+}
+
+func WithCodeSourceProxyURL(url string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Proxy URL can only be set in Code Source mode")
+		}
+		c.CodeSource.Proxy.URL = url
+		return nil
+	}
+}
+
+func WithCodeSourceProxyAuth(user string, password string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source Proxy Auth can only be set in Code Source mode")
+		}
+		c.CodeSource.Proxy.User = user
+		c.CodeSource.Proxy.Password = password
+		return nil
+	}
+}
+
+func WithCodeSourceJson(raw string) Option {
+	return func(c *Config) error {
+		if c.CodeSource == nil {
+			return utils.Errorf("Config: Code Source JSON can only be set in Code Source mode")
+		}
+		err := json.Unmarshal([]byte(raw), c.CodeSource)
+		if err != nil {
+			return utils.Errorf("Config: Code Source JSON Unmarshal failed: %v", err)
+		}
+		if err := c.CodeSource.ValidateSourceConfig(); err != nil {
+			return utils.Errorf("Config: Code Source JSON Validate failed: %v", err)
+		}
 		return nil
 	}
 }

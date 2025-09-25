@@ -8,56 +8,64 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type SSAProjectBuilder struct {
-	ID               uint
-	ProjectName      string
-	Description      string
-	Tags             []string
-	Language         string
-	CodeSourceConfig *schema.CodeSourceInfo
-	Config           *schema.SSAProjectConfig
+	ID          uint
+	ProjectName string
+	Description string
+	Tags        []string
+	Language    string
+	Config      *ssaconfig.Config
 }
 
-func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) *SSAProjectBuilder {
+func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, error) {
 	if proto == nil {
-		return nil
+		return nil, utils.Errorf("failed to new SSA project builder: proto is nil")
 	}
 	builder := &SSAProjectBuilder{
-		ID:               uint(proto.ID),
-		ProjectName:      proto.ProjectName,
-		Description:      proto.Description,
-		Tags:             proto.Tags,
-		Language:         proto.Language,
-		CodeSourceConfig: &schema.CodeSourceInfo{},
-		Config:           schema.NewSSAProjectConfig(),
+		ID:          uint(proto.ID),
+		ProjectName: proto.ProjectName,
+		Description: proto.Description,
+		Tags:        proto.Tags,
+		Language:    proto.Language,
 	}
+
 	if proto.CodeSourceConfig != "" {
-		json.Unmarshal([]byte(proto.CodeSourceConfig), builder.CodeSourceConfig)
+		json.Unmarshal([]byte(proto.CodeSourceConfig), builder.Config.CodeSource)
 	}
+
+	var opts []ssaconfig.Option
 	if cc := proto.CompileConfig; cc != nil {
-		builder.Config.CompileConfig = &schema.SSACompileConfig{
-			StrictMode:    cc.StrictMode,
-			PeepholeSize:  int(cc.PeepholeSize),
-			ExcludeFiles:  cc.ExcludeFiles,
-			ReCompile:     cc.ReCompile,
-			MemoryCompile: cc.Memory,
-			Concurrency:   cc.Concurrency,
-		}
+		opts = append(opts, ssaconfig.WithCompileStrictMode(cc.StrictMode))
+		opts = append(opts, ssaconfig.WithCompilePeepholeSize(int(cc.PeepholeSize)))
+		opts = append(opts, ssaconfig.WithCompileExcludeFiles(cc.ExcludeFiles))
+		opts = append(opts, ssaconfig.WithCompileReCompile(cc.ReCompile))
+		opts = append(opts, ssaconfig.WithCompileMemoryCompile(cc.Memory))
+		opts = append(opts, ssaconfig.WithCompileConcurrency(cc.Concurrency))
 	}
 	if sc := proto.ScanConfig; sc != nil {
-		builder.Config.ScanConfig = &schema.SSAScanConfig{
-			Concurrency:    sc.Concurrency,
-			Memory:         sc.Memory,
-			IgnoreLanguage: sc.IgnoreLanguage,
-		}
+		opts = append(opts, ssaconfig.WithScanConcurrency(sc.Concurrency))
+		opts = append(opts, ssaconfig.WithScanMemory(sc.Memory))
+		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(sc.IgnoreLanguage))
 	}
 	if rc := proto.RuleConfig; rc != nil && rc.RuleFilter != nil {
-		builder.Config.RuleConfig.RuleFilter = rc.RuleFilter
+		opts = append(opts, ssaconfig.WithRuleFilter(rc.RuleFilter))
 	}
-	return builder
+	if proto.CodeSourceConfig != "" {
+		opts = append(opts, ssaconfig.WithCodeSourceJson(proto.CodeSourceConfig))
+	}
+	config, err := ssaconfig.New(ssaconfig.ModeAll, opts...)
+	if err != nil {
+		return nil, utils.Errorf("failed to new SSA project config: %s", err)
+	}
+	builder.Config = config
+	if err := builder.Validate(); err != nil {
+		return nil, utils.Errorf("failed to validate SSA project builder: %s", err)
+	}
+	return builder, nil
 }
 
 func (s *SSAProjectBuilder) ToSchemaSSAProject() (*schema.SSAProject, error) {
@@ -70,7 +78,6 @@ func (s *SSAProjectBuilder) ToSchemaSSAProject() (*schema.SSAProject, error) {
 	result.Description = s.Description
 	result.Language = s.Language
 	result.SetTagsList(s.Tags)
-	result.CodeSourceConfig = s.CodeSourceConfig.JsonString()
 	err := result.SetConfig(s.Config)
 	if err != nil {
 		return nil, utils.Errorf("to schema SSA project failed: %s", err)
@@ -118,70 +125,57 @@ func (s *SSAProjectBuilder) Validate() error {
 	if s.Language == "" {
 		return utils.Errorf("validate SSA project failed: language is required")
 	}
-	if s.CodeSourceConfig == nil {
+	if s.Config.CodeSource == nil {
 		return utils.Errorf("validate SSA project failed: code source config is required")
-	}
-	if err := s.CodeSourceConfig.ValidateSourceConfig(); err != nil {
-		return utils.Errorf("validate SSA project failed: %s", err)
 	}
 	return nil
 }
 
-func (s *SSAProjectBuilder) GetCompileConfig() *schema.SSACompileConfig {
+func (s *SSAProjectBuilder) GetCompileConfig() *ssaconfig.SSACompileConfig {
 	if s == nil {
 		return nil
 	}
 	if s.Config == nil {
 		return nil
 	}
-	return s.Config.CompileConfig
+	return s.Config.SSACompile
 }
 
-func (s *SSAProjectBuilder) GetScanConfig() *schema.SSAScanConfig {
+func (s *SSAProjectBuilder) GetScanConfig() *ssaconfig.SyntaxFlowConfig {
 	if s == nil {
 		return nil
 	}
 	if s.Config == nil {
 		return nil
 	}
-	return s.Config.ScanConfig
+	return s.Config.SyntaxFlow
 }
 
-type SSAProjectOption func(builder *SSAProjectBuilder)
-type SSAProjectScanOption func(config *schema.SSAScanConfig)
-type SSAProjectRuleOption func(config *schema.SSARuleConfig)
-type SSAProjectCompileOption func(config *schema.SSACompileConfig)
-
-func NewSSAProjectBuilder(projectName string, opts ...any) *SSAProjectBuilder {
+func NewSSAProjectBuilder(opts ...ssaconfig.Option) (*SSAProjectBuilder, error) {
+	config, err := ssaconfig.New(ssaconfig.ModeAll, opts...)
+	if err != nil {
+		return nil, utils.Errorf("failed to new SSA project builder: %s", err)
+	}
 	builder := &SSAProjectBuilder{
-		ProjectName:      projectName,
-		CodeSourceConfig: &schema.CodeSourceInfo{},
-		Config:           schema.NewSSAProjectConfig(),
+		ProjectName: config.GetProjectName(),
+		Description: config.GetProjectDescription(),
+		Tags:        config.GetTags(),
+		Language:    config.GetLanguage(),
+		Config:      config,
 	}
-	for _, opt := range opts {
-		switch opt := opt.(type) {
-		case SSAProjectOption:
-			opt(builder)
-		case SSAProjectScanOption:
-			opt(builder.Config.ScanConfig)
-		case SSAProjectRuleOption:
-			opt(builder.Config.RuleConfig)
-		case SSAProjectCompileOption:
-			opt(builder.Config.CompileConfig)
-		}
+	if err := builder.Validate(); err != nil {
+		return nil, utils.Errorf("failed to validate SSA project builder: %s", err)
 	}
-	return builder
+	return builder, nil
 }
 
 func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProjectBuilder, error) {
 	builder := &SSAProjectBuilder{
-		ID:               project.ID,
-		ProjectName:      project.ProjectName,
-		Description:      project.Description,
-		Tags:             project.GetTagsList(),
-		Language:         project.Language,
-		CodeSourceConfig: project.GetSourceConfig(),
-		Config:           schema.NewSSAProjectConfig(),
+		ID:          project.ID,
+		ProjectName: project.ProjectName,
+		Description: project.Description,
+		Tags:        project.GetTagsList(),
+		Language:    project.Language,
 	}
 	config, err := project.GetConfig()
 	if err != nil {
@@ -193,7 +187,6 @@ func loadSSAProjectBySchema(project *schema.SSAProject) (*SSAProjectBuilder, err
 
 func LoadSSAProjectBuilderByName(projectName string) (*SSAProjectBuilder, error) {
 	db := consts.GetGormProfileDatabase()
-
 	var project schema.SSAProject
 	if err := db.Where("project_name = ?", projectName).First(&project).Error; err != nil {
 		return nil, utils.Errorf("load SSA project failed: %s", err)
@@ -208,237 +201,4 @@ func LoadSSAProjectBuilderByID(id uint) (*SSAProjectBuilder, error) {
 		return nil, utils.Errorf("load SSA project failed: %s", err)
 	}
 	return loadSSAProjectBySchema(&project)
-}
-
-// 编译配置
-func WithSSAProjectStrictMode(strictMode bool) SSAProjectCompileOption {
-	return func(config *schema.SSACompileConfig) {
-		config.StrictMode = strictMode
-	}
-}
-
-func WithSSAProjectPeepholeSize(peepholeSize int) SSAProjectCompileOption {
-	return func(config *schema.SSACompileConfig) {
-		config.PeepholeSize = peepholeSize
-	}
-}
-
-func WithSSAProjectExcludeFiles(excludeFiles []string) SSAProjectCompileOption {
-	return func(config *schema.SSACompileConfig) {
-		config.ExcludeFiles = excludeFiles
-	}
-}
-
-func WithSSAProjectReCompile(reCompile bool) SSAProjectCompileOption {
-	return func(config *schema.SSACompileConfig) {
-		config.ReCompile = reCompile
-	}
-}
-
-func WithSSAProjectMemoryCompile(memoryCompile bool) SSAProjectCompileOption {
-	return func(config *schema.SSACompileConfig) {
-		config.MemoryCompile = memoryCompile
-	}
-}
-
-func WithSSAProjectCompileConcurrency(concurrency int) SSAProjectCompileOption {
-	return func(config *schema.SSACompileConfig) {
-		config.Concurrency = uint32(concurrency)
-	}
-}
-
-// 扫描配置
-func WithSSAProjectScanConcurrency(concurrency int) SSAProjectScanOption {
-	return func(config *schema.SSAScanConfig) {
-		config.Concurrency = uint32(concurrency)
-	}
-}
-
-func WithSSAProjectMemoryScan(memoryScan bool) SSAProjectScanOption {
-	return func(config *schema.SSAScanConfig) {
-		config.Memory = memoryScan
-	}
-}
-
-func WithSSAProjectIgnoreLanguage(ignoreLanguage bool) SSAProjectScanOption {
-	return func(config *schema.SSAScanConfig) {
-		config.IgnoreLanguage = ignoreLanguage
-	}
-}
-
-// 基础信息配置
-func WithSSAProjectTags(tags []string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.Tags = tags
-	}
-}
-
-func WithSSAProjectLanguage(language string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.Language = language
-	}
-}
-
-func WithSSAProjectDescription(description string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.Description = description
-	}
-}
-
-// 规则配置
-func WithSSAProjectRuleFilterLanguage(language ...string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.Language = language
-	}
-}
-
-func WithSSAProjectRuleFilterSeverity(severity ...string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.Severity = severity
-	}
-}
-
-func WithSSAProjectRuleFilterKind(kind string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.FilterRuleKind = kind
-	}
-}
-
-func WithSSAProjectRuleFilterPurpose(purpose ...string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.Purpose = purpose
-	}
-}
-
-func WithSSAProjectRuleFilterKeyword(keyword string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.Keyword = keyword
-	}
-}
-
-func WithSSAProjectRuleFilterGroupNames(groupNames ...string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.GroupNames = groupNames
-	}
-}
-
-func WithSSAProjectRuleFilterRuleNames(ruleNames ...string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.RuleNames = ruleNames
-	}
-}
-
-func WithSSAProjectRuleFilterTag(tag ...string) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.Tag = tag
-	}
-}
-
-func WithSSAProjectRuleFilterIncludeLibraryRule(includeLibraryRule bool) SSAProjectRuleOption {
-	return func(config *schema.SSARuleConfig) {
-		if config.RuleFilter == nil {
-			config.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		config.RuleFilter.IncludeLibraryRule = includeLibraryRule
-	}
-}
-
-func WithSSAProjectProcessCallback(callback func(progress float64)) SSAProjectScanOption {
-	return func(config *schema.SSAScanConfig) {
-		config.ProcessCallback = callback
-	}
-}
-
-// 代码源配置
-func WithSSAProjectCodeSourceKind(kind string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Kind = schema.CodeSourceKind(kind)
-	}
-}
-
-func WithSSAProjectCodeSourceLocalFile(localFile string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.LocalFile = localFile
-	}
-}
-
-func WithSSAProjectCodeSourceURL(url string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.URL = url
-	}
-}
-
-func WithSSAProjectCodeSourceBranch(branch string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Branch = branch
-	}
-}
-
-func WithSSAProjectCodeSourcePath(path string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Path = path
-	}
-}
-
-// 认证配置
-func WithSSAProjectCodeSourceAuthKind(kind string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Auth.Kind = kind
-	}
-}
-
-func WithSSAProjectCodeSourceAuthUserName(userName string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Auth.UserName = userName
-	}
-}
-
-func WithSSAProjectCodeSourceAuthPassword(password string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Auth.Password = password
-	}
-}
-
-func WithSSAProjectCodeSourceAuthKeyPath(keyPath string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Auth.KeyPath = keyPath
-	}
-}
-
-// 代理配置
-func WithSSAProjectCodeSourceProxyURL(url string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Proxy.URL = url
-	}
-}
-
-func WithSSAProjectCodeSourceProxyAuth(user string, password string) SSAProjectOption {
-	return func(builder *SSAProjectBuilder) {
-		builder.CodeSourceConfig.Proxy.User = user
-		builder.CodeSourceConfig.Proxy.Password = password
-	}
 }
