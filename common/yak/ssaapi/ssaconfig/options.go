@@ -136,6 +136,16 @@ func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) Option {
 	}
 }
 
+func WithRuleInput(input *ypb.SyntaxFlowRuleInput) Option {
+	return func(c *Config) error {
+		if c.SyntaxFlowRule == nil {
+			return utils.Errorf("Config: Rule Input can only be set in Rule mode")
+		}
+		c.SyntaxFlowRule.RuleInput = input
+		return nil
+	}
+}
+
 // WithRuleFilterLanguage 设置规则过滤器语言
 func WithRuleFilterLanguage(language ...string) Option {
 	return func(c *Config) error {
