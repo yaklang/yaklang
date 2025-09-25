@@ -460,7 +460,7 @@ func (m *Timeline) Dump() string {
 	return ""
 }
 
-func (m *Timeline) DumpBefore(id int64) string {
+func (m *Timeline) DumpBefore(beforeId int64) string {
 	buf := bytes.NewBuffer(nil)
 	initOnce := sync.Once{}
 	reducerOnce := sync.Once{}
@@ -468,16 +468,20 @@ func (m *Timeline) DumpBefore(id int64) string {
 
 	shrinkStartId, _, _ := m.summary.Last()
 	reduceredStartId, _, _ := m.reducers.Last()
-	m.tsToTimelineItem.ForEach(func(key int64, item *TimelineItem) bool {
+	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
 		initOnce.Do(func() {
 			buf.WriteString("timeline:\n")
 		})
 
-		if item.GetID() > id {
+		if item.GetID() > beforeId {
 			return true
 		}
 
-		t := time.Unix(0, key*int64(time.Millisecond))
+		ts, ok := m.idToTs.Get(item.GetID())
+		if !ok {
+			log.Warnf("BUG: timeline id %v not found", item.GetID())
+		}
+		t := time.Unix(0, ts*int64(time.Millisecond))
 		timeStr := t.Format(utils.DefaultTimeFormat3)
 
 		if reduceredStartId > 0 {
