@@ -14,11 +14,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type scanManager struct {
+	*Config
+
 	// task info
 	taskID       string
 	status       string
@@ -26,18 +29,16 @@ type scanManager struct {
 	resumeSignal *sync.Cond
 	cancel       context.CancelFunc
 
-	memory bool
 	// record {{
 	// task record
 	lock         sync.Mutex
 	taskRecorder *schema.SyntaxFlowScanTask
-	// config record
-	config *ScanTaskConfig
+	// ssaConfig record
+	ssaConfig *ssaconfig.Config
 	// }}
 
 	// config {{
-	kind           schema.SyntaxflowResultKind
-	ignoreLanguage bool
+	kind schema.SyntaxflowResultKind
 	// }}
 
 	// runtime {{
@@ -88,6 +89,15 @@ func RemoveSyntaxFlowTaskByID(id string) {
 	// syntaxFlowScanManagerMap.Delete(id)
 }
 
+func removeSyntaxFlowTaskByID(id string) {
+	r, ok := syntaxFlowScanManagerMap.Get(id)
+	if !ok {
+		return
+	}
+	r.Stop()
+	syntaxFlowScanManagerMap.Delete(id)
+}
+
 func createEmptySyntaxFlowTaskByID(
 	ctx context.Context,
 	runningID, taskId string,
@@ -129,7 +139,6 @@ func createSyntaxflowTaskById(
 	if err := m.initByConfig(); err != nil {
 		return nil, err
 	}
-	// 设置扫描批次
 	m.setScanBatch()
 
 	return m, nil
@@ -148,7 +157,7 @@ func (m *scanManager) setScanBatch() {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
 
-	maxBatch, err := yakit.GetMaxScanBatch(ssadb.GetDB(), m.programs)
+	maxBatch, err := yakit.GetMaxScanBatch(ssadb.GetDB(), m.ProgramNames)
 	if err != nil {
 		m.taskRecorder.ScanBatch = 1
 	} else {
@@ -168,7 +177,7 @@ func (m *scanManager) SaveTask() error {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
-	m.taskRecorder.Programs = strings.Join(m.programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
+	m.taskRecorder.Programs = strings.Join(m.ProgramNames, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 	m.taskRecorder.TaskId = m.taskID
 	m.taskRecorder.Status = m.status
 	m.taskRecorder.SuccessQuery = m.GetSuccessQuery()
@@ -362,14 +371,14 @@ func (m *scanManager) CurrentTaskIndex() int64 {
 func (m *scanManager) ScanNewTask() error {
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
 	// start task
-	err := m.StartQuerySF()
+	err := m.startQuerySF()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *scanManager) ResumeTask() error {
+func (m *scanManager) resumeTask() error {
 	taskIndex := m.CurrentTaskIndex()
 	log.Errorf("resume task %s from index %d", m.taskID, taskIndex)
 	log.Errorf("total query: %d; finish query: %d", m.GetTotalQuery(), m.GetFinishedQuery())
@@ -378,7 +387,7 @@ func (m *scanManager) ResumeTask() error {
 		return nil
 	}
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
-	err := m.StartQuerySF(taskIndex)
+	err := m.startQuerySF(taskIndex)
 	if err != nil {
 		return err
 	}

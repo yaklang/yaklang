@@ -1,7 +1,6 @@
 package yakit
 
 import (
-	"context"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -272,39 +271,39 @@ func AllSyntaxFlowRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.Sy
 	return ret, nil
 }
 
-func YieldSyntaxFlowRulesBySSAProjectId(db *gorm.DB, ctx context.Context, ssaProjectId uint) chan *schema.SyntaxFlowRule {
-	if ssaProjectId == 0 {
-		return nil
-	}
-	project, err := LoadSSAProjectBuilderByID(ssaProjectId)
-	if err != nil {
-		return nil
-	}
-	if project == nil {
-		return nil
-	}
-	filter := project.GetRuleFilter()
-	if filter == nil {
-		return nil
-	}
-	db = FilterSyntaxFlowRule(db, filter)
-	return sfdb.YieldSyntaxFlowRules(db, ctx)
-}
-
-func GetRuleCountBySSAProjectId(db *gorm.DB, ssaProjectId uint) (int64, error) {
-	if ssaProjectId == 0 {
-		return 0, utils.Errorf("get rule count by ssa project id failed: ssa project id is 0")
-	}
-	project, err := LoadSSAProjectBuilderByID(ssaProjectId)
-	if err != nil {
-		return 0, utils.Errorf("get rule count by ssa project id failed: %s", err)
-	}
-	if project == nil {
-		return 0, utils.Errorf("get rule count by ssa project id failed: project is nil")
-	}
-	filter := project.GetRuleFilter()
-	db = FilterSyntaxFlowRule(db, filter)
-	var count int64
-	db.Count(&count)
-	return count, nil
-}
+//func YieldSyntaxFlowRulesBySSAProjectName(db *gorm.DB, ctx context.Context, ssaProjectName string) chan *schema.SyntaxFlowRule {
+//	if ssaProjectName == "" {
+//		return nil
+//	}
+//	project, err := LoadSSAProjectBuilderByID(ssaProjectId)
+//	if err != nil {
+//		return nil
+//	}
+//	if project == nil {
+//		return nil
+//	}
+//	filter := project.GetRuleFilter()
+//	if filter == nil {
+//		return nil
+//	}
+//	db = FilterSyntaxFlowRule(db, filter)
+//	return sfdb.YieldSyntaxFlowRules(db, ctx)
+//}
+//
+//func GetRuleCountBySSAProjectId(db *gorm.DB, ssaProjectId uint) (int64, error) {
+//	if ssaProjectId == 0 {
+//		return 0, utils.Errorf("get rule count by ssa project id failed: ssa project id is 0")
+//	}
+//	project, err := LoadSSAProjectBuilderByID(ssaProjectId)
+//	if err != nil {
+//		return 0, utils.Errorf("get rule count by ssa project id failed: %s", err)
+//	}
+//	if project == nil {
+//		return 0, utils.Errorf("get rule count by ssa project id failed: project is nil")
+//	}
+//	filter := project.GetRuleFilter()
+//	db = FilterSyntaxFlowRule(db, filter)
+//	var count int64
+//	db.Count(&count)
+//	return count, nil
+//}

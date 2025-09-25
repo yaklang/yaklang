@@ -30974,13 +30974,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields        protoimpl.UnknownFields
-	sizeCache            protoimpl.SizeCache
+	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -40529,8 +40529,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -54150,7 +54150,8 @@ type SyntaxFlowScanRequest struct {
 	// compile data only in memory
 	Memory bool `protobuf:"varint,8,opt,name=Memory,proto3" json:"Memory,omitempty"`
 	// 根据项目扫描
-	SSAProjectId  uint64 `protobuf:"varint,9,opt,name=SSAProjectId,proto3" json:"SSAProjectId,omitempty"`
+	SSAProjectId  uint64   `protobuf:"varint,9,opt,name=SSAProjectId,proto3" json:"SSAProjectId,omitempty"`
+	ProjectName   []string `protobuf:"bytes,10,rep,name=ProjectName,proto3" json:"ProjectName,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -54246,6 +54247,13 @@ func (x *SyntaxFlowScanRequest) GetSSAProjectId() uint64 {
 		return x.SSAProjectId
 	}
 	return 0
+}
+
+func (x *SyntaxFlowScanRequest) GetProjectName() []string {
+	if x != nil {
+		return x.ProjectName
+	}
+	return nil
 }
 
 type QuerySyntaxFlowScanTaskRequest struct {
@@ -67245,7 +67253,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vMessageType\x18\x03 \x01(\tR\vMessageType\"h\n" +
 	"\x1dDownloadSyntaxFlowRuleRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x121\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\xf0\x02\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\x92\x03\n" +
 	"\x15SyntaxFlowScanRequest\x12 \n" +
 	"\vControlMode\x18\x01 \x01(\tR\vControlMode\x121\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\x12 \n" +
@@ -67255,7 +67263,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\x12 \n" +
 	"\vConcurrency\x18\a \x01(\rR\vConcurrency\x12\x16\n" +
 	"\x06Memory\x18\b \x01(\bR\x06Memory\x12\"\n" +
-	"\fSSAProjectId\x18\t \x01(\x04R\fSSAProjectId\"\xa8\x01\n" +
+	"\fSSAProjectId\x18\t \x01(\x04R\fSSAProjectId\x12 \n" +
+	"\vProjectName\x18\n" +
+	" \x03(\tR\vProjectName\"\xa8\x01\n" +
 	"\x1eQuerySyntaxFlowScanTaskRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +
