@@ -3,6 +3,7 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -19,6 +20,27 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		r.EmitJSON(schema.EVENT_TYPE_STRUCTURED, "queue_info", queueInfo)
 		return nil
 
+	case SYNC_TYPE_KNOWLEDGE:
+		// 同步某个任务已经获取到的知识
+		taskID := r.GetCurrentTask().GetId()         // 默认使用当前任务ID
+		if r.config.enhanceKnowledgeManager == nil { // 检查知识管理器是否配置, 如果没有则报错记录但不会返回错误
+			r.EmitError("knowledge manager is not configured")
+			return nil
+		}
+		if event.SyncJsonInput != "" {
+			var params map[string]interface{}
+			if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err == nil {
+				if id, ok := params["taskid"].(string); ok && id != "" {
+					taskID = id
+				}
+			}
+		}
+		knowledgeList := r.config.enhanceKnowledgeManager.GetKnowledgeByTaskID(taskID)
+		if len(knowledgeList) <= 0 {
+			log.Error("no knowledge found")
+		}
+		r.EmitKnowledgeListAboutTask(taskID, knowledgeList)
+		return nil
 	case SYNC_TYPE_TIMELINE:
 
 		var limit = -1
