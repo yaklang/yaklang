@@ -149,9 +149,6 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 					}
 				case "modify_code":
 					payload = action.GetString("code")
-					if payload == "" {
-						return utils.Error("modify_code action must have 'code' field")
-					}
 					start := action.GetInt("modify_start_line")
 					end := action.GetInt("modify_end_line")
 					if start <= 0 || end <= 0 || end < start {
