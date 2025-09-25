@@ -427,23 +427,15 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 		g.pqQuantizer = pq.NewQuantizer(g.pqCodebook)
 	}
 
-	layerOffset := []uint32{}
-	preOffset := uint32(0)
-	for _, layer := range p.Layers {
-		layerOffset = append(layerOffset, preOffset)
-		preOffset += uint32(len(layer.Nodes))
-	}
-
+	totalNodes := len(p.Layers[0].Nodes)
 	parseOffsetWithLayer := func(level int, offset uint32) uint32 {
-		if level == 0 {
-			return offset
-		}
-		return offset - layerOffset[level]
+		return offset - uint32(totalNodes)*uint32(level)
 	}
 
 	// 创建节点映射
 	nodes := make(map[uint32]hnswspec.LayerNode[K])
 	for level, layer := range p.Layers {
+		layerNodes := []K{}
 		for _, offset := range layer.Nodes {
 			offsetWithoutLayer := parseOffsetWithLayer(level, offset)
 			if offset == 0 {
@@ -453,6 +445,7 @@ func (p *Persistent[K]) BuildLazyGraph(dataLoader func(data hnswspec.LazyNodeID)
 				return nil, utils.Errorf("recovery node failed, offset %d not found", offsetWithoutLayer)
 			}
 			node := p.OffsetToKey[offsetWithoutLayer]
+			layerNodes = append(layerNodes, node.Key)
 			key := node.Key
 			var vec Vector
 
