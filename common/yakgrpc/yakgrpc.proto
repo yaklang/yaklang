@@ -1210,6 +1210,7 @@ message KnowledgeBaseType{
   string Value = 3;
 }
 
+
 message GetKnowledgeBaseTypeListResponse{
   repeated KnowledgeBaseType KnowledgeBaseTypes = 1;
 }
@@ -1344,6 +1345,7 @@ message ListVectorStoreEntriesRequest {
   int64 CollectionID = 1;
   string Keyword = 2;
   Paging Pagination = 3;
+  string CollectionName = 4;
 }
 
 message CreateVectorStoreEntryRequest {
@@ -1359,6 +1361,7 @@ message VectorStoreEntry {
   string Metadata = 4;
   repeated float Embedding = 5;
 }
+
 
 message ListVectorStoreEntriesResponse {
   repeated VectorStoreEntry Entries = 1;
