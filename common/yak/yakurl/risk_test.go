@@ -1459,6 +1459,7 @@ alert $sink5 for {
 
 		// 直接使用yakit进行compare查询，验证RiskFeatureHash对比逻辑
 		_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskID2},
 			SSARiskDiffRequest: &ypb.SSARiskDiffRequest{
 				BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
 				Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
@@ -1734,5 +1735,30 @@ func test1() {
 
 		got3 := queryByUrl(2)
 		require.Equal(t, 4, len(got3), "第三次扫描增量查询应该返回4个风险")
+	})
+
+	t.Run("search all risk without diposal", func(t *testing.T) {
+		queryWithoutDisposalByUrl := func() map[string]data {
+			url := &ypb.YakURL{
+				Schema: "ssarisk",
+				Path:   urlProgramPath(programName) + "/test.go",
+				Query: []*ypb.KVPair{
+					{Key: "program", Value: programName},
+					{Key: "increment", Value: "true"},
+					{Key: "type", Value: string(yakurl.SSARiskTypeFile)},
+					{Key: "source", Value: "/test.go"},
+				},
+			}
+			got := GetSSARisk(t, suite.Client, url)
+			return got
+		}
+
+		got := queryWithoutDisposalByUrl()
+		t.Log(got)
+		require.Equal(t, 7, len(got), "查询所有风险应该返回6个风险")
+		for _, g := range got {
+			require.NotContains(t, g.Name, "Test Risk 1")
+			require.NotContains(t, g.Name, "Test Risk 3")
+		}
 	})
 }

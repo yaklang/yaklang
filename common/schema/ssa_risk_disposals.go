@@ -12,7 +12,7 @@ type SSARiskDisposals struct {
 	TaskId    string `json:"task_id" gorm:"index"`
 	SSARiskID int64  `json:"ssa_risk_id" gorm:"index"`
 	// RiskFeatureHash 用于标识风险特征的唯一哈希值,可以用来实现处置的继承
-	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index"`
+	RiskFeatureHash string `json:"risk_feature_hash" gorm:"index;not null"`
 	Status          string `json:"status" gorm:"index"`
 	Comment         string `json:"comment" gorm:"type:text"`
 }
