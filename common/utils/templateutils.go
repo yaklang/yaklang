@@ -31,3 +31,27 @@ func RenderTemplate(templateStr string, data any) (string, error) {
 
 	return buf.String(), nil
 }
+
+func MustRenderTemplate(templateStr string, data any) string {
+	// 创建新的模板实例
+	tmpl, err := template.New("template").Parse(templateStr)
+	if err != nil {
+		log.Errorf("parse template failed: %v", err)
+		return templateStr
+	}
+
+	// 创建缓冲区存储渲染结果
+	var buf bytes.Buffer
+
+	// 执行模板渲染
+	err = tmpl.Execute(&buf, data)
+	if err != nil {
+		log.Errorf("execute template failed: %v", err)
+		if len(buf.String()) > 0 {
+			return buf.String()
+		}
+		return templateStr
+	}
+
+	return buf.String()
+}

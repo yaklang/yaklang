@@ -87,6 +87,7 @@ func (r *ReAct) reviewAIForge(
 	switch suggestion {
 	case "cancel":
 		r.Emitter.EmitWarning("AI Forge execution cancelled by user")
+		r.EmitResult("AI智能应用执行已被用户取消(cancelled by user), 用户仍然可以继续对话, 或重新发起智能应用调用")
 		return nil, nil, false, utils.Error("ai forge execution cancelled by user")
 	case "modify_params":
 		return r.invokeBlueprintReviewModifyParams(ins, invokeParams, reviewParams, release)
