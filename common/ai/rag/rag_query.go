@@ -295,6 +295,7 @@ type RAGQueryConfig struct {
 }
 
 const (
+	BasicPlan                              = "basic" // 空字符串表示不使用任何增强计划
 	EnhancePlanHypotheticalAnswer          = "hypothetical_answer"
 	EnhancePlanHypotheticalAnswerWithSplit = "hypothetical_answer_with_split"
 	EnhancePlanSplitQuery                  = "split_query"
@@ -502,21 +503,21 @@ func (s *ScoredResult) GetUUID() string {
 	return s.Document.ID
 }
 
-func QueryYakitProfile(query string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
+func QueryYakitProfile(query string, opts ...RAGQueryOption) (<-chan *RAGSearchResult, error) {
 	return Query(consts.GetGormProfileDatabase(), query, opts...)
 }
 
 // Query 在RAG系统中搜索多个集合
 // 这个函数直接在RAG级别进行查询，不依赖于知识库结构
-func Query(db *gorm.DB, query string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
+func Query(db *gorm.DB, query string, opts ...RAGQueryOption) (<-chan *RAGSearchResult, error) {
 	return _query(db, query, "1", opts...)
 }
 
 // _query 内部查询函数，用于对一些增强搜索的递归调用
-func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
+func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (<-chan *RAGSearchResult, error) {
 	config := NewRAGQueryConfig(opts...)
 	ctx := config.Ctx
-	resultCh := make(chan *RAGSearchResult)
+	resultCh := chanx.NewUnlimitedChan[*RAGSearchResult](ctx, 10)
 
 	sendRaw := func(msg *RAGSearchResult) {
 		if config.MsgCallBack != nil {
@@ -526,10 +527,11 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			return
 		}
 		select {
-		case resultCh <- msg:
 		case <-ctx.Done():
 			return
+		default:
 		}
+		resultCh.SafeFeed(msg)
 	}
 
 	sendMsg := func(msg string) {
@@ -638,6 +640,12 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 	chans := chanx.NewUnlimitedChan[*subQuery](ctx, 10)
 	status("STATUS", "开始创建子查询（强化）")
 	wg := new(sync.WaitGroup)
+
+	startSubQuery(BasicPlan, query) // 基础查询
+	chans.FeedBlock(&subQuery{
+		Method: BasicPlan,
+		Query:  query,
+	})
 
 	if utils.StringArrayContains(config.EnhancePlan, EnhancePlanHypotheticalAnswer) {
 		wg.Add(1)
@@ -759,7 +767,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 	go func() {
 		defer func() {
-			close(resultCh)
+			resultCh.Close()
 		}()
 		// 收集所有结果
 
@@ -952,7 +960,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		}
 		sendMsg(fmt.Sprintf("查询完成，返回 %d 个最佳结果", finalCount))
 	}()
-	return resultCh, nil
+	return resultCh.OutputChannel(), nil
 }
 
 // SimpleQuery 简化的RAG查询接口，直接返回结果

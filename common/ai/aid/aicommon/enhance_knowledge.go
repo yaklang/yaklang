@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"strings"
 	"sync"
 )
@@ -73,7 +74,21 @@ type EnhanceKnowledgeManager struct {
 }
 
 func (m *EnhanceKnowledgeManager) FetchKnowledge(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
-	return m.knowledgeGetter(ctx, query)
+	//todo 支持多种来源的知识方式合并 rag ｜ web search
+
+	result := chanx.NewUnlimitedChan[EnhanceKnowledge](ctx, 10)
+	midResult, err := m.knowledgeGetter(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	go func() {
+		defer result.Close()
+		for knowledge := range midResult {
+			result.SafeFeed(knowledge)
+		}
+	}()
+
+	return result.OutputChannel(), nil
 }
 
 func (m *EnhanceKnowledgeManager) AppendKnowledge(taskID string, knowledge EnhanceKnowledge) {
