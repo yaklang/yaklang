@@ -99,7 +99,7 @@ jobs:
 
       - name: Check With SyntaxFlow
         run: |
-          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level degug
+          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level degug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go
           NUM=$(cat risk.json | jq .RiskNums)
           echo "Find risk num is: $NUM"
           if [  $NUM == 0 ]; then
