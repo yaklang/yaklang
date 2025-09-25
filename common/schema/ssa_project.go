@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -18,28 +19,8 @@ type SSAProject struct {
 	Description string `json:"description,omitempty" gorm:"comment:项目描述"`
 	Tags        string `json:"tags,omitempty" gorm:"comment:项目标签"`
 	Language    string `json:"language" gorm:"comment:项目语言"`
-	// 源码获取方式配置
-	CodeSourceConfig string `json:"code_source_config"`
 	// 配置选项
 	Config []byte `json:"config"`
-}
-
-func (p *SSAProject) GetSourceConfig() *CodeSourceInfo {
-	var config CodeSourceInfo
-	err := json.Unmarshal([]byte(p.CodeSourceConfig), &config)
-	if err != nil {
-		log.Errorf("failed to unmarshal code source config: %v", err)
-		return &CodeSourceInfo{}
-	}
-	return &config
-}
-
-func (p *SSAProject) GetCodeSourceConfigRaw() string {
-	return p.CodeSourceConfig
-}
-
-func (p *SSAProject) SetSourceConfig(raw string) {
-	p.CodeSourceConfig = raw
 }
 
 func (p *SSAProject) GetTagsList() []string {
@@ -50,8 +31,8 @@ func (p *SSAProject) SetTagsList(tags []string) {
 	p.Tags = strings.Join(tags, ",")
 }
 
-func (p *SSAProject) GetConfig() (*SSAProjectConfig, error) {
-	var config SSAProjectConfig
+func (p *SSAProject) GetConfig() (*ssaconfig.Config, error) {
+	var config ssaconfig.Config
 	err := json.Unmarshal(p.Config, &config)
 	if err != nil {
 		return nil, err
@@ -59,65 +40,13 @@ func (p *SSAProject) GetConfig() (*SSAProjectConfig, error) {
 	return &config, nil
 }
 
-func (p *SSAProject) SetConfig(config *SSAProjectConfig) error {
+func (p *SSAProject) SetConfig(config *ssaconfig.Config) error {
 	data, err := json.Marshal(config)
 	if err != nil {
 		return err
 	}
 	p.Config = data
 	return nil
-}
-
-type SSAProjectConfig struct {
-	CompileConfig *SSACompileConfig
-	ScanConfig    *SSAScanConfig
-	RuleConfig    *SSARuleConfig
-}
-type SSACompileConfig struct {
-	StrictMode    bool     `json:"strict_mode"`
-	PeepholeSize  int      `json:"peephole_size"`
-	ExcludeFiles  []string `json:"exclude_files"`
-	ReCompile     bool     `json:"re_compile"`
-	MemoryCompile bool     `json:"memory_compile"`
-	Concurrency   uint32   `json:"compile_concurrency"`
-}
-type SSAScanConfig struct {
-	Concurrency    uint32 `json:"concurrency"`
-	Memory         bool   `json:"memory"`
-	IgnoreLanguage bool   `json:"ignore_language"`
-	// 运行时配置，不存数据库
-	ProcessCallback func(progress float64) `json:"-"`
-}
-
-type SSARuleConfig struct {
-	RuleFilter *ypb.SyntaxFlowRuleFilter
-}
-
-func NewSSAProjectConfig() *SSAProjectConfig {
-	return &SSAProjectConfig{
-		CompileConfig: &SSACompileConfig{},
-		ScanConfig:    &SSAScanConfig{},
-		RuleConfig: &SSARuleConfig{
-			RuleFilter: &ypb.SyntaxFlowRuleFilter{},
-		},
-	}
-}
-
-func (s *SSAProjectConfig) SetRuleFilter(filter *ypb.SyntaxFlowRuleFilter) {
-	if s == nil {
-		return
-	}
-	if s.RuleConfig == nil {
-		s.RuleConfig = &SSARuleConfig{}
-	}
-	s.RuleConfig.RuleFilter = filter
-}
-
-func (s *SSAProjectConfig) GetRuleFilter() *ypb.SyntaxFlowRuleFilter {
-	if s == nil || s.RuleConfig == nil {
-		return nil
-	}
-	return s.RuleConfig.RuleFilter
 }
 
 func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
@@ -132,35 +61,27 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 		UpdatedAt:        p.UpdatedAt.Unix(),
 		ProjectName:      p.ProjectName,
 		Language:         p.Language,
-		CodeSourceConfig: p.CodeSourceConfig,
+		CodeSourceConfig: config.CodeSource.JsonString(),
 		Description:      p.Description,
 		Tags:             p.GetTagsList(),
 	}
 
-	if cc := config.CompileConfig; cc != nil {
-		result.CompileConfig = &ypb.SSAProjectCompileConfig{
-			StrictMode:   cc.StrictMode,
-			PeepholeSize: int64(cc.PeepholeSize),
-			ExcludeFiles: cc.ExcludeFiles,
-			ReCompile:    cc.ReCompile,
-			Memory:       cc.MemoryCompile,
-		}
+	result.CompileConfig = &ypb.SSAProjectCompileConfig{
+		StrictMode:   config.GetCompileStrictMode(),
+		PeepholeSize: int64(config.GetCompilePeepholeSize()),
+		ExcludeFiles: config.GetCompileExcludeFiles(),
+		ReCompile:    config.GetCompileReCompile(),
+		Memory:       config.GetCompileMemory(),
 	}
 
-	if sc := config.ScanConfig; sc != nil {
-		result.ScanConfig = &ypb.SSAProjectScanConfig{
-			Concurrency:    uint32(int64(sc.Concurrency)),
-			Memory:         sc.Memory,
-			IgnoreLanguage: sc.IgnoreLanguage,
-		}
+	result.ScanConfig = &ypb.SSAProjectScanConfig{
+		Concurrency:    uint32(int64(config.GetScanConcurrency())),
+		Memory:         config.GetScanMemory(),
+		IgnoreLanguage: config.GetScanIgnoreLanguage(),
 	}
 
-	if rc := config.RuleConfig; rc != nil {
-		if filter := rc.RuleFilter; filter != nil {
-			result.RuleConfig = &ypb.SSAProjectScanRuleConfig{
-				RuleFilter: filter,
-			}
-		}
+	result.RuleConfig = &ypb.SSAProjectScanRuleConfig{
+		RuleFilter: config.GetRuleFilter(),
 	}
 	return result
 }
