@@ -2,10 +2,8 @@ package aireact
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"testing"
 	"time"
 
@@ -15,8 +13,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-// Mock AI callback for answer with knowledge flow
-func newMockedAnswerWithKnowledgeFlow(token string) aicommon.AICallbackType {
+func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+	manager, token := aicommon.NewMockEKManagerAndToken()
+
+	syncSignal := make(chan bool)
+
+	ctx := utils.TimeoutContextSeconds(10)
+
 	callback := func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		prompt := req.GetPrompt()
 		if utils.MatchAllOfSubString(prompt, string(ActionDirectlyAnswer), string(ActionRequireTool), string(ActionKnowledgeEnhanceAnswer)) {
@@ -49,6 +54,15 @@ func newMockedAnswerWithKnowledgeFlow(token string) aicommon.AICallbackType {
 			return rsp, nil
 		}
 		if utils.MatchAllOfSubString(prompt, "verify-satisfaction", "user_satisfied") {
+			in <- &ypb.AIInputEvent{ // 触发同步知识事件
+				IsSyncMessage: true,
+				SyncType:      SYNC_TYPE_KNOWLEDGE,
+			}
+
+			select {
+			case <-syncSignal:
+			case <-ctx.Done():
+			}
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "verify-satisfaction", "user_satisfied": true, "reasoning": "User is satisfied with the answer."}`))
 			rsp.Close()
@@ -57,20 +71,13 @@ func newMockedAnswerWithKnowledgeFlow(token string) aicommon.AICallbackType {
 		return nil, utils.Errorf("unexpected prompt: %s", prompt)
 	}
 
-	return callback
-}
-
-func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
-	in := make(chan *ypb.AIInputEvent, 10)
-	out := make(chan *ypb.AIOutputEvent, 10)
-	handle, knowledgeToken := NewMockEnhanceHandlerAndToken()
 	_, err := NewReAct(
-		WithAICallback(newMockedAnswerWithKnowledgeFlow(knowledgeToken)),
+		WithAICallback(callback),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
-		WithKnowledgeEnhanceHandle(handle),
+		WithEnhanceKnowledgeManager(manager),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -83,29 +90,37 @@ func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
 		}
 	}()
 
-	after := time.After(10 * time.Second)
-	var gotResult, gotKnowledge, gotSatisfied bool
+	var gotResult, gotKnowledge, gotSatisfied, gotSyncKnowledge bool
 
 LOOP:
 	for {
 		select {
 		case e := <-out:
 			fmt.Println(e.String())
-			if e.Type == string(schema.EVENT_TYPE_KNOWLEDGE) && utils.MatchAllOfSubString(e.Content, knowledgeToken) {
+			if e.Type == string(schema.EVENT_TYPE_KNOWLEDGE) && utils.MatchAllOfSubString(e.Content, token) {
 				gotKnowledge = true
 			}
 			if e.Type == string(schema.EVENT_TYPE_RESULT) {
 				gotResult = true
 			}
+
+			if e.Type == string(schema.EVENT_TYPE_TASK_ABOUT_KNOWLEDGE) {
+				if utils.MatchAllOfSubString(e.Content, token) {
+					gotSyncKnowledge = true
+					close(syncSignal)
+				}
+			}
+
 			if e.Type == string(schema.EVENT_TYPE_STRUCTURED) {
 				if utils.MatchAllOfSubString(e.Content, string(TaskStatus_Completed)) {
 					gotSatisfied = true
 				}
 			}
-			if gotResult && gotKnowledge && gotSatisfied {
+
+			if gotResult && gotKnowledge && gotSatisfied && gotSyncKnowledge {
 				break LOOP
 			}
-		case <-after:
+		case <-ctx.Done():
 			break LOOP
 		}
 	}
@@ -119,6 +134,9 @@ LOOP:
 	}
 	if !gotSatisfied {
 		t.Fatal("Expected satisfaction event")
+	}
+	if !gotSyncKnowledge {
+		t.Fatal("Expected sync knowledge event")
 	}
 }
 
@@ -186,46 +204,6 @@ func newMockedAnswerWithKnowledgeUnsatisfied(token, okToken string) aicommon.AIC
 	return callback
 }
 
-func satisfiedMockHandle(token, okToken string) func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error) {
-	checkData1 := aicommon.NewBasicEnhanceKnowledge(
-		token,
-		"mock",
-		0.82,
-	)
-
-	checkData2 := aicommon.NewBasicEnhanceKnowledge(
-		okToken,
-		"mock",
-		0.82,
-	)
-
-	first := true
-
-	return func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error) {
-		if first {
-			first = false
-			result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
-			go func() {
-				defer result.Close()
-				for _, k := range []aicommon.EnhanceKnowledge{checkData1} {
-					result.SafeFeed(k)
-				}
-			}()
-			return result.OutputChannel(), nil
-		}
-
-		result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
-		go func() {
-			defer result.Close()
-			for _, k := range []aicommon.EnhanceKnowledge{checkData2} {
-				result.SafeFeed(k)
-			}
-		}()
-		return result.OutputChannel(), nil
-
-	}
-}
-
 // Test satisfaction loop: user not satisfied, triggers another iteration
 
 func TestReAct_AnswerWithKnowledge_SatisfactionLoop(t *testing.T) {
@@ -241,7 +219,7 @@ func TestReAct_AnswerWithKnowledge_SatisfactionLoop(t *testing.T) {
 			out <- e.ToGRPC()
 		}),
 		WithMaxIterations(2),
-		WithKnowledgeEnhanceHandle(satisfiedMockHandle(firstToken, okToken)),
+		WithEnhanceKnowledgeManager(aicommon.NewDifferentResultEKManager(firstToken, okToken)),
 	)
 	if err != nil {
 		t.Fatal(err)
