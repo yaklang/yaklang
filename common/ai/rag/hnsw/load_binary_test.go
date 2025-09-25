@@ -562,93 +562,97 @@ func TestKeyEdgeCases(t *testing.T) {
 }
 
 func TestSearchAfterSerializationRoundTrip(t *testing.T) {
-	// 测试序列化/反序列化后搜索功能是否正常工作
+	// 测试序列化/反序列化后搜索功能是否正常工作 - 运行10次确保稳定性
 
-	// 创建原始图并添加节点
-	originalGraph := NewGraph[string](
-		WithM[string](16),
-		WithMl[string](0.5),
-		WithEfSearch[string](20),
-		WithCosineDistance[string](),
-		WithDeterministicRng[string](0),
-	)
+	for round := 1; round <= 10; round++ {
+		t.Run(fmt.Sprintf("Round_%d", round), func(t *testing.T) {
+			// 创建原始图并添加节点
+			originalGraph := NewGraph[string](
+				WithM[string](16),
+				WithMl[string](0.5),
+				WithEfSearch[string](20),
+				WithCosineDistance[string](),
+				WithDeterministicRng[string](int64(round)), // 使用不同的种子确保每轮测试的多样性
+			)
 
-	// 添加测试节点 - 使用不同的向量以便搜索
-	nodes := []InputNode[string]{
-		{Key: "node1", Value: []float32{1.0, 0.0, 0.0, 0.0}}, // x轴方向
-		{Key: "node2", Value: []float32{0.0, 1.0, 0.0, 0.0}}, // y轴方向
-		{Key: "node3", Value: []float32{0.0, 0.0, 1.0, 0.0}}, // z轴方向
-		{Key: "node4", Value: []float32{0.7, 0.7, 0.0, 0.0}}, // 第一象限
-		{Key: "node5", Value: []float32{0.5, 0.5, 0.5, 0.5}}, // 对角线方向
-		{Key: "node6", Value: []float32{0.9, 0.1, 0.1, 0.1}}, // 接近node1
-		{Key: "node7", Value: []float32{0.1, 0.9, 0.1, 0.1}}, // 接近node2
-		{Key: "node8", Value: []float32{0.1, 0.1, 0.9, 0.1}}, // 接近node3
-	}
-	originalGraph.Add(nodes...)
+			// 添加测试节点 - 使用不同的向量以便搜索
+			nodes := []InputNode[string]{
+				{Key: "node1", Value: []float32{1.0, 0.0, 0.0, 0.0}}, // x轴方向
+				{Key: "node2", Value: []float32{0.0, 1.0, 0.0, 0.0}}, // y轴方向
+				{Key: "node3", Value: []float32{0.0, 0.0, 1.0, 0.0}}, // z轴方向
+				{Key: "node4", Value: []float32{0.7, 0.7, 0.0, 0.0}}, // 第一象限
+				{Key: "node5", Value: []float32{0.5, 0.5, 0.5, 0.5}}, // 对角线方向
+				{Key: "node6", Value: []float32{0.9, 0.1, 0.1, 0.1}}, // 接近node1
+				{Key: "node7", Value: []float32{0.1, 0.9, 0.1, 0.1}}, // 接近node2
+				{Key: "node8", Value: []float32{0.1, 0.1, 0.9, 0.1}}, // 接近node3
+			}
+			originalGraph.Add(nodes...)
 
-	// 在原始图上进行搜索测试
-	queryVector := []float32{0.8, 0.2, 0.2, 0.2} // 接近node1和node6的方向
-	originalResults := originalGraph.SearchWithDistance(queryVector, 3)
-	require.True(t, len(originalResults) > 0, "原始图应该返回搜索结果")
+			// 在原始图上进行搜索测试
+			queryVector := []float32{0.8, 0.2, 0.2, 0.2} // 接近node1和node6的方向
+			originalResults := originalGraph.SearchWithDistance(queryVector, 3)
+			require.True(t, len(originalResults) > 0, "第%d轮：原始图应该返回搜索结果", round)
 
-	// 记录原始搜索结果的key顺序
-	originalKeys := make([]string, len(originalResults))
-	for i, result := range originalResults {
-		originalKeys[i] = result.Key
-	}
+			// 记录原始搜索结果的key顺序
+			originalKeys := make([]string, len(originalResults))
+			for i, result := range originalResults {
+				originalKeys[i] = result.Key
+			}
 
-	// 序列化
-	pers, err := ExportHNSWGraph(originalGraph)
-	require.NoError(t, err)
+			// 序列化
+			pers, err := ExportHNSWGraph(originalGraph)
+			require.NoError(t, err, "第%d轮：序列化不应该失败", round)
 
-	// 从Persistent构建回Graph
-	restoredGraph, err := pers.BuildGraph()
-	require.NoError(t, err)
-	require.NotNil(t, restoredGraph)
+			// 从Persistent构建回Graph
+			restoredGraph, err := pers.BuildGraph()
+			require.NoError(t, err, "第%d轮：从Persistent构建Graph不应该失败", round)
+			require.NotNil(t, restoredGraph, "第%d轮：重建的图不应该为nil", round)
 
-	// 验证重建的图结构
-	require.Equal(t, originalGraph.M, restoredGraph.M)
-	require.Equal(t, originalGraph.Ml, restoredGraph.Ml)
-	require.Equal(t, originalGraph.EfSearch, restoredGraph.EfSearch)
-	require.Equal(t, len(originalGraph.Layers), len(restoredGraph.Layers))
+			// 验证重建的图结构
+			require.Equal(t, originalGraph.M, restoredGraph.M, "第%d轮：M参数应该相等", round)
+			require.Equal(t, originalGraph.Ml, restoredGraph.Ml, "第%d轮：Ml参数应该相等", round)
+			require.Equal(t, originalGraph.EfSearch, restoredGraph.EfSearch, "第%d轮：EfSearch参数应该相等", round)
+			require.Equal(t, len(originalGraph.Layers), len(restoredGraph.Layers), "第%d轮：层数应该相等", round)
 
-	// 验证重建的图有正确的节点数量
-	if len(restoredGraph.Layers) > 0 {
-		originalNodeCount := 0
-		for _, layer := range originalGraph.Layers {
-			originalNodeCount += len(layer.Nodes)
-		}
-		restoredNodeCount := 0
-		for _, layer := range restoredGraph.Layers {
-			restoredNodeCount += len(layer.Nodes)
-		}
-		require.Equal(t, originalNodeCount, restoredNodeCount, "重建的图应该有相同数量的节点")
-	}
+			// 验证重建的图有正确的节点数量
+			if len(restoredGraph.Layers) > 0 {
+				originalNodeCount := 0
+				for _, layer := range originalGraph.Layers {
+					originalNodeCount += len(layer.Nodes)
+				}
+				restoredNodeCount := 0
+				for _, layer := range restoredGraph.Layers {
+					restoredNodeCount += len(layer.Nodes)
+				}
+				require.Equal(t, originalNodeCount, restoredNodeCount, "第%d轮：重建的图应该有相同数量的节点", round)
+			}
 
-	// 在重建的图上进行相同的搜索
-	restoredResults := restoredGraph.SearchWithDistance(queryVector, 3)
-	t.Logf("Original results count: %d", len(originalResults))
-	t.Logf("Restored results count: %d", len(restoredResults))
+			// 在重建的图上进行相同的搜索
+			restoredResults := restoredGraph.SearchWithDistance(queryVector, 3)
+			t.Logf("第%d轮：Original results count: %d", round, len(originalResults))
+			t.Logf("第%d轮：Restored results count: %d", round, len(restoredResults))
 
-	// 验证重建的图能够进行搜索
-	require.True(t, len(restoredResults) >= 0, "重建的图应该能够进行搜索")
+			// 验证重建的图能够进行搜索
+			require.True(t, len(restoredResults) >= 0, "第%d轮：重建的图应该能够进行搜索", round)
 
-	// 如果有结果，验证结果的基本合理性
-	if len(restoredResults) > 0 {
-		// 验证所有返回的key都存在于原始节点中
-		validKeys := make(map[string]bool)
-		for _, node := range nodes {
-			validKeys[node.Key] = true
-		}
+			// 如果有结果，验证结果的基本合理性
+			if len(restoredResults) > 0 {
+				// 验证所有返回的key都存在于原始节点中
+				validKeys := make(map[string]bool)
+				for _, node := range nodes {
+					validKeys[node.Key] = true
+				}
 
-		for _, result := range restoredResults {
-			require.True(t, validKeys[result.Key], "搜索结果应该包含有效的节点key: %s", result.Key)
-			require.True(t, result.Distance >= 0, "距离应该是非负数")
-		}
+				for _, result := range restoredResults {
+					require.True(t, validKeys[result.Key], "第%d轮：搜索结果应该包含有效的节点key: %s", round, result.Key)
+					require.True(t, result.Distance >= 0, "第%d轮：距离应该是非负数", round)
+				}
 
-		t.Logf("搜索功能验证通过 - 找到了 %d 个有效结果", len(restoredResults))
-	} else {
-		t.Logf("搜索功能验证通过 - 没有找到结果（这是可以接受的）")
+				t.Logf("第%d轮：搜索功能验证通过 - 找到了 %d 个有效结果", round, len(restoredResults))
+			} else {
+				t.Logf("第%d轮：搜索功能验证通过 - 没有找到结果（这是可以接受的）", round)
+			}
+		})
 	}
 }
 
@@ -732,30 +736,26 @@ func TestMultipleQueriesAfterSerialization(t *testing.T) {
 }
 
 func TestSearchConsistencyAfterMultipleSerialization(t *testing.T) {
-	// 测试多次序列化/反序列化后的搜索一致性
-
-	// 创建原始图
-	originalGraph := NewGraph[string](
-		WithM[string](16),
-		WithMl[string](0.5),
-		WithEfSearch[string](20),
-		WithCosineDistance[string](),
-	)
-
-	// 添加节点
-	nodes := []InputNode[string]{
-		{Key: "a", Value: []float32{1.0, 0.0, 0.0, 0.0}},
-		{Key: "b", Value: []float32{0.0, 1.0, 0.0, 0.0}},
-		{Key: "c", Value: []float32{0.0, 0.0, 1.0, 0.0}},
-		{Key: "d", Value: []float32{0.6, 0.6, 0.0, 0.0}},
-		{Key: "e", Value: []float32{0.0, 0.6, 0.6, 0.0}},
-	}
-	originalGraph.Add(nodes...)
-
-	// 多次序列化/反序列化循环
-	currentGraph := originalGraph
-	for round := 0; round < 3; round++ {
+	for round := 0; round < 30; round++ {
 		t.Run(fmt.Sprintf("round_%d", round), func(t *testing.T) {
+			// 创建原始图
+			currentGraph := NewGraph[string](
+				WithM[string](16),
+				WithMl[string](0.5),
+				WithEfSearch[string](20),
+				WithCosineDistance[string](),
+			)
+			originalGraph := currentGraph
+			// 添加节点
+			nodes := []InputNode[string]{
+				{Key: "a", Value: []float32{1.0, 0.0, 0.0, 0.0}},
+				{Key: "b", Value: []float32{0.0, 1.0, 0.0, 0.0}},
+				{Key: "c", Value: []float32{0.0, 0.0, 1.0, 0.0}},
+				{Key: "d", Value: []float32{0.6, 0.6, 0.0, 0.0}},
+				{Key: "e", Value: []float32{0.0, 0.6, 0.6, 0.0}},
+			}
+			originalGraph.Add(nodes...)
+
 			// 序列化
 			pers, err := ExportHNSWGraph(currentGraph)
 			require.NoError(t, err)
