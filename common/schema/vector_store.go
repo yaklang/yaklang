@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	META_Doc_Index  = "meta_document_index"
-	META_Doc_Name   = "meta_document_name"
-	META_Base_Index = "meta_base_index"
+	META_Data_UUID  = "meta_data_UUID"
+	META_Data_Title = "meta_data_title"
+	META_Repos_UUID = "meta_repos_UUID"
 )
 
 // FloatArray 用于在数据库中存储浮点数数组的自定义类型
@@ -62,14 +62,19 @@ const (
 // 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储 map 类型数据
 type MetadataMap map[string]interface{}
 
-func (m MetadataMap) GetDocIndex() (string, bool) {
-	index, ok := m[META_Doc_Index]
+func (m MetadataMap) GetDataUUID() (string, bool) {
+	index, ok := m[META_Data_UUID]
 	return utils.InterfaceToString(index), ok
 }
 
-func (m MetadataMap) GetBaseIndex() (string, bool) {
-	index, ok := m[META_Base_Index]
+func (m MetadataMap) GetReposUUID() (string, bool) {
+	index, ok := m[META_Repos_UUID]
 	return utils.InterfaceToString(index), ok
+}
+
+func (m MetadataMap) GetTitle() (string, bool) {
+	title, ok := m[META_Data_Title]
+	return utils.InterfaceToString(title), ok
 }
 
 // Value 实现 driver.Valuer 接口，用于将 map 转换为数据库可以存储的值
