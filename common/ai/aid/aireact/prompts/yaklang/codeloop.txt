@@ -220,9 +220,34 @@ Yaklang 提供了超过 70 个内置标准库模块。以下是基于实际使�
 
 *   **`servicescan` (使用频率: 63次)**: 服务和端口扫描
     *   `servicescan.Scan(target, ports, ...opts)`: 主扫描函数
+    *   `servicescan.ScanFromSynResult(synChan, ...opts)`: 从SYN扫描结果进行指纹扫描
+    *   `servicescan.ScanOne(host, port, ...opts)`: 扫描单个端口
     *   `servicescan.onOpen(callback)`: 开放端口回调
     *   `servicescan.concurrent(n)`: 并发数
-    *   `servicescan.web()`: Web服务扫描
+    *   `servicescan.web()`: Web服务扫描模式
+    *   `servicescan.service()`: 非HTTP服务扫描模式  
+    *   `servicescan.all()`: 全指纹扫描模式
+    *   `servicescan.active(bool)`: 主动探测模式
+    *   `servicescan.probeTimeout(n)`: 探测超时时间
+    *   `servicescan.proto([]string)`: 指定协议（tcp/udp）
+    *   `servicescan.excludePorts(ports)`, `servicescan.excludeHosts(hosts)`: 排除选项
+
+*   **`synscan`**: TCP SYN端口扫描（高速无状态扫描）
+    *   `synscan.Scan(target, ports, ...opts)`: 主扫描函数，返回channel
+    *   `synscan.ScanFromPing(pingResult, ports, ...opts)`: 从ping结果扫描
+    *   `synscan.callback(func)`: 开放端口回调
+    *   `synscan.concurrent(n)`: 并发数控制
+    *   `synscan.excludeHosts(hosts)`, `synscan.excludePorts(ports)`: 排除主机/端口
+    *   `synscan.iface(interface)`: 指定网络接口
+    ```yak
+    synChan, err := synscan.Scan(target, ports, synscan.callback(result => {
+        yakit.Info("synscan: %v", result.String())
+    }))
+    if err != nil {
+        yakit.Error("SYN扫描失败: %v", err)
+        return
+    }
+    ```
 
 *   **`brute`**: 暴力破解
     *   `brute.New(serviceName, ...opts)`: 创建破解任务
@@ -440,6 +465,41 @@ results, err := servicescan.Scan(
 )
 for result in results {
     printf("扫描结果: %v\n", result.String())
+}
+```
+
+#### **H. SYN扫描 + 服务指纹识别模式**
+```yak
+// 两阶段扫描：先SYN快速发现开放端口，再进行指纹识别
+opts = []
+opts.Push(servicescan.concurrent(50))
+opts.Push(servicescan.active(true))
+opts.Push(servicescan.probeTimeout(5))
+opts.Push(servicescan.onOpen(i => {
+    yakit.Info("%v is open", i.String())
+}))
+
+// 第一阶段：SYN扫描
+synChan, err := synscan.Scan(target, ports, synscan.callback(result => {
+    yakit.Info("synscan: %v", result.String())
+}))
+if err != nil {
+    yakit.Error("SYN扫描失败: %v", err)
+    return
+}
+
+// 第二阶段：基于SYN结果进行服务指纹扫描
+results, err := servicescan.ScanFromSynResult(synChan, opts...)
+if err != nil {
+    yakit.Error("指纹扫描失败: %v", err)
+    return
+}
+
+for result in results {
+    if result.IsOpen() {
+        banner := result.GetBanner()
+        yakit.Info("发现服务: %v banner: %v", result.String(), banner)
+    }
 }
 ```
 
