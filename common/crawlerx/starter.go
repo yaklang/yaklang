@@ -143,8 +143,6 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 		aiInputInfo: baseConfig.aiInputInfo,
 
 		login:         baseConfig.login,
-		aiDomain:      baseConfig.domain,
-		aiApiKey:      baseConfig.key,
 		loginUsername: baseConfig.username,
 		loginPassword: baseConfig.password,
 	}

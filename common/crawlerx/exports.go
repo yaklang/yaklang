@@ -46,8 +46,6 @@ var CrawlerXExports = map[string]interface{}{
 
 	"loginUsername": WithLoginUsername,
 	"loginPassword": WithLoginPassword,
-	"aiDomain":      WithAIDomain,
-	"aiKey":         WithAiKey,
 
 	"UnLimitRepeat":      unlimited,
 	"LowRepeatLevel":     lowLevel,

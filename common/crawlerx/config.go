@@ -71,9 +71,6 @@ type BaseConfig struct {
 	login    bool
 	username string
 	password string
-
-	domain string
-	key    string
 }
 
 type BrowserConfig struct {
@@ -723,17 +720,5 @@ func WithLoginPassword(password string) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.login = true
 		config.baseConfig.password = password
-	}
-}
-
-func WithAIDomain(domain string) ConfigOpt {
-	return func(config *Config) {
-		config.baseConfig.domain = domain
-	}
-}
-
-func WithAiKey(key string) ConfigOpt {
-	return func(config *Config) {
-		config.baseConfig.key = key
 	}
 }
