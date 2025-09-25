@@ -12,37 +12,27 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (m *scanManager) StartQuerySF(startIndex ...int64) error {
-	if m == nil || m.stream == nil {
-		return utils.Errorf("scanManager or stream is nil")
+func (m *scanManager) startQuerySF(startIndex ...int64) error {
+	if m == nil {
+		return utils.Errorf("SyntaxFlowScan Failed: scanManager or stream is nil")
 	}
 	defer func() {
 		if err := recover(); err != nil {
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
-		}
-		m.StatusTask()
-		m.SaveTask()
-		m.saveReport()
-	}()
-
-	// wait for pause signal
-	go func() {
-		for {
-			rsp, err := m.stream.Recv()
-			if err != nil {
-				m.taskRecorder.Reason = err.Error()
-				return
-			}
-			if rsp.GetControlMode() == "pause" {
+		} else {
+			// 暂停or结束
+			if m.isFinishScan() {
+				m.status = schema.SYNTAXFLOWSCAN_DONE
+			} else {
 				m.status = schema.SYNTAXFLOWSCAN_PAUSED
-				m.Pause()
-				m.Stop()
 			}
 		}
+		m.saveReport()
+		m.notifyStatus()
+		_ = m.SaveTask()
 	}()
 
 	var start int64
@@ -57,14 +47,18 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 
 	var errs error
 	var taskIndex atomic.Int64
-
-	swg := utils.NewSizedWaitGroup(int(m.GetConcurrency()))
-
+	var concurrency int
+	if m.ssaConfig.GetScanConcurrency() <= 0 {
+		concurrency = 5
+	} else {
+		concurrency = int(m.ssaConfig.GetScanConcurrency())
+	}
+	swg := utils.NewSizedWaitGroup(concurrency)
 	for rule := range m.ruleChan {
 		if m.IsPause() || m.IsStop() {
 			break
 		}
-		for _, progName := range m.programs {
+		for _, progName := range m.ProgramNames {
 			if m.IsPause() || m.IsStop() {
 				break
 			}
@@ -77,10 +71,10 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			swg.Add()
 			go func(rule *schema.SyntaxFlowRule, progName string) {
 				defer func() {
-					m.StatusTask()
+					m.notifyStatus()
 					swg.Done()
 				}()
-
+				// TODO:传入实例
 				prog, err := ssaapi.FromDatabase(progName)
 				if err != nil {
 					m.markRuleSkipped()
@@ -94,16 +88,23 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 		}
 	}
 	swg.Wait()
-	m.StatusTask()
+	m.notifyStatus()
 	return errs
+}
+
+func (m *scanManager) isFinishScan() bool {
+	if m.finishedQuery >= m.totalQuery {
+		return true
+	}
+	return false
 }
 
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	m.notifyStatus()
 	defer m.SaveTask()
 
-	if !m.ignoreLanguage {
-		if rule.Language != string(consts.General) && string(rule.Language) != prog.GetLanguage() {
+	if m.ssaConfig.GetScanIgnoreLanguage() {
+		if rule.Language != string(consts.General) && rule.Language != prog.GetLanguage() {
 			m.markRuleSkipped()
 			return
 		}
@@ -117,7 +118,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		}),
 		ssaapi.QueryWithSave(m.kind),
 	)
-	if m.memory {
+	if m.ssaConfig.GetScanMemory() {
 		option = append(option, ssaapi.QueryWithMemory())
 	}
 
@@ -127,7 +128,9 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		m.notifyResult(res)
 	} else {
 		m.markRuleFailed()
-		m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
+		if m.client != nil {
+			m.client.YakitError("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
+		}
 	}
 }
 func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
@@ -137,15 +140,17 @@ func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	for key, count := range res.GetRiskCountMap() {
 		m.riskCountMap.Set(key, count)
 	}
+
 	if m.reporter != nil {
 		m.reporter.AddSyntaxFlowResult(res)
 	}
-	m.stream.Send(&ypb.SyntaxFlowScanResponse{
-		TaskID:   m.taskID,
-		Status:   m.status,
-		Result:   res.GetGRPCModelResult(),
-		SSARisks: res.GetGRPCModelRisk(),
-	})
+	// TODO:notify for  stream
+	//m.stream.Send(&ypb.SyntaxFlowScanResponse{
+	//	TaskID:   m.taskID,
+	//	Status:   m.status,
+	//	Result:   res.GetGRPCModelResult(),
+	//	SSARisks: res.GetGRPCModelRisk(),
+	//})
 }
 
 func (m *scanManager) notifyStatus() {
@@ -154,20 +159,21 @@ func (m *scanManager) notifyStatus() {
 	failedQuery := atomic.LoadInt64(&m.failedQuery)
 	skipQuery := atomic.LoadInt64(&m.skipQuery)
 	riskCount := atomic.LoadInt64(&m.riskCount)
-	// process
-	m.client.StatusCard("已执行规则", fmt.Sprintf("%d/%d", finishQuery, m.totalQuery), "规则执行状态")
-	m.client.StatusCard("已跳过规则", skipQuery, "规则执行状态")
-	m.client.StatusCard("执行成功个数", successQuery, "规则执行状态")
-	m.client.StatusCard("执行失败个数", failedQuery, "规则执行状态")
-	m.client.StatusCard("检出漏洞/风险个数", riskCount, "漏洞/风险状态")
 	if finishQuery == m.totalQuery {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
 	}
-
 	process := float64(finishQuery) / float64(m.totalQuery)
-	m.client.YakitSetProgress(process)
-	if m.processCallback != nil {
-		m.processCallback(process)
+	// process
+	if m.client != nil {
+		m.client.StatusCard("已执行规则", fmt.Sprintf("%d/%d", finishQuery, m.totalQuery), "规则执行状态")
+		m.client.StatusCard("已跳过规则", skipQuery, "规则执行状态")
+		m.client.StatusCard("执行成功个数", successQuery, "规则执行状态")
+		m.client.StatusCard("执行失败个数", failedQuery, "规则执行状态")
+		m.client.StatusCard("检出漏洞/风险个数", riskCount, "漏洞/风险状态")
+		m.client.YakitSetProgress(process)
+	}
+	if m.ssaConfig.GetScanProcessCallback() != nil {
+		m.ssaConfig.GetScanProcessCallback()(process)
 	}
 }
 
@@ -185,11 +191,9 @@ func (m *scanManager) notifyRuleProcess(progName, ruleName string, f float64) {
 	if err != nil {
 		return
 	}
-	m.client.Output(marshal)
-	if m.ruleProcessCallback != nil {
-		m.ruleProcessCallback(progName, ruleName, f)
+	if m.client != nil {
+		m.client.Output(marshal)
 	}
-
 }
 
 func (m *scanManager) saveReport() {
