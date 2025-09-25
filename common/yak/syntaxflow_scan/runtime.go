@@ -35,14 +35,18 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 
 	var errs error
 	var taskIndex atomic.Int64
-
-	swg := utils.NewSizedWaitGroup(int(m.GetConcurrency()))
-
+	var concurrency int
+	if m.ssaConfig.GetScanConcurrency() <= 0 {
+		concurrency = 5
+	} else {
+		concurrency = int(m.ssaConfig.GetScanConcurrency())
+	}
+	swg := utils.NewSizedWaitGroup(concurrency)
 	for rule := range m.ruleChan {
 		if m.IsPause() || m.IsStop() {
 			break
 		}
-		for _, progName := range m.programs {
+		for _, progName := range m.ProgramNames {
 			if m.IsPause() || m.IsStop() {
 				break
 			}
@@ -70,6 +74,13 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	return errs
 }
 
+func (m *scanManager) isFinishScan() bool {
+	if m.finishedQuery >= m.totalQuery {
+		return true
+	}
+	return false
+}
+
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 	if !m.ignoreLanguage {
 		if rule.Language != string(consts.General) && string(rule.Language) != prog.GetLanguage() {
@@ -86,7 +97,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		}),
 		ssaapi.QueryWithSave(m.kind),
 	)
-	if m.memory {
+	if m.ssaConfig.GetScanMemory() {
 		option = append(option, ssaapi.QueryWithMemory())
 	}
 
