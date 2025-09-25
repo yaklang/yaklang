@@ -255,3 +255,36 @@ func TestGenerateERMDot(t *testing.T) {
 		t.Errorf("DOT output missing relationship type: %s", relationshipType)
 	}
 }
+
+func TestQueryEntityByKeyword(t *testing.T) {
+	entityBaseIndex, _, _, entityNames, _, _, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatalf("Failed to create local gRPC client: %v", err)
+	}
+	// 使用第一个实体的名称的部分作为关键词进行模糊查询
+	keyword := entityNames[0][:8]
+	req := &ypb.QueryEntityRequest{
+		Filter:     &ypb.EntityFilter{BaseIndex: entityBaseIndex, Keywords: []string{keyword}},
+		Pagination: &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id"},
+	}
+	resp, err := client.QueryEntity(context.Background(), req)
+	if err != nil {
+		t.Fatalf("QueryEntity by keyword failed: %v", err)
+	}
+	if len(resp.Entities) == 0 {
+		t.Fatalf("QueryEntity by keyword returned empty, expected at least one")
+	}
+	found := false
+	for _, e := range resp.Entities {
+		if strings.Contains(e.Name, keyword) {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("QueryEntity by keyword: expected entity name containing %s", keyword)
+	}
+}

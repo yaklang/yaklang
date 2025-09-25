@@ -1224,6 +1224,7 @@ type EntityFilter struct {
 	Names         []string               `protobuf:"bytes,4,rep,name=Names,proto3" json:"Names,omitempty"`
 	HiddenIndex   []string               `protobuf:"bytes,5,rep,name=HiddenIndex,proto3" json:"HiddenIndex,omitempty"`
 	RuntimeID     []string               `protobuf:"bytes,7,rep,name=RuntimeID,proto3" json:"RuntimeID,omitempty"`
+	Keywords      []string               `protobuf:"bytes,9,rep,name=Keywords,proto3" json:"Keywords,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1310,6 +1311,13 @@ func (x *EntityFilter) GetHiddenIndex() []string {
 func (x *EntityFilter) GetRuntimeID() []string {
 	if x != nil {
 		return x.RuntimeID
+	}
+	return nil
+}
+
+func (x *EntityFilter) GetKeywords() []string {
+	if x != nil {
+		return x.Keywords
 	}
 	return nil
 }
@@ -61335,7 +61343,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"Attributes\x18\x06 \x03(\v2\v.ypb.KVPairR\n" +
 	"Attributes\x12\x1c\n" +
 	"\tRationale\x18\a \x01(\tR\tRationale\x12 \n" +
-	"\vHiddenIndex\x18\b \x01(\tR\vHiddenIndex\"\xe0\x01\n" +
+	"\vHiddenIndex\x18\b \x01(\tR\vHiddenIndex\"\xfc\x01\n" +
 	"\fEntityFilter\x12\x16\n" +
 	"\x06BaseID\x18\x01 \x01(\x04R\x06BaseID\x12\x1c\n" +
 	"\tBaseIndex\x18\x06 \x01(\tR\tBaseIndex\x12\x1c\n" +
@@ -61344,7 +61352,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x05Types\x18\x03 \x03(\tR\x05Types\x12\x14\n" +
 	"\x05Names\x18\x04 \x03(\tR\x05Names\x12 \n" +
 	"\vHiddenIndex\x18\x05 \x03(\tR\vHiddenIndex\x12\x1c\n" +
-	"\tRuntimeID\x18\a \x03(\tR\tRuntimeID\"l\n" +
+	"\tRuntimeID\x18\a \x03(\tR\tRuntimeID\x12\x1a\n" +
+	"\bKeywords\x18\t \x03(\tR\bKeywords\"l\n" +
 	"\x12QueryEntityRequest\x12)\n" +
 	"\x06Filter\x18\x01 \x01(\v2\x11.ypb.EntityFilterR\x06Filter\x12+\n" +
 	"\n" +

@@ -997,6 +997,7 @@ message EntityFilter {
   repeated string Names = 4;
   repeated string HiddenIndex = 5;
   repeated string RuntimeID = 7;
+  repeated string Keywords = 9;
 }
 
 message QueryEntityRequest {
