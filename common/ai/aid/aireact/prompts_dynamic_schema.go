@@ -190,7 +190,8 @@ func getYaklangCodeLoopSchema() string {
 	opts := []any{
 		aitool.WithStringParam(
 			"@action",
-			aitool.WithParam_Description("You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process."),
+			aitool.WithParam_Description("You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process.\n"+
+				"'write_code'  or 'modify_code' means you have to provide Yaklang Code in <|GEN_CODE_...|>, check the example after schema"),
 			aitool.WithParam_EnumString(
 				"query_document",
 				"write_code",
@@ -215,10 +216,6 @@ func getYaklangCodeLoopSchema() string {
 		aitool.WithNumberParam(
 			"modify_end_line",
 			aitool.WithParam_Description("If the action is 'modify_code', specify the ending line number (1-based index) of the code segment to be modified. This indicates where the changes should end in the existing code. The lines from modify_start_line to modify_end_line (inclusive) will be replaced with the new code provided in the 'code' field."),
-		),
-		aitool.WithStringParam(
-			"code",
-			aitool.WithParam_Description("If this action involves code modification (write_code or modify_code), provide the updated code content here. Leave empty for other actions."),
 		),
 		aitool.WithStringParam(
 			"query_document",
