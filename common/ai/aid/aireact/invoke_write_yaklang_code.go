@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -53,8 +52,9 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 	tools := buildinaitools.GetAllTools()
 	nonceStr := utils.RandStringBytes(4)
 
-	for !satisfied {
+	for {
 		iterationCount++
+		log.Infof("start to generate yaklang code, iteration %d", iterationCount)
 		prompt, err := r.promptManager.GenerateYaklangCodeActionLoop(
 			userQuery+"\n\n"+approach, // userQuery
 			currentCode,               // currentCode
@@ -75,15 +75,26 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 		var action *aicommon.Action
 		var actionErr error
 		var modifyStartLine, modifyEndLine int
+
+		cb := utils.NewCondBarrier()
+		codeBarrier := cb.CreateBarrier("code")
+
 		transactionErr := aicommon.CallAITransaction(
 			r.config, prompt, r.config.CallAI,
 			func(resp *aicommon.AIResponse) error {
 				stream := resp.GetOutputStreamReader("yaklang-code-loop", true, r.config.Emitter)
 
 				// debug io
+				stream = io.TeeReader(stream, os.Stdout)
 
 				stream = utils.CreateUTF8StreamMirror(stream, func(reader io.Reader) {
-					aitag.Parse(reader, aitag.WithCallback("GEN_CODE", "nonceStr", func(reader io.Reader) {
+					defer func() {
+						cb.Cancel()
+					}()
+					aitag.Parse(reader, aitag.WithCallback("GEN_CODE", nonceStr, func(reader io.Reader) {
+						defer func() {
+							codeBarrier.Done()
+						}()
 						var result bytes.Buffer
 						io.Copy(io.Discard, io.TeeReader(reader, io.MultiWriter(os.Stdout, &result)))
 						generatedCode = result.String()
@@ -137,11 +148,6 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)
 				}
-
-				fmt.Println("=================================================")
-				spew.Dump(action)
-				fmt.Println("=================================================")
-
 				actionName = action.Name()
 				switch actionName {
 				case "write_code":
@@ -180,13 +186,15 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			return utils.Wrap(transactionErr, "AI transaction failed in code generation loop")
 		}
 
-		if actionName == "write_code" && generatedCode == "" {
-			errorMessages += "AI did not provide any code in write_code action; "
-			continue
+		if actionName == "write_code" || actionName == "modify_code" {
+			log.Info("start to wait code in conditional barrier")
+			cb.Wait("code")
+			payload = generatedCode
 		}
 
-		if actionName == "write_code" || actionName == "modify_code" {
-			payload = generatedCode
+		if actionName == "write_code" && payload == "" {
+			errorMessages += "AI did not provide any code in write_code action; "
+			continue
 		}
 
 		// Handle different action types
