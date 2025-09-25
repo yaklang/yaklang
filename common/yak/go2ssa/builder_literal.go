@@ -71,16 +71,18 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		b.SupportClosure = true
 		b.SetForceCapture(true)
 
-		if para, ok := exp.Signature().(*gol.SignatureContext); ok {
-			b.buildSignature(para)
-		}
+		b.BuildSyntaxBlock(func() {
+			if para, ok := exp.Signature().(*gol.SignatureContext); ok {
+				b.buildSignature(para)
+			}
 
-		handleFunctionType(b.Function)
+			handleFunctionType(b.Function)
 
-		b.SetGlobal = false
-		if block, ok := exp.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block, true)
-		}
+			b.SetGlobal = false
+			if block, ok := exp.Block().(*gol.BlockContext); ok {
+				b.buildBlock(block, false)
+			}
+		})
 
 		b.Finish()
 		b.SetForceCapture(false)

@@ -1051,6 +1051,10 @@ var ssaRisk = &cli.Command{
 			Name:  "input,i",
 			Usage: "risk report JSON file to be imported",
 		},
+		cli.StringFlag{
+			Name:  "program,p",
+			Usage: "program name for ssa compiler in db",
+		},
 		// 	cli.StringFlag{
 		// 		Name: "format",
 		// 		Usage: `output format:
@@ -1076,45 +1080,75 @@ var ssaRisk = &cli.Command{
 	},
 	Action: func(c *cli.Context) (e error) {
 		input := c.String("input")
-		if input == "" {
-			return utils.Error("input file is required")
+		program := c.String("program")
+
+		showAll := func(content []byte) error {
+			var report sfreport.Report
+			if err := json.Unmarshal(content, &report); err != nil {
+				return utils.Wrap(err, "failed to parse JSON file")
+			}
+
+			// format := sfreport.ReportTypeFromString(c.String("format"))
+			severityFilter := c.String("severity-filter")
+			ruleFilter := c.String("rule-filter")
+			withCode := c.Bool("with-code")
+			return outputConsole(os.Stdout, &report, severityFilter, ruleFilter, withCode)
 		}
 
-		if !utils.IsFile(input) {
-			return utils.Errorf("input file not found: %v", input)
+		if input != "" {
+			if !utils.IsFile(input) {
+				return utils.Errorf("input file not found: %v", input)
+			}
+
+			content, err := os.ReadFile(input)
+			if err != nil {
+				return utils.Wrap(err, "failed to read input file")
+			}
+			return showAll(content)
+		} else if program != "" {
+			config, err := parseSFScanConfig(c)
+			if err != nil {
+				log.Errorf("parse config failed: %s", err)
+				return err
+			}
+			defer config.DeferFunc()
+
+			ctx := context.Background()
+			prog, err := getProgram(ctx, config)
+			if err != nil {
+				log.Errorf("get program failed: %s", err)
+				return err
+			}
+
+			ruleFilter := &ypb.SyntaxFlowRuleFilter{
+				Language:          []string{prog.GetLanguage()},
+				FilterLibRuleKind: yakit.FilterLibRuleFalse,
+			}
+
+			var content []byte
+			riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, true)
+			if err != nil {
+				log.Errorf("scan failed: %s", err)
+				// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
+				return err
+			}
+			opt := []sfreport.Option{}
+			if c.Bool("with-file-content") {
+				opt = append(opt, sfreport.WithFileContent(true))
+			}
+			if c.Bool("with-dataflow-path") {
+				opt = append(opt, sfreport.WithDataflowPath(true))
+			}
+
+			// 创建一个缓冲区来捕获ShowRisk的输出
+			var buffer bytes.Buffer
+			ShowRisk(config.Format, riskCh, &buffer, opt...)
+			content = buffer.Bytes()
+
+			return showAll(content)
 		}
 
-		content, err := os.ReadFile(input)
-		if err != nil {
-			return utils.Wrap(err, "failed to read input file")
-		}
-
-		var report sfreport.Report
-		if err := json.Unmarshal(content, &report); err != nil {
-			return utils.Wrap(err, "failed to parse JSON file")
-		}
-
-		// format := sfreport.ReportTypeFromString(c.String("format"))
-		severityFilter := c.String("severity-filter")
-		ruleFilter := c.String("rule-filter")
-		withCode := c.Bool("with-code")
-
-		writer := os.Stdout
-		return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
-
-		// switch format {
-		// case sfreport.SarifReportType:
-		// 	// TODO
-		// 	return outputSARIF(writer, &report)
-		// case sfreport.IRifyReportType:
-		// 	return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
-		// case sfreport.IRifyFullReportType:
-		// 	return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
-		// case sfreport.IRifyReactReportType:
-		// 	return outputConsole(writer, &report, severityFilter, ruleFilter, withCode)
-		// default:
-		// 	return utils.Errorf("unsupported output format: %s, supported formats: console, sarif, irify, irify-full, irify-react-report, json, summary", format)
-		// }
+		return nil
 	},
 }
 
@@ -1205,6 +1239,12 @@ var ssaCodeScan = &cli.Command{
 			Name:  "log-level,loglevel",
 			Usage: `set log level, default is info, optional value: debug, info, warn, error`,
 		},
+
+		cli.StringSliceFlag{
+			Name: "exclude-file",
+			Usage: `exclude default file,only support glob mode. eg.
+					targets/*, vendor/*`,
+		},
 	},
 	Action: func(c *cli.Context) (e error) {
 		defer func() {
@@ -1267,7 +1307,6 @@ var ssaCodeScan = &cli.Command{
 			Keyword:           c.String("rule-keyword"),
 			FilterLibRuleKind: yakit.FilterLibRuleFalse,
 		}
-		ruleFilter.Keyword = c.String("rule-keyword")
 
 		// Handle rule group filtering
 		if groupNames := c.StringSlice("rule-group"); len(groupNames) > 0 {

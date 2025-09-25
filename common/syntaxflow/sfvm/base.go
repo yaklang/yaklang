@@ -8,6 +8,12 @@ import (
 func validSSAOpcode(raw string) ssa.Opcode {
 	text := yakunquote.TryUnquote(raw)
 	switch text {
+	case "und", "undefined":
+		return ssa.SSAOpcodeUndefined
+	case "free", "freeValue":
+		return ssa.SSAOpcodeFreeValue
+	case "extendLib", "lib":
+		return ssa.SSAOpcodeExternLib
 	case "call":
 		return ssa.SSAOpcodeCall
 	case "phi":
@@ -16,6 +22,8 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeConstInst
 	case "param", "formal_param":
 		return ssa.SSAOpcodeParameter
+	case "param_member", "parammember":
+		return ssa.SSAOpcodeParameterMember
 	case "return":
 		return ssa.SSAOpcodeReturn
 	case "function", "func", "def":

@@ -437,6 +437,11 @@ func (c *Call) handleCalleeFunction() {
 						}
 					}
 				}
+
+				if _, ok := ToExternLib(object); ok {
+					continue
+				}
+
 				if utils.IsNil(val) {
 					val = builder.ReadMemberCallValue(object, key)
 				}

@@ -53,6 +53,8 @@ type ssaCliConfig struct {
 	// {{ defer function
 	deferFunc []func()
 	// }}
+
+	exclude string
 }
 
 func (config *ssaCliConfig) DeferFunc() {
@@ -126,6 +128,10 @@ func parseSFScanConfig(c *cli.Context) (res *ssaCliConfig, err error) {
 		})
 	}
 
+	if e := c.String("exclude-file"); e != "" {
+		config.exclude = e
+	}
+
 	return config, nil
 }
 
@@ -148,6 +154,7 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 		para := make(map[string]any)
 		if config.memory {
 			para["memory"] = true
+			para["excludeFile"] = config.exclude
 		}
 		_, prog, err := coreplugin.ParseProjectWithAutoDetective(ctx, config.targetPath, config.language, para)
 		return prog, err
