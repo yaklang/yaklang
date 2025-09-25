@@ -91,9 +91,9 @@ none
 REFERENCE
 )
 
-consts?{have: ExternLib}?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
-$consts.*Database?{!have: ParameterMember} as $database;
-$database<getFunc>?{have: "init"} as $high;
+consts?{opcode: lib}?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
+$consts.*Database?{!opcode: param_member} as $database;
+$database<getFunc>?{have: /\bFunction-init\b/} as $high;
 
 alert $high for {
 	title: "Audit Golang Database Operations in Init Function",
@@ -135,8 +135,8 @@ func init() {
 SAFE
 )
 
-consts?{have: ExternLib}?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
-$consts.*Database?{have: ParameterMember} as $database;
+consts?{opcode: lib}?{<fullTypeName>?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;
+$consts.*Database?{!opcode: param_member} as $database;
 $database<getFunc> as $level1;
 $level1<getCall>?{!have: 'RegisterPostInitDatabaseFunction'}<getFunc> as $level2
 $level2<getCall>?{!have: 'RegisterPostInitDatabaseFunction'}<getFunc> as $level3
@@ -146,7 +146,7 @@ $level1 as $level
 $level2 as $level
 $level3 as $level
 $level4 as $level
-$level?{have: "init"} as $mid;
+$level?{have: /\bFunction-init\b/} as $mid;
 
 alert $mid for {
 	title: "Audit Golang Database Operations in Init Function",
