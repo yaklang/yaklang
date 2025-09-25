@@ -208,15 +208,12 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		switch result.Kind {
 		case schema.SFResultKindDebug:
 			// debug模式下，所有变量都存数据库
-			if msg, ok := r.GetAlertMsg(name); ok {
-				opts = append(opts, OptionSaveValue_ResultAlert(msg))
-			}
 		case schema.SFResultKindSearch:
 			// search模式下，不保存到risk数据库
 		case schema.SFResultKindScan:
 			// scan模式下，只存有风险的变量
 			if msg, ok := r.GetAlertMsg(name); ok {
-				opts = append(opts, OptionSaveValue_ResultAlert(msg))
+				_ = msg
 			} else {
 				result.UnValueVariable = append(result.UnValueVariable, name)
 				return

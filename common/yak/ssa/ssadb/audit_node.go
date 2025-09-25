@@ -16,8 +16,8 @@ type AuditNodeStatus struct {
 	ResultId       uint   `json:"result_id" gorm:"index"`
 	ResultVariable string `json:"result_variable" gorm:"index"` // syntaxflow result variable name
 	ResultIndex    uint   `json:"result_index" gorm:"index"`
-	ResultAlertMsg string `json:"result_alert_msg"`
-	RiskHash       string `json:"risk_hash"`
+	// ResultAlertMsg string `json:"result_alert_msg"`
+	RiskHash string `json:"risk_hash"`
 	// rule  info
 	RuleName  string `json:"rule_name" gorm:"index"`
 	RuleTitle string `json:"rule_title"`

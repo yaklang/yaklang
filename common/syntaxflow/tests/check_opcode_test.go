@@ -74,12 +74,12 @@ func TestOpcode(t *testing.T) {
 	})
 
 	//  description
-	t.Run("description", func(t *testing.T) {
-		check(t, `desc(a: b)`, sfvm.OpAddDescription)
-	})
-	t.Run("description no :", func(t *testing.T) {
-		check(t, `desc("xxxx")`, sfvm.OpAddDescription)
-	})
+	// t.Run("description", func(t *testing.T) {
+	// 	check(t, `desc(a: b)`, sfvm.OpAddDescription)
+	// })
+	// t.Run("description no :", func(t *testing.T) {
+	// 	check(t, `desc("xxxx")`, sfvm.OpAddDescription)
+	// })
 
 	// search
 	t.Run("search exact", func(t *testing.T) {

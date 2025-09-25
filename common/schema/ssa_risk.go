@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -44,8 +45,8 @@ type SSARisk struct {
 	ProgramName string `json:"program_name" gorm:"index"`
 	// file url yakurl
 	CodeSourceUrl string `json:"code_source_url" gorm:"index"`
-	CodeRange     string `json:"code_range"`
-	CodeFragment  string `json:"code_fragment"`
+	CodeRange     string `json:"code_range" gorm:"type:longtext"`
+	CodeFragment  string `json:"code_fragment" gorm:"type:longtext"`
 	// for query risk
 	FunctionName string `json:"function_name" gorm:"index"`
 	Line         int64  `json:"line" gorm:"index"`
