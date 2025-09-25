@@ -213,23 +213,13 @@ func ExportHNSWGraph[K cmp.Ordered](i *Graph[K]) (*Persistent[K], error) {
 		return currentOffset, nil
 	}
 
-	layerOffset := []uint32{}
-	preOffset := uint32(0)
-	for _, layer := range i.Layers {
-		layerOffset = append(layerOffset, preOffset)
-		preOffset += uint32(len(layer.Nodes))
-	}
-
+	totalNodes := len(i.Layers[0].Nodes)
 	loadOffsetWithLevel := func(level uint32, node hnswspec.LayerNode[K]) (uint32, error) {
 		offset, err := loadOffset(node)
 		if err != nil {
 			return 0, err
 		}
-		if level == 0 {
-			return offset, nil
-		}
-		layerOffset := layerOffset[level]
-		return offset + layerOffset, nil
+		return uint32(totalNodes)*uint32(level) + offset, nil
 	}
 
 	pers.Layers = make([]*PersistentLayer, len(i.Layers))
