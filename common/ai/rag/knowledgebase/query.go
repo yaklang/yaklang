@@ -182,6 +182,9 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 	// 如果有Filter配置，转换为RAG Filter
 	if config.Filter != nil {
 		ragFilter := func(key string, getDoc func() *rag.Document) bool {
+			if getDoc().Type != schema.RAGDocumentType_Knowledge {
+				return false
+			}
 			return config.Filter(key, getDoc, func() (*schema.KnowledgeBaseEntry, error) {
 				var entry schema.KnowledgeBaseEntry
 				err := db.Model(&schema.KnowledgeBaseEntry{}).Where("id = ?", key).First(&entry).Error
@@ -192,6 +195,10 @@ func Query(db *gorm.DB, query string, opts ...QueryOption) (chan *SearchKnowledg
 			})
 		}
 		ragOpts = append(ragOpts, rag.WithRAGFilter(ragFilter))
+	} else {
+		ragOpts = append(ragOpts, rag.WithRAGFilter(func(key string, getDoc func() *rag.Document) bool {
+			return getDoc().Type == schema.RAGDocumentType_Knowledge
+		}))
 	}
 
 	var allResults []*SearchKnowledgebaseResult

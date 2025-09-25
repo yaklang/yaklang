@@ -54,6 +54,24 @@ func GetAllRAGCollectionInfos(db *gorm.DB) ([]*schema.VectorStoreCollection, err
 	return collections, nil
 }
 
+func GetRAGCollectionInfoByName(db *gorm.DB, name string) (*schema.VectorStoreCollection, error) {
+	var collection schema.VectorStoreCollection
+	db = selectRAGCollectionCoreFields(db).Where("name = ?", name).First(&collection)
+	if db.Error != nil {
+		return nil, db.Error
+	}
+	return &collection, nil
+}
+
+func GetRAGCollectionInfoByID(db *gorm.DB, id int64) (*schema.VectorStoreCollection, error) {
+	var collection schema.VectorStoreCollection
+	db = selectRAGCollectionCoreFields(db).Where("id = ?", id).First(&collection)
+	if db.Error != nil {
+		return nil, db.Error
+	}
+	return &collection, nil
+}
+
 func GetRAGDocumentByID(db *gorm.DB, name string, id string) (*schema.VectorStoreDocument, error) {
 	var doc schema.VectorStoreDocument
 	db = db.Where("document_id = ?", id).First(&doc)

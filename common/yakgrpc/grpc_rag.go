@@ -139,20 +139,22 @@ func (s *Server) UpdateVectorStoreCollection(ctx context.Context, req *ypb.Updat
 func (s *Server) ListVectorStoreEntries(ctx context.Context, req *ypb.ListVectorStoreEntriesRequest) (*ypb.ListVectorStoreEntriesResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
-	// 验证集合ID
-	if req.GetCollectionID() <= 0 {
-		return nil, utils.Errorf("集合ID不能为空")
-	}
-
-	// 验证集合是否存在
-	var collection schema.VectorStoreCollection
-	err := db.Model(&schema.VectorStoreCollection{}).Where("id = ?", req.GetCollectionID()).First(&collection).Error
-	if err != nil {
-		return nil, utils.Errorf("找不到指定的向量存储集合: %v", err)
+	var collection *schema.VectorStoreCollection
+	var err error
+	if req.GetCollectionName() != "" {
+		collection, err = yakit.GetRAGCollectionInfoByName(db, req.GetCollectionName())
+		if err != nil {
+			return nil, utils.Errorf("找不到指定的向量存储集合: %v", err)
+		}
+	} else {
+		collection, err = yakit.GetRAGCollectionInfoByID(db, req.GetCollectionID())
+		if err != nil {
+			return nil, utils.Errorf("找不到指定的向量存储集合: %v", err)
+		}
 	}
 
 	// 构建查询
-	query := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", req.GetCollectionID())
+	query := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID)
 
 	// 关键词搜索
 	if req.GetKeyword() != "" {
