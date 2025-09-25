@@ -152,12 +152,12 @@ func (r *EntityRepository) VectorSearch(query string, top int, scoreLimit ...flo
 		}
 		switch res.Document.Type {
 		case schema.RAGDocumentType_Entity:
-			index, ok := res.Document.Metadata.GetDocIndex()
+			index, ok := res.Document.Metadata.GetDataUUID()
 			if ok {
 				entityIndex = append(entityIndex, utils.InterfaceToString(index))
 			}
 		case schema.RAGDocumentType_Relationship:
-			index, ok := res.Document.Metadata.GetDocIndex()
+			index, ok := res.Document.Metadata.GetDataUUID()
 			if ok {
 				relationshipIndex = append(relationshipIndex, utils.InterfaceToString(index))
 			}
@@ -220,7 +220,7 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 			continue
 		}
 		if res.Document.Type == schema.RAGDocumentType_Entity {
-			index, ok := res.Document.Metadata.GetDocIndex()
+			index, ok := res.Document.Metadata.GetDataUUID()
 			if ok {
 				entityIndex = append(entityIndex, utils.InterfaceToString(index))
 			}
@@ -257,9 +257,9 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 	defer r.entityVectorMutex.Unlock()
 
 	metadata := map[string]any{
-		schema.META_Doc_Index:  entry.Uuid,
-		schema.META_Doc_Name:   entry.EntityName,
-		schema.META_Base_Index: entry.RepositoryUUID,
+		schema.META_Data_UUID:  entry.Uuid,
+		schema.META_Data_Title: entry.EntityName,
+		schema.META_Repos_UUID: entry.RepositoryUUID,
 		META_EntityType:        entry.EntityType,
 	}
 
@@ -275,23 +275,29 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 	return r.GetRAGSystem().Add(documentID, content, opts...)
 }
 
-func (r *EntityRepository) addRelationshipToVectorIndex(entry *schema.ERModelRelationship) error {
-	src, err := r.GetEntityByUUID(entry.SourceEntityIndex)
+func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERModelRelationship) error {
+	src, err := r.GetEntityByUUID(relationship.SourceEntityIndex)
 	if err != nil {
-		return utils.Errorf("failed to get source entity by uuid [%s]: %v", entry.SourceEntityIndex, err)
+		return utils.Errorf("failed to get source entity by uuid [%s]: %v", relationship.SourceEntityIndex, err)
 	}
 	srcDoc := src.ToRAGContent()
-	dst, err := r.GetEntityByUUID(entry.TargetEntityIndex)
+	dst, err := r.GetEntityByUUID(relationship.TargetEntityIndex)
 	if err != nil {
-		return utils.Errorf("failed to get target entity by uuid [%s]: %v", entry.TargetEntityIndex, err)
+		return utils.Errorf("failed to get target entity by uuid [%s]: %v", relationship.TargetEntityIndex, err)
 	}
 	dstDoc := dst.ToRAGContent()
-	content := entry.ToRAGContent(srcDoc, dstDoc)
+	content := relationship.ToRAGContent(srcDoc, dstDoc)
+	metadata := map[string]any{
+		schema.META_Data_UUID:  relationship.Uuid,
+		schema.META_Data_Title: fmt.Sprintf("关系[%s]", relationship.RelationshipTypeVerbose),
+		schema.META_Repos_UUID: relationship.RepositoryUUID,
+	}
 	return r.GetRAGSystem().Add(
-		entry.Uuid, content,
+		relationship.Uuid, content,
 		rag.WithDocumentType(schema.RAGDocumentType_Relationship),
-		rag.WithDocumentRelatedEntities(entry.SourceEntityIndex, entry.TargetEntityIndex),
-		rag.WithDocumentRuntimeID(entry.RuntimeID),
+		rag.WithDocumentRelatedEntities(relationship.SourceEntityIndex, relationship.TargetEntityIndex),
+		rag.WithDocumentRuntimeID(relationship.RuntimeID),
+		rag.WithDocumentRawMetadata(metadata),
 	)
 }
 
