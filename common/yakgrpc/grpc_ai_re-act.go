@@ -63,7 +63,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}),
 		aireact.WithEventInputChan(inputEvent),
 		aireact.WithContext(baseCtx),
-		aireact.WithBuiltinTools(),
+		aireact.WithBuiltinTools(baseCtx),
 		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
 		aireact.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 		aireact.WithPersistentSessionId(persistentSession),

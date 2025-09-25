@@ -1,6 +1,7 @@
 package buildinaitools
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/samber/lo"
@@ -12,7 +13,8 @@ import (
 
 // AiToolManager 是工具管理器的默认实现
 type AiToolManager struct {
-	toolsGetter  func() []*aitool.Tool
+	ctx          context.Context
+	toolsGetter  func(ctx context.Context) ([]*aitool.Tool, error)
 	toolEnabled  map[string]bool // 记录工具是否开启
 	enableSearch bool            // 是否开启工具搜索
 	searcher     searchtools.AISearcher[*aitool.Tool]
@@ -27,6 +29,12 @@ type ToolManagerOption func(*AiToolManager)
 func WithSearcher(searcher searchtools.AISearcher[*aitool.Tool]) ToolManagerOption {
 	return func(m *AiToolManager) {
 		m.searcher = searcher
+	}
+}
+
+func WithCtx(ctx context.Context) ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.ctx = ctx
 	}
 }
 
@@ -45,8 +53,12 @@ func WithExtendTools(tools []*aitool.Tool, suggested ...bool) ToolManagerOption 
 	return func(m *AiToolManager) {
 		var enable = len(suggested) > 0 && suggested[0]
 		var allTools []*aitool.Tool
+		var err error
 		if m.toolsGetter != nil {
-			allTools = m.toolsGetter()
+			allTools, err = m.toolsGetter(m.ctx)
+			if err != nil {
+				log.Errorf("get tools: %v", err)
+			}
 		}
 
 		toolsMap := map[string]*aitool.Tool{}
@@ -65,8 +77,12 @@ func WithExtendTools(tools []*aitool.Tool, suggested ...bool) ToolManagerOption 
 		})
 
 		originGetter := m.toolsGetter
-		m.toolsGetter = func() []*aitool.Tool {
-			return append(originGetter(), extTools...)
+		m.toolsGetter = func(ctx context.Context) ([]*aitool.Tool, error) {
+			allTools, err := originGetter(ctx)
+			if err != nil {
+				log.Errorf("get tools error: %v", err)
+			}
+			return append(allTools, extTools...), nil
 		}
 	}
 }
@@ -97,7 +113,14 @@ func WithSearchEnabled(enabled bool) ToolManagerOption {
 	}
 }
 func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolManagerOption) *AiToolManager {
+	return NewToolManagerByCtxToolGetter(func(ctx context.Context) ([]*aitool.Tool, error) {
+		return getter(), nil
+	}, options...)
+}
+
+func NewToolManagerByCtxToolGetter(getter func(ctx context.Context) ([]*aitool.Tool, error), options ...ToolManagerOption) *AiToolManager {
 	manager := &AiToolManager{
+		ctx:         context.Background(),
 		toolsGetter: getter,
 		toolEnabled: make(map[string]bool),
 	}
@@ -112,15 +135,18 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 
 // NewToolManager 创建一个新的默认工具管理器实例
 func NewToolManager(options ...ToolManagerOption) *AiToolManager {
-	manager := NewToolManagerByToolGetter(GetAllTools, options...)
-	return manager
+	return NewToolManagerByCtxToolGetter(GetAllToolsWithContext, options...)
 }
 
 func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 	if m.toolsGetter == nil {
 		return []*aitool.Tool{}
 	}
-	allTools := m.toolsGetter()
+	allTools, err := m.toolsGetter(m.ctx)
+	if err != nil {
+		log.Errorf("get tools: %v", err)
+		return []*aitool.Tool{}
+	}
 	if len(m.disableTools) > 0 {
 		allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
 			_, ok := m.disableTools[tool.Name]

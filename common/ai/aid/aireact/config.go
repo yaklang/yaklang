@@ -405,14 +405,18 @@ func WithTools(tool ...*aitool.Tool) Option {
 }
 
 // WithBuiltinTools adds all builtin AI tools including search capabilities
-func WithBuiltinTools() Option {
+func WithBuiltinTools(ctx context.Context) Option {
 	return func(cfg *ReActConfig) {
 		if cfg.aiToolManagerOption == nil {
 			cfg.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
 
 		// Get all builtin tools
-		allTools := buildinaitools.GetAllTools()
+		allTools, err := buildinaitools.GetAllToolsWithContext(ctx)
+		if err != nil {
+			log.Errorf("get all builtin tools: %v", err)
+			return
+		}
 
 		// Create a simple AI chat function for the searcher
 		aiChatFunc := func(prompt string) (io.Reader, error) {
@@ -707,7 +711,7 @@ func NewReActConfig(ctx context.Context, opts ...Option) *ReActConfig {
 
 	// Initialize tool manager if not set
 	if config.aiToolManager == nil {
-		config.aiToolManager = buildinaitools.NewToolManager(config.aiToolManagerOption...)
+		config.aiToolManager = buildinaitools.NewToolManager(append(config.aiToolManagerOption, buildinaitools.WithCtx(config.ctx))...)
 	}
 
 	// Restore persistent session if configured
