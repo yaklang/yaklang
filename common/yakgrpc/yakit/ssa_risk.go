@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -143,119 +142,66 @@ func NewSSARiskFilter(opts ...SSARiskFilterOption) *ypb.SSARisksFilter {
 	return filter
 }
 
-func filterSSARiskByIncremental(db *gorm.DB, runtimeId string) (*gorm.DB, error) {
-	if runtimeId == "" {
-		return db, utils.Errorf("task_id is empty")
-	}
-	// 获取基础任务信息
-	var baseTask schema.SyntaxFlowScanTask
-	if err := db.New().Where("task_id = ?", runtimeId).First(&baseTask).Error; err != nil {
-		return db, utils.Errorf("Failed to get base task: %v", err)
-	}
-
-	// 第一步：获取当前批次产生的所有 RiskFeatureHash
-	var currentBatchFeatureHashes []string
-	err := db.New().Model(&schema.SSARisk{}).
-		Where("runtime_id = ? AND risk_feature_hash != ''", runtimeId).
-		Pluck("DISTINCT risk_feature_hash", &currentBatchFeatureHashes).Error
-	if err != nil || len(currentBatchFeatureHashes) == 0 {
-		// 如果当前批次没有风险或查询失败，返回空结果
-		return db, utils.Errorf("filterSSARiskByIncremental failed: %v", err)
-	}
-
-	// 第二步：获取早于或等于基础批次的已被处置过的 risk_feature_hash
-	var disposedFeatureHashes []string
-	subQuery := db.New().Model(&schema.SSARiskDisposals{}).
-		Joins("JOIN syntax_flow_scan_tasks ON ssa_risk_disposals.task_id = syntax_flow_scan_tasks.task_id").
-		Where("ssa_risk_disposals.risk_feature_hash != '' AND ssa_risk_disposals.risk_feature_hash IN (?) AND syntax_flow_scan_tasks.scan_batch <= ?",
-			currentBatchFeatureHashes, baseTask.ScanBatch)
-
-	err = subQuery.Pluck("DISTINCT ssa_risk_disposals.risk_feature_hash", &disposedFeatureHashes).Error
-
-	var hashs []string
-	if err == nil && len(disposedFeatureHashes) > 0 {
-		// 第三步：筛选有效特征（未处置）
-		disposedSet := lo.SliceToMap(disposedFeatureHashes, func(hash string) (string, bool) {
-			return hash, true
-		})
-		validFeatureHashes := lo.Filter(currentBatchFeatureHashes, func(hash string, _ int) bool {
-			return !disposedSet[hash]
-		})
-		if len(validFeatureHashes) > 0 {
-			hashs = validFeatureHashes
-		} else {
-			return db, utils.Errorf("filterSSARiskByIncremental failed: %v", err)
+func filterSSARiskByIncremental(db *gorm.DB, runtimeId ...string) *gorm.DB {
+	if len(runtimeId) == 0 {
+		// 查询所有未处置的漏洞
+		var disposedFeatureHashes []string
+		err := db.New().Model(&schema.SSARiskDisposals{}).
+			Pluck("DISTINCT risk_feature_hash", &disposedFeatureHashes).Error
+		if err != nil {
+			log.Errorf("Failed to query disposed feature hashes: %v", err)
+			return db
 		}
-	} else {
-		hashs = currentBatchFeatureHashes
+		db = db.Where("risk_feature_hash NOT IN (?)", disposedFeatureHashes)
+		return db
+	} else if len(runtimeId) == 1 {
+		var baseTask schema.SyntaxFlowScanTask
+		if err := db.New().Where("task_id = ?", runtimeId).First(&baseTask).Error; err != nil {
+			return db
+		}
+		var validFeatureHashes []string
+		subWhere := `
+		NOT EXISTS (
+			SELECT 1
+			FROM ssa_risk_disposals
+			JOIN syntax_flow_scan_tasks base_task ON ssa_risk_disposals.task_id = base_task.task_id
+			WHERE ssa_risk_disposals.risk_feature_hash = ssa_risks.risk_feature_hash
+			  AND base_task.scan_batch <= ?
+		)
+	`
+		err := db.New().
+			Model(&schema.SSARisk{}).
+			Where("ssa_risks.runtime_id = ? AND ssa_risks.risk_feature_hash != ''", runtimeId).
+			Where(subWhere, baseTask.ScanBatch).
+			Pluck("DISTINCT ssa_risks.risk_feature_hash", &validFeatureHashes).Error
+		if err != nil {
+			log.Errorf("Failed to query valid feature hashes: %v", err)
+			return db
+		}
+		return db.Where("risk_feature_hash IN (?)", validFeatureHashes)
 	}
-
-	// 获取符合条件的 runtime_id 列表（scan_batch <= baseTask.ScanBatch）
-	var validRuntimeIDs []string
-	err = db.New().Model(&schema.SyntaxFlowScanTask{}).
-		Where("scan_batch <= ?", baseTask.ScanBatch).
-		Pluck("task_id", &validRuntimeIDs).Error
-	if err != nil {
-		return db, utils.Errorf("Failed to get valid runtime IDs: %v", err)
-	}
-
-	if len(validRuntimeIDs) == 0 {
-		return db, utils.Error("Failed to get valid runtime IDs")
-	}
-
-	return db.Where("risk_feature_hash IN (?) AND runtime_id IN (?)", hashs, validRuntimeIDs), nil
+	return db
 }
 
-func filterSSARiskByCompare(db *gorm.DB, baselineTaskID, compareTaskID string) (*gorm.DB, error) {
+func filterSSARiskByCompare(db *gorm.DB, baselineTaskID, compareTaskID string) *gorm.DB {
 	if baselineTaskID == "" || compareTaskID == "" {
-		return db, utils.Errorf("baselineTaskID or compareTaskID is empty")
+		return db
 	}
 	var compareHash []string
-	compareQuery := db.Model(&schema.SSARisk{}).
+	db.New().Model(&schema.SSARisk{}).
 		Where("runtime_id = ?", compareTaskID).
 		Where("risk_feature_hash != ''").
 		Pluck("risk_feature_hash", &compareHash)
-
-	if compareQuery.Error == nil {
-		if len(compareHash) > 0 {
-			db = db.Where("runtime_id = ?", baselineTaskID).
-				Where("risk_feature_hash NOT IN (?)", compareHash)
-		} else {
-			db = db.Where("runtime_id = ?", baselineTaskID)
-		}
-	} else {
-		return db, utils.Errorf("Failed to query baseline task hashes: %v", compareQuery.Error)
+	if len(compareHash) > 0 {
+		db = db.Where("risk_feature_hash NOT IN (?)", compareHash)
 	}
-	return db, nil
+	return db
 }
 func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if filter == nil {
 		return db
 	}
-	var err error
-	// 对比查询
-	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
-		baselineTaskID := dr.GetBaseLine().GetRiskRuntimeId()
-		compareTaskID := dr.GetCompare().GetRiskRuntimeId()
 
-		db, err = filterSSARiskByCompare(db, baselineTaskID, compareTaskID)
-		if err != nil {
-			log.Errorf("Failed to apply compare filter: %v", err)
-			return db.Where("1 = 0")
-		}
-	}
-
-	if filter.GetIncremental() {
-		runtimeIDs := filter.GetRuntimeID()
-		if len(runtimeIDs) != 1 {
-			return db
-		}
-		db, err = filterSSARiskByIncremental(db, runtimeIDs[0])
-		if err != nil {
-			log.Errorf("Failed to apply incremental filter: %v", err)
-			return db.Where("1 = 0")
-		}
-	}
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramName())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "function_name", filter.GetFunctionName())
@@ -288,6 +234,18 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if disposalStatuses := filter.GetLatestDisposalStatus(); len(disposalStatuses) > 0 {
 		db = bizhelper.ExactOrQueryStringArrayOr(db, "latest_disposal_status", disposalStatuses)
 	}
+
+	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
+		baselineTaskID := dr.GetBaseLine().GetRiskRuntimeId()
+		compareTaskID := dr.GetCompare().GetRiskRuntimeId()
+		db = filterSSARiskByCompare(db, baselineTaskID, compareTaskID)
+	}
+
+	if filter.GetIncremental() {
+		runtimeIDs := filter.GetRuntimeID()
+		db = filterSSARiskByIncremental(db, runtimeIDs...)
+	}
+
 	return db
 }
 
