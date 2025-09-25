@@ -1,12 +1,15 @@
 package buildinaitools
 
 import (
+	"context"
 	"io"
+	"slices"
 	"sync"
 	"time"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/bashtools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -72,13 +75,6 @@ func GetAllTools() []*aitool.Tool {
 		yakscriptTools := yakscripttools.GetAllYakScriptAiTools()
 		tools = append(tools, yakscriptTools...)
 
-		// Add generated tools (added by code-gen when run)
-		// These functions will be generated based on aitools.tools by the code generator
-		// Example:
-		// tools = append(tools, GetSystemTools()...)  // From system_tools.go
-		// tools = append(tools, GetFilesystemTools()...)  // From filesystem_tools.go
-		// tools = append(tools, GetExampleTools()...)  // From example_tools.go
-
 		allAiTools = lo.Filter(tools, func(item *aitool.Tool, index int) bool {
 			if utils.IsNil(item) {
 				log.Errorf("tool is nil")
@@ -88,4 +84,16 @@ func GetAllTools() []*aitool.Tool {
 		})
 	})
 	return allAiTools
+}
+
+func GetAllToolsWithContext(ctx context.Context) ([]*aitool.Tool, error) {
+	allTools := GetAllTools()
+	copiedAllTools := slices.Clone(allTools)
+	bashCtx := bashtools.NewBashSessionContext(ctx)
+	bashTools, err := bashtools.CreateBashTools(bashCtx)
+	if err != nil {
+		log.Errorf("create bash tools: %v", err)
+	}
+	copiedAllTools = append(copiedAllTools, bashTools...)
+	return copiedAllTools, nil
 }
