@@ -1,8 +1,9 @@
-package schema
+package ssaconfig
 
 import (
 	"encoding/json"
-	"fmt"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // CodeSourceKind 源码获取方式枚举
@@ -51,33 +52,25 @@ func (c *CodeSourceInfo) JsonString() string {
 // ValidateSourceConfig 验证代码源配置的有效性
 func (c *CodeSourceInfo) ValidateSourceConfig() error {
 	if c.Kind == "" {
-		return fmt.Errorf("source kind is required")
+		return utils.Errorf("source kind is required")
 	}
 
 	switch c.Kind {
 	case CodeSourceLocal:
 		if c.LocalFile == "" {
-			return fmt.Errorf("local_file is required for local source")
+			return utils.Errorf("local_file is required for local source")
 		}
 	case CodeSourceCompression, CodeSourceJar:
 		if c.LocalFile == "" && c.URL == "" {
-			return fmt.Errorf("either local_file or url is required for %s source", c.Kind)
+			return utils.Errorf("either local_file or url is required for %s source", c.Kind)
 		}
 	case CodeSourceGit, CodeSourceSvn:
 		if c.URL == "" {
-			return fmt.Errorf("url is required for %s source", c.Kind)
+			return utils.Errorf("url is required for %s source", c.Kind)
 		}
 	default:
-		return fmt.Errorf("unsupported source kind: %s", c.Kind)
+		return utils.Errorf("unsupported source kind: %s", c.Kind)
 	}
 
 	return nil
-}
-
-func isValidCodeSourceKind(kind CodeSourceKind) bool {
-	switch kind {
-	case CodeSourceLocal, CodeSourceCompression, CodeSourceJar, CodeSourceGit, CodeSourceSvn:
-		return true
-	}
-	return false
 }

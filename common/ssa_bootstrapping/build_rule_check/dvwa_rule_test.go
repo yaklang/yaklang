@@ -1,17 +1,19 @@
 package ssa_bootstrapping
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"testing"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func TestBuildInRule(t *testing.T) {
 	testCase := []RuleChecker{{
 		Name: "test git repo",
-		ConfigInfo: &schema.CodeSourceInfo{
-			Kind:   schema.CodeSourceGit,
+		ConfigInfo: &ssaconfig.CodeSourceInfo{
+			Kind:   ssaconfig.CodeSourceGit,
 			URL:    "https://github.com/digininja/DVWA",
 			Branch: "master",
 		},
