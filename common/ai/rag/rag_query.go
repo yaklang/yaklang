@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -276,7 +275,7 @@ func (e *SimpleERMAnalysisResult) GenerateDotGraphWithDirection(direction string
 // RAGQueryConfig RAG查询配置
 type RAGQueryConfig struct {
 	Ctx                  context.Context
-	Limit                int // 返回结果限制，其限制的的不止是最终结果，还包括单次子查询的结果限制。
+	Limit                int // 单次子查询的结果限制。
 	CollectionNumLimit   int
 	CollectionNames      []string
 	CollectionScoreLimit float64
@@ -285,10 +284,12 @@ type RAGQueryConfig struct {
 	Concurrent           int
 	MsgCallBack          func(*RAGSearchResult)
 	OnSubQueryStart      func(method string, query string)
+	OnQueryFinish        func([]*ScoredResult)
 	OnStatus             func(label string, value string)
 	OnlyResults          bool // 仅返回最终结果，忽略中间结果和消息
 
-	RAGSimilarityThreshold float64 // RAG相似度限制
+	RAGSimilarityThreshold   float64 // RAG相似度限制
+	EveryQueryResultCallback func(result *ScoredResult)
 
 	LoadConfig []SQLiteVectorStoreHNSWOption
 }
@@ -409,6 +410,18 @@ func WithRAGSimilarityThreshold(threshold float64) RAGQueryOption {
 	}
 }
 
+func WithEveryQueryResultCallback(callback func(result *ScoredResult)) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.EveryQueryResultCallback = callback
+	}
+}
+
+func WithRAGOnQueryFinish(callback func([]*ScoredResult)) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.OnQueryFinish = callback
+	}
+}
+
 // NewRAGQueryConfig 创建新的RAG查询配置
 func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 	config := &RAGQueryConfig{
@@ -449,6 +462,44 @@ func (R RAGSearchResult) GetSource() string {
 
 func (R RAGSearchResult) GetScore() float64 {
 	return R.Score
+}
+
+type ScoredResult struct {
+	Index       int64
+	QueryMethod string
+	QueryOrigin string
+	Document    *Document
+	Score       float64
+	Source      string
+}
+
+func (s *ScoredResult) GetTitle() string {
+	title, _ := s.Document.Metadata.GetTitle()
+	return title
+}
+
+func (s *ScoredResult) GetType() string {
+	return string(s.Document.Type)
+}
+
+func (s *ScoredResult) GetContent() string {
+	return s.Document.Content
+}
+
+func (s *ScoredResult) GetSource() string {
+	return s.Source
+}
+
+func (s *ScoredResult) GetScoreMethod() string {
+	return s.QueryMethod
+}
+
+func (s *ScoredResult) GetScore() float64 {
+	return s.Score
+}
+
+func (s *ScoredResult) GetUUID() string {
+	return s.Document.ID
 }
 
 func QueryYakitProfile(query string, opts ...RAGQueryOption) (chan *RAGSearchResult, error) {
@@ -711,24 +762,28 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			close(resultCh)
 		}()
 		// 收集所有结果
-		type ScoredResult struct {
-			Index       int64
-			QueryMethod string
-			QueryOrigin string
-			Document    *Document
-			Score       float64
-			Source      string
-		}
 
 		var offset int64 = 0
-		var allResults []ScoredResult
+		var allResults []*ScoredResult
 		var storeMutex sync.Mutex
 		var enhanceSubQuery int64 = 0
-		var resultRecorder = map[string]float64{}
+		var resultRecorder = map[string]struct{}{}
 
 		var nodesRecorder = make(map[string]struct{})
 
 		storeResults := func(source string, result SearchResult, query *subQuery) (int64, bool) {
+			res := &ScoredResult{
+				QueryMethod: query.Method,
+				QueryOrigin: query.Query,
+				Document:    &result.Document,
+				Score:       result.Score,
+				Source:      source,
+			}
+
+			if config.EveryQueryResultCallback != nil {
+				config.EveryQueryResultCallback(res)
+			}
+
 			storeMutex.Lock()
 			defer storeMutex.Unlock()
 
@@ -745,25 +800,15 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				}
 			}
 
-			mergeID := utils.CalcSha1(result.Document.ID, query.Method)
-			if score, exist := resultRecorder[mergeID]; exist {
-				if score < result.Score {
-					resultRecorder[mergeID] = result.Score // 分数聚合,一种查询方式查出来的相同文档聚合,取最高分
-				}
-				return 0, true
+			_, exist := resultRecorder[result.Document.ID]
+			if !exist {
+				resultRecorder[result.Document.ID] = struct{}{}
 			}
-			resultRecorder[mergeID] = result.Score
 
 			offset += 1
-			allResults = append(allResults, ScoredResult{
-				Index:       offset,
-				QueryMethod: query.Method,
-				QueryOrigin: query.Query,
-				Document:    &result.Document,
-				Score:       result.Score,
-				Source:      source,
-			})
-			return offset, false
+			res.Index = offset
+			allResults = append(allResults, res)
+			return offset, exist
 		}
 
 		var ragQueryCostSum float64 = 0
@@ -853,49 +898,11 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			}
 		}
 
-		type RankResult struct {
-			r            ScoredResult
-			rrfRankScore float64
+		if config.OnQueryFinish != nil {
+			config.OnQueryFinish(allResults)
 		}
 
-		rrfRank := func(results []ScoredResult, k int) []RankResult {
-			resultQueryMethodMap := make(map[string][]ScoredResult)
-
-			for _, result := range results {
-				if maxScore := resultRecorder[utils.CalcSha1(result.Document.ID, result.QueryMethod)]; maxScore > result.Score {
-					result.Score = maxScore
-				}
-				if resultList, ok := resultQueryMethodMap[result.QueryMethod]; ok {
-					resultQueryMethodMap[result.QueryMethod] = append(resultList, result)
-				} else {
-					resultQueryMethodMap[result.QueryMethod] = []ScoredResult{result}
-				}
-			}
-			rrfScores := make(map[string]float64)
-			resultMap := make(map[string]ScoredResult)
-			for _, resultsList := range resultQueryMethodMap {
-				sort.Slice(resultsList, func(i, j int) bool {
-					return resultsList[i].Score > resultsList[j].Score
-				})
-				for rank, result := range resultsList {
-					actualRank := rank + 1
-					resultMap[result.Document.ID] = result
-					rrfScores[result.Document.ID] += 1.0 / (float64(k) + float64(actualRank))
-				}
-			}
-			var sortedResults []RankResult
-			for docID, score := range rrfScores {
-				r := resultMap[docID]
-				sortedResults = append(sortedResults, RankResult{r: r, rrfRankScore: score})
-			}
-			sort.Slice(sortedResults, func(i, j int) bool {
-				return sortedResults[i].rrfRankScore > sortedResults[j].rrfRankScore
-			})
-			return sortedResults
-		}
-
-		// 使用 RRF 排名法对所有结果进行排序
-		sortedResults := rrfRank(allResults, 60)
+		sortedResults := utils.RRFRankWithDefaultK[*ScoredResult](allResults)
 
 		sendMsg(fmt.Sprintf("共收集到 %d 个候选结果", len(allResults)))
 
@@ -907,7 +914,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 
 		// 发送最终结果
 		for i := 0; i < finalCount; i++ {
-			result := sortedResults[i].r
+			result := sortedResults[i]
 			sendResult(result.Index, result.QueryMethod, result.QueryOrigin, result.Document, result.Score, result.Source)
 		}
 
