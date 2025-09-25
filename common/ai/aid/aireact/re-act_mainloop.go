@@ -102,7 +102,7 @@ func (r *ReAct) generateMainLoopPrompt(
 		userQuery,
 		enableUserInteractive,
 		r.config.enablePlanAndExec && !disablePlanAndExec,
-		r.config.directlyAnswerEnhanceHandle != nil && !r.config.disableEnhanceDirectlyAnswer,
+		r.config.enhanceKnowledgeManager != nil && !r.config.disableEnhanceDirectlyAnswer,
 		true,
 		r.currentUserInteractiveCount,
 		r.config.userInteractiveLimitedTimes,
@@ -541,22 +541,23 @@ LOOP:
 func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (string, error) {
 	currentTask := r.GetCurrentTask()
 	enhanceID := uuid.NewString()
-	if r.config.directlyAnswerEnhanceHandle == nil {
-		return "", utils.Errorf("directlyAnswerEnhanceHandle is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
-	}
-	enhanceData, err := r.config.directlyAnswerEnhanceHandle(r.config.ctx, userQuery)
-	if err != nil {
-		return "", err
+	config := r.config
+
+	if config.enhanceKnowledgeManager == nil {
+		return "", utils.Errorf("enhanceKnowledgeManager is not configured, but ai choice knowledge enhance answer action, check main loop prompt!")
 	}
 
-	allData := make([]aicommon.EnhanceKnowledge, 0)
+	enhanceData, err := config.enhanceKnowledgeManager.FetchKnowledge(r.config.ctx, userQuery)
+	if err != nil {
+		return "", utils.Errorf("enhanceKnowledgeManager.FetchKnowledge(%s) failed: %v", userQuery, err)
+	}
+
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
-		currentTask.AppendEnhanceData(enhanceDatum)
-		allData = append(allData, enhanceDatum)
+		config.enhanceKnowledgeManager.AppendKnowledge(currentTask.Id, enhanceDatum)
 	}
 
-	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, currentTask.DumpEnhanceData())
+	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, r.DumpCurrentEnhanceData())
 	if err != nil {
 		return "", err
 	}
