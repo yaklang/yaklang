@@ -85,6 +85,8 @@ type SSAScanConfig struct {
 	Concurrency    uint32 `json:"concurrency"`
 	Memory         bool   `json:"memory"`
 	IgnoreLanguage bool   `json:"ignore_language"`
+	// 运行时配置，不存数据库
+	ProcessCallback func(progress float64) `json:"-"`
 }
 
 type SSARuleConfig struct {
