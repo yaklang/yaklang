@@ -40,6 +40,7 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	db = bizhelper.ExactQueryStringArrayOr(db, "entity_type", entityFilter.Types)
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "uuid", entityFilter.HiddenIndex)
 	db = bizhelper.ExactQueryStringArrayOr(db, "runtime_id", entityFilter.RuntimeID)
+	db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{"entity_name", "description", "entity_type", "entity_type_verbose", "attributes"}, entityFilter.Keywords, false) // 通过库名称过滤
 	return db
 }
 
