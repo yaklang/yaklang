@@ -3,6 +3,7 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"testing"
 	"time"
 
@@ -33,8 +34,21 @@ func mockedYaklangWriting(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, 
 	}
 
 	if utils.MatchAllOfSubString(prompt, `"query_document"`, `"require_tool"`, `"write_code"`, `"@action"`) {
+		// extract nonce from <|GEN_CODE_{{.Nonce}}|>
+		re := regexp.MustCompile(`<\|GEN_CODE_([^|]+)\|>`)
+		matches := re.FindStringSubmatch(prompt)
+		var nonceStr string
+		if len(matches) > 1 {
+			nonceStr = matches[1]
+		}
 		rsp := i.NewAIResponse()
-		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "write_code", "code": "println(a)"}`))
+		rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "write_code"}
+
+<|GEN_CODE_{{ .nonce }}|>
+println("a")
+<|GEN_CODE_END_{{ .nonce }}|>`, map[string]any{
+			"nonce": nonceStr,
+		})))
 		rsp.Close()
 		return rsp, nil
 	}
@@ -95,7 +109,7 @@ LOOP:
 	fmt.Println("--------------------------------------")
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
-	if !utils.MatchAllOfSubString(tl, "mocked thought for write-yaklang", "println(a)") {
+	if !utils.MatchAllOfSubString(tl, "mocked thought for write-yaklang") {
 		t.Fatal("timeline not match")
 	}
 	fmt.Println("--------------------------------------")
