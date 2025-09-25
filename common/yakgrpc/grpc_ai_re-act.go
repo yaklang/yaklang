@@ -3,7 +3,6 @@ package yakgrpc
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
 	"time"
 
@@ -63,22 +62,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aireact.WithContext(baseCtx),
 		aireact.WithBuiltinTools(),
 		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
-		aireact.WithKnowledgeEnhanceHandle(func(ctx context.Context, query string) (<-chan aicommon.EnhanceKnowledge, error) {
-			ragKnowledge, err := rag.QueryYakitProfile(query, rag.WithRAGCtx(ctx))
-			if err != nil {
-				return nil, err
-			}
-			result := chanx.NewUnlimitedChan[aicommon.EnhanceKnowledge](ctx, 10)
-			go func() {
-				defer result.Close()
-				for k := range ragKnowledge {
-					if k.Type == rag.RAGResultTypeResult {
-						result.SafeFeed(k)
-					}
-				}
-			}()
-			return result.OutputChannel(), nil
-		}),
+		aireact.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 	}
 	reActOptions = append(reActOptions, optsFromStartParams...)
 

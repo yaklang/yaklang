@@ -494,13 +494,39 @@ func (e *Emitter) EmitResult(nodeId string, result interface{}, success bool) {
 // EmitKnowledge emits a knowledge enhancement data for AI processes
 func (e *Emitter) EmitKnowledge(nodeId string, enhanceID string, result EnhanceKnowledge) {
 	knowledgeMap := map[string]any{
-		"Content": result.GetContent(),
-		"Source":  result.GetSource(),
-		"Score":   result.GetScore(),
+		"Content":     result.GetContent(),
+		"Source":      result.GetSource(),
+		"Score":       result.GetScore(),
+		"Type":        result.GetType(),
+		"Title":       result.GetTitle(),
+		"UUID":        result.GetUUID(),
+		"ScoreMethod": result.GetScoreMethod(),
 	}
 	e.EmitJSON(schema.EVENT_TYPE_KNOWLEDGE, nodeId, map[string]any{
 		"data":      knowledgeMap,
 		"id":        enhanceID,
 		"timestamp": time.Now().Unix(),
 	})
+}
+
+func (e *Emitter) EmitKnowledgeListAboutTask(nodeId string, taskID string, results []EnhanceKnowledge) {
+	knowledgeList := make([]map[string]any, 0, len(results))
+	for _, result := range results {
+		knowledgeMap := map[string]any{
+			"Content":     result.GetContent(),
+			"Source":      result.GetSource(),
+			"Score":       result.GetScore(),
+			"Type":        result.GetType(),
+			"Title":       result.GetTitle(),
+			"UUID":        result.GetUUID(),
+			"ScoreMethod": result.GetScoreMethod(),
+		}
+		knowledgeList = append(knowledgeList, knowledgeMap)
+	}
+	e.EmitJSON(schema.EVENT_TYPE_TASK_ABOUT_KNOWLEDGE, nodeId, map[string]any{
+		"task_id":   taskID,
+		"data_list": knowledgeList,
+		"timestamp": time.Now().Unix(),
+	})
+
 }

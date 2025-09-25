@@ -54,6 +54,17 @@ func (r *ReAct) GetCurrentTask() *Task {
 	return r.currentTask
 }
 
+func (r *ReAct) DumpCurrentEnhanceData() string {
+	if r.config.enhanceKnowledgeManager == nil {
+		return ""
+	}
+	data := r.config.enhanceKnowledgeManager.DumpTaskAboutKnowledge(r.GetCurrentTask().GetId())
+	if r.config.debugEvent {
+		log.Infof("Dumped enhance data: %s", data)
+	}
+	return data
+}
+
 // enqueueReTask 将输入事件转换为任务并添加到队列
 func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 	// 创建基于aireact.Task的任务（初始状态为created）

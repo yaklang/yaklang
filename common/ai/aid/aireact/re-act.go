@@ -20,6 +20,7 @@ import (
 const (
 	SYNC_TYPE_QUEUE_INFO = "queue_info"
 	SYNC_TYPE_TIMELINE   = "timeline"
+	SYNC_TYPE_KNOWLEDGE  = "enhance_knowledge"
 )
 
 // ReactTaskItem 表示ReAct任务队列中的单个任务

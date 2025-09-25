@@ -14,7 +14,7 @@ import (
 // verifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
 func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, payload string) (bool, error) {
 	verificationPrompt := r.generateVerificationPrompt(
-		originalQuery, isToolCall, payload, r.GetCurrentTask().DumpEnhanceData(),
+		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
 	)
 	if r.config.debugPrompt {
 		log.Infof("Verification prompt: %s", verificationPrompt)
