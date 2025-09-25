@@ -596,3 +596,11 @@ When you receive a request, first understand the user's goal. Then, structure yo
 ```schema
 {{ .Schema }}
 ```
+
+如果你输出'write_code'和'modify_code'，输出类似如下内容，JSON + AI-TAG 生成的代码禁止包含行号：
+
+{"@action": "write_code"}
+
+<|GEN_CODE_{{ .Nonce }}|>
+println("Hello World")
+<|GEN_CODE_END_{{ .Nonce }}|>

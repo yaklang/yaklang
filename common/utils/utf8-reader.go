@@ -130,3 +130,57 @@ func UTF8Reader(r io.Reader) io.Reader {
 
 	return &utf8Reader{r: r, buffer: make([]byte, 0)}
 }
+
+func CreateUTF8StreamMirror(r io.Reader, cb ...func(reader io.Reader)) io.Reader {
+	if cb == nil || len(cb) <= 0 {
+		return UTF8Reader(r)
+	}
+
+	// 为每个callback创建一个独立的pipe，还要为返回的主流创建一个pipe
+	numPipes := len(cb) + 1 // callbacks + 主流
+	pipes := make([]io.Writer, numPipes)
+	readers := make([]io.Reader, numPipes)
+
+	for i := 0; i < numPipes; i++ {
+		pr, pw := io.Pipe()
+		pipes[i] = pw
+		readers[i] = pr
+	}
+
+	// 创建一个MultiWriter，将数据分发到所有pipe
+	multiWriter := io.MultiWriter(pipes...)
+
+	// 启动goroutine来处理数据分发
+	go func() {
+		// 确保所有pipe writer都被关闭
+		defer func() {
+			for _, pipe := range pipes {
+				if pw, ok := pipe.(*io.PipeWriter); ok {
+					pw.Close()
+				}
+			}
+		}()
+
+		// 将原始流的数据写入到所有镜像流中
+		_, err := io.Copy(multiWriter, r)
+		if err != nil {
+			// 处理错误，但不阻塞
+			for _, pipe := range pipes {
+				if pw, ok := pipe.(*io.PipeWriter); ok {
+					pw.CloseWithError(err)
+				}
+			}
+		}
+	}()
+
+	// 为每个callback启动独立的goroutine
+	for i, callback := range cb {
+		go func(cb func(reader io.Reader), reader io.Reader) {
+			utf8Stream := UTF8Reader(reader)
+			cb(utf8Stream)
+		}(callback, readers[i])
+	}
+
+	// 返回最后一个pipe作为主流（独立于所有callback）
+	return UTF8Reader(readers[len(cb)])
+}
