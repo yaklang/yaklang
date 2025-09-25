@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
@@ -402,7 +402,7 @@ func WithProgramName(name string) Option {
 
 func WithProjectName(name string) Option {
 	return func(c *Config) error {
-		project, err := yakit.LoadSSAProjectBuilderByName(name)
+		project, err := ssaproject.LoadSSAProjectBuilderByName(name)
 		if err != nil {
 			return err
 		}
