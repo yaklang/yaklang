@@ -45,6 +45,9 @@ func (r *ReAct) invokeBlueprintReviewModifyParams(
 				return utils.Errorf("extract action from call-ai-blueprint failed: %v", err)
 			}
 			newParams = action.GetParams()
+			if newParams.Has("@action") && newParams.Has("params") {
+				newParams = newParams.GetObject("params")
+			}
 			return nil
 		},
 	)

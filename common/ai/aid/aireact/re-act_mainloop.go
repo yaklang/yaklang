@@ -192,6 +192,8 @@ LOOP:
 							"write_yaklang_code_approach",
 							"human_readable_thought",
 						}, func(key string, reader io.Reader, parents []string) {
+							var output bytes.Buffer
+							outputThought := utils.NewAtomicBool()
 							pr, pw := utils.NewPipe()
 							go func() {
 								defer pw.Close()
@@ -205,16 +207,21 @@ LOOP:
 									pw.WriteString("决定调用工具：")
 								case "write_yaklang_code_approach":
 									pw.WriteString("决定编写Yaklang代码：")
+								default:
+									outputThought.Set()
 								}
-								var output bytes.Buffer
 								io.Copy(pw, utils.JSONStringReader(io.TeeReader(reader, &output)))
-								r.addToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
 							}()
 							r.config.Emitter.EmitStreamEvent(
 								"re-act-loop-thought",
 								time.Now(),
 								pr,
 								resp.GetTaskIndex(),
+								func() {
+									if outputThought.IsSet() {
+										r.addToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
+									}
+								},
 							)
 						}),
 						jsonextractor.WithRegisterFieldStreamHandler(
