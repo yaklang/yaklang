@@ -606,7 +606,7 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForg
 }
 
 // GenerateYaklangCodeActionLoop generates Yaklang code generation action loop prompt using template
-func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages string, iterationCount int, tools []*aitool.Tool) (string, error) {
+func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages string, iterationCount int, tools []*aitool.Tool, nonceString string) (string, error) {
 	data := &YaklangCodeActionLoopPromptData{
 		CurrentTime:               time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:                    fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
@@ -615,9 +615,13 @@ func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, e
 		CurrentCodeWithLineNumber: utils.PrefixLinesWithLineNumbers(currentCode),
 		IterationCount:            iterationCount,
 		ErrorMessages:             errorMessages,
-		Nonce:                     utils.RandStringBytes(4),
+		Nonce:                     nonceString,
 		Language:                  pm.react.config.language,
 		DynamicContext:            pm.DynamicContext(),
+	}
+
+	if data.Nonce == "" {
+		data.Nonce = nonce()
 	}
 
 	// Set working directory
