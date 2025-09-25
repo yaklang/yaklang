@@ -38,8 +38,8 @@ func TestEnhanceKnowledgeManager_AppendAndGet(t *testing.T) {
 	uuid2 := uuid.NewString()
 
 	taskID := "task-1"
-	k1 := newTestKnowledge(uuid1, "mock", "Title1", "Content1", "Source1", 0.9)
-	k2 := newTestKnowledge(uuid2, "mock", "Title2", "Content2", "Source2", 0.8)
+	k1 := newTestKnowledge("mock", uuid1, "Title1", "Content1", "Source1", 0.9)
+	k2 := newTestKnowledge("mock", uuid2, "Title2", "Content2", "Source2", 0.8)
 
 	manager.AppendKnowledge(taskID, k1)
 	manager.AppendKnowledge(taskID, k2)
@@ -64,7 +64,8 @@ func TestEnhanceKnowledgeManager_DumpKnowledgeByTaskID(t *testing.T) {
 	})
 
 	taskID := "task-2"
-	k := newTestKnowledge("mock", "uuid-3", "DumpTitle", "DumpContent", "DumpSource", 0.7)
+	uuid1 := uuid.NewString()
+	k := newTestKnowledge("mock", uuid1, "DumpTitle", "DumpContent", "DumpSource", 0.7)
 	manager.AppendKnowledge(taskID, k)
 
 	dump := manager.DumpTaskAboutKnowledge(taskID)
