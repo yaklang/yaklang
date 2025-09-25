@@ -755,3 +755,257 @@ func (e *MemEditor) GetTextContextWithPrompt(p *Range, n int, msg ...string) str
 	}
 	return raw
 }
+
+// =============================================================================
+// 编辑功能 - Edit Functions
+// =============================================================================
+
+// InsertAtPosition 在指定位置插入文本
+func (ve *MemEditor) InsertAtPosition(pos *Position, text string) error {
+	if pos == nil {
+		return errors.New("position cannot be nil")
+	}
+
+	offset, err := ve.GetOffsetByPositionWithError(pos.GetLine(), pos.GetColumn())
+	if err != nil {
+		return err
+	}
+
+	return ve.InsertAtOffset(offset, text)
+}
+
+// InsertAtOffset 在指定偏移量处插入文本
+func (ve *MemEditor) InsertAtOffset(offset int, text string) error {
+	if offset < 0 || offset > ve.safeSourceCode.Len() {
+		return errors.New("offset out of bounds")
+	}
+
+	before := ve.safeSourceCode.SliceBeforeStart(offset)
+	after := ""
+	if offset < ve.safeSourceCode.Len() {
+		after = ve.safeSourceCode.Slice2(offset, ve.safeSourceCode.Len())
+	}
+
+	ve.safeSourceCode = NewSafeString(before + text + after)
+	ve.recalculateLineMappings()
+
+	return nil
+}
+
+// InsertAtLine 在指定行号的开头插入文本（行号从1开始）
+func (ve *MemEditor) InsertAtLine(lineNumber int, text string) error {
+	if lineNumber < 1 {
+		return errors.New("line number must be positive")
+	}
+
+	// 如果行号超出范围，在最后添加新行
+	if lineNumber > len(ve.lineStartOffsetMap) {
+		// 添加到文件末尾，确保以换行符结尾
+		sourceCode := ve.safeSourceCode.String()
+		if !strings.HasSuffix(sourceCode, "\n") {
+			sourceCode += "\n"
+		}
+		// 添加空行直到目标行号
+		for i := len(ve.lineStartOffsetMap); i < lineNumber-1; i++ {
+			sourceCode += "\n"
+		}
+		sourceCode += text
+		ve.safeSourceCode = NewSafeString(sourceCode)
+		ve.recalculateLineMappings()
+		return nil
+	}
+
+	offset, err := ve.GetStartOffsetByLine(lineNumber)
+	if err != nil {
+		return err
+	}
+
+	return ve.InsertAtOffset(offset, text)
+}
+
+// ReplaceLine 替换指定行的内容（行号从1开始）
+func (ve *MemEditor) ReplaceLine(lineNumber int, text string) error {
+	if lineNumber < 1 {
+		return errors.New("line number must be positive")
+	}
+
+	if lineNumber > len(ve.lineStartOffsetMap) {
+		return errors.New("line number out of range")
+	}
+
+	startOffset, err := ve.GetStartOffsetByLine(lineNumber)
+	if err != nil {
+		return err
+	}
+
+	endOffset, err := ve.GetEndOffsetByLine(lineNumber)
+	if err != nil {
+		return err
+	}
+
+	before := ve.safeSourceCode.SliceBeforeStart(startOffset)
+	after := ""
+	if endOffset < ve.safeSourceCode.Len() {
+		after = ve.safeSourceCode.Slice2(endOffset, ve.safeSourceCode.Len())
+	}
+
+	ve.safeSourceCode = NewSafeString(before + text + after)
+	ve.recalculateLineMappings()
+
+	return nil
+}
+
+// ReplaceLineRange 替换指定行范围的内容（行号从1开始，包含起始和结束行）
+func (ve *MemEditor) ReplaceLineRange(startLine, endLine int, text string) error {
+	if startLine < 1 || endLine < 1 {
+		return errors.New("line numbers must be positive")
+	}
+
+	if startLine > endLine {
+		return errors.New("start line must be less than or equal to end line")
+	}
+
+	if startLine > len(ve.lineStartOffsetMap) || endLine > len(ve.lineStartOffsetMap) {
+		return errors.New("line number out of range")
+	}
+
+	startOffset, err := ve.GetStartOffsetByLine(startLine)
+	if err != nil {
+		return err
+	}
+
+	endOffset, err := ve.GetEndOffsetByLine(endLine)
+	if err != nil {
+		return err
+	}
+
+	before := ve.safeSourceCode.SliceBeforeStart(startOffset)
+	after := ""
+	if endOffset < ve.safeSourceCode.Len() {
+		after = ve.safeSourceCode.Slice2(endOffset, ve.safeSourceCode.Len())
+	}
+
+	ve.safeSourceCode = NewSafeString(before + text + after)
+	ve.recalculateLineMappings()
+
+	return nil
+}
+
+// DeleteLine 删除指定行（行号从1开始）
+func (ve *MemEditor) DeleteLine(lineNumber int) error {
+	if lineNumber < 1 {
+		return errors.New("line number must be positive")
+	}
+
+	if lineNumber > len(ve.lineStartOffsetMap) {
+		return errors.New("line number out of range")
+	}
+
+	startOffset, err := ve.GetStartOffsetByLine(lineNumber)
+	if err != nil {
+		return err
+	}
+
+	// 对于最后一行，需要特殊处理
+	if lineNumber == len(ve.lineStartOffsetMap) {
+		// 如果是最后一行，删除到文件末尾
+		before := ve.safeSourceCode.SliceBeforeStart(startOffset)
+		// 如果前面有内容且不以换行符结尾，移除前面的换行符
+		if len(before) > 0 && strings.HasSuffix(before, "\n") {
+			before = before[:len(before)-1]
+		}
+		ve.safeSourceCode = NewSafeString(before)
+	} else {
+		// 不是最后一行，删除包括换行符
+		endOffset, err := ve.GetEndOffsetByLine(lineNumber)
+		if err != nil {
+			return err
+		}
+		// 包括行末的换行符
+		if endOffset < ve.safeSourceCode.Len() {
+			endOffset++
+		}
+
+		before := ve.safeSourceCode.SliceBeforeStart(startOffset)
+		after := ""
+		if endOffset < ve.safeSourceCode.Len() {
+			after = ve.safeSourceCode.Slice2(endOffset, ve.safeSourceCode.Len())
+		}
+
+		ve.safeSourceCode = NewSafeString(before + after)
+	}
+
+	ve.recalculateLineMappings()
+	return nil
+}
+
+// DeleteLineRange 删除指定行范围（行号从1开始，包含起始和结束行）
+func (ve *MemEditor) DeleteLineRange(startLine, endLine int) error {
+	if startLine < 1 || endLine < 1 {
+		return errors.New("line numbers must be positive")
+	}
+
+	if startLine > endLine {
+		return errors.New("start line must be less than or equal to end line")
+	}
+
+	if startLine > len(ve.lineStartOffsetMap) || endLine > len(ve.lineStartOffsetMap) {
+		return errors.New("line number out of range")
+	}
+
+	startOffset, err := ve.GetStartOffsetByLine(startLine)
+	if err != nil {
+		return err
+	}
+
+	var endOffset int
+	// 对于最后一行，需要特殊处理
+	if endLine == len(ve.lineStartOffsetMap) {
+		endOffset = ve.safeSourceCode.Len()
+		// 如果删除包含最后一行，需要删除前面的换行符
+		if startLine > 1 && startOffset > 0 {
+			startOffset--
+		}
+	} else {
+		endOffset, err = ve.GetEndOffsetByLine(endLine)
+		if err != nil {
+			return err
+		}
+		// 包括行末的换行符
+		endOffset++
+	}
+
+	before := ve.safeSourceCode.SliceBeforeStart(startOffset)
+	after := ""
+	if endOffset < ve.safeSourceCode.Len() {
+		after = ve.safeSourceCode.Slice2(endOffset, ve.safeSourceCode.Len())
+	}
+
+	ve.safeSourceCode = NewSafeString(before + after)
+	ve.recalculateLineMappings()
+
+	return nil
+}
+
+// AppendLine 在文件末尾添加新行
+func (ve *MemEditor) AppendLine(text string) error {
+	sourceCode := ve.safeSourceCode.String()
+	if !strings.HasSuffix(sourceCode, "\n") && sourceCode != "" {
+		sourceCode += "\n"
+	}
+	sourceCode += text
+
+	ve.safeSourceCode = NewSafeString(sourceCode)
+	ve.recalculateLineMappings()
+
+	return nil
+}
+
+// PrependLine 在文件开头添加新行
+func (ve *MemEditor) PrependLine(text string) error {
+	sourceCode := text + "\n" + ve.safeSourceCode.String()
+	ve.safeSourceCode = NewSafeString(sourceCode)
+	ve.recalculateLineMappings()
+
+	return nil
+}

@@ -187,27 +187,16 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 		// Handle different action types
 		switch actionName {
 		case "modify_code":
-			// Apply modification to current code
+			// Apply modification to current code using new edit methods
 			editor := memedit.NewMemEditor(currentCode)
-			startPos, err := editor.GetStartOffsetByLine(int(modifyStartLine))
+			err = editor.ReplaceLineRange(modifyStartLine, modifyEndLine, payload)
 			if err != nil {
-				return utils.Errorf("Failed to get start offset by line: %v", err)
-			}
-			endPos, err := editor.GetEndOffsetByLine(modifyEndLine)
-			if err != nil {
-				return utils.Errorf("Failed to get end offset by line: %v", err)
-			}
-			err = editor.UpdateTextByRange(
-				editor.GetRangeOffset(startPos, endPos),
-				payload,
-			)
-			if err != nil {
-				return utils.Errorf("Failed to update text by range: %v", err)
+				return utils.Errorf("Failed to replace line range: %v", err)
 			}
 			fmt.Println("=================================================")
 			fmt.Println(string(payload))
 			fmt.Println("=================================================")
-			fullCode := editor.GetTextFromRange(editor.GetFullRange())
+			fullCode := editor.GetSourceCode()
 			os.RemoveAll(filename)
 			os.WriteFile(filename, []byte(fullCode), 0644)
 			currentCode = fullCode
