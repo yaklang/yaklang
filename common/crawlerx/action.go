@@ -3,6 +3,7 @@
 package crawlerx
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -10,10 +11,8 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/crawlerx/forge"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
-	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -798,33 +797,20 @@ func (starter *BrowserStarter) doLogin(page *rod.Page) error {
 		return err
 	}
 	originScreenShot := "data:image/png;base64," + base64.StdEncoding.EncodeToString(originScreenShotBytes)
-	var (
-		details   string
-		selectors LoginSelector
-	)
-	details, err = ai.OpenAI(
-		aispec.WithDomain(starter.aiDomain),
-		aispec.WithModel("qwen-plus"),
-		aispec.WithAPIKey(starter.aiApiKey),
-	).Chat(fmt.Sprintf("%s\n%s", selectorPrompt, html))
+	extractor, err := forge.NewLoginElementExtractor()
 	if err != nil {
 		return err
 	}
-	selectorJsonStrs, _ := jsonextractor.ExtractJSONWithRaw(details)
-	if len(selectorJsonStrs) == 0 {
-		return NewLoginFailError("selectors not found")
-	}
-	log.Debugf("selectors: %v", selectorJsonStrs)
-	err = json.Unmarshal([]byte(selectorJsonStrs[0]), &selectors)
+	selectors, err := extractor.ExtractLoginElements(page.GetContext(), html)
 	if err != nil {
 		return err
 	}
-	if selectors.Username == "" {
+	if selectors.UsernameSelector == "" {
 		return nil
 	}
-	var captchaResult CaptchaResult
-	if selectors.Captcha != "" {
-		captchaElements, _ := page.Elements(selectors.CaptchaImg)
+	var captchaResult string
+	if selectors.CaptchaInputSelector != "" {
+		captchaElements, _ := page.Elements(selectors.CaptchaImageSelector)
 		if len(captchaElements) == 0 {
 			return NewLoginFailError("captcha not found")
 		}
@@ -835,10 +821,10 @@ func (starter *BrowserStarter) doLogin(page *rod.Page) error {
 			return err
 		}
 		captchaBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(captchaElementBytes)
-		captchaResult = starter.getCaptcha(captchaBase64)
+		captchaResult = starter.getCaptcha(page.GetContext(), captchaBase64)
 	}
 	// input
-	usernameElements, err := page.Elements(selectors.Username)
+	usernameElements, err := page.Elements(selectors.UsernameSelector)
 	if err != nil {
 		return err
 	}
@@ -848,7 +834,7 @@ func (starter *BrowserStarter) doLogin(page *rod.Page) error {
 			return err
 		}
 	}
-	passwordElements, err := page.Elements(selectors.Password)
+	passwordElements, err := page.Elements(selectors.PasswordSelector)
 	if err != nil {
 		return err
 	}
@@ -858,19 +844,19 @@ func (starter *BrowserStarter) doLogin(page *rod.Page) error {
 			return err
 		}
 	}
-	if captchaResult.Result != "" {
+	if captchaResult != "" {
 		var captchaElements rod.Elements
-		captchaElements, err = page.Elements(selectors.Captcha)
+		captchaElements, err = page.Elements(selectors.CaptchaInputSelector)
 		if err != nil {
 			return err
 		}
-		err = elementInput(captchaElements.First(), captchaResult.Result)
+		err = elementInput(captchaElements.First(), captchaResult)
 		if err != nil {
 			return err
 		}
 	}
 	time.Sleep(500 * time.Millisecond)
-	loginButtons, err := page.Elements(selectors.Login)
+	loginButtons, err := page.Elements(selectors.LoginButtonSelector)
 	if err != nil {
 		return err
 	}
@@ -900,24 +886,26 @@ func (starter *BrowserStarter) doLogin(page *rod.Page) error {
 	return nil
 }
 
-func (starter *BrowserStarter) getCaptcha(imgBase64 string) CaptchaResult {
-	var captchaResult CaptchaResult
-	result, err := ai.OpenAI(
-		aispec.WithDomain(starter.aiDomain),
-		aispec.WithModel("qwen-vl-plus"),
-		aispec.WithAPIKey(starter.aiApiKey),
-		aispec.WithChatImageContent(imgBase64),
-	).Chat(captchaPrompt)
+func (starter *BrowserStarter) getCaptcha(ctx context.Context, imgBase64 string) (result string) {
+	detector, err := forge.NewCaptchaDetector()
 	if err != nil {
-		return captchaResult
+		log.Debugf("get captcha detector err: %v", err)
+		return
 	}
-	results, _ := jsonextractor.ExtractJSONWithRaw(result)
-	if len(results) == 0 {
-		return captchaResult
+	detectResult, err := detector.DetectCaptcha(ctx, imgBase64)
+	if err != nil {
+		log.Debugf("get captcha detector err: %v", err)
+		return
 	}
-	log.Debugf("captcha: %v", results)
-	_ = json.Unmarshal([]byte(results[0]), &captchaResult)
-	return captchaResult
+	if detectResult.CaptchaType == "math" {
+		result, err = tools.GetCalculateResult(detectResult.CaptchaText)
+		if err != nil {
+			log.Debugf("get captcha result err: %v", err)
+		}
+		return
+	}
+	result = detectResult.CaptchaText
+	return
 }
 
 func elementInput(ele *rod.Element, inputStr string) error {
