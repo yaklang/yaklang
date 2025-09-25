@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"io"
 	"os"
 	"strings"
@@ -50,6 +51,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 
 	// Get available tools
 	tools := buildinaitools.GetAllTools()
+	nonceStr := utils.RandStringBytes(4)
 
 	for !satisfied {
 		iterationCount++
@@ -59,6 +61,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			errorMessages,             // errorMessages
 			iterationCount,            // iterationCount
 			tools,                     // tools
+			nonceStr,
 		)
 		if err != nil {
 			log.Errorf("Failed to generate prompt for yaklang code action loop: %v", err)
@@ -68,6 +71,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 
 		var actionName string
 		var payload string
+		var generatedCode string
 		var action *aicommon.Action
 		var actionErr error
 		var modifyStartLine, modifyEndLine int
@@ -76,8 +80,16 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			func(resp *aicommon.AIResponse) error {
 				stream := resp.GetOutputStreamReader("yaklang-code-loop", true, r.config.Emitter)
 
-				// stream = io.TeeReader(stream, os.Stdout)
-				fmt.Println(prompt)
+				// debug io
+
+				stream = utils.CreateUTF8StreamMirror(stream, func(reader io.Reader) {
+					aitag.Parse(reader, aitag.WithCallback("GEN_CODE", "nonceStr", func(reader io.Reader) {
+						var result bytes.Buffer
+						io.Copy(io.Discard, io.TeeReader(reader, io.MultiWriter(os.Stdout, &result)))
+						generatedCode = result.String()
+					}))
+				})
+
 				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
 					stream,
 					"write_code",
@@ -121,16 +133,6 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 								)
 							},
 						),
-						jsonextractor.WithRegisterFieldStreamHandler("code", func(key string, reader io.Reader, parents []string) {
-							reader = utils.JSONStringReader(reader)
-							reader = io.TeeReader(reader, os.Stdout) // debug
-							r.Emitter.EmitStreamEvent(
-								"yaklang-code",
-								time.Now(),
-								reader,
-								resp.GetTaskIndex(),
-							)
-						}),
 					})
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)
@@ -143,10 +145,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 				actionName = action.Name()
 				switch actionName {
 				case "write_code":
-					payload = action.GetString("code")
-					if payload == "" {
-						return utils.Error("code action must have 'code' field")
-					}
+					return nil
 				case "modify_code":
 					payload = action.GetString("code")
 					start := action.GetInt("modify_start_line")
@@ -179,6 +178,15 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			})
 		if transactionErr != nil {
 			return utils.Wrap(transactionErr, "AI transaction failed in code generation loop")
+		}
+
+		if actionName == "write_code" && generatedCode == "" {
+			errorMessages += "AI did not provide any code in write_code action; "
+			continue
+		}
+
+		if actionName == "write_code" || actionName == "modify_code" {
+			payload = generatedCode
 		}
 
 		// Handle different action types
