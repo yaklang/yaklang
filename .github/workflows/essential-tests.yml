@@ -3,7 +3,7 @@ name: Essential Tests
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "common/**"
       - ".github/workflows/essential-tests.yml"
@@ -14,14 +14,19 @@ jobs:
     # fork PR should not run this action
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-22.04
+    outputs:
+      wip_detected: ${{ steps.check-wip.outputs.wip_detected }}
+      should_skip: ${{ steps.check-wip.outputs.should_skip }}
     steps:
       - name: Check if PR is WIP
         id: check-wip
         run: |
-          # Check PR labels for WIP indicators
+          # Get current event information
+          event_action="${{ github.event.action }}"
           labels="${{ join(github.event.pull_request.labels.*.name, ',') }}"
           title="${{ github.event.pull_request.title }}"
           
+          echo "Event Action: $event_action"
           echo "PR Labels: $labels"
           echo "PR Title: $title"
           
@@ -29,35 +34,99 @@ jobs:
           labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
           title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
           
-          # Check for WIP indicators in labels
+          # Define WIP indicators
           wip_labels="do-not-merge,work in progress,wip,rfc"
-          IFS=',' read -ra LABEL_ARRAY <<< "$wip_labels"
-          for wip_label in "${LABEL_ARRAY[@]}"; do
-            if [[ "$labels_lower" == *"$wip_label"* ]]; then
-              echo "WIP indicator found in labels: $wip_label"
-              echo "wip_detected=true" >> $GITHUB_OUTPUT
+          
+          # Function to check if current state has WIP
+          check_current_wip() {
+            # Check for WIP indicators in labels
+            IFS=',' read -ra LABEL_ARRAY <<< "$wip_labels"
+            for wip_label in "${LABEL_ARRAY[@]}"; do
+              if [[ "$labels_lower" == *"$wip_label"* ]]; then
+                return 0  # WIP found
+              fi
+            done
+            
+            # Check for WIP indicators in title
+            IFS=',' read -ra KEYWORD_ARRAY <<< "$wip_labels"
+            for wip_keyword in "${KEYWORD_ARRAY[@]}"; do
+              if [[ "$title_lower" == *"$wip_keyword"* ]]; then
+                return 0  # WIP found
+              fi
+            done
+            
+            return 1  # No WIP found
+          }
+          
+          # Handle label change events
+          if [[ "$event_action" == "labeled" || "$event_action" == "unlabeled" ]]; then
+            label_name="${{ github.event.label.name }}"
+            label_name_lower=$(echo "$label_name" | tr '[:upper:]' '[:lower:]')
+            
+            echo "Label changed: $label_name"
+            
+            # Check if the changed label is WIP-related
+            is_wip_label=false
+            IFS=',' read -ra WIP_LABEL_ARRAY <<< "$wip_labels"
+            for wip_label in "${WIP_LABEL_ARRAY[@]}"; do
+              if [[ "$label_name_lower" == *"$wip_label"* ]]; then
+                is_wip_label=true
+                break
+              fi
+            done
+            
+            if [[ "$is_wip_label" == "false" ]]; then
+              echo "Label change is not WIP-related, skipping CI"
+              echo "should_skip=true" >> $GITHUB_OUTPUT
+              echo "wip_detected=false" >> $GITHUB_OUTPUT
               exit 0
             fi
-          done
-          
-          # Check for WIP indicators in title
-          wip_keywords="do-not-merge,work in progress,wip,rfc"
-          IFS=',' read -ra KEYWORD_ARRAY <<< "$wip_keywords"
-          for wip_keyword in "${KEYWORD_ARRAY[@]}"; do
-            if [[ "$title_lower" == *"$wip_keyword"* ]]; then
-              echo "WIP indicator found in title: $wip_keyword"
-              echo "wip_detected=true" >> $GITHUB_OUTPUT
-              exit 0
+            
+            # WIP-related label changed, check current state
+            if check_current_wip; then
+              if [[ "$event_action" == "labeled" ]]; then
+                echo "WIP label added, stopping CI"
+                echo "wip_detected=true" >> $GITHUB_OUTPUT
+                echo "should_skip=false" >> $GITHUB_OUTPUT
+              else
+                echo "Still has WIP indicators after unlabeling"
+                echo "wip_detected=true" >> $GITHUB_OUTPUT
+                echo "should_skip=false" >> $GITHUB_OUTPUT
+              fi
+            else
+              if [[ "$event_action" == "unlabeled" ]]; then
+                echo "WIP label removed and no other WIP indicators, proceeding with CI"
+                echo "wip_detected=false" >> $GITHUB_OUTPUT
+                echo "should_skip=false" >> $GITHUB_OUTPUT
+              else
+                echo "No WIP indicators found"
+                echo "wip_detected=false" >> $GITHUB_OUTPUT
+                echo "should_skip=false" >> $GITHUB_OUTPUT
+              fi
             fi
-          done
-          
-          echo "No WIP indicators found"
-          echo "wip_detected=false" >> $GITHUB_OUTPUT
+          else
+            # For other events (opened, synchronize, reopened), check current WIP state
+            if check_current_wip; then
+              echo "WIP indicator found"
+              echo "wip_detected=true" >> $GITHUB_OUTPUT
+              echo "should_skip=false" >> $GITHUB_OUTPUT
+            else
+              echo "No WIP indicators found"
+              echo "wip_detected=false" >> $GITHUB_OUTPUT
+              echo "should_skip=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+
+      - name: Skip CI if not WIP-related change
+        if: steps.check-wip.outputs.should_skip == 'true'
+        run: |
+          echo "::notice::Label change is not WIP-related, skipping CI to save resources."
+          exit 0
 
       - name: Fail if WIP detected
-        if: steps.check-wip.outputs.wip_detected == 'true'
+        if: steps.check-wip.outputs.wip_detected == 'true' && steps.check-wip.outputs.should_skip != 'true'
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
           echo "::error::This PR is marked as WIP (Work In Progress). Skipping CI run to save resources."
           echo "::error::Please remove WIP indicators from labels and title when ready for review."
@@ -77,6 +146,7 @@ jobs:
 
   setup:
     needs: check-wip
+    if: needs.check-wip.outputs.should_skip != 'true'
     runs-on: ubuntu-22.04
     steps:
       - name: Cache YakLang Project
@@ -122,6 +192,7 @@ jobs:
   test:
     name: ${{ matrix.name }}
     needs: [check-wip, setup]
+    if: needs.check-wip.outputs.should_skip != 'true'
     runs-on: ubuntu-22.04
     strategy:
       matrix:
