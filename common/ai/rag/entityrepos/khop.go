@@ -799,7 +799,7 @@ func (r *EntityRepository) AddKHopToVectorIndex(kHop *KHopPath) error {
 	)
 	documentID := fmt.Sprintf("%s_khop", uuid.NewString())
 	content := kHop.ToRAGContent()
-	return r.GetRAGSystem().Add(documentID, content, opts...)
+	return r.AddVectorIndex(documentID, content, opts...)
 }
 
 const (
