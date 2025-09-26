@@ -44,23 +44,18 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		syntaxflow_scan.WithPauseFunc(func() bool {
 			return pause.Load()
 		}),
-		syntaxflow_scan.WithProcessCallback(func(progress float64, status syntaxflow_scan.ProcessStatus, info *syntaxflow_scan.RuleProcessInfoList) {
+		syntaxflow_scan.WithProcessCallback(func(progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 			// update rule info
-			sendExecResult(yaklib.NewYakitLogExecResult("code", "%s", info)) // 发送 rules info
+			sendExecResult(yaklib.NewYakitLogExecResult("code", info)) // 发送 rules info
 
-			switch status {
-			case syntaxflow_scan.ProcessStatusRuleInfo:
-				// skip
-			case syntaxflow_scan.ProcessStatusProgress:
-				// update progress
-				sendExecResult(yaklib.NewYakitProgressExecResult("main", progress))
-				// status card
-				sendExecResult(yaklib.NewYakitStatusCardExecResult("已执行规则", fmt.Sprintf("%d/%d", info.FinishedQuery, info.TotalQuery), "规则执行状态"))
-				sendExecResult(yaklib.NewYakitStatusCardExecResult("已跳过规则", info.SkippedQuery, "规则执行状态"))
-				sendExecResult(yaklib.NewYakitStatusCardExecResult("执行成功个数", info.SuccessQuery, "规则执行状态"))
-				sendExecResult(yaklib.NewYakitStatusCardExecResult("执行失败个数", info.FailedQuery, "规则执行状态"))
-				sendExecResult(yaklib.NewYakitStatusCardExecResult("检出漏洞/风险个数", info.RiskCount, "漏洞/风险状态"))
-			}
+			// update progress
+			sendExecResult(yaklib.NewYakitProgressExecResult("main", progress))
+			// status card
+			sendExecResult(yaklib.NewYakitStatusCardExecResult("已执行规则", fmt.Sprintf("%d/%d", info.FinishedQuery, info.TotalQuery), "规则执行状态"))
+			sendExecResult(yaklib.NewYakitStatusCardExecResult("已跳过规则", info.SkippedQuery, "规则执行状态"))
+			sendExecResult(yaklib.NewYakitStatusCardExecResult("执行成功个数", info.SuccessQuery, "规则执行状态"))
+			sendExecResult(yaklib.NewYakitStatusCardExecResult("执行失败个数", info.FailedQuery, "规则执行状态"))
+			sendExecResult(yaklib.NewYakitStatusCardExecResult("检出漏洞/风险个数", info.RiskCount, "漏洞/风险状态"))
 		}),
 		syntaxflow_scan.WithScanResultCallback(func(sr *syntaxflow_scan.ScanResult) {
 			taskID = sr.TaskID

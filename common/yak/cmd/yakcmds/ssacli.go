@@ -1137,19 +1137,20 @@ var ssaRisk = &cli.Command{
 			defer config.DeferFunc()
 
 			ctx := context.Background()
-			prog, err := getProgram(ctx, config)
-			if err != nil {
-				log.Errorf("get program failed: %s", err)
-				return err
-			}
+			_ = ctx
+			// prog, err := getProgram(ctx, config)
+			// if err != nil {
+			// 	log.Errorf("get program failed: %s", err)
+			// 	return err
+			// }
 
-			ruleFilter := &ypb.SyntaxFlowRuleFilter{
-				Language:          []string{prog.GetLanguage()},
-				FilterLibRuleKind: yakit.FilterLibRuleFalse,
-			}
+			// ruleFilter := &ypb.SyntaxFlowRuleFilter{
+			// 	Language:          []string{prog.GetLanguage()},
+			// 	FilterLibRuleKind: yakit.FilterLibRuleFalse,
+			// }
 
 			var content []byte
-			riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, true)
+			// riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, true)
 			if err != nil {
 				log.Errorf("scan failed: %s", err)
 				// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
@@ -1164,9 +1165,9 @@ var ssaRisk = &cli.Command{
 			}
 
 			// 创建一个缓冲区来捕获ShowRisk的输出
-			var buffer bytes.Buffer
-			ShowRisk(config.Format, riskCh, &buffer, opt...)
-			content = buffer.Bytes()
+			// var buffer bytes.Buffer
+			// ShowRisk(config.Format, riskCh, &buffer, opt...)
+			// content = buffer.Bytes()
 
 			return showAll(content)
 		}

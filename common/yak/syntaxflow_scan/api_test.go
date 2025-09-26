@@ -74,13 +74,12 @@ func TestStartScan_WithProcessCallback(t *testing.T) {
 		}),
 		WithProgramNames(progID),
 		WithRuleFilter(&ypb.SyntaxFlowRuleFilter{}),
-		WithProcessCallback(func(progress float64, status ProcessStatus, info *RuleProcessInfoList) {
+		WithProcessCallback(func(progress float64, info *RuleProcessInfoList) {
 			lock.Lock()
 			defer lock.Unlock()
-			log.Infof("===[%s]== %.2f%% -- %s", time.UnixMicro(info.Time), progress*100, status)
-			// log.Infof("=%s== %.2f%%, status: %s, info: %v", time.UnixMicro(info.Time), progress*100, status, info)
-			// require.GreaterOrEqual(t, progress, recordProcess, "总体进度不应该减少")
-			// recordProcess = progress
+			log.Infof("=%s== %.2f%%, status: %s ", time.UnixMicro(info.Time), progress*100, status)
+			require.GreaterOrEqual(t, progress, recordProcess, "总体进度不应该减少")
+			recordProcess = progress
 		}),
 	)
 
@@ -104,7 +103,7 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 	f := prepareTestProgram(t, progID)
 	defer f()
 
-	ruleProgressCalls := utils.NewSafeMapWithKey[string, float64]()
+	ruleProgress := utils.NewSafeMapWithKey[string, float64]()
 	var status string
 	var taskID string
 
@@ -114,38 +113,39 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 		WithScanResultCallback(func(sr *ScanResult) {
 			status = sr.Status
 			taskID = sr.TaskID
-			log.Infof("扫描结果: TaskID=%s, Status=%s", taskID, status)
+			// log.Infof("扫描结果: TaskID=%s, Status=%s", taskID, status)
 		}),
 		WithProgramNames(progID),
 		WithRuleFilter(&ypb.SyntaxFlowRuleFilter{}),
-		WithProcessCallback(func(progress float64, status ProcessStatus, infos *RuleProcessInfoList) {
+		WithProcessMonitorTTL(100*time.Millisecond), // 设置回调间隔
+		WithProcessCallback(func(progress float64, infos *RuleProcessInfoList) {
+			// log.Infof("=%s== %.2f%%, status: %s --\n%s\n", time.UnixMicro(infos.Time), progress*100, status, infos)
+			log.Infof("=%s== %.2f%%, status: %s --", time.UnixMicro(infos.Time), progress*100, status)
 			require.False(t, progress < totalProcess, "总体进度不应该减少")
 			totalProcess = progress
 			for _, info := range infos.Rules {
-				if precoss, ok := ruleProgressCalls.Get(info.Key()); ok {
-					if info.Progress > precoss {
-						ruleProgressCalls.Set(info.Key(), progress)
-					}
-					require.False(t, info.Progress < precoss, "规则进度不应该减少")
-				} else {
-					ruleProgressCalls.Set(info.Key(), progress)
+				if oldProgress, ok := ruleProgress.Get(info.Key()); ok {
+					log.Infof("  规则进度(历史): %s %.2f%% vs %.2f%%", info.Key(), oldProgress*100, info.Progress*100)
+					require.GreaterOrEqual(t, info.Progress, oldProgress, "规则进度不应该减少")
 				}
+				ruleProgress.Set(info.Key(), info.Progress)
 			}
 		}),
 	)
+	log.Infof("======================= 最终总体进度: %.2f%%", totalProcess*100)
 
 	require.NoError(t, err)
 	require.Equal(t, 1.0, totalProcess, "最终总体进度应该是100%")
 
 	// 验证规则进度回调被调用
-	require.Greater(t, ruleProgressCalls.Count(), 0, "规则进度回调应该被调用")
+	require.Greater(t, ruleProgress.Count(), 0, "规则进度回调应该被调用")
 	require.NotEmpty(t, taskID, "应该有任务ID")
 	require.Equal(t, "done", status, "任务应该完成")
 
 	// 验证规则进度调用包含有效数据
-	for _, call := range ruleProgressCalls.GetAll() {
-		require.Equal(t, 1.0, call, "进度应该等于1.0")
+	for key, process := range ruleProgress.GetAll() {
+		require.Equal(t, 1.0, process, "进度应该等于1.0 %s", key)
 	}
 
-	log.Infof("测试完成: 任务ID=%s, 规则进度回调次数=%d", taskID, ruleProgressCalls.Count())
+	log.Infof("测试完成: 任务ID=%s, 规则进度回调次数=%d", taskID, ruleProgress.Count())
 }
