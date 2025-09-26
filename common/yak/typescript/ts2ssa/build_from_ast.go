@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/google/uuid"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/core"
@@ -31,9 +30,9 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 	recoverRange := b.GetRecoverRange(sourcefile, &sourcefile.Loc, sourcefile.Text())
 	defer recoverRange()
 
-	//if b.PreHandler() {
-	//	return nil
-	//}
+	if b.PreHandler() {
+		return nil
+	}
 
 	if sourcefile.Statements != nil {
 		for _, statement := range sourcefile.Statements.Nodes {
@@ -139,7 +138,10 @@ func (b *builder) VisitVariableStatement(node *ast.VariableStatement) interface{
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	isExport := node.Modifiers().ModifierFlags&ast.ModifierFlagsExport != 0
+	var isExport bool
+	if modifierFlags := node.Modifiers(); modifierFlags != nil {
+		isExport = modifierFlags.ModifierFlags&ast.ModifierFlagsExport != 0
+	}
 
 	if decList := node.DeclarationList; decList != nil {
 		b.VisitVariableDeclarationList(decList, isExport)
@@ -622,7 +624,13 @@ func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
 	// 如果有返回表达式，处理它并返回
 	if node.Expression != nil {
 		returnValue := b.VisitRightValueExpression(node.Expression)
-		b.EmitReturn([]ssa.Value{returnValue})
+		if returnValue != nil {
+			b.EmitReturn([]ssa.Value{returnValue})
+		} else {
+			b.EmitReturn([]ssa.Value{ssa.NewUndefined("ret")})
+			_ = b.VisitRightValueExpression(node.Expression)
+		}
+
 	} else {
 		// 如果没有返回表达式，返回undefined
 		b.EmitReturn([]ssa.Value{b.EmitUndefined("")})
@@ -781,14 +789,13 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 	var caseCount int
 	var commonCase []*ast.Node
 	var defaultCase *ast.Node
-
 	if caseBlock.Clauses != nil && caseBlock.Clauses.Nodes != nil {
-		lastCase := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1].AsCaseOrDefaultClause()
-		if lastCase.Expression == nil {
-			defaultCase = lastCase.AsNode()
-			commonCase = caseBlock.Clauses.Nodes[:len(caseBlock.Clauses.Nodes)-1]
-		} else {
-			commonCase = caseBlock.Clauses.Nodes
+		for _, caseClause := range caseBlock.Clauses.Nodes {
+			if caseClause.AsCaseOrDefaultClause().Expression == nil {
+				defaultCase = caseClause
+			} else {
+				commonCase = append(commonCase, caseClause)
+			}
 		}
 		if defaultCase != nil {
 			caseCount = len(caseBlock.Clauses.Nodes) - 1
@@ -798,6 +805,7 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 	} else {
 		caseCount = 0
 	}
+
 	switchBuilder.BuildCaseSize(caseCount)
 
 	switchBuilder.SetCase(func(i int) []ssa.Value {
@@ -1056,19 +1064,30 @@ func (b *builder) VisitImportDeclaration(node *ast.ImportDeclaration) interface{
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
-	modulePath := b.extractModuleSpecifier(node.ModuleSpecifier)
+	// 提取模块路径
+	modulePath := b.extractModuleSpecifierText(node.ModuleSpecifier)
 	if modulePath == "" {
+		b.NewError(ssa.Warn, TAG, "empty import module specifier")
 		return nil
 	}
+	// 解析导入路径
+	resolvedPath, isExternal := b.resolveImportLibPath(modulePath)
 
-	b.ensureModuleImported(modulePath)
+	// 确保模块被导入
+	b.ensureModuleImported(resolvedPath, isExternal)
 
+	// 处理导入子句
 	if node.ImportClause != nil {
-		previous := b.currentImportModule
-		b.currentImportModule = modulePath
+		// 保存当前导入模块信息
+		previousUnresolvedImportModulePath := b.unresolvedCurrentImportModulePath
+		previousModule := b.currentImportModule
+		b.unresolvedCurrentImportModulePath = modulePath
+		b.currentImportModule = resolvedPath
 		defer func() {
-			b.currentImportModule = previous
+			b.unresolvedCurrentImportModulePath = previousUnresolvedImportModulePath
+			b.currentImportModule = previousModule
 		}()
+
 		b.VisitImportClause(node.ImportClause.AsImportClause())
 	}
 
@@ -1084,28 +1103,38 @@ func (b *builder) VisitImportClause(node *ast.ImportClause) interface{} {
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	// 跳过类型导入
 	if node.IsTypeOnly {
 		return nil
 	}
 
-	moduleName := b.currentImportModule
+	modulePath := b.currentImportModule
+	_, isExternal := b.resolveImportLibPath(b.unresolvedCurrentImportModulePath)
 
+	// 处理默认导入: import React from 'react'
 	if binding := node.Name(); binding != nil {
-		if local := b.declarationNameText(binding); local != "" {
-			b.assignImportedValue(local, "default", moduleName)
+		localName := b.getDeclarationNameText(binding)
+		if localName != "" {
+			b.assignImportedValue(localName, "default", modulePath, isExternal)
 		}
 	}
 
+	// 处理命名绑定
 	if node.NamedBindings != nil {
 		bindings := node.NamedBindings
 		switch {
 		case ast.IsNamespaceImport(bindings):
+			// 命名空间导入: import * as fs from 'fs'
 			namespace := bindings.AsNamespaceImport()
-			alias := b.declarationNameText(namespace.Name())
-			if alias != "" {
-				b.bindNamespaceImport(alias, moduleName)
+			if namespace != nil && namespace.Name() != nil {
+				alias := b.getDeclarationNameText(namespace.Name())
+				if alias != "" {
+					b.bindNamespaceImport(alias, modulePath, isExternal)
+				}
 			}
+
 		case ast.IsNamedImports(bindings):
+			// 命名导入: import { a, b as c } from 'module'
 			named := bindings.AsNamedImports()
 			if named != nil && named.Elements != nil {
 				for _, specNode := range named.Elements.Nodes {
@@ -1116,238 +1145,29 @@ func (b *builder) VisitImportClause(node *ast.ImportClause) interface{} {
 					if spec == nil || spec.IsTypeOnly {
 						continue
 					}
-					local := b.declarationNameText(spec.Name())
-					if local == "" {
+
+					localName := b.getDeclarationNameText(spec.Name())
+					if localName == "" {
 						continue
 					}
-					original := b.moduleExportNameText(spec)
-					if original == "" {
-						original = local
+
+					// 获取原始导出名（如果有别名的话）
+					originalName := localName
+					if spec.PropertyName != nil {
+						if ast.IsIdentifier(spec.PropertyName) {
+							originalName = spec.PropertyName.AsIdentifier().Text
+						} else if ast.IsStringLiteral(spec.PropertyName) {
+							originalName = strings.Trim(spec.PropertyName.AsStringLiteral().Text, `"'`)
+						}
 					}
-					b.assignImportedValue(local, original, moduleName)
+
+					b.assignImportedValue(localName, originalName, modulePath, isExternal)
 				}
 			}
 		}
 	}
 
 	return nil
-}
-
-func (b *builder) extractModuleSpecifier(expr *ast.Expression) string {
-	if expr == nil {
-		return ""
-	}
-	switch expr.Kind {
-	case ast.KindStringLiteral:
-		return strings.TrimSpace(expr.AsStringLiteral().Text)
-	case ast.KindNoSubstitutionTemplateLiteral:
-		return strings.TrimSpace(expr.AsNoSubstitutionTemplateLiteral().Text)
-	default:
-		return ""
-	}
-}
-
-func (b *builder) ensureModuleImported(modulePath string) {
-	if modulePath == "" {
-		return
-	}
-
-	if b.PreHandler() {
-		return
-	}
-
-	if strings.HasPrefix(modulePath, ".") || strings.HasPrefix(modulePath, "/") {
-		resolved, err := b.resolveImportPath(modulePath)
-		if err != nil {
-			log.Warnf("ts import resolve %s failed: %v", modulePath, err)
-			return
-		}
-		if resolved == "" {
-			return
-		}
-		if err := b.BuildFilePackage(resolved, true); err != nil {
-			log.Warnf("ts import build %s failed: %v", modulePath, err)
-		}
-		return
-	}
-
-	if _, err := b.GetProgram().GetOrCreateLibrary(modulePath); err != nil {
-		log.Warnf("ts import library %s failed: %v", modulePath, err)
-	}
-}
-
-func (b *builder) resolveImportPath(modulePath string) (string, error) {
-	prog := b.GetProgram()
-	if prog == nil || prog.Loader == nil {
-		return "", utils.Errorf("program loader not ready")
-	}
-	fsys := prog.Loader.GetFilesysFileSystem()
-	if fsys == nil {
-		return "", utils.Errorf("filesystem not available")
-	}
-	editor := b.GetEditor()
-	if editor == nil {
-		return "", utils.Errorf("editor not set")
-	}
-	dir := editor.GetFolderPath()
-	candidates := b.importCandidates(fsys, modulePath)
-	for _, candidate := range candidates {
-		candidatePath := candidate
-		if !fsys.IsAbs(candidatePath) {
-			candidatePath = fsys.Join(dir, candidatePath)
-		}
-		exists, err := fsys.Exists(candidatePath)
-		if err != nil || !exists {
-			continue
-		}
-		info, err := fsys.Stat(candidatePath)
-		if err != nil {
-			continue
-		}
-		if info.IsDir() {
-			continue
-		}
-		return candidatePath, nil
-	}
-	return "", utils.Errorf("module %s not found", modulePath)
-}
-
-func (b *builder) importCandidates(fsys fi.FileSystem, modulePath string) []string {
-	sep := string(fsys.GetSeparators())
-	normalized := strings.TrimSpace(modulePath)
-	if sep != "/" {
-		normalized = strings.ReplaceAll(normalized, "/", sep)
-	}
-	if strings.HasSuffix(normalized, sep) {
-		normalized = strings.TrimSuffix(normalized, sep)
-	}
-
-	candidates := make([]string, 0)
-	if b.hasImportExtension(normalized) {
-		candidates = append(candidates, normalized)
-	} else {
-		exts := []string{".d.ts", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json"}
-		for _, ext := range exts {
-			candidates = append(candidates, normalized+ext)
-		}
-	}
-
-	base := normalized
-	indexFiles := []string{"index.d.ts", "index.ts", "index.tsx", "index.js", "index.jsx", "index.mjs", "index.cjs", "index.json"}
-	for _, idx := range indexFiles {
-		if base == "" || base == "." {
-			candidates = append(candidates, idx)
-			continue
-		}
-		candidates = append(candidates, fsys.Join(base, idx))
-	}
-
-	seen := make(map[string]struct{}, len(candidates))
-	uniq := make([]string, 0, len(candidates))
-	for _, cand := range candidates {
-		if cand == "" {
-			continue
-		}
-		if _, ok := seen[cand]; ok {
-			continue
-		}
-		seen[cand] = struct{}{}
-		uniq = append(uniq, cand)
-	}
-	return uniq
-}
-
-func (b *builder) hasImportExtension(path string) bool {
-	lower := strings.ToLower(path)
-	for _, ext := range []string{".d.ts", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json"} {
-		if strings.HasSuffix(lower, ext) {
-			return true
-		}
-	}
-	return false
-}
-
-func (b *builder) declarationNameText(name *ast.DeclarationName) string {
-	if name == nil {
-		return ""
-	}
-	if id := name.AsIdentifier(); id != nil {
-		return id.Text
-	}
-	if str := name.AsStringLiteral(); str != nil {
-		return str.Text
-	}
-	return ""
-}
-
-func (b *builder) nodeText(node *ast.Node) string {
-	if node == nil {
-		return ""
-	}
-	if ast.IsIdentifier(node) {
-		return node.AsIdentifier().Text
-	}
-	if ast.IsStringLiteral(node) {
-		return node.AsStringLiteral().Text
-	}
-	if ast.IsNumericLiteral(node) {
-		return node.AsNumericLiteral().Text
-	}
-	return ""
-}
-
-func (b *builder) moduleExportNameText(spec *ast.ImportSpecifier) string {
-	if spec == nil {
-		return ""
-	}
-	if spec.PropertyName != nil {
-		return b.nodeText((*ast.Node)(spec.PropertyName))
-	}
-	return b.declarationNameText(spec.Name())
-}
-
-func (b *builder) assignImportedValue(localName, originalName, module string) {
-	if localName == "" || b.PreHandler() {
-		return
-	}
-	if originalName == "" {
-		originalName = localName
-	}
-
-	var value ssa.Value
-	switch originalName {
-	case "default":
-		value = b.PeekValue("default")
-		if value == nil {
-			value = b.PeekValue("__default__")
-		}
-	default:
-		value = b.PeekValue(originalName)
-	}
-
-	if value == nil {
-		placeholder := originalName
-		if module != "" {
-			placeholder = fmt.Sprintf("%s.%s", module, originalName)
-		}
-		value = b.EmitConstInstPlaceholder(placeholder)
-	}
-
-	variable := b.CreateJSVariable(localName)
-	b.AssignVariable(variable, value)
-}
-
-func (b *builder) bindNamespaceImport(localName, module string) {
-	if localName == "" || b.PreHandler() {
-		return
-	}
-	placeholder := module
-	if placeholder == "" {
-		placeholder = localName
-	}
-	value := b.EmitConstInstPlaceholder(placeholder)
-	variable := b.CreateJSVariable(localName)
-	b.AssignVariable(variable, value)
 }
 
 // VisitNamespaceImport 访问命名空间导入
@@ -2464,7 +2284,10 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 		funcName = "anonymous_func_" + uuid.NewString()
 	}
 
-	isExport := node.Modifiers().ModifierFlags&ast.ModifierFlagsExport != 0
+	var isExport bool
+	if modifierFlags := node.Modifiers(); modifierFlags != nil {
+		isExport = modifierFlags.ModifierFlags&ast.ModifierFlagsExport != 0
+	}
 	if isExport {
 		b.namedExports[funcName] = funcName
 	}

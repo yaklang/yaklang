@@ -198,7 +198,15 @@ func (b *builder) VisitNumericLiteral(node *ast.NumericLiteral) ssa.Value {
 	defer recoverRange()
 
 	// 创建数字常量
-	return b.EmitConstInst(codec.Atoi(text))
+	num, err := strconv.ParseInt(text, 0, 64)
+	if err == nil {
+		return b.EmitConstInst(num)
+	}
+	float, err := strconv.ParseFloat(text, 64)
+	if err == nil {
+		return b.EmitConstInst(float)
+	}
+	return b.EmitConstInst(utils.InterfaceToFloat64(text))
 }
 
 // VisitBooleanLiteral 访问布尔字面量
@@ -620,7 +628,11 @@ func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
 	// 如果有返回表达式，处理它并返回
 	if node.Expression != nil {
 		returnValue := b.VisitRightValueExpression(node.Expression)
-		b.EmitReturn([]ssa.Value{returnValue})
+		if returnValue != nil {
+			b.EmitReturn([]ssa.Value{returnValue})
+		} else {
+			b.EmitReturn([]ssa.Value{b.EmitUndefined("")})
+		}
 	} else {
 		// 如果没有返回表达式，返回undefined
 		b.EmitReturn([]ssa.Value{b.EmitUndefined("")})
@@ -779,14 +791,13 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 	var caseCount int
 	var commonCase []*ast.Node
 	var defaultCase *ast.Node
-
 	if caseBlock.Clauses != nil && caseBlock.Clauses.Nodes != nil {
-		lastCase := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1].AsCaseOrDefaultClause()
-		if lastCase.Expression == nil {
-			defaultCase = lastCase.AsNode()
-			commonCase = caseBlock.Clauses.Nodes[:len(caseBlock.Clauses.Nodes)-1]
-		} else {
-			commonCase = caseBlock.Clauses.Nodes
+		for _, caseClause := range caseBlock.Clauses.Nodes {
+			if caseClause.AsCaseOrDefaultClause().Expression == nil {
+				defaultCase = caseClause
+			} else {
+				commonCase = append(commonCase, caseClause)
+			}
 		}
 		if defaultCase != nil {
 			caseCount = len(caseBlock.Clauses.Nodes) - 1
@@ -796,6 +807,7 @@ func (b *builder) VisitSwitchStatement(node *ast.SwitchStatement) interface{} {
 	} else {
 		caseCount = 0
 	}
+
 	switchBuilder.BuildCaseSize(caseCount)
 
 	switchBuilder.SetCase(func(i int) []ssa.Value {

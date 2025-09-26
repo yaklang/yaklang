@@ -1,6 +1,11 @@
 package ts2ssa
 
 import (
+	"fmt"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/log"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/frontend/ast"
 )
@@ -111,4 +116,283 @@ func (b *builder) CreateJSVariable(identifierName string) *ssa.Variable {
 		return b.CreateLocalVariable(identifierName)
 	}
 	return b.CreateVariable(identifierName)
+}
+
+// resolveImportLibPath 解析导入路径
+func (b *builder) resolveImportLibPath(importPath string) (resolvedPath string, isExternal bool) {
+	if importPath == "" {
+		return "", false
+	}
+
+	// 检查是否是外部模块（不以.或/开头）
+	if !strings.HasPrefix(importPath, ".") && !strings.HasPrefix(importPath, "/") {
+		return importPath, true // 外部模块
+	}
+
+	// 处理相对路径导入
+	prog := b.GetProgram()
+	if prog == nil || prog.Loader == nil {
+		return importPath, false
+	}
+
+	fsys := prog.Loader.GetFilesysFileSystem()
+	if fsys == nil {
+		return importPath, false
+	}
+
+	editor := b.GetEditor()
+	if editor == nil {
+		return importPath, false
+	}
+
+	dir := editor.GetFolderPath()
+	candidates := b.getImportCandidates(fsys, importPath, dir)
+
+	for _, candidate := range candidates {
+		candidatePath := candidate
+		if !fsys.IsAbs(candidatePath) {
+			candidatePath = fsys.Join(dir, candidatePath)
+		}
+
+		exists, err := fsys.Exists(candidatePath)
+		if err != nil || !exists {
+			continue
+		}
+
+		info, err := fsys.Stat(candidatePath)
+		if err != nil || info.IsDir() {
+			continue
+		}
+
+		return candidatePath, false
+	}
+
+	return importPath, false
+}
+
+// getImportCandidates 获取导入路径的候选文件
+func (b *builder) getImportCandidates(fsys fi.FileSystem, importPath, baseDir string) []string {
+	candidates := []string{}
+	extensions := []string{".ts", ".tsx", ".js", ".jsx", ".d.ts"}
+
+	// 如果导入路径已经有扩展名，直接使用
+	if hasValidExtension(importPath) {
+		candidates = append(candidates, importPath)
+	} else {
+		// 尝试添加各种扩展名
+		for _, ext := range extensions {
+			candidates = append(candidates, importPath+ext)
+		}
+
+		// 尝试index文件
+		for _, ext := range extensions {
+			candidates = append(candidates, fsys.Join(importPath, "index"+ext))
+		}
+	}
+
+	return candidates
+}
+
+// hasValidExtension 检查文件是否有有效的扩展名
+func hasValidExtension(path string) bool {
+	// TS support direct json file import but we will not handle json import for now
+	validExts := []string{".ts", ".tsx", ".js", ".jsx", ".d.ts", ".mjs", ".cjs"}
+	for _, ext := range validExts {
+		if strings.HasSuffix(strings.ToLower(path), ext) {
+			return true
+		}
+	}
+	return false
+}
+
+// createExternalImportPlaceholder 为外部导入创建占位符
+func (b *builder) createExternalImportPlaceholder(importPath, exportName string) ssa.Value {
+	placeholderName := fmt.Sprintf("external_%s_from_%s", exportName, importPath)
+	placeholder := b.EmitConstInstPlaceholder(placeholderName)
+	placeholder.SetName(fmt.Sprintf("%s (from %s)", exportName, importPath))
+	return placeholder
+}
+
+// createNamespaceImportPlaceholder 为命名空间导入创建占位符
+func (b *builder) createNamespaceImportPlaceholder(importPath string) ssa.Value {
+	placeholderName := fmt.Sprintf("namespace_%s", importPath)
+	placeholder := b.EmitConstInstPlaceholder(placeholderName)
+	placeholder.SetName(fmt.Sprintf("* as namespace (from %s)", importPath))
+	return placeholder
+}
+
+// getModuleExportValue 从模块中获取导出值
+func (b *builder) getModuleExportValue(modulePath, exportName string) ssa.Value {
+	prog := b.GetProgram()
+	if prog == nil {
+		return b.EmitUndefined(fmt.Sprintf("module_%s_not_found", modulePath))
+	}
+
+	// 尝试获取模块Program
+	moduleProgram, exists := prog.GetLibrary(modulePath)
+	if !exists {
+		// 模块未加载，返回占位符
+		return b.EmitUndefined(fmt.Sprintf("module_%s_not_loaded", modulePath))
+	}
+
+	// 从模块的ExportValue中获取导出值
+	if exportValue := moduleProgram.GetExportValue(exportName); exportValue != nil {
+		return exportValue
+	}
+
+	// 找不到导出，返回占位符
+	return b.EmitUndefined(fmt.Sprintf("export_%s_not_found_in_%s", exportName, modulePath))
+}
+
+// extractModuleSpecifierText 提取模块说明符的文本
+func (b *builder) extractModuleSpecifierText(expr *ast.Expression) string {
+	if expr == nil {
+		return ""
+	}
+
+	switch expr.Kind {
+	case ast.KindStringLiteral:
+		return strings.Trim(expr.AsStringLiteral().Text, `"'`)
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return strings.Trim(expr.AsNoSubstitutionTemplateLiteral().Text, "`")
+	default:
+		return ""
+	}
+}
+
+// getDeclarationNameText 获取声明名称的文本
+func (b *builder) getDeclarationNameText(name *ast.DeclarationName) string {
+	if name == nil {
+		return ""
+	}
+	if id := name.AsIdentifier(); id != nil {
+		return id.Text
+	}
+	if str := name.AsStringLiteral(); str != nil {
+		return strings.Trim(str.Text, `"'`)
+	}
+	return ""
+}
+
+// ensureModuleImported 确保模块被导入
+func (b *builder) ensureModuleImported(modulePath string, isExternal bool) {
+	if modulePath == "" {
+		return
+	}
+
+	if isExternal {
+		// 外部模块：创建占位符Library
+		b.createExternalModuleLibrary(modulePath)
+	} else {
+		prog := b.GetProgram()
+		// 本地模块：尝试构建文件包
+		lib, exist := prog.GetLibrary(modulePath)
+		if !b.PreHandler() && (!exist || lib == nil) {
+			log.Warnf("Can't find module %s", modulePath)
+			return
+		}
+		if b.PreHandler() && (!exist || lib == nil) {
+			lib = prog.NewLibrary(modulePath, []string{modulePath})
+		}
+		lib.PushEditor(prog.GetApplication().GetCurrentEditor())
+
+		funcBuilder := lib.GetAndCreateFunctionBuilder(modulePath, string(ssa.MainFunctionName))
+		if funcBuilder != nil {
+			funcBuilder.SetEditor(prog.GetApplication().GetCurrentEditor())
+			funcBuilder.SetBuildSupport(b.FunctionBuilder)
+			currentBuilder := b.FunctionBuilder
+			b.FunctionBuilder = funcBuilder
+			defer func() {
+				b.FunctionBuilder = currentBuilder
+			}()
+		}
+
+	}
+}
+
+// createExternalModuleLibrary 为外部模块创建占位符Library
+func (b *builder) createExternalModuleLibrary(modulePath string) {
+	prog := b.GetProgram()
+	if prog == nil {
+		return
+	}
+
+	// 创建或获取外部模块的Library
+	if _, err := prog.GetOrCreateLibrary(modulePath); err != nil {
+		log.Warnf("Failed to create external library %s: %v", modulePath, err)
+	}
+}
+
+// assignImportedValue 分配导入的值
+func (b *builder) assignImportedValue(localName, exportName, modulePath string, isExternal bool) {
+	if localName == "" || b.PreHandler() {
+		return
+	}
+
+	var value ssa.Value
+
+	if isExternal {
+		// 外部模块：创建占位符
+		value = b.createExternalImportPlaceholder(modulePath, exportName)
+	} else {
+		// 本地模块：尝试获取实际值
+		value = b.getModuleExportValue(modulePath, exportName)
+	}
+
+	// 创建变量并赋值
+	variable := b.CreateJSVariable(localName)
+	b.AssignVariable(variable, value)
+
+	log.Infof("Import binding: %s -> %s from %s (external: %t)", localName, exportName, modulePath, isExternal)
+}
+
+// bindNamespaceImport 绑定命名空间导入
+func (b *builder) bindNamespaceImport(localName, modulePath string, isExternal bool) {
+	if localName == "" || b.PreHandler() {
+		return
+	}
+
+	var value ssa.Value
+
+	if isExternal {
+		// 外部模块：创建命名空间占位符
+		value = b.createNamespaceImportPlaceholder(modulePath)
+	} else {
+		// 本地模块：创建包含所有导出的容器
+		value = b.createLocalNamespaceObject(modulePath)
+	}
+
+	// 创建变量并赋值
+	variable := b.CreateJSVariable(localName)
+	b.AssignVariable(variable, value)
+
+	log.Infof("Namespace import binding: %s -> * from %s (external: %t)", localName, modulePath, isExternal)
+}
+
+// createLocalNamespaceObject 为本地模块创建命名空间对象
+func (b *builder) createLocalNamespaceObject(modulePath string) ssa.Value {
+	prog := b.GetProgram()
+	if prog == nil {
+		return b.EmitUndefined("namespace_prog_not_found")
+	}
+
+	// 尝试获取模块Program
+	moduleProgram, exists := prog.GetLibrary(modulePath)
+	if !exists {
+		return b.EmitUndefined(fmt.Sprintf("namespace_module_%s_not_found", modulePath))
+	}
+
+	// 创建命名空间容器
+	namespaceObj := b.EmitEmptyContainer()
+
+	// 从模块的ExportValue中添加所有导出
+	if moduleProgram.ExportValue != nil {
+		for exportName, exportValue := range moduleProgram.ExportValue {
+			member := b.CreateMemberCallVariable(namespaceObj, b.EmitConstInst(exportName))
+			b.AssignVariable(member, exportValue)
+		}
+		log.Infof("Created local namespace object for module: %s with %d exports", modulePath, len(moduleProgram.ExportValue))
+	}
+
+	return namespaceObj
 }

@@ -2,6 +2,7 @@ package ts2ssa
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
@@ -37,11 +38,12 @@ type builder struct {
 	useStrict         bool
 	contextLabelStack []string
 
-	currentImportModule string
-	namedExports        map[string]string            // exportedName -> realName (exportedName may not be the same as realName in case of export alias)
-	defaultExport       string                       // only one default export per ts file
-	cjsExport           string                       // export equal + require syntax only support one export per ts file
-	reExports           map[string]map[string]string // re-exported name -> (path -> exportName)
+	currentImportModule               string
+	unresolvedCurrentImportModulePath string
+	namedExports                      map[string]string            // exportedName -> realName (exportedName may not be the same as realName in case of export alias)
+	defaultExport                     string                       // only one default export per ts file
+	cjsExport                         string                       // export equal + require syntax only support one export per ts file
+	reExports                         map[string]map[string]string // re-exported name -> (path -> exportName)
 
 }
 
@@ -70,7 +72,29 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 }
 
 func (*SSABuilder) FilterFile(path string) bool {
-	return filepath.Ext(path) == ".ts" || filepath.Ext(path) == ".d.ts" || filepath.Ext(path) == "js"
+	// 排除 node_modules 目录
+	if strings.Contains(path, "node_modules") {
+		return false
+	}
+
+	// 排除其他常见的不需要解析的目录
+	excludeDirs := []string{
+		".git", ".svn", ".hg", // 版本控制
+		"dist", "build", "out", // 构建输出目录
+		".next", ".nuxt", ".vitepress", // 框架构建目录
+		"coverage", ".nyc_output", // 测试覆盖率
+		".cache", "tmp", "temp", // 缓存和临时目录
+	}
+
+	for _, dir := range excludeDirs {
+		if strings.Contains(path, dir+string(filepath.Separator)) ||
+			strings.HasSuffix(path, dir) {
+			return false
+		}
+	}
+
+	extension := filepath.Ext(path)
+	return extension == ".ts" || extension == ".d.ts" || extension == ".js"
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {

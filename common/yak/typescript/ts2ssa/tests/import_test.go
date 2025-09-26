@@ -17,12 +17,14 @@ export function getValue(): number {
 }
 
 export const message = "Hello World";
+const PI = 3.14
 `)
 	vf.AddFile("src/main.ts", `
 import { getValue, message } from './utils';
 
 console.log(getValue());
 console.log(message);
+console.log(PI);
 `)
 
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
