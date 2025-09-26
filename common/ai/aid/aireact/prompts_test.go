@@ -523,7 +523,7 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	t.Logf("Generated prompt length: %d", len(prompt))
 
 	// 验证生成的提示包含 Forge 列表相关的文本
-	if !utils.MatchAllOfSubString(prompt, "AI Bluprint(AI Forge)") {
+	if !utils.MatchAllOfSubString(prompt, "AI Blueprint(AI Forge)") {
 		t.Fatal("Generated prompt should contain AI Forge section")
 	}
 
