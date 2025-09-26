@@ -27,18 +27,18 @@ type ScanTaskConfig struct {
 	*ypb.SyntaxFlowScanRequest
 	RuleNames []string `json:"rule_names"`
 
-	errorCallback  errorCallback
-	resultCallback ScanResultCallback
+	// ttl
+	ProcessMonitorTTL time.Duration
 
+	ProcessCallback RuleProcessCallback `json:"-"`
+	errorCallback   errorCallback       `json:"-"`
+	resultCallback  ScanResultCallback  `json:"-"`
 	// this function check if need pauseCheck,
 	// /return true to pauseCheck, and no-blocking
-	pauseCheck func() bool
+	pauseCheck func() bool `json:"-"`
 
-	ProcessMonitorTTL time.Duration
-	ProcessCallback   RuleProcessCallback
-
-	Reporter       sfreport.IReport
-	ReporterWriter io.Writer
+	Reporter       sfreport.IReport `json:"-"`
+	ReporterWriter io.Writer        `json:"-"`
 }
 
 func NewScanConfig(options ...ScanOption) *ScanTaskConfig {
@@ -426,5 +426,11 @@ func WithResumeTaskId(taskId string) ScanOption {
 func WithProcessCallback(callback RuleProcessCallback) ScanOption {
 	return func(sc *ScanTaskConfig) {
 		sc.ProcessCallback = callback
+	}
+}
+
+func WithProcessMonitorTTL(ttl time.Duration) ScanOption {
+	return func(sc *ScanTaskConfig) {
+		sc.ProcessMonitorTTL = ttl
 	}
 }
