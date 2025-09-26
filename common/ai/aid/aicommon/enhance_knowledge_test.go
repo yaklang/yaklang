@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/utils"
 	"testing"
 )
 
@@ -65,15 +66,17 @@ func TestEnhanceKnowledgeManager_DumpKnowledgeByTaskID(t *testing.T) {
 
 	taskID := "task-2"
 	uuid1 := uuid.NewString()
-	k := newTestKnowledge("mock", uuid1, "DumpTitle", "DumpContent", "DumpSource", 0.7)
+	title := uuid.NewString()
+	content := uuid.NewString()
+	k := newTestKnowledge("mock", uuid1, title, content, "DumpSource", 0.7)
 	manager.AppendKnowledge(taskID, k)
 
 	dump := manager.DumpTaskAboutKnowledge(taskID)
 	if dump == "" || dump == "\n" {
 		t.Errorf("expected non-empty dump, got: %q", dump)
 	}
-	if want := "DumpTitle"; !contains(dump, want) {
-		t.Errorf("expected dump to contain %q, got: %q", want, dump)
+	if !utils.MatchAllOfSubString(dump, title, content) {
+		t.Errorf("expected dump to want tile[%q] content[%q], got: %q", title, content, dump)
 	}
 }
 
@@ -191,8 +194,4 @@ func TestEnhanceKnowledgeManager_UselessFilter(t *testing.T) {
 	manager.UnsetKnowledge(taskID, uuid1)
 	got = manager.GetKnowledgeByTaskID(taskID)
 	require.Len(t, got, 2)
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || (len(s) > 0 && (contains(s[1:], substr) || contains(s[:len(s)-1], substr))))
 }
