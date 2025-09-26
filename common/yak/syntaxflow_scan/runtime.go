@@ -13,12 +13,14 @@ import (
 )
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
+	m.processMonitor.StartMonitor()
+	defer m.processMonitor.Close()
+
 	defer func() {
 		if err := recover(); err != nil {
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
 		}
-		m.StatusTask()
 		m.SaveTask()
 		m.saveReport()
 	}()

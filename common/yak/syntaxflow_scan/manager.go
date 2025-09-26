@@ -245,9 +245,7 @@ func (m *scanManager) initByConfig() error {
 		m.programs = config.GetProgramName()
 		m.ignoreLanguage = config.GetIgnoreLanguage()
 		m.memory = config.GetMemory()
-		if config.GetConcurrency() != 0 {
-			m.concurrency = config.GetConcurrency()
-		}
+		m.concurrency = config.GetConcurrency()
 	}
 
 	if input := config.GetRuleInput(); input != nil {
@@ -376,5 +374,5 @@ func (m *scanManager) ResumeTask() error {
 
 func (m *scanManager) StatusTask() {
 	m.notifyResult(nil)
-	m.processMonitor.Callback()
+	m.processMonitor.EmitEvent()
 }
