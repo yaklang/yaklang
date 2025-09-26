@@ -37,7 +37,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 
 		stream.Send(&ypb.SyntaxFlowScanRequest{
 			ControlMode: "start",
-			Filter:      &ypb.SyntaxFlowRuleFilter{},
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{"java"},
+			},
 			ProgramName: progIds,
 		})
 

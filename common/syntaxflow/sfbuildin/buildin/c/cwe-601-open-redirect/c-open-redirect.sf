@@ -1,0 +1,719 @@
+desc(
+	title: "Check C Open Redirect Vulnerability"
+	type: audit
+	severity: low
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   开放重定向漏洞发生在C语言Web应用程序接受用户输入的URL参数，并使用该参数进行HTTP重定向时，未对目标URL进行适当验证。攻击者可以利用此漏洞将用户重定向到恶意网站，进行钓鱼攻击、恶意软件分发或其他欺骗行为。在C语言中，这通常涉及CGI程序、Web服务器模块或嵌入式Web应用中的HTTP响应头设置。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <stdlib.h>
+   #include <string.h>
+   
+   // CGI程序中的开放重定向漏洞
+   void vulnerable_cgi_redirect(const char *redirect_url) {
+       // 直接使用用户输入的URL进行重定向
+       printf("Status: 302 Found\r\n");
+       printf("Location: %s\r\n", redirect_url);
+       printf("Content-Type: text/html\r\n\r\n");
+       printf("<html><body>");
+       printf("<p>Redirecting to <a href=\"%s\">%s</a></p>", redirect_url, redirect_url);
+       printf("</body></html>");
+   }
+   
+   // Web服务器中的开放重定向
+   void vulnerable_http_redirect(int client_socket, const char *target_url) {
+       char response[2048];
+       
+       // 构造重定向响应，未验证目标URL
+       snprintf(response, sizeof(response),
+           "HTTP/1.1 302 Found\r\n"
+           "Location: %s\r\n"
+           "Content-Type: text/html\r\n"
+           "Content-Length: 0\r\n\r\n",
+           target_url);
+       
+       send(client_socket, response, strlen(response), 0);
+   }
+   
+   // 基于参数的重定向
+   void vulnerable_param_redirect() {
+       char *redirect_param = getenv("QUERY_STRING");
+       if (redirect_param && strstr(redirect_param, "redirect=")) {
+           char *url_start = strstr(redirect_param, "redirect=") + 9;
+           char *url_end = strchr(url_start, '&');
+           
+           char redirect_url[512];
+           if (url_end) {
+               strncpy(redirect_url, url_start, url_end - url_start);
+               redirect_url[url_end - url_start] = '\0';
+           } else {
+               strncpy(redirect_url, url_start, sizeof(redirect_url) - 1);
+               redirect_url[sizeof(redirect_url) - 1] = '\0';
+           }
+           
+           // 直接重定向到用户指定的URL
+           printf("Location: %s\r\n\r\n", redirect_url);
+       }
+   }
+   ```
+   攻击者可以构造URL如`http://example.com/redirect?url=http://malicious-site.com`来重定向用户到恶意网站。
+
+3. **潜在影响**
+   - **钓鱼攻击**: 将用户重定向到伪造的登录页面窃取凭据。
+   - **恶意软件分发**: 重定向到包含恶意软件的网站。
+   - **信任滥用**: 利用受信任域名的重定向功能进行欺骗。
+   - **会话劫持**: 在重定向过程中泄露敏感信息。
+DESC
+	rule_id: "e9c7f2a4-1d8b-4e3f-9a6c-2b5e8d1f4a7c"
+	title_zh: "检测C语言开放重定向漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. URL白名单验证
+建立允许重定向的域名白名单。
+```c
+#include <stdio.h>
+#include <string.h>
+
+// 允许重定向的域名白名单
+const char *allowed_redirect_domains[] = {
+    "example.com",
+    "www.example.com",
+    "subdomain.example.com",
+    NULL
+};
+
+// 验证URL是否在白名单中
+int is_allowed_redirect_url(const char *url) {
+    if (!url) return 0;
+    
+    // 检查是否为相对URL（允许）
+    if (url[0] == '/' && url[1] != '/') {
+        return 1;
+    }
+    
+    // 检查协议
+    if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0) {
+        return 0;
+    }
+    
+    // 提取域名
+    const char *domain_start = strstr(url, "://");
+    if (!domain_start) return 0;
+    domain_start += 3;
+    
+    char domain[256];
+    const char *path_start = strchr(domain_start, '/');
+    const char *port_start = strchr(domain_start, ':');
+    
+    size_t domain_len;
+    if (port_start && (!path_start || port_start < path_start)) {
+        domain_len = port_start - domain_start;
+    } else if (path_start) {
+        domain_len = path_start - domain_start;
+    } else {
+        domain_len = strlen(domain_start);
+    }
+    
+    if (domain_len >= sizeof(domain)) return 0;
+    strncpy(domain, domain_start, domain_len);
+    domain[domain_len] = '\0';
+    
+    // 检查域名是否在白名单中
+    for (int i = 0; allowed_redirect_domains[i]; i++) {
+        if (strcmp(domain, allowed_redirect_domains[i]) == 0) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+// 安全的重定向函数
+void safe_redirect(const char *redirect_url) {
+    if (!is_allowed_redirect_url(redirect_url)) {
+        // 重定向到默认安全页面
+        printf("Status: 302 Found\r\n");
+        printf("Location: /default-page\r\n");
+        printf("Content-Type: text/html\r\n\r\n");
+        printf("<html><body>");
+        printf("<p>Invalid redirect URL. Redirecting to <a href=\"/default-page\">default page</a></p>");
+        printf("</body></html>");
+        return;
+    }
+    
+    printf("Status: 302 Found\r\n");
+    printf("Location: %s\r\n", redirect_url);
+    printf("Content-Type: text/html\r\n\r\n");
+    printf("<html><body>");
+    printf("<p>Redirecting to <a href=\"%s\">%s</a></p>", redirect_url, redirect_url);
+    printf("</body></html>");
+}
+```
+
+#### 2. 相对URL重定向
+优先使用相对URL进行重定向。
+```c
+// 规范化重定向URL为相对路径
+char* normalize_redirect_url(const char *input_url) {
+    if (!input_url) return NULL;
+    
+    // 如果已经是相对URL，直接返回
+    if (input_url[0] == '/' && input_url[1] != '/') {
+        return strdup(input_url);
+    }
+    
+    // 如果是同域的绝对URL，转换为相对URL
+    if (strncmp(input_url, "http://example.com", 18) == 0) {
+        return strdup(input_url + 18);
+    }
+    if (strncmp(input_url, "https://example.com", 19) == 0) {
+        return strdup(input_url + 19);
+    }
+    
+    // 其他情况返回默认路径
+    return strdup("/");
+}
+
+void safe_relative_redirect(const char *redirect_url) {
+    char *safe_url = normalize_redirect_url(redirect_url);
+    if (!safe_url) {
+        safe_url = strdup("/");
+    }
+    
+    printf("Status: 302 Found\r\n");
+    printf("Location: %s\r\n", safe_url);
+    printf("Content-Type: text/html\r\n\r\n");
+    
+    free(safe_url);
+}
+```
+
+#### 3. 重定向令牌验证
+使用令牌机制验证重定向请求的合法性。
+```c
+#include <openssl/sha.h>
+#include <time.h>
+
+// 生成重定向令牌
+char* generate_redirect_token(const char *url, const char *secret) {
+    char timestamp[32];
+    snprintf(timestamp, sizeof(timestamp), "%ld", time(NULL));
+    
+    char token_data[512];
+    snprintf(token_data, sizeof(token_data), "%s:%s:%s", url, timestamp, secret);
+    
+    unsigned char hash[SHA256_DIGEST_LENGTH];
+    SHA256((unsigned char*)token_data, strlen(token_data), hash);
+    
+    char *hex_token = malloc(SHA256_DIGEST_LENGTH * 2 + 1);
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
+        sprintf(hex_token + i * 2, "%02x", hash[i]);
+    }
+    hex_token[SHA256_DIGEST_LENGTH * 2] = '\0';
+    
+    return hex_token;
+}
+
+// 验证重定向令牌
+int verify_redirect_token(const char *url, const char *token, const char *secret) {
+    if (!url || !token || !secret) return 0;
+    
+    char *expected_token = generate_redirect_token(url, secret);
+    int result = (strcmp(token, expected_token) == 0);
+    
+    free(expected_token);
+    return result;
+}
+
+// 带令牌验证的安全重定向
+void token_verified_redirect(const char *redirect_url, const char *token) {
+    const char *secret = "your-secret-key"; // 应该从安全配置获取
+    
+    if (!verify_redirect_token(redirect_url, token, secret)) {
+        printf("Status: 400 Bad Request\r\n");
+        printf("Content-Type: text/html\r\n\r\n");
+        printf("<html><body><h1>Invalid redirect token</h1></body></html>");
+        return;
+    }
+    
+    if (!is_allowed_redirect_url(redirect_url)) {
+        printf("Status: 400 Bad Request\r\n");
+        printf("Content-Type: text/html\r\n\r\n");
+        printf("<html><body><h1>Invalid redirect URL</h1></body></html>");
+        return;
+    }
+    
+    printf("Status: 302 Found\r\n");
+    printf("Location: %s\r\n", redirect_url);
+    printf("Content-Type: text/html\r\n\r\n");
+}
+```
+
+#### 4. 重定向确认页面
+在重定向前显示确认页面。
+```c
+void redirect_confirmation_page(const char *target_url) {
+    if (!is_allowed_redirect_url(target_url)) {
+        target_url = "/";
+    }
+    
+    printf("Content-Type: text/html\r\n\r\n");
+    printf("<html><head><title>Redirect Confirmation</title></head><body>");
+    printf("<h2>You are being redirected</h2>");
+    printf("<p>You are about to be redirected to: <strong>%s</strong></p>", target_url);
+    printf("<p><a href=\"%s\">Continue to destination</a></p>", target_url);
+    printf("<p><a href=\"/\">Return to home page</a></p>");
+    printf("</body></html>");
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-601: URL Redirection to Untrusted Site](https://cwe.mitre.org/data/definitions/601.html)
+[OWASP Unvalidated Redirects and Forwards](https://owasp.org/www-project-top-ten/2017/A10_2017-Unvalidated_Redirects_and_Forwards)
+REFERENCE
+)
+
+<include('c-user-input')> as $user_input;
+
+accept -->?{have: 'write'} as $target;
+accept -->?{have: 'send'} as $target;
+$target<getCallee>(*<slice(index=1)> as $sink);
+
+$sink #{
+    until: '* & $user_input'
+}-> as $low;
+
+alert $low for {
+	level: "low",
+	type: "vuln",
+	title: "C Open Redirect Vulnerability Was Detected",
+	title_zh: "检测到C语言开放重定向漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   开放重定向漏洞是由于应用程序接受用户输入的URL参数并使用该参数进行HTTP重定向时，未对目标URL进行适当验证。攻击者可以利用此漏洞将用户重定向到恶意网站。
+
+2. **触发场景**
+   检测到用户输入被直接用于HTTP响应输出，可能包含Location重定向头：
+   ```c
+   // 危险示例
+   printf("Location: %s\r\n", user_input);
+   sprintf(response, "HTTP/1.1 302 Found\r\nLocation: %s\r\n", user_input);
+   ```
+   攻击者可以构造恶意URL进行重定向攻击。
+
+3. **潜在影响**
+   - 钓鱼攻击，将用户重定向到伪造的登录页面
+   - 恶意软件分发，重定向到包含恶意软件的网站
+   - 信任滥用，利用受信任域名进行欺骗
+   - 在重定向过程中可能泄露敏感信息
+DESC
+	message: "检测到C语言代码中可能存在开放重定向漏洞，用户输入被直接用于HTTP重定向",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. URL白名单验证
+```c
+const char *allowed_domains[] = {"example.com", "www.example.com", NULL};
+
+int is_allowed_redirect_url(const char *url) {
+    if (!url) return 0;
+    
+    // 允许相对URL
+    if (url[0] == '/' && url[1] != '/') {
+        return 1;
+    }
+    
+    // 检查协议和域名
+    if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0) {
+        return 0;
+    }
+    
+    // 提取并验证域名
+    const char *domain_start = strstr(url, "://") + 3;
+    char domain[256];
+    // ... 域名提取和验证逻辑
+    
+    return 0; // 默认拒绝
+}
+
+void safe_redirect(const char *url) {
+    if (!is_allowed_redirect_url(url)) {
+        printf("Location: /default-page\r\n");
+        return;
+    }
+    printf("Location: %s\r\n", url);
+}
+```
+
+#### 2. 使用相对URL
+```c
+char* normalize_to_relative_url(const char *input_url) {
+    if (!input_url) return strdup("/");
+    
+    // 如果已经是相对URL
+    if (input_url[0] == '/' && input_url[1] != '/') {
+        return strdup(input_url);
+    }
+    
+    // 转换同域绝对URL为相对URL
+    if (strncmp(input_url, "https://example.com", 19) == 0) {
+        return strdup(input_url + 19);
+    }
+    
+    return strdup("/"); // 默认返回根路径
+}
+```
+
+#### 3. 重定向确认页面
+```c
+void show_redirect_confirmation(const char *target_url) {
+    printf("Content-Type: text/html\r\n\r\n");
+    printf("<html><body>");
+    printf("<h2>Redirect Confirmation</h2>");
+    printf("<p>Continue to: <a href=\"%s\">%s</a></p>", target_url, target_url);
+    printf("<p><a href=\"/\">Return home</a></p>");
+    printf("</body></html>");
+}
+```
+
+#### 4. 令牌验证机制
+```c
+char* generate_redirect_token(const char *url, const char *secret) {
+    // 生成包含URL和时间戳的安全令牌
+    char token_data[512];
+    snprintf(token_data, sizeof(token_data), "%s:%ld:%s", 
+             url, time(NULL), secret);
+    return sha256_hash(token_data);
+}
+```
+SOLUTION
+	risk: "开放重定向",
+	name: "low",
+}
+
+desc(
+	lang: c
+	alert_low: 1
+	'file://unsafe_redirect.c': <<<UNSAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+
+// CGI程序中的开放重定向漏洞
+void vulnerable_cgi_redirect(const char *redirect_url) {
+    printf("Content-Type: text/html\r\n");
+    // 直接使用用户输入的URL进行重定向
+    printf("Status: 302 Found\r\n");
+    printf("Location: %s\r\n", redirect_url);
+    printf("\r\n");
+    printf("<html><body>");
+    printf("<p>Redirecting to <a href=\"%s\">%s</a></p>", redirect_url, redirect_url);
+    printf("</body></html>");
+}
+
+// Web服务器中的开放重定向
+void vulnerable_http_redirect(int client_socket, const char *target_url) {
+    char response[2048];
+    
+    // 构造重定向响应，未验证目标URL
+    sprintf(response,
+        "HTTP/1.1 302 Found\r\n"
+        "Location: %s\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: 0\r\n\r\n",
+        target_url);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// 基于查询参数的重定向
+void vulnerable_query_redirect() {
+    char *query_string = getenv("QUERY_STRING");
+    if (query_string && strstr(query_string, "redirect=")) {
+        char *url_start = strstr(query_string, "redirect=") + 9;
+        char *url_end = strchr(url_start, '&');
+        
+        char redirect_url[512];
+        if (url_end) {
+            strncpy(redirect_url, url_start, url_end - url_start);
+            redirect_url[url_end - url_start] = '\0';
+        } else {
+            strncpy(redirect_url, url_start, sizeof(redirect_url) - 1);
+            redirect_url[sizeof(redirect_url) - 1] = '\0';
+        }
+        
+        // URL解码（简化版本）
+        char *src = redirect_url, *dst = redirect_url;
+        while (*src) {
+            if (*src == '%' && src[1] && src[2]) {
+                int hex;
+                sscanf(src + 1, "%2x", &hex);
+                *dst++ = (char)hex;
+                src += 3;
+            } else {
+                *dst++ = *src++;
+            }
+        }
+        *dst = '\0';
+        
+        // 直接重定向到用户指定的URL
+        printf("Status: 302 Found\r\n");
+        printf("Location: %s\r\n\r\n", redirect_url);
+    }
+}
+
+// 使用fprintf的重定向漏洞
+void vulnerable_fprintf_redirect(FILE *output, const char *user_url) {
+    fprintf(output, "HTTP/1.1 302 Found\r\n");
+    fprintf(output, "Location: %s\r\n", user_url);
+    fprintf(output, "Content-Type: text/html\r\n\r\n");
+    fprintf(output, "<html><body><p>Redirecting...</p></body></html>");
+}
+
+// 使用snprintf的重定向漏洞
+void vulnerable_snprintf_redirect(const char *redirect_to) {
+    char response[1024];
+    
+    snprintf(response, sizeof(response),
+        "Status: 302 Found\r\n"
+        "Location: %s\r\n"
+        "Content-Type: text/html\r\n\r\n"
+        "<html><body><p>Redirecting to %s</p></body></html>",
+        redirect_to, redirect_to);
+    
+    printf("%s", response);
+}
+
+int main() {
+    // 从各种来源获取重定向URL
+    char *redirect_param = getenv("REDIRECT_URL");
+    char *query_redirect = getenv("QUERY_STRING");
+    char *referer_header = getenv("HTTP_REFERER");
+    
+    if (redirect_param) {
+        vulnerable_cgi_redirect(redirect_param);
+    }
+    
+    if (query_redirect) {
+        vulnerable_query_redirect();
+    }
+    
+    if (referer_header) {
+        vulnerable_snprintf_redirect(referer_header);
+    }
+    
+    // 从标准输入读取重定向URL
+    char user_input[512];
+    if (fgets(user_input, sizeof(user_input), stdin)) {
+        // 直接使用用户输入进行重定向
+        int socket_fd = accept(); // 假设的socket
+        vulnerable_http_redirect(socket_fd, user_input);
+    }
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_redirect.c': <<<SAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+
+// 允许重定向的域名白名单
+const char *allowed_redirect_domains[] = {
+    "example.com",
+    "www.example.com",
+    "subdomain.example.com",
+    NULL
+};
+
+// 默认重定向页面
+const char *default_redirect = "/home";
+
+// 验证URL是否在白名单中
+int is_allowed_redirect_url(const char *url) {
+    if (!url) return 0;
+    
+    // 允许相对URL（以/开头但不是//）
+    if (url[0] == '/' && url[1] != '/') {
+        return 1;
+    }
+    
+    // 检查协议
+    if (strncmp(url, "http://", 7) != 0 && strncmp(url, "https://", 8) != 0) {
+        return 0;
+    }
+    
+    // 提取域名
+    const char *domain_start = strstr(url, "://");
+    if (!domain_start) return 0;
+    domain_start += 3;
+    
+    char domain[256];
+    const char *path_start = strchr(domain_start, '/');
+    const char *port_start = strchr(domain_start, ':');
+    
+    size_t domain_len;
+    if (port_start && (!path_start || port_start < path_start)) {
+        domain_len = port_start - domain_start;
+    } else if (path_start) {
+        domain_len = path_start - domain_start;
+    } else {
+        domain_len = strlen(domain_start);
+    }
+    
+    if (domain_len >= sizeof(domain)) return 0;
+    strncpy(domain, domain_start, domain_len);
+    domain[domain_len] = '\0';
+    
+    // 检查域名是否在白名单中
+    for (int i = 0; allowed_redirect_domains[i]; i++) {
+        if (strcmp(domain, allowed_redirect_domains[i]) == 0) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+// 安全的CGI重定向
+void safe_cgi_redirect(const char *redirect_url) {
+    const char *safe_url = default_redirect;
+    
+    if (is_allowed_redirect_url(redirect_url)) {
+        safe_url = redirect_url;
+    }
+    
+    printf("Content-Type: text/html\r\n");
+    printf("Status: 302 Found\r\n");
+    printf("Location: %s\r\n", safe_url);
+    printf("\r\n");
+    printf("<html><body>");
+    printf("<p>Redirecting to <a href=\"%s\">safe destination</a></p>", safe_url);
+    printf("</body></html>");
+}
+
+// 安全的HTTP重定向
+void safe_http_redirect(int client_socket, const char *target_url) {
+    const char *safe_url = default_redirect;
+    
+    if (is_allowed_redirect_url(target_url)) {
+        safe_url = target_url;
+    }
+    
+    char response[2048];
+    snprintf(response, sizeof(response),
+        "HTTP/1.1 302 Found\r\n"
+        "Location: %s\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: 0\r\n\r\n",
+        safe_url);
+    
+    send(client_socket, response, strlen(response), 0);
+}
+
+// 安全的查询参数重定向
+void safe_query_redirect() {
+    char *query_string = getenv("QUERY_STRING");
+    if (query_string && strstr(query_string, "redirect=")) {
+        char *url_start = strstr(query_string, "redirect=") + 9;
+        char *url_end = strchr(url_start, '&');
+        
+        char redirect_url[512];
+        if (url_end) {
+            size_t len = url_end - url_start;
+            if (len >= sizeof(redirect_url)) len = sizeof(redirect_url) - 1;
+            strncpy(redirect_url, url_start, len);
+            redirect_url[len] = '\0';
+        } else {
+            strncpy(redirect_url, url_start, sizeof(redirect_url) - 1);
+            redirect_url[sizeof(redirect_url) - 1] = '\0';
+        }
+        
+        // 验证URL并重定向
+        const char *safe_url = default_redirect;
+        if (is_allowed_redirect_url(redirect_url)) {
+            safe_url = redirect_url;
+        }
+        
+        printf("Status: 302 Found\r\n");
+        printf("Location: %s\r\n\r\n", safe_url);
+    } else {
+        printf("Status: 302 Found\r\n");
+        printf("Location: %s\r\n\r\n", default_redirect);
+    }
+}
+
+// 重定向确认页面
+void show_redirect_confirmation(const char *target_url) {
+    const char *safe_url = default_redirect;
+    
+    if (is_allowed_redirect_url(target_url)) {
+        safe_url = target_url;
+    }
+    
+    printf("Content-Type: text/html\r\n\r\n");
+    printf("<html><head><title>Redirect Confirmation</title></head><body>");
+    printf("<h2>You are being redirected</h2>");
+    printf("<p>You are about to be redirected to: <strong>%s</strong></p>", safe_url);
+    printf("<p><a href=\"%s\">Continue to destination</a></p>", safe_url);
+    printf("<p><a href=\"/\">Return to home page</a></p>");
+    printf("</body></html>");
+}
+
+// 输入验证函数
+int is_valid_redirect_input(const char *input) {
+    if (!input) return 0;
+    
+    // 检查长度
+    if (strlen(input) > 500) return 0;
+    
+    // 检查是否包含危险字符
+    const char *dangerous_chars = "\r\n\t";
+    for (int i = 0; input[i]; i++) {
+        if (strchr(dangerous_chars, input[i])) {
+            return 0;
+        }
+    }
+    
+    return 1;
+}
+
+int main() {
+    printf("Content-Type: text/html\r\n\r\n");
+    printf("<html><head><title>Safe Redirect Demo</title></head><body>");
+    printf("<h1>Safe Redirect Demonstration</h1>");
+    
+    // 从环境变量获取重定向URL
+    char *redirect_param = getenv("REDIRECT_URL");
+    if (redirect_param && is_valid_redirect_input(redirect_param)) {
+        printf("<p>Requested redirect to: %s</p>", redirect_param);
+        
+        if (is_allowed_redirect_url(redirect_param)) {
+            printf("<p><a href=\"%s\">Proceed to destination</a></p>", redirect_param);
+        } else {
+            printf("<p>Redirect URL not allowed. <a href=\"%s\">Go to default page</a></p>", default_redirect);
+        }
+    }
+    
+    printf("<p>Allowed domains for redirect:</p><ul>");
+    for (int i = 0; allowed_redirect_domains[i]; i++) {
+        printf("<li>%s</li>", allowed_redirect_domains[i]);
+    }
+    printf("</ul>");
+    
+    printf("</body></html>");
+    
+    return 0;
+}
+SAFE
+)

@@ -1,0 +1,194 @@
+desc(
+	title: "Detect C Buffer Overflow Vulnerability"
+	type: audit
+	severity: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   缓冲区溢出漏洞发生在程序向缓冲区内写入超出其预定大小的数据时，导致覆盖相邻的内存区域。在C语言中，这类漏洞常见于使用不安全的字符串操作函数（如`memcpy`）且未正确计算目标缓冲区大小的情况下。攻击者可利用此漏洞执行任意代码、修改程序逻辑或导致程序崩溃。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   void vulnerable_function(char *src) {
+       char dest[32];
+       memcpy(dest, src, strlen(src)); // 可能导致缓冲区溢出
+   }
+   ```
+   如果`src`长度超过32字节，将覆盖`dest`数组后的内存内容。攻击者可精心构造输入数据覆盖函数返回地址，劫持程序控制流。
+
+3. **潜在影响**
+   - 执行任意代码（如获取Shell、安装后门）。
+   - 读取或篡改敏感内存数据（如密码、密钥）。
+   - 导致服务拒绝（DoS）。
+DESC
+	rule_id: "364b224d-5ed5-4fe8-8edc-43f318dd7d9d"
+	title_zh: "检测C语言缓冲区溢出漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全的内存操作函数
+替换`memcpy`为安全版本（如`memcpy_s`），明确指定目标缓冲区大小。
+```c
+#include <string.h>
+void safe_function(char *src, size_t src_len) {
+    char dest[32];
+    memcpy_s(dest, sizeof(dest), src, src_len); // 安全拷贝
+}
+```
+
+#### 2. 严格校验输入长度
+在执行拷贝前验证源数据长度不超过目标缓冲区大小。
+```c
+if (src_len > sizeof(dest)) {
+    return -1; // 或截断处理
+}
+memcpy(dest, src, src_len);
+```
+
+#### 3. 使用静态分析工具
+集成静态分析工具（如Coverity、Clang静态分析器）自动检测潜在的缓冲区溢出问题。
+
+#### 4. 启用编译防护
+- GCC/Clang开启栈保护标志（`-fstack-protector`）。
+- 启用不可执行栈（NX/DEP）。
+SOLUTION
+	reference: <<<REFERENCE
+CWE-119: [Buffer Overflow](https://cwe.mitre.org/data/definitions/119.html)
+OWASP: [Buffer Overflow Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Buffer_Overflow_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+memcpy(*<slice(index=2)> as $sink)
+$sink?{opcode: add}?{have: sizeof} as $mid
+
+alert $mid for {
+	level: "mid",
+	type: "vuln",
+	title: "C Buffer Overflow Vulnerability Was Detected",
+	title_zh: "检测到C语言缓冲区溢出漏洞",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   缓冲区溢出是由于程序在向缓冲区写入数据时超出了其预分配的大小，导致覆盖了相邻的内存区域。攻击者可能利用这一点执行任意代码或导致程序崩溃。
+2. **触发场景**
+   ```c
+   struct header *packet_copy = malloc(sizeof(struct header));
+   memcpy(packet_copy, input, sizeof(struct header) + data_length); // 可能溢出
+   ```
+   攻击者通过控制`data_length`可能导致缓冲区溢出。
+3. **潜在影响**
+   - 程序崩溃或异常终止
+   - 任意代码执行
+   - 敏感数据泄露
+DESC
+	message: "检测到C语言缓冲区溢出漏洞，并且在数据源到污染汇聚点间可能存在sizeof检查，需进一步审计确认",
+	solution: <<<SOLUTION
+### 修复建议
+1. **使用安全的库函数**
+   使用`memcpy_s`等安全函数进行缓冲区拷贝。
+   ```c
+   memcpy_s(packet_copy, sizeof(struct header), input, sizeof(struct header));
+   ```
+2. **手动检查边界**
+   在拷贝前手动检查目标缓冲区大小是否足够。
+   ```c
+   if (data_length <= sizeof(struct header)) {
+       memcpy(packet_copy, input, sizeof(struct header) + data_length);
+   }
+   ```
+3. **使用现代语言特性**
+   考虑使用更安全的编程语言如Rust，内置内存安全机制。
+SOLUTION
+	risk: "缓冲区溢出",
+	name: "mid",
+}
+
+
+memcpy(*<slice(index=2)> as $sink)
+$sink?{opcode: const} as $low
+
+alert $low for {
+	level: "low",
+	type: "vuln",
+	title: "C Buffer Overflow Vulnerability Was Detected",
+	title_zh: "检测到C语言缓冲区溢出漏洞",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   当使用固定大小的数据进行拷贝时，仍然可能存在潜在的缓冲区溢出风险。
+2. **触发场景**
+   ```c
+   memcpy(packet_copy, input, 0x400); // 使用固定大小，仍可能溢出
+   ```
+   如果源缓冲区大小小于目标缓冲区，可能不会立即引发问题。
+3. **潜在影响**
+   - 如果实际数据超出固定大小，仍然可能导致缓冲区溢出
+DESC
+	message: "检测到C语言缓冲区溢出漏洞，但使用的是固定大小拷贝，风险较低",
+	solution: <<<SOLUTION
+### 修复建议
+1. **动态计算缓冲区大小**
+   根据实际需要动态计算拷贝大小。
+   ```c
+   size_t copy_size = min(0x400, actual_data_size);
+   memcpy(packet_copy, input, copy_size);
+   ```
+2. **使用strncpy替代**
+   对于字符串操作，使用`strncpy`等限制长度的函数。
+3. **增加边界检查**
+   在拷贝前后添加边界检查逻辑以确保安全。
+SOLUTION
+	risk: "缓冲区溢出",
+	name: "low",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_buffer.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+
+struct header {
+    uint32_t length; // 数据长度
+    char data[1];    // 柔性数组（实际数据区）
+};
+
+void process_packet(char *input, size_t input_len) {
+    struct header *hdr = (struct header *)input;
+    uint32_t data_length = ntohl(hdr->length); 
+
+    struct header *packet_copy = malloc(sizeof(struct header)); 
+
+    if (packet_copy) {
+        memcpy(packet_copy, input, sizeof(struct header) + data_length); // 可能溢出
+        memcpy(packet_copy, input, 0x400); // 可能溢出
+    }
+    free(packet_copy);
+}
+UNSAFE
+	'safefile://safe_buffer.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+
+struct header {
+    uint32_t length; // 数据长度
+    char data[1];    // 柔性数组（实际数据区）
+};
+
+void process_packet(char *input, size_t input_len) {
+    struct header *hdr = (struct header *)input;
+    uint32_t data_length = ntohl(hdr->length); 
+
+    struct header *packet_copy = malloc(sizeof(struct header)); 
+
+    if (packet_copy) {
+        memcpy(packet_copy, input, sizeof(struct header)); 
+    }
+    free(packet_copy);
+}
+SAFE
+)

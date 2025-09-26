@@ -80,16 +80,18 @@ REFERENCE
 main<getFormalParams><slice(index=1)> as $output
 
 getenv() as $output;
+getenv as $output;
 
-fgets(<slice(index=0)> #-> as $output);
-gets(<slice(index=0)> #-> as $output);
-scanf(<slice(index=1)> #-> as $output);
-fscanf(<slice(index=2)> #-> as $output);
-read(<slice(index=2)> #-> as $output);
+fgets(*<slice(index=0)> as $output);
+gets(*<slice(index=0)> as $output);
+scanf(*<slice(index=1)> as $output);
+sscanf(*<slice(index=2)> as $output);
+fscanf(*<slice(index=2)> as $output);
+read(*<slice(index=1)> as $output);
 
-recv(<slice(index=1)> #-> as $output);
-recvfrom(<slice(index=1)> #-> as $output);
-recvmsg(<slice(index=1)> #-> as $output);
+recv(*<slice(index=1)> as $output);
+recvfrom(*<slice(index=1)> as $output);
+recvmsg(*<slice(index=1)> as $output);
 
 alert $output for {
 	level: "info",

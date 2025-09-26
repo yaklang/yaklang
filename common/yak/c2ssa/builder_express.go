@@ -317,13 +317,10 @@ func (b *astbuilder) buildUnaryExpression(ast *cparser.UnaryExpressionContext, i
 		}
 	}
 
-	// 3. ('sizeof' | '_Alignof') '(' typeName | postfixExpression ')'
+	// 3. ('sizeof' | '_Alignof') '(' typeName ')'
 	if t := ast.TypeName(); t != nil && ast.Sizeof() != nil {
 		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
-		return b.GetDefaultValue(ssatype), nil
-	} else if p := ast.PostfixExpression(); p != nil && ast.Sizeof() != nil {
-		// return b.buildPostfixExpression(p.(*cparser.PostfixExpressionContext), false)
-		return b.EmitConstInst(0), nil
+		return b.EmitCall(b.NewCall(b.EmitUndefined(ast.Sizeof().GetText()), ssa.Values{b.GetDefaultValue(ssatype)})), nil
 	}
 
 	// 4. '&&' unaryExpression
@@ -608,7 +605,9 @@ func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 				sb.WriteString(lit)
 			}
 		}
-		return b.EmitConstInst(sb.String()), nil
+		str := sb.String()
+		str = strings.ReplaceAll(str, "%", "%%")
+		return b.EmitConstInst(str), nil
 	}
 	// 4. '(' expression ')'
 	if ast.LeftParen() != nil && ast.Expression() != nil && ast.RightParen() != nil {
