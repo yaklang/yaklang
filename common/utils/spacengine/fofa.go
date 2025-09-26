@@ -2,8 +2,9 @@ package spacengine
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -12,6 +13,13 @@ import (
 )
 
 func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	return FofaQueryWithConfig(email, fofaKey, filter, maxPage, pageSize, maxRecord, nil, domains...)
+}
+
+func FofaQueryWithConfig(email string, fofaKey string, filter string, maxPage, pageSize, maxRecord int, config *base.QueryConfig, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	if config == nil {
+		config = &base.QueryConfig{}
+	}
 	var client *fofa.FofaClient
 	if len(domains) > 0 && domains[0] != "" {
 		client = fofa.NewClientEx(email, fofaKey, domains[0])
@@ -45,6 +53,12 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 				return
 			}
 			rResults := result.Get("results").Array()
+
+			// 如果当前页没有数据，停止翻页
+			if len(rResults) == 0 {
+				nextFinished = true
+				break
+			}
 
 			for _, r := range rResults {
 				if nextFinished {
@@ -108,10 +122,21 @@ func FofaQuery(email string, fofaKey string, filter string, maxPage, pageSize, m
 				}
 
 				count++
+				// 检查是否达到最大记录数限制
 				if maxRecord > 0 && count >= maxRecord {
 					nextFinished = true
 					break
 				}
+			}
+
+			// 如果当前页返回的数据少于pageSize，说明没有更多数据了
+			if len(rResults) < pageSize {
+				nextFinished = true
+			}
+
+			// 在翻页之间应用随机延迟
+			if !nextFinished && page < maxPage {
+				base.ApplyRandomDelay(config.RandomDelayRange)
 			}
 		}
 	}()

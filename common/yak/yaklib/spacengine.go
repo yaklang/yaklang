@@ -20,16 +20,18 @@ var SpaceEngineExports = map[string]interface{}{
 
 	"Query": Query,
 
-	"domain":    _spaceEngine_Domain,
-	"maxPage":   _spaceEngine_MaxPage,
-	"maxRecord": _spaceEngine_MaxRecord,
-	"pageSize":  _spaceEngine_PageSize,
-	"zoomeye":   withUseZoomeye,
-	"shodan":    withUseShodan,
-	"quake":     withUseQuake,
-	"hunter":    withUseHunter,
-	"fofa":      withUseFofa,
-	"engine":    withEngine,
+	"domain":      _spaceEngine_Domain,
+	"maxPage":     _spaceEngine_MaxPage,
+	"maxRecord":   _spaceEngine_MaxRecord,
+	"pageSize":    _spaceEngine_PageSize,
+	"randomDelay": _spaceEngine_RandomDelay,
+	"retryTimes":  _spaceEngine_RetryTimes,
+	"zoomeye":     withUseZoomeye,
+	"shodan":      withUseShodan,
+	"quake":       withUseQuake,
+	"hunter":      withUseHunter,
+	"fofa":        withUseFofa,
+	"engine":      withEngine,
 }
 
 func withEngine(i string, auth ...string) _spaceEngineConfigOpt {
@@ -182,13 +184,15 @@ func Query(filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEng
 }
 
 type _spaceEngineConfig struct {
-	engine    string
-	apiKey    string
-	user      string
-	domain    string
-	maxRecord int
-	maxPage   int
-	pageSize  int
+	engine           string
+	apiKey           string
+	user             string
+	domain           string
+	maxRecord        int
+	maxPage          int
+	pageSize         int
+	randomDelayRange int // 随机延迟范围（秒），0 表示无延迟
+	retryTimes       int // 重试次数，0 表示不重试
 }
 
 type _spaceEngineConfigOpt func(c *_spaceEngineConfig)
@@ -217,53 +221,85 @@ func _spaceEngine_PageSize(i int) _spaceEngineConfigOpt {
 	}
 }
 
+func _spaceEngine_RandomDelay(delayRange int) _spaceEngineConfigOpt {
+	return func(c *_spaceEngineConfig) {
+		c.randomDelayRange = delayRange
+	}
+}
+
+func _spaceEngine_RetryTimes(times int) _spaceEngineConfigOpt {
+	return func(c *_spaceEngineConfig) {
+		c.retryTimes = times
+	}
+}
+
 func _shodan(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
-		maxRecord: 100,
-		maxPage:   10,
-		pageSize:  10,
+		maxRecord:        1000, // 默认最多1000条记录
+		maxPage:          10,   // 默认最多翻10页
+		pageSize:         100,  // 每页100条
+		randomDelayRange: 0,
+		retryTimes:       0,
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	return spacengine.ShodanQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
+	queryConfig := &base.QueryConfig{
+		RandomDelayRange: config.randomDelayRange,
+		RetryTimes:       config.retryTimes,
+	}
+	return spacengine.ShodanQueryWithConfig(token, filter, config.maxPage, config.maxRecord, queryConfig, config.domain)
 }
 
 func _quake(token string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
-		maxRecord: 100,
-		maxPage:   10,
-		pageSize:  10,
+		maxRecord:        1000, // 默认最多1000条记录
+		maxPage:          10,   // 默认最多翻10页
+		pageSize:         100,  // 每页100条
+		randomDelayRange: 0,
+		retryTimes:       0,
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	return spacengine.QuakeQuery(token, filter, config.maxPage, config.maxRecord, config.domain)
+	queryConfig := &base.QueryConfig{
+		RandomDelayRange: config.randomDelayRange,
+		RetryTimes:       config.retryTimes,
+	}
+	return spacengine.QuakeQueryWithConfig(token, filter, config.maxPage, config.maxRecord, queryConfig, config.domain)
 }
 
 func _hunter(name, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
-		maxRecord: 100,
-		maxPage:   10,
-		pageSize:  10,
+		maxRecord:        1000, // 默认最多1000条记录
+		maxPage:          10,   // 默认最多翻10页
+		pageSize:         10,   // Hunter限制每页最多10条
+		randomDelayRange: 0,
+		retryTimes:       0,
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	return spacengine.HunterQuery(key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
+	queryConfig := &base.QueryConfig{
+		RandomDelayRange: config.randomDelayRange,
+		RetryTimes:       config.retryTimes,
+	}
+	return spacengine.HunterQueryWithConfig(key, filter, config.maxPage, config.pageSize, config.maxRecord, queryConfig, config.domain)
 }
 
 func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
-		maxRecord: 100,
-		maxPage:   10,
-		pageSize:  100,
+		maxRecord:        1000, // 默认最多1000条记录
+		maxPage:          10,   // 默认最多翻10页
+		pageSize:         100,  // 每页100条
+		randomDelayRange: 0,
+		retryTimes:       0,
 	}
 
 	for _, opt := range opts {
@@ -275,19 +311,29 @@ func _fofa(email, key string, filter string, opts ..._spaceEngineConfigOpt) (cha
 		config.pageSize = 10000
 	}
 
-	return spacengine.FofaQuery(email, key, filter, config.maxPage, config.pageSize, config.maxRecord, config.domain)
+	queryConfig := &base.QueryConfig{
+		RandomDelayRange: config.randomDelayRange,
+		RetryTimes:       config.retryTimes,
+	}
+	return spacengine.FofaQueryWithConfig(email, key, filter, config.maxPage, config.pageSize, config.maxRecord, queryConfig, config.domain)
 }
 
 func _zoomeye(key string, filter string, opts ..._spaceEngineConfigOpt) (chan *base.NetSpaceEngineResult, error) {
 	config := &_spaceEngineConfig{
-		maxRecord: 100,
-		maxPage:   10,
-		pageSize:  10,
+		maxRecord:        1000, // 默认最多1000条记录
+		maxPage:          10,   // 默认最多翻10页
+		pageSize:         100,  // 每页100条
+		randomDelayRange: 0,
+		retryTimes:       0,
 	}
 
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	return spacengine.ZoomeyeQuery(key, filter, config.maxPage, config.maxRecord, config.domain)
+	queryConfig := &base.QueryConfig{
+		RandomDelayRange: config.randomDelayRange,
+		RetryTimes:       config.retryTimes,
+	}
+	return spacengine.ZoomeyeQueryWithConfig(key, filter, config.maxPage, config.maxRecord, queryConfig, config.domain)
 }
