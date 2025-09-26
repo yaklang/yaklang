@@ -15,6 +15,7 @@ import (
 type AiToolManager struct {
 	ctx          context.Context
 	toolsGetter  func(ctx context.Context) ([]*aitool.Tool, error)
+	allTools     []*aitool.Tool
 	toolEnabled  map[string]bool // 记录工具是否开启
 	enableSearch bool            // 是否开启工具搜索
 	searcher     searchtools.AISearcher[*aitool.Tool]
@@ -139,10 +140,18 @@ func NewToolManager(options ...ToolManagerOption) *AiToolManager {
 }
 
 func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
+	if len(m.allTools) != 0 {
+		return m.allTools
+	}
+	var allTools []*aitool.Tool
+	var err error
+	defer func() {
+		m.allTools = allTools
+	}()
 	if m.toolsGetter == nil {
 		return []*aitool.Tool{}
 	}
-	allTools, err := m.toolsGetter(m.ctx)
+	allTools, err = m.toolsGetter(m.ctx)
 	if err != nil {
 		log.Errorf("get tools: %v", err)
 		return []*aitool.Tool{}
