@@ -1,4 +1,4 @@
-package js2ssa
+package ts2ssa
 
 import (
 	"path/filepath"
@@ -37,6 +37,14 @@ type builder struct {
 
 	useStrict         bool
 	contextLabelStack []string
+
+	currentImportModule               string
+	unresolvedCurrentImportModulePath string
+	namedExports                      map[string]string            // exportedName -> realName (exportedName may not be the same as realName in case of export alias)
+	defaultExport                     string                       // only one default export per ts file
+	cjsExport                         string                       // export equal + require syntax only support one export per ts file
+	reExports                         map[string]map[string]string // re-exported name -> (path -> exportName)
+
 }
 
 var Builder ssa.Builder = &SSABuilder{}
@@ -56,6 +64,8 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 		sourceFile:        jsAST,
 		useStrict:         false,
 		contextLabelStack: make([]string, 0),
+		namedExports:      make(map[string]string),
+		reExports:         make(map[string]map[string]string),
 	}
 	build.VisitSourceFile(jsAST)
 	return nil
@@ -83,19 +93,19 @@ func (*SSABuilder) FilterFile(path string) bool {
 		}
 	}
 
-	return filepath.Ext(path) == ".js"
+	extension := filepath.Ext(path)
+	return extension == ".ts" || extension == ".d.ts" || extension == ".js"
 }
 
 func (*SSABuilder) GetLanguage() consts.Language {
-	//TODO implement me
-	return consts.JS
+	return consts.TS
 }
 
 func Frontend(src string) (*ast.SourceFile, error) {
-	jsast := parser.ParseSourceFile("", "", src, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
+	tsast := parser.ParseSourceFile("", "", src, core.ScriptTargetES5, scanner.JSDocParsingModeParseNone)
 	var err error
-	if len(jsast.Diagnostics()) != 0 {
-		err = utils.Errorf("parse AST FrontEnd error: %v", jsast.Diagnostics()[0].Message())
+	if len(tsast.Diagnostics()) != 0 {
+		err = utils.Errorf("parse AST FrontEnd error: %v", tsast.Diagnostics()[0].Message())
 	}
-	return jsast, err
+	return tsast, err
 }

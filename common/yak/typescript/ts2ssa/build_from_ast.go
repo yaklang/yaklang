@@ -1,4 +1,4 @@
-package js2ssa
+package ts2ssa
 
 import (
 	"fmt"
@@ -30,7 +30,6 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 	recoverRange := b.GetRecoverRange(sourcefile, &sourcefile.Loc, sourcefile.Text())
 	defer recoverRange()
 
-	// js暂时不需要处理prehandle阶段
 	if b.PreHandler() {
 		return nil
 	}
@@ -139,8 +138,13 @@ func (b *builder) VisitVariableStatement(node *ast.VariableStatement) interface{
 	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
 	defer recoverRange()
 
+	var isExport bool
+	if modifierFlags := node.Modifiers(); modifierFlags != nil {
+		isExport = modifierFlags.ModifierFlags&ast.ModifierFlagsExport != 0
+	}
+
 	if decList := node.DeclarationList; decList != nil {
-		b.VisitVariableDeclarationList(decList)
+		b.VisitVariableDeclarationList(decList, isExport)
 	}
 	return nil
 }
@@ -198,15 +202,7 @@ func (b *builder) VisitNumericLiteral(node *ast.NumericLiteral) ssa.Value {
 	defer recoverRange()
 
 	// 创建数字常量
-	num, err := strconv.ParseInt(text, 0, 64)
-	if err == nil {
-		return b.EmitConstInst(num)
-	}
-	float, err := strconv.ParseFloat(text, 64)
-	if err == nil {
-		return b.EmitConstInst(float)
-	}
-	return b.EmitConstInst(utils.InterfaceToFloat64(text))
+	return b.EmitConstInst(codec.Atoi(text))
 }
 
 // VisitBooleanLiteral 访问布尔字面量
@@ -424,7 +420,7 @@ func (b *builder) VisitWhileStatement(node *ast.WhileStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Expression != nil {
 			condition := b.VisitRightValueExpression(node.Expression)
-			if utils.IsNil(condition) {
+			if condition == nil {
 				return b.EmitConstInst(true)
 			}
 			return condition
@@ -470,7 +466,7 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 			switch node.Initializer.Kind {
 			case ast.KindVariableDeclarationList:
 				// 变量声明初始化：for(let i = 0; ...)
-				b.VisitVariableDeclarationList(node.Initializer.AsVariableDeclarationList().AsNode())
+				b.VisitVariableDeclarationList(node.Initializer.AsVariableDeclarationList().AsNode(), false)
 				for _, varDecl := range node.Initializer.AsVariableDeclarationList().Declarations.Nodes {
 					name := varDecl.AsVariableDeclaration().Name()
 					switch {
@@ -501,7 +497,7 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Condition != nil {
 			condition := b.VisitRightValueExpression(node.Condition)
-			if utils.IsNil(condition) {
+			if condition == nil {
 				return b.EmitConstInst(true)
 			}
 			return condition
@@ -631,8 +627,10 @@ func (b *builder) VisitReturnStatement(node *ast.ReturnStatement) interface{} {
 		if returnValue != nil {
 			b.EmitReturn([]ssa.Value{returnValue})
 		} else {
-			b.EmitReturn([]ssa.Value{b.EmitUndefined("")})
+			b.EmitReturn([]ssa.Value{ssa.NewUndefined("ret")})
+			_ = b.VisitRightValueExpression(node.Expression)
 		}
+
 	} else {
 		// 如果没有返回表达式，返回undefined
 		b.EmitReturn([]ssa.Value{b.EmitUndefined("")})
@@ -947,7 +945,7 @@ func (b *builder) VisitHeritageClause(node *ast.HeritageClause) interface{} { re
 // ===== Declaration =====
 
 // VisitVariableDeclarationList 访问变量声明列表
-func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationListNode) interface{} {
+func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationListNode, isExport bool) interface{} {
 	if node == nil || b.IsStop() {
 		return nil
 	}
@@ -957,13 +955,13 @@ func (b *builder) VisitVariableDeclarationList(node *ast.VariableDeclarationList
 
 	declList := node.AsVariableDeclarationList()
 	for _, varDecl := range declList.Declarations.Nodes {
-		b.VisitVariableDeclaration(varDecl.AsVariableDeclaration(), declList.Flags)
+		b.VisitVariableDeclaration(varDecl.AsVariableDeclaration(), declList.Flags, isExport)
 	}
 	return nil
 }
 
 // VisitVariableDeclaration 访问变量声明
-func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declType ast.NodeFlags) interface{} {
+func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declType ast.NodeFlags, isExport bool) interface{} {
 	if decl == nil || b.IsStop() {
 		return nil
 	}
@@ -1014,7 +1012,9 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 	switch {
 	case ast.IsIdentifier(name): // 简单变量: let x = value
 		identifier := b.VisitIdentifier(name.AsIdentifier())
-
+		if isExport {
+			b.namedExports[identifier] = identifier
+		}
 		var variable *ssa.Variable
 		if isLocal {
 			variable = b.CreateLocalVariable(identifier)
@@ -1039,10 +1039,10 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 		// 根据绑定模式类型处理
 		if ast.IsObjectBindingPattern(name) {
 			// 对象解构: let {a, b} = obj
-			b.ProcessObjectBindingPattern(name.AsBindingPattern(), initValue, isLocal)
+			b.ProcessObjectBindingPattern(name.AsBindingPattern(), initValue, isLocal, isExport)
 		} else if ast.IsArrayBindingPattern(name) {
 			// 数组解构: let [x, y] = arr
-			b.ProcessArrayBindingPattern(name.AsBindingPattern(), initValue, isLocal)
+			b.ProcessArrayBindingPattern(name.AsBindingPattern(), initValue, isLocal, isExport)
 		}
 
 	default:
@@ -1056,10 +1056,119 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 func (b *builder) VisitModuleBlock(node *ast.ModuleBlock) interface{} { return nil }
 
 // VisitImportDeclaration 访问导入声明
-func (b *builder) VisitImportDeclaration(node *ast.ImportDeclaration) interface{} { return nil }
+func (b *builder) VisitImportDeclaration(node *ast.ImportDeclaration) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 提取模块路径
+	modulePath := b.extractModuleSpecifierText(node.ModuleSpecifier)
+	if modulePath == "" {
+		b.NewError(ssa.Warn, TAG, "empty import module specifier")
+		return nil
+	}
+	// 解析导入路径
+	resolvedPath, isExternal := b.resolveImportLibPath(modulePath)
+
+	// 确保模块被导入
+	b.ensureModuleImported(resolvedPath, isExternal)
+
+	// 处理导入子句
+	if node.ImportClause != nil {
+		// 保存当前导入模块信息
+		previousUnresolvedImportModulePath := b.unresolvedCurrentImportModulePath
+		previousModule := b.currentImportModule
+		b.unresolvedCurrentImportModulePath = modulePath
+		b.currentImportModule = resolvedPath
+		defer func() {
+			b.unresolvedCurrentImportModulePath = previousUnresolvedImportModulePath
+			b.currentImportModule = previousModule
+		}()
+
+		b.VisitImportClause(node.ImportClause.AsImportClause())
+	}
+
+	return nil
+}
 
 // VisitImportClause 访问导入子句
-func (b *builder) VisitImportClause(node *ast.ImportClause) interface{} { return nil }
+func (b *builder) VisitImportClause(node *ast.ImportClause) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	// 跳过类型导入
+	if node.IsTypeOnly {
+		return nil
+	}
+
+	modulePath := b.currentImportModule
+	_, isExternal := b.resolveImportLibPath(b.unresolvedCurrentImportModulePath)
+
+	// 处理默认导入: import React from 'react'
+	if binding := node.Name(); binding != nil {
+		localName := b.getDeclarationNameText(binding)
+		if localName != "" {
+			b.assignImportedValue(localName, "default", modulePath, isExternal)
+		}
+	}
+
+	// 处理命名绑定
+	if node.NamedBindings != nil {
+		bindings := node.NamedBindings
+		switch {
+		case ast.IsNamespaceImport(bindings):
+			// 命名空间导入: import * as fs from 'fs'
+			namespace := bindings.AsNamespaceImport()
+			if namespace != nil && namespace.Name() != nil {
+				alias := b.getDeclarationNameText(namespace.Name())
+				if alias != "" {
+					b.bindNamespaceImport(alias, modulePath, isExternal)
+				}
+			}
+
+		case ast.IsNamedImports(bindings):
+			// 命名导入: import { a, b as c } from 'module'
+			named := bindings.AsNamedImports()
+			if named != nil && named.Elements != nil {
+				for _, specNode := range named.Elements.Nodes {
+					if specNode == nil {
+						continue
+					}
+					spec := specNode.AsImportSpecifier()
+					if spec == nil || spec.IsTypeOnly {
+						continue
+					}
+
+					localName := b.getDeclarationNameText(spec.Name())
+					if localName == "" {
+						continue
+					}
+
+					// 获取原始导出名（如果有别名的话）
+					originalName := localName
+					if spec.PropertyName != nil {
+						if ast.IsIdentifier(spec.PropertyName) {
+							originalName = spec.PropertyName.AsIdentifier().Text
+						} else if ast.IsStringLiteral(spec.PropertyName) {
+							originalName = strings.Trim(spec.PropertyName.AsStringLiteral().Text, `"'`)
+						}
+					}
+
+					b.assignImportedValue(localName, originalName, modulePath, isExternal)
+				}
+			}
+		}
+	}
+
+	return nil
+}
 
 // VisitNamespaceImport 访问命名空间导入
 func (b *builder) VisitNamespaceImport(node *ast.NamespaceImport) interface{} { return nil }
@@ -1070,14 +1179,128 @@ func (b *builder) VisitNamedImports(node *ast.NamedImports) interface{} { return
 // VisitImportSpecifier 访问导入说明符
 func (b *builder) VisitImportSpecifier(node *ast.ImportSpecifier) interface{} { return nil }
 
-// VisitNamedExports 访问命名导出
-func (b *builder) VisitNamedExports(node *ast.NamedExports) interface{} { return nil }
-
-// VisitExportSpecifier 访问导出说明符
-func (b *builder) VisitExportSpecifier(node *ast.ExportSpecifier) interface{} { return nil }
+func (b *builder) VisitImportEqualsDeclaration(node *ast.ImportEqualsDeclaration) interface{} {
+	return nil
+}
 
 // VisitExportAssignment 访问导出赋值
-func (b *builder) VisitExportAssignment(node *ast.ExportAssignment) interface{} { return nil }
+/*
+A. export default <表达式>;（IsExportEquals == false） export default 42;
+B. export = <实体名>;（IsExportEquals == true） 等价 CJS：module.exports = foo
+   这是 TypeScript 专有的 export-equals，用于兼容 CommonJS/AMD。右侧严格是 实体名（EntityName）：标识符或限定名（A.B.C）。不是任意表达式。
+
+不会命中的写法（列举以便区分）
+
+导出声明族（ExportDeclaration）：
+
+export { a, b as c };
+export { x as default };      // 这是“把具名导出重新导出为默认”，仍是 ExportDeclaration
+export * from "./mod";
+export { a } from "./mod";
+export { ChildNewApp as default } // convert named export to default export
+export * as ns from "./mod";
+
+
+带 default 的声明（声明节点本身）：
+
+export default function F() {}
+export default class C {}
+
+
+这些是 FunctionDeclaration / ClassDeclaration，带 Export+Default 修饰，不走 ExportAssignment。
+
+变量默认导出（不合法）：
+
+export default const x = 1;   // 语法非法
+*/
+func (b *builder) VisitExportAssignment(node *ast.ExportAssignment) interface{} {
+	if node == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	if !node.IsExportEquals { // export default
+		if variable := b.VisitLeftValueExpression(node.Expression); variable != nil {
+			b.defaultExport = variable.GetName()
+		}
+	} else {
+		if variable := b.VisitLeftValueExpression(node.Expression); variable != nil {
+			b.cjsExport = variable.GetName()
+		}
+	}
+	return nil
+}
+
+// VisitExportDeclaration 导出声明
+/*
+export { foo }
+export { foo as bar }
+export { foo } from './mod'
+*/
+func (b *builder) VisitExportDeclaration(decl *ast.ExportDeclaration) interface{} {
+	if decl == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &decl.Loc, "")
+	defer recoverRange()
+
+	if exportClause := decl.ExportClause; exportClause != nil {
+		if ast.IsNamedExports(exportClause) {
+			namedExports := exportClause.AsNamedExports()
+			b.VisitNamedExports(namedExports)
+		} else if ast.IsNamespaceExport(exportClause) {
+			namespaceExport := exportClause.AsNamespaceExport()
+			_ = namespaceExport
+			log.Warn("unimplemented Namespace export")
+		}
+	}
+	return nil
+}
+
+// VisitNamedExports 访问命名导出
+func (b *builder) VisitNamedExports(namedExports *ast.NamedExports) interface{} {
+	if namedExports == nil || b.IsStop() {
+		return nil
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &namedExports.Loc, "")
+	defer recoverRange()
+
+	var exportName, exportedItemName string
+	for _, element := range namedExports.Elements.Nodes {
+		if aliasName := element.AsExportSpecifier().PropertyName; aliasName != nil {
+			exportName = b.VisitModuleExportName(aliasName)
+		}
+		exportedItemName = b.VisitModuleExportName(element.AsExportSpecifier().Name())
+		if exportName == "" {
+			exportName = exportedItemName
+		}
+		if exportName == "default" { // export { ChildNewApp as default }
+			b.namedExports["default"] = exportedItemName
+		} else {
+			b.namedExports[exportName] = exportedItemName
+		}
+
+	}
+	return nil
+}
+
+func (b *builder) VisitModuleExportName(node *ast.ModuleExportName) string {
+	if node == nil || b.IsStop() {
+		return ""
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &node.Loc, "")
+	defer recoverRange()
+
+	if ast.IsIdentifier(node) {
+		return node.AsIdentifier().Text
+	}
+	return node.AsStringLiteral().Text
+}
 
 // VisitExternalModuleReference 访问外部模块引用
 func (b *builder) VisitExternalModuleReference(node *ast.ExternalModuleReference) interface{} {
@@ -2061,6 +2284,14 @@ func (b *builder) VisitFunctionDeclaration(node *ast.FunctionDeclaration) interf
 		funcName = "anonymous_func_" + uuid.NewString()
 	}
 
+	var isExport bool
+	if modifierFlags := node.Modifiers(); modifierFlags != nil {
+		isExport = modifierFlags.ModifierFlags&ast.ModifierFlagsExport != 0
+	}
+	if isExport {
+		b.namedExports[funcName] = funcName
+	}
+
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
 
@@ -2770,7 +3001,7 @@ func (b *builder) VisitPropertyName(propertyName *ast.PropertyName) ssa.Value {
 }
 
 // ProcessObjectBindingPattern 处理对象解构模式
-func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourceObj ssa.Value, isLocal bool) {
+func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourceObj ssa.Value, isLocal bool, isExport bool) {
 	if pattern == nil || sourceObj == nil || b.IsStop() {
 		return
 	}
@@ -2848,6 +3079,9 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 		case ast.IsIdentifier(bindingElement.Name()):
 			// 简单变量: let { a } = obj 或 let { a: b } = obj
 			varName := bindingElement.Name().AsIdentifier().Text
+			if isExport {
+				b.namedExports[varName] = varName
+			}
 			var variable *ssa.Variable
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
@@ -2858,20 +3092,26 @@ func (b *builder) ProcessObjectBindingPattern(pattern *ast.BindingPattern, sourc
 
 		case ast.IsBindingPattern(bindingElement.Name()):
 			// 嵌套解构: let { a: { b, c } } = obj 或 let { a: [x, y] } = obj
+			/*
+				obj
+				└── a
+				    ├── b  → 绑定到变量 b
+				    └── c  → 绑定到变量 c
+			*/
 			nestedPattern := bindingElement.Name()
 
 			// 递归处理
 			if ast.IsObjectBindingPattern(nestedPattern) {
-				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal)
+				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal, isExport)
 			} else if ast.IsArrayBindingPattern(nestedPattern) {
-				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal)
+				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), propValue, isLocal, isExport)
 			}
 		}
 	}
 }
 
 // ProcessArrayBindingPattern 处理数组解构模式
-func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, sourceArr ssa.Value, isLocal bool) {
+func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, sourceArr ssa.Value, isLocal bool, isExport bool) {
 	if pattern == nil || sourceArr == nil || b.IsStop() {
 		return
 	}
@@ -2931,6 +3171,9 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 		case ast.IsIdentifier(bindingElement.Name()):
 			// 标识符: let [a] = arr
 			varName := bindingElement.Name().AsIdentifier().Text
+			if isExport {
+				b.namedExports[varName] = varName
+			}
 			var variable *ssa.Variable
 			if isLocal {
 				variable = b.CreateLocalVariable(varName)
@@ -2945,9 +3188,9 @@ func (b *builder) ProcessArrayBindingPattern(pattern *ast.BindingPattern, source
 
 			// 递归处理
 			if ast.IsObjectBindingPattern(nestedPattern) {
-				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal)
+				b.ProcessObjectBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal, isExport)
 			} else if ast.IsArrayBindingPattern(nestedPattern) {
-				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal)
+				b.ProcessArrayBindingPattern(nestedPattern.AsBindingPattern(), elementValue, isLocal, isExport)
 			}
 		}
 	}
