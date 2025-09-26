@@ -11,6 +11,50 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
+func TestSSHOperator(t *testing.T) {
+	sshCtx := NewBashSessionContext(context.Background())
+	tools, err := CreateBashTools(sshCtx)
+	if err != nil {
+		t.Fatalf("CreateSSHTools failed: %v", err)
+	}
+	res, err := tools[0].InvokeWithParams(aitool.InvokeParams{
+		"command": "ssh root@127.0.0.1 -p 2222",
+		"session": "test_session_1",
+		"timeout": 5,
+	})
+	if err != nil {
+		t.Fatalf("InvokeWithParams failed: %v", err)
+	}
+	fmt.Printf("InvokeWithParams result: %v\n", res.Data)
+	res, err = tools[0].InvokeWithParams(aitool.InvokeParams{
+		"command": "1234567",
+		"session": "test_session_1",
+		"timeout": 5,
+	})
+	if err != nil {
+		t.Fatalf("InvokeWithParams failed: %v", err)
+	}
+	fmt.Printf("InvokeWithParams result: %v\n", res.Data)
+
+	res, err = tools[3].InvokeWithParams(aitool.InvokeParams{
+		"session": "test_session_1",
+	})
+	if err != nil {
+		t.Fatalf("InvokeWithParams failed: %v", err)
+	}
+	fmt.Printf("InvokeWithParams result: %v\n", res.Data)
+
+	res, err = tools[0].InvokeWithParams(aitool.InvokeParams{
+		"command": "ls",
+		"session": "test_session_1",
+		"timeout": 5,
+	})
+	if err != nil {
+		t.Fatalf("InvokeWithParams failed: %v", err)
+	}
+	fmt.Printf("InvokeWithParams result: %v\n", res.Data)
+	closeSession(sshCtx, "test_session_1")
+}
 func TestCreateBashTools(t *testing.T) {
 	bashCtx := NewBashSessionContext(context.Background())
 	tools, err := CreateBashTools(bashCtx)

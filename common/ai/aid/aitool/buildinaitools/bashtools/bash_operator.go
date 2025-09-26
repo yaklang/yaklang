@@ -12,26 +12,63 @@ import (
 	"sync"
 	"time"
 
+	"github.com/creack/pty"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+// filterCommandEcho 过滤命令回显，返回过滤后的输出
+func filterCommandEcho(output, command string) string {
+	if command == "" {
+		return output
+	}
+
+	lines := strings.Split(output, "\n")
+	var filteredLines []string
+	commandFound := false
+
+	for _, line := range lines {
+		// 跳过包含命令本身的行（回显）
+		if strings.Contains(line, strings.TrimSpace(command)) && !commandFound {
+			commandFound = true
+			continue
+		}
+		filteredLines = append(filteredLines, line)
+	}
+
+	return strings.Join(filteredLines, "\n")
+}
+
+// limitToLastLines 限制输出内容只保留最后N行
+func limitToLastLines(output string, maxLines int) string {
+	if output == "" {
+		return output
+	}
+
+	lines := strings.Split(output, "\n")
+	if len(lines) <= maxLines {
+		return output
+	}
+
+	// 保留最后maxLines行
+	lastLines := lines[len(lines)-maxLines:]
+	return strings.Join(lastLines, "\n")
+}
+
 // BashSession 表示一个bash会话
 type BashSession struct {
-	Name       string
-	ShellType  string
-	Cmd        *exec.Cmd
-	Stdin      io.WriteCloser
-	Stdout     *bytes.Buffer
-	Stderr     *bytes.Buffer
-	StdoutPipe io.ReadCloser
-	StderrPipe io.ReadCloser
-	Cancel     context.CancelFunc
-	IsRunning  bool
-	LastActive time.Time
-	mutex      sync.Mutex
+	Name        string
+	ShellType   string
+	Cmd         *exec.Cmd
+	Pty         *os.File // PTY主端
+	Stdout      *bytes.Buffer
+	Cancel      context.CancelFunc
+	IsRunning   bool
+	LastActive  time.Time
+	LastCommand string // 记录最后发送的命令，用于过滤回显
+	mutex       sync.Mutex
 }
 
 type BashSessionContext struct {
@@ -110,10 +147,10 @@ func CreateBashTools(bashSessionContext *BashSessionContext) ([]*aitool.Tool, er
 	// 注册带会话的bash命令执行工具
 	err := factory.RegisterTool(
 		"bash_session_execute",
-		aitool.WithDescription("一个带会话管理的跨平台Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，可以创建持久化的shell会话，在同一会话中执行多个命令，支持超时控制和输出捕获，适用于需要上下文环境的系统管理、自动化脚本执行和运维操作。"),
-		aitool.WithStringParam("command",
+		aitool.WithDescription("一个带会话管理的跨平台TTY输入工具，支持bash、cmd、powershell等多种shell类型，可以创建持久化的shell会话，向TTY会话中写入内容（如命令、交互式输入等），支持超时控制和输出捕获，适用于需要上下文环境的系统管理、自动化脚本执行和运维操作。注意：如果执行结果返回'Input sent, waiting for output...'，说明输入在1秒内没有产生输出，此时可以使用read_bash_session_buffer工具多次读取缓冲区来获取实际输出。"),
+		aitool.WithStringParam("input",
 			aitool.WithParam_Required(true),
-			aitool.WithParam_Description("要执行的shell命令"),
+			aitool.WithParam_Description("要向TTY会话中写入的内容（可以是命令、文本输入等）"),
 		),
 		aitool.WithStringParam("session",
 			aitool.WithParam_Required(true),
@@ -127,16 +164,16 @@ func CreateBashTools(bashSessionContext *BashSessionContext) ([]*aitool.Tool, er
 		aitool.WithIntegerParam("timeout",
 			aitool.WithParam_Required(false),
 			aitool.WithParam_Default(10),
-			aitool.WithParam_Description("命令超时时间(秒)，默认10秒，不能为0或负数"),
+			aitool.WithParam_Description("输入超时时间(秒)，默认10秒，不能为0或负数"),
 		),
 		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
-			command := params.GetString("command")
+			input := params.GetString("input")
 			sessionName := params.GetString("session")
 			shellType := params.GetString("shell")
 			timeoutSeconds := int(params.GetInt("timeout"))
 
-			if command == "" {
-				return nil, utils.Errorf("command cannot be empty")
+			if input == "" {
+				return nil, utils.Errorf("input cannot be empty")
 			}
 			if sessionName == "" {
 				return nil, utils.Errorf("session name cannot be empty")
@@ -159,8 +196,8 @@ func CreateBashTools(bashSessionContext *BashSessionContext) ([]*aitool.Tool, er
 				}
 			}
 
-			// 执行带会话的命令
-			result, err := executeSessionCommand(bashSessionContext, sessionName, command, shellType, timeoutSeconds, stdout, stderr)
+			// 执行带会话的输入
+			result, err := executeSessionCommand(bashSessionContext, sessionName, input, shellType, timeoutSeconds, stdout, stderr)
 			if err != nil {
 				return nil, err
 			}
@@ -233,11 +270,68 @@ func CreateBashTools(bashSessionContext *BashSessionContext) ([]*aitool.Tool, er
 		log.Errorf("register close_bash_session tool: %v", err)
 	}
 
+	// 注册读取buffer工具
+	err = factory.RegisterTool(
+		"read_bash_session_buffer",
+		aitool.WithDescription("读取指定bash会话的buffer内容，可以查看当前缓冲区中的所有输出。特别适用于当bash_session_execute返回'Input sent, waiting for output...'时，通过多次调用此工具来获取TTY会话的实际输出结果。支持限制返回行数以控制输出量。"),
+		aitool.WithStringParam("session",
+			aitool.WithParam_Required(true),
+			aitool.WithParam_Description("要读取buffer的会话名称"),
+		),
+		aitool.WithIntegerParam("lines",
+			aitool.WithParam_Required(false),
+			aitool.WithParam_Default(0),
+			aitool.WithParam_Description("限制返回的行数，0表示返回所有内容，正数表示返回最后N行"),
+		),
+		aitool.WithSimpleCallback(func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			sessionName := params.GetString("session")
+			maxLines := int(params.GetInt("lines"))
+
+			if sessionName == "" {
+				return nil, utils.Errorf("session name cannot be empty")
+			}
+
+			// 获取会话
+			bashSessionContext.sessionsMutex.RLock()
+			session, exists := bashSessionContext.sessions[sessionName]
+			bashSessionContext.sessionsMutex.RUnlock()
+
+			if !exists {
+				return nil, utils.Errorf("session %s not found", sessionName)
+			}
+
+			// 读取buffer内容
+			session.mutex.Lock()
+			bufferContent := toUTF8(session.Stdout.Bytes())
+			session.mutex.Unlock()
+
+			// 如果指定了行数限制
+			if maxLines > 0 {
+				bufferContent = limitToLastLines(bufferContent, maxLines)
+			}
+
+			// 将内容写入到stdout
+			if stdout != nil && len(bufferContent) > 0 {
+				stdout.Write([]byte(fmt.Sprintf("Buffer content for session '%s':\n%s\n", sessionName, bufferContent)))
+			}
+
+			return map[string]interface{}{
+				"session":        sessionName,
+				"buffer_content": bufferContent,
+				"buffer_size":    len(bufferContent),
+				"lines_count":    len(strings.Split(bufferContent, "\n")),
+			}, nil
+		}),
+	)
+	if err != nil {
+		log.Errorf("register read_bash_session_buffer tool: %v", err)
+	}
+
 	return factory.Tools(), nil
 }
 
-// executeSessionCommand 在指定会话中执行命令
-func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, command, shellType string, timeoutSeconds int, stdout, stderr io.Writer) (string, error) {
+// executeSessionCommand 向指定会话中写入输入内容
+func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, input, shellType string, timeoutSeconds int, stdout, stderr io.Writer) (string, error) {
 	session, err := getOrCreateSession(bashSessionContext, sessionName, shellType)
 	if err != nil {
 		return "", err
@@ -246,8 +340,9 @@ func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, 
 	session.mutex.Lock()
 	defer session.mutex.Unlock()
 
-	// 更新最后活跃时间
+	// 更新最后活跃时间和输入记录
 	session.LastActive = time.Now()
+	session.LastCommand = input
 
 	// 如果会话已经结束，重新创建
 	if !session.IsRunning {
@@ -257,17 +352,17 @@ func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, 
 		}
 	}
 
-	// 向会话发送命令
-	_, err = session.Stdin.Write([]byte(command + "\n"))
+	// 向会话写入内容
+	_, err = session.Pty.Write([]byte(input + "\n"))
 	if err != nil {
 		// 如果写入失败，尝试重新创建会话
 		err2 := createSessionProcess(bashSessionContext, session)
 		if err2 != nil {
-			return "", utils.Errorf("failed to send command and restart session %s: %v, %v", session.Name, err, err2)
+			return "", utils.Errorf("failed to send input and restart session %s: %v, %v", session.Name, err, err2)
 		}
-		_, err = session.Stdin.Write([]byte(command + "\n"))
+		_, err = session.Pty.Write([]byte(input + "\n"))
 		if err != nil {
-			return "", utils.Errorf("failed to send command to session %s: %v", session.Name, err)
+			return "", utils.Errorf("failed to send input to session %s: %v", session.Name, err)
 		}
 	}
 
@@ -279,28 +374,26 @@ func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, 
 	errorChan := make(chan error, 1)
 
 	go func() {
-		// 给一些时间让命令执行并产生输出
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(1 * time.Second)
+		stdoutStr := session.Stdout.Bytes()
 
-		// 读取当前缓冲区内容
-		stdoutStr := toUTF8(session.Stdout.Bytes())
-		stderrStr := toUTF8(session.Stderr.Bytes())
+		session.Stdout.Reset()
+		// 过滤命令回显
+		filteredStdout := filterCommandEcho(string(stdoutStr), session.LastCommand)
+
+		// 限制输出内容只保留最后10行
+		limitedStdout := limitToLastLines(filteredStdout, 10)
 
 		// 将输出写入到提供的writer中
-		if stdout != nil && len(stdoutStr) > 0 {
-			stdout.Write([]byte(fmt.Sprintf("Stdout:\n%s\n", stdoutStr)))
-		}
-		if stderr != nil && len(stderrStr) > 0 {
-			stderr.Write([]byte(fmt.Sprintf("Stderr:\n%s\n", stderrStr)))
+		if stdout != nil && len(limitedStdout) > 0 {
+			stdout.Write([]byte(fmt.Sprintf("Stdout:\n%s\n", limitedStdout)))
 		}
 
 		// 返回结果
-		if len(stdoutStr) > 0 {
-			resultChan <- stdoutStr
-		} else if len(stderrStr) > 0 {
-			resultChan <- stderrStr
+		if len(limitedStdout) > 0 {
+			resultChan <- limitedStdout
 		} else {
-			resultChan <- "Command executed, waiting for output..."
+			resultChan <- "Input sent, waiting for output..."
 		}
 	}()
 
@@ -313,14 +406,19 @@ func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, 
 	case <-ctx.Done():
 		// 超时时返回当前缓冲区内容
 		stdoutStr := toUTF8(session.Stdout.Bytes())
-		stderrStr := toUTF8(session.Stderr.Bytes())
+		session.Stdout.Reset()
+		// 过滤命令回显
+		filteredStdout := filterCommandEcho(stdoutStr, session.LastCommand)
 
-		if len(stdoutStr) > 0 || len(stderrStr) > 0 {
-			result := fmt.Sprintf("Command timed out after %d seconds. Current output:\nStdout: %s\nStderr: %s",
-				timeoutSeconds, stdoutStr, stderrStr)
+		// 限制输出内容只保留最后10行
+		limitedStdout := limitToLastLines(filteredStdout, 10)
+
+		if len(limitedStdout) > 0 {
+			result := fmt.Sprintf("Input timed out after %d seconds. Current output:\nStdout: %s",
+				timeoutSeconds, limitedStdout)
 			return result, nil
 		}
-		return fmt.Sprintf("Command timed out after %d seconds with no output", timeoutSeconds), nil
+		return fmt.Sprintf("Input timed out after %d seconds with no output", timeoutSeconds), nil
 	}
 }
 
@@ -351,7 +449,6 @@ func getOrCreateSession(bashSessionContext *BashSessionContext, sessionName, she
 		Name:       sessionName,
 		ShellType:  shellType,
 		Stdout:     &bytes.Buffer{},
-		Stderr:     &bytes.Buffer{},
 		LastActive: time.Now(),
 		IsRunning:  false,
 	}
@@ -374,6 +471,11 @@ func createSessionProcess(bashSessionContext *BashSessionContext, session *BashS
 		session.Cmd.Wait()
 	}
 
+	// 如果有旧的 PTY，先关闭
+	if session.Pty != nil {
+		session.Pty.Close()
+	}
+
 	// 创建新的上下文，继承自BashSessionContext的context
 	ctx, cancel := context.WithCancel(bashSessionContext.ctx)
 	session.Cancel = cancel
@@ -391,57 +493,43 @@ func createSessionProcess(bashSessionContext *BashSessionContext, session *BashS
 		return utils.Errorf("unsupported shell type: %s", session.ShellType)
 	}
 
-	// 设置输入输出管道
-	stdin, err := cmd.StdinPipe()
+	// 使用 pty 创建带 tty 的进程
+	ptyFile, err := pty.Start(cmd)
 	if err != nil {
-		return utils.Errorf("failed to create stdin pipe: %v", err)
+		return utils.Errorf("failed to start %s process with pty: %v", session.ShellType, err)
 	}
-	session.Stdin = stdin
 
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return utils.Errorf("failed to create stdout pipe: %v", err)
-	}
-	session.StdoutPipe = stdoutPipe
-
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return utils.Errorf("failed to create stderr pipe: %v", err)
-	}
-	session.StderrPipe = stderrPipe
+	// 尝试禁用终端回显
+	// disablePtyEcho(ptyFile)
+	// oldState, err := term.MakeRaw(int(ptyFile.Fd()))
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// _ = oldState
+	// defer term.Restore(int(ptyFile.Fd()), oldState) // 退出前恢复
 
 	session.Cmd = cmd
-
-	// 启动进程
-	err = cmd.Start()
-	if err != nil {
-		return utils.Errorf("failed to start %s process: %v", session.ShellType, err)
-	}
-
+	session.Pty = ptyFile
 	session.IsRunning = true
 
-	// 启动输出读取goroutine，确保它们能正确处理管道关闭
+	// 启动输出读取goroutine，从 pty 读取所有输出（stdout + stderr）
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Debugf("Stdout copy goroutine recovered from panic: %v", r)
+				log.Debugf("PTY copy goroutine recovered from panic: %v", r)
 			}
 		}()
-		_, err := io.Copy(session.Stdout, session.StdoutPipe)
-		if err != nil && err != io.EOF {
-			log.Debugf("Stdout copy finished with error: %v", err)
-		}
-	}()
 
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Debugf("Stderr copy goroutine recovered from panic: %v", r)
-			}
-		}()
-		_, err := io.Copy(session.Stderr, session.StderrPipe)
+		// 创建一个混合缓冲区来同时捕获 stdout 和 stderr
+		mixedOutput := &bytes.Buffer{}
+
+		// 使用 TeeReader 同时写入到 session.Stdout 和 mixedOutput
+		teeReader := io.TeeReader(session.Pty, io.MultiWriter(session.Stdout, mixedOutput))
+
+		// 读取所有输出
+		_, err := io.Copy(io.Discard, teeReader)
 		if err != nil && err != io.EOF {
-			log.Debugf("Stderr copy finished with error: %v", err)
+			log.Debugf("PTY copy finished with error: %v", err)
 		}
 	}()
 
@@ -491,10 +579,10 @@ func closeSession(bashSessionContext *BashSessionContext, sessionName string) er
 	}
 
 	// 关闭进程的正确顺序：
-	// 1. 首先关闭stdin，让进程知道没有更多输入
-	if session.Stdin != nil {
-		session.Stdin.Close()
-		session.Stdin = nil
+	// 1. 首先关闭pty，让进程知道没有更多输入
+	if session.Pty != nil {
+		session.Pty.Close()
+		session.Pty = nil
 	}
 
 	// 2. 发送取消信号
@@ -557,15 +645,7 @@ func closeSession(bashSessionContext *BashSessionContext, sessionName string) er
 		}
 	}
 
-	// 4. 关闭管道（如果还没关闭的话）
-	if session.StdoutPipe != nil {
-		session.StdoutPipe.Close()
-		session.StdoutPipe = nil
-	}
-	if session.StderrPipe != nil {
-		session.StderrPipe.Close()
-		session.StderrPipe = nil
-	}
+	// 4. PTY 已经在步骤1中关闭，无需额外关闭管道
 
 	session.IsRunning = false
 	session.mutex.Unlock()
