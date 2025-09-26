@@ -1,0 +1,33 @@
+{
+  "github": {
+    "token": "ghp_your_token_here",
+    "repo": "owner/repo",
+    "pr_number": 123
+  },
+  "comment": {
+    "template": "## {emoji} 代码安全问题检测\n\n**严重程度:** `{severity}`\n**问题:** {title}\n\n**描述:**\n{description}\n\n{solution_section}\n---\n*此评论由代码安全扫描工具自动生成*",
+    "solution_template": "**建议解决方案:**\n{solution}\n\n",
+    "emoji_map": {
+      "critical": "🔴",
+      "high": "🟠",
+      "medium": "🟡",
+      "low": "🟢",
+      "middle": "🟡"
+    }
+  },
+  "processing": {
+    "delay_between_comments": 1,
+    "max_retries": 3,
+    "retry_delay": 5
+  },
+  "filters": {
+    "min_severity": "low",
+    "exclude_files": [
+      "*.test.js",
+      "*.spec.js",
+      "node_modules/**",
+      "vendor/**"
+    ],
+    "include_only_files": []
+  }
+}
