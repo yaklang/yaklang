@@ -1,0 +1,90 @@
+name: Security Comment (Simple)
+
+on:
+  workflow_call:
+    inputs:
+      head_sha:
+        description: 'Head SHA of the pull request'
+        required: true
+        type: string
+      pr_number:
+        description: 'Pull request number'
+        required: true
+        type: string
+      risk_json_path:
+        description: 'Path to risk.json file'
+        required: true
+        type: string
+      github_token:
+        description: 'GitHub token for API access'
+        required: true
+        type: string
+
+jobs:
+  security-comment:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Generate security report
+        id: report
+        run: |
+          # 检查风险文件是否存在
+          if [ ! -f "${{ inputs.risk_json_path }}" ]; then
+            echo "❌ Risk file not found: ${{ inputs.risk_json_path }}"
+            exit 1
+          fi
+          
+          # 生成安全报告
+          REPORT=$(cat "${{ inputs.risk_json_path }}" | jq -r '
+            "## 🔍 代码安全扫描报告\n\n" +
+            "**扫描时间:** " + (.report_time // "N/A") + "\n" +
+            "**程序名称:** " + (.program_name // "N/A") + "\n" +
+            "**编程语言:** " + (.program_lang // "N/A") + "\n" +
+            "**扫描文件数:** " + (.file_count | tostring) + "\n" +
+            "**代码行数:** " + (.code_line_count | tostring) + "\n" +
+            "**发现风险数:** " + (.RiskNums | tostring) + "\n\n" +
+            "### 🚨 风险详情\n\n" +
+            (if .RiskNums > 0 then
+              (.Risks | to_entries | map(
+                "#### " + (.value.title_verbose // .value.title // "未知问题") + "\n\n" +
+                "**严重程度:** `" + (.value.severity // "unknown") + "`\n" +
+                "**位置:** " + (.value.code_source_url // "N/A") + ":" + (.value.line | tostring) + "\n" +
+                "**规则:** " + (.value.rule_name // "N/A") + "\n" +
+                "**函数:** " + (.value.function_name // "N/A") + "\n\n" +
+                "**描述:**\n" + (.value.description // "无描述") + "\n\n" +
+                "**建议解决方案:**\n" + (.value.solution // "无解决方案") + "\n\n" +
+                "**问题代码:**\n```go\n" + (.value.code_fragment // "无代码片段") + "\n```\n\n" +
+                "---\n\n"
+              ) | join(""))
+            else
+              "未发现安全风险。"
+            end) +
+            "\n---\n*此报告由代码安全扫描工具自动生成*"
+          )
+          
+          # 输出报告内容（用于后续步骤）
+          echo "report_content<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Comment PR with security findings
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ inputs.github_token }}
+          script: |
+            const report = `${{ steps.report.outputs.report_content }}`;
+            
+            // 创建评论
+            await github.rest.issues.createComment({
+              issue_number: ${{ inputs.pr_number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+            
+            console.log('Security report comment posted successfully');

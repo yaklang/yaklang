@@ -1,0 +1,99 @@
+# GitHub Commenter Configuration
+# 用于配置GitHub评论工具的设置
+
+# 默认仓库配置
+default_repo: "yaklang/yaklang"
+
+# 评论配置
+comment:
+  # 是否启用自动评论
+  enabled: true
+  
+  # 评论模板配置
+  template:
+    # 严重程度对应的emoji
+    severity_emojis:
+      critical: "🔴"
+      high: "🟠" 
+      medium: "🟡"
+      middle: "🟡"
+      low: "🟢"
+      info: "ℹ️"
+      unknown: "⚪"
+    
+    # 评论头部模板
+    header: |
+      ## {emoji} 代码安全问题检测
+      
+      **严重程度:** `{severity}`
+      **问题:** {title}
+      
+    # 描述部分模板
+    description: |
+      **描述:**
+      {description}
+      
+    # 解决方案部分模板
+    solution: |
+      **建议解决方案:**
+      {solution}
+      
+    # 评论尾部模板
+    footer: |
+      ---
+      *此评论由代码安全扫描工具自动生成*
+  
+  # 过滤配置
+  filters:
+    # 最小严重程度（只评论此级别及以上的问题）
+    min_severity: "info"
+    
+    # 排除的文件模式（支持glob模式）
+    exclude_files:
+      - "*.test.go"
+      - "*/test/*"
+      - "*/tests/*"
+      - "*/vendor/*"
+      - "*/node_modules/*"
+    
+    # 排除的目录模式
+    exclude_dirs:
+      - "test"
+      - "tests"
+      - "vendor"
+      - "node_modules"
+      - ".git"
+      - ".github"
+  
+  # API限制配置
+  api:
+    # 请求间隔（秒）
+    request_delay: 1
+    
+    # 最大重试次数
+    max_retries: 3
+    
+    # 超时时间（秒）
+    timeout: 30
+
+# 风险报告配置
+risk_report:
+  # JSON文件路径
+  json_file: "risk.json"
+  
+  # 是否启用详细日志
+  verbose: true
+  
+  # 输出目录
+  output_dir: "scripts/ssa-risk-tools/output"
+
+# 通知配置
+notifications:
+  # 是否在评论中包含@提及
+  enable_mentions: false
+  
+  # 要@的用户列表
+  mention_users: []
+  
+  # 是否在PR描述中添加风险摘要
+  add_summary_to_pr: true

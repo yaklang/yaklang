@@ -5,7 +5,7 @@ on:
     types:
       - completed
   pull_request:
-    branches: [ main ]
+    branches: [main]
     types: [ opened, synchronize, reopened ]
     paths:
       - "go.mod"
@@ -22,7 +22,6 @@ jobs:
       issues: write
       checks: write
       actions: read
-      # metadata: read
     steps:
       - name: Debug trigger conditions
         run: |
@@ -58,7 +57,13 @@ jobs:
       - name: Init PR_NUMBER
         run: |
           if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "PR_NUMBER=${{ github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_ENV
+            # 检查是否有 pull_requests 数据
+            if [ "${{ github.event.workflow_run.pull_requests }}" != "[]" ] && [ "${{ github.event.workflow_run.pull_requests }}" != "null" ]; then
+              echo "PR_NUMBER=${{ github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_ENV
+            else
+              echo "PR_NUMBER=0" >> $GITHUB_ENV
+              echo "Warning: No pull requests found in workflow_run event"
+            fi
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
             echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
           else
@@ -151,41 +156,29 @@ jobs:
         # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
 
       - name: Set up Python for commenting
-        if: steps.scan.outputs.scan_result == 'failure'
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
       - name: Install Python dependencies
-        if: steps.scan.outputs.scan_result == 'failure'
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml requests
-
-      - name: Generate GitHub App Token
-        id: generate_token
-        if: secrets.GITHUB_APP_ID != '' && secrets.GITHUB_APP_PRIVATE_KEY != ''
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-      
-      - name: Set fallback token
+ 
+      - name: Set GitHub Token
         id: set_token
         run: |
-          if [ "${{ steps.generate_token.outputs.token }}" != "" ]; then
-            echo "token=${{ steps.generate_token.outputs.token }}" >> $GITHUB_OUTPUT
-          else
-            echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
-          fi
+          echo "Using GITHUB_TOKEN"
+          echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+          echo "token_type=default" >> $GITHUB_OUTPUT
+          echo "Event type: ${{ github.event_name }}"
 
       # - name: Call Security Scan and Comment (GitHub App)
       #   if: steps.scan.outputs.scan_result == 'failure'
       #   uses: ./.github/workflows/security-scan-comment.yml
       #   with:
       #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ github.event.pull_request.number }}
+      #     pr_number: ${{ env.PR_NUMBER }}
       #   secrets:
       #     GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
       #     GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
@@ -195,24 +188,69 @@ jobs:
       #   uses: ./.github/workflows/security-comment-community.yml
       #   with:
       #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ github.event.pull_request.number }}
+      #     pr_number: ${{ env.PR_NUMBER }}
       #   secrets:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GITHUB_TOKEN: ${{ steps.set_token.outputs.token }}
 
-      # - name: Call Security Comment (Simple)
-      #   if: steps.scan.outputs.scan_result == 'failure'
-      #   uses: ./.github/workflows/security-comment-simple.yml
-      #   with:
-      #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ github.event.pull_request.number }}
-      #   secrets:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test Token Permissions
+        id: test_token
+        run: |
+          echo "Testing token permissions..."
+          # 测试仓库访问权限而不是用户权限
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }})
+          echo "Repository API HTTP Status: $response"
+          
+          # 测试 PR 访问权限
+          pr_response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }})
+          echo "PR API HTTP Status: $pr_response"
+          
+          if [ "$response" = "200" ] && [ "$pr_response" = "200" ]; then
+            echo "has_permissions=true" >> $GITHUB_OUTPUT
+            echo "Token has sufficient permissions for repository and PR access"
+          else
+            echo "has_permissions=false" >> $GITHUB_OUTPUT
+            echo "Token lacks sufficient permissions (Repo: $response, PR: $pr_response)"
+          fi
+
+      - name: Debug File Paths
+        if: steps.scan.outputs.scan_result == 'failure'
+        run: |
+          echo "=== Debug File Paths ==="
+          echo "Current working directory: $(pwd)"
+          echo "GitHub workspace: ${{ github.workspace }}"
+          echo "Risk JSON path: ./risk.json"
+          echo "Config path: ${{ github.workspace }}/.github/github-commenter.yml"
+          echo "Checking if files exist:"
+          ls -la ./risk.json || echo "risk.json not found"
+          ls -la ${{ github.workspace }}/.github/github-commenter.yml || echo "config file not found"
+          echo "========================="
+
+      - name: Skip Security Comment (Insufficient Permissions)
+        if: steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'false'
+        run: |
+          echo "⚠️ Skipping security comment due to insufficient token permissions"
+          echo "Consider configuring GitHub App secrets for better permissions in workflow_run events"
+
+      - name: Call Security Comment (Simple)
+        if: steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        uses: ./.github/workflows/security-comment-simple.yml
+        with:
+          head_sha: ${{ env.HEAD_SHA }}
+          pr_number: ${{ env.PR_NUMBER }}
+          risk_json_path: ./risk.json
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Add success comment
-        if: steps.scan.outputs.scan_result == 'success' && env.PR_NUMBER != ''
-        uses: actions/github-script@v7
+        if: steps.scan.outputs.scan_result == 'success' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        uses: actions/github-script@v6
         with:
-          github-token: ${{ steps.set_token.outputs.token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             github.rest.issues.createComment({
               issue_number: Number(process.env.PR_NUMBER),
