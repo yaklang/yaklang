@@ -290,6 +290,7 @@ type RAGQueryConfig struct {
 
 	RAGSimilarityThreshold   float64 // RAG相似度限制
 	EveryQueryResultCallback func(result *ScoredResult)
+	RAGQueryType             []string
 
 	LoadConfig []SQLiteVectorStoreHNSWOption
 }
@@ -313,16 +314,11 @@ func WithRAGLimit(limit int) RAGQueryOption {
 	}
 }
 
-// todo 这里暂时使用临时构建图的方式处理，等待恢复图速度优化
 func WithRAGDocumentType(documentType ...string) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
-		if config.LoadConfig == nil {
-			config.LoadConfig = make([]SQLiteVectorStoreHNSWOption, 0)
+		if len(documentType) > 0 {
+			config.RAGQueryType = documentType
 		}
-		config.LoadConfig = append(config.LoadConfig, WithBuildGraphPolicy(Policy_UseFilter))
-		config.LoadConfig = append(config.LoadConfig, WithBuildGraphFilter(&yakit.VectorDocumentFilter{
-			DocumentTypes: documentType,
-		}))
 	}
 }
 
@@ -867,6 +863,17 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 							if key == DocumentTypeCollectionInfo {
 								return false
 							}
+
+							doc := getDoc()
+							if doc == nil {
+								return false
+							}
+
+							if len(config.RAGQueryType) > 0 && !utils.StringArrayContains(config.RAGQueryType, string(doc.Type)) {
+								return false
+
+							}
+
 							if config.Filter != nil {
 								return config.Filter(key, getDoc)
 							}
