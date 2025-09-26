@@ -181,10 +181,10 @@ type YakitLog struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
-func NewYakitStatusCardExecResult(status, data string, items ...string) *ypb.ExecResult {
+func NewYakitStatusCardExecResult(status string, data any, items ...string) *ypb.ExecResult {
 	card := &YakitStatusCard{
 		Id:   status,
-		Data: data,
+		Data: fmt.Sprint(data),
 		Tags: items,
 	}
 	raw, _ := YakitMessageGenerator(card)
