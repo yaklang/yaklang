@@ -82,20 +82,20 @@ none
 REFERENCE
 )
 
-fopen(* #-> as $output);
-open(* #-> as $output);
-creat(* #-> as $output);
-access(* #-> as $output);
-stat(* #-> as $output);
-lstat(* #-> as $output);
-chmod(* #-> as $output);
-chown(* #-> as $output);
-unlink(* #-> as $output);
-rename(* #-> as $output);
+fopen(*<slice(index=0)> #-> as $output);
+open(*<slice(index=0)> #-> as $output);
+creat(*<slice(index=0)> #-> as $output);
+access(*<slice(index=0)> #-> as $output);
+stat(*<slice(index=0)> #-> as $output);
+lstat(*<slice(index=0)> #-> as $output);
+chmod(*<slice(index=0)> #-> as $output);
+chown(*<slice(index=0)> #-> as $output);
+unlink(*<slice(index=0)> #-> as $output);
+rename(*<slice(index=0)> #-> as $output);
 link(* #-> as $output);
 symlink(* #-> as $output);
 readlink(* #-> as $output);
-utime(* #-> as $output);
+utime(*<slice(index=0)> #-> as $output);
 
 
 alert $output for {
