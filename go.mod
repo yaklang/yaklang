@@ -24,6 +24,7 @@ require (
 	github.com/chzyer/readline v1.5.1
 	github.com/cloudflare/circl v1.3.7
 	github.com/corpix/uarand v0.2.0
+	github.com/creack/pty v1.1.21
 	github.com/dave/jennifer v1.4.1
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set/v2 v2.7.0
@@ -152,7 +153,6 @@ require (
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
-	github.com/creack/pty v1.1.21 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.5 // indirect
 	github.com/distribution/reference v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
