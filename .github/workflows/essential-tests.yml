@@ -10,7 +10,73 @@ on:
       - "go.mod"
 
 jobs:
+  check-wip:
+    # fork PR should not run this action
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check if PR is WIP
+        id: check-wip
+        run: |
+          # Check PR labels for WIP indicators
+          labels="${{ join(github.event.pull_request.labels.*.name, ',') }}"
+          title="${{ github.event.pull_request.title }}"
+          
+          echo "PR Labels: $labels"
+          echo "PR Title: $title"
+          
+          # Convert to lowercase for case-insensitive matching
+          labels_lower=$(echo "$labels" | tr '[:upper:]' '[:lower:]')
+          title_lower=$(echo "$title" | tr '[:upper:]' '[:lower:]')
+          
+          # Check for WIP indicators in labels
+          wip_labels="do-not-merge,work in progress,wip,rfc"
+          IFS=',' read -ra LABEL_ARRAY <<< "$wip_labels"
+          for wip_label in "${LABEL_ARRAY[@]}"; do
+            if [[ "$labels_lower" == *"$wip_label"* ]]; then
+              echo "WIP indicator found in labels: $wip_label"
+              echo "wip_detected=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          
+          # Check for WIP indicators in title
+          wip_keywords="do-not-merge,work in progress,wip,rfc"
+          IFS=',' read -ra KEYWORD_ARRAY <<< "$wip_keywords"
+          for wip_keyword in "${KEYWORD_ARRAY[@]}"; do
+            if [[ "$title_lower" == *"$wip_keyword"* ]]; then
+              echo "WIP indicator found in title: $wip_keyword"
+              echo "wip_detected=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          done
+          
+          echo "No WIP indicators found"
+          echo "wip_detected=false" >> $GITHUB_OUTPUT
+
+      - name: Fail if WIP detected
+        if: steps.check-wip.outputs.wip_detected == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          echo "::error::This PR is marked as WIP (Work In Progress). Skipping CI run to save resources."
+          echo "::error::Please remove WIP indicators from labels and title when ready for review."
+          
+          # Use gh CLI to add a comment to the PR
+          gh pr comment ${{ github.event.pull_request.number }} --body "🚧 **WIP Detected** 🚧
+          
+          This PR has been marked as Work In Progress. CI tests have been skipped to save resources.
+          
+          **To enable CI testing:**
+          - Remove WIP-related labels: \`wip\`, \`work in progress\`, \`do-not-merge\`, \`rfc\`
+          - Remove WIP-related keywords from the PR title
+          
+          The CI will automatically run once the WIP indicators are removed." || true
+          
+          exit 1
+
   setup:
+    needs: check-wip
     runs-on: ubuntu-22.04
     steps:
       - name: Cache YakLang Project
@@ -55,7 +121,7 @@ jobs:
           ./yak --help
   test:
     name: ${{ matrix.name }}
-    needs: setup
+    needs: [check-wip, setup]
     runs-on: ubuntu-22.04
     strategy:
       matrix:
