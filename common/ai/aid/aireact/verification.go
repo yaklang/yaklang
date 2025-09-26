@@ -1,14 +1,18 @@
 package aireact
 
 import (
+	"bytes"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"io"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // verifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
-func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, payload string) (bool, string, error) {
+func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, payload string) (bool, error) {
 	verificationPrompt := r.generateVerificationPrompt(
 		originalQuery, isToolCall, payload, r.GetCurrentTask().DumpEnhanceData(),
 	)
@@ -17,43 +21,49 @@ func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, pa
 	}
 
 	var satisfied bool
-	var result string
-	var reason string
-
 	log.Infof("Verifying if user needs are satisfied and formatting results...")
 	transErr := aicommon.CallAITransaction(
 		r.config, verificationPrompt, r.config.CallAI,
 		func(rsp *aicommon.AIResponse) error {
-			stream := rsp.GetOutputStreamReader("re-act-verify", false, r.Emitter)
-			action, err := aicommon.ExtractActionFromStream(stream, "verify-satisfaction")
+			stream := rsp.GetOutputStreamReader("re-act-verify", true, r.Emitter)
+
+			createReasonCallback := func(prompt string) func(key string, reader io.Reader, parents []string) {
+				return func(key string, reader io.Reader, parents []string) {
+					var out bytes.Buffer
+					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
+					r.Emitter.EmitStreamEvent(
+						"re-act-verify",
+						time.Now(),
+						reader,
+						rsp.GetTaskIndex(),
+						func() {
+							if out.Len() > 0 {
+								r.addToTimeline("verify", prompt+": "+out.String())
+							}
+						},
+					)
+				}
+			}
+
+			action, err := aicommon.ExtractWaitableActionFromStream(
+				r.config.GetContext(),
+				stream, "verify-satisfaction", []string{}, []jsonextractor.CallbackOption{
+					jsonextractor.WithRegisterFieldStreamHandler("human_readable_result", createReasonCallback("Result")),
+					jsonextractor.WithRegisterFieldStreamHandler("reasoning", createReasonCallback("Reasoning")),
+				})
 			if err != nil {
 				return utils.Errorf("failed to extract verification action: %v, need ...\"@action\":\"verify-satisfaction\" ", err)
 			}
 			// If we found a proper @action structure, extract data from it
-			satisfied = action.GetBool("user_satisfied")
-			result = action.GetString("human_readable_result")
-			reason = action.GetString("reasoning")
-
-			if result == "" && reason == "" {
-				return utils.Error("both human_readable_result and reasoning are empty, at least one must be provided")
-			}
+			satisfied = action.WaitBool("user_satisfied")
 			return nil
 		},
 	)
 	if transErr != nil {
 		log.Errorf("AI transaction failed during verification: %v", transErr)
-		return false, "", transErr
+		return false, transErr
 	}
-
-	var finalResult string
-	if result != "" {
-		finalResult = result
-	}
-	if reason != "" {
-		finalResult += "\nReasoning: " + reason
-	}
-
-	return satisfied, finalResult, nil
+	return satisfied, nil
 }
 
 // generateVerificationPrompt generates a prompt for verifying user satisfaction
