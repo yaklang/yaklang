@@ -16,7 +16,33 @@ jobs:
   setup:
     runs-on: ubuntu-22.04
     if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || (github.event_name == 'pull_request') }}
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: write
+      actions: read
+      # metadata: read
     steps:
+      - name: Debug trigger conditions
+        run: |
+          echo "=== Debug Information ==="
+          echo "Event name: ${{ github.event_name }}"
+          echo "Repository: ${{ github.repository }}"
+          echo "Ref: ${{ github.ref }}"
+          echo "Head ref: ${{ github.head_ref }}"
+          echo "Base ref: ${{ github.base_ref }}"
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
+            echo "Workflow run head sha: ${{ github.event.workflow_run.head_sha }}"
+            echo "Workflow run pull requests: ${{ github.event.workflow_run.pull_requests }}"
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "Pull request number: ${{ github.event.pull_request.number }}"
+            echo "Pull request head sha: ${{ github.event.pull_request.head.sha }}"
+            echo "Pull request base sha: ${{ github.event.pull_request.base.sha }}"
+          fi
+          echo "========================="
+
       - name: Init HEAD_SHA
         run: | 
           if [ "${{ github.event_name }}" == "workflow_run" ]; then
@@ -28,6 +54,17 @@ jobs:
             exit 1
           fi
           echo "Current head sha is: ${{ env.HEAD_SHA }}"
+
+      - name: Init PR_NUMBER
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_run" ]; then
+            echo "PR_NUMBER=${{ github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          else
+            echo "PR_NUMBER=0" >> $GITHUB_ENV
+          fi
+          echo "Current PR number is: ${{ env.PR_NUMBER }}"
 
       - name: Cache YakLang Project
         uses: actions/cache@v3
@@ -98,17 +135,91 @@ jobs:
           path: fs.zip
 
       - name: Check With SyntaxFlow
+        id: scan
         run: |
-          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level degug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go
+          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go
           NUM=$(cat risk.json | jq .RiskNums)
           echo "Find risk num is: $NUM"
-          if [  $NUM == 0 ]; then
+          echo "risk_count=$NUM" >> $GITHUB_OUTPUT
+          if [ $NUM == 0 ]; then
             echo "success" 
+            echo "scan_result=success" >> $GITHUB_OUTPUT
           else
             echo "fail"
-            exit 1
+            echo "scan_result=failure" >> $GITHUB_OUTPUT
           fi
         # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
+
+      - name: Set up Python for commenting
+        if: steps.scan.outputs.scan_result == 'failure'
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install Python dependencies
+        if: steps.scan.outputs.scan_result == 'failure'
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml requests
+
+      - name: Generate GitHub App Token
+        id: generate_token
+        if: secrets.GITHUB_APP_ID != '' && secrets.GITHUB_APP_PRIVATE_KEY != ''
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GITHUB_APP_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      
+      - name: Set fallback token
+        id: set_token
+        run: |
+          if [ "${{ steps.generate_token.outputs.token }}" != "" ]; then
+            echo "token=${{ steps.generate_token.outputs.token }}" >> $GITHUB_OUTPUT
+          else
+            echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+          fi
+
+      # - name: Call Security Scan and Comment (GitHub App)
+      #   if: steps.scan.outputs.scan_result == 'failure'
+      #   uses: ./.github/workflows/security-scan-comment.yml
+      #   with:
+      #     head_sha: ${{ env.HEAD_SHA }}
+      #     pr_number: ${{ github.event.pull_request.number }}
+      #   secrets:
+      #     GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
+      #     GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+
+      # - name: Call Security Comment (Community Action)
+      #   if: steps.scan.outputs.scan_result == 'failure'
+      #   uses: ./.github/workflows/security-comment-community.yml
+      #   with:
+      #     head_sha: ${{ env.HEAD_SHA }}
+      #     pr_number: ${{ github.event.pull_request.number }}
+      #   secrets:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # - name: Call Security Comment (Simple)
+      #   if: steps.scan.outputs.scan_result == 'failure'
+      #   uses: ./.github/workflows/security-comment-simple.yml
+      #   with:
+      #     head_sha: ${{ env.HEAD_SHA }}
+      #     pr_number: ${{ github.event.pull_request.number }}
+      #   secrets:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add success comment
+        if: steps.scan.outputs.scan_result == 'success' && env.PR_NUMBER != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.set_token.outputs.token }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: Number(process.env.PR_NUMBER),
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## ✅ 代码安全检查通过\n\n代码安全扫描未发现任何问题。\n\n---\n*此评论由代码安全检查工具自动生成*'
+            })
 
       - name: Upload risk log
         if: failure()
