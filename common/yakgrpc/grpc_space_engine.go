@@ -296,13 +296,15 @@ func (s *Server) FetchPortAssetFromSpaceEngine(req *ypb.FetchPortAssetFromSpaceE
 	}
 	engine.RegisterEngineHooks(func(engine *antlr4yak.Engine) error {
 		engine.SetVars(map[string]any{
-			"ENGINE_TYPE": req.GetType(),
-			"FILTER":      req.GetFilter(),
-			"MAX_PAGE":    req.GetMaxPage(),
-			"MAX_RECORD":  req.GetMaxRecord(),
-			"PAGE_SIZE":   req.GetPageSize(),
-			"SCAN_VERIFY": req.GetScanBeforeSave(),
-			"CONCURRENT":  req.GetConcurrent(),
+			"ENGINE_TYPE":  req.GetType(),
+			"FILTER":       req.GetFilter(),
+			"MAX_PAGE":     req.GetMaxPage(),
+			"MAX_RECORD":   req.GetMaxRecord(),
+			"PAGE_SIZE":    req.GetPageSize(),
+			"SCAN_VERIFY":  req.GetScanBeforeSave(),
+			"CONCURRENT":   req.GetConcurrent(),
+			"RANDOM_DELAY": req.GetRandomDelay(),
+			"RETRY_TIMES":  req.GetRetryTimes(),
 		})
 		yak.BindYakitPluginContextToEngine(
 			engine,

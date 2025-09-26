@@ -1168,7 +1168,7 @@ message BuildVectorIndexForKnowledgeBaseEntryRequest {
   int64 KnowledgeBaseEntryId = 1;
   string KnowledgeBaseEntryHiddenIndex = 13;
   int64 KnowledgeBaseId = 12;
-  
+
   string BaseUrl = 2;
   string ApiKey = 3;
   string Proxy = 4;
@@ -1794,6 +1794,8 @@ message FetchPortAssetFromSpaceEngineRequest {
   bool ScanBeforeSave = 6;
   string Proxy = 7;
   int64 Concurrent = 8;
+  uint32 RandomDelay = 9;
+  uint32 RetryTimes = 10;
 }
 
 message DeleteHybridScanTaskRequest {
@@ -2313,7 +2315,7 @@ message SmokingEvaluatePluginRequest {
 
   string Code = 3;
   // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
-  string PluginType = 4; 
+  string PluginType = 4;
 }
 
 
@@ -5979,8 +5981,8 @@ message HTTPFlowsToOnlineBatchRequest {
 }
 
 message HTTPFlowsToOnlineBatchResponse {
-    int64 SuccessCount = 1;
-    int64 FailedCount = 2;
+  int64 SuccessCount = 1;
+  int64 FailedCount = 2;
 }
 
 message AnalyzeHTTPFlowRequest{
@@ -6028,10 +6030,10 @@ message HTTPFlowRuleData{
   int64 HTTPFlowId = 2;
   string RuleVerboseName = 3;
   string Rule = 4;
-  int64 StatusCode =5;
+  int64 StatusCode = 5;
   string Url = 6;
   string Method = 7;
-  string IPAddress= 8;
+  string IPAddress = 8;
 }
 
 message ExportHTTPFlowsRequest {
@@ -6650,8 +6652,8 @@ message RenderHTTPFuzzerPacketResponse {
 
 message SmokingEvaluatePluginBatchRequest {
   repeated string ScriptNames = 1;
-    // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
-  string PluginType = 2; 
+  // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
+  string PluginType = 2;
 }
 
 message SmokingEvaluatePluginBatchResponse {
@@ -7187,7 +7189,7 @@ message SyntaxFlowScanRequest{
   // for new rule scan task
   SyntaxFlowRuleInput RuleInput = 6; // 用于新建规则时的调试功能
   // 并发，默认5
-  uint32  Concurrency =7;
+  uint32  Concurrency = 7;
 
   // compile data only in memory 
   bool Memory = 8;
@@ -7510,11 +7512,11 @@ message SSARiskFeedbackToOnlineRequest {
 }
 
 message SSARiskDisposalData{
-  int64 Id =1 ;
+  int64 Id = 1 ;
   int64 CreatedAt = 2;
   int64 UpdatedAt = 3;
 
-  string Status =4;
+  string Status = 4;
   string Comment = 5;
 
   int64 RiskId = 6;
@@ -7541,14 +7543,14 @@ message CreateSSARiskDisposalsResponse {
 }
 
 message QuerySSARiskDisposalsRequest {
-    Paging  Pagination=1;
-    SSARiskDisposalsFilter Filter = 2;
+  Paging  Pagination = 1;
+  SSARiskDisposalsFilter Filter = 2;
 }
 
 message QuerySSARiskDisposalsResponse {
   Paging Pagination = 1;
   repeated SSARiskDisposalData Data = 2;
-  int64 Total =3;
+  int64 Total = 3;
 }
 
 message UpdateSSARiskDisposalsRequest {
@@ -7576,7 +7578,7 @@ message GetSSARiskDisposalRequest{
 }
 
 message GetSSARiskDisposalResponse{
- repeated SSARiskDisposalData Data = 1;
+  repeated SSARiskDisposalData Data = 1;
 }
 
 
@@ -8006,7 +8008,7 @@ message SingleManualHijackInfoMessage{
 }
 
 message QueryMITMReplacerRulesRequest{
-  string KeyWord =1;
+  string KeyWord = 1;
 }
 
 message QueryMITMReplacerRulesResponse{
@@ -8083,9 +8085,9 @@ message SSAProject {
   // 编译配置选项
   SSAProjectCompileConfig CompileConfig = 9;
   // 扫描配置选项
-  SSAProjectScanConfig ScanConfig=10;
+  SSAProjectScanConfig ScanConfig = 10;
   // 规则策略配置
-  SSAProjectScanRuleConfig RuleConfig =11;
+  SSAProjectScanRuleConfig RuleConfig = 11;
 }
 
 message SSAProjectCompileConfig{
@@ -8104,7 +8106,7 @@ message SSAProjectScanConfig{
 }
 
 message SSAProjectScanRuleConfig{
-    SyntaxFlowRuleFilter RuleFilter =1;
+  SyntaxFlowRuleFilter RuleFilter = 1;
 }
 
 message SSAProjectFilter {

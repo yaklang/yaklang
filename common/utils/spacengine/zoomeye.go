@@ -2,9 +2,9 @@ package spacengine
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
-	"time"
+
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
@@ -88,6 +88,13 @@ func zoomeyeResultToSpacengineList(filter string, result *gjson.Result) []*base.
 }
 
 func ZoomeyeQuery(key, query string, maxPage, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	return ZoomeyeQueryWithConfig(key, query, maxPage, maxRecord, nil, domains...)
+}
+
+func ZoomeyeQueryWithConfig(key, query string, maxPage, maxRecord int, config *base.QueryConfig, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	if config == nil {
+		config = &base.QueryConfig{RandomDelayRange: 3} // 默认3秒延迟，保持兼容性
+	}
 	var client *zoomeye.ZoomEyeClient
 	if len(domains) > 0 && domains[0] != "" {
 		client = zoomeye.NewClientEx(key, domains[0])
@@ -115,7 +122,14 @@ func ZoomeyeQuery(key, query string, maxPage, maxRecord int, domains ...string) 
 				break
 			}
 
-			for _, record := range zoomeyeResultToSpacengineList(query, result) {
+			records := zoomeyeResultToSpacengineList(query, result)
+			// 如果当前页没有数据，停止翻页
+			if len(records) == 0 {
+				nextFinished = true
+				break
+			}
+
+			for _, record := range records {
 				if nextFinished {
 					break
 				}
@@ -126,8 +140,9 @@ func ZoomeyeQuery(key, query string, maxPage, maxRecord int, domains ...string) 
 				}
 			}
 
+			// 在翻页之间应用随机延迟
 			if !nextFinished {
-				time.Sleep(3 * time.Second)
+				base.ApplyRandomDelay(config.RandomDelayRange)
 			}
 		}
 	}()
