@@ -415,6 +415,8 @@ func (o *OrderedMap[T, V]) Values() []V {
 		return nil
 	}
 	o.init()
+	o.lock.RLock()
+	defer o.lock.RUnlock()
 	values := make([]V, len(o.keyChain))
 	for i, k := range o.keyChain {
 		values[i] = o.m[k]
