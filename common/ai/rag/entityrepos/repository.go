@@ -375,7 +375,13 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	if err != nil {
 		return err
 	}
-	return r.addEntityToVectorIndex(entity) // 实体本身需要用rag搜索聚合，所以这里尝试使用同步构建向量
+	go func() {
+		err := r.addEntityToVectorIndex(entity)
+		if err != nil {
+			log.Errorf("failed to add entity [%s] to vector index: %v", entity.EntityName, err)
+		}
+	}()
+	return nil
 }
 
 //--- Relationship Operations ---
