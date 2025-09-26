@@ -23,6 +23,5 @@ var Exports = map[string]any{
 	"withIncludeLibraryRule": WithIncludeLibraryRule,
 
 	// 进度
-	"withProcessCallback":     WithProcessCallback,
-	"withRuleProcessCallback": WithRuleProcessCallback,
+	"withProcessCallback": WithProcessCallback,
 }

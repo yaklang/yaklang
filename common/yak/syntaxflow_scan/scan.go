@@ -8,39 +8,21 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-type ScanTaskConfig struct {
-	*ypb.SyntaxFlowScanRequest
-	RuleNames []string `json:"rule_names"`
-}
+func Scan(ctx context.Context, option ...ScanOption) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
-type ScanStream interface {
-	Recv() (*ypb.SyntaxFlowScanRequest, error)
-	Send(*ypb.SyntaxFlowScanResponse) error
-	Context() context.Context
-}
-
-func Scan(stream ScanStream) error {
-	return ScanWithConfig(stream, &scanInputConfig{})
-}
-
-func ScanWithConfig(stream ScanStream, sc *scanInputConfig) error {
-	config, err := stream.Recv()
-	if err != nil {
-		return err
-	}
-
-	streamCtx := stream.Context()
-
+	config := NewScanConfig(option...)
 	var taskId string
 	var m *scanManager
+	var err error
 	errC := make(chan error)
-	switch strings.ToLower(config.GetControlMode()) {
-	case "start":
+	switch ControlMode(strings.ToLower(config.GetControlMode())) {
+	case ControlModeStart:
 		taskId = uuid.New().String()
-		m, err = createSyntaxflowTaskById(taskId, streamCtx, config, stream, sc)
+		m, err = createSyntaxflowTaskById(taskId, ctx, config)
 		if err != nil {
 			return err
 		}
@@ -52,21 +34,20 @@ func ScanWithConfig(stream ScanStream, sc *scanInputConfig) error {
 			}
 			close(errC)
 		}()
-	case "status":
+	case ControlModeStatus:
 		taskId = config.ResumeTaskId
-		m, err = LoadSyntaxflowTaskFromDB(taskId, streamCtx, stream)
+		m, err = LoadSyntaxflowTaskFromDB(taskId, ctx)
 		if err != nil {
 			return err
 		}
-		err = m.StatusTask()
+		m.StatusTask()
 		return err
-	case "resume":
+	case ControlModeResume:
 		taskId = config.GetResumeTaskId()
-		m, err = LoadSyntaxflowTaskFromDB(taskId, streamCtx, stream)
+		m, err = LoadSyntaxflowTaskFromDB(taskId, ctx)
 		if err != nil {
 			return err
 		}
-		m.Resume()
 		go func() {
 			// err := s.syntaxFlowResumeTask(m, stream)
 			err := m.ResumeTask()
@@ -87,7 +68,7 @@ func ScanWithConfig(stream ScanStream, sc *scanInputConfig) error {
 			return err
 		}
 		return nil
-	case <-streamCtx.Done():
+	case <-ctx.Done():
 		m.Stop()
 		RemoveSyntaxFlowTaskByID(taskId)
 		m.status = schema.SYNTAXFLOWSCAN_DONE

@@ -2,10 +2,11 @@ package syntaxflow_scan
 
 import (
 	"context"
+	"testing"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -16,37 +17,34 @@ import (
 func TestManager(t *testing.T) {
 	t.Run("test save and resume scan task", func(t *testing.T) {
 		taskId := uuid.NewString()
-		task, err := createSyntaxflowTaskById(taskId, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode: "",
-			Filter: &ypb.SyntaxFlowRuleFilter{
+		task, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
+			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
 				Language: []string{"java"},
-			},
-			ProgramName: []string{
-				"a", "b", "c",
-			},
-		}, nil, nil)
+			}),
+			WithProgramNames("a", "b", "c"),
+		))
 		require.NoError(t, err)
 		log.Infof("m; %v", task)
 
-		task.totalQuery = 60
-		task.skipQuery = 11
-		task.failedQuery = 22
-		task.successQuery = 33
-		task.riskCount = 44
+		task.setTotalQuery(60)
+		task.markRuleSkipped(11)
+		task.markRuleFailed(22)
+		task.markRuleSuccess(33)
+		task.setRiskCount(44)
 
 		err = task.SaveTask()
 		require.NoError(t, err)
 
-		newTask, err := LoadSyntaxflowTaskFromDB(taskId, context.Background(), nil)
+		newTask, err := LoadSyntaxflowTaskFromDB(taskId, context.Background())
 		require.NoError(t, err)
 
 		require.Equal(t, task.TaskId(), newTask.TaskId())
 		require.Equal(t, task.status, newTask.status)
-		require.Equal(t, task.totalQuery, newTask.totalQuery)
-		require.Equal(t, task.skipQuery, newTask.skipQuery)
-		require.Equal(t, task.failedQuery, newTask.failedQuery)
-		require.Equal(t, task.successQuery, newTask.successQuery)
-		require.Equal(t, task.riskCount, newTask.riskCount)
+		require.Equal(t, task.GetTotalQuery(), newTask.GetTotalQuery())
+		require.Equal(t, task.GetSkippedQuery(), newTask.GetSkippedQuery())
+		require.Equal(t, task.GetFailedQuery(), newTask.GetFailedQuery())
+		require.Equal(t, task.GetSuccessQuery(), newTask.GetSuccessQuery())
+		require.Equal(t, task.GetRiskCount(), newTask.GetRiskCount())
 		require.Equal(t, task.programs, newTask.programs)
 
 		require.NotNil(t, newTask.config)
@@ -57,26 +55,24 @@ func TestManager(t *testing.T) {
 	t.Run("test scan batch increment", func(t *testing.T) {
 		taskId1 := uuid.NewString()
 		programName := uuid.NewString()
-		task1, err := createSyntaxflowTaskById(taskId1, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode: "",
-			Filter: &ypb.SyntaxFlowRuleFilter{
+		task1, err := createSyntaxflowTaskById(taskId1, context.Background(), NewScanConfig(
+			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
 				Language: []string{"java"},
-			},
-			ProgramName: []string{programName},
-		}, nil, nil)
+			}),
+			WithProgramNames(programName),
+		))
 		require.NoError(t, err)
 
 		err = task1.SaveTask()
 		require.NoError(t, err)
 
 		taskId2 := uuid.NewString()
-		task2, err := createSyntaxflowTaskById(taskId2, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode: "",
-			Filter: &ypb.SyntaxFlowRuleFilter{
+		task2, err := createSyntaxflowTaskById(taskId2, context.Background(), NewScanConfig(
+			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
 				Language: []string{"java"},
-			},
-			ProgramName: []string{programName},
-		}, nil, nil)
+			}),
+			WithProgramNames(programName),
+		))
 		require.NoError(t, err)
 
 		err = task2.SaveTask()
@@ -88,13 +84,12 @@ func TestManager(t *testing.T) {
 
 		taskId3 := uuid.NewString()
 		newProgramName := uuid.NewString()
-		task3, err := createSyntaxflowTaskById(taskId3, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode: "",
-			Filter: &ypb.SyntaxFlowRuleFilter{
+		task3, err := createSyntaxflowTaskById(taskId3, context.Background(), NewScanConfig(
+			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
 				Language: []string{"java"},
-			},
-			ProgramName: []string{newProgramName},
-		}, nil, nil)
+			}),
+			WithProgramNames(newProgramName),
+		))
 		require.NoError(t, err)
 
 		err = task3.SaveTask()
@@ -141,14 +136,10 @@ func TestManager(t *testing.T) {
 
 		// 测试使用项目配置初始化扫描任务
 		taskId := uuid.NewString()
-		task, err := createSyntaxflowTaskById(taskId, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode:  "",
-			SSAProjectId: uint64(schemaProject.ID),
-			ProgramName:  []string{}, // 空程序名，应该从项目配置中获取
-		}, nil, &scanInputConfig{
-			ProcessCallback:     func(progress float64) {},
-			RuleProcessCallback: func(progName, ruleName string, progress float64) {},
-		})
+		task, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
+			WithControlMode(""),
+			WithProjectId(uint64(schemaProject.ID)),
+		))
 		require.NoError(t, err)
 		require.NotNil(t, task)
 
@@ -163,17 +154,11 @@ func TestManager(t *testing.T) {
 
 		// 测试项目配置被正确覆盖
 		taskId2 := uuid.NewString()
-		task2, err := createSyntaxflowTaskById(taskId2, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode:    "",
-			SSAProjectId:   uint64(schemaProject.ID),
-			ProgramName:    []string{"custom-program"}, // 自定义程序名
-			IgnoreLanguage: false,                      // 覆盖项目设置
-			Memory:         false,                      // 覆盖项目设置
-			Concurrency:    16,                         // 覆盖项目设置
-		}, nil, &scanInputConfig{
-			ProcessCallback:     func(progress float64) {},
-			RuleProcessCallback: func(progName, ruleName string, progress float64) {},
-		})
+		task2, err := createSyntaxflowTaskById(taskId2, context.Background(), NewScanConfig(
+			WithControlMode(""),
+			WithProjectId(uint64(schemaProject.ID)),
+			WithProgramNames("custom-program"),
+		))
 		require.NoError(t, err)
 		require.NotNil(t, task2)
 
@@ -229,14 +214,11 @@ func TestManager(t *testing.T) {
 
 		// 测试使用项目规则配置初始化扫描任务
 		taskId := uuid.NewString()
-		task, err := createSyntaxflowTaskById(taskId, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode:  "",
-			SSAProjectId: uint64(schemaProject.ID),
-			ProgramName:  []string{schemaProject.ProjectName},
-		}, nil, &scanInputConfig{
-			ProcessCallback:     func(progress float64) {},
-			RuleProcessCallback: func(progName, ruleName string, progress float64) {},
-		})
+		task, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
+			WithControlMode(""),
+			WithProjectId(uint64(schemaProject.ID)),
+			WithProgramNames(schemaProject.ProjectName),
+		))
 		require.NoError(t, err)
 		require.NotNil(t, task)
 
@@ -251,14 +233,10 @@ func TestManager(t *testing.T) {
 	t.Run("test invalid SSA project ID", func(t *testing.T) {
 		// 测试使用无效的项目ID
 		taskId := uuid.NewString()
-		_, err := createSyntaxflowTaskById(taskId, context.Background(), &ypb.SyntaxFlowScanRequest{
-			ControlMode:  "",
-			SSAProjectId: 99999, // 不存在的项目ID
-			ProgramName:  []string{},
-		}, nil, &scanInputConfig{
-			ProcessCallback:     func(progress float64) {},
-			RuleProcessCallback: func(progName, ruleName string, progress float64) {},
-		})
+		_, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
+			WithControlMode(""),
+			WithProjectId(99999), // 不存在的项目ID
+		))
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "query ssa project by id failed")
 	})
