@@ -3,6 +3,8 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"io"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -84,26 +86,36 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					return
 				}
 				var score float64
-				var reason string
+				var action *aicommon.WaitableAction
 				err = aicommon.CallAITransaction(r, prompt, r.CallAI, func(rsp *aicommon.AIResponse) error {
-					stream := rsp.GetOutputStreamReader("review", false, r.Emitter)
+					stream := rsp.GetOutputStreamReader("review", true, r.Emitter)
 					// stream = io.TeeReader(stream, os.Stdout)
-					action, err := aicommon.ExtractActionFromStream(stream, "risk_assessment", "object")
+					var err error
+					action, err = aicommon.ExtractWaitableActionFromStream(
+						ctx,
+						stream, "risk_assessment", []string{
+							"object",
+						}, []jsonextractor.CallbackOption{
+							jsonextractor.WithRegisterFieldStreamHandler("reason", func(key string, reader io.Reader, parents []string) {
+								reader = utils.JSONStringReader(utils.UTF8Reader(reader))
+								r.Emitter.EmitStreamEvent(
+									"review",
+									time.Now(),
+									reader,
+									rsp.GetTaskIndex(),
+								)
+							}),
+						})
 					if err != nil {
 						return utils.Errorf("error extracting action from stream: %v", err)
 					}
-					score = action.GetFloat("risk_score")
-					reason = action.GetString("reason")
-					if reason == "" {
-						return utils.Error("invalid review score or reason: empty reason")
-					}
+					score = action.WaitFloat("risk_score")
 					if score < 0 {
 						score = 0.0
 					}
 					if score > 1 {
 						score = 1.0
 					}
-					log.Infof("Auto-review evaluating: score=%.2f, reason=%s", score, reason)
 					return nil
 				})
 				if err != nil {
@@ -120,6 +132,7 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 						"level":          "low",
 					})
 					r.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
+					reason := action.WaitString("reason")
 					endNormally(score, "low", reason)
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
@@ -132,6 +145,7 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 						"score":          score,
 						"level":          "middle",
 					})
+					reason := action.WaitString("reason")
 					endNormally(score, "middle", reason)
 					r.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
@@ -139,6 +153,7 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 					endpoint.Release()
 				} else {
 					r.Emitter.EmitInfo("Auto-review score is high, suggesting to handled by user")
+					reason := action.WaitString("reason")
 					endNormally(score, "high", reason)
 				}
 			}()
