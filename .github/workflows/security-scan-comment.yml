@@ -1,0 +1,146 @@
+name: Security Scan and Comment
+
+on:
+  workflow_call:
+    inputs:
+      head_sha:
+        description: 'Head SHA of the pull request'
+        required: true
+        type: string
+      pr_number:
+        description: 'Pull request number'
+        required: true
+        type: string
+    secrets:
+      GITHUB_APP_ID:
+        required: true
+      GITHUB_APP_PRIVATE_KEY:
+        required: true
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      checks: read
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Generate GitHub App Token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.GITHUB_APP_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+      
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      
+      - name: Cache yak binary
+        uses: actions/cache@v3
+        id: cache-yak
+        with:
+          path: |
+            ./yak
+            ./vendor
+          key: ${{ runner.os }}-yak-${{ hashFiles('go.mod', 'go.sum', 'common/yak/**') }}
+          restore-keys: |
+            ${{ runner.os }}-yak-
+      
+      - name: Init Project
+        if: steps.cache-yak.outputs.cache-hit != 'true'
+        env: 
+          SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+        run: |
+          go mod tidy && go work vendor
+          # 处理libpcap依赖
+          ls -la $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
+          chmod +r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
+          cp -r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
+          go build common/yak/cmd/yak.go 
+          ./yak --help
+      
+      - name: Verify yak binary
+        if: steps.cache-yak.outputs.cache-hit == 'true'
+        run: |
+          ./yak --help
+      
+      - name: Generate program for scanning
+        run: |
+          ./yak sync-rule 
+          ./yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
+          MERGE_BASE=$(git merge-base main ${{ inputs.head_sha }})
+          echo "Merge base: $MERGE_BASE"
+          echo "Head SHA: ${{ inputs.head_sha }}"
+          ./yak gitefs --start $MERGE_BASE --end ${{ inputs.head_sha }} --output ./fs.zip
+      
+      - name: Run security scan
+        id: scan
+        run: |
+          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug
+          RISK_COUNT=$(cat risk.json | jq .RiskNums)
+          echo "Found $RISK_COUNT risks"
+          echo "risk_count=$RISK_COUNT" >> $GITHUB_OUTPUT
+          echo "scan_result=$([ $RISK_COUNT -eq 0 ] && echo 'success' || echo 'failure')" >> $GITHUB_OUTPUT
+      
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            risk.json
+            fs.zip
+      
+      - name: Set PR number
+        id: get_pr
+        run: |
+          echo "pr_number=${{ inputs.pr_number }}" >> $GITHUB_OUTPUT
+
+      - name: Comment on PR with security findings
+        if: steps.scan.outputs.scan_result == 'failure' && steps.get_pr.outputs.pr_number != ''
+        uses: ./.github/actions/security-commenter
+        with:
+          risk_json_path: risk.json
+          github_token: ${{ steps.generate_token.outputs.token }}
+          pr_number: ${{ steps.get_pr.outputs.pr_number }}
+          repo: ${{ github.repository }}
+      
+      - name: Add success comment
+        if: steps.scan.outputs.scan_result == 'success' && steps.get_pr.outputs.pr_number != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.generate_token.outputs.token }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: ${{ steps.get_pr.outputs.pr_number }},
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## ✅ 安全扫描通过\n\n代码安全扫描未发现任何问题。\n\n---\n*此评论由安全扫描工具自动生成*'
+            })
+      
+      - name: Fail if security issues found
+        if: steps.scan.outputs.scan_result == 'failure'
+        run: |
+          echo "❌ 发现安全风险，请检查PR评论中的详细信息"
+          exit 1

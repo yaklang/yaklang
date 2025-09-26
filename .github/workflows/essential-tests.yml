@@ -7,7 +7,9 @@ on:
     paths:
       - "common/**"
       - ".github/workflows/essential-tests.yml"
+      - ".github/workflows/diff-code-check.yml"
       - "go.mod"
+      - "scripts/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}

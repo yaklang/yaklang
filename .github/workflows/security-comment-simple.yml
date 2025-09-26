@@ -1,0 +1,173 @@
+name: Security Comment (Simple)
+
+on:
+  workflow_call:
+    inputs:
+      head_sha:
+        description: 'Head SHA of the pull request'
+        required: true
+        type: string
+      pr_number:
+        description: 'Pull request number'
+        required: true
+        type: string
+    secrets:
+      GITHUB_TOKEN:
+        required: false
+
+jobs:
+  security-scan-and-comment:
+    runs-on: ubuntu-22.04
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+      
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      
+      - name: Cache yak binary
+        uses: actions/cache@v3
+        id: cache-yak
+        with:
+          path: |
+            ./yak
+            ./vendor
+          key: ${{ runner.os }}-yak-${{ hashFiles('go.mod', 'go.sum', 'common/yak/**') }}
+          restore-keys: |
+            ${{ runner.os }}-yak-
+      
+      - name: Init Project
+        if: steps.cache-yak.outputs.cache-hit != 'true'
+        env: 
+          SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
+        run: |
+          go mod tidy && go work vendor
+          # 处理libpcap依赖
+          ls -la $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
+          chmod +r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
+          cp -r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
+          go build common/yak/cmd/yak.go 
+          ./yak --help
+      
+      - name: Verify yak binary
+        if: steps.cache-yak.outputs.cache-hit == 'true'
+        run: |
+          ./yak --help
+      
+      - name: Generate program for scanning
+        run: |
+          ./yak sync-rule 
+          ./yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
+          MERGE_BASE=$(git merge-base main ${{ inputs.head_sha }})
+          echo "Merge base: $MERGE_BASE"
+          echo "Head SHA: ${{ inputs.head_sha }}"
+          ./yak gitefs --start $MERGE_BASE --end ${{ inputs.head_sha }} --output ./fs.zip
+      
+      - name: Run security scan
+        id: scan
+        run: |
+          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug
+          RISK_COUNT=$(cat risk.json | jq .RiskNums)
+          echo "Found $RISK_COUNT risks"
+          echo "risk_count=$RISK_COUNT" >> $GITHUB_OUTPUT
+          echo "scan_result=$([ $RISK_COUNT -eq 0 ] && echo 'success' || echo 'failure')" >> $GITHUB_OUTPUT
+      
+      - name: Generate security report
+        if: steps.scan.outputs.scan_result == 'failure'
+        id: report
+        run: |
+          # 生成安全报告
+          REPORT=$(cat risk.json | jq -r '
+            "## 🔍 代码安全扫描报告\n\n" +
+            "**扫描时间:** " + (.report_time // "N/A") + "\n" +
+            "**程序名称:** " + (.program_name // "N/A") + "\n" +
+            "**编程语言:** " + (.program_lang // "N/A") + "\n" +
+            "**扫描文件数:** " + (.file_count | tostring) + "\n" +
+            "**代码行数:** " + (.code_line_count | tostring) + "\n" +
+            "**发现风险数:** " + (.RiskNums | tostring) + "\n\n" +
+            "### 🚨 风险详情\n\n" +
+            (if .RiskNums > 0 then
+              (.Risks | to_entries | map(
+                "#### " + (.value.title_verbose // .value.title // "未知问题") + "\n\n" +
+                "**严重程度:** `" + (.value.severity // "unknown") + "`\n" +
+                "**位置:** " + (.value.code_source_url // "N/A") + ":" + (.value.line | tostring) + "\n" +
+                "**规则:** " + (.value.rule_name // "N/A") + "\n" +
+                "**函数:** " + (.value.function_name // "N/A") + "\n\n" +
+                "**描述:**\n" + (.value.description // "无描述") + "\n\n" +
+                "**建议解决方案:**\n" + (.value.solution // "无解决方案") + "\n\n" +
+                "**问题代码:**\n```go\n" + (.value.code_fragment // "无代码片段") + "\n```\n\n" +
+                "---\n\n"
+              ) | join(""))
+            else
+              "未发现安全风险。"
+            end) +
+            "\n---\n*此报告由代码安全扫描工具自动生成*"
+          )
+          
+          # 将报告保存到文件
+          echo "$REPORT" > security_report.md
+          
+          # 输出报告内容（用于后续步骤）
+          echo "report_content<<EOF" >> $GITHUB_OUTPUT
+          echo "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Comment PR with security findings
+        if: steps.scan.outputs.scan_result == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = `${{ steps.report.outputs.report_content }}`;
+            
+            // 创建评论
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+            
+            console.log('Security report comment posted successfully');
+      
+      - name: Comment PR with success message
+        if: steps.scan.outputs.scan_result == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '## ✅ 代码安全检查通过\n\n🎉 代码安全扫描未发现任何问题。\n\n**扫描统计:**\n- 扫描文件数: ${{ steps.scan.outputs.risk_count }}\n- 发现风险数: 0\n\n---\n*此评论由代码安全检查工具自动生成*'
+            });
+      
+      - name: Upload scan artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            risk.json
+            fs.zip
+            security_report.md
+      
+      - name: Fail if security issues found
+        if: steps.scan.outputs.scan_result == 'failure'
+        run: |
+          echo "❌ 发现 ${{ steps.scan.outputs.risk_count }} 个安全风险，请检查PR评论中的详细信息"
+          exit 1
