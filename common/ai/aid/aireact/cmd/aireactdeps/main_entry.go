@@ -274,7 +274,7 @@ func buildReActOptions(ctx context.Context, aiCallback aicommon.AICallbackType, 
 		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
 			outputChan <- e
 		}),
-		aireact.WithBuiltinTools(),
+		aireact.WithBuiltinTools(ctx),
 	}
 
 	// 如果指定了文件路径，添加 traced file context provider

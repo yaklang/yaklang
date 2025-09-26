@@ -231,23 +231,26 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 
 func (c *Config) InitToolManager() error {
 	if c.aiToolManager == nil {
-		c.aiToolManager = buildinaitools.NewToolManager(append(c.aiToolManagerOption, buildinaitools.WithSearcher(func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
-			keywords := omap.NewOrderedMap[string, []string](nil)
-			toolMap := map[string]*aitool.Tool{}
-			for _, tool := range searchList {
-				keywords.Set(tool.GetName(), tool.GetKeywords())
-				toolMap[tool.GetName()] = tool
-			}
-			searchResults, err := c.HandleSearch(query, keywords)
-			if err != nil {
-				return nil, err
-			}
-			tools := []*aitool.Tool{}
-			for _, result := range searchResults {
-				tools = append(tools, toolMap[result.Tool])
-			}
-			return tools, nil
-		}))...)
+		c.aiToolManager = buildinaitools.NewToolManager(append(c.aiToolManagerOption,
+			buildinaitools.WithSearcher(func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
+				keywords := omap.NewOrderedMap[string, []string](nil)
+				toolMap := map[string]*aitool.Tool{}
+				for _, tool := range searchList {
+					keywords.Set(tool.GetName(), tool.GetKeywords())
+					toolMap[tool.GetName()] = tool
+				}
+				searchResults, err := c.HandleSearch(query, keywords)
+				if err != nil {
+					return nil, err
+				}
+				tools := []*aitool.Tool{}
+				for _, result := range searchResults {
+					tools = append(tools, toolMap[result.Tool])
+				}
+				return tools, nil
+			}),
+			buildinaitools.WithCtx(c.ctx),
+		)...)
 	}
 	return nil
 }
