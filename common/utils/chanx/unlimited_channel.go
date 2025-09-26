@@ -93,7 +93,10 @@ func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initB
 	validator := make(chan struct{})
 	go process(validator, ctx, in, out, &ch)
 	// if validator write finished, the process is working!
-	validator <- struct{}{}
+	select {
+	case validator <- struct{}{}:
+	case <-ctx.Done():
+	}
 	return &ch
 }
 
@@ -109,7 +112,10 @@ func NewUnlimitedChanSize[T any](ctx context.Context, initInCapacity, initOutCap
 
 	validator := make(chan struct{})
 	go process(validator, ctx, in, out, &ch)
-	validator <- struct{}{}
+	select {
+	case validator <- struct{}{}:
+	case <-ctx.Done():
+	}
 	return &ch
 }
 
