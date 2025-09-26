@@ -42,6 +42,7 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 			"total_entries": total,
 			"limit":         limit,
 			"entries":       r.getTimeline(limit),
+			"dump":          r.DumpTimeline(),
 		})
 		return nil
 
