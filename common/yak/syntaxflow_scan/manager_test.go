@@ -154,11 +154,18 @@ func TestManager(t *testing.T) {
 
 		// 测试项目配置被正确覆盖
 		taskId2 := uuid.NewString()
-		task2, err := createSyntaxflowTaskById(taskId2, context.Background(), NewScanConfig(
-			WithControlMode(""),
-			WithProjectId(uint64(schemaProject.ID)),
-			WithProgramNames("custom-program"),
-		))
+
+		task2, err := createSyntaxflowTaskById(taskId2, context.Background(),
+			NewScanConfig(
+				WithControlMode(""),
+				WithProjectId(uint64(schemaProject.ID)),
+				// 覆盖项目配置
+				WithProgramNames("custom-program"),
+				WithIgnoreLanguage(false),
+				WithMemory(false),
+				WithConcurrency(16),
+			),
+		)
 		require.NoError(t, err)
 		require.NotNil(t, task2)
 

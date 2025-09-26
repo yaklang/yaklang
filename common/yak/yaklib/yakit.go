@@ -217,11 +217,12 @@ func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
 	return i.String()
 }
 
-func NewYakitLogExecResult(level string, data string, items ...interface{}) *ypb.ExecResult {
+func NewYakitLogExecResult(level string, input any, items ...interface{}) *ypb.ExecResult {
 	logItem := &YakitLog{
 		Level:     level,
 		Timestamp: time.Now().Unix(),
 	}
+	data := utils.InterfaceToString(input)
 	if len(items) > 0 {
 		logItem.Data = fmt.Sprintf(data, items...)
 	} else {

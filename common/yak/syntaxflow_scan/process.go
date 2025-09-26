@@ -3,17 +3,18 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
-type RuleProcessCallback func(progress float64, status ProcessStatus, info *RuleProcessInfoList)
+type RuleProcessCallback func(progress float64, info *RuleProcessInfoList)
 
 type processMonitor struct {
+	ctx    context.Context
 	Status *omap.OrderedMap[string, *RuleProcessInfo] `json:"status"`
 
 	// query execute
@@ -26,16 +27,13 @@ type processMonitor struct {
 	TotalQuery atomic.Int64
 
 	processCallBack RuleProcessCallback
+	monitorTTL      time.Duration
+	eventCh         chan struct{}
+	waitGroup       sync.WaitGroup
 }
 
-type ProcessStatus string
-
-const (
-	ProcessStatusProgress ProcessStatus = "progress"
-	ProcessStatusRuleInfo ProcessStatus = "rule_info"
-)
-
 type RuleProcessInfoList struct {
+	Progress      float64            `json:"progress"`
 	Time          int64              `json:"time"`
 	Rules         []*RuleProcessInfo `json:"rules"`
 	FailedQuery   int64              `json:"failed_query"`
@@ -64,6 +62,8 @@ type RuleProcessInfo struct {
 	Finished  bool  `json:"finished"`
 	Error     error `json:"error"`
 	RiskCount int64 `json:"risk_count"`
+
+	Report bool `json:"-"`
 }
 
 func (r *RuleProcessInfo) String() string {
@@ -82,58 +82,102 @@ func (r *RuleProcessInfo) Key() string {
 	return r.RuleName + "@" + r.ProgramName
 }
 
+func (pm *processMonitor) Close() {
+	close(pm.eventCh)
+	pm.waitGroup.Wait()
+}
+
 func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProcessCallback) *processMonitor {
-	ret := &processMonitor{
+	pm := &processMonitor{
+		ctx:             ctx,
 		Status:          omap.NewEmptyOrderedMap[string, *RuleProcessInfo](),
 		processCallBack: callback,
+		monitorTTL:      ttl,
+		eventCh:         make(chan struct{}, 128),
 	}
+	return pm
+}
+func (pm *processMonitor) StartMonitor() {
+	pm.Status = omap.NewEmptyOrderedMap[string, *RuleProcessInfo]()
+	pm.eventCh = make(chan struct{}, 128)
 
+	pm.waitGroup = sync.WaitGroup{}
+	pm.waitGroup.Add(1)
 	go func() {
-		ticker := time.NewTicker(ttl)
+		defer pm.waitGroup.Done()
+		ticker := time.NewTicker(pm.monitorTTL)
 		defer ticker.Stop()
+
+		defer pm.reportProcess() // final event
+
+		var dirty bool = true
 		for {
 			select {
-			case <-ctx.Done():
+			case <-pm.ctx.Done():
 				return
+			case _, ok := <-pm.eventCh:
+				if !ok {
+					return
+				}
+				dirty = true
 			case <-ticker.C:
-				ret.Callback()
+				if !dirty {
+					continue
+				}
+				dirty = false
+				pm.reportProcess()
 			}
 		}
 	}()
-
-	return ret
 }
 
-func (p *processMonitor) Process() float64 {
-	log.Infof("process: finished %d / total %d", p.FinishedQuery.Load(), p.TotalQuery.Load())
-	return float64(p.FinishedQuery.Load()) / float64(p.TotalQuery.Load())
-}
-
-func (p *processMonitor) Callback(infos ...*RuleProcessInfo) {
-	process := p.Process()
+func (p *processMonitor) reportProcess() {
 	if p.processCallBack != nil {
-		// foreach status, if update time > ttl, callback it
-		var status ProcessStatus
-		var tmp = &RuleProcessInfoList{
-			Time:          time.Now().UnixMicro(),
-			FailedQuery:   p.FailedQuery.Load(),
-			SkippedQuery:  p.SkippedQuery.Load(),
-			SuccessQuery:  p.SuccessQuery.Load(),
-			FinishedQuery: p.FinishedQuery.Load(),
-			TotalQuery:    p.TotalQuery.Load(),
-			RiskCount:     p.RiskCount.Load(),
-		}
-		if len(infos) != 0 {
-			status = ProcessStatusRuleInfo
-			tmp.Rules = infos
-		} else {
-			status = ProcessStatusProgress
-			tmp.Rules = p.Status.Filter(func(s string, rpi *RuleProcessInfo) (bool, error) {
-				return !rpi.Finished, nil
-			}).Values()
-		}
-		p.processCallBack(process, status, tmp)
+		info := p.snapshotInfoList()
+		p.processCallBack(info.Progress, info)
 	}
+}
+
+func (p *processMonitor) EmitEvent() {
+	// Build a consistent snapshot at emit time
+	select {
+	case p.eventCh <- struct{}{}:
+	default:
+		// channel full, drop event to avoid blocking
+	}
+}
+
+func (p *processMonitor) snapshotInfoList() *RuleProcessInfoList {
+	ret := &RuleProcessInfoList{
+		Time:          time.Now().UnixMicro(),
+		FailedQuery:   p.FailedQuery.Load(),
+		SkippedQuery:  p.SkippedQuery.Load(),
+		SuccessQuery:  p.SuccessQuery.Load(),
+		FinishedQuery: p.FinishedQuery.Load(),
+		TotalQuery:    p.TotalQuery.Load(),
+		RiskCount:     p.RiskCount.Load(),
+	}
+	// progress
+	if total := ret.TotalQuery; total == 0 {
+		ret.Progress = 0
+	} else {
+		ret.Progress = float64(ret.FinishedQuery) / float64(total)
+	}
+	// rule
+	ret.Rules = make([]*RuleProcessInfo, 0, p.Status.Len())
+	p.Status.ForEach(func(i string, rpi *RuleProcessInfo) bool {
+		if rpi.Finished && rpi.Report {
+			// already reported, skip
+			return true
+		}
+
+		if rpi.Finished {
+			rpi.Report = true // mark as reported
+		}
+		ret.Rules = append(ret.Rules, rpi)
+		return true
+	})
+	return ret
 }
 
 func (p *processMonitor) UpdateRuleStatus(program, rule string, progress float64, info string) {
@@ -147,7 +191,6 @@ func (p *processMonitor) UpdateRuleStatus(program, rule string, progress float64
 			ProgramName: program,
 			StartTime:   time.Now().Unix(),
 		}
-		defer p.Callback(ruleInfo)
 	}
 
 	ruleInfo.UpdateTime = time.Now().Unix()
@@ -157,7 +200,6 @@ func (p *processMonitor) UpdateRuleStatus(program, rule string, progress float64
 	if progress >= 1.0 {
 		ruleInfo.Finished = true
 		ruleInfo.EndTime = time.Now().Unix()
-		defer p.Callback(ruleInfo)
 	}
 	p.Status.Set(key, ruleInfo)
 }
@@ -196,7 +238,6 @@ func (m *scanManager) markRuleSkipped(num ...int64) {
 	if len(num) > 0 {
 		count = num[0]
 	}
-	log.Infof("add skip query: %d", count)
 	m.processMonitor.SkippedQuery.Add(count)
 	m.AddFinishedQuery(count)
 }
@@ -206,7 +247,6 @@ func (m *scanManager) GetSkippedQuery() int64 {
 }
 
 func (m *scanManager) setTotalQuery(num int64) {
-	log.Errorf("set total query: %d", num)
 	m.processMonitor.TotalQuery.Store(num)
 }
 func (m *scanManager) GetTotalQuery() int64 {
@@ -222,7 +262,6 @@ func (m *scanManager) GetRiskCount() int64 {
 }
 
 func (m *scanManager) AddFinishedQuery(num int64) {
-	log.Infof("add finished query: %d", num)
 	m.processMonitor.FinishedQuery.Add(num)
 	if m.processMonitor.FinishedQuery.Load() >= m.processMonitor.TotalQuery.Load() {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
