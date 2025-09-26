@@ -8,8 +8,8 @@
   {
     "rule_id": "49b36a64-d6d1-4a78-a5a7-c97fbb9c8bfa",
     "rule_name": "审计C语言中的危险输入函数",
-    "hash": "165ca0f1db0f385b7b8b8dafcaaa7824444ead198b113aa02f0a7c1b3778214e",
-    "version": "20250919.0001"
+    "hash": "aa2e36ed9431b65a7b31c04559be87810b796ecd3d14181fb94c33d7be55f6db",
+    "version": "20250925.0001"
   },
   {
     "rule_id": "254bbfe6-c356-421e-a3e1-a6662e0abb7e",
@@ -18,10 +18,28 @@
     "version": "20250919.0001"
   },
   {
+    "rule_id": "a7f9c2e1-3b8d-4f6e-9c2a-1e5f8d3b7c9a",
+    "rule_name": "检测C语言信息泄露漏洞",
+    "hash": "7b1dcb2ec400fca9977fbabb81880838c94407d59afc3b6581ea96a517accba9",
+    "version": "20250925.0001"
+  },
+  {
     "rule_id": "bcac7b40-eb5e-4cab-ae45-96a3e38c0ce4",
     "rule_name": "检测C语言路径遍历漏洞",
     "hash": "860bd251043436adb1f8a652f036f773f4492e1c1570dd7d9bf1c084d768ebba",
     "version": "20250919.0001"
+  },
+  {
+    "rule_id": "f8b2d4c9-1e5a-4f7b-8c3d-9a6e2b4f8d1c",
+    "rule_name": "检测C语言硬编码密码漏洞",
+    "hash": "b5cc3b7051762bdf468b27140e04ef2786574c3280a2b4a16a839c1cb657213a",
+    "version": "20250925.0001"
+  },
+  {
+    "rule_id": "d3f8c1e7-4b9a-4d2e-8f1c-6a7b5e9d2c4f",
+    "rule_name": "检测C语言身份验证不当漏洞",
+    "hash": "7f7b2920a4680ebbb18290a2177da27a0d4722e33c10dde13617dbcfc4e6d7fa",
+    "version": "20250925.0001"
   },
   {
     "rule_id": "f3464649-d789-464e-8394-82135485717e",
@@ -30,10 +48,28 @@
     "version": "20250919.0001"
   },
   {
+    "rule_id": "f1e8d3b7-4c9a-4f2e-8b1d-6a5c9e2f7b4d",
+    "rule_name": "检测C语言文件上传漏洞",
+    "hash": "bd963c3271b624f011afa13fca857c3e4bca4bbdaaa1f92fdf4604a9bacf448c",
+    "version": "20250925.0001"
+  },
+  {
+    "rule_id": "e9c7f2a4-1d8b-4e3f-9a6c-2b5e8d1f4a7c",
+    "rule_name": "检测C语言开放重定向漏洞",
+    "hash": "b47f316c289d9843f3f61e79a896dd44d7fb4ce7527e85b12bfe4b23942e8f74",
+    "version": "20250925.0001"
+  },
+  {
     "rule_id": "e02361da-8cd0-4c3d-bcce-db14caabe70e",
     "rule_name": "检测C语言命令注入漏洞",
     "hash": "60ff773dc66465557f11e11444277efe80da88ad6086fbffc5968eee41a03aee",
     "version": "20250919.0001"
+  },
+  {
+    "rule_id": "c8e1f4b2-9d3a-4c7e-8f2b-1a6d9e4c7b8f",
+    "rule_name": "检测C语言Web应用XSS漏洞",
+    "hash": "3e23d932709838ff97d64583693cb6330ea6b91067c2848382d16987818440cb",
+    "version": "20250925.0001"
   },
   {
     "rule_id": "a83edb46-428e-481d-af2b-e5ac45db032e",
@@ -42,16 +78,22 @@
     "version": "20250919.0001"
   },
   {
+    "rule_id": "b9f7e3a1-2c8d-4e6f-9b1a-7d5c8e2f4a9b",
+    "rule_name": "检测C语言SSRF漏洞",
+    "hash": "1c8507fd77eb2101ea301b68314c77c1a8003031a7063b4336a7d437dae5e54a",
+    "version": "20250925.0001"
+  },
+  {
     "rule_id": "a9784e29-29cd-44eb-992b-fe914e58476e",
     "rule_name": "审计C语言文件操作函数",
-    "hash": "c374cd81ce25dd2fd78721848b188413bd9cbc4bd023c6afdb9e44ce573d6da0",
-    "version": "20250919.0001"
+    "hash": "669ead95b3a5f436951a4bab31289996822dd314141f985c3ac55fb1cdc8e35c",
+    "version": "20250925.0001"
   },
   {
     "rule_id": "5b44af50-f3c8-4a40-b411-86cf65ee656b",
     "rule_name": "查找C语言用户输入函数",
-    "hash": "b9f04006c62429ce768c37e2cb351f1913b4a67d25096d8358dd121ed1169981",
-    "version": "20250919.0001"
+    "hash": "c8aba8281c71cfae4b89b23fe2700555f5b1091127842a6871ac939423355965",
+    "version": "20250925.0001"
   },
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",

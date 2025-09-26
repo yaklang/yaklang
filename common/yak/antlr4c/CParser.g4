@@ -94,7 +94,6 @@ argumentExpressionList
 unaryExpression
     : ('++' | '--' | '*') unaryExpression
     | ('sizeof' | '_Alignof') '(' '*'* typeName ')'
-    | ('sizeof' | '_Alignof') '(' postfixExpression ')'
     | '&&' unaryExpression
     | postfixExpression
     ;

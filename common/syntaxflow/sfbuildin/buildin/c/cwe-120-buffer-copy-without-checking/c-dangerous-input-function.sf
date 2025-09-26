@@ -74,12 +74,12 @@ REFERENCE
 )
 
 gets()    as $high;
-scanf()   as $high;
-vscanf()  as $high;
-fscanf()  as $high;
-vfscanf() as $high;
-sscanf()  as $high;
-vsscanf() as $high;
+scanf(*<slice(index=0)>?{have: "%s"} as $high);
+vscanf(*<slice(index=1)>?{have: "%s"} as $high);
+fscanf(*<slice(index=1)>?{have: "%s"} as $high);
+vfscanf(*<slice(index=1)>?{have: "%s"} as $high);
+sscanf(*<slice(index=1)>?{have: "%s"} as $high);
+vsscanf(*<slice(index=1)>?{have: "%s"} as $high);
 
 alert $high for {
 	level: "high",

@@ -1,0 +1,788 @@
+desc(
+	title: "Check C Improper Authentication Vulnerability"
+	type: audit
+	severity: mid
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   身份验证不当漏洞发生在C语言应用程序未能正确验证用户身份或使用了不安全的身份验证机制时。这类漏洞包括使用弱密码比较、缺乏适当的密码哈希、绕过身份验证检查、使用不安全的认证协议等。攻击者可以利用这些缺陷来获得未授权访问，冒充合法用户，或完全绕过身份验证系统。在C语言中，常见的问题包括使用简单的字符串比较进行密码验证、不当的空指针检查、时序攻击漏洞等。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   #include <stdlib.h>
+   
+   // 不安全的密码比较
+   int vulnerable_password_check(const char *input_password) {
+       const char *correct_password = "admin123";
+       
+       // 直接使用strcmp进行密码比较，存在时序攻击风险
+       if (strcmp(input_password, correct_password) == 0) {
+           return 1; // 认证成功
+       }
+       return 0; // 认证失败
+   }
+   
+   // 不当的空指针检查导致认证绕过
+   int vulnerable_null_check(const char *username, const char *password) {
+       if (!username || !password) {
+           // 错误：空指针时返回认证成功
+           return 1;
+       }
+       
+       if (strcmp(username, "admin") == 0 && strcmp(password, "secret") == 0) {
+           return 1;
+       }
+       return 0;
+   }
+   
+   // 不安全的认证状态管理
+   static int is_authenticated = 0;
+   
+   void vulnerable_auth_state() {
+       char username[100], password[100];
+       
+       printf("Username: ");
+       fgets(username, sizeof(username), stdin);
+       printf("Password: ");
+       fgets(password, sizeof(password), stdin);
+       
+       // 简化的认证逻辑，容易被绕过
+       if (strlen(username) > 0 && strlen(password) > 0) {
+           is_authenticated = 1; // 错误：仅检查长度就认为认证成功
+       }
+   }
+   
+   // 使用不安全的哈希算法
+   int vulnerable_hash_auth(const char *password) {
+       // 使用MD5等不安全的哈希算法
+       char *hashed = md5(password);
+       const char *stored_hash = "5d41402abc4b2a76b9719d911017c592"; // "hello"的MD5
+       
+       if (strcmp(hashed, stored_hash) == 0) {
+           return 1;
+       }
+       return 0;
+   }
+   ```
+
+3. **潜在影响**
+   - **未授权访问**: 攻击者可以绕过身份验证获得系统访问权限。
+   - **权限提升**: 通过身份验证漏洞获得更高级别的系统权限。
+   - **用户冒充**: 攻击者可以冒充合法用户执行操作。
+   - **数据泄露**: 未经授权访问敏感数据和系统资源。
+   - **系统完整性破坏**: 攻击者可能修改系统配置或数据。
+DESC
+	rule_id: "d3f8c1e7-4b9a-4d2e-8f1c-6a7b5e9d2c4f"
+	title_zh: "检测C语言身份验证不当漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全的密码哈希和比较
+使用安全的哈希算法和常量时间比较函数。
+```c
+#include <stdio.h>
+#include <string.h>
+#include <openssl/sha.h>
+#include <openssl/evp.h>
+
+// 安全的密码哈希函数（使用SHA-256）
+char* secure_hash_password(const char *password, const char *salt) {
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    const EVP_MD *md = EVP_sha256();
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    
+    EVP_DigestInit_ex(ctx, md, NULL);
+    EVP_DigestUpdate(ctx, salt, strlen(salt));
+    EVP_DigestUpdate(ctx, password, strlen(password));
+    EVP_DigestFinal_ex(ctx, hash, &hash_len);
+    EVP_MD_CTX_free(ctx);
+    
+    // 转换为十六进制字符串
+    char *hex_hash = malloc(hash_len * 2 + 1);
+    for (int i = 0; i < hash_len; i++) {
+        sprintf(hex_hash + i * 2, "%02x", hash[i]);
+    }
+    hex_hash[hash_len * 2] = '\0';
+    
+    return hex_hash;
+}
+
+// 常量时间比较函数（防止时序攻击）
+int secure_compare(const char *a, const char *b, size_t len) {
+    int result = 0;
+    for (size_t i = 0; i < len; i++) {
+        result |= a[i] ^ b[i];
+    }
+    return result == 0;
+}
+
+// 安全的密码验证
+int secure_password_check(const char *input_password, const char *stored_hash, const char *salt) {
+    if (!input_password || !stored_hash || !salt) {
+        return 0; // 拒绝空指针
+    }
+    
+    char *input_hash = secure_hash_password(input_password, salt);
+    if (!input_hash) {
+        return 0;
+    }
+    
+    int result = secure_compare(input_hash, stored_hash, strlen(stored_hash));
+    
+    // 清理内存中的敏感数据
+    memset(input_hash, 0, strlen(input_hash));
+    free(input_hash);
+    
+    return result;
+}
+```
+
+#### 2. 实施强身份验证检查
+建立完整的身份验证逻辑，包括适当的错误处理。
+```c
+#include <time.h>
+
+typedef struct {
+    char username[100];
+    char password_hash[65]; // SHA-256 hex string
+    char salt[33];
+    int failed_attempts;
+    time_t last_attempt;
+    int is_locked;
+} user_account_t;
+
+// 账户锁定机制
+int is_account_locked(user_account_t *account) {
+    if (!account->is_locked) {
+        return 0;
+    }
+    
+    // 检查是否可以解锁（例如，30分钟后）
+    time_t now = time(NULL);
+    if (now - account->last_attempt > 1800) { // 30分钟
+        account->is_locked = 0;
+        account->failed_attempts = 0;
+        return 0;
+    }
+    
+    return 1;
+}
+
+// 安全的身份验证函数
+int secure_authenticate(const char *username, const char *password) {
+    if (!username || !password) {
+        return 0; // 明确拒绝空输入
+    }
+    
+    // 输入验证
+    if (strlen(username) == 0 || strlen(username) > 99 ||
+        strlen(password) == 0 || strlen(password) > 255) {
+        return 0;
+    }
+    
+    // 查找用户账户（这里简化为示例）
+    user_account_t *account = find_user_account(username);
+    if (!account) {
+        // 即使用户不存在也要执行哈希计算，防止用户枚举攻击
+        char dummy_salt[33] = "dummy_salt_to_prevent_timing_attack";
+        secure_hash_password(password, dummy_salt);
+        return 0;
+    }
+    
+    // 检查账户是否被锁定
+    if (is_account_locked(account)) {
+        return 0;
+    }
+    
+    // 验证密码
+    int auth_result = secure_password_check(password, account->password_hash, account->salt);
+    
+    // 更新失败尝试计数
+    if (!auth_result) {
+        account->failed_attempts++;
+        account->last_attempt = time(NULL);
+        
+        // 超过5次失败尝试则锁定账户
+        if (account->failed_attempts >= 5) {
+            account->is_locked = 1;
+        }
+    } else {
+        // 认证成功，重置失败计数
+        account->failed_attempts = 0;
+        account->last_attempt = time(NULL);
+    }
+    
+    return auth_result;
+}
+```
+
+#### 3. 使用安全的会话管理
+实现安全的会话管理机制。
+```c
+#include <openssl/rand.h>
+
+typedef struct {
+    char session_id[65]; // SHA-256 hex string
+    char username[100];
+    time_t created_at;
+    time_t last_activity;
+    int is_valid;
+} session_t;
+
+// 生成安全的会话ID
+char* generate_session_id() {
+    unsigned char random_bytes[32];
+    if (RAND_bytes(random_bytes, sizeof(random_bytes)) != 1) {
+        return NULL;
+    }
+    
+    char *session_id = malloc(65);
+    for (int i = 0; i < 32; i++) {
+        sprintf(session_id + i * 2, "%02x", random_bytes[i]);
+    }
+    session_id[64] = '\0';
+    
+    return session_id;
+}
+
+// 创建新会话
+session_t* create_session(const char *username) {
+    session_t *session = malloc(sizeof(session_t));
+    if (!session) return NULL;
+    
+    char *session_id = generate_session_id();
+    if (!session_id) {
+        free(session);
+        return NULL;
+    }
+    
+    strncpy(session->session_id, session_id, sizeof(session->session_id) - 1);
+    strncpy(session->username, username, sizeof(session->username) - 1);
+    session->created_at = time(NULL);
+    session->last_activity = time(NULL);
+    session->is_valid = 1;
+    
+    free(session_id);
+    return session;
+}
+
+// 验证会话
+int validate_session(const char *session_id) {
+    if (!session_id) return 0;
+    
+    session_t *session = find_session(session_id);
+    if (!session || !session->is_valid) {
+        return 0;
+    }
+    
+    time_t now = time(NULL);
+    
+    // 检查会话超时（例如，2小时）
+    if (now - session->last_activity > 7200) {
+        session->is_valid = 0;
+        return 0;
+    }
+    
+    // 更新最后活动时间
+    session->last_activity = now;
+    return 1;
+}
+```
+
+#### 4. 实施多因素认证
+增加额外的认证因素提高安全性。
+```c
+// 简单的TOTP验证示例
+int verify_totp_code(const char *username, const char *code) {
+    if (!username || !code || strlen(code) != 6) {
+        return 0;
+    }
+    
+    // 这里应该实现实际的TOTP验证逻辑
+    // 例如使用Google Authenticator兼容的算法
+    
+    return totp_verify(username, code);
+}
+
+// 完整的多因素认证
+int multi_factor_authenticate(const char *username, const char *password, const char *totp_code) {
+    // 第一步：密码验证
+    if (!secure_authenticate(username, password)) {
+        return 0;
+    }
+    
+    // 第二步：TOTP验证
+    if (!verify_totp_code(username, totp_code)) {
+        return 0;
+    }
+    
+    return 1; // 所有认证因素都通过
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-287: Improper Authentication](https://cwe.mitre.org/data/definitions/287.html)
+[OWASP Authentication Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
+REFERENCE
+)
+
+<include('c-user-input')> as $user_input;
+
+strcmp(*<slice(index=0)> #-> as $password_cmp);
+strncmp(*<slice(index=0)> #-> as $password_cmp);
+memcmp(*<slice(index=0)> #-> as $password_cmp);
+
+md5(* #-> as $weak_hash);
+sha1(* #-> as $weak_hash);
+
+$user_input & $password_cmp as $mid;
+$user_input & $weak_hash as $low;
+
+
+alert $mid for {
+	level: "mid",
+	type: "vuln",
+	title: "C Improper Authentication Vulnerability Was Detected",
+	title_zh: "检测到C语言身份验证不当漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   身份验证不当漏洞是由于应用程序未能正确验证用户身份或使用了不安全的身份验证机制。这包括使用弱密码比较、缺乏适当的密码哈希、绕过身份验证检查等问题。
+
+2. **触发场景**
+   检测到以下不安全的身份验证实现：
+   ```c
+   // 危险示例
+   if (strcmp(user_input, "admin_password") == 0) {
+       // 直接字符串比较，存在时序攻击风险
+   }
+   
+   if (strncmp(password, stored_password, strlen(password)) == 0) {
+       // 不安全的密码比较
+   }
+   ```
+
+3. **潜在影响**
+   - 未授权访问，攻击者可以绕过身份验证获得系统访问权限
+   - 权限提升，通过身份验证漏洞获得更高级别的系统权限
+   - 用户冒充，攻击者可以冒充合法用户执行操作
+   - 时序攻击，通过分析响应时间推断密码信息
+DESC
+	message: "检测到C语言代码中存在身份验证不当漏洞，使用了不安全的认证机制",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全的密码哈希和比较
+```c
+// 使用安全的哈希算法（SHA-256或更强）
+char* secure_hash_password(const char *password, const char *salt) {
+    // 实现安全的密码哈希
+    return sha256_hash(password, salt);
+}
+
+// 常量时间比较（防止时序攻击）
+int secure_compare(const char *a, const char *b, size_t len) {
+    int result = 0;
+    for (size_t i = 0; i < len; i++) {
+        result |= a[i] ^ b[i];
+    }
+    return result == 0;
+}
+```
+
+#### 2. 实施完整的身份验证检查
+```c
+int secure_authenticate(const char *username, const char *password) {
+    if (!username || !password) {
+        return 0; // 明确拒绝空输入
+    }
+    
+    // 输入验证
+    if (strlen(username) == 0 || strlen(password) == 0) {
+        return 0;
+    }
+    
+    // 查找用户并验证密码哈希
+    user_account_t *account = find_user_account(username);
+    if (!account) {
+        // 防止用户枚举攻击
+        dummy_hash_calculation();
+        return 0;
+    }
+    
+    return verify_password_hash(password, account->password_hash, account->salt);
+}
+```
+
+#### 3. 实施账户锁定机制
+```c
+typedef struct {
+    int failed_attempts;
+    time_t last_attempt;
+    int is_locked;
+} account_security_t;
+
+int check_account_security(account_security_t *security) {
+    if (security->failed_attempts >= 5) {
+        security->is_locked = 1;
+        return 0; // 账户被锁定
+    }
+    return 1;
+}
+```
+
+#### 4. 使用强密码策略
+```c
+int validate_password_strength(const char *password) {
+    if (strlen(password) < 8) return 0;
+    
+    int has_upper = 0, has_lower = 0, has_digit = 0, has_special = 0;
+    for (int i = 0; password[i]; i++) {
+        if (isupper(password[i])) has_upper = 1;
+        if (islower(password[i])) has_lower = 1;
+        if (isdigit(password[i])) has_digit = 1;
+        if (!isalnum(password[i])) has_special = 1;
+    }
+    
+    return has_upper && has_lower && has_digit && has_special;
+}
+```
+SOLUTION
+	risk: "身份验证不当",
+	name: "mid",
+}
+
+alert $low for {
+	level: "low",
+	type: "vuln",
+	title: "C Weak Hash Algorithm Usage Was Detected",
+	title_zh: "检测到C语言使用弱哈希算法",
+	desc: <<<DESC
+### 漏洞描述
+检测到使用了不安全的哈希算法（如MD5、SHA1）进行密码处理。这些算法已被证明存在碰撞漏洞，不应用于密码哈希。
+DESC
+	message: "检测到使用弱哈希算法处理用户输入，建议使用更安全的哈希算法",
+	solution: <<<SOLUTION
+### 修复建议
+使用更安全的哈希算法如SHA-256、SHA-3或专门的密码哈希函数如bcrypt、scrypt、Argon2。
+```c
+// 使用SHA-256替代MD5/SHA1
+char* secure_hash(const char *input) {
+    return sha256_hash(input);
+}
+
+// 更好的选择：使用专门的密码哈希函数
+char* password_hash(const char *password, const char *salt) {
+    return bcrypt_hash(password, salt, 12); // 工作因子12
+}
+```
+SOLUTION
+	risk: "弱哈希算法",
+	name: "low",
+}
+
+desc(
+	lang: c
+	alert_mid: 1
+	'file://unsafe_auth.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+// 不安全的密码比较
+int vulnerable_login(const char *username, const char *password) {
+    const char *admin_user = "admin";
+    const char *admin_pass = "admin123";
+    
+    // 直接使用strcmp进行密码比较，存在时序攻击风险
+    if (strcmp(username, admin_user) == 0 && strcmp(password, admin_pass) == 0) {
+        printf("Login successful!\n");
+        return 1;
+    }
+    
+    printf("Login failed!\n");
+    return 0;
+}
+
+// 不当的空指针检查导致认证绕过
+int vulnerable_null_check(const char *username, const char *password) {
+    // 错误：空指针时返回认证成功
+    if (!username || !password) {
+        return 1; // 认证绕过漏洞
+    }
+    
+    if (strcmp(username, "admin") == 0 && strcmp(password, "secret") == 0) {
+        return 1;
+    }
+    return 0;
+}
+
+// 使用长度检查的错误认证逻辑
+int vulnerable_length_check(const char *password) {
+    const char *correct_password = "supersecret";
+    
+    // 错误：仅检查长度就认为认证成功
+    if (strlen(password) == strlen(correct_password)) {
+        printf("Password length matches, access granted!\n");
+        return 1;
+    }
+    
+    return 0;
+}
+
+// 使用不安全的MD5哈希
+char* vulnerable_md5_hash(const char *password) {
+    // 使用不安全的MD5算法
+    return md5(password);
+}
+
+// 部分字符串比较漏洞
+int vulnerable_partial_compare(const char *input_password) {
+    const char *stored_password = "mypassword123";
+    
+    // 只比较前几个字符，容易被绕过
+    if (strncmp(input_password, stored_password, 3) == 0) {
+        printf("Access granted with partial match!\n");
+        return 1;
+    }
+    
+    return 0;
+}
+
+// 简单的认证状态管理漏洞
+static int is_authenticated = 0;
+
+void vulnerable_auth_state(const char *input) {
+    // 任何非空输入都被认为是有效认证
+    if (strlen(input) > 0) {
+        is_authenticated = 1;
+        printf("Authentication successful!\n");
+    }
+}
+
+int check_auth_status() {
+    return is_authenticated;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 3) {
+        printf("Usage: %s <username> <password>\n", argv[0]);
+        return 1;
+    }
+    
+    char *username = argv[1];
+    char *password = argv[2];
+    
+    // 各种不安全的认证方法
+    vulnerable_login(username, password);
+    vulnerable_null_check(username, password);
+    vulnerable_length_check(password);
+    vulnerable_partial_compare(password);
+    vulnerable_auth_state(username);
+    
+    // 使用弱哈希算法
+    char *hash = vulnerable_md5_hash(password);
+    printf("MD5 hash: %s\n", hash);
+    
+    // 从环境变量获取密码进行不安全比较
+    char *env_password = getenv("USER_PASSWORD");
+    if (env_password && strcmp(password, env_password) == 0) {
+        printf("Environment password match!\n");
+    }
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_auth.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <time.h>
+#include <openssl/sha.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
+
+// 用户账户结构
+typedef struct {
+    char username[100];
+    char password_hash[65]; // SHA-256 hex string
+    char salt[33];
+    int failed_attempts;
+    time_t last_attempt;
+    int is_locked;
+} user_account_t;
+
+// 模拟用户数据库
+static user_account_t users[] = {
+    {"admin", "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3", "randomsalt123", 0, 0, 0},
+    {"", "", "", 0, 0, 0} // 结束标记
+};
+
+// 安全的密码哈希函数
+char* secure_hash_password(const char *password, const char *salt) {
+    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
+    const EVP_MD *md = EVP_sha256();
+    unsigned char hash[EVP_MAX_MD_SIZE];
+    unsigned int hash_len;
+    
+    EVP_DigestInit_ex(ctx, md, NULL);
+    EVP_DigestUpdate(ctx, salt, strlen(salt));
+    EVP_DigestUpdate(ctx, password, strlen(password));
+    EVP_DigestFinal_ex(ctx, hash, &hash_len);
+    EVP_MD_CTX_free(ctx);
+    
+    char *hex_hash = malloc(hash_len * 2 + 1);
+    for (unsigned int i = 0; i < hash_len; i++) {
+        sprintf(hex_hash + i * 2, "%02x", hash[i]);
+    }
+    hex_hash[hash_len * 2] = '\0';
+    
+    return hex_hash;
+}
+
+// 常量时间比较函数（防止时序攻击）
+int secure_compare(const char *a, const char *b, size_t len) {
+    int result = 0;
+    for (size_t i = 0; i < len; i++) {
+        result |= a[i] ^ b[i];
+    }
+    return result == 0;
+}
+
+// 查找用户账户
+user_account_t* find_user_account(const char *username) {
+    for (int i = 0; users[i].username[0] != '\0'; i++) {
+        if (strcmp(users[i].username, username) == 0) {
+            return &users[i];
+        }
+    }
+    return NULL;
+}
+
+// 检查账户是否被锁定
+int is_account_locked(user_account_t *account) {
+    if (!account->is_locked) {
+        return 0;
+    }
+    
+    // 检查是否可以解锁（30分钟后）
+    time_t now = time(NULL);
+    if (now - account->last_attempt > 1800) {
+        account->is_locked = 0;
+        account->failed_attempts = 0;
+        return 0;
+    }
+    
+    return 1;
+}
+
+// 安全的身份验证函数
+int secure_authenticate(const char *username, const char *password) {
+    // 输入验证
+    if (!username || !password) {
+        return 0; // 明确拒绝空输入
+    }
+    
+    if (strlen(username) == 0 || strlen(username) > 99 ||
+        strlen(password) == 0 || strlen(password) > 255) {
+        return 0;
+    }
+    
+    // 查找用户账户
+    user_account_t *account = find_user_account(username);
+    if (!account) {
+        // 即使用户不存在也要执行哈希计算，防止用户枚举攻击
+        char dummy_salt[33] = "dummy_salt_to_prevent_timing";
+        char *dummy_hash = secure_hash_password(password, dummy_salt);
+        free(dummy_hash);
+        return 0;
+    }
+    
+    // 检查账户是否被锁定
+    if (is_account_locked(account)) {
+        printf("Account is locked due to too many failed attempts\n");
+        return 0;
+    }
+    
+    // 验证密码
+    char *input_hash = secure_hash_password(password, account->salt);
+    int auth_result = secure_compare(input_hash, account->password_hash, strlen(account->password_hash));
+    
+    // 清理内存中的敏感数据
+    memset(input_hash, 0, strlen(input_hash));
+    free(input_hash);
+    
+    // 更新失败尝试计数
+    if (!auth_result) {
+        account->failed_attempts++;
+        account->last_attempt = time(NULL);
+        
+        // 超过5次失败尝试则锁定账户
+        if (account->failed_attempts >= 5) {
+            account->is_locked = 1;
+            printf("Account locked due to too many failed attempts\n");
+        } else {
+            printf("Login failed. %d attempts remaining\n", 5 - account->failed_attempts);
+        }
+    } else {
+        // 认证成功，重置失败计数
+        account->failed_attempts = 0;
+        account->last_attempt = time(NULL);
+        printf("Login successful!\n");
+    }
+    
+    return auth_result;
+}
+
+// 密码强度验证
+int validate_password_strength(const char *password) {
+    if (!password || strlen(password) < 8) {
+        return 0;
+    }
+    
+    int has_upper = 0, has_lower = 0, has_digit = 0, has_special = 0;
+    for (int i = 0; password[i]; i++) {
+        if (password[i] >= 'A' && password[i] <= 'Z') has_upper = 1;
+        if (password[i] >= 'a' && password[i] <= 'z') has_lower = 1;
+        if (password[i] >= '0' && password[i] <= '9') has_digit = 1;
+        if (!((password[i] >= 'A' && password[i] <= 'Z') ||
+              (password[i] >= 'a' && password[i] <= 'z') ||
+              (password[i] >= '0' && password[i] <= '9'))) {
+            has_special = 1;
+        }
+    }
+    
+    return has_upper && has_lower && has_digit && has_special;
+}
+
+int main(int argc, char **argv) {
+    if (argc < 3) {
+        printf("Usage: %s <username> <password>\n", argv[0]);
+        return 1;
+    }
+    
+    char *username = argv[1];
+    char *password = argv[2];
+    
+    // 验证密码强度
+    if (!validate_password_strength(password)) {
+        printf("Password does not meet strength requirements\n");
+        printf("Password must be at least 8 characters with uppercase, lowercase, digit, and special character\n");
+    }
+    
+    // 执行安全的身份验证
+    if (secure_authenticate(username, password)) {
+        printf("Access granted\n");
+    } else {
+        printf("Access denied\n");
+    }
+    
+    return 0;
+}
+SAFE
+)

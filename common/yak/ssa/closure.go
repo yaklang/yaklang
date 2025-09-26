@@ -187,6 +187,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			if !exists || utils.IsNil(v) {
 				continue
 			}
+			if utils.IsNil(modify) {
+				modify = v
+			}
 			if v.GetType().GetTypeKind() == PointerKind {
 				se.Name = builder.GetOriginPointerName(v)
 			} else {
@@ -207,6 +210,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			if !ok {
 				continue
 			}
+			if utils.IsNil(modify) {
+				modify = obj
+			}
 			if obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
@@ -220,6 +226,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			if !ok {
 				continue
 			}
+			if utils.IsNil(modify) {
+				modify = obj
+			}
 			if obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
@@ -232,6 +241,9 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 			obj, ok := se.Get(c)
 			if !ok {
 				continue
+			}
+			if utils.IsNil(modify) {
+				modify = obj
 			}
 			if obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
@@ -256,6 +268,11 @@ func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 				sideEffect.SetVerboseName(se.VerboseName)
 			}
 			c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
+			if buildPointer {
+				if se.parameterMemberInner.MemberCallObjectIndex < len(c.Args) {
+					c.Args[se.parameterMemberInner.MemberCallObjectIndex] = sideEffect.GetId()
+				}
+			}
 		}
 	}
 }
@@ -300,6 +317,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			if !exists || utils.IsNil(v) {
 				continue
 			}
+			if utils.IsNil(modify) {
+				modify = v
+			}
 			if v.GetType().GetTypeKind() == PointerKind {
 				se.Name = builder.GetOriginPointerName(v)
 			} else {
@@ -320,6 +340,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			if !ok {
 				continue
 			}
+			if utils.IsNil(modify) {
+				modify = obj
+			}
 			if obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
 			}
@@ -332,6 +355,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			obj, ok := se.Get(c)
 			if !ok {
 				continue
+			}
+			if utils.IsNil(modify) {
+				modify = obj
 			}
 			if obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
@@ -352,6 +378,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			obj, ok := se.Get(c)
 			if !ok {
 				continue
+			}
+			if utils.IsNil(modify) {
+				modify = obj
 			}
 			if obj.GetType().GetTypeKind() == PointerKind {
 				obj = builder.GetOriginValue(obj)
