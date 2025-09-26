@@ -316,24 +316,28 @@ LOOP:
 			if err != nil {
 				return false, err
 			}
-			satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, false, enhanceResult)
+			satisfied, err := r.verifyUserSatisfaction(userQuery, false, enhanceResult)
 			if err != nil {
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))
 				continue
 			} else if satisfied {
-				r.EmitResult(finalResult)
+				r.EmitResult("** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **")
 				endIterationCall()
+				result, err := r.requireDirectlyAnswer(userQuery, nil)
+				if result != "" {
+					r.EmitResult(result)
+					currentTask.SetResult(strings.TrimSpace(result))
+				}
+				if err != nil {
+					r.EmitError("Failed to require directly answer after knowledge enhance: %v", err)
+					r.addToTimeline("error", fmt.Sprintf("Failed to require directly answer after knowledge enhance: %v", err))
+				}
 				currentTask.SetStatus(string(TaskStatus_Completed))
 				continue
 			} else {
 				// User needs not satisfied, continue loop
 				log.Infof("User needs not fully satisfied, continuing analysis...")
-				r.addToTimeline(
-					"reason",
-					fmt.Sprintf("User needs not fully satisfied after tool call, continuing analysis...\n"+
-						"%v", finalResult,
-					))
 			}
 		case ActionRequireTool:
 			saveIterationInfoIntoTimeline()
@@ -387,24 +391,18 @@ LOOP:
 
 			// Tool executed successfully, now verify if user needs are satisfied
 			// Temporarily release the lock before calling verification to avoid deadlock
-			satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, true, toolPayload)
+			satisfied, err := r.verifyUserSatisfaction(userQuery, true, toolPayload)
 			if err != nil {
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))
 				continue
 			} else if satisfied {
-				r.EmitResult(finalResult)
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Completed))
 				continue
 			} else {
 				// User needs not satisfied, continue loop
 				log.Infof("User needs not fully satisfied, continuing analysis...")
-				r.addToTimeline(
-					"reason",
-					fmt.Sprintf("User needs not fully satisfied after tool call, continuing analysis...\n"+
-						"%v", finalResult,
-					))
 			}
 		case ActionRequireAIBlueprintForge:
 			saveIterationInfoIntoTimeline()
@@ -501,13 +499,12 @@ LOOP:
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}
-			satisfied, finalResult, err := r.verifyUserSatisfaction(userQuery, false, suggestion)
+			satisfied, err := r.verifyUserSatisfaction(userQuery, false, suggestion)
 			if err != nil {
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))
 				continue
 			} else if satisfied {
-				r.EmitResult(finalResult)
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Completed))
 				continue
