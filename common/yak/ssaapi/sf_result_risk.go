@@ -292,5 +292,8 @@ func (r *SyntaxFlowResult) YieldRisk() chan *schema.SSARisk {
 }
 
 func (r *SyntaxFlowResult) RiskCount() int {
+	if r == nil {
+		return 0
+	}
 	return len(r.riskMap)
 }

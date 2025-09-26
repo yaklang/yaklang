@@ -1346,9 +1346,12 @@ var ssaCodeScan = &cli.Command{
 			opt = append(opt, sfreport.WithDataflowPath(true))
 		}
 		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format, opt...)
+		if err != nil {
+			log.Errorf("create report instance failed: %s", err)
+			return err
+		}
 		err = syntaxflow_scan.StartScan(
 			ctx,
-			nil,
 			syntaxflow_scan.WithProgramNames(prog.GetProgramName()),
 			syntaxflow_scan.WithRuleFilter(ruleFilter),
 			syntaxflow_scan.WithMemory(c.Bool("memory")),
