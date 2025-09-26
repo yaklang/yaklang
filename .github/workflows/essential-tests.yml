@@ -9,6 +9,10 @@ on:
       - ".github/workflows/essential-tests.yml"
       - "go.mod"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check-wip:
     # fork PR should not run this action
