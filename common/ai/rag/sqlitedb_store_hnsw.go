@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -444,6 +445,15 @@ func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
 func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	addStartTime := time.Now()
+	defer func() {
+		usedTime := time.Since(addStartTime)
+		if usedTime > 2*time.Second {
+			log.Warnf("adding docs took too long: %v", usedTime)
+		} else {
+			log.Debugf("adding docs took: %v", usedTime)
+		}
+	}()
 
 	// 开始事务
 	tx := s.db.Begin()
@@ -540,18 +550,29 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 // SearchWithFilter 根据查询文本检索相关文档，并根据过滤函数过滤结果
 func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
 	//log.Infof("start to search with query: %s", query)
-	pageSize := 10
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	//log.Infof("starting search for query with length: %d, page: %d, limit: %d", len(query), page, limit)
-
 	// 生成查询的嵌入向量
+	//log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
 	queryEmbedding, err := s.embedder.Embedding(query)
 	if err != nil {
 		return nil, utils.Errorf("generate embedding vector for %#v: %v", query, err)
 	}
-	//log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
+
+	startSearch := time.Now()
+	defer func() {
+		useTime := time.Since(startSearch)
+		if useTime > 2*time.Second {
+			log.Warnf("just search without embedding took too long: %v with [%s]", useTime, query)
+		} else {
+			log.Debugf("search took: %v", useTime)
+		}
+	}()
+
+	pageSize := 10
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	//log.Infof("starting search for query with length: %d, page: %d, limit: %d", len(query), page, limit)
+
+	nodesFilterStart := time.Now()
 
 	resultNodes := s.hnsw.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
 		if key == DocumentTypeCollectionInfo {
@@ -572,9 +593,16 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 		}
 		return true
 	})
+	nodesFilterUseTime := time.Since(nodesFilterStart)
+	if nodesFilterUseTime > 2*time.Second {
+		log.Warnf("nodes filter took too long: %v with query[%s]", nodesFilterUseTime, query)
+	} else {
+		log.Debugf("nodes filter took: %v", nodesFilterUseTime)
+	}
+
 	resultIds := make([]string, len(resultNodes))
-	for i, result := range resultNodes {
-		resultIds[i] = result.Key
+	for i, resultNode := range resultNodes {
+		resultIds[i] = resultNode.Key
 	}
 	//log.Infof("hnsw search returned %d candidate documents", len(resultNodes))
 
@@ -591,7 +619,7 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 		batchIds := resultIds[i:end]
 		var batchDocs []schema.VectorStoreDocument
 
-		err := s.db.Where("document_id IN (?) AND collection_id = ?", batchIds, s.collection.ID).Find(&batchDocs).Error
+		err := s.db.Where("collection_id = ? AND document_id IN (?)", s.collection.ID, batchIds).Find(&batchDocs).Error
 		if err != nil {
 			return nil, utils.Errorf("批量查询文档失败: %v", err)
 		}

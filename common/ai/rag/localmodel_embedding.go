@@ -50,6 +50,16 @@ func NewLocalModelEmbedding(model *localmodel.Model, address string) *LocalModel
 
 // Embedding 实现 EmbeddingClient 接口，生成文本的嵌入向量
 func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
+	embeddingStart := time.Now()
+	defer func() {
+		useTime := time.Since(embeddingStart)
+		if useTime > 2*time.Second {
+			log.Warnf("embedding took too long: %v with [%s]", useTime, text)
+		} else {
+			log.Debugf("embedding took: %v", useTime)
+		}
+	}()
+
 	if l.embedding == nil {
 		return nil, fmt.Errorf("embedding client not initialized")
 	}
@@ -138,7 +148,7 @@ func startEmbeddingServiceInternal() (*LocalModelEmbedding, error) {
 		localmodel.WithContextSize(4096),
 		localmodel.WithContBatching(true),
 		localmodel.WithBatchSize(1024),
-		localmodel.WithThreads(8),
+		localmodel.WithThreads(20),
 	)
 	if err != nil {
 		log.Errorf("failed to start embedding service: %v", err)
