@@ -1,7 +1,7 @@
 desc(
 	title: "Check C File Upload Vulnerability"
 	type: audit
-    severity: high
+	severity: high
 	desc: <<<DESC
 ### 漏洞描述
 
