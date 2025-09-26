@@ -17,9 +17,6 @@ concurrent = getFromScope(`CONCURRENT`, 20)
 randomDelay = getFromScope("RANDOM_DELAY",0)
 retryTimes = getFromScope("RETRY_TIMES",0)
 
-println(randomDelay)
-println(retryTimes)
-
 total = 0
 scanTotal = 0
 activeTask = 0
