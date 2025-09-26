@@ -413,6 +413,7 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 		endpoint := eb.NewSaveEndpoint(refineConfig.Ctx)
 		entitySwg := sync.WaitGroup{}
 		relationSwg := sync.WaitGroup{}
+		defer relationSwg.Wait()
 
 		chunkOptions := append(options, WithJsonExtractHook(
 			jsonextractor.WithRegisterConditionalObjectCallback([]string{"entity_type"}, func(data map[string]any) {

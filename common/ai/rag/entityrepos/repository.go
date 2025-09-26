@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"sync"
+	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -83,18 +84,38 @@ func (r *EntityRepository) GetRAGSystem() *rag.RAGSystem {
 	return r.ragSystem
 }
 
+func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...rag.DocumentOption) error {
+	r.entityVectorMutex.Lock()
+	defer r.entityVectorMutex.Unlock()
+	return r.GetRAGSystem().Add(docId, content, opts...)
+}
+
+func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResult, error) {
+	r.entityVectorMutex.RLock()
+	defer r.entityVectorMutex.RUnlock()
+	return r.GetRAGSystem().Query(query, top)
+}
+
 //--- Entity Operations ---
 
 func (r *EntityRepository) MatchEntities(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, bool, error) {
 	var results []*schema.ERModelEntity
+	dbSearchStart := time.Now()
 	results, err := r.IdentifierSearchEntity(entity)
 	if err != nil {
 		return nil, false, err
 	}
+	if time.Since(dbSearchStart) > time.Second*1 {
+		log.Warnf("identifier search entity [%s] took %v and found %d results", entity.EntityName, time.Since(dbSearchStart), len(results))
+	}
 	if len(results) > 0 {
 		return results, true, nil
 	}
+	vectorSearchStart := time.Now()
 	results, err = r.VectorSearchEntity(entity)
+	if time.Since(vectorSearchStart) > time.Second*3 {
+		log.Warnf("vector search entity [%s] took %v and found %d results", entity.EntityName, time.Since(vectorSearchStart), len(results))
+	}
 	return results, false, err
 }
 
@@ -127,15 +148,17 @@ func (r *EntityRepository) VectorSearch(query string, top int, scoreLimit ...flo
 		return nil, nil, utils.Errorf("RAG system is not initialized")
 	}
 
-	r.entityVectorMutex.RLock()
-	defer r.entityVectorMutex.RUnlock()
-
 	needSocreLimit := 0.0
 	if len(scoreLimit) > 0 {
 		needSocreLimit = scoreLimit[0]
 	}
 
-	results, err := r.GetRAGSystem().Query(query, top)
+	if top == 0 {
+		top = r.runtimeConfig.queryTop
+	}
+
+	results, err := r.QueryVector(query, top)
+
 	if err != nil {
 		return nil, nil, err
 	}
@@ -202,10 +225,7 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 		return nil, utils.Errorf("RAG system is not initialized")
 	}
 
-	r.entityVectorMutex.RLock()
-	defer r.entityVectorMutex.RUnlock()
-
-	results, err := r.GetRAGSystem().Query(entity.String(), r.runtimeConfig.queryTop) // need query fast so not use rag enhance query
+	results, err := r.QueryVector(entity.String(), r.runtimeConfig.queryTop)
 	if err != nil {
 		return nil, err
 	}
@@ -253,9 +273,6 @@ func (r *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ER
 }
 
 func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
-	r.entityVectorMutex.Lock()
-	defer r.entityVectorMutex.Unlock()
-
 	metadata := map[string]any{
 		schema.META_Data_UUID:  entry.Uuid,
 		schema.META_Data_Title: entry.EntityName,
@@ -272,7 +289,7 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 	)
 	documentID := fmt.Sprintf("%v_entity", entry.Uuid)
 	content := entry.ToRAGContent()
-	return r.GetRAGSystem().Add(documentID, content, opts...)
+	return r.AddVectorIndex(documentID, content, opts...)
 }
 
 func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERModelRelationship) error {
@@ -292,13 +309,12 @@ func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERM
 		schema.META_Data_Title: fmt.Sprintf("关系[%s]", relationship.RelationshipTypeVerbose),
 		schema.META_Repos_UUID: relationship.RepositoryUUID,
 	}
-	return r.GetRAGSystem().Add(
-		relationship.Uuid, content,
+
+	return r.AddVectorIndex(relationship.Uuid, content,
 		rag.WithDocumentType(schema.RAGDocumentType_Relationship),
 		rag.WithDocumentRelatedEntities(relationship.SourceEntityIndex, relationship.TargetEntityIndex),
 		rag.WithDocumentRuntimeID(relationship.RuntimeID),
-		rag.WithDocumentRawMetadata(metadata),
-	)
+		rag.WithDocumentRawMetadata(metadata))
 }
 
 func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
@@ -321,10 +337,11 @@ func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*sc
 			firstEntity = m
 		}
 		m.Attributes = utils.MergeGeneralMap(m.Attributes, entity.Attributes)
-		err = r.UpdateEntity(m.ID, m)
-		if err != nil {
-			log.Errorf("failed to update entity [%s]: %v", entity.EntityName, err)
-		}
+	}
+
+	err = r.UpdateEntity(firstEntity.ID, firstEntity) // 只更新最早创建的实体 并为它生成冗余向量
+	if err != nil {
+		log.Errorf("failed to update entity [%s]: %v", firstEntity.EntityName, err)
 	}
 
 	return firstEntity, nil // 返回最早创建的实体，用于将关系集中联系在一个实体上，用于维护无目的质量中心
@@ -358,13 +375,7 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	if err != nil {
 		return err
 	}
-	go func() {
-		err := r.addEntityToVectorIndex(entity)
-		if err != nil {
-			log.Errorf("failed to add entity [%s] to vector index: %v", entity.EntityName, err)
-		}
-	}()
-	return nil
+	return r.addEntityToVectorIndex(entity) // 实体本身需要用rag搜索聚合，所以这里尝试使用同步构建向量
 }
 
 //--- Relationship Operations ---
@@ -406,11 +417,12 @@ func (r *EntityRepository) UpdateRelationship(uuid string, relationship *schema.
 		return err
 	}
 
-	err = r.addRelationshipToVectorIndex(relationship)
-	if err != nil {
-		log.Warnf("failed to add relation [%s] to vector index: %v", relationship.RelationshipType, err)
-		return utils.Wrapf(err, "failed to add relation [%s] to vector index", relationship.RelationshipType)
-	}
+	go func() {
+		err = r.addRelationshipToVectorIndex(relationship)
+		if err != nil {
+			log.Warnf("failed to add relation [%s] to vector index: %v", relationship.RelationshipType, err)
+		}
+	}()
 	return nil
 }
 
@@ -420,11 +432,12 @@ func (r *EntityRepository) AddRelationship(sourceIndex, targetIndex string, rela
 		log.Warnf("failed to add relation [%s] to vector [%s]: %v", relationType, sourceIndex, err)
 		return utils.Wrapf(err, "failed to add relation [%s] to vector [%s]", relationType, sourceIndex)
 	}
-	err = r.addRelationshipToVectorIndex(data)
-	if err != nil {
-		log.Warnf("failed to add relation [%s] to vector index: %v", relationType, err)
-		return utils.Wrapf(err, "failed to add relation [%s] to vector index", relationType)
-	}
+	go func() {
+		err = r.addRelationshipToVectorIndex(data)
+		if err != nil {
+			log.Warnf("failed to add relation [%s] to vector index: %v", relationType, err)
+		}
+	}()
 	return nil
 }
 
@@ -479,7 +492,6 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		// todo 需要rag优化图恢复速度
 		ragSystem, err = rag.LoadCollectionEx(db, name)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
@@ -526,7 +538,6 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		// todo 需要rag优化图恢复速度
 		ragSystem, err = rag.LoadCollectionEx(db, name)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)

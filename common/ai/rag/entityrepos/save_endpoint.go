@@ -3,6 +3,7 @@ package entityrepos
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -50,12 +51,15 @@ type SaveEndpoint struct {
 
 func (e *SaveEndpoint) SaveEntity(entity *schema.ERModelEntity) error {
 	tempName := entity.EntityName
+	sig := e.nameSig.GetOrSet(tempName, newEndpointSignal())
 	saveEntity, err := e.eb.MergeAndSaveEntity(entity)
 	if err != nil {
 		return utils.Errorf("merge entity failed, %v", err)
 	}
+	if saveEntity.EntityName != tempName {
+		log.Infof("merge entity name changed, from %s to %s", tempName, saveEntity.EntityName)
+	}
 	e.nameToIndex.Set(tempName, saveEntity.Uuid)
-	sig := e.nameSig.GetOrSet(tempName, newEndpointSignal())
 	sig.SetDataReady(saveEntity.Uuid)
 	return nil
 }
