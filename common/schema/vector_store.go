@@ -104,44 +104,6 @@ func (m *MetadataMap) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, m)
 }
 
-// GroupInfos 用于存储 HNSW 图结构中节点连接信息数组的自定义类型
-// 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储复杂结构数组
-type GroupInfos []GroupInfo
-
-// Value 实现 driver.Valuer 接口，用于将 GroupInfos 转换为数据库可以存储的值
-func (g GroupInfos) Value() (driver.Value, error) {
-	if g == nil {
-		return nil, nil
-	}
-	bytes, err := json.Marshal(g)
-	return string(bytes), err
-}
-
-// Scan 实现 sql.Scanner 接口，用于将数据库存储的值转换回 GroupInfos
-func (g *GroupInfos) Scan(value interface{}) error {
-	if value == nil {
-		*g = nil
-		return nil
-	}
-	var bytes []byte
-	switch v := value.(type) {
-	case []byte:
-		bytes = v
-	case string:
-		bytes = []byte(v)
-	default:
-		return utils.Errorf("不支持的类型: %T", value)
-	}
-
-	// 处理空字符串或空字节数组的情况
-	if len(bytes) == 0 {
-		*g = GroupInfos{}
-		return nil
-	}
-
-	return json.Unmarshal(bytes, g)
-}
-
 // GroupInfo 用于存储 HNSW 图结构中节点连接信息的自定义类型
 // 实现了 driver.Valuer 和 sql.Scanner 接口，支持在数据库中存储复杂结构
 type GroupInfo struct {
@@ -202,9 +164,6 @@ type VectorStoreCollection struct {
 	EnablePQMode bool `gorm:"default:false" json:"enable_pq_mode"`
 
 	Archived bool `gorm:"default:false" json:"archived"`
-
-	// HNSW 图连接信息，存储为 JSON 格式
-	GroupInfos GroupInfos `gorm:"type:text" json:"group_infos"`
 
 	UUID string
 
