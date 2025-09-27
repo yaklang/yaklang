@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sort"
 	"strings"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/jinzhu/gorm"
@@ -443,20 +443,30 @@ func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
 
 // Add 添加文档到向量存储
 func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
+	// 记录锁获取时间
+	lockStartTime := time.Now()
 	s.mu.Lock()
+	lockAcquireTime := time.Since(lockStartTime)
 	defer s.mu.Unlock()
-	addStartTime := time.Now()
+
+	totalStartTime := time.Now()
+	docCount := len(docs)
+
+	// 分析：当前使用单一大事务，可能导致长时间锁持有
+	// 如果事务持续时间过长，建议考虑分批处理或更小的事务粒度
 	defer func() {
-		usedTime := time.Since(addStartTime)
-		if usedTime > 2*time.Second {
-			log.Warnf("adding docs took too long: %v", usedTime)
+		totalUsedTime := time.Since(totalStartTime)
+		if totalUsedTime > 2*time.Second {
+			log.Warnf("HNSW Add total took too long: %v (lock acquire: %v, %d docs)", totalUsedTime, lockAcquireTime, docCount)
 		} else {
-			log.Debugf("adding docs took: %v", usedTime)
+			log.Debugf("HNSW Add total took: %v (lock acquire: %v, %d docs)", totalUsedTime, lockAcquireTime, docCount)
 		}
 	}()
 
-	// 开始事务
+	// 开始事务 - 这是潜在的性能瓶颈点
+	txStartTime := time.Now()
 	tx := s.db.Begin()
+	txInitTime := time.Since(txStartTime)
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("recover from panic when adding docs: %v", r)
@@ -464,7 +474,13 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 		}
 	}()
 
-	for _, doc := range docs {
+	// 记录文档处理时间
+	var totalDbQueryTime, totalDocUpdateTime, totalDocCreateTime time.Duration
+	var dbQueryCount, docUpdateCount, docCreateCount int
+
+	for i, doc := range docs {
+		docStartTime := time.Now()
+
 		// 确保文档有 ID
 		if doc.ID == "" {
 			tx.Rollback()
@@ -477,10 +493,17 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			return utils.Errorf("文档 %s 必须有嵌入向量", doc.ID)
 		}
 
+		// 数据库查询时间 - 这是另一个潜在瓶颈
+		queryStartTime := time.Now()
 		existingDoc, err := yakit.GetRAGDocumentByCollectionIDAndKey(tx, s.collection.ID, doc.ID)
+		queryTime := time.Since(queryStartTime)
+		totalDbQueryTime += queryTime
+		dbQueryCount++
+
 		schemaDoc := s.toSchemaDocument(doc)
 		if existingDoc != nil {
 			// 更新现有文档
+			updateStartTime := time.Now()
 			existingDoc.Metadata = schemaDoc.Metadata
 			existingDoc.Embedding = schemaDoc.Embedding
 			existingDoc.Content = schemaDoc.Content
@@ -490,19 +513,40 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 				tx.Rollback()
 				return utils.Errorf("更新文档失败: %v", err)
 			}
+			updateTime := time.Since(updateStartTime)
+			totalDocUpdateTime += updateTime
+			docUpdateCount++
+
+			docProcessTime := time.Since(docStartTime)
+			if docProcessTime > time.Second {
+				log.Warnf("doc[%d] %s update took too long: %v (query: %v, update: %v)",
+					i, doc.ID, docProcessTime, queryTime, updateTime)
+			}
 		} else if err == gorm.ErrRecordNotFound {
 			// 创建新文档
+			createStartTime := time.Now()
 			if err := tx.Create(schemaDoc).Error; err != nil {
 				tx.Rollback()
 				return utils.Errorf("创建文档失败: %v", err)
 			}
+			createTime := time.Since(createStartTime)
+			totalDocCreateTime += createTime
+			docCreateCount++
+
+			docProcessTime := time.Since(docStartTime)
+			if docProcessTime > time.Second {
+				log.Warnf("doc[%d] %s create took too long: %v (query: %v, create: %v)",
+					i, doc.ID, docProcessTime, queryTime, createTime)
+			}
 		} else {
 			// 其他错误
 			tx.Rollback()
-			return utils.Errorf("查询文档失败: %v", result.Error)
+			return utils.Errorf("查询文档失败: %v", err)
 		}
 	}
 
+	// 记录节点创建时间
+	nodeCreationStartTime := time.Now()
 	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
 		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(getLazyNodeUIDByMd5(s.collection.Name, doc.ID)), func(uid hnswspec.LazyNodeID) ([]float32, error) {
@@ -513,14 +557,88 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			return dbDoc.Embedding, nil
 		})
 	}
+	nodeCreationTime := time.Since(nodeCreationStartTime)
+
+	// 事务提交时间 - 提交可能成为瓶颈，特别是当事务很大时
+	commitStartTime := time.Now()
 	err := tx.Commit().Error
+	commitTime := time.Since(commitStartTime)
 	if err != nil {
+		log.Errorf("transaction commit failed: %v", err)
 		return err
 	}
 
+	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
+	hnswStartTime := time.Now()
 	s.hnsw.Add(nodes...)
+	hnswAddTime := time.Since(hnswStartTime)
 
-	// 提交事务
+	// 记录详细性能指标
+	totalTime := time.Since(totalStartTime)
+
+	// 计算平均指标
+	var avgQueryTime, avgUpdateTime, avgCreateTime time.Duration
+	if dbQueryCount > 0 {
+		avgQueryTime = totalDbQueryTime / time.Duration(dbQueryCount)
+	}
+	if docUpdateCount > 0 {
+		avgUpdateTime = totalDocUpdateTime / time.Duration(docUpdateCount)
+	}
+	if docCreateCount > 0 {
+		avgCreateTime = totalDocCreateTime / time.Duration(docCreateCount)
+	}
+
+	// 事务持续时间分析 - 关键指标：事务持续时间
+	transactionDuration := time.Since(txStartTime)
+
+	// 性能警告条件 - 包含事务持续时间检查
+	shouldWarn := totalTime > 5*time.Second ||
+		totalDbQueryTime > time.Second ||
+		hnswAddTime > time.Second ||
+		transactionDuration > 10*time.Second || // 新增：事务持续时间警告
+		(docCount > 10 && avgQueryTime > 500*time.Millisecond)
+
+	if shouldWarn {
+		log.Warnf("HNSW Add performance breakdown - Total: %v (%d docs), LockAcquire: %v, TxInit: %v, TransactionDuration: %v, NodeCreation: %v, TxCommit: %v, HNSW: %v",
+			totalTime, docCount, lockAcquireTime, txInitTime, transactionDuration, nodeCreationTime, commitTime, hnswAddTime)
+
+		log.Warnf("Database operations summary - TotalDocs: %d, Queries: %d (total: %v, avg: %v), Updates: %d (total: %v, avg: %v), Creates: %d (total: %v, avg: %v)",
+			docCount, dbQueryCount, totalDbQueryTime, avgQueryTime, docUpdateCount, totalDocUpdateTime, avgUpdateTime, docCreateCount, totalDocCreateTime, avgCreateTime)
+
+		// 记录性能诊断信息
+		s.LogPerformanceDiagnostics()
+
+		// 分析可能的性能瓶颈
+		if transactionDuration > 30*time.Second {
+			log.Warnf("CRITICAL: TRANSACTION DURATION TOO LONG: %v for %d documents - THIS MAY CAUSE SYSTEM-WIDE PERFORMANCE ISSUES", transactionDuration, docCount)
+			log.Warnf("RECOMMENDATION: Consider breaking large document batches into smaller chunks or using separate transactions per document")
+		}
+		if transactionDuration > 60*time.Second {
+			log.Errorf("SEVERE: Transaction lasted over 1 minute (%v) - likely blocking other database operations", transactionDuration)
+		}
+		if avgQueryTime > time.Second {
+			log.Warnf("DATABASE QUERY SLOW: average query time %v - possible index or database performance issue", avgQueryTime)
+		}
+		if hnswAddTime > 5*time.Second {
+			log.Warnf("HNSW INDEXING SLOW: %v for %d nodes - possible HNSW algorithm bottleneck", hnswAddTime, docCount)
+			log.Warnf("HNSW BOTTLENECK ANALYSIS: Check if collection has too many documents for current M/EfSearch parameters")
+		}
+		if lockAcquireTime > time.Second {
+			log.Warnf("LOCK CONTENTION: lock acquire took %v - possible concurrent access bottleneck", lockAcquireTime)
+		}
+
+		// 新增：事务效率分析
+		transactionEfficiency := float64(totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime) / float64(transactionDuration)
+		if transactionDuration > 5*time.Second && transactionEfficiency < 0.5 {
+			log.Warnf("TRANSACTION INEFFICIENCY: Only %.1f%% of transaction time was spent on actual database operations", transactionEfficiency*100)
+			log.Warnf("ROOT CAUSE ANALYSIS: The bottleneck is likely in HNSW indexing, not database operations")
+		}
+	} else {
+		// 即使不警告，也记录基本统计信息用于监控
+		log.Debugf("HNSW Add completed - Total: %v (%d docs), TxDuration: %v, DB: %v, HNSW: %v",
+			totalTime, docCount, transactionDuration, totalDbQueryTime+totalDocUpdateTime+totalDocCreateTime, hnswAddTime)
+	}
+
 	return nil
 }
 
@@ -737,6 +855,87 @@ func (s *SQLiteVectorStoreHNSW) Count() (int, error) {
 	}
 
 	return count, nil
+}
+
+// PerformanceDiagnostics 返回性能诊断信息
+func (s *SQLiteVectorStoreHNSW) PerformanceDiagnostics() map[string]interface{} {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	diagnostics := make(map[string]interface{})
+
+	// 基本集合信息
+	diagnostics["collection_name"] = s.collection.Name
+	diagnostics["collection_id"] = s.collection.ID
+	diagnostics["model_name"] = s.collection.ModelName
+	diagnostics["dimension"] = s.collection.Dimension
+
+	// HNSW配置
+	diagnostics["hnsw_m"] = s.collection.M
+	diagnostics["hnsw_ml"] = s.collection.Ml
+	diagnostics["hnsw_ef_search"] = s.collection.EfSearch
+	diagnostics["hnsw_ef_construct"] = s.collection.EfConstruct
+	diagnostics["hnsw_distance_func"] = s.collection.DistanceFuncType
+	diagnostics["hnsw_enable_pq"] = s.collection.EnablePQMode
+
+	// 文档统计
+	docCount, err := s.Count()
+	if err != nil {
+		diagnostics["document_count_error"] = err.Error()
+	} else {
+		diagnostics["document_count"] = docCount
+	}
+
+	// HNSW图状态
+	if s.hnsw != nil {
+		diagnostics["hnsw_layers_count"] = len(s.hnsw.Layers)
+		totalNodes := 0
+		for i, layer := range s.hnsw.Layers {
+			nodesInLayer := len(layer.Nodes)
+			diagnostics[fmt.Sprintf("layer_%d_nodes", i)] = nodesInLayer
+			totalNodes += nodesInLayer
+		}
+		diagnostics["hnsw_total_nodes"] = totalNodes
+
+		// 计算理论复杂度
+		if docCount > 0 {
+			diagnostics["estimated_search_complexity"] = fmt.Sprintf("O(%d * %d)", s.collection.EfSearch, docCount)
+			diagnostics["estimated_construction_complexity"] = fmt.Sprintf("O(%d * %d * %d)", s.collection.M, s.collection.EfConstruct, docCount)
+		}
+	} else {
+		diagnostics["hnsw_status"] = "not_initialized"
+	}
+
+	return diagnostics
+}
+
+// LogPerformanceDiagnostics 记录性能诊断信息
+func (s *SQLiteVectorStoreHNSW) LogPerformanceDiagnostics() {
+	diagnostics := s.PerformanceDiagnostics()
+
+	log.Infof("=== HNSW Performance Diagnostics for Collection: %s ===", diagnostics["collection_name"])
+	log.Infof("Documents: %v", diagnostics["document_count"])
+	log.Infof("HNSW Config - M:%v, ML:%v, EfSearch:%v, EfConstruct:%v, Distance:%v, PQ:%v",
+		diagnostics["hnsw_m"], diagnostics["hnsw_ml"], diagnostics["hnsw_ef_search"],
+		diagnostics["hnsw_ef_construct"], diagnostics["hnsw_distance_func"], diagnostics["hnsw_enable_pq"])
+	log.Infof("HNSW Status - Layers:%v, TotalNodes:%v", diagnostics["hnsw_layers_count"], diagnostics["hnsw_total_nodes"])
+
+	if complexity, ok := diagnostics["estimated_search_complexity"]; ok {
+		log.Infof("Estimated Complexity - Search:%v, Construction:%v", complexity, diagnostics["estimated_construction_complexity"])
+	}
+
+	// 性能建议
+	docCount := 0
+	if count, ok := diagnostics["document_count"]; ok {
+		docCount = count.(int)
+	}
+
+	if docCount > 10000 {
+		log.Warnf("PERFORMANCE WARNING: Collection has %d documents - consider increasing M and EfSearch parameters", docCount)
+	}
+	if docCount > 50000 {
+		log.Errorf("CRITICAL PERFORMANCE: Collection has %d documents - HNSW performance will degrade significantly", docCount)
+	}
 }
 
 // 确保 SQLiteVectorStoreHNSW 实现了 VectorStore 接口
