@@ -323,12 +323,9 @@ LOOP:
 				continue
 			} else if satisfied {
 				r.EmitResult("** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **")
+				r.EmitResultAfterStream(enhanceResult)
+				currentTask.SetResult(strings.TrimSpace(enhanceResult))
 				endIterationCall()
-				result, err := r.requireDirectlyAnswer(userQuery, nil)
-				if result != "" {
-					r.EmitResult(result)
-					currentTask.SetResult(strings.TrimSpace(result))
-				}
 				if err != nil {
 					r.EmitError("Failed to require directly answer after knowledge enhance: %v", err)
 					r.addToTimeline("error", fmt.Sprintf("Failed to require directly answer after knowledge enhance: %v", err))
@@ -579,7 +576,7 @@ func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (st
 						"answer_payload",
 						func(key string, reader io.Reader, parents []string) {
 							var output bytes.Buffer
-							reader = utils.UTF8Reader(reader)
+							reader = utils.JSONStringReader(utils.UTF8Reader(reader))
 							reader = io.TeeReader(reader, &output)
 							r.config.Emitter.EmitStreamEventEx(
 								"re-act-loop-answer-payload",
@@ -587,6 +584,9 @@ func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (st
 								reader,
 								rsp.GetTaskIndex(),
 								false,
+								func() {
+									r.EmitResultAfterStream(output.String())
+								},
 							)
 						},
 					),
