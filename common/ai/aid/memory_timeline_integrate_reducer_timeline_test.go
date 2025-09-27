@@ -3,31 +3,28 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_Timeline_ToolUse_TooMany_TimelineReducer(t *testing.T) {
+func TestCoordinator_Timeline_ToolUse_BatchCompression_Reducer(t *testing.T) {
 	inputChan := make(chan *InputEvent)
 	outputChan := make(chan *schema.AiOutputEvent)
 
 	requireMoreToolCount := 0
 
-	timelineShrinkTrigger := false
-	timelineShrinkApplyCount := 0
+	timelineBatchCompressTrigger := false
+	timelineBatchCompressApplyCount := 0
 
-	timelineReducerTrigger := false
-	timelineReducerApplyCount := 0
-
-	tokenPersistent := utils.RandStringBytes(100)
-	tokenReducer := utils.RandStringBytes(100)
+	tokenBatchCompressed := utils.RandStringBytes(100)
 
 	coordinator, err := NewCoordinator(
 		"test",
@@ -43,24 +40,15 @@ func TestCoordinator_Timeline_ToolUse_TooMany_TimelineReducer(t *testing.T) {
 				rsp.Close()
 			}()
 
-			if utils.MatchAllOfRegexp(request.GetPrompt(), tokenReducer) {
-				timelineReducerApplyCount++
+			if utils.MatchAllOfRegexp(request.GetPrompt(), tokenBatchCompressed) {
+				timelineBatchCompressApplyCount++
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), tokenPersistent) {
-				timelineShrinkApplyCount++
-			}
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-reducer`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-reducer", "reducer_memory": "` + tokenReducer + `"}`))
-				timelineReducerTrigger = true
-				return rsp, nil
-			}
-
-			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-shrink"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-shrink", "persistent": "` + tokenPersistent + `"}`))
-				log.Info("timeline shrink triggered")
-				timelineShrinkTrigger = true
+			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-reducer"`) ||
+				strings.Contains(request.GetPrompt(), "批量精炼与浓缩") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-reducer", "reducer_memory": "` + tokenBatchCompressed + `"}`))
+				log.Info("timeline batch compress triggered")
+				timelineBatchCompressTrigger = true
 				return rsp, nil
 			}
 
@@ -125,7 +113,7 @@ LOOP:
 				break LOOP
 			}
 
-			if timelineReducerTrigger && timelineReducerApplyCount >= 1 {
+			if timelineBatchCompressTrigger && timelineBatchCompressApplyCount >= 1 {
 				break LOOP
 			}
 
@@ -180,15 +168,11 @@ LOOP:
 		t.Fatal("require more tool count not proper")
 	}
 
-	if !timelineShrinkTrigger {
-		t.Fatal("timeline shrink not triggered")
+	if !timelineBatchCompressTrigger {
+		t.Fatal("timeline batch compress not triggered")
 	}
 
-	if timelineShrinkApplyCount <= 3 {
-		t.Fatal("timelien shrink count not proper")
-	}
-
-	if timelineReducerApplyCount < 1 {
-		t.Fatal("timeline reducer not proper")
+	if timelineBatchCompressApplyCount < 1 {
+		t.Fatal("timeline batch compress count not proper")
 	}
 }
