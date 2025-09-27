@@ -27,6 +27,46 @@ const (
 	InputNodeTypeNone     InputNodeType = "none"
 )
 
+// DistanceCache 距离缓存，用于避免重复的距离计算
+type DistanceCache[K cmp.Ordered] struct {
+	cache map[string]float64
+	size  int
+}
+
+func NewDistanceCache[K cmp.Ordered](size int) *DistanceCache[K] {
+	return &DistanceCache[K]{
+		cache: make(map[string]float64),
+		size:  size,
+	}
+}
+
+func (dc *DistanceCache[K]) makeKey(nodeID K, targetVec []float32) string {
+	// 简化的缓存键：节点ID + 目标向量的前几个元素哈希
+	// 在实际应用中可能需要更复杂的哈希函数
+	return fmt.Sprintf("%v_%x", nodeID, targetVec[:min(4, len(targetVec))])
+}
+
+func (dc *DistanceCache[K]) Get(nodeID K, targetVec []float32) (float64, bool) {
+	if dc == nil {
+		return 0, false
+	}
+	key := dc.makeKey(nodeID, targetVec)
+	dist, exists := dc.cache[key]
+	return dist, exists
+}
+
+func (dc *DistanceCache[K]) Put(nodeID K, targetVec []float32, distance float64) {
+	if dc == nil {
+		return
+	}
+	key := dc.makeKey(nodeID, targetVec)
+	// 简单的LRU：当缓存满时清空（实际应用中应实现真正的LRU）
+	if len(dc.cache) >= dc.size {
+		dc.cache = make(map[string]float64)
+	}
+	dc.cache[key] = distance
+}
+
 // InputNode 输入节点，用于接收外部输入数据
 type InputNode[K cmp.Ordered] struct {
 	Key       K
@@ -96,6 +136,8 @@ func search[K cmp.Ordered](
 	distance hnswspec.DistanceFunc[K],
 	filter FilterFunc[K],
 ) []searchCandidate[K] {
+	searchStartTime := time.Now()
+
 	// Check for nil entryNode to prevent panic
 	if entryNode == nil {
 		log.Errorf("search called with nil entryNode")
@@ -103,19 +145,34 @@ func search[K cmp.Ordered](
 	}
 
 	// Create a temporary standard node for distance calculation with target
+	targetNodeCreationStart := time.Now()
 	targetNode := hnswspec.NewStandardLayerNode[K](
 		entryNode.GetKey(), // dummy key, not used
 		target,
 	)
+	_ = time.Since(targetNodeCreationStart) // targetNode creation time
+
+	// Performance tracking
+	totalDistanceCalls := 0
+	totalDistanceTime := time.Duration(0)
+	visitedNodesCount := 0
 
 	// This is a basic greedy algorithm to find the entry point at the given level
 	// that is closest to the target node.
 	candidates := NewHeap[searchCandidate[K]]()
 	candidates.Init(make([]searchCandidate[K], 0, efSearch))
+
+	// First distance calculation
+	firstDistanceStart := time.Now()
+	firstDist := distance(entryNode, targetNode)
+	firstDistanceTime := time.Since(firstDistanceStart)
+	totalDistanceCalls++
+	totalDistanceTime += firstDistanceTime
+
 	candidates.Push(
 		searchCandidate[K]{
 			node: entryNode,
-			dist: distance(entryNode, targetNode),
+			dist: firstDist,
 		},
 	)
 	var (
@@ -155,7 +212,29 @@ func search[K cmp.Ordered](
 				continue
 			}
 
-			dist := distance(neighbor, targetNode)
+			// Distance calculation - this is the most expensive operation
+			// Try to get from cache first
+			var dist float64
+			var cacheHit bool
+
+			distanceStart := time.Now()
+
+			// Note: We can't easily cache here because we need access to the graph's cache
+			// This would require passing the cache to the search function or making it global
+			// For now, we'll just measure the performance without caching in search
+			dist = distance(neighbor, targetNode)
+
+			distanceTime := time.Since(distanceStart)
+			totalDistanceCalls++
+			totalDistanceTime += distanceTime
+
+			// Log slow distance calculations
+			if distanceTime > 10*time.Millisecond {
+				log.Debugf("slow distance calculation: %v for neighbor %v", distanceTime, neighbor.GetKey())
+			}
+
+			// Cache the result for future use (would need graph access)
+			_ = cacheHit // placeholder for future cache integration
 			if result.Len() > 0 {
 				improved = improved || dist < result.Min().dist
 			} else {
@@ -185,9 +264,32 @@ func search[K cmp.Ordered](
 		if result.Len() == 0 && candidates.Len() == 0 {
 			break
 		}
+
+		visitedNodesCount++
 	}
 
-	return result.Slice()
+	searchTotalTime := time.Since(searchStartTime)
+	finalResult := result.Slice()
+
+	// Performance analysis and logging
+	if searchTotalTime > time.Second {
+		log.Warnf("HNSW SEARCH PERFORMANCE: k=%d, efSearch=%d, duration=%v, distanceCalls=%d, totalDistanceTime=%v, visitedNodes=%d, results=%d",
+			k, efSearch, searchTotalTime, totalDistanceCalls, totalDistanceTime, visitedNodesCount, len(finalResult))
+
+		if totalDistanceCalls > 0 {
+			avgDistanceTime := totalDistanceTime / time.Duration(totalDistanceCalls)
+			log.Warnf("DISTANCE STATS: avg_distance_time=%v, total_distance_time=%v, calls=%d",
+				avgDistanceTime, totalDistanceTime, totalDistanceCalls)
+
+			// Analyze if distance calculation is the bottleneck
+			if totalDistanceTime > searchTotalTime/2 {
+				log.Warnf("DISTANCE BOTTLENECK: distance calculations took %v (%d%% of total search time)",
+					totalDistanceTime, int(100*float64(totalDistanceTime)/float64(searchTotalTime)))
+			}
+		}
+	}
+
+	return finalResult
 }
 
 // Old LayerNode methods removed - now implemented in hnswspec interface
@@ -271,6 +373,9 @@ type Graph[K cmp.Ordered] struct {
 
 	// convertToUIDFunc 转换为UID函数
 	convertToUIDFunc func(node hnswspec.LayerNode[K]) (hnswspec.LazyNodeID, error)
+
+	// distanceCache 距离缓存，用于优化重复的距离计算
+	distanceCache *DistanceCache[K]
 }
 
 func defaultRand() *rand.Rand {
@@ -316,6 +421,12 @@ type GraphConfig[K cmp.Ordered] struct {
 	NodeType InputNodeType
 
 	ConvertToUIDFunc func(node hnswspec.LayerNode[K]) (hnswspec.LazyNodeID, error)
+
+	// EnableDistanceCache 是否启用距离缓存来优化性能
+	EnableDistanceCache bool
+
+	// DistanceCacheSize 距离缓存的大小
+	DistanceCacheSize int
 }
 
 // GraphOption defines the configuration option function type
@@ -324,11 +435,13 @@ type GraphOption[K cmp.Ordered] func(*GraphConfig[K])
 // DefaultGraphConfig returns the default graph configuration
 func DefaultGraphConfig[K cmp.Ordered]() *GraphConfig[K] {
 	return &GraphConfig[K]{
-		M:        16,
-		Ml:       0.25,
-		Distance: CosineDistance,
-		EfSearch: 20,
-		Rng:      defaultRand(),
+		M:                   16,
+		Ml:                  0.25,
+		Distance:            CosineDistance,
+		EfSearch:            20,
+		Rng:                 defaultRand(),
+		EnableDistanceCache: true, // 默认启用距离缓存
+		DistanceCacheSize:   1000, // 默认缓存1000个距离计算结果
 	}
 }
 
@@ -343,6 +456,21 @@ func WithM[K cmp.Ordered](m int) GraphOption[K] {
 func WithConvertToUIDFunc[K cmp.Ordered](convertToUIDFunc func(node hnswspec.LayerNode[K]) (hnswspec.LazyNodeID, error)) GraphOption[K] {
 	return func(config *GraphConfig[K]) {
 		config.ConvertToUIDFunc = convertToUIDFunc
+	}
+}
+
+// WithDistanceCache enables distance caching with the specified cache size
+func WithDistanceCache[K cmp.Ordered](cacheSize int) GraphOption[K] {
+	return func(config *GraphConfig[K]) {
+		config.EnableDistanceCache = true
+		config.DistanceCacheSize = cacheSize
+	}
+}
+
+// WithDisableDistanceCache disables distance caching
+func WithDisableDistanceCache[K cmp.Ordered]() GraphOption[K] {
+	return func(config *GraphConfig[K]) {
+		config.EnableDistanceCache = false
 	}
 }
 
@@ -438,6 +566,11 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 		config.Rng = defaultRand()
 	}
 
+	var distanceCache *DistanceCache[K]
+	if config.EnableDistanceCache {
+		distanceCache = NewDistanceCache[K](config.DistanceCacheSize)
+	}
+
 	graph := &Graph[K]{
 		M:                config.M,
 		Ml:               config.Ml,
@@ -445,6 +578,7 @@ func NewGraph[K cmp.Ordered](options ...GraphOption[K]) *Graph[K] {
 		EfSearch:         config.EfSearch,
 		Rng:              config.Rng,
 		convertToUIDFunc: config.ConvertToUIDFunc,
+		distanceCache:    distanceCache,
 	}
 
 	// 设置节点距离函数为基于接口的版本
@@ -573,6 +707,7 @@ func (g *Graph[K]) getNodeType() InputNodeType {
 // Add inserts nodes into the graph.
 // If another node with the same ID exists, it is replaced.
 func (g *Graph[K]) Add(nodes ...InputNode[K]) {
+	addStartTime := time.Now()
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("recover from panic when adding nodes: %v", r)
@@ -582,8 +717,13 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			g.OnLayersChange(g.Layers)
 		}
 	}()
+
+	log.Debugf("HNSW Add starting: %d nodes, current graph size: %d", len(nodes), g.Len())
+
 	nodeType := g.getNodeType()
 	for _, node := range nodes {
+		nodeStartTime := time.Now()
+
 		if nodeType == InputNodeTypeNone {
 			nodeType = node.NodeType
 			g.nodeType = nodeType
@@ -591,14 +731,22 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		key := node.Key
 		vec := node.ToVector()
 
+		deleteStart := time.Now()
 		g.Delete(key)
+		deleteTime := time.Since(deleteStart)
+
 		g.assertDims(vec)
 
+		levelGenStart := time.Now()
 		insertLevel := g.randomLevel()
+		levelGenTime := time.Since(levelGenStart)
+
 		// Create layers that don't exist yet.
+		layersCreateStart := time.Now()
 		for insertLevel >= len(g.Layers) {
 			g.Layers = append(g.Layers, &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K])})
 		}
+		layersCreateTime := time.Since(layersCreateStart)
 
 		if insertLevel < 0 {
 			panic("invalid level")
@@ -606,6 +754,12 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 		var elevator *K
 		preLen := g.Len()
+
+		// Performance tracking variables
+		totalSearchTime := time.Duration(0)
+		totalNodeCreationTime := time.Duration(0)
+		totalNeighborUpdateTime := time.Duration(0)
+		searchCallCount := 0
 
 		// Phase 1: Search from highest layer down to insertLevel+1 (search only, no insertion)
 		// Phase 2: Search and insert from insertLevel down to layer 0
@@ -617,6 +771,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			var err error
 
 			if i <= insertLevel {
+				nodeCreationStart := time.Now()
 				if g.IsPQEnabled() {
 					// 创建PQ节点
 					newNode, err = hnswspec.NewPQLayerNode(key, vec, g.pqQuantizer)
@@ -653,6 +808,8 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 						}
 					}
 				}
+				nodeCreationTime := time.Since(nodeCreationStart)
+				totalNodeCreationTime += nodeCreationTime
 			}
 
 			// Handle empty layer case - only insert if i <= insertLevel
@@ -701,7 +858,18 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 				}
 			}
 
+			searchCallStart := time.Now()
 			neighborhood := search(searchPoint, searchK, searchEf, vec, g.nodeDistance, nil)
+			searchCallTime := time.Since(searchCallStart)
+			totalSearchTime += searchCallTime
+			searchCallCount++
+
+			// Log slow searches
+			if searchCallTime > time.Second {
+				log.Warnf("HNSW slow search: layer=%d, searchK=%d, efSearch=%d, duration=%v, candidates=%d",
+					i, searchK, searchEf, searchCallTime, len(neighborhood))
+			}
+
 			if len(neighborhood) == 0 {
 				// This should never happen because the searchPoint itself
 				// should be in the result set.
@@ -713,12 +881,15 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 			if i <= insertLevel {
 				// Insert the new node into the layer.
+				neighborUpdateStart := time.Now()
 				layer.Nodes[key] = newNode
 				for _, candidate := range neighborhood {
 					// Create connections between the new node and the best nodes
 					candidate.node.AddNeighbor(newNode, g.M, g.nodeDistance)
 					newNode.AddNeighbor(candidate.node, g.M, g.nodeDistance)
 				}
+				neighborUpdateTime := time.Since(neighborUpdateStart)
+				totalNeighborUpdateTime += neighborUpdateTime
 			}
 		}
 
@@ -728,7 +899,23 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 				g.Layers = g.Layers[:len(g.Layers)-1]
 			}
 		}
+
+		// Performance logging for this node
+		nodeTotalTime := time.Since(nodeStartTime)
+		if nodeTotalTime > 5*time.Second {
+			log.Warnf("HNSW slow node insertion [%v]: total=%v, delete=%v, levelGen=%v, layersCreate=%v, searchCalls=%d, totalSearch=%v, nodeCreate=%v, neighborUpdate=%v",
+				key, nodeTotalTime, deleteTime, levelGenTime, layersCreateTime, searchCallCount, totalSearchTime, totalNodeCreationTime, totalNeighborUpdateTime)
+		}
 	}
+
+	totalAddTime := time.Since(addStartTime)
+	if totalAddTime > 10*time.Second {
+		log.Errorf("HNSW CRITICAL ADD PERFORMANCE: %d nodes took %v (avg: %v per node)", len(nodes), totalAddTime, totalAddTime/time.Duration(len(nodes)))
+	} else if totalAddTime > 3*time.Second {
+		log.Warnf("HNSW SLOW ADD PERFORMANCE: %d nodes took %v (avg: %v per node)", len(nodes), totalAddTime, totalAddTime/time.Duration(len(nodes)))
+	}
+
+	log.Debugf("HNSW Add completed: %d nodes added, final graph size: %d, total time: %v", len(nodes), g.Len(), totalAddTime)
 }
 
 // Search finds the k nearest neighbors from the target node.
