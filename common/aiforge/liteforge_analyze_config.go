@@ -2,10 +2,12 @@ package aiforge
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type AnalysisConfig struct {
@@ -21,6 +23,7 @@ type AnalysisConfig struct {
 }
 
 func NewAnalysisConfig(opts ...any) *AnalysisConfig {
+	throttle := utils.NewThrottle(3)
 	cfg := &AnalysisConfig{
 		ExtraPrompt:        "",
 		AnalyzeConcurrency: 20,
@@ -28,7 +31,9 @@ func NewAnalysisConfig(opts ...any) *AnalysisConfig {
 			log.Infof(format, args...)
 		},
 		AnalyzeStatusCard: func(id string, data interface{}, tags ...string) {
-			log.Infof("Status card [%s]: %v tag: %v", id, data, tags)
+			throttle(func() {
+				log.Infof("Status card [%s]: %v tag: %v", id, data, tags)
+			})
 		},
 		fallbackOptions: []any{},
 		Ctx:             context.Background(),
@@ -102,7 +107,10 @@ func WithAnalyzeContext(ctx context.Context) AnalysisOption {
 func WithAnalyzeStatusCard(handler func(id string, data interface{}, tags ...string)) AnalysisOption {
 	return func(config *AnalysisConfig) {
 		config.AnalyzeStatusCard = func(id string, data interface{}, tags ...string) {
-			log.Infof("Status card [%s]: %v tag: %v", id, data, tags)
+			if handler == nil {
+				log.Infof("Status card [%s]: %v tag: %v", id, data, tags)
+				return
+			}
 			handler(id, data, tags...)
 		}
 	}

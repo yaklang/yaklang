@@ -3,8 +3,11 @@ package hnswspec
 import (
 	"cmp"
 	"math"
+	"slices"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // StandardLayerNode 标准HNSW层节点（无PQ优化）
@@ -43,6 +46,14 @@ func (n *StandardLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {
 }
 
 func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc DistanceFunc[K]) {
+	addNeighborStart := time.Now()
+	defer func() {
+		duration := time.Since(addNeighborStart)
+		if duration > 100*time.Millisecond {
+			log.Warnf("AddNeighbor slow: node=%v, neighbors=%d, duration=%v", n.key, len(n.neighbors), duration)
+		}
+	}()
+
 	if n.neighbors == nil {
 		n.neighbors = make(map[K]LayerNode[K], m)
 	}
@@ -53,22 +64,35 @@ func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFun
 	}
 
 	// 找到距离最远的邻居节点
+	findWorstStart := time.Now()
 	var (
-		worstDist = math.Inf(-1)
-		worst     LayerNode[K]
+		worstDist     = math.Inf(-1)
+		worst         LayerNode[K]
+		distanceCalls = 0
 	)
 	for _, neighborNode := range n.neighbors {
 		d := distFunc(neighborNode, n)
+		distanceCalls++
 		if d > worstDist || worst == nil {
 			worstDist = d
 			worst = neighborNode
 		}
 	}
+	findWorstDuration := time.Since(findWorstStart)
 
 	delete(n.neighbors, worst.GetKey())
-	// 删除反向链接
+
+	// 删除反向链接并补充
+	removeAndReplenishStart := time.Now()
 	worst.RemoveNeighbor(n.key)
 	worst.Replenish(m, distFunc)
+	removeAndReplenishDuration := time.Since(removeAndReplenishStart)
+
+	totalDuration := time.Since(addNeighborStart)
+	if totalDuration > 500*time.Millisecond {
+		log.Warnf("AddNeighbor PERFORMANCE: total=%v, findWorst=%v (%d calls), removeAndReplenish=%v",
+			totalDuration, findWorstDuration, distanceCalls, removeAndReplenishDuration)
+	}
 }
 
 func (n *StandardLayerNode[K]) AddSingleNeighbor(neighbor LayerNode[K]) {
@@ -94,11 +118,21 @@ func (n *StandardLayerNode[K]) Isolate(layerNodes map[K]LayerNode[K], m int, dis
 }
 
 func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
+	replenishStart := time.Now()
+	defer func() {
+		duration := time.Since(replenishStart)
+		if duration > 200*time.Millisecond {
+			log.Warnf("Replenish slow: node=%v, current_neighbors=%d, target_m=%d, duration=%v",
+				n.key, len(n.neighbors), m, duration)
+		}
+	}()
+
 	if len(n.neighbors) >= m {
 		return
 	}
 
 	// 收集候选节点（避免在迭代过程中修改map）
+	collectCandidatesStart := time.Now()
 	candidates := make([]LayerNode[K], 0)
 	visited := make(map[K]bool)
 	visited[n.key] = true
@@ -115,30 +149,60 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 			candidates = append(candidates, candidate)
 		}
 	}
+	collectCandidatesDuration := time.Since(collectCandidatesStart)
 
 	// 如果没有足够的候选者，直接返回
 	if len(candidates) == 0 {
 		return
 	}
 
-	// 按距离排序候选者
-	for i := 0; i < len(candidates)-1; i++ {
-		for j := i + 1; j < len(candidates); j++ {
-			distI := distFunc(candidates[i], n)
-			distJ := distFunc(candidates[j], n)
-			if distI > distJ {
-				candidates[i], candidates[j] = candidates[j], candidates[i]
-			}
+	// 按距离排序候选者 - 使用更高效的算法避免重复距离计算
+	sortCandidatesStart := time.Now()
+	distanceCalls := 0
+
+	// 创建候选者-距离对，避免重复计算距离
+	type candidateWithDist struct {
+		candidate LayerNode[K]
+		distance  float64
+	}
+
+	candidatesWithDist := make([]candidateWithDist, len(candidates))
+	for i, candidate := range candidates {
+		dist := distFunc(candidate, n)
+		distanceCalls++
+		candidatesWithDist[i] = candidateWithDist{
+			candidate: candidate,
+			distance:  dist,
 		}
 	}
 
+	// 使用标准库的排序（更高效）
+	slices.SortFunc(candidatesWithDist, func(a, b candidateWithDist) int {
+		if a.distance < b.distance {
+			return -1
+		} else if a.distance > b.distance {
+			return 1
+		}
+		return 0
+	})
+
+	// 重新组织candidates数组
+	for i, cwd := range candidatesWithDist {
+		candidates[i] = cwd.candidate
+	}
+
+	sortCandidatesDuration := time.Since(sortCandidatesStart)
+
 	// 添加最近的候选者直到达到m个邻居（但避免递归调用AddNeighbor）
+	addCandidatesStart := time.Now()
+	addedCount := 0
 	for _, candidate := range candidates {
 		if len(n.neighbors) >= m {
 			break
 		}
 		// 直接添加到neighbors map，避免递归调用AddNeighbor
 		n.neighbors[candidate.GetKey()] = candidate
+		addedCount++
 
 		// 确保双向连接：让候选者也添加我们作为邻居
 		// 但要小心避免无限递归
@@ -150,6 +214,13 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 				candidateNeighbors[n.key] = n
 			}
 		}
+	}
+	addCandidatesDuration := time.Since(addCandidatesStart)
+
+	totalDuration := time.Since(replenishStart)
+	if totalDuration > 1*time.Second {
+		log.Warnf("Replenish PERFORMANCE: total=%v, collectCandidates=%v (candidates=%d), sortCandidates=%v (%d distance calls), addCandidates=%v (added=%d)",
+			totalDuration, collectCandidatesDuration, len(candidates), sortCandidatesDuration, distanceCalls, addCandidatesDuration, addedCount)
 	}
 }
 
