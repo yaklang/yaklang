@@ -484,10 +484,22 @@ func (e *Emitter) EmitIteration(nodeId string, current int, max int, description
 // EmitResult emits a result event for AI final output
 func (e *Emitter) EmitResult(nodeId string, result interface{}, success bool) {
 	e.EmitJSON(schema.EVENT_TYPE_RESULT, nodeId, map[string]any{
-		"result":    result,
-		"success":   success,
-		"finished":  true,
-		"timestamp": time.Now().Unix(),
+		"result":       result,
+		"success":      success,
+		"finished":     true,
+		"after_stream": false,
+		"timestamp":    time.Now().Unix(),
+	})
+}
+
+// EmitResult emits a result event for AI final output
+func (e *Emitter) EmitResultAfterStream(nodeId string, result interface{}, success bool) {
+	e.EmitJSON(schema.EVENT_TYPE_RESULT, nodeId, map[string]any{
+		"result":       result,
+		"success":      success,
+		"finished":     true,
+		"after_stream": true,
+		"timestamp":    time.Now().Unix(),
 	})
 }
 

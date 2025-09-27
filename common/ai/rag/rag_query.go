@@ -875,7 +875,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				}()
 			}
 
-			logWriter.WriteString(fmt.Sprintf("[增强方案:%v]：", subquery.Method))
+			logWriter.WriteString(fmt.Sprintf("[增强方案:%v]：", MethodVerboseName(subquery.Method)))
 			logWriter.WriteString(fmt.Sprintf("%v", subquery.Query))
 
 			currentSearchCount := int64(0)
