@@ -1,8 +1,9 @@
 package utils
 
 import (
-	"github.com/samber/lo"
 	"sort"
+
+	"github.com/samber/lo"
 )
 
 type RRFScoredData interface {
@@ -59,7 +60,11 @@ func RRFRank[T RRFScoredData](scoredDataList []T, k int) []T {
 		rrfData = append(rrfData, RankScoredData{ID: dataID, RRFRankScore: score})
 	}
 	sort.Slice(rrfData, func(i, j int) bool {
-		return rrfData[i].RRFRankScore > rrfData[j].RRFRankScore
+		if rrfData[i].RRFRankScore != rrfData[j].RRFRankScore {
+			return rrfData[i].RRFRankScore > rrfData[j].RRFRankScore
+		}
+		// 当RRF分数相等时，按ID（UUID）进行稳定排序
+		return rrfData[i].ID < rrfData[j].ID
 	})
 
 	return lo.Map(rrfData, func(item RankScoredData, _ int) T {
