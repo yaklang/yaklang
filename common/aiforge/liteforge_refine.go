@@ -5,8 +5,10 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/ai/rag/entityrepos"
@@ -117,19 +119,76 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 
 		var total int64 = 0
 		var done int64 = 0
+		var processingStartTime = time.Now()
+		var lastLogTime = time.Now()
+		var vectorIndexDuration int64 = 0
+		var knowledgeEntryDuration int64 = 0
+		var saveDuration int64 = 0
+
 		for hop := range er.YieldKHop(refineConfig.Ctx, append(refineConfig.KHopOption(), entityrepos.WithRuntimeBuildOnly(true))...) {
-			atomic.AddInt64(&total, 1)
-			refineConfig.AnalyzeStatusCard("多跳知识构建(Multi-Hops Knowledge)", total)
+			currentTotal := atomic.AddInt64(&total, 1)
+
+			// 性能监控：只在性能表现差时才打印详细日志
+			shouldLogPerformance := false
+			var logReason string
+
+			// 检查是否需要记录性能日志的条件
+			if currentTotal%1000 == 0 || time.Since(lastLogTime) > 60*time.Second {
+				elapsed := time.Since(processingStartTime)
+				rate := float64(currentTotal) / elapsed.Seconds()
+				avgVectorTime := time.Duration(atomic.LoadInt64(&vectorIndexDuration)) / time.Duration(currentTotal)
+				avgKnowledgeTime := time.Duration(atomic.LoadInt64(&knowledgeEntryDuration)) / time.Duration(int(math.Max(1, float64(done))))
+				avgSaveTime := time.Duration(atomic.LoadInt64(&saveDuration)) / time.Duration(int(math.Max(1, float64(done))))
+
+				// 性能阈值判断：只在性能差时才打印
+				if rate < 10.0 { // 处理速度低于10 hops/s
+					shouldLogPerformance = true
+					logReason = "slow_rate"
+				} else if avgVectorTime > 200*time.Millisecond { // 平均向量索引时间超过200ms
+					shouldLogPerformance = true
+					logReason = "slow_vector"
+				} else if avgKnowledgeTime > 1*time.Second { // 平均知识构建时间超过1s
+					shouldLogPerformance = true
+					logReason = "slow_knowledge"
+				} else if avgSaveTime > 500*time.Millisecond { // 平均保存时间超过500ms
+					shouldLogPerformance = true
+					logReason = "slow_save"
+				} else if elapsed > 5*time.Minute && currentTotal < 100 { // 运行超过5分钟但处理数量少
+					shouldLogPerformance = true
+					logReason = "inefficient"
+				}
+
+				if shouldLogPerformance {
+					refineConfig.AnalyzeLog("MULTI-HOP PERFORMANCE [%s]: total=%d, elapsed=%v, rate=%.1f hops/s, avg_vector=%v, avg_knowledge=%v, avg_save=%v",
+						logReason, currentTotal, elapsed, rate, avgVectorTime, avgKnowledgeTime, avgSaveTime)
+				} else {
+					// 性能良好时，只记录简单的进度信息
+					refineConfig.AnalyzeLog("Multi-hop processing: %d hops completed, rate=%.1f hops/s", currentTotal, rate)
+				}
+				lastLogTime = time.Now()
+			}
+
+			refineConfig.AnalyzeStatusCard("多跳知识构建(Multi-Hops Knowledge)", currentTotal)
 			hopAnalyzeWg.Add(1)
 			if refineConfig.Ctx != nil && refineConfig.Ctx.Err() != nil {
 				break
 			}
-			go func() {
+			go func(currentHop *entityrepos.KHopPath) {
 				defer hopAnalyzeWg.Done()
+
+				// 向量索引处理（异步）
 				go func() {
-					err := er.AddKHopToVectorIndex(hop)
+					vectorStart := time.Now()
+					err := er.AddKHopToVectorIndex(currentHop)
+					vectorTime := time.Since(vectorStart)
+					atomic.AddInt64(&vectorIndexDuration, int64(vectorTime))
+
 					if err != nil {
 						refineConfig.AnalyzeLog("failed to add khop to vector index: %v", err)
+					}
+					// 只在向量索引明显慢时才警告
+					if vectorTime > 2*time.Second {
+						refineConfig.AnalyzeLog("SLOW VECTOR INDEX: hop=%s took %v", currentHop.String()[:min(50, len(currentHop.String()))], vectorTime)
 					}
 				}()
 
@@ -145,10 +204,21 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 					return
 				}
 
-				entries, err := BuildKnowledgeEntryFromKHop(hop, kb, option...)
+				// 知识条目构建
+				knowledgeStart := time.Now()
+				entries, err := BuildKnowledgeEntryFromKHop(currentHop, kb, option...)
+				knowledgeTime := time.Since(knowledgeStart)
+				atomic.AddInt64(&knowledgeEntryDuration, int64(knowledgeTime))
+
 				if err != nil {
 					refineConfig.AnalyzeLog("failed to build knowledge entry: %v", err)
 					return
+				}
+
+				// 只在知识构建明显慢时才警告
+				if knowledgeTime > 10*time.Second {
+					refineConfig.AnalyzeLog("SLOW KNOWLEDGE BUILD: hop=%s took %v, entries=%d",
+						currentHop.String()[:min(50, len(currentHop.String()))], knowledgeTime, len(entries))
 				}
 
 				for _, entry := range entries {
@@ -156,14 +226,46 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 				}
 
 				count := atomic.AddInt64(&done, 1)
-				refineConfig.AnalyzeStatusCard("[multi-hops]: knowledge", fmt.Sprintf("%v/%v", count, total))
+				refineConfig.AnalyzeStatusCard("[multi-hops]: knowledge", fmt.Sprintf("%v/%v", count, currentTotal))
 
-				err = SaveKnowledgeEntries(kb, entries, hop.GetRelatedEntityUUIDs(), option...)
+				// 保存知识条目
+				saveStart := time.Now()
+				err = SaveKnowledgeEntries(kb, entries, currentHop.GetRelatedEntityUUIDs(), option...)
+				saveTime := time.Since(saveStart)
+				atomic.AddInt64(&saveDuration, int64(saveTime))
+
 				if err != nil {
 					refineConfig.AnalyzeLog("failed to save knowledge entries: %v", err)
 					return
 				}
-			}()
+
+				// 只在保存明显慢时才警告
+				if saveTime > 3*time.Second {
+					refineConfig.AnalyzeLog("SLOW KNOWLEDGE SAVE: hop=%s took %v, entries=%d",
+						currentHop.String()[:min(50, len(currentHop.String()))], saveTime, len(entries))
+				}
+			}(hop)
+		}
+
+		// 最终统计：只在性能异常时详细输出
+		finalElapsed := time.Since(processingStartTime)
+		finalTotal := atomic.LoadInt64(&total)
+		finalDone := atomic.LoadInt64(&done)
+		finalRate := float64(finalTotal) / finalElapsed.Seconds()
+
+		// 判断是否需要详细的最终统计
+		if finalRate < 5.0 || finalElapsed > 10*time.Minute || finalTotal > 1000 {
+			// 性能差或处理数量大时输出详细统计
+			avgVectorTime := time.Duration(atomic.LoadInt64(&vectorIndexDuration)) / time.Duration(finalTotal)
+			avgKnowledgeTime := time.Duration(atomic.LoadInt64(&knowledgeEntryDuration)) / time.Duration(int(math.Max(1, float64(finalDone))))
+			avgSaveTime := time.Duration(atomic.LoadInt64(&saveDuration)) / time.Duration(int(math.Max(1, float64(finalDone))))
+
+			refineConfig.AnalyzeLog("MULTI-HOP COMPLETED [detailed]: total=%d, completed=%d, elapsed=%v, rate=%.1f hops/s, avg_vector=%v, avg_knowledge=%v, avg_save=%v",
+				finalTotal, finalDone, finalElapsed, finalRate, avgVectorTime, avgKnowledgeTime, avgSaveTime)
+		} else {
+			// 性能良好时简单输出
+			refineConfig.AnalyzeLog("Multi-hop completed: %d hops processed in %v (%.1f hops/s)",
+				finalTotal, finalElapsed, finalRate)
 		}
 	}()
 
