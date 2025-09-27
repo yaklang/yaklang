@@ -2,10 +2,11 @@ package aicommon
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils"
-	"testing"
 )
 
 type testKnowledge struct {
@@ -29,7 +30,7 @@ func newTestKnowledge(method, uuid, title, content, source string, score float64
 }
 
 func TestEnhanceKnowledgeManager_AppendAndGet(t *testing.T) {
-	manager := NewEnhanceKnowledgeManager(func(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
+	manager := NewEnhanceKnowledgeManager(func(ctx context.Context, e *Emitter, query string) (<-chan EnhanceKnowledge, error) {
 		ch := make(chan EnhanceKnowledge, 1)
 		close(ch)
 		return ch, nil
@@ -58,7 +59,7 @@ func TestEnhanceKnowledgeManager_AppendAndGet(t *testing.T) {
 }
 
 func TestEnhanceKnowledgeManager_DumpKnowledgeByTaskID(t *testing.T) {
-	manager := NewEnhanceKnowledgeManager(func(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
+	manager := NewEnhanceKnowledgeManager(func(ctx context.Context, e *Emitter, query string) (<-chan EnhanceKnowledge, error) {
 		ch := make(chan EnhanceKnowledge, 1)
 		close(ch)
 		return ch, nil
@@ -167,7 +168,7 @@ func TestKnowledgeCollection_UselessFilter(t *testing.T) {
 }
 
 func TestEnhanceKnowledgeManager_UselessFilter(t *testing.T) {
-	manager := NewEnhanceKnowledgeManager(func(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
+	manager := NewEnhanceKnowledgeManager(func(ctx context.Context, e *Emitter, query string) (<-chan EnhanceKnowledge, error) {
 		ch := make(chan EnhanceKnowledge, 1)
 		close(ch)
 		return ch, nil

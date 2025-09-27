@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
@@ -52,7 +53,7 @@ func NewMockEKManagerAndToken() (*EnhanceKnowledgeManager, string) {
 		0.82,
 	)
 
-	return NewEnhanceKnowledgeManager(func(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
+	return NewEnhanceKnowledgeManager(func(ctx context.Context, e *Emitter, query string) (<-chan EnhanceKnowledge, error) {
 		result := chanx.NewUnlimitedChan[EnhanceKnowledge](ctx, 10)
 		go func() {
 			defer result.Close()
@@ -79,7 +80,7 @@ func NewDifferentResultEKManager(token, okToken string) *EnhanceKnowledgeManager
 
 	first := true
 
-	return NewEnhanceKnowledgeManager(func(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
+	return NewEnhanceKnowledgeManager(func(ctx context.Context, e *Emitter, query string) (<-chan EnhanceKnowledge, error) {
 		if first {
 			first = false
 			result := chanx.NewUnlimitedChan[EnhanceKnowledge](ctx, 10)

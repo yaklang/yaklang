@@ -582,7 +582,7 @@ func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (st
 							reader = utils.UTF8Reader(reader)
 							reader = io.TeeReader(reader, &output)
 							r.config.Emitter.EmitStreamEventEx(
-								"re-act-loop",
+								"re-act-loop-answer-payload",
 								time.Now(),
 								reader,
 								rsp.GetTaskIndex(),
