@@ -238,17 +238,18 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 
 func (m *Timeline) timelineLengthCheck() {
 	total := int64(m.idToTimelineItem.Len())
-	summaryCount := int64(m.summary.Len())
-	if total-summaryCount > m.fullMemoryCount {
-		shrinkTargetIndex := total - m.fullMemoryCount - 1
-		id := m.idToTimelineItem.Index(int(shrinkTargetIndex))
-		for _, v := range id.Values() {
-			log.Infof("start to shrink memory timeline id: %v, total: %v, summary: %v, size: %v", v.value.GetID(), total, summaryCount, m.fullMemoryCount)
-			m.shrink(v)
-		}
+
+	// 当 timeline 达到 100 个 items 时，触发批量压缩
+	const batchCompressThreshold = 100
+	if total >= batchCompressThreshold {
+		halfCount := total / 2
+		log.Infof("start to batch compress memory timeline, total: %v, compress first half: %v items", total, halfCount)
+		m.batchCompress(int(halfCount))
+		return
 	}
 
-	if m.maxTimelineLimit > 0 && total-m.maxTimelineLimit > 0 {
+	// 保留原有的 reducer 逻辑，用于处理超过 maxTimelineLimit 的情况
+	if m.maxTimelineLimit > 0 && total > m.maxTimelineLimit {
 		endIdx := total - m.maxTimelineLimit - 1
 		rawValue, ok := m.idToTimelineItem.GetByIndex(int(endIdx))
 		if ok {
@@ -259,48 +260,91 @@ func (m *Timeline) timelineLengthCheck() {
 	}
 }
 
-func (m *Timeline) dumpSizeCheck() {
-	if m.ai == nil {
-		log.Error("ai is nil, memory cannot emit memory shrink")
+func (m *Timeline) batchCompress(compressCount int) {
+	if compressCount <= 0 || m.ai == nil {
 		return
 	}
 
-	if m.totalDumpContentLimit <= 0 || int64(len(m.Dump())) <= m.totalDumpContentLimit {
-		return
-	}
-	totalLastID, _, _ := m.idToTimelineItem.Last()
-	summaryLastID, _, _ := m.summary.Last()
+	// 获取前 compressCount 个 items 进行压缩
+	var itemsToCompress []*TimelineItem
+	var idsToRemove []int64
 
-	var updated = false
-
-	// check everyone timeline item was shrunk
-	if totalLastID > summaryLastID {
-		m.idToTimelineItem.ForEach(func(k int64, v *TimelineItem) bool {
-			if k > summaryLastID {
-				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
-				m.shrink(v)
-				updated = true
-				return false
-			}
-			return true
-		})
-	} else {
-		reducerID := int64(0)
-		if m.reducers.Len() > 0 { // has reducer, reducer index should be current reducer next
-			reducerID, _, _ = m.reducers.Last()
+	count := 0
+	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		if count >= compressCount {
+			return false
 		}
-		m.idToTimelineItem.ForEach(func(k int64, v *TimelineItem) bool {
-			if k > reducerID {
-				log.Infof("start to shrink memory timeline id: %v", v.value.GetID())
-				m.reducer(k)
-				updated = true
-				return false
-			}
-			return true
-		})
+		itemsToCompress = append(itemsToCompress, item)
+		idsToRemove = append(idsToRemove, id)
+		count++
+		return true
+	})
+
+	if len(itemsToCompress) == 0 {
+		return
 	}
-	if updated {
-		m.dumpSizeCheck() // recursion check
+
+	// 生成压缩提示
+	prompt := m.renderBatchCompressPrompt(itemsToCompress)
+	if prompt == "" {
+		return
+	}
+
+	// 调用 AI 进行批量压缩
+	response, err := m.ai.CallAI(NewAIRequest(prompt))
+	if err != nil {
+		log.Errorf("batch compress call ai failed: %v", err)
+		return
+	}
+
+	var r io.Reader
+	if m.config == nil {
+		r = response.GetUnboundStreamReader(false)
+	} else {
+		r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
+	}
+
+	action, err := ExtractActionFromStream(r, "timeline-reducer")
+	if err != nil {
+		log.Errorf("extract timeline batch compress action failed: %v", err)
+		return
+	}
+
+	compressedMemory := action.GetString("reducer_memory")
+	if compressedMemory == "" {
+		log.Warnf("batch compress got empty compressed memory")
+		return
+	}
+
+	// 存储压缩结果
+	lastCompressedId := idsToRemove[len(idsToRemove)-1]
+	if lt, ok := m.reducers.Get(lastCompressedId); ok {
+		lt.Push(compressedMemory)
+	} else {
+		m.reducers.Set(lastCompressedId, linktable.NewUnlimitedStringLinkTable(compressedMemory))
+	}
+	log.Infof("batch compressed %d items into reducer at id: %v", len(itemsToCompress), lastCompressedId)
+
+	// 删除被压缩的 items
+	for _, id := range idsToRemove {
+		m.idToTimelineItem.Delete(id)
+		if ts, ok := m.idToTs.Get(id); ok {
+			m.tsToTimelineItem.Delete(ts)
+			m.idToTs.Delete(id)
+		}
+	}
+}
+
+func (m *Timeline) dumpSizeCheck() {
+	// Since we removed shrink mechanism and use batch compression instead,
+	// this function now only handles content size by triggering batch compression if needed
+	total := int64(m.idToTimelineItem.Len())
+
+	// If content is too large and we have many items, trigger batch compression
+	if m.totalDumpContentLimit > 0 && int64(len(m.Dump())) > m.totalDumpContentLimit && total >= 50 {
+		log.Infof("dump size check: content too large, triggering batch compression")
+		halfCount := total / 2
+		m.batchCompress(int(halfCount))
 	}
 }
 
@@ -428,6 +472,45 @@ func (m *Timeline) renderReducerPrompt(beforeId int64) string {
 	return buf.String()
 }
 
+//go:embed prompts/timeline/batch_compress.txt
+var timelineBatchCompress string
+
+func (m *Timeline) renderBatchCompressPrompt(items []*TimelineItem) string {
+	if len(items) == 0 {
+		return ""
+	}
+
+	ins, err := template.New("timeline-batch-compress").Parse(timelineBatchCompress)
+	if err != nil {
+		log.Errorf("BUG: batch compress prompt template failed: %v", err)
+		return ""
+	}
+
+	var buf bytes.Buffer
+	var nonce = utils.RandStringBytes(6)
+
+	// 构建要压缩的 items 字符串
+	var itemsStr strings.Builder
+	for i, item := range items {
+		if i > 0 {
+			itemsStr.WriteString("\n")
+		}
+		itemsStr.WriteString(fmt.Sprintf("[%d] %s", i+1, item.String()))
+	}
+
+	err = ins.Execute(&buf, map[string]any{
+		"ExtraMetaInfo":   m.ExtraMetaInfo(),
+		"ItemsToCompress": itemsStr.String(),
+		"ItemCount":       len(items),
+		"NONCE":           nonce,
+	})
+	if err != nil {
+		log.Errorf("BUG: batch compress prompt execution failed: %v", err)
+		return ""
+	}
+	return buf.String()
+}
+
 //go:embed prompts/timeline/shrink_tool_result.txt
 var timelineSummary string
 
@@ -463,11 +546,25 @@ func (m *Timeline) Dump() string {
 func (m *Timeline) DumpBefore(beforeId int64) string {
 	buf := bytes.NewBuffer(nil)
 	initOnce := sync.Once{}
-	reducerOnce := sync.Once{}
 	count := 0
 
 	shrinkStartId, _, _ := m.summary.Last()
 	reduceredStartId, _, _ := m.reducers.Last()
+
+	// If we have reducers, show them first
+	if reduceredStartId > 0 {
+		val, ok := m.reducers.Get(reduceredStartId)
+		if ok {
+			initOnce.Do(func() {
+				buf.WriteString("timeline:\n")
+			})
+			buf.WriteString(fmt.Sprint("  ...\n"))
+			// Use a fixed timestamp for reducer display
+			reducerTimeStr := time.Now().Format(utils.DefaultTimeFormat3)
+			buf.WriteString(fmt.Sprintf("--[%s] id: %v reducer-memory: %v\n", reducerTimeStr, reduceredStartId, val.Value()))
+		}
+	}
+
 	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
 		initOnce.Do(func() {
 			buf.WriteString("timeline:\n")
@@ -483,23 +580,6 @@ func (m *Timeline) DumpBefore(beforeId int64) string {
 		}
 		t := time.Unix(0, ts*int64(time.Millisecond))
 		timeStr := t.Format(utils.DefaultTimeFormat3)
-
-		if reduceredStartId > 0 {
-			if item.GetID() == reduceredStartId {
-				val, ok := m.reducers.Get(reduceredStartId)
-				if ok {
-					reducerOnce.Do(func() {
-						// buf.WriteString(fmt.Sprint("├─...\n"))
-						buf.WriteString(fmt.Sprint("  ...\n"))
-						//buf.WriteString(fmt.Sprintf("├─[%s] id: %v reducer-memory: %v\n", timeStr, item.GetID(), val.Value()))
-						buf.WriteString(fmt.Sprintf("--[%s] id: %v reducer-memory: %v\n", timeStr, item.GetID(), val.Value()))
-					})
-					return true
-				}
-			} else if item.GetID() < reduceredStartId {
-				return true
-			}
-		}
 
 		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
 			val, ok := m.summary.Get(shrinkStartId)
