@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/chanx"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -121,6 +122,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		taskQueue:            NewTaskQueue("react-main-queue"),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 	}
+	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 
 	// Initialize prompt manager
 	react.promptManager = NewPromptManager(react, cfg.workdir)

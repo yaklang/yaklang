@@ -3,12 +3,13 @@ package aicommon
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
+
 	"github.com/google/uuid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"strings"
-	"sync"
 )
 
 type KnowledgeCollection struct {
@@ -66,18 +67,26 @@ func (kc *KnowledgeCollection) UnsetUseless(uuid string) {
 }
 
 type EnhanceKnowledgeManager struct {
-	knowledgeGetter func(ctx context.Context, query string) (<-chan EnhanceKnowledge, error)
+	emitter         *Emitter
+	knowledgeGetter func(ctx context.Context, emitter *Emitter, query string) (<-chan EnhanceKnowledge, error)
 
 	mux                 sync.Mutex
 	knowledgeMap        map[string]EnhanceKnowledge
 	taskToKnowledgeUUID map[string]*KnowledgeCollection
 }
 
+func (m *EnhanceKnowledgeManager) SetEmitter(emitter *Emitter) {
+	if m == nil {
+		return
+	}
+	m.emitter = emitter
+}
+
 func (m *EnhanceKnowledgeManager) FetchKnowledge(ctx context.Context, query string) (<-chan EnhanceKnowledge, error) {
 	//todo 支持多种来源的知识方式合并 rag ｜ web search
 
 	result := chanx.NewUnlimitedChan[EnhanceKnowledge](ctx, 10)
-	midResult, err := m.knowledgeGetter(ctx, query)
+	midResult, err := m.knowledgeGetter(ctx, m.emitter, query)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +161,7 @@ func (m *EnhanceKnowledgeManager) DumpTaskAboutKnowledgeWithTop(taskID string, t
 	return sb.String()
 }
 
-func NewEnhanceKnowledgeManager(knowledgeGetter func(ctx context.Context, query string) (<-chan EnhanceKnowledge, error)) *EnhanceKnowledgeManager {
+func NewEnhanceKnowledgeManager(knowledgeGetter func(ctx context.Context, emitter *Emitter, query string) (<-chan EnhanceKnowledge, error)) *EnhanceKnowledgeManager {
 	return &EnhanceKnowledgeManager{
 		knowledgeGetter:     knowledgeGetter,
 		knowledgeMap:        make(map[string]EnhanceKnowledge),
