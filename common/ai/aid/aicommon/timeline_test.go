@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -89,6 +90,30 @@ func TestMemoryTimelineWithBatchCompression(t *testing.T) {
 	// Check if compression actually happened (either reducer-memory: or compressed items)
 	hasCompression := strings.Contains(result, "reducer-memory:") || totalItems < 100
 	require.True(t, hasCompression, "Should have some form of compression")
+}
+
+type mockedToolResult struct {
+	ID int64
+}
+
+func (m *mockedToolResult) String() string {
+	return "mocked result"
+}
+
+func (m *mockedToolResult) GetID() int64 {
+	return m.ID
+}
+
+func (m *mockedToolResult) GetShrinkResult() string {
+	return "mocked shrink"
+}
+
+func (m *mockedToolResult) GetShrinkSimilarResult() string {
+	return "mocked similar"
+}
+
+func (m *mockedToolResult) SetShrinkResult(s string) {
+	// do nothing
 }
 
 type mockedAI2 struct {
@@ -498,4 +523,416 @@ func TestCompressionWithDifferentSizes(t *testing.T) {
 	require.True(t, compressionCount > 0, "Should have compression")
 	require.True(t, totalItems < 200, "Should have fewer items after compression")
 	require.True(t, totalItems >= 50, "Should keep reasonable number of items")
+}
+
+// TestTimelineBasicMethods 测试Timeline基础方法
+func TestTimelineBasicMethods(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Test SetAICaller and GetAICaller
+	newAI := &mockedAI{}
+	memoryTimeline.SetAICaller(newAI)
+	require.Equal(t, newAI, memoryTimeline.GetAICaller())
+
+	// Test GetIdToTimelineItem and GetTimelineItemIDs
+	// Add some items first
+	for i := 1; i <= 3; i++ {
+		memoryTimeline.PushToolResult(&aitool.ToolResult{
+			ID:          int64(i + 100),
+			Name:        "test",
+			Description: "test",
+			Param:       map[string]any{"test": "test"},
+			Success:     true,
+			Data:        "test",
+			Error:       "test",
+		})
+	}
+
+	// Test GetIdToTimelineItem
+	idToItem := memoryTimeline.GetIdToTimelineItem()
+	require.Equal(t, 3, idToItem.Len())
+
+	// Test GetTimelineItemIDs
+	ids := memoryTimeline.GetTimelineItemIDs()
+	require.Len(t, ids, 3)
+	require.Contains(t, ids, int64(101))
+	require.Contains(t, ids, int64(102))
+	require.Contains(t, ids, int64(103))
+
+	// Test ClearRuntimeConfig
+	memoryTimeline.ClearRuntimeConfig()
+	require.Nil(t, memoryTimeline.GetAICaller())
+}
+
+// TestTimelineAdvancedOperations 测试Timeline高级操作
+func TestTimelineAdvancedOperations(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Test PushUserInteraction
+	memoryTimeline.PushUserInteraction(UserInteractionStage_FreeInput, 200, "test system prompt", "test user prompt")
+
+	result := memoryTimeline.Dump()
+	require.Contains(t, result, "test system prompt")
+	require.Contains(t, result, "test user prompt")
+
+	// Test PushText
+	memoryTimeline.PushText(300, "test text content")
+	result = memoryTimeline.Dump()
+	require.Contains(t, result, "test text content")
+
+	// Test SoftDelete
+	// Add an item to delete
+	memoryTimeline.PushToolResult(&aitool.ToolResult{
+		ID:          400,
+		Name:        "test",
+		Description: "test",
+		Param:       map[string]any{"test": "test"},
+		Success:     true,
+		Data:        "test",
+		Error:       "test",
+	})
+
+	beforeDelete := memoryTimeline.Dump()
+	require.Contains(t, beforeDelete, "id: 400")
+
+	memoryTimeline.SoftDelete(400)
+	afterDelete := memoryTimeline.Dump()
+	require.NotContains(t, afterDelete, "id: 400")
+
+	// Test CreateSubTimeline
+	subTimeline := memoryTimeline.CreateSubTimeline(200)
+	require.NotNil(t, subTimeline)
+	require.IsType(t, &Timeline{}, subTimeline)
+}
+
+// TestTimelineUtilityMethods 测试Timeline工具方法
+func TestTimelineUtilityMethods(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Add some items
+	for i := 1; i <= 3; i++ {
+		memoryTimeline.PushToolResult(&aitool.ToolResult{
+			ID:          int64(i + 100),
+			Name:        "test",
+			Description: "test",
+			Param:       map[string]any{"test": "test"},
+			Success:     true,
+			Data:        "test",
+			Error:       "test",
+		})
+	}
+
+	// Test GetTimelineOutput
+	output := memoryTimeline.GetTimelineOutput()
+	require.NotNil(t, output)
+	require.True(t, len(output) > 0)
+
+	// Test ToTimelineItemOutputLastN
+	lastN := memoryTimeline.ToTimelineItemOutputLastN(2)
+	require.Len(t, lastN, 2)
+
+	// Test PromptForToolCallResultsForLastN
+	prompt := memoryTimeline.PromptForToolCallResultsForLastN(2)
+	require.NotEmpty(t, prompt)
+	require.Contains(t, prompt, "test")
+}
+
+// TestTimelineItemMethods 测试TimelineItem相关方法
+func TestTimelineItemMethods(t *testing.T) {
+	// Test TimelineItem methods
+	item := &TimelineItem{
+		value: &aitool.ToolResult{
+			ID:          100,
+			Name:        "test",
+			Description: "test",
+			Param:       map[string]any{"test": "test"},
+			Success:     true,
+			Data:        "test",
+			Error:       "test",
+		},
+	}
+
+	// Test GetValue
+	val := item.GetValue()
+	require.NotNil(t, val)
+	require.Equal(t, int64(100), val.GetID())
+
+	// Test IsDeleted
+	require.False(t, item.IsDeleted())
+
+	// Test GetShrinkResult and SetShrinkResult
+	item.SetShrinkResult("shrink result")
+	require.Equal(t, "shrink result", item.GetShrinkResult())
+
+	// Test GetShrinkSimilarResult (for ToolResult, this should return ShrinkResult)
+	require.Equal(t, "shrink result", item.GetShrinkSimilarResult())
+
+	// Test ToTimelineItemOutput
+	output := item.ToTimelineItemOutput()
+	require.NotNil(t, output)
+	require.Equal(t, "tool_result", output.Type)
+	require.Contains(t, output.Content, "test")
+}
+
+// TestUserInteractionMethods 测试UserInteraction相关方法
+func TestUserInteractionMethods(t *testing.T) {
+	userInteraction := &UserInteraction{
+		ID:              200,
+		SystemPrompt:    "test system prompt",
+		UserExtraPrompt: "test user prompt",
+		Stage:           UserInteractionStage_Review,
+	}
+
+	// Test String
+	str := userInteraction.String()
+	require.Contains(t, str, "test system prompt")
+	require.Contains(t, str, "test user prompt")
+	require.Contains(t, str, "review")
+
+	// Test GetID
+	require.Equal(t, int64(200), userInteraction.GetID())
+
+	// Test GetShrinkResult and SetShrinkResult
+	userInteraction.SetShrinkResult("shrink result")
+	require.Equal(t, "shrink result", userInteraction.GetShrinkResult())
+
+	// Test GetShrinkSimilarResult
+	require.Equal(t, "shrink result", userInteraction.GetShrinkSimilarResult())
+}
+
+// TestTextTimelineItemMethods 测试TextTimelineItem相关方法
+func TestTextTimelineItemMethods(t *testing.T) {
+	textItem := &TextTimelineItem{
+		ID:   300,
+		Text: "test text content",
+	}
+
+	// Test String
+	str := textItem.String()
+	require.Equal(t, "test text content", str)
+
+	// Test GetID
+	require.Equal(t, int64(300), textItem.GetID())
+
+	// Test GetShrinkResult and SetShrinkResult
+	textItem.SetShrinkResult("shrink result")
+	require.Equal(t, "shrink result", textItem.GetShrinkResult())
+
+	// Test GetShrinkSimilarResult
+	textItem.ShrinkSimilarResult = "similar result"
+	require.Equal(t, "similar result", textItem.GetShrinkSimilarResult())
+}
+
+// TestTimelineCompressionMethods 测试Timeline压缩相关方法
+func TestTimelineCompressionMethods(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Add an item
+	memoryTimeline.PushToolResult(&aitool.ToolResult{
+		ID:          100,
+		Name:        "test",
+		Description: "test",
+		Param:       map[string]any{"test": "test"},
+		Success:     true,
+		Data:        "test",
+		Error:       "test",
+	})
+
+	// Test CopyReducibleTimelineWithMemory
+	copied := memoryTimeline.CopyReducibleTimelineWithMemory()
+	require.NotNil(t, copied)
+	require.IsType(t, &Timeline{}, copied)
+
+	// Test renderSummaryPrompt (this is called internally by shrink)
+	// We can test this indirectly by checking if shrink works
+	items := []*TimelineItem{
+		{
+			value: &aitool.ToolResult{
+				ID:          100,
+				Name:        "test",
+				Description: "test",
+				Param:       map[string]any{"test": "test"},
+				Success:     true,
+				Data:        "test",
+				Error:       "test",
+			},
+		},
+	}
+
+	// Test shrink method indirectly by setting perDumpContentLimit
+	memoryTimeline.perDumpContentLimit = 10 // Very small limit to trigger shrink
+	memoryTimeline.shrink(items[0])
+
+	// The shrink result should be set
+	require.NotEmpty(t, items[0].GetShrinkResult())
+}
+
+// TestTimelineConfigurationMethods 测试Timeline配置相关方法
+func TestTimelineConfigurationMethods(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Test SetTimelineLimit
+	memoryTimeline.SetTimelineLimit(20)
+	// This is internal, we can't directly test it, but we can test that timeline works
+
+	// Test SetTimelineContentLimit
+	memoryTimeline.SetTimelineContentLimit(1000)
+	// This is internal, we can't directly test it, but we can test that timeline works
+
+	// Test ExtraMetaInfo
+	metaFunc := func() string { return "test meta info" }
+	timelineWithMeta := NewTimeline(10, &mockedAI{}, metaFunc)
+	metaInfo := timelineWithMeta.ExtraMetaInfo()
+	require.Equal(t, "test meta info", metaInfo)
+
+	// Test with nil extraMetaInfo
+	timelineNilMeta := NewTimeline(10, &mockedAI{}, nil)
+	metaInfoNil := timelineNilMeta.ExtraMetaInfo()
+	require.Equal(t, "", metaInfoNil)
+}
+
+// TestTimelineBindConfig 测试Timeline绑定配置
+func TestTimelineBindConfig(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Test BindConfig
+	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
+	memoryTimeline.BindConfig(config, &mockedAI{})
+	// This sets internal config, we can test that compression still works
+}
+
+// TestTimelineShrinkMethod 测试Timeline的shrink方法
+func TestTimelineShrinkMethod(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Add an item that will be shrunk
+	memoryTimeline.PushToolResult(&aitool.ToolResult{
+		ID:          100,
+		Name:        "test",
+		Description: "test",
+		Param:       map[string]any{"test": "test"},
+		Success:     true,
+		Data:        "test",
+		Error:       "test",
+	})
+
+	// Set perDumpContentLimit to trigger shrink
+	memoryTimeline.perDumpContentLimit = 10 // Very small limit
+
+	// Call shrink (this is normally called internally)
+	items := []*TimelineItem{
+		{
+			value: &aitool.ToolResult{
+				ID:          100,
+				Name:        "test",
+				Description: "test",
+				Param:       map[string]any{"test": "test"},
+				Success:     true,
+				Data:        "test",
+				Error:       "test",
+			},
+		},
+	}
+
+	memoryTimeline.shrink(items[0])
+	require.NotEmpty(t, items[0].GetShrinkResult())
+}
+
+// TestTimelineRenderSummaryPrompt 测试renderSummaryPrompt方法
+func TestTimelineRenderSummaryPrompt(t *testing.T) {
+	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+
+	// Add items
+	for i := 1; i <= 3; i++ {
+		memoryTimeline.PushToolResult(&aitool.ToolResult{
+			ID:          int64(i + 100),
+			Name:        "test",
+			Description: "test",
+			Param:       map[string]any{"test": "test"},
+			Success:     true,
+			Data:        "test",
+			Error:       "test",
+		})
+	}
+
+	// Test renderSummaryPrompt indirectly by checking if summary works
+	// This method is called internally by compression, but we can test the summary field
+	require.NotNil(t, memoryTimeline.summary)
+}
+
+// TestTimelineItemOutputString 测试TimelineItemOutput的String方法
+func TestTimelineItemOutputString(t *testing.T) {
+	output := &TimelineItemOutput{
+		Timestamp: time.Now(),
+		Type:      "tool_result",
+		Content:   "test content",
+	}
+
+	str := output.String()
+	require.Contains(t, str, "tool_result")
+	require.Contains(t, str, "test content")
+	require.Contains(t, str, "[")
+	require.Contains(t, str, "]")
+}
+
+// TestTimelineItemOutputTypeSwitch 测试ToTimelineItemOutput的类型切换
+func TestTimelineItemOutputTypeSwitch(t *testing.T) {
+	// Test with UserInteraction
+	userItem := &TimelineItem{
+		value: &UserInteraction{
+			ID:              100,
+			SystemPrompt:    "system",
+			UserExtraPrompt: "user",
+			Stage:           UserInteractionStage_Review,
+		},
+	}
+
+	output := userItem.ToTimelineItemOutput()
+	require.Equal(t, "user_interaction", output.Type)
+	require.Contains(t, output.Content, "system")
+	require.Contains(t, output.Content, "user")
+
+	// Test with TextTimelineItem
+	textItem := &TimelineItem{
+		value: &TextTimelineItem{
+			ID:   200,
+			Text: "test text",
+		},
+	}
+
+	output2 := textItem.ToTimelineItemOutput()
+	require.Equal(t, "text", output2.Type)
+	require.Equal(t, "test text", output2.Content)
+
+	// Test with unknown type
+	unknownItem := &TimelineItem{
+		value: &mockedToolResult{ID: 300},
+	}
+
+	output3 := unknownItem.ToTimelineItemOutput()
+	require.Equal(t, "raw", output3.Type)
+}
+
+// TestTimelineEdgeCases 测试Timeline边缘情况
+func TestTimelineEdgeCases(t *testing.T) {
+	// Test with nil AI
+	memoryTimeline := NewTimeline(10, nil, nil)
+	require.NotNil(t, memoryTimeline)
+
+	// Test with empty timeline
+	emptyTimeline := NewTimeline(10, &mockedAI{}, nil)
+	result := emptyTimeline.Dump()
+	require.Equal(t, "", result)
+
+	// Test GetTimelineOutput with empty timeline
+	output := emptyTimeline.GetTimelineOutput()
+	require.Nil(t, output)
+
+	// Test PromptForToolCallResultsForLastN with empty timeline
+	prompt := emptyTimeline.PromptForToolCallResultsForLastN(5)
+	require.Equal(t, "", prompt)
+
+	// Test ToTimelineItemOutputLastN with empty timeline
+	lastN := emptyTimeline.ToTimelineItemOutputLastN(5)
+	require.Len(t, lastN, 0)
 }

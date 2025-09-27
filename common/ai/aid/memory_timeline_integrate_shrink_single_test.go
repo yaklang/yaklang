@@ -35,6 +35,7 @@ func TestCoordinator_Timeline_ToolUse_BatchCompression(t *testing.T) {
 			outputChan <- event
 		}),
 		WithTimeLineLimit(3),
+		WithTimelineContentLimit(10),
 		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -147,8 +148,12 @@ LOOP:
 
 			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") {
 				useToolReviewPass = true
-				// break LOOP
 			}
+
+			if useToolReviewPass && timelineBatchCompressTrigger && requireMoreToolCount > 3 {
+				break LOOP
+			}
+
 			fmt.Println("review task result:" + result.String())
 		}
 	}

@@ -640,10 +640,19 @@ func (m *Timeline) PromptForToolCallResultsForLastN(n int) string {
 		return ""
 	}
 
-	var result = m.idToTimelineItem.Values()
-	if len(result) > n {
-		result = result[len(result)-n:]
+	var timelineItems = m.idToTimelineItem.Values()
+	if len(timelineItems) > n {
+		timelineItems = timelineItems[len(timelineItems)-n:]
 	}
+
+	// Extract ToolResult objects from TimelineItems
+	var result []*aitool.ToolResult
+	for _, item := range timelineItems {
+		if toolResult, ok := item.value.(*aitool.ToolResult); ok {
+			result = append(result, toolResult)
+		}
+	}
+
 	templateData := map[string]interface{}{
 		"ToolCallResults": result,
 	}
