@@ -45,8 +45,8 @@ func WithQueryTop(top int) RuntimeConfigOption {
 
 func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 	config := &EntityRepositoryRuntimeConfig{
-		similarityThreshold: 0.8,
-		queryTop:            5,
+		similarityThreshold: 0.6, // 降低相似度阈值，减少low_score问题
+		queryTop:            10,  // 增加查询数量，提高匹配概率
 		runtimeID:           uuid.NewString(),
 	}
 	for _, opt := range opts {
@@ -86,45 +86,151 @@ func (r *EntityRepository) GetRAGSystem() *rag.RAGSystem {
 }
 
 func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...rag.DocumentOption) error {
-	r.entityVectorMutex.Lock()
-	defer r.entityVectorMutex.Unlock()
-	return r.GetRAGSystem().Add(docId, content, opts...)
+	addIndexStartTime := time.Now()
+
+	// 实现锁超时机制防止永久死锁
+	lockAcquiredCh := make(chan bool, 1)
+	var lockAcquireDuration time.Duration
+	var err error
+
+	go func() {
+		defer func() {
+			if recover() != nil {
+				log.Errorf("PANIC in AddVectorIndex lock acquire for doc [%s]", docId[:min(50, len(docId))])
+			}
+		}()
+
+		lockAcquireStart := time.Now()
+		r.entityVectorMutex.Lock()
+		lockAcquireDuration = time.Since(lockAcquireStart)
+
+		select {
+		case lockAcquiredCh <- true:
+			// 锁获取成功，继续执行
+		default:
+			// 如果主goroutine已经超时返回，释放锁
+			r.entityVectorMutex.Unlock()
+			return
+		}
+
+		defer r.entityVectorMutex.Unlock()
+
+		// 记录锁竞争情况
+		if lockAcquireDuration > 5*time.Second {
+			log.Errorf("CRITICAL LOCK CONTENTION: AddVectorIndex lock acquire took %v for doc [%s]", lockAcquireDuration, docId[:min(50, len(docId))])
+			utils.PrintCurrentGoroutineRuntimeStack()
+		} else if lockAcquireDuration > time.Second {
+			log.Warnf("SLOW LOCK ACQUIRE: AddVectorIndex lock acquire took %v for doc [%s]", lockAcquireDuration, docId[:min(50, len(docId))])
+		}
+
+		ragAddStart := time.Now()
+		err = r.GetRAGSystem().Add(docId, content, opts...)
+		ragAddDuration := time.Since(ragAddStart)
+
+		totalDuration := time.Since(addIndexStartTime)
+
+		// 记录总体性能和分解
+		if totalDuration > 10*time.Second {
+			log.Errorf("CRITICAL AddVectorIndex: doc [%s] total=%v (lock_acquire=%v, rag_add=%v)",
+				docId[:min(50, len(docId))], totalDuration, lockAcquireDuration, ragAddDuration)
+		} else if totalDuration > 3*time.Second {
+			log.Warnf("SLOW AddVectorIndex: doc [%s] total=%v (lock_acquire=%v, rag_add=%v)",
+				docId[:min(50, len(docId))], totalDuration, lockAcquireDuration, ragAddDuration)
+		}
+	}()
+
+	// 实现30秒超时机制
+	select {
+	case <-lockAcquiredCh:
+		// 锁获取成功，返回结果
+		return err
+	case <-time.After(30 * time.Second):
+		// 超时，强制返回错误，避免永久阻塞
+		log.Errorf("DEADLOCK RECOVERY: AddVectorIndex lock timeout after 30s for doc [%s] - forcing abort", docId[:min(50, len(docId))])
+		utils.PrintCurrentGoroutineRuntimeStack()
+		return utils.Errorf("vector index operation timeout: possible deadlock detected")
+	}
 }
 
 func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResult, error) {
 	queryStartTime := time.Now()
 
-	r.entityVectorMutex.RLock()
-	lockAcquireTime := time.Since(queryStartTime)
-	defer r.entityVectorMutex.RUnlock()
+	// 实现读锁超时机制防止死锁
+	resultCh := make(chan struct {
+		results []rag.SearchResult
+		err     error
+	}, 1)
 
-	actualQueryStart := time.Now()
-	results, err := r.GetRAGSystem().Query(query, top)
-	queryDuration := time.Since(actualQueryStart)
+	go func() {
+		defer func() {
+			if recover() != nil {
+				log.Errorf("PANIC in QueryVector for query [%s]", query[:min(50, len(query))])
+			}
+		}()
 
-	totalDuration := time.Since(queryStartTime)
+		lockAcquireStart := time.Now()
+		r.entityVectorMutex.RLock()
+		lockAcquireTime := time.Since(lockAcquireStart)
+		defer r.entityVectorMutex.RUnlock()
 
-	if err != nil {
-		log.Errorf("RAG Query failed: query='%s', top=%d, error=%v", query[:min(50, len(query))], top, err)
-		return results, err
+		// 检测读锁获取时间，可能表明有写锁阻塞
+		if lockAcquireTime > 10*time.Second {
+			log.Errorf("CRITICAL READ LOCK CONTENTION: QueryVector read lock acquire took %v for query [%s] - possible write lock deadlock",
+				lockAcquireTime, query[:min(50, len(query))])
+			utils.PrintCurrentGoroutineRuntimeStack()
+		} else if lockAcquireTime > 3*time.Second {
+			log.Warnf("SLOW READ LOCK ACQUIRE: QueryVector read lock acquire took %v for query [%s]",
+				lockAcquireTime, query[:min(50, len(query))])
+		}
+
+		actualQueryStart := time.Now()
+		results, err := r.GetRAGSystem().Query(query, top)
+		queryDuration := time.Since(actualQueryStart)
+
+		totalDuration := time.Since(queryStartTime)
+
+		if err != nil {
+			log.Errorf("RAG Query failed: query='%s', top=%d, error=%v", query[:min(50, len(query))], top, err)
+		}
+
+		// 性能监控 - 增强死锁检测
+		if totalDuration > 15*time.Second {
+			log.Errorf("CRITICAL RAG QUERY DEADLOCK SUSPECTED: query='%s' took %v (lock_acquire: %v, actual_query: %v), returned %d results",
+				query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
+			utils.PrintCurrentGoroutineRuntimeStack()
+		} else if totalDuration > 10*time.Second {
+			log.Errorf("CRITICAL RAG QUERY: query='%s' took %v (lock: %v, query: %v), returned %d results",
+				query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
+		} else if totalDuration > 3*time.Second {
+			log.Warnf("SLOW RAG QUERY: query='%s' took %v (lock: %v, query: %v), returned %d results",
+				query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
+		}
+
+		// 记录低效查询（耗时长但结果少）
+		if totalDuration > 5*time.Second && len(results) < 3 {
+			log.Warnf("INEFFICIENT RAG QUERY: query='%s' took %v but only returned %d results",
+				query[:min(100, len(query))], totalDuration, len(results))
+		}
+
+		select {
+		case resultCh <- struct {
+			results []rag.SearchResult
+			err     error
+		}{results, err}:
+		default:
+			// 主goroutine已经超时，不发送结果
+		}
+	}()
+
+	// 实现15秒超时机制
+	select {
+	case result := <-resultCh:
+		return result.results, result.err
+	case <-time.After(15 * time.Second):
+		log.Errorf("DEADLOCK RECOVERY: QueryVector timeout after 15s for query [%s] - forcing abort", query[:min(50, len(query))])
+		utils.PrintCurrentGoroutineRuntimeStack()
+		return nil, utils.Errorf("vector query timeout: possible deadlock detected")
 	}
-
-	// 性能监控
-	if totalDuration > 10*time.Second {
-		log.Errorf("CRITICAL RAG QUERY: query='%s' took %v (lock: %v, query: %v), returned %d results",
-			query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
-	} else if totalDuration > 3*time.Second {
-		log.Warnf("SLOW RAG QUERY: query='%s' took %v (lock: %v, query: %v), returned %d results",
-			query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
-	}
-
-	// 记录低效查询（耗时长但结果少）
-	if totalDuration > 5*time.Second && len(results) < 3 {
-		log.Warnf("INEFFICIENT RAG QUERY: query='%s' took %v but only returned %d results",
-			query[:min(100, len(query))], totalDuration, len(results))
-	}
-
-	return results, err
 }
 
 //--- Entity Operations ---
@@ -333,8 +439,15 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 	wrongTypeCount := 0
 
 	for _, res := range results {
+		// 记录详细的分数信息用于调试
 		if res.Score < r.runtimeConfig.similarityThreshold {
 			lowScoreCount++
+			// 当分数很接近阈值时记录详细信息
+			if res.Score > r.runtimeConfig.similarityThreshold-0.1 {
+				log.Debugf("Near-threshold entity: [%s] score=%.3f (threshold=%.3f, diff=%.3f)",
+					entity.EntityName, res.Score, r.runtimeConfig.similarityThreshold,
+					r.runtimeConfig.similarityThreshold-res.Score)
+			}
 			continue
 		}
 		if res.Document.Type == schema.RAGDocumentType_Entity {
@@ -342,6 +455,8 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 			if ok {
 				entityIndex = append(entityIndex, utils.InterfaceToString(index))
 				filteredResultsCount++
+				// 记录成功匹配的实体分数
+				log.Debugf("Matched entity: [%s] score=%.3f", entity.EntityName, res.Score)
 			}
 		} else {
 			wrongTypeCount++
@@ -351,8 +466,23 @@ func (r *EntityRepository) VectorSearchEntity(entity *schema.ERModelEntity) ([]*
 	filterDuration := time.Since(filterStartTime)
 
 	if len(entityIndex) == 0 {
-		log.Warnf("NO VALID ENTITIES: entity [%s] vector search found %d results but 0 valid entities (low_score: %d, wrong_type: %d)",
-			entity.EntityName, vectorResultsCount, lowScoreCount, wrongTypeCount)
+		// 增强低分数问题的诊断信息
+		maxScore := 0.0
+		for _, res := range results {
+			if res.Score > maxScore {
+				maxScore = res.Score
+			}
+		}
+
+		log.Warnf("NO VALID ENTITIES: entity [%s] vector search found %d results but 0 valid entities (low_score: %d, wrong_type: %d, max_score: %.3f, threshold: %.3f)",
+			entity.EntityName, vectorResultsCount, lowScoreCount, wrongTypeCount, maxScore, r.runtimeConfig.similarityThreshold)
+
+		// 如果最高分数非常接近阈值，建议调整阈值
+		if maxScore > 0 && maxScore < r.runtimeConfig.similarityThreshold && (r.runtimeConfig.similarityThreshold-maxScore) < 0.2 {
+			log.Warnf("SIMILARITY THRESHOLD TOO HIGH: entity [%s] max_score=%.3f close to threshold=%.3f, consider lowering threshold",
+				entity.EntityName, maxScore, r.runtimeConfig.similarityThreshold)
+		}
+
 		return nil, nil
 	}
 
@@ -481,18 +611,39 @@ func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERM
 }
 
 func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
-	matchedEntity, _, err := r.MatchEntities(entity)
+	mergeStartTime := time.Now()
+
+	matchedEntity, isExactMatch, err := r.MatchEntities(entity)
 	if err != nil { // not critical error
 		log.Errorf("failed to match entity [%s]: %v", entity.EntityName, err)
 	}
+
+	matchDuration := time.Since(mergeStartTime)
+	if matchDuration > 3*time.Second {
+		log.Warnf("SLOW entity matching: entity [%s] took %v to match", entity.EntityName, matchDuration)
+	}
+
 	if len(matchedEntity) <= 0 {
-		log.Infof("start to create entity: %s", entity.EntityName)
+		// 记录实体创建的原因和统计信息
+		log.Infof("Creating new entity: %s (no matches found after %v)", entity.EntityName, matchDuration)
+
+		createStartTime := time.Now()
 		err = r.CreateEntity(entity)
+		createDuration := time.Since(createStartTime)
+
 		if err != nil {
 			return nil, utils.Errorf("failed to create entity [%s]: %v", entity.EntityName, err)
 		}
+
+		if createDuration > 2*time.Second {
+			log.Warnf("SLOW entity creation: entity [%s] took %v to create", entity.EntityName, createDuration)
+		}
+
 		return entity, nil
 	}
+
+	// 记录成功匹配的情况
+	log.Debugf("Entity matched: %s found %d matches (exact: %v)", entity.EntityName, len(matchedEntity), isExactMatch)
 
 	var firstEntity = matchedEntity[0]
 	for _, m := range matchedEntity {
@@ -524,13 +675,33 @@ func (r *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error 
 	}
 	go func() {
 		goroutineStartTime := time.Now()
-		err := r.addEntityToVectorIndex(e)
-		goroutineDuration := time.Since(goroutineStartTime)
+		defer func() {
+			goroutineDuration := time.Since(goroutineStartTime)
+			// 增强异步操作死锁检测
+			if goroutineDuration > 30*time.Second {
+				log.Errorf("CRITICAL ASYNC DEADLOCK: UpdateEntity vector index goroutine for [%s] took %v - possible deadlock", e.EntityName, goroutineDuration)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			} else if goroutineDuration > 10*time.Second {
+				log.Errorf("CRITICAL ASYNC SLOW: UpdateEntity vector index goroutine for [%s] took %v", e.EntityName, goroutineDuration)
+			} else if goroutineDuration > 5*time.Second {
+				log.Warnf("SLOW entity vector index goroutine: entity [%s] took %v", e.EntityName, goroutineDuration)
+			}
+		}()
 
-		if err != nil {
-			log.Errorf("failed to add entity [%s] to vector index: %v (goroutine took %v)", e.EntityName, err, goroutineDuration)
-		} else if goroutineDuration > 5*time.Second {
-			log.Warnf("SLOW entity vector index goroutine: entity [%s] took %v", e.EntityName, goroutineDuration)
+		// 在独立goroutine中实现超时控制
+		done := make(chan error, 1)
+		go func() {
+			done <- r.addEntityToVectorIndex(e)
+		}()
+
+		select {
+		case err := <-done:
+			if err != nil {
+				log.Errorf("failed to add entity [%s] to vector index: %v", e.EntityName, err)
+			}
+		case <-time.After(35 * time.Second):
+			log.Errorf("ASYNC DEADLOCK ABORT: UpdateEntity vector index for [%s] timeout after 35s - abandoning operation", e.EntityName)
+			// 不等待结果，直接返回避免goroutine泄漏加剧死锁
 		}
 	}()
 	return nil
@@ -545,13 +716,33 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 	}
 	go func() {
 		goroutineStartTime := time.Now()
-		err := r.addEntityToVectorIndex(entity)
-		goroutineDuration := time.Since(goroutineStartTime)
+		defer func() {
+			goroutineDuration := time.Since(goroutineStartTime)
+			// 增强异步操作死锁检测
+			if goroutineDuration > 30*time.Second {
+				log.Errorf("CRITICAL ASYNC DEADLOCK: CreateEntity vector index goroutine for [%s] took %v - possible deadlock", entity.EntityName, goroutineDuration)
+				utils.PrintCurrentGoroutineRuntimeStack()
+			} else if goroutineDuration > 10*time.Second {
+				log.Errorf("CRITICAL ASYNC SLOW: CreateEntity vector index goroutine for [%s] took %v", entity.EntityName, goroutineDuration)
+			} else if goroutineDuration > 5*time.Second {
+				log.Warnf("SLOW entity vector index goroutine: entity [%s] took %v", entity.EntityName, goroutineDuration)
+			}
+		}()
 
-		if err != nil {
-			log.Errorf("failed to add entity [%s] to vector index: %v (goroutine took %v)", entity.EntityName, err, goroutineDuration)
-		} else if goroutineDuration > 5*time.Second {
-			log.Warnf("SLOW entity vector index goroutine: entity [%s] took %v", entity.EntityName, goroutineDuration)
+		// 在独立goroutine中实现超时控制
+		done := make(chan error, 1)
+		go func() {
+			done <- r.addEntityToVectorIndex(entity)
+		}()
+
+		select {
+		case err := <-done:
+			if err != nil {
+				log.Errorf("failed to add entity [%s] to vector index: %v", entity.EntityName, err)
+			}
+		case <-time.After(35 * time.Second):
+			log.Errorf("ASYNC DEADLOCK ABORT: CreateEntity vector index for [%s] timeout after 35s - abandoning operation", entity.EntityName)
+			// 不等待结果，直接返回避免goroutine泄漏加剧死锁
 		}
 	}()
 	return nil
