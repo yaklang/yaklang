@@ -3,6 +3,7 @@ package rag
 import (
 	"context"
 	"fmt"
+	"io"
 	"regexp"
 	"sync"
 	"sync/atomic"
@@ -288,6 +289,9 @@ type RAGQueryConfig struct {
 	OnStatus             func(label string, value string)
 	OnlyResults          bool // 仅返回最终结果，忽略中间结果和消息
 
+	// On Stream Reader
+	OnLogReader func(reader io.Reader)
+
 	RAGSimilarityThreshold   float64 // RAG相似度限制
 	EveryQueryResultCallback func(result *ScoredResult)
 	RAGQueryType             []string
@@ -303,6 +307,21 @@ const (
 	EnhancePlanGeneralizeQuery             = "generalize_query"
 	EnhancePlanExactKeywordSearch          = "exact_keyword_search"
 )
+
+func MethodVerboseName(i string) string {
+	switch i {
+	case EnhancePlanHypotheticalAnswer:
+		return "HyDE"
+	case EnhancePlanSplitQuery:
+		return "拆分查询"
+	case EnhancePlanGeneralizeQuery:
+		return "泛化查询"
+	case EnhancePlanExactKeywordSearch:
+		return "泛化关键字"
+	default:
+		return "基础回答"
+	}
+}
 
 // RAGQueryOption RAG查询选项
 type RAGQueryOption func(*RAGQueryConfig)
@@ -371,6 +390,12 @@ func WithRAGEnhance(enhancePlan ...string) RAGQueryOption {
 func WithRAGFilter(filter func(key string, getDoc func() *Document) bool) RAGQueryOption {
 	return func(config *RAGQueryConfig) {
 		config.Filter = filter
+	}
+}
+
+func WithRAGLogReader(f func(reader io.Reader)) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.OnLogReader = f
 	}
 }
 
@@ -834,6 +859,25 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			enhanceSubQuery++
 			status("强化查询", fmt.Sprint(enhanceSubQuery))
 
+			logReader, logWriter := utils.NewPipe()
+			if config.OnLogReader != nil {
+				go func() {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Warnf("[OnLogReader] panic: %v", err)
+						}
+					}()
+					config.OnLogReader(logReader)
+				}()
+			} else {
+				go func() {
+					io.Copy(io.Discard, logReader)
+				}()
+			}
+
+			logWriter.WriteString(fmt.Sprintf("[增强方案:%v]：", subquery.Method))
+			logWriter.WriteString(fmt.Sprintf("%v", subquery.Query))
+
 			currentSearchCount := int64(0)
 			var queryWg sync.WaitGroup
 			for _, ragSystem := range cols { // 一个子查询的不同集合查询至少是可以并行的，
@@ -908,6 +952,8 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 				}()
 			}
 			queryWg.Wait()
+			logWriter.WriteString("\n\n查询完成，结果数：" + fmt.Sprint(currentSearchCount) + "\n")
+			logWriter.Close()
 			if currentSearchCount > 0 {
 				status(subquery.Method+"结果数", fmt.Sprint(currentSearchCount))
 			}
