@@ -202,7 +202,6 @@ func (m *Timeline) PushToolResult(toolResult *aitool.ToolResult) {
 
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(toolResult.GetID(), item)
-	m.timelineLengthCheck()
 	m.dumpSizeCheck()
 }
 
@@ -232,38 +231,60 @@ func (m *Timeline) PushUserInteraction(stage UserInteractionStage, id int64, sys
 
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(id, item)
-	m.timelineLengthCheck()
 	m.dumpSizeCheck()
 }
 
-func (m *Timeline) timelineLengthCheck() {
+// findCompressCountForTargetSize 使用二分法找到需要压缩的项目数量，使得剩余项目数约为 targetSize
+func (m *Timeline) findCompressCountForTargetSize(targetSize int) int {
 	total := int64(m.idToTimelineItem.Len())
-
-	// 当 timeline 达到 100 个 items 时，触发批量压缩
-	const batchCompressThreshold = 100
-	if total >= batchCompressThreshold {
-		halfCount := total / 2
-		log.Infof("start to batch compress memory timeline, total: %v, compress first half: %v items", total, halfCount)
-		m.batchCompress(int(halfCount))
-		return
+	if total <= int64(targetSize) {
+		return 0 // 已经达到或小于目标大小，不需要压缩
 	}
 
-	// 保留原有的 reducer 逻辑，用于处理超过 maxTimelineLimit 的情况
-	if m.maxTimelineLimit > 0 && total > m.maxTimelineLimit {
-		endIdx := total - m.maxTimelineLimit - 1
-		rawValue, ok := m.idToTimelineItem.GetByIndex(int(endIdx))
-		if ok {
-			val := rawValue.value
-			log.Infof("start to reducer from id: %v, total: %v, limit: %v, delta: %v", val.GetID(), total, m.maxTimelineLimit, total-m.maxTimelineLimit)
-			m.reducer(val.GetID())
+	// 使用二分法找到合适的压缩数量
+	left, right := 0, int(total-1)
+
+	for left < right {
+		mid := (left + right) / 2
+		remainingSize := int(total) - mid
+
+		if remainingSize <= targetSize {
+			// 剩余大小小于等于目标大小，压缩太多了，需要减少压缩数量
+			right = mid
+		} else {
+			// 剩余大小大于目标大小，需要增加压缩数量
+			left = mid + 1
 		}
 	}
+
+	compressCount := left
+	if compressCount < 0 {
+		compressCount = 0
+	}
+	if compressCount > int(total)-1 {
+		compressCount = int(total) - 1
+	}
+
+	return compressCount
 }
 
-func (m *Timeline) batchCompress(compressCount int) {
-	if compressCount <= 0 || m.ai == nil {
+func (m *Timeline) batchCompressByTargetSize(targetSize int) {
+	if targetSize <= 0 || m.ai == nil {
 		return
 	}
+
+	total := int64(m.idToTimelineItem.Len())
+	if total <= 1 {
+		return
+	}
+
+	// 使用二分法找到需要压缩的项目数量，使得压缩后大小约为 targetSize
+	compressCount := m.findCompressCountForTargetSize(targetSize)
+	if compressCount <= 0 {
+		return
+	}
+
+	log.Infof("batch compress: found compress count %d for target size %d", compressCount, targetSize)
 
 	// 获取前 compressCount 个 items 进行压缩
 	var itemsToCompress []*TimelineItem
@@ -335,73 +356,97 @@ func (m *Timeline) batchCompress(compressCount int) {
 	}
 }
 
-func (m *Timeline) dumpSizeCheck() {
-	// Since we removed shrink mechanism and use batch compression instead,
-	// this function now only handles content size by triggering batch compression if needed
-	total := int64(m.idToTimelineItem.Len())
+func (m *Timeline) calculateActualContentSize() int64 {
+	buf := bytes.NewBuffer(nil)
+	initOnce := sync.Once{}
+	count := 0
 
-	// If content is too large and we have many items, trigger batch compression
-	if m.totalDumpContentLimit > 0 && int64(len(m.Dump())) > m.totalDumpContentLimit && total >= 50 {
-		log.Infof("dump size check: content too large, triggering batch compression")
-		halfCount := total / 2
-		m.batchCompress(int(halfCount))
+	shrinkStartId, _, _ := m.summary.Last()
+
+	m.idToTimelineItem.ForEach(func(id int64, item *TimelineItem) bool {
+		initOnce.Do(func() {
+			buf.WriteString("timeline:\n")
+		})
+
+		ts, ok := m.idToTs.Get(item.GetID())
+		if !ok {
+			log.Warnf("BUG: timeline id %v not found", item.GetID())
+		}
+		t := time.Unix(0, ts*int64(time.Millisecond))
+		timeStr := t.Format(utils.DefaultTimeFormat3)
+
+		if shrinkStartId > 0 && item.GetID() <= shrinkStartId {
+			val, ok := m.summary.Get(shrinkStartId)
+			if ok && !val.Value().deleted {
+				buf.WriteString(fmt.Sprintf("--[%s] id: %v memory: %v\n", timeStr, item.GetID(), val.Value().GetShrinkResult()))
+			}
+			return true
+		}
+
+		if item.deleted {
+			return true
+		}
+
+		buf.WriteString(fmt.Sprintf("--[%s]\n", timeStr))
+		raw := item.String()
+		for _, line := range utils.ParseStringToRawLines(raw) {
+			buf.WriteString(fmt.Sprintf("     %s\n", line))
+		}
+		count++
+		return true
+	})
+	if count > 0 {
+		return int64(len(buf.String()))
 	}
+	return 0
 }
 
-func (m *Timeline) reducer(beforeId int64) {
-	if beforeId <= 0 {
-		return
-	}
-	pmt := m.renderReducerPrompt(beforeId)
-	if utils.IsNil(m.ai) {
+func (m *Timeline) dumpSizeCheck() {
+	// 在 push 时检查内容大小，如果超过限制就压缩
+	if m.totalDumpContentLimit <= 0 {
 		return
 	}
 
-	if m.config == nil {
-		err := CallAITransaction(nil, pmt, m.ai.CallAI, func(response *AIResponse) error {
-			action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "timeline-reducer")
-			if err != nil {
-				log.Errorf("extract timeline action failed: %v", err)
-				return utils.Errorf("extract timeline-reducer failed: %v", err)
-			}
-			pers := action.GetString("reducer_memory")
-			if pers != "" {
-				if lt, ok := m.reducers.Get(beforeId); ok {
-					lt.Push(pers)
-				} else {
-					m.reducers.Set(beforeId, linktable.NewUnlimitedStringLinkTable(pers))
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			log.Errorf("call ai transaction failed in memory reducer: %v", err)
-			return
-		}
-	} else {
-		err := CallAITransaction(m.config, pmt, m.ai.CallAI, func(response *AIResponse) error {
-			action, err := ExtractActionFromStream(
-				response.GetOutputStreamReader("memory-reducer", true, m.config.GetEmitter()),
-				"timeline-reducer",
-			)
-			if err != nil {
-				return utils.Errorf("extract timeline action failed: %v", err)
-			}
-			pers := action.GetString("reducer_memory")
-			if pers != "" {
-				if lt, ok := m.reducers.Get(beforeId); ok {
-					lt.Push(pers)
-				} else {
-					m.reducers.Set(beforeId, linktable.NewUnlimitedStringLinkTable(pers))
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			log.Errorf("call ai transaction failed in memory reducer: %v", err)
-			return
-		}
+	// 获取当前内容大小（不包括reducer）
+	contentSize := m.calculateActualContentSize()
+	if contentSize <= m.totalDumpContentLimit {
+		return // 内容大小正常
 	}
+
+	log.Infof("timeline content too large (%d > %d), triggering batch compression", contentSize, m.totalDumpContentLimit)
+
+	// 压缩到合适的大小
+	m.compressForSizeLimit()
+}
+
+func (m *Timeline) compressForSizeLimit() {
+	if m.ai == nil || m.totalDumpContentLimit <= 0 {
+		return
+	}
+
+	total := int64(m.idToTimelineItem.Len())
+	if total <= 1 {
+		return // 不能压缩到少于1个项目
+	}
+
+	// 计算当前内容大小（不包括reducer）
+	currentSize := m.calculateActualContentSize()
+
+	// 如果内容大小没有超过限制，不需要压缩
+	if currentSize <= m.totalDumpContentLimit {
+		return
+	}
+
+	// 当内容大小超过限制时，压缩到原来的一半大小
+	targetSize := int(total / 2)
+	if targetSize < 1 {
+		targetSize = 1
+	}
+
+	log.Infof("content size %d > limit %d, compressing to half size: %d items",
+		currentSize, m.totalDumpContentLimit, targetSize)
+
+	m.batchCompressByTargetSize(targetSize)
 }
 
 func (m *Timeline) shrink(currentItem *TimelineItem) {
@@ -445,31 +490,6 @@ func (m *Timeline) shrink(currentItem *TimelineItem) {
 	} else {
 		m.summary.Set(currentItem.GetID(), linktable.NewUnlimitedLinkTable(&newItem))
 	}
-}
-
-//go:embed prompts/timeline/reducer_memory.txt
-var timelineReducer string
-
-func (m *Timeline) renderReducerPrompt(beforeId int64) string {
-	input := m.DumpBefore(beforeId)
-	ins, err := template.New("timeline-reducer").Parse(timelineReducer)
-	if err != nil {
-		log.Errorf("BUG: dump summary prompt failed: %v", err)
-		return ""
-	}
-	var buf bytes.Buffer
-	var nonce = utils.RandStringBytes(6)
-	err = ins.Execute(&buf, map[string]any{
-		"Timeline":      m.Dump(),
-		"ExtraMetaInfo": m.ExtraMetaInfo(),
-		"Input":         input,
-		`NONCE`:         nonce,
-	})
-	if err != nil {
-		log.Errorf("BUG: dump summary prompt failed: %v", err)
-		return ""
-	}
-	return buf.String()
 }
 
 //go:embed prompts/timeline/batch_compress.txt
@@ -672,7 +692,6 @@ func (m *Timeline) PushText(id int64, fmtText string, items ...any) {
 
 	m.tsToTimelineItem.Set(ts, item)
 	m.idToTimelineItem.Set(id, item)
-	m.timelineLengthCheck()
 	m.dumpSizeCheck()
 }
 
