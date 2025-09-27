@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
 
@@ -29,6 +30,10 @@ func (r *ReAct) EmitIteration(iteration int, maxIterations int) {
 // EmitResult emits a final result event using the embedded Emitter
 func (r *ReAct) EmitResult(result interface{}) {
 	r.Emitter.EmitResult("result", result, true)
+}
+
+func (r *ReAct) EmitResultAfterStream(result interface{}) {
+	r.Emitter.EmitResultAfterStream("result", result, false)
 }
 
 // EmitKnowledge emits a knowledge event using the embedded Emitter
