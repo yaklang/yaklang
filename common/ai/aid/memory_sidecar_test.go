@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestCoordinator_Basic_WithMemoryPreset(t *testing.T) {
@@ -20,6 +21,7 @@ func TestCoordinator_Basic_WithMemoryPreset(t *testing.T) {
 }
 
 func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *testing.T) {
+	t.Skip("Skip: shrink mechanism has been removed, replaced with batch compression")
 	t.Skip("skip, this test is not stable, need to fix")
 
 	m := memoryTestBasic(t)
@@ -186,9 +188,9 @@ func memoryTestBasic(t *testing.T) *Memory {
 
 	requireMoreToolCount := 0
 
-	timelienShrinkApplyCount := 0
+	timelineBatchCompressApplyCount := 0
 
-	tokenShrink := utils.RandStringBytes(100)
+	tokenBatchCompressed := utils.RandStringBytes(100)
 
 	m := GetDefaultMemory()
 	token1 := "memory-timeline-sidecar+" + utils.RandStringBytes(100)
@@ -198,7 +200,7 @@ func memoryTestBasic(t *testing.T) *Memory {
 
 	noexistedfileToken := utils.RandStringBytes(100)
 
-	timeshrinkTrigger := false
+	timeBatchCompressTrigger := false
 	haveSidecarMem := false
 
 	coordinator, err := NewCoordinator(
@@ -223,14 +225,15 @@ func memoryTestBasic(t *testing.T) *Memory {
 				haveSidecarMem = true
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), tokenShrink) {
-				timelienShrinkApplyCount++
+			if utils.MatchAllOfSubString(request.GetPrompt(), tokenBatchCompressed) {
+				timelineBatchCompressApplyCount++
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-shrink"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-shrink", "persistent": "` + tokenShrink + `"}`))
-				log.Info("timeline shrink triggered")
-				timeshrinkTrigger = true
+			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-reducer"`) ||
+				strings.Contains(request.GetPrompt(), "批量精炼与浓缩") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-reducer", "reducer_memory": "` + tokenBatchCompressed + `"}`))
+				log.Info("timeline batch compress triggered")
+				timeBatchCompressTrigger = true
 				return rsp, nil
 			}
 
@@ -333,7 +336,7 @@ LOOP:
 				// break LOOP
 			}
 
-			if useToolReview && useToolReviewPass && timeshrinkTrigger {
+			if useToolReview && useToolReviewPass && timeBatchCompressTrigger {
 
 				break LOOP
 			}
@@ -356,7 +359,7 @@ LOOP:
 	passed := false
 	// 由于异步处理原因，时间线检查给 3 * 500 ms 的宽容度
 	for i := 0; i < 3; i++ {
-		if utils.MatchAllOfSubString(m.timeline.Dump(), token2, tokenShrink, noexistedfileToken) {
+		if utils.MatchAllOfSubString(m.timeline.Dump(), token2, tokenBatchCompressed, noexistedfileToken) {
 			passed = true
 			break
 		}
@@ -367,7 +370,7 @@ LOOP:
 		fmt.Println("--------------------------------------------------------")
 		fmt.Println(token1)
 		fmt.Println(token2)
-		fmt.Println(tokenShrink)
+		fmt.Println(tokenBatchCompressed)
 		t.Fatal("timeline not right")
 	}
 
