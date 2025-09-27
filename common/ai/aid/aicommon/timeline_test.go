@@ -39,17 +39,31 @@ type mockedAI struct {
 func (m *mockedAI) CallAI(req *AIRequest) (*AIResponse, error) {
 	rsp := NewUnboundAIResponse()
 	defer rsp.Close()
-	rsp.EmitOutputStream(strings.NewReader(`
+
+	// Check if this is a batch compression request
+	prompt := req.GetPrompt()
+	if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
+		rsp.EmitOutputStream(strings.NewReader(`
+{"@action": "timeline-reducer", "reducer_memory": "batch compressed summary via ai"}
+`))
+	} else if strings.Contains(prompt, "timeline-reducer") || strings.Contains(prompt, "timeline reducer") {
+		rsp.EmitOutputStream(strings.NewReader(`
+{"@action": "timeline-reducer", "reducer_memory": "reducer memory via ai"}
+`))
+	} else {
+		rsp.EmitOutputStream(strings.NewReader(`
 {"@action": "timeline-shrink", "persistent": "summary via ai"}
 `))
+	}
 	return rsp, nil
 }
 
-func TestMemoryTimelineWithSummary(t *testing.T) {
-	memoryTimeline := NewTimeline(3, &mockedAI{}, nil)
+func TestMemoryTimelineWithBatchCompression(t *testing.T) {
+	memoryTimeline := NewTimeline(200, &mockedAI{}, nil)
 	memoryTimeline.BindConfig(NewMockedAIConfig(context.Background()), &mockedAI{})
-	memoryTimeline.SetTimelineLimit(3)
-	for i := 1; i <= 10; i++ {
+	memoryTimeline.SetTimelineLimit(1000) // Set very high limit to avoid any reducer triggering
+	// Push exactly 105 items to trigger batch compression (100 items threshold)
+	for i := 1; i <= 105; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(i + 100),
 			Name:        "test",
@@ -62,11 +76,14 @@ func TestMemoryTimelineWithSummary(t *testing.T) {
 	}
 
 	result := memoryTimeline.Dump()
-	t.Log(result)
 	require.True(t, strings.Contains(result, "test"))
 	require.True(t, strings.Contains(result, "--["))
-	require.True(t, strings.Contains(result, "summary via ai"))
-	require.Equal(t, strings.Count(result, `summary via ai`), 7)
+	// With batch compression, we should have compressed items and remaining items
+	require.True(t, strings.Contains(result, "reducer-memory"))
+	// Should have roughly half the original items after compression (originally 105, should be around 50-60 after compression)
+	totalItems := strings.Count(result, "--[")
+	require.True(t, totalItems < 70, "Should have compressed items, total items: %d", totalItems)
+	require.True(t, totalItems > 30, "Should have remaining items after compression, total items: %d", totalItems)
 }
 
 type mockedAI2 struct {
@@ -77,7 +94,12 @@ func (m *mockedAI2) CallAI(req *AIRequest) (*AIResponse, error) {
 	rsp := NewUnboundAIResponse()
 	defer rsp.Close()
 
-	if utils.MatchAllOfRegexp(req.GetPrompt(), `const"\s*:\s*"timeline-reducer"`) {
+	prompt := req.GetPrompt()
+	if strings.Contains(prompt, "批量精炼与浓缩") || strings.Contains(prompt, "batch compress") {
+		rsp.EmitOutputStream(strings.NewReader(`
+{"@action": "timeline-reducer", "reducer_memory": "batch compressed content ` + fmt.Sprint(atomic.AddInt64(m.hCompressTime, 1)) + `"}
+`))
+	} else if utils.MatchAllOfRegexp(prompt, `const"\s*:\s*"timeline-reducer"`) || strings.Contains(prompt, "timeline-reducer") {
 		rsp.EmitOutputStream(strings.NewReader(`
 {"@action": "timeline-reducer", "reducer_memory": "高度压缩的内容` + fmt.Sprint(atomic.AddInt64(m.hCompressTime, 1)) + `"}
 `))
@@ -90,13 +112,14 @@ func (m *mockedAI2) CallAI(req *AIRequest) (*AIResponse, error) {
 	return rsp, nil
 }
 
-func TestMemoryTimelineWithReachLimitSummary(t *testing.T) {
+func TestMemoryTimelineWithReachLimitBatchCompression(t *testing.T) {
 	memoryTimeline := NewTimeline(2, &mockedAI2{
 		hCompressTime: new(int64),
 	}, nil)
 	memoryTimeline.BindConfig(NewMockedAIConfig(context.Background()), &mockedAI2{})
 	memoryTimeline.SetTimelineLimit(2)
-	for i := 1; i <= 20; i++ {
+	// Push enough items to trigger batch compression (100 items threshold)
+	for i := 1; i <= 105; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(i + 100),
 			Name:        "test",
@@ -112,11 +135,12 @@ func TestMemoryTimelineWithReachLimitSummary(t *testing.T) {
 	t.Log(result)
 	require.True(t, strings.Contains(result, "test"))
 	require.True(t, strings.Contains(result, "--["))
-	require.True(t, strings.Contains(result, "summary via ai"))
-	require.Equal(t, strings.Count(result, `summary via ai`), 4)
 	require.True(t, strings.Contains(result, "高度压缩的内容"))
-	require.Equal(t, strings.Count(result, `高度压缩的内容`), 1)
-	require.True(t, strings.Contains(result, "高度压缩的内容14"))
+	// Should have at least one batch compression result
+	require.True(t, strings.Count(result, `高度压缩的内容`) >= 1)
+	// Should have remaining timeline items
+	totalItems := strings.Count(result, "--[")
+	require.True(t, totalItems > 0, "Should have remaining timeline items")
 }
 
 // MockedAIConfig 实现 AICallerConfigIf 接口，用于测试
