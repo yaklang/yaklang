@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -175,68 +174,6 @@ func SplitDocumentsByMetadata(docs []Document, metadataKey string) map[any][]Doc
 	}
 
 	return groups
-}
-
-func ParseLayersInfo(graphInfos *schema.GroupInfos, loadVectorByKey func(string) []float32) []*hnsw.Layer[string] {
-	if graphInfos == nil || len(*graphInfos) == 0 {
-		return nil
-	}
-
-	// 注意：当前只支持恢复标准HNSW图（非PQ优化）
-	// 如果需要PQ优化支持，需要额外的序列化信息
-
-	layers := make([]*hnsw.Layer[string], 0)
-	layerMap := make(map[int]*hnsw.Layer[string])
-
-	// 第一步：创建所有节点的映射，但不建立邻居关系
-	nodeMap := make(map[string]hnswspec.LayerNode[string])
-
-	for _, graphInfo := range *graphInfos {
-		if _, ok := layerMap[graphInfo.LayerLevel]; !ok {
-			layerMap[graphInfo.LayerLevel] = &hnsw.Layer[string]{
-				Nodes: make(map[string]hnswspec.LayerNode[string]),
-			}
-		}
-
-		// 为每个节点创建StandardLayerNode（非PQ模式）
-		if _, exists := nodeMap[graphInfo.Key]; !exists {
-			nodeMap[graphInfo.Key] = hnswspec.NewStandardLayerNode(
-				graphInfo.Key,
-				func() []float32 { return loadVectorByKey(graphInfo.Key) },
-			)
-		}
-
-		layerMap[graphInfo.LayerLevel].Nodes[graphInfo.Key] = nodeMap[graphInfo.Key]
-	}
-
-	// 第二步：建立邻居关系
-	for _, graphInfo := range *graphInfos {
-		currentNode := nodeMap[graphInfo.Key]
-		if currentNode == nil {
-			continue
-		}
-
-		// 创建邻居节点并建立连接
-		for _, neighborKey := range graphInfo.Neighbors {
-			if neighborNode, exists := nodeMap[neighborKey]; exists {
-				// 这里使用默认的距离函数，实际应该从图配置中获取
-				// 但由于我们只是恢复结构，不重新计算邻居，所以使用任意距离函数
-				currentNode.AddNeighbor(neighborNode, 16, hnswspec.CosineDistance[string])
-			}
-		}
-	}
-
-	// 按层数排序
-	keys := make([]int, 0, len(layerMap))
-	for key := range layerMap {
-		keys = append(keys, key)
-	}
-	slices.Sort(keys)
-	for _, key := range keys {
-		layers = append(layers, layerMap[key])
-	}
-
-	return layers
 }
 
 // MockEmbedder 是一个模拟的嵌入客户端，用于测试
