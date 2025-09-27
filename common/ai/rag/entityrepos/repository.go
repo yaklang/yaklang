@@ -412,6 +412,18 @@ func (r *EntityRepository) queryEntities(filter *ypb.EntityFilter) ([]*schema.ER
 }
 
 func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) error {
+	addEntityStartTime := time.Now()
+	defer func() {
+		duration := time.Since(addEntityStartTime)
+		if duration > 3*time.Second {
+			log.Warnf("SLOW addEntityToVectorIndex: entity [%s] took %v", entry.EntityName, duration)
+		}
+		if duration > 10*time.Second {
+			log.Errorf("CRITICAL addEntityToVectorIndex: entity [%s] took %v - possible deadlock", entry.EntityName, duration)
+		}
+	}()
+
+	metadataStartTime := time.Now()
 	metadata := map[string]any{
 		schema.META_Data_UUID:  entry.Uuid,
 		schema.META_Data_Title: entry.EntityName,
@@ -428,7 +440,19 @@ func (r *EntityRepository) addEntityToVectorIndex(entry *schema.ERModelEntity) e
 	)
 	documentID := fmt.Sprintf("%v_entity", entry.Uuid)
 	content := entry.ToRAGContent()
-	return r.AddVectorIndex(documentID, content, opts...)
+	metadataDuration := time.Since(metadataStartTime)
+
+	vectorIndexStartTime := time.Now()
+	err := r.AddVectorIndex(documentID, content, opts...)
+	vectorIndexDuration := time.Since(vectorIndexStartTime)
+
+	totalDuration := time.Since(addEntityStartTime)
+	if totalDuration > 5*time.Second {
+		log.Warnf("addEntityToVectorIndex PERFORMANCE: entity [%s] total=%v, metadata=%v, vectorIndex=%v",
+			entry.EntityName, totalDuration, metadataDuration, vectorIndexDuration)
+	}
+
+	return err
 }
 
 func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERModelRelationship) error {
@@ -499,9 +523,14 @@ func (r *EntityRepository) UpdateEntity(id uint, e *schema.ERModelEntity) error 
 		return err
 	}
 	go func() {
+		goroutineStartTime := time.Now()
 		err := r.addEntityToVectorIndex(e)
+		goroutineDuration := time.Since(goroutineStartTime)
+
 		if err != nil {
-			log.Errorf("failed to add entity [%s] to vector index: %v", e.EntityName, err)
+			log.Errorf("failed to add entity [%s] to vector index: %v (goroutine took %v)", e.EntityName, err, goroutineDuration)
+		} else if goroutineDuration > 5*time.Second {
+			log.Warnf("SLOW entity vector index goroutine: entity [%s] took %v", e.EntityName, goroutineDuration)
 		}
 	}()
 	return nil
@@ -515,9 +544,14 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 		return err
 	}
 	go func() {
+		goroutineStartTime := time.Now()
 		err := r.addEntityToVectorIndex(entity)
+		goroutineDuration := time.Since(goroutineStartTime)
+
 		if err != nil {
-			log.Errorf("failed to add entity [%s] to vector index: %v", entity.EntityName, err)
+			log.Errorf("failed to add entity [%s] to vector index: %v (goroutine took %v)", entity.EntityName, err, goroutineDuration)
+		} else if goroutineDuration > 5*time.Second {
+			log.Warnf("SLOW entity vector index goroutine: entity [%s] took %v", entity.EntityName, goroutineDuration)
 		}
 	}()
 	return nil
@@ -526,34 +560,74 @@ func (r *EntityRepository) CreateEntity(entity *schema.ERModelEntity) error {
 //--- Relationship Operations ---
 
 func (r *EntityRepository) MergeAndSaveRelationship(newRelationship *schema.ERModelRelationship) error {
+	mergeStartTime := time.Now()
+	defer func() {
+		duration := time.Since(mergeStartTime)
+		if duration > 5*time.Second {
+			log.Warnf("SLOW MergeAndSaveRelationship: relationship [%s->%s] took %v",
+				newRelationship.SourceEntityIndex[:min(20, len(newRelationship.SourceEntityIndex))],
+				newRelationship.TargetEntityIndex[:min(20, len(newRelationship.TargetEntityIndex))], duration)
+		}
+	}()
+
+	queryStartTime := time.Now()
 	oldRelationships, err := r.queryRelationship(&ypb.RelationshipFilter{
 		SourceEntityIndex: []string{newRelationship.SourceEntityIndex},
 		TargetEntityIndex: []string{newRelationship.TargetEntityIndex},
 		Types:             []string{newRelationship.RelationshipType},
 	})
+	queryDuration := time.Since(queryStartTime)
+
 	if err != nil {
 		return utils.Errorf("failed to query relationship: %v", err)
 	}
+
+	if queryDuration > time.Second {
+		log.Warnf("SLOW relationship query: took %v for %d results", queryDuration, len(oldRelationships))
+	}
+
 	similarCheck := func(old string, new string) bool {
 		if old == new {
 			return true
 		}
-		score, err := r.GetRAGSystem().VectorSimilarity(old, new)
-		if err != nil {
-			log.Errorf("failed to calculate relationship similarity: %v", err)
-		}
-		if score > r.runtimeConfig.similarityThreshold {
-			return true
-		}
-		return false
+		// 避免在关系合并时调用VectorSimilarity，这可能导致死锁
+		// VectorSimilarity需要RLock，而当前可能已经持有其他锁
+		log.Debugf("relationship type similarity check avoided: %s vs %s", old, new)
+		return false // 简化逻辑，避免潜在死锁
 	}
+
+	similarityStartTime := time.Now()
+	var similarityChecks int
 	for _, relationship := range oldRelationships { // 关系相对于实体来说相对明确，可以简单地通过语义相似度做合并
-		if similarCheck(relationship.RelationshipType, relationship.RelationshipType) {
+		similarityChecks++
+		if similarCheck(relationship.RelationshipType, newRelationship.RelationshipType) {
 			relationship.Attributes = utils.MergeGeneralMap(newRelationship.Attributes, relationship.Attributes)
-			return r.UpdateRelationship(relationship.Uuid, relationship)
+			updateStartTime := time.Now()
+			err := r.UpdateRelationship(relationship.Uuid, relationship)
+			updateDuration := time.Since(updateStartTime)
+
+			if updateDuration > time.Second {
+				log.Warnf("SLOW relationship update: took %v", updateDuration)
+			}
+
+			return err
 		}
 	}
-	return r.AddRelationship(newRelationship.SourceEntityIndex, newRelationship.TargetEntityIndex, newRelationship.RelationshipType, newRelationship.RelationshipTypeVerbose, newRelationship.Attributes)
+	similarityDuration := time.Since(similarityStartTime)
+
+	if similarityDuration > 2*time.Second {
+		log.Warnf("SLOW similarity checks: %d checks took %v", similarityChecks, similarityDuration)
+	}
+
+	addStartTime := time.Now()
+	err = r.AddRelationship(newRelationship.SourceEntityIndex, newRelationship.TargetEntityIndex, newRelationship.RelationshipType, newRelationship.RelationshipTypeVerbose, newRelationship.Attributes)
+	addDuration := time.Since(addStartTime)
+
+	if addDuration > time.Second {
+		log.Warnf("SLOW relationship add: took %v", addDuration)
+	}
+
+	return err
 }
 
 func (r *EntityRepository) UpdateRelationship(uuid string, relationship *schema.ERModelRelationship) error {
