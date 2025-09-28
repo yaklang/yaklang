@@ -2,6 +2,7 @@ package hnsw
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"strings"
 	"testing"
@@ -13,11 +14,95 @@ import (
 )
 
 // generateRandomVector 生成指定维度的随机向量
+// 使用更复杂的数值范围和分布来增加向量计算复杂度
 func generateRandomVector(dimension int, rng *rand.Rand) []float32 {
 	vector := make([]float32, dimension)
 	for i := range vector {
-		vector[i] = rng.Float32()
+		// 使用更大的数值范围和更高的精度
+		// 范围：[-100.0, 100.0]，增加负数和更大的数值
+		vector[i] = (rng.Float32() - 0.5) * 200.0
+
+		// 添加一些小数位的复杂性
+		// 通过额外的随机数增加精度
+		vector[i] += rng.Float32() * 0.001  // 增加千分位的随机性
+		vector[i] += rng.Float32() * 0.0001 // 增加万分位的随机性
 	}
+	return vector
+}
+
+// generateComplexRandomVector 生成更复杂的随机向量（高精度、多分布）
+func generateComplexRandomVector(dimension int, rng *rand.Rand) []float32 {
+	vector := make([]float32, dimension)
+	for i := range vector {
+		switch i % 4 {
+		case 0:
+			// 正态分布 (均值=0, 标准差=10)
+			vector[i] = float32(rng.NormFloat64() * 10.0)
+		case 1:
+			// 指数分布的负对数 (范围约 [0, 10])
+			vector[i] = float32(-math.Log(rng.Float64()) * 2.0)
+		case 2:
+			// 高精度均匀分布 [-50, 50]
+			vector[i] = (rng.Float32() - 0.5) * 100.0
+			// 增加多层精度
+			vector[i] += rng.Float32() * 0.01
+			vector[i] += rng.Float32() * 0.001
+			vector[i] += rng.Float32() * 0.0001
+		case 3:
+			// 分段函数：50%概率为大值，50%概率为小值
+			if rng.Float32() < 0.5 {
+				vector[i] = rng.Float32() * 100.0 // [0, 100]
+			} else {
+				vector[i] = -rng.Float32() * 100.0 // [-100, 0]
+			}
+			// 添加噪声
+			vector[i] += float32(rng.NormFloat64() * 0.1)
+		}
+	}
+	return vector
+}
+
+// generateRealisticEmbeddingVector 生成类似真实embedding的向量
+func generateRealisticEmbeddingVector(dimension int, rng *rand.Rand) []float32 {
+	vector := make([]float32, dimension)
+
+	// 模拟真实embedding的特征：
+	// 1. 大部分值接近0
+	// 2. 少数维度有显著值
+	// 3. 符合某种分布模式
+
+	for i := range vector {
+		// 80%的维度为小值（接近0）
+		if rng.Float32() < 0.8 {
+			vector[i] = float32(rng.NormFloat64() * 0.1) // 小值，标准差0.1
+		} else {
+			// 20%的维度为显著值
+			vector[i] = float32(rng.NormFloat64() * 2.0) // 较大值，标准差2.0
+		}
+
+		// 添加一些稀疏性：5%的维度设为0
+		if rng.Float32() < 0.05 {
+			vector[i] = 0.0
+		}
+
+		// 增加精度复杂度
+		vector[i] += float32(rng.NormFloat64() * 0.001)
+	}
+
+	// L2标准化（可选，模拟真实embedding）
+	if rng.Float32() < 0.5 {
+		norm := float32(0.0)
+		for _, v := range vector {
+			norm += v * v
+		}
+		norm = float32(math.Sqrt(float64(norm)))
+		if norm > 0 {
+			for i := range vector {
+				vector[i] /= norm
+			}
+		}
+	}
+
 	return vector
 }
 
@@ -636,7 +721,7 @@ func TestHNSWStressTest10K(t *testing.T) {
 		t.Skip("no performance test in ci")
 		return
 	}
-	
+
 	if testing.Short() {
 		t.Skip("Skipping 10K stress test in short mode")
 	}
@@ -731,4 +816,371 @@ func TestHNSWStressTest10K(t *testing.T) {
 	}
 
 	fmt.Println(strings.Repeat("=", 70))
+}
+
+// TestVectorComplexityImpact 测试不同向量复杂度对HNSW性能的影响
+func TestVectorComplexityImpact(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
+	if testing.Short() {
+		t.Skip("Skipping vector complexity impact test in short mode")
+	}
+
+	nodeCount := 2000 // 使用中等规模进行快速对比
+	dimension := 512
+	addNodes := 50
+
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("                Vector Complexity Impact on HNSW Performance")
+	fmt.Println(strings.Repeat("=", 80))
+
+	// 定义不同的向量生成策略
+	strategies := []struct {
+		name      string
+		generator func(int, *rand.Rand) []float32
+	}{
+		{"Simple [0,1]", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				vector[i] = rng.Float32() // 原始简单策略
+			}
+			return vector
+		}},
+		{"Enhanced [-100,100]", generateRandomVector},             // 增强的范围和精度
+		{"Complex Multi-Dist", generateComplexRandomVector},       // 多分布复杂向量
+		{"Realistic Embedding", generateRealisticEmbeddingVector}, // 真实embedding风格
+	}
+
+	fmt.Printf("\n%-20s %-15s %-15s %-12s %-15s %-15s\n",
+		"Strategy", "Build Time", "Add Time", "Avg/Node", "Nodes/sec", "Memory(KB)")
+	fmt.Println(strings.Repeat("-", 100))
+
+	var allResults []struct {
+		strategy string
+		result   PerformanceResult
+	}
+
+	for _, strategy := range strategies {
+		fmt.Printf("\n🔍 Testing Strategy: %s\n", strategy.name)
+
+		// 创建图并使用指定的向量生成策略
+		g := NewGraph[int]()
+		g.Rng = rand.New(rand.NewSource(42))
+
+		// 生成初始节点
+		rng := rand.New(rand.NewSource(42))
+		initialNodes := make([]InputNode[int], nodeCount)
+		for i := 0; i < nodeCount; i++ {
+			initialNodes[i] = MakeInputNode(i+1, strategy.generator(dimension, rng))
+		}
+
+		// 测量构建图的时间
+		start := time.Now()
+		g.Add(initialNodes...)
+		buildDuration := time.Since(start)
+
+		// 生成要添加的新节点
+		rng = rand.New(rand.NewSource(43))
+		newNodes := make([]InputNode[int], addNodes)
+		for i := 0; i < addNodes; i++ {
+			newNodes[i] = MakeInputNode(nodeCount+i+1, strategy.generator(dimension, rng))
+		}
+
+		// 测量添加新节点的时间
+		start = time.Now()
+		g.Add(newNodes...)
+		addDuration := time.Since(start)
+
+		// 计算性能指标
+		avgPerNode := addDuration / time.Duration(addNodes)
+		nodesPerSec := float64(addNodes) / addDuration.Seconds()
+
+		// 估算内存使用
+		totalNodes := 0
+		totalConnections := 0
+		for _, layer := range g.Layers {
+			totalNodes += len(layer.Nodes)
+			for _, node := range layer.Nodes {
+				totalConnections += len(node.GetNeighbors())
+			}
+		}
+
+		var memoryKB float64
+		if totalNodes > 0 {
+			vectorMemory := dimension * 4
+			avgConnections := float64(totalConnections) / float64(totalNodes)
+			connectionMemory := int(avgConnections * 8)
+			metadataMemory := 50
+			estimatedMemoryPerNode := vectorMemory + connectionMemory + metadataMemory
+			memoryKB = float64(estimatedMemoryPerNode*totalNodes) / 1024
+		}
+
+		result := PerformanceResult{
+			InitialNodes:     nodeCount,
+			AddedNodes:       addNodes,
+			Dimension:        dimension,
+			InitDuration:     buildDuration,
+			AddDuration:      addDuration,
+			AvgPerNode:       avgPerNode,
+			NodesPerSecond:   nodesPerSec,
+			ActualNodes:      totalNodes,
+			MemoryEstimateKB: memoryKB,
+		}
+
+		allResults = append(allResults, struct {
+			strategy string
+			result   PerformanceResult
+		}{strategy.name, result})
+
+		fmt.Printf("%-20s %-15v %-15v %-12v %-15.2f %-15.1f\n",
+			strategy.name, buildDuration, addDuration, avgPerNode, nodesPerSec, memoryKB)
+
+		// 验证搜索功能
+		queryVec := strategy.generator(dimension, rand.New(rand.NewSource(44)))
+		results := g.Search(queryVec, 10)
+		require.NotEmpty(t, results, "Search should return results for strategy %s", strategy.name)
+
+		log.Infof("Strategy '%s' completed: build=%v, add=%v, nodes/sec=%.2f",
+			strategy.name, buildDuration, addDuration, nodesPerSec)
+	}
+
+	// 性能对比分析
+	fmt.Println("\n" + strings.Repeat("=", 80))
+	fmt.Println("                           Performance Comparison")
+	fmt.Println(strings.Repeat("=", 80))
+
+	if len(allResults) > 1 {
+		baseline := allResults[0] // 以第一个（简单策略）为基准
+		fmt.Printf("\nBaseline (Simple [0,1]): %.2f nodes/sec\n", baseline.result.NodesPerSecond)
+		fmt.Println(strings.Repeat("-", 60))
+
+		for i := 1; i < len(allResults); i++ {
+			current := allResults[i]
+			speedRatio := current.result.NodesPerSecond / baseline.result.NodesPerSecond
+			timeRatio := float64(current.result.AvgPerNode.Nanoseconds()) / float64(baseline.result.AvgPerNode.Nanoseconds())
+
+			fmt.Printf("%-20s: %.2fx speed, %.2fx time complexity\n",
+				current.strategy, speedRatio, timeRatio)
+
+			if speedRatio < 0.7 {
+				log.Warnf("Strategy '%s' significantly slower than baseline: %.2fx", current.strategy, speedRatio)
+			} else if speedRatio > 1.3 {
+				log.Infof("Strategy '%s' significantly faster than baseline: %.2fx", current.strategy, speedRatio)
+			}
+		}
+	}
+
+	fmt.Println(strings.Repeat("=", 80))
+}
+
+// TestFloatPrecisionImpact 测试浮点数精度对HNSW性能的影响
+func TestFloatPrecisionImpact(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
+	if testing.Short() {
+		t.Skip("Skipping float precision impact test in short mode")
+	}
+
+	nodeCount := 1500 // 稍小的规模用于快速测试
+	dimension := 256
+	addNodes := 30
+
+	fmt.Println("\n" + strings.Repeat("=", 90))
+	fmt.Println("                    Float Precision Impact on HNSW Performance")
+	fmt.Println(strings.Repeat("=", 90))
+
+	// 定义不同精度的向量生成策略
+	precisionStrategies := []struct {
+		name      string
+		generator func(int, *rand.Rand) []float32
+	}{
+		{"Integer Only", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				vector[i] = float32(rng.Intn(201) - 100) // [-100, 100] 整数
+			}
+			return vector
+		}},
+		{"1 Decimal", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				vector[i] = float32(rng.Intn(2001)-1000) / 10.0 // [-100.0, 100.0] 一位小数
+			}
+			return vector
+		}},
+		{"2 Decimals", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				vector[i] = float32(rng.Intn(20001)-10000) / 100.0 // [-100.00, 100.00] 两位小数
+			}
+			return vector
+		}},
+		{"3 Decimals", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				vector[i] = float32(rng.Intn(200001)-100000) / 1000.0 // [-100.000, 100.000] 三位小数
+			}
+			return vector
+		}},
+		{"High Precision", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				// 使用当前的"增强"策略（多层小数位）
+				vector[i] = (rng.Float32() - 0.5) * 200.0
+				vector[i] += rng.Float32() * 0.001
+				vector[i] += rng.Float32() * 0.0001
+			}
+			return vector
+		}},
+		{"Ultra Precision", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				// 极高精度（更多小数位）
+				vector[i] = (rng.Float32() - 0.5) * 200.0
+				vector[i] += rng.Float32() * 0.001
+				vector[i] += rng.Float32() * 0.0001
+				vector[i] += rng.Float32() * 0.00001
+				vector[i] += rng.Float32() * 0.000001
+				vector[i] += rng.Float32() * 0.0000001
+			}
+			return vector
+		}},
+		{"Simple [0,1]", func(dim int, rng *rand.Rand) []float32 {
+			vector := make([]float32, dim)
+			for i := range vector {
+				vector[i] = rng.Float32() // 基准对比
+			}
+			return vector
+		}},
+	}
+
+	fmt.Printf("\n%-15s %-15s %-15s %-12s %-15s %-20s\n",
+		"Precision", "Build Time", "Add Time", "Avg/Node", "Nodes/sec", "Sample Vector[0]")
+	fmt.Println(strings.Repeat("-", 100))
+
+	var allResults []struct {
+		strategy string
+		result   PerformanceResult
+		sample   float32
+	}
+
+	for _, strategy := range precisionStrategies {
+		fmt.Printf("\n🔍 Testing Precision: %s\n", strategy.name)
+
+		// 创建图并使用指定的精度策略
+		g := NewGraph[int]()
+		g.Rng = rand.New(rand.NewSource(42))
+
+		// 生成初始节点
+		rng := rand.New(rand.NewSource(42))
+		initialNodes := make([]InputNode[int], nodeCount)
+		var sampleVector []float32
+		for i := 0; i < nodeCount; i++ {
+			vec := strategy.generator(dimension, rng)
+			if i == 0 {
+				sampleVector = vec // 保存第一个向量作为样本
+			}
+			initialNodes[i] = MakeInputNode(i+1, vec)
+		}
+
+		// 测量构建图的时间
+		start := time.Now()
+		g.Add(initialNodes...)
+		buildDuration := time.Since(start)
+
+		// 生成要添加的新节点
+		rng = rand.New(rand.NewSource(43))
+		newNodes := make([]InputNode[int], addNodes)
+		for i := 0; i < addNodes; i++ {
+			newNodes[i] = MakeInputNode(nodeCount+i+1, strategy.generator(dimension, rng))
+		}
+
+		// 测量添加新节点的时间
+		start = time.Now()
+		g.Add(newNodes...)
+		addDuration := time.Since(start)
+
+		// 计算性能指标
+		avgPerNode := addDuration / time.Duration(addNodes)
+		nodesPerSec := float64(addNodes) / addDuration.Seconds()
+
+		result := PerformanceResult{
+			InitialNodes:   nodeCount,
+			AddedNodes:     addNodes,
+			Dimension:      dimension,
+			InitDuration:   buildDuration,
+			AddDuration:    addDuration,
+			AvgPerNode:     avgPerNode,
+			NodesPerSecond: nodesPerSec,
+		}
+
+		allResults = append(allResults, struct {
+			strategy string
+			result   PerformanceResult
+			sample   float32
+		}{strategy.name, result, sampleVector[0]})
+
+		fmt.Printf("%-15s %-15v %-15v %-12v %-15.2f %-20.6f\n",
+			strategy.name, buildDuration, addDuration, avgPerNode, nodesPerSec, sampleVector[0])
+
+		// 验证搜索功能
+		queryVec := strategy.generator(dimension, rand.New(rand.NewSource(44)))
+		results := g.Search(queryVec, 5)
+		require.NotEmpty(t, results, "Search should return results for precision %s", strategy.name)
+
+		log.Infof("Precision '%s' completed: build=%v, add=%v, nodes/sec=%.2f, sample=%.6f",
+			strategy.name, buildDuration, addDuration, nodesPerSec, sampleVector[0])
+	}
+
+	// 精度对比分析
+	fmt.Println("\n" + strings.Repeat("=", 90))
+	fmt.Println("                           Precision Performance Analysis")
+	fmt.Println(strings.Repeat("=", 90))
+
+	if len(allResults) > 0 {
+		// 找到基准（Simple [0,1]）
+		var baseline *struct {
+			strategy string
+			result   PerformanceResult
+			sample   float32
+		}
+		for i := range allResults {
+			if allResults[i].strategy == "Simple [0,1]" {
+				baseline = &allResults[i]
+				break
+			}
+		}
+
+		if baseline != nil {
+			fmt.Printf("\nBaseline (Simple [0,1]): %.2f nodes/sec\n", baseline.result.NodesPerSecond)
+			fmt.Println(strings.Repeat("-", 70))
+
+			for _, current := range allResults {
+				if current.strategy == "Simple [0,1]" {
+					continue
+				}
+
+				speedRatio := current.result.NodesPerSecond / baseline.result.NodesPerSecond
+				timeRatio := float64(current.result.AvgPerNode.Nanoseconds()) / float64(baseline.result.AvgPerNode.Nanoseconds())
+
+				fmt.Printf("%-15s: %.2fx speed, %.2fx time, sample=%.6f\n",
+					current.strategy, speedRatio, timeRatio, current.sample)
+
+				// 性能警告
+				if speedRatio < 0.8 {
+					log.Warnf("Precision '%s' significantly slower: %.2fx", current.strategy, speedRatio)
+				} else if speedRatio > 1.2 {
+					log.Infof("Precision '%s' significantly faster: %.2fx", current.strategy, speedRatio)
+				}
+			}
+		}
+	}
+
+	fmt.Println(strings.Repeat("=", 90))
 }
