@@ -144,7 +144,7 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 	cumulativeSummary := ""
 
 	analyze := func(query string) error {
-		forgeResult, err := _executeLiteForgeTemp(prompt+"\n"+query+"\n"+cumulativeSummary, analyzeConfig.fallbackOptions...)
+		forgeResult, err := _executeLiteForgeTemp(prompt+"\n"+query+"\n"+cumulativeSummary, analyzeConfig.ForgeExecOption(AUDIO_OUTPUT_SCHEMA)...)
 		if err != nil {
 			return err
 		}

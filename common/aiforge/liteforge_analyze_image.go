@@ -499,7 +499,7 @@ Do not treat the image and the text as separate items. You must **integrate** th
 
 ` + imgCfg.ExtraPrompt
 
-	forgeResult, err := _executeLiteForgeTemp(prompt, imgCfg.fallbackOptions...)
+	forgeResult, err := _executeLiteForgeTemp(prompt, imgCfg.ForgeExecOption(IMAGE_OUTPUT_SCHEMA)...)
 	if err != nil {
 		return nil, err
 	}
@@ -522,9 +522,9 @@ Do not treat the image and the text as separate items. You must **integrate** th
 	}
 
 	// 检查具体的字段内容用于调试
-	log.Infof("Raw cumulative_summary: %q", forgeResult.GetString("cumulative_summary"))
-	log.Infof("Visual elements count: %d", len(forgeResult.GetInvokeParamsArray("visual_elements")))
-	log.Infof("Text elements count: %d", len(forgeResult.GetInvokeParamsArray("text_elements")))
+	log.Debugf("Raw cumulative_summary: %q", forgeResult.GetString("cumulative_summary"))
+	log.Debugf("Visual elements count: %d", len(forgeResult.GetInvokeParamsArray("visual_elements")))
+	log.Debugf("Text elements count: %d", len(forgeResult.GetInvokeParamsArray("text_elements")))
 
 	result := &ImageAnalysisResult{}
 	/*
@@ -582,7 +582,7 @@ Do not treat the image and the text as separate items. You must **integrate** th
 			continue // 跳过空的visual元素
 		}
 
-		log.Infof("Processing visual element %d: id=%q, label=%q", idx, visual.GetString("id"), visual.GetString("label"))
+		log.Debugf("Processing visual element %d: id=%q, label=%q", idx, visual.GetString("id"), visual.GetString("label"))
 
 		element := VisualElement{
 			ID:          visual.GetString("id"),
@@ -624,7 +624,7 @@ Do not treat the image and the text as separate items. You must **integrate** th
 			continue // 跳过空的text元素
 		}
 
-		log.Infof("Processing text element %d: id=%q, text=%q", idx, text.GetString("id"), text.GetString("text"))
+		log.Debugf("Processing text element %d: id=%q, text=%q", idx, text.GetString("id"), text.GetString("text"))
 
 		textElement := TextElement{
 			ID:         text.GetString("id"),
@@ -702,7 +702,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 			analyzeConfig.AnalyzeStatusCard("知识实体分析(Entity Analyzing)", processedCount)
 		}()
 		if chunk.MIMEType().IsImage() {
-			return AnalyzeImage(chunk.Data(), opts)
+			return AnalyzeImage(chunk.Data(), opts...)
 		} else {
 			return &TextAnalysisResult{Text: string(chunk.Data())}, nil
 		}

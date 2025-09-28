@@ -3,6 +3,7 @@ package hnsw
 import (
 	"cmp"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"io"
 	"math"
 	"math/rand"
@@ -707,12 +708,16 @@ func (g *Graph[K]) getNodeType() InputNodeType {
 // Add inserts nodes into the graph.
 // If another node with the same ID exists, it is replaced.
 func (g *Graph[K]) Add(nodes ...InputNode[K]) {
-	addStartTime := time.Now()
+	helper := asynchelper.NewDefaultAsyncPerformanceHelper("HNSW Graph Add")
+	helper.Start()
+	defer helper.Close()
+	addStart := helper.MarkNow()
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("recover from panic when adding nodes: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
+		helper.UpdateStatus("LayersChage Callback")
 		if g.OnLayersChange != nil {
 			g.OnLayersChange(g.Layers)
 		}
@@ -722,7 +727,8 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 	nodeType := g.getNodeType()
 	for _, node := range nodes {
-		nodeStartTime := time.Now()
+		helper.UpdateStatus(fmt.Sprintf("adding node %v", node.Key))
+		nodeStart := helper.MarkNow()
 
 		if nodeType == InputNodeTypeNone {
 			nodeType = node.NodeType
@@ -731,6 +737,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		key := node.Key
 		vec := node.ToVector()
 
+		helper.UpdateStatus(fmt.Sprintf("delete key %v", node.Key))
 		deleteStart := time.Now()
 		g.Delete(key)
 		deleteTime := time.Since(deleteStart)
@@ -743,6 +750,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 		// Create layers that don't exist yet.
 		layersCreateStart := time.Now()
+		helper.UpdateStatus(fmt.Sprint("insert level"))
 		for insertLevel >= len(g.Layers) {
 			g.Layers = append(g.Layers, &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K])})
 		}
@@ -771,6 +779,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			var err error
 
 			if i <= insertLevel {
+				helper.UpdateStatus(fmt.Sprintf("nodeCreationStart %v : I [%d]", node.Key, i))
 				nodeCreationStart := time.Now()
 				if g.IsPQEnabled() {
 					// 创建PQ节点
@@ -859,6 +868,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			}
 
 			searchCallStart := time.Now()
+			helper.UpdateStatus(fmt.Sprintf("search layer %d for key %v", i, node.Key))
 			neighborhood := search(searchPoint, searchK, searchEf, vec, g.nodeDistance, nil)
 			searchCallTime := time.Since(searchCallStart)
 			totalSearchTime += searchCallTime
@@ -901,19 +911,15 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		}
 
 		// Performance logging for this node
-		nodeTotalTime := time.Since(nodeStartTime)
+		nodeTotalTime := helper.CheckMarkAndLog(nodeStart, 5*time.Second, "node addition")
 		if nodeTotalTime > 5*time.Second {
 			log.Warnf("HNSW slow node insertion [%v]: total=%v, delete=%v, levelGen=%v, layersCreate=%v, searchCalls=%d, totalSearch=%v, nodeCreate=%v, neighborUpdate=%v",
 				key, nodeTotalTime, deleteTime, levelGenTime, layersCreateTime, searchCallCount, totalSearchTime, totalNodeCreationTime, totalNeighborUpdateTime)
 		}
 	}
 
-	totalAddTime := time.Since(addStartTime)
-	if totalAddTime > 10*time.Second {
-		log.Errorf("HNSW CRITICAL ADD PERFORMANCE: %d nodes took %v (avg: %v per node)", len(nodes), totalAddTime, totalAddTime/time.Duration(len(nodes)))
-	} else if totalAddTime > 3*time.Second {
-		log.Warnf("HNSW SLOW ADD PERFORMANCE: %d nodes took %v (avg: %v per node)", len(nodes), totalAddTime, totalAddTime/time.Duration(len(nodes)))
-	}
+	totalAddTime := helper.CheckMarkAndLog(addStart, 3*time.Second, fmt.Sprintf("HNSW SLOW ADD PERFORMANCE: %d nodes", len(nodes)))
+	helper.CheckMarkAndLog(addStart, 10*time.Second, fmt.Sprintf("HNSW CRITICAL ADD PERFORMANCE: %d nodes", len(nodes)))
 
 	log.Debugf("HNSW Add completed: %d nodes added, final graph size: %d, total time: %v", len(nodes), g.Len(), totalAddTime)
 }

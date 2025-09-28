@@ -42,6 +42,7 @@ func SplitText(text string, maxLength int, opts ...any) ([]string, error) {
 		"Limit": maxLength,
 		"Input": text,
 	}
+	config := NewAnalysisConfig(opts...)
 	tmp, err := template.New("splite").Parse(splitPrompt)
 	if err != nil {
 		return nil, utils.Errorf("template parse failed: %v", err)
@@ -52,9 +53,7 @@ func SplitText(text string, maxLength int, opts ...any) ([]string, error) {
 		return nil, utils.Errorf("template execute failed: %v", err)
 	}
 
-	opts = append(opts, WithOutputJSONSchema(splitSchema))
-
-	result, err := _executeLiteForgeTemp(buf.String(), opts...)
+	result, err := _executeLiteForgeTemp(buf.String(), config.ForgeExecOption(splitSchema)...)
 	if err != nil {
 		return nil, utils.Errorf("execute liteforge failed: %v", err)
 	}
