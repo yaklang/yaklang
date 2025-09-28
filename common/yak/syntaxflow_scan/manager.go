@@ -15,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -61,39 +60,15 @@ type scanManager struct {
 	client *yaklib.YakitClient // TODO NO NEED client
 }
 
-var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
-
 func loadSyntaxFlowTaskFromDB(taskId string, ctx context.Context) (*scanManager, error) {
-	// load from cache
-	// TODO: 不需要缓存
-	if manager, ok := syntaxFlowScanManagerMap.Get(taskId); ok {
-		ctx, cancel := context.WithCancel(ctx)
-		manager.ctx = ctx
-		manager.cancel = cancel
-		if err := manager.restoreTask(); err != nil {
-			return nil, err
-		}
-		return manager, nil
-	} else {
-		// load from db
-		m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
-		if err != nil {
-			return nil, err
-		}
-		if err := m.restoreTask(); err != nil {
-			return nil, err
-		}
-		return m, nil
+	m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
+	if err != nil {
+		return nil, err
 	}
-}
-
-func removeSyntaxFlowTaskByID(id string) {
-	r, ok := syntaxFlowScanManagerMap.Get(id)
-	if !ok {
-		return
+	if err := m.restoreTask(); err != nil {
+		return nil, err
 	}
-	r.Stop()
-	syntaxFlowScanManagerMap.Delete(id)
+	return m, nil
 }
 
 func createEmptySyntaxFlowTaskByID(
@@ -113,13 +88,12 @@ func createEmptySyntaxFlowTaskByID(
 		riskCountMap: utils.NewSafeMap[int64](),
 		cancel:       cancel,
 	}
-	syntaxFlowScanManagerMap.Set(taskId, m)
 	return m, nil
 }
 
 func createSyntaxFlowTaskByConfig(ctx context.Context, c *Config, taskIds ...string) (*scanManager, error) {
 	taskId := ""
-	if len(taskId) > 0 {
+	if len(taskIds) > 0 {
 		taskId = taskIds[0]
 	} else {
 		taskId = uuid.NewString()

@@ -16,6 +16,13 @@ import (
 )
 
 func TestManager(t *testing.T) {
+	newConfig := func(ssaConfig *ssaconfig.Config) *Config {
+		config := &Config{
+			ssaConfig: ssaConfig,
+		}
+		return config
+	}
+
 	t.Run("test save and resume scan task", func(t *testing.T) {
 		taskId := uuid.NewString()
 
@@ -26,7 +33,7 @@ func TestManager(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		task, err := createSyntaxFlowTaskByConfig(context.Background(), scanConfig)
+		task, err := createSyntaxFlowTaskByConfig(context.Background(), newConfig(scanConfig))
 		require.NoError(t, err)
 		log.Infof("m; %v", task)
 
@@ -49,7 +56,7 @@ func TestManager(t *testing.T) {
 		require.Equal(t, task.failedQuery, newTask.failedQuery)
 		require.Equal(t, task.successQuery, newTask.successQuery)
 		require.Equal(t, task.riskCount, newTask.riskCount)
-		require.Equal(t, task.programs, newTask.programs)
+		require.Equal(t, task.ProgramNames, newTask.ProgramNames)
 
 		require.NotNil(t, newTask.ssaConfig)
 		require.NotNil(t, newTask.ssaConfig.GetRuleFilter())
@@ -65,7 +72,7 @@ func TestManager(t *testing.T) {
 			ssaconfig.WithProgramNames(programName),
 		)
 		require.NoError(t, err)
-		task1, err := createSyntaxFlowTaskByConfig(context.Background(), config1)
+		task1, err := createSyntaxFlowTaskByConfig(context.Background(), newConfig(config1))
 		require.NoError(t, err)
 
 		err = task1.SaveTask()
@@ -77,8 +84,9 @@ func TestManager(t *testing.T) {
 			}),
 			ssaconfig.WithProgramNames(programName),
 		)
+
 		require.NoError(t, err)
-		task2, err := createSyntaxFlowTaskByConfig(context.Background(), config2)
+		task2, err := createSyntaxFlowTaskByConfig(context.Background(), newConfig(config2))
 		require.NoError(t, err)
 
 		err = task2.SaveTask()
@@ -95,7 +103,7 @@ func TestManager(t *testing.T) {
 			ssaconfig.WithProgramNames(programName),
 		)
 		require.NoError(t, err)
-		task3, err := createSyntaxFlowTaskByConfig(context.Background(), config3)
+		task3, err := createSyntaxFlowTaskByConfig(context.Background(), newConfig(config3))
 		require.NoError(t, err)
 
 		err = task3.SaveTask()
@@ -149,7 +157,7 @@ func TestManager(t *testing.T) {
 			ssaconfig.WithProjectName(schemaProject.ProjectName),
 		)
 		require.NoError(t, err)
-		task, err := createSyntaxFlowTaskByConfig(context.Background(), config)
+		task, err := createSyntaxFlowTaskByConfig(context.Background(), newConfig(config))
 		require.NoError(t, err)
 		require.NotNil(t, task)
 
@@ -237,7 +245,7 @@ func TestManager(t *testing.T) {
 			ssaconfig.WithProjectName(schemaProject.ProjectName),
 		)
 		require.NoError(t, err)
-		task, err := createSyntaxFlowTaskByConfig(context.Background(), config)
+		task, err := createSyntaxFlowTaskByConfig(context.Background(), newConfig(config))
 		require.NoError(t, err)
 		require.NotNil(t, task)
 

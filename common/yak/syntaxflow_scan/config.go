@@ -37,7 +37,7 @@ type Config struct {
 	ProgramNames []string
 	ProjectName  string
 
-	Config *ssaconfig.Config
+	ssaConfig *ssaconfig.Config
 
 	ResultCallback  ScanCallback
 	ProcessCallback func(progress float64)
@@ -57,7 +57,7 @@ func WithSyntaxFlowScanConfig(config *ssaconfig.Config) Option {
 		}
 		c.ProjectName = projectName
 		c.ProgramNames = programNames
-		c.Config = config
+		c.ssaConfig = config
 		return nil
 	}
 }
