@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sync"
+	"time"
 
+	"github.com/gorilla/websocket"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -13,6 +16,70 @@ var (
 	SfWebLogger      = log.GetLogger("sfweb")
 	CHAT_GLM_API_KEY = "CHATGLM_API_KEY"
 )
+
+type WebSocketRateLimiter struct {
+	interval time.Duration
+	lastSent time.Time
+	mutex    sync.Mutex
+	enabled  bool
+}
+
+func NewWebSocketRateLimiter(interval time.Duration) *WebSocketRateLimiter {
+	return &WebSocketRateLimiter{
+		interval: interval,
+		enabled:  interval > 0,
+	}
+}
+
+func (r *WebSocketRateLimiter) TrySend(conn *websocket.Conn, data interface{}) error {
+	if !r.enabled {
+		return r.DirectSend(conn, data)
+	}
+
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	now := time.Now()
+	elapsed := now.Sub(r.lastSent)
+
+	if elapsed < r.interval {
+		return nil
+	}
+
+	r.lastSent = now
+	return r.DirectSend(conn, data)
+}
+
+func (r *WebSocketRateLimiter) DirectSend(conn *websocket.Conn, data interface{}) error {
+	if err := conn.WriteJSON(data); err != nil {
+		return err
+	}
+	if SfWebLogger.Level == log.DebugLevel {
+		bytes, _ := json.Marshal(data)
+		SfWebLogger.Debugf("->client (rate limited): %s", bytes)
+	}
+	return nil
+}
+
+type RateLimitedWebSocketWriter struct {
+	conn        *websocket.Conn
+	rateLimiter *WebSocketRateLimiter
+}
+
+func NewRateLimitedWebSocketWriter(conn *websocket.Conn, rateLimiter *WebSocketRateLimiter) *RateLimitedWebSocketWriter {
+	return &RateLimitedWebSocketWriter{
+		conn:        conn,
+		rateLimiter: rateLimiter,
+	}
+}
+
+func (w *RateLimitedWebSocketWriter) TryWriteJSON(data interface{}) error {
+	return w.rateLimiter.TrySend(w.conn, data)
+}
+
+func (w *RateLimitedWebSocketWriter) WriteJSON(data interface{}) error {
+	return w.rateLimiter.DirectSend(w.conn, data)
+}
 
 type ErrorResponse struct {
 	Message string `json:"message"`
