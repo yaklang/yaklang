@@ -17,16 +17,18 @@ import (
 func TestManager(t *testing.T) {
 	t.Run("test save and resume scan task", func(t *testing.T) {
 		taskId := uuid.NewString()
-		task, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
-			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
-				Language: []string{"java"},
-			}),
-			WithProgramNames("a", "b", "c"),
-		))
+		task, err := createSyntaxflowTaskById(context.Background(), "",
+			taskId,
+			NewScanConfig(
+				WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
+					Language: []string{"java"},
+				}),
+				WithProgramNames("a", "b", "c"),
+			),
+		)
 		require.NoError(t, err)
 		log.Infof("m; %v", task)
 
-		task.setTotalQuery(60)
 		task.markRuleSkipped(11)
 		task.markRuleFailed(22)
 		task.markRuleSuccess(33)
@@ -35,7 +37,9 @@ func TestManager(t *testing.T) {
 		err = task.SaveTask()
 		require.NoError(t, err)
 
-		newTask, err := LoadSyntaxflowTaskFromDB(taskId, context.Background())
+		newTask, err := LoadSyntaxflowTaskFromDB(context.Background(), "",
+			NewScanConfig(WithResumeTaskId(taskId)),
+		)
 		require.NoError(t, err)
 
 		require.Equal(t, task.TaskId(), newTask.TaskId())
@@ -55,7 +59,7 @@ func TestManager(t *testing.T) {
 	t.Run("test scan batch increment", func(t *testing.T) {
 		taskId1 := uuid.NewString()
 		programName := uuid.NewString()
-		task1, err := createSyntaxflowTaskById(taskId1, context.Background(), NewScanConfig(
+		task1, err := createSyntaxflowTaskById(context.Background(), "", taskId1, NewScanConfig(
 			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
 				Language: []string{"java"},
 			}),
@@ -67,7 +71,7 @@ func TestManager(t *testing.T) {
 		require.NoError(t, err)
 
 		taskId2 := uuid.NewString()
-		task2, err := createSyntaxflowTaskById(taskId2, context.Background(), NewScanConfig(
+		task2, err := createSyntaxflowTaskById(context.Background(), "", taskId2, NewScanConfig(
 			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
 				Language: []string{"java"},
 			}),
@@ -84,7 +88,7 @@ func TestManager(t *testing.T) {
 
 		taskId3 := uuid.NewString()
 		newProgramName := uuid.NewString()
-		task3, err := createSyntaxflowTaskById(taskId3, context.Background(), NewScanConfig(
+		task3, err := createSyntaxflowTaskById(context.Background(), "", taskId3, NewScanConfig(
 			WithRuleFilter(&ypb.SyntaxFlowRuleFilter{
 				Language: []string{"java"},
 			}),
@@ -136,7 +140,7 @@ func TestManager(t *testing.T) {
 
 		// 测试使用项目配置初始化扫描任务
 		taskId := uuid.NewString()
-		task, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
+		task, err := createSyntaxflowTaskById(context.Background(), "", taskId, NewScanConfig(
 			WithControlMode(""),
 			WithProjectId(uint64(schemaProject.ID)),
 		))
@@ -155,7 +159,7 @@ func TestManager(t *testing.T) {
 		// 测试项目配置被正确覆盖
 		taskId2 := uuid.NewString()
 
-		task2, err := createSyntaxflowTaskById(taskId2, context.Background(),
+		task2, err := createSyntaxflowTaskById(context.Background(), "", taskId2,
 			NewScanConfig(
 				WithControlMode(""),
 				WithProjectId(uint64(schemaProject.ID)),
@@ -221,7 +225,7 @@ func TestManager(t *testing.T) {
 
 		// 测试使用项目规则配置初始化扫描任务
 		taskId := uuid.NewString()
-		task, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
+		task, err := createSyntaxflowTaskById(context.Background(), "", taskId, NewScanConfig(
 			WithControlMode(""),
 			WithProjectId(uint64(schemaProject.ID)),
 			WithProgramNames(schemaProject.ProjectName),
@@ -240,7 +244,7 @@ func TestManager(t *testing.T) {
 	t.Run("test invalid SSA project ID", func(t *testing.T) {
 		// 测试使用无效的项目ID
 		taskId := uuid.NewString()
-		_, err := createSyntaxflowTaskById(taskId, context.Background(), NewScanConfig(
+		_, err := createSyntaxflowTaskById(context.Background(), "", taskId, NewScanConfig(
 			WithControlMode(""),
 			WithProjectId(99999), // 不存在的项目ID
 		))

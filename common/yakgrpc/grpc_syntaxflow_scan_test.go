@@ -42,7 +42,7 @@ func prepareProgram(t *testing.T, progID string) func() {
 	class B {
 		public  int get() {
 			return 	 1;
-		}
+		grpc_syntaxflow_scan_test:73}
 		public void show(int a) {
 			target2(a);
 		}
@@ -65,6 +65,7 @@ func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handl
 		resp, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF || strings.Contains(err.Error(), "context canceled") {
+				log.Errorf("finish sf-scan stream %v", err)
 				return
 			}
 			t.Fatalf("err : %v", err.Error())

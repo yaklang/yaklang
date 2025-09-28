@@ -3,6 +3,7 @@ package syntaxflow_scan
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -74,7 +75,7 @@ func TestStartScan_WithProcessCallback(t *testing.T) {
 		}),
 		WithProgramNames(progID),
 		WithRuleFilter(&ypb.SyntaxFlowRuleFilter{}),
-		WithProcessCallback(func(progress float64, info *RuleProcessInfoList) {
+		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
 			lock.Lock()
 			defer lock.Unlock()
 			log.Infof("=%s== %.2f%%, status: %s ", time.UnixMicro(info.Time), progress*100, status)
@@ -117,8 +118,7 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 		}),
 		WithProgramNames(progID),
 		WithRuleFilter(&ypb.SyntaxFlowRuleFilter{}),
-		WithProcessMonitorTTL(100*time.Millisecond), // 设置回调间隔
-		WithProcessCallback(func(progress float64, infos *RuleProcessInfoList) {
+		WithProcessCallback(func(taskID, status string, progress float64, infos *RuleProcessInfoList) {
 			// log.Infof("=%s== %.2f%%, status: %s --\n%s\n", time.UnixMicro(infos.Time), progress*100, status, infos)
 			log.Infof("=%s== %.2f%%, status: %s --", time.UnixMicro(infos.Time), progress*100, status)
 			require.False(t, progress < totalProcess, "总体进度不应该减少")
@@ -148,4 +148,71 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 	}
 
 	log.Infof("测试完成: 任务ID=%s, 规则进度回调次数=%d", taskID, ruleProgress.Count())
+}
+
+func TestPauseAndCheck(t *testing.T) {
+	progID := uuid.NewString()
+	f := prepareTestProgram(t, progID)
+	defer f()
+
+	var status string
+	var taskID string
+	pause := atomic.Bool{}
+	log.Infof("================================= round 1 start scan")
+	err := StartScan(context.Background(),
+		WithScanResultCallback(func(sr *ScanResult) {
+			status = sr.Status
+			taskID = sr.TaskID
+			log.Infof("扫描结果: TaskID=%s, Status=%s", sr.TaskID, sr.Status)
+		}),
+		WithProgramNames(progID),
+		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+			log.Infof("=%s== %.2f%%, status: %s --", time.UnixMicro(info.Time), progress*100, status)
+			if progress >= 0.5 && !pause.Load() {
+				log.Infof("暂停扫描")
+				pause.Store(true)
+			}
+		}),
+		WithPauseFunc(func() bool {
+			return pause.Load()
+		}),
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, "paused", status, "任务应该暂停")
+	require.NotEmpty(t, taskID, "应该有任务ID")
+
+	log.Infof("测试完成: 任务ID=%s", taskID)
+
+	log.Infof("================================= round 2 check status and resume scan")
+	// 测试恢复扫描
+	// log.Infof("恢复扫描")
+	err = GetScanStatus(context.Background(), taskID, func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+		log.Infof("扫描结果: TaskID=%s, Status=%s; info=%s", taskID, status, info.String())
+	})
+	require.NoError(t, err)
+	require.Equal(t, "paused", status, "任务状态应该是暂停")
+
+	// 这里直接调用恢复接口，继续扫描
+	log.Infof("================================= round 3 resume scan")
+	var processStatus, resultStatus string
+	var finalProgress float64
+	err = ResumeScan(context.Background(), taskID,
+		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+			if progress > finalProgress {
+				finalProgress = progress
+			}
+			processStatus = status
+			log.Infof("=%s== %.2f%%, status: %s -- %s", time.UnixMicro(info.Time), progress*100, status, info.String())
+		}),
+		WithScanResultCallback(func(sr *ScanResult) {
+			taskID = sr.TaskID
+			resultStatus = sr.Status
+			log.Infof("扫描结果: TaskID=%s, Status=%s", sr.TaskID, sr.Status)
+		}),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "done", processStatus, "任务过程状态应该是完成")
+	require.Equal(t, "done", resultStatus, "任务结果状态应该是完成")
+	require.Equal(t, 1.0, finalProgress, "最终进度应该是100%")
 }
