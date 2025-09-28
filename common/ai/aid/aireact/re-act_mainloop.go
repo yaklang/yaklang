@@ -234,9 +234,6 @@ LOOP:
 									reader,
 									resp.GetTaskIndex(),
 									false,
-									func() {
-										r.EmitResultAfterStream(o.String())
-									},
 								)
 							},
 						),
