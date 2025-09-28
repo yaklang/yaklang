@@ -48,7 +48,7 @@ func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, err
 	}
 	if sc := proto.ScanConfig; sc != nil {
 		opts = append(opts, ssaconfig.WithScanConcurrency(sc.Concurrency))
-		opts = append(opts, ssaconfig.WithScanMemory(sc.Memory))
+		opts = append(opts, ssaconfig.WithSyntaxFlowMemory(sc.Memory))
 		opts = append(opts, ssaconfig.WithScanIgnoreLanguage(sc.IgnoreLanguage))
 	}
 	if rc := proto.RuleConfig; rc != nil && rc.RuleFilter != nil {
