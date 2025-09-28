@@ -104,9 +104,12 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 		}
 		defer conn.Close()
 
+		rateLimiter := NewWebSocketRateLimiter(s.config.WebSocketRateLimit)
+		writer := NewRateLimitedWebSocketWriter(conn, rateLimiter)
+
 		var req SyntaxFlowScanRequest
 		if err = ReadWebsocketJSON(conn, &req); err != nil {
-			WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+			writer.WriteJSON(&SyntaxFlowScanResponse{
 				Error: fmt.Sprintf("invalid request: %v", err),
 			})
 			SfWebLogger.Errorf("unmarshal request failed: %v", err)
@@ -125,7 +128,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 			ssaapi.WithContext(ctx),
 		)
 		if err != nil {
-			WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+			writer.WriteJSON(&SyntaxFlowScanResponse{
 				Error: fmt.Sprintf("compile file failed: %v", err),
 			})
 			SfWebLogger.Errorf("compile file failed: %v", err)
@@ -133,7 +136,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 		}
 		stream, err := s.grpcClient.SyntaxFlowScan(ctx)
 		if err != nil {
-			WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+			writer.WriteJSON(&SyntaxFlowScanResponse{
 				Error: fmt.Sprintf("create stream failed: %v", err),
 			})
 			SfWebLogger.Errorf("create stream failed: %v", err)
@@ -147,7 +150,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 				Language: []string{req.Lang},
 			},
 		}); err != nil {
-			WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+			writer.WriteJSON(&SyntaxFlowScanResponse{
 				Error: fmt.Sprintf("start syntaxflow scan failed: %v", err),
 			})
 			SfWebLogger.Errorf("start syntaxflow scan failed: %v", err)
@@ -157,7 +160,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 			msg, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) && !errors.Is(err, context.Canceled) {
-					WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+					writer.WriteJSON(&SyntaxFlowScanResponse{
 						Error: fmt.Sprintf("syntaxflow scan failed: %v", err),
 					})
 					SfWebLogger.Errorf("syntaxflow scan failed: %v", err)
@@ -169,7 +172,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 				risks := lo.Map(msg.GetSSARisks(), func(risk *ypb.SSARisk, _ int) *SyntaxFlowScanRisk {
 					return ypbToSyntaxFlowScanRisk(risk, msg.GetResult())
 				})
-				err = WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+				err = writer.WriteJSON(&SyntaxFlowScanResponse{
 					Risk: risks,
 				})
 				if err != nil {
@@ -186,7 +189,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 				if typ == "progress" {
 					progress := content.Get("progress").Float()
 					if progress > 0 {
-						err = WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+						err = writer.WriteJSON(&SyntaxFlowScanResponse{
 							Progress: progress,
 						})
 						if err != nil {
@@ -198,7 +201,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 					level := content.Get("level").String()
 					data := content.Get("data").String()
 					if level == "error" {
-						err = WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+						err = writer.WriteJSON(&SyntaxFlowScanResponse{
 							Error: data,
 						})
 						if err != nil {
@@ -206,7 +209,7 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 							break
 						}
 					} else if level != "feature-status-card-data" {
-						err = WriteWebsocketJSON(conn, &SyntaxFlowScanResponse{
+						err = writer.TryWriteJSON(&SyntaxFlowScanResponse{
 							Message: fmt.Sprintf("[%s] %s", level, data),
 						})
 						if err != nil {
