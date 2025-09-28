@@ -3,7 +3,9 @@ package hnswspec
 import (
 	"cmp"
 	"math"
+	"runtime"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
@@ -45,8 +47,108 @@ func (n *StandardLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {
 	return n.neighbors
 }
 
+// HNSWPerformanceStats 收集HNSW性能统计数据
+type HNSWPerformanceStats struct {
+	DistanceCalculations   int64
+	NeighborConnections    int64
+	NeighborDisconnections int64
+	GraphRestructures      int64
+	CascadeUpdates         int64
+}
+
+// Global performance tracker
+var globalPerformanceStats = &HNSWPerformanceStats{}
+
+// GetGlobalPerformanceStats 获取全局性能统计
+func GetGlobalPerformanceStats() *HNSWPerformanceStats {
+	return globalPerformanceStats
+}
+
+// ResetGlobalPerformanceStats 重置全局性能统计
+func ResetGlobalPerformanceStats() {
+	globalPerformanceStats = &HNSWPerformanceStats{}
+}
+
+// parallelDistanceResultForReplenish Replenish专用的并行距离计算结果
+type parallelDistanceResultForReplenish[K cmp.Ordered] struct {
+	Index    int
+	Node     LayerNode[K]
+	Distance float64
+}
+
+// parallelDistanceCalculationForReplenish Replenish专用的并行距离计算函数
+func parallelDistanceCalculationForReplenish[K cmp.Ordered](
+	candidates []LayerNode[K],
+	target LayerNode[K],
+	distFunc DistanceFunc[K],
+) []parallelDistanceResultForReplenish[K] {
+	candidateCount := len(candidates)
+	if candidateCount == 0 {
+		return nil
+	}
+
+	// 对于少量候选者，直接串行计算
+	if candidateCount < 16 {
+		results := make([]parallelDistanceResultForReplenish[K], candidateCount)
+		for i, candidate := range candidates {
+			dist := distFunc(candidate, target)
+			results[i] = parallelDistanceResultForReplenish[K]{
+				Index:    i,
+				Node:     candidate,
+				Distance: dist,
+			}
+		}
+		return results
+	}
+
+	// 并行计算
+	workerCount := runtime.NumCPU()
+	if workerCount > candidateCount {
+		workerCount = candidateCount
+	}
+	if workerCount > 8 {
+		workerCount = 8 // 限制最大worker数量
+	}
+
+	results := make([]parallelDistanceResultForReplenish[K], candidateCount)
+	var wg sync.WaitGroup
+
+	batchSize := (candidateCount + workerCount - 1) / workerCount
+
+	for w := 0; w < workerCount; w++ {
+		start := w * batchSize
+		end := start + batchSize
+		if end > candidateCount {
+			end = candidateCount
+		}
+		if start >= candidateCount {
+			break
+		}
+
+		wg.Add(1)
+		go func(startIdx, endIdx int) {
+			defer wg.Done()
+			for i := startIdx; i < endIdx; i++ {
+				dist := distFunc(candidates[i], target)
+				results[i] = parallelDistanceResultForReplenish[K]{
+					Index:    i,
+					Node:     candidates[i],
+					Distance: dist,
+				}
+			}
+		}(start, end)
+	}
+
+	wg.Wait()
+	return results
+}
+
 func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc DistanceFunc[K]) {
 	addNeighborStart := time.Now()
+
+	// 性能统计：记录一次邻居连接
+	globalPerformanceStats.NeighborConnections++
+
 	defer func() {
 		duration := time.Since(addNeighborStart)
 		if duration > 100*time.Millisecond {
@@ -73,6 +175,7 @@ func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFun
 	for _, neighborNode := range n.neighbors {
 		d := distFunc(neighborNode, n)
 		distanceCalls++
+		globalPerformanceStats.DistanceCalculations++ // 性能统计：距离计算次数
 		if d > worstDist || worst == nil {
 			worstDist = d
 			worst = neighborNode
@@ -81,17 +184,33 @@ func (n *StandardLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFun
 	findWorstDuration := time.Since(findWorstStart)
 
 	delete(n.neighbors, worst.GetKey())
+	globalPerformanceStats.NeighborDisconnections++ // 性能统计：邻居断开连接
 
 	// 删除反向链接并补充
 	removeAndReplenishStart := time.Now()
 	worst.RemoveNeighbor(n.key)
 	worst.Replenish(m, distFunc)
 	removeAndReplenishDuration := time.Since(removeAndReplenishStart)
+	globalPerformanceStats.GraphRestructures++ // 性能统计：图结构重组
 
 	totalDuration := time.Since(addNeighborStart)
-	if totalDuration > 500*time.Millisecond {
-		log.Warnf("AddNeighbor PERFORMANCE: total=%v, findWorst=%v (%d calls), removeAndReplenish=%v",
-			totalDuration, findWorstDuration, distanceCalls, removeAndReplenishDuration)
+
+	// 根据M值调整性能警告阈值
+	var warningThreshold time.Duration
+	switch {
+	case m <= 50:
+		warningThreshold = 200 * time.Millisecond
+	case m <= 100:
+		warningThreshold = 500 * time.Millisecond
+	case m <= 200:
+		warningThreshold = 1 * time.Second
+	default:
+		warningThreshold = 2 * time.Second
+	}
+
+	if totalDuration > warningThreshold {
+		log.Warnf("AddNeighbor PERFORMANCE [M=%d]: total=%v, findWorst=%v (%d distance calls), removeAndReplenish=%v, expected_complexity=O(%d)",
+			m, totalDuration, findWorstDuration, distanceCalls, removeAndReplenishDuration, m)
 	}
 }
 
@@ -156,25 +275,41 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 		return
 	}
 
-	// 按距离排序候选者 - 使用更高效的算法避免重复距离计算
+	// 按距离排序候选者 - 使用并行计算优化
 	sortCandidatesStart := time.Now()
-	distanceCalls := 0
+	distanceCalls := len(candidates)
 
-	// 创建候选者-距离对，避免重复计算距离
+	// 创建候选者-距离对，使用并行计算距离
 	type candidateWithDist struct {
 		candidate LayerNode[K]
 		distance  float64
 	}
 
 	candidatesWithDist := make([]candidateWithDist, len(candidates))
-	for i, candidate := range candidates {
-		dist := distFunc(candidate, n)
-		distanceCalls++
-		candidatesWithDist[i] = candidateWithDist{
-			candidate: candidate,
-			distance:  dist,
+
+	// 如果候选者数量足够多，使用并行计算
+	if len(candidates) >= 16 { // 并行阈值
+		// 使用并行距离计算
+		parallelResults := parallelDistanceCalculationForReplenish(candidates, n, distFunc)
+		for i, result := range parallelResults {
+			candidatesWithDist[i] = candidateWithDist{
+				candidate: result.Node,
+				distance:  result.Distance,
+			}
+		}
+	} else {
+		// 串行计算距离
+		for i, candidate := range candidates {
+			dist := distFunc(candidate, n)
+			candidatesWithDist[i] = candidateWithDist{
+				candidate: candidate,
+				distance:  dist,
+			}
 		}
 	}
+
+	// 更新性能统计
+	globalPerformanceStats.DistanceCalculations += int64(distanceCalls)
 
 	// 使用标准库的排序（更高效）
 	slices.SortFunc(candidatesWithDist, func(a, b candidateWithDist) int {
@@ -203,6 +338,7 @@ func (n *StandardLayerNode[K]) Replenish(m int, distFunc DistanceFunc[K]) {
 		// 直接添加到neighbors map，避免递归调用AddNeighbor
 		n.neighbors[candidate.GetKey()] = candidate
 		addedCount++
+		globalPerformanceStats.NeighborConnections++ // 性能统计：邻居连接
 
 		// 确保双向连接：让候选者也添加我们作为邻居
 		// 但要小心避免无限递归
@@ -307,6 +443,11 @@ func (n *PQLayerNode[K]) GetNeighbors() map[K]LayerNode[K] {
 }
 
 func (n *PQLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc DistanceFunc[K]) {
+	addNeighborStart := time.Now()
+
+	// 性能统计：记录一次邻居连接
+	globalPerformanceStats.NeighborConnections++
+
 	if n.neighbors == nil {
 		n.neighbors = make(map[K]LayerNode[K], m)
 	}
@@ -318,11 +459,14 @@ func (n *PQLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc Dist
 
 	// 找到距离最远的邻居节点
 	var (
-		worstDist = math.Inf(-1)
-		worst     LayerNode[K]
+		worstDist     = math.Inf(-1)
+		worst         LayerNode[K]
+		distanceCalls = 0
 	)
 	for _, neighborNode := range n.neighbors {
 		d := distFunc(neighborNode, n)
+		distanceCalls++
+		globalPerformanceStats.DistanceCalculations++ // 性能统计：距离计算次数
 		if d > worstDist || worst == nil {
 			worstDist = d
 			worst = neighborNode
@@ -330,9 +474,32 @@ func (n *PQLayerNode[K]) AddNeighbor(neighbor LayerNode[K], m int, distFunc Dist
 	}
 
 	delete(n.neighbors, worst.GetKey())
+	globalPerformanceStats.NeighborDisconnections++ // 性能统计：邻居断开连接
+
 	// 删除反向链接
 	worst.RemoveNeighbor(n.key)
 	worst.Replenish(m, distFunc)
+	globalPerformanceStats.GraphRestructures++ // 性能统计：图结构重组
+
+	totalDuration := time.Since(addNeighborStart)
+
+	// PQ节点的性能警告阈值（通常比标准节点更高效）
+	var warningThreshold time.Duration
+	switch {
+	case m <= 50:
+		warningThreshold = 100 * time.Millisecond
+	case m <= 100:
+		warningThreshold = 250 * time.Millisecond
+	case m <= 200:
+		warningThreshold = 500 * time.Millisecond
+	default:
+		warningThreshold = 1 * time.Second
+	}
+
+	if totalDuration > warningThreshold {
+		log.Warnf("PQ AddNeighbor PERFORMANCE [M=%d]: total=%v (%d distance calls), expected_complexity=O(%d)",
+			m, totalDuration, distanceCalls, m)
+	}
 }
 
 func (n *PQLayerNode[K]) RemoveNeighbor(key K) {

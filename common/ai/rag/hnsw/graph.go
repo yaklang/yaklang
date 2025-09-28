@@ -3,13 +3,14 @@ package hnsw
 import (
 	"cmp"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"io"
 	"math"
 	"math/rand"
 	"slices"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
@@ -201,6 +202,9 @@ func search[K cmp.Ordered](
 		neighbors := current.GetNeighbors()
 		neighborKeys := maps.Keys(neighbors)
 		slices.Sort(neighborKeys)
+
+		// 收集未访问的邻居节点
+		unvisitedNeighbors := make([]hnswspec.LayerNode[K], 0, len(neighbors))
 		for _, neighborID := range neighborKeys {
 			neighbor := neighbors[neighborID]
 			if visited[neighborID] {
@@ -213,29 +217,46 @@ func search[K cmp.Ordered](
 				continue
 			}
 
-			// Distance calculation - this is the most expensive operation
-			// Try to get from cache first
-			var dist float64
-			var cacheHit bool
+			unvisitedNeighbors = append(unvisitedNeighbors, neighbor)
+		}
 
-			distanceStart := time.Now()
+		// 如果邻居数量足够多，使用并行距离计算
+		var neighborDistances []ParallelDistanceResult[K]
+		if len(unvisitedNeighbors) >= 8 { // 并行阈值
+			// 并行计算距离
+			parallelStart := time.Now()
+			neighborDistances = ParallelDistanceCalculation(unvisitedNeighbors, targetNode, distance)
+			parallelTime := time.Since(parallelStart)
+			totalDistanceCalls += len(unvisitedNeighbors)
+			totalDistanceTime += parallelTime
+		} else {
+			// 串行计算距离
+			neighborDistances = make([]ParallelDistanceResult[K], len(unvisitedNeighbors))
+			for i, neighbor := range unvisitedNeighbors {
+				distanceStart := time.Now()
+				dist := distance(neighbor, targetNode)
+				distanceTime := time.Since(distanceStart)
+				totalDistanceCalls++
+				totalDistanceTime += distanceTime
 
-			// Note: We can't easily cache here because we need access to the graph's cache
-			// This would require passing the cache to the search function or making it global
-			// For now, we'll just measure the performance without caching in search
-			dist = distance(neighbor, targetNode)
+				// Log slow distance calculations
+				if distanceTime > 10*time.Millisecond {
+					log.Debugf("slow distance calculation: %v for neighbor %v", distanceTime, neighbor.GetKey())
+				}
 
-			distanceTime := time.Since(distanceStart)
-			totalDistanceCalls++
-			totalDistanceTime += distanceTime
-
-			// Log slow distance calculations
-			if distanceTime > 10*time.Millisecond {
-				log.Debugf("slow distance calculation: %v for neighbor %v", distanceTime, neighbor.GetKey())
+				neighborDistances[i] = ParallelDistanceResult[K]{
+					Index:    i,
+					Node:     neighbor,
+					Distance: dist,
+				}
 			}
+		}
 
-			// Cache the result for future use (would need graph access)
-			_ = cacheHit // placeholder for future cache integration
+		// 处理距离计算结果
+		for _, distResult := range neighborDistances {
+			neighbor := distResult.Node
+			dist := distResult.Distance
+
 			if result.Len() > 0 {
 				improved = improved || dist < result.Min().dist
 			} else {
