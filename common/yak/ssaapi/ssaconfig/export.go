@@ -2,7 +2,7 @@ package ssaconfig
 
 var SyntaxFlowScanConfigExports = map[string]interface{}{
 	"withScanConcurrency":    WithScanConcurrency,
-	"withMemoryScan":         WithScanMemory,
+	"WithSyntaxFlowMemory":   WithSyntaxFlowMemory,
 	"withIgnoreLanguage":     WithScanIgnoreLanguage,
 	"withProcessCallback":    WithScanProcessCallback,
 	"withRuleFilter":         WithRuleFilter,
