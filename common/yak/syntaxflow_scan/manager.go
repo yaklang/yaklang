@@ -159,6 +159,10 @@ func (m *scanManager) setScanBatch() {
 
 // SaveTask save task info which is from manager to database
 func (m *scanManager) SaveTask() error {
+	if m == nil {
+		// return utils.Errorf("manager is nil ")
+		return nil
+	}
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
@@ -177,25 +181,21 @@ func (m *scanManager) SaveTask() error {
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
 
 	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
-		levelCounts, err := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
+		levelCounts, _ := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},
 		})
-		if err != nil {
-			return err
-		}
-
 		for _, c := range levelCounts {
 			switch c.Severity {
 			case string(schema.SFR_SEVERITY_INFO):
-				m.taskRecorder.InfoCount += c.Count
+				m.taskRecorder.InfoCount = c.Count
 			case string(schema.SFR_SEVERITY_WARNING):
-				m.taskRecorder.WarningCount += c.Count
+				m.taskRecorder.WarningCount = c.Count
 			case string(schema.SFR_SEVERITY_CRITICAL):
-				m.taskRecorder.CriticalCount += c.Count
+				m.taskRecorder.CriticalCount = c.Count
 			case string(schema.SFR_SEVERITY_HIGH):
-				m.taskRecorder.HighCount += c.Count
+				m.taskRecorder.HighCount = c.Count
 			case string(schema.SFR_SEVERITY_LOW):
-				m.taskRecorder.LowCount += c.Count
+				m.taskRecorder.LowCount = c.Count
 			}
 		}
 	}
@@ -340,9 +340,7 @@ func (m *scanManager) Stop(runningID string) {
 	}
 	m.cancel()
 	m.callback.Delete(runningID)
-	if m.callback.Count() == 0 {
-		m.processMonitor.Close()
-	}
+	m.processMonitor.Close()
 }
 
 func (m *scanManager) IsStop() bool {
@@ -382,7 +380,6 @@ func (m *scanManager) ResumeTask() error {
 	log.Errorf("total query: %d; finish query: %d", m.GetTotalQuery(), m.GetFinishedQuery())
 	if taskIndex > m.GetTotalQuery() {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
-		m.SaveTask()
 		return nil
 	}
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
