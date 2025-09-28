@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/google/uuid"
@@ -15,6 +16,13 @@ import (
 )
 
 func TestManager(t *testing.T) {
+	newConfig := func(ssaConfig *ssaconfig.Config) *Config {
+		config := &Config{
+			ssaConfig: ssaConfig,
+		}
+		return config
+	}
+
 	t.Run("test save and resume scan task", func(t *testing.T) {
 		taskId := uuid.NewString()
 		task, err := createSyntaxflowTaskById(context.Background(), "",
