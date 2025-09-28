@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"sync"
 	"time"
 
@@ -27,6 +28,9 @@ type EntityRepositoryRuntimeConfig struct {
 	similarityThreshold float64
 	runtimeID           string
 	queryTop            int
+	ctx                 context.Context
+
+	entityRagQueryCache *utils.CacheEx[*schema.ERModelEntity]
 }
 
 type RuntimeConfigOption func(config *EntityRepositoryRuntimeConfig)
@@ -43,11 +47,24 @@ func WithQueryTop(top int) RuntimeConfigOption {
 	}
 }
 
+func WithRuntimeID(runtimeID string) RuntimeConfigOption {
+	return func(config *EntityRepositoryRuntimeConfig) {
+		config.runtimeID = runtimeID
+	}
+}
+
+func WithContext(ctx context.Context) RuntimeConfigOption {
+	return func(config *EntityRepositoryRuntimeConfig) {
+		config.ctx = ctx
+	}
+}
+
 func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 	config := &EntityRepositoryRuntimeConfig{
 		similarityThreshold: 0.6, // 降低相似度阈值，减少low_score问题
 		queryTop:            10,  // 增加查询数量，提高匹配概率
 		runtimeID:           uuid.NewString(),
+		ctx:                 context.Background(),
 	}
 	for _, opt := range opts {
 		switch configOpt := opt.(type) {
@@ -55,6 +72,8 @@ func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 			configOpt(config)
 		}
 	}
+	config.entityRagQueryCache = utils.NewCacheEx[*schema.ERModelEntity]()
+
 	return config
 }
 
@@ -141,6 +160,8 @@ func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...
 
 	// 实现30秒超时机制
 	select {
+	case <-r.runtimeConfig.ctx.Done():
+		return utils.Errorf("context cacel")
 	case <-lockAcquiredCh:
 		// 锁获取成功，返回结果
 		return err
@@ -224,6 +245,8 @@ func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResul
 
 	// 实现15秒超时机制
 	select {
+	case <-r.runtimeConfig.ctx.Done():
+		return nil, utils.Errorf("context cacel")
 	case result := <-resultCh:
 		return result.results, result.err
 	case <-time.After(15 * time.Second):
@@ -234,6 +257,26 @@ func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResul
 }
 
 //--- Entity Operations ---
+
+func (r *EntityRepository) getEntityCache(cacheKey string) *schema.ERModelEntity {
+	if r.runtimeConfig.entityRagQueryCache != nil {
+		cacheData, ok := r.runtimeConfig.entityRagQueryCache.Get(cacheKey)
+		if ok {
+			return cacheData
+		}
+	}
+	return nil
+}
+
+func (r *EntityRepository) cacheEntity(cacheKey string, entity *schema.ERModelEntity) {
+	if entity == nil || entity.Uuid == "" {
+		log.Errorf("entity is nil or empty for entity")
+		return
+	}
+	if r.runtimeConfig.entityRagQueryCache != nil {
+		r.runtimeConfig.entityRagQueryCache.Set(cacheKey, entity)
+	}
+}
 
 func (r *EntityRepository) MatchEntities(entity *schema.ERModelEntity) ([]*schema.ERModelEntity, bool, error) {
 	totalStartTime := time.Now()
@@ -611,34 +654,38 @@ func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERM
 }
 
 func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
-	mergeStartTime := time.Now()
+	helper := asynchelper.NewDefaultAsyncPerformanceHelper("merge_and_save_entity")
+	helper.Start()
+	defer helper.Close()
+	cacheKey := entity.EntityName
+	if cacheData := r.getEntityCache(cacheKey); cacheData != nil {
+		cacheData.Attributes = utils.MergeGeneralMap(cacheData.Attributes, entity.Attributes)
+		err := r.UpdateEntity(cacheData.ID, cacheData)
+		if err != nil {
+			log.Errorf("failed to update entity [%s]: %v", cacheData.EntityName, err)
+		}
+		return cacheData, nil
+	}
 
+	helper.MarkNow()
 	matchedEntity, isExactMatch, err := r.MatchEntities(entity)
 	if err != nil { // not critical error
 		log.Errorf("failed to match entity [%s]: %v", entity.EntityName, err)
 	}
-
-	matchDuration := time.Since(mergeStartTime)
-	if matchDuration > 3*time.Second {
-		log.Warnf("SLOW entity matching: entity [%s] took %v to match", entity.EntityName, matchDuration)
-	}
+	matchDuration := helper.CheckLastMarkAndLog(3*time.Second, "match_entities")
 
 	if len(matchedEntity) <= 0 {
 		// 记录实体创建的原因和统计信息
 		log.Infof("Creating new entity: %s (no matches found after %v)", entity.EntityName, matchDuration)
 
-		createStartTime := time.Now()
+		helper.MarkNow()
 		err = r.CreateEntity(entity)
-		createDuration := time.Since(createStartTime)
+		helper.CheckLastMarkAndLog(2*time.Second, "create_entity")
 
 		if err != nil {
 			return nil, utils.Errorf("failed to create entity [%s]: %v", entity.EntityName, err)
 		}
-
-		if createDuration > 2*time.Second {
-			log.Warnf("SLOW entity creation: entity [%s] took %v to create", entity.EntityName, createDuration)
-		}
-
+		r.cacheEntity(cacheKey, entity)
 		return entity, nil
 	}
 
@@ -657,7 +704,7 @@ func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*sc
 	if err != nil {
 		log.Errorf("failed to update entity [%s]: %v", firstEntity.EntityName, err)
 	}
-
+	r.cacheEntity(cacheKey, firstEntity)
 	return firstEntity, nil // 返回最早创建的实体，用于将关系集中联系在一个实体上，用于维护无目的质量中心
 }
 
