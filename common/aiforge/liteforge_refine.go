@@ -255,6 +255,9 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 
 		// 判断是否需要详细的最终统计
 		if finalRate < 5.0 || finalElapsed > 10*time.Minute || finalTotal > 1000 {
+			if finalTotal == 0 {
+				finalTotal = 1
+			}
 			// 性能差或处理数量大时输出详细统计
 			avgVectorTime := time.Duration(atomic.LoadInt64(&vectorIndexDuration)) / time.Duration(finalTotal)
 			avgKnowledgeTime := time.Duration(atomic.LoadInt64(&knowledgeEntryDuration)) / time.Duration(int(math.Max(1, float64(finalDone))))
@@ -281,7 +284,7 @@ func BuildKnowledgeEntryFromKHop(hop *entityrepos.KHopPath, kb *knowledgebase.Kn
 		return nil, err
 	}
 
-	refineResult, err := _executeLiteForgeTemp(query, append(refineConfig.fallbackOptions, WithOutputJSONSchema(refineSchema))...)
+	refineResult, err := _executeLiteForgeTemp(query, refineConfig.ForgeExecOption(refineSchema)...)
 	if err != nil {
 		return nil, err
 	}

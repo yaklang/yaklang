@@ -101,7 +101,7 @@ func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, err
 			analyzeConfig.AnalyzeStatusCard("[analyze raw data]:analysed chunk ", processedCount)
 		}()
 		if chunk.MIMEType().IsImage() {
-			return AnalyzeImage(chunk.Data(), opts)
+			return AnalyzeImage(chunk.Data(), opts...)
 		} else {
 			return &TextAnalysisResult{Text: string(chunk.Data())}, nil
 		}

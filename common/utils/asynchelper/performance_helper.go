@@ -11,14 +11,15 @@ import (
 var defaultLogLevel = false
 
 type AsyncPerformanceHelper struct {
-	triggerTime    time.Duration
-	logRequireTime time.Duration
-	processPrefix  string
-	status         string
-	timeMark       *omap.OrderedMap[string, time.Time]
-	errorLogMode   bool
-	closeFunc      func()
-	mockLog        func(string, ...any)
+	triggerTime       time.Duration
+	logRequireTime    time.Duration
+	processPrefix     string
+	status            string
+	currentStatusMark string
+	timeMark          *omap.OrderedMap[string, time.Time]
+	errorLogMode      bool
+	closeFunc         func()
+	mockLog           func(string, ...any)
 }
 
 // NewAsyncPerformanceHelper creates a new AsyncPerformanceHelper with custom period, log requirement time, prefix, and error log mode.
@@ -56,6 +57,7 @@ func (a *AsyncPerformanceHelper) Log(fmtString string, arg ...any) {
 // UpdateStatus updates the status field of the helper.
 func (a *AsyncPerformanceHelper) UpdateStatus(status string) {
 	a.status = status
+	a.currentStatusMark = a.MarkNow()
 }
 
 // Close triggers the close function if it is set, used to stop the background goroutine.
@@ -80,7 +82,13 @@ func (a *AsyncPerformanceHelper) Start() {
 		checkAndLog := func() {
 			useTime := time.Since(startTime)
 			if useTime > a.logRequireTime {
-				a.Log("[%s]: took too long: %v, current status: %s", a.processPrefix, useTime, a.status)
+				currentStartTime, ok := a.timeMark.Get(a.currentStatusMark)
+				if !ok {
+					a.Log("[%s]: took too long: %v, current status: %s, current status %s", a.processPrefix, useTime, a.status)
+				} else {
+					a.Log("[%s]: took too long: %v, current status: %s, current status %s use time : %v", a.processPrefix, useTime, a.status, currentStartTime)
+				}
+
 			}
 		}
 		for {

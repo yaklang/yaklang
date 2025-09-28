@@ -136,8 +136,7 @@ var ermOtherPrompt string
 
 func DetectERMPrompt(input string, options ...any) (string, error) {
 	analyzeConfig := NewAnalysisConfig(options...)
-	options = append(options, WithOutputJSONSchema(detectDomainSchema))
-	detectResut, err := _executeLiteForgeTemp(quickQueryBuild(DetectPrompt, input), options...)
+	detectResut, err := _executeLiteForgeTemp(quickQueryBuild(DetectPrompt, input), analyzeConfig.ForgeExecOption(detectDomainSchema)...)
 	if err != nil {
 		return "", err
 	}
@@ -361,7 +360,7 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 	var detectERMPromptOnce = new(sync.Once)
 	var firstMutex = new(sync.Mutex)
 
-	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc)
+	eb, err := entityrepos.GetOrCreateEntityRepository(refineConfig.Database, refineConfig.KnowledgeBaseName, refineConfig.KnowledgeBaseDesc, entityrepos.WithContext(refineConfig.Ctx))
 	if err != nil {
 		return nil, err
 	}
@@ -409,6 +408,12 @@ func AnalyzeERMChunkMakerSync(cm chunkmaker.ChunkMaker, options ...any) (*entity
 		unlockOnce.Do(func() {
 			firstMutex.Unlock()
 		})
+
+		select {
+		case <-refineConfig.Ctx.Done():
+			return nil, refineConfig.Ctx.Err()
+		default:
+		}
 
 		endpoint := eb.NewSaveEndpoint(refineConfig.Ctx)
 		entitySwg := sync.WaitGroup{}
@@ -506,7 +511,7 @@ func AnalyzeERMChunk(domainPrompt string, c chunkmaker.Chunk, options ...any) (*
 		return nil, err
 	}
 
-	ermResult, err := _executeLiteForgeTemp(query, append(analyzeConfig.fallbackOptions, WithOutputJSONSchema(ermOutputSchema))...)
+	ermResult, err := _executeLiteForgeTemp(query, analyzeConfig.ForgeExecOption(ermOutputSchema)...)
 	if err != nil {
 		analyzeConfig.AnalyzeLog("[analyze erm] error in analyzing ERM: %v", err)
 		return nil, err

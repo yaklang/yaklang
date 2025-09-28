@@ -72,6 +72,13 @@ func (a *AnalysisConfig) KHopOption() []entityrepos.KHopQueryOption {
 	return options
 }
 
+func (a *AnalysisConfig) ForgeExecOption(schema string) []any {
+	options := a.fallbackOptions
+	options = append(options, WithOutputJSONSchema(schema))
+	options = append(options, LiteForgeExecWithContext(a.Ctx))
+	return options
+}
+
 type AnalysisOption func(config *AnalysisConfig)
 
 func WithExtraPrompt(prompt string) AnalysisOption {

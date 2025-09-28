@@ -285,10 +285,34 @@ func getVectorDocumentByLazyNodeID(db *gorm.DB, id hnswspec.LazyNodeID) (*schema
 }
 
 func ExportHNSWGraphToBinary(graph *hnsw.Graph[string]) (io.Reader, error) {
+	totalStartTime := time.Now()
+	finish := make(chan struct{})
+	currentStatus := fmt.Sprintf("grap start")
+
+	defer close(finish)
+	go func() {
+		logTime := func() {
+			useTime := time.Since(totalStartTime)
+			if useTime > 2*time.Second {
+				log.Errorf("[ExportHNSWGraphToBinary] took too long: %v | status [%s]", useTime, currentStatus)
+			}
+		}
+		for {
+			select {
+			case <-finish:
+				logTime()
+				return
+			case <-time.After(1 * time.Second):
+				logTime()
+			}
+		}
+	}()
+	currentStatus = "export hnsw graph"
 	pers, err := hnsw.ExportHNSWGraph(graph)
 	if err != nil {
 		return nil, err
 	}
+	currentStatus = "convert to binary"
 	pers.Dims = 1024
 	return pers.ToBinary(context.Background())
 }
