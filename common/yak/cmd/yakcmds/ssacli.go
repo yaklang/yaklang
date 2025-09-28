@@ -1353,7 +1353,7 @@ var ssaCodeScan = &cli.Command{
 		scanConfig, err := ssaconfig.NewSyntaxFlowScanConfig(
 			ssaconfig.WithProgramNames(prog.GetProgramName()),
 			ssaconfig.WithRuleFilter(ruleFilter),
-			ssaconfig.WithScanMemory(c.Bool("memory")),
+			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
 		)
 		if err != nil {
 			log.Errorf("create ssaconfig failed: %s", err)
