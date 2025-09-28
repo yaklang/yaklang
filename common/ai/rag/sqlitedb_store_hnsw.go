@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"io"
 	"sort"
 	"strings"
@@ -444,29 +445,28 @@ func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
 // Add 添加文档到向量存储
 func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	// 记录锁获取时间
-	lockStartTime := time.Now()
+	helper := asynchelper.NewDefaultAsyncPerformanceHelper("Vector ADD")
+	helper.Start()
+	defer helper.Close()
+
+	helper.MarkNow()
 	s.mu.Lock()
-	lockAcquireTime := time.Since(lockStartTime)
+	lockAcquireTime := helper.CheckLastMark1Second("lock acquire")
 	defer s.mu.Unlock()
 
-	totalStartTime := time.Now()
+	totalStart := helper.MarkNow()
 	docCount := len(docs)
 
 	// 分析：当前使用单一大事务，可能导致长时间锁持有
 	// 如果事务持续时间过长，建议考虑分批处理或更小的事务粒度
 	defer func() {
-		totalUsedTime := time.Since(totalStartTime)
-		if totalUsedTime > 2*time.Second {
-			log.Warnf("HNSW Add total took too long: %v (lock acquire: %v, %d docs)", totalUsedTime, lockAcquireTime, docCount)
-		} else {
-			log.Debugf("HNSW Add total took: %v (lock acquire: %v, %d docs)", totalUsedTime, lockAcquireTime, docCount)
-		}
+		helper.CheckMarkAndLog(totalStart, 2*time.Second, fmt.Sprintf("total time(lock acquire: %v, %d docs)", lockAcquireTime, docCount))
 	}()
 
 	// 开始事务 - 这是潜在的性能瓶颈点
-	txStartTime := time.Now()
+	helper.UpdateStatus("db transaction acquire")
 	tx := s.db.Begin()
-	txInitTime := time.Since(txStartTime)
+	txInitTime := helper.CheckLastMark1Second("db transaction acquire")
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("recover from panic when adding docs: %v", r)
@@ -479,7 +479,8 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	var dbQueryCount, docUpdateCount, docCreateCount int
 
 	for i, doc := range docs {
-		docStartTime := time.Now()
+		helper.UpdateStatus(fmt.Sprintf("db query id :%s", doc.ID))
+		docStart := helper.MarkNow()
 
 		// 确保文档有 ID
 		if doc.ID == "" {
@@ -516,12 +517,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			updateTime := time.Since(updateStartTime)
 			totalDocUpdateTime += updateTime
 			docUpdateCount++
-
-			docProcessTime := time.Since(docStartTime)
-			if docProcessTime > time.Second {
-				log.Warnf("doc[%d] %s update took too long: %v (query: %v, update: %v)",
-					i, doc.ID, docProcessTime, queryTime, updateTime)
-			}
+			helper.CheckMarkAndLog(docStart, time.Second, fmt.Sprintf("doc[%d] %s update (query: %v, update: %v)", i, doc.ID, queryTime, updateTime))
 		} else if err == gorm.ErrRecordNotFound {
 			// 创建新文档
 			createStartTime := time.Now()
@@ -533,11 +529,8 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			totalDocCreateTime += createTime
 			docCreateCount++
 
-			docProcessTime := time.Since(docStartTime)
-			if docProcessTime > time.Second {
-				log.Warnf("doc[%d] %s create took too long: %v (query: %v, create: %v)",
-					i, doc.ID, docProcessTime, queryTime, createTime)
-			}
+			helper.CheckMarkAndLog(docStart, time.Second, fmt.Sprintf("doc[%d] %s update (query: %v, update: %v)", i, doc.ID, queryTime, createTime))
+
 		} else {
 			// 其他错误
 			tx.Rollback()
@@ -549,6 +542,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	nodeCreationStartTime := time.Now()
 	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
+		helper.UpdateStatus(fmt.Sprintf("maker node id: %s", doc.ID))
 		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(getLazyNodeUIDByMd5(s.collection.Name, doc.ID)), func(uid hnswspec.LazyNodeID) ([]float32, error) {
 			dbDoc, err := getVectorDocumentByLazyNodeID(s.db, uid)
 			if err != nil {
@@ -560,21 +554,24 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	nodeCreationTime := time.Since(nodeCreationStartTime)
 
 	// 事务提交时间 - 提交可能成为瓶颈，特别是当事务很大时
-	commitStartTime := time.Now()
+	helper.UpdateStatus(fmt.Sprint("db transaction commit"))
+	helper.MarkNow()
 	err := tx.Commit().Error
-	commitTime := time.Since(commitStartTime)
+	commitTime := helper.CheckLastMark1Second("db transaction commit")
 	if err != nil {
 		log.Errorf("transaction commit failed: %v", err)
 		return err
 	}
+	transactionDuration := helper.CheckLastMarkAndLog(2*time.Second, "db transaction total")
 
 	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
-	hnswStartTime := time.Now()
+	helper.UpdateStatus("hnsw add nodes")
+	helper.MarkNow()
 	s.hnsw.Add(nodes...)
-	hnswAddTime := time.Since(hnswStartTime)
+	hnswAddTime := helper.CheckLastMark1Second("hnsw add nodes")
 
 	// 记录详细性能指标
-	totalTime := time.Since(totalStartTime)
+	totalTime := helper.CheckMarkAndLog(totalStart, 2*time.Second, "total time")
 
 	// 计算平均指标
 	var avgQueryTime, avgUpdateTime, avgCreateTime time.Duration
@@ -588,9 +585,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 		avgCreateTime = totalDocCreateTime / time.Duration(docCreateCount)
 	}
 
-	// 事务持续时间分析 - 关键指标：事务持续时间
-	transactionDuration := time.Since(txStartTime)
-
+	helper.UpdateStatus("analyzing performance")
 	// 性能警告条件 - 包含事务持续时间检查
 	shouldWarn := totalTime > 5*time.Second ||
 		totalDbQueryTime > time.Second ||
@@ -606,7 +601,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 			docCount, dbQueryCount, totalDbQueryTime, avgQueryTime, docUpdateCount, totalDocUpdateTime, avgUpdateTime, docCreateCount, totalDocCreateTime, avgCreateTime)
 
 		// 记录性能诊断信息
-		s.LogPerformanceDiagnostics()
+		s._logPerformanceDiagnosticsNeedLock()
 
 		// 分析可能的性能瓶颈
 		if transactionDuration > 30*time.Second {
@@ -857,11 +852,23 @@ func (s *SQLiteVectorStoreHNSW) Count() (int, error) {
 	return count, nil
 }
 
-// PerformanceDiagnostics 返回性能诊断信息
+func (s *SQLiteVectorStoreHNSW) UnSafeCount() (int, error) {
+	var count int
+	if err := s.db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", s.collection.ID).Where("document_id <> ?", DocumentTypeCollectionInfo).Count(&count).Error; err != nil {
+		return 0, utils.Errorf("计算文档数量失败: %v", err)
+	}
+
+	return count, nil
+}
+
 func (s *SQLiteVectorStoreHNSW) PerformanceDiagnostics() map[string]interface{} {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+	return s._performanceDiagnosticsNeedLock()
+}
 
+// _performanceDiagnosticsNeedLock 返回性能诊断信息 (需要外部锁)
+func (s *SQLiteVectorStoreHNSW) _performanceDiagnosticsNeedLock() map[string]interface{} {
 	diagnostics := make(map[string]interface{})
 
 	// 基本集合信息
@@ -879,7 +886,7 @@ func (s *SQLiteVectorStoreHNSW) PerformanceDiagnostics() map[string]interface{} 
 	diagnostics["hnsw_enable_pq"] = s.collection.EnablePQMode
 
 	// 文档统计
-	docCount, err := s.Count()
+	docCount, err := s.UnSafeCount()
 	if err != nil {
 		diagnostics["document_count_error"] = err.Error()
 	} else {
@@ -909,9 +916,15 @@ func (s *SQLiteVectorStoreHNSW) PerformanceDiagnostics() map[string]interface{} 
 	return diagnostics
 }
 
-// LogPerformanceDiagnostics 记录性能诊断信息
 func (s *SQLiteVectorStoreHNSW) LogPerformanceDiagnostics() {
-	diagnostics := s.PerformanceDiagnostics()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	s._logPerformanceDiagnosticsNeedLock()
+}
+
+// _logPerformanceDiagnosticsNeedLock 记录性能诊断信息
+func (s *SQLiteVectorStoreHNSW) _logPerformanceDiagnosticsNeedLock() {
+	diagnostics := s._performanceDiagnosticsNeedLock()
 
 	log.Infof("=== HNSW Performance Diagnostics for Collection: %s ===", diagnostics["collection_name"])
 	log.Infof("Documents: %v", diagnostics["document_count"])
