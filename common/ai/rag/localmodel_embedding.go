@@ -2,6 +2,7 @@ package rag
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"net"
 	"sync"
 	"time"
@@ -50,15 +51,9 @@ func NewLocalModelEmbedding(model *localmodel.Model, address string) *LocalModel
 
 // Embedding 实现 EmbeddingClient 接口，生成文本的嵌入向量
 func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
-	embeddingStart := time.Now()
-	defer func() {
-		useTime := time.Since(embeddingStart)
-		if useTime > 2*time.Second {
-			log.Warnf("embedding took too long: %v with [%s]", useTime, text)
-		} else {
-			log.Debugf("embedding took: %v", useTime)
-		}
-	}()
+	al := asynchelper.NewDefaultAsyncPerformanceHelper("local embedding")
+	al.Start()
+	defer al.Close()
 
 	if l.embedding == nil {
 		return nil, fmt.Errorf("embedding client not initialized")
