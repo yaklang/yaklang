@@ -235,6 +235,9 @@ LOOP:
 									reader,
 									resp.GetTaskIndex(),
 									false,
+									func() {
+										r.EmitResultAfterStream(o.String())
+									},
 								)
 							},
 						),
@@ -300,7 +303,6 @@ LOOP:
 		switch actionType {
 		case ActionDirectlyAnswer:
 			answerPayload := nextAction.GetString("answer_payload")
-			r.EmitResult(answerPayload)
 			currentTask.SetResult(strings.TrimSpace(answerPayload))
 			r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
 				"%s\n"+
