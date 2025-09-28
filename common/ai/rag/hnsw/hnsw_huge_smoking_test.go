@@ -736,9 +736,9 @@ func TestHNSWStressTest10K(t *testing.T) {
 	// 分批添加节点，监控性能变化
 	batchSizes := []int{1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000}
 
-	fmt.Printf("\n%-8s %-12s %-15s %-12s %-15s\n",
-		"Nodes", "Duration", "Avg/Node", "Nodes/sec", "Memory(KB)")
-	fmt.Println(strings.Repeat("-", 70))
+	fmt.Printf("\n%-8s %-8s %-12s %-15s %-12s %-15s\n",
+		"Total", "Batch", "Duration", "Avg/Node", "Nodes/sec", "Memory(KB)")
+	fmt.Println(strings.Repeat("-", 80))
 
 	var cumulativeResults []PerformanceResult
 
@@ -778,8 +778,8 @@ func TestHNSWStressTest10K(t *testing.T) {
 			memoryKB = float64(estimatedMemoryPerNode*totalNodes) / 1024
 		}
 
-		fmt.Printf("%-8d %-12v %-15v %-12.2f %-15.1f\n",
-			targetSize, duration, avgPerNode, nodesPerSec, memoryKB)
+		fmt.Printf("%-8d %-8d %-12v %-15v %-12.2f %-15.1f\n",
+			targetSize, batchSize, duration, avgPerNode, nodesPerSec, memoryKB)
 
 		result := PerformanceResult{
 			InitialNodes:     currentSize,

@@ -1,11 +1,12 @@
 package asynchelper
 
 import (
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"sync"
-	"time"
 )
 
 var defaultLogLevel = false
@@ -84,9 +85,9 @@ func (a *AsyncPerformanceHelper) Start() {
 			if useTime > a.logRequireTime {
 				currentStartTime, ok := a.timeMark.Get(a.currentStatusMark)
 				if !ok {
-					a.Log("[%s]: took too long: %v, current status: %s, current status %s", a.processPrefix, useTime, a.status)
+					a.Log("[%s]: took too long: %v, current status: %s", a.processPrefix, useTime, a.status)
 				} else {
-					a.Log("[%s]: took too long: %v, current status: %s, current status %s use time : %v", a.processPrefix, useTime, a.status, currentStartTime)
+					a.Log("[%s]: took too long: %v, current status: %s, current status %s use time: %v", a.processPrefix, useTime, a.status, currentStartTime, time.Since(currentStartTime))
 				}
 
 			}
