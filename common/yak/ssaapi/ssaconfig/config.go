@@ -199,11 +199,31 @@ func (c *Config) GetCompileStrictMode() bool {
 	return c.SSACompile.StrictMode
 }
 
+func (c *Config) SetCompileStrictMode(strictMode bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = &SSACompileConfig{}
+	}
+	c.SSACompile.StrictMode = strictMode
+}
+
 func (c *Config) GetCompilePeepholeSize() int {
 	if c == nil || c.SSACompile == nil {
 		return 0
 	}
 	return c.SSACompile.PeepholeSize
+}
+
+func (c *Config) SetCompilePeepholeSize(peepholeSize int) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = &SSACompileConfig{}
+	}
+	c.SSACompile.PeepholeSize = peepholeSize
 }
 
 func (c *Config) GetCompileExcludeFiles() []string {
@@ -213,11 +233,31 @@ func (c *Config) GetCompileExcludeFiles() []string {
 	return c.SSACompile.ExcludeFiles
 }
 
+func (c *Config) SetCompileExcludeFiles(excludeFiles []string) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = &SSACompileConfig{}
+	}
+	c.SSACompile.ExcludeFiles = excludeFiles
+}
+
 func (c *Config) GetCompileReCompile() bool {
 	if c == nil || c.SSACompile == nil {
 		return false
 	}
 	return c.SSACompile.ReCompile
+}
+
+func (c *Config) SetCompileReCompile(reCompile bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = &SSACompileConfig{}
+	}
+	c.SSACompile.ReCompile = reCompile
 }
 
 func (c *Config) GetCompileMemory() bool {
@@ -227,11 +267,31 @@ func (c *Config) GetCompileMemory() bool {
 	return c.SSACompile.MemoryCompile
 }
 
+func (c *Config) SetCompileMemory(memory bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = &SSACompileConfig{}
+	}
+	c.SSACompile.MemoryCompile = memory
+}
+
 func (c *Config) GetCompileConcurrency() uint32 {
 	if c == nil || c.SSACompile == nil {
 		return 0
 	}
 	return c.SSACompile.Concurrency
+}
+
+func (c *Config) SetCompileConcurrency(concurrency uint32) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = &SSACompileConfig{}
+	}
+	c.SSACompile.Concurrency = concurrency
 }
 
 func (c *Config) GetProgramNames() []string {

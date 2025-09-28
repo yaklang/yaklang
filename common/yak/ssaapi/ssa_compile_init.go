@@ -69,7 +69,7 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 			// recover source code context
 			fb.SetEditor(originEditor)
 			save := true
-			if c.strictMode && err != nil {
+			if c.GetCompileStrictMode() && err != nil {
 				save = false
 			}
 			application.PopEditor(save)

@@ -20,7 +20,7 @@ func SaveConfig(c *Config, prog *Program) {
 		irProg.Language = string(c.language)
 		irProg.EngineVersion = consts.GetYakVersion()
 		irProg.ConfigInput = c.info
-		irProg.PeepholeSize = c.peepholeSize
+		irProg.PeepholeSize = c.GetCompilePeepholeSize()
 		ssadb.UpdateProgram(irProg)
 	} else {
 		// only memory

@@ -45,14 +45,14 @@ func ParseProject(opts ...Option) (prog Programs, err error) {
 
 func (c *Config) parseProject() (Programs, error) {
 
-	if c.reCompile {
+	if c.GetCompileReCompile() {
 		c.Processf(0, "recompile project, delete old data...")
 		ssadb.DeleteProgramIrCode(ssadb.GetDB(), c.ProgramName)
 		c.Processf(0, "recompile project, delete old data finish")
 	}
 
 	c.Processf(0, "recompile project, start compile")
-	if c.peepholeSize != 0 {
+	if c.GetCompilePeepholeSize() != 0 {
 		// peephole compile
 		if progs, err := c.peephole(); err != nil {
 			return nil, err
@@ -86,7 +86,7 @@ func (c *Config) peephole() (Programs, error) {
 	var errs error
 
 	filesys.Peephole(originFs,
-		filesys.WithPeepholeSize(c.peepholeSize),
+		filesys.WithPeepholeSize(c.GetCompilePeepholeSize()),
 		filesys.WithPeepholeContext(c.ctx),
 		filesys.WithPeepholeCallback(func(count, totalCount int, system filesys_interface.FileSystem) {
 			totalCount = totalCount + 1
