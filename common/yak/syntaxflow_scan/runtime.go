@@ -13,7 +13,6 @@ import (
 )
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
-
 	defer func() {
 		if err := recover(); err != nil {
 			log.Errorf("error: panic: %v", err)
@@ -22,7 +21,6 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
 		}
 		m.StatusTask()
-		m.SaveTask()
 		m.saveReport()
 	}()
 
@@ -57,6 +55,7 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 
 			swg.Add()
 			go func(rule *schema.SyntaxFlowRule, progName string) {
+				defer m.SaveTask()
 				defer swg.Done()
 
 				prog, err := ssaapi.FromDatabase(progName)

@@ -2,7 +2,6 @@ package syntaxflow_scan
 
 import (
 	"io"
-	"sync"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
@@ -13,8 +12,6 @@ type errorCallback func(string, ...any)
 type ProcessCallback func(taskID, status string, progress float64, info *RuleProcessInfoList)
 
 type ScanTaskCallback struct {
-	waitGroup sync.WaitGroup
-
 	ProcessCallback ProcessCallback `json:"-"`
 
 	errorCallback  errorCallback      `json:"-"`
