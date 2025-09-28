@@ -147,6 +147,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (skipTaskStatusChange bool, er
 	r.currentIteration = 0
 	skipTaskStatusChange = false
 
+	r.addToTimeline("USER-Original-Query", userQuery)
 LOOP:
 	for r.currentIteration < r.config.maxIterations {
 		if currentTask.IsFinished() {
