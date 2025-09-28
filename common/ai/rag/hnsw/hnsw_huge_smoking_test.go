@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // generateRandomVector 生成指定维度的随机向量
@@ -152,6 +153,11 @@ func measureAddPerformance(t *testing.T, initialNodeCount int, addNodeCount int,
 
 // TestHNSWPerformance1K 测试在1000个节点基础上添加单个节点的性能
 func TestHNSWPerformance1K(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
 	t.Run("Add1NodeTo1K_128D", func(t *testing.T) {
 		measureAddPerformance(t, 1000, 1, 128) // 128维向量
 	})
@@ -180,6 +186,11 @@ func TestHNSWPerformance1K(t *testing.T) {
 
 // TestHNSWPerformance10K 测试在10000个节点基础上添加节点的性能
 func TestHNSWPerformance10K(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
 	t.Run("Add1NodeTo10K_128D", func(t *testing.T) {
 		measureAddPerformance(t, 10000, 1, 128) // 128维向量
 	})
@@ -208,6 +219,10 @@ func TestHNSWPerformance10K(t *testing.T) {
 
 // BenchmarkHNSWAdd1K 基准测试：在1K节点基础上添加单个节点
 func BenchmarkHNSWAdd1K(b *testing.B) {
+	if utils.InGithubActions() {
+		b.Skip("no performance test in ci")
+		return
+	}
 	// 预创建图和初始节点
 	g := NewGraph[int]()
 	g.Rng = rand.New(rand.NewSource(42))
@@ -227,6 +242,11 @@ func BenchmarkHNSWAdd1K(b *testing.B) {
 
 // BenchmarkHNSWAdd1K_1024D 基准测试：在1K节点基础上添加单个1024维节点
 func BenchmarkHNSWAdd1K_1024D(b *testing.B) {
+	if utils.InGithubActions() {
+		b.Skip("no performance test in ci")
+		return
+	}
+
 	// 预创建图和初始节点
 	g := NewGraph[int]()
 	g.Rng = rand.New(rand.NewSource(42))
@@ -246,6 +266,11 @@ func BenchmarkHNSWAdd1K_1024D(b *testing.B) {
 
 // BenchmarkHNSWAdd10K 基准测试：在10K节点基础上添加单个节点
 func BenchmarkHNSWAdd10K(b *testing.B) {
+	if utils.InGithubActions() {
+		b.Skip("no performance test in ci")
+		return
+	}
+
 	// 预创建图和初始节点
 	g := NewGraph[int]()
 	g.Rng = rand.New(rand.NewSource(42))
@@ -265,6 +290,11 @@ func BenchmarkHNSWAdd10K(b *testing.B) {
 
 // BenchmarkHNSWAdd10K_1024D 基准测试：在10K节点基础上添加单个1024维节点
 func BenchmarkHNSWAdd10K_1024D(b *testing.B) {
+	if utils.InGithubActions() {
+		b.Skip("no performance test in ci")
+		return
+	}
+
 	// 预创建图和初始节点
 	g := NewGraph[int]()
 	g.Rng = rand.New(rand.NewSource(42))
@@ -284,6 +314,11 @@ func BenchmarkHNSWAdd10K_1024D(b *testing.B) {
 
 // TestHNSWScalabilityAnalysis 分析HNSW的可扩展性
 func TestHNSWScalabilityAnalysis(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
 	if testing.Short() {
 		t.Skip("Skipping scalability analysis in short mode")
 	}
@@ -325,6 +360,11 @@ func TestHNSWScalabilityAnalysis(t *testing.T) {
 
 // TestHNSWScalabilityAnalysis1024D 分析HNSW在1024维度下的可扩展性
 func TestHNSWScalabilityAnalysis1024D(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
 	if testing.Short() {
 		t.Skip("Skipping 1024D scalability analysis in short mode")
 	}
@@ -387,6 +427,11 @@ func TestHNSWScalabilityAnalysis1024D(t *testing.T) {
 
 // TestHNSWMemoryUsageEstimate 估算内存使用情况
 func TestHNSWMemoryUsageEstimate(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
 	if testing.Short() {
 		t.Skip("Skipping memory usage test in short mode")
 	}
@@ -445,6 +490,11 @@ func TestHNSWMemoryUsageEstimate(t *testing.T) {
 
 // TestHNSWDimensionComparison 比较不同维度下的性能
 func TestHNSWDimensionComparison(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
 	if testing.Short() {
 		t.Skip("Skipping dimension comparison test in short mode")
 	}
@@ -507,6 +557,11 @@ func TestHNSWDimensionComparison(t *testing.T) {
 
 // TestHNSW10KDataDetailedAnalysis 针对10K数据的详细性能分析
 func TestHNSW10KDataDetailedAnalysis(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+
 	if testing.Short() {
 		t.Skip("Skipping 10K detailed analysis in short mode")
 	}
@@ -577,6 +632,11 @@ func TestHNSW10KDataDetailedAnalysis(t *testing.T) {
 
 // TestHNSWStressTest10K 10K数据压力测试
 func TestHNSWStressTest10K(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("no performance test in ci")
+		return
+	}
+	
 	if testing.Short() {
 		t.Skip("Skipping 10K stress test in short mode")
 	}
