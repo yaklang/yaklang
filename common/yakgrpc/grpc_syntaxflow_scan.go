@@ -36,7 +36,7 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 func createSSAConfigByRequest(req *ypb.SyntaxFlowScanRequest) (*ssaconfig.Config, error) {
 	config, err := ssaconfig.NewSyntaxFlowScanConfig(
 		ssaconfig.WithScanConcurrency(req.Concurrency),
-		ssaconfig.WithScanMemory(req.Memory),
+		ssaconfig.WithSyntaxFlowMemory(req.Memory),
 		ssaconfig.WithScanIgnoreLanguage(req.IgnoreLanguage),
 		ssaconfig.WithRuleFilter(req.GetFilter()),
 		ssaconfig.WithRuleInput(req.GetRuleInput()),
