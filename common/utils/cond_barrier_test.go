@@ -1567,3 +1567,471 @@ func TestCondBarrier_NestedLockIssue(t *testing.T) {
 		t.Fatal("Nested lock test timed out - DEADLOCK DETECTED!")
 	}
 }
+
+func TestCondBarrier_ConcurrentWaitNonExistentBarriers(t *testing.T) {
+	log.Info("Testing concurrent Wait for non-existent barriers")
+
+	cb := NewCondBarrier()
+	const numWaiters = 50
+	var wg sync.WaitGroup
+	var completed int64
+
+	// 并发等待多个不存在的屏障
+	for i := 0; i < numWaiters; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			barrierName := fmt.Sprintf("non_existent_%d", id)
+			err := cb.Wait(barrierName)
+			if err != nil {
+				t.Errorf("Wait for %s failed: %v", barrierName, err)
+			} else {
+				atomic.AddInt64(&completed, 1)
+			}
+		}(i)
+	}
+
+	// 等待一段时间，确保所有 Wait 都已开始
+	time.Sleep(100 * time.Millisecond)
+
+	// 取消所有等待 - 这应该让所有 Wait 立即返回
+	cb.Cancel()
+
+	// 等待所有 goroutine 完成
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		finalCompleted := atomic.LoadInt64(&completed)
+		log.Infof("Concurrent wait test completed with %d successful waits", finalCompleted)
+	case <-time.After(1 * time.Second):
+		t.Error("Concurrent wait for non-existent barriers timed out - DEADLOCK!")
+	}
+}
+
+func TestCondBarrier_ConcurrentWaitSameNonExistentBarrier(t *testing.T) {
+	log.Info("Testing concurrent Wait for the same non-existent barrier")
+
+	cb := NewCondBarrier()
+	const numWaiters = 100
+	var wg sync.WaitGroup
+	var completed int64
+
+	barrierName := "same_non_existent"
+
+	// 并发等待同一个不存在的屏障
+	for i := 0; i < numWaiters; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			err := cb.Wait(barrierName)
+			if err != nil {
+				t.Errorf("Wait %d for %s failed: %v", id, barrierName, err)
+			} else {
+				atomic.AddInt64(&completed, 1)
+			}
+		}(i)
+	}
+
+	// 等待一段时间，确保所有 Wait 都已开始
+	time.Sleep(200 * time.Millisecond)
+
+	// 取消所有等待
+	cb.Cancel()
+
+	// 等待所有 goroutine 完成
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		finalCompleted := atomic.LoadInt64(&completed)
+		if finalCompleted != numWaiters {
+			t.Errorf("Expected %d completed waits, got %d", numWaiters, finalCompleted)
+		}
+		log.Infof("Concurrent wait same barrier test completed with %d successful waits", finalCompleted)
+	case <-time.After(1 * time.Second):
+		t.Error("Concurrent wait for same non-existent barrier timed out - DEADLOCK!")
+	}
+}
+
+func TestCondBarrier_WaitNonExistentWithContextTimeout(t *testing.T) {
+	log.Info("Testing Wait for non-existent barrier with context timeout")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	cb := NewCondBarrierContext(ctx)
+	var waitErrors []error
+	var mu sync.Mutex
+
+	const numWaiters = 10
+	var wg sync.WaitGroup
+
+	// 启动多个等待不存在屏障的 goroutine
+	for i := 0; i < numWaiters; i++ {
+		wg.Add(1)
+		go func(id int) {
+			defer wg.Done()
+			err := cb.Wait(fmt.Sprintf("timeout_barrier_%d", id))
+			mu.Lock()
+			waitErrors = append(waitErrors, err)
+			mu.Unlock()
+		}(i)
+	}
+
+	// 等待所有操作完成或超时
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		mu.Lock()
+		errorCount := 0
+		for _, err := range waitErrors {
+			if err != nil {
+				errorCount++
+				if err != context.DeadlineExceeded {
+					t.Errorf("Expected context timeout error, got %v", err)
+				}
+			}
+		}
+		mu.Unlock()
+
+		if errorCount != numWaiters {
+			t.Errorf("Expected all %d waits to timeout, but %d succeeded", numWaiters, numWaiters-errorCount)
+		}
+
+		log.Infof("Context timeout test completed with %d timeouts", errorCount)
+	case <-time.After(500 * time.Millisecond):
+		t.Error("Wait with context timeout took too long - possible deadlock")
+	}
+}
+
+func TestCondBarrier_MixedConcurrentWaitAndCancel(t *testing.T) {
+	log.Info("Testing mixed concurrent Wait and Cancel operations")
+
+	const numIterations = 5
+	const numWaiters = 20
+
+	for iter := 0; iter < numIterations; iter++ {
+		cb := NewCondBarrier()
+		var wg sync.WaitGroup
+		var successCount int64
+
+		// 启动等待不存在屏障的 goroutine
+		for i := 0; i < numWaiters; i++ {
+			wg.Add(1)
+			go func(id int) {
+				defer wg.Done()
+				err := cb.Wait(fmt.Sprintf("mixed_barrier_%d", id%5))
+				if err == nil {
+					atomic.AddInt64(&successCount, 1)
+				}
+			}(i)
+		}
+
+		// 随机时间后取消
+		go func() {
+			time.Sleep(time.Duration(iter*20) * time.Millisecond)
+			cb.Cancel()
+		}()
+
+		// 等待完成
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			finalSuccess := atomic.LoadInt64(&successCount)
+			log.Infof("Iteration %d: %d successful waits after cancel", iter, finalSuccess)
+		case <-time.After(1 * time.Second):
+			t.Errorf("Iteration %d: Mixed concurrent operations timed out - DEADLOCK!", iter)
+			return
+		}
+	}
+
+	log.Info("Mixed concurrent wait and cancel test passed")
+}
+
+func TestCondBarrier_WaitContext_BasicUsage(t *testing.T) {
+	log.Info("Testing WaitContext basic usage")
+
+	cb := NewCondBarrier()
+	ctx := context.Background()
+
+	// 启动一个任务
+	go func() {
+		barrier := cb.CreateBarrier("task1")
+		defer barrier.Done()
+		time.Sleep(50 * time.Millisecond)
+		log.Info("Task1 completed")
+	}()
+
+	// 使用 WaitContext 等待
+	start := time.Now()
+	err := cb.WaitContext(ctx, "task1")
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("WaitContext failed: %v", err)
+	}
+	if elapsed < 40*time.Millisecond || elapsed > 100*time.Millisecond {
+		t.Errorf("WaitContext time should be around 50ms, got %v", elapsed)
+	}
+
+	log.Info("WaitContext basic usage test passed")
+}
+
+func TestCondBarrier_WaitContext_WithTimeout(t *testing.T) {
+	log.Info("Testing WaitContext with timeout")
+
+	cb := NewCondBarrier()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	// 启动一个长时间运行的任务
+	go func() {
+		barrier := cb.CreateBarrier("long_task")
+		defer barrier.Done()
+		time.Sleep(200 * time.Millisecond) // 超过超时时间
+		log.Info("Long task completed")
+	}()
+
+	// 使用 WaitContext 等待，应该因为超时而失败
+	start := time.Now()
+	err := cb.WaitContext(ctx, "long_task")
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("WaitContext should timeout")
+	}
+	if err != context.DeadlineExceeded {
+		t.Errorf("Expected context.DeadlineExceeded, got %v", err)
+	}
+	if elapsed < 40*time.Millisecond || elapsed > 100*time.Millisecond {
+		t.Errorf("WaitContext timeout should be around 50ms, got %v", elapsed)
+	}
+
+	log.Info("WaitContext timeout test passed")
+}
+
+func TestCondBarrier_WaitContext_MultipleBarriers(t *testing.T) {
+	log.Info("Testing WaitContext with multiple barriers")
+
+	cb := NewCondBarrier()
+	ctx := context.Background()
+
+	// 启动多个任务
+	for i, name := range []string{"task1", "task2", "task3"} {
+		go func(taskName string, delay int) {
+			barrier := cb.CreateBarrier(taskName)
+			defer barrier.Done()
+			time.Sleep(time.Duration(delay) * time.Millisecond)
+			log.Infof("%s completed", taskName)
+		}(name, (i+1)*30)
+	}
+
+	// 等待 task1 和 task2 完成
+	start := time.Now()
+	err := cb.WaitContext(ctx, "task1", "task2")
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("WaitContext for multiple barriers failed: %v", err)
+	}
+	if elapsed < 50*time.Millisecond || elapsed > 120*time.Millisecond {
+		t.Errorf("WaitContext time should be around 60ms, got %v", elapsed)
+	}
+
+	log.Info("WaitContext multiple barriers test passed")
+}
+
+func TestCondBarrier_WaitAllContext_BasicUsage(t *testing.T) {
+	log.Info("Testing WaitAllContext basic usage")
+
+	cb := NewCondBarrier()
+	ctx := context.Background()
+
+	// 启动两个任务
+	go func() {
+		barrier := cb.CreateBarrier("task1")
+		defer barrier.Done()
+		time.Sleep(50 * time.Millisecond)
+		log.Info("Task1 completed")
+	}()
+
+	go func() {
+		barrier := cb.CreateBarrier("task2")
+		defer barrier.Done()
+		time.Sleep(80 * time.Millisecond)
+		log.Info("Task2 completed")
+	}()
+
+	// 给一点时间让屏障被创建
+	time.Sleep(10 * time.Millisecond)
+
+	// 使用 WaitAllContext 等待所有
+	start := time.Now()
+	err := cb.WaitAllContext(ctx)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("WaitAllContext failed: %v", err)
+	}
+	if elapsed < 70*time.Millisecond || elapsed > 130*time.Millisecond {
+		t.Errorf("WaitAllContext time should be around 80ms, got %v", elapsed)
+	}
+
+	log.Info("WaitAllContext basic usage test passed")
+}
+
+func TestCondBarrier_WaitAllContext_WithTimeout(t *testing.T) {
+	log.Info("Testing WaitAllContext with timeout")
+
+	cb := NewCondBarrier()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	// 启动一个长时间运行的任务
+	go func() {
+		barrier := cb.CreateBarrier("long_task")
+		defer barrier.Done()
+		time.Sleep(100 * time.Millisecond) // 超过超时时间
+		log.Info("Long task completed")
+	}()
+
+	// 给一点时间让屏障被创建
+	time.Sleep(10 * time.Millisecond)
+
+	// 使用 WaitAllContext 等待，应该因为超时而失败
+	start := time.Now()
+	err := cb.WaitAllContext(ctx)
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Error("WaitAllContext should timeout")
+	}
+	if err != context.DeadlineExceeded {
+		t.Errorf("Expected context.DeadlineExceeded, got %v", err)
+	}
+	if elapsed < 40*time.Millisecond || elapsed > 100*time.Millisecond {
+		t.Errorf("WaitAllContext timeout should be around 50ms, got %v", elapsed)
+	}
+
+	log.Info("WaitAllContext timeout test passed")
+}
+
+func TestCondBarrier_WaitContext_CondBarrierCancelVsParameterContext(t *testing.T) {
+	log.Info("Testing WaitContext with both CondBarrier cancel and parameter context")
+
+	cb := NewCondBarrier()
+
+	// 创建一个较长的超时上下文
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+
+	var waitErr error
+	done := make(chan struct{})
+
+	// 启动等待不存在屏障的 goroutine
+	go func() {
+		defer close(done)
+		waitErr = cb.WaitContext(ctx, "never_created")
+	}()
+
+	// 等待一段时间后取消 CondBarrier
+	time.Sleep(50 * time.Millisecond)
+	cb.Cancel()
+
+	// 等待 WaitContext 完成
+	select {
+	case <-done:
+		if waitErr != nil {
+			t.Errorf("WaitContext should succeed when CondBarrier is cancelled, got %v", waitErr)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("WaitContext should complete when CondBarrier is cancelled")
+	}
+
+	log.Info("WaitContext CondBarrier cancel vs parameter context test passed")
+}
+
+func TestCondBarrier_WaitContext_ParameterContextCancelVsCondBarrierCancel(t *testing.T) {
+	log.Info("Testing WaitContext with parameter context cancel vs CondBarrier cancel")
+
+	cb := NewCondBarrier()
+
+	// 创建一个较短的超时上下文
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	var waitErr error
+	done := make(chan struct{})
+
+	// 启动等待不存在屏障的 goroutine
+	go func() {
+		defer close(done)
+		waitErr = cb.WaitContext(ctx, "never_created")
+	}()
+
+	// 等待 WaitContext 因上下文超时而完成
+	select {
+	case <-done:
+		if waitErr == nil {
+			t.Error("WaitContext should fail when parameter context times out")
+		}
+		if waitErr != context.DeadlineExceeded {
+			t.Errorf("Expected context.DeadlineExceeded, got %v", waitErr)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("WaitContext should complete when parameter context times out")
+	}
+
+	log.Info("WaitContext parameter context cancel vs CondBarrier cancel test passed")
+}
+
+func TestCondBarrier_WaitContext_EmptyNames(t *testing.T) {
+	log.Info("Testing WaitContext with empty names (should call WaitAllContext)")
+
+	cb := NewCondBarrier()
+	ctx := context.Background()
+
+	// 启动一个任务
+	go func() {
+		barrier := cb.CreateBarrier("task1")
+		defer barrier.Done()
+		time.Sleep(50 * time.Millisecond)
+		log.Info("Task1 completed")
+	}()
+
+	// 给一点时间让屏障被创建
+	time.Sleep(10 * time.Millisecond)
+
+	// 使用 WaitContext 空参数，应该等同于 WaitAllContext
+	start := time.Now()
+	err := cb.WaitContext(ctx)
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Errorf("WaitContext with empty names failed: %v", err)
+	}
+	if elapsed < 35*time.Millisecond || elapsed > 100*time.Millisecond {
+		t.Errorf("WaitContext empty names time should be around 50ms, got %v", elapsed)
+	}
+
+	log.Info("WaitContext empty names test passed")
+}
