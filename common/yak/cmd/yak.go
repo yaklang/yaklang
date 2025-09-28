@@ -74,11 +74,13 @@ func initializeDatabase(projectDatabase string, profileDBName string, frontendNa
 		return nil
 	}
 
-	// 调用一些数据库初始化的操作
-	err = yakit.CallPostInitDatabase()
-	if err != nil {
-		return utils.Errorf("CallPostInitDatabase failed: %s", err)
-	}
+	go func() {
+		// 调用一些数据库初始化的操作
+		err = yakit.CallPostInitDatabase()
+		if err != nil {
+			log.Errorf("CallPostInitDatabase failed: %s", err)
+		}
+	}()
 	return nil
 }
 
@@ -562,12 +564,12 @@ var startGRPCServerCommand = cli.Command{
 			}
 		}
 
-		log.Infof("start to startup grpc server...")
+		log.Info("start to startup grpc server...")
 		if c.String("host") == "127.0.0.1" {
 			log.Info("the current yak grpc for '127.0.0.1', if u want to connect from other host. use \n" +
 				"    yak grpc --host 0.0.0.0")
 		}
-		log.Infof("yak grpc ok") // 勿删
+		log.Info("yak grpc ok") // 勿删
 		err = grpcTrans.Serve(lis)
 		if err != nil {
 			log.Error(err)

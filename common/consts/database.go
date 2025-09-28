@@ -30,6 +30,59 @@ const (
 	DEFAULT_DRIVER = SQLite
 )
 
+type DatabasePostInitTag string
+
+const (
+	POST_INIT_SYNC_AI_TOOLS           DatabasePostInitTag = "sync-ai-tools"
+	POST_INIT_SYNC_BUILDIN_AI_FORGES  DatabasePostInitTag = "sync-buildin-ai-forge"
+	POST_INIT_SYNC_YAKIT_CORE_PLUGINS DatabasePostInitTag = "sync-core-plugin-for-yakit"
+)
+
+var (
+	databaseInitBarrier = utils.NewCondBarrier()
+	barriers            = map[DatabasePostInitTag]*utils.Barrier{
+		POST_INIT_SYNC_AI_TOOLS:           databaseInitBarrier.CreateBarrier(string(POST_INIT_SYNC_AI_TOOLS)),
+		POST_INIT_SYNC_BUILDIN_AI_FORGES:  databaseInitBarrier.CreateBarrier(string(POST_INIT_SYNC_BUILDIN_AI_FORGES)),
+		POST_INIT_SYNC_YAKIT_CORE_PLUGINS: databaseInitBarrier.CreateBarrier(string(POST_INIT_SYNC_YAKIT_CORE_PLUGINS)),
+	}
+)
+
+func DatabaseInitDone(i string) {
+	if b, ok := barriers[DatabasePostInitTag(i)]; ok {
+		b.Done()
+	}
+}
+
+func WaitDatabasePostInitAITools() {
+	err := databaseInitBarrier.Wait(string(POST_INIT_SYNC_AI_TOOLS))
+	if err != nil {
+		return
+	}
+}
+
+func WaitDatabasePostInitBuildinAIForages() {
+	err := databaseInitBarrier.Wait(string(POST_INIT_SYNC_BUILDIN_AI_FORGES))
+	if err != nil {
+		return
+	}
+}
+
+func WaitAIDatabasePostInit() {
+	WaitDatabasePostInitAITools()
+	WaitDatabasePostInitBuildinAIForages()
+}
+
+var waitCorePluginOnce = utils.NewOnce()
+
+func WaitDatabasePostInitYakitCorePlugins() {
+	waitCorePluginOnce.Do(func() {
+		err := databaseInitBarrier.Wait(string(POST_INIT_SYNC_YAKIT_CORE_PLUGINS))
+		if err != nil {
+			return
+		}
+	})
+}
+
 var RegisterDriverOnce = new(sync.Once)
 
 func DeleteDatabaseFile(path string) error {

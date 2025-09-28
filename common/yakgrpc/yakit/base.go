@@ -68,14 +68,17 @@ func CallPostInitDatabase() error {
 		if f == nil || f.Fn == nil {
 			continue
 		}
+
 		currentFuncStart := time.Now()
 		err := f.Fn()
+		node := f.Note
+		if node == "" {
+			node = fmt.Sprint(idx)
+		}
+		consts.DatabaseInitDone(node)
+
 		elapsed := time.Since(currentFuncStart)
 		if elapsed > 1*time.Second {
-			node := f.Note
-			if node == "" {
-				node = fmt.Sprint(idx)
-			}
 			log.Warnf("call post function[%v] took too long: %v", node, elapsed)
 		}
 		if err != nil {

@@ -317,7 +317,7 @@ func init() {
 			withPluginEnableGenerateParam(true),
 		)
 		return nil
-	}, "sync-core-plugin-for-yakit")
+	}, string(consts.POST_INIT_SYNC_YAKIT_CORE_PLUGINS))
 
 }
 

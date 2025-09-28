@@ -3,6 +3,7 @@ package aid
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/consts"
 	"io"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -39,6 +40,8 @@ func NewCoordinator(userInput string, options ...Option) (*Coordinator, error) {
 
 // NewCoordinator 创建一个新的 Coordinator
 func NewCoordinatorContext(ctx context.Context, userInput string, options ...Option) (*Coordinator, error) {
+	consts.WaitAIDatabasePostInit()
+
 	config := NewConfig(ctx)
 	for _, opt := range options {
 		err := opt(config)

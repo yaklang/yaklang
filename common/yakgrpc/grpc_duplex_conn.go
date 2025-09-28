@@ -15,6 +15,8 @@ import (
 )
 
 func (s *Server) DuplexConnection(stream ypb.Yak_DuplexConnectionServer) error {
+	consts.WaitDatabasePostInitYakitCorePlugins()
+
 	id := uuid.New().String()
 	yakit.RegisterServerPushCallback(id, stream)
 	defer yakit.UnRegisterServerPushCallback(id)

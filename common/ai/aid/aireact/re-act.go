@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"sync"
 	"time"
 
@@ -114,6 +115,8 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 }
 
 func NewReAct(opts ...Option) (*ReAct, error) {
+	consts.WaitAIDatabasePostInit()
+
 	cfg := NewReActConfig(context.Background(), opts...)
 
 	react := &ReAct{

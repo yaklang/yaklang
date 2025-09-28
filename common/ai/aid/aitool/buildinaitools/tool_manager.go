@@ -2,6 +2,7 @@ package buildinaitools
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/samber/lo"
 
@@ -112,6 +113,8 @@ func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolMan
 
 // NewToolManager 创建一个新的默认工具管理器实例
 func NewToolManager(options ...ToolManagerOption) *AiToolManager {
+	consts.WaitAIDatabasePostInit()
+	
 	manager := NewToolManagerByToolGetter(GetAllTools, options...)
 	return manager
 }
