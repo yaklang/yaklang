@@ -5,13 +5,16 @@ on:
     types:
       - completed
   pull_request:
-    branches: [ main ]
+    branches: [main]
     types: [ opened, synchronize, reopened ]
     paths:
       - "go.mod"
       - ".github/workflows/diff-code-check.yml"
+      - ".github/workflows/security-comment-simple.yml"
+      - ".github/actions/security-commenter/action.yml"
       - "common/ssa_bootstrapping/ci_rule/**"
       - "common/syntaxflow/sfbuildin/buildin/golang/**"
+      - "scripts/ssa-risk-tools/**"
 jobs:
   setup:
     runs-on: ubuntu-22.04
@@ -22,7 +25,6 @@ jobs:
       issues: write
       checks: write
       actions: read
-      # metadata: read
     steps:
       - name: Debug trigger conditions
         run: |
@@ -58,7 +60,13 @@ jobs:
       - name: Init PR_NUMBER
         run: |
           if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "PR_NUMBER=${{ github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_ENV
+            # 检查是否有 pull_requests 数据
+            if [ "${{ github.event.workflow_run.pull_requests }}" != "[]" ] && [ "${{ github.event.workflow_run.pull_requests }}" != "null" ]; then
+              echo "PR_NUMBER=${{ github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_ENV
+            else
+              echo "PR_NUMBER=0" >> $GITHUB_ENV
+              echo "Warning: No pull requests found in workflow_run event"
+            fi
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
             echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
           else
@@ -151,41 +159,29 @@ jobs:
         # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
 
       - name: Set up Python for commenting
-        if: steps.scan.outputs.scan_result == 'failure'
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
       - name: Install Python dependencies
-        if: steps.scan.outputs.scan_result == 'failure'
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml requests
 
-      - name: Generate GitHub App Token
-        id: generate_token
-        if: secrets.GITHUB_APP_ID != '' && secrets.GITHUB_APP_PRIVATE_KEY != ''
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-      
-      - name: Set fallback token
+      - name: Set GitHub Token
         id: set_token
         run: |
-          if [ "${{ steps.generate_token.outputs.token }}" != "" ]; then
-            echo "token=${{ steps.generate_token.outputs.token }}" >> $GITHUB_OUTPUT
-          else
-            echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
-          fi
+          echo "Using GITHUB_TOKEN"
+          echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
+          echo "token_type=default" >> $GITHUB_OUTPUT
+          echo "Event type: ${{ github.event_name }}"
 
       # - name: Call Security Scan and Comment (GitHub App)
       #   if: steps.scan.outputs.scan_result == 'failure'
       #   uses: ./.github/workflows/security-scan-comment.yml
       #   with:
       #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ github.event.pull_request.number }}
+      #     pr_number: ${{ env.PR_NUMBER }}
       #   secrets:
       #     GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
       #     GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
@@ -195,31 +191,396 @@ jobs:
       #   uses: ./.github/workflows/security-comment-community.yml
       #   with:
       #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ github.event.pull_request.number }}
+      #     pr_number: ${{ env.PR_NUMBER }}
       #   secrets:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     GITHUB_TOKEN: ${{ steps.set_token.outputs.token }}
 
-      # - name: Call Security Comment (Simple)
-      #   if: steps.scan.outputs.scan_result == 'failure'
-      #   uses: ./.github/workflows/security-comment-simple.yml
-      #   with:
-      #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ github.event.pull_request.number }}
-      #   secrets:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test Token Permissions
+        id: test_token
+        run: |
+          echo "Testing token permissions..."
+          # 测试仓库访问权限而不是用户权限
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }})
+          echo "Repository API HTTP Status: $response"
+          
+          # 测试 PR 访问权限
+          pr_response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }})
+          echo "PR API HTTP Status: $pr_response"
+          
+          if [ "$response" = "200" ] && [ "$pr_response" = "200" ]; then
+            echo "has_permissions=true" >> $GITHUB_OUTPUT
+            echo "Token has sufficient permissions for repository and PR access"
+          else
+            echo "has_permissions=false" >> $GITHUB_OUTPUT
+            echo "Token lacks sufficient permissions (Repo: $response, PR: $pr_response)"
+          fi
 
-      - name: Add success comment
-        if: steps.scan.outputs.scan_result == 'success' && env.PR_NUMBER != ''
-        uses: actions/github-script@v7
+      - name: Debug File Paths
+        if: steps.scan.outputs.scan_result == 'failure'
+        run: |
+          echo "=== Debug File Paths ==="
+          echo "Current working directory: $(pwd)"
+          echo "GitHub workspace: ${{ github.workspace }}"
+          echo "Risk JSON path: ./risk.json"
+          echo "Config path: ${{ github.workspace }}/.github/github-commenter.yml"
+          echo "Checking if files exist:"
+          ls -la ./risk.json || echo "risk.json not found"
+          ls -la ${{ github.workspace }}/.github/github-commenter.yml || echo "config file not found"
+          echo "========================="
+
+      - name: Skip Security Comment (Insufficient Permissions)
+        if: steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'false'
+        run: |
+          echo "⚠️ Skipping security comment due to insufficient token permissions"
+          echo "Consider configuring GitHub App secrets for better permissions in workflow_run events"
+
+      - name: Generate security report
+        id: report
+        if: steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        run: |
+          if [ ! -f "./risk.json" ]; then
+            echo "❌ Risk file not found: ./risk.json"
+            exit 1
+          fi
+          
+          # 检查 AWK 脚本是否存在
+          if [ ! -f "scripts/ssa-risk-tools/extract-risks.awk" ]; then
+            echo "❌ AWK script not found: scripts/ssa-risk-tools/extract-risks.awk"
+            exit 1
+          fi
+          
+          # 清理旧的 results 目录
+          rm -rf results
+          
+          # 使用 extract-risks.awk 生成报告
+          awk -f scripts/ssa-risk-tools/extract-risks.awk ./risk.json
+          
+          # 检查 results 目录是否存在
+          if [ ! -d "results" ]; then
+            echo "❌ Results directory not found after AWK execution"
+            exit 1
+          fi
+          
+          # 解析风险详情文件并生成带位置信息的报告
+          REPORT="## 🔍 代码安全扫描报告\n\n"
+          
+          # 读取扫描总结
+          if [ -f "results/scan_summary.txt" ]; then
+            SCAN_TIME=$(grep "扫描时间:" results/scan_summary.txt | sed 's/扫描时间: //')
+            RISK_COUNT=$(grep "总风险数:" results/scan_summary.txt | sed 's/总风险数: //')
+            
+            REPORT="${REPORT}**扫描时间:** ${SCAN_TIME}\n"
+            REPORT="${REPORT}**发现风险数:** ${RISK_COUNT}\n\n"
+          fi
+          
+          # 处理每个风险详情文件
+          if [ "$RISK_COUNT" -gt 0 ]; then
+            REPORT="${REPORT}### 🚨 风险详情\n\n"
+            
+            HIGH_CRITICAL_COUNT=0
+            
+            for i in $(seq 1 $RISK_COUNT); do
+              detail_file="results/risk_details_${i}.txt"
+              if [ -f "$detail_file" ]; then
+                # 提取风险信息
+                RISK_ID=$(grep "风险ID:" "$detail_file" | sed 's/风险ID: //')
+                FILE_PATH=$(grep "文件路径:" "$detail_file" | sed 's/文件路径: //')
+                LINE_NUM=$(grep "行号:" "$detail_file" | sed 's/行号: //')
+                CODE_RANGE=$(grep "代码范围:" "$detail_file" | sed 's/代码范围: //')
+                SEVERITY=$(grep "严重程度:" "$detail_file" | sed 's/严重程度: //')
+                TITLE=$(grep "标题:" "$detail_file" | sed 's/标题: //')
+                CHINESE_TITLE=$(grep "中文标题:" "$detail_file" | sed 's/中文标题: //' || echo "")
+                DESCRIPTION=$(grep "描述:" "$detail_file" | sed 's/描述: //' || echo "无描述")
+                SOLUTION=$(grep "解决方案:" "$detail_file" | sed 's/解决方案: //' || echo "无解决方案")
+                
+                # 只处理 high 或 critical 严重程度的风险
+                if [ "$SEVERITY" = "high" ] || [ "$SEVERITY" = "critical" ]; then
+                  HIGH_CRITICAL_COUNT=$((HIGH_CRITICAL_COUNT + 1))
+                  # 构建风险报告
+                  REPORT="${REPORT}#### ${CHINESE_TITLE:-$TITLE}\n\n"
+                  REPORT="${REPORT}**严重程度:** ${SEVERITY}\n"
+                  REPORT="${REPORT}**文件:** ${FILE_PATH}\n"
+                  REPORT="${REPORT}**位置:** 第${LINE_NUM}行"
+                  
+                  # 添加代码范围信息
+                  if [ -n "$CODE_RANGE" ] && [ "$CODE_RANGE" != "第${LINE_NUM}行" ]; then
+                    REPORT="${REPORT} (${CODE_RANGE})"
+                  fi
+                  REPORT="${REPORT}\n"
+                  
+                  # 添加 GitHub 代码引用链接
+                  if [ -n "$FILE_PATH" ] && [ -n "$CODE_RANGE" ]; then
+                    # 解析代码范围
+                    if echo "$CODE_RANGE" | grep -q "-"; then
+                      # 范围格式: 7-12行
+                      START_LINE=$(echo "$CODE_RANGE" | sed 's/-.*//' | sed 's/行//')
+                      END_LINE=$(echo "$CODE_RANGE" | sed 's/.*-//' | sed 's/行//')
+                      REPORT="${REPORT}**代码引用:** [${FILE_PATH}:${START_LINE}-${END_LINE}](https://github.com/${{ github.repository }}/blob/${{ env.HEAD_SHA }}/${FILE_PATH}#L${START_LINE}-L${END_LINE})\n"
+                    else
+                      # 单行格式: 7行
+                      LINE=$(echo "$CODE_RANGE" | sed 's/行//')
+                      REPORT="${REPORT}**代码引用:** [${FILE_PATH}:${LINE}](https://github.com/${{ github.repository }}/blob/${{ env.HEAD_SHA }}/${FILE_PATH}#L${LINE})\n"
+                    fi
+                  fi
+                  
+                  REPORT="${REPORT}**规则:** $(grep "规则名称:" "$detail_file" | sed 's/规则名称: //' || echo "N/A")\n"
+                  REPORT="${REPORT}**函数:** $(grep "函数名称:" "$detail_file" | sed 's/函数名称: //' || echo "N/A")\n\n"
+                  
+                  REPORT="${REPORT}**描述:**\n${DESCRIPTION}\n\n"
+                  REPORT="${REPORT}**建议解决方案:**\n${SOLUTION}\n\n"
+                  REPORT="${REPORT}---\n\n"
+                fi
+              fi
+            done
+            
+            # 检查是否有高严重程度的风险
+            if [ "$HIGH_CRITICAL_COUNT" -eq 0 ]; then
+              REPORT="${REPORT}✅ 未发现高严重程度的安全风险！\n\n"
+              REPORT="${REPORT}**说明:** 虽然检测到 ${RISK_COUNT} 个安全风险，但严重程度均低于 high/critical 级别。\n\n"
+              REPORT="${REPORT}**建议:** 可以在后续版本中逐步修复这些低严重程度的风险。"
+            fi
+          else
+            REPORT="${REPORT}✅ 未发现安全风险，代码安全检查通过！"
+          fi
+          
+          REPORT="${REPORT}\n---\n*此报告由代码安全扫描工具自动生成*"
+          
+          echo "report_content<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$REPORT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          # 将报告内容保存到文件，供 JavaScript 读取
+          echo -e "$REPORT" > report_content.txt
+      
+      - name: Comment PR with security findings
+        if: steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        uses: actions/github-script@v6
         with:
-          github-token: ${{ steps.set_token.outputs.token }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            github.rest.issues.createComment({
-              issue_number: Number(process.env.PR_NUMBER),
+            const fs = require('fs');
+            
+            try {
+              // 从文件读取报告内容，避免 JavaScript 关键字冲突
+              let report = '';
+              if (fs.existsSync('report_content.txt')) {
+                report = fs.readFileSync('report_content.txt', 'utf8');
+              } else {
+                report = '报告文件未找到';
+              }
+              
+              // 定义安全扫描评论的标识符
+              const commentIdentifier = '<!-- Security Scan Report -->';
+              const commentSignature = '此报告由代码安全扫描工具自动生成';
+              
+              // 查询现有的 PR 评论
+              const comments = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: Number(process.env.PR_NUMBER)
+              });
+              
+              // 查找现有的安全扫描评论
+              let existingComment = null;
+              for (const comment of comments.data) {
+                if (comment.body.includes(commentIdentifier) && comment.body.includes(commentSignature)) {
+                  existingComment = comment;
+                  break;
+                }
+              }
+              
+              // 在报告内容中添加标识符
+              const reportWithIdentifier = commentIdentifier + '\n\n' + report;
+              
+              if (existingComment) {
+                // 更新现有评论
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existingComment.id,
+                  body: reportWithIdentifier
+                });
+                console.log('Security report comment updated successfully');
+              } else {
+                // 创建新评论
+                await github.rest.issues.createComment({
+                  issue_number: Number(process.env.PR_NUMBER),
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: reportWithIdentifier
+                });
+                console.log('Security report comment posted successfully to PR comments');
+              }
+              
+              // 然后尝试在具体的代码行上添加评论
+              // 读取 results 目录中的风险详情文件
+              const path = require('path');
+              
+              try {
+                const resultsDir = path.join(process.cwd(), 'results');
+                if (fs.existsSync(resultsDir)) {
+                  const files = fs.readdirSync(resultsDir);
+                  const detailFiles = files.filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
+                  
+                  for (const detailFile of detailFiles) {
+                    const detailPath = path.join(resultsDir, detailFile);
+                    const content = fs.readFileSync(detailPath, 'utf8');
+                    
+                    // 解析文件内容
+                    const lines = content.split('\n');
+                    let filePath = '';
+                    let lineNum = '';
+                    let severity = '';
+                    let title = '';
+                    let description = '';
+                    let solution = '';
+                    
+                    for (const line of lines) {
+                      if (line.startsWith('文件路径:')) {
+                        filePath = line.replace('文件路径:', '').trim();
+                      } else if (line.startsWith('行号:')) {
+                        lineNum = line.replace('行号:', '').trim();
+                      } else if (line.startsWith('严重程度:')) {
+                        severity = line.replace('严重程度:', '').trim();
+                      } else if (line.startsWith('中文标题:')) {
+                        title = line.replace('中文标题:', '').trim();
+                      } else if (line.startsWith('标题:') && !title) {
+                        title = line.replace('标题:', '').trim();
+                      } else if (line.startsWith('描述:')) {
+                        description = line.replace('描述:', '').trim();
+                      } else if (line.startsWith('解决方案:')) {
+                        solution = line.replace('解决方案:', '').trim();
+                      }
+                    }
+                    
+                     // 如果找到了文件路径和行号，且严重程度为 high 或 critical，创建带代码引用的评论
+                     if (filePath && lineNum && severity && title && (severity === 'high' || severity === 'critical')) {
+                       try {
+                         // 构建带代码引用的评论内容和精准链接
+                         const codeReference = `\`${filePath}:${lineNum}\``;
+                         const lineCommentIdentifier = `<!-- Security Line Comment: ${filePath}:${lineNum} -->`;
+                         const lineCommentSignature = '此评论由代码安全检查工具自动生成';
+                         
+                         // 生成精准的 GitHub 代码链接
+                         const lineLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.sha}/${filePath}#L${lineNum}`;
+                         
+                         const lineComment = `${lineCommentIdentifier}\n\n## ⚠️ 安全风险检测\n\n**问题:** ${title}\n**严重程度:** ${severity}\n**文件位置:** ${codeReference}\n**代码链接:** [查看代码](${lineLink})\n\n**描述:**\n${description}\n\n**建议解决方案:**\n${solution}\n\n---\n*${lineCommentSignature}*`;
+                         
+                         // 查找现有的行级评论
+                         let existingLineComment = null;
+                         for (const comment of comments.data) {
+                           if (comment.body.includes(lineCommentIdentifier) && comment.body.includes(lineCommentSignature)) {
+                             existingLineComment = comment;
+                             break;
+                           }
+                         }
+                         
+                         if (existingLineComment) {
+                           // 更新现有的行级评论
+                           await github.rest.issues.updateComment({
+                             owner: context.repo.owner,
+                             repo: context.repo.repo,
+                             comment_id: existingLineComment.id,
+                             body: lineComment
+                           });
+                           console.log(`Line-specific comment updated for ${filePath}:${lineNum} (severity: ${severity})`);
+                         } else {
+                           // 创建新的行级评论
+                           await github.rest.issues.createComment({
+                             issue_number: Number(process.env.PR_NUMBER),
+                             owner: context.repo.owner,
+                             repo: context.repo.repo,
+                             body: lineComment
+                           });
+                           console.log(`Line-specific comment posted for ${filePath}:${lineNum} (severity: ${severity})`);
+                         }
+                       } catch (lineError) {
+                         console.warn(`Failed to post line-specific comment for ${filePath}:${lineNum}:`, lineError.message);
+                         // 继续处理其他文件，不中断整个流程
+                       }
+                     } else if (severity && severity !== 'high' && severity !== 'critical') {
+                       console.log(`Skipping line-specific comment for ${filePath}:${lineNum} (severity: ${severity} - not high/critical)`);
+                     }
+                  }
+                }
+              } catch (resultsError) {
+                console.warn('Failed to process results directory for line comments:', resultsError.message);
+                // 不中断主流程
+              }
+              
+              // 清理不再相关的旧评论
+              // 收集当前活跃的风险文件路径和行号
+              const activeRisks = new Set();
+              try {
+                const resultsDir = path.join(process.cwd(), 'results');
+                if (fs.existsSync(resultsDir)) {
+                  const files = fs.readdirSync(resultsDir);
+                  const detailFiles = files.filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
+                  
+                  for (const detailFile of detailFiles) {
+                    const detailPath = path.join(resultsDir, detailFile);
+                    const content = fs.readFileSync(detailPath, 'utf8');
+                    
+                    const lines = content.split('\n');
+                    let filePath = '';
+                    let lineNum = '';
+                    let severity = '';
+                    
+                    for (const line of lines) {
+                      if (line.startsWith('文件路径:')) {
+                        filePath = line.replace('文件路径:', '').trim();
+                      } else if (line.startsWith('行号:')) {
+                        lineNum = line.replace('行号:', '').trim();
+                      } else if (line.startsWith('严重程度:')) {
+                        severity = line.replace('严重程度:', '').trim();
+                      }
+                    }
+                    
+                    // 只保留 high 和 critical 的风险
+                    if (filePath && lineNum && severity && (severity === 'high' || severity === 'critical')) {
+                      activeRisks.add(`${filePath}:${lineNum}`);
+                    }
+                  }
+                }
+                
+                // 查找并删除不再活跃的评论
+                for (const comment of comments.data) {
+                  if (comment.body.includes('<!-- Security Line Comment:') && comment.body.includes('此评论由代码安全检查工具自动生成')) {
+                    // 提取评论中的文件路径和行号
+                    const match = comment.body.match(/<!-- Security Line Comment: ([^:]+:\d+) -->/);
+                    if (match) {
+                      const commentKey = match[1];
+                      if (!activeRisks.has(commentKey)) {
+                        // 这个评论对应的风险已经不存在，删除该评论
+                        await github.rest.issues.deleteComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '## ✅ 代码安全检查通过\n\n代码安全扫描未发现任何问题。\n\n---\n*此评论由代码安全检查工具自动生成*'
-            })
+                          comment_id: comment.id
+                        });
+                        console.log(`Deleted outdated comment for ${commentKey}`);
+                      }
+                    }
+                  }
+                }
+              } catch (cleanupError) {
+                console.warn('Failed to cleanup outdated comments:', cleanupError.message);
+                // 不中断主流程
+              }
+              
+              console.log('Security comments posted successfully, but workflow will fail to trigger failure handling steps');
+              // 故意抛出错误，让工作流失败，以便执行后续的失败处理步骤
+              throw new Error('Security scan found issues - workflow intentionally failing to trigger failure handling');
+              
+            } catch (error) {
+              console.error('Failed to post security comments:', error);
+              throw error;
+            }
 
       - name: Upload risk log
         if: failure()
