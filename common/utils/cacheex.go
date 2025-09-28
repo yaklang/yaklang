@@ -33,6 +33,8 @@ type CacheEx[T any] struct {
 // CacheExWithKey is a synchronized map of items that can auto-expire once stale
 type CacheExWithKey[U comparable, T any] struct {
 	*ttlcache.Cache[U, T]
+	ctx                   context.Context
+	cancel                context.CancelFunc
 	config                *cacheExConfig
 	expireCallback        expireCallback[U, T]
 	newItemCallback       itemCallback[U, T]
@@ -57,6 +59,7 @@ type flightEntry[T any] struct {
 
 // Can only close once
 func (cache *CacheExWithKey[U, T]) Close() {
+	cache.cancel()
 	// close
 	cache.Cache.DeleteAll()
 	cache.Cache.Stop()
@@ -66,9 +69,6 @@ func (cache *CacheExWithKey[U, T]) Close() {
 	cache.flightMu.Lock()
 	cache.flightEntries = make(map[U]*flightEntry[T])
 	cache.flightMu.Unlock()
-
-	// reset
-	cache.reset()
 }
 
 // Set is a thread-safe way to add new items to the map
@@ -288,12 +288,15 @@ func NewCacheEx[T any](opt ...cacheExOption) *CacheEx[T] {
 }
 
 func NewCacheExWithKey[U comparable, T any](opt ...cacheExOption) *CacheExWithKey[U, T] {
+	ctx, cancel := context.WithCancel(context.Background())
 	config := &cacheExConfig{}
 	for _, o := range opt {
 		o(config)
 	}
 
 	cache := &CacheExWithKey[U, T]{
+		ctx:    ctx,
+		cancel: cancel,
 		config: config,
 		ttl:    config.ttl,
 	}
@@ -339,6 +342,8 @@ func (c *CacheExWithKey[U, T]) cleanupFlightEntries() {
 
 	for {
 		select {
+		case <-c.ctx.Done():
+			return
 		case <-ticker.C:
 			c.flightMu.Lock()
 			cutoff := time.Now().Add(-5 * time.Minute) // Remove entries older than 5 minutes
