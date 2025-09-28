@@ -235,12 +235,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			// status task 1
 			var havePause bool
 			var processStatus1 float64
+			log.Infof("============================================ status task 1")
 			statusStream1 := statusTask(taskID1)
 			checkSfScanRecvMsg(t, statusStream1, func(status string) {
+				log.Infof("status : %s", status)
 				if status == "paused" {
 					havePause = true
 				}
 			}, func(process float64) {
+				log.Infof("process : %v", process)
 				processStatus1 = process
 			})
 			require.True(t, havePause)
@@ -251,7 +254,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			// status task 2
 			var haveExecute bool
 			statusStream2 := statusTask(taskID2)
+			log.Infof("============================================ status task 2")
 			checkSfScanRecvMsg(t, statusStream2, func(status string) {
+				log.Infof("status %v", status)
 				if status == "executing" {
 					haveExecute = true // query status when executing
 				}
@@ -265,12 +270,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			var finishStatus string
 			haveExecute := false
 			resumeStream := resumeTask(taskID1)
+			log.Infof("============================================ resume task 1")
 			checkSfScanRecvMsg(t, resumeStream, func(status string) {
+				log.Infof("status: %v", status)
 				if status == "executing" {
 					haveExecute = true
 				}
 				finishStatus = status
 			}, func(process float64) {
+				log.Infof("process: %v", process)
 				finishProcess = process
 			})
 			require.True(t, haveExecute)

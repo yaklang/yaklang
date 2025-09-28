@@ -17,6 +17,7 @@ func Scan(ctx context.Context, option ...ScanOption) error {
 
 	runningID := uuid.NewString()
 	defer func() {
+		m.SaveTask()
 		m.StatusTask()
 		m.Stop(runningID)
 	}()
@@ -74,7 +75,6 @@ func Scan(ctx context.Context, option ...ScanOption) error {
 		return nil
 	case <-ctx.Done():
 		m.status = schema.SYNTAXFLOWSCAN_DONE
-		m.SaveTask()
 		return utils.Error("client canceled")
 	}
 }
