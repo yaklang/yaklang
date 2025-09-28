@@ -82,21 +82,10 @@ func WithCompileConcurrency(concurrency uint32) Option {
 // WithScanConcurrency 设置扫描并发数
 func WithScanConcurrency(concurrency uint32) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlow == nil {
+		if c.SyntaxFlowScanManager == nil {
 			return utils.Errorf("Config: Scan Concurrency can only be set in Scan mode")
 		}
-		c.SyntaxFlow.Concurrency = concurrency
-		return nil
-	}
-}
-
-// WithScanMemory 设置内存扫描
-func WithScanMemory(memory bool) Option {
-	return func(c *Config) error {
-		if c.SyntaxFlow == nil {
-			return utils.Errorf("Config: Scan Memory can only be set in Scan mode")
-		}
-		c.SyntaxFlow.Memory = memory
+		c.SyntaxFlowScanManager.Concurrency = concurrency
 		return nil
 	}
 }
@@ -104,10 +93,10 @@ func WithScanMemory(memory bool) Option {
 // WithScanIgnoreLanguage 设置忽略语言
 func WithScanIgnoreLanguage(ignoreLanguage bool) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlow == nil {
+		if c.SyntaxFlowScanManager == nil {
 			return utils.Errorf("Config: Scan Ignore Language can only be set in Scan mode")
 		}
-		c.SyntaxFlow.IgnoreLanguage = ignoreLanguage
+		c.SyntaxFlowScanManager.IgnoreLanguage = ignoreLanguage
 		return nil
 	}
 }
@@ -115,10 +104,20 @@ func WithScanIgnoreLanguage(ignoreLanguage bool) Option {
 // WithScanProcessCallback 设置进度回调
 func WithScanProcessCallback(callback func(progress float64)) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlow == nil {
+		if c.SyntaxFlowScanManager == nil {
 			return utils.Errorf("Config: Scan Process Callback can only be set in Scan mode")
 		}
-		c.SyntaxFlow.ProcessCallback = callback
+		c.SyntaxFlowScanManager.ProcessCallback = callback
+		return nil
+	}
+}
+
+func WithSyntaxFlowMemory(memory bool) Option {
+	return func(c *Config) error {
+		if c.SyntaxFlow == nil {
+			return utils.Errorf("Config: Scan Memory can only be set in Scan mode")
+		}
+		c.SyntaxFlow.Memory = memory
 		return nil
 	}
 }

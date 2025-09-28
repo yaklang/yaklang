@@ -23,12 +23,25 @@ type SSACompileConfig struct {
 	Concurrency   uint32   `json:"compile_concurrency"`
 }
 
-// SyntaxFlowConfig 扫描配置
+// SyntaxFlow结果保存类型
+type SFResultSaveKind string
+
+const (
+	SFResultSaveNone     SFResultSaveKind = "none"     // no save
+	SFResultSaveMemory   SFResultSaveKind = "memory"   // in cache
+	SFResultSaveDatabase SFResultSaveKind = "database" // in database
+)
+
 type SyntaxFlowConfig struct {
-	Concurrency     uint32                 `json:"concurrency"`
-	Memory          bool                   `json:"memory"`
+	Memory          bool                  `json:"memory"`
+	ResultSaveKind  SFResultSaveKind      `json:"result_save_kind"`
+	ProcessCallback func(float64, string) `json:"-"`
+}
+
+type SyntaxFlowScanManagerConfig struct {
 	IgnoreLanguage  bool                   `json:"ignore_language"`
 	Language        []string               `json:"language"`
+	Concurrency     uint32                 `json:"concurrency"`
 	ProcessCallback func(progress float64) `json:"-"`
 }
 
@@ -39,25 +52,27 @@ type SyntaxFlowRuleConfig struct {
 }
 
 type Config struct {
-	Mode           Mode
-	BaseInfo       *BaseInfo
-	CodeSource     *CodeSourceInfo
-	SSACompile     *SSACompileConfig
-	SyntaxFlow     *SyntaxFlowConfig
-	SyntaxFlowRule *SyntaxFlowRuleConfig
+	Mode                  Mode
+	BaseInfo              *BaseInfo
+	CodeSource            *CodeSourceInfo
+	SSACompile            *SSACompileConfig
+	SyntaxFlow            *SyntaxFlowConfig
+	SyntaxFlowScanManager *SyntaxFlowScanManagerConfig
+	SyntaxFlowRule        *SyntaxFlowRuleConfig
 }
 
 type Mode int
 
 const (
-	ModeProjectBase    Mode = 1 << iota // 0 - 基础模式
-	ModeSSACompile     Mode = 1 << iota // 1 - 编译模式
-	ModeSyntaxFlow     Mode = 1 << iota // 2 - SyntaxFlow模式
-	ModeSyntaxFlowRule Mode = 1 << iota // 4 - 规则模式
-	ModeCodeSource     Mode = 1 << iota // 5 - 源码配置模式
-	ModeSyntaxFlowScan Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule
+	ModeProjectBase           Mode = 1 << iota // 0 - 基础模式
+	ModeSSACompile            Mode = 1 << iota // 1 - 编译模式
+	ModeSyntaxFlowScanManager Mode = 1 << iota // 2 - 扫描管理器模式
+	ModeSyntaxFlow            Mode = 1 << iota // 3 - SyntaxFlow模式
+	ModeSyntaxFlowRule        Mode = 1 << iota // 4 - 规则模式
+	ModeCodeSource            Mode = 1 << iota // 5 - 源码配置模式
+	ModeSyntaxFlowScan        Mode = ModeProjectBase | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeSyntaxFlowScanManager
 	// all
-	ModeAll = ModeProjectBase | ModeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource
+	ModeAll = ModeProjectBase | ModeSSACompile | ModeSyntaxFlow | ModeSyntaxFlowRule | ModeCodeSource | ModeSyntaxFlowScanManager
 )
 
 func New(mode Mode, opts ...Option) (*Config, error) {
@@ -81,9 +96,15 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 	}
 	if mode&ModeSyntaxFlow != 0 {
 		cfg.SyntaxFlow = &SyntaxFlowConfig{
-			Concurrency:    1,
 			Memory:         false,
+			ResultSaveKind: SFResultSaveNone,
+		}
+	}
+	if mode&ModeSyntaxFlowScanManager != 0 {
+		cfg.SyntaxFlowScanManager = &SyntaxFlowScanManagerConfig{
 			IgnoreLanguage: false,
+			Language:       []string{},
+			Concurrency:    5,
 		}
 	}
 	if mode&ModeSyntaxFlowRule != 0 {
@@ -164,11 +185,13 @@ func (c *Config) SetRuleInput(input *ypb.SyntaxFlowRuleInput) {
 	c.SyntaxFlowRule.RuleInput = input
 }
 
+// syntaxflow scan manager
+
 func (c *Config) GetScanConcurrency() uint32 {
-	if c == nil || c.SyntaxFlow == nil {
+	if c == nil || c.SyntaxFlowScanManager == nil {
 		return 0
 	}
-	return c.SyntaxFlow.Concurrency
+	return c.SyntaxFlowScanManager.Concurrency
 }
 
 func (c *Config) GetScanMemory() bool {
@@ -179,17 +202,17 @@ func (c *Config) GetScanMemory() bool {
 }
 
 func (c *Config) GetScanIgnoreLanguage() bool {
-	if c == nil || c.SyntaxFlow == nil {
+	if c == nil || c.SyntaxFlowScanManager == nil {
 		return false
 	}
-	return c.SyntaxFlow.IgnoreLanguage
+	return c.SyntaxFlowScanManager.IgnoreLanguage
 }
 
 func (c *Config) GetScanProcessCallback() func(progress float64) {
 	if c == nil || c.SyntaxFlow == nil {
 		return nil
 	}
-	return c.SyntaxFlow.ProcessCallback
+	return c.SyntaxFlowScanManager.ProcessCallback
 }
 
 func (c *Config) GetCompileStrictMode() bool {
@@ -405,4 +428,60 @@ func (c *Config) GetCodeSourceAuth() *AuthConfigInfo {
 		return nil
 	}
 	return c.CodeSource.Auth
+}
+
+// syntaxflow
+
+func (c *Config) GetSyntaxFlowResultKind() SFResultSaveKind {
+	if c == nil || c.SyntaxFlow == nil {
+		return SFResultSaveNone
+	}
+	return c.SyntaxFlow.ResultSaveKind
+}
+
+func (c *Config) SetSyntaxFlowResultKind(resultKind SFResultSaveKind) {
+	if c == nil {
+		return
+	}
+	if c.SyntaxFlow == nil {
+		return
+	}
+	c.SyntaxFlow.ResultSaveKind = resultKind
+}
+
+func (c *Config) SetSyntaxFlowResultSaveDataBase() {
+	if c == nil {
+		return
+	}
+	if c.SyntaxFlow == nil {
+		return
+	}
+	c.SyntaxFlow.ResultSaveKind = SFResultSaveDatabase
+}
+
+func (c *Config) SetSyntaxFlowResultSaveMemory() {
+	if c == nil {
+		return
+	}
+	if c.SyntaxFlow == nil {
+		return
+	}
+	c.SyntaxFlow.ResultSaveKind = SFResultSaveMemory
+}
+
+func (c *Config) GetSyntaxFlowProcessCallback() func(float64, string) {
+	if c == nil || c.SyntaxFlow == nil {
+		return nil
+	}
+	return c.SyntaxFlow.ProcessCallback
+}
+
+func (c *Config) SetSyntaxFlowProcessCallback(processCallback func(float64, string)) {
+	if c == nil {
+		return
+	}
+	if c.SyntaxFlow == nil {
+		return
+	}
+	c.SyntaxFlow.ProcessCallback = processCallback
 }
