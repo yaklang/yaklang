@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
@@ -31,20 +32,34 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		}
 	}()
 
+	lock := sync.RWMutex{}
 	var taskID string
+	var status string
+
 	sendExecResult := func(execResult *ypb.ExecResult) error {
-		return stream.Send(&ypb.SyntaxFlowScanResponse{
+		lock.RLock()
+		ret := &ypb.SyntaxFlowScanResponse{
 			TaskID:     taskID,
+			Status:     status,
 			ExecResult: execResult,
-		})
+		}
+		lock.RUnlock()
+
+		return stream.Send(ret)
 	}
 
-	return syntaxflow_scan.Scan(stream.Context(),
+	err = syntaxflow_scan.Scan(stream.Context(),
 		syntaxflow_scan.WithRawConfig(rawConfig),
 		syntaxflow_scan.WithPauseFunc(func() bool {
 			return pause.Load()
 		}),
-		syntaxflow_scan.WithProcessCallback(func(progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+		syntaxflow_scan.WithProcessCallback(func(tid, s string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+
+			lock.Lock()
+			taskID = tid
+			status = s
+			lock.Unlock()
+
 			// update rule info
 			sendExecResult(yaklib.NewYakitLogExecResult("code", info)) // 发送 rules info
 
@@ -58,7 +73,11 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 			sendExecResult(yaklib.NewYakitStatusCardExecResult("检出漏洞/风险个数", info.RiskCount, "漏洞/风险状态"))
 		}),
 		syntaxflow_scan.WithScanResultCallback(func(sr *syntaxflow_scan.ScanResult) {
+			lock.Lock()
 			taskID = sr.TaskID
+			status = sr.Status
+			lock.Unlock()
+
 			// 发送扫描结果
 			stream.Send(&ypb.SyntaxFlowScanResponse{
 				TaskID:   sr.TaskID,
@@ -72,4 +91,5 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 			sendExecResult(yaklib.NewYakitLogExecResult("error", format, args...))
 		}),
 	)
+	return err
 }

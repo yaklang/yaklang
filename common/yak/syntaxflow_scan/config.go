@@ -2,14 +2,11 @@ package syntaxflow_scan
 
 import (
 	"io"
-	"time"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-type errorCallback func(string, ...any)
 
 // ScanResult 扫描结果结构体，包含扫描任务的所有结果信息
 type ScanResult struct {
@@ -27,46 +24,17 @@ type ScanTaskConfig struct {
 	*ypb.SyntaxFlowScanRequest
 	RuleNames []string `json:"rule_names"`
 
-	// ttl
-	ProcessMonitorTTL time.Duration
-
-	ProcessCallback RuleProcessCallback `json:"-"`
-	errorCallback   errorCallback       `json:"-"`
-	resultCallback  ScanResultCallback  `json:"-"`
-	// this function check if need pauseCheck,
-	// /return true to pauseCheck, and no-blocking
-	pauseCheck func() bool `json:"-"`
-
-	Reporter       sfreport.IReport `json:"-"`
-	ReporterWriter io.Writer        `json:"-"`
+	*ScanTaskCallback `json:"-"`
 }
 
 func NewScanConfig(options ...ScanOption) *ScanTaskConfig {
 	config := &ScanTaskConfig{
-		ProcessMonitorTTL: 30 * time.Second,
+		ScanTaskCallback: &ScanTaskCallback{},
 	}
 	for _, option := range options {
 		option(config)
 	}
 	return config
-}
-
-func WithPauseFunc(pause func() bool) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.pauseCheck = pause
-	}
-}
-
-func WithScanResultCallback(callback ScanResultCallback) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.resultCallback = callback
-	}
-}
-
-func WithErrorCallback(callback errorCallback) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.errorCallback = callback
-	}
 }
 
 // ScanOption 定义扫描选项类型，用于配置SyntaxFlow扫描任务的各种参数
@@ -419,18 +387,5 @@ func WithResumeTaskId(taskId string) ScanOption {
 			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
 		}
 		sc.SyntaxFlowScanRequest.ResumeTaskId = taskId
-	}
-}
-
-// WithProcessCallback 设置扫描进度回调函数
-func WithProcessCallback(callback RuleProcessCallback) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.ProcessCallback = callback
-	}
-}
-
-func WithProcessMonitorTTL(ttl time.Duration) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.ProcessMonitorTTL = ttl
 	}
 }

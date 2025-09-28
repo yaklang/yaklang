@@ -11,18 +11,21 @@ import (
 )
 
 func Scan(ctx context.Context, option ...ScanOption) error {
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
 	config := NewScanConfig(option...)
 	var taskId string
 	var m *scanManager
+
+	runningID := uuid.NewString()
+	defer func() {
+		m.StatusTask()
+		m.Stop(runningID)
+	}()
 	var err error
 	errC := make(chan error)
 	switch ControlMode(strings.ToLower(config.GetControlMode())) {
 	case ControlModeStart:
 		taskId = uuid.New().String()
-		m, err = createSyntaxflowTaskById(taskId, ctx, config)
+		m, err = createSyntaxflowTaskById(ctx, runningID, taskId, config)
 		if err != nil {
 			return err
 		}
@@ -36,15 +39,15 @@ func Scan(ctx context.Context, option ...ScanOption) error {
 		}()
 	case ControlModeStatus:
 		taskId = config.ResumeTaskId
-		m, err = LoadSyntaxflowTaskFromDB(taskId, ctx)
+		m, err = LoadSyntaxflowTaskFromDB(ctx, runningID, config)
 		if err != nil {
 			return err
 		}
 		m.StatusTask()
-		return err
+		close(errC)
 	case ControlModeResume:
-		taskId = config.GetResumeTaskId()
-		m, err = LoadSyntaxflowTaskFromDB(taskId, ctx)
+		taskId = config.ResumeTaskId
+		m, err = LoadSyntaxflowTaskFromDB(ctx, runningID, config)
 		if err != nil {
 			return err
 		}
@@ -59,18 +62,17 @@ func Scan(ctx context.Context, option ...ScanOption) error {
 	default:
 		return utils.Error("invalid syntaxFlow scan mode")
 	}
+	RemoveSyntaxFlowTaskByID(taskId)
 
 	// wait result
 	select {
 	case err, ok := <-errC:
-		RemoveSyntaxFlowTaskByID(taskId)
 		if ok {
+			m.status = schema.SYNTAXFLOWSCAN_ERROR
 			return err
 		}
 		return nil
 	case <-ctx.Done():
-		m.Stop()
-		RemoveSyntaxFlowTaskByID(taskId)
 		m.status = schema.SYNTAXFLOWSCAN_DONE
 		m.SaveTask()
 		return utils.Error("client canceled")

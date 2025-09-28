@@ -109,6 +109,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		var finishStatus string
 
 		// pause task
+		log.Errorf("===================================round 1 ===================================")
 		checkSfScanRecvMsg(t, stream, func(status string) {
 			finishStatus = status
 		}, func(process float64) {
@@ -125,6 +126,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		var havePause bool
 		var processStatus float64
 		statusStream := statusTask(taskID)
+		log.Errorf("===================================round 2 ===================================")
 		checkSfScanRecvMsg(t, statusStream, func(status string) {
 			if status == "paused" {
 				havePause = true
@@ -137,6 +139,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		// resume
 		resumeStream := resumeTask(taskID)
 		haveExecute := false
+		log.Errorf("===================================round 2 ===================================")
 		checkSfScanRecvMsg(t, resumeStream, func(status string) {
 			finishStatus = status
 			if status == "executing" {

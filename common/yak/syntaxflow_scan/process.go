@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -110,7 +111,6 @@ func (pm *processMonitor) StartMonitor() {
 
 		defer pm.reportProcess() // final event
 
-		var dirty bool = true
 		for {
 			select {
 			case <-pm.ctx.Done():
@@ -119,12 +119,9 @@ func (pm *processMonitor) StartMonitor() {
 				if !ok {
 					return
 				}
-				dirty = true
+				pm.reportProcess()
+				// ticker.Reset(pm.monitorTTL)
 			case <-ticker.C:
-				if !dirty {
-					continue
-				}
-				dirty = false
 				pm.reportProcess()
 			}
 		}
@@ -139,6 +136,11 @@ func (p *processMonitor) reportProcess() {
 }
 
 func (p *processMonitor) EmitEvent() {
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("err: %v", e)
+		}
+	}()
 	// Build a consistent snapshot at emit time
 	select {
 	case p.eventCh <- struct{}{}:
@@ -180,6 +182,20 @@ func (p *processMonitor) snapshotInfoList() *RuleProcessInfoList {
 	return ret
 }
 
+func (p *processMonitor) UpdateRuleError(program, rule string, err error) {
+	key := rule + "@" + program
+	ruleInfo, ok := p.Status.Get(key)
+
+	if !ok {
+		return
+	}
+
+	ruleInfo.Progress = 1
+	ruleInfo.Error = err
+	ruleInfo.EndTime = time.Now().Unix()
+	p.Status.Set(key, ruleInfo)
+}
+
 func (p *processMonitor) UpdateRuleStatus(program, rule string, progress float64, info string) {
 	key := rule + "@" + program
 	statusMap := p.Status
@@ -214,6 +230,10 @@ func (m *scanManager) markRuleSuccess(num ...int64) {
 	m.AddFinishedQuery(count)
 }
 
+func (m *scanManager) SetSuccessQuery(num int64) {
+	m.processMonitor.SuccessQuery.Store(num)
+}
+
 func (m *scanManager) GetSuccessQuery() int64 {
 	return m.processMonitor.SuccessQuery.Load()
 }
@@ -228,6 +248,10 @@ func (m *scanManager) markRuleFailed(num ...int64) {
 	m.AddFinishedQuery(count)
 }
 
+func (m *scanManager) SetFailedQuery(num int64) {
+	m.processMonitor.FailedQuery.Store(num)
+}
+
 func (m *scanManager) GetFailedQuery() int64 {
 	return m.processMonitor.FailedQuery.Load()
 }
@@ -240,6 +264,10 @@ func (m *scanManager) markRuleSkipped(num ...int64) {
 	}
 	m.processMonitor.SkippedQuery.Add(count)
 	m.AddFinishedQuery(count)
+}
+
+func (m *scanManager) SetSkippedQuery(num int64) {
+	m.processMonitor.SkippedQuery.Store(num)
 }
 
 func (m *scanManager) GetSkippedQuery() int64 {
@@ -263,6 +291,13 @@ func (m *scanManager) GetRiskCount() int64 {
 
 func (m *scanManager) AddFinishedQuery(num int64) {
 	m.processMonitor.FinishedQuery.Add(num)
+	if m.processMonitor.FinishedQuery.Load() >= m.processMonitor.TotalQuery.Load() {
+		m.status = schema.SYNTAXFLOWSCAN_DONE
+	}
+}
+
+func (m *scanManager) SetFinishedQuery(num int64) {
+	m.processMonitor.FinishedQuery.Store(num)
 	if m.processMonitor.FinishedQuery.Load() >= m.processMonitor.TotalQuery.Load() {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
 	}
