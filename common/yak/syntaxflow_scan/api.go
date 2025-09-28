@@ -85,11 +85,13 @@ func StartScan(ctx context.Context, opts ...ScanOption) error {
 //
 // die(err)
 // ```
-func ResumeScan(ctx context.Context, taskId string, callback ScanResultCallback) error {
-	return Scan(ctx,
+func ResumeScan(ctx context.Context, taskId string, opts ...ScanOption) error {
+	opts = append(opts,
 		WithControlMode(ControlModeResume),
 		WithResumeTaskId(taskId),
-		WithScanResultCallback(callback),
+	)
+	return Scan(ctx,
+		opts...,
 	)
 }
 
@@ -120,10 +122,10 @@ func ResumeScan(ctx context.Context, taskId string, callback ScanResultCallback)
 //
 // die(err)
 // ```
-func GetScanStatus(ctx context.Context, taskId string, callback ScanResultCallback) error {
+func GetScanStatus(ctx context.Context, taskId string, callback ProcessCallback) error {
 	return Scan(ctx,
 		WithControlMode(ControlModeStatus),
 		WithResumeTaskId(taskId),
-		WithScanResultCallback(callback),
+		WithProcessCallback(callback),
 	)
 }

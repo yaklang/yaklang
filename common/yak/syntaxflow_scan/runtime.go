@@ -13,14 +13,15 @@ import (
 )
 
 func (m *scanManager) StartQuerySF(startIndex ...int64) error {
-	m.processMonitor.StartMonitor()
-	defer m.processMonitor.Close()
 
 	defer func() {
 		if err := recover(); err != nil {
+			log.Errorf("error: panic: %v", err)
+			utils.PrintCurrentGoroutineRuntimeStack()
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
 		}
+		m.StatusTask()
 		m.SaveTask()
 		m.saveReport()
 	}()
@@ -57,7 +58,6 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			swg.Add()
 			go func(rule *schema.SyntaxFlowRule, progName string) {
 				defer swg.Done()
-				defer m.StatusTask()
 
 				prog, err := ssaapi.FromDatabase(progName)
 				if err != nil {
@@ -94,9 +94,11 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 
 	// if language match or ignore language
 	if res, err := prog.SyntaxFlowRule(rule, option...); err == nil {
+		m.StatusTask(res)
 		m.markRuleSuccess()
-		m.notifyResult(res)
 	} else {
+		m.processMonitor.UpdateRuleError(prog.GetProgramName(), rule.RuleName, err)
+		m.StatusTask(nil)
 		m.markRuleFailed()
 		m.errorCallback("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 	}
@@ -125,8 +127,6 @@ func (m *scanManager) saveReport() {
 }
 
 func (m *scanManager) errorCallback(format string, a ...interface{}) {
-	if m.config.errorCallback != nil {
-		m.config.errorCallback(format, a...)
-	}
+	m.callback.Error(format, a...)
 	log.Errorf(format, a...)
 }

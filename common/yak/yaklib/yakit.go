@@ -237,10 +237,11 @@ func NewYakitLogExecResult(level string, input any, items ...interface{}) *ypb.E
 }
 
 func NewYakitProgressExecResult(id string, progress float64) *ypb.ExecResult {
-	raw, _ := json.Marshal(&YakitProgress{
+	p := &YakitProgress{
 		Id:       id,
 		Progress: progress,
-	})
+	}
+	raw, _ := YakitMessageGenerator(p)
 	return &ypb.ExecResult{
 		IsMessage: true,
 		Message:   raw,
@@ -488,6 +489,7 @@ func YakitMessageGenerator(i interface{}) ([]byte, error) {
 	switch i.(type) {
 	case *YakitStatusCard:
 		msg.Type = "status-card"
+		msg.Content = raw
 	case *YakitProgress:
 		msg.Type = "progress"
 		msg.Content = raw
