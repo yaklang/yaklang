@@ -82,7 +82,7 @@ func (r *ReAct) SaveTimeline() {
 		}
 		last1 := ins.ToTimelineItemOutputLastN(1)
 		if len(last1) > 0 {
-			log.Errorf("ReAct: save timeline to db success timeline last updated time: %v", last1[0].Timestamp.String())
+			log.Debugf("ReAct: save timeline to db success timeline last updated time: %v", last1[0].Timestamp.String())
 		}
 	})
 }
