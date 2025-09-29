@@ -56,9 +56,9 @@ func NewConfig() *Config {
 	return &Config{
 		noStopWhenErr:      false,
 		RecursiveDirectory: true,
-		fileLimit:          100000,
+		fileLimit:          1000000,
 		dirLimit:           100000,
-		totalLimit:         100000,
+		totalLimit:         1000000,
 		fileSystem:         NewLocalFs(),
 		ctx:                ctx,
 		ctxCancel:          cancel,

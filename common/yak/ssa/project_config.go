@@ -1,9 +1,12 @@
 package ssa
 
 import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
 	yaml "github.com/yaklang/yaklang/common/openapi/openapiyaml"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 type ProjectConfigType int
@@ -60,6 +63,11 @@ func (p *Program) ParseProjectConfig(raw []byte, path string, typ ProjectConfigT
 		if err != nil {
 			return err
 		}
+	case PROJECT_CONFIG_JSON:
+		err := p.parseJsonProjectConfig(raw, path)
+		if err != nil {
+			return err
+		}
 	default:
 		return utils.Errorf("not support project config type: %d", typ)
 	}
@@ -100,6 +108,25 @@ func (p *Program) parseYamlProjectConfig(raw []byte, path string) error {
 		return utils.Errorf("parse yaml project config error: %v", err)
 	}
 	for k, v := range config {
+		p.SetProjectConfig(k, v, path)
+	}
+	return nil
+}
+
+func (p *Program) parseJsonProjectConfig(raw []byte, path string) error {
+	if p == nil {
+		return utils.Errorf("program is nil")
+	}
+
+	var jsonObj map[string]interface{}
+	err := json.Unmarshal(raw, &jsonObj)
+	if err != nil {
+		return fmt.Errorf("error unmarshaling JSON: %v", err)
+	}
+
+	result := make(map[string]string)
+	yaml.FlattenJSON(jsonObj, "", result)
+	for k, v := range result {
 		p.SetProjectConfig(k, v, path)
 	}
 	return nil

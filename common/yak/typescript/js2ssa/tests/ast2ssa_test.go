@@ -1,13 +1,18 @@
 package tests
 
 import (
+	_ "embed"
+	"strings"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"strings"
-	"testing"
 )
+
+//go:embed testdata/replace_member_call_inf_loop.js
+var inf_loop_js_file string
 
 func TestSimplePrint(t *testing.T) {
 	t.Parallel()
@@ -77,6 +82,17 @@ a=1
 }
 println(a)
 `, []string{"phi(a)[1,Undefined-a]"}, t)
+}
+
+func TestBasicFunctionCall(t *testing.T) {
+	t.Parallel()
+
+	ssatest.CheckPrintlnValue(`
+function foo(){
+println(1)
+}
+foo()
+`, []string{"1"}, t)
 }
 
 func TestLabeledBlock(t *testing.T) {
@@ -2043,6 +2059,71 @@ println(a);`
 		ssatest.CheckPrintlnValue(code, []string{"1"}, t)
 	})
 
+}
+
+func TestPanicWhenBuilt(t *testing.T) {
+	t.Run("panic when switch built", func(t *testing.T) {
+		code := `switch (i.shape) {
+                            case "circle":
+                            default:
+                                i.shape = "circle";
+                                break;
+                            case "cardioid":
+                                i.shape = function(t) {
+                                    return 1 - Math.sin(t)
+                                };
+                                break;
+                            case "diamond":
+                                i.shape = function(t) {
+                                    var e = t % (2 * Math.PI / 4);
+                                    return 1 / (Math.cos(e) + Math.sin(e))
+                                };
+                                break;
+                            case "square":
+                                i.shape = function(t) {
+                                    return Math.min(1 / Math.abs(Math.cos(t)), 1 / Math.abs(Math.sin(t)))
+                                };
+                                break;
+                            case "triangle-forward":
+                                i.shape = function(t) {
+                                    var e = t % (2 * Math.PI / 3);
+                                    return 1 / (Math.cos(e) + Math.sqrt(3) * Math.sin(e))
+                                };
+                                break;
+                            case "triangle":
+                            case "triangle-upright":
+                                i.shape = function(t) {
+                                    var e = (t + 3 * Math.PI / 2) % (2 * Math.PI / 3);
+                                    return 1 / (Math.cos(e) + Math.sqrt(3) * Math.sin(e))
+                                };
+                                break;
+                            case "pentagon":
+                                i.shape = function(t) {
+                                    var e = (t + .955) % (2 * Math.PI / 5);
+                                    return 1 / (Math.cos(e) + .726543 * Math.sin(e))
+                                };
+                                break;
+                            case "star":
+                                i.shape = function(t) {
+                                    var e = (t + .955) % (2 * Math.PI / 10);
+                                    return (t + .955) % (2 * Math.PI / 5) - 2 * Math.PI / 10 >= 0 ? 1 / (Math.cos(2 * Math.PI / 10 - e) + 3.07768 * Math.sin(2 * Math.PI / 10 - e)) : 1 / (Math.cos(e) + 3.07768 * Math.sin(e))
+                                }
+                        }`
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		_ = prog
+	})
+	t.Run("stuck", func(t *testing.T) {
+		code := inf_loop_js_file
+		prog, err := ssaapi.Parse(code,
+			ssaapi.WithLanguage("js"),
+		)
+		require.NoError(t, err)
+		_ = prog
+
+	})
 }
 
 //func TestDestructuring(t *testing.T) {
