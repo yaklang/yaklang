@@ -48,7 +48,7 @@ func init() {
 
 		OverrideYakScriptAiTools()
 		return nil
-	}, "sync-ai-tool")
+	}, string(consts.POST_INIT_SYNC_AI_TOOLS))
 }
 
 func BuildInAIToolHash() (string, error) {

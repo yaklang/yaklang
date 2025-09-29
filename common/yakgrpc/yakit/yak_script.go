@@ -166,18 +166,7 @@ func UpdateGeneralModuleFromByYakScriptName(db *gorm.DB, scriptName string, i bo
 
 func GetYakScript(db *gorm.DB, id int64) (*schema.YakScript, error) {
 	var req schema.YakScript
-
 	if db := db.Model(&schema.YakScript{}).Where("id = ?", id).First(&req); db.Error != nil {
-		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
-	}
-
-	return &req, nil
-}
-
-func GetYakScriptIdOrName(db *gorm.DB, id int64, name string) (*schema.YakScript, error) {
-	var req schema.YakScript
-
-	if db := db.Model(&schema.YakScript{}).Where("(id = ?) OR (script_name = ?)", id, name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
 
@@ -186,19 +175,8 @@ func GetYakScriptIdOrName(db *gorm.DB, id int64, name string) (*schema.YakScript
 
 func GetYakScriptByName(db *gorm.DB, name string) (*schema.YakScript, error) {
 	var req schema.YakScript
-
 	if db := db.Model(&schema.YakScript{}).Where("script_name = ?", name).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
-	}
-
-	return &req, nil
-}
-
-func GetSyntaxFlowRuleByName(db *gorm.DB, name string) (*schema.SyntaxFlowRule, error) {
-	var req schema.SyntaxFlowRule
-
-	if db := db.Model(&schema.SyntaxFlowRule{}).Where("rule_name = ?", name).First(&req); db.Error != nil {
-		return nil, utils.Errorf("get SyntaxFlowRule failed: %s", db.Error)
 	}
 
 	return &req, nil
@@ -224,7 +202,6 @@ func GetNucleiYakScriptByName(db *gorm.DB, scriptName string) (*schema.YakScript
 
 func GetYakScriptByOnlineID(db *gorm.DB, onlineId int64) (*schema.YakScript, error) {
 	var req schema.YakScript
-
 	if db := db.Model(&schema.YakScript{}).Where("online_id = ?", onlineId).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}
@@ -234,7 +211,6 @@ func GetYakScriptByOnlineID(db *gorm.DB, onlineId int64) (*schema.YakScript, err
 
 func GetYakScriptByUUID(db *gorm.DB, uuid string) (*schema.YakScript, error) {
 	var req schema.YakScript
-
 	if db := db.Model(&schema.YakScript{}).Where("uuid = ?", uuid).First(&req); db.Error != nil {
 		return nil, utils.Errorf("get YakScript failed: %s", db.Error)
 	}

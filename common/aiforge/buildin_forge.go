@@ -125,7 +125,7 @@ func init() {
 		registerBuildInForge("ssa_vulnerability_analyzer")
 		//registerBuildInForge("mock_forge")
 		return nil
-	}, "sync-buildin-ai-forge")
+	}, string(consts.POST_INIT_SYNC_BUILDIN_AI_FORGES))
 }
 
 func BuildInForgeHash() (string, error) {

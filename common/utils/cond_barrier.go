@@ -430,6 +430,221 @@ func (cb *CondBarrier) WaitAll() error {
 	}
 }
 
+// WaitContext 等待指定的屏障条件完成，支持传入的上下文
+// 参数：
+//
+//	ctx - 传入的上下文，用于额外的取消/超时控制
+//	names - 要等待的屏障名称列表，如果为空则等待所有屏障
+//
+// 返回：
+//
+//	error - 在上下文超时/取消时返回错误，Cancel 操作不会返回错误
+//
+// 特性：
+//   - 同时受到 CondBarrier 自身上下文和传入上下文的管控
+//   - 支持等待尚未创建的屏障
+//   - 支持同时等待多个屏障
+//   - 空参数时等同于 WaitAllContext(ctx)
+func (cb *CondBarrier) WaitContext(ctx context.Context, names ...string) error {
+	// 如果没有指定名称，等待所有屏障
+	if len(names) == 0 {
+		return cb.WaitAllContext(ctx)
+	}
+
+	// 等待指定的屏障
+	for _, name := range names {
+		if err := cb.waitSingleContext(ctx, name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// WaitAllContext 等待所有已创建的屏障完成，支持传入的上下文
+func (cb *CondBarrier) WaitAllContext(ctx context.Context) error {
+	combinedCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// 创建一个 goroutine 来监听 CondBarrier 的上下文
+	go func() {
+		select {
+		case <-cb.ctx.Done():
+			cancel()
+		case <-combinedCtx.Done():
+		}
+	}()
+
+	for {
+		cb.mutex.RLock()
+		allCompleted := true
+		var waitChannels []<-chan struct{}
+
+		// 检查所有屏障是否完成
+		for name, barrier := range cb.barriers {
+			if !cb.completedBarriers[name] {
+				allCompleted = false
+				waitChannels = append(waitChannels, barrier.done)
+			}
+		}
+
+		// 如果所有屏障都已完成，直接返回
+		if allCompleted {
+			cb.mutex.RUnlock()
+			return nil
+		}
+
+		cb.mutex.RUnlock()
+
+		// 如果没有要等待的屏障，直接返回
+		if len(waitChannels) == 0 {
+			return nil
+		}
+
+		// 等待任何一个屏障完成，然后重新检查
+		if err := cb.waitAnyChannelContext(combinedCtx, waitChannels); err != nil {
+			return err
+		}
+	}
+}
+
+// waitSingleContext 等待单个屏障完成，支持传入的上下文
+func (cb *CondBarrier) waitSingleContext(ctx context.Context, name string) error {
+	combinedCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// 创建一个 goroutine 来监听 CondBarrier 的上下文
+	go func() {
+		select {
+		case <-cb.ctx.Done():
+			cancel()
+		case <-combinedCtx.Done():
+		}
+	}()
+
+	for {
+		cb.mutex.Lock()
+
+		// 如果已经取消，直接返回成功
+		if cb.cancelled {
+			cb.mutex.Unlock()
+			return nil
+		}
+
+		// 检查是否已经完成
+		if cb.completedBarriers[name] {
+			cb.mutex.Unlock()
+			return nil
+		}
+
+		// 检查屏障是否存在
+		if barrier, exists := cb.barriers[name]; exists {
+			done := barrier.done
+			cb.mutex.Unlock()
+
+			// 等待屏障完成或上下文取消
+			select {
+			case <-done:
+				return nil
+			case <-combinedCtx.Done():
+				// 检查是否是因为 Cancel 导致的上下文取消
+				cb.mutex.RLock()
+				cancelled := cb.cancelled
+				cb.mutex.RUnlock()
+				if cancelled {
+					return nil // Cancel 导致的取消不返回错误
+				}
+				return combinedCtx.Err() // 返回传入上下文的错误
+			}
+		}
+
+		// 屏障不存在，创建等待 channel 并注册
+		waitCh := make(chan struct{})
+		cb.waiters[name] = append(cb.waiters[name], waitCh)
+		cb.mutex.Unlock()
+
+		// 等待屏障被创建、取消或上下文结束
+		select {
+		case <-waitCh:
+			// 屏障已创建或被取消，继续循环检查
+			continue
+		case <-combinedCtx.Done():
+			// 清理等待 channel
+			cb.mutex.Lock()
+			if waitChannels, exists := cb.waiters[name]; exists {
+				for i, ch := range waitChannels {
+					if ch == waitCh {
+						cb.waiters[name] = append(waitChannels[:i], waitChannels[i+1:]...)
+						break
+					}
+				}
+				if len(cb.waiters[name]) == 0 {
+					delete(cb.waiters, name)
+				}
+			}
+			cancelled := cb.cancelled
+			cb.mutex.Unlock()
+
+			if cancelled {
+				return nil // Cancel 导致的取消不返回错误
+			}
+			return combinedCtx.Err()
+		}
+	}
+}
+
+// waitAnyChannelContext 等待任何一个 channel 完成，支持传入的上下文
+func (cb *CondBarrier) waitAnyChannelContext(ctx context.Context, channels []<-chan struct{}) error {
+	if len(channels) == 0 {
+		return nil
+	}
+
+	combinedCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// 创建一个 goroutine 来监听 CondBarrier 的上下文
+	go func() {
+		select {
+		case <-cb.ctx.Done():
+			cancel()
+		case <-combinedCtx.Done():
+		}
+	}()
+
+	// 创建一个 select case 来等待任何一个 channel
+	cases := make([]reflect.SelectCase, len(channels)+1)
+
+	// 添加组合上下文取消的 case
+	cases[0] = reflect.SelectCase{
+		Dir:  reflect.SelectRecv,
+		Chan: reflect.ValueOf(combinedCtx.Done()),
+	}
+
+	// 添加所有屏障的 case
+	for i, ch := range channels {
+		cases[i+1] = reflect.SelectCase{
+			Dir:  reflect.SelectRecv,
+			Chan: reflect.ValueOf(ch),
+		}
+	}
+
+	chosen, _, _ := reflect.Select(cases)
+
+	// 如果选中的是上下文取消
+	if chosen == 0 {
+		// 检查是否是因为 CondBarrier 的 Cancel 导致的
+		cb.mutex.RLock()
+		cancelled := cb.cancelled
+		cb.mutex.RUnlock()
+		if cancelled {
+			return nil // Cancel 导致的取消不返回错误
+		}
+		return combinedCtx.Err() // 返回传入上下文的错误
+	}
+
+	return nil
+}
+
 // waitAnyChannel 等待任何一个 channel 完成
 func (cb *CondBarrier) waitAnyChannel(channels []<-chan struct{}) error {
 	if len(channels) == 0 {
