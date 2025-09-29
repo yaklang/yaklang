@@ -83,6 +83,7 @@ type EntityRepository struct {
 	ragSystem         *rag.RAGSystem
 	entityVectorMutex sync.RWMutex
 
+	bulkProcessor *bulkProcessor
 	runtimeConfig *EntityRepositoryRuntimeConfig
 }
 
@@ -105,6 +106,10 @@ func (r *EntityRepository) GetRAGSystem() *rag.RAGSystem {
 }
 
 func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...rag.DocumentOption) error {
+	if r.bulkProcessor != nil {
+		r.bulkProcessor.addRequest(docId, content, opts...)
+		return nil
+	}
 	addIndexStartTime := time.Now()
 
 	// 实现锁超时机制防止永久死锁
@@ -189,21 +194,6 @@ func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResul
 			}
 		}()
 
-		lockAcquireStart := time.Now()
-		r.entityVectorMutex.RLock()
-		lockAcquireTime := time.Since(lockAcquireStart)
-		defer r.entityVectorMutex.RUnlock()
-
-		// 检测读锁获取时间，可能表明有写锁阻塞
-		if lockAcquireTime > 10*time.Second {
-			log.Errorf("CRITICAL READ LOCK CONTENTION: QueryVector read lock acquire took %v for query [%s] - possible write lock deadlock",
-				lockAcquireTime, query[:min(50, len(query))])
-			utils.PrintCurrentGoroutineRuntimeStack()
-		} else if lockAcquireTime > 3*time.Second {
-			log.Warnf("SLOW READ LOCK ACQUIRE: QueryVector read lock acquire took %v for query [%s]",
-				lockAcquireTime, query[:min(50, len(query))])
-		}
-
 		actualQueryStart := time.Now()
 		results, err := r.GetRAGSystem().Query(query, top)
 		queryDuration := time.Since(actualQueryStart)
@@ -216,15 +206,15 @@ func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResul
 
 		// 性能监控 - 增强死锁检测
 		if totalDuration > 15*time.Second {
-			log.Errorf("CRITICAL RAG QUERY DEADLOCK SUSPECTED: query='%s' took %v (lock_acquire: %v, actual_query: %v), returned %d results",
-				query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
+			log.Errorf("CRITICAL RAG QUERY DEADLOCK SUSPECTED: query='%s' took %v ( actual_query: %v), returned %d results",
+				query[:min(50, len(query))], totalDuration, queryDuration, len(results))
 			utils.PrintCurrentGoroutineRuntimeStack()
 		} else if totalDuration > 10*time.Second {
-			log.Errorf("CRITICAL RAG QUERY: query='%s' took %v (lock: %v, query: %v), returned %d results",
-				query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
+			log.Errorf("CRITICAL RAG QUERY: query='%s' took %v (query: %v), returned %d results",
+				query[:min(50, len(query))], totalDuration, queryDuration, len(results))
 		} else if totalDuration > 3*time.Second {
-			log.Warnf("SLOW RAG QUERY: query='%s' took %v (lock: %v, query: %v), returned %d results",
-				query[:min(50, len(query))], totalDuration, lockAcquireTime, queryDuration, len(results))
+			log.Warnf("SLOW RAG QUERY: query='%s' took %v (query: %v), returned %d results",
+				query[:min(50, len(query))], totalDuration, queryDuration, len(results))
 		}
 
 		// 记录低效查询（耗时长但结果少）
@@ -251,7 +241,6 @@ func (r *EntityRepository) QueryVector(query string, top int) ([]rag.SearchResul
 		return result.results, result.err
 	case <-time.After(15 * time.Second):
 		log.Errorf("DEADLOCK RECOVERY: QueryVector timeout after 15s for query [%s] - forcing abort", query[:min(50, len(query))])
-		utils.PrintCurrentGoroutineRuntimeStack()
 		return nil, utils.Errorf("vector query timeout: possible deadlock detected")
 	}
 }
@@ -930,6 +919,12 @@ func (r *EntityRepository) NewSaveEndpoint(ctx context.Context) *SaveEndpoint {
 	}
 }
 
+func (r *EntityRepository) StartBulkProcessor() error {
+	bp := startBulkProcessor(r.runtimeConfig.ctx, r.ragSystem, 10, 3*time.Second)
+	r.bulkProcessor = bp
+	return nil
+}
+
 func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRepository, error) {
 	var entityBaseInfo schema.EntityRepository
 	err := db.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", name).First(&entityBaseInfo).Error
@@ -959,6 +954,11 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 		info:          &entityBaseInfo,
 		ragSystem:     ragSystem,
 		runtimeConfig: NewRuntimeConfig(opts...),
+	}
+
+	err = repos.StartBulkProcessor()
+	if err != nil {
+		return nil, err
 	}
 
 	return repos, nil
@@ -1005,6 +1005,11 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 		info:          &entityBaseInfo,
 		ragSystem:     ragSystem,
 		runtimeConfig: NewRuntimeConfig(opts...),
+	}
+
+	err = repos.StartBulkProcessor()
+	if err != nil {
+		return nil, err
 	}
 
 	return repos, nil
