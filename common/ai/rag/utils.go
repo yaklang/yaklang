@@ -17,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // ChunkText 将长文本分割成多个小块，以便于处理和嵌入
@@ -194,7 +195,8 @@ func (m *MockEmbedder) Embedding(text string) ([]float32, error) {
 
 type NodeOffsetToVectorFunc func(offset uint32) []float32
 
-func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, cacheMaxSize int, pqmode bool, wg *sync.WaitGroup) (*hnsw.Graph[string], error) {
+func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphBinaryReader io.Reader, db *gorm.DB, cacheMinSize int, pqmode bool, wg *sync.WaitGroup) (*hnsw.Graph[string], error) {
+	cacheMaxSize := cacheMinSize + 2000
 	cache := map[hnswspec.LazyNodeID]any{}
 	clearCache := func() {
 		if len(cache) > cacheMaxSize {
@@ -211,6 +213,15 @@ func ParseHNSWGraphFromBinary(ctx context.Context, collectionName string, graphB
 				delete(cache, key)
 			}
 		}
+	}
+
+	cols, err := yakit.GetRAGDocumentsByCollectionNameAnd(db.Limit(cacheMinSize), collectionName)
+	if err != nil {
+		return nil, err
+	}
+	for _, col := range cols {
+		uidStr := fmt.Sprint(col.UID)
+		cache[uidStr] = []float32(col.Embedding)
 	}
 
 	allOpts := getDefaultHNSWGraphOptions(collectionName)

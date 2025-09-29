@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"io"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
@@ -44,6 +45,8 @@ type SQLiteVectorStoreHNSW struct {
 	UIDType                    string
 
 	opts []SQLiteVectorStoreHNSWOption
+
+	cacheSize int
 }
 
 const (
@@ -96,6 +99,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		buildGraphPolicy:           Policy_UseDBCanche,
 		ctx:                        context.Background(),
 		opts:                       opts,
+		cacheSize:                  10000,
 	}
 
 	for _, opt := range opts {
@@ -154,7 +158,7 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 			)
 		} else {
 			graphBinaryReader := bytes.NewReader(collection.GraphBinary)
-			hnswGraph, err = ParseHNSWGraphFromBinary(vectorStore.ctx, collectionName, graphBinaryReader, db, 1000, 1200, collection.EnablePQMode, &vectorStore.wg)
+			hnswGraph, err = ParseHNSWGraphFromBinary(vectorStore.ctx, collectionName, graphBinaryReader, db, vectorStore.cacheSize, collection.EnablePQMode, &vectorStore.wg)
 			if err != nil {
 				return nil, utils.Wrap(err, "parse hnsw graph from binary")
 			}
@@ -349,6 +353,7 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 		embedder:                   embedder,
 		collection:                 collection,
 		hnsw:                       hnswGraph,
+		cacheSize:                  10000,
 	}
 
 	vectorStore.hnsw.OnLayersChange = func(layers []*hnsw.Layer[string]) {
@@ -543,12 +548,9 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
 		helper.UpdateStatus(fmt.Sprintf("maker node id: %s", doc.ID))
-		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(getLazyNodeUIDByMd5(s.collection.Name, doc.ID)), func(uid hnswspec.LazyNodeID) ([]float32, error) {
-			dbDoc, err := getVectorDocumentByLazyNodeID(s.db, uid)
-			if err != nil {
-				return nil, utils.Wrap(err, "get vector document by lazy node uid")
-			}
-			return dbDoc.Embedding, nil
+		docVecCache := doc.Embedding
+		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(doc.ID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
+			return docVecCache, nil
 		})
 	}
 	nodeCreationTime := time.Since(nodeCreationStartTime)
