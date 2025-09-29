@@ -1,6 +1,8 @@
 package config
 
 import (
+	"context"
+
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -15,10 +17,20 @@ type SQLiteVectorStoreHNSWConfig struct {
 	DistanceFuncType string  `json:"distance_func_type"` // 距离函数类型（cosine、euclidean等）
 
 	EnablePQMode bool `json:"enable_pq_mode"`
+
+	CacheSize        int             `json:"cache_size"`
+	Ctx              context.Context `json:"ctx"`
+	BuildGraphPolicy string
 }
 
 // SQLiteVectorStoreHNSWOption 定义配置选项函数类型
 type SQLiteVectorStoreHNSWOption func(config *SQLiteVectorStoreHNSWConfig)
+
+const (
+	Policy_UseDBCanche = "DB_Cache"
+	Policy_UseFilter   = "Filter"
+	Policy_None        = "None"
+)
 
 // NewSQLiteVectorStoreHNSWConfig 返回默认配置
 func NewSQLiteVectorStoreHNSWConfig() *SQLiteVectorStoreHNSWConfig {
@@ -29,6 +41,9 @@ func NewSQLiteVectorStoreHNSWConfig() *SQLiteVectorStoreHNSWConfig {
 		EfConstruct:      200,      // 构建时的候选节点数
 		DistanceFuncType: "cosine", // 默认使用余弦距离
 		EnablePQMode:     false,    // 默认不启用PQ模式
+		CacheSize:        10000,    // 默认缓存10000个节点
+		BuildGraphPolicy: Policy_UseDBCanche,
+		Ctx:              context.Background(),
 	}
 }
 
@@ -131,6 +146,20 @@ func WithPQMode() SQLiteVectorStoreHNSWOption {
 	return WithEnablePQMode(true)
 }
 
+// WithCtx 设置上下文
+func WithCtx(ctx context.Context) SQLiteVectorStoreHNSWOption {
+	return func(config *SQLiteVectorStoreHNSWConfig) {
+		config.Ctx = ctx
+	}
+}
+
+// WithBuildGraphPolicy 设置构建图策略
+func WithBuildGraphPolicy(policy string) SQLiteVectorStoreHNSWOption {
+	return func(config *SQLiteVectorStoreHNSWConfig) {
+		config.BuildGraphPolicy = policy
+	}
+}
+
 // WithHNSWParameters 批量设置 HNSW 参数
 func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) SQLiteVectorStoreHNSWOption {
 	return func(config *SQLiteVectorStoreHNSWConfig) {
@@ -138,6 +167,13 @@ func WithHNSWParameters(m int, ml float64, efSearch, efConstruct int) SQLiteVect
 		config.Ml = ml
 		config.EfSearch = efSearch
 		config.EfConstruct = efConstruct
+	}
+}
+
+// WithCacheSize 设置缓存大小
+func WithCacheSize(size int) SQLiteVectorStoreHNSWOption {
+	return func(config *SQLiteVectorStoreHNSWConfig) {
+		config.CacheSize = size
 	}
 }
 
