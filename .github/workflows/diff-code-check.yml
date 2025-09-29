@@ -264,14 +264,14 @@ jobs:
             exit 1
           fi
           
-          if [ ! -f "./scripts/ssa-risk-tools/extract-risks.awk" ]; then
-            echo "❌ AWK script not found: ./scripts/ssa-risk-tools/extract-risks.awk"
+          if [ ! -f "./scripts/ssa-risk-tools/extract-risks-deserializer.awk" ]; then
+            echo "❌ AWK script not found: ./scripts/ssa-risk-tools/extract-risks-deserializer.awk"
             exit 1
           fi
           
           # 生成报告
-          echo "📊 Processing risk data with AWK script..."
-          awk -f scripts/ssa-risk-tools/extract-risks.awk ./risk.json
+          echo "📊 Processing risk data with enhanced AWK script..."
+          awk -f scripts/ssa-risk-tools/extract-risks-deserializer.awk ./risk.json
           
           # 检查生成的结果
           if [ -d "results" ]; then
