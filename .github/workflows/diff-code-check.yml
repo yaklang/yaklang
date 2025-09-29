@@ -15,6 +15,11 @@ on:
       - "common/ssa_bootstrapping/ci_rule/**"
       - "common/syntaxflow/sfbuildin/buildin/golang/**"
       - "scripts/ssa-risk-tools/**"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   setup:
     runs-on: ubuntu-22.04
@@ -74,7 +79,72 @@ jobs:
           fi
           echo "Current PR number is: ${{ env.PR_NUMBER }}"
 
+      - name: Validate PR State and SHA
+        id: validate_pr
+        run: |
+          echo "=== PR State and SHA Validation ==="
+          
+          # 检查 PR 状态
+          if [ "${{ env.PR_NUMBER }}" != "0" ] && [ "${{ env.PR_NUMBER }}" != "" ]; then
+            echo "Checking PR state for PR #${{ env.PR_NUMBER }}..."
+            
+            # 获取 PR 信息
+            PR_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}")
+            
+            PR_STATE=$(echo "$PR_RESPONSE" | jq -r '.state // "unknown"')
+            PR_HEAD_SHA=$(echo "$PR_RESPONSE" | jq -r '.head.sha // "unknown"')
+            PR_UPDATED_AT=$(echo "$PR_RESPONSE" | jq -r '.updated_at // "unknown"')
+            
+            echo "PR State: $PR_STATE"
+            echo "PR Head SHA: $PR_HEAD_SHA"
+            echo "PR Updated At: $PR_UPDATED_AT"
+            echo "Current HEAD_SHA: ${{ env.HEAD_SHA }}"
+            
+            # 检查 PR 是否开放
+            if [ "$PR_STATE" != "open" ]; then
+              echo "PR is not open (state: $PR_STATE). Skipping workflow."
+              echo "should_skip=true" >> $GITHUB_OUTPUT
+              echo "skip_reason=pr_not_open" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            # 检查 SHA 是否匹配（确保处理的是最新的提交）
+            if [ "$PR_HEAD_SHA" != "${{ env.HEAD_SHA }}" ]; then
+              echo "SHA mismatch. PR head SHA ($PR_HEAD_SHA) != Current HEAD_SHA (${{ env.HEAD_SHA }})."
+              echo "This workflow is processing an outdated commit. Skipping to avoid conflicts."
+              echo "should_skip=true" >> $GITHUB_OUTPUT
+              echo "skip_reason=sha_mismatch" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            
+            echo "PR validation passed. Continuing workflow."
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+            echo "skip_reason=none" >> $GITHUB_OUTPUT
+          else
+            echo "No PR number available. Skipping PR validation."
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+            echo "skip_reason=none" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "================================"
+
+      - name: Skip Workflow (PR State or SHA Validation Failed)
+        if: steps.validate_pr.outputs.should_skip == 'true'
+        run: |
+          echo "=== Workflow Skipped ==="
+          echo "Skip reason: ${{ steps.validate_pr.outputs.skip_reason }}"
+          if [ "${{ steps.validate_pr.outputs.skip_reason }}" == "pr_not_open" ]; then
+            echo "ℹ️ PR is not open, skipping security scan and comments"
+          elif [ "${{ steps.validate_pr.outputs.skip_reason }}" == "sha_mismatch" ]; then
+            echo "ℹ️ SHA mismatch detected, this workflow is processing an outdated commit"
+            echo "ℹ️ A newer workflow should be running for the latest commit"
+          fi
+          echo "========================="
+
       - name: Cache YakLang Project
+        if: steps.validate_pr.outputs.should_skip != 'true'
         uses: actions/cache@v3
         id: cache-project
         with:
@@ -84,14 +154,14 @@ jobs:
           key: go-${{ env.HEAD_SHA }}
 
       - name: Check out code into the Go module directory
-        if: steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
           ref: ${{ env.HEAD_SHA }}
           fetch-depth: 0
 
       - name: Fetch Main And Reset Main
-        if: steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         run: |
           git fetch --all
           git checkout main
@@ -99,7 +169,7 @@ jobs:
           git checkout ${{ env.HEAD_SHA }}
 
       - name: Set up Go 1.x
-        if: steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
@@ -111,7 +181,7 @@ jobs:
       #          chmod +x ./yak_linux_amd64
 
       - name: Init Module
-        if: steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         run: |
           go mod tidy && go work vendor
           ls -la $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
@@ -120,7 +190,7 @@ jobs:
           tree ./vendor
 
       - name: Init Project
-        if: steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         env: 
           SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
         run: |
@@ -128,6 +198,7 @@ jobs:
           ./yak --help
 
       - name: Generate Prog
+        if: steps.validate_pr.outputs.should_skip != 'true'
         run: |
           pwd && ls -al
           ./yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
@@ -137,12 +208,14 @@ jobs:
           ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip 
 
       - name: Upload fs.zip
+        if: steps.validate_pr.outputs.should_skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fs.zip
           path: fs.zip
 
       - name: Check With SyntaxFlow
+        if: steps.validate_pr.outputs.should_skip != 'true'
         id: scan
         run: |
           ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go
@@ -159,11 +232,13 @@ jobs:
         # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
 
       - name: Set up Python for commenting
+        if: steps.validate_pr.outputs.should_skip != 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
 
       - name: Cache Python dependencies
+        if: steps.validate_pr.outputs.should_skip != 'true'
         uses: actions/cache@v3
         id: cache-python-deps
         with:
@@ -173,12 +248,13 @@ jobs:
           key: python-deps-${{ runner.os }}-3.9-${{ hashFiles('**/requirements.txt', '**/setup.py', '**/pyproject.toml') }}
 
       - name: Install Python dependencies
-        if: steps.cache-python-deps.outputs.cache-hit != 'true'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-python-deps.outputs.cache-hit != 'true'
         run: |
           python -m pip install --upgrade pip
           pip install pyyaml requests
 
       - name: Set GitHub Token
+        if: steps.validate_pr.outputs.should_skip != 'true'
         id: set_token
         run: |
           echo "Using GITHUB_TOKEN"
@@ -206,6 +282,7 @@ jobs:
       #     GITHUB_TOKEN: ${{ steps.set_token.outputs.token }}
 
       - name: Test Token Permissions
+        if: steps.validate_pr.outputs.should_skip != 'true'
         id: test_token
         run: |
           echo "Testing token permissions..."
@@ -232,7 +309,7 @@ jobs:
           fi
 
       - name: Debug File Paths
-        if: steps.scan.outputs.scan_result == 'failure'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: |
           echo "=== Debug File Paths ==="
           echo "Current working directory: $(pwd)"
@@ -245,13 +322,13 @@ jobs:
           echo "========================="
 
       - name: Skip Security Comment (Insufficient Permissions)
-        if: steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'false'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'false'
         run: |
           echo "⚠️ Skipping security comment due to insufficient token permissions"
           echo "Consider configuring GitHub App secrets for better permissions in workflow_run events"
       
       - name: Generate security report
-        if: steps.scan.outputs.scan_result == 'failure'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: |
           echo "=== Generating Security Report ==="
           
@@ -282,8 +359,30 @@ jobs:
             # 统计高风险和关键风险数量
             HIGH_CRITICAL_COUNT=0
             if [ -f "results/scan_summary.txt" ]; then
-              HIGH_CRITICAL_COUNT=$(grep -c "严重程度: high\|严重程度: critical" results/risk_details_*.txt 2>/dev/null || echo "0")
+              echo "📊 Analyzing risk details files..."
+              # 检查是否存在风险详情文件
+              if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
+                echo "📁 Found risk detail files, counting high/critical risks..."
+                # 统计高风险和关键风险数量，确保返回纯数字
+                COUNT_RESULT=$(grep -c "严重程度: high\|严重程度: critical" results/risk_details_*.txt 2>/dev/null || echo "0")
+                echo "🔍 Raw count result: '$COUNT_RESULT'"
+                # 确保结果是纯数字，如果不是则设为0
+                if [[ "$COUNT_RESULT" =~ ^[0-9]+$ ]]; then
+                  HIGH_CRITICAL_COUNT=$COUNT_RESULT
+                  echo "✅ Valid count: $HIGH_CRITICAL_COUNT"
+                else
+                  HIGH_CRITICAL_COUNT=0
+                  echo "⚠️ Invalid count format, setting to 0"
+                fi
+              else
+                # 没有风险详情文件，说明没有风险
+                HIGH_CRITICAL_COUNT=0
+                echo "ℹ️ No risk detail files found, count set to 0"
+              fi
+            else
+              echo "ℹ️ No scan summary file found, count set to 0"
             fi
+            echo "📈 Final HIGH_CRITICAL_COUNT: $HIGH_CRITICAL_COUNT"
             echo "HIGH_CRITICAL_COUNT=$HIGH_CRITICAL_COUNT" >> $GITHUB_OUTPUT
           else
             echo "❌ Failed to generate results directory"
@@ -291,7 +390,7 @@ jobs:
           fi
 
       - name: Clean up old security comments (No vulnerabilities found)
-        if: steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0' && github.event.pull_request.state == 'open'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -341,7 +440,7 @@ jobs:
             }
 
       - name: Comment PR with security findings
-        if: steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0' && github.event.pull_request.state == 'open'
+        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -430,27 +529,36 @@ jobs:
                     let inDescription = false;
                     let inSolution = false;
                     
+                    console.log(`Processing risk detail file: ${detailFile}`);
+                    
                     for (let i = 0; i < lines.length; i++) {
                       const line = lines[i];
                       
                       if (line.startsWith('文件路径:')) {
                         filePath = line.replace('文件路径:', '').trim();
+                        console.log(`Found file path: ${filePath}`);
                       } else if (line.startsWith('行号:')) {
                         lineNum = line.replace('行号:', '').trim();
+                        console.log(`Found line number: ${lineNum}`);
                       } else if (line.startsWith('严重程度:')) {
                         severity = line.replace('严重程度:', '').trim();
+                        console.log(`Found severity: ${severity}`);
                       } else if (line.startsWith('中文标题:')) {
                         title = line.replace('中文标题:', '').trim();
+                        console.log(`Found Chinese title: ${title}`);
                       } else if (line.startsWith('标题:') && !title) {
                         title = line.replace('标题:', '').trim();
+                        console.log(`Found title: ${title}`);
                       } else if (line.startsWith('描述:')) {
                         description = line.replace('描述:', '').trim();
                         inDescription = true;
                         inSolution = false;
+                        console.log(`Found description: ${description.substring(0, 50)}...`);
                       } else if (line.startsWith('解决方案:')) {
                         solution = line.replace('解决方案:', '').trim();
                         inDescription = false;
                         inSolution = true;
+                        console.log(`Found solution: ${solution.substring(0, 50)}...`);
                       } else if (line.startsWith('=== 扫描统计 ===')) {
                         // 遇到统计信息，停止解析
                         inDescription = false;
@@ -465,8 +573,13 @@ jobs:
                       }
                     }
                     
+                    console.log(`Parsed values - filePath: "${filePath}", lineNum: "${lineNum}", severity: "${severity}", title: "${title}"`);
+                    
                      // 如果找到了文件路径和行号，且严重程度为 high 或 critical，创建带代码引用的评论
+                     console.log(`Checking conditions - filePath: ${!!filePath}, lineNum: ${!!lineNum}, severity: ${!!severity}, title: ${!!title}, severity value: "${severity}"`);
+                     
                      if (filePath && lineNum && severity && title && (severity === 'high' || severity === 'critical')) {
+                       console.log(`✅ All conditions met, creating line-specific comment for ${filePath}:${lineNum}`);
                        try {
                          // 构建带代码引用的评论内容和精准链接
                          const codeReference = `\`${filePath}:${lineNum}\``;
@@ -511,6 +624,8 @@ jobs:
                        }
                      } else if (severity && severity !== 'high' && severity !== 'critical') {
                        console.log(`Skipping line-specific comment for ${filePath}:${lineNum} (severity: ${severity} - not high/critical)`);
+                     } else {
+                       console.log(`❌ Conditions not met for line-specific comment - filePath: "${filePath}", lineNum: "${lineNum}", severity: "${severity}", title: "${title}"`);
                      }
                   }
                 }
@@ -587,8 +702,9 @@ jobs:
               }
               
               console.log('Security comments posted successfully, but workflow will fail to trigger failure handling steps');
-              // 故意抛出错误，让工作流失败，以便执行后续的失败处理步骤
-              throw new Error('Security scan found issues - workflow intentionally failing to trigger failure handling');
+              // 故意退出，让工作流失败，以便执行后续的失败处理步骤
+              console.log('Intentionally failing workflow to trigger failure handling steps');
+              process.exit(1);
               
             } catch (error) {
               console.error('Failed to post security comments:', error);
@@ -596,19 +712,19 @@ jobs:
             }
 
       - name: Upload risk log
-        if: failure()
+        if: steps.validate_pr.outputs.should_skip != 'true' && failure()
         uses: actions/upload-artifact@v4
         with:
           name: risk.json
           path: risk.json
 
       - name: Workflows fail info
-        if: failure()
+        if: steps.validate_pr.outputs.should_skip != 'true' && failure()
         run: |
           ./yak ssa-risk --input ./risk.json --with-code --severity high
 
       - name: Workflows fail info - full
-        if: failure()
+        if: steps.validate_pr.outputs.should_skip != 'true' && failure()
         run: |
           ./yak ssa-risk --input ./risk.json --with-code 
         # cat risk.json | jq -r '

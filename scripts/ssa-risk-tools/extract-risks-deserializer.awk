@@ -13,6 +13,7 @@ BEGIN {
     in_risk = 0
     risk_count = 0
     current_risk = ""
+    file_is_empty = 1  # 标记文件是否为空
     
     # 风险数据结构
     risk_data["file"] = ""
@@ -152,6 +153,11 @@ function parse_json_boolean(bool_str) {
     if (bool_str == "false") return 0
     if (bool_str == "null") return ""
     return bool_str
+}
+
+# 处理任何非空行，标记文件不为空
+NF > 0 {
+    file_is_empty = 0
 }
 
 # 检测到Risks字段开始
@@ -774,7 +780,10 @@ END {
     print "总风险数: " risk_count > summary_file
     print "" > summary_file
     
-    if (risk_count > 0) {
+    if (file_is_empty) {
+        print "⚠️ 输入文件为空，未进行安全扫描" > summary_file
+        print "这通常意味着没有发现安全风险" > summary_file
+    } else if (risk_count > 0) {
         print "发现的安全风险:" > summary_file
         for (i = 1; i <= risk_count; i++) {
             detail_file = results_dir "/risk_details_" i ".txt"
