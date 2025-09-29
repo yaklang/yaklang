@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -23,8 +24,101 @@ type TimelineItem struct {
 	value TimelineItemValue // *aitool.ToolResult
 }
 
+// timelineItemSerializable 用于序列化的 TimelineItem 结构体
+type timelineItemSerializable struct {
+	Deleted   bool            `json:"deleted"`
+	CreatedAt time.Time       `json:"created_at"`
+	Type      string          `json:"type"`
+	Value     json.RawMessage `json:"value"`
+}
+
 func (item *TimelineItem) GetValue() TimelineItemValue {
 	return item.value
+}
+
+// MarshalJSON 实现自定义 JSON 序列化
+func (item *TimelineItem) MarshalJSON() ([]byte, error) {
+	var typeName string
+	var valueJSON json.RawMessage
+
+	switch v := item.value.(type) {
+	case *aitool.ToolResult:
+		typeName = "tool_result"
+		data, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		valueJSON = data
+	case *UserInteraction:
+		typeName = "user_interaction"
+		data, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		valueJSON = data
+	case *TextTimelineItem:
+		typeName = "text"
+		data, err := json.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		valueJSON = data
+	default:
+		typeName = "raw"
+		valueJSON = []byte(fmt.Sprintf(`"%v"`, v))
+	}
+
+	serializable := timelineItemSerializable{
+		Deleted:   item.deleted,
+		CreatedAt: item.createdAt,
+		Type:      typeName,
+		Value:     valueJSON,
+	}
+
+	return json.Marshal(serializable)
+}
+
+// UnmarshalJSON 实现自定义 JSON 反序列化
+func (item *TimelineItem) UnmarshalJSON(data []byte) error {
+	var serializable timelineItemSerializable
+	err := json.Unmarshal(data, &serializable)
+	if err != nil {
+		return err
+	}
+
+	item.deleted = serializable.Deleted
+	item.createdAt = serializable.CreatedAt
+
+	switch serializable.Type {
+	case "tool_result":
+		var toolResult aitool.ToolResult
+		err := json.Unmarshal(serializable.Value, &toolResult)
+		if err != nil {
+			return err
+		}
+		item.value = &toolResult
+	case "user_interaction":
+		var userInteraction UserInteraction
+		err := json.Unmarshal(serializable.Value, &userInteraction)
+		if err != nil {
+			return err
+		}
+		item.value = &userInteraction
+	case "text":
+		var textItem TextTimelineItem
+		err := json.Unmarshal(serializable.Value, &textItem)
+		if err != nil {
+			return err
+		}
+		item.value = &textItem
+	default:
+		// 对于未知类型，尝试作为字符串处理
+		item.value = &TextTimelineItem{
+			Text: string(serializable.Value),
+		}
+	}
+
+	return nil
 }
 
 func (item *TimelineItem) IsDeleted() bool {
