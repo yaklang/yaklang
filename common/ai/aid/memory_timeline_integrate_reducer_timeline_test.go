@@ -19,7 +19,6 @@ package aid
 //		WithEventHandler(func(event *schema.AiOutputEvent) {
 //			outputChan <- event
 //		}),
-//		WithTimeLineLimit(3),
 //		WithTimelineContentLimit(500), // 设置更小的内容大小限制以更快触发compression
 //		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 //			rsp := config.NewAIResponse()

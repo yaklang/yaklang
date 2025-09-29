@@ -30,9 +30,6 @@ func ConvertReActConfigToAIDConfigOptions(i *ReActConfig) []aid.Option {
 	if i.aiTransactionAutoRetry > 0 {
 		opts = append(opts, aid.WithAITransactionRetry(int(i.aiTransactionAutoRetry)))
 	}
-	if i.timelineLimit > 0 {
-		opts = append(opts, aid.WithTimeLineLimit(int(i.timelineLimit)))
-	}
 	if i.timelineContentSizeLimit > 0 {
 		opts = append(opts, aid.WithTimelineContentLimit(int(i.timelineContentSizeLimit)))
 	}
@@ -57,10 +54,6 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []Option {
 
 	if i.ReActMaxIteration > 0 {
 		opts = append(opts, WithMaxIterations(int(i.ReActMaxIteration)))
-	}
-
-	if i.GetTimelineItemLimit() > 0 {
-		opts = append(opts, WithTimelineLimit(i.GetTimelineItemLimit()))
 	}
 
 	if i.GetTimelineContentSizeLimit() > 0 {

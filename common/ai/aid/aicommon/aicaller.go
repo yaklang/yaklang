@@ -19,7 +19,6 @@ type AICallerConfigIf interface {
 	GetContext() context.Context
 	CallAIResponseConsumptionCallback(int)
 	GetAITransactionAutoRetryCount() int64
-	GetTimelineRecordLimit() int64
 	GetTimelineContentSizeLimit() int64
 	RetryPromptBuilder(string, error) string
 	GetEmitter() *Emitter
