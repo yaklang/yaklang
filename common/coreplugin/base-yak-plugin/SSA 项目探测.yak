@@ -12,11 +12,13 @@ languages = cli.StringSlice(
     cli.setSelectOption("C", "c"),
 )
 
-
+// significant参数组为重要的参数，在前端会显示在最前面
 memory := cli.Bool("memory",
     cli.setDefault(false),
     cli.setVerboseName("内存编译，将会保存10分钟"),
-    cli.setCliGroup("compile"),
+    cli.setRequired(true),
+    cli.setDefault(false),
+    cli.setCliGroup("significant"),
 )
 
 concurrency := cli.Int("concurrency",
