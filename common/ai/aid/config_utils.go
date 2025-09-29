@@ -6,7 +6,7 @@ func (c *Config) SimpleInfoMap() map[string]interface{} {
 		"AllowPlanUserInteract":       c.allowPlanUserInteract,
 		"PlanUserInteractMaxCount":    c.planUserInteractMaxCount,
 		"PersistentMemory":            c.persistentMemory,
-		"TimelineRecordLimit":         c.timelineRecordLimit,
+		"TimelineRecordLimit":         0,
 		"TimelineContentSizeLimit":    c.timelineContentSizeLimit,
 		"TimelineTotalContentLimit":   c.timelineTotalContentLimit,
 		"Keywords":                    c.keywords,

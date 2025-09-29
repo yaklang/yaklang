@@ -138,7 +138,6 @@ type ReActConfig struct {
 
 	// field config
 	aiTransactionAutoRetry   int64
-	timelineLimit            int64 // Limit for timeline records
 	timelineContentSizeLimit int64 // Limit for timeline content size
 
 	// async Guardian
@@ -180,10 +179,6 @@ func (cfg *ReActConfig) GetUserInteractiveLimitedTimes() int64 {
 		return 3 // Default to 100 if not set
 	}
 	return cfg.userInteractiveLimitedTimes
-}
-
-func (cfg *ReActConfig) GetTimelineRecordLimit() int64 {
-	return cfg.timelineLimit
 }
 
 func (cfg *ReActConfig) GetTimelineContentSizeLimit() int64 {
@@ -273,11 +268,14 @@ func WithMaxIterations(max int) Option {
 	}
 }
 
+var depBot = utils.NewOnce()
+
+// Deprecated: use WithTimelineContentLimit instead
 func WithTimelineLimit(limit int64) Option {
 	return func(cfg *ReActConfig) {
-		if limit > 0 {
-			cfg.timelineLimit = limit
-		}
+		depBot.Do(func() {
+			log.Warn("WithTimelineLimit is abandoned, use instead of WithTimelineContentSizeLimit")
+		})
 	}
 }
 
@@ -549,7 +547,6 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		inputConsumption:            new(int64),
 		outputConsumption:           new(int64),
 		aiTransactionAutoRetry:      5,
-		timelineLimit:               100,       // Default limit for timeline records
 		timelineContentSizeLimit:    50 * 1024, // Default limit for 50k
 		guardian:                    aicommon.NewAsyncGuardian(ctx, id),
 		userInteractiveLimitedTimes: 3, // Default to 3 times

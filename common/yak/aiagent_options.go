@@ -127,14 +127,16 @@ var (
 	WithGenerateReport               = aid.WithGenerateReport
 	WithResultHandler                = aid.WithResultHandler
 	WithAppendPersistentMemory       = aid.WithAppendPersistentMemory
-	WithTimeLineLimit                = aid.WithTimeLineLimit
-	WithTimelineContentLimit         = aid.WithTimelineContentLimit
-	WithPlanMocker                   = aid.WithPlanMocker
-	WithForgeParams                  = aid.WithForgeParams
-	WithDisableToolUse               = aid.WithDisableToolUse
-	WithAIAutoRetry                  = aid.WithAIAutoRetry
-	WithAITransactionRetry           = aid.WithAITransactionRetry
-	WithDisableOutputType            = aid.WithDisableOutputEvent
+
+	// Deprecated: use WithTimelineContentLimit instead
+	WithTimeLineLimit        = aid.WithTimeLineLimit
+	WithTimelineContentLimit = aid.WithTimelineContentLimit
+	WithPlanMocker           = aid.WithPlanMocker
+	WithForgeParams          = aid.WithForgeParams
+	WithDisableToolUse       = aid.WithDisableToolUse
+	WithAIAutoRetry          = aid.WithAIAutoRetry
+	WithAITransactionRetry   = aid.WithAITransactionRetry
+	WithDisableOutputType    = aid.WithDisableOutputEvent
 
 	// aiforge options
 	WithForgePlanMocker      = aiforge.WithPlanMocker

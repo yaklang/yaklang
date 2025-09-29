@@ -190,7 +190,6 @@ type MockedAIConfig struct {
 
 	emitter *Emitter
 
-	timelineRecordLimit      int64
 	timelineContentSizeLimit int64
 }
 
@@ -208,7 +207,6 @@ func NewMockedAIConfig(ctx context.Context) AICallerConfigIf {
 		ctx:                       ctx,
 		runtimeId:                 "mock-runtime-id",
 		emitter:                   emitter,
-		timelineRecordLimit:       10,
 		timelineContentSizeLimit:  1000,
 	}
 
@@ -263,10 +261,6 @@ func (m *MockedAIConfig) NewAIResponse() *AIResponse {
 
 func (m *MockedAIConfig) CallAIResponseOutputFinishedCallback(s string) {
 	// Mock implementation - do nothing
-}
-
-func (m *MockedAIConfig) GetTimelineRecordLimit() int64 {
-	return m.timelineRecordLimit
 }
 
 func (m *MockedAIConfig) GetTimelineContentSizeLimit() int64 {
@@ -389,7 +383,6 @@ func TestCompressionWithContentSizeLimit(t *testing.T) {
 			}
 			return emitter
 		}(),
-		timelineRecordLimit:      10,
 		timelineContentSizeLimit: 100, // 设置较小的内容大小限制
 	}
 
