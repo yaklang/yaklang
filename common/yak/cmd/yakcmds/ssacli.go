@@ -1104,6 +1104,29 @@ var ssaRisk = &cli.Command{
 			if err != nil {
 				return utils.Wrap(err, "failed to read input file")
 			}
+
+			// 检查文件是否为空
+			if len(content) == 0 {
+				fmt.Println("⚠️ Input file is empty (no security risks found)")
+				fmt.Println("This usually means no security risks were detected during the scan")
+				return nil
+			}
+
+			// 检查文件是否包含有效的 JSON
+			if !json.Valid(content) {
+				fmt.Printf("❌ Input file contains invalid JSON\n")
+				fmt.Printf("File content: %s\n", string(content))
+				return utils.Errorf("input file contains invalid JSON")
+			}
+
+			// 尝试解析 JSON 以检查结构
+			var testReport sfreport.Report
+			if err := json.Unmarshal(content, &testReport); err != nil {
+				fmt.Printf("❌ Input file is not a valid risk report JSON\n")
+				fmt.Printf("Parse error: %v\n", err)
+				return utils.Wrap(err, "failed to parse JSON file")
+			}
+
 			return showAll(content)
 		} else if program != "" {
 			config, err := parseSFScanConfig(c)
