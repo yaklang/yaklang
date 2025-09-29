@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"strconv"
 	"sync"
 	"time"
 
@@ -59,6 +60,31 @@ type ReAct struct {
 	queueProcessor       sync.Once  // 确保队列处理器只启动一次
 	mirrorMutex          sync.RWMutex
 	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
+
+	saveTimelineDebounce func(func())
+}
+
+func (r *ReAct) SaveTimeline() {
+	r.saveTimelineDebounce(func() {
+		ins := r.config.memory.GetTimelineInstance()
+		if ins == nil {
+			return
+		}
+		tl, err := aicommon.MarshalTimeline(ins)
+		if err != nil {
+			log.Errorf("ReAct: marshal timeline failed: %v", err)
+			return
+		}
+		result := strconv.Quote(tl)
+		if err := yakit.UpdateAIAgentRuntimeTimeline(r.config.GetDB(), r.config.id, result); err != nil {
+			log.Errorf("ReAct: save timeline to db failed: %v", err)
+			return
+		}
+		last1 := ins.ToTimelineItemOutputLastN(1)
+		if len(last1) > 0 {
+			log.Errorf("ReAct: save timeline to db success timeline last updated time: %v", last1[0].Timestamp.String())
+		}
+	})
 }
 
 func (r *ReAct) PushCumulativeSummaryHandle(f func() string) {
@@ -122,6 +148,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		Emitter:              cfg.Emitter, // Use the emitter from config
 		taskQueue:            NewTaskQueue("react-main-queue"),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
+		saveTimelineDebounce: utils.NewDebounceEx(3, true, true),
 	}
 	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 
@@ -220,6 +247,7 @@ func (r *ReAct) addToTimeline(entryType, content string) {
 	}
 	msg.WriteString(utils.PrefixLines(content, "  "))
 	r.config.memory.PushText(r.config.AcquireId(), msg.String())
+	r.SaveTimeline()
 }
 
 // getTimeline 获取时间线信息（可选择限制数量）

@@ -49,6 +49,7 @@ func (r *ReAct) processReActFromQueue() {
 func (r *ReAct) processReActTask(task *Task) {
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
+		r.SaveTimeline()
 		r.setCurrentTask(nil) // 处理完成后清除当前任务
 		if err := recover(); err != nil {
 			log.Errorf("ReAct task processing panic: %v", err)
