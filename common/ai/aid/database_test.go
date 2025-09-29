@@ -149,7 +149,7 @@ LOOP:
 		t.Fatal("sync check failed")
 	}
 
-	rt, err := yakit.GetCoordinatorRuntime(ins.config.GetDB(), ins.config.id)
+	rt, err := yakit.GetAgentRuntime(ins.config.GetDB(), ins.config.id)
 	if err != nil {
 		t.Fatal(err)
 	}

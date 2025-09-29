@@ -254,21 +254,6 @@ func (m *Memory) GetInteractiveEvent(eventID string) (*InteractiveEventRecord, b
 	return m.InteractiveHistory.Get(eventID)
 }
 
-// SetTimelineAI safely sets the AI instance for memory timeline
-func (m *Memory) SetTimelineAI(ai aicommon.AICaller) {
-	if m.timeline != nil {
-		m.timeline.SetAICaller(ai)
-	}
-}
-
-// GetTimelineAI returns the AI instance from memory timeline
-func (m *Memory) GetTimelineAI() aicommon.AICaller {
-	if m.timeline != nil {
-		return m.timeline.GetAICaller()
-	}
-	return nil
-}
-
 // tool results memory
 func (m *Memory) PushToolCallResults(t *aitool.ToolResult) {
 	m.timeline.PushToolResult(t)
@@ -284,6 +269,10 @@ func (m *Memory) Timeline() string {
 
 func (m *Memory) GetTimelineInstance() *aicommon.Timeline {
 	return m.timeline
+}
+
+func (m *Memory) SetTimelineInstance(timeline *aicommon.Timeline) {
+	m.timeline = timeline
 }
 
 func (m *Memory) PushText(id int64, i any) {

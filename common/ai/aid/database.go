@@ -7,15 +7,15 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AiCoordinatorRuntime {
-	rt := &schema.AiCoordinatorRuntime{
+func (c *Coordinator) CreateDatabaseSchema(input string) *schema.AIAgentRuntime {
+	rt := &schema.AIAgentRuntime{
 		Uuid:            c.config.id,
 		Name:            "coordinator initializing...",
 		Seq:             c.config.GetSequenceStart(),
 		QuotedUserInput: codec.StrConvQuote(input),
 		ForgeName:       c.GetConfig().forgeName,
 	}
-	yakit.CreateOrUpdateRuntime(c.config.GetDB(), rt)
+	yakit.CreateOrUpdateAIAgentRuntime(c.config.GetDB(), rt)
 	return rt
 }
 
