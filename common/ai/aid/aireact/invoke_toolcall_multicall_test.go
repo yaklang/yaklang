@@ -92,7 +92,6 @@ func TestReAct_ToolUse_MultiCalls(t *testing.T) {
 			out <- e.ToGRPC()
 		}),
 		WithTools(sleepTool),
-		WithTimelineLimit(10000),
 		WithMaxIterations(4),
 	)
 	if err != nil {

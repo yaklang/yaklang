@@ -1635,7 +1635,7 @@ message AIStartParams {
   int64 ReActMaxIteration = 27;
 
   // 限制 Timeline 的最大条目和最大内容大小（bytes）
-  int64 TimelineItemLimit = 28;
+  int64 TimelineItemLimit = 28; // 已经废弃，功能不可用了，只需要关注 TimelineContentSizeLimit 就好
   int64 TimelineContentSizeLimit = 29;
 
   // 用户交互的最大次数限制,超过这个次数，AI 将不再被允许问用户问题

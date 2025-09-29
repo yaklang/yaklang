@@ -82,7 +82,6 @@ type Config struct {
 	// memory
 	persistentMemory          []string
 	memory                    *Memory
-	timelineRecordLimit       int
 	timelineContentSizeLimit  int
 	timelineTotalContentLimit int
 	keywords                  []string // task keywords, maybe tools name ,help ai to plan
@@ -126,10 +125,6 @@ type Config struct {
 	aiTaskRuntime *runtime
 
 	disableOutputEventType []string
-}
-
-func (c *Config) GetTimelineRecordLimit() int64 {
-	return int64(c.timelineRecordLimit)
 }
 
 func (c *Config) GetTimelineContentSizeLimit() int64 {
@@ -438,7 +433,6 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		aiAutoRetry:                 5,
 		aiTransactionAutoRetry:      5,
 		allowRequireForUserInteract: true,
-		timelineRecordLimit:         10,
 		timelineContentSizeLimit:    30 * 1024,
 		aiToolManagerOption:         make([]buildinaitools.ToolManagerOption, 0),
 		planUserInteractMaxCount:    3,
@@ -869,11 +863,14 @@ func WithToolKeywords(i ...string) Option {
 	}
 }
 
+var depNotifyOnce = utils.NewOnce()
+
+// Deprecated: use WithTimelineContentLimit instead
 func WithTimeLineLimit(i int) Option {
 	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		config.timelineRecordLimit = i
+		depNotifyOnce.Do(func() {
+			log.Warn("WithTimeLineLimit is deprecated, use WithTimelineContentLimit instead")
+		})
 		return nil
 	}
 }

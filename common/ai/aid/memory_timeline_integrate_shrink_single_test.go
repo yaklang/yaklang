@@ -34,7 +34,6 @@ func TestCoordinator_Timeline_ToolUse_BatchCompression(t *testing.T) {
 		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithTimeLineLimit(3),
 		WithTimelineContentLimit(10),
 		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()

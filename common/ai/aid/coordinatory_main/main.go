@@ -59,7 +59,6 @@ func main() {
 		aid.WithTools(aid.GetAllMockTools()...),
 		aid.WithDebugPrompt(),
 		aid.WithAgreeYOLO(true),
-		aid.WithTimeLineLimit(5),
 		aid.WithRiskControlForgeName("pimatrix", aiforge.GetOpenRouterAICallback()),
 		aid.WithAllowRequireForUserInteract(false),
 		aid.WithAIAgree(),
