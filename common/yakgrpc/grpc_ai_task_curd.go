@@ -8,7 +8,7 @@ import (
 )
 
 func (s *Server) QueryAITask(ctx context.Context, req *ypb.AITaskQueryRequest) (*ypb.AITaskQueryResponse, error) {
-	paging, data, err := yakit.QueryCoordinatorRuntime(s.GetProfileDatabase(), req.GetFilter(), req.GetPagination())
+	paging, data, err := yakit.QueryAgentRuntime(s.GetProfileDatabase(), req.GetFilter(), req.GetPagination())
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (s *Server) QueryAITask(ctx context.Context, req *ypb.AITaskQueryRequest) (
 }
 
 func (s *Server) DeleteAITask(ctx context.Context, req *ypb.AITaskDeleteRequest) (*ypb.DbOperateMessage, error) {
-	effectCount, err := yakit.DeleteCoordinatorRuntime(s.GetProfileDatabase(), req.GetFilter())
+	effectCount, err := yakit.DeleteAgentRuntime(s.GetProfileDatabase(), req.GetFilter())
 	if err != nil {
 		return nil, err
 	}

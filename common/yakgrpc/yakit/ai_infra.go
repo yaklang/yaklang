@@ -69,12 +69,12 @@ func GetReviewCheckpoint(db *gorm.DB, coordinatorUuid string, seq int64) (*schem
 	return &checkpoint, true
 }
 
-func CreateOrUpdateRuntime(db *gorm.DB, runtime *schema.AiCoordinatorRuntime) error {
+func CreateOrUpdateAIAgentRuntime(db *gorm.DB, runtime *schema.AIAgentRuntime) error {
 	if runtime.Uuid == "" {
 		return db.Create(runtime).Error
 	}
 
-	var existingRuntime schema.AiCoordinatorRuntime
+	var existingRuntime schema.AIAgentRuntime
 	if err := db.Where("uuid = ?", runtime.Uuid).First(&existingRuntime).Error; err != nil {
 		if gorm.IsRecordNotFoundError(err) {
 			return db.Create(runtime).Error
@@ -85,16 +85,25 @@ func CreateOrUpdateRuntime(db *gorm.DB, runtime *schema.AiCoordinatorRuntime) er
 	return db.Model(&existingRuntime).Updates(runtime).Error
 }
 
-func GetCoordinatorRuntime(db *gorm.DB, uuid string) (*schema.AiCoordinatorRuntime, error) {
-	var runtime schema.AiCoordinatorRuntime
+// GetLatestAIAgentRuntimeByPersistentSession 获取某个持久化会话的最新运行时
+func GetLatestAIAgentRuntimeByPersistentSession(db *gorm.DB, sessionId string) (*schema.AIAgentRuntime, error) {
+	var runtime schema.AIAgentRuntime
+	if err := db.Where("persistent_session = ?", sessionId).Order("updated_at DESC").First(&runtime).Error; err != nil {
+		return nil, err
+	}
+	return &runtime, nil
+}
+
+func GetAgentRuntime(db *gorm.DB, uuid string) (*schema.AIAgentRuntime, error) {
+	var runtime schema.AIAgentRuntime
 	if err := db.Where("uuid = ?", uuid).First(&runtime).Error; err != nil {
 		return nil, err
 	}
 	return &runtime, nil
 }
 
-func FilterCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter) *gorm.DB {
-	db = db.Model(&schema.AiCoordinatorRuntime{})
+func FilterAgentRuntime(db *gorm.DB, filter *ypb.AITaskFilter) *gorm.DB {
+	db = db.Model(&schema.AIAgentRuntime{})
 	db = bizhelper.ExactQueryStringArrayOr(db, "forge_name", filter.GetForgeName())
 	db = bizhelper.ExactQueryStringArrayOr(db, "uuid", filter.GetCoordinatorId())
 	db = bizhelper.ExactQueryStringArrayOr(db, "name", filter.GetName())
@@ -104,10 +113,10 @@ func FilterCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter) *gorm.DB {
 	return db
 }
 
-func QueryCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter, paging *ypb.Paging) (*bizhelper.Paginator, []schema.AiCoordinatorRuntime, error) {
-	db = FilterCoordinatorRuntime(db, filter)
+func QueryAgentRuntime(db *gorm.DB, filter *ypb.AITaskFilter, paging *ypb.Paging) (*bizhelper.Paginator, []schema.AIAgentRuntime, error) {
+	db = FilterAgentRuntime(db, filter)
 	db = bizhelper.OrderByPaging(db, paging)
-	var aiTasks []schema.AiCoordinatorRuntime
+	var aiTasks []schema.AIAgentRuntime
 	pag, db := bizhelper.Paging(db, int(paging.Page), int(paging.Limit), &aiTasks)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
@@ -115,9 +124,9 @@ func QueryCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter, paging *ypb.
 	return pag, aiTasks, nil
 }
 
-func DeleteCoordinatorRuntime(db *gorm.DB, filter *ypb.AITaskFilter) (int64, error) {
-	db = FilterCoordinatorRuntime(db, filter)
-	if db = db.Unscoped().Delete(&schema.AiCoordinatorRuntime{}); db.Error != nil {
+func DeleteAgentRuntime(db *gorm.DB, filter *ypb.AITaskFilter) (int64, error) {
+	db = FilterAgentRuntime(db, filter)
+	if db = db.Unscoped().Delete(&schema.AIAgentRuntime{}); db.Error != nil {
 		return 0, db.Error
 	}
 	return db.RowsAffected, nil
