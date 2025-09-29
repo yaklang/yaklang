@@ -44,6 +44,16 @@ func FilterEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) *gorm.DB {
 	return db
 }
 
+func DeleteEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) (int64, error) {
+	db = db.Model(&schema.ERModelEntity{})
+	db = FilterEntities(db, entityFilter)
+	db = db.Unscoped().Delete(&schema.ERModelEntity{})
+	if db.Error != nil {
+		return 0, db.Error
+	}
+	return db.RowsAffected, nil
+}
+
 func QueryEntities(db *gorm.DB, entityFilter *ypb.EntityFilter) ([]*schema.ERModelEntity, error) {
 	db = db.Model(&schema.ERModelEntity{})
 	db = FilterEntities(db, entityFilter)

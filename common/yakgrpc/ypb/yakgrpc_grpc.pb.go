@@ -568,6 +568,7 @@ const (
 	Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName      = "/ypb.Yak/BuildVectorIndexForKnowledgeBaseEntry"
 	Yak_ListEntityRepository_FullMethodName                       = "/ypb.Yak/ListEntityRepository"
 	Yak_QueryEntity_FullMethodName                                = "/ypb.Yak/QueryEntity"
+	Yak_DeleteEntity_FullMethodName                               = "/ypb.Yak/DeleteEntity"
 	Yak_QueryRelationship_FullMethodName                          = "/ypb.Yak/QueryRelationship"
 	Yak_QuerySubERM_FullMethodName                                = "/ypb.Yak/QuerySubERM"
 	Yak_GenerateERMDot_FullMethodName                             = "/ypb.Yak/GenerateERMDot"
@@ -1273,6 +1274,7 @@ type YakClient interface {
 	// Entity Repository
 	ListEntityRepository(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListEntityRepositoryResponse, error)
 	QueryEntity(ctx context.Context, in *QueryEntityRequest, opts ...grpc.CallOption) (*QueryEntityResponse, error)
+	DeleteEntity(ctx context.Context, in *DeleteEntityRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryRelationship(ctx context.Context, in *QueryRelationshipRequest, opts ...grpc.CallOption) (*QueryRelationshipResponse, error)
 	QuerySubERM(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (*QuerySubERMResponse, error)
 	GenerateERMDot(ctx context.Context, in *GenerateERMDotRequest, opts ...grpc.CallOption) (*GenerateERMDotResponse, error)
@@ -7580,6 +7582,16 @@ func (c *yakClient) QueryEntity(ctx context.Context, in *QueryEntityRequest, opt
 	return out, nil
 }
 
+func (c *yakClient) DeleteEntity(ctx context.Context, in *DeleteEntityRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) QueryRelationship(ctx context.Context, in *QueryRelationshipRequest, opts ...grpc.CallOption) (*QueryRelationshipResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(QueryRelationshipResponse)
@@ -8310,6 +8322,7 @@ type YakServer interface {
 	// Entity Repository
 	ListEntityRepository(context.Context, *Empty) (*ListEntityRepositoryResponse, error)
 	QueryEntity(context.Context, *QueryEntityRequest) (*QueryEntityResponse, error)
+	DeleteEntity(context.Context, *DeleteEntityRequest) (*DbOperateMessage, error)
 	QueryRelationship(context.Context, *QueryRelationshipRequest) (*QueryRelationshipResponse, error)
 	QuerySubERM(context.Context, *QuerySubERMRequest) (*QuerySubERMResponse, error)
 	GenerateERMDot(context.Context, *GenerateERMDotRequest) (*GenerateERMDotResponse, error)
@@ -9969,6 +9982,9 @@ func (UnimplementedYakServer) ListEntityRepository(context.Context, *Empty) (*Li
 }
 func (UnimplementedYakServer) QueryEntity(context.Context, *QueryEntityRequest) (*QueryEntityResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryEntity not implemented")
+}
+func (UnimplementedYakServer) DeleteEntity(context.Context, *DeleteEntityRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteEntity not implemented")
 }
 func (UnimplementedYakServer) QueryRelationship(context.Context, *QueryRelationshipRequest) (*QueryRelationshipResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryRelationship not implemented")
@@ -19118,6 +19134,24 @@ func _Yak_QueryEntity_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_DeleteEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteEntityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteEntity(ctx, req.(*DeleteEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_QueryRelationship_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(QueryRelationshipRequest)
 	if err := dec(in); err != nil {
@@ -20974,6 +21008,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryEntity",
 			Handler:    _Yak_QueryEntity_Handler,
+		},
+		{
+			MethodName: "DeleteEntity",
+			Handler:    _Yak_DeleteEntity_Handler,
 		},
 		{
 			MethodName: "QueryRelationship",

@@ -46,6 +46,18 @@ func (s *Server) QueryEntity(ctx context.Context, req *ypb.QueryEntityRequest) (
 	}, nil
 }
 
+func (s *Server) DeleteEntity(ctx context.Context, req *ypb.DeleteEntityRequest) (*ypb.DbOperateMessage, error) {
+	db := s.GetProfileDatabase()
+	affectRaw, err := yakit.DeleteEntities(db, req.GetFilter())
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.DbOperateMessage{
+		Operation:  DbOperationDelete,
+		EffectRows: affectRaw,
+	}, nil
+}
+
 // QueryRelationship 查询关系
 func (s *Server) QueryRelationship(ctx context.Context, req *ypb.QueryRelationshipRequest) (*ypb.QueryRelationshipResponse, error) {
 	db := consts.GetGormProfileDatabase()
