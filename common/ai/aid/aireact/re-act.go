@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"sync"
 	"time"
 
@@ -115,7 +117,6 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 
 func NewReAct(opts ...Option) (*ReAct, error) {
 	cfg := NewReActConfig(context.Background(), opts...)
-
 	react := &ReAct{
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
@@ -141,9 +142,6 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 
 	// Initialize memory with AI capability
 	if cfg.memory != nil && cfg.aiCallback != nil {
-		// Set the AI instance for memory timeline
-		cfg.memory.SetTimelineAI(cfg)
-
 		// Store tools function
 		cfg.memory.StoreTools(func() []*aitool.Tool {
 			if cfg.aiToolManager == nil {
@@ -166,6 +164,19 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	done := make(chan struct{})
 	react.startQueueProcessor(cfg.ctx, done)
 	<-done // Ensure the queue processor has started
+
+	err := yakit.CreateOrUpdateAIAgentRuntime(
+		react.config.GetDB(), &schema.AIAgentRuntime{
+			Uuid:              cfg.GetRuntimeId(),
+			Name:              "[re-act-runtime]",
+			Seq:               cfg.idSequence,
+			TypeName:          schema.AIAgentRuntimeType_ReAct,
+			PersistentSession: cfg.persistentSessionId,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return react, nil
 }

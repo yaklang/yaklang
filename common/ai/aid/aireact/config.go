@@ -94,9 +94,10 @@ type ReActConfig struct {
 	eventInputChan      *chanx.UnlimitedChan[*ypb.AIInputEvent]
 
 	// ID management
-	id          string
-	idSequence  int64
-	idGenerator func() int64
+	id                  string
+	idSequence          int64
+	idGenerator         func() int64
+	persistentSessionId string
 
 	// AI callback for handling LLM calls
 	aiCallback AICallbackType
@@ -620,6 +621,39 @@ func (c *ReActConfig) emitBaseHandler(e *schema.AiOutputEvent) {
 	c.eventHandler(e)
 }
 
+// restorePersistentSession attempts to restore the timeline instance from a persistent session
+func (c *ReActConfig) restorePersistentSession() {
+	if c.persistentSessionId == "" {
+		return
+	}
+
+	runtime, err := yakit.GetLatestAIAgentRuntimeByPersistentSession(c.GetDB(), c.persistentSessionId)
+	if err != nil {
+		log.Warnf("failed to fetch AI runtime for session [%s]: %v", c.persistentSessionId, err)
+		return
+	}
+
+	if runtime == nil {
+		log.Debugf("no runtime found for persistent session [%s]", c.persistentSessionId)
+		return
+	}
+
+	timelineInstance, err := aicommon.UnmarshalTimeline(runtime.GetTimeline())
+	if err != nil {
+		log.Errorf("failed to unmarshal timeline for session [%s]: %v", c.persistentSessionId, err)
+		return
+	}
+
+	timelineInstance.BindConfig(c, c)
+	if !timelineInstance.Valid() {
+		log.Errorf("restored timeline instance is invalid for session [%s]", c.persistentSessionId)
+		return
+	}
+
+	c.memory.SetTimelineInstance(timelineInstance)
+	log.Infof("successfully restored timeline instance from persistent session [%s]", c.persistentSessionId)
+}
+
 // NewReActConfig creates a new ReActConfig with options
 func NewReActConfig(ctx context.Context, opts ...Option) *ReActConfig {
 	config := newReActConfig(ctx)
@@ -633,6 +667,9 @@ func NewReActConfig(ctx context.Context, opts ...Option) *ReActConfig {
 	if config.aiToolManager == nil {
 		config.aiToolManager = buildinaitools.NewToolManager(config.aiToolManagerOption...)
 	}
+
+	// Restore persistent session if configured
+	config.restorePersistentSession()
 
 	return config
 }
@@ -751,6 +788,14 @@ func WithTracedFileContext(name string, filePath string) Option {
 					traced:   true, // Mark as traced
 				})
 			}
+		}
+	}
+}
+
+func WithPersistentSessionId(sessionId string) Option {
+	return func(cfg *ReActConfig) {
+		if sessionId != "" {
+			cfg.persistentSessionId = sessionId
 		}
 	}
 }

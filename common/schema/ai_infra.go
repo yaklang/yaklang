@@ -3,6 +3,7 @@ package schema
 import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"time"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
@@ -11,21 +12,45 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type AiCoordinatorRuntime struct {
+type AIAgentRuntimeType string
+
+const (
+	AIAgentRuntimeType_PlanAndExec AIAgentRuntimeType = "plan-exec"
+	AIAgentRuntimeType_ReAct       AIAgentRuntimeType = "re-act"
+	AIAgentRuntimeType_Unkown      AIAgentRuntimeType = ""
+)
+
+type AIAgentRuntime struct {
 	gorm.Model
 
-	Uuid            string `json:"uuid" gorm:"unique_index"`
-	Name            string `json:"name"`
-	Seq             int64  `json:"seq" gorm:"index"`
+	Uuid              string `json:"uuid" gorm:"unique_index"`
+	PersistentSession string `gorm:"index"`
+	Name              string `json:"name"`
+	Seq               int64  `json:"seq" gorm:"index"`
+
+	TypeName       AIAgentRuntimeType `gorm:"index"`
+	QuotedTimeline string             `json:"timeline"`
+
 	QuotedUserInput string `json:"quoted_user_input"`
 	ForgeName       string `json:"forge_name"`
 }
 
-func (a *AiCoordinatorRuntime) GetUserInput() string {
+func (a *AIAgentRuntime) GetTimeline() string {
+	if a == nil {
+		return ""
+	}
+	result, err := strconv.Unquote(a.QuotedTimeline)
+	if err != nil {
+		return a.QuotedTimeline
+	}
+	return result
+}
+
+func (a *AIAgentRuntime) GetUserInput() string {
 	return string(codec.StrConvUnquoteForce(a.QuotedUserInput))
 }
 
-func (a *AiCoordinatorRuntime) ToGRPC() *ypb.AITask {
+func (a *AIAgentRuntime) ToGRPC() *ypb.AITask {
 	return &ypb.AITask{
 		CoordinatorId: a.Uuid,
 		Name:          a.Name,
