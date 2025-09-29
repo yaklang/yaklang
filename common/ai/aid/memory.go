@@ -86,7 +86,7 @@ func GetDefaultMemory() *Memory {
 			return make([]*aitool.Tool, 0)
 		},
 	}
-	mem.timeline = aicommon.NewTimeline(10, nil, mem.CurrentTaskInfo)
+	mem.timeline = aicommon.NewTimeline(nil, mem.CurrentTaskInfo)
 	return mem
 }
 
@@ -338,7 +338,7 @@ func (m *Memory) TaskMaxContinue() int64 {
 
 // timeline limit set
 func (m *Memory) SetTimelineLimit(i int) {
-	m.timeline.SetTimelineLimit(int64(i))
+	m.timeline.SetTimelineContentLimit(int64(i))
 }
 
 func (m *Memory) PromptForToolCallResultsForLastN(n int) string {

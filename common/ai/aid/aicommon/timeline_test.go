@@ -16,7 +16,7 @@ import (
 )
 
 func TestMemoryTimelineOrdinary(t *testing.T) {
-	memoryTimeline := NewTimeline(10, nil, nil)
+	memoryTimeline := NewTimeline(nil, nil)
 	for i := 1; i <= 5; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(100 + i),
@@ -60,7 +60,7 @@ func (m *mockedAI) CallAI(req *AIRequest) (*AIResponse, error) {
 }
 
 func TestMemoryTimelineWithBatchCompression(t *testing.T) {
-	memoryTimeline := NewTimeline(200, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.timelineContentSizeLimit = 20000 // Set larger content size limit
 	memoryTimeline.BindConfig(config, &mockedAI{})
@@ -143,7 +143,7 @@ func (m *mockedAI2) CallAI(req *AIRequest) (*AIResponse, error) {
 }
 
 func TestMemoryTimelineWithReachLimitBatchCompression(t *testing.T) {
-	memoryTimeline := NewTimeline(2, &mockedAI2{
+	memoryTimeline := NewTimeline(&mockedAI2{
 		hCompressTime: new(int64),
 	}, nil)
 
@@ -151,17 +151,16 @@ func TestMemoryTimelineWithReachLimitBatchCompression(t *testing.T) {
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
 	config.timelineContentSizeLimit = 5000 // 设置合适的大小限制
 	memoryTimeline.BindConfig(config, &mockedAI2{})
-	memoryTimeline.SetTimelineLimit(2)
-	// Push enough items to trigger batch compression (100 items threshold)
-	for i := 1; i <= 105; i++ {
+	// Push items with longer content to trigger batch compression by content size
+	for i := 1; i <= 60; i++ {
 		memoryTimeline.PushToolResult(&aitool.ToolResult{
 			ID:          int64(i + 100),
 			Name:        "test",
-			Description: "test",
-			Param:       map[string]any{"test": "test"},
+			Description: "test with longer content to trigger compression",
+			Param:       map[string]any{"test": "test with longer content to trigger compression"},
 			Success:     true,
-			Data:        "test",
-			Error:       "test",
+			Data:        "test with longer content to trigger compression",
+			Error:       "test with longer content to trigger compression",
 		})
 	}
 
@@ -169,9 +168,11 @@ func TestMemoryTimelineWithReachLimitBatchCompression(t *testing.T) {
 	t.Log(result)
 	require.True(t, strings.Contains(result, "test"))
 	require.True(t, strings.Contains(result, "--["))
-	require.True(t, strings.Contains(result, "batch compressed content"))
-	// Should have at least one batch compression result
-	require.True(t, strings.Count(result, `batch compressed content`) >= 1)
+
+	// Check if compression happened (either batch compression or content size triggered compression)
+	hasCompression := strings.Contains(result, "batch compressed content") || strings.Contains(result, "reducer-memory:")
+	require.True(t, hasCompression, "Should have some form of compression due to content size limit")
+
 	// Should have remaining timeline items
 	totalItems := strings.Count(result, "--[")
 	require.True(t, totalItems > 0, "Should have remaining timeline items")
@@ -274,7 +275,7 @@ func (m *MockedAIConfig) GetTimelineContentSizeLimit() int64 {
 
 // TestNoCompression 测试不触发压缩的情况
 func TestNoCompression(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// 创建配置并设置大的内容限制以避免内容大小触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
@@ -306,7 +307,7 @@ func TestNoCompression(t *testing.T) {
 
 // TestBinarySearchCompression 测试二分法压缩逻辑
 func TestBinarySearchCompression(t *testing.T) {
-	memoryTimeline := NewTimeline(200, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
@@ -341,7 +342,7 @@ func TestBinarySearchCompression(t *testing.T) {
 
 // TestCompressionBoundary 测试压缩边界条件
 func TestCompressionBoundary(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
@@ -371,7 +372,7 @@ func TestCompressionBoundary(t *testing.T) {
 
 // TestCompressionWithContentSizeLimit 测试内容大小限制触发的压缩
 func TestCompressionWithContentSizeLimit(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// 创建具体的 MockedAIConfig 实例以便设置字段
 	config := &MockedAIConfig{
@@ -420,7 +421,7 @@ func TestCompressionWithContentSizeLimit(t *testing.T) {
 
 // TestCompressionRatio 测试压缩比例是否合理
 func TestCompressionRatio(t *testing.T) {
-	memoryTimeline := NewTimeline(200, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
@@ -457,7 +458,7 @@ func TestCompressionRatio(t *testing.T) {
 
 // TestNoCompressionUnderThreshold 测试低于阈值时不压缩
 func TestNoCompressionUnderThreshold(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// 设置大的内容限制以避免内容大小触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
@@ -489,7 +490,7 @@ func TestNoCompressionUnderThreshold(t *testing.T) {
 
 // TestCompressionWithDifferentSizes 测试不同大小的压缩
 func TestCompressionWithDifferentSizes(t *testing.T) {
-	memoryTimeline := NewTimeline(200, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// 设置合理的内容大小限制以触发压缩
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
@@ -527,7 +528,7 @@ func TestCompressionWithDifferentSizes(t *testing.T) {
 
 // TestTimelineBasicMethods 测试Timeline基础方法
 func TestTimelineBasicMethods(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Test SetAICaller and GetAICaller
 	newAI := &mockedAI{}
@@ -566,7 +567,7 @@ func TestTimelineBasicMethods(t *testing.T) {
 
 // TestTimelineAdvancedOperations 测试Timeline高级操作
 func TestTimelineAdvancedOperations(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Test PushUserInteraction
 	memoryTimeline.PushUserInteraction(UserInteractionStage_FreeInput, 200, "test system prompt", "test user prompt")
@@ -607,7 +608,7 @@ func TestTimelineAdvancedOperations(t *testing.T) {
 
 // TestTimelineUtilityMethods 测试Timeline工具方法
 func TestTimelineUtilityMethods(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Add some items
 	for i := 1; i <= 3; i++ {
@@ -725,7 +726,7 @@ func TestTextTimelineItemMethods(t *testing.T) {
 
 // TestTimelineCompressionMethods 测试Timeline压缩相关方法
 func TestTimelineCompressionMethods(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Add an item
 	memoryTimeline.PushToolResult(&aitool.ToolResult{
@@ -769,11 +770,7 @@ func TestTimelineCompressionMethods(t *testing.T) {
 
 // TestTimelineConfigurationMethods 测试Timeline配置相关方法
 func TestTimelineConfigurationMethods(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
-
-	// Test SetTimelineLimit
-	memoryTimeline.SetTimelineLimit(20)
-	// This is internal, we can't directly test it, but we can test that timeline works
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Test SetTimelineContentLimit
 	memoryTimeline.SetTimelineContentLimit(1000)
@@ -781,19 +778,19 @@ func TestTimelineConfigurationMethods(t *testing.T) {
 
 	// Test ExtraMetaInfo
 	metaFunc := func() string { return "test meta info" }
-	timelineWithMeta := NewTimeline(10, &mockedAI{}, metaFunc)
+	timelineWithMeta := NewTimeline(&mockedAI{}, metaFunc)
 	metaInfo := timelineWithMeta.ExtraMetaInfo()
 	require.Equal(t, "test meta info", metaInfo)
 
 	// Test with nil extraMetaInfo
-	timelineNilMeta := NewTimeline(10, &mockedAI{}, nil)
+	timelineNilMeta := NewTimeline(&mockedAI{}, nil)
 	metaInfoNil := timelineNilMeta.ExtraMetaInfo()
 	require.Equal(t, "", metaInfoNil)
 }
 
 // TestTimelineBindConfig 测试Timeline绑定配置
 func TestTimelineBindConfig(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Test BindConfig
 	config := NewMockedAIConfig(context.Background()).(*MockedAIConfig)
@@ -803,7 +800,7 @@ func TestTimelineBindConfig(t *testing.T) {
 
 // TestTimelineShrinkMethod 测试Timeline的shrink方法
 func TestTimelineShrinkMethod(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Add an item that will be shrunk
 	memoryTimeline.PushToolResult(&aitool.ToolResult{
@@ -840,7 +837,7 @@ func TestTimelineShrinkMethod(t *testing.T) {
 
 // TestTimelineRenderSummaryPrompt 测试renderSummaryPrompt方法
 func TestTimelineRenderSummaryPrompt(t *testing.T) {
-	memoryTimeline := NewTimeline(10, &mockedAI{}, nil)
+	memoryTimeline := NewTimeline(&mockedAI{}, nil)
 
 	// Add items
 	for i := 1; i <= 3; i++ {
@@ -916,11 +913,11 @@ func TestTimelineItemOutputTypeSwitch(t *testing.T) {
 // TestTimelineEdgeCases 测试Timeline边缘情况
 func TestTimelineEdgeCases(t *testing.T) {
 	// Test with nil AI
-	memoryTimeline := NewTimeline(10, nil, nil)
+	memoryTimeline := NewTimeline(nil, nil)
 	require.NotNil(t, memoryTimeline)
 
 	// Test with empty timeline
-	emptyTimeline := NewTimeline(10, &mockedAI{}, nil)
+	emptyTimeline := NewTimeline(&mockedAI{}, nil)
 	result := emptyTimeline.Dump()
 	require.Equal(t, "", result)
 
