@@ -12,9 +12,10 @@ import (
 
 // handleRequireTool handles tool requirement action using aicommon.ToolCaller
 func (r *ReAct) handleRequireTool(toolName string) (*aitool.ToolResult, bool, error) {
+	currentTaskId := r.currentTask.Id
 	r.config.Emitter = r.config.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
-		if event.TaskIndex == "" {
-			event.TaskIndex = r.currentTask.Id
+		if event != nil && event.TaskIndex == "" {
+			event.TaskIndex = currentTaskId
 		}
 		return event
 	})
