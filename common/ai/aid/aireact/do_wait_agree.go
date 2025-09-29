@@ -132,8 +132,8 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 						"level":          "low",
 					})
 					r.Emitter.EmitInfo("Auto-review score is low, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
-					reason := action.WaitString("reason")
-					endNormally(score, "low", reason)
+					// reason := action.WaitString("reason")
+					endNormally(score, "low", "")
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
 					endpoint.Release()
@@ -145,8 +145,8 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 						"score":          score,
 						"level":          "middle",
 					})
-					reason := action.WaitString("reason")
-					endNormally(score, "middle", reason)
+					// reason := action.WaitString("reason")
+					endNormally(score, "middle", "")
 					r.Emitter.EmitInfo("Auto-review score is middle, suggesting to continue in " + fmt.Sprint(int(duSec)) + " seconds...")
 					time.Sleep(duSec * time.Second) // Simulate a delay for user to read the message
 					endpoint.SetParams(aitool.InvokeParams{"suggestion": "continue"})
