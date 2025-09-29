@@ -35,6 +35,19 @@ type Timeline struct {
 	totalDumpContentLimit int64
 }
 
+func (m *Timeline) Valid() bool {
+	if m == nil {
+		return false
+	}
+	if m.config == nil {
+		return false
+	}
+	if m.ai == nil {
+		return false
+	}
+	return true
+}
+
 func (m *Timeline) GetIdToTimelineItem() *omap.OrderedMap[int64, *TimelineItem] {
 	return m.idToTimelineItem
 }
