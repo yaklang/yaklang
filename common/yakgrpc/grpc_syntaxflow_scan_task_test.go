@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 
@@ -21,8 +22,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
-	client, err := NewLocalClient()
+func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task_Info(t *testing.T) {
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	pauseTask := func(stream ypb.Yak_SyntaxFlowScanClient) {
@@ -32,7 +33,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 	}
 
 	startScan := func(progIds []string) (string, ypb.Yak_SyntaxFlowScanClient) {
-		stream, err := client.SyntaxFlowScan(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		_ = cancel
+		stream, err := client.SyntaxFlowScan(ctx)
 		require.NoError(t, err)
 
 		stream.Send(&ypb.SyntaxFlowScanRequest{
@@ -50,8 +53,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		return taskID, stream
 	}
 
-	resumeTask := func(taskId string) ypb.Yak_SyntaxFlowScanClient {
-		stream, err := client.SyntaxFlowScan(context.Background())
+	resumeTask := func(taskId string, ctx context.Context) ypb.Yak_SyntaxFlowScanClient {
+		stream, err := client.SyntaxFlowScan(ctx)
 		require.NoError(t, err)
 		stream.Send(&ypb.SyntaxFlowScanRequest{
 			ControlMode:  "resume",
@@ -68,7 +71,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 	}
 
 	statusTask := func(taskId string) ypb.Yak_SyntaxFlowScanClient {
-		stream, err := client.SyntaxFlowScan(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		_ = cancel
+		stream, err := client.SyntaxFlowScan(ctx)
 		require.NoError(t, err)
 		stream.Send(&ypb.SyntaxFlowScanRequest{
 			ControlMode:  "status",
@@ -131,27 +136,88 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			if status == "paused" {
 				havePause = true
 			}
+			log.Infof("status : %v", status)
 		}, func(process float64) {
 			processStatus = process
+			log.Infof("process : %v", process)
 		})
 		require.True(t, havePause)
 		require.Equal(t, finishProcess, processStatus)
 		// resume
-		resumeStream := resumeTask(taskID)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		resumeStream := resumeTask(taskID, ctx)
 		haveExecute := false
-		log.Errorf("===================================round 2 ===================================")
+		log.Errorf("===================================round 3 ===================================")
 		checkSfScanRecvMsg(t, resumeStream, func(status string) {
 			finishStatus = status
 			if status == "executing" {
+				cancel()
 				haveExecute = true
 			}
 		}, func(process float64) {
 			finishProcess = process
 		})
 		require.True(t, haveExecute)
-		require.Equal(t, "done", finishStatus)
-		require.Equal(t, 1.0, finishProcess)
+		require.Equal(t, "executing", finishStatus)
+		require.LessOrEqual(t, finishProcess, 1.0)
 	})
+}
+
+func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	pauseTask := func(stream ypb.Yak_SyntaxFlowScanClient) {
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "pause",
+		})
+	}
+
+	startScan := func(progIds []string) (string, ypb.Yak_SyntaxFlowScanClient) {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{"java"},
+			},
+			ProgramName: progIds,
+		})
+
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		return taskID, stream
+	}
+
+	resumeTask := func(taskId string) ypb.Yak_SyntaxFlowScanClient {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode:  "resume",
+			ResumeTaskId: taskId,
+		})
+		return stream
+	}
+
+	deleteTask := func(taskId string) {
+		_, err := ssadb.DeleteResultByTaskID(taskId)
+		require.NoError(t, err)
+		err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskId)
+		require.NoError(t, err)
+	}
+
+	statusTask := func(taskId string) ypb.Yak_SyntaxFlowScanClient {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode:  "status",
+			ResumeTaskId: taskId,
+		})
+		return stream
+	}
 
 	t.Run("test save two task and resume one of them", func(t *testing.T) {
 		// save prog

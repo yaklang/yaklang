@@ -7,7 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 )
 
-type errorCallback func(string, ...any)
+type errorCallback func(string, string, string, ...any)
 
 type ProcessCallback func(taskID, status string, progress float64, info *RuleProcessInfoList)
 
@@ -81,10 +81,10 @@ func (s *ScanTaskCallbacks) Process(taskId, status string, progress float64, inf
 }
 
 // Error triggers errorCallback for all callbacks.
-func (s *ScanTaskCallbacks) Error(msg string, args ...any) {
+func (s *ScanTaskCallbacks) Error(taskid, status, msg string, args ...any) {
 	s.foreach(func(callback *ScanTaskCallback) bool {
 		if callback.errorCallback != nil {
-			callback.errorCallback(msg, args...)
+			callback.errorCallback(taskid, status, msg, args...)
 		}
 		return true
 	})

@@ -126,6 +126,6 @@ func (m *scanManager) saveReport() {
 }
 
 func (m *scanManager) errorCallback(format string, a ...interface{}) {
-	m.callback.Error(format, a...)
+	m.callback.Error(m.taskID, m.status, format, a...)
 	log.Errorf(format, a...)
 }
