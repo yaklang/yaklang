@@ -157,6 +157,7 @@ func TestPauseAndCheck(t *testing.T) {
 
 	var status string
 	var taskID string
+	var scanProgress float64
 	pause := atomic.Bool{}
 	log.Infof("================================= round 1 start scan")
 	err := StartScan(context.Background(),
@@ -167,6 +168,7 @@ func TestPauseAndCheck(t *testing.T) {
 		}),
 		WithProgramNames(progID),
 		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+			scanProgress = progress
 			log.Infof("=%s== %.2f%%, status: %s --", time.UnixMicro(info.Time), progress*100, status)
 			if progress >= 0.5 && !pause.Load() {
 				log.Infof("暂停扫描")
@@ -187,32 +189,62 @@ func TestPauseAndCheck(t *testing.T) {
 	log.Infof("================================= round 2 check status and resume scan")
 	// 测试恢复扫描
 	// log.Infof("恢复扫描")
-	err = GetScanStatus(context.Background(), taskID, func(taskID, status string, progress float64, info *RuleProcessInfoList) {
-		log.Infof("扫描结果: TaskID=%s, Status=%s; info=%s", taskID, status, info.String())
-	})
-	require.NoError(t, err)
-	require.Equal(t, "paused", status, "任务状态应该是暂停")
+	{
+		var resultStatus string
+		var statusProcess float64
+		err = GetScanStatus(context.Background(), taskID,
+			func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+				statusProcess = progress
+				resultStatus = status
+				log.Infof("扫描结果: TaskID=%s, Status=%s; info=%s", taskID, status, info.String())
+			},
+		)
+		require.NoError(t, err)
+		require.Equal(t, "paused", resultStatus, "任务状态应该是暂停")
+		require.Equal(t, statusProcess, scanProgress, "任务进度应该不变")
+	}
+
+	log.Infof("=================================== round 2 check status use req")
+	{
+		var resultStatus string
+		var statusProcess float64
+		req := &ypb.SyntaxFlowScanRequest{
+			ControlMode:  string(ControlModeStatus),
+			ResumeTaskId: taskID,
+		}
+		err = Scan(context.Background(),
+			WithRawConfig(req),
+			WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
+				statusProcess = progress
+				resultStatus = status
+				log.Infof("扫描结果: TaskID=%s, Status=%s; info=%s", taskID, status, info.String())
+			}),
+		)
+		require.NoError(t, err)
+		require.Equal(t, "paused", resultStatus, "任务状态应该是暂停")
+		require.Equal(t, statusProcess, scanProgress, "任务进度应该不变")
+	}
 
 	// 这里直接调用恢复接口，继续扫描
 	log.Infof("================================= round 3 resume scan")
-	var processStatus, resultStatus string
+	var processResume, resultResume string
 	var finalProgress float64
 	err = ResumeScan(context.Background(), taskID,
 		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
 			if progress > finalProgress {
 				finalProgress = progress
 			}
-			processStatus = status
+			processResume = status
 			log.Infof("=%s== %.2f%%, status: %s -- %s", time.UnixMicro(info.Time), progress*100, status, info.String())
 		}),
 		WithScanResultCallback(func(sr *ScanResult) {
 			taskID = sr.TaskID
-			resultStatus = sr.Status
+			resultResume = sr.Status
 			log.Infof("扫描结果: TaskID=%s, Status=%s", sr.TaskID, sr.Status)
 		}),
 	)
 	require.NoError(t, err)
-	require.Equal(t, "done", processStatus, "任务过程状态应该是完成")
-	require.Equal(t, "done", resultStatus, "任务结果状态应该是完成")
+	require.Equal(t, "done", processResume, "任务过程状态应该是完成")
+	require.Equal(t, "done", resultResume, "任务结果状态应该是完成")
 	require.Equal(t, 1.0, finalProgress, "最终进度应该是100%")
 }

@@ -12,7 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -56,29 +55,36 @@ type scanManager struct {
 	callback       *ScanTaskCallbacks
 }
 
-var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
+// var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
 
 func LoadSyntaxflowTaskFromDB(ctx context.Context, runningID string, config *ScanTaskConfig) (*scanManager, error) {
 	taskId := config.GetResumeTaskId()
 	var manager *scanManager
-	var ok bool
-	if manager, ok = syntaxFlowScanManagerMap.Get(taskId); ok {
-		ctx, cancel := context.WithCancel(ctx)
-		manager.ctx = ctx
-		manager.cancel = cancel
-	} else {
-		var err error
-		manager, err = createEmptySyntaxFlowTaskByID(ctx, runningID, taskId, config)
-		if err != nil {
-			return nil, err
-		}
+	// var ok bool
+	// if manager, ok = syntaxFlowScanManagerMap.Get(taskId); ok {
+	// 	ctx, cancel := context.WithCancel(ctx)
+	// 	manager.ctx = ctx
+	// 	manager.cancel = cancel
+	// } else {
+	var err error
+	manager, err = createEmptySyntaxFlowTaskByID(ctx, runningID, taskId, config)
+	if err != nil {
+		return nil, err
 	}
+	// }
 	manager.callback.Set(runningID, config.ScanTaskCallback)
 	manager.processMonitor.StartMonitor()
 	if err := manager.RestoreTask(); err != nil {
 		return nil, err
 	}
 	return manager, nil
+}
+func RemoveSyntaxFlowTaskByID(id string) {
+	// _, ok := syntaxFlowScanManagerMap.Get(id)
+	// if !ok {
+	// 	return
+	// }
+	// syntaxFlowScanManagerMap.Delete(id)
 }
 
 func createEmptySyntaxFlowTaskByID(
@@ -100,7 +106,7 @@ func createEmptySyntaxFlowTaskByID(
 		callback:     NewScanTaskCallbacks(),
 	}
 	m.callback.Set(runningID, config.ScanTaskCallback)
-	syntaxFlowScanManagerMap.Set(taskId, m)
+	// syntaxFlowScanManagerMap.Set(taskId, m)
 	m.config = config
 	// 设置进度回调
 	m.processMonitor = newProcessMonitor(ctx, 30*time.Second, func(progress float64, info *RuleProcessInfoList) {
@@ -126,14 +132,6 @@ func createSyntaxflowTaskById(
 	m.setScanBatch()
 
 	return m, nil
-}
-
-func RemoveSyntaxFlowTaskByID(id string) {
-	_, ok := syntaxFlowScanManagerMap.Get(id)
-	if !ok {
-		return
-	}
-	syntaxFlowScanManagerMap.Delete(id)
 }
 
 func (m *scanManager) GetConcurrency() uint32 {
@@ -339,7 +337,6 @@ func (m *scanManager) Stop(runningID string) {
 		return
 	}
 	m.cancel()
-	m.callback.Delete(runningID)
 	m.processMonitor.Close()
 }
 

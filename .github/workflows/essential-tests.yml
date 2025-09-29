@@ -493,5 +493,5 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: grpc.log
-          path: /tmp/grpc.log
+          name: tmp_logs
+          path: /tmp/*.log 
