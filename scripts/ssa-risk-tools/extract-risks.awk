@@ -29,14 +29,28 @@ BEGIN {
     current_cwe = ""
     current_time = ""
     current_latest_disposal_status = ""
+    current_code_range = ""
+    current_start_line = 0
+    current_end_line = 0
+    current_start_column = 0
+    current_end_column = 0
+    current_code_fragment = ""
     
-    # 输出格式
-    printf "%-20s %-8s %-10s %-50s\n", "文件路径", "行号", "严重程度", "问题标题"
-    printf "%-20s %-8s %-10s %-50s\n", "--------------------", "--------", "----------", "--------------------------------------------------"
+    # 多行字段处理变量
+    in_description = 0
+    in_solution = 0
+    description_raw = ""
+    solution_raw = ""
+    
+    # 创建 results 目录
+    results_dir = "results"
+    system("mkdir -p " results_dir)
+
+    # 移除屏幕输出格式（只保留文件输出）
 }
 
 # 检测到Risks字段开始 (注意是大写R)
-/\"Risks\"\s*:\s*\{/ {
+/"Risks"\s*:\s*\{/ {
     in_risks = 1
     next
 }
@@ -48,7 +62,7 @@ in_risks && /^\s*\}\s*,?\s*$/ {
 }
 
 # 在Risks字段内，检测到新的风险项
-in_risks && /\"[a-f0-9]{40}\"\s*:\s*\{/ {
+in_risks && /"[a-f0-9]{40}"\s*:\s*\{/ {
     # 如果有之前的风险，先输出
     if (current_risk != "") {
         output_risk()
@@ -73,123 +87,442 @@ in_risks && /\"[a-f0-9]{40}\"\s*:\s*\{/ {
     current_cwe = ""
     current_time = ""
     current_latest_disposal_status = ""
+    current_code_range = ""
+    current_start_line = 0
+    current_end_line = 0
+    current_start_column = 0
+    current_end_column = 0
+    current_code_fragment = ""
+    
+    # 重置多行字段处理变量
+    in_description = 0
+    in_solution = 0
+    description_raw = ""
+    solution_raw = ""
     
     # 提取风险ID (40位哈希值)
-    match($0, /\"([a-f0-9]{40})\"\s*:\s*\{/, arr)
+    match($0, /"([a-f0-9]{40})"[[:space:]]*:[[:space:]]*{/, arr)
     current_risk = arr[1]
     next
 }
 
 # 在风险项内，检测到code_source_url字段 (对应文件路径)
-in_risk && /\"code_source_url\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"code_source_url\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"code_source_url"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"code_source_url"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_file = arr[1]
     next
 }
 
 # 检测line字段
-in_risk && /\"line\"\s*:\s*[0-9]+/ {
-    match($0, /\"line\"\s*:\s*([0-9]+)/, arr)
+in_risk && /"line"[[:space:]]*:[[:space:]]*[0-9]+/ {
+    match($0, /"line"[[:space:]]*:[[:space:]]*([0-9]+)/, arr)
     current_line = arr[1]
     next
 }
 
 # 检测severity字段
-in_risk && /\"severity\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"severity\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"severity"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"severity"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_severity = arr[1]
     next
 }
 
 # 检测title字段
-in_risk && /\"title\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"title\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"title"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"title"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_title = arr[1]
     next
 }
 
 # 检测title_verbose字段
-in_risk && /\"title_verbose\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"title_verbose\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"title_verbose"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"title_verbose"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_title_verbose = arr[1]
     next
 }
 
 # 检测description字段
-in_risk && /\"description\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"description\"\s*:\s*\"([^\"]*)\"/, arr)
-    current_description = arr[1]
+in_risk && /"description"[[:space:]]*:[[:space:]]*"/ {
+    # 定位到 description 字段
+    start_pos = index($0, "description")
+    if (start_pos > 0) {
+        # 找到冒号位置
+        colon_pos = index(substr($0, start_pos), ":")
+        if (colon_pos > 0) {
+            # 找到第一个引号
+            quote_start = index(substr($0, start_pos + colon_pos), "\"")
+            if (quote_start > 0) {
+                # 提取从第一个引号开始到行尾的内容
+                rest_line = substr($0, start_pos + colon_pos + quote_start)
+                
+                # 检查是否是单行完整的 JSON 字符串
+                # 寻找真正的结束引号（跳过转义的引号）
+                end_quote_pos = 0
+                escaped = 0
+                for (i = 2; i <= length(rest_line); i++) {
+                    char = substr(rest_line, i, 1)
+                    if (escaped) {
+                        escaped = 0
+                    } else if (char == "\\") {
+                        escaped = 1
+                    } else if (char == "\"") {
+                        end_quote_pos = i
+                        break
+                    }
+                }
+                
+                if (end_quote_pos > 0) {
+                    # 单行完整的 JSON 字符串
+                    description_raw = substr(rest_line, 2, end_quote_pos - 2)
+                } else {
+                    # 多行 JSON 字符串，需要继续读取后续行
+                    description_raw = substr(rest_line, 2)  # 去掉第一个引号
+                    in_description = 1
+                    description_lines = 1
+                }
+                
+                if (end_quote_pos > 0) {
+                    # 处理常见的转义字符
+                    current_description = description_raw
+                    # 替换 \r\n 为换行符（Windows风格换行）
+                    gsub(/\\r\\n/, "\n", current_description)
+                    # 替换 \n 为真正的换行符
+                    gsub(/\\n/, "\n", current_description)
+                    # 替换 \t 为真正的制表符
+                    gsub(/\\t/, "\t", current_description)
+                    # 替换 \" 为 "
+                    gsub(/\\"/, "\"", current_description)
+                    # 替换 \\ 为 \
+                    gsub(/\\\\/, "\\", current_description)
+                }
+            }
+        }
+    }
+    next
+}
+
+# 处理多行 description 字段
+in_risk && in_description {
+    # 寻找结束引号
+    end_quote_pos = 0
+    escaped = 0
+    for (i = 1; i <= length($0); i++) {
+        char = substr($0, i, 1)
+        if (escaped) {
+            escaped = 0
+        } else if (char == "\\") {
+            escaped = 1
+        } else if (char == "\"") {
+            end_quote_pos = i
+            break
+        }
+    }
+    
+    if (end_quote_pos > 0) {
+        # 找到结束引号，完成 description 字段的读取
+        description_raw = description_raw substr($0, 1, end_quote_pos - 1)
+        
+        # 处理常见的转义字符
+        current_description = description_raw
+        # 替换 \r\n 为换行符（Windows风格换行）
+        gsub(/\\r\\n/, "\n", current_description)
+        # 替换 \n 为真正的换行符
+        gsub(/\\n/, "\n", current_description)
+        # 替换 \t 为真正的制表符
+        gsub(/\\t/, "\t", current_description)
+        # 替换 \" 为 "
+        gsub(/\\"/, "\"", current_description)
+        # 替换 \\ 为 \
+        gsub(/\\\\/, "\\", current_description)
+        
+        in_description = 0
+        description_raw = ""
+    } else {
+        # 继续累积内容
+        description_raw = description_raw $0
+    }
     next
 }
 
 # 检测solution字段
-in_risk && /\"solution\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"solution\"\s*:\s*\"([^\"]*)\"/, arr)
-    current_solution = arr[1]
+in_risk && /"solution"[[:space:]]*:[[:space:]]*"/ {
+    # 定位到 solution 字段
+    start_pos = index($0, "solution")
+    if (start_pos > 0) {
+        # 找到冒号位置
+        colon_pos = index(substr($0, start_pos), ":")
+        if (colon_pos > 0) {
+            # 找到第一个引号
+            quote_start = index(substr($0, start_pos + colon_pos), "\"")
+            if (quote_start > 0) {
+                # 提取从第一个引号开始到行尾的内容
+                rest_line = substr($0, start_pos + colon_pos + quote_start)
+                
+                # 检查是否是单行完整的 JSON 字符串
+                # 寻找真正的结束引号（跳过转义的引号）
+                end_quote_pos = 0
+                escaped = 0
+                for (i = 2; i <= length(rest_line); i++) {
+                    char = substr(rest_line, i, 1)
+                    if (escaped) {
+                        escaped = 0
+                    } else if (char == "\\") {
+                        escaped = 1
+                    } else if (char == "\"") {
+                        end_quote_pos = i
+                        break
+                    }
+                }
+                
+                if (end_quote_pos > 0) {
+                    # 单行完整的 JSON 字符串
+                    solution_raw = substr(rest_line, 2, end_quote_pos - 2)
+                } else {
+                    # 多行 JSON 字符串，需要继续读取后续行
+                    solution_raw = substr(rest_line, 2)  # 去掉第一个引号
+                    in_solution = 1
+                    solution_lines = 1
+                }
+                
+                if (end_quote_pos > 0) {
+                    # 处理常见的转义字符
+                    current_solution = solution_raw
+                    # 替换 \r\n 为换行符（Windows风格换行）
+                    gsub(/\\r\\n/, "\n", current_solution)
+                    # 替换 \n 为真正的换行符
+                    gsub(/\\n/, "\n", current_solution)
+                    # 替换 \t 为真正的制表符
+                    gsub(/\\t/, "\t", current_solution)
+                    # 替换 \" 为 "
+                    gsub(/\\"/, "\"", current_solution)
+                    # 替换 \\ 为 \
+                    gsub(/\\\\/, "\\", current_solution)
+                }
+            }
+        }
+    }
+    next
+}
+
+# 处理多行 solution 字段
+in_risk && in_solution {
+    # 寻找结束引号
+    end_quote_pos = 0
+    escaped = 0
+    for (i = 1; i <= length($0); i++) {
+        char = substr($0, i, 1)
+        if (escaped) {
+            escaped = 0
+        } else if (char == "\\") {
+            escaped = 1
+        } else if (char == "\"") {
+            end_quote_pos = i
+            break
+        }
+    }
+    
+    if (end_quote_pos > 0) {
+        # 找到结束引号，完成 solution 字段的读取
+        solution_raw = solution_raw substr($0, 1, end_quote_pos - 1)
+        
+        # 处理常见的转义字符
+        current_solution = solution_raw
+        # 替换 \r\n 为换行符（Windows风格换行）
+        gsub(/\\r\\n/, "\n", current_solution)
+        # 替换 \n 为真正的换行符
+        gsub(/\\n/, "\n", current_solution)
+        # 替换 \t 为真正的制表符
+        gsub(/\\t/, "\t", current_solution)
+        # 替换 \" 为 "
+        gsub(/\\"/, "\"", current_solution)
+        # 替换 \\ 为 \
+        gsub(/\\\\/, "\\", current_solution)
+        
+        in_solution = 0
+        solution_raw = ""
+    } else {
+        # 继续累积内容
+        solution_raw = solution_raw $0
+    }
     next
 }
 
 # 检测rule_name字段
-in_risk && /\"rule_name\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"rule_name\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"rule_name"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"rule_name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_rule_name = arr[1]
     next
 }
 
 # 检测function_name字段
-in_risk && /\"function_name\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"function_name\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"function_name"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"function_name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_function_name = arr[1]
     next
 }
 
 # 检测program_name字段
-in_risk && /\"program_name\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"program_name\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"program_name"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"program_name"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_program_name = arr[1]
     next
 }
 
 # 检测language字段
-in_risk && /\"language\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"language\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"language"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"language"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_language = arr[1]
     next
 }
 
 # 检测risk_type字段
-in_risk && /\"risk_type\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"risk_type\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"risk_type"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"risk_type"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_risk_type = arr[1]
     next
 }
 
 # 检测cve字段
-in_risk && /\"cve\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"cve\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"cve"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"cve"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_cve = arr[1]
     next
 }
 
 # 检测cwe字段 (数组格式)
-in_risk && /\"cwe\"\s*:\s*\[/ {
+in_risk && /"cwe"[[:space:]]*:[[:space:]]*\[/ {
     # 简单处理，提取数组内容
-    match($0, /\"cwe\"\s*:\s*\[([^\]]*)\]/, arr)
+    match($0, /"cwe"[[:space:]]*:[[:space:]]*\[([^\]]*)\]/, arr)
     current_cwe = arr[1]
     next
 }
 
 # 检测time字段
-in_risk && /\"time\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"time\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"time"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"time"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_time = arr[1]
     next
 }
 
 # 检测latest_disposal_status字段
-in_risk && /\"latest_disposal_status\"\s*:\s*\"[^\"]*\"/ {
-    match($0, /\"latest_disposal_status\"\s*:\s*\"([^\"]*)\"/, arr)
+in_risk && /"latest_disposal_status"[[:space:]]*:[[:space:]]*"[^"]*"/ {
+    match($0, /"latest_disposal_status"[[:space:]]*:[[:space:]]*"([^"]*)"/, arr)
     current_latest_disposal_status = arr[1]
+    next
+}
+
+# 检测code_range字段
+in_risk && /code_range/ {
+    # 定位到 code_range 字段
+    start_pos = index($0, "code_range")
+    if (start_pos > 0) {
+        # 找到冒号位置
+        colon_pos = index(substr($0, start_pos), ":")
+        if (colon_pos > 0) {
+            # 找到第一个引号
+            quote_start = index(substr($0, start_pos + colon_pos), "\"")
+            if (quote_start > 0) {
+                # 找到 JSON 字符串的结束引号
+                rest_line = substr($0, start_pos + colon_pos + quote_start)
+                
+                # 寻找真正的结束引号（跳过转义的引号）
+                end_quote_pos = 0
+                escaped = 0
+                for (i = 2; i <= length(rest_line); i++) {
+                    char = substr(rest_line, i, 1)
+                    if (escaped) {
+                        escaped = 0
+                    } else if (char == "\\") {
+                        escaped = 1
+                    } else if (char == "\"") {
+                        end_quote_pos = i
+                        break
+                    }
+                }
+                
+                if (end_quote_pos > 0) {
+                    code_range_json = substr(rest_line, 2, end_quote_pos - 2)
+                    
+                    # 使用逗号切片，然后匹配每个字段
+                    # 将 JSON 字符串按逗号分割
+                    split(code_range_json, parts, ",")
+                    
+                    # 遍历每个部分，匹配需要的字段
+                    for (i = 1; i <= length(parts); i++) {
+                        part = parts[i]
+                        # 匹配 start_line
+                        if (match(part, /\\"start_line\\":([0-9]+)/, arr)) {
+                            current_start_line = arr[1]
+                        }
+                        # 匹配 end_line
+                        else if (match(part, /\\"end_line\\":([0-9]+)/, arr)) {
+                            current_end_line = arr[1]
+                        }
+                        # 匹配 start_column
+                        else if (match(part, /\\"start_column\\":([0-9]+)/, arr)) {
+                            current_start_column = arr[1]
+                        }
+                        # 匹配 end_column
+                        else if (match(part, /\\"end_column\\":([0-9]+)/, arr)) {
+                            current_end_column = arr[1]
+                        }
+                    }
+                }
+            }
+        }
+    }
+    next
+}
+
+# 检测code_fragment字段
+in_risk && /"code_fragment"[[:space:]]*:[[:space:]]*"/ {
+    # 定位到 code_fragment 字段
+    start_pos = index($0, "code_fragment")
+    if (start_pos > 0) {
+        # 找到冒号位置
+        colon_pos = index(substr($0, start_pos), ":")
+        if (colon_pos > 0) {
+            # 找到第一个引号
+            quote_start = index(substr($0, start_pos + colon_pos), "\"")
+            if (quote_start > 0) {
+                # 找到 JSON 字符串的结束引号
+                rest_line = substr($0, start_pos + colon_pos + quote_start)
+                
+                # 寻找真正的结束引号（跳过转义的引号）
+                end_quote_pos = 0
+                escaped = 0
+                for (i = 2; i <= length(rest_line); i++) {
+                    char = substr(rest_line, i, 1)
+                    if (escaped) {
+                        escaped = 0
+                    } else if (char == "\\") {
+                        escaped = 1
+                    } else if (char == "\"") {
+                        end_quote_pos = i
+                        break
+                    }
+                }
+                
+                if (end_quote_pos > 0) {
+                    # 提取 code_fragment 内容，处理转义字符
+                    code_fragment_raw = substr(rest_line, 2, end_quote_pos - 2)
+                    
+                    # 处理常见的转义字符
+                    current_code_fragment = code_fragment_raw
+                    # 替换 \r\n 为换行符（Windows风格换行）
+                    gsub(/\\r\\n/, "\n", current_code_fragment)
+                    # 替换 \n 为真正的换行符
+                    gsub(/\\n/, "\n", current_code_fragment)
+                    # 替换 \t 为真正的制表符
+                    gsub(/\\t/, "\t", current_code_fragment)
+                    # 替换 \" 为 "
+                    gsub(/\\"/, "\"", current_code_fragment)
+                    # 替换 \\ 为 \
+                    gsub(/\\\\/, "\\", current_code_fragment)
+                }
+            }
+        }
+    }
     next
 }
 
@@ -211,26 +544,39 @@ function output_risk() {
             display_title = current_title
         }
         
-        # 截断过长的标题
+        # 不截断标题，保持完整信息
         title_short = display_title
-        if (length(title_short) > 50) {
-            title_short = substr(title_short, 1, 47) "..."
-        }
         
-        # 截断过长的文件路径
+        # 从第二个 / 开始提取文件路径（不截断）
         file_short = current_file
-        if (length(file_short) > 20) {
-            file_short = "..." substr(file_short, length(file_short) - 16)
+        # 找到第二个 / 的位置
+        first_slash = index(file_short, "/")
+        if (first_slash > 0) {
+            second_slash = index(substr(file_short, first_slash + 1), "/")
+            if (second_slash > 0) {
+                # 从第二个 / 开始提取（不包含第二个 /）
+                file_short = substr(file_short, first_slash + second_slash + 1)
+            }
         }
         
-        printf "%-20s %-8s %-10s %-50s\n", file_short, current_line, current_severity, title_short
+        # 移除屏幕输出（只保留文件输出）
         
         # 输出详细信息到文件
-        detail_file = "risk_details_" risk_count ".txt"
+        detail_file = results_dir "/risk_details_" risk_count ".txt"
         print "=== 风险 " risk_count " ===" > detail_file
         print "风险ID: " current_risk > detail_file
-        print "文件路径: " current_file > detail_file
+        print "文件路径: " file_short > detail_file
         print "行号: " current_line > detail_file
+        if (current_start_line > 0 && current_end_line > 0) {
+            if (current_start_line == current_end_line) {
+                print "代码范围: " current_start_line "行" > detail_file
+            } else {
+                print "代码范围: " current_start_line "-" current_end_line "行" > detail_file
+            }
+            if (current_start_column > 0 && current_end_column > 0) {
+                print "列范围: " current_start_column "-" current_end_column > detail_file
+            }
+        }
         print "严重程度: " current_severity > detail_file
         print "标题: " current_title > detail_file
         if (current_title_verbose != "") {
@@ -263,15 +609,47 @@ function output_risk() {
         if (current_latest_disposal_status != "") {
             print "处置状态: " current_latest_disposal_status > detail_file
         }
+        if (current_code_fragment != "") {
+            print "代码片段:" > detail_file
+            print current_code_fragment > detail_file
+        }
         print "描述: " current_description > detail_file
         print "解决方案: " current_solution > detail_file
         print "" > detail_file
+        
+        # 在每个详细文件末尾添加统计信息
+        print "=== 扫描统计 ===" > detail_file
+        print "总风险数: " risk_count > detail_file
+        print "当前风险: " risk_count " / " risk_count > detail_file
+        print "扫描完成时间: " strftime("%Y-%m-%d %H:%M:%S") > detail_file
     }
 }
 
 END {
-    printf "\n总共找到 %d 个风险\n", risk_count
+    # 生成总结文件到 results 目录
+    summary_file = results_dir "/scan_summary.txt"
+    print "=== 安全扫描总结报告 ===" > summary_file
+    print "扫描时间: " strftime("%Y-%m-%d %H:%M:%S") > summary_file
+    print "总风险数: " risk_count > summary_file
+    print "" > summary_file
+    
     if (risk_count > 0) {
-        print "详细信息已保存到 risk_details_*.txt 文件中"
+        print "发现的安全风险:" > summary_file
+        for (i = 1; i <= risk_count; i++) {
+            detail_file = results_dir "/risk_details_" i ".txt"
+            if (system("test -f " detail_file) == 0) {
+                print "  风险 " i ": 详细信息请查看 risk_details_" i ".txt" > summary_file
+            }
+        }
+        print "" > summary_file
+        print "建议:" > summary_file
+        print "1. 查看各个风险详情文件了解具体问题" > summary_file
+        print "2. 根据解决方案建议进行代码修复" > summary_file
+        print "3. 重新扫描验证修复效果" > summary_file
+    } else {
+        print "✅ 未发现安全风险，代码安全检查通过！" > summary_file
     }
+    
+    print "" > summary_file
+    print "报告生成完成，所有文件保存在 " results_dir " 目录中" > summary_file
 }

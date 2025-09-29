@@ -1,0 +1,55 @@
+name: 'Security Commenter'
+description: 'Comment on PR with security scan results'
+inputs:
+  risk_json_path:
+    description: 'Path to the risk.json file'
+    required: true
+  github_token:
+    description: 'GitHub token for API access'
+    required: true
+  pr_number:
+    description: 'Pull Request number'
+    required: true
+  repo:
+    description: 'Repository in format owner/repo'
+    required: true
+  config_path:
+    description: 'Path to configuration file'
+    required: false
+    default: '.github/github-commenter.yml'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python for commenting
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      id: cache-python-deps
+      with:
+        path: |
+          ~/.cache/pip
+          ~/.local/lib/python3.9/site-packages
+        key: python-deps-${{ runner.os }}-3.9-${{ hashFiles('**/requirements.txt', '**/setup.py', '**/pyproject.toml') }}
+    
+    - name: Install Python dependencies
+      if: steps.cache-python-deps.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyyaml requests
+    
+    - name: Run security commenter
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        # 验证 token 权限
+        echo "Testing GitHub token permissions..."
+        curl -H "Authorization: token ${{ inputs.github_token }}" \
+             -H "Accept: application/vnd.github.v3+json" \
+             https://api.github.com/user
+      
