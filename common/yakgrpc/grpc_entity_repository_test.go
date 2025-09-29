@@ -245,7 +245,7 @@ func TestGenerateERMDot(t *testing.T) {
 	if resp.Dot == "" {
 		t.Fatalf("GenerateERMDot returned empty dot string, expected non-empty")
 	}
-	// 检查 DOT 内容包含实体和关系
+	// 检查 DOT 内容包含实���和关系
 	for _, name := range entityNames {
 		if !strings.Contains(resp.Dot, name) {
 			t.Errorf("DOT output missing entity name: %s", name)
@@ -286,5 +286,55 @@ func TestQueryEntityByKeyword(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("QueryEntity by keyword: expected entity name containing %s", keyword)
+	}
+}
+
+func TestDeleteEntity(t *testing.T) {
+	entityBaseIndex, _, entityIndex, entityNames, _, _, clearFunc := setupTestData(t)
+	t.Cleanup(clearFunc)
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatalf("Failed to create local gRPC client: %v", err)
+	}
+
+	// 查询当前实体数��
+	queryReq := &ypb.QueryEntityRequest{
+		Filter:     &ypb.EntityFilter{BaseIndex: entityBaseIndex},
+		Pagination: &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id"},
+	}
+	queryResp, err := client.QueryEntity(context.Background(), queryReq)
+	if err != nil {
+		t.Fatalf("QueryEntity before delete failed: %v", err)
+	}
+	if len(queryResp.Entities) != 2 {
+		t.Fatalf("Expected 2 entities before delete, got %d", len(queryResp.Entities))
+	}
+
+	// 删除其中一个实体
+	delReq := &ypb.DeleteEntityRequest{
+		Filter: &ypb.EntityFilter{HiddenIndex: []string{entityIndex[0]}},
+	}
+	delResp, err := client.DeleteEntity(context.Background(), delReq)
+	if err != nil {
+		t.Fatalf("DeleteEntity failed: %v", err)
+	}
+	if delResp.Operation != DbOperationDelete {
+		t.Errorf("DeleteEntity: expected operation %s, got %s", DbOperationDelete, delResp.Operation)
+	}
+	if delResp.EffectRows != 1 {
+		t.Errorf("DeleteEntity: expected effectRows 1, got %d", delResp.EffectRows)
+	}
+
+	// 再次查询，确认只剩下一个实体
+	queryResp2, err := client.QueryEntity(context.Background(), queryReq)
+	if err != nil {
+		t.Fatalf("QueryEntity after delete failed: %v", err)
+	}
+	if len(queryResp2.Entities) != 1 {
+		t.Fatalf("Expected 1 entity after delete, got %d", len(queryResp2.Entities))
+	}
+	if queryResp2.Entities[0].Name != entityNames[1] {
+		t.Errorf("DeleteEntity: remaining entity name mismatch, got %s, want %s", queryResp2.Entities[0].Name, entityNames[1])
 	}
 }

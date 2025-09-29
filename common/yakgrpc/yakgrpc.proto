@@ -960,6 +960,7 @@ service Yak {
   rpc ListEntityRepository(Empty) returns(ListEntityRepositoryResponse);
 
   rpc QueryEntity(QueryEntityRequest) returns (QueryEntityResponse);
+  rpc DeleteEntity(DeleteEntityRequest) returns (DbOperateMessage);
   rpc QueryRelationship(QueryRelationshipRequest) returns (QueryRelationshipResponse);
   rpc QuerySubERM(QuerySubERMRequest) returns (QuerySubERMResponse);
   rpc GenerateERMDot(GenerateERMDotRequest) returns (GenerateERMDotResponse);
@@ -1009,6 +1010,10 @@ message QueryEntityResponse {
   repeated Entity Entities = 1;
   Paging Pagination = 2;
   uint64 Total = 3;
+}
+
+message DeleteEntityRequest {
+  EntityFilter Filter = 1;
 }
 
 message Relationship {
