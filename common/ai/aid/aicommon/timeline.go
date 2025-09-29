@@ -30,10 +30,6 @@ type Timeline struct {
 	summary          *omap.OrderedMap[int64, *linktable.LinkTable[*TimelineItem]]
 	reducers         *omap.OrderedMap[int64, *linktable.LinkTable[string]]
 
-	// this limit is used to limit the number of timeline items.
-	maxTimelineLimit int64 // total timeline item count
-	fullMemoryCount  int64 // full memory timeline item count
-
 	// this limit is used to limit the timeline dump string size.
 	perDumpContentLimit   int64
 	totalDumpContentLimit int64
@@ -75,8 +71,6 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		idToTimelineItem:      m.idToTimelineItem.Copy(),
 		summary:               m.summary.Copy(),
 		reducers:              m.reducers.Copy(),
-		maxTimelineLimit:      m.maxTimelineLimit,
-		fullMemoryCount:       m.fullMemoryCount,
 		perDumpContentLimit:   m.perDumpContentLimit,
 		totalDumpContentLimit: m.totalDumpContentLimit,
 	}
@@ -99,7 +93,7 @@ func (m *Timeline) SoftDelete(id ...int64) {
 }
 
 func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
-	tl := NewTimeline(m.fullMemoryCount, m.ai, m.extraMetaInfo)
+	tl := NewTimeline(m.ai, m.extraMetaInfo)
 	if m.config != nil {
 		tl.config = m.config
 	}
@@ -131,19 +125,16 @@ func (m *Timeline) CreateSubTimeline(ids ...int64) *Timeline {
 
 func (m *Timeline) BindConfig(config AICallerConfigIf, aiCaller AICaller) {
 	m.config = config
-	m.SetTimelineLimit(config.GetTimelineRecordLimit())
 	m.SetTimelineContentLimit(config.GetTimelineContentSizeLimit())
 	if utils.IsNil(m.ai) {
 		m.setAICaller(aiCaller)
 	}
 }
 
-func NewTimeline(clearCount int64, ai AICaller, extraMetaInfo func() string) *Timeline {
+func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 	return &Timeline{
 		extraMetaInfo:    extraMetaInfo,
 		ai:               ai,
-		fullMemoryCount:  clearCount,
-		maxTimelineLimit: 3 * clearCount,
 		tsToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTimelineItem: omap.NewOrderedMap(map[int64]*TimelineItem{}),
 		idToTs:           omap.NewOrderedMap(map[int64]int64{}),
@@ -157,11 +148,6 @@ func (m *Timeline) ExtraMetaInfo() string {
 		return ""
 	}
 	return m.extraMetaInfo()
-}
-
-func (m *Timeline) SetTimelineLimit(clearCount int64) {
-	m.fullMemoryCount = clearCount
-	m.maxTimelineLimit = 3 * clearCount
 }
 
 func (m *Timeline) SetTimelineContentLimit(contentSize int64) {
