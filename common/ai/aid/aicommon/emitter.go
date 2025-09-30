@@ -500,6 +500,7 @@ func (e *Emitter) EmitPinDirectory(path string) {
 }
 
 func (e *Emitter) EmitPinFilename(path string) {
+	log.Infof("Emitting pin filename event for path: %s", path)
 	e.EmitJSON(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME, "filesystem", map[string]any{
 		"path":      path,
 		"timestamp": time.Now().Unix(),

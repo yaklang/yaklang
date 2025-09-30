@@ -2,9 +2,10 @@ package aireact
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
@@ -40,11 +41,6 @@ func (r *ReAct) EmitYaklangCodeArtifact(identifier string, i any) string {
 }
 
 func (r *ReAct) EmitFileArtifactWithExt(identifier string, ext string, i any) string {
-	wd, err := r.artifacts.Getwd()
-	if err != nil {
-		log.Warnf("Error getting working directory: %v", err)
-		return ""
-	}
 	var name string
 	var suffix string
 	if r.artifacts.Ext(identifier) != ext {
@@ -54,16 +50,17 @@ func (r *ReAct) EmitFileArtifactWithExt(identifier string, ext string, i any) st
 		identifier = identifier + "_"
 	}
 	name = identifier + utils.DatetimePretty2() + suffix
-	filename := r.artifacts.Join(wd, name)
-	if !r.artifacts.IsAbs(filename) {
-		log.Errorf("Could not find absolute filename: %s", filename)
-		return ""
-	}
-	err = r.artifacts.WriteFile(filename, utils.InterfaceToBytes(i), 0644)
+	err := r.artifacts.WriteFile(name, utils.InterfaceToBytes(i), 0644)
 	if err != nil {
 		log.Errorf("Error writing file: %v", err)
 		return ""
 	}
+	wd, err := r.artifacts.Getwd()
+	if err != nil {
+		log.Errorf("Error getting working directory: %v", err)
+		return ""
+	}
+	filename := r.artifacts.Join(wd, name)
 	r.Emitter.EmitPinFilename(filename)
 	return filename
 }
