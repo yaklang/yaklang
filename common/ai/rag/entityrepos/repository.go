@@ -78,10 +78,9 @@ func NewRuntimeConfig(opts ...any) *EntityRepositoryRuntimeConfig {
 }
 
 type EntityRepository struct {
-	db                *gorm.DB
-	info              *schema.EntityRepository
-	ragSystem         *rag.RAGSystem
-	entityVectorMutex sync.RWMutex
+	db        *gorm.DB
+	info      *schema.EntityRepository
+	ragSystem *rag.RAGSystem
 
 	bulkProcessor *bulkProcessor
 	runtimeConfig *EntityRepositoryRuntimeConfig
@@ -110,13 +109,10 @@ func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...
 		r.bulkProcessor.addRequest(docId, content, opts...)
 		return nil
 	}
-	addIndexStartTime := time.Now()
 
-	// 实现锁超时机制防止永久死锁
-	lockAcquiredCh := make(chan bool, 1)
-	var lockAcquireDuration time.Duration
+	var finishCh = make(chan struct{})
 	var err error
-
+	// 实现锁超时机制防止永久死锁
 	go func() {
 		defer func() {
 			if recover() != nil {
@@ -124,42 +120,18 @@ func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...
 			}
 		}()
 
-		lockAcquireStart := time.Now()
-		r.entityVectorMutex.Lock()
-		lockAcquireDuration = time.Since(lockAcquireStart)
-
-		select {
-		case lockAcquiredCh <- true:
-			// 锁获取成功，继续执行
-		default:
-			// 如果主goroutine已经超时返回，释放锁
-			r.entityVectorMutex.Unlock()
-			return
-		}
-
-		defer r.entityVectorMutex.Unlock()
-
-		// 记录锁竞争情况
-		if lockAcquireDuration > 5*time.Second {
-			log.Errorf("CRITICAL LOCK CONTENTION: AddVectorIndex lock acquire took %v for doc [%s]", lockAcquireDuration, docId[:min(50, len(docId))])
-			utils.PrintCurrentGoroutineRuntimeStack()
-		} else if lockAcquireDuration > time.Second {
-			log.Warnf("SLOW LOCK ACQUIRE: AddVectorIndex lock acquire took %v for doc [%s]", lockAcquireDuration, docId[:min(50, len(docId))])
-		}
-
 		ragAddStart := time.Now()
 		err = r.GetRAGSystem().Add(docId, content, opts...)
 		ragAddDuration := time.Since(ragAddStart)
-
-		totalDuration := time.Since(addIndexStartTime)
+		close(finishCh)
 
 		// 记录总体性能和分解
-		if totalDuration > 10*time.Second {
-			log.Errorf("CRITICAL AddVectorIndex: doc [%s] total=%v (lock_acquire=%v, rag_add=%v)",
-				docId[:min(50, len(docId))], totalDuration, lockAcquireDuration, ragAddDuration)
-		} else if totalDuration > 3*time.Second {
-			log.Warnf("SLOW AddVectorIndex: doc [%s] total=%v (lock_acquire=%v, rag_add=%v)",
-				docId[:min(50, len(docId))], totalDuration, lockAcquireDuration, ragAddDuration)
+		if ragAddDuration > 10*time.Second {
+			log.Errorf("CRITICAL AddVectorIndex: doc [%s] (rag_add=%v)",
+				docId[:min(50, len(docId))], ragAddDuration)
+		} else if ragAddDuration > 3*time.Second {
+			log.Warnf("SLOW AddVectorIndex: doc [%s] (rag_add=%v)",
+				docId[:min(50, len(docId))], ragAddDuration)
 		}
 	}()
 
@@ -167,8 +139,7 @@ func (r *EntityRepository) AddVectorIndex(docId string, content string, opts ...
 	select {
 	case <-r.runtimeConfig.ctx.Done():
 		return utils.Errorf("context cacel")
-	case <-lockAcquiredCh:
-		// 锁获取成功，返回结果
+	case <-finishCh:
 		return err
 	case <-time.After(30 * time.Second):
 		// 超时，强制返回错误，避免永久阻塞
