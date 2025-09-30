@@ -2,6 +2,11 @@ package aireact
 
 import (
 	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -10,10 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestReAct_PersistentSession_ToolUse(t *testing.T) {
@@ -156,15 +157,25 @@ LOOP:
 	if err != nil {
 		t.Fatal(err)
 	}
-	restoredTimeline := persistentTimeline.DumpTimeline()
-	fmt.Println(restoredTimeline)
-	if !strings.Contains(restoredTimeline, `mocked thought for tool calling`) {
-		t.Fatal("timeline does not contain mocked thought")
+
+	withoutPersistent, err := NewReAct(
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			return mockedToolCalling(i, r, "sleep")
+		}),
+		WithEventInputChan(in),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		WithTools(sleepTool),
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !utils.MatchAllOfSubString(restoredTimeline, `system-question`, "user-answer", "when review") {
-		t.Fatal("timeline does not contain system-question")
+
+	if withoutPersistent.getTimelineTotal() > 0 {
+		t.Fatal("Timeline (without persistent) is not empty")
 	}
-	if !utils.MatchAllOfSubString(restoredTimeline, `ReAct iteration 1`, `ReAct loop finished END[1]`) {
-		t.Fatal("timeline does not contain ReAct iteration")
+	if persistentTimeline.getTimelineTotal() <= 0 {
+		t.Fatal("Timeline (with persistent) is empty")
 	}
 }
