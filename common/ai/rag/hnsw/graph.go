@@ -729,8 +729,7 @@ func (g *Graph[K]) getNodeType() InputNodeType {
 // Add inserts nodes into the graph.
 // If another node with the same ID exists, it is replaced.
 func (g *Graph[K]) Add(nodes ...InputNode[K]) {
-	helper := asynchelper.NewDefaultAsyncPerformanceHelper("HNSW Graph Add")
-	helper.Start()
+	helper := asynchelper.NewAsyncPerformanceHelper("HNSW Graph Add")
 	defer helper.Close()
 	addStart := helper.MarkNow()
 	defer func() {
@@ -738,7 +737,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			log.Errorf("recover from panic when adding nodes: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
-		helper.UpdateStatus("LayersChage Callback")
+		helper.SetStatus("LayersChage Callback")
 		if g.OnLayersChange != nil {
 			g.OnLayersChange(g.Layers)
 		}
@@ -748,7 +747,6 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 
 	nodeType := g.getNodeType()
 	for _, node := range nodes {
-		helper.UpdateStatus(fmt.Sprintf("adding node %v", node.Key))
 		nodeStart := helper.MarkNow()
 
 		if nodeType == InputNodeTypeNone {
@@ -758,20 +756,20 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 		key := node.Key
 		vec := node.ToVector()
 
-		helper.UpdateStatus(fmt.Sprintf("delete key %v", node.Key))
+		helper.SetStatus("delete existing node")
 		deleteStart := time.Now()
 		g.Delete(key)
 		deleteTime := time.Since(deleteStart)
 
 		g.assertDims(vec)
 
+		helper.SetStatus("insert level")
 		levelGenStart := time.Now()
 		insertLevel := g.randomLevel()
 		levelGenTime := time.Since(levelGenStart)
 
 		// Create layers that don't exist yet.
 		layersCreateStart := time.Now()
-		helper.UpdateStatus(fmt.Sprint("insert level"))
 		for insertLevel >= len(g.Layers) {
 			g.Layers = append(g.Layers, &Layer[K]{Nodes: make(map[K]hnswspec.LayerNode[K])})
 		}
@@ -800,7 +798,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			var err error
 
 			if i <= insertLevel {
-				helper.UpdateStatus(fmt.Sprintf("nodeCreationStart %v : I [%d]", node.Key, i))
+				helper.SetStatus("create node")
 				nodeCreationStart := time.Now()
 				if g.IsPQEnabled() {
 					// 创建PQ节点
@@ -889,7 +887,7 @@ func (g *Graph[K]) Add(nodes ...InputNode[K]) {
 			}
 
 			searchCallStart := time.Now()
-			helper.UpdateStatus(fmt.Sprintf("search layer %d for key %v", i, node.Key))
+			helper.SetStatus("search layer")
 			neighborhood := search(searchPoint, searchK, searchEf, vec, g.nodeDistance, nil)
 			searchCallTime := time.Since(searchCallStart)
 			totalSearchTime += searchCallTime
