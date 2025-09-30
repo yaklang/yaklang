@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/utils/chanx"
 
@@ -61,11 +62,14 @@ type ReAct struct {
 	mirrorMutex          sync.RWMutex
 	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
 
-	saveTimelineDebounce func(func())
+	saveTimelineThrottle func(func())
 }
 
 func (r *ReAct) SaveTimeline() {
-	r.saveTimelineDebounce(func() {
+	if r.config.persistentSessionId == "" {
+		return
+	}
+	r.saveTimelineThrottle(func() {
 		ins := r.config.memory.GetTimelineInstance()
 		if ins == nil {
 			return
@@ -148,7 +152,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		Emitter:              cfg.Emitter, // Use the emitter from config
 		taskQueue:            NewTaskQueue("react-main-queue"),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
-		saveTimelineDebounce: utils.NewDebounceEx(3, true, true),
+		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 	}
 	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 
