@@ -211,6 +211,12 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		return nil, err
 	}
 
+	wd, err := react.artifacts.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	react.Emitter.EmitPinDirectory(wd)
+
 	return react, nil
 }
 

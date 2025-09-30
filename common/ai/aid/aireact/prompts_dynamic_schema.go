@@ -198,6 +198,7 @@ func getYaklangCodeLoopSchema() string {
 				"modify_code",
 				"require_tool",
 				"ask_for_clarification",
+				"finish",
 			),
 			aitool.WithParam_Required(true),
 		),
