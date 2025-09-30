@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"strconv"
 	"sync"
 	"time"
@@ -63,6 +64,7 @@ type ReAct struct {
 	mirrorOfAIInputEvent map[string]func(*ypb.AIInputEvent)
 
 	saveTimelineThrottle func(func())
+	artifacts            *filesys.RelLocalFs
 }
 
 func (r *ReAct) SaveTimeline() {
