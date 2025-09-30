@@ -29,6 +29,7 @@ type scanManager struct {
 	memory bool
 	// record {{
 	// task record
+	lock         sync.Mutex
 	taskRecorder *schema.SyntaxFlowScanTask
 	// config record
 	config *ScanTaskConfig
@@ -161,6 +162,9 @@ func (m *scanManager) SaveTask() error {
 		// return utils.Errorf("manager is nil ")
 		return nil
 	}
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
@@ -277,12 +281,11 @@ func (m *scanManager) initByConfig() error {
 		// get all rule name
 		var ruleNames []string
 		err := db.Pluck("rule_name", &ruleNames).Error
-		config.RuleNames = ruleNames
 		if err != nil {
 			return utils.Errorf("count rules failed: %s", err)
 		}
 		m.ruleChan = sfdb.YieldSyntaxFlowRules(db, m.ctx)
-		m.rulesCount = int64(len(config.RuleNames))
+		m.rulesCount = int64(len(ruleNames))
 		m.kind = schema.SFResultKindScan
 		return nil
 	}
@@ -301,10 +304,6 @@ func (m *scanManager) initByConfig() error {
 		m.ruleChan = ruleCh
 		m.rulesCount = 1
 		m.kind = schema.SFResultKindDebug
-	} else if len(config.RuleNames) != 0 {
-		if err := setRuleChan(yakit.NewSyntaxFlowRuleFilter(nil, yakit.WithSyntaxFlowRuleName(config.RuleNames...))); err != nil {
-			return err
-		}
 	} else if config.GetFilter() != nil {
 		if err := setRuleChan(config.GetFilter()); err != nil {
 			return err

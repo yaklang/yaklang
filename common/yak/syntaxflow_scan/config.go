@@ -22,7 +22,6 @@ type ScanResultCallback func(*ScanResult)
 
 type ScanTaskConfig struct {
 	*ypb.SyntaxFlowScanRequest
-	RuleNames []string `json:"rule_names"`
 
 	*ScanTaskCallback `json:"-"`
 }
