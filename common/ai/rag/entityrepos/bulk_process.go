@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"sync"
 	"time"
@@ -106,6 +107,9 @@ func (p *bulkProcessor) processBatch(ctx context.Context, batch []*addRequest) {
 	for _, req := range batch {
 		documents = append(documents, rag.BuildDocument(req.DocID, req.Content, req.Options...))
 	}
+	helper := asynchelper.NewAsyncPerformanceHelper("add index batch", asynchelper.WithCtx(ctx), asynchelper.WithLogRequireTime(1*time.Second), asynchelper.WithTriggerTime(1*time.Second))
+	defer helper.Close()
+
 	err := p.ragSystem.AddDocuments(documents...)
 	if err != nil {
 		log.Errorf("[Processor] Failed to add documents: %v.\n", err)

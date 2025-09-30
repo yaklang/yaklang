@@ -354,16 +354,17 @@ func (r *EntityRepository) YieldKHopEx(ctx context.Context, startInput <-chan st
 	var result = chanx.NewUnlimitedChan[*KHopPath](subCtx, 1000)
 	go func() {
 		defer result.Close()
+		defer cancel()
 
 		total := 0
 		for path := range channel.OutputChannel() {
 			if total >= config.KHopLimit && config.KHopLimit > 0 {
 				log.Debugf("Reach k-hop limit: %d", config.KHopLimit)
-				cancel()
 				return
 			}
 			if !hashMap[path.Hash()] {
 				hashMap[path.Hash()] = true
+				total++
 				result.SafeFeed(path)
 			} else {
 				log.Debugf("find exist sub path: %s", path.String())
