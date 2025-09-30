@@ -37,9 +37,6 @@ type SQLiteVectorStoreHNSW struct {
 	// 是否自动更新 graph_infos
 	hnsw *hnsw.Graph[string]
 
-	searchHNSW   *hnsw.Graph[string]
-	searchHNSWMu sync.RWMutex
-
 	EnableAutoUpdateGraphInfos bool
 	buildGraphFilter           *yakit.VectorDocumentFilter
 	buildGraphPolicy           string
@@ -180,7 +177,6 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	}
 
 	vectorStore.hnsw = hnswGraph
-	vectorStore.SyncHNSWGraph(bytes.NewReader(collection.GraphBinary))
 	hnswGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
 			vectorStore.UpdateAutoUpdateGraphInfos()
@@ -188,23 +184,6 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	}
 
 	return vectorStore, nil
-}
-
-func (s *SQLiteVectorStoreHNSW) SyncHNSWGraph(graphBinaryReader io.Reader) error {
-	helper := asynchelper.NewAsyncPerformanceHelper("sync hnsw graph")
-	defer helper.Close()
-	helper.MarkNow()
-	collection := s.collection
-	copyGraph, err := ParseHNSWGraphFromBinary(utils.TimeoutContextSeconds(3), collection.Name, graphBinaryReader, s.db, 1000, collection.EnablePQMode, nil)
-	if err != nil {
-		return err
-	}
-	helper.CheckLastMarkAndLog(200*time.Millisecond, "parse hnsw graph from binary")
-
-	s.searchHNSWMu.Lock()
-	s.searchHNSW = copyGraph
-	s.searchHNSWMu.Unlock()
-	return nil
 }
 
 func (s *SQLiteVectorStoreHNSW) ConvertToStandardMode() error {
@@ -473,32 +452,10 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	helper := asynchelper.NewAsyncPerformanceHelper("Vector ADD")
 	defer helper.Close()
 
-	var binaryData []byte
-	defer func() {
-		if len(binaryData) <= 0 {
-			log.Warnf("binary data length is zero")
-			return
-		}
-		err := s.SyncHNSWGraph(bytes.NewReader(binaryData))
-		if err != nil {
-			log.Errorf("sync graph failed: %v", err)
-		}
-	}()
-
 	helper.MarkNow()
 	s.mu.Lock()
 	lockAcquireTime := helper.CheckLastMark1Second("lock acquire")
 	defer s.mu.Unlock()
-	defer func() {
-		helper.MarkNow()
-		binaryDataReader, err := ExportHNSWGraphToBinary(s.hnsw)
-		if err != nil {
-			log.Warnf("export graph to binary failed: %v", err)
-			return
-		}
-		binaryData, err = io.ReadAll(binaryDataReader)
-		helper.CheckLastMarkAndLog(20*time.Millisecond, "export graph to binary")
-	}()
 
 	totalStart := helper.MarkNow()
 	docCount := len(docs)
@@ -711,10 +668,10 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 	}
 
 	pageSize := 10
-	s.searchHNSWMu.RLock()
-	defer s.searchHNSWMu.RUnlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 
-	resultNodes := s.searchHNSW.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
+	resultNodes := s.hnsw.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
 		if key == DocumentTypeCollectionInfo {
 			return false
 		}
