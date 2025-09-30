@@ -617,3 +617,7 @@ When you receive a request, first understand the user's goal. Then, structure yo
 <|GEN_CODE_{{ .Nonce }}|>
 println("Hello World")
 <|GEN_CODE_END_{{ .Nonce }}|>
+
+如果你觉得不需要修改代码，直接回答用户问题，请输出：
+
+{"@action": "finish", "human_readable_thought": "..."}

@@ -85,7 +85,7 @@ func TempAIDir(pattern ...string) string {
 		paths = append(paths, pattern...)
 		p = filepath.Join(paths...)
 	}
-	_ = os.MkdirAll(filepath.Dir(p), os.ModePerm)
+	_ = os.MkdirAll(p, os.ModePerm)
 	return p
 }
 

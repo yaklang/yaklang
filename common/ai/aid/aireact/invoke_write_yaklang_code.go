@@ -38,7 +38,12 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 		userQuery = r.config.memory.Query
 	}
 
-	filename := r.EmitYaklangCodeArtifact("generated_code", userQuery)
+	filename := r.EmitYaklangCodeArtifact("generated_code", "")
+
+	log.Info("================================================================")
+	log.Infof("Generating yaklang code to file: %s", filename)
+	log.Infof("in terminal, use `code %#v` for open current in editor", filename)
+	log.Info("================================================================")
 
 	// Get available tools
 	tools := buildinaitools.GetAllTools()
