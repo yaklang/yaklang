@@ -51,8 +51,7 @@ func NewLocalModelEmbedding(model *localmodel.Model, address string) *LocalModel
 
 // Embedding 实现 EmbeddingClient 接口，生成文本的嵌入向量
 func (l *LocalModelEmbedding) Embedding(text string) ([]float32, error) {
-	al := asynchelper.NewDefaultAsyncPerformanceHelper("local embedding")
-	al.Start()
+	al := asynchelper.NewAsyncPerformanceHelper("local embedding")
 	defer al.Close()
 
 	if l.embedding == nil {

@@ -643,8 +643,7 @@ func (r *EntityRepository) addRelationshipToVectorIndex(relationship *schema.ERM
 }
 
 func (r *EntityRepository) MergeAndSaveEntity(entity *schema.ERModelEntity) (*schema.ERModelEntity, error) {
-	helper := asynchelper.NewDefaultAsyncPerformanceHelper("merge_and_save_entity")
-	helper.Start()
+	helper := asynchelper.NewAsyncPerformanceHelper("merge_and_save_entity")
 	defer helper.Close()
 	cacheKey := entity.EntityName
 	if cacheData := r.getEntityCache(cacheKey); cacheData != nil {

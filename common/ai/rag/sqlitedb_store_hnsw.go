@@ -37,6 +37,9 @@ type SQLiteVectorStoreHNSW struct {
 	// 是否自动更新 graph_infos
 	hnsw *hnsw.Graph[string]
 
+	searchHNSW   *hnsw.Graph[string]
+	searchHNSWMu sync.RWMutex
+
 	EnableAutoUpdateGraphInfos bool
 	buildGraphFilter           *yakit.VectorDocumentFilter
 	buildGraphPolicy           string
@@ -177,14 +180,31 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 	}
 
 	vectorStore.hnsw = hnswGraph
+	vectorStore.SyncHNSWGraph(bytes.NewReader(collection.GraphBinary))
 	hnswGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
 		if vectorStore.EnableAutoUpdateGraphInfos {
 			vectorStore.UpdateAutoUpdateGraphInfos()
 		}
 	}
-	vectorStore.hnsw = hnswGraph
 
 	return vectorStore, nil
+}
+
+func (s *SQLiteVectorStoreHNSW) SyncHNSWGraph(graphBinaryReader io.Reader) error {
+	helper := asynchelper.NewAsyncPerformanceHelper("sync hnsw graph")
+	defer helper.Close()
+	helper.MarkNow()
+	collection := s.collection
+	copyGraph, err := ParseHNSWGraphFromBinary(utils.TimeoutContextSeconds(3), collection.Name, graphBinaryReader, s.db, 1000, collection.EnablePQMode, nil)
+	if err != nil {
+		return err
+	}
+	helper.CheckLastMarkAndLog(200*time.Millisecond, "parse hnsw graph from binary")
+
+	s.searchHNSWMu.Lock()
+	s.searchHNSW = copyGraph
+	s.searchHNSWMu.Unlock()
+	return nil
 }
 
 func (s *SQLiteVectorStoreHNSW) ConvertToStandardMode() error {
@@ -450,14 +470,35 @@ func (s *SQLiteVectorStoreHNSW) DeleteEmbeddingData() error {
 // Add 添加文档到向量存储
 func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	// 记录锁获取时间
-	helper := asynchelper.NewDefaultAsyncPerformanceHelper("Vector ADD")
-	helper.Start()
+	helper := asynchelper.NewAsyncPerformanceHelper("Vector ADD")
 	defer helper.Close()
+
+	var binaryData []byte
+	defer func() {
+		if len(binaryData) <= 0 {
+			log.Warnf("binary data length is zero")
+			return
+		}
+		err := s.SyncHNSWGraph(bytes.NewReader(binaryData))
+		if err != nil {
+			log.Errorf("sync graph failed: %v", err)
+		}
+	}()
 
 	helper.MarkNow()
 	s.mu.Lock()
 	lockAcquireTime := helper.CheckLastMark1Second("lock acquire")
 	defer s.mu.Unlock()
+	defer func() {
+		helper.MarkNow()
+		binaryDataReader, err := ExportHNSWGraphToBinary(s.hnsw)
+		if err != nil {
+			log.Warnf("export graph to binary failed: %v", err)
+			return
+		}
+		binaryData, err = io.ReadAll(binaryDataReader)
+		helper.CheckLastMarkAndLog(20*time.Millisecond, "export graph to binary")
+	}()
 
 	totalStart := helper.MarkNow()
 	docCount := len(docs)
@@ -469,7 +510,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	}()
 
 	// 开始事务 - 这是潜在的性能瓶颈点
-	helper.UpdateStatus("db transaction acquire")
+	helper.SetStatus("db transaction acquire")
 	tx := s.db.Begin()
 	txInitTime := helper.CheckLastMark1Second("db transaction acquire")
 	defer func() {
@@ -484,7 +525,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	var dbQueryCount, docUpdateCount, docCreateCount int
 
 	for i, doc := range docs {
-		helper.UpdateStatus(fmt.Sprintf("db query id :%s", doc.ID))
+		helper.SetStatus(fmt.Sprintf("db query id :%s", doc.ID))
 		docStart := helper.MarkNow()
 
 		// 确保文档有 ID
@@ -547,7 +588,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	nodeCreationStartTime := time.Now()
 	nodes := make([]hnsw.InputNode[string], len(docs))
 	for i, doc := range docs {
-		helper.UpdateStatus(fmt.Sprintf("maker node id: %s", doc.ID))
+		helper.SetStatus(fmt.Sprintf("maker node id: %s", doc.ID))
 		docVecCache := doc.Embedding
 		nodes[i] = hnsw.MakeInputNodeFromID(doc.ID, hnswspec.LazyNodeID(doc.ID), func(uid hnswspec.LazyNodeID) ([]float32, error) {
 			return docVecCache, nil
@@ -556,7 +597,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	nodeCreationTime := time.Since(nodeCreationStartTime)
 
 	// 事务提交时间 - 提交可能成为瓶颈，特别是当事务很大时
-	helper.UpdateStatus(fmt.Sprint("db transaction commit"))
+	helper.SetStatus(fmt.Sprint("db transaction commit"))
 	helper.MarkNow()
 	err := tx.Commit().Error
 	commitTime := helper.CheckLastMark1Second("db transaction commit")
@@ -567,7 +608,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 	transactionDuration := helper.CheckLastMarkAndLog(2*time.Second, "db transaction total")
 
 	// HNSW 添加时间 - 这个操作不在事务中，但可能很耗时
-	helper.UpdateStatus("hnsw add nodes")
+	helper.SetStatus("hnsw add nodes")
 	helper.MarkNow()
 	s.hnsw.Add(nodes...)
 	hnswAddTime := helper.CheckLastMark1Second("hnsw add nodes")
@@ -587,7 +628,7 @@ func (s *SQLiteVectorStoreHNSW) Add(docs ...Document) error {
 		avgCreateTime = totalDocCreateTime / time.Duration(docCreateCount)
 	}
 
-	helper.UpdateStatus("analyzing performance")
+	helper.SetStatus("analyzing performance")
 	// 性能警告条件 - 包含事务持续时间检查
 	shouldWarn := totalTime > 5*time.Second ||
 		totalDbQueryTime > time.Second ||
@@ -664,32 +705,16 @@ func (s *SQLiteVectorStoreHNSW) Search(query string, page, limit int) ([]SearchR
 
 // SearchWithFilter 根据查询文本检索相关文档，并根据过滤函数过滤结果
 func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
-	//log.Infof("start to search with query: %s", query)
-	// 生成查询的嵌入向量
-	//log.Infof("generated query embedding with dimension: %d", len(queryEmbedding))
 	queryEmbedding, err := s.embedder.Embedding(query)
 	if err != nil {
 		return nil, utils.Errorf("generate embedding vector for %#v: %v", query, err)
 	}
 
-	startSearch := time.Now()
-	defer func() {
-		useTime := time.Since(startSearch)
-		if useTime > 2*time.Second {
-			log.Warnf("just search without embedding took too long: %v with [%s]", useTime, query)
-		} else {
-			log.Debugf("search took: %v", useTime)
-		}
-	}()
-
 	pageSize := 10
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	//log.Infof("starting search for query with length: %d, page: %d, limit: %d", len(query), page, limit)
+	s.searchHNSWMu.RLock()
+	defer s.searchHNSWMu.RUnlock()
 
-	nodesFilterStart := time.Now()
-
-	resultNodes := s.hnsw.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
+	resultNodes := s.searchHNSW.SearchWithDistanceAndFilter(queryEmbedding, (page-1)*pageSize+limit, func(key string, vector hnsw.Vector) bool {
 		if key == DocumentTypeCollectionInfo {
 			return false
 		}
@@ -708,12 +733,6 @@ func (s *SQLiteVectorStoreHNSW) SearchWithFilter(query string, page, limit int, 
 		}
 		return true
 	})
-	nodesFilterUseTime := time.Since(nodesFilterStart)
-	if nodesFilterUseTime > 2*time.Second {
-		log.Warnf("nodes filter took too long: %v with query[%s]", nodesFilterUseTime, query)
-	} else {
-		log.Debugf("nodes filter took: %v", nodesFilterUseTime)
-	}
 
 	resultIds := make([]string, len(resultNodes))
 	for i, resultNode := range resultNodes {

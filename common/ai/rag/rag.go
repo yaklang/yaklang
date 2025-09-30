@@ -233,6 +233,26 @@ func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) er
 	return r.addDocuments(*doc)
 }
 
+func BuildDocument(docId, content string, opts ...DocumentOption) Document {
+	doc := Document{
+		ID:        docId,
+		Content:   content,
+		Metadata:  make(map[string]any),
+		Embedding: nil,
+	}
+	for _, opt := range opts {
+		opt(&doc)
+	}
+	return doc
+}
+
+func (r *RAGSystem) AddDocuments(docs ...Document) error {
+	if err := r.requireWriteCollection(); err != nil {
+		return utils.Wrap(err, "require write vector store")
+	}
+	return r.addDocuments(docs...)
+}
+
 // AddDocuments 添加文档到 RAG 系统
 func (r *RAGSystem) addDocuments(docs ...Document) error {
 	//log.Infof("adding %d documents to RAG system", len(docs))
