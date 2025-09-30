@@ -73,11 +73,13 @@ const (
 	EVENT_TYPE_ITERATION   EventType = "iteration"   // AI 迭代信息（循环推理、多轮对话等）
 	EVENT_TYPE_RESULT      EventType = "result"      // AI 最终结果（推理结论、任务完成等）
 
-	EVENT_TYPE_KNOWLEDGE EventType = "knowledge" // AI 知识增强（外部知识、上下文信息等）
+	EVENT_TYPE_KNOWLEDGE            EventType = "knowledge"      // AI 知识增强（外部知识、上下文信息等）
 	EVENT_TYPE_TASK_ABOUT_KNOWLEDGE EventType = "task_knowledge" // 同步任务相关的已查询到的知识
 	// YakLang 代码编辑器事件
 	EVENT_TYPE_YAKLANG_CODE_EDITOR EventType = "yaklang_code_editor"
 
+	EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY EventType = "filesystem_pin_directory" // pin_directory means pin a directory in the filesystem
+	EVENT_TYPE_FILESYSTEM_PIN_FILENAME  EventType = "filesystem_pin_filename"  // pin_filename means pin a filename in the filesystem
 )
 
 type AiOutputEvent struct {
