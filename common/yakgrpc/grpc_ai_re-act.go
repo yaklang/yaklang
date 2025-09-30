@@ -2,9 +2,10 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/rag"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -60,7 +61,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}),
 		aireact.WithEventInputChan(inputEvent),
 		aireact.WithContext(baseCtx),
-		aireact.WithBuiltinTools(),
+		aireact.WithBuiltinTools(baseCtx),
 		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
 		aireact.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 	}
