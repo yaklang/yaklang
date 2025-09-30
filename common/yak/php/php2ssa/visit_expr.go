@@ -1149,7 +1149,7 @@ func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Va
 	case *phpparser.IndexVariableContext:
 		value := y.VisitRightValue(i.FlexiVariable())
 		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
-			return y.CreateMemberCallVariable(value, key) //这里有问�?
+			return y.CreateMemberCallVariable(value, key) //这里有问题?
 		} else {
 			return y.VisitLeftVariable(i.FlexiVariable())
 		}
