@@ -606,7 +606,11 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForg
 }
 
 // GenerateYaklangCodeActionLoop generates Yaklang code generation action loop prompt using template
-func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, errorMessages string, iterationCount int, tools []*aitool.Tool, nonceString string) (string, error) {
+func (pm *PromptManager) GenerateYaklangCodeActionLoop(
+	userQuery, currentCode, errorMessages string,
+	iterationCount int, tools []*aitool.Tool, nonceString string,
+	allowAskForClarification bool,
+) (string, error) {
 	data := &YaklangCodeActionLoopPromptData{
 		CurrentTime:               time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:                    fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
@@ -650,7 +654,7 @@ func (pm *PromptManager) GenerateYaklangCodeActionLoop(userQuery, currentCode, e
 	}
 
 	// Set schema
-	data.Schema = getYaklangCodeLoopSchema()
+	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification)
 
 	return pm.executeTemplate("yaklang-codeloop", yaklangCodeLoopPromptTemplate, data)
 }

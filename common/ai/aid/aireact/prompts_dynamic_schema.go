@@ -186,20 +186,24 @@ func getLoopSchema(
 	return aitool.NewObjectSchemaWithAction(opts...)
 }
 
-func getYaklangCodeLoopSchema() string {
+func getYaklangCodeLoopSchema(allowAskForClarification bool) string {
+	actionEnums := []string{
+		"query_document",
+		"write_code",
+		"modify_code",
+		"require_tool",
+		"finish",
+	}
+	if allowAskForClarification {
+		actionEnums = append(actionEnums, "ask_for_clarification")
+	}
+
 	opts := []any{
 		aitool.WithStringParam(
 			"@action",
 			aitool.WithParam_Description("You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process.\n"+
 				"'write_code'  or 'modify_code' means you have to provide Yaklang Code in <|GEN_CODE_...|>, check the example after schema"),
-			aitool.WithParam_EnumString(
-				"query_document",
-				"write_code",
-				"modify_code",
-				"require_tool",
-				"ask_for_clarification",
-				"finish",
-			),
+			aitool.WithParam_EnumString(actionEnums...),
 			aitool.WithParam_Required(true),
 		),
 		aitool.WithStringParam(
@@ -222,7 +226,9 @@ func getYaklangCodeLoopSchema() string {
 			"query_document",
 			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'query_document'. Provide the exact name of the document you need to query (e.g., 'yaklang-syntax', 'yaklang-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
 		),
-		aitool.WithStructParam(
+	}
+	if allowAskForClarification {
+		opts = append(opts, aitool.WithStructParam(
 			"ask_for_clarification_payload",
 			[]aitool.PropertyOption{
 				aitool.WithParam_Description("Use this action when user's intent is ambiguous or incomplete."),
@@ -234,7 +240,7 @@ func getYaklangCodeLoopSchema() string {
 					`Optional additional context that may help the user understand what information is needed. This can include examples or explanations of why the clarification is necessary.`,
 				),
 			),
-		),
+		))
 	}
 	return aitool.NewObjectSchema(opts...)
 }

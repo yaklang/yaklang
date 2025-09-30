@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -60,12 +61,13 @@ LOOP:
 
 		log.Infof("start to generate yaklang code, iteration %d", iterationCount)
 		prompt, err := r.promptManager.GenerateYaklangCodeActionLoop(
-			userQuery+"\n\n"+approach, // userQuery
-			currentCode,               // currentCode
-			errorMessages,             // errorMessages
-			iterationCount,            // iterationCount
-			tools,                     // tools
-			nonceStr,
+			userQuery+"\n\n"+approach,   // userQuery
+			currentCode,                 // currentCode
+			errorMessages,               // errorMessages
+			iterationCount,              // iterationCount
+			tools,                       // tools
+			nonceStr,                    // nonce for build boundary safe tag
+			r.config.enableUserInteract, // allow ask for clarification
 		)
 		if err != nil {
 			log.Errorf("Failed to generate prompt for yaklang code action loop: %v", err)
@@ -99,6 +101,12 @@ LOOP:
 							code := result.String()
 							if code == "" {
 								return
+							}
+							if strings.HasPrefix(code, "\n") {
+								code = code[1:]
+							}
+							if strings.HasSuffix(code, "\n") {
+								code = code[:len(code)-1]
 							}
 							generatedCode = code
 							codeBarrier.Done()
@@ -234,9 +242,9 @@ LOOP:
 				buf.WriteString(msg.String())
 				buf.WriteString("\n")
 			}
-			r.addToTimeline("code_generated", utils.ShrinkString(currentCode, 128))
+			r.addToTimeline("code_modified",
+				utils.ShrinkString(fmt.Sprintf("line[%v-%v]:", modifyStartLine, modifyEndLine)+strconv.Quote(currentCode), 128))
 			errorMessages += buf.String()
-			r.addToTimeline("re-enter-code-generate-loop", "")
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
 		case "write_code":
@@ -254,9 +262,8 @@ LOOP:
 				buf.WriteString(msg.String())
 				buf.WriteString("\n")
 			}
-			r.addToTimeline("code_generated", utils.ShrinkString(code, 128))
+			r.addToTimeline("code_generated", utils.ShrinkString(strconv.Quote(code), 128))
 			errorMessages += buf.String()
-			r.addToTimeline("re-enter-code-generate-loop", "")
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
 		case "require_tool":
