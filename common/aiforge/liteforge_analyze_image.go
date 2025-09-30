@@ -508,8 +508,8 @@ Do not treat the image and the text as separate items. You must **integrate** th
 	}
 
 	// 添加调试信息
-	log.Infof("ForgeResult Action Name: %s", forgeResult.Action.Name())
-	log.Infof("ForgeResult Action Type: %s", forgeResult.Action.ActionType())
+	log.Debugf("ForgeResult Action Name: %s", forgeResult.Action.Name())
+	log.Debugf("ForgeResult Action Type: %s", forgeResult.Action.ActionType())
 	// 添加调试信息 - 输出是否检测到图像相关内容
 	if forgeResult.GetString("cumulative_summary") == "" {
 		log.Warnf("No cumulative_summary found in action result")
@@ -532,7 +532,7 @@ Do not treat the image and the text as separate items. You must **integrate** th
 	*/
 	// 修复累积摘要提取问题 - 直接从ForgeResult中提取
 	result.CumulativeSummary = forgeResult.GetString("cumulative_summary")
-	log.Infof("Extracted cumulative_summary: %q", result.CumulativeSummary)
+	log.Debugf("Extracted cumulative_summary: %q", result.CumulativeSummary)
 	sceneContext := forgeResult.GetInvokeParams("scene_context")
 	if sceneContext != nil {
 		// 安全处理场景上下文
