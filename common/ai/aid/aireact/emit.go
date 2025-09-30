@@ -2,6 +2,8 @@ package aireact
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
@@ -30,6 +32,31 @@ func (r *ReAct) EmitIteration(iteration int, maxIterations int) {
 // EmitResult emits a final result event using the embedded Emitter
 func (r *ReAct) EmitResult(result interface{}) {
 	r.Emitter.EmitResult("result", result, true)
+}
+
+func (r *ReAct) EmitTextArtifact(identifier string, i any) {
+	wd, err := r.artifacts.Getwd()
+	if err != nil {
+		log.Warnf("Error getting working directory: %v", err)
+		return
+	}
+	var name string
+	var suffix string
+	if r.artifacts.Ext(identifier) != ".txt" {
+		suffix = ".txt"
+	}
+	name = identifier + utils.DatetimePretty2() + suffix
+	filename := r.artifacts.Join(wd, name)
+	if !r.artifacts.IsAbs(filename) {
+		log.Errorf("Could not find absolute filename: %s", filename)
+		return
+	}
+	err = r.artifacts.WriteFile(filename, utils.InterfaceToBytes(i), 0644)
+	if err != nil {
+		log.Errorf("Error writing file: %v", err)
+		return
+	}
+	r.Emitter.EmitPinFilename(filename)
 }
 
 func (r *ReAct) EmitResultAfterStream(result interface{}) {

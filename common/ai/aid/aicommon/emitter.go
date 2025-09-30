@@ -492,6 +492,20 @@ func (e *Emitter) EmitResult(nodeId string, result interface{}, success bool) {
 	})
 }
 
+func (e *Emitter) EmitPinDirectory(path string) {
+	e.EmitJSON(schema.EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY, "filesystem", map[string]any{
+		"path":      path,
+		"timestamp": time.Now().Unix(),
+	})
+}
+
+func (e *Emitter) EmitPinFilename(path string) {
+	e.EmitJSON(schema.EVENT_TYPE_FILESYSTEM_PIN_FILENAME, "filesystem", map[string]any{
+		"path":      path,
+		"timestamp": time.Now().Unix(),
+	})
+}
+
 // EmitResult emits a result event for AI final output
 func (e *Emitter) EmitResultAfterStream(nodeId string, result interface{}, success bool) {
 	e.EmitJSON(schema.EVENT_TYPE_RESULT, nodeId, map[string]any{
