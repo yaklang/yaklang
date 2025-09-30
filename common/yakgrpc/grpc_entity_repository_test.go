@@ -245,7 +245,7 @@ func TestGenerateERMDot(t *testing.T) {
 	if resp.Dot == "" {
 		t.Fatalf("GenerateERMDot returned empty dot string, expected non-empty")
 	}
-	// 检查 DOT 内容包含实���和关系
+	// 检查 DOT 内容包含实体和关系
 	for _, name := range entityNames {
 		if !strings.Contains(resp.Dot, name) {
 			t.Errorf("DOT output missing entity name: %s", name)
@@ -298,7 +298,7 @@ func TestDeleteEntity(t *testing.T) {
 		t.Fatalf("Failed to create local gRPC client: %v", err)
 	}
 
-	// 查询当前实体数��
+	// 查询当前实体数量，确认有两个实体
 	queryReq := &ypb.QueryEntityRequest{
 		Filter:     &ypb.EntityFilter{BaseIndex: entityBaseIndex},
 		Pagination: &ypb.Paging{Page: 1, Limit: 10, OrderBy: "id"},
