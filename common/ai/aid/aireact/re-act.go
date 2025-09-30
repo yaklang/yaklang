@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -149,12 +151,17 @@ func (r *ReAct) UnregisterMirrorOfAIInputEvent(id string) {
 
 func NewReAct(opts ...Option) (*ReAct, error) {
 	cfg := NewReActConfig(context.Background(), opts...)
+	dirname := consts.TempAIDir(cfg.id)
+	if existed, _ := utils.PathExists(dirname); !existed {
+		return nil, utils.Errorf("temp ai dir %s not existed", dirname)
+	}
 	react := &ReAct{
 		config:               cfg,
 		Emitter:              cfg.Emitter, // Use the emitter from config
 		taskQueue:            NewTaskQueue("react-main-queue"),
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
+		artifacts:            filesys.NewRelLocalFs(dirname),
 	}
 	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 
