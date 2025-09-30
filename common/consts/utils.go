@@ -2,6 +2,7 @@ package consts
 
 import (
 	"bytes"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -69,6 +70,23 @@ func TempAIFile(pattern string) (*os.File, error) {
 		dirname = GetDefaultYakitBaseTempDir()
 	}
 	return ioutil.TempFile(dirname, pattern)
+}
+
+func TempAIDir(pattern ...string) string {
+	dirname := filepath.Clean(filepath.Join(GetDefaultYakitBaseTempDir(), "..", "aispace"))
+	if os.MkdirAll(dirname, os.ModePerm) != nil {
+		dirname = GetDefaultYakitBaseTempDir()
+	}
+	var p string
+	if len(pattern) <= 0 {
+		p = filepath.Join(dirname, uuid.New().String())
+	} else {
+		paths := []string{dirname}
+		paths = append(paths, pattern...)
+		p = filepath.Join(paths...)
+	}
+	_ = os.MkdirAll(filepath.Dir(p), os.ModePerm)
+	return p
 }
 
 func TempAIFileFast(pattern string, datas ...any) string {
