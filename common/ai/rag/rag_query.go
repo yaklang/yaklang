@@ -908,12 +908,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 								return false
 							}
 
-							doc := getDoc()
-							if doc == nil {
-								return false
-							}
-
-							if len(config.RAGQueryType) > 0 && !utils.StringArrayContains(config.RAGQueryType, string(doc.Type)) {
+							if len(config.RAGQueryType) > 0 && !utils.StringArrayContains(config.RAGQueryType, string(getDoc().Type)) {
 								return false
 
 							}
