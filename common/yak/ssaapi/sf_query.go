@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
 
@@ -14,14 +15,6 @@ import (
 )
 
 var DefaultInputVar = "input"
-
-type ResultSaveKind string
-
-const (
-	resultSaveNone     ResultSaveKind = "none"     // no save
-	resultSaveMemory   ResultSaveKind = "memory"   // in cache
-	resultSaveDatabase ResultSaveKind = "database" // in database
-)
 
 type queryConfig struct {
 	// check if exist in database just use this
@@ -44,15 +37,13 @@ type queryConfig struct {
 	// parentResult *sfvm.SFFrameResult
 
 	// save
-	save   ResultSaveKind
 	kind   schema.SyntaxflowResultKind
 	taskID string
 
 	// control
 	ctx context.Context
 
-	// process
-	processCallback func(float64, string)
+	*ssaconfig.Config
 }
 
 func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
@@ -110,13 +101,16 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 }
 
 func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
-	config := &queryConfig{}
+	c, _ := ssaconfig.New(ssaconfig.ModeSyntaxFlow)
+	config := &queryConfig{
+		Config: c,
+	}
 	for _, o := range opt {
 		o(config)
 	}
 	process := func(f float64, msg string) {
-		if config.processCallback != nil {
-			config.processCallback(f, msg)
+		if callBack := config.GetSyntaxFlowProcessCallback(); callBack != nil {
+			callBack(f, msg)
 		}
 	}
 	process(0, "start query syntaxflow")
@@ -178,22 +172,22 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
 		ret.program = config.program
-		switch config.save {
-		case resultSaveDatabase:
+		switch kind := config.GetSyntaxFlowResultKind(); kind {
+		case ssaconfig.SFResultSaveDatabase:
 			process(float64(total-1)/float64(total), "save result")
 			resultID, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID)
 			_ = resultID
 			if err != nil {
 				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
 			}
-			setResultToCache(config.save, ret)
-		case resultSaveMemory:
+			setResultToCache(kind, ret)
+		case ssaconfig.SFResultSaveMemory:
 			// save to memory
 			id := getResultCacheId()
 			ret.SetResultID(id)
 			ret.CreateRisk()
 			ret.TaskID = config.taskID
-			setResultToCache(config.save, ret)
+			setResultToCache(kind, ret)
 		}
 	}
 
@@ -253,14 +247,14 @@ func QueryWithFrame(f *sfvm.SFFrame) QueryOption {
 
 func QueryWithSave(kind schema.SyntaxflowResultKind) QueryOption {
 	return func(c *queryConfig) {
-		c.save = resultSaveDatabase
+		c.SetSyntaxFlowResultSaveDataBase()
 		c.kind = kind
 	}
 }
 
 func QueryWithMemory() QueryOption {
 	return func(c *queryConfig) {
-		c.save = resultSaveMemory
+		c.SetSyntaxFlowResultSaveMemory()
 	}
 }
 
@@ -304,7 +298,13 @@ func QueryWithContext(ctx context.Context) QueryOption {
 
 func QueryWithProcessCallback(cb func(float64, string)) QueryOption {
 	return func(c *queryConfig) {
-		c.processCallback = cb
+		c.SetSyntaxFlowProcessCallback(cb)
+	}
+}
+
+func QueryWithSSAConfig(c *ssaconfig.Config) QueryOption {
+	return func(q *queryConfig) {
+		q.Config = c
 	}
 }
 

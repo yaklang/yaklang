@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yak/ssaproject"
 
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/gobwas/glob"
@@ -44,8 +45,6 @@ type config struct {
 	// other compile options
 	feedCode        bool
 	ignoreSyntaxErr bool
-	reCompile       bool
-	strictMode      bool
 
 	// input, code or project path
 	originEditor *memedit.MemEditor
@@ -68,9 +67,6 @@ type config struct {
 	externMethod            ssa.MethodBuilder
 	externBuildValueHandler map[string]func(b *ssa.FunctionBuilder, id string, v any) (value ssa.Value)
 
-	// peephole
-	peepholeSize int
-
 	// other build options
 	DatabaseProgramCacheHitter func(any)
 	EnableCache                bool
@@ -84,11 +80,12 @@ type config struct {
 	logLevel string
 
 	astSequence ssareducer.ASTSequenceType
-	// for concurrency
-	concurrency int
+
+	*ssaconfig.Config
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
+	sc, _ := ssaconfig.New(ssaconfig.ModeSSACompile)
 	c := &config{
 		language:                   "",
 		LanguageBuilder:            nil,
@@ -107,6 +104,7 @@ func defaultConfig(opts ...Option) (*config, error) {
 		},
 		logLevel:    "error",
 		astSequence: ssareducer.OutOfOrder,
+		Config:      sc,
 	}
 
 	for _, opt := range opts {
@@ -194,14 +192,14 @@ func WithProcess(process ProcessFunc) Option {
 
 func WithReCompile(b bool) Option {
 	return func(c *config) error {
-		c.reCompile = b
+		c.SetCompileReCompile(b)
 		return nil
 	}
 }
 
 func WithStrictMode(b bool) Option {
 	return func(c *config) error {
-		c.strictMode = b
+		c.SetCompileStrictMode(b)
 		return nil
 	}
 }
@@ -341,7 +339,7 @@ func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder
 
 func WithPeepholeSize(size int) Option {
 	return func(c *config) error {
-		c.peepholeSize = size
+		c.SetCompilePeepholeSize(size)
 		return nil
 	}
 }
@@ -402,27 +400,16 @@ func WithProgramName(name string) Option {
 
 func WithProjectName(name string) Option {
 	return func(c *config) error {
-		project, err := yakit.LoadSSAProjectBuilderByName(name)
+		project, err := ssaproject.LoadSSAProjectBuilderByName(name)
 		if err != nil {
 			return err
 		}
-		cc := project.GetCompileConfig()
-		if cc == nil {
-			return utils.Errorf("projectName %s compile config is nil", name)
+		sc := project.Config
+		c.ProjectName = name
+		if sc == nil || sc.SSACompile == nil {
+			return utils.Errorf("project %s config not found", name)
 		}
-		WithReCompile(cc.ReCompile)(c)
-		WithStrictMode(cc.StrictMode)(c)
-		WithPeepholeSize(cc.PeepholeSize)(c)
-		excludeOptions, err := DefaultExcludeFunc(cc.ExcludeFiles)
-		if err != nil {
-			return err
-		}
-		excludeOptions(c)
-		WithConcurrency(int(cc.Concurrency))(c)
-		if cc.MemoryCompile {
-			WithMemory()(c)
-		}
-		return nil
+		return WithSSAConfig(sc)(c)
 	}
 }
 
@@ -436,9 +423,42 @@ func WithMemory(ttl ...time.Duration) Option {
 	}
 }
 
+func WithSSAConfig(sc *ssaconfig.Config) Option {
+	return func(c *config) error {
+		if sc != nil {
+			c.Config = sc
+		}
+		if sc.GetCompileMemory() {
+			err := WithMemory()(c)
+			if err != nil {
+				return err
+			}
+		}
+		if sc.GetCompileStrictMode() {
+			err := WithStrictMode(true)(c)
+			if err != nil {
+				return err
+			}
+		}
+		if sc.GetCompilePeepholeSize() > 0 {
+			err := WithPeepholeSize(sc.GetCompilePeepholeSize())(c)
+			if err != nil {
+				return err
+			}
+		}
+		if sc.GetCompileExcludeFiles() != nil {
+			_, err := DefaultExcludeFunc(sc.GetCompileExcludeFiles())
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+}
+
 func WithConcurrency(concurrency int) Option {
 	return func(c *config) error {
-		c.concurrency = concurrency
+		c.SetCompileConcurrency(uint32(concurrency))
 		return nil
 	}
 }
@@ -590,6 +610,7 @@ var Exports = map[string]any{
 	"withExcludeFile":        WithExcludeFile,
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
 	"withMemory":             WithMemory,
+	"withSSAConfig":          WithSSAConfig,
 
 	//diff compare
 	// "withDiffProgName":          DiffWithProgram,

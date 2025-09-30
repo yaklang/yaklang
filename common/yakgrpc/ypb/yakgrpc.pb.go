@@ -6623,7 +6623,7 @@ type AIStartParams struct {
 	AIService         string `protobuf:"bytes,26,opt,name=AIService,proto3" json:"AIService,omitempty"`
 	ReActMaxIteration int64  `protobuf:"varint,27,opt,name=ReActMaxIteration,proto3" json:"ReActMaxIteration,omitempty"`
 	// 限制 Timeline 的最大条目和最大内容大小（bytes）
-	TimelineItemLimit        int64 `protobuf:"varint,28,opt,name=TimelineItemLimit,proto3" json:"TimelineItemLimit,omitempty"`
+	TimelineItemLimit        int64 `protobuf:"varint,28,opt,name=TimelineItemLimit,proto3" json:"TimelineItemLimit,omitempty"` // 已经废弃，功能不可用了，只需要关注 TimelineContentSizeLimit 就好
 	TimelineContentSizeLimit int64 `protobuf:"varint,29,opt,name=TimelineContentSizeLimit,proto3" json:"TimelineContentSizeLimit,omitempty"`
 	// 用户交互的最大次数限制,超过这个次数，AI 将不再被允许问用户问题
 	UserInteractLimit int64 `protobuf:"varint,30,opt,name=UserInteractLimit,proto3" json:"UserInteractLimit,omitempty"`
@@ -53096,7 +53096,8 @@ type SyntaxFlowScanRequest struct {
 	// compile data only in memory
 	Memory bool `protobuf:"varint,8,opt,name=Memory,proto3" json:"Memory,omitempty"`
 	// 根据项目扫描
-	SSAProjectId  uint64 `protobuf:"varint,9,opt,name=SSAProjectId,proto3" json:"SSAProjectId,omitempty"`
+	SSAProjectId  uint64   `protobuf:"varint,9,opt,name=SSAProjectId,proto3" json:"SSAProjectId,omitempty"`
+	ProjectName   []string `protobuf:"bytes,10,rep,name=ProjectName,proto3" json:"ProjectName,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -53192,6 +53193,13 @@ func (x *SyntaxFlowScanRequest) GetSSAProjectId() uint64 {
 		return x.SSAProjectId
 	}
 	return 0
+}
+
+func (x *SyntaxFlowScanRequest) GetProjectName() []string {
+	if x != nil {
+		return x.ProjectName
+	}
+	return nil
 }
 
 type QuerySyntaxFlowScanTaskRequest struct {
@@ -65884,7 +65892,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\vMessageType\x18\x03 \x01(\tR\vMessageType\"h\n" +
 	"\x1dDownloadSyntaxFlowRuleRequest\x12\x14\n" +
 	"\x05Token\x18\x01 \x01(\tR\x05Token\x121\n" +
-	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\xf0\x02\n" +
+	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\"\x92\x03\n" +
 	"\x15SyntaxFlowScanRequest\x12 \n" +
 	"\vControlMode\x18\x01 \x01(\tR\vControlMode\x121\n" +
 	"\x06Filter\x18\x02 \x01(\v2\x19.ypb.SyntaxFlowRuleFilterR\x06Filter\x12 \n" +
@@ -65894,7 +65902,9 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tRuleInput\x18\x06 \x01(\v2\x18.ypb.SyntaxFlowRuleInputR\tRuleInput\x12 \n" +
 	"\vConcurrency\x18\a \x01(\rR\vConcurrency\x12\x16\n" +
 	"\x06Memory\x18\b \x01(\bR\x06Memory\x12\"\n" +
-	"\fSSAProjectId\x18\t \x01(\x04R\fSSAProjectId\"\xa8\x01\n" +
+	"\fSSAProjectId\x18\t \x01(\x04R\fSSAProjectId\x12 \n" +
+	"\vProjectName\x18\n" +
+	" \x03(\tR\vProjectName\"\xa8\x01\n" +
 	"\x1eQuerySyntaxFlowScanTaskRequest\x12+\n" +
 	"\n" +
 	"Pagination\x18\x01 \x01(\v2\v.ypb.PagingR\n" +

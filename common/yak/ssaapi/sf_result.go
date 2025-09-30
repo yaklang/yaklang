@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"sort"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 
 type SyntaxFlowResult struct {
 	id       uint
-	saveKind ResultSaveKind
+	saveKind ssaconfig.SFResultSaveKind
 	TaskID   string
 	// result
 	memResult *sfvm.SFFrameResult
@@ -61,8 +62,8 @@ func getResultCacheId() uint {
 
 var resultCache = utils.NewTTLCache[*SyntaxFlowResult](10 * time.Minute)
 
-func CreateResultFromCache(kind ResultSaveKind, id uint64) *SyntaxFlowResult {
-	if kind == resultSaveNone {
+func CreateResultFromCache(kind ssaconfig.SFResultSaveKind, id uint64) *SyntaxFlowResult {
+	if kind == ssaconfig.SFResultSaveNone {
 		return nil
 	}
 	name := fmt.Sprintf("%s-%d", kind, id)
@@ -73,9 +74,9 @@ func CreateResultFromCache(kind ResultSaveKind, id uint64) *SyntaxFlowResult {
 	return nil
 }
 
-func setResultToCache(kind ResultSaveKind, res *SyntaxFlowResult) {
+func setResultToCache(kind ssaconfig.SFResultSaveKind, res *SyntaxFlowResult) {
 	// resultCache.Set(res.GetResultID(), res)
-	if kind == resultSaveNone {
+	if kind == ssaconfig.SFResultSaveNone {
 		return
 	}
 	res.saveKind = kind

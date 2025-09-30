@@ -7195,6 +7195,7 @@ message SyntaxFlowScanRequest{
   bool Memory = 8;
   // 根据项目扫描
   uint64 SSAProjectId = 9;
+  repeated string ProjectName = 10;
 }
 
 message QuerySyntaxFlowScanTaskRequest{
