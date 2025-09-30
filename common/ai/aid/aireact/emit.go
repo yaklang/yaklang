@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 )
@@ -34,29 +35,41 @@ func (r *ReAct) EmitResult(result interface{}) {
 	r.Emitter.EmitResult("result", result, true)
 }
 
-func (r *ReAct) EmitTextArtifact(identifier string, i any) {
+func (r *ReAct) EmitYaklangCodeArtifact(identifier string, i any) string {
+	return r.EmitFileArtifactWithExt(identifier, ".yak", i)
+}
+
+func (r *ReAct) EmitFileArtifactWithExt(identifier string, ext string, i any) string {
 	wd, err := r.artifacts.Getwd()
 	if err != nil {
 		log.Warnf("Error getting working directory: %v", err)
-		return
+		return ""
 	}
 	var name string
 	var suffix string
-	if r.artifacts.Ext(identifier) != ".txt" {
-		suffix = ".txt"
+	if r.artifacts.Ext(identifier) != ext {
+		suffix = ext
+	}
+	if !strings.HasSuffix(identifier, "_") {
+		identifier = identifier + "_"
 	}
 	name = identifier + utils.DatetimePretty2() + suffix
 	filename := r.artifacts.Join(wd, name)
 	if !r.artifacts.IsAbs(filename) {
 		log.Errorf("Could not find absolute filename: %s", filename)
-		return
+		return ""
 	}
 	err = r.artifacts.WriteFile(filename, utils.InterfaceToBytes(i), 0644)
 	if err != nil {
 		log.Errorf("Error writing file: %v", err)
-		return
+		return ""
 	}
 	r.Emitter.EmitPinFilename(filename)
+	return filename
+}
+
+func (r *ReAct) EmitTextArtifact(identifier string, i any) {
+	r.EmitFileArtifactWithExt(identifier, ".txt", i)
 }
 
 func (r *ReAct) EmitResultAfterStream(result interface{}) {

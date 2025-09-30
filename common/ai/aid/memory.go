@@ -73,8 +73,16 @@ func (m *Memory) CopyReducibleMemory() *Memory {
 		RootTask:    nil,
 		PlanHistory: nil,
 	}
-	mem.timeline = m.timeline.CopyReducibleTimelineWithMemory()
-	return m
+
+	// Copy timeline if it exists
+	if m.timeline != nil {
+		mem.timeline = m.timeline.CopyReducibleTimelineWithMemory()
+	} else {
+		// Initialize with a new timeline if original is nil
+		mem.timeline = aicommon.NewTimeline(nil, mem.CurrentTaskInfo)
+	}
+
+	return mem
 }
 
 func GetDefaultMemory() *Memory {
@@ -165,7 +173,17 @@ func (m *Memory) StoreTools(toolList func() []*aitool.Tool) {
 }
 
 func (m *Memory) ClearRuntimeConfig() {
-	m.timeline.ClearRuntimeConfig()
+	if m.timeline != nil {
+		m.timeline.ClearRuntimeConfig()
+	}
+}
+
+// TimelineDump returns the timeline dump safely
+func (m *Memory) TimelineDump() string {
+	if m.timeline != nil {
+		return m.timeline.Dump()
+	}
+	return ""
 }
 
 // set tools list
