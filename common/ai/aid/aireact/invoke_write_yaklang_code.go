@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -91,16 +92,17 @@ LOOP:
 				stream = io.TeeReader(stream, os.Stdout)
 
 				stream = utils.CreateUTF8StreamMirror(stream, func(reader io.Reader) {
-					defer func() {
-						cb.Cancel()
-					}()
 					aitag.Parse(reader, aitag.WithCallback("GEN_CODE", nonceStr, func(reader io.Reader) {
-						defer func() {
-							codeBarrier.Done()
-						}()
 						var result bytes.Buffer
-						io.Copy(io.Discard, io.TeeReader(reader, io.MultiWriter(os.Stdout, &result)))
-						generatedCode = result.String()
+						resultReader := io.TeeReader(reader, &result)
+						r.EmitStreamEvent("yaklang-code", time.Now(), resultReader, resp.GetTaskIndex(), func() {
+							code := result.String()
+							if code == "" {
+								return
+							}
+							generatedCode = code
+							codeBarrier.Done()
+						})
 					}))
 				})
 
@@ -194,13 +196,16 @@ LOOP:
 
 		if actionName == "write_code" || actionName == "modify_code" {
 			log.Info("start to wait code in conditional barrier")
-			cb.Wait("code")
+			cberr := cb.Wait("code")
+			if cberr != nil {
+				log.Warnf("Failed to wait for code generation: %v", cberr)
+			}
 			payload = generatedCode
-		}
-
-		if actionName == "write_code" && payload == "" {
-			errorMessages += "AI did not provide any code in write_code action; "
-			continue
+			if actionName == "write_code" && payload == "" {
+				errorMessages += "AI did not provide any code in write_code action; "
+				continue
+			}
+			log.Infof("end to wait code in conditional barrier, code received, len: %v, shrinked: %v", len(generatedCode), utils.ShrinkString(generatedCode, 128))
 		}
 
 		// Handle different action types
@@ -210,6 +215,7 @@ LOOP:
 		case "modify_code":
 			// Apply modification to current code using new edit methods
 			editor := memedit.NewMemEditor(currentCode)
+			log.Infof("start to modify code lines %d to %d", modifyStartLine, modifyEndLine)
 			err = editor.ReplaceLineRange(modifyStartLine, modifyEndLine, payload)
 			if err != nil {
 				return utils.Errorf("Failed to replace line range: %v", err)

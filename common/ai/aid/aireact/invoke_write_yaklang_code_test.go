@@ -96,7 +96,6 @@ LOOP:
 	for {
 		select {
 		case e := <-out:
-			fmt.Println(e.String())
 			if e.Type == string(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR) {
 				break LOOP
 			}

@@ -134,6 +134,7 @@ func ExtractActionFromStreamWithJSONExtractOptions(
 	actionName string,
 	alias []string,
 	options []jsonextractor.CallbackOption,
+	onReaderFinished ...func(),
 ) (*Action, error) {
 	ac := &Action{
 		name:   actionName,
@@ -148,11 +149,17 @@ func ExtractActionFromStreamWithJSONExtractOptions(
 	var buf bytes.Buffer
 	go func() {
 		defer func() {
+			for _, onFinished := range onReaderFinished {
+				onFinished()
+			}
+		}()
+		defer func() {
 			utils.TryCloseChannel(allFinished)
 		}()
 		defer func() {
 			utils.TryCloseChannel(sigchan)
 		}()
+
 		stopped := utils.NewBool(false)
 
 		opts := options
@@ -194,7 +201,6 @@ func ExtractActionFromStreamWithJSONExtractOptions(
 				}
 			}
 		}))
-
 		err = jsonextractor.ExtractStructuredJSONFromStream(io.TeeReader(reader, &buf), opts...)
 		if err != nil {
 			log.Error("Failed to extract action", "action", buf.String(), "error", err)
