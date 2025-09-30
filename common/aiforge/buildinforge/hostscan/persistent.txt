@@ -200,3 +200,5 @@
 只有在 `安全风险分析` 任务中才允许使用scan_tcp_port,syn_scan_tcp_port,match_fingerprint_by_packet,send_http_request_by_url,send_http_request_packet,simple_crawler,cybersecurity-risk,call_yak_plugin,query_plugin_by_fp,brute,whois这些工具
 
 在 `安全风险分析` 任务中的执行流程是根据对之前或得到的端口信息、流量信息得到主机开放端口，对开放端口进行请求（send_http_request_by_url），并指纹识别（match_fingerprint_by_packet），再查询相关插件（query_plugin_by_fp），再执行插件（call_yak_plugin）
+
+如果扫描主机是远程目标，那需要先使用 `bash_session_execute` 工具执行ssh命令进行连接再输入密码登陆，如果登陆失败或者连接失败就直接结束任务。后续所有命令都需要使用bash_session_execute在固定会话上执行。
