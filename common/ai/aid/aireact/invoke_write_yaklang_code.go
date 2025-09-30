@@ -30,7 +30,6 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 	// * (query document && modify to file)
 	// * return
 
-	satisfied := false
 	iterationCount := 0
 	currentCode := ""
 	errorMessages := ""
@@ -39,21 +38,20 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 		userQuery = r.config.memory.Query
 	}
 
-	//tempFile, err := consts.TempAIFile("codegen-%v.yak")
-	//if err != nil {
-	//	return utils.Errorf("Failed to create temp file for code generation: %v", err)
-	//}
-	//var filename string
-	//_ = tempFile.Close()
-	//filename = tempFile.Name()
-	filename := "/tmp/a.yak"
+	filename := r.EmitYaklangCodeArtifact("generated_code", userQuery)
 
 	// Get available tools
 	tools := buildinaitools.GetAllTools()
 	nonceStr := utils.RandStringBytes(4)
 
+LOOP:
 	for {
 		iterationCount++
+
+		if r.config.maxIterations > 0 && iterationCount > r.config.maxIterations {
+			break
+		}
+
 		log.Infof("start to generate yaklang code, iteration %d", iterationCount)
 		prompt, err := r.promptManager.GenerateYaklangCodeActionLoop(
 			userQuery+"\n\n"+approach, // userQuery
@@ -109,6 +107,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 						"require_tool",
 						"modify_code",
 						"ask_for_clarification",
+						"finish",
 					},
 					[]jsonextractor.CallbackOption{
 						jsonextractor.WithRegisterMultiFieldStreamHandler(
@@ -176,6 +175,8 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 					if result.GetString("question") == "" {
 						return utils.Error("ask_for_clarification action must have 'question' field in 'ask_for_clarification_payload'")
 					}
+				case "finish":
+					return nil
 				default:
 					// For other actions, we don't have specific payload requirements
 					return utils.Errorf("unknown action: %s", actionName)
@@ -199,6 +200,8 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 
 		// Handle different action types
 		switch actionName {
+		case "finish":
+			break LOOP
 		case "modify_code":
 			// Apply modification to current code using new edit methods
 			editor := memedit.NewMemEditor(currentCode)
@@ -225,7 +228,6 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			r.addToTimeline("re-enter-code-generate-loop", "")
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
-
 		case "write_code":
 			// Update current code
 			code := payload
@@ -270,16 +272,10 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}
+			continue
 		case "query_document":
 			return utils.Errorf("query_document action not implemented yet")
 		}
-
-		// If satisfied, break the loop
-		if satisfied {
-			r.addToTimeline("code_generation", "Code generation completed successfully")
-			break
-		}
 	}
-
 	return nil
 }

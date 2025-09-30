@@ -303,6 +303,7 @@ LOOP:
 		switch actionType {
 		case ActionDirectlyAnswer:
 			answerPayload := nextAction.GetString("answer_payload")
+			r.EmitTextArtifact("directly_answer", answerPayload)
 			r.EmitResultAfterStream(answerPayload)
 			currentTask.SetResult(strings.TrimSpace(answerPayload))
 			r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
@@ -606,5 +607,6 @@ func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (st
 			return nil
 		},
 	)
+	r.EmitTextArtifact("enhance_directly_answer", finalResult)
 	return finalResult, err
 }

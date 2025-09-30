@@ -35,13 +35,13 @@ func TestCoordinator_SidecarMemory_Timeline_ToolUse_TooMany_TimelineShrink(t *te
 	token2 := "memory-timeline-sidecar+" + utils.RandStringBytes(100)
 	m.timeline.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, 1, token1, token1)
 	m.timeline.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, 2, token2, token2)
-	result := m.timeline.Dump()
+	result := m.TimelineDump()
 	fmt.Println(result)
 	fmt.Println("token1", token1)
 	fmt.Println("token2", token2)
 	// require.Contains(t, result, token1, token2)
 
-	fmt.Println(m.timeline.Dump())
+	fmt.Println(m.TimelineDump())
 
 	noexistedfileToken := utils.RandStringBytes(100)
 	haveSidecarMem := false
@@ -184,7 +184,7 @@ LOOP:
 
 	// After compression, the original tokens might be compressed into reducers
 	// So we just check that timeline dump is not empty and contains some content
-	dump := m.timeline.Dump()
+	dump := m.TimelineDump()
 	if len(dump) == 0 {
 		t.Fatal("timeline is empty after compression")
 	}
@@ -378,7 +378,7 @@ LOOP:
 
 	// Check that timeline contains some content after processing
 	// Due to timeline compression, we can't guarantee all tokens will be present
-	dump := m.timeline.Dump()
+	dump := m.TimelineDump()
 	if len(dump) == 0 {
 		t.Fatal("timeline is empty after processing")
 	}
