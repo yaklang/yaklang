@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
 type RuleProcessCallback func(progress float64, info *RuleProcessInfoList)
@@ -28,10 +29,15 @@ type processMonitor struct {
 	TotalQuery atomic.Int64
 
 	processCallBack RuleProcessCallback
+	resultCallback  RuleResultCallback
 	monitorTTL      time.Duration
 	eventCh         chan struct{}
+	resultCh        chan *ssaapi.SyntaxFlowResult
 	waitGroup       sync.WaitGroup
+	closed          atomic.Bool
 }
+
+type RuleResultCallback func(*ssaapi.SyntaxFlowResult)
 
 type RuleProcessInfoList struct {
 	Progress      float64            `json:"progress"`
@@ -84,23 +90,35 @@ func (r *RuleProcessInfo) Key() string {
 }
 
 func (pm *processMonitor) Close() {
+	if !pm.closed.CompareAndSwap(false, true) {
+		log.Errorf("process monitor closed wait swap fail!!!!")
+		pm.waitGroup.Wait()
+		return
+	}
+
+	log.Errorf("process monitor closed wait !!!!")
 	close(pm.eventCh)
+	close(pm.resultCh)
 	pm.waitGroup.Wait()
 }
 
-func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProcessCallback) *processMonitor {
+func newProcessMonitor(ctx context.Context, ttl time.Duration, callback RuleProcessCallback, resultCallback RuleResultCallback) *processMonitor {
 	pm := &processMonitor{
 		ctx:             ctx,
 		Status:          omap.NewEmptyOrderedMap[string, *RuleProcessInfo](),
 		processCallBack: callback,
+		resultCallback:  resultCallback,
 		monitorTTL:      ttl,
 		eventCh:         make(chan struct{}, 128),
+		resultCh:        make(chan *ssaapi.SyntaxFlowResult, 128),
 	}
 	return pm
 }
 func (pm *processMonitor) StartMonitor() {
 	pm.Status = omap.NewEmptyOrderedMap[string, *RuleProcessInfo]()
 	pm.eventCh = make(chan struct{}, 128)
+	pm.resultCh = make(chan *ssaapi.SyntaxFlowResult, 128)
+	pm.closed.Store(false)
 
 	pm.waitGroup = sync.WaitGroup{}
 	pm.waitGroup.Add(1)
@@ -110,6 +128,7 @@ func (pm *processMonitor) StartMonitor() {
 		defer ticker.Stop()
 
 		defer pm.reportProcess() // final event
+		defer pm.drainResults()
 
 		for {
 			select {
@@ -120,7 +139,12 @@ func (pm *processMonitor) StartMonitor() {
 					return
 				}
 				pm.reportProcess()
-				// ticker.Reset(pm.monitorTTL)
+				ticker.Reset(pm.monitorTTL)
+			case res, ok := <-pm.resultCh:
+				if !ok {
+					return
+				}
+				pm.handleResult(res)
 			case <-ticker.C:
 				pm.reportProcess()
 			}
@@ -128,24 +152,70 @@ func (pm *processMonitor) StartMonitor() {
 	}()
 }
 
+func (pm *processMonitor) handleResult(res *ssaapi.SyntaxFlowResult) {
+	if res == nil {
+		return
+	}
+	if pm.resultCallback != nil {
+		log.Errorf("call resultCallback")
+		pm.resultCallback(res)
+	}
+}
+
+func (pm *processMonitor) drainResults() {
+	for pm.resultCh != nil {
+		select {
+		case res, ok := <-pm.resultCh:
+			if !ok {
+				pm.resultCh = nil
+				return
+			}
+			pm.handleResult(res)
+		default:
+			return
+		}
+	}
+}
+
 func (p *processMonitor) reportProcess() {
 	if p.processCallBack != nil {
 		info := p.snapshotInfoList()
+		log.Errorf("process report process: %v ", info.Progress)
 		p.processCallBack(info.Progress, info)
 	}
 }
 
 func (p *processMonitor) EmitEvent() {
+	if p.closed.Load() {
+		return
+	}
 	defer func() {
 		if e := recover(); e != nil {
 			log.Errorf("err: %v", e)
 		}
 	}()
 	// Build a consistent snapshot at emit time
+	log.Errorf("write to eventCh")
 	select {
 	case p.eventCh <- struct{}{}:
 	default:
 		// channel full, drop event to avoid blocking
+	}
+}
+
+func (p *processMonitor) PublishResult(res *ssaapi.SyntaxFlowResult) {
+	if p.closed.Load() {
+		return
+	}
+	defer func() {
+		if e := recover(); e != nil {
+			log.Errorf("err: %v", e)
+		}
+	}()
+	log.Errorf("write to resultCh")
+	select {
+	case <-p.ctx.Done():
+	case p.resultCh <- res:
 	}
 }
 

@@ -112,7 +112,7 @@ func createEmptySyntaxFlowTaskByID(
 	// 设置进度回调
 	m.processMonitor = newProcessMonitor(ctx, 30*time.Second, func(progress float64, info *RuleProcessInfoList) {
 		m.callback.Process(m.taskID, m.status, progress, info)
-	})
+	}, m.notifyResult)
 	return m, nil
 }
 
@@ -394,6 +394,6 @@ func (m *scanManager) StatusTask(res ...*ssaapi.SyntaxFlowResult) {
 	if len(res) > 0 {
 		ret = res[0]
 	}
-	m.notifyResult(ret)
+	m.processMonitor.PublishResult(ret)
 	m.processMonitor.EmitEvent()
 }
