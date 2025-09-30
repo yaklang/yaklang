@@ -62,12 +62,14 @@ type BashSession struct {
 	Name        string
 	ShellType   string
 	Cmd         *exec.Cmd
-	Pty         *os.File // PTY主端
+	Pty         *os.File       // PTY主端（仅在非Windows系统使用）
+	Stdin       io.WriteCloser // 标准输入（Windows非PTY模式使用）
 	Stdout      *bytes.Buffer
 	Cancel      context.CancelFunc
 	IsRunning   bool
 	LastActive  time.Time
 	LastCommand string // 记录最后发送的命令，用于过滤回显
+	UsePty      bool   // 是否使用PTY模式
 	mutex       sync.Mutex
 }
 
@@ -353,16 +355,31 @@ func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, 
 	}
 
 	// 向会话写入内容
-	_, err = session.Pty.Write([]byte(input + "\n"))
-	if err != nil {
+	var writeErr error
+	if session.UsePty {
+		// PTY 模式：写入到 PTY
+		_, writeErr = session.Pty.Write([]byte(input + "\n"))
+	} else {
+		// 非 PTY 模式：写入到 Stdin
+		_, writeErr = session.Stdin.Write([]byte(input + "\n"))
+	}
+
+	if writeErr != nil {
 		// 如果写入失败，尝试重新创建会话
 		err2 := createSessionProcess(bashSessionContext, session)
 		if err2 != nil {
-			return "", utils.Errorf("failed to send input and restart session %s: %v, %v", session.Name, err, err2)
+			return "", utils.Errorf("failed to send input and restart session %s: %v, %v", session.Name, writeErr, err2)
 		}
-		_, err = session.Pty.Write([]byte(input + "\n"))
-		if err != nil {
-			return "", utils.Errorf("failed to send input to session %s: %v", session.Name, err)
+
+		// 重试写入
+		if session.UsePty {
+			_, writeErr = session.Pty.Write([]byte(input + "\n"))
+		} else {
+			_, writeErr = session.Stdin.Write([]byte(input + "\n"))
+		}
+
+		if writeErr != nil {
+			return "", utils.Errorf("failed to send input to session %s: %v", session.Name, writeErr)
 		}
 	}
 
@@ -476,6 +493,11 @@ func createSessionProcess(bashSessionContext *BashSessionContext, session *BashS
 		session.Pty.Close()
 	}
 
+	// 如果有旧的 Stdin，先关闭
+	if session.Stdin != nil {
+		session.Stdin.Close()
+	}
+
 	// 创建新的上下文，继承自BashSessionContext的context
 	ctx, cancel := context.WithCancel(bashSessionContext.ctx)
 	session.Cancel = cancel
@@ -493,45 +515,102 @@ func createSessionProcess(bashSessionContext *BashSessionContext, session *BashS
 		return utils.Errorf("unsupported shell type: %s", session.ShellType)
 	}
 
-	// 使用 pty 创建带 tty 的进程
-	ptyFile, err := pty.Start(cmd)
-	if err != nil {
-		return utils.Errorf("failed to start %s process with pty: %v", session.ShellType, err)
-	}
+	// 决定是否使用 PTY 模式
+	session.UsePty = runtime.GOOS != "windows"
 
-	// 尝试禁用终端回显
-	// disablePtyEcho(ptyFile)
-	// oldState, err := term.MakeRaw(int(ptyFile.Fd()))
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// _ = oldState
-	// defer term.Restore(int(ptyFile.Fd()), oldState) // 退出前恢复
+	if session.UsePty {
+		// 非 Windows 系统：使用 PTY 模式
+		ptyFile, err := pty.Start(cmd)
+		if err != nil {
+			return utils.Errorf("failed to start %s process with pty: %v", session.ShellType, err)
+		}
 
-	session.Cmd = cmd
-	session.Pty = ptyFile
-	session.IsRunning = true
+		session.Cmd = cmd
+		session.Pty = ptyFile
+		session.IsRunning = true
 
-	// 启动输出读取goroutine，从 pty 读取所有输出（stdout + stderr）
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Debugf("PTY copy goroutine recovered from panic: %v", r)
+		// 启动输出读取goroutine，从 pty 读取所有输出（stdout + stderr）
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Debugf("PTY copy goroutine recovered from panic: %v", r)
+				}
+			}()
+
+			// 创建一个混合缓冲区来同时捕获 stdout 和 stderr
+			mixedOutput := &bytes.Buffer{}
+
+			// 使用 TeeReader 同时写入到 session.Stdout 和 mixedOutput
+			teeReader := io.TeeReader(session.Pty, io.MultiWriter(session.Stdout, mixedOutput))
+
+			// 读取所有输出
+			_, err := io.Copy(io.Discard, teeReader)
+			if err != nil && err != io.EOF {
+				log.Debugf("PTY copy finished with error: %v", err)
+			}
+		}()
+	} else {
+		// Windows 系统：使用直接管道模式
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return utils.Errorf("failed to create stdin pipe: %v", err)
+		}
+
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			stdin.Close()
+			return utils.Errorf("failed to create stdout pipe: %v", err)
+		}
+
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			stdin.Close()
+			stdout.Close()
+			return utils.Errorf("failed to create stderr pipe: %v", err)
+		}
+
+		// 启动进程
+		err = cmd.Start()
+		if err != nil {
+			stdin.Close()
+			stdout.Close()
+			stderr.Close()
+			return utils.Errorf("failed to start %s process: %v", session.ShellType, err)
+		}
+
+		session.Cmd = cmd
+		session.Stdin = stdin
+		session.IsRunning = true
+
+		// 启动输出读取goroutine，分别处理 stdout 和 stderr
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Debugf("Stdout copy goroutine recovered from panic: %v", r)
+				}
+			}()
+
+			// 读取 stdout
+			_, err := io.Copy(session.Stdout, stdout)
+			if err != nil && err != io.EOF {
+				log.Debugf("Stdout copy finished with error: %v", err)
 			}
 		}()
 
-		// 创建一个混合缓冲区来同时捕获 stdout 和 stderr
-		mixedOutput := &bytes.Buffer{}
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Debugf("Stderr copy goroutine recovered from panic: %v", r)
+				}
+			}()
 
-		// 使用 TeeReader 同时写入到 session.Stdout 和 mixedOutput
-		teeReader := io.TeeReader(session.Pty, io.MultiWriter(session.Stdout, mixedOutput))
-
-		// 读取所有输出
-		_, err := io.Copy(io.Discard, teeReader)
-		if err != nil && err != io.EOF {
-			log.Debugf("PTY copy finished with error: %v", err)
-		}
-	}()
+			// 读取 stderr
+			_, err := io.Copy(session.Stdout, stderr)
+			if err != nil && err != io.EOF {
+				log.Debugf("Stderr copy finished with error: %v", err)
+			}
+		}()
+	}
 
 	// 监控进程状态
 	go func() {
@@ -579,10 +658,19 @@ func closeSession(bashSessionContext *BashSessionContext, sessionName string) er
 	}
 
 	// 关闭进程的正确顺序：
-	// 1. 首先关闭pty，让进程知道没有更多输入
-	if session.Pty != nil {
-		session.Pty.Close()
-		session.Pty = nil
+	// 1. 首先关闭输入/输出，让进程知道没有更多输入
+	if session.UsePty {
+		// PTY 模式：关闭 PTY
+		if session.Pty != nil {
+			session.Pty.Close()
+			session.Pty = nil
+		}
+	} else {
+		// 非 PTY 模式：关闭 Stdin
+		if session.Stdin != nil {
+			session.Stdin.Close()
+			session.Stdin = nil
+		}
 	}
 
 	// 2. 发送取消信号
