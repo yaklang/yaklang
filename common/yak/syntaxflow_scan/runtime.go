@@ -20,7 +20,6 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 			m.taskRecorder.Reason = fmt.Sprintf("%v", err)
 			m.status = schema.SYNTAXFLOWSCAN_ERROR
 		}
-		m.StatusTask()
 		m.saveReport()
 	}()
 
@@ -102,6 +101,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		m.errorCallback("program %s exc rule %s failed: %s", prog.GetProgramName(), rule.RuleName, err)
 	}
 }
+
 func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 	if m.config.Reporter != nil {
 		m.config.Reporter.AddSyntaxFlowResult(res)
