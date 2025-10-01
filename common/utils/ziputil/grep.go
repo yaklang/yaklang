@@ -21,6 +21,12 @@ type GrepConfig struct {
 	Limit         int  // 限制结果数量
 	Context       int  // 上下文行数
 	CaseSensitive bool // 是否区分大小写
+
+	// 路径过滤
+	IncludePathSubString []string // 包含路径子串（任一匹配即可）
+	ExcludePathSubString []string // 排除路径子串（任一匹配即排除）
+	IncludePathRegexp    []string // 包含路径正则（任一匹配即可）
+	ExcludePathRegexp    []string // 排除路径正则（任一匹配即排除）
 }
 
 type GrepOption func(*GrepConfig)
@@ -44,6 +50,32 @@ func WithGrepCaseSensitive(i ...bool) GrepOption {
 			return
 		}
 		c.CaseSensitive = true
+	}
+}
+
+// 路径过滤选项
+
+func WithIncludePathSubString(patterns ...string) GrepOption {
+	return func(c *GrepConfig) {
+		c.IncludePathSubString = append(c.IncludePathSubString, patterns...)
+	}
+}
+
+func WithExcludePathSubString(patterns ...string) GrepOption {
+	return func(c *GrepConfig) {
+		c.ExcludePathSubString = append(c.ExcludePathSubString, patterns...)
+	}
+}
+
+func WithIncludePathRegexp(patterns ...string) GrepOption {
+	return func(c *GrepConfig) {
+		c.IncludePathRegexp = append(c.IncludePathRegexp, patterns...)
+	}
+}
+
+func WithExcludePathRegexp(patterns ...string) GrepOption {
+	return func(c *GrepConfig) {
+		c.ExcludePathRegexp = append(c.ExcludePathRegexp, patterns...)
 	}
 }
 
@@ -98,7 +130,7 @@ func GrepRawRegexp(raw interface{}, pattern string, opts ...GrepOption) ([]*Grep
 
 	return grepZipContent(raw, func(line string) bool {
 		return re.MatchString(line)
-	}, config)
+	}, config, "regexp:"+pattern)
 }
 
 // GrepRawSubString 使用子字符串在 ZIP 原始数据中搜索
@@ -120,10 +152,59 @@ func GrepRawSubString(raw interface{}, substring string, opts ...GrepOption) ([]
 		return strings.Contains(strings.ToLower(line), strings.ToLower(searchStr))
 	}
 
-	return grepZipContent(raw, matcher, config)
+	return grepZipContent(raw, matcher, config, "substring:"+substring)
 }
 
-func grepZipContent(raw interface{}, matcher func(string) bool, config *GrepConfig) ([]*GrepResult, error) {
+// shouldIncludePath 判断路径是否应该被包含
+func shouldIncludePath(path string, config *GrepConfig) bool {
+	// 检查排除规则
+	for _, pattern := range config.ExcludePathSubString {
+		if strings.Contains(path, pattern) {
+			return false
+		}
+	}
+
+	for _, pattern := range config.ExcludePathRegexp {
+		if matched, _ := regexp.MatchString(pattern, path); matched {
+			return false
+		}
+	}
+
+	// 检查包含规则（如果设置了包含规则，则必须匹配其中之一）
+	if len(config.IncludePathSubString) > 0 {
+		matched := false
+		for _, pattern := range config.IncludePathSubString {
+			if strings.Contains(path, pattern) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	if len(config.IncludePathRegexp) > 0 {
+		matched := false
+		for _, pattern := range config.IncludePathRegexp {
+			if m, _ := regexp.MatchString(pattern, path); m {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	return true
+}
+
+func grepZipContent(raw interface{}, matcher func(string) bool, config *GrepConfig, method ...string) ([]*GrepResult, error) {
+	scoreMethod := "default"
+	if len(method) > 0 {
+		scoreMethod = method[0]
+	}
 	var data []byte
 	switch v := raw.(type) {
 	case []byte:
@@ -171,6 +252,11 @@ func grepZipContent(raw interface{}, matcher func(string) bool, config *GrepConf
 			continue
 		}
 
+		// 应用路径过滤
+		if !shouldIncludePath(file.Name, config) {
+			continue
+		}
+
 		// 如果已达到限制，停止处理
 		if config.Limit > 0 {
 			select {
@@ -196,7 +282,7 @@ func grepZipContent(raw interface{}, matcher func(string) bool, config *GrepConf
 			}
 			defer rc.Close()
 
-			fileResults := grepFile(f.Name, rc, matcher, config)
+			fileResults := grepFile(f.Name, rc, matcher, config, scoreMethod)
 			if len(fileResults) > 0 {
 				resultsMu.Lock()
 				results = append(results, fileResults...)
@@ -219,7 +305,7 @@ done:
 	return results, nil
 }
 
-func grepFile(filename string, r io.Reader, matcher func(string) bool, config *GrepConfig) []*GrepResult {
+func grepFile(filename string, r io.Reader, matcher func(string) bool, config *GrepConfig, scoreMethod string) []*GrepResult {
 	var results []*GrepResult
 	scanner := bufio.NewScanner(r)
 	lineNumber := 0
@@ -239,9 +325,11 @@ func grepFile(filename string, r io.Reader, matcher func(string) bool, config *G
 
 		if matcher(line) {
 			result := &GrepResult{
-				FileName:   filename,
-				LineNumber: lineNumber,
-				Line:       line,
+				FileName:    filename,
+				LineNumber:  lineNumber,
+				Line:        line,
+				ScoreMethod: scoreMethod,
+				Score:       1.0 / float64(lineNumber+1), // 默认得分
 			}
 
 			// 添加上下文
@@ -509,4 +597,128 @@ func MergeGrepResults(results []*GrepResult) []*GrepResult {
 	merged = append(merged, current)
 
 	return merged
+}
+
+// GrepPath 系列函数 - 搜索文件路径/文件名
+
+// GrepPathRegexp 使用正则表达式搜索文件路径
+func GrepPathRegexp(zipFile string, pattern string, opts ...GrepOption) ([]*GrepResult, error) {
+	raw, err := ioutil.ReadFile(zipFile)
+	if err != nil {
+		return nil, utils.Errorf("read zip file failed: %s", err)
+	}
+	return GrepPathRawRegexp(raw, pattern, opts...)
+}
+
+// GrepPathSubString 使用子字符串搜索文件路径
+func GrepPathSubString(zipFile string, substring string, opts ...GrepOption) ([]*GrepResult, error) {
+	raw, err := ioutil.ReadFile(zipFile)
+	if err != nil {
+		return nil, utils.Errorf("read zip file failed: %s", err)
+	}
+	return GrepPathRawSubString(raw, substring, opts...)
+}
+
+// GrepPathRawRegexp 使用正则表达式在原始数据中搜索文件路径
+func GrepPathRawRegexp(raw interface{}, pattern string, opts ...GrepOption) ([]*GrepResult, error) {
+	config := &GrepConfig{
+		Limit:         -1,
+		Context:       0,
+		CaseSensitive: true,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, utils.Errorf("compile regexp failed: %s", err)
+	}
+
+	return grepPathContent(raw, func(path string) bool {
+		return re.MatchString(path)
+	}, config, "path_regexp:"+pattern)
+}
+
+// GrepPathRawSubString 使用子字符串在原始数据中搜索文件路径
+func GrepPathRawSubString(raw interface{}, substring string, opts ...GrepOption) ([]*GrepResult, error) {
+	config := &GrepConfig{
+		Limit:         -1,
+		Context:       0,
+		CaseSensitive: false,
+	}
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	matcher := func(path string) bool {
+		if config.CaseSensitive {
+			return strings.Contains(path, substring)
+		}
+		return strings.Contains(strings.ToLower(path), strings.ToLower(substring))
+	}
+
+	return grepPathContent(raw, matcher, config, "path_substring:"+substring)
+}
+
+// grepPathContent 在文件路径中搜索
+func grepPathContent(raw interface{}, matcher func(string) bool, config *GrepConfig, method string) ([]*GrepResult, error) {
+	var data []byte
+	switch v := raw.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	case io.Reader:
+		var err error
+		data, err = io.ReadAll(v)
+		if err != nil {
+			return nil, utils.Errorf("read data from reader failed: %s", err)
+		}
+	default:
+		return nil, utils.Error("unsupported raw type, must be []byte, string or io.Reader")
+	}
+
+	size := len(data)
+	mfile := memfile.New(data)
+	reader, err := zip.NewReader(mfile, int64(size))
+	if err != nil {
+		return nil, utils.Errorf("create zip reader failed: %s", err)
+	}
+
+	var results []*GrepResult
+	fileIndex := 0
+
+	for _, file := range reader.File {
+		if file.FileInfo().IsDir() {
+			continue
+		}
+
+		fileIndex++
+
+		// 应用路径过滤（对于 GrepPath，过滤是可选的）
+		if !shouldIncludePath(file.Name, config) {
+			continue
+		}
+
+		// 检查路径是否匹配
+		if matcher(file.Name) {
+			result := &GrepResult{
+				FileName:    file.Name,
+				LineNumber:  0, // 路径搜索没有行号概念
+				Line:        file.Name,
+				ScoreMethod: method,
+				Score:       1.0 / float64(fileIndex+1), // 基于文件顺序的得分
+			}
+
+			results = append(results, result)
+
+			// 检查是否达到限制
+			if config.Limit > 0 && len(results) >= config.Limit {
+				break
+			}
+		}
+	}
+
+	return results, nil
 }
