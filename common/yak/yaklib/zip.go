@@ -3,11 +3,12 @@ package yaklib
 import (
 	"archive/zip"
 	"bytes"
+	"os"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
-	"os"
 )
 
 var ZipExports = map[string]interface{}{
@@ -18,6 +19,25 @@ var ZipExports = map[string]interface{}{
 	"CompressRaw":      CompressRaw,
 	"Recursive":        Recursive,
 	"RecursiveFromRaw": RecursiveFromRaw,
+
+	// Grep 功能
+	"GrepRegexp":       ziputil.GrepRegexp,
+	"GrepSubString":    ziputil.GrepSubString,
+	"GrepRawRegexp":    ziputil.GrepRawRegexp,
+	"GrepRawSubString": ziputil.GrepRawSubString,
+
+	// Grep 配置选项
+	"grepLimit":         ziputil.WithGrepLimit,
+	"grepContextLine":   ziputil.WithContext,
+	"grepCaseSensitive": ziputil.WithGrepCaseSensitive,
+
+	// 文件提取功能
+	"ExtractFile":             ziputil.ExtractFile,
+	"ExtractFileFromRaw":      ziputil.ExtractFileFromRaw,
+	"ExtractFiles":            ziputil.ExtractFiles,
+	"ExtractFilesFromRaw":     ziputil.ExtractFilesFromRaw,
+	"ExtractByPattern":        ziputil.ExtractByPattern,
+	"ExtractByPatternFromRaw": ziputil.ExtractByPatternFromRaw,
 }
 
 // Recursive Decompress decompresses a zip file to a directory
