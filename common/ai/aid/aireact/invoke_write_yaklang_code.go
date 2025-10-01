@@ -86,6 +86,19 @@ LOOP:
 			break
 		}
 
+		// Before generating prompt, check current code status to determine if finish is allowed
+		if currentCode != "" {
+			errMsg, hasErrors := checkCodeAndFormatErrors(currentCode)
+			hasBlockingErrors = hasErrors
+			if errMsg != "" && errorMessages == "" {
+				// If we have errors but no error messages from previous iteration, use current errors
+				errorMessages = errMsg
+			}
+			log.Infof("iteration %d pre-check: hasBlockingErrors=%v, finish_allowed=%v", iterationCount, hasBlockingErrors, !hasBlockingErrors)
+		} else {
+			log.Infof("iteration %d: currentCode is empty, hasBlockingErrors=%v, finish_allowed=%v", iterationCount, hasBlockingErrors, !hasBlockingErrors)
+		}
+
 		log.Infof("start to generate yaklang code, iteration %d", iterationCount)
 		prompt, err := r.promptManager.GenerateYaklangCodeActionLoop(
 			userQuery+"\n\n"+approach,   // userQuery
@@ -275,15 +288,23 @@ LOOP:
 		switch actionName {
 		case "finish":
 			log.Info("start to check code for finish action")
-			errorMessages, hasBlockingErrors = checkCodeAndFormatErrors(currentCode)
-			if errorMessages != "" {
+			errMsg, hasErrors := checkCodeAndFormatErrors(currentCode)
+			hasBlockingErrors = hasErrors
+
+			if errMsg != "" {
 				fmt.Println("=================================================")
 				fmt.Println(currentCode)
 				fmt.Println("=================================================")
 				if hasBlockingErrors {
-					log.Warnf("finish action, but code has ERRORS: %v", errorMessages)
+					log.Warnf("finish action, but code has ERRORS: %v", errMsg)
+					errorMessages = "⚠️ CRITICAL: You attempted to use 'finish' action, but the code still has ERRORS that MUST be fixed:\n\n" + errMsg + "\n\n⚠️ You MUST fix all errors before using 'finish' action again. Use 'modify_code' or 'query_document' to resolve these issues.\n"
+					fmt.Println(errorMessages)
+					fmt.Println("=================================================")
+					// Don't break - continue the loop to give AI a chance to fix errors
+					continue
 				} else {
-					log.Infof("finish action with warnings/hints: %v", errorMessages)
+					log.Infof("finish action with warnings/hints: %v", errMsg)
+					errorMessages = errMsg
 				}
 				fmt.Println(errorMessages)
 				fmt.Println("=================================================")
