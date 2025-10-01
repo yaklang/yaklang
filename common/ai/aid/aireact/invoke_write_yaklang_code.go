@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
+	"github.com/yaklang/yaklang/common/utils/ziputil"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -292,6 +294,31 @@ LOOP:
 			}
 			continue
 		case "query_document":
+			zipName, err := thirdparty_bin.GetBinaryPath("yaklang-aikb")
+			if err != nil {
+				log.Errorf("Failed to get yaklang-aikb binary: %v", err)
+				return utils.Errorf("Failed to get yaklang-aikb binary: %v", err)
+			}
+			payloads := action.GetInvokeParams("query_document_payload")
+			caseSensitive := payloads.GetBool("case_sensitive")
+			var results []*ziputil.GrepResult
+			for _, keyword := range payloads.GetStringSlice("keywords") {
+				searchResult, err := ziputil.GrepSubString(zipName, keyword, ziputil.WithGrepCaseSensitive(caseSensitive))
+				if err != nil {
+					log.Warnf("Failed to grep keyword: %v", err)
+					continue
+				}
+				results = append(results, searchResult...)
+			}
+			for _, reg := range payloads.GetStringSlice("regexp") {
+				searchResults, err := ziputil.GrepRegexp(zipName, reg, ziputil.WithGrepCaseSensitive(caseSensitive))
+				if err != nil {
+					log.Warnf("Failed to grep regexp: %v", err)
+					continue
+				}
+				results = append(results, searchResults...)
+			}
+			_ = zipName
 			return utils.Errorf("query_document action not implemented yet")
 		}
 	}

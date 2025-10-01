@@ -38,6 +38,10 @@ var ZipExports = map[string]interface{}{
 	"ExtractFilesFromRaw":     ziputil.ExtractFilesFromRaw,
 	"ExtractByPattern":        ziputil.ExtractByPattern,
 	"ExtractByPatternFromRaw": ziputil.ExtractByPatternFromRaw,
+
+	// GrepResult 处理功能
+	"MergeGrepResults": ziputil.MergeGrepResults,
+	"RRFRankResults":   RRFRankGrepResults,
 }
 
 // Recursive Decompress decompresses a zip file to a directory
@@ -125,4 +129,18 @@ func CompressRaw(i any) ([]byte, error) {
 	zipFp.Flush()
 	zipFp.Close()
 	return buf.Bytes(), nil
+}
+
+// RRFRankGrepResults 使用 RRF 算法对 GrepResult 进行排序
+// Example:
+// ```
+//
+//	results1 = zip.GrepRegexp("file.zip", "pattern1")~
+//	results2 = zip.GrepSubString("file.zip", "keyword")~
+//	allResults = append(results1, results2...)
+//	ranked = zip.RRFRankResults(allResults)~
+//
+// ```
+func RRFRankGrepResults(results []*ziputil.GrepResult) []*ziputil.GrepResult {
+	return utils.RRFRankWithDefaultK(results)
 }
