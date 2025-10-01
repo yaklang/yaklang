@@ -249,6 +249,8 @@ LOOP:
 					if !utils.MatchAllOfSubString(content, "http server example") {
 						t.Errorf("Generated code doesn't contain expected content: %s", content)
 					}
+					// Successfully completed query_document -> write_code flow, exit
+					break LOOP
 				}
 			}
 		case <-after:
