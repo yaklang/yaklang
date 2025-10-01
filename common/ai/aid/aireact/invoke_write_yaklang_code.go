@@ -68,6 +68,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) (st
 	log.Info("================================================================")
 	log.Infof("Generating yaklang code to file: %s", filename)
 	log.Infof("in terminal, use `code %#v` for open current in editor", filename)
+	log.Infof("Code generation loop maxIterations: %d", r.config.maxIterations)
 	log.Info("================================================================")
 
 	// Create document searcher before entering loop for better performance
@@ -83,6 +84,7 @@ LOOP:
 		iterationCount++
 
 		if r.config.maxIterations > 0 && iterationCount > r.config.maxIterations {
+			log.Warnf("Reached max iterations (%d), stopping code generation loop", r.config.maxIterations)
 			break
 		}
 
