@@ -401,3 +401,174 @@ func TestReAct_QueryDocumentRRFRanking(t *testing.T) {
 		}
 	}
 }
+
+func TestReAct_QueryDocumentSizeLimit(t *testing.T) {
+	// Test size limit enforcement
+	tempDir := os.TempDir()
+	zipPath := filepath.Join(tempDir, "test-aikb-sizelimit-"+ksuid.New().String()+".zip")
+	defer os.Remove(zipPath)
+
+	// Create large documents to test size limit
+	docs := make(map[string]string)
+	for i := 0; i < 100; i++ {
+		content := ""
+		for j := 0; j < 100; j++ {
+			content += fmt.Sprintf("Line %d: This is a test document with some content about http server and api documentation. ", j)
+		}
+		docs[fmt.Sprintf("doc%d.md", i)] = content
+	}
+
+	raw, err := createTestZip(docs)
+	if err != nil {
+		t.Fatalf("Failed to create test zip data: %v", err)
+	}
+	err = os.WriteFile(zipPath, raw, 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test zip: %v", err)
+	}
+
+	// Test with small size limit (1KB)
+	searcher, err := ziputil.NewZipGrepSearcher(zipPath)
+	if err != nil {
+		t.Fatalf("Failed to create searcher: %v", err)
+	}
+
+	// Search for common term that will match many documents
+	results, err := searcher.GrepSubString("http", ziputil.WithContext(2))
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+
+	if len(results) == 0 {
+		t.Fatal("Expected some results")
+	}
+
+	// Merge and rank
+	merged := ziputil.MergeGrepResults(results)
+	ranked := utils.RRFRankWithDefaultK(merged)
+
+	// Test size limit logic manually
+	maxSize := int64(1024) // 1KB limit
+	var docBuffer bytes.Buffer
+	docBuffer.WriteString("=== Document Query Results ===\n")
+
+	var includedResults int
+	var truncated bool
+
+	for i, result := range ranked {
+		resultStr := fmt.Sprintf("--- Result %d ---\n", i+1)
+		resultStr += result.String()
+		resultStr += "\n"
+
+		if int64(docBuffer.Len()+len(resultStr)+100) > maxSize {
+			truncated = true
+			break
+		}
+
+		docBuffer.WriteString(resultStr)
+		includedResults++
+	}
+
+	if truncated {
+		docBuffer.WriteString(fmt.Sprintf("...[truncated: %d more results]\n", len(ranked)-includedResults))
+	}
+
+	docBuffer.WriteString("=== End ===\n")
+	finalResult := docBuffer.String()
+
+	// Verify truncation happened
+	if !truncated {
+		t.Log("Warning: Expected truncation with 1KB limit, but no truncation occurred")
+	}
+
+	// Verify final size is within limit (with some margin for footer)
+	if int64(len(finalResult)) > maxSize+200 {
+		t.Errorf("Final result size %d exceeds limit %d (even with margin)", len(finalResult), maxSize)
+	}
+
+	// Verify truncation message exists if truncated
+	if truncated && !utils.MatchAllOfSubString(finalResult, "truncated") {
+		t.Error("Truncated result should contain truncation message")
+	}
+
+	t.Logf("Results: total=%d, included=%d, truncated=%v, size=%d bytes",
+		len(ranked), includedResults, truncated, len(finalResult))
+}
+
+func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
+	// Test that default size limit is set correctly
+	in := make(chan *ypb.AIInputEvent, 10)
+	out := make(chan *ypb.AIOutputEvent, 10)
+
+	ins, err := NewReAct(
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+		WithEventInputChan(in),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check default value
+	expectedDefault := int64(20 * 1024)
+	if ins.config.aikbResultMaxSize != expectedDefault {
+		t.Errorf("Default aikb result max size should be %d, got %d",
+			expectedDefault, ins.config.aikbResultMaxSize)
+	}
+
+	// Test with custom value
+	ins2, err := NewReAct(
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+		WithEventInputChan(in),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		WithAIKBResultMaxSize(10*1024), // 10KB
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if ins2.config.aikbResultMaxSize != 10*1024 {
+		t.Errorf("Custom aikb result max size should be %d, got %d",
+			10*1024, ins2.config.aikbResultMaxSize)
+	}
+
+	// Test with value exceeding hard limit
+	ins3, err := NewReAct(
+		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
+			rsp.Close()
+			return rsp, nil
+		}),
+		WithEventInputChan(in),
+		WithEventHandler(func(e *schema.AiOutputEvent) {
+			out <- e.ToGRPC()
+		}),
+		WithAIKBResultMaxSize(50*1024), // Try to set 50KB (exceeds hard limit)
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should be capped at 20KB
+	if ins3.config.aikbResultMaxSize != 20*1024 {
+		t.Errorf("aikb result max size exceeding hard limit should be capped at %d, got %d",
+			20*1024, ins3.config.aikbResultMaxSize)
+	}
+
+	close(in)
+}

@@ -97,21 +97,55 @@ func (r *ReAct) handleQueryDocument(
 		rankedResults = rankedResults[:limit]
 	}
 
-	// Format results for AI consumption
+	// Get max size from config (default 20KB)
+	maxSize := r.config.aikbResultMaxSize
+	if maxSize <= 0 {
+		maxSize = 20 * 1024 // Fallback to 20KB
+	}
+
+	// Format results for AI consumption with size control
 	var docBuffer bytes.Buffer
 	docBuffer.WriteString("\n=== Document Query Results ===\n")
 	docBuffer.WriteString(fmt.Sprintf("Found %d relevant documents:\n\n", len(rankedResults)))
 
+	var includedResults int
+	var truncated bool
+
+	// Add results one by one, checking size limit
 	for i, result := range rankedResults {
-		docBuffer.WriteString(fmt.Sprintf("--- Result %d (Score: %.4f) ---\n", i+1, result.Score))
-		docBuffer.WriteString(result.String())
-		docBuffer.WriteString("\n")
+		resultStr := fmt.Sprintf("--- Result %d (Score: %.4f) ---\n", i+1, result.Score)
+		resultStr += result.String()
+		resultStr += "\n"
+
+		// Check if adding this result would exceed the limit
+		if int64(docBuffer.Len()+len(resultStr)+100) > maxSize { // +100 for footer
+			truncated = true
+			break
+		}
+
+		docBuffer.WriteString(resultStr)
+		includedResults++
 	}
+
+	// Add truncation notice if needed
+	if truncated {
+		docBuffer.WriteString(fmt.Sprintf("\n...[truncated: %d more results not shown due to size limit %d bytes]\n",
+			len(rankedResults)-includedResults, maxSize))
+		log.Warnf("document query results truncated: %d/%d results included (size limit: %d bytes)",
+			includedResults, len(rankedResults), maxSize)
+	}
+
 	docBuffer.WriteString("=== End of Document Query Results ===\n")
 
 	documentResults := docBuffer.String()
 
-	r.addToTimeline("query_document", fmt.Sprintf("found %d documents", len(rankedResults)))
+	// Final safety check - hard truncate if still too large
+	if int64(len(documentResults)) > maxSize {
+		documentResults = documentResults[:maxSize-100] + "\n...[truncated]\n=== End of Document Query Results ===\n"
+		log.Warnf("document query results hard truncated to %d bytes", maxSize)
+	}
+
+	r.addToTimeline("query_document", fmt.Sprintf("found %d documents (%d included)", len(rankedResults), includedResults))
 	r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
 
 	return documentResults, true
