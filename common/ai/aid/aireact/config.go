@@ -152,12 +152,27 @@ type ReActConfig struct {
 	hijackPlanRequest func(ctx context.Context, planPayload string) error
 
 	// AI Knowledge Base path for document query
-	aikbPath string
+	aikbPath          string
+	aikbResultMaxSize int64 // Max size for document query results (default 20KB)
 }
 
 func WithAIKBPath(path string) Option {
 	return func(opt *ReActConfig) {
 		opt.aikbPath = path
+	}
+}
+
+func WithAIKBResultMaxSize(maxSize int64) Option {
+	return func(opt *ReActConfig) {
+		if maxSize <= 0 {
+			maxSize = 20 * 1024 // Default 20KB
+		}
+		// Hard limit: cannot exceed 20KB
+		if maxSize > 20*1024 {
+			log.Warnf("aikb result max size %d exceeds hard limit 20KB, setting to 20KB", maxSize)
+			maxSize = 20 * 1024
+		}
+		opt.aikbResultMaxSize = maxSize
 	}
 }
 
@@ -563,6 +578,9 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
 		workdir:                     consts.GetDefaultYakitBaseDir(),
+
+		// AIKB configuration
+		aikbResultMaxSize: 20 * 1024, // Default 20KB for document query results
 
 		// aiforge manager
 		aiBlueprintManager: aiforge.NewForgeFactory(),
