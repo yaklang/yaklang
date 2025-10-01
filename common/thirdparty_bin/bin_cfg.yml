@@ -3,6 +3,14 @@ description: "Third-party binary tools configuration"
 baseurl: "https://oss-qn.yaklang.com"
 
 binaries:
+  - name: "aikb"
+    description: "Yaklang AIKB - A comprehensive knowledge base for AI"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/ai-knowledge-base/yaklang-aikb.zip"
+        bin_path: "yaklang-aikb.zip"
   - name: "vulinbox"
     description: "Yaklang Vulnerability Testing Box - A comprehensive vulnerability testing platform"
     version: "latest"
