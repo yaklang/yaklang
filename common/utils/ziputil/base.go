@@ -184,7 +184,7 @@ func DeCompressFromRaw(raw []byte, dest string) error {
 		filename := filepath.Join(dest, file.Name)
 		filenameAbs, err := filepath.Abs(filename)
 		if err != nil {
-			return utils.Errorf("cannot convert %s as abs path: %s", err)
+			return utils.Errorf("cannot convert %s as abs path: %s", filename, err)
 		}
 		if !strings.HasPrefix(filenameAbs, absDestFull) {
 			return utils.Errorf("extract file(%s) [abs:%s] is not in [%s]", filename, filenameAbs, absDestFull)
@@ -192,7 +192,7 @@ func DeCompressFromRaw(raw []byte, dest string) error {
 		if file.FileInfo().IsDir() {
 			err := os.MkdirAll(filename, 0777)
 			if err != nil {
-				return utils.Errorf("mkdir failed: %s")
+				return utils.Errorf("mkdir failed: %s", err)
 			}
 			continue
 		}
