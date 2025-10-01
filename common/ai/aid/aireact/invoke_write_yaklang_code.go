@@ -86,17 +86,16 @@ LOOP:
 			break
 		}
 
-		// Before generating prompt, check current code status to determine if finish is allowed
+		// Before generating prompt, ALWAYS check current code status to determine errors and finish availability
+		// This ensures we have the most up-to-date error state for the prompt
 		if currentCode != "" {
-			errMsg, hasErrors := checkCodeAndFormatErrors(currentCode)
-			hasBlockingErrors = hasErrors
-			if errMsg != "" && errorMessages == "" {
-				// If we have errors but no error messages from previous iteration, use current errors
-				errorMessages = errMsg
-			}
-			log.Infof("iteration %d pre-check: hasBlockingErrors=%v, finish_allowed=%v", iterationCount, hasBlockingErrors, !hasBlockingErrors)
+			errorMessages, hasBlockingErrors = checkCodeAndFormatErrors(currentCode)
+			log.Infof("iteration %d: checked code, hasBlockingErrors=%v, errorMsgLen=%d, finish_allowed=%v",
+				iterationCount, hasBlockingErrors, len(errorMessages), !hasBlockingErrors)
 		} else {
-			log.Infof("iteration %d: currentCode is empty, hasBlockingErrors=%v, finish_allowed=%v", iterationCount, hasBlockingErrors, !hasBlockingErrors)
+			errorMessages = ""
+			hasBlockingErrors = false
+			log.Infof("iteration %d: no code yet, hasBlockingErrors=%v, finish_allowed=%v", iterationCount, hasBlockingErrors, !hasBlockingErrors)
 		}
 
 		log.Infof("start to generate yaklang code, iteration %d", iterationCount)
@@ -114,7 +113,7 @@ LOOP:
 			log.Errorf("Failed to generate prompt for yaklang code action loop: %v", err)
 			return "", err
 		}
-		errorMessages = ""
+		// Don't clear errorMessages here - it's already set correctly above based on current code state
 
 		var actionName string
 		var payload string
@@ -328,9 +327,10 @@ LOOP:
 
 			errMsg, hasErrors := checkCodeAndFormatErrors(currentCode)
 			hasBlockingErrors = hasErrors
+			errorMessages = errMsg // Set error messages (don't accumulate)
 			r.addToTimeline("code_modified",
 				utils.ShrinkString(fmt.Sprintf("line[%v-%v]:", modifyStartLine, modifyEndLine)+strconv.Quote(currentCode), 128))
-			errorMessages += errMsg
+			log.Infof("modify_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
 		case "write_code":
@@ -344,8 +344,9 @@ LOOP:
 			currentCode = code
 			errMsg, hasErrors := checkCodeAndFormatErrors(code)
 			hasBlockingErrors = hasErrors
+			errorMessages = errMsg // Set error messages (don't accumulate)
 			r.addToTimeline("code_generated", utils.ShrinkString(strconv.Quote(code), 128))
-			errorMessages += errMsg
+			log.Infof("write_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
 		case "require_tool":
