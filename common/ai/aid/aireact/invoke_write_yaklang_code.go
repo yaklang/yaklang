@@ -178,9 +178,10 @@ LOOP:
 					modifyStartLine = int(start)
 					modifyEndLine = int(end)
 				case "query_document":
-					payload = action.GetString("query_document")
-					if payload == "" {
-						return utils.Error("query_document action must have 'query_document' field")
+					// query_document uses query_document_payload, no simple payload field needed
+					payloads := action.GetInvokeParams("query_document_payload")
+					if len(payloads.GetStringSlice("keywords")) == 0 && len(payloads.GetStringSlice("regexp")) == 0 {
+						return utils.Error("query_document action must have at least one keyword or regexp in 'query_document_payload'")
 					}
 				case "require_tool":
 					payload = action.GetString("tool_require_payload")
@@ -297,29 +298,111 @@ LOOP:
 			zipName, err := thirdparty_bin.GetBinaryPath("yaklang-aikb")
 			if err != nil {
 				log.Errorf("Failed to get yaklang-aikb binary: %v", err)
-				return utils.Errorf("Failed to get yaklang-aikb binary: %v", err)
+				errorMessages += fmt.Sprintf("Failed to get yaklang-aikb binary: %v; ", err)
+				continue
 			}
+
 			payloads := action.GetInvokeParams("query_document_payload")
 			caseSensitive := payloads.GetBool("case_sensitive")
+			contextLines := payloads.GetInt("context_lines")
+			if contextLines == 0 {
+				contextLines = 2 // default context
+			}
+			limit := payloads.GetInt("limit")
+			if limit == 0 {
+				limit = 20 // default limit
+			}
+
+			// Create searcher for better performance with multiple searches
+			searcher, err := ziputil.NewZipGrepSearcher(zipName)
+			if err != nil {
+				log.Errorf("Failed to create zip searcher: %v", err)
+				errorMessages += fmt.Sprintf("Failed to create document searcher: %v; ", err)
+				continue
+			}
+
 			var results []*ziputil.GrepResult
+
+			// Build grep options
+			grepOpts := []ziputil.GrepOption{
+				ziputil.WithGrepCaseSensitive(caseSensitive),
+				ziputil.WithContext(int(contextLines)),
+			}
+
+			// Add path filters if specified
+			includePathSubString := payloads.GetStringSlice("include_path_substring")
+			if len(includePathSubString) > 0 {
+				grepOpts = append(grepOpts, ziputil.WithIncludePathSubString(includePathSubString...))
+			}
+
+			excludePathSubString := payloads.GetStringSlice("exclude_path_substring")
+			if len(excludePathSubString) > 0 {
+				grepOpts = append(grepOpts, ziputil.WithExcludePathSubString(excludePathSubString...))
+			}
+
+			includePathRegexp := payloads.GetStringSlice("include_path_regexp")
+			if len(includePathRegexp) > 0 {
+				grepOpts = append(grepOpts, ziputil.WithIncludePathRegexp(includePathRegexp...))
+			}
+
+			excludePathRegexp := payloads.GetStringSlice("exclude_path_regexp")
+			if len(excludePathRegexp) > 0 {
+				grepOpts = append(grepOpts, ziputil.WithExcludePathRegexp(excludePathRegexp...))
+			}
+
+			// Search by keywords
 			for _, keyword := range payloads.GetStringSlice("keywords") {
-				searchResult, err := ziputil.GrepSubString(zipName, keyword, ziputil.WithGrepCaseSensitive(caseSensitive))
+				searchResult, err := searcher.GrepSubString(keyword, grepOpts...)
 				if err != nil {
-					log.Warnf("Failed to grep keyword: %v", err)
+					log.Warnf("Failed to grep keyword '%s': %v", keyword, err)
 					continue
 				}
 				results = append(results, searchResult...)
 			}
+
+			// Search by regexp
 			for _, reg := range payloads.GetStringSlice("regexp") {
-				searchResults, err := ziputil.GrepRegexp(zipName, reg, ziputil.WithGrepCaseSensitive(caseSensitive))
+				searchResults, err := searcher.GrepRegexp(reg, grepOpts...)
 				if err != nil {
-					log.Warnf("Failed to grep regexp: %v", err)
+					log.Warnf("Failed to grep regexp '%s': %v", reg, err)
 					continue
 				}
 				results = append(results, searchResults...)
 			}
-			_ = zipName
-			return utils.Errorf("query_document action not implemented yet")
+
+			if len(results) == 0 {
+				errorMessages += "No matching documents found for the query; "
+				r.addToTimeline("query_document", "No results found")
+				continue
+			}
+
+			// Apply RRF ranking to merge and rank results from multiple searches
+			results = ziputil.MergeGrepResults(results)
+			rankedResults := utils.RRFRankWithDefaultK(results)
+
+			// Apply limit
+			if limit > 0 && len(rankedResults) > int(limit) {
+				rankedResults = rankedResults[:limit]
+			}
+
+			// Format results for AI consumption
+			var docBuffer bytes.Buffer
+			docBuffer.WriteString("\n=== Document Query Results ===\n")
+			docBuffer.WriteString(fmt.Sprintf("Found %d relevant documents:\n\n", len(rankedResults)))
+
+			for i, result := range rankedResults {
+				docBuffer.WriteString(fmt.Sprintf("--- Result %d (Score: %.4f) ---\n", i+1, result.Score))
+				docBuffer.WriteString(result.String())
+				docBuffer.WriteString("\n")
+			}
+			docBuffer.WriteString("=== End of Document Query Results ===\n")
+
+			documentResults := docBuffer.String()
+			errorMessages += documentResults
+
+			r.addToTimeline("query_document", fmt.Sprintf("Found %d documents", len(rankedResults)))
+			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
+			continue
 		}
 	}
 	return nil
