@@ -655,7 +655,7 @@ func (pm *PromptManager) GenerateYaklangCodeActionLoop(
 	}
 
 	// Set schema - only allow 'finish' action when there are no blocking errors
-	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification, allowFinish)
+	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification, allowFinish, data.Nonce)
 
 	return pm.executeTemplate("yaklang-codeloop", yaklangCodeLoopPromptTemplate, data)
 }

@@ -481,12 +481,23 @@ When you receive a request, first understand the user's goal. Then, structure yo
 
 ### ⚠️⚠️⚠️ 代码生成的铁律 - 必须遵守 ⚠️⚠️⚠️
 
-**ABSOLUTELY CRITICAL - 生成代码时的禁止事项：**
-1. ❌ 禁止在生成的代码中包含任何行号前缀（如 `18 |`, `19 |`, `20 |` 等）
-2. ❌ 禁止在生成的代码中包含任何 `|` 分隔符
-3. ❌ 禁止复制带行号的代码显示格式到生成区域
-4. ✅ 只能生成纯净的、可直接执行的 Yaklang 代码
-5. ✅ modify_start_line 和 modify_end_line 仅用于标识替换范围，生成的代码本身不包含这些行号
+**ABSOLUTELY CRITICAL - 生成代码时的必须事项：**
+1. ⚠️ 当使用 'write_code' 或 'modify_code' 时，你必须ALWAYS在响应中包含 <|GEN_CODE_{{ .Nonce }}|> 代码块
+2. ⚠️ 不能只输出 JSON！必须输出：JSON行 + 代码块
+3. ❌ 禁止在生成的代码中包含任何行号前缀（如 `18 |`, `19 |`, `20 |` 等）
+4. ❌ 禁止在生成的代码中包含任何 `|` 分隔符
+5. ❌ 禁止复制带行号的代码显示格式到生成区域
+6. ✅ 只能生成纯净的、可直接执行的 Yaklang 代码
+7. ✅ modify_start_line 和 modify_end_line 仅用于标识替换范围，生成的代码本身不包含这些行号
+
+**响应格式要求：**
+```
+{"@action": "write_code", ...}
+
+<|GEN_CODE_{{ .Nonce }}|>
+你的Yaklang代码
+<|GEN_CODE_END_{{ .Nonce }}|>
+```
 
 **错误示例（绝对禁止）：**
 ```
@@ -597,7 +608,15 @@ if err != nil {
 defer reader.Close()
 <|GEN_CODE_END_{{ .Nonce }}|>
 
-### ❌ 错误示例：包含行号前缀（绝对禁止！）
+⚠️ 关键提示：JSON 和代码标签必须同时出现！不能只输出 JSON！
+
+### ❌ 错误示例 1：只输出JSON不输出代码（会导致超时！）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25, "human_readable_thought": "修正代码"}
+```
+☝️ 这种格式是错误的！缺少 <|GEN_CODE_{{ .Nonce }}|> 代码块，系统会一直等待超时！
+
+### ❌ 错误示例 2：包含行号前缀（绝对禁止！）
 ```json
 {"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25}
 ```
@@ -610,11 +629,11 @@ defer reader.Close()
 22 |     return
 23 | }
 <|GEN_CODE_END_{{ .Nonce }}|>
-☝️ 这种格式是错误的！会导致语法解析失败！
+☝️ 这种格式是错误的！包含行号会导致语法解析失败！
 
 ### ✅ 正确示例 3: finish 动作（任务完成）
 ```json
 {"@action": "finish", "human_readable_thought": "代码已经完成并通过语法检查"}
 ```
 
-**再次强调：在 <|GEN_CODE_...|> 标签内，只能有纯净的可执行 Yaklang 代码，不能有任何行号、分隔符或其他装饰！**
+**再次强调：在 <|GEN_CODE_{{ .Nonce }}|> 标签内，只能有纯净的可执行 Yaklang 代码，不能有任何行号、分隔符或其他装饰！**

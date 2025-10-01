@@ -1,6 +1,10 @@
 package aireact
 
-import "github.com/yaklang/yaklang/common/ai/aid/aitool"
+import (
+	"fmt"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+)
 
 func getReSelectTool(
 	allowAskForClarification bool,
@@ -186,7 +190,7 @@ func getLoopSchema(
 	return aitool.NewObjectSchemaWithAction(opts...)
 }
 
-func getYaklangCodeLoopSchema(allowAskForClarification bool, haveFinished bool) string {
+func getYaklangCodeLoopSchema(allowAskForClarification bool, haveFinished bool, nonce string) string {
 	actionEnums := []string{
 		"query_document",
 		"write_code",
@@ -200,12 +204,17 @@ func getYaklangCodeLoopSchema(allowAskForClarification bool, haveFinished bool) 
 		actionEnums = append(actionEnums, "finish")
 	}
 
-	description := "You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process.\n" +
-		"⚠️ CRITICAL: When using 'write_code' or 'modify_code', you MUST provide PURE Yaklang code in <|GEN_CODE_...|> tags WITHOUT any line numbers or prefixes. The code must be directly executable. Check examples after schema.\n\n" +
+	description := "You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process.\n\n" +
+		"⚠️⚠️⚠️ CRITICAL CODE GENERATION RULES ⚠️⚠️⚠️\n" +
+		fmt.Sprintf("1. When using 'write_code' or 'modify_code', you MUST ALWAYS generate code in <|GEN_CODE_%s|> tags\n", nonce) +
+		"2. The code must be PURE Yaklang WITHOUT any line numbers (no '18 |', '19 |' prefixes)\n" +
+		"3. The code must be directly executable\n" +
+		fmt.Sprintf("4. NEVER output JSON only - you must output JSON + <|GEN_CODE_%s|> code block together\n", nonce) +
+		"5. Check examples at the end of this prompt for the exact tag format and response structure\n\n" +
 		"Action descriptions:\n" +
 		"- 'query_document': Search for specific Yaklang functions or patterns in documentation\n" +
-		"- 'write_code': Generate new Yaklang code from scratch\n" +
-		"- 'modify_code': Modify existing code by replacing specific line ranges\n" +
+		fmt.Sprintf("- 'write_code': Generate new Yaklang code from scratch [REQUIRES <|GEN_CODE_%s|> code block]\n", nonce) +
+		fmt.Sprintf("- 'modify_code': Modify existing code by replacing specific line ranges [REQUIRES <|GEN_CODE_%s|> code block]\n", nonce) +
 		"- 'require_tool': Request additional tools to help complete the task\n" +
 		"- 'ask_for_clarification': Ask user for more information when intent is unclear\n"
 
@@ -231,11 +240,11 @@ func getYaklangCodeLoopSchema(allowAskForClarification bool, haveFinished bool) 
 		),
 		aitool.WithNumberParam(
 			"modify_start_line",
-			aitool.WithParam_Description("⚠️ ONLY for 'modify_code': Specify the starting line number (1-based) of code to replace. IMPORTANT: These numbers are ONLY for identifying the replacement range - the generated code in <|GEN_CODE_...|> must NOT include any line numbers or '|' separators. Generate pure, clean Yaklang code only."),
+			aitool.WithParam_Description(fmt.Sprintf("⚠️ ONLY for 'modify_code': Specify the starting line number (1-based) of code to replace. IMPORTANT: These numbers are ONLY for identifying the replacement range - the generated code in <|GEN_CODE_%s|> must NOT include any line numbers or '|' separators. Generate pure, clean Yaklang code only.", nonce)),
 		),
 		aitool.WithNumberParam(
 			"modify_end_line",
-			aitool.WithParam_Description("⚠️ ONLY for 'modify_code': Specify the ending line number (1-based) of code to replace. Lines from modify_start_line to modify_end_line will be replaced by your generated code. CRITICAL: Your code in <|GEN_CODE_...|> must be pure Yaklang without line numbers - no '18 |', '19 |' prefixes! Just raw executable code."),
+			aitool.WithParam_Description(fmt.Sprintf("⚠️ ONLY for 'modify_code': Specify the ending line number (1-based) of code to replace. Lines from modify_start_line to modify_end_line will be replaced by your generated code. CRITICAL: Your code in <|GEN_CODE_%s|> must be pure Yaklang without line numbers - no '18 |', '19 |' prefixes! Just raw executable code.", nonce)),
 		),
 		aitool.WithStructParam(
 			"query_document_payload",

@@ -112,6 +112,7 @@ LOOP:
 
 		cb := utils.NewCondBarrier()
 		codeBarrier := cb.CreateBarrier("code")
+		streamFinished := make(chan struct{})
 
 		transactionErr := aicommon.CallAITransaction(
 			r.config, prompt, r.config.CallAI,
@@ -186,7 +187,12 @@ LOOP:
 								)
 							},
 						),
-					})
+					},
+					func() {
+						// Called when stream reading is finished
+						close(streamFinished)
+					},
+				)
 				if actionErr != nil {
 					return utils.Errorf("Failed to parse action: %v", actionErr)
 				}
@@ -232,17 +238,37 @@ LOOP:
 		}
 
 		if actionName == "write_code" || actionName == "modify_code" {
-			log.Info("start to wait code in conditional barrier")
-			cberr := cb.Wait("code")
-			if cberr != nil {
-				log.Warnf("Failed to wait for code generation: %v", cberr)
-			}
-			payload = generatedCode
-			if actionName == "write_code" && payload == "" {
-				errorMessages += "AI did not provide any code in write_code action; "
+			log.Info("start to wait for stream to finish, then wait for code")
+
+			// First, wait for the stream to finish reading
+			<-streamFinished
+			log.Info("stream finished, now waiting for code barrier with 30s timeout")
+
+			// After stream finishes, wait up to 30 seconds for code to be generated
+			waitDone := make(chan error, 1)
+			go func() {
+				waitDone <- cb.Wait("code")
+			}()
+
+			select {
+			case cberr := <-waitDone:
+				if cberr != nil {
+					log.Warnf("Failed to wait for code generation: %v", cberr)
+					errorMessages += fmt.Sprintf("Code generation failed: %v. AI MUST provide code in <|GEN_CODE_...|> tags when using %s action. ", cberr, actionName)
+					continue
+				}
+			case <-time.After(30 * time.Second):
+				log.Warnf("Code generation timeout: stream finished but no code received within 30 seconds")
+				errorMessages += fmt.Sprintf("Code generation TIMEOUT! Stream finished but AI did not provide code in <|GEN_CODE_...|> tags within 30 seconds after stream ended. CRITICAL: You MUST generate code inside <|GEN_CODE_...|> tags when using '%s' action! ", actionName)
 				continue
 			}
-			log.Infof("end to wait code in conditional barrier, code received, len: %v, shrinked: %v", len(generatedCode), utils.ShrinkString(generatedCode, 128))
+
+			payload = generatedCode
+			if payload == "" {
+				errorMessages += fmt.Sprintf("AI did not provide any code in %s action. CRITICAL: You MUST generate code inside <|GEN_CODE_...|> tags when using %s action! ", actionName, actionName)
+				continue
+			}
+			log.Infof("code barrier passed, code received, len: %v, shrinked: %v", len(generatedCode), utils.ShrinkString(generatedCode, 128))
 		}
 
 		// Handle different action types
