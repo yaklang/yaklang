@@ -21,7 +21,29 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils"
+
+	resultSpec "github.com/yaklang/yaklang/common/yak/static_analyzer/result"
 )
+
+// checkCodeAndFormatErrors performs static analysis and formats error messages
+// Returns: errorMessages string, hasBlockingErrors bool
+func checkCodeAndFormatErrors(code string) (string, bool) {
+	result := static_analyzer.YaklangScriptChecking(code, "yak")
+	var buf bytes.Buffer
+	hasBlockingErrors := false
+
+	for _, msg := range result {
+		buf.WriteString(msg.String())
+		buf.WriteString("\n")
+
+		// Check if there are any errors (not just warnings/hints)
+		if msg.Severity == resultSpec.Error {
+			hasBlockingErrors = true
+		}
+	}
+
+	return buf.String(), hasBlockingErrors
+}
 
 func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) (string, error) {
 	// start to write code:
@@ -35,6 +57,7 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) (st
 	iterationCount := 0
 	currentCode := ""
 	errorMessages := ""
+	hasBlockingErrors := false
 	userQuery := ""
 	if r.config.memory != nil {
 		userQuery = r.config.memory.Query
@@ -72,6 +95,7 @@ LOOP:
 			tools,                       // tools
 			nonceStr,                    // nonce for build boundary safe tag
 			r.config.enableUserInteract, // allow ask for clarification
+			!hasBlockingErrors,          // allow finish only when no blocking errors
 		)
 		if err != nil {
 			log.Errorf("Failed to generate prompt for yaklang code action loop: %v", err)
@@ -225,18 +249,17 @@ LOOP:
 		switch actionName {
 		case "finish":
 			log.Info("start to check code for finish action")
-			result := static_analyzer.YaklangScriptChecking(currentCode, "yak")
-			var buf bytes.Buffer
-			for _, msg := range result {
-				buf.WriteString(msg.String())
-				buf.WriteString("\n")
-			}
-			if buf.String() != "" {
+			errorMessages, hasBlockingErrors = checkCodeAndFormatErrors(currentCode)
+			if errorMessages != "" {
 				fmt.Println("=================================================")
 				fmt.Println(currentCode)
 				fmt.Println("=================================================")
-				log.Warnf("finish action, but code has errors: %v", buf.String())
-				fmt.Println(buf.String())
+				if hasBlockingErrors {
+					log.Warnf("finish action, but code has ERRORS: %v", errorMessages)
+				} else {
+					log.Infof("finish action with warnings/hints: %v", errorMessages)
+				}
+				fmt.Println(errorMessages)
 				fmt.Println("=================================================")
 			}
 			break LOOP
@@ -256,15 +279,11 @@ LOOP:
 			os.WriteFile(filename, []byte(fullCode), 0644)
 			currentCode = fullCode
 
-			result := static_analyzer.YaklangScriptChecking(currentCode, "yak")
-			var buf bytes.Buffer
-			for _, msg := range result {
-				buf.WriteString(msg.String())
-				buf.WriteString("\n")
-			}
+			errMsg, hasErrors := checkCodeAndFormatErrors(currentCode)
+			hasBlockingErrors = hasErrors
 			r.addToTimeline("code_modified",
 				utils.ShrinkString(fmt.Sprintf("line[%v-%v]:", modifyStartLine, modifyEndLine)+strconv.Quote(currentCode), 128))
-			errorMessages += buf.String()
+			errorMessages += errMsg
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
 		case "write_code":
@@ -276,14 +295,10 @@ LOOP:
 				return filename, utils.Errorf("Failed to write code to file: %v", err)
 			}
 			currentCode = code
-			result := static_analyzer.YaklangScriptChecking(code, "yak")
-			var buf bytes.Buffer
-			for _, msg := range result {
-				buf.WriteString(msg.String())
-				buf.WriteString("\n")
-			}
+			errMsg, hasErrors := checkCodeAndFormatErrors(code)
+			hasBlockingErrors = hasErrors
 			r.addToTimeline("code_generated", utils.ShrinkString(strconv.Quote(code), 128))
-			errorMessages += buf.String()
+			errorMessages += errMsg
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
 		case "require_tool":
