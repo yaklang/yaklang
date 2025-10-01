@@ -186,23 +186,38 @@ func getLoopSchema(
 	return aitool.NewObjectSchemaWithAction(opts...)
 }
 
-func getYaklangCodeLoopSchema(allowAskForClarification bool) string {
+func getYaklangCodeLoopSchema(allowAskForClarification bool, haveFinished bool) string {
 	actionEnums := []string{
 		"query_document",
 		"write_code",
 		"modify_code",
 		"require_tool",
-		"finish",
 	}
 	if allowAskForClarification {
 		actionEnums = append(actionEnums, "ask_for_clarification")
+	}
+	if haveFinished {
+		actionEnums = append(actionEnums, "finish")
+	}
+
+	description := "You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process.\n" +
+		"⚠️ CRITICAL: When using 'write_code' or 'modify_code', you MUST provide PURE Yaklang code in <|GEN_CODE_...|> tags WITHOUT any line numbers or prefixes. The code must be directly executable. Check examples after schema.\n\n" +
+		"Action descriptions:\n" +
+		"- 'query_document': Search for specific Yaklang functions or patterns in documentation\n" +
+		"- 'write_code': Generate new Yaklang code from scratch\n" +
+		"- 'modify_code': Modify existing code by replacing specific line ranges\n" +
+		"- 'require_tool': Request additional tools to help complete the task\n" +
+		"- 'ask_for_clarification': Ask user for more information when intent is unclear\n"
+
+	if haveFinished {
+		description += "- 'finish': Complete the task when code is fully functional and error-free"
+		description += "\n\n⚠️ IMPORTANT: Since 'finish' action is available, you MUST ensure that all errors in the error section (<|ERR/LINT_WARNING|>) are thoroughly addressed. No syntax errors, logic errors, or functionality-impairing issues should remain. The code must be production-ready before choosing 'finish'."
 	}
 
 	opts := []any{
 		aitool.WithStringParam(
 			"@action",
-			aitool.WithParam_Description("You MUST choose one of the following action types for the Yaklang code generation loop. What you choose will determine the next-step behavior in the code generation process.\n"+
-				"'write_code'  or 'modify_code' means you have to provide Yaklang Code in <|GEN_CODE_...|>, check the example after schema"),
+			aitool.WithParam_Description(description),
 			aitool.WithParam_EnumString(actionEnums...),
 			aitool.WithParam_Required(true),
 		),
@@ -216,11 +231,11 @@ func getYaklangCodeLoopSchema(allowAskForClarification bool) string {
 		),
 		aitool.WithNumberParam(
 			"modify_start_line",
-			aitool.WithParam_Description("If the action is 'modify_code', specify the starting line number (1-based index) of the code segment to be modified. This indicates where the changes should begin in the existing code."),
+			aitool.WithParam_Description("⚠️ ONLY for 'modify_code': Specify the starting line number (1-based) of code to replace. IMPORTANT: These numbers are ONLY for identifying the replacement range - the generated code in <|GEN_CODE_...|> must NOT include any line numbers or '|' separators. Generate pure, clean Yaklang code only."),
 		),
 		aitool.WithNumberParam(
 			"modify_end_line",
-			aitool.WithParam_Description("If the action is 'modify_code', specify the ending line number (1-based index) of the code segment to be modified. This indicates where the changes should end in the existing code. The lines from modify_start_line to modify_end_line (inclusive) will be replaced with the new code provided in the 'code' field."),
+			aitool.WithParam_Description("⚠️ ONLY for 'modify_code': Specify the ending line number (1-based) of code to replace. Lines from modify_start_line to modify_end_line will be replaced by your generated code. CRITICAL: Your code in <|GEN_CODE_...|> must be pure Yaklang without line numbers - no '18 |', '19 |' prefixes! Just raw executable code."),
 		),
 		aitool.WithStructParam(
 			"query_document_payload",
@@ -233,11 +248,67 @@ func getYaklangCodeLoopSchema(allowAskForClarification bool) string {
 			),
 			aitool.WithStringArrayParam(
 				"keywords",
-				aitool.WithParam_Description("A list of keywords or phrases to search for within the specified document. These keywords should be relevant to the information you are seeking and will help narrow down the search results."),
+				aitool.WithParam_Description(`Keywords or phrases to search in Yaklang documentation (supports both Chinese and English). Common patterns:
+
+**High-Frequency Functions (use exact names)**:
+• Network: 'poc.HTTP', 'poc.HTTPEx', 'poc.Get', 'poc.Post', 'servicescan.Scan', 'synscan.Scan'
+• File: 'file.ReadFile', 'file.Save', 'filesys.Recursive', 'zip.CompressRaw', 'zip.Recursive'
+• String: 'str.Split', 'str.Join', 'str.Contains', 'str.Replace', 'str.TrimPrefix'
+• Codec: 'codec.DecodeBase64', 'codec.EncodeBase64', 'json.dumps', 'json.loads'
+• Database: 'db.Query', 'db.Exec', 'risk.NewRisk'
+
+**Function Options (exact option names)**:
+• HTTP: 'poc.timeout', 'poc.json', 'poc.header', 'poc.cookie', 'poc.body', 'poc.retry'
+• Scan: 'servicescan.concurrent', 'servicescan.active', 'servicescan.web', 'servicescan.all'
+• File: 'filesys.onFileStat', 'file.IsDir', 'file.IsFile'
+
+**Feature Keywords (Chinese or English)**:
+• Chinese: 'HTTP发包', 'HTTP请求', '端口扫描', '服务扫描', '文件读取', '文件写入', '字符串处理', 'JSON解析', '并发编程', '错误处理', '正则匹配'
+• English: 'send request', 'port scan', 'file operation', 'string processing', 'error handling', 'concurrent', 'goroutine', 'channel'
+
+**Common Patterns**:
+• Error handling: 'die(err)', '~', 'try-catch', 'defer-recover'
+• Concurrency: 'go func', 'sync.NewWaitGroup', 'sync.NewSizedWaitGroup', 'channel'
+• Fuzzing: 'fuzz.HTTPRequest', 'fuzztag', '{{参数}}'
+
+**Example combinations**:
+- For HTTP: ["poc.HTTP", "HTTP发包", "poc.timeout", "发送请求"]
+- For scanning: ["servicescan.Scan", "端口扫描", "servicescan.concurrent", "指纹识别"]
+- For files: ["file.ReadFile", "文件读取", "filesys.Recursive", "文件遍历"]`),
 			),
 			aitool.WithStringArrayParam(
 				"regexp",
-				aitool.WithParam_Description("A list of regular expressions to match against the content of the document. These regex patterns should be designed to capture specific formats or structures in the text that are relevant to your query."),
+				aitool.WithParam_Description(`Regular expressions to match specific code patterns in Yaklang documentation. Use for precise structural matching:
+
+**Function Call Patterns**:
+• Library functions: '\w+\.\w+\(' - matches any library.function() calls
+• Specific library: 'poc\.\w+\(' - matches all poc.* functions
+• HTTP methods: 'poc\.(HTTP|HTTPEx|Get|Post|Do)\(' - matches HTTP-related functions
+• File operations: 'file\.(ReadFile|Save|WriteFile)\(' - matches file functions
+• String utils: 'str\.(Split|Join|Contains|Replace)\(' - matches string functions
+
+**Configuration Options**:
+• HTTP options: 'poc\.(timeout|json|header|cookie|body|query|postParams)\(' - matches HTTP config
+• Scan options: 'servicescan\.(concurrent|timeout|active|web|all)\(' - matches scan config
+• Context options: '\.(https|port|host|redirectTimes|retryTimes)\(' - matches connection config
+
+**Control Flow & Error Handling**:
+• Error handling: 'die\(|~\s*$|try\s*\{|defer.*recover\(' - matches error patterns
+• Concurrency: 'go\s+func|sync\.New\w+WaitGroup|make\(chan\s+' - matches concurrent code
+• Loops: 'for\s+\w+\s+in\s+|for\s+\w+\s*:?=?\s*range\s+' - matches for-in/range loops
+
+**Code Structure**:
+• Function definition: '(func|fn|def)\s+\w+\s*\(' - matches function declarations
+• Variable assignment: '\w+\s*:?=\s*\w+\.\w+\(' - matches var = lib.func() pattern
+• Method chaining: '\)\s*\.\s*\w+\(' - matches chained method calls
+
+**Example patterns**:
+- HTTP workflow: ['poc\.(HTTP|Get|Post)\(', 'poc\.(timeout|json|header)\(', '~\s*$']
+- File processing: ['file\.\w+\(', 'filesys\.Recursive\(', 'for.*range.*']
+- Error handling: ['die\(|~', 'try\s*\{.*\}\s*catch', 'defer.*recover\(']
+- Concurrency: ['go\s+func', 'sync\.New.*WaitGroup', '<-.*chan|chan\s*<-']
+
+**Note**: Patterns are case-sensitive. Use '\s+' for whitespace, '\w+' for identifiers, '.*' for wildcards.`),
 			),
 		),
 	}
