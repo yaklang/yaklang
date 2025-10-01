@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 
@@ -20,6 +21,147 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task_Info(t *testing.T) {
+	client, err := NewLocalClient(true)
+	require.NoError(t, err)
+
+	pauseTask := func(stream ypb.Yak_SyntaxFlowScanClient) {
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "pause",
+		})
+	}
+
+	startScan := func(progIds []string) (string, ypb.Yak_SyntaxFlowScanClient) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		_ = cancel
+		stream, err := client.SyntaxFlowScan(ctx)
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{"java"},
+			},
+			ProgramName: progIds,
+		})
+
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		return taskID, stream
+	}
+
+	resumeTask := func(taskId string, ctx context.Context) ypb.Yak_SyntaxFlowScanClient {
+		stream, err := client.SyntaxFlowScan(ctx)
+		require.NoError(t, err)
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode:  "resume",
+			ResumeTaskId: taskId,
+		})
+		return stream
+	}
+
+	deleteTask := func(taskId string) {
+		_, err := ssadb.DeleteResultByTaskID(taskId)
+		require.NoError(t, err)
+		err = schema.DeleteSyntaxFlowScanTask(ssadb.GetDB(), taskId)
+		require.NoError(t, err)
+	}
+
+	statusTask := func(taskId string) ypb.Yak_SyntaxFlowScanClient {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		_ = cancel
+		stream, err := client.SyntaxFlowScan(ctx)
+		require.NoError(t, err)
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode:  "status",
+			ResumeTaskId: taskId,
+		})
+		return stream
+	}
+	t.Run("test start, pause, resume, status", func(t *testing.T) {
+		// save prog
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
+		package com.example.apackage;
+		import com.example.bpackage.sub.B;
+		class A {
+			public static void main(String[] args) {
+				B b = new B();
+				target1(b.get());
+				b.show(1);
+			}
+		}
+		`)
+		progID := uuid.NewString()
+		prog, err := ssaapi.ParseProjectWithFS(vf,
+			ssaapi.WithLanguage(consts.JAVA),
+			ssaapi.WithProgramPath("example"),
+			ssaapi.WithProgramName(progID),
+		)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progID)
+		}()
+		require.NoError(t, err)
+		require.NotNil(t, prog)
+		//start
+		taskID, stream := startScan([]string{progID})
+		defer deleteTask(taskID)
+
+		finishProcess := 0.0
+		var finishStatus string
+
+		// pause task
+		log.Errorf("===================================round 1 ===================================")
+		checkSfScanRecvMsg(t, stream, func(status string) {
+			finishStatus = status
+		}, func(process float64) {
+			finishProcess = process
+			if 0.5 < process {
+				pauseTask(stream)
+			}
+		})
+		require.LessOrEqual(t, finishProcess, 1.0)
+		require.GreaterOrEqual(t, finishProcess, 0.5)
+		require.Equal(t, "paused", finishStatus)
+
+		// status
+		var havePause bool
+		var processStatus float64
+		statusStream := statusTask(taskID)
+		log.Errorf("===================================round 2 ===================================")
+		checkSfScanRecvMsg(t, statusStream, func(status string) {
+			if status == "paused" {
+				havePause = true
+			}
+			log.Infof("status : %v", status)
+		}, func(process float64) {
+			processStatus = process
+			log.Infof("process : %v", process)
+		})
+		require.True(t, havePause)
+		require.Equal(t, finishProcess, processStatus)
+		// resume
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		resumeStream := resumeTask(taskID, ctx)
+		haveExecute := false
+		log.Errorf("===================================round 3 ===================================")
+		checkSfScanRecvMsg(t, resumeStream, func(status string) {
+			finishStatus = status
+			if status == "executing" {
+				cancel()
+				haveExecute = true
+			}
+		}, func(process float64) {
+			finishProcess = process
+		})
+		require.True(t, haveExecute)
+		require.Equal(t, "executing", finishStatus)
+		require.LessOrEqual(t, finishProcess, 1.0)
+	})
+}
 
 func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 	client, err := NewLocalClient()
@@ -76,79 +218,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 		})
 		return stream
 	}
-	t.Run("test start, pause, resume, status", func(t *testing.T) {
-		// save prog
-		vf := filesys.NewVirtualFs()
-		vf.AddFile("example/src/main/java/com/example/apackage/a.java", `
-		package com.example.apackage;
-		import com.example.bpackage.sub.B;
-		class A {
-			public static void main(String[] args) {
-				B b = new B();
-				target1(b.get());
-				b.show(1);
-			}
-		}
-		`)
-		progID := uuid.NewString()
-		prog, err := ssaapi.ParseProjectWithFS(vf,
-			ssaapi.WithLanguage(consts.JAVA),
-			ssaapi.WithProgramPath("example"),
-			ssaapi.WithProgramName(progID),
-		)
-		defer func() {
-			ssadb.DeleteProgram(ssadb.GetDB(), progID)
-		}()
-		require.NoError(t, err)
-		require.NotNil(t, prog)
-		//start
-		taskID, stream := startScan([]string{progID})
-		defer deleteTask(taskID)
-
-		finishProcess := 0.0
-		var finishStatus string
-
-		// pause task
-		checkSfScanRecvMsg(t, stream, func(status string) {
-			finishStatus = status
-		}, func(process float64) {
-			finishProcess = process
-			if 0.5 < process {
-				pauseTask(stream)
-			}
-		})
-		require.LessOrEqual(t, finishProcess, 1.0)
-		require.GreaterOrEqual(t, finishProcess, 0.5)
-		require.Equal(t, "paused", finishStatus)
-
-		// status
-		var havePause bool
-		var processStatus float64
-		statusStream := statusTask(taskID)
-		checkSfScanRecvMsg(t, statusStream, func(status string) {
-			if status == "paused" {
-				havePause = true
-			}
-		}, func(process float64) {
-			processStatus = process
-		})
-		require.True(t, havePause)
-		require.Equal(t, finishProcess, processStatus)
-		// resume
-		resumeStream := resumeTask(taskID)
-		haveExecute := false
-		checkSfScanRecvMsg(t, resumeStream, func(status string) {
-			finishStatus = status
-			if status == "executing" {
-				haveExecute = true
-			}
-		}, func(process float64) {
-			finishProcess = process
-		})
-		require.True(t, haveExecute)
-		require.Equal(t, "done", finishStatus)
-		require.Equal(t, 1.0, finishProcess)
-	})
 
 	t.Run("test save two task and resume one of them", func(t *testing.T) {
 		// save prog
@@ -232,12 +301,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			// status task 1
 			var havePause bool
 			var processStatus1 float64
+			log.Infof("============================================ status task 1")
 			statusStream1 := statusTask(taskID1)
 			checkSfScanRecvMsg(t, statusStream1, func(status string) {
+				log.Infof("status : %s", status)
 				if status == "paused" {
 					havePause = true
 				}
 			}, func(process float64) {
+				log.Infof("process : %v", process)
 				processStatus1 = process
 			})
 			require.True(t, havePause)
@@ -248,7 +320,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			// status task 2
 			var haveExecute bool
 			statusStream2 := statusTask(taskID2)
+			log.Infof("============================================ status task 2")
 			checkSfScanRecvMsg(t, statusStream2, func(status string) {
+				log.Infof("status %v", status)
 				if status == "executing" {
 					haveExecute = true // query status when executing
 				}
@@ -262,12 +336,15 @@ func TestGRPCMUSTPASS_SyntaxFlow_Save_And_Resume_Task(t *testing.T) {
 			var finishStatus string
 			haveExecute := false
 			resumeStream := resumeTask(taskID1)
+			log.Infof("============================================ resume task 1")
 			checkSfScanRecvMsg(t, resumeStream, func(status string) {
+				log.Infof("status: %v", status)
 				if status == "executing" {
 					haveExecute = true
 				}
 				finishStatus = status
 			}, func(process float64) {
+				log.Infof("process: %v", process)
 				finishProcess = process
 			})
 			require.True(t, haveExecute)

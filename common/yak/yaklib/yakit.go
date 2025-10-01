@@ -181,10 +181,10 @@ type YakitLog struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
-func NewYakitStatusCardExecResult(status, data string, items ...string) *ypb.ExecResult {
+func NewYakitStatusCardExecResult(status string, data any, items ...string) *ypb.ExecResult {
 	card := &YakitStatusCard{
 		Id:   status,
-		Data: data,
+		Data: fmt.Sprint(data),
 		Tags: items,
 	}
 	raw, _ := YakitMessageGenerator(card)
@@ -217,11 +217,12 @@ func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
 	return i.String()
 }
 
-func NewYakitLogExecResult(level string, data string, items ...interface{}) *ypb.ExecResult {
+func NewYakitLogExecResult(level string, input any, items ...interface{}) *ypb.ExecResult {
 	logItem := &YakitLog{
 		Level:     level,
 		Timestamp: time.Now().Unix(),
 	}
+	data := utils.InterfaceToString(input)
 	if len(items) > 0 {
 		logItem.Data = fmt.Sprintf(data, items...)
 	} else {
@@ -236,10 +237,11 @@ func NewYakitLogExecResult(level string, data string, items ...interface{}) *ypb
 }
 
 func NewYakitProgressExecResult(id string, progress float64) *ypb.ExecResult {
-	raw, _ := json.Marshal(&YakitProgress{
+	p := &YakitProgress{
 		Id:       id,
 		Progress: progress,
-	})
+	}
+	raw, _ := YakitMessageGenerator(p)
 	return &ypb.ExecResult{
 		IsMessage: true,
 		Message:   raw,
@@ -487,6 +489,7 @@ func YakitMessageGenerator(i interface{}) ([]byte, error) {
 	switch i.(type) {
 	case *YakitStatusCard:
 		msg.Type = "status-card"
+		msg.Content = raw
 	case *YakitProgress:
 		msg.Type = "progress"
 		msg.Content = raw

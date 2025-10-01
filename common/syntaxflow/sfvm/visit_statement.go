@@ -150,7 +150,7 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 				extraDesc.rawDesc[key] = value
 			}
 		}
-		y.EmitAddDescription(key, value)
+		// y.EmitAddDescription(key, value)
 	}
 	if haveFileSystem {
 		y.verifyFsInfo = append(y.verifyFsInfo, extraDesc)

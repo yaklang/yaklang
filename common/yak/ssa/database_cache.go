@@ -58,7 +58,7 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 	}
 	fetchSize := min(max(fileSize*5, defaultFetchSize), maxFetchSize)
 	saveSize := min(max(fileSize*5, defaultSaveSize), maxSaveSize)
-	log.Debugf("Databasex Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
+	log.Debugf("asyncdb Channel: ReSetSize: fileSize(%d) fetchSize(%d) saveSize(%d)", fileSize, fetchSize, saveSize)
 	cache.initIndex(databaseKind, saveSize/2)
 	cache.afterSaveNotify = func(i int) {}
 	cache.InstructionCache = createInstructionCache(

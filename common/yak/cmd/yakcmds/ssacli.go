@@ -1137,19 +1137,20 @@ var ssaRisk = &cli.Command{
 			defer config.DeferFunc()
 
 			ctx := context.Background()
-			prog, err := getProgram(ctx, config)
-			if err != nil {
-				log.Errorf("get program failed: %s", err)
-				return err
-			}
+			_ = ctx
+			// prog, err := getProgram(ctx, config)
+			// if err != nil {
+			// 	log.Errorf("get program failed: %s", err)
+			// 	return err
+			// }
 
-			ruleFilter := &ypb.SyntaxFlowRuleFilter{
-				Language:          []string{prog.GetLanguage()},
-				FilterLibRuleKind: yakit.FilterLibRuleFalse,
-			}
+			// ruleFilter := &ypb.SyntaxFlowRuleFilter{
+			// 	Language:          []string{prog.GetLanguage()},
+			// 	FilterLibRuleKind: yakit.FilterLibRuleFalse,
+			// }
 
 			var content []byte
-			riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, true)
+			// riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, true)
 			if err != nil {
 				log.Errorf("scan failed: %s", err)
 				// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
@@ -1164,9 +1165,9 @@ var ssaRisk = &cli.Command{
 			}
 
 			// 创建一个缓冲区来捕获ShowRisk的输出
-			var buffer bytes.Buffer
-			ShowRisk(config.Format, riskCh, &buffer, opt...)
-			content = buffer.Bytes()
+			// var buffer bytes.Buffer
+			// ShowRisk(config.Format, riskCh, &buffer, opt...)
+			// content = buffer.Bytes()
 
 			return showAll(content)
 		}
@@ -1303,7 +1304,9 @@ var ssaCodeScan = &cli.Command{
 		log.Infof("sync rule from embed to database success, cost %v", ruleTime)
 
 		if databaseRaw := c.String("database"); databaseRaw != "" {
-			consts.SetGormSSAProjectDatabaseByInfo(databaseRaw)
+			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseRaw); err != nil {
+				return utils.Errorf("set database by info %s failed: %v", databaseRaw, err)
+			}
 		}
 		// Parse configuration
 		config, err := parseSFScanConfig(c)
@@ -1344,9 +1347,12 @@ var ssaCodeScan = &cli.Command{
 			opt = append(opt, sfreport.WithDataflowPath(true))
 		}
 		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format, opt...)
+		if err != nil {
+			log.Errorf("create report instance failed: %s", err)
+			return err
+		}
 		err = syntaxflow_scan.StartScan(
 			ctx,
-			nil,
 			syntaxflow_scan.WithProgramNames(prog.GetProgramName()),
 			syntaxflow_scan.WithRuleFilter(ruleFilter),
 			syntaxflow_scan.WithMemory(c.Bool("memory")),

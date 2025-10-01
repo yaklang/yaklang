@@ -65,19 +65,21 @@ func checkSfScanRecvMsg(t *testing.T, stream ypb.Yak_SyntaxFlowScanClient, handl
 		resp, err := stream.Recv()
 		if err != nil {
 			if err == io.EOF || strings.Contains(err.Error(), "context canceled") {
+				log.Errorf("finish sf-scan stream %v", err)
 				return
 			}
 			t.Fatalf("err : %v", err.Error())
+			return
 		}
 		require.NoError(t, err)
-		log.Infof("resp %v", resp)
+		// log.Infof("resp %v", resp)
 		handlerStatus(resp.Status)
 		if resp.ExecResult != nil && resp.ExecResult.IsMessage {
 			rawMsg := resp.ExecResult.GetMessage()
 			var msg msg
 			json.Unmarshal(rawMsg, &msg)
 			if msg.Type == "progress" {
-				log.Infof("msg: %v", msg)
+				// log.Infof("msg: %v", msg)
 				handlerProcess(msg.Content.Process)
 			}
 		}
@@ -128,7 +130,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 				var tmp map[string]string
 				err = json.Unmarshal(res.GetData(), &tmp)
 				require.NoError(t, err)
-				log.Infof("taskid: %#v", tmp)
+				// log.Infof("taskid: %#v", tmp)
 				if tmp["task_id"] == taskID {
 					matchTaskID = true
 					res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
@@ -210,7 +212,7 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel_Multiple(t *testing.T) {
-	client, err := NewLocalClient()
+	client, err := NewLocalClient(true)
 	require.NoError(t, err)
 
 	progID := uuid.NewString()
@@ -231,8 +233,10 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_Cancel_Multiple(t *testing.T) {
 		finishProcess := 0.0
 		var finishStatus string
 		checkSfScanRecvMsg(t, stream2, func(status string) {
+			log.Info("stream2 status:", status)
 			finishStatus = status
 		}, func(process float64) {
+			log.Infof("stream2 process: %.2f", process)
 			if 0 < process && process < 1 {
 				hasProcess = true
 			}
@@ -852,7 +856,6 @@ alert $high for {
 		{
 			stream, err := client.SyntaxFlowScan(context.Background())
 			require.NoError(t, err)
-
 			stream.Send(&ypb.SyntaxFlowScanRequest{
 				ControlMode: "start",
 				Filter: &ypb.SyntaxFlowRuleFilter{
@@ -863,6 +866,7 @@ alert $high for {
 				},
 			})
 
+			// risk count 11
 			resp, err := stream.Recv()
 			taskID3 = resp.TaskID
 			require.NoError(t, err)
@@ -890,21 +894,26 @@ alert $high for {
 		require.NoError(t, err)
 		require.Equal(t, len(rsp.Data), 3)
 
-		task := rsp.Data[0]
-		require.Equal(t, task.Programs, []string{progID})
-		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.RiskCount, int64(11))
-		require.Equal(t, task.NewRiskCount, int64(11))
-		task = rsp.Data[1]
-		require.Equal(t, task.Programs, []string{progID})
-		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.RiskCount, int64(2))
-		require.Equal(t, task.NewRiskCount, int64(2))
-		task = rsp.Data[2]
-		require.Equal(t, task.Programs, []string{progID})
-		require.Equal(t, task.Status, "done")
-		require.Equal(t, task.RiskCount, int64(1))
-		require.Equal(t, task.NewRiskCount, int64(0))
+		for _, task := range rsp.Data {
+			if task.TaskId == taskID3 {
+				require.Equal(t, task.Programs, []string{progID})
+				require.Equal(t, task.Status, "done")
+				require.Equal(t, task.RiskCount, int64(11))
+				require.Equal(t, task.NewRiskCount, int64(11))
+			}
+			if task.TaskId == taskID2 {
+				require.Equal(t, task.Programs, []string{progID})
+				require.Equal(t, task.Status, "done")
+				require.Equal(t, task.RiskCount, int64(2))
+				require.Equal(t, task.NewRiskCount, int64(2))
+			}
+			if task.TaskId == taskID1 {
+				require.Equal(t, task.Programs, []string{progID})
+				require.Equal(t, task.Status, "done")
+				require.Equal(t, task.RiskCount, int64(1))
+				require.Equal(t, task.NewRiskCount, int64(0))
+			}
+		}
 	})
 }
 

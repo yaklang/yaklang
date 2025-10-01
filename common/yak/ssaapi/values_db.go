@@ -92,12 +92,6 @@ func OptionSaveValue_ResultIndex(index uint) SaveValueOption {
 	}
 }
 
-func OptionSaveValue_ResultAlert(alertMsg string) SaveValueOption {
-	return func(c *saveValueCtx) {
-		c.ResultAlertMsg = alertMsg
-	}
-}
-
 func OptionSaveValue_ResultRiskHash(hash string) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.RiskHash = hash

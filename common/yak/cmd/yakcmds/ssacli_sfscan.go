@@ -6,17 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/coreplugin"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
-	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 )
 
 func SyncEmbedRule(force ...bool) {
@@ -160,86 +156,4 @@ func getProgram(ctx context.Context, config *ssaCliConfig) (*ssaapi.Program, err
 		return prog, err
 	}
 	return nil, utils.Errorf("get program by parameter fail, please check your command")
-}
-
-func scan(ctx context.Context, progName string, ruleFilter *ypb.SyntaxFlowRuleFilter, memory bool) (ch chan *ssaapi.SyntaxFlowResult, e error) {
-	log.Infof("================= start code scan ================")
-	defer func() {
-		log.Infof("syntaxflow scan done")
-		if err := recover(); err != nil {
-			log.Errorf("syntaxflow scan failed: %s", err)
-			utils.PrintCurrentGoroutineRuntimeStack()
-			e = utils.Errorf("syntaxflow scan failed: %s", err)
-		}
-	}()
-	// start code scan
-	ch = make(chan *ssaapi.SyntaxFlowResult, 10)
-	go func() {
-		defer close(ch)
-		err := syntaxflow_scan.StartScan(ctx, func(result *syntaxflow_scan.ScanResult) error {
-			// 处理扫描结果
-			if result.Result == nil {
-				return nil
-			}
-
-			id := result.Result.ResultID
-			kind := result.Result.SaveKind
-
-			// 从缓存中创建结果
-			ssaResult := ssaapi.CreateResultFromCache(ssaapi.ResultSaveKind(kind), id)
-			if ssaResult == nil {
-				return nil
-			}
-
-			if ssaResult.RiskCount() > 0 {
-				ch <- ssaResult
-			} else {
-				log.Infof("no risk skip ")
-			}
-			return nil
-		},
-			syntaxflow_scan.WithProgramNames(progName),
-			syntaxflow_scan.WithRuleFilter(ruleFilter),
-			syntaxflow_scan.WithMemory(memory),
-		)
-
-		if err != nil {
-			log.Errorf("scan failed: %v", err)
-		}
-	}()
-	return ch, nil
-}
-
-// ShowRisk displays scan results based on the provided configuration
-// TODO: should use `showRisk` not result
-func ShowRisk(format sfreport.ReportType, ch chan *ssaapi.SyntaxFlowResult, writer io.Writer, opt ...sfreport.Option) {
-	log.Infof("================= show result ================")
-	defer func() {
-		log.Infof("show sarif result done")
-		if err := recover(); err != nil {
-			log.Errorf("show sarif result failed: %s", err)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-
-	// convert result to report
-	reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(format, opt...)
-	if err != nil {
-		log.Errorf("convert syntax flow result to report failed: %s", err)
-		return
-	}
-
-	count := 0
-	for result := range ch {
-		count++
-		log.Infof("cover result[%d] to sarif run %d: ", result.GetResultID(), count)
-		f1 := func() {
-			reportInstance.AddSyntaxFlowResult(result)
-		}
-		ssaprofile.ProfileAdd(true, "convert result to report", f1)
-		log.Infof("cover result[%d] add run to report %d done", result.GetResultID(), count)
-	}
-	log.Infof("write report ... ")
-	reportInstance.Save(writer)
-	log.Infof("write report done")
 }
