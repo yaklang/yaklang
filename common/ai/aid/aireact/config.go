@@ -150,6 +150,15 @@ type ReActConfig struct {
 
 	// Plan and execute hijack function for advanced usage/testing
 	hijackPlanRequest func(ctx context.Context, planPayload string) error
+
+	// AI Knowledge Base path for document query
+	aikbPath string
+}
+
+func WithAIKBPath(path string) Option {
+	return func(opt *ReActConfig) {
+		opt.aikbPath = path
+	}
 }
 
 func WithReActWorkdir(dir string) Option {

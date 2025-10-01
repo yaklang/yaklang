@@ -1,0 +1,147 @@
+package aireact
+
+import (
+	"bytes"
+	"fmt"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/ziputil"
+)
+
+// handleQueryDocument handles document query action
+// Returns: documentResults string, shouldContinue bool
+func (r *ReAct) handleQueryDocument(
+	searcher *ziputil.ZipGrepSearcher,
+	payloads aitool.InvokeParams,
+) (string, bool) {
+	// If searcher is nil, try to create it
+	if searcher == nil {
+		log.Warn("document searcher not available, query_document action will be skipped")
+		return "Document searcher not available. Please ensure yaklang-aikb is properly installed; ", false
+	}
+
+	caseSensitive := payloads.GetBool("case_sensitive")
+	contextLines := payloads.GetInt("context_lines")
+	if contextLines == 0 {
+		contextLines = 2 // default context
+	}
+	limit := payloads.GetInt("limit")
+	if limit == 0 {
+		limit = 20 // default limit
+	}
+
+	var results []*ziputil.GrepResult
+
+	// Build grep options
+	grepOpts := []ziputil.GrepOption{
+		ziputil.WithGrepCaseSensitive(caseSensitive),
+		ziputil.WithContext(int(contextLines)),
+	}
+
+	// Add path filters if specified
+	includePathSubString := payloads.GetStringSlice("include_path_substring")
+	if len(includePathSubString) > 0 {
+		grepOpts = append(grepOpts, ziputil.WithIncludePathSubString(includePathSubString...))
+	}
+
+	excludePathSubString := payloads.GetStringSlice("exclude_path_substring")
+	if len(excludePathSubString) > 0 {
+		grepOpts = append(grepOpts, ziputil.WithExcludePathSubString(excludePathSubString...))
+	}
+
+	includePathRegexp := payloads.GetStringSlice("include_path_regexp")
+	if len(includePathRegexp) > 0 {
+		grepOpts = append(grepOpts, ziputil.WithIncludePathRegexp(includePathRegexp...))
+	}
+
+	excludePathRegexp := payloads.GetStringSlice("exclude_path_regexp")
+	if len(excludePathRegexp) > 0 {
+		grepOpts = append(grepOpts, ziputil.WithExcludePathRegexp(excludePathRegexp...))
+	}
+
+	// Search by keywords
+	for _, keyword := range payloads.GetStringSlice("keywords") {
+		searchResult, err := searcher.GrepSubString(keyword, grepOpts...)
+		if err != nil {
+			log.Warnf("failed to grep keyword '%s': %v", keyword, err)
+			continue
+		}
+		results = append(results, searchResult...)
+	}
+
+	// Search by regexp
+	for _, reg := range payloads.GetStringSlice("regexp") {
+		searchResults, err := searcher.GrepRegexp(reg, grepOpts...)
+		if err != nil {
+			log.Warnf("failed to grep regexp '%s': %v", reg, err)
+			continue
+		}
+		results = append(results, searchResults...)
+	}
+
+	if len(results) == 0 {
+		r.addToTimeline("query_document", "no results found")
+		return "No matching documents found for the query; ", false
+	}
+
+	// Apply RRF ranking to merge and rank results from multiple searches
+	results = ziputil.MergeGrepResults(results)
+	rankedResults := utils.RRFRankWithDefaultK(results)
+
+	// Apply limit
+	if limit > 0 && len(rankedResults) > int(limit) {
+		rankedResults = rankedResults[:limit]
+	}
+
+	// Format results for AI consumption
+	var docBuffer bytes.Buffer
+	docBuffer.WriteString("\n=== Document Query Results ===\n")
+	docBuffer.WriteString(fmt.Sprintf("Found %d relevant documents:\n\n", len(rankedResults)))
+
+	for i, result := range rankedResults {
+		docBuffer.WriteString(fmt.Sprintf("--- Result %d (Score: %.4f) ---\n", i+1, result.Score))
+		docBuffer.WriteString(result.String())
+		docBuffer.WriteString("\n")
+	}
+	docBuffer.WriteString("=== End of Document Query Results ===\n")
+
+	documentResults := docBuffer.String()
+
+	r.addToTimeline("query_document", fmt.Sprintf("found %d documents", len(rankedResults)))
+	r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
+
+	return documentResults, true
+}
+
+// createDocumentSearcher creates a document searcher from aikb path
+func (r *ReAct) createDocumentSearcher() *ziputil.ZipGrepSearcher {
+	var zipPath string
+
+	// Use custom aikb path if provided
+	if r.config.aikbPath != "" {
+		zipPath = r.config.aikbPath
+		log.Infof("using custom aikb path: %s", zipPath)
+	} else {
+		// Get default yaklang-aikb binary path
+		path, err := thirdparty_bin.GetBinaryPath("yaklang-aikb")
+		if err != nil {
+			log.Warnf("failed to get yaklang-aikb binary: %v", err)
+			return nil
+		}
+		zipPath = path
+	}
+
+	// Create searcher
+	searcher, err := ziputil.NewZipGrepSearcher(zipPath)
+	if err != nil {
+		log.Warnf("failed to create document searcher from %s: %v", zipPath, err)
+		return nil
+	}
+
+	log.Infof("document searcher created successfully from: %s", zipPath)
+	return searcher
+}

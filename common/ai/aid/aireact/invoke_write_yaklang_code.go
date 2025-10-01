@@ -11,8 +11,6 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
-	"github.com/yaklang/yaklang/common/thirdparty_bin"
-	"github.com/yaklang/yaklang/common/utils/ziputil"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -48,6 +46,10 @@ func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) err
 	log.Infof("Generating yaklang code to file: %s", filename)
 	log.Infof("in terminal, use `code %#v` for open current in editor", filename)
 	log.Info("================================================================")
+
+	// Create document searcher before entering loop for better performance
+	// This will be nil if aikb is not available, which is handled gracefully
+	documentSearcher := r.createDocumentSearcher()
 
 	// Get available tools
 	tools := buildinaitools.GetAllTools()
@@ -295,113 +297,13 @@ LOOP:
 			}
 			continue
 		case "query_document":
-			zipName, err := thirdparty_bin.GetBinaryPath("yaklang-aikb")
-			if err != nil {
-				log.Errorf("Failed to get yaklang-aikb binary: %v", err)
-				errorMessages += fmt.Sprintf("Failed to get yaklang-aikb binary: %v; ", err)
-				continue
-			}
-
 			payloads := action.GetInvokeParams("query_document_payload")
-			caseSensitive := payloads.GetBool("case_sensitive")
-			contextLines := payloads.GetInt("context_lines")
-			if contextLines == 0 {
-				contextLines = 2 // default context
-			}
-			limit := payloads.GetInt("limit")
-			if limit == 0 {
-				limit = 20 // default limit
-			}
-
-			// Create searcher for better performance with multiple searches
-			searcher, err := ziputil.NewZipGrepSearcher(zipName)
-			if err != nil {
-				log.Errorf("Failed to create zip searcher: %v", err)
-				errorMessages += fmt.Sprintf("Failed to create document searcher: %v; ", err)
-				continue
-			}
-
-			var results []*ziputil.GrepResult
-
-			// Build grep options
-			grepOpts := []ziputil.GrepOption{
-				ziputil.WithGrepCaseSensitive(caseSensitive),
-				ziputil.WithContext(int(contextLines)),
-			}
-
-			// Add path filters if specified
-			includePathSubString := payloads.GetStringSlice("include_path_substring")
-			if len(includePathSubString) > 0 {
-				grepOpts = append(grepOpts, ziputil.WithIncludePathSubString(includePathSubString...))
-			}
-
-			excludePathSubString := payloads.GetStringSlice("exclude_path_substring")
-			if len(excludePathSubString) > 0 {
-				grepOpts = append(grepOpts, ziputil.WithExcludePathSubString(excludePathSubString...))
-			}
-
-			includePathRegexp := payloads.GetStringSlice("include_path_regexp")
-			if len(includePathRegexp) > 0 {
-				grepOpts = append(grepOpts, ziputil.WithIncludePathRegexp(includePathRegexp...))
-			}
-
-			excludePathRegexp := payloads.GetStringSlice("exclude_path_regexp")
-			if len(excludePathRegexp) > 0 {
-				grepOpts = append(grepOpts, ziputil.WithExcludePathRegexp(excludePathRegexp...))
-			}
-
-			// Search by keywords
-			for _, keyword := range payloads.GetStringSlice("keywords") {
-				searchResult, err := searcher.GrepSubString(keyword, grepOpts...)
-				if err != nil {
-					log.Warnf("Failed to grep keyword '%s': %v", keyword, err)
-					continue
-				}
-				results = append(results, searchResult...)
-			}
-
-			// Search by regexp
-			for _, reg := range payloads.GetStringSlice("regexp") {
-				searchResults, err := searcher.GrepRegexp(reg, grepOpts...)
-				if err != nil {
-					log.Warnf("Failed to grep regexp '%s': %v", reg, err)
-					continue
-				}
-				results = append(results, searchResults...)
-			}
-
-			if len(results) == 0 {
-				errorMessages += "No matching documents found for the query; "
-				r.addToTimeline("query_document", "No results found")
-				continue
-			}
-
-			// Apply RRF ranking to merge and rank results from multiple searches
-			results = ziputil.MergeGrepResults(results)
-			rankedResults := utils.RRFRankWithDefaultK(results)
-
-			// Apply limit
-			if limit > 0 && len(rankedResults) > int(limit) {
-				rankedResults = rankedResults[:limit]
-			}
-
-			// Format results for AI consumption
-			var docBuffer bytes.Buffer
-			docBuffer.WriteString("\n=== Document Query Results ===\n")
-			docBuffer.WriteString(fmt.Sprintf("Found %d relevant documents:\n\n", len(rankedResults)))
-
-			for i, result := range rankedResults {
-				docBuffer.WriteString(fmt.Sprintf("--- Result %d (Score: %.4f) ---\n", i+1, result.Score))
-				docBuffer.WriteString(result.String())
-				docBuffer.WriteString("\n")
-			}
-			docBuffer.WriteString("=== End of Document Query Results ===\n")
-
-			documentResults := docBuffer.String()
+			documentResults, ok := r.handleQueryDocument(documentSearcher, payloads)
 			errorMessages += documentResults
-
-			r.addToTimeline("query_document", fmt.Sprintf("Found %d documents", len(rankedResults)))
-			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
+			if !ok {
+				// If searcher is not available or no results found, still continue the loop
+				log.Warn("query_document action did not complete successfully")
+			}
 			continue
 		}
 	}
