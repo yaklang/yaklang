@@ -222,9 +222,23 @@ func getYaklangCodeLoopSchema(allowAskForClarification bool) string {
 			"modify_end_line",
 			aitool.WithParam_Description("If the action is 'modify_code', specify the ending line number (1-based index) of the code segment to be modified. This indicates where the changes should end in the existing code. The lines from modify_start_line to modify_end_line (inclusive) will be replaced with the new code provided in the 'code' field."),
 		),
-		aitool.WithStringParam(
-			"query_document",
-			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'query_document'. Provide the exact name of the document you need to query (e.g., 'yaklang-syntax', 'yaklang-document'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here."),
+		aitool.WithStructParam(
+			"query_document_payload",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'query_document'. Provide the exact search pattern of the document you need to query (e.g., 'json.dump', 'servicescan.Scan', 'file.ReadFile', '端口扫描', '打开文件'). Another system will handle the parameter generation based on this name."),
+			},
+			aitool.WithBoolParam(
+				"case_sensitive",
+				aitool.WithParam_Description("Indicates whether the search should be case-sensitive. If true, the search will differentiate between uppercase and lowercase letters. If false, the search will be case-insensitive."),
+			),
+			aitool.WithStringArrayParam(
+				"keywords",
+				aitool.WithParam_Description("A list of keywords or phrases to search for within the specified document. These keywords should be relevant to the information you are seeking and will help narrow down the search results."),
+			),
+			aitool.WithStringArrayParam(
+				"regexp",
+				aitool.WithParam_Description("A list of regular expressions to match against the content of the document. These regex patterns should be designed to capture specific formats or structures in the text that are relevant to your query."),
+			),
 		),
 	}
 	if allowAskForClarification {
