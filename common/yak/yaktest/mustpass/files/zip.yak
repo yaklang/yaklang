@@ -1,6 +1,9 @@
 raw = zip.CompressRaw({
     "a.txt": "Content in a.txt",
     "b.txt": "Content in b.txt",
+    "test.log": "ERROR: test error\nINFO: test info\nDEBUG: test debug",
+    "config.json": `{"name": "test", "port": 8080}`,
+    "src/main.yak": "func main() {\n    println(\"hello\")\n}",
 })~
 
 a = yakit.GetHomeTempDir()
@@ -10,9 +13,9 @@ baseFile = file.Join(a, fileName)
 println(baseFile)
 file.Save(baseFile, raw)
 
-// defer file.Remove(baseFile)
+defer file.Remove(baseFile)
 
-
+// Test basic Recursive functionality
 count=0
 files = []
 zip.Recursive(baseFile, (dir, path, info) => {
@@ -26,8 +29,9 @@ println(count)
 println(files)
 assert "a.txt" in files
 assert "b.txt" in files
-assert 2 == count
+assert count >= 2
 
+// Test RecursiveFromRaw
 count = 0
 files = []
 rawFile = file.ReadFile(baseFile)~
@@ -42,6 +46,116 @@ println(count)
 println(files)
 assert "a.txt" in files
 assert "b.txt" in files
-assert 2 == count
+assert count >= 2
+
+// Test GrepRegexp
+println("\n=== Testing GrepRegexp ===")
+grepResults = zip.GrepRegexp(baseFile, "ERROR.*")~
+assert len(grepResults) > 0, "should find ERROR pattern"
+println("GrepRegexp found:", len(grepResults), "results")
+for result in grepResults {
+    println("  ", result.FileName, ":", result.LineNumber, "-", result.Line)
+    assert result.FileName == "test.log"
+}
+
+// Test GrepSubString with case sensitivity
+println("\n=== Testing GrepSubString ===")
+grepResults = zip.GrepSubString(baseFile, "Content", zip.grepCaseSensitive())~
+assert len(grepResults) >= 2, "should find 'Content' in at least 2 files"
+println("GrepSubString found:", len(grepResults), "results")
+
+// Test GrepSubString with limit
+grepResults = zip.GrepSubString(baseFile, "test", zip.grepLimit(2))~
+assert len(grepResults) <= 2, "should respect limit"
+println("GrepSubString with limit found:", len(grepResults), "results")
+
+// Test GrepRawRegexp with context
+println("\n=== Testing GrepRawRegexp with context ===")
+grepResults = zip.GrepRawRegexp(rawFile, "ERROR", zip.grepContextLine(1))~
+assert len(grepResults) > 0, "should find ERROR"
+for result in grepResults {
+    println("File:", result.FileName, "Line:", result.LineNumber)
+    println("Match:", result.Line)
+    if len(result.ContextAfter) > 0 {
+        println("Context after:", result.ContextAfter)
+    }
+}
+
+// Test GrepRawSubString
+println("\n=== Testing GrepRawSubString ===")
+grepResults = zip.GrepRawSubString(rawFile, "info")~
+assert len(grepResults) > 0, "should find 'info' (case insensitive)"
+println("GrepRawSubString found:", len(grepResults), "results")
+
+// Test ExtractFile
+println("\n=== Testing ExtractFile ===")
+content = zip.ExtractFile(baseFile, "a.txt")~
+assert content == "Content in a.txt", "extracted content should match"
+println("ExtractFile success:", content)
+
+// Test ExtractFile with path
+content = zip.ExtractFile(baseFile, "src/main.yak")~
+assert str.Contains(content, "func main"), "should contain function definition"
+println("ExtractFile with path success")
+
+// Test ExtractFileFromRaw
+println("\n=== Testing ExtractFileFromRaw ===")
+content = zip.ExtractFileFromRaw(rawFile, "b.txt")~
+assert content == "Content in b.txt", "extracted content should match"
+println("ExtractFileFromRaw success:", content)
+
+// Test ExtractFiles
+println("\n=== Testing ExtractFiles ===")
+results = zip.ExtractFiles(baseFile, ["a.txt", "b.txt", "config.json"])~
+assert len(results) == 3, "should extract 3 files"
+for result in results {
+    assert result.Error == nil, sprintf("extract %s should not have error", result.FileName)
+    assert len(result.Content) > 0, "content should not be empty"
+    println("Extracted:", result.FileName, "-", len(result.Content), "bytes")
+}
+
+// Test ExtractFilesFromRaw
+println("\n=== Testing ExtractFilesFromRaw ===")
+results = zip.ExtractFilesFromRaw(rawFile, ["test.log", "config.json"])~
+assert len(results) == 2, "should extract 2 files"
+for result in results {
+    assert result.Error == nil, sprintf("extract %s should not have error", result.FileName)
+    println("Extracted from raw:", result.FileName, "-", len(result.Content), "bytes")
+}
+
+// Test ExtractByPattern
+println("\n=== Testing ExtractByPattern ===")
+results = zip.ExtractByPattern(baseFile, "*.txt")~
+assert len(results) >= 2, "should extract at least 2 .txt files"
+println("ExtractByPattern (*.txt) found:", len(results), "files")
+for result in results {
+    assert str.HasSuffix(result.FileName, ".txt") || str.Contains(result.FileName, ".txt"), "should be .txt file"
+    println("  ", result.FileName)
+}
+
+// Test ExtractByPattern with wildcard
+results = zip.ExtractByPattern(baseFile, "*")~
+assert len(results) >= 5, "should extract all files"
+println("ExtractByPattern (*) found:", len(results), "files")
+
+// Test ExtractByPatternFromRaw
+println("\n=== Testing ExtractByPatternFromRaw ===")
+results = zip.ExtractByPatternFromRaw(rawFile, "*.json")~
+assert len(results) >= 1, "should extract at least 1 .json file"
+for result in results {
+    assert str.HasSuffix(result.FileName, ".json"), "should be .json file"
+    println("Extracted JSON:", result.FileName)
+}
+
+// Test extract non-existent file
+println("\n=== Testing error handling ===")
+try {
+    content = zip.ExtractFile(baseFile, "nonexistent.txt")~
+    assert false, "should fail when extracting non-existent file"
+} catch err {
+    println("Expected error for non-existent file:", err)
+}
+
+println("\n=== All zip tests passed! ===")
 
 

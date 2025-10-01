@@ -233,6 +233,8 @@ jobs:
               go test -v -timeout 15s ./common/utils/memedit/. | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"  
               go test -v -timeout 15s ./common/pcapx/pcaputil/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
               go test -v -timeout 15s ./common/yak/yakurl/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              # ziputil
+              go test -v -timeout 20s ./common/utils/ziputil/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
               # yso
               go test -v -timeout 20s ./common/yso/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
               go test -v -timeout 20s ./common/yserx | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
