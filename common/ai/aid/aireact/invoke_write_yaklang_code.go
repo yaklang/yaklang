@@ -23,7 +23,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) error {
+func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) (string, error) {
 	// start to write code:
 	// * (optional)query code snippets
 	// * write to file
@@ -75,7 +75,7 @@ LOOP:
 		)
 		if err != nil {
 			log.Errorf("Failed to generate prompt for yaklang code action loop: %v", err)
-			return err
+			return "", err
 		}
 		errorMessages = ""
 
@@ -204,7 +204,7 @@ LOOP:
 				return nil
 			})
 		if transactionErr != nil {
-			return utils.Wrap(transactionErr, "AI transaction failed in code generation loop")
+			return "", utils.Wrap(transactionErr, "AI transaction failed in code generation loop")
 		}
 
 		if actionName == "write_code" || actionName == "modify_code" {
@@ -224,6 +224,21 @@ LOOP:
 		// Handle different action types
 		switch actionName {
 		case "finish":
+			log.Info("start to check code for finish action")
+			result := static_analyzer.YaklangScriptChecking(currentCode, "yak")
+			var buf bytes.Buffer
+			for _, msg := range result {
+				buf.WriteString(msg.String())
+				buf.WriteString("\n")
+			}
+			if buf.String() != "" {
+				fmt.Println("=================================================")
+				fmt.Println(currentCode)
+				fmt.Println("=================================================")
+				log.Warnf("finish action, but code has errors: %v", buf.String())
+				fmt.Println(buf.String())
+				fmt.Println("=================================================")
+			}
 			break LOOP
 		case "modify_code":
 			// Apply modification to current code using new edit methods
@@ -231,7 +246,7 @@ LOOP:
 			log.Infof("start to modify code lines %d to %d", modifyStartLine, modifyEndLine)
 			err = editor.ReplaceLineRange(modifyStartLine, modifyEndLine, payload)
 			if err != nil {
-				return utils.Errorf("Failed to replace line range: %v", err)
+				return filename, utils.Errorf("Failed to replace line range: %v", err)
 			}
 			fmt.Println("=================================================")
 			fmt.Println(string(payload))
@@ -258,7 +273,7 @@ LOOP:
 			err := os.WriteFile(filename, []byte(code), 0644)
 			if err != nil {
 				r.addToTimeline("error", "Failed to write code to file: "+err.Error())
-				return utils.Errorf("Failed to write code to file: %v", err)
+				return filename, utils.Errorf("Failed to write code to file: %v", err)
 			}
 			currentCode = code
 			result := static_analyzer.YaklangScriptChecking(code, "yak")
@@ -304,8 +319,14 @@ LOOP:
 				// If searcher is not available or no results found, still continue the loop
 				log.Warn("query_document action did not complete successfully")
 			}
+
+			if len(documentResults) > 0 {
+				log.Infof("================== document query =====================\n"+
+					"%v\n===================== document result ===================\n"+
+					"%v\n=================================================", string(payload), string(documentResults))
+			}
 			continue
 		}
 	}
-	return nil
+	return filename, nil
 }

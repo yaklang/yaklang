@@ -208,7 +208,7 @@ Yaklang 提供了超过 70 个内置标准库模块。以下是基于实际使�
 
 #### **C. 网络和安全模块 (最核心)**
 
-*   **`poc` (使用频率: 194次)**: HTTP数据包精确控制
+*   **`poc`**: HTTP数据包精确控制
     *   `poc.ParseUrlToHTTPRequestRaw(method, url)`: URL转HTTP原始包
     *   `poc.HTTPEx(packet, ...opts)`: 发送原始HTTP包
     *   `poc.ReplaceHTTPPacketQueryParam(packet, name, value)`: 修改查询参数
@@ -271,50 +271,13 @@ Yaklang 提供了超过 70 个内置标准库模块。以下是基于实际使�
     *   `dns.QueryIPAll(domain, ...opts)`: 查询A记录
     *   `dns.QueryNS()`, `dns.QueryTXT()`: 查询其他记录类型
 
-#### **D. 漏洞报告模块**
-
-*   **`risk` (使用频率: 621次)**: 漏洞报告系统
-    *   `risk.NewRisk(url, ...opts)`: 创建新漏洞报告
-    *   `risk.severity("critical"|"high"|"medium"|"low")`: 严重程度
-    *   `risk.title(title)`, `risk.titleVerbose(zhTitle)`: 标题
-    *   `risk.description(desc)`, `risk.solution(sol)`: 描述和解决方案
-    *   `risk.type("sqli"|"xss"|"rce"|...)`: 漏洞类型
-    ```yak
-    risk.NewRisk(
-        url,
-        risk.severity("critical"),
-        risk.title("SQL Injection Found"),
-        risk.type("sqlinjection"),
-        risk.payload(sqlPayload)
-    )
-    ```
-
 #### **E. 编码和加密模块**
 
-*   **`codec` (使用频率: 104次)**: 编码解码工具集
+*   **`codec`**: 编码解码工具集
     *   `codec.EncodeBase64(data)`, `codec.DecodeBase64(data)`: Base64
     *   `codec.EncodeHex(data)`, `codec.DecodeHex(data)`: 十六进制
     *   `codec.MD5(data)`, `codec.SHA1(data)`, `codec.SHA256(data)`: 哈希
     *   `codec.AESCBCEncrypt()`, `codec.AESGCMEncrypt()`: AES加密
-
-#### **F. 并发和同步**
-
-*   **`sync`**: 并发控制
-    *   `sync.NewMutex()`: 互斥锁
-    *   `sync.NewWaitGroup()`: 等待组
-    *   `sync.NewSizedWaitGroup(size)`: 限制大小的等待组
-    ```yak
-    wg := sync.NewWaitGroup()
-    m := sync.NewMutex()
-    wg.Add(1)
-    go func() {
-        defer wg.Done()
-        m.Lock()
-        defer m.Unlock()
-        // 临界区代码
-    }()
-    wg.Wait()
-    ```
 
 #### **G. 其他重要模块**
 
@@ -375,45 +338,7 @@ for param in freq.GetCommonParams() {
 }
 ```
 
-#### **C. 并发处理模式**
-```yak
-wg := sync.NewWaitGroup()
-m := sync.NewMutex()
-results := []
-
-for target in targets {
-    wg.Add(1)
-    go func(t) {
-        defer wg.Done()
-        // 执行扫描
-        result := scanTarget(t)
-
-        m.Lock()
-        results = append(results, result)
-        m.Unlock()
-    }(target)
-}
-wg.Wait()
-```
-
-#### **D. 漏洞报告模式**
-```yak
-risk.NewRisk(
-    url,
-    risk.severity("critical"),  // critical/high/medium/low
-    risk.title("SQL注入漏洞"),
-    risk.titleVerbose("在参数%v中发现SQL注入漏洞" % paramName),
-    risk.description("详细的漏洞描述..."),
-    risk.solution("修复建议..."),
-    risk.type("sqlinjection"),
-    risk.payload(maliciousPayload),
-    risk.parameter(paramName),
-    risk.request(requestRaw),
-    risk.response(responseRaw),
-)
-```
-
-#### **E. 文件处理模式**
+#### **文件处理模式**
 ```yak
 // 检查文件存在并读取
 if file.IsExisted(filepath) {
@@ -548,11 +473,34 @@ When you receive a request, first understand the user's goal. Then, structure yo
 代码生成是一个综合工作，一般需要多轮迭代完成，遵守如下步骤和准则可以让你更高效地完成代码编写任务；
 * 根据<|YAKLANG_CODER_RULE|>内容生成代码；
 * 系统自动运行静态代码分析，发现语法错误或者警告，会放在后续的<|ERR/LINT_WARNING|>区域，你需要再下一次循环中修正错误；
-* 创建一个新的脚本或代码，可以直接使用 @action: 'write_yaklang_code' 来完成；
+* 创建一个新的脚本或代码，可以直接使用 @action: 'write_code' 来完成；
 * 如果要对已有代码进行修改，请使用 'modify_code' 工具，精确到行；
 * 如果代码内容过大，系统会将代码保存到临时文件中，你可以使用 'read_file' 或者 'grep' 等工具来查看；
 * 代码运行结束的时候，可以使用系统命令 'yak your-script.yak' 来运行脚本，并查看输出结果，是否符合预期；
 * 如果代码报错，或者执行结果不符合日期，你可以使用 'modify_code' 工具来修正代码，或者使用 'query_document' 来查询文档，修正代码错误；
+
+### ⚠️⚠️⚠️ 代码生成的铁律 - 必须遵守 ⚠️⚠️⚠️
+
+**ABSOLUTELY CRITICAL - 生成代码时的禁止事项：**
+1. ❌ 禁止在生成的代码中包含任何行号前缀（如 `18 |`, `19 |`, `20 |` 等）
+2. ❌ 禁止在生成的代码中包含任何 `|` 分隔符
+3. ❌ 禁止复制带行号的代码显示格式到生成区域
+4. ✅ 只能生成纯净的、可直接执行的 Yaklang 代码
+5. ✅ modify_start_line 和 modify_end_line 仅用于标识替换范围，生成的代码本身不包含这些行号
+
+**错误示例（绝对禁止）：**
+```
+18 | // 打开ZIP文件
+19 | reader, err := file.Open(someFilePath)
+20 | if err != nil {
+```
+
+**正确示例（必须这样）：**
+```
+// 打开ZIP文件
+reader, err := file.Open(someFilePath)
+if err != nil {
+```
 
 ## Call-Tools 机制
 
@@ -583,7 +531,9 @@ When you receive a request, first understand the user's goal. Then, structure yo
 * 如果代码内容不是特别大的话，请直接在下面的代码块中展示
 * 代码内容过大，会保存到临时文件中，你可以使用 `read_file` 或者 `grep` 等工具来查看
 * 下面的代码块儿为了方便展示，将会展示行列号，你需要正确读取并区分
-* 如果你要修改代码，请你使用 'modify_file' 工具来进行，精确修改到具体行
+* 如果你要修改代码，请你使用 'modify_code' 工具来进行，精确修改到具体行
+
+⚠️⚠️⚠️ **重要提示：下面显示的代码包含行号是为了方便你定位和理解代码结构。但当你使用 'write_code' 或 'modify_code' 生成新代码时，生成的代码中绝对不能包含这些行号前缀！只生成纯净的 Yaklang 代码！** ⚠️⚠️⚠️
 
 <|CURRENT_CODE_{{ .Nonce }}|>
 {{ .CurrentCodeWithLineNumber }}
@@ -610,14 +560,61 @@ When you receive a request, first understand the user's goal. Then, structure yo
 {{ .Schema }}
 ```
 
-如果你输出'write_code'和'modify_code'，输出类似如下内容，JSON + AI-TAG 生成的代码禁止包含行号：
+## 代码生成输出格式示例
 
-{"@action": "write_code"}
+### ✅ 正确示例 1: write_code 动作（创建新代码）
+```json
+{"@action": "write_code", "human_readable_thought": "创建一个简单的端口扫描脚本"}
+```
 
 <|GEN_CODE_{{ .Nonce }}|>
-println("Hello World")
+yakit.AutoInitYakit()
+
+target := cli.String("target", cli.setRequired(true))
+ports := cli.String("ports", cli.setDefault("80,443"))
+cli.check()
+
+results, err := servicescan.Scan(target, ports)
+die(err)
+
+for result in results {
+    yakit.Info("Found: %v", result.String())
+}
 <|GEN_CODE_END_{{ .Nonce }}|>
 
-如果你觉得不需要修改代码，直接回答用户问题，请输出：
+### ✅ 正确示例 2: modify_code 动作（修改现有代码）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25, "human_readable_thought": "修正ZIP文件打开方式"}
+```
 
-{"@action": "finish", "human_readable_thought": "..."}
+<|GEN_CODE_{{ .Nonce }}|>
+// 打开ZIP文件
+reader, err := zip.OpenReader(zipFilePath)
+if err != nil {
+    yakit.Error("打开ZIP文件失败: %v", err)
+    return
+}
+defer reader.Close()
+<|GEN_CODE_END_{{ .Nonce }}|>
+
+### ❌ 错误示例：包含行号前缀（绝对禁止！）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+18 | // 打开ZIP文件
+19 | reader, err := zip.OpenReader(zipFilePath)
+20 | if err != nil {
+21 |     yakit.Error("打开ZIP文件失败: %v", err)
+22 |     return
+23 | }
+<|GEN_CODE_END_{{ .Nonce }}|>
+☝️ 这种格式是错误的！会导致语法解析失败！
+
+### ✅ 正确示例 3: finish 动作（任务完成）
+```json
+{"@action": "finish", "human_readable_thought": "代码已经完成并通过语法检查"}
+```
+
+**再次强调：在 <|GEN_CODE_...|> 标签内，只能有纯净的可执行 Yaklang 代码，不能有任何行号、分隔符或其他装饰！**
