@@ -524,14 +524,21 @@ LOOP:
 			}
 		case ActionWriteYaklangCode:
 			saveIterationInfoIntoTimeline()
-			err := r.invokeWriteYaklangCode(currentTask.GetContext(), writeYaklangCodeApproach)
+			filename, err := r.invokeWriteYaklangCode(currentTask.GetContext(), writeYaklangCodeApproach)
 			if err != nil {
+				r.addToTimeline("error", fmt.Sprintf("Failed to invoke write yaklang code: %v", err))
 				return false, err
 			}
+			if filename != "" {
+				log.Infof("========== [WRITE YAKLANG CODE] ==========\nFile written: %v\n=========================================", filename)
+				r.addToTimeline("write_yaklang_code", fmt.Sprintf("write yaklang code: %v", filename))
+			}
 			r.finished = true
+			return false, nil
 		default:
 			r.EmitError("unknown action type: %v", actionType)
 			r.finished = true
+			r.addToTimeline("error", fmt.Sprintf("unknown action type: %v", actionType))
 		}
 	}
 	if r.currentIteration >= r.config.maxIterations {

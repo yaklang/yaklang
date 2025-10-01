@@ -147,7 +147,7 @@ func (r *ReAct) handleQueryDocument(
 
 	r.addToTimeline("query_document", fmt.Sprintf("found %d documents (%d included)", len(rankedResults), includedResults))
 	r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
-
+	r.addToTimeline("document_query_results", documentResults)
 	return documentResults, true
 }
 

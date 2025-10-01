@@ -654,7 +654,7 @@ func (pm *PromptManager) GenerateYaklangCodeActionLoop(
 	}
 
 	// Set schema
-	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification)
+	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification, true)
 
 	return pm.executeTemplate("yaklang-codeloop", yaklangCodeLoopPromptTemplate, data)
 }
