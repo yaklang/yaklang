@@ -610,6 +610,7 @@ func (pm *PromptManager) GenerateYaklangCodeActionLoop(
 	userQuery, currentCode, errorMessages string,
 	iterationCount int, tools []*aitool.Tool, nonceString string,
 	allowAskForClarification bool,
+	allowFinish bool,
 ) (string, error) {
 	data := &YaklangCodeActionLoopPromptData{
 		CurrentTime:               time.Now().Format("2006-01-02 15:04:05"),
@@ -653,8 +654,8 @@ func (pm *PromptManager) GenerateYaklangCodeActionLoop(
 		data.HasMoreTools = len(tools) > len(data.TopTools)
 	}
 
-	// Set schema
-	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification, true)
+	// Set schema - only allow 'finish' action when there are no blocking errors
+	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification, allowFinish)
 
 	return pm.executeTemplate("yaklang-codeloop", yaklangCodeLoopPromptTemplate, data)
 }
