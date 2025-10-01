@@ -208,6 +208,7 @@ Various string functions are available.
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
+		WithAIKBPath(zipPath), // Use test zip file as aikb
 	)
 	if err != nil {
 		t.Fatal(err)
