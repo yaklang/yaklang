@@ -156,6 +156,125 @@ try {
     println("Expected error for non-existent file:", err)
 }
 
+// Test GrepPath functionality
+println("\n=== Testing GrepPath ===")
+
+// Create a more complex structure for path testing
+complexRaw = zip.CompressRaw({
+    "src/main.go": "package main",
+    "src/utils/helper.go": "package utils",
+    "src/api/handler.go": "package api",
+    "test/main_test.go": "package main",
+    "test/utils_test.go": "package utils",
+    "vendor/lib.go": "package vendor",
+    "docs/README.md": "# README",
+    "config.json": "{}",
+})~
+
+complexFile = file.Join(a, f"${str.RandStr(10)}_complex.zip")
+file.Save(complexFile, complexRaw)
+defer file.Remove(complexFile)
+
+// Test GrepPathRegexp - search for .go files
+results = zip.GrepPathRegexp(complexFile, `\.go$`)~
+assert len(results) >= 5, f"should find at least 5 .go files, found ${len(results)}"
+println("Found", len(results), ".go files")
+for r in results {
+    assert str.HasSuffix(r.FileName, ".go"), "should end with .go"
+}
+
+// Test GrepPathSubString - case insensitive
+results = zip.GrepPathSubString(complexFile, "test")~
+assert len(results) >= 2, "should find at least 2 files with 'test'"
+println("Found", len(results), "files with 'test'")
+
+// Test GrepPathSubString - case sensitive
+results = zip.GrepPathSubString(complexFile, "TEST", zip.grepCaseSensitive())~
+println("Found", len(results), "files with 'TEST' (case sensitive)")
+
+// Test path filtering with include
+println("\n=== Testing Path Filtering ===")
+
+// Include only src/ directory
+results = zip.GrepSubString(complexFile, "package", 
+    zip.grepIncludePathSubString("src/"))~
+assert len(results) >= 3, "should find at least 3 files in src/"
+println("Found", len(results), "matches in src/")
+for r in results {
+    assert str.HasPrefix(r.FileName, "src/"), f"${r.FileName} should be in src/"
+}
+
+// Exclude test and vendor directories
+results = zip.GrepSubString(complexFile, "package",
+    zip.grepExcludePathSubString("test", "vendor"))~
+println("Found", len(results), "matches excluding test and vendor")
+for r in results {
+    assert !str.Contains(r.FileName, "test"), f"${r.FileName} should not contain test"
+    assert !str.Contains(r.FileName, "vendor"), f"${r.FileName} should not contain vendor"
+}
+
+// Include only .go files using regexp
+results = zip.GrepSubString(complexFile, "package",
+    zip.grepIncludePathRegexp(`\.go$`))~
+assert len(results) >= 5, "should find at least 5 .go files"
+println("Found", len(results), "matches in .go files")
+for r in results {
+    assert str.HasSuffix(r.FileName, ".go"), f"${r.FileName} should end with .go"
+}
+
+// Exclude test files using regexp
+results = zip.GrepSubString(complexFile, "package",
+    zip.grepExcludePathRegexp(`_test\.go$`))~
+println("Found", len(results), "matches excluding test files")
+for r in results {
+    assert !str.Contains(r.FileName, "_test.go"), f"${r.FileName} should not be a test file"
+}
+
+// Combined filters - only src/ .go files, excluding test
+results = zip.GrepSubString(complexFile, "package",
+    zip.grepIncludePathSubString("src/"),
+    zip.grepIncludePathRegexp(`\.go$`),
+    zip.grepExcludePathRegexp(`_test\.go$`))~
+assert len(results) >= 3, "should find at least 3 files"
+println("Found", len(results), "matches with combined filters")
+for r in results {
+    assert str.HasPrefix(r.FileName, "src/"), f"${r.FileName} should be in src/"
+    assert str.HasSuffix(r.FileName, ".go"), f"${r.FileName} should end with .go"
+}
+
+// Test ZipGrepSearcher with path features
+println("\n=== Testing ZipGrepSearcher Path Features ===")
+
+searcher = zip.NewGrepSearcher(complexFile)~
+
+// GrepPathRegexp
+pathResults = searcher.GrepPathRegexp(`\.go$`)~
+assert len(pathResults) >= 5, "searcher should find .go files"
+println("Searcher found", len(pathResults), ".go files")
+
+// GrepPathSubString
+pathResults = searcher.GrepPathSubString("src")~
+assert len(pathResults) >= 3, "searcher should find files with 'src'"
+println("Searcher found", len(pathResults), "files with 'src'")
+
+// GrepSubString with path filters
+contentResults = searcher.GrepSubString("package",
+    zip.grepIncludePathSubString("src/"),
+    zip.grepExcludePathSubString("vendor"))~
+assert len(contentResults) >= 3, "searcher should find matches in src/"
+println("Searcher found", len(contentResults), "matches in src/ (excluding vendor)")
+
+// Test that path search results have correct properties
+println("\n=== Testing GrepPath Result Properties ===")
+pathResults = zip.GrepPathSubString(complexFile, ".go")~
+assert len(pathResults) >= 1, "should have path results"
+for r in pathResults {
+    assert r.LineNumber == 0, "path search should have LineNumber=0"
+    assert r.Line == r.FileName, "path search Line should equal FileName"
+    assert str.HasPrefix(r.ScoreMethod, "path_"), f"ScoreMethod should start with 'path_', got ${r.ScoreMethod}"
+    println(f"Path result: ${r.FileName} (Score: ${r.Score}, Method: ${r.ScoreMethod})")
+}
+
 println("\n=== All zip tests passed! ===")
 
 

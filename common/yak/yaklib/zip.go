@@ -26,10 +26,22 @@ var ZipExports = map[string]interface{}{
 	"GrepRawRegexp":    ziputil.GrepRawRegexp,
 	"GrepRawSubString": ziputil.GrepRawSubString,
 
+	// GrepPath 功能 - 搜索文件路径
+	"GrepPathRegexp":       ziputil.GrepPathRegexp,
+	"GrepPathSubString":    ziputil.GrepPathSubString,
+	"GrepPathRawRegexp":    ziputil.GrepPathRawRegexp,
+	"GrepPathRawSubString": ziputil.GrepPathRawSubString,
+
 	// Grep 配置选项
 	"grepLimit":         ziputil.WithGrepLimit,
 	"grepContextLine":   ziputil.WithContext,
 	"grepCaseSensitive": ziputil.WithGrepCaseSensitive,
+
+	// 路径过滤选项
+	"grepIncludePathSubString": ziputil.WithIncludePathSubString,
+	"grepExcludePathSubString": ziputil.WithExcludePathSubString,
+	"grepIncludePathRegexp":    ziputil.WithIncludePathRegexp,
+	"grepExcludePathRegexp":    ziputil.WithExcludePathRegexp,
 
 	// 文件提取功能
 	"ExtractFile":             ziputil.ExtractFile,
@@ -42,6 +54,10 @@ var ZipExports = map[string]interface{}{
 	// GrepResult 处理功能
 	"MergeGrepResults": ziputil.MergeGrepResults,
 	"RRFRankResults":   RRFRankGrepResults,
+
+	// ZipGrepSearcher - 带缓存的搜索器
+	"NewGrepSearcher":        ziputil.NewZipGrepSearcher,
+	"NewGrepSearcherFromRaw": ziputil.NewZipGrepSearcherFromRaw,
 }
 
 // Recursive Decompress decompresses a zip file to a directory
