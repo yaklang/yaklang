@@ -3,7 +3,7 @@ description: "Third-party binary tools configuration"
 baseurl: "https://oss-qn.yaklang.com"
 
 binaries:
-  - name: "aikb"
+  - name: "yaklang-aikb"
     description: "Yaklang AIKB - A comprehensive knowledge base for AI"
     version: "latest"
     install_type: "bin"
