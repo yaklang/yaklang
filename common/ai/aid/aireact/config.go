@@ -671,14 +671,25 @@ func (c *ReActConfig) restorePersistentSession() {
 		return
 	}
 
+	// Bind config first so timeline can access it
 	timelineInstance.BindConfig(c, c)
 	if !timelineInstance.Valid() {
 		log.Errorf("restored timeline instance is invalid for session [%s]", c.persistentSessionId)
 		return
 	}
 
+	// Reassign IDs to all restored timeline items to avoid ID conflicts
+	// This uses the current idGenerator to ensure sequential IDs
+	lastID := timelineInstance.ReassignIDs(c.idGenerator)
+	if lastID > 0 {
+		log.Infof("reassigned timeline IDs, last assigned ID: %d", lastID)
+		// Update idSequence to continue from the last assigned ID
+		atomic.StoreInt64(&c.idSequence, lastID)
+	}
+
 	c.memory.SetTimelineInstance(timelineInstance)
-	log.Infof("successfully restored timeline instance from persistent session [%s]", c.persistentSessionId)
+	log.Infof("successfully restored timeline instance from persistent session [%s] with %d items",
+		c.persistentSessionId, timelineInstance.GetIdToTimelineItem().Len())
 }
 
 // NewReActConfig creates a new ReActConfig with options

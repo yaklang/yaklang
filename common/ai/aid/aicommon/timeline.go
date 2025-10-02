@@ -714,6 +714,89 @@ func (m *TimelineItemOutput) String() string {
 	return fmt.Sprintf("[%v][%s] %s", m.Timestamp, m.Type, m.Content)
 }
 
+// ReassignIDs reassigns sequential IDs to all timeline items starting from the given startID
+// This is used when restoring from persistent session to avoid ID conflicts
+// Returns the next available ID after reassignment
+func (m *Timeline) ReassignIDs(idGenerator func() int64) int64 {
+	if m == nil || idGenerator == nil {
+		return 0
+	}
+
+	// Collect all items ordered by their original timestamp to maintain order
+	type itemWithTs struct {
+		ts   int64
+		item *TimelineItem
+	}
+	var orderedItems []itemWithTs
+
+	// Iterate through items in timestamp order
+	m.tsToTimelineItem.ForEach(func(ts int64, item *TimelineItem) bool {
+		orderedItems = append(orderedItems, itemWithTs{ts: ts, item: item})
+		return true
+	})
+
+	if len(orderedItems) == 0 {
+		return 0
+	}
+
+	// Create new mappings
+	newIdToTs := omap.NewOrderedMap(map[int64]int64{})
+	newIdToTimelineItem := omap.NewOrderedMap(map[int64]*TimelineItem{})
+	newSummary := omap.NewOrderedMap(map[int64]*linktable.LinkTable[*TimelineItem]{})
+	newReducers := omap.NewOrderedMap(map[int64]*linktable.LinkTable[string]{})
+
+	// Track old ID to new ID mapping for summary and reducers
+	oldToNewID := make(map[int64]int64)
+
+	var lastID int64
+	// Reassign IDs in order
+	for _, itemWithTs := range orderedItems {
+		item := itemWithTs.item
+		ts := itemWithTs.ts
+		oldID := item.GetID()
+		newID := idGenerator()
+		lastID = newID
+
+		// Update the ID in the underlying value
+		switch v := item.value.(type) {
+		case *aitool.ToolResult:
+			v.ID = newID
+		case *UserInteraction:
+			v.ID = newID
+		case *TextTimelineItem:
+			v.ID = newID
+		default:
+			log.Warnf("unknown timeline item value type: %T", v)
+		}
+
+		// Store mapping
+		oldToNewID[oldID] = newID
+
+		// Add to new mappings
+		newIdToTs.Set(newID, ts)
+		newIdToTimelineItem.Set(newID, item)
+
+		// Update summary if exists for this old ID
+		if summaryLt, ok := m.summary.Get(oldID); ok {
+			newSummary.Set(newID, summaryLt)
+		}
+
+		// Update reducers if exists for this old ID
+		if reducerLt, ok := m.reducers.Get(oldID); ok {
+			newReducers.Set(newID, reducerLt)
+		}
+	}
+
+	// Replace old mappings with new ones
+	m.idToTs = newIdToTs
+	m.idToTimelineItem = newIdToTimelineItem
+	m.summary = newSummary
+	m.reducers = newReducers
+
+	log.Infof("reassigned IDs for %d timeline items, last ID: %d", len(orderedItems), lastID)
+	return lastID
+}
+
 func (m *Timeline) GetTimelineOutput() []*TimelineItemOutput {
 	l := m.idToTimelineItem.Len()
 	if l == 0 {
