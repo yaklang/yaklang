@@ -2,9 +2,10 @@ package yakgrpc
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/rag"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -54,6 +55,8 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}
 	}
 
+	persistentSession := "default"
+
 	var reActOptions = []aireact.Option{
 		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {
 			feedback(e)
@@ -63,6 +66,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		aireact.WithBuiltinTools(),
 		aireact.WithAICallback(aicommon.AIChatToAICallbackType(ai.Chat)),
 		aireact.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
+		aireact.WithPersistentSessionId(persistentSession),
 	}
 	reActOptions = append(reActOptions, optsFromStartParams...)
 
