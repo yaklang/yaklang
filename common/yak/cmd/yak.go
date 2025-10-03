@@ -48,6 +48,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	// start pprof
 	_ "net/http/pprof"
@@ -577,6 +578,124 @@ var startGRPCServerCommand = cli.Command{
 	},
 }
 
+var checkSecretLocalGRPCServerCommand = cli.Command{
+	Name:  "check-secret-local-grpc",
+	Usage: "Check if local GRPC server with secret can be started and accessed",
+	Action: func(ctx *cli.Context) error {
+		const port = 9011
+		addr := utils.HostPort("127.0.0.1", port)
+
+		// 检查端口是否被占用
+		lis, err := net.Listen("tcp", addr)
+		if err != nil {
+			log.Errorf("failed to listen on port %d: %s", port, err)
+			fmt.Printf("\n[FAILED] Port %d is already in use\n", port)
+			fmt.Printf("Please check if:\n")
+			fmt.Printf("  1. Local firewall is blocking the port\n")
+			fmt.Printf("  2. Anti-virus software is preventing yak engine from starting\n")
+			fmt.Printf("  3. Another yak instance is already running\n\n")
+			return utils.Errorf("port %d is occupied, please check local firewall or anti-virus software", port)
+		}
+
+		// 生成随机密码
+		secret := utils.RandStringBytes(32)
+		log.Infof("generated random secret for testing: %s", secret)
+
+		// 创建 GRPC 服务器
+		auth := func(authCtx context.Context) (context.Context, error) {
+			userSecret, err := grpc_auth.AuthFromMD(authCtx, "bearer")
+			if err != nil {
+				log.Errorf("secret schema[%v] missed", "bearer")
+				return nil, err
+			}
+			if userSecret != secret {
+				return nil, utils.Errorf("secret verify failed...")
+			}
+			return authCtx, nil
+		}
+
+		streamInterceptors := []grpc.StreamServerInterceptor{
+			grpc_recovery.StreamServerInterceptor(),
+			grpc_auth.StreamServerInterceptor(auth),
+		}
+		unaryInterceptors := []grpc.UnaryServerInterceptor{
+			grpc_recovery.UnaryServerInterceptor(),
+			grpc_auth.UnaryServerInterceptor(auth),
+		}
+
+		grpcTrans := grpc.NewServer(
+			grpc.ChainStreamInterceptor(streamInterceptors...),
+			grpc.ChainUnaryInterceptor(unaryInterceptors...),
+			grpc.MaxRecvMsgSize(100*1024*1024),
+			grpc.MaxSendMsgSize(100*1024*1024),
+		)
+
+		// 初始化服务器
+		s, err := yakgrpc.NewServer(
+			yakgrpc.WithInitFacadeServer(false),
+		)
+		if err != nil {
+			log.Errorf("build yakit server failed: %s", err)
+			return err
+		}
+		ypb.RegisterYakServer(grpcTrans, s)
+
+		// 启动服务器
+		log.Infof("starting test grpc server on %s", addr)
+		go func() {
+			err := grpcTrans.Serve(lis)
+			if err != nil {
+				log.Errorf("grpc serve error: %s", err)
+			}
+		}()
+		defer grpcTrans.Stop()
+
+		// 等待服务器启动
+		time.Sleep(time.Second)
+
+		// 创建客户端连接
+		log.Infof("connecting to test grpc server...")
+		conn, err := grpc.Dial(
+			addr,
+			grpc.WithInsecure(),
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(100*1024*1024),
+				grpc.MaxCallSendMsgSize(100*1024*1024),
+			),
+		)
+		if err != nil {
+			log.Errorf("failed to dial grpc server: %s", err)
+			return err
+		}
+		defer conn.Close()
+
+		client := ypb.NewYakClient(conn)
+
+		// 创建带认证的 context
+		clientCtx := context.Background()
+		clientCtx = metadata.AppendToOutgoingContext(
+			clientCtx,
+			"authorization", fmt.Sprintf("bearer %v", secret),
+		)
+
+		// 调用 Version 接口
+		log.Infof("calling Version RPC...")
+		versionResp, err := client.Version(clientCtx, &ypb.Empty{})
+		if err != nil {
+			log.Errorf("failed to call Version: %s", err)
+			return err
+		}
+
+		log.Infof("Version RPC successful: %s", versionResp.Version)
+		fmt.Printf("\n[SUCCESS] Local GRPC server with secret authentication test passed\n")
+		fmt.Printf("  Port: %d\n", port)
+		fmt.Printf("  Secret: %s\n", secret)
+		fmt.Printf("  Version: %s\n\n", versionResp.Version)
+
+		return nil
+	},
+}
+
 func startPProf(sec float64) {
 	day := time.Now().Format("20060102")
 	pprofCpuDir := path.Join(consts.GetDefaultYakitBaseTempDir(), "pprof", day, "cpu")
@@ -752,6 +871,7 @@ func main() {
 			},
 		},
 		&startGRPCServerCommand,
+		&checkSecretLocalGRPCServerCommand,
 		&installSubCommand,
 		&tunnelServerCommand,
 		&mirrorGRPCServerCommand,
