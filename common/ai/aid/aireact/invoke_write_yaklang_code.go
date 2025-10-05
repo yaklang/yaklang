@@ -330,7 +330,7 @@ LOOP:
 			errMsg, hasErrors := checkCodeAndFormatErrors(currentCode)
 			hasBlockingErrors = hasErrors
 			errorMessages = errMsg // Set error messages (don't accumulate)
-			r.addToTimeline("code_modified",
+			r.AddToTimeline("code_modified",
 				utils.ShrinkString(fmt.Sprintf("line[%v-%v]:", modifyStartLine, modifyEndLine)+strconv.Quote(currentCode), 128))
 			log.Infof("modify_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
@@ -340,20 +340,20 @@ LOOP:
 			code := payload
 			err := os.WriteFile(filename, []byte(code), 0644)
 			if err != nil {
-				r.addToTimeline("error", "Failed to write code to file: "+err.Error())
+				r.AddToTimeline("error", "Failed to write code to file: "+err.Error())
 				return filename, utils.Errorf("Failed to write code to file: %v", err)
 			}
 			currentCode = code
 			errMsg, hasErrors := checkCodeAndFormatErrors(code)
 			hasBlockingErrors = hasErrors
 			errorMessages = errMsg // Set error messages (don't accumulate)
-			r.addToTimeline("code_generated", utils.ShrinkString(strconv.Quote(code), 128))
+			r.AddToTimeline("code_generated", utils.ShrinkString(strconv.Quote(code), 128))
 			log.Infof("write_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 			r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, actionName, payload)
 			continue
 		case "require_tool":
 			toolPayload := payload
-			toolcallResult, directlyAnswerRequired, err := r.handleRequireTool(
+			toolcallResult, directlyAnswerRequired, err := r.ExecuteToolRequiredAndCall(
 				toolPayload,
 			)
 			if err != nil {
@@ -365,13 +365,13 @@ LOOP:
 				continue
 			}
 			result := toolcallResult.StringWithoutID()
-			r.addToTimeline("tool_call", "Tool call result: "+result)
+			r.AddToTimeline("tool_call", "Tool call result: "+result)
 			continue
 		case "ask_for_clarification":
 			result := action.GetInvokeParams("ask_for_clarification_payload")
 			question := result.GetString("question")
 			options := result.GetStringSlice("options")
-			suggestion := r.invokeAskForClarification(question, options)
+			suggestion := r.AskForClarification(question, options)
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}

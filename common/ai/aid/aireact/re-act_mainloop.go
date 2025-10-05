@@ -55,7 +55,7 @@ func (r *ReAct) processReActTask(task *Task) {
 			log.Errorf("ReAct task processing panic: %v", err)
 			utils.PrintCurrentGoroutineRuntimeStack()
 			task.SetStatus(string(TaskStatus_Aborted))
-			r.addToTimeline("error", fmt.Sprintf("Task processing panic: %v", err))
+			r.AddToTimeline("error", fmt.Sprintf("Task processing panic: %v", err))
 		} else {
 			if r.config.debugEvent {
 				log.Infof("Finished processing task: %s", task.GetId())
@@ -77,7 +77,7 @@ func (r *ReAct) processReActTask(task *Task) {
 	if err != nil {
 		log.Errorf("Task execution failed: %v", err)
 		task.SetStatus(string(TaskStatus_Aborted))
-		r.addToTimeline("error", fmt.Sprintf("Task execution failed: %v", err))
+		r.AddToTimeline("error", fmt.Sprintf("Task execution failed: %v", err))
 		return
 	}
 	if !skipStatus {
@@ -136,7 +136,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (skipTaskStatusChange bool, er
 	endIterationCall := func() {
 		if iterationTimelineInfo.IsSet() {
 			endIterationRecordingOnce.Do(func() {
-				r.addToTimeline("iteration", "======= ReAct loop finished END["+fmt.Sprint(r.currentIteration)+"] =======")
+				r.AddToTimeline("iteration", "======= ReAct loop finished END["+fmt.Sprint(r.currentIteration)+"] =======")
 			})
 		}
 	}
@@ -148,7 +148,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (skipTaskStatusChange bool, er
 	r.currentIteration = 0
 	skipTaskStatusChange = false
 
-	r.addToTimeline("USER-Original-Query", userQuery)
+	r.AddToTimeline("USER-Original-Query", userQuery)
 LOOP:
 	for r.currentIteration < r.config.maxIterations {
 		r.SaveTimeline()
@@ -223,7 +223,7 @@ LOOP:
 								resp.GetTaskIndex(),
 								func() {
 									if outputThought.IsSet() {
-										r.addToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
+										r.AddToTimeline("thought", fmt.Sprintf("AI Thought:\n%v", output.String()))
 									}
 								},
 							)
@@ -286,7 +286,7 @@ LOOP:
 
 		saveIterationInfoIntoTimeline := func() {
 			// allow iteration info to be added to timeline
-			r.addToTimeline("iteration", fmt.Sprintf(
+			r.AddToTimeline("iteration", fmt.Sprintf(
 				"======== ReAct iteration %d ========\n"+
 					"%v", r.currentIteration, action.WaitString("human_readable_thought"),
 			))
@@ -306,7 +306,7 @@ LOOP:
 			r.EmitTextArtifact("directly_answer", answerPayload)
 			r.EmitResultAfterStream(answerPayload)
 			currentTask.SetResult(strings.TrimSpace(answerPayload))
-			r.addToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
+			r.AddToTimeline("directly_answer", fmt.Sprintf("user input: \n"+
 				"%s\n"+
 				"ai directly answer:\n"+
 				"%v",
@@ -333,7 +333,7 @@ LOOP:
 				endIterationCall()
 				if err != nil {
 					r.EmitError("Failed to require directly answer after knowledge enhance: %v", err)
-					r.addToTimeline("error", fmt.Sprintf("Failed to require directly answer after knowledge enhance: %v", err))
+					r.AddToTimeline("error", fmt.Sprintf("Failed to require directly answer after knowledge enhance: %v", err))
 				}
 				currentTask.SetStatus(string(TaskStatus_Completed))
 				continue
@@ -346,9 +346,9 @@ LOOP:
 
 			toolPayload := nextAction.GetString("tool_require_payload")
 			log.Infof("Requesting tool: %s", toolPayload)
-			toolcallResult, directlyAnswerRequired, err := r.handleRequireTool(toolPayload)
+			toolcallResult, directlyAnswerRequired, err := r.ExecuteToolRequiredAndCall(toolPayload)
 			if err != nil {
-				r.addToTimeline("error-calling-tool", fmt.Sprintf("Failed to handle require tool[%v]: %v", toolPayload, err))
+				r.AddToTimeline("error-calling-tool", fmt.Sprintf("Failed to handle require tool[%v]: %v", toolPayload, err))
 				currentTask.SetStatus(string(TaskStatus_Processing))
 				log.Errorf("Failed to handle require tool: %v, retry it", err)
 				continue
@@ -358,7 +358,7 @@ LOOP:
 			if !directlyAnswerRequired {
 				if toolcallResult != nil && toolcallResult.Error != "" {
 					// 工具返回了错误信息
-					r.addToTimeline("error-calling-tool", fmt.Sprintf("Tool[%v] returned error: %v", toolPayload, toolcallResult.Error))
+					r.AddToTimeline("error-calling-tool", fmt.Sprintf("Tool[%v] returned error: %v", toolPayload, toolcallResult.Error))
 					currentTask.SetStatus(string(TaskStatus_Processing))
 					log.Errorf("Tool[%v] returned error: %v", toolPayload, toolcallResult.Error)
 					continue
@@ -367,11 +367,11 @@ LOOP:
 			} else {
 				// handle directly answer required
 				// forcely set satisfied to true
-				r.addToTimeline(
+				r.AddToTimeline(
 					"directly_answer_required",
 					"ai call-tool step is aborted due user requirement",
 				)
-				result, err := r.requireDirectlyAnswer(
+				result, err := r.DirectlyAnswer(
 					userQuery+
 						"\n===========\n"+
 						"**用户要求 AI 直接回答，所以在本次回答中，不允许使用工具和其他复杂方法手段回答**", tools)
@@ -416,23 +416,23 @@ LOOP:
 		case ActionRequireAIBlueprintForge:
 			saveIterationInfoIntoTimeline()
 			forgeName := nextAction.GetString("blueprint_payload")
-			r.addToTimeline("plan", fmt.Sprintf("ai-forge-name(blueprint): %v is requested", forgeName))
+			r.AddToTimeline("plan", fmt.Sprintf("ai-forge-name(blueprint): %v is requested", forgeName))
 
 			if havePlanExecuting {
 				r.Emitter.EmitWarning("existed plan execution task is running, cannot start a new one")
-				r.addToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
+				r.AddToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
 				return false, utils.Errorf("a plan execution task is already running, cannot start a new one (even through ai-blueprint is requested)")
 			}
 
 			ins, forgeParams, err := r.invokeBlueprint(forgeName)
 			if err != nil {
 				r.finished = true
-				r.addToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
+				r.AddToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
 				return false, utils.Errorf("failed to invoke ai-blueprint[%v]: %v", forgeName, err)
 			}
 			forgeName = ins.ForgeName // use the real name from schema manager
 
-			r.addToTimeline("ai-blueprint", fmt.Sprintf(
+			r.AddToTimeline("ai-blueprint", fmt.Sprintf(
 				`ai-blueprint: %v is invoked with params: %v`,
 				forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 256),
 			))
@@ -445,7 +445,7 @@ LOOP:
 				defer func() {
 					select {
 					case <-timelineStartPlanChan:
-						r.addToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is finished", utils.ShrinkString(forgeName, 128)))
+						r.AddToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is finished", utils.ShrinkString(forgeName, 128)))
 					}
 					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
 					currentTask.SetStatus(string(TaskStatus_Completed))
@@ -457,7 +457,7 @@ LOOP:
 			}()
 			select {
 			case <-taskStarted:
-				r.addToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is started", forgeName))
+				r.AddToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is started", forgeName))
 				close(timelineStartPlanChan)
 				log.Infof("plan execution task started")
 				skipTaskStatusChange = true
@@ -469,7 +469,7 @@ LOOP:
 			planPayload := nextAction.GetString("plan_request_payload")
 			if havePlanExecuting {
 				r.Emitter.EmitWarning("existed plan execution task is running, cannot start a new one")
-				r.addToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
+				r.AddToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
 				return false, utils.Errorf("a plan execution task is already running, cannot start a new one")
 			}
 			r.SetCurrentPlanExecutionTask(currentTask)
@@ -481,7 +481,7 @@ LOOP:
 				defer func() {
 					select {
 					case <-timelineStartPlanChan:
-						r.addToTimeline("plan_execution", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
+						r.AddToTimeline("plan_execution", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
 					}
 					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
 					currentTask.SetStatus(string(TaskStatus_Completed))
@@ -493,7 +493,7 @@ LOOP:
 			}()
 			select {
 			case <-taskStarted:
-				r.addToTimeline("plan_execution", fmt.Sprintf("plan: %v is started", planPayload))
+				r.AddToTimeline("plan_execution", fmt.Sprintf("plan: %v is started", planPayload))
 				close(timelineStartPlanChan)
 				log.Infof("plan execution task started")
 				skipTaskStatusChange = true
@@ -504,7 +504,7 @@ LOOP:
 			obj := nextAction.GetObject("ask_for_clarification_payload")
 			payloads := obj.GetStringSlice("options")
 			question := obj.GetString("question")
-			suggestion := r.invokeAskForClarification(question, payloads)
+			suggestion := r.AskForClarification(question, payloads)
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}
@@ -526,19 +526,19 @@ LOOP:
 			saveIterationInfoIntoTimeline()
 			filename, err := r.invokeWriteYaklangCode(currentTask.GetContext(), writeYaklangCodeApproach)
 			if err != nil {
-				r.addToTimeline("error", fmt.Sprintf("Failed to invoke write yaklang code: %v", err))
+				r.AddToTimeline("error", fmt.Sprintf("Failed to invoke write yaklang code: %v", err))
 				return false, err
 			}
 			if filename != "" {
 				log.Infof("========== [WRITE YAKLANG CODE] ==========\nFile written: %v\n=========================================", filename)
-				r.addToTimeline("write_yaklang_code", fmt.Sprintf("write yaklang code: %v", filename))
+				r.AddToTimeline("write_yaklang_code", fmt.Sprintf("write yaklang code: %v", filename))
 			}
 			r.finished = true
 			return false, nil
 		default:
 			r.EmitError("unknown action type: %v", actionType)
 			r.finished = true
-			r.addToTimeline("error", fmt.Sprintf("unknown action type: %v", actionType))
+			r.AddToTimeline("error", fmt.Sprintf("unknown action type: %v", actionType))
 		}
 	}
 	if r.currentIteration >= r.config.maxIterations {

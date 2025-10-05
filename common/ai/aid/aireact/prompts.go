@@ -58,6 +58,9 @@ var changeBlueprintPromptTemplate string
 //go:embed prompts/yaklang/codeloop.txt
 var yaklangCodeLoopPromptTemplate string
 
+//go:embed prompts/base/base.txt
+var yaklangCodeBasePromptTemplate string
+
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
 	cpm                  *aicommon.ContextProviderManager
@@ -277,6 +280,53 @@ func (pm *PromptManager) GetAvailableAIForgeBlueprints() string {
 		return ""
 	}
 	return result
+}
+
+func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+	result := make(map[string]any)
+	result["CurrentTime"] = time.Now().Format("2006-01-02 15:04:05")
+	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+	result["WorkingDir"] = pm.workdir
+	result["DynamicContext"] = pm.DynamicContext()
+	if len(tools) > 0 {
+		result["Tools"] = tools
+		result["ToolsCount"] = len(tools)
+		result["TopToolsCount"] = len(tools)
+		result["TopTools"] = tools
+		result["HasMoreTools"] = false
+	} else {
+		var err error
+		tools, err = pm.react.config.aiToolManager.GetEnableTools()
+		if err != nil {
+			return "", nil, err
+		}
+		searchTools, err := pm.react.config.aiToolManager.GetSearchTools()
+		if err != nil {
+			return "", nil, err
+		}
+		tools = append(tools, searchTools...)
+		result["Tools"] = tools
+		result["ToolsCount"] = len(tools)
+		result["TopToolsCount"] = pm.react.config.topToolsCount
+		// Get prioritized tools
+		if len(tools) > 0 {
+			topTools := pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
+			result["TopTools"] = topTools
+			result["HasMoreTools"] = len(tools) > len(topTools)
+		} else {
+			result["TopTools"] = []*aitool.Tool{}
+			result["HasMoreTools"] = false
+		}
+	}
+
+	result["ConversationMemory"] = pm.react.cumulativeSummary
+	result["Timeline"] = pm.react.config.memory.Timeline()
+
+	renderResult, err := utils.RenderTemplate(yaklangCodeBasePromptTemplate, result)
+	if err != nil {
+		return "", nil, err
+	}
+	return renderResult, result, nil
 }
 
 // GenerateLoopPrompt generates the main ReAct loop prompt using template

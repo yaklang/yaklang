@@ -84,7 +84,7 @@ func (r *ReAct) handleQueryDocument(
 	}
 
 	if len(results) == 0 {
-		r.addToTimeline("query_document", "no results found")
+		r.AddToTimeline("query_document", "no results found")
 		return "No matching documents found for the query; ", false
 	}
 
@@ -145,9 +145,9 @@ func (r *ReAct) handleQueryDocument(
 		log.Warnf("document query results hard truncated to %d bytes", maxSize)
 	}
 
-	r.addToTimeline("query_document", fmt.Sprintf("found %d documents (%d included)", len(rankedResults), includedResults))
+	r.AddToTimeline("query_document", fmt.Sprintf("found %d documents (%d included)", len(rankedResults), includedResults))
 	r.EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
-	r.addToTimeline("document_query_results", documentResults)
+	r.AddToTimeline("document_query_results", documentResults)
 	return documentResults, true
 }
 

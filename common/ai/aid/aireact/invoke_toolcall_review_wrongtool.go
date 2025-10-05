@@ -14,7 +14,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 
 	var tools []*aitool.Tool
 	if suggestionToolName != "" {
-		r.addToTimeline("User Suggested Tools: %s", suggestionToolName)
+		r.AddToTimeline("User Suggested Tools: %s", suggestionToolName)
 		log.Infof("User Suggested Tools: %s", suggestionToolName)
 		for _, item := range utils.PrettifyListFromStringSplited(suggestionToolName, ",") {
 			toolins, err := manager.GetToolByName(item)
@@ -31,7 +31,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 
 	var err error
 	if suggestionKeyword != "" {
-		r.addToTimeline("User Suggested Tool Keywords: %s", suggestionKeyword)
+		r.AddToTimeline("User Suggested Tool Keywords: %s", suggestionKeyword)
 		searched, err := manager.SearchTools("", suggestionKeyword)
 		if err != nil {
 			r.EmitError("error searching tool: %v", err)
@@ -44,7 +44,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongTool(oldTool *aitool.Tool, suggestion
 	}
 
 	if len(tools) <= 0 {
-		r.addToTimeline("re-select-tool", "No tools available for selection, no enabled tools, skip tool re-selection.")
+		r.AddToTimeline("re-select-tool", "No tools available for selection, no enabled tools, skip tool re-selection.")
 		return nil, true, nil
 	}
 
@@ -77,7 +77,7 @@ REDO:
 					return nil
 				}
 				redo = true
-				r.addToTimeline(
+				r.AddToTimeline(
 					"user-suggestion-after-clarification",
 					"Question: "+question+"\nAnswer: "+suggestion+"\n"+extra,
 				)
@@ -87,13 +87,13 @@ REDO:
 				toolName := action.GetString("tool")
 				selectedTool, err = manager.GetToolByName(toolName)
 				if err != nil {
-					r.addToTimeline("re-select-tool-failed", fmt.Sprintf("error searching tool[%v]: %v", toolName, err))
+					r.AddToTimeline("re-select-tool-failed", fmt.Sprintf("error searching tool[%v]: %v", toolName, err))
 					return utils.Errorf("error searching tool: %v", err)
 				}
-				r.addToTimeline("re-select-tool", fmt.Sprintf("AI Auto Re-Selected tool: %s", toolName))
+				r.AddToTimeline("re-select-tool", fmt.Sprintf("AI Auto Re-Selected tool: %s", toolName))
 			case "abandon":
 				reason := action.GetString("abandon_reason")
-				r.addToTimeline(
+				r.AddToTimeline(
 					"re-select-tool-abandoned",
 					fmt.Sprintf(
 						"AI Abandoned tool selection, no tool will be used. \nReason: %v",

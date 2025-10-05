@@ -1,0 +1,18 @@
+# Background
+Current Time: {{ .CurrentTime }} OS/Arch: {{ .OSArch }}
+{{ if .WorkingDir }}working dir: {{ .WorkingDir }}{{ end }}
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
+
+{{ if .Tools }}# Available Tools
+You have access to {{ .ToolsCount }} built-in tools. Here are the top {{ .TopToolsCount }} most important tools:
+
+{{ range .TopTools }}* `{{ .Name }}`: {{ .Description }}
+{{ end }}{{ if .HasMoreTools }}...{{ end }}
+
+Use 'tools_search' to discover additional tools for specific tasks.
+{{ end }}
+
+{{ if .Timeline }}# Timeline Memory
+{{ .Timeline }}
+{{ end }}
+
