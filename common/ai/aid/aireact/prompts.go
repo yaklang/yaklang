@@ -55,9 +55,6 @@ var blueprintParamsPromptTemplate string
 //go:embed prompts/change-blueprint/change-blueprint.txt
 var changeBlueprintPromptTemplate string
 
-//go:embed prompts/yaklang/codeloop.txt
-var yaklangCodeLoopPromptTemplate string
-
 //go:embed prompts/base/base.txt
 var yaklangCodeBasePromptTemplate string
 
@@ -653,61 +650,6 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 // GenerateAIBlueprintForgeParamsPrompt generates AI blueprint forge parameter generation prompt using template
 func (pm *PromptManager) GenerateAIBlueprintForgeParamsPrompt(ins *schema.AIForge, blueprintSchema string) (string, error) {
 	return pm.GenerateAIBlueprintForgeParamsPromptEx(ins, blueprintSchema, nil, "")
-}
-
-// GenerateYaklangCodeActionLoop generates Yaklang code generation action loop prompt using template
-func (pm *PromptManager) GenerateYaklangCodeActionLoop(
-	userQuery, currentCode, errorMessages string,
-	iterationCount int, tools []*aitool.Tool, nonceString string,
-	allowAskForClarification bool,
-	allowFinish bool,
-) (string, error) {
-	data := &YaklangCodeActionLoopPromptData{
-		CurrentTime:               time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:                    fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:                 userQuery,
-		CurrentCode:               currentCode,
-		CurrentCodeWithLineNumber: utils.PrefixLinesWithLineNumbers(currentCode),
-		IterationCount:            iterationCount,
-		ErrorMessages:             errorMessages,
-		Nonce:                     nonceString,
-		Language:                  pm.react.config.language,
-		DynamicContext:            pm.DynamicContext(),
-	}
-
-	if data.Nonce == "" {
-		data.Nonce = nonce()
-	}
-
-	// Set working directory
-	data.WorkingDir = pm.workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
-	}
-
-	// Set conversation memory
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
-	}
-
-	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
-	}
-
-	// Get prioritized tools
-	data.Tools = tools
-	data.ToolsCount = len(tools)
-	data.TopToolsCount = pm.react.config.topToolsCount
-	if len(tools) > 0 {
-		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
-		data.HasMoreTools = len(tools) > len(data.TopTools)
-	}
-
-	// Set schema - only allow 'finish' action when there are no blocking errors
-	data.Schema = getYaklangCodeLoopSchema(allowAskForClarification, allowFinish, data.Nonce)
-
-	return pm.executeTemplate("yaklang-codeloop", yaklangCodeLoopPromptTemplate, data)
 }
 
 // executeTemplate executes a template with the given data

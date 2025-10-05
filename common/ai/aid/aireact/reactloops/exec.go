@@ -81,7 +81,11 @@ LOOP:
 				for _, tagIns := range r.aiTagFields.Values() {
 					v := tagIns
 					aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
+						defer func() {
+							streamWg.Done()
+						}()
 						tagErr := aitag.Parse(reader, aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
+							streamWg.Add(1)
 							var result bytes.Buffer
 							fieldReader = io.TeeReader(fieldReader, &result)
 							emitter.EmitStreamEvent(

@@ -205,6 +205,7 @@ func init() {
 					},
 					func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 						code := loop.Get("yak_code")
+						loop.Set("full_code", code)
 						if code == "" {
 							r.AddToTimeline("error", "No code generated in write_code action")
 							operator.Fail("No code generated in 'write_code' action")
@@ -239,23 +240,24 @@ func init() {
 						return nil
 					},
 					func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-						code := loop.Get("yak_code")
-						payload := code
-						editor := memedit.NewMemEditor(code)
+						fullCode := loop.Get("full_code")
+						partialCode := loop.Get("yak_code")
+						editor := memedit.NewMemEditor(fullCode)
 						modifyStartLine := action.GetInt("modify_start_line")
 						modifyEndLine := action.GetInt("modify_end_line")
 
 						log.Infof("start to modify code lines %d to %d", modifyStartLine, modifyEndLine)
-						err := editor.ReplaceLineRange(modifyStartLine, modifyEndLine, code)
+						err := editor.ReplaceLineRange(modifyStartLine, modifyEndLine, partialCode)
 						if err != nil {
 							//return filename, utils.Errorf("Failed to replace line range: %v", err)
 							op.Fail("failed to replace line range: " + err.Error())
 							return
 						}
 						fmt.Println("=================================================")
-						fmt.Println(string(payload))
+						fmt.Println(string(partialCode))
 						fmt.Println("=================================================")
-						fullCode := editor.GetSourceCode()
+						fullCode = editor.GetSourceCode()
+						loop.Set("full_code", fullCode)
 
 						os.RemoveAll(filename)
 						os.WriteFile(filename, []byte(fullCode), 0644)
@@ -264,11 +266,13 @@ func init() {
 						if hasBlockingErrors {
 							op.DisallowNextLoopExit()
 						}
-						op.Feedback(errMsg)
+						if errMsg != "" {
+							op.Feedback(errMsg)
+						}
 						r.AddToTimeline("code_modified",
-							utils.ShrinkString(fmt.Sprintf("line[%v-%v]:", modifyStartLine, modifyEndLine)+strconv.Quote(code), 128))
+							utils.ShrinkString(fmt.Sprintf("line[%v-%v]:", modifyStartLine, modifyEndLine)+strconv.Quote(partialCode), 128))
 						log.Infof("modify_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
-						loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", payload)
+						loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
 					},
 				),
 			)
