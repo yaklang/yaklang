@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,6 +37,8 @@ func (r *ReActLoop) Execute(ctx context.Context, startup string) error {
 		return utils.Error("no action names in ReActLoop")
 	}
 
+	var operator = newLoopActionHandlerOperator()
+
 LOOP:
 	for {
 		iterationCount++
@@ -43,20 +50,24 @@ LOOP:
 		prompt, err := r.generateLoopPrompt(
 			nonce,
 			startup,
+			operator,
 		)
 		if err != nil {
 			log.Errorf("Failed to generate loop prompt: %v", err)
 			break LOOP
 		}
 
+		// 重置上次操作状态对这次反应的影响
+		operator = newLoopActionHandlerOperator()
+
 		var actionName string
 		var action *aicommon.Action
 		var actionErr error
-
+		streamWg := new(sync.WaitGroup)
 		transactionErr := aicommon.CallAITransaction(
 			r.config,
 			prompt,
-			r.caller.CallAI,
+			r.config.CallAI,
 			func(resp *aicommon.AIResponse) error {
 				stream := resp.GetOutputStreamReader(
 					r.loopName,
@@ -64,11 +75,47 @@ LOOP:
 					r.config.GetEmitter(),
 				)
 
-				stream = utils.CreateUTF8StreamMirror(
-					stream, func(reader io.Reader) {
-						return
-					},
-				)
+				stream = io.TeeReader(stream, os.Stdout)
+
+				var aiTagStreamMirror []func(io.Reader)
+				for _, tagIns := range r.aiTagFields.Values() {
+					v := tagIns
+					aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
+						tagErr := aitag.Parse(reader, aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
+							var result bytes.Buffer
+							fieldReader = io.TeeReader(fieldReader, &result)
+							emitter.EmitStreamEvent(
+								"yaklang-code",
+								time.Now(),
+								fieldReader,
+								resp.GetTaskIndex(),
+								func() {
+									defer streamWg.Done()
+									code := result.String()
+									if code == "" {
+										return
+									}
+									if strings.HasPrefix(code, "\n") {
+										code = code[1:]
+									}
+									if strings.HasSuffix(code, "\n") {
+										code = code[:len(code)-1]
+									}
+									r.Set(v.VariableName, code)
+								},
+							)
+						}))
+						if tagErr != nil {
+							log.Errorf("Failed to emit tag event for[%v]: %v", v.TagName, tagErr)
+						}
+					})
+				}
+
+				if len(aiTagStreamMirror) > 0 {
+					streamWg.Add(len(aiTagStreamMirror))
+					log.Infof("there aitag detected, will mirror the stream")
+					stream = utils.CreateUTF8StreamMirror(stream, aiTagStreamMirror...)
+				}
 
 				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
 					stream,
@@ -78,7 +125,38 @@ LOOP:
 						jsonextractor.WithRegisterMultiFieldStreamHandler(
 							r.streamFields.Keys(),
 							func(key string, reader io.Reader, parents []string) {
-								// TODO: handle stream field
+								streamWg.Add(1)
+								doneOnce := utils.NewOnce()
+								done := func() {
+									doneOnce.Do(func() {
+										streamWg.Done()
+									})
+								}
+								defer func() {
+									done()
+								}()
+
+								reader = utils.JSONStringReader(reader)
+								fieldIns, ok := r.streamFields.Get(key)
+								if !ok {
+									return
+								}
+
+								pr, pw := utils.NewPipe()
+								go func(field *LoopStreamField) {
+									defer pw.Close()
+									if field.Prefix != "" {
+										pw.WriteString(field.Prefix + ": ")
+									}
+									io.Copy(pw, reader)
+								}(fieldIns)
+								emitter.EmitStreamEvent(
+									"re-act-loop-thought",
+									time.Now(),
+									pr,
+									resp.GetTaskIndex(),
+									func() { done() },
+								)
 							},
 						),
 					},
@@ -98,9 +176,11 @@ LOOP:
 				if verifier.ActionVerifier == nil {
 					return nil
 				}
-				return verifier.ActionVerifier(action)
+				return verifier.ActionVerifier(r, action)
 			},
 		)
+		streamWg.Wait()
+
 		if transactionErr != nil {
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			break LOOP
@@ -119,38 +199,28 @@ LOOP:
 
 		execOnce := utils.NewOnce()
 		var continueTriggered = utils.NewAtomicBool()
+		var failedReason any
 		var failedTriggered = utils.NewAtomicBool()
-		var feedback bytes.Buffer
 		instance.ActionHandler(
 			r,
 			action,
-			func() {
-				execOnce.DoOr(func() {
-					continueTriggered.SetTo(true)
-				}, func() {
-					log.Warn("continue triggered multiple times in ReActLoop")
-				})
-			}, func(i any) {
-				feedback.WriteString(utils.InterfaceToString(i))
-				feedback.WriteString("\n")
-			}, func(err any) {
-				execOnce.DoOr(func() {
-					feedback.WriteString(utils.InterfaceToString(err))
-					feedback.WriteString("\n")
-					failedTriggered.SetTo(true)
-				}, func() {
-					log.Warn("failed/error triggered multiple times in ReActLoop")
-				})
-			},
+			operator,
 		)
 		execOnce.Do(func() {
 			continueTriggered.SetTo(true)
 		})
+
+		// handle result value
+		if failedTriggered.IsSet() {
+			if utils.IsNil(failedReason) {
+				break LOOP
+			} else {
+				return utils.Errorf("ReActLoop failed: %v", failedReason)
+			}
+		}
+
 		if continueTriggered.IsSet() {
 			continue
-		}
-		if failedTriggered.IsSet() {
-			break LOOP
 		}
 	}
 	return nil

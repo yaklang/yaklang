@@ -1,9 +1,10 @@
 package reactloops
 
 import (
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 func WithLoopPromptGenerator(generator ReActLoopCoreGenerateCode) ReActLoopOption {
@@ -69,16 +70,18 @@ func WithUserInteract(b ...bool) ReActLoopOption {
 	})
 }
 
-func WithRegisterLoopAction(actionName string, desc string, opts ...aitool.ToolOption) ReActLoopOption {
+func WithRegisterLoopAction(actionName string, desc string, opts []aitool.ToolOption, verifier LoopActionVerifierFunc, handler LoopActionHandlerFunc) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r.actions.Have(actionName) {
 			log.Errorf("loop action %s already registered", actionName)
 			return
 		}
 		r.actions.Set(actionName, &LoopAction{
-			ActionType:  actionName,
-			Description: desc,
-			Options:     opts,
+			ActionType:     actionName,
+			Description:    desc,
+			Options:        opts,
+			ActionVerifier: verifier,
+			ActionHandler:  handler,
 		})
 	}
 
@@ -90,8 +93,48 @@ func WithMaxIterations(maxIterations int) ReActLoopOption {
 	}
 }
 
-func WithAICaller(caller aicommon.AICaller) ReActLoopOption {
+func WithAITagField(tagName, variableName string) ReActLoopOption {
 	return func(r *ReActLoop) {
-		r.caller = caller
+		if r.aiTagFields == nil {
+			r.aiTagFields = omap.NewEmptyOrderedMap[string, *LoopAITagField]()
+		}
+		r.aiTagFields.Set(tagName, &LoopAITagField{
+			TagName:      tagName,
+			VariableName: variableName,
+		})
+	}
+}
+
+func WithReflectionOutputExampleContextProvider(provider ContextProviderFunc) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.reflectionOutputExampleProvider = provider
+	}
+}
+
+func WithPersistentContextProvider(provider ContextProviderFunc) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.persistentInstructionProvider = provider
+	}
+}
+
+func WithReflectionOutputExample(example string) ReActLoopOption {
+	return WithReflectionOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
+		return utils.RenderTemplate(example, map[string]any{
+			"Nonce": nonce,
+		})
+	})
+}
+
+func WithPersistentInstruction(instruction string) ReActLoopOption {
+	return WithPersistentContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
+		return utils.RenderTemplate(instruction, map[string]any{
+			"Nonce": nonce,
+		})
+	})
+}
+
+func WithReactiveDataBuilder(provider FeedbackProviderFunc) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.reactiveDataBuilder = provider
 	}
 }

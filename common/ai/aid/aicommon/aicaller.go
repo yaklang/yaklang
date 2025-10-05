@@ -13,6 +13,14 @@ import (
 type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error)
 
 type AICallerConfigIf interface {
+	AICaller
+
+	// Interactivable
+	Interactivable
+
+	// Checkpointable
+	CheckpointableStorage
+
 	AcquireId() int64
 	GetRuntimeId() string
 	IsCtxDone() bool
@@ -20,16 +28,12 @@ type AICallerConfigIf interface {
 	CallAIResponseConsumptionCallback(int)
 	GetAITransactionAutoRetryCount() int64
 	GetTimelineContentSizeLimit() int64
+	GetMaxIterationCount() int64
+	GetAllowUserInteraction() bool
 	RetryPromptBuilder(string, error) string
 	GetEmitter() *Emitter
 	NewAIResponse() *AIResponse
 	CallAIResponseOutputFinishedCallback(string)
-
-	// Interactivable
-	Interactivable
-
-	// Checkpointable
-	CheckpointableStorage
 }
 
 func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption) (string, error)) AICallbackType {

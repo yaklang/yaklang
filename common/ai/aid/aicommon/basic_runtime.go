@@ -8,4 +8,5 @@ type AIInvokeRuntime interface {
 	DirectlyAnswer(query string, tools []*aitool.Tool) (string, error)
 	AddToTimeline(entry, content string)
 	GetConfig() AICallerConfigIf
+	EmitFileArtifactWithExt(name, ext string, data any) string
 }
