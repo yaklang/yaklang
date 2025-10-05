@@ -524,7 +524,7 @@ LOOP:
 			}
 		case ActionWriteYaklangCode:
 			saveIterationInfoIntoTimeline()
-			filename, err := r.invokeWriteYaklangCode2(currentTask.GetContext(), writeYaklangCodeApproach)
+			filename, err := r.invokeWriteYaklangCode(currentTask.GetContext(), writeYaklangCodeApproach)
 			if err != nil {
 				r.AddToTimeline("error", fmt.Sprintf("Failed to invoke write yaklang code: %v", err))
 				return false, err
