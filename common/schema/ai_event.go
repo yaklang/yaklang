@@ -13,6 +13,11 @@ import (
 type EventType string
 
 const (
+	AI_REACT_LOOP_ACTION_REQUIRE_TOOL          = "require_tool"
+	AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION = "ask_for_clarification"
+)
+
+const (
 	EVENT_TYPE_STREAM              EventType = "stream"
 	EVENT_TYPE_STRUCTURED          EventType = "structured"
 	EVENT_TYPE_AI_REVIEW_START     EventType = "ai_review_start"

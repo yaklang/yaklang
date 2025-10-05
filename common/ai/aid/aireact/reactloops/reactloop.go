@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
@@ -78,9 +79,9 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		aiTagFields:   omap.NewEmptyOrderedMap[string, *LoopAITagField](),
 		vars:          omap.NewEmptyOrderedMap[string, any](),
 	}
+
 	for _, action := range []*LoopAction{
-		loopAction_RequireTool,
-		loopAction_AskForClarification,
+		loopAction_DirectlyAnswer,
 		loopAction_Finish,
 	} {
 		r.actions.Set(action.ActionType, action)
@@ -96,6 +97,23 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 
 	for _, opt := range options {
 		opt(r)
+	}
+
+	if r.allowRAG == nil || r.allowToolCall() {
+		// allow tool call, must have tools
+		toolcall, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+		if !ok {
+			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+		}
+		r.actions.Set(toolcall.ActionType, toolcall)
+	}
+
+	if r.allowUserInteract == nil || r.allowUserInteract() {
+		ac, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
+		if !ok {
+			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
+		}
+		r.actions.Set(ac.ActionType, ac)
 	}
 
 	if r.emitter == nil {

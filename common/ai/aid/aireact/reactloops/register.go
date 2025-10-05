@@ -8,10 +8,27 @@ import (
 )
 
 var loops = new(sync.Map)
+var actions = new(sync.Map)
+
+func RegisterAction(name string, action *LoopAction) {
+	actions.Store(name, action)
+}
+
+func GetLoopAction(name string) (*LoopAction, bool) {
+	action, ok := actions.Load(name)
+	if !ok {
+		return nil, false
+	}
+	actionObj, ok := action.(*LoopAction)
+	if !ok {
+		return nil, false
+	}
+	return actionObj, true
+}
 
 type LoopFactory func(r aicommon.AIInvokeRuntime) (*ReActLoop, error)
 
-func Register(
+func RegisterLoopFactory(
 	name string,
 	creator LoopFactory,
 ) error {
