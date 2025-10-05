@@ -117,6 +117,7 @@ var loopAction_Finish = &LoopAction{
 	ActionType:  "finish",
 	Description: "Finish the task, MUST fill the 'human_readable_thought' field",
 	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
+
 		loop.invoker.AddToTimeline("finish", "AI decided mark the current Task is finished")
 		operator.Exit()
 	},
