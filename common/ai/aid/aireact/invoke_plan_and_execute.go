@@ -15,6 +15,34 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func (r *ReAct) AsyncExecutePlanAndExecute(ctx context.Context, planPayload string, onFinished func()) error {
+	cb := utils.NewCondBarrierContext(ctx)
+	startupBarrier := cb.CreateBarrier("startup")
+
+	taskDone := make(chan struct{})
+	go func() {
+		defer func() {
+			if err := cb.Wait("startup"); err != nil {
+				log.Warnf("start up failed: %v", err)
+			}
+			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
+			if onFinished != nil {
+				onFinished()
+			}
+		}()
+		err := r.invokePlanAndExecute(taskDone, ctx, planPayload, "", nil)
+		if err != nil {
+			log.Errorf("AsyncExecutePlanAndExecute error: %v", err)
+		}
+	}()
+	select {
+	case <-taskDone:
+		r.AddToTimeline("plan_execute", fmt.Sprintf("plan: %v is started", utils.ShrinkString(planPayload, 128)))
+		startupBarrier.Done()
+		return nil
+	}
+}
+
 func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Context, planPayload string, forgeName string, forgeParams any) error {
 	doneOnce := new(sync.Once)
 	done := func() {
