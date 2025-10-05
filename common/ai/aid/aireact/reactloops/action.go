@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -12,10 +14,11 @@ type LoopAction struct {
 	Options        []aitool.ToolOption
 	ActionVerifier func(action *aicommon.Action) error
 	ActionHandler  func(
+		loop *ReActLoop,
 		action *aicommon.Action,
 		continueTrigger func(),
 		feedback func(i any),
-		failTrigger func(err error),
+		failTrigger func(err any),
 	)
 }
 
@@ -35,13 +38,41 @@ var loopAction_RequireTool = &LoopAction{
 		}
 		return nil
 	},
-	ActionHandler: func(action *aicommon.Action, continueTrigger func(), feedback func(i any), fail func(error)) {
+	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, continueTrigger func(), feedback func(i any), fail func(any)) {
 		toolPayload := action.GetString("tool_require_payload")
 		if toolPayload == "" {
 			feedback(utils.Error("tool_require_payload is required for ActionRequireTool but empty"))
 			return
 		}
-		fail(utils.Error("TBD"))
+		invoker := loop.invoker
+		result, directly, err := invoker.ExecuteToolRequiredAndCall(toolPayload)
+		if err != nil {
+			fail(utils.Error("ExecuteToolRequiredAndCall fail"))
+			return
+		}
+		if directly {
+			answer, err := invoker.DirectlyAnswer("在上一次工具调用中，用户中断了工具执行，要求直接回答一些问题", nil)
+			if err != nil {
+				fail(utils.Error("DirectlyAnswer fail, reason: " + err.Error()))
+				return
+			}
+			invoker.AddToTimeline("directly-answer", answer)
+			continueTrigger()
+			return
+		}
+
+		if result == nil {
+			msg := fmt.Sprintf("ExecuteToolRequiredAndCall[%v] returned nil result", toolPayload)
+			invoker.AddToTimeline("error", msg)
+			continueTrigger()
+			return
+		}
+
+		if result.Error != "" {
+			invoker.AddToTimeline("call["+toolPayload+"] error", result.Error)
+		}
+
+		continueTrigger()
 	},
 }
 
@@ -70,13 +101,21 @@ var loopAction_AskForClarification = &LoopAction{
 		}
 		return nil
 	},
-	ActionHandler: func(action *aicommon.Action, continueTrigger func(), feedback func(i any), fail func(error)) {
+	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, continueTrigger func(), feedback func(any), fail func(any)) {
 		result := action.GetInvokeParams("ask_for_clarification_payload")
 		if result.GetString("question") == "" {
 			feedback(utils.Error("ask_for_clarification action must have 'question' field in 'ask_for_clarification_payload'"))
 			return
 		}
-		fail(utils.Error("TBD"))
+		question := result.GetString("question")
+		options := result.GetStringSlice("options")
+
+		invoker := loop.invoker
+		suggestion := invoker.AskForClarification(question, options)
+		if suggestion == "" {
+			suggestion = "user did not provide a valid suggestion, using default 'continue' action"
+		}
+		continueTrigger()
 	},
 }
 

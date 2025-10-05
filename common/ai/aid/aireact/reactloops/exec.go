@@ -122,6 +122,7 @@ LOOP:
 		var failedTriggered = utils.NewAtomicBool()
 		var feedback bytes.Buffer
 		instance.ActionHandler(
+			r,
 			action,
 			func() {
 				execOnce.DoOr(func() {
@@ -132,9 +133,9 @@ LOOP:
 			}, func(i any) {
 				feedback.WriteString(utils.InterfaceToString(i))
 				feedback.WriteString("\n")
-			}, func(err error) {
+			}, func(err any) {
 				execOnce.DoOr(func() {
-					feedback.WriteString(err.Error())
+					feedback.WriteString(utils.InterfaceToString(err))
 					feedback.WriteString("\n")
 					failedTriggered.SetTo(true)
 				}, func() {
@@ -142,7 +143,9 @@ LOOP:
 				})
 			},
 		)
-
+		execOnce.Do(func() {
+			continueTriggered.SetTo(true)
+		})
 		if continueTriggered.IsSet() {
 			continue
 		}

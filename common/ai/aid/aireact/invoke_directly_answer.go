@@ -11,7 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) requireDirectlyAnswer(query string, tools []*aitool.Tool) (string, error) {
+func (r *ReAct) DirectlyAnswer(query string, tools []*aitool.Tool) (string, error) {
 	prompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(
 		query,
 		tools,

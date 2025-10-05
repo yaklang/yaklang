@@ -2,14 +2,15 @@ package aireact
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReAct) invokeAskForClarification(question string, payloads []string) string {
+func (r *ReAct) AskForClarification(question string, payloads []string) string {
 	r.currentUserInteractiveCount++
-	r.addToTimeline("question-for-clarification", question)
+	r.AddToTimeline("question-for-clarification", question)
 	ep := r.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 	var opts []map[string]any
@@ -42,7 +43,7 @@ func (r *ReAct) invokeAskForClarification(question string, payloads []string) st
 	r.config.EmitInteractiveRelease(ep.GetId(), params)
 	r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
 	suggestion := params.GetAnyToString("suggestion")
-	r.addToTimeline(
+	r.AddToTimeline(
 		"user-clarification",
 		fmt.Sprintf("User clarification requested: %s result: %v",
 			question, suggestion),

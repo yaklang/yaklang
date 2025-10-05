@@ -13,7 +13,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(tool *aitool.Tool, old aitool.I
 	if extraPrompt != "" {
 		input = input + "\n\n Extra:\n\n" + extraPrompt
 	}
-	r.addToTimeline(
+	r.AddToTimeline(
 		"re-generate-tool-params",
 		fmt.Sprintf("Regenerating parameters for tool: %s", tool.Name),
 	)
@@ -32,7 +32,7 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(tool *aitool.Tool, old aitool.I
 				"call-tool",
 			)
 			if err != nil {
-				r.addToTimeline("err", fmt.Sprintf(
+				r.AddToTimeline("err", fmt.Sprintf(
 					"generate tool params failed: %v", err,
 				))
 				return err
@@ -43,17 +43,17 @@ func (r *ReAct) _invokeToolCall_ReviewWrongParam(tool *aitool.Tool, old aitool.I
 				ok, reasons := tool.ValidateParams(result)
 				if !ok {
 					err := utils.Errorf("invalid tool params: %v", reasons)
-					r.addToTimeline("err", fmt.Sprintf(
+					r.AddToTimeline("err", fmt.Sprintf(
 						"generate tool params failed: %v", err,
 					))
 					return err
 				}
-				r.addToTimeline("re-generate-tool-params", fmt.Sprintf(
+				r.AddToTimeline("re-generate-tool-params", fmt.Sprintf(
 					"Result:\n%v", utils.PrefixLines(result.Dump(), "  ")))
 				return nil
 			default:
 				err := utils.Errorf("cannot handle action type: %s", action.ActionType())
-				r.addToTimeline("err", fmt.Sprintf(
+				r.AddToTimeline("err", fmt.Sprintf(
 					"generate tool params failed: %v", err,
 				))
 				return err

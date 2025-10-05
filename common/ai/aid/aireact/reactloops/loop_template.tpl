@@ -1,3 +1,5 @@
+{{ .Background }}
+
 # User Query
 <|USER_QUERY_NONCE_{{ .Nonce }}|>
 {{ .UserQuery }}
