@@ -4,11 +4,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 var loopAction_AskForClarification = &reactloops.LoopAction{
-	ActionType:  LoopAction_AskForClarification,
+	ActionType:  schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION,
 	Description: "Ask for clarification",
 	Options: []aitool.ToolOption{
 		aitool.WithStructParam(

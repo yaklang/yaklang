@@ -10,8 +10,8 @@ import (
 var loops = new(sync.Map)
 var actions = new(sync.Map)
 
-func RegisterAction(name string, action *LoopAction) {
-	actions.Store(name, action)
+func RegisterAction(action *LoopAction) {
+	actions.Store(action.ActionType, action)
 }
 
 func GetLoopAction(name string) (*LoopAction, bool) {

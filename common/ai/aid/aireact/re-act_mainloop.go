@@ -317,7 +317,7 @@ LOOP:
 			currentTask.SetStatus(string(TaskStatus_Completed))
 			continue
 		case ActionKnowledgeEnhanceAnswer:
-			enhanceResult, err := r.EnhanceDirectlyAnswer(currentTask.GetContext(), userQuery)
+			enhanceResult, err := r.EnhanceKnowledgeAnswer(currentTask.GetContext(), userQuery)
 			if err != nil {
 				return false, err
 			}
@@ -475,30 +475,46 @@ LOOP:
 			r.SetCurrentPlanExecutionTask(currentTask)
 			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)
 			skipContextCancel.SetTo(true) // Plan execution will manage the context
-			taskStarted := make(chan struct{})
-			timelineStartPlanChan := make(chan struct{})
-			go func() {
-				defer func() {
-					select {
-					case <-timelineStartPlanChan:
-						r.AddToTimeline("plan_execution", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
-					}
+
+			err := r.AsyncExecutePlanAndExecute(
+				currentTask.GetContext(),
+				planPayload,
+				func() {
 					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
 					currentTask.SetStatus(string(TaskStatus_Completed))
 					r.SetCurrentPlanExecutionTask(nil)
-				}()
-				if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), planPayload, "", nil); err != nil {
-					log.Errorf("Plan execution failed: %v", err)
-				}
-			}()
-			select {
-			case <-taskStarted:
-				r.AddToTimeline("plan_execution", fmt.Sprintf("plan: %v is started", planPayload))
-				close(timelineStartPlanChan)
-				log.Infof("plan execution task started")
-				skipTaskStatusChange = true
-				break LOOP
+				},
+			)
+			if err != nil {
+				return false, utils.Errorf("failed to request plan execution: %v", err)
 			}
+			log.Infof("plan execution task started")
+			skipTaskStatusChange = true
+			break LOOP
+			//taskStarted := make(chan struct{})
+			//timelineStartPlanChan := make(chan struct{})
+			//go func() {
+			//	defer func() {
+			//		select {
+			//		case <-timelineStartPlanChan:
+			//			r.AddToTimeline("plan_execution", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
+			//		}
+			//		currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
+			//		currentTask.SetStatus(string(TaskStatus_Completed))
+			//		r.SetCurrentPlanExecutionTask(nil)
+			//	}()
+			//	if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), planPayload, "", nil); err != nil {
+			//		log.Errorf("Plan execution failed: %v", err)
+			//	}
+			//}()
+			//select {
+			//case <-taskStarted:
+			//	r.AddToTimeline("plan_execution", fmt.Sprintf("plan: %v is started", planPayload))
+			//	close(timelineStartPlanChan)
+			//	log.Infof("plan execution task started")
+			//	skipTaskStatusChange = true
+			//	break LOOP
+			//}
 		case ActionAskForClarification:
 			saveIterationInfoIntoTimeline()
 			obj := nextAction.GetObject("ask_for_clarification_payload")
@@ -547,7 +563,7 @@ LOOP:
 	return skipTaskStatusChange, nil
 }
 
-func (r *ReAct) EnhanceDirectlyAnswer(ctx context.Context, userQuery string) (string, error) {
+func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (string, error) {
 	currentTask := r.GetCurrentTask()
 	enhanceID := uuid.NewString()
 	config := r.config
