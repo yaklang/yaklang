@@ -180,6 +180,7 @@ func TestMemoryTimelineWithReachLimitBatchCompression(t *testing.T) {
 
 // MockedAIConfig 实现 AICallerConfigIf 接口，用于测试
 type MockedAIConfig struct {
+	*KeyValueConfig
 	*BaseInteractiveHandler
 	*BaseCheckpointableStorage
 
@@ -209,6 +210,7 @@ func NewMockedAIConfig(ctx context.Context) AICallerConfigIf {
 	}
 
 	config := &MockedAIConfig{
+		KeyValueConfig:            NewKeyValueConfig(),
 		BaseInteractiveHandler:    &BaseInteractiveHandler{},
 		BaseCheckpointableStorage: NewBaseCheckpointableStorage(),
 		ctx:                       ctx,

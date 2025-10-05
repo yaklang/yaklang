@@ -65,7 +65,9 @@ func init() {
 	err := reactloops.Register(
 		LOOP_NAME_WRITE_YAKLANG_CODE,
 		func(r aicommon.AIInvokeRuntime) (*reactloops.ReActLoop, error) {
-			docSearcher := createDocumentSearcher("")
+			config := r.GetConfig()
+			aikbPath := config.GetConfigString("aikb_path")
+			docSearcher := createDocumentSearcher(aikbPath)
 			filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
 			return reactloops.NewReActLoop(
 				LOOP_NAME_WRITE_YAKLANG_CODE,

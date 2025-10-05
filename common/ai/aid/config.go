@@ -37,6 +37,7 @@ var _ aicommon.AICaller = &AiTask{}
 var _ aicommon.AICallerConfigIf = &Config{}
 
 type Config struct {
+	*aicommon.KeyValueConfig
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
 
@@ -423,11 +424,13 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	ctx, cancel := context.WithCancel(ctx)
 
 	c := &Config{
-		ctx: ctx, cancel: cancel,
-		idSequence: atomic.AddInt64(idGenerator, offsetSeq),
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
+		KeyValueConfig:              aicommon.NewKeyValueConfig(),
+		ctx:                         ctx,
+		cancel:                      cancel,
+		idSequence:                  atomic.AddInt64(idGenerator, offsetSeq),
 		agreePolicy:                 aicommon.AgreePolicyManual,
 		agreeAIScore:                0.5,
 		agreeRiskCtrl:               new(riskControl),

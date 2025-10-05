@@ -99,7 +99,11 @@ func handleQueryDocument(
 	}
 
 	// Get max size from config (default 20KB)
+
 	var maxSize int64 = 20 * 1024 // invoker.GetConfig().aikbResultMaxSize
+	if ret := invoker.GetConfig().GetConfigInt64("aikb_result_max_size", 20*1024); ret > 0 {
+		maxSize = int64(ret)
+	}
 
 	// Format results for AI consumption with size control
 	var docBuffer bytes.Buffer

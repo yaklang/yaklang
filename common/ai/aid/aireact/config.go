@@ -10,9 +10,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/yaklang/yaklang/common/aiforge"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -20,10 +17,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
+	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -74,6 +73,7 @@ func (t *ReactTask) GetName() string {
 type ReActConfig struct {
 	*aicommon.Emitter
 	*aicommon.BaseCheckpointableStorage
+	*aicommon.KeyValueConfig
 
 	enhanceKnowledgeManager      *aicommon.EnhanceKnowledgeManager
 	disableEnhanceDirectlyAnswer bool
@@ -150,15 +150,13 @@ type ReActConfig struct {
 
 	// Plan and execute hijack function for advanced usage/testing
 	hijackPlanRequest func(ctx context.Context, planPayload string) error
-
-	// AI Knowledge Base path for document query
-	aikbPath          string
-	aikbResultMaxSize int64 // Max size for document query results (default 20KB)
 }
+
+var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
 
 func WithAIKBPath(path string) Option {
 	return func(opt *ReActConfig) {
-		opt.aikbPath = path
+		opt.SetConfig("aikb_path", path)
 	}
 }
 
@@ -172,7 +170,7 @@ func WithAIKBResultMaxSize(maxSize int64) Option {
 			log.Warnf("aikb result max size %d exceeds hard limit 20KB, setting to 20KB", maxSize)
 			maxSize = 20 * 1024
 		}
-		opt.aikbResultMaxSize = maxSize
+		opt.SetConfig("aikb_result_max_size", int64(maxSize))
 	}
 }
 
@@ -562,6 +560,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 	}
 
 	config := &ReActConfig{
+		KeyValueConfig:      aicommon.NewKeyValueConfig(),
 		task:                task,
 		ctx:                 ctx,
 		cancel:              cancel,
@@ -586,9 +585,6 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
 		workdir:                     consts.GetDefaultYakitBaseDir(),
-
-		// AIKB configuration
-		aikbResultMaxSize: 20 * 1024, // Default 20KB for document query results
 
 		// aiforge manager
 		aiBlueprintManager: aiforge.NewForgeFactory(),
