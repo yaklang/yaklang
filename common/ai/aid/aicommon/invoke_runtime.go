@@ -10,7 +10,7 @@ type AIInvokeRuntime interface {
 	ExecuteToolRequiredAndCall(name string) (*aitool.ToolResult, bool, error)
 	AskForClarification(question string, payloads []string) string
 	DirectlyAnswer(query string, tools []*aitool.Tool) (string, error)
-	EnhanceDirectlyAnswer(context.Context, string) (string, error)
+	EnhanceKnowledgeAnswer(context.Context, string) (string, error)
 	VerifyUserSatisfaction(query string, isToolCall bool, payload string) (bool, error)
 	AddToTimeline(entry, content string)
 

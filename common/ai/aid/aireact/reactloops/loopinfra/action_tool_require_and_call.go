@@ -6,11 +6,12 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 var loopAction_toolRequireAndCall = &reactloops.LoopAction{
-	ActionType:  LoopAction_RequireTool,
+	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL,
 	Description: "Require tool call",
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
