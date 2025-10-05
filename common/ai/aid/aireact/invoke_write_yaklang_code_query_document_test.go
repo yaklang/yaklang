@@ -520,9 +520,10 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 
 	// Check default value
 	expectedDefault := int64(20 * 1024)
-	if ins.config.aikbResultMaxSize != expectedDefault {
+	aikbResultMaxSize := ins.config.GetConfigInt64("aikb_result_max_size", 20*1024)
+	if aikbResultMaxSize != expectedDefault {
 		t.Errorf("Default aikb result max size should be %d, got %d",
-			expectedDefault, ins.config.aikbResultMaxSize)
+			expectedDefault, aikbResultMaxSize)
 	}
 
 	// Test with custom value
@@ -543,9 +544,10 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if ins2.config.aikbResultMaxSize != 10*1024 {
+	aikbResultMaxSize = ins2.config.GetConfigInt64("aikb_result_max_size")
+	if aikbResultMaxSize != 10*1024 {
 		t.Errorf("Custom aikb result max size should be %d, got %d",
-			10*1024, ins2.config.aikbResultMaxSize)
+			10*1024, aikbResultMaxSize)
 	}
 
 	// Test with value exceeding hard limit
@@ -567,9 +569,10 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 	}
 
 	// Should be capped at 20KB
-	if ins3.config.aikbResultMaxSize != 20*1024 {
+	aikbResultMaxSize = ins3.config.GetConfigInt64("aikb_result_max_size")
+	if aikbResultMaxSize != 20*1024 {
 		t.Errorf("aikb result max size exceeding hard limit should be capped at %d, got %d",
-			20*1024, ins3.config.aikbResultMaxSize)
+			20*1024, aikbResultMaxSize)
 	}
 
 	close(in)

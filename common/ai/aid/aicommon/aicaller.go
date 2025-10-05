@@ -14,6 +14,7 @@ type AICallbackType func(i AICallerConfigIf, req *AIRequest) (*AIResponse, error
 
 type AICallerConfigIf interface {
 	AICaller
+	KeyValueConfigIf
 
 	// Interactivable
 	Interactivable
