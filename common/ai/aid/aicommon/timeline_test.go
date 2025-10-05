@@ -193,6 +193,13 @@ type MockedAIConfig struct {
 	timelineContentSizeLimit int64
 }
 
+func (m *MockedAIConfig) CallAI(request *AIRequest) (*AIResponse, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+var _ AICallerConfigIf = (*MockedAIConfig)(nil)
+
 func NewMockedAIConfig(ctx context.Context) AICallerConfigIf {
 	emitter := &Emitter{
 		streamWG:            &sync.WaitGroup{},
