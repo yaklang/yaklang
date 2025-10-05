@@ -37,7 +37,7 @@ func checkCodeAndFormatErrors(code string) (string, bool) {
 		buf.WriteString("\n")
 
 		// Check if there are any errors (not just warnings/hints)
-		if msg.Severity == resultSpec.Error {
+		if !hasBlockingErrors && msg.Severity == resultSpec.Error {
 			hasBlockingErrors = true
 		}
 	}
@@ -215,7 +215,6 @@ LOOP:
 				case "write_code":
 					return nil
 				case "modify_code":
-					payload = action.GetString("code")
 					start := action.GetInt("modify_start_line")
 					end := action.GetInt("modify_end_line")
 					if start <= 0 || end <= 0 || end < start {

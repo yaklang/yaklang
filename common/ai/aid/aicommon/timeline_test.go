@@ -267,6 +267,14 @@ func (m *MockedAIConfig) GetTimelineContentSizeLimit() int64 {
 	return m.timelineContentSizeLimit
 }
 
+func (c *MockedAIConfig) GetMaxIterationCount() int64 {
+	return int64(100)
+}
+
+func (c *MockedAIConfig) GetAllowUserInteraction() bool {
+	return false
+}
+
 // TestNoCompression 测试不触发压缩的情况
 func TestNoCompression(t *testing.T) {
 	memoryTimeline := NewTimeline(&mockedAI{}, nil)

@@ -127,8 +127,20 @@ type Config struct {
 	disableOutputEventType []string
 }
 
+func (c *Config) GetAllowUserInteraction() bool {
+	return c.allowRequireForUserInteract
+}
+
 func (c *Config) GetTimelineContentSizeLimit() int64 {
 	return int64(c.timelineContentSizeLimit)
+}
+
+func (c *Config) GetMaxIterationCount() int64 {
+	return int64(c.maxTaskContinue)
+}
+
+func (c *Config) GetAllowUserInteracction() bool {
+	return c.allowRequireForUserInteract
 }
 
 func (c *Config) GetRuntimeId() string {

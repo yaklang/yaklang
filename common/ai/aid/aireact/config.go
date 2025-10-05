@@ -210,6 +210,14 @@ func (cfg *ReActConfig) GetTimelineContentSizeLimit() int64 {
 	return cfg.timelineContentSizeLimit
 }
 
+func (c *ReActConfig) GetMaxIterationCount() int64 {
+	return int64(c.maxIterations)
+}
+
+func (c *ReActConfig) GetAllowUserInteraction() bool {
+	return c.enableUserInteract
+}
+
 type Option func(*ReActConfig)
 
 func WithEnhanceKnowledgeManager(manager *aicommon.EnhanceKnowledgeManager) Option {
