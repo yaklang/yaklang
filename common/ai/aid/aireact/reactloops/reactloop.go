@@ -1,6 +1,8 @@
 package reactloops
 
 import (
+	"bytes"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
@@ -15,15 +17,21 @@ type ReActLoopCoreGenerateCode func(
 
 type ReActLoopOption func(r *ReActLoop)
 
+type ContextProviderFunc func(loop *ReActLoop, nonce string) (string, error)
+type FeedbackProviderFunc func(loop *ReActLoop, feedback *bytes.Buffer, nonce string) (string, error)
+
 type ReActLoop struct {
 	invoker aicommon.AIInvokeRuntime
 	config  aicommon.AICallerConfigIf
-	caller  aicommon.AICaller
 	emitter *aicommon.Emitter
 
 	maxIterations int
 
 	loopName string
+
+	persistentInstructionProvider   ContextProviderFunc
+	reflectionOutputExampleProvider ContextProviderFunc
+	reactiveDataBuilder             FeedbackProviderFunc
 
 	allowRAG            func() bool
 	allowToolCall       func() bool
@@ -31,9 +39,25 @@ type ReActLoop struct {
 	allowUserInteract   func() bool
 	loopPromptGenerator ReActLoopCoreGenerateCode
 
+	// store variable
+	vars *omap.OrderedMap[string, any]
+
 	// ai loop once
 	actions      *omap.OrderedMap[string, *LoopAction]
 	streamFields *omap.OrderedMap[string, *LoopStreamField]
+	aiTagFields  *omap.OrderedMap[string, *LoopAITagField]
+}
+
+func (r *ReActLoop) GetInvoker() aicommon.AIInvokeRuntime {
+	return r.invoker
+}
+
+func (r *ReActLoop) GetEmitter() *aicommon.Emitter {
+	return r.emitter
+}
+
+func (r *ReActLoop) GetConfig() aicommon.AICallerConfigIf {
+	return r.config
 }
 
 func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReActLoopOption) (*ReActLoop, error) {
@@ -41,23 +65,17 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		return nil, utils.Error("invoker is nil in ReActLoop")
 	}
 
-	caller, ok := invoker.(aicommon.AICaller)
-	if ok {
-		caller = caller
-	} else {
-		caller = nil
-	}
-
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
 		loopName:      name,
 		config:        config,
-		caller:        caller,
 		emitter:       config.GetEmitter(),
 		maxIterations: 100,
 		actions:       omap.NewEmptyOrderedMap[string, *LoopAction](),
 		streamFields:  omap.NewEmptyOrderedMap[string, *LoopStreamField](),
+		aiTagFields:   omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+		vars:          omap.NewEmptyOrderedMap[string, any](),
 	}
 	for _, action := range []*LoopAction{
 		loopAction_RequireTool,
@@ -83,16 +101,17 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		return nil, utils.Error("loop's emitter is nil in ReActLoop")
 	}
 
-	if utils.IsNil(r.caller) {
-		return nil, utils.Error("loop's ai caller is nil in ReActLoop")
-	}
-
 	return r, nil
 }
 
-func (r *ReActLoop) generateSchemaString() (string, error) {
-	// loop
-	// build in code
-	schema := buildSchema(r.actions.Values()...)
-	return schema, nil
+func (r *ReActLoop) Set(i string, result any) {
+	r.vars.Set(i, result)
+}
+
+func (r *ReActLoop) Get(i string) string {
+	result, ok := r.vars.Get(i)
+	if ok {
+		return utils.InterfaceToString(result)
+	}
+	return ""
 }

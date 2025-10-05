@@ -1,0 +1,66 @@
+## 代码生成输出格式示例
+
+### ✅ 正确示例 1: write_code 动作（创建新代码）
+```json
+{"@action": "write_code", "human_readable_thought": "创建一个简单的端口扫描脚本"}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+yakit.AutoInitYakit()
+
+target := cli.String("target", cli.setRequired(true))
+ports := cli.String("ports", cli.setDefault("80,443"))
+cli.check()
+
+results, err := servicescan.Scan(target, ports)
+die(err)
+
+for result in results {
+    yakit.Info("Found: %v", result.String())
+}
+<|GEN_CODE_END_{{ .Nonce }}|>
+
+### ✅ 正确示例 2: modify_code 动作（修改现有代码）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25, "human_readable_thought": "修正ZIP文件打开方式"}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+// 打开ZIP文件
+reader, err := zip.OpenReader(zipFilePath)
+if err != nil {
+    yakit.Error("打开ZIP文件失败: %v", err)
+    return
+}
+defer reader.Close()
+<|GEN_CODE_END_{{ .Nonce }}|>
+
+⚠️ 关键提示：JSON 和代码标签必须同时出现！不能只输出 JSON！
+
+### ❌ 错误示例 1：只输出JSON不输出代码（会导致超时！）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25, "human_readable_thought": "修正代码"}
+```
+☝️ 这种格式是错误的！缺少 <|GEN_CODE_{{ .Nonce }}|> 代码块，系统会一直等待超时！
+
+### ❌ 错误示例 2：包含行号前缀（绝对禁止！）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+18 | // 打开ZIP文件
+19 | reader, err := zip.OpenReader(zipFilePath)
+20 | if err != nil {
+21 |     yakit.Error("打开ZIP文件失败: %v", err)
+22 |     return
+23 | }
+<|GEN_CODE_END_{{ .Nonce }}|>
+☝️ 这种格式是错误的！包含行号会导致语法解析失败！
+
+### ✅ 正确示例 3: finish 动作（任务完成）
+```json
+{"@action": "finish", "human_readable_thought": "代码已经完成并通过语法检查"}
+```
+
+**再次强调：在 <|GEN_CODE_{{ .Nonce }}|> 标签内，只能有纯净的可执行 Yaklang 代码，不能有任何行号、分隔符或其他装饰！**
