@@ -11,8 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// verifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
-func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, payload string) (bool, error) {
+// VerifyUserSatisfaction verifies if the materials satisfied the user's needs and provides human-readable output
+func (r *ReAct) VerifyUserSatisfaction(originalQuery string, isToolCall bool, payload string) (bool, error) {
 	verificationPrompt := r.generateVerificationPrompt(
 		originalQuery, isToolCall, payload, r.DumpCurrentEnhanceData(),
 	)

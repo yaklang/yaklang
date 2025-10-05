@@ -3,10 +3,10 @@ package aireact
 import (
 	"bytes"
 	"fmt"
-	"github.com/google/uuid"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
