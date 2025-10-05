@@ -16,6 +16,48 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+func (r *ReActLoop) createMirrors(taskIndex string, nonce string, streamWg *sync.WaitGroup) []func(io.Reader) {
+	var aiTagStreamMirror []func(io.Reader)
+	var emitter = r.GetEmitter()
+	for _, tagIns := range r.aiTagFields.Values() {
+		v := tagIns
+		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
+			defer func() {
+				streamWg.Done()
+			}()
+			tagErr := aitag.Parse(reader, aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
+				streamWg.Add(1)
+				var result bytes.Buffer
+				fieldReader = io.TeeReader(fieldReader, &result)
+				emitter.EmitStreamEvent(
+					"yaklang-code",
+					time.Now(),
+					fieldReader,
+					taskIndex,
+					func() {
+						defer streamWg.Done()
+						code := result.String()
+						if code == "" {
+							return
+						}
+						if strings.HasPrefix(code, "\n") {
+							code = code[1:]
+						}
+						if strings.HasSuffix(code, "\n") {
+							code = code[:len(code)-1]
+						}
+						r.Set(v.VariableName, code)
+					},
+				)
+			}))
+			if tagErr != nil {
+				log.Errorf("Failed to emit tag event for[%v]: %v", v.TagName, tagErr)
+			}
+		})
+	}
+	return aiTagStreamMirror
+}
+
 func (r *ReActLoop) Execute(ctx context.Context, startup string) error {
 	nonce := utils.RandStringBytes(4)
 	_ = nonce
@@ -77,55 +119,33 @@ LOOP:
 
 				stream = io.TeeReader(stream, os.Stdout)
 
-				var aiTagStreamMirror []func(io.Reader)
-				for _, tagIns := range r.aiTagFields.Values() {
-					v := tagIns
-					aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
-						defer func() {
-							streamWg.Done()
-						}()
-						tagErr := aitag.Parse(reader, aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
-							streamWg.Add(1)
-							var result bytes.Buffer
-							fieldReader = io.TeeReader(fieldReader, &result)
-							emitter.EmitStreamEvent(
-								"yaklang-code",
-								time.Now(),
-								fieldReader,
-								resp.GetTaskIndex(),
-								func() {
-									defer streamWg.Done()
-									code := result.String()
-									if code == "" {
-										return
-									}
-									if strings.HasPrefix(code, "\n") {
-										code = code[1:]
-									}
-									if strings.HasSuffix(code, "\n") {
-										code = code[:len(code)-1]
-									}
-									r.Set(v.VariableName, code)
-								},
-							)
-						}))
-						if tagErr != nil {
-							log.Errorf("Failed to emit tag event for[%v]: %v", v.TagName, tagErr)
-						}
-					})
-				}
-
+				aiTagStreamMirror := r.createMirrors(resp.GetTaskIndex(), nonce, streamWg)
 				if len(aiTagStreamMirror) > 0 {
 					streamWg.Add(len(aiTagStreamMirror))
 					log.Infof("there aitag detected, will mirror the stream")
 					stream = utils.CreateUTF8StreamMirror(stream, aiTagStreamMirror...)
 				}
 
+				actionNameFallback := ""
 				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
-					stream,
-					allActionNames[0],
-					allActionNames[1:],
+					stream, "object", allActionNames,
 					[]jsonextractor.CallbackOption{
+						jsonextractor.WithRegisterFieldStreamHandler(
+							"type",
+							func(key string, reader io.Reader, parents []string) {
+								if len(parents) <= 0 {
+									return
+								}
+								if parents[len(parents)-1] != "next_action" {
+									return
+								}
+								raw, err := io.ReadAll(utils.JSONStringReader(reader))
+								if err != nil {
+									return
+								}
+								actionNameFallback = string(raw)
+							},
+						),
 						jsonextractor.WithRegisterMultiFieldStreamHandler(
 							r.streamFields.Keys(),
 							func(key string, reader io.Reader, parents []string) {
@@ -167,6 +187,9 @@ LOOP:
 				)
 				if actionErr != nil {
 					return utils.Wrap(actionErr, "failed to parse action")
+				}
+				if actionNameFallback != "" && action.ActionType() == "object" {
+					action.SetActionType(actionNameFallback)
 				}
 				actionName = action.Name()
 
