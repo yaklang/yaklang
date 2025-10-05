@@ -8,19 +8,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/utils/filesys"
-
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
-
-	"github.com/yaklang/yaklang/common/utils/chanx"
-
-	"github.com/yaklang/yaklang/common/utils"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 

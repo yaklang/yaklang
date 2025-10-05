@@ -321,7 +321,7 @@ LOOP:
 			if err != nil {
 				return false, err
 			}
-			satisfied, err := r.verifyUserSatisfaction(userQuery, false, enhanceResult)
+			satisfied, err := r.VerifyUserSatisfaction(userQuery, false, enhanceResult)
 			if err != nil {
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))
@@ -400,7 +400,7 @@ LOOP:
 
 			// Tool executed successfully, now verify if user needs are satisfied
 			// Temporarily release the lock before calling verification to avoid deadlock
-			satisfied, err := r.verifyUserSatisfaction(userQuery, true, toolPayload)
+			satisfied, err := r.VerifyUserSatisfaction(userQuery, true, toolPayload)
 			if err != nil {
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))
@@ -508,7 +508,7 @@ LOOP:
 			if suggestion == "" {
 				suggestion = "user did not provide a valid suggestion, using default 'continue' action"
 			}
-			satisfied, err := r.verifyUserSatisfaction(userQuery, false, suggestion)
+			satisfied, err := r.VerifyUserSatisfaction(userQuery, false, suggestion)
 			if err != nil {
 				endIterationCall()
 				currentTask.SetStatus(string(TaskStatus_Aborted))

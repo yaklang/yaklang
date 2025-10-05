@@ -62,7 +62,7 @@ var outputExample string
 var reactiveData string
 
 func init() {
-	err := reactloops.Register(
+	err := reactloops.RegisterLoopFactory(
 		LOOP_NAME_WRITE_YAKLANG_CODE,
 		func(r aicommon.AIInvokeRuntime) (*reactloops.ReActLoop, error) {
 			config := r.GetConfig()
