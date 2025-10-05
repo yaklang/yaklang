@@ -68,6 +68,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
+		invoker:       invoker,
 		loopName:      name,
 		config:        config,
 		emitter:       config.GetEmitter(),
