@@ -69,6 +69,17 @@ type ReAct struct {
 	artifacts            *filesys.RelLocalFs
 }
 
+var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)
+var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
+
+func (r *ReAct) GetConfig() aicommon.AICallerConfigIf {
+	return r.config
+}
+
+func (r *ReActConfig) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+	return r.promptManager.GetBasicPromptInfo(tools)
+}
+
 func (r *ReAct) SaveTimeline() {
 	if r.config.persistentSessionId == "" {
 		return
@@ -249,8 +260,8 @@ func (r *ReAct) SendInputEvent(event *ypb.AIInputEvent) (ret error) {
 	return nil
 }
 
-// addToTimeline 添加条目到时间线
-func (r *ReAct) addToTimeline(entryType, content string) {
+// AddToTimeline 添加条目到时间线
+func (r *ReAct) AddToTimeline(entryType, content string) {
 	msg := new(bytes.Buffer)
 	if entryType != "" {
 		msg.WriteString(fmt.Sprintf("[%s]", entryType))

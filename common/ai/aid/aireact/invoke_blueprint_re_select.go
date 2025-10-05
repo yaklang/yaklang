@@ -23,7 +23,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 	// Get available AI Forge blueprints
 	forgeList := r.promptManager.GetAvailableAIForgeBlueprints()
 	if forgeList == "" {
-		r.addToTimeline("note", "No available AI Forge blueprints for re-selection")
+		r.AddToTimeline("note", "No available AI Forge blueprints for re-selection")
 		return ins, invokeParams, false, utils.Errorf("no available AI Forge blueprints")
 	}
 
@@ -61,7 +61,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 								reason,
 								r.GetCurrentTask().GetId(),
 								func() {
-									r.addToTimeline("blueprint-selection", "Reasoning: "+reasonBuf.String())
+									r.AddToTimeline("blueprint-selection", "Reasoning: "+reasonBuf.String())
 								},
 							)
 						},
@@ -129,7 +129,7 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 		return nil, nil, false, err
 	}
 
-	r.addToTimeline(
+	r.AddToTimeline(
 		"blueprint-selection",
 		fmt.Sprintf("Selected new blueprint: %v \nwith params: %v", selectedForge.ForgeName, newParams))
 	// Return the new blueprint with newly generated parameters

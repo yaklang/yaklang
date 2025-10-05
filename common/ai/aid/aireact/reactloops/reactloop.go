@@ -16,6 +16,7 @@ type ReActLoopCoreGenerateCode func(
 type ReActLoopOption func(r *ReActLoop)
 
 type ReActLoop struct {
+	invoker aicommon.AIInvokeRuntime
 	config  aicommon.AICallerConfigIf
 	caller  aicommon.AICaller
 	emitter *aicommon.Emitter
@@ -35,17 +36,19 @@ type ReActLoop struct {
 	streamFields *omap.OrderedMap[string, *LoopStreamField]
 }
 
-func NewReActLoop(name string, config aicommon.AICallerConfigIf, options ...ReActLoopOption) (*ReActLoop, error) {
-	if utils.IsNil(config) {
-		return nil, utils.Error("config is nil in ReActLoop")
+func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReActLoopOption) (*ReActLoop, error) {
+	if utils.IsNil(invoker) {
+		return nil, utils.Error("invoker is nil in ReActLoop")
 	}
 
-	caller, ok := config.(aicommon.AICaller)
+	caller, ok := invoker.(aicommon.AICaller)
 	if ok {
 		caller = caller
 	} else {
 		caller = nil
 	}
+
+	config := invoker.GetConfig()
 
 	r := &ReActLoop{
 		loopName:      name,

@@ -38,7 +38,7 @@ func (r *ReAct) verifyUserSatisfaction(originalQuery string, isToolCall bool, pa
 						rsp.GetTaskIndex(),
 						func() {
 							if out.Len() > 0 {
-								r.addToTimeline("verify", prompt+": "+out.String())
+								r.AddToTimeline("verify", prompt+": "+out.String())
 							}
 						},
 					)

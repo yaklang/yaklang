@@ -15,7 +15,7 @@ type InteractOption struct {
 
 func (r *ReAct) _requireUserInteract(question string, options []map[string]any) (string, string, error) {
 	if !r.config.enableUserInteract {
-		r.addToTimeline("note", "Require user interact but not enabled, skip it.")
+		r.AddToTimeline("note", "Require user interact but not enabled, skip it.")
 		return "", "", utils.Errorf("require user interact but not enabled")
 	}
 
@@ -46,7 +46,7 @@ func (r *ReAct) _requireUserInteract(question string, options []map[string]any) 
 	r.config.CallAfterInteractiveEventReleased(ep.GetId(), params)
 	suggestion := params.GetAnyToString("suggestion")
 	extra := params.GetAnyToString("extra_info")
-	r.addToTimeline(
+	r.AddToTimeline(
 		"user-clarification",
 		fmt.Sprintf("User clarification requested: %s result: %v",
 			question, suggestion),
