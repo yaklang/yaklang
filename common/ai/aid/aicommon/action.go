@@ -30,6 +30,11 @@ func NewAction(name string, params aitool.InvokeParams) *Action {
 	}
 }
 
+func (r *Action) SetActionType(name string) {
+	r.name = name
+	r.params.Set("@action", name)
+}
+
 func (q *Action) Name() string {
 	if q == nil {
 		return ""
