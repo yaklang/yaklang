@@ -296,34 +296,42 @@ LOOP:
 			})
 		}
 
-		execOnce := utils.NewOnce()
-		var continueTriggered = utils.NewAtomicBool()
-		var failedReason any
-		var failedTriggered = utils.NewAtomicBool()
+		// 调用 ActionHandler
+		if instance.ActionHandler == nil {
+			// ActionHandler 必须存在
+			finalError = utils.Errorf("action[%s] has no ActionHandler", actionName)
+			return finalError
+		}
+
 		instance.ActionHandler(
 			r,
 			action,
 			operator,
 		)
 
-		execOnce.Do(func() {
-			continueTriggered.SetTo(true)
-		})
-		// handle result value
-		if failedTriggered.IsSet() || instance.AsyncMode {
-			if utils.IsNil(failedReason) {
-				finalError = nil
-				return nil
-			} else {
-				finalError = utils.Errorf("action[%s] failed: %v", actionName, failedReason)
+		// 检查 operator 状态
+		if isTerminated, err := operator.IsTerminated(); isTerminated {
+			if err != nil {
+				finalError = err
 				return finalError
 			}
+			// 正常退出
+			break LOOP
 		}
 
-		if !instance.AsyncMode && continueTriggered.IsSet() {
-			// 不是异步模式才可以下一次循环
+		if instance.AsyncMode {
+			// 异步模式直接退出循环
+			finalError = nil
+			return nil
+		}
+
+		// 非异步模式，继续下一次循环
+		if operator.IsContinued() {
 			continue
 		}
+
+		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
+		continue
 	}
 	return nil
 }
