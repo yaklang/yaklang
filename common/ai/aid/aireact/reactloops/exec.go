@@ -3,6 +3,7 @@ package reactloops
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"strings"
@@ -58,7 +59,53 @@ func (r *ReActLoop) createMirrors(taskIndex string, nonce string, streamWg *sync
 	return aiTagStreamMirror
 }
 
-func (r *ReActLoop) Execute(ctx context.Context, startup string) error {
+func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string) error {
+	task := aicommon.NewStatefulTaskBase(
+		taskId,
+		userInput,
+		ctx,
+		r.GetEmitter(),
+	)
+	return r.ExecuteWithExistedTask(task)
+}
+
+func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
+	if utils.IsNil(task) {
+		return errors.New("re-act loop task is nil")
+	}
+
+	done := utils.NewOnce()
+	abort := func(err error) {
+		result := task.GetResult()
+		result += "\n\n[Error]: " + err.Error()
+		task.SetResult(result)
+		done.Do(func() {
+			task.SetStatus(aicommon.AITaskState_Aborted)
+		})
+	}
+	complete := func(err any) {
+		if !utils.IsNil(err) {
+			result := task.GetResult()
+			result += "\n\n[Reason]: " + utils.InterfaceToString(err)
+			task.SetResult(result)
+		}
+		done.Do(func() {
+			task.SetStatus(aicommon.AITaskState_Completed)
+		})
+	}
+
+	taskStartProcessing := func() {
+		task.SetStatus(aicommon.AITaskState_Processing)
+	}
+
+	defer func() {
+		if err := recover(); err != nil {
+			abort(utils.Errorf("ReActLoop panicked: %v", err))
+		} else {
+			complete(nil)
+		}
+	}()
+
 	nonce := utils.RandStringBytes(4)
 	_ = nonce
 
@@ -71,16 +118,27 @@ func (r *ReActLoop) Execute(ctx context.Context, startup string) error {
 	}
 	var emitter = r.emitter
 	if utils.IsNil(emitter) {
+		abort(utils.Errorf("Emitter is nil"))
 		return utils.Error("emitter is nil in ReActLoop")
 	}
 
 	allActionNames := r.actions.Keys()
 	if len(allActionNames) == 0 {
+		abort(utils.Errorf("no action names in ReActLoop"))
 		return utils.Error("no action names in ReActLoop")
 	}
 
 	var operator = newLoopActionHandlerOperator()
+	var finalError error
+	defer func() {
+		if finalError != nil {
+			abort(finalError)
+		} else {
+			complete(nil)
+		}
+	}()
 
+	taskStartProcessing()
 LOOP:
 	for {
 		iterationCount++
@@ -89,14 +147,15 @@ LOOP:
 			break LOOP
 		}
 
-		prompt, err := r.generateLoopPrompt(
+		var prompt string
+		prompt, finalError = r.generateLoopPrompt(
 			nonce,
-			startup,
+			task.GetId(),
 			operator,
 		)
-		if err != nil {
-			log.Errorf("Failed to generate loop prompt: %v", err)
-			break LOOP
+		if finalError != nil {
+			log.Errorf("Failed to generate prompt: %v", finalError)
+			return finalError
 		}
 
 		// 重置上次操作状态对这次反应的影响
@@ -242,7 +301,8 @@ LOOP:
 			if utils.IsNil(failedReason) {
 				break LOOP
 			} else {
-				return utils.Errorf("ReActLoop failed: %v", failedReason)
+				finalError = utils.Errorf("action[%s] failed: %v", actionName, failedReason)
+				return finalError
 			}
 		}
 
