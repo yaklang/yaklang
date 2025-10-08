@@ -112,7 +112,7 @@ LOOP:
 			}
 
 			if e.Type == string(schema.EVENT_TYPE_STRUCTURED) {
-				if utils.MatchAllOfSubString(e.Content, string(TaskStatus_Completed)) {
+				if utils.MatchAllOfSubString(e.Content, string(aicommon.AITaskState_Completed)) {
 					gotSatisfied = true
 				}
 			}
@@ -252,7 +252,7 @@ LOOP:
 				gotResult = true
 			}
 			if e.Type == string(schema.EVENT_TYPE_STRUCTURED) {
-				if utils.MatchAllOfSubString(e.Content, string(TaskStatus_Completed)) {
+				if utils.MatchAllOfSubString(e.Content, string(aicommon.AITaskState_Completed)) {
 					gotSatisfied = true
 				}
 			}

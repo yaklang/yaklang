@@ -15,7 +15,46 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func (r *ReAct) AsyncExecutePlanAndExecute(ctx context.Context, planPayload string, onFinished func()) error {
+func (r *ReAct) RequireAIForgeAndAsyncExecute(
+	ctx context.Context, forgeName string,
+	onFinished func(),
+) error {
+	ins, forgeParams, err := r.invokeBlueprint(forgeName)
+	if err != nil {
+		r.AddToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
+		return err
+	}
+	forgeName = ins.ForgeName
+
+	r.AddToTimeline("ai-blueprint", fmt.Sprintf("invoke ai-blueprint[%v] success, params: %v", forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 256)))
+
+	cb := utils.NewCondBarrierContext(ctx)
+	startupBarrier := cb.CreateBarrier("startup")
+	taskDone := make(chan struct{})
+	go func() {
+		defer func() {
+			if err := cb.Wait("startup"); err != nil {
+				log.Warnf("start up failed: %v", err)
+			}
+			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan/forge: %v is finished", utils.ShrinkString(forgeName, 128)))
+			if onFinished != nil {
+				onFinished()
+			}
+		}()
+		err := r.invokePlanAndExecute(taskDone, ctx, "", forgeName, forgeParams)
+		if err != nil {
+			log.Errorf("AsyncPlanAndExecute error: %v", err)
+		}
+	}()
+	select {
+	case <-taskDone:
+		r.AddToTimeline("plan_execute", fmt.Sprintf("plan/forge: %v is started", utils.ShrinkString(forgeName, 128)))
+		startupBarrier.Done()
+		return nil
+	}
+}
+
+func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinished func()) error {
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
 
@@ -32,7 +71,7 @@ func (r *ReAct) AsyncExecutePlanAndExecute(ctx context.Context, planPayload stri
 		}()
 		err := r.invokePlanAndExecute(taskDone, ctx, planPayload, "", nil)
 		if err != nil {
-			log.Errorf("AsyncExecutePlanAndExecute error: %v", err)
+			log.Errorf("AsyncPlanAndExecute error: %v", err)
 		}
 	}()
 	select {
@@ -134,29 +173,22 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		done()
 		result, err := yak.ExecuteForge(forgeName, forgeParams, opts...)
 		if err != nil {
-			r.finished = true
 			log.Errorf("Failed to execute forge: %v", err)
 			return utils.Errorf("failed to execute forge %s: %v", forgeName, err)
 		}
-		r.finished = true
 		_ = result
 		return nil
 	} else {
 		cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)
 		if err != nil {
-			r.finished = true
 			log.Errorf("Failed to create coordinator for plan execution: %v", err)
 			return utils.Errorf("failed to create coordinator for plan execution: %v", err)
 		}
 		done()
 		if err := cod.Run(); err != nil {
-			r.finished = true
 			log.Errorf("Plan execution failed: %v", err)
 			return utils.Errorf("plan execution failed: %v", err)
 		}
-		// Emit the final result from the coordinator
-		r.finished = true
-
 		return nil
 	}
 }

@@ -36,8 +36,7 @@ func (r *ReAct) processReActFromQueue() {
 		return
 	}
 	r.setCurrentTask(nextTask)
-	// 更新任务状态为处理中
-	nextTask.SetStatus(string(TaskStatus_Processing))
+	nextTask.SetStatus(aicommon.AITaskState_Processing)
 	if r.config.debugEvent {
 		log.Infof("Processing task from queue: %s", nextTask.GetId())
 	}
@@ -46,7 +45,7 @@ func (r *ReAct) processReActFromQueue() {
 }
 
 // processReActTask 处理单个 Task
-func (r *ReAct) processReActTask(task *Task) {
+func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 	skipStatusFallback := utils.NewAtomicBool()
 	defer func() {
 		r.SaveTimeline()
@@ -54,14 +53,14 @@ func (r *ReAct) processReActTask(task *Task) {
 		if err := recover(); err != nil {
 			log.Errorf("ReAct task processing panic: %v", err)
 			utils.PrintCurrentGoroutineRuntimeStack()
-			task.SetStatus(string(TaskStatus_Aborted))
+			task.SetStatus(aicommon.AITaskState_Aborted)
 			r.AddToTimeline("error", fmt.Sprintf("Task processing panic: %v", err))
 		} else {
 			if r.config.debugEvent {
 				log.Infof("Finished processing task: %s", task.GetId())
 			}
 			if !skipStatusFallback.IsSet() {
-				task.SetStatus(string(TaskStatus_Completed))
+				task.SetStatus(aicommon.AITaskState_Completed)
 			}
 		}
 	}()
@@ -71,17 +70,16 @@ func (r *ReAct) processReActTask(task *Task) {
 	// 从任务中提取用户输入
 	userInput := task.GetUserInput()
 
-	r.finished = false
 	r.currentIteration = 0
 	skipStatus, err := r.executeMainLoop(userInput)
 	if err != nil {
 		log.Errorf("Task execution failed: %v", err)
-		task.SetStatus(string(TaskStatus_Aborted))
+		task.SetStatus(aicommon.AITaskState_Aborted)
 		r.AddToTimeline("error", fmt.Sprintf("Task execution failed: %v", err))
 		return
 	}
 	if !skipStatus {
-		task.SetStatus(string(TaskStatus_Completed))
+		task.SetStatus(aicommon.AITaskState_Completed)
 	}
 	skipStatusFallback.SetTo(skipStatus)
 }
@@ -314,7 +312,7 @@ LOOP:
 				utils.PrefixLines(answerPayload, "  | "),
 			))
 			endIterationCall()
-			currentTask.SetStatus(string(TaskStatus_Completed))
+			currentTask.SetStatus(aicommon.AITaskState_Completed)
 			continue
 		case ActionKnowledgeEnhanceAnswer:
 			enhanceResult, err := r.EnhanceKnowledgeAnswer(currentTask.GetContext(), userQuery)
@@ -324,7 +322,7 @@ LOOP:
 			satisfied, err := r.VerifyUserSatisfaction(userQuery, false, enhanceResult)
 			if err != nil {
 				endIterationCall()
-				currentTask.SetStatus(string(TaskStatus_Aborted))
+				currentTask.SetStatus(aicommon.AITaskState_Aborted)
 				continue
 			} else if satisfied {
 				r.EmitResult("** 知识增强结果已经初步满足用户需求(Knowledge enhancement results have initially met the user's needs) **")
@@ -335,7 +333,7 @@ LOOP:
 					r.EmitError("Failed to require directly answer after knowledge enhance: %v", err)
 					r.AddToTimeline("error", fmt.Sprintf("Failed to require directly answer after knowledge enhance: %v", err))
 				}
-				currentTask.SetStatus(string(TaskStatus_Completed))
+				currentTask.SetStatus(aicommon.AITaskState_Completed)
 				continue
 			} else {
 				// User needs not satisfied, continue loop
@@ -349,7 +347,7 @@ LOOP:
 			toolcallResult, directlyAnswerRequired, err := r.ExecuteToolRequiredAndCall(toolPayload)
 			if err != nil {
 				r.AddToTimeline("error-calling-tool", fmt.Sprintf("Failed to handle require tool[%v]: %v", toolPayload, err))
-				currentTask.SetStatus(string(TaskStatus_Processing))
+				currentTask.SetStatus(aicommon.AITaskState_Processing)
 				log.Errorf("Failed to handle require tool: %v, retry it", err)
 				continue
 			}
@@ -359,7 +357,7 @@ LOOP:
 				if toolcallResult != nil && toolcallResult.Error != "" {
 					// 工具返回了错误信息
 					r.AddToTimeline("error-calling-tool", fmt.Sprintf("Tool[%v] returned error: %v", toolPayload, toolcallResult.Error))
-					currentTask.SetStatus(string(TaskStatus_Processing))
+					currentTask.SetStatus(aicommon.AITaskState_Processing)
 					log.Errorf("Tool[%v] returned error: %v", toolPayload, toolcallResult.Error)
 					continue
 				}
@@ -377,19 +375,19 @@ LOOP:
 						"**用户要求 AI 直接回答，所以在本次回答中，不允许使用工具和其他复杂方法手段回答**", tools)
 				if err != nil {
 					endIterationCall()
-					currentTask.SetStatus(string(TaskStatus_Aborted))
+					currentTask.SetStatus(aicommon.AITaskState_Aborted)
 					log.Errorf("Failed to require directly answer: %v", err)
 					continue
 				}
 				if result == "" {
 					endIterationCall()
-					currentTask.SetStatus(string(TaskStatus_Aborted))
+					currentTask.SetStatus(aicommon.AITaskState_Aborted)
 					log.Errorf("Failed to require directly answer: %v", err)
 					continue
 				}
 				currentTask.SetResult(strings.TrimSpace(result) + " (force directly answer)")
 				endIterationCall()
-				currentTask.SetStatus(string(TaskStatus_Completed))
+				currentTask.SetStatus(aicommon.AITaskState_Completed)
 				continue
 			}
 
@@ -403,11 +401,11 @@ LOOP:
 			satisfied, err := r.VerifyUserSatisfaction(userQuery, true, toolPayload)
 			if err != nil {
 				endIterationCall()
-				currentTask.SetStatus(string(TaskStatus_Aborted))
+				currentTask.SetStatus(aicommon.AITaskState_Aborted)
 				continue
 			} else if satisfied {
 				endIterationCall()
-				currentTask.SetStatus(string(TaskStatus_Completed))
+				currentTask.SetStatus(aicommon.AITaskState_Completed)
 				continue
 			} else {
 				// User needs not satisfied, continue loop
@@ -418,51 +416,60 @@ LOOP:
 			forgeName := nextAction.GetString("blueprint_payload")
 			r.AddToTimeline("plan", fmt.Sprintf("ai-forge-name(blueprint): %v is requested", forgeName))
 
-			if havePlanExecuting {
-				r.Emitter.EmitWarning("existed plan execution task is running, cannot start a new one")
-				r.AddToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
-				return false, utils.Errorf("a plan execution task is already running, cannot start a new one (even through ai-blueprint is requested)")
-			}
-
-			ins, forgeParams, err := r.invokeBlueprint(forgeName)
+			err := r.RequireAIForgeAndAsyncExecute(currentTask.GetContext(), forgeName, func() {
+				currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
+				currentTask.SetStatus(aicommon.AITaskState_Completed)
+				r.SetCurrentPlanExecutionTask(nil)
+			})
 			if err != nil {
-				r.finished = true
-				r.AddToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
-				return false, utils.Errorf("failed to invoke ai-blueprint[%v]: %v", forgeName, err)
+				return false, err
 			}
-			forgeName = ins.ForgeName // use the real name from schema manager
+			skipTaskStatusChange = true
 
-			r.AddToTimeline("ai-blueprint", fmt.Sprintf(
-				`ai-blueprint: %v is invoked with params: %v`,
-				forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 256),
-			))
-
-			r.SetCurrentPlanExecutionTask(currentTask)
-			skipContextCancel.SetTo(true) // Plan execution will manage the context
-			taskStarted := make(chan struct{})
-			timelineStartPlanChan := make(chan struct{})
-			go func() {
-				defer func() {
-					select {
-					case <-timelineStartPlanChan:
-						r.AddToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is finished", utils.ShrinkString(forgeName, 128)))
-					}
-					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
-					currentTask.SetStatus(string(TaskStatus_Completed))
-					r.SetCurrentPlanExecutionTask(nil)
-				}()
-				if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), "", ins.ForgeName, forgeParams); err != nil {
-					log.Errorf("Plan execution failed: %v", err)
-				}
-			}()
-			select {
-			case <-taskStarted:
-				r.AddToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is started", forgeName))
-				close(timelineStartPlanChan)
-				log.Infof("plan execution task started")
-				skipTaskStatusChange = true
-				break LOOP
-			}
+			//if havePlanExecuting {
+			//	r.Emitter.EmitWarning("existed plan execution task is running, cannot start a new one")
+			//	r.AddToTimeline("plan_warning", "a plan execution task is already running, cannot start a new one")
+			//	return false, utils.Errorf("a plan execution task is already running, cannot start a new one (even through ai-blueprint is requested)")
+			//}
+			//
+			//ins, forgeParams, err := r.invokeBlueprint(forgeName)
+			//if err != nil {
+			//	r.AddToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
+			//	return false, utils.Errorf("failed to invoke ai-blueprint[%v]: %v", forgeName, err)
+			//}
+			//forgeName = ins.ForgeName // use the real name from schema manager
+			//
+			//r.AddToTimeline("ai-blueprint", fmt.Sprintf(
+			//	`ai-blueprint: %v is invoked with params: %v`,
+			//	forgeName, utils.ShrinkString(utils.InterfaceToString(forgeParams), 256),
+			//))
+			//
+			//r.SetCurrentPlanExecutionTask(currentTask)
+			//skipContextCancel.SetTo(true) // Plan execution will manage the context
+			//taskStarted := make(chan struct{})
+			//timelineStartPlanChan := make(chan struct{})
+			//go func() {
+			//	defer func() {
+			//		select {
+			//		case <-timelineStartPlanChan:
+			//			r.AddToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is finished", utils.ShrinkString(forgeName, 128)))
+			//		}
+			//		currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
+			//		currentTask.SetStatus(string(TaskStatus_Completed))
+			//		r.SetCurrentPlanExecutionTask(nil)
+			//	}()
+			//	if err := r.invokePlanAndExecute(taskStarted, currentTask.GetContext(), "", ins.ForgeName, forgeParams); err != nil {
+			//		log.Errorf("Plan execution failed: %v", err)
+			//	}
+			//}()
+			//select {
+			//case <-taskStarted:
+			//	r.AddToTimeline("plan_execution", fmt.Sprintf("ai-blueprint: %v is started", forgeName))
+			//	close(timelineStartPlanChan)
+			//	log.Infof("plan execution task started")
+			//	skipTaskStatusChange = true
+			//	break LOOP
+			//}
 		case ActionRequestPlanExecution:
 			saveIterationInfoIntoTimeline()
 
@@ -476,12 +483,12 @@ LOOP:
 			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)
 			skipContextCancel.SetTo(true) // Plan execution will manage the context
 
-			err := r.AsyncExecutePlanAndExecute(
+			err := r.AsyncPlanAndExecute(
 				currentTask.GetContext(),
 				planPayload,
 				func() {
 					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
-					currentTask.SetStatus(string(TaskStatus_Completed))
+					currentTask.SetStatus(aicommon.AITaskState_Completed)
 					r.SetCurrentPlanExecutionTask(nil)
 				},
 			)
@@ -527,11 +534,11 @@ LOOP:
 			satisfied, err := r.VerifyUserSatisfaction(userQuery, false, suggestion)
 			if err != nil {
 				endIterationCall()
-				currentTask.SetStatus(string(TaskStatus_Aborted))
+				currentTask.SetStatus(aicommon.AITaskState_Aborted)
 				continue
 			} else if satisfied {
 				endIterationCall()
-				currentTask.SetStatus(string(TaskStatus_Completed))
+				currentTask.SetStatus(aicommon.AITaskState_Completed)
 				continue
 			} else {
 				// User needs not satisfied, continue loop
@@ -549,11 +556,9 @@ LOOP:
 				log.Infof("========== [WRITE YAKLANG CODE] ==========\nFile written: %v\n=========================================", filename)
 				r.AddToTimeline("write_yaklang_code", fmt.Sprintf("write yaklang code: %v", filename))
 			}
-			r.finished = true
 			return false, nil
 		default:
 			r.EmitError("unknown action type: %v", actionType)
-			r.finished = true
 			r.AddToTimeline("error", fmt.Sprintf("unknown action type: %v", actionType))
 		}
 	}
@@ -579,7 +584,7 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 
 	for enhanceDatum := range enhanceData {
 		r.EmitKnowledge(enhanceID, enhanceDatum)
-		config.enhanceKnowledgeManager.AppendKnowledge(currentTask.Id, enhanceDatum)
+		config.enhanceKnowledgeManager.AppendKnowledge(currentTask.GetId(), enhanceDatum)
 	}
 
 	queryPrompt, err := r.promptManager.GenerateDirectlyAnswerPrompt(userQuery, nil, r.DumpCurrentEnhanceData())

@@ -50,14 +50,13 @@ type ReAct struct {
 
 	currentIteration            int
 	currentUserInteractiveCount int64 // 当前用户交互次数
-	finished                    bool
 
 	config        *ReActConfig
 	promptManager *PromptManager
 
 	// 任务队列相关
-	currentTask          *Task // 当前正在处理的任务
-	currentPlanExecution *Task
+	currentTask          aicommon.AIStatefulTask // 当前正在处理的任务
+	currentPlanExecution aicommon.AIStatefulTask
 	taskQueue            *TaskQueue // 任务队列
 	queueProcessor       sync.Once  // 确保队列处理器只启动一次
 	mirrorMutex          sync.RWMutex
@@ -121,14 +120,14 @@ func (r *ReAct) DumpTimeline() string {
 	return r.config.memory.Timeline()
 }
 
-func (r *ReAct) SetCurrentPlanExecutionTask(t *Task) {
+func (r *ReAct) SetCurrentPlanExecutionTask(t aicommon.AIStatefulTask) {
 	if r == nil {
 		return
 	}
 	r.currentPlanExecution = t
 }
 
-func (r *ReAct) GetCurrentPlanExecutionTask() *Task {
+func (r *ReAct) GetCurrentPlanExecutionTask() aicommon.AIStatefulTask {
 	if r == nil {
 		return nil
 	}
@@ -322,11 +321,11 @@ func (r *ReAct) startQueueProcessor(ctx context.Context, done chan struct{}) {
 			}
 
 			// register hook for queue
-			r.taskQueue.AddEnqueueHook(func(task *Task) (bool, error) {
+			r.taskQueue.AddEnqueueHook(func(task aicommon.AIStatefulTask) (bool, error) {
 				r.EmitEnqueueReActTask(task)
 				return true, nil
 			})
-			r.taskQueue.AddDequeueHook(func(task *Task, reason string) {
+			r.taskQueue.AddDequeueHook(func(task aicommon.AIStatefulTask, reason string) {
 				r.EmitDequeueReActTask(task, reason)
 			})
 
