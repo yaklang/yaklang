@@ -1,19 +1,20 @@
 package aireact
 
 import (
-	"context"
 	_ "embed"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_yaklangcode"
 )
 
-func (r *ReAct) invokeWriteYaklangCode(ctx context.Context, approach string) (string, error) {
+func (r *ReAct) invokeWriteYaklangCode(task aicommon.AIStatefulTask, approach string) (string, error) {
 	loop, err := reactloops.CreateLoopByName(loop_yaklangcode.LOOP_NAME_WRITE_YAKLANG_CODE, r)
 	if err != nil {
 		return "", err
 	}
-	err = loop.Execute(ctx, approach)
+	task.SetUserInput(approach)
+	err = loop.ExecuteWithExistedTask(task)
 	if err != nil {
 		return "", err
 	}

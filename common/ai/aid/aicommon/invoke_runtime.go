@@ -12,8 +12,8 @@ type AIInvokeRuntime interface {
 	DirectlyAnswer(query string, tools []*aitool.Tool) (string, error)
 	EnhanceKnowledgeAnswer(context.Context, string) (string, error)
 	VerifyUserSatisfaction(query string, isToolCall bool, payload string) (bool, error)
-	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func()) error
-	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func()) error
+	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
+	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
 	AddToTimeline(entry, content string)
 
 	GetConfig() AICallerConfigIf

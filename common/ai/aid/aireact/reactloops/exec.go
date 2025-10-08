@@ -66,6 +66,11 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 		ctx,
 		r.GetEmitter(),
 	)
+
+	if r.onTaskCreated != nil {
+		r.onTaskCreated(task)
+	}
+
 	return r.ExecuteWithExistedTask(task)
 }
 
@@ -284,6 +289,12 @@ LOOP:
 		}
 
 		if instance.AsyncMode {
+			// 异步模式不在主循环更新状态
+			// 只能在异步回调中更新状态
+			// 否则会出现状态被覆盖的问题
+			if r.onAsyncTaskTrigger != nil {
+				r.onAsyncTaskTrigger(instance, task)
+			}
 			done.Do(func() {
 				log.Infof("async mode, not update task status in mainloop")
 			})
@@ -303,7 +314,7 @@ LOOP:
 			continueTriggered.SetTo(true)
 		})
 		// handle result value
-		if failedTriggered.IsSet() {
+		if failedTriggered.IsSet() || instance.AsyncMode {
 			if utils.IsNil(failedReason) {
 				finalError = nil
 				return nil
