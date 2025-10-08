@@ -128,7 +128,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 		return utils.Error("no action names in ReActLoop")
 	}
 
-	var operator = newLoopActionHandlerOperator()
+	var operator = newLoopActionHandlerOperator(task)
 	var finalError error
 	defer func() {
 		if finalError != nil {
@@ -159,7 +159,7 @@ LOOP:
 		}
 
 		// 重置上次操作状态对这次反应的影响
-		operator = newLoopActionHandlerOperator()
+		operator = newLoopActionHandlerOperator(task)
 
 		var actionName string
 		var action *aicommon.Action
@@ -283,6 +283,12 @@ LOOP:
 			break LOOP
 		}
 
+		if instance.AsyncMode {
+			done.Do(func() {
+				log.Infof("async mode, not update task status in mainloop")
+			})
+		}
+
 		execOnce := utils.NewOnce()
 		var continueTriggered = utils.NewAtomicBool()
 		var failedReason any
@@ -292,21 +298,23 @@ LOOP:
 			action,
 			operator,
 		)
+
 		execOnce.Do(func() {
 			continueTriggered.SetTo(true)
 		})
-
 		// handle result value
 		if failedTriggered.IsSet() {
 			if utils.IsNil(failedReason) {
-				break LOOP
+				finalError = nil
+				return nil
 			} else {
 				finalError = utils.Errorf("action[%s] failed: %v", actionName, failedReason)
 				return finalError
 			}
 		}
 
-		if continueTriggered.IsSet() {
+		if !instance.AsyncMode && continueTriggered.IsSet() {
+			// 不是异步模式才可以下一次循环
 			continue
 		}
 	}

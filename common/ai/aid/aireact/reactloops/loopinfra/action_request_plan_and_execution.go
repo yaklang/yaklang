@@ -1,8 +1,6 @@
 package loopinfra
 
 import (
-	"context"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -28,11 +26,13 @@ var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+		task := operator.GetTask()
+
 		rewriteQuery := action.GetString("plan_request_payload")
 		invoker := loop.GetInvoker()
-		ctx := context.TODO()
-		err := invoker.AsyncPlanAndExecute(ctx, rewriteQuery, func() {
 
+		err := invoker.AsyncPlanAndExecute(task.GetContext(), rewriteQuery, func() {
+			task.SetStatus(aicommon.AITaskState_Completed)
 		})
 		if err != nil {
 			operator.Fail(utils.Wrap(err, "AsyncPlanAndExecute"))
