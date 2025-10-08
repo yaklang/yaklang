@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 type AITask interface {
@@ -118,8 +120,21 @@ func (s *AIStatefulTaskBase) GetStatus() AITaskState {
 	return s.status
 }
 
-func (s *AIStatefulTaskBase) SetStatus(state AITaskState) {
-	s.status = state
+func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
+	old := s.status
+	s.status = status
+
+	// 输出调试日志记录状态变化
+	if old != status {
+		log.Debugf("Task %s status changed: %s -> %s", s.GetId(), old, status)
+		if s.emitter != nil {
+			s.emitter.EmitStructured("react_task_status_changed", map[string]any{
+				"react_task_id":         s.GetId(),
+				"react_task_old_status": old,
+				"react_task_now_status": status,
+			})
+		}
+	}
 }
 
 func (s *AIStatefulTaskBase) GetCreatedAt() time.Time {
