@@ -2,10 +2,12 @@ package aicommon
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type AITask interface {
@@ -36,7 +38,9 @@ type AIStatefulTask interface {
 	SetUserInput(string)
 	GetStatus() AITaskState
 	SetStatus(state AITaskState)
+	AppendErrorToResult(i error)
 	GetCreatedAt() time.Time
+	Finish(i error)
 }
 
 type AIStatefulTaskBase struct {
@@ -52,6 +56,18 @@ type AIStatefulTaskBase struct {
 	createdAt time.Time
 }
 
+func (s *AIStatefulTaskBase) AppendErrorToResult(i error) {
+	if utils.IsNil(i) {
+		return
+	}
+	result := s.GetResult()
+	if result != "" {
+		result += "\n\n"
+	}
+	result += fmt.Sprintf("[ERR] %v", i)
+	s.SetResult(result)
+}
+
 func (s *AIStatefulTaskBase) SetName(name string) {
 	if s == nil {
 		return
@@ -64,6 +80,15 @@ func (s *AIStatefulTaskBase) GetIndex() string {
 		return ""
 	}
 	return s.id
+}
+
+func (s *AIStatefulTaskBase) Finish(i error) {
+	if utils.IsNil(i) {
+		s.SetStatus(AITaskState_Completed)
+		return
+	}
+	s.AppendErrorToResult(i)
+	s.SetStatus(AITaskState_Aborted)
 }
 
 func (s *AIStatefulTaskBase) GetName() string {
@@ -92,7 +117,7 @@ func (s *AIStatefulTaskBase) GetContext() context.Context {
 	return s.ctx
 }
 
-func (s AIStatefulTaskBase) Cancel() {
+func (s *AIStatefulTaskBase) Cancel() {
 	if s.cancel == nil {
 		return
 	}
@@ -123,6 +148,12 @@ func (s *AIStatefulTaskBase) GetStatus() AITaskState {
 func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
 	old := s.status
 	s.status = status
+
+	defer func() {
+		if s.IsFinished() {
+			s.Cancel()
+		}
+	}()
 
 	// 输出调试日志记录状态变化
 	if old != status {

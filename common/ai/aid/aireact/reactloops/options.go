@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -136,5 +137,17 @@ func WithPersistentInstruction(instruction string) ReActLoopOption {
 func WithReactiveDataBuilder(provider FeedbackProviderFunc) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.reactiveDataBuilder = provider
+	}
+}
+
+func WithOnTaskCreated(fn func(task aicommon.AIStatefulTask)) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.onTaskCreated = fn
+	}
+}
+
+func WithOnAsyncTaskTrigger(fn func(i *LoopAction, task aicommon.AIStatefulTask)) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.onAsyncTaskTrigger = fn
 	}
 }

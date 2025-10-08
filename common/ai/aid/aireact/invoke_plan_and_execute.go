@@ -17,12 +17,23 @@ import (
 
 func (r *ReAct) RequireAIForgeAndAsyncExecute(
 	ctx context.Context, forgeName string,
-	onFinished func(),
-) error {
+	onFinished func(error),
+) {
+
+	doneOnce := utils.NewOnce()
+	done := func(i error) {
+		doneOnce.Do(func() {
+			if onFinished != nil {
+				onFinished(i)
+			}
+		})
+	}
+
 	ins, forgeParams, err := r.invokeBlueprint(forgeName)
 	if err != nil {
 		r.AddToTimeline("plan_error", fmt.Sprintf("failed to invoke ai-blueprint[%v]: %v", forgeName, err))
-		return err
+		done(fmt.Errorf("failed to invoke ai-blueprint[%v]: %w", forgeName, err))
+		return
 	}
 	forgeName = ins.ForgeName
 
@@ -32,53 +43,51 @@ func (r *ReAct) RequireAIForgeAndAsyncExecute(
 	startupBarrier := cb.CreateBarrier("startup")
 	taskDone := make(chan struct{})
 	go func() {
+		var finalError error
 		defer func() {
 			if err := cb.Wait("startup"); err != nil {
 				log.Warnf("start up failed: %v", err)
 			}
 			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan/forge: %v is finished", utils.ShrinkString(forgeName, 128)))
-			if onFinished != nil {
-				onFinished()
-			}
+			done(finalError)
 		}()
-		err := r.invokePlanAndExecute(taskDone, ctx, "", forgeName, forgeParams)
-		if err != nil {
-			log.Errorf("AsyncPlanAndExecute error: %v", err)
+		finalError = r.invokePlanAndExecute(taskDone, ctx, "", forgeName, forgeParams)
+		if finalError != nil {
+			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
 	}()
 	select {
 	case <-taskDone:
 		r.AddToTimeline("plan_execute", fmt.Sprintf("plan/forge: %v is started", utils.ShrinkString(forgeName, 128)))
 		startupBarrier.Done()
-		return nil
 	}
 }
 
-func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinished func()) error {
+func (r *ReAct) AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinished func(error)) {
 	cb := utils.NewCondBarrierContext(ctx)
 	startupBarrier := cb.CreateBarrier("startup")
 
 	taskDone := make(chan struct{})
 	go func() {
+		var finalError error
 		defer func() {
 			if err := cb.Wait("startup"); err != nil {
 				log.Warnf("start up failed: %v", err)
 			}
 			r.AddToTimeline("plan_executeion", fmt.Sprintf("plan: %v is finished", utils.ShrinkString(planPayload, 128)))
 			if onFinished != nil {
-				onFinished()
+				onFinished(finalError)
 			}
 		}()
-		err := r.invokePlanAndExecute(taskDone, ctx, planPayload, "", nil)
-		if err != nil {
-			log.Errorf("AsyncPlanAndExecute error: %v", err)
+		finalError = r.invokePlanAndExecute(taskDone, ctx, planPayload, "", nil)
+		if finalError != nil {
+			log.Errorf("AsyncPlanAndExecute error: %v", finalError)
 		}
 	}()
 	select {
 	case <-taskDone:
 		r.AddToTimeline("plan_execute", fmt.Sprintf("plan: %v is started", utils.ShrinkString(planPayload, 128)))
 		startupBarrier.Done()
-		return nil
 	}
 }
 
