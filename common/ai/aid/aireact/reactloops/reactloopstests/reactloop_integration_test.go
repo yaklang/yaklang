@@ -496,11 +496,18 @@ func TestReActLoop_ErrorHandling(t *testing.T) {
 // TestReActLoop_AsyncMode 测试异步模式
 func TestReActLoop_AsyncMode(t *testing.T) {
 	actionHandlerCalled := false
+	callCount := 0
 
 	reactIns, err := aireact.NewReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "async_action", "data": "async data"}`))
+			// 第一次返回async_action，之后返回finish避免无限循环
+			if callCount == 1 {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "async_action", "data": "async data"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
+			}
 			rsp.Close()
 			return rsp, nil
 		}),
