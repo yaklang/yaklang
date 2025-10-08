@@ -3,6 +3,7 @@ package reactloops
 import (
 	"bytes"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -16,14 +17,21 @@ type LoopActionHandlerOperator struct {
 	isContinued  bool
 	isTerminated bool
 	failedError  error
+
+	task aicommon.AIStatefulTask
 }
 
-func newLoopActionHandlerOperator() *LoopActionHandlerOperator {
+func newLoopActionHandlerOperator(task aicommon.AIStatefulTask) *LoopActionHandlerOperator {
 	return &LoopActionHandlerOperator{
 		feedbacks:            new(bytes.Buffer),
 		terminateOperateOnce: utils.NewOnce(),
 		disallowLoopExitOnce: utils.NewOnce(),
+		task:                 task,
 	}
+}
+
+func (l *LoopActionHandlerOperator) GetTask() aicommon.AIStatefulTask {
+	return l.task
 }
 
 func (l *LoopActionHandlerOperator) DisallowNextLoopExit() {

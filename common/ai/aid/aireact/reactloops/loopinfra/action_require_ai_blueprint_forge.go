@@ -1,8 +1,6 @@
 package loopinfra
 
 import (
-	"context"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -11,6 +9,7 @@ import (
 )
 
 var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
+	AsyncMode:   true,
 	ActionType:  schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT,
 	Description: `Require an AI Blueprint to accomplish complex tasks that need specialized AI capabilities.`,
 	Options: []aitool.ToolOption{
@@ -29,10 +28,11 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		forgeName := action.GetString("blueprint_payload")
 		invoker := loop.GetInvoker()
-		ctx := context.TODO()
 
-		err := invoker.RequireAIForgeAndAsyncExecute(ctx, forgeName, func() {
+		task := operator.GetTask()
 
+		err := invoker.RequireAIForgeAndAsyncExecute(task.GetContext(), forgeName, func() {
+			task.SetStatus(aicommon.AITaskState_Completed)
 		})
 		if err != nil {
 			operator.Fail(utils.Wrap(err, "RequireAIForgeAndAsyncExecute"))
