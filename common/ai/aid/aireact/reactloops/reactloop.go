@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"bytes"
+	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -47,6 +48,11 @@ type ReActLoop struct {
 	actions      *omap.OrderedMap[string, *LoopAction]
 	streamFields *omap.OrderedMap[string, *LoopStreamField]
 	aiTagFields  *omap.OrderedMap[string, *LoopAITagField]
+
+	// execution state
+	taskMutex        *sync.Mutex
+	currentTask      aicommon.AIStatefulTask
+	asyncCurrentTask aicommon.AIStatefulTask
 }
 
 func (r *ReActLoop) GetInvoker() aicommon.AIInvokeRuntime {
@@ -78,6 +84,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		streamFields:  omap.NewEmptyOrderedMap[string, *LoopStreamField](),
 		aiTagFields:   omap.NewEmptyOrderedMap[string, *LoopAITagField](),
 		vars:          omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:     new(sync.Mutex),
 	}
 
 	for _, action := range []*LoopAction{

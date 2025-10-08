@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -49,7 +50,7 @@ func TestTaskQueue_BasicOperations(t *testing.T) {
 	}
 
 	// 添加任务
-	task1 := NewTask("task1", "test input 1", nil)
+	task1 := aicommon.NewStatefulTaskBase("task1", "test input 1", nil, nil)
 	err := queue.Append(task1)
 	if err != nil {
 		t.Fatalf("Failed to append task: %v", err)
@@ -96,9 +97,9 @@ func TestTaskQueue_BasicOperations(t *testing.T) {
 func TestTaskQueue_AppendAndPrepend(t *testing.T) {
 	queue := NewTaskQueue("test")
 
-	task1 := NewTask("task1", "input1", nil)
-	task2 := NewTask("task2", "input2", nil)
-	task3 := NewTask("task3", "input3", nil)
+	task1 := aicommon.NewStatefulTaskBase("task1", "input1", nil, nil)
+	task2 := aicommon.NewStatefulTaskBase("task2", "input2", nil, nil)
+	task3 := aicommon.NewStatefulTaskBase("task3", "input3", nil, nil)
 
 	// 添加到末尾
 	queue.Append(task1)
@@ -136,7 +137,7 @@ func TestTaskQueue_GetQueueingTasks(t *testing.T) {
 
 	// 添加多个任务
 	for i := 1; i <= 5; i++ {
-		task := NewTask(fmt.Sprintf("task%d", i), fmt.Sprintf("input%d", i), nil)
+		task := aicommon.NewStatefulTaskBase(fmt.Sprintf("task%d", i), fmt.Sprintf("input%d", i), nil, nil)
 		queue.Append(task)
 	}
 
@@ -160,7 +161,7 @@ func TestTaskQueue_Clear(t *testing.T) {
 
 	// 添加多个任务
 	for i := 1; i <= 3; i++ {
-		task := NewTask(fmt.Sprintf("task%d", i), fmt.Sprintf("input%d", i), nil)
+		task := aicommon.NewStatefulTaskBase(fmt.Sprintf("task%d", i), fmt.Sprintf("input%d", i), nil, nil)
 		queue.Append(task)
 	}
 
@@ -205,14 +206,14 @@ func TestTaskQueue_EnqueueHooks(t *testing.T) {
 	queue := NewTaskQueue("test")
 
 	// 测试允许所有任务的钩子
-	allowAllHook := func(task *Task) (bool, error) {
+	allowAllHook := func(task aicommon.AIStatefulTask) (bool, error) {
 		log.Infof("Allow all hook called for task: %s", task.GetId())
 		return true, nil
 	}
 
 	queue.AddEnqueueHook(allowAllHook)
 
-	task := NewTask("task1", "input1", nil)
+	task := aicommon.NewStatefulTaskBase("task1", "input1", nil, nil)
 	err := queue.Append(task)
 	if err != nil {
 		t.Errorf("Should not fail with allow-all hook: %v", err)
@@ -226,14 +227,14 @@ func TestTaskQueue_EnqueueHooks(t *testing.T) {
 	queue.Clear()
 	queue.ClearHooks()
 
-	denyAllHook := func(task *Task) (bool, error) {
+	denyAllHook := func(task aicommon.AIStatefulTask) (bool, error) {
 		log.Infof("Deny all hook called for task: %s", task.GetId())
 		return false, nil
 	}
 
 	queue.AddEnqueueHook(denyAllHook)
 
-	task2 := NewTask("task2", "input2", nil)
+	task2 := aicommon.NewStatefulTaskBase("task2", "input2", nil, nil)
 	err = queue.Append(task2)
 	if err != nil {
 		t.Errorf("Should not return error with deny-all hook: %v", err)
@@ -248,13 +249,13 @@ func TestTaskQueue_EnqueueHooks(t *testing.T) {
 func TestTaskQueue_EnqueueHookError(t *testing.T) {
 	queue := NewTaskQueue("test")
 
-	errorHook := func(task *Task) (bool, error) {
+	errorHook := func(task aicommon.AIStatefulTask) (bool, error) {
 		return false, errors.New("hook error")
 	}
 
 	queue.AddEnqueueHook(errorHook)
 
-	task := NewTask("task1", "input1", nil)
+	task := aicommon.NewStatefulTaskBase("task1", "input1", nil, nil)
 	err := queue.Append(task)
 	if err == nil {
 		t.Error("Should return error when hook fails")
@@ -285,7 +286,7 @@ func TestTaskQueue_MultipleHooks(t *testing.T) {
 	queue.AddEnqueueHook(hook1)
 	queue.AddEnqueueHook(hook2)
 
-	task := NewTask("task1", "input1", nil)
+	task := aicommon.NewStatefulTaskBase("task1", "input1", nil, nil)
 	queue.Append(task)
 
 	if !hook1Called {
@@ -328,9 +329,9 @@ func TestTaskQueue_PredefinedHooks(t *testing.T) {
 	duplicateFilter := TaskDuplicateFilter()
 	queue.AddEnqueueHook(duplicateFilter)
 
-	task1 := NewTask("duplicate", "input1", nil)
-	task2 := NewTask("duplicate", "input2", nil) // 相同ID
-	task3 := NewTask("unique", "input3", nil)
+	task1 := aicommon.NewStatefulTaskBase("duplicate", "input1", nil, nil)
+	task2 := aicommon.NewStatefulTaskBase("duplicate", "input2", nil, nil) // 相同ID
+	task3 := aicommon.NewStatefulTaskBase("unique", "input3", nil, nil)
 
 	queue.Append(task1)
 	queue.Append(task2) // 应该被过滤
@@ -358,9 +359,9 @@ func TestTaskQueue_PriorityFilter(t *testing.T) {
 	priorityFilter := TaskPriorityFilter(allowedIds)
 	queue.AddEnqueueHook(priorityFilter)
 
-	taskHigh := NewTask("high", "high priority task", nil)
-	taskMedium := NewTask("medium", "medium priority task", nil)
-	taskLow := NewTask("low", "low priority task", nil)
+	taskHigh := aicommon.NewStatefulTaskBase("high", "high priority task", nil, nil)
+	taskMedium := aicommon.NewStatefulTaskBase("medium", "medium priority task", nil, nil)
+	taskLow := aicommon.NewStatefulTaskBase("low", "low priority task", nil, nil)
 
 	queue.Append(taskHigh)
 	queue.Append(taskMedium)
@@ -385,7 +386,7 @@ func TestTaskQueue_TaskLogger(t *testing.T) {
 	logger := TaskLogger()
 	queue.AddEnqueueHook(logger)
 
-	task := NewTask("logged-task", "test input", nil)
+	task := aicommon.NewStatefulTaskBase("logged-task", "test input", nil, nil)
 	err := queue.Append(task)
 	if err != nil {
 		t.Errorf("Logger hook should not cause error: %v", err)
@@ -410,7 +411,7 @@ func TestTaskQueue_ConcurrentOperations(t *testing.T) {
 	for i := 0; i < numGoroutines; i++ {
 		go func(id int) {
 			for j := 0; j < tasksPerGoroutine; j++ {
-				task := NewTask(fmt.Sprintf("task-%d-%d", id, j), fmt.Sprintf("input-%d-%d", id, j), nil)
+				task := aicommon.NewStatefulTaskBase(fmt.Sprintf("task-%d-%d", id, j), fmt.Sprintf("input-%d-%d", id, j), nil, nil)
 				queue.Append(task)
 			}
 			done <- true
@@ -472,7 +473,7 @@ func TestTaskQueue_HookWithPrependToFirst(t *testing.T) {
 
 	queue.AddEnqueueHook(hook)
 
-	task := NewTask("prepend-task", "prepend input", nil)
+	task := aicommon.NewStatefulTaskBase("prepend-task", "prepend input", nil, nil)
 	err := queue.PrependToFirst(task)
 	if err != nil {
 		t.Errorf("PrependToFirst should not fail: %v", err)
