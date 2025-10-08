@@ -41,12 +41,8 @@ func (r *ReActLoop) createMirrors(taskIndex string, nonce string, streamWg *sync
 						if code == "" {
 							return
 						}
-						if strings.HasPrefix(code, "\n") {
-							code = code[1:]
-						}
-						if strings.HasSuffix(code, "\n") {
-							code = code[:len(code)-1]
-						}
+						code = strings.TrimPrefix(code, "\n")
+						code = strings.TrimSuffix(code, "\n")
 						r.Set(v.VariableName, code)
 					},
 				)
