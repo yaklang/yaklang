@@ -273,12 +273,12 @@ func TestTaskQueue_MultipleHooks(t *testing.T) {
 	hook1Called := false
 	hook2Called := false
 
-	hook1 := func(task *Task) (bool, error) {
+	hook1 := func(task aicommon.AIStatefulTask) (bool, error) {
 		hook1Called = true
 		return true, nil
 	}
 
-	hook2 := func(task *Task) (bool, error) {
+	hook2 := func(task aicommon.AIStatefulTask) (bool, error) {
 		hook2Called = true
 		return true, nil
 	}
@@ -300,11 +300,11 @@ func TestTaskQueue_MultipleHooks(t *testing.T) {
 	dequeueHook1Called := false
 	dequeueHook2Called := false
 
-	dequeueHook1 := func(task *Task, reason string) {
+	dequeueHook1 := func(task aicommon.AIStatefulTask, reason string) {
 		dequeueHook1Called = true
 	}
 
-	dequeueHook2 := func(task *Task, reason string) {
+	dequeueHook2 := func(task aicommon.AIStatefulTask, reason string) {
 		dequeueHook2Called = true
 	}
 
@@ -431,7 +431,7 @@ func TestTaskQueue_ConcurrentOperations(t *testing.T) {
 	}
 
 	// 并发获取任务
-	retrievedTasks := make(chan *Task, expectedCount)
+	retrievedTasks := make(chan aicommon.AIStatefulTask, expectedCount)
 
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
@@ -466,7 +466,7 @@ func TestTaskQueue_HookWithPrependToFirst(t *testing.T) {
 	queue := NewTaskQueue("test")
 
 	hookCalled := false
-	hook := func(task *Task) (bool, error) {
+	hook := func(task aicommon.AIStatefulTask) (bool, error) {
 		hookCalled = true
 		return true, nil
 	}
