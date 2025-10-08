@@ -3,6 +3,7 @@ package reactloops
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var loopAction_Finish = &LoopAction{
@@ -23,10 +24,19 @@ var loopAction_DirectlyAnswer = &LoopAction{
 		),
 	},
 	ActionVerifier: func(loop *ReActLoop, action *aicommon.Action) error {
+		payload := action.GetString("answer_payload")
+		if payload == "" {
+			return utils.Error("answer_payload is required for ActionDirectlyAnswer but empty")
+		}
+		return nil
+	},
+	ActionHandler: func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 		invoker := loop.GetInvoker()
 		payload := action.GetString("answer_payload")
 		invoker.EmitFileArtifactWithExt("directly_answer", ".md", payload)
 		invoker.EmitResultAfterStream(payload)
-		return nil
+
+		// directly_answer 默认继续循环
+		operator.Continue()
 	},
 }
