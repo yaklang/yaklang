@@ -4,10 +4,11 @@ import (
 	"container/list"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func (r *ReAct) EmitEnqueueReActTask(t *Task) {
+func (r *ReAct) EmitEnqueueReActTask(t aicommon.AIStatefulTask) {
 	if t == nil {
 		return
 	}
@@ -21,7 +22,7 @@ func (r *ReAct) EmitEnqueueReActTask(t *Task) {
 	})
 }
 
-func (r *ReAct) EmitDequeueReActTask(t *Task, reason string) {
+func (r *ReAct) EmitDequeueReActTask(t aicommon.AIStatefulTask, reason string) {
 	if t == nil {
 		return
 	}
@@ -38,9 +39,9 @@ func (r *ReAct) EmitDequeueReActTask(t *Task, reason string) {
 
 // taskEnqueueHook 定义任务预处理钩子函数类型
 // 钩子函数可以修改任务状态，返回值决定是否继续入队
-type taskEnqueueHook func(task *Task) (shouldQueue bool, err error)
+type taskEnqueueHook func(task aicommon.AIStatefulTask) (shouldQueue bool, err error)
 
-type taskDequeueHook func(task *Task, reason string)
+type taskDequeueHook func(task aicommon.AIStatefulTask, reason string)
 
 // TaskQueue 任务队列结构
 type TaskQueue struct {
@@ -62,7 +63,7 @@ func NewTaskQueue(name string) *TaskQueue {
 }
 
 // executeHooks 执行所有预处理钩子
-func (tq *TaskQueue) executeHooks(task *Task) (bool, error) {
+func (tq *TaskQueue) executeHooks(task aicommon.AIStatefulTask) (bool, error) {
 	for _, hook := range tq.enqueueHook {
 		shouldQueue, err := hook(task)
 		if err != nil {
@@ -78,7 +79,7 @@ func (tq *TaskQueue) executeHooks(task *Task) (bool, error) {
 }
 
 // executeDequeueHooks 执行所有出队钩子
-func (tq *TaskQueue) executeDequeueHooks(task *Task, reason string) (bool, error) {
+func (tq *TaskQueue) executeDequeueHooks(task aicommon.AIStatefulTask, reason string) (bool, error) {
 	for _, hook := range tq.dequeueHooks {
 		hook(task, reason)
 	}
@@ -86,7 +87,7 @@ func (tq *TaskQueue) executeDequeueHooks(task *Task, reason string) (bool, error
 }
 
 // GetFirst 获取并移除队列中的第一个任务
-func (tq *TaskQueue) GetFirst() *Task {
+func (tq *TaskQueue) GetFirst() aicommon.AIStatefulTask {
 	tq.mutex.Lock()
 	defer tq.mutex.Unlock()
 
@@ -95,7 +96,7 @@ func (tq *TaskQueue) GetFirst() *Task {
 		return nil
 	}
 
-	task := front.Value.(*Task)
+	task := front.Value.(aicommon.AIStatefulTask)
 
 	// 执行出队钩子
 	shouldDequeue, err := tq.executeDequeueHooks(task, "normal")
@@ -114,7 +115,7 @@ func (tq *TaskQueue) GetFirst() *Task {
 }
 
 // Append 将任务添加到队列末尾
-func (tq *TaskQueue) Append(task *Task) error {
+func (tq *TaskQueue) Append(task aicommon.AIStatefulTask) error {
 	if task == nil {
 		return nil
 	}
@@ -137,7 +138,7 @@ func (tq *TaskQueue) Append(task *Task) error {
 }
 
 // PrependToFirst 将任务插队到队列最前面
-func (tq *TaskQueue) PrependToFirst(task *Task) error {
+func (tq *TaskQueue) PrependToFirst(task aicommon.AIStatefulTask) error {
 	if task == nil {
 		return nil
 	}
@@ -160,13 +161,13 @@ func (tq *TaskQueue) PrependToFirst(task *Task) error {
 }
 
 // GetQueueingTasks 获取所有排队中的任务（不移除）
-func (tq *TaskQueue) GetQueueingTasks() []*Task {
+func (tq *TaskQueue) GetQueueingTasks() []aicommon.AIStatefulTask {
 	tq.mutex.RLock()
 	defer tq.mutex.RUnlock()
 
-	tasks := make([]*Task, 0, tq.queue.Len())
+	tasks := make([]aicommon.AIStatefulTask, 0, tq.queue.Len())
 	for e := tq.queue.Front(); e != nil; e = e.Next() {
-		tasks = append(tasks, e.Value.(*Task))
+		tasks = append(tasks, e.Value.(aicommon.AIStatefulTask))
 	}
 
 	return tasks
@@ -235,7 +236,7 @@ func (tq *TaskQueue) IsEmpty() bool {
 }
 
 // PeekFirst 查看队列第一个任务但不移除
-func (tq *TaskQueue) PeekFirst() *Task {
+func (tq *TaskQueue) PeekFirst() aicommon.AIStatefulTask {
 	tq.mutex.RLock()
 	defer tq.mutex.RUnlock()
 
@@ -244,7 +245,7 @@ func (tq *TaskQueue) PeekFirst() *Task {
 		return nil
 	}
 
-	return front.Value.(*Task)
+	return front.Value.(aicommon.AIStatefulTask)
 }
 
 // GetQueueName 获取队列名称
@@ -258,7 +259,7 @@ func (tq *TaskQueue) GetQueueName() string {
 // 基于任务ID进行去重
 func TaskDuplicateFilter() taskEnqueueHook {
 	taskIds := make(map[string]bool)
-	return func(task *Task) (bool, error) {
+	return func(task aicommon.AIStatefulTask) (bool, error) {
 		id := task.GetId()
 		if taskIds[id] {
 			log.Infof("Duplicate task filtered: %s", id)
@@ -277,7 +278,7 @@ func TaskPriorityFilter(allowedIds []string) taskEnqueueHook {
 		allowedMap[id] = true
 	}
 
-	return func(task *Task) (bool, error) {
+	return func(task aicommon.AIStatefulTask) (bool, error) {
 		if len(allowedMap) == 0 {
 			return true, nil // 如果没有限制，允许所有任务
 		}
@@ -293,7 +294,7 @@ func TaskPriorityFilter(allowedIds []string) taskEnqueueHook {
 
 // TaskLogger 创建一个记录任务信息的Hook
 func TaskLogger() taskEnqueueHook {
-	return func(task *Task) (bool, error) {
+	return func(task aicommon.AIStatefulTask) (bool, error) {
 		log.Infof("Processing task: id=[%s], input=[%s], status=[%s]",
 			task.GetId(), task.GetUserInput(), task.GetStatus())
 		return true, nil
