@@ -53,6 +53,10 @@ type ReActLoop struct {
 	taskMutex        *sync.Mutex
 	currentTask      aicommon.AIStatefulTask
 	asyncCurrentTask aicommon.AIStatefulTask
+
+	// task status control
+	onTaskCreated      func(task aicommon.AIStatefulTask)
+	onAsyncTaskTrigger func(ins *LoopAction, task aicommon.AIStatefulTask)
 }
 
 func (r *ReActLoop) GetInvoker() aicommon.AIInvokeRuntime {

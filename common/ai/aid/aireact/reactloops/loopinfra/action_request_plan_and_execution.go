@@ -31,13 +31,8 @@ var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
 		rewriteQuery := action.GetString("plan_request_payload")
 		invoker := loop.GetInvoker()
 
-		err := invoker.AsyncPlanAndExecute(task.GetContext(), rewriteQuery, func() {
-			task.SetStatus(aicommon.AITaskState_Completed)
+		invoker.AsyncPlanAndExecute(task.GetContext(), rewriteQuery, func(err error) {
+			task.Finish(err)
 		})
-		if err != nil {
-			operator.Fail(utils.Wrap(err, "AsyncPlanAndExecute"))
-			return
-		}
-		operator.Continue()
 	},
 }

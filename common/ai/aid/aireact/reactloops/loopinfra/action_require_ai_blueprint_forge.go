@@ -31,13 +31,8 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 
 		task := operator.GetTask()
 
-		err := invoker.RequireAIForgeAndAsyncExecute(task.GetContext(), forgeName, func() {
-			task.SetStatus(aicommon.AITaskState_Completed)
+		invoker.RequireAIForgeAndAsyncExecute(task.GetContext(), forgeName, func(err error) {
+			task.Finish(err)
 		})
-		if err != nil {
-			operator.Fail(utils.Wrap(err, "RequireAIForgeAndAsyncExecute"))
-			return
-		}
-		operator.Continue()
 	},
 }

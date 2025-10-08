@@ -415,16 +415,12 @@ LOOP:
 			saveIterationInfoIntoTimeline()
 			forgeName := nextAction.GetString("blueprint_payload")
 			r.AddToTimeline("plan", fmt.Sprintf("ai-forge-name(blueprint): %v is requested", forgeName))
-
-			err := r.RequireAIForgeAndAsyncExecute(currentTask.GetContext(), forgeName, func() {
-				currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
+			r.RequireAIForgeAndAsyncExecute(currentTask.GetContext(), forgeName, func(err error) {
+				currentTask.Finish(err)
 				currentTask.SetStatus(aicommon.AITaskState_Completed)
 				r.SetCurrentPlanExecutionTask(nil)
 			})
-			if err != nil {
-				return false, err
-			}
-			skipTaskStatusChange = true
+			return true, nil
 
 			//if havePlanExecuting {
 			//	r.Emitter.EmitWarning("existed plan execution task is running, cannot start a new one")
@@ -483,21 +479,14 @@ LOOP:
 			log.Infof("Requesting plan execution: %s, start to create p-e coordinator", planPayload)
 			skipContextCancel.SetTo(true) // Plan execution will manage the context
 
-			err := r.AsyncPlanAndExecute(
+			r.AsyncPlanAndExecute(
 				currentTask.GetContext(),
 				planPayload,
-				func() {
-					currentTask.Cancel() // Ensure the task context is cancelled after plan execution.
-					currentTask.SetStatus(aicommon.AITaskState_Completed)
-					r.SetCurrentPlanExecutionTask(nil)
+				func(err error) {
+					currentTask.Finish(err)
 				},
 			)
-			if err != nil {
-				return false, utils.Errorf("failed to request plan execution: %v", err)
-			}
-			log.Infof("plan execution task started")
-			skipTaskStatusChange = true
-			break LOOP
+			return true, nil
 			//taskStarted := make(chan struct{})
 			//timelineStartPlanChan := make(chan struct{})
 			//go func() {
@@ -547,7 +536,7 @@ LOOP:
 			}
 		case ActionWriteYaklangCode:
 			saveIterationInfoIntoTimeline()
-			filename, err := r.invokeWriteYaklangCode(currentTask.GetContext(), writeYaklangCodeApproach)
+			filename, err := r.invokeWriteYaklangCode(currentTask, writeYaklangCodeApproach)
 			if err != nil {
 				r.AddToTimeline("error", fmt.Sprintf("Failed to invoke write yaklang code: %v", err))
 				return false, err
