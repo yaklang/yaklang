@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonpath"
@@ -64,6 +66,7 @@ func TestReAct_AskForClarification_multicall(t *testing.T) {
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
+		WithUserInteractive(true),
 		WithUserInteractiveLimitedTimes(4),
 		WithMaxIterations(7),
 	)
