@@ -187,11 +187,8 @@ func NewYakitStatusCardExecResult(status string, data any, items ...string) *ypb
 		Data: fmt.Sprint(data),
 		Tags: items,
 	}
-	raw, _ := YakitMessageGenerator(card)
-	return &ypb.ExecResult{
-		IsMessage: true,
-		Message:   raw,
-	}
+	level, data := MarshalYakitOutput(card)
+	return NewYakitLogExecResult(level, data)
 }
 
 func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
