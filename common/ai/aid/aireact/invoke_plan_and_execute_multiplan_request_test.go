@@ -21,6 +21,7 @@ import (
 
 func mockedRequestPlanAndExecuting_MultiPlans(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+	fmt.Println(prompt)
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`

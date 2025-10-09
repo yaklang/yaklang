@@ -285,12 +285,13 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
 	result["DynamicContext"] = pm.DynamicContext()
-	result["AllowPlan"] = pm.react.config.enablePlanAndExec
 	result["Language"] = pm.react.config.language
+
+	result["AllowPlan"] = pm.react.config.enablePlanAndExec && pm.react.GetCurrentPlanExecutionTask() == nil
 	result["AllowAskForClarification"] = pm.react.config.enableUserInteract
+	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.enhanceKnowledgeManager == nil || !pm.react.config.disableEnhanceDirectlyAnswer
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
 	result["AskForClarificationMaxTimes"] = pm.react.config.userInteractiveLimitedTimes
-	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.enhanceKnowledgeManager == nil || !pm.react.config.disableEnhanceDirectlyAnswer
 
 	result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	if len(tools) > 0 {

@@ -81,10 +81,17 @@ func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
 	}
 	info["AskForClarificationCurrentTime"] = r.GetInt("ask_for_clarification_call_count")
 
-	if r.allowPlanAndExec != nil && r.allowPlanAndExec() {
-		info["AllowPlan"] = true
-	} else {
-		info["AllowPlan"] = false
+	allowPlanRaw, ok := info["AllowPlan"]
+	if ok && utils.InterfaceToBoolean(allowPlanRaw) {
+		if r.allowPlanAndExec != nil && r.allowPlanAndExec() {
+			if r.GetCurrentTask() != nil && r.GetCurrentTask().IsAsyncMode() {
+				info["AllowPlan"] = false
+				info["PlanInProgress"] = true
+			} else {
+				info["PlanInProgress"] = false
+				info["AllowPlan"] = true
+			}
+		}
 	}
 
 	if r.allowRAG != nil && r.allowRAG() {
