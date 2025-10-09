@@ -63,6 +63,49 @@ type ReActLoop struct {
 	onAsyncTaskTrigger  func(ins *LoopAction, task aicommon.AIStatefulTask)
 }
 
+func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {
+	var tools []*aitool.Tool
+	if r.toolsGetter == nil {
+		tools = []*aitool.Tool{}
+	} else {
+		tools = r.toolsGetter()
+	}
+	temp, info, err := r.invoker.GetBasicPromptInfo(tools)
+	if err != nil {
+		return "", nil, err
+	}
+	if r.allowUserInteract != nil && r.allowUserInteract() {
+		info["AllowAskForClarification"] = true
+	} else {
+		info["AllowAskForClarification"] = false
+	}
+	info["AskForClarificationCurrentTime"] = r.GetInt("ask_for_clarification_call_count")
+
+	if r.allowPlanAndExec != nil && r.allowPlanAndExec() {
+		info["AllowPlan"] = true
+	} else {
+		info["AllowPlan"] = false
+	}
+
+	if r.allowRAG != nil && r.allowRAG() {
+		info["AllowKnowledgeEnhanceAnswer"] = true
+	} else {
+		info["AllowKnowledgeEnhanceAnswer"] = false
+	}
+
+	result, err := utils.RenderTemplate(temp, info)
+	if err != nil {
+		return "", nil, err
+	}
+	return result, info, nil
+}
+
+func (r *ReActLoop) DisallowAskForClarification() {
+	r.allowUserInteract = func() bool {
+		return false
+	}
+}
+
 func (r *ReActLoop) GetCurrentTask() aicommon.AIStatefulTask {
 	r.taskMutex.Lock()
 	defer r.taskMutex.Unlock()

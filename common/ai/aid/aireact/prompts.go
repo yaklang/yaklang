@@ -326,12 +326,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 
 	result["ConversationMemory"] = pm.react.cumulativeSummary
 	result["Timeline"] = pm.react.config.memory.Timeline()
-
-	renderResult, err := utils.RenderTemplate(basePrompt, result)
-	if err != nil {
-		return "", nil, err
-	}
-	return renderResult, result, nil
+	return basePrompt, result, nil
 }
 
 // GenerateLoopPrompt generates the main ReAct loop prompt using template
