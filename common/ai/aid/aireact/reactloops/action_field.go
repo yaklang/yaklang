@@ -2,6 +2,7 @@ package reactloops
 
 type LoopStreamField struct {
 	FieldName string
+	AINodeId  string
 	Prefix    string
 }
 

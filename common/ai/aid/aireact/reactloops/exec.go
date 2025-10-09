@@ -164,7 +164,7 @@ LOOP:
 		var prompt string
 		prompt, finalError = r.generateLoopPrompt(
 			nonce,
-			task.GetId(),
+			task.GetUserInput(),
 			operator,
 		)
 		if finalError != nil {
@@ -200,6 +200,15 @@ LOOP:
 				}
 
 				actionNameFallback := ""
+
+				streamFields := r.streamFields.Copy()
+
+				for _, i := range r.actions.Values() {
+					for _, field := range i.StreamFields {
+						streamFields.Set(field.FieldName, field)
+					}
+				}
+
 				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
 					stream, "object", allActionNames,
 					[]jsonextractor.CallbackOption{
@@ -220,7 +229,7 @@ LOOP:
 							},
 						),
 						jsonextractor.WithRegisterMultiFieldStreamHandler(
-							r.streamFields.Keys(),
+							streamFields.Keys(),
 							func(key string, reader io.Reader, parents []string) {
 								streamWg.Add(1)
 								doneOnce := utils.NewOnce()
@@ -234,7 +243,7 @@ LOOP:
 								}()
 
 								reader = utils.JSONStringReader(reader)
-								fieldIns, ok := r.streamFields.Get(key)
+								fieldIns, ok := streamFields.Get(key)
 								if !ok {
 									return
 								}
@@ -247,8 +256,14 @@ LOOP:
 									}
 									io.Copy(pw, reader)
 								}(fieldIns)
+
+								defaultNodeId := "re-act-loop-thought"
+								if fieldIns.AINodeId != "" {
+									defaultNodeId = fieldIns.AINodeId
+								}
+
 								emitter.EmitStreamEvent(
-									"re-act-loop-thought",
+									defaultNodeId,
 									time.Now(),
 									pr,
 									resp.GetTaskIndex(),
