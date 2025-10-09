@@ -21,18 +21,21 @@ var loopAction_RequestPlanAndExecution = &reactloops.LoopAction{
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		improveQuery := action.GetString("plan_request_payload")
 		if improveQuery == "" {
+			improveQuery = action.GetInvokeParams("next_action").GetString("plan_request_payload")
+		}
+		if improveQuery == "" {
 			return utils.Errorf("request_plan_and_execution action must have 'plan_request_payload' field")
 		}
+		loop.Set("plan_request_payload", improveQuery)
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		task := operator.GetTask()
 
-		rewriteQuery := action.GetString("plan_request_payload")
+		rewriteQuery := loop.Get("plan_request_payload")
 		invoker := loop.GetInvoker()
-
 		invoker.AsyncPlanAndExecute(task.GetContext(), rewriteQuery, func(err error) {
-			task.Finish(err)
+			loop.FinishAsyncTask(task, err)
 		})
 	},
 }

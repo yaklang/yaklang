@@ -42,7 +42,7 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 		task := operator.GetTask()
 
 		invoker.RequireAIForgeAndAsyncExecute(task.GetContext(), forgeName, func(err error) {
-			task.Finish(err)
+			loop.FinishAsyncTask(task, err)
 		})
 	},
 }

@@ -198,6 +198,7 @@ LOOP:
 	}
 
 	timeline := ins.DumpTimeline()
+	fmt.Println(timeline)
 	if !strings.Contains(timeline, flag) {
 		t.Fatal("timeline does not contain flag", flag)
 	}
