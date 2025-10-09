@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -85,6 +87,7 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 		WithEventHandler(func(e *schema.AiOutputEvent) {
 			out <- e.ToGRPC()
 		}),
+		WithReActAllowPlanAndExec(true),
 		WithTools(sleepTool),
 		WithReActHijackPlanRequest(func(ctx context.Context, payload string) error {
 			planDo = true
