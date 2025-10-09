@@ -33,6 +33,7 @@ func prepareProgram(t *testing.T, progID string) func() {
 			target1(b.get());
 			// for test 2: B->A
 			b.show(1);
+			Runtime.getRuntime().exec(args[0]);
 		}
 	}
 	`)
@@ -116,21 +117,26 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 	progID := uuid.NewString()
 	f := prepareProgram(t, progID)
 	defer f()
-	taskID, stream := startScan(client, t, progID, context.Background())
-	require.NoError(t, err)
 
+	notify, err := client.DuplexConnection(context.Background())
+	require.NoError(t, err)
+	taskID, stream := startScan(client, t, progID, context.Background(), &ypb.SyntaxFlowRuleFilter{
+		RuleNames: []string{"检测Java命令执行漏洞", "检测Java SpringBoot RestController XSS漏洞"},
+	})
+
+	matchTaskID := false
+	matchRisk := false
 	go func() {
-		notify, err := client.DuplexConnection(context.Background())
-		require.NoError(t, err)
-		matchTaskID := false
 		for {
 			res, err := notify.Recv()
+			log.Errorf("recv notify: %v, err: %v", res, err)
+			log.Errorf("target task id: %s", taskID)
 			require.NoError(t, err)
 			if res.MessageType == ssadb.ServerPushType_SyntaxflowResult {
 				var tmp map[string]string
 				err = json.Unmarshal(res.GetData(), &tmp)
 				require.NoError(t, err)
-				// log.Infof("taskid: %#v", tmp)
+				log.Infof("taskid: %#v", tmp)
 				if tmp["task_id"] == taskID {
 					matchTaskID = true
 					res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
@@ -142,11 +148,21 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 					require.Greater(t, len(res.Results), 0)
 					require.Equal(t, res.Results[0].Kind, string(schema.SFResultKindScan))
 				}
-				break
+			}
+			if res.MessageType == schema.ServerPushType_SSARisk {
+				var tmp map[string]string
+				err = json.Unmarshal(res.GetData(), &tmp)
+				require.NoError(t, err)
+				log.Infof("risk taskid: %#v", tmp)
+				if tmp["task_id"] == taskID {
+					matchRisk = true
+				}
 			}
 		}
-		require.True(t, matchTaskID)
 	}()
+
+	log.Infof("start scan task: %v", taskID)
+	require.NoError(t, err)
 
 	hasProcess := false
 	finishProcess := 0.0
@@ -162,6 +178,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan(t *testing.T) {
 	require.True(t, hasProcess)
 	require.Equal(t, 1.0, finishProcess)
 	require.Equal(t, "done", finishStatus)
+	require.True(t, matchTaskID)
+	require.True(t, matchRisk)
 	log.Infof("wait for task %v", taskID)
 }
 
