@@ -41,6 +41,8 @@ type AIStatefulTask interface {
 	AppendErrorToResult(i error)
 	GetCreatedAt() time.Time
 	Finish(i error)
+	SetAsyncMode(async bool)
+	IsAsyncMode() bool
 }
 
 type AIStatefulTaskBase struct {
@@ -54,6 +56,7 @@ type AIStatefulTaskBase struct {
 	emitter   *Emitter
 	status    AITaskState
 	createdAt time.Time
+	asyncMode bool
 }
 
 func (s *AIStatefulTaskBase) AppendErrorToResult(i error) {
@@ -73,6 +76,20 @@ func (s *AIStatefulTaskBase) SetName(name string) {
 		return
 	}
 	s.name = name
+}
+
+func (s *AIStatefulTaskBase) SetAsyncMode(async bool) {
+	if s == nil {
+		return
+	}
+	s.asyncMode = async
+}
+
+func (s *AIStatefulTaskBase) IsAsyncMode() bool {
+	if s == nil {
+		return false
+	}
+	return s.asyncMode
 }
 
 func (s *AIStatefulTaskBase) GetIndex() string {

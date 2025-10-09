@@ -1,15 +1,17 @@
 package aireact
 
+import "github.com/yaklang/yaklang/common/schema"
+
 // ActionType represents the type of action to take
 type ActionType string
 
 const (
-	ActionDirectlyAnswer          ActionType = "directly_answer"
-	ActionRequireTool             ActionType = "require_tool"
-	ActionRequireAIBlueprintForge ActionType = "require_ai_blueprint"
-	ActionRequestPlanExecution    ActionType = "request_plan_and_execution"
-	ActionAskForClarification     ActionType = "ask_for_clarification"
-	ActionKnowledgeEnhanceAnswer  ActionType = "knowledge_enhance_answer"
+	ActionDirectlyAnswer          ActionType = schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER
+	ActionRequireTool             ActionType = schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL
+	ActionRequireAIBlueprintForge ActionType = schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT
+	ActionRequestPlanExecution    ActionType = schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION
+	ActionAskForClarification     ActionType = schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION
+	ActionKnowledgeEnhanceAnswer  ActionType = schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE
 	ActionWriteYaklangCode        ActionType = "write_yaklang_code"
 )
 

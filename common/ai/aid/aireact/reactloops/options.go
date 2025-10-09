@@ -20,6 +20,40 @@ func WithAllowRAGGetter(allowRAG func() bool) ReActLoopOption {
 	}
 }
 
+func WithAllowAIForgeGetter(allowAIForge func() bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.allowAIForge = allowAIForge
+	}
+}
+
+func WithAllowPlanAndExecGetter(allowPlanAndExec func() bool) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.allowPlanAndExec = allowPlanAndExec
+	}
+}
+
+func WithAllowPlanAndExec(b ...bool) ReActLoopOption {
+	if len(b) > 0 {
+		return WithAllowPlanAndExecGetter(func() bool {
+			return b[0]
+		})
+	}
+	return WithAllowPlanAndExecGetter(func() bool {
+		return true
+	})
+}
+
+func WithAllowAIForge(b ...bool) ReActLoopOption {
+	if len(b) > 0 {
+		return WithAllowAIForgeGetter(func() bool {
+			return b[0]
+		})
+	}
+	return WithAllowAIForgeGetter(func() bool {
+		return true
+	})
+}
+
 func WithAllowRAG(b ...bool) ReActLoopOption {
 	if len(b) > 0 {
 		return WithAllowRAGGetter(func() bool {
@@ -60,7 +94,7 @@ func WithUserInteractGetter(allowUserInteract func() bool) ReActLoopOption {
 	}
 }
 
-func WithUserInteract(b ...bool) ReActLoopOption {
+func WithAllowUserInteract(b ...bool) ReActLoopOption {
 	if len(b) > 0 {
 		return WithUserInteractGetter(func() bool {
 			return b[0]

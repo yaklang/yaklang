@@ -35,10 +35,13 @@ type ReActLoop struct {
 	reflectionOutputExampleProvider ContextProviderFunc
 	reactiveDataBuilder             FeedbackProviderFunc
 
-	allowRAG            func() bool
-	allowToolCall       func() bool
+	allowAIForge      func() bool
+	allowPlanAndExec  func() bool
+	allowRAG          func() bool
+	allowToolCall     func() bool
+	allowUserInteract func() bool
+
 	toolsGetter         func() []*aitool.Tool
-	allowUserInteract   func() bool
 	loopPromptGenerator ReActLoopCoreGenerateCode
 
 	// store variable
@@ -50,13 +53,24 @@ type ReActLoop struct {
 	aiTagFields  *omap.OrderedMap[string, *LoopAITagField]
 
 	// execution state
-	taskMutex        *sync.Mutex
-	currentTask      aicommon.AIStatefulTask
-	asyncCurrentTask aicommon.AIStatefulTask
+	taskMutex   *sync.Mutex
+	currentTask aicommon.AIStatefulTask
 
 	// task status control
 	onTaskCreated      func(task aicommon.AIStatefulTask)
 	onAsyncTaskTrigger func(ins *LoopAction, task aicommon.AIStatefulTask)
+}
+
+func (r *ReActLoop) GetCurrentTask() aicommon.AIStatefulTask {
+	r.taskMutex.Lock()
+	defer r.taskMutex.Unlock()
+	return r.currentTask
+}
+
+func (r *ReActLoop) SetCurrentTask(t aicommon.AIStatefulTask) {
+	r.taskMutex.Lock()
+	defer r.taskMutex.Unlock()
+	r.currentTask = t
 }
 
 func (r *ReActLoop) GetInvoker() aicommon.AIInvokeRuntime {
@@ -110,13 +124,37 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		opt(r)
 	}
 
-	if r.allowRAG == nil || r.allowToolCall() {
-		// allow tool call, must have tools
+	if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL); !ok {
 		toolcall, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 		if !ok {
 			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
 		}
 		r.actions.Set(toolcall.ActionType, toolcall)
+	}
+
+	if r.allowRAG == nil || r.allowRAG() {
+		// allow tool call, must have tools
+		ins, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE)
+		if !ok {
+			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL)
+		}
+		r.actions.Set(ins.ActionType, ins)
+	}
+
+	if r.allowAIForge == nil || r.allowAIForge() {
+		aiforge, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
+		if !ok {
+			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
+		}
+		r.actions.Set(aiforge.ActionType, aiforge)
+	}
+
+	if r.allowPlanAndExec == nil || r.allowPlanAndExec() {
+		plan, ok := GetLoopAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
+		if !ok {
+			return nil, utils.Errorf("loop action %s not found", schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
+		}
+		r.actions.Set(plan.ActionType, plan)
 	}
 
 	if r.allowUserInteract == nil || r.allowUserInteract() {
