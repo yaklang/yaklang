@@ -648,18 +648,14 @@ func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 // TestExec_EdgeCase_RapidIterations 测试快速连续迭代
 func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 	iterCount := 0
-	maxIter := 5
 
 	reactIns, err := aireact.NewReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
 
-			if iterCount < maxIter {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Continue rapid"}`))
-			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Rapid done"}`))
-			}
+			// directly_answer 应该一次就结束
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Rapid task completed"}`))
 
 			rsp.Close()
 			return rsp, nil
@@ -684,8 +680,8 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
-	if iterCount != maxIter {
-		t.Errorf("Expected %d iterations, got: %d", maxIter, iterCount)
+	if iterCount != 1 {
+		t.Errorf("Expected 1 iteration (directly_answer should exit), got: %d", iterCount)
 	}
 
 	t.Logf("✅ Rapid iterations completed: %d iterations in %v", iterCount, duration)
@@ -699,11 +695,12 @@ func TestExec_BoundaryCondition_MaxIterationsZero(t *testing.T) {
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
-			// 第3次就结束，避免运行太久
+
+			// 使用自定义action来测试多次迭代，而不是directly_answer
 			if iterCount >= 3 {
 				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
 			} else {
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Continue"}`))
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "continue_action"}`))
 			}
 			rsp.Close()
 			return rsp, nil
@@ -715,6 +712,15 @@ func TestExec_BoundaryCondition_MaxIterationsZero(t *testing.T) {
 
 	loop, err := reactloops.NewReActLoop("zero-iter-loop", reactIns,
 		reactloops.WithMaxIterations(0), // 0会使用默认值100
+		reactloops.WithRegisterLoopAction(
+			"continue_action",
+			"Continue action for testing",
+			nil,
+			nil,
+			func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+				operator.Continue()
+			},
+		),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create loop: %v", err)

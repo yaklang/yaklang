@@ -407,20 +407,8 @@ func TestExec_ComplexIterations(t *testing.T) {
 			callCount++
 			rsp := i.NewAIResponse()
 
-			switch callCount {
-			case 1:
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Step 1"}`))
-			case 2:
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Step 2"}`))
-			case 3:
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Step 3"}`))
-			case 4:
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Step 4"}`))
-			case 5:
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "All done"}`))
-			default:
-				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Done"}`))
-			}
+			// directly_answer 应该一次就结束，所以直接返回 directly_answer
+			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Task completed in one step"}`))
 
 			rsp.Close()
 			return rsp, nil
@@ -440,8 +428,8 @@ func TestExec_ComplexIterations(t *testing.T) {
 		t.Errorf("Should complete successfully, got error: %v", err)
 	}
 
-	if callCount != 5 {
-		t.Errorf("Expected 5 iterations, got %d", callCount)
+	if callCount != 1 {
+		t.Errorf("Expected 1 iteration (directly_answer should exit), got %d", callCount)
 	}
 
 	t.Logf("Completed %d iterations successfully", callCount)
@@ -631,7 +619,14 @@ func TestExec_MaxIterationsExactly(t *testing.T) {
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			callCount++
 			rsp := i.NewAIResponse()
-			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "directly_answer", "answer_payload": "Never finish"}`))
+
+			// 使用自定义action来测试最大迭代次数，而不是directly_answer
+			if callCount < maxIter {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "continue_action"}`))
+			} else {
+				rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "Max iterations reached"}`))
+			}
+
 			rsp.Close()
 			return rsp, nil
 		}),
@@ -642,6 +637,15 @@ func TestExec_MaxIterationsExactly(t *testing.T) {
 
 	loop, err := reactloops.NewReActLoop("maxiter-exact-loop", reactIns,
 		reactloops.WithMaxIterations(maxIter),
+		reactloops.WithRegisterLoopAction(
+			"continue_action",
+			"Continue action for testing",
+			nil,
+			nil,
+			func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+				operator.Continue()
+			},
+		),
 	)
 	if err != nil {
 		t.Fatalf("Failed to create loop: %v", err)
