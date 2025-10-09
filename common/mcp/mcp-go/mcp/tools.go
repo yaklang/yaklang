@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -88,6 +89,23 @@ type ToolInputSchema struct {
 	Type       string                        `json:"type"`
 	Properties *omap.OrderedMap[string, any] `json:"properties,omitempty"`
 	Required   []string                      `json:"required,omitempty"`
+}
+
+func (t *ToolInputSchema) MarshalJSON() ([]byte, error) {
+	temp := struct {
+		Type       string         `json:"type"`
+		Properties map[string]any `json:"properties,omitempty"`
+		Required   []string       `json:"required,omitempty"`
+	}{
+		Type:     t.Type,
+		Required: t.Required,
+	}
+
+	if t.Properties != nil {
+		temp.Properties = t.Properties.GetMap()
+	}
+
+	return json.Marshal(temp)
 }
 
 // ToolOption is a function that configures a Tool.
