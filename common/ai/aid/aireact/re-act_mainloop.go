@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
+	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"strings"
 	"sync"
@@ -128,9 +129,21 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	}
 	currentTask := r.GetCurrentTask()
 	currentTask.SetUserInput(userQuery)
+	if r.GetCurrentPlanExecutionTask() != nil {
+		// have async plan execution task running, disable plan and exec in main loop
+		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION)
+		mainloop.RemoveAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT)
+	}
 	err = mainloop.ExecuteWithExistedTask(currentTask)
 	if err != nil {
 		return false, err
+	}
+	if currentTask.IsAsyncMode() {
+		r.SetCurrentPlanExecutionTask(currentTask)
+		mainloop.OnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
+			r.SetCurrentPlanExecutionTask(nil)
+		})
+		mainloop.GetConfig()
 	}
 	return currentTask.IsAsyncMode(), nil
 }
