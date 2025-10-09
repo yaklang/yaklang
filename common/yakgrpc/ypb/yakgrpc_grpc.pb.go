@@ -135,6 +135,8 @@ const (
 	Yak_UpdateSnippet_FullMethodName                              = "/ypb.Yak/UpdateSnippet"
 	Yak_DeleteSnippets_FullMethodName                             = "/ypb.Yak/DeleteSnippets"
 	Yak_QuerySnippets_FullMethodName                              = "/ypb.Yak/QuerySnippets"
+	Yak_ShowSnippetsWithJson_FullMethodName                       = "/ypb.Yak/ShowSnippetsWithJson"
+	Yak_ImportSnippetsFromJson_FullMethodName                     = "/ypb.Yak/ImportSnippetsFromJson"
 	Yak_Codec_FullMethodName                                      = "/ypb.Yak/Codec"
 	Yak_NewCodec_FullMethodName                                   = "/ypb.Yak/NewCodec"
 	Yak_GetAllCodecMethods_FullMethodName                         = "/ypb.Yak/GetAllCodecMethods"
@@ -717,6 +719,8 @@ type YakClient interface {
 	UpdateSnippet(ctx context.Context, in *EditSnippetsRequest, opts ...grpc.CallOption) (*Empty, error)
 	DeleteSnippets(ctx context.Context, in *QuerySnippetsRequest, opts ...grpc.CallOption) (*Empty, error)
 	QuerySnippets(ctx context.Context, in *QuerySnippetsRequest, opts ...grpc.CallOption) (*SnippetsResponse, error)
+	ShowSnippetsWithJson(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SnippetsJsonResponse, error)
+	ImportSnippetsFromJson(ctx context.Context, in *ImportSnippetsRequest, opts ...grpc.CallOption) (*Empty, error)
 	// 编码解码
 	Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error)
 	NewCodec(ctx context.Context, in *CodecRequestFlow, opts ...grpc.CallOption) (*CodecResponse, error)
@@ -2610,6 +2614,26 @@ func (c *yakClient) QuerySnippets(ctx context.Context, in *QuerySnippetsRequest,
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SnippetsResponse)
 	err := c.cc.Invoke(ctx, Yak_QuerySnippets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ShowSnippetsWithJson(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SnippetsJsonResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SnippetsJsonResponse)
+	err := c.cc.Invoke(ctx, Yak_ShowSnippetsWithJson_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ImportSnippetsFromJson(ctx context.Context, in *ImportSnippetsRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_ImportSnippetsFromJson_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -7765,6 +7789,8 @@ type YakServer interface {
 	UpdateSnippet(context.Context, *EditSnippetsRequest) (*Empty, error)
 	DeleteSnippets(context.Context, *QuerySnippetsRequest) (*Empty, error)
 	QuerySnippets(context.Context, *QuerySnippetsRequest) (*SnippetsResponse, error)
+	ShowSnippetsWithJson(context.Context, *Empty) (*SnippetsJsonResponse, error)
+	ImportSnippetsFromJson(context.Context, *ImportSnippetsRequest) (*Empty, error)
 	// 编码解码
 	Codec(context.Context, *CodecRequest) (*CodecResponse, error)
 	NewCodec(context.Context, *CodecRequestFlow) (*CodecResponse, error)
@@ -8683,6 +8709,12 @@ func (UnimplementedYakServer) DeleteSnippets(context.Context, *QuerySnippetsRequ
 }
 func (UnimplementedYakServer) QuerySnippets(context.Context, *QuerySnippetsRequest) (*SnippetsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QuerySnippets not implemented")
+}
+func (UnimplementedYakServer) ShowSnippetsWithJson(context.Context, *Empty) (*SnippetsJsonResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ShowSnippetsWithJson not implemented")
+}
+func (UnimplementedYakServer) ImportSnippetsFromJson(context.Context, *ImportSnippetsRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ImportSnippetsFromJson not implemented")
 }
 func (UnimplementedYakServer) Codec(context.Context, *CodecRequest) (*CodecResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Codec not implemented")
@@ -11926,6 +11958,42 @@ func _Yak_QuerySnippets_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).QuerySnippets(ctx, req.(*QuerySnippetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ShowSnippetsWithJson_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ShowSnippetsWithJson(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ShowSnippetsWithJson_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ShowSnippetsWithJson(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ImportSnippetsFromJson_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportSnippetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ImportSnippetsFromJson(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ImportSnippetsFromJson_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ImportSnippetsFromJson(ctx, req.(*ImportSnippetsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -19588,6 +19656,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QuerySnippets",
 			Handler:    _Yak_QuerySnippets_Handler,
+		},
+		{
+			MethodName: "ShowSnippetsWithJson",
+			Handler:    _Yak_ShowSnippetsWithJson_Handler,
+		},
+		{
+			MethodName: "ImportSnippetsFromJson",
+			Handler:    _Yak_ImportSnippetsFromJson_Handler,
 		},
 		{
 			MethodName: "Codec",

@@ -167,7 +167,6 @@ func UpdateSnippet(db *gorm.DB, target string, customCode *schema.Snippets) erro
 	return db.Save(customCode).Error
 }
 
-// DeleteSnippets 根据过滤器删除自定义代码签名
 func DeleteSnippets(db *gorm.DB, filter *ypb.SnippetsFilter) error {
 	if db == nil {
 		return utils.Errorf("database connection is nil")
@@ -177,14 +176,22 @@ func DeleteSnippets(db *gorm.DB, filter *ypb.SnippetsFilter) error {
 	}
 
 	if len(filter.Name) == 0 {
-		return db.Delete(&schema.Snippets{}).Error
+		return nil
 	}
+
 	db = db.Model(&schema.Snippets{})
 	if filter.GetName() != nil {
 		db = bizhelper.ExactQueryStringArrayOr(db, "snippet_name", filter.GetName())
 	}
 
 	return db.Unscoped().Delete(&schema.Snippets{}).Error
+}
+
+func DeleteAllSnippets(db *gorm.DB) error {
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+	return db.Where("1 = 1").Unscoped().Delete(&schema.Snippets{}).Error
 }
 
 // DeleteSnippetsByName 根据名称删除自定义代码签名

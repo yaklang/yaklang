@@ -284,6 +284,9 @@ service Yak {
   rpc DeleteSnippets(QuerySnippetsRequest) returns (Empty);
   rpc QuerySnippets(QuerySnippetsRequest) returns (SnippetsResponse);
 
+  rpc ShowSnippetsWithJson(Empty) returns (SnippetsJsonResponse);
+  rpc ImportSnippetsFromJson(ImportSnippetsRequest) returns (Empty);
+
   // 编码解码
   rpc Codec(CodecRequest) returns (CodecResponse);
   rpc NewCodec(CodecRequestFlow) returns (CodecResponse);
@@ -5352,6 +5355,14 @@ message SnippetsResponse {
   repeated string Descriptions = 3;
   repeated string States = 4;
   repeated string Levels = 5;
+}
+
+message SnippetsJsonResponse {
+  string JsonData = 1;  
+}
+
+message ImportSnippetsRequest {
+  string JsonData = 1;  
 }
 
 message CodecRequest {
