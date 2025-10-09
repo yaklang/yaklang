@@ -39,11 +39,7 @@ func (r *ReActLoop) generateLoopPrompt(
 	userInput string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
-	getter, ok := r.config.(basicPromptGetter)
-	if !ok {
-		return "", utils.Errorf("config[%T] does not implement GetBasicPromptInfo", r.config)
-	}
-	background, extraInfos, err := getter.GetBasicPromptInfo(nil)
+	background, extraInfos, err := r.GetInvoker().GetBasicPromptInfo(nil)
 	schema, err := r.generateSchemaString(operator.disallowLoopExit)
 	if err != nil {
 		return "", err

@@ -56,7 +56,7 @@ var blueprintParamsPromptTemplate string
 var changeBlueprintPromptTemplate string
 
 //go:embed prompts/base/base.txt
-var yaklangCodeBasePromptTemplate string
+var basePrompt string
 
 // PromptManager manages ReAct prompt templates
 type PromptManager struct {
@@ -85,7 +85,7 @@ type LoopPromptData struct {
 	AllowKnowledgeEnhanceAnswer    bool
 	AllowWriteYaklangCode          bool
 	AskForClarificationCurrentTime int64
-	AstForClarificationMaxTimes    int64
+	AskForClarificationMaxTimes    int64
 
 	CurrentTime        string
 	OSArch             string
@@ -285,6 +285,14 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["OSArch"] = fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	result["WorkingDir"] = pm.workdir
 	result["DynamicContext"] = pm.DynamicContext()
+	result["AllowPlan"] = pm.react.config.enablePlanAndExec
+	result["Language"] = pm.react.config.language
+	result["AllowAskForClarification"] = pm.react.config.enableUserInteract
+	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
+	result["AskForClarificationMaxTimes"] = pm.react.config.userInteractiveLimitedTimes
+	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.enhanceKnowledgeManager == nil || !pm.react.config.disableEnhanceDirectlyAnswer
+
+	result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	if len(tools) > 0 {
 		result["Tools"] = tools
 		result["ToolsCount"] = len(tools)
@@ -319,7 +327,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["ConversationMemory"] = pm.react.cumulativeSummary
 	result["Timeline"] = pm.react.config.memory.Timeline()
 
-	renderResult, err := utils.RenderTemplate(yaklangCodeBasePromptTemplate, result)
+	renderResult, err := utils.RenderTemplate(basePrompt, result)
 	if err != nil {
 		return "", nil, err
 	}
@@ -343,7 +351,7 @@ func (pm *PromptManager) GenerateLoopPrompt(
 		AllowKnowledgeEnhanceAnswer:    allowKnowledgeEnhanceAnswer,
 		AllowWriteYaklangCode:          allowWriteYaklangCode,
 		AskForClarificationCurrentTime: currentUserInteractiveCount,
-		AstForClarificationMaxTimes:    userInteractiveLimitedTimes,
+		AskForClarificationMaxTimes:    userInteractiveLimitedTimes,
 		CurrentTime:                    time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:                         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:                      userQuery,

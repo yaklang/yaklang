@@ -154,17 +154,25 @@ func WithPersistentContextProvider(provider ContextProviderFunc) ReActLoopOption
 
 func WithReflectionOutputExample(example string) ReActLoopOption {
 	return WithReflectionOutputExampleContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
-		return utils.RenderTemplate(example, map[string]any{
-			"Nonce": nonce,
-		})
+		invoker := loop.GetInvoker()
+		_, result, err := invoker.GetBasicPromptInfo(nil)
+		if err != nil {
+			return "", utils.Errorf("get basic prompt info failed: %v", err)
+		}
+		result["Nonce"] = nonce
+		return utils.RenderTemplate(example, result)
 	})
 }
 
 func WithPersistentInstruction(instruction string) ReActLoopOption {
 	return WithPersistentContextProvider(func(loop *ReActLoop, nonce string) (string, error) {
-		return utils.RenderTemplate(instruction, map[string]any{
-			"Nonce": nonce,
-		})
+		invoker := loop.GetInvoker()
+		_, result, err := invoker.GetBasicPromptInfo(nil)
+		if err != nil {
+			return "", utils.Errorf("get basic prompt info failed: %v", err)
+		}
+		result["Nonce"] = nonce
+		return utils.RenderTemplate(instruction, result)
 	})
 }
 

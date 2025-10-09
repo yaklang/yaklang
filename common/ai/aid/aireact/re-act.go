@@ -66,6 +66,10 @@ type ReAct struct {
 	artifacts            *filesys.RelLocalFs
 }
 
+func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
+	return r.config.GetBasicPromptInfo(tools)
+}
+
 var _ aicommon.AIInvokeRuntime = (*ReAct)(nil)
 var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
 
