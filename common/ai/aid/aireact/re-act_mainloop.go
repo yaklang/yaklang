@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 	"io"
 	"strings"
 	"sync"
@@ -115,8 +117,25 @@ func (r *ReAct) generateMainLoopPrompt(
 	return prompt
 }
 
+func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
+	mainloop, err := reactloops.CreateLoopByName(
+		loop_default.LOOP_NAME_DEFAULT,
+		r,
+	)
+	if err != nil {
+		return false, utils.Errorf("failed to create main loop runtime instance: %v", err)
+	}
+	currentTask := r.GetCurrentTask()
+	currentTask.SetUserInput(userQuery)
+	err = mainloop.ExecuteWithExistedTask(currentTask)
+	if err != nil {
+		return false, err
+	}
+	return currentTask.IsAsyncMode(), nil
+}
+
 // executeMainLoop executes the main ReAct loop
-func (r *ReAct) executeMainLoop(userQuery string) (skipTaskStatusChange bool, err error) {
+func (r *ReAct) executeMainLoop_lagecy(userQuery string) (skipTaskStatusChange bool, err error) {
 	currentTask := r.GetCurrentTask()
 
 	skipContextCancel := utils.NewAtomicBool()

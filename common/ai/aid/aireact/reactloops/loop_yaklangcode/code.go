@@ -75,7 +75,7 @@ func init() {
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
-				reactloops.WithUserInteract(r.GetConfig().GetAllowUserInteraction()),
+				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithAITagField("GEN_CODE", "yak_code"),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
