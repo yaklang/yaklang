@@ -137,7 +137,7 @@ func (s *SSARisk) BeforeCreate(tx *gorm.DB) (err error) {
 func (s *SSARisk) AfterCreate(tx *gorm.DB) (err error) {
 	broadcastData.Call(ServerPushType_SSARisk, map[string]string{
 		"task_id": s.RuntimeId,
-		"action":  "create",
+		"action":  "update", // just notify update for frontend
 	})
 	return nil
 }

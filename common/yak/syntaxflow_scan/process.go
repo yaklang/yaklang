@@ -91,12 +91,12 @@ func (r *RuleProcessInfo) Key() string {
 
 func (pm *processMonitor) Close() {
 	if !pm.closed.CompareAndSwap(false, true) {
-		log.Errorf("process monitor closed wait swap fail!!!!")
+		// log.Errorf("process monitor closed wait swap fail!!!!")
 		pm.waitGroup.Wait()
 		return
 	}
 
-	log.Errorf("process monitor closed wait !!!!")
+	log.Infof("process monitor closed wait !!!!")
 	close(pm.eventCh)
 	close(pm.resultCh)
 	pm.waitGroup.Wait()
@@ -157,7 +157,7 @@ func (pm *processMonitor) handleResult(res *ssaapi.SyntaxFlowResult) {
 		return
 	}
 	if pm.resultCallback != nil {
-		log.Errorf("call resultCallback")
+		// log.Errorf("call resultCallback")
 		pm.resultCallback(res)
 	}
 }
@@ -180,7 +180,7 @@ func (pm *processMonitor) drainResults() {
 func (p *processMonitor) reportProcess() {
 	if p.processCallBack != nil {
 		info := p.snapshotInfoList()
-		log.Errorf("process report process: %v ", info.Progress)
+		// log.Errorf("process report process: %v ", info.Progress)
 		p.processCallBack(info.Progress, info)
 	}
 }
@@ -195,7 +195,7 @@ func (p *processMonitor) EmitEvent() {
 		}
 	}()
 	// Build a consistent snapshot at emit time
-	log.Errorf("write to eventCh")
+	// log.Infof("write to eventCh")
 	select {
 	case p.eventCh <- struct{}{}:
 	default:
@@ -212,7 +212,7 @@ func (p *processMonitor) PublishResult(res *ssaapi.SyntaxFlowResult) {
 			log.Errorf("err: %v", e)
 		}
 	}()
-	log.Errorf("write to resultCh")
+	// log.Errorf("write to resultCh")
 	select {
 	case <-p.ctx.Done():
 	case p.resultCh <- res:

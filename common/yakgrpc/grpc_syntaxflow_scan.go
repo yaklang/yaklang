@@ -32,6 +32,7 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 	}()
 
 	sendExecResult := func(taskId, status string, execResult *ypb.ExecResult) error {
+		execResult.RuntimeID = taskId
 		ret := &ypb.SyntaxFlowScanResponse{
 			TaskID:     taskId,
 			Status:     status,
