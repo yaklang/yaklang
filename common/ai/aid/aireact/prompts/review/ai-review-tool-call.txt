@@ -15,9 +15,9 @@ OS/Arch: {{ .OSArch }}
 
 # 待审核的内容
 **User Query That Triggered This Call:**
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 
 <|REVIEW_ENTITY|>
 {{ .Title }}

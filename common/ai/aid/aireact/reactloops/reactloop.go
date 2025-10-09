@@ -183,3 +183,33 @@ func (r *ReActLoop) Get(i string) string {
 	}
 	return ""
 }
+
+func (r *ReActLoop) GetVariable(i string) any {
+	result, ok := r.vars.Get(i)
+	if ok {
+		return result
+	}
+	return nil
+}
+
+func (r *ReActLoop) GetStringSlice(i string) []string {
+	resultRaw := r.GetVariable(i)
+	result := utils.IsNil(resultRaw)
+	if !result {
+		return utils.InterfaceToStringSlice(resultRaw)
+	}
+	return []string{}
+}
+
+func (r *ReActLoop) GetInt(k string) int {
+	resultRaw := r.GetVariable(k)
+	result := utils.IsNil(resultRaw)
+	if !result {
+		return utils.InterfaceToInt(resultRaw)
+	}
+	return 0
+}
+
+func (r *ReActLoop) RemoveAction(actionType string) {
+	r.actions.Delete(actionType)
+}

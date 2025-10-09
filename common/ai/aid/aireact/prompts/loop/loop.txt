@@ -39,9 +39,9 @@ AI 蓝图（也称应用体或 Forge）是一种强大的机制，旨在帮助�
 {{ end }}
 
 # User Query
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 
 {{/*================================================================================================================*/}}
 {{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.{{ else }}LANGUAGE: Please respond in English unless specifically asked otherwise.{{ end }}

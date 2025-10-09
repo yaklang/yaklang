@@ -276,6 +276,10 @@ func (m *MockedAIConfig) GetTimelineContentSizeLimit() int64 {
 	return m.timelineContentSizeLimit
 }
 
+func (c *MockedAIConfig) GetUserInteractiveLimitedTimes() int64 {
+	return 3
+}
+
 func (c *MockedAIConfig) GetMaxIterationCount() int64 {
 	return int64(100)
 }
