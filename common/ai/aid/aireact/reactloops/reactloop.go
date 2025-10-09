@@ -117,6 +117,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	for _, streamField := range []*LoopStreamField{
 		{
 			FieldName: "human_readable_thought",
+			AINodeId:  "re-act-loop-thought",
 		},
 	} {
 		r.streamFields.Set(streamField.FieldName, streamField)

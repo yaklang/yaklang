@@ -26,6 +26,11 @@ var loopAction_AskForClarification = &reactloops.LoopAction{
 			),
 		),
 	},
+	StreamFields: []*reactloops.LoopStreamField{
+		{
+			FieldName: "question",
+		},
+	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		result := action.GetInvokeParams("ask_for_clarification_payload")
 		if !result.Has("question") {
