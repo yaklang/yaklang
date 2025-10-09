@@ -19,8 +19,11 @@ func init() {
 				r,
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
+				reactloops.WithAllowAIForge(true),
+				reactloops.WithAllowPlanAndExec(true),
+				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
-				reactloops.WithUserInteract(r.GetConfig().GetAllowUserInteraction()),
+				reactloops.WithPersistentInstruction(""),
 			)
 			return loop, err
 		},

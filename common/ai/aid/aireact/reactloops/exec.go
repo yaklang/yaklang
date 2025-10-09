@@ -74,6 +74,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	if utils.IsNil(task) {
 		return errors.New("re-act loop task is nil")
 	}
+	r.SetCurrentTask(task)
 
 	done := utils.NewOnce()
 	abort := func(err error) {
@@ -285,6 +286,7 @@ LOOP:
 		}
 
 		if instance.AsyncMode {
+			task.SetAsyncMode(true)
 			// 异步模式不在主循环更新状态
 			// 只能在异步回调中更新状态
 			// 否则会出现状态被覆盖的问题
