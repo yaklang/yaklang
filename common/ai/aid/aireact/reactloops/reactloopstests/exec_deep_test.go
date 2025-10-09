@@ -317,6 +317,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 	var statusMu sync.Mutex
 	var capturedTask aicommon.AIStatefulTask
 	var wg sync.WaitGroup
+	done := make(chan struct{})
 
 	reactIns, err := aireact.NewReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -345,16 +346,15 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 		t.Fatalf("Failed to create loop: %v", err)
 	}
 
-	// 启动状态监控，使用更频繁的检查和通道通信
-	statusChan := make(chan aicommon.AITaskState, 10)
+	// 启动状态监控
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		ticker := time.NewTicker(5 * time.Millisecond) // 更频繁的检查
+		ticker := time.NewTicker(5 * time.Millisecond)
 		defer ticker.Stop()
 
 		var lastStatus aicommon.AITaskState = ""
-		timeout := time.After(5 * time.Second) // 5秒超时
+		timeout := time.After(3 * time.Second) // 3秒超时
 
 		for {
 			select {
@@ -365,15 +365,44 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 						statusMu.Lock()
 						statusHistory = append(statusHistory, currentStatus)
 						statusMu.Unlock()
-						statusChan <- currentStatus
 						lastStatus = currentStatus
 						t.Logf("Status changed to: %v", currentStatus)
 
-						// 如果已经完成，退出监控
+						// 如果已经完成，等待一小段时间再退出，确保状态被记录
 						if currentStatus == aicommon.AITaskState_Completed ||
 							currentStatus == aicommon.AITaskState_Aborted {
+							time.Sleep(10 * time.Millisecond)
 							return
 						}
+					}
+				}
+			case <-done:
+				// Execute完成后继续监控一小段时间，确保捕获最终状态
+				finalTicker := time.NewTicker(5 * time.Millisecond)
+				finalTimeout := time.After(200 * time.Millisecond)
+				for {
+					select {
+					case <-finalTicker.C:
+						if capturedTask != nil {
+							currentStatus := capturedTask.GetStatus()
+							if currentStatus != lastStatus {
+								statusMu.Lock()
+								statusHistory = append(statusHistory, currentStatus)
+								statusMu.Unlock()
+								lastStatus = currentStatus
+								t.Logf("Final status changed to: %v", currentStatus)
+
+								if currentStatus == aicommon.AITaskState_Completed ||
+									currentStatus == aicommon.AITaskState_Aborted {
+									finalTicker.Stop()
+									return
+								}
+							}
+						}
+					case <-finalTimeout:
+						finalTicker.Stop()
+						t.Log("Final status monitoring finished")
+						return
 					}
 				}
 			case <-timeout:
@@ -388,16 +417,18 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 		t.Fatalf("Execute failed: %v", err)
 	}
 
+	// 通知监控goroutine Execute已完成
+	close(done)
+
 	// 等待监控goroutine完成
 	wg.Wait()
-	close(statusChan)
 
 	statusMu.Lock()
 	defer statusMu.Unlock()
 
 	t.Logf("Status history: %v", statusHistory)
 
-	// 验证状态转换序列 - 更宽松的检查
+	// 验证状态转换序列
 	hasProcessing := false
 	hasCompleted := false
 
