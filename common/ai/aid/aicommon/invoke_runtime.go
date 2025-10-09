@@ -7,6 +7,8 @@ import (
 )
 
 type AIInvokeRuntime interface {
+	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
+
 	ExecuteToolRequiredAndCall(name string) (*aitool.ToolResult, bool, error)
 	AskForClarification(question string, payloads []string) string
 	DirectlyAnswer(query string, tools []*aitool.Tool) (string, error)
