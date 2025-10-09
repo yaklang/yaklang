@@ -66,7 +66,7 @@ AI 蓝图（也称应用体或 Forge）是一种强大的机制，旨在帮助�
         *. 清晰地指出你需要什么信息。
         *. 一组明确的选项，尝试为用户提供选择，降低用户思考和输入成本。这比一个开放式问题要好得多。
       例如：假设用户说“帮我打开文件”，而你有 /tmp/a.txt 和 /tmp/b.txt。你应该这样问: {"type": "ask_for_clarification", "payload": {"question": "我找到了几个文件，您想查看哪一个？", "options": ["/tmp/a.txt", "/tmp/b.txt", "其他未列出的文件"]}}
-    *. 机会限制: 请注意，你只有有限的机会（当前是第[{{ .AskForClarificationCurrentTime }}]次，共[{{ .AstForClarificationMaxTimes }}]次）来向用户提问。因此，要珍惜每一次提问，确保问题清晰、具体，并且引导用户来解答问题**
+    *. 机会限制: 请注意，你只有有限的机会（当前是第[{{ .AskForClarificationCurrentTime }}]次，共[{{ .AskForClarificationMaxTimes }}]次）来向用户提问。因此，要珍惜每一次提问，确保问题清晰、具体，并且引导用户来解答问题**
     {{ end }}
 2.  选择工具{{ if .AllowPlan }}与规划{{end}}来完成用户发布的任务，
     - “为了获取所需信息，我需要使用哪些工具？执行需要哪些参数？这些参数是否清晰？”
