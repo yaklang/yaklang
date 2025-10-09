@@ -21,12 +21,22 @@ var loopAction_RequireAIBlueprintForge = &reactloops.LoopAction{
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		forgeName := action.GetString("blueprint_payload")
 		if forgeName == "" {
+			forgeName = action.GetInvokeParams("next_action").GetString("blueprint_payload")
+		}
+		if forgeName == "" {
 			return utils.Error("require_ai_blueprint action must have 'blueprint_payload' field")
 		}
+		loop.Set("blueprint_payload", forgeName)
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 		forgeName := action.GetString("blueprint_payload")
+		if forgeName == "" {
+			forgeName = action.GetInvokeParams("next_action").GetString("blueprint_payload")
+		}
+		if forgeName == "" {
+			forgeName = loop.Get("blueprint_payload")
+		}
 		invoker := loop.GetInvoker()
 
 		task := operator.GetTask()

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -305,6 +306,9 @@ LOOP:
 			return finalError
 		}
 
+		continueIter := func() {
+			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("ReAct loop finished END[%v]", iterationCount))
+		}
 		instance.ActionHandler(
 			r,
 			action,
@@ -317,6 +321,7 @@ LOOP:
 				finalError = err
 				return finalError
 			}
+			continueIter()
 			// 正常退出
 			break LOOP
 		}
@@ -329,10 +334,12 @@ LOOP:
 
 		// 非异步模式，继续下一次循环
 		if operator.IsContinued() {
+			continueIter()
 			continue
 		}
 
 		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
+		continueIter()
 		continue
 	}
 	return nil

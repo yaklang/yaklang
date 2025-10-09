@@ -29,6 +29,7 @@ type AICallerConfigIf interface {
 	CallAIResponseConsumptionCallback(int)
 	GetAITransactionAutoRetryCount() int64
 	GetTimelineContentSizeLimit() int64
+	GetUserInteractiveLimitedTimes() int64
 	GetMaxIterationCount() int64
 	GetAllowUserInteraction() bool
 	RetryPromptBuilder(string, error) string

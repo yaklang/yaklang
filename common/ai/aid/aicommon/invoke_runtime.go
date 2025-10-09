@@ -14,6 +14,8 @@ type AIInvokeRuntime interface {
 	VerifyUserSatisfaction(query string, isToolCall bool, payload string) (bool, error)
 	RequireAIForgeAndAsyncExecute(ctx context.Context, forgeName string, onFinish func(error))
 	AsyncPlanAndExecute(ctx context.Context, planPayload string, onFinish func(error))
+
+	// timeline operator
 	AddToTimeline(entry, content string)
 
 	GetConfig() AICallerConfigIf
