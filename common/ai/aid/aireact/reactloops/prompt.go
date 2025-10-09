@@ -3,17 +3,12 @@ package reactloops
 import (
 	_ "embed"
 
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 //go:embed loop_template.tpl
 var coreTemplate string
-
-type basicPromptGetter interface {
-	GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error)
-}
 
 func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// loop
@@ -39,7 +34,10 @@ func (r *ReActLoop) generateLoopPrompt(
 	userInput string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
-	background, extraInfos, err := r.GetInvoker().GetBasicPromptInfo(nil)
+	background, infos, err := r.getRenderInfo()
+	if err != nil {
+		return "", utils.Wrap(err, "get basic prompt info failed")
+	}
 	schema, err := r.generateSchemaString(operator.disallowLoopExit)
 	if err != nil {
 		return "", err
@@ -69,19 +67,14 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
-	_ = extraInfos
-	prompt, err := utils.RenderTemplate(
-		coreTemplate,
-		map[string]any{
-			"ReactiveData":      reactiveData,
-			"Background":        background,
-			"PersistentContext": persistent,
-			"OutputExample":     outputExample,
-			"Nonce":             nonce,
-			"UserQuery":         userInput,
-			"Schema":            schema,
-		},
-	)
+	infos["ReactiveData"] = reactiveData
+	infos["Background"] = background
+	infos["PersistentContext"] = persistent
+	infos["OutputExample"] = outputExample
+	infos["Nonce"] = nonce
+	infos["UserQuery"] = userInput
+	infos["Schema"] = schema
+	prompt, err := utils.RenderTemplate(coreTemplate, infos)
 	if err != nil {
 		return "", utils.Wrap(err, "render loop prompt template failed")
 	}

@@ -51,6 +51,7 @@ var loopAction_AskForClarification = &reactloops.LoopAction{
 			loop.Set("ask_for_clarification_call_count", callCount+i)
 			if callCount+i >= int(loop.GetConfig().GetUserInteractiveLimitedTimes()) {
 				loop.RemoveAction(schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
+				loop.DisallowAskForClarification()
 			}
 		}
 
