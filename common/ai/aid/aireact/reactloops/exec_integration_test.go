@@ -363,6 +363,13 @@ func (m *mockSimpleTask) Finish(err error) {
 	}
 }
 
+func (m *mockSimpleTask) IsAsyncMode() bool {
+	return false
+}
+
+func (m *mockSimpleTask) SetAsyncMode(async bool) {
+}
+
 // TestOperatorFail 测试操作符的失败处理
 func TestOperatorFail(t *testing.T) {
 	task := &mockSimpleTask{id: "test", index: "test-index"}
