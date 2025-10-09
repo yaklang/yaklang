@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/log"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -57,8 +58,9 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 
 	// task status control
-	onTaskCreated      func(task aicommon.AIStatefulTask)
-	onAsyncTaskTrigger func(ins *LoopAction, task aicommon.AIStatefulTask)
+	onTaskCreated       func(task aicommon.AIStatefulTask)
+	onAsyncTaskFinished func(task aicommon.AIStatefulTask)
+	onAsyncTaskTrigger  func(ins *LoopAction, task aicommon.AIStatefulTask)
 }
 
 func (r *ReActLoop) GetCurrentTask() aicommon.AIStatefulTask {
@@ -212,4 +214,30 @@ func (r *ReActLoop) GetInt(k string) int {
 
 func (r *ReActLoop) RemoveAction(actionType string) {
 	r.actions.Delete(actionType)
+}
+
+func (r *ReActLoop) OnTaskCreated(f func(task aicommon.AIStatefulTask)) {
+	r.onTaskCreated = f
+}
+
+func (r *ReActLoop) OnAsyncTaskTrigger(f func(ins *LoopAction, task aicommon.AIStatefulTask)) {
+	r.onAsyncTaskTrigger = f
+}
+
+func (r *ReActLoop) OnAsyncTaskFinished(f func(task aicommon.AIStatefulTask)) {
+	r.onAsyncTaskFinished = f
+}
+
+func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
+	if utils.IsNil(t) {
+		log.Error("FinishAsyncTask: task is nil")
+		return
+	}
+	if !t.IsAsyncMode() {
+		return
+	}
+	t.Finish(err)
+	if r.onAsyncTaskFinished != nil {
+		r.onAsyncTaskFinished(t)
+	}
 }

@@ -68,7 +68,12 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 		r.onTaskCreated(task)
 	}
 
-	return r.ExecuteWithExistedTask(task)
+	err := r.ExecuteWithExistedTask(task)
+	if task.IsAsyncMode() {
+		return err
+	}
+	task.Finish(err)
+	return err
 }
 
 func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
@@ -285,6 +290,12 @@ LOOP:
 			log.Errorf("action[%s] instance is nil in ReActLoop", actionName)
 			break LOOP
 		}
+
+		// allow iteration info to be added to timeline
+		r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf(
+			"======== ReAct iteration %d ========\n"+
+				"%v", iterationCount, action.GetString("human_readable_thought"),
+		))
 
 		if instance.AsyncMode {
 			task.SetAsyncMode(true)

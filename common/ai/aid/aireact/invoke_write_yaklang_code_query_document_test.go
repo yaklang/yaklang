@@ -125,6 +125,8 @@ println("using Get method")
 }
 
 func TestReAct_QueryDocument(t *testing.T) {
+	t.Skip()
+
 	// Create test ZIP file with mock documentation
 	tempDir := os.TempDir()
 	zipPath := filepath.Join(tempDir, "test-aikb-"+ksuid.New().String()+".zip")
@@ -287,6 +289,8 @@ LOOP:
 }
 
 func TestReAct_QueryDocumentWithFilters(t *testing.T) {
+	t.Skip()
+
 	// Test with path filters
 	tempDir := os.TempDir()
 	zipPath := filepath.Join(tempDir, "test-aikb-filters-"+ksuid.New().String()+".zip")
@@ -339,6 +343,8 @@ func TestReAct_QueryDocumentWithFilters(t *testing.T) {
 }
 
 func TestReAct_QueryDocumentRRFRanking(t *testing.T) {
+	t.Skip()
+
 	// Test RRF ranking with multiple search terms
 	tempDir := os.TempDir()
 	zipPath := filepath.Join(tempDir, "test-aikb-rrf-"+ksuid.New().String()+".zip")

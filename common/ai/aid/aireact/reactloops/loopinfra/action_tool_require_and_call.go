@@ -22,12 +22,16 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		payload := action.GetString("tool_require_payload")
 		if payload == "" {
+			payload = action.GetInvokeParams("next_action").GetString("tool_require_payload")
+		}
+		if payload == "" {
 			return utils.Error("tool_require_payload is required for ActionRequireTool but empty")
 		}
+		loop.Set("tool_require_payload", payload)
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-		toolPayload := action.GetString("tool_require_payload")
+		toolPayload := loop.Get("tool_require_payload")
 		if toolPayload == "" {
 			operator.Feedback(utils.Error("tool_require_payload is required for ActionRequireTool but empty"))
 			return
@@ -45,7 +49,7 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 				return
 			}
 			invoker.AddToTimeline("directly-answer", answer)
-			operator.Continue()
+			operator.Exit()
 			return
 		}
 
@@ -58,6 +62,18 @@ var loopAction_toolRequireAndCall = &reactloops.LoopAction{
 
 		if result.Error != "" {
 			invoker.AddToTimeline("call["+toolPayload+"] error", result.Error)
+		}
+
+		task := loop.GetCurrentTask()
+		satisfied, err := invoker.VerifyUserSatisfaction(task.GetUserInput(), true, toolPayload)
+		if err != nil {
+			operator.Fail(err)
+			return
+		}
+
+		if satisfied {
+			operator.Exit()
+			return
 		}
 	},
 }
