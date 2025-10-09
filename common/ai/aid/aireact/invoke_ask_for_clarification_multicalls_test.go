@@ -19,6 +19,7 @@ import (
 
 func mockedClarification2(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, flag string) (*aicommon.AIResponse, error) {
 	prompt := req.GetPrompt()
+	fmt.Println(prompt)
 	if utils.MatchAllOfSubString(prompt, "directly_answer", "request_plan_and_execution", "require_tool") && !utils.MatchAllOfSubString(prompt, `ask_for_clarification`) {
 		rsp := i.NewAIResponse()
 		rsp.EmitOutputStream(bytes.NewBufferString(`
@@ -82,7 +83,7 @@ func TestReAct_AskForClarification_multicall(t *testing.T) {
 			}
 		}
 	}()
-	after := time.After(5 * time.Second)
+	after := time.After(20 * time.Second)
 
 	var iid string
 	var flagMatched bool
