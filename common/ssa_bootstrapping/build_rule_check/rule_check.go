@@ -4,6 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -13,11 +17,9 @@ import (
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"path/filepath"
-	"strings"
-	"time"
 )
 
 type CheckKind int
@@ -38,7 +40,7 @@ type InputRule struct {
 }
 type RuleChecker struct {
 	Name        string
-	ConfigInfo  *schema.CodeSourceInfo
+	ConfigInfo  *ssaconfig.CodeSourceInfo
 	RiskInfo    []*RiskInfo
 	RuleNames   []string
 	InputRules  []*InputRule

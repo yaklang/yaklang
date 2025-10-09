@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
+	sfscan "github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
@@ -31,6 +31,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"golang.org/x/exp/slices"
 
 	"github.com/segmentio/ksuid"
@@ -1344,14 +1345,22 @@ var ssaCodeScan = &cli.Command{
 			opt = append(opt, sfreport.WithDataflowPath(true))
 		}
 		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format, opt...)
-		err = syntaxflow_scan.StartScan(
+
+		scanConfig, err := ssaconfig.NewSyntaxFlowScanConfig(
+			ssaconfig.WithProgramNames(prog.GetProgramName()),
+			ssaconfig.WithRuleFilter(ruleFilter),
+			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
+		)
+		if err != nil {
+			log.Errorf("create ssaconfig failed: %s", err)
+			return err
+		}
+
+		_, err = sfscan.StartScan(
 			ctx,
-			nil,
-			syntaxflow_scan.WithProgramNames(prog.GetProgramName()),
-			syntaxflow_scan.WithRuleFilter(ruleFilter),
-			syntaxflow_scan.WithMemory(c.Bool("memory")),
-			syntaxflow_scan.WithReporter(reportInstance),
-			syntaxflow_scan.WithReporterWriter(config.OutputWriter),
+			sfscan.WithSyntaxFlowScanConfig(scanConfig),
+			sfscan.WithSyntaxFlowScanReporter(reportInstance),
+			sfscan.WithSyntaxFlowScanReporterWriter(config.OutputWriter),
 		)
 		if err != nil {
 			log.Errorf("scan failed: %s", err)

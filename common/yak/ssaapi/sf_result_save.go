@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -26,7 +27,7 @@ func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 		// Skip cache when force is true
 	} else {
 		// check cache
-		if result := CreateResultFromCache(resultSaveDatabase, uint64(resultID)); result != nil {
+		if result := CreateResultFromCache(ssaconfig.SFResultSaveDatabase, uint64(resultID)); result != nil {
 			return result, nil
 		}
 	}

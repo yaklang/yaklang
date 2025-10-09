@@ -3,24 +3,26 @@ package syntaxflow_scan
 import (
 	"context"
 	"encoding/json"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
-	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type scanManager struct {
+	*Config
+
 	// task info
 	taskID       string
 	status       string
@@ -29,30 +31,20 @@ type scanManager struct {
 	isPaused     *utils.AtomicBool
 	cancel       context.CancelFunc
 
-	memory bool
 	// record {{
 	// task record
 	taskRecorder *schema.SyntaxFlowScanTask
-	// config record
-	config *ScanTaskConfig
+	// ssaConfig record
+	ssaConfig *ssaconfig.Config
 	// }}
 
 	// config {{
-	kind           schema.SyntaxflowResultKind
-	ignoreLanguage bool
+	kind schema.SyntaxflowResultKind
 	// }}
-
-	// runtime {{
-	// stream
-	stream ScanStream
-	client *yaklib.YakitClient
 
 	// rules
 	ruleChan   chan *schema.SyntaxFlowRule
 	rulesCount int64
-
-	// program
-	programs []string
 
 	// query execute
 	failedQuery   int64 // query failed
@@ -64,39 +56,19 @@ type scanManager struct {
 	riskCountMap *utils.SafeMap[int64]
 	// query process
 	totalQuery int64
-
-	concurrency uint32
 	//}}
-	// process
-	processCallback     ProcessCallback
-	ruleProcessCallback RuleProcessCallback
-
-	reporter       sfreport.IReport
-	reporterWriter io.Writer
+	client *yaklib.YakitClient // TODO NO NEED client
 }
 
-var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
-
-func LoadSyntaxflowTaskFromDB(taskId string, ctx context.Context, stream ScanStream) (*scanManager, error) {
-	if manager, ok := syntaxFlowScanManagerMap.Get(taskId); ok {
-		ctx, cancel := context.WithCancel(ctx)
-		manager.ctx = ctx
-		manager.cancel = cancel
-		if err := manager.RestoreTask(stream); err != nil {
-			return nil, err
-		}
-		return manager, nil
-	} else {
-		m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
-		if err != nil {
-			return nil, err
-		}
-		// load from db
-		if err := m.RestoreTask(stream); err != nil {
-			return nil, err
-		}
-		return m, nil
+func loadSyntaxFlowTaskFromDB(taskId string, ctx context.Context) (*scanManager, error) {
+	m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
+	if err != nil {
+		return nil, err
 	}
+	if err := m.restoreTask(); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func createEmptySyntaxFlowTaskByID(
@@ -116,52 +88,78 @@ func createEmptySyntaxFlowTaskByID(
 		riskCountMap: utils.NewSafeMap[int64](),
 		cancel:       cancel,
 	}
-	syntaxFlowScanManagerMap.Set(taskId, m)
 	return m, nil
 }
 
-func createSyntaxflowTaskById(
-	taskId string, ctx context.Context,
-	req *ypb.SyntaxFlowScanRequest,
-	stream ScanStream,
-	sc *scanInputConfig,
-) (*scanManager, error) {
+func createSyntaxFlowTaskByConfig(ctx context.Context, c *Config, taskIds ...string) (*scanManager, error) {
+	taskId := ""
+	if len(taskIds) > 0 {
+		taskId = taskIds[0]
+	} else {
+		taskId = uuid.NewString()
+	}
 	m, err := createEmptySyntaxFlowTaskByID(taskId, ctx)
 	if err != nil {
 		return nil, err
 	}
-	m.config = &ScanTaskConfig{
-		SyntaxFlowScanRequest: req,
-	}
-	if err := m.initByConfig(stream); err != nil {
+	m.Config = c
+	err = m.initScanRules()
+	if err != nil {
 		return nil, err
 	}
-	// 设置扫描批次
 	m.setScanBatch()
-	// 设置进度回调
-	if sc != nil {
-		m.processCallback = sc.GetProcessCallback()
-		m.ruleProcessCallback = sc.GetRuleProcessCallback()
-		m.reporter = sc.Reporter
-		m.reporterWriter = sc.ReporterWriter
-	}
 	return m, nil
 }
 
-func RemoveSyntaxFlowTaskByID(id string) {
-	r, ok := syntaxFlowScanManagerMap.Get(id)
-	if !ok {
-		return
+func (m *scanManager) initScanRules() error {
+	if m == nil || m.ssaConfig == nil {
+		return utils.Error("Valid SyntaxFlow Scan Failed: config is nil")
 	}
-	r.Stop()
-	syntaxFlowScanManagerMap.Delete(id)
-}
-
-func (m *scanManager) GetConcurrency() uint32 {
-	if m.concurrency == 0 {
-		return 5
+	if input := m.ssaConfig.GetRuleInput(); input != nil {
+		ruleCh := make(chan *schema.SyntaxFlowRule)
+		go func() {
+			defer close(ruleCh)
+			if rule, err := yakit.ParseSyntaxFlowInput(input); err != nil {
+				m.client.YakitError("compile rule failed: %s", err)
+			} else {
+				ruleCh <- rule
+			}
+		}()
+		m.ruleChan = ruleCh
+		m.rulesCount = 1
+		m.kind = schema.SFResultKindDebug
+	} else if ruleNames := m.ssaConfig.GetRuleNames(); len(ruleNames) > 0 {
+		// resume task, use ruleNames
+		m.ruleChan = sfdb.YieldSyntaxFlowRules(
+			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(),
+				nil, yakit.WithSyntaxFlowRuleName(ruleNames...),
+			),
+			m.ctx,
+		)
+		m.rulesCount = int64(len(ruleNames))
+		m.kind = schema.SFResultKindScan
+	} else if filter := m.ssaConfig.GetRuleFilter(); filter != nil {
+		db := consts.GetGormProfileDatabase()
+		db = yakit.FilterSyntaxFlowRule(db, filter)
+		// get all rule name
+		var ruleNames []string
+		err := db.Pluck("rule_name", &ruleNames).Error
+		m.ssaConfig.SetRuleNames(ruleNames)
+		if err != nil {
+			return utils.Errorf("count rules failed: %s", err)
+		}
+		m.ruleChan = sfdb.YieldSyntaxFlowRules(
+			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(),
+				m.ssaConfig.GetRuleFilter(), yakit.WithSyntaxFlowRuleName(m.ssaConfig.GetRuleNames()...),
+			),
+			m.ctx,
+		)
+		m.rulesCount = int64(len(m.ssaConfig.GetRuleNames()))
+		m.kind = schema.SFResultKindScan
 	}
-	return m.concurrency
+	m.totalQuery = m.rulesCount * int64(len(m.ProgramNames))
+	_ = m.SaveTask()
+	return nil
 }
 
 // setScanBatch 设置扫描批次号
@@ -170,7 +168,7 @@ func (m *scanManager) setScanBatch() {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
 
-	maxBatch, err := yakit.GetMaxScanBatch(ssadb.GetDB(), m.programs)
+	maxBatch, err := yakit.GetMaxScanBatch(ssadb.GetDB(), m.ProgramNames)
 	if err != nil {
 		m.taskRecorder.ScanBatch = 1
 	} else {
@@ -183,7 +181,7 @@ func (m *scanManager) SaveTask() error {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
-	m.taskRecorder.Programs = strings.Join(m.programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
+	m.taskRecorder.Programs = strings.Join(m.ProgramNames, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 	m.taskRecorder.TaskId = m.taskID
 	m.taskRecorder.Status = m.status
 	m.taskRecorder.SuccessQuery = atomic.LoadInt64(&m.successQuery)
@@ -192,8 +190,7 @@ func (m *scanManager) SaveTask() error {
 	m.taskRecorder.RiskCount = atomic.LoadInt64(&m.riskCount)
 	m.taskRecorder.TotalQuery = m.totalQuery
 	m.taskRecorder.Kind = m.kind
-	m.taskRecorder.Config, _ = json.Marshal(m.config)
-	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
+	m.taskRecorder.Config, _ = json.Marshal(m.ssaConfig)
 
 	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
 		levelCounts, err := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
@@ -202,7 +199,6 @@ func (m *scanManager) SaveTask() error {
 		if err != nil {
 			return err
 		}
-
 		for _, c := range levelCounts {
 			switch c.Severity {
 			case string(schema.SFR_SEVERITY_INFO):
@@ -221,7 +217,7 @@ func (m *scanManager) SaveTask() error {
 	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
 }
 
-func (m *scanManager) RestoreTask(stream ScanStream) error {
+func (m *scanManager) restoreTask() error {
 	task, err := schema.GetSyntaxFlowScanTaskById(ssadb.GetDB(), m.TaskId())
 	if err != nil {
 		return utils.Wrapf(err, "Resume SyntaxFlow task by is failed")
@@ -229,7 +225,7 @@ func (m *scanManager) RestoreTask(stream ScanStream) error {
 	m.taskRecorder = task
 	m.status = task.Status
 	m.status = task.Status
-	m.programs = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
+	m.ProgramNames = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 	m.successQuery = task.SuccessQuery
 	m.failedQuery = task.FailedQuery
 	m.skipQuery = task.SkipQuery
@@ -237,128 +233,17 @@ func (m *scanManager) RestoreTask(stream ScanStream) error {
 	m.riskCount = task.RiskCount
 	m.totalQuery = task.TotalQuery
 	m.kind = task.Kind
-	m.config = &ScanTaskConfig{}
+	m.ssaConfig = &ssaconfig.Config{}
 	if len(task.Config) == 0 {
 		return utils.Errorf("Config is empty")
 	}
-	if err = json.Unmarshal(task.Config, m.config); err != nil {
+	if err = json.Unmarshal(task.Config, m.ssaConfig); err != nil {
 		return utils.Wrapf(err, "Unmarshal SyntaxFlowScan Config: %v", task.Config)
 	}
-	if err := m.initByConfig(stream); err != nil {
-		return utils.Wrapf(err, "initByConfig failed")
+	err = m.initScanRules()
+	if err != nil {
+		return err
 	}
-	return nil
-}
-
-func (m *scanManager) initByConfig(stream ScanStream) error {
-	config := m.config
-	if config == nil {
-		return utils.Errorf("config is nil")
-	}
-
-	taskId := m.taskID
-	projectId := config.GetSSAProjectId()
-	if projectId != 0 && len(config.GetProgramName()) == 0 {
-		// init by project info in db
-		project, err := yakit.LoadSSAProjectBuilderByID(uint(projectId))
-		if err != nil || project == nil {
-			return utils.Errorf("query ssa project by id failed: %s", err)
-		}
-		m.programs = []string{project.ProjectName}
-		scanConfig := project.GetScanConfig()
-		if scanConfig == nil {
-			return utils.Errorf("scan config is nil")
-		}
-		m.ignoreLanguage = scanConfig.IgnoreLanguage
-		m.memory = scanConfig.Memory
-		m.concurrency = scanConfig.Concurrency
-	} else {
-		// init by stream config
-		if len(config.GetProgramName()) == 0 {
-			return utils.Errorf("program name is empty")
-		}
-		m.programs = config.GetProgramName()
-		m.ignoreLanguage = config.GetIgnoreLanguage()
-		m.memory = config.GetMemory()
-		if config.GetConcurrency() != 0 {
-			m.concurrency = config.GetConcurrency()
-		}
-	}
-
-	m.stream = stream
-	yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
-		result.RuntimeID = taskId
-		return m.stream.Send(&ypb.SyntaxFlowScanResponse{
-			TaskID:     taskId,
-			Status:     m.status,
-			ExecResult: result,
-		})
-	}, taskId)
-	m.client = yakitClient
-
-	if input := config.GetRuleInput(); input != nil {
-		// start debug mode scan task
-		ruleCh := make(chan *schema.SyntaxFlowRule)
-		go func() {
-			defer close(ruleCh)
-			if rule, err := yakit.ParseSyntaxFlowInput(input); err != nil {
-				m.client.YakitError("compile rule failed: %s", err)
-			} else {
-				ruleCh <- rule
-			}
-		}()
-		m.ruleChan = ruleCh
-		m.rulesCount = 1
-		m.kind = schema.SFResultKindDebug
-	} else if len(config.RuleNames) != 0 {
-		// resume task, use ruleNames
-		m.ruleChan = sfdb.YieldSyntaxFlowRules(
-			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(),
-				nil, yakit.WithSyntaxFlowRuleName(config.RuleNames...),
-			),
-			m.ctx,
-		)
-		m.rulesCount = int64(len(config.RuleNames))
-		m.kind = schema.SFResultKindScan
-	} else if config.GetFilter() != nil {
-		db := consts.GetGormProfileDatabase()
-		db = yakit.FilterSyntaxFlowRule(db, config.GetFilter())
-		// get all rule name
-		var ruleNames []string
-		err := db.Pluck("rule_name", &ruleNames).Error
-		config.RuleNames = ruleNames
-		if err != nil {
-			return utils.Errorf("count rules failed: %s", err)
-		}
-		m.ruleChan = sfdb.YieldSyntaxFlowRules(
-			yakit.FilterSyntaxFlowRule(consts.GetGormProfileDatabase(),
-				config.GetFilter(), yakit.WithSyntaxFlowRuleName(config.RuleNames...),
-			),
-			m.ctx,
-		)
-		m.rulesCount = int64(len(config.RuleNames))
-		m.kind = schema.SFResultKindScan
-	} else if projectId != 0 {
-		db := consts.GetGormProfileDatabase()
-		count, err := yakit.GetRuleCountBySSAProjectId(db, uint(config.GetSSAProjectId()))
-		if err != nil {
-			return utils.Errorf("get rule count by ssa project id failed: %s", err)
-		}
-		m.rulesCount = count
-
-		m.ruleChan = yakit.YieldSyntaxFlowRulesBySSAProjectId(
-			db,
-			m.ctx,
-			uint(config.GetSSAProjectId()),
-		)
-		m.rulesCount = count
-		m.kind = schema.SFResultKindScan
-	} else {
-		return utils.Errorf("config is invalid")
-	}
-
-	m.totalQuery = m.rulesCount * int64(len(m.programs))
-	m.SaveTask()
 	return nil
 }
 
@@ -379,6 +264,11 @@ func (m *scanManager) IsStop() bool {
 	}
 }
 
+// isFinish判断任务是否完成
+func (m *scanManager) isFinish() bool {
+	return m.finishedQuery >= m.totalQuery
+}
+
 func (m *scanManager) Resume() {
 	m.isPaused.UnSet()
 }
@@ -394,18 +284,18 @@ func (m *scanManager) CurrentTaskIndex() int64 {
 	return atomic.LoadInt64(&m.finishedQuery)
 }
 
-func (m *scanManager) ScanNewTask() error {
+func (m *scanManager) startScan() error {
 	defer m.Stop()
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
 	// start task
-	err := m.StartQuerySF()
+	err := m.startQuerySF()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (m *scanManager) ResumeTask() error {
+func (m *scanManager) resumeTask() error {
 	taskIndex := m.CurrentTaskIndex()
 	if taskIndex > m.totalQuery {
 		m.status = schema.SYNTAXFLOWSCAN_DONE
@@ -413,15 +303,10 @@ func (m *scanManager) ResumeTask() error {
 		return nil
 	}
 	m.status = schema.SYNTAXFLOWSCAN_EXECUTING
-	err := m.StartQuerySF(taskIndex)
+	err := m.startQuerySF(taskIndex)
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-func (m *scanManager) StatusTask() error {
-	m.notifyStatus()
 	return nil
 }
 
