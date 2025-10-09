@@ -15,7 +15,11 @@ var loopAction_EnhanceKnowledgeAnswer = &reactloops.LoopAction{
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"rewrite_user_query_for_knowledge_enhance",
+			aitool.WithParam_Description(`The user query to enhance the knowledge answer. If not provided, the system will use the original user input as the query.`),
 		),
+	},
+	StreamFields: []*reactloops.LoopStreamField{
+		{FieldName: `rewrite_user_query_for_knowledge_enhance`},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 		query := action.GetString("rewrite_user_query_for_knowledge_enhance")

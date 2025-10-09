@@ -16,6 +16,7 @@ type LoopAction struct {
 	Options        []aitool.ToolOption
 	ActionVerifier LoopActionVerifierFunc
 	ActionHandler  LoopActionHandlerFunc
+	StreamFields   []*LoopStreamField
 }
 
 func buildSchema(actions ...*LoopAction) string {

@@ -22,7 +22,14 @@ var loopAction_DirectlyAnswer = &LoopAction{
 	Options: []aitool.ToolOption{
 		aitool.WithStringParam(
 			"answer_payload",
+			aitool.WithParam_Description(`USE THIS FIELD ONLY IF @action is 'directly_answer'. Provide the final, complete answer for the user here. The content should be self-contained and ready to be displayed.`),
 		),
+	},
+	StreamFields: []*LoopStreamField{
+		{
+			FieldName: "answer_payload",
+			AINodeId:  "re-act-loop-answer-payload",
+		},
 	},
 	ActionVerifier: func(loop *ReActLoop, action *aicommon.Action) error {
 		payload := action.GetString("answer_payload")
