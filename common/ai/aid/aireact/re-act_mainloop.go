@@ -122,6 +122,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 		loop_default.LOOP_NAME_DEFAULT,
 		r,
 	)
+
 	if err != nil {
 		return false, utils.Errorf("failed to create main loop runtime instance: %v", err)
 	}
@@ -436,7 +437,6 @@ LOOP:
 			r.AddToTimeline("plan", fmt.Sprintf("ai-forge-name(blueprint): %v is requested", forgeName))
 			r.RequireAIForgeAndAsyncExecute(currentTask.GetContext(), forgeName, func(err error) {
 				currentTask.Finish(err)
-				currentTask.SetStatus(aicommon.AITaskState_Completed)
 				r.SetCurrentPlanExecutionTask(nil)
 			})
 			return true, nil

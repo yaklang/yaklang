@@ -23,9 +23,9 @@ Use 'tools_search' to discover additional tools for specific tasks.
 {{ end }}
 
 # User Query
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 
 
 {{if .EnhanceData}}

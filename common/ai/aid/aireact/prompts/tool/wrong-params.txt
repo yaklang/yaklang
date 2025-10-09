@@ -18,9 +18,9 @@ OS/Arch: {{ .OSArch }}
 {{ end }}
 
 # User Query
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
-<|USER_QUERY_NONCE_{{ .Nonce }}|>
+<|USER_QUERY_{{ .Nonce }}|>
 
 # 上下文
 
