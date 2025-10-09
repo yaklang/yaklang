@@ -80,6 +80,12 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	if utils.IsNil(task) {
 		return errors.New("re-act loop task is nil")
 	}
+	if r == nil {
+		return errors.New("re-act loop is nil")
+	}
+	if r.taskMutex == nil {
+		return errors.New("re-act loop taskMutex is nil")
+	}
 	r.SetCurrentTask(task)
 
 	done := utils.NewOnce()
