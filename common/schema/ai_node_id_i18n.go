@@ -334,6 +334,44 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "错误工具",
 		En: "Wrong Tool",
 	},
+
+	// AddToTimeline 中使用的 nodeId (去除重复项)
+	"directly-answer": {
+		Zh: "直接回答",
+		En: "Direct Answer",
+	},
+	"finish": {
+		Zh: "完成",
+		En: "Finish",
+	},
+	"USER-Original-Query": {
+		Zh: "用户原始查询",
+		En: "User Original Query",
+	},
+	"code_modified": {
+		Zh: "代码修改",
+		En: "Code Modified",
+	},
+	"note": {
+		Zh: "备注",
+		En: "Note",
+	},
+
+	// 工具调用相关的 timeline nodeId
+	"call[*] error": {
+		Zh: "调用错误",
+		En: "Call Error",
+	},
+
+	// 其他发现的 nodeId
+	"re-act-runtime": {
+		Zh: "ReAct 运行时",
+		En: "ReAct Runtime",
+	},
+	"react-task": {
+		Zh: "ReAct 任务",
+		En: "ReAct Task",
+	},
 }
 
 func NodeIdToI18n(nodeId string, isStream bool) *I18n {
