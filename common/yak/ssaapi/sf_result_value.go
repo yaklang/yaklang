@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -146,10 +147,14 @@ func (r *SyntaxFlowResult) GetValue(name string, index int) (*Value, error) {
 		// for new DB data  have index
 		id, err := ssadb.GetResultNodeByVariableIndex(ssadb.GetDB(), r.GetResultID(), name, uint(index))
 		if err == nil {
-			return r.program.NewValueFromAuditNode(id), nil
+			if r.program != nil {
+				return r.program.NewValueFromAuditNode(id), nil
+			} else {
+				// 内存编译的program为空
+				return r.getValueFromTmpAuditNode(id), nil
+			}
 		}
 	}
-
 	// the old DB data and memory data can get by this
 	vs := r.GetValues(name)
 	if len(vs) > int(index) {
@@ -222,10 +227,74 @@ func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
 	}
 
 	vs := make(Values, 0, len(auditNodeIDs))
-	for _, nodeID := range auditNodeIDs {
-		if v := r.program.NewValueFromAuditNode(nodeID); v != nil {
-			vs = append(vs, v)
+	if r.program != nil {
+		for _, nodeID := range auditNodeIDs {
+			v := r.program.NewValueFromAuditNode(nodeID)
+			if v != nil {
+				vs = append(vs, v)
+			}
 		}
+	} else {
+		// 内存编译的时候program为空
+		vs = r.getValuesFromTmpAuditNodes(auditNodeIDs)
 	}
 	return vs
+}
+
+func (r *SyntaxFlowResult) getValuesFromTmpAuditNodes(nodeIds []uint) Values {
+	auditNodes, err := ssadb.GetAuditNodesByIds(nodeIds)
+	if err != nil {
+		log.Errorf("NewValueFromDB: audit node not found: %v", nodeIds)
+		return nil
+	}
+
+	program := NewTmpProgram(r.Name())
+	vs := make(Values, 0, len(auditNodes))
+	for _, auditNode := range auditNodes {
+		var rangeIf *memedit.Range
+		var memEditor *memedit.MemEditor
+		if auditNode.TmpValueFileHash != "" {
+			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
+			if err != nil {
+				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
+			} else {
+				if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
+					rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
+				} else {
+					rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+				}
+			}
+		}
+		val := program.NewConstValue(auditNode.TmpValue, rangeIf)
+		val.auditNode = auditNode
+		vs = append(vs, val)
+	}
+	return vs
+}
+
+func (r *SyntaxFlowResult) getValueFromTmpAuditNode(nodeId uint) *Value {
+	auditNode, err := ssadb.GetAuditNodeById(nodeId)
+	if err != nil {
+		log.Errorf("NewValueFromDB: audit node not found: %d", nodeId)
+		return nil
+	}
+
+	program := NewTmpProgram(r.Name())
+	var rangeIf *memedit.Range
+	var memEditor *memedit.MemEditor
+	if auditNode.TmpValueFileHash != "" {
+		memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
+		if err != nil {
+			log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
+		} else {
+			if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
+				rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
+			} else {
+				rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+			}
+		}
+	}
+	val := program.NewConstValue(auditNode.TmpValue, rangeIf)
+	val.auditNode = auditNode
+	return val
 }

@@ -63,6 +63,40 @@ func NewProgram(
 	)
 	return prog
 }
+
+func NewTmpProgram(ProgramName string) *Program {
+	prog := &Program{
+		Name:                    ProgramName,
+		ProgramKind:             Application,
+		LibraryFile:             make(map[string][]string),
+		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
+		DownStream:              make(map[string]*Program),
+		errors:                  make([]*SSAError, 0),
+		astMap:                  make(map[string]struct{}),
+		OffsetMap:               make(map[int]*OffsetItem),
+		OffsetSortedSlice:       make([]int, 0),
+		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
+		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
+		BlueprintStack:          utils.NewStack[*Blueprint](),
+		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		FileList:                make(map[string]string),
+		LineCount:               0,
+		cacheExternInstance:     make(map[string]Value),
+		externType:              make(map[string]Type),
+		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
+		ExternInstance:          make(map[string]any),
+		ExternLib:               make(map[string]map[string]any),
+		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
+		ProjectConfig:           make(map[string]*ProjectConfig),
+		Template:                make(map[string]tl.TemplateGeneratedInfo),
+		CurrentIncludingStack:   utils.NewStack[string](),
+		config:                  NewLanguageConfig(),
+	}
+	prog.Application = prog
+	prog.DatabaseKind = ProgramCacheMemory
+	return prog
+}
 func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path ...string) *Program {
 	fs := prog.Loader.GetFilesysFileSystem()
 	fullPath := prog.GetCurrentEditor().GetFilename()

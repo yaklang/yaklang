@@ -208,8 +208,11 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 
 	switch {
 	case g.isMemoryCompile:
+		an.IRCodeID = -1
 		setTmpValue(an, value)
 		saveIrSource(value)
+		an.AuditNodeStatus = g.AuditNodeStatus
+		an.IsEntryNode = entry
 	default:
 		an.AuditNodeStatus = g.AuditNodeStatus
 		an.IsEntryNode = entry
