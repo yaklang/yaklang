@@ -47,6 +47,16 @@ type SearchResult struct {
 	Score    float64  `json:"score"`    // 相似度得分 (-1 到 1 之间)
 }
 
+type EmptyEmbedding struct{}
+
+func (e EmptyEmbedding) Embedding(text string) ([]float32, error) {
+	var result = make([]float32, 0)
+	for i := 0; i < 1024; i++ {
+		result = append(result, float32(i))
+	}
+	return result, nil
+}
+
 // EmbeddingClient 接口定义了嵌入向量生成的操作
 type EmbeddingClient interface {
 	Embedding(text string) ([]float32, error)

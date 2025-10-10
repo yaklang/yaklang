@@ -11,6 +11,8 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
+var testEmbedding = &rag.EmptyEmbedding{}
+
 // TestExportVectorData 测试向量数据的导出和导入功能的基础流程
 // 测试场景：在空白数据库环境下的完整导出导入周期
 func TestMUSTPASS_ExportVectorData(t *testing.T) {
@@ -25,7 +27,7 @@ func TestMUSTPASS_ExportVectorData(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 2. 创建向量存储并添加测试数据
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +110,7 @@ func TestMUSTPASS_ImportVectorData_ExistingCollection(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 创建初始的Collection和Document
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +172,7 @@ func TestMUSTPASS_ImportVectorData_ExistingDocument(t *testing.T) {
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
 	// 创建初始的Collection和Document
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +256,7 @@ func TestMUSTPASS_ImportVectorDataFullUpdate(t *testing.T) {
 
 	db.AutoMigrate(&schema.VectorStoreCollection{}, &schema.VectorStoreDocument{})
 
-	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, nil, db)
+	store, err := rag.NewSQLiteVectorStoreHNSW(PLUGIN_RAG_COLLECTION_NAME, "test", "text-embedding-3-small", 1536, testEmbedding, db)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -95,7 +95,7 @@ func (c *CollectionConfig) FixEmbeddingClient() error {
 		}
 		log.Infof("successfully initialized RAG system with mock embedding service")
 		c.EmbeddingClient = NewMockEmbedder(mockRagDataForTest)
-	} else if c.EmbeddingClient == nil && !c.LazyLoadEmbeddingClient {
+	} else if c.EmbeddingClient == nil {
 		localEmbedder, err := GetLocalEmbeddingService()
 		if err != nil {
 			log.Errorf("failed to get local embedding service: %v", err)
