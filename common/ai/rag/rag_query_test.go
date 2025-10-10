@@ -2,6 +2,10 @@ package rag
 
 import (
 	"context"
+	"github.com/google/uuid"
+	"github.com/samber/lo"
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
 	"testing"
 	"time"
 
@@ -338,4 +342,164 @@ func TestMUSTPASS_RAGQueryWithFilter(t *testing.T) {
 
 	assert.Equal(t, 1, len(results))
 	assert.Equal(t, "test", results[0].Document.ID)
+}
+
+func TestMUSTPASS_RAGQuery(t *testing.T) {
+
+	db, _ := utils.CreateTempTestDatabaseInMemory()
+	if db == nil {
+		t.Skip("database not available")
+		return
+	}
+	/*
+		测试逻辑：
+		原始输入是一个uuid，基本不存在任何语义相关性。相似度近似0，即在原始输入的情况下应该没有任何返回结果。
+		开启增强搜索后，通过mock embedding生成与各自对应集合中的文档有一定相似度的文本。
+		- Hypothetical Answer生成的文本与集合中文档的相似度最高，设置为0.8
+		- Generalize Query生成的文本与集合中文档的相似度次之，设置为0.6
+		- Split Query生成的文本与集合中文档的相似度最低，设置为0.4
+
+		test 1：相似度阈值设置为0.4，确保只要生成的文本与集合中的文档有一定的相似度就能命中。预期 应得到 三个集合的三个文档
+		test 2：相似度阈值设置为0.6，确保只有Hypothetical Answer和Generalize Query生成的文本能命中。预期 应得到 两个集合的两个文档
+		test 3：相似度阈值设置为0.8，确保只有Hypothetical Answer生成的文本能命中。预期 应得到 一个集合的一个文档
+	*/
+	mockEmbedding := NewDefaultMockEmbedding()
+	HighSimilarThresh := 0.8
+	MidSimilarThresh := 0.6
+	LowSimilarThresh := 0.4
+
+	contentHypotheticalAnswer := mockEmbedding.GenerateRandomText(40)
+	contentGeneralizeQuery := mockEmbedding.GenerateRandomText(40)
+	contentSplitQuery := mockEmbedding.GenerateRandomText(40)
+
+	uuidHypotheticalAnswer := uuid.NewString()
+	uuidGeneralizeQuery := uuid.NewString()
+	uuidSplitQuery := uuid.NewString()
+
+	enhanceHandler := enhancesearch.NewMockSearchHandler()
+
+	enhanceHandler.SetHypotheticalAnswerFunc(func(ctx context.Context, query string) (string, error) {
+		return mockEmbedding.GenerateSimilarText(contentHypotheticalAnswer, HighSimilarThresh)
+	})
+
+	enhanceHandler.SetGeneralizeQueryFunc(func(ctx context.Context, query string) ([]string, error) {
+		result, err := mockEmbedding.GenerateSimilarText(contentGeneralizeQuery, MidSimilarThresh)
+		if err != nil {
+			return nil, err
+		}
+		return []string{
+			result,
+		}, nil
+	})
+
+	enhanceHandler.SetSplitQueryFunc(func(ctx context.Context, query string) ([]string, error) {
+		result, err := mockEmbedding.GenerateSimilarText(contentSplitQuery, LowSimilarThresh)
+		if err != nil {
+			return nil, err
+		}
+		return []string{
+			result,
+		}, nil
+	})
+
+	// 定义三个不同领域的集合
+	collections := []struct {
+		name        string
+		description string
+		document    Document
+	}{
+		{
+			name:        "A" + utils.RandStringBytes(6),
+			description: "测试知识库A",
+			document: Document{
+				ID:      uuidHypotheticalAnswer,
+				Content: contentHypotheticalAnswer,
+			},
+		},
+		{
+			name:        "B" + utils.RandStringBytes(6),
+			description: "测试知识库B",
+			document: Document{
+				ID:      uuidGeneralizeQuery,
+				Content: contentGeneralizeQuery,
+			},
+		},
+		{
+			name:        "C" + utils.RandStringBytes(6),
+			description: "测试知识库C",
+			document: Document{
+				ID:      uuidSplitQuery,
+				Content: contentSplitQuery,
+			},
+		},
+	}
+
+	// 创建并初始化所有集合
+	var ragSystems []*RAGSystem
+	var collectionNames []string
+
+	for i, col := range collections {
+		t.Logf("Creating collection %d: %s", i+1, col.name)
+		ragSystem, err := CreateCollection(db, col.name, col.description, WithEmbeddingClient(mockEmbedding))
+		if err != nil {
+			t.Logf("Failed to create collection %s (may be expected if embedding service is not available): %v", col.name, err)
+			t.Skip("skipping test due to collection creation failure")
+			return
+		}
+
+		ragSystems = append(ragSystems, ragSystem)
+		collectionNames = append(collectionNames, col.name)
+
+		doc := col.document
+		err = ragSystem.Add(doc.ID, doc.Content, WithDocumentRawMetadata(doc.Metadata))
+		if err != nil {
+			t.Fatalf("Failed to add document %s to collection %s: %v", doc.ID, col.name, err)
+		}
+
+		t.Logf("Added %s document to collection: %s", doc.ID, col.name)
+	}
+
+	// 清理资源
+	defer func() {
+		for _, name := range collectionNames {
+			DeleteCollection(db, name)
+		}
+	}()
+
+	t.Run("test low", func(t *testing.T) {
+		results, err := SimpleQuery(db, uuid.NewString(), 5,
+			WithRAGEnhanceSearchHandler(enhanceHandler),
+			WithRAGSystemLoadConfig(WithEmbeddingClient(mockEmbedding)),
+			WithRAGSimilarityThreshold(LowSimilarThresh))
+		require.NoError(t, err)
+		require.Len(t, results, 3)
+		require.Contains(t, lo.Map(results, func(item *SearchResult, index int) string {
+			return item.Document.ID
+		}), uuidHypotheticalAnswer, uuidGeneralizeQuery, uuidSplitQuery)
+	})
+
+	t.Run("test mid", func(t *testing.T) {
+		results, err := SimpleQuery(db, uuid.NewString(), 5,
+			WithRAGEnhanceSearchHandler(enhanceHandler),
+			WithRAGSystemLoadConfig(WithEmbeddingClient(mockEmbedding)),
+			WithRAGSimilarityThreshold(MidSimilarThresh))
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+		require.Contains(t, lo.Map(results, func(item *SearchResult, index int) string {
+			return item.Document.ID
+		}), uuidHypotheticalAnswer, uuidGeneralizeQuery)
+	})
+
+	t.Run("test high", func(t *testing.T) {
+		results, err := SimpleQuery(db, uuid.NewString(), 5,
+			WithRAGEnhanceSearchHandler(enhanceHandler),
+			WithRAGSystemLoadConfig(WithEmbeddingClient(mockEmbedding)),
+			WithRAGSimilarityThreshold(HighSimilarThresh))
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.Contains(t, lo.Map(results, func(item *SearchResult, index int) string {
+			return item.Document.ID
+		}), uuidHypotheticalAnswer)
+	})
+
 }
