@@ -19,7 +19,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
-	"github.com/yaklang/yaklang/common/ai/rag/config"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/hnsw/hnswspec"
 	"github.com/yaklang/yaklang/common/ai/rag/pq"
@@ -38,13 +37,9 @@ type SQLiteVectorStoreHNSW struct {
 	hnsw *hnsw.Graph[string]
 
 	EnableAutoUpdateGraphInfos bool
-	buildGraphFilter           *yakit.VectorDocumentFilter
-	buildGraphPolicy           string
 	ctx                        context.Context
 	wg                         sync.WaitGroup
 	UIDType                    string
-
-	opts []SQLiteVectorStoreHNSWOption
 
 	cacheSize int
 }
@@ -55,33 +50,7 @@ const (
 	Policy_None        = "None"
 )
 
-type SQLiteVectorStoreHNSWOption func(*SQLiteVectorStoreHNSW)
-
-func WithBuildGraphPolicy(policy string) SQLiteVectorStoreHNSWOption {
-	return func(s *SQLiteVectorStoreHNSW) {
-		s.buildGraphPolicy = policy
-	}
-}
-
-func WithBuildGraphFilter(filter *yakit.VectorDocumentFilter) SQLiteVectorStoreHNSWOption {
-	return func(s *SQLiteVectorStoreHNSW) {
-		s.buildGraphFilter = filter
-	}
-}
-
-func WithEnableAutoUpdateGraphInfos(enable bool) SQLiteVectorStoreHNSWOption {
-	return func(s *SQLiteVectorStoreHNSW) {
-		s.EnableAutoUpdateGraphInfos = enable
-	}
-}
-
-func WithContext(ctx context.Context) SQLiteVectorStoreHNSWOption {
-	return func(s *SQLiteVectorStoreHNSW) {
-		s.ctx = ctx
-	}
-}
-
-func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder EmbeddingClient, opts ...SQLiteVectorStoreHNSWOption) (*SQLiteVectorStoreHNSW, error) {
+func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
 	if err != nil {
 		return nil, utils.Errorf("query rag collection [%#v] err: %v", collectionName, err)
@@ -91,33 +60,32 @@ func LoadSQLiteVectorStoreHNSW(db *gorm.DB, collectionName string, embedder Embe
 		return nil, utils.Errorf("rag collection[%v] not existed", collectionName)
 	}
 
+	collectionConfig := LoadConfigFromCollectionInfo(collection, opts...)
+
+	if err := collectionConfig.FixEmbeddingClient(); err != nil {
+		return nil, utils.Errorf("fix embedding client err: %v", err)
+	}
+
 	vectorStore := &SQLiteVectorStoreHNSW{
 		db:                         db,
-		EnableAutoUpdateGraphInfos: true,
-		embedder:                   embedder,
+		EnableAutoUpdateGraphInfos: collectionConfig.EnableAutoUpdateGraphInfos,
 		collection:                 collection,
-		buildGraphPolicy:           Policy_UseDBCanche,
 		ctx:                        context.Background(),
-		opts:                       opts,
+		embedder:                   collectionConfig.EmbeddingClient,
 		cacheSize:                  10000,
 	}
 
-	for _, opt := range opts {
-		opt(vectorStore)
-	}
-
-	collectionConfig := collection
 	hnswGraph := NewHNSWGraph(collectionName,
-		hnsw.WithHNSWParameters[string](collectionConfig.M, collectionConfig.Ml, collectionConfig.EfSearch),
+		hnsw.WithHNSWParameters[string](collectionConfig.MaxNeighbors, collectionConfig.LayerGenerationFactor, collectionConfig.EfSearch),
 		hnsw.WithDistance[string](hnsw.GetDistanceFunc(collectionConfig.DistanceFuncType)),
 	)
 
 	log.Infof("start to recover hnsw graph from db, collection name: %s", collectionName)
-	switch vectorStore.buildGraphPolicy {
+	switch collectionConfig.buildGraphPolicy {
 	case Policy_UseFilter: // 选择性加载子图
-		vectorStore.buildGraphFilter.CollectionUUID = collection.UUID
+		collectionConfig.buildGraphFilter.CollectionUUID = collection.UUID
 		log.Info("build graph with filter policy, load existed vectors from db with filter")
-		for document := range yakit.YieldVectorDocument(vectorStore.ctx, db, vectorStore.buildGraphFilter) {
+		for document := range yakit.YieldVectorDocument(vectorStore.ctx, db, collectionConfig.buildGraphFilter) {
 			hnswGraph.Add(hnsw.InputNode[string]{
 				Key:   document.DocumentID,
 				Value: document.Embedding,
@@ -311,46 +279,36 @@ func (s *SQLiteVectorStoreHNSW) UpdateAutoUpdateGraphInfos() error {
 	return nil
 }
 
-// NewSQLiteVectorStore 创建一个新的 SQLite 向量存储
-func NewSQLiteVectorStoreHNSW(name string, description string, modelName string, dimension int, embedder EmbeddingClient, db *gorm.DB, options ...config.SQLiteVectorStoreHNSWOption) (*SQLiteVectorStoreHNSW, error) {
-	cfg := config.NewSQLiteVectorStoreHNSWConfig()
-	for _, option := range options {
-		option(cfg)
+func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, opts ...any) (*SQLiteVectorStoreHNSW, error) {
+	cfg := NewCollectionConfig(opts...)
+
+	// 创建集合配置
+	collection := schema.VectorStoreCollection{
+		Name:             name,
+		Description:      description,
+		ModelName:        cfg.ModelName,
+		Dimension:        cfg.Dimension,
+		M:                cfg.MaxNeighbors,
+		Ml:               cfg.LayerGenerationFactor,
+		EfSearch:         cfg.EfSearch,
+		EfConstruct:      cfg.EfConstruct,
+		DistanceFuncType: cfg.DistanceFuncType,
+	}
+	// 创建集合
+	res := db.Create(&collection)
+	if res.Error != nil {
+		return nil, utils.Errorf("创建集合失败: %v", res.Error)
 	}
 
-	vcolsNum := 0
-	db.Where("name = ?", name).Count(&vcolsNum)
-	var collection *schema.VectorStoreCollection
-	var err error
+	if err := cfg.FixEmbeddingClient(); err != nil {
+		return nil, utils.Errorf("fix embedding client err: %v", err)
+	}
 	hnswGraph := NewHNSWGraph(name)
-	if vcolsNum == 0 {
-		collection = &schema.VectorStoreCollection{
-			Name:             name,
-			Description:      description,
-			ModelName:        modelName,
-			Dimension:        dimension,
-			M:                cfg.M,
-			Ml:               cfg.Ml,
-			EfSearch:         cfg.EfSearch,
-			EfConstruct:      cfg.EfConstruct,
-			DistanceFuncType: cfg.DistanceFuncType,
-			EnablePQMode:     cfg.EnablePQMode,
-		}
-		if err := db.Create(&collection).Error; err != nil {
-			return nil, utils.Errorf("创建集合失败: %v", err)
-		}
-	} else {
-		collection, err = yakit.QueryRAGCollectionByName(db, name)
-		if err != nil {
-			return nil, utils.Errorf("查询集合失败: %v", err)
-		}
-	}
-
 	vectorStore := &SQLiteVectorStoreHNSW{
 		db:                         db,
 		EnableAutoUpdateGraphInfos: true,
-		embedder:                   embedder,
-		collection:                 collection,
+		embedder:                   cfg.EmbeddingClient,
+		collection:                 &collection,
 		hnsw:                       hnswGraph,
 		cacheSize:                  10000,
 	}
@@ -362,6 +320,17 @@ func NewSQLiteVectorStoreHNSW(name string, description string, modelName string,
 	}
 	return vectorStore, nil
 }
+
+// NewSQLiteVectorStore 创建一个新的 SQLite 向量存储
+func NewSQLiteVectorStoreHNSW(name string, description string, modelName string, dimension int, embedder EmbeddingClient, db *gorm.DB, options ...any) (*SQLiteVectorStoreHNSW, error) {
+	options = append(options, WithModelName(name))
+	options = append(options, WithModelDimension(dimension))
+	if embedder != nil {
+		options = append(options, WithEmbeddingClient(embedder))
+	}
+	return NewSQLiteVectorStoreHNSWEx(db, name, description, options...)
+}
+
 func RemoveCollectionHNSW(db *gorm.DB, collectionName string) error {
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
 		collection, err := yakit.QueryRAGCollectionByName(tx, collectionName)
