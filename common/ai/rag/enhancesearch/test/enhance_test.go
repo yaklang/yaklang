@@ -14,7 +14,9 @@ func TestRewriteQuerySearch(t *testing.T) {
 	yakit.LoadGlobalNetworkConfig()
 	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
 	query := "什么是yaklang"
-	enhance, err := enhancesearch.HypotheticalAnswer(context.Background(), query)
+	handler := enhancesearch.NewDefaultSearchHandler()
+
+	enhance, err := handler.HypotheticalAnswer(context.Background(), query)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +27,8 @@ func TestSplitQuerySearch(t *testing.T) {
 	yakit.LoadGlobalNetworkConfig()
 	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
 	query := "什么是yaklang"
-	enhance, err := enhancesearch.SplitQuery(context.Background(), query)
+	handler := enhancesearch.NewDefaultSearchHandler()
+	enhance, err := handler.SplitQuery(context.Background(), query)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +39,8 @@ func TestGeneralizeQuerySearch(t *testing.T) {
 	yakit.LoadGlobalNetworkConfig()
 	enhancesearch.Simpleliteforge = aiforge.SimpleAiForgeIns
 	query := "什么是yaklang"
-	enhance, err := enhancesearch.GeneralizeQuery(context.Background(), query)
+	handler := enhancesearch.NewDefaultSearchHandler()
+	enhance, err := handler.GeneralizeQuery(context.Background(), query)
 	if err != nil {
 		t.Fatal(err)
 	}
