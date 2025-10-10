@@ -153,6 +153,13 @@ jobs:
     if: needs.check-wip.outputs.should_skip != 'true'
     runs-on: ubuntu-22.04
     steps:
+      - name: Set Cache Key
+        id: cache_key
+        run: |
+          CACHE_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "sha=$CACHE_SHA" >> $GITHUB_OUTPUT
+          echo "Cache key will be: go-$CACHE_SHA"
+
       - name: Cache YakLang Project
         uses: actions/cache@v3
         id: cache-project
@@ -160,7 +167,7 @@ jobs:
           path: |
             ~/yakit-projects
             ${{ github.workspace }}
-          key: go-${{ github.event.pull_request.head.sha }}
+          key: go-${{ steps.cache_key.outputs.sha }}
 
       - name: Check out code into the Go module directory
         if: steps.cache-project.outputs.cache-hit != 'true'
@@ -439,6 +446,13 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
+      - name: Set Cache Key
+        id: cache_key
+        run: |
+          CACHE_SHA="${{ github.event.pull_request.head.sha }}"
+          echo "sha=$CACHE_SHA" >> $GITHUB_OUTPUT
+          echo "Cache key will be: go-$CACHE_SHA"
+
       - name: Cache YakLang Project
         uses: actions/cache/restore@v3
         id: cache-project
@@ -446,7 +460,7 @@ jobs:
           path: |
             ~/yakit-projects
             ${{ github.workspace }}
-          key: go-${{ github.event.pull_request.head.sha }}
+          key: go-${{ steps.cache_key.outputs.sha }}
 
       - name: Set up Go 1.x
         uses: actions/setup-go@v5
