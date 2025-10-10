@@ -8,13 +8,34 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type SearchHandler interface {
+	ExtractKeywords(ctx context.Context, query string) ([]string, error)
+	HypotheticalAnswer(ctx context.Context, query string) (string, error)
+	SplitQuery(ctx context.Context, query string) ([]string, error)
+	GeneralizeQuery(ctx context.Context, query string) ([]string, error)
+}
+
+type LiteForgeSearchHandler struct {
+	liteForge contracts.LiteForge
+}
+
+func NewDefaultSearchHandler() *LiteForgeSearchHandler {
+	return NewSearchHandler(Simpleliteforge)
+}
+
+func NewSearchHandler(liteForge contracts.LiteForge) *LiteForgeSearchHandler {
+	return &LiteForgeSearchHandler{
+		liteForge: liteForge,
+	}
+}
+
 // 需要调用之前注入Simpleliteforge
 var Simpleliteforge contracts.LiteForge
 
 // ExtractKeywords 从问题中提取核心关键词，用于精确的词条搜索。
-func ExtractKeywords(ctx context.Context, query string) ([]string, error) {
-	if Simpleliteforge == nil {
-		return nil, utils.Errorf("Simpleliteforge is not injected")
+func (h *LiteForgeSearchHandler) ExtractKeywords(ctx context.Context, query string) ([]string, error) {
+	if h.liteForge == nil {
+		return nil, utils.Errorf("liteForge is not injected")
 	}
 	prompt := `# 角色
 你是一位精通各领域知识的首席信息检索专家（Chief Information Retrieval Expert）。
@@ -52,7 +73,7 @@ func ExtractKeywords(ctx context.Context, query string) ([]string, error) {
 		return nil, err
 	}
 	inputPrompt := prompt
-	result, err := Simpleliteforge.SimpleExecute(ctx,
+	result, err := h.liteForge.SimpleExecute(ctx,
 		inputPrompt,
 		[]aitool.ToolOption{
 			aitool.WithStringArrayParam(
@@ -69,9 +90,9 @@ func ExtractKeywords(ctx context.Context, query string) ([]string, error) {
 }
 
 // HypotheticalAnswer 生成详细的假设回答，有助于搜索到更多相关结果
-func HypotheticalAnswer(ctx context.Context, query string) (string, error) {
-	if Simpleliteforge == nil {
-		return "", utils.Errorf("Simpleliteforge is not injected")
+func (h *LiteForgeSearchHandler) HypotheticalAnswer(ctx context.Context, query string) (string, error) {
+	if h.liteForge == nil {
+		return "", utils.Errorf("liteForge is not injected")
 	}
 	prompt, err := utils.RenderTemplate(`
 你是一个精通信息检索的AI助手。
@@ -97,7 +118,7 @@ func HypotheticalAnswer(ctx context.Context, query string) (string, error) {
 	}
 
 	inputPrompt := prompt
-	result, err := Simpleliteforge.SimpleExecute(ctx,
+	result, err := h.liteForge.SimpleExecute(ctx,
 		inputPrompt,
 		[]aitool.ToolOption{
 			aitool.WithStringParam(
@@ -115,9 +136,9 @@ func HypotheticalAnswer(ctx context.Context, query string) (string, error) {
 }
 
 // SplitQuery 将复杂问题拆分为多个子问题，有助于精确搜索多个领域的问题
-func SplitQuery(ctx context.Context, query string) ([]string, error) {
-	if Simpleliteforge == nil {
-		return nil, utils.Errorf("Simpleliteforge is not injected")
+func (h *LiteForgeSearchHandler) SplitQuery(ctx context.Context, query string) ([]string, error) {
+	if h.liteForge == nil {
+		return nil, utils.Errorf("liteForge is not injected")
 	}
 	prompt := `# 角色
 你是一位顶级的首席信息分析师和搜索策略师。
@@ -154,7 +175,7 @@ func SplitQuery(ctx context.Context, query string) ([]string, error) {
 	})
 
 	inputPrompt := prompt
-	result, err := Simpleliteforge.SimpleExecute(ctx,
+	result, err := h.liteForge.SimpleExecute(ctx,
 		inputPrompt,
 		[]aitool.ToolOption{
 			aitool.WithStringArrayParam(
@@ -172,9 +193,9 @@ func SplitQuery(ctx context.Context, query string) ([]string, error) {
 }
 
 // GeneralizeQuery 把问题泛化，有助于扩大搜索范围
-func GeneralizeQuery(ctx context.Context, query string) ([]string, error) {
-	if Simpleliteforge == nil {
-		return nil, utils.Errorf("Simpleliteforge is not injected")
+func (h *LiteForgeSearchHandler) GeneralizeQuery(ctx context.Context, query string) ([]string, error) {
+	if h.liteForge == nil {
+		return nil, utils.Errorf("liteForge is not injected")
 	}
 	prompt := `# 角色
 你是一位专业的知识架构师和信息检索策略师。
@@ -203,7 +224,7 @@ func GeneralizeQuery(ctx context.Context, query string) ([]string, error) {
 		"query": query,
 	})
 	inputPrompt := prompt
-	result, err := Simpleliteforge.SimpleExecute(ctx,
+	result, err := h.liteForge.SimpleExecute(ctx,
 		inputPrompt,
 		[]aitool.ToolOption{
 			aitool.WithStringArrayParam(
