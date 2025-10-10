@@ -150,7 +150,8 @@ const (
 	HOOK_CLAER = "clear"
 
 	// httpflow analyze
-	HOOK_Analyze_HTTPFlow = "analyzeHTTPFlow"
+	HOOK_Analyze_HTTPFlow        = "analyzeHTTPFlow"
+	HOOK_OnAnalyzeHTTPFlowFinish = "onAnalyzeHTTPFlowFinish"
 
 	/*
 		hijackSaveHTTPFlow = func(flow, forward, drop) {
@@ -183,6 +184,7 @@ var (
 		HOOK_AfterRequest,
 		// httpFlow analyze
 		HOOK_Analyze_HTTPFlow,
+		HOOK_OnAnalyzeHTTPFlowFinish,
 	}
 	HotPatchScriptName = "@HotPatchCode"
 )
@@ -851,6 +853,20 @@ func (m *MixPluginCaller) CallAnalyzeHTTPFlow(
 			HOOK_Analyze_HTTPFlow,
 			WithCallConfigRuntimeCtx(runtimeCtx),
 			WithCallConfigItems(flow, extract),
+		)
+	}
+}
+
+func (m *MixPluginCaller) CallOnAnalyzeHTTPFlowFinish(
+	runtimeCtx context.Context,
+	totalCount int64,
+	matchedCount int64,
+) {
+	if m.callers.ShouldCallByName(HOOK_OnAnalyzeHTTPFlowFinish) {
+		m.callers.Call(
+			HOOK_OnAnalyzeHTTPFlowFinish,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItems(totalCount, matchedCount),
 		)
 	}
 }
