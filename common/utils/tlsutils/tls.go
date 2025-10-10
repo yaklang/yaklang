@@ -184,12 +184,16 @@ func ParsePEMCertificateAndKeyForGM(ca, key []byte) (*x509gm.Certificate, *sm2.P
 
 	caKeyBlock, _ := pem.Decode(key)
 	// 尝试 PKCS8 格式
-	caKey, err := x509gm.ParsePKCS8PrivateKey(caKeyBlock.Bytes, nil)
-	if err != nil {
-		return nil, nil, errors.Errorf("parse private key error (tried PKCS8):PKCS8: %s", err)
+	caKey, err := x509gm.ParsePKCS8UnecryptedPrivateKey(caKeyBlock.Bytes)
+	if err == nil {
+		return caCert, caKey, nil
 	}
-
-	return caCert, caKey, nil
+	caKey, err = x509gm.ParseSm2PrivateKey(caKeyBlock.Bytes)
+	if err == nil {
+		return caCert, caKey, nil
+	}
+	log.Errorf("all strategry failed while trying to unmarshal GM private key asn1 data")
+	return nil, nil, err
 }
 
 func ParsePEMCertificate(ca []byte) (*x509.Certificate, error) {
