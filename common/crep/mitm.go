@@ -126,10 +126,13 @@ func GetDefaultMITMCAAndPrivForGM() (*gmx509.Certificate, *sm2.PrivateKey, error
 
 	priv, _ := pem.Decode(key)
 	privKey, err := gmx509.ParseSm2PrivateKey(priv.Bytes)
+	if err == nil {
+		return caCert, privKey, nil
+	}
+	privKey, err = gmx509.ParsePKCS8UnecryptedPrivateKey(priv.Bytes)
 	if err != nil {
 		return nil, nil, utils.Errorf("default private key failed: %s", err)
 	}
-
 	return caCert, privKey, nil
 }
 
