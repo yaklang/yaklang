@@ -31,9 +31,8 @@ func (r *ReAct) VerifyUserSatisfaction(originalQuery string, isToolCall bool, pa
 				return func(key string, reader io.Reader, parents []string) {
 					var out bytes.Buffer
 					reader = io.TeeReader(utils.JSONStringReader(utils.UTF8Reader(reader)), &out)
-					r.Emitter.EmitStreamEvent(
+					r.Emitter.EmitTextPlainTextStreamEvent(
 						"re-act-verify",
-						time.Now(),
 						reader,
 						rsp.GetTaskIndex(),
 						func() {

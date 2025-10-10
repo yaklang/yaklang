@@ -314,13 +314,52 @@ func (r *Emitter) EmitToolCallSummary(callToolId string, summary string) {
 }
 
 func (r *Emitter) EmitToolCallStd(toolName string, stdOut, stdErr io.Reader, taskIndex string) {
-	startTime := time.Now()
-	r.EmitStreamEventEx(fmt.Sprintf("tool-%v-stdout", toolName), startTime, stdOut, taskIndex, true)
-	r.EmitStreamEventEx(fmt.Sprintf("tool-%v-stderr", toolName), startTime, stdErr, taskIndex, true)
+	r.EmitTextPlainTextStreamEvent(fmt.Sprintf("tool-%v-stdout", toolName), stdOut, taskIndex)
+	r.EmitTextPlainTextStreamEvent(fmt.Sprintf("tool-%v-stderr", toolName), stdErr, taskIndex)
 }
 
 func (r *Emitter) EmitStreamEvent(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, finishCallback ...func()) {
 	r.EmitStreamEventEx(nodeId, startTime, reader, taskIndex, false, finishCallback...)
+}
+
+func (r *Emitter) EmitTextPlainTextStreamEvent(
+	nodeId string,
+	reader io.Reader,
+	taskIndex string,
+	finishCallback ...func(),
+) {
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "text/plain", finishCallback...)
+}
+
+func (r *Emitter) EmitTextMarkdownStreamEvent(
+	nodeId string,
+	reader io.Reader,
+	taskIndex string,
+	finishCallback ...func(),
+) {
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "text/markdown", finishCallback...)
+}
+
+func (r *Emitter) EmitYaklangCodeStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "code/yaklang", finishCallback...)
+}
+
+func (r *Emitter) EmitHTTPRequestStreamEvent(nodeId string, reader io.Reader, taskIndex string, finishCallback ...func()) {
+	r.EmitStreamEventWithContentType(nodeId, reader, taskIndex, "code/http-request", finishCallback...)
+}
+
+func (r *Emitter) EmitStreamEventWithContentType(nodeId string, reader io.Reader, taskIndex string, contentType string, finishCallback ...func()) {
+	r.emitStreamEvent(&streamEvent{
+		disableMarkdown:    true,
+		startTime:          time.Now(),
+		isSystem:           false,
+		isReason:           false,
+		reader:             reader,
+		nodeId:             nodeId,
+		contentType:        contentType,
+		taskIndex:          taskIndex,
+		emitFinishCallback: finishCallback,
+	})
 }
 
 func (r *Emitter) EmitStreamEventEx(nodeId string, startTime time.Time, reader io.Reader, taskIndex string, disableMarkdown bool, finishCallback ...func()) {
@@ -377,19 +416,17 @@ func (r *Emitter) EmitReasonStreamEvent(nodeId string, startTime time.Time, read
 func (r *Emitter) emitStreamEvent(e *streamEvent) {
 	r.streamWG.Add(1)
 
+	if e.contentType == "" {
+		e.contentType = "text/plain"
+	}
+
+	if e.startTime.IsZero() {
+		e.startTime = time.Now()
+	}
 	startTS := e.startTime.Unix()
+
 	ewid := ksuid.New().String()
-	producer := newStreamAIOutputEventWriter(
-		r.id,
-		e.nodeId,
-		e.disableMarkdown,
-		e.isSystem,
-		e.isReason,
-		r.emit,
-		startTS,
-		ewid,
-		e.taskIndex,
-	)
+	producer := newStreamAIOutputEventWriter(r.id, r.emit, startTS, ewid, e)
 
 	go func() {
 		defer r.streamWG.Done()
