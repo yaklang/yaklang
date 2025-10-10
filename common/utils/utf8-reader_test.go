@@ -373,3 +373,34 @@ func BenchmarkUTF8Reader(b *testing.B) {
 		}
 	}
 }
+
+func TestCreateUTF8StreamMirror_RealtimeError(t *testing.T) {
+	cb := NewCondBarrier()
+	b1 := cb.CreateBarrier("realtime")
+	pr, pw := NewPipe()
+	go func() {
+		defer pw.Close()
+		pw.WriteString("a你好")
+		cb.Wait("realtime")
+		pw.WriteString("b")
+		fmt.Println("finished")
+	}()
+
+	b2 := cb.CreateBarrier("done")
+	mainStream := CreateUTF8StreamMirror(pr, func(reader io.Reader) {
+		var buf = make([]byte, 1)
+		io.ReadFull(reader, buf)
+		if string(buf) != "a" {
+			t.Fatal("Expected a, got ", string(buf))
+			return
+		}
+		b1.Done()
+		io.ReadAll(reader)
+		b2.Done()
+	})
+
+	// Must read the main stream to avoid blocking the MultiWriter
+	go io.Copy(io.Discard, mainStream)
+
+	cb.Wait("done")
+}
