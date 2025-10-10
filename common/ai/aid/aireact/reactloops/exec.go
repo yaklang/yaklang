@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +31,8 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 					log.Warnf("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
 					log.Warn("-------------------------------------------------------------------------")
 					log.Warn("-------------------------------------------------------------------------")
+				} else {
+					log.Infof("AI Response Mirror[%s] stream cost %v, stream maybe valid", v.TagName, cost)
 				}
 				streamWg.Done()
 			}()
@@ -66,8 +67,6 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 						if code == "" {
 							return
 						}
-						code = strings.TrimPrefix(code, "\n")
-						code = strings.TrimSuffix(code, "\n")
 						r.Set(v.VariableName, code)
 					},
 				)

@@ -250,18 +250,27 @@ func TestMalformedTags(t *testing.T) {
 
 	var goodCount int
 	var results = make(map[string]string)
+	var mu sync.Mutex
 
 	err := Parse(strings.NewReader(input),
 		WithCallback("GOOD", "test", func(reader io.Reader) {
+			mu.Lock()
 			goodCount++
+			mu.Unlock()
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["good"] = string(content)
+			mu.Unlock()
 			log.Infof("GOOD 标签处理完成")
 		}),
 		WithCallback("ANOTHER_GOOD", "test", func(reader io.Reader) {
+			mu.Lock()
 			goodCount++
+			mu.Unlock()
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["another_good"] = string(content)
+			mu.Unlock()
 			log.Infof("ANOTHER_GOOD 标签处理完成")
 		}),
 		WithCallback("BAD", "test", func(reader io.Reader) {
@@ -274,15 +283,23 @@ func TestMalformedTags(t *testing.T) {
 	}
 
 	// 应该只有两个正常标签被处理
-	if goodCount != 2 {
-		t.Errorf("期望处理2个正常标签，实际处理了 %d 个", goodCount)
+	mu.Lock()
+	finalGoodCount := goodCount
+	finalResults := make(map[string]string)
+	for k, v := range results {
+		finalResults[k] = v
+	}
+	mu.Unlock()
+
+	if finalGoodCount != 2 {
+		t.Errorf("期望处理2个正常标签，实际处理了 %d 个", finalGoodCount)
 	}
 
 	// 验证正常标签内容
-	if !strings.Contains(results["good"], "正常标签内容") {
+	if !strings.Contains(finalResults["good"], "正常标签内容") {
 		t.Error("GOOD 标签内容不正确")
 	}
-	if !strings.Contains(results["another_good"], "另一个正常标签") {
+	if !strings.Contains(finalResults["another_good"], "另一个正常标签") {
 		t.Error("ANOTHER_GOOD 标签内容不正确")
 	}
 
