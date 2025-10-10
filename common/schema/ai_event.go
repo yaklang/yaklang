@@ -284,5 +284,6 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		DisableMarkdown: e.DisableMarkdown,
 		SyncID:          e.SyncID,
 		EventUUID:       e.EventUUID,
+		NodeIdVerbose:   NodeIdToI18n(e.NodeId, e.IsStream).I18nToYPB_I18n(),
 	}
 }
