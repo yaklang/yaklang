@@ -140,7 +140,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				if !ok {
 					continue
 				}
-				// fun, _ := ssa.ToFunction(bp.Constructor)
 				log.Infof("add interface funcName = %s", fun.GetName())
 				fun.AddLazyBuilder(func() {
 					log.Infof("build interface funcName = %s", fun.GetName())
@@ -148,23 +147,30 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					defer func() {
 						switchHandler()
 					}()
+
+					interfaceBp := b.GetBluePrint(n)
+					if interfaceBp == nil {
+						b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
+						return
+					}
+
+					processedTypes := make(map[string]bool)
 					for funcName, _ := range i.GetMethod() {
 						for typeName, t := range b.GetStructAll() {
 							if t.GetTypeKind() == ssa.InterfaceTypeKind {
 								continue
 							}
+							if processedTypes[typeName] {
+								continue
+							}
 							if _, ok := t.GetMethod()[funcName]; ok {
-								childBp := b.GetBluePrint(typeName)
-								if childBp == nil {
+								implBp := b.GetBluePrint(typeName)
+								if implBp == nil {
 									b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
 									continue
 								}
-								parentBp := b.GetBluePrint(n)
-								if parentBp == nil {
-									b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
-									continue
-								}
-								parentBp.AddParentBlueprint(childBp)
+								implBp.AddInterfaceBlueprint(interfaceBp)
+								processedTypes[typeName] = true
 							}
 						}
 					}
