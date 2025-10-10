@@ -2,11 +2,10 @@ package aireact
 
 import (
 	"bytes"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonextractor"
-	"io"
-	"time"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
