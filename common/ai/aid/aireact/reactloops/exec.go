@@ -21,18 +21,24 @@ import (
 func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, streamWg *sync.WaitGroup) []func(io.Reader) {
 	var aiTagStreamMirror []func(io.Reader)
 	var emitter = r.GetEmitter()
-	for _, tagIns := range r.aiTagFields.Values() {
-		v := tagIns
+	for _, _tagInstance := range r.aiTagFields.Values() {
+		v := _tagInstance
 		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
 			defer func() {
 				streamWg.Done()
 			}()
 			tagErr := aitag.Parse(reader, aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
 				streamWg.Add(1)
+
+				nodeId := v.AINodeId
+				if nodeId == "" {
+					nodeId = "re-act-loop-answer-payload"
+				}
+
 				var result bytes.Buffer
 				fieldReader = io.TeeReader(fieldReader, &result)
 				emitter.EmitStreamEvent(
-					"yaklang-code",
+					nodeId,
 					time.Now(),
 					fieldReader,
 					taskIndex,
