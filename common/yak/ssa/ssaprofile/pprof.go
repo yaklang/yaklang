@@ -2,6 +2,8 @@ package ssaprofile
 
 import (
 	"fmt"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -136,6 +138,13 @@ func dump(cfg dumpHeapConfig, saveFile bool) bool {
 
 func DumpHeapProfileWithInterval(dumpInterval time.Duration, opts ...dumpHeapOption) {
 	log.Printf("Memory usage exceeds threshold, dumping heap profile every %v\n", dumpInterval)
+	println("USE: go tool pprof --seconds 30 http://127.0.0.1:18080/debug/pprof/profile")
+	go func() {
+		err := http.ListenAndServe(":18080", nil)
+		if err != nil {
+			return
+		}
+	}()
 	// 定期dump heap profile
 	go func() {
 		cfg := NewHeapConfig(opts...)
