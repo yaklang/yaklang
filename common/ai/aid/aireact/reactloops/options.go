@@ -140,6 +140,19 @@ func WithAITagField(tagName, variableName string) ReActLoopOption {
 	}
 }
 
+func WithAITagFieldWithAINodeId(tagName, variableName, nodeId string) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if r.aiTagFields == nil {
+			r.aiTagFields = omap.NewEmptyOrderedMap[string, *LoopAITagField]()
+		}
+		r.aiTagFields.Set(tagName, &LoopAITagField{
+			TagName:      tagName,
+			VariableName: variableName,
+			AINodeId:     nodeId,
+		})
+	}
+}
+
 func WithReflectionOutputExampleContextProvider(provider ContextProviderFunc) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.reflectionOutputExampleProvider = provider

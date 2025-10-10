@@ -9,4 +9,5 @@ type LoopStreamField struct {
 type LoopAITagField struct {
 	TagName      string
 	VariableName string
+	AINodeId     string
 }
