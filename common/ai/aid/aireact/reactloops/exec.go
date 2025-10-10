@@ -19,13 +19,16 @@ import (
 func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, streamWg *sync.WaitGroup) []func(io.Reader) {
 	var aiTagStreamMirror []func(io.Reader)
 	var emitter = r.GetEmitter()
+	var mirrorStart = time.Now()
 	for _, _tagInstance := range r.aiTagFields.Values() {
 		v := _tagInstance
 		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
+			log.Infof("[ai-tag] mirror[%s] started, time since mirror start: %v", v.TagName, time.Since(mirrorStart))
+
 			pReader := utils.NewPeekableReader(reader)
 			parseStart := time.Now()
 			pReader.Peek(1)
-			log.Infof("peeked first byte for tag[%s] cost: %v", v.TagName, time.Since(parseStart))
+			log.Infof("[ai-tag] mirror peeked first byte for tag[%s] cost: %v", v.TagName, time.Since(parseStart))
 			log.Infof("starting aitag.Parse for tag[%s]", v.TagName)
 			defer func() {
 				cost := time.Since(parseStart)
@@ -111,27 +114,34 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	var emitter = r.emitter
 	var actionNames = r.GetAllActionNames()
 
+	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
 		r.config.CallAI,
 		func(resp *aicommon.AIResponse) error {
-			stream := resp.GetOutputStreamReader(
+			rawStream := resp.GetOutputStreamReader(
 				r.loopName,
 				true,
 				r.config.GetEmitter(),
 			)
 
-			// stream = io.TeeReader(stream, os.Stdout)
-
+			var stream io.Reader
 			aiTagStreamMirror := r.createAITagStreamMirrors(resp.GetTaskIndex(), nonce, streamWg)
 			if len(aiTagStreamMirror) > 0 {
 				streamWg.Add(len(aiTagStreamMirror))
-				log.Infof("creating %d aitag stream mirrors, will mirror the stream", len(aiTagStreamMirror))
-				stream = utils.CreateUTF8StreamMirror(stream, aiTagStreamMirror...)
-				log.Debugf("stream mirror created successfully")
+				log.Debugf("creating %d aitag stream mirrors, will mirror the stream", len(aiTagStreamMirror))
+				pr, pw := utils.NewPipe()
+				go func() {
+					defer func() {
+						pw.Close()
+					}()
+					rawReader := utils.CreateUTF8StreamMirror(rawStream, aiTagStreamMirror...)
+					io.Copy(pw, rawReader)
+				}()
+				stream = pr
 			} else {
-				log.Debugf("no aitag stream mirrors needed")
+				stream = rawStream
 			}
 
 			actionNameFallback := ""
