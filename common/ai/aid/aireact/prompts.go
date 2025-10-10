@@ -23,11 +23,6 @@ func nonce() string {
 	return utils.RandAlphaNumStringBytes(5)
 }
 
-// Embed template files
-//
-//go:embed prompts/loop/loop.txt
-var loopPromptTemplate string
-
 //go:embed prompts/tool-params/tool-params.txt
 var toolParamsPromptTemplate string
 
@@ -328,62 +323,6 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	result["ConversationMemory"] = pm.react.cumulativeSummary
 	result["Timeline"] = pm.react.config.memory.Timeline()
 	return basePrompt, result, nil
-}
-
-// GenerateLoopPrompt generates the main ReAct loop prompt using template
-func (pm *PromptManager) GenerateLoopPrompt(
-	userQuery string,
-	allowUserInteractive, allowPlan, allowKnowledgeEnhanceAnswer, allowWriteYaklangCode bool,
-	currentUserInteractiveCount,
-	userInteractiveLimitedTimes int64,
-	tools []*aitool.Tool,
-) (string, error) {
-	forges := pm.GetAvailableAIForgeBlueprints()
-
-	// Build template data
-	data := &LoopPromptData{
-		AllowAskForClarification:       allowUserInteractive,
-		AllowPlan:                      allowPlan,
-		AllowKnowledgeEnhanceAnswer:    allowKnowledgeEnhanceAnswer,
-		AllowWriteYaklangCode:          allowWriteYaklangCode,
-		AskForClarificationCurrentTime: currentUserInteractiveCount,
-		AskForClarificationMaxTimes:    userInteractiveLimitedTimes,
-		CurrentTime:                    time.Now().Format("2006-01-02 15:04:05"),
-		OSArch:                         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		UserQuery:                      userQuery,
-		Nonce:                          utils.RandStringBytes(4),
-		Language:                       pm.react.config.language,
-		AIForgeList:                    forges,
-		Tools:                          tools,
-		ToolsCount:                     len(tools),
-		TopToolsCount:                  pm.react.config.topToolsCount,
-		DynamicContext:                 pm.DynamicContext(),
-	}
-
-	data.Schema = getLoopSchema(!allowUserInteractive, !allowPlan, !allowKnowledgeEnhanceAnswer, !allowWriteYaklangCode, data.AIForgeList != "")
-
-	data.WorkingDir = pm.workdir
-	if data.WorkingDir != "" {
-		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
-	}
-
-	// Get prioritized tools
-	if len(tools) > 0 {
-		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
-		data.HasMoreTools = len(tools) > len(data.TopTools)
-	}
-
-	// Set conversation memory
-	if pm.react.cumulativeSummary != "" {
-		data.ConversationMemory = pm.react.cumulativeSummary
-	}
-
-	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
-	}
-
-	return pm.executeTemplate("loop", loopPromptTemplate, data)
 }
 
 // GenerateToolParamsPrompt generates tool parameter generation prompt using template
