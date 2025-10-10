@@ -2,9 +2,10 @@ package utils
 
 import (
 	"io"
+	"sync"
 	"unicode/utf8"
 
-	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
 )
 
 type utf8Reader struct {
@@ -138,58 +139,44 @@ func CreateUTF8StreamMirror(r io.Reader, cb ...func(reader io.Reader)) io.Reader
 		return UTF8Reader(r)
 	}
 
-	log.Debugf("[UTF8MIRROR] creating stream mirror with %d callbacks", len(cb))
+	pr, pw := NewPipe()
 
-	// 为每个callback创建一个独立的pipe，还要为返回的主流创建一个pipe
-	numPipes := len(cb) + 1 // callbacks + 主流
-	pipes := make([]io.Writer, numPipes)
-	readers := make([]io.Reader, numPipes)
-
-	for i := 0; i < numPipes; i++ {
-		pr, pw := io.Pipe()
-		pipes[i] = pw
-		readers[i] = pr
+	numPipes := len(cb)
+	writers := make([]*bufpipe.PipeWriter, numPipes)
+	readers := make([]*bufpipe.PipeReader, numPipes)
+	for i := 0; i < len(cb); i++ {
+		readers[i], writers[i] = NewPipe()
 	}
-
-	// 创建一个MultiWriter，将数据分发到所有pipe
-	multiWriter := io.MultiWriter(pipes...)
-
-	// 启动goroutine来处理数据分发
 	go func() {
-		log.Debugf("[UTF8MIRROR] starting data distribution goroutine")
-		// 确保所有pipe writer都被关闭
 		defer func() {
-			log.Debugf("[UTF8MIRROR] closing all pipes")
-			for _, pipe := range pipes {
-				if pw, ok := pipe.(*io.PipeWriter); ok {
-					pw.Close()
-				}
+			pw.Close()
+			for _, w := range writers {
+				w.Close()
 			}
 		}()
-
-		// 将原始流的数据写入到所有镜像流中
-		n, err := io.Copy(multiWriter, r)
-		log.Debugf("[UTF8MIRROR] data distribution completed, copied %d bytes, err: %v", n, err)
-		if err != nil {
-			// 处理错误，但不阻塞
-			for _, pipe := range pipes {
-				if pw, ok := pipe.(*io.PipeWriter); ok {
-					pw.CloseWithError(err)
-				}
-			}
+		var pipes = make([]io.Writer, numPipes)
+		for i, w := range writers {
+			pipes[i] = w
 		}
+		go func() {
+			wg := new(sync.WaitGroup)
+			for i, c := range cb {
+				wg.Add(1)
+				handler := c
+				idx := i
+				go func() {
+					defer func() {
+						wg.Done()
+					}()
+					if handler != nil {
+						handler(readers[idx])
+					}
+				}()
+			}
+			wg.Wait()
+		}()
+		io.Copy(pw, io.TeeReader(r, io.MultiWriter(pipes...)))
 	}()
 
-	// 为每个callback启动独立的goroutine
-	for i, callback := range cb {
-		go func(cb func(reader io.Reader), reader io.Reader, idx int) {
-			log.Debugf("[UTF8MIRROR] starting callback %d", idx)
-			utf8Stream := UTF8Reader(reader)
-			cb(utf8Stream)
-			log.Debugf("[UTF8MIRROR] callback %d finished", idx)
-		}(callback, readers[i], i)
-	}
-
-	// 返回最后一个pipe作为主流（独立于所有callback）
-	return UTF8Reader(readers[len(cb)])
+	return UTF8Reader(pr)
 }
