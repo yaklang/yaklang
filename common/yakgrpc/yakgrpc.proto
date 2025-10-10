@@ -1525,6 +1525,7 @@ message AIOutputEvent {
   string SyncID = 14; // 用于同步消息的 ID
   string EventUUID = 16; // 事件的唯一ID, used via stream stream-finished
   I18n NodeIdVerbose = 17; // 用于展示的节点ID，可能是节点名称
+  string ContentType = 18; // markdown / yaklang_code / plain_code
 }
 
 message I18n {

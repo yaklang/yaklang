@@ -6182,6 +6182,7 @@ type AIOutputEvent struct {
 	SyncID          string                 `protobuf:"bytes,14,opt,name=SyncID,proto3" json:"SyncID,omitempty"`               // 用于同步消息的 ID
 	EventUUID       string                 `protobuf:"bytes,16,opt,name=EventUUID,proto3" json:"EventUUID,omitempty"`         // 事件的唯一ID, used via stream stream-finished
 	NodeIdVerbose   *I18N                  `protobuf:"bytes,17,opt,name=NodeIdVerbose,proto3" json:"NodeIdVerbose,omitempty"` // 用于展示的节点ID，可能是节点名称
+	ContentType     string                 `protobuf:"bytes,18,opt,name=ContentType,proto3" json:"ContentType,omitempty"`     // markdown / yaklang_code / plain_code
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -6333,6 +6334,13 @@ func (x *AIOutputEvent) GetNodeIdVerbose() *I18N {
 		return x.NodeIdVerbose
 	}
 	return nil
+}
+
+func (x *AIOutputEvent) GetContentType() string {
+	if x != nil {
+		return x.ContentType
+	}
+	return ""
 }
 
 type I18N struct {
@@ -61875,7 +61883,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12$\n" +
-	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\x8a\x04\n" +
+	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xac\x04\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -61894,7 +61902,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06IsSync\x18\f \x01(\bR\x06IsSync\x12\x16\n" +
 	"\x06SyncID\x18\x0e \x01(\tR\x06SyncID\x12\x1c\n" +
 	"\tEventUUID\x18\x10 \x01(\tR\tEventUUID\x12/\n" +
-	"\rNodeIdVerbose\x18\x11 \x01(\v2\t.ypb.I18nR\rNodeIdVerbose\"&\n" +
+	"\rNodeIdVerbose\x18\x11 \x01(\v2\t.ypb.I18nR\rNodeIdVerbose\x12 \n" +
+	"\vContentType\x18\x12 \x01(\tR\vContentType\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +
 	"\x02En\x18\x02 \x01(\tR\x02En\"\xda\x03\n" +
