@@ -125,8 +125,6 @@ println("using Get method")
 }
 
 func TestReAct_QueryDocument(t *testing.T) {
-	t.Skip()
-
 	// Create test ZIP file with mock documentation
 	tempDir := os.TempDir()
 	zipPath := filepath.Join(tempDir, "test-aikb-"+ksuid.New().String()+".zip")

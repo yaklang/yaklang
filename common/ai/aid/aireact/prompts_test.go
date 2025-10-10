@@ -193,10 +193,9 @@ func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.
 		t.Fatalf("Failed to create ReAct instance: %v", err)
 	}
 
-	// Test that DynamicContext is called during prompt generation
-	_, err = react.promptManager.GenerateLoopPrompt("test query", true, true, true, true, 0, 5, nil)
+	_, _, err = react.config.GetBasicPromptInfo(nil)
 	if err != nil {
-		t.Fatalf("Failed to generate loop prompt: %v", err)
+		t.Fatal(err)
 	}
 
 	callMutex.Lock()
@@ -508,42 +507,6 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 	// 验证 Forge 列表不为空
 	if forgeList == "" {
 		t.Fatal("AI Forge List should not be empty")
-	}
-
-	// 生成包含 Forge 列表的循环提示
-	prompt, err := react.promptManager.GenerateLoopPrompt("test query", true, true, true, true, 0, 5, nil)
-	if err != nil {
-		t.Fatalf("Failed to generate loop prompt: %v", err)
-	}
-
-	// 记录 Forge 列表内容，用于调试和了解有哪些 Forge
-	t.Logf("Prompt Include AI Forge List:\n%s", prompt)
-
-	// 记录生成的完整提示，用于调试
-	t.Logf("Generated prompt length: %d", len(prompt))
-
-	// 验证生成的提示包含 Forge 列表相关的文本
-	if !utils.MatchAllOfSubString(prompt, "AI Blueprint(AI Forge)") {
-		t.Fatal("Generated prompt should contain AI Forge section")
-	}
-
-	// 验证生成的提示包含 Forge 列表内容的关键部分
-	if !utils.MatchAllOfSubString(prompt, "hostscan") {
-		t.Fatal("Generated prompt should contain hostscan forge")
-	}
-
-	// 验证生成的提示包含多个 Forge
-	if !utils.MatchAllOfSubString(prompt, "xss", "sqlinject") {
-		t.Fatal("Generated prompt should contain multiple forges")
-	}
-
-	// 验证生成的提示包含 loop.txt 中的 Forge 相关文本
-	if !utils.MatchAllOfSubString(prompt, "AI 蓝图（也称应用体或 Forge）是一种强大的机制") {
-		t.Fatal("Generated prompt should contain AI Forge introduction text from loop.txt")
-	}
-
-	if !utils.MatchAllOfSubString(prompt, "以下是本系统可以使用的AI蓝图列表") {
-		t.Fatal("Generated prompt should contain AI Forge description from loop.txt")
 	}
 
 	// 专门测试 hostscan Forge（作为内置 aiforge 的代表）

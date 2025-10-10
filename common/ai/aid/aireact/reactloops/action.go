@@ -26,7 +26,7 @@ func buildSchema(actions ...*LoopAction) string {
 	for _, action := range actions {
 		actionNames = append(actionNames, action.ActionType)
 	}
-	var opts []any = []any{
+	var opts = []any{
 		aitool.WithStringParam(
 			"@action",
 			aitool.WithParam_Description("required '@action' field to identify the action type"),
