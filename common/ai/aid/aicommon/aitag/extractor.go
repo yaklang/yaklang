@@ -81,7 +81,6 @@ func (p *Parser) parseStream(reader io.Reader) error {
 	var wg sync.WaitGroup              // Wait for all callbacks to complete
 	var skipFirstNewline = false       // Flag to skip first newline after start tag
 	var lastFlushTime = time.Now()     // Track last flush time for timeout-based flushing
-
 	// Helper function to flush pending bytes if they form complete UTF-8 characters
 	flushPending := func(force bool) {
 		if pendingBytes.Len() == 0 {
@@ -135,6 +134,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 		// Write all complete UTF-8 characters (except potentially last newline)
 		toWrite := data[:len(data)-keepBytes]
 		if len(toWrite) > 0 {
+			log.Infof("[AITAG] Streaming %d bytes at %v", len(toWrite), time.Now().Format("15:04:05.000"))
 			contentPipe.Write(toWrite)
 			lastFlushTime = time.Now() // Update flush time
 			// Keep incomplete sequence and/or trailing newline
@@ -199,7 +199,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 							if tagName != "" && nonce != "" {
 								key := fmt.Sprintf("%s_%s", tagName, nonce)
 								if callback, exists := p.callbacks[key]; exists {
-									log.Debugf("found start tag: %s with nonce: %s", tagName, nonce)
+									log.Infof("[AITAG] Found start tag <%s_%s> at %v", tagName, nonce, time.Now().Format("15:04:05.000"))
 									activeTag = callback
 									currentState = stateInTag
 
@@ -212,7 +212,10 @@ func (p *Parser) parseStream(reader io.Reader) error {
 									// Start callback in goroutine
 									wg.Add(1)
 									go func(cb CallbackFunc, r io.Reader) {
-										defer wg.Done()
+										defer func() {
+											log.Infof("[AITAG] Callback for <%s_%s> finished at %v", tagName, nonce, time.Now().Format("15:04:05.000"))
+											wg.Done()
+										}()
 										cb(r)
 									}(callback.Callback, contentReader)
 
@@ -296,7 +299,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 								tagName, nonce := p.parseEndTag(tagStr)
 								if tagName == activeTag.TagName && nonce == activeTag.Nonce {
 									// Found matching end tag!
-									log.Debugf("found end tag: %s with nonce: %s", tagName, nonce)
+									log.Infof("[AITAG] Found end tag <%s_END_%s> at %v", tagName, nonce, time.Now().Format("15:04:05.000"))
 
 									// Write any pending bytes (everything before the end tag)
 									// For block text formatting: remove trailing newline before end tag
@@ -313,6 +316,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 											}
 										}
 										if len(content) > 0 {
+											log.Infof("[AITAG] Writing final %d bytes for <%s_%s>", len(content), tagName, nonce)
 											contentPipe.Write(content)
 										}
 										pendingBytes.Reset()
@@ -320,6 +324,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 
 									// Close the pipe to signal end of content
 									if closer, ok := contentPipe.(io.Closer); ok {
+										log.Infof("[AITAG] Closing pipe for <%s_%s> at %v", tagName, nonce, time.Now().Format("15:04:05.000"))
 										closer.Close()
 									}
 
