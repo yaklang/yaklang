@@ -14,8 +14,10 @@ import (
 
 	"github.com/creack/pty"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/winpty"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -63,7 +65,8 @@ type BashSession struct {
 	ShellType   string
 	Cmd         *exec.Cmd
 	Pty         *os.File       // PTY主端（仅在非Windows系统使用）
-	Stdin       io.WriteCloser // 标准输入（Windows非PTY模式使用）
+	WinPty      *winpty.WinPTY // Windows系统使用的winpty对象
+	Stdin       io.WriteCloser // 标准输入（备用）
 	Stdout      *bytes.Buffer
 	Cancel      context.CancelFunc
 	IsRunning   bool
@@ -356,12 +359,20 @@ func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, 
 
 	// 向会话写入内容
 	var writeErr error
-	if session.UsePty {
-		// PTY 模式：写入到 PTY
-		_, writeErr = session.Pty.Write([]byte(input + "\n"))
+	if runtime.GOOS == "windows" {
+		// Windows 系统：使用 winpty 写入
+		if session.WinPty != nil && session.WinPty.StdIn != nil {
+			_, writeErr = session.WinPty.StdIn.Write([]byte(input + "\n"))
+		} else {
+			writeErr = utils.Errorf("winpty object or stdin is nil")
+		}
 	} else {
-		// 非 PTY 模式：写入到 Stdin
-		_, writeErr = session.Stdin.Write([]byte(input + "\n"))
+		// 非 Windows 系统：使用 PTY 写入
+		if session.Pty != nil {
+			_, writeErr = session.Pty.Write([]byte(input + "\n"))
+		} else {
+			writeErr = utils.Errorf("pty object is nil")
+		}
 	}
 
 	if writeErr != nil {
@@ -372,10 +383,18 @@ func executeSessionCommand(bashSessionContext *BashSessionContext, sessionName, 
 		}
 
 		// 重试写入
-		if session.UsePty {
-			_, writeErr = session.Pty.Write([]byte(input + "\n"))
+		if runtime.GOOS == "windows" {
+			if session.WinPty != nil && session.WinPty.StdIn != nil {
+				_, writeErr = session.WinPty.StdIn.Write([]byte(input + "\n"))
+			} else {
+				writeErr = utils.Errorf("winpty object or stdin is nil after restart")
+			}
 		} else {
-			_, writeErr = session.Stdin.Write([]byte(input + "\n"))
+			if session.Pty != nil {
+				_, writeErr = session.Pty.Write([]byte(input + "\n"))
+			} else {
+				writeErr = utils.Errorf("pty object is nil after restart")
+			}
 		}
 
 		if writeErr != nil {
@@ -491,35 +510,33 @@ func createSessionProcess(bashSessionContext *BashSessionContext, session *BashS
 	// 如果有旧的 PTY，先关闭
 	if session.Pty != nil {
 		session.Pty.Close()
+		session.Pty = nil
+	}
+
+	// 如果有旧的 WinPty，先关闭
+	if session.WinPty != nil {
+		session.WinPty.Close()
+		session.WinPty = nil
 	}
 
 	// 如果有旧的 Stdin，先关闭
 	if session.Stdin != nil {
 		session.Stdin.Close()
+		session.Stdin = nil
 	}
 
 	// 创建新的上下文，继承自BashSessionContext的context
 	ctx, cancel := context.WithCancel(bashSessionContext.ctx)
 	session.Cancel = cancel
 
-	// 根据shell类型创建命令
+	// 决定是否使用 PTY 模式 - 现在所有平台都使用PTY
+	session.UsePty = true
+
 	var cmd *exec.Cmd
-	switch session.ShellType {
-	case "bash":
+
+	if runtime.GOOS != "windows" {
+		// 非 Windows 系统：使用传统 PTY 模式
 		cmd = exec.CommandContext(ctx, "bash")
-	case "cmd":
-		cmd = exec.CommandContext(ctx, "cmd")
-	case "powershell":
-		cmd = exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NoExit")
-	default:
-		return utils.Errorf("unsupported shell type: %s", session.ShellType)
-	}
-
-	// 决定是否使用 PTY 模式
-	session.UsePty = runtime.GOOS != "windows"
-
-	if session.UsePty {
-		// 非 Windows 系统：使用 PTY 模式
 		ptyFile, err := pty.Start(cmd)
 		if err != nil {
 			return utils.Errorf("failed to start %s process with pty: %v", session.ShellType, err)
@@ -550,64 +567,43 @@ func createSessionProcess(bashSessionContext *BashSessionContext, session *BashS
 			}
 		}()
 	} else {
-		// Windows 系统：使用直接管道模式
-		stdin, err := cmd.StdinPipe()
-		if err != nil {
-			return utils.Errorf("failed to create stdin pipe: %v", err)
+		// Windows 系统：使用 winpty 模式
+		winptyPath := getWinptyPathOrInstallWinpty()
+		if winptyPath == "" {
+			return utils.Errorf("winpty not found, please install winpty")
 		}
 
-		stdout, err := cmd.StdoutPipe()
-		if err != nil {
-			stdin.Close()
-			return utils.Errorf("failed to create stdout pipe: %v", err)
+		// 根据shell类型选择命令
+		var shellCmd string
+		switch session.ShellType {
+		case "powershell":
+			shellCmd = "powershell.exe"
+		case "cmd":
+			shellCmd = "cmd.exe"
+		default:
+			shellCmd = "cmd.exe"
 		}
 
-		stderr, err := cmd.StderrPipe()
+		winptyPty, err := winpty.NewDefault(winptyPath, shellCmd)
 		if err != nil {
-			stdin.Close()
-			stdout.Close()
-			return utils.Errorf("failed to create stderr pipe: %v", err)
+			return utils.Errorf("failed to create winpty: %v", err)
 		}
 
-		// 启动进程
-		err = cmd.Start()
-		if err != nil {
-			stdin.Close()
-			stdout.Close()
-			stderr.Close()
-			return utils.Errorf("failed to start %s process: %v", session.ShellType, err)
-		}
-
-		session.Cmd = cmd
-		session.Stdin = stdin
+		session.WinPty = winptyPty
 		session.IsRunning = true
 
-		// 启动输出读取goroutine，分别处理 stdout 和 stderr
+		// 启动输出读取goroutine，从 winpty 读取所有输出
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					log.Debugf("Stdout copy goroutine recovered from panic: %v", r)
+					log.Debugf("WinPty copy goroutine recovered from panic: %v", r)
 				}
 			}()
 
-			// 读取 stdout
-			_, err := io.Copy(session.Stdout, stdout)
+			// 从 winpty 的 StdOut 读取输出
+			_, err := io.Copy(session.Stdout, winptyPty.StdOut)
 			if err != nil && err != io.EOF {
-				log.Debugf("Stdout copy finished with error: %v", err)
-			}
-		}()
-
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					log.Debugf("Stderr copy goroutine recovered from panic: %v", r)
-				}
-			}()
-
-			// 读取 stderr
-			_, err := io.Copy(session.Stdout, stderr)
-			if err != nil && err != io.EOF {
-				log.Debugf("Stderr copy finished with error: %v", err)
+				log.Debugf("WinPty copy finished with error: %v", err)
 			}
 		}()
 	}
@@ -631,6 +627,15 @@ func createSessionProcess(bashSessionContext *BashSessionContext, session *BashS
 	}()
 
 	return nil
+}
+
+func getWinptyPathOrInstallWinpty() string {
+	winptyPath := consts.GetWinptyPath()
+	if winptyPath == "" {
+		log.Errorf("winpty not found, please install winpty")
+		return ""
+	}
+	return winptyPath
 }
 
 // closeSession 关闭指定会话
@@ -659,18 +664,24 @@ func closeSession(bashSessionContext *BashSessionContext, sessionName string) er
 
 	// 关闭进程的正确顺序：
 	// 1. 首先关闭输入/输出，让进程知道没有更多输入
-	if session.UsePty {
-		// PTY 模式：关闭 PTY
+	if runtime.GOOS == "windows" {
+		// Windows 系统：关闭 WinPty
+		if session.WinPty != nil {
+			session.WinPty.Close()
+			session.WinPty = nil
+		}
+	} else {
+		// 非 Windows 系统：关闭 PTY
 		if session.Pty != nil {
 			session.Pty.Close()
 			session.Pty = nil
 		}
-	} else {
-		// 非 PTY 模式：关闭 Stdin
-		if session.Stdin != nil {
-			session.Stdin.Close()
-			session.Stdin = nil
-		}
+	}
+
+	// 关闭备用的 Stdin（如果存在）
+	if session.Stdin != nil {
+		session.Stdin.Close()
+		session.Stdin = nil
 	}
 
 	// 2. 发送取消信号

@@ -322,3 +322,16 @@ func GetWhisperCliBinaryPath() string {
 	}
 	return utils.GetFirstExistedFile(paths...)
 }
+
+func GetWinptyPath() string {
+	paths := []string{
+		"C:\\Program Files\\Git\\usr\\bin\\winpty.dll", // git for windows
+		"C:\\Program Files (x86)\\Git\\usr\\bin\\winpty.dll",
+		"C:\\msys64\\usr\\bin\\winpty.dll", // msys64
+		"C:\\msys64\\mingw64\\bin\\winpty.dll",
+		"C:\\msys64\\mingw32\\bin\\winpty.dll",
+	}
+	defaultPath := GetDefaultYakitProjectsDir()
+	paths = append(paths, filepath.Join(defaultPath, "libs", "winpty", "winpty.dll"))
+	return utils.GetFirstExistedFile(paths...)
+}
