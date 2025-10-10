@@ -29,6 +29,7 @@ type EntityRepositoryRuntimeConfig struct {
 	runtimeID           string
 	queryTop            int
 	ctx                 context.Context
+	disableBulkProcess   bool
 
 	entityRagQueryCache *utils.CacheEx[*schema.ERModelEntity]
 }
@@ -50,6 +51,12 @@ func WithQueryTop(top int) RuntimeConfigOption {
 func WithRuntimeID(runtimeID string) RuntimeConfigOption {
 	return func(config *EntityRepositoryRuntimeConfig) {
 		config.runtimeID = runtimeID
+	}
+}
+
+func WithDisableBulkProcess() RuntimeConfigOption {
+	return func(config *EntityRepositoryRuntimeConfig) {
+		config.disableBulkProcess = true
 	}
 }
 
@@ -914,7 +921,7 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		ragSystem, err = rag.LoadCollectionEx(db, name)
+		ragSystem, err = rag.LoadCollection(db, name)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
@@ -925,12 +932,13 @@ func GetEntityRepositoryByName(db *gorm.DB, name string, opts ...any) (*EntityRe
 		ragSystem:     ragSystem,
 		runtimeConfig: NewRuntimeConfig(opts...),
 	}
+	if !repos.runtimeConfig.disableBulkProcess {
+		err = repos.StartBulkProcessor()
+		if err != nil {
+			return nil, err
 
-	err = repos.StartBulkProcessor()
-	if err != nil {
-		return nil, err
+		}
 	}
-
 	return repos, nil
 }
 
@@ -965,7 +973,7 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 			return nil, utils.Errorf("create entity repository & rag collection err: %v", err)
 		}
 	} else {
-		ragSystem, err = rag.LoadCollectionEx(db, name)
+		ragSystem, err = rag.LoadCollection(db, name)
 		if err != nil {
 			return nil, utils.Errorf("加载RAG集合失败: %v", err)
 		}
@@ -977,9 +985,12 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 		runtimeConfig: NewRuntimeConfig(opts...),
 	}
 
-	err = repos.StartBulkProcessor()
-	if err != nil {
-		return nil, err
+	if !repos.runtimeConfig.disableBulkProcess {
+		err = repos.StartBulkProcessor()
+		if err != nil {
+			return nil, err
+
+		}
 	}
 
 	return repos, nil
