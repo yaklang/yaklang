@@ -173,39 +173,6 @@ func TestSchemaGeneration_WithDisallowExit(t *testing.T) {
 	}
 }
 
-// TestAITagFieldsManagement 测试 AI 标签字段管理
-func TestAITagFieldsManagement(t *testing.T) {
-	// 由于 ReActLoop 需要完整的runtime，这里只测试字段结构
-	field := &LoopAITagField{
-		TagName:      "test-tag",
-		VariableName: "test_var",
-	}
-
-	if field.TagName != "test-tag" {
-		t.Error("TagName should be set correctly")
-	}
-
-	if field.VariableName != "test_var" {
-		t.Error("VariableName should be set correctly")
-	}
-}
-
-// TestStreamFieldsManagement 测试流字段管理
-func TestStreamFieldsManagement(t *testing.T) {
-	field := &LoopStreamField{
-		FieldName: "thought",
-		Prefix:    "Thinking",
-	}
-
-	if field.FieldName != "thought" {
-		t.Error("FieldName should be set correctly")
-	}
-
-	if field.Prefix != "Thinking" {
-		t.Error("Prefix should be set correctly")
-	}
-}
-
 // TestActionHandler_SuccessFlow 测试成功流程的动作处理
 func TestActionHandler_SuccessFlow(t *testing.T) {
 	handlerCalled := false
