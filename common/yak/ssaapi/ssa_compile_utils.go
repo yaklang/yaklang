@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"errors"
+	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -23,6 +24,11 @@ func (c *config) getFileHandler(
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		func(path string, content []byte) (ssa.FrontAST, error) {
+			start := time.Now()
+			defer func() {
+				c.Processf(0, "pre-handler parse ast: %s, cost: %v", path, time.Since(start))
+			}()
+
 			defer func() {
 				if r := recover(); r != nil {
 					log.Errorf("pre-handler parse [%s] error %v  ", path, r)
