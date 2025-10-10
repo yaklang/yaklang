@@ -159,7 +159,7 @@ func CreateUTF8StreamMirror(r io.Reader, cb ...func(reader io.Reader)) io.Reader
 		log.Infof("[UTF8MIRROR] Starting data distribution goroutine")
 		// 确保所有pipe writer都被关闭
 		defer func() {
-			log.Infof("🔄 [UTF8MIRROR] Closing all pipes")
+			log.Infof("[UTF8MIRROR] Closing all pipes")
 			for _, pipe := range pipes {
 				if pw, ok := pipe.(*io.PipeWriter); ok {
 					pw.Close()
@@ -169,7 +169,7 @@ func CreateUTF8StreamMirror(r io.Reader, cb ...func(reader io.Reader)) io.Reader
 
 		// 将原始流的数据写入到所有镜像流中
 		n, err := io.Copy(multiWriter, r)
-		log.Infof("🔄 [UTF8MIRROR] Data distribution completed, copied %d bytes, err: %v", n, err)
+		log.Infof("[UTF8MIRROR] Data distribution completed, copied %d bytes, err: %v", n, err)
 		if err != nil {
 			// 处理错误，但不阻塞
 			for _, pipe := range pipes {
@@ -183,10 +183,10 @@ func CreateUTF8StreamMirror(r io.Reader, cb ...func(reader io.Reader)) io.Reader
 	// 为每个callback启动独立的goroutine
 	for i, callback := range cb {
 		go func(cb func(reader io.Reader), reader io.Reader, idx int) {
-			log.Infof("🔄 [UTF8MIRROR] Starting callback %d", idx)
+			log.Infof("[UTF8MIRROR] Starting callback %d", idx)
 			utf8Stream := UTF8Reader(reader)
 			cb(utf8Stream)
-			log.Infof("🔄 [UTF8MIRROR] Callback %d finished", idx)
+			log.Infof("[UTF8MIRROR] Callback %d finished", idx)
 		}(callback, readers[i], i)
 	}
 
