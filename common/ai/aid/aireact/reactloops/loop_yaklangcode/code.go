@@ -19,10 +19,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/ziputil"
 )
 
-const (
-	LOOP_NAME_WRITE_YAKLANG_CODE = "write_yaklang_code"
-)
-
 // createDocumentSearcher creates a document searcher from aikb path
 func createDocumentSearcher(aikbPath string) *ziputil.ZipGrepSearcher {
 	var zipPath string
@@ -63,14 +59,14 @@ var reactiveData string
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
-		LOOP_NAME_WRITE_YAKLANG_CODE,
+		schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG,
 		func(r aicommon.AIInvokeRuntime) (*reactloops.ReActLoop, error) {
 			config := r.GetConfig()
 			aikbPath := config.GetConfigString("aikb_path")
 			docSearcher := createDocumentSearcher(aikbPath)
 			filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
 			return reactloops.NewReActLoop(
-				LOOP_NAME_WRITE_YAKLANG_CODE,
+				schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG,
 				r,
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
@@ -281,6 +277,6 @@ func init() {
 		},
 	)
 	if err != nil {
-		log.Errorf("register reactloop: %v failed", LOOP_NAME_WRITE_YAKLANG_CODE)
+		log.Errorf("register reactloop: %v failed", schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG)
 	}
 }

@@ -14,8 +14,3 @@ const (
 	ActionKnowledgeEnhanceAnswer  ActionType = schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE
 	ActionWriteYaklangCode        ActionType = "write_yaklang_code"
 )
-
-// ReAct actions available
-const (
-	ReActActionObject = "object"
-)

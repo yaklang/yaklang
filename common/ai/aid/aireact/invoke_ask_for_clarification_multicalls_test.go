@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
