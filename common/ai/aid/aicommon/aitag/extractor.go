@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"sync"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // CallbackFunc defines the function signature for tag content handlers
@@ -65,100 +68,308 @@ const (
 	stateInTag         // Inside a tag, collecting content
 )
 
-// parseStream performs the actual parsing using a simplified approach
+// parseStream performs the actual parsing using true streaming approach
 // No nesting is supported - this makes the implementation much more reliable
 func (p *Parser) parseStream(reader io.Reader) error {
 	var currentState = stateNormal
 	var activeTag *TagCallback
-	var contentBuffer = &bytes.Buffer{}
-	var buffer = &bytes.Buffer{}
+	var contentPipe io.Writer
+	var contentReader io.Reader
+	var lookAheadBuffer = make([]byte, 1)
+	var pendingBytes = &bytes.Buffer{} // Buffer to hold bytes before we write them
+	var wg sync.WaitGroup              // Wait for all callbacks to complete
+	var skipFirstNewline = false       // Flag to skip first newline after start tag
 
-	// Read entire stream into buffer first for simpler processing
-	_, err := buffer.ReadFrom(reader)
-	if err != nil {
-		return fmt.Errorf("failed to read stream: %w", err)
-	}
+	// Helper function to flush pending bytes if they form complete UTF-8 characters
+	flushPending := func(force bool) {
+		if pendingBytes.Len() == 0 {
+			return
+		}
 
-	content := buffer.String()
-	i := 0
+		data := pendingBytes.Bytes()
+		if force {
+			// Force flush everything
+			contentPipe.Write(data)
+			pendingBytes.Reset()
+			return
+		}
 
-	for i < len(content) {
-		switch currentState {
-		case stateNormal:
-			// Look for start tag pattern: <|TAGNAME_NONCE|>
-			if i+2 < len(content) && content[i:i+2] == "<|" {
-				// Try to parse a start tag
-				tagStart := i
-				tagEnd := p.findTagEnd(content, i)
-				if tagEnd > tagStart {
-					tagStr := content[tagStart : tagEnd+1]
-					tagName, nonce := p.parseStartTag(tagStr)
-					if tagName != "" && nonce != "" {
-						// Valid start tag found
-						key := fmt.Sprintf("%s_%s", tagName, nonce)
-						if callback, exists := p.callbacks[key]; exists {
-							log.Debugf("found start tag: %s with nonce: %s", tagName, nonce)
-							activeTag = callback
-							contentBuffer.Reset()
-							currentState = stateInTag
-							i = tagEnd + 1
-							continue
-						} else {
-							log.Debugf("no callback registered for tag: %s with nonce: %s", tagName, nonce)
-							// Skip the entire tag
-							i = tagEnd + 1
-							continue
-						}
-					} else {
-						// Invalid tag format, skip the entire potential tag
-						i = tagEnd + 1
-						continue
-					}
-				} else {
-					// No proper tag end found, skip just the "<|" and continue
-					i += 2
-					continue
-				}
-			}
-			// Not a tag start, just skip character
-			i++
+		// Keep last incomplete UTF-8 sequence OR last newline for block text formatting
+		// Find the last complete UTF-8 character boundary
+		keepBytes := 0
 
-		case stateInTag:
-			// Look for matching end tag: <|TAGNAME_END_NONCE|>
-			if i+2 < len(content) && content[i:i+2] == "<|" {
-				tagStart := i
-				tagEnd := p.findTagEnd(content, i)
-				if tagEnd > tagStart {
-					tagStr := content[tagStart : tagEnd+1]
-					tagName, nonce := p.parseEndTag(tagStr)
-					if tagName == activeTag.TagName && nonce == activeTag.Nonce {
-						// Found matching end tag
-						log.Debugf("found end tag: %s with nonce: %s", tagName, nonce)
+		// First, check if last byte is a newline - if so, keep it for potential removal
+		// This enables block text formatting feature
+		if len(data) > 0 && data[len(data)-1] == '\n' {
+			keepBytes = 1
+		}
 
-						// Trigger callback
-						contentReader := bytes.NewReader(contentBuffer.Bytes())
-						activeTag.Callback(contentReader)
-
-						// Reset state
-						activeTag = nil
-						contentBuffer.Reset()
-						currentState = stateNormal
-						i = tagEnd + 1
-						continue
+		// Also check for incomplete UTF-8 sequences (max 4 bytes for UTF-8)
+		for i := len(data) - 1; i >= 0 && i >= len(data)-4; i-- {
+			if utf8.RuneStart(data[i]) {
+				// Check if this starts a complete rune
+				_, size := utf8.DecodeRune(data[i:])
+				if i+size > len(data) {
+					// This rune is incomplete, keep it
+					incomplete := len(data) - i
+					if incomplete > keepBytes {
+						keepBytes = incomplete
 					}
 				}
+				break
 			}
+		}
 
-			// Not an end tag, add character to content
-			contentBuffer.WriteByte(content[i])
-			i++
+		if keepBytes >= len(data) {
+			// All bytes should be kept
+			return
+		}
+
+		// Write all complete UTF-8 characters (except potentially last newline)
+		toWrite := data[:len(data)-keepBytes]
+		if len(toWrite) > 0 {
+			contentPipe.Write(toWrite)
+			// Keep incomplete sequence and/or trailing newline
+			pendingBytes.Reset()
+			if keepBytes > 0 {
+				pendingBytes.Write(data[len(data)-keepBytes:])
+			}
 		}
 	}
 
-	// Check for unclosed tags
-	if activeTag != nil {
-		log.Warnf("stream ended with unclosed tag: %s_%s", activeTag.TagName, activeTag.Nonce)
+	// For streaming, we need to process byte by byte
+	for {
+		n, err := reader.Read(lookAheadBuffer)
+		if n > 0 {
+			ch := lookAheadBuffer[0]
+
+			switch currentState {
+			case stateNormal:
+				// Look for start tag pattern: <|
+				pendingBytes.WriteByte(ch)
+
+				// Check if we have a potential tag start
+				if pendingBytes.Len() >= 2 {
+					tail := pendingBytes.Bytes()[pendingBytes.Len()-2:]
+					if string(tail) == "<|" {
+						// We have a potential tag, need to scan until we find |>
+						tagBuffer := &bytes.Buffer{}
+						tagBuffer.WriteString("<|")
+
+						// Scan until we find |> or newline or reach reasonable limit
+						found := false
+						for i := 0; i < 200; i++ {
+							n, err := reader.Read(lookAheadBuffer)
+							if n > 0 {
+								tagBuffer.WriteByte(lookAheadBuffer[0])
+
+								// Check for end of tag
+								if tagBuffer.Len() >= 4 {
+									lastTwo := tagBuffer.Bytes()[tagBuffer.Len()-2:]
+									if string(lastTwo) == "|>" {
+										found = true
+										break
+									}
+								}
+
+								// Stop at newline (tags shouldn't span multiple lines)
+								if lookAheadBuffer[0] == '\n' {
+									break
+								}
+							}
+							if err != nil {
+								if err == io.EOF {
+									break
+								}
+								return fmt.Errorf("failed to read stream: %w", err)
+							}
+						}
+
+						if found {
+							tagStr := tagBuffer.String()
+							tagName, nonce := p.parseStartTag(tagStr)
+							if tagName != "" && nonce != "" {
+								key := fmt.Sprintf("%s_%s", tagName, nonce)
+								if callback, exists := p.callbacks[key]; exists {
+									log.Debugf("found start tag: %s with nonce: %s", tagName, nonce)
+									activeTag = callback
+									currentState = stateInTag
+
+									// Create buffered pipe for streaming content to callback
+									// This avoids blocking on Write calls
+									pr, pw := utils.NewPipe()
+									contentReader = pr
+									contentPipe = pw
+
+									// Start callback in goroutine
+									wg.Add(1)
+									go func(cb CallbackFunc, r io.Reader) {
+										defer wg.Done()
+										cb(r)
+									}(callback.Callback, contentReader)
+
+									pendingBytes.Reset()
+									skipFirstNewline = true // Skip first newline for block text formatting
+									continue
+								} else {
+									log.Debugf("no callback registered for tag: %s with nonce: %s", tagName, nonce)
+								}
+							}
+						}
+
+						// If we didn't find a valid start tag, continue scanning
+						// Reset and keep the unmatched tag content
+						pendingBytes.Reset()
+						pendingBytes.Write(tagBuffer.Bytes())
+					}
+				}
+
+			case stateInTag:
+				// We're inside a tag, need to stream content to callback
+				// But we also need to watch for end tag
+
+				// For block text formatting: skip first newline after start tag
+				if skipFirstNewline {
+					skipFirstNewline = false
+					if ch == '\n' {
+						// Skip this newline
+						continue
+					}
+					// Not a newline, process it normally
+				}
+
+				// Strategy: buffer a small amount to detect end tags
+				// If we see <|, we need to lookahead to see if it's an end tag
+
+				if ch == '<' {
+					// Potential start of end tag, peek ahead
+					// From now on, buffer content instead of writing immediately
+					// This allows us to remove trailing newline if this is indeed an end tag
+					pendingBytes.WriteByte(ch)
+
+					nextByte := make([]byte, 1)
+					n, err := reader.Read(nextByte)
+					if n > 0 {
+						pendingBytes.WriteByte(nextByte[0])
+						if nextByte[0] == '|' {
+							// We have <|, now scan for the full end tag
+							tagBuffer := &bytes.Buffer{}
+							tagBuffer.WriteString("<|")
+
+							found := false
+							for i := 0; i < 200; i++ {
+								n, err := reader.Read(lookAheadBuffer)
+								if n > 0 {
+									tagBuffer.WriteByte(lookAheadBuffer[0])
+									pendingBytes.WriteByte(lookAheadBuffer[0])
+
+									if tagBuffer.Len() >= 4 {
+										lastTwo := tagBuffer.Bytes()[tagBuffer.Len()-2:]
+										if string(lastTwo) == "|>" {
+											found = true
+											break
+										}
+									}
+
+									if lookAheadBuffer[0] == '\n' {
+										break
+									}
+								}
+								if err != nil {
+									if err == io.EOF {
+										break
+									}
+									return fmt.Errorf("failed to read stream: %w", err)
+								}
+							}
+
+							if found {
+								tagStr := tagBuffer.String()
+								tagName, nonce := p.parseEndTag(tagStr)
+								if tagName == activeTag.TagName && nonce == activeTag.Nonce {
+									// Found matching end tag!
+									log.Debugf("found end tag: %s with nonce: %s", tagName, nonce)
+
+									// Write any pending bytes (everything before the end tag)
+									// For block text formatting: remove trailing newline before end tag
+									if pendingBytes.Len() > 0 {
+										content := pendingBytes.Bytes()
+										// Remove the end tag itself from content
+										tagLen := len(tagStr)
+										if len(content) >= tagLen {
+											content = content[:len(content)-tagLen]
+											// Now check if the last byte before end tag is a newline
+											if len(content) > 0 && content[len(content)-1] == '\n' {
+												// Remove the trailing newline
+												content = content[:len(content)-1]
+											}
+										}
+										if len(content) > 0 {
+											contentPipe.Write(content)
+										}
+										pendingBytes.Reset()
+									}
+
+									// Close the pipe to signal end of content
+									if closer, ok := contentPipe.(io.Closer); ok {
+										closer.Close()
+									}
+
+									// Reset state
+									activeTag = nil
+									contentPipe = nil
+									contentReader = nil
+									currentState = stateNormal
+									continue
+								}
+							}
+
+							// Not a matching end tag, write everything as content
+							if pendingBytes.Len() > 0 {
+								contentPipe.Write(pendingBytes.Bytes())
+								pendingBytes.Reset()
+							}
+
+						} else {
+							// Not a tag start, write pending content (includes <ch>)
+							contentPipe.Write(pendingBytes.Bytes())
+							pendingBytes.Reset()
+						}
+					} else if err == io.EOF {
+						// EOF after '<', write pending content
+						contentPipe.Write(pendingBytes.Bytes())
+						pendingBytes.Reset()
+					}
+				} else {
+					// Regular character, buffer and flush on UTF-8 boundaries
+					pendingBytes.WriteByte(ch)
+					// Flush complete UTF-8 characters, keeping incomplete sequences
+					flushPending(false)
+				}
+			}
+		}
+
+		if err != nil {
+			if err == io.EOF {
+				// Handle end of stream
+				if currentState == stateInTag {
+					// Flush remaining content
+					if pendingBytes.Len() > 0 {
+						contentPipe.Write(pendingBytes.Bytes())
+					}
+					if closer, ok := contentPipe.(io.Closer); ok {
+						closer.Close()
+					}
+					log.Warnf("stream ended with unclosed tag: %s_%s", activeTag.TagName, activeTag.Nonce)
+				}
+				break
+			}
+			return fmt.Errorf("failed to read stream: %w", err)
+		}
 	}
+
+	// Wait for all callbacks to complete
+	wg.Wait()
 
 	return nil
 }

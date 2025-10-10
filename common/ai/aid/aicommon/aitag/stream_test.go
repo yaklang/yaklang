@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/utils"
+
 	"github.com/yaklang/yaklang/common/log"
 )
 
@@ -39,6 +41,51 @@ func (sr *slowReader) Read(p []byte) (n int, err error) {
 	p[0] = sr.data[sr.position]
 	sr.position++
 	return 1, nil
+}
+
+func TestPartialStreamProcessing(t *testing.T) {
+	var pr, pw = utils.NewPipe()
+	var cb = utils.NewCondBarrier()
+	b1 := cb.CreateBarrier("world")
+	b2 := cb.CreateBarrier("end")
+	go func() {
+		defer pw.Close()
+		pw.WriteString("<|CODE_0|>\n")
+		pw.WriteString("Hello")
+		cb.Wait("world")
+		pw.WriteString("World")
+		cb.Wait("end")
+		pw.WriteString("<|CODE_END_0|>\n")
+	}()
+
+	finished := false
+	_ = Parse(pr, WithCallback("CODE", "0", func(reader io.Reader) {
+		// Note: With block text formatting, the first \n after <|CODE_0|> is skipped
+		// So the content is "HelloWorld" (10 bytes)
+		var buf = make([]byte, 5)
+		io.ReadFull(reader, buf)
+		if string(buf) != "Hello" {
+			t.Fatalf("buf not match, got: %q", string(buf))
+			return
+		}
+		b1.Done()
+		buf = make([]byte, 5)
+		io.ReadFull(reader, buf)
+		if string(buf) != "World" {
+			t.Fatalf("buf not match, got: %q", string(buf))
+			return
+		}
+		b2.Done()
+		rest, _ := io.ReadAll(reader)
+		if string(rest) != "" {
+			t.Fatalf("rest not match, got: %q", string(rest))
+			return
+		}
+		finished = true
+	}))
+	if !finished {
+		t.Fatal("not finished")
+	}
 }
 
 // TestLongStreamProcessing 测试长流输入处理
