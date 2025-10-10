@@ -18,7 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (r *ReActLoop) createMirrors(taskIndex string, nonce string, streamWg *sync.WaitGroup) []func(io.Reader) {
+func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, streamWg *sync.WaitGroup) []func(io.Reader) {
 	var aiTagStreamMirror []func(io.Reader)
 	var emitter = r.GetEmitter()
 	for _, tagIns := range r.aiTagFields.Values() {
@@ -74,6 +74,138 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 	}
 	task.Finish(err)
 	return err
+}
+
+func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
+	var action *aicommon.Action
+	var emitter = r.emitter
+	transactionErr := aicommon.CallAITransaction(
+		r.config,
+		prompt,
+		r.config.CallAI,
+		func(resp *aicommon.AIResponse) error {
+			stream := resp.GetOutputStreamReader(
+				r.loopName,
+				true,
+				r.config.GetEmitter(),
+			)
+
+			stream = io.TeeReader(stream, os.Stdout)
+
+			aiTagStreamMirror := r.createAITagStreamMirrors(resp.GetTaskIndex(), nonce, streamWg)
+			if len(aiTagStreamMirror) > 0 {
+				streamWg.Add(len(aiTagStreamMirror))
+				log.Infof("there aitag detected, will mirror the stream")
+				stream = utils.CreateUTF8StreamMirror(stream, aiTagStreamMirror...)
+			}
+
+			actionNameFallback := ""
+
+			streamFields := r.streamFields.Copy()
+
+			for _, i := range r.actions.Values() {
+				for _, field := range i.StreamFields {
+					streamFields.Set(field.FieldName, field)
+				}
+			}
+			var actionErr error
+			action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
+				stream, "object", r.actions.Keys(),
+				[]jsonextractor.CallbackOption{
+					jsonextractor.WithRegisterFieldStreamHandler(
+						"type",
+						func(key string, reader io.Reader, parents []string) {
+							if len(parents) <= 0 {
+								return
+							}
+							if parents[len(parents)-1] != "next_action" {
+								return
+							}
+							raw, err := io.ReadAll(utils.JSONStringReader(reader))
+							if err != nil {
+								return
+							}
+							actionNameFallback = string(raw)
+						},
+					),
+					jsonextractor.WithRegisterMultiFieldStreamHandler(
+						streamFields.Keys(),
+						func(key string, reader io.Reader, parents []string) {
+							streamWg.Add(1)
+							doneOnce := utils.NewOnce()
+							done := func() {
+								doneOnce.Do(func() {
+									streamWg.Done()
+								})
+							}
+							defer func() {
+								done()
+							}()
+
+							reader = utils.JSONStringReader(reader)
+							fieldIns, ok := streamFields.Get(key)
+							if !ok {
+								return
+							}
+
+							pr, pw := utils.NewPipe()
+							go func(field *LoopStreamField) {
+								defer pw.Close()
+								if field.Prefix != "" {
+									pw.WriteString(field.Prefix + ": ")
+								}
+								io.Copy(pw, reader)
+							}(fieldIns)
+
+							defaultNodeId := "re-act-loop-thought"
+							if fieldIns.AINodeId != "" {
+								defaultNodeId = fieldIns.AINodeId
+							}
+
+							emitter.EmitStreamEvent(
+								defaultNodeId,
+								time.Now(),
+								pr,
+								resp.GetTaskIndex(),
+								func() { done() },
+							)
+						},
+					),
+				},
+			)
+			if actionErr != nil {
+				return utils.Wrap(actionErr, "failed to parse action")
+			}
+			if actionNameFallback != "" && action.ActionType() == "object" {
+				action.SetActionType(actionNameFallback)
+			}
+			actionName := action.Name()
+			verifier, ok := r.actions.Get(actionName)
+			if !ok {
+				return utils.Errorf("action[%s] not found", actionName)
+			}
+			if utils.IsNil(verifier) {
+				return utils.Errorf("action[%s] verifier is nil", actionName)
+			}
+			if verifier.ActionVerifier == nil {
+				return nil
+			}
+			return verifier.ActionVerifier(r, action)
+		},
+	)
+	if transactionErr != nil {
+		return nil, nil, transactionErr
+	}
+	if utils.IsNil(action) {
+		return nil, nil, utils.Error("action is nil in ReActLoop")
+	}
+
+	handler, ok := r.actions.Get(action.Name())
+	if !ok || utils.IsNil(handler) {
+		return nil, nil, utils.Errorf("action[%s] 's handler is nil in ReActLoop.actions", action.Name())
+	}
+
+	return action, handler, nil
 }
 
 func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
@@ -136,8 +268,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 		return utils.Error("emitter is nil in ReActLoop")
 	}
 
-	allActionNames := r.actions.Keys()
-	if len(allActionNames) == 0 {
+	if r.actions.Len() == 0 {
 		abort(utils.Errorf("no action names in ReActLoop"))
 		return utils.Error("no action names in ReActLoop")
 	}
@@ -172,167 +303,44 @@ LOOP:
 			return finalError
 		}
 
-		// 重置上次操作状态对这次反应的影响
-		operator = newLoopActionHandlerOperator(task)
-
-		var actionName string
-		var action *aicommon.Action
-		var actionErr error
 		streamWg := new(sync.WaitGroup)
-		transactionErr := aicommon.CallAITransaction(
-			r.config,
-			prompt,
-			r.config.CallAI,
-			func(resp *aicommon.AIResponse) error {
-				stream := resp.GetOutputStreamReader(
-					r.loopName,
-					true,
-					r.config.GetEmitter(),
-				)
-
-				stream = io.TeeReader(stream, os.Stdout)
-
-				aiTagStreamMirror := r.createMirrors(resp.GetTaskIndex(), nonce, streamWg)
-				if len(aiTagStreamMirror) > 0 {
-					streamWg.Add(len(aiTagStreamMirror))
-					log.Infof("there aitag detected, will mirror the stream")
-					stream = utils.CreateUTF8StreamMirror(stream, aiTagStreamMirror...)
-				}
-
-				actionNameFallback := ""
-
-				streamFields := r.streamFields.Copy()
-
-				for _, i := range r.actions.Values() {
-					for _, field := range i.StreamFields {
-						streamFields.Set(field.FieldName, field)
-					}
-				}
-
-				action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
-					stream, "object", allActionNames,
-					[]jsonextractor.CallbackOption{
-						jsonextractor.WithRegisterFieldStreamHandler(
-							"type",
-							func(key string, reader io.Reader, parents []string) {
-								if len(parents) <= 0 {
-									return
-								}
-								if parents[len(parents)-1] != "next_action" {
-									return
-								}
-								raw, err := io.ReadAll(utils.JSONStringReader(reader))
-								if err != nil {
-									return
-								}
-								actionNameFallback = string(raw)
-							},
-						),
-						jsonextractor.WithRegisterMultiFieldStreamHandler(
-							streamFields.Keys(),
-							func(key string, reader io.Reader, parents []string) {
-								streamWg.Add(1)
-								doneOnce := utils.NewOnce()
-								done := func() {
-									doneOnce.Do(func() {
-										streamWg.Done()
-									})
-								}
-								defer func() {
-									done()
-								}()
-
-								reader = utils.JSONStringReader(reader)
-								fieldIns, ok := streamFields.Get(key)
-								if !ok {
-									return
-								}
-
-								pr, pw := utils.NewPipe()
-								go func(field *LoopStreamField) {
-									defer pw.Close()
-									if field.Prefix != "" {
-										pw.WriteString(field.Prefix + ": ")
-									}
-									io.Copy(pw, reader)
-								}(fieldIns)
-
-								defaultNodeId := "re-act-loop-thought"
-								if fieldIns.AINodeId != "" {
-									defaultNodeId = fieldIns.AINodeId
-								}
-
-								emitter.EmitStreamEvent(
-									defaultNodeId,
-									time.Now(),
-									pr,
-									resp.GetTaskIndex(),
-									func() { done() },
-								)
-							},
-						),
-					},
-				)
-				if actionErr != nil {
-					return utils.Wrap(actionErr, "failed to parse action")
-				}
-				if actionNameFallback != "" && action.ActionType() == "object" {
-					action.SetActionType(actionNameFallback)
-				}
-				actionName = action.Name()
-
-				verifier, ok := r.actions.Get(actionName)
-				if !ok {
-					return utils.Errorf("action[%s] not found", actionName)
-				}
-				if utils.IsNil(verifier) {
-					return utils.Errorf("action[%s] verifier is nil", actionName)
-				}
-				if verifier.ActionVerifier == nil {
-					return nil
-				}
-				return verifier.ActionVerifier(r, action)
-			},
-		)
+		/* Generate AI Action */
+		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
 		streamWg.Wait()
-
 		if transactionErr != nil {
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			break LOOP
 		}
 
-		if utils.IsNil(action) {
+		if utils.IsNil(actionParams) {
 			log.Errorf("action is nil in ReActLoop")
 			break LOOP
 		}
-
-		instance, ok := r.actions.Get(actionName)
-		if !ok {
-			log.Errorf("action[%s] instance is nil in ReActLoop", actionName)
-			break LOOP
-		}
+		actionName := actionParams.Name()
 
 		// allow iteration info to be added to timeline
 		r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf(
 			"======== ReAct iteration %d ========\n"+
-				"%v", iterationCount, action.GetString("human_readable_thought"),
+				"%v", iterationCount, actionParams.GetString("human_readable_thought"),
 		))
 
-		if instance.AsyncMode {
+		if handler.AsyncMode {
 			task.SetAsyncMode(true)
 			// 异步模式不在主循环更新状态
 			// 只能在异步回调中更新状态
 			// 否则会出现状态被覆盖的问题
 			if r.onAsyncTaskTrigger != nil {
-				r.onAsyncTaskTrigger(instance, task)
+				r.onAsyncTaskTrigger(handler, task)
 			}
 			done.Do(func() {
 				log.Infof("async mode, not update task status in mainloop")
 			})
 		}
 
+		// 重置上次操作状态对这次反应的影响
+		operator = newLoopActionHandlerOperator(task)
 		// 调用 ActionHandler
-		if instance.ActionHandler == nil {
+		if handler.ActionHandler == nil {
 			// ActionHandler 必须存在
 			finalError = utils.Errorf("action[%s] has no ActionHandler", actionName)
 			return finalError
@@ -341,9 +349,9 @@ LOOP:
 		continueIter := func() {
 			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("ReAct loop finished END[%v]", iterationCount))
 		}
-		instance.ActionHandler(
+		handler.ActionHandler(
 			r,
-			action,
+			actionParams,
 			operator,
 		)
 
@@ -358,7 +366,7 @@ LOOP:
 			break LOOP
 		}
 
-		if instance.AsyncMode {
+		if handler.AsyncMode {
 			// 异步模式直接退出循环
 			finalError = nil
 			return nil
