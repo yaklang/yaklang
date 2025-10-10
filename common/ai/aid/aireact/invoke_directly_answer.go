@@ -3,7 +3,6 @@ package aireact
 import (
 	"bytes"
 	"io"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
