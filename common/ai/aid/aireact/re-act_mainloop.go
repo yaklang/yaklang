@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
-	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_default"
 	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"time"
@@ -118,7 +117,7 @@ func (r *ReAct) generateMainLoopPrompt(
 
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	mainloop, err := reactloops.CreateLoopByName(
-		loop_default.LOOP_NAME_DEFAULT,
+		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		r,
 	)
 

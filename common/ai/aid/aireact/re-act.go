@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loopinfra"
+	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
