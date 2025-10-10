@@ -25,9 +25,8 @@ func NewRagEnhanceKnowledgeManager() *aicommon.EnhanceKnowledgeManager {
 					io.Copy(io.Discard, reader)
 					return
 				}
-				e.EmitStreamEvent(
+				e.EmitTextMarkdownStreamEvent(
 					"enhance-query",
-					time.Now(),
 					reader,
 					"",
 				)

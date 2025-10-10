@@ -54,12 +54,10 @@ func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (s
 							var output bytes.Buffer
 							reader = utils.JSONStringReader(utils.UTF8Reader(reader))
 							reader = io.TeeReader(reader, &output)
-							r.config.Emitter.EmitStreamEventEx(
+							r.config.Emitter.EmitTextMarkdownStreamEvent(
 								"re-act-loop-answer-payload",
-								time.Now(),
 								reader,
 								rsp.GetTaskIndex(),
-								false,
 								func() {
 									r.EmitResultAfterStream(output.String())
 								},

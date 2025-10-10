@@ -124,6 +124,8 @@ type AiOutputEvent struct {
 	DisableMarkdown bool
 
 	Processes []*AiProcess `gorm:"many2many:ai_processes_and_events;"`
+
+	ContentType string
 }
 
 func (e *AiOutputEvent) ShouldSave() bool {
@@ -285,5 +287,6 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		SyncID:          e.SyncID,
 		EventUUID:       e.EventUUID,
 		NodeIdVerbose:   NodeIdToI18n(e.NodeId, e.IsStream).I18nToYPB_I18n(),
+		ContentType:     e.ContentType,
 	}
 }
