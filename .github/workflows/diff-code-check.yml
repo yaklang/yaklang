@@ -27,149 +27,121 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: write
-      checks: write
+      issues: write  # TODO: Test removal - may be redundant with pull-requests: write
       actions: read
     steps:
-      - name: Debug trigger conditions
-        run: |
-          echo "=== Debug Information ==="
-          echo "Event name: ${{ github.event_name }}"
-          echo "Repository: ${{ github.repository }}"
-          echo "Ref: ${{ github.ref }}"
-          echo "Head ref: ${{ github.head_ref }}"
-          echo "Base ref: ${{ github.base_ref }}"
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "Workflow run conclusion: ${{ github.event.workflow_run.conclusion }}"
-            echo "Workflow run head sha: ${{ github.event.workflow_run.head_sha }}"
-            echo "Workflow run pull requests: ${{ github.event.workflow_run.pull_requests }}"
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "Pull request number: ${{ github.event.pull_request.number }}"
-            echo "Pull request head sha: ${{ github.event.pull_request.head.sha }}"
-            echo "Pull request base sha: ${{ github.event.pull_request.base.sha }}"
-          fi
-          echo "========================="
-
-      - name: Init HEAD_SHA
+      - name: Initialize workflow context
+        id: init
         run: | 
           if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            echo "HEAD_SHA=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_ENV
-          elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "HEAD_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_ENV
-          else
-            echo "Unsupported event: ${{ github.event_name }}"
-            exit 1
-          fi
-          echo "Current head sha is: ${{ env.HEAD_SHA }}"
-
-      - name: Init PR_NUMBER
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_run" ]; then
-            # 检查是否有 pull_requests 数据
+            HEAD_SHA="${{ github.event.workflow_run.head_sha }}"
             if [ "${{ github.event.workflow_run.pull_requests }}" != "[]" ] && [ "${{ github.event.workflow_run.pull_requests }}" != "null" ]; then
-              echo "PR_NUMBER=${{ github.event.workflow_run.pull_requests[0].number }}" >> $GITHUB_ENV
+              PR_NUMBER="${{ github.event.workflow_run.pull_requests[0].number }}"
             else
-              echo "PR_NUMBER=0" >> $GITHUB_ENV
-              echo "Warning: No pull requests found in workflow_run event"
+              PR_NUMBER="0"
             fi
           elif [ "${{ github.event_name }}" == "pull_request" ]; then
-            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+            PR_NUMBER="${{ github.event.pull_request.number }}"
           else
-            echo "PR_NUMBER=0" >> $GITHUB_ENV
+            echo "::error::Unsupported event type: ${{ github.event_name }}"
+            exit 1
           fi
-          echo "Current PR number is: ${{ env.PR_NUMBER }}"
-
-      - name: Validate PR State and SHA
-        id: validate_pr
-        run: |
-          echo "=== PR State and SHA Validation ==="
           
-          # 检查 PR 状态
-          if [ "${{ env.PR_NUMBER }}" != "0" ] && [ "${{ env.PR_NUMBER }}" != "" ]; then
-            echo "Checking PR state for PR #${{ env.PR_NUMBER }}..."
-            
-            # 获取 PR 信息
+          echo "HEAD_SHA=$HEAD_SHA" >> $GITHUB_ENV
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
+
+      - name: Set Cache Key
+        id: cache_key
+        run: |
+          CACHE_SHA="${{ env.HEAD_SHA }}"
+          echo "sha=$CACHE_SHA" >> $GITHUB_OUTPUT
+          echo "Cache key will be: go-$CACHE_SHA"
+
+      - name: Security validation and PR checks
+        id: validate
+        run: |
+          if [ "${{ env.PR_NUMBER }}" == "0" ] || [ "${{ env.PR_NUMBER }}" == "" ]; then
+            echo "should_skip=false" >> $GITHUB_OUTPUT
+            echo "skip_reason=none" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
             PR_RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}")
             
+            HEAD_REPO=$(echo "$PR_RESPONSE" | jq -r '.head.repo.full_name // "unknown"')
+            BASE_REPO=$(echo "$PR_RESPONSE" | jq -r '.base.repo.full_name // "unknown"')
             PR_STATE=$(echo "$PR_RESPONSE" | jq -r '.state // "unknown"')
             PR_HEAD_SHA=$(echo "$PR_RESPONSE" | jq -r '.head.sha // "unknown"')
-            PR_UPDATED_AT=$(echo "$PR_RESPONSE" | jq -r '.updated_at // "unknown"')
-            
-            echo "PR State: $PR_STATE"
-            echo "PR Head SHA: $PR_HEAD_SHA"
-            echo "PR Updated At: $PR_UPDATED_AT"
-            echo "Current HEAD_SHA: ${{ env.HEAD_SHA }}"
-            
-            # 检查 PR 是否开放
+          
+          if [ "$HEAD_REPO" != "$BASE_REPO" ] && [ "$HEAD_REPO" != "unknown" ] && [ "$BASE_REPO" != "unknown" ]; then
+            echo "::error::🚫 SECURITY BLOCK: Fork PR detected (Base: $BASE_REPO, Head: $HEAD_REPO)"
+            echo "::error::This workflow only runs for PRs from the same repository."
+            exit 1
+          fi
+          
             if [ "$PR_STATE" != "open" ]; then
-              echo "PR is not open (state: $PR_STATE). Skipping workflow."
               echo "should_skip=true" >> $GITHUB_OUTPUT
               echo "skip_reason=pr_not_open" >> $GITHUB_OUTPUT
               exit 0
             fi
             
-            # 检查 SHA 是否匹配（确保处理的是最新的提交）
             if [ "$PR_HEAD_SHA" != "${{ env.HEAD_SHA }}" ]; then
-              echo "SHA mismatch. PR head SHA ($PR_HEAD_SHA) != Current HEAD_SHA (${{ env.HEAD_SHA }})."
-              echo "This workflow is processing an outdated commit. Skipping to avoid conflicts."
               echo "should_skip=true" >> $GITHUB_OUTPUT
               echo "skip_reason=sha_mismatch" >> $GITHUB_OUTPUT
               exit 0
             fi
             
-            echo "PR validation passed. Continuing workflow."
             echo "should_skip=false" >> $GITHUB_OUTPUT
             echo "skip_reason=none" >> $GITHUB_OUTPUT
-          else
-            echo "No PR number available. Skipping PR validation."
-            echo "should_skip=false" >> $GITHUB_OUTPUT
-            echo "skip_reason=none" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "================================"
 
-      - name: Skip Workflow (PR State or SHA Validation Failed)
-        if: steps.validate_pr.outputs.should_skip == 'true'
+      - name: Skip Workflow (Validation Failed)
+        if: steps.validate.outputs.should_skip == 'true'
         run: |
-          echo "=== Workflow Skipped ==="
-          echo "Skip reason: ${{ steps.validate_pr.outputs.skip_reason }}"
-          if [ "${{ steps.validate_pr.outputs.skip_reason }}" == "pr_not_open" ]; then
-            echo "ℹ️ PR is not open, skipping security scan and comments"
-          elif [ "${{ steps.validate_pr.outputs.skip_reason }}" == "sha_mismatch" ]; then
-            echo "ℹ️ SHA mismatch detected, this workflow is processing an outdated commit"
-            echo "ℹ️ A newer workflow should be running for the latest commit"
-          fi
-          echo "========================="
+          echo "Skipped: ${{ steps.validate.outputs.skip_reason }}"
 
-      - name: Cache YakLang Project
-        if: steps.validate_pr.outputs.should_skip != 'true'
+      - name: Restore cached YakLang project
+        if: steps.validate.outputs.should_skip != 'true'
         uses: actions/cache@v3
         id: cache-project
         with:
           path: |
             ~/yakit-projects
-            ${{ github.workspace }}
-          key: go-${{ env.HEAD_SHA }}
+            ~/go/pkg/mod
+          key: go-${{ steps.cache_key.outputs.sha }}
+          restore-keys: |
+            go-
+
+      - name: Clean problematic directories
+        if: steps.validate.outputs.should_skip != 'true'
+        run: |
+          if [ -d "vendor" ]; then
+            sudo chmod -R +w vendor/ 2>/dev/null || true
+            sudo rm -rf vendor/ || rm -rf vendor/ || true
+          fi
+          if [ -d ".git/modules" ]; then
+            sudo chmod -R +w .git/modules/ 2>/dev/null || true
+          fi
 
       - name: Check out code into the Go module directory
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
           ref: ${{ env.HEAD_SHA }}
           fetch-depth: 0
+          clean: false
 
       - name: Fetch Main And Reset Main
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         run: |
           git fetch --all
           git checkout main
           git reset --hard origin/main
-          git checkout ${{ env.HEAD_SHA }}
 
       - name: Set up Go 1.x
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/setup-go@v5
         with:
           go-version-file: "./go.mod"
@@ -181,16 +153,23 @@ jobs:
       #          chmod +x ./yak_linux_amd64
 
       - name: Init Module
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         run: |
           go mod tidy && go work vendor
-          ls -la $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
-          chmod +r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
-          cp -r $(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap ./vendor/github.com/yaklang/pcap/
-          tree ./vendor
+          
+          LIBPCAP_PATH=$(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
+          
+          if [ -d "$LIBPCAP_PATH" ]; then
+            chmod -R +r "$LIBPCAP_PATH" 2>/dev/null || true
+            mkdir -p ./vendor/github.com/yaklang/pcap/
+            cp -r "$LIBPCAP_PATH" ./vendor/github.com/yaklang/pcap/
+            chmod -R +w ./vendor/github.com/yaklang/pcap/libpcap 2>/dev/null || true
+          fi
+          
+          tree ./vendor || ls -la ./vendor
 
       - name: Init Project
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         env: 
           SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
         run: |
@@ -198,199 +177,108 @@ jobs:
           ./yak --help
 
       - name: Generate Prog
-        if: steps.validate_pr.outputs.should_skip != 'true'
+        if: steps.validate.outputs.should_skip != 'true'
         run: |
-          pwd && ls -al
+          git checkout ${{ env.HEAD_SHA }}
           ./yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
           MERGE_BASE=$(git merge-base main ${{ env.HEAD_SHA }})
-          echo "Merge base is: $MERGE_BASE"
-          echo "Head base is: ${{ env.HEAD_SHA }}"
           ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip 
 
       - name: Upload fs.zip
-        if: steps.validate_pr.outputs.should_skip != 'true'
+        if: steps.validate.outputs.should_skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: fs.zip
           path: fs.zip
 
       - name: Check With SyntaxFlow
-        if: steps.validate_pr.outputs.should_skip != 'true'
+        if: steps.validate.outputs.should_skip != 'true'
         id: scan
         run: |
           ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go
           NUM=$(cat risk.json | jq .RiskNums)
-          echo "Find risk num is: $NUM"
           echo "risk_count=$NUM" >> $GITHUB_OUTPUT
           if [ $NUM == 0 ]; then
-            echo "success" 
             echo "scan_result=success" >> $GITHUB_OUTPUT
           else
-            echo "fail"
             echo "scan_result=failure" >> $GITHUB_OUTPUT
           fi
         # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
 
-      - name: Set up Python for commenting
-        if: steps.validate_pr.outputs.should_skip != 'true'
+      - name: Setup Python environment
+        if: steps.validate.outputs.should_skip != 'true'
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-
-      - name: Cache Python dependencies
-        if: steps.validate_pr.outputs.should_skip != 'true'
-        uses: actions/cache@v3
-        id: cache-python-deps
-        with:
-          path: |
-            ~/.cache/pip
-            ~/.local/lib/python3.9/site-packages
-          key: python-deps-${{ runner.os }}-3.9-${{ hashFiles('**/requirements.txt', '**/setup.py', '**/pyproject.toml') }}
+          cache: 'pip'
 
       - name: Install Python dependencies
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.cache-python-deps.outputs.cache-hit != 'true'
+        if: steps.validate.outputs.should_skip != 'true'
         run: |
-          python -m pip install --upgrade pip
-          pip install pyyaml requests
+          pip install --quiet --upgrade pip
+          pip install --quiet pyyaml requests
 
-      - name: Set GitHub Token
-        if: steps.validate_pr.outputs.should_skip != 'true'
-        id: set_token
-        run: |
-          echo "Using GITHUB_TOKEN"
-          echo "token=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_OUTPUT
-          echo "token_type=default" >> $GITHUB_OUTPUT
-          echo "Event type: ${{ github.event_name }}"
-
-      # - name: Call Security Scan and Comment (GitHub App)
-      #   if: steps.scan.outputs.scan_result == 'failure'
-      #   uses: ./.github/workflows/security-scan-comment.yml
-      #   with:
-      #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ env.PR_NUMBER }}
-      #   secrets:
-      #     GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-      #     GITHUB_APP_PRIVATE_KEY: ${{ secrets.GITHUB_APP_PRIVATE_KEY }}
-
-      # - name: Call Security Comment (Community Action)
-      #   if: steps.scan.outputs.scan_result == 'failure'
-      #   uses: ./.github/workflows/security-comment-community.yml
-      #   with:
-      #     head_sha: ${{ env.HEAD_SHA }}
-      #     pr_number: ${{ env.PR_NUMBER }}
-      #   secrets:
-      #     GITHUB_TOKEN: ${{ steps.set_token.outputs.token }}
-
-      - name: Test Token Permissions
-        if: steps.validate_pr.outputs.should_skip != 'true'
+      - name: Verify GitHub token permissions
+        if: steps.validate.outputs.should_skip != 'true' && env.PR_NUMBER != '0'
         id: test_token
         run: |
-          echo "Testing token permissions..."
-          # 测试仓库访问权限而不是用户权限
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }})
-          echo "Repository API HTTP Status: $response"
+            "https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}")
           
-          # 测试 PR 访问权限
-          pr_response=$(curl -s -o /dev/null -w "%{http_code}" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }})
-          echo "PR API HTTP Status: $pr_response"
-          
-          if [ "$response" = "200" ] && [ "$pr_response" = "200" ]; then
+          if [ "$HTTP_CODE" = "200" ]; then
             echo "has_permissions=true" >> $GITHUB_OUTPUT
-            echo "Token has sufficient permissions for repository and PR access"
           else
             echo "has_permissions=false" >> $GITHUB_OUTPUT
-            echo "Token lacks sufficient permissions (Repo: $response, PR: $pr_response)"
           fi
 
-      - name: Debug File Paths
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
-        run: |
-          echo "=== Debug File Paths ==="
-          echo "Current working directory: $(pwd)"
-          echo "GitHub workspace: ${{ github.workspace }}"
-          echo "Risk JSON path: ./risk.json"
-          echo "Config path: ${{ github.workspace }}/.github/github-commenter.yml"
-          echo "Checking if files exist:"
-          ls -la ./risk.json || echo "risk.json not found"
-          ls -la ${{ github.workspace }}/.github/github-commenter.yml || echo "config file not found"
-          echo "========================="
-
       - name: Skip Security Comment (Insufficient Permissions)
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'false'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'false'
         run: |
-          echo "⚠️ Skipping security comment due to insufficient token permissions"
-          echo "Consider configuring GitHub App secrets for better permissions in workflow_run events"
+          echo "::warning::Insufficient token permissions, skipping security comments"
       
       - name: Generate security report
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: |
-          echo "=== Generating Security Report ==="
-          
-          # 清理之前的结果
           rm -rf results
           
-          # 检查必要文件是否存在
           if [ ! -f "./risk.json" ]; then
-            echo "❌ Risk file not found: ./risk.json"
+            echo "::error::Risk file not found: ./risk.json"
             exit 1
           fi
           
           if [ ! -f "./scripts/ssa-risk-tools/extract-risks-deserializer.awk" ]; then
-            echo "❌ AWK script not found: ./scripts/ssa-risk-tools/extract-risks-deserializer.awk"
+            echo "::error::AWK script not found: ./scripts/ssa-risk-tools/extract-risks-deserializer.awk"
             exit 1
           fi
           
-          # 生成报告
-          echo "📊 Processing risk data with enhanced AWK script..."
           awk -f scripts/ssa-risk-tools/extract-risks-deserializer.awk ./risk.json
           
-          # 检查生成的结果
           if [ -d "results" ]; then
-            echo "✅ Report generated successfully in results/ directory"
-            echo "📁 Generated files:"
-            ls -la results/
-            
-            # 统计高风险和关键风险数量
             HIGH_CRITICAL_COUNT=0
             if [ -f "results/scan_summary.txt" ]; then
-              echo "📊 Analyzing risk details files..."
-              # 检查是否存在风险详情文件
               if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
-                echo "📁 Found risk detail files, counting high/critical risks..."
-                # 统计高风险和关键风险数量，确保返回纯数字
                 COUNT_RESULT=$(grep -c "严重程度: high\|严重程度: critical" results/risk_details_*.txt 2>/dev/null || echo "0")
-                echo "🔍 Raw count result: '$COUNT_RESULT'"
-                # 确保结果是纯数字，如果不是则设为0
                 if [[ "$COUNT_RESULT" =~ ^[0-9]+$ ]]; then
                   HIGH_CRITICAL_COUNT=$COUNT_RESULT
-                  echo "✅ Valid count: $HIGH_CRITICAL_COUNT"
                 else
                   HIGH_CRITICAL_COUNT=0
-                  echo "⚠️ Invalid count format, setting to 0"
                 fi
               else
-                # 没有风险详情文件，说明没有风险
                 HIGH_CRITICAL_COUNT=0
-                echo "ℹ️ No risk detail files found, count set to 0"
               fi
             else
-              echo "ℹ️ No scan summary file found, count set to 0"
+              HIGH_CRITICAL_COUNT=0
             fi
-            echo "📈 Final HIGH_CRITICAL_COUNT: $HIGH_CRITICAL_COUNT"
             echo "HIGH_CRITICAL_COUNT=$HIGH_CRITICAL_COUNT" >> $GITHUB_OUTPUT
           else
-            echo "❌ Failed to generate results directory"
+            echo "::error::Failed to generate results directory"
             exit 1
           fi
 
       - name: Clean up old security comments (No vulnerabilities found)
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -440,7 +328,7 @@ jobs:
             }
 
       - name: Comment PR with security findings
-        if: steps.validate_pr.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -712,21 +600,29 @@ jobs:
             }
 
       - name: Upload risk log
-        if: steps.validate_pr.outputs.should_skip != 'true' && failure()
+        if: steps.validate.outputs.should_skip != 'true' && failure()
         uses: actions/upload-artifact@v4
         with:
           name: risk.json
           path: risk.json
 
       - name: Workflows fail info
-        if: steps.validate_pr.outputs.should_skip != 'true' && failure()
+        if: steps.validate.outputs.should_skip != 'true' && failure()
         run: |
           ./yak ssa-risk --input ./risk.json --with-code --severity high
 
       - name: Workflows fail info - full
-        if: steps.validate_pr.outputs.should_skip != 'true' && failure()
+        if: steps.validate.outputs.should_skip != 'true' && failure()
         run: |
           ./yak ssa-risk --input ./risk.json --with-code 
+      
+      - name: Cleanup workspace after workflow
+        if: always()
+        run: |
+          if [ -d "vendor" ]; then
+            sudo chmod -R +w vendor/ 2>/dev/null || chmod -R +w vendor/ || true
+            rm -rf vendor/ || true
+          fi 
         # cat risk.json | jq -r '
         #   "=== Scan Report Summary ===",
         #   "Scan Time: \(.report_time)",
