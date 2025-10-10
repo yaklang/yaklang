@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 	"unicode"
 	"unicode/utf8"
 
@@ -79,6 +80,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 	var pendingBytes = &bytes.Buffer{} // Buffer to hold bytes before we write them
 	var wg sync.WaitGroup              // Wait for all callbacks to complete
 	var skipFirstNewline = false       // Flag to skip first newline after start tag
+	var lastFlushTime = time.Now()     // Track last flush time for timeout-based flushing
 
 	// Helper function to flush pending bytes if they form complete UTF-8 characters
 	flushPending := func(force bool) {
@@ -98,9 +100,14 @@ func (p *Parser) parseStream(reader io.Reader) error {
 		// Find the last complete UTF-8 character boundary
 		keepBytes := 0
 
+		// Check if we should flush due to timeout (for better streaming performance)
+		timeSinceLastFlush := time.Since(lastFlushTime)
+		shouldFlushDueToTimeout := timeSinceLastFlush > 200*time.Millisecond
+
 		// First, check if last byte is a newline - if so, keep it for potential removal
-		// This enables block text formatting feature
-		if len(data) > 0 && data[len(data)-1] == '\n' {
+		// But only if we haven't exceeded the timeout threshold
+		// This enables block text formatting while maintaining streaming performance
+		if len(data) > 0 && data[len(data)-1] == '\n' && !shouldFlushDueToTimeout {
 			keepBytes = 1
 		}
 
@@ -129,6 +136,7 @@ func (p *Parser) parseStream(reader io.Reader) error {
 		toWrite := data[:len(data)-keepBytes]
 		if len(toWrite) > 0 {
 			contentPipe.Write(toWrite)
+			lastFlushTime = time.Now() // Update flush time
 			// Keep incomplete sequence and/or trailing newline
 			pendingBytes.Reset()
 			if keepBytes > 0 {
