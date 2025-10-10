@@ -35,9 +35,8 @@ func (r *ReAct) DirectlyAnswer(query string, tools []*aitool.Tool) (string, erro
 							var out bytes.Buffer
 							reader = utils.JSONStringReader(reader)
 							reader = io.TeeReader(reader, &out)
-							r.Emitter.EmitStreamEvent(
+							r.Emitter.EmitTextMarkdownStreamEvent(
 								"re-act-loop-answer-payload",
-								time.Now(),
 								reader,
 								rsp.GetTaskIndex(),
 								func() {

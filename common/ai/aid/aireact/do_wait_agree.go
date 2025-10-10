@@ -98,9 +98,8 @@ func (r *ReActConfig) DoWaitAgree(ctx context.Context, endpoint *aicommon.Endpoi
 						}, []jsonextractor.CallbackOption{
 							jsonextractor.WithRegisterFieldStreamHandler("reason", func(key string, reader io.Reader, parents []string) {
 								reader = utils.JSONStringReader(utils.UTF8Reader(reader))
-								r.Emitter.EmitStreamEvent(
+								r.Emitter.EmitTextMarkdownStreamEvent(
 									"review",
-									time.Now(),
 									reader,
 									rsp.GetTaskIndex(),
 								)

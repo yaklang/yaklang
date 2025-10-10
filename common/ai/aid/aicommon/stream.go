@@ -17,19 +17,22 @@ type streamEvent struct {
 	nodeId             string
 	taskIndex          string
 	disableMarkdown    bool
+	contentType        string
 	emitFinishCallback []func()
 }
 
 func newStreamAIOutputEventWriter(
 	id string,
-	nodeId string,
-	disableMarkdown bool,
-	system, reason bool,
 	emit BaseEmitter,
 	timeStamp int64,
 	eventWriterID string,
-	taskIndex string,
+	event *streamEvent,
 ) *streamAIOutputEventWriter {
+	nodeId := event.nodeId
+	system := event.isSystem
+	reason := event.isReason
+	disableMarkdown := event.disableMarkdown
+	taskIndex := event.taskIndex
 	return &streamAIOutputEventWriter{
 		coordinatorId:   id,
 		nodeId:          nodeId,
@@ -49,6 +52,7 @@ type streamAIOutputEventWriter struct {
 	disableMarkdown bool
 	coordinatorId   string
 	nodeId          string
+	contentType     string
 	taskIndex       string
 	handler         BaseEmitter
 	timeStamp       int64
@@ -77,6 +81,7 @@ func (e *streamAIOutputEventWriter) Write(b []byte) (int, error) {
 		EventUUID:       e.eventWriterID,
 		TaskIndex:       e.taskIndex,
 		DisableMarkdown: e.disableMarkdown,
+		ContentType:     e.contentType,
 	}
 	e.handler(event)
 	return len(b), nil

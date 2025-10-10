@@ -55,9 +55,8 @@ func (r *ReAct) invokeBlueprintReviewChangeBlueprint(
 						func(key string, reasonReader io.Reader, parents []string) {
 							var reasonBuf bytes.Buffer
 							var reason = io.TeeReader(reasonReader, &reasonBuf)
-							r.Emitter.EmitStreamEvent(
+							r.Emitter.EmitTextMarkdownStreamEvent(
 								"change-blueprint-reasoning",
-								time.Now(),
 								reason,
 								r.GetCurrentTask().GetId(),
 								func() {
