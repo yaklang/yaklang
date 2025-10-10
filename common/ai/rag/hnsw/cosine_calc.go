@@ -68,3 +68,11 @@ func CosineDistance(af, bf Vector) float64 {
 	}
 	return 1.0 - similarity
 }
+
+func Norm(vec []float32) float32 {
+	var sumOfSquares float32
+	for _, val := range vec {
+		sumOfSquares += val * val
+	}
+	return float32(math.Sqrt(float64(sumOfSquares)))
+}

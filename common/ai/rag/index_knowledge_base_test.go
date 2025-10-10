@@ -97,7 +97,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBase(t *testing.T) {
 	// 7. 测试搜索功能
 	// 创建真实的RAG系统来进行测试
 	mockEmbedder := NewMockEmbedder(testEmbedder)
-	store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, mockEmbedder)
+	store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, WithEmbeddingClient(mockEmbedder))
 	assert.NoError(t, err)
 	defer store.Remove()
 
@@ -204,7 +204,7 @@ func TestMUSTPASS_BuildVectorIndexEmptyKnowledgeBase(t *testing.T) {
 	ragCollectionName := savedKnowledgeBase.KnowledgeBaseName
 	if CollectionIsExists(db, ragCollectionName) {
 		mockEmbedder := NewMockEmbedder(testEmbedder)
-		store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, mockEmbedder)
+		store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, WithEmbeddingClient(mockEmbedder))
 		assert.NoError(t, err)
 		defer store.Remove()
 
@@ -307,7 +307,7 @@ func TestMUSTPASS_BuildVectorIndexForKnowledgeBaseEntry(t *testing.T) {
 	// 7. 测试搜索功能
 	// 创建RAG系统来进行测试
 	mockEmbedder := NewMockEmbedder(testEmbedder)
-	store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, mockEmbedder)
+	store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, WithEmbeddingClient(mockEmbedder))
 	assert.NoError(t, err)
 	defer store.Remove()
 
@@ -507,7 +507,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 
 	// 7. 创建RAG系统来进行测试
 	mockEmbedder := NewMockEmbedder(test1024Embedder)
-	store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, mockEmbedder)
+	store, err := LoadSQLiteVectorStoreHNSW(db, ragCollectionName, WithEmbeddingClient(mockEmbedder))
 	assert.NoError(t, err)
 	defer store.Remove()
 
@@ -603,7 +603,7 @@ func TestMUSTPASS_DeleteEmbeddingData(t *testing.T) {
 		assert.Len(t, doc.Embedding, 1024, "修复embedding数据后embedding字段应该为1024维")
 	}
 	// 16. 验证查询
-	store, err = LoadSQLiteVectorStoreHNSW(db, ragCollectionName, mockEmbedder)
+	store, err = LoadSQLiteVectorStoreHNSW(db, ragCollectionName, WithEmbeddingClient(mockEmbedder))
 	assert.NoError(t, err)
 	defer store.Remove()
 

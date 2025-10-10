@@ -26,7 +26,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 
 	// 自动迁移表结构
-	err = db.AutoMigrate(&schema.ERModelEntity{}, &schema.ERModelRelationship{}).Error
+	err = db.AutoMigrate(&schema.EntityRepository{},&schema.ERModelEntity{}, &schema.ERModelRelationship{}, &schema.VectorStoreCollection{},&schema.VectorStoreDocument{}).Error
 	require.NoError(t, err, "Failed to auto migrate tables")
 
 	// 设置数据库连接池和超时
