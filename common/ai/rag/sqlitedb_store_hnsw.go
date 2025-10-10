@@ -323,11 +323,9 @@ func NewSQLiteVectorStoreHNSWEx(db *gorm.DB, name string, description string, op
 
 // NewSQLiteVectorStore 创建一个新的 SQLite 向量存储
 func NewSQLiteVectorStoreHNSW(name string, description string, modelName string, dimension int, embedder EmbeddingClient, db *gorm.DB, options ...any) (*SQLiteVectorStoreHNSW, error) {
-	options = append(options, WithModelName(name))
+	options = append(options, WithModelName(modelName))
 	options = append(options, WithModelDimension(dimension))
-	if embedder != nil {
-		options = append(options, WithEmbeddingClient(embedder))
-	}
+	options = append(options, WithEmbeddingClient(embedder))
 	return NewSQLiteVectorStoreHNSWEx(db, name, description, options...)
 }
 
