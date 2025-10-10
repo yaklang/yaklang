@@ -22,6 +22,11 @@ const (
 )
 
 const (
+	AI_REACT_LOOP_NAME_DEFAULT       = "default"
+	AI_REACT_LOOP_NAME_WRITE_YAKLANG = "write_yaklang_code"
+)
+
+const (
 	EVENT_TYPE_STREAM              EventType = "stream"
 	EVENT_TYPE_STRUCTURED          EventType = "structured"
 	EVENT_TYPE_AI_REVIEW_START     EventType = "ai_review_start"

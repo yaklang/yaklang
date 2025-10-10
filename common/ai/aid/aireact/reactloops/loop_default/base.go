@@ -5,10 +5,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
-)
-
-const (
-	LOOP_NAME_DEFAULT = "default"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 //go:embed prompts/instruction.txt
@@ -19,10 +16,10 @@ var outputExample string
 
 func init() {
 	err := reactloops.RegisterLoopFactory(
-		LOOP_NAME_DEFAULT,
+		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		func(r aicommon.AIInvokeRuntime) (*reactloops.ReActLoop, error) {
 			loop, err := reactloops.NewReActLoop(
-				LOOP_NAME_DEFAULT,
+				schema.AI_REACT_LOOP_NAME_DEFAULT,
 				r,
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
@@ -32,6 +29,7 @@ func init() {
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
+				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG),
 			)
 			return loop, err
 		},
