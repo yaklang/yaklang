@@ -3,12 +3,12 @@ package aireact
 import (
 	"bytes"
 	"context"
+	"io"
+
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
-	"time"
 )
 
 func (r *ReAct) EnhanceKnowledgeAnswer(ctx context.Context, userQuery string) (string, error) {
