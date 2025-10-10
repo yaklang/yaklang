@@ -79,6 +79,8 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, nonce string) (*aicommon.Action, *LoopAction, error) {
 	var action *aicommon.Action
 	var emitter = r.emitter
+	var actionNames = r.GetAllActionNames()
+
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
@@ -103,14 +105,14 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 
 			streamFields := r.streamFields.Copy()
 
-			for _, i := range r.actions.Values() {
+			for _, i := range r.GetAllActions() {
 				for _, field := range i.StreamFields {
 					streamFields.Set(field.FieldName, field)
 				}
 			}
 			var actionErr error
 			action, actionErr = aicommon.ExtractActionFromStreamWithJSONExtractOptions(
-				stream, "object", r.actions.Keys(),
+				stream, "object", actionNames,
 				[]jsonextractor.CallbackOption{
 					jsonextractor.WithRegisterFieldStreamHandler(
 						"type",
@@ -180,9 +182,9 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				action.SetActionType(actionNameFallback)
 			}
 			actionName := action.Name()
-			verifier, ok := r.actions.Get(actionName)
-			if !ok {
-				return utils.Errorf("action[%s] not found", actionName)
+			verifier, err := r.GetActionHandler(actionName)
+			if err != nil {
+				return utils.Wrapf(err, "action[%s] GetActionHandler failed", actionName)
 			}
 			if utils.IsNil(verifier) {
 				return utils.Errorf("action[%s] verifier is nil", actionName)
@@ -200,8 +202,11 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
 
-	handler, ok := r.actions.Get(action.Name())
-	if !ok || utils.IsNil(handler) {
+	handler, err := r.GetActionHandler(action.Name())
+	if err != nil {
+		return nil, nil, utils.Wrap(err, "GetActionHandler failed")
+	}
+	if utils.IsNil(handler) {
 		return nil, nil, utils.Errorf("action[%s] 's handler is nil in ReActLoop.actions", action.Name())
 	}
 
@@ -268,7 +273,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 		return utils.Error("emitter is nil in ReActLoop")
 	}
 
-	if r.actions.Len() == 0 {
+	if r.NoActions() {
 		abort(utils.Errorf("no action names in ReActLoop"))
 		return utils.Error("no action names in ReActLoop")
 	}
@@ -361,8 +366,10 @@ LOOP:
 				finalError = err
 				return finalError
 			}
-			continueIter()
-			// 正常退出
+			if !operator.isSilence {
+				// 正常退出
+				continueIter()
+			}
 			break LOOP
 		}
 

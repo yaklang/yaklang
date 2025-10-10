@@ -17,6 +17,7 @@ type LoopActionHandlerOperator struct {
 	isContinued  bool
 	isTerminated bool
 	failedError  error
+	isSilence    bool
 
 	task aicommon.AIStatefulTask
 }
@@ -78,4 +79,12 @@ func (l *LoopActionHandlerOperator) GetFeedback() *bytes.Buffer {
 
 func (l *LoopActionHandlerOperator) GetDisallowLoopExit() bool {
 	return l.disallowLoopExit
+}
+
+func (l *LoopActionHandlerOperator) MarkSilence(i ...bool) {
+	if len(i) <= 0 {
+		l.isSilence = true
+		return
+	}
+	l.isSilence = i[0]
 }

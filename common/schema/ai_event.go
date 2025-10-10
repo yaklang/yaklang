@@ -89,6 +89,9 @@ const (
 
 	EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY EventType = "filesystem_pin_directory" // pin_directory means pin a directory in the filesystem
 	EVENT_TYPE_FILESYSTEM_PIN_FILENAME  EventType = "filesystem_pin_filename"  // pin_filename means pin a filename in the filesystem
+
+	EVENT_TYPE_FOCUS_ON_LOOP   = "focus_on"
+	EVENT_TYPE_LOSE_FOCUS_LOOP = "lose_focus"
 )
 
 type AiOutputEvent struct {
