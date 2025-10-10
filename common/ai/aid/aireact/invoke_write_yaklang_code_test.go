@@ -59,8 +59,6 @@ println("a")
 }
 
 func TestReAct_WriteYaklangCode(t *testing.T) {
-	t.Skip()
-
 	flag := ksuid.New().String()
 	_ = flag
 	in := make(chan *ypb.AIInputEvent, 10)

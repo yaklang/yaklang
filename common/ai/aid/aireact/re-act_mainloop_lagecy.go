@@ -1,5 +1,40 @@
 package aireact
 
+/*
+这里是一个旧代码保存器，旧的代码已经被注释掉了，会被随时删除
+*/
+
+//// generateMainLoopPrompt generates the prompt for the main ReAct loop
+//func (r *ReAct) generateMainLoopPrompt(
+//	userQuery string,
+//	tools []*aitool.Tool,
+//	disablePlanAndExec bool,
+//) string {
+//	// Generate prompt for main loop
+//	var enableUserInteractive = r.config.enableUserInteract
+//	if enableUserInteractive && (r.currentUserInteractiveCount >= r.config.userInteractiveLimitedTimes) {
+//		enableUserInteractive = false
+//	}
+//
+//	// Use the prompt manager to generate the prompt
+//	prompt, err := r.promptManager.GenerateLoopPrompt(
+//		userQuery,
+//		enableUserInteractive,
+//		r.config.enablePlanAndExec && !disablePlanAndExec,
+//		r.config.enhanceKnowledgeManager != nil && !r.config.disableEnhanceDirectlyAnswer,
+//		true,
+//		r.currentUserInteractiveCount,
+//		r.config.userInteractiveLimitedTimes,
+//		tools,
+//	)
+//	if err != nil {
+//		// Fallback to basic prompt if template fails
+//		log.Errorf("Failed to generate loop prompt from template: %v", err)
+//		return fmt.Sprintf("User Query: %s\nPlease respond with a JSON object for ReAct action.", userQuery)
+//	}
+//	return prompt
+//}
+
 // executeMainLoop executes the main ReAct loop
 //func (r *ReAct) executeMainLoop_lagecy(userQuery string) (skipTaskStatusChange bool, err error) {
 //	currentTask := r.GetCurrentTask()
@@ -440,3 +475,178 @@ package aireact
 //	}
 //	return skipTaskStatusChange, nil
 //}
+
+/*
+
+
+// Embed template files
+//
+//go:embed prompts/loop/loop.txt
+var loopPromptTemplate string
+
+
+// GenerateLoopPrompt generates the main ReAct loop prompt using template
+func (pm *PromptManager) GenerateLoopPrompt(
+	userQuery string,
+	allowUserInteractive, allowPlan, allowKnowledgeEnhanceAnswer, allowWriteYaklangCode bool,
+	currentUserInteractiveCount,
+	userInteractiveLimitedTimes int64,
+	tools []*aitool.Tool,
+) (string, error) {
+	forges := pm.GetAvailableAIForgeBlueprints()
+
+	// Build template data
+	data := &LoopPromptData{
+		AllowAskForClarification:       allowUserInteractive,
+		AllowPlan:                      allowPlan,
+		AllowKnowledgeEnhanceAnswer:    allowKnowledgeEnhanceAnswer,
+		AllowWriteYaklangCode:          allowWriteYaklangCode,
+		AskForClarificationCurrentTime: currentUserInteractiveCount,
+		AskForClarificationMaxTimes:    userInteractiveLimitedTimes,
+		CurrentTime:                    time.Now().Format("2006-01-02 15:04:05"),
+		OSArch:                         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		UserQuery:                      userQuery,
+		Nonce:                          utils.RandStringBytes(4),
+		Language:                       pm.react.config.language,
+		AIForgeList:                    forges,
+		Tools:                          tools,
+		ToolsCount:                     len(tools),
+		TopToolsCount:                  pm.react.config.topToolsCount,
+		DynamicContext:                 pm.DynamicContext(),
+	}
+
+	data.Schema = getLoopSchema(!allowUserInteractive, !allowPlan, !allowKnowledgeEnhanceAnswer, !allowWriteYaklangCode, data.AIForgeList != "")
+
+	data.WorkingDir = pm.workdir
+	if data.WorkingDir != "" {
+		data.WorkingDirGlance = pm.GetGlanceWorkdir(data.WorkingDir)
+	}
+
+	// Get prioritized tools
+	if len(tools) > 0 {
+		data.TopTools = pm.react.getPrioritizedTools(tools, pm.react.config.topToolsCount)
+		data.HasMoreTools = len(tools) > len(data.TopTools)
+	}
+
+	// Set conversation memory
+	if pm.react.cumulativeSummary != "" {
+		data.ConversationMemory = pm.react.cumulativeSummary
+	}
+
+	// Set timeline memory
+	if pm.react.config.memory != nil {
+		data.Timeline = pm.react.config.memory.Timeline()
+	}
+
+	return pm.executeTemplate("loop", loopPromptTemplate, data)
+}
+
+
+func getLoopSchema(
+	disallowAskForClarification,
+	disableKnowledgeEnhanceAnswer,
+	disallowPlanAndExecution,
+	disallowWriteYaklangCode bool,
+	haveAIForgeList bool,
+) string {
+	var opts []any
+	mode := []any{
+		ActionDirectlyAnswer, ActionRequireTool,
+	}
+	if !disallowPlanAndExecution {
+		mode = append(mode, ActionRequestPlanExecution)
+		if haveAIForgeList {
+			mode = append(mode, ActionRequireAIBlueprintForge)
+		}
+	}
+	if !disallowAskForClarification {
+		mode = append(mode, ActionAskForClarification)
+	}
+
+	if !disableKnowledgeEnhanceAnswer {
+		mode = append(mode, ActionKnowledgeEnhanceAnswer)
+	}
+
+	if !disallowWriteYaklangCode {
+		mode = append(mode, ActionWriteYaklangCode)
+	}
+
+	actionFields := []aitool.ToolOption{
+		aitool.WithStringParam(
+			"type",
+			aitool.WithParam_Description("You MUST choose one of following action types. The value you select here determines which of the other fields in this 'action' object you should populate."),
+			aitool.WithParam_Enum(mode...),
+			aitool.WithParam_Required(true),
+		),
+	}
+	actionFields = append(
+		actionFields,
+		aitool.WithStringParam("answer_payload", aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'directly_answer'. Provide the final, complete answer for the user here. The content should be self-contained and ready to be displayed.")),
+		aitool.WithStringParam("tool_require_payload", aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'require_tool'. Provide the exact name of the tool you need to use (e.g., 'web_search', 'database_query'). Another system will handle the parameter generation based on this name. Do NOT include tool arguments here.")),
+		aitool.WithBoolParam(
+			"middle_step",
+			aitool.WithParam_Description("CRUCIAL for multi-tool tasks. Use ONLY with 'tool_require_payload'. Set to 'true' if this tool call is an intermediate step in a sequence to solve a complex task. Set to 'false' if this is the FINAL tool call needed before you can provide the complete answer. Before starting, you should outline your multi-step plan in 'cumulative_summary'."),
+			aitool.WithParam_Required(true),
+		),
+	)
+	if !disallowPlanAndExecution {
+		actionFields = append(
+			actionFields,
+			aitool.WithStringParam(
+				"plan_request_payload",
+				aitool.WithParam_Description(
+					"USE THIS FIELD ONLY IF type is 'request_plan_and_execution'. Provide a one-sentence summary of the complex task that needs a multi-step plan. This summary will trigger a more advanced planning system. Example: 'Create a marketing plan for a new product launch.'",
+				),
+			),
+		)
+		if haveAIForgeList {
+			aitool.WithStringParam(
+				"blueprint_payload",
+				aitool.WithParam_Description(
+					"USE THIS FIELD ONLY IF type is 'require_ai_blueprint'. Provide a forge blueprint ID from the available AI blueprint list to execute the task.",
+				),
+			)
+		}
+	}
+	if !disallowAskForClarification {
+		actionFields = append(actionFields, aitool.WithStructParam(
+			"ask_for_clarification_payload",
+			[]aitool.PropertyOption{
+				aitool.WithParam_Description("Use this action when user's intent is ambiguous or incomplete."),
+			},
+			aitool.WithStringParam("question", aitool.WithParam_Required(true), aitool.WithParam_Description("A clear, concise question to ask the user for more information. This should help clarify their intent or provide necessary details.")),
+			aitool.WithStringArrayParam(
+				"options",
+				aitool.WithParam_Description(
+					`Optional additional context that may help the user understand what information is needed. This can include examples or explanations of why the clarification is necessary.`,
+				),
+			),
+		))
+	}
+
+	if !disallowWriteYaklangCode {
+		actionFields = append(actionFields, aitool.WithStringParam(
+			"write_yaklang_code_approach",
+			aitool.WithParam_Description("USE THIS FIELD ONLY IF type is 'write_yaklang_code' 编写Yaklang代码的具体思路和策略。应该包含：1) 代码的核心逻辑设计思路和主要执行流程；2) 需要使用的Yaklang内置库和关键函数（如poc、synscan、servicescan、crawler、等安全库）；3) 数据处理方式和结果输出策略；4) 并发控制方案（是否使用go关键字、SizedWaitGroup限制并发数等）；5) 错误处理策略（优先使用~操作符进行简洁的错误处理）；6) 用户交互设计（如cli参数接收、进度显示等）。重点阐述如何充分利用Yaklang的安全特性、语法糖和内置能力来高效实现目标功能，确保代码既简洁又强大。"),
+		))
+	}
+
+	opts = append(opts, aitool.WithStringParam(
+		"human_readable_thought",
+		aitool.WithParam_Required(false),
+		aitool.WithParam_Description("[Not a must-being] Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. Examples: 'Okay, I understand. Searching for the requested information now...', 'I need to use a tool to get the current stock price.', 'This is a complex request, I will try to execute tool step by step.' if direct-answer mode, no need to fill this field"),
+	), aitool.WithStructParam(
+		"next_action",
+		[]aitool.PropertyOption{
+			aitool.WithParam_Description("Contains the specific action the AI has decided to take. You must choose one action type and provide its corresponding payload."),
+		},
+		actionFields...,
+	), aitool.WithStringParam(
+		"cumulative_summary",
+		aitool.WithParam_Required(true),
+		aitool.WithParam_Description("An evolving summary of the conversation. Update this field to include key information from the current interaction that should be remembered for future responses. Include topics discussed, user preferences, important context, and relevant details. If this is the first interaction, create a new summary. If there's existing context, build upon it."),
+	))
+	return aitool.NewObjectSchemaWithAction(opts...)
+}
+
+*/

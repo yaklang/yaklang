@@ -152,6 +152,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		emitter:       config.GetEmitter(),
 		maxIterations: 100,
 		actions:       omap.NewEmptyOrderedMap[string, *LoopAction](),
+		loopActions:   omap.NewEmptyOrderedMap[string, LoopActionFactory](),
 		streamFields:  omap.NewEmptyOrderedMap[string, *LoopStreamField](),
 		aiTagFields:   omap.NewEmptyOrderedMap[string, *LoopAITagField](),
 		vars:          omap.NewEmptyOrderedMap[string, any](),
