@@ -296,7 +296,9 @@ type RAGQueryConfig struct {
 	EveryQueryResultCallback func(result *ScoredResult)
 	RAGQueryType             []string
 
-	LoadConfig []SQLiteVectorStoreHNSWOption
+	enhanceSearchHandler enhancesearch.SearchHandler
+
+	LoadConfig []any
 }
 
 const (
@@ -338,6 +340,21 @@ func WithRAGDocumentType(documentType ...string) RAGQueryOption {
 		if len(documentType) > 0 {
 			config.RAGQueryType = documentType
 		}
+	}
+}
+
+func WithRAGEnhanceSearchHandler(handler enhancesearch.SearchHandler) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		config.enhanceSearchHandler = handler
+	}
+}
+
+func WithRAGSystemLoadConfig(loadConfig ...any) RAGQueryOption {
+	return func(config *RAGQueryConfig) {
+		if config.LoadConfig == nil {
+			config.LoadConfig = []any{}
+		}
+		config.LoadConfig = append(config.LoadConfig, loadConfig...)
 	}
 }
 
@@ -454,6 +471,7 @@ func NewRAGQueryConfig(opts ...RAGQueryOption) *RAGQueryConfig {
 		CollectionScoreLimit: 0.3,
 		EnhancePlan:          []string{EnhancePlanHypotheticalAnswer, EnhancePlanGeneralizeQuery, EnhancePlanSplitQuery},
 		Ctx:                  context.Background(),
+		enhanceSearchHandler: enhancesearch.NewDefaultSearchHandler(),
 	}
 	for _, opt := range opts {
 		opt(config)
@@ -643,7 +661,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 	start := time.Now()
 	for _, name := range ListCollections(db) {
 		log.Infof("start to load collection %v", name)
-		r, err := LoadCollectionEx(db, name, utils.InterfaceToSliceInterface(config.LoadConfig)...)
+		r, err := LoadCollection(db, name, config.LoadConfig...)
 		if err != nil {
 			log.Warnf("load collection %s failed: %v", name, err)
 			continue
@@ -668,6 +686,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 		Query:  query,
 	})
 
+	enhanceHandler := config.enhanceSearchHandler
 	if utils.StringArrayContains(config.EnhancePlan, EnhancePlanHypotheticalAnswer) {
 		wg.Add(1)
 		go func() {
@@ -678,7 +697,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			}()
 			log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
 			start := time.Now()
-			result, err := enhancesearch.HypotheticalAnswer(ctx, query)
+			result, err := enhanceHandler.HypotheticalAnswer(ctx, query)
 			if err != nil {
 				log.Warnf("enhance [HypotheticalAnswer] query failed: %v", err)
 				return
@@ -704,7 +723,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			}()
 			log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
 			start := time.Now()
-			results, err := enhancesearch.GeneralizeQuery(ctx, query)
+			results, err := enhanceHandler.GeneralizeQuery(ctx, query)
 			if err != nil {
 				log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
 				return
@@ -732,7 +751,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			}()
 			log.Infof("start to create sub query for enhance plan: %s", config.EnhancePlan)
 			start := time.Now()
-			results, err := enhancesearch.SplitQuery(ctx, query)
+			results, err := enhanceHandler.SplitQuery(ctx, query)
 			if err != nil {
 				log.Warnf("enhance [GeneralizeQuery] query failed: %v", err)
 				return
@@ -761,7 +780,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 			log.Infof("start to create sub query for enhance plan: %s", method)
 			start := time.Now()
 			// 直接使用原始查询作为精确关键词搜索
-			results, err := enhancesearch.ExtractKeywords(ctx, query)
+			results, err := enhanceHandler.ExtractKeywords(ctx, query)
 			if err != nil {
 				log.Warnf("enhance [ExtractKeywords] query failed: %v", err)
 				return
@@ -1014,7 +1033,7 @@ func _query(db *gorm.DB, query string, queryId string, opts ...RAGQueryOption) (
 // SimpleQuery 简化的RAG查询接口，直接返回结果
 func SimpleQuery(db *gorm.DB, query string, limit int, opts ...RAGQueryOption) ([]*SearchResult, error) {
 	// 添加限制选项
-	options := append(opts, WithRAGLimit(limit), WithRAGEnhance(EnhancePlanHypotheticalAnswer))
+	options := append(opts, WithRAGLimit(limit))
 
 	resultCh, err := Query(db, query, options...)
 	if err != nil {
