@@ -191,3 +191,15 @@ func WithOnAsyncTaskTrigger(fn func(i *LoopAction, task aicommon.AIStatefulTask)
 		r.onAsyncTaskTrigger = fn
 	}
 }
+
+func WithActionFactoryFromLoop(name string) ReActLoopOption {
+	return func(r *ReActLoop) {
+		factory, ok := GetLoopFactory(name)
+		if !ok {
+			log.Errorf("reactloop[%v] not found", name)
+			return
+		}
+		actionFac := ConvertReActLoopFactoryToActionFactory(name, factory)
+		r.loopActions.Set(name, actionFac)
+	}
+}

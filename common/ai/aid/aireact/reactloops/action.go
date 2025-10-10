@@ -5,6 +5,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
+type LoopActionFactory func(r aicommon.AIInvokeRuntime) (*LoopAction, error)
+
 type LoopActionVerifierFunc func(loop *ReActLoop, action *aicommon.Action) error
 type LoopActionHandlerFunc func(loop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator)
 

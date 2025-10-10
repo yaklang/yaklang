@@ -50,6 +50,7 @@ type ReActLoop struct {
 
 	// ai loop once
 	actions      *omap.OrderedMap[string, *LoopAction]
+	loopActions  *omap.OrderedMap[string, LoopActionFactory]
 	streamFields *omap.OrderedMap[string, *LoopStreamField]
 	aiTagFields  *omap.OrderedMap[string, *LoopAITagField]
 
@@ -265,6 +266,7 @@ func (r *ReActLoop) GetInt(k string) int {
 
 func (r *ReActLoop) RemoveAction(actionType string) {
 	r.actions.Delete(actionType)
+	r.loopActions.Delete(actionType)
 }
 
 func (r *ReActLoop) OnTaskCreated(f func(task aicommon.AIStatefulTask)) {
@@ -291,4 +293,56 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 	if r.onAsyncTaskFinished != nil {
 		r.onAsyncTaskFinished(t)
 	}
+}
+
+func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
+	ac, ok := r.actions.Get(actionName)
+	if ok {
+		return ac, nil
+	}
+	fac, ok := r.loopActions.Get(actionName)
+	if ok {
+		ac, err := fac(r.GetInvoker())
+		if err != nil {
+			return nil, utils.Errorf("cannot create loop action[%s] instance: %v", r.loopName, err)
+		}
+		return ac, nil
+	}
+	return nil, utils.Errorf("action handler[%s] not found in loop or actions", r.loopName)
+}
+
+func (r *ReActLoop) GetAllActionNames() []string {
+	actionNames := r.actions.Keys()
+	for _, actionName := range r.loopActions.Keys() {
+		if !r.actions.Have(actionName) {
+			actionNames = append(actionNames, actionName)
+		}
+	}
+	return actionNames
+}
+
+func (r *ReActLoop) NoActions() bool {
+	return r.actions.Len() == 0 && r.loopActions.Len() == 0
+}
+
+func (r *ReActLoop) GetAllActions() []*LoopAction {
+	var actions []*LoopAction
+	actions = append(actions, r.actions.Values()...)
+	for _, actionName := range r.loopActions.Keys() {
+		if r.actions.Have(actionName) {
+			continue
+		}
+		actionFac, ok := r.loopActions.Get(actionName)
+		if !ok {
+			log.Errorf("loopAction factory[%s] not found when getting all actions", actionName)
+			continue
+		}
+		actionInstance, err := actionFac(r.GetInvoker())
+		if err != nil {
+			log.Errorf("create loopAction[%s] instance failed when getting all actions: %v", actionName, err)
+			continue
+		}
+		actions = append(actions, actionInstance)
+	}
+	return actions
 }
