@@ -281,6 +281,7 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromRawPacket(db *gorm.DB) error 
 	}
 	m.notifyHandleFlowNum()
 	m.notifyProcess(1)
+	m.OnFinish()
 	return nil
 }
 
@@ -328,6 +329,17 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 		}(flow)
 	}
 	swg.Wait()
+	m.OnFinish()
+}
+
+func (m *HTTPFlowAnalyzeManger) OnFinish() {
+	if m.pluginCaller != nil {
+		m.pluginCaller.CallOnAnalyzeHTTPFlowFinish(
+			m.ctx,
+			atomic.LoadInt64(&m.allHTTPFlowCount),
+			atomic.LoadInt64(&m.matchedHTTPFlowCount),
+		)
+	}
 }
 
 func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFlow) error {

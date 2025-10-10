@@ -29,6 +29,7 @@ func CheckDefineFunctionMitm(prog *ssaapi.Program) *result.StaticAnalyzeResults 
 	ret := result.NewStaticAnalyzeResults("check define function in mitm")
 	funcs := []string{
 		"analyzeHTTPFlow",
+		"onAnalyzeHTTPFlowFinish",
 		"hijackSaveHTTPFlow",
 		"hijackHTTPResponse",
 		"hijackHTTPResponseEx",
