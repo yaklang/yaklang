@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/log"
@@ -883,4 +886,111 @@ Content-Length: 116
 		t.Logf("Successfully matched session_key with regex: %s", regexRule)
 		t.Logf("Flow tags: %s", flows.Data[0].Tags)
 	}
+}
+
+func TestGRPCMUSTPASS_AnalyzeHTTPFlow_OnFinishHotPatch(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	urlToken := uuid.NewString()
+	rspToken := uuid.NewString()
+
+	tempDir := t.TempDir()
+	tempFile := path.Join(tempDir, "test_analyze_result.txt")
+
+	hotPatchCode := fmt.Sprintf(`
+	tempFile =<<<URL
+%s
+URL
+	f = file.OpenFile(tempFile, file.O_APPEND|file.O_CREATE|file.O_RDWR, 0o777)~
+	m = sync.NewMutex()
+	
+	analyzeHTTPFlow = func(flow, extract) {
+		if str.Contains(flow.Url, "%s") && str.Contains(string(flow.Response), "%s") {
+			m.Lock()
+			f.WriteLine(sprintf("MATCHED: %%s", flow.Url))
+			m.Unlock()
+			extract("test_rule", flow, "matched_data")
+		}
+	}
+	
+	onAnalyzeHTTPFlowFinish = func(totalCount, matchedCount) {
+		m.Lock()
+		f.WriteLine(sprintf("FINISH: totalCount=%%d, matchedCount=%%d", totalCount, matchedCount))
+		m.Unlock()
+		f.Close()
+	}
+	`, tempFile, urlToken, rspToken)
+
+	flows := []struct {
+		url string
+		req string
+		rsp string
+	}{
+		{fmt.Sprintf("http://www.test%s.com", urlToken), `GET /test HTTP/1.1`, fmt.Sprintf("HTTP/1.1 200 OK\n\n%s", rspToken)},
+		{fmt.Sprintf("http://www.test%s.com/2", urlToken), `POST /test HTTP/1.1`, fmt.Sprintf("HTTP/1.1 200 OK\n\n%s", rspToken)},
+		{"http://www.other.com", `GET /other HTTP/1.1`, "HTTP/1.1 200 OK\n\nother"},
+	}
+
+	for _, flow := range flows {
+		err, deleteFlow := createHTTPFlow(flow.url, flow.req, flow.rsp)
+		require.NoError(t, err)
+		defer deleteFlow()
+	}
+
+	stream, err := client.AnalyzeHTTPFlow(context.Background(), &ypb.AnalyzeHTTPFlowRequest{
+		HotPatchCode: hotPatchCode,
+	})
+	require.NoError(t, err)
+
+	var resultId string
+
+	for {
+		rsp, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		require.NoError(t, err)
+
+		if rsp.ExecResult != nil {
+			resultId = rsp.ExecResult.GetRuntimeID()
+		}
+	}
+
+	time.Sleep(2 * time.Second)
+	stat, err := os.Stat(tempFile)
+	t.Logf("Exists before reading: %v", stat)
+	content, err := os.ReadFile(tempFile)
+	require.NoError(t, err)
+
+	contentStr := string(content)
+	t.Log("file content:")
+	t.Log(contentStr)
+	lines := strings.Split(contentStr, "\n")
+
+	matchedCount := 0
+	var finishFound bool
+	var totalCount, matchedCountFromFinish int64
+
+	for _, line := range lines {
+		if strings.Contains(line, "MATCHED:") {
+			matchedCount++
+			require.True(t, strings.Contains(line, urlToken), "Matched URL should contain token")
+		}
+		if strings.Contains(line, "FINISH:") {
+			finishFound = true
+			if strings.Contains(line, "totalCount=") && strings.Contains(line, "matchedCount=") {
+				fmt.Sscanf(line, "FINISH: totalCount=%d, matchedCount=%d", &totalCount, &matchedCountFromFinish)
+			}
+		}
+	}
+
+	require.Equal(t, 2, matchedCount, "Should have 2 matched flows")
+	require.True(t, finishFound, "Should have finish callback")
+	require.Equal(t, int64(2), matchedCountFromFinish, "Should have matched count of 2")
+
+	result := yakit.QueryAnalyzedHTTPFlowRule(consts.GetGormProjectDatabase(), []string{resultId})
+	require.Equal(t, 2, len(result), "Should have 2 matched flows in database")
+	t.Logf("Successfully tested onAnalyzeHTTPFlowFinish callback")
+	t.Logf("File content: %s", contentStr)
 }
