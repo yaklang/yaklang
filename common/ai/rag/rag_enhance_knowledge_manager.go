@@ -3,7 +3,6 @@ package rag
 import (
 	"context"
 	"io"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/utils/chanx"
