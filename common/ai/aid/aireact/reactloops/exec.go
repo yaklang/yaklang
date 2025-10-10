@@ -23,19 +23,15 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 		v := _tagInstance
 		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
 			pReader := utils.NewPeekableReader(reader)
-			start := time.Now()
+			parseStart := time.Now()
 			pReader.Peek(1)
-			log.Infof("[TRACE] Peeked first byte for tag[%s] at %v", v.TagName, start.Format("15:04:05.000"))
-			log.Infof("[TRACE] Starting aitag.Parse for tag[%s] at %v", v.TagName, start.Format("15:04:05.000"))
+			log.Infof("peeked first byte for tag[%s] cost: %v", v.TagName, time.Since(parseStart))
+			log.Infof("starting aitag.Parse for tag[%s]", v.TagName)
 			defer func() {
-				cost := time.Now().Sub(start)
-				log.Infof("[TRACE] Finished aitag.Parse for tag[%s], total cost: %v", v.TagName, cost)
+				cost := time.Since(parseStart)
+				log.Infof("finished aitag.Parse for tag[%s], total cost: %v", v.TagName, cost)
 				if cost.Milliseconds() <= 300 {
-					log.Warn("-------------------------------------------------------------------------")
-					log.Warn("-------------------------------------------------------------------------")
-					log.Warnf("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
-					log.Warn("-------------------------------------------------------------------------")
-					log.Warn("-------------------------------------------------------------------------")
+					log.Infof("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
 				} else {
 					log.Infof("AI Response Mirror[%s] stream cost %v, stream maybe valid", v.TagName, cost)
 				}
@@ -49,8 +45,8 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 					nodeId = "re-act-loop-answer-payload"
 				}
 
-				start := time.Now()
-				log.Infof("[TRACE] Tag[%s] callback started at %v", v.TagName, start.Format("15:04:05.000"))
+				callbackStart := time.Now()
+				log.Infof("tag[%s] callback started, parse started %v ago", v.TagName, callbackStart.Sub(parseStart))
 				var result bytes.Buffer
 				fieldReader = io.TeeReader(utils.UTF8Reader(fieldReader), &result)
 				emitter.EmitStreamEvent(
@@ -59,21 +55,18 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 					fieldReader,
 					taskIndex,
 					func() {
-						cost := time.Now().Sub(start)
+						// Use parseStart instead of callbackStart to measure the whole streaming process
+						totalCost := time.Since(parseStart)
 						contentLength := len(result.String())
-						log.Infof("[TRACE] Tag[%s] callback finished at %v, content length: %d chars, cost: %v",
-							v.TagName, time.Now().Format("15:04:05.000"), contentLength, cost)
+						log.Infof("tag[%s] callback finished, content length: %d chars, total stream cost: %v",
+							v.TagName, contentLength, totalCost)
 
-						if cost.Milliseconds() <= 300 {
-							log.Warn("-------------------------------------------------------------------------")
-							log.Warn("-------------------------------------------------------------------------")
+						if totalCost.Milliseconds() <= 300 {
 							log.Warnf("AITag[%s] stream too fast, cost %v (content: %d chars), stream maybe not valid",
-								v.TagName, cost, contentLength)
-							log.Warn("-------------------------------------------------------------------------")
-							log.Warn("-------------------------------------------------------------------------")
+								v.TagName, totalCost, contentLength)
 						} else {
 							log.Infof("AITag[%s] stream processing completed normally, cost %v for %d chars",
-								v.TagName, cost, contentLength)
+								v.TagName, totalCost, contentLength)
 						}
 
 						defer streamWg.Done()
@@ -134,11 +127,11 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			aiTagStreamMirror := r.createAITagStreamMirrors(resp.GetTaskIndex(), nonce, streamWg)
 			if len(aiTagStreamMirror) > 0 {
 				streamWg.Add(len(aiTagStreamMirror))
-				log.Infof("[TRACE] Creating %d aitag stream mirrors, will mirror the stream", len(aiTagStreamMirror))
+				log.Infof("creating %d aitag stream mirrors, will mirror the stream", len(aiTagStreamMirror))
 				stream = utils.CreateUTF8StreamMirror(stream, aiTagStreamMirror...)
-				log.Infof("[TRACE] Stream mirror created successfully")
+				log.Debugf("stream mirror created successfully")
 			} else {
-				log.Infof("[TRACE] No aitag stream mirrors needed")
+				log.Debugf("no aitag stream mirrors needed")
 			}
 
 			actionNameFallback := ""
