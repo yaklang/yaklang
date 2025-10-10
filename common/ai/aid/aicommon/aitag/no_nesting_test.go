@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -78,21 +79,28 @@ func TestMultipleSequentialTags(t *testing.T) {
 结束`
 
 	var results = make(map[string]string)
+	var mu sync.Mutex
 
 	err := Parse(strings.NewReader(input),
 		WithCallback("TAG1", "nonce1", func(reader io.Reader) {
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["tag1"] = string(content)
+			mu.Unlock()
 			log.Infof("TAG1 处理完成")
 		}),
 		WithCallback("TAG2", "nonce2", func(reader io.Reader) {
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["tag2"] = string(content)
+			mu.Unlock()
 			log.Infof("TAG2 处理完成")
 		}),
 		WithCallback("TAG3", "nonce3", func(reader io.Reader) {
 			content, _ := io.ReadAll(reader)
+			mu.Lock()
 			results["tag3"] = string(content)
+			mu.Unlock()
 			log.Infof("TAG3 处理完成")
 		}),
 	)

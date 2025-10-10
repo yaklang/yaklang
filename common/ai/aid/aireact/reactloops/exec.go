@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -24,10 +23,19 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 	for _, _tagInstance := range r.aiTagFields.Values() {
 		v := _tagInstance
 		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
+			start := time.Now()
 			defer func() {
+				cost := time.Now().Sub(start)
+				if cost.Milliseconds() <= 300 {
+					log.Warn("-------------------------------------------------------------------------")
+					log.Warn("-------------------------------------------------------------------------")
+					log.Warnf("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
+					log.Warn("-------------------------------------------------------------------------")
+					log.Warn("-------------------------------------------------------------------------")
+				}
 				streamWg.Done()
 			}()
-			tagErr := aitag.Parse(reader, aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
+			tagErr := aitag.Parse(utils.UTF8Reader(reader), aitag.WithCallback(v.TagName, nonce, func(fieldReader io.Reader) {
 				streamWg.Add(1)
 
 				nodeId := v.AINodeId
@@ -35,14 +43,24 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 					nodeId = "re-act-loop-answer-payload"
 				}
 
+				start := time.Now()
 				var result bytes.Buffer
-				fieldReader = io.TeeReader(fieldReader, &result)
+				fieldReader = io.TeeReader(utils.UTF8Reader(fieldReader), &result)
 				emitter.EmitStreamEvent(
 					nodeId,
 					time.Now(),
 					fieldReader,
 					taskIndex,
 					func() {
+						cost := time.Now().Sub(start)
+						if cost.Milliseconds() <= 300 {
+							log.Warn("-------------------------------------------------------------------------")
+							log.Warn("-------------------------------------------------------------------------")
+							log.Warnf("AITag[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
+							log.Warn("-------------------------------------------------------------------------")
+							log.Warn("-------------------------------------------------------------------------")
+						}
+
 						defer streamWg.Done()
 						code := result.String()
 						if code == "" {
@@ -98,7 +116,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				r.config.GetEmitter(),
 			)
 
-			stream = io.TeeReader(stream, os.Stdout)
+			// stream = io.TeeReader(stream, os.Stdout)
 
 			aiTagStreamMirror := r.createAITagStreamMirrors(resp.GetTaskIndex(), nonce, streamWg)
 			if len(aiTagStreamMirror) > 0 {
@@ -146,13 +164,11 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 									streamWg.Done()
 								})
 							}
-							defer func() {
-								done()
-							}()
 
 							reader = utils.JSONStringReader(reader)
 							fieldIns, ok := streamFields.Get(key)
 							if !ok {
+								done()
 								return
 							}
 
