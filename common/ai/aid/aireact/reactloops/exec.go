@@ -23,20 +23,20 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 	for _, _tagInstance := range r.aiTagFields.Values() {
 		v := _tagInstance
 		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
-			log.Infof("[ai-tag] mirror[%s] started, time since mirror start: %v", v.TagName, time.Since(mirrorStart))
+			log.Debugf("[ai-tag] mirror[%s] started, time since mirror start: %v", v.TagName, time.Since(mirrorStart))
 
 			pReader := utils.NewPeekableReader(reader)
 			parseStart := time.Now()
 			pReader.Peek(1)
-			log.Infof("[ai-tag] mirror peeked first byte for tag[%s] cost: %v", v.TagName, time.Since(parseStart))
-			log.Infof("starting aitag.Parse for tag[%s]", v.TagName)
+			log.Debugf("[ai-tag] mirror peeked first byte for tag[%s] cost: %v", v.TagName, time.Since(parseStart))
+			log.Debugf("starting aitag.Parse for tag[%s]", v.TagName)
 			defer func() {
 				cost := time.Since(parseStart)
-				log.Infof("finished aitag.Parse for tag[%s], total cost: %v", v.TagName, cost)
+				log.Debugf("finished aitag.Parse for tag[%s], total cost: %v", v.TagName, cost)
 				if cost.Milliseconds() <= 300 {
-					log.Infof("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
+					log.Debugf("AI Response Mirror[%s] stream too fast, cost %v, stream maybe not valid", v.TagName, cost)
 				} else {
-					log.Infof("AI Response Mirror[%s] stream cost %v, stream maybe valid", v.TagName, cost)
+					log.Debugf("AI Response Mirror[%s] stream cost %v, stream maybe valid", v.TagName, cost)
 				}
 				streamWg.Done()
 			}()
@@ -49,7 +49,7 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 				}
 
 				callbackStart := time.Now()
-				log.Infof("tag[%s] callback started, parse started %v ago", v.TagName, callbackStart.Sub(parseStart))
+				log.Debugf("tag[%s] callback started, parse started %v ago", v.TagName, callbackStart.Sub(parseStart))
 				var result bytes.Buffer
 				fieldReader = io.TeeReader(utils.UTF8Reader(fieldReader), &result)
 				emitter.EmitStreamEvent(
@@ -61,7 +61,7 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 						// Use parseStart instead of callbackStart to measure the whole streaming process
 						totalCost := time.Since(parseStart)
 						contentLength := len(result.String())
-						log.Infof("tag[%s] callback finished, content length: %d chars, total stream cost: %v",
+						log.Debugf("tag[%s] callback finished, content length: %d chars, total stream cost: %v",
 							v.TagName, contentLength, totalCost)
 
 						if totalCost.Milliseconds() <= 300 {
