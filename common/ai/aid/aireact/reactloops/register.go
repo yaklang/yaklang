@@ -51,3 +51,15 @@ func CreateLoopByName(name string, invoker aicommon.AIInvokeRuntime) (*ReActLoop
 	}
 	return factoryCreator(invoker)
 }
+
+func GetLoopFactory(name string) (LoopFactory, bool) {
+	factory, ok := loops.Load(name)
+	if !ok {
+		return nil, false
+	}
+	factoryCreator, ok := factory.(LoopFactory)
+	if !ok {
+		return nil, false
+	}
+	return factoryCreator, true
+}

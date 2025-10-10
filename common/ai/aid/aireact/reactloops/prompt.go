@@ -13,7 +13,7 @@ var coreTemplate string
 func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 	// loop
 	// build in code
-	values := r.actions.Values()
+	values := r.GetAllActions()
 	if disallowExit {
 		var filteredValues []*LoopAction
 		for _, v := range values {
