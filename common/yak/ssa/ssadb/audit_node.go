@@ -154,6 +154,16 @@ func GetAuditNodeById(id uint) (*AuditNode, error) {
 	}
 }
 
+func GetAuditNodesByIds(ids []uint) ([]*AuditNode, error) {
+	db := GetDB()
+	var ans []*AuditNode
+	if err := db.Model(&AuditNode{}).Where("id IN (?)", ids).Find(&ans).Error; err != nil {
+		return nil, err
+	} else {
+		return ans, nil
+	}
+}
+
 type AuditEdgeType string
 
 const (

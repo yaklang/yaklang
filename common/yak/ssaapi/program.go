@@ -91,6 +91,17 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 	return p
 }
 
+func NewTmpProgram(name string) *Program {
+	p := &Program{
+		Program:           ssa.NewTmpProgram(name),
+		config:            &config{},
+		enableDatabase:    false,
+		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
+		id:                atomic.NewInt64(0),
+	}
+	return p
+}
+
 func (p *Program) DBDebug() {
 	if p == nil || p.Program == nil {
 		return

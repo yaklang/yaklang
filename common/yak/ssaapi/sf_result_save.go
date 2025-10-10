@@ -68,7 +68,7 @@ func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
 	res.rule = rule
 	prog, err := FromDatabase(result.ProgramName)
 	if err != nil {
-		return nil, utils.Errorf("load program %s error: %v", result.ProgramName, err)
+		log.Errorf("load program %s error: %v, create a empty program", result.ProgramName, err)
 	}
 	res.program = prog
 	return res, nil
