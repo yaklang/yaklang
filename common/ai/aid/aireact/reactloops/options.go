@@ -106,20 +106,25 @@ func WithAllowUserInteract(b ...bool) ReActLoopOption {
 }
 
 func WithRegisterLoopAction(actionName string, desc string, opts []aitool.ToolOption, verifier LoopActionVerifierFunc, handler LoopActionHandlerFunc) ReActLoopOption {
+	return WithRegisterLoopActionWithStreamField(actionName, desc, opts, nil, verifier, handler)
+}
+
+func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts []aitool.ToolOption, fields []*LoopStreamField, verifier LoopActionVerifierFunc, handler LoopActionHandlerFunc) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r.actions.Have(actionName) {
 			log.Errorf("loop action %s already registered", actionName)
 			return
 		}
 		r.actions.Set(actionName, &LoopAction{
+			AsyncMode:      false,
 			ActionType:     actionName,
 			Description:    desc,
 			Options:        opts,
 			ActionVerifier: verifier,
 			ActionHandler:  handler,
+			StreamFields:   fields,
 		})
 	}
-
 }
 
 func WithMaxIterations(maxIterations int) ReActLoopOption {

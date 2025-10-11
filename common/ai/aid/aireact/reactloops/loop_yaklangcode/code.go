@@ -88,7 +88,7 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				reactloops.WithRegisterLoopAction(
+				reactloops.WithRegisterLoopActionWithStreamField(
 					"query_document",
 					"Query the document database or sample code to find relevant information.",
 					[]aitool.ToolOption{
@@ -167,6 +167,22 @@ func init() {
 							),
 						),
 					},
+					[]*reactloops.LoopStreamField{
+						{
+							FieldName: "keywords",
+							AINodeId:  "query_yaklang_document",
+							Prefix:    "Keywords",
+						},
+						{
+							FieldName: "regexp",
+							AINodeId:  "query_yaklang_document",
+							Prefix:    "Regexp",
+						},
+						{
+							FieldName: "query_document_payload",
+							AINodeId:  "query_yaklang_document",
+						},
+					},
 					func(r *reactloops.ReActLoop, action *aicommon.Action) error {
 						payloads := action.GetInvokeParams("query_document_payload")
 						if len(payloads.GetStringSlice("keywords")) == 0 && len(payloads.GetStringSlice("regexp")) == 0 {
@@ -215,7 +231,7 @@ func init() {
 				),
 				reactloops.WithRegisterLoopAction(
 					"write_code",
-					"if the current code is empty or need to create an initial version",
+					"If there is NO CODE, you need to create a new file, then use 'write_code'. If there is already code, it is forbidden to use 'write_code' as it will forcibly overwrite the previous code. You must use 'modify_code' to modify the code.",
 					nil,
 					func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 						return nil
@@ -253,10 +269,20 @@ func init() {
 						loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)
 					},
 				),
-				reactloops.WithRegisterLoopAction(
+				reactloops.WithRegisterLoopActionWithStreamField(
 					"modify_code",
 					"do NOT use this action to create new code file, ONLY use it to modify existing code. Modify the code between the specified line numbers (inclusive). The line numbers are 1-based, meaning the first line of the file is line 1. Ensure that the 'modify_start_line' is less than or equal to 'modify_end_line'.",
-					[]aitool.ToolOption{},
+					[]aitool.ToolOption{
+						aitool.WithIntegerParam("modify_start_line"),
+						aitool.WithIntegerParam("modify_end_line"),
+						aitool.WithStringParam("modify_code_reason", aitool.WithParam_Description(`What is the purpose of this modification, and what lessons has AI learned? Summarize briefly to ensure this mistake is not repeated next time.`)),
+					},
+					[]*reactloops.LoopStreamField{
+						{
+							FieldName: "modify_code_reason",
+							AINodeId:  "re-act-loop-thought",
+						},
+					},
 					func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 						start := action.GetInt("modify_start_line")
 						end := action.GetInt("modify_end_line")
@@ -276,6 +302,11 @@ func init() {
 
 						msg := fmt.Sprintf("decided to modify code file, from start_line[%v] to end_line:[%v]", modifyStartLine, modifyEndLine)
 						invoker.AddToTimeline("modify_code", msg)
+
+						reason := action.GetString("modify_code_reason")
+						if reason == "" {
+							r.AddToTimeline("modify_reason", reason)
+						}
 
 						log.Infof("start to modify code lines %d to %d", modifyStartLine, modifyEndLine)
 						err := editor.ReplaceLineRange(modifyStartLine, modifyEndLine, partialCode)

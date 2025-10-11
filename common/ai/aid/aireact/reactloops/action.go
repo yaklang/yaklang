@@ -23,8 +23,10 @@ type LoopAction struct {
 
 func buildSchema(actions ...*LoopAction) string {
 	var actionNames []string
+	var actionDesc []string
 	for _, action := range actions {
 		actionNames = append(actionNames, action.ActionType)
+		actionDesc = append(actionDesc, action.ActionType+": "+action.Description)
 	}
 	var opts = []any{
 		aitool.WithStringParam(
@@ -32,10 +34,11 @@ func buildSchema(actions ...*LoopAction) string {
 			aitool.WithParam_Description("required '@action' field to identify the action type"),
 			aitool.WithParam_EnumString(actionNames...),
 			aitool.WithParam_Required(true),
+			aitool.WithParam_Raw("x-@action-rules", actionDesc),
 		),
 		aitool.WithStringParam(
 			"human_readable_thought",
-			aitool.WithParam_Description("Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. "),
+			aitool.WithParam_Description("Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. keep context, make it useful for next steps"),
 		),
 	}
 

@@ -55,6 +55,7 @@ func ConvertReActLoopFactoryToActionFactory(
 					return
 				}
 				// exit with no error
+				invoker.AddToTimeline("lose-focus", "AI finished focus on the loop["+name+"]")
 				operator.Exit()
 			},
 		}

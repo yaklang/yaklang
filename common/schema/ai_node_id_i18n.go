@@ -11,6 +11,10 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"query_yaklang_document": {
+		Zh: "查询 Yaklang 文档",
+		En: "Query Yaklang Document",
+	},
 	"batch-compress": {
 		Zh: "记忆压缩",
 		En: "Memory Compression",
