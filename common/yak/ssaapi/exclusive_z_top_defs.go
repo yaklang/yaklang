@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/samber/lo"
@@ -15,6 +16,11 @@ func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 		if r := recover(); r != nil {
 			if r == errRecursiveDepth {
 				log.Warnf("Value GetTopDefs recursive call too deep, stop it: %s", i.String())
+				ret = nil
+				return
+			}
+			if r == context.Canceled {
+				log.Warnf("Value GetTopDefs context canceled, stop it: %s", i.String())
 				ret = nil
 				return
 			}

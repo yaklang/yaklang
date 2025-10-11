@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"context"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -10,6 +12,11 @@ func (v *Value) GetBottomUses(opt ...OperationOption) (ret Values) {
 		if r := recover(); r != nil {
 			if r == errRecursiveDepth {
 				log.Warnf("Value GetBottomUses recursive call too deep, stop it: %s", v.String())
+				ret = nil
+				return
+			}
+			if r == context.Canceled {
+				log.Warnf("Value GetBottomUses context canceled, stop it: %s", v.String())
 				ret = nil
 				return
 			}
