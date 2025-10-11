@@ -188,23 +188,22 @@ func init() {
 							return
 						}
 						var msg string
-						if documentResults != "" {
-							fullcode := loop.Get("full_code")
-							if fullcode != "" {
-								errMsg, blocking := checkCodeAndFormatErrors(fullcode)
-								if blocking {
-									op.DisallowNextLoopExit()
-								}
-								if errMsg != "" {
-									msg += "LINT ERR:\n" + errMsg + "\n\n"
-								}
+						fullcode := loop.Get("full_code")
+						if fullcode != "" {
+							errMsg, blocking := checkCodeAndFormatErrors(fullcode)
+							if blocking {
+								op.DisallowNextLoopExit()
 							}
-							msg += "--[DOCS]--\n" + documentResults
+							if errMsg != "" {
+								msg += "LINT ERR:\n" + errMsg + "\n\n"
+							}
+						}
+						if msg != "" {
 							op.Feedback(msg)
 						}
 
 						if len(documentResults) > 0 {
-							log.Infof("================== document query =====================\n"+
+							log.Infof("\n================== document query =====================\n"+
 								"%v\n===================== document result ===================\n"+
 								"%v\n=================================================",
 								utils.InterfaceToString(payloads),
