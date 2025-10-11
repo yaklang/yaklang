@@ -14,6 +14,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -122,6 +123,10 @@ func (s *SyntaxFlowWebServer) registerScanRoute() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(req.TimeoutSecond)*time.Second)
 		defer cancel()
 		programName := uuid.NewString()
+		// 确保测试完成后清理数据库，避免数据库膨胀导致性能下降
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programName)
+		}()
 		_, err = ssaapi.Parse(req.Content,
 			ssaapi.WithRawLanguage(req.Lang),
 			ssaapi.WithProgramName(programName),
