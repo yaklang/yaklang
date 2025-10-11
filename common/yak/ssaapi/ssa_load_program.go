@@ -30,14 +30,14 @@ func FromDatabase(programName string) (p *Program, err error) {
 		SetProgramCache(p)
 	}()
 
-	config, err := defaultConfig(WithProgramName(programName))
+	config, err := DefaultConfig(WithProgramName(programName))
 	if err != nil {
 		return nil, err
 	}
 	return config.fromDatabase()
 }
 
-func (c *config) fromDatabase() (*Program, error) {
+func (c *Config) fromDatabase() (*Program, error) {
 	// get program from database
 	prog, err := ssa.GetProgram(c.ProgramName, ssa.Application)
 	if err != nil {

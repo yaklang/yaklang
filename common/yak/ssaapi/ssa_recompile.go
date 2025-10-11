@@ -9,7 +9,7 @@ import (
 )
 
 // save to Profile SSAProgram
-func SaveConfig(c *config, prog *Program) {
+func SaveConfig(c *Config, prog *Program) {
 	if c.databaseKind != ssa.ProgramCacheMemory {
 		irProg, err := ssadb.GetProgram(c.ProgramName, ssa.Application)
 		if err != nil {

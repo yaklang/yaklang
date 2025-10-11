@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	_ "embed"
 	"os"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -242,5 +244,71 @@ $sink #-> ?{opcode: param} as $result;
 	require.NotNil(t, result)
 	result.GetValues("result").Show()
 	log.Infof("Time: \n\tCompile time: %s, \n\tQuery time: %s, \n\tTotal time: %s", compile, query, compile+query)
+	ssaprofile.ShowCacheCost()
+}
+
+func TestA(t *testing.T) {
+	t.Skip()
+	go func() {
+		err := http.ListenAndServe(":18080", nil)
+		if err != nil {
+			return
+		}
+	}()
+	// ssaprofile.DumpHeapProfileWithInterval(time.Second, ssaprofile.WithFileName("heap.prof"))
+
+	path := "/Users/wlz/Developer/Target/yakssaExample/wanwu"
+	fs := filesys.NewRelLocalFs(path)
+
+	ctx := context.Background()
+	config := ssaapi.Config{}
+	for _, opt := range []ssaapi.Option{
+		ssaapi.WithContext(ctx),
+		ssaapi.WithFileSystem(fs),
+		ssaapi.WithLanguage(ssaapi.GO),
+		ssaapi.WithProcess(func(msg string, process float64) {
+			log.Infof("Process: %s, %.2f%%", msg, process*100)
+		}),
+		ssaapi.WithConcurrency(runtime.NumCPU()),
+	} {
+		opt(&config)
+	}
+
+	fileList := []string{}
+	fileMap := make(map[string]struct{})
+	ssaprofile.ProfileAdd(true, "collect file", func() {
+		filesys.Recursive(".",
+			filesys.WithFileSystem(fs),
+			filesys.WithFileStat(func(s string, fi os.FileInfo) error {
+				if fi.IsDir() {
+					return nil
+				}
+				// log.Infof("file: %s", s)
+				if fs.Ext(s) == ".go" {
+					fileList = append(fileList, s)
+					fileMap[s] = struct{}{}
+				}
+				return nil
+			}),
+		)
+	})
+
+	var ch <-chan *ssareducer.FileContent
+
+	ssaprofile.ProfileAdd(true, "getFileHandler", func() {
+		ch = config.GetFileHandler(
+			fs,
+			fileList,
+			fileMap,
+		)
+	})
+
+	for fc := range ch {
+		if fc.Err != nil {
+			log.Errorf("file %s error: %v", fc.Path, fc.Err)
+			// } else {
+			// 	log.Infof("file %s ", fc.Path)
+		}
+	}
 	ssaprofile.ShowCacheCost()
 }

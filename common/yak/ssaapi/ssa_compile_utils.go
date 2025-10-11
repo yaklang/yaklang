@@ -16,7 +16,7 @@ var (
 	ErrNoFoundCompiledFile error = errors.New("not found can compiled file")
 )
 
-func (c *config) getFileHandler(
+func (c *Config) GetFileHandler(
 	filesystem filesys_interface.FileSystem,
 	preHandlerFiles []string,
 	handlerFilesMap map[string]struct{},

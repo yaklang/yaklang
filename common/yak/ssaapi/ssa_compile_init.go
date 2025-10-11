@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
+func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
 	application := ssa.NewProgram(programName, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
 	application.Language = string(c.language)
