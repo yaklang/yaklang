@@ -235,7 +235,6 @@ func (p *processMonitor) snapshotInfoList() *RuleProcessInfoList {
 	} else {
 		ret.Progress = float64(ret.FinishedQuery) / float64(total)
 	}
-	log.Infof("progress: %v", ret.Progress)
 	// rule
 	ret.Rules = make([]*RuleProcessInfo, 0, p.Status.Len())
 	p.Status.ForEach(func(i string, rpi *RuleProcessInfo) bool {
