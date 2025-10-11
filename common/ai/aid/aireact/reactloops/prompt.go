@@ -21,7 +21,7 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 			if v.ActionType != loopAction_Finish.ActionType {
 				filteredValues = append(filteredValues, v)
 			} else {
-				log.Warnf("action[%s] is removed from schema because loop exit is disallowed", v.ActionType)
+				log.Infof("action[%s] is removed from schema because loop exit is disallowed", v.ActionType)
 			}
 		}
 		values = filteredValues

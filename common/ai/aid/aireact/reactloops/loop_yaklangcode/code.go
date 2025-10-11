@@ -175,12 +175,34 @@ func init() {
 						return nil
 					},
 					func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+
 						payloads := action.GetInvokeParams("query_document_payload")
+
+						invoker := loop.GetInvoker()
+
+						invoker.AddToTimeline("start_query_yaklang_docs", "AI decided to query document with payload: "+utils.InterfaceToString(payloads))
+
 						documentResults, ok := handleQueryDocument(r, docSearcher, payloads)
 						if !ok {
+							invoker.AddToTimeline("query_yaklang_docs_result", "No document searcher available, cannot perform document query, maybe keyword or regexp is invalid: "+utils.InterfaceToString(payloads))
 							log.Warn("document searcher is not available, cannot perform document query")
 							op.Continue()
 							return
+						}
+						var msg string
+						if documentResults != "" {
+							fullcode := loop.Get("full_code")
+							if fullcode != "" {
+								errMsg, blocking := checkCodeAndFormatErrors(fullcode)
+								if blocking {
+									op.DisallowNextLoopExit()
+								}
+								if errMsg != "" {
+									msg += "LINT ERR:\n" + errMsg + "\n\n"
+								}
+							}
+							msg += "--[DOCS]--\n" + documentResults
+							op.Feedback(msg)
 						}
 
 						if len(documentResults) > 0 {
