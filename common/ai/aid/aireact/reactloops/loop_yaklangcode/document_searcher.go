@@ -28,7 +28,7 @@ func handleQueryDocument(
 	caseSensitive := payloads.GetBool("case_sensitive")
 	contextLines := payloads.GetInt("context_lines")
 	if contextLines == 0 {
-		contextLines = 2 // default context
+		contextLines = 5 // default context
 	}
 	limit := payloads.GetInt("limit")
 	if limit == 0 {
@@ -149,6 +149,5 @@ func handleQueryDocument(
 
 	invoker.AddToTimeline("query_document", fmt.Sprintf("found %d documents (%d included)", len(rankedResults), includedResults))
 	invoker.GetConfig().GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
-	invoker.AddToTimeline("document_query_results", documentResults)
 	return documentResults, true
 }

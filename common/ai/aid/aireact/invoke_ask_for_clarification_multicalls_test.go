@@ -134,7 +134,7 @@ LOOP:
 	tl := ins.DumpTimeline()
 	fmt.Println(tl)
 
-	if !utils.MatchAllOfSubString(tl, `ReAct loop finished END[5]`) {
+	if !utils.MatchAllOfSubString(tl, `ReAct Iteration Done[5]`) {
 		t.Fatal("iteration count should be 5")
 	}
 	if !utils.MatchAllOfSubString(tl, `ai directly answer`) {

@@ -60,6 +60,7 @@ func ExtractStrContextByKeyword(raw string, res []string) []string {
 }
 
 var ShrinkString = codec.ShrinkString
+var ShrinkTextBlock = codec.ShrinkTextBlock
 
 func StringBefore(value string, a string) string {
 	pos := strings.Index(value, a)

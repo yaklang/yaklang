@@ -14,6 +14,7 @@ import (
 	"os/user"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	ws "github.com/gorilla/websocket"
@@ -265,7 +266,7 @@ func InTestcase() bool {
 }
 
 func Debug(f func()) {
-	if InDebugMode() {
+	if InDebugMode() || testing.Testing() {
 		f()
 	}
 }
