@@ -2,11 +2,10 @@ package aicommon
 
 import (
 	"fmt"
-	"sync"
-
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"sync"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -18,6 +17,7 @@ type ToolCaller struct {
 	config     AICallerConfigIf
 	emitter    *Emitter // specific, backup for config.GetEmitter()
 	ai         AICaller
+	start      *sync.Once
 	done       *sync.Once
 	callToolId string
 
@@ -102,6 +102,7 @@ func WithToolCaller_GenerateToolParamsBuilder(
 func NewToolCaller(opts ...ToolCallerOption) (*ToolCaller, error) {
 	caller := &ToolCaller{
 		callToolId: ksuid.New().String(),
+		start:      &sync.Once{},
 		done:       &sync.Once{},
 		m:          &sync.Mutex{},
 	}
@@ -109,7 +110,7 @@ func NewToolCaller(opts ...ToolCallerOption) (*ToolCaller, error) {
 		opt(caller)
 	}
 	if caller.runtimeId == "" {
-		caller.runtimeId = caller.config.GetRuntimeId()
+		caller.runtimeId = caller.callToolId
 	}
 
 	if caller.config == nil || utils.IsNil(caller.config) {
@@ -184,16 +185,18 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, presetParams b
 		t.emitter = emitter
 	}
 
-	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
 	callToolId := t.callToolId
 
-	t.emitter.EmitToolCallStart(callToolId, tool)
-	t.m.Lock()
-	if t.onCallToolStart != nil {
-		t.onCallToolStart(callToolId)
-	}
-	t.m.Unlock()
+	t.start.Do(func() { // only emit once
+		t.m.Lock()
+		defer t.m.Unlock()
+		if t.onCallToolStart != nil {
+			t.onCallToolStart(callToolId)
+		}
+		t.emitter.EmitToolCallStart(callToolId, tool) // should emit after call tool start callback , this call will bind call tool id for emitter
+	})
 
+	t.emitter.EmitInfo("start to generate tool[%v] params in task: %v", tool.Name, t.task.GetName())
 	handleDone := func() {
 		t.done.Do(func() {
 			t.m.Lock()
