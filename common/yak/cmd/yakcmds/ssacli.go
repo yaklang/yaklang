@@ -1365,7 +1365,9 @@ var ssaCodeScan = &cli.Command{
 				}
 				str := "\n"
 				for _, rule := range info.Rules {
-					str += fmt.Sprintf("\t%s (progress: %.2f%%, status: %s)\n", rule.RuleName, rule.Progress*100, rule.Info)
+					since := time.Since(time.Unix(rule.UpdateTime, 0))
+					str += fmt.Sprintf("\t %s [progress: %.2f%%, update: %s, status: %s]\n", rule.RuleName, rule.Progress*100, since, rule.Info)
+					// str += fmt.Sprintf("\t%s (progress: %.2f%%, status: %s)\n", rule.RuleName, rule.Progress*100, rule.Info)
 				}
 
 				log.Infof("rule: %s", str)
