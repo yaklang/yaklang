@@ -2,7 +2,11 @@ package c2ssa
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/yaklang/yaklang/common/consts"
@@ -119,13 +123,88 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
+func PreprocessCMacros(src string) (string, error) {
+	var preprocessorCmd string
+	var preprocessorArgs []string
+
+	/* TODO: 未来改进：
+	1. 将 gcc/clang 集成到项目中（可选）
+	2. 提供在不同平台上构建 gcc/clang 的脚本
+	3. 添加编译选项，让用户决定是否自动扩展宏
+	*/
+
+	candidates := []string{"gcc", "clang", "cc"}
+
+	for _, cmd := range candidates {
+		if _, err := exec.LookPath(cmd); err == nil {
+			preprocessorCmd = cmd
+			break
+		}
+	}
+
+	if preprocessorCmd == "" {
+		return "", fmt.Errorf("C preprocessor not found: please install gcc, clang, or compatible C compiler (Platform: %s/%s)", runtime.GOOS, runtime.GOARCH)
+	}
+
+	tmpFile, err := os.CreateTemp("", "c_preprocess_*.c")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpFileName := tmpFile.Name()
+	defer os.Remove(tmpFileName)
+
+	if _, err := tmpFile.WriteString(src); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to write source to temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	preprocessorArgs = []string{
+		"-E",
+		"-P",
+		"-nostdinc",
+		"-undef",
+		"-Wno-everything",
+		tmpFileName,
+	}
+
+	cmd := exec.Command(preprocessorCmd, preprocessorArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("preprocessor failed: %w\nOutput: %s", err, string(output))
+	}
+
+	result := string(output)
+	lines := strings.Split(result, "\n")
+	cleanedLines := make([]string, 0, len(lines))
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "#") {
+			cleanedLines = append(cleanedLines, line)
+		} else if strings.HasPrefix(trimmed, "#include") {
+			cleanedLines = append(cleanedLines, line)
+		}
+	}
+
+	return strings.Join(cleanedLines, "\n"), nil
+}
+
 func Frontend(src string, ssabuilder ...*SSABuilder) (*cparser.CompilationUnitContext, error) {
 	var builder *ssa.PreHandlerBase
 	if len(ssabuilder) > 0 {
 		builder = ssabuilder[0].PreHandlerBase
 	}
+
+	preprocessedSrc := src
+	if preprocessed, err := PreprocessCMacros(src); err == nil {
+		preprocessedSrc = preprocessed
+	} else {
+		log.Warnf("C macro preprocessing failed: %v, using original source", err)
+	}
+
 	errListener := antlr4util.NewErrorListener()
-	lexer := cparser.NewCLexer(antlr.NewInputStream(src))
+	lexer := cparser.NewCLexer(antlr.NewInputStream(preprocessedSrc))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
