@@ -165,6 +165,58 @@ func init() {
 								documentResults,
 							)
 							invoker.AddToTimeline("query_yaklang_docs_result", documentResults)
+							nonce := utils.RandBytes(4)
+							targetPrompt, err := utils.RenderTemplate(`
+<|QUERY_PARAM_{{ .nonce }}|>
+{{ .payloads }}
+<|QUERY_PARAM_END_{{ .nonce }}|>
+
+<|DOC_{{ .nonce }}|>
+{{ .docs }}
+<|DOC_END_{{ .nonce }}|>
+
+根据查询参数以及查询结果给出总结，如果查询结果和意图不相关，则你需要在 summary 中说明
+
+summary 回答的内容需要为：
+
+* 描述查询参数和查询结果的意图
+* 增加相关的代码示例，告诉后续的行动如何在 modify_code 中修改代码修复错误
+* 吸取经验教训，告诉后面不要犯什么错误
+`, map[string]any{
+								"nonce":    string(nonce),
+								"payloads": payloads.Dump(),
+								"docs":     documentResults,
+							})
+							if err != nil {
+								invoker.AddToTimeline("failed_to_render_prompt", "Failed to render document summarization prompt: "+err.Error())
+								op.Fail(err)
+								return
+							}
+							action, err := invoker.InvokeLiteForge(
+								loop.GetCurrentTask().GetContext(),
+								"yaklang_doc_summarizer",
+								targetPrompt,
+								[]aitool.ToolOption{
+									aitool.WithStringParam(
+										"summary",
+										aitool.WithParam_Required(true),
+										aitool.WithParam_Description("The summary of the document, use it to generate the code"),
+									),
+								},
+							)
+							if err != nil {
+								r.AddToTimeline("error", "Failed to invoke liteforge: "+err.Error())
+								op.Continue()
+								return
+							}
+							summary := action.GetParams().GetString("summary")
+							if summary == "" {
+								r.AddToTimeline("error", "No summary generated in 'yaklang_doc_summarizer' action")
+								op.Continue()
+								return
+							} else {
+								r.AddToTimeline("summary-request-docs", summary)
+							}
 						}
 					},
 				),
