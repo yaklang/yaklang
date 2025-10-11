@@ -103,86 +103,15 @@ func init() {
 							),
 							aitool.WithStringArrayParam(
 								"keywords",
-								aitool.WithParam_Description(`Keywords or phrases to search in Yaklang documentation (supports both Chinese and English). Common patterns:
-
-**High-Frequency Functions (use exact names)**:
-• Network: 'poc.HTTP', 'poc.HTTPEx', 'poc.Get', 'poc.Post', 'servicescan.Scan', 'synscan.Scan'
-• File: 'file.ReadFile', 'file.Save', 'filesys.Recursive', 'zip.CompressRaw', 'zip.Recursive'
-• String: 'str.Split', 'str.Join', 'str.Contains', 'str.Replace', 'str.TrimPrefix'
-• Codec: 'codec.DecodeBase64', 'codec.EncodeBase64', 'json.dumps', 'json.loads'
-• Database: 'db.Query', 'db.Exec', 'risk.NewRisk'
-
-**Function Options (exact option names)**:
-• HTTP: 'poc.timeout', 'poc.json', 'poc.header', 'poc.cookie', 'poc.body', 'poc.retry'
-• Scan: 'servicescan.concurrent', 'servicescan.active', 'servicescan.web', 'servicescan.all'
-• File: 'filesys.onFileStat', 'file.IsDir', 'file.IsFile'
-
-**Feature Keywords (Chinese or English)**:
-• Chinese: 'HTTP发包', 'HTTP请求', '端口扫描', '服务扫描', '文件读取', '文件写入', '字符串处理', 'JSON解析', '并发编程', '错误处理', '正则匹配'
-• English: 'send request', 'port scan', 'file operation', 'string processing', 'error handling', 'concurrent', 'goroutine', 'channel'
-
-**Common Patterns**:
-• Error handling: 'die(err)', '~', 'try-catch', 'defer-recover'
-• Concurrency: 'go func', 'sync.NewWaitGroup', 'sync.NewSizedWaitGroup', 'channel'
-• Fuzzing: 'fuzz.HTTPRequest', 'fuzztag', '{{参数}}'
-
-**Example combinations**:
-- For HTTP: ["poc.HTTP", "HTTP发包", "poc.timeout", "发送请求"]
-- For scanning: ["servicescan.Scan", "端口扫描", "servicescan.concurrent", "指纹识别"]
-- For files: ["file.ReadFile", "文件读取", "filesys.Recursive", "文件遍历"]`),
-							),
+								aitool.WithParam_Description(`Keywords or phrases to search in Yaklang documentation (supports both Chinese and English). Common patterns:`)),
 							aitool.WithStringArrayParam(
 								"regexp",
-								aitool.WithParam_Description(`Regular expressions to match specific code patterns in Yaklang documentation. Use for precise structural matching:
-
-**Function Call Patterns**:
-• Library functions: '\w+\.\w+\(' - matches any library.function() calls
-• Specific library: 'poc\.\w+\(' - matches all poc.* functions
-• HTTP methods: 'poc\.(HTTP|HTTPEx|Get|Post|Do)\(' - matches HTTP-related functions
-• File operations: 'file\.(ReadFile|Save|WriteFile)\(' - matches file functions
-• String utils: 'str\.(Split|Join|Contains|Replace)\(' - matches string functions
-
-**Configuration Options**:
-• HTTP options: 'poc\.(timeout|json|header|cookie|body|query|postParams)\(' - matches HTTP config
-• Scan options: 'servicescan\.(concurrent|timeout|active|web|all)\(' - matches scan config
-• Context options: '\.(https|port|host|redirectTimes|retryTimes)\(' - matches connection config
-
-**Control Flow & Error Handling**:
-• Error handling: 'die\(|~\s*$|try\s*\{|defer.*recover\(' - matches error patterns
-• Concurrency: 'go\s+func|sync\.New\w+WaitGroup|make\(chan\s+' - matches concurrent code
-• Loops: 'for\s+\w+\s+in\s+|for\s+\w+\s*:?=?\s*range\s+' - matches for-in/range loops
-
-**Code Structure**:
-• Function definition: '(func|fn|def)\s+\w+\s*\(' - matches function declarations
-• Variable assignment: '\w+\s*:?=\s*\w+\.\w+\(' - matches var = lib.func() pattern
-• Method chaining: '\)\s*\.\s*\w+\(' - matches chained method calls
-
-**Example patterns**:
-- HTTP workflow: ['poc\.(HTTP|Get|Post)\(', 'poc\.(timeout|json|header)\(', '~\s*$']
-- File processing: ['file\.\w+\(', 'filesys\.Recursive\(', 'for.*range.*']
-- Error handling: ['die\(|~', 'try\s*\{.*\}\s*catch', 'defer.*recover\(']
-- Concurrency: ['go\s+func', 'sync\.New.*WaitGroup', '<-.*chan|chan\s*<-']
-
+								aitool.WithParam_Description(`Regular expressions to match specific code patterns in Yaklang documentation.
 **Note**: Patterns are case-sensitive. Use '\s+' for whitespace, '\w+' for identifiers, '.*' for wildcards.`),
 							),
 						),
 					},
-					[]*reactloops.LoopStreamField{
-						{
-							FieldName: "keywords",
-							AINodeId:  "query_yaklang_document",
-							Prefix:    "Keywords",
-						},
-						{
-							FieldName: "regexp",
-							AINodeId:  "query_yaklang_document",
-							Prefix:    "Regexp",
-						},
-						{
-							FieldName: "query_document_payload",
-							AINodeId:  "query_yaklang_document",
-						},
-					},
+					[]*reactloops.LoopStreamField{},
 					func(r *reactloops.ReActLoop, action *aicommon.Action) error {
 						payloads := action.GetInvokeParams("query_document_payload")
 						if len(payloads.GetStringSlice("keywords")) == 0 && len(payloads.GetStringSlice("regexp")) == 0 {
@@ -193,6 +122,16 @@ func init() {
 					func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 
 						payloads := action.GetInvokeParams("query_document_payload")
+
+						searching := payloads.Dump()
+						loop.GetEmitter().EmitTextPlainTextStreamEvent(
+							"query_yaklang_document",
+							bytes.NewReader([]byte(searching)),
+							loop.GetCurrentTask().GetIndex(),
+							func() {
+								log.Infof("searching yaklang document: \n%v", searching)
+							},
+						)
 
 						invoker := loop.GetInvoker()
 						invoker.AddToTimeline("start_query_yaklang_docs", "AI decided to query document with payload: "+utils.InterfaceToString(payloads))
@@ -256,6 +195,7 @@ func init() {
 						errMsg, blocking := checkCodeAndFormatErrors(code)
 						if blocking {
 							operator.DisallowNextLoopExit()
+							loop.RemoveAction("write_code")
 						}
 						msg := utils.ShrinkTextBlock(code, 256)
 						if errMsg != "" {
@@ -275,7 +215,7 @@ func init() {
 					[]aitool.ToolOption{
 						aitool.WithIntegerParam("modify_start_line"),
 						aitool.WithIntegerParam("modify_end_line"),
-						aitool.WithStringParam("modify_code_reason", aitool.WithParam_Description(`What is the purpose of this modification, and what lessons has AI learned? Summarize briefly to ensure this mistake is not repeated next time.`)),
+						aitool.WithStringParam("modify_code_reason", aitool.WithParam_Description(`Fix code errors or issues, and summarize the fixing approach and lessons learned, keeping the original code content for future reference value`)),
 					},
 					[]*reactloops.LoopStreamField{
 						{
@@ -289,6 +229,9 @@ func init() {
 						if start <= 0 || end <= 0 || end < start {
 							return utils.Error("modify_code action must have valid 'modify_start_line' and 'modify_end_line' parameters")
 						}
+						l.GetEmitter().EmitTextPlainTextStreamEvent(
+							"thought",
+							bytes.NewReader([]byte(fmt.Sprintf("Preparing modify line:%v-%v", start, end))), l.GetCurrentTask().GetIndex())
 						return nil
 					},
 					func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
@@ -339,6 +282,10 @@ func init() {
 						r.AddToTimeline("code_modified", msg)
 						log.Infof("modify_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 						loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
+
+						if errMsg != "" {
+							invoker.AddToTimeline("advice", "use 'query_document' to find more syntax sample or docs")
+						}
 					},
 				),
 			)
