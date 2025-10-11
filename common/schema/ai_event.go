@@ -122,6 +122,7 @@ type AiOutputEvent struct {
 	TaskIndex string
 	// disable markdown render
 	DisableMarkdown bool
+	CallToolID      string
 
 	Processes []*AiProcess `gorm:"many2many:ai_processes_and_events;"`
 
@@ -286,6 +287,7 @@ func (e *AiOutputEvent) ToGRPC() *ypb.AIOutputEvent {
 		DisableMarkdown: e.DisableMarkdown,
 		SyncID:          e.SyncID,
 		EventUUID:       e.EventUUID,
+		CallToolID:      e.CallToolID,
 		NodeIdVerbose:   NodeIdToI18n(e.NodeId, e.IsStream).I18nToYPB_I18n(),
 		ContentType:     e.ContentType,
 	}
