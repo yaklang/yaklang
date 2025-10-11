@@ -304,7 +304,7 @@ func init() {
 						invoker.AddToTimeline("modify_code", msg)
 
 						reason := action.GetString("modify_code_reason")
-						if reason == "" {
+						if reason != "" {
 							r.AddToTimeline("modify_reason", reason)
 						}
 
