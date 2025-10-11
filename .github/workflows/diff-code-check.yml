@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: write  # TODO: Test removal - may be redundant with pull-requests: write
+      issues: write
       actions: read
     steps:
       - name: Initialize workflow context
@@ -146,11 +146,6 @@ jobs:
         with:
           go-version-file: "./go.mod"
         id: go
-
-      #      - name: Download From oos
-      #        run: |
-      #          wget https://aliyun-oss.yaklang.com/yak/latest/yak_linux_amd64
-      #          chmod +x ./yak_linux_amd64
 
       - name: Init Module
         if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
@@ -417,68 +412,74 @@ jobs:
                     let inDescription = false;
                     let inSolution = false;
                     
-                    console.log(`Processing risk detail file: ${detailFile}`);
-                    
                     for (let i = 0; i < lines.length; i++) {
                       const line = lines[i];
                       
                       if (line.startsWith('文件路径:')) {
                         filePath = line.replace('文件路径:', '').trim();
-                        console.log(`Found file path: ${filePath}`);
                       } else if (line.startsWith('行号:')) {
                         lineNum = line.replace('行号:', '').trim();
-                        console.log(`Found line number: ${lineNum}`);
                       } else if (line.startsWith('严重程度:')) {
                         severity = line.replace('严重程度:', '').trim();
-                        console.log(`Found severity: ${severity}`);
                       } else if (line.startsWith('中文标题:')) {
                         title = line.replace('中文标题:', '').trim();
-                        console.log(`Found Chinese title: ${title}`);
                       } else if (line.startsWith('标题:') && !title) {
                         title = line.replace('标题:', '').trim();
-                        console.log(`Found title: ${title}`);
                       } else if (line.startsWith('描述:')) {
-                        description = line.replace('描述:', '').trim();
+                        description = '';
                         inDescription = true;
                         inSolution = false;
-                        console.log(`Found description: ${description.substring(0, 50)}...`);
                       } else if (line.startsWith('解决方案:')) {
-                        solution = line.replace('解决方案:', '').trim();
+                        solution = '';
                         inDescription = false;
                         inSolution = true;
-                        console.log(`Found solution: ${solution.substring(0, 50)}...`);
                       } else if (line.startsWith('=== 扫描统计 ===')) {
-                        // 遇到统计信息，停止解析
                         inDescription = false;
                         inSolution = false;
                         break;
-                      } else if (inDescription && line.trim() !== '') {
-                        // 累积描述内容
-                        description += '\n' + line;
-                      } else if (inSolution && line.trim() !== '') {
-                        // 累积解决方案内容
-                        solution += '\n' + line;
+                      } else if (inDescription) {
+                        if (description !== '') {
+                          description += '\n';
+                        }
+                        description += line;
+                      } else if (inSolution) {
+                        if (solution !== '') {
+                          solution += '\n';
+                        }
+                        solution += line;
                       }
                     }
-                    
-                    console.log(`Parsed values - filePath: "${filePath}", lineNum: "${lineNum}", severity: "${severity}", title: "${title}"`);
-                    
-                     // 如果找到了文件路径和行号，且严重程度为 high 或 critical，创建带代码引用的评论
-                     console.log(`Checking conditions - filePath: ${!!filePath}, lineNum: ${!!lineNum}, severity: ${!!severity}, title: ${!!title}, severity value: "${severity}"`);
                      
                      if (filePath && lineNum && severity && title && (severity === 'high' || severity === 'critical')) {
-                       console.log(`✅ All conditions met, creating line-specific comment for ${filePath}:${lineNum}`);
                        try {
-                         // 构建带代码引用的评论内容和精准链接
                          const codeReference = `\`${filePath}:${lineNum}\``;
                          const lineCommentIdentifier = `<!-- security-line-comment:${filePath}:${lineNum} -->`;
-                         
-                         // 生成精准的 GitHub 代码链接
                          const lineLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.sha}/${filePath}#L${lineNum}`;
+                         const cleanedDescription = description.trim();
+                         const cleanedSolution = solution.trim();
                          
-                         const lineComment = `${lineCommentIdentifier}\n\n## ⚠️ 安全风险检测\n\n**问题:** ${title}\n**严重程度:** ${severity}\n**文件位置:** ${codeReference}\n**代码链接:** [查看代码](${lineLink})\n\n**描述:**\n${description}\n\n**建议解决方案:**\n${solution}\n\n---\n*此评论由代码安全检查工具自动生成*`;
+                         const lineComment = [
+                           lineCommentIdentifier,
+                           '',
+                           '## ⚠️ 安全风险检测',
+                           '',
+                           `**问题:** ${title}`,
+                           `**严重程度:** ${severity}`,
+                           `**文件位置:** ${codeReference}`,
+                           `**代码链接:** [查看代码](${lineLink})`,
+                           '',
+                           '### 📋 描述',
+                           '',
+                           cleanedDescription,
+                           '',
+                           '### 💡 建议解决方案',
+                           '',
+                           cleanedSolution,
+                           '',
+                           '---',
+                           '*此评论由代码安全检查工具自动生成*'
+                         ].join('\n');
                          
-                         // 高效查找现有的行级评论（只查找机器人自己的评论）
                          let existingLineComment = null;
                          for (const comment of comments.data) {
                            if (comment.user.type === 'Bot' && comment.body.includes(lineCommentIdentifier)) {
@@ -488,43 +489,31 @@ jobs:
                          }
                          
                          if (existingLineComment) {
-                           // 更新现有的行级评论
                            await github.rest.issues.updateComment({
                              owner: context.repo.owner,
                              repo: context.repo.repo,
                              comment_id: existingLineComment.id,
                              body: lineComment
                            });
-                           console.log(`Line-specific comment updated for ${filePath}:${lineNum} (severity: ${severity})`);
                          } else {
-                           // 创建新的行级评论
                            await github.rest.issues.createComment({
                              issue_number: Number(process.env.PR_NUMBER),
                              owner: context.repo.owner,
                              repo: context.repo.repo,
                              body: lineComment
                            });
-                           console.log(`Line-specific comment posted for ${filePath}:${lineNum} (severity: ${severity})`);
                          }
                        } catch (lineError) {
-                         console.warn(`Failed to post line-specific comment for ${filePath}:${lineNum}:`, lineError.message);
-                         // 继续处理其他文件，不中断整个流程
+                         console.warn(`Failed to post comment for ${filePath}:${lineNum}`);
                        }
-                     } else if (severity && severity !== 'high' && severity !== 'critical') {
-                       console.log(`Skipping line-specific comment for ${filePath}:${lineNum} (severity: ${severity} - not high/critical)`);
-                     } else {
-                       console.log(`❌ Conditions not met for line-specific comment - filePath: "${filePath}", lineNum: "${lineNum}", severity: "${severity}", title: "${title}"`);
                      }
                   }
                 }
               } catch (resultsError) {
-                console.warn('Failed to process results directory for line comments:', resultsError.message);
-                // 不中断主流程
+                console.warn('Failed to process results directory');
               }
               
-              // 高效清理不再相关的旧评论
               try {
-                // 收集当前活跃的风险文件路径和行号
                 const activeRisks = new Set();
                 if (fs.existsSync(resultsDir)) {
                   const files = fs.readdirSync(resultsDir);
@@ -533,65 +522,40 @@ jobs:
                   for (const detailFile of detailFiles) {
                     const detailPath = path.join(resultsDir, detailFile);
                     const content = fs.readFileSync(detailPath, 'utf8');
-                    
                     const lines = content.split('\n');
                     let filePath = '';
                     let lineNum = '';
                     let severity = '';
                     
                     for (const line of lines) {
-                      if (line.startsWith('文件路径:')) {
-                        filePath = line.replace('文件路径:', '').trim();
-                      } else if (line.startsWith('行号:')) {
-                        lineNum = line.replace('行号:', '').trim();
-                      } else if (line.startsWith('严重程度:')) {
-                        severity = line.replace('严重程度:', '').trim();
-                      } else if (line.startsWith('=== 扫描统计 ===')) {
-                        // 遇到统计信息，停止解析
-                        break;
-                      }
+                      if (line.startsWith('文件路径:')) filePath = line.replace('文件路径:', '').trim();
+                      else if (line.startsWith('行号:')) lineNum = line.replace('行号:', '').trim();
+                      else if (line.startsWith('严重程度:')) severity = line.replace('严重程度:', '').trim();
+                      else if (line.startsWith('=== 扫描统计 ===')) break;
                     }
                     
-                    // 只保留 high 和 critical 的风险
                     if (filePath && lineNum && severity && (severity === 'high' || severity === 'critical')) {
                       activeRisks.add(`${filePath}:${lineNum}`);
                     }
                   }
                 }
                 
-                // 高效清理：只处理机器人自己的行级评论
-                let deletedCount = 0;
                 for (const comment of comments.data) {
                   if (comment.user.type === 'Bot' && comment.body.includes('<!-- security-line-comment:')) {
-                    // 提取评论中的文件路径和行号
                     const match = comment.body.match(/<!-- security-line-comment:([^:]+:\d+) -->/);
-                    if (match) {
-                      const commentKey = match[1];
-                      if (!activeRisks.has(commentKey)) {
-                        // 这个评论对应的风险已经不存在，删除该评论
-                        await github.rest.issues.deleteComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-                          comment_id: comment.id
-                        });
-                        deletedCount++;
-                        console.log(`Cleaned up outdated comment for ${commentKey}`);
-                      }
+                    if (match && !activeRisks.has(match[1])) {
+                      await github.rest.issues.deleteComment({
+                        owner: context.repo.owner,
+                        repo: context.repo.repo,
+                        comment_id: comment.id
+                      });
                     }
                   }
                 }
-                
-                if (deletedCount > 0) {
-                  console.log(`Cleaned up ${deletedCount} outdated security comments`);
-                }
               } catch (cleanupError) {
-                console.warn('Failed to cleanup outdated comments:', cleanupError.message);
-                // 不中断主流程
+                console.warn('Failed to cleanup outdated comments');
               }
               
-              console.log('Security comments posted successfully, but workflow will fail to trigger failure handling steps');
-              // 故意退出，让工作流失败，以便执行后续的失败处理步骤
-              console.log('Intentionally failing workflow to trigger failure handling steps');
               process.exit(1);
               
             } catch (error) {
@@ -606,49 +570,18 @@ jobs:
           name: risk.json
           path: risk.json
 
-      - name: Workflows fail info
+      - name: Display high severity risks
         if: steps.validate.outputs.should_skip != 'true' && failure()
-        run: |
-          ./yak ssa-risk --input ./risk.json --with-code --severity high
+        run: ./yak ssa-risk --input ./risk.json --with-code --severity high
 
-      - name: Workflows fail info - full
+      - name: Display all risks
         if: steps.validate.outputs.should_skip != 'true' && failure()
-        run: |
-          ./yak ssa-risk --input ./risk.json --with-code 
+        run: ./yak ssa-risk --input ./risk.json --with-code
       
-      - name: Cleanup workspace after workflow
+      - name: Cleanup workspace
         if: always()
         run: |
           if [ -d "vendor" ]; then
             sudo chmod -R +w vendor/ 2>/dev/null || chmod -R +w vendor/ || true
             rm -rf vendor/ || true
-          fi 
-        # cat risk.json | jq -r '
-        #   "=== Scan Report Summary ===",
-        #   "Scan Time: \(.report_time)",
-        #   "Program: \(.program_name)",
-        #   "Language: \(.program_lang)",
-        #   "Files Scanned: \(.file_count)",
-        #   "Lines of Code: \(.code_line_count)",
-        #   "Risks Found: \(.RiskNums)",
-        #   "",
-        #   "=== Risk Details ===",
-        #   (.Risks[] | 
-        #     "Risk ID: \(.hash)",
-        #     "Title: \(.title_verbose)",
-        #     "Severity: \(.severity)",
-        #     "Location: \(.code_source_url):\(.line)",
-        #     "Description: \(.description | split("\n")[0])",
-        #     "Solution: \(.solution | split("\n")[0])",
-        #     "Affected Code:",
-        #     (.code_fragment | split("\n")[] | "  \(.)"),
-        #     ""
-        #   ),
-        #   "=== Affected Files ===",
-        #   (.File[] | 
-        #     "File: \(.path)",
-        #     "Lines: \(.line_count)",
-        #     "Risk IDs: \(.risks | join(", "))",
-        #     ""
-        #   )'
-        # exit 1
+          fi
