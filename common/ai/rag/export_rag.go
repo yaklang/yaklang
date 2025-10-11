@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -25,15 +27,19 @@ type RAGBinaryData struct {
 
 // RAGExportConfig 导出选项
 type RAGExportConfig struct {
-	IncludeHNSWIndex bool // 是否包含HNSW索引
-	OnlyPQCode       bool // 是否只导出PQ编码
-	NoMetadata       bool // 是否不导出元数据
+	IncludeHNSWIndex  bool // 是否包含HNSW索引
+	OnlyPQCode        bool // 是否只导出PQ编码
+	NoMetadata        bool // 是否不导出元数据
+	DocumentHandler   func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
+	OnProgressHandler func(percent float64, message string, messageType string) // 进度回调
 }
 
 // RAGImportConfig 导入选项
 type RAGImportConfig struct {
 	OverwriteExisting bool   // 是否覆盖现有数据
 	CollectionName    string // 指定集合名称（可选）
+	DocumentHandler   func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
+	OnProgressHandler func(percent float64, message string, messageType string) // 进度回调
 }
 
 type ExportOptionFunc func(*RAGExportConfig)
@@ -56,6 +62,18 @@ func WithExportIncludeHNSWIndex(b bool) ExportOptionFunc {
 	}
 }
 
+func WithExportDocumentHandler(handler func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)) ExportOptionFunc {
+	return func(opts *RAGExportConfig) {
+		opts.DocumentHandler = handler
+	}
+}
+
+func WithExportProgressHandler(handler func(percent float64, message string, messageType string)) ExportOptionFunc {
+	return func(opts *RAGExportConfig) {
+		opts.OnProgressHandler = handler
+	}
+}
+
 func NewExportOptions(opts ...ExportOptionFunc) *RAGExportConfig {
 	config := &RAGExportConfig{
 		IncludeHNSWIndex: true,
@@ -70,6 +88,16 @@ func NewExportOptions(opts ...ExportOptionFunc) *RAGExportConfig {
 func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, opts ...ExportOptionFunc) (io.Reader, error) {
 	cfg := NewExportOptions(opts...)
 	buf := new(bytes.Buffer)
+
+	// 进度回调辅助函数
+	reportProgress := func(percent float64, message string, messageType string) {
+		if cfg.OnProgressHandler != nil {
+			cfg.OnProgressHandler(percent, message, messageType)
+		}
+	}
+
+	reportProgress(0, "开始导出向量库数据", "info")
+
 	// 查询集合信息
 	collection, err := yakit.QueryRAGCollectionByName(db, collectionName)
 	if err != nil {
@@ -77,6 +105,13 @@ func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, 
 	}
 	if collection == nil {
 		return nil, utils.Errorf("collection %s not found", collectionName)
+	}
+
+	reportProgress(10, "正在写入集合信息", "info")
+
+	// 确保Collection有UUID（如果没有就生成一个）
+	if collection.UUID == "" {
+		return nil, utils.Errorf("collection %s has empty UUID", collectionName)
 	}
 
 	// 写入魔数头和版本号
@@ -104,9 +139,12 @@ func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, 
 		return nil, utils.Wrap(err, "failed to write documents count")
 	}
 
+	reportProgress(20, fmt.Sprintf("开始导出 %d 个向量文档", totalDocs), "info")
+
 	// 分页导出文档数据
 	const pageSize = 100
 	page := 1
+	processedDocs := int64(0)
 
 	for {
 		var documents []*schema.VectorStoreDocument
@@ -128,8 +166,24 @@ func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, 
 
 		// 逐个写入文档数据
 		for _, doc := range documents {
+			if cfg.DocumentHandler != nil {
+				newDoc, err := cfg.DocumentHandler(*doc)
+				if err != nil {
+					return nil, utils.Wrapf(err, "failed to handle document %s", doc.DocumentID)
+				}
+				doc = &newDoc
+			}
+
 			if err := writeDocumentToBinary(buf, doc); err != nil {
 				return nil, utils.Wrapf(err, "failed to write document %s", doc.DocumentID)
+			}
+
+			processedDocs++
+
+			// 每处理10个文档或最后一个文档报告进度
+			if processedDocs%10 == 0 || processedDocs == totalDocs {
+				progress := 20 + (float64(processedDocs)/float64(totalDocs))*60 // 20-80%用于文档导出
+				reportProgress(progress, fmt.Sprintf("已导出 %d/%d 个向量文档", processedDocs, totalDocs), "info")
 			}
 		}
 
@@ -140,6 +194,8 @@ func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, 
 
 		page++
 	}
+
+	reportProgress(80, "向量文档导出完成，开始导出HNSW索引", "info")
 
 	// 导出并写入HNSW索引
 	if cfg.IncludeHNSWIndex {
@@ -154,13 +210,16 @@ func ExportRAGToBinary(ctx context.Context, db *gorm.DB, collectionName string, 
 				return nil, utils.Wrap(err, "failed to write hnsw index data")
 			}
 		}
+		reportProgress(95, "HNSW索引导出完成", "info")
 	} else {
 		// 不包含HNSW索引，写入0长度
 		if err := pbWriteVarint(buf, 0); err != nil {
 			return nil, utils.Wrap(err, "failed to write empty hnsw index length")
 		}
+		reportProgress(95, "跳过HNSW索引导出", "info")
 	}
 
+	reportProgress(100, "向量库数据导出完成", "success")
 	return buf, nil
 }
 
@@ -262,6 +321,30 @@ func writeDocumentToBinary(writer io.Writer, doc *schema.VectorStoreDocument) er
 		}
 	}
 
+	// PQCode
+	if err := pbWriteBytes(writer, doc.PQCode); err != nil {
+		return utils.Wrap(err, "write pq code")
+	}
+
+	// Content
+	if err := pbWriteBytes(writer, []byte(doc.Content)); err != nil {
+		return utils.Wrap(err, "write content")
+	}
+
+	// DocumentType
+	if err := pbWriteBytes(writer, []byte(doc.DocumentType)); err != nil {
+		return utils.Wrap(err, "write document type")
+	}
+
+	// EntityID
+	if err := pbWriteBytes(writer, []byte(doc.EntityID)); err != nil {
+		return utils.Wrap(err, "write entity id")
+	}
+
+	// RelatedEntities
+	if err := pbWriteBytes(writer, []byte(doc.RelatedEntities)); err != nil {
+		return utils.Wrap(err, "write related entities")
+	}
 	return nil
 }
 
@@ -422,46 +505,89 @@ func readDocumentsFromStream(reader io.Reader) ([]*ExportVectorStoreDocument, er
 	documents := make([]*ExportVectorStoreDocument, docCount)
 
 	for i := uint64(0); i < docCount; i++ {
-		doc := &ExportVectorStoreDocument{}
-
-		// 文档ID
-		docIDBytes, err := consumeBytes(reader)
+		doc, err := readDocumentFromStream(reader)
 		if err != nil {
-			return nil, utils.Wrap(err, "read document id")
+			return nil, utils.Wrap(err, "read document")
 		}
-		doc.DocumentID = string(docIDBytes)
-
-		// 元数据
-		metadataBytes, err := consumeBytes(reader)
-		if err != nil {
-			return nil, utils.Wrap(err, "read metadata")
-		}
-		if len(metadataBytes) > 0 {
-			err = json.Unmarshal(metadataBytes, &doc.Metadata)
-			if err != nil {
-				return nil, utils.Wrap(err, "unmarshal metadata")
-			}
-		}
-
-		// 向量数据
-		embeddingLen, err := consumeVarint(reader)
-		if err != nil {
-			return nil, utils.Wrap(err, "read embedding length")
-		}
-
-		doc.Embedding = make([]float32, embeddingLen)
-		for j := uint64(0); j < embeddingLen; j++ {
-			val, err := consumeFloat32(reader)
-			if err != nil {
-				return nil, utils.Wrap(err, "read embedding value")
-			}
-			doc.Embedding[j] = val
-		}
-
 		documents[i] = doc
 	}
 
 	return documents, nil
+}
+
+func readDocumentFromStream(reader io.Reader) (*ExportVectorStoreDocument, error) {
+	doc := &ExportVectorStoreDocument{}
+
+	// 文档ID
+	docIDBytes, err := consumeBytes(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read document id")
+	}
+	doc.DocumentID = string(docIDBytes)
+
+	// 元数据
+	metadataBytes, err := consumeBytes(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read metadata")
+	}
+	if len(metadataBytes) > 0 {
+		err = json.Unmarshal(metadataBytes, &doc.Metadata)
+		if err != nil {
+			return nil, utils.Wrap(err, "unmarshal metadata")
+		}
+	}
+
+	// 向量数据
+	embeddingLen, err := consumeVarint(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read embedding length")
+	}
+
+	doc.Embedding = make([]float32, embeddingLen)
+	for j := uint64(0); j < embeddingLen; j++ {
+		val, err := consumeFloat32(reader)
+		if err != nil {
+			return nil, utils.Wrap(err, "read embedding value")
+		}
+		doc.Embedding[j] = val
+	}
+
+	// PQCode
+	pqCodeBytes, err := consumeBytes(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read pq code")
+	}
+	doc.PQCode = pqCodeBytes
+
+	// Content
+	contentBytes, err := consumeBytes(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read content")
+	}
+	doc.Content = string(contentBytes)
+
+	// DocumentType
+	documentTypeBytes, err := consumeBytes(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read document type")
+	}
+	doc.DocumentType = string(documentTypeBytes)
+
+	// EntityID
+	entityIDBytes, err := consumeBytes(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read entity id")
+	}
+	doc.EntityID = string(entityIDBytes)
+
+	// RelatedEntities
+	relatedEntitiesBytes, err := consumeBytes(reader)
+	if err != nil {
+		return nil, utils.Wrap(err, "read related entities")
+	}
+	doc.RelatedEntities = string(relatedEntitiesBytes)
+
+	return doc, nil
 }
 
 // readHNSWIndexFromStream 从流中读取HNSW索引
@@ -485,8 +611,8 @@ func readHNSWIndexFromStream(reader io.Reader) ([]byte, error) {
 	return hnswIndex, nil
 }
 
-// ImportRAGFromBinary 从二进制文件导入RAG数据
-func ImportRAGFromBinary(ctx context.Context, db *gorm.DB, inputPath string, opts *RAGImportConfig) error {
+// ImportRAGFromFile 从二进制文件导入RAG数据，支持从文件路径导入
+func ImportRAGFromFile(ctx context.Context, db *gorm.DB, inputPath string, opts *RAGImportConfig) error {
 	if opts == nil {
 		opts = &RAGImportConfig{
 			OverwriteExisting: false,
@@ -507,9 +633,30 @@ func ImportRAGFromBinary(ctx context.Context, db *gorm.DB, inputPath string, opt
 	}
 
 	// 执行导入
-	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		return importRAGDataToDB(ctx, tx, ragData, opts)
-	})
+	return importRAGDataToDB(ctx, db, ragData, opts)
+}
+
+// ImportRAGFromReader 从二进制流导入RAG数据
+func ImportRAGFromReader(ctx context.Context, db *gorm.DB, reader io.Reader, opts *RAGImportConfig) error {
+	if opts == nil {
+		opts = &RAGImportConfig{
+			OverwriteExisting: false,
+		}
+	}
+
+	// 加载RAG数据
+	ragData, err := LoadRAGFromBinary(reader)
+	if err != nil {
+		return utils.Wrap(err, "failed to load RAG binary data")
+	}
+
+	// 如果指定了名称，更新集合名称
+	if opts.CollectionName != "" && ragData.Collection != nil {
+		ragData.Collection.Name = opts.CollectionName
+	}
+
+	// 执行导入
+	return importRAGDataToDB(ctx, db, ragData, opts)
 }
 
 // importRAGDataToDB 将RAG数据导入到数据库
@@ -517,6 +664,15 @@ func importRAGDataToDB(ctx context.Context, db *gorm.DB, ragData *RAGBinaryData,
 	if ragData.Collection == nil {
 		return utils.Error("collection data is missing")
 	}
+
+	// 进度回调辅助函数
+	reportProgress := func(percent float64, message string, messageType string) {
+		if opts.OnProgressHandler != nil {
+			opts.OnProgressHandler(percent, message, messageType)
+		}
+	}
+
+	reportProgress(0, "开始导入向量库数据", "info")
 
 	collection := ragData.Collection
 	collectionName := collection.Name
@@ -527,12 +683,10 @@ func importRAGDataToDB(ctx context.Context, db *gorm.DB, ragData *RAGBinaryData,
 		collection.Name = collectionName
 	}
 
-	// 检查集合是否已存在
-	existingCollection, err := yakit.QueryRAGCollectionByName(db, collectionName)
-	if err != nil {
-		return utils.Wrap(err, "failed to query existing collection")
-	}
+	reportProgress(10, "正在处理集合信息", "info")
 
+	// 检查集合是否已存在
+	existingCollection, _ := yakit.QueryRAGCollectionByName(db, collectionName)
 	var collectionID uint
 	if existingCollection != nil {
 		if !opts.OverwriteExisting {
@@ -541,7 +695,7 @@ func importRAGDataToDB(ctx context.Context, db *gorm.DB, ragData *RAGBinaryData,
 
 		// 删除现有数据
 		collectionID = existingCollection.ID
-		err = db.Unscoped().Where("collection_id = ?", collectionID).Delete(&schema.VectorStoreDocument{}).Error
+		err := db.Unscoped().Where("collection_id = ?", collectionID).Delete(&schema.VectorStoreDocument{}).Error
 		if err != nil {
 			return utils.Wrap(err, "failed to delete existing documents")
 		}
@@ -563,49 +717,90 @@ func importRAGDataToDB(ctx context.Context, db *gorm.DB, ragData *RAGBinaryData,
 	} else {
 		// 创建新集合
 		collection.ID = 0 // 重置ID，让数据库自动分配
-		err = db.Create(collection).Error
+		// 确保UUID不为空
+		if collection.UUID == "" {
+			collection.UUID = uuid.NewString()
+		}
+		err := db.Create(collection).Error
 		if err != nil {
 			return utils.Wrap(err, "failed to create collection")
 		}
 		collectionID = collection.ID
 	}
 
+	reportProgress(20, "集合信息处理完成，开始导入向量文档", "info")
+
 	// 导入文档数据
 	if len(ragData.Documents) > 0 {
-		documents := make([]*schema.VectorStoreDocument, len(ragData.Documents))
+		totalDocs := len(ragData.Documents)
+		documents := make([]*schema.VectorStoreDocument, totalDocs)
+
+		reportProgress(30, fmt.Sprintf("正在处理 %d 个向量文档", totalDocs), "info")
+
 		for i, exportDoc := range ragData.Documents {
 			documents[i] = &schema.VectorStoreDocument{
-				DocumentID:   exportDoc.DocumentID,
-				Metadata:     exportDoc.Metadata,
-				Embedding:    exportDoc.Embedding,
-				CollectionID: collectionID,
+				DocumentID:      exportDoc.DocumentID,
+				Metadata:        exportDoc.Metadata,
+				Embedding:       exportDoc.Embedding,
+				PQCode:          exportDoc.PQCode,
+				Content:         exportDoc.Content,
+				DocumentType:    schema.RAGDocumentType(exportDoc.DocumentType),
+				UID:             getLazyNodeUIDByMd5(collection.Name, exportDoc.DocumentID),
+				EntityID:        exportDoc.EntityID,
+				RelatedEntities: exportDoc.RelatedEntities,
+				CollectionID:    collectionID,
+				CollectionUUID:  collection.UUID,
+			}
+
+			// 应用文档处理器
+			if opts.DocumentHandler != nil {
+				newDoc, err := opts.DocumentHandler(*documents[i])
+				if err != nil {
+					return utils.Wrapf(err, "failed to handle document %s", exportDoc.DocumentID)
+				}
+				documents[i] = &newDoc
+			}
+
+			// 每处理100个文档报告一次进度
+			if (i+1)%100 == 0 || i+1 == totalDocs {
+				progress := 30 + (float64(i+1)/float64(totalDocs))*40 // 30-70%用于文档处理
+				reportProgress(progress, fmt.Sprintf("已处理 %d/%d 个向量文档", i+1, totalDocs), "info")
 			}
 		}
 
-		// 批量插入文档
-		batchSize := 1000
-		for i := 0; i < len(documents); i += batchSize {
-			end := i + batchSize
-			if end > len(documents) {
-				end = len(documents)
+		reportProgress(70, "开始将向量文档插入数据库", "info")
+
+		// 逐个插入文档，避免批量创建的问题
+		for i, doc := range documents {
+			err := db.Create(doc).Error
+			if err != nil {
+				log.Errorf("failed to create document %d (ID: %s): %v", i, doc.DocumentID, err)
+				continue
 			}
 
-			err = db.Create(documents[i:end]).Error
-			if err != nil {
-				return utils.Wrapf(err, "failed to create documents batch %d-%d", i, end)
+			// 每插入100个文档报告一次进度
+			if (i+1)%100 == 0 || i+1 == len(documents) {
+				progress := 70 + (float64(i+1)/float64(len(documents)))*20 // 70-90%用于文档插入
+				reportProgress(progress, fmt.Sprintf("已插入 %d/%d 个向量文档到数据库", i+1, len(documents)), "info")
 			}
 		}
 	}
 
+	reportProgress(90, "向量文档导入完成，开始导入HNSW索引", "info")
+
 	// 导入HNSW索引（如果存在）
 	if len(ragData.Collection.GraphBinary) > 0 {
-		err = db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionID).Update("graph_binary", ragData.Collection.GraphBinary).Error
+		err := db.Model(&schema.VectorStoreCollection{}).Where("id = ?", collectionID).Update("graph_binary", ragData.Collection.GraphBinary).Error
 		if err != nil {
 			// HNSW索引导入失败不应该影响整个导入过程
 			log.Warnf("failed to import HNSW index: %v", err)
 		}
+		reportProgress(95, "HNSW索引导入完成", "info")
+	} else {
+		reportProgress(95, "跳过HNSW索引导入", "info")
 	}
 
+	reportProgress(100, "向量库数据导入完成", "success")
 	return nil
 }
 

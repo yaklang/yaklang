@@ -62,6 +62,17 @@ func GetKnowledgeBase(db *gorm.DB, id int64) (*schema.KnowledgeBaseInfo, error) 
 	return &knowledgeBase, nil
 }
 
+// GetKnowledgeBase 获取知识库信息
+func GetKnowledgeBaseByName(db *gorm.DB, name string) (*schema.KnowledgeBaseInfo, error) {
+	db = db.Model(&schema.KnowledgeBaseInfo{})
+	var knowledgeBase schema.KnowledgeBaseInfo
+	err := db.Where("knowledge_base_name = ?", name).First(&knowledgeBase).Error
+	if err != nil {
+		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
+	}
+	return &knowledgeBase, nil
+}
+
 // GetKnowledgeBaseNameList 获取知识库名称列表
 func GetKnowledgeBaseNameList(db *gorm.DB) ([]string, error) {
 	db = db.Model(&schema.KnowledgeBaseInfo{}).Select("knowledge_base_name")
