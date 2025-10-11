@@ -542,7 +542,8 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 }
 
 func CreateTempTestDatabaseInMemory() (*gorm.DB, error) {
-	db, err := gorm.Open("sqlite3", "file::memory:?cache=shared")
+	uuid := uuid.New().String()
+	db, err := gorm.Open("sqlite3", "file::memory-"+uuid+"?mode=memory&cache=shared")
 	if err != nil {
 		return nil, err
 	}

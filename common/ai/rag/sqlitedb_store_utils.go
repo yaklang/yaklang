@@ -21,9 +21,14 @@ func IsReadyCollection(db *gorm.DB, collectionName string) bool {
 }
 
 type ExportVectorStoreDocument struct {
-	DocumentID string                 `json:"document_id"`
-	Metadata   map[string]interface{} `json:"metadata"`
-	Embedding  []float32              `json:"embedding"`
+	DocumentID      string                 `json:"document_id"`
+	Metadata        map[string]interface{} `json:"metadata"`
+	Embedding       []float32              `json:"embedding"`
+	PQCode          []byte                 `json:"pq_code"`
+	Content         string                 `json:"content"`
+	DocumentType    string                 `json:"document_type"`
+	EntityID        string                 `json:"entity_id"`
+	RelatedEntities string                 `json:"related_entities"`
 }
 
 func ImportVectorData(db *gorm.DB, filepath string) error {
