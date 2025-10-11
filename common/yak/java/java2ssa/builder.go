@@ -42,8 +42,13 @@ func (s *SSABuilder) FilterParseAST(path string) bool {
 	return extension == ".java"
 }
 
-func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src, s)
+func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
+	parser := javaparser.NewJavaParser(nil)
+	return s.CreateAntlrCache(parser.BaseParser)
+}
+
+func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
+	return Frontend(src, cache)
 }
 
 func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
@@ -88,10 +93,10 @@ type singleFileBuilder struct {
 	isInController bool
 }
 
-func Frontend(src string, ssabuilder ...*SSABuilder) (javaparser.ICompilationUnitContext, error) {
-	var builder *ssa.PreHandlerBase
-	if len(ssabuilder) > 0 {
-		builder = ssabuilder[0].PreHandlerBase
+func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
+	var cache *ssa.AntlrCache
+	if len(caches) > 0 {
+		cache = caches[0]
 	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
@@ -99,7 +104,7 @@ func Frontend(src string, ssabuilder ...*SSABuilder) (javaparser.ICompilationUni
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
+	ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

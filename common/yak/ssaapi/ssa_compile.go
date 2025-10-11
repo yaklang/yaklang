@@ -102,7 +102,7 @@ func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 	if err != nil {
 		return nil, err
 	}
-	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode())
+	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode(), nil)
 	defer c.LanguageBuilder.Clearup()
 	if !c.ignoreSyntaxErr && err != nil {
 		return nil, utils.Errorf("parse file error: %v", err)
