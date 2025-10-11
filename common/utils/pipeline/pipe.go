@@ -9,19 +9,22 @@ import (
 )
 
 type Pipe[T, U any] struct {
-	ctx     context.Context
-	in      *chanx.UnlimitedChan[T]
-	out     *chanx.UnlimitedChan[U]
-	err     error
-	swg     *utils.SizedWaitGroup
-	handler func(item T) (U, error)
+	ctx        context.Context
+	in         *chanx.UnlimitedChan[T]
+	out        *chanx.UnlimitedChan[U]
+	err        error
+	swg        *utils.SizedWaitGroup
+	handler    func(item T, store *utils.SafeMap[any]) (U, error)
+	initWorker func() *utils.SafeMap[any]
 }
 
 func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item T) (U, error)) *Pipe[T, U] {
 	ret := &Pipe[T, U]{
-		ctx:     ctx,
-		out:     chanx.NewUnlimitedChan[U](ctx, defaultPipeSize),
-		handler: handler,
+		ctx: ctx,
+		out: chanx.NewUnlimitedChan[U](ctx, defaultPipeSize),
+		handler: func(item T, store *utils.SafeMap[any]) (U, error) {
+			return handler(item)
+		},
 	}
 	go func() {
 		defer ret.out.Close()
@@ -33,9 +36,9 @@ func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item
 				if !ok {
 					return
 				}
-				outResult, err := ret.handler(item)
+				outResult, err := ret.handler(item, nil)
 				if err != nil {
-					log.Errorf("failed to handle item '%s': %v", item, err)
+					log.Errorf("failed to handle item: %v", err)
 					return
 				}
 				ret.out.SafeFeed(outResult)
@@ -47,10 +50,44 @@ func NewSimplePipe[T, U any](ctx context.Context, in <-chan T, handler func(item
 
 const defaultPipeSize = 200
 
+// NewPipe 创建一个基本的 Pipe，兼容不需要 store 的老代码
 func NewPipe[T, U any](
 	ctx context.Context,
 	initBufSize int,
 	handler func(item T) (U, error),
+	concurrency ...int,
+) *Pipe[T, U] {
+	// 包装老的 handler，使其兼容新的签名
+	wrappedHandler := func(item T, store *utils.SafeMap[any]) (U, error) {
+		return handler(item)
+	}
+	return NewPipeWithInit(ctx, initBufSize, wrappedHandler, nil, concurrency...)
+}
+
+// NewPipeWithStore 创建一个带有 worker 初始化函数的 Pipe
+// initWorker 会在每个 worker 协程启动时执行一次，用于初始化协程本地存储
+// handler 的第二个参数会接收到 initWorker 返回的 store
+func NewPipeWithStore[T, U any](
+	ctx context.Context,
+	initBufSize int,
+	handler func(item T, store *utils.SafeMap[any]) (U, error),
+	initWorker func() *utils.SafeMap[any],
+	concurrency ...int,
+) *Pipe[T, U] {
+	// 包装 handler，适配可变参数签名
+	wrappedHandler := func(item T, store *utils.SafeMap[any]) (U, error) {
+		return handler(item, store)
+	}
+	return NewPipeWithInit(ctx, initBufSize, wrappedHandler, initWorker, concurrency...)
+}
+
+// NewPipeWithInit 创建一个带有 worker 初始化函数的 Pipe（内部使用）
+// initWorker 会在每个 worker 协程启动时执行一次，用于初始化协程本地存储
+func NewPipeWithInit[T, U any](
+	ctx context.Context,
+	initBufSize int,
+	handler func(item T, store *utils.SafeMap[any]) (U, error),
+	initWorker func() *utils.SafeMap[any],
 	concurrency ...int,
 ) *Pipe[T, U] {
 	pipeSize := defaultPipeSize
@@ -58,10 +95,11 @@ func NewPipe[T, U any](
 		pipeSize = initBufSize
 	}
 	ret := &Pipe[T, U]{
-		ctx:     ctx,
-		in:      chanx.NewUnlimitedChan[T](ctx, pipeSize),
-		out:     chanx.NewUnlimitedChan[U](ctx, pipeSize),
-		handler: handler,
+		ctx:        ctx,
+		in:         chanx.NewUnlimitedChan[T](ctx, pipeSize),
+		out:        chanx.NewUnlimitedChan[U](ctx, pipeSize),
+		handler:    handler,
+		initWorker: initWorker,
 	}
 	var con int
 	if len(concurrency) > 0 && concurrency[0] > 0 {
@@ -70,11 +108,15 @@ func NewPipe[T, U any](
 		con = 10 // 默认并发10
 	}
 	ret.swg = utils.NewSizedWaitGroup(con)
-	ret.swg.Add(1)
-	go func() {
-		defer ret.swg.Done()
-		ret.process()
-	}()
+
+	// 启动固定数量的消费者协程
+	for i := 0; i < con; i++ {
+		ret.swg.Add(1)
+		go func() {
+			defer ret.swg.Done()
+			ret.worker()
+		}()
+	}
 
 	return ret
 }
@@ -105,7 +147,21 @@ func (p *Pipe[T, U]) Out() <-chan U {
 	return p.out.OutputChannel()
 }
 
-func (p *Pipe[T, U]) process() {
+// worker 是固定的消费者协程，持续从输入通道读取数据并处理
+func (p *Pipe[T, U]) worker() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Errorf("Pipe worker panic: %v", r)
+			utils.PrintCurrentGoroutineRuntimeStack()
+		}
+	}()
+
+	// 初始化协程本地存储
+	var store *utils.SafeMap[any]
+	if p.initWorker != nil {
+		store = p.initWorker()
+	}
+
 	for {
 		select {
 		case <-p.ctx.Done():
@@ -114,23 +170,17 @@ func (p *Pipe[T, U]) process() {
 			if !ok {
 				return
 			}
-			_ = item
 
-			p.swg.Add(1)
-			go func(t T) {
-				defer p.swg.Done()
-				defer func() {
-					if r := recover(); r != nil {
-						log.Errorf("Pipe process panic: %v", r)
-						utils.PrintCurrentGoroutineRuntimeStack()
-					}
-				}()
-				if result, err := p.handler(t); err == nil {
-					p.out.SafeFeed(result)
-				} else {
-					p.err = utils.JoinErrors(p.err, err)
-				}
-			}(item)
+			var result U
+			var err error
+
+			result, err = p.handler(item, store)
+
+			if err == nil {
+				p.out.SafeFeed(result)
+			} else {
+				p.err = utils.JoinErrors(p.err, err)
+			}
 		}
 	}
 }
