@@ -523,7 +523,38 @@ func TimeEstimateTool() *aitool.Tool {
 	return tool
 }
 
-// PrintTool 直接输出工具
+func ErrorTool() *aitool.Tool {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		return nil, fmt.Errorf("这是一个模拟错误的工具")
+	}
+
+	tool, _ := aitool.New("error",
+		aitool.WithDescription("模拟错误的工具"),
+		aitool.WithSimpleCallback(callback),
+	)
+
+	return tool
+}
+
+// EchoTool 直接返回输入的工具
+func EchoTool() *aitool.Tool {
+	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+		input := params.GetString("input")
+		return input, nil
+	}
+
+	tool, _ := aitool.New("echo",
+		aitool.WithDescription("输出测试工具"),
+		aitool.WithSimpleCallback(callback),
+		aitool.WithStringParam("input",
+			aitool.WithParam_Description("直接返回的结果"),
+		),
+	)
+
+	return tool
+}
+
+// PrintTool 直接输出到标准输出的工具
 func PrintTool() *aitool.Tool {
 	callback := func(params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 		output := params.GetString("output")

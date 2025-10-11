@@ -64,6 +64,44 @@ type AiTask struct {
 	TaskContinueCount int64 `json:"task_continue_count"` // 任务继续执行的次数
 }
 
+func (t *AiTask) GetSummary() string {
+	if t.TaskSummary != "" {
+		return t.TaskSummary
+	}
+	if t.ShortSummary != "" {
+		return t.ShortSummary
+	}
+	if t.LongSummary != "" {
+		return t.LongSummary
+	}
+	if t.StatusSummary != "" {
+		return t.StatusSummary
+	}
+	return ""
+}
+
+func (t *AiTask) GetSuccessCallCount() int {
+	count := 0
+	t.toolCallResultIds.ForEach(func(i int64, v *aitool.ToolResult) bool {
+		if v.Success {
+			count++
+		}
+		return true
+	})
+	return count
+}
+
+func (t *AiTask) GetFailCallCount() int {
+	count := 0
+	t.toolCallResultIds.ForEach(func(i int64, v *aitool.ToolResult) bool {
+		if !v.Success {
+			count++
+		}
+		return true
+	})
+	return count
+}
+
 func (t *AiTask) GetEmitter() *aicommon.Emitter {
 	if t.Emitter == nil {
 		return t.Config.GetEmitter()
@@ -103,7 +141,7 @@ func (t *AiTask) PushToolCallResult(i *aitool.ToolResult) {
 }
 
 // MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
-func (t AiTask) MarshalJSON() ([]byte, error) {
+func (t *AiTask) MarshalJSON() ([]byte, error) {
 	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
 	var progress string
 	if t.executed {
@@ -114,17 +152,25 @@ func (t AiTask) MarshalJSON() ([]byte, error) {
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
-		Index    string    `json:"index"`
-		Name     string    `json:"name"`
-		Goal     string    `json:"goal"`
-		Subtasks []*AiTask `json:"subtasks,omitempty"`
-		Progress string    `json:"progress"` // 添加进度字段
+		Index                string    `json:"index"`
+		Name                 string    `json:"name"`
+		Goal                 string    `json:"goal"`
+		Subtasks             []*AiTask `json:"subtasks,omitempty"`
+		Progress             string    `json:"progress"` // 添加进度字段
+		Summary              string    `json:"summary"`
+		TotalToolCallCount   int64     `json:"total_tool_call_count"`
+		SuccessToolCallCount int       `json:"success_tool_call_count"`
+		FailToolCallCount    int       `json:"fail_tool_call_count"`
 	}{
-		Index:    t.Index,
-		Name:     t.Name,
-		Goal:     t.Goal,
-		Subtasks: t.Subtasks,
-		Progress: progress,
+		Index:                t.Index,
+		Name:                 t.Name,
+		Goal:                 t.Goal,
+		Subtasks:             t.Subtasks,
+		Progress:             progress,
+		Summary:              t.GetSummary(),
+		TotalToolCallCount:   t.ToolCallCount,
+		SuccessToolCallCount: t.GetSuccessCallCount(),
+		FailToolCallCount:    t.GetFailCallCount(),
 	})
 }
 
