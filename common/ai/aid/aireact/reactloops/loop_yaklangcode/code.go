@@ -75,7 +75,7 @@ func init() {
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithReactiveDataBuilder(func(loop *reactloops.ReActLoop, feedbacker *bytes.Buffer, nonce string) (string, error) {
-					yakCode := loop.Get("yak_code")
+					yakCode := loop.Get("full_code")
 					codeWithLine := utils.PrefixLinesWithLineNumbers(yakCode)
 
 					feedbacks := feedbacker.String()
