@@ -429,7 +429,6 @@ func main() {
 	unsafeHTTPClient3()
 }
 UNSAFE
-
 	'safefile://safe_default_verification.go': <<<SAFE
 package main
 
@@ -483,7 +482,6 @@ func main() {
 	safeHTTPClientExplicit()
 }
 SAFE
-
 	'safefile://safe_custom_ca.go': <<<SAFE
 package main
 
@@ -582,7 +580,6 @@ func main() {
 	fmt.Printf("Response status: %s\n", resp.Status)
 }
 SAFE
-
 	'safefile://safe_mutual_tls.go': <<<SAFE
 package main
 

@@ -10,7 +10,7 @@ const ExistedCorePluginEmbedFSHash string = "fd10795280537a0d5af60d669818ecabcb4
 // ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
 // This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
 // The hash is automatically calculated from the SyntaxFlow rule files during compilation.
-const ExistedSyntaxFlowEmbedFSHash string = "8884e88536577be3d86db91b6349cfd1c60b06831f41a11c91f96dc0e9f171b6"
+const ExistedSyntaxFlowEmbedFSHash string = "bc03c4c4b7cd0a51b63d5e5d9be87d1656afc482fc60916b39285825b522e3b7"
 
 // ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
 // This hash is used to verify the integrity of the built-in forge templates and resources.

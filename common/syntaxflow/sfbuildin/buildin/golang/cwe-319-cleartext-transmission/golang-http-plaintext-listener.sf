@@ -589,7 +589,6 @@ func main() {
 	// unsafeServer3()
 }
 UNSAFE
-
 	'safefile://safe_https_server.go': <<<SAFE
 package main
 
@@ -687,7 +686,6 @@ func main() {
 	safeServer2()
 }
 SAFE
-
 	'safefile://safe_http_redirect_to_https.go': <<<SAFE
 package main
 
@@ -770,7 +768,6 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"secure": true}`))
 }
 SAFE
-
 	'safefile://safe_localhost_only.go': <<<SAFE
 package main
 

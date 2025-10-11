@@ -263,7 +263,7 @@ func main() {
 	http.HandleFunc("/data", handleSSEResponse)
 	http.ListenAndServe(":8080", nil)
 }
-UNSAFE,
+UNSAFE
 	'safefile://safe_strict_type.go': <<<SAFE
 package main
 
@@ -327,7 +327,6 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 SAFE
-
 	'safefile://safe_whitelist.go': <<<SAFE
 package main
 

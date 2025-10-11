@@ -756,7 +756,6 @@ func main() {
 	}
 }
 UNSAFE
-
 	'safefile://safe_aes_gcm.go': <<<SAFE
 package main
 
@@ -914,7 +913,6 @@ func main() {
 	log.Printf("Decrypted: %s\n", decrypted)
 }
 SAFE
-
 	'safefile://safe_chacha20_poly1305.go': <<<SAFE
 package main
 
