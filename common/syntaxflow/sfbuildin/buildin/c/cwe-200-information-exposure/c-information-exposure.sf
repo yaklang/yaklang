@@ -147,12 +147,12 @@ REFERENCE
 
 <include('c-user-input')> as $user_input;
 
-printf(*<slice(index=1)> #-> as $output_sink);
-fprintf(*<slice(index=2)> #-> as $output_sink);
-puts(* #-> as $output_sink);
-fputs(*<slice(index=1)> #-> as $output_sink);
+printf(*<slice(index=1)> as $output_sink);
+fprintf(*<slice(index=2)> as $output_sink);
+puts(* as $output_sink);
+fputs(*<slice(index=1)> as $output_sink);
 
-perror(* #-> as $error_sink);
+perror(* as $error_sink);
 strerror() as $error_info;
 
 getcwd() as $system_info;
@@ -160,12 +160,10 @@ getenv() as $system_info;
 mysql_error() as $db_error;
 sqlite3_errmsg() as $db_error;
 
-$user_input & $output_sink as $medium;
-
-$system_info & $output_sink as $medium;
-$error_info & $output_sink as $medium;
-$db_error & $output_sink as $medium;
-
+$user_input?{* #{ until: `* & $output_sink`}-> } as $medium
+$system_info?{* #{ until: `* & $output_sink`}-> } as $medium
+$error_info?{* #{ until: `* & $output_sink`}-> } as $medium
+$db_error?{* #{ until: `* & $output_sink`}-> } as $medium
 alert $medium for {
 	level: "medium",
 	type: "vuln",

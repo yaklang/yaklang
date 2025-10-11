@@ -1,0 +1,408 @@
+desc(
+	title: "Detect Golang JSON Injection Vulnerability"
+	title_zh: "检测Golang JSON注入漏洞"
+	type: vuln
+	severity: high
+	risk: "json_injection"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   JSON注入（也称为JSON参数污染或解析器差异性攻击）是一种安全漏洞，当不可信的输入数据未经严格处理就被直接序列化为JSON时发生。攻击者可以通过构造包含重复键、非标准JSON扩展的恶意数据，导致生成的JSON结构被下游系统错误解析，从而引发安全风险。
+
+2. **触发场景**
+   JSON注入漏洞通常发生在以下场景：
+   - 直接将外部数据源（HTTP响应体、用户输入）序列化为JSON，未进行数据清洗和类型校验
+   - 使用 `json.Marshal` 直接序列化 `map[string]interface{}` 或 `interface{}` 类型的不可信数据
+   - 将从网络流、SSE响应或第三方API获取的数据未验证就序列化
+   
+   ```go
+   // 不安全的代码示例
+   func handleData(w http.ResponseWriter, r *http.Request) {
+       // 从外部API获取数据
+       resp, _ := http.Get("https://untrusted-api.com/data")
+       var streamData map[string]interface{}
+       json.NewDecoder(resp.Body).Decode(&streamData)
+       
+       // 直接序列化不可信的数据
+       searchListData := streamData["search_list"]
+       jsonBytes, _ := json.Marshal(searchListData) // 危险！
+       w.Write(jsonBytes)
+   }
+   ```
+
+3. **潜在影响**
+   - **解析器差异性攻击**：不同JSON解析器对重复键的处理不同（Go选择最后一个值，某些Python/JavaScript库选择第一个值），可能绕过安全校验
+   - **数据污染**：攻击者可以注入额外的键值对（如 `"role":"admin"`），提升权限或修改业务逻辑
+   - **信息泄露**：通过构造特殊的JSON结构，可能导致敏感信息在序列化-反序列化过程中泄露
+   - **拒绝服务**：通过构造大量嵌套或重复的JSON结构，可能导致内存耗尽或解析超时
+
+DESC
+	rule_id: "a1b2c3d4-json-injection-001"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用严格类型约束
+定义只包含预期字段的严格结构体，将输入数据反序列化到此结构体中。这会自动过滤未知字段和非法结构。
+
+```go
+// 定义严格的数据结构
+type SafeSearchList struct {
+    Items []string `json:"items"`
+    Total int      `json:"total"`
+}
+
+func processData(streamData map[string]interface{}) ([]byte, error) {
+    // 通过JSON序列化再反序列化，进行类型转换和清洗
+    tmpBytes, _ := json.Marshal(streamData["search_list"])
+    
+    var safeList SafeSearchList
+    if err := json.Unmarshal(tmpBytes, &safeList); err != nil {
+        return nil, fmt.Errorf("invalid data format: %v", err)
+    }
+    
+    // 使用清洗后的安全数据
+    return json.Marshal(safeList)
+}
+```
+
+#### 2. 创建数据白名单
+对预期的数据结构进行显式校验，只允许符合预期的字段和类型。
+
+```go
+func sanitizeSearchList(data interface{}) ([]string, error) {
+    var results []string
+    
+    slice, ok := data.([]interface{})
+    if !ok {
+        return nil, errors.New("invalid format: expected array")
+    }
+    
+    for i, item := range slice {
+        str, ok := item.(string)
+        if !ok {
+            return nil, fmt.Errorf("item at index %d is not a string", i)
+        }
+        // 可选：进一步校验字符串内容
+        if len(str) > 100 || containsDangerousChars(str) {
+            return nil, fmt.Errorf("item at index %d contains invalid characters", i)
+        }
+        results = append(results, str)
+    }
+    
+    return results, nil
+}
+
+func handleData(w http.ResponseWriter, r *http.Request) {
+    var streamData map[string]interface{}
+    // ... 获取数据 ...
+    
+    // 先进行清洗
+    safeList, err := sanitizeSearchList(streamData["search_list"])
+    if err != nil {
+        http.Error(w, "Invalid data", http.StatusBadRequest)
+        return
+    }
+    
+    // 使用清洗后的数据
+    jsonBytes, _ := json.Marshal(safeList)
+    w.Write(jsonBytes)
+}
+```
+
+#### 3. 输入验证与净化
+在数据流入系统的源头进行严格验证。
+
+```go
+import "github.com/go-playground/validator/v10"
+
+type SearchData struct {
+    Items []string `json:"items" validate:"required,max=100,dive,max=200"`
+    Query string   `json:"query" validate:"required,max=500,alphanum"`
+}
+
+func validateAndMarshal(rawData map[string]interface{}) ([]byte, error) {
+    validate := validator.New()
+    
+    // 转换为结构体
+    tmpBytes, _ := json.Marshal(rawData)
+    var data SearchData
+    if err := json.Unmarshal(tmpBytes, &data); err != nil {
+        return nil, err
+    }
+    
+    // 验证数据
+    if err := validate.Struct(data); err != nil {
+        return nil, fmt.Errorf("validation failed: %v", err)
+    }
+    
+    // 安全序列化
+    return json.Marshal(data)
+}
+```
+
+#### 4. 避免字符串拼接构造JSON
+永远不要通过字符串拼接来构造JSON，这会完全绕过JSON编码器的安全保护。
+
+```go
+// ❌ 危险：通过字符串拼接
+func someHandler(username, password string) string {
+    return `{"username":"` + username + `","password":"` + password + `"}`
+}
+
+// ✅ 安全：使用结构体和json.Marshal
+func someHandler(username, password string) (string, error) {
+    data := struct {
+        Username string `json:"username"`
+        Password string `json:"password"`
+    }{
+        Username: username,
+        Password: password,
+    }
+    bytes, err := json.Marshal(data)
+    if err != nil {
+        return "", err
+    }
+    return string(bytes), nil
+}
+```
+
+#### 5. 安全开发实践
+- **永不信任输入**：对所有外部输入（HTTP请求、外部API响应）进行严格验证和过滤
+- **使用明确的数据结构**：避免使用 `map[string]interface{}` 或 `interface{}` 处理不可信数据
+- **数据传输标准化**：在不同服务间传递数据时，使用定义清晰的API接口和稳定的数据结构
+- **保持依赖更新**：定期更新Go语言版本及其依赖库，确保包含最新的安全修复
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-111: Direct Use of Unsafe JNI](https://cwe.mitre.org/data/definitions/111.html)
+[OWASP JSON Injection](https://owasp.org/www-community/vulnerabilities/JSON_Injection)
+REFERENCE
+)
+
+json?{<fullTypeName>?{have: 'encoding/json'}}.Marshal(* #-> as $marshal_param) as $json_marshal;
+
+<include('golang-http-source')> as $http_source;
+
+http?{<fullTypeName>?{have: 'net/http'}}.Get(* #-> ) as $http_get;
+$http_get.Body #-> as $response_body;
+$response_body.Read(* #-> as $body_data) as $external_data;
+
+json?{<fullTypeName>?{have: 'encoding/json'}}.NewDecoder(* #-> as $decode_source) as $decoder;
+$decoder.Decode(* #-> as $decoded_data);
+
+<include('golang-user-input')> as $user_input;
+<include('golang-gin-context')> as $gin_ctx;
+$gin_ctx.Query(* #-> ) as $query_input;
+$gin_ctx.Param(* #-> ) as $param_input;
+$gin_ctx.PostForm(* #-> ) as $form_input;
+$gin_ctx.GetHeader(* #-> ) as $header_input;
+
+$http_source as $untrusted;
+$external_data as $untrusted;
+$decoded_data as $untrusted;
+$body_data as $untrusted;
+$user_input as $untrusted;
+$query_input as $untrusted;
+$param_input as $untrusted;
+$form_input as $untrusted;
+$header_input as $untrusted;
+
+$marshal_param?{<typeName>?{have: 'interface'}} as $unsafe_type;
+$marshal_param?{<typeName>?{have: 'map'}} as $unsafe_type;
+
+$marshal_param & $untrusted as $high;
+
+
+alert $high for {
+	type: "vuln",
+	title: "Golang JSON Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang JSON注入漏洞",
+	level: "high",
+	name: "high",
+	message: "检测到Golang JSON注入漏洞：不可信数据未经清洗直接序列化为JSON，可能导致解析器差异性攻击、数据污染或权限绕过。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **使用严格类型约束**：定义明确的结构体，避免使用 `map[string]interface{}` 或 `interface{}` 处理不可信数据
+2. **数据白名单校验**：对输入数据的字段和类型进行严格校验，只允许预期的数据结构
+3. **输入验证**：在序列化前对数据进行净化，移除或转义潜在的危险字符
+4. **避免字符串拼接**：永远不要通过字符串拼接来构造JSON
+SOLUTION
+	risk: "JSON注入",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe_json_marshal.go': <<<UNSAFE
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+func handleSSEResponse(w http.ResponseWriter, r *http.Request) {
+	// 从外部API获取SSE响应
+	sseResp, _ := http.Get("https://external-api.com/stream")
+	defer sseResp.Body.Close()
+	
+	// 解析外部数据到map
+	var streamData map[string]interface{}
+	json.NewDecoder(sseResp.Body).Decode(&streamData)
+	
+	// 不安全：直接序列化不可信的数据
+	searchListData := streamData["search_list"]
+	jsonBytes, _ := json.Marshal(searchListData) // 漏洞点
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonBytes)
+}
+
+func main() {
+	http.HandleFunc("/data", handleSSEResponse)
+	http.ListenAndServe(":8080", nil)
+}
+UNSAFE,
+	'safefile://safe_strict_type.go': <<<SAFE
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+// 定义严格的数据结构
+type SafeSearchList struct {
+	Items []string `json:"items"`
+	Total int      `json:"total"`
+}
+
+type SafeUser struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+func handleSSEResponse(w http.ResponseWriter, r *http.Request) {
+	// 从外部API获取SSE响应
+	sseResp, _ := http.Get("https://external-api.com/stream")
+	defer sseResp.Body.Close()
+	
+	var streamData map[string]interface{}
+	json.NewDecoder(sseResp.Body).Decode(&streamData)
+	
+	// 安全：通过严格类型进行清洗
+	tmpBytes, _ := json.Marshal(streamData["search_list"])
+	var safeList SafeSearchList
+	if err := json.Unmarshal(tmpBytes, &safeList); err != nil {
+		http.Error(w, "Invalid data format", http.StatusBadRequest)
+		return
+	}
+	
+	// 使用清洗后的数据
+	jsonBytes, _ := json.Marshal(safeList)
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonBytes)
+}
+
+func someHandler(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	
+	// 安全：使用结构体和json.Marshal
+	user := SafeUser{
+		Username: username,
+		Password: password,
+	}
+	jsonBytes, _ := json.Marshal(user)
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonBytes)
+}
+
+func main() {
+	http.HandleFunc("/data", handleSSEResponse)
+	http.HandleFunc("/login", someHandler)
+	http.ListenAndServe(":8080", nil)
+}
+SAFE
+
+	'safefile://safe_whitelist.go': <<<SAFE
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"regexp"
+)
+
+// 数据白名单校验
+func sanitizeSearchList(data interface{}) ([]string, error) {
+	var results []string
+	
+	slice, ok := data.([]interface{})
+	if !ok {
+		return nil, errors.New("invalid format: expected array")
+	}
+	
+	// 限制数组大小，防止拒绝服务
+	if len(slice) > 1000 {
+		return nil, errors.New("array too large")
+	}
+	
+	// 正则表达式校验字符串内容
+	validPattern := regexp.MustCompile(`^[a-zA-Z0-9\s\-_]+$`)
+	
+	for i, item := range slice {
+		str, ok := item.(string)
+		if !ok {
+			return nil, fmt.Errorf("item at index %d is not a string", i)
+		}
+		
+		// 校验字符串长度和内容
+		if len(str) == 0 || len(str) > 200 {
+			return nil, fmt.Errorf("item at index %d has invalid length", i)
+		}
+		
+		if !validPattern.MatchString(str) {
+			return nil, fmt.Errorf("item at index %d contains invalid characters", i)
+		}
+		
+		results = append(results, str)
+	}
+	
+	return results, nil
+}
+
+func handleData(w http.ResponseWriter, r *http.Request) {
+	var streamData map[string]interface{}
+	// ... 获取数据 ...
+	
+	// 先进行白名单校验和清洗
+	safeList, err := sanitizeSearchList(streamData["search_list"])
+	if err != nil {
+		http.Error(w, "Invalid data: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	
+	// 使用清洗后的数据
+	response := map[string]interface{}{
+		"items": safeList,
+		"count": len(safeList),
+	}
+	jsonBytes, _ := json.Marshal(response)
+	
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonBytes)
+}
+
+func main() {
+	http.HandleFunc("/data", handleData)
+	http.ListenAndServe(":8080", nil)
+}
+SAFE
+)
+
