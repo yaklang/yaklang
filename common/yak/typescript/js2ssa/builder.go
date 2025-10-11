@@ -45,7 +45,11 @@ func (s *SSABuilder) FilterParseAST(path string) bool {
 	return extension == ".js" || extension == ".ts" || extension == ".tsx"
 }
 
-func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
+	return nil
+}
+
+func (*SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
 	return Frontend(src)
 }
 

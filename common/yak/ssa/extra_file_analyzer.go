@@ -15,7 +15,9 @@ type PreHandlerAnalyzer interface {
 	FilterPreHandlerFile(string) bool
 
 	FilterParseAST(string) bool
-	ParseAST(string) (FrontAST, error)
+	ParseAST(string, *AntlrCache) (FrontAST, error)
+	GetAntlrCache() *AntlrCache
+
 	PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error
 	PreHandlerFile(FrontAST, *memedit.MemEditor, *FunctionBuilder)
 
@@ -25,6 +27,11 @@ type PreHandlerAnalyzer interface {
 }
 
 type FrontAST interface {
+}
+
+type AntlrCache struct {
+	DfaCache               []*antlr.DFA
+	PredictionContextCache *antlr.PredictionContextCache
 }
 
 type CreateBuilder func() Builder
@@ -46,10 +53,10 @@ type PreHandlerBase struct {
 	languageConfigOpts    []LanguageConfigOpt
 
 	// antlr cache
-	antlrMutex             sync.RWMutex
-	antlrBuild             bool
-	DfaCache               []*antlr.DFA
-	PredictionContextCache *antlr.PredictionContextCache
+	antlrMutex sync.RWMutex
+	Caches     []*AntlrCache
+	// antlrBuild bool
+
 }
 
 func (d *PreHandlerBase) AfterPreHandlerProject(builder *FunctionBuilder) {
@@ -117,9 +124,7 @@ func (d *PreHandlerBase) Clearup() {
 	d.antlrMutex.Lock()
 	defer d.antlrMutex.Unlock()
 	// Clear DFA cache explicitly
-	d.DfaCache = nil
-	// Clear prediction context cache
-	d.PredictionContextCache = nil
+	d.Caches = nil
 	// Force garbage collection
 	runtime.GC()
 }
@@ -135,46 +140,37 @@ func createAntlrCache(atn *antlr.ATN) ([]*antlr.DFA, *antlr.PredictionContextCac
 	return decisionToDFA, predictionContextCache
 }
 
-// getOrCreateAntlrCache returns existing cache if available, otherwise creates new cache
-func (builder *PreHandlerBase) getOrCreateAntlrCache(atn *antlr.ATN) ([]*antlr.DFA, *antlr.PredictionContextCache) {
-	if builder == nil {
-		// No builder available, create cache directly
-		return createAntlrCache(atn)
+func (b *PreHandlerBase) CreateAntlrCache(parser *antlr.BaseParser) *AntlrCache {
+	ant := parser.GetATN()
+	decisionToDFA, predictionContextCache := createAntlrCache(ant)
+	cache := &AntlrCache{
+		DfaCache:               decisionToDFA,
+		PredictionContextCache: predictionContextCache,
 	}
 
-	// Check if cache is already built
-	builder.antlrMutex.RLock()
-	if len(builder.DfaCache) != 0 && builder.PredictionContextCache != nil {
-		// Cache is available, return existing cache
-		decisionToDFA := builder.DfaCache
-		predictionContextCache := builder.PredictionContextCache
-		builder.antlrMutex.RUnlock()
-		// log.Errorf("Using existing ANTLR cache with %d DFAs", len(decisionToDFA))
-		return decisionToDFA, predictionContextCache
-	}
-	builder.antlrMutex.RUnlock()
+	b.antlrMutex.Lock()
+	b.Caches = append(b.Caches, cache)
+	b.antlrMutex.Unlock()
 
-	// Cache not built yet, create new cache
-	decisionToDFA, predictionContextCache := createAntlrCache(atn)
-
-	// Store cache in builder for future use
-	builder.antlrMutex.Lock()
-	builder.DfaCache = decisionToDFA
-	builder.PredictionContextCache = predictionContextCache
-	builder.antlrMutex.Unlock()
-	// log.Errorf("Storing new ANTLR cache with %d DFAs", len(decisionToDFA))
-
-	return decisionToDFA, predictionContextCache
+	return cache
 }
 
 // ParserSetAntlrCache sets up ANTLR cache for the parser to improve performance
 // If builder has existing cache, use it; otherwise create new cache and store in builder if available
-func ParserSetAntlrCache(parser *antlr.BaseParser, builder *PreHandlerBase) *antlr.BaseParser {
+func ParserSetAntlrCache(parser *antlr.BaseParser, lexer *antlr.BaseLexer, cache *AntlrCache) *antlr.BaseParser {
 	atn := parser.GetATN()
-	decisionToDFA, predictionContextCache := builder.getOrCreateAntlrCache(atn)
-
+	if cache == nil {
+		decisionToDFA, predictionContextCache := createAntlrCache(atn)
+		cache = &AntlrCache{
+			DfaCache:               decisionToDFA,
+			PredictionContextCache: predictionContextCache,
+		}
+	}
 	parser.Interpreter = antlr.NewParserATNSimulator(
-		parser, atn, decisionToDFA, predictionContextCache,
+		parser, atn, cache.DfaCache, cache.PredictionContextCache,
+	)
+	lexer.Interpreter = antlr.NewLexerATNSimulator(
+		lexer, atn, cache.DfaCache, cache.PredictionContextCache,
 	)
 	return parser
 }
