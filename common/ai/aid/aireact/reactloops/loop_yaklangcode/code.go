@@ -179,9 +179,7 @@ func init() {
 						payloads := action.GetInvokeParams("query_document_payload")
 
 						invoker := loop.GetInvoker()
-
 						invoker.AddToTimeline("start_query_yaklang_docs", "AI decided to query document with payload: "+utils.InterfaceToString(payloads))
-
 						documentResults, ok := handleQueryDocument(r, docSearcher, payloads)
 						if !ok {
 							invoker.AddToTimeline("query_yaklang_docs_result", "No document searcher available, cannot perform document query, maybe keyword or regexp is invalid: "+utils.InterfaceToString(payloads))
@@ -212,6 +210,7 @@ func init() {
 								utils.InterfaceToString(payloads),
 								documentResults,
 							)
+							invoker.AddToTimeline("query_yaklang_docs_result", documentResults)
 						}
 					},
 				),

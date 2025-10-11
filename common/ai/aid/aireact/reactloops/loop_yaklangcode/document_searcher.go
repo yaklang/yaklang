@@ -28,7 +28,7 @@ func handleQueryDocument(
 	caseSensitive := payloads.GetBool("case_sensitive")
 	contextLines := payloads.GetInt("context_lines")
 	if contextLines == 0 {
-		contextLines = 2 // default context
+		contextLines = 5 // default context
 	}
 	limit := payloads.GetInt("limit")
 	if limit == 0 {
