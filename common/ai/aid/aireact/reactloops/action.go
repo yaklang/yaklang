@@ -38,7 +38,9 @@ func buildSchema(actions ...*LoopAction) string {
 		),
 		aitool.WithStringParam(
 			"human_readable_thought",
-			aitool.WithParam_Description("Provide a brief, user-friendly status message here, explaining what you are currently doing. This will be shown to the user in real-time. keep context, make it useful for next steps"),
+			aitool.WithParam_Description(
+				"Provide a brief summary of your thoughts regarding the current task. This thought will serve as the basis for subsequent actions, so please ensure its accuracy and completeness.",
+			),
 		),
 	}
 

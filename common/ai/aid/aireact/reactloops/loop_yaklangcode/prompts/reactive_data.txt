@@ -87,8 +87,9 @@
 ```
 错误做法：看到 yakit.AppendRow 报错后，继续尝试 yakit.EnableTable 的各种写法
 正确做法：立即搜索 "yakit table usage" 或 "yakit.EnableTable" 找到正确语法
-
-Yaklang中声明一个变量不需要类型，可以直接写 `x = 10` 或者 "var x"，而不是 `var x int`
+* Yaklang中声明一个变量不需要类型，可以直接写 `x = 10` 或者 "var x"，而不是 `var x int`
+* 在 yaklang 中生成随机数，可以直接搜索 `randstr` 或 `randn` 的用法
+* yaklang 禁止使用 import 或者 require 类似，所有包都是内置的
 ```
 
 **记住：搜索 5 分钟比盲目试错 50 分钟更高效！**

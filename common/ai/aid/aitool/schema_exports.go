@@ -28,8 +28,12 @@ func _withParamObject(objectName string, opts ...any) ToolOption {
 }
 
 func NewObjectSchemaWithAction(opts ...any) string {
+	return NewObjectSchemaWithActionName("object", opts...)
+}
+
+func NewObjectSchemaWithActionName(name string, opts ...any) string {
 	var params []any
-	params = append(params, WithAction("object"))
+	params = append(params, WithAction(name))
 	params = append(params, opts...)
 	return NewObjectSchema(params...)
 }

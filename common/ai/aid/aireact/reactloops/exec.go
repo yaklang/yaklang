@@ -101,6 +101,18 @@ func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string
 		r.onTaskCreated(task)
 	}
 
+	utils.Debug(func() {
+		fmt.Println("---------------------------------------------")
+		fmt.Println("start to handle userInput \n" + utils.PrefixLines(userInput, "> "))
+		fmt.Println("---------------------------------------------")
+	})
+	defer func() {
+		utils.Debug(func() {
+			fmt.Println("---------------------------------------------")
+			fmt.Println("end to handle userInput \n" + utils.PrefixLines(userInput, "> "))
+			fmt.Println("---------------------------------------------")
+		})
+	}()
 	err := r.ExecuteWithExistedTask(task)
 	if task.IsAsyncMode() {
 		return err
@@ -225,6 +237,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			actionName := action.Name()
 			verifier, err := r.GetActionHandler(actionName)
 			if err != nil {
+				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionName, err))
 				return utils.Wrapf(err, "action[%s] GetActionHandler failed", actionName)
 			}
 			if utils.IsNil(verifier) {
@@ -353,6 +366,13 @@ LOOP:
 		/* Generate AI Action */
 		actionParams, handler, transactionErr := r.callAITransaction(streamWg, prompt, nonce)
 		streamWg.Wait()
+
+		utils.Debug(func() {
+			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			fmt.Printf("AI decide to exec action[%v]: %v", actionParams.ActionType(), actionParams.GetParams().Dump())
+			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+		})
+
 		if transactionErr != nil {
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			break LOOP
@@ -372,7 +392,7 @@ LOOP:
 		reason := actionParams.GetString("human_readable_thought")
 		msg := fmt.Sprintf("[%v]======== ReAct iteration %d ========", loopName, iterationCount)
 		if reason != "" {
-			msg += "\nReason/: " + reason
+			msg += "\nReason/Next-Step: " + reason
 		}
 		r.GetInvoker().AddToTimeline("iteration", msg)
 
@@ -409,31 +429,57 @@ LOOP:
 
 		// 检查 operator 状态
 		if isTerminated, err := operator.IsTerminated(); isTerminated {
+			log.Infof("ReactLoop[%v] terminated", r.loopName)
 			if err != nil {
 				finalError = err
+				utils.Debug(func() {
+					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+					fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
+					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+				})
 				return finalError
 			}
 			if !operator.isSilence {
 				// 正常退出
 				continueIter()
 			}
-			break LOOP
+			utils.Debug(func() {
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			})
+			return nil
 		}
 
 		if handler.AsyncMode {
 			// 异步模式直接退出循环
 			finalError = nil
+			utils.Debug(func() {
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+				fmt.Printf("[Async] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			})
 			return nil
 		}
 
 		// 非异步模式，继续下一次循环
 		if operator.IsContinued() {
 			continueIter()
+			utils.Debug(func() {
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+				fmt.Printf("[Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
+				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			})
 			continue
 		}
 
 		// 如果既没有调用 Exit/Fail 也没有调用 Continue，默认继续
 		continueIter()
+		utils.Debug(func() {
+			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+			fmt.Printf("[Default Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
+			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+		})
 		continue
 	}
 	return nil
