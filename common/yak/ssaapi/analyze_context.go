@@ -168,7 +168,7 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	needExit = true
 	// depth limited check
 	if a.reachedDepthLimited {
-		log.Warnf("reached depth limit,stop it")
+		// log.Warnf("reached depth limit,stop it")
 		return
 	}
 	a.enterRecursive()
@@ -176,18 +176,21 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	// if !utils.InGithubActions() {
 	if a.IsRecursiveLimit() {
 		log.Warnf("recursive call is over 10000, stop it")
-		panic(errRecursiveDepth)
-		// return
+		a.reachedDepthLimited = true
+		// panic(errRecursiveDepth)
+		return
 	}
 	// }
 	if a.depth > 0 && a.config.MaxDepth > 0 && a.depth > a.config.MaxDepth {
+		log.Warnf("reached depth limit,stop it")
 		a.reachedDepthLimited = true
-		panic(errRecursiveDepth)
+		// panic(errRecursiveDepth)
 		return
 	}
 	if a.depth < 0 && a.config.MinDepth < 0 && a.depth < a.config.MinDepth {
+		log.Warnf("reached depth limit,stop it")
 		a.reachedDepthLimited = true
-		panic(errRecursiveDepth)
+		// panic(errRecursiveDepth)
 		return
 	}
 
@@ -195,7 +198,7 @@ func (a *AnalyzeContext) check(v *Value) (needExit bool, recoverStack func()) {
 	select {
 	case <-ctx.Done():
 		log.Warnf("context is done, stop it")
-		panic(context.Canceled)
+		// panic(context.Canceled)
 		return true, recoverStack
 	default:
 	}
