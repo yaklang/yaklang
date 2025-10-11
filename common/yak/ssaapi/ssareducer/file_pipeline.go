@@ -37,7 +37,7 @@ func FilesHandler(
 	filesystem filesys_interface.FileSystem,
 	paths []string,
 	handler func(path string, content []byte) (ssa.FrontAST, error),
-	orderType int,
+	orderType ASTSequenceType,
 	concurrency int,
 ) <-chan *FileContent {
 	bufSize := len(paths)
@@ -121,11 +121,11 @@ func FilesHandler(
 
 	parseASTPipe.FeedChannel(readFilePipe.Out())
 	switch orderType {
-	case int(OutOfOrder):
+	case OutOfOrder:
 		return parseASTPipe.Out()
-	case int(Order):
+	case Order:
 		return sort(-1)
-	case int(ReverseOrder):
+	case ReverseOrder:
 		return sort(1)
 	}
 
