@@ -1,7 +1,7 @@
 desc(
 	title: "Check C File Upload Vulnerability"
 	type: audit
-	severity: high
+	severity: mid
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -412,16 +412,16 @@ REFERENCE
 <include('c-user-input')> as $user_input;
 <include('c-file-path')> as $file_ops;
 
-fopen(*<slice(index=0)> #-> as $file_create);
-fwrite(*<slice(index=0)> #-> as $file_write);
-fprintf(*<slice(index=1)> #-> as $file_write);
+fopen(*<slice(index=0)> as $file_create);
+fwrite(*<slice(index=0)> as $file_write);
+fprintf(*<slice(index=1)> as $file_write);
 
-$user_input & $file_create as $high;
-$user_input & $file_write as $high;
-$user_input & $file_ops as $medium;
+$file_create?{* #{ until: `* & $user_input`}-> } as $mid
+$file_write?{* #{ until: `* & $user_input`}-> } as $mid
+$file_ops?{* #{ until: `* & $user_input`}-> } as $mid
 
-alert $high for {
-	level: "high",
+alert $mid for {
+	level: "mid",
 	type: "vuln",
 	title: "C File Upload Vulnerability Was Detected",
 	title_zh: "检测到C语言文件上传漏洞",
@@ -539,7 +539,7 @@ int is_safe_filepath(const char *filepath) {
 ```
 SOLUTION
 	risk: "文件上传",
-	name: "high",
+	name: "mid",
 }
 
 alert $medium for {
@@ -565,7 +565,7 @@ SOLUTION
 
 desc(
 	lang: c
-	alert_high: 1
+	alert_mid: 1
 	'file://unsafe_upload.c': <<<UNSAFE
 #include <stdio.h>
 #include <stdlib.h>

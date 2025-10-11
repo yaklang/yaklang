@@ -1,0 +1,650 @@
+desc(
+	title: "Detect Golang TLS Certificate Verification Bypass (InsecureSkipVerify)"
+	title_zh: "检测Golang TLS证书验证绕过漏洞(InsecureSkipVerify)"
+	type: vuln
+	severity: high
+	risk: "insecure_tls"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   当在 `tls.Config` 中设置 `InsecureSkipVerify: true` 时，Go 语言的 TLS/SSL 客户端会完全跳过服务器证书的验证。这意味着：
+   - 不验证服务器证书是否由受信任的证书颁发机构（CA）签发
+   - 不验证证书是否过期
+   - 不验证证书中的域名是否与请求的服务器匹配
+   - 不检查证书是否被吊销
+   
+   这使得应用程序完全失去了对服务器身份的验证能力，攻击者可以轻易伪造服务器身份。
+
+2. **触发场景**
+   该漏洞通常出现在以下场景：
+   - 开发者为了快速测试而临时禁用证书验证，但忘记在生产环境中恢复
+   - 连接使用自签名证书的内部服务器，但采用了不安全的方式
+   - 对 TLS/SSL 原理理解不足，误以为这只是一个"警告"而非严重的安全问题
+   
+   ```go
+   // 不安全的配置示例
+   client := &http.Client{
+       Transport: &http.Transport{
+           TLSClientConfig: &tls.Config{
+               InsecureSkipVerify: true, // 危险！
+           },
+       },
+   }
+   resp, _ := client.Get("https://api.example.com")
+   ```
+
+3. **潜在影响**
+   - **中间人攻击（MITM）**：攻击者可以拦截并篡改客户端与服务器之间的所有通信
+   - **数据窃取**：攻击者可以读取传输中的敏感数据，如登录凭证、API密钥、个人信息等
+   - **数据篡改**：攻击者可以修改请求和响应内容，注入恶意代码或数据
+   - **身份冒充**：攻击者可以伪装成合法服务器，欺骗客户端
+   - **违反合规要求**：违反 PCI DSS、HIPAA 等安全标准，导致审计失败
+   - **声誉损害**：一旦发生安全事故，会严重损害企业声誉和客户信任
+
+4. **为什么开发者会使用这个设置**
+   尽管极度不安全，开发者可能在以下情况下使用：
+   - 使用自签名证书的测试环境
+   - 证书配置错误（域名不匹配、证书链不完整）
+   - 快速原型开发时为了"方便"
+   - 对安全风险认识不足
+
+DESC
+	rule_id: "f8e9a1b2-c3d4-5e6f-a7b8-c9d0e1f2a3b4"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 🔴 生产环境：使用受信任的CA证书（必须）
+
+**最佳实践**：从公共证书颁发机构获取有效证书，让系统自动验证。
+
+```go
+// 安全的默认配置 - 使用系统默认的受信任CA
+client := &http.Client{
+    // 不需要特殊配置，默认就会验证证书
+    Timeout: 10 * time.Second,
+}
+resp, err := client.Get("https://api.example.com")
+```
+
+#### 🟡 内部环境：配置自定义CA（推荐）
+
+如果必须使用内部CA签发的证书，正确的做法是将CA证书添加到信任列表。
+
+```go
+package main
+
+import (
+    "crypto/tls"
+    "crypto/x509"
+    "io/ioutil"
+    "log"
+    "net/http"
+)
+
+func createSecureClient() (*http.Client, error) {
+    // 1. 读取内部CA的根证书
+    caCert, err := ioutil.ReadFile("./internal-ca-root.crt")
+    if err != nil {
+        return nil, err
+    }
+
+    // 2. 创建证书池并添加CA证书
+    caCertPool := x509.NewCertPool()
+    if !caCertPool.AppendCertsFromPEM(caCert) {
+        return nil, fmt.Errorf("failed to parse CA certificate")
+    }
+
+    // 3. 配置TLS，指定自定义CA，保持验证开启
+    tlsConfig := &tls.Config{
+        RootCAs: caCertPool, // 使用自定义CA
+        MinVersion: tls.VersionTLS12, // 强制使用TLS 1.2或更高版本
+        // InsecureSkipVerify: false, // 默认为false，必须保持验证开启！
+    }
+
+    // 4. 创建安全的HTTP客户端
+    client := &http.Client{
+        Transport: &http.Transport{
+            TLSClientConfig: tlsConfig,
+        },
+        Timeout: 30 * time.Second,
+    }
+
+    return client, nil
+}
+
+func main() {
+    client, err := createSecureClient()
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    resp, err := client.Get("https://internal-server.company.com")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer resp.Body.Close()
+    // ... 处理响应
+}
+```
+
+#### 🟠 多CA证书支持
+
+如果需要同时信任系统CA和自定义CA：
+
+```go
+func createClientWithMultipleCAs() (*http.Client, error) {
+    // 1. 获取系统默认的CA证书池
+    systemCertPool, err := x509.SystemCertPool()
+    if err != nil {
+        // 如果无法获取系统证书池，创建新的空池
+        systemCertPool = x509.NewCertPool()
+    }
+
+    // 2. 添加自定义CA证书
+    customCA, err := ioutil.ReadFile("./custom-ca.crt")
+    if err != nil {
+        return nil, err
+    }
+    systemCertPool.AppendCertsFromPEM(customCA)
+
+    // 3. 配置TLS
+    tlsConfig := &tls.Config{
+        RootCAs: systemCertPool, // 同时信任系统CA和自定义CA
+        MinVersion: tls.VersionTLS12,
+    }
+
+    client := &http.Client{
+        Transport: &http.Transport{
+            TLSClientConfig: tlsConfig,
+        },
+    }
+
+    return client, nil
+}
+```
+
+#### 🔵 客户端证书认证（双向TLS）
+
+如果服务器要求客户端证书：
+
+```go
+func createMutualTLSClient() (*http.Client, error) {
+    // 1. 加载客户端证书和私钥
+    clientCert, err := tls.LoadX509KeyPair("client-cert.pem", "client-key.pem")
+    if err != nil {
+        return nil, err
+    }
+
+    // 2. 加载服务器CA证书
+    caCert, err := ioutil.ReadFile("server-ca.crt")
+    if err != nil {
+        return nil, err
+    }
+
+    caCertPool := x509.NewCertPool()
+    caCertPool.AppendCertsFromPEM(caCert)
+
+    // 3. 配置双向TLS
+    tlsConfig := &tls.Config{
+        Certificates: []tls.Certificate{clientCert}, // 客户端证书
+        RootCAs:      caCertPool,                    // 服务器CA
+        MinVersion:   tls.VersionTLS12,
+    }
+
+    client := &http.Client{
+        Transport: &http.Transport{
+            TLSClientConfig: tlsConfig,
+        },
+    }
+
+    return client, nil
+}
+```
+
+#### ⚠️ 测试环境的临时方案（仅限开发，绝不用于生产）
+
+如果在开发阶段确实需要临时禁用验证（极不推荐），至少应该：
+
+1. **使用环境变量控制**
+2. **记录明确的警告日志**
+3. **确保生产环境强制启用验证**
+
+```go
+func createClientWithEnvControl() *http.Client {
+    skipVerify := os.Getenv("INSECURE_SKIP_VERIFY") == "true"
+    
+    if skipVerify {
+        log.Println("⚠️  WARNING: TLS certificate verification is DISABLED!")
+        log.Println("⚠️  This should NEVER be used in production!")
+        log.Println("⚠️  Application is vulnerable to man-in-the-middle attacks!")
+    }
+
+    tlsConfig := &tls.Config{
+        InsecureSkipVerify: skipVerify,
+        MinVersion:         tls.VersionTLS12,
+    }
+
+    // 生产环境强制检查
+    if os.Getenv("ENVIRONMENT") == "production" && skipVerify {
+        log.Fatal("❌ FATAL: InsecureSkipVerify cannot be true in production!")
+    }
+
+    return &http.Client{
+        Transport: &http.Transport{
+            TLSClientConfig: tlsConfig,
+        },
+    }
+}
+```
+
+#### 📋 安全检查清单
+
+在部署前，请确保：
+
+- [ ] **绝不在生产环境设置 `InsecureSkipVerify: true`**
+- [ ] **使用受信任的CA签发证书，或正确配置自定义CA**
+- [ ] **强制使用 TLS 1.2 或更高版本** (`MinVersion: tls.VersionTLS12`)
+- [ ] **定期更新和轮换证书**
+- [ ] **监控证书到期时间**
+- [ ] **使用安全的密码套件** (可选配置 `CipherSuites`)
+- [ ] **代码审查时重点检查 TLS 配置**
+- [ ] **在 CI/CD 中集成安全扫描**
+
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-295: Improper Certificate Validation](https://cwe.mitre.org/data/definitions/295.html)
+[OWASP: Insufficient Transport Layer Protection](https://owasp.org/www-community/vulnerabilities/Insufficient_Transport_Layer_Protection)
+[Go crypto/tls Documentation](https://pkg.go.dev/crypto/tls)
+[RFC 5280: Internet X.509 Public Key Infrastructure](https://tools.ietf.org/html/rfc5280)
+REFERENCE
+)
+
+tls?{<fullTypeName>?{have: 'crypto/tls'}} as $tls;
+$tls.Config as $tls_config;
+
+http?{<fullTypeName>?{have: 'net/http'}} as $http;
+
+// TODO: 我发现http.Client的fullTypeName没有接上http，这里先暂时用*代替之后再精确修改
+*.InsecureSkipVerify?{have: 'true'} as $key;
+
+*.Post(*<slice(index=0)> as $sink);
+*.Get(*<slice(index=0)> as $sink);
+
+$sink #{
+	until: '* & $key'
+}-> as $high;
+
+alert $high for {
+	type: "vuln",
+	title: "Golang TLS Certificate Verification Bypass Detected (InsecureSkipVerify: true)",
+	title_zh: "检测到Golang TLS证书验证绕过漏洞(InsecureSkipVerify: true)",
+	level: "high",
+	name: "high",
+	message: "检测到极度危险的 TLS 配置：InsecureSkipVerify 被设置为 true，这会完全禁用证书验证，使应用程序容易遭受中间人攻击(MITM)。所有通过此配置建立的 HTTPS 连接都是不安全的，攻击者可以拦截、读取和篡改所有传输数据。",
+	solution: <<<SOLUTION
+### 立即修复步骤
+
+#### 🚨 紧急情况（生产环境）
+1. **立即移除或注释掉 `InsecureSkipVerify: true`**
+2. **确保使用受信任的CA签发的有效证书**
+3. **重新部署应用程序**
+
+#### 📋 根本解决方案
+
+**方案A - 使用公共CA证书（推荐）**
+```go
+// 删除不安全的配置，使用默认的安全设置
+client := &http.Client{
+    Timeout: 10 * time.Second,
+}
+```
+
+**方案B - 配置自定义CA（内部环境）**
+```go
+caCert, _ := ioutil.ReadFile("./ca-cert.crt")
+caCertPool := x509.NewCertPool()
+caCertPool.AppendCertsFromPEM(caCert)
+
+tlsConfig := &tls.Config{
+    RootCAs: caCertPool, // 指定信任的CA
+    MinVersion: tls.VersionTLS12,
+    // 不要设置 InsecureSkipVerify！
+}
+
+client := &http.Client{
+    Transport: &http.Transport{
+        TLSClientConfig: tlsConfig,
+    },
+}
+```
+
+⚠️ **绝不要在生产环境中使用 `InsecureSkipVerify: true`！**
+SOLUTION
+	risk: "不安全的TLS配置",
+	desc: <<<DESC
+### 详细说明
+
+检测到代码中存在 `tls.Config{InsecureSkipVerify: true}` 配置。
+
+**风险等级：🔴 high（严重）**
+
+**具体问题**：
+- 服务器证书的有效性不会被验证
+- 证书过期、域名不匹配、证书链不完整等问题都会被忽略
+- 无法确认连接的服务器身份是否可信
+
+**攻击场景示例**：
+1. 攻击者在网络中间拦截客户端请求
+2. 使用自己的证书伪装成目标服务器
+3. 因为 `InsecureSkipVerify: true`，客户端接受了攻击者的证书
+4. 攻击者可以读取、篡改所有通信内容
+
+**受影响的操作**：
+- HTTPS API 调用
+- 数据库连接（PostgreSQL、MySQL 等使用 TLS）
+- 消息队列连接（RabbitMQ、Kafka 等使用 TLS）
+- 任何使用该 TLS 配置的网络通信
+DESC
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe_insecure_skip_verify.go': <<<UNSAFE
+package main
+
+import (
+	"crypto/tls"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+)
+
+// 案例1: 在 http.Transport 中设置
+func unsafeHTTPClient1() {
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true, // ← 严重漏洞！
+			},
+		},
+	}
+
+	resp, err := client.Get("https://api.example.com/data")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println(string(body))
+}
+
+// 案例2: 创建 TLS 配置后使用
+func unsafeHTTPClient2() {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true, // ← 严重漏洞！
+	}
+
+	transport := &http.Transport{
+		TLSClientConfig: tlsConfig,
+	}
+
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	client.Get("https://internal-api.company.com")
+}
+
+// 案例3: 分步设置字段
+func unsafeHTTPClient3() {
+	config := &tls.Config{}
+	config.InsecureSkipVerify = true // ← 严重漏洞！
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: config,
+		},
+	}
+
+	client.Post("https://api.example.com/submit", "application/json", nil)
+}
+
+// 案例4: 在数据库连接中使用（如 PostgreSQL）
+func unsafeDatabaseConnection() {
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: true, // ← 严重漏洞！
+	}
+	
+	// 这个不安全的配置可能被用于数据库连接
+	_ = tlsConfig
+}
+
+func main() {
+	unsafeHTTPClient1()
+	unsafeHTTPClient2()
+	unsafeHTTPClient3()
+}
+UNSAFE
+	'safefile://safe_default_verification.go': <<<SAFE
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"time"
+)
+
+// 方案1: 使用默认配置（最安全，最简单）
+func safeHTTPClientDefault() {
+	// 不需要任何特殊配置，默认就会验证证书
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get("https://api.example.com/data")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println(string(body))
+}
+
+// 方案2: 显式配置安全的 TLS 设置
+func safeHTTPClientExplicit() {
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				// InsecureSkipVerify: false, // 这是默认值，不需要显式设置
+				MinVersion: tls.VersionTLS12, // 强制使用 TLS 1.2+
+			},
+		},
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Get("https://secure-api.example.com/data")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+	defer resp.Body.Close()
+}
+
+func main() {
+	safeHTTPClientDefault()
+	safeHTTPClientExplicit()
+}
+SAFE
+	'safefile://safe_custom_ca.go': <<<SAFE
+package main
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"time"
+)
+
+// 方案3: 使用自定义CA证书（适用于内部服务器）
+func safeHTTPClientWithCustomCA() (*http.Client, error) {
+	// 1. 读取内部CA的根证书文件
+	caCert, err := ioutil.ReadFile("./internal-ca-root.crt")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read CA certificate: %v", err)
+	}
+
+	// 2. 创建证书池并添加CA证书
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to parse CA certificate")
+	}
+
+	// 3. 配置TLS，使用自定义CA，保持验证开启
+	tlsConfig := &tls.Config{
+		RootCAs:    caCertPool,           // 指定信任的CA
+		MinVersion: tls.VersionTLS12,     // 强制 TLS 1.2+
+		// InsecureSkipVerify: false,     // 必须保持验证开启（这是默认值）
+	}
+
+	// 4. 创建HTTP客户端
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+		Timeout: 30 * time.Second,
+	}
+
+	return client, nil
+}
+
+// 方案4: 同时信任系统CA和自定义CA
+func safeHTTPClientWithMultipleCAs() (*http.Client, error) {
+	// 1. 获取系统默认的CA证书池
+	systemCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		// 如果无法获取系统证书池，创建新的空池
+		log.Printf("Warning: failed to load system cert pool: %v", err)
+		systemCertPool = x509.NewCertPool()
+	}
+
+	// 2. 读取并添加自定义CA证书
+	customCA, err := ioutil.ReadFile("./custom-ca.crt")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read custom CA: %v", err)
+	}
+
+	if !systemCertPool.AppendCertsFromPEM(customCA) {
+		return nil, fmt.Errorf("failed to parse custom CA certificate")
+	}
+
+	// 3. 配置TLS
+	tlsConfig := &tls.Config{
+		RootCAs:    systemCertPool,       // 同时信任系统CA和自定义CA
+		MinVersion: tls.VersionTLS12,
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+		Timeout: 30 * time.Second,
+	}
+
+	return client, nil
+}
+
+func main() {
+	// 使用自定义CA的安全客户端
+	client, err := safeHTTPClientWithCustomCA()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err := client.Get("https://internal-server.company.com/api")
+	if err != nil {
+		log.Printf("Request failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	fmt.Printf("Response status: %s\n", resp.Status)
+}
+SAFE
+	'safefile://safe_mutual_tls.go': <<<SAFE
+package main
+
+import (
+	"crypto/tls"
+	"crypto/x509"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+)
+
+// 方案5: 双向TLS认证（客户端证书 + 服务器证书验证）
+func safeHTTPClientWithMutualTLS() (*http.Client, error) {
+	// 1. 加载客户端证书和私钥
+	clientCert, err := tls.LoadX509KeyPair(
+		"./client-cert.pem",
+		"./client-key.pem",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load client certificate: %v", err)
+	}
+
+	// 2. 加载服务器CA证书
+	serverCACert, err := ioutil.ReadFile("./server-ca.crt")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read server CA certificate: %v", err)
+	}
+
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(serverCACert) {
+		return nil, fmt.Errorf("failed to parse server CA certificate")
+	}
+
+	// 3. 配置双向TLS
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{clientCert}, // 客户端证书
+		RootCAs:      caCertPool,                    // 服务器CA证书
+		MinVersion:   tls.VersionTLS12,
+		// InsecureSkipVerify: false, // 必须验证服务器证书
+	}
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	return client, nil
+}
+
+func main() {
+	client, err := safeHTTPClientWithMutualTLS()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err := client.Get("https://secure-api.example.com/protected")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	fmt.Printf("Mutual TLS connection successful: %s\n", resp.Status)
+}
+SAFE
+)
+
