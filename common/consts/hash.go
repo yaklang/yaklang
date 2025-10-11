@@ -15,7 +15,7 @@ const ExistedSyntaxFlowEmbedFSHash string = "8884e88536577be3d86db91b6349cfd1c60
 // ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
 // This hash is used to verify the integrity of the built-in forge templates and resources.
 // The forge system provides templates for code generation and vulnerability testing scenarios.
-const ExistedBuildInForgeEmbedFSHash string = "e39ba7d570bd0d5a166286342a3f0f1b68ab1178c9f10f71e60d44e4dd310b9c"
+const ExistedBuildInForgeEmbedFSHash string = "f0eaffad063a7529eb9f81114babe17654e7c9108dc6f6151290cebc00dee2b7"
 
 // ExistedBuildInAIToolEmbedFSHash contains the SHA256 hash of the embedded AI tool filesystem.
 // This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.

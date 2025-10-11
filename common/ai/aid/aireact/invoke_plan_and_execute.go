@@ -163,6 +163,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		aid.WithAICallback(r.config.aiCallback),
 		aid.WithAllowPlanUserInteract(true),
 		aid.WithAgreeManual(),
+		aid.WithToolManager(r.config.aiToolManager),
 		aid.WithEventInputChan(inputChannel),
 		aid.WithAgreePolicy(r.config.reviewPolicy),
 		aid.WithEventHandler(func(e *schema.AiOutputEvent) {

@@ -91,6 +91,16 @@ binaries:
         url: "https://yaklang.oss-cn-beijing.aliyuncs.com/pandoc/pandoc-windows-amd64.zip"
         pick: "pandoc.exe"
         bin_path: "pandoc.exe"
+  - name: "winpty"
+    description: "winpty - A tool for creating pseudo-TTYs"
+    version: "latest"
+    install_type: "archive"
+    download_info_map:
+      "windows-amd64":
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/winpty/winpty-windows-amd64.zip"
+        pick: "*"
+        bin_dir: "winpty"
+        bin_path: "winpty/winpty.dll"
   - name: "whisper.cpp"
     description: "Whisper.cpp - A fast and accurate speech-to-text model"
     version: "latest"
