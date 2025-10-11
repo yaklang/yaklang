@@ -14,6 +14,7 @@ type PreHandlerAnalyzer interface {
 	InitHandler(builder *FunctionBuilder)
 	FilterPreHandlerFile(string) bool
 
+	FilterParseAST(string) bool
 	ParseAST(string) (FrontAST, error)
 	PreHandlerProject(fi.FileSystem, FrontAST, *FunctionBuilder, *memedit.MemEditor) error
 	PreHandlerFile(FrontAST, *memedit.MemEditor, *FunctionBuilder)
