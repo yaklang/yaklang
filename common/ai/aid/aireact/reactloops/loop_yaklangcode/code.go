@@ -223,7 +223,7 @@ func init() {
 						}
 						msg := utils.ShrinkTextBlock(code, 256)
 						if errMsg != "" {
-							msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 256), "  ")
+							msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
 							operator.Feedback(errMsg)
 						} else {
 							msg += "\n\n--[linter]--\nNo issues found in the modified code segment."
@@ -280,7 +280,7 @@ func init() {
 						}
 						msg = utils.ShrinkTextBlock(fmt.Sprintf("line[%v-%v]:\n", modifyStartLine, modifyEndLine)+partialCode, 256)
 						if errMsg != "" {
-							msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 256), "  ")
+							msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
 							op.Feedback(errMsg)
 						} else {
 							msg += "\n\n--[linter]--\nNo issues found in the modified code segment."
