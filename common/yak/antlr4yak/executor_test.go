@@ -135,6 +135,46 @@ func init() {
 	})
 }
 
+func TestTypeOfEQ(t *testing.T) {
+	code := `
+// compare between typeof and typeof
+assert typeof(1) == typeof(1)
+assert typeof("1") == typeof("1")
+assert typeof(1.0) == typeof(1.0)
+assert typeof(true) == typeof(true)
+assert typeof([]int{1}) == typeof([]int{1})
+assert typeof(map[string]int{"a": 1}) == typeof(map[string]int{"a": 1})
+
+assert typeof("1") != typeof(1)
+assert typeof(1) != typeof("1")
+assert typeof(1.0) != typeof(1)
+assert typeof(1) != typeof(1.0)
+assert typeof(true) != typeof(1)
+assert typeof(1) != typeof(true)
+assert typeof([]int{1}) != typeof(1)
+assert typeof(1) != typeof([]int{1})
+assert typeof(map[string]int{"a": 1}) != typeof(1)
+assert typeof(1) != typeof(map[string]int{"a": 1})
+
+// compare between typeof and string
+assert typeof(1) == "int"
+assert typeof(1.0) == "float"
+assert typeof(true) == "bool"
+assert typeof([]int{1}) == "array"
+// assert typeof([]int{1}) != "slice"
+a = [1]
+assert typeof(a) == "array"
+assert typeof(a) == "slice"
+assert typeof({"a": 1}) == "map"
+assert typeof({"a": 1}) == "map[string]int"
+assert typeof({"a": 1}) == "dict"
+`
+
+	if err := NewExecutor(code).VM.SafeExec(); err != nil {
+		panic(err)
+	}
+}
+
 func TestBoolEqualityComparison(t *testing.T) {
 	code := `
 assert !("true" == true)
