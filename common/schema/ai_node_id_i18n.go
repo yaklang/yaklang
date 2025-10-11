@@ -11,10 +11,18 @@ type I18n struct {
 }
 
 var nodeIdMapper = map[string]*I18n{
+	"write_yaklang_code": {
+		Zh: "编写 Yaklang 代码",
+		En: "Writing Yaklang",
+	},
+	"default": {
+		Zh: "通用",
+		En: "General",
+	},
 	// 从注释中的 AIStreamNodeIdToLabel 获取的 nodeId
 	"re-act-loop": {
 		Zh: "推理与行动",
-		En: "ReAct Loop",
+		En: "Reason and Act",
 	},
 	"call-forge": {
 		Zh: "智能应用",

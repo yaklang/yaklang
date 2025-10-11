@@ -1,30 +1,37 @@
 {{ if .Code }}## 代码块区域说明
 
 * 如果代码内容不是特别大的话，请直接在下面的代码块中展示
-* 代码内容过大，会保存到临时文件中，你可以使用 'read_file' 或者 'grep'' 等工具来查看
+* 代码内容过大，会保存到临时文件中，你可以使用 'read_file' 或者 'grep' 等工具来查看
 * 下面的代码块儿为了方便展示，将会展示行列号，你需要正确读取并区分
 * 如果你要修改代码，请你使用 'modify_code' 工具来进行，精确修改到具体行
+* 如果是库使用问题，需要可以使用 'query_document' 来搜索修正
+* 如果出现了语法错误，你可以使用 'query_document' 来搜索相似的代码片段来参考
+* 调试时，你可以使用 `desc(instance)` 来查看变量的类型和属性
+* 你可以在必要的地方使用 `log.Info("Hello %v", name)` 来打印日志到标准输出以辅助调试
 
-**重要提示：下面显示的代码包含行号是为了方便你定位和理解代码结构。但当你使用 'write_code' 或 'modify_code' 生成新代码时，生成的代码中绝对不能包含这些行号前缀！只生成纯净的 Yaklang 代码！**
+**重要提示：下面显示的代码(`<|CURRENT_CODE_{{ .Nonce }}|>` 内)包含行号是为了方便你定位和理解代码结构。但当你使用 'write_code' 或 'modify_code' 生成新代码时，生成的代码中绝对不能包含这些行号前缀！只生成纯净的 Yaklang 代码！**
 
 <|CURRENT_CODE_{{ .Nonce }}|>
 {{ .CurrentCodeWithLineNumber }}
 <|CURRENT_CODE_END_{{ .Nonce }}|>
-{{ else }}
-## 当前没有代码块
+{{ else }}## 当前没有代码块
 
-当前操作并不是对代码的修改，直接生成代码即可。
-{{ end }}
-
-{{ if .FeedbackMessages }}## 反馈/警告/待评估
+当前操作并不是对代码的修改，直接生成代码即可。{{ end }}
+{{ if .FeedbackMessages }}
+## 反馈/警告/待评估
 
 针对上述代码，经过Yaklang编译器静态分析发现如下警告和错误，处理原则如下：
 
 * 语法错误类需要优先处理，保证不出现语法错误
 * 功能缺陷类调试可以通过 'log.Info' 或者 'dump' 函数来辅助调试，dump 函数可以打印变量值和类型到标准输出。
-* 如果是库使用错误，需要可以使用 'query_document' 来搜索修正
+* 如果是库使用错误或语法错误，需要可以使用 'query_document' 来搜索修正和参考案例代码
+* 调试时，你可以使用 `desc(instance)` 来查看变量的类型和属性
 
 <|ERR/LINT_WARNING_{{ .Nonce }}|>
 {{ .FeedbackMessages }}
-<|ERR/LINT_WARNING_{{ .Nonce }}|>
+<|ERR/LINT_WARNING_END_{{ .Nonce }}|>
+
+下一步行动：
+* 接下来请你使用 modify_code 这个 '@action' 修改或局部生成代码以修复问题
+* 如果你不知道如何修复，请你使用 `query_document` 来搜索相关的代码片段来参考
 {{ end }}

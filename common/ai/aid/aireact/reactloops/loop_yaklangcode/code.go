@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -196,12 +195,15 @@ func init() {
 				),
 				reactloops.WithRegisterLoopAction(
 					"write_code",
-					"",
+					"if the current code is empty or need to create an initial version",
 					nil,
 					func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 						return nil
 					},
 					func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+						invoker := loop.GetInvoker()
+
+						invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)
 						code := loop.Get("yak_code")
 						loop.Set("full_code", code)
 						if code == "" {
@@ -219,15 +221,21 @@ func init() {
 						if blocking {
 							operator.DisallowNextLoopExit()
 						}
-						operator.Feedback(errMsg)
-						r.AddToTimeline("write_code", utils.ShrinkString(strconv.Quote(code), 128))
+						msg := utils.ShrinkTextBlock(code, 256)
+						if errMsg != "" {
+							msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 256), "  ")
+							operator.Feedback(errMsg)
+						} else {
+							msg += "\n\n--[linter]--\nNo issues found in the modified code segment."
+						}
+						r.AddToTimeline("initial-yaklang-code", msg)
 						log.Infof("write_code done: hasBlockingErrors=%v, will show errors in next iteration", blocking)
 						loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "write_code", code)
 					},
 				),
 				reactloops.WithRegisterLoopAction(
 					"modify_code",
-					"",
+					"do NOT use this action to create new code file, ONLY use it to modify existing code. Modify the code between the specified line numbers (inclusive). The line numbers are 1-based, meaning the first line of the file is line 1. Ensure that the 'modify_start_line' is less than or equal to 'modify_end_line'.",
 					[]aitool.ToolOption{},
 					func(l *reactloops.ReActLoop, action *aicommon.Action) error {
 						start := action.GetInt("modify_start_line")
@@ -238,15 +246,21 @@ func init() {
 						return nil
 					},
 					func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+						invoker := loop.GetInvoker()
+
 						fullCode := loop.Get("full_code")
 						partialCode := loop.Get("yak_code")
 						editor := memedit.NewMemEditor(fullCode)
 						modifyStartLine := action.GetInt("modify_start_line")
 						modifyEndLine := action.GetInt("modify_end_line")
 
+						msg := fmt.Sprintf("decided to modify code file, from start_line[%v] to end_line:[%v]", modifyStartLine, modifyEndLine)
+						invoker.AddToTimeline("modify_code", msg)
+
 						log.Infof("start to modify code lines %d to %d", modifyStartLine, modifyEndLine)
 						err := editor.ReplaceLineRange(modifyStartLine, modifyEndLine, partialCode)
 						if err != nil {
+							r.AddToTimeline("modify_failed", "Failed to replace line range: "+err.Error())
 							//return filename, utils.Errorf("Failed to replace line range: %v", err)
 							op.Fail("failed to replace line range: " + err.Error())
 							return
@@ -264,11 +278,14 @@ func init() {
 						if hasBlockingErrors {
 							op.DisallowNextLoopExit()
 						}
+						msg = utils.ShrinkTextBlock(fmt.Sprintf("line[%v-%v]:\n", modifyStartLine, modifyEndLine)+partialCode, 256)
 						if errMsg != "" {
+							msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 256), "  ")
 							op.Feedback(errMsg)
+						} else {
+							msg += "\n\n--[linter]--\nNo issues found in the modified code segment."
 						}
-						r.AddToTimeline("code_modified",
-							utils.ShrinkString(fmt.Sprintf("line[%v-%v]:", modifyStartLine, modifyEndLine)+strconv.Quote(partialCode), 128))
+						r.AddToTimeline("code_modified", msg)
 						log.Infof("modify_code done: hasBlockingErrors=%v, will show errors in next iteration", hasBlockingErrors)
 						loop.GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "modify_code", partialCode)
 					},

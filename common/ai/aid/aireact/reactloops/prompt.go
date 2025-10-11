@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	_ "embed"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -64,6 +65,13 @@ func (r *ReActLoop) generateLoopPrompt(
 		reactiveData, err = r.reactiveDataBuilder(r, operator.GetFeedback(), nonce)
 		if err != nil {
 			return "", utils.Wrap(err, "build reactive data failed")
+		}
+		if reactiveData != "" {
+			utils.Debug(func() {
+				fmt.Println("---------- Reactive Data ----------")
+				fmt.Println(reactiveData)
+				fmt.Println("---------- Reactive Data ----------")
+			})
 		}
 	}
 
