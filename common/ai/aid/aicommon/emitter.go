@@ -38,6 +38,9 @@ func (i *Emitter) AssociativeAIProcess(newProcess *schema.AiProcess) *Emitter {
 		return nil
 	}
 	callBack := func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if newProcess.ProcessType == schema.AI_Call_Tool {
+			event.CallToolID = newProcess.ProcessId
+		}
 		event.Processes = append(event.Processes, newProcess)
 		return event
 	}
