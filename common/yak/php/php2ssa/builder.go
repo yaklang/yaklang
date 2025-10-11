@@ -104,13 +104,18 @@ func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, b
 	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
+func (s *SSABuild) GetAntlrCache() *ssa.AntlrCache {
+	parser := phpparser.NewPHPParser(nil)
+	return s.CreateAntlrCache(parser.BaseParser)
+}
+
 func (s *SSABuild) FilterParseAST(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php"
 }
 
-func (s *SSABuild) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src, s)
+func (s *SSABuild) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
+	return Frontend(src, cache)
 }
 
 // func (s *ssa.BasicBlock) BuildFromAst()
@@ -187,10 +192,10 @@ type builder struct {
 	currentInclude map[string]struct{}
 }
 
-func Frontend(src string, builders ...*SSABuild) (phpparser.IHtmlDocumentContext, error) {
-	var builder *ssa.PreHandlerBase
-	if len(builders) > 0 {
-		builder = builders[0].PreHandlerBase
+func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentContext, error) {
+	var cache *ssa.AntlrCache
+	if len(caches) > 0 {
+		cache = caches[0]
 	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
@@ -198,7 +203,7 @@ func Frontend(src string, builders ...*SSABuild) (phpparser.IHtmlDocumentContext
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := phpparser.NewPHPParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
+	ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

@@ -84,7 +84,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			return utils.Errorf("convert jsp to java error: %v", err)
 		}
 		prog.SetTemplate(path, info)
-		ast, err := s.ParseAST(info.GetContent())
+		ast, err := s.ParseAST(info.GetContent(), s.GetAntlrCache())
 		if err != nil {
 			log.Infof("parse jsp file %s error: %v", path, err)
 			return err
@@ -104,7 +104,7 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			}
 			prog.SetTemplate(path, info)
 			saveExtraFile(path)
-			ast, err := s.ParseAST(info.GetContent())
+			ast, err := s.ParseAST(info.GetContent(), s.GetAntlrCache())
 			if err != nil {
 				return err
 			}

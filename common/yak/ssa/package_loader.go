@@ -53,7 +53,7 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 		log.Errorf("language builder is nil")
 		return nil
 	}
-	ast, err := languageBuilder.ParseAST(editor.GetSourceCode())
+	ast, err := languageBuilder.ParseAST(editor.GetSourceCode(), nil)
 	if err != nil {
 		return utils.Errorf("parse file %s error: %v", filename, err)
 	}
@@ -96,7 +96,7 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 			log.Errorf("Build with file loader failed: %s", err)
 			continue
 		}
-		ast, err := languageBuilder.ParseAST(string(raw))
+		ast, err := languageBuilder.ParseAST(string(raw), nil)
 		if err != nil {
 			log.Errorf("Parse file %s error: %v", v.FileName, err)
 			continue
