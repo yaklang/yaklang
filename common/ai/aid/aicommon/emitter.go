@@ -435,6 +435,9 @@ func (r *Emitter) emitStreamEvent(e *streamEvent) {
 		defer r.streamWG.Done()
 		defer func() {
 			for _, f := range e.emitFinishCallback {
+				if f == nil {
+					continue
+				}
 				f()
 			}
 		}()
