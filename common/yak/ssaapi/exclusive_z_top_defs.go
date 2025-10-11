@@ -10,6 +10,8 @@ import (
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
+const objectAnalyzeLevel = 50
+
 // GetTopDefs desc all of 'Defs' is not used by any other value
 func (i *Value) GetTopDefs(opt ...OperationOption) (ret Values) {
 	defer func() {
@@ -163,21 +165,23 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		if value.HasValues() {
 			return i.visitedDefs(actx, opt...)
 		}
-		if value.IsMember() {
-			obj := i.NewValue(value.GetObject())
-			key := i.NewValue(value.GetKey())
-			if utils.IsNil(obj) || utils.IsNil(key) {
-				return nil
-			}
-			if err := actx.pushObject(obj, key, i); err != nil {
-				return i.visitedDefs(actx, opt...)
-			}
+		if actx._objectStack.Len() < objectAnalyzeLevel {
+			if value.IsMember() {
+				obj := i.NewValue(value.GetObject())
+				key := i.NewValue(value.GetKey())
+				if utils.IsNil(obj) || utils.IsNil(key) {
+					return nil
+				}
+				if err := actx.pushObject(obj, key, i); err != nil {
+					return i.visitedDefs(actx, opt...)
+				}
 
-			results := obj.getTopDefs(actx, opt...)
-			if len(results) == 0 && !ValueCompare(i, actx.Self) {
-				results = append(results, i)
+				results := obj.getTopDefs(actx, opt...)
+				if len(results) == 0 && !ValueCompare(i, actx.Self) {
+					results = append(results, i)
+				}
+				return results
 			}
-			return results
 		}
 		return i.visitedDefs(actx, opt...)
 	}
