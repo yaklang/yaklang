@@ -138,7 +138,7 @@ LOOP:
 	if !utils.MatchAllOfSubString(tl, `system-question`, "user-answer", "when review") {
 		t.Fatal("timeline does not contain system-question")
 	}
-	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct loop finished END[1]`) {
+	if !utils.MatchAllOfSubString(tl, `ReAct iteration 1`, `ReAct Iteration Done[1]`) {
 		t.Fatal("timeline does not contain ReAct iteration")
 	}
 	fmt.Println("--------------------------------------")

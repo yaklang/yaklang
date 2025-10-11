@@ -54,7 +54,7 @@ package aireact
 //	endIterationCall := func() {
 //		if iterationTimelineInfo.IsSet() {
 //			endIterationRecordingOnce.Do(func() {
-//				r.AddToTimeline("iteration", "======= ReAct loop finished END["+fmt.Sprint(r.currentIteration)+"] =======")
+//				r.AddToTimeline("iteration", "======= ReAct Iteration Done["+fmt.Sprint(r.currentIteration)+"] =======")
 //			})
 //		}
 //	}

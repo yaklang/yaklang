@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -32,6 +33,12 @@ func ConvertReActLoopFactoryToActionFactory(
 			},
 			ActionHandler: func(oldLoop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
 				emitter := oldLoop.GetEmitter()
+				invoker := oldLoop.GetInvoker()
+				msg := fmt.Sprintf(
+					"AI decided to focus on the loop: %v", name,
+				)
+				invoker.AddToTimeline("focus-on", msg)
+
 				emitter.EmitJSON(schema.EVENT_TYPE_FOCUS_ON_LOOP, "focus-on", map[string]any{
 					"loop": name,
 				})
@@ -48,6 +55,7 @@ func ConvertReActLoopFactoryToActionFactory(
 					return
 				}
 				// exit with no error
+				invoker.AddToTimeline("lose-focus", "AI finished focus on the loop["+name+"]")
 				operator.Exit()
 			},
 		}

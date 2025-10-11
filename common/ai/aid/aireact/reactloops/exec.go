@@ -365,10 +365,16 @@ LOOP:
 		actionName := actionParams.Name()
 
 		// allow iteration info to be added to timeline
-		r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf(
-			"======== ReAct iteration %d ========\n"+
-				"%v", iterationCount, actionParams.GetString("human_readable_thought"),
-		))
+		loopName := r.loopName
+		if loopName == "" {
+			loopName = "general-purpose"
+		}
+		reason := actionParams.GetString("human_readable_thought")
+		msg := fmt.Sprintf("[%v]======== ReAct iteration %d ========", loopName, iterationCount)
+		if reason != "" {
+			msg += "\nReason/: " + reason
+		}
+		r.GetInvoker().AddToTimeline("iteration", msg)
 
 		if handler.AsyncMode {
 			task.SetAsyncMode(true)
@@ -393,7 +399,7 @@ LOOP:
 		}
 
 		continueIter := func() {
-			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("ReAct loop finished END[%v]", iterationCount))
+			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
 		}
 		handler.ActionHandler(
 			r,
