@@ -336,11 +336,26 @@ func WithCtx(ctx context.Context) ConfigOption {
 //}
 
 func NewConfig(options ...ConfigOption) *Config {
-	config := &Config{}
-	config.init()
+	config := &Config{
+		TransportProtos:           []TransportProto{TCP},
+		ActiveMode:                true,
+		RarityMax:                 5,
+		ProbesMax:                 5,
+		ProbeTimeout:              5 * time.Second,
+		ProbesConcurrentMax:       5,
+		OnlyEnableWebFingerprint:  false,
+		DisableWebFingerprint:     false,
+		ForceEnableAllFingerprint: false,
+		WebFingerprintUseAllRules: true,
+		CrawlerMaxUrlCount:        5,
+		PoolSize:                  20,
+		FingerprintDataSize:       20480,
+		Ctx:                       context.Background(),
+	}
 
-	for _, p := range options {
-		p(config)
+	// 应用自定义配置
+	for _, op := range options {
+		op(config)
 	}
 
 	return config
@@ -350,24 +365,6 @@ func (c *Config) Configure(ops ...ConfigOption) {
 	for _, op := range ops {
 		op(c)
 	}
-}
-
-func (c *Config) init() {
-	c.TransportProtos = []TransportProto{TCP}
-	c.ActiveMode = true
-	c.RarityMax = 5
-	c.ProbesMax = 5
-	c.ProbeTimeout = 5 * time.Second
-	c.ProbesConcurrentMax = 5
-	c.OnlyEnableWebFingerprint = false
-	c.DisableWebFingerprint = false
-	c.ForceEnableAllFingerprint = false
-	c.WebFingerprintUseAllRules = true
-	c.CrawlerMaxUrlCount = 5
-	c.PoolSize = 20
-
-	c.FingerprintDataSize = 20480
-	c.Ctx = context.Background()
 }
 
 func (c *Config) GetWebFingerprintRules() []*rule.FingerPrintRule {
