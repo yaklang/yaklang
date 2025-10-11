@@ -99,6 +99,12 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST,
 func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
 	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
+
+func (s *SSABuild) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".php"
+}
+
 func (s *SSABuild) ParseAST(src string) (ssa.FrontAST, error) {
 	return Frontend(src, s)
 }

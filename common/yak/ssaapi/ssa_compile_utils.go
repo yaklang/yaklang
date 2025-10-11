@@ -41,7 +41,12 @@ func (c *config) getFileHandler(
 			}
 
 			if language := c.LanguageBuilder; language != nil {
-				return language.ParseAST(utils.UnsafeBytesToString(content))
+				if language.FilterParseAST(path) {
+					return language.ParseAST(utils.UnsafeBytesToString(content))
+				} else {
+					log.Debugf("skip parse ast file: %s", path)
+					return nil, nil
+				}
 			}
 			return nil, utils.Errorf("not select language %s", c.language)
 		},

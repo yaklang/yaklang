@@ -106,6 +106,12 @@ func (*SSABuilder) FilterFile(path string) bool {
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.C
 }
+
+func (s *SSABuilder) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".c" || extension == ".h"
+}
+
 func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
 	return Frontend(src, s)
 }

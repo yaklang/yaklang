@@ -82,6 +82,11 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 	return nil
 }
 
+func (s *SSABuilder) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".go"
+}
+
 func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
 	return Frontend(src, s)
 }
