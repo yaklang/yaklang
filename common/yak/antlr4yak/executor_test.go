@@ -165,6 +165,7 @@ assert typeof([]int{1}) == "array"
 a = [1]
 assert typeof(a) == "array"
 assert typeof(a) == "slice"
+assert typeof(a) == "[]int"
 assert typeof({"a": 1}) == "map"
 assert typeof({"a": 1}) == "map[string]int"
 assert typeof({"a": 1}) == "dict"
