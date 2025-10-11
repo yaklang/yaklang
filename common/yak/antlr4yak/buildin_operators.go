@@ -104,8 +104,18 @@ func typeofEQ(value *yakvm.Value, value2 *yakvm.Value) (ok bool, ret bool) {
 			kinds = append(kinds, PointerKind...)
 		case reflect.Slice:
 			kinds = append(kinds, SliceKind...)
+			elemType := typ.Elem()
+			elemYakKinds := refKindToYakKind(elemType)
+			for _, elemYakKind := range elemYakKinds {
+				kinds = append(kinds, "[]"+elemYakKind)
+			}
 		case reflect.Array:
 			kinds = append(kinds, ArrayKind...)
+			elemType := typ.Elem()
+			elemYakKinds := refKindToYakKind(elemType)
+			for _, elemYakKind := range elemYakKinds {
+				kinds = append(kinds, "[]"+elemYakKind)
+			}
 		case reflect.String:
 			kinds = append(kinds, StringKind)
 		case reflect.Struct:
