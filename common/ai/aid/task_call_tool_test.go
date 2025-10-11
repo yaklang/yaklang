@@ -85,6 +85,7 @@ func TestAITaskCallToolStdOut(t *testing.T) {
 	count := 0
 	var outBuffer = bytes.NewBuffer(nil)
 	var errBuffer = bytes.NewBuffer(nil)
+	var toolCallID string
 
 LOOP:
 	for {
@@ -98,17 +99,27 @@ LOOP:
 			}
 			fmt.Println("result:" + result.String())
 
+			if result.Type == schema.EVENT_TOOL_CALL_START {
+				toolCallID = result.CallToolID
+				continue
+			}
+
+			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
+				toolCallID = ""
+				continue
+			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
 				if result.NodeId == "tool-print-stdout" {
+					require.Equal(t, toolCallID, result.CallToolID)
 					require.True(t, result.DisableMarkdown)
 					outBuffer.Write(result.StreamDelta)
 				}
 				if result.NodeId == "tool-print-stderr" {
+					require.Equal(t, toolCallID, result.CallToolID)
 					require.True(t, result.DisableMarkdown)
 					errBuffer.Write(result.StreamDelta)
 				}
 			}
-
 			if utils.MatchAllOfSubString(string(result.Content), "start to generate and feedback tool:") {
 				break LOOP
 			}
