@@ -40,6 +40,11 @@ type builder struct {
 
 var Builder ssa.Builder = &SSABuilder{}
 
+func (s *SSABuilder) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".js" || extension == ".ts" || extension == ".tsx"
+}
+
 func (*SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
 	return Frontend(src)
 }

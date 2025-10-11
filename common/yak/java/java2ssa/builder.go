@@ -37,6 +37,11 @@ func CreateBuilder() ssa.Builder {
 	return builder
 }
 
+func (s *SSABuilder) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".java"
+}
+
 func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
 	return Frontend(src, s)
 }
