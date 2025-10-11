@@ -248,6 +248,11 @@ func (s *SFFrame) WithPredecessorContext(label string) AnalysisContextOption {
 	}
 }
 
+func (s *SFFrame) ProcessCallback(msg string, args ...any) {
+	if s.config.processCallback != nil {
+		s.config.processCallback(s.idx, fmt.Sprintf(msg, args...))
+	}
+}
 func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 	s.predCounter = 0
 	defer func() {
@@ -264,15 +269,13 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 		}
 	}()
 	for {
-		if s.config.processCallback != nil {
-			var msg string
-			if s.idx < len(s.Codes) {
-				msg = s.Codes[s.idx].String()
-			} else {
-				msg = "exec rule finished"
-			}
-			s.config.processCallback(s.idx, msg)
+		var msg string
+		if s.idx < len(s.Codes) {
+			msg = s.Codes[s.idx].String()
+		} else {
+			msg = "exec rule finished"
 		}
+		s.ProcessCallback(msg)
 		if s.idx >= len(s.Codes) {
 			break
 		}
@@ -795,6 +798,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 		s.debugSubLog("- call TopDefs")
+		s.ProcessCallback("get topdef %v(%v)", ValuesLen(value), i.SyntaxFlowConfig)
 		vals, err := value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
