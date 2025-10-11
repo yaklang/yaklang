@@ -1526,6 +1526,7 @@ message AIOutputEvent {
   string EventUUID = 16; // 事件的唯一ID, used via stream stream-finished
   I18n NodeIdVerbose = 17; // 用于展示的节点ID，可能是节点名称
   string ContentType = 18; // markdown / yaklang_code / plain_code
+  string CallToolID = 19; // 如果是调用工具相关的事件，那么这里是调用的ID
 }
 
 message I18n {
