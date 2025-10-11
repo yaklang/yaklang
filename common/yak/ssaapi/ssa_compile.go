@@ -35,7 +35,7 @@ var LanguageBuilderCreater = map[consts.Language]ssa.CreateBuilder{
 	C:    c2ssa.CreateBuilder,
 }
 
-func (c *config) isStop() bool {
+func (c *Config) isStop() bool {
 	if c == nil || c.ctx == nil {
 		return false
 	}
@@ -47,7 +47,7 @@ func (c *config) isStop() bool {
 	}
 }
 
-func (c *config) parseFile() (ret *Program, err error) {
+func (c *Config) parseFile() (ret *Program, err error) {
 	var prog *ssa.Program
 	prog, err = c.parseSimple(c.originEditor)
 	if err != nil {
@@ -69,7 +69,7 @@ func (c *config) parseFile() (ret *Program, err error) {
 	return p, nil
 }
 
-func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
+func (c *Config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 	return utils.Errorf("not implemented")
 	// builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
 	// if err := prog.Build("", code, builder); err != nil {
@@ -80,7 +80,7 @@ func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
 	// return nil
 }
 
-func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
+func (c *Config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			ret = nil
@@ -120,19 +120,19 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 
 var SkippedError = ssareducer.SkippedError
 
-func (c *config) checkLanguagePreHandler(path string) error {
+func (c *Config) checkLanguagePreHandler(path string) error {
 	return c.checkLanguageEx(path, func(builder ssa.Builder) bool {
 		return builder.FilterPreHandlerFile(path)
 	})
 }
 
-func (c *config) checkLanguage(path string) error {
+func (c *Config) checkLanguage(path string) error {
 	return c.checkLanguageEx(path, func(builder ssa.Builder) bool {
 		return builder.FilterFile(path)
 	})
 }
 
-func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) error {
+func (c *Config) checkLanguageEx(path string, handler func(ssa.Builder) bool) error {
 
 	processBuilders := func(builders ...ssa.Builder) (ssa.Builder, error) {
 		for _, instance := range builders {

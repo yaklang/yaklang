@@ -20,7 +20,7 @@ type SaveFolder struct {
 	path []string
 }
 
-func (c *config) parseProjectWithFS(
+func (c *Config) parseProjectWithFS(
 	filesystem filesys_interface.FileSystem,
 	processCallback func(float64, string, ...any),
 ) (*Program, error) {
@@ -155,7 +155,7 @@ func (c *config) parseProjectWithFS(
 		prog.SetPreHandler(true)
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 		start = time.Now()
-		ch := c.getFileHandler(
+		ch := c.GetFileHandler(
 			filesystem, preHandlerFiles, handlerFilesMap,
 		)
 		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
