@@ -176,7 +176,6 @@ func (m *scanManager) SaveTask() error {
 	m.taskRecorder.SkipQuery = m.GetSkippedQuery()
 	m.taskRecorder.RiskCount = m.GetRiskCount()
 	m.taskRecorder.TotalQuery = m.GetTotalQuery()
-	log.Errorf("save task, success: %d; failed: %d; skip: %d", m.taskRecorder.SuccessQuery, m.taskRecorder.FailedQuery, m.taskRecorder.SkipQuery)
 	m.taskRecorder.Kind = m.kind
 
 	m.taskRecorder.Config, _ = json.Marshal(m.config)

@@ -1358,6 +1358,19 @@ var ssaCodeScan = &cli.Command{
 			syntaxflow_scan.WithMemory(c.Bool("memory")),
 			syntaxflow_scan.WithReporter(reportInstance),
 			syntaxflow_scan.WithReporterWriter(config.OutputWriter),
+			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
+				if info == nil || len(info.Rules) == 0 {
+					return
+				}
+				str := "\n"
+				for _, rule := range info.Rules {
+					str += fmt.Sprintf("\t%s (progress: %.2f%%, status: %s)\n", rule.RuleName, rule.Progress*100, rule.Info)
+				}
+
+				log.Infof("rule: %s", str)
+
+			}),
 		)
 		if err != nil {
 			log.Errorf("scan failed: %s", err)
