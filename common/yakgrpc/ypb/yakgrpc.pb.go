@@ -6183,6 +6183,7 @@ type AIOutputEvent struct {
 	EventUUID       string                 `protobuf:"bytes,16,opt,name=EventUUID,proto3" json:"EventUUID,omitempty"`         // 事件的唯一ID, used via stream stream-finished
 	NodeIdVerbose   *I18N                  `protobuf:"bytes,17,opt,name=NodeIdVerbose,proto3" json:"NodeIdVerbose,omitempty"` // 用于展示的节点ID，可能是节点名称
 	ContentType     string                 `protobuf:"bytes,18,opt,name=ContentType,proto3" json:"ContentType,omitempty"`     // markdown / yaklang_code / plain_code
+	CallToolID      string                 `protobuf:"bytes,19,opt,name=CallToolID,proto3" json:"CallToolID,omitempty"`       // 如果是调用工具相关的事件，那么这里是调用的ID
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -6339,6 +6340,13 @@ func (x *AIOutputEvent) GetNodeIdVerbose() *I18N {
 func (x *AIOutputEvent) GetContentType() string {
 	if x != nil {
 		return x.ContentType
+	}
+	return ""
+}
+
+func (x *AIOutputEvent) GetCallToolID() string {
+	if x != nil {
+		return x.CallToolID
 	}
 	return ""
 }
@@ -30032,13 +30040,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -39587,8 +39595,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -61883,7 +61891,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"Pagination\x18\x03 \x01(\v2\v.ypb.PagingR\n" +
 	"Pagination\x12$\n" +
-	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xac\x04\n" +
+	"\rOnlyFavorites\x18\x04 \x01(\bR\rOnlyFavorites\"\xcc\x04\n" +
 	"\rAIOutputEvent\x12$\n" +
 	"\rCoordinatorId\x18\x01 \x01(\tR\rCoordinatorId\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x16\n" +
@@ -61903,7 +61911,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06SyncID\x18\x0e \x01(\tR\x06SyncID\x12\x1c\n" +
 	"\tEventUUID\x18\x10 \x01(\tR\tEventUUID\x12/\n" +
 	"\rNodeIdVerbose\x18\x11 \x01(\v2\t.ypb.I18nR\rNodeIdVerbose\x12 \n" +
-	"\vContentType\x18\x12 \x01(\tR\vContentType\"&\n" +
+	"\vContentType\x18\x12 \x01(\tR\vContentType\x12\x1e\n" +
+	"\n" +
+	"CallToolID\x18\x13 \x01(\tR\n" +
+	"CallToolID\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +
 	"\x02En\x18\x02 \x01(\tR\x02En\"\xda\x03\n" +
