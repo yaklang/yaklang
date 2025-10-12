@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -311,22 +312,48 @@ func (m *Timeline) batchCompressByTargetSize(targetSize int) {
 	}
 
 	// 调用 AI 进行批量压缩
-	response, err := m.ai.CallAI(NewAIRequest(prompt))
-	if err != nil {
-		log.Errorf("batch compress call ai failed: %v", err)
-		return
-	}
+	var action *Action
+	err := CallAITransaction(m.config, prompt, m.ai.CallAI, func(response *AIResponse) error {
+		var err error
+		response, err = m.ai.CallAI(NewAIRequest(prompt))
+		if err != nil {
+			log.Errorf("batch compress call ai failed: %v", err)
+			return utils.Errorf("context-shrink call ai failed: %v", err)
+		}
 
-	var r io.Reader
-	if m.config == nil {
-		r = response.GetUnboundStreamReader(false)
-	} else {
-		r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
-	}
+		var r io.Reader
+		if m.config == nil {
+			r = response.GetUnboundStreamReader(false)
+		} else {
+			r = response.GetOutputStreamReader("batch-compress", true, m.config.GetEmitter())
+		}
 
-	action, err := ExtractActionFromStream(r, "timeline-reducer")
+		action, err = ExtractActionFromStreamWithJSONExtractOptions(
+			r, "timeline-reducer", []string{},
+			[]jsonextractor.CallbackOption{
+				jsonextractor.WithRegisterFieldStreamHandler("reducer_memory", func(key string, reader io.Reader, parents []string) {
+					reducerMem := utils.JSONStringReader(reader)
+					m.config.GetEmitter().EmitTextPlainTextStreamEvent(
+						"memory-timeline",
+						reducerMem,
+						response.GetTaskIndex(),
+					)
+				}),
+			},
+		)
+		if err != nil {
+			log.Errorf("extract timeline batch compress action failed: %v", err)
+			return utils.Errorf("extract timeline context-shrink action failed: %v", err)
+		}
+		result := action.GetString("reducer_memory")
+		if result == "" {
+			log.Warnf("batch compress got empty reducer memory")
+			return utils.Error("context-shrink got empty reducer memory")
+		}
+		return nil
+	})
 	if err != nil {
-		log.Errorf("extract timeline batch compress action failed: %v", err)
+		log.Warnf("batch compress call ai failed: %v", err)
 		return
 	}
 
