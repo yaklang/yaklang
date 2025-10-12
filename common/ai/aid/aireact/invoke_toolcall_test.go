@@ -3,6 +3,11 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -10,10 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"io"
-	"strings"
-	"testing"
-	"time"
 )
 
 func mockedToolCalling(i aicommon.AICallerConfigIf, req *aicommon.AIRequest, toolName string) (*aicommon.AIResponse, error) {
@@ -108,6 +109,15 @@ LOOP:
 	for {
 		select {
 		case e := <-out:
+			if e.IsStream {
+				if e.ContentType == "" {
+					t.Fatal("stream event should have content type")
+				}
+				if utils.IsNil(e.GetNodeIdVerbose()) {
+					t.Fatal("node id should not be nil")
+				}
+				fmt.Println(string(e.GetStreamDelta()))
+			}
 			fmt.Println(e.String())
 			if e.Type == string(schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE) {
 				reviewed = true
