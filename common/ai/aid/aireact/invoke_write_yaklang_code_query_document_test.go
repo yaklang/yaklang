@@ -119,6 +119,14 @@ println("using Get method")
 		rsp.Close()
 		return rsp, nil
 	}
+	if utils.MatchAllOfSubString(prompt, `yaklang_doc_summarizer`, "<|QUERY_PARAM_") {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(utils.MustRenderTemplate(`{"@action": "yaklang_doc_summarizer", "summary": "mocked_summary"}`, map[string]any{
+			"nonce": utils.RandStringBytes(4),
+		})))
+		rsp.Close()
+		return rsp, nil
+	}
 
 	fmt.Println("Unexpected prompt:", prompt)
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
