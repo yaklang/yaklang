@@ -43,6 +43,7 @@ func newStreamAIOutputEventWriter(
 		timeStamp:       timeStamp,
 		eventWriterID:   eventWriterID,
 		taskIndex:       taskIndex,
+		contentType:     event.contentType,
 	}
 }
 
