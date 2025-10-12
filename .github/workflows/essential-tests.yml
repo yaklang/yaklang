@@ -214,135 +214,135 @@ jobs:
           - name: "Test Utils/Misc in 2min USE gRPC "
             run: |
               # these tests are very quick
-              go test -v -timeout 20s ./common/chunkmaker/...   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/jsonextractor    | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/markdownextractor    | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/yak/yaklib/codec   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/yak/cartesian    | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/jsonpath    | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/domainextractor    | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 20s ./common/chunkmaker/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/jsonextractor    2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/markdownextractor    2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/yak/yaklib/codec   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/yak/cartesian    2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/jsonpath    2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/domainextractor    2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # --- OMAP with race detection ---
-              go test -v -timeout 30s -race ./common/utils/omap/...   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 30s -race ./common/utils/omap/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # -----------------------------
-              go test -v -timeout 1m ./common/utils | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/utils/imageutils/...   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 10s ./common/utils/xml2 | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/utils/tlsutils/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 10s ./common/utils/linktable/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s -run TestQueryCVEWithFixName ./common/cve | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/sca/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s -run TestMUSTPASS_Common ./common/yak/yaklib | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 1m -run TestMUSTPASS_Fp ./common/yak/yaklib/tools | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 30s ./common/openapi/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 10s ./common/utils/dot/... ./common/utils/filesys/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 15s ./common/utils/bruteutils/. | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 15s ./common/utils/memedit/. | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"  
-              go test -v -timeout 15s ./common/pcapx/pcaputil/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 15s ./common/yak/yakurl/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 1m ./common/utils 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/utils/imageutils/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 10s ./common/utils/xml2 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/utils/tlsutils/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 10s ./common/utils/linktable/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s -run TestQueryCVEWithFixName ./common/cve 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/sca/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s -run TestMUSTPASS_YakitLog ./common/yak/yaklib 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s -run TestMUSTPASS_Common ./common/yak/yaklib 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 1m -run TestMUSTPASS_Fp ./common/yak/yaklib/tools 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 30s ./common/openapi/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 10s ./common/utils/dot/... ./common/utils/filesys/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 15s ./common/utils/bruteutils/. 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 15s ./common/utils/memedit/. 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }  
+              go test -v -timeout 15s ./common/pcapx/pcaputil/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 15s ./common/yak/yakurl/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # ziputil
-              go test -v -timeout 20s ./common/utils/ziputil/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 20s ./common/utils/ziputil/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # yso
-              go test -v -timeout 20s ./common/yso/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/yserx | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 20s ./common/yso/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/yserx 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # totp
-              go test -v -timeout 20s ./common/twofa/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 20s ./common/twofa/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # cybertunnel http trigger
-              go test -v ./common/cybertunnel/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v ./common/cybertunnel/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # YAK GIT
-              go test -v ./common/utils/yakgit/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v ./common/utils/yakgit/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # YAK suspect tools
-              go test -v ./common/utils/suspect | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v ./common/javaclassparser/jarwar/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 1m ./common/bin-parser/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 1m ./common/yak/antlr4nasl/tests/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 30s ./common/fp/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 30s ./common/utils/gzip_embed/test/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 30s ./common/yak/cmd/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 30s ./common/javaclassparser/tests/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v ./common/utils/suspect 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v ./common/javaclassparser/jarwar/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 1m ./common/bin-parser/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 1m ./common/yak/antlr4nasl/tests/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 30s ./common/fp/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 30s ./common/utils/gzip_embed/test/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 30s ./common/yak/cmd/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 30s ./common/javaclassparser/tests/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
               # suricate generate && match
-              go test -v -timeout 20s -run TestMUSTPASS* ./common/suricata/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s -run TestMUSTPASS* ./common/chaosmaker | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 20s -run TestMUSTPASS* ./common/suricata/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s -run TestMUSTPASS* ./common/chaosmaker 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # pcapx
-              go test -v -timeout 20s -run TestSmoking_* ./common/pcapx | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/netx/mustpass | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/mutate_tests ./common/fuzztag   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/fuzztagx  | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 30s ./common/mutate | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 30s ./common/fuzzx | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 20s ./common/utils/bizhelper/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 20s -run TestSmoking_* ./common/pcapx 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/netx/mustpass 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s -run TestPingAutoConfig ./common/utils/pingutil 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/mutate_tests ./common/fuzztag   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/fuzztagx  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 30s ./common/mutate 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 30s ./common/fuzzx 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 20s ./common/utils/bizhelper/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               
                # cli
-              go test -v --timeout 1m ./common/utils/cli | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v --timeout 1m ./common/utils/cli 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # mcp
-              go test -v --timeout 1m ./common/mcp/yakcliconvert | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v --timeout 1m ./common/mcp/yakcliconvert 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # doc
-              go test -v -timeout 3m  ./common/yak/yakdoc/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 3m  ./common/yak/yakdoc/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # jwt
-              go test -v --timeout 1m ./common/authhack/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v --timeout 1m ./common/authhack/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
               # vulinbox agent client
-              go test -v -timeout 1m -run TestMUSTPASS ./common/vulinboxagentclient | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 1m -run TestMUSTPASS ./common/vulinboxagentclient 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
               # yakdiff
-              go test -v -timeout 20s ./common/utils/yakgit/yakdiff/...   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 20s ./common/utils/yakgit/yakdiff/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test AI Infra / RAG / Knowledge
             run: |
-              go test -v -timeout 5m ./common/ai/aid/...  | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 60s ./common/ai/tests/...  | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 60s ./common/ai/rag/pq/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 60s ./common/ai/rag/hnsw/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 60s ./common/ai/aispec/...   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 60s ./common/aireducer/...   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 40s ./common/aiforge/aibp/forge_builder_test.go   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 3m ./common/aiforge   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 60s ./common/ai/rag/entityrepos/... | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 1m -run TestMUSTPASS ./common/ai/rag   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
-              go test -v -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...   | grep -E "(PASS|FAIL|RUN|=== RUN|--- PASS|--- FAIL|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)"
+              go test -v -timeout 5m ./common/ai/aid/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 60s ./common/ai/tests/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 60s ./common/ai/rag/pq/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 60s ./common/ai/rag/hnsw/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 60s ./common/ai/aispec/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 60s ./common/aireducer/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 40s ./common/aiforge/aibp/forge_builder_test.go   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 3m ./common/aiforge   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 60s ./common/ai/rag/entityrepos/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 1m -run TestMUSTPASS ./common/ai/rag   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -v -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan
             run: |
               # SSA plugin rule/option
-              go test -timeout 20s ./common/yak/static_analyzer/test/...
+              go test -timeout 20s ./common/yak/static_analyzer/test/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # StaticAnalyze
-              go test -timeout 1m -run TestAnalyzeMustPASS* ./common/coreplugin
+              go test -timeout 1m -run TestAnalyzeMustPASS* ./common/coreplugin 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # BuildIn SyntaxFlow Rule
-              go test -timeout 5m ./common/syntaxflow/sfbuildin/...
-              go test -timeout 1m ./common/yak/ssaapi/test/syntaxflow
+              go test -timeout 5m ./common/syntaxflow/sfbuildin/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 1m ./common/yak/ssaapi/test/syntaxflow 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # SyntaxFlowRule Evaluation
-              go test -timeout 20s ./common/syntaxflow/sfanalyzer/...
+              go test -timeout 20s ./common/syntaxflow/sfanalyzer/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # SSA
-              go test -timeout 20s ./common/yak/ssa/...
+              go test -timeout 20s ./common/yak/ssa/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # SSAAPI
-              go test -timeout 1m ./common/yak/ssaapi
-              go test -timeout 1m ./common/yak/ssaapi/ssareducer
-              go test -timeout 1m ./common/yak/ssaapi/test/ssatest
+              go test -timeout 1m ./common/yak/ssaapi 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 1m ./common/yak/ssaapi/ssareducer 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 1m ./common/yak/ssaapi/test/ssatest 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # SyntaxFlow Scan
-              go test -timeout 1m ./common/yak/syntaxflow_scan/...
+              go test -timeout 1m ./common/yak/syntaxflow_scan/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test gRPC SSA Frontend Yak  / JS(TS|ES) | PHP | Golang | C | Java
             run: |
               # yak ssa
-              go test -timeout 20s ./common/yak/yak2ssa/test/...
-              go test -timeout 1m ./common/yak/ssaapi/test/yak
+              go test -timeout 20s ./common/yak/yak2ssa/test/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 1m ./common/yak/ssaapi/test/yak 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # Test js
               # go test -timeout 60s ./common/yak/JS2ssa/... // remove this frontend 
-              go test -timeout 1m ./common/yak/ssaapi/test/javascript
-              go test -timeout 5m ./common/yak/java/...
-              go test -timeout 3m ./common/yak/ssaapi/test/java
-              go test -timeout 1m ./common/yak/typescript/frontend/tests/...
-              go test -timeout 1m ./common/yak/typescript/js2ssa/tests/...
-              go test -timeout 2m ./common/yak/php/...
-              go test -timeout 2m ./common/yak/ssaapi/test/php
-              go test -timeout 30s ./common/yak/go2ssa/...
-              go test -timeout 30s ./common/yak/antlr4go/...
-              go test -timeout 2m ./common/yak/ssaapi/test/golang
-              go test -timeout 30s ./common/yak/c2ssa/...
-              go test -timeout 30s ./common/yak/antlr4c/...
-              go test -timeout 2m ./common/yak/ssaapi/test/c
+              go test -timeout 1m ./common/yak/ssaapi/test/javascript 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 5m ./common/yak/java/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 3m ./common/yak/ssaapi/test/java 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 1m ./common/yak/typescript/frontend/tests/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 1m ./common/yak/typescript/js2ssa/tests/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 2m ./common/yak/php/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 2m ./common/yak/ssaapi/test/php 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 30s ./common/yak/go2ssa/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 30s ./common/yak/antlr4go/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 2m ./common/yak/ssaapi/test/golang 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 30s ./common/yak/c2ssa/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 30s ./common/yak/antlr4c/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 2m ./common/yak/ssaapi/test/c 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test lowhttp / DNSX
             run: |
@@ -369,10 +369,10 @@ jobs:
               go test -v -timeout 30s ./common/facades/... 2>&1 | tee /tmp/dnsx_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/dnsx_test.log; }
 
           - name: Test HttpTpl(YakTemplate)
-            run: go test -timeout 1m ./common/yak/httptpl
+            run: go test -timeout 1m ./common/yak/httptpl 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test MustPass - full yak scripts
-            run: go test -timeout 3m ./common/yak/yaktest/mustpass
+            run: go test -timeout 3m ./common/yak/yaktest/mustpass 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test gRPC MUSTPASS MITM
             run: |
@@ -419,9 +419,9 @@ jobs:
               #  integration MITM
               go test -v -timeout 2m -run TestGRPCMUSTPASS_MITM ./common/coreplugin 2>&1 | tee /tmp/integration_mitm_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/integration_mitm_test.log; }
               # SyntaxFlow
-              go test -timeout 20s  ./common/syntaxflow/tests
-              go test -timeout 20s  ./common/syntaxflow/sfdb/...
-              go test -timeout 20s  ./common/syntaxflow/sfvm/...
+              go test -timeout 20s  ./common/syntaxflow/tests 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 20s  ./common/syntaxflow/sfdb/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -timeout 20s  ./common/syntaxflow/sfvm/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test Vulinbox Coreplugin Fastjson
             run: go test -v -timeout 3m -run TestGRPCMUSTPASS_Fastjson ./common/coreplugin 2>&1 | tee /tmp/fastjson_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/fastjson_test.log; }
@@ -436,9 +436,9 @@ jobs:
           - name: Test Crawler / Crawlerx (chromium based crawler)
             run: |
               # crawlerx
-              go test --timeout 5m ./common/crawlerx/...
+              go test --timeout 5m ./common/crawlerx/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               # crawler
-              go test -timeout 20s -run TestMUSTPASS ./common/crawler
+              go test -timeout 20s -run TestMUSTPASS ./common/crawler 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
     steps:
       - name: "Checkout"
