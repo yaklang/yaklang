@@ -165,7 +165,7 @@ func init() {
 								documentResults,
 							)
 							invoker.AddToTimeline("query_yaklang_docs_result", documentResults)
-							nonce := utils.RandBytes(4)
+							nonce := utils.RandStringBytes(4)
 							targetPrompt, err := utils.RenderTemplate(`
 <|QUERY_PARAM_{{ .nonce }}|>
 {{ .payloads }}
