@@ -321,7 +321,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	}
 
 	result["ConversationMemory"] = pm.react.cumulativeSummary
-	result["Timeline"] = pm.react.config.memory.Timeline()
+	result["Timeline"] = pm.react.config.timeline.Dump()
 	return basePrompt, result, nil
 }
 
@@ -339,9 +339,11 @@ func (pm *PromptManager) GenerateToolParamsPrompt(tool *aitool.Tool) (string, er
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
-	if pm.react.config.memory != nil {
-		data.OriginalQuery = pm.react.config.memory.Query
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		if task := pm.react.GetCurrentTask(); task != nil {
+			data.OriginalQuery = task.GetUserInput()
+		}
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 	data.CumulativeSummary = pm.react.cumulativeSummary
 	data.CurrentIteration = pm.react.currentIteration
@@ -357,7 +359,7 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 		OriginalQuery:  originalQuery,
 		IsToolCall:     isToolResult,
 		Payload:        payload,
-		Timeline:       pm.react.config.memory.Timeline(),
+		Timeline:       pm.react.config.timeline.Dump(),
 		Language:       pm.react.config.language,
 		Schema:         verificationSchemaJSON,
 		DynamicContext: pm.DynamicContext(),
@@ -365,8 +367,8 @@ func (pm *PromptManager) GenerateVerificationPrompt(originalQuery string, isTool
 	}
 
 	// Get timeline for context (without lock, assume caller handles it)
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 
 	return pm.executeTemplate("verification", verificationPromptTemplate, data)
@@ -396,8 +398,8 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 	}
 
 	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 
 	return pm.executeTemplate("ai-review", aiReviewPromptTemplate, data)
@@ -441,8 +443,8 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 	}
 
 	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 
 	return pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
@@ -477,8 +479,8 @@ func (pm *PromptManager) GenerateToolReSelectPrompt(noUserInteract bool, oldTool
 	}
 
 	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 
 	return pm.executeTemplate("wrong-tool", wrongToolPromptTemplate, data)
@@ -508,8 +510,8 @@ func (pm *PromptManager) GenerateReGenerateToolParamsPrompt(userQuery string, ol
 	}
 
 	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 
 	return pm.executeTemplate("wrong-params", wrongParamsPromptTemplate, data)
@@ -550,9 +552,11 @@ func (pm *PromptManager) GenerateChangeAIBlueprintPrompt(
 	}
 
 	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
-		data.UserQuery = pm.react.config.memory.Query
+	if pm.react.config.timeline != nil {
+		data.Timeline = pm.react.config.timeline.Dump()
+		if task := pm.react.GetCurrentTask(); task != nil {
+			data.UserQuery = task.GetUserInput()
+		}
 	}
 
 	return pm.executeTemplate("change-blueprint", changeBlueprintPromptTemplate, data)
@@ -580,9 +584,11 @@ func (pm *PromptManager) GenerateAIBlueprintForgeParamsPromptEx(
 	}
 
 	// Extract context data from memory without lock (assume caller already holds lock)
-	if pm.react.config.memory != nil {
-		data.OriginalQuery = pm.react.config.memory.Query
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		if task := pm.react.GetCurrentTask(); task != nil {
+			data.OriginalQuery = task.GetUserInput()
+		}
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 	data.CumulativeSummary = pm.react.cumulativeSummary
 	data.CurrentIteration = pm.react.currentIteration
