@@ -1,0 +1,13 @@
+{{ .Basic }}
+
+{{ if .HaveDynamicContext }}<|DynamicContext_{{ .Nonce }}|>
+{{ .DynamicContext }}
+<|DynamicContext_END_{{ .Nonce }}|>{{ end }}
+
+<|QUERY_{{ .Nonce }}|>
+{{ .Query }}
+<|QUERY_END_{{ .Nonce }}|>
+
+<|Instruct|>
+
+<|Instruct_END|>
