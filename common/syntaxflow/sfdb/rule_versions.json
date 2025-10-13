@@ -20,7 +20,11 @@
   {
     "rule_id": "a7f9c2e1-3b8d-4f6e-9c2a-1e5f8d3b7c9a",
     "rule_name": "检测C语言信息泄露漏洞",
+<<<<<<< HEAD
     "hash": "f73a84334efbb103e8b956ba08e94163d0c5bb5188bfe23dc0952b1b478811c9",
+=======
+    "hash": "c708f05f2ad6a0eb487bebdba4d575be2d2280120463b78f94b76dc4ebed2268",
+>>>>>>> b3cbb2f88 (chore: auto-update embed files [bot commit])
     "version": "20251013.0001"
   },
   {
@@ -50,7 +54,11 @@
   {
     "rule_id": "f1e8d3b7-4c9a-4f2e-8b1d-6a5c9e2f7b4d",
     "rule_name": "检测C语言文件上传漏洞",
+<<<<<<< HEAD
     "hash": "055729eb9a49bcc9a87748bd9c7df5b98600045baa220aaf0f70372cabe86efc",
+=======
+    "hash": "7cdcb93f19f58e468a91080eac6e7f19bb66a362d220b3fc67ac2c80422ed447",
+>>>>>>> b3cbb2f88 (chore: auto-update embed files [bot commit])
     "version": "20251013.0001"
   },
   {
@@ -100,12 +108,15 @@
     "rule_name": "检测通用硬编码凭据",
     "hash": "c6102fe0e31486ec3dacbc21c7cc951f7e001da7690baa86334d0b022ac0d4a4",
     "version": "20251013.0001"
+<<<<<<< HEAD
   },
   {
     "rule_id": "a1b2c3d4-json-injection-001",
     "rule_name": "检测Golang JSON注入漏洞",
     "hash": "25fe9a1bcd28be8dc28bf96ff09cde20c20a127bd1db246e4666e30c5ec9ee7f",
     "version": "20251013.0001"
+=======
+>>>>>>> b3cbb2f88 (chore: auto-update embed files [bot commit])
   },
   {
     "rule_id": "017cae33-9b73-4470-9e98-adbdd10dbc3a",
@@ -154,6 +165,7 @@
     "rule_name": "检测Golang空密码漏洞",
     "hash": "aa4c4998ec54e8de4ae939b70ed54c0b18b68f22a1d3509bcb610618ff27c691",
     "version": "20251013.0001"
+<<<<<<< HEAD
   },
   {
     "rule_id": "f8e9a1b2-c3d4-5e6f-a7b8-c9d0e1f2a3b4",
@@ -172,6 +184,8 @@
     "rule_name": "检测Golang使用AES-CBC弱加密模式",
     "hash": "d483a856a8a7b18bd4d0119f4fec12c4e946780a1a94c0c01743b75c9f364171",
     "version": "20251013.0001"
+=======
+>>>>>>> b3cbb2f88 (chore: auto-update embed files [bot commit])
   },
   {
     "rule_id": "c13ec0d1-e9bd-447b-9307-daf87528bd3e",
