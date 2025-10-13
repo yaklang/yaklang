@@ -19,6 +19,9 @@ import (
 )
 
 type scanManager struct {
+	// *Config
+	Config *Config
+
 	// task info
 	taskID       string
 	status       string
@@ -26,18 +29,13 @@ type scanManager struct {
 	resumeSignal *sync.Cond
 	cancel       context.CancelFunc
 
-	memory bool
 	// record {{
 	// task record
 	lock         sync.Mutex
 	taskRecorder *schema.SyntaxFlowScanTask
-	// config record
-	config *ScanTaskConfig
-	// }}
 
 	// config {{
-	kind           schema.SyntaxflowResultKind
-	ignoreLanguage bool
+	kind schema.SyntaxflowResultKind
 	// }}
 
 	// runtime {{
@@ -46,9 +44,8 @@ type scanManager struct {
 	rulesCount int64
 
 	// program
-	programs []string
-
-	concurrency uint32
+	// programs []string
+	// concurrency uint32
 	//}}
 
 	// process
@@ -58,8 +55,8 @@ type scanManager struct {
 
 // var syntaxFlowScanManagerMap = omap.NewEmptyOrderedMap[string, *scanManager]()
 
-func LoadSyntaxflowTaskFromDB(ctx context.Context, runningID string, config *ScanTaskConfig) (*scanManager, error) {
-	taskId := config.GetResumeTaskId()
+func LoadSyntaxflowTaskFromDB(ctx context.Context, runningID string, config *Config) (*scanManager, error) {
+	taskId := config.GetScanResumeTaskId()
 	var manager *scanManager
 	// var ok bool
 	// if manager, ok = syntaxFlowScanManagerMap.Get(taskId); ok {
@@ -91,7 +88,7 @@ func RemoveSyntaxFlowTaskByID(id string) {
 func createEmptySyntaxFlowTaskByID(
 	ctx context.Context,
 	runningID, taskId string,
-	config *ScanTaskConfig,
+	config *Config,
 ) (*scanManager, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -108,7 +105,7 @@ func createEmptySyntaxFlowTaskByID(
 	}
 	m.callback.Set(runningID, config.ScanTaskCallback)
 	// syntaxFlowScanManagerMap.Set(taskId, m)
-	m.config = config
+	m.Config = config
 	// 设置进度回调
 	m.processMonitor = newProcessMonitor(ctx, 30*time.Second, func(progress float64, info *RuleProcessInfoList) {
 		m.callback.Process(m.taskID, m.status, progress, info)
@@ -119,7 +116,7 @@ func createEmptySyntaxFlowTaskByID(
 func createSyntaxflowTaskById(
 	ctx context.Context,
 	runningID, taskId string,
-	config *ScanTaskConfig,
+	config *Config,
 ) (*scanManager, error) {
 	m, err := createEmptySyntaxFlowTaskByID(ctx, runningID, taskId, config)
 	if err != nil {
@@ -129,17 +126,13 @@ func createSyntaxflowTaskById(
 	if err := m.initByConfig(); err != nil {
 		return nil, err
 	}
-	// 设置扫描批次
 	m.setScanBatch()
 
 	return m, nil
 }
 
 func (m *scanManager) GetConcurrency() uint32 {
-	if m.concurrency == 0 {
-		return 5
-	}
-	return m.concurrency
+	return m.Config.GetScanConcurrency()
 }
 
 // setScanBatch 设置扫描批次号
@@ -148,7 +141,7 @@ func (m *scanManager) setScanBatch() {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
 
-	maxBatch, err := yakit.GetMaxScanBatch(ssadb.GetDB(), m.programs)
+	maxBatch, err := yakit.GetMaxScanBatch(ssadb.GetDB(), m.Config.GetProgramNames())
 	if err != nil {
 		m.taskRecorder.ScanBatch = 1
 	} else {
@@ -168,7 +161,7 @@ func (m *scanManager) SaveTask() error {
 	if m.taskRecorder == nil {
 		m.taskRecorder = &schema.SyntaxFlowScanTask{}
 	}
-	m.taskRecorder.Programs = strings.Join(m.programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
+	m.taskRecorder.Programs = strings.Join(m.Config.GetProgramNames(), schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 	m.taskRecorder.TaskId = m.taskID
 	m.taskRecorder.Status = m.status
 	m.taskRecorder.SuccessQuery = m.GetSuccessQuery()
@@ -179,7 +172,7 @@ func (m *scanManager) SaveTask() error {
 	log.Errorf("save task, success: %d; failed: %d; skip: %d", m.taskRecorder.SuccessQuery, m.taskRecorder.FailedQuery, m.taskRecorder.SkipQuery)
 	m.taskRecorder.Kind = m.kind
 
-	m.taskRecorder.Config, _ = json.Marshal(m.config)
+	m.taskRecorder.Config, _ = json.Marshal(m.Config)
 	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
 
 	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
@@ -201,7 +194,9 @@ func (m *scanManager) SaveTask() error {
 			}
 		}
 	}
-	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
+	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
+	log.Errorf("save task : %v", utils.InterfaceToString(m.taskRecorder))
+	return err
 }
 
 func (m *scanManager) RestoreTask() error {
@@ -213,17 +208,22 @@ func (m *scanManager) RestoreTask() error {
 	m.taskRecorder = task
 	m.status = task.Status
 	m.status = task.Status
-	m.programs = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
+	// m.programs = strings.Split(task.Programs, schema.SYNTAXFLOWSCAN_PROGRAM_SPLIT)
 
 	// load config
-	var config = &ScanTaskConfig{}
+	var config = &Config{}
+	log.Errorf("task config : %v", string(task.Config))
 	if len(task.Config) == 0 {
 		return utils.Errorf("Config is empty")
 	}
 	if err = json.Unmarshal(task.Config, config); err != nil {
 		return utils.Wrapf(err, "Unmarshal SyntaxFlowScan Config: %v", task.Config)
 	}
-	m.config.SyntaxFlowScanRequest = config.SyntaxFlowScanRequest
+
+	m.Config.Config = config.Config
+	if err != nil {
+		return utils.Wrapf(err, "NewConfig from raw config failed")
+	}
 
 	// init rule
 	if err := m.initByConfig(); err != nil {
@@ -243,36 +243,37 @@ func (m *scanManager) RestoreTask() error {
 }
 
 func (m *scanManager) initByConfig() error {
-	config := m.config
+	config := m.Config
 	if config == nil {
 		return utils.Errorf("config is nil")
 	}
 
-	projectId := config.GetSSAProjectId()
-	if projectId != 0 && len(config.GetProgramName()) == 0 {
+	projectId := config.GetProjectID()
+	if projectId != 0 && len(config.GetProgramNames()) == 0 {
 		// init by project info in db
-		project, err := yakit.LoadSSAProjectBuilderByID(uint(projectId))
+		project, err := yakit.QuerySSAProjectById((projectId))
 		if err != nil || project == nil {
 			return utils.Errorf("query ssa project by id failed: %s", err)
 		}
-		scanConfig := project.GetScanConfig()
-		if scanConfig == nil {
-			return utils.Errorf("scan config is nil")
+		config, err := project.GetConfig()
+		if config == nil || err != nil {
+			return utils.Errorf("scan config error: %v", err)
 		}
 
-		m.programs = []string{project.ProjectName}
-		m.ignoreLanguage = scanConfig.IgnoreLanguage
-		m.memory = scanConfig.Memory
-		m.concurrency = scanConfig.Concurrency
+		// m.programs = []string{project.ProjectName}
+		m.Config.Config = config
+		// m.ignoreLanguage = scanConfig.IgnoreLanguage
+		// m.memory = scanConfig.Memory
+		// m.concurrency = scanConfig.Concurrency
 	} else {
 		// init by stream config
-		if len(config.GetProgramName()) == 0 {
-			return utils.Errorf("program name is empty")
-		}
-		m.programs = config.GetProgramName()
-		m.ignoreLanguage = config.GetIgnoreLanguage()
-		m.memory = config.GetMemory()
-		m.concurrency = config.GetConcurrency()
+		// if len(config.GetProgramName()) == 0 {
+		// 	return utils.Errorf("program name is empty")
+		// }
+		// m.programs = config.GetProgramName()
+		// m.ignoreLanguage = config.GetIgnoreLanguage()
+		// m.memory = config.GetMemory()
+		// m.concurrency = config.GetConcurrency()
 	}
 
 	setRuleChan := func(filter *ypb.SyntaxFlowRuleFilter) error {
@@ -290,6 +291,7 @@ func (m *scanManager) initByConfig() error {
 		return nil
 	}
 
+	log.Errorf("config: %v", config.Config.GetRuleInput())
 	if input := config.GetRuleInput(); input != nil {
 		// start debug mode scan task
 		ruleCh := make(chan *schema.SyntaxFlowRule)
@@ -304,16 +306,20 @@ func (m *scanManager) initByConfig() error {
 		m.ruleChan = ruleCh
 		m.rulesCount = 1
 		m.kind = schema.SFResultKindDebug
-	} else if config.GetFilter() != nil {
-		if err := setRuleChan(config.GetFilter()); err != nil {
+	} else if config.GetRuleFilter() != nil {
+		if err := setRuleChan(config.GetRuleFilter()); err != nil {
 			return err
 		}
 	} else if projectId != 0 {
-		project, err := yakit.LoadSSAProjectBuilderByID(uint(projectId))
+		project, err := yakit.QuerySSAProjectById(projectId)
 		if err != nil {
 			return utils.Errorf("load ssa project by id failed: %s", err)
 		}
-		if err := setRuleChan(project.GetRuleFilter()); err != nil {
+		config, err := project.GetConfig()
+		if err != nil {
+			return utils.Errorf("get rule filter from project config failed: %s", err)
+		}
+		if err := setRuleChan(config.GetRuleFilter()); err != nil {
 			return err
 		}
 	} else {
@@ -322,8 +328,9 @@ func (m *scanManager) initByConfig() error {
 		}
 	}
 
-	log.Errorf("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(len(m.programs)))
-	m.setTotalQuery(m.rulesCount * int64(len(m.programs)))
+	programCount := len(config.GetProgramNames())
+	log.Errorf("rulecount %d ; total query: %v", m.rulesCount, m.rulesCount*int64(programCount))
+	m.setTotalQuery(m.rulesCount * int64(programCount))
 	return nil
 }
 

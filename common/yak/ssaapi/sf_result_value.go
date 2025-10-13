@@ -6,6 +6,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // ======================================== All Value/Variable ========================================
@@ -193,9 +194,9 @@ func (r *SyntaxFlowResult) GetUnNameValues() Values {
 	return r.unName
 }
 
-func (r *SyntaxFlowResult) GetResultSaveKind() ResultSaveKind {
+func (r *SyntaxFlowResult) GetResultSaveKind() ssaconfig.SFResultSaveKind {
 	if r == nil {
-		return resultSaveNone
+		return ssaconfig.SFResultSaveNone
 	}
 	return r.saveKind
 }
