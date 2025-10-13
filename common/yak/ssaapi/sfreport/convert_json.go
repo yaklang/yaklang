@@ -20,10 +20,18 @@ import (
 
 var _ IReport = (*Report)(nil)
 
-func (r *Report) Save(writer io.Writer) error {
+func (r *Report) SetWriter(writer io.Writer) error {
+	if writer == nil {
+		return utils.Errorf("writer is nil")
+	}
+	r.writer = writer
+	return nil
+}
+
+func (r *Report) Save() error {
 	switch r.ReportType {
 	case IRifyReportType, IRifyFullReportType:
-		return r.PrettyWrite(writer)
+		return r.PrettyWrite(r.writer)
 	case IRifyReactReportType:
 		return r.SaveForIRify()
 	}
