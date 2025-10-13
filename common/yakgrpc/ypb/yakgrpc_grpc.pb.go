@@ -574,6 +574,10 @@ const (
 	Yak_GenerateERMDot_FullMethodName                             = "/ypb.Yak/GenerateERMDot"
 	Yak_ExportKnowledgeBase_FullMethodName                        = "/ypb.Yak/ExportKnowledgeBase"
 	Yak_ImportKnowledgeBase_FullMethodName                        = "/ypb.Yak/ImportKnowledgeBase"
+	Yak_AddMCPServer_FullMethodName                               = "/ypb.Yak/AddMCPServer"
+	Yak_DeleteMCPServer_FullMethodName                            = "/ypb.Yak/DeleteMCPServer"
+	Yak_UpdateMCPServer_FullMethodName                            = "/ypb.Yak/UpdateMCPServer"
+	Yak_GetAllMCPServers_FullMethodName                           = "/ypb.Yak/GetAllMCPServers"
 )
 
 // YakClient is the client API for Yak service.
@@ -1283,6 +1287,10 @@ type YakClient interface {
 	// Export and Import Knowledge Base
 	ExportKnowledgeBase(ctx context.Context, in *ExportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error)
 	ImportKnowledgeBase(ctx context.Context, in *ImportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error)
+	AddMCPServer(ctx context.Context, in *AddMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	DeleteMCPServer(ctx context.Context, in *DeleteMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	UpdateMCPServer(ctx context.Context, in *UpdateMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	GetAllMCPServers(ctx context.Context, in *GetAllMCPServersRequest, opts ...grpc.CallOption) (*GetAllMCPServersResponse, error)
 }
 
 type yakClient struct {
@@ -7665,6 +7673,46 @@ func (c *yakClient) ImportKnowledgeBase(ctx context.Context, in *ImportKnowledge
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ImportKnowledgeBaseClient = grpc.ServerStreamingClient[GeneralProgress]
 
+func (c *yakClient) AddMCPServer(ctx context.Context, in *AddMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_AddMCPServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteMCPServer(ctx context.Context, in *DeleteMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteMCPServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateMCPServer(ctx context.Context, in *UpdateMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateMCPServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAllMCPServers(ctx context.Context, in *GetAllMCPServersRequest, opts ...grpc.CallOption) (*GetAllMCPServersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllMCPServersResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAllMCPServers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -8372,6 +8420,10 @@ type YakServer interface {
 	// Export and Import Knowledge Base
 	ExportKnowledgeBase(*ExportKnowledgeBaseRequest, grpc.ServerStreamingServer[GeneralProgress]) error
 	ImportKnowledgeBase(*ImportKnowledgeBaseRequest, grpc.ServerStreamingServer[GeneralProgress]) error
+	AddMCPServer(context.Context, *AddMCPServerRequest) (*GeneralResponse, error)
+	DeleteMCPServer(context.Context, *DeleteMCPServerRequest) (*GeneralResponse, error)
+	UpdateMCPServer(context.Context, *UpdateMCPServerRequest) (*GeneralResponse, error)
+	GetAllMCPServers(context.Context, *GetAllMCPServersRequest) (*GetAllMCPServersResponse, error)
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -10046,6 +10098,18 @@ func (UnimplementedYakServer) ExportKnowledgeBase(*ExportKnowledgeBaseRequest, g
 }
 func (UnimplementedYakServer) ImportKnowledgeBase(*ImportKnowledgeBaseRequest, grpc.ServerStreamingServer[GeneralProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method ImportKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) AddMCPServer(context.Context, *AddMCPServerRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddMCPServer not implemented")
+}
+func (UnimplementedYakServer) DeleteMCPServer(context.Context, *DeleteMCPServerRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteMCPServer not implemented")
+}
+func (UnimplementedYakServer) UpdateMCPServer(context.Context, *UpdateMCPServerRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateMCPServer not implemented")
+}
+func (UnimplementedYakServer) GetAllMCPServers(context.Context, *GetAllMCPServersRequest) (*GetAllMCPServersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllMCPServers not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -19280,6 +19344,78 @@ func _Yak_ImportKnowledgeBase_Handler(srv interface{}, stream grpc.ServerStream)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ImportKnowledgeBaseServer = grpc.ServerStreamingServer[GeneralProgress]
 
+func _Yak_AddMCPServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddMCPServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).AddMCPServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_AddMCPServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).AddMCPServer(ctx, req.(*AddMCPServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteMCPServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMCPServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteMCPServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteMCPServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteMCPServer(ctx, req.(*DeleteMCPServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateMCPServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMCPServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateMCPServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateMCPServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateMCPServer(ctx, req.(*UpdateMCPServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAllMCPServers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllMCPServersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllMCPServers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAllMCPServers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllMCPServers(ctx, req.(*GetAllMCPServersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -21098,6 +21234,22 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GenerateERMDot",
 			Handler:    _Yak_GenerateERMDot_Handler,
+		},
+		{
+			MethodName: "AddMCPServer",
+			Handler:    _Yak_AddMCPServer_Handler,
+		},
+		{
+			MethodName: "DeleteMCPServer",
+			Handler:    _Yak_DeleteMCPServer_Handler,
+		},
+		{
+			MethodName: "UpdateMCPServer",
+			Handler:    _Yak_UpdateMCPServer_Handler,
+		},
+		{
+			MethodName: "GetAllMCPServers",
+			Handler:    _Yak_GetAllMCPServers_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
