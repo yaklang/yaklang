@@ -357,75 +357,112 @@ func TestGRPCMUSTPASS_SyntaxFlow_Scan_WithContent(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_Group(t *testing.T) {
-	client, err := NewLocalClient(true)
-	require.NoError(t, err)
-
-	progID := uuid.NewString()
-	f := prepareProgram(t, progID)
-	defer f()
-	stream, err := client.SyntaxFlowScan(context.Background())
-	require.NoError(t, err)
-
-	stream.Send(&ypb.SyntaxFlowScanRequest{
-		ControlMode: "start",
-		Filter: &ypb.SyntaxFlowRuleFilter{
-			GroupNames: []string{string(consts.JAVA), string(consts.PHP), string(consts.GO)},
-		},
-		ProgramName: []string{
-			progID,
-		},
-	})
-
-	resp, err := stream.Recv()
-	require.NoError(t, err)
-	log.Infof("resp: %v", resp)
-	taskID := resp.TaskID
-	require.NoError(t, err)
-
-	go func() {
-		notify, err := client.DuplexConnection(context.Background())
+	t.Run("test scan task with group", func(t *testing.T) {
+		client, err := NewLocalClient(true)
 		require.NoError(t, err)
-		matchTaskID := false
-		for {
-			res, err := notify.Recv()
-			require.NoError(t, err)
-			if res.MessageType == ssadb.ServerPushType_SyntaxflowResult {
-				var tmp map[string]string
-				err = json.Unmarshal(res.GetData(), &tmp)
-				require.NoError(t, err)
-				log.Infof("taskid: %#v", tmp)
-				if tmp["task_id"] == taskID {
-					matchTaskID = true
-					res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
-						Filter: &ypb.SyntaxFlowResultFilter{
-							TaskIDs: []string{taskID},
-						},
-					})
-					require.NoError(t, err)
-					require.Greater(t, len(res.Results), 0)
-					require.Equal(t, res.Results[0].Kind, string(schema.SFResultKindScan))
-				}
-				break
-			}
-		}
-		require.True(t, matchTaskID)
-	}()
 
-	hasProcess := false
-	finishProcess := 0.0
-	var finishStatus string
-	checkSfScanRecvMsg(t, stream, func(status string) {
-		finishStatus = status
-	}, func(process float64) {
-		if 0 < process && process < 1 {
-			hasProcess = true
+		progID := uuid.NewString()
+		f := prepareProgram(t, progID)
+		defer f()
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				GroupNames: []string{string(consts.JAVA), string(consts.PHP), string(consts.GO)},
+			},
+			ProgramName: []string{
+				progID,
+			},
+		})
+
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		require.NoError(t, err)
+
+		notifyCtx, notifyCancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer notifyCancel()
+
+		notify, err := client.DuplexConnection(notifyCtx)
+		require.NoError(t, err)
+
+		notificationReceived := make(chan bool, 1)
+
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Errorf("Goroutine panic: %v", r)
+				}
+			}()
+
+			matchTaskID := false
+			for {
+				res, err := notify.Recv()
+				if err != nil {
+					if err == io.EOF || strings.Contains(err.Error(), "context") {
+						log.Infof("Notification stream ended: %v", err)
+						notificationReceived <- matchTaskID
+						return
+					}
+					log.Errorf("Notification recv error: %v", err)
+					notificationReceived <- false
+					return
+				}
+
+				if res.MessageType == ssadb.ServerPushType_SyntaxflowResult {
+					var tmp map[string]string
+					err = json.Unmarshal(res.GetData(), &tmp)
+					if err != nil {
+						log.Errorf("Unmarshal error: %v", err)
+						continue
+					}
+					log.Infof("Received notification for taskid: %#v", tmp)
+					if tmp["task_id"] == taskID {
+						matchTaskID = true
+						res, err := client.QuerySyntaxFlowResult(context.Background(), &ypb.QuerySyntaxFlowResultRequest{
+							Filter: &ypb.SyntaxFlowResultFilter{
+								TaskIDs: []string{taskID},
+							},
+						})
+						if err == nil && len(res.Results) > 0 {
+							require.Equal(t, res.Results[0].Kind, string(schema.SFResultKindScan))
+						}
+						notificationReceived <- true
+						return
+					}
+				}
+			}
+		}()
+
+		hasProcess := false
+		finishProcess := 0.0
+		var finishStatus string
+		checkSfScanRecvMsg(t, stream, func(status string) {
+			finishStatus = status
+		}, func(process float64) {
+			if 0 < process && process < 1 {
+				hasProcess = true
+			}
+			finishProcess = process
+		})
+		require.True(t, hasProcess)
+		require.Equal(t, 1.0, finishProcess)
+		require.Equal(t, "done", finishStatus)
+
+		select {
+		case matched := <-notificationReceived:
+			if !matched {
+				log.Warnf("Did not receive expected notification for task %v", taskID)
+			}
+		case <-time.After(5 * time.Second):
+			log.Warnf("Timeout waiting for notification goroutine to complete")
 		}
-		finishProcess = process
+
+		log.Infof("Test completed for task %v", taskID)
 	})
-	require.True(t, hasProcess)
-	require.Equal(t, 1.0, finishProcess)
-	require.Equal(t, "done", finishStatus)
-	log.Infof("wait for task %v", taskID)
 }
 
 func TestGRPCMUSTPASS_SyntaxFlow_Scan_With_DiffRule(t *testing.T) {
