@@ -17,7 +17,7 @@ type AIAgentRuntimeType string
 const (
 	AIAgentRuntimeType_PlanAndExec AIAgentRuntimeType = "plan-exec"
 	AIAgentRuntimeType_ReAct       AIAgentRuntimeType = "re-act"
-	AIAgentRuntimeType_Unkown      AIAgentRuntimeType = ""
+	AIAgentRuntimeType_Unknown     AIAgentRuntimeType = ""
 )
 
 type AIAgentRuntime struct {
