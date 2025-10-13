@@ -48,8 +48,15 @@ type ScoreFilter struct {
 	T_Min, T_Max float64
 }
 
+// Config AIMemoryTriage的配置
+type Config struct {
+	invoker         aicommon.AIInvokeRuntime
+	contextProvider func() (string, error)
+	ragOptions      []any
+}
+
 // Option AIMemoryTriage的配置选项
-type Option func(memory *AIMemoryTriage)
+type Option func(config *Config)
 
 // AIMemoryTriage AI记忆管理系统
 type AIMemoryTriage struct {
@@ -64,14 +71,21 @@ type AIMemoryTriage struct {
 
 // WithContextProvider 设置上下文提供者
 func WithContextProvider(i func() (string, error)) Option {
-	return func(memory *AIMemoryTriage) {
-		memory.contextProvider = i
+	return func(config *Config) {
+		config.contextProvider = i
 	}
 }
 
 // WithInvoker 设置AI调用运行时
 func WithInvoker(invoker aicommon.AIInvokeRuntime) Option {
-	return func(memory *AIMemoryTriage) {
-		memory.invoker = invoker
+	return func(config *Config) {
+		config.invoker = invoker
+	}
+}
+
+// WithRAGOptions 设置RAG选项（主要用于测试时注入mock embedding）
+func WithRAGOptions(opts ...any) Option {
+	return func(config *Config) {
+		config.ragOptions = append(config.ragOptions, opts...)
 	}
 }
