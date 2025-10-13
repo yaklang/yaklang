@@ -40,7 +40,11 @@ func CreateBuilder() ssa.Builder {
 
 func initHandler(fb *ssa.FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
-	fb.GetProgram().GlobalScope = container
+
+	prog := fb.GetProgram()
+	if prog.GlobalVariablesBlueprint != nil {
+		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
+	}
 }
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
@@ -262,7 +266,18 @@ func (b *astbuilder) GetAliasAll() map[string]*ssa.AliasType {
 
 func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
 	variables := make(map[string]ssa.Value)
-	for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
+	prog := b.GetProgram()
+
+	if prog.GlobalVariablesBlueprint == nil {
+		return variables
+	}
+
+	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
+	if globalVarsContainer == nil {
+		return variables
+	}
+
+	for i, m := range globalVarsContainer.GetAllMember() {
 		variables[i.String()] = m
 	}
 	return variables

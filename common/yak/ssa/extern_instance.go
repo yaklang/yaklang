@@ -103,9 +103,6 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		// create variable for extern value
 		variable := ret.GetVariable(name)
 		if variable == nil {
-			// b.AssignVariable(
-			// 	b.CreateMemberCallVariable(extern, key), ret,
-			// )
 			ret.AddVariable(b.CreateMemberCallVariable(extern, key))
 		} else {
 			variable.AddRange(b.CurrentRange, true)
@@ -114,6 +111,16 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		// set member call
 		setMemberCallRelationship(extern, key, ret)
 		return ret
+	}
+
+	if lib, _ := b.GetProgram().GetLibrary(extern.GetName()); !utils.IsNil(lib) {
+		text := key.GetName()
+		if text == "" {
+			text = key.String()
+		}
+		if g, ok := lib.GetGlobalVariable(text); ok {
+			return g
+		}
 	}
 
 	// try build field for phi

@@ -48,7 +48,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 			prog := b.GetProgram()
 			application := prog.Application
-			global := application.GlobalScope
+
+			global := application.GlobalVariablesBlueprint.Container()
+			if global == nil {
+				return
+			}
 
 			initHandler := func(name string) {
 				variable := b.CreateMemberCallVariable(global, b.EmitConstInstPlaceholder(name))
@@ -65,7 +69,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 			if lib == nil {
 				lib = prog.NewLibrary(pkgPath[0], pkgPath)
-				lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
+				// Initialize library's GlobalVariablesBlueprint container with the package scope
+				if lib.GlobalVariablesBlueprint != nil {
+					pkgScope := b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
+					lib.GlobalVariablesBlueprint.InitializeWithContainer(pkgScope)
+				}
 			}
 			defer func() {
 				lib.VisitAst(ast)
@@ -88,6 +96,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					b.FunctionBuilder = currentBuilder
 				}()
 			}
+
+			b.AddGlobalVariable("", func() ssa.Value {
+				b.handleImportPackage()
+				return nil
+			})
 		}
 
 		for _, impo := range ast.AllImportDecl() {
@@ -411,7 +424,9 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				if b.GetFromCmap(id) {
 					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
-				b.AddGlobalVariable(id, b.GetDefaultValue(ssaTyp))
+				b.AddGlobalVariable(id, func() ssa.Value {
+					return b.GetDefaultValue(ssaTyp)
+				})
 				recoverRange()
 			}
 		} else {
@@ -423,9 +438,10 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				}
 			}
 			for i, value := range rightList {
-				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
-				rightvl = append(rightvl, rightv)
-				b.AddGlobalVariable(leftList[i].GetText(), rightv)
+				b.AddGlobalVariable(leftList[i].GetText(), func() ssa.Value {
+					rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+					return rightv
+				})
 			}
 		}
 	} else {
@@ -1129,9 +1145,6 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, buildGlobal bool, synta
 			b.buildStatementList(s)
 		})
 	} else {
-		if buildGlobal {
-			b.LoadGlobalVariable()
-		}
 		b.buildStatementList(s)
 	}
 }
