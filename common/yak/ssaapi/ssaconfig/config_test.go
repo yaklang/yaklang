@@ -12,14 +12,14 @@ func TestConfigInitializationByMode(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 
-	require.NotNil(t, cfg.BaseInfo)
-	require.NotNil(t, cfg.SyntaxFlow)
-	require.NotNil(t, cfg.SyntaxFlowScan)
-	require.NotNil(t, cfg.SyntaxFlowRule)
+	// New() no longer eagerly initializes nested structs - they should be nil
+	require.Nil(t, cfg.BaseInfo)
+	require.Nil(t, cfg.SyntaxFlow)
+	require.Nil(t, cfg.SyntaxFlowScan)
+	require.Nil(t, cfg.SyntaxFlowRule)
 
-	require.Equal(t, uint32(5), cfg.SyntaxFlowScan.Concurrency)
-	require.False(t, cfg.SyntaxFlowScan.IgnoreLanguage)
-	require.Equal(t, SFResultSaveNone, cfg.SyntaxFlow.ResultSaveKind)
+	// Test that Mode is set correctly
+	require.Equal(t, ModeSyntaxFlowScan, cfg.Mode)
 }
 
 func TestConfigWithOptions(t *testing.T) {
@@ -167,4 +167,290 @@ func TestOptionRequiresMode(t *testing.T) {
 
 	err = WithCodeSourceKind(CodeSourceGit)(cfg)
 	require.Error(t, err)
+}
+
+// TestLazyInitialization verifies that nested structs are only created when options are applied
+func TestLazyInitialization(t *testing.T) {
+	t.Run("BaseInfo lazy initialization", func(t *testing.T) {
+		cfg, err := New(ModeProjectBase)
+		require.NoError(t, err)
+		require.Nil(t, cfg.BaseInfo, "BaseInfo should be nil after New()")
+
+		err = WithProgramNames("test")(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.BaseInfo, "BaseInfo should be created by WithProgramNames")
+		require.Equal(t, []string{"test"}, cfg.BaseInfo.ProgramNames)
+	})
+
+	t.Run("SSACompile lazy initialization", func(t *testing.T) {
+		cfg, err := New(ModeSSACompile)
+		require.NoError(t, err)
+		require.Nil(t, cfg.SSACompile, "SSACompile should be nil after New()")
+
+		err = WithCompileStrictMode(true)(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.SSACompile, "SSACompile should be created by WithCompileStrictMode")
+		require.True(t, cfg.SSACompile.StrictMode)
+	})
+
+	t.Run("SyntaxFlow lazy initialization", func(t *testing.T) {
+		cfg, err := New(ModeSyntaxFlow)
+		require.NoError(t, err)
+		require.Nil(t, cfg.SyntaxFlow, "SyntaxFlow should be nil after New()")
+
+		err = WithSyntaxFlowMemory(true)(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.SyntaxFlow, "SyntaxFlow should be created by WithSyntaxFlowMemory")
+		require.True(t, cfg.SyntaxFlow.Memory)
+	})
+
+	t.Run("SyntaxFlowScan lazy initialization", func(t *testing.T) {
+		cfg, err := New(ModeSyntaxFlowScanManager)
+		require.NoError(t, err)
+		require.Nil(t, cfg.SyntaxFlowScan, "SyntaxFlowScan should be nil after New()")
+
+		err = WithScanConcurrency(10)(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.SyntaxFlowScan, "SyntaxFlowScan should be created by WithScanConcurrency")
+		require.Equal(t, uint32(10), cfg.SyntaxFlowScan.Concurrency)
+	})
+
+	t.Run("SyntaxFlowRule lazy initialization", func(t *testing.T) {
+		cfg, err := New(ModeSyntaxFlowRule)
+		require.NoError(t, err)
+		require.Nil(t, cfg.SyntaxFlowRule, "SyntaxFlowRule should be nil after New()")
+
+		err = WithRuleFilterKeyword("test")(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.SyntaxFlowRule, "SyntaxFlowRule should be created by WithRuleFilterKeyword")
+		require.NotNil(t, cfg.SyntaxFlowRule.RuleFilter)
+		require.Equal(t, "test", cfg.SyntaxFlowRule.RuleFilter.Keyword)
+	})
+
+	t.Run("CodeSource lazy initialization", func(t *testing.T) {
+		cfg, err := New(ModeCodeSource)
+		require.NoError(t, err)
+		require.Nil(t, cfg.CodeSource, "CodeSource should be nil after New()")
+
+		err = WithCodeSourceKind(CodeSourceGit)(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.CodeSource, "CodeSource should be created by WithCodeSourceKind")
+		require.Equal(t, CodeSourceGit, cfg.CodeSource.Kind)
+	})
+}
+
+// TestDefaultFactoryFunctions verifies that default factory functions create proper defaults
+func TestDefaultFactoryFunctions(t *testing.T) {
+	t.Run("defaultBaseInfo", func(t *testing.T) {
+		info := defaultBaseInfo()
+		require.NotNil(t, info)
+		require.Empty(t, info.ProgramNames)
+		require.Empty(t, info.ProjectName)
+	})
+
+	t.Run("defaultSSACompileConfig", func(t *testing.T) {
+		config := defaultSSACompileConfig()
+		require.NotNil(t, config)
+		require.False(t, config.StrictMode)
+		require.Equal(t, 0, config.PeepholeSize)
+		require.Empty(t, config.ExcludeFiles)
+		require.False(t, config.ReCompile)
+		require.False(t, config.MemoryCompile)
+		require.Equal(t, uint32(1), config.Concurrency)
+	})
+
+	t.Run("defaultSyntaxFlowConfig", func(t *testing.T) {
+		config := defaultSyntaxFlowConfig()
+		require.NotNil(t, config)
+		require.False(t, config.Memory)
+		require.Equal(t, SFResultSaveNone, config.ResultSaveKind)
+	})
+
+	t.Run("defaultSyntaxFlowScanConfig", func(t *testing.T) {
+		config := defaultSyntaxFlowScanConfig()
+		require.NotNil(t, config)
+		require.False(t, config.IgnoreLanguage)
+		require.Empty(t, config.Language)
+		require.Equal(t, uint32(5), config.Concurrency)
+	})
+
+	t.Run("defaultSyntaxFlowRuleConfig", func(t *testing.T) {
+		config := defaultSyntaxFlowRuleConfig()
+		require.NotNil(t, config)
+		require.Empty(t, config.RuleNames)
+		require.Nil(t, config.RuleFilter)
+		require.Nil(t, config.RuleInput)
+	})
+
+	t.Run("defaultCodeSourceConfig", func(t *testing.T) {
+		config := defaultCodeSourceConfig()
+		require.NotNil(t, config)
+		require.NotNil(t, config.Auth)
+		require.NotNil(t, config.Proxy)
+		require.Empty(t, config.Kind)
+		require.Empty(t, config.LocalFile)
+		require.Empty(t, config.URL)
+	})
+}
+
+// TestModeBitmaskValidation verifies that options properly validate Mode bitmask
+func TestModeBitmaskValidation(t *testing.T) {
+	t.Run("BaseInfo options require ModeProjectBase", func(t *testing.T) {
+		cfg, _ := New(ModeSSACompile) // Wrong mode
+
+		err := WithProgramNames("test")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Base mode")
+
+		err = WithProgramDescription("desc")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Base mode")
+
+		err = WithProgramLanguage("Go")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Base mode")
+	})
+
+	t.Run("Compile options require ModeSSACompile", func(t *testing.T) {
+		cfg, _ := New(ModeProjectBase) // Wrong mode
+
+		err := WithCompileStrictMode(true)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Compile mode")
+
+		err = WithCompilePeepholeSize(10)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Compile mode")
+
+		err = WithCompileConcurrency(5)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Compile mode")
+	})
+
+	t.Run("SyntaxFlow options require ModeSyntaxFlow or ModeSyntaxFlowScanManager", func(t *testing.T) {
+		cfg, _ := New(ModeProjectBase) // Wrong mode
+
+		err := WithSyntaxFlowMemory(true)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Scan mode")
+	})
+
+	t.Run("Scan options require ModeSyntaxFlowScanManager", func(t *testing.T) {
+		cfg, _ := New(ModeProjectBase) // Wrong mode
+
+		err := WithScanConcurrency(10)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Scan mode")
+
+		err = WithScanIgnoreLanguage(true)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Scan mode")
+
+		err = WithScanLanguage("go")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Scan mode")
+	})
+
+	t.Run("Rule options require ModeSyntaxFlowRule", func(t *testing.T) {
+		cfg, _ := New(ModeProjectBase) // Wrong mode
+
+		err := WithRuleFilterKeyword("test")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Rule mode")
+
+		err = WithRuleFilterLanguage("go")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Rule mode")
+
+		err = WithRuleInput(&ypb.SyntaxFlowRuleInput{RuleName: "test"})(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Rule mode")
+	})
+
+	t.Run("CodeSource options require ModeCodeSource", func(t *testing.T) {
+		cfg, _ := New(ModeProjectBase) // Wrong mode
+
+		err := WithCodeSourceKind(CodeSourceGit)(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Code Source mode")
+
+		err = WithCodeSourceURL("http://example.com")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Code Source mode")
+
+		err = WithCodeSourceBranch("main")(cfg)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "Code Source mode")
+	})
+}
+
+// TestCompositeModeInitialization verifies that composite modes work correctly
+func TestCompositeModeInitialization(t *testing.T) {
+	t.Run("ModeSyntaxFlowScan includes multiple modes", func(t *testing.T) {
+		cfg, err := New(ModeSyntaxFlowScan)
+		require.NoError(t, err)
+
+		// Should allow BaseInfo options
+		err = WithProgramNames("test")(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.BaseInfo)
+
+		// Should allow SyntaxFlow options
+		err = WithSyntaxFlowMemory(true)(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.SyntaxFlow)
+
+		// Should allow Scan options
+		err = WithScanConcurrency(10)(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.SyntaxFlowScan)
+
+		// Should allow Rule options
+		err = WithRuleFilterKeyword("test")(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.SyntaxFlowRule)
+	})
+
+	t.Run("ModeAll includes all modes", func(t *testing.T) {
+		cfg, err := New(ModeAll)
+		require.NoError(t, err)
+
+		// Should allow all option types
+		err = WithProgramNames("test")(cfg)
+		require.NoError(t, err)
+
+		err = WithCompileStrictMode(true)(cfg)
+		require.NoError(t, err)
+
+		err = WithSyntaxFlowMemory(true)(cfg)
+		require.NoError(t, err)
+
+		err = WithScanConcurrency(10)(cfg)
+		require.NoError(t, err)
+
+		err = WithRuleFilterKeyword("test")(cfg)
+		require.NoError(t, err)
+
+		err = WithCodeSourceKind(CodeSourceGit)(cfg)
+		require.NoError(t, err)
+
+		// All nested structs should be initialized
+		require.NotNil(t, cfg.BaseInfo)
+		require.NotNil(t, cfg.SSACompile)
+		require.NotNil(t, cfg.SyntaxFlow)
+		require.NotNil(t, cfg.SyntaxFlowScan)
+		require.NotNil(t, cfg.SyntaxFlowRule)
+		require.NotNil(t, cfg.CodeSource)
+	})
+}
+
+// TestMultipleOptionsOnSameField verifies that multiple options can modify the same field
+func TestMultipleOptionsOnSameField(t *testing.T) {
+	cfg, err := New(ModeProjectBase,
+		WithProgramNames("prog1"),
+		WithProgramNames("prog2", "prog3"),
+	)
+	require.NoError(t, err)
+	require.NotNil(t, cfg.BaseInfo)
+	require.Equal(t, []string{"prog1", "prog2", "prog3"}, cfg.BaseInfo.ProgramNames)
 }

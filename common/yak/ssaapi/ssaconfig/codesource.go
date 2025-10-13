@@ -78,77 +78,77 @@ func (c *CodeSourceInfo) ValidateSourceConfig() error {
 // --- 代码源配置 Get 方法 ---
 
 func (c *Config) GetCodeSourceKind() CodeSourceKind {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
 		return ""
 	}
 	return c.CodeSource.Kind
 }
 
 func (c *Config) GetCodeSourceLocalFile() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
 		return ""
 	}
 	return c.CodeSource.LocalFile
 }
 
 func (c *Config) GetCodeSourceURL() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
 		return ""
 	}
 	return c.CodeSource.URL
 }
 
 func (c *Config) GetCodeSourceBranch() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
 		return ""
 	}
 	return c.CodeSource.Branch
 }
 
 func (c *Config) GetCodeSourcePath() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
 		return ""
 	}
 	return c.CodeSource.Path
 }
 
 func (c *Config) GetCodeSourceAuthKind() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil || c.CodeSource.Auth == nil {
 		return ""
 	}
 	return c.CodeSource.Auth.Kind
 }
 
 func (c *Config) GetCodeSourceAuthUserName() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil || c.CodeSource.Auth == nil {
 		return ""
 	}
 	return c.CodeSource.Auth.UserName
 }
 
 func (c *Config) GetCodeSourceAuthPassword() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil || c.CodeSource.Auth == nil {
 		return ""
 	}
 	return c.CodeSource.Auth.Password
 }
 
 func (c *Config) GetCodeSourceProxyURL() string {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil || c.CodeSource.Proxy == nil {
 		return ""
 	}
 	return c.CodeSource.Proxy.URL
 }
 
 func (c *Config) GetCodeSourceProxyAuth() (string, string) {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil || c.CodeSource.Proxy == nil {
 		return "", ""
 	}
 	return c.CodeSource.Proxy.User, c.CodeSource.Proxy.Password
 }
 
 func (c *Config) GetCodeSourceAuth() *AuthConfigInfo {
-	if c == nil || c.CodeSource == nil {
+	if c == nil || c.Mode&ModeCodeSource == 0 || c.CodeSource == nil {
 		return nil
 	}
 	return c.CodeSource.Auth
@@ -159,8 +159,11 @@ func (c *Config) GetCodeSourceAuth() *AuthConfigInfo {
 // WithCodeSourceKind 设置代码源类型
 func WithCodeSourceKind(kind CodeSourceKind) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Kind can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
 		}
 		c.CodeSource.Kind = kind
 		return nil
@@ -169,8 +172,11 @@ func WithCodeSourceKind(kind CodeSourceKind) Option {
 
 func WithCodeSourceLocalFile(localFile string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Local File can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
 		}
 		c.CodeSource.LocalFile = localFile
 		return nil
@@ -179,8 +185,11 @@ func WithCodeSourceLocalFile(localFile string) Option {
 
 func WithCodeSourceURL(url string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source URL can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
 		}
 		c.CodeSource.URL = url
 		return nil
@@ -189,8 +198,11 @@ func WithCodeSourceURL(url string) Option {
 
 func WithCodeSourceBranch(branch string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Branch can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
 		}
 		c.CodeSource.Branch = branch
 		return nil
@@ -199,8 +211,11 @@ func WithCodeSourceBranch(branch string) Option {
 
 func WithCodeSourcePath(path string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Path can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
 		}
 		c.CodeSource.Path = path
 		return nil
@@ -209,8 +224,14 @@ func WithCodeSourcePath(path string) Option {
 
 func WithCodeSourceAuthKind(kind string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Auth Kind can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
+		}
+		if c.CodeSource.Auth == nil {
+			c.CodeSource.Auth = &AuthConfigInfo{}
 		}
 		c.CodeSource.Auth.Kind = kind
 		return nil
@@ -219,8 +240,14 @@ func WithCodeSourceAuthKind(kind string) Option {
 
 func WithCodeSourceAuthUserName(userName string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Auth User Name can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
+		}
+		if c.CodeSource.Auth == nil {
+			c.CodeSource.Auth = &AuthConfigInfo{}
 		}
 		c.CodeSource.Auth.UserName = userName
 		return nil
@@ -229,8 +256,14 @@ func WithCodeSourceAuthUserName(userName string) Option {
 
 func WithCodeSourceAuthPassword(password string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Auth Password can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
+		}
+		if c.CodeSource.Auth == nil {
+			c.CodeSource.Auth = &AuthConfigInfo{}
 		}
 		c.CodeSource.Auth.Password = password
 		return nil
@@ -239,8 +272,14 @@ func WithCodeSourceAuthPassword(password string) Option {
 
 func WithSSAProjectCodeSourceAuthKeyPath(keyPath string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Auth Key Path can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
+		}
+		if c.CodeSource.Auth == nil {
+			c.CodeSource.Auth = &AuthConfigInfo{}
 		}
 		c.CodeSource.Auth.KeyPath = keyPath
 		return nil
@@ -249,8 +288,14 @@ func WithSSAProjectCodeSourceAuthKeyPath(keyPath string) Option {
 
 func WithCodeSourceProxyURL(url string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Proxy URL can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
+		}
+		if c.CodeSource.Proxy == nil {
+			c.CodeSource.Proxy = &ProxyConfigInfo{}
 		}
 		c.CodeSource.Proxy.URL = url
 		return nil
@@ -259,8 +304,14 @@ func WithCodeSourceProxyURL(url string) Option {
 
 func WithCodeSourceProxyAuth(user string, password string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source Proxy Auth can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
+		}
+		if c.CodeSource.Proxy == nil {
+			c.CodeSource.Proxy = &ProxyConfigInfo{}
 		}
 		c.CodeSource.Proxy.User = user
 		c.CodeSource.Proxy.Password = password
@@ -270,8 +321,11 @@ func WithCodeSourceProxyAuth(user string, password string) Option {
 
 func WithCodeSourceJson(raw string) Option {
 	return func(c *Config) error {
-		if c.CodeSource == nil {
+		if c == nil || c.Mode&ModeCodeSource == 0 {
 			return utils.Errorf("Config: Code Source JSON can only be set in Code Source mode")
+		}
+		if c.CodeSource == nil {
+			c.CodeSource = defaultCodeSourceConfig()
 		}
 		err := json.Unmarshal([]byte(raw), c.CodeSource)
 		if err != nil {

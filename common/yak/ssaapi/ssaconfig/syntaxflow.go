@@ -95,11 +95,25 @@ func (c *Config) SetSyntaxFlowProcessCallback(processCallback func(float64, stri
 
 // --- 扫描配置 Get 方法 ---
 
-func (c *Config) GetScanMemory() bool {
-	if c == nil || c.SyntaxFlowScan == nil {
+func (c *Config) GetSyntaxFlowMemory() bool {
+	if c == nil || (c.Mode&ModeSyntaxFlow == 0 && c.Mode&ModeSyntaxFlowScanManager == 0) {
 		return false
 	}
-	return c.SyntaxFlowScan.Memory
+	if c.SyntaxFlow == nil {
+		c.SyntaxFlow = defaultSyntaxFlowConfig()
+	}
+	return c.SyntaxFlow.Memory
+}
+
+// GetScanMemory is a compatibility wrapper used by tests and callers.
+func (c *Config) GetScanMemory() bool {
+	if c == nil || (c.Mode&ModeSyntaxFlow == 0 && c.Mode&ModeSyntaxFlowScanManager == 0) {
+		return false
+	}
+	if c.SyntaxFlow == nil {
+		c.SyntaxFlow = defaultSyntaxFlowConfig()
+	}
+	return c.SyntaxFlow.Memory
 }
 
 func (c *Config) GetScanConcurrency() uint32 {
@@ -141,15 +155,13 @@ func (c *Config) GetScanLanguage() []string {
 
 func WithSyntaxFlowMemory(memory bool) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlow != nil {
-			c.SyntaxFlow.Memory = memory
-		}
-		if c.SyntaxFlowScan != nil {
-			c.SyntaxFlowScan.Memory = memory
-		}
-		if c.SyntaxFlow == nil && c.SyntaxFlowScan == nil {
+		if c == nil || (c.Mode&ModeSyntaxFlow == 0 && c.Mode&ModeSyntaxFlowScanManager == 0) {
 			return utils.Errorf("Config: Scan Memory can only be set in Scan mode")
 		}
+		if c.SyntaxFlow == nil {
+			c.SyntaxFlow = defaultSyntaxFlowConfig()
+		}
+		c.SyntaxFlow.Memory = memory
 		return nil
 	}
 }
@@ -157,8 +169,11 @@ func WithSyntaxFlowMemory(memory bool) Option {
 // WithScanConcurrency 设置扫描并发数
 func WithScanConcurrency(concurrency uint32) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlowScan == nil {
+		if c == nil || c.Mode&ModeSyntaxFlowScanManager == 0 {
 			return utils.Errorf("Config: Scan Concurrency can only be set in Scan mode")
+		}
+		if c.SyntaxFlowScan == nil {
+			c.SyntaxFlowScan = defaultSyntaxFlowScanConfig()
 		}
 		c.SyntaxFlowScan.Concurrency = concurrency
 		return nil
@@ -168,8 +183,11 @@ func WithScanConcurrency(concurrency uint32) Option {
 // WithScanIgnoreLanguage 设置忽略语言
 func WithScanIgnoreLanguage(ignoreLanguage bool) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlowScan == nil {
+		if c == nil || c.Mode&ModeSyntaxFlowScanManager == 0 {
 			return utils.Errorf("Config: Scan Ignore Language can only be set in Scan mode")
+		}
+		if c.SyntaxFlowScan == nil {
+			c.SyntaxFlowScan = defaultSyntaxFlowScanConfig()
 		}
 		c.SyntaxFlowScan.IgnoreLanguage = ignoreLanguage
 		return nil
@@ -178,8 +196,11 @@ func WithScanIgnoreLanguage(ignoreLanguage bool) Option {
 
 func WithScanControlMode(mode ControlMode) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlowScan == nil {
+		if c == nil || c.Mode&ModeSyntaxFlowScanManager == 0 {
 			return utils.Errorf("Config: Scan Control Mode can only be set in Scan mode")
+		}
+		if c.SyntaxFlowScan == nil {
+			c.SyntaxFlowScan = defaultSyntaxFlowScanConfig()
 		}
 		c.SyntaxFlowScan.ControlMode = string(mode)
 		return nil
@@ -189,8 +210,11 @@ func WithScanControlMode(mode ControlMode) Option {
 // WithScanRaw 从 ypb.SyntaxFlowScanRequest 提取配置
 func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlowScan == nil {
+		if c == nil || c.Mode&ModeSyntaxFlowScanManager == 0 {
 			return utils.Errorf("Config: Scan Raw can only be set in Scan mode")
+		}
+		if c.SyntaxFlowScan == nil {
+			c.SyntaxFlowScan = defaultSyntaxFlowScanConfig()
 		}
 		if req == nil {
 			return nil
@@ -201,22 +225,36 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 		c.SyntaxFlowScan.IgnoreLanguage = req.IgnoreLanguage
 		c.SyntaxFlowScan.ResumeTaskId = req.ResumeTaskId
 		c.SyntaxFlowScan.Concurrency = req.Concurrency
-		c.SyntaxFlowScan.Memory = req.Memory
+
+		if c.SyntaxFlow == nil {
+			c.SyntaxFlow = &SyntaxFlowConfig{}
+		}
+		c.SyntaxFlow.Memory = req.Memory
 
 		// 提取基础信息
-		if c.BaseInfo != nil && len(req.ProgramName) > 0 {
-			c.BaseInfo.ProgramNames = req.ProgramName
-		}
-		if c.BaseInfo != nil && len(req.ProjectName) > 0 {
-			c.BaseInfo.ProjectName = req.ProjectName[0]
+		if c.Mode&ModeProjectBase != 0 {
+			if c.BaseInfo == nil {
+				c.BaseInfo = defaultBaseInfo()
+			}
+			if len(req.ProgramName) > 0 {
+				c.BaseInfo.ProgramNames = req.ProgramName
+			}
+			if len(req.ProjectName) > 0 {
+				c.BaseInfo.ProjectName = req.ProjectName[0]
+			}
 		}
 
 		// 提取规则配置
-		if c.SyntaxFlowRule != nil && req.Filter != nil {
-			c.SyntaxFlowRule.RuleFilter = req.Filter
-		}
-		if c.SyntaxFlowRule != nil && req.RuleInput != nil {
-			c.SyntaxFlowRule.RuleInput = req.RuleInput
+		if c.Mode&ModeSyntaxFlowRule != 0 {
+			if c.SyntaxFlowRule == nil {
+				c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+			}
+			if req.Filter != nil {
+				c.SyntaxFlowRule.RuleFilter = req.Filter
+			}
+			if req.RuleInput != nil {
+				c.SyntaxFlowRule.RuleInput = req.RuleInput
+			}
 		}
 
 		return nil
@@ -226,8 +264,11 @@ func WithScanRaw(req *ypb.SyntaxFlowScanRequest) Option {
 // WithResumeTaskId 设置要恢复的任务ID，用于恢复之前暂停的扫描任务
 func WithScanResumeTaskId(taskId string) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlowScan == nil {
+		if c == nil || c.Mode&ModeSyntaxFlowScanManager == 0 {
 			return utils.Errorf("Config: Resume Task Id can only be set in Scan mode")
+		}
+		if c.SyntaxFlowScan == nil {
+			c.SyntaxFlowScan = defaultSyntaxFlowScanConfig()
 		}
 		c.SyntaxFlowScan.ResumeTaskId = taskId
 		return nil
@@ -237,8 +278,11 @@ func WithScanResumeTaskId(taskId string) Option {
 // WithScanLanguage 设置扫描语言
 func WithScanLanguage(language ...string) Option {
 	return func(c *Config) error {
-		if c.SyntaxFlowScan == nil {
+		if c == nil || c.Mode&ModeSyntaxFlowScanManager == 0 {
 			return utils.Errorf("Config: Scan Language can only be set in Scan mode")
+		}
+		if c.SyntaxFlowScan == nil {
+			c.SyntaxFlowScan = defaultSyntaxFlowScanConfig()
 		}
 		c.SyntaxFlowScan.Language = language
 		return nil
