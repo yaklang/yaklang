@@ -75,10 +75,7 @@ func NewPipeWithStore[T, U any](
 	concurrency ...int,
 ) *Pipe[T, U] {
 	// 包装 handler，适配可变参数签名
-	wrappedHandler := func(item T, store *utils.SafeMap[any]) (U, error) {
-		return handler(item, store)
-	}
-	return NewPipeWithInit(ctx, initBufSize, wrappedHandler, initWorker, concurrency...)
+	return NewPipeWithInit(ctx, initBufSize, handler, initWorker, concurrency...)
 }
 
 // NewPipeWithInit 创建一个带有 worker 初始化函数的 Pipe（内部使用）
