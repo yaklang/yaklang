@@ -1,0 +1,805 @@
+desc(
+	title: "Detect Golang HTTP Server Using Plaintext (Unencrypted) Communication"
+	title_zh: "检测Golang HTTP服务器使用明文(未加密)通信"
+	type: vuln
+	severity: high
+	risk: "cleartext_transmission"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   使用 `http.ListenAndServe()` 创建的 HTTP 服务器通过明文传输所有数据，没有任何加密保护。这意味着：
+   - 所有请求和响应内容（包括敏感数据）都以明文形式在网络中传输
+   - 攻击者可以在传输路径的任何节点拦截和读取所有通信内容
+   - 无法验证服务器的真实身份，客户端可能连接到伪装的服务器
+   - 数据在传输过程中可能被篡改，且接收方无法检测到
+   
+   与 HTTPS 相比，HTTP 完全缺乏：
+   - **机密性**: 数据加密，防止窃听
+   - **完整性**: 数据签名，防止篡改
+   - **身份认证**: 证书验证，防止伪装
+
+2. **触发场景**
+   该漏洞通常出现在以下场景：
+   - 开发者为了简单方便，在生产环境中使用 HTTP 而非 HTTPS
+   - 误认为内网环境不需要加密（但内网攻击同样危险）
+   - 使用了 HTTP 但处理敏感数据（登录凭证、支付信息、个人隐私）
+   - 没有意识到明文传输的严重安全风险
+   
+   ```go
+   // 不安全的服务器启动方式
+   func main() {
+       http.HandleFunc("/login", loginHandler)
+       http.HandleFunc("/payment", paymentHandler)
+       
+       // 危险！所有数据明文传输
+       log.Fatal(http.ListenAndServe(":8080", nil))
+   }
+   
+   func loginHandler(w http.ResponseWriter, r *http.Request) {
+       username := r.FormValue("username")
+       password := r.FormValue("password") // 密码明文传输！
+       // ... 处理登录
+   }
+   ```
+
+3. **潜在影响**
+   - **敏感数据泄露**: 攻击者可以使用 Wireshark 等工具轻松捕获并查看：
+     - 用户名和密码
+     - 会话 Cookie 和 Token
+     - API 密钥和访问令牌
+     - 个人身份信息（姓名、身份证号、手机号）
+     - 支付信息（银行卡号、CVV）
+     - 商业机密和敏感文档
+   
+   - **中间人攻击（MITM）**: 攻击者可以：
+     - 伪装成服务器，欺骗客户端
+     - 拦截并修改请求和响应内容
+     - 注入恶意代码（如 JavaScript）到响应中
+     - 劫持用户会话（Session Hijacking）
+   
+   - **数据篡改**: 攻击者可以：
+     - 修改交易金额
+     - 篡改订单信息
+     - 更改用户权限
+     - 注入恶意数据
+   
+   - **合规违规**: 违反以下安全标准和法规：
+     - PCI DSS（支付卡行业标准）明确要求传输敏感数据必须加密
+     - GDPR（通用数据保护条例）要求保护个人数据传输安全
+     - HIPAA（医疗信息保护法）要求医疗数据传输加密
+     - SOC 2 和 ISO 27001 等合规要求
+   
+   - **声誉损害**: 一旦发生数据泄露事故：
+     - 用户信任度急剧下降
+     - 法律诉讼和巨额罚款
+     - 媒体负面报道
+     - 业务损失
+
+4. **攻击难度**
+   - **极低**: 使用免费工具（如 Wireshark、tcpdump）即可实施攻击
+   - **攻击场景**: 
+     - 公共 WiFi 网络（咖啡店、机场、酒店）
+     - 被攻陷的路由器
+     - ISP 或网络服务提供商
+     - 共享网络环境（如大学、公司）
+
+DESC
+	rule_id: "b2c3d4e5-http-plaintext-001"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 🔴 方案 1: 使用 ListenAndServeTLS（标准方案）
+
+**最直接的修复**：将 `http.ListenAndServe` 替换为 `http.ListenAndServeTLS`。
+
+```go
+package main
+
+import (
+    "log"
+    "net/http"
+)
+
+func main() {
+    // 设置路由
+    http.HandleFunc("/", homeHandler)
+    http.HandleFunc("/api/data", apiHandler)
+
+    // 安全的 HTTPS 服务器
+    log.Println("Starting HTTPS server on :8443")
+    log.Fatal(http.ListenAndServeTLS(
+        ":8443",           // 监听端口（HTTPS 通常使用 443 或 8443）
+        "cert.pem",        // SSL 证书文件
+        "key.pem",         // 私钥文件
+        nil,               // Handler（nil 表示使用 DefaultServeMux）
+    ))
+}
+```
+
+#### 🟡 方案 2: 配置安全的 http.Server（推荐）
+
+**更好的做法**：显式配置 `http.Server`，设置安全的超时参数。
+
+```go
+package main
+
+import (
+    "crypto/tls"
+    "log"
+    "net/http"
+    "time"
+)
+
+func main() {
+    // 配置路由
+    mux := http.NewServeMux()
+    mux.HandleFunc("/", homeHandler)
+    mux.HandleFunc("/api/data", apiHandler)
+
+    // 配置安全的 HTTPS 服务器
+    server := &http.Server{
+        Addr:         ":8443",
+        Handler:      mux,
+        ReadTimeout:  10 * time.Second,  // 防止慢速读取攻击
+        WriteTimeout: 10 * time.Second,  // 防止慢速写入攻击
+        IdleTimeout:  120 * time.Second, // 空闲连接超时
+        
+        // TLS 配置（可选，增强安全性）
+        TLSConfig: &tls.Config{
+            MinVersion:               tls.VersionTLS12, // 最低 TLS 1.2
+            CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+            PreferServerCipherSuites: true,
+            CipherSuites: []uint16{
+                tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+                tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+                tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+                tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+            },
+        },
+    }
+
+    log.Println("Starting secure HTTPS server on :8443")
+    log.Fatal(server.ListenAndServeTLS("cert.pem", "key.pem"))
+}
+```
+
+#### 🔵 方案 3: HTTP 自动重定向到 HTTPS
+
+**生产环境最佳实践**：同时监听 HTTP 和 HTTPS，将 HTTP 流量自动重定向到 HTTPS。
+
+```go
+package main
+
+import (
+    "crypto/tls"
+    "fmt"
+    "log"
+    "net/http"
+    "time"
+)
+
+func main() {
+    // 配置路由
+    mux := http.NewServeMux()
+    mux.HandleFunc("/", homeHandler)
+    mux.HandleFunc("/api/data", apiHandler)
+
+    // HTTPS 服务器
+    httpsServer := &http.Server{
+        Addr:         ":443",
+        Handler:      mux,
+        ReadTimeout:  10 * time.Second,
+        WriteTimeout: 10 * time.Second,
+        IdleTimeout:  120 * time.Second,
+        TLSConfig: &tls.Config{
+            MinVersion: tls.VersionTLS12,
+        },
+    }
+
+    // HTTP 服务器 - 仅用于重定向到 HTTPS
+    httpServer := &http.Server{
+        Addr:         ":80",
+        Handler:      http.HandlerFunc(redirectToHTTPS),
+        ReadTimeout:  5 * time.Second,
+        WriteTimeout: 5 * time.Second,
+    }
+
+    // 在后台启动 HTTP 重定向服务器
+    go func() {
+        log.Println("Starting HTTP redirect server on :80")
+        if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("HTTP server failed: %v", err)
+        }
+    }()
+
+    // 启动 HTTPS 服务器（主服务）
+    log.Println("Starting HTTPS server on :443")
+    log.Fatal(httpsServer.ListenAndServeTLS("cert.pem", "key.pem"))
+}
+
+// HTTP 到 HTTPS 的重定向处理器
+func redirectToHTTPS(w http.ResponseWriter, r *http.Request) {
+    // 构建 HTTPS URL
+    httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+    
+    // 301 永久重定向
+    http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+}
+```
+
+#### 🟢 方案 4: 使用反向代理（企业级方案）
+
+**大规模生产环境**：在应用前部署反向代理（如 Nginx、Caddy）处理 HTTPS。
+
+**Nginx 配置示例**：
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+    
+    # 重定向到 HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name example.com;
+
+    # SSL 证书配置
+    ssl_certificate /etc/ssl/certs/cert.pem;
+    ssl_certificate_key /etc/ssl/private/key.pem;
+    
+    # SSL 安全配置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # 代理到后端 Go 应用（可以使用 HTTP）
+    location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+**Go 应用代码**（在反向代理后可以使用 HTTP）：
+```go
+func main() {
+    // 应用运行在反向代理后，监听本地 HTTP
+    // 外部 HTTPS 由 Nginx 处理
+    server := &http.Server{
+        Addr:    "localhost:8080",
+        Handler: mux,
+    }
+    
+    log.Println("Starting HTTP server on localhost:8080 (behind reverse proxy)")
+    log.Fatal(server.ListenAndServe()) // 这里可以使用 HTTP，因为有反向代理
+}
+```
+
+#### 📋 获取 SSL/TLS 证书
+
+**生产环境 - Let's Encrypt（免费，推荐）**:
+
+```bash
+# 安装 certbot
+sudo apt-get update
+sudo apt-get install certbot
+
+# 获取证书（需要域名和公网访问）
+sudo certbot certonly --standalone -d yourdomain.com -d www.yourdomain.com
+
+# 证书文件位置
+# /etc/letsencrypt/live/yourdomain.com/fullchain.pem  # 证书
+# /etc/letsencrypt/live/yourdomain.com/privkey.pem    # 私钥
+
+# 自动续期（Let's Encrypt 证书 90 天有效）
+sudo certbot renew --dry-run
+```
+
+**开发/测试环境 - 自签名证书**:
+
+```bash
+# 使用 OpenSSL 生成自签名证书
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout key.pem -out cert.pem \
+    -subj "/C=CN/ST=Beijing/L=Beijing/O=MyCompany/CN=localhost"
+
+# 生成的文件：
+# - cert.pem: SSL 证书
+# - key.pem: 私钥
+```
+
+**使用 Go 内置工具生成（更简单）**:
+
+```bash
+# Go 1.14+ 内置证书生成工具
+go run $GOROOT/src/crypto/tls/generate_cert.go --host localhost
+```
+
+#### 🔒 增强安全性的额外配置
+
+**1. HSTS（HTTP Strict Transport Security）**
+
+强制浏览器始终使用 HTTPS：
+
+```go
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // HSTS: 强制 HTTPS，有效期 1 年
+        w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+        
+        // 其他安全头
+        w.Header().Set("X-Content-Type-Options", "nosniff")
+        w.Header().Set("X-Frame-Options", "DENY")
+        w.Header().Set("X-XSS-Protection", "1; mode=block")
+        w.Header().Set("Content-Security-Policy", "default-src 'self'")
+        
+        next.ServeHTTP(w, r)
+    })
+}
+
+func main() {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/", homeHandler)
+    
+    // 应用安全头中间件
+    handler := securityHeadersMiddleware(mux)
+    
+    server := &http.Server{
+        Addr:    ":443",
+        Handler: handler,
+    }
+    
+    log.Fatal(server.ListenAndServeTLS("cert.pem", "key.pem"))
+}
+```
+
+**2. 证书自动续期（Let's Encrypt + Go）**
+
+```go
+import (
+    "golang.org/x/crypto/acme/autocert"
+)
+
+func main() {
+    // 自动获取和续期 Let's Encrypt 证书
+    certManager := autocert.Manager{
+        Prompt:     autocert.AcceptTOS,
+        HostPolicy: autocert.HostWhitelist("yourdomain.com", "www.yourdomain.com"),
+        Cache:      autocert.DirCache("/etc/letsencrypt/cache"), // 证书缓存目录
+    }
+
+    server := &http.Server{
+        Addr:    ":443",
+        Handler: mux,
+        TLSConfig: &tls.Config{
+            GetCertificate: certManager.GetCertificate,
+            MinVersion:     tls.VersionTLS12,
+        },
+    }
+
+    // 启动 HTTP-01 challenge 服务器（Let's Encrypt 验证需要）
+    go http.ListenAndServe(":80", certManager.HTTPHandler(nil))
+
+    log.Fatal(server.ListenAndServeTLS("", "")) // 证书由 certManager 管理，留空
+}
+```
+
+#### ⚠️ 注意事项
+
+1. **证书文件权限**：确保私钥文件权限为 600（只有所有者可读写）
+   ```bash
+   chmod 600 key.pem
+   chmod 644 cert.pem
+   ```
+
+2. **证书有效期监控**：设置监控和告警，提前 30 天提醒续期
+
+3. **端口选择**：
+   - 生产环境：使用标准端口 443（HTTPS）和 80（HTTP 重定向）
+   - 开发环境：可以使用 8443、8080 等高端口
+
+4. **防火墙配置**：确保防火墙允许 443 端口入站流量
+
+5. **性能优化**：
+   - 启用 HTTP/2（Go 1.6+ 自动支持）
+   - 使用连接池复用
+   - 考虑使用 CDN 分发静态内容
+
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-319: Cleartext Transmission of Sensitive Information](https://cwe.mitre.org/data/definitions/319.html)
+[OWASP: Insufficient Transport Layer Protection](https://owasp.org/www-community/vulnerabilities/Insufficient_Transport_Layer_Protection)
+[Go net/http Package](https://pkg.go.dev/net/http)
+[Let's Encrypt](https://letsencrypt.org/)
+[Mozilla SSL Configuration Generator](https://ssl-config.mozilla.org/)
+REFERENCE
+)
+
+// TODO: 我发现http.Server的fullTypeName没有接上http，这里先暂时用*代替之后再精确修改
+*.ListenAndServe(*<slice(index=0)> as $addr, * #-> as $handler) as $listen_and_serve;
+$http_server.ListenAndServe(* #-> as $params) as $server_listen;
+
+$listen_and_serve as $insecure_listener;
+$server_listen as $insecure_listener;
+
+$insecure_listener as $high;
+
+alert $high for {
+	type: "vuln",
+	title: "Golang HTTP Server Using Plaintext Communication",
+	title_zh: "检测到Golang HTTP服务器使用明文通信",
+	level: "high",
+	name: "high",
+	message: "检测到安全漏洞：HTTP 服务器正在使用明文（未加密）协议。所有数据传输都是明文的，攻击者可以拦截和读取传输内容，包括密码、令牌等敏感信息。应该使用 HTTPS（http.ListenAndServeTLS）来加密所有通信。",
+	solution: <<<SOLUTION
+### 修复建议
+
+**方案 1 - 使用 ListenAndServeTLS（推荐）**：
+```go
+// 安全的 HTTPS 服务器
+log.Fatal(http.ListenAndServeTLS(":8443", "cert.pem", "key.pem", nil))
+```
+
+**方案 2 - 配置安全的 http.Server**：
+```go
+server := &http.Server{
+    Addr:         ":8443",
+    Handler:      mux,
+    ReadTimeout:  10 * time.Second,
+    WriteTimeout: 10 * time.Second,
+    IdleTimeout:  120 * time.Second,
+    TLSConfig: &tls.Config{
+        MinVersion: tls.VersionTLS12,
+    },
+}
+log.Fatal(server.ListenAndServeTLS("cert.pem", "key.pem"))
+```
+
+**方案 3 - HTTP 自动重定向到 HTTPS**：
+- 启动两个服务器
+- HTTP 服务器（:80）仅用于重定向
+- HTTPS 服务器（:443）处理所有实际流量
+
+**获取证书**：
+- 生产环境：Let's Encrypt 或商业 CA
+- 测试环境：自签名证书（OpenSSL）
+SOLUTION
+	risk: "明文传输",
+	desc: <<<DESC
+### 详细说明
+
+检测到代码中使用 `http.ListenAndServe()` 或 `Server.ListenAndServe()` 启动 HTTP 服务器。
+
+**风险等级：🟠 HIGH（高危）**
+
+**问题**：
+- HTTP 协议不加密，所有数据明文传输
+- 容易遭受窃听、中间人攻击、数据篡改
+- 如果处理敏感数据，风险更高
+
+**建议**：
+- 使用 `http.ListenAndServeTLS()` 启用 HTTPS
+- 配置 SSL/TLS 证书
+- 添加安全头（HSTS 等）
+DESC
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	alert_critical: 1
+	'file://unsafe_http_server.go': <<<UNSAFE
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+)
+
+// 案例 1: 直接使用 ListenAndServe（最常见）
+func unsafeServer1() {
+	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/login", loginHandler)
+	
+	// 危险：明文 HTTP 服务器，监听所有网络接口
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+// 案例 2: 使用 Server 结构体但没有 TLS
+func unsafeServer2() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/data", apiHandler)
+	
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: mux,
+	}
+	
+	// 危险：仍然是明文 HTTP
+	log.Fatal(server.ListenAndServe())
+}
+
+// 案例 3: 监听公网地址（最危险）
+func unsafeServer3() {
+	http.HandleFunc("/payment", paymentHandler)
+	
+	// 极度危险：明文 HTTP + 公网地址
+	// 任何人都可以拦截支付信息
+	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
+}
+
+// 案例 4: 处理敏感数据但使用 HTTP
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	// 从表单获取密码
+	password := r.FormValue("password")
+	
+	// 危险：密码通过明文 HTTP 传输，可以被拦截
+	if authenticate(password) {
+		http.SetCookie(w, &http.Cookie{
+			Name:  "session",
+			Value: generateSessionToken(),
+			// 即使设置了 HttpOnly，但通过 HTTP 传输仍然不安全
+			HttpOnly: true,
+		})
+	}
+}
+
+func paymentHandler(w http.ResponseWriter, r *http.Request) {
+	// 获取支付信息
+	cardNumber := r.FormValue("card_number")
+	cvv := r.FormValue("cvv")
+	
+	// 极度危险：支付信息明文传输
+	// 严重违反 PCI DSS 标准
+	processPayment(cardNumber, cvv)
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Welcome!")
+}
+
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+	// API 可能包含敏感数据
+	fmt.Fprintf(w, `{"user": "admin", "token": "secret123"}`)
+}
+
+func authenticate(password string) bool {
+	return password == "secret"
+}
+
+func generateSessionToken() string {
+	return "token123"
+}
+
+func processPayment(cardNumber, cvv string) {
+	// 处理支付
+}
+
+func main() {
+	unsafeServer1()
+	// unsafeServer2()
+	// unsafeServer3()
+}
+UNSAFE
+
+	'safefile://safe_https_server.go': <<<SAFE
+package main
+
+import (
+	"crypto/tls"
+	"log"
+	"net/http"
+	"time"
+)
+
+// 方案 1: 使用 ListenAndServeTLS（最简单）
+func safeServer1() {
+	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/login", loginHandler)
+	
+	// 安全：使用 HTTPS
+	log.Println("Starting HTTPS server on :8443")
+	log.Fatal(http.ListenAndServeTLS(
+		":8443",
+		"cert.pem",  // SSL 证书
+		"key.pem",   // 私钥
+		nil,
+	))
+}
+
+// 方案 2: 配置安全的 http.Server（推荐）
+func safeServer2() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/api/data", apiHandler)
+
+	server := &http.Server{
+		Addr:         ":8443",
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		
+		// TLS 安全配置
+		TLSConfig: &tls.Config{
+			MinVersion:               tls.VersionTLS12, // 最低 TLS 1.2
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+		},
+	}
+
+	log.Println("Starting secure HTTPS server on :8443")
+	log.Fatal(server.ListenAndServeTLS("cert.pem", "key.pem"))
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	// 添加安全响应头
+	w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Frame-Options", "DENY")
+	
+	w.Write([]byte("Welcome to secure site!"))
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	// 密码通过 HTTPS 加密传输，安全
+	password := r.FormValue("password")
+	
+	if authenticate(password) {
+		http.SetCookie(w, &http.Cookie{
+			Name:     "session",
+			Value:    generateSessionToken(),
+			HttpOnly: true,
+			Secure:   true, // 只通过 HTTPS 传输
+			SameSite: http.SameSiteStrictMode,
+		})
+	}
+}
+
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"status": "secure"}`))
+}
+
+func authenticate(password string) bool {
+	return true // 示例
+}
+
+func generateSessionToken() string {
+	return "secure_token"
+}
+
+func main() {
+	safeServer2()
+}
+SAFE
+
+	'safefile://safe_http_redirect_to_https.go': <<<SAFE
+package main
+
+import (
+	"crypto/tls"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+)
+
+// 方案 3: HTTP 自动重定向到 HTTPS（生产环境最佳实践）
+func main() {
+	// 配置路由
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/api/data", apiHandler)
+
+	// HTTPS 服务器（主服务）
+	httpsServer := &http.Server{
+		Addr:         ":443",
+		Handler:      addSecurityHeaders(mux),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+		TLSConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		},
+	}
+
+	// HTTP 服务器（仅用于重定向）
+	httpServer := &http.Server{
+		Addr:         ":80",
+		Handler:      http.HandlerFunc(redirectToHTTPS),
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 5 * time.Second,
+	}
+
+	// 启动 HTTP 重定向服务器（后台）
+	go func() {
+		log.Println("Starting HTTP redirect server on :80")
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	// 启动 HTTPS 服务器（主进程）
+	log.Println("Starting HTTPS server on :443")
+	log.Fatal(httpsServer.ListenAndServeTLS("cert.pem", "key.pem"))
+}
+
+// HTTP 到 HTTPS 重定向
+func redirectToHTTPS(w http.ResponseWriter, r *http.Request) {
+	httpsURL := fmt.Sprintf("https://%s%s", r.Host, r.RequestURI)
+	http.Redirect(w, r, httpsURL, http.StatusMovedPermanently)
+}
+
+// 添加安全响应头中间件
+func addSecurityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// HSTS: 强制 HTTPS
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload")
+		
+		// 其他安全头
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("X-XSS-Protection", "1; mode=block")
+		w.Header().Set("Content-Security-Policy", "default-src 'self'")
+		
+		next.ServeHTTP(w, r)
+	})
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("Secure HTTPS Connection"))
+}
+
+func apiHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.Write([]byte(`{"secure": true}`))
+}
+SAFE
+
+	'safefile://safe_localhost_only.go': <<<SAFE
+package main
+
+import (
+	"log"
+	"net/http"
+)
+
+// 特殊情况：如果服务器只监听本地回环地址（localhost/127.0.0.1）
+// 并且只用于本地开发或与本机其他进程通信，可以暂时使用 HTTP
+// 但仍然建议在生产环境使用 HTTPS
+
+func localhostOnlyServer() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("Local development server"))
+	})
+
+	// 只监听 localhost，不对外暴露
+	// 这种情况风险较低，但仍不建议处理敏感数据
+	log.Println("Starting local HTTP server on localhost:8080")
+	log.Println("⚠️  This server is only accessible from localhost")
+	log.Println("⚠️  Do NOT use this configuration in production")
+	
+	log.Fatal(http.ListenAndServe("localhost:8080", nil))
+	// 或者: log.Fatal(http.ListenAndServe("127.0.0.1:8080", nil))
+}
+
+func main() {
+	localhostOnlyServer()
+}
+SAFE
+)
+
