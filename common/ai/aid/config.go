@@ -82,7 +82,7 @@ type Config struct {
 
 	// memory
 	persistentMemory          []string
-	memory                    *Memory
+	memory                    *PromptContextProvider
 	timelineContentSizeLimit  int
 	timelineTotalContentLimit int
 	keywords                  []string // task keywords, maybe tools name ,help ai to plan
@@ -330,7 +330,7 @@ func (c *Config) GetInputConsumption() int64 {
 	return atomic.LoadInt64(c.inputConsumption)
 }
 
-func (c *Config) GetMemory() *Memory {
+func (c *Config) GetMemory() *PromptContextProvider {
 	return c.memory
 }
 
@@ -631,7 +631,7 @@ func WithToolManager(manager *buildinaitools.AiToolManager) Option {
 	}
 }
 
-func WithMemory(m *Memory) Option {
+func WithMemory(m *PromptContextProvider) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()

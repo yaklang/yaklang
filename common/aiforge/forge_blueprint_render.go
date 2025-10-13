@@ -3,9 +3,10 @@ package aiforge
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 
@@ -173,7 +174,7 @@ func (f *ForgeBlueprint) renderPersistentPrompt(query string) (string, error) {
 	return buf.String(), nil
 }
 
-func (f *ForgeBlueprint) renderResultPrompt(memory *aid.Memory) (string, error) {
+func (f *ForgeBlueprint) renderResultPrompt(memory *aid.PromptContextProvider) (string, error) {
 	tmpl, err := template.New("result").Parse(f.ResultPrompt)
 	if err != nil {
 		log.Errorf("parse result prompt failed: %v", err)

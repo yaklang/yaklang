@@ -70,7 +70,7 @@ func TestReducerAI(t *testing.T) {
 	key := "前情提要"
 	reducer, err := aireducer.NewReducerFromString(
 		string(raw),
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			textSnippet := string(chunk.Data())
 			preData, _ := memory.GetPersistentData(key)
 			if preData != "" {
@@ -115,7 +115,7 @@ func TestReducerAI2(t *testing.T) {
 
 	reducer, err := aireducer.NewReducerFromString(
 		string(raw),
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			textSnippet := string(chunk.Data())
 			res, err := ExecuteForge("biography",
 				[]*ypb.ExecParamItem{
@@ -183,7 +183,7 @@ func TestReducerIntentRecognition(t *testing.T) {
 
 	reducer, err := aireducer.NewReducerFromString(
 		raw,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			query := string(chunk.Data())
 			go func() {
 				//subCtx, cancel := context.WithCancel(ctx)
@@ -514,7 +514,7 @@ func TestWebLogMonitor(t *testing.T) {
 
 	reducer, err := aireducer.NewReducerFromReader(
 		fp,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			cacheBuffer = append(cacheBuffer, string(chunk.Data()))
 			if len(cacheBuffer) < 10 {
 				return nil

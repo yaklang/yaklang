@@ -22,7 +22,7 @@ import (
 )
 
 // TaskResponseCallback 定义Task执行过程中响应回调函数类型
-type TaskResponseCallback func(ctx *Memory, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
+type TaskResponseCallback func(ctx *PromptContextProvider, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
 
 // TaskProgress 记录任务执行的进度信息
 type TaskProgress struct {

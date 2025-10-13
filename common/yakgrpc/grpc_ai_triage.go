@@ -150,7 +150,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 	}
 	reducer, err := aireducer.NewReducerFromInputChunk(
 		freeInputChan,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			query := strings.TrimSpace(string(chunk.Data()))
 			memory.PushUserInteraction(aicommon.UserInteractionStage_FreeInput, cod.GetConfig().AcquireId(), "", query) // push user input timeline
 			defer emitEvent(Triage_Event_Finish, []byte("意图识别完成"))

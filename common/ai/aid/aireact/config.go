@@ -507,7 +507,7 @@ func (cfg *ReActConfig) CallAfterReview(seq int64, reviewQuestion string, userIn
 }
 
 func (cfg *ReActConfig) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
-	log.Warnf("aid.Memory is removed from ReActConfig, cannot store interactive input")
+	log.Warnf("aid.PromptContextProvider is removed from ReActConfig, cannot store interactive input")
 	// Store interactive user input
 	//if cfg.memory != nil {
 	//	cfg.memory.StoreInteractiveUserInput(eventID, invoke)

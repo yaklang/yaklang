@@ -195,7 +195,7 @@ LOOP:
 	}
 }
 
-func memoryTestBasic(t *testing.T) *Memory {
+func memoryTestBasic(t *testing.T) *PromptContextProvider {
 	inputChan := make(chan *InputEvent, 1000)
 	outputChan := make(chan *schema.AiOutputEvent, 1000)
 
