@@ -106,7 +106,8 @@ func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, b
 
 func (s *SSABuild) GetAntlrCache() *ssa.AntlrCache {
 	parser := phpparser.NewPHPParser(nil)
-	return s.CreateAntlrCache(parser.BaseParser)
+	lexer := phpparser.NewPHPLexer(nil)
+	return s.CreateAntlrCache(parser.BaseParser, lexer.BaseLexer)
 }
 
 func (s *SSABuild) FilterParseAST(path string) bool {

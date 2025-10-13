@@ -37,7 +37,8 @@ func CreateBuilder() ssa.Builder {
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	parser := yak.NewYaklangParser(nil)
-	return s.CreateAntlrCache(parser.BaseParser)
+	lexer := yak.NewYaklangLexer(nil)
+	return s.CreateAntlrCache(parser.BaseParser, lexer.BaseLexer)
 }
 
 func (s *SSABuilder) FilterParseAST(path string) bool {
