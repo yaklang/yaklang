@@ -82,7 +82,9 @@ type Proxy struct {
 	proxyPassword string
 
 	// lowhttp config
-	lowhttpConfig []lowhttp.LowhttpOpt
+	lowhttpConfig    []lowhttp.LowhttpOpt
+	proxyUrlStrings  []string
+	proxyHostMatcher *ProxyHostMatcher
 
 	maxContentLength int
 	maxReadWaitTime  time.Duration
@@ -267,6 +269,16 @@ func (p *Proxy) SetHTTPForceClose(enable bool) {
 // SetLowhttpConfig sets the lowhttp config
 func (p *Proxy) SetLowhttpConfig(config []lowhttp.LowhttpOpt) {
 	p.lowhttpConfig = config
+}
+
+// SetDownstreamProxyConfig updates the proxy routing configuration.
+func (p *Proxy) SetDownstreamProxyConfig(proxies []string, matcher *ProxyHostMatcher) {
+	if len(proxies) == 0 {
+		p.proxyUrlStrings = nil
+	} else {
+		p.proxyUrlStrings = append([]string(nil), proxies...)
+	}
+	p.proxyHostMatcher = matcher
 }
 
 func (p *Proxy) SetFindProcessName(b bool) {
