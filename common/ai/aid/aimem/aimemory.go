@@ -7,6 +7,7 @@ import (
 
 	_ "embed"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -21,17 +22,16 @@ type MemoryEntity struct {
 	Content string
 	Tags    []string // 已有 TAG，
 
-	// 7 dims
-	/*
-	   "C_Score": 0, // Connectivity Score 这个记忆与其他记忆如何关联？这是一个一次性事实，几乎与其他事实没有什么关联程度
-	   "O_Score": 0, // Origin Score 记忆与信息来源确定性，这个来源从哪里来？到底有多少可信度？
-	   "R_Score": 0, // Relevance Score 这个信息对用户的目的有多关键？无关紧要？锦上添花？还是成败在此一举？
-	   "E_Score": 0, // Emotion Score 用户在表达这个信息时的情绪如何？越低越消极，消极评分时一般伴随信息源不可信
-	   "P_Score": 0, // Preference Score 个人偏好对齐评分，这个行为或者问题是否绑定了用户个人风格，品味？
-	   "A_Score": 0, // Actionability Score 可操作性评分，是否可以从学习中改进未来行为？
-	   "T_Score": 0  // Temporality Score 时效评分，核心问题：这个记忆应该如何被保留？配合时间搜索
-	*/
-	Vector []float32
+	// 7 dims - C.O.R.E. P.A.C.T. Framework (all normalized to 0.0-1.0)
+	C_Score float64 // Connectivity Score 这个记忆与其他记忆如何关联？这是一个一次性事实，几乎与其他事实没有什么关联程度
+	O_Score float64 // Origin Score 记忆与信息来源确定性，这个来源从哪里来？到底有多少可信度？
+	R_Score float64 // Relevance Score 这个信息对用户的目的有多关键？无关紧要？锦上添花？还是成败在此一举？
+	E_Score float64 // Emotion Score 用户在表达这个信息时的情绪如何？越低越消极，消极评分时一般伴随信息源不可信
+	P_Score float64 // Preference Score 个人偏好对齐评分，这个行为或者问题是否绑定了用户个人风格，品味？
+	A_Score float64 // Actionability Score 可操作性评分，是否可以从学习中改进未来行为？
+	T_Score float64 // Temporality Score 时效评分，核心问题：这个记忆应该如何被保留？配合时间搜索
+
+	CorePactVector []float32
 
 	// designed for rag searching
 	PotentialQuestions []string
@@ -51,6 +51,12 @@ type AIMemoryTriage struct {
 func WithContextProvider(i func() (string, error)) Option {
 	return func(memory *AIMemoryTriage) {
 		memory.contextProvider = i
+	}
+}
+
+func WithInvoker(invoker aicommon.AIInvokeRuntime) Option {
+	return func(memory *AIMemoryTriage) {
+		memory.invoker = invoker
 	}
 }
 
@@ -147,20 +153,34 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
 	if len(result) == 0 {
 		return nil, utils.Errorf("no memory entities found")
 	}
-	for _, i := range result {
-		entity := &MemoryEntity{}
+
+	var entities []*MemoryEntity
+	for _, item := range result {
+		id := uuid.New().String()
+		entity := &MemoryEntity{
+			Id:                 id,
+			CreatedAt:          time.Now(),
+			Content:            item.GetString("content"),
+			Tags:               item.GetStringSlice("tags"),
+			PotentialQuestions: item.GetStringSlice("potential_questions"),
+			T_Score:            item.GetFloat("t"),
+			A_Score:            item.GetFloat("a"),
+			P_Score:            item.GetFloat("p"),
+			O_Score:            item.GetFloat("o"),
+			E_Score:            item.GetFloat("e"),
+			R_Score:            item.GetFloat("r"),
+			C_Score:            item.GetFloat("c"),
+		}
+		entity.CorePactVector = []float32{
+			float32(entity.C_Score),
+			float32(entity.O_Score),
+			float32(entity.R_Score),
+			float32(entity.E_Score),
+			float32(entity.P_Score),
+			float32(entity.A_Score),
+			float32(entity.T_Score),
+		}
+		entities = append(entities, entity)
 	}
-	entity := &MemoryEntity{
-		Content:            i.GetString("content"),
-		Tags:               i.GetStringArray("tags"),
-		PotentialQuestions: i.GetStringArray("potential_questions"),
-		T:                  i.GetFloat("t"),
-		A:                  i.GetFloat("a"),
-		P:                  i.GetFloat("p"),
-		O:                  i.GetFloat("o"),
-		E:                  i.GetFloat("e"),
-		R:                  i.GetFloat("r"),
-		C:                  i.GetFloat("c"),
-	}
-	return []*MemoryEntity{entity}, nil
+	return entities, nil
 }
