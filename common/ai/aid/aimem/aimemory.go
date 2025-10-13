@@ -18,28 +18,23 @@ import (
 //go:embed memory_triage.txt
 var memoryTriagePrompt string
 
-// IsMockMode 是否使用mock模式（用于测试）
-var IsMockMode = false
-
 // NewAIMemory 创建AI记忆管理系统
 func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	if sessionId == "" {
 		return nil, utils.Errorf("sessionId is required")
 	}
 
+	// 应用配置选项
+	config := &Config{}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	name := fmt.Sprintf("ai-memory-%s", sessionId)
 	db := consts.GetGormProjectDatabase()
 
-	// 构建RAG选项
-	var ragOpts []any
-	if IsMockMode {
-		// 使用mock embedding
-		mockEmbedder, err := NewMockEmbeddingClient()
-		if err != nil {
-			return nil, utils.Errorf("failed to create mock embedder: %v", err)
-		}
-		ragOpts = append(ragOpts, rag.WithEmbeddingClient(mockEmbedder))
-	}
+	// 使用配置中的RAG选项
+	ragOpts := config.ragOptions
 
 	// 尝试加载现有collection，如果不存在则创建新的
 	system, err := rag.LoadCollection(db, name, ragOpts...)
@@ -51,19 +46,15 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 		}
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+
 	triage := &AIMemoryTriage{
-		rag:       system,
-		sessionID: sessionId,
-	}
-
-	for _, opt := range opts {
-		opt(triage)
-	}
-
-	if utils.IsNil(triage.ctx) {
-		triage.ctx, triage.cancel = context.WithCancel(context.Background())
-	} else {
-		triage.ctx, triage.cancel = context.WithCancel(triage.ctx)
+		ctx:             ctx,
+		cancel:          cancel,
+		rag:             system,
+		invoker:         config.invoker,
+		contextProvider: config.contextProvider,
+		sessionID:       sessionId,
 	}
 
 	if triage.invoker == nil {
