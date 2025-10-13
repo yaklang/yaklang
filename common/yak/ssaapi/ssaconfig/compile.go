@@ -60,10 +60,26 @@ func (c *Config) GetTags() []string {
 
 // --- 基础信息配置 Options ---
 
+func WithProjectID(projectId uint64) Option {
+	return func(c *Config) error {
+		if c == nil || c.Mode&ModeProjectBase == 0 {
+			return utils.Errorf("Config: Project ID can only be set in Base mode")
+		}
+		if c.BaseInfo == nil {
+			c.BaseInfo = defaultBaseInfo()
+		}
+		c.BaseInfo.ProjectID = projectId
+		return nil
+	}
+}
+
 func WithProgramNames(programName ...string) Option {
 	return func(c *Config) error {
-		if c.BaseInfo == nil {
+		if c == nil || c.Mode&ModeProjectBase == 0 {
 			return utils.Errorf("Config: Program Name can only be set in Base mode")
+		}
+		if c.BaseInfo == nil {
+			c.BaseInfo = defaultBaseInfo()
 		}
 		c.BaseInfo.ProgramNames = append(c.BaseInfo.ProgramNames, programName...)
 		return nil
@@ -72,8 +88,11 @@ func WithProgramNames(programName ...string) Option {
 
 func WithProgramDescription(description string) Option {
 	return func(c *Config) error {
-		if c.BaseInfo == nil {
+		if c == nil || c.Mode&ModeProjectBase == 0 {
 			return utils.Errorf("Config: Program Description can only be set in Base mode")
+		}
+		if c.BaseInfo == nil {
+			c.BaseInfo = defaultBaseInfo()
 		}
 		c.BaseInfo.ProjectDescription = description
 		return nil
@@ -82,8 +101,11 @@ func WithProgramDescription(description string) Option {
 
 func WithProgramLanguage(language string) Option {
 	return func(c *Config) error {
-		if c.BaseInfo == nil {
+		if c == nil || c.Mode&ModeProjectBase == 0 {
 			return utils.Errorf("Config: Program Language can only be set in Base mode")
+		}
+		if c.BaseInfo == nil {
+			c.BaseInfo = defaultBaseInfo()
 		}
 		c.BaseInfo.Language = language
 		return nil
@@ -114,7 +136,7 @@ func (c *Config) SetCompileStrictMode(strictMode bool) {
 		return
 	}
 	if c.SSACompile == nil {
-		c.SSACompile = &SSACompileConfig{}
+		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.StrictMode = strictMode
 }
@@ -131,7 +153,7 @@ func (c *Config) SetCompilePeepholeSize(peepholeSize int) {
 		return
 	}
 	if c.SSACompile == nil {
-		c.SSACompile = &SSACompileConfig{}
+		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.PeepholeSize = peepholeSize
 }
@@ -148,7 +170,7 @@ func (c *Config) SetCompileExcludeFiles(excludeFiles []string) {
 		return
 	}
 	if c.SSACompile == nil {
-		c.SSACompile = &SSACompileConfig{}
+		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.ExcludeFiles = excludeFiles
 }
@@ -165,7 +187,7 @@ func (c *Config) SetCompileReCompile(reCompile bool) {
 		return
 	}
 	if c.SSACompile == nil {
-		c.SSACompile = &SSACompileConfig{}
+		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.ReCompile = reCompile
 }
@@ -182,7 +204,7 @@ func (c *Config) SetCompileMemory(memory bool) {
 		return
 	}
 	if c.SSACompile == nil {
-		c.SSACompile = &SSACompileConfig{}
+		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.MemoryCompile = memory
 }
@@ -199,7 +221,7 @@ func (c *Config) SetCompileConcurrency(concurrency uint32) {
 		return
 	}
 	if c.SSACompile == nil {
-		c.SSACompile = &SSACompileConfig{}
+		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.Concurrency = concurrency
 }
@@ -209,8 +231,11 @@ func (c *Config) SetCompileConcurrency(concurrency uint32) {
 // WithCompileStrictMode 设置严格模式
 func WithCompileStrictMode(strictMode bool) Option {
 	return func(c *Config) error {
-		if c.SSACompile == nil {
+		if c == nil || c.Mode&ModeSSACompile == 0 {
 			return utils.Errorf("Config: Compile Strict Mode can only be set in Compile mode")
+		}
+		if c.SSACompile == nil {
+			c.SSACompile = &SSACompileConfig{}
 		}
 		c.SSACompile.StrictMode = strictMode
 		return nil
@@ -220,8 +245,11 @@ func WithCompileStrictMode(strictMode bool) Option {
 // WithCompilePeepholeSize 设置窥视孔大小
 func WithCompilePeepholeSize(peepholeSize int) Option {
 	return func(c *Config) error {
-		if c.SSACompile == nil {
+		if c == nil || c.Mode&ModeSSACompile == 0 {
 			return utils.Errorf("Config: Compile Peephole Size can only be set in Compile mode")
+		}
+		if c.SSACompile == nil {
+			c.SSACompile = &SSACompileConfig{}
 		}
 		c.SSACompile.PeepholeSize = peepholeSize
 		return nil
@@ -231,8 +259,11 @@ func WithCompilePeepholeSize(peepholeSize int) Option {
 // WithCompileExcludeFiles 设置排除文件
 func WithCompileExcludeFiles(excludeFiles []string) Option {
 	return func(c *Config) error {
-		if c.SSACompile == nil {
+		if c == nil || c.Mode&ModeSSACompile == 0 {
 			return utils.Errorf("Config: Compile Exclude Files can only be set in Compile mode")
+		}
+		if c.SSACompile == nil {
+			c.SSACompile = &SSACompileConfig{}
 		}
 		c.SSACompile.ExcludeFiles = excludeFiles
 		return nil
@@ -242,8 +273,11 @@ func WithCompileExcludeFiles(excludeFiles []string) Option {
 // WithCompileReCompile 设置重新编译
 func WithCompileReCompile(reCompile bool) Option {
 	return func(c *Config) error {
-		if c.SSACompile == nil {
+		if c == nil || c.Mode&ModeSSACompile == 0 {
 			return utils.Errorf("Config: Compile Re Compile can only be set in Compile mode")
+		}
+		if c.SSACompile == nil {
+			c.SSACompile = &SSACompileConfig{}
 		}
 		c.SSACompile.ReCompile = reCompile
 		return nil
@@ -253,8 +287,11 @@ func WithCompileReCompile(reCompile bool) Option {
 // WithCompileMemoryCompile 设置内存编译
 func WithCompileMemoryCompile(memoryCompile bool) Option {
 	return func(c *Config) error {
-		if c.SSACompile == nil {
+		if c == nil || c.Mode&ModeSSACompile == 0 {
 			return utils.Errorf("Config: Compile Memory Compile can only be set in Compile mode")
+		}
+		if c.SSACompile == nil {
+			c.SSACompile = &SSACompileConfig{}
 		}
 		c.SSACompile.MemoryCompile = memoryCompile
 		return nil
@@ -264,8 +301,11 @@ func WithCompileMemoryCompile(memoryCompile bool) Option {
 // WithCompileConcurrency 设置编译并发数
 func WithCompileConcurrency(concurrency uint32) Option {
 	return func(c *Config) error {
-		if c.SSACompile == nil {
+		if c == nil || c.Mode&ModeSSACompile == 0 {
 			return utils.Errorf("Config: Compile Concurrency can only be set in Compile mode")
+		}
+		if c.SSACompile == nil {
+			c.SSACompile = &SSACompileConfig{}
 		}
 		c.SSACompile.Concurrency = concurrency
 		return nil
