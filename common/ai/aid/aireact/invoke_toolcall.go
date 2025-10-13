@@ -72,7 +72,7 @@ func (r *ReAct) ExecuteToolRequiredAndCall(toolName string) (*aitool.ToolResult,
 			result.ID = r.config.AcquireId()
 		}
 		// Store the result in memory
-		r.config.memory.PushToolCallResults(result)
+		r.config.timeline.PushToolResult(result)
 		// Emit the result
 		r.EmitInfo("Tool execution completed: %s", result.Name)
 	}
@@ -83,10 +83,6 @@ func (r *ReAct) ExecuteToolRequiredAndCall(toolName string) (*aitool.ToolResult,
 func (r *ReAct) generateToolParamsPrompt(tool *aitool.Tool, toolName string) (string, error) {
 	if tool == nil {
 		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
-	}
-
-	if r.config.memory == nil {
-		return "", utils.Error("memory is not initialized")
 	}
 
 	// Use PromptManager to generate the prompt

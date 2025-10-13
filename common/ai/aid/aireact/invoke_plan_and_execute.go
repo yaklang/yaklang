@@ -159,7 +159,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 
 	baseOpts := ConvertReActConfigToAIDConfigOptions(r.config)
 	baseOpts = append(baseOpts, aid.WithCoordinatorId(uid),
-		aid.WithMemory(r.config.memory),
+		aid.WithTimelineInstance(r.config.timeline),
 		aid.WithAICallback(r.config.aiCallback),
 		aid.WithAllowPlanUserInteract(true),
 		aid.WithAgreeManual(),

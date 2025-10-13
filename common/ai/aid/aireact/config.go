@@ -12,7 +12,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -129,9 +128,9 @@ type ReActConfig struct {
 	maxIterations int
 
 	// Memory and state
-	memory        *aid.Memory // Replace conversationHistory with Memory/Timeline
-	language      string      // Response language preference
-	topToolsCount int         // Number of top tools to display in prompt
+	timeline      *aicommon.Timeline
+	language      string // Response language preference
+	topToolsCount int    // Number of top tools to display in prompt
 
 	// Consumption tracking
 	inputConsumption  *int64
@@ -502,16 +501,17 @@ func (cfg *ReActConfig) GetEndpointManager() *aicommon.EndpointManager {
 }
 
 func (cfg *ReActConfig) CallAfterReview(seq int64, reviewQuestion string, userInput aitool.InvokeParams) {
-	if cfg.memory != nil {
-		cfg.memory.PushUserInteraction(aicommon.UserInteractionStage_Review, seq, reviewQuestion, string(utils.Jsonify(userInput)))
+	if cfg.timeline != nil {
+		cfg.timeline.PushUserInteraction(aicommon.UserInteractionStage_Review, seq, reviewQuestion, string(utils.Jsonify(userInput)))
 	}
 }
 
 func (cfg *ReActConfig) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
+	log.Warnf("aid.Memory is removed from ReActConfig, cannot store interactive input")
 	// Store interactive user input
-	if cfg.memory != nil {
-		cfg.memory.StoreInteractiveUserInput(eventID, invoke)
-	}
+	//if cfg.memory != nil {
+	//	cfg.memory.StoreInteractiveUserInput(eventID, invoke)
+	//}
 }
 
 // Implement AICaller interface
@@ -571,11 +571,11 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		reviewPolicy:                aicommon.AgreePolicyManual,
-		maxIterations:               100,
-		memory:                      aid.GetDefaultMemory(), // Initialize with default memory
-		language:                    "zh",                   // Default to Chinese
-		topToolsCount:               100,                    //
+		reviewPolicy:  aicommon.AgreePolicyManual,
+		maxIterations: 100,
+		// memory:                      aid.GetDefaultMemory(), // Initialize with default memory
+		language:                    "zh", // Default to Chinese
+		topToolsCount:               100,  //
 		inputConsumption:            new(int64),
 		outputConsumption:           new(int64),
 		aiTransactionAutoRetry:      5,
@@ -603,7 +603,9 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 	// Initialize endpoint manager
 	config.epm = aicommon.NewEndpointManagerContext(ctx)
 	config.epm.SetConfig(config)
-	config.memory.GetTimelineInstance().BindConfig(config, config)
+	config.timeline = aicommon.NewTimeline(nil, nil)
+	config.timeline.BindConfig(config, config)
+	// config.timeline.BindConfig(config, config)
 
 	return config
 }
@@ -691,7 +693,7 @@ func (c *ReActConfig) restorePersistentSession() {
 		atomic.StoreInt64(&c.idSequence, lastID)
 	}
 
-	c.memory.SetTimelineInstance(timelineInstance)
+	c.timeline = timelineInstance
 	log.Infof("successfully restored timeline instance from persistent session [%s] with %d items",
 		c.persistentSessionId, timelineInstance.GetIdToTimelineItem().Len())
 }
