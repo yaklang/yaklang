@@ -5,8 +5,16 @@ import (
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
+
+type Config struct {
+	*ssaconfig.Config
+	*ScanTaskCallback `json:"-"`
+}
+type errorCallback func(string, string, string, ...any)
+
+type ProcessCallback func(taskID, status string, progress float64, info *RuleProcessInfoList)
 
 // ScanResult 扫描结果结构体，包含扫描任务的所有结果信息
 type ScanResult struct {
@@ -20,371 +28,104 @@ type ScanResult struct {
 // 返回非nil错误将中止扫描过程
 type ScanResultCallback func(*ScanResult)
 
-type ScanTaskConfig struct {
-	*ypb.SyntaxFlowScanRequest
+type ScanTaskCallback struct {
+	ProcessCallback ProcessCallback `json:"-"`
 
-	*ScanTaskCallback `json:"-"`
+	errorCallback  errorCallback      `json:"-"`
+	resultCallback ScanResultCallback `json:"-"`
+	// this function check if need pauseCheck,
+	// /return true to pauseCheck, and no-blocking
+
+	pauseCheck func() bool `json:"-"`
+
+	Reporter       sfreport.IReport `json:"-"`
+	ReporterWriter io.Writer        `json:"-"`
 }
-
-func NewScanConfig(options ...ScanOption) *ScanTaskConfig {
-	config := &ScanTaskConfig{
-		ScanTaskCallback: &ScanTaskCallback{},
-	}
-	for _, option := range options {
-		option(config)
-	}
-	return config
-}
-
-// ScanOption 定义扫描选项类型，用于配置SyntaxFlow扫描任务的各种参数
-type ScanOption func(*ScanTaskConfig)
-
-type ControlMode string
 
 const (
-	ControlModeStart  ControlMode = "start"
-	ControlModeStatus ControlMode = "status"
-	ControlModeResume ControlMode = "resume"
+	pauseFuncKey       = "pauseFunc"
+	resultCallbackKey  = "resultCallback"
+	errorCallbackKey   = "errorCallback"
+	processCallbackKey = "processCallback"
+	reporterKey        = "reporter"
+	reporterWriterKey  = "reporterWriter"
 )
 
-func WithControlMode(id ControlMode) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.ControlMode = string(id)
+func WithReporter(reporter sfreport.IReport) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(reporterKey, reporter)
+		return nil
 	}
 }
 
-func WithProjectId(id uint64) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.SSAProjectId = id
+func WithPauseFunc(pause func() bool) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(pauseFuncKey, pause)
+		return nil
 	}
 }
 
-func WithRawConfig(req *ypb.SyntaxFlowScanRequest) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.SyntaxFlowScanRequest = req
+func WithScanResultCallback(callback ScanResultCallback) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(resultCallbackKey, callback)
+		return nil
 	}
 }
 
-// WithProgramNames 设置要扫描的程序名称，可以指定一个或多个程序进行扫描
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//
-// )
-// // 或扫描多个程序
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("program1", "program2"),
-//
-// )
-// ```
-func WithProgramNames(names ...string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.ProgramName = names
+func WithErrorCallback(callback errorCallback) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(errorCallbackKey, callback)
+		return nil
 	}
 }
 
-// WithRuleNames 设置要使用的规则名称列表
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withRuleNames("sql-injection", "xss", "path-traversal"),
-//
-// )
-// ```
-func WithRuleNames(names ...string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.RuleNames = names
+// WithProcessCallback 设置扫描进度回调函数
+func WithProcessCallback(callback ProcessCallback) ssaconfig.Option {
+	return func(sc *ssaconfig.Config) error {
+		sc.SetExtraInfo(processCallbackKey, callback)
+		return nil
 	}
 }
 
-// WithLanguages 设置要扫描的编程语言列表
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withLanguages("java", "javascript", "go"),
-//
-// )
-// ```
-func WithLanguages(languages ...string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.Language = languages
+func NewConfig(opts ...ssaconfig.Option) (*Config, error) {
+	cfg := &Config{
+		ScanTaskCallback: &ScanTaskCallback{},
 	}
-}
+	var err error
+	cfg.Config, err = ssaconfig.New(ssaconfig.ModeSyntaxFlowScan, opts...)
+	if err != nil {
+		return nil, err
+	}
 
-// WithGroupNames 设置要使用的规则组名称列表
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withGroupNames("web-security", "api-security"),
-//
-// )
-// ```
-func WithGroupNames(groups ...string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
+	if f, ok := cfg.ExtraInfo[pauseFuncKey]; ok {
+		if pauseFunc, ok := f.(func() bool); ok {
+			cfg.pauseCheck = pauseFunc
 		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.GroupNames = groups
 	}
-}
 
-// WithSeverity 设置要扫描的漏洞严重程度列表
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withSeverity("high", "critical"),
-//
-// )
-// ```
-func WithSeverity(severity ...string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
+	if f, ok := cfg.ExtraInfo[resultCallbackKey]; ok {
+		if resultCallback, ok := f.(ScanResultCallback); ok {
+			cfg.resultCallback = resultCallback
 		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.Severity = severity
 	}
-}
 
-// WithPurpose 设置规则用途列表，用于指定扫描的目的
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withPurpose("vulnerability", "audit"),
-//
-// )
-// ```
-func WithPurpose(purpose ...string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
+	if f, ok := cfg.ExtraInfo[errorCallbackKey]; ok {
+		if errorCallback, ok := f.(errorCallback); ok {
+			cfg.errorCallback = errorCallback
 		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.Purpose = purpose
 	}
-}
 
-// WithTags 设置规则标签列表
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withTags("owasp", "cwe-89", "sqli"),
-//
-// )
-// ```
-func WithTags(tags ...string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
+	if f, ok := cfg.ExtraInfo[processCallbackKey]; ok {
+		if processCallback, ok := f.(ProcessCallback); ok {
+			cfg.ProcessCallback = processCallback
 		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.Tag = tags
 	}
-}
 
-// WithKeyword 设置关键词过滤，用于模糊匹配规则
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withKeyword("injection"),
-//
-// )
-// ```
-func WithKeyword(keyword string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
+	if f, ok := cfg.ExtraInfo[reporterKey]; ok {
+		if reporter, ok := f.(sfreport.IReport); ok {
+			cfg.Reporter = reporter
 		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.Keyword = keyword
 	}
-}
 
-// WithIncludeLibraryRule 设置是否包含库规则，这些规则通常被其他规则引用
-// Example:
-// ```
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withIncludeLibraryRule(true),
-//
-// )
-// ```
-func WithIncludeLibraryRule(include bool) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter.IncludeLibraryRule = include
-	}
-}
-
-// withRuleInput 设置规则输入，用于调试模式时直接输入自定义规则内容（内部使用，不导出）
-func withRuleInput(input *ypb.SyntaxFlowRuleInput) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.RuleInput = input
-	}
-}
-
-// WithRuleFilter 设置规则过滤器，直接传入过滤器结构体（内部使用，保持向后兼容）
-func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		if sc.SyntaxFlowScanRequest.Filter == nil {
-			sc.SyntaxFlowScanRequest.Filter = &ypb.SyntaxFlowRuleFilter{}
-		}
-		sc.SyntaxFlowScanRequest.Filter = filter
-	}
-}
-
-// WithIgnoreLanguage 设置是否忽略语言匹配，当设置为true时，将运行所有规则而不考虑程序语言
-// Example:
-// ```
-// // 忽略语言匹配，运行所有规则
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("my-program"),
-//	syntaxflowscan.withIgnoreLanguage(true),
-//	syntaxflowscan.withRuleFilter(filter),
-//
-// )
-// ```
-func WithIgnoreLanguage(ignore bool) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.IgnoreLanguage = ignore
-	}
-}
-
-// WithConcurrency 设置并发数，控制同时执行的扫描任务数量，默认为5
-// Example:
-// ```
-// // 设置高并发扫描
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("large-program"),
-//	syntaxflowscan.withConcurrency(20),
-//	syntaxflowscan.withRuleFilter(filter),
-//
-// )
-// ```
-func WithConcurrency(concurrency uint32) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.Concurrency = concurrency
-	}
-}
-
-// WithMemory 设置是否在内存中编译数据，当设置为true时，程序数据将仅在内存中处理，不持久化到数据库
-// Example:
-// ```
-// // 临时扫描，不保存到数据库
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withProgramNames("temp-program"),
-//	syntaxflowscan.withMemory(true),
-//	syntaxflowscan.withRuleFilter(filter),
-//
-// )
-// ```
-func WithMemory(memory bool) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.Memory = memory
-	}
-}
-
-func WithReporter(reporter sfreport.IReport) ScanOption {
-	return func(config *ScanTaskConfig) {
-		config.Reporter = reporter
-	}
-}
-
-func WithReporterWriter(writer io.Writer) ScanOption {
-	return func(config *ScanTaskConfig) {
-		config.ReporterWriter = writer
-	}
-}
-
-// WithResumeTaskId 设置要恢复的任务ID，用于恢复之前暂停的扫描任
-// WithResumeTaskId 设置要恢复的任务ID，用于恢复之前暂停的扫描任务
-// Example:
-// ```
-// taskId := "task-123-456"
-// syntaxflowscan.StartScan(context.New(), callback,
-//
-//	syntaxflowscan.withResumeTaskId(taskId),
-//
-// )
-// ```
-func WithResumeTaskId(taskId string) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		if sc.SyntaxFlowScanRequest == nil {
-			sc.SyntaxFlowScanRequest = &ypb.SyntaxFlowScanRequest{}
-		}
-		sc.SyntaxFlowScanRequest.ResumeTaskId = taskId
-	}
+	return cfg, nil
 }

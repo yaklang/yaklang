@@ -5,6 +5,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 
@@ -46,7 +47,7 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 	}
 
 	err = syntaxflow_scan.Scan(stream.Context(),
-		syntaxflow_scan.WithRawConfig(rawConfig),
+		ssaconfig.WithScanRaw(rawConfig),
 		syntaxflow_scan.WithPauseFunc(func() bool {
 			return pause.Load()
 		}),

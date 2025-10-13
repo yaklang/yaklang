@@ -1349,22 +1349,19 @@ var ssaCodeScan = &cli.Command{
 			opt = append(opt, sfreport.WithDataflowPath(true))
 		}
 		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format, opt...)
+		reportInstance.SetWriter(config.OutputWriter)
 
-		scanConfig, err := ssaconfig.NewSyntaxFlowScanConfig(
-			ssaconfig.WithProgramNames(prog.GetProgramName()),
-			ssaconfig.WithRuleFilter(ruleFilter),
-			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
-		)
 		if err != nil {
 			log.Errorf("create ssaconfig failed: %s", err)
 			return err
 		}
 
-		_, err = sfscan.StartScan(
+		err = sfscan.StartScan(
 			ctx,
-			sfscan.WithSyntaxFlowScanConfig(scanConfig),
-			sfscan.WithSyntaxFlowScanReporter(reportInstance),
-			sfscan.WithSyntaxFlowScanReporterWriter(config.OutputWriter),
+			ssaconfig.WithProgramNames(prog.GetProgramName()),
+			ssaconfig.WithRuleFilter(ruleFilter),
+			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
+			sfscan.WithReporter(reportInstance),
 			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
 				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
 				if info == nil || len(info.Rules) == 0 {
