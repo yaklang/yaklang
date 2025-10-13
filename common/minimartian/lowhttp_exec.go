@@ -83,6 +83,15 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		opts = append(opts, lowhttp.WithDialer(p.dialer))
 	}
 
+	if len(p.proxyUrlStrings) > 0 {
+		if p.proxyHostMatcher == nil || p.proxyHostMatcher.Match(host) {
+			opts = append(opts, lowhttp.WithProxy(p.proxyUrlStrings...))
+		} else {
+			// Explicitly clear proxy for hosts that are not in the whitelist.
+			opts = append(opts, lowhttp.WithProxy())
+		}
+	}
+
 	//if connectedPort := httpctx.GetContextIntInfoFromRequest(req, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort); connectedPort > 0 {
 	//	portValid := (connectedPort == 443 && isHttps) || (connectedPort == 80 && !isHttps)
 	//	if !portValid {
