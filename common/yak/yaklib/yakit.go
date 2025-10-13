@@ -181,6 +181,12 @@ type YakitLog struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+// 格式化输出 YakitLog
+func (y *YakitLog) String() string {
+	timestamp := time.Unix(y.Timestamp, 0).Format("2006-01-02 15:04:05")
+	return fmt.Sprintf("[%s] %s %s\n", y.Level, timestamp, y.Data)
+}
+
 func NewYakitStatusCardExecResult(status string, data any, items ...string) *ypb.ExecResult {
 	card := &YakitStatusCard{
 		Id:   status,
