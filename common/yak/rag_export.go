@@ -80,5 +80,5 @@ var RagExports = map[string]interface{}{
 	"BuildCollectionFromReader": aiforge.BuildKnowledgeFromReader,
 	"BuildCollectionFromRaw":    aiforge.BuildKnowledgeFromBytes,
 
-	"BuildKnowledgeFromEntityRepos": aiforge.BuildKnowledgeEntryFromEntityRepos,
+	"BuildKnowledgeFromEntityRepos": aiforge.BuildKnowledgeFromEntityReposByName,
 }
