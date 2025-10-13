@@ -1,0 +1,9 @@
+{
+	"name": "remote_hostscan",
+	"verbose_name": "远程主机体检",
+	"description": "专业的远程主机体检AI助手，能够通过SSH连接远程主机并执行全面的主机健康状态扫描，包括系统资源监控、端口服务检查、配置安全分析、进程状态监控等。通过bash_session_execute工具建立持久化SSH会话，自动化发现和识别远程主机系统的健康问题、安全风险和性能瓶颈。",
+	"tool_keywords": "远程主机体检,SSH连接,系统监控,资源检查,端口扫描,服务检查,配置分析,进程监控,安全评估,性能分析,健康检查,系统诊断,网络连接,磁盘使用,内存监控,CPU监控,系统状态,bash会话",
+	"tools": "bash_session_execute,read_bash_session_buffer,ostype",
+	"actions": "remote_hostscan_result",
+	"tags": "远程主机体检,SSH连接,系统监控,健康检查,安全评估,性能分析,资源监控,端口扫描,服务检查,配置分析,进程监控,网络诊断,磁盘分析,内存分析,CPU分析,bash会话管理"
+}

@@ -7,7 +7,7 @@
   "tasks": [
     {
       "subtask_name": "获取操作系统类型",
-      "subtask_goal": "使用 `ostype` 工具获取目标主机的操作系统类型。"
+      "subtask_goal": "获取目标主机的操作系统类型。"
     },
     {
       "subtask_name": "系统配置检查",
