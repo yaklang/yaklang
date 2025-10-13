@@ -501,12 +501,12 @@ func TestMCPServerToolsRetrieval(t *testing.T) {
 
 			// 验证参数信息
 			for j, param := range tool.GetParams() {
-				t.Logf("  参数 %d: 名称=%s, 类型=%s, 必需=%s, 描述=%s",
+				t.Logf("  参数 %d: 名称=%s, 类型=%s, 必需=%v, 描述=%s",
 					j+1, param.GetName(), param.GetType(), param.GetRequired(), param.GetDescription())
 
 				assert.NotEmpty(t, param.GetName(), "参数名称不应为空")
 				assert.NotEmpty(t, param.GetType(), "参数类型不应为空")
-				assert.Contains(t, []string{"true", "false"}, param.GetRequired(), "参数必需字段应为 true 或 false")
+				assert.Contains(t, []bool{true, false}, param.GetRequired(), "参数必需字段应为 true 或 false")
 			}
 		}
 	})
