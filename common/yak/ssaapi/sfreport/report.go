@@ -9,7 +9,8 @@ import (
 )
 
 type Report struct {
-	config Config `json:"-"`
+	config Config    `json:"-"`
+	writer io.Writer `json:"-"`
 	// info
 	ReportType    ReportType `json:"report_type"`
 	EngineVersion string     `json:"engine_version"`
