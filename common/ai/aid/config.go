@@ -641,6 +641,21 @@ func WithMemory(m *Memory) Option {
 	}
 }
 
+func WithTimelineInstance(m *aicommon.Timeline) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		m.ClearRuntimeConfig()
+		if config.memory != nil {
+			config.memory.SetTimelineInstance(m)
+		} else {
+			config.memory = GetDefaultMemory()
+			config.memory.SetTimelineInstance(m)
+		}
+		return nil
+	}
+}
+
 func WithTaskAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()

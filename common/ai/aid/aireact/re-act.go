@@ -86,7 +86,7 @@ func (r *ReAct) SaveTimeline() {
 		return
 	}
 	r.saveTimelineThrottle(func() {
-		ins := r.config.memory.GetTimelineInstance()
+		ins := r.config.timeline
 		if ins == nil {
 			return
 		}
@@ -118,10 +118,10 @@ func (r *ReAct) PushCumulativeSummaryHandle(f func() string) {
 }
 
 func (r *ReAct) DumpTimeline() string {
-	if r == nil || r.config == nil || r.config.memory == nil {
+	if r == nil || r.config == nil || r.config.timeline == nil {
 		return ""
 	}
-	return r.config.memory.Timeline()
+	return r.config.timeline.Dump()
 }
 
 func (r *ReAct) SetCurrentPlanExecutionTask(t aicommon.AIStatefulTask) {
@@ -191,21 +191,6 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	}
 	// Clear pending list after registration
 	cfg.pendingContextProviders = nil
-
-	// Initialize memory with AI capability
-	if cfg.memory != nil && cfg.aiCallback != nil {
-		// Store tools function
-		cfg.memory.StoreTools(func() []*aitool.Tool {
-			if cfg.aiToolManager == nil {
-				return []*aitool.Tool{}
-			}
-			tools, err := cfg.aiToolManager.GetEnableTools()
-			if err != nil {
-				return []*aitool.Tool{}
-			}
-			return tools
-		})
-	}
 
 	// Start the event loop in background
 	mainloopDone := make(chan struct{})
@@ -277,17 +262,17 @@ func (r *ReAct) AddToTimeline(entryType, content string) {
 		msg.WriteString(":\n")
 	}
 	msg.WriteString(utils.PrefixLines(content, "  "))
-	r.config.memory.PushText(r.config.AcquireId(), msg.String())
+	r.config.timeline.PushText(r.config.AcquireId(), msg.String())
 	r.SaveTimeline()
 }
 
 // getTimeline 获取时间线信息（可选择限制数量）
 func (r *ReAct) getTimeline(lastN int) []*aicommon.TimelineItemOutput {
-	return r.config.memory.GetTimelineInstance().ToTimelineItemOutputLastN(lastN)
+	return r.config.timeline.ToTimelineItemOutputLastN(lastN)
 }
 
 func (r *ReAct) getTimelineTotal() int {
-	return r.config.memory.GetTimelineInstance().GetIdToTimelineItem().Len()
+	return r.config.timeline.GetIdToTimelineItem().Len()
 }
 
 // startQueueProcessor 启动任务队列处理器

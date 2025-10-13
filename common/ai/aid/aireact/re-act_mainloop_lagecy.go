@@ -534,8 +534,8 @@ func (pm *PromptManager) GenerateLoopPrompt(
 	}
 
 	// Set timeline memory
-	if pm.react.config.memory != nil {
-		data.Timeline = pm.react.config.memory.Timeline()
+	if pm.react.config.timeline != nil {
+		data.Timeline = pm.react.config.timeline.Dump()
 	}
 
 	return pm.executeTemplate("loop", loopPromptTemplate, data)
