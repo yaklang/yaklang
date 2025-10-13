@@ -59235,7 +59235,9 @@ type MITMV2Request struct {
 	DownstreamProxy string `protobuf:"bytes,3,opt,name=DownstreamProxy,proto3" json:"DownstreamProxy,omitempty"`
 	// runtime change proxy
 	SetDownstreamProxy bool `protobuf:"varint,4,opt,name=SetDownstreamProxy,proto3" json:"SetDownstreamProxy,omitempty"` // runtime change proxy
-	EnableHttp2        bool `protobuf:"varint,5,opt,name=EnableHttp2,proto3" json:"EnableHttp2,omitempty"`
+	// optional host/domain whitelist for downstream proxy
+	DownstreamProxyHosts []string `protobuf:"bytes,48,rep,name=DownstreamProxyHosts,proto3" json:"DownstreamProxyHosts,omitempty"`
+	EnableHttp2          bool     `protobuf:"varint,5,opt,name=EnableHttp2,proto3" json:"EnableHttp2,omitempty"`
 	// gmtls config
 	EnableGMTLS     bool           `protobuf:"varint,6,opt,name=EnableGMTLS,proto3" json:"EnableGMTLS,omitempty"`
 	OnlyEnableGMTLS bool           `protobuf:"varint,7,opt,name=OnlyEnableGMTLS,proto3" json:"OnlyEnableGMTLS,omitempty"`
@@ -59353,6 +59355,13 @@ func (x *MITMV2Request) GetSetDownstreamProxy() bool {
 		return x.SetDownstreamProxy
 	}
 	return false
+}
+
+func (x *MITMV2Request) GetDownstreamProxyHosts() []string {
+	if x != nil {
+		return x.DownstreamProxyHosts
+	}
+	return nil
 }
 
 func (x *MITMV2Request) GetEnableHttp2() bool {
@@ -66494,12 +66503,13 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x06Status\x18\n" +
 	" \x01(\v2\x15.ypb.LocalModelStatusR\x06Status\"P\n" +
 	"\x1fGetSupportedLocalModelsResponse\x12-\n" +
-	"\x06Models\x18\x01 \x03(\v2\x15.ypb.LocalModelConfigR\x06Models\"\xc1\x10\n" +
+	"\x06Models\x18\x01 \x03(\v2\x15.ypb.LocalModelConfigR\x06Models\"\xf5\x10\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
 	"\x0fDownstreamProxy\x18\x03 \x01(\tR\x0fDownstreamProxy\x12.\n" +
-	"\x12SetDownstreamProxy\x18\x04 \x01(\bR\x12SetDownstreamProxy\x12 \n" +
+	"\x12SetDownstreamProxy\x18\x04 \x01(\bR\x12SetDownstreamProxy\x122\n" +
+	"\x14DownstreamProxyHosts\x180 \x03(\tR\x14DownstreamProxyHosts\x12 \n" +
 	"\vEnableHttp2\x18\x05 \x01(\bR\vEnableHttp2\x12 \n" +
 	"\vEnableGMTLS\x18\x06 \x01(\bR\vEnableGMTLS\x12(\n" +
 	"\x0fOnlyEnableGMTLS\x18\a \x01(\bR\x0fOnlyEnableGMTLS\x12 \n" +
