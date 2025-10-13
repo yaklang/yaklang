@@ -94,7 +94,7 @@ cli.check()
 //go:embed yaklang_reviewer_prompts/suggestion.txt
 var _planSuggestionPrompt string
 
-func analyzeToolCallResult(m *aid.Memory) aitool.InvokeParams {
+func analyzeToolCallResult(m *aid.PromptContextProvider) aitool.InvokeParams {
 	params := make(map[string]any)
 	toolCallResults := m.CurrentTaskToolCallResults()
 	if toolCallResults == nil {
@@ -114,7 +114,7 @@ func analyzeToolCallResult(m *aid.Memory) aitool.InvokeParams {
 	return params
 }
 
-func renderSuggestion(m *aid.Memory, suggestions []*FixSuggestion) string {
+func renderSuggestion(m *aid.PromptContextProvider, suggestions []*FixSuggestion) string {
 	// 解析模板
 	tmpl, err := template.New("suggestion").Parse(_planSuggestionPrompt)
 	if err != nil {

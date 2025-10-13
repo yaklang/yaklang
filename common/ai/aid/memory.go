@@ -35,7 +35,7 @@ type PersistentDataRecord struct {
 	Value    string
 }
 
-type Memory struct {
+type PromptContextProvider struct {
 	// user first input
 	Query string
 
@@ -60,8 +60,8 @@ type Memory struct {
 	timeline *aicommon.Timeline
 }
 
-func (m *Memory) CopyReducibleMemory() *Memory {
-	mem := &Memory{
+func (m *PromptContextProvider) CopyReducibleMemory() *PromptContextProvider {
+	mem := &PromptContextProvider{
 		PersistentData:        m.PersistentData.Copy(),
 		DisableTools:          m.DisableTools,
 		Tools:                 m.Tools,
@@ -85,8 +85,8 @@ func (m *Memory) CopyReducibleMemory() *Memory {
 	return mem
 }
 
-func GetDefaultMemory() *Memory {
-	mem := &Memory{
+func GetDefaultMemory() *PromptContextProvider {
+	mem := &PromptContextProvider{
 		PlanHistory:        make([]*PlanRecord, 0),
 		PersistentData:     omap.NewOrderedMap[string, *PersistentDataRecord](make(map[string]*PersistentDataRecord)),
 		InteractiveHistory: omap.NewOrderedMap[string, *InteractiveEventRecord](make(map[string]*InteractiveEventRecord)),
@@ -98,7 +98,7 @@ func GetDefaultMemory() *Memory {
 	return mem
 }
 
-func (m *Memory) BindCoordinator(c *Coordinator) {
+func (m *PromptContextProvider) BindCoordinator(c *Coordinator) {
 	config := c.config
 	m.StoreQuery(c.userInput)
 	m.StoreTools(func() []*aitool.Tool {
@@ -118,7 +118,7 @@ func (m *Memory) BindCoordinator(c *Coordinator) {
 
 // user data memory api, user or ai can set and get
 
-func (m *Memory) PushPersistentData(values ...string) {
+func (m *PromptContextProvider) PushPersistentData(values ...string) {
 	for _, value := range values {
 		m.PersistentData.Set(codec.Sha1(value), &PersistentDataRecord{
 			Variable: false,
@@ -127,14 +127,14 @@ func (m *Memory) PushPersistentData(values ...string) {
 	}
 }
 
-func (m *Memory) SetPersistentData(key string, value string) {
+func (m *PromptContextProvider) SetPersistentData(key string, value string) {
 	m.PersistentData.Set(key, &PersistentDataRecord{
 		Variable: true,
 		Value:    value,
 	})
 }
 
-func (m *Memory) GetPersistentData(key string) (string, bool) {
+func (m *PromptContextProvider) GetPersistentData(key string) (string, bool) {
 	res, ok := m.PersistentData.Get(key)
 	if ok {
 		return res.Value, ok
@@ -142,24 +142,24 @@ func (m *Memory) GetPersistentData(key string) (string, bool) {
 	return "", ok
 }
 
-func (m *Memory) DeletePersistentData(key string) {
+func (m *PromptContextProvider) DeletePersistentData(key string) {
 	m.PersistentData.Delete(key)
 }
 
 // constants info memory api
-func (m *Memory) Now() string {
+func (m *PromptContextProvider) Now() string {
 	return time.Now().Format("2006-01-02 15:04:05")
 }
 
-func (m *Memory) OS() string {
+func (m *PromptContextProvider) OS() string {
 	return osRuntime.GOOS
 }
 
-func (m *Memory) Arch() string {
+func (m *PromptContextProvider) Arch() string {
 	return osRuntime.GOARCH
 }
 
-func (m *Memory) Schema() map[string]string {
+func (m *PromptContextProvider) Schema() map[string]string {
 	var toolNames []string
 	for _, tool := range m.Tools() {
 		toolNames = append(toolNames, tool.Name)
@@ -168,18 +168,18 @@ func (m *Memory) Schema() map[string]string {
 }
 
 // set tools list
-func (m *Memory) StoreTools(toolList func() []*aitool.Tool) {
+func (m *PromptContextProvider) StoreTools(toolList func() []*aitool.Tool) {
 	m.Tools = toolList
 }
 
-func (m *Memory) ClearRuntimeConfig() {
+func (m *PromptContextProvider) ClearRuntimeConfig() {
 	if m.timeline != nil {
 		m.timeline.ClearRuntimeConfig()
 	}
 }
 
 // TimelineDump returns the timeline dump safely
-func (m *Memory) TimelineDump() string {
+func (m *PromptContextProvider) TimelineDump() string {
 	if m.timeline != nil {
 		return m.timeline.Dump()
 	}
@@ -187,34 +187,34 @@ func (m *Memory) TimelineDump() string {
 }
 
 // set tools list
-func (m *Memory) StoreToolsKeywords(keywords func() []string) {
+func (m *PromptContextProvider) StoreToolsKeywords(keywords func() []string) {
 	m.toolsKeywordsCallback = keywords
 }
 
-func (m *Memory) ToolsKeywords() string {
+func (m *PromptContextProvider) ToolsKeywords() string {
 	return strings.Join(m.toolsKeywordsCallback(), ", ")
 }
 
 // user first input
-func (m *Memory) StoreQuery(query string) {
+func (m *PromptContextProvider) StoreQuery(query string) {
 	m.Query = query
 }
 
 // task info memory
-func (m *Memory) StoreRootTask(t *AiTask) {
+func (m *PromptContextProvider) StoreRootTask(t *AiTask) {
 	m.RootTask = t
 }
 
-func (m *Memory) Progress() string {
+func (m *PromptContextProvider) Progress() string {
 	return m.RootTask.Progress()
 }
 
-func (m *Memory) StoreCurrentTask(task *AiTask) {
+func (m *PromptContextProvider) StoreCurrentTask(task *AiTask) {
 	m.CurrentTask = task
 }
 
 // interactive history memory
-func (m *Memory) StoreInteractiveEvent(eventID string, e *schema.AiOutputEvent) {
+func (m *PromptContextProvider) StoreInteractiveEvent(eventID string, e *schema.AiOutputEvent) {
 	// Check if there's already a placeholder record with user input
 	if existing, ok := m.InteractiveHistory.Get(eventID); ok && existing.InteractiveEvent == nil {
 		// Update the existing placeholder with the event
@@ -228,7 +228,7 @@ func (m *Memory) StoreInteractiveEvent(eventID string, e *schema.AiOutputEvent) 
 	}
 }
 
-func (m *Memory) StoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
+func (m *PromptContextProvider) StoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
 	record, ok := m.InteractiveHistory.Get(eventID)
 	if !ok {
 		log.Debugf("interactive event record not found for ID %s, creating placeholder", eventID)
@@ -244,7 +244,7 @@ func (m *Memory) StoreInteractiveUserInput(eventID string, invoke aitool.InvokeP
 }
 
 // SafeStoreInteractiveUserInput safely stores interactive user input with better error handling
-func (m *Memory) SafeStoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
+func (m *PromptContextProvider) SafeStoreInteractiveUserInput(eventID string, invoke aitool.InvokeParams) {
 	if eventID == "" {
 		log.Warn("attempted to store interactive user input with empty event ID")
 		return
@@ -264,40 +264,40 @@ func (m *Memory) SafeStoreInteractiveUserInput(eventID string, invoke aitool.Inv
 	log.Debugf("updated interactive user input for event ID %s", eventID)
 }
 
-func (m *Memory) GetInteractiveEventLast() (string, *InteractiveEventRecord, bool) {
+func (m *PromptContextProvider) GetInteractiveEventLast() (string, *InteractiveEventRecord, bool) {
 	return m.InteractiveHistory.Last()
 }
 
-func (m *Memory) GetInteractiveEvent(eventID string) (*InteractiveEventRecord, bool) {
+func (m *PromptContextProvider) GetInteractiveEvent(eventID string) (*InteractiveEventRecord, bool) {
 	return m.InteractiveHistory.Get(eventID)
 }
 
 // tool results memory
-func (m *Memory) PushToolCallResults(t *aitool.ToolResult) {
+func (m *PromptContextProvider) PushToolCallResults(t *aitool.ToolResult) {
 	m.timeline.PushToolResult(t)
 }
 
-func (m *Memory) PushUserInteraction(stage aicommon.UserInteractionStage, seq int64, question, userInput string) {
+func (m *PromptContextProvider) PushUserInteraction(stage aicommon.UserInteractionStage, seq int64, question, userInput string) {
 	m.timeline.PushUserInteraction(stage, seq, question, userInput)
 }
 
-func (m *Memory) Timeline() string {
+func (m *PromptContextProvider) Timeline() string {
 	return m.timeline.Dump()
 }
 
-func (m *Memory) GetTimelineInstance() *aicommon.Timeline {
+func (m *PromptContextProvider) GetTimelineInstance() *aicommon.Timeline {
 	return m.timeline
 }
 
-func (m *Memory) SetTimelineInstance(timeline *aicommon.Timeline) {
+func (m *PromptContextProvider) SetTimelineInstance(timeline *aicommon.Timeline) {
 	m.timeline = timeline
 }
 
-func (m *Memory) PushText(id int64, i any) {
+func (m *PromptContextProvider) PushText(id int64, i any) {
 	m.timeline.PushText(id, utils.InterfaceToString(i))
 }
 
-func (m *Memory) TimelineWithout(n ...any) string {
+func (m *PromptContextProvider) TimelineWithout(n ...any) string {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("error creating sub timeline: %v", r)
@@ -322,7 +322,7 @@ func (m *Memory) TimelineWithout(n ...any) string {
 	return stl.Dump()
 }
 
-func (m *Memory) CurrentTaskTimeline() string {
+func (m *PromptContextProvider) CurrentTaskTimeline() string {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Errorf("error creating sub timeline: %v", r)
@@ -339,21 +339,21 @@ func (m *Memory) CurrentTaskTimeline() string {
 	return stl.Dump()
 }
 
-func (m *Memory) TaskMaxContinue() int64 {
+func (m *PromptContextProvider) TaskMaxContinue() int64 {
 	return m.CurrentTask.Config.maxTaskContinue
 }
 
 // timeline limit set
-func (m *Memory) SetTimelineLimit(i int) {
+func (m *PromptContextProvider) SetTimelineLimit(i int) {
 	m.timeline.SetTimelineContentLimit(int64(i))
 }
 
-func (m *Memory) PromptForToolCallResultsForLastN(n int) string {
+func (m *PromptContextProvider) PromptForToolCallResultsForLastN(n int) string {
 	return m.timeline.PromptForToolCallResultsForLastN(n)
 }
 
 // memory tools current task info
-func (m *Memory) CurrentTaskInfo() string {
+func (m *PromptContextProvider) CurrentTaskInfo() string {
 	if m.CurrentTask == nil {
 		return ""
 	}
@@ -374,7 +374,7 @@ func (m *Memory) CurrentTaskInfo() string {
 	return promptBuilder.String()
 }
 
-func (m *Memory) PersistentMemory() string {
+func (m *PromptContextProvider) PersistentMemory() string {
 	var buf bytes.Buffer
 	buf.WriteString("# Now " + time.Now().String() + "\n")
 	buf.WriteString("<persistent_memory>\n")
@@ -390,7 +390,7 @@ func (m *Memory) PersistentMemory() string {
 	return buf.String()
 }
 
-func (m *Memory) PlanHelp() string {
+func (m *PromptContextProvider) PlanHelp() string {
 	templateData := map[string]interface{}{
 		"Memory": m,
 	}
@@ -408,7 +408,7 @@ func (m *Memory) PlanHelp() string {
 	return promptBuilder.String()
 }
 
-func (m *Memory) ToolsList() string {
+func (m *PromptContextProvider) ToolsList() string {
 	if m.DisableTools {
 		return ""
 	}
@@ -429,11 +429,11 @@ func (m *Memory) ToolsList() string {
 	return promptBuilder.String()
 }
 
-func (m *Memory) CurrentTaskToolCallResults() []*aitool.ToolResult {
+func (m *PromptContextProvider) CurrentTaskToolCallResults() []*aitool.ToolResult {
 	return m.CurrentTask.toolCallResultIds.Values()
 }
 
-func (m *Memory) StoreCliParameter(param []*ypb.ExecParamItem) {
+func (m *PromptContextProvider) StoreCliParameter(param []*ypb.ExecParamItem) {
 	if utils.IsNil(m) {
 		log.Warnf("memory nil while calling StoreCliParameter")
 		return
@@ -446,7 +446,7 @@ func (m *Memory) StoreCliParameter(param []*ypb.ExecParamItem) {
 	}
 }
 
-func (m *Memory) SoftDeleteTimeline(id ...int64) {
+func (m *PromptContextProvider) SoftDeleteTimeline(id ...int64) {
 	m.timeline.SoftDelete(id...)
 }
 
@@ -467,7 +467,7 @@ var MemoryOpSchemaOption = []aitool.ToolOption{
 }
 
 // ApplyOp applies a list of operations to the memory.
-func (m *Memory) ApplyOp(memoryOpAction *aicommon.Action) {
+func (m *PromptContextProvider) ApplyOp(memoryOpAction *aicommon.Action) {
 	if memoryOpAction.ActionType() != MemoryOpAction {
 		return
 	}

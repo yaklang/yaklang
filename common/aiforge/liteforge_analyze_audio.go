@@ -173,7 +173,7 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 	legacyData := ""
 
 	reducerOpts := append(analyzeConfig.ReducerOptions(),
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			srtData := string(chunk.Data())
 			index := strings.LastIndex(srtData, "\n\n")
 			if index != -1 {
@@ -192,7 +192,7 @@ Analyze the provided "current_srt_chunk". Classify its time segments as either "
 			analyzeConfig.AnalyzeLog("audio analysis processed chunk %d, cumulative summary length: %d, timeline segments: %d", processedCount, len(cumulativeSummary), len(allResult))
 			return nil
 		}),
-		aireducer.WithFinishCallback(func(config *aireducer.Config, memory *aid.Memory) error {
+		aireducer.WithFinishCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider) error {
 			if !funk.IsEmpty(legacyData) {
 				err := analyze(legacyData)
 				if err != nil {
