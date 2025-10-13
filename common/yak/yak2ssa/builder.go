@@ -36,9 +36,7 @@ func CreateBuilder() ssa.Builder {
 }
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
-	parser := yak.NewYaklangParser(nil)
-	lexer := yak.NewYaklangLexer(nil)
-	return s.CreateAntlrCache(parser.BaseParser, lexer.BaseLexer)
+	return s.CreateAntlrCache(yak.GetLexerSerializedATN(), yak.GetParserSerializedATN())
 }
 
 func (s *SSABuilder) FilterParseAST(path string) bool {
@@ -75,18 +73,16 @@ type astbuilder struct {
 	*ssa.FunctionBuilder
 }
 
-func FrontEnd(src string, caches ...*ssa.AntlrCache) (yak.IProgramContext, error) {
-	var cache *ssa.AntlrCache
-	if len(caches) > 0 {
-		cache = caches[0]
-	}
+func FrontEnd(src string, cache *ssa.AntlrCache) (yak.IProgramContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := yak.NewYaklangLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := yak.NewYaklangParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
+	if cache.Empty() {
+		ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
+	}
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

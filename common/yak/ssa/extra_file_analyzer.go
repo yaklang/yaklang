@@ -30,9 +30,11 @@ type FrontAST interface {
 }
 
 type AntlrCache struct {
+	LexerATN                    *antlr.ATN
 	LexerDfaCache               []*antlr.DFA
 	LexerPredictionContextCache *antlr.PredictionContextCache
 
+	ParserATN                    *antlr.ATN
 	ParserDfaCache               []*antlr.DFA
 	ParserPredictionContextCache *antlr.PredictionContextCache
 }
@@ -132,39 +134,46 @@ func (d *PreHandlerBase) Clearup() {
 	runtime.GC()
 }
 
+func (a *AntlrCache) Empty() bool {
+	return a == nil || (a.LexerATN == nil && a.ParserATN == nil)
+}
+
 // createAntlrCache creates new DFA cache and prediction context cache for the given ATN
-func createAntlrCache(parser *antlr.BaseParser, lexer *antlr.BaseLexer) *AntlrCache {
-	CreateCacheFromATN := func(atn *antlr.ATN) ([]*antlr.DFA, *antlr.PredictionContextCache) {
+func createAntlrCache(lexer, parser []int32) *AntlrCache {
+	CreateCacheFromATN := func(serializedATN []int32) (*antlr.ATN, []*antlr.DFA, *antlr.PredictionContextCache) {
+		atn := antlr.NewATNDeserializer(nil).Deserialize(serializedATN)
 		decisionToDFA := make([]*antlr.DFA, len(atn.DecisionToState))
 		for i := range decisionToDFA {
 			decisionToDFA[i] = antlr.NewDFA(atn.DecisionToState[i], i)
 		}
 		predictionContextCache := antlr.NewPredictionContextCache()
 		// log.Errorf("Created new ANTLR cache with %d DFAs", len(decisionToDFA))
-		return decisionToDFA, predictionContextCache
+		return atn, decisionToDFA, predictionContextCache
 	}
 
 	cache := &AntlrCache{}
 	log.Errorf("Creating new ANTLR cache")
-	{
-		atn := parser.GetATN()
-		decisionToDFA, predictionContextCache := CreateCacheFromATN(atn)
+	if parser != nil {
+		atn, decisionToDFA, predictionContextCache := CreateCacheFromATN(parser)
+		cache.ParserATN = atn
 		cache.ParserDfaCache = decisionToDFA
 		cache.ParserPredictionContextCache = predictionContextCache
 	}
 
-	{
-		atn := lexer.GetATN()
-		decisionToDFA, predictionContextCache := CreateCacheFromATN(atn)
+	if lexer != nil {
+		atn, decisionToDFA, predictionContextCache := CreateCacheFromATN(lexer)
+		cache.LexerATN = atn
 		cache.LexerDfaCache = decisionToDFA
 		cache.LexerPredictionContextCache = predictionContextCache
 	}
 	return cache
-
 }
 
-func (b *PreHandlerBase) CreateAntlrCache(parser *antlr.BaseParser, lexer *antlr.BaseLexer) *AntlrCache {
-	cache := createAntlrCache(parser, lexer)
+func (b *PreHandlerBase) CreateAntlrCache(lexer []int32, parser []int32) *AntlrCache {
+	cache := createAntlrCache(lexer, parser)
+	if cache.Empty() {
+		return nil
+	}
 	b.antlrMutex.Lock()
 	b.Caches = append(b.Caches, cache)
 	b.antlrMutex.Unlock()
@@ -173,16 +182,14 @@ func (b *PreHandlerBase) CreateAntlrCache(parser *antlr.BaseParser, lexer *antlr
 
 // ParserSetAntlrCache sets up ANTLR cache for the parser to improve performance
 // If builder has existing cache, use it; otherwise create new cache and store in builder if available
-func ParserSetAntlrCache(parser *antlr.BaseParser, lexer *antlr.BaseLexer, cache *AntlrCache) *antlr.BaseParser {
-	if cache == nil {
-		return parser
-		cache = createAntlrCache(parser, lexer)
+func ParserSetAntlrCache(parser *antlr.BaseParser, lexer *antlr.BaseLexer, cache *AntlrCache) {
+	if cache.Empty() {
+		return
 	}
 	parser.Interpreter = antlr.NewParserATNSimulator(
-		parser, parser.GetATN(), cache.ParserDfaCache, cache.ParserPredictionContextCache,
+		parser, cache.ParserATN, cache.ParserDfaCache, cache.ParserPredictionContextCache,
 	)
 	lexer.Interpreter = antlr.NewLexerATNSimulator(
-		lexer, lexer.GetATN(), cache.LexerDfaCache, cache.LexerPredictionContextCache,
+		lexer, cache.LexerATN, cache.LexerDfaCache, cache.LexerPredictionContextCache,
 	)
-	return parser
 }

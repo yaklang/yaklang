@@ -44,7 +44,7 @@ func (c *Config) GetFileHandler(
 
 		var cache *ssa.AntlrCache
 		raw, ok := store.Get(key)
-		if !ok {
+		if ok {
 			if raw, ok := raw.(*ssa.AntlrCache); ok && raw != nil {
 				cache = raw
 			}
@@ -68,7 +68,7 @@ func (c *Config) GetFileHandler(
 	initWorker := func() *utils.SafeMap[any] {
 		ret := utils.NewSafeMap[any]()
 		ret.Set(key, c.LanguageBuilder.GetAntlrCache())
-		log.Errorf("get antlr cache from store failed, new one, goroutine id: %d", getGID())
+		log.Errorf("create antrl cache, goroutine id: %d", getGID())
 		return ret
 	}
 	return ssareducer.FilesHandler(
