@@ -52,14 +52,14 @@ graph TD
   style K fill:#e8f5e8
 */
 
-type ReducerCallbackType func(config *Config, memory *aid.Memory, chunk chunkmaker.Chunk) error
+type ReducerCallbackType func(config *Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error
 
 type Config struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
 	// save status in timeline and memory
-	Memory *aid.Memory
+	Memory *aid.PromptContextProvider
 
 	// time trigger mean chunk trigger interval, if set to 0, it will not trigger by time.
 	TimeTriggerInterval time.Duration
@@ -74,7 +74,7 @@ type Config struct {
 
 	// Reducer Worker Callback
 	callback       ReducerCallbackType
-	finishCallback func(config *Config, memory *aid.Memory) error
+	finishCallback func(config *Config, memory *aid.PromptContextProvider) error
 }
 
 type Option func(*Config)
@@ -115,7 +115,7 @@ func WithReducerCallback(callback ReducerCallbackType) Option {
 // ```
 func WithSimpleCallback(callback func(chunk chunkmaker.Chunk)) Option {
 	return func(c *Config) {
-		c.callback = func(config *Config, memory *aid.Memory, chunk chunkmaker.Chunk) (ret error) {
+		c.callback = func(config *Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) (ret error) {
 			defer func() {
 				if err := recover(); err != nil {
 					ret = utils.Error(err)
@@ -127,13 +127,13 @@ func WithSimpleCallback(callback func(chunk chunkmaker.Chunk)) Option {
 	}
 }
 
-func WithFinishCallback(callback func(config *Config, memory *aid.Memory) error) Option {
+func WithFinishCallback(callback func(config *Config, memory *aid.PromptContextProvider) error) Option {
 	return func(c *Config) {
 		c.finishCallback = callback
 	}
 }
 
-func WithMemory(memory *aid.Memory) Option {
+func WithMemory(memory *aid.PromptContextProvider) Option {
 	return func(c *Config) {
 		c.Memory = memory
 	}

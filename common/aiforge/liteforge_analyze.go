@@ -3,15 +3,16 @@ package aiforge
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"os"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
-	"io"
-	"os"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/mimetype"
 )
@@ -71,7 +72,7 @@ func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, err
 	indexedChannel := chanx.NewUnlimitedChan[chunkmaker.Chunk](analyzeConfig.Ctx, 100)
 	count := 0
 	ar, err := aireducer.NewReducerEx(cm,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			analyzeConfig.AnalyzeLog("chunk index[%d] size:%v ", count, utils.ByteSize(uint64(chunk.BytesSize())))
 			indexedChannel.SafeFeed(chunk)
 			count++

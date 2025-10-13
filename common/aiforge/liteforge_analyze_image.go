@@ -672,7 +672,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 	indexedChannel := chanx.NewUnlimitedChan[chunkmaker.Chunk](analyzeConfig.Ctx, 100)
 	count := 0
 	ar, err := aireducer.NewReducerEx(cm,
-		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.Memory, chunk chunkmaker.Chunk) error {
+		aireducer.WithReducerCallback(func(config *aireducer.Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 			analyzeConfig.AnalyzeLog("chunk index[%d] size:%v Analyzing media type [%s]", count, utils.ByteSize(uint64(chunk.BytesSize())), chunk.MIMEType().String())
 			indexedChannel.SafeFeed(chunk)
 			count++

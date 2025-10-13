@@ -1,13 +1,14 @@
 package aid
 
 import (
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
-	"io"
 )
 
-func (m *Memory) CreateBasicMemoryTools() ([]*aitool.Tool, error) {
+func (m *PromptContextProvider) CreateBasicMemoryTools() ([]*aitool.Tool, error) {
 	var err error
 	factory := aitool.NewFactory()
 	err = factory.RegisterTool("delete_memory",
@@ -42,7 +43,7 @@ func (m *Memory) CreateBasicMemoryTools() ([]*aitool.Tool, error) {
 }
 
 // Memory 和 config的 绑定太强烈了，所以将tool直接放置在aid包内
-func (m *Memory) CreateMemoryTools() ([]*aitool.Tool, error) {
+func (m *PromptContextProvider) CreateMemoryTools() ([]*aitool.Tool, error) {
 	var err error
 	factory := aitool.NewFactory()
 
