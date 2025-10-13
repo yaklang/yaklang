@@ -279,6 +279,15 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	}
 	r.SetCurrentTask(task)
 
+	if r.initHandler != nil {
+		utils.Debug(func() {
+			fmt.Println("================================================")
+			fmt.Printf("re-act loop [%v] task init handler start to execute\n", r.loopName)
+			fmt.Println("================================================")
+		})
+		r.initHandler(task)
+	}
+
 	done := utils.NewOnce()
 	abort := func(err error) {
 		result := task.GetResult()
