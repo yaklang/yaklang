@@ -270,6 +270,10 @@ type Program struct {
 	ExportValue    map[string]Value
 	ExportType     map[string]Type
 
+	// GlobalVariablesBlueprint is a virtual Blueprint that wraps global variables,
+	// enabling them to be lazily built through the LazyBuilder mechanism
+	GlobalVariablesBlueprint *Blueprint
+
 	//store import
 
 	// if importCoverInner is true, it will cover the inner import declare
@@ -296,7 +300,6 @@ type Program struct {
 	ProcessInfof func(string, ...any)
 
 	// extern lib
-	GlobalScope             Value            //全局作用域
 	cacheExternInstance     map[string]Value // lib and value
 	externType              map[string]Type
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)

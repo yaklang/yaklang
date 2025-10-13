@@ -517,9 +517,6 @@ func (b *astbuilder) buildOperandNameL(name *gol.OperandNameContext, isLocal boo
 		if b.GetFromCmap(text) {
 			b.NewError(ssa.Warn, TAG, "cannot assign to const value")
 		}
-		/*if v, ok := b.GetGlobalVariableL(text); ok {
-			return v
-		}*/
 		if isLocal {
 			return b.CreateLocalVariable(text)
 		} else {
@@ -545,20 +542,20 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return b.EmitConstInstPlaceholder(c)
 		}
 
-		v := b.PeekValue(text)
-		if v == nil {
-			v = b.GetGlobalVariableR(text)
-		}
-		if v != nil {
+		if v := b.PeekValue(text); !utils.IsNil(v) {
 			return v
 		}
 
-		v = b.GetFunc(text, "")
-		if v.(*ssa.Function) == nil {
-			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
-			return b.ReadValue(text)
+		if g := b.GetGlobalVariableR(text); !utils.IsNil(g) {
+			return g
 		}
-		return v
+
+		if f, ok := b.GetFunc(text, ""); ok {
+			return f
+		}
+
+		b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
+		return b.ReadValue(text)
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())

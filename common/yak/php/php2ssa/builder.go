@@ -62,7 +62,11 @@ func initHandler(fb *ssa.FunctionBuilder) {
 		}
 	}
 	initHandler("_SERVER")
-	fb.GetProgram().GlobalScope = container
+
+	prog := fb.GetProgram()
+	if prog.GlobalVariablesBlueprint != nil {
+		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
+	}
 }
 
 func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {

@@ -120,11 +120,11 @@ func (c *Call) handleMethod() {
 				from <string> to getFunc
 			*/
 			if weakLanguage {
-				if newMethod := builder.GetFunc(method.String(), ""); utils.IsNil(newMethod) {
+				if newMethod, ok := builder.GetFunc(method.String(), ""); ok {
+					PointFunc(newMethod, callMethod)
+				} else {
 					log.Errorf("weakLanguage call %s not found", method.String())
 					return
-				} else {
-					PointFunc(newMethod, callMethod)
 				}
 			}
 		case *SideEffect:
