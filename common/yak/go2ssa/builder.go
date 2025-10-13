@@ -93,7 +93,8 @@ func (s *SSABuilder) FilterParseAST(path string) bool {
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
 	parser := gol.NewGoParser(nil)
-	return s.CreateAntlrCache(parser.BaseParser)
+	lexer := gol.NewGoLexer(nil)
+	return s.CreateAntlrCache(parser.BaseParser, lexer.BaseLexer)
 }
 
 func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {

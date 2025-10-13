@@ -2,6 +2,9 @@ package ssaapi
 
 import (
 	"errors"
+	"runtime"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -48,6 +51,7 @@ func (c *Config) GetFileHandler(
 		}
 		if cache == nil {
 			cache = c.LanguageBuilder.GetAntlrCache()
+			log.Errorf("get antlr cache from store failed, new one, path: %s, goroutine id: %d", path, getGID())
 			store.Set(key, cache)
 		}
 
@@ -64,6 +68,7 @@ func (c *Config) GetFileHandler(
 	initWorker := func() *utils.SafeMap[any] {
 		ret := utils.NewSafeMap[any]()
 		ret.Set(key, c.LanguageBuilder.GetAntlrCache())
+		log.Errorf("get antlr cache from store failed, new one, goroutine id: %d", getGID())
 		return ret
 	}
 	return ssareducer.FilesHandler(
@@ -72,4 +77,13 @@ func (c *Config) GetFileHandler(
 		c.astSequence,
 		c.concurrency,
 	)
+}
+func getGID() uint64 {
+	var buf [64]byte
+	// false=不获取全堆栈，仅当前G的ID
+	n := runtime.Stack(buf[:], false)
+	// 堆栈开头格式: "goroutine 123 [running]:"
+	idStr := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
+	id, _ := strconv.ParseUint(idStr, 10, 64)
+	return id
 }
