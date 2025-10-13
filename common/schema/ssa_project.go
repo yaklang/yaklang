@@ -76,7 +76,7 @@ func (p *SSAProject) ToGRPCModel() *ypb.SSAProject {
 
 	result.ScanConfig = &ypb.SSAProjectScanConfig{
 		Concurrency:    uint32(int64(config.GetScanConcurrency())),
-		Memory:         config.GetScanMemory(),
+		Memory:         config.GetSyntaxFlowMemory(),
 		IgnoreLanguage: config.GetScanIgnoreLanguage(),
 	}
 

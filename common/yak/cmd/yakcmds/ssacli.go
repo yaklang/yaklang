@@ -1348,22 +1348,19 @@ var ssaCodeScan = &cli.Command{
 			opt = append(opt, sfreport.WithDataflowPath(true))
 		}
 		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format, opt...)
+		reportInstance.SetWriter(config.OutputWriter)
 
-		scanConfig, err := ssaconfig.NewSyntaxFlowScanConfig(
-			ssaconfig.WithProgramNames(prog.GetProgramName()),
-			ssaconfig.WithRuleFilter(ruleFilter),
-			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
-		)
 		if err != nil {
 			log.Errorf("create ssaconfig failed: %s", err)
 			return err
 		}
 
-		_, err = sfscan.StartScan(
+		err = sfscan.StartScan(
 			ctx,
-			sfscan.WithSyntaxFlowScanConfig(scanConfig),
-			sfscan.WithSyntaxFlowScanReporter(reportInstance),
-			sfscan.WithSyntaxFlowScanReporterWriter(config.OutputWriter),
+			ssaconfig.WithProgramNames(prog.GetProgramName()),
+			ssaconfig.WithRuleFilter(ruleFilter),
+			ssaconfig.WithSyntaxFlowMemory(c.Bool("memory")),
+			sfscan.WithReporter(reportInstance),
 		)
 		if err != nil {
 			log.Errorf("scan failed: %s", err)

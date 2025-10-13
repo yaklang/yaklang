@@ -1,54 +1,8 @@
 package syntaxflow_scan
 
 import (
-	"io"
-
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 )
-
-type errorCallback func(string, string, string, ...any)
-
-type ProcessCallback func(taskID, status string, progress float64, info *RuleProcessInfoList)
-
-type ScanTaskCallback struct {
-	ProcessCallback ProcessCallback `json:"-"`
-
-	errorCallback  errorCallback      `json:"-"`
-	resultCallback ScanResultCallback `json:"-"`
-	// this function check if need pauseCheck,
-	// /return true to pauseCheck, and no-blocking
-
-	pauseCheck func() bool `json:"-"`
-
-	Reporter       sfreport.IReport `json:"-"`
-	ReporterWriter io.Writer        `json:"-"`
-}
-
-func WithPauseFunc(pause func() bool) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.pauseCheck = pause
-	}
-}
-
-func WithScanResultCallback(callback ScanResultCallback) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.resultCallback = callback
-	}
-}
-
-func WithErrorCallback(callback errorCallback) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.errorCallback = callback
-	}
-}
-
-// WithProcessCallback 设置扫描进度回调函数
-func WithProcessCallback(callback ProcessCallback) ScanOption {
-	return func(sc *ScanTaskConfig) {
-		sc.ProcessCallback = callback
-	}
-}
 
 type ScanTaskCallbacks utils.SafeMap[*ScanTaskCallback]
 

@@ -32,6 +32,11 @@ func NewSSAProjectBuilderByProto(proto *ypb.SSAProject) (*SSAProjectBuilder, err
 		Tags:        proto.Tags,
 		Language:    proto.Language,
 	}
+	var err error
+	builder.Config, err = ssaconfig.New(ssaconfig.ModeProjectBase)
+	if err != nil {
+		return nil, err
+	}
 
 	if proto.CodeSourceConfig != "" {
 		json.Unmarshal([]byte(proto.CodeSourceConfig), builder.Config.CodeSource)

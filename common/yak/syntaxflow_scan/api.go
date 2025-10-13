@@ -2,6 +2,8 @@ package syntaxflow_scan
 
 import (
 	"context"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 // StartScan 启动新的SyntaxFlow扫描任务，使用options模式配置扫描参数
@@ -51,10 +53,10 @@ import (
 //
 // )
 // ```
-func StartScan(ctx context.Context, opts ...ScanOption) error {
+func StartScan(ctx context.Context, opts ...ssaconfig.Option) error {
 	opts = append(opts,
-		WithControlMode(ControlModeStart),
-		WithConcurrency(5),
+		ssaconfig.WithScanControlMode(ssaconfig.ControlModeStart),
+		ssaconfig.WithScanConcurrency(5),
 	)
 	return Scan(ctx, opts...)
 }
@@ -85,11 +87,12 @@ func StartScan(ctx context.Context, opts ...ScanOption) error {
 //
 // die(err)
 // ```
-func ResumeScan(ctx context.Context, taskId string, opts ...ScanOption) error {
+func ResumeScan(ctx context.Context, taskId string, opts ...ssaconfig.Option) error {
 	opts = append(opts,
-		WithControlMode(ControlModeResume),
-		WithResumeTaskId(taskId),
+		ssaconfig.WithScanControlMode(ssaconfig.ControlModeResume),
+		ssaconfig.WithScanResumeTaskId(taskId),
 	)
+
 	return Scan(ctx,
 		opts...,
 	)
@@ -124,8 +127,8 @@ func ResumeScan(ctx context.Context, taskId string, opts ...ScanOption) error {
 // ```
 func GetScanStatus(ctx context.Context, taskId string, callback ProcessCallback) error {
 	return Scan(ctx,
-		WithControlMode(ControlModeStatus),
-		WithResumeTaskId(taskId),
+		ssaconfig.WithScanControlMode(ssaconfig.ControlModeStatus),
+		ssaconfig.WithScanResumeTaskId(taskId),
 		WithProcessCallback(callback),
 	)
 }
