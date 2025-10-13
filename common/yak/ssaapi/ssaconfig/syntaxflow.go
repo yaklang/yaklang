@@ -34,7 +34,6 @@ type SyntaxFlowScanConfig struct {
 	Concurrency    uint32   `json:"concurrency"`
 	ControlMode    string   `json:"control_mode"`   // 控制模式 "start" "pause" "resume" "status"
 	ResumeTaskId   string   `json:"resume_task_id"` // 恢复任务ID
-	Memory         bool     `json:"memory"`         // compile data only in memory
 }
 
 // --- SyntaxFlow 配置 Get/Set 方法 ---

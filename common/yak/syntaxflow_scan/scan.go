@@ -2,16 +2,19 @@ package syntaxflow_scan
 
 import (
 	"context"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-func Scan(ctx context.Context, option ...ScanOption) error {
-	config := NewScanConfig(option...)
+func Scan(ctx context.Context, option ...ssaconfig.Option) error {
+	config, err := NewConfig(option...)
+	if err != nil {
+		return err
+	}
 	var taskId string
 	var m *scanManager
 
@@ -21,10 +24,9 @@ func Scan(ctx context.Context, option ...ScanOption) error {
 		m.StatusTask()
 		m.Stop(runningID)
 	}()
-	var err error
 	errC := make(chan error)
-	switch ControlMode(strings.ToLower(config.GetControlMode())) {
-	case ControlModeStart:
+	switch ssaconfig.ControlMode(config.GetScanControlMode()) {
+	case ssaconfig.ControlModeStart:
 		taskId = uuid.New().String()
 		m, err = createSyntaxflowTaskById(ctx, runningID, taskId, config)
 		if err != nil {
@@ -38,22 +40,21 @@ func Scan(ctx context.Context, option ...ScanOption) error {
 			}
 			close(errC)
 		}()
-	case ControlModeStatus:
-		taskId = config.ResumeTaskId
+	case ssaconfig.ControlModeStatus:
+		taskId = config.GetScanResumeTaskId()
 		m, err = LoadSyntaxflowTaskFromDB(ctx, runningID, config)
 		if err != nil {
 			return err
 		}
 		m.StatusTask()
 		close(errC)
-	case ControlModeResume:
-		taskId = config.ResumeTaskId
+	case ssaconfig.ControlModeResume:
+		taskId = config.GetScanResumeTaskId()
 		m, err = LoadSyntaxflowTaskFromDB(ctx, runningID, config)
 		if err != nil {
 			return err
 		}
 		go func() {
-			// err := s.syntaxFlowResumeTask(m, stream)
 			err := m.ResumeTask()
 			if err != nil {
 				utils.TryWriteChannel(errC, err)
