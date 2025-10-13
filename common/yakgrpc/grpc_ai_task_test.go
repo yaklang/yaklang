@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -459,15 +460,22 @@ func TestAITaskForge(t *testing.T) {
 	tempDir := t.TempDir()
 	tempFile, err := os.CreateTemp(tempDir, "*.txt")
 	require.NoError(t, err)
-	tempFile.WriteString("1+1")
-	tempFile.Close()
+	defer tempFile.Close()
+
+	dataPath := filepath.Join("common", "aiforge", "aisecretary", "long_text_summarizer_data", "我的叔叔于勒.txt")
+	data, err := os.ReadFile(dataPath)
+	require.NoError(t, err)
+
+	_, err = tempFile.Write(data)
+	require.NoError(t, err)
+	require.NoError(t, tempFile.Sync())
 
 	stream.Send(&ypb.AIInputEvent{
 		IsStart: true,
 		Params: &ypb.AIStartParams{
 			ForgeName: "long_text_summarizer",
 			ForgeParams: []*ypb.ExecParamItem{
-				{Key: "filePath", Value: "C:\\Users\\Rookie\\home\\code\\yaklang\\common\\aiforge\\aisecretary\\long_text_summarizer_data\\我的叔叔于勒.txt"},
+				{Key: "filePath", Value: tempFile.Name()},
 			},
 			UseDefaultAIConfig: true,
 		},
