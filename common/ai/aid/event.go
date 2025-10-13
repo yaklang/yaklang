@@ -153,6 +153,7 @@ const (
 	SYNC_TYPE_PLAN          SyncType = "plan"
 	SYNC_TYPE_CONSUMPTION   SyncType = "consumption"
 	SYNC_TYPE_PING          SyncType = "ping"
+	SYNC_TYPE_SET_CONFIG    SyncType = "set_config"
 	SYNC_TYPE_PROCESS_EVENT SyncType = "sync_process_event"
 
 	ProcessID           string = "process_id"
@@ -161,7 +162,7 @@ const (
 
 func ParseSyncType(s string) (SyncType, bool) {
 	for _, t := range []SyncType{
-		SYNC_TYPE_PLAN, SYNC_TYPE_CONSUMPTION, SYNC_TYPE_PING, SYNC_TYPE_PROCESS_EVENT,
+		SYNC_TYPE_PLAN, SYNC_TYPE_CONSUMPTION, SYNC_TYPE_PING, SYNC_TYPE_PROCESS_EVENT, SYNC_TYPE_SET_CONFIG,
 	} {
 		if string(t) == s {
 			return t, true
