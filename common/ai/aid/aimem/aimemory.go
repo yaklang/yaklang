@@ -8,58 +8,20 @@ import (
 	_ "embed"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type MemoryEntity struct {
-	Id        string
-	CreatedAt time.Time
-	// 尽量保留原文，适当增加一点点内容的 Content，不准超过1000字，作为记忆来说可用
-	Content string
-	Tags    []string // 已有 TAG，
+//go:embed memory_triage.txt
+var memoryTriagePrompt string
 
-	// 7 dims - C.O.R.E. P.A.C.T. Framework (all normalized to 0.0-1.0)
-	C_Score float64 // Connectivity Score 这个记忆与其他记忆如何关联？这是一个一次性事实，几乎与其他事实没有什么关联程度
-	O_Score float64 // Origin Score 记忆与信息来源确定性，这个来源从哪里来？到底有多少可信度？
-	R_Score float64 // Relevance Score 这个信息对用户的目的有多关键？无关紧要？锦上添花？还是成败在此一举？
-	E_Score float64 // Emotion Score 用户在表达这个信息时的情绪如何？越低越消极，消极评分时一般伴随信息源不可信
-	P_Score float64 // Preference Score 个人偏好对齐评分，这个行为或者问题是否绑定了用户个人风格，品味？
-	A_Score float64 // Actionability Score 可操作性评分，是否可以从学习中改进未来行为？
-	T_Score float64 // Temporality Score 时效评分，核心问题：这个记忆应该如何被保留？配合时间搜索
+// IsMockMode 是否使用mock模式（用于测试）
+var IsMockMode = false
 
-	CorePactVector []float32
-
-	// designed for rag searching
-	PotentialQuestions []string
-}
-
-type Option func(memory *AIMemoryTriage)
-
-type AIMemoryTriage struct {
-	ctx    context.Context
-	cancel context.CancelFunc
-
-	rag             *rag.RAGSystem
-	invoker         aicommon.AIInvokeRuntime
-	contextProvider func() (string, error)
-}
-
-func WithContextProvider(i func() (string, error)) Option {
-	return func(memory *AIMemoryTriage) {
-		memory.contextProvider = i
-	}
-}
-
-func WithInvoker(invoker aicommon.AIInvokeRuntime) Option {
-	return func(memory *AIMemoryTriage) {
-		memory.invoker = invoker
-	}
-}
-
+// NewAIMemory 创建AI记忆管理系统
 func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	if sessionId == "" {
 		return nil, utils.Errorf("sessionId is required")
@@ -67,12 +29,31 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 
 	name := fmt.Sprintf("ai-memory-%s", sessionId)
 	db := consts.GetGormProjectDatabase()
-	system, err := rag.LoadCollection(db, name)
-	if err != nil {
-		return nil, utils.Errorf("load collection failed: %v", err)
+
+	// 构建RAG选项
+	var ragOpts []any
+	if IsMockMode {
+		// 使用mock embedding
+		mockEmbedder, err := NewMockEmbeddingClient()
+		if err != nil {
+			return nil, utils.Errorf("failed to create mock embedder: %v", err)
+		}
+		ragOpts = append(ragOpts, rag.WithEmbeddingClient(mockEmbedder))
 	}
+
+	// 尝试加载现有collection，如果不存在则创建新的
+	system, err := rag.LoadCollection(db, name, ragOpts...)
+	if err != nil {
+		log.Infof("collection not found, creating new one: %s", name)
+		system, err = rag.CreateCollection(db, name, fmt.Sprintf("AI Memory for session %s", sessionId), ragOpts...)
+		if err != nil {
+			return nil, utils.Errorf("create collection failed: %v", err)
+		}
+	}
+
 	triage := &AIMemoryTriage{
-		rag: system,
+		rag:       system,
+		sessionID: sessionId,
 	}
 
 	for _, opt := range opts {
@@ -92,9 +73,7 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	return triage, nil
 }
 
-//go:embed memory_triage.txt
-var memoryTriagePrompt string
-
+// AddRawText 从原始文本生成记忆条目
 func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
 	temp, infos, err := r.invoker.GetBasicPromptInfo(nil)
 	if err != nil {
@@ -183,4 +162,12 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
 		entities = append(entities, entity)
 	}
 	return entities, nil
+}
+
+// Close 关闭资源
+func (r *AIMemoryTriage) Close() error {
+	if r.cancel != nil {
+		r.cancel()
+	}
+	return nil
 }
