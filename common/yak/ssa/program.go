@@ -51,6 +51,11 @@ func NewProgram(
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
 	}
+
+	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
+	prog.GlobalVariablesBlueprint.SetKind(BlueprintClass)
+	prog.Blueprint.Set("__GlobalVariables__", prog.GlobalVariablesBlueprint)
+
 	if kind == Application {
 		prog.Application = prog
 		prog.Cache = NewDBCache(prog, databaseKind, fileSize, ttl...)
@@ -120,9 +125,6 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.ExternLib = prog.ExternLib
 	subProg.ExportType = make(map[string]Type)
 	subProg.ExportValue = make(map[string]Value)
-
-	//todo: 这里需要加一个测试
-	subProg.GlobalScope = prog.GlobalScope
 
 	// up-down stream and application
 	prog.AddUpStream(subProg)

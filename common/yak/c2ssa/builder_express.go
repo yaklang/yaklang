@@ -563,11 +563,13 @@ func (b *astbuilder) buildPrimaryExpression(ast *cparser.PrimaryExpressionContex
 		if right, ok := b.getSpecialValue(text); ok {
 			return right, left
 		}
-		right = b.GetFunc(text, "")
-		if right.(*ssa.Function) == nil {
+		if fun, ok := b.GetFunc(text, ""); ok {
+			right = fun
+		} else {
 			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
 			right = b.ReadValue(text)
 		}
+
 		return right, left
 	}
 	// 2. Constant

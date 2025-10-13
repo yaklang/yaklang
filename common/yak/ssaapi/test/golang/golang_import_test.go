@@ -170,13 +170,14 @@ func TestImport_aliastyp(t *testing.T) {
 }
 
 func TestImport_globals(t *testing.T) {
-	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/main/go/go.mod", `
+	t.Run("import struct", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
 	module github.com/yaklang/yaklang
 
 	go 1.20
 	`)
-	vf.AddFile("src/main/go/A/test.go", `
+		vf.AddFile("src/main/go/A/test.go", `
 	package A
 
 	var Mymap map[string]int = map[string]int{
@@ -191,7 +192,7 @@ func TestImport_globals(t *testing.T) {
 
 	`)
 
-	vf.AddFile("src/main/go/B/test.go", `
+		vf.AddFile("src/main/go/B/test.go", `
 	package B
 
 	import (
@@ -205,12 +206,94 @@ func TestImport_globals(t *testing.T) {
 	}
 	`)
 
-	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		println(* #-> as $a)
 		`, map[string][]string{
-		"a": {"1", "\"hello world\"", "3"},
-	}, true, ssaapi.WithLanguage(ssaapi.GO),
-	)
+			"a": {"1", "\"hello world\"", "3"},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+
+	t.Run("import global cross", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+		vf.AddFile("src/main/go/main.go", `
+	package main
+
+	import "go0p/A"
+
+	var PI = A.PI
+
+	func main() {
+		println(PI)
+	}
+	`)
+
+		vf.AddFile("src/main/go/A/test.go", `
+	package A
+
+	import "go0p/B"
+
+	var PI = B.PI
+	`)
+
+		vf.AddFile("src/main/go/B/test.go", `
+	package B
+
+	var PI = 3.1415926
+	`)
+
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		println(* #-> as $a)
+		`, map[string][]string{
+			"a": {"3.1415926"},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+
+	t.Run("import global cross ver", func(t *testing.T) {
+		vf := filesys.NewVirtualFs()
+		vf.AddFile("src/main/go/go.mod", `
+	module github.com/yaklang/yaklang
+
+	go 1.20
+	`)
+		vf.AddFile("src/main/go/main.go", `
+	package main
+
+	import "go0p/A"
+
+	func main() {
+		var PI = A.PI
+		println(PI)
+	}
+	`)
+
+		vf.AddFile("src/main/go/A/test.go", `
+	package A
+
+	import "go0p/B"
+
+	var PI = B.PI
+	`)
+
+		vf.AddFile("src/main/go/B/test.go", `
+	package B
+
+	var PI = 3.1415926
+	`)
+
+		ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		println(* #-> as $a)
+		`, map[string][]string{
+			"a": {"3.1415926"},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 }
 
 func TestImport_Syntaxflow(t *testing.T) {

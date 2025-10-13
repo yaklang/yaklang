@@ -806,8 +806,7 @@ func (y *builder) VisitFullyQualifiedNamespaceExpr(raw phpparser.IFullyQualified
 		return nil
 	}
 	if !wantBlueprint {
-		_func := y.GetFunc(i.GetText(), "")
-		if _func != nil {
+		if _func, ok := y.GetFunc(i.GetText(), ""); ok {
 			return _func
 		}
 	} else {

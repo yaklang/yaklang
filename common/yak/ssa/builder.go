@@ -127,7 +127,7 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 func (f *FunctionBuilder) AddCaptureFreevalue(name string) {
 	f.captureFreeValue[name] = struct{}{}
 }
-func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
+func (b *FunctionBuilder) GetFunc(name, pkg string) (*Function, bool) {
 	var function *Function
 	b.includeStack.ForeachStack(func(program *Program) bool {
 		functionEx := program.GetFunctionEx(name, pkg)
@@ -137,10 +137,13 @@ func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
 		}
 		return true
 	})
-	if function != nil {
-		return function
+	if !utils.IsNil(function) {
+		return function, true
 	}
-	return b.GetProgram().GetFunction(name, pkg)
+	if function = b.GetProgram().GetFunction(name, pkg); !utils.IsNil(function) {
+		return function, true
+	}
+	return nil, false
 }
 
 func (b *FunctionBuilder) SetBuildSupport(parent *FunctionBuilder) {

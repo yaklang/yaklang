@@ -38,7 +38,11 @@ func CreateBuilder() ssa.Builder {
 
 func initHandler(fb *ssa.FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
-	fb.GetProgram().GlobalScope = container
+
+	prog := fb.GetProgram()
+	if prog.GlobalVariablesBlueprint != nil {
+		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
+	}
 }
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
@@ -187,56 +191,6 @@ func (b *astbuilder) OutCmapLevel() {
 
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.GO
-}
-
-func (b *astbuilder) AddGlobalVariable(name string, value ssa.Value) {
-	scope := b.CurrentBlock.ScopeTable
-	for _, v := range scope.GetAllVariables() {
-		if object := v.GetValue().GetObject(); object != nil && object.GetId() == value.GetId() {
-			variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInstPlaceholder(v.GetName()))
-			b.AssignVariable(variable, v.GetValue())
-		}
-	}
-	variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInstPlaceholder(name))
-	b.AssignVariable(variable, value)
-}
-
-func (b *astbuilder) CheckGlobalVariablePhi(l *ssa.Variable, r ssa.Value) bool {
-	name := l.GetName()
-	for i, _ := range b.GetProgram().GlobalScope.GetAllMember() {
-		if i.String() == name {
-			b.GetProgram().GlobalScope.GetAllMember()[i] = r
-			return true
-		}
-	}
-	return false
-}
-
-func (b *astbuilder) GetGlobalVariableL(name string) (*ssa.Variable, bool) {
-	var variable *ssa.Variable
-	return variable, false
-}
-
-func (b *astbuilder) LoadGlobalVariable() {
-	global := b.GetProgram().GlobalScope
-	for i, m := range global.GetAllMember() {
-		variable := b.CreateVariableCross(i.String())
-		b.AssignVariable(variable, m)
-	}
-}
-
-func (b *astbuilder) GetGlobalVariableR(name string) ssa.Value {
-	global := b.GetProgram().GlobalScope
-	member, _ := global.GetStringMember(name)
-	return member
-}
-
-func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
-	var variables = make(map[string]ssa.Value)
-	for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
-		variables[i.String()] = m
-	}
-	return variables
 }
 
 func (b *astbuilder) AddResultDefault(name string) {
