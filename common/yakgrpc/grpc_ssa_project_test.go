@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -19,15 +19,15 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 	ctx := context.Background()
 
 	// 测试用的代码源配置
-	codeSourceConfig := &schema.CodeSourceInfo{
-		Kind:      schema.CodeSourceLocal,
+	codeSourceConfig := &ssaconfig.CodeSourceInfo{
+		Kind:      ssaconfig.CodeSourceLocal,
 		LocalFile: "/tmp/test-project",
-		Auth: &schema.AuthConfigInfo{
+		Auth: &ssaconfig.AuthConfigInfo{
 			Kind:     "password",
 			UserName: "test",
 			Password: "test123",
 		},
-		Proxy: &schema.ProxyConfigInfo{
+		Proxy: &ssaconfig.ProxyConfigInfo{
 			URL:      "http://127.0.0.1:8080",
 			User:     "proxy_user",
 			Password: "proxy_pass",
@@ -123,12 +123,12 @@ func TestSSAProjectCRUDOperations(t *testing.T) {
 	// 3. 测试更新SSA项目
 	t.Run("UpdateSSAProject", func(t *testing.T) {
 		// 修改代码源配置为Git类型
-		gitConfig := &schema.CodeSourceInfo{
-			Kind:   schema.CodeSourceGit,
+		gitConfig := &ssaconfig.CodeSourceInfo{
+			Kind:   ssaconfig.CodeSourceGit,
 			URL:    "https://github.com/test/repo.git",
 			Branch: "main",
 			Path:   "src/main",
-			Auth: &schema.AuthConfigInfo{
+			Auth: &ssaconfig.AuthConfigInfo{
 				Kind:     "ssh_key",
 				UserName: "git",
 				KeyPath:  "/home/user/.ssh/id_rsa",
@@ -238,8 +238,8 @@ func TestSSAProjectValidation(t *testing.T) {
 
 	t.Run("CreateWithInvalidConfig", func(t *testing.T) {
 		// 测试无效的配置 - 缺少required字段
-		invalidConfig := &schema.CodeSourceInfo{
-			Kind: schema.CodeSourceLocal,
+		invalidConfig := &ssaconfig.CodeSourceInfo{
+			Kind: ssaconfig.CodeSourceLocal,
 			// 缺少 LocalFile
 		}
 
@@ -287,30 +287,30 @@ func TestSSAProjectDifferentSourceTypes(t *testing.T) {
 
 	testCases := []struct {
 		name   string
-		config *schema.CodeSourceInfo
+		config *ssaconfig.CodeSourceInfo
 	}{
 		{
 			name: "CompressionSource",
-			config: &schema.CodeSourceInfo{
-				Kind:      schema.CodeSourceCompression,
+			config: &ssaconfig.CodeSourceInfo{
+				Kind:      ssaconfig.CodeSourceCompression,
 				LocalFile: "/tmp/test.zip",
 			},
 		},
 		{
 			name: "JarSource",
-			config: &schema.CodeSourceInfo{
-				Kind: schema.CodeSourceJar,
+			config: &ssaconfig.CodeSourceInfo{
+				Kind: ssaconfig.CodeSourceJar,
 				URL:  "https://repo1.maven.org/maven2/org/example/example/1.0.0/example-1.0.0.jar",
 			},
 		},
 		{
 			name: "GitSourceWithBranch",
-			config: &schema.CodeSourceInfo{
-				Kind:   schema.CodeSourceGit,
+			config: &ssaconfig.CodeSourceInfo{
+				Kind:   ssaconfig.CodeSourceGit,
 				URL:    "https://github.com/example/repo.git",
 				Branch: "develop",
 				Path:   "src",
-				Auth: &schema.AuthConfigInfo{
+				Auth: &ssaconfig.AuthConfigInfo{
 					Kind:     "password",
 					UserName: "user",
 					Password: "token",
