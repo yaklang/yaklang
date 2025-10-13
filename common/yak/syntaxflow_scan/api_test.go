@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -68,13 +69,12 @@ func TestStartScan_WithProcessCallback(t *testing.T) {
 	var lock = sync.Mutex{}
 
 	err := StartScan(context.Background(),
+		ssaconfig.WithProgramNames(progID),
 		WithScanResultCallback(func(sr *ScanResult) {
 			status = sr.Status
 			taskID = sr.TaskID
 			// log.Infof("扫描结果: TaskID=%s, Status=%s", taskID, status)
 		}),
-		WithProgramNames(progID),
-		WithRuleFilter(&ypb.SyntaxFlowRuleFilter{}),
 		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
 			lock.Lock()
 			defer lock.Unlock()
@@ -116,8 +116,7 @@ func TestStartScan_WithRuleProcessCallback(t *testing.T) {
 			taskID = sr.TaskID
 			// log.Infof("扫描结果: TaskID=%s, Status=%s", taskID, status)
 		}),
-		WithProgramNames(progID),
-		WithRuleFilter(&ypb.SyntaxFlowRuleFilter{}),
+		ssaconfig.WithProgramNames(progID),
 		WithProcessCallback(func(taskID, status string, progress float64, infos *RuleProcessInfoList) {
 			// log.Infof("=%s== %.2f%%, status: %s --\n%s\n", time.UnixMicro(infos.Time), progress*100, status, infos)
 			log.Infof("=%s== %.2f%%, status: %s --", time.UnixMicro(infos.Time), progress*100, status)
@@ -166,7 +165,7 @@ func TestPauseAndCheck(t *testing.T) {
 			taskID = sr.TaskID
 			log.Infof("扫描结果: TaskID=%s, Status=%s", sr.TaskID, sr.Status)
 		}),
-		WithProgramNames(progID),
+		ssaconfig.WithProgramNames(progID),
 		WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
 			scanProgress = progress
 			log.Infof("=%s== %.2f%%, status: %s --", time.UnixMicro(info.Time), progress*100, status)
@@ -209,11 +208,11 @@ func TestPauseAndCheck(t *testing.T) {
 		var resultStatus string
 		var statusProcess float64
 		req := &ypb.SyntaxFlowScanRequest{
-			ControlMode:  string(ControlModeStatus),
+			ControlMode:  string(ssaconfig.ControlModeStatus),
 			ResumeTaskId: taskID,
 		}
 		err = Scan(context.Background(),
-			WithRawConfig(req),
+			ssaconfig.WithScanRaw(req),
 			WithProcessCallback(func(taskID, status string, progress float64, info *RuleProcessInfoList) {
 				statusProcess = progress
 				resultStatus = status

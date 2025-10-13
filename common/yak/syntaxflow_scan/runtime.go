@@ -36,17 +36,17 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	var errs error
 	var taskIndex atomic.Int64
 	var concurrency int
-	if m.ssaConfig.GetScanConcurrency() <= 0 {
+	if m.Config.GetScanConcurrency() <= 0 {
 		concurrency = 5
 	} else {
-		concurrency = int(m.ssaConfig.GetScanConcurrency())
+		concurrency = int(m.Config.GetScanConcurrency())
 	}
 	swg := utils.NewSizedWaitGroup(concurrency)
 	for rule := range m.ruleChan {
 		if m.IsPause() || m.IsStop() {
 			break
 		}
-		for _, progName := range m.ProgramNames {
+		for _, progName := range m.Config.GetProgramNames() {
 			if m.IsPause() || m.IsStop() {
 				break
 			}
@@ -74,15 +74,8 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 	return errs
 }
 
-func (m *scanManager) isFinishScan() bool {
-	if m.finishedQuery >= m.totalQuery {
-		return true
-	}
-	return false
-}
-
 func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
-	if !m.ignoreLanguage {
+	if !m.Config.GetScanIgnoreLanguage() {
 		if rule.Language != string(consts.General) && string(rule.Language) != prog.GetLanguage() {
 			m.markRuleSkipped()
 			return
@@ -97,7 +90,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 		}),
 		ssaapi.QueryWithSave(m.kind),
 	)
-	if m.ssaConfig.GetScanMemory() {
+	if m.Config.GetSyntaxFlowMemory() {
 		option = append(option, ssaapi.QueryWithMemory())
 	}
 
@@ -114,12 +107,12 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, prog *ssaapi.Program) {
 }
 
 func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
-	if m.config.Reporter != nil {
-		m.config.Reporter.AddSyntaxFlowResult(res)
+	if m.Config.Reporter != nil {
+		m.Config.Reporter.AddSyntaxFlowResult(res)
 	}
 	m.processMonitor.RiskCount.Add(int64(res.RiskCount()))
-	if m.config.resultCallback != nil {
-		m.config.resultCallback(&ScanResult{
+	if m.Config.resultCallback != nil {
+		m.Config.resultCallback(&ScanResult{
 			TaskID: m.taskID,
 			Status: m.status,
 			Result: res,
@@ -128,10 +121,10 @@ func (m *scanManager) notifyResult(res *ssaapi.SyntaxFlowResult) {
 }
 
 func (m *scanManager) saveReport() {
-	if m == nil || m.config == nil || m.config.Reporter == nil {
+	if m == nil || m.Config == nil || m.Config.Reporter == nil {
 		return
 	}
-	if err := m.config.Reporter.Save(m.config.ReporterWriter); err != nil {
+	if err := m.Config.Reporter.Save(); err != nil {
 		log.Errorf("save report failed: %v", err)
 	}
 }
