@@ -11,7 +11,8 @@ import (
 type IReport interface {
 	AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool
 	AddSyntaxFlowRisks(risks ...*schema.SSARisk)
-	Save(writer io.Writer) error
+	SetWriter(writer io.Writer) error
+	Save() error
 }
 
 func ConvertSyntaxFlowResultToReport(format ReportType, opt ...Option) (IReport, error) {

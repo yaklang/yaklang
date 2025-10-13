@@ -15,6 +15,15 @@ import (
 
 type SarifReport struct {
 	report *sarif.Report
+	writer io.Writer
+}
+
+func (r *SarifReport) SetWriter(writer io.Writer) error {
+	if writer == nil {
+		return utils.Errorf("writer is nil")
+	}
+	r.writer = writer
+	return nil
 }
 
 func (r *SarifReport) AddSyntaxFlowRisks(risks ...*schema.SSARisk) {
@@ -43,8 +52,8 @@ func (r *SarifReport) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool 
 	return false
 }
 
-func (r *SarifReport) Save(writer io.Writer) error {
-	return r.report.PrettyWrite(writer)
+func (r *SarifReport) Save() error {
+	return r.report.PrettyWrite(r.writer)
 }
 
 // ====================== sarif context ======================
