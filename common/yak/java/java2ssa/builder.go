@@ -43,9 +43,7 @@ func (s *SSABuilder) FilterParseAST(path string) bool {
 }
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
-	parser := javaparser.NewJavaParser(nil)
-	lexer := javaparser.NewJavaLexer(nil)
-	return s.CreateAntlrCache(parser.BaseParser, lexer.BaseLexer)
+	return s.CreateAntlrCache(javaparser.GetJavaLexerSerializedATN(), javaparser.GetJavaParserSerializedATN())
 }
 
 func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {

@@ -274,7 +274,7 @@ func TestA(t *testing.T) {
 		opt(&config)
 	}
 
-	fileList := []string{}
+	fileList := make([]string, 0)
 	fileMap := make(map[string]struct{})
 	ssaprofile.ProfileAdd(true, "collect file", func() {
 		filesys.Recursive(".",
