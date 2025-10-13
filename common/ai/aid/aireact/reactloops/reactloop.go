@@ -2,8 +2,9 @@ package reactloops
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/log"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -62,6 +63,9 @@ type ReActLoop struct {
 	onTaskCreated       func(task aicommon.AIStatefulTask)
 	onAsyncTaskFinished func(task aicommon.AIStatefulTask)
 	onAsyncTaskTrigger  func(ins *LoopAction, task aicommon.AIStatefulTask)
+
+	// 启动这个 loop 的时候马上要执行的事情
+	initHandler func(task aicommon.AIStatefulTask)
 }
 
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {

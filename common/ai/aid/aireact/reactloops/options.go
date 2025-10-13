@@ -221,3 +221,9 @@ func WithActionFactoryFromLoop(name string) ReActLoopOption {
 		r.loopActions.Set(name, actionFac)
 	}
 }
+
+func WithInitTask(initHandler func(task aicommon.AIStatefulTask)) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.initHandler = initHandler
+	}
+}
