@@ -1,12 +1,15 @@
 package aireact
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/log"
@@ -179,6 +182,32 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 		for i, o := range baseOpts {
 			opts[i] = o
 		}
+		stdOut := new(bytes.Buffer)
+		opts = append(opts, yak.WithAiAgentEventHandler(func(e *schema.AiOutputEvent) {
+			if e.Type == schema.EVENT_TYPE_YAKIT_EXEC_RESULT && e.IsJson {
+				var execResult ypb.ExecResult
+				if err := json.Unmarshal(e.Content, &execResult); err != nil {
+					log.Errorf("Failed to unmarshal exec result: %v", err)
+					return
+				}
+				if execResult.IsMessage {
+					var yakitMsg yaklib.YakitMessage
+					if err := json.Unmarshal(execResult.Message, &yakitMsg); err != nil {
+						log.Errorf("Failed to unmarshal yakit message: %v", err)
+						return
+					}
+					if yakitMsg.Type == "log" {
+						var yakitLog yaklib.YakitLog
+						if err := json.Unmarshal(yakitMsg.Content, &yakitLog); err != nil {
+							log.Errorf("Failed to unmarshal yakit message: %v", err)
+							return
+						}
+						stdOut.WriteString(yakitLog.String())
+					}
+				}
+			}
+			r.config.Emit(e)
+		}))
 		done()
 		result, err := yak.ExecuteForge(forgeName, forgeParams, opts...)
 		if err != nil {
@@ -186,6 +215,7 @@ func (r *ReAct) invokePlanAndExecute(doneChannel chan struct{}, ctx context.Cont
 			return utils.Errorf("failed to execute forge %s: %v", forgeName, err)
 		}
 		_ = result
+		r.AddToTimeline("forge output log", stdOut.String())
 		return nil
 	} else {
 		cod, err := aid.NewCoordinatorContext(planCtx, planPayload, baseOpts...)

@@ -343,6 +343,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	}()
 
 	taskStartProcessing()
+	r.GetInvoker().AddToTimeline("current task user input", fmt.Sprintf("%v", task.GetUserInput()))
 LOOP:
 	for {
 		iterationCount++

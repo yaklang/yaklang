@@ -100,12 +100,16 @@ func (f *ForgeFactory) GenerateAIJSONSchemaFromSchemaAIForge(forge *schema.AIFor
 	options = append(options, aitool.WithAction("call-ai-blueprint"))
 
 	// 如果 forge.Params 为空，只返回基本选项
-	if forge.Params == "" {
-		params = append(params, aitool.WithStringParam("query", aitool.WithParam_Description("Some input for helping the AI blueprint execute plan and executing")))
-	} else {
+	if forge.Params != "" {
 		// 解析 Yak CLI 代码获取参数选项
 		parsedParams := aitool.ConvertYaklangCliCodeToToolOptions(forge.Params)
 		params = append(params, parsedParams...)
+	} else if forge.ForgeContent != "" {
+		parsedParams := aitool.ConvertYaklangCliCodeToToolOptions(forge.ForgeContent)
+		params = append(params, parsedParams...)
+	} else {
+		params = append(params, aitool.WithStringParam("query", aitool.WithParam_Description("Some input for helping the AI blueprint execute plan and executing")))
+
 	}
 
 	// 如果有参数，添加到 params 结构体中
