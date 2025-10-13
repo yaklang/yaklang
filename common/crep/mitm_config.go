@@ -345,10 +345,13 @@ func MITM_MergeOptions(b ...MITMConfig) MITMConfig {
 func MITM_SetDownstreamProxy(proxys ...string) MITMConfig {
 	return func(server *MITMServer) error {
 		server.proxyUrls = make([]*url.URL, 0)
+		server.proxyUrlStrings = nil
 		if len(proxys) == 0 || proxys == nil {
 			server.proxyUrls = nil
+			server.proxy.SetDownstreamProxyConfig(nil, server.proxyHostMatcher)
 			return nil
 		}
+		server.proxyUrlStrings = make([]string, 0, len(proxys))
 		for _, proxy := range proxys {
 			urlRaw, err := url.Parse(proxy)
 			if err != nil {
@@ -356,7 +359,23 @@ func MITM_SetDownstreamProxy(proxys ...string) MITMConfig {
 			}
 			log.Infof("set downstream proxy as %v", urlRaw.String())
 			server.proxyUrls = append(server.proxyUrls, urlRaw)
+			server.proxyUrlStrings = append(server.proxyUrlStrings, urlRaw.String())
 		}
+		server.proxy.SetDownstreamProxyConfig(server.proxyUrlStrings, server.proxyHostMatcher)
+		return nil
+	}
+}
+
+func MITM_SetDownstreamProxyHostFilter(hosts ...string) MITMConfig {
+	return func(server *MITMServer) error {
+		clean := utils.StringArrayFilterEmpty(hosts)
+		if len(clean) == 0 {
+			server.proxyHostMatcher = nil
+		} else {
+			server.proxyHostMatcher = minimartian.NewProxyHostMatcher(clean)
+			log.Infof("set downstream proxy host filter: %v", clean)
+		}
+		server.proxy.SetDownstreamProxyConfig(server.proxyUrlStrings, server.proxyHostMatcher)
 		return nil
 	}
 }

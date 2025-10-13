@@ -326,6 +326,8 @@ type MITMServer struct {
 	// httpTransport            *http.Transport
 	proxyUrl                 *url.URL
 	proxyUrls                []*url.URL
+	proxyUrlStrings          []string
+	proxyHostMatcher         *minimartian.ProxyHostMatcher
 	hijackedMaxContentLength int
 
 	// transparent hijack mode
@@ -407,6 +409,9 @@ func (m *MITMServer) initConfig() error {
 	config = append(config, lowhttp.WithProxyGetter(func() []string {
 		if m.proxyUrls == nil {
 			return []string{}
+		}
+		if len(m.proxyUrlStrings) > 0 {
+			return append([]string(nil), m.proxyUrlStrings...)
 		}
 		var proxys []string
 		for _, proxyUrl := range m.proxyUrls {
