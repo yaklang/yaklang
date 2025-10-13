@@ -24,9 +24,10 @@ import (
 
 // 同步类型常量
 const (
-	SYNC_TYPE_QUEUE_INFO = "queue_info"
-	SYNC_TYPE_TIMELINE   = "timeline"
-	SYNC_TYPE_KNOWLEDGE  = "enhance_knowledge"
+	SYNC_TYPE_QUEUE_INFO    = "queue_info"
+	SYNC_TYPE_TIMELINE      = "timeline"
+	SYNC_TYPE_KNOWLEDGE     = "enhance_knowledge"
+	SYNC_TYPE_UPDATE_CONFIG = "update_config"
 )
 
 // ReactTaskItem 表示ReAct任务队列中的单个任务
