@@ -156,3 +156,13 @@ func GetKnowledgeBaseEntryByFilter(db *gorm.DB, id int64, keyword string, filter
 	}
 	return pag, knowledgeBases, nil
 }
+
+func GetKnowledgeBaseEntryByUUID(db *gorm.DB, uuid string) (*schema.KnowledgeBaseEntry, error) {
+	db = db.Model(&schema.KnowledgeBaseEntry{})
+	var knowledgeBase schema.KnowledgeBaseEntry
+	err := db.Where("hidden_index = ?", uuid).First(&knowledgeBase).Error
+	if err != nil {
+		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
+	}
+	return &knowledgeBase, nil
+}
