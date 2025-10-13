@@ -104,13 +104,13 @@ forgeHandle = func(params) {
     allFiles = []
     for filePath in filePaths{
         if !file.IsExisted(filePath) {
-            yakit.Error("路径 %s 不存在， 跳过检测")
+            yakit.Error("路径 %s 不存在， 跳过检测" % filePath)
             continue
         }
         if file.IsDir(filePath) {
             fileInfos,err = file.ReadFileInfoInDirectory(filePath)
             if err {
-                yakit.Error("读取目录 %s 失败， 跳过检测")
+                yakit.Error("读取目录 %s 失败， 跳过检测" % filePath)
                 continue
             }
             for info in fileInfos{
