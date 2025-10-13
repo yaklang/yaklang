@@ -1,7 +1,5 @@
 package ssaconfig
 
-import "github.com/yaklang/yaklang/common/yakgrpc/ypb"
-
 type Config struct {
 	Mode           Mode
 	BaseInfo       *BaseInfo
@@ -37,44 +35,8 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 		ExtraInfo: map[string]any{},
 	}
 	cfg.Mode = mode
-	if mode&ModeCodeSource != 0 {
-		cfg.CodeSource = &CodeSourceInfo{
-			Auth:  &AuthConfigInfo{},
-			Proxy: &ProxyConfigInfo{},
-		}
-	}
-	if mode&ModeSSACompile != 0 {
-		cfg.SSACompile = &SSACompileConfig{
-			StrictMode:    false,
-			PeepholeSize:  0,
-			ExcludeFiles:  []string{},
-			ReCompile:     false,
-			MemoryCompile: false,
-			Concurrency:   1,
-		}
-	}
-	if mode&ModeSyntaxFlow != 0 {
-		cfg.SyntaxFlow = &SyntaxFlowConfig{
-			Memory:         false,
-			ResultSaveKind: SFResultSaveNone,
-		}
-	}
-	if mode&ModeSyntaxFlowScanManager != 0 {
-		cfg.SyntaxFlowScan = &SyntaxFlowScanConfig{
-			IgnoreLanguage: false,
-			Language:       []string{},
-			Concurrency:    5,
-		}
-	}
-	if mode&ModeSyntaxFlowRule != 0 {
-		cfg.SyntaxFlowRule = &SyntaxFlowRuleConfig{
-			RuleFilter: &ypb.SyntaxFlowRuleFilter{},
-			RuleInput:  &ypb.SyntaxFlowRuleInput{},
-		}
-	}
-	if mode&ModeProjectBase != 0 {
-		cfg.BaseInfo = &BaseInfo{}
-	}
+	// New intentionally does not eagerly initialize nested config structs.
+	// With... option functions should check c.Mode and create defaults when needed.
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
 			return nil, err
@@ -82,13 +44,51 @@ func New(mode Mode, opts ...Option) (*Config, error) {
 	}
 	return cfg, nil
 }
-
 func NewSyntaxFlowScanConfig(opts ...Option) (*Config, error) {
 	return New(ModeSyntaxFlowScan, opts...)
 }
 
 func (c *Config) IsSyntaxFlowScanConfig() bool {
 	return c.Mode == ModeSyntaxFlowScan
+}
+
+// default factory functions - used by With... option helpers to create nested configs
+func defaultCodeSourceConfig() *CodeSourceInfo {
+	return &CodeSourceInfo{}
+}
+
+func defaultSSACompileConfig() *SSACompileConfig {
+	return &SSACompileConfig{
+		StrictMode:    false,
+		PeepholeSize:  0,
+		ExcludeFiles:  []string{},
+		ReCompile:     false,
+		MemoryCompile: false,
+		Concurrency:   1,
+	}
+}
+
+func defaultSyntaxFlowConfig() *SyntaxFlowConfig {
+	return &SyntaxFlowConfig{
+		Memory:         false,
+		ResultSaveKind: SFResultSaveNone,
+	}
+}
+
+func defaultSyntaxFlowScanConfig() *SyntaxFlowScanConfig {
+	return &SyntaxFlowScanConfig{
+		IgnoreLanguage: false,
+		Language:       []string{},
+		Concurrency:    5,
+	}
+}
+
+func defaultBaseInfo() *BaseInfo {
+	return &BaseInfo{}
+}
+
+func defaultSyntaxFlowRuleConfig() *SyntaxFlowRuleConfig {
+	return &SyntaxFlowRuleConfig{}
 }
 
 // --- ExtraInfo 扩展信息 Get/Set 方法 ---
