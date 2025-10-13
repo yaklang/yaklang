@@ -205,8 +205,7 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-003"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -257,8 +256,7 @@ func TestRAGIndexingVerification(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-004-rag"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -308,8 +306,7 @@ func TestSearchBySemantics(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-005"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -344,8 +341,7 @@ func TestSearchByScoreVector(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-006-vector"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -396,8 +392,7 @@ func TestSearchByScores(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-007"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -435,8 +430,7 @@ func TestSearchByTags(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-008"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -478,8 +472,7 @@ func TestGetAllTags(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-009"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -510,8 +503,7 @@ func TestGetDynamicContextWithTags(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-010"
 
-	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+	// 清理测试数据
 	defer cleanupTestData(t, sessionID)
 
 	mem, err := NewAIMemory(sessionID,
@@ -538,8 +530,7 @@ func TestGetDynamicContextWithTags(t *testing.T) {
 	assert.Contains(t, context, "已存储的记忆领域标签")
 }
 
-// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
+// 清理测试数据
 func cleanupTestData(t *testing.T, sessionID string) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
