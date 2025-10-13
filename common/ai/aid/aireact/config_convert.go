@@ -1,8 +1,10 @@
 package aireact
 
 import (
+	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -79,6 +81,13 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []Option {
 	if len(i.GetIncludeSuggestedToolKeywords()) > 0 {
 		opts = append(opts, WithToolKeywords(i.GetIncludeSuggestedToolKeywords()...))
 	}
-
+	if i.GetAIService() != "" {
+		chat, err := ai.LoadChater(i.GetAIService())
+		if err != nil {
+			log.Errorf("load ai service failed: %v", err)
+		} else {
+			opts = append(opts, WithAICallback(aicommon.AIChatToAICallbackType(chat)))
+		}
+	}
 	return opts
 }
