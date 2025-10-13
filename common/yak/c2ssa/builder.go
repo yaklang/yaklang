@@ -112,9 +112,7 @@ func (*SSABuilder) GetLanguage() consts.Language {
 }
 
 func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
-	parser := cparser.NewCParser(nil)
-	lexer := cparser.NewCLexer(nil)
-	return s.CreateAntlrCache(parser.BaseParser, lexer.BaseLexer)
+	return s.CreateAntlrCache(cparser.GetLexerSerializedATN(), cparser.GetParserSerializedATN())
 }
 
 func (s *SSABuilder) FilterParseAST(path string) bool {
