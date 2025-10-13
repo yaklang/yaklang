@@ -234,13 +234,19 @@ func (f *Function) Finish() {
 		t := p.GetType()
 		return t
 	})
-	funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
-		inst, ok := f.GetValueById(i)
-		if !ok {
-			return nil, false
-		}
-		return ToReturn(inst)
-	}), funType)
+	// 优先使用显式设置的返回类型（如 TypeScript 的类型注解）
+	// 否则从 return 语句中推导
+	if f.currentReturnType != nil {
+		funType.ReturnType = f.currentReturnType
+	} else {
+		funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
+			inst, ok := f.GetValueById(i)
+			if !ok {
+				return nil, false
+			}
+			return ToReturn(inst)
+		}), funType)
+	}
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
 	funType.ParameterLen = f.ParamLength

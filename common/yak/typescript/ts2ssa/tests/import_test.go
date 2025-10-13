@@ -41,18 +41,17 @@ go0p()
 
 func TestDefaultImport(t *testing.T) {
 	vf := filesys.NewVirtualFs()
-	vf.AddFile("src/math.ts", `
-export default function calculate(): number {
-	return 100;
-}
-`)
 	vf.AddFile("src/app.ts", `
 import calculate from './math';
 
 const result = calculate();
 console.log(result);
 `)
-
+	vf.AddFile("src/math.ts", `
+export default function calculate(): number {
+	return 100;
+}
+`)
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		console.log(* #-> as $output)
 	`, map[string][]string{
@@ -111,7 +110,7 @@ console.log(helper());
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		console.log(* #-> as $outputs)
 	`, map[string][]string{
-		"outputs": {"30", "\"2.0\"", "\"helper\""},
+		"outputs": {"20", "10", "\"2.0\"", "\"helper\""},
 	}, false, ssaapi.WithLanguage(ssaapi.TS),
 	)
 }
@@ -147,8 +146,8 @@ console.log(button.getText());
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		console.log(* #-> as $text)
 	`, map[string][]string{
-		"text": {"\"Click me\""},
-	}, false, ssaapi.WithLanguage(ssaapi.TS),
+		"text": {"\"Click me\"", "\"clicked\""},
+	}, true, ssaapi.WithLanguage(ssaapi.TS),
 	)
 }
 
@@ -200,8 +199,8 @@ processFile('test.txt');
 		readFile as $readFileFunc
 		path as $pathModule
 	`, map[string][]string{
-		"readFileFunc": {"import { readFile } from 'fs';"},
-		"pathModule":   {"import path from 'path';"},
+		"readFileFunc": {"readFile"},
+		"pathModule":   {"path"},
 	}, ssaapi.WithLanguage(consts.TS))
 }
 
@@ -271,7 +270,7 @@ service.getData().then(data => {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		console.log(* #-> as $processed)
 	`, map[string][]string{
-		"processed": {"ParameterMember-parameterMember"},
+		"processed": {"sample data"},
 	}, true, ssaapi.WithLanguage(ssaapi.TS))
 }
 
@@ -298,7 +297,7 @@ console.log(MathUtils.PI);
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 			console.log(* #-> as $values)
 		`, map[string][]string{
-			"values": {"50", "3.14159"},
+			"values": {"5", "10", "3.14159"},
 		}, false, ssaapi.WithLanguage(ssaapi.TS))
 	})
 
@@ -323,13 +322,19 @@ console.log(user.getInfo());
 		ssatest.CheckSyntaxFlowWithFS(t, vf, `
 			console.log(* #-> as $info)
 		`, map[string][]string{
-			"info": {"ParameterMember-parameterMember"},
+			"info": {"\" is \"", "\" years old\"", "\"John\"", "25"},
 		}, true, ssaapi.WithLanguage(ssaapi.TS))
 	})
 }
 
 func TestImportEnum(t *testing.T) {
 	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main.ts", `
+import { Color, Status } from './enums/Color';
+
+console.log(Color.Red);
+console.log(Status.Approved);
+`)
 	vf.AddFile("src/enums/Color.ts", `
 export enum Color {
 	Red = "red",
@@ -343,12 +348,6 @@ export enum Status {
 	Rejected = 3
 }
 `)
-	vf.AddFile("src/main.ts", `
-import { Color, Status } from './enums/Color';
-
-console.log(Color.Red);
-console.log(Status.Approved);
-`)
 
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		console.log(* #-> as $enumValues)
@@ -356,3 +355,40 @@ console.log(Status.Approved);
 		"enumValues": {"\"red\"", "2"},
 	}, false, ssaapi.WithLanguage(ssaapi.TS))
 }
+
+// TODO: Fix environment lost in lazy build lazy build not contain full variable table context
+//func TestImportEnumRecursive(t *testing.T) {
+//	vf := filesys.NewVirtualFs()
+//	vf.AddFile("src/main.ts", `
+//import { Color, Status } from './enums/colors';
+//
+//console.log(Color.Red);
+//console.log(Status.Approved);
+//`)
+//	vf.AddFile("src/enums/colors.ts", `
+//import { Palette } from './palette';
+//
+//export enum Color {
+//  Red = Palette.SlotA,   // 二层递归来源
+//  Green = "green",
+//  Blue = "blue",
+//}
+//
+//export enum Status {
+//  Pending = 1,
+//  Approved = 2,
+//  Rejected = 3
+//}
+//`)
+//	vf.AddFile("src/enums/palette.ts", `
+//export const enum Palette {
+//  SlotA = "red"
+//}
+//`)
+//
+//	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+//		console.log(* #-> as $enumValues)
+//	`, map[string][]string{
+//		"enumValues": {"Undefined-Palette", "2"},
+//	}, false, ssaapi.WithLanguage(ssaapi.TS))
+//}

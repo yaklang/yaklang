@@ -227,6 +227,8 @@ func (b *builder) getModuleExportValue(modulePath, exportName string) ssa.Value 
 		return b.EmitUndefined(fmt.Sprintf("module_%s_not_loaded", modulePath))
 	}
 
+	err := b.GetProgram().ImportTypeFromLib(moduleProgram, exportName, nil)
+	_ = err
 	// 从模块的ExportValue中获取导出值
 	if exportValue := moduleProgram.GetExportValue(exportName); exportValue != nil {
 		return exportValue
@@ -297,7 +299,7 @@ func (b *builder) assignImportedValue(localName, exportName, modulePath string, 
 	_ = value
 
 	// 创建变量并赋值
-	variable := b.CreateVariable(localName)
+	variable := b.CreateJSVariable(localName)
 	b.AssignVariable(variable, value)
 
 	log.Infof("Import binding: %s -> %s from %s (external: %t)", localName, exportName, modulePath, isExternal)
@@ -352,4 +354,8 @@ func (b *builder) createLocalNamespaceObject(modulePath string) ssa.Value {
 	}
 
 	return namespaceObj
+}
+
+func ShouldVisit(isPreHandle, isExport bool) bool {
+	return isExport == isPreHandle
 }

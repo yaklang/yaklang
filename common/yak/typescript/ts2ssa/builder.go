@@ -41,7 +41,8 @@ type builder struct {
 
 	currentImportModule               string
 	unresolvedCurrentImportModulePath string
-	namedExports                      map[string]string            // exportedName -> realName (exportedName may not be the same as realName in case of export alias)
+	namedValueExports                 map[string]string // exportedName -> realName (exportedName may not be the same as realName in case of export alias)
+	namedTypeExports                  map[string]string
 	cjsExport                         string                       // export equal + require syntax only support one export per ts file
 	reExports                         map[string]map[string]string // re-exported name -> (path -> exportName)
 
@@ -64,7 +65,8 @@ func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error 
 		sourceFile:        jsAST,
 		useStrict:         false,
 		contextLabelStack: make([]string, 0),
-		namedExports:      make(map[string]string),
+		namedValueExports: make(map[string]string),
+		namedTypeExports:  make(map[string]string),
 		reExports:         make(map[string]map[string]string),
 	}
 	build.VisitSourceFile(jsAST)
