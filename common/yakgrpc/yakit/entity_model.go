@@ -220,6 +220,16 @@ func AddRelationship(db *gorm.DB, sourceIndex, targetIndex, baseIndex, Relations
 	return &Relationship, err
 }
 
+func GetRelationshipByUUID(db *gorm.DB, uuid string) (*schema.ERModelRelationship, error) {
+	db = db.Model(&schema.ERModelRelationship{})
+	var relationship schema.ERModelRelationship
+	err := db.Where("uuid = ?", uuid).First(&relationship).Error
+	if err != nil {
+		return nil, utils.Errorf("get KnowledgeBase failed: %s", err)
+	}
+	return &relationship, nil
+}
+
 func GetOutgoingRelationships(db *gorm.DB, entity *schema.ERModelEntity) ([]*schema.ERModelRelationship, error) {
 	var relationships []*schema.ERModelRelationship
 	if err := db.Model(&schema.ERModelRelationship{}).Where("source_entity_index = ?", entity.Uuid).Find(&relationships).Error; err != nil {
