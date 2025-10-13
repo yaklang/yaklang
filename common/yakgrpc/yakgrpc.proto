@@ -968,6 +968,11 @@ service Yak {
   // Export and Import Knowledge Base
   rpc ExportKnowledgeBase(ExportKnowledgeBaseRequest) returns (stream GeneralProgress);
   rpc ImportKnowledgeBase(ImportKnowledgeBaseRequest) returns (stream GeneralProgress);
+
+  rpc AddMCPServer(AddMCPServerRequest) returns (GeneralResponse);
+  rpc DeleteMCPServer(DeleteMCPServerRequest) returns (GeneralResponse);
+  rpc UpdateMCPServer(UpdateMCPServerRequest) returns (GeneralResponse);
+  rpc GetAllMCPServers(GetAllMCPServersRequest) returns (GetAllMCPServersResponse);
 }
 
 message ExportKnowledgeBaseRequest {
@@ -984,6 +989,62 @@ message GeneralProgress {
   double Percent = 1;
   string Message = 2;
   string MessageType = 3;
+}
+
+message AddMCPServerRequest {
+  string Name = 1;
+  string Type = 2;
+  string URL = 3;
+  string Command = 4;
+}
+
+message DeleteMCPServerRequest {
+  int64 ID = 1;
+}
+
+message UpdateMCPServerRequest {
+  int64 ID = 1;
+  string Name = 2;
+  string Type = 3;
+  string URL = 4;
+  string Command = 5;
+}
+
+// 支持分页查询
+message GetAllMCPServersRequest {
+  string Keyword = 1;
+  int64 ID = 2;
+  Paging Pagination = 3;
+  bool IsShowToolList = 4;
+}
+
+message MCPServerToolParamInfo {
+  string Type = 1;
+  string Description = 2;
+  string Default = 3;
+  bool Required = 4;
+  string Name = 5;
+}
+
+message MCPServerTool {
+  string Name = 1;
+  string Description = 2;
+  repeated MCPServerToolParamInfo Params = 3;
+}
+
+message MCPServer {
+  int64 ID = 1;
+  string Name = 2;
+  string Type = 3;
+  string URL = 4;
+  string Command = 5;
+  repeated MCPServerTool Tools = 6;
+}
+
+message GetAllMCPServersResponse {
+  repeated MCPServer MCPServers = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
 }
 
 message EntityRepository {
