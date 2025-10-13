@@ -3,6 +3,9 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -67,7 +70,19 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 			"dump":          r.DumpTimeline(),
 		})
 		return nil
-
+	case SYNC_TYPE_UPDATE_CONFIG:
+		if event.Params.GetAIService() != "" {
+			chat, err := ai.LoadChater(event.Params.GetAIService())
+			if err != nil {
+				r.EmitError("load ai service failed: %v", err)
+			} else {
+				r.config.aiCallback = aicommon.AIChatToAICallbackType(chat)
+			}
+		}
+		if event.Params.GetReviewPolicy() != "" {
+			r.config.reviewPolicy = aicommon.AgreePolicyType(event.Params.GetReviewPolicy())
+		}
+		return nil
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
