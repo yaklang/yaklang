@@ -14,7 +14,6 @@ import (
 
 func TestEntityRepository_Basic(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	repoName := "test_repo"
 	repoDesc := "desc"
@@ -68,7 +67,6 @@ func TestEntityRepository_Basic(t *testing.T) {
 
 func TestEntityRepository_VectorSearchEntity(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	mockEmbedding := rag.NewDefaultMockEmbedding()
 
@@ -105,7 +103,6 @@ func TestEntityRepository_VectorSearchEntity(t *testing.T) {
 
 func TestEntityRepository_MergeAndSaveEntity(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	mockEmbedding := rag.NewDefaultMockEmbedding()
 	repo, err := GetOrCreateEntityRepository(db, "merge_repo", "desc", rag.WithEmbeddingClient(mockEmbedding), WithDisableBulkProcess(), WithSimilarityThreshold(0.6))
@@ -167,7 +164,6 @@ func TestEntityRepository_MergeAndSaveEntity(t *testing.T) {
 
 func TestSaveEndpoint_Basic(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	mockEmbedding := rag.NewDefaultMockEmbedding()
 	repo, err := GetOrCreateEntityRepository(db, "saveendpoint_repo", "desc", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
@@ -216,7 +212,6 @@ func TestSaveEndpoint_Basic(t *testing.T) {
 
 func TestSaveEndpoint_WaitIndex(t *testing.T) {
 	db := setupTestDB(t)
-	defer db.Close()
 
 	mockEmbedding := rag.NewDefaultMockEmbedding()
 	repo, err := GetOrCreateEntityRepository(db, "saveendpoint_repo2", "desc", WithDisableBulkProcess(), rag.WithEmbeddingClient(mockEmbedding))
