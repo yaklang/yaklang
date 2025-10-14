@@ -1,14 +1,9 @@
 package sfreport
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 type ReportType string
@@ -74,117 +69,4 @@ func GetValueByRisk(ssarisk *schema.SSARisk) (*ssaapi.Value, error) {
 	}
 
 	return value, nil
-}
-
-// GenerateDataFlowAnalysis generates comprehensive data flow analysis for a risk
-func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*DataFlowPath, error) {
-	if risk.ResultID == 0 || risk.Variable == "" {
-		return nil, utils.Errorf("risk has no valid result ID or variable")
-	}
-
-	var value *ssaapi.Value
-	if len(values) > 0 {
-		value = values[0]
-	}
-
-	if utils.IsNil(value) {
-		var err error
-		value, err = GetValueByRisk(risk)
-		if err != nil {
-			return nil, utils.Errorf("get value by risk failed: %v", err)
-		}
-	}
-
-	dotGraph := ssaapi.NewDotGraph()
-	value.GenerateGraph(dotGraph)
-	nodes, edges := coverNodeAndEdgeInfos(dotGraph, risk.ProgramName, risk)
-
-	path := &DataFlowPath{
-		PathID:      fmt.Sprintf("path_%d", risk.ID),
-		Description: generatePathDescription(risk),
-		Nodes:       nodes,
-		Edges:       edges,
-		DotGraph:    dotGraph.String(),
-	}
-
-	return path, nil
-}
-
-// generatePathDescription generates a description for the data flow path
-func generatePathDescription(risk *schema.SSARisk) string {
-	return fmt.Sprintf("Data flow path for %s vulnerability in %s", risk.RiskType, risk.ProgramName)
-}
-
-// coverNodeAndEdgeInfos converts graph nodes and edges to NodeInfo and EdgeInfo
-func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, programName string, risk *schema.SSARisk) ([]*NodeInfo, []*EdgeInfo) {
-	nodes := make([]*NodeInfo, 0, graph.NodeCount())
-	edges := make([]*EdgeInfo, 0)
-
-	graph.ForEach(func(s string, v *ssaapi.Value) {
-		codeRange, source := ssaapi.CoverCodeRange(v.GetRange())
-		nodeInfo := &NodeInfo{
-			NodeID:          s,
-			IRCode:          v.String(),
-			SourceCode:      source,
-			SourceCodeStart: 0,
-			CodeRange:       codeRange,
-		}
-		nodes = append(nodes, nodeInfo)
-	})
-
-	edgeCache := make(map[string]struct{})
-	for edgeID, edge := range graph.Graph.GetAllEdges() {
-		if edge == nil {
-			continue
-		}
-
-		fromNode := edge.From()
-		toNode := edge.To()
-		if fromNode == nil || toNode == nil {
-			continue
-		}
-
-		hash := codec.Sha256(fmt.Sprintf(
-			"%d-%d-%s",
-			fromNode.ID(),
-			toNode.ID(),
-			edge.Label,
-		))
-		if _, ok := edgeCache[hash]; ok {
-			continue
-		}
-		edgeCache[hash] = struct{}{}
-
-		edgeInfo := &EdgeInfo{
-			EdgeID:      fmt.Sprintf("e%d", edgeID),
-			FromNodeID:  nodeId(fromNode.ID()),
-			ToNodeID:    nodeId(toNode.ID()),
-			EdgeType:    edge.Label,
-			Description: generateEdgeDescription(edge.Label),
-		}
-		edges = append(edges, edgeInfo)
-	}
-
-	return nodes, edges
-}
-
-// generateEdgeDescription generates description for edge types
-func generateEdgeDescription(edgeLabel string) string {
-	switch {
-	case strings.Contains(edgeLabel, "depend_on"):
-		return "The dependency edge in the dataflow, DependOn indicates which other values the current value depends on. For example, A DependOn B means Value A depends on Value B."
-	case strings.Contains(edgeLabel, "effect_on"):
-		return "Dependency edge in the dataflow, EffectOn indicates which other values the current value affects. For example, A EffectOn B means Value A affects Value B."
-	case strings.Contains(edgeLabel, "call"):
-		return "Function call"
-	case strings.Contains(edgeLabel, "search-exact"):
-		return "Search value from database exactly"
-	default:
-		return ""
-	}
-}
-
-// nodeId converts node ID to string format
-func nodeId(i int) string {
-	return fmt.Sprintf("n%d", i)
 }

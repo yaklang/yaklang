@@ -1,7 +1,6 @@
 package sfreport
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -162,17 +161,6 @@ func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) *File {
 	ret := NewFile(editor, r)
 	r.File = append(r.File, ret)
 	return ret
-}
-
-func ConvertRisksToJson(risks []*schema.SSARisk) ([]byte, error) {
-	reporter := NewReport(IRifyReportType)
-	reporter.AddSyntaxFlowRisks(risks)
-	var writer bytes.Buffer
-	err := reporter.PrettyWrite(&writer)
-	if err != nil {
-		return nil, err
-	}
-	return writer.Bytes(), nil
 }
 
 func ImportSSARiskFromJSON(jsonData []byte) error {
