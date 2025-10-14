@@ -233,3 +233,14 @@ func init() {
 	)
 
 }
+
+func SimpleBuildEntityFilter(reposName string, entityTypes, names, HiddenIndex, keywords []string) *ypb.EntityFilter {
+	filter := &ypb.EntityFilter{
+		ReposName:   reposName,
+		Types:       entityTypes,
+		Names:       names,
+		HiddenIndex: HiddenIndex,
+		Keywords:    keywords,
+	}
+	return filter
+}
