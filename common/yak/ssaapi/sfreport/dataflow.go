@@ -26,9 +26,10 @@ type NodeInfo struct {
 	CodeRange       *ssaapi.CodeRange `json:"code_range"`
 
 	// for audit
-	IRSouceHash string `json:"ir_source_hash"`
-	StartOffset int    `json:"start_offset"`
-	EndOffset   int    `json:"end_offset"`
+	IRSourceHash string `json:"ir_source_hash"`
+	StartOffset  int    `json:"start_offset"`
+	EndOffset    int    `json:"end_offset"`
+	IsEntryNode  bool   `json:"is_entry_node"`
 }
 
 type EdgeInfo struct {
@@ -62,7 +63,7 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*D
 	// 但是好像又不影响最后查看结果
 	dotGraph := ssaapi.NewDotGraph()
 	value.GenerateGraph(dotGraph)
-	nodes, edges := coverNodeAndEdgeInfos(dotGraph, risk.ProgramName, risk)
+	nodes, edges := coverNodeAndEdgeInfos(dotGraph, value)
 
 	path := &DataFlowPath{
 		Description: generatePathDescription(risk),
@@ -73,13 +74,11 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*D
 	return path, nil
 }
 
-// generatePathDescription generates a description for the data flow path
 func generatePathDescription(risk *schema.SSARisk) string {
 	return fmt.Sprintf("Data flow path for %s vulnerability in %s", risk.RiskType, risk.ProgramName)
 }
 
-// coverNodeAndEdgeInfos converts graph nodes and edges to NodeInfo and EdgeInfo
-func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, programName string, risk *schema.SSARisk) ([]*NodeInfo, []*EdgeInfo) {
+func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]*NodeInfo, []*EdgeInfo) {
 	nodes := make([]*NodeInfo, 0, graph.NodeCount())
 	edges := make([]*EdgeInfo, 0)
 
@@ -97,8 +96,9 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, programName string, risk *sch
 			CodeRange:       codeRange,
 			StartOffset:     rng.GetStartOffset(),
 			EndOffset:       rng.GetEndOffset(),
+			IsEntryNode:     entryValue != nil && v == entryValue,
 		}
-		nodeInfo.IRSouceHash = rng.GetEditor().GetIrSourceHash()
+		nodeInfo.IRSourceHash = rng.GetEditor().GetIrSourceHash()
 		nodes = append(nodes, nodeInfo)
 	})
 
@@ -114,7 +114,7 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, programName string, risk *sch
 			continue
 		}
 
-		hash := codec.Sha256(fmt.Sprintf(
+		hash := codec.Md5(fmt.Sprintf(
 			"%d-%d-%s",
 			fromNode.ID(),
 			toNode.ID(),
@@ -146,10 +146,10 @@ func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
 		AuditNodeStatus: ssadb.AuditNodeStatus{
 			RiskHash: riskHash,
 		},
-		IsEntryNode:      true,
+		IsEntryNode:      n.IsEntryNode,
 		IRCodeID:         -1,
 		TmpValue:         n.IRCode,
-		TmpValueFileHash: n.IRSouceHash,
+		TmpValueFileHash: n.IRSourceHash,
 	}
 	if n.CodeRange != nil {
 		an.TmpStartOffset = n.StartOffset
