@@ -59,14 +59,13 @@ var reactiveData string
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG,
-		func(r aicommon.AIInvokeRuntime) (*reactloops.ReActLoop, error) {
+		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			config := r.GetConfig()
 			aikbPath := config.GetConfigString("aikb_path")
 			docSearcher := createDocumentSearcher(aikbPath)
 			filename := r.EmitFileArtifactWithExt("gen_code", ".yak", "")
-			return reactloops.NewReActLoop(
-				schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG,
-				r,
+
+			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
@@ -340,7 +339,10 @@ summary 回答的内容需要为：
 						}
 					},
 				),
-			)
+			}
+
+			preset = append(preset, opts...)
+			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG, r, preset...)
 		},
 	)
 	if err != nil {

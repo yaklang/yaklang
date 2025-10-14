@@ -17,10 +17,8 @@ var outputExample string
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
-		func(r aicommon.AIInvokeRuntime) (*reactloops.ReActLoop, error) {
-			loop, err := reactloops.NewReActLoop(
-				schema.AI_REACT_LOOP_NAME_DEFAULT,
-				r,
+		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
+			preset := []reactloops.ReActLoopOption{
 				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowAIForge(true),
@@ -30,7 +28,9 @@ func init() {
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithReflectionOutputExample(outputExample),
 				reactloops.WithActionFactoryFromLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG),
-			)
+			}
+			preset = append(preset, opts...)
+			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err
 		},
 	)

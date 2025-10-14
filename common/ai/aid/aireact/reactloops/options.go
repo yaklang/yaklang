@@ -222,6 +222,19 @@ func WithActionFactoryFromLoop(name string) ReActLoopOption {
 	}
 }
 
+func WithOnAsyncTaskFinished(fn func(task aicommon.AIStatefulTask)) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.onAsyncTaskFinished = fn
+	}
+}
+
+// WithOnPostIteraction sets a callback function that is called after each iteration of the ReAct loop.
+func WithOnPostIteraction(fn func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any)) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.onPostIteration = fn
+	}
+}
+
 func WithInitTask(initHandler func(task aicommon.AIStatefulTask)) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.initHandler = initHandler
