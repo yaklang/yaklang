@@ -1,7 +1,9 @@
 package aimem
 
 import (
+	"bytes"
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -29,6 +31,30 @@ type MemoryEntity struct {
 
 	// designed for rag searching
 	PotentialQuestions []string
+}
+
+func (r *MemoryEntity) String() string {
+	var buf bytes.Buffer
+	buf.WriteString("MemoryEntity{\n")
+	buf.WriteString("  ID: " + r.Id + "\n")
+	buf.WriteString("  Content: " + r.Content + "\n")
+	buf.WriteString("  Tags: ")
+	for i, tag := range r.Tags {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(tag)
+	}
+	buf.WriteString("\n")
+	buf.WriteString("  C.O.R.E. P.A.C.T. Scores:\n")
+	buf.WriteString(fmt.Sprintf("    C=%.2f, O=%.2f, R=%.2f, E=%.2f, P=%.2f, A=%.2f, T=%.2f\n",
+		r.C_Score, r.O_Score, r.R_Score, r.E_Score, r.P_Score, r.A_Score, r.T_Score))
+	buf.WriteString("  Potential Questions:\n")
+	for _, question := range r.PotentialQuestions {
+		buf.WriteString("    - " + question + "\n")
+	}
+	buf.WriteString("}")
+	return buf.String()
 }
 
 // SearchResult 搜索结果

@@ -84,6 +84,26 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 		reactloops.WithOnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(nil)
 		}),
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+			diffStr, err := r.timelineDiffer.Diff()
+			if err != nil {
+				log.Warnf("timeline differ call failed: %v", err)
+				return
+			}
+			go func() {
+				entities, err := r.memoryTriage.AddRawText(diffStr)
+				if err != nil {
+					log.Warnf("memory triage call failed: %v", err)
+				} else {
+					if r.config.debugEvent {
+						log.Infof("memory triage added entities: %v", entities)
+					}
+					for _, e := range entities {
+						log.Infof("memory triage content: %v", e.String())
+					}
+				}
+			}()
+		}),
 	)
 	if err != nil {
 		return false, utils.Errorf("failed to create main loop runtime instance: %v", err)
