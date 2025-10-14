@@ -40,8 +40,9 @@ func UpdateMCPServer(db *gorm.DB, id int64, server *schema.MCPServer) error {
 	if server == nil {
 		return utils.Errorf("mcp server is nil")
 	}
-
-	return db.Model(&schema.MCPServer{}).Where("id = ?", id).Updates(server).Error
+	copyServer := *server
+	copyServer.ID = uint(id)
+	return db.Model(&schema.MCPServer{}).Save(&copyServer).Error
 }
 
 // DeleteMCPServer 删除MCP服务器
@@ -85,6 +86,11 @@ func QueryMCPServers(db *gorm.DB, req *ypb.GetAllMCPServersRequest) (*bizhelper.
 	// 根据ID过滤
 	if req.GetID() > 0 {
 		db = db.Model(&schema.MCPServer{}).Where("id = ?", req.GetID())
+	}
+
+	// 根据启用状态过滤
+	if req.GetIsEnable() {
+		db = db.Where("enable = ?", true)
 	}
 
 	// 关键词搜索（在name、type、url、command字段中搜索）

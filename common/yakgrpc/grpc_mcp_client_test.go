@@ -261,7 +261,6 @@ func TestMCPServerDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("创建临时数据库失败: %v", err)
 	}
-	db = db.Debug()
 	// 确保数据库表存在
 	db.AutoMigrate(&schema.MCPServer{})
 
@@ -351,6 +350,29 @@ func TestMCPServerDatabase(t *testing.T) {
 		_, err = yakit.GetMCPServer(db, 99999)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
+	})
+	t.Run("UpdateEnableTest", func(t *testing.T) {
+		// 测试启用状态
+		server := &schema.MCPServer{
+			Name:    "enable-test-server",
+			Type:    "stdio",
+			Command: "cmd",
+			Enable:  true,
+		}
+		err := yakit.CreateMCPServer(db, server)
+		require.NoError(t, err)
+		assert.Equal(t, true, server.Enable)
+		assert.Equal(t, "enable-test-server", server.Name)
+		assert.Equal(t, "stdio", server.Type)
+		assert.Equal(t, "cmd", server.Command)
+
+		server.Enable = false
+		err = yakit.UpdateMCPServer(db, int64(server.ID), server)
+		require.NoError(t, err)
+
+		updated, err := yakit.GetMCPServer(db, int64(server.ID))
+		require.NoError(t, err)
+		assert.Equal(t, false, updated.Enable)
 	})
 }
 

@@ -13,6 +13,7 @@ type MCPServer struct {
 	Type    string `gorm:"index;not null" json:"type"` // 服务器类型 (stdio/sse)
 	URL     string `gorm:"type:text" json:"url"`       // 服务器URL (for sse type)
 	Command string `gorm:"type:text" json:"command"`   // 启动命令 (for stdio type)
+	Enable  bool   `gorm:"default:true" json:"enable"` // 是否启用
 }
 
 func (m *MCPServer) TableName() string {
@@ -27,6 +28,7 @@ func (m *MCPServer) ToGRPC() *ypb.MCPServer {
 		Type:    m.Type,
 		URL:     m.URL,
 		Command: m.Command,
+		Enable:  m.Enable,
 		Tools:   []*ypb.MCPServerTool{}, // 工具列表将在需要时动态获取
 	}
 }
@@ -39,6 +41,7 @@ func (m *MCPServer) ToGRPCWithTools(tools []*ypb.MCPServerTool) *ypb.MCPServer {
 		Type:    m.Type,
 		URL:     m.URL,
 		Command: m.Command,
+		Enable:  m.Enable,
 		Tools:   tools,
 	}
 }
