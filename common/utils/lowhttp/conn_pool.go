@@ -82,6 +82,11 @@ func (l *LowHttpConnPool) clear() {
 	}
 }
 
+// Clear clears all connections in the pool (public method)
+func (l *LowHttpConnPool) Clear() {
+	l.clear()
+}
+
 func (l *LowHttpConnPool) contextDone() bool {
 	select {
 	case <-l.ctx.Done():

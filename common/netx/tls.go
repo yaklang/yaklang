@@ -216,10 +216,13 @@ func LoadCertificatesConfig(i any) error {
 			ret.GetClientCertificate = func(info *utls.CertificateRequestInfo) (*utls.Certificate, error) {
 				for _, cert := range certs {
 					err := info.SupportsCertificate(&cert)
-					if err != nil {
-						continue
+					if err == nil {
+						return &cert, nil
 					}
-					return &cert, nil
+					if strings.Contains(err.Error(), "chain is not signed by an acceptable CA") && IsUTLSCertCAMatch(cert, info) {
+						return &cert, nil
+					}
+					continue
 				}
 				return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(certs), info.Version)
 			}
@@ -236,10 +239,13 @@ func LoadCertificatesConfig(i any) error {
 				}
 				for _, cert := range presetUClientCertificates {
 					err := info.SupportsCertificate(&cert)
-					if err != nil {
-						continue
+					if err == nil {
+						return &cert, nil
 					}
-					return &cert, nil
+					if strings.Contains(err.Error(), "chain is not signed by an acceptable CA") && IsUTLSCertCAMatch(cert, info) {
+						return &cert, nil
+					}
+					continue
 				}
 				return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(presetClientCertificates), info.Version)
 			}
@@ -308,4 +314,25 @@ func ResetPresetCertificates() {
 	presetUClientCertificates = presetUClientCertificates[:0]
 	hostCertMappings = hostCertMappings[:0]
 	clientRootCA = x509.NewCertPool()
+}
+
+func IsUTLSCertCAMatch(chain utls.Certificate, certReq *utls.CertificateRequestInfo) bool {
+	for j, cert := range chain.Certificate {
+		x509Cert := chain.Leaf
+		// parse the certificate if this isn't the leaf
+		// node, or if chain.Leaf was nil
+		if j != 0 || x509Cert == nil {
+			var err error
+			if x509Cert, err = x509.ParseCertificate(cert); err != nil {
+				return false
+			}
+		}
+		for _, ca := range certReq.AcceptableCAs {
+			if !gmtls.IsCertificateIssuerDNMatch(x509Cert.RawIssuer, ca) {
+				continue
+			}
+			return true
+		}
+	}
+	return false
 }

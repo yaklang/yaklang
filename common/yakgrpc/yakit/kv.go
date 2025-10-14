@@ -381,7 +381,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 
 	consts.SetGlobalTLSMaxVersion(uint16(c.GetMaxTlsVersion()))
 	consts.SetGlobalTLSMinVersion(uint16(c.GetMinTlsVersion()))
-
+	netx.ResetPresetCertificates()
 	for _, certs := range c.GetClientCertificates() {
 		if len(certs.GetPkcs12Bytes()) > 0 {
 			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()), certs.GetHost())

@@ -1,6 +1,9 @@
 package minimartian
 
 import (
+	"io"
+	"net/http"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian/proxyutil"
@@ -8,8 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"io"
-	"net/http"
 )
 
 func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, error) {
@@ -78,6 +79,11 @@ func (p *Proxy) execLowhttp(req *http.Request) (*http.Response, error) {
 		lowhttp.WithNativeHTTPRequestInstance(req),
 		lowhttp.WithMaxContentLength(MaxContentLength),
 	)
+
+	// Use custom connection pool if available
+	if p.connPool != nil {
+		opts = append(opts, lowhttp.ConnPool(p.connPool))
+	}
 
 	if p.dialer != nil {
 		opts = append(opts, lowhttp.WithDialer(p.dialer))
