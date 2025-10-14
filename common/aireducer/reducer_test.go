@@ -1529,10 +1529,10 @@ Line 10 wraps everything up nicely`
 
 		// 使用非常小的chunk size来强制分割
 		reducer, err := NewReducerFromString(complexData,
-			WithLines(5),                                 // 5行per chunk
-			WithSeparatorTrigger("\n"),                   // 换行符触发
+			WithLines(5),               // 5行per chunk
+			WithSeparatorTrigger("\n"), // 换行符触发
 			WithTimeTriggerInterval(50*time.Millisecond), // 时间触发
-			WithChunkSize(40),                            // 很小的chunk size，应该覆盖所有其他选项
+			WithChunkSize(40), // 很小的chunk size，应该覆盖所有其他选项
 			WithReducerCallback(func(config *Config, memory *aid.PromptContextProvider, chunk chunkmaker.Chunk) error {
 				mu.Lock()
 				chunks = append(chunks, string(chunk.Data()))
