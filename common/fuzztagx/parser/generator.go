@@ -356,7 +356,7 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 	ctx, cancel := context.WithCancel(ctx)
 	cfg := &GenerateConfig{
 		ctx:       ctx,
-		swg:       utils.NewSizedWaitGroup(100), // 限制并发100
+		swg:       utils.NewSizedWaitGroup(-1), // 限制并发100
 		cancelCtx: cancel,
 		logger:    log.GetLogger("fuzztag"),
 	}
