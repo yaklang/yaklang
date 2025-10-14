@@ -313,6 +313,14 @@ func QuerySSARiskCount(DB *gorm.DB, filter *ypb.SSARisksFilter) (int, error) {
 	return count, db.Error
 }
 
+func QuerySSARiskByRiskHash(db *gorm.DB, riskHash string) (*schema.SSARisk, error) {
+	var r schema.SSARisk
+	if db := db.Model(&schema.SSARisk{}).Where("hash = ?", riskHash).First(&r); db.Error != nil {
+		return nil, utils.Errorf("get Risk failed: %s", db.Error)
+	}
+	return &r, nil
+}
+
 func YieldSSARisk(db *gorm.DB, ctx context.Context) chan *schema.SSARisk {
 	return bizhelper.YieldModel[*schema.SSARisk](ctx, db, bizhelper.WithYieldModel_PageSize(100))
 }
