@@ -159,3 +159,12 @@ Severity: %s
 Description: %s
 `, s.ID, s.Hash, s.Title, s.RiskType, s.Severity, s.Description)
 }
+
+// Ref : func (info *SyntaxFlowDescInfo) String()
+// common/schema/syntaxflow_rule.go:191
+func (s *SSARisk) GetAlertMsg() string {
+	if s.Details != "" {
+		return s.Description
+	}
+	return fmt.Sprintf("%s: %s", s.Title, s.Description)
+}
