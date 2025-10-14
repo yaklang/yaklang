@@ -1,6 +1,7 @@
 package yak
 
 import (
+	"github.com/yaklang/yaklang/common/schema"
 	"path/filepath"
 
 	"github.com/google/uuid"
@@ -65,17 +66,20 @@ var RagExports = map[string]interface{}{
 		rag.IsMockMode = true
 	},
 
-	"ctx":                       aiforge.WithAnalyzeContext,    // use for analyzeContext
-	"log":                       aiforge.WithAnalyzeLog,        // use for analyzeLog
-	"statusCard":                aiforge.WithAnalyzeStatusCard, // use for analyzeStatusCard
-	"extraPrompt":               aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
-	"entryLength":               aiforge.RefineWithKnowledgeEntryLength,
-	"khopk":                     entityrepos.WithKHopK,
-	"khopLimit":                 entityrepos.WithKHopLimit,
-	"khopkMin":                  entityrepos.WithKHopKMin,
-	"khopkMax":                  entityrepos.WithKHopKMax,
-	"buildQuery":                entityrepos.WithRagQuery,
-	"buildFilter":               entityrepos.WithStartEntityFilter,
+	"ctx":             aiforge.WithAnalyzeContext,    // use for analyzeContext
+	"log":             aiforge.WithAnalyzeLog,        // use for analyzeLog
+	"statusCard":      aiforge.WithAnalyzeStatusCard, // use for analyzeStatusCard
+	"extraPrompt":     aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
+	"entryLength":     aiforge.RefineWithKnowledgeEntryLength,
+	"khopk":           entityrepos.WithKHopK,
+	"khopLimit":       entityrepos.WithKHopLimit,
+	"khopkMin":        entityrepos.WithKHopKMin,
+	"khopkMax":        entityrepos.WithKHopKMax,
+	"buildQuery":      entityrepos.WithRagQuery,
+	"buildFilter":     entityrepos.WithStartEntityFilter,
+	"pathDepth":       entityrepos.WithPathDepth,
+	"getEntityFilter": schema.SimpleBuildEntityFilter,
+
 	"BuildCollectionFromFile":   aiforge.BuildKnowledgeFromFile,
 	"BuildCollectionFromReader": aiforge.BuildKnowledgeFromReader,
 	"BuildCollectionFromRaw":    aiforge.BuildKnowledgeFromBytes,
