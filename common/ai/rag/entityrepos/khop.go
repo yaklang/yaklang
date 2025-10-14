@@ -215,6 +215,8 @@ type KHopConfig struct {
 	KMax      int
 	KHopLimit int
 
+	PathDepth int
+
 	StartFilter    *ypb.EntityFilter
 	RagQuery       string
 	IsRuntimeBuild bool // 是否只查询当前运行时的关系
@@ -251,10 +253,19 @@ func WithKHopKMin(kMin int) KHopQueryOption {
 	}
 }
 
-// WithKHopKMin 设置最小路径长度，最小值为2
+// WithKHopKMax 设置最大路径长度，最小值为2
 func WithKHopKMax(kMax int) KHopQueryOption {
 	return func(config *KHopConfig) {
 		config.KMax = kMax
+	}
+}
+
+func WithPathDepth(deep int) KHopQueryOption {
+	return func(config *KHopConfig) {
+		if deep < 1 { // 至少1层
+			deep = 1
+		}
+		config.PathDepth = deep
 	}
 }
 
@@ -377,7 +388,7 @@ func (r *EntityRepository) YieldKHopEx(ctx context.Context, startInput <-chan st
 
 // findAllPathSegments 找到所有可能的路径片段
 func (r *EntityRepository) findAllPathSegments(ctx context.Context, queryConfig *KHopConfig, resultCh *chanx.UnlimitedChan[*KHopPath], startUUID <-chan string) {
-	allPaths := r.findAllPaths(ctx, startUUID)
+	allPaths := r.findAllPaths(ctx, queryConfig, startUUID)
 
 	for {
 		select {
@@ -393,7 +404,7 @@ func (r *EntityRepository) findAllPathSegments(ctx context.Context, queryConfig 
 }
 
 // findAllPaths 使用DFS找到图中所有的路径（优化版本：直接在关系遍历中处理，只从源实体开始）
-func (r *EntityRepository) findAllPaths(ctx context.Context, startEntityChannel <-chan string) <-chan *HopBlock {
+func (r *EntityRepository) findAllPaths(ctx context.Context, queryConfig *KHopConfig, startEntityChannel <-chan string) <-chan *HopBlock {
 	var allPaths = chanx.NewUnlimitedChan[*HopBlock](ctx, 1000)
 
 	// 使用set来避免重复处理源实体（有向图）
@@ -423,7 +434,7 @@ func (r *EntityRepository) findAllPaths(ctx context.Context, startEntityChannel 
 					}
 
 					// 创建一个空的初始路径，第一个实体会在DFS中添加
-					r.dfsFindPathsOptimized(ctx, startEntity, visited, allPaths, nil)
+					r.dfsFindPathsOptimized(ctx, queryConfig, startEntity, visited, allPaths, nil)
 				}
 			}
 		}
@@ -435,7 +446,7 @@ func (r *EntityRepository) findAllPaths(ctx context.Context, startEntityChannel 
 
 // dfsFindPathsOptimized 优化的DFS算法，按需加载数据
 // 对于有向图，只沿着出边遍历，并使用路径级别的去重来避免环
-func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEntity *schema.ERModelEntity,
+func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, queryConfig *KHopConfig, currentEntity *schema.ERModelEntity,
 	visited map[string]bool, allPaths *chanx.UnlimitedChan[*HopBlock], currentPath *HopBlock) {
 
 	select {
@@ -450,6 +461,13 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 			Src:   currentEntity,
 			IsEnd: true,
 		}
+	}
+	pathLength := r.getPathLength(currentPath)
+	if pathLength >= queryConfig.PathDepth {
+		log.Debugf("Reached path deep limit for entity: %s, path length: %d", currentEntity.EntityName, pathLength)
+		pathCopy := r.copyHopBlock(currentPath)
+		allPaths.SafeFeed(pathCopy)
+		return
 	}
 
 	// 查找当前实体的出边关系（有向图）
@@ -509,7 +527,7 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, currentEnt
 		}
 
 		// 递归探索（不传递visited，因为我们使用路径级别去重）
-		r.dfsFindPathsOptimized(ctx, neighborEntity, visited, allPaths, currentPath)
+		r.dfsFindPathsOptimized(ctx, queryConfig, neighborEntity, visited, allPaths, currentPath)
 
 		// 回溯：恢复路径状态
 		if lastHop.Relationship == rel {
