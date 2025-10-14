@@ -55,6 +55,9 @@ type http2ClientConn struct {
 
 	fr           *http2.Framer
 	frWriteMutex *sync.Mutex
+
+	// 资源清理标记
+	resourceCleaned *utils.AtomicBool
 }
 
 type http2ClientStream struct {
@@ -157,10 +160,52 @@ func (h2Conn *http2ClientConn) preface() error {
 
 func (h2Conn *http2ClientConn) setClose() {
 	h2Conn.closeCond.L.Lock()
+	if h2Conn.closed {
+		h2Conn.closeCond.L.Unlock()
+		return // 避免重复关闭
+	}
 	h2Conn.closed = true
 	h2Conn.closeCond.L.Unlock()
 	h2Conn.closeCond.Broadcast()
+
+	// 清理资源
+	h2Conn.cleanupResources()
+
 	h2Conn.conn.Close()
+}
+
+// 清理HTTP/2连接相关资源
+func (h2Conn *http2ClientConn) cleanupResources() {
+	if h2Conn.resourceCleaned != nil && h2Conn.resourceCleaned.IsSet() {
+		return // 已经清理过
+	}
+
+	// 停止空闲定时器
+	if h2Conn.idleTimer != nil {
+		h2Conn.idleTimer.Stop()
+		h2Conn.idleTimer = nil
+	}
+
+	// 清理所有流
+	h2Conn.mu.Lock()
+	for streamID, stream := range h2Conn.streams {
+		if stream != nil {
+			stream.setEndStream()              // 结束流
+			h2Conn.http2StreamPool.Put(stream) // 回收到池中
+		}
+		delete(h2Conn.streams, streamID)
+	}
+	h2Conn.mu.Unlock()
+
+	// 重置hpack解码器以释放内部缓冲
+	if h2Conn.hDec != nil {
+		// hpack.Decoder没有公开的Reset方法，但可以重新创建
+		h2Conn.hDec = hpack.NewDecoder(defaultHeaderTableSize, nil)
+	}
+
+	if h2Conn.resourceCleaned != nil {
+		h2Conn.resourceCleaned.Set()
+	}
 }
 
 func (h2Conn *http2ClientConn) setPreface() {
@@ -175,8 +220,18 @@ func (h2Conn *http2ClientConn) newStream(req *http.Request, packet []byte) (*htt
 		return nil, CreateStreamAfterGoAwayErr
 	}
 
+	// 检查连接是否已关闭
+	h2Conn.closeCond.L.Lock()
+	if h2Conn.closed {
+		h2Conn.closeCond.L.Unlock()
+		return nil, errH2ConnClosed
+	}
+	h2Conn.closeCond.L.Unlock()
+
 	newStreamID := h2Conn.getNewStreamID()
 	cs := h2Conn.http2StreamPool.Get().(*http2ClientStream)
+	// 重置流状态，防止污染
+	*cs = http2ClientStream{}
 	cs.h2Conn = h2Conn
 	cs.ID = newStreamID
 	cs.resp = new(http.Response)
