@@ -414,8 +414,34 @@ func TestYieldFun(t *testing.T) {
 	assert.Equal(t, "2", string(generator.Result().GetData()))
 	assert.Equal(t, 3, i)
 	generator.Cancel()
-	time.Sleep(500 * time.Millisecond)
+	generator.Wait()
 	assert.Equal(t, true, finished)
+}
+
+func TestFuzztagGeneratorCancel(t *testing.T) {
+	code := `{{genStringList}}`
+	nodes, err := ParseFuzztag(code, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sleepTime := 1 * time.Second
+	generator := parser.NewGenerator(nil, nodes, map[string]*parser.TagMethod{
+		"genStringList": &parser.TagMethod{
+			YieldFun: func(ctx context.Context, params string, yield func(*parser.FuzzResult)) error {
+				yield(parser.NewFuzzResultWithData("1"))
+				time.Sleep(sleepTime)
+				return nil
+			},
+		},
+	})
+	generator.Next()
+	timeStart := time.Now()
+	generator.Cancel()
+	generator.Wait()
+	timeEnd := time.Now()
+
+	delta := timeEnd.Sub(timeStart)
+	assert.True(t, delta >= sleepTime && delta <= sleepTime+time.Millisecond*500)
 }
 
 func TestSyncRender2(t *testing.T) {
