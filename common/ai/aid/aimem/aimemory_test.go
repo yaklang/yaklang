@@ -228,11 +228,20 @@ func cleanupAllTestData() {
 	}
 
 	// 删除所有测试相关的记忆条目
-	db.Where("session_id LIKE ?", "test-session-%").Delete(&schema.AIMemoryEntity{})
+	db.Where("session_id LIKE ?", "test-session-%").Unscoped().Delete(&schema.AIMemoryEntity{})
 
-	// 使用原生SQL删除测试相关的RAG collection和documents
-	db.Exec("DELETE FROM rag_vector_document_test WHERE collection_id IN (SELECT id FROM rag_vector_collection_test WHERE name LIKE 'ai-memory-test-session-%')")
-	db.Exec("DELETE FROM rag_vector_collection_test WHERE name LIKE 'ai-memory-test-session-%'")
+	// 删除测试相关的RAG collection和documents
+	// 先查找所有测试相关的collection
+	var testCollections []schema.VectorStoreCollection
+	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Find(&testCollections)
+
+	// 删除这些collection对应的documents
+	for _, collection := range testCollections {
+		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{})
+	}
+
+	// 删除collection本身
+	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Unscoped().Delete(&schema.VectorStoreCollection{})
 
 	log.Infof("cleaned up all test data")
 }
@@ -799,7 +808,7 @@ func cleanupTestData(t *testing.T, sessionID string) {
 	}
 
 	// 删除测试数据
-	err := db.Where("session_id = ?", sessionID).Delete(&schema.AIMemoryEntity{}).Error
+	err := db.Where("session_id = ?", sessionID).Unscoped().Delete(&schema.AIMemoryEntity{}).Error
 	if err != nil {
 		log.Warnf("cleanup test data failed: %v", err)
 	}
@@ -807,13 +816,26 @@ func cleanupTestData(t *testing.T, sessionID string) {
 	// 清理RAG collection和相关文档
 	collectionName := fmt.Sprintf("ai-memory-%s", sessionID)
 
-	// 使用原生SQL强制删除相关collection和documents
-	db.Exec("DELETE FROM rag_vector_document_test WHERE collection_id IN (SELECT id FROM rag_vector_collection_test WHERE name = ?)", collectionName)
-	db.Exec("DELETE FROM rag_vector_collection_test WHERE name = ?", collectionName)
+	// 先查找指定的collection
+	var collection schema.VectorStoreCollection
+	if err := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).First(&collection).Error; err == nil {
+		// 删除该collection对应的documents
+		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{})
+		// 删除collection本身
+		db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Unscoped().Delete(&schema.VectorStoreCollection{})
+	}
 
 	// 额外清理：删除所有可能的测试相关collection
-	db.Exec("DELETE FROM rag_vector_document_test WHERE collection_id IN (SELECT id FROM rag_vector_collection_test WHERE name LIKE 'ai-memory-test-session-%')")
-	db.Exec("DELETE FROM rag_vector_collection_test WHERE name LIKE 'ai-memory-test-session-%'")
+	var testCollections []schema.VectorStoreCollection
+	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Find(&testCollections)
+
+	// 删除这些collection对应的documents
+	for _, testCollection := range testCollections {
+		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", testCollection.ID).Unscoped().Delete(&schema.VectorStoreDocument{})
+	}
+
+	// 删除collection本身
+	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Unscoped().Delete(&schema.VectorStoreCollection{})
 
 	log.Infof("cleaned up test data for session: %s", sessionID)
 }
