@@ -3,10 +3,11 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -105,7 +106,8 @@ LOOP:
 			}
 
 			if result.Type == schema.EVENT_TOOL_CALL_DONE || result.Type == schema.EVENT_TOOL_CALL_ERROR || result.Type == schema.EVENT_TOOL_CALL_USER_CANCEL {
-				toolCallID = ""
+				// 不要立即清空toolCallID，因为 stdout 和 stderr 是流事件，是异步的
+				// toolCallID = ""
 				continue
 			}
 			if result.Type == schema.EVENT_TYPE_STREAM {
