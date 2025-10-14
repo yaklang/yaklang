@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+
 	"github.com/google/uuid"
-	logger "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -38,7 +40,7 @@ func (r *Report) SaveForIRify() error {
 	// 生成报告内容
 	err := GenerateYakitReportContent(reportInstance, ssaReport)
 	if err != nil {
-		logger.Errorf("generate yakit report content failed: %v", err)
+		log.Errorf("generate yakit report content failed: %v", err)
 		return utils.Wrapf(err, "generate yakit report content failed")
 	}
 
@@ -171,4 +173,44 @@ func ConvertRisksToJson(risks []*schema.SSARisk) ([]byte, error) {
 		return nil, err
 	}
 	return writer.Bytes(), nil
+}
+
+func ImportSSARiskFromJSON(jsonData []byte) error {
+	var report *Report
+	if err := json.Unmarshal(jsonData, &report); err != nil {
+		return utils.Wrapf(err, "failed to parse JSON data")
+	}
+	db := ssadb.GetDB()
+	if err := importRisksFromReport(db, report); err != nil {
+		log.Errorf("Import SSARisk from JSON failed: %v", err)
+	}
+	if err := importFilesFromReport(db, report); err != nil {
+		log.Errorf("Import Files from JSON failed: %v", err)
+	}
+	return nil
+}
+
+func importRisksFromReport(db *gorm.DB, report *Report) error {
+	if len(report.Risks) == 0 {
+		return nil
+	}
+	for _, risk := range report.Risks {
+		if err := risk.SaveToDB(db); err != nil {
+			log.Errorf("Import SSARisk from JSON failed: %v", err)
+		}
+	}
+	return nil
+}
+
+func importFilesFromReport(db *gorm.DB, report *Report) error {
+	if len(report.File) == 0 {
+		return nil
+	}
+	for _, file := range report.File {
+		if err := file.SaveToDB(db); err != nil {
+			log.Errorf("Import Files from JSON failed: %v", err)
+		}
+
+	}
+	return nil
 }

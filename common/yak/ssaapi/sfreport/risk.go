@@ -3,7 +3,9 @@ package sfreport
 import (
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -40,6 +42,8 @@ type Risk struct {
 	LatestDisposalStatus string `json:"latest_disposal_status"`
 	// 数据流路径信息
 	DataFlowPaths []*DataFlowPath `json:"data_flow_paths,omitempty"`
+	// RiskFeatureHash
+	RiskFeatureHash string `json:"risk_feature_hash"`
 }
 
 // DataFlowPath 数据流路径
@@ -98,6 +102,7 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
 
 		ProgramName:          ssarisk.ProgramName,
 		LatestDisposalStatus: ssarisk.LatestDisposalStatus,
+		RiskFeatureHash:      ssarisk.RiskFeatureHash,
 	}
 
 	// Generate data flow paths if available
@@ -113,6 +118,50 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
 	}
 
 	return risk
+}
+
+func (r *Risk) SaveToDB(db *gorm.DB) error {
+	if db == nil {
+		return utils.Error("Save Risk to DB failed: db is nil")
+	}
+
+	ssaRisk := &schema.SSARisk{
+		Hash:                r.Hash,
+		Title:               r.Title,
+		TitleVerbose:        r.TitleVerbose,
+		Description:         r.Description,
+		Solution:            r.Solution,
+		RiskType:            r.RiskType,
+		Details:             r.Details,
+		Severity:            schema.SyntaxFlowSeverity(r.Severity),
+		Language:            r.Language,
+		IsPotential:         false,
+		CVE:                 r.CVE,
+		CWE:                 r.CWE,
+		IsRead:              false,
+		Ignore:              false,
+		UploadOnline:        false,
+		CveAccessVector:     "",
+		CveAccessComplexity: "",
+		Tags:                "",
+		FromRule:            r.RuleName,
+		ProgramName:         r.ProgramName,
+		CodeSourceUrl:       r.CodeSourceURL,
+		CodeRange:           r.CodeRange,
+		CodeFragment:        r.CodeFragment,
+		FunctionName:        r.FunctionName,
+		Line:                r.Line,
+		// RuntimeId:            "",
+		// ResultID:             uint64(r.ResultID),
+		// Variable:             r.Variable,
+		// Index:                int64(r.Index),
+		LatestDisposalStatus: r.LatestDisposalStatus,
+		RiskFeatureHash:      r.RiskFeatureHash,
+	}
+	if err := db.Create(ssaRisk).Error; err != nil {
+		return utils.Wrapf(err, "Save Risk to DB failed")
+	}
+	return nil
 }
 
 func (r *Risk) GetHash() string {
