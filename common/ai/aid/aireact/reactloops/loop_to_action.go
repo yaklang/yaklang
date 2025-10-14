@@ -16,10 +16,6 @@ func ConvertReActLoopFactoryToActionFactory(
 			return nil, utils.Errorf("runtime is nil when creating loop action: %s", name)
 		}
 
-		loop, err := factory(r)
-		if err != nil {
-			return nil, err
-		}
 		action := &LoopAction{
 			ActionType:   name,
 			Description:  "focus on solving the problem using [" + name + "] loop",
@@ -32,6 +28,12 @@ func ConvertReActLoopFactoryToActionFactory(
 				return nil
 			},
 			ActionHandler: func(oldLoop *ReActLoop, action *aicommon.Action, operator *LoopActionHandlerOperator) {
+				var err error
+				loop, err := factory(r, WithOnPostIteraction(oldLoop.onPostIteration))
+				if err != nil {
+					operator.Fail(err.Error())
+					return
+				}
 				emitter := oldLoop.GetEmitter()
 				invoker := oldLoop.GetInvoker()
 				msg := fmt.Sprintf(
@@ -49,7 +51,7 @@ func ConvertReActLoopFactoryToActionFactory(
 					})
 				}()
 				current := oldLoop.GetCurrentTask()
-				err := loop.ExecuteWithExistedTask(current)
+				err = loop.ExecuteWithExistedTask(current)
 				if err != nil {
 					operator.Fail(err.Error())
 					return
