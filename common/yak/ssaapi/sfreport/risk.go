@@ -132,13 +132,15 @@ func (r *Risk) SaveToDB(db *gorm.DB) error {
 		LatestDisposalStatus: r.LatestDisposalStatus,
 		RiskFeatureHash:      r.RiskFeatureHash,
 	}
+
+	// CreateSSARisk会在BeforeCreate修正Hash
 	err := yakit.CreateSSARisk(db, ssaRisk)
 	if err != nil {
 		return utils.Wrapf(err, "Save Risk to DB failed")
 	}
 
 	// save data flow paths
-	saver := newSaveDataFlowCtx(db, r.Hash)
+	saver := newSaveDataFlowCtx(db, ssaRisk.Hash)
 	for _, dataFlowPath := range r.DataFlowPaths {
 		saver.SaveDataFlow(dataFlowPath)
 	}
