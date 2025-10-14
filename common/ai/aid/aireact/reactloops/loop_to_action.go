@@ -9,7 +9,7 @@ import (
 
 func ConvertReActLoopFactoryToActionFactory(
 	name string,
-	factory func(r aicommon.AIInvokeRuntime) (*ReActLoop, error),
+	factory LoopFactory,
 ) func(r aicommon.AIInvokeRuntime) (*LoopAction, error) {
 	return func(r aicommon.AIInvokeRuntime) (*LoopAction, error) {
 		if utils.IsNil(r) {

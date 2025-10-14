@@ -357,6 +357,7 @@ LOOP:
 	for {
 		iterationCount++
 		if iterationCount > maxIterations {
+			r.finishIterationLoopWithError(iterationCount, task, utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations))
 			log.Warnf("Reached max iterations (%d), stopping code generation loop", maxIterations)
 			break LOOP
 		}
@@ -368,6 +369,7 @@ LOOP:
 			operator,
 		)
 		if finalError != nil {
+			r.finishIterationLoopWithError(iterationCount, task, finalError)
 			log.Errorf("Failed to generate prompt: %v", finalError)
 			return finalError
 		}
@@ -384,12 +386,14 @@ LOOP:
 		})
 
 		if transactionErr != nil {
+			r.finishIterationLoopWithError(iterationCount, task, transactionErr)
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			break LOOP
 		}
 
 		if utils.IsNil(actionParams) {
-			log.Errorf("action is nil in ReActLoop")
+			r.finishIterationLoopWithError(iterationCount, task, utils.Error("action is nil in ReActLoop"))
+			log.Error("action is nil in ReActLoop")
 			break LOOP
 		}
 		actionName := actionParams.Name()
@@ -425,6 +429,7 @@ LOOP:
 		if handler.ActionHandler == nil {
 			// ActionHandler 必须存在
 			finalError = utils.Errorf("action[%s] has no ActionHandler", actionName)
+			r.finishIterationLoopWithError(iterationCount, task, finalError)
 			return finalError
 		}
 
@@ -447,6 +452,7 @@ LOOP:
 					fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 					fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 				})
+				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
 			}
 			if !operator.isSilence {
@@ -458,6 +464,7 @@ LOOP:
 				fmt.Printf("[IsTerminated] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
+			r.finishIterationLoopWithError(iterationCount, task, nil)
 			return nil
 		}
 
@@ -469,6 +476,7 @@ LOOP:
 				fmt.Printf("[Async] action executed[%v]: \n%v\npreparing for end iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
+			r.finishIterationLoopWithError(iterationCount, task, finalError)
 			return nil
 		}
 
@@ -480,6 +488,7 @@ LOOP:
 				fmt.Printf("[Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 				fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 			})
+			r.doneCurrentIteration(iterationCount, task)
 			continue
 		}
 
@@ -490,7 +499,20 @@ LOOP:
 			fmt.Printf("[Default Continue] action executed[%v]: \n%v\npreparing for next iteration\n", actionParams.ActionType(), actionParams.GetParams().Dump())
 			fmt.Println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 		})
+		r.doneCurrentIteration(iterationCount, task)
 		continue
 	}
 	return nil
+}
+
+func (r *ReActLoop) doneCurrentIteration(current int, task aicommon.AIStatefulTask) {
+	if r.onPostIteration != nil {
+		r.onPostIteration(r, current, task, false, nil)
+	}
+}
+
+func (r *ReActLoop) finishIterationLoopWithError(current int, task aicommon.AIStatefulTask, err any) {
+	if r.onPostIteration != nil {
+		r.onPostIteration(r, current, task, true, utils.Errorf("reason: %v", err))
+	}
 }

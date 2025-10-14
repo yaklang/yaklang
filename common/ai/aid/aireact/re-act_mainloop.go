@@ -77,13 +77,18 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	mainloop, err := reactloops.CreateLoopByName(
-		schema.AI_REACT_LOOP_NAME_DEFAULT,
-		r,
+		schema.AI_REACT_LOOP_NAME_DEFAULT, r,
+		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
+			r.SetCurrentPlanExecutionTask(task)
+		}),
+		reactloops.WithOnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
+			r.SetCurrentPlanExecutionTask(nil)
+		}),
 	)
-
 	if err != nil {
 		return false, utils.Errorf("failed to create main loop runtime instance: %v", err)
 	}
+
 	currentTask := r.GetCurrentTask()
 	currentTask.SetUserInput(userQuery)
 	if r.GetCurrentPlanExecutionTask() != nil {
@@ -94,13 +99,6 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	err = mainloop.ExecuteWithExistedTask(currentTask)
 	if err != nil {
 		return false, err
-	}
-	if currentTask.IsAsyncMode() {
-		r.SetCurrentPlanExecutionTask(currentTask)
-		mainloop.OnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
-			r.SetCurrentPlanExecutionTask(nil)
-		})
-		mainloop.GetConfig()
 	}
 	return currentTask.IsAsyncMode(), nil
 }
