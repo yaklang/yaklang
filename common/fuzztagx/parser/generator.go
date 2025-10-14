@@ -12,6 +12,7 @@ import (
 
 type GenerateConfig struct {
 	ctx         context.Context
+	swg         *utils.SizedWaitGroup
 	cancelCtx   func()
 	AssertError bool
 	logger      *log.Logger
@@ -204,6 +205,8 @@ func (f *TagExecNode) exec(s *FuzzResult) error {
 	}
 
 	go func() {
+		f.config.swg.Add(1)
+		defer f.config.swg.Done()
 		defer func() {
 			if e := recover(); e != nil {
 				err = utils.Error(e)
@@ -353,6 +356,7 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 	ctx, cancel := context.WithCancel(ctx)
 	cfg := &GenerateConfig{
 		ctx:       ctx,
+		swg:       utils.NewSizedWaitGroup(100), // 限制并发100
 		cancelCtx: cancel,
 		logger:    log.GetLogger("fuzztag"),
 	}
@@ -397,14 +401,20 @@ func NewGenerator(ctx context.Context, nodes []Node, table map[string]*TagMethod
 	return g
 }
 
+func (g *Generator) Wait() {
+	g.swg.Wait()
+}
+
 func (g *Generator) Cancel() {
 	if g.cancelCtx != nil {
 		g.cancelCtx()
 	}
 }
+
 func (g *Generator) RawResult() []*FuzzResult {
 	return g.container
 }
+
 func (g *Generator) Result() *FuzzResult {
 	res := NewFuzzResult()
 	data := []byte{}
