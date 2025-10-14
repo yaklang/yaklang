@@ -67,7 +67,8 @@ type ReAct struct {
 	saveTimelineThrottle func(func())
 	artifacts            *filesys.RelLocalFs
 
-	memoryTriage *aimem.AIMemoryTriage
+	timelineDiffer *aicommon.TimelineDiffer
+	memoryTriage   *aimem.AIMemoryTriage
 }
 
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -181,6 +182,8 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	}
 	var err error
 	react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
+	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.timeline)
+
 	if err != nil {
 		return nil, utils.Errorf("create memory triage failed: %v", err)
 	}
