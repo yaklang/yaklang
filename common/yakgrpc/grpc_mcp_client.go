@@ -56,6 +56,7 @@ func (s *Server) AddMCPServer(ctx context.Context, req *ypb.AddMCPServerRequest)
 		Type:    req.GetType(),
 		URL:     req.GetURL(),
 		Command: req.GetCommand(),
+		Enable:  req.GetEnable(),
 	}
 
 	err := yakit.CreateMCPServer(s.GetProfileDatabase(), server)
@@ -117,6 +118,7 @@ func (s *Server) UpdateMCPServer(ctx context.Context, req *ypb.UpdateMCPServerRe
 		Type:    req.GetType(),
 		URL:     req.GetURL(),
 		Command: req.GetCommand(),
+		Enable:  req.GetEnable(),
 	}
 
 	err := yakit.UpdateMCPServer(s.GetProfileDatabase(), req.GetID(), server)
@@ -144,8 +146,8 @@ func (s *Server) GetAllMCPServers(ctx context.Context, req *ypb.GetAllMCPServers
 	for _, server := range servers {
 		mcpServer := server.ToGRPC()
 
-		// 如果需要显示工具列表，尝试连接服务器获取工具信息
-		if req.GetIsShowToolList() {
+		// 如果需要显示工具列表且服务器已启用，尝试连接服务器获取工具信息
+		if req.GetIsShowToolList() && server.Enable {
 			tools, err := s.getMCPServerTools(ctx, server)
 			if err != nil {
 				return nil, utils.Errorf("get mcp server tools failed: %s", err)
