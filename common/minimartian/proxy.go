@@ -91,6 +91,9 @@ type Proxy struct {
 	forceDisableKeepAlive bool
 
 	tunMode bool
+
+	// connection pool for remote server connections
+	connPool *lowhttp.LowHttpConnPool
 }
 
 func (p *Proxy) saveCache(r *http.Request, ctx *Context) {
@@ -229,6 +232,11 @@ func (p *Proxy) SetTunMode(b bool) {
 	p.tunMode = b
 }
 
+// SetConnPool sets the connection pool for remote server connections
+func (p *Proxy) SetConnPool(pool *lowhttp.LowHttpConnPool) {
+	p.connPool = pool
+}
+
 // Close sets the proxy to the closing state so it stops receiving new connections,
 // finishes processing any inflight requests, and closes existing connections without
 // reading anymore requests from them.
@@ -242,6 +250,13 @@ func (p *Proxy) Close() {
 	p.conns.Wait()
 	p.connsMu.Unlock()
 	log.Infof("mitm: all connections closed")
+
+	// Clean up connection pool if it exists
+	if p.connPool != nil {
+		log.Infof("mitm: clearing connection pool")
+		p.connPool.Clear()
+		log.Infof("mitm: connection pool cleared")
+	}
 }
 
 // Closing returns whether the proxy is in the closing state.

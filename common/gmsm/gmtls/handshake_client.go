@@ -24,6 +24,8 @@ import (
 	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/subtle"
+	"crypto/x509/pkix"
+	"encoding/asn1"
 	"errors"
 	"fmt"
 	"io"
@@ -1032,6 +1034,14 @@ findCert:
 				if bytes.Equal(x509Cert.RawIssuer, ca) {
 					return &chain, nil
 				}
+				// try parse with ASN.1 format DN name
+				/*
+					这里需要处理 DN (Distinguished Name) 的比较。由于 x509Cert.RawIssuer 是原始 ASN.1 编码的 DN，
+					而 ca 也是 ASN.1 编码的 DN，但它们可能因为编码方式的差异导致字节不完全相同。因此需要解析并规范化后再比较
+				*/
+				if IsCertificateIssuerDNMatch(x509Cert.RawIssuer, ca) {
+					return &chain, nil
+				}
 			}
 		}
 	}
@@ -1184,4 +1194,14 @@ func (c *Conn) verifyServerCertificate(certificates [][]byte) error {
 	}
 
 	return nil
+}
+
+func IsCertificateIssuerDNMatch(issuer, ca []byte) bool {
+	var issuerRDN, caRDN pkix.RDNSequence
+	if _, err := asn1.Unmarshal(issuer, &issuerRDN); err == nil {
+		if _, err := asn1.Unmarshal(ca, &caRDN); err == nil {
+			return issuerRDN.String() == caRDN.String()
+		}
+	}
+	return false
 }

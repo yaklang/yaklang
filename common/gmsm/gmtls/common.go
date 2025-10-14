@@ -1213,14 +1213,15 @@ func supportedVersionsFromMax(maxVersion uint16) []uint16 {
 // the server that sent the CertificateRequest. Otherwise, it returns an error
 // describing the reason for the incompatibility.
 func (cri *CertificateRequestInfo) SupportsCertificate(c *Certificate) error {
-	if _, err := selectSignatureScheme(cri.Version, c, cri.SignatureSchemes); err != nil {
+	// 如果CRI根本没有指定他想要的CA 我们这只能做最简单的算法筛选 例如国密TLS需要证书一般是国密证书
+	if _, err := selectSignatureScheme(cri.Version, c, cri.SignatureSchemes); err != nil && len(cri.AcceptableCAs) == 0 {
 		return err
 	}
-
+	// 如果服务端没有指定CA 同时本地证书和TLS版本也能对上 这里就采用第一个符合的本地证书
 	if len(cri.AcceptableCAs) == 0 {
 		return nil
 	}
-
+	// 如果指定了CA就以CA为准
 	for j, cert := range c.Certificate {
 		x509Cert := c.Leaf
 		// Parse the certificate if this isn't the leaf node, or if
@@ -1234,6 +1235,14 @@ func (cri *CertificateRequestInfo) SupportsCertificate(c *Certificate) error {
 
 		for _, ca := range cri.AcceptableCAs {
 			if bytes.Equal(x509Cert.RawIssuer, ca) {
+				return nil
+			}
+			// try parse with ASN.1 format DN name
+			/*
+				这里需要处理 DN (Distinguished Name) 的比较。由于 x509Cert.RawIssuer 是原始 ASN.1 编码的 DN，
+				而 ca 也是 ASN.1 编码的 DN，但它们可能因为编码方式的差异导致字节不完全相同。因此需要解析并规范化后再比较
+			*/
+			if IsCertificateIssuerDNMatch(x509Cert.RawIssuer, ca) {
 				return nil
 			}
 		}
