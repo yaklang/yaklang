@@ -26,7 +26,7 @@ func GetLoopAction(name string) (*LoopAction, bool) {
 	return actionObj, true
 }
 
-type LoopFactory func(r aicommon.AIInvokeRuntime) (*ReActLoop, error)
+type LoopFactory func(r aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error)
 
 func RegisterLoopFactory(
 	name string,
@@ -40,7 +40,7 @@ func RegisterLoopFactory(
 	return nil
 }
 
-func CreateLoopByName(name string, invoker aicommon.AIInvokeRuntime) (*ReActLoop, error) {
+func CreateLoopByName(name string, invoker aicommon.AIInvokeRuntime, opts ...ReActLoopOption) (*ReActLoop, error) {
 	factory, ok := loops.Load(name)
 	if !ok {
 		return nil, utils.Errorf("reactloop[%v] not found", name)
@@ -49,7 +49,7 @@ func CreateLoopByName(name string, invoker aicommon.AIInvokeRuntime) (*ReActLoop
 	if !ok {
 		return nil, utils.Errorf("reactloop[%v] type assert error", name)
 	}
-	return factoryCreator(invoker)
+	return factoryCreator(invoker, opts...)
 }
 
 func GetLoopFactory(name string) (LoopFactory, bool) {

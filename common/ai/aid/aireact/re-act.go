@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"strconv"
 	"sync"
 	"time"
@@ -65,6 +66,8 @@ type ReAct struct {
 
 	saveTimelineThrottle func(func())
 	artifacts            *filesys.RelLocalFs
+
+	memoryTriage *aimem.AIMemoryTriage
 }
 
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -176,6 +179,11 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            filesys.NewRelLocalFs(dirname),
 	}
+	var err error
+	react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
+	if err != nil {
+		return nil, utils.Errorf("create memory triage failed: %v", err)
+	}
 	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 
 	// Initialize prompt manager
@@ -203,7 +211,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	react.startQueueProcessor(cfg.ctx, done)
 	<-done // Ensure the queue processor has started
 
-	err := yakit.CreateOrUpdateAIAgentRuntime(
+	err = yakit.CreateOrUpdateAIAgentRuntime(
 		react.config.GetDB(), &schema.AIAgentRuntime{
 			Uuid:              cfg.GetRuntimeId(),
 			Name:              "[re-act-runtime]",
