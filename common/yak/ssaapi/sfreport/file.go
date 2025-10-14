@@ -4,7 +4,10 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 type File struct {
@@ -37,6 +40,18 @@ func NewFile(editor *memedit.MemEditor, r *Report) *File {
 	}
 
 	return ret
+}
+
+func (f *File) SaveToDB(db *gorm.DB) error {
+	if db == nil {
+		return utils.Error("Save File to DB failed: db is nil")
+	}
+	editor := memedit.NewMemEditorWithFileUrl(f.Content, f.Path)
+	irSource := ssadb.MarshalFile(editor)
+	if err := irSource.Save(db); err != nil {
+		return utils.Wrapf(err, "Save File to DB failed")
+	}
+	return nil
 }
 
 func (f *File) AddRisk(risk *Risk) {
