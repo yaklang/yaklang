@@ -1,6 +1,7 @@
 package yakurl
 
 import (
+	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strconv"
 	"strings"
@@ -8,8 +9,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -108,9 +111,11 @@ type QuerySyntaxFlow struct {
 
 	// result
 	Result *ssaapi.SyntaxFlowResult
+
+	riskHash string
 }
 
-func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyntaxFlow, error) {
+func (a *SyntaxFlowAction) GetQuerySyntaxFlow(params *ypb.RequestYakURLParams) (*QuerySyntaxFlow, error) {
 	u := params.GetUrl()
 
 	// query
@@ -139,10 +144,9 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 			return nil, utils.Errorf("parse result_id %s failed: %v", resultIDRaw, err)
 		}
 		// check result_id
-		if resultID == 0 {
-			return nil, utils.Errorf("result_id can not be 0")
-		}
 	}
+
+	riskHash := query["risk_hash"]
 
 	// Parse variable and index from path
 	path := u.Path
@@ -162,14 +166,14 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 		}
 	}
 
+	riskHash = "b7f0e39ee6cd302d328a9af1499e0c512ba4f95b"
 	// get program
 	programName := u.GetLocation()
-	result, resultID, err := a.getResult(programName, string(params.GetBody()), resultID)
-	if err != nil {
-		return nil, err
+	if riskHash == "" && resultID == 0 {
+		return nil, utils.Errorf("must set one of result_id or risk_hash")
 	}
 
-	return &QuerySyntaxFlow{
+	q := &QuerySyntaxFlow{
 		variable: variable,
 		index:    index,
 
@@ -179,8 +183,18 @@ func (a *SyntaxFlowAction) GetResult(params *ypb.RequestYakURLParams) (*QuerySyn
 		ResultID:    resultID,
 		programName: programName,
 
-		Result: result,
-	}, nil
+		riskHash: riskHash,
+	}
+
+	if resultID != 0 {
+		result, resultID, err := a.getResult(programName, string(params.GetBody()), resultID)
+		if err != nil {
+			return nil, err
+		}
+		q.Result = result
+		q.ResultID = resultID
+	}
+	return q, nil
 }
 
 var _ Action = (*SyntaxFlowAction)(nil)
@@ -216,16 +230,28 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 		}
 	}()
 
-	query, err := a.GetResult(params)
+	query, err := a.GetQuerySyntaxFlow(params)
 	if err != nil {
 		return nil, err
 	}
+	if query.Result != nil && query.ResultID != 0 {
+		a.GetResultByResultID(query, params)
+	} else {
+		a.GetResultByRiskHash(query, params)
+	}
+	return
+}
 
+func (a *SyntaxFlowAction) GetResultByResultID(
+	query *QuerySyntaxFlow,
+	params *ypb.RequestYakURLParams,
+) (*ypb.RequestYakURLResponse, error) {
 	variable := query.variable
 	index := query.index
 	result := query.Result
 	programName := query.programName
 	url := params.GetUrl()
+
 	// page start from 1
 	if params.Page <= 1 {
 		params.Page = 1
@@ -316,6 +342,50 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 		Total:     int64(len(resources)),
 		Resources: resources,
 	}, nil
+}
+
+func (a *SyntaxFlowAction) GetResultByRiskHash(
+	query *QuerySyntaxFlow,
+	params *ypb.RequestYakURLParams,
+) (*ypb.RequestYakURLResponse, error) {
+	riskHash := query.riskHash
+	programName := query.programName
+
+	risk, err := yakit.QuerySSARiskByRiskHash(ssadb.GetDB(), riskHash)
+	if err != nil {
+		return nil, err
+	}
+	value, err := GetTmpValueByRiskHash(programName, risk)
+	if err != nil {
+		return nil, err
+	}
+	resources := []*ypb.YakURLResource{
+		Value2Response(query.programName, value, risk.GetAlertMsg(), params.GetUrl()),
+	}
+	return &ypb.RequestYakURLResponse{
+		Resources: resources,
+	}, nil
+}
+
+func GetTmpValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Value, error) {
+	var auditNodeID uint
+
+	auditNodeIDs, err := ssadb.GetResultNodeByRiskHash(ssadb.GetDB(), risk.Hash)
+	if err != nil {
+		return nil, err
+	}
+	if len(auditNodeIDs) == 0 {
+		return nil, utils.Error("auditNodeIDs is empty")
+	} else if len(auditNodeIDs) == 1 {
+		auditNodeID = auditNodeIDs[0]
+	} else if len(auditNodeIDs) > 1 {
+		log.Errorf("multiple auditNodeIDs found: %v", auditNodeIDs)
+		auditNodeID = auditNodeIDs[0]
+	}
+
+	prog := ssaapi.NewTmpProgram(programName)
+	value := prog.NewValueFromAuditNode(auditNodeID)
+	return value, nil
 }
 
 func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.YakURLResource {

@@ -108,6 +108,16 @@ func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) 
 	return items, nil
 }
 
+func GetResultNodeByRiskHash(db *gorm.DB, riskHash string) ([]uint, error) {
+	var items []uint
+	if err := db.Model(&AuditNode{}).
+		Where("risk_hash = ? and is_entry_node = true", riskHash).
+		Pluck("id", &items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func GetEffectOnEdgeByFromNodeId(id uint) []uint {
 	db := GetDB()
 	var effectOns []uint
