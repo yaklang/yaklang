@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type Risk struct {
@@ -44,33 +45,6 @@ type Risk struct {
 	DataFlowPaths []*DataFlowPath `json:"data_flow_paths,omitempty"`
 	// RiskFeatureHash
 	RiskFeatureHash string `json:"risk_feature_hash"`
-}
-
-// DataFlowPath 数据流路径
-type DataFlowPath struct {
-	PathID      string      `json:"path_id"`
-	Description string      `json:"description"`
-	Nodes       []*NodeInfo `json:"nodes"`
-	Edges       []*EdgeInfo `json:"edges"`
-	DotGraph    string      `json:"dot_graph,omitempty"`
-}
-
-type NodeInfo struct {
-	NodeID          string            `json:"node_id"`
-	IRCode          string            `json:"ir_code"`
-	SourceCode      string            `json:"source_code"`
-	SourceCodeStart int               `json:"source_code_start"`
-	CodeRange       *ssaapi.CodeRange `json:"code_range"`
-	//NodeType        string            `json:"node_type"`   // 节点类型 TODO:目前确定source、sink比较难
-	//Description     string            `json:"description"` // 节点描述
-}
-
-type EdgeInfo struct {
-	EdgeID      string `json:"edge_id"`
-	FromNodeID  string `json:"from_node_id"`
-	ToNodeID    string `json:"to_node_id"`
-	EdgeType    string `json:"edge_type"`   // 边类型：data_flow, control_flow, call, etc.
-	Description string `json:"description"` // 边描述，便于AI理解
 }
 
 func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
@@ -158,8 +132,15 @@ func (r *Risk) SaveToDB(db *gorm.DB) error {
 		LatestDisposalStatus: r.LatestDisposalStatus,
 		RiskFeatureHash:      r.RiskFeatureHash,
 	}
-	if err := db.Create(ssaRisk).Error; err != nil {
+	err := yakit.CreateSSARisk(db, ssaRisk)
+	if err != nil {
 		return utils.Wrapf(err, "Save Risk to DB failed")
+	}
+
+	// save data flow paths
+	saver := newSaveDataFlowCtx(db, r.Hash)
+	for _, dataFlowPath := range r.DataFlowPaths {
+		saver.SaveDataFlow(dataFlowPath)
 	}
 	return nil
 }
