@@ -673,6 +673,14 @@ findCert:
 				if bytes.Equal(x509Cert.RawIssuer, ca) {
 					return &chain, nil
 				}
+				// try parse with ASN.1 format DN name
+				/*
+					这里需要处理 DN (Distinguished Name) 的比较。由于 x509Cert.RawIssuer 是原始 ASN.1 编码的 DN，
+					而 ca 也是 ASN.1 编码的 DN，但它们可能因为编码方式的差异导致字节不完全相同。因此需要解析并规范化后再比较
+				*/
+				if IsCertificateIssuerDNMatch(x509Cert.RawIssuer, ca) {
+					return &chain, nil
+				}
 			}
 		}
 	}

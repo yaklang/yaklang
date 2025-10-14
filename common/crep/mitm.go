@@ -362,6 +362,11 @@ type MITMServer struct {
 	randomJA3 bool
 
 	tunMode bool
+
+	// connection pool for remote server connections
+	connPool       *lowhttp.LowHttpConnPool
+	connPoolCtx    context.Context
+	connPoolCancel context.CancelFunc
 }
 
 func (m *MITMServer) GetMaxContentLength() int {
@@ -488,6 +493,24 @@ func (m *MITMServer) ServerListener(ctx context.Context, lis net.Listener) error
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+
+	// Create connection pool with cancellable context
+	m.connPoolCtx, m.connPoolCancel = context.WithCancel(ctx)
+	m.connPool = lowhttp.NewHttpConnPool(m.connPoolCtx, 100, 2)
+	m.proxy.SetConnPool(m.connPool)
+
+	// Clean up connection pool when done
+	defer func() {
+		if m.connPoolCancel != nil {
+			log.Infof("mitm: cancelling connection pool context")
+			m.connPoolCancel()
+		}
+		if m.connPool != nil {
+			log.Infof("mitm: clearing connection pool in ServerListener")
+			m.connPool.Clear()
+		}
+	}()
+
 	m.setHijackHandler(ctx)
 	err := m.proxy.Serve(lis, ctx)
 	if err != nil {
