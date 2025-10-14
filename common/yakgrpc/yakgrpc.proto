@@ -973,6 +973,9 @@ service Yak {
   rpc DeleteMCPServer(DeleteMCPServerRequest) returns (GeneralResponse);
   rpc UpdateMCPServer(UpdateMCPServerRequest) returns (GeneralResponse);
   rpc GetAllMCPServers(GetAllMCPServersRequest) returns (GetAllMCPServersResponse);
+
+  // RAG Collection Search
+  rpc RAGCollectionSearch(RAGCollectionSearchRequest) returns (stream RAGCollectionSearchResponse);
 }
 
 message ExportKnowledgeBaseRequest {
@@ -989,10 +992,6 @@ message GeneralProgress {
   double Percent = 1;
   string Message = 2;
   string MessageType = 3;
-
-
-  // RAG Collection Search
-  rpc RAGCollectionSearch(RAGCollectionSearchRequest) returns (stream RAGCollectionSearchResponse);
 }
 
 message RAGCollectionSearchRequest {
