@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"net"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
+
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/log"
@@ -84,11 +85,9 @@ func main() {
 
 	app.Action = func(c *cli.Context) error {
 		yakit.InitialDatabase()
-		if sfbuildin.CheckEmbedRule() {
-			sfbuildin.SyncEmbedRule(func(process float64, ruleName string) {
-				log.Infof("sync embed rule: %s, process: %f", ruleName, process)
-			})
-		}
+		sfbuildin.SyncEmbedRule(func(process float64, ruleName string) {
+			log.Infof("sync embed rule: %s, process: %f", ruleName, process)
+		})
 		debug := c.Bool("debug")
 		port := c.Int("port")
 		opts := []sfweb.ServerOpt{

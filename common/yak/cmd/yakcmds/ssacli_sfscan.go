@@ -21,7 +21,7 @@ func SyncEmbedRule(force ...bool) {
 		sync = force[0]
 	}
 	log.Infof("================= check builtin rule sync ================")
-	if sync || sfbuildin.CheckEmbedRule() {
+	if sync {
 		sfbuildin.SyncEmbedRule(func(process float64, ruleName string) {
 			log.Infof("sync embed rule: %s, process: %f", ruleName, process)
 		})

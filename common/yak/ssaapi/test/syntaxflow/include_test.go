@@ -149,7 +149,18 @@ func TestLib_ServletParam(t *testing.T) {
 	vfs := createTestVFS()
 	ssatest.CheckWithFS(vfs, t, func(programs ssaapi.Programs) error {
 		prog := programs[0]
-		results, err := prog.SyntaxFlowWithError(`<include('java-servlet-param')> as $params`, ssaapi.QueryWithEnableDebug())
+		results, err := prog.SyntaxFlowWithError(`
+HttpServletRequest?{opcode:param}?{<typeName>?{have:'javax.servlet.http.HttpServletRequest'}} as $req
+/(do(Get|Post|Delete|Filter|[A-Z]\w+))|(service)/<getFormalParams>?{!have: this && opcode: param } as $req;
+$req.getParameter() as $directParam;
+$req -{
+  hook: "*.getParameter() as $indirectParam"
+}->;
+.getInputStream?{<getObject><typeName>?{have: *Http*Request*}}() as $getInputStream;
+.getSession?{<getObject><typeName>?{have: *Http*Request*}}() as $getSession;
+
+$directParam + $indirectParam + $getInputStream +$getSession as $params;
+		`, ssaapi.QueryWithEnableDebug())
 		require.NoError(t, err)
 		results.Show()
 		require.Greater(t, len(results.GetValues("params")), 7)
