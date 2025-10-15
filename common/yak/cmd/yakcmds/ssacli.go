@@ -487,7 +487,7 @@ var syntaxFlowImport = &cli.Command{
 			}
 		case "raw":
 			rfs := filesys.NewRelLocalFs(file)
-			err := sfbuildin.SyncBuildRuleByFileSystem(rfs, false, func(process float64, ruleName string) {
+			err := sfbuildin.SyncRuleFromFileSystem(rfs, false, func(process float64, ruleName string) {
 				log.Infof("sync input rule: %s, process: %f", ruleName, process)
 			})
 			if err != nil {

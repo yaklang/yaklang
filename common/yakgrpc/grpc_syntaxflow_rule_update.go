@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) CheckSyntaxFlowRuleUpdate(ctx context.Context, req *ypb.CheckSyntaxFlowRuleUpdateRequest) (*ypb.CheckSyntaxFlowRuleUpdateResponse, error) {
-	needUpdate := sfbuildin.CheckEmbedRule()
+	needUpdate := sfbuildin.NeedSyncEmbedRule()
 	if !needUpdate {
 		return &ypb.CheckSyntaxFlowRuleUpdateResponse{NeedUpdate: false}, nil
 	}

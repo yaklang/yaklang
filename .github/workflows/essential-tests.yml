@@ -393,6 +393,7 @@ jobs:
 
           - name: Test gRPC MUSTPASS SyntaxFlow | SSA
             run: |
+              ./yak sync-rule 
               go test -v -timeout 5m -run TestGRPCMUSTPASS_SyntaxFlow* ./common/yakgrpc/... 2>&1 | tee /tmp/syntaxflow_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/syntaxflow_test.log; }
               go test -v -timeout 5m -run TestGRPCMUSTPASS_SSA* ./common/yakgrpc/... 2>&1 | tee /tmp/ssa_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/ssa_test.log; }
               go test -v -timeout 4m ./common/sfweb/... 2>&1 | tee /tmp/sfweb_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/sfweb_test.log; }
