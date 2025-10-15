@@ -8,7 +8,13 @@ entryLength := cli.Int("entrylen", cli.setVerboseName("知识条目长度限制"
 k := cli.Int("k", cli.setVerboseName("实体子图跳数"))
 kmin := cli.Int("kmin",cli.setVerboseName("实体子图最小跳数"),cli.setDefault(2))
 kmax := cli.Int("kmax", cli.setVerboseName("实体子图最大跳数"),cli.setDefault(4))
+pathDepth := cli.Int("depth", cli.setVerboseName("邻接节点深度"))
+entityUUID := cli.String("entityID",cli.setVerboseName("实体UUID"),cli.setHelp("起始实体的UUID列表，支持使用英文逗号分隔"),cli.setCliGroup("起点过滤器"))
+entityType := cli.String("entityType", cli.setVerboseName("实体类型"),cli.setHelp("起始实体的类型列表，支持使用英文逗号分隔"),cli.setCliGroup("起点过滤器"))
+entityName := cli.String("entityName", cli.setVerboseName("实体名"),cli.setHelp("起始实体的名字列表，支持使用英文逗号分隔"),cli.setCliGroup("起点过滤器"))
+keywords := cli.String("keywords", cli.setVerboseName("实体类型"),cli.setHelp("起始实体的关键字，支持使用英文逗号分隔"),cli.setCliGroup("起点过滤器"))
 cli.check()
+
 
 options := [
     rag.ctx(context.Background()),
@@ -26,6 +32,24 @@ if kmax > kmin {
 if k > 0 {
     options = append(options, rag.khopk(k))
 }
+
+split := func(i) {
+    if i == "" {
+        return nil
+    }
+    return str.Split(i, ",")
+}
+
+
+if entityName != "" || entityType != "" || entityUUID != "" || keywords != "" {
+    filter := rag.getEntityFilter(kbName, split(entityType), split(entityName), split(entityUUID), split(keywords))
+    options = append(options, rag.buildFilter(filter))
+}
+
+if pathDepth > 0 {
+    options = append(options, rag.pathDepth(pathDepth))
+}
+
 yakit.StatusCard("building target", kbName)
 for i in rag.BuildKnowledgeFromEntityRepos(kbName, options...)~ {
     yakit.Output(i.KnowledgeTitle)

@@ -201,6 +201,9 @@ func DocumentHelperWithVerboseInfo(funcMap map[string]any) *yakdoc.DocumentHelpe
 	var extLibs []*yakdoc.ScriptLib
 	// 标准库导出的函数
 	for name, item := range funcMap {
+		if name == "cli" {
+			log.Warnf("cli functions are not supported")
+		}
 		itemType := reflect.TypeOf(item)
 		itemValue := reflect.ValueOf(item)
 		_, _ = itemType, itemValue
