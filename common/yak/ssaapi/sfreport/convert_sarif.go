@@ -17,7 +17,7 @@ type SarifReport struct {
 	report *sarif.Report
 }
 
-func (r *SarifReport) AddSyntaxFlowRisks(risks []*schema.SSARisk) {
+func (r *SarifReport) AddSyntaxFlowRisks(risks ...*schema.SSARisk) {
 	log.Errorf("The sarif format cannot specify only a single risk for generation")
 }
 

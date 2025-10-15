@@ -1,6 +1,7 @@
 package sfreport
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 
@@ -77,7 +78,7 @@ func (r *Report) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool {
 	return true
 }
 
-func (r *Report) AddSyntaxFlowRisks(risks []*schema.SSARisk) {
+func (r *Report) AddSyntaxFlowRisks(risks ...*schema.SSARisk) {
 	for _, risk := range risks {
 		r.ConvertSSARiskToReport(risk)
 	}
@@ -163,42 +164,136 @@ func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) *File {
 	return ret
 }
 
-func ImportSSARiskFromJSON(jsonData []byte) error {
+type ImportSSARiskOption func(*ImportSSARiskManager)
+
+type ImportSSARiskManager struct {
+	db       *gorm.DB
+	ctx      context.Context
+	callback func(string, float64)
+}
+
+func WithDB(db *gorm.DB) ImportSSARiskOption {
+	return func(m *ImportSSARiskManager) {
+		m.db = db
+	}
+}
+
+func WithContext(ctx context.Context) ImportSSARiskOption {
+	return func(m *ImportSSARiskManager) {
+		m.ctx = ctx
+	}
+}
+
+func WithCallback(callback func(string, float64)) ImportSSARiskOption {
+	return func(m *ImportSSARiskManager) {
+		m.callback = callback
+	}
+}
+
+func (m *ImportSSARiskManager) subProgressCallback(start, end float64) func(string, float64) {
+	return func(msg string, subProgress float64) {
+		if m.callback == nil {
+			return
+		}
+		if subProgress < 0 {
+			subProgress = 0
+		} else if subProgress > 1 {
+			subProgress = 1
+		}
+		global := start + (end-start)*subProgress
+		m.callback(msg, global)
+	}
+}
+
+func NewImportSSARiskManager(opts ...ImportSSARiskOption) *ImportSSARiskManager {
+	m := &ImportSSARiskManager{}
+	for _, opt := range opts {
+		opt(m)
+	}
+	if m.db == nil {
+		m.db = ssadb.GetDB()
+	}
+	return m
+}
+
+func ImportSSARiskFromJSON(
+	ctx context.Context,
+	db *gorm.DB,
+	jsonData []byte,
+	callBacks ...func(string, float64),
+) error {
 	var report *Report
 	if err := json.Unmarshal(jsonData, &report); err != nil {
 		return utils.Wrapf(err, "failed to parse JSON data")
 	}
-	db := ssadb.GetDB()
-	if err := importRisksFromReport(db, report); err != nil {
-		log.Errorf("Import SSARisk from JSON failed: %v", err)
+
+	opts := []ImportSSARiskOption{
+		WithDB(db),
+		WithContext(ctx),
 	}
-	if err := importFilesFromReport(db, report); err != nil {
-		log.Errorf("Import Files from JSON failed: %v", err)
+	if len(callBacks) > 0 {
+		opts = append(opts, WithCallback(callBacks[0]))
+	}
+
+	manager := NewImportSSARiskManager(opts...)
+
+	if err := manager.importRisksFromReport(report, manager.subProgressCallback(0, 0.5)); err != nil {
+		return err
+	}
+	if err := manager.importFilesFromReport(report, manager.subProgressCallback(0.5, 1)); err != nil {
+		return err
 	}
 	return nil
 }
 
-func importRisksFromReport(db *gorm.DB, report *Report) error {
+func (m *ImportSSARiskManager) importRisksFromReport(report *Report, cb func(string, float64)) error {
 	if len(report.Risks) == 0 {
+		if cb != nil {
+			cb("No risks to import", 1)
+		}
 		return nil
 	}
+	total := len(report.Risks)
+	count := 0
 	for _, risk := range report.Risks {
-		if err := risk.SaveToDB(db); err != nil {
+		select {
+		case <-m.ctx.Done():
+			return utils.Error("Import SSARisk from JSON failed: context done")
+		default:
+		}
+		count++
+		if err := risk.SaveToDB(m.db); err != nil {
 			log.Errorf("Import SSARisk from JSON failed: %v", err)
 		}
+		if cb != nil {
+			progress := float64(count+1) / float64(total)
+			cb(fmt.Sprintf("Importing risk %d/%d", count+1, total), progress)
+		}
 	}
 	return nil
 }
 
-func importFilesFromReport(db *gorm.DB, report *Report) error {
+func (m *ImportSSARiskManager) importFilesFromReport(report *Report, cb func(string, float64)) error {
 	if len(report.File) == 0 {
+		if cb != nil {
+			cb("No files to import", 1)
+		}
 		return nil
 	}
-	for _, file := range report.File {
-		if err := file.SaveToDB(db); err != nil {
+	total := len(report.File)
+	for i, file := range report.File {
+		select {
+		case <-m.ctx.Done():
+			return utils.Error("Import Files from JSON failed: context done")
+		default:
+		}
+		if err := file.SaveToDB(m.db); err != nil {
 			log.Errorf("Import Files from JSON failed: %v", err)
 		}
-
+		if cb != nil {
+			progress := float64(i+1) / float64(total)
+			cb(fmt.Sprintf("Importing file %d/%d", i+1, total), progress)
+		}
 	}
 	return nil
 }
