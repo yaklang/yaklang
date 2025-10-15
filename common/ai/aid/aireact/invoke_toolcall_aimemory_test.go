@@ -303,7 +303,7 @@ LOOP:
 	}
 	fmt.Println("--------------------------------------")
 
-	// 等待内存处理完成
+	// 等待内存处理完成（包括数据库保存，因为是同步的）
 	ins.Wait()
 
 	// 验证 AIMemory Mock 被调用
@@ -312,10 +312,9 @@ LOOP:
 	}
 	fmt.Printf("AIMemory mock was called %d times\n", mockInvoker.memoryTriageCallCount)
 
-	// 等待数据保存到数据库
-	time.Sleep(2 * time.Second)
-
 	// 验证数据库中保存了 memory entities
+	// 注意：不需要额外的 sleep，因为 SaveMemoryEntities 是同步调用，
+	// Wait() 已经等待了包括数据库保存在内的所有操作完成
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		t.Fatal("Database connection is nil")
