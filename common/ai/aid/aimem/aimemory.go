@@ -48,6 +48,12 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// 创建HNSW后端
+	hnswBackend, err := NewAIMemoryHNSWBackend(sessionId)
+	if err != nil {
+		return nil, utils.Errorf("create HNSW backend failed: %v", err)
+	}
+
 	triage := &AIMemoryTriage{
 		ctx:             ctx,
 		cancel:          cancel,
@@ -55,6 +61,7 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 		invoker:         config.invoker,
 		contextProvider: config.contextProvider,
 		sessionID:       sessionId,
+		hnswBackend:     hnswBackend,
 	}
 
 	if triage.invoker == nil {
@@ -160,10 +167,33 @@ func (r *AIMemoryTriage) GetSessionID() string {
 	return r.sessionID
 }
 
+// GetHNSWStats 获取HNSW索引统计信息
+func (r *AIMemoryTriage) GetHNSWStats() map[string]interface{} {
+	if r.hnswBackend == nil {
+		return map[string]interface{}{
+			"error": "HNSW backend not initialized",
+		}
+	}
+	return r.hnswBackend.GetStats()
+}
+
+// RebuildHNSWIndex 重建HNSW索引
+func (r *AIMemoryTriage) RebuildHNSWIndex() error {
+	if r.hnswBackend == nil {
+		return utils.Errorf("HNSW backend not initialized")
+	}
+	return r.hnswBackend.RebuildIndex()
+}
+
 // Close 关闭资源
 func (r *AIMemoryTriage) Close() error {
 	if r.cancel != nil {
 		r.cancel()
+	}
+	if r.hnswBackend != nil {
+		if err := r.hnswBackend.Close(); err != nil {
+			log.Errorf("close HNSW backend failed: %v", err)
+		}
 	}
 	return nil
 }

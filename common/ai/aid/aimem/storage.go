@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -11,7 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统
+// SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW
 func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
@@ -46,6 +47,15 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
 		}
 
 		log.Infof("saved memory entity to database: %s", entity.Id)
+
+		// 添加到HNSW索引
+		if r.hnswBackend != nil {
+			if err := r.hnswBackend.Add(entity); err != nil {
+				log.Errorf("add to HNSW index failed: %v", err)
+				return utils.Errorf("add to HNSW index failed: %v", err)
+			}
+			log.Infof("added memory entity to HNSW index: %s", entity.Id)
+		}
 
 		// 索引 potential_questions 到 RAG 系统
 		// 每个问题作为一个文档，关联到同一个 memory_id
@@ -122,4 +132,148 @@ func (r *AIMemoryTriage) GetDynamicContextWithTags() (string, error) {
 	}
 
 	return builder.String(), nil
+}
+
+// DeleteMemoryEntity 删除记忆条目
+func (r *AIMemoryTriage) DeleteMemoryEntity(memoryID string) error {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+
+	// 从数据库删除
+	if err := db.Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).
+		Delete(&schema.AIMemoryEntity{}).Error; err != nil {
+		return utils.Errorf("delete memory entity from database failed: %v", err)
+	}
+
+	// 从HNSW索引删除
+	if r.hnswBackend != nil {
+		if err := r.hnswBackend.Delete(memoryID); err != nil {
+			log.Errorf("delete from HNSW index failed: %v", err)
+		}
+	}
+
+	// 从RAG系统删除相关问题
+	// 注意：这里需要删除所有以 memoryID 开头的文档
+	// 由于RAG系统的限制，我们暂时不实现这个功能
+	log.Warnf("RAG documents for memory %s not deleted (not implemented)", memoryID)
+
+	return nil
+}
+
+// UpdateMemoryEntity 更新记忆条目
+func (r *AIMemoryTriage) UpdateMemoryEntity(entity *MemoryEntity) error {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return utils.Errorf("database connection is nil")
+	}
+
+	// 更新数据库
+	updates := map[string]interface{}{
+		"content":             entity.Content,
+		"tags":                schema.StringArray(entity.Tags),
+		"potential_questions": schema.StringArray(entity.PotentialQuestions),
+		"c_score":             entity.C_Score,
+		"o_score":             entity.O_Score,
+		"r_score":             entity.R_Score,
+		"e_score":             entity.E_Score,
+		"p_score":             entity.P_Score,
+		"a_score":             entity.A_Score,
+		"t_score":             entity.T_Score,
+		"core_pact_vector":    schema.FloatArray(entity.CorePactVector),
+	}
+
+	if err := db.Model(&schema.AIMemoryEntity{}).
+		Where("memory_id = ? AND session_id = ?", entity.Id, r.sessionID).
+		Updates(updates).Error; err != nil {
+		return utils.Errorf("update memory entity in database failed: %v", err)
+	}
+
+	// 更新HNSW索引
+	if r.hnswBackend != nil {
+		if err := r.hnswBackend.Update(entity); err != nil {
+			log.Errorf("update HNSW index failed: %v", err)
+			return utils.Errorf("update HNSW index failed: %v", err)
+		}
+	}
+
+	log.Infof("updated memory entity: %s", entity.Id)
+
+	return nil
+}
+
+// GetMemoryEntity 获取单个记忆条目
+func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*MemoryEntity, error) {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+
+	var dbEntity schema.AIMemoryEntity
+	if err := db.Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).
+		First(&dbEntity).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, utils.Errorf("memory entity not found: %s", memoryID)
+		}
+		return nil, utils.Errorf("query memory entity failed: %v", err)
+	}
+
+	entity := &MemoryEntity{
+		Id:                 dbEntity.MemoryID,
+		CreatedAt:          dbEntity.CreatedAt,
+		Content:            dbEntity.Content,
+		Tags:               []string(dbEntity.Tags),
+		PotentialQuestions: []string(dbEntity.PotentialQuestions),
+		C_Score:            dbEntity.C_Score,
+		O_Score:            dbEntity.O_Score,
+		R_Score:            dbEntity.R_Score,
+		E_Score:            dbEntity.E_Score,
+		P_Score:            dbEntity.P_Score,
+		A_Score:            dbEntity.A_Score,
+		T_Score:            dbEntity.T_Score,
+		CorePactVector:     []float32(dbEntity.CorePactVector),
+	}
+
+	return entity, nil
+}
+
+// ListAllMemories 列出所有记忆条目
+func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*MemoryEntity, error) {
+	db := consts.GetGormProjectDatabase()
+	if db == nil {
+		return nil, utils.Errorf("database connection is nil")
+	}
+
+	query := db.Where("session_id = ?", r.sessionID).Order("created_at DESC")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	var dbEntities []schema.AIMemoryEntity
+	if err := query.Find(&dbEntities).Error; err != nil {
+		return nil, utils.Errorf("query memory entities failed: %v", err)
+	}
+
+	var results []*MemoryEntity
+	for _, dbEntity := range dbEntities {
+		entity := &MemoryEntity{
+			Id:                 dbEntity.MemoryID,
+			CreatedAt:          dbEntity.CreatedAt,
+			Content:            dbEntity.Content,
+			Tags:               []string(dbEntity.Tags),
+			PotentialQuestions: []string(dbEntity.PotentialQuestions),
+			C_Score:            dbEntity.C_Score,
+			O_Score:            dbEntity.O_Score,
+			R_Score:            dbEntity.R_Score,
+			E_Score:            dbEntity.E_Score,
+			P_Score:            dbEntity.P_Score,
+			A_Score:            dbEntity.A_Score,
+			T_Score:            dbEntity.T_Score,
+			CorePactVector:     []float32(dbEntity.CorePactVector),
+		}
+		results = append(results, entity)
+	}
+
+	return results, nil
 }

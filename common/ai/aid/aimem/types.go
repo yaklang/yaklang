@@ -93,6 +93,9 @@ type AIMemoryTriage struct {
 	invoker         aicommon.AIInvokeRuntime
 	contextProvider func() (string, error)
 	sessionID       string
+
+	// HNSW后端用于ScoreVector搜索
+	hnswBackend *AIMemoryHNSWBackend
 }
 
 // WithContextProvider 设置上下文提供者

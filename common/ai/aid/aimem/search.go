@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -174,77 +173,22 @@ func (r *AIMemoryTriage) SearchByScoreVector(targetScores *MemoryEntity, limit i
 		float32(targetScores.T_Score),
 	}
 
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		return nil, utils.Errorf("database connection is nil")
+	// 使用HNSW后端搜索
+	if r.hnswBackend == nil {
+		return nil, utils.Errorf("HNSW backend is not initialized")
 	}
 
-	// 获取所有记忆条目
-	var dbEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
-		return nil, utils.Errorf("query memory entities failed: %v", err)
+	searchResults, err := r.hnswBackend.Search(queryVector, limit)
+	if err != nil {
+		return nil, utils.Errorf("HNSW search failed: %v", err)
 	}
 
-	if len(dbEntities) == 0 {
-		return []*SearchResult{}, nil
-	}
-
-	// 计算相似度
-	type scoredEntity struct {
-		entity     *MemoryEntity
-		similarity float64
-	}
-
-	var scoredEntities []scoredEntity
-	for _, dbEntity := range dbEntities {
-		entity := &MemoryEntity{
-			Id:                 dbEntity.MemoryID,
-			CreatedAt:          dbEntity.CreatedAt,
-			Content:            dbEntity.Content,
-			Tags:               []string(dbEntity.Tags),
-			PotentialQuestions: []string(dbEntity.PotentialQuestions),
-			C_Score:            dbEntity.C_Score,
-			O_Score:            dbEntity.O_Score,
-			R_Score:            dbEntity.R_Score,
-			E_Score:            dbEntity.E_Score,
-			P_Score:            dbEntity.P_Score,
-			A_Score:            dbEntity.A_Score,
-			T_Score:            dbEntity.T_Score,
-			CorePactVector:     []float32(dbEntity.CorePactVector),
-		}
-
-		// 计算余弦相似度
-		similarity, err := hnsw.CosineSimilarity(queryVector, entity.CorePactVector)
-		if err != nil {
-			log.Warnf("calculate similarity failed for entity %s: %v", entity.Id, err)
-			continue
-		}
-
-		scoredEntities = append(scoredEntities, scoredEntity{
-			entity:     entity,
-			similarity: similarity,
-		})
-	}
-
-	// 按相似度排序
-	for i := 0; i < len(scoredEntities)-1; i++ {
-		for j := i + 1; j < len(scoredEntities); j++ {
-			if scoredEntities[i].similarity < scoredEntities[j].similarity {
-				scoredEntities[i], scoredEntities[j] = scoredEntities[j], scoredEntities[i]
-			}
-		}
-	}
-
-	// 取topK
-	if limit > 0 && len(scoredEntities) > limit {
-		scoredEntities = scoredEntities[:limit]
-	}
-
+	// 转换结果格式
 	var results []*SearchResult
-	for _, scored := range scoredEntities {
+	for _, sr := range searchResults {
 		results = append(results, &SearchResult{
-			Entity: scored.entity,
-			Score:  scored.similarity,
+			Entity: sr.Entity,
+			Score:  sr.Score,
 		})
 	}
 
