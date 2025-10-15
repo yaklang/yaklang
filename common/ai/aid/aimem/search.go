@@ -12,11 +12,7 @@ import (
 )
 
 // SearchBySemantics 通过语义搜索记忆
-func (r *AIMemoryTriage) SearchBySemantics(sessionID string, query string, limit int) ([]*SearchResult, error) {
-	if sessionID == "" {
-		return nil, utils.Errorf("sessionID is required")
-	}
-
+func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchResult, error) {
 	// 使用 RAG 搜索相关问题
 	ragResults, err := r.rag.QueryWithPage(query, 1, limit)
 	if err != nil {
@@ -45,7 +41,7 @@ func (r *AIMemoryTriage) SearchBySemantics(sessionID string, query string, limit
 
 		// 从数据库获取完整记忆条目
 		var dbEntity schema.AIMemoryEntity
-		if err := db.Where("memory_id = ? AND session_id = ?", memoryID, sessionID).First(&dbEntity).Error; err != nil {
+		if err := db.Where("memory_id = ? AND session_id = ?", memoryID, r.sessionID).First(&dbEntity).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				log.Warnf("memory entity not found in database: %s", memoryID)
 				continue
@@ -80,17 +76,13 @@ func (r *AIMemoryTriage) SearchBySemantics(sessionID string, query string, limit
 }
 
 // SearchByScores 按照C.O.R.E. P.A.C.T.评分搜索
-func (r *AIMemoryTriage) SearchByScores(sessionID string, filter *ScoreFilter, limit int) ([]*MemoryEntity, error) {
-	if sessionID == "" {
-		return nil, utils.Errorf("sessionID is required")
-	}
-
+func (r *AIMemoryTriage) SearchByScores(filter *ScoreFilter, limit int) ([]*MemoryEntity, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}
 
-	query := db.Where("session_id = ?", sessionID)
+	query := db.Where("session_id = ?", r.sessionID)
 
 	if filter != nil {
 		if filter.C_Min > 0 || filter.C_Max > 0 {
@@ -170,11 +162,7 @@ func (r *AIMemoryTriage) SearchByScores(sessionID string, filter *ScoreFilter, l
 }
 
 // SearchByScoreVector 通过分数向量搜索相似的记忆（基于HNSW）
-func (r *AIMemoryTriage) SearchByScoreVector(sessionID string, targetScores *MemoryEntity, limit int) ([]*SearchResult, error) {
-	if sessionID == "" {
-		return nil, utils.Errorf("sessionID is required")
-	}
-
+func (r *AIMemoryTriage) SearchByScoreVector(targetScores *MemoryEntity, limit int) ([]*SearchResult, error) {
 	// 构建目标向量
 	queryVector := []float32{
 		float32(targetScores.C_Score),
@@ -193,7 +181,7 @@ func (r *AIMemoryTriage) SearchByScoreVector(sessionID string, targetScores *Mem
 
 	// 获取所有记忆条目
 	var dbEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", sessionID).Find(&dbEntities).Error; err != nil {
+	if err := db.Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 
@@ -264,10 +252,7 @@ func (r *AIMemoryTriage) SearchByScoreVector(sessionID string, targetScores *Mem
 }
 
 // SearchByTags 按照标签搜索
-func (r *AIMemoryTriage) SearchByTags(sessionID string, tags []string, matchAll bool, limit int) ([]*MemoryEntity, error) {
-	if sessionID == "" {
-		return nil, utils.Errorf("sessionID is required")
-	}
+func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*MemoryEntity, error) {
 	if len(tags) == 0 {
 		return nil, utils.Errorf("at least one tag is required")
 	}
@@ -278,7 +263,7 @@ func (r *AIMemoryTriage) SearchByTags(sessionID string, tags []string, matchAll 
 	}
 
 	var dbEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", sessionID).Find(&dbEntities).Error; err != nil {
+	if err := db.Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 

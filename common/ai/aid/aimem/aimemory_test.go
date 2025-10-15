@@ -20,49 +20,6 @@ import (
 //go:embed testdata/mock_embedding_data.json
 var mockEmbeddingDataJSON []byte
 
-// MockEmbeddingClient mock的embedding客户端，用于测试
-type MockEmbeddingClient struct {
-	embeddingData map[string][]float32
-}
-
-// NewMockEmbeddingClient 创建mock embedding客户端
-func NewMockEmbeddingClient() (*MockEmbeddingClient, error) {
-	var embeddingData map[string][]float32
-	if err := json.Unmarshal(mockEmbeddingDataJSON, &embeddingData); err != nil {
-		return nil, utils.Errorf("failed to unmarshal mock embedding data: %v", err)
-	}
-
-	log.Infof("loaded %d mock embedding entries", len(embeddingData))
-	return &MockEmbeddingClient{
-		embeddingData: embeddingData,
-	}, nil
-}
-
-// Embedding 实现EmbeddingClient接口
-func (m *MockEmbeddingClient) Embedding(text string) ([]float32, error) {
-	if embedding, ok := m.embeddingData[text]; ok {
-		return embedding, nil
-	}
-
-	// 如果找不到，返回一个默认的向量
-	log.Warnf("text not found in mock data, returning default vector: %s", utils.ShrinkString(text, 50))
-	return generateDefaultVector(text), nil
-}
-
-// generateDefaultVector 为未知文本生成一个简单的默认向量
-func generateDefaultVector(text string) []float32 {
-	// 基于文本长度和hash生成一个简单的向量
-	hash := utils.CalcMd5(text)
-	vec := make([]float32, 768) // 假设维度为768
-
-	for i := 0; i < 768; i++ {
-		// 使用hash的字节来生成向量值
-		vec[i] = float32(hash[i%len(hash)]) / 255.0
-	}
-
-	return vec
-}
-
 // SaveEmbeddingToMockData 将embedding数据保存到mock数据（用于生成测试数据）
 func SaveEmbeddingToMockData(text string, embedding []float32) error {
 	var embeddingData map[string][]float32
@@ -203,8 +160,8 @@ func init() {
 
 // createTestAIMemory 创建用于测试的AIMemory实例，自动注入mock embedding
 func createTestAIMemory(sessionID string, opts ...Option) (*AIMemoryTriage, error) {
-	// 创建mock embedding客户端
-	mockEmbedder, err := NewMockEmbeddingClient()
+	// 创建mock embedding客户端（使用内置的测试数据）
+	mockEmbedder, err := NewMockEmbeddingClientFromJSON(mockEmbeddingDataJSON)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +301,7 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 	assert.NotEmpty(t, entities)
 
 	// 保存到数据库
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	log.Infof("successfully saved %d memory entities", len(entities))
@@ -396,7 +353,7 @@ func TestRAGIndexingVerification(t *testing.T) {
 	entities, err := mem.AddRawText(rawText)
 	assert.NoError(t, err)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 验证RAG文档数量
@@ -449,11 +406,11 @@ func TestSearchBySemantics(t *testing.T) {
 	entities, err := mem.AddRawText(rawText)
 	assert.NoError(t, err)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 执行语义搜索
-	results, err := mem.SearchBySemantics(sessionID, "如何实现语义搜索？", 10)
+	results, err := mem.SearchBySemantics("如何实现语义搜索？", 10)
 	assert.NoError(t, err)
 
 	log.Infof("semantic search returned %d results", len(results))
@@ -487,7 +444,7 @@ func TestSearchByScoreVector(t *testing.T) {
 	entities, err := mem.AddRawText(rawText)
 	assert.NoError(t, err)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 构建目标分数向量（寻找相似评分的记忆）
@@ -502,7 +459,7 @@ func TestSearchByScoreVector(t *testing.T) {
 	}
 
 	// 执行向量相似度搜索
-	results, err := mem.SearchByScoreVector(sessionID, targetScores, 10)
+	results, err := mem.SearchByScoreVector(targetScores, 10)
 	assert.NoError(t, err)
 
 	log.Infof("score vector search returned %d results", len(results))
@@ -541,7 +498,7 @@ func TestSearchByScores(t *testing.T) {
 	entities, err := mem.AddRawText(rawText)
 	assert.NoError(t, err)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 搜索高相关性的记忆
@@ -549,7 +506,7 @@ func TestSearchByScores(t *testing.T) {
 		R_Min: 0.7,
 		R_Max: 1.0,
 	}
-	results, err := mem.SearchByScores(sessionID, filter, 10)
+	results, err := mem.SearchByScores(filter, 10)
 	assert.NoError(t, err)
 
 	log.Infof("score search returned %d results", len(results))
@@ -582,11 +539,11 @@ func TestSearchByTags(t *testing.T) {
 	entities, err := mem.AddRawText(rawText)
 	assert.NoError(t, err)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 按标签搜索
-	results, err := mem.SearchByTags(sessionID, []string{"AI开发"}, false, 10)
+	results, err := mem.SearchByTags([]string{"AI开发"}, false, 10)
 	assert.NoError(t, err)
 
 	log.Infof("tag search returned %d results", len(results))
@@ -627,11 +584,11 @@ func TestGetAllTags(t *testing.T) {
 	entities, err := mem.AddRawText(rawText)
 	assert.NoError(t, err)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 获取所有标签
-	tags, err := mem.GetAllTags(sessionID)
+	tags, err := mem.GetAllTags()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, tags)
 
@@ -661,11 +618,11 @@ func TestGetDynamicContextWithTags(t *testing.T) {
 	entities, err := mem.AddRawText(rawText)
 	assert.NoError(t, err)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 获取动态上下文
-	context, err := mem.GetDynamicContextWithTags(sessionID)
+	context, err := mem.GetDynamicContextWithTags()
 	assert.NoError(t, err)
 	assert.NotEmpty(t, context)
 
@@ -692,23 +649,23 @@ func TestErrorHandling(t *testing.T) {
 	}
 
 	// 测试空字符串搜索
-	results, err := mem.SearchBySemantics(sessionID, "", 5)
+	results, err := mem.SearchBySemantics("", 5)
 	assert.NoError(t, err)
 	assert.Empty(t, results)
 
 	// 测试无效的分数范围
 	filter := &ScoreFilter{R_Min: 2.0, R_Max: 3.0} // 超出0-1范围
-	results2, err := mem.SearchByScores("R_Score", filter, 5)
+	results2, err := mem.SearchByScores(filter, 5)
 	assert.NoError(t, err)
 	assert.Empty(t, results2)
 
 	// 测试空标签搜索
-	_, err = mem.SearchByTags(sessionID, []string{}, false, 5)
+	_, err = mem.SearchByTags([]string{}, false, 5)
 	assert.Error(t, err) // 应该返回错误，因为至少需要一个标签
 	assert.Contains(t, err.Error(), "at least one tag is required")
 
 	// 测试不存在的标签
-	results4, err := mem.SearchByTags(sessionID, []string{"不存在的标签"}, false, 5)
+	results4, err := mem.SearchByTags([]string{"不存在的标签"}, false, 5)
 	assert.NoError(t, err)
 	assert.Empty(t, results4)
 
@@ -764,7 +721,7 @@ func TestSearchEdgeCases(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, entities)
 
-	err = mem.SaveMemoryEntities(sessionID, entities...)
+	err = mem.SaveMemoryEntities(entities...)
 	assert.NoError(t, err)
 
 	// 测试SearchByScores的不同分数维度
@@ -779,13 +736,13 @@ func TestSearchEdgeCases(t *testing.T) {
 			A_Min: 0.0, A_Max: 1.0,
 			T_Min: 0.0, T_Max: 1.0,
 		}
-		results, err := mem.SearchByScores(dim, filter, 10)
+		results, err := mem.SearchByScores(filter, 10)
 		assert.NoError(t, err)
 		log.Infof("search by %s returned %d results", dim, len(results))
 	}
 
 	// 测试SearchByTags的matchAll模式
-	results, err := mem.SearchByTags(sessionID, []string{"AI开发"}, true, 10)
+	results, err := mem.SearchByTags([]string{"AI开发"}, true, 10)
 	assert.NoError(t, err)
 	log.Infof("tag search (matchAll) returned %d results", len(results))
 
@@ -793,7 +750,7 @@ func TestSearchEdgeCases(t *testing.T) {
 	targetEntity := &MemoryEntity{
 		CorePactVector: []float32{0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5},
 	}
-	results2, err := mem.SearchByScoreVector(sessionID, targetEntity, 10)
+	results2, err := mem.SearchByScoreVector(targetEntity, 10)
 	assert.NoError(t, err)
 	log.Infof("score vector search returned %d results", len(results2))
 
