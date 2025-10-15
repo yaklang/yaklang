@@ -3,6 +3,7 @@ package entityrepos
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -19,7 +20,7 @@ import (
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	// 创建临时文件数据库用于测试，避免并发访问问题
-	tmpDir := t.TempDir()
+	tmpDir := consts.GetDefaultYakitBaseTempDir()
 	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
 
 	db, err := gorm.Open("sqlite3", dbFile)
