@@ -463,7 +463,7 @@ func (r *EntityRepository) dfsFindPathsOptimized(ctx context.Context, queryConfi
 		}
 	}
 	pathLength := r.getPathLength(currentPath)
-	if pathLength >= queryConfig.PathDepth {
+	if queryConfig.PathDepth > 0 && pathLength >= queryConfig.PathDepth {
 		log.Debugf("Reached path deep limit for entity: %s, path length: %d", currentEntity.EntityName, pathLength)
 		pathCopy := r.copyHopBlock(currentPath)
 		allPaths.SafeFeed(pathCopy)

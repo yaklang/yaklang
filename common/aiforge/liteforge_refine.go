@@ -350,5 +350,5 @@ func BuildKnowledgeFromEntityReposByName(name string, option ...any) (<-chan *sc
 		return nil, utils.Errorf("failed to create knowledge base: %v", err)
 	}
 
-	return BuildKnowledgeFromEntityRepository(er, kb, option...)
+	return BuildKnowledgeFromEntityRepository(er, kb, append(option, WithAllowMultiHopAIRefine(true))...)
 }
