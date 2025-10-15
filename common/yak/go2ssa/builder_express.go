@@ -501,6 +501,9 @@ func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, IslValue bo
 		if id := exp.OperandName(); id != nil {
 			leftv = b.buildOperandNameL(id.(*gol.OperandNameContext), false)
 		}
+		if literal := exp.Literal(); literal != nil {
+			rightv = b.buildLiteral(literal.(*gol.LiteralContext))
+		}
 	}
 	return rightv, leftv
 }

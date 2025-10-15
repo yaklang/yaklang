@@ -102,31 +102,8 @@ jobs:
         run: |
           echo "Skipped: ${{ steps.validate.outputs.skip_reason }}"
 
-      - name: Restore cached YakLang project
+      - name: Check out code
         if: steps.validate.outputs.should_skip != 'true'
-        uses: actions/cache@v3
-        id: cache-project
-        with:
-          path: |
-            ~/yakit-projects
-            ~/go/pkg/mod
-          key: go-${{ steps.cache_key.outputs.sha }}
-          restore-keys: |
-            go-
-
-      - name: Clean problematic directories
-        if: steps.validate.outputs.should_skip != 'true'
-        run: |
-          if [ -d "vendor" ]; then
-            sudo chmod -R +w vendor/ 2>/dev/null || true
-            sudo rm -rf vendor/ || rm -rf vendor/ || true
-          fi
-          if [ -d ".git/modules" ]; then
-            sudo chmod -R +w .git/modules/ 2>/dev/null || true
-          fi
-
-      - name: Check out code into the Go module directory
-        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
         uses: actions/checkout@v3
         with:
           ref: ${{ env.HEAD_SHA }}
@@ -134,50 +111,74 @@ jobs:
           clean: false
 
       - name: Fetch Main And Reset Main
-        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
+        if: steps.validate.outputs.should_skip != 'true'
         run: |
           git fetch --all
           git checkout main
           git reset --hard origin/main
 
-      - name: Set up Go 1.x
-        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: "./go.mod"
-        id: go
-
-      - name: Init Module
-        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
-        run: |
-          go mod tidy && go work vendor
-          
-          LIBPCAP_PATH=$(go env GOPATH)/pkg/mod/$(go list -m github.com/yaklang/pcap | sed 's/ /@/')/libpcap
-          
-          if [ -d "$LIBPCAP_PATH" ]; then
-            chmod -R +r "$LIBPCAP_PATH" 2>/dev/null || true
-            mkdir -p ./vendor/github.com/yaklang/pcap/
-            cp -r "$LIBPCAP_PATH" ./vendor/github.com/yaklang/pcap/
-            chmod -R +w ./vendor/github.com/yaklang/pcap/libpcap 2>/dev/null || true
-          fi
-          
-          tree ./vendor || ls -la ./vendor
-
-      - name: Init Project
-        if: steps.validate.outputs.should_skip != 'true' && steps.cache-project.outputs.cache-hit != 'true'
+      - name: Install Yak
+        if: steps.validate.outputs.should_skip != 'true'
         env: 
           SKIP_SYNC_EMBED_RULE_IN_GITHUB: "true"
         run: |
-          go build common/yak/cmd/yak.go 
-          ./yak --help
+          echo "::group::Downloading Yak installation script"
+          if ! curl -sS -L http://oss.yaklang.io/install-latest-yak.sh -o install-latest-yak.sh; then
+            echo "::error::Failed to download Yak installation script"
+            exit 1
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::Installing Yak"
+          chmod +x install-latest-yak.sh
+          if ! ./install-latest-yak.sh; then
+            echo "::error::Failed to install Yak"
+            exit 1
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::Verifying Yak installation"
+          if ! yak version; then
+            echo "::error::Yak installation verification failed"
+            exit 1
+          fi
+          echo "::endgroup::"
 
       - name: Generate Prog
         if: steps.validate.outputs.should_skip != 'true'
         run: |
-          git checkout ${{ env.HEAD_SHA }}
-          ./yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw
+          echo "::group::Checking out target commit"
+          if ! git checkout ${{ env.HEAD_SHA }}; then
+            echo "::error::Failed to checkout commit ${{ env.HEAD_SHA }}"
+            exit 1
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::Importing SyntaxFlow rules"
+          if ! yak sf-import --file common/ssa_bootstrapping/ci_rule/ --format raw; then
+            echo "::error::Failed to import SyntaxFlow rules"
+            exit 1
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::Generating file system snapshot"
           MERGE_BASE=$(git merge-base main ${{ env.HEAD_SHA }})
-          ./yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip 
+          if [ -z "$MERGE_BASE" ]; then
+            echo "::error::Failed to find merge base between main and ${{ env.HEAD_SHA }}"
+            exit 1
+          fi
+          echo "Merge base: $MERGE_BASE"
+          
+          if ! yak gitefs --start $MERGE_BASE --end ${{ env.HEAD_SHA }} --output ./fs.zip; then
+            echo "::error::Failed to generate file system snapshot"
+            exit 1
+          fi
+          
+          if [ ! -f "./fs.zip" ]; then
+            echo "::error::fs.zip was not created"
+            exit 1
+          fi
+          echo "::endgroup::" 
 
       - name: Upload fs.zip
         if: steps.validate.outputs.should_skip != 'true'
@@ -190,28 +191,36 @@ jobs:
         if: steps.validate.outputs.should_skip != 'true'
         id: scan
         run: |
-          ./yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go
+          echo "::group::Running security scan"
+          if ! yak code-scan -t ./fs.zip -l golang --rule-keyword golang --format irify -o risk --memory --log-level debug --exclude-file **/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**,*.pb.go; then
+            echo "::error::Security scan failed"
+            exit 1
+          fi
+          echo "::endgroup::"
+          
+          echo "::group::Processing scan results"
+          if [ ! -f "./risk.json" ]; then
+            echo "::error::risk.json was not generated"
+            exit 1
+          fi
+          
           NUM=$(cat risk.json | jq .RiskNums)
+          if [ -z "$NUM" ]; then
+            echo "::error::Failed to extract risk count from risk.json"
+            exit 1
+          fi
+          
+          echo "Found $NUM security risks"
           echo "risk_count=$NUM" >> $GITHUB_OUTPUT
+          
           if [ $NUM == 0 ]; then
             echo "scan_result=success" >> $GITHUB_OUTPUT
+            echo "::notice::No security risks found"
           else
             echo "scan_result=failure" >> $GITHUB_OUTPUT
+            echo "::warning::Found $NUM security risks"
           fi
-        # Get-Content risk.json -Encoding UTF8 | jq .RiskNums
-
-      - name: Setup Python environment
-        if: steps.validate.outputs.should_skip != 'true'
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.9'
-          cache: 'pip'
-
-      - name: Install Python dependencies
-        if: steps.validate.outputs.should_skip != 'true'
-        run: |
-          pip install --quiet --upgrade pip
-          pip install --quiet pyyaml requests
+          echo "::endgroup::"
 
       - name: Verify GitHub token permissions
         if: steps.validate.outputs.should_skip != 'true' && env.PR_NUMBER != '0'
@@ -236,6 +245,7 @@ jobs:
       - name: Generate security report
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure'
         run: |
+          echo "::group::Preparing report generation"
           rm -rf results
           
           if [ ! -f "./risk.json" ]; then
@@ -247,30 +257,44 @@ jobs:
             echo "::error::AWK script not found: ./scripts/ssa-risk-tools/extract-risks-deserializer.awk"
             exit 1
           fi
+          echo "::endgroup::"
           
-          awk -f scripts/ssa-risk-tools/extract-risks-deserializer.awk ./risk.json
+          echo "::group::Generating security report"
+          if ! awk -f scripts/ssa-risk-tools/extract-risks-deserializer.awk ./risk.json; then
+            echo "::error::Failed to generate security report with AWK script"
+            exit 1
+          fi
+          echo "::endgroup::"
           
-          if [ -d "results" ]; then
-            HIGH_CRITICAL_COUNT=0
-            if [ -f "results/scan_summary.txt" ]; then
-              if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
-                COUNT_RESULT=$(grep -c "严重程度: high\|严重程度: critical" results/risk_details_*.txt 2>/dev/null || echo "0")
-                if [[ "$COUNT_RESULT" =~ ^[0-9]+$ ]]; then
-                  HIGH_CRITICAL_COUNT=$COUNT_RESULT
-                else
-                  HIGH_CRITICAL_COUNT=0
-                fi
+          echo "::group::Analyzing report results"
+          if [ ! -d "results" ]; then
+            echo "::error::Results directory was not created"
+            exit 1
+          fi
+          
+          HIGH_CRITICAL_COUNT=0
+          if [ -f "results/scan_summary.txt" ]; then
+            echo "Scan summary generated successfully"
+            if ls results/risk_details_*.txt 1> /dev/null 2>&1; then
+              COUNT_RESULT=$(grep -c "严重程度: high\|严重程度: critical" results/risk_details_*.txt 2>/dev/null || echo "0")
+              if [[ "$COUNT_RESULT" =~ ^[0-9]+$ ]]; then
+                HIGH_CRITICAL_COUNT=$COUNT_RESULT
               else
+                echo "::warning::Failed to parse high/critical risk count, defaulting to 0"
                 HIGH_CRITICAL_COUNT=0
               fi
             else
+              echo "::notice::No risk detail files found"
               HIGH_CRITICAL_COUNT=0
             fi
-            echo "HIGH_CRITICAL_COUNT=$HIGH_CRITICAL_COUNT" >> $GITHUB_OUTPUT
           else
-            echo "::error::Failed to generate results directory"
-            exit 1
+            echo "::warning::Scan summary file not found"
+            HIGH_CRITICAL_COUNT=0
           fi
+          
+          echo "High/Critical risks found: $HIGH_CRITICAL_COUNT"
+          echo "HIGH_CRITICAL_COUNT=$HIGH_CRITICAL_COUNT" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
 
       - name: Clean up old security comments (No vulnerabilities found)
         if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
@@ -331,73 +355,93 @@ jobs:
             const fs = require('fs');
             
             try {
-              // 从文件读取报告内容，避免 JavaScript 关键字冲突
+              console.log('::group::Reading security report');
               const path = require('path');
               const resultsDir = path.join(process.cwd(), 'results');
+              console.log(`Results directory: ${resultsDir}`);
               
               let report = '';
               const summaryFile = path.join(resultsDir, 'scan_summary.txt');
-              if (fs.existsSync(summaryFile)) {
-                report = fs.readFileSync(summaryFile, 'utf8');
-              } else {
-                report = '报告文件未找到';
+              
+              if (!fs.existsSync(resultsDir)) {
+                core.error('Results directory does not exist');
+                throw new Error('Results directory not found');
               }
               
-              // 定义安全扫描评论的唯一标识符
+              if (fs.existsSync(summaryFile)) {
+                report = fs.readFileSync(summaryFile, 'utf8');
+                console.log(`Successfully read summary file (${report.length} characters)`);
+              } else {
+                core.error(`Summary file not found: ${summaryFile}`);
+                report = '⚠️ 报告文件未找到';
+              }
+              console.log('::endgroup::');
+              
+              console.log('::group::Fetching existing PR comments');
               const commentIdentifier = '<!-- security-scan-report:main -->';
               
-              // 使用更高效的查询方式：只查询机器人自己的评论
               const comments = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: Number(process.env.PR_NUMBER),
                 per_page: 100
               });
+              console.log(`Found ${comments.data.length} total comments on PR`);
               
-              // 查找现有的安全扫描主报告评论（只查找机器人自己的评论）
               let existingMainComment = null;
               for (const comment of comments.data) {
-                // 只处理机器人自己的评论，避免误操作其他人的评论
                 if (comment.user.type === 'Bot' && comment.body.includes(commentIdentifier)) {
                   existingMainComment = comment;
+                  console.log(`Found existing main security comment (ID: ${comment.id})`);
                   break;
                 }
               }
               
-              // 在报告内容中添加标识符
+              if (!existingMainComment) {
+                console.log('No existing main security comment found');
+              }
+              console.log('::endgroup::');
+              
+              console.log('::group::Posting/Updating main security report');
               const reportWithIdentifier = commentIdentifier + '\n\n' + report;
               
               if (existingMainComment) {
-                // 更新现有主报告评论
                 await github.rest.issues.updateComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   comment_id: existingMainComment.id,
                   body: reportWithIdentifier
                 });
-                console.log('Security report comment updated successfully');
+                console.log(`✅ Security report comment updated (ID: ${existingMainComment.id})`);
               } else {
-                // 创建新的主报告评论
-                await github.rest.issues.createComment({
+                const newComment = await github.rest.issues.createComment({
                   issue_number: Number(process.env.PR_NUMBER),
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   body: reportWithIdentifier
                 });
-                console.log('Security report comment posted successfully to PR comments');
+                console.log(`✅ Security report comment created (ID: ${newComment.data.id})`);
               }
+              console.log('::endgroup::');
               
               // 然后尝试在具体的代码行上添加评论
               // 读取 results 目录中的风险详情文件
               
+              console.log('::group::Processing detailed risk files');
               try {
                 if (fs.existsSync(resultsDir)) {
                   const files = fs.readdirSync(resultsDir);
                   const detailFiles = files.filter(file => file.startsWith('risk_details_') && file.endsWith('.txt'));
+                  console.log(`Found ${detailFiles.length} risk detail files`);
+                  
+                  let processedCount = 0;
+                  let skippedCount = 0;
+                  let commentedCount = 0;
                   
                   for (const detailFile of detailFiles) {
                     const detailPath = path.join(resultsDir, detailFile);
                     const content = fs.readFileSync(detailPath, 'utf8');
+                    processedCount++;
                     
                     // 解析文件内容
                     const lines = content.split('\n');
@@ -411,6 +455,7 @@ jobs:
                     // 解析文件内容，处理多行字段
                     let inDescription = false;
                     let inSolution = false;
+                    let inCodeFragment = false;
                     
                     for (let i = 0; i < lines.length; i++) {
                       const line = lines[i];
@@ -425,17 +470,25 @@ jobs:
                         title = line.replace('中文标题:', '').trim();
                       } else if (line.startsWith('标题:') && !title) {
                         title = line.replace('标题:', '').trim();
+                      } else if (line.startsWith('代码片段:')) {
+                        // 跳过代码片段部分
+                        inCodeFragment = true;
+                        inDescription = false;
+                        inSolution = false;
                       } else if (line.startsWith('描述:')) {
                         description = '';
                         inDescription = true;
                         inSolution = false;
+                        inCodeFragment = false;
                       } else if (line.startsWith('解决方案:')) {
                         solution = '';
                         inDescription = false;
                         inSolution = true;
+                        inCodeFragment = false;
                       } else if (line.startsWith('=== 扫描统计 ===')) {
                         inDescription = false;
                         inSolution = false;
+                        inCodeFragment = false;
                         break;
                       } else if (inDescription) {
                         if (description !== '') {
@@ -448,10 +501,12 @@ jobs:
                         }
                         solution += line;
                       }
+                      // 如果在代码片段中，跳过该行
                     }
                      
                      if (filePath && lineNum && severity && title && (severity === 'high' || severity === 'critical')) {
                        try {
+                         console.log(`Processing ${severity} risk: ${filePath}:${lineNum}`);
                          const codeReference = `\`${filePath}:${lineNum}\``;
                          const lineCommentIdentifier = `<!-- security-line-comment:${filePath}:${lineNum} -->`;
                          const lineLink = `https://github.com/${context.repo.owner}/${context.repo.repo}/blob/${context.sha}/${filePath}#L${lineNum}`;
@@ -495,6 +550,7 @@ jobs:
                              comment_id: existingLineComment.id,
                              body: lineComment
                            });
+                           console.log(`  ✅ Updated comment for ${filePath}:${lineNum}`);
                          } else {
                            await github.rest.issues.createComment({
                              issue_number: Number(process.env.PR_NUMBER),
@@ -502,17 +558,34 @@ jobs:
                              repo: context.repo.repo,
                              body: lineComment
                            });
+                           console.log(`  ✅ Created comment for ${filePath}:${lineNum}`);
                          }
+                         commentedCount++;
                        } catch (lineError) {
-                         console.warn(`Failed to post comment for ${filePath}:${lineNum}`);
+                         core.warning(`Failed to post comment for ${filePath}:${lineNum}: ${lineError.message}`);
+                       }
+                     } else {
+                       if (filePath && lineNum) {
+                         console.log(`  ⏭️  Skipped ${severity || 'unknown'} risk: ${filePath}:${lineNum} (not high/critical)`);
+                         skippedCount++;
                        }
                      }
                   }
+                  
+                  console.log(`\nSummary:`);
+                  console.log(`  - Processed: ${processedCount} detail files`);
+                  console.log(`  - Commented: ${commentedCount} high/critical risks`);
+                  console.log(`  - Skipped: ${skippedCount} lower severity risks`);
+                } else {
+                  core.warning('Results directory not found for detailed processing');
                 }
               } catch (resultsError) {
-                console.warn('Failed to process results directory');
+                core.error(`Failed to process results directory: ${resultsError.message}`);
+                console.error(resultsError);
               }
+              console.log('::endgroup::');
               
+              console.log('::group::Cleaning up outdated comments');
               try {
                 const activeRisks = new Set();
                 if (fs.existsSync(resultsDir)) {
@@ -538,8 +611,12 @@ jobs:
                       activeRisks.add(`${filePath}:${lineNum}`);
                     }
                   }
+                  console.log(`Found ${activeRisks.size} active high/critical risks`);
+                } else {
+                  core.warning('Results directory not found for cleanup');
                 }
                 
+                let deletedCount = 0;
                 for (const comment of comments.data) {
                   if (comment.user.type === 'Bot' && comment.body.includes('<!-- security-line-comment:')) {
                     const match = comment.body.match(/<!-- security-line-comment:([^:]+:\d+) -->/);
@@ -549,12 +626,22 @@ jobs:
                         repo: context.repo.repo,
                         comment_id: comment.id
                       });
+                      console.log(`  🗑️  Deleted outdated comment for ${match[1]}`);
+                      deletedCount++;
                     }
                   }
                 }
+                
+                if (deletedCount > 0) {
+                  console.log(`✅ Cleaned up ${deletedCount} outdated security comments`);
+                } else {
+                  console.log('No outdated comments to clean up');
+                }
               } catch (cleanupError) {
-                console.warn('Failed to cleanup outdated comments');
+                core.warning(`Failed to cleanup outdated comments: ${cleanupError.message}`);
+                console.error(cleanupError);
               }
+              console.log('::endgroup::');
               
               process.exit(1);
               
@@ -572,16 +659,8 @@ jobs:
 
       - name: Display high severity risks
         if: steps.validate.outputs.should_skip != 'true' && failure()
-        run: ./yak ssa-risk --input ./risk.json --with-code --severity high
+        run: yak ssa-risk --input ./risk.json --with-code --severity high
 
       - name: Display all risks
         if: steps.validate.outputs.should_skip != 'true' && failure()
-        run: ./yak ssa-risk --input ./risk.json --with-code
-      
-      - name: Cleanup workspace
-        if: always()
-        run: |
-          if [ -d "vendor" ]; then
-            sudo chmod -R +w vendor/ 2>/dev/null || chmod -R +w vendor/ || true
-            rm -rf vendor/ || true
-          fi
+        run: yak ssa-risk --input ./risk.json --with-code
