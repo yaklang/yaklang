@@ -149,15 +149,14 @@ func InitMITMCert() {
 
 	if defaultGMCA != nil && defaultGMKey != nil {
 		// just check if the cert is valid
-		if _, err := gmtls.X509KeyPair(defaultGMCA, defaultGMKey); err == nil {
-			log.Debug("Successfully load GM cert and key from default files")
-			return
-		} else {
+		if _, err := gmtls.X509KeyPair(defaultGMCA, defaultGMKey); err != nil {
 			log.Infof("detect gm ca certs n key err for parsing, re-generate it, reason: %v", err)
 			_ = os.RemoveAll(defaultGMCAFile)
 			_ = os.RemoveAll(defaultGMKeyFile)
 			defaultGMCA = nil
 			defaultGMKey = nil
+		} else {
+			log.Debug("Successfully load GM cert and key from default files")
 		}
 	}
 
