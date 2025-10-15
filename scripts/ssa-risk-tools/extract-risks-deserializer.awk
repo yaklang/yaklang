@@ -180,6 +180,28 @@ function find_end_quote(str, start_pos) {
     return 0
 }
 
+# 统一的转义字符处理函数
+function unescape_json_string(str) {
+    # 处理 JSON 转义字符，按照正确的顺序
+    # 先处理 \r\n (Windows 换行)
+    gsub(/\\r\\n/, "\n", str)
+    # 再处理单独的 \n
+    gsub(/\\n/, "\n", str)
+    # 处理 \r
+    gsub(/\\r/, "\r", str)
+    # 处理制表符
+    gsub(/\\t/, "\t", str)
+    # 处理引号
+    gsub(/\\"/, "\"", str)
+    # 处理 Unicode 转义（常见的 HTML 实体）
+    gsub(/\\u003c/, "<", str)
+    gsub(/\\u003e/, ">", str)
+    gsub(/\\u0026/, "\\&", str)
+    # 处理反斜杠（必须最后处理）
+    gsub(/\\\\/, "\\", str)
+    return str
+}
+
 # 处理任何非空行，标记文件不为空
 NF > 0 {
     file_is_empty = 0
@@ -279,9 +301,9 @@ function start_multiline_field(field_name, line) {
     end_quote_pos = find_end_quote(rest_line, 2)
     
     if (end_quote_pos > 0) {
-        # 单行完整字符串
+        # 单行完整字符串，需要转义处理
         raw_content = substr(rest_line, 2, end_quote_pos - 2)
-        risk_data[field_name] = raw_content
+        risk_data[field_name] = unescape_json_string(raw_content)
         return 1  # 完成
     } else {
         # 多行字符串，开始累积
@@ -309,7 +331,7 @@ in_risk && in_description {
     end_quote_pos = find_end_quote($0, 1)
     if (end_quote_pos > 0) {
         description_raw = description_raw substr($0, 1, end_quote_pos - 1)
-        risk_data["description"] = description_raw
+        risk_data["description"] = unescape_json_string(description_raw)
         in_description = 0
         description_raw = ""
     } else {
@@ -337,7 +359,7 @@ in_risk && in_solution {
     end_quote_pos = find_end_quote($0, 1)
     if (end_quote_pos > 0) {
         solution_raw = solution_raw substr($0, 1, end_quote_pos - 1)
-        risk_data["solution"] = solution_raw
+        risk_data["solution"] = unescape_json_string(solution_raw)
         in_solution = 0
         solution_raw = ""
     } else {
@@ -365,7 +387,7 @@ in_risk && in_code_fragment {
     end_quote_pos = find_end_quote($0, 1)
     if (end_quote_pos > 0) {
         code_fragment_raw = code_fragment_raw substr($0, 1, end_quote_pos - 1)
-        risk_data["code_fragment"] = code_fragment_raw
+        risk_data["code_fragment"] = unescape_json_string(code_fragment_raw)
         in_code_fragment = 0
         code_fragment_raw = ""
     } else {
