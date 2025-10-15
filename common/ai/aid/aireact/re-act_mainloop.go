@@ -2,6 +2,7 @@ package aireact
 
 import (
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
@@ -85,12 +86,21 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 			r.SetCurrentPlanExecutionTask(nil)
 		}),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
+			r.wg.Add(1)
 			diffStr, err := r.timelineDiffer.Diff()
 			if err != nil {
 				log.Warnf("timeline differ call failed: %v", err)
+				r.wg.Done()
 				return
 			}
 			go func() {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("memory triage panic: %v", err)
+						utils.PrintCurrentGoroutineRuntimeStack()
+					}
+					r.wg.Done()
+				}()
 				entities, err := r.memoryTriage.AddRawText(diffStr)
 				if err != nil {
 					log.Warnf("memory triage call failed: %v", err)
@@ -100,6 +110,12 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 					}
 					for _, e := range entities {
 						log.Infof("memory triage content: %v", e.String())
+					}
+					// Save memory entities to database
+					if err := r.memoryTriage.SaveMemoryEntities(entities...); err != nil {
+						log.Warnf("save memory entities to database failed: %v", err)
+					} else {
+						log.Infof("saved %d memory entities to database", len(entities))
 					}
 				}
 			}()

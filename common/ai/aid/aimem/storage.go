@@ -12,11 +12,7 @@ import (
 )
 
 // SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统
-func (r *AIMemoryTriage) SaveMemoryEntities(sessionID string, entities ...*MemoryEntity) error {
-	if sessionID == "" {
-		return utils.Errorf("sessionID is required")
-	}
-
+func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return utils.Errorf("database connection is nil")
@@ -30,7 +26,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(sessionID string, entities ...*Memor
 		// 保存到数据库
 		dbEntity := &schema.AIMemoryEntity{
 			MemoryID:           entity.Id,
-			SessionID:          sessionID,
+			SessionID:          r.sessionID,
 			Content:            entity.Content,
 			Tags:               schema.StringArray(entity.Tags),
 			PotentialQuestions: schema.StringArray(entity.PotentialQuestions),
@@ -64,7 +60,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(sessionID string, entities ...*Memor
 			err := r.rag.Add(docID, question,
 				rag.WithDocumentMetadataKeyValue("memory_id", entity.Id),
 				rag.WithDocumentMetadataKeyValue("question", question),
-				rag.WithDocumentMetadataKeyValue("session_id", sessionID),
+				rag.WithDocumentMetadataKeyValue("session_id", r.sessionID),
 			)
 			if err != nil {
 				log.Errorf("index question to RAG failed: %v", err)
@@ -79,18 +75,14 @@ func (r *AIMemoryTriage) SaveMemoryEntities(sessionID string, entities ...*Memor
 }
 
 // GetAllTags 获取当前会话的所有标签
-func (r *AIMemoryTriage) GetAllTags(sessionID string) ([]string, error) {
-	if sessionID == "" {
-		return nil, utils.Errorf("sessionID is required")
-	}
-
+func (r *AIMemoryTriage) GetAllTags() ([]string, error) {
 	db := consts.GetGormProjectDatabase()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}
 
 	var dbEntities []schema.AIMemoryEntity
-	if err := db.Where("session_id = ?", sessionID).Find(&dbEntities).Error; err != nil {
+	if err := db.Where("session_id = ?", r.sessionID).Find(&dbEntities).Error; err != nil {
 		return nil, utils.Errorf("query memory entities failed: %v", err)
 	}
 
@@ -113,8 +105,8 @@ func (r *AIMemoryTriage) GetAllTags(sessionID string) ([]string, error) {
 }
 
 // GetDynamicContextWithTags 获取包含已有标签的动态上下文
-func (r *AIMemoryTriage) GetDynamicContextWithTags(sessionID string) (string, error) {
-	tags, err := r.GetAllTags(sessionID)
+func (r *AIMemoryTriage) GetDynamicContextWithTags() (string, error) {
+	tags, err := r.GetAllTags()
 	if err != nil {
 		return "", err
 	}

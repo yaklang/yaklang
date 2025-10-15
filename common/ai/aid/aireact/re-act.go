@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 
@@ -67,6 +68,7 @@ type ReAct struct {
 	saveTimelineThrottle func(func())
 	artifacts            *filesys.RelLocalFs
 
+	wg             *sync.WaitGroup
 	timelineDiffer *aicommon.TimelineDiffer
 	memoryTriage   *aimem.AIMemoryTriage
 }
@@ -179,6 +181,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		mirrorOfAIInputEvent: make(map[string]func(*ypb.AIInputEvent)),
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            filesys.NewRelLocalFs(dirname),
+		wg:                   new(sync.WaitGroup),
 	}
 	var err error
 	react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
@@ -455,4 +458,11 @@ func (r *ReAct) IsFinished() bool {
 		return true
 	}
 	return r.GetCurrentTask().IsFinished()
+}
+
+func (r *ReAct) Wait() {
+	if r.wg == nil {
+		return
+	}
+	r.wg.Wait()
 }
