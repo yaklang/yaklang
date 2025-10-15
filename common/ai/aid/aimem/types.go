@@ -85,6 +85,20 @@ type Config struct {
 type Option func(config *Config)
 
 // AIMemoryTriage AI记忆管理系统
+
+type MemoryTriage interface {
+	// AddRawText 添加原始文本，返回提取的记忆实体
+	AddRawText(text string) ([]*MemoryEntity, error)
+	// SaveMemoryEntities 保存记忆条目到数据库
+	SaveMemoryEntities(entities ...*MemoryEntity) error
+
+	SearchBySemantics(query string, limit int) ([]*SearchResult, error)
+
+	SearchByTags(tags []string, matchAll bool, limit int) ([]*MemoryEntity, error)
+
+	Close() error
+}
+
 type AIMemoryTriage struct {
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -117,4 +131,81 @@ func WithRAGOptions(opts ...any) Option {
 	return func(config *Config) {
 		config.ragOptions = append(config.ragOptions, opts...)
 	}
+}
+
+// MockMemoryTriage 这是一个简单的mock，用于不需要使用triage的测试
+type MockMemoryTriage struct {
+}
+
+func (m *MockMemoryTriage) AddRawText(text string) ([]*MemoryEntity, error) {
+	entity := &MemoryEntity{
+		Id:                 "mock-id",
+		CreatedAt:          time.Now(),
+		Content:            text,
+		Tags:               []string{"mock-tag"},
+		C_Score:            0.5,
+		O_Score:            0.5,
+		R_Score:            0.5,
+		E_Score:            0.5,
+		P_Score:            0.5,
+		A_Score:            0.5,
+		T_Score:            0.5,
+		CorePactVector:     []float32{0.1, 0.2, 0.3},
+		PotentialQuestions: []string{"What is mock?", "How to use mock?"},
+	}
+	return []*MemoryEntity{entity}, nil
+}
+
+func (m *MockMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
+	return nil
+}
+
+func (m *MockMemoryTriage) Close() error {
+	return nil
+}
+
+func (m *MockMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchResult, error) {
+	entity := &MemoryEntity{
+		Id:                 "mock-id",
+		CreatedAt:          time.Now(),
+		Content:            "This is a mock memory entity related to " + query,
+		Tags:               []string{"mock-tag"},
+		C_Score:            0.5,
+		O_Score:            0.5,
+		R_Score:            0.5,
+		E_Score:            0.5,
+		P_Score:            0.5,
+		A_Score:            0.5,
+		T_Score:            0.5,
+		CorePactVector:     []float32{0.1, 0.2, 0.3},
+		PotentialQuestions: []string{"What is mock?", "How to use mock?"},
+	}
+	result := &SearchResult{
+		Entity: entity,
+		Score:  0.9,
+	}
+	return []*SearchResult{result}, nil
+}
+
+func (m *MockMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) ([]*MemoryEntity, error) {
+	entity := &MemoryEntity{
+		Id:                 "mock-id",
+		CreatedAt:          time.Now(),
+		Content:            "This is a mock memory entity with tags",
+		Tags:               tags,
+		C_Score:            0.5,
+		O_Score:            0.5,
+		R_Score:            0.5,
+		E_Score:            0.5,
+		P_Score:            0.5,
+		A_Score:            0.5,
+		T_Score:            0.5,
+		CorePactVector:     []float32{0.1, 0.2, 0.3},
+		PotentialQuestions: []string{"What is mock?", "How to use mock?"},
+	}
+	return []*MemoryEntity{entity}, nil
+}
+
+func NewMockMemoryTriage() *MockMemoryTriage {
+	return &MockMemoryTriage{}
 }

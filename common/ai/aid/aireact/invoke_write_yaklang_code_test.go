@@ -64,7 +64,7 @@ func TestReAct_WriteYaklangCode(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedYaklangWriting(i, r, "sleep")
 		}),

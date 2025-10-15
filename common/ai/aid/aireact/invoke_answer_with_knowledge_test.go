@@ -71,7 +71,7 @@ func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
 		return nil, utils.Errorf("unexpected prompt: %s", prompt)
 	}
 
-	_, err := NewReAct(
+	_, err := NewTestReAct(
 		WithAICallback(callback),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {
@@ -212,7 +212,7 @@ func TestReAct_AnswerWithKnowledge_SatisfactionLoop(t *testing.T) {
 	firstToken := uuid.NewString()
 	okToken := uuid.NewString()
 
-	_, err := NewReAct(
+	_, err := NewTestReAct(
 		WithAICallback(newMockedAnswerWithKnowledgeUnsatisfied(firstToken, okToken)),
 		WithEventInputChan(in),
 		WithEventHandler(func(e *schema.AiOutputEvent) {

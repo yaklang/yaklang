@@ -66,7 +66,7 @@ func TestReAct_PlanAndExecute_Basic(t *testing.T) {
 
 	planDo := false
 	planMatchFlag := false
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedRequestPlanAndExecuting_Normal(i, r, flag)
 		}),

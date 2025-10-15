@@ -58,7 +58,7 @@ func TestReAct_AskForClarification_multicall(t *testing.T) {
 	out := make(chan *ypb.AIOutputEvent, 10)
 
 	_ = flag
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedClarification2(i, r, flag)
 		}),
