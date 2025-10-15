@@ -232,7 +232,6 @@ func TestImport_globals(t *testing.T) {
 		println(PI)
 	}
 	`)
-
 		vf.AddFile("src/main/go/A/test.go", `
 	package A
 
@@ -240,7 +239,6 @@ func TestImport_globals(t *testing.T) {
 
 	var PI = B.PI
 	`)
-
 		vf.AddFile("src/main/go/B/test.go", `
 	package B
 
@@ -272,7 +270,6 @@ func TestImport_globals(t *testing.T) {
 		println(PI)
 	}
 	`)
-
 		vf.AddFile("src/main/go/A/test.go", `
 	package A
 
@@ -280,7 +277,6 @@ func TestImport_globals(t *testing.T) {
 
 	var PI = B.PI
 	`)
-
 		vf.AddFile("src/main/go/B/test.go", `
 	package B
 

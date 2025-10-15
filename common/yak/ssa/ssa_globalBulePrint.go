@@ -84,6 +84,15 @@ func (b *FunctionBuilder) GetGlobalVariableR(name string) Value {
 	return nil
 }
 
+func (b *FunctionBuilder) LoadGlobalVariable() {
+	prog := b.GetProgram()
+	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
+	for i, m := range globalVarsContainer.GetAllMember() {
+		variable := b.CreateVariableCross(i.String())
+		b.AssignVariable(variable, m)
+	}
+}
+
 func (p *Program) GetGlobalVariable(name string) (Value, bool) {
 	if p.GlobalVariablesBlueprint == nil {
 		return nil, false

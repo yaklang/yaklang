@@ -122,7 +122,6 @@ func TestStmt_spin(t *testing.T) {
 	t.Run("for Spin array", func(t *testing.T) {
 		test.CheckPrintlnValue(`package A
 
-
 	func main() {
 		var strg = []string{
 			"hello world",

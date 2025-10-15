@@ -142,7 +142,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
-	t.Run("test ent", func(t *testing.T) {
+	t.Run("test ent2", func(t *testing.T) {
 		ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 			fmt := prog.SyntaxFlow("fmt?{<fullTypeName>?{have: 'fmt'}} as $target;").GetValues("target")
 			check(t, fmt, []string{"5:2 - 5:7: \"fmt\""}, ssa.ToExternLib)

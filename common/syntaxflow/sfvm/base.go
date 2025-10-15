@@ -12,7 +12,7 @@ func validSSAOpcode(raw string) ssa.Opcode {
 		return ssa.SSAOpcodeUndefined
 	case "free", "freeValue":
 		return ssa.SSAOpcodeFreeValue
-	case "extendLib", "lib":
+	case "externlib", "extern_lib", "lib":
 		return ssa.SSAOpcodeExternLib
 	case "call":
 		return ssa.SSAOpcodeCall
