@@ -121,9 +121,17 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				} else {
 					kvs = b.buildLiteralValue(s, false)
 				}
-			case *ssa.AliasType: // 处理golang库
-				typ = typ.(*ssa.AliasType).GetType()
-				kvs = b.buildLiteralValue(s, true)
+			case *ssa.AliasType: // 已弃用
+				if a, ok := ssa.ToAliasType(t); ok {
+					typ = a.GetType()
+					kvs = b.buildLiteralValue(s, true)
+				}
+			case *ssa.Blueprint: // 处理golang库
+				if bp, ok := ssa.ToClassBluePrintType(t); ok {
+					bp.Build()
+					typ = ssa.CreateAnyType()
+					kvs = b.buildLiteralValue(s, true)
+				}
 			default:
 				typ = ssa.CreateAnyType()
 				kvs = b.buildLiteralValue(s, true)
@@ -255,7 +263,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			alias := typ.(*ssa.AliasType)
 			obj = typeHandler(alias.GetType(), kvs)
 		case ssa.AnyTypeKind: // 对于未知类型，这里选择根据LiteralValue的特征来推测其类型
-			var typt ssa.Type
+			var objtyp ssa.Type
 
 			if len(kvs) == 0 {
 				return b.EmitUndefined(typ.String())
@@ -266,20 +274,20 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 
 			if kvs[0].key == nil && kvs[0].value == nil { // array slice
 				kv := kvs[0].kv
-				typt = ssa.NewSliceType(kv[0].value.GetType())
+				objtyp = ssa.NewSliceType(kv[0].value.GetType())
 			} else if kvs[0].key == nil { // any
 				return b.EmitUndefined(typ.String())
 			} else if _, ok := ssa.ToBasicType(kvs[0].key.GetType()); ok { // struct map
-				typt = ssa.NewStructType()
+				objtyp = ssa.NewStructType()
 				for _, kv := range kvs {
 					value := kv.kv[0].value
-					typt.(*ssa.ObjectType).AddField(kv.key, value.GetType())
+					objtyp.(*ssa.ObjectType).AddField(kv.key, value.GetType())
 				}
 			} else {
-				return b.EmitUndefined(typt.String())
+				return b.EmitUndefined(objtyp.String())
 			}
 
-			return typeHandler(typt, kvs)
+			return typeHandler(objtyp, kvs)
 		case ssa.UndefinedTypeKind:
 			obj = b.InterfaceAddFieldBuild(0,
 				func(i int) ssa.Value {

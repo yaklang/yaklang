@@ -8,174 +8,116 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   JSON注入（也称为JSON参数污染或解析器差异性攻击）是一种安全漏洞，当不可信的输入数据未经严格处理就被直接序列化为JSON时发生。攻击者可以通过构造包含重复键、非标准JSON扩展的恶意数据，导致生成的JSON结构被下游系统错误解析，从而引发安全风险。
+   JSON注入漏洞发生在应用程序将不受信任的数据直接序列化为JSON格式，而没有进行适当的清洗或验证时。攻击者可以构造恶意的JSON数据，利用解析器的差异性或特性，导致数据污染、解析错误或权限绕过。在Golang中，常见的触发场景包括使用`json.Unmarshal`或`json.Marshal`函数时，未对输入数据进行严格检查。
 
 2. **触发场景**
-   JSON注入漏洞通常发生在以下场景：
-   - 直接将外部数据源（HTTP响应体、用户输入）序列化为JSON，未进行数据清洗和类型校验
-   - 使用 `json.Marshal` 直接序列化 `map[string]interface{}` 或 `interface{}` 类型的不可信数据
-   - 将从网络流、SSE响应或第三方API获取的数据未验证就序列化
-   
    ```go
-   // 不安全的代码示例
-   func handleData(w http.ResponseWriter, r *http.Request) {
-       // 从外部API获取数据
-       resp, _ := http.Get("https://untrusted-api.com/data")
-       var streamData map[string]interface{}
-       json.NewDecoder(resp.Body).Decode(&streamData)
-       
-       // 直接序列化不可信的数据
-       searchListData := streamData["search_list"]
-       jsonBytes, _ := json.Marshal(searchListData) // 危险！
-       w.Write(jsonBytes)
+   package main
+
+   import (
+       "encoding/json"
+       "fmt"
+       "net/http"
+   )
+
+   func handler(w http.ResponseWriter, r *http.Request) {
+       var data map[string]interface{}
+       if err := json.Unmarshal([]byte(r.FormValue("data")), &data); err != nil {
+           fmt.Fprintf(w, "Error: %v", err)
+           return
+       }
+       fmt.Fprintf(w, "Data: %v", data)
+   }
+
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
    }
    ```
+   攻击者可以提交恶意的JSON数据，例如包含特殊字符或结构的数据，可能导致解析器错误或非预期的行为。
 
 3. **潜在影响**
-   - **解析器差异性攻击**：不同JSON解析器对重复键的处理不同（Go选择最后一个值，某些Python/JavaScript库选择第一个值），可能绕过安全校验
-   - **数据污染**：攻击者可以注入额外的键值对（如 `"role":"admin"`），提升权限或修改业务逻辑
-   - **信息泄露**：通过构造特殊的JSON结构，可能导致敏感信息在序列化-反序列化过程中泄露
-   - **拒绝服务**：通过构造大量嵌套或重复的JSON结构，可能导致内存耗尽或解析超时
-
+   - 数据污染：攻击者可以注入恶意数据，影响应用程序的逻辑或输出。
+   - 解析器错误：可能导致解析器崩溃或返回错误信息，泄露敏感信息。
+   - 权限绕过：通过构造特定的JSON结构，可能绕过应用程序的权限检查。
 DESC
-	rule_id: "a1b2c3d4-json-injection-001"
+	rule_id: "085048db-7a44-4478-a3e7-64872486f239"
 	solution: <<<SOLUTION
 ### 修复建议
 
-#### 1. 使用严格类型约束
-定义只包含预期字段的严格结构体，将输入数据反序列化到此结构体中。这会自动过滤未知字段和非法结构。
+#### 1. 验证和清洗输入数据
+   在使用`json.Unmarshal`或`json.Marshal`之前，确保输入数据是可信的，并进行严格的验证和清洗。
+   ```go
+   package main
 
-```go
-// 定义严格的数据结构
-type SafeSearchList struct {
-    Items []string `json:"items"`
-    Total int      `json:"total"`
-}
+   import (
+       "encoding/json"
+       "fmt"
+       "net/http"
+       "regexp"
+   )
 
-func processData(streamData map[string]interface{}) ([]byte, error) {
-    // 通过JSON序列化再反序列化，进行类型转换和清洗
-    tmpBytes, _ := json.Marshal(streamData["search_list"])
-    
-    var safeList SafeSearchList
-    if err := json.Unmarshal(tmpBytes, &safeList); err != nil {
-        return nil, fmt.Errorf("invalid data format: %v", err)
-    }
-    
-    // 使用清洗后的安全数据
-    return json.Marshal(safeList)
-}
-```
+   func handler(w http.ResponseWriter, r *http.Request) {
+       input := r.FormValue("data")
+       // 验证输入数据是否为有效的JSON格式
+       if !json.Valid([]byte(input)) {
+           fmt.Fprintf(w, "Error: invalid JSON data")
+           return
+       }
+       // 使用正则表达式进一步验证数据内容
+       if matched, _ := regexp.MatchString(`^\{\s*"\w+"\s*:\s*"[^"]*"\s*\}$`, input); !matched {
+           fmt.Fprintf(w, "Error: invalid JSON structure")
+           return
+       }
+       var data map[string]interface{}
+       if err := json.Unmarshal([]byte(input), &data); err != nil {
+           fmt.Fprintf(w, "Error: %v", err)
+           return
+       }
+       fmt.Fprintf(w, "Data: %v", data)
+   }
 
-#### 2. 创建数据白名单
-对预期的数据结构进行显式校验，只允许符合预期的字段和类型。
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
 
-```go
-func sanitizeSearchList(data interface{}) ([]string, error) {
-    var results []string
-    
-    slice, ok := data.([]interface{})
-    if !ok {
-        return nil, errors.New("invalid format: expected array")
-    }
-    
-    for i, item := range slice {
-        str, ok := item.(string)
-        if !ok {
-            return nil, fmt.Errorf("item at index %d is not a string", i)
-        }
-        // 可选：进一步校验字符串内容
-        if len(str) > 100 || containsDangerousChars(str) {
-            return nil, fmt.Errorf("item at index %d contains invalid characters", i)
-        }
-        results = append(results, str)
-    }
-    
-    return results, nil
-}
+#### 2. 使用严格的JSON解析库
+   考虑使用更严格的JSON解析库，例如`github.com/tidwall/gjson`或`github.com/buger/jsonparser`，这些库提供了更细粒度的控制和安全特性。
 
-func handleData(w http.ResponseWriter, r *http.Request) {
-    var streamData map[string]interface{}
-    // ... 获取数据 ...
-    
-    // 先进行清洗
-    safeList, err := sanitizeSearchList(streamData["search_list"])
-    if err != nil {
-        http.Error(w, "Invalid data", http.StatusBadRequest)
-        return
-    }
-    
-    // 使用清洗后的数据
-    jsonBytes, _ := json.Marshal(safeList)
-    w.Write(jsonBytes)
-}
-```
+#### 3. 限制输入数据大小和结构
+   限制输入的JSON数据大小和结构，避免攻击者提交过大的数据或复杂的嵌套结构。
+   ```go
+   package main
 
-#### 3. 输入验证与净化
-在数据流入系统的源头进行严格验证。
+   import (
+       "encoding/json"
+       "fmt"
+       "net/http"
+   )
 
-```go
-import "github.com/go-playground/validator/v10"
+   func handler(w http.ResponseWriter, r *http.Request) {
+       if len(r.FormValue("data")) > 1024 {
+           fmt.Fprintf(w, "Error: data too large")
+           return
+       }
+       var data map[string]string
+       if err := json.Unmarshal([]byte(r.FormValue("data")), &data); err != nil {
+           fmt.Fprintf(w, "Error: %v", err)
+           return
+       }
+       fmt.Fprintf(w, "Data: %v",data)
+   }
 
-type SearchData struct {
-    Items []string `json:"items" validate:"required,max=100,dive,max=200"`
-    Query string   `json:"query" validate:"required,max=500,alphanum"`
-}
-
-func validateAndMarshal(rawData map[string]interface{}) ([]byte, error) {
-    validate := validator.New()
-    
-    // 转换为结构体
-    tmpBytes, _ := json.Marshal(rawData)
-    var data SearchData
-    if err := json.Unmarshal(tmpBytes, &data); err != nil {
-        return nil, err
-    }
-    
-    // 验证数据
-    if err := validate.Struct(data); err != nil {
-        return nil, fmt.Errorf("validation failed: %v", err)
-    }
-    
-    // 安全序列化
-    return json.Marshal(data)
-}
-```
-
-#### 4. 避免字符串拼接构造JSON
-永远不要通过字符串拼接来构造JSON，这会完全绕过JSON编码器的安全保护。
-
-```go
-// ❌ 危险：通过字符串拼接
-func someHandler(username, password string) string {
-    return `{"username":"` + username + `","password":"` + password + `"}`
-}
-
-// ✅ 安全：使用结构体和json.Marshal
-func someHandler(username, password string) (string, error) {
-    data := struct {
-        Username string `json:"username"`
-        Password string `json:"password"`
-    }{
-        Username: username,
-        Password: password,
-    }
-    bytes, err := json.Marshal(data)
-    if err != nil {
-        return "", err
-    }
-    return string(bytes), nil
-}
-```
-
-#### 5. 安全开发实践
-- **永不信任输入**：对所有外部输入（HTTP请求、外部API响应）进行严格验证和过滤
-- **使用明确的数据结构**：避免使用 `map[string]interface{}` 或 `interface{}` 处理不可信数据
-- **数据传输标准化**：在不同服务间传递数据时，使用定义清晰的API接口和稳定的数据结构
-- **保持依赖更新**：定期更新Go语言版本及其依赖库，确保包含最新的安全修复
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
 SOLUTION
 	reference: <<<REFERENCE
-[CWE-111: Direct Use of Unsafe JNI](https://cwe.mitre.org/data/definitions/111.html)
-[OWASP JSON Injection](https://owasp.org/www-community/vulnerabilities/JSON_Injection)
+none
 REFERENCE
 )
 
@@ -198,12 +140,65 @@ alert $high for {
 	message: "检测到Golang JSON注入漏洞：不可信数据未经清洗直接序列化为JSON，可能导致解析器差异性攻击、数据污染或权限绕过。",
 	solution: <<<SOLUTION
 ### 修复建议
-1. **使用严格类型约束**：定义明确的结构体，避免使用 `map[string]interface{}` 或 `interface{}` 处理不可信数据
-2. **数据白名单校验**：对输入数据的字段和类型进行严格校验，只允许预期的数据结构
-3. **输入验证**：在序列化前对数据进行净化，移除或转义潜在的危险字符
-4. **避免字符串拼接**：永远不要通过字符串拼接来构造JSON
+
+#### 1. 使用结构体绑定而非动态解析
+通过预定义结构体并绑定用户输入，避免动态解析不可信数据。
+```go
+// 修复代码示例
+type SafeData struct {
+    Field1 string `json:"field1"`
+    Field2 int    `json:"field2"`
+}
+
+userInput := r.URL.Query().Get("data")
+var data SafeData
+if err := json.Unmarshal([]byte(userInput), &data); err != nil {
+    log.Fatal(err)
+}
+```
+
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+```go
+// 示例：校验输入为合法JSON
+if !json.Valid([]byte(userInput)) {
+    log.Fatal("输入必须为合法JSON")
+}
+```
+
+#### 3. 使用严格模式解析
+启用`DisallowUnknownFields`防止未知字段注入。
+```go
+decoder := json.NewDecoder(bytes.NewReader([]byte(userInput)))
+decoder.DisallowUnknownFields()
+if err := decoder.Decode(&data); err != nil {
+    log.Fatal(err)
+}
+```
 SOLUTION
 	risk: "JSON注入",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   JSON注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始JSON数据的结构或内容。这可能导致非预期的数据操作，例如数据污染、权限绕过或解析器差异性攻击。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```go
+   userInput := r.URL.Query().Get("data")
+   var data map[string]interface{}
+   if err := json.Unmarshal([]byte(userInput), &data); err != nil {
+       log.Fatal(err)
+   }
+   ```
+   攻击者输入恶意构造的JSON字符串可能导致解析器异常或数据污染。
+
+3. **潜在影响**
+   - 数据污染导致业务逻辑异常。
+   - 权限绕过导致敏感信息泄露。
+   - 解析器差异性攻击导致服务崩溃或拒绝服务。
+DESC
 }
 
 desc(
