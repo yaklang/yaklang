@@ -60,7 +60,7 @@ func TestReAct_RequireBlueprint(t *testing.T) {
 
 	abort, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedRequireBlueprint_BASIC(i, r, flag)
 		}),
@@ -171,7 +171,7 @@ func TestReAct_RequireBlueprintWithoutHijacked(t *testing.T) {
 	defer cancel()
 
 	aiforgeExecuteConfirmed := false
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			if utils.MatchAllOfSubString(r.GetPrompt(), `"plan"`, `"require-user-interact"`, `"main_task"`) {
 				aiforgeExecuteConfirmed = true

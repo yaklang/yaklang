@@ -31,7 +31,7 @@ func TestPromptManager_WithDynamicContextProvider(t *testing.T) {
 	}
 
 	// Create ReAct instance with the dynamic context provider
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithDynamicContextProvider("test_provider", mockProvider),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			// Mock AI response for testing
@@ -93,7 +93,7 @@ func TestPromptManager_WithDynamicContextProvider_MultipleProviders(t *testing.T
 	}
 
 	// Create ReAct instance with multiple providers
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithDynamicContextProvider("provider1", provider1),
 		WithDynamicContextProvider("provider2", provider2),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -139,7 +139,7 @@ func TestPromptManager_WithDynamicContextProvider_ErrorHandling(t *testing.T) {
 		return "Normal context", nil
 	}
 
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithDynamicContextProvider("error_provider", errorProvider),
 		WithDynamicContextProvider("normal_provider", normalProvider),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -180,7 +180,7 @@ func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.
 		return "Context for prompt generation", nil
 	}
 
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithDynamicContextProvider("prompt_test", mockProvider),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -234,7 +234,7 @@ func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 		return fmt.Sprintf("Traced content call #%d at %s", callCount, time.Now().Format("15:04:05")), nil
 	}
 
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithTracedDynamicContextProvider("traced_provider", mockProvider),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -291,7 +291,7 @@ func TestPromptManager_WithTracedFileContext(t *testing.T) {
 	}
 	tempFile.Close()
 
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithTracedFileContext("test_file", tempFile.Name()),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -342,7 +342,7 @@ func TestPromptManager_WithTracedFileContext(t *testing.T) {
 func TestPromptManager_WithTracedFileContext_FileNotExist(t *testing.T) {
 	nonExistentFile := "/tmp/non_existent_file_12345.txt"
 
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithTracedFileContext("non_existent", nonExistentFile),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
@@ -387,7 +387,7 @@ func TestPromptManager_WithMixedContextProviders(t *testing.T) {
 		return fmt.Sprintf("Traced provider content #%d", tracedCallCount), nil
 	}
 
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithDynamicContextProvider("regular", regularProvider),
 		WithTracedDynamicContextProvider("traced", tracedProvider),
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -440,7 +440,7 @@ func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
 	// This example shows how to use the new traced context provider features
 
 	// Create a ReAct instance with traced providers
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		// Regular dynamic context provider (no tracing)
 		WithDynamicContextProvider("system_info", func(config aicommon.AICallerConfigIf, emitter *aicommon.Emitter, key string) (string, error) {
 			return "System: Linux x86_64", nil
@@ -489,7 +489,7 @@ func TestExample_WithTracedDynamicContextProvider(t *testing.T) {
 // 3. 特别验证 hostscan 作为内置 aiforge 的代表
 func TestPromptManager_AIForgeList(t *testing.T) {
 	// 创建一个基本的 ReAct 实例来测试 AIForgeList 功能
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))
@@ -530,7 +530,7 @@ func TestPromptManager_AIForgeList(t *testing.T) {
 // TestPromptManager_GenerateAIBlueprintForgeParamsPrompt 测试 GenerateAIBlueprintForgeParamsPrompt 方法
 func TestPromptManager_GenerateAIBlueprintForgeParamsPrompt(t *testing.T) {
 	// 创建一个基本的 ReAct 实例来测试 GenerateAIBlueprintForgeParamsPrompt 方法
-	react, err := NewReAct(
+	react, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "object", "next_action": {"type": "directly_answer", "answer_payload": "test"}, "cumulative_summary": "test summary", "human_readable_thought": "test thought"}`))

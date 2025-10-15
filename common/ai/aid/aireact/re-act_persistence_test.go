@@ -42,7 +42,7 @@ func TestReAct_PersistentSession_ToolUse(t *testing.T) {
 	}
 
 	pid := uuid.New()
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
@@ -143,7 +143,7 @@ LOOP:
 	}
 	fmt.Println("--------------------------------------")
 
-	persistentTimeline, err := NewReAct(
+	persistentTimeline, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),
@@ -158,7 +158,7 @@ LOOP:
 		t.Fatal(err)
 	}
 
-	withoutPersistent, err := NewReAct(
+	withoutPersistent, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling(i, r, "sleep")
 		}),

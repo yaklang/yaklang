@@ -21,7 +21,7 @@ func TestExec_CreateMirrors_SingleAITag(t *testing.T) {
 	aiCallCount := 0
 	codeExtracted := false
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			aiCallCount++
 			prompt := req.GetPrompt()
@@ -113,7 +113,7 @@ func testFunc() {
 
 // TestExec_CreateMirrors_MultipleAITags 测试多个AITag
 func TestExec_CreateMirrors_MultipleAITags(t *testing.T) {
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 返回多个标签
@@ -181,7 +181,7 @@ const jsCode = "test js code";
 
 // TestExec_CreateMirrors_EmptyTag 测试空标签内容
 func TestExec_CreateMirrors_EmptyTag(t *testing.T) {
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 返回空标签
@@ -220,7 +220,7 @@ func TestExec_CreateMirrors_EmptyTag(t *testing.T) {
 
 // TestExec_CreateMirrors_NoAITags 测试没有AITag的情况
 func TestExec_CreateMirrors_NoAITags(t *testing.T) {
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish", "answer": "No tags"}`))
@@ -248,7 +248,7 @@ func TestExec_CreateMirrors_NoAITags(t *testing.T) {
 
 // TestExec_CreateMirrors_TagWithNewlines 测试带换行符的标签
 func TestExec_CreateMirrors_TagWithNewlines(t *testing.T) {
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 标签内容前后有换行符
@@ -319,7 +319,7 @@ func TestExec_TaskStatusTransitions(t *testing.T) {
 	var wg sync.WaitGroup
 	done := make(chan struct{})
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			// 添加小延迟确保processing状态能被捕获
@@ -463,7 +463,7 @@ func TestExec_TaskStatusAborted(t *testing.T) {
 	var finalStatus aicommon.AITaskState
 	var capturedTask aicommon.AIStatefulTask
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "panic_action"}`))
@@ -515,7 +515,7 @@ func TestExec_TaskStatusAborted(t *testing.T) {
 func TestExec_AITransaction_RetryMechanism(t *testing.T) {
 	attemptCount := 0
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			attemptCount++
 			rsp := i.NewAIResponse()
@@ -558,7 +558,7 @@ func TestExec_AITransaction_RetryMechanism(t *testing.T) {
 func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 	codeExtracted := false
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			rsp := i.NewAIResponse()
@@ -649,7 +649,7 @@ func TestExec_EdgeCase_VeryLongResponse(t *testing.T) {
 func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 	iterCount := 0
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
@@ -691,7 +691,7 @@ func TestExec_EdgeCase_RapidIterations(t *testing.T) {
 func TestExec_BoundaryCondition_MaxIterationsZero(t *testing.T) {
 	iterCount := 0
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
@@ -744,7 +744,7 @@ func TestExec_BoundaryCondition_MaxIterationsZero(t *testing.T) {
 func TestExec_BoundaryCondition_MaxIterationsOne(t *testing.T) {
 	iterCount := 0
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			iterCount++
 			rsp := i.NewAIResponse()
@@ -775,7 +775,7 @@ func TestExec_BoundaryCondition_MaxIterationsOne(t *testing.T) {
 
 // TestExec_StreamProcessing_ComplexJSON 测试复杂JSON流处理
 func TestExec_StreamProcessing_ComplexJSON(t *testing.T) {
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 
@@ -820,7 +820,7 @@ func TestExec_StreamProcessing_ComplexJSON(t *testing.T) {
 func TestExec_Feedback_MultipleRounds(t *testing.T) {
 	roundCount := 0
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			roundCount++
 			rsp := i.NewAIResponse()
@@ -879,7 +879,7 @@ func TestExec_Feedback_MultipleRounds(t *testing.T) {
 func TestExec_DisallowNextLoopExit_Enforcement(t *testing.T) {
 	attemptCount := 0
 
-	reactIns, err := aireact.NewReAct(
+	reactIns, err := aireact.NewTestReAct(
 		aireact.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := req.GetPrompt()
 			attemptCount++

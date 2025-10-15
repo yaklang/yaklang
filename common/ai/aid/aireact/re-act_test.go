@@ -17,7 +17,7 @@ import (
 func TestReAct_QueueEnqueue(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			time.Sleep(20 * time.Second)
 			return nil, nil
@@ -66,7 +66,7 @@ func TestReAct_CounterForQueueEnqueueFlushed(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 100)
 	ctx, cancel := context.WithCancel(context.Background())
 	atomicCount := new(int32)
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			time.Sleep(20 * time.Second)
 			return nil, nil
@@ -119,7 +119,7 @@ func TestReAct_QueueEnqueueDequeue(t *testing.T) {
 	out := make(chan *ypb.AIOutputEvent, 10)
 	haveTaskEnqueue := false
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			if strings.Contains(req.GetPrompt(), `如果你觉得问题比较简单，直接回答 Example`) {
 				for {
