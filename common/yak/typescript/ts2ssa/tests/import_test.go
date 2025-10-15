@@ -357,38 +357,38 @@ export enum Status {
 }
 
 // TODO: Fix environment lost in lazy build lazy build not contain full variable table context
-//func TestImportEnumRecursive(t *testing.T) {
-//	vf := filesys.NewVirtualFs()
-//	vf.AddFile("src/main.ts", `
-//import { Color, Status } from './enums/colors';
-//
-//console.log(Color.Red);
-//console.log(Status.Approved);
-//`)
-//	vf.AddFile("src/enums/colors.ts", `
-//import { Palette } from './palette';
-//
-//export enum Color {
-//  Red = Palette.SlotA,   // 二层递归来源
-//  Green = "green",
-//  Blue = "blue",
-//}
-//
-//export enum Status {
-//  Pending = 1,
-//  Approved = 2,
-//  Rejected = 3
-//}
-//`)
-//	vf.AddFile("src/enums/palette.ts", `
-//export const enum Palette {
-//  SlotA = "red"
-//}
-//`)
-//
-//	ssatest.CheckSyntaxFlowWithFS(t, vf, `
-//		console.log(* #-> as $enumValues)
-//	`, map[string][]string{
-//		"enumValues": {"Undefined-Palette", "2"},
-//	}, false, ssaapi.WithLanguage(ssaapi.TS))
-//}
+func TestImportEnumRecursive(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("src/main.ts", `
+import { Color, Status } from './enums/colors';
+
+console.log(Color.Red);
+console.log(Status.Approved);
+`)
+	vf.AddFile("src/enums/colors.ts", `
+import { Palette } from './palette';
+
+export enum Color {
+ Red = Palette.SlotA,   // 二层递归来源
+ Green = "green",
+ Blue = "blue",
+}
+
+export enum Status {
+ Pending = 1,
+ Approved = 2,
+ Rejected = 3
+}
+`)
+	vf.AddFile("src/enums/palette.ts", `
+export const enum Palette {
+ SlotA = "red"
+}
+`)
+
+	ssatest.CheckSyntaxFlowWithFS(t, vf, `
+		console.log(* #-> as $enumValues)
+	`, map[string][]string{
+		"enumValues": {"red", "2"},
+	}, false, ssaapi.WithLanguage(ssaapi.TS))
+}

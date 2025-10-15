@@ -100,6 +100,11 @@ func (*SSABuilder) FilterFile(path string) bool {
 	return !slices.Contains(fileList, extension)
 }
 
+func (s *SSABuilder) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".js" || extension == ".ts" || extension == ".tsx"
+}
+
 func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.TS
 }
