@@ -810,6 +810,8 @@ service Yak {
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
   rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
   rpc NewSSARiskRead(NewSSARiskReadRequest) returns (NewSSARiskReadResponse);
+  rpc ExportSSARisk(ExportSSARiskRequest) returns(stream ExportSSARiskResponse);
+  rpc ImportSSARisk(ImportSSARiskRequest) returns(stream ImportSSARiskResponse);
   // SSA risk diff
   rpc SSARiskDiff(SSARiskDiffRequest) returns (stream SSARiskDiffResponse);
   // SSA Risk Disposal CURD
@@ -7625,6 +7627,27 @@ message NewSSARiskReadRequest {
   SSARisksFilter Filter = 1;
 }
 message NewSSARiskReadResponse {
+}
+
+message ExportSSARiskRequest {
+  SSARisksFilter Filter = 1;
+  string TargetPath =2 ;
+  bool WithDataFlowPath =3 ;
+  bool WithFileContent = 4;
+}
+
+message ExportSSARiskResponse{
+  double  Process =1 ;
+  string  Verbose =2 ;
+}
+
+message ImportSSARiskRequest{
+  string InputPath = 1;
+}
+
+message ImportSSARiskResponse{
+  double  Process =1 ;
+  string  Verbose =2 ;
 }
 
 message SSARiskFeedbackToOnlineRequest {
