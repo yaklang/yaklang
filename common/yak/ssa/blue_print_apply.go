@@ -144,6 +144,6 @@ func (c *Blueprint) Apply(obj Value) Type {
 		}
 	}
 
-	objTyp.fullTypeName = append(c.fullTypeName, c.GetFullTypeNames()...)
+	objTyp.fullTypeName = c.GetFullTypeNames()
 	return objTyp
 }
