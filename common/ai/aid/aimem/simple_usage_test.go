@@ -29,8 +29,8 @@ func TestSimpleUsage(t *testing.T) {
 	}
 	defer backend.Close()
 
-	// 禁用自动保存以避免并发问题
-	backend.autoSave = false
+	// 启用自动保存测试
+	backend.autoSave = true // 启用自动保存测试并发安全性
 
 	t.Run("BasicOperations", func(t *testing.T) {
 		// 创建测试记忆
@@ -212,8 +212,11 @@ func TestSimpleUsage(t *testing.T) {
 	})
 
 	t.Run("ManualSave", func(t *testing.T) {
-		// 测试手动保存 - 暂时跳过，因为有数据库schema问题
-		t.Skip("Manual save temporarily disabled due to schema validation issues")
+		// 测试手动保存
+		if err := backend.SaveGraph(); err != nil {
+			t.Fatalf("manual save failed: %v", err)
+		}
+		t.Logf("Manual save completed successfully")
 	})
 
 	// 清理测试数据
@@ -238,7 +241,7 @@ func TestPerformanceBaseline(t *testing.T) {
 	}
 	defer backend.Close()
 
-	backend.autoSave = false
+	backend.autoSave = true // 启用自动保存测试并发安全性
 
 	// 添加一些测试数据
 	numMemories := 50

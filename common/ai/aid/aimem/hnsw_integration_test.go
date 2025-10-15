@@ -28,8 +28,8 @@ func TestAIMemoryHNSWBackend_BasicOperations(t *testing.T) {
 	}
 	defer backend.Close()
 
-	// 禁用自动保存以避免测试中的并发问题
-	backend.autoSave = false
+	// 启用自动保存测试
+	backend.autoSave = true
 
 	// 测试数据
 	entities := []*MemoryEntity{
