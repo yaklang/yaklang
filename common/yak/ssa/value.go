@@ -71,6 +71,15 @@ func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
 	return b.readValueEx(name, false, false)
 }
 
+// for ExternLib
+func (b *FunctionBuilder) PeekValueInRoot(name string) Value {
+	root := b
+	for p := b.parentBuilder; p != nil; p = p.parentBuilder {
+		root = p
+	}
+	return root.readValueEx(name, false, false)
+}
+
 func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
 	// read value from include stack
 	var value Value

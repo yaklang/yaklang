@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 )
 
@@ -61,5 +62,5 @@ func (c *Blueprint) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = names
+	c.fullTypeName = clean(names)
 }

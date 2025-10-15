@@ -97,7 +97,12 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				}()
 			}
 
+			store := b.StoreFunctionBuilder()
 			b.AddGlobalVariable("", func() ssa.Value {
+				switchHandler := b.SwitchFunctionBuilder(store)
+				defer func() {
+					switchHandler()
+				}()
 				b.handleImportPackage()
 				return nil
 			})
@@ -424,7 +429,12 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				if b.GetFromCmap(id) {
 					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
+				store := b.StoreFunctionBuilder()
 				b.AddGlobalVariable(id, func() ssa.Value {
+					switchHandler := b.SwitchFunctionBuilder(store)
+					defer func() {
+						switchHandler()
+					}()
 					return b.GetDefaultValue(ssaTyp)
 				})
 				recoverRange()
@@ -437,8 +447,14 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
 			}
+
+			store := b.StoreFunctionBuilder()
 			for i, value := range rightList {
 				b.AddGlobalVariable(leftList[i].GetText(), func() ssa.Value {
+					switchHandler := b.SwitchFunctionBuilder(store)
+					defer func() {
+						switchHandler()
+					}()
 					rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
 					return rightv
 				})
@@ -719,8 +735,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		b.handleImportPackage()
-
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
@@ -861,8 +875,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		b.handleImportPackage()
-
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
@@ -990,7 +1002,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 				if len(bp.ParentBlueprints) == 0 {
 					continue
 				}
-				if exlib := b.PeekValue(bp.ParentBlueprints[0].Name); exlib != nil {
+				if exlib := b.PeekValueInRoot(bp.ParentBlueprints[0].Name); exlib != nil {
 					method := bp.GetMagicMethod(ssa.Constructor, b.FunctionBuilder)
 					lv := b.CreateMemberCallVariable(exlib, method)
 					b.AssignVariable(lv, p)
@@ -1145,6 +1157,9 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, buildGlobal bool, synta
 			b.buildStatementList(s)
 		})
 	} else {
+		if buildGlobal {
+			b.LoadGlobalVariable()
+		}
 		b.buildStatementList(s)
 	}
 }
