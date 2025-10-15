@@ -108,6 +108,10 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "思考",
 		En: "Thought",
 	},
+	"thought": {
+		Zh: "思考",
+		En: "Thought",
+	},
 	"re-act-loop-answer-payload": {
 		Zh: "AI 响应",
 		En: "AI Response",
