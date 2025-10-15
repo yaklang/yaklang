@@ -155,6 +155,11 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
 	return entities, nil
 }
 
+// GetSessionID 获取当前会话ID
+func (r *AIMemoryTriage) GetSessionID() string {
+	return r.sessionID
+}
+
 // Close 关闭资源
 func (r *AIMemoryTriage) Close() error {
 	if r.cancel != nil {
