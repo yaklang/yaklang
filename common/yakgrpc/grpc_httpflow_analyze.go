@@ -591,7 +591,7 @@ func (m *HTTPFlowAnalyzeManger) notifyResult(
 
 	m.stream.Send(&ypb.AnalyzeHTTPFlowResponse{
 		RuleData:         ruleData,
-		ExtractedContent: content,
+		ExtractedContent: utils.EscapeInvalidUTF8Byte([]byte(content)),
 	})
 }
 
