@@ -32,7 +32,7 @@ public class XSSController {
 `, func(prog *ssaapi.Program) error {
 		results := prog.SyntaxFlow(`
 
-<include('java-spring-mvc-param')>?{<typeName>?{have: String}} as $params;
+*Mapping.__ref__?{opcode:function}<getFormalParams>?{!have:this} as $params
 RestController.__ref__<getMembers>?{.annotation.*Mapping} as $entryMethods;
 $entryMethods<getReturns> as $sink;
 $sink #{
