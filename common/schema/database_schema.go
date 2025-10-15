@@ -128,6 +128,7 @@ var ProjectTables = []interface{}{
 	&AiOutputEvent{},
 	&AiProcess{},
 	&AIMemoryEntity{},
+	&AIMemoryCollection{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {
