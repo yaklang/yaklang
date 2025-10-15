@@ -144,7 +144,7 @@ func TestEntityRepository_MergeAndSaveEntity(t *testing.T) {
 	require.Equal(t, merged.Attributes["b"], entityAttrB, "name merge attribute b should be added")
 
 	// 通过embedding相似度merge
-	text, err := mockEmbedding.GenerateSimilarText(merged.String(), 0.6)
+	text, err := mockEmbedding.GenerateSimilarText(merged.String(), 0.8) // 提高相似度限制，避免出现临界情况
 	require.NoError(t, err)
 
 	entity3 := &schema.ERModelEntity{
