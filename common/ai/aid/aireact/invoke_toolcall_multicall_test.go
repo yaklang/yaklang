@@ -83,7 +83,7 @@ func TestReAct_ToolUse_MultiCalls(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCalling3(i, r, "sleep")
 		}),

@@ -80,7 +80,7 @@ func TestReAct_PlanAndExecute_MultiPlan(t *testing.T) {
 
 	planDo := false
 	planMatchFlag := false
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedRequestPlanAndExecuting_MultiPlans(i, r, flag)
 		}),

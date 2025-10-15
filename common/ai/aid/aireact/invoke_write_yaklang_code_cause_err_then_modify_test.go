@@ -87,7 +87,7 @@ func TestReAct_WriteYaklangCodeCauseErrorAndThenModify(t *testing.T) {
 	stat := &mockStats_forWriteAndModify{
 		writeDone: false,
 	}
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			sample := `[Error]: 基础语法错误（Syntax Error）`
 			if strings.Contains(r.GetPrompt(), sample) {

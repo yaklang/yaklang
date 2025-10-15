@@ -70,7 +70,7 @@ type ReAct struct {
 
 	wg             *sync.WaitGroup
 	timelineDiffer *aicommon.TimelineDiffer
-	memoryTriage   *aimem.AIMemoryTriage
+	memoryTriage   aimem.MemoryTriage
 }
 
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -183,15 +183,19 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		artifacts:            filesys.NewRelLocalFs(dirname),
 		wg:                   new(sync.WaitGroup),
 	}
-	var err error
-	react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
-	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.timeline)
 
-	if err != nil {
-		return nil, utils.Errorf("create memory triage failed: %v", err)
+	if cfg.memoryTriage != nil {
+		react.memoryTriage = cfg.memoryTriage
+	} else {
+		var err error
+		react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
+		if err != nil {
+			return nil, utils.Errorf("create memory triage failed: %v", err)
+		}
 	}
-	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 
+	react.timelineDiffer = aicommon.NewTimelineDiffer(cfg.timeline)
+	cfg.enhanceKnowledgeManager.SetEmitter(cfg.Emitter)
 	// Initialize prompt manager
 	react.promptManager = NewPromptManager(react, cfg.workdir)
 	cfg.promptManager = react.promptManager
@@ -217,7 +221,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 	react.startQueueProcessor(cfg.ctx, done)
 	<-done // Ensure the queue processor has started
 
-	err = yakit.CreateOrUpdateAIAgentRuntime(
+	err := yakit.CreateOrUpdateAIAgentRuntime(
 		react.config.GetDB(), &schema.AIAgentRuntime{
 			Uuid:              cfg.GetRuntimeId(),
 			Name:              "[re-act-runtime]",

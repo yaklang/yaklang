@@ -208,7 +208,7 @@ Various string functions are available.
 		codeWritten:       false,
 	}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedYaklangQueryDocument(i, r, stat)
 		}),
@@ -514,7 +514,7 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
@@ -539,7 +539,7 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 	}
 
 	// Test with custom value
-	ins2, err := NewReAct(
+	ins2, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))
@@ -563,7 +563,7 @@ func TestReAct_QueryDocumentDefaultSizeLimit(t *testing.T) {
 	}
 
 	// Test with value exceeding hard limit
-	ins3, err := NewReAct(
+	ins3, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := i.NewAIResponse()
 			rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "finish"}`))

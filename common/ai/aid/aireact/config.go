@@ -3,6 +3,7 @@ package aireact
 import (
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"io"
 	"os"
 	"path/filepath"
@@ -149,6 +150,9 @@ type ReActConfig struct {
 
 	// Plan and execute hijack function for advanced usage/testing
 	hijackPlanRequest func(ctx context.Context, planPayload string) error
+
+	// Memory triage for dynamic memory management
+	memoryTriage aimem.MemoryTriage
 }
 
 var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
@@ -221,6 +225,14 @@ func WithEnhanceKnowledgeManager(manager *aicommon.EnhanceKnowledgeManager) Opti
 	return func(cfg *ReActConfig) {
 		if manager != nil {
 			cfg.enhanceKnowledgeManager = manager
+		}
+	}
+}
+
+func WithMemoryTriage(triage aimem.MemoryTriage) Option {
+	return func(cfg *ReActConfig) {
+		if triage != nil {
+			cfg.memoryTriage = triage
 		}
 	}
 }

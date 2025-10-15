@@ -176,7 +176,7 @@ func TestReAct_ToolUse_Reject_WithAIMemory(t *testing.T) {
 	// 创建 mock embedding 客户端
 	mockEmbedder := &mockEmbeddingClient{}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCallingWithAIMemory2(i, r, "sleep")
 		}),

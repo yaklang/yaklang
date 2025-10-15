@@ -31,7 +31,7 @@ func TestReAct_FreeInput(t *testing.T) {
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedFreeInputOutput(i, flag)
 		}),
@@ -94,7 +94,7 @@ func TestReAct_FreeInput_MultiCalls(t *testing.T) {
 	flag := ksuid.New().String()
 	in := make(chan *ypb.AIInputEvent, 10)
 	out := make(chan *ypb.AIOutputEvent, 10)
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedFreeInputOutput(i, flag)
 		}),

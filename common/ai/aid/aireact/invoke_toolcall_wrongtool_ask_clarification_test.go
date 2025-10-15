@@ -113,7 +113,7 @@ func TestReAct_ToolUse_WrongTool_AskForClarification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedToolCallingWrongTool_AskForClarification(i, r, "sleep")
 		}),

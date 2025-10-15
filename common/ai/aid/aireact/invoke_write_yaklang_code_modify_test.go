@@ -88,7 +88,7 @@ func TestReAct_WriteYaklangCodeAndThenModify(t *testing.T) {
 	stat := &mockStats_forWriteAndModify{
 		writeDone: false,
 	}
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedYaklangWritingAndModify(i, r, "demo", stat)
 		}),

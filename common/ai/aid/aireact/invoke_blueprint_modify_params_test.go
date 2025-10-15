@@ -82,7 +82,7 @@ func TestReAct_RequireBlueprint_ModifyParams(t *testing.T) {
 
 	abort, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ins, err := NewReAct(
+	ins, err := NewTestReAct(
 		WithAICallback(func(i aicommon.AICallerConfigIf, r *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			return mockedRequireBlueprint_ModifyParams(i, r, flag)
 		}),
