@@ -2,7 +2,6 @@ package schema
 
 import (
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 // AIMemoryCollection 存储AI记忆的HNSW索引信息
@@ -30,9 +29,6 @@ func (a *AIMemoryCollection) TableName() string {
 }
 
 func (a *AIMemoryCollection) BeforeSave() error {
-	if a.SessionID == "" {
-		return utils.Errorf("session_id must be set")
-	}
 	if a.Dimension == 0 {
 		a.Dimension = 7 // 默认7维
 	}

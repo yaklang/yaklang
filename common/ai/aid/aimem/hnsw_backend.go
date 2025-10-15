@@ -3,8 +3,10 @@ package aimem
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/jinzhu/gorm"
@@ -23,8 +25,13 @@ type AIMemoryHNSWBackend struct {
 	graph      atomic.Pointer[hnsw.Graph[string]]
 	collection *schema.AIMemoryCollection
 
+	// 保存操作的专用锁 - 确保保存操作的原子性
+	saveMutex sync.Mutex
+
+	// 图操作的全局锁 - 确保所有图操作（Add/Delete/Update/Export）的互斥性
+	graphMutex sync.RWMutex
+
 	// 原子操作标志
-	saving     int32 // 是否正在保存
 	rebuilding int32 // 是否正在重建
 
 	// 是否自动保存graph到数据库
@@ -41,7 +48,7 @@ func NewAIMemoryHNSWBackend(sessionID string) (*AIMemoryHNSWBackend, error) {
 	// 查找或创建collection
 	var collection schema.AIMemoryCollection
 	err := db.Where("session_id = ?", sessionID).First(&collection).Error
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// 创建新的collection
 		collection = schema.AIMemoryCollection{
 			SessionID:   sessionID,
@@ -83,13 +90,11 @@ func NewAIMemoryHNSWBackend(sessionID string) (*AIMemoryHNSWBackend, error) {
 	// 设置到原子指针
 	backend.graph.Store(graph)
 
-	// 设置graph变化回调 - 暂时禁用自动保存以避免并发问题
+	// 设置graph变化回调 - 使用专用锁保证保存操作的原子性
 	graph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
-		// 暂时禁用自动保存，避免并发map访问问题
-		// TODO: 需要HNSW库支持更好的并发安全
-		if false && backend.autoSave && atomic.CompareAndSwapInt32(&backend.saving, 0, 1) {
+		if backend.autoSave {
+			// 异步保存，使用专用锁确保原子性
 			go func() {
-				defer atomic.StoreInt32(&backend.saving, 0)
 				if err := backend.SaveGraph(); err != nil {
 					log.Errorf("auto save graph failed: %v", err)
 				}
@@ -146,13 +151,22 @@ func (b *AIMemoryHNSWBackend) loadGraphFromBinary(graphBinary []byte) (*hnsw.Gra
 
 // SaveGraph 保存HNSW Graph到数据库
 func (b *AIMemoryHNSWBackend) SaveGraph() error {
+	// 使用专用锁确保保存操作的原子性
+	b.saveMutex.Lock()
+	defer b.saveMutex.Unlock()
+
+	// 获取读锁来导出图 - 确保与Add/Delete/Update操作互斥
+	b.graphMutex.RLock()
 	graph := b.graph.Load()
 	if graph == nil {
+		b.graphMutex.RUnlock()
 		return utils.Errorf("graph is nil")
 	}
 
-	// 导出graph为二进制
+	// 在读锁保护下导出图
 	exportedGraph, err := hnsw.ExportHNSWGraph(graph)
+	b.graphMutex.RUnlock() // Export完成后立即释放锁
+
 	if err != nil {
 		return utils.Errorf("export graph failed: %v", err)
 	}
@@ -170,6 +184,7 @@ func (b *AIMemoryHNSWBackend) SaveGraph() error {
 
 	// 原子更新数据库 - 使用事务确保原子性
 	return utils.GormTransaction(b.db, func(tx *gorm.DB) error {
+		// 使用Update方法避免主键冲突
 		return tx.Model(&schema.AIMemoryCollection{}).
 			Where("session_id = ?", b.sessionID).
 			Update("graph_binary", binaryData).Error
@@ -178,6 +193,10 @@ func (b *AIMemoryHNSWBackend) SaveGraph() error {
 
 // Add 添加记忆实体到HNSW索引
 func (b *AIMemoryHNSWBackend) Add(entity *MemoryEntity) error {
+	// 获取写锁来修改图
+	b.graphMutex.Lock()
+	defer b.graphMutex.Unlock()
+
 	graph := b.graph.Load()
 	if graph == nil {
 		return utils.Errorf("graph is nil")
@@ -189,7 +208,7 @@ func (b *AIMemoryHNSWBackend) Add(entity *MemoryEntity) error {
 		Value: entity.CorePactVector,
 	}
 
-	// 添加到graph - HNSW内部已经处理并发安全
+	// 添加到graph
 	graph.Add(node)
 
 	return nil
@@ -197,6 +216,10 @@ func (b *AIMemoryHNSWBackend) Add(entity *MemoryEntity) error {
 
 // Delete 从HNSW索引中删除记忆实体
 func (b *AIMemoryHNSWBackend) Delete(memoryID string) error {
+	// 获取写锁来修改图
+	b.graphMutex.Lock()
+	defer b.graphMutex.Unlock()
+
 	graph := b.graph.Load()
 	if graph == nil {
 		return utils.Errorf("graph is nil")
@@ -212,6 +235,10 @@ func (b *AIMemoryHNSWBackend) Delete(memoryID string) error {
 
 // Update 更新HNSW索引中的记忆实体
 func (b *AIMemoryHNSWBackend) Update(entity *MemoryEntity) error {
+	// 获取写锁来修改图
+	b.graphMutex.Lock()
+	defer b.graphMutex.Unlock()
+
 	graph := b.graph.Load()
 	if graph == nil {
 		return utils.Errorf("graph is nil")
@@ -231,17 +258,22 @@ func (b *AIMemoryHNSWBackend) Update(entity *MemoryEntity) error {
 
 // Search 使用HNSW索引搜索相似的记忆实体
 func (b *AIMemoryHNSWBackend) Search(queryVector []float32, limit int) ([]SearchResultWithDistance, error) {
+	// 获取读锁来搜索图
+	b.graphMutex.RLock()
 	graph := b.graph.Load()
 	if graph == nil {
+		b.graphMutex.RUnlock()
 		return nil, utils.Errorf("graph is nil")
 	}
 
 	if len(queryVector) != 7 {
+		b.graphMutex.RUnlock()
 		return nil, utils.Errorf("query vector must be 7 dimensions, got %d", len(queryVector))
 	}
 
 	// 使用HNSW搜索
 	searchResults := graph.SearchWithDistance(queryVector, limit)
+	b.graphMutex.RUnlock() // 搜索完成后立即释放读锁
 
 	// 批量查询数据库以提高性能
 	if len(searchResults) == 0 {
@@ -329,12 +361,11 @@ func (b *AIMemoryHNSWBackend) RebuildIndex() error {
 			})
 		}
 
-		// 设置回调函数 - 暂时禁用自动保存
+		// 设置回调函数 - 使用专用锁保证保存操作的原子性
 		newGraph.OnLayersChange = func(layers []*hnsw.Layer[string]) {
-			// 暂时禁用自动保存，避免并发map访问问题
-			if false && b.autoSave && atomic.CompareAndSwapInt32(&b.saving, 0, 1) {
+			if b.autoSave {
+				// 异步保存，使用专用锁确保原子性
 				go func() {
-					defer atomic.StoreInt32(&b.saving, 0)
 					if err := b.SaveGraph(); err != nil {
 						log.Errorf("auto save graph failed: %v", err)
 					}
@@ -363,7 +394,6 @@ func (b *AIMemoryHNSWBackend) GetStats() map[string]interface{} {
 	stats["ef_construct"] = b.collection.EfConstruct
 	stats["dimension"] = b.collection.Dimension
 	stats["auto_save"] = b.autoSave
-	stats["saving"] = atomic.LoadInt32(&b.saving) == 1
 	stats["rebuilding"] = atomic.LoadInt32(&b.rebuilding) == 1
 
 	graph := b.graph.Load()
