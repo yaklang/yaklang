@@ -222,6 +222,14 @@ func averagePooling(embeddings [][]float32) []float32 {
 	return result
 }
 
+func (r *RAGSystem) Has(docId string) bool {
+	v, ok := r.VectorStore.(*SQLiteVectorStoreHNSW)
+	if !ok {
+		return false
+	}
+	return v.Has(docId)
+}
+
 func (r *RAGSystem) Add(docId string, content string, opts ...DocumentOption) error {
 	if err := r.requireWriteCollection(); err != nil {
 		return utils.Wrap(err, "require write vector store")

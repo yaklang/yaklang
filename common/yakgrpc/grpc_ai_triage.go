@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -19,9 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"regexp"
-	"strings"
-	"time"
 )
 
 var (
@@ -126,7 +127,7 @@ func (s *Server) StartAITriage(stream ypb.Yak_StartAITriageServer) error {
 		}
 		forges := []*schema.AIForge{}
 		for _, result := range searchResults {
-			forges = append(forges, forgeMap[result.Tool])
+			forges = append(forges, forgeMap[result.Key])
 		}
 		return forges, nil
 	}

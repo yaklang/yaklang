@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -17,9 +18,9 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -226,7 +227,7 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 		if len(tools) > 0 {
 			for _, toolInfo := range tools {
 				callResults = append(callResults, &searchtools.KeywordSearchResult{
-					Tool:            toolInfo.GetString("tool"),
+					Key:             toolInfo.GetString("tool"),
 					MatchedKeywords: toolInfo.GetStringSlice("matched_keywords"),
 				})
 			}
@@ -243,9 +244,9 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 
 func (c *Config) InitToolManager() error {
 	if c.aiToolManager == nil {
-		c.aiToolManager = buildinaitools.NewToolManager(append(c.aiToolManagerOption, buildinaitools.WithSearcher(func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
+		keyWordSearcher := func(query string, searchList []searchtools.AISearchable) ([]searchtools.AISearchable, error) {
 			keywords := omap.NewOrderedMap[string, []string](nil)
-			toolMap := map[string]*aitool.Tool{}
+			toolMap := map[string]searchtools.AISearchable{}
 			for _, tool := range searchList {
 				keywords.Set(tool.GetName(), tool.GetKeywords())
 				toolMap[tool.GetName()] = tool
@@ -254,12 +255,51 @@ func (c *Config) InitToolManager() error {
 			if err != nil {
 				return nil, err
 			}
-			tools := []*aitool.Tool{}
+			tools := []searchtools.AISearchable{}
 			for _, result := range searchResults {
-				tools = append(tools, toolMap[result.Tool])
+				tools = append(tools, toolMap[result.Key])
 			}
 			return tools, nil
-		}))...)
+		}
+
+		aiToolKeywordSearcher := func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
+			tools, err := keyWordSearcher(query, lo.Map(searchList, func(item *aitool.Tool, _ int) searchtools.AISearchable {
+				return item
+			}))
+			if err != nil {
+				return nil, err
+			}
+			res := lo.Map(tools, func(item searchtools.AISearchable, _ int) *aitool.Tool {
+				return item.(*aitool.Tool)
+			})
+			return res, nil
+		}
+
+		forgeKeywordSearcher := func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
+			tools, err := keyWordSearcher(query, lo.Map(searchList, func(item *schema.AIForge, _ int) searchtools.AISearchable {
+				return item
+			}))
+			if err != nil {
+				return nil, err
+			}
+			res := lo.Map(tools, func(item searchtools.AISearchable, _ int) *schema.AIForge {
+				return item.(*schema.AIForge)
+			})
+			return res, nil
+		}
+
+		aiToolRagSearcher, err := rag_search_tool.NewRAGSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName)
+		if err != nil {
+			log.Errorf("create ai tool rag searcher failed: %v", err)
+		}
+		forgeRagSearcher, err := rag_search_tool.NewRAGSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName)
+		if err != nil {
+			log.Errorf("create forge rag searcher failed: %v", err)
+		}
+		aiToolRagSearcher = rag_search_tool.NewMergeSearchr(aiToolRagSearcher, aiToolKeywordSearcher)
+		forgeRagSearcher = rag_search_tool.NewMergeSearchr(forgeRagSearcher, forgeKeywordSearcher)
+
+		c.aiToolManager = buildinaitools.NewToolManager(append(c.aiToolManagerOption, buildinaitools.WithAIToolsSearcher(aiToolRagSearcher), buildinaitools.WithAiForgeSearcher(forgeRagSearcher))...)
 	}
 	return nil
 }
@@ -721,44 +761,21 @@ func WithAiToolsSearchTool() Option {
 			config.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
 		config.aiToolManagerOption = append(config.aiToolManagerOption,
-			buildinaitools.WithSearchEnabled(true))
+			buildinaitools.WithSearchToolEnabled(true))
 		return nil
 	}
 }
 
 func WithAiForgeSearchTool() Option {
 	return func(config *Config) error {
-		forgeSearchTools, err := searchtools.CreateAISearchTools(
-			func(query string, searchList []*schema.AIForge) ([]*schema.AIForge, error) {
-				keywords := omap.NewOrderedMap[string, []string](nil)
-				forgeMap := map[string]*schema.AIForge{}
-				for _, forge := range searchList {
-					keywords.Set(forge.GetName(), forge.GetKeywords())
-					forgeMap[forge.GetName()] = forge
-				}
-				searchResults, err := config.HandleSearch(query, keywords)
-				if err != nil {
-					return nil, err
-				}
-				forges := []*schema.AIForge{}
-				for _, result := range searchResults {
-					forges = append(forges, forgeMap[result.Tool])
-				}
-				return forges, nil
-			},
-			func() []*schema.AIForge {
-				forgeList, err := yakit.GetAllAIForge(consts.GetGormProfileDatabase())
-				if err != nil {
-					log.Errorf("yakit.GetAllAIForge: %v", err)
-					return nil
-				}
-				return forgeList
-			}, searchtools.SearchForgeName,
-		)
-		if err != nil {
-			return utils.Errorf("create ai forge search tools fail: %v", err)
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.aiToolManagerOption == nil {
+			config.aiToolManagerOption = make([]buildinaitools.ToolManagerOption, 0)
 		}
-		return WithTools(forgeSearchTools...)(config)
+		config.aiToolManagerOption = append(config.aiToolManagerOption,
+			buildinaitools.WithForgeSearchToolEnabled(true))
+		return nil
 	}
 }
 
