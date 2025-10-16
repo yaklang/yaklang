@@ -5,28 +5,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
 func TestAIMemoryHNSWBackend_BasicOperations(t *testing.T) {
-	// 初始化数据库
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		t.Skip("database not available")
-	}
-
-	// 确保表存在
-	db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{})
-
 	sessionID := "test-hnsw-" + uuid.New().String()
 
 	// 创建HNSW后端
-	backend, err := NewAIMemoryHNSWBackend(sessionID)
-	if err != nil {
-		t.Fatalf("create HNSW backend failed: %v", err)
-	}
+	backend := NewTestAIMemoryHNSWBackend(t, sessionID)
 	defer backend.Close()
+	db := backend.db
 
 	// 启用自动保存测试
 	backend.autoSave = true
@@ -258,22 +246,23 @@ func TestAIMemoryHNSWBackend_BasicOperations(t *testing.T) {
 
 func TestAIMemoryHNSWBackend_Persistence(t *testing.T) {
 	// 测试HNSW图的持久化
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		t.Skip("database not available")
+	sessionID := "test-persistence-" + uuid.New().String()
+	db, err := getTestDatabase()
+	if db == nil || err != nil {
+		t.Fatal("getTestDatabase failed")
 	}
 
 	db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{})
 
-	sessionID := "test-persistence-" + uuid.New().String()
+	backend, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionID), WithHNSWDatabase(db))
+	if err != nil {
+		t.Fatalf("create HNSW backend failed: %v", err)
+	}
+
+	backend.autoSave = true // 启用自动保存测试并发安全性
 
 	// 第一阶段：创建并保存数据
 	t.Run("CreateAndSave", func(t *testing.T) {
-		backend, err := NewAIMemoryHNSWBackend(sessionID)
-		if err != nil {
-			t.Fatalf("create HNSW backend failed: %v", err)
-		}
-
 		// 启用自动保存用于持久化测试
 		backend.autoSave = true
 
@@ -327,15 +316,15 @@ func TestAIMemoryHNSWBackend_Persistence(t *testing.T) {
 
 	// 第二阶段：重新加载并验证
 	t.Run("LoadAndVerify", func(t *testing.T) {
-		backend, err := NewAIMemoryHNSWBackend(sessionID)
+		loadBackEnd, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionID), WithHNSWDatabase(db))
 		if err != nil {
-			t.Fatalf("reload HNSW backend failed: %v", err)
+			t.Fatalf("load HNSW backend failed: %v", err)
 		}
-		defer backend.Close()
+		defer loadBackEnd.Close()
 
 		// 验证数据是否正确加载
 		queryVector := []float32{0.8, 0.7, 0.9, 0.6, 0.5, 0.8, 0.7}
-		results, err := backend.Search(queryVector, 1)
+		results, err := loadBackEnd.Search(queryVector, 1)
 		if err != nil {
 			t.Fatalf("search after reload failed: %v", err)
 		}

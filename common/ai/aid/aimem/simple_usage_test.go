@@ -6,28 +6,37 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-// TestSimpleUsage 测试简单的使用场景，避免并发问题
-func TestSimpleUsage(t *testing.T) {
-	// 初始化数据库
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		t.Skip("database not available")
+func NewTestAIMemoryHNSWBackend(t *testing.T, sessionID string) *AIMemoryHNSWBackend {
+	db, err := getTestDatabase()
+	if db == nil || err != nil {
+		t.Fatal("getTestDatabase failed")
 	}
 
 	db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{})
 
-	sessionID := "simple-usage-" + uuid.New().String()
-
-	// 创建HNSW后端
-	backend, err := NewAIMemoryHNSWBackend(sessionID)
+	backend, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionID), WithHNSWDatabase(db))
 	if err != nil {
 		t.Fatalf("create HNSW backend failed: %v", err)
 	}
+
+	backend.autoSave = true // 启用自动保存测试并发安全性
+
+	return backend
+}
+
+// TestSimpleUsage 测试简单的使用场景，避免并发问题
+func TestSimpleUsage(t *testing.T) {
+
+	sessionID := "simple-usage-" + uuid.New().String()
+
+	// 创建HNSW后端
+	backend := NewTestAIMemoryHNSWBackend(t, sessionID)
 	defer backend.Close()
+
+	db := backend.db
 
 	// 启用自动保存测试
 	backend.autoSave = true // 启用自动保存测试并发安全性
@@ -226,20 +235,11 @@ func TestSimpleUsage(t *testing.T) {
 
 // TestPerformanceBaseline 测试性能基准
 func TestPerformanceBaseline(t *testing.T) {
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		t.Skip("database not available")
-	}
-
-	db.AutoMigrate(&schema.AIMemoryEntity{}, &schema.AIMemoryCollection{})
-
 	sessionID := "perf-test-" + uuid.New().String()
 
-	backend, err := NewAIMemoryHNSWBackend(sessionID)
-	if err != nil {
-		t.Fatalf("create HNSW backend failed: %v", err)
-	}
+	backend := NewTestAIMemoryHNSWBackend(t, sessionID)
 	defer backend.Close()
+	db := backend.db
 
 	backend.autoSave = true // 启用自动保存测试并发安全性
 
