@@ -11,7 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc"
@@ -67,12 +69,26 @@ func NewSFScanTestRisk(id, title, sinkName string) SFScanTestRisk {
 		SinkName: sinkName,
 	}
 }
-func (suite *SFScanRiskTestSuite) InitProgram(code string, riskConfigs ...SFScanTestRisk) *SFScanRiskTestSuite {
+func (suite *SFScanRiskTestSuite) InitSimpleProgram(code string, riskConfigs ...SFScanTestRisk) *SFScanRiskTestSuite {
 	suite.TestRisks = riskConfigs
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("test"+suite.Language.GetFileExt(), code)
 	programs, err := ssaapi.ParseProjectWithFS(
 		vf,
+		ssaapi.WithLanguage(suite.Language),
+		ssaapi.WithProgramName(suite.ProgramName),
+		ssaapi.WithReCompile(len(suite.TaskIDs) > 0),
+	)
+	require.NoError(suite.t, err)
+	require.NotEmpty(suite.t, programs)
+	suite.t.Logf("已初始化程序 %s，包含 %d 个风险配置", suite.ProgramName, len(riskConfigs))
+	return suite
+}
+
+func (suite *SFScanRiskTestSuite) InitProgram(fs fi.FileSystem, riskConfigs ...SFScanTestRisk) *SFScanRiskTestSuite {
+	suite.TestRisks = riskConfigs
+	programs, err := ssaapi.ParseProjectWithFS(
+		fs,
 		ssaapi.WithLanguage(suite.Language),
 		ssaapi.WithProgramName(suite.ProgramName),
 		ssaapi.WithReCompile(len(suite.TaskIDs) > 0),
@@ -115,7 +131,40 @@ func (suite *SFScanRiskTestSuite) Scan() *SFScanRiskTestSuite {
 	// 获取最新扫描的TaskID
 	taskID := suite.getLatestTaskID()
 	suite.TaskIDs = append(suite.TaskIDs, taskID)
+	suite.t.Logf("扫描完成，TaskID: %s，当前总任务数: %d", taskID, len(suite.TaskIDs))
+	return suite
+}
 
+func (suite *SFScanRiskTestSuite) ScanWithRule(rule string) *SFScanRiskTestSuite {
+	stream, err := suite.Client.SyntaxFlowScan(context.Background())
+	require.NoError(suite.t, err)
+	err = stream.Send(&ypb.SyntaxFlowScanRequest{
+		ControlMode: "start",
+		ProgramName: []string{suite.ProgramName},
+		RuleInput: &ypb.SyntaxFlowRuleInput{
+			Content:  rule,
+			Language: string(suite.Language),
+		},
+	})
+	require.NoError(suite.t, err)
+
+	// 等待扫描完成
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			require.NoError(suite.t, err)
+		}
+		if resp.GetStatus() == "finished" || resp.GetStatus() == "error" {
+			break
+		}
+	}
+
+	// 获取最新扫描的TaskID
+	taskID := suite.getLatestTaskID()
+	suite.TaskIDs = append(suite.TaskIDs, taskID)
 	suite.t.Logf("扫描完成，TaskID: %s，当前总任务数: %d", taskID, len(suite.TaskIDs))
 	return suite
 }
@@ -259,4 +308,17 @@ func (suite *SFScanRiskTestSuite) getLatestTaskID() string {
 	}
 
 	return allRisks[0].RuntimeId
+}
+
+func (suite *SFScanRiskTestSuite) HandleLastTaskRisks(fn func(risks []*schema.SSARisk) error) error {
+	taskID := suite.getLatestTaskID()
+	if taskID == "" {
+		return utils.Error("no task id found")
+	}
+	_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
+		RuntimeID: []string{taskID},
+	}, nil)
+	require.NoError(suite.t, err)
+	require.NotEmpty(suite.t, risks)
+	return fn(risks)
 }

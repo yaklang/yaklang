@@ -270,7 +270,7 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 		var rangeIf *memedit.Range
 		var memEditor *memedit.MemEditor
 		if auditNode.TmpValueFileHash != "" {
-			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
+			memEditor, err = ssadb.GetEditorByHash(auditNode.TmpValueFileHash)
 			if err != nil {
 				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
 			} else {
