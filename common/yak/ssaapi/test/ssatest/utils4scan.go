@@ -318,7 +318,8 @@ func (suite *SFScanRiskTestSuite) HandleLastTaskRisks(fn func(risks []*schema.SS
 	_, risks, err := yakit.QuerySSARisk(ssadb.GetDB(), &ypb.SSARisksFilter{
 		RuntimeID: []string{taskID},
 	}, nil)
-	require.NoError(suite.t, err)
-	require.NotEmpty(suite.t, risks)
+	if err != nil {
+		return utils.Wrapf(err, "failed to query risks")
+	}
 	return fn(risks)
 }

@@ -112,6 +112,7 @@ func (r *Report) AddRisks(risk ...*Risk) {
 	}
 	for _, risk := range risk {
 		// set program from risk if not set in report
+		// TODO:不同program的risk能放在一个报告吗？
 		if r.ProgramName == "" && risk.GetProgramName() != "" {
 			r.ProgramName = risk.GetProgramName()
 		}

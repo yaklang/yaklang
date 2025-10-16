@@ -2,6 +2,7 @@ package sfreport_test
 
 import (
 	"bytes"
+	"context"
 	_ "embed"
 	"encoding/json"
 	"os"
@@ -20,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func TestReport(t *testing.T) {
@@ -256,7 +258,6 @@ func TestRiskImportAndExportWithDataFlow(t *testing.T) {
 	program := uuid.NewString()
 	suite, clean := ssatest.NewSFScanRiskTestSuite(t, program, consts.JAVA)
 	defer clean()
-
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("sqli.java", `package com.mycompany.myapp;
 
@@ -323,9 +324,12 @@ public interface UserMapper {
 	)
 
 	riskCount := 0
+	allRisks := make([]*schema.SSARisk, 0)
+
 	err := suite.InitProgram(vf).ScanWithRule(rule).HandleLastTaskRisks(func(risks []*schema.SSARisk) error {
 		reporter.AddSyntaxFlowRisks(risks...)
 		riskCount += len(risks)
+		allRisks = append(allRisks, risks...)
 		return nil
 	})
 	require.NoError(t, err)
@@ -365,5 +369,57 @@ public interface UserMapper {
 		}
 		require.True(t, hasSqliJava)
 		require.True(t, hasSqlmapXml)
+	})
+
+	t.Run("test import report to database", func(t *testing.T) {
+		callBack := func(msg string, progress float64) {
+			t.Logf("import report to database: %s, progress: %f", msg, progress)
+		}
+		// 删除后导入才不会重复
+		clean()
+		require.NoError(t, err)
+		files := reporter.File
+
+		db := ssadb.GetDB()
+		// ================ 查询导入前的风险和文件 ========================
+		beforeImportRiskCount, err := yakit.QuerySSARiskCount(db, &ypb.SSARisksFilter{ProgramName: []string{program}})
+		require.NoError(t, err)
+		// 查询导入前的文件
+		beforeImportFileCount, err := ssadb.GetEditorCountByProgramName(program)
+		require.NoError(t, err)
+
+		// ================ 导入risk ========================
+		err = sfreport.ImportSSARiskFromJSON(context.Background(), db, buf.Bytes(), callBack)
+		require.NoError(t, err)
+		afterImportRiskCount, err := yakit.QuerySSARiskCount(db, &ypb.SSARisksFilter{ProgramName: []string{program}})
+		require.NoError(t, err)
+		require.Equal(t, beforeImportRiskCount+riskCount, afterImportRiskCount)
+		// ================ 查询导入后的风险 ========================
+		_, importedRisks, err := yakit.QuerySSARisk(db, &ypb.SSARisksFilter{
+			ProgramName: []string{program},
+		}, nil)
+		require.NoError(t, err)
+		require.Equal(t, riskCount, len(importedRisks))
+		riskTitleMap := make(map[string]bool)
+		for _, risk := range importedRisks {
+			riskTitleMap[risk.Title] = true
+		}
+		for _, risk := range allRisks {
+			require.True(t, riskTitleMap[risk.Title])
+		}
+		// ================ 查询导入后的文件 ========================
+		afterImportFileCount, err := ssadb.GetEditorCountByProgramName(program)
+		require.NoError(t, err)
+		require.Equal(t, beforeImportFileCount+len(files), afterImportFileCount)
+		filePathMap := make(map[string]bool)
+		for _, file := range files {
+			filePathMap[file.Path] = true
+		}
+
+		queryFiles, err := ssadb.GetEditorByProgramName(program)
+		require.NoError(t, err)
+		for _, queryFile := range queryFiles {
+			require.True(t, filePathMap[queryFile.GetUrl()])
+		}
 	})
 }
