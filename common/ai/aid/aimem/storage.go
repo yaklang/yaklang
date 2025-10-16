@@ -169,24 +169,28 @@ func (r *AIMemoryTriage) UpdateMemoryEntity(entity *MemoryEntity) error {
 		return utils.Errorf("database connection is nil")
 	}
 
-	// 更新数据库
-	updates := map[string]interface{}{
-		"content":             entity.Content,
-		"tags":                schema.StringArray(entity.Tags),
-		"potential_questions": schema.StringArray(entity.PotentialQuestions),
-		"c_score":             entity.C_Score,
-		"o_score":             entity.O_Score,
-		"r_score":             entity.R_Score,
-		"e_score":             entity.E_Score,
-		"p_score":             entity.P_Score,
-		"a_score":             entity.A_Score,
-		"t_score":             entity.T_Score,
-		"core_pact_vector":    schema.FloatArray(entity.CorePactVector),
+	// 先查询现有实体
+	var existingEntity schema.AIMemoryEntity
+	if err := db.Where("memory_id = ? AND session_id = ?", entity.Id, r.sessionID).
+		First(&existingEntity).Error; err != nil {
+		return utils.Errorf("find existing memory entity failed: %v", err)
 	}
 
-	if err := db.Model(&schema.AIMemoryEntity{}).
-		Where("memory_id = ? AND session_id = ?", entity.Id, r.sessionID).
-		Updates(updates).Error; err != nil {
+	// 更新字段
+	existingEntity.Content = entity.Content
+	existingEntity.Tags = schema.StringArray(entity.Tags)
+	existingEntity.PotentialQuestions = schema.StringArray(entity.PotentialQuestions)
+	existingEntity.C_Score = entity.C_Score
+	existingEntity.O_Score = entity.O_Score
+	existingEntity.R_Score = entity.R_Score
+	existingEntity.E_Score = entity.E_Score
+	existingEntity.P_Score = entity.P_Score
+	existingEntity.A_Score = entity.A_Score
+	existingEntity.T_Score = entity.T_Score
+	existingEntity.CorePactVector = schema.FloatArray(entity.CorePactVector)
+
+	// 保存更新
+	if err := db.Save(&existingEntity).Error; err != nil {
 		return utils.Errorf("update memory entity in database failed: %v", err)
 	}
 

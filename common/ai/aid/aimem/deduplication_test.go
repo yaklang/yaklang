@@ -117,7 +117,7 @@ func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
 
 	// 先保存一个记忆实体到数据库
 	existingEntity := &MemoryEntity{
-		Id:                 "existing-memory",
+		Id:                 "existing-memory-" + uuid.New().String(),
 		Content:            "现有的Go语言记忆",
 		Tags:               []string{"编程", "Go语言", "后端"},
 		PotentialQuestions: []string{"Go语言怎么样？"},
@@ -141,7 +141,7 @@ func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
 	config := DefaultDeduplicationConfig()
 	testEntities := []*MemoryEntity{
 		{
-			Id:                 "high-overlap-memory",
+			Id:                 "high-overlap-memory-" + uuid.New().String(),
 			Content:            "另一个Go语言记忆",
 			Tags:               []string{"编程", "Go语言"}, // 2/4重叠，Jaccard = 2/4 = 0.5 < 0.8
 			PotentialQuestions: []string{"Go语言好用吗？"},
@@ -155,7 +155,7 @@ func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
 			CorePactVector:     []float32{0.7, 0.8, 0.8, 0.5, 0.7, 0.8, 0.7},
 		},
 		{
-			Id:                 "different-memory",
+			Id:                 "different-memory-" + uuid.New().String(),
 			Content:            "关于数据库的记忆",
 			Tags:               []string{"数据库", "SQL", "存储"},
 			PotentialQuestions: []string{"什么是数据库？"},
