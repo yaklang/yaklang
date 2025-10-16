@@ -12,8 +12,6 @@ import (
 )
 
 func TestHandleMemory_Basic(t *testing.T) {
-	t.Parallel()
-
 	sessionID := "handle-memory-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
@@ -53,8 +51,6 @@ func TestHandleMemory_Basic(t *testing.T) {
 }
 
 func TestHandleMemory_Deduplication(t *testing.T) {
-	t.Parallel()
-
 	sessionID := "handle-dedup-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
@@ -110,8 +106,6 @@ func TestHandleMemory_Deduplication(t *testing.T) {
 }
 
 func TestSearchMemory_Basic(t *testing.T) {
-	t.Parallel()
-
 	sessionID := "search-memory-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
@@ -179,8 +173,6 @@ func TestSearchMemory_Basic(t *testing.T) {
 }
 
 func TestSearchMemory_BytesLimit(t *testing.T) {
-	t.Parallel()
-
 	sessionID := "search-bytes-limit-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
@@ -233,8 +225,6 @@ func TestSearchMemory_BytesLimit(t *testing.T) {
 }
 
 func TestSearchMemory_EmptyQuery(t *testing.T) {
-	t.Parallel()
-
 	sessionID := "search-empty-test-" + uuid.New().String()
 	defer cleanupEntryTestData(t, sessionID)
 
