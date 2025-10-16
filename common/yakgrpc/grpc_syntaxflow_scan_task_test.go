@@ -396,7 +396,9 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 
 		stream.Send(&ypb.SyntaxFlowScanRequest{
 			ControlMode: "start",
-			Filter:      &ypb.SyntaxFlowRuleFilter{},
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				Language: []string{"java"},
+			},
 			ProgramName: progIds,
 		})
 
@@ -425,6 +427,26 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 		})
 		require.NoError(t, err)
 		return rsp.GetData()
+	}
+
+	startScanWithGroup := func(progIds []string, groupName string, isIgnoreLanguage bool) (string, ypb.Yak_SyntaxFlowScanClient) {
+		stream, err := client.SyntaxFlowScan(context.Background())
+		require.NoError(t, err)
+
+		stream.Send(&ypb.SyntaxFlowScanRequest{
+			ControlMode: "start",
+			Filter: &ypb.SyntaxFlowRuleFilter{
+				GroupNames: []string{groupName},
+			},
+			IgnoreLanguage: isIgnoreLanguage,
+			ProgramName:    progIds,
+		})
+
+		resp, err := stream.Recv()
+		require.NoError(t, err)
+		log.Infof("resp: %v", resp)
+		taskID := resp.TaskID
+		return taskID, stream
 	}
 
 	t.Run("test query and delete after starting a scan task", func(t *testing.T) {
@@ -533,26 +555,6 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 	//	}
 	//})
 
-	startScanWithGroup := func(progIds []string, groupName string, isIgnoreLanguage bool) (string, ypb.Yak_SyntaxFlowScanClient) {
-		stream, err := client.SyntaxFlowScan(context.Background())
-		require.NoError(t, err)
-
-		stream.Send(&ypb.SyntaxFlowScanRequest{
-			ControlMode: "start",
-			Filter: &ypb.SyntaxFlowRuleFilter{
-				GroupNames: []string{groupName},
-			},
-			IgnoreLanguage: isIgnoreLanguage,
-			ProgramName:    progIds,
-		})
-
-		resp, err := stream.Recv()
-		require.NoError(t, err)
-		log.Infof("resp: %v", resp)
-		taskID := resp.TaskID
-		return taskID, stream
-	}
-
 	t.Run("test ignore language", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("/a.java", `package com.example.apackage;`)
@@ -569,16 +571,20 @@ func TestGRPCMUSTPASS_SyntaxFlow_Query_And_Delete_Task(t *testing.T) {
 
 		// create some rule with different language
 		for _, language := range languages {
+			ruleName := uuid.NewString()
 			rule, err := sfdb.CreateRule(&schema.SyntaxFlowRule{
-				RuleName: uuid.NewString(),
+				RuleName: ruleName,
 				Language: language,
+				Content:  `* as $target; alert $target`, // 添加规则内容，避免编译失败
 			})
+			require.NoError(t, err)
 			_, err = sfdb.BatchAddGroupsForRules(db, []string{rule.RuleName}, []string{groupName})
 			require.NoError(t, err)
-			t.Cleanup(func() {
-				err = sfdb.DeleteRuleByRuleName(rule.RuleName)
-				require.NoError(t, err)
-			})
+			func(name string) {
+				t.Cleanup(func() {
+					sfdb.DeleteRuleByRuleName(name)
+				})
+			}(ruleName)
 		}
 
 		progIDA := uuid.NewString()
