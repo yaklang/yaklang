@@ -192,9 +192,10 @@ func (r *Report) FirstOrCreateFileByHash(irSourceHash string) (*File, bool) {
 type ImportSSARiskOption func(*ImportSSARiskManager)
 
 type ImportSSARiskManager struct {
-	db       *gorm.DB
-	ctx      context.Context
-	callback func(string, float64)
+	programName string
+	db          *gorm.DB
+	ctx         context.Context
+	callback    func(string, float64)
 }
 
 func WithDB(db *gorm.DB) ImportSSARiskOption {
@@ -206,6 +207,12 @@ func WithDB(db *gorm.DB) ImportSSARiskOption {
 func WithContext(ctx context.Context) ImportSSARiskOption {
 	return func(m *ImportSSARiskManager) {
 		m.ctx = ctx
+	}
+}
+
+func WithProgramName(programName string) ImportSSARiskOption {
+	return func(m *ImportSSARiskManager) {
+		m.programName = programName
 	}
 }
 
@@ -255,6 +262,7 @@ func ImportSSARiskFromJSON(
 	opts := []ImportSSARiskOption{
 		WithDB(db),
 		WithContext(ctx),
+		WithProgramName(report.ProgramName),
 	}
 	if len(callBacks) > 0 {
 		opts = append(opts, WithCallback(callBacks[0]))
@@ -291,8 +299,8 @@ func (m *ImportSSARiskManager) importRisksFromReport(report *Report, cb func(str
 			log.Errorf("Import SSARisk from JSON failed: %v", err)
 		}
 		if cb != nil {
-			progress := float64(count+1) / float64(total)
-			cb(fmt.Sprintf("Importing risk %d/%d", count+1, total), progress)
+			progress := float64(count) / float64(total)
+			cb(fmt.Sprintf("Importing risk %d/%d", count, total), progress)
 		}
 	}
 	return nil
@@ -312,7 +320,7 @@ func (m *ImportSSARiskManager) importFilesFromReport(report *Report, cb func(str
 			return utils.Error("Import Files from JSON failed: context done")
 		default:
 		}
-		if err := file.SaveToDB(m.db); err != nil {
+		if err := file.SaveToDB(m.db, m.programName); err != nil {
 			log.Errorf("Import Files from JSON failed: %v", err)
 		}
 		if cb != nil {
