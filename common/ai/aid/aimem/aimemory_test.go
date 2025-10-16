@@ -4,7 +4,10 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"fmt"
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/require"
+	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
@@ -154,22 +157,23 @@ func (m *MockInvoker) EmitResultAfterStream(any) {
 func (m *MockInvoker) EmitResult(any) {
 }
 
-func init() {
-	// 全局清理所有测试数据
-	cleanupAllTestData()
-}
-
-// createTestAIMemory 创建用于测试的AIMemory实例，自动注入mock embedding
-func createTestAIMemory(sessionID string, opts ...Option) (*AIMemoryTriage, error) {
+// CreateTestAIMemory 创建用于测试的AIMemory实例，自动注入mock embedding，新建测试临时数据库
+func CreateTestAIMemory(sessionID string, opts ...Option) (*AIMemoryTriage, error) {
 	// 创建mock embedding客户端（使用内置的测试数据）
 	mockEmbedder, err := NewMockEmbeddingClientFromJSON(mockEmbeddingDataJSON)
 	if err != nil {
 		return nil, err
 	}
 
-	// 默认选项：使用mock embedding
+	db, err := getTestDatabase()
+	if err != nil {
+		return nil, err
+	}
+
+	// 默认选项：使用mock emdatabasebedding
 	defaultOpts := []Option{
 		WithRAGOptions(rag.WithEmbeddingClient(mockEmbedder)),
+		WithDatabase(db),
 	}
 
 	// 合并用户提供的选项
@@ -178,41 +182,14 @@ func createTestAIMemory(sessionID string, opts ...Option) (*AIMemoryTriage, erro
 	return NewAIMemory(sessionID, allOpts...)
 }
 
-// 清理所有测试数据
-func cleanupAllTestData() {
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		return
-	}
-
-	// 删除所有测试相关的记忆条目
-	db.Where("session_id LIKE ?", "test-session-%").Unscoped().Delete(&schema.AIMemoryEntity{})
-
-	// 删除测试相关的RAG collection和documents
-	// 先查找所有测试相关的collection
-	var testCollections []schema.VectorStoreCollection
-	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Find(&testCollections)
-
-	// 删除这些collection对应的documents
-	for _, collection := range testCollections {
-		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{})
-	}
-
-	// 删除collection本身
-	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Unscoped().Delete(&schema.VectorStoreCollection{})
-
-	log.Infof("cleaned up all test data")
-}
-
 // 测试创建AIMemory
 func TestNewAIMemory(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-001"
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 		WithContextProvider(func() (string, error) {
 			return "测试背景：用户正在开发AI记忆系统", nil
@@ -220,7 +197,6 @@ func TestNewAIMemory(t *testing.T) {
 	)
 
 	// 确保最后清理
-	defer cleanupTestData(t, sessionID)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -239,10 +215,8 @@ func TestAddRawText(t *testing.T) {
 	sessionID := "test-session-002"
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 		WithContextProvider(func() (string, error) {
 			return "已有标签：AI开发、记忆系统、搜索功能", nil
@@ -283,10 +257,7 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 	sessionID := "test-session-003-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
-
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -294,6 +265,8 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 	if mem != nil {
 		defer mem.Close()
 	}
+
+	db := mem.GetDB()
 
 	// 添加并保存记忆条目
 	rawText := "测试保存功能：用户需要实现语义搜索和按标签搜索"
@@ -308,7 +281,6 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 	log.Infof("successfully saved %d memory entities", len(entities))
 
 	// 验证数据库中的数据
-	db := consts.GetGormProjectDatabase()
 	var count int64
 	err = db.Model(&schema.AIMemoryEntity{}).Where("session_id = ?", sessionID).Count(&count).Error
 	assert.NoError(t, err)
@@ -337,10 +309,8 @@ func TestRAGIndexingVerification(t *testing.T) {
 	sessionID := "test-session-004-rag-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -390,10 +360,8 @@ func TestSearchBySemantics(t *testing.T) {
 	sessionID := "test-session-005-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -428,10 +396,8 @@ func TestSearchByScoreVector(t *testing.T) {
 	sessionID := "test-session-006-vector-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -482,10 +448,8 @@ func TestSearchByScores(t *testing.T) {
 	sessionID := "test-session-007-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -523,10 +487,8 @@ func TestSearchByTags(t *testing.T) {
 	sessionID := "test-session-008-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -568,10 +530,8 @@ func TestGetAllTags(t *testing.T) {
 	sessionID := "test-session-009"
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -602,10 +562,8 @@ func TestGetDynamicContextWithTags(t *testing.T) {
 	sessionID := "test-session-010"
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -637,10 +595,8 @@ func TestErrorHandling(t *testing.T) {
 	sessionID := "test-session-error"
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -704,10 +660,8 @@ func TestSearchEdgeCases(t *testing.T) {
 	sessionID := "test-session-edge"
 
 	// 先清理可能存在的旧数据
-	cleanupTestData(t, sessionID)
-	defer cleanupTestData(t, sessionID)
 
-	mem, err := createTestAIMemory(sessionID,
+	mem, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
@@ -758,42 +712,41 @@ func TestSearchEdgeCases(t *testing.T) {
 	log.Infof("search edge cases test completed")
 }
 
+func setupTestDB(t *testing.T) *gorm.DB {
+	// 创建临时文件数据库用于测试，避免并发访问问题
+	tmpDir := consts.GetDefaultYakitBaseTempDir()
+	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
+
+	db, err := gorm.Open("sqlite3", dbFile)
+	require.NoError(t, err)
+
+	// 自动迁移表结构
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_PROFILE_DATABASE)
+
+	// 设置数据库连接池和超时
+	db.DB().SetMaxOpenConns(1)
+	db.DB().SetMaxIdleConns(1)
+
+	return db
+}
+
 // 清理测试数据
-func cleanupTestData(t *testing.T, sessionID string) {
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		return
-	}
+func getTestDatabase() (*gorm.DB, error) {
+	// 创建临时文件数据库用于测试，避免并发访问问题
+	tmpDir := consts.GetDefaultYakitBaseTempDir()
+	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
 
-	// 删除测试数据
-	err := db.Where("session_id = ?", sessionID).Unscoped().Delete(&schema.AIMemoryEntity{}).Error
+	db, err := gorm.Open("sqlite3", dbFile)
 	if err != nil {
-		log.Warnf("cleanup test data failed: %v", err)
+		return nil, err
 	}
 
-	// 清理RAG collection和相关文档
-	collectionName := fmt.Sprintf("ai-memory-%s", sessionID)
+	// 自动迁移表结构
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
 
-	// 先查找指定的collection
-	var collection schema.VectorStoreCollection
-	if err := db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).First(&collection).Error; err == nil {
-		// 删除该collection对应的documents
-		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID).Unscoped().Delete(&schema.VectorStoreDocument{})
-		// 删除collection本身
-		db.Model(&schema.VectorStoreCollection{}).Where("name = ?", collectionName).Unscoped().Delete(&schema.VectorStoreCollection{})
-	}
+	// 设置数据库连接池和超时
+	db.DB().SetMaxOpenConns(1)
+	db.DB().SetMaxIdleConns(1)
 
-	// 额外清理：删除所有可能的测试相关collection
-	var testCollections []schema.VectorStoreCollection
-	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Find(&testCollections)
-
-	// 删除这些collection对应的documents
-	for _, testCollection := range testCollections {
-		db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", testCollection.ID).Unscoped().Delete(&schema.VectorStoreDocument{})
-	}
-
-	// 删除collection本身
-	db.Model(&schema.VectorStoreCollection{}).Where("name LIKE ?", "ai-memory-test-session-%").Unscoped().Delete(&schema.VectorStoreCollection{})
-
-	log.Infof("cleaned up test data for session: %s", sessionID)
+	return db, nil
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -38,16 +39,67 @@ type AIMemoryHNSWBackend struct {
 	autoSave bool
 }
 
-// NewAIMemoryHNSWBackend 创建或加载HNSW后端
-func NewAIMemoryHNSWBackend(sessionID string) (*AIMemoryHNSWBackend, error) {
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		return nil, utils.Errorf("database connection is nil")
+type HNSWBackendConfig struct {
+	autoSave  bool
+	sessionID string
+	db        *gorm.DB
+}
+
+type HNSWOption func(*HNSWBackendConfig)
+
+func WithHNSWAutoSave(autoSave bool) HNSWOption {
+	return func(b *HNSWBackendConfig) {
+		b.autoSave = autoSave
 	}
+}
+
+func WithHNSWDatabase(db *gorm.DB) HNSWOption {
+	return func(b *HNSWBackendConfig) {
+		b.db = db
+	}
+}
+
+func WithHNSWSessionID(sessionID string) HNSWOption {
+	return func(b *HNSWBackendConfig) {
+		b.sessionID = sessionID
+	}
+}
+
+func NewHNSWBackendConfig(opts ...HNSWOption) (*HNSWBackendConfig, error) {
+	config := &HNSWBackendConfig{
+		autoSave: true,
+	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	if config.sessionID == "" {
+		config.sessionID = uuid.NewString()
+	}
+
+	if config.db == nil {
+		config.db = consts.GetGormProjectDatabase()
+		if config.db == nil {
+			return nil, utils.Errorf("database connection is nil")
+		}
+	}
+
+	return config, nil
+}
+
+// NewAIMemoryHNSWBackend 创建或加载HNSW后端
+func NewAIMemoryHNSWBackend(options ...HNSWOption) (*AIMemoryHNSWBackend, error) {
+	config, err := NewHNSWBackendConfig(options...)
+	if err != nil {
+		return nil, err
+	}
+	db := config.db
+	sessionID := config.sessionID
 
 	// 查找或创建collection
 	var collection schema.AIMemoryCollection
-	err := db.Where("session_id = ?", sessionID).First(&collection).Error
+	err = db.Where("session_id = ?", sessionID).First(&collection).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		// 创建新的collection
 		collection = schema.AIMemoryCollection{

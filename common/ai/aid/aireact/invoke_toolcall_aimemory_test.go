@@ -4,7 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/require"
 	"io"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -135,6 +139,26 @@ func mockedToolCallingWithAIMemory2(i aicommon.AICallerConfigIf, req *aicommon.A
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
 }
 
+func getTestDatabase() (*gorm.DB, error) {
+	// 创建临时文件数据库用于测试，避免并发访问问题
+	tmpDir := consts.GetDefaultYakitBaseTempDir()
+	dbFile := filepath.Join(tmpDir, uuid.NewString()+".db")
+
+	db, err := gorm.Open("sqlite3", dbFile)
+	if err != nil {
+		return nil, err
+	}
+
+	// 自动迁移表结构
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_YAKIT_DATABASE)
+
+	// 设置数据库连接池和超时
+	db.DB().SetMaxOpenConns(1)
+	db.DB().SetMaxIdleConns(1)
+
+	return db, nil
+}
+
 func TestReAct_ToolUse_Reject_WithAIMemory(t *testing.T) {
 	sessionID := "test-session-" + ksuid.New().String()
 	flag := ksuid.New().String()
@@ -143,18 +167,6 @@ func TestReAct_ToolUse_Reject_WithAIMemory(t *testing.T) {
 	out := make(chan *ypb.AIOutputEvent, 10)
 
 	// 清理测试数据（在开始时和结束时都清理）
-	cleanupTestMemoryData := func() {
-		db := consts.GetGormProjectDatabase()
-		if db != nil {
-			db.Where("session_id = ?", sessionID).Delete(&schema.AIMemoryEntity{})
-			// 清理 RAG collection
-			collectionName := fmt.Sprintf("ai-memory-%s", sessionID)
-			_ = rag.DeleteCollection(db, collectionName)
-		}
-	}
-	cleanupTestMemoryData()
-	defer cleanupTestMemoryData()
-
 	toolCalled := false
 	sleepTool, err := aitool.New(
 		"sleep",
@@ -195,11 +207,15 @@ func TestReAct_ToolUse_Reject_WithAIMemory(t *testing.T) {
 		_ = ins.memoryTriage.Close()
 	}
 
+	db, err := getTestDatabase()
+	require.NoError(t, err)
+
 	mockInvoker := &MockAIMemoryInvoker{ReAct: ins}
 	ins.memoryTriage, err = aimem.NewAIMemory(
 		sessionID,
 		aimem.WithInvoker(mockInvoker),
 		aimem.WithRAGOptions(rag.WithEmbeddingClient(mockEmbedder)),
+		aimem.WithDatabase(db),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -311,14 +327,6 @@ LOOP:
 		t.Fatal("Expected AIMemory mock to be called, but it was not")
 	}
 	fmt.Printf("AIMemory mock was called %d times\n", mockInvoker.memoryTriageCallCount)
-
-	// 验证数据库中保存了 memory entities
-	// 注意：不需要额外的 sleep，因为 SaveMemoryEntities 是同步调用，
-	// Wait() 已经等待了包括数据库保存在内的所有操作完成
-	db := consts.GetGormProjectDatabase()
-	if db == nil {
-		t.Fatal("Database connection is nil")
-	}
 
 	var memoryEntities []schema.AIMemoryEntity
 	if err := db.Where("session_id = ?", sessionID).Find(&memoryEntities).Error; err != nil {

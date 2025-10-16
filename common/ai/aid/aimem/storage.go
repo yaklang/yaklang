@@ -6,7 +6,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,7 +13,7 @@ import (
 
 // SaveMemoryEntities 保存记忆条目到数据库并索引到RAG系统和HNSW
 func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
-	db := consts.GetGormProjectDatabase()
+	db := r.SafeGetDB()
 	if db == nil {
 		return utils.Errorf("database connection is nil")
 	}
@@ -86,7 +85,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
 
 // GetAllTags 获取当前会话的所有标签
 func (r *AIMemoryTriage) GetAllTags() ([]string, error) {
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}
@@ -136,7 +135,7 @@ func (r *AIMemoryTriage) GetDynamicContextWithTags() (string, error) {
 
 // DeleteMemoryEntity 删除记忆条目
 func (r *AIMemoryTriage) DeleteMemoryEntity(memoryID string) error {
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return utils.Errorf("database connection is nil")
 	}
@@ -164,7 +163,7 @@ func (r *AIMemoryTriage) DeleteMemoryEntity(memoryID string) error {
 
 // UpdateMemoryEntity 更新记忆条目
 func (r *AIMemoryTriage) UpdateMemoryEntity(entity *MemoryEntity) error {
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return utils.Errorf("database connection is nil")
 	}
@@ -209,7 +208,7 @@ func (r *AIMemoryTriage) UpdateMemoryEntity(entity *MemoryEntity) error {
 
 // GetMemoryEntity 获取单个记忆条目
 func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*MemoryEntity, error) {
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}
@@ -244,7 +243,7 @@ func (r *AIMemoryTriage) GetMemoryEntity(memoryID string) (*MemoryEntity, error)
 
 // ListAllMemories 列出所有记忆条目
 func (r *AIMemoryTriage) ListAllMemories(limit int) ([]*MemoryEntity, error) {
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}

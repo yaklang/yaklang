@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/consts"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -80,6 +82,7 @@ type Config struct {
 	invoker         aicommon.AIInvokeRuntime
 	contextProvider func() (string, error)
 	ragOptions      []any
+	database        *gorm.DB
 }
 
 // Option AIMemoryTriage的配置选项
@@ -114,6 +117,7 @@ type AIMemoryTriage struct {
 	invoker         aicommon.AIInvokeRuntime
 	contextProvider func() (string, error)
 	sessionID       string
+	db              *gorm.DB
 
 	// HNSW后端用于ScoreVector搜索
 	hnswBackend *AIMemoryHNSWBackend
@@ -138,6 +142,24 @@ func WithRAGOptions(opts ...any) Option {
 	return func(config *Config) {
 		config.ragOptions = append(config.ragOptions, opts...)
 	}
+}
+
+// WithDatabase 设置GORM数据库连接
+func WithDatabase(db *gorm.DB) Option {
+	return func(config *Config) {
+		config.database = db
+	}
+}
+
+func (r *AIMemoryTriage) SafeGetDB() *gorm.DB {
+	if r.db == nil {
+		return consts.GetGormProjectDatabase()
+	}
+	return r.db
+}
+
+func (r *AIMemoryTriage) GetDB() *gorm.DB {
+	return r.db
 }
 
 // MockMemoryTriage 这是一个简单的mock，用于不需要使用triage的测试
