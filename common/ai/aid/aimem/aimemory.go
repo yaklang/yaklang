@@ -38,13 +38,39 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	// 使用配置中的RAG选项
 	ragOpts := config.ragOptions
 
-	// 尝试加载现有collection，如果不存在则创建新的
-	system, err := rag.LoadCollection(db, name, ragOpts...)
-	if err != nil {
-		log.Infof("collection not found, creating new one: %s", name)
-		system, err = rag.CreateCollection(db, name, fmt.Sprintf("AI Memory for session %s", sessionId), ragOpts...)
+	// 检查 embedding 服务可用性，如果不可用，记录警告但继续
+	var system *rag.RAGSystem
+	var embeddingAvailable bool
+	var err error
+	
+	// 在 mock 模式下，总是认为 embedding 可用
+	if rag.IsMockMode {
+		log.Debugf("RAG mock mode detected, embedding considered available for session: %s", sessionId)
+		embeddingAvailable = true
+	} else {
+		// 非 mock 模式下检查实际的 embedding 服务
+		_, err = rag.GetLocalEmbeddingService()
 		if err != nil {
-			return nil, utils.Errorf("create collection failed: %v", err)
+			log.Warnf("embedding service not available, RAG-based semantic search will be disabled: %v", err)
+			log.Warnf("all semantic searches and RAG queries will return empty results for session: %s", sessionId)
+			embeddingAvailable = false
+		} else {
+			embeddingAvailable = true
+		}
+	}
+
+	// 尝试加载现有collection，如果不存在则创建新的
+	// 只有在 embedding 可用时才真正初始化 RAG
+	if embeddingAvailable {
+		system, err = rag.LoadCollection(db, name, ragOpts...)
+		if err != nil {
+			log.Infof("collection not found, creating new one: %s", name)
+			system, err = rag.CreateCollection(db, name, fmt.Sprintf("AI Memory for session %s", sessionId), ragOpts...)
+			if err != nil {
+				log.Warnf("failed to create RAG collection, semantic search will be unavailable: %v", err)
+				system = nil
+				embeddingAvailable = false
+			}
 		}
 	}
 
@@ -57,15 +83,16 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	}
 
 	triage := &AIMemoryTriage{
-		ctx:             ctx,
-		cancel:          cancel,
-		rag:             system,
-		invoker:         config.invoker,
-		contextProvider: config.contextProvider,
-		sessionID:       sessionId,
-		hnswBackend:     hnswBackend,
-		db:              db,
-		keywordMatcher:  NewKeywordMatcher(), // 初始化关键词匹配器
+		ctx:                ctx,
+		cancel:             cancel,
+		rag:                system,
+		invoker:            config.invoker,
+		contextProvider:    config.contextProvider,
+		sessionID:          sessionId,
+		hnswBackend:        hnswBackend,
+		db:                 db,
+		keywordMatcher:     NewKeywordMatcher(), // 初始化关键词匹配器
+		embeddingAvailable: embeddingAvailable,
 	}
 
 	if triage.invoker == nil {
