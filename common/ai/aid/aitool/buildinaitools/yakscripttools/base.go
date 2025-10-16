@@ -1,7 +1,6 @@
 package yakscripttools
 
 import (
-	"embed"
 	"encoding/json"
 	"io/fs"
 	"os"
@@ -22,10 +21,10 @@ import (
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
-//go:embed yakscriptforai/**
-var yakScriptFS embed.FS
+//go:generate gzip-embed -cache --source ./yakscriptforai --gz yakscriptforai.tar.gz --no-embed
 
 func init() {
+	InitEmbedFS()
 	yakit.RegisterPostInitDatabaseFunction(func() error {
 		if !consts.IsDevMode() {
 			const key = "2b709ef7252a06a0c1cfbb952f77f976"
@@ -52,7 +51,7 @@ func init() {
 }
 
 func BuildInAIToolHash() (string, error) {
-	return filesys.CreateEmbedFSHash(yakScriptFS)
+	return yakScriptFS.GetHash()
 }
 
 var overrideYakScriptAiToolsOnce sync.Once
@@ -60,17 +59,21 @@ var overrideYakScriptAiToolsOnce sync.Once
 func OverrideYakScriptAiTools() {
 	overrideYakScriptAiToolsOnce.Do(func() {
 		db := consts.GetGormProfileDatabase()
-		aiTools := loadAllYakScriptFromEmbedFS()
+		aiTools, err := loadAllYakScriptFromEmbedFS()
+		if err != nil {
+			log.Errorf("load all yak script from embed fs failed: %v", err)
+			return
+		}
 		for _, aiTool := range aiTools {
 			yakit.SaveAIYakTool(db, aiTool)
 		}
 	})
 }
 
-func loadAllYakScriptFromEmbedFS() []*schema.AIYakTool {
+func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 	aiTools := []*schema.AIYakTool{}
-	efs := filesys.NewEmbedFS(yakScriptFS)
-	_ = filesys.Recursive(".", filesys.WithFileSystem(efs), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+	efs := yakScriptFS
+	err := filesys.Recursive(".", filesys.WithFileSystem(yakScriptFS), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
 		filename := info.Name()
 		_, filename = efs.PathSplit(filename)
 		dirname, _ := efs.PathSplit(s)
@@ -99,7 +102,7 @@ func loadAllYakScriptFromEmbedFS() []*schema.AIYakTool {
 		aiTools = append(aiTools, aiTool)
 		return nil
 	}))
-	return aiTools
+	return aiTools, err
 }
 
 func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
