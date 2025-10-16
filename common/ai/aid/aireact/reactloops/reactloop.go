@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -58,6 +59,9 @@ type ReActLoop struct {
 	// execution state
 	taskMutex   *sync.Mutex
 	currentTask aicommon.AIStatefulTask
+
+	// memory management
+	memoryTriage aimem.MemoryTriage
 
 	// task status control
 	onTaskCreated       func(task aicommon.AIStatefulTask)
