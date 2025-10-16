@@ -65,6 +65,7 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 		sessionID:       sessionId,
 		hnswBackend:     hnswBackend,
 		db:              db,
+		keywordMatcher:  NewKeywordMatcher(), // 初始化关键词匹配器
 	}
 
 	if triage.invoker == nil {

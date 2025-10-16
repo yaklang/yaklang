@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/jinzhu/gorm"
-	"github.com/stretchr/testify/require"
 	"io"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/require"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -389,4 +390,45 @@ LOOP:
 		t.Fatal("Expected to find tag search results, but found none")
 	}
 	fmt.Printf("Found %d results by tag search\n", len(tagResults))
+
+	// 验证使用 SearchMemory（使用AI增强的搜索）
+	fmt.Println("\n=== Testing SearchMemory (with AI) ===")
+	memorySearchResults, err := ins.memoryTriage.SearchMemory("用户拒绝工具调用", 10000)
+	if err != nil {
+		t.Fatalf("Failed to search memory: %v", err)
+	}
+	if memorySearchResults == nil {
+		t.Fatal("Expected SearchMemory to return a result, but got nil")
+	}
+	fmt.Printf("SearchMemory found %d memories\n", len(memorySearchResults.Memories))
+	fmt.Printf("Total content bytes: %d\n", memorySearchResults.ContentBytes)
+	fmt.Printf("Search summary: %s\n", memorySearchResults.SearchSummary)
+	for _, mem := range memorySearchResults.Memories {
+		fmt.Printf("  - Memory: %s\n", mem.Content[:min(len(mem.Content), 100)])
+	}
+
+	// 验证使用 SearchMemoryWithoutAI（关键词搜索，不用AI）
+	fmt.Println("\n=== Testing SearchMemoryWithoutAI (keyword-based) ===")
+	noAIResults, err := ins.memoryTriage.SearchMemoryWithoutAI("工具调用 拒绝", 10000)
+	if err != nil {
+		t.Fatalf("Failed to search memory without AI: %v", err)
+	}
+	if noAIResults == nil {
+		t.Fatal("Expected SearchMemoryWithoutAI to return a result, but got nil")
+	}
+	fmt.Printf("SearchMemoryWithoutAI found %d memories\n", len(noAIResults.Memories))
+	fmt.Printf("Total content bytes: %d\n", noAIResults.ContentBytes)
+	fmt.Printf("Search summary: %s\n", noAIResults.SearchSummary)
+	for _, mem := range noAIResults.Memories {
+		fmt.Printf("  - Memory: %s\n", mem.Content[:min(len(mem.Content), 100)])
+	}
+
+	// Helper function to get minimum of two integers
+	min := func(a, b int) int {
+		if a < b {
+			return a
+		}
+		return b
+	}
+	_ = min
 }

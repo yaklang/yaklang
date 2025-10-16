@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
-	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
@@ -106,6 +107,9 @@ type MemoryTriage interface {
 	// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
 	SearchMemory(origin any, bytesLimit int) (*SearchMemoryResult, error)
 
+	// SearchMemoryWithoutAI 不使用AI的关键词搜索，直接基于关键词匹配
+	SearchMemoryWithoutAI(origin any, bytesLimit int) (*SearchMemoryResult, error)
+
 	Close() error
 }
 
@@ -121,6 +125,9 @@ type AIMemoryTriage struct {
 
 	// HNSW后端用于ScoreVector搜索
 	hnswBackend *AIMemoryHNSWBackend
+
+	// 关键词匹配器 - 支持中英文混合
+	keywordMatcher *KeywordMatcher
 }
 
 // WithContextProvider 设置上下文提供者
@@ -264,6 +271,33 @@ func (m *MockMemoryTriage) SearchMemory(origin any, bytesLimit int) (*SearchMemo
 		TotalContent:  content,
 		ContentBytes:  len([]byte(content)),
 		SearchSummary: "Mock search completed",
+	}, nil
+}
+
+func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*SearchMemoryResult, error) {
+	// Mock实现：无AI版本，直接基于关键词匹配
+	entity := &MemoryEntity{
+		Id:                 "mock-search-no-ai-id",
+		CreatedAt:          time.Now(),
+		Content:            "Mock keyword search result for: " + utils.InterfaceToString(origin),
+		Tags:               []string{"mock-search", "keyword-only"},
+		C_Score:            0.6,
+		O_Score:            0.6,
+		R_Score:            0.7,
+		E_Score:            0.5,
+		P_Score:            0.6,
+		A_Score:            0.6,
+		T_Score:            0.7,
+		CorePactVector:     []float32{0.6, 0.6, 0.7},
+		PotentialQuestions: []string{"What keywords matched in this search?"},
+	}
+
+	content := entity.Content
+	return &SearchMemoryResult{
+		Memories:      []*MemoryEntity{entity},
+		TotalContent:  content,
+		ContentBytes:  len([]byte(content)),
+		SearchSummary: "Mock keyword-based search completed (without AI)",
 	}, nil
 }
 
