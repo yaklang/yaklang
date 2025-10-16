@@ -8,6 +8,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 // MemoryEntity 表示一个记忆条目
@@ -95,6 +96,12 @@ type MemoryTriage interface {
 	SearchBySemantics(query string, limit int) ([]*SearchResult, error)
 
 	SearchByTags(tags []string, matchAll bool, limit int) ([]*MemoryEntity, error)
+
+	// HandleMemory 智能处理输入内容，自动构造记忆、去重并保存
+	HandleMemory(i any) error
+
+	// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
+	SearchMemory(origin any, bytesLimit int) (*SearchMemoryResult, error)
 
 	Close() error
 }
@@ -204,6 +211,38 @@ func (m *MockMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int)
 		PotentialQuestions: []string{"What is mock?", "How to use mock?"},
 	}
 	return []*MemoryEntity{entity}, nil
+}
+
+func (m *MockMemoryTriage) HandleMemory(i any) error {
+	// Mock实现：简单记录输入但不实际处理
+	return nil
+}
+
+func (m *MockMemoryTriage) SearchMemory(origin any, bytesLimit int) (*SearchMemoryResult, error) {
+	// Mock实现：返回一个简单的搜索结果
+	entity := &MemoryEntity{
+		Id:                 "mock-search-id",
+		CreatedAt:          time.Now(),
+		Content:            "Mock search result for: " + utils.InterfaceToString(origin),
+		Tags:               []string{"mock-search"},
+		C_Score:            0.8,
+		O_Score:            0.7,
+		R_Score:            0.9,
+		E_Score:            0.6,
+		P_Score:            0.7,
+		A_Score:            0.8,
+		T_Score:            0.9,
+		CorePactVector:     []float32{0.8, 0.7, 0.9},
+		PotentialQuestions: []string{"What is this search about?"},
+	}
+
+	content := entity.Content
+	return &SearchMemoryResult{
+		Memories:      []*MemoryEntity{entity},
+		TotalContent:  content,
+		ContentBytes:  len([]byte(content)),
+		SearchSummary: "Mock search completed",
+	}, nil
 }
 
 func NewMockMemoryTriage() *MockMemoryTriage {
