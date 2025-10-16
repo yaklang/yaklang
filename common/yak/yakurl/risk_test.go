@@ -1605,7 +1605,9 @@ func test1() {
 }
 `
 
-	suite, cleanup := ssatest.NewSFScanRiskTestSuite(t, programName, consts.GO)
+	client, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
+	suite, cleanup := ssatest.NewSFScanRiskTestSuite(t, client, programName, consts.GO)
 	defer cleanup()
 
 	// 执行所有扫描操作（在主测试函数中，确保所有子测试都能访问到结果）
