@@ -91,6 +91,11 @@ func TestSearchMemory_BytesLimit(t *testing.T) {
 	}
 	defer memory.Close()
 
+	// 如果RAG系统不可用，跳过这个测试
+	if memory.rag == nil {
+		t.Skip("RAG system not initialized (embedding service unavailable)")
+	}
+
 	// 添加一些较长的测试记忆
 	longInputs := []string{
 		"Go语言的并发编程模型基于CSP（Communicating Sequential Processes）理论，通过goroutine和channel实现轻量级并发。Goroutine是Go语言的轻量级线程，可以在单个线程上运行数千个goroutine。Channel是goroutine之间通信的管道，支持同步和异步通信模式。",
