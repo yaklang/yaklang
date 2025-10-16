@@ -30,7 +30,10 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	}
 
 	name := fmt.Sprintf("ai-memory-%s", sessionId)
-	db := consts.GetGormProjectDatabase()
+	if config.database == nil {
+		config.database = consts.GetGormProjectDatabase()
+	}
+	db := config.database
 
 	// 使用配置中的RAG选项
 	ragOpts := config.ragOptions
@@ -48,7 +51,7 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// 创建HNSW后端
-	hnswBackend, err := NewAIMemoryHNSWBackend(sessionId)
+	hnswBackend, err := NewAIMemoryHNSWBackend(WithHNSWSessionID(sessionId), WithHNSWDatabase(db))
 	if err != nil {
 		return nil, utils.Errorf("create HNSW backend failed: %v", err)
 	}
@@ -61,6 +64,7 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 		contextProvider: config.contextProvider,
 		sessionID:       sessionId,
 		hnswBackend:     hnswBackend,
+		db:              db,
 	}
 
 	if triage.invoker == nil {

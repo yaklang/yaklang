@@ -129,6 +129,10 @@ var ProjectTables = []interface{}{
 	&AiProcess{},
 	&AIMemoryEntity{},
 	&AIMemoryCollection{},
+
+	// project level vector collection
+	&VectorStoreCollection{},
+	&VectorStoreDocument{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {

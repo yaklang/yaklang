@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -18,7 +17,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchRe
 		return nil, utils.Errorf("RAG search failed: %v", err)
 	}
 
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}
@@ -76,7 +75,7 @@ func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchRe
 
 // SearchByScores 按照C.O.R.E. P.A.C.T.评分搜索
 func (r *AIMemoryTriage) SearchByScores(filter *ScoreFilter, limit int) ([]*MemoryEntity, error) {
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}
@@ -201,7 +200,7 @@ func (r *AIMemoryTriage) SearchByTags(tags []string, matchAll bool, limit int) (
 		return nil, utils.Errorf("at least one tag is required")
 	}
 
-	db := consts.GetGormProjectDatabase()
+	db := r.GetDB()
 	if db == nil {
 		return nil, utils.Errorf("database connection is nil")
 	}
