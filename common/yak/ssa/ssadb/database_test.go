@@ -224,7 +224,7 @@ func TestLoadEditor(t *testing.T) {
 	editor := codeRange.GetEditor()
 	require.NotNil(t, editor)
 
-	editorFromDB, err := ssadb.GetIrSourceFromHash(editor.GetIrSourceHash())
+	editorFromDB, err := ssadb.GetEditorByHash(editor.GetIrSourceHash())
 	require.NoError(t, err)
 	require.NotNil(t, editorFromDB)
 	require.Equal(t, editor.GetUrl(), editorFromDB.GetUrl())

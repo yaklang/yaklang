@@ -381,7 +381,7 @@ func (p *Program) getEditor(filename, hash string) (*memedit.MemEditor, error) {
 		return nil, utils.Errorf("get editor by filename %s not found", filename)
 	}
 	// if have database, get source code from database
-	if editor, err := ssadb.GetIrSourceFromHash(hash); err != nil {
+	if editor, err := ssadb.GetEditorByHash(hash); err != nil {
 		return nil, utils.Errorf("get ir source from hash error: %s", err)
 	} else {
 		p.Program.SetEditor(filename, editor)

@@ -26,9 +26,10 @@ type Report struct {
 	// ProgramVersion string `json:"program_version"`
 	RiskNums int
 	// Program Program
-	Rules []*Rule
-	Risks map[string]*Risk // hash -> risk
-	File  []*File
+	Rules          []*Rule
+	Risks          map[string]*Risk    // hash -> risk
+	IrSourceHashes map[string]struct{} `json:"-"` // 用来去重文件
+	File           []*File             // irsourceHash -> file
 }
 
 func NewReport(reportType ReportType, opts ...Option) *Report {
@@ -44,9 +45,10 @@ func NewReport(reportType ReportType, opts ...Option) *Report {
 		FileCount:     0,
 		CodeLineCount: 0,
 
-		Rules: make([]*Rule, 0),
-		Risks: make(map[string]*Risk),
-		File:  make([]*File, 0),
+		Rules:          make([]*Rule, 0),
+		Risks:          make(map[string]*Risk),
+		IrSourceHashes: make(map[string]struct{}),
+		File:           make([]*File, 0),
 	}
 	for _, o := range opts {
 		o(&report.config)

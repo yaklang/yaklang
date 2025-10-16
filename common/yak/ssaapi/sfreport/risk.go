@@ -47,9 +47,9 @@ type Risk struct {
 	RiskFeatureHash string `json:"risk_feature_hash"`
 }
 
-func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
+func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) (*Risk, []string) {
 	if ssarisk == nil {
-		return &Risk{}
+		return &Risk{}, nil
 	}
 
 	risk := &Risk{
@@ -79,19 +79,22 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
 		RiskFeatureHash:      ssarisk.RiskFeatureHash,
 	}
 
+	var irSourceHashes []string
 	// Generate data flow paths if available
 	if r.ReportType == IRifyFullReportType || r.config.showDataflowPath {
 		if ssarisk.ResultID != 0 && ssarisk.Variable != "" {
-			dataFlowPath, err := GenerateDataFlowAnalysis(ssarisk, value...)
+			var err error
+			var dataFlowPath *DataFlowPath
+			dataFlowPath, irSourceHashes, err = GenerateDataFlowAnalysis(ssarisk, value...)
 			if err != nil {
 				log.Errorf("generate data flow paths failed for risk %d: %v", ssarisk.ID, err)
 			} else {
-				risk.DataFlowPaths = []*DataFlowPath{dataFlowPath}
+				risk.DataFlowPaths = append(risk.DataFlowPaths, dataFlowPath)
 			}
 		}
 	}
 
-	return risk
+	return risk, irSourceHashes
 }
 
 func (r *Risk) SaveToDB(db *gorm.DB) error {
@@ -221,9 +224,4 @@ func (r *Risk) GetRuleName() string {
 
 func (r *Risk) SetRule(rule *Rule) {
 	r.RuleName = rule.RuleName
-}
-
-func (r *Risk) SetFile(file *File) {
-	// 不覆盖 CodeSourceURL，因为它已经从 SSARisk 中正确设置
-	// r.CodeSourceURL = file.Path
 }

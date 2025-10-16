@@ -41,9 +41,9 @@ type EdgeInfo struct {
 	AnalysisLabel string `json:"analysis_label"`
 }
 
-func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*DataFlowPath, error) {
+func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*DataFlowPath, []string, error) {
 	if risk.ResultID == 0 || risk.Variable == "" {
-		return nil, utils.Errorf("risk has no valid result ID or variable")
+		return nil, nil, utils.Errorf("risk has no valid result ID or variable")
 	}
 
 	var value *ssaapi.Value
@@ -55,7 +55,7 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*D
 		var err error
 		value, err = GetValueByRisk(risk)
 		if err != nil {
-			return nil, utils.Errorf("get value by risk failed: %v", err)
+			return nil, nil, utils.Errorf("get value by risk failed: %v", err)
 		}
 	}
 	// 这儿行为图的产生是GraphKindShow而不是GraphKindDump
@@ -63,7 +63,7 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*D
 	// 但是好像又不影响最后查看结果
 	dotGraph := ssaapi.NewDotGraph()
 	value.GenerateGraph(dotGraph)
-	nodes, edges := coverNodeAndEdgeInfos(dotGraph, value)
+	nodes, edges, irSourceHashes := coverNodeAndEdgeInfos(dotGraph, value)
 
 	path := &DataFlowPath{
 		Description: generatePathDescription(risk),
@@ -71,17 +71,17 @@ func GenerateDataFlowAnalysis(risk *schema.SSARisk, values ...*ssaapi.Value) (*D
 		Edges:       edges,
 		DotGraph:    dotGraph.String(),
 	}
-	return path, nil
+	return path, irSourceHashes, nil
 }
 
 func generatePathDescription(risk *schema.SSARisk) string {
 	return fmt.Sprintf("Data flow path for %s vulnerability in %s", risk.RiskType, risk.ProgramName)
 }
 
-func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]*NodeInfo, []*EdgeInfo) {
+func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]*NodeInfo, []*EdgeInfo, []string) {
 	nodes := make([]*NodeInfo, 0, graph.NodeCount())
 	edges := make([]*EdgeInfo, 0)
-
+	irSourceHashes := make([]string, 0)
 	graph.ForEach(func(s string, v *ssaapi.Value) {
 		rng := v.GetRange()
 		if rng == nil {
@@ -98,7 +98,9 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]
 			EndOffset:       rng.GetEndOffset(),
 			IsEntryNode:     entryValue != nil && v == entryValue,
 		}
-		nodeInfo.IRSourceHash = rng.GetEditor().GetIrSourceHash()
+		irSourceHash := rng.GetEditor().GetIrSourceHash()
+		nodeInfo.IRSourceHash = irSourceHash
+		irSourceHashes = append(irSourceHashes, irSourceHash)
 		nodes = append(nodes, nodeInfo)
 	})
 
@@ -134,7 +136,7 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]
 		edges = append(edges, edgeInfo)
 	}
 
-	return nodes, edges
+	return nodes, edges, irSourceHashes
 }
 
 func nodeId(i int) string {
