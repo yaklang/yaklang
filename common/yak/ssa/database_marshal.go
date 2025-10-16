@@ -97,7 +97,7 @@ func fetchIds(origin any) any {
 	return ids
 }
 
-func marshalExtraInformation(cache *ProgramCache, raw Instruction) map[string]any {
+func marshalExtraInformation(raw Instruction) map[string]any {
 
 	params := make(map[string]any)
 	switch ret := raw.(type) {
@@ -111,7 +111,7 @@ func marshalExtraInformation(cache *ProgramCache, raw Instruction) map[string]an
 		params["free_values"] = freeValues
 		params["current_blueprint"] = -1
 		if ret.currentBlueprint != nil {
-			typID := saveType(cache, ret.currentBlueprint)
+			typID := saveType(ret.currentBlueprint)
 			params["current_blueprint"] = typID
 		}
 		params["is_method"] = ret.isMethod

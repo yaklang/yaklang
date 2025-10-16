@@ -4,6 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 type IrOffset struct {
@@ -31,7 +32,12 @@ func CreateOffset(rng *memedit.Range, projectName string) *IrOffset {
 	return ret
 }
 func SaveIrOffset(db *gorm.DB, idx *IrOffset) {
-	db.Save(idx)
+	// db.Save(idx)
+	var err error
+	ssaprofile.ProfileAdd(true, "Database.IrOffset", func() {
+		err = db.Save(idx).Error
+	})
+	_ = err
 }
 
 func GetOffsetByVariable(name string, valueID int64) []*IrOffset {

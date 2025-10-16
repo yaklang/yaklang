@@ -4,10 +4,12 @@ import (
 	"github.com/jinzhu/gorm"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 type IrType struct {
 	gorm.Model
+	TypeId           uint64 `json:"type_id" gorm:"index"`
 	Kind             int    `json:"kind"`
 	ProgramName      string `json:"program_name"`
 	String           string `json:"string" gorm:"type:text"`
@@ -16,25 +18,23 @@ type IrType struct {
 }
 
 func (t *IrType) GetIdInt64() int64 {
-	return int64(t.ID)
+	return int64(t.TypeId)
 }
 
 func (t *IrType) CalcHash(ex ...string) string {
 	return utils.CalcSha1(t.ProgramName, t.Kind, t.String, t.ExtraInformation, ex)
 }
 
-func RequireIrType(DB *gorm.DB, program string) (int64, *IrType) {
-	db := DB.Model(&IrType{})
-	irType := &IrType{}
-	irType.ProgramName = program
-	irType.Kind = -1
-	// irType.Hash = irType.CalcHash(uuid.NewString())
-	db.Create(irType)
-	return int64(irType.ID), irType
+func (ir *IrType) Save(db *gorm.DB) error {
+	var err error
+	ssaprofile.ProfileAdd(true, "Database.SaveIrType", func() {
+		err = db.Save(ir).Error
+	})
+	return err
 }
 
-func (ir *IrType) Save(db *gorm.DB) error {
-	return db.Save(ir).Error
+func EmptyIrType() *IrType {
+	return &IrType{}
 }
 
 func GetIrTypeById(db *gorm.DB, id int64) *IrType {
@@ -44,7 +44,7 @@ func GetIrTypeById(db *gorm.DB, id int64) *IrType {
 	// check cache
 	ir := &IrType{}
 	// db = db.Debug()
-	if db := db.Model(&IrType{}).Where("id = ?", id).First(ir); db.Error != nil {
+	if db := db.Model(&IrType{}).Where("type_id = ?", id).First(ir); db.Error != nil {
 		return nil
 	}
 	return ir

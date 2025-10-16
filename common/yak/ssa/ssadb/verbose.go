@@ -11,7 +11,7 @@ func (i *IrCode) VerboseString() string {
 	if len(hashShort) > 5 {
 		hashShort = hashShort[:5]
 	}
-	buf.WriteString(fmt.Sprintf("%5s:%-5s: %v - %v", hashShort, fmt.Sprint(i.ID), i.OpcodeName, i.ShortVerboseName))
+	buf.WriteString(fmt.Sprintf("%5s:%-5s: %v - %v", hashShort, fmt.Sprint(i.CodeID), i.OpcodeName, i.ShortVerboseName))
 	return buf.String()
 }
 

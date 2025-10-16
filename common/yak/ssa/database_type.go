@@ -22,11 +22,11 @@ func saveTypeWithValue(value Value, typ Type) {
 	}
 
 	if cache := application.Cache; cache != nil && cache.HaveDatabaseBackend() {
-		saveType(cache, typ)
+		saveType(typ)
 	}
 }
 
-func saveType(cache *ProgramCache, typ Type) int64 {
+func saveType(typ Type) int64 {
 	if utils.IsNil(typ) {
 		return -1
 	}
@@ -34,7 +34,7 @@ func saveType(cache *ProgramCache, typ Type) int64 {
 		// log.Errorf("saveType: type %v already has id %d", typ, id)
 		return id
 	}
-	cache.TypeCache.Set(typ)
+	// cache.TypeCache.Set(typ)
 	return typ.GetId()
 }
 
