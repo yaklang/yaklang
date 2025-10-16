@@ -188,7 +188,6 @@ func (m *AdvancedMockInvoker) EmitStreamResult(any) {
 
 // TestAIMemoryTriage_NewAIMemory 测试创建AI记忆系统
 func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "new-memory-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -237,7 +236,6 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 
 // TestAIMemoryTriage_AddRawText 测试原始文本处理
 func TestAIMemoryTriage_AddRawText(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "add-raw-text-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -329,7 +327,6 @@ func TestAIMemoryTriage_AddRawText(t *testing.T) {
 
 // TestAIMemoryTriage_SelectTags 测试标签选择
 func TestAIMemoryTriage_SelectTags(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "select-tags-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -401,7 +398,6 @@ func TestAIMemoryTriage_SelectTags(t *testing.T) {
 
 // TestAIMemoryTriage_ShouldSaveMemoryEntities 测试去重保存判断
 func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "should-save-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -461,7 +457,6 @@ func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
 
 // TestAIMemoryTriage_HandleMemory 测试记忆处理
 func TestAIMemoryTriage_HandleMemory(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "handle-memory-comprehensive-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -521,7 +516,6 @@ func TestAIMemoryTriage_HandleMemory(t *testing.T) {
 
 // TestAIMemoryTriage_SearchMemory 测试记忆搜索
 func TestAIMemoryTriage_SearchMemory(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "search-memory-comprehensive-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -599,7 +593,6 @@ func TestAIMemoryTriage_SearchMemory(t *testing.T) {
 
 // TestAIMemoryTriage_StorageOperations 测试存储操作
 func TestAIMemoryTriage_StorageOperations(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "storage-ops-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -769,7 +762,6 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 
 // TestAIMemoryTriage_HNSWOperations 测试HNSW操作
 func TestAIMemoryTriage_HNSWOperations(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "hnsw-ops-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -850,7 +842,6 @@ func TestAIMemoryTriage_HNSWOperations(t *testing.T) {
 
 // TestAIMemoryTriage_TagOperations 测试标签操作
 func TestAIMemoryTriage_TagOperations(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "tag-ops-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -933,7 +924,6 @@ func TestAIMemoryTriage_TagOperations(t *testing.T) {
 
 // TestAIMemoryTriage_ErrorHandling 测试错误处理
 func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "error-handling-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)
@@ -1004,7 +994,6 @@ func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
 
 // TestAIMemoryTriage_ConcurrentOperations 测试并发操作
 func TestAIMemoryTriage_ConcurrentOperations(t *testing.T) {
-	t.Parallel()
 
 	sessionID := "concurrent-test-" + uuid.New().String()
 	defer cleanupComprehensiveTestData(t, sessionID)

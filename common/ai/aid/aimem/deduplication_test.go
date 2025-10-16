@@ -11,8 +11,6 @@ import (
 )
 
 func TestShouldSaveMemoryEntities_BatchDeduplication(t *testing.T) {
-	t.Parallel()
-
 	sessionID := "batch-dedup-test-" + uuid.New().String()
 	defer cleanupDeduplicationTestData(t, sessionID)
 
@@ -101,8 +99,6 @@ func TestShouldSaveMemoryEntities_BatchDeduplication(t *testing.T) {
 }
 
 func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
-	t.Parallel()
-
 	sessionID := "batch-tag-overlap-test-" + uuid.New().String()
 	defer cleanupDeduplicationTestData(t, sessionID)
 
