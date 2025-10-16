@@ -1733,27 +1733,89 @@ func (y *singleFileBuilder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRe
 	if i == nil {
 		return nil
 	}
-	// 数组声明
+
 	if ret := i.ArrayInitializer(); ret != nil {
 		return y.VisitArrayInitializer(ret)
 	}
+
 	allExpr := i.AllExpression()
-	var slice ssa.Value
-	if allExpr == nil {
-		slice = y.EmitMakeBuildWithType(ssa.NewSliceType(ssa.CreateAnyType()),
-			y.EmitConstInstPlaceholder(0), y.EmitConstInstPlaceholder(0))
-	}
-	slice = y.InterfaceAddFieldBuild(len(allExpr),
-		func(i int) ssa.Value { return y.EmitConstInstPlaceholder(i) },
-		func(i int) ssa.Value { return y.VisitExpression(allExpr[i]) },
-	)
-	if utils.IsNil(slice) {
-		return nil
-	} else {
-		slice.SetType(p)
+	if len(allExpr) == 0 {
+		slice := y.EmitMakeBuildWithType(
+			ssa.NewSliceType(ssa.CreateAnyType()),
+			y.EmitConstInst(0),
+			y.EmitConstInst(0),
+		)
+		if !utils.IsNil(slice) {
+			slice.SetType(p)
+		}
 		return slice
 	}
 
+	return y.buildMultiDimensionalArray(allExpr, 0, p)
+}
+
+func (y *singleFileBuilder) getDefaultValueForType(typ ssa.Type) ssa.Value {
+	if utils.IsNil(typ) {
+		return y.EmitConstInst(nil)
+	}
+
+	switch typ.GetTypeKind() {
+	case ssa.NumberTypeKind:
+		return y.EmitConstInst(0)
+	case ssa.StringTypeKind:
+		return y.EmitConstInst("")
+	case ssa.BooleanTypeKind:
+		return y.EmitConstInst(false)
+	default:
+		return y.EmitConstInst(nil)
+	}
+}
+
+func (y *singleFileBuilder) buildMultiDimensionalArray(dimExprs []javaparser.IExpressionContext, currentLevel int, arrayType ssa.Type) ssa.Value {
+	if currentLevel >= len(dimExprs) {
+		return nil
+	}
+
+	sizeExpr := y.VisitExpression(dimExprs[currentLevel])
+	if utils.IsNil(sizeExpr) {
+		sizeExpr = y.EmitConstInst(0)
+	}
+
+	isLastDim := currentLevel == len(dimExprs)-1
+
+	if cons, ok := ssa.ToConstInst(sizeExpr); ok {
+		if rawVal := cons.Const.GetRawValue(); rawVal != nil {
+			size := utils.InterfaceToInt(rawVal)
+			if size > 0 {
+				var valueFunc func(int) ssa.Value
+				if isLastDim {
+					valueFunc = func(i int) ssa.Value {
+						return y.getDefaultValueForType(arrayType)
+					}
+				} else {
+					valueFunc = func(i int) ssa.Value {
+						return y.buildMultiDimensionalArray(dimExprs, currentLevel+1, arrayType)
+					}
+				}
+
+				slice := y.InterfaceAddFieldBuild(
+					size,
+					func(i int) ssa.Value { return y.EmitConstInst(i) },
+					valueFunc,
+				)
+				if !utils.IsNil(slice) {
+					slice.SetType(arrayType)
+				}
+				return slice
+			}
+		}
+	}
+
+	outerArray := y.EmitMakeBuildWithType(arrayType, sizeExpr, sizeExpr)
+	if !isLastDim {
+		_ = y.buildMultiDimensionalArray(dimExprs, currentLevel+1, arrayType)
+	}
+	return outerArray
 }
 
 func (y *singleFileBuilder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type {
