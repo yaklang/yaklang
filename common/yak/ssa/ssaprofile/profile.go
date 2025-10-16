@@ -54,7 +54,7 @@ func GetProfileListMap() *utils.SafeMap[*Profile] {
 	return profileListMap
 }
 func Refresh() {
-	profileListMap.Clear()
+	profileListMap = utils.NewSafeMap[*Profile]()
 }
 
 func ProfileAdd(enable bool, name string, fs ...func()) {

@@ -1,12 +1,11 @@
 package ssadb
 
 import (
-	"context"
 	"encoding/json"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,6 +15,7 @@ import (
 
 type IrCode struct {
 	gorm.Model
+	CodeID int64 `json:"code_id" gorm:"index"`
 
 	ProgramName string `json:"program_name" gorm:"index"`
 	Version     string `json:"package_version" gorm:"index"`
@@ -102,54 +102,26 @@ type IrCode struct {
 	ConstType string `json:"const_type" gorm:"index"`
 }
 
-func emptyIrCode() *IrCode {
+func EmptyIrCode() *IrCode {
 	return &IrCode{}
 }
-
-func RequireIrCode(DB *gorm.DB, program string) (int64, *IrCode) {
-	db := DB.Model(&IrCode{})
-	ircode := emptyIrCode()
-	ircode.ProgramName = program
-	db.Create(ircode)
-	return int64(ircode.ID), ircode
-}
-
-var irCodeCache = utils.NewCacheExWithKey[int64, *IrCode](utils.WithCacheTTL(time.Hour * 1))
 
 func GetIrCodeById(db *gorm.DB, id int64) *IrCode {
 	if id == -1 {
 		return nil
 	}
 	// check cache
-	if ret, ok := irCodeCache.Get(id); ok && ret != nil {
-		return ret
-	}
-	var ir IrCode
-	err := db.Model(&IrCode{}).Where("id = ?", id).First(&ir).Error
-	if err != nil {
-		log.Errorf("GetIrCodeById err: %v", err)
-		return nil
-	} else {
-		irCodeCache.Set(id, &ir)
-		return &ir
-	}
+	ir := db.Model(&IrCode{}).Where("code_id = ?", id).First(&IrCode{}).Value.(*IrCode)
+	// save to cache
+	return ir
 }
 
 func (ir *IrCode) Save(db *gorm.DB) error {
-	if ir != nil {
-		irCodeCache.Set(ir.GetIdInt64(), ir)
-	}
-	return db.Save(ir).Error
-}
-
-func GetIrByVariable(db *gorm.DB, program, name string) []*IrCode {
-	// var irVariable IrIndex
-	ret := make([]*IrCode, 0)
-	res := db.Model(&IrIndex{}).Where("(variable_name = ? OR class_name = ?) AND program_name = ?", name, name, program)
-	for v := range yieldIrIndex(res, context.Background()) {
-		ret = append(ret, v)
-	}
-	return ret
+	var err error
+	ssaprofile.ProfileAdd(true, "Database.SaveIrCode", func() {
+		err = db.Save(ir).Error
+	})
+	return err
 }
 
 func (r *IrCode) IsEmptySourceCodeHash() bool {
@@ -173,11 +145,11 @@ func (r *IrCode) IsEmptySourceCodeHash() bool {
 }
 
 func (r *IrCode) GetIdInt64() int64 {
-	return int64(r.ID)
+	return int64(r.CodeID)
 }
 
 func (r *IrCode) GetIdInt() int {
-	return int(r.ID)
+	return int(r.CodeID)
 }
 
 func (r *IrCode) SetExtraInfo(params map[string]any) {
