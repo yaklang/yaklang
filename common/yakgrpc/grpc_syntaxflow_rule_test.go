@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/bytedance/mockey"
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"google.golang.org/grpc"
-	"testing"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -380,8 +381,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule(t *testing.T) {
 		_, err = client.CreateSyntaxFlowRule(context.Background(), req)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			err = deleteRuleByNames(client, []string{ruleName})
-			require.NoError(t, err)
+			deleteRuleByNames(client, []string{ruleName})
+			deleteRuleGroup(client, []string{groupName})
 		})
 
 		queryRule, err := queryRulesByName(client, []string{ruleName})
