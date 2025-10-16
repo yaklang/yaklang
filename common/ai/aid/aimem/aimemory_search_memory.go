@@ -10,65 +10,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// HandleMemory 处理输入内容，自动构造记忆并去重保存
-func (t *AIMemoryTriage) HandleMemory(i any) error {
-	// 转换输入为字符串
-	inputText := utils.InterfaceToString(i)
-	if strings.TrimSpace(inputText) == "" {
-		log.Infof("input is empty, skipping memory handling")
-		return nil
-	}
-
-	log.Infof("handling memory for input: %s", utils.ShrinkString(inputText, 100))
-
-	// 1. 使用 AddRawText 构造记忆实体
-	entities, err := t.AddRawText(inputText)
-	if err != nil {
-		return utils.Errorf("failed to build memory entities: %v", err)
-	}
-
-	if len(entities) == 0 {
-		log.Infof("no memory entities generated from input")
-		return nil
-	}
-
-	log.Infof("generated %d memory entities from input", len(entities))
-
-	// 2. 使用去重功能判断是否有重复
-	worthSaving := t.ShouldSaveMemoryEntities(entities)
-
-	// 3. 处理重复和非重复的记忆
-	duplicateCount := len(entities) - len(worthSaving)
-	if duplicateCount > 0 {
-		log.Infof("detected %d duplicate memory entities, skipping them", duplicateCount)
-
-		// 记录被跳过的重复记忆
-		savedIds := make(map[string]bool)
-		for _, saved := range worthSaving {
-			savedIds[saved.Id] = true
-		}
-
-		for _, entity := range entities {
-			if !savedIds[entity.Id] {
-				log.Infof("skipping duplicate memory: %s (content: %s)",
-					entity.Id, utils.ShrinkString(entity.Content, 50))
-			}
-		}
-	}
-
-	// 4. 保存非重复的记忆
-	if len(worthSaving) > 0 {
-		if err := t.SaveMemoryEntities(worthSaving...); err != nil {
-			return utils.Errorf("failed to save memory entities: %v", err)
-		}
-		log.Infof("successfully saved %d new memory entities", len(worthSaving))
-	} else {
-		log.Infof("no new memories to save after deduplication")
-	}
-
-	return nil
-}
-
 // SearchMemoryResult 搜索记忆的结果
 type SearchMemoryResult struct {
 	Memories      []*MemoryEntity `json:"memories"`
@@ -77,8 +18,16 @@ type SearchMemoryResult struct {
 	SearchSummary string          `json:"search_summary"`
 }
 
-// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
 func (t *AIMemoryTriage) SearchMemory(origin any, bytesLimit int) (*SearchMemoryResult, error) {
+	return t.searchMemoryWithAIOption(origin, bytesLimit, false)
+}
+
+func (t *AIMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*SearchMemoryResult, error) {
+	return t.searchMemoryWithAIOption(origin, bytesLimit, true)
+}
+
+// SearchMemory 根据输入内容搜索相关记忆，限制总内容字节数
+func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, disableAI bool) (*SearchMemoryResult, error) {
 	// 转换输入为字符串
 	queryText := utils.InterfaceToString(origin)
 	if strings.TrimSpace(queryText) == "" {
@@ -98,10 +47,16 @@ func (t *AIMemoryTriage) SearchMemory(origin any, bytesLimit int) (*SearchMemory
 
 	// 1. 使用 SelectTags 获取相关标签
 	ctx := context.Background()
-	relevantTags, err := t.SelectTags(ctx, queryText)
-	if err != nil {
-		log.Warnf("failed to select tags: %v", err)
-		relevantTags = []string{} // 继续执行，但没有标签
+	var relevantTags []string
+	var err error
+	if disableAI {
+		// 不使用AI，直接基于简单关键词匹配标签
+	} else {
+		relevantTags, err = t.SelectTags(ctx, queryText)
+		if err != nil {
+			log.Warnf("failed to select tags: %v", err)
+			relevantTags = []string{} // 继续执行，但没有标签
+		}
 	}
 
 	searchSteps = append(searchSteps, fmt.Sprintf("selected %d relevant tags: %v", len(relevantTags), relevantTags))
@@ -168,7 +123,10 @@ func (t *AIMemoryTriage) deduplicateMemories(memories []*MemoryEntity) []*Memory
 }
 
 // rankMemoriesByRelevance 基于 C.O.R.E. P.A.C.T. 原则对记忆进行重排序
+// 现已集成改进的关键词系统
 func (t *AIMemoryTriage) rankMemoriesByRelevance(memories []*MemoryEntity, query string) []*MemoryEntity {
+	// 关键词匹配器在创建时已初始化
+
 	// 为每个记忆计算综合相关性分数
 	type ScoredMemory struct {
 		Memory         *MemoryEntity
@@ -199,11 +157,15 @@ func (t *AIMemoryTriage) rankMemoriesByRelevance(memories []*MemoryEntity, query
 		}
 	}
 
+	log.Infof("ranked %d memories from %d, filtered threshold: 0.3", len(rankedMemories), len(scoredMemories))
 	return rankedMemories
 }
 
 // calculateRelevanceScore 基于 C.O.R.E. P.A.C.T. 原则计算记忆的相关性分数
+// 现已集成改进的关键词匹配系统
 func (t *AIMemoryTriage) calculateRelevanceScore(memory *MemoryEntity, query string) float64 {
+	// 关键词匹配器在创建时已初始化，这里直接使用
+
 	// 权重设计基于搜索场景的重要性
 	weights := map[string]float64{
 		"R": 0.25, // Relevance - 最重要，直接影响搜索相关性
@@ -224,34 +186,8 @@ func (t *AIMemoryTriage) calculateRelevanceScore(memory *MemoryEntity, query str
 		weights["O"]*memory.O_Score +
 		weights["E"]*memory.E_Score
 
-	// 内容相关性加成：检查查询词是否出现在记忆内容或标签中
-	queryLower := strings.ToLower(query)
-	contentLower := strings.ToLower(memory.Content)
-
-	contentBonus := 0.0
-	if strings.Contains(contentLower, queryLower) {
-		contentBonus += 0.1 // 内容匹配加成
-	}
-
-	// 标签匹配加成
-	for _, tag := range memory.Tags {
-		if strings.Contains(strings.ToLower(tag), queryLower) ||
-			strings.Contains(queryLower, strings.ToLower(tag)) {
-			contentBonus += 0.05 // 每个匹配标签加成
-		}
-	}
-
-	// 问题匹配加成
-	for _, question := range memory.PotentialQuestions {
-		if strings.Contains(strings.ToLower(question), queryLower) {
-			contentBonus += 0.03 // 每个匹配问题加成
-		}
-	}
-
-	// 限制加成不超过0.2
-	if contentBonus > 0.2 {
-		contentBonus = 0.2
-	}
+	// 使用改进的关键词匹配系统计算内容相关性加成
+	contentBonus := t.calculateKeywordBonus(memory, query)
 
 	finalScore := relevanceScore + contentBonus
 
@@ -264,6 +200,55 @@ func (t *AIMemoryTriage) calculateRelevanceScore(memory *MemoryEntity, query str
 	}
 
 	return finalScore
+}
+
+// calculateKeywordBonus 使用关键词系统计算匹配加成
+func (t *AIMemoryTriage) calculateKeywordBonus(memory *MemoryEntity, query string) float64 {
+	if t.keywordMatcher == nil {
+		// 防御性编程：即使没有初始化，也返回0
+		return 0.0
+	}
+
+	contentBonus := 0.0
+
+	// 1. 内容关键词匹配分数 (权重: 0.1)
+	contentMatchScore := t.keywordMatcher.MatchScore(query, memory.Content)
+	contentBonus += contentMatchScore * 0.1
+
+	// 2. 标签关键词匹配 (权重: 0.08)
+	tagContent := strings.Join(memory.Tags, " ")
+	tagMatchScore := t.keywordMatcher.MatchScore(query, tagContent)
+	contentBonus += tagMatchScore * 0.08
+
+	// 3. 问题关键词匹配 (权重: 0.05)
+	questionContent := strings.Join(memory.PotentialQuestions, " ")
+	questionMatchScore := t.keywordMatcher.MatchScore(query, questionContent)
+	contentBonus += questionMatchScore * 0.05
+
+	// 4. 直接关键词包含检查 (权重: 0.05)
+	if t.keywordMatcher.ContainsKeyword(query, memory.Content) {
+		contentBonus += 0.05
+	}
+
+	// 5. 所有关键词都包含的奖励 (权重: 0.03)
+	if t.keywordMatcher.MatchAllKeywords(query, memory.Content) {
+		contentBonus += 0.03
+	}
+
+	// 限制加成不超过0.3
+	if contentBonus > 0.3 {
+		contentBonus = 0.3
+	}
+
+	log.Debugf("keyword bonus calculation for query '%s': content_match=%.3f, tag_match=%.3f, "+
+		"question_match=%.3f, has_keyword=%v, all_keywords=%v, total_bonus=%.3f",
+		utils.ShrinkString(query, 50),
+		contentMatchScore*0.1, tagMatchScore*0.08, questionMatchScore*0.05,
+		t.keywordMatcher.ContainsKeyword(query, memory.Content),
+		t.keywordMatcher.MatchAllKeywords(query, memory.Content),
+		contentBonus)
+
+	return contentBonus
 }
 
 // selectMemoriesByBytesLimit 根据字节限制选择记忆
