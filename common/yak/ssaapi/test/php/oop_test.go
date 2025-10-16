@@ -320,9 +320,19 @@ class A{
 func TestNativeCall_DataFlow(t *testing.T) {
 	rule := `
 /^create_function|eval|assert$/ as $evalFunction;
-<include('php-param')> as $params;
-<include('php-tp-all-extern-variable-param-source')> as $params
-<include('php-filter-function')> as $filter;
+_POST.* as $params
+_GET.* as $params
+_REQUEST.* as $params
+_COOKIE.* as $params
+
+input() as $sink
+I() as $sink
+./param|request|server|cookie|get|post|only|except|file/ as $function
+$function?{<getObject>?{opcode: call && any: "Request"}} as $sink
+$function?{<getObject>?{any: "Request","request"}} as $sink
+$sink?{<getFunc><getCurrentBlueprint><fullTypeName>?{any: "Controller","controller"}}  as $params
+
+/^(htmlspecialchars|strip_tags|mysql_real_escape_string|addslashes|filter|is_numeric|str_replace|ereg|strpos|preg_replace|trim)$/ as $filter;
 
 $evalFunction(* #{include: <<<CODE
 	<self> & $params
