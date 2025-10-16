@@ -91,6 +91,13 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
 			return nil, utils.Errorf("contextProvider failed: %v", err)
 		}
 	}
+
+	existedTag, err := r.GetDynamicContextWithTags()
+	if err != nil {
+		return nil, utils.Errorf("GetDynamicContextWithTags failed: %v", err)
+	}
+	dynContext += existedTag
+
 	promptResult, err := utils.RenderTemplate(memoryTriagePrompt, map[string]any{
 		"Basic":              basic,
 		"Nonce":              nonce,
