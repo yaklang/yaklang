@@ -128,6 +128,9 @@ type AIMemoryTriage struct {
 
 	// 关键词匹配器 - 支持中英文混合
 	keywordMatcher *KeywordMatcher
+
+	// embedding 服务可用标志
+	embeddingAvailable bool
 }
 
 // WithContextProvider 设置上下文提供者
