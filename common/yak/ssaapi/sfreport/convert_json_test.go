@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
+	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -256,7 +257,9 @@ alert $op for {
 
 func TestRiskImportAndExportWithDataFlow(t *testing.T) {
 	program := uuid.NewString()
-	suite, clean := ssatest.NewSFScanRiskTestSuite(t, program, consts.JAVA)
+	client, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
+	suite, clean := ssatest.NewSFScanRiskTestSuite(t, client, program, consts.JAVA)
 	defer clean()
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("sqli.java", `package com.mycompany.myapp;
@@ -326,7 +329,7 @@ public interface UserMapper {
 	riskCount := 0
 	allRisks := make([]*schema.SSARisk, 0)
 
-	err := suite.InitProgram(vf).ScanWithRule(rule).HandleLastTaskRisks(func(risks []*schema.SSARisk) error {
+	err = suite.InitProgram(vf).ScanWithRule(rule).HandleLastTaskRisks(func(risks []*schema.SSARisk) error {
 		reporter.AddSyntaxFlowRisks(risks...)
 		riskCount += len(risks)
 		allRisks = append(allRisks, risks...)

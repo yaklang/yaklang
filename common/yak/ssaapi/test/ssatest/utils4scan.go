@@ -16,7 +16,6 @@ import (
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -45,10 +44,7 @@ type SFScanRiskData struct {
 	Count int
 }
 
-func NewSFScanRiskTestSuite(t *testing.T, programName string, language consts.Language) (*SFScanRiskTestSuite, func()) {
-	client, err := yakgrpc.NewLocalClient()
-	require.NoError(t, err)
-
+func NewSFScanRiskTestSuite(t *testing.T, client ypb.YakClient, programName string, language consts.Language) (*SFScanRiskTestSuite, func()) {
 	suite := &SFScanRiskTestSuite{
 		t:           t,
 		Client:      client,
