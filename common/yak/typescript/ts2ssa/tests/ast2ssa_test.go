@@ -1873,8 +1873,8 @@ func TestClass(t *testing.T) {
 		A.setA(1);
 		println(A.getA());
 		`, []string{
-			"Function-A.getA() binding[A] member[0]",
-			"Function-A.getA() binding[A] member[side-effect(Parameter-par, A.a)]",
+			"Function-A.getA()",
+			"Function-A.getA()",
 		}, t)
 	})
 

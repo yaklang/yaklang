@@ -144,7 +144,7 @@ func (b *builder) resolveImportLibPath(importPath string) (resolvedPath string, 
 	dir := editor.GetFolderPath()
 	candidates := b.getImportCandidates(importPath, dir)
 	for _, candidate := range candidates {
-		if lib, exist := b.GetProgram().GetLibrary(candidate); exist && lib != nil {
+		if exist, err := prog.Loader.GetFilesysFileSystem().Exists(candidate); exist && err == nil {
 			return candidate, false
 		}
 	}
@@ -221,21 +221,20 @@ func (b *builder) getModuleExportValue(modulePath, exportName string) ssa.Value 
 	}
 
 	// 尝试获取模块Program
-	moduleProgram, exists := prog.GetLibrary(modulePath)
-	if !exists {
-		// 模块未加载，返回占位符
-		return b.EmitUndefined(fmt.Sprintf("module_%s_not_loaded", modulePath))
+	moduleProgram, _ := prog.GetOrCreateLibrary(modulePath)
+	if moduleProgram == nil {
+		return nil
 	}
+	moduleProgram.PushEditor(b.GetEditor())
 
-	err := b.GetProgram().ImportTypeFromLib(moduleProgram, exportName, nil)
+	err := prog.ImportTypeFromLib(moduleProgram, exportName, nil)
 	_ = err
 	// 从模块的ExportValue中获取导出值
 	if exportValue := moduleProgram.GetExportValue(exportName); exportValue != nil {
 		return exportValue
 	}
-
-	// 找不到导出，返回占位符
-	return b.EmitUndefined(fmt.Sprintf("export_%s_not_found_in_%s", exportName, modulePath))
+	moduleProgram.PopEditor(false)
+	return nil
 }
 
 // extractModuleSpecifierText 提取模块说明符的文本
@@ -283,7 +282,7 @@ func (b *builder) createExternalModuleLibrary(modulePath string) {
 
 // assignImportedValue 分配导入的值
 func (b *builder) assignImportedValue(localName, exportName, modulePath string, isExternal bool) {
-	if localName == "" || b.PreHandler() {
+	if localName == "" {
 		return
 	}
 
@@ -299,15 +298,16 @@ func (b *builder) assignImportedValue(localName, exportName, modulePath string, 
 	_ = value
 
 	// 创建变量并赋值
-	variable := b.CreateJSVariable(localName)
-	b.AssignVariable(variable, value)
-
-	log.Infof("Import binding: %s -> %s from %s (external: %t)", localName, exportName, modulePath, isExternal)
+	if value != nil && !b.PreHandler() {
+		variable := b.CreateJSVariable(localName)
+		b.AssignVariable(variable, value)
+		log.Infof("Import binding: %s -> %s from %s (external: %t)", localName, exportName, modulePath, isExternal)
+	}
 }
 
 // bindNamespaceImport 绑定命名空间导入
 func (b *builder) bindNamespaceImport(localName, modulePath string, isExternal bool) {
-	if localName == "" || b.PreHandler() {
+	if localName == "" {
 		return
 	}
 

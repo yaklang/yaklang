@@ -389,6 +389,6 @@ export const enum Palette {
 	ssatest.CheckSyntaxFlowWithFS(t, vf, `
 		console.log(* #-> as $enumValues)
 	`, map[string][]string{
-		"enumValues": {"red", "2"},
-	}, false, ssaapi.WithLanguage(ssaapi.TS))
+		"enumValues": {"\"red\"", "2"},
+	}, true, ssaapi.WithLanguage(ssaapi.TS))
 }

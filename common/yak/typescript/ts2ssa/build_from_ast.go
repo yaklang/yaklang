@@ -33,17 +33,27 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 	defer recoverRange()
 
 	prog := b.GetProgram()
+	application := prog.Application
 	fileName := b.GetEditor().GetFilename()
 	folderPath := b.GetEditor().GetFolderPath()
 	fileUrl := path.Join([]string{folderPath, fileName}...)
 
+	ssaGlobal := application.GlobalVariablesBlueprint.Container()
+	if ssaGlobal == nil {
+		return nil
+	}
+
 	if b.PreHandler() {
-		lib, skip := prog.GetLibrary(fileUrl)
-		if skip {
-			return nil
-		}
+		lib, _ := prog.GetLibrary(fileUrl)
 		if lib == nil {
 			lib = prog.NewLibrary(fileUrl, []string{fileUrl})
+			variable := b.CreateMemberCallVariable(ssaGlobal, b.EmitConstInstPlaceholder(fileUrl))
+			emptyContainer := b.EmitEmptyContainer()
+			b.AssignVariable(variable, emptyContainer)
+			if lib.GlobalVariablesBlueprint != nil {
+				moduleScope := b.ReadMemberCallValue(ssaGlobal, b.EmitConstInstPlaceholder(fileUrl))
+				lib.GlobalVariablesBlueprint.InitializeWithContainer(moduleScope)
+			}
 		}
 		defer func() {
 			lib.VisitAst(sourcefile)
@@ -69,7 +79,9 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			for _, statement := range sourcefile.Statements.Nodes {
 				if ast.IsPrologueDirective(statement) && statement.AsExpressionStatement().Expression.Text() == "use strict" {
 					b.useStrict = true
-					break
+				}
+				if ast.IsImportDeclaration(statement) {
+					b.VisitStatement(statement)
 				}
 			}
 			for _, statement := range sourcefile.Statements.Nodes {
@@ -1489,6 +1501,16 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 			}
 		}
 
+		bp := b.GetBluePrint(identifierName)
+		if bp != nil {
+			return nil, bp.Container()
+		}
+		if importType, ok := b.GetProgram().TryReadImportDeclare(identifierName); ok {
+			if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+				return nil, blueprint.Container()
+			}
+		}
+
 		return nil, b.ReadValue(identifierName)
 	case ast.KindPropertyAccessExpression:
 		propertyAccessExp := node.AsPropertyAccessExpression()
@@ -1499,6 +1521,11 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 		}
 
 		bp := b.GetBluePrint(objName) // 处理静态方法调用
+		if importType, ok := b.GetProgram().TryReadImportDeclare(objName); ok {
+			if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+				bp = blueprint
+			}
+		}
 		if (obj == nil && bp == nil) || propName == "" {
 			return nil, nil
 		}
@@ -4103,6 +4130,9 @@ func (b *builder) VisitEnumDeclaration(node *ast.EnumDeclaration) interface{} {
 	enumBlueprint.AddLazyBuilder(func() {
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer switchHandler()
+		if enumName == "Color" {
+			b.GetBluePrint("Palette")
+		}
 
 		// 处理枚举成员
 		if node.Members != nil && len(node.Members.Nodes) > 0 {

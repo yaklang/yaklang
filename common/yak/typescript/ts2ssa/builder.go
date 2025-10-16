@@ -20,7 +20,7 @@ type SSABuilder struct {
 
 func CreateBuilder() ssa.Builder {
 	builder := &SSABuilder{
-		PreHandlerBase: ssa.NewPreHandlerBase(),
+		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
 	}
 	builder.WithLanguageConfigOpts(
 		ssa.WithLanguageConfigBind(true), // 设置处理语言闭包的副作用的策略
@@ -30,6 +30,15 @@ func CreateBuilder() ssa.Builder {
 		ssa.WithLanguageConfigTryBuildValue(true),
 	)
 	return builder
+}
+
+func initHandler(fb *ssa.FunctionBuilder) {
+	container := fb.EmitEmptyContainer()
+
+	prog := fb.GetProgram()
+	if prog.GlobalVariablesBlueprint != nil {
+		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
+	}
 }
 
 type builder struct {
