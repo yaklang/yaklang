@@ -173,7 +173,6 @@ public interface RemoteLogService
 	require.NoError(t, err)
 
 	res, err := prog.SyntaxFlowWithError(`
-	// <include('java-spring-mvc-param')> as $entry;
 	JSON.parse*() as $entry;
 	`)
 	require.NoError(t, err)
