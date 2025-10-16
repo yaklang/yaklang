@@ -361,7 +361,26 @@ func (f *FunctionBuilder) emitMake(parentI Value, typ Type, low, high, max, Len,
 	i := NewMake(parentI, typ, low, high, max, Len, Cap)
 	f.emit(i)
 	saveTypeWithValue(i, typ)
+	f.generateMakeMetaInfo(i, low, high, max, Len, Cap)
 	return i
+}
+
+func (f *FunctionBuilder) generateMakeMetaInfo(m *Make, low, high, max, Len, Cap Value) {
+	if !utils.IsNil(low) {
+		f.AssignVariable(f.CreateMemberCallVariable(m, f.EmitConstInst("__low__")), low)
+	}
+	if !utils.IsNil(high) {
+		f.AssignVariable(f.CreateMemberCallVariable(m, f.EmitConstInst("__high__")), high)
+	}
+	if !utils.IsNil(max) {
+		f.AssignVariable(f.CreateMemberCallVariable(m, f.EmitConstInst("__max__")), max)
+	}
+	if !utils.IsNil(Cap) {
+		f.AssignVariable(f.CreateMemberCallVariable(m, f.EmitConstInst("__cap__")), Cap)
+	}
+	if !utils.IsNil(Len) {
+		f.AssignVariable(f.CreateMemberCallVariable(m, f.EmitConstInst("__len__")), Len)
+	}
 }
 
 func (f *FunctionBuilder) EmitMakeBuildWithType(typ Type, Len, Cap Value) *Make {

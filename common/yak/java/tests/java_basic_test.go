@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
@@ -397,5 +398,64 @@ func TestJavaTernaryExpression(t *testing.T) {
 		String result = (c) ? "condition true" : "condition false";
 		println(result);
 		`, []string{`phi(result)["condition true","condition false"]`}, t)
+	})
+}
+
+func TestJavaArrayCap(t *testing.T) {
+	code := `
+package com.example;
+
+public class ByteExample {
+    public static void main(String[] args) {
+        byte[] a = new byte[6];
+        int[] b = new int[10];
+        int[][] c = new int[5][8];
+        String[][][] d = new String[3][4][7];
+        System.out.println(a);
+    }
+}
+`
+
+	t.Run("test 1D arrays getCap", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `
+			*?{opcode:make && <typeName>?{have:"byte"} }.__cap__ as $byteCap
+			*?{opcode:make && <typeName>?{have:"int"} }.__cap__ as $intCap
+		`,
+			map[string][]string{
+				"byteCap": {"6"},
+				"intCap":  {"10"},
+			},
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	t.Run("test multi-dimensional arrays first dimension getCap", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `
+			*?{opcode:make && <typeName>?{have:"int[][]"} }	as $int2D
+			$int2D.__cap__ as $cap2D
+			$int2D.*?{opcode:make}<slice(index=0)>.__cap__ as $cap2D_inner
+		`,
+			map[string][]string{
+				"cap2D":       {"5"},
+				"cap2D_inner": {"8"},
+			},
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
+	})
+
+	t.Run("test multi-dimensional arrays inner dimensions getCap", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, code, `
+			*?{opcode:make && <typeName>?{have:"String[][][]"} } as $str3d
+			$str3d.__cap__ as $cap3D
+			$str3d.*?{opcode:make}<slice(index=0)>.__cap__ as $cap3D_2nd
+			$str3d.*?{opcode:make}<slice(index=0)>.*?{opcode:make}<slice(index=0)>.__cap__ as $cap3D_3rd
+		`,
+			map[string][]string{
+				"cap3D":     {"3"},
+				"cap3D_2nd": {"4"},
+				"cap3D_3rd": {"7"},
+			},
+			ssaapi.WithLanguage(ssaapi.JAVA),
+		)
 	})
 }
