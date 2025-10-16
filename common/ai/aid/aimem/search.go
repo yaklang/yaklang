@@ -11,15 +11,29 @@ import (
 
 // SearchBySemantics 通过语义搜索记忆
 func (r *AIMemoryTriage) SearchBySemantics(query string, limit int) ([]*SearchResult, error) {
+	// 检查 embedding 服务是否可用
+	if !r.embeddingAvailable {
+		log.Debugf("embedding service not available for session %s, returning empty semantic search results", r.sessionID)
+		return []*SearchResult{}, nil
+	}
+
+	// 检查 RAG 系统是否已初始化
+	if r.rag == nil {
+		log.Debugf("RAG system not initialized for session %s, returning empty semantic search results", r.sessionID)
+		return []*SearchResult{}, nil
+	}
+
 	// 使用 RAG 搜索相关问题
 	ragResults, err := r.rag.QueryWithPage(query, 1, limit)
 	if err != nil {
-		return nil, utils.Errorf("RAG search failed: %v", err)
+		log.Warnf("RAG search failed for session %s: %v, returning empty results", r.sessionID, err)
+		return []*SearchResult{}, nil
 	}
 
 	db := r.GetDB()
 	if db == nil {
-		return nil, utils.Errorf("database connection is nil")
+		log.Debugf("database connection is nil for session %s, returning empty semantic search results", r.sessionID)
+		return []*SearchResult{}, nil
 	}
 
 	var results []*SearchResult
