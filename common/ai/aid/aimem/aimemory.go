@@ -169,6 +169,20 @@ func (r *AIMemoryTriage) AddRawText(i string) ([]*MemoryEntity, error) {
 	return entities, nil
 }
 
+// TriageTagsFromText 从文本中生成标签以便搜索
+func (r *AIMemoryTriage) TriageTagsFromText(i string) ([]string, error) {
+	// summarize existing tags
+	tags, err := r.GetDynamicContextWithTags()
+	if err != nil {
+		return nil, utils.Errorf("GetDynamicContextWithTags failed: %v", err)
+	}
+	_ = tags
+	temp, infos, err := r.invoker.GetBasicPromptInfo(nil)
+	_ = temp
+	_ = infos
+	return []string{}, err
+}
+
 // GetSessionID 获取当前会话ID
 func (r *AIMemoryTriage) GetSessionID() string {
 	return r.sessionID
