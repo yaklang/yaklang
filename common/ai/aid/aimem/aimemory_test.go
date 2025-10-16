@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -279,7 +280,7 @@ func TestAddRawText(t *testing.T) {
 // 测试保存记忆条目并验证数据库
 func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 	ctx := context.Background()
-	sessionID := "test-session-003"
+	sessionID := "test-session-003-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
 	cleanupTestData(t, sessionID)
@@ -333,7 +334,7 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 // 测试RAG索引验证
 func TestRAGIndexingVerification(t *testing.T) {
 	ctx := context.Background()
-	sessionID := "test-session-004-rag"
+	sessionID := "test-session-004-rag-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
 	cleanupTestData(t, sessionID)
@@ -386,7 +387,7 @@ func TestRAGIndexingVerification(t *testing.T) {
 // 测试语义搜索
 func TestSearchBySemantics(t *testing.T) {
 	ctx := context.Background()
-	sessionID := "test-session-005"
+	sessionID := "test-session-005-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
 	cleanupTestData(t, sessionID)
@@ -424,7 +425,7 @@ func TestSearchBySemantics(t *testing.T) {
 // 测试按分数向量搜索
 func TestSearchByScoreVector(t *testing.T) {
 	ctx := context.Background()
-	sessionID := "test-session-006-vector"
+	sessionID := "test-session-006-vector-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
 	cleanupTestData(t, sessionID)
@@ -478,7 +479,7 @@ func TestSearchByScoreVector(t *testing.T) {
 // 测试按分数范围搜索
 func TestSearchByScores(t *testing.T) {
 	ctx := context.Background()
-	sessionID := "test-session-007"
+	sessionID := "test-session-007-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
 	cleanupTestData(t, sessionID)
@@ -519,7 +520,7 @@ func TestSearchByScores(t *testing.T) {
 // 测试按标签搜索
 func TestSearchByTags(t *testing.T) {
 	ctx := context.Background()
-	sessionID := "test-session-008"
+	sessionID := "test-session-008-" + uuid.New().String()
 
 	// 先清理可能存在的旧数据
 	cleanupTestData(t, sessionID)
