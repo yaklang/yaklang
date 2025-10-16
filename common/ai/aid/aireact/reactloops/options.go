@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -238,5 +239,11 @@ func WithOnPostIteraction(fn func(loop *ReActLoop, iteration int, task aicommon.
 func WithInitTask(initHandler func(task aicommon.AIStatefulTask)) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.initHandler = initHandler
+	}
+}
+
+func WithMemoryTriage(triage aimem.MemoryTriage) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.memoryTriage = triage
 	}
 }
