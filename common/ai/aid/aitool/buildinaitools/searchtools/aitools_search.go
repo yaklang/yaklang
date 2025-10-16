@@ -11,7 +11,7 @@ import (
 )
 
 const SearchToolName = "tools_search"
-const SearchForgeName = "forge_search"
+const SearchForgeName = "aiforge_search"
 
 func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGetter func() []T, toolName string) ([]*aitool.Tool, error) {
 	factory := aitool.NewFactory()

@@ -7,26 +7,46 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/searchtools"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 // AiToolManager 是工具管理器的默认实现
 type AiToolManager struct {
-	toolsGetter  func() []*aitool.Tool
-	toolEnabled  map[string]bool // 记录工具是否开启
-	enableSearch bool            // 是否开启工具搜索
-	searcher     searchtools.AISearcher[*aitool.Tool]
-	disableTools map[string]struct{} // 禁用的工具列表 优先级最高
-	searchTool   []*aitool.Tool
+	toolsGetter           func() []*aitool.Tool
+	toolEnabled           map[string]bool // 记录工具是否开启
+	enableSearchTool      bool            // 是否开启工具搜索
+	enableForgeSearchTool bool            // 是否开启forge工具搜索
+	aiToolsSearcher       searchtools.AISearcher[*aitool.Tool]
+	aiForgeSearcher       searchtools.AISearcher[*schema.AIForge]
+	disableTools          map[string]struct{} // 禁用的工具列表 优先级最高
+	searchTool            []*aitool.Tool
+	forgeSearchTool       []*aitool.Tool
 }
 
 // ToolManagerOption 定义工具管理器的配置选项
 type ToolManagerOption func(*AiToolManager)
 
-// WithSearcher 设置搜索器
-func WithSearcher(searcher searchtools.AISearcher[*aitool.Tool]) ToolManagerOption {
+// WithAIToolsSearcher 设置搜索器
+func WithAIToolsSearcher(searcher searchtools.AISearcher[*aitool.Tool]) ToolManagerOption {
 	return func(m *AiToolManager) {
-		m.searcher = searcher
+		m.aiToolsSearcher = searcher
+	}
+}
+
+// WithAiForgeSearcher 设置forge搜索器
+func WithAiForgeSearcher(searcher searchtools.AISearcher[*schema.AIForge]) ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.aiForgeSearcher = searcher
+	}
+}
+
+func WithForgeSearchToolEnabled(enabled bool) ToolManagerOption {
+	return func(m *AiToolManager) {
+		m.enableForgeSearchTool = enabled
 	}
 }
 
@@ -90,12 +110,13 @@ func WithToolEnabled(name string, enabled bool) ToolManagerOption {
 	}
 }
 
-// WithSearchEnabled 设置是否开启工具搜索
-func WithSearchEnabled(enabled bool) ToolManagerOption {
+// WithSearchToolEnabled 设置是否开启工具搜索
+func WithSearchToolEnabled(enabled bool) ToolManagerOption {
 	return func(m *AiToolManager) {
-		m.enableSearch = enabled
+		m.enableSearchTool = enabled
 	}
 }
+
 func NewToolManagerByToolGetter(getter func() []*aitool.Tool, options ...ToolManagerOption) *AiToolManager {
 	manager := &AiToolManager{
 		toolsGetter: getter,
@@ -138,12 +159,23 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 			enabledTools = append(enabledTools, tool)
 		}
 	}
-	if m.enableSearch {
-		if m.searcher == nil {
+	if m.enableSearchTool {
+		if m.aiToolsSearcher == nil {
 			log.Errorf("searcher is not set")
 			return enabledTools, nil
 		}
-		tool, err := m.GetSearchTools()
+		tool, err := m.getSearchTools()
+		if err != nil {
+			return nil, err
+		}
+		enabledTools = append(enabledTools, tool...)
+	}
+	if m.enableForgeSearchTool {
+		if m.aiToolsSearcher == nil {
+			log.Errorf("searcher is not set")
+			return enabledTools, nil
+		}
+		tool, err := m.getForgeSearchTools()
 		if err != nil {
 			return nil, err
 		}
@@ -152,22 +184,33 @@ func (m *AiToolManager) GetEnableTools() ([]*aitool.Tool, error) {
 	return enabledTools, nil
 }
 
-func (m *AiToolManager) GetSearchTools() ([]*aitool.Tool, error) {
+func (m *AiToolManager) getForgeSearchTools() ([]*aitool.Tool, error) {
+	if m.forgeSearchTool == nil {
+		// aiforge search tools
+		aiforgeSearchTools, err := searchtools.CreateAISearchTools(m.aiForgeSearcher, func() []*schema.AIForge {
+			forgeList, err := yakit.GetAllAIForge(consts.GetGormProfileDatabase())
+			if err != nil {
+				log.Errorf("get all ai forge error: %v", err)
+			}
+			return forgeList
+		}, searchtools.SearchForgeName)
+		if err != nil {
+			return nil, utils.Errorf("create ai forge search tools: %v", err)
+		}
+		m.forgeSearchTool = aiforgeSearchTools
+	}
+	return m.forgeSearchTool, nil
+}
+
+func (m *AiToolManager) getSearchTools() ([]*aitool.Tool, error) {
 	if m.searchTool == nil {
 		var err error
-		m.searchTool, err = searchtools.CreateAISearchTools(func(query string, searchList []*aitool.Tool) ([]*aitool.Tool, error) {
-			res, err := m.searcher(query, searchList)
-			for _, tool := range res {
-				m.EnableTool(tool.Name)
-			}
-			if err != nil {
-				return nil, err
-			}
-			return res, nil
-		}, m.safeToolsGetter, searchtools.SearchToolName)
+		// ai tool search tools
+		aiToolSearchTools, err := searchtools.CreateAISearchTools(m.aiToolsSearcher, m.safeToolsGetter, searchtools.SearchToolName)
 		if err != nil {
 			log.Error(err)
 		}
+		m.searchTool = aiToolSearchTools
 	}
 	return m.searchTool, nil
 }
@@ -188,11 +231,14 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 
 // SearchTools 通过字符串搜索相关工具
 func (m *AiToolManager) SearchTools(method string, query string) ([]*aitool.Tool, error) {
-	if !m.enableSearch {
+	if !m.enableSearchTool {
 		return nil, fmt.Errorf("工具搜索功能已被禁用")
 	}
-
-	return m.searcher(query, m.safeToolsGetter())
+	res, err := m.aiToolsSearcher(query, m.safeToolsGetter())
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // EnableTool 开启单个工具

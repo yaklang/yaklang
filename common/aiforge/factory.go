@@ -2,10 +2,12 @@ package aiforge
 
 import (
 	"context"
+	"io"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/rag/rag_search_tool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -38,6 +40,15 @@ func WithForgeFilter_Limit(limit int) ForgeQueryOption {
 			paging.Limit = int64(limit)
 		}
 	}
+}
+
+func (f ForgeFactory) NLQuery(ctx context.Context, query string, aiChatFunc func(string) (io.Reader, error), opts ...ForgeQueryOption) ([]*schema.AIForge, error) {
+	data, err := f.Query(ctx, opts...)
+	if err != nil {
+		return nil, err
+	}
+	seacher := rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)
+	return seacher(query, data)
 }
 
 // Query 从 Profile 数据库中查询 schema.AIForge 列表

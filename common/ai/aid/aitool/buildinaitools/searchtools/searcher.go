@@ -25,7 +25,7 @@ var __prompt_KeywordSearch string
 var __prompt_KeywordSummary string
 
 type AISearchable interface {
-	GetName() string
+	GetName() string // 唯一标识
 	GetDescription() string
 	GetKeywords() []string
 }
@@ -42,7 +42,7 @@ type AiToolsSearchResult struct {
 }
 
 type KeywordSearchResult struct {
-	Tool            string   `json:"tool"`
+	Key             string   `json:"tool"`
 	MatchedKeywords []string `json:"matched_keywords"`
 }
 
@@ -127,7 +127,7 @@ func NewKeyWordSearcher[T AISearchable](chatToAiFunc func(string) (io.Reader, er
 
 		results := []T{}
 		for _, res := range callResults {
-			tool, ok := toolMap[res.Tool]
+			tool, ok := toolMap[res.Key]
 			if !ok {
 				continue
 			}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/aiforge/contracts"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -13,7 +14,7 @@ import (
 type SimpleAiForge struct {
 }
 
-func (s *SimpleAiForge) SimpleExecute(ctx context.Context, input string, aitoolOptions []aitool.ToolOption, opts ...aid.Option) (aitool.InvokeParams, error) {
+func (s *SimpleAiForge) SimpleExecute(ctx context.Context, input string, aitoolOptions []aitool.ToolOption) (aitool.InvokeParams, error) {
 	param := aitool.WithStructParam("result", []aitool.PropertyOption{}, aitoolOptions...)
 	lf, err := aiforge.NewLiteForge(
 		"simple_ai_forge",
@@ -28,7 +29,7 @@ func (s *SimpleAiForge) SimpleExecute(ctx context.Context, input string, aitoolO
 			Key:   "input",
 			Value: input,
 		},
-	}, opts...)
+	}, aid.WithToolManager(&buildinaitools.AiToolManager{}))
 	if err != nil {
 		return nil, err
 	}
