@@ -245,6 +245,12 @@ func (t *AIMemoryTriage) checkQuestionRepetition(entity *MemoryEntity, threshold
 		return false, nil
 	}
 
+	// 如果RAG系统不可用，直接返回false（不检查重复）
+	if t.rag == nil {
+		log.Debugf("RAG system not initialized, skipping question repetition check")
+		return false, nil
+	}
+
 	// 使用RAG系统搜索相似问题
 	for _, question := range entity.PotentialQuestions {
 		if strings.TrimSpace(question) == "" {
@@ -274,6 +280,12 @@ func (t *AIMemoryTriage) checkQuestionRepetition(entity *MemoryEntity, threshold
 // checkContentRepetition 检查内容重复
 func (t *AIMemoryTriage) checkContentRepetition(entity *MemoryEntity, threshold float64) (bool, error) {
 	if strings.TrimSpace(entity.Content) == "" {
+		return false, nil
+	}
+
+	// 如果RAG系统不可用，直接返回false（不检查重复）
+	if t.rag == nil {
+		log.Debugf("RAG system not initialized, skipping content repetition check")
 		return false, nil
 	}
 

@@ -58,26 +58,31 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
 
 		// 索引 potential_questions 到 RAG 系统
 		// 每个问题作为一个文档，关联到同一个 memory_id
-		for _, question := range entity.PotentialQuestions {
-			if strings.TrimSpace(question) == "" {
-				continue
+		if r.rag != nil {
+			for _, question := range entity.PotentialQuestions {
+				if strings.TrimSpace(question) == "" {
+					continue
+				}
+
+				// 使用 question + memory_id 作为文档 ID，确保唯一性
+				docID := fmt.Sprintf("%s-%s", entity.Id, utils.CalcMd5(question))
+
+				err := r.rag.Add(docID, question,
+					rag.WithDocumentMetadataKeyValue("memory_id", entity.Id),
+					rag.WithDocumentMetadataKeyValue("question", question),
+					rag.WithDocumentMetadataKeyValue("session_id", r.sessionID),
+				)
+				if err != nil {
+					log.Errorf("index question to RAG failed: %v", err)
+					// RAG 失败时仍然继续保存记忆实体，但记录错误
+					log.Warnf("continuing despite RAG indexing failure for memory entity: %s", entity.Id)
+				}
 			}
 
-			// 使用 question + memory_id 作为文档 ID，确保唯一性
-			docID := fmt.Sprintf("%s-%s", entity.Id, utils.CalcMd5(question))
-
-			err := r.rag.Add(docID, question,
-				rag.WithDocumentMetadataKeyValue("memory_id", entity.Id),
-				rag.WithDocumentMetadataKeyValue("question", question),
-				rag.WithDocumentMetadataKeyValue("session_id", r.sessionID),
-			)
-			if err != nil {
-				log.Errorf("index question to RAG failed: %v", err)
-				return utils.Errorf("index question to RAG failed: %v", err)
-			}
+			log.Infof("indexed %d questions for memory entity: %s", len(entity.PotentialQuestions), entity.Id)
+		} else {
+			log.Debugf("RAG system not initialized, skipping question indexing for memory entity: %s", entity.Id)
 		}
-
-		log.Infof("indexed %d questions for memory entity: %s", len(entity.PotentialQuestions), entity.Id)
 	}
 
 	return nil
