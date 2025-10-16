@@ -4,10 +4,11 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
-	"github.com/jinzhu/gorm"
-	"github.com/stretchr/testify/require"
 	"path/filepath"
 	"testing"
+
+	"github.com/jinzhu/gorm"
+	"github.com/stretchr/testify/require"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -327,6 +328,10 @@ func TestRAGIndexingVerification(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 验证RAG文档数量
+	if mem.rag == nil {
+		t.Skip("RAG system not initialized (embedding service unavailable)")
+	}
+
 	docCount, err := mem.rag.CountDocuments()
 	assert.NoError(t, err)
 
