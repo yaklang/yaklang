@@ -60,6 +60,16 @@ func TestTemplateDebug(t *testing.T) {
 	if utils.InGithubActions() {
 		t.Skip()
 	}
+
+	t.Run("check template", func(t *testing.T) {
+		name := "cwe-611-xxe.java"
+		lang := "java"
+		fullName := path.Join("templates", lang, name)
+		content, err := sfweb.TemplateFS.ReadFile(fullName)
+		require.NoError(t, err)
+		scanContent(t, lang, string(content))
+	})
+
 	t.Run("golang rule debug", func(t *testing.T) {
 		t.Skip("跳过测试：模板文件使用CRLF行终止符，在macOS/Linux环境下会导致SSA解析失败")
 

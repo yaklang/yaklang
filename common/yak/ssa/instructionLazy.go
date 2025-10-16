@@ -100,8 +100,8 @@ func NewLazyInstructionFromIrCode(ir *ssadb.IrCode, prog *Program, ignoreCache .
 			return inst, nil
 		}
 	}
-	if ir.ID == 0 {
-		log.Infof("ircode id is 0")
+	if ir == nil || ir.CodeID == 0 {
+		log.Infof("ircode is nil or id is 0")
 	}
 	lz := &LazyInstruction{
 		id:          ir.GetIdInt64(),

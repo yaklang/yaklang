@@ -2,6 +2,7 @@ package ssadb
 
 import (
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 type IrIndex struct {
@@ -38,7 +39,11 @@ func CreateIndex(progName string) *IrIndex {
 }
 
 func SaveIrIndex(db *gorm.DB, idx *IrIndex) {
-	db.Save(idx)
+	var err error
+	ssaprofile.ProfileAdd(true, "Database.SaveIRIndex", func() {
+		err = db.Save(idx).Error
+	})
+	_ = err
 }
 
 type IrVariable struct {

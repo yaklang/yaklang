@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -189,7 +190,11 @@ func (irSource *IrSource) Save(db *gorm.DB) error {
 
 	// log.Infof("save source: %v", irSource.SourceCodeHash)
 	// check existed
-	if err := db.Save(irSource).Error; err != nil {
+	var err error
+	ssaprofile.ProfileAdd(true, "Database.Source", func() {
+		err = db.Save(irSource).Error
+	})
+	if err != nil {
 		log.Errorf("save ir source failed: %v", err)
 		return utils.Wrapf(err, "save ir source failed")
 	}

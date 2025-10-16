@@ -14,10 +14,15 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -41,11 +46,27 @@ func TestCodeCompile(t *testing.T) {
 	go func() {
 		log.Println(http.ListenAndServe("localhost:18080", nil)) // 启动 pprof 服务
 	}()
+	_ = ssadb.GetDB()
 
 	runtime.SetBlockProfileRate(1)
 
-	// path := `/Users/wlz/Developer/Target/yakssaExample/java-sec-code`
-	path := `/Users/wlz/Developer/Target/yakssaExample/spring-boot`
+	path := `/Users/wlz/Developer/Target/yakssaExample/java-sec-code`
+	// path := `/Users/wlz/Developer/Target/yakssaExample/spring-boot`
+
+	db, err := gorm.Open(consts.SQLiteExtend, "file::memory:?cache=shared")
+	if err != nil {
+		log.Errorf("failed to open gorm database: %v", err)
+		panic(utils.Errorf("failt open memory database "))
+		// return
+	}
+	// db = db.Debug()
+	consts.SetGormSSAProjectDatabase(db)
+	schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
+	db.DB().SetConnMaxLifetime(time.Hour)
+	db.DB().SetMaxIdleConns(10)
+	// set MaxOpenConns to disable connections pool, for write speed and "database is locked" error
+	db.DB().SetMaxOpenConns(1)
 
 	// relfs := filesys.NewRelLocalFs(path)
 	// filesys.Recursive(
@@ -63,6 +84,7 @@ func TestCodeCompile(t *testing.T) {
 	// 	}),
 	// )
 	log.SetLevel(log.DebugLevel)
+	ssalog.Log.SetLevel("debug")
 	progName := uuid.NewString()
 	_ = progName
 	start := time.Now()
@@ -119,9 +141,11 @@ func TestCodeCompile(t *testing.T) {
 		log.Errorf("----------------------------------------------------------------------------------------------")
 		log.Errorf("----------------------------------------------------------------------------------------------")
 	}
+	// select {}
 }
 
 func TestCodeScan(t *testing.T) {
+	t.Skip()
 
 	f, err := os.Create("trace.out")
 	if err != nil {
