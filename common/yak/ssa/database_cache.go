@@ -19,19 +19,20 @@ import (
 // and load the data from database when the data is not in cache.
 
 type ProgramCache struct {
-	program          *Program // mark which program handled
-	DB               *gorm.DB
-	InstructionCache Cache[Instruction]
-	TypeCache        Cache[Type]
+	program *Program // mark which program handled
+	DB      *gorm.DB
 
-	VariableIndex SimpleCache[Instruction]
-	MemberIndex   SimpleCache[Instruction]
-	ClassIndex    SimpleCache[Instruction]
-	ConstCache    SimpleCache[Instruction]
+	InstructionCache *Cache[Instruction]
+	TypeCache        *Cache[Type]
 
-	indexCache  SimpleCache[*ssadb.IrIndex]
-	offsetCache SimpleCache[*ssadb.IrOffset]
-	editorCache SimpleCache[*ssadb.IrSource]
+	VariableIndex *SimpleCache[Instruction]
+	MemberIndex   *SimpleCache[Instruction]
+	ClassIndex    *SimpleCache[Instruction]
+	ConstCache    *SimpleCache[Instruction]
+
+	indexCache  *SimpleCache[*ssadb.IrIndex]
+	offsetCache *SimpleCache[*ssadb.IrOffset]
+	editorCache *SimpleCache[*ssadb.IrSource]
 
 	afterSaveNotify func(int)
 
@@ -65,17 +66,13 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 		cacheCtx, databaseKind,
 		cache.DB, prog,
 		programName, fetchSize, saveSize,
-		func(inst Instruction, instIr *ssadb.IrCode) {
-			cache.afterSaveNotify(1)
-		},
-		func(count int) {
-			cache.afterSaveNotify(count)
+		func(size int) {
+			cache.afterSaveNotify(size)
 		},
 	)
 	cache.TypeCache = createTypeCache(
-		cacheCtx, databaseKind,
-		cache.DB, prog,
-		programName, fetchSize, saveSize,
+		cacheCtx, cache.DB,
+		programName, saveSize,
 	)
 	return cache
 }

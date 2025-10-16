@@ -145,7 +145,7 @@ func (s *Save[T]) Save(item T) {
 
 // Close stops the background goroutine and waits for it to finish.
 // It also processes any remaining items in the buffer before returning.
-func (s *Save[T]) Close() {
+func (s *Save[T]) Close(wg ...*sync.WaitGroup) {
 	if s == nil {
 		return
 	}
