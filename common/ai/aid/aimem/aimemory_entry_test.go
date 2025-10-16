@@ -16,7 +16,7 @@ func TestHandleMemory_Basic(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := createTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -55,7 +55,7 @@ func TestHandleMemory_Deduplication(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := createTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -110,7 +110,7 @@ func TestSearchMemory_Basic(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := createTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -177,7 +177,7 @@ func TestSearchMemory_BytesLimit(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := createTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -229,7 +229,7 @@ func TestSearchMemory_EmptyQuery(t *testing.T) {
 	defer cleanupEntryTestData(t, sessionID)
 
 	// 创建AI记忆系统
-	memory, err := createTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(context.Background())),
 	)
 	if err != nil {
