@@ -94,8 +94,7 @@ func irSource2Editor(source *IrSource) *memedit.MemEditor {
 	return ret
 }
 
-// GetIrSourceFromHash fetch editor from cache by hash(md5)
-func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
+func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 	db := GetDB()
 	result, ok := irSourceCache.Get(hash)
 	if ok {

@@ -129,15 +129,23 @@ func (r *Report) ConvertSSARiskToReport(ssarisk *schema.SSARisk, results ...*ssa
 	}
 
 	// create risk with detailed structure
-	risk := NewRisk(ssarisk, r, value)
+	risk, toAddIrSourceHashes := NewRisk(ssarisk, r, value)
 	r.AddRisks(risk)
 
 	// create report.file
-	file := r.FirstOrCreateFile(editor)
-	risk.SetFile(file)
-	file.AddRisk(risk)
+	file, ok := r.FirstOrCreateFile(editor)
+	if ok {
+		file.AddRisk(risk)
+	}
 	// }}
 
+	// add ir source from data flow paths
+	for _, irSourceHash := range toAddIrSourceHashes {
+		file, ok := r.FirstOrCreateFileByHash(irSourceHash)
+		if ok {
+			file.AddRisk(risk)
+		}
+	}
 	// {{ rule
 	// create report.rule
 	rule := r.FirstOrCreateRule(result.GetRule())
@@ -155,13 +163,30 @@ func (r *Report) FirstOrCreateRule(rule *schema.SyntaxFlowRule) *Rule {
 	return ret
 }
 
-func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) *File {
-	if ret := r.GetFile(editor.GetUrl()); ret != nil {
-		return ret
+func (r *Report) FirstOrCreateFile(editor *memedit.MemEditor) (*File, bool) {
+	irsourceHash := editor.GetIrSourceHash()
+	if _, ok := r.IrSourceHashes[irsourceHash]; ok {
+		return nil, false
+	}
+	r.IrSourceHashes[irsourceHash] = struct{}{}
+	ret := NewFile(editor, r)
+	r.File = append(r.File, ret)
+	return ret, true
+}
+
+func (r *Report) FirstOrCreateFileByHash(irSourceHash string) (*File, bool) {
+	if _, ok := r.IrSourceHashes[irSourceHash]; ok {
+		return nil, false
+	}
+	r.IrSourceHashes[irSourceHash] = struct{}{}
+	editor, err := ssadb.GetEditorByHash(irSourceHash)
+	if err != nil {
+		log.Errorf("get editor by hash %s error: %v", irSourceHash, err)
+		return nil, false
 	}
 	ret := NewFile(editor, r)
 	r.File = append(r.File, ret)
-	return ret
+	return ret, true
 }
 
 type ImportSSARiskOption func(*ImportSSARiskManager)
