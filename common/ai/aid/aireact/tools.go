@@ -14,6 +14,7 @@ func (r *ReAct) getPrioritizedTools(tools []*aitool.Tool, maxCount int) []*aitoo
 	// Priority tool names (tools_search should be first)
 	priorityNames := []string{
 		"tools_search",
+		"aiforge_search",
 		"now",
 		"bash",
 		"read_file",

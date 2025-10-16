@@ -6,6 +6,15 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -26,14 +35,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"os"
-	"path/filepath"
-	"runtime"
-	"strconv"
-	"strings"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestBuildInForge(t *testing.T) {
@@ -167,7 +168,7 @@ func TestReducerIntentRecognition(t *testing.T) {
 		}
 		forges := []*schema.AIForge{}
 		for _, result := range searchResults {
-			forges = append(forges, forgeMap[result.Tool])
+			forges = append(forges, forgeMap[result.Key])
 		}
 		return forges, nil
 	}
