@@ -93,30 +93,83 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 				r.wg.Done()
 				return
 			}
+
+			// 如果没有新的时间线差异，跳过记忆处理
+			if diffStr == "" {
+				if r.config.debugEvent {
+					log.Infof("no timeline diff detected, skipping memory processing for iteration %d", iteration)
+				}
+				r.wg.Done()
+				return
+			}
+
 			go func() {
 				defer func() {
 					if err := recover(); err != nil {
-						log.Errorf("memory triage panic: %v", err)
+						log.Errorf("intelligent memory processing panic: %v", err)
 						utils.PrintCurrentGoroutineRuntimeStack()
 					}
 					r.wg.Done()
 				}()
-				entities, err := r.memoryTriage.AddRawText(diffStr)
+
+				// 使用智能记忆处理系统
+				if r.config.debugEvent {
+					log.Infof("processing memory for iteration %d with timeline diff: %s", iteration, utils.ShrinkString(diffStr, 200))
+				}
+
+				// 构建上下文信息，包含任务状态和迭代信息
+				contextualInput := fmt.Sprintf("ReAct迭代 %d/%s: %s\n任务状态: %s\n完成状态: %v\n原因: %v",
+					iteration,
+					task.GetId(),
+					diffStr,
+					string(task.GetStatus()),
+					isDone,
+					reason)
+
+				// 使用HandleMemory进行智能记忆处理（包含去重、评分、保存）
+				r.memoryTriage.HandleMemory(contextualInput)
 				if err != nil {
-					log.Warnf("memory triage call failed: %v", err)
-				} else {
-					if r.config.debugEvent {
-						log.Infof("memory triage added entities: %v", entities)
-					}
-					for _, e := range entities {
-						log.Infof("memory triage content: %v", e.String())
-					}
-					// Save memory entities to database
-					if err := r.memoryTriage.SaveMemoryEntities(entities...); err != nil {
-						log.Warnf("save memory entities to database failed: %v", err)
-					} else {
-						log.Infof("saved %d memory entities to database", len(entities))
-					}
+					log.Warnf("intelligent memory processing failed: %v", err)
+					return
+				}
+
+				if r.config.debugEvent {
+					log.Infof("intelligent memory processing completed for iteration %d", iteration)
+				}
+
+				// 如果任务完成，尝试搜索相关记忆用于后续任务参考
+				if isDone {
+					go func() {
+						defer func() {
+							if err := recover(); err != nil {
+								log.Errorf("memory search for completed task panic: %v", err)
+								utils.PrintCurrentGoroutineRuntimeStack()
+							}
+						}()
+
+						// 搜索与当前任务相关的记忆，限制在2KB内
+						searchResult, err := r.memoryTriage.SearchMemory(task.GetUserInput(), 2048)
+						if err != nil {
+							log.Warnf("memory search for completed task failed: %v", err)
+							return
+						}
+
+						if len(searchResult.Memories) > 0 {
+							log.Infof("found %d relevant memories for completed task %s (total: %d bytes)",
+								len(searchResult.Memories), task.GetId(), searchResult.ContentBytes)
+							if r.config.debugEvent {
+								log.Infof("memory search summary: %s", searchResult.SearchSummary)
+								for i, mem := range searchResult.Memories {
+									log.Infof("relevant memory %d: %s (tags: %v, relevance: C=%.2f, R=%.2f)",
+										i+1, utils.ShrinkString(mem.Content, 100), mem.Tags, mem.C_Score, mem.R_Score)
+								}
+							}
+						} else {
+							if r.config.debugEvent {
+								log.Infof("no relevant memories found for completed task %s", task.GetId())
+							}
+						}
+					}()
 				}
 			}()
 		}),
