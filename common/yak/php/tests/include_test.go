@@ -158,7 +158,12 @@ func TestNativeCall_Include(t *testing.T) {
 	$escaped_username = pass($username, '', LDAP_ESCAPE_FILTER);
 	$dn = "cn={$escaped_username},ou=users,dc=example,dc=com";
 	$is_valid = ldap_compare($ldap_conn, $dn, "userPassword", $password);`)
-	ssatest.CheckSyntaxFlowWithFS(t, fs, `<include('php-param')> as $params`, map[string][]string{
+	ssatest.CheckSyntaxFlowWithFS(t, fs, `
+_POST.* as $params
+_GET.* as $params
+_REQUEST.* as $params
+_COOKIE.* as $params
+	`, map[string][]string{
 		"params": {"Undefined-$password(valid)", "Undefined-$user2(valid)", "Undefined-$username(valid)"},
 	}, false, ssaapi.WithLanguage(ssaapi.PHP))
 }

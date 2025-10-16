@@ -117,8 +117,16 @@ if($c){
 }
 eval($a);`
 	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
-		ssatest.CheckSyntaxFlow(t, code, `<include('php-param')> as $start;
-<include('php-filter-function')> as $filter;
+		ssatest.CheckSyntaxFlow(t, code, `
+_POST.* as $start
+_GET.* as $start
+_REQUEST.* as $start
+_COOKIE.* as $start
+
+
+/^(htmlspecialchars|strip_tags|mysql_real_escape_string|addslashes|filter|is_numeric|str_replace|ereg|strpos|preg_replace|trim)$/ as $filter;
+
+
 eval(* as $param);
 $param#{
 include: <<<CODE
