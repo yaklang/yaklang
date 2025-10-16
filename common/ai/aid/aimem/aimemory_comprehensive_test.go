@@ -193,7 +193,7 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 	defer cleanupComprehensiveTestData(t, sessionID)
 
 	t.Run("ValidCreation", func(t *testing.T) {
-		memory, err := createTestAIMemory(sessionID,
+		memory, err := CreateTestAIMemory(sessionID,
 			WithInvoker(NewAdvancedMockInvoker(context.Background())),
 		)
 		if err != nil {
@@ -214,7 +214,7 @@ func TestAIMemoryTriage_NewAIMemory(t *testing.T) {
 	})
 
 	t.Run("MissingInvoker", func(t *testing.T) {
-		_, err := createTestAIMemory(sessionID)
+		_, err := CreateTestAIMemory(sessionID)
 		if err == nil {
 			t.Errorf("expected error when invoker is missing")
 		}
@@ -250,7 +250,7 @@ func TestAIMemoryTriage_AddRawText(t *testing.T) {
 				strings.Contains(prompt, "Go语言并发编程")
 		})
 
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -295,7 +295,7 @@ func TestAIMemoryTriage_AddRawText(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
 		mockInvoker.SetShouldFail("memory-triage", true)
 
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -309,7 +309,7 @@ func TestAIMemoryTriage_AddRawText(t *testing.T) {
 
 	t.Run("EmptyInput", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -339,7 +339,7 @@ func TestAIMemoryTriage_SelectTags(t *testing.T) {
 			return strings.Contains(prompt, "编程语言特性")
 		})
 
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -382,7 +382,7 @@ func TestAIMemoryTriage_SelectTags(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
 		mockInvoker.SetShouldFail("tag-selection", true)
 
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -404,7 +404,7 @@ func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
 
 	t.Run("AllEntitiesUnique", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -442,7 +442,7 @@ func TestAIMemoryTriage_ShouldSaveMemoryEntities(t *testing.T) {
 
 	t.Run("EmptyEntities", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -463,7 +463,7 @@ func TestAIMemoryTriage_HandleMemory(t *testing.T) {
 
 	t.Run("SuccessfulHandling", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -487,7 +487,7 @@ func TestAIMemoryTriage_HandleMemory(t *testing.T) {
 
 	t.Run("EmptyInput", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -501,7 +501,7 @@ func TestAIMemoryTriage_HandleMemory(t *testing.T) {
 
 	t.Run("NilInput", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -522,7 +522,7 @@ func TestAIMemoryTriage_SearchMemory(t *testing.T) {
 
 	t.Run("SuccessfulSearch", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -556,7 +556,7 @@ func TestAIMemoryTriage_SearchMemory(t *testing.T) {
 
 	t.Run("ZeroBytesLimit", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -574,7 +574,7 @@ func TestAIMemoryTriage_SearchMemory(t *testing.T) {
 
 	t.Run("NegativeBytesLimit", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -598,7 +598,7 @@ func TestAIMemoryTriage_StorageOperations(t *testing.T) {
 	defer cleanupComprehensiveTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
-	memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}
@@ -767,7 +767,7 @@ func TestAIMemoryTriage_HNSWOperations(t *testing.T) {
 	defer cleanupComprehensiveTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
-	memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}
@@ -847,7 +847,7 @@ func TestAIMemoryTriage_TagOperations(t *testing.T) {
 	defer cleanupComprehensiveTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
-	memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}
@@ -930,7 +930,7 @@ func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
 
 	t.Run("InvalidMemoryEntity", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -960,7 +960,7 @@ func TestAIMemoryTriage_ErrorHandling(t *testing.T) {
 
 	t.Run("NonExistentEntity", func(t *testing.T) {
 		mockInvoker := NewAdvancedMockInvoker(context.Background())
-		memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+		memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 		if err != nil {
 			t.Fatalf("create AI memory failed: %v", err)
 		}
@@ -999,7 +999,7 @@ func TestAIMemoryTriage_ConcurrentOperations(t *testing.T) {
 	defer cleanupComprehensiveTestData(t, sessionID)
 
 	mockInvoker := NewAdvancedMockInvoker(context.Background())
-	memory, err := createTestAIMemory(sessionID, WithInvoker(mockInvoker))
+	memory, err := CreateTestAIMemory(sessionID, WithInvoker(mockInvoker))
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
 	}

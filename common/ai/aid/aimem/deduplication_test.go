@@ -15,7 +15,7 @@ func TestShouldSaveMemoryEntities_BatchDeduplication(t *testing.T) {
 	defer cleanupDeduplicationTestData(t, sessionID)
 
 	// 创建AI记忆系统（使用测试专用的创建函数）
-	memory, err := createTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(context.Background())),
 	)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
 	defer cleanupDeduplicationTestData(t, sessionID)
 
 	// 创建AI记忆系统（使用测试专用的创建函数）
-	memory, err := createTestAIMemory(sessionID,
+	memory, err := CreateTestAIMemory(sessionID,
 		WithInvoker(NewMockInvoker(context.Background())),
 	)
 	if err != nil {
