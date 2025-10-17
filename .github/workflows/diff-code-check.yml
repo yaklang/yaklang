@@ -71,18 +71,8 @@ jobs:
               -H "Accept: application/vnd.github.v3+json" \
               "https://api.github.com/repos/${{ github.repository }}/pulls/${{ env.PR_NUMBER }}")
             
-            HEAD_REPO=$(echo "$PR_RESPONSE" | jq -r '.head.repo.full_name // "unknown"')
-            BASE_REPO=$(echo "$PR_RESPONSE" | jq -r '.base.repo.full_name // "unknown"')
             PR_STATE=$(echo "$PR_RESPONSE" | jq -r '.state // "unknown"')
             PR_HEAD_SHA=$(echo "$PR_RESPONSE" | jq -r '.head.sha // "unknown"')
-          
-          if [ "$HEAD_REPO" != "$BASE_REPO" ] && [ "$HEAD_REPO" != "unknown" ] && [ "$BASE_REPO" != "unknown" ]; then
-            echo "is_fork_pr=true" >> $GITHUB_OUTPUT
-            echo "::notice::🔍 Fork PR detected (Base: $BASE_REPO, Head: $HEAD_REPO)"
-            echo "::notice::Running in read-only mode - scan will run but no comments will be posted"
-          else
-            echo "is_fork_pr=false" >> $GITHUB_OUTPUT
-          fi
           
             if [ "$PR_STATE" != "open" ]; then
               echo "should_skip=true" >> $GITHUB_OUTPUT
@@ -299,7 +289,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Clean up old security comments (No vulnerabilities found)
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0' && steps.validate.outputs.is_fork_pr != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -349,7 +339,7 @@ jobs:
             }
 
       - name: Comment PR with security findings
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0' && steps.validate.outputs.is_fork_pr != 'true'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
