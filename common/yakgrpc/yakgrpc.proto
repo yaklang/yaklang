@@ -1066,6 +1066,7 @@ message MCPServer {
   string Command = 5;
   bool Enable = 7;
   repeated MCPServerTool Tools = 6;
+  string ErrorMsg = 8;
 }
 
 message GetAllMCPServersResponse {
