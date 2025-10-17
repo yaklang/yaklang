@@ -292,6 +292,9 @@ func (r *EntityRepository) YieldKHop(ctx context.Context, opts ...KHopQueryOptio
 	for _, opt := range opts {
 		opt(config)
 	}
+
+	log.Infof("start YieldKHop: K=%d, KMin=%d, KMax=%d, RagQuery=%s, IsRuntimeBuild=%v, KHopLimit=%d", config.K, config.KMin, config.KMax, config.RagQuery, config.IsRuntimeBuild, config.KHopLimit)
+
 	var input = chanx.NewUnlimitedChan[string](ctx, 1000)
 	go func() {
 		defer input.Close()
