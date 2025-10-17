@@ -56,7 +56,7 @@ func GetValueBeforeEndOffset(DB *gorm.DB, rng *memedit.Range) (int64, error) {
 }
 
 func (r *IrOffset) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
-	editor, err := GetIrSourceFromHash(r.FileHash)
+	editor, err := GetEditorByHash(r.FileHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}

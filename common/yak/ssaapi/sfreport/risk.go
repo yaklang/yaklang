@@ -3,8 +3,11 @@ package sfreport
 import (
 	"time"
 
+	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 type Risk struct {
@@ -40,38 +43,13 @@ type Risk struct {
 	LatestDisposalStatus string `json:"latest_disposal_status"`
 	// 数据流路径信息
 	DataFlowPaths []*DataFlowPath `json:"data_flow_paths,omitempty"`
+	// RiskFeatureHash
+	RiskFeatureHash string `json:"risk_feature_hash"`
 }
 
-// DataFlowPath 数据流路径
-type DataFlowPath struct {
-	PathID      string      `json:"path_id"`
-	Description string      `json:"description"`
-	Nodes       []*NodeInfo `json:"nodes"`
-	Edges       []*EdgeInfo `json:"edges"`
-	DotGraph    string      `json:"dot_graph,omitempty"`
-}
-
-type NodeInfo struct {
-	NodeID          string            `json:"node_id"`
-	IRCode          string            `json:"ir_code"`
-	SourceCode      string            `json:"source_code"`
-	SourceCodeStart int               `json:"source_code_start"`
-	CodeRange       *ssaapi.CodeRange `json:"code_range"`
-	//NodeType        string            `json:"node_type"`   // 节点类型 TODO:目前确定source、sink比较难
-	//Description     string            `json:"description"` // 节点描述
-}
-
-type EdgeInfo struct {
-	EdgeID      string `json:"edge_id"`
-	FromNodeID  string `json:"from_node_id"`
-	ToNodeID    string `json:"to_node_id"`
-	EdgeType    string `json:"edge_type"`   // 边类型：data_flow, control_flow, call, etc.
-	Description string `json:"description"` // 边描述，便于AI理解
-}
-
-func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
+func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) (*Risk, []string) {
 	if ssarisk == nil {
-		return &Risk{}
+		return &Risk{}, nil
 	}
 
 	risk := &Risk{
@@ -98,21 +76,78 @@ func NewRisk(ssarisk *schema.SSARisk, r *Report, value ...*ssaapi.Value) *Risk {
 
 		ProgramName:          ssarisk.ProgramName,
 		LatestDisposalStatus: ssarisk.LatestDisposalStatus,
+		RiskFeatureHash:      ssarisk.RiskFeatureHash,
 	}
 
+	var irSourceHashes []string
 	// Generate data flow paths if available
 	if r.ReportType == IRifyFullReportType || r.config.showDataflowPath {
 		if ssarisk.ResultID != 0 && ssarisk.Variable != "" {
-			dataFlowPath, err := GenerateDataFlowAnalysis(ssarisk, value...)
+			var err error
+			var dataFlowPath *DataFlowPath
+			dataFlowPath, irSourceHashes, err = GenerateDataFlowAnalysis(ssarisk, value...)
 			if err != nil {
 				log.Errorf("generate data flow paths failed for risk %d: %v", ssarisk.ID, err)
 			} else {
-				risk.DataFlowPaths = []*DataFlowPath{dataFlowPath}
+				risk.DataFlowPaths = append(risk.DataFlowPaths, dataFlowPath)
 			}
 		}
 	}
 
-	return risk
+	return risk, irSourceHashes
+}
+
+func (r *Risk) SaveToDB(db *gorm.DB) error {
+	if db == nil {
+		return utils.Error("Save Risk to DB failed: db is nil")
+	}
+
+	ssaRisk := &schema.SSARisk{
+		Hash:                r.Hash,
+		Title:               r.Title,
+		TitleVerbose:        r.TitleVerbose,
+		Description:         r.Description,
+		Solution:            r.Solution,
+		RiskType:            r.RiskType,
+		Details:             r.Details,
+		Severity:            schema.SyntaxFlowSeverity(r.Severity),
+		Language:            r.Language,
+		IsPotential:         false,
+		CVE:                 r.CVE,
+		CWE:                 r.CWE,
+		IsRead:              false,
+		Ignore:              false,
+		UploadOnline:        false,
+		CveAccessVector:     "",
+		CveAccessComplexity: "",
+		Tags:                "",
+		FromRule:            r.RuleName,
+		ProgramName:         r.ProgramName,
+		CodeSourceUrl:       r.CodeSourceURL,
+		CodeRange:           r.CodeRange,
+		CodeFragment:        r.CodeFragment,
+		FunctionName:        r.FunctionName,
+		Line:                r.Line,
+		// RuntimeId:            "",
+		// ResultID:             uint64(r.ResultID),
+		// Variable:             r.Variable,
+		// Index:                int64(r.Index),
+		LatestDisposalStatus: r.LatestDisposalStatus,
+		RiskFeatureHash:      r.RiskFeatureHash,
+	}
+
+	// CreateSSARisk会在BeforeCreate修正Hash
+	err := yakit.CreateSSARisk(db, ssaRisk)
+	if err != nil {
+		return utils.Wrapf(err, "Save Risk to DB failed")
+	}
+
+	// save data flow paths
+	saver := newSaveDataFlowCtx(db, ssaRisk.Hash)
+	for _, dataFlowPath := range r.DataFlowPaths {
+		saver.SaveDataFlow(dataFlowPath)
+	}
+	return nil
 }
 
 func (r *Risk) GetHash() string {
@@ -189,9 +224,4 @@ func (r *Risk) GetRuleName() string {
 
 func (r *Risk) SetRule(rule *Rule) {
 	r.RuleName = rule.RuleName
-}
-
-func (r *Risk) SetFile(file *File) {
-	// 不覆盖 CodeSourceURL，因为它已经从 SSARisk 中正确设置
-	// r.CodeSourceURL = file.Path
 }

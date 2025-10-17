@@ -108,6 +108,16 @@ func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) 
 	return items, nil
 }
 
+func GetResultNodeByRiskHash(db *gorm.DB, riskHash string) ([]uint, error) {
+	var items []uint
+	if err := db.Model(&AuditNode{}).
+		Where("risk_hash = ? and is_entry_node = true", riskHash).
+		Pluck("id", &items).Error; err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 func GetEffectOnEdgeByFromNodeId(id uint) []uint {
 	db := GetDB()
 	var effectOns []uint
@@ -174,6 +184,19 @@ const (
 	// EdgeType_Predecessor 记录审计过程
 	EdgeType_Predecessor AuditEdgeType = "predecessor"
 )
+
+func ValidEdgeType(edgeType string) AuditEdgeType {
+	switch edgeType {
+	case string(EdgeType_DependsOn):
+		return EdgeType_DependsOn
+	case string(EdgeType_EffectsOn):
+		return EdgeType_EffectsOn
+	case string(EdgeType_DataFlow):
+		return EdgeType_DataFlow
+	default:
+		return EdgeType_Predecessor
+	}
+}
 
 type AuditEdge struct {
 	gorm.Model

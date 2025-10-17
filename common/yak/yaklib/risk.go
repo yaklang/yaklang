@@ -377,7 +377,7 @@ func GetSSARiskWithDataFlow(id int64) *sfreport.Risk {
 	}
 
 	if ssaRisk.ResultID != 0 && ssaRisk.Variable != "" {
-		dataFlowPath, err := sfreport.GenerateDataFlowAnalysis(ssaRisk)
+		dataFlowPath, _, err := sfreport.GenerateDataFlowAnalysis(ssaRisk)
 		if err != nil {
 			log.Errorf("generate data flow paths failed for risk %d: %v", ssaRisk.ID, err)
 		} else {

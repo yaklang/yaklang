@@ -1605,13 +1605,15 @@ func test1() {
 }
 `
 
-	suite, cleanup := ssatest.NewSFScanRiskTestSuite(t, programName, consts.GO)
+	client, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
+	suite, cleanup := ssatest.NewSFScanRiskTestSuite(t, client, programName, consts.GO)
 	defer cleanup()
 
 	// 执行所有扫描操作（在主测试函数中，确保所有子测试都能访问到结果）
 
 	// 第一次扫描
-	suite.InitProgram(testCode1, risk1, risk2, risk3, risk4, risk5, risk6).
+	suite.InitSimpleProgram(testCode1, risk1, risk2, risk3, risk4, risk5, risk6).
 		Scan().
 		CheckRiskCount(t, 2, 0).                                              // 检查第一次扫描产生2个风险
 		CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2"}, 0). // 检查第一次扫描的风险标题
@@ -1621,7 +1623,7 @@ func test1() {
 	time.Sleep(2 * time.Second)
 
 	// 第二次扫描
-	suite.InitProgram(testCode2, risk1, risk2, risk3, risk4, risk5, risk6).
+	suite.InitSimpleProgram(testCode2, risk1, risk2, risk3, risk4, risk5, risk6).
 		Scan().
 		CheckRiskCount(t, 4, 1).                                                                            // 检查第二次扫描产生4个风险
 		CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4"}, 1). // 检查第二次扫描的风险标题
@@ -1631,7 +1633,7 @@ func test1() {
 	time.Sleep(2 * time.Second)
 
 	// 第三次扫描
-	suite.InitProgram(testCode3, risk1, risk2, risk3, risk4, risk5, risk6).
+	suite.InitSimpleProgram(testCode3, risk1, risk2, risk3, risk4, risk5, risk6).
 		Scan().
 		CheckRiskCount(t, 6, 2).                                                                                                         // 检查第三次扫描产生6个风险
 		CheckRiskTitlesContain(t, []string{"Test Risk 1", "Test Risk 2", "Test Risk 3", "Test Risk 4", "Test Risk 5", "Test Risk 6"}, 2) // 检查第三次扫描的风险标题

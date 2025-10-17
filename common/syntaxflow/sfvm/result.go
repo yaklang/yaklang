@@ -196,7 +196,7 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 		fileName := editor.GetUrl()
 		if fileName == "" {
 			var err error
-			editor, err = ssadb.GetIrSourceFromHash(editor.GetIrSourceHash())
+			editor, err = ssadb.GetEditorByHash(editor.GetIrSourceHash())
 			if err != nil {
 				log.Warn(err)
 			}

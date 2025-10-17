@@ -197,7 +197,7 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 }
 
 func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
-	editor, err := GetIrSourceFromHash(r.SourceCodeHash)
+	editor, err := GetEditorByHash(r.SourceCodeHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}

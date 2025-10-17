@@ -94,8 +94,7 @@ func irSource2Editor(source *IrSource) *memedit.MemEditor {
 	return ret
 }
 
-// GetIrSourceFromHash fetch editor from cache by hash(md5)
-func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
+func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 	db := GetDB()
 	result, ok := irSourceCache.Get(hash)
 	if ok {
@@ -112,6 +111,28 @@ func GetIrSourceFromHash(hash string) (*memedit.MemEditor, error) {
 	}
 
 	return irSource2Editor(&source), nil
+}
+
+func GetEditorCountByProgramName(programName string) (int, error) {
+	db := GetDB()
+	var count int
+	if err := db.Model(&IrSource{}).Where("program_name = ?", programName).Count(&count).Error; err != nil {
+		return 0, utils.Wrapf(err, "query source via program name: %v failed", programName)
+	}
+	return count, nil
+}
+
+func GetEditorByProgramName(programName string) ([]*memedit.MemEditor, error) {
+	db := GetDB()
+	var sources []*IrSource
+	if err := db.Where("program_name = ?", programName).Find(&sources).Error; err != nil {
+		return nil, utils.Wrapf(err, "query source via program name: %v failed", programName)
+	}
+	editors := make([]*memedit.MemEditor, 0, len(sources))
+	for _, source := range sources {
+		editors = append(editors, irSource2Editor(source))
+	}
+	return editors, nil
 }
 
 func MarshalFile(editor *memedit.MemEditor) *IrSource {
