@@ -107,7 +107,15 @@ func (c *ProgramCache) GetInstruction(id int64) Instruction {
 	if ret, ok := c.InstructionCache.Get(id); ok {
 		return ret
 	}
-	return nil
+
+	if inst, err := NewLazyInstruction(c.program, id); err == nil {
+		c.InstructionCache.Set(inst)
+		return inst
+	} else {
+		log.Errorf("LazyInstruction Create faild: %v", err)
+		return nil
+	}
+
 }
 
 // =============================================== Variable =======================================================
