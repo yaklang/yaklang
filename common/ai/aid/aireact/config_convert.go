@@ -89,5 +89,9 @@ func ConvertYPBAIStartParamsToReActConfig(i *ypb.AIStartParams) []Option {
 			opts = append(opts, WithAICallback(aicommon.AIChatToAICallbackType(chat)))
 		}
 	}
+
+	// 默认开启 forge 搜索
+	opts = append(opts, WithAiForgeSearchTool())
+
 	return opts
 }
