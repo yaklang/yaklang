@@ -1913,6 +1913,8 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 		}
 	}
 
+	var callee ssa.Value
+	callee = b.VisitRightValueExpression(node.Expression)
 	// 检查是否是 Promise 的特殊方法调用（then, catch, finally）
 	if ast.IsPropertyAccessExpression(node.Expression) {
 		propAccess := node.Expression.AsPropertyAccessExpression()
@@ -1920,10 +1922,9 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 			methodName := b.ProcessMemberName(propAccess.Name())
 			if methodName == "then" || methodName == "catch" || methodName == "finally" {
 				// 检查调用对象是否返回 Promise 类型
-				promiseValue := b.VisitRightValueExpression(node.Expression)
-				if b.IsPromiseType(promiseValue.GetType()) {
+				if b.IsPromiseType(callee.GetType()) {
 					// 确认是 Promise 类型，进行特殊处理
-					return b.HandlePromiseMethod(promiseValue, methodName, args)
+					return b.HandlePromiseMethod(callee, methodName, args)
 				}
 				// 如果不是 Promise 类型，按普通方法调用处理
 			}
@@ -1931,22 +1932,21 @@ func (b *builder) VisitCallExpression(node *ast.CallExpression) ssa.Value {
 	}
 
 	// 处理callee（被调用函数）
-	funcValue := b.VisitRightValueExpression(node.Expression)
-	if funcValue == nil {
+	if callee == nil {
 		b.NewErrorWithPos(ssa.Error, TAG, b.CurrentRange, InvalidFunctionCallee())
 		return b.EmitUndefined("")
 	}
-	if !utils.IsNil(funcValue.GetFunc()) {
-		for len(funcValue.GetFunc().Params) > len(args) {
+	if !utils.IsNil(callee.GetFunc()) {
+		for len(callee.GetFunc().Params) > len(args) {
 			args = append(args, b.EmitUndefined(""))
 		}
 		// 创建调用
 		// TODO: 函数调用导致实参发生改变如何处理?
-		call := b.EmitCall(b.NewCall(funcValue, args))
+		call := b.EmitCall(b.NewCall(callee, args))
 
 		// 根据被调用函数的类型设置 Call 指令的返回类型
 		// 这对于 Promise 等返回类型的正确传递非常重要
-		if funcType := funcValue.GetType(); funcType != nil {
+		if funcType := callee.GetType(); funcType != nil {
 			if funcType.GetTypeKind() == ssa.FunctionTypeKind {
 				// 如果是函数类型，获取其返回类型
 				if ft, ok := funcType.(*ssa.FunctionType); ok && ft.ReturnType != nil {
