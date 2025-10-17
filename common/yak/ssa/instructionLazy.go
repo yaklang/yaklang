@@ -76,7 +76,7 @@ func NewInstructionWithCover[T Instruction](prog *Program, id int64, Cover func(
 
 // // NewLazyInstruction : create a new lazy instruction, only create in cache
 func NewLazyInstruction(prog *Program, id int64) (Instruction, error) {
-	ir := ssadb.GetIrCodeById(ssadb.GetDB(), prog.Name, id)
+	ir := ssadb.GetIrCodeById(ssadb.GetDB(), prog.GetProgramName(), id)
 	if ir == nil {
 		return nil, utils.Error("IrCode is nil")
 	}

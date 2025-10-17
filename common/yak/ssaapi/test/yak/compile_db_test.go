@@ -136,7 +136,7 @@ c("d")
 
 	count := 0
 	includeFile := omap.NewOrderedMap(make(map[string]any))
-	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
+	for result := range ssadb.YieldIrCode(ssadb.GetDB(), context.Background(), progName) {
 		if result.Opcode <= 0 {
 			continue
 		}
@@ -180,7 +180,7 @@ c("d")
 	includeFile := omap.NewOrderedMap(make(map[string]any))
 	includeHash := prog.Program.CreateEditor([]byte(includeCode), filepath, false).GetIrSourceHash()
 	// includeHash := memedit.NewMemEditorWithFileUrl(includeCode, filepath).GetIrSourceHash()
-	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
+	for result := range ssadb.YieldIrCode(ssadb.GetDB(), context.Background(), progName) {
 		if result.IsEmptySourceCodeHash() {
 			log.Warn("source code hash is empty")
 			continue
@@ -220,7 +220,7 @@ dump(a(3))
 	m := omap.NewGeneralOrderedMap()
 
 	// test source code
-	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
+	for result := range ssadb.YieldIrCode(ssadb.GetDB(), context.Background(), progName) {
 		count++
 		result.Show()
 		if result.IsEmptySourceCodeHash() {
