@@ -199,13 +199,6 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 			return result, nil
 		}
 
-		if f.Config.DisableWebFingerprint {
-			return result, nil
-		}
-
-		if f.Config.DisableWebFingerprint {
-			return result, nil
-		}
 		if serviceName != "" && serviceName != "tcp" && serviceName != "ssl" && !utils2.MatchAllOfRegexp(serviceName, "(?i)http") {
 			f.log("non-http service detected, skip web detection")
 			return result, nil
