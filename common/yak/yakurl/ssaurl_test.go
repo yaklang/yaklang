@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -20,8 +21,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -932,4 +935,212 @@ func TestHaveRange(t *testing.T) {
 		}
 		require.False(t, haveValue)
 	}
+}
+
+func TestRiskHashQuery(t *testing.T) {
+	local, err := yakgrpc.NewLocalClient()
+	require.NoError(t, err)
+
+	progID := uuid.NewString()
+	suite, clean := ssatest.NewSFScanRiskTestSuite(t, local, progID, consts.JAVA)
+	defer clean()
+
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("sqli.java", `package com.mycompany.myapp;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+
+    User getUser(@Param("id") Long id);
+
+    void insertUser(User user);
+
+    void updateUser(User user);
+
+    void deleteUser(@Param("id") Long id);
+
+    List<User> getAllUsers();
+}`)
+	vf.AddFile("sqlmap.xml", `<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id}
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+</mapper>`)
+
+	rule := `
+	<mybatisSink> as $sink
+	alert $sink for {
+		title_zh: "MyBatis SQL 注入漏洞",
+		type: audit,
+		severity: medium,
+		desc: "MyBatis SQL 注入漏洞",
+	};
+	`
+
+	var riskCount int
+	err = suite.InitProgram(vf).ScanWithRule(rule).HandleLastTaskRisks(func(risks []*schema.SSARisk) error {
+		riskCount = len(risks)
+		return nil
+	})
+	require.NoError(t, err)
+	require.Greater(t, riskCount, 0, "No risks found after scan")
+	t.Logf("Generated %d risks", riskCount)
+
+	ctx := context.Background()
+	db := ssadb.GetDB()
+	_, risks, err := yakit.QuerySSARisk(db, &ypb.SSARisksFilter{
+		ProgramName: []string{progID},
+	}, nil)
+	require.NoError(t, err)
+	require.Greater(t, len(risks), 0, "Should have risks")
+	t.Logf("Risks in database: %d", len(risks))
+
+	targetDir := t.TempDir()
+
+	exportStream, err := local.ExportSSARisk(ctx, &ypb.ExportSSARiskRequest{
+		Filter: &ypb.SSARisksFilter{
+			ProgramName: []string{progID},
+		},
+		TargetPath:       targetDir,
+		WithDataFlowPath: true,
+		WithFileContent:  true,
+	})
+	require.NoError(t, err)
+
+	for {
+		msg, err := exportStream.Recv()
+		if err != nil {
+			break
+		}
+		t.Logf("Export progress: %.2f", msg.Process)
+	}
+
+	files, err := filepath.Glob(filepath.Join(targetDir, "ssa_risk_export_*.json"))
+	require.NoError(t, err)
+	require.Len(t, files, 1, "Expected one export file")
+	exportedFile := files[0]
+	t.Logf("Exported to: %s", exportedFile)
+	clean()
+
+	importStream, err := local.ImportSSARisk(ctx, &ypb.ImportSSARiskRequest{
+		InputPath: exportedFile,
+	})
+	require.NoError(t, err)
+
+	for {
+		msg, err := importStream.Recv()
+		if err != nil {
+			break
+		}
+		t.Logf("Import progress: %.2f", msg.Process)
+	}
+	t.Log("Import completed")
+
+	_, importedRisks, err := yakit.QuerySSARisk(db, &ypb.SSARisksFilter{
+		ProgramName: []string{progID},
+	}, nil)
+	require.NoError(t, err)
+	require.Greater(t, len(importedRisks), 0, "No risks found after import")
+
+	firstRisk := importedRisks[0]
+	require.NotEmpty(t, firstRisk.Hash, "Risk hash should not be empty")
+	t.Logf("Testing with risk hash: %s", firstRisk.Hash)
+
+	t.Run("query value details via risk_hash", func(t *testing.T) {
+		url := &ypb.RequestYakURLParams{
+			Method: "GET",
+			Url: &ypb.YakURL{
+				Schema:   "syntaxflow",
+				Location: progID,
+				Path:     "/",
+				Query: []*ypb.KVPair{
+					{
+						Key:   "risk_hash",
+						Value: firstRisk.Hash,
+					},
+				},
+			},
+		}
+
+		res, err := local.RequestYakURL(ctx, url)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+		require.Len(t, res.Resources, 1, "Should have exactly one resource")
+
+		resource := res.Resources[0]
+		require.Equal(t, "information", resource.ResourceType, "Should be a information resource")
+
+		// 验证包含完整的信息（graph_info, graph_line, code_range, risk_hash 等）
+		hasGraph := false
+		hasGraphInfo := false
+		hasGraphLine := false
+		hasNodeID := false
+
+		for _, extra := range resource.Extra {
+			switch extra.Key {
+			case "graph":
+				// dot图测试
+				hasGraph = true
+				dotGraph := extra.Value
+				fmt.Println("dotGraph: \n", dotGraph)
+				require.Contains(t, dotGraph, "user")
+				require.Contains(t, dotGraph, "${id}")
+				require.Contains(t, dotGraph, "UserMapper")
+			case "graph_info":
+				hasGraphInfo = true
+				var graphInfo []*ssaapi.NodeInfo
+				err := json.Unmarshal([]byte(extra.Value), &graphInfo)
+				require.NoError(t, err)
+				require.Greater(t, len(graphInfo), 0, "Should have graph nodes")
+				t.Logf("Graph info has %d nodes", len(graphInfo))
+				for _, nodeInfo := range graphInfo {
+					require.NotEmpty(t, nodeInfo.CodeRange)
+					require.NotEmpty(t, nodeInfo.IRCode)
+					require.NotEmpty(t, nodeInfo.SourceCode)
+				}
+			case "graph_line":
+				hasGraphLine = true
+				var graphLine [][]string
+				err := json.Unmarshal([]byte(extra.Value), &graphLine)
+				require.NoError(t, err)
+				t.Logf("Graph has %d edges", len(graphLine))
+			case "node_id":
+				hasNodeID = true
+			}
+		}
+
+		require.True(t, hasGraph, "Should have graph")
+		require.True(t, hasGraphInfo, "Should have graph_info")
+		require.True(t, hasGraphLine, "Should have graph_line")
+		require.True(t, hasNodeID, "Should have node_id")
+		t.Log("Successfully queried complete value details via risk_hash")
+	})
 }
