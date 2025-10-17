@@ -109,7 +109,7 @@ func EmptyIrCode(progName string, id int64) *IrCode {
 	}
 }
 
-func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
+func GetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 	if id == -1 {
 		return nil
 	}

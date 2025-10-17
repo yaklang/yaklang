@@ -40,7 +40,7 @@ func EmptyIrType(progName string, id uint64) *IrType {
 	}
 }
 
-func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
+func GetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
 	if id == -1 {
 		return nil
 	}

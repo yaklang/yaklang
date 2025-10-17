@@ -38,7 +38,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 		// wait instruction save to db
 		time.Sleep(ttl * 2)
 
-		ir := ssadb.GetIrCodeById(ssadb.GetDB(), instID)
+		ir := ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID)
 		log.Infof("ir: %v", ir)
 		require.NotNil(t, ir)
 		require.Equal(t, ir.Opcode, int64(SSAOpcodeBinOp))
@@ -61,7 +61,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 	// wait instruction save to db
 	time.Sleep(ttl * 2)
 	{
-		ir := ssadb.GetIrCodeById(ssadb.GetDB(), instID)
+		ir := ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, instID)
 		log.Infof("ir: %v", ir)
 		require.NotNil(t, ir)
 		require.Equal(t, ir.Opcode, int64(SSAOpcodeBinOp))
@@ -84,7 +84,7 @@ func TestLazyInstructionSaveAgain(t *testing.T) {
 
 	{
 		// check database
-		ir := ssadb.GetIrCodeById(ssadb.GetDB(), instID)
+		ir := ssadb.GetIrCodeItemById(ssadb.GetDB(), instID)
 		log.Infof("ir: %v", ir)
 		require.NotNil(t, ir)
 		require.Equal(t, ir.Opcode, int64(SSAOpcodeBinOp))
@@ -134,13 +134,13 @@ func TestCache_with_lazyBuilder(t *testing.T) {
 	require.Greater(t, undefineId, int64(0))
 	require.True(t, builded)
 	{
-		ir := ssadb.GetIrCodeById(ssadb.GetDB(), subFuncId)
+		ir := ssadb.GetIrCodeItemById(ssadb.GetDB(), subFuncId)
 		require.NotNil(t, ir)
 		require.Equal(t, ir.Opcode, int64(SSAOpcodeFunction))
 		require.Equal(t, ir.Name, subFunctionName)
 	}
 	{
-		ir := ssadb.GetIrCodeById(ssadb.GetDB(), undefineId)
+		ir := ssadb.GetIrCodeItemById(ssadb.GetDB(), undefineId)
 		require.NotNil(t, ir)
 		require.Equal(t, ir.Opcode, int64(SSAOpcodeUndefined))
 		require.Equal(t, ir.CurrentFunction, subFuncId)

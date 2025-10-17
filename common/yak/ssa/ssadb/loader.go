@@ -8,12 +8,34 @@ import (
 	"github.com/yaklang/yaklang/common/utils/glob"
 )
 
-func YieldIrCodesProgramName(rawDB *gorm.DB, ctx context.Context, program string) chan *IrCode {
-	db := rawDB.Model(&IrCode{}).Where("program_name = ?", program)
-	return yieldIrCodes(db, ctx)
-}
-func yieldIrCodes(DB *gorm.DB, ctx context.Context) chan *IrCode {
-	return bizhelper.YieldModel[*IrCode](ctx, DB)
+func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) chan *IrCode {
+	db := DB.Model(&IrCode{}).Where("program_name = ?", progName)
+	filter := make(map[int64]struct{})
+	outC := make(chan *IrCode)
+	go func() {
+		defer close(outC)
+		ch := bizhelper.FastPagination[int64](ctx, db, nil, bizhelper.WithFastPaginator_FindField("code_id"))
+		for ir := range ch {
+			if ir <= 0 {
+				continue
+			}
+			if _, ok := filter[ir]; ok {
+				continue
+			}
+			filter[ir] = struct{}{}
+
+			code := GetIrCodeById(GetDB(), progName, ir)
+			if code == nil {
+				continue
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case outC <- code:
+			}
+		}
+	}()
+	return outC
 }
 
 func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
@@ -22,7 +44,8 @@ func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
 	filter := make(map[int64]struct{})
 	go func() {
 		defer close(outC)
-		for index := range bizhelper.YieldModel[*IrIndex](ctx, db) {
+		ch := bizhelper.YieldModel[*IrIndex](ctx, db, bizhelper.WithYieldModel_Fast())
+		for index := range ch {
 			if index == nil {
 				break
 			}
@@ -59,24 +82,24 @@ const (
 	OpcodeCompare
 )
 
-func SearchVariable(db *gorm.DB, ctx context.Context, compareMode, matchMod int, value string) chan *IrCode {
+func SearchVariable(db *gorm.DB, ctx context.Context, progName string, compareMode, matchMod int, value string) chan *IrCode {
 	switch compareMode {
 	case ExactCompare:
-		return ExactSearchVariable(db, ctx, matchMod, value)
+		return ExactSearchVariable(db, ctx, progName, matchMod, value)
 	case GlobCompare:
-		return GlobSearchVariable(db, ctx, matchMod, value)
+		return GlobSearchVariable(db, ctx, progName, matchMod, value)
 	case RegexpCompare:
-		return RegexpSearchVariable(db, ctx, matchMod, value)
+		return RegexpSearchVariable(db, ctx, progName, matchMod, value)
 	}
 	return nil
 }
 
-func ExactSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string) chan *IrCode {
+func ExactSearchVariable(DB *gorm.DB, ctx context.Context, progName string, mod int, value string) chan *IrCode {
 	db := DB.Model(&IrIndex{})
 	if mod&ConstType != 0 {
 		//指定opcode为const
 		_db := DB.Model(&IrCode{}).Where("opcode=5 AND const_type = 'normal' AND string=? ", value)
-		return yieldIrCodes(_db, ctx)
+		return YieldIrCode(_db, ctx, progName)
 	}
 	switch mod {
 	case NameMatch:
@@ -90,16 +113,16 @@ func ExactSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string
 	return yieldIrIndex(db, ctx)
 }
 
-func GlobSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string) chan *IrCode {
+func GlobSearchVariable(DB *gorm.DB, ctx context.Context, progName string, mod int, value string) chan *IrCode {
 	regStr := glob.Glob2Regex(value)
-	return RegexpSearchVariable(DB, ctx, mod, regStr)
+	return RegexpSearchVariable(DB, ctx, progName, mod, regStr)
 }
 
-func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value string) chan *IrCode {
+func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, progName string, mod int, value string) chan *IrCode {
 	db := DB.Model(&IrIndex{})
 	if mod&ConstType != 0 {
 		_db := DB.Model(&IrCode{}).Where("opcode=5 AND const_type = 'normal' AND string REGEXP ?", value)
-		return yieldIrCodes(_db, ctx)
+		return YieldIrCode(_db, ctx, progName)
 	}
 	switch mod {
 	case NameMatch:
@@ -112,16 +135,7 @@ func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, mod int, value strin
 	return yieldIrIndex(db, ctx)
 }
 
-func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, opcodes ...int) chan *IrCode {
+func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, progName string, opcodes ...int) chan *IrCode {
 	db = db.Model(&IrCode{}).Where("opcode in (?)", opcodes)
-	return yieldIrCodes(db, ctx)
-}
-
-func GetVariableByValue(valueID int64) []*IrIndex {
-	db := GetDB()
-	var ir []*IrIndex
-	if err := db.Model(&IrIndex{}).Where("value_id = ? and variable_name != ?", valueID, "").Find(&ir).Error; err != nil {
-		return nil
-	}
-	return ir
+	return YieldIrCode(db, ctx, progName)
 }
