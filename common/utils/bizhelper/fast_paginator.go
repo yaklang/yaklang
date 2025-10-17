@@ -15,6 +15,7 @@ type FastPaginator struct {
 	offset      int
 	page        int
 	cfg         *FastPaginatorConfig
+	findField   string
 	// p   Paginator
 }
 
@@ -37,6 +38,12 @@ func WithFastPaginator_OrderBy(orderBy string) FastPaginatorOpts {
 	}
 }
 
+func WithFastPaginator_FindField(field string) FastPaginatorOpts {
+	return func(c *FastPaginatorConfig) {
+		c.IndexField = field
+	}
+}
+
 func WithFastPaginator_IndexField(selectField string) FastPaginatorOpts {
 	return func(c *FastPaginatorConfig) {
 		c.IndexField = selectField
@@ -45,7 +52,7 @@ func WithFastPaginator_IndexField(selectField string) FastPaginatorOpts {
 
 func NewFastPaginator(db *gorm.DB, size int, opts ...FastPaginatorOpts) *FastPaginator {
 	if size == 0 {
-		size = 10
+		size = 1024
 	}
 	cfg := NewFastPaginatorConfig()
 	if len(opts) > 0 {
@@ -95,7 +102,11 @@ func (p *FastPaginator) Next(result any) (error, bool) {
 			end = len(p.ids)
 		}
 		db = ExactQueryIntArrayOr(p.db, p.cfg.IndexField, p.ids[p.offset:end])
-		db = db.Find(result)
+		if p.findField != "" {
+			db = db.Pluck(p.findField, result)
+		} else {
+			db = db.Find(result)
+		}
 		p.page++
 		p.offset = end
 	}

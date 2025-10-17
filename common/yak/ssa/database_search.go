@@ -39,6 +39,7 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 		}
 	case ProgramCacheDBRead, ProgramCacheDBWrite:
 		ch := ssadb.SearchIrCodeByOpcodes(ssadb.GetDBInProgram(prog.Name), ctx,
+			prog.Name,
 			lo.Map(opcodes, func(opcode Opcode, index int) int {
 				return int(opcode)
 			})...,
@@ -100,7 +101,7 @@ func matchInstructionsByVariable(
 		}
 		addRes(prog.Cache._getByVariableEx(matchMode, check)...)
 	case ProgramCacheDBRead, ProgramCacheDBWrite:
-		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, compareMode, matchMode, name)
+		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, prog.Name, compareMode, matchMode, name)
 		for ir := range ch {
 			inst, err := NewLazyInstructionFromIrCode(ir, prog)
 			if err != nil {

@@ -15,6 +15,7 @@ type YieldModelConfig struct {
 	IndexField    string
 	CountCallback func(int)
 	Limit         int
+	Fast          bool
 }
 
 func NewYieldModelConfig() *YieldModelConfig {
@@ -29,6 +30,16 @@ type YieldModelOpts func(*YieldModelConfig)
 func WithYieldModel_IndexField(selectField string) YieldModelOpts {
 	return func(c *YieldModelConfig) {
 		c.IndexField = selectField
+	}
+}
+
+func WithYieldModel_Fast(fast ...bool) YieldModelOpts {
+	return func(c *YieldModelConfig) {
+		if len(fast) > 0 {
+			c.Fast = fast[0]
+		} else {
+			c.Fast = true
+		}
 	}
 }
 
@@ -51,7 +62,6 @@ func WithYieldModel_Limit(l int) YieldModelOpts {
 }
 
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
-
 	var t T
 	db = db.Table(db.NewScope(t).TableName())
 
@@ -60,6 +70,53 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 		opt(cfg)
 	}
 
+	if cfg.Fast {
+		return FastPagination[T](ctx, db, cfg)
+	} else {
+		return normalPagination[T](cfg, ctx, db)
+	}
+}
+
+func FastPagination[T any](ctx context.Context, db *gorm.DB, cfg *YieldModelConfig, opts ...FastPaginatorOpts) chan T {
+	outC := make(chan T)
+	go func() {
+		defer close(outC)
+		size := 0
+		if cfg != nil {
+			if cfg.Size > 0 {
+				size = cfg.Size
+			}
+			if cfg.IndexField != "" {
+				opts = append(opts, WithFastPaginator_IndexField(cfg.IndexField))
+			}
+		}
+
+		paginator := NewFastPaginator(db, size, opts...)
+		if cfg != nil && cfg.CountCallback != nil {
+			cfg.CountCallback(paginator.totalRecord)
+		}
+		for {
+			var items []T
+			if err, ok := paginator.Next(&items); !ok {
+				break
+			} else if err != nil {
+				log.Errorf("paging failed: %s", err)
+				break
+			}
+
+			for _, d := range items {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- d:
+				}
+			}
+		}
+	}()
+	return outC
+}
+
+func normalPagination[T any](cfg *YieldModelConfig, ctx context.Context, db *gorm.DB) chan T {
 	outC := make(chan T)
 	total := 0
 	go func() {
