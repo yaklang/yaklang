@@ -1,11 +1,12 @@
 package yakurl
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -166,12 +167,9 @@ func (a *SyntaxFlowAction) GetQuerySyntaxFlow(params *ypb.RequestYakURLParams) (
 		}
 	}
 
-	riskHash = "b7f0e39ee6cd302d328a9af1499e0c512ba4f95b"
 	// get program
 	programName := u.GetLocation()
-	if riskHash == "" && resultID == 0 {
-		return nil, utils.Errorf("must set one of result_id or risk_hash")
-	}
+	result, resultID, _ := a.getResult(programName, string(params.GetBody()), resultID)
 
 	q := &QuerySyntaxFlow{
 		variable: variable,
@@ -182,17 +180,8 @@ func (a *SyntaxFlowAction) GetQuerySyntaxFlow(params *ypb.RequestYakURLParams) (
 
 		ResultID:    resultID,
 		programName: programName,
-
-		riskHash: riskHash,
-	}
-
-	if resultID != 0 {
-		result, resultID, err := a.getResult(programName, string(params.GetBody()), resultID)
-		if err != nil {
-			return nil, err
-		}
-		q.Result = result
-		q.ResultID = resultID
+		Result:      result,
+		riskHash:    riskHash,
 	}
 	return q, nil
 }
@@ -234,15 +223,16 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 	if err != nil {
 		return nil, err
 	}
-	if query.Result != nil && query.ResultID != 0 {
-		a.GetResultByResultID(query, params)
+	if query.Result != nil {
+		return a.GetResultBySFResult(query, params)
+	} else if query.riskHash != "" {
+		return a.GetResultByRiskHash(query, params)
 	} else {
-		a.GetResultByRiskHash(query, params)
+		return nil, utils.Errorf("query syntaxflow failed, sf result not found  or riskHash %s not found", query.riskHash)
 	}
-	return
 }
 
-func (a *SyntaxFlowAction) GetResultByResultID(
+func (a *SyntaxFlowAction) GetResultBySFResult(
 	query *QuerySyntaxFlow,
 	params *ypb.RequestYakURLParams,
 ) (*ypb.RequestYakURLResponse, error) {
