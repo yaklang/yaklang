@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -218,6 +219,10 @@ func _executeLiteForgeTemp(query string, opts ...any) (*ForgeResult, error) {
 		case aid.Option:
 			cfg.aidOptions = append(cfg.aidOptions, opt)
 		}
+	}
+
+	if cfg.ctx == nil {
+		cfg.ctx = context.Background()
 	}
 
 	if ret := utils.InterfaceToString(jsonpath.FindFirst(cfg.output, "$..properties..const")); ret != cfg.action {
