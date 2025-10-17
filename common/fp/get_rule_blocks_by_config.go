@@ -48,6 +48,9 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 			if probe.Proto == UDP && config.CanScanUDP() {
 				bestBlocks = append(bestBlocks, &RuleBlock{Probe: probe, Matched: matches})
 			}
+		} else if probe.Rarity <= 3 {
+			// 最佳队列默认加入常见的指纹
+			bestBlocks = append(bestBlocks, &RuleBlock{Probe: probe, Matched: matches})
 		} else {
 			// 过滤协议
 			isFitProto := false

@@ -468,8 +468,8 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 	if len(b.Insts) <= 0 {
 		return nil, false
 	}
-	jmpId, err := lo.Last(b.Insts)
-	if jmpId <= 0 || err != nil {
+	jmpId, exists := lo.Last(b.Insts)
+	if jmpId <= 0 || !exists {
 		return nil, false
 	}
 	jmp, ok := b.GetInstructionById(jmpId)
@@ -499,8 +499,8 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 			return nil, false
 		}
 
-		lastId, err := lo.Last(toBlock.Insts)
-		if lastId <= 0 || err != nil {
+		lastId, exists := lo.Last(toBlock.Insts)
+		if lastId <= 0 || !exists {
 			return nil, false
 		}
 		last, ok := b.GetInstructionById(lastId)
