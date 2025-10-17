@@ -193,10 +193,9 @@ func ValidEdgeType(edgeType string) AuditEdgeType {
 		return EdgeType_EffectsOn
 	case string(EdgeType_DataFlow):
 		return EdgeType_DataFlow
-	case string(EdgeType_Predecessor):
+	default:
 		return EdgeType_Predecessor
 	}
-	return ""
 }
 
 type AuditEdge struct {

@@ -5,6 +5,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -424,5 +425,18 @@ public interface UserMapper {
 		for _, queryFile := range queryFiles {
 			require.True(t, filePathMap[queryFile.GetUrl()])
 		}
+		// 导入后的数据流图
+		tmpProg := ssaapi.NewTmpProgram(program)
+		auditNodeIDs, err := ssadb.GetResultNodeByRiskHash(ssadb.GetDB(), importedRisks[0].Hash)
+		require.NoError(t, err)
+		require.Equal(t, len(auditNodeIDs), 1)
+		value := tmpProg.NewValueFromAuditNode(auditNodeIDs[0])
+		require.NotNil(t, value)
+
+		graphStr := value.DotGraph()
+		fmt.Println(graphStr)
+		require.Contains(t, graphStr, "Parameter-user")
+		require.Contains(t, graphStr, "${id}")
+		require.Contains(t, graphStr, "UserMapper")
 	})
 }
