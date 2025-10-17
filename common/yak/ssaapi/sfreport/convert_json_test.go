@@ -435,8 +435,13 @@ public interface UserMapper {
 
 		graphStr := value.DotGraph()
 		fmt.Println(graphStr)
-		require.Contains(t, graphStr, "Parameter-user")
+		require.Contains(t, graphStr, "user")
 		require.Contains(t, graphStr, "${id}")
 		require.Contains(t, graphStr, "UserMapper")
+		// 导入后节点的位置
+		rng := value.GetRange()
+		require.NotNil(t, rng)
+		editor := rng.GetEditor()
+		require.NotEmpty(t, editor)
 	})
 }
