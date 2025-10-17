@@ -4,8 +4,11 @@ import (
 	"path"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/stretchr/testify/require"
@@ -14,8 +17,6 @@ import (
 )
 
 func TestTemplate(t *testing.T) {
-	// TODO
-	t.Skip()
 	t.Run("check template all", func(t *testing.T) {
 		entries, _ := sfweb.TemplateFS.ReadDir("templates")
 		for _, entry := range entries {
@@ -39,7 +40,16 @@ func TestTemplate(t *testing.T) {
 
 				// test cache
 				t.Run(fullName, func(t *testing.T) {
+					startTime := time.Now()
+					log.Infof("[TEMPLATE SCAN START] File: %s, Language: %s, Start: %s",
+						fullName, lang, startTime.Format("15:04:05.000"))
+
 					scanContent(t, lang, string(content))
+
+					endTime := time.Now()
+					duration := endTime.Sub(startTime)
+					log.Infof("[TEMPLATE SCAN END] File: %s, End: %s, Duration: %v",
+						fullName, endTime.Format("15:04:05.000"), duration)
 				})
 			}
 		}
@@ -62,6 +72,11 @@ func TestTemplateDebug(t *testing.T) {
 		// scanContent(t, lang, string(content))
 
 		progName := uuid.NewString()
+
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progName)
+		}()
+
 		_, err = ssaapi.Parse(
 			string(content),
 			ssaapi.WithProgramName(progName),
@@ -80,6 +95,11 @@ func TestTemplateDebug(t *testing.T) {
 		content, err := sfweb.TemplateFS.ReadFile(fullName)
 		require.NoError(t, err)
 		progName := uuid.NewString()
+
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), progName)
+		}()
+
 		_, err = ssaapi.Parse(
 			string(content),
 			ssaapi.WithProgramName(progName),
