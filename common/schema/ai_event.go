@@ -95,8 +95,15 @@ const (
 	EVENT_TYPE_FILESYSTEM_PIN_DIRECTORY EventType = "filesystem_pin_directory" // pin_directory means pin a directory in the filesystem
 	EVENT_TYPE_FILESYSTEM_PIN_FILENAME  EventType = "filesystem_pin_filename"  // pin_filename means pin a filename in the filesystem
 
-	EVENT_TYPE_FOCUS_ON_LOOP   = "focus_on"
-	EVENT_TYPE_LOSE_FOCUS_LOOP = "lose_focus"
+	EVENT_TYPE_FOCUS_ON_LOOP   EventType = "focus_on"
+	EVENT_TYPE_LOSE_FOCUS_LOOP EventType = "lose_focus"
+
+	// AI Memory Operation
+	EVENT_TYPE_MEMORY_SEARCH_QUICKLY  EventType = "memory_search_quickly"  // quickly memory search event, used to emit the quickly memory search information
+	EVENT_TYPE_MEMORY_SEARCH_SPECIFIC EventType = "memory_search_specific" // specific memory search event, used to emit the specific memory search information
+	EVENT_TYPE_MEMORY_BUILD           EventType = "memory_build"           // memory build event, used to emit the memory build information
+	EVENT_TYPE_MEMORY_ADD_CONTEXT     EventType = "memory_change_context"
+	EVENT_TYPE_MEMORY_REMOVED_CONTEXT EventType = "memory_removed_context"
 )
 
 type AiOutputEvent struct {
