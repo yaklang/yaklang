@@ -104,6 +104,7 @@ func CheckWithName(
 	{
 		prog, err := ssaapi.Parse(code, opt...)
 		require.Nil(t, err)
+		_ = prog
 
 		log.Infof("only in memory ")
 		err = handler(prog)

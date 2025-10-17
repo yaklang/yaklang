@@ -21,7 +21,8 @@ func saveTypeWithValue(value Value, typ Type) {
 		return
 	}
 
-	if cache := application.Cache; cache != nil && cache.HaveDatabaseBackend() {
+	if cache := application.Cache; cache != nil {
+		cache.TypeCache.Set(typ)
 		saveType(typ)
 	}
 }
@@ -98,6 +99,7 @@ func type2IrType(typ Type, ir *ssadb.IrType) {
 	if err != nil {
 		log.Errorf("SaveTypeToDB: %v: param: %v", err, param)
 	}
+	ir.TypeId = uint64(typ.GetId())
 	ir.Kind = int(kind)
 	ir.ExtraInformation = utils.UnsafeBytesToString(extra)
 	ir.String = str
@@ -108,7 +110,7 @@ func GetTypeFromDB(cache *ProgramCache, id int64) Type {
 		return nil
 	}
 
-	irType := ssadb.GetIrTypeById(cache.DB, id)
+	irType := ssadb.GetIrTypeById(cache.DB, cache.program.GetProgramName(), id)
 	if utils.IsNil(irType) {
 		log.Errorf("GetTypeFromDB: failed type is nil: id: %v", id)
 		return nil

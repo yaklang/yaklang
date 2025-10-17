@@ -32,7 +32,7 @@ func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
 			}
 			filter[index.ValueID] = struct{}{}
 			// get ir code
-			code := GetIrCodeById(GetDB(), index.ValueID)
+			code := GetIrCodeById(GetDB(), index.ProgramName, index.ValueID)
 			select {
 			case <-ctx.Done():
 				return

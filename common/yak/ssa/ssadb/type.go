@@ -33,18 +33,24 @@ func (ir *IrType) Save(db *gorm.DB) error {
 	return err
 }
 
-func EmptyIrType() *IrType {
-	return &IrType{}
+func EmptyIrType(progName string, id uint64) *IrType {
+	return &IrType{
+		ProgramName: progName,
+		TypeId:      id,
+	}
 }
 
-func GetIrTypeById(db *gorm.DB, id int64) *IrType {
+func GetIrTypeById(db *gorm.DB, progName string, id int64) *IrType {
 	if id == -1 {
 		return nil
 	}
 	// check cache
 	ir := &IrType{}
 	// db = db.Debug()
-	if db := db.Model(&IrType{}).Where("type_id = ?", id).First(ir); db.Error != nil {
+	if db := db.Model(&IrType{}).
+		Where("type_id = ?", id).
+		Where("program_name = ?", progName).
+		First(ir); db.Error != nil {
 		return nil
 	}
 	return ir

@@ -21,7 +21,7 @@ if input.Contains("b") {
 os.System(input)
 
 `
-	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
 		if len(phis) == 0 {
@@ -58,7 +58,7 @@ if input.Contains("b") {
 os.System(input)
 
 `
-	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
 		phi := phis[0]
@@ -73,6 +73,8 @@ os.System(input)
 			if !ok {
 				t.Fatal("not enter block")
 			}
+
+			require.Equal(t, 2, len(next))
 			_, ok = next[0].(*ssa.If)
 			assert.True(t, ok)
 			_, ok = next[1].(*ssa.If)
@@ -98,7 +100,7 @@ if input.Contains("b") {
 os.System(input)
 
 `
-	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		phis := prog.SyntaxFlow("os.System(* as $param,)").GetValues("param")
 		phi := phis[0]
@@ -116,14 +118,11 @@ os.System(input)
 			if !ok {
 				t.Fatal("not enter block")
 			}
+			require.Equal(t, 2, len(next))
 			_, ok = next[0].(*ssa.If)
 			assert.True(t, ok)
 			_, ok = next[1].(*ssa.If)
 			assert.True(t, ok)
-
-			// else statement should contain an if branch?
-			// ignore else...
-			assert.Equal(t, 2, len(next))
 		}
 		return nil
 	})
@@ -136,7 +135,7 @@ func TestPhiInCFG_If_Without_ElseStatement(t *testing.T) {
 		}
 		b = a
 `
-	ssatest.CheckWithName("phi-in-for-case", t, code, func(prog *ssaapi.Program) error {
+	ssatest.Check(t, code, func(prog *ssaapi.Program) error {
 		prog.Show()
 		phis := prog.SyntaxFlow("b as $b").GetValues("b")
 		phi := phis[0]
