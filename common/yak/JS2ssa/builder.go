@@ -57,17 +57,12 @@ type astbuilder struct {
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (*JS.ProgramContext, error) {
-	var cache *ssa.AntlrCache
-	if len(caches) > 0 {
-		cache = caches[0]
-	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := JS.NewJavaScriptParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

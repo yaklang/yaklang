@@ -143,11 +143,10 @@ func createAntlrCache(lexer, parser []int32) *AntlrCache {
 	CreateCacheFromATN := func(serializedATN []int32) (*antlr.ATN, []*antlr.DFA, *antlr.PredictionContextCache) {
 		atn := antlr.NewATNDeserializer(nil).Deserialize(serializedATN)
 		decisionToDFA := make([]*antlr.DFA, len(atn.DecisionToState))
-		for i := range decisionToDFA {
-			decisionToDFA[i] = antlr.NewDFA(atn.DecisionToState[i], i)
+		for i, state := range atn.DecisionToState {
+			decisionToDFA[i] = antlr.NewDFA(state, i)
 		}
 		predictionContextCache := antlr.NewPredictionContextCache()
-		// log.Errorf("Created new ANTLR cache with %d DFAs", len(decisionToDFA))
 		return atn, decisionToDFA, predictionContextCache
 	}
 
@@ -180,16 +179,16 @@ func (b *PreHandlerBase) CreateAntlrCache(lexer []int32, parser []int32) *AntlrC
 	return cache
 }
 
+type LexerOrParser interface {
+	SetInterpreter(*antlr.ATN, []*antlr.DFA, *antlr.PredictionContextCache)
+}
+
 // ParserSetAntlrCache sets up ANTLR cache for the parser to improve performance
 // If builder has existing cache, use it; otherwise create new cache and store in builder if available
-func ParserSetAntlrCache(parser *antlr.BaseParser, lexer *antlr.BaseLexer, cache *AntlrCache) {
+func ParserSetAntlrCache(parser, lexer LexerOrParser, cache *AntlrCache) {
 	if cache.Empty() {
 		return
 	}
-	parser.Interpreter = antlr.NewParserATNSimulator(
-		parser, cache.ParserATN, cache.ParserDfaCache, cache.ParserPredictionContextCache,
-	)
-	lexer.Interpreter = antlr.NewLexerATNSimulator(
-		lexer, cache.LexerATN, cache.LexerDfaCache, cache.LexerPredictionContextCache,
-	)
+	parser.SetInterpreter(cache.ParserATN, cache.ParserDfaCache, cache.ParserPredictionContextCache)
+	lexer.SetInterpreter(cache.LexerATN, cache.LexerDfaCache, cache.LexerPredictionContextCache)
 }
