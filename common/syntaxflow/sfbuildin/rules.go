@@ -118,8 +118,7 @@ func SyntaxFlowRuleHash() (string, error) {
 
 func NeedSyncEmbedRule() bool {
 	diffHash := yakit.Get(consts.EmbedSfBuildInRuleKey) != consts.ExistedSyntaxFlowEmbedFSHash
-	devMode := consts.IsDevMode()
-	return diffHash || devMode
+	return diffHash
 }
 
 func DoneEmbedRule() {
