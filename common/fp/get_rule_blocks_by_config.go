@@ -83,8 +83,10 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 		}
 	}
 
-	// 如果 probe 端口匹配到了，则说明这些是最合适的，如果匹配不到，再去使用剩下的内容
+	// 如果 probe 端口匹配到了，则说明这些是最合适的
+	// 同时也合并一些通用规则，以提高非标准端口服务的识别率
 	if len(bestBlocks) > 0 {
+		// 排序端口特定规则
 		sort.Sort(byName(bestBlocks))
 		sort.Sort(byIndex(bestBlocks))
 		sort.Sort(byRarity(bestBlocks))
@@ -92,11 +94,22 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 		//	return i.Probe.Name
 		//})
 		//panic(strings.Join(result.([]string), "/"))
-		if config.ProbesMax > 0 && config.ProbesMax < len(bestBlocks) {
-			log.Debugf("filter probe only[%v] by config ProbeMax, best total: %v", config.ProbesMax, len(bestBlocks))
-			return emptyBlock, bestBlocks[:config.ProbesMax], true
+
+		if len(blocks) > 0 {
+			sort.Sort(byName(blocks))
+			sort.Sort(byIndex(blocks))
+			sort.Sort(byRarity(blocks))
 		}
-		return emptyBlock, bestBlocks, true
+
+		// 合并规则：bestBlocks 在前，blocks 在后
+		combinedBlocks := append(bestBlocks, blocks...)
+
+		// 应用 ProbesMax 限制
+		if config.ProbesMax > 0 && len(combinedBlocks) > config.ProbesMax {
+			log.Debugf("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(combinedBlocks))
+			return emptyBlock, combinedBlocks[:config.ProbesMax], true
+		}
+		return emptyBlock, combinedBlocks, true
 	}
 
 	// 如果没有过滤出任何 blocks 就直接退出
