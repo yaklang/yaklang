@@ -281,6 +281,9 @@ func GetKeyString(key Value) string {
 		text = ci.String()
 	}
 	if text == "" {
+		if utils.IsNil(key) {
+			println("hit")
+		}
 		text = key.GetVerboseName()
 	}
 

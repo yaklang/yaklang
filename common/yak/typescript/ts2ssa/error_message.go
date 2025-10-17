@@ -1,4 +1,4 @@
-package js2ssa
+package ts2ssa
 
 import (
 	"fmt"
