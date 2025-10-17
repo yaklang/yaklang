@@ -6,6 +6,7 @@ kbName := cli.String("kbName", cli.setVerboseName("实体关系库名"),cli.setD
 query := cli.String("query", cli.setVerboseName("聚焦提示"),cli.setHelp("用于提示需要聚焦的知识目标"))
 entryLength := cli.Int("entrylen", cli.setVerboseName("知识条目长度限制"),cli.setDefault(1000))
 k := cli.Int("k", cli.setVerboseName("实体子图跳数"))
+khoplimit := cli.Int("klimit", cli.setVerboseName("实体子图数量限制"),cli.setDefault(300))
 kmin := cli.Int("kmin",cli.setVerboseName("实体子图最小跳数"),cli.setDefault(2))
 kmax := cli.Int("kmax", cli.setVerboseName("实体子图最大跳数"),cli.setDefault(4))
 pathDepth := cli.Int("depth", cli.setVerboseName("邻接节点深度"))
@@ -22,7 +23,8 @@ options := [
     rag.entryLength(entryLength),
     rag.extraPrompt(query),
     rag.log(yakit.Info),
-    rag.khopkMin(kmin)
+    rag.khopkMin(kmin),
+    rag.khopLimit(khoplimit)
 ]
 
 if kmax > kmin {
