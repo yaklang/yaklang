@@ -28,7 +28,7 @@ import (
 
 type ProcessFunc func(msg string, process float64)
 
-type config struct {
+type Config struct {
 	databaseKind   ssa.ProgramCacheKind
 	programSaveTTL time.Duration
 	// project
@@ -88,8 +88,8 @@ type config struct {
 	concurrency int
 }
 
-func defaultConfig(opts ...Option) (*config, error) {
-	c := &config{
+func DefaultConfig(opts ...Option) (*Config, error) {
+	c := &Config{
 		language:                   "",
 		LanguageBuilder:            nil,
 		originEditor:               memedit.NewMemEditor(""),
@@ -126,7 +126,7 @@ func DefaultExcludeFunc(patterns []string) (Option, error) {
 		}
 		compile = append(compile, g)
 	}
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.excludeFile = func(dir string, path string) bool {
 			for _, g := range compile {
 				if match := g.Match(dir); match {
@@ -142,13 +142,13 @@ func DefaultExcludeFunc(patterns []string) (Option, error) {
 	}, nil
 }
 
-func (c *config) CalcHash() string {
+func (c *Config) CalcHash() string {
 	return utils.CalcSha1(c.originEditor.GetSourceCode(), c.language, c.ignoreSyntaxErr, c.externInfo)
 }
 
-type Option func(*config) error
+type Option func(*Config) error
 
-func (c *config) Processf(process float64, format string, arg ...any) {
+func (c *Config) Processf(process float64, format string, arg ...any) {
 	msg := fmt.Sprintf(format, arg...)
 	if c.process != nil {
 		c.process(msg, process)
@@ -158,14 +158,14 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 }
 
 func WithASTOrder(sequence ssareducer.ASTSequenceType) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.astSequence = sequence
 		return nil
 	}
 }
 
 func WithLogLevel(level string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		log.SetLevel(level)
 		c.logLevel = level
 		return nil
@@ -173,41 +173,41 @@ func WithLogLevel(level string) Option {
 }
 
 func WithCacheTTL(ttl time.Duration) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.cacheTTL = append(c.cacheTTL, ttl)
 		return nil
 	}
 }
 
 func WithExcludeFile(f func(path, filename string) bool) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.excludeFile = f
 		return nil
 	}
 }
 func WithProcess(process ProcessFunc) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.process = process
 		return nil
 	}
 }
 
 func WithReCompile(b bool) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.reCompile = b
 		return nil
 	}
 }
 
 func WithStrictMode(b bool) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.strictMode = b
 		return nil
 	}
 }
 
 func WithLocalFs(path string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		WithConfigInfo(map[string]any{
 			"kind":       "local",
 			"local_file": path,
@@ -217,7 +217,7 @@ func WithLocalFs(path string) Option {
 }
 
 func WithFileSystem(fs fi.FileSystem) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if fs == nil {
 			return utils.Errorf("need set filesystem")
 		}
@@ -227,7 +227,7 @@ func WithFileSystem(fs fi.FileSystem) Option {
 }
 
 func WithConfigInfoRaw(info string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.info = info
 		fs, err := c.parseFSFromInfo(info)
 		if err != nil {
@@ -241,7 +241,7 @@ func WithConfigInfoRaw(info string) Option {
 	}
 }
 func WithConfigInfo(input map[string]any) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if input == nil {
 			return nil
 		}
@@ -258,19 +258,19 @@ func WithConfigInfo(input map[string]any) Option {
 
 func WithRawLanguage(input_language string) Option {
 	if input_language == "" {
-		return func(*config) error { return nil }
+		return func(*Config) error { return nil }
 	}
 	if language, err := consts.ValidateLanguage(input_language); err == nil {
 		return WithLanguage(language)
 	} else {
-		return func(c *config) error {
+		return func(c *Config) error {
 			return err
 		}
 	}
 }
 
 func WithLanguage(language consts.Language) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if language == "" {
 			return nil
 		}
@@ -286,35 +286,35 @@ func WithLanguage(language consts.Language) Option {
 }
 
 func WithFileSystemEntry(files ...string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.entryFile = append(c.entryFile, files...)
 		return nil
 	}
 }
 
 func WithProgramPath(path string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.programPath = path
 		return nil
 	}
 }
 
 func WithIncludePath(path ...string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.includePath = append(c.includePath, path...)
 		return nil
 	}
 }
 
 func WithExternLib(name string, table map[string]any) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.externLib[name] = table
 		return nil
 	}
 }
 
 func WithExternValue(table map[string]any) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		for name, value := range table {
 			c.externValue[name] = value
 		}
@@ -323,14 +323,14 @@ func WithExternValue(table map[string]any) Option {
 }
 
 func WithExternMethod(b ssa.MethodBuilder) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.externMethod = b
 		return nil
 	}
 }
 
 func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder, id string, v any) ssa.Value) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if c.externBuildValueHandler == nil {
 			c.externBuildValueHandler = make(map[string]func(b *ssa.FunctionBuilder, id string, v any) ssa.Value)
 		}
@@ -340,14 +340,14 @@ func WithExternBuildValueHandler(id string, callback func(b *ssa.FunctionBuilder
 }
 
 func WithPeepholeSize(size int) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.peepholeSize = size
 		return nil
 	}
 }
 
 func WithIgnoreSyntaxError(b ...bool) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if len(b) > 0 {
 			c.ignoreSyntaxErr = b[0]
 		} else {
@@ -358,14 +358,14 @@ func WithIgnoreSyntaxError(b ...bool) Option {
 }
 
 func WithExternInfo(info string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.externInfo = info
 		return nil
 	}
 }
 
 func WithDefineFunc(table map[string]any) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		for name, t := range table {
 			c.defineFunc[name] = t
 		}
@@ -374,7 +374,7 @@ func WithDefineFunc(table map[string]any) Option {
 }
 
 func WithFeedCode(b ...bool) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if len(b) > 0 {
 			c.feedCode = b[0]
 		} else {
@@ -385,7 +385,7 @@ func WithFeedCode(b ...bool) Option {
 }
 
 func WithProgramDescription(desc string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.ProgramDescription = desc
 		return nil
 	}
@@ -393,7 +393,7 @@ func WithProgramDescription(desc string) Option {
 
 // save to database, please set the program name
 func WithProgramName(name string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.ProgramName = name
 		c.databaseKind = ssa.ProgramCacheDBWrite
 		return nil
@@ -401,7 +401,7 @@ func WithProgramName(name string) Option {
 }
 
 func WithProjectName(name string) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		project, err := yakit.LoadSSAProjectBuilderByName(name)
 		if err != nil {
 			return err
@@ -427,7 +427,7 @@ func WithProjectName(name string) Option {
 }
 
 func WithMemory(ttl ...time.Duration) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.databaseKind = ssa.ProgramCacheMemory
 		if len(ttl) > 0 {
 			c.programSaveTTL = ttl[0]
@@ -437,21 +437,21 @@ func WithMemory(ttl ...time.Duration) Option {
 }
 
 func WithConcurrency(concurrency int) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.concurrency = concurrency
 		return nil
 	}
 }
 
 func WithDatabaseProgramCacheHitter(h func(i any)) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.DatabaseProgramCacheHitter = h
 		return nil
 	}
 }
 
 func WithEnableCache(b ...bool) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if len(b) > 0 {
 			c.EnableCache = b[0]
 		} else {
@@ -462,7 +462,7 @@ func WithEnableCache(b ...bool) Option {
 }
 
 func WithContext(ctx context.Context) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		c.ctx = ctx
 		return nil
 	}
@@ -498,7 +498,7 @@ func Parse(code string, opts ...Option) (*Program, error) {
 
 // ParseFromReader parse simple file to ssa.Program
 func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
-	config, err := defaultConfig(opts...)
+	config, err := DefaultConfig(opts...)
 	if err != nil {
 		return nil, err
 	}

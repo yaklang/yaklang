@@ -56,18 +56,13 @@ type astbuilder struct {
 	cmap map[string]struct{}
 }
 
-func Frontend(src string, ssabuilder ...*SSABuild) (*JS.ProgramContext, error) {
-	var builder *ssa.PreHandlerBase
-	if len(ssabuilder) > 0 {
-		builder = ssabuilder[0].PreHandlerBase
-	}
+func Frontend(src string, caches ...*ssa.AntlrCache) (*JS.ProgramContext, error) {
 	errListener := antlr4util.NewErrorListener()
 	lexer := JS.NewJavaScriptLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := JS.NewJavaScriptParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

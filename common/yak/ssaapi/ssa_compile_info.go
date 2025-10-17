@@ -19,7 +19,7 @@ import (
 
 type ConfigInfo = schema.CodeSourceInfo
 
-func (c *config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
+func (c *Config) parseFSFromInfo(raw string) (fi.FileSystem, error) {
 	if raw == "" {
 		return nil, utils.Errorf("info is empty ")
 	}

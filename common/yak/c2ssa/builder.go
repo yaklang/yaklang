@@ -111,13 +111,17 @@ func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.C
 }
 
+func (s *SSABuilder) GetAntlrCache() *ssa.AntlrCache {
+	return s.CreateAntlrCache(cparser.GetLexerSerializedATN(), cparser.GetParserSerializedATN())
+}
+
 func (s *SSABuilder) FilterParseAST(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".c" || extension == ".h"
 }
 
-func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
-	return Frontend(src, s)
+func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
+	return Frontend(src, cache)
 }
 
 type astbuilder struct {
@@ -200,11 +204,7 @@ func PreprocessCMacros(src string) (string, error) {
 	return strings.Join(cleanedLines, "\n"), nil
 }
 
-func Frontend(src string, ssabuilder ...*SSABuilder) (*cparser.CompilationUnitContext, error) {
-	var builder *ssa.PreHandlerBase
-	if len(ssabuilder) > 0 {
-		builder = ssabuilder[0].PreHandlerBase
-	}
+func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContext, error) {
 
 	preprocessedSrc := src
 	if preprocessed, err := PreprocessCMacros(src); err == nil {
@@ -219,7 +219,7 @@ func Frontend(src string, ssabuilder ...*SSABuilder) (*cparser.CompilationUnitCo
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := cparser.NewCParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
+	ssa.ParserSetAntlrCache(parser, lexer, cache)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

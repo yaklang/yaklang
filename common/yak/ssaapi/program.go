@@ -23,7 +23,7 @@ type Program struct {
 	Program   *ssa.Program
 	irProgram *ssadb.IrProgram
 	// DBCache *ssa.Cache
-	config         *config
+	config         *Config
 	enableDatabase bool
 	// come from database will affect search operation
 	comeFromDatabase bool
@@ -74,7 +74,7 @@ func (p *Program) Hash() (string, bool) {
 	}
 }
 
-func NewProgram(prog *ssa.Program, config *config) *Program {
+func NewProgram(prog *ssa.Program, config *Config) *Program {
 	p := &Program{
 		Program:           prog,
 		config:            config,
@@ -94,7 +94,7 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 func NewTmpProgram(name string) *Program {
 	p := &Program{
 		Program:           ssa.NewTmpProgram(name),
-		config:            &config{},
+		config:            &Config{},
 		enableDatabase:    false,
 		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
 		id:                atomic.NewInt64(0),

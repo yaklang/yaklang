@@ -36,7 +36,8 @@ func FilesHandler(
 	ctx context.Context,
 	filesystem filesys_interface.FileSystem,
 	paths []string,
-	handler func(path string, content []byte) (ssa.FrontAST, error),
+	handler func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error),
+	initWorker func() *utils.SafeMap[any],
 	orderType ASTSequenceType,
 	concurrency int,
 ) <-chan *FileContent {
@@ -74,16 +75,17 @@ func FilesHandler(
 	)
 	readFilePipe.FeedSlice(paths)
 
-	parseASTPipe := pipeline.NewPipe[*FileContent, *FileContent](
-		ctx, bufSize, func(fileContent *FileContent) (*FileContent, error) {
+	parseASTPipe := pipeline.NewPipeWithStore[*FileContent, *FileContent](
+		ctx, bufSize, func(fileContent *FileContent, store *utils.SafeMap[any]) (*FileContent, error) {
 			if fileContent.Err != nil || !fileContent.Skip {
 				return fileContent, nil
 			}
-			ast, err := handler(fileContent.Path, fileContent.Content)
+			ast, err := handler(fileContent.Path, fileContent.Content, store)
 			fileContent.AST = ast
 			fileContent.Err = err
 			return fileContent, nil
 		},
+		initWorker,
 		concurrency,
 	)
 

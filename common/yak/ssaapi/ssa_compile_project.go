@@ -29,7 +29,7 @@ func PeepholeCompile(fs fi.FileSystem, size int, opts ...Option) (Programs, erro
 }
 
 func ParseProject(opts ...Option) (prog Programs, err error) {
-	config, err := defaultConfig(opts...)
+	config, err := DefaultConfig(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func ParseProject(opts ...Option) (prog Programs, err error) {
 	return
 }
 
-func (c *config) parseProject() (Programs, error) {
+func (c *Config) parseProject() (Programs, error) {
 
 	if c.reCompile {
 		c.Processf(0, "recompile project, delete old data...")
@@ -75,7 +75,7 @@ func (c *config) parseProject() (Programs, error) {
 	}
 }
 
-func (c *config) peephole() (Programs, error) {
+func (c *Config) peephole() (Programs, error) {
 
 	originFs := c.fs
 	if originFs == nil {
