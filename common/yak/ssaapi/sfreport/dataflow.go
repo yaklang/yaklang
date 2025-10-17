@@ -127,11 +127,19 @@ func coverNodeAndEdgeInfos(graph *ssaapi.DotGraph, entryValue *ssaapi.Value) ([]
 		}
 		edgeCache[hash] = struct{}{}
 
+		typ := ssadb.ValidEdgeType(edge.Label)
 		edgeInfo := &EdgeInfo{
-			EdgeID:     fmt.Sprintf("e%d", edgeID),
-			FromNodeID: nodeId(fromNode.ID()),
-			ToNodeID:   nodeId(toNode.ID()),
-			EdgeType:   edge.Label,
+			EdgeID:        fmt.Sprintf("e%d", edgeID),
+			EdgeType:      string(typ),
+			AnalysisLabel: edge.Label,
+		}
+		switch typ {
+		case ssadb.EdgeType_Predecessor:
+			edgeInfo.ToNodeID = nodeId(fromNode.ID())
+			edgeInfo.FromNodeID = nodeId(toNode.ID())
+		default:
+			edgeInfo.ToNodeID = nodeId(toNode.ID())
+			edgeInfo.FromNodeID = nodeId(fromNode.ID())
 		}
 		edges = append(edges, edgeInfo)
 	}
@@ -162,9 +170,10 @@ func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
 
 func (e *EdgeInfo) ToAuditEdge(m map[string]uint) *ssadb.AuditEdge {
 	return &ssadb.AuditEdge{
-		FromNode: m[e.FromNodeID],
-		ToNode:   m[e.ToNodeID],
-		EdgeType: ssadb.ValidEdgeType(e.EdgeType),
+		FromNode:      m[e.FromNodeID],
+		ToNode:        m[e.ToNodeID],
+		EdgeType:      ssadb.ValidEdgeType(e.EdgeType),
+		AnalysisLabel: e.AnalysisLabel,
 	}
 }
 
