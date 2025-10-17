@@ -353,6 +353,27 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 
 	taskStartProcessing()
 	r.GetInvoker().AddToTimeline("current task user input", fmt.Sprintf("%v", task.GetUserInput()))
+
+	if !utils.IsNil(r.memoryTriage) && r.GetCurrentMemoriesContent() == "" {
+		log.Info("start to handle searching memory for ReActLoop without AI")
+		searchResult, err := r.memoryTriage.SearchMemoryWithoutAI(task.GetUserInput(), 5*1024)
+		if err != nil {
+			log.Warnf("search memory (without AI) failed: %v", err)
+		}
+		r.PushMemory(searchResult)
+	}
+
+	go func() {
+		if !utils.IsNil(r.memoryTriage) {
+			log.Info("start to handle searching memory for ReActLoop with AI")
+			result, err := r.memoryTriage.SearchMemory(task.GetUserInput(), 5*1024)
+			if err != nil {
+				log.Warnf("search memory failed: %v", err)
+			}
+			r.PushMemory(result)
+		}
+	}()
+
 LOOP:
 	for {
 		iterationCount++
@@ -366,6 +387,7 @@ LOOP:
 		prompt, finalError = r.generateLoopPrompt(
 			nonce,
 			task.GetUserInput(),
+			r.GetCurrentMemoriesContent(),
 			operator,
 		)
 		if finalError != nil {

@@ -15,6 +15,12 @@
 {{ .ReactiveData }}
 <|REFLECTION_END_{{ .Nonce }}|>{{ end }}
 
+{{ if .InjectedMemory }}<|INJECTED_MEMORY_{{ .Nonce }}|>
+# Memory Context
+These are the memories automatically retrieved by the system that are most relevant to the current input.
+{{ .InjectedMemory }}
+<|INJECTED_MEMORY_END_{{ .Nonce }}|>{{ end }}
+
 {{/*----------------------------------------------------------------------------------------------------------------*/}}
 响应格式输出JSON和<|TAG...{{.Nonce}}|>，请遵守如下Schema ：
 
