@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
@@ -31,6 +32,7 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 		}
 	}()
 
+	var mu sync.Mutex
 	sendExecResult := func(taskId, status string, execResult *ypb.ExecResult) error {
 		execResult.RuntimeID = taskId
 		ret := &ypb.SyntaxFlowScanResponse{
@@ -38,7 +40,8 @@ func (s *Server) SyntaxFlowScan(stream ypb.Yak_SyntaxFlowScanServer) error {
 			Status:     status,
 			ExecResult: execResult,
 		}
-
+		mu.Lock()
+		defer mu.Unlock()
 		return stream.Send(ret)
 	}
 
