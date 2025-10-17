@@ -164,7 +164,10 @@ _GET.* as $params
 _REQUEST.* as $params
 _COOKIE.* as $params
 	`, map[string][]string{
-		"params": {"Undefined-$password(valid)", "Undefined-$user2(valid)", "Undefined-$username(valid)"},
+		"params": {
+			"Undefined-$password(valid)", "Undefined-$user2(valid)",
+			"Undefined-$username(valid)",
+		},
 	}, false, ssaapi.WithLanguage(ssaapi.PHP))
 }
 

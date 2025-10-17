@@ -45,7 +45,7 @@ type Cache[T asyncdb.MemoryItem] struct {
 func NewCache[T asyncdb.MemoryItem]() *Cache[T] {
 	return &Cache[T]{
 		SafeMapWithKey: utils.NewSafeMapWithKey[int64, T](),
-		id:             atomic.NewInt64(0),
+		id:             atomic.NewInt64(1),
 	}
 }
 
@@ -108,7 +108,7 @@ func createTypeCache(
 	saveSize = min(max(saveSize, defaultSaveSize), maxSaveSize)
 	ret := NewCache[Type]()
 	ret.SetPersistence(NewSerializingPersistenceStrategy[Type, *ssadb.IrType](ctx,
-		marshalIrType, saveIrType(db),
+		marshalIrType(programName), saveIrType(db),
 		asyncdb.WithSaveSize(saveSize),
 		asyncdb.WithSaveTimeout(saveTime),
 		asyncdb.WithEnableSave(true), // always enable save for type cache
@@ -139,15 +139,17 @@ func saveIrCode(db *gorm.DB, f func(int)) func(t []*ssadb.IrCode) {
 }
 
 func marshalIrCode(s Instruction) (*ssadb.IrCode, error) {
-	ret := ssadb.EmptyIrCode()
+	ret := ssadb.EmptyIrCode(s.GetProgramName(), s.GetId())
 	marshalInstruction(s, ret)
 	return ret, nil
 }
-func marshalIrType(s Type) (*ssadb.IrType, error) {
-	// log.Infof("SAVE: marshal type: %v", d.ID)
-	ret := ssadb.EmptyIrType()
-	marshalType(s, ret)
-	return ret, nil
+
+func marshalIrType(name string) func(s Type) (*ssadb.IrType, error) {
+	return func(s Type) (*ssadb.IrType, error) {
+		ret := ssadb.EmptyIrType(name, uint64(s.GetId()))
+		marshalType(s, ret)
+		return ret, nil
+	}
 }
 
 func saveIrType(db *gorm.DB) func(t []*ssadb.IrType) {

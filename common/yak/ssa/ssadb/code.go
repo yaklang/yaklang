@@ -102,17 +102,25 @@ type IrCode struct {
 	ConstType string `json:"const_type" gorm:"index"`
 }
 
-func EmptyIrCode() *IrCode {
-	return &IrCode{}
+func EmptyIrCode(progName string, id int64) *IrCode {
+	return &IrCode{
+		ProgramName: progName,
+		CodeID:      id,
+	}
 }
 
-func GetIrCodeById(db *gorm.DB, id int64) *IrCode {
+func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 	if id == -1 {
 		return nil
 	}
 	// check cache
-	ir := db.Model(&IrCode{}).Where("code_id = ?", id).First(&IrCode{}).Value.(*IrCode)
-	// save to cache
+	ir := &IrCode{}
+	if db := db.Model(&IrCode{}).
+		Where("code_id = ?", id).
+		Where("program_name = ?", progName).
+		First(ir); db.Error != nil {
+		return nil
+	}
 	return ir
 }
 
