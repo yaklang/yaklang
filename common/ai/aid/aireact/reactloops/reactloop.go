@@ -61,7 +61,9 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 
 	// memory management
-	memoryTriage aimem.MemoryTriage
+	memorySizeLimit int
+	currentMemories *omap.OrderedMap[string, *aimem.MemoryEntity]
+	memoryTriage    aimem.MemoryTriage
 
 	// task status control
 	onTaskCreated       func(task aicommon.AIStatefulTask)
@@ -159,17 +161,19 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
-		invoker:       invoker,
-		loopName:      name,
-		config:        config,
-		emitter:       config.GetEmitter(),
-		maxIterations: 100,
-		actions:       omap.NewEmptyOrderedMap[string, *LoopAction](),
-		loopActions:   omap.NewEmptyOrderedMap[string, LoopActionFactory](),
-		streamFields:  omap.NewEmptyOrderedMap[string, *LoopStreamField](),
-		aiTagFields:   omap.NewEmptyOrderedMap[string, *LoopAITagField](),
-		vars:          omap.NewEmptyOrderedMap[string, any](),
-		taskMutex:     new(sync.Mutex),
+		invoker:         invoker,
+		loopName:        name,
+		config:          config,
+		emitter:         config.GetEmitter(),
+		maxIterations:   100,
+		actions:         omap.NewEmptyOrderedMap[string, *LoopAction](),
+		loopActions:     omap.NewEmptyOrderedMap[string, LoopActionFactory](),
+		streamFields:    omap.NewEmptyOrderedMap[string, *LoopStreamField](),
+		aiTagFields:     omap.NewEmptyOrderedMap[string, *LoopAITagField](),
+		vars:            omap.NewEmptyOrderedMap[string, any](),
+		taskMutex:       new(sync.Mutex),
+		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		memorySizeLimit: 5 * 1024,
 	}
 
 	for _, action := range []*LoopAction{

@@ -33,6 +33,7 @@ func (r *ReActLoop) generateSchemaString(disallowExit bool) (string, error) {
 func (r *ReActLoop) generateLoopPrompt(
 	nonce string,
 	userInput string,
+	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
 	background, infos, err := r.getRenderInfo()
@@ -75,6 +76,7 @@ func (r *ReActLoop) generateLoopPrompt(
 		}
 	}
 
+	infos["InjectedMemory"] = memory
 	infos["ReactiveData"] = reactiveData
 	infos["Background"] = background
 	infos["PersistentContext"] = persistent
