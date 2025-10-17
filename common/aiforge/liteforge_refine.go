@@ -124,6 +124,20 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 		var vectorIndexDuration int64 = 0
 		var knowledgeEntryDuration int64 = 0
 		var saveDuration int64 = 0
+		throttleTotal := utils.NewThrottle(1)
+		feedbackKnowledgeHopTotal := func() {
+			throttleTotal(func() {
+				refineConfig.AnalyzeStatusCard("多跳知识构建(Multi-Hops Knowledge)", atomic.LoadInt64(&total))
+			})
+
+		}
+
+		throttleDone := utils.NewThrottle(1)
+		feedbackKnowledgeDoneAll := func() {
+			throttleDone(func() {
+				refineConfig.AnalyzeStatusCard("[multi-hops]: knowledge", fmt.Sprintf("%v/%v", atomic.LoadInt64(&done), atomic.LoadInt64(&total)))
+			})
+		}
 
 		for hop := range er.YieldKHop(refineConfig.Ctx, refineConfig.KHopOption()...) {
 			currentTotal := atomic.AddInt64(&total, 1)
@@ -168,7 +182,7 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 				lastLogTime = time.Now()
 			}
 
-			refineConfig.AnalyzeStatusCard("多跳知识构建(Multi-Hops Knowledge)", currentTotal)
+			feedbackKnowledgeHopTotal()
 			hopAnalyzeWg.Add(1)
 			if refineConfig.Ctx != nil && refineConfig.Ctx.Err() != nil {
 				break
@@ -225,9 +239,8 @@ func BuildKnowledgeFromEntityRepository(er *entityrepos.EntityRepository, kb *kn
 					output.SafeFeed(entry)
 				}
 
-				count := atomic.AddInt64(&done, 1)
-				refineConfig.AnalyzeStatusCard("[multi-hops]: knowledge", fmt.Sprintf("%v/%v", count, currentTotal))
-
+				atomic.AddInt64(&done, 1)
+				feedbackKnowledgeDoneAll()
 				// 保存知识条目
 				saveStart := time.Now()
 				err = SaveKnowledgeEntries(kb, entries, currentHop.GetRelatedEntityUUIDs(), option...)
