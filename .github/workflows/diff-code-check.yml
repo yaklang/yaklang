@@ -77,9 +77,11 @@ jobs:
             PR_HEAD_SHA=$(echo "$PR_RESPONSE" | jq -r '.head.sha // "unknown"')
           
           if [ "$HEAD_REPO" != "$BASE_REPO" ] && [ "$HEAD_REPO" != "unknown" ] && [ "$BASE_REPO" != "unknown" ]; then
-            echo "::error::🚫 SECURITY BLOCK: Fork PR detected (Base: $BASE_REPO, Head: $HEAD_REPO)"
-            echo "::error::This workflow only runs for PRs from the same repository."
-            exit 1
+            echo "is_fork_pr=true" >> $GITHUB_OUTPUT
+            echo "::notice::🔍 Fork PR detected (Base: $BASE_REPO, Head: $HEAD_REPO)"
+            echo "::notice::Running in read-only mode - scan will run but no comments will be posted"
+          else
+            echo "is_fork_pr=false" >> $GITHUB_OUTPUT
           fi
           
             if [ "$PR_STATE" != "open" ]; then
@@ -297,7 +299,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Clean up old security comments (No vulnerabilities found)
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'success' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0' && steps.validate.outputs.is_fork_pr != 'true'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -347,7 +349,7 @@ jobs:
             }
 
       - name: Comment PR with security findings
-        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0'
+        if: steps.validate.outputs.should_skip != 'true' && steps.scan.outputs.scan_result == 'failure' && steps.test_token.outputs.has_permissions == 'true' && env.PR_NUMBER != '' && env.PR_NUMBER != '0' && steps.validate.outputs.is_fork_pr != 'true'
         uses: actions/github-script@v6
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
