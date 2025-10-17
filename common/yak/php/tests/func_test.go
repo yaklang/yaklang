@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -570,4 +571,52 @@ CODE
 `, map[string][]string{
 		"sink": {"Undefined-request"},
 	}, true, ssaapi.WithLanguage(ssaapi.PHP))
+}
+
+func TestA(t *testing.T) {
+	codes := []string{`<?php
+
+namespace app\admin\service;
+
+
+use app\admin\model\Menu;
+use app\common\service\BaseService;
+use think\Db;
+class GenerateService extends BaseService
+{
+	public function getColumnList($tableName)
+    {
+        $columnList = Db::query("SELECT COLUMN_NAME,COLUMN_DEFAULT,DATA_TYPE,COLUMN_TYPE,COLUMN_COMMENT FROM information_schema.COLUMNS where TABLE_SCHEMA = '" . env('database.database') . "' AND TABLE_NAME = '{$tableName}'");
+}
+
+}
+`,
+		`<?php
+
+
+namespace app\admin\controller;
+
+
+use app\admin\service\GenerateService;
+use app\common\controller\Backend;
+
+class Generate extends Backend
+{
+    public function generate()
+    {
+            $param = request()->param();
+			$this->service = new GenerateService();
+            return $this->service->getColumnList($param);
+    }
+}
+`}
+	builder := php2ssa.CreateBuilder()
+	cache := builder.GetAntlrCache()
+	_ = cache
+	for _, code := range codes {
+		ast, err := builder.ParseAST(code, cache)
+		require.NoError(t, err)
+		_ = ast
+	}
+
 }

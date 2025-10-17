@@ -103,7 +103,7 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUni
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
+	ssa.ParserSetAntlrCache(parser, lexer, cache)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())

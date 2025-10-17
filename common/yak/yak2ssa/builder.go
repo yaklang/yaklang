@@ -81,7 +81,7 @@ func FrontEnd(src string, cache *ssa.AntlrCache) (yak.IProgramContext, error) {
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := yak.NewYaklangParser(tokenStream)
 	if cache.Empty() {
-		ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
+		ssa.ParserSetAntlrCache(parser, lexer, cache)
 	}
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)

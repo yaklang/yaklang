@@ -219,7 +219,7 @@ func Frontend(src string, cache *ssa.AntlrCache) (*cparser.CompilationUnitContex
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := cparser.NewCParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
+	ssa.ParserSetAntlrCache(parser, lexer, cache)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
