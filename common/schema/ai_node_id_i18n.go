@@ -1,6 +1,8 @@
 package schema
 
 import (
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -399,6 +401,19 @@ func NodeIdToI18n(nodeId string, isStream bool) *I18n {
 		return val
 	}
 	if isStream {
+		if strings.HasPrefix(nodeId, "tool-") {
+			if strings.HasSuffix(nodeId, "-stdout") {
+				return &I18n{
+					Zh: "工具标准输出流",
+					En: "Tool Standard Output",
+				}
+			} else if strings.HasSuffix(nodeId, "-stderr") {
+				return &I18n{
+					Zh: "工具标准错误流",
+					En: "Tool Standard Error",
+				}
+			}
+		}
 		log.Warn("================================================")
 		log.Warnf("[i18n] nodeId cannot be found in nodeIdMapper: %s", nodeId)
 		log.Warn("================================================")

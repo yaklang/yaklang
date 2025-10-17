@@ -85,6 +85,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 		reactloops.WithOnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(nil)
 		}),
+		reactloops.WithMemoryTriage(r.memoryTriage),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 			r.wg.Add(1)
 			diffStr, err := r.timelineDiffer.Diff()
@@ -127,7 +128,7 @@ func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 					reason)
 
 				// 使用HandleMemory进行智能记忆处理（包含去重、评分、保存）
-				r.memoryTriage.HandleMemory(contextualInput)
+				err := r.memoryTriage.HandleMemory(contextualInput)
 				if err != nil {
 					log.Warnf("intelligent memory processing failed: %v", err)
 					return
