@@ -83,19 +83,47 @@ func scanContent(t *testing.T, lang, content string) {
 		Content:        content,
 		Lang:           lang,
 		ControlMessage: `start`,
-		TimeoutSecond:  30, // 将超时从默认的180秒减少到30秒
+		TimeoutSecond:  40,
 	})
+
+	/*
+		--- PASS: TestTemplate/check_template_all (89.50s)
+		--- PASS: TestTemplate/check_template_all/templates/golang/cwe-79-xss-unsafe (0.92s)
+		--- PASS: TestTemplate/check_template_all/templates/golang/cwe-89-sql-injection-gin-unsafe (1.38s)
+		--- PASS: TestTemplate/check_template_all/templates/golang/cwe-89-sql-injection-net-unsafe (1.66s)
+		--- PASS: TestTemplate/check_template_all/templates/golang/cwe-90-ldqp-injection-unsafe (1.52s)
+		--- PASS: TestTemplate/check_template_all/templates/golang/cwe-918-ssrf-unsafe (1.57s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-1336-ssti.java (6.24s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-22-path-travel.java (25.55s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-434-unrestricted-upload-file-1.java (2.95s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-434-unrestricted-upload-file-2.java (8.85s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-502-untrusted-unserialization.java (2.13s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-611-xxe.java (2.28s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-77-command-injection-1.java (4.12s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-77-command-injection-2.java (3.22s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-79-xss.java (2.84s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-89-sql-injection-unsafe-query-statement-concat.java (6.40s)
+		--- PASS: TestTemplate/check_template_all/templates/java/cwe-918-ssrf.java (2.47s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-502-unserialize.php (3.80s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-611-xxe.php (1.02s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-73-unfiltered-file-or-path.php (2.22s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-77-common-injection.php (1.55s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-78-os-command-injection.php (1.72s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-79-xss.php (2.06s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-89-sql-injection.php (1.87s)
+		--- PASS: TestTemplate/check_template_all/templates/php/cwe-90-ldap-injection.php (1.13s)
+	*/
 	require.NoError(t, err)
 
 	wc.Start()
 	wc.Wait()
-	
+
 	if len(risks) > 0 {
 		t.Cleanup(func() {
 			ssadb.DeleteProgram(ssadb.GetDB(), risks[0].ProgramName)
 		})
 	}
-	
+
 	require.Equal(t, 1.0, progress)
 	require.GreaterOrEqual(t, len(risks), 1)
 	require.GreaterOrEqual(t, risks[0].Timestamp, now.Unix(), "timestamp should be >= time that scan started")
