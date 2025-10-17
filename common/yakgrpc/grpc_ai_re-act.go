@@ -2,6 +2,7 @@ package yakgrpc
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"sync"
 	"time"
 
@@ -55,7 +56,7 @@ func (s *Server) StartAIReAct(stream ypb.Yak_StartAIReActServer) error {
 		}
 	}
 
-	persistentSession := "default"
+	persistentSession := uuid.NewString() // default to random session id
 
 	var reActOptions = []aireact.Option{
 		aireact.WithEventHandler(func(e *schema.AiOutputEvent) {

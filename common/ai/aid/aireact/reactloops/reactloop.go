@@ -326,7 +326,7 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 		}
 		return ac, nil
 	}
-	return nil, utils.Errorf("action handler[%s] not found in loop or actions", r.loopName)
+	return nil, utils.Errorf("loop handler[%s] action[%s] not found in loop or actions", r.loopName, actionName)
 }
 
 func (r *ReActLoop) GetAllActionNames() []string {
