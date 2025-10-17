@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 )
 
@@ -14,8 +16,8 @@ type AuditNodeStatus struct {
 	ResultId       uint   `json:"result_id" gorm:"index"`
 	ResultVariable string `json:"result_variable" gorm:"index"` // syntaxflow result variable name
 	ResultIndex    uint   `json:"result_index" gorm:"index"`
-	ResultAlertMsg string `json:"result_alert_msg"`
-	RiskHash       string `json:"risk_hash"`
+	// ResultAlertMsg string `json:"result_alert_msg"`
+	RiskHash string `json:"risk_hash"`
 	// rule  info
 	RuleName  string `json:"rule_name" gorm:"index"`
 	RuleTitle string `json:"rule_title"`
@@ -124,6 +126,15 @@ func GetDependEdgeOnByFromNodeId(id uint) []uint {
 	return dependOns
 }
 
+func GetDataFlowEdgeByToNodeId(fromId uint) []uint {
+	db := GetDB()
+	var edges []uint
+	db.Model(&AuditEdge{}).
+		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_DataFlow).
+		Pluck("to_node", &edges)
+	return edges
+}
+
 func GetPredecessorEdgeByFromID(fromId uint) []*AuditEdge {
 	db := GetDB()
 	var edges []*AuditEdge
@@ -143,11 +154,22 @@ func GetAuditNodeById(id uint) (*AuditNode, error) {
 	}
 }
 
+func GetAuditNodesByIds(ids []uint) ([]*AuditNode, error) {
+	db := GetDB()
+	var ans []*AuditNode
+	if err := db.Model(&AuditNode{}).Where("id IN (?)", ids).Find(&ans).Error; err != nil {
+		return nil, err
+	} else {
+		return ans, nil
+	}
+}
+
 type AuditEdgeType string
 
 const (
 	EdgeType_DependsOn AuditEdgeType = "depends_on"
 	EdgeType_EffectsOn AuditEdgeType = "effects_on"
+	EdgeType_DataFlow  AuditEdgeType = "prev_dataflow"
 
 	// EdgeType_Predecessor 记录审计过程
 	EdgeType_Predecessor AuditEdgeType = "predecessor"
@@ -166,7 +188,7 @@ type AuditEdge struct {
 	ToNode   uint `json:"to_node" gorm:"index"`
 
 	// program
-	ProgramName string `json:"program_name"`
+	ProgramName string `json:"program_name" gorm:"index"`
 
 	// type
 	EdgeType AuditEdgeType `json:"edge_type" gorm:"index"`
@@ -200,6 +222,18 @@ func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
 	return ae
 }
 
+func (n *AuditNode) CreateDataFlowEdge(progName string, to uint) *AuditEdge {
+	ae := &AuditEdge{
+		ProgramName: progName,
+		FromNode:    to,
+		ToNode:      n.ID,
+		EdgeType:    EdgeType_DataFlow,
+		TaskId:      n.TaskId,
+		ResultId:    n.ResultId,
+	}
+	return ae
+}
+
 func (n *AuditNode) CreatePredecessorEdge(progName string, to uint, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName:   progName,
@@ -227,4 +261,24 @@ func YieldAuditNodeByRuleName(DB *gorm.DB, ruleName string) chan *AuditNode {
 func yieldAuditNode(DB *gorm.DB, ctx context.Context) chan *AuditNode {
 	db := DB.Model(&AuditNode{}).Where("is_entry_node = true")
 	return bizhelper.YieldModel[*AuditNode](ctx, db)
+}
+
+func DeleteAuditNode(DB *gorm.DB, nodes ...*AuditNode) error {
+	if len(nodes) == 0 {
+		return utils.Errorf("delete type from database id is empty")
+	}
+	id := lo.Map(nodes, func(item *AuditNode, _ int) uint {
+		return item.ID
+	})
+	return utils.GormTransaction(DB, func(tx *gorm.DB) error {
+		// split each 999
+		for i := 0; i < len(id); i += 999 {
+			end := i + 999
+			if end > len(id) {
+				end = len(id)
+			}
+			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&IrCode{})
+		}
+		return nil
+	})
 }

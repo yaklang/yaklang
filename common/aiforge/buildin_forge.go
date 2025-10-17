@@ -112,11 +112,20 @@ func init() {
 		registerBuildInForge("pimatrix")
 		registerBuildInForge("netscan")
 		registerBuildInForge("recon")
-		registerBuildInForge("forge_triage")
 		registerBuildInForge("biography")
 		registerBuildInForge("intent_recognition")
+		registerBuildInForge("entity_identify")
+		registerBuildInForge("log_event_formatter")
+		registerBuildInForge("event_analyzer")
+		registerBuildInForge("web_log_monitor")
+		registerBuildInForge("vulscan")
+		registerBuildInForge("hostscan")
+		registerBuildInForge("ssapoc")
+		registerBuildInForge("flow_report")
+		registerBuildInForge("ssa_vulnerability_analyzer")
+		//registerBuildInForge("mock_forge")
 		return nil
-	})
+	}, "sync-buildin-ai-forge")
 }
 
 func BuildInForgeHash() (string, error) {
@@ -153,11 +162,13 @@ func buildAIForgeFromYakCode(forgeName string, codeBytes []byte) (*schema.AIForg
 	}
 
 	return &schema.AIForge{
-		ForgeName:      scriptMetadata.Name,
-		Description:    scriptMetadata.Description,
-		Tags:           strings.Join(scriptMetadata.Keywords, ","),
-		ForgeContent:   string(codeBytes),
-		ParamsUIConfig: uiParamsConfig,
+		ForgeName:        scriptMetadata.Name,
+		ForgeVerboseName: scriptMetadata.VerboseName,
+		Description:      scriptMetadata.Description,
+		Tags:             strings.Join(scriptMetadata.Keywords, ","),
+		ForgeContent:     string(codeBytes),
+		ParamsUIConfig:   uiParamsConfig,
+		ForgeType:        schema.FORGE_TYPE_YAK,
 	}, nil
 }
 
@@ -173,7 +184,9 @@ func getBuildInForgeConfig(name string) (string, *schema.AIForge, error) {
 }
 
 func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte, loadDefaultPrompt func(string) string) (string, *schema.AIForge, error) {
-	forge := &schema.AIForge{}
+	forge := &schema.AIForge{
+		ForgeType: schema.FORGE_TYPE_Config,
+	}
 	if len(configBytes) <= 0 {
 		// If config file doesn't exist, try to read prompt files directly
 		initPrompt := loadDefaultPrompt("init")
@@ -214,6 +227,7 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 			cfg.ForgeContent = string(codeContent)
 		}
 		forge.ForgeName = cfg.Name
+		forge.ForgeVerboseName = cfg.VerboseName
 		forge.ToolKeywords = cfg.ToolKeywords
 		forge.Tools = cfg.Tools
 		forge.Description = cfg.Description
@@ -224,6 +238,7 @@ func buildAIForgeFromConfig(name string, configBytes []byte, codeContent []byte,
 		forge.Actions = cfg.Actions
 		forge.ForgeContent = cfg.ForgeContent
 		forge.Tags = cfg.Tags
+		forge.Params = cfg.CLIParameterRuleYaklangCode
 	}
 	return string(configBytes), forge, nil
 }

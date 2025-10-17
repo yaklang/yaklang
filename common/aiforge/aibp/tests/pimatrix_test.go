@@ -18,7 +18,7 @@ var allForgeTestData embed.FS
 
 func DebugExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	yakit.CallPostInitDatabase()
-	var aiCallback aid.AICallbackType
+	var aiCallback aicommon.AICallbackType
 	data, err := allForgeTestData.ReadFile(fmt.Sprintf("testsdata/%s.json", forgeName))
 	if err != nil {
 		return nil, err

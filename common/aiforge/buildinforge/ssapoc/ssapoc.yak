@@ -1,0 +1,25 @@
+risk_id = cli.Int("risk_id", cli.setVerboseName("RiskID"), cli.setRequired(true))
+additional_context = cli.String("additional_context", cli.setVerboseName("附加提示词"))
+save_path = cli.String("save_path", cli.setVerboseName("保存文件夹"), cli.setRequired(true))
+target_base_url = cli.String("target_base_url", cli.setHelp("目标BASE URL（用于POC示例）"), cli.setDefault("http://target.example.com"))
+strict_mode = cli.Bool("strict_mode", cli.setHelp("严格模式，更保守的可行性评估"), cli.setDefault(false))
+cli.check()
+
+
+forgeHandle = func(params, opts...) {
+    yakit.StatusCard("执行进度", "正在分析生成md报告")
+    # 首先通过默认forge处理获取AI生成的结果
+    res, err = __DEFAULT_FORGE_HANDLE__(params, opts...)
+    if err != nil {
+        return nil
+    }
+    yakit.StatusCard("执行进度", "生成md报告成功")
+    dump(res)
+    result = res.Action.GetString("result")
+    unquoteRes,_ = str.Unquote(string(result))
+    fileName = "ssa-report-%s.md" % str.RandStr(8)
+    savePath = file.Join(save_path,fileName)
+    file.Save(savePath, unquoteRes != "" ? unquoteRes : str.ReplaceAll(result, `\n`, "\n"))
+    yakit.StatusCard("md报告保存路径", savePath)
+    return unquoteRes
+}

@@ -22,7 +22,6 @@ func (p *Proxy) doHTTPRequest(ctx *Context, req *http.Request) (*http.Response, 
 		return proxyutil.NewResponse(200, nil, req), nil
 	}
 
-	httpctx.SetRequestHTTPS(req, ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps))
 	inherit := func(i string) {
 		// 从session中继承， session > httpctx
 		// 可能存在session中没有，httpctx中有的情况

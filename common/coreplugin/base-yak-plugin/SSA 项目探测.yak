@@ -9,6 +9,24 @@ languages = cli.StringSlice(
     cli.setSelectOption("Yaklang", "yak"),
     cli.setSelectOption("JavaScript", "js"),
     cli.setSelectOption("Golang", "go"),
+    cli.setSelectOption("C", "c"),
+)
+
+// significant参数组为重要的参数，在前端会显示在最前面
+memory := cli.Bool("memory",
+    cli.setDefault(false),
+    cli.setVerboseName("内存编译"),
+    cli.setHelp("内存编译将会把编译中间产物存储在内存而非数据库以提升编译速度，默认缓存到内存10分钟。内存编译会占用更多的内存，但是编译速度更快。"),
+    cli.setRequired(true),
+    cli.setCliGroup("significant"),
+)
+
+
+concurrency := cli.Int("concurrency",
+    cli.setVerboseName("并发数"),
+    cli.setCliGroup("compile"),
+    cli.setDefault(10),
+    cli.setHelp("编译时，同时进行编译的文件数量"),
 )
 
 proxy = cli.String("proxy", cli.setHelp("remote url proxy"))
@@ -26,7 +44,7 @@ peepholeSizes := cli.StringSlice(
 
 programName := cli.String("programName", cli.setVerboseName("项目名"), cli.setCliGroup("information"))
 description := cli.Text("description", cli.setVerboseName("项目描述"), cli.setCliGroup("information"))
-excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include**,**caches**,**cache**,**tmp**,**alipay**,**includes**,**temp**,**zh_cn**,**zh_en**,**plugins**,**PHPExcel**"))
+excludeFile := cli.String("excludeFile", cli.setVerboseName("排除文件/文件夹"),cli.setCliGroup("compile"),cli.setDefault("**/vendor/**,vendor/**,**/classes/**,**/target/**,**include/**,**caches/**,**cache/**,**tmp/**,**alipay/**,**includes/**,**temp/**,**zh_cn/**,**zh_en/**,**plugins/**,**PHPExcel/**"))
 
 // {{ compile option
 entry := cli.FileNames("entry", cli.setVerboseName("项目入口文件"), cli.setCliGroup("compile"))
@@ -353,9 +371,9 @@ language = sprint(params.language)
 opts = [
     ssa.withProgramName(programName),
     ssa.withProcess((msg, process) => {
-    yakit.SetProgressEx("complile", process)
-    yakit.Info("%s: %f", msg, process)
-  }),
+        yakit.SetProgressEx("complile", process)
+        yakit.Info("%s: %f", msg, process)
+    }),
     ssa.withLanguage(language),
     ssa.withReCompile(reCompile),
     ssa.withStrictMode(strictMode),
@@ -363,7 +381,12 @@ opts = [
     ssa.withContext(context.Background()),
     ssa.withConfigInfo(params.info),
     ssa.withPeepholeSize(peepholeSize),
-    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~]
+    ssa.withDefaultExcludeFunc(str.Split(excludeFile, ","))~,
+    ssa.withConcurrency(concurrency),
+]
+if memory{
+    opts = append(opts, ssa.withMemory())
+}
 if len(entry) != 0 {
     opts = append(opts, ssa.withEntryFile(entry...))
 }

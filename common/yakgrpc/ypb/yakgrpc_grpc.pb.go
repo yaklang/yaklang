@@ -29,6 +29,7 @@ const (
 	Yak_GetMITMFilter_FullMethodName                              = "/ypb.Yak/GetMITMFilter"
 	Yak_ResetMITMFilter_FullMethodName                            = "/ypb.Yak/ResetMITMFilter"
 	Yak_DownloadMITMCert_FullMethodName                           = "/ypb.Yak/DownloadMITMCert"
+	Yak_DownloadMITMGMCert_FullMethodName                         = "/ypb.Yak/DownloadMITMGMCert"
 	Yak_MITMV2_FullMethodName                                     = "/ypb.Yak/MITMV2"
 	Yak_OpenPort_FullMethodName                                   = "/ypb.Yak/OpenPort"
 	Yak_Exec_FullMethodName                                       = "/ypb.Yak/Exec"
@@ -93,6 +94,7 @@ const (
 	Yak_ExportHTTPFlows_FullMethodName                            = "/ypb.Yak/ExportHTTPFlows"
 	Yak_HTTPFlowsToOnline_FullMethodName                          = "/ypb.Yak/HTTPFlowsToOnline"
 	Yak_QueryHTTPFlowsProcessNames_FullMethodName                 = "/ypb.Yak/QueryHTTPFlowsProcessNames"
+	Yak_HTTPFlowsToOnlineBatch_FullMethodName                     = "/ypb.Yak/HTTPFlowsToOnlineBatch"
 	Yak_AnalyzeHTTPFlow_FullMethodName                            = "/ypb.Yak/AnalyzeHTTPFlow"
 	Yak_ExtractUrl_FullMethodName                                 = "/ypb.Yak/ExtractUrl"
 	Yak_GetHistoryHTTPFuzzerTask_FullMethodName                   = "/ypb.Yak/GetHistoryHTTPFuzzerTask"
@@ -129,10 +131,15 @@ const (
 	Yak_ConvertFuzzerResponseToHTTPFlow_FullMethodName            = "/ypb.Yak/ConvertFuzzerResponseToHTTPFlow"
 	Yak_StringFuzzer_FullMethodName                               = "/ypb.Yak/StringFuzzer"
 	Yak_HTTPRequestAnalyzer_FullMethodName                        = "/ypb.Yak/HTTPRequestAnalyzer"
+	Yak_CreateSnippet_FullMethodName                              = "/ypb.Yak/CreateSnippet"
+	Yak_UpdateSnippet_FullMethodName                              = "/ypb.Yak/UpdateSnippet"
+	Yak_DeleteSnippets_FullMethodName                             = "/ypb.Yak/DeleteSnippets"
+	Yak_QuerySnippets_FullMethodName                              = "/ypb.Yak/QuerySnippets"
 	Yak_Codec_FullMethodName                                      = "/ypb.Yak/Codec"
 	Yak_NewCodec_FullMethodName                                   = "/ypb.Yak/NewCodec"
 	Yak_GetAllCodecMethods_FullMethodName                         = "/ypb.Yak/GetAllCodecMethods"
 	Yak_SaveCodecFlow_FullMethodName                              = "/ypb.Yak/SaveCodecFlow"
+	Yak_UpdateCodecFlow_FullMethodName                            = "/ypb.Yak/UpdateCodecFlow"
 	Yak_DeleteCodecFlow_FullMethodName                            = "/ypb.Yak/DeleteCodecFlow"
 	Yak_GetAllCodecFlow_FullMethodName                            = "/ypb.Yak/GetAllCodecFlow"
 	Yak_PacketPrettifyHelper_FullMethodName                       = "/ypb.Yak/PacketPrettifyHelper"
@@ -161,6 +168,10 @@ const (
 	Yak_CoverPayloadGroupToDatabase_FullMethodName                = "/ypb.Yak/CoverPayloadGroupToDatabase"
 	Yak_ConvertPayloadGroupToDatabase_FullMethodName              = "/ypb.Yak/ConvertPayloadGroupToDatabase"
 	Yak_MigratePayloads_FullMethodName                            = "/ypb.Yak/MigratePayloads"
+	Yak_ExportPayloadBatch_FullMethodName                         = "/ypb.Yak/ExportPayloadBatch"
+	Yak_UploadPayloadToOnline_FullMethodName                      = "/ypb.Yak/UploadPayloadToOnline"
+	Yak_DownloadPayload_FullMethodName                            = "/ypb.Yak/DownloadPayload"
+	Yak_ExportPayloadDBAndFile_FullMethodName                     = "/ypb.Yak/ExportPayloadDBAndFile"
 	Yak_GetYakitCompletionRaw_FullMethodName                      = "/ypb.Yak/GetYakitCompletionRaw"
 	Yak_GetYakVMBuildInMethodCompletion_FullMethodName            = "/ypb.Yak/GetYakVMBuildInMethodCompletion"
 	Yak_StaticAnalyzeError_FullMethodName                         = "/ypb.Yak/StaticAnalyzeError"
@@ -454,7 +465,18 @@ const (
 	Yak_UpdateSSARiskTags_FullMethodName                          = "/ypb.Yak/UpdateSSARiskTags"
 	Yak_GetSSARiskFieldGroup_FullMethodName                       = "/ypb.Yak/GetSSARiskFieldGroup"
 	Yak_NewSSARiskRead_FullMethodName                             = "/ypb.Yak/NewSSARiskRead"
+	Yak_SSARiskDiff_FullMethodName                                = "/ypb.Yak/SSARiskDiff"
+	Yak_CreateSSARiskDisposals_FullMethodName                     = "/ypb.Yak/CreateSSARiskDisposals"
+	Yak_QuerySSARiskDisposals_FullMethodName                      = "/ypb.Yak/QuerySSARiskDisposals"
+	Yak_UpdateSSARiskDisposals_FullMethodName                     = "/ypb.Yak/UpdateSSARiskDisposals"
+	Yak_DeleteSSARiskDisposals_FullMethodName                     = "/ypb.Yak/DeleteSSARiskDisposals"
+	Yak_GetSSARiskDisposal_FullMethodName                         = "/ypb.Yak/GetSSARiskDisposal"
 	Yak_SSARiskFeedbackToOnline_FullMethodName                    = "/ypb.Yak/SSARiskFeedbackToOnline"
+	Yak_GenerateSSAReport_FullMethodName                          = "/ypb.Yak/GenerateSSAReport"
+	Yak_CreateSSAProject_FullMethodName                           = "/ypb.Yak/CreateSSAProject"
+	Yak_UpdateSSAProject_FullMethodName                           = "/ypb.Yak/UpdateSSAProject"
+	Yak_DeleteSSAProject_FullMethodName                           = "/ypb.Yak/DeleteSSAProject"
+	Yak_QuerySSAProject_FullMethodName                            = "/ypb.Yak/QuerySSAProject"
 	Yak_GetAllPluginEnv_FullMethodName                            = "/ypb.Yak/GetAllPluginEnv"
 	Yak_QueryPluginEnv_FullMethodName                             = "/ypb.Yak/QueryPluginEnv"
 	Yak_CreatePluginEnv_FullMethodName                            = "/ypb.Yak/CreatePluginEnv"
@@ -484,26 +506,79 @@ const (
 	Yak_SearchNoteContent_FullMethodName                          = "/ypb.Yak/SearchNoteContent"
 	Yak_ImportNote_FullMethodName                                 = "/ypb.Yak/ImportNote"
 	Yak_ExportNote_FullMethodName                                 = "/ypb.Yak/ExportNote"
+	Yak_StartAIReAct_FullMethodName                               = "/ypb.Yak/StartAIReAct"
 	Yak_StartAITask_FullMethodName                                = "/ypb.Yak/StartAITask"
 	Yak_QueryAITask_FullMethodName                                = "/ypb.Yak/QueryAITask"
+	Yak_DeleteAITask_FullMethodName                               = "/ypb.Yak/DeleteAITask"
+	Yak_QueryAIEvent_FullMethodName                               = "/ypb.Yak/QueryAIEvent"
 	Yak_StartAITriage_FullMethodName                              = "/ypb.Yak/StartAITriage"
 	Yak_CreateAIForge_FullMethodName                              = "/ypb.Yak/CreateAIForge"
 	Yak_UpdateAIForge_FullMethodName                              = "/ypb.Yak/UpdateAIForge"
 	Yak_DeleteAIForge_FullMethodName                              = "/ypb.Yak/DeleteAIForge"
 	Yak_QueryAIForge_FullMethodName                               = "/ypb.Yak/QueryAIForge"
+	Yak_GetAIForge_FullMethodName                                 = "/ypb.Yak/GetAIForge"
 	Yak_StartMcpServer_FullMethodName                             = "/ypb.Yak/StartMcpServer"
 	Yak_GetToolSetList_FullMethodName                             = "/ypb.Yak/GetToolSetList"
 	Yak_GetAIToolList_FullMethodName                              = "/ypb.Yak/GetAIToolList"
 	Yak_DeleteAITool_FullMethodName                               = "/ypb.Yak/DeleteAITool"
 	Yak_SaveAITool_FullMethodName                                 = "/ypb.Yak/SaveAITool"
+	Yak_SaveAIToolV2_FullMethodName                               = "/ypb.Yak/SaveAIToolV2"
+	Yak_UpdateAITool_FullMethodName                               = "/ypb.Yak/UpdateAITool"
 	Yak_ToggleAIToolFavorite_FullMethodName                       = "/ypb.Yak/ToggleAIToolFavorite"
 	Yak_AIToolGenerateMetadata_FullMethodName                     = "/ypb.Yak/AIToolGenerateMetadata"
 	Yak_IsLlamaServerReady_FullMethodName                         = "/ypb.Yak/IsLlamaServerReady"
 	Yak_IsLocalModelReady_FullMethodName                          = "/ypb.Yak/IsLocalModelReady"
 	Yak_InstallLlamaServer_FullMethodName                         = "/ypb.Yak/InstallLlamaServer"
 	Yak_StartLocalModel_FullMethodName                            = "/ypb.Yak/StartLocalModel"
+	Yak_StopLocalModel_FullMethodName                             = "/ypb.Yak/StopLocalModel"
 	Yak_DownloadLocalModel_FullMethodName                         = "/ypb.Yak/DownloadLocalModel"
 	Yak_GetSupportedLocalModels_FullMethodName                    = "/ypb.Yak/GetSupportedLocalModels"
+	Yak_AddLocalModel_FullMethodName                              = "/ypb.Yak/AddLocalModel"
+	Yak_DeleteLocalModel_FullMethodName                           = "/ypb.Yak/DeleteLocalModel"
+	Yak_UpdateLocalModel_FullMethodName                           = "/ypb.Yak/UpdateLocalModel"
+	Yak_GetAllStartedLocalModels_FullMethodName                   = "/ypb.Yak/GetAllStartedLocalModels"
+	Yak_ClearAllModels_FullMethodName                             = "/ypb.Yak/ClearAllModels"
+	Yak_IsSearchVectorDatabaseReady_FullMethodName                = "/ypb.Yak/IsSearchVectorDatabaseReady"
+	Yak_InitSearchVectorDatabase_FullMethodName                   = "/ypb.Yak/InitSearchVectorDatabase"
+	Yak_GetAllVectorStoreCollections_FullMethodName               = "/ypb.Yak/GetAllVectorStoreCollections"
+	Yak_GetAllVectorStoreCollectionsWithFilter_FullMethodName     = "/ypb.Yak/GetAllVectorStoreCollectionsWithFilter"
+	Yak_DeleteSearchVectorDatabase_FullMethodName                 = "/ypb.Yak/DeleteSearchVectorDatabase"
+	Yak_UpdateVectorStoreCollection_FullMethodName                = "/ypb.Yak/UpdateVectorStoreCollection"
+	Yak_ListVectorStoreEntries_FullMethodName                     = "/ypb.Yak/ListVectorStoreEntries"
+	Yak_CreateVectorStoreEntry_FullMethodName                     = "/ypb.Yak/CreateVectorStoreEntry"
+	Yak_GetDocumentByVectorStoreEntryID_FullMethodName            = "/ypb.Yak/GetDocumentByVectorStoreEntryID"
+	Yak_ListThirdPartyBinary_FullMethodName                       = "/ypb.Yak/ListThirdPartyBinary"
+	Yak_InstallThirdPartyBinary_FullMethodName                    = "/ypb.Yak/InstallThirdPartyBinary"
+	Yak_UninstallThirdPartyBinary_FullMethodName                  = "/ypb.Yak/UninstallThirdPartyBinary"
+	Yak_IsThirdPartyBinaryReady_FullMethodName                    = "/ypb.Yak/IsThirdPartyBinaryReady"
+	Yak_StartThirdPartyBinary_FullMethodName                      = "/ypb.Yak/StartThirdPartyBinary"
+	Yak_PluginTrace_FullMethodName                                = "/ypb.Yak/PluginTrace"
+	Yak_GetKnowledgeBaseNameList_FullMethodName                   = "/ypb.Yak/GetKnowledgeBaseNameList"
+	Yak_GetKnowledgeBase_FullMethodName                           = "/ypb.Yak/GetKnowledgeBase"
+	Yak_GetKnowledgeBaseTypeList_FullMethodName                   = "/ypb.Yak/GetKnowledgeBaseTypeList"
+	Yak_DeleteKnowledgeBase_FullMethodName                        = "/ypb.Yak/DeleteKnowledgeBase"
+	Yak_CreateKnowledgeBase_FullMethodName                        = "/ypb.Yak/CreateKnowledgeBase"
+	Yak_UpdateKnowledgeBase_FullMethodName                        = "/ypb.Yak/UpdateKnowledgeBase"
+	Yak_DeleteKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/DeleteKnowledgeBaseEntry"
+	Yak_CreateKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/CreateKnowledgeBaseEntry"
+	Yak_UpdateKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/UpdateKnowledgeBaseEntry"
+	Yak_SearchKnowledgeBaseEntry_FullMethodName                   = "/ypb.Yak/SearchKnowledgeBaseEntry"
+	Yak_QueryKnowledgeBaseByAI_FullMethodName                     = "/ypb.Yak/QueryKnowledgeBaseByAI"
+	Yak_BuildVectorIndexForKnowledgeBase_FullMethodName           = "/ypb.Yak/BuildVectorIndexForKnowledgeBase"
+	Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName      = "/ypb.Yak/BuildVectorIndexForKnowledgeBaseEntry"
+	Yak_ListEntityRepository_FullMethodName                       = "/ypb.Yak/ListEntityRepository"
+	Yak_QueryEntity_FullMethodName                                = "/ypb.Yak/QueryEntity"
+	Yak_DeleteEntity_FullMethodName                               = "/ypb.Yak/DeleteEntity"
+	Yak_QueryRelationship_FullMethodName                          = "/ypb.Yak/QueryRelationship"
+	Yak_QuerySubERM_FullMethodName                                = "/ypb.Yak/QuerySubERM"
+	Yak_GenerateERMDot_FullMethodName                             = "/ypb.Yak/GenerateERMDot"
+	Yak_ExportKnowledgeBase_FullMethodName                        = "/ypb.Yak/ExportKnowledgeBase"
+	Yak_ImportKnowledgeBase_FullMethodName                        = "/ypb.Yak/ImportKnowledgeBase"
+	Yak_AddMCPServer_FullMethodName                               = "/ypb.Yak/AddMCPServer"
+	Yak_DeleteMCPServer_FullMethodName                            = "/ypb.Yak/DeleteMCPServer"
+	Yak_UpdateMCPServer_FullMethodName                            = "/ypb.Yak/UpdateMCPServer"
+	Yak_GetAllMCPServers_FullMethodName                           = "/ypb.Yak/GetAllMCPServers"
+	Yak_RAGCollectionSearch_FullMethodName                        = "/ypb.Yak/RAGCollectionSearch"
 )
 
 // YakClient is the client API for Yak service.
@@ -524,6 +599,7 @@ type YakClient interface {
 	GetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
 	ResetMITMFilter(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error)
+	DownloadMITMGMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error)
 	MITMV2(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[MITMV2Request, MITMV2Response], error)
 	// 开启端口
 	OpenPort(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Input, Output], error)
@@ -597,6 +673,7 @@ type YakClient interface {
 	ExportHTTPFlows(ctx context.Context, in *ExportHTTPFlowsRequest, opts ...grpc.CallOption) (*QueryHTTPFlowResponse, error)
 	HTTPFlowsToOnline(ctx context.Context, in *HTTPFlowsToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
 	QueryHTTPFlowsProcessNames(ctx context.Context, in *QueryHTTPFlowRequest, opts ...grpc.CallOption) (*QueryHTTPFlowsProcessNamesResponse, error)
+	HTTPFlowsToOnlineBatch(ctx context.Context, in *HTTPFlowsToOnlineBatchRequest, opts ...grpc.CallOption) (*HTTPFlowsToOnlineBatchResponse, error)
 	// 流量分析器
 	AnalyzeHTTPFlow(ctx context.Context, in *AnalyzeHTTPFlowRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[AnalyzeHTTPFlowResponse], error)
 	// 从一个 FuzzerRequest 中提取 Url
@@ -642,11 +719,17 @@ type YakClient interface {
 	StringFuzzer(ctx context.Context, in *StringFuzzerRequest, opts ...grpc.CallOption) (*StringFuzzerResponse, error)
 	// 分析一个 HTTP 请求详情
 	HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnalysisMaterial, opts ...grpc.CallOption) (*HTTPRequestAnalysis, error)
+	// 用户自定义代码补全
+	CreateSnippet(ctx context.Context, in *SnippetsRequest, opts ...grpc.CallOption) (*Empty, error)
+	UpdateSnippet(ctx context.Context, in *EditSnippetsRequest, opts ...grpc.CallOption) (*Empty, error)
+	DeleteSnippets(ctx context.Context, in *QuerySnippetsRequest, opts ...grpc.CallOption) (*Empty, error)
+	QuerySnippets(ctx context.Context, in *QuerySnippetsRequest, opts ...grpc.CallOption) (*SnippetsResponse, error)
 	// 编码解码
 	Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error)
 	NewCodec(ctx context.Context, in *CodecRequestFlow, opts ...grpc.CallOption) (*CodecResponse, error)
 	GetAllCodecMethods(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*CodecMethods, error)
 	SaveCodecFlow(ctx context.Context, in *CustomizeCodecFlow, opts ...grpc.CallOption) (*Empty, error)
+	UpdateCodecFlow(ctx context.Context, in *UpdateCodecFlowRequest, opts ...grpc.CallOption) (*Empty, error)
 	DeleteCodecFlow(ctx context.Context, in *DeleteCodecFlowRequest, opts ...grpc.CallOption) (*Empty, error)
 	GetAllCodecFlow(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetCodecFlowResponse, error)
 	PacketPrettifyHelper(ctx context.Context, in *PacketPrettifyHelperRequest, opts ...grpc.CallOption) (*PacketPrettifyHelperResponse, error)
@@ -688,6 +771,12 @@ type YakClient interface {
 	ConvertPayloadGroupToDatabase(ctx context.Context, in *NameRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SavePayloadProgress], error)
 	// 迁移旧的payload
 	MigratePayloads(ctx context.Context, in *Empty, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SavePayloadProgress], error)
+	// 批量导payload 数据库 已废弃
+	ExportPayloadBatch(ctx context.Context, in *ExportPayloadBatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error)
+	UploadPayloadToOnline(ctx context.Context, in *UploadPayloadToOnlineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error)
+	DownloadPayload(ctx context.Context, in *DownloadPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error)
+	// 批量导payload所有
+	ExportPayloadDBAndFile(ctx context.Context, in *ExportPayloadDBAndFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error)
 	// 自动生成补全
 	GetYakitCompletionRaw(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakitCompletionRawResponse, error)
 	GetYakVMBuildInMethodCompletion(ctx context.Context, in *GetYakVMBuildInMethodCompletionRequest, opts ...grpc.CallOption) (*GetYakVMBuildInMethodCompletionResponse, error)
@@ -1071,7 +1160,22 @@ type YakClient interface {
 	UpdateSSARiskTags(ctx context.Context, in *UpdateSSARiskTagsRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	GetSSARiskFieldGroup(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*SSARiskFieldGroupResponse, error)
 	NewSSARiskRead(ctx context.Context, in *NewSSARiskReadRequest, opts ...grpc.CallOption) (*NewSSARiskReadResponse, error)
+	// SSA risk diff
+	SSARiskDiff(ctx context.Context, in *SSARiskDiffRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SSARiskDiffResponse], error)
+	// SSA Risk Disposal CURD
+	CreateSSARiskDisposals(ctx context.Context, in *CreateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*CreateSSARiskDisposalsResponse, error)
+	QuerySSARiskDisposals(ctx context.Context, in *QuerySSARiskDisposalsRequest, opts ...grpc.CallOption) (*QuerySSARiskDisposalsResponse, error)
+	UpdateSSARiskDisposals(ctx context.Context, in *UpdateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*UpdateSSARiskDisposalsResponse, error)
+	DeleteSSARiskDisposals(ctx context.Context, in *DeleteSSARiskDisposalsRequest, opts ...grpc.CallOption) (*DeleteSSARiskDisposalsResponse, error)
+	GetSSARiskDisposal(ctx context.Context, in *GetSSARiskDisposalRequest, opts ...grpc.CallOption) (*GetSSARiskDisposalResponse, error)
 	SSARiskFeedbackToOnline(ctx context.Context, in *SSARiskFeedbackToOnlineRequest, opts ...grpc.CallOption) (*Empty, error)
+	// SSA Report
+	GenerateSSAReport(ctx context.Context, in *GenerateSSAReportRequest, opts ...grpc.CallOption) (*GenerateSSAReportResponse, error)
+	// SSA Project CRUD
+	CreateSSAProject(ctx context.Context, in *CreateSSAProjectRequest, opts ...grpc.CallOption) (*CreateSSAProjectResponse, error)
+	UpdateSSAProject(ctx context.Context, in *UpdateSSAProjectRequest, opts ...grpc.CallOption) (*UpdateSSAProjectResponse, error)
+	DeleteSSAProject(ctx context.Context, in *DeleteSSAProjectRequest, opts ...grpc.CallOption) (*DeleteSSAProjectResponse, error)
+	QuerySSAProject(ctx context.Context, in *QuerySSAProjectRequest, opts ...grpc.CallOption) (*QuerySSAProjectResponse, error)
 	GetAllPluginEnv(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*PluginEnvData, error)
 	QueryPluginEnv(ctx context.Context, in *QueryPluginEnvRequest, opts ...grpc.CallOption) (*PluginEnvData, error)
 	CreatePluginEnv(ctx context.Context, in *PluginEnvData, opts ...grpc.CallOption) (*Empty, error)
@@ -1108,20 +1212,26 @@ type YakClient interface {
 	ImportNote(ctx context.Context, in *ImportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportNoteResponse], error)
 	ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error)
 	// AI Task
+	StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error)
 	QueryAITask(ctx context.Context, in *AITaskQueryRequest, opts ...grpc.CallOption) (*AITaskQueryResponse, error)
+	DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, opts ...grpc.CallOption) (*AIEventQueryResponse, error)
 	StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error)
 	// AI forge curd
 	CreateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	UpdateAIForge(ctx context.Context, in *AIForge, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	DeleteAIForge(ctx context.Context, in *AIForgeFilter, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, opts ...grpc.CallOption) (*QueryAIForgeResponse, error)
+	GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts ...grpc.CallOption) (*AIForge, error)
 	// mcp server
 	StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error)
 	GetToolSetList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetToolSetListResponse, error)
 	GetAIToolList(ctx context.Context, in *GetAIToolListRequest, opts ...grpc.CallOption) (*GetAIToolListResponse, error)
 	DeleteAITool(ctx context.Context, in *DeleteAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	SaveAIToolV2(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*SaveAIToolV2Response, error)
+	UpdateAITool(ctx context.Context, in *UpdateAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
 	ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(ctx context.Context, in *AIToolGenerateMetadataRequest, opts ...grpc.CallOption) (*AIToolGenerateMetadataResponse, error)
 	// Local Model Management
@@ -1129,8 +1239,61 @@ type YakClient interface {
 	IsLocalModelReady(ctx context.Context, in *IsLocalModelReadyRequest, opts ...grpc.CallOption) (*IsLocalModelReadyResponse, error)
 	InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	StopLocalModel(ctx context.Context, in *StopLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
 	DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
 	GetSupportedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetSupportedLocalModelsResponse, error)
+	AddLocalModel(ctx context.Context, in *AddLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	DeleteLocalModel(ctx context.Context, in *DeleteLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	UpdateLocalModel(ctx context.Context, in *UpdateLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	GetAllStartedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllStartedLocalModelsResponse, error)
+	ClearAllModels(ctx context.Context, in *ClearAllModelsRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearchVectorDatabaseReadyRequest, opts ...grpc.CallOption) (*IsSearchVectorDatabaseReadyResponse, error)
+	InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	GetAllVectorStoreCollections(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsResponse, error)
+	GetAllVectorStoreCollectionsWithFilter(ctx context.Context, in *GetAllVectorStoreCollectionsWithFilterRequest, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsWithFilterResponse, error)
+	DeleteSearchVectorDatabase(ctx context.Context, in *DeleteSearchVectorDatabaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	UpdateVectorStoreCollection(ctx context.Context, in *UpdateVectorStoreCollectionRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	ListVectorStoreEntries(ctx context.Context, in *ListVectorStoreEntriesRequest, opts ...grpc.CallOption) (*ListVectorStoreEntriesResponse, error)
+	CreateVectorStoreEntry(ctx context.Context, in *CreateVectorStoreEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	GetDocumentByVectorStoreEntryID(ctx context.Context, in *GetDocumentByVectorStoreEntryIDRequest, opts ...grpc.CallOption) (*GetDocumentByVectorStoreEntryIDResponse, error)
+	// 第三方应用管理
+	ListThirdPartyBinary(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListThirdPartyBinaryResponse, error)
+	InstallThirdPartyBinary(ctx context.Context, in *InstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	UninstallThirdPartyBinary(ctx context.Context, in *UninstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	IsThirdPartyBinaryReady(ctx context.Context, in *IsThirdPartyBinaryReadyRequest, opts ...grpc.CallOption) (*IsThirdPartyBinaryReadyResponse, error)
+	StartThirdPartyBinary(ctx context.Context, in *StartThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error)
+	// 插件执行跟踪双向流服务
+	PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error)
+	// Knowledge Base
+	GetKnowledgeBaseNameList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseNameListResponse, error)
+	GetKnowledgeBase(ctx context.Context, in *GetKnowledgeBaseRequest, opts ...grpc.CallOption) (*GetKnowledgeBaseResponse, error)
+	GetKnowledgeBaseTypeList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseTypeListResponse, error)
+	DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	UpdateKnowledgeBase(ctx context.Context, in *UpdateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	DeleteKnowledgeBaseEntry(ctx context.Context, in *DeleteKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	CreateKnowledgeBaseEntry(ctx context.Context, in *CreateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	UpdateKnowledgeBaseEntry(ctx context.Context, in *UpdateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	SearchKnowledgeBaseEntry(ctx context.Context, in *SearchKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*SearchKnowledgeBaseEntryResponse, error)
+	QueryKnowledgeBaseByAI(ctx context.Context, in *QueryKnowledgeBaseByAIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse], error)
+	BuildVectorIndexForKnowledgeBase(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	// Entity Repository
+	ListEntityRepository(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListEntityRepositoryResponse, error)
+	QueryEntity(ctx context.Context, in *QueryEntityRequest, opts ...grpc.CallOption) (*QueryEntityResponse, error)
+	DeleteEntity(ctx context.Context, in *DeleteEntityRequest, opts ...grpc.CallOption) (*DbOperateMessage, error)
+	QueryRelationship(ctx context.Context, in *QueryRelationshipRequest, opts ...grpc.CallOption) (*QueryRelationshipResponse, error)
+	QuerySubERM(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (*QuerySubERMResponse, error)
+	GenerateERMDot(ctx context.Context, in *GenerateERMDotRequest, opts ...grpc.CallOption) (*GenerateERMDotResponse, error)
+	// Export and Import Knowledge Base
+	ExportKnowledgeBase(ctx context.Context, in *ExportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error)
+	ImportKnowledgeBase(ctx context.Context, in *ImportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error)
+	AddMCPServer(ctx context.Context, in *AddMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	DeleteMCPServer(ctx context.Context, in *DeleteMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	UpdateMCPServer(ctx context.Context, in *UpdateMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error)
+	GetAllMCPServers(ctx context.Context, in *GetAllMCPServersRequest, opts ...grpc.CallOption) (*GetAllMCPServersResponse, error)
+	// RAG Collection Search
+	RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error)
 }
 
 type yakClient struct {
@@ -1238,6 +1401,16 @@ func (c *yakClient) DownloadMITMCert(ctx context.Context, in *Empty, opts ...grp
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(MITMCert)
 	err := c.cc.Invoke(ctx, Yak_DownloadMITMCert_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DownloadMITMGMCert(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*MITMCert, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MITMCert)
+	err := c.cc.Invoke(ctx, Yak_DownloadMITMGMCert_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2016,6 +2189,16 @@ func (c *yakClient) QueryHTTPFlowsProcessNames(ctx context.Context, in *QueryHTT
 	return out, nil
 }
 
+func (c *yakClient) HTTPFlowsToOnlineBatch(ctx context.Context, in *HTTPFlowsToOnlineBatchRequest, opts ...grpc.CallOption) (*HTTPFlowsToOnlineBatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HTTPFlowsToOnlineBatchResponse)
+	err := c.cc.Invoke(ctx, Yak_HTTPFlowsToOnlineBatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) AnalyzeHTTPFlow(ctx context.Context, in *AnalyzeHTTPFlowRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[AnalyzeHTTPFlowResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[17], Yak_AnalyzeHTTPFlow_FullMethodName, cOpts...)
@@ -2409,6 +2592,46 @@ func (c *yakClient) HTTPRequestAnalyzer(ctx context.Context, in *HTTPRequestAnal
 	return out, nil
 }
 
+func (c *yakClient) CreateSnippet(ctx context.Context, in *SnippetsRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_CreateSnippet_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateSnippet(ctx context.Context, in *EditSnippetsRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_UpdateSnippet_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSnippets(ctx context.Context, in *QuerySnippetsRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_DeleteSnippets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QuerySnippets(ctx context.Context, in *QuerySnippetsRequest, opts ...grpc.CallOption) (*SnippetsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SnippetsResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySnippets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) Codec(ctx context.Context, in *CodecRequest, opts ...grpc.CallOption) (*CodecResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CodecResponse)
@@ -2443,6 +2666,16 @@ func (c *yakClient) SaveCodecFlow(ctx context.Context, in *CustomizeCodecFlow, o
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_SaveCodecFlow_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateCodecFlow(ctx context.Context, in *UpdateCodecFlowRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, Yak_UpdateCodecFlow_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2819,6 +3052,82 @@ func (c *yakClient) MigratePayloads(ctx context.Context, in *Empty, opts ...grpc
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigratePayloadsClient = grpc.ServerStreamingClient[SavePayloadProgress]
 
+func (c *yakClient) ExportPayloadBatch(ctx context.Context, in *ExportPayloadBatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_ExportPayloadBatch_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExportPayloadBatchRequest, GetAllPayloadResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportPayloadBatchClient = grpc.ServerStreamingClient[GetAllPayloadResponse]
+
+func (c *yakClient) UploadPayloadToOnline(ctx context.Context, in *UploadPayloadToOnlineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[33], Yak_UploadPayloadToOnline_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[UploadPayloadToOnlineRequest, DownloadProgress]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_UploadPayloadToOnlineClient = grpc.ServerStreamingClient[DownloadProgress]
+
+func (c *yakClient) DownloadPayload(ctx context.Context, in *DownloadPayloadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadProgress], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[34], Yak_DownloadPayload_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DownloadPayloadRequest, DownloadProgress]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_DownloadPayloadClient = grpc.ServerStreamingClient[DownloadProgress]
+
+func (c *yakClient) ExportPayloadDBAndFile(ctx context.Context, in *ExportPayloadDBAndFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GetAllPayloadResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[35], Yak_ExportPayloadDBAndFile_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExportPayloadDBAndFileRequest, GetAllPayloadResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportPayloadDBAndFileClient = grpc.ServerStreamingClient[GetAllPayloadResponse]
+
 func (c *yakClient) GetYakitCompletionRaw(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*YakitCompletionRawResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(YakitCompletionRawResponse)
@@ -2911,7 +3220,7 @@ func (c *yakClient) YaklangGetCliCodeFromDatabase(ctx context.Context, in *Yakla
 
 func (c *yakClient) YaklangTerminal(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[Input, Output], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[32], Yak_YaklangTerminal_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[36], Yak_YaklangTerminal_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2924,7 +3233,7 @@ type Yak_YaklangTerminalClient = grpc.BidiStreamingClient[Input, Output]
 
 func (c *yakClient) PortScan(ctx context.Context, in *PortScanRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[33], Yak_PortScan_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[37], Yak_PortScan_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2953,7 +3262,7 @@ func (c *yakClient) ViewPortScanCode(ctx context.Context, in *Empty, opts ...grp
 
 func (c *yakClient) SimpleDetect(ctx context.Context, in *RecordPortScanRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[34], Yak_SimpleDetect_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[38], Yak_SimpleDetect_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -2982,7 +3291,7 @@ func (c *yakClient) SaveCancelSimpleDetect(ctx context.Context, in *RecordPortSc
 
 func (c *yakClient) SimpleDetectCreatReport(ctx context.Context, in *CreatReportRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[35], Yak_SimpleDetectCreatReport_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[39], Yak_SimpleDetectCreatReport_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3031,7 +3340,7 @@ func (c *yakClient) DeleteSimpleDetectUnfinishedTask(ctx context.Context, in *De
 
 func (c *yakClient) RecoverSimpleDetectTask(ctx context.Context, in *RecoverUnfinishedTaskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[36], Yak_RecoverSimpleDetectTask_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[40], Yak_RecoverSimpleDetectTask_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3080,7 +3389,7 @@ func (c *yakClient) PopSimpleDetectUnfinishedTaskByUid(ctx context.Context, in *
 
 func (c *yakClient) RecoverSimpleDetectUnfinishedTask(ctx context.Context, in *RecoverExecBatchYakScriptUnfinishedTaskRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[37], Yak_RecoverSimpleDetectUnfinishedTask_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[41], Yak_RecoverSimpleDetectUnfinishedTask_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3459,7 +3768,7 @@ func (c *yakClient) DeleteYakScriptExec(ctx context.Context, in *Empty, opts ...
 
 func (c *yakClient) StartBrute(ctx context.Context, in *StartBruteParams, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[38], Yak_StartBrute_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[42], Yak_StartBrute_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3508,7 +3817,7 @@ func (c *yakClient) VerifyTunnelServerDomain(ctx context.Context, in *VerifyTunn
 
 func (c *yakClient) StartFacades(ctx context.Context, in *StartFacadesParams, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[39], Yak_StartFacades_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[43], Yak_StartFacades_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3527,7 +3836,7 @@ type Yak_StartFacadesClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) StartFacadesWithYsoObject(ctx context.Context, in *StartFacadesWithYsoParams, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[40], Yak_StartFacadesWithYsoObject_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[44], Yak_StartFacadesWithYsoObject_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -3566,7 +3875,7 @@ func (c *yakClient) BytesToBase64(ctx context.Context, in *BytesToBase64Request,
 
 func (c *yakClient) ConfigGlobalReverse(ctx context.Context, in *ConfigGlobalReverseParams, opts ...grpc.CallOption) (grpc.ServerStreamingClient[Empty], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[41], Yak_ConfigGlobalReverse_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[45], Yak_ConfigGlobalReverse_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4065,7 +4374,7 @@ func (c *yakClient) ForceUpdateAvailableYakScriptTags(ctx context.Context, in *E
 
 func (c *yakClient) ExecYakitPluginsByYakScriptFilter(ctx context.Context, in *ExecYakitPluginsByYakScriptFilterRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[42], Yak_ExecYakitPluginsByYakScriptFilter_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[46], Yak_ExecYakitPluginsByYakScriptFilter_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4164,7 +4473,7 @@ func (c *yakClient) GenerateURL(ctx context.Context, in *GenerateURLRequest, opt
 
 func (c *yakClient) ExtractDataToFile(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ExtractDataToFileRequest, ExtractDataToFileResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[43], Yak_ExtractDataToFile_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[47], Yak_ExtractDataToFile_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4317,7 +4626,7 @@ func (c *yakClient) DownloadOnlinePluginByIds(ctx context.Context, in *DownloadO
 
 func (c *yakClient) DownloadOnlinePluginAll(ctx context.Context, in *DownloadOnlinePluginByTokenRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadOnlinePluginProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[44], Yak_DownloadOnlinePluginAll_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[48], Yak_DownloadOnlinePluginAll_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4386,7 +4695,7 @@ func (c *yakClient) DownloadOnlinePluginByScriptNames(ctx context.Context, in *D
 
 func (c *yakClient) DownloadOnlinePlugins(ctx context.Context, in *DownloadOnlinePluginsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DownloadOnlinePluginProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[45], Yak_DownloadOnlinePlugins_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[49], Yak_DownloadOnlinePlugins_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4445,7 +4754,7 @@ func (c *yakClient) QueryOnlinePlugins(ctx context.Context, in *QueryOnlinePlugi
 
 func (c *yakClient) ExecPacketScan(ctx context.Context, in *ExecPacketScanRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[46], Yak_ExecPacketScan_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[50], Yak_ExecPacketScan_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4564,7 +4873,7 @@ func (c *yakClient) ResetAndInvalidUserData(ctx context.Context, in *ResetAndInv
 
 func (c *yakClient) CreateYaklangShell(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[YaklangShellRequest, YaklangShellResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[47], Yak_CreateYaklangShell_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[51], Yak_CreateYaklangShell_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4577,7 +4886,7 @@ type Yak_CreateYaklangShellClient = grpc.BidiStreamingClient[YaklangShellRequest
 
 func (c *yakClient) AttachCombinedOutput(ctx context.Context, in *AttachCombinedOutputRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[48], Yak_AttachCombinedOutput_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[52], Yak_AttachCombinedOutput_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4756,7 +5065,7 @@ func (c *yakClient) GetTemporaryProjectEx(ctx context.Context, in *GetTemporaryP
 
 func (c *yakClient) ExportProject(ctx context.Context, in *ExportProjectRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ProjectIOProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[49], Yak_ExportProject_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[53], Yak_ExportProject_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4775,7 +5084,7 @@ type Yak_ExportProjectClient = grpc.ServerStreamingClient[ProjectIOProgress]
 
 func (c *yakClient) ImportProject(ctx context.Context, in *ImportProjectRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ProjectIOProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[50], Yak_ImportProject_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[54], Yak_ImportProject_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4814,7 +5123,7 @@ func (c *yakClient) QueryMITMRuleExtractedData(ctx context.Context, in *QueryMIT
 
 func (c *yakClient) ExportMITMRuleExtractedData(ctx context.Context, in *ExportMITMRuleExtractedDataRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportMITMRuleExtractedDataResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[51], Yak_ExportMITMRuleExtractedData_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[55], Yak_ExportMITMRuleExtractedData_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4863,7 +5172,7 @@ func (c *yakClient) DeleteChaosMakerRuleByID(ctx context.Context, in *DeleteChao
 
 func (c *yakClient) ExecuteChaosMakerRule(ctx context.Context, in *ExecuteChaosMakerRuleRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[52], Yak_ExecuteChaosMakerRule_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[56], Yak_ExecuteChaosMakerRule_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4932,7 +5241,7 @@ func (c *yakClient) IsCVEDatabaseReady(ctx context.Context, in *IsCVEDatabaseRea
 
 func (c *yakClient) UpdateCVEDatabase(ctx context.Context, in *UpdateCVEDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[53], Yak_UpdateCVEDatabase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[57], Yak_UpdateCVEDatabase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4951,7 +5260,7 @@ type Yak_UpdateCVEDatabaseClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) ExportsProfileDatabase(ctx context.Context, in *ExportsProfileDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[54], Yak_ExportsProfileDatabase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[58], Yak_ExportsProfileDatabase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -4970,7 +5279,7 @@ type Yak_ExportsProfileDatabaseClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) ImportsProfileDatabase(ctx context.Context, in *ImportsProfileDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[55], Yak_ImportsProfileDatabase_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[59], Yak_ImportsProfileDatabase_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5029,7 +5338,7 @@ func (c *yakClient) IsScrecorderReady(ctx context.Context, in *IsScrecorderReady
 
 func (c *yakClient) InstallScrecorder(ctx context.Context, in *InstallScrecorderRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[56], Yak_InstallScrecorder_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[60], Yak_InstallScrecorder_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5048,7 +5357,7 @@ type Yak_InstallScrecorderClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) StartScrecorder(ctx context.Context, in *StartScrecorderRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[57], Yak_StartScrecorder_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], Yak_StartScrecorder_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5127,7 +5436,7 @@ func (c *yakClient) IsVulinboxReady(ctx context.Context, in *IsVulinboxReadyRequ
 
 func (c *yakClient) InstallVulinbox(ctx context.Context, in *InstallVulinboxRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[58], Yak_InstallVulinbox_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], Yak_InstallVulinbox_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5146,7 +5455,7 @@ type Yak_InstallVulinboxClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) StartVulinbox(ctx context.Context, in *StartVulinboxRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[59], Yak_StartVulinbox_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], Yak_StartVulinbox_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5165,7 +5474,7 @@ type Yak_StartVulinboxClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) GenQualityInspectionReport(ctx context.Context, in *GenQualityInspectionReportRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[60], Yak_GenQualityInspectionReport_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], Yak_GenQualityInspectionReport_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5194,7 +5503,7 @@ func (c *yakClient) HTTPRequestBuilder(ctx context.Context, in *HTTPRequestBuild
 
 func (c *yakClient) DebugPlugin(ctx context.Context, in *DebugPluginRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[61], Yak_DebugPlugin_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[65], Yak_DebugPlugin_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5223,7 +5532,7 @@ func (c *yakClient) SmokingEvaluatePlugin(ctx context.Context, in *SmokingEvalua
 
 func (c *yakClient) SmokingEvaluatePluginBatch(ctx context.Context, in *SmokingEvaluatePluginBatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SmokingEvaluatePluginBatchResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[62], Yak_SmokingEvaluatePluginBatch_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[66], Yak_SmokingEvaluatePluginBatch_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5252,7 +5561,7 @@ func (c *yakClient) GetSystemDefaultDnsServers(ctx context.Context, in *Empty, o
 
 func (c *yakClient) DiagnoseNetwork(ctx context.Context, in *DiagnoseNetworkRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DiagnoseNetworkResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[63], Yak_DiagnoseNetwork_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[67], Yak_DiagnoseNetwork_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5271,7 +5580,7 @@ type Yak_DiagnoseNetworkClient = grpc.ServerStreamingClient[DiagnoseNetworkRespo
 
 func (c *yakClient) DiagnoseNetworkDNS(ctx context.Context, in *DiagnoseNetworkDNSRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DiagnoseNetworkResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[64], Yak_DiagnoseNetworkDNS_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[68], Yak_DiagnoseNetworkDNS_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5290,7 +5599,7 @@ type Yak_DiagnoseNetworkDNSClient = grpc.ServerStreamingClient[DiagnoseNetworkRe
 
 func (c *yakClient) TraceRoute(ctx context.Context, in *TraceRouteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[TraceRouteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[65], Yak_TraceRoute_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[69], Yak_TraceRoute_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5359,7 +5668,7 @@ func (c *yakClient) RequestYakURL(ctx context.Context, in *RequestYakURLParams, 
 
 func (c *yakClient) ReadFile(ctx context.Context, in *ReadFileRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ReadFileResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[66], Yak_ReadFile_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[70], Yak_ReadFile_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5388,7 +5697,7 @@ func (c *yakClient) GetPcapMetadata(ctx context.Context, in *PcapMetadataRequest
 
 func (c *yakClient) PcapX(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PcapXRequest, PcapXResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[67], Yak_PcapX_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[71], Yak_PcapX_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5441,7 +5750,7 @@ func (c *yakClient) ParseTraffic(ctx context.Context, in *ParseTrafficRequest, o
 
 func (c *yakClient) DuplexConnection(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[DuplexConnectionRequest, DuplexConnectionResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[68], Yak_DuplexConnection_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[72], Yak_DuplexConnection_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5454,7 +5763,7 @@ type Yak_DuplexConnectionClient = grpc.BidiStreamingClient[DuplexConnectionReque
 
 func (c *yakClient) HybridScan(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[HybridScanRequest, HybridScanResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[69], Yak_HybridScan_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[73], Yak_HybridScan_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5517,7 +5826,7 @@ func (c *yakClient) GetSpaceEngineAccountStatusV2(ctx context.Context, in *Third
 
 func (c *yakClient) FetchPortAssetFromSpaceEngine(ctx context.Context, in *FetchPortAssetFromSpaceEngineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[70], Yak_FetchPortAssetFromSpaceEngine_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[74], Yak_FetchPortAssetFromSpaceEngine_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5726,7 +6035,7 @@ func (c *yakClient) GetFingerprintGroupSetByFilter(ctx context.Context, in *GetF
 
 func (c *yakClient) ExportFingerprint(ctx context.Context, in *ExportFingerprintRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataTransferProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[71], Yak_ExportFingerprint_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[75], Yak_ExportFingerprint_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5745,7 +6054,7 @@ type Yak_ExportFingerprintClient = grpc.ServerStreamingClient[DataTransferProgre
 
 func (c *yakClient) ImportFingerprint(ctx context.Context, in *ImportFingerprintRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[DataTransferProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[72], Yak_ImportFingerprint_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[76], Yak_ImportFingerprint_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5854,7 +6163,7 @@ func (c *yakClient) CheckSyntaxFlowRuleUpdate(ctx context.Context, in *CheckSynt
 
 func (c *yakClient) ApplySyntaxFlowRuleUpdate(ctx context.Context, in *ApplySyntaxFlowRuleUpdateRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ApplySyntaxFlowRuleUpdateResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[73], Yak_ApplySyntaxFlowRuleUpdate_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[77], Yak_ApplySyntaxFlowRuleUpdate_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5933,7 +6242,7 @@ func (c *yakClient) QuerySyntaxFlowSameGroup(ctx context.Context, in *QuerySynta
 
 func (c *yakClient) SyntaxFlowRuleToOnline(ctx context.Context, in *SyntaxFlowRuleToOnlineRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxFlowRuleOnlineProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[74], Yak_SyntaxFlowRuleToOnline_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[78], Yak_SyntaxFlowRuleToOnline_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5952,7 +6261,7 @@ type Yak_SyntaxFlowRuleToOnlineClient = grpc.ServerStreamingClient[SyntaxFlowRul
 
 func (c *yakClient) DownloadSyntaxFlowRule(ctx context.Context, in *DownloadSyntaxFlowRuleRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxFlowRuleOnlineProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[75], Yak_DownloadSyntaxFlowRule_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[79], Yak_DownloadSyntaxFlowRule_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -5971,7 +6280,7 @@ type Yak_DownloadSyntaxFlowRuleClient = grpc.ServerStreamingClient[SyntaxFlowRul
 
 func (c *yakClient) SyntaxFlowScan(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[SyntaxFlowScanRequest, SyntaxFlowScanResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[76], Yak_SyntaxFlowScan_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[80], Yak_SyntaxFlowScan_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6112,10 +6421,129 @@ func (c *yakClient) NewSSARiskRead(ctx context.Context, in *NewSSARiskReadReques
 	return out, nil
 }
 
+func (c *yakClient) SSARiskDiff(ctx context.Context, in *SSARiskDiffRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SSARiskDiffResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[81], Yak_SSARiskDiff_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[SSARiskDiffRequest, SSARiskDiffResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SSARiskDiffClient = grpc.ServerStreamingClient[SSARiskDiffResponse]
+
+func (c *yakClient) CreateSSARiskDisposals(ctx context.Context, in *CreateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*CreateSSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateSSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateSSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QuerySSARiskDisposals(ctx context.Context, in *QuerySSARiskDisposalsRequest, opts ...grpc.CallOption) (*QuerySSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuerySSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateSSARiskDisposals(ctx context.Context, in *UpdateSSARiskDisposalsRequest, opts ...grpc.CallOption) (*UpdateSSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateSSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSSARiskDisposals(ctx context.Context, in *DeleteSSARiskDisposalsRequest, opts ...grpc.CallOption) (*DeleteSSARiskDisposalsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteSSARiskDisposalsResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteSSARiskDisposals_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetSSARiskDisposal(ctx context.Context, in *GetSSARiskDisposalRequest, opts ...grpc.CallOption) (*GetSSARiskDisposalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSSARiskDisposalResponse)
+	err := c.cc.Invoke(ctx, Yak_GetSSARiskDisposal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) SSARiskFeedbackToOnline(ctx context.Context, in *SSARiskFeedbackToOnlineRequest, opts ...grpc.CallOption) (*Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Empty)
 	err := c.cc.Invoke(ctx, Yak_SSARiskFeedbackToOnline_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GenerateSSAReport(ctx context.Context, in *GenerateSSAReportRequest, opts ...grpc.CallOption) (*GenerateSSAReportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateSSAReportResponse)
+	err := c.cc.Invoke(ctx, Yak_GenerateSSAReport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) CreateSSAProject(ctx context.Context, in *CreateSSAProjectRequest, opts ...grpc.CallOption) (*CreateSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateSSAProject(ctx context.Context, in *UpdateSSAProjectRequest, opts ...grpc.CallOption) (*UpdateSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSSAProject(ctx context.Context, in *DeleteSSAProjectRequest, opts ...grpc.CallOption) (*DeleteSSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteSSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteSSAProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QuerySSAProject(ctx context.Context, in *QuerySSAProjectRequest, opts ...grpc.CallOption) (*QuerySSAProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuerySSAProjectResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySSAProject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6194,7 +6622,7 @@ func (c *yakClient) GenerateFuzztag(ctx context.Context, in *GenerateFuzztagRequ
 
 func (c *yakClient) ExportSyntaxFlows(ctx context.Context, in *ExportSyntaxFlowsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxflowsProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[77], Yak_ExportSyntaxFlows_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[82], Yak_ExportSyntaxFlows_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6213,7 +6641,7 @@ type Yak_ExportSyntaxFlowsClient = grpc.ServerStreamingClient[SyntaxflowsProgres
 
 func (c *yakClient) ImportSyntaxFlows(ctx context.Context, in *ImportSyntaxFlowsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[SyntaxflowsProgress], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[78], Yak_ImportSyntaxFlows_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[83], Yak_ImportSyntaxFlows_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6342,7 +6770,7 @@ func (c *yakClient) ResetMITMHijackFilter(ctx context.Context, in *Empty, opts .
 
 func (c *yakClient) ExportHTTPFlowStream(ctx context.Context, in *ExportHTTPFlowStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportHTTPFlowStreamResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[79], Yak_ExportHTTPFlowStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[84], Yak_ExportHTTPFlowStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6361,7 +6789,7 @@ type Yak_ExportHTTPFlowStreamClient = grpc.ServerStreamingClient[ExportHTTPFlowS
 
 func (c *yakClient) ImportHTTPFlowStream(ctx context.Context, in *ImportHTTPFlowStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportHTTPFlowStreamResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[80], Yak_ImportHTTPFlowStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[85], Yak_ImportHTTPFlowStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6430,7 +6858,7 @@ func (c *yakClient) SearchNoteContent(ctx context.Context, in *SearchNoteContent
 
 func (c *yakClient) ImportNote(ctx context.Context, in *ImportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ImportNoteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[81], Yak_ImportNote_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[86], Yak_ImportNote_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6449,7 +6877,7 @@ type Yak_ImportNoteClient = grpc.ServerStreamingClient[ImportNoteResponse]
 
 func (c *yakClient) ExportNote(ctx context.Context, in *ExportNoteRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExportNoteResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[82], Yak_ExportNote_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_ExportNote_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6466,9 +6894,22 @@ func (c *yakClient) ExportNote(ctx context.Context, in *ExportNoteRequest, opts 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExportNoteClient = grpc.ServerStreamingClient[ExportNoteResponse]
 
+func (c *yakClient) StartAIReAct(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_StartAIReAct_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[AIInputEvent, AIOutputEvent]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartAIReActClient = grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent]
+
 func (c *yakClient) StartAITask(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AIInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[83], Yak_StartAITask_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[89], Yak_StartAITask_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6489,9 +6930,29 @@ func (c *yakClient) QueryAITask(ctx context.Context, in *AITaskQueryRequest, opt
 	return out, nil
 }
 
+func (c *yakClient) DeleteAITask(ctx context.Context, in *AITaskDeleteRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteAITask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryAIEvent(ctx context.Context, in *AIEventQueryRequest, opts ...grpc.CallOption) (*AIEventQueryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIEventQueryResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryAIEvent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) StartAITriage(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[AITriageInputEvent, AIOutputEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[84], Yak_StartAITriage_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[90], Yak_StartAITriage_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6542,9 +7003,19 @@ func (c *yakClient) QueryAIForge(ctx context.Context, in *QueryAIForgeRequest, o
 	return out, nil
 }
 
+func (c *yakClient) GetAIForge(ctx context.Context, in *GetAIForgeRequest, opts ...grpc.CallOption) (*AIForge, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AIForge)
+	err := c.cc.Invoke(ctx, Yak_GetAIForge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) StartMcpServer(ctx context.Context, in *StartMcpServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[StartMcpServerResponse], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[85], Yak_StartMcpServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[91], Yak_StartMcpServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6601,6 +7072,26 @@ func (c *yakClient) SaveAITool(ctx context.Context, in *SaveAIToolRequest, opts 
 	return out, nil
 }
 
+func (c *yakClient) SaveAIToolV2(ctx context.Context, in *SaveAIToolRequest, opts ...grpc.CallOption) (*SaveAIToolV2Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveAIToolV2Response)
+	err := c.cc.Invoke(ctx, Yak_SaveAIToolV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateAITool(ctx context.Context, in *UpdateAIToolRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_UpdateAITool_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) ToggleAIToolFavorite(ctx context.Context, in *ToggleAIToolFavoriteRequest, opts ...grpc.CallOption) (*ToggleAIToolFavoriteResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ToggleAIToolFavoriteResponse)
@@ -6643,7 +7134,7 @@ func (c *yakClient) IsLocalModelReady(ctx context.Context, in *IsLocalModelReady
 
 func (c *yakClient) InstallLlamaServer(ctx context.Context, in *InstallLlamaServerRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[86], Yak_InstallLlamaServer_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[92], Yak_InstallLlamaServer_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6662,7 +7153,7 @@ type Yak_InstallLlamaServerClient = grpc.ServerStreamingClient[ExecResult]
 
 func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[87], Yak_StartLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[93], Yak_StartLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6679,9 +7170,19 @@ func (c *yakClient) StartLocalModel(ctx context.Context, in *StartLocalModelRequ
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartLocalModelClient = grpc.ServerStreamingClient[ExecResult]
 
+func (c *yakClient) StopLocalModel(ctx context.Context, in *StopLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_StopLocalModel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *yakClient) DownloadLocalModel(ctx context.Context, in *DownloadLocalModelRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[88], Yak_DownloadLocalModel_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[94], Yak_DownloadLocalModel_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -6708,6 +7209,532 @@ func (c *yakClient) GetSupportedLocalModels(ctx context.Context, in *Empty, opts
 	return out, nil
 }
 
+func (c *yakClient) AddLocalModel(ctx context.Context, in *AddLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_AddLocalModel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteLocalModel(ctx context.Context, in *DeleteLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteLocalModel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateLocalModel(ctx context.Context, in *UpdateLocalModelRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateLocalModel_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAllStartedLocalModels(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllStartedLocalModelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllStartedLocalModelsResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAllStartedLocalModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ClearAllModels(ctx context.Context, in *ClearAllModelsRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_ClearAllModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) IsSearchVectorDatabaseReady(ctx context.Context, in *IsSearchVectorDatabaseReadyRequest, opts ...grpc.CallOption) (*IsSearchVectorDatabaseReadyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IsSearchVectorDatabaseReadyResponse)
+	err := c.cc.Invoke(ctx, Yak_IsSearchVectorDatabaseReady_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) InitSearchVectorDatabase(ctx context.Context, in *InitSearchVectorDatabaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[95], Yak_InitSearchVectorDatabase_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[InitSearchVectorDatabaseRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_InitSearchVectorDatabaseClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) GetAllVectorStoreCollections(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllVectorStoreCollectionsResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAllVectorStoreCollections_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAllVectorStoreCollectionsWithFilter(ctx context.Context, in *GetAllVectorStoreCollectionsWithFilterRequest, opts ...grpc.CallOption) (*GetAllVectorStoreCollectionsWithFilterResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllVectorStoreCollectionsWithFilterResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAllVectorStoreCollectionsWithFilter_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteSearchVectorDatabase(ctx context.Context, in *DeleteSearchVectorDatabaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteSearchVectorDatabase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateVectorStoreCollection(ctx context.Context, in *UpdateVectorStoreCollectionRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateVectorStoreCollection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListVectorStoreEntries(ctx context.Context, in *ListVectorStoreEntriesRequest, opts ...grpc.CallOption) (*ListVectorStoreEntriesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListVectorStoreEntriesResponse)
+	err := c.cc.Invoke(ctx, Yak_ListVectorStoreEntries_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) CreateVectorStoreEntry(ctx context.Context, in *CreateVectorStoreEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateVectorStoreEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetDocumentByVectorStoreEntryID(ctx context.Context, in *GetDocumentByVectorStoreEntryIDRequest, opts ...grpc.CallOption) (*GetDocumentByVectorStoreEntryIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDocumentByVectorStoreEntryIDResponse)
+	err := c.cc.Invoke(ctx, Yak_GetDocumentByVectorStoreEntryID_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListThirdPartyBinary(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListThirdPartyBinaryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListThirdPartyBinaryResponse)
+	err := c.cc.Invoke(ctx, Yak_ListThirdPartyBinary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) InstallThirdPartyBinary(ctx context.Context, in *InstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[96], Yak_InstallThirdPartyBinary_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[InstallThirdPartyBinaryRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_InstallThirdPartyBinaryClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) UninstallThirdPartyBinary(ctx context.Context, in *UninstallThirdPartyBinaryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UninstallThirdPartyBinary_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) IsThirdPartyBinaryReady(ctx context.Context, in *IsThirdPartyBinaryReadyRequest, opts ...grpc.CallOption) (*IsThirdPartyBinaryReadyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IsThirdPartyBinaryReadyResponse)
+	err := c.cc.Invoke(ctx, Yak_IsThirdPartyBinaryReady_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) StartThirdPartyBinary(ctx context.Context, in *StartThirdPartyBinaryRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ExecResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[97], Yak_StartThirdPartyBinary_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StartThirdPartyBinaryRequest, ExecResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartThirdPartyBinaryClient = grpc.ServerStreamingClient[ExecResult]
+
+func (c *yakClient) PluginTrace(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[98], Yak_PluginTrace_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PluginTraceRequest, PluginTraceResponse]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_PluginTraceClient = grpc.BidiStreamingClient[PluginTraceRequest, PluginTraceResponse]
+
+func (c *yakClient) GetKnowledgeBaseNameList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseNameListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetKnowledgeBaseNameListResponse)
+	err := c.cc.Invoke(ctx, Yak_GetKnowledgeBaseNameList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetKnowledgeBase(ctx context.Context, in *GetKnowledgeBaseRequest, opts ...grpc.CallOption) (*GetKnowledgeBaseResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetKnowledgeBaseResponse)
+	err := c.cc.Invoke(ctx, Yak_GetKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetKnowledgeBaseTypeList(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*GetKnowledgeBaseTypeListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetKnowledgeBaseTypeListResponse)
+	err := c.cc.Invoke(ctx, Yak_GetKnowledgeBaseTypeList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteKnowledgeBase(ctx context.Context, in *DeleteKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) CreateKnowledgeBase(ctx context.Context, in *CreateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateKnowledgeBase(ctx context.Context, in *UpdateKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteKnowledgeBaseEntry(ctx context.Context, in *DeleteKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteKnowledgeBaseEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) CreateKnowledgeBaseEntry(ctx context.Context, in *CreateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_CreateKnowledgeBaseEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateKnowledgeBaseEntry(ctx context.Context, in *UpdateKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateKnowledgeBaseEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) SearchKnowledgeBaseEntry(ctx context.Context, in *SearchKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*SearchKnowledgeBaseEntryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchKnowledgeBaseEntryResponse)
+	err := c.cc.Invoke(ctx, Yak_SearchKnowledgeBaseEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryKnowledgeBaseByAI(ctx context.Context, in *QueryKnowledgeBaseByAIRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[99], Yak_QueryKnowledgeBaseByAI_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[QueryKnowledgeBaseByAIRequest, QueryKnowledgeBaseByAIResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_QueryKnowledgeBaseByAIClient = grpc.ServerStreamingClient[QueryKnowledgeBaseByAIResponse]
+
+func (c *yakClient) BuildVectorIndexForKnowledgeBase(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_BuildVectorIndexForKnowledgeBase_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) BuildVectorIndexForKnowledgeBaseEntry(ctx context.Context, in *BuildVectorIndexForKnowledgeBaseEntryRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ListEntityRepository(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListEntityRepositoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListEntityRepositoryResponse)
+	err := c.cc.Invoke(ctx, Yak_ListEntityRepository_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryEntity(ctx context.Context, in *QueryEntityRequest, opts ...grpc.CallOption) (*QueryEntityResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryEntityResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteEntity(ctx context.Context, in *DeleteEntityRequest, opts ...grpc.CallOption) (*DbOperateMessage, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DbOperateMessage)
+	err := c.cc.Invoke(ctx, Yak_DeleteEntity_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QueryRelationship(ctx context.Context, in *QueryRelationshipRequest, opts ...grpc.CallOption) (*QueryRelationshipResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QueryRelationshipResponse)
+	err := c.cc.Invoke(ctx, Yak_QueryRelationship_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) QuerySubERM(ctx context.Context, in *QuerySubERMRequest, opts ...grpc.CallOption) (*QuerySubERMResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(QuerySubERMResponse)
+	err := c.cc.Invoke(ctx, Yak_QuerySubERM_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GenerateERMDot(ctx context.Context, in *GenerateERMDotRequest, opts ...grpc.CallOption) (*GenerateERMDotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateERMDotResponse)
+	err := c.cc.Invoke(ctx, Yak_GenerateERMDot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) ExportKnowledgeBase(ctx context.Context, in *ExportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[100], Yak_ExportKnowledgeBase_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ExportKnowledgeBaseRequest, GeneralProgress]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportKnowledgeBaseClient = grpc.ServerStreamingClient[GeneralProgress]
+
+func (c *yakClient) ImportKnowledgeBase(ctx context.Context, in *ImportKnowledgeBaseRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GeneralProgress], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[101], Yak_ImportKnowledgeBase_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ImportKnowledgeBaseRequest, GeneralProgress]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ImportKnowledgeBaseClient = grpc.ServerStreamingClient[GeneralProgress]
+
+func (c *yakClient) AddMCPServer(ctx context.Context, in *AddMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_AddMCPServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) DeleteMCPServer(ctx context.Context, in *DeleteMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_DeleteMCPServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) UpdateMCPServer(ctx context.Context, in *UpdateMCPServerRequest, opts ...grpc.CallOption) (*GeneralResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GeneralResponse)
+	err := c.cc.Invoke(ctx, Yak_UpdateMCPServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) GetAllMCPServers(ctx context.Context, in *GetAllMCPServersRequest, opts ...grpc.CallOption) (*GetAllMCPServersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllMCPServersResponse)
+	err := c.cc.Invoke(ctx, Yak_GetAllMCPServers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *yakClient) RAGCollectionSearch(ctx context.Context, in *RAGCollectionSearchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RAGCollectionSearchResponse], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &Yak_ServiceDesc.Streams[102], Yak_RAGCollectionSearch_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[RAGCollectionSearchRequest, RAGCollectionSearchResponse]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_RAGCollectionSearchClient = grpc.ServerStreamingClient[RAGCollectionSearchResponse]
+
 // YakServer is the server API for Yak service.
 // All implementations must embed UnimplementedYakServer
 // for forward compatibility.
@@ -6726,6 +7753,7 @@ type YakServer interface {
 	GetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
 	ResetMITMFilter(context.Context, *Empty) (*SetMITMFilterRequest, error)
 	DownloadMITMCert(context.Context, *Empty) (*MITMCert, error)
+	DownloadMITMGMCert(context.Context, *Empty) (*MITMCert, error)
 	MITMV2(grpc.BidiStreamingServer[MITMV2Request, MITMV2Response]) error
 	// 开启端口
 	OpenPort(grpc.BidiStreamingServer[Input, Output]) error
@@ -6799,6 +7827,7 @@ type YakServer interface {
 	ExportHTTPFlows(context.Context, *ExportHTTPFlowsRequest) (*QueryHTTPFlowResponse, error)
 	HTTPFlowsToOnline(context.Context, *HTTPFlowsToOnlineRequest) (*Empty, error)
 	QueryHTTPFlowsProcessNames(context.Context, *QueryHTTPFlowRequest) (*QueryHTTPFlowsProcessNamesResponse, error)
+	HTTPFlowsToOnlineBatch(context.Context, *HTTPFlowsToOnlineBatchRequest) (*HTTPFlowsToOnlineBatchResponse, error)
 	// 流量分析器
 	AnalyzeHTTPFlow(*AnalyzeHTTPFlowRequest, grpc.ServerStreamingServer[AnalyzeHTTPFlowResponse]) error
 	// 从一个 FuzzerRequest 中提取 Url
@@ -6844,11 +7873,17 @@ type YakServer interface {
 	StringFuzzer(context.Context, *StringFuzzerRequest) (*StringFuzzerResponse, error)
 	// 分析一个 HTTP 请求详情
 	HTTPRequestAnalyzer(context.Context, *HTTPRequestAnalysisMaterial) (*HTTPRequestAnalysis, error)
+	// 用户自定义代码补全
+	CreateSnippet(context.Context, *SnippetsRequest) (*Empty, error)
+	UpdateSnippet(context.Context, *EditSnippetsRequest) (*Empty, error)
+	DeleteSnippets(context.Context, *QuerySnippetsRequest) (*Empty, error)
+	QuerySnippets(context.Context, *QuerySnippetsRequest) (*SnippetsResponse, error)
 	// 编码解码
 	Codec(context.Context, *CodecRequest) (*CodecResponse, error)
 	NewCodec(context.Context, *CodecRequestFlow) (*CodecResponse, error)
 	GetAllCodecMethods(context.Context, *Empty) (*CodecMethods, error)
 	SaveCodecFlow(context.Context, *CustomizeCodecFlow) (*Empty, error)
+	UpdateCodecFlow(context.Context, *UpdateCodecFlowRequest) (*Empty, error)
 	DeleteCodecFlow(context.Context, *DeleteCodecFlowRequest) (*Empty, error)
 	GetAllCodecFlow(context.Context, *Empty) (*GetCodecFlowResponse, error)
 	PacketPrettifyHelper(context.Context, *PacketPrettifyHelperRequest) (*PacketPrettifyHelperResponse, error)
@@ -6890,6 +7925,12 @@ type YakServer interface {
 	ConvertPayloadGroupToDatabase(*NameRequest, grpc.ServerStreamingServer[SavePayloadProgress]) error
 	// 迁移旧的payload
 	MigratePayloads(*Empty, grpc.ServerStreamingServer[SavePayloadProgress]) error
+	// 批量导payload 数据库 已废弃
+	ExportPayloadBatch(*ExportPayloadBatchRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error
+	UploadPayloadToOnline(*UploadPayloadToOnlineRequest, grpc.ServerStreamingServer[DownloadProgress]) error
+	DownloadPayload(*DownloadPayloadRequest, grpc.ServerStreamingServer[DownloadProgress]) error
+	// 批量导payload所有
+	ExportPayloadDBAndFile(*ExportPayloadDBAndFileRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error
 	// 自动生成补全
 	GetYakitCompletionRaw(context.Context, *Empty) (*YakitCompletionRawResponse, error)
 	GetYakVMBuildInMethodCompletion(context.Context, *GetYakVMBuildInMethodCompletionRequest) (*GetYakVMBuildInMethodCompletionResponse, error)
@@ -7273,7 +8314,22 @@ type YakServer interface {
 	UpdateSSARiskTags(context.Context, *UpdateSSARiskTagsRequest) (*DbOperateMessage, error)
 	GetSSARiskFieldGroup(context.Context, *Empty) (*SSARiskFieldGroupResponse, error)
 	NewSSARiskRead(context.Context, *NewSSARiskReadRequest) (*NewSSARiskReadResponse, error)
+	// SSA risk diff
+	SSARiskDiff(*SSARiskDiffRequest, grpc.ServerStreamingServer[SSARiskDiffResponse]) error
+	// SSA Risk Disposal CURD
+	CreateSSARiskDisposals(context.Context, *CreateSSARiskDisposalsRequest) (*CreateSSARiskDisposalsResponse, error)
+	QuerySSARiskDisposals(context.Context, *QuerySSARiskDisposalsRequest) (*QuerySSARiskDisposalsResponse, error)
+	UpdateSSARiskDisposals(context.Context, *UpdateSSARiskDisposalsRequest) (*UpdateSSARiskDisposalsResponse, error)
+	DeleteSSARiskDisposals(context.Context, *DeleteSSARiskDisposalsRequest) (*DeleteSSARiskDisposalsResponse, error)
+	GetSSARiskDisposal(context.Context, *GetSSARiskDisposalRequest) (*GetSSARiskDisposalResponse, error)
 	SSARiskFeedbackToOnline(context.Context, *SSARiskFeedbackToOnlineRequest) (*Empty, error)
+	// SSA Report
+	GenerateSSAReport(context.Context, *GenerateSSAReportRequest) (*GenerateSSAReportResponse, error)
+	// SSA Project CRUD
+	CreateSSAProject(context.Context, *CreateSSAProjectRequest) (*CreateSSAProjectResponse, error)
+	UpdateSSAProject(context.Context, *UpdateSSAProjectRequest) (*UpdateSSAProjectResponse, error)
+	DeleteSSAProject(context.Context, *DeleteSSAProjectRequest) (*DeleteSSAProjectResponse, error)
+	QuerySSAProject(context.Context, *QuerySSAProjectRequest) (*QuerySSAProjectResponse, error)
 	GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error)
 	QueryPluginEnv(context.Context, *QueryPluginEnvRequest) (*PluginEnvData, error)
 	CreatePluginEnv(context.Context, *PluginEnvData) (*Empty, error)
@@ -7310,20 +8366,26 @@ type YakServer interface {
 	ImportNote(*ImportNoteRequest, grpc.ServerStreamingServer[ImportNoteResponse]) error
 	ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error
 	// AI Task
+	StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error
 	QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error)
+	DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error)
+	QueryAIEvent(context.Context, *AIEventQueryRequest) (*AIEventQueryResponse, error)
 	StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error
 	// AI forge curd
 	CreateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
 	UpdateAIForge(context.Context, *AIForge) (*DbOperateMessage, error)
 	DeleteAIForge(context.Context, *AIForgeFilter) (*DbOperateMessage, error)
 	QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error)
+	GetAIForge(context.Context, *GetAIForgeRequest) (*AIForge, error)
 	// mcp server
 	StartMcpServer(*StartMcpServerRequest, grpc.ServerStreamingServer[StartMcpServerResponse]) error
 	GetToolSetList(context.Context, *Empty) (*GetToolSetListResponse, error)
 	GetAIToolList(context.Context, *GetAIToolListRequest) (*GetAIToolListResponse, error)
 	DeleteAITool(context.Context, *DeleteAIToolRequest) (*DbOperateMessage, error)
 	SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error)
+	SaveAIToolV2(context.Context, *SaveAIToolRequest) (*SaveAIToolV2Response, error)
+	UpdateAITool(context.Context, *UpdateAIToolRequest) (*DbOperateMessage, error)
 	ToggleAIToolFavorite(context.Context, *ToggleAIToolFavoriteRequest) (*ToggleAIToolFavoriteResponse, error)
 	AIToolGenerateMetadata(context.Context, *AIToolGenerateMetadataRequest) (*AIToolGenerateMetadataResponse, error)
 	// Local Model Management
@@ -7331,8 +8393,61 @@ type YakServer interface {
 	IsLocalModelReady(context.Context, *IsLocalModelReadyRequest) (*IsLocalModelReadyResponse, error)
 	InstallLlamaServer(*InstallLlamaServerRequest, grpc.ServerStreamingServer[ExecResult]) error
 	StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
+	StopLocalModel(context.Context, *StopLocalModelRequest) (*GeneralResponse, error)
 	DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error
 	GetSupportedLocalModels(context.Context, *Empty) (*GetSupportedLocalModelsResponse, error)
+	AddLocalModel(context.Context, *AddLocalModelRequest) (*GeneralResponse, error)
+	DeleteLocalModel(context.Context, *DeleteLocalModelRequest) (*GeneralResponse, error)
+	UpdateLocalModel(context.Context, *UpdateLocalModelRequest) (*GeneralResponse, error)
+	GetAllStartedLocalModels(context.Context, *Empty) (*GetAllStartedLocalModelsResponse, error)
+	ClearAllModels(context.Context, *ClearAllModelsRequest) (*GeneralResponse, error)
+	IsSearchVectorDatabaseReady(context.Context, *IsSearchVectorDatabaseReadyRequest) (*IsSearchVectorDatabaseReadyResponse, error)
+	InitSearchVectorDatabase(*InitSearchVectorDatabaseRequest, grpc.ServerStreamingServer[ExecResult]) error
+	GetAllVectorStoreCollections(context.Context, *Empty) (*GetAllVectorStoreCollectionsResponse, error)
+	GetAllVectorStoreCollectionsWithFilter(context.Context, *GetAllVectorStoreCollectionsWithFilterRequest) (*GetAllVectorStoreCollectionsWithFilterResponse, error)
+	DeleteSearchVectorDatabase(context.Context, *DeleteSearchVectorDatabaseRequest) (*GeneralResponse, error)
+	UpdateVectorStoreCollection(context.Context, *UpdateVectorStoreCollectionRequest) (*GeneralResponse, error)
+	ListVectorStoreEntries(context.Context, *ListVectorStoreEntriesRequest) (*ListVectorStoreEntriesResponse, error)
+	CreateVectorStoreEntry(context.Context, *CreateVectorStoreEntryRequest) (*GeneralResponse, error)
+	GetDocumentByVectorStoreEntryID(context.Context, *GetDocumentByVectorStoreEntryIDRequest) (*GetDocumentByVectorStoreEntryIDResponse, error)
+	// 第三方应用管理
+	ListThirdPartyBinary(context.Context, *Empty) (*ListThirdPartyBinaryResponse, error)
+	InstallThirdPartyBinary(*InstallThirdPartyBinaryRequest, grpc.ServerStreamingServer[ExecResult]) error
+	UninstallThirdPartyBinary(context.Context, *UninstallThirdPartyBinaryRequest) (*GeneralResponse, error)
+	IsThirdPartyBinaryReady(context.Context, *IsThirdPartyBinaryReadyRequest) (*IsThirdPartyBinaryReadyResponse, error)
+	StartThirdPartyBinary(*StartThirdPartyBinaryRequest, grpc.ServerStreamingServer[ExecResult]) error
+	// 插件执行跟踪双向流服务
+	PluginTrace(grpc.BidiStreamingServer[PluginTraceRequest, PluginTraceResponse]) error
+	// Knowledge Base
+	GetKnowledgeBaseNameList(context.Context, *Empty) (*GetKnowledgeBaseNameListResponse, error)
+	GetKnowledgeBase(context.Context, *GetKnowledgeBaseRequest) (*GetKnowledgeBaseResponse, error)
+	GetKnowledgeBaseTypeList(context.Context, *Empty) (*GetKnowledgeBaseTypeListResponse, error)
+	DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*GeneralResponse, error)
+	CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*GeneralResponse, error)
+	UpdateKnowledgeBase(context.Context, *UpdateKnowledgeBaseRequest) (*GeneralResponse, error)
+	DeleteKnowledgeBaseEntry(context.Context, *DeleteKnowledgeBaseEntryRequest) (*GeneralResponse, error)
+	CreateKnowledgeBaseEntry(context.Context, *CreateKnowledgeBaseEntryRequest) (*GeneralResponse, error)
+	UpdateKnowledgeBaseEntry(context.Context, *UpdateKnowledgeBaseEntryRequest) (*GeneralResponse, error)
+	SearchKnowledgeBaseEntry(context.Context, *SearchKnowledgeBaseEntryRequest) (*SearchKnowledgeBaseEntryResponse, error)
+	QueryKnowledgeBaseByAI(*QueryKnowledgeBaseByAIRequest, grpc.ServerStreamingServer[QueryKnowledgeBaseByAIResponse]) error
+	BuildVectorIndexForKnowledgeBase(context.Context, *BuildVectorIndexForKnowledgeBaseRequest) (*GeneralResponse, error)
+	BuildVectorIndexForKnowledgeBaseEntry(context.Context, *BuildVectorIndexForKnowledgeBaseEntryRequest) (*GeneralResponse, error)
+	// Entity Repository
+	ListEntityRepository(context.Context, *Empty) (*ListEntityRepositoryResponse, error)
+	QueryEntity(context.Context, *QueryEntityRequest) (*QueryEntityResponse, error)
+	DeleteEntity(context.Context, *DeleteEntityRequest) (*DbOperateMessage, error)
+	QueryRelationship(context.Context, *QueryRelationshipRequest) (*QueryRelationshipResponse, error)
+	QuerySubERM(context.Context, *QuerySubERMRequest) (*QuerySubERMResponse, error)
+	GenerateERMDot(context.Context, *GenerateERMDotRequest) (*GenerateERMDotResponse, error)
+	// Export and Import Knowledge Base
+	ExportKnowledgeBase(*ExportKnowledgeBaseRequest, grpc.ServerStreamingServer[GeneralProgress]) error
+	ImportKnowledgeBase(*ImportKnowledgeBaseRequest, grpc.ServerStreamingServer[GeneralProgress]) error
+	AddMCPServer(context.Context, *AddMCPServerRequest) (*GeneralResponse, error)
+	DeleteMCPServer(context.Context, *DeleteMCPServerRequest) (*GeneralResponse, error)
+	UpdateMCPServer(context.Context, *UpdateMCPServerRequest) (*GeneralResponse, error)
+	GetAllMCPServers(context.Context, *GetAllMCPServersRequest) (*GetAllMCPServersResponse, error)
+	// RAG Collection Search
+	RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error
 	mustEmbedUnimplementedYakServer()
 }
 
@@ -7372,6 +8487,9 @@ func (UnimplementedYakServer) ResetMITMFilter(context.Context, *Empty) (*SetMITM
 }
 func (UnimplementedYakServer) DownloadMITMCert(context.Context, *Empty) (*MITMCert, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DownloadMITMCert not implemented")
+}
+func (UnimplementedYakServer) DownloadMITMGMCert(context.Context, *Empty) (*MITMCert, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DownloadMITMGMCert not implemented")
 }
 func (UnimplementedYakServer) MITMV2(grpc.BidiStreamingServer[MITMV2Request, MITMV2Response]) error {
 	return status.Errorf(codes.Unimplemented, "method MITMV2 not implemented")
@@ -7565,6 +8683,9 @@ func (UnimplementedYakServer) HTTPFlowsToOnline(context.Context, *HTTPFlowsToOnl
 func (UnimplementedYakServer) QueryHTTPFlowsProcessNames(context.Context, *QueryHTTPFlowRequest) (*QueryHTTPFlowsProcessNamesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryHTTPFlowsProcessNames not implemented")
 }
+func (UnimplementedYakServer) HTTPFlowsToOnlineBatch(context.Context, *HTTPFlowsToOnlineBatchRequest) (*HTTPFlowsToOnlineBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HTTPFlowsToOnlineBatch not implemented")
+}
 func (UnimplementedYakServer) AnalyzeHTTPFlow(*AnalyzeHTTPFlowRequest, grpc.ServerStreamingServer[AnalyzeHTTPFlowResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method AnalyzeHTTPFlow not implemented")
 }
@@ -7673,6 +8794,18 @@ func (UnimplementedYakServer) StringFuzzer(context.Context, *StringFuzzerRequest
 func (UnimplementedYakServer) HTTPRequestAnalyzer(context.Context, *HTTPRequestAnalysisMaterial) (*HTTPRequestAnalysis, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HTTPRequestAnalyzer not implemented")
 }
+func (UnimplementedYakServer) CreateSnippet(context.Context, *SnippetsRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSnippet not implemented")
+}
+func (UnimplementedYakServer) UpdateSnippet(context.Context, *EditSnippetsRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSnippet not implemented")
+}
+func (UnimplementedYakServer) DeleteSnippets(context.Context, *QuerySnippetsRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSnippets not implemented")
+}
+func (UnimplementedYakServer) QuerySnippets(context.Context, *QuerySnippetsRequest) (*SnippetsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySnippets not implemented")
+}
 func (UnimplementedYakServer) Codec(context.Context, *CodecRequest) (*CodecResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Codec not implemented")
 }
@@ -7684,6 +8817,9 @@ func (UnimplementedYakServer) GetAllCodecMethods(context.Context, *Empty) (*Code
 }
 func (UnimplementedYakServer) SaveCodecFlow(context.Context, *CustomizeCodecFlow) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveCodecFlow not implemented")
+}
+func (UnimplementedYakServer) UpdateCodecFlow(context.Context, *UpdateCodecFlowRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateCodecFlow not implemented")
 }
 func (UnimplementedYakServer) DeleteCodecFlow(context.Context, *DeleteCodecFlowRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteCodecFlow not implemented")
@@ -7768,6 +8904,18 @@ func (UnimplementedYakServer) ConvertPayloadGroupToDatabase(*NameRequest, grpc.S
 }
 func (UnimplementedYakServer) MigratePayloads(*Empty, grpc.ServerStreamingServer[SavePayloadProgress]) error {
 	return status.Errorf(codes.Unimplemented, "method MigratePayloads not implemented")
+}
+func (UnimplementedYakServer) ExportPayloadBatch(*ExportPayloadBatchRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method ExportPayloadBatch not implemented")
+}
+func (UnimplementedYakServer) UploadPayloadToOnline(*UploadPayloadToOnlineRequest, grpc.ServerStreamingServer[DownloadProgress]) error {
+	return status.Errorf(codes.Unimplemented, "method UploadPayloadToOnline not implemented")
+}
+func (UnimplementedYakServer) DownloadPayload(*DownloadPayloadRequest, grpc.ServerStreamingServer[DownloadProgress]) error {
+	return status.Errorf(codes.Unimplemented, "method DownloadPayload not implemented")
+}
+func (UnimplementedYakServer) ExportPayloadDBAndFile(*ExportPayloadDBAndFileRequest, grpc.ServerStreamingServer[GetAllPayloadResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method ExportPayloadDBAndFile not implemented")
 }
 func (UnimplementedYakServer) GetYakitCompletionRaw(context.Context, *Empty) (*YakitCompletionRawResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetYakitCompletionRaw not implemented")
@@ -8648,8 +9796,41 @@ func (UnimplementedYakServer) GetSSARiskFieldGroup(context.Context, *Empty) (*SS
 func (UnimplementedYakServer) NewSSARiskRead(context.Context, *NewSSARiskReadRequest) (*NewSSARiskReadResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewSSARiskRead not implemented")
 }
+func (UnimplementedYakServer) SSARiskDiff(*SSARiskDiffRequest, grpc.ServerStreamingServer[SSARiskDiffResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method SSARiskDiff not implemented")
+}
+func (UnimplementedYakServer) CreateSSARiskDisposals(context.Context, *CreateSSARiskDisposalsRequest) (*CreateSSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) QuerySSARiskDisposals(context.Context, *QuerySSARiskDisposalsRequest) (*QuerySSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) UpdateSSARiskDisposals(context.Context, *UpdateSSARiskDisposalsRequest) (*UpdateSSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) DeleteSSARiskDisposals(context.Context, *DeleteSSARiskDisposalsRequest) (*DeleteSSARiskDisposalsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSARiskDisposals not implemented")
+}
+func (UnimplementedYakServer) GetSSARiskDisposal(context.Context, *GetSSARiskDisposalRequest) (*GetSSARiskDisposalResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSSARiskDisposal not implemented")
+}
 func (UnimplementedYakServer) SSARiskFeedbackToOnline(context.Context, *SSARiskFeedbackToOnlineRequest) (*Empty, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SSARiskFeedbackToOnline not implemented")
+}
+func (UnimplementedYakServer) GenerateSSAReport(context.Context, *GenerateSSAReportRequest) (*GenerateSSAReportResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GenerateSSAReport not implemented")
+}
+func (UnimplementedYakServer) CreateSSAProject(context.Context, *CreateSSAProjectRequest) (*CreateSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSSAProject not implemented")
+}
+func (UnimplementedYakServer) UpdateSSAProject(context.Context, *UpdateSSAProjectRequest) (*UpdateSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSSAProject not implemented")
+}
+func (UnimplementedYakServer) DeleteSSAProject(context.Context, *DeleteSSAProjectRequest) (*DeleteSSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSSAProject not implemented")
+}
+func (UnimplementedYakServer) QuerySSAProject(context.Context, *QuerySSAProjectRequest) (*QuerySSAProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySSAProject not implemented")
 }
 func (UnimplementedYakServer) GetAllPluginEnv(context.Context, *Empty) (*PluginEnvData, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllPluginEnv not implemented")
@@ -8738,11 +9919,20 @@ func (UnimplementedYakServer) ImportNote(*ImportNoteRequest, grpc.ServerStreamin
 func (UnimplementedYakServer) ExportNote(*ExportNoteRequest, grpc.ServerStreamingServer[ExportNoteResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method ExportNote not implemented")
 }
+func (UnimplementedYakServer) StartAIReAct(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
+	return status.Errorf(codes.Unimplemented, "method StartAIReAct not implemented")
+}
 func (UnimplementedYakServer) StartAITask(grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITask not implemented")
 }
 func (UnimplementedYakServer) QueryAITask(context.Context, *AITaskQueryRequest) (*AITaskQueryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryAITask not implemented")
+}
+func (UnimplementedYakServer) DeleteAITask(context.Context, *AITaskDeleteRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAITask not implemented")
+}
+func (UnimplementedYakServer) QueryAIEvent(context.Context, *AIEventQueryRequest) (*AIEventQueryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryAIEvent not implemented")
 }
 func (UnimplementedYakServer) StartAITriage(grpc.BidiStreamingServer[AITriageInputEvent, AIOutputEvent]) error {
 	return status.Errorf(codes.Unimplemented, "method StartAITriage not implemented")
@@ -8759,6 +9949,9 @@ func (UnimplementedYakServer) DeleteAIForge(context.Context, *AIForgeFilter) (*D
 func (UnimplementedYakServer) QueryAIForge(context.Context, *QueryAIForgeRequest) (*QueryAIForgeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method QueryAIForge not implemented")
 }
+func (UnimplementedYakServer) GetAIForge(context.Context, *GetAIForgeRequest) (*AIForge, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAIForge not implemented")
+}
 func (UnimplementedYakServer) StartMcpServer(*StartMcpServerRequest, grpc.ServerStreamingServer[StartMcpServerResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method StartMcpServer not implemented")
 }
@@ -8773,6 +9966,12 @@ func (UnimplementedYakServer) DeleteAITool(context.Context, *DeleteAIToolRequest
 }
 func (UnimplementedYakServer) SaveAITool(context.Context, *SaveAIToolRequest) (*DbOperateMessage, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveAITool not implemented")
+}
+func (UnimplementedYakServer) SaveAIToolV2(context.Context, *SaveAIToolRequest) (*SaveAIToolV2Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SaveAIToolV2 not implemented")
+}
+func (UnimplementedYakServer) UpdateAITool(context.Context, *UpdateAIToolRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAITool not implemented")
 }
 func (UnimplementedYakServer) ToggleAIToolFavorite(context.Context, *ToggleAIToolFavoriteRequest) (*ToggleAIToolFavoriteResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ToggleAIToolFavorite not implemented")
@@ -8792,11 +9991,152 @@ func (UnimplementedYakServer) InstallLlamaServer(*InstallLlamaServerRequest, grp
 func (UnimplementedYakServer) StartLocalModel(*StartLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
 	return status.Errorf(codes.Unimplemented, "method StartLocalModel not implemented")
 }
+func (UnimplementedYakServer) StopLocalModel(context.Context, *StopLocalModelRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StopLocalModel not implemented")
+}
 func (UnimplementedYakServer) DownloadLocalModel(*DownloadLocalModelRequest, grpc.ServerStreamingServer[ExecResult]) error {
 	return status.Errorf(codes.Unimplemented, "method DownloadLocalModel not implemented")
 }
 func (UnimplementedYakServer) GetSupportedLocalModels(context.Context, *Empty) (*GetSupportedLocalModelsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSupportedLocalModels not implemented")
+}
+func (UnimplementedYakServer) AddLocalModel(context.Context, *AddLocalModelRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddLocalModel not implemented")
+}
+func (UnimplementedYakServer) DeleteLocalModel(context.Context, *DeleteLocalModelRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteLocalModel not implemented")
+}
+func (UnimplementedYakServer) UpdateLocalModel(context.Context, *UpdateLocalModelRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateLocalModel not implemented")
+}
+func (UnimplementedYakServer) GetAllStartedLocalModels(context.Context, *Empty) (*GetAllStartedLocalModelsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllStartedLocalModels not implemented")
+}
+func (UnimplementedYakServer) ClearAllModels(context.Context, *ClearAllModelsRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ClearAllModels not implemented")
+}
+func (UnimplementedYakServer) IsSearchVectorDatabaseReady(context.Context, *IsSearchVectorDatabaseReadyRequest) (*IsSearchVectorDatabaseReadyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsSearchVectorDatabaseReady not implemented")
+}
+func (UnimplementedYakServer) InitSearchVectorDatabase(*InitSearchVectorDatabaseRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method InitSearchVectorDatabase not implemented")
+}
+func (UnimplementedYakServer) GetAllVectorStoreCollections(context.Context, *Empty) (*GetAllVectorStoreCollectionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllVectorStoreCollections not implemented")
+}
+func (UnimplementedYakServer) GetAllVectorStoreCollectionsWithFilter(context.Context, *GetAllVectorStoreCollectionsWithFilterRequest) (*GetAllVectorStoreCollectionsWithFilterResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllVectorStoreCollectionsWithFilter not implemented")
+}
+func (UnimplementedYakServer) DeleteSearchVectorDatabase(context.Context, *DeleteSearchVectorDatabaseRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSearchVectorDatabase not implemented")
+}
+func (UnimplementedYakServer) UpdateVectorStoreCollection(context.Context, *UpdateVectorStoreCollectionRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateVectorStoreCollection not implemented")
+}
+func (UnimplementedYakServer) ListVectorStoreEntries(context.Context, *ListVectorStoreEntriesRequest) (*ListVectorStoreEntriesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListVectorStoreEntries not implemented")
+}
+func (UnimplementedYakServer) CreateVectorStoreEntry(context.Context, *CreateVectorStoreEntryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateVectorStoreEntry not implemented")
+}
+func (UnimplementedYakServer) GetDocumentByVectorStoreEntryID(context.Context, *GetDocumentByVectorStoreEntryIDRequest) (*GetDocumentByVectorStoreEntryIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDocumentByVectorStoreEntryID not implemented")
+}
+func (UnimplementedYakServer) ListThirdPartyBinary(context.Context, *Empty) (*ListThirdPartyBinaryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListThirdPartyBinary not implemented")
+}
+func (UnimplementedYakServer) InstallThirdPartyBinary(*InstallThirdPartyBinaryRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method InstallThirdPartyBinary not implemented")
+}
+func (UnimplementedYakServer) UninstallThirdPartyBinary(context.Context, *UninstallThirdPartyBinaryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UninstallThirdPartyBinary not implemented")
+}
+func (UnimplementedYakServer) IsThirdPartyBinaryReady(context.Context, *IsThirdPartyBinaryReadyRequest) (*IsThirdPartyBinaryReadyResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IsThirdPartyBinaryReady not implemented")
+}
+func (UnimplementedYakServer) StartThirdPartyBinary(*StartThirdPartyBinaryRequest, grpc.ServerStreamingServer[ExecResult]) error {
+	return status.Errorf(codes.Unimplemented, "method StartThirdPartyBinary not implemented")
+}
+func (UnimplementedYakServer) PluginTrace(grpc.BidiStreamingServer[PluginTraceRequest, PluginTraceResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method PluginTrace not implemented")
+}
+func (UnimplementedYakServer) GetKnowledgeBaseNameList(context.Context, *Empty) (*GetKnowledgeBaseNameListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetKnowledgeBaseNameList not implemented")
+}
+func (UnimplementedYakServer) GetKnowledgeBase(context.Context, *GetKnowledgeBaseRequest) (*GetKnowledgeBaseResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) GetKnowledgeBaseTypeList(context.Context, *Empty) (*GetKnowledgeBaseTypeListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetKnowledgeBaseTypeList not implemented")
+}
+func (UnimplementedYakServer) DeleteKnowledgeBase(context.Context, *DeleteKnowledgeBaseRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) CreateKnowledgeBase(context.Context, *CreateKnowledgeBaseRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) UpdateKnowledgeBase(context.Context, *UpdateKnowledgeBaseRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) DeleteKnowledgeBaseEntry(context.Context, *DeleteKnowledgeBaseEntryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteKnowledgeBaseEntry not implemented")
+}
+func (UnimplementedYakServer) CreateKnowledgeBaseEntry(context.Context, *CreateKnowledgeBaseEntryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateKnowledgeBaseEntry not implemented")
+}
+func (UnimplementedYakServer) UpdateKnowledgeBaseEntry(context.Context, *UpdateKnowledgeBaseEntryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateKnowledgeBaseEntry not implemented")
+}
+func (UnimplementedYakServer) SearchKnowledgeBaseEntry(context.Context, *SearchKnowledgeBaseEntryRequest) (*SearchKnowledgeBaseEntryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchKnowledgeBaseEntry not implemented")
+}
+func (UnimplementedYakServer) QueryKnowledgeBaseByAI(*QueryKnowledgeBaseByAIRequest, grpc.ServerStreamingServer[QueryKnowledgeBaseByAIResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method QueryKnowledgeBaseByAI not implemented")
+}
+func (UnimplementedYakServer) BuildVectorIndexForKnowledgeBase(context.Context, *BuildVectorIndexForKnowledgeBaseRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BuildVectorIndexForKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) BuildVectorIndexForKnowledgeBaseEntry(context.Context, *BuildVectorIndexForKnowledgeBaseEntryRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BuildVectorIndexForKnowledgeBaseEntry not implemented")
+}
+func (UnimplementedYakServer) ListEntityRepository(context.Context, *Empty) (*ListEntityRepositoryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListEntityRepository not implemented")
+}
+func (UnimplementedYakServer) QueryEntity(context.Context, *QueryEntityRequest) (*QueryEntityResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryEntity not implemented")
+}
+func (UnimplementedYakServer) DeleteEntity(context.Context, *DeleteEntityRequest) (*DbOperateMessage, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteEntity not implemented")
+}
+func (UnimplementedYakServer) QueryRelationship(context.Context, *QueryRelationshipRequest) (*QueryRelationshipResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QueryRelationship not implemented")
+}
+func (UnimplementedYakServer) QuerySubERM(context.Context, *QuerySubERMRequest) (*QuerySubERMResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method QuerySubERM not implemented")
+}
+func (UnimplementedYakServer) GenerateERMDot(context.Context, *GenerateERMDotRequest) (*GenerateERMDotResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GenerateERMDot not implemented")
+}
+func (UnimplementedYakServer) ExportKnowledgeBase(*ExportKnowledgeBaseRequest, grpc.ServerStreamingServer[GeneralProgress]) error {
+	return status.Errorf(codes.Unimplemented, "method ExportKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) ImportKnowledgeBase(*ImportKnowledgeBaseRequest, grpc.ServerStreamingServer[GeneralProgress]) error {
+	return status.Errorf(codes.Unimplemented, "method ImportKnowledgeBase not implemented")
+}
+func (UnimplementedYakServer) AddMCPServer(context.Context, *AddMCPServerRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AddMCPServer not implemented")
+}
+func (UnimplementedYakServer) DeleteMCPServer(context.Context, *DeleteMCPServerRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteMCPServer not implemented")
+}
+func (UnimplementedYakServer) UpdateMCPServer(context.Context, *UpdateMCPServerRequest) (*GeneralResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateMCPServer not implemented")
+}
+func (UnimplementedYakServer) GetAllMCPServers(context.Context, *GetAllMCPServersRequest) (*GetAllMCPServersResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllMCPServers not implemented")
+}
+func (UnimplementedYakServer) RAGCollectionSearch(*RAGCollectionSearchRequest, grpc.ServerStreamingServer[RAGCollectionSearchResponse]) error {
+	return status.Errorf(codes.Unimplemented, "method RAGCollectionSearch not implemented")
 }
 func (UnimplementedYakServer) mustEmbedUnimplementedYakServer() {}
 func (UnimplementedYakServer) testEmbeddedByValue()             {}
@@ -8984,6 +10324,24 @@ func _Yak_DownloadMITMCert_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).DownloadMITMCert(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DownloadMITMGMCert_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DownloadMITMGMCert(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DownloadMITMGMCert_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DownloadMITMGMCert(ctx, req.(*Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -10020,6 +11378,24 @@ func _Yak_QueryHTTPFlowsProcessNames_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_HTTPFlowsToOnlineBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HTTPFlowsToOnlineBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).HTTPFlowsToOnlineBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_HTTPFlowsToOnlineBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).HTTPFlowsToOnlineBatch(ctx, req.(*HTTPFlowsToOnlineBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_AnalyzeHTTPFlow_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(AnalyzeHTTPFlowRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -10625,6 +12001,78 @@ func _Yak_HTTPRequestAnalyzer_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_CreateSnippet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SnippetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateSnippet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateSnippet_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateSnippet(ctx, req.(*SnippetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateSnippet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EditSnippetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSnippet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSnippet_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSnippet(ctx, req.(*EditSnippetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSnippets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySnippetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSnippets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSnippets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSnippets(ctx, req.(*QuerySnippetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QuerySnippets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySnippetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySnippets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySnippets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySnippets(ctx, req.(*QuerySnippetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_Codec_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CodecRequest)
 	if err := dec(in); err != nil {
@@ -10693,6 +12141,24 @@ func _Yak_SaveCodecFlow_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).SaveCodecFlow(ctx, req.(*CustomizeCodecFlow))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateCodecFlow_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateCodecFlowRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateCodecFlow(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateCodecFlow_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateCodecFlow(ctx, req.(*UpdateCodecFlowRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -11130,6 +12596,50 @@ func _Yak_MigratePayloads_Handler(srv interface{}, stream grpc.ServerStream) err
 
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_MigratePayloadsServer = grpc.ServerStreamingServer[SavePayloadProgress]
+
+func _Yak_ExportPayloadBatch_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportPayloadBatchRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ExportPayloadBatch(m, &grpc.GenericServerStream[ExportPayloadBatchRequest, GetAllPayloadResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportPayloadBatchServer = grpc.ServerStreamingServer[GetAllPayloadResponse]
+
+func _Yak_UploadPayloadToOnline_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(UploadPayloadToOnlineRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).UploadPayloadToOnline(m, &grpc.GenericServerStream[UploadPayloadToOnlineRequest, DownloadProgress]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_UploadPayloadToOnlineServer = grpc.ServerStreamingServer[DownloadProgress]
+
+func _Yak_DownloadPayload_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DownloadPayloadRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).DownloadPayload(m, &grpc.GenericServerStream[DownloadPayloadRequest, DownloadProgress]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_DownloadPayloadServer = grpc.ServerStreamingServer[DownloadProgress]
+
+func _Yak_ExportPayloadDBAndFile_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportPayloadDBAndFileRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ExportPayloadDBAndFile(m, &grpc.GenericServerStream[ExportPayloadDBAndFileRequest, GetAllPayloadResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportPayloadDBAndFileServer = grpc.ServerStreamingServer[GetAllPayloadResponse]
 
 func _Yak_GetYakitCompletionRaw_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Empty)
@@ -16062,6 +17572,107 @@ func _Yak_NewSSARiskRead_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_SSARiskDiff_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(SSARiskDiffRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).SSARiskDiff(m, &grpc.GenericServerStream[SSARiskDiffRequest, SSARiskDiffResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_SSARiskDiffServer = grpc.ServerStreamingServer[SSARiskDiffResponse]
+
+func _Yak_CreateSSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateSSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateSSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateSSARiskDisposals(ctx, req.(*CreateSSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QuerySSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySSARiskDisposals(ctx, req.(*QuerySSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateSSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSSARiskDisposals(ctx, req.(*UpdateSSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSSARiskDisposals_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSSARiskDisposalsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSSARiskDisposals(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSSARiskDisposals_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSSARiskDisposals(ctx, req.(*DeleteSSARiskDisposalsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetSSARiskDisposal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSSARiskDisposalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetSSARiskDisposal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetSSARiskDisposal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetSSARiskDisposal(ctx, req.(*GetSSARiskDisposalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_SSARiskFeedbackToOnline_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SSARiskFeedbackToOnlineRequest)
 	if err := dec(in); err != nil {
@@ -16076,6 +17687,96 @@ func _Yak_SSARiskFeedbackToOnline_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).SSARiskFeedbackToOnline(ctx, req.(*SSARiskFeedbackToOnlineRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GenerateSSAReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateSSAReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GenerateSSAReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GenerateSSAReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GenerateSSAReport(ctx, req.(*GenerateSSAReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreateSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateSSAProject(ctx, req.(*CreateSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateSSAProject(ctx, req.(*UpdateSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSSAProject(ctx, req.(*DeleteSSAProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QuerySSAProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySSAProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySSAProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySSAProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySSAProject(ctx, req.(*QuerySSAProjectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -16560,6 +18261,13 @@ func _Yak_ExportNote_Handler(srv interface{}, stream grpc.ServerStream) error {
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_ExportNoteServer = grpc.ServerStreamingServer[ExportNoteResponse]
 
+func _Yak_StartAIReAct_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).StartAIReAct(&grpc.GenericServerStream[AIInputEvent, AIOutputEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartAIReActServer = grpc.BidiStreamingServer[AIInputEvent, AIOutputEvent]
+
 func _Yak_StartAITask_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(YakServer).StartAITask(&grpc.GenericServerStream[AIInputEvent, AIOutputEvent]{ServerStream: stream})
 }
@@ -16581,6 +18289,42 @@ func _Yak_QueryAITask_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).QueryAITask(ctx, req.(*AITaskQueryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteAITask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AITaskDeleteRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteAITask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteAITask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteAITask(ctx, req.(*AITaskDeleteRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryAIEvent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AIEventQueryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryAIEvent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryAIEvent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryAIEvent(ctx, req.(*AIEventQueryRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -16664,6 +18408,24 @@ func _Yak_QueryAIForge_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Yak_GetAIForge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAIForgeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAIForge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAIForge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAIForge(ctx, req.(*GetAIForgeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_StartMcpServer_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(StartMcpServerRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -16743,6 +18505,42 @@ func _Yak_SaveAITool_Handler(srv interface{}, ctx context.Context, dec func(inte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(YakServer).SaveAITool(ctx, req.(*SaveAIToolRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SaveAIToolV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveAIToolRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SaveAIToolV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SaveAIToolV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SaveAIToolV2(ctx, req.(*SaveAIToolRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateAITool_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAIToolRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateAITool(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateAITool_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateAITool(ctx, req.(*UpdateAIToolRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -16841,6 +18639,24 @@ func _Yak_StartLocalModel_Handler(srv interface{}, stream grpc.ServerStream) err
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type Yak_StartLocalModelServer = grpc.ServerStreamingServer[ExecResult]
 
+func _Yak_StopLocalModel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopLocalModelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).StopLocalModel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_StopLocalModel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).StopLocalModel(ctx, req.(*StopLocalModelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Yak_DownloadLocalModel_Handler(srv interface{}, stream grpc.ServerStream) error {
 	m := new(DownloadLocalModelRequest)
 	if err := stream.RecvMsg(m); err != nil {
@@ -16869,6 +18685,774 @@ func _Yak_GetSupportedLocalModels_Handler(srv interface{}, ctx context.Context, 
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _Yak_AddLocalModel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddLocalModelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).AddLocalModel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_AddLocalModel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).AddLocalModel(ctx, req.(*AddLocalModelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteLocalModel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteLocalModelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteLocalModel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteLocalModel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteLocalModel(ctx, req.(*DeleteLocalModelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateLocalModel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateLocalModelRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateLocalModel(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateLocalModel_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateLocalModel(ctx, req.(*UpdateLocalModelRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAllStartedLocalModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllStartedLocalModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAllStartedLocalModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllStartedLocalModels(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ClearAllModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ClearAllModelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ClearAllModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ClearAllModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ClearAllModels(ctx, req.(*ClearAllModelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_IsSearchVectorDatabaseReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsSearchVectorDatabaseReadyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).IsSearchVectorDatabaseReady(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_IsSearchVectorDatabaseReady_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).IsSearchVectorDatabaseReady(ctx, req.(*IsSearchVectorDatabaseReadyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_InitSearchVectorDatabase_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(InitSearchVectorDatabaseRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).InitSearchVectorDatabase(m, &grpc.GenericServerStream[InitSearchVectorDatabaseRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_InitSearchVectorDatabaseServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_GetAllVectorStoreCollections_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllVectorStoreCollections(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAllVectorStoreCollections_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllVectorStoreCollections(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAllVectorStoreCollectionsWithFilter_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllVectorStoreCollectionsWithFilterRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllVectorStoreCollectionsWithFilter(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAllVectorStoreCollectionsWithFilter_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllVectorStoreCollectionsWithFilter(ctx, req.(*GetAllVectorStoreCollectionsWithFilterRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteSearchVectorDatabase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSearchVectorDatabaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteSearchVectorDatabase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteSearchVectorDatabase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteSearchVectorDatabase(ctx, req.(*DeleteSearchVectorDatabaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateVectorStoreCollection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateVectorStoreCollectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateVectorStoreCollection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateVectorStoreCollection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateVectorStoreCollection(ctx, req.(*UpdateVectorStoreCollectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListVectorStoreEntries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListVectorStoreEntriesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListVectorStoreEntries(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListVectorStoreEntries_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListVectorStoreEntries(ctx, req.(*ListVectorStoreEntriesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreateVectorStoreEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateVectorStoreEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateVectorStoreEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateVectorStoreEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateVectorStoreEntry(ctx, req.(*CreateVectorStoreEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetDocumentByVectorStoreEntryID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDocumentByVectorStoreEntryIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetDocumentByVectorStoreEntryID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetDocumentByVectorStoreEntryID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetDocumentByVectorStoreEntryID(ctx, req.(*GetDocumentByVectorStoreEntryIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListThirdPartyBinary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListThirdPartyBinary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListThirdPartyBinary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListThirdPartyBinary(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_InstallThirdPartyBinary_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(InstallThirdPartyBinaryRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).InstallThirdPartyBinary(m, &grpc.GenericServerStream[InstallThirdPartyBinaryRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_InstallThirdPartyBinaryServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_UninstallThirdPartyBinary_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UninstallThirdPartyBinaryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UninstallThirdPartyBinary(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UninstallThirdPartyBinary_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UninstallThirdPartyBinary(ctx, req.(*UninstallThirdPartyBinaryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_IsThirdPartyBinaryReady_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IsThirdPartyBinaryReadyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).IsThirdPartyBinaryReady(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_IsThirdPartyBinaryReady_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).IsThirdPartyBinaryReady(ctx, req.(*IsThirdPartyBinaryReadyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_StartThirdPartyBinary_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StartThirdPartyBinaryRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).StartThirdPartyBinary(m, &grpc.GenericServerStream[StartThirdPartyBinaryRequest, ExecResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_StartThirdPartyBinaryServer = grpc.ServerStreamingServer[ExecResult]
+
+func _Yak_PluginTrace_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(YakServer).PluginTrace(&grpc.GenericServerStream[PluginTraceRequest, PluginTraceResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_PluginTraceServer = grpc.BidiStreamingServer[PluginTraceRequest, PluginTraceResponse]
+
+func _Yak_GetKnowledgeBaseNameList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetKnowledgeBaseNameList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetKnowledgeBaseNameList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetKnowledgeBaseNameList(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetKnowledgeBase(ctx, req.(*GetKnowledgeBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetKnowledgeBaseTypeList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetKnowledgeBaseTypeList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetKnowledgeBaseTypeList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetKnowledgeBaseTypeList(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteKnowledgeBase(ctx, req.(*DeleteKnowledgeBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreateKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateKnowledgeBase(ctx, req.(*CreateKnowledgeBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateKnowledgeBase(ctx, req.(*UpdateKnowledgeBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteKnowledgeBaseEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteKnowledgeBaseEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteKnowledgeBaseEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteKnowledgeBaseEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteKnowledgeBaseEntry(ctx, req.(*DeleteKnowledgeBaseEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_CreateKnowledgeBaseEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateKnowledgeBaseEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).CreateKnowledgeBaseEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_CreateKnowledgeBaseEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).CreateKnowledgeBaseEntry(ctx, req.(*CreateKnowledgeBaseEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateKnowledgeBaseEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateKnowledgeBaseEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateKnowledgeBaseEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateKnowledgeBaseEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateKnowledgeBaseEntry(ctx, req.(*UpdateKnowledgeBaseEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_SearchKnowledgeBaseEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchKnowledgeBaseEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).SearchKnowledgeBaseEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_SearchKnowledgeBaseEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).SearchKnowledgeBaseEntry(ctx, req.(*SearchKnowledgeBaseEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryKnowledgeBaseByAI_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(QueryKnowledgeBaseByAIRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).QueryKnowledgeBaseByAI(m, &grpc.GenericServerStream[QueryKnowledgeBaseByAIRequest, QueryKnowledgeBaseByAIResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_QueryKnowledgeBaseByAIServer = grpc.ServerStreamingServer[QueryKnowledgeBaseByAIResponse]
+
+func _Yak_BuildVectorIndexForKnowledgeBase_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BuildVectorIndexForKnowledgeBaseRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).BuildVectorIndexForKnowledgeBase(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_BuildVectorIndexForKnowledgeBase_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).BuildVectorIndexForKnowledgeBase(ctx, req.(*BuildVectorIndexForKnowledgeBaseRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_BuildVectorIndexForKnowledgeBaseEntry_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BuildVectorIndexForKnowledgeBaseEntryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).BuildVectorIndexForKnowledgeBaseEntry(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_BuildVectorIndexForKnowledgeBaseEntry_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).BuildVectorIndexForKnowledgeBaseEntry(ctx, req.(*BuildVectorIndexForKnowledgeBaseEntryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ListEntityRepository_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).ListEntityRepository(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_ListEntityRepository_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).ListEntityRepository(ctx, req.(*Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryEntityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryEntity(ctx, req.(*QueryEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteEntity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteEntityRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteEntity(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteEntity_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteEntity(ctx, req.(*DeleteEntityRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QueryRelationship_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QueryRelationshipRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QueryRelationship(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QueryRelationship_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QueryRelationship(ctx, req.(*QueryRelationshipRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_QuerySubERM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(QuerySubERMRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).QuerySubERM(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_QuerySubERM_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).QuerySubERM(ctx, req.(*QuerySubERMRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GenerateERMDot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateERMDotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GenerateERMDot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GenerateERMDot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GenerateERMDot(ctx, req.(*GenerateERMDotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_ExportKnowledgeBase_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ExportKnowledgeBaseRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ExportKnowledgeBase(m, &grpc.GenericServerStream[ExportKnowledgeBaseRequest, GeneralProgress]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ExportKnowledgeBaseServer = grpc.ServerStreamingServer[GeneralProgress]
+
+func _Yak_ImportKnowledgeBase_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ImportKnowledgeBaseRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).ImportKnowledgeBase(m, &grpc.GenericServerStream[ImportKnowledgeBaseRequest, GeneralProgress]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_ImportKnowledgeBaseServer = grpc.ServerStreamingServer[GeneralProgress]
+
+func _Yak_AddMCPServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddMCPServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).AddMCPServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_AddMCPServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).AddMCPServer(ctx, req.(*AddMCPServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_DeleteMCPServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMCPServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).DeleteMCPServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_DeleteMCPServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).DeleteMCPServer(ctx, req.(*DeleteMCPServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_UpdateMCPServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateMCPServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).UpdateMCPServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_UpdateMCPServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).UpdateMCPServer(ctx, req.(*UpdateMCPServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_GetAllMCPServers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllMCPServersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(YakServer).GetAllMCPServers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Yak_GetAllMCPServers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(YakServer).GetAllMCPServers(ctx, req.(*GetAllMCPServersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Yak_RAGCollectionSearch_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RAGCollectionSearchRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(YakServer).RAGCollectionSearch(m, &grpc.GenericServerStream[RAGCollectionSearchRequest, RAGCollectionSearchResponse]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type Yak_RAGCollectionSearchServer = grpc.ServerStreamingServer[RAGCollectionSearchResponse]
 
 // Yak_ServiceDesc is the grpc.ServiceDesc for Yak service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -16912,6 +19496,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DownloadMITMCert",
 			Handler:    _Yak_DownloadMITMCert_Handler,
+		},
+		{
+			MethodName: "DownloadMITMGMCert",
+			Handler:    _Yak_DownloadMITMGMCert_Handler,
 		},
 		{
 			MethodName: "QueryExecHistory",
@@ -17106,6 +19694,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_QueryHTTPFlowsProcessNames_Handler,
 		},
 		{
+			MethodName: "HTTPFlowsToOnlineBatch",
+			Handler:    _Yak_HTTPFlowsToOnlineBatch_Handler,
+		},
+		{
 			MethodName: "ExtractUrl",
 			Handler:    _Yak_ExtractUrl_Handler,
 		},
@@ -17230,6 +19822,22 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_HTTPRequestAnalyzer_Handler,
 		},
 		{
+			MethodName: "CreateSnippet",
+			Handler:    _Yak_CreateSnippet_Handler,
+		},
+		{
+			MethodName: "UpdateSnippet",
+			Handler:    _Yak_UpdateSnippet_Handler,
+		},
+		{
+			MethodName: "DeleteSnippets",
+			Handler:    _Yak_DeleteSnippets_Handler,
+		},
+		{
+			MethodName: "QuerySnippets",
+			Handler:    _Yak_QuerySnippets_Handler,
+		},
+		{
 			MethodName: "Codec",
 			Handler:    _Yak_Codec_Handler,
 		},
@@ -17244,6 +19852,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SaveCodecFlow",
 			Handler:    _Yak_SaveCodecFlow_Handler,
+		},
+		{
+			MethodName: "UpdateCodecFlow",
+			Handler:    _Yak_UpdateCodecFlow_Handler,
 		},
 		{
 			MethodName: "DeleteCodecFlow",
@@ -18310,8 +20922,48 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_NewSSARiskRead_Handler,
 		},
 		{
+			MethodName: "CreateSSARiskDisposals",
+			Handler:    _Yak_CreateSSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "QuerySSARiskDisposals",
+			Handler:    _Yak_QuerySSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "UpdateSSARiskDisposals",
+			Handler:    _Yak_UpdateSSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "DeleteSSARiskDisposals",
+			Handler:    _Yak_DeleteSSARiskDisposals_Handler,
+		},
+		{
+			MethodName: "GetSSARiskDisposal",
+			Handler:    _Yak_GetSSARiskDisposal_Handler,
+		},
+		{
 			MethodName: "SSARiskFeedbackToOnline",
 			Handler:    _Yak_SSARiskFeedbackToOnline_Handler,
+		},
+		{
+			MethodName: "GenerateSSAReport",
+			Handler:    _Yak_GenerateSSAReport_Handler,
+		},
+		{
+			MethodName: "CreateSSAProject",
+			Handler:    _Yak_CreateSSAProject_Handler,
+		},
+		{
+			MethodName: "UpdateSSAProject",
+			Handler:    _Yak_UpdateSSAProject_Handler,
+		},
+		{
+			MethodName: "DeleteSSAProject",
+			Handler:    _Yak_DeleteSSAProject_Handler,
+		},
+		{
+			MethodName: "QuerySSAProject",
+			Handler:    _Yak_QuerySSAProject_Handler,
 		},
 		{
 			MethodName: "GetAllPluginEnv",
@@ -18410,6 +21062,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_QueryAITask_Handler,
 		},
 		{
+			MethodName: "DeleteAITask",
+			Handler:    _Yak_DeleteAITask_Handler,
+		},
+		{
+			MethodName: "QueryAIEvent",
+			Handler:    _Yak_QueryAIEvent_Handler,
+		},
+		{
 			MethodName: "CreateAIForge",
 			Handler:    _Yak_CreateAIForge_Handler,
 		},
@@ -18424,6 +21084,10 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "QueryAIForge",
 			Handler:    _Yak_QueryAIForge_Handler,
+		},
+		{
+			MethodName: "GetAIForge",
+			Handler:    _Yak_GetAIForge_Handler,
 		},
 		{
 			MethodName: "GetToolSetList",
@@ -18442,6 +21106,14 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_SaveAITool_Handler,
 		},
 		{
+			MethodName: "SaveAIToolV2",
+			Handler:    _Yak_SaveAIToolV2_Handler,
+		},
+		{
+			MethodName: "UpdateAITool",
+			Handler:    _Yak_UpdateAITool_Handler,
+		},
+		{
 			MethodName: "ToggleAIToolFavorite",
 			Handler:    _Yak_ToggleAIToolFavorite_Handler,
 		},
@@ -18458,8 +21130,164 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Yak_IsLocalModelReady_Handler,
 		},
 		{
+			MethodName: "StopLocalModel",
+			Handler:    _Yak_StopLocalModel_Handler,
+		},
+		{
 			MethodName: "GetSupportedLocalModels",
 			Handler:    _Yak_GetSupportedLocalModels_Handler,
+		},
+		{
+			MethodName: "AddLocalModel",
+			Handler:    _Yak_AddLocalModel_Handler,
+		},
+		{
+			MethodName: "DeleteLocalModel",
+			Handler:    _Yak_DeleteLocalModel_Handler,
+		},
+		{
+			MethodName: "UpdateLocalModel",
+			Handler:    _Yak_UpdateLocalModel_Handler,
+		},
+		{
+			MethodName: "GetAllStartedLocalModels",
+			Handler:    _Yak_GetAllStartedLocalModels_Handler,
+		},
+		{
+			MethodName: "ClearAllModels",
+			Handler:    _Yak_ClearAllModels_Handler,
+		},
+		{
+			MethodName: "IsSearchVectorDatabaseReady",
+			Handler:    _Yak_IsSearchVectorDatabaseReady_Handler,
+		},
+		{
+			MethodName: "GetAllVectorStoreCollections",
+			Handler:    _Yak_GetAllVectorStoreCollections_Handler,
+		},
+		{
+			MethodName: "GetAllVectorStoreCollectionsWithFilter",
+			Handler:    _Yak_GetAllVectorStoreCollectionsWithFilter_Handler,
+		},
+		{
+			MethodName: "DeleteSearchVectorDatabase",
+			Handler:    _Yak_DeleteSearchVectorDatabase_Handler,
+		},
+		{
+			MethodName: "UpdateVectorStoreCollection",
+			Handler:    _Yak_UpdateVectorStoreCollection_Handler,
+		},
+		{
+			MethodName: "ListVectorStoreEntries",
+			Handler:    _Yak_ListVectorStoreEntries_Handler,
+		},
+		{
+			MethodName: "CreateVectorStoreEntry",
+			Handler:    _Yak_CreateVectorStoreEntry_Handler,
+		},
+		{
+			MethodName: "GetDocumentByVectorStoreEntryID",
+			Handler:    _Yak_GetDocumentByVectorStoreEntryID_Handler,
+		},
+		{
+			MethodName: "ListThirdPartyBinary",
+			Handler:    _Yak_ListThirdPartyBinary_Handler,
+		},
+		{
+			MethodName: "UninstallThirdPartyBinary",
+			Handler:    _Yak_UninstallThirdPartyBinary_Handler,
+		},
+		{
+			MethodName: "IsThirdPartyBinaryReady",
+			Handler:    _Yak_IsThirdPartyBinaryReady_Handler,
+		},
+		{
+			MethodName: "GetKnowledgeBaseNameList",
+			Handler:    _Yak_GetKnowledgeBaseNameList_Handler,
+		},
+		{
+			MethodName: "GetKnowledgeBase",
+			Handler:    _Yak_GetKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "GetKnowledgeBaseTypeList",
+			Handler:    _Yak_GetKnowledgeBaseTypeList_Handler,
+		},
+		{
+			MethodName: "DeleteKnowledgeBase",
+			Handler:    _Yak_DeleteKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "CreateKnowledgeBase",
+			Handler:    _Yak_CreateKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "UpdateKnowledgeBase",
+			Handler:    _Yak_UpdateKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "DeleteKnowledgeBaseEntry",
+			Handler:    _Yak_DeleteKnowledgeBaseEntry_Handler,
+		},
+		{
+			MethodName: "CreateKnowledgeBaseEntry",
+			Handler:    _Yak_CreateKnowledgeBaseEntry_Handler,
+		},
+		{
+			MethodName: "UpdateKnowledgeBaseEntry",
+			Handler:    _Yak_UpdateKnowledgeBaseEntry_Handler,
+		},
+		{
+			MethodName: "SearchKnowledgeBaseEntry",
+			Handler:    _Yak_SearchKnowledgeBaseEntry_Handler,
+		},
+		{
+			MethodName: "BuildVectorIndexForKnowledgeBase",
+			Handler:    _Yak_BuildVectorIndexForKnowledgeBase_Handler,
+		},
+		{
+			MethodName: "BuildVectorIndexForKnowledgeBaseEntry",
+			Handler:    _Yak_BuildVectorIndexForKnowledgeBaseEntry_Handler,
+		},
+		{
+			MethodName: "ListEntityRepository",
+			Handler:    _Yak_ListEntityRepository_Handler,
+		},
+		{
+			MethodName: "QueryEntity",
+			Handler:    _Yak_QueryEntity_Handler,
+		},
+		{
+			MethodName: "DeleteEntity",
+			Handler:    _Yak_DeleteEntity_Handler,
+		},
+		{
+			MethodName: "QueryRelationship",
+			Handler:    _Yak_QueryRelationship_Handler,
+		},
+		{
+			MethodName: "QuerySubERM",
+			Handler:    _Yak_QuerySubERM_Handler,
+		},
+		{
+			MethodName: "GenerateERMDot",
+			Handler:    _Yak_GenerateERMDot_Handler,
+		},
+		{
+			MethodName: "AddMCPServer",
+			Handler:    _Yak_AddMCPServer_Handler,
+		},
+		{
+			MethodName: "DeleteMCPServer",
+			Handler:    _Yak_DeleteMCPServer_Handler,
+		},
+		{
+			MethodName: "UpdateMCPServer",
+			Handler:    _Yak_UpdateMCPServer_Handler,
+		},
+		{
+			MethodName: "GetAllMCPServers",
+			Handler:    _Yak_GetAllMCPServers_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{
@@ -18626,6 +21454,26 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "MigratePayloads",
 			Handler:       _Yak_MigratePayloads_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExportPayloadBatch",
+			Handler:       _Yak_ExportPayloadBatch_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "UploadPayloadToOnline",
+			Handler:       _Yak_UploadPayloadToOnline_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "DownloadPayload",
+			Handler:       _Yak_DownloadPayload_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExportPayloadDBAndFile",
+			Handler:       _Yak_ExportPayloadDBAndFile_Handler,
 			ServerStreams: true,
 		},
 		{
@@ -18861,6 +21709,11 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			ClientStreams: true,
 		},
 		{
+			StreamName:    "SSARiskDiff",
+			Handler:       _Yak_SSARiskDiff_Handler,
+			ServerStreams: true,
+		},
+		{
 			StreamName:    "ExportSyntaxFlows",
 			Handler:       _Yak_ExportSyntaxFlows_Handler,
 			ServerStreams: true,
@@ -18889,6 +21742,12 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "ExportNote",
 			Handler:       _Yak_ExportNote_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "StartAIReAct",
+			Handler:       _Yak_StartAIReAct_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
 		},
 		{
 			StreamName:    "StartAITask",
@@ -18920,6 +21779,47 @@ var Yak_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "DownloadLocalModel",
 			Handler:       _Yak_DownloadLocalModel_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "InitSearchVectorDatabase",
+			Handler:       _Yak_InitSearchVectorDatabase_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "InstallThirdPartyBinary",
+			Handler:       _Yak_InstallThirdPartyBinary_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StartThirdPartyBinary",
+			Handler:       _Yak_StartThirdPartyBinary_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "PluginTrace",
+			Handler:       _Yak_PluginTrace_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "QueryKnowledgeBaseByAI",
+			Handler:       _Yak_QueryKnowledgeBaseByAI_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ExportKnowledgeBase",
+			Handler:       _Yak_ExportKnowledgeBase_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ImportKnowledgeBase",
+			Handler:       _Yak_ImportKnowledgeBase_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "RAGCollectionSearch",
+			Handler:       _Yak_RAGCollectionSearch_Handler,
 			ServerStreams: true,
 		},
 	},

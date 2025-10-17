@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -170,14 +171,23 @@ type ImageDescription struct {
 type ChatBaseContext struct {
 	PoCOptionGenerator  func() ([]poc.PocConfigOption, error)
 	EnableThinking      bool
+	EnableThinkingField string
+	EnableThinkingValue any
 	ThinkingBudget      int64
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	ErrHandler          func(err error)
 	ImageUrls           []*ImageDescription
+	DisableStream       bool
 }
 
 type ChatBaseOption func(c *ChatBaseContext)
+
+func WithChatBase_DisableStream(b bool) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.DisableStream = b
+	}
+}
 
 func WithChatBase_ThinkingBudget(budget int64) ChatBaseOption {
 	return func(c *ChatBaseContext) {
@@ -188,6 +198,14 @@ func WithChatBase_ThinkingBudget(budget int64) ChatBaseOption {
 func WithChatBase_EnableThinking(b bool) ChatBaseOption {
 	return func(c *ChatBaseContext) {
 		c.EnableThinking = b
+	}
+}
+
+func WithChatBase_EnableThinkingEx(b bool, key string, value any) ChatBaseOption {
+	return func(c *ChatBaseContext) {
+		c.EnableThinking = b
+		c.EnableThinkingField = key
+		c.EnableThinkingValue = value
 	}
 }
 
@@ -229,7 +247,7 @@ func WithChatBase_ImageRawInstance(images ...*ImageDescription) ChatBaseOption {
 
 func NewChatBaseContext(opts ...ChatBaseOption) *ChatBaseContext {
 	ctx := &ChatBaseContext{
-		EnableThinking: true,
+		EnableThinking: false,
 	}
 	for _, i := range opts {
 		i(ctx)
@@ -263,30 +281,44 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		msgs = append(msgs, NewUserChatDetailEx(contents))
 	}
 	msgIns := NewChatMessage(model, msgs)
+	msgIns.Stream = !ctx.DisableStream
+	handleStream := msgIns.Stream
 
-	handleStream := streamHandler != nil
-	if handleStream {
-		msgIns.Stream = true
+	var msgResult any = msgIns
+	var raw []byte
+	if ctx.EnableThinkingField != "" {
+		raw, err = json.Marshal(msgIns)
+		if err != nil {
+			return "", utils.Errorf("marshal msg[%v] to json failed: %s", spew.Sdump(msgIns), err)
+		}
+		msgMap := make(map[string]any)
+		err = json.Unmarshal(raw, &msgMap)
+		if err != nil {
+			return "", utils.Errorf("unmarshal msg[%v] to map failed: %s", string(raw), err)
+		}
+		msgMap[ctx.EnableThinkingField] = ctx.EnableThinkingValue
+		msgResult = msgMap
 	}
 
-	raw, err := json.Marshal(msgIns)
+	raw, err = json.Marshal(msgResult)
 	if err != nil {
 		return "", utils.Errorf("build msg[%v] to json failed: %s", string(raw), err)
 	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 	opts = append(opts, poc.WithConnectTimeout(5))
 	opts = append(opts, poc.WithRetryTimes(3))
+	opts = append(opts, poc.WithSave(true))
 
 	var pr, reasonPr io.Reader
 	var cancel context.CancelFunc
-	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(opts)
+	pr, reasonPr, opts, cancel = appendStreamHandlerPoCOptionEx(handleStream, opts)
 	wg := new(sync.WaitGroup)
 
-	noMerge := false
-	// handle out and reason
+	// 统一处理reasoning stream handler
+	noMerge := reasonStreamHandler != nil
+
+	// 启动reasoning处理协程（如果需要）
 	if reasonStreamHandler != nil {
-		noMerge = true
-		// reason is not empty, not merge output
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -299,50 +331,51 @@ func ChatBase(url string, model string, msg string, chatOpts ...ChatBaseOption) 
 		}()
 	}
 
-	if streamHandler != nil {
-		var body = bytes.NewBufferString("")
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					log.Warnf("streamHandler panic: %v", err)
-				}
-			}()
-			if streamHandler != nil && noMerge {
-				streamHandler(io.TeeReader(pr, body))
-			} else {
-				result := mergeReasonIntoOutputStream(reasonPr, pr)
-				streamHandler(io.TeeReader(result, body))
+	// 设置流式处理handler（如果需要）
+	var body bytes.Buffer
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer func() {
+			if err := recover(); err != nil {
+				log.Warnf("streamHandler panic: %v", err)
 			}
 		}()
-		rsp, _, err := poc.DoPOST(url, opts...)
-		_ = rsp
-		if err != nil {
-			if errHandler != nil {
-				errHandler(err)
-			}
-			if !utils.IsNil(cancel) {
-				cancel()
-			}
-			wg.Wait()
-			return "", utils.Errorf("request post to %v：%v", url, err)
+
+		var streamReader io.Reader
+		if noMerge {
+			streamReader = io.TeeReader(pr, &body)
+		} else {
+			// 合并模式：将reasoning包装为<think>标签
+			result := mergeReasonIntoOutputStream(reasonPr, pr)
+			streamReader = io.TeeReader(result, &body)
 		}
-		wg.Wait()
-		return body.String(), nil
-	}
+
+		if streamHandler != nil {
+			streamHandler(streamReader)
+		} else {
+			utils.Debug(func() {
+				streamReader = io.TeeReader(streamReader, os.Stdout)
+			})
+			io.Copy(io.Discard, streamReader)
+		}
+	}()
 
 	_, _, err = poc.DoPOST(url, opts...)
 	if err != nil {
 		if errHandler != nil {
 			errHandler(err)
 		}
-		return "", utils.Errorf("request post to %v：%v", url, err)
+		if !utils.IsNil(cancel) {
+			cancel()
+		}
+		wg.Wait() // 确保在错误情况下也等待goroutine完成
+		return body.String(), utils.Errorf("request post to %v：%v", url, err)
 	}
 
-	reader := mergeReasonIntoOutputStream(reasonPr, pr)
-	bodyRaw, err := io.ReadAll(reader)
-	return string(bodyRaw), nil
+	// 等待所有goroutine完成数据写入，确保body.Buffer中有完整数据
+	wg.Wait()
+	return body.String(), nil
 }
 
 func ExtractFromResult(result string, fields map[string]any) (map[string]any, error) {
@@ -458,67 +491,4 @@ func ChatBasedExtractData(
 	}
 	result = strings.ReplaceAll(result, "`", "")
 	return ExtractFromResult(result, fields)
-}
-
-func ChatExBase(url string, model string, details []ChatDetail, function []any, opt func() ([]poc.PocConfigOption, error), streamHandler func(closer io.Reader)) ([]ChatChoice, error) {
-	handleStream := streamHandler != nil
-	opts, err := opt()
-	if err != nil {
-		return nil, err
-	}
-	msg := NewChatMessage(model, details, function...)
-	if handleStream {
-		msg.Stream = true
-	}
-	raw, err := json.Marshal(msg)
-	if err != nil {
-		return nil, utils.Errorf("marshal message failed: %v", err)
-	}
-	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
-	opts = append(opts, poc.WithConnectTimeout(10))
-	opts = append(opts, poc.WithRetryTimes(3))
-
-	if handleStream {
-		var pr io.Reader
-		var body = bytes.NewBufferString("")
-		pr, opts = appendStreamHandlerPoCOption(opts)
-		wg := new(sync.WaitGroup)
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					log.Warnf("streamHandler panic: %v", err)
-				}
-			}()
-			streamHandler(io.TeeReader(pr, body))
-		}()
-		_, _, err := poc.DoPOST(url, opts...)
-		if err != nil {
-			return nil, utils.Errorf("request post to %v：%v", url, err)
-		}
-		wg.Wait()
-		return []ChatChoice{
-			{
-				Index: 0,
-				Message: ChatDetail{
-					Role:    "system",
-					Name:    "",
-					Content: body.String(),
-				},
-				FinishReason: "stop",
-			},
-		}, nil
-	}
-
-	rsp, _, err := poc.DoPOST(url, opts...)
-	if err != nil {
-		return nil, utils.Errorf("request post to %v：%v", url, err)
-	}
-	var compl ChatCompletion
-	err = json.Unmarshal(rsp.GetBody(), &compl)
-	if err != nil {
-		return nil, utils.Errorf("JSON response (%v) failed：%v", string(rsp.GetBody()), err)
-	}
-	return compl.Choices, nil
 }

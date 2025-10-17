@@ -3,7 +3,6 @@ package log
 import (
 	"errors"
 	"fmt"
-	"github.com/kataras/golog"
 	"io"
 	"io/ioutil"
 	"os"
@@ -12,7 +11,31 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+
+	"github.com/kataras/golog"
 )
+
+// LogWriter is an io.Writer that writes to a golog.Logger.
+// It's useful for redirecting the output of other processes (like ffmpeg)
+// into the application's logging system.
+type LogWriter struct {
+	level golog.Level
+}
+
+// NewLogWriter creates a new LogWriter.
+func NewLogWriter(level golog.Level) *LogWriter {
+	return &LogWriter{level: level}
+}
+
+// Write implements the io.Writer interface. It logs the provided byte slice
+// as a string message at the configured log level.
+func (lw *LogWriter) Write(p []byte) (n int, err error) {
+	msg := strings.TrimSpace(string(p))
+	if msg != "" {
+		DefaultLogger.Log(lw.level, msg)
+	}
+	return len(p), nil
+}
 
 func init() {
 	SetConfig(NewDefaultConfig())

@@ -75,7 +75,7 @@ func (w *WebSocketModifier) ModifyRequest(req *http.Request) error {
 	log.Infof("start to exec websocket hijack %v", localConn.RemoteAddr())
 
 	addr := ""
-	isTLS := ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_KEY_IsHttps)
+	isTLS := httpctx.GetRequestHTTPS(req)
 	hostname := req.URL.Hostname()
 	portStr := req.URL.Port()
 	scheme := req.URL.Scheme

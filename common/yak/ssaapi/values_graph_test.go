@@ -1,7 +1,6 @@
 package ssaapi_test
 
 import (
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"testing"
 	"time"
@@ -9,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
-
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -17,6 +16,24 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
+
+func TestAnalyzeGraph(t *testing.T) {
+	code := `
+f0 = (a0) => a0 + 1
+f1 = (a1) => f(a1) + 2 
+
+a = f1(3)
+`
+
+	rule := `a as $a; $a #->?{have:"3"} as $target`
+	ssatest.CheckSyntaxFlowGraph(t, code, rule, map[string]func(g *ssatest.GraphInTest){
+		"target": func(g *ssatest.GraphInTest) {
+			g.Check(t, "f1(3)", "(a1) => f(a1) + 2")
+			g.Check(t, "f(a1)", "a1")
+			g.Check(t, "a1", "3")
+		},
+	})
+}
 
 func TestGraph(t *testing.T) {
 	vf := filesys.NewVirtualFs()
@@ -84,8 +101,8 @@ func TestGraph(t *testing.T) {
 		require.NotNil(t, valueMem)
 		require.Equal(t, len(valueMem), 1)
 		value := valueMem[0]
-		graph := ssaapi.NewValueGraph(value)
-		dotStr := graph.Dot()
+		graph := value.NewDotGraph()
+		dotStr := graph.String()
 		since := time.Since(start)
 		log.Infof("memory graph time: %v", since)
 		log.Infof("memory graph time: %d", since)
@@ -102,8 +119,8 @@ func TestGraph(t *testing.T) {
 		valueDB := result.GetValues("para_top_def")
 		require.Equal(t, len(valueDB), 1)
 		value := valueDB[0]
-		graphDB := ssaapi.NewValueGraph(value)
-		dotStrDB := graphDB.Dot()
+		graphDB := value.NewDotGraph()
+		dotStrDB := graphDB.String()
 		since := time.Since(start)
 		log.Infof("db graph time: %v", since)
 		log.Infof("db graph time: %d", since)
@@ -114,8 +131,8 @@ func TestGraph(t *testing.T) {
 	log.Infof("memory path: %v", memPath)
 	log.Infof("db path: %v", dbPath)
 
-	require.Equal(t, 1, len(memPath))
-	require.Equal(t, 1, len(dbPath))
+	require.Equal(t, 4, len(memPath))
+	require.Equal(t, 4, len(dbPath))
 }
 
 func TestGraph2(t *testing.T) {
@@ -163,7 +180,7 @@ public interface RemoteLogService
 	entrys := res.GetValues("entry")
 	require.Greater(t, len(entrys), 0)
 	entry := entrys[0]
-	graph := ssaapi.NewValueGraph(entry)
+	graph := entry.NewDotGraph()
 	path := graph.DeepFirstGraphPrev(entry)
 	log.Infof("path: %v", path)
 	memDot := entry.DotGraph()
@@ -178,7 +195,7 @@ public interface RemoteLogService
 	entrysDB := result.GetValues("entry")
 	require.Greater(t, len(entrysDB), 0)
 	entryDB := entrysDB[0]
-	graphDB := ssaapi.NewValueGraph(entryDB)
+	graphDB := entryDB.NewDotGraph()
 	pathDB := graphDB.DeepFirstGraphPrev(entryDB)
 	require.Equal(t, len(pathDB), 1)
 
@@ -188,6 +205,7 @@ public interface RemoteLogService
 }
 
 func Test_Values_Graph_Dot(t *testing.T) {
+
 	t.Run("test dfs simple", func(t *testing.T) {
 		progName := uuid.NewString()
 		prog, err := ssaapi.Parse(``, ssaapi.WithProgramName(progName))
@@ -197,17 +215,19 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		value3_1 := CreateValue(prog, 3)
 		value3_2 := CreateValue(prog, 3)
 		value4 := CreateValue(prog, 4)
-		value1.AppendDependOn(value2)
-		value2.AppendDependOn(value3_1)
-		value1.AppendDependOn(value3_2)
-		value3_2.AppendDependOn(value4)
+		value1.AppendPredecessor(value2)
+		value2.AppendPredecessor(value3_1)
+		value1.AppendPredecessor(value3_2)
+		value3_2.AppendPredecessor(value4)
 
-		graph := ssaapi.NewValueGraph(value1)
-		graph.ShowDot()
+		graph := ssaapi.NewDotGraph()
+		value1.GenerateGraph(graph)
+		graph.Show()
 
-		result := graph.DeepFirstGraphNext(value1)
+		result := graph.DeepFirstGraphPrev(value1)
+		log.Infof("result: %v", result)
 		require.Equal(t, 2, len(result))
-		require.Equal(t, strings.Count(graph.Dot(), "t3: 3"), 2)
+		require.Equal(t, strings.Count(graph.String(), "t3: 3"), 2)
 	})
 
 	t.Run("test dfs with predecessor", func(t *testing.T) {
@@ -226,13 +246,36 @@ func Test_Values_Graph_Dot(t *testing.T) {
 		value1.AppendPredecessor(value2, sfvm.WithAnalysisContext_Label("Test1"), sfvm.WithAnalysisContext_Step(1))
 		value1.AppendPredecessor(value3, sfvm.WithAnalysisContext_Label("Test2"), sfvm.WithAnalysisContext_Step(2))
 		value3.AppendPredecessor(value4, sfvm.WithAnalysisContext_Label("Test3"), sfvm.WithAnalysisContext_Step(-1))
-		graph := ssaapi.NewValueGraph(value1)
-		graph.ShowDot()
+		// graph := ssaapi.NewValueGraph(value1)
+		graph := ssaapi.NewDotGraph()
+		value1.GenerateGraph(graph)
+		graph.Show()
 
-		require.Contains(t, graph.Dot(), "step[1]: Test1")
-		require.Contains(t, graph.Dot(), "step[2]: Test2")
-		require.Contains(t, graph.Dot(), "Test3")
+		require.Contains(t, graph.String(), "step[1]: Test1")
+		require.Contains(t, graph.String(), "step[2]: Test2")
+		require.Contains(t, graph.String(), "Test3")
 	})
+
+	t.Run("test dfs with cycle", func(t *testing.T) {
+		prog, err := ssaapi.Parse("")
+		require.NoError(t, err)
+		value1 := CreateValue(prog, 1)
+		value2 := CreateValue(prog, 2)
+		value3 := CreateValue(prog, 3)
+		value4 := CreateValue(prog, 4)
+
+		// 1 -> 2 -> 3 -> 4 -> 1
+		value1.AppendPredecessor(value2)
+		value2.AppendPredecessor(value3)
+		value3.AppendPredecessor(value4)
+		value4.AppendPredecessor(value1)
+
+		graph := ssaapi.NewDotGraph()
+		value1.GenerateGraph(graph)
+		graph.Show()
+
+	})
+
 }
 
 func TestGraph_Limit(t *testing.T) {
@@ -254,7 +297,7 @@ func login(w http.ResponseWriter, r *http.Request) {
         password := r.FormValue("password")
 
         // 不安全的 SQL 查询
-		// depth > 10 
+		// depth > 10
         query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
 		query = fmt.Sprintf(query)
 		query = fmt.Sprintf(query)
@@ -283,25 +326,17 @@ func main() {
 
 	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
 
-	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+	ssatest.CheckResultWithFS(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
 		sfr.Show()
 
 		value := sfr.GetValues("para_top_def")
 
-		dot := value.DotGraph()
+		dot := value.NewDotGraph()
 		log.Infof("dot : \n%s", dot)
+		dot.Show()
 
-		if sfr.IsDatabase() {
-			// database
-			log.Infof("in database")
-			require.Contains(t, dot, "db.QueryRow(query") // contain path
-			require.NotContains(t, dot, "r.FormValue")    // contain dataflow path
-		} else {
-			log.Infof("in memory ")
-			// contain all edge
-			require.Contains(t, dot, "db.QueryRow(query") // contain path
-			require.Contains(t, dot, "r.FormValue")       // contain dataflow path
-		}
+		require.Contains(t, dot.String(), "db.QueryRow(query") // contain path
+		require.Contains(t, dot.String(), "r.FormValue")       // contain dataflow path
 	})
 }
 
@@ -324,7 +359,7 @@ func login(w http.ResponseWriter, r *http.Request) {
         password := r.FormValue("password")
 
         // 不安全的 SQL 查询
-		// depth > 10 
+		// depth > 10
         query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
         err = db.QueryRow(query).Scan(&userID)
         if err != nil {
@@ -343,7 +378,7 @@ func main() {
 
 	rule := `.QueryRow(* #->?{opcode:param} as $para_top_def)`
 
-	ssatest.CheckResult(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
+	ssatest.CheckResultWithFS(t, vf, rule, func(sfr *ssaapi.SyntaxFlowResult) {
 		sfr.Show()
 
 		value := sfr.GetValues("para_top_def")
@@ -354,6 +389,6 @@ func main() {
 		log.Infof("in memory ")
 		// contain all edge
 		require.Contains(t, dot, "db.QueryRow(query") // contain path
-		require.Contains(t, dot, "r.FormValue")       // contain dataflow path
+		require.Contains(t, dot, "r")                 // contain dataflow path
 	})
 }

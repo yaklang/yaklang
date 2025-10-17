@@ -74,14 +74,14 @@ func (v *Value) IsList() bool {
 
 func (v *Value) ExactMatch(ctx context.Context, mod int, want string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool { return s == want }, sfvm.WithAnalysisContext_Label("search-exact:"+want))
-	return value != nil, value, nil
+	return value.Len() != 0, value, nil
 }
 
 func (v *Value) GlobMatch(ctx context.Context, mod int, g string) (bool, sfvm.ValueOperator, error) {
 	value := _SearchValue(v, mod, func(s string) bool {
 		return glob.MustCompile(g).Match(s)
 	}, sfvm.WithAnalysisContext_Label("search-glob:"+g))
-	return value != nil, value, nil
+	return value.Len() != 0, value, nil
 }
 
 func (v *Value) Merge(sf ...sfvm.ValueOperator) (sfvm.ValueOperator, error) {
@@ -94,7 +94,7 @@ func (v *Value) RegexpMatch(ctx context.Context, mod int, re string) (bool, sfvm
 	value := _SearchValue(v, mod, func(s string) bool {
 		return regexp.MustCompile(re).MatchString(s)
 	}, sfvm.WithAnalysisContext_Label("search-regexp:"+re))
-	return value != nil, value, nil
+	return value.Len() != 0, value, nil
 }
 
 func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator, []bool) {
@@ -103,7 +103,6 @@ func (v *Value) CompareString(items *sfvm.StringComparator) (sfvm.ValueOperator,
 	}
 
 	names := getValueNames(v)
-	fmt.Println("names", names)
 	names = append(names, yakunquote.TryUnquote(v.String()))
 	return v, []bool{items.Matches(names...)}
 }
@@ -152,7 +151,11 @@ func (v *Value) GetCallActualParams(start int, contain bool) (sfvm.ValueOperator
 
 	rets := make(Values, 0)
 	addvalue := func(id int64) {
-		ret := v.NewValue(call.GetValueById(id))
+		value, ok := call.GetValueById(id)
+		if !ok {
+			return
+		}
+		ret := v.NewValue(value)
 		ret.AppendPredecessor(v, sfvm.WithAnalysisContext_Label(
 			fmt.Sprintf("actual-args[%d](containRest:%v)", start, contain),
 		))
@@ -197,8 +200,10 @@ func (v *Value) GetFields() (sfvm.ValueOperator, error) {
 
 func (v *Value) GetMembersByString(key string) (sfvm.ValueOperator, bool) {
 	if v.IsMap() || v.IsList() || v.IsObject() {
-		if m := v.GetMember(v.NewValue(ssa.NewConst(key))); m != nil {
-			return m, true
+		for _, m := range v.GetMember(v.NewValue(ssa.NewConst(key))) {
+			if m != nil {
+				return m, true
+			}
 		}
 		return nil, false
 	}
@@ -227,9 +232,11 @@ func (v *Value) ListIndex(i int) (sfvm.ValueOperator, error) {
 	if !v.IsList() {
 		return nil, utils.Error("ssa.Value is not a list")
 	}
-	member := v.GetMember(v.NewValue(ssa.NewConst(i)))
-	if member != nil {
-		return member, nil
+	members := v.GetMember(v.NewValue(ssa.NewConst(i)))
+	for _, member := range members {
+		if member != nil {
+			return member, nil
+		}
 	}
 	return nil, utils.Errorf("ssa.Value %v cannot call by slice, like v[%v]", v.String(), i)
 }
@@ -240,6 +247,9 @@ func (v *Value) AppendPredecessor(operator sfvm.ValueOperator, opts ...sfvm.Anal
 			ctx := sfvm.NewDefaultAnalysisContext()
 			for _, opt := range opts {
 				opt(ctx)
+			}
+			if len(v.Predecessors) > 30 {
+				log.Warnf("Value %s Predecessors too many: %d", v.StringWithRange(), len(v.Predecessors))
 			}
 			v.Predecessors = append(v.Predecessors, &PredecessorValue{
 				Node: result, Info: ctx,
@@ -253,6 +263,6 @@ func (v *Value) FileFilter(path string, match string, rule map[string]string, ru
 	return v.ParentProgram.FileFilter(path, match, rule, rule2)
 }
 
-func (v *Value) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+func (v *Value) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return v.NewConstValue(i, rng...)
 }

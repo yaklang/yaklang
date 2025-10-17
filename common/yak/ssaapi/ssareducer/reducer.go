@@ -10,7 +10,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 var SkippedError error = utils.Error("compiling skipped")
@@ -104,7 +103,7 @@ func ReducerCompile(base string, opts ...Option) error {
 			folders = append(folders,
 				strings.Split(folder, string(c.fs.GetSeparators()))...,
 			)
-			ssadb.SaveFolder(name, folders)
+			// ssadb.SaveFolder(name, folders)
 		}
 		return nil
 	}))

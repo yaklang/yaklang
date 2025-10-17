@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"golang.org/x/exp/slices"
 	"io"
 	"os"
@@ -25,7 +26,6 @@ import (
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -619,15 +619,18 @@ func (s *Server) HTTPFlowsData(ctx context.Context, httpFlow *schema.HTTPFlow) (
 		projectGeneralStorage []*schema.ProjectGeneralStorage
 	)
 	if httpFlow.Hash != "" {
-		db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.Hash)
+		db1 := s.GetProjectDatabase().Where("source_type == 'httpflow' and trace_id = ? ", httpFlow.HiddenIndex)
 		extracted := yakit.BatchExtractedData(db1, ctx)
 		for v := range extracted {
 			extractedData = append(extractedData, &schema.ExtractedData{
-				SourceType:  v.SourceType,
-				TraceId:     v.TraceId,
-				Regexp:      utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
-				RuleVerbose: utils.EscapeInvalidUTF8Byte([]byte(v.RuleVerbose)),
-				Data:        utils.EscapeInvalidUTF8Byte([]byte(v.Data)),
+				SourceType:     v.SourceType,
+				TraceId:        v.TraceId,
+				Regexp:         utils.EscapeInvalidUTF8Byte([]byte(v.Regexp)),
+				RuleVerbose:    utils.EscapeInvalidUTF8Byte([]byte(v.RuleVerbose)),
+				Data:           utils.EscapeInvalidUTF8Byte([]byte(v.Data)),
+				DataIndex:      v.DataIndex,
+				Length:         v.Length,
+				IsMatchRequest: v.IsMatchRequest,
 			})
 		}
 	}
@@ -710,24 +713,63 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 		return nil, utils.Errorf("params empty")
 	}
 
+	if ok, running := yaklib.StartSync("auto"); !ok {
+		return nil, utils.Errorf("已有同步任务正在执行中（当前：%s）", running)
+	}
+	defer yaklib.EndSync()
+
+	db := s.GetProjectDatabase()
+	db = db.Where("upload_online <> '1' ")
+
+	_, _, err := s.DoHTTPFlowsSync(ctx, db, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) HTTPFlowsToOnlineBatch(ctx context.Context, req *ypb.HTTPFlowsToOnlineBatchRequest) (*ypb.HTTPFlowsToOnlineBatchResponse, error) {
+	if req.ToOnlineWhere.Token == "" || req.ToOnlineWhere.ProjectName == "" {
+		return nil, utils.Errorf("params empty")
+	}
+
+	if ok, running := yaklib.StartSync("manual"); !ok {
+		return nil, utils.Errorf("已有同步任务正在执行中（当前：%s）", running)
+	}
+	defer yaklib.EndSync()
+
+	db := s.GetProjectDatabase()
+	db = db.Where("upload_online <> '1' ")
+	db = yakit.FilterHTTPFlow(db, req.UploadHTTPFlowsWhere)
+
+	success, failed, err := s.DoHTTPFlowsSync(ctx, db, req.ToOnlineWhere)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ypb.HTTPFlowsToOnlineBatchResponse{
+		SuccessCount: int64(len(success)),
+		FailedCount:  int64(len(failed)),
+	}, nil
+}
+
+func (s *Server) DoHTTPFlowsSync(ctx context.Context, db *gorm.DB, toOnlineReq *ypb.HTTPFlowsToOnlineRequest) (success []string, failed []string, err error) {
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	limit := make(chan struct{}, 20)
 	var (
-		successHash  []string
 		wg           sync.WaitGroup
-		count        = 0
 		mu           sync.Mutex
-		tokenExpired bool // 标记token是否过期
+		tokenExpired bool
 		tokenErr     error
+		total        int
 	)
 
-	db := s.GetProjectDatabase()
-	db = db.Where("upload_online <> '1' ")
 	ret := yakit.YieldHTTPFlows(db, cancelCtx)
 
 	for httpFlow := range ret {
-		// 如果token已过期，立即退出循环
+		total++
 		if tokenExpired {
 			break
 		}
@@ -759,56 +801,52 @@ func (s *Server) HTTPFlowsToOnline(ctx context.Context, req *ypb.HTTPFlowsToOnli
 			data, err := json.Marshal(content)
 			if err != nil {
 				log.Errorf("JSON marshal error: %s", err)
+				mu.Lock()
+				failed = append(failed, httpFlow.Hash)
+				mu.Unlock()
 				return
 			}
 			client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-			err = client.UploadHTTPFlowToOnline(cancelCtx, req, data)
+			err = client.UploadHTTPFlowToOnline(cancelCtx, toOnlineReq, data)
+
+			mu.Lock()
+			defer mu.Unlock()
 			if err != nil {
 				if strings.Contains(err.Error(), "token过期") {
 					log.Errorf("token过期, 停止上传")
 					// 设置token过期标志并取消上下文
-					mu.Lock()
 					tokenExpired = true
 					tokenErr = err
-					mu.Unlock()
-
 					cancel() // 取消所有后续操作
 					return
 				}
 				log.Errorf("httpflow to online failed: %s", err.Error())
+				failed = append(failed, httpFlow.Hash)
 			} else {
-				mu.Lock()
-				defer mu.Unlock()
-				successHash = append(successHash, httpFlow.Hash)
+				success = append(success, httpFlow.Hash)
 			}
 		}(httpFlow)
-
-		count++
-		if count == 20 {
-			select {
-			case <-cancelCtx.Done():
-				break
-			case <-time.After(1 * time.Second):
-				count = 0
-			}
-		}
 	}
 
-	// 等待所有协程执行完毕
 	wg.Wait()
 
 	if tokenExpired {
-		return nil, tokenErr
+		return nil, nil, tokenErr
 	}
 
-	for _, v := range funk.ChunkStrings(successHash, 100) {
+	if total == 0 {
+		return nil, nil, utils.Errorf("没有需要上传的数据")
+	}
+
+	// 批量更新数据库
+	for _, v := range funk.ChunkStrings(success, 100) {
 		err := yakit.HTTPFlowToOnline(s.GetProjectDatabase(), v)
 		if err != nil {
 			log.Errorf("HTTPFlowsToOnline failed: %s", err)
 		}
 	}
 
-	return &ypb.Empty{}, nil
+	return success, failed, nil
 }
 
 func (s *Server) QueryHTTPFlowsProcessNames(ctx context.Context, req *ypb.QueryHTTPFlowRequest) (*ypb.QueryHTTPFlowsProcessNamesResponse, error) {

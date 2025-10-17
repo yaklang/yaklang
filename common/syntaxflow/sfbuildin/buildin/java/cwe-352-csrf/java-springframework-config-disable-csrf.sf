@@ -5,43 +5,35 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 跨站请求伪造（CSRF）是一种攻击方式，强制受害者在不知情的情况下提交恶意的请求，从而在被攻击网站上执行非预期的操作。如果应用程序禁用了Spring Security的CSRF保护（通过`.csrf().disable()`），将失去Spring Security提供的默认CSRF令牌验证机制，使得攻击者可以更容易地构造恶意请求，利用用户已有的会话来执行操作。
-
 2. **触发场景**
 在Spring Security的配置类中，通过`HttpSecurity`对象调用`.csrf().disable()`方法会禁用CSRF保护。常见的触发场景包括:
 - 在`WebSecurityConfigurerAdapter`的`configure(HttpSecurity http)`方法中显式调用 `.csrf().disable()`。
 - 在某些特定的请求路径上通过配置允许所有请求绕过CSRF保护。
-
 ```java
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-            .csrf().disable().and() // 禁用 CSRF 保护
-            // ... 其他配置
-    }
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.csrf().disable().and() // 禁用 CSRF 保护
+// ... 其他配置
+}
 }
 ```
-
 3. **潜在影响**
 攻击者可以诱导用户点击恶意链接或访问包含恶意代码的网页，在用户已登录的应用程序上执行未经用户授权的操作，例如：
 - 修改用户配置信息（如密码、邮箱）。
 - 执行敏感的业务操作（如转账、发帖、删除数据）。
 - 可能导致账户被盗、数据泄露或其他业务损失。
-
 DESC
 	rule_id: "e334c491-5e84-4f45-b13a-7b16e6d26e35"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 启用和配置Spring Security内置的CSRF保护
 Spring Security默认是开启CSRF保护的。强烈建议不要禁用它，并根据需要进行适当配置。
 ```java
@@ -49,65 +41,56 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-            .csrf().enable() // 显式启用 CSRF 保护 (通常不需要，因为默认启用)
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // 配置 CSRF 令牌的存储方式，例如使用 Cookie
-                .and()
-            // ... 其他配置
-    }
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.csrf().enable() // 显式启用 CSRF 保护 (通常不需要，因为默认启用)
+.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // 配置 CSRF 令牌的存储方式，例如使用 Cookie
+.and()
+// ... 其他配置
+}
 }
 ```
-
 #### 2. 确保所有写操作请求都包含有效的CSRF令牌
 对于使用表单或JavaScript提交数据的写操作（如POST, PUT, DELETE等），需要在请求中包含CSRF令牌。Spring Security会自动处理大部分情况，但对于自定义表单或AJAX请求，需要手动获取并发送令牌。
-
 #### 3. 对于不需要CSRF保护的API或场景，进行精细化配置
 如果应用程序包含一些API（如RESTful API），它们不依赖于浏览器会话，并且希望禁用CSRF保护，应仅对这些特定的路径禁用，而不是全局禁用。
 ```java
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
-
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-            .csrf()
-                .ignoringAntMatchers("/api/**") // 对 /api/** 路径禁用 CSRF 保护
-                .and()
-            // ... 其他配置
-    }
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.csrf()
+.ignoringAntMatchers("/api/**") // 对 /api/** 路径禁用 CSRF 保护
+.and()
+// ... 其他配置
+}
 }
 ```
-
 #### 4. 使用合适的CSRF令牌存储方式
 Spring Security支持多种CSRF令牌存储方式，如HttpSessionCsrfTokenRepository (默认) 和 CookieCsrfTokenRepository。根据应用程序的需求选择最合适的存储方式。
-
 SOLUTION
 	reference: <<<REFERENCE
 [OWASP CSRF](https://owasp.org/www-community/attacks/csrf)
 REFERENCE
 )
 
-configure(* as $configEntry);
+configure<getFormalParams()> as $configEntry;
 check $configEntry;
 
 $configEntry ... csrf().disable() as $disableCSRF;
 check $disableCSRF;
 alert $disableCSRF for {
-	title: "Check Java Spring Framework CSRF Protection",
-	title_zh: "检查 Java Spring Framework CSRF 保护",
-	solution: <<<CODE
+	title: "Java Spring Framework CSRF Protection Disabled Vulnerability Was Detected",
+	title_zh: "检测到Java Spring Framework CSRF保护被禁用漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 启用和配置Spring Security内置的CSRF保护
 Spring Security默认是开启CSRF保护的。强烈建议不要禁用它，并根据需要进行适当配置。
 ```java
@@ -118,21 +101,19 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
             .csrf().enable() // 显式启用 CSRF 保护 (通常不需要，因为默认启用)
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // 配置 CSRF 令牌的存储方式，例如使用 Cookie
-                .and()
+            .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()) // 配置 CSRF 令牌的存储方式，例如使用 Cookie
+            .and()
             // ... 其他配置
+            ;
     }
 }
 ```
-
 #### 2. 确保所有写操作请求都包含有效的CSRF令牌
 对于使用表单或JavaScript提交数据的写操作（如POST, PUT, DELETE等），需要在请求中包含CSRF令牌。Spring Security会自动处理大部分情况，但对于自定义表单或AJAX请求，需要手动获取并发送令牌。
-
 #### 3. 对于不需要CSRF保护的API或场景，进行精细化配置
 如果应用程序包含一些API（如RESTful API），它们不依赖于浏览器会话，并且希望禁用CSRF保护，应仅对这些特定的路径禁用，而不是全局禁用。
 ```java
@@ -142,32 +123,28 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
             .csrf()
-                .ignoringAntMatchers("/api/**") // 对 /api/** 路径禁用 CSRF 保护
-                .and()
+            .ignoringAntMatchers("/api/**") // 对 /api/** 路径禁用 CSRF 保护
+            .and()
             // ... 其他配置
+            ;
     }
 }
 ```
-
 #### 4. 使用合适的CSRF令牌存储方式
 Spring Security支持多种CSRF令牌存储方式，如HttpSessionCsrfTokenRepository (默认) 和 CookieCsrfTokenRepository。根据应用程序的需求选择最合适的存储方式。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 跨站请求伪造（CSRF）是一种攻击方式，强制受害者在不知情的情况下提交恶意的请求，从而在被攻击网站上执行非预期的操作。如果应用程序禁用了Spring Security的CSRF保护（通过`.csrf().disable()`），将失去Spring Security提供的默认CSRF令牌验证机制，使得攻击者可以更容易地构造恶意请求，利用用户已有的会话来执行操作。
-
 2. **触发场景**
 在Spring Security的配置类中，通过`HttpSecurity`对象调用`.csrf().disable()`方法会禁用CSRF保护。常见的触发场景包括:
 - 在`WebSecurityConfigurerAdapter`的`configure(HttpSecurity http)`方法中显式调用 `.csrf().disable()`。
 - 在某些特定的请求路径上通过配置允许所有请求绕过CSRF保护。
-
 ```java
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -175,23 +152,25 @@ import org.springframework.security.config.annotation.web.configuration.WebSecur
 
 @EnableWebSecurity
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
-
     @Override
     protected void configure(HttpSecurity http) throws Exception {
         http
             .csrf().disable().and() // 禁用 CSRF 保护
             // ... 其他配置
+            ;
     }
 }
 ```
-
 3. **潜在影响**
 攻击者可以诱导用户点击恶意链接或访问包含恶意代码的网页，在用户已登录的应用程序上执行未经用户授权的操作，例如：
 - 修改用户配置信息（如密码、邮箱）。
 - 执行敏感的业务操作（如转账、发帖、删除数据）。
 - 可能导致账户被盗、数据泄露或其他业务损失。
-CODE
+DESC
 	level: "low",
+	name: "disableCSRF",
+	message: "检测到Java Spring Framework中通过调用`.csrf().disable()`全局禁用了CSRF保护，这可能导致跨站请求伪造攻击。",
+	risk: "CSRF",
 }
 
 

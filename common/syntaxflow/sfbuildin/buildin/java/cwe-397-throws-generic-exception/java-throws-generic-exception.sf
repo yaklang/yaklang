@@ -7,21 +7,17 @@ desc(
 	cwe: "CWE-397"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **问题原理**
 声明抛出过于笼统的异常类型（如 `Exception` 或 `Throwable`）使得调用者无法明确知道方法可能抛出的具体异常类型。这导致调用者难以编写针对性的异常处理代码，或者被迫捕获并忽略所有可能的异常，从而掩盖了潜在的问题。
-
 2. **触发场景**
 当一个方法内部可能抛出多种不同类型且需要不同处理方式的特化异常时，如果方法签名却声明抛出 `Exception` 或 `Throwable`，就会触发此规则。
-
 示例代码（不推荐的做法）：
 ```java
 public void doExchange() throws Exception {
-    // 方法实现，可能内部抛出 IOException, SQLException 等
+// 方法实现，可能内部抛出 IOException, SQLException 等
 }
 ```
 在上述代码中，虽然 `doExchange()` 方法可能抛出多个具体异常，但其声明却使用了宽泛的 `Exception`，使得调用方无法区分并处理具体的异常类型。
-
 3. **潜在影响**
 - 代码的调用者不知道具体会发生什么异常，无法进行精细化的错误处理。
 - 潜在的错误可能被忽略或处理不当，导致程序行为异常或崩溃。
@@ -30,30 +26,24 @@ public void doExchange() throws Exception {
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免声明过于笼统的异常**：不要在方法签名中声明抛出 `Exception` 或 `Throwable` 等过于笼统的异常类型。应明确声明方法可能抛出的具体异常类型（如 `IOException`、`SQLException` 等），以便调用者能够针对性地处理异常。
-
 2. **使用未检查异常（Unchecked Exception）**：如果方法抛出的异常无法恢复，或者通常不期望被调用者捕获，可以考虑抛出未检查的异常（如继承自 `RuntimeException` 或 `Error` 的自定义异常类），而不是已检查的异常（Checked Exception）。
-
 3. **转换异常类型**：如果方法内部调用了可能抛出已检查异常的代码，但不希望将这些异常直接抛给调用者，可以在方法中使用 `try/catch` 块将已检查异常转换为未检查异常。例如：
-   ```java
-   public void doExchange() {
-       try {
-           // 调用可能抛出已检查异常的代码
-       } catch (IOException e) {
-           throw new RuntimeException("Failed to perform exchange due to IO error", e);
-       }
-   }
-   ```
-
+```java
+public void doExchange() {
+try {
+// 调用可能抛出已检查异常的代码
+} catch (IOException e) {
+throw new RuntimeException("Failed to perform exchange due to IO error", e);
+}
+}
+```
 4. **使用静态代码分析工具**：配置静态代码分析工具以检测方法签名中声明的过于笼统的异常，并强制执行异常声明的最佳实践。
-
 5. **代码审查**：在代码审查过程中，重点检查方法签名中的异常声明，确保没有声明过于笼统的异常类型，并验证所有抛出的异常类型都具有明确的业务含义和处理逻辑。
-
 示例代码（推荐的做法）：
 ```java
 public void doExchange() throws IOException, InvocationTargetException, SQLException {
-    // 方法实现
+// 方法实现
 }
 ```
 通过声明具体的异常类型，调用者可以更清晰地了解可能发生的错误，并编写相应的处理逻辑。
@@ -71,6 +61,52 @@ alert $generic_throws for {
 	title: "Audit Java Generic Exception Throws Declaration",
 	title_zh: "审计Java方法声明中抛出过于宽泛的异常",
 	level: "low",
+	risk: "异常处理",
+	desc: <<<DESC
+### 漏洞描述
+1. **问题原理**
+声明抛出过于笼统的异常类型（如 `Exception` 或 `Throwable`）使得调用者无法明确知道方法可能抛出的具体异常类型。这导致调用者难以编写针对性的异常处理代码，或者被迫捕获并忽略所有可能的异常，从而掩盖了潜在的问题。
+2. **触发场景**
+当一个方法内部可能抛出多种不同类型且需要不同处理方式的特化异常时，如果方法签名却声明抛出 `Exception` 或 `Throwable`，就会触发此规则。
+示例代码（不推荐的做法）：
+```java
+public void doExchange() throws Exception {
+// 方法实现，可能内部抛出 IOException, SQLException 等
+}
+```
+在上述代码中，虽然 `doExchange()` 方法可能抛出多个具体异常，但其声明却使用了宽泛的 `Exception`，使得调用方无法区分并处理具体的异常类型。
+3. **潜在影响**
+- 代码的调用者不知道具体会发生什么异常，无法进行精细化的错误处理。
+- 潜在的错误可能被忽略或处理不当，导致程序行为异常或崩溃。
+- 新引入的异常类型可能无法被调用方正确处理，引入新的不稳定因素。
+- 降低代码的可读性和可维护性。
+DESC
+	name: "generic_throws",
+	message: "发现Java方法声明中抛出过于宽泛的异常，并建议开发者替换为更具体的异常类型以提升代码安全性和可维护性。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **避免声明过于笼统的异常**：不要在方法签名中声明抛出 `Exception` 或 `Throwable` 等过于笼统的异常类型。应明确声明方法可能抛出的具体异常类型（如 `IOException`、`SQLException` 等），以便调用者能够针对性地处理异常。
+2. **使用未检查异常（Unchecked Exception）**：如果方法抛出的异常无法恢复，或者通常不期望被调用者捕获，可以考虑抛出未检查的异常（如继承自 `RuntimeException` 或 `Error` 的自定义异常类），而不是已检查的异常（Checked Exception）。
+3. **转换异常类型**：如果方法内部调用了可能抛出已检查异常的代码，但不希望将这些异常直接抛给调用者，可以在方法中使用 `try/catch` 块将已检查异常转换为未检查异常。例如：
+```java
+public void doExchange() {
+try {
+// 调用可能抛出已检查异常的代码
+} catch (IOException e) {
+throw new RuntimeException("Failed to perform exchange due to IO error", e);
+}
+}
+```
+4. **使用静态代码分析工具**：配置静态代码分析工具以检测方法签名中声明的过于笼统的异常，并强制执行异常声明的最佳实践。
+5. **代码审查**：在代码审查过程中，重点检查方法签名中的异常声明，确保没有声明过于笼统的异常类型，并验证所有抛出的异常类型都具有明确的业务含义和处理逻辑。
+示例代码（推荐的做法）：
+```java
+public void doExchange() throws IOException, InvocationTargetException, SQLException {
+// 方法实现
+}
+```
+通过声明具体的异常类型，调用者可以更清晰地了解可能发生的错误，并编写相应的处理逻辑。
+SOLUTION
 }
 
 desc(

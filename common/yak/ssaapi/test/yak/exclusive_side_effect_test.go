@@ -20,24 +20,22 @@ b = () => {
 b()
 c = a;
 `
-		ssatest.Check(t, code,
-			ssatest.CheckTopDef_Contain("c", []string{"2"}, true),
-		)
+		ssatest.CheckTopDef(t, code, "c", []string{"2"}, true)
 	})
 
 	t.Run("phi side-effect", func(t *testing.T) {
-		ssatest.Check(t, `
+		ssatest.CheckTopDef(t, `
 a = 1
 b = () => {
 	a = 2
 }
 if e {b()}
 c = a;
-		`, ssatest.CheckTopDef_Contain("c", []string{"2", "1", "Undefined-e"}, true))
+		`, "c", []string{"2", "1", "Undefined-e"}, true)
 	})
 
 	t.Run("if-else phi side-effect", func(t *testing.T) {
-		ssatest.Check(t, `
+		code := `
 		d = "kkk"
 		ok = foo("ooo", d)
 		a= 1 
@@ -48,17 +46,18 @@ c = a;
 		}
 		b = a
 
-		`, ssatest.CheckTopDef_Contain("b", []string{
+		`
+		ssatest.CheckTopDef(t, code, "b", []string{
 			"1",
 			"2",
 			"Undefined-foo",
 			"ooo",
 			"kkk",
-		}, true))
+		}, true)
 	})
 
 	t.Run("simple if else-if phi side-effect ", func(t *testing.T) {
-		ssatest.Check(t, `
+		ssatest.CheckTopDef(t, `
 		a = 3
 		if c{
 			a= 1
@@ -67,17 +66,17 @@ c = a;
 		}
 		b = a
 
-		`, ssatest.CheckTopDef_Contain("b", []string{
+		`, "b", []string{
 			"1",
 			"2",
 			"3",
 			"Undefined-c",
 			"Undefined-d",
-		}, true))
+		}, true)
 	})
 
 	t.Run("complex if else-if phi side-effect", func(t *testing.T) {
-		ssatest.Check(t, `
+		ssatest.CheckTopDef(t, `
 		a = 1
 
 		ok = false
@@ -94,7 +93,7 @@ c = a;
 		}
 		b = a
 
-		`, ssatest.CheckTopDef_Contain("b", []string{
+		`, "b", []string{
 			"1",
 			"111",
 			"11",
@@ -102,7 +101,7 @@ c = a;
 			"true",
 			"false",
 			"Undefined-e",
-		}, true))
+		}, true)
 	})
 
 	t.Run("side-effect without bind", func(t *testing.T) {
@@ -233,7 +232,7 @@ b=()=>{
 }
 
 func Test_SideEffect_Double_lower_exclude(t *testing.T) {
-	// 外部f1()继承内部f2()的side-effect,但在当前函数作用域之内的变量不会继承
+	// 外部f1()继承内部f2()的side-effect,但在当前函数作用域之內的變量不會繼承
 	code := `
 b = 1  
 f1=()=>{  

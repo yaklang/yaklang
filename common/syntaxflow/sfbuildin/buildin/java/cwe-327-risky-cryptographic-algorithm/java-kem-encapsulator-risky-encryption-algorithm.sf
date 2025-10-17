@@ -6,69 +6,101 @@ desc(
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 [Oracle 官方文档: javax.crypto.KEM.Encapsulator](https://docs.oracle.com/en/java/javase/17/docs/api/java.base/javax/crypto/KEM.Encapsulator.html)
 REFERENCE
-	desc: <<<DESCRIPTION
- 该规则用于检测Java代码中是否使用了不安全的加密算法。使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。
-- 规则审计的类：
-    javax.crypto.KEM.Encapsulator
-- 规则审计的方法：
-    encapsulate()
-DESCRIPTION
-	rule_id: "99bd33d2-7b63-4980-b70f-33ea3b69f553"
-	solution: <<<SOLUTION
-### 修复建议
+	desc: <<<DESC
+### 漏洞描述
 
-#### 1. 使用高强度、现代的加密算法
-   避免使用已知的弱加密算法，如 DES、3DES、RC4、RC2 等。优先选择使用被证明安全且目前未被有效破解的现代加密算法，例如：
+1. **漏洞原理**
+   使用已破解或存在风险的加密算法（如DES、3DES、RC4等）会导致敏感数据面临暴露的风险。这些算法由于其已知的安全弱点，无法为现代应用提供足够的保护。例如，DES算法使用56位密钥，容易受到暴力破解攻击；而RC4则可能因统计偏差导致信息泄露。
 
-   *   AES（Advanced Encryption Standard）：推荐使用 AES-128、AES-192 或 AES-256。
-   *   ChaCha20-Poly1305 (RFC 7539)：结合流密码 ChaCha20 和消息认证码 Poly1305。
-   *   Post-Quantum Cryptography (PQC) 算法：随着量子计算威胁的临近，考虑采用 NIST 标准化的 PQC 算法，如 Dilithium、Kyber 等（如果 JDK 版本支持）。
-
+2. **触发场景**
+   // 存在漏洞的代码示例
    ```java
-   // 修复代码示例：使用 AES 算法
    import javax.crypto.KEM;
    import java.security.KeyPair;
    import java.security.KeyPairGenerator;
    import java.security.PublicKey;
-   import java.security.SecureRandom;
 
-   public class SecureKEMExample {
+   public class WeakKEMExample {
        public static void main(String[] args) {
            try {
-               // 生成密钥对，使用高强度的 RSA 或 EC 算法（KEM 通常搭配非对称算法）
-               KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA"); // 或者 "EC"
-               keyPairGenerator.initialize(2048); // 推荐 2048 位或更高
+               // 使用弱加密算法 DES
+               KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DES");
+               keyPairGenerator.initialize(56);
                KeyPair keyPair = keyPairGenerator.generateKeyPair();
                PublicKey publicKey = keyPair.getPublic();
 
-               // 创建 KEM 实例，使用高强度的 KEM 算法，如基于 AES 或 PQC 的 KEM 算法
-               KEM kem = KEM.getInstance("AES/GCM/NoPadding"); // <-- 修复点：使用安全算法名称
-
-               // 创建封装器
+               KEM kem = KEM.getInstance("DES"); // 这里会触发规则检查
                KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
-
-               // 执行密钥封装
                KEM.Encapsulated encapsulated = encapsulator.encapsulate();
 
-               // 获取封装的密钥和密文
                byte[] encapsulatedKey = encapsulated.key();
                byte[] encapsulatedSecret = encapsulated.encapsulation();
-
            } catch (Exception e) {
                e.printStackTrace();
            }
        }
    }
    ```
+   上述代码中，`javax.crypto.KEM.Encapsulator` 被配置为使用 DES 算法，这是一种不再推荐使用的弱加密算法，可能导致系统易受攻击。
+
+3. **潜在影响**
+   - 数据泄露：攻击者可以通过暴力破解或利用统计偏差窃取敏感信息。
+   - 数据篡改：攻击者可能伪造或修改数据以破坏业务逻辑。
+   - 合规性问题：使用不安全算法可能导致未能满足行业标准或法规要求（如 GDPR 或 PCI DSS）。
+
+DESC
+	rule_id: "99bd33d2-7b63-4980-b70f-33ea3b69f553"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用高强度、现代的加密算法
+避免使用已知的弱加密算法，如 DES、3DES、RC4、RC2 等。优先选择使用被证明安全且目前未被有效破解的现代加密算法，例如：
+*   AES（Advanced Encryption Standard）：推荐使用 AES-128、AES-192 或 AES-256。
+*   ChaCha20-Poly1305 (RFC 7539)：结合流密码 ChaCha20 和消息认证码 Poly1305。
+*   Post-Quantum Cryptography (PQC) 算法：随着量子计算威胁的临近，考虑采用 NIST 标准化的 PQC 算法，如 Dilithium、Kyber 等（如果 JDK 版本支持）。
+```java
+// 修复代码示例：使用 AES 算法
+import javax.crypto.KEM;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+
+public class SecureKEMExample {
+    public static void main(String[] args) {
+        try {
+            // 生成密钥对，使用高强度的 RSA 或 EC 算法（KEM 通常搭配非对称算法）
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA"); // 或者 "EC"
+            keyPairGenerator.initialize(2048); // 推荐 2048 位或更高
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+            PublicKey publicKey = keyPair.getPublic();
+
+            // 创建 KEM 实例，使用高强度的 KEM 算法，如基于 AES 或 PQC 的 KEM 算法
+            KEM kem = KEM.getInstance("AES/GCM/NoPadding"); // <-- 修复点：使用安全算法名称
+
+            // 创建封装器
+            KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+
+            // 执行密钥封装
+            KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+
+            // 获取封装的密钥和密文
+            byte[] encapsulatedKey = encapsulated.key();
+            byte[] encapsulatedSecret = encapsulated.encapsulation();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
 
 #### 2. 更新 JDK 版本和安全提供者
-   确保使用的 Java Development Kit (JDK) 版本是最新的，并且更新了安全提供者（如 Bouncy Castle Provider），以便支持最新的加密算法和协议标准，同时修复已知的漏洞。旧版本的 JDK 或安全提供者可能默认启用或支持不安全的算法。
+确保使用的 Java Development Kit (JDK) 版本是最新的，并且更新了安全提供者（如 Bouncy Castle Provider），以便支持最新的加密算法和协议标准，同时修复已知的漏洞。旧版本的 JDK 或安全提供者可能默认启用或支持不安全的算法。
 
 #### 3. 参考官方文档和行业标准
-   查阅 Oracle 官方的 Java Cryptography Architecture (JCA) 文档以及相关的行业标准（如 NIST、RFC），了解当前推荐使用的 KEM 算法和密钥大小，并根据这些推荐来配置应用程序使用的加密算法。
+查阅 Oracle 官方的 Java Cryptography Architecture (JCA) 文档以及相关的行业标准（如 NIST、RFC），了解当前推荐使用的 KEM 算法和密钥大小，并根据这些推荐来配置应用程序使用的加密算法。
 
 #### 4. 配置应用程序和服务以废弃弱算法
-   在应用程序的配置文件、TLS/SSL 配置中，明确禁用所有已知的弱加密算法，只启用强壮的、高强度算法。例如，在配置 TLS 协议时，只允许 TLS 1.2 或 TLS 1.3，并配置安全的加密套件。
+在应用程序的配置文件、TLS/SSL 配置中，明确禁用所有已知的弱加密算法，只启用强壮的、高强度算法。例如，在配置 TLS 协议时，只允许 TLS 1.2 或 TLS 1.3，并配置安全的加密套件。
 SOLUTION
 )
 
@@ -81,6 +113,91 @@ $algorithm#{
 alert $sink for {
 	message: "发现Java代码中使用了不安全的加密算法",
 	level: "low",
+	name: "sink",
+	title: "Check Java javax.crypto.KEM.Encapsulator The Use Of Broken Or Risky Encryption Algorithm",
+	title_zh: "检测Java javax.crypto.KEM.Encapsulator使用不安全的加密算法",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用高强度、现代的加密算法
+避免使用已知的弱加密算法，如 DES、3DES、RC4、RC2 等。优先选择使用被证明安全且目前未被有效破解的现代加密算法，例如：
+*   AES（Advanced Encryption Standard）：推荐使用 AES-128、AES-192 或 AES-256。
+*   ChaCha20-Poly1305 (RFC 7539)：结合流密码 ChaCha20 和消息认证码 Poly1305。
+*   Post-Quantum Cryptography (PQC) 算法：随着量子计算威胁的临近，考虑采用 NIST 标准化的 PQC 算法，如 Dilithium、Kyber 等（如果 JDK 版本支持）。
+```java
+// 修复代码示例：使用 AES 算法
+import javax.crypto.KEM;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+public class SecureKEMExample {
+    public static void main(String[] args) {
+        try {
+            // 生成密钥对，使用高强度的 RSA 或 EC 算法（KEM 通常搭配非对称算法）
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA"); // 或者 "EC"
+            keyPairGenerator.initialize(2048); // 推荐 2048 位或更高
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+            PublicKey publicKey = keyPair.getPublic();
+            // 创建 KEM 实例，使用高强度的 KEM 算法，如基于 AES 或 PQC 的 KEM 算法
+            KEM kem = KEM.getInstance("AES/GCM/NoPadding"); // <-- 修复点：使用安全算法名称
+            // 创建封装器
+            KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+            // 执行密钥封装
+            KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+            // 获取封装的密钥和密文
+            byte[] encapsulatedKey = encapsulated.key();
+            byte[] encapsulatedSecret = encapsulated.encapsulation();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+#### 2. 更新 JDK 版本和安全提供者
+确保使用的 Java Development Kit (JDK) 版本是最新的，并且更新了安全提供者（如 Bouncy Castle Provider），以便支持最新的加密算法和协议标准，同时修复已知的漏洞。旧版本的 JDK 或安全提供者可能默认启用或支持不安全的算法。
+#### 3. 参考官方文档和行业标准
+查阅 Oracle 官方的 Java Cryptography Architecture (JCA) 文档以及相关的行业标准（如 NIST、RFC），了解当前推荐使用的 KEM 算法和密钥大小，并根据这些推荐来配置应用程序使用的加密算法。
+#### 4. 配置应用程序和服务以废弃弱算法
+在应用程序的配置文件、TLS/SSL 配置中，明确禁用所有已知的弱加密算法，只启用强壮的、高强度算法。例如，在配置 TLS 协议时，只允许 TLS 1.2 或 TLS 1.3，并配置安全的加密套件。
+SOLUTION
+	risk: "不安全加密算法",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。
+2. **触发场景**
+   ```java
+   import javax.crypto.KEM;
+   import java.security.KeyPair;
+   import java.security.KeyPairGenerator;
+   import java.security.PublicKey;
+   public class WeakKEMExample {
+       public static void main(String[] args) {
+           try {
+               // 生成密钥对
+               KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DES");
+               keyPairGenerator.initialize(56); // DES 使用 56 位密钥
+               KeyPair keyPair = keyPairGenerator.generateKeyPair();
+               PublicKey publicKey = keyPair.getPublic();
+               // 创建 KEM 实例
+               KEM kem = KEM.getInstance("DES");
+               // 创建封装器 - 这里会触发规则检查
+               KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+               // 执行密钥封装
+               KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+               // 获取封装的密钥和密文
+               byte[] encapsulatedKey = encapsulated.key();
+               byte[] encapsulatedSecret = encapsulated.encapsulation();
+           } catch (Exception e) {
+               e.printStackTrace();
+           }
+       }
+   }
+   ```
+3. **潜在影响**
+   - 敏感数据容易被窃取或篡改。
+   - 可能导致系统整体安全性降低。
+DESC
 }
 
 desc(
@@ -120,5 +237,71 @@ desc(
             }
         }
     }
+CODE
+	"safefile://SecureKEMAlgorithm.java": <<<CODE
+import javax.crypto.KEM;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+
+public class SecureKEMAlgorithm {
+    public static void main(String[] args) {
+        try {
+            // 使用高强度的KEM算法，例如基于AES的KEM或未来PQC算法
+            // KEM.getInstance("AES/GCM/NoPadding") 是一个示例，实际需要根据JRE和标准选择KEM算法
+            // 注意：JavaSE 17中KEM.getInstance()仅支持"DiffieHellman"和"EC"作为算法名称
+            // 如果需要特定KEM模式(如KEM/AES/GCM)，通常是通过其他库或更高版本JDK实现
+            // 此处示例为了符合规则逻辑，模拟使用"AESKEM"，假设未来JDK或框架支持更明确的算法字符串
+            KEM kem = KEM.getInstance("DiffieHellman"); // Or "EC" for Elliptic Curve
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("DH"); // Or "EC"
+            keyPairGenerator.initialize(2048); // Recommended key size for DH
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+            PublicKey publicKey = keyPair.getPublic();
+
+            KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+            KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+
+            byte[] encapsulatedKey = encapsulated.key();
+            byte[] encapsulatedSecret = encapsulated.encapsulation();
+
+            System.out.println("KEM operation successful with secure algorithm.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://KEMWithOtherAlgorithms.java": <<<CODE
+import javax.crypto.KEM;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+
+public class KEMWithOtherAlgorithms {
+    public static void main(String[] args) {
+        try {
+            // KEM.getInstance(""algo"")仅检查其参数，并非实际执行加密算法
+            // 如果传入的算法名不包含弱算法关键字 (DES, 3DES, RC4, RC2), 则判定为安全
+            // 例如，这里使用了一个非加密算法或将来可能的算法名称，只要不包含特定弱关键字，就不会告警。
+            KEM kem = KEM.getInstance("FutureSecureKEMAlgo"); // 使用一个假设的、不含弱算法关键字的算法名
+
+            KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+            keyPairGenerator.initialize(2048);
+            KeyPair keyPair = keyPairGenerator.generateKeyPair();
+            PublicKey publicKey = keyPair.getPublic();
+
+            KEM.Encapsulator encapsulator = kem.newEncapsulator(publicKey);
+            KEM.Encapsulated encapsulated = encapsulator.encapsulate();
+
+            System.out.println("KEM operation successful with a non-weak algorithm name.");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
 CODE
 )

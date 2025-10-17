@@ -5,82 +5,72 @@ desc(
 	risk: "information-exposure"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当应用程序开发者未妥善处理错误或调试信息时，可能无意中将敏感的内部信息暴露给攻击者。这些信息可能包括但不限于：详细的错误堆栈跟踪、数据库连接字符串、API密钥、文件路径、调试数据、服务器配置信息或应用程序内部逻辑的细节。这些信息可以帮助攻击者理解应用程序的内部结构和潜在的弱点，从而更容易地构造进一步的攻击。
-
+当应用程序开发者未妥善处理错误或调试信息时，可能无意中将敏感的内部信息暴露给攻击者。这些信息可能包括但不限于：详细的错误堆栈跟踪、数据库连接字符串、API密钥、文件路径、调试数据、服务器配置信息或应用程序内部逻辑的细节。这些信息可以帮助攻击者理解应用程序的内部结构和潜在的弱点，从而更容易地构造进一步的攻击。
 2. **触发场景**
-   - **错误日志暴露**：在生产环境中，错误信息直接显示在用户的浏览器界面上，包含详细的错误信息。
-   - **调试模式未关闭**：应用程序在生产环境中开启了调试模式，导致敏感信息输出。
-   - **信息泄露函数的使用不当**：规则中检测的函数 (`preg_last_error`, `preg_last_error_msg`, `error_get_last`, `debug_backtrace`, `apd_callstack`, `apd_dump_persistent_resources`, `apd_dump_regular_resources`, `apd_get_active_symbols`) 本身用于提供调试或错误信息，如果其返回的结果未经处理直接输出到用户界面，就会导致信息泄露。
-
-   // 存在漏洞的代码示例
-   ```php
-   <?php
-       // 示例1：直接输出错误信息
-       $result = preg_match('/[a-z]+/', 'abc', $matches);
-       if ($result === false) {
-           echo preg_last_error_msg(); // 直接输出详细错误信息
-       }
-
-       // 示例2：根据 GET 参数输出调试信息
-       if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
-           print_r(debug_backtrace()); // 暴露调用栈信息
-       }
-   ?>
-   ```
-
+- **错误日志暴露**：在生产环境中，错误信息直接显示在用户的浏览器界面上，包含详细的错误信息。
+- **调试模式未关闭**：应用程序在生产环境中开启了调试模式，导致敏感信息输出。
+- **信息泄露函数的使用不当**：规则中检测的函数 (`preg_last_error`, `preg_last_error_msg`, `error_get_last`, `debug_backtrace`, `apd_callstack`, `apd_dump_persistent_resources`, `apd_dump_regular_resources`, `apd_get_active_symbols`) 本身用于提供调试或错误信息，如果其返回的结果未经处理直接输出到用户界面，就会导致信息泄露。
+// 存在漏洞的代码示例
+```php
+<?php
+// 示例1：直接输出错误信息
+$result = preg_match('/[a-z]+/', 'abc', $matches);
+if ($result === false) {
+echo preg_last_error_msg(); // 直接输出详细错误信息
+}
+// 示例2：根据 GET 参数输出调试信息
+if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
+print_r(debug_backtrace()); // 暴露调用栈信息
+}
+?>
+```
 3. **潜在影响**
-   - **攻击面扩大**：攻击者获取内部信息后，可以更精准地识别其他潜在漏洞，例如SQL注入、文件包含、远程代码执行等。
-   - **敏感数据泄露**：错误信息中可能包含数据库凭据、API密钥等敏感数据，导致数据泄露。
-   - **绕过安全措施**：攻击者可以利用泄露的信息来绕过应用程序或系统的安全防护措施。
-   - **服务中断**：如果泄露的信息被用于恶意攻击，可能导致应用程序或服务中断。
+- **攻击面扩大**：攻击者获取内部信息后，可以更精准地识别其他潜在漏洞，例如SQL注入、文件包含、远程代码执行等。
+- **敏感数据泄露**：错误信息中可能包含数据库凭据、API密钥等敏感数据，导致数据泄露。
+- **绕过安全措施**：攻击者可以利用泄露的信息来绕过应用程序或系统的安全防护措施。
+- **服务中断**：如果泄露的信息被用于恶意攻击，可能导致应用程序或服务中断。
 
 DESC
 	rule_id: "8bf5c4b5-51c2-49b5-b30c-c7552a7be29b"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 在生产环境中禁用或限制详细错误信息
 修改PHP配置 (`php.ini`) 或在代码中设置错误报告级别，避免在生产环境中显示详细错误信息。
 ```php
 <?php
-    // 在生产环境中设置错误报告级别
-    error_reporting(0); // 完全关闭错误报告显示
-    ini_set('display_errors', 0);
-
-    // 或者只记录错误到日志文件
-    ini_reporting(E_ALL);
-    ini_set('display_errors', 0);
-    ini_set('log_errors', 1);
-    ini_set('error_log', '/path/to/your/error.log');
+// 在生产环境中设置错误报告级别
+error_reporting(0); // 完全关闭错误报告显示
+ini_set('display_errors', 0);
+// 或者只记录错误到日志文件
+ini_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', '/path/to/your/error.log');
 ?>
 ```
-
 #### 2. 不要将调试信息或错误函数的输出直接暴露给用户
 避免将 `preg_last_error`, `preg_last_error_msg`, `error_get_last`, `debug_backtrace` 等函数的输出直接通过 `echo`, `print_r`, `var_dump` 等方式显示在用户界面上。
 ```php
 <?php
-    // 修复示例1：将错误信息记录到日志而不是输出
-    $result = preg_match('/[a-z]+/', 'abc', $matches);
-    if ($result === false) {
-        error_log("PCRE error: " . preg_last_error_msg()); // 记录到日志
-        // 可以显示一个通用的错误信息给用户
-        // echo "An error occurred.";
-    }
-
-    // 修复示例2：限制调试信息的输出，或只对授权用户开放
-    if (isset($_GET['debug']) && $_GET['debug'] == 'true' && current_user_can_access_debug()) { // 检查用户权限
-        print_r(debug_backtrace());
-    }
+// 修复示例1：将错误信息记录到日志而不是输出
+$result = preg_match('/[a-z]+/', 'abc', $matches);
+if ($result === false) {
+error_log("PCRE error: " . preg_last_error_msg()); // 记录到日志
+// 可以显示一个通用的错误信息给用户
+// echo "An error occurred.";
+}
+// 修复示例2：限制调试信息的输出，或只对授权用户开放
+if (isset($_GET['debug']) && $_GET['debug'] == 'true' && current_user_can_access_debug()) { // 检查用户权限
+print_r(debug_backtrace());
+}
 ?>
 ```
-
 #### 3. 统一的错误处理机制
 实现一个集中的错误处理机制，捕获所有错误和异常，并以安全的方式处理（例如记录到日志，向用户显示通用的错误页面）。
-
 #### 4. 禁用不必要的调试扩展和函数
 在 `php.ini` 中禁用不必要的调试相关的PHP扩展和函数，例如 `apd`。
+
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-200: Information Exposure](https://cwe.mitre.org/data/definitions/200.html)
@@ -102,6 +92,75 @@ alert $sink for {
 	title: "Unsafe Error Handling and Information Exposure",
 	title_zh: "不安全的错误处理与信息泄露风险",
 	level: "low",
+	name: "sink",
+	message: "检测到PHP代码中存在不安全的错误处理函数使用，可能导致敏感信息暴露。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 在生产环境中禁用或限制详细错误信息
+修改PHP配置 (`php.ini`) 或在代码中设置错误报告级别，避免在生产环境中显示详细错误信息。
+```php
+<?php
+// 在生产环境中设置错误报告级别
+error_reporting(0); // 完全关闭错误报告显示
+ini_set('display_errors', 0);
+// 或者只记录错误到日志文件
+ini_reporting(E_ALL);
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('error_log', '/path/to/your/error.log');
+?>
+```
+#### 2. 不要将调试信息或错误函数的输出直接暴露给用户
+避免将 `preg_last_error`, `preg_last_error_msg`, `error_get_last`, `debug_backtrace` 等函数的输出直接通过 `echo`, `print_r`, `var_dump` 等方式显示在用户界面上。
+```php
+<?php
+// 修复示例1：将错误信息记录到日志而不是输出
+$result = preg_match('/[a-z]+/', 'abc', $matches);
+if ($result === false) {
+error_log("PCRE error: " . preg_last_error_msg()); // 记录到日志
+// 可以显示一个通用的错误信息给用户
+// echo "An error occurred.";
+}
+// 修复示例2：限制调试信息的输出，或只对授权用户开放
+if (isset($_GET['debug']) && $_GET['debug'] == 'true' && current_user_can_access_debug()) { // 检查用户权限
+print_r(debug_backtrace());
+}
+?>
+```
+#### 3. 统一的错误处理机制
+实现一个集中的错误处理机制，捕获所有错误和异常，并以安全的方式处理（例如记录到日志，向用户显示通用的错误页面）。
+#### 4. 禁用不必要的调试扩展和函数
+在 `php.ini` 中禁用不必要的调试相关的PHP扩展和函数，例如 `apd`。
+SOLUTION
+	risk: "信息泄露",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+当应用程序开发者未妥善处理错误或调试信息时，可能无意中将敏感的内部信息暴露给攻击者。这些信息可能包括但不限于：详细的错误堆栈跟踪、数据库连接字符串、API密钥、文件路径、调试数据、服务器配置信息或应用程序内部逻辑的细节。这些信息可以帮助攻击者理解应用程序的内部结构和潜在的弱点，从而更容易地构造进一步的攻击。
+2. **触发场景**
+- **错误日志暴露**：在生产环境中，错误信息直接显示在用户的浏览器界面上，包含详细的错误信息。
+- **调试模式未关闭**：应用程序在生产环境中开启了调试模式，导致敏感信息输出。
+- **信息泄露函数的使用不当**：规则中检测的函数 (`preg_last_error`, `preg_last_error_msg`, `error_get_last`, `debug_backtrace`, `apd_callstack`, `apd_dump_persistent_resources`, `apd_dump_regular_resources`, `apd_get_active_symbols`) 本身用于提供调试或错误信息，如果其返回的结果未经处理直接输出到用户界面，就会导致信息泄露。
+// 存在漏洞的代码示例
+```php
+<?php
+// 示例1：直接输出错误信息
+$result = preg_match('/[a-z]+/', 'abc', $matches);
+if ($result === false) {
+echo preg_last_error_msg(); // 直接输出详细错误信息
+}
+// 示例2：根据 GET 参数输出调试信息
+if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
+print_r(debug_backtrace()); // 暴露调用栈信息
+}
+?>
+```
+3. **潜在影响**
+- **攻击面扩大**：攻击者获取内部信息后，可以更精准地识别其他潜在漏洞，例如SQL注入、文件包含、远程代码执行等。
+- **敏感数据泄露**：错误信息中可能包含数据库凭据、API密钥等敏感数据，导致数据泄露。
+- **绕过安全措施**：攻击者可以利用泄露的信息来绕过应用程序或系统的安全防护措施。
+- **服务中断**：如果泄露的信息被用于恶意攻击，可能导致应用程序或服务中断。
+DESC
 }
 desc(
 	lang: 'php'
@@ -117,5 +176,114 @@ CODE
     $trace = debug_backtrace();
     $filtered = strip_tags($trace[0]['file']);
     var_dump($filtered);
+CODE
+	"safefile://SafeErrorLogging.php": <<<CODE
+<?php
+// 生产环境下关闭错误显示，并记录到日志文件
+error_reporting(E_ALL);
+ini_set('display_errors', 'Off');
+ini_set('log_errors', 'On');
+ini_set('error_log', '/var/log/php_errors.log');
+
+$result = preg_match('/[a-z]+/', 'abc', $matches);
+if ($result === false) {
+    // 将PCRE错误信息记录到日志而不是直接输出
+    error_log("PCRE error: " . preg_last_error_msg() . ", " . preg_last_error());
+    // 向用户显示通用友好信息
+    echo "An unexpected error occurred. Please try again later.";
+}
+
+// 永远不直接输出敏感的调试信息到用户界面
+function my_safe_debug($data) {
+    if (defined('DEBUG_MODE') && DEBUG_MODE === true && current_user_has_admin_privileges()) {
+        // 仅在明确的调试模式下且用户有权限时才输出到特殊的调试日志或非公开接口
+        error_log("Debug Info: " . print_r($data, true));
+    }
+}
+
+// 模拟一个函数，只允许特定用户访问敏感信息
+function current_user_has_admin_privileges() {
+    // 实际应用中会检查session、token或数据库权限
+    return false; // 默认不让普通用户访问
+}
+
+// 确保debug_backtrace等函数在生产环境中不会被滥用
+if (isset($_GET['debug']) && $_GET['debug'] == 'true') {
+    // 仅在开发环境且有严格权限控制下才可能触发，否则不应该触发
+    if (current_user_has_admin_privileges()) {
+        // do_debug_output(debug_backtrace()); // 仅作为示例，实际应避免直接输出
+    } else {
+        echo "Debug mode is not allowed for your access level.";
+    }
+}
+
+// apd_* 系列函数通常用于开发和调试，生产环境应禁用或不使用
+// 下面的代码块仅用于演示这些函数不会被不当使用，而是在安全的环境中处理
+// if (function_exists('apd_callstack')) {
+//     // apd_callstack()等函数的结果不应直接暴露
+//     // process_apd_info(apd_callstack());
+// }
+?>
+CODE
+	"safefile://SecureUnifiedErrorHandling.php": <<<CODE
+<?php
+// 设置自定义错误处理函数
+function customErrorHandler($errno, $errstr, $errfile, $errline) {
+    // 根据错误类型或环境决定是否记录或显示
+    if (!(error_reporting() & $errno)) {
+        // This error code is not included in error_reporting
+        return false;
+    }
+
+    switch ($errno) {
+        case E_USER_ERROR:
+            error_log("FATAL ERROR [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_errors.log");
+            break;
+        case E_USER_WARNING:
+            error_log("WARNING [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_warnings.log");
+            break;
+        case E_USER_NOTICE:
+            error_log("NOTICE [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_notices.log");
+            break;
+        default:
+            error_log("UNKNOWN ERROR [$errno] $errstr in $errfile on line $errline\n", 3, "/var/log/app_other.log");
+            break;
+    }
+
+    // 对于用户，统一显示友好信息
+    if (ini_get('display_errors') == 'Off') {
+        // 非开发环境，显示通用错误页
+        // header("Location: /error.php");
+        // exit();
+        echo "An error occurred. We apologize for the inconvenience.";
+    } else {
+        // 开发环境，显示详细信息
+        echo "<b>My ERROR</b>: [$errno] $errstr<br />\n";
+        echo "Fatal error on line $errline in file $errfile";
+        echo ", PHP " . PHP_VERSION . " (" . PHP_OS . ")<br />\n";
+        echo "Aborting...<br />\n";
+    }
+
+    /* Don't execute PHP internal error handler */
+    return true;
+}
+
+set_error_handler("customErrorHandler");
+
+// 触发一个警告来测试自定义错误处理器
+$numerator = 10;
+$denominator = 0;
+@($result = $numerator / $denominator); // 故意触发一个警告，使用@抑制PHP默认警告
+
+// 确保不直接输出任何敏感系统信息
+$some_data = ['key' => 'value'];
+if (isset($_GET['debug_info']) && $_GET['debug_info'] === 'true') {
+    // 安全地处理调试信息，不直接输出
+    // 例如，仅将调试信息传递给一个安全的内部API，或者写入只有管理员才能访问的日志。
+    // var_dump($some_data); // Bad! Avoid this in production
+    error_log("Attempted debug info request: " . json_encode($some_data));
+}
+
+?>
 CODE
 )

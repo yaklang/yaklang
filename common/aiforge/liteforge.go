@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
@@ -15,11 +18,14 @@ import (
 
 // LiteForge 被设计只允许提取数据，生成结构化（单步），如果需要多步拆解，不能使用 LiteForge
 type LiteForge struct {
+	ForgeName        string
 	Prompt           string
 	RequireSchema    string
 	OutputSchema     string
 	OutputActionName string
 	ExtendAIDOptions []aid.Option
+
+	OutputJsonHook []jsonextractor.CallbackOption
 }
 
 type LiteForgeOption func(*LiteForge) error
@@ -53,6 +59,16 @@ func WithLiteForge_OutputSchemaRaw(actionName string, outputSchema string) LiteF
 	}
 }
 
+func WithLiteForge_OutputJsonHook(hook ...jsonextractor.CallbackOption) LiteForgeOption {
+	return func(l *LiteForge) error {
+		if l.OutputJsonHook == nil {
+			l.OutputJsonHook = make([]jsonextractor.CallbackOption, 0)
+		}
+		l.OutputJsonHook = append(l.OutputJsonHook, hook...)
+		return nil
+	}
+}
+
 func WithLiteForge_OutputMemoryOP() LiteForgeOption {
 	return func(l *LiteForge) error {
 		t := aitool.NewWithoutCallback(
@@ -79,7 +95,9 @@ func WithLiteForge_Prompt(i string) LiteForgeOption {
 }
 
 func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
-	lf := &LiteForge{}
+	lf := &LiteForge{
+		ForgeName: i,
+	}
 	for _, o := range opts {
 		err := o(lf)
 		if err != nil {
@@ -90,6 +108,10 @@ func NewLiteForge(i string, opts ...LiteForgeOption) (*LiteForge, error) {
 }
 
 func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*ForgeResult, error) {
+	return l.ExecuteEx(ctx, params, nil, opts...)
+}
+
+func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, imageData []*aicommon.ImageData, opts ...aid.Option) (*ForgeResult, error) {
 	if l.OutputSchema == "" {
 		return nil, fmt.Errorf("liteforge output schema is required")
 	}
@@ -100,7 +122,19 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 	}
 
 	nonce := strings.ToLower(utils.RandStringBytes(6))
-	call := utils.Jsonify(params)
+	var callBuffer bytes.Buffer
+	for _, i := range params {
+		if strings.Contains(i.Value, "\n") {
+			callBuffer.WriteString(i.Key + ": \\\n")
+			for _, line := range utils.ParseStringToLines(i.Value) {
+				callBuffer.WriteString("  ")
+				callBuffer.WriteString(line + " \\\n")
+			}
+		} else {
+			callBuffer.WriteString(fmt.Sprintf("%v: %v\n", i.Key, i.Value))
+		}
+	}
+	call := callBuffer.String()
 
 	temp := `# Preset
 你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
@@ -146,21 +180,27 @@ func (l *LiteForge) Execute(ctx context.Context, params []*ypb.ExecParamItem, op
 	if err != nil {
 		return nil, utils.Errorf("template execute failed: %v", err)
 	}
-	var action *aid.Action
-	transactionErr := cod.CallAITransaction(buf.String(), func(response *aid.AIResponse) error {
-		raw, err := io.ReadAll(response.GetOutputStreamReader("liteforge", true, cod.GetConfig()))
-		if err != nil {
-			return err
-		}
-		action, err = aid.ExtractAction(string(raw), l.OutputActionName)
-		if err != nil {
-			return utils.Errorf("extract action failed: %v", err)
-		}
-		if action == nil {
-			return utils.Errorf("action is nil(unknown reason): \n%v", string(raw))
-		}
-		return nil
-	})
+	var action *aicommon.Action
+	transactionErr := cod.CallAITransaction(buf.String(),
+		func(response *aicommon.AIResponse) error {
+			if l.ForgeName == "" {
+				l.ForgeName = "LiteForge"
+			}
+			result := response.GetOutputStreamReader(fmt.Sprintf(`liteforge[%v]`, l.ForgeName), true, cod.GetConfig().GetEmitter())
+			var mirrored bytes.Buffer
+			action, err = aicommon.ExtractActionEx(io.TeeReader(result, &mirrored), l.OutputActionName, l.OutputJsonHook...)
+			if err != nil {
+				return utils.Errorf("extract action failed: %v", err)
+			}
+			if action == nil {
+				return utils.Errorf("action is nil(unknown reason): \n%v", mirrored.String())
+			}
+			return nil
+		},
+		lo.Map(imageData, func(item *aicommon.ImageData, _ int) aicommon.AIRequestOption {
+			return aicommon.WithAIRequest_ImageData(item)
+		})...,
+	)
 	if transactionErr != nil {
 		return nil, utils.Errorf("liteforge execute failed: %v", transactionErr)
 	}

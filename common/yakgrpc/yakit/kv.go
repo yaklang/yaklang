@@ -99,10 +99,6 @@ func MigrateLegacyDatabase() error {
 	return nil
 }
 
-func init() {
-	// RegisterPostInitDatabaseFunction(MigrateLegacyDatabase)
-}
-
 func GetProcessEnvKey(db *gorm.DB) []*schema.GeneralStorage {
 	var keys []*schema.GeneralStorage
 
@@ -123,7 +119,7 @@ func init() {
 	RegisterPostInitDatabaseFunction(func() error {
 		RefreshProcessEnv(consts.GetGormProfileDatabase())
 		return nil
-	})
+	}, "refresh-process-env")
 }
 
 // RefreshProcessEnv 在数据库初始化的时候执行这个，可以快速更新本进程的环境变量
@@ -302,7 +298,7 @@ func InitNetworkConfig(config *ypb.GlobalNetworkConfig) { // init some network c
 		config.MinTlsVersion = tls.VersionSSL30
 	}
 	if config.CallPluginTimeout == 0 {
-		config.CallPluginTimeout = 60 // default 60s
+		config.CallPluginTimeout = float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()) // use global default instead of previous 60s
 	}
 	if config.MaxContentLength == 0 {
 		config.MaxContentLength = 1024 * 1024 * 10 // default 10M
@@ -324,7 +320,7 @@ func GetDefaultNetworkConfig() *ypb.GlobalNetworkConfig {
 		SkipSaveHTTPFlow:  false,
 		AuthInfos:         make([]*ypb.AuthInfo, 0),
 		DbSaveSync:        false,
-		CallPluginTimeout: 60,
+		CallPluginTimeout: float32(consts.GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT.Load()),
 		MaxTlsVersion:     tls.VersionTLS13,
 		MinTlsVersion:     tls.VersionSSL30,
 		MaxContentLength:  1024 * 1024 * 10,
@@ -388,7 +384,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 
 	for _, certs := range c.GetClientCertificates() {
 		if len(certs.GetPkcs12Bytes()) > 0 {
-			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()))
+			err := netx.LoadP12Bytes(certs.Pkcs12Bytes, string(certs.GetPkcs12Password()), certs.GetHost())
 			if err != nil {
 				log.Errorf("load p12 bytes failed: %s", err)
 			}
@@ -398,7 +394,7 @@ func ConfigureNetWork(c *ypb.GlobalNetworkConfig) {
 				log.Errorf("build p12 bytes failed: %s", err)
 				continue
 			}
-			err = netx.LoadP12Bytes(p12bytes, "")
+			err = netx.LoadP12Bytes(p12bytes, "", certs.GetHost())
 			if err != nil {
 				log.Errorf("load p12 bytes failed: %s", err)
 			}

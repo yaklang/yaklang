@@ -1,52 +1,50 @@
 desc(
-	title: "Audit Golang XML Parsing"
+	title: "Audit Golang XML Parsing Vulnerability"
 	type: audit
 	level: info
 	lib: 'golang-xml-sink'
 	desc: <<<DESC
-### 风险描述
+### 漏洞描述
 
-1. **风险原理**
-   此规则旨在审计Go语言代码中`encoding/xml`包的使用情况，特别是关注`NewDecoder()`的调用。在某些配置下，XML解析器可能存在XXE（XML External Entity）注入风险。攻击者通过构造恶意的XML输入，利用XML解析器加载外部实体，可能导致敏感信息泄露、服务端请求伪造（SSRF）或拒绝服务。
+1. **漏洞原理**
+   XXE（XML External Entity Injection，XML外部实体注入）是一种针对使用XML解析器的程序的安全漏洞。在Go语言中，`encoding/xml`包提供了XML解析功能，默认情况下可能未完全限制外部实体解析。当攻击者向应用程序传递恶意构造的XML数据时，如果程序直接解析该数据而未禁用外部实体加载，则可能导致敏感文件泄露、服务端请求伪造（SSRF）或拒绝服务等高危风险。
 
 2. **触发场景**
-   当应用程序接收并解析来自不受信任来源的XML数据时，如果未对XML解析器进行适当配置以禁用外部实体解析，就可能存在XXE风险。例如，直接使用`xml.NewDecoder()`创建解码器进行数据解析，而未显式禁用`Strict`或设置`Entity`属性。
-
+   当开发人员使用`xml.NewDecoder()`方法解析不可信来源的XML输入，并且没有显式配置解码器以禁用外部实体支持时，就会产生XXE风险。例如：
    ```go
-   // 存在风险的代码示例 (XXE可能被利用)
+   // 存在漏洞的代码示例 (XXE可能被利用)
    xmlData := `<?xml version="1.0"?>
-<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-<root>&xxe;</root>`
+   <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+   <root>&xxe;</root>`
    decoder := xml.NewDecoder(strings.NewReader(xmlData))
    var result string
    decoder.Decode(&result)
    fmt.Println(result) // 可能泄露 /etc/passwd 内容
    ```
+   在上述代码中，XML解析器加载了外部实体`xxe`，其值为服务器上的`/etc/passwd`文件内容，造成信息泄露。
 
 3. **潜在影响**
-    - 读取服务器上的任意文件。
-    - 发起端口扫描或SSRF攻击内部网络。
-    - 触发拒绝服务攻击，消耗服务器资源。
+   - 攻击者能够读取服务器上的任意文件，包括系统配置文件、密钥文件等。
+   - 利用外部实体引用发起内部网络探测或服务端请求伪造（SSRF），进一步渗透目标环境。
+   - 构造复杂的XML结构消耗大量CPU和内存资源，导致拒绝服务（DoS）。
+
 DESC
 	rule_id: "cc977fdf-90b8-44e5-a80d-468e05c15276"
-	title_zh: "审计Golang XML解析"
+	title_zh: "审计Golang XML解析漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
-1. **禁用外部实体解析**
-   在创建XML解码器后，显式地设置其属性以禁用外部实体和其他潜在危险特性。
-
+#### 1. 禁用外部实体解析
+   在创建XML解码器后，通过设置相关属性来禁用外部实体解析，从而避免XXE风险。
    ```go
    // 修复代码示例：禁用外部实体解析
    xmlData := `<?xml version="1.0"?>
-<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-<root>&xxe;</root>`
+   <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+   <root>&xxe;</root>`
    decoder := xml.NewDecoder(strings.NewReader(xmlData))
-
    // 禁用外部实体解析
    decoder.Strict = false // 允许文档类型声明，但下面的Entity设置会禁用外部实体
    decoder.Entity = xml.HTMLEntity // 仅允许预定义的HTML实体
-
    var result string
    err := decoder.Decode(&result)
    if err != nil {
@@ -56,21 +54,85 @@ DESC
    fmt.Println(result) // XXE不会被解析
    ```
 
-2. **验证和过滤输入**
-   在解析XML之前，对输入进行严格的验证和过滤，移除或转义潜在的恶意构造，特别是DOCTYPE声明和外部实体引用。
+#### 2. 验证和过滤输入
+   在解析XML之前，对输入进行严格的验证和过滤，移除或转义潜在的恶意构造，特别是DOCTYPE声明和外部实体引用。可以借助白名单机制确保输入符合预期格式。
+   ```go
+   func validateXMLInput(input string) bool {
+       // 示例：检查是否包含非法关键字
+       invalidPatterns := []string{"<!DOCTYPE", "<!ENTITY", "SYSTEM", "PUBLIC"}
+       for _, pattern := range invalidPatterns {
+           if strings.Contains(input, pattern) {
+               return false
+           }
+       }
+       return true
+   }
+   if !validateXMLInput(xmlData) {
+       fmt.Println("Invalid XML input")
+       return
+   }
+   ```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-611: Improper Restriction of XML External Entity Reference ('XXE')](https://cwe.mitre.org/data/definitions/611.html)
 REFERENCE
 )
 
-xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry
-$entry.NewDecoder() as $output
+xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry;
+$entry.NewDecoder() as $output;
 
 alert $output for {
-	title: "Audit Golang XML Parsing",
-	title_zh: "审计Golang XML解析",
+	title: "Golang XML External Entity Vulnerability Was Detected",
+	title_zh: "检测到Go语言XML外部实体漏洞",
 	level: "mid",
+	name: "output",
+	message: "检测到Go语言XML解析器可能存在XXE漏洞，需进一步排查是否禁用了外部实体解析。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **禁用外部实体解析**
+在创建XML解码器后，显式地设置其属性以禁用外部实体和其他潜在危险特性。
+```go
+// 修复代码示例：禁用外部实体解析
+xmlData := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<root>&xxe;</root>`
+decoder := xml.NewDecoder(strings.NewReader(xmlData))
+// 禁用外部实体解析
+decoder.Strict = false // 允许文档类型声明，但下面的Entity设置会禁用外部实体
+decoder.Entity = xml.HTMLEntity // 仅允许预定义的HTML实体
+var result string
+err := decoder.Decode(&result)
+if err != nil {
+fmt.Println("Error decoding XML:", err)
+return
+}
+fmt.Println(result) // XXE不会被解析
+```
+2. **验证和过滤输入**
+在解析XML之前，对输入进行严格的验证和过滤，移除或转义潜在的恶意构造，特别是DOCTYPE声明和外部实体引用。
+SOLUTION
+	risk: "XXE",
+	desc: <<<DESC
+### 风险描述
+1. **风险原理**
+此规则旨在审计Go语言代码中`encoding/xml`包的使用情况，特别是关注`NewDecoder()`的调用。在某些配置下，XML解析器可能存在XXE（XML External Entity）注入风险。攻击者通过构造恶意的XML输入，利用XML解析器加载外部实体，可能导致敏感信息泄露、服务端请求伪造（SSRF）或拒绝服务。
+2. **触发场景**
+当应用程序接收并解析来自不受信任来源的XML数据时，如果未对XML解析器进行适当配置以禁用外部实体解析，就可能存在XXE风险。例如，直接使用`xml.NewDecoder()`创建解码器进行数据解析，而未显式禁用`Strict`或设置`Entity`属性。
+```go
+// 存在风险的代码示例 (XXE可能被利用)
+xmlData := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<root>&xxe;</root>`
+decoder := xml.NewDecoder(strings.NewReader(xmlData))
+var result string
+decoder.Decode(&result)
+fmt.Println(result) // 可能泄露 /etc/passwd 内容
+```
+3. **潜在影响**
+- 读取服务器上的任意文件。
+- 发起端口扫描或SSRF攻击内部网络。
+- 触发拒绝服务攻击，消耗服务器资源。
+DESC
 }
 
 desc(

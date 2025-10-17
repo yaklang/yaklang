@@ -3,7 +3,9 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -11,8 +13,8 @@ import (
 )
 
 func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
-	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	inputChan := make(chan *InputEvent, 10)
+	outputChan := make(chan *schema.AiOutputEvent, 10)
 
 	lsReviewed := false
 	nowReviewed := false
@@ -21,10 +23,10 @@ func TestCoordinator_ToolUseReview_WrongTool_SuggestionTools(t *testing.T) {
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -82,11 +84,11 @@ LOOP:
 			break LOOP
 		case result := <-outputChan:
 			count++
-			if count > 100 {
+			if count > 1000 {
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -96,7 +98,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				toolname := a.GetString("tool")
@@ -125,7 +127,7 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "now") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "now") {
 				useToolReviewPass = true
 				break LOOP
 			}

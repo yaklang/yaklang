@@ -2,6 +2,7 @@ package consts
 
 import (
 	"bytes"
+	"github.com/google/uuid"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -71,6 +72,23 @@ func TempAIFile(pattern string) (*os.File, error) {
 	return ioutil.TempFile(dirname, pattern)
 }
 
+func TempAIDir(pattern ...string) string {
+	dirname := filepath.Clean(filepath.Join(GetDefaultYakitBaseTempDir(), "..", "aispace"))
+	if os.MkdirAll(dirname, os.ModePerm) != nil {
+		dirname = GetDefaultYakitBaseTempDir()
+	}
+	var p string
+	if len(pattern) <= 0 {
+		p = filepath.Join(dirname, uuid.New().String())
+	} else {
+		paths := []string{dirname}
+		paths = append(paths, pattern...)
+		p = filepath.Join(paths...)
+	}
+	_ = os.MkdirAll(p, os.ModePerm)
+	return p
+}
+
 func TempAIFileFast(pattern string, datas ...any) string {
 	if pattern == "" {
 		pattern = "ai-*.tmp"
@@ -107,50 +125,42 @@ func TempFileFast(datas ...any) string {
 	f.Write(data)
 	return f.Name()
 }
-func GetFfmpegPath() string {
+
+func GetThirdPartyApp(appName string) string {
 	defaultPath := GetDefaultYakitProjectsDir()
 	var paths []string
 	if runtime.GOOS == "darwin" {
-		paths = append(paths, filepath.Join(defaultPath, "libs", "ffmpeg"))
-		paths = append(paths, filepath.Join(defaultPath, "base", "ffmpeg"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "ffmpeg"))
-		paths = append(paths, filepath.Join(defaultPath, "ffmpeg"))
-		paths = append(paths, "ffmpeg")
-		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "ffmpeg"))
-		paths = append(paths, filepath.Join("/", "bin", "ffmpeg"))
-		paths = append(paths, filepath.Join("/", "usr", "bin", "ffmpeg"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", appName))
+		paths = append(paths, filepath.Join(defaultPath, "base", appName))
+		paths = append(paths, filepath.Join(defaultPath, "engine", appName))
+		paths = append(paths, filepath.Join(defaultPath, appName))
+		paths = append(paths, appName)
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", appName))
+		paths = append(paths, filepath.Join("/", "bin", appName))
+		paths = append(paths, filepath.Join("/", "usr", "bin", appName))
 	}
 
+	windowsName := appName + ".exe"
 	if runtime.GOOS == "windows" {
-		paths = append(paths, filepath.Join(defaultPath, "base", "ffmpeg.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "libs", "ffmpeg.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "ffmpeg.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "ffmpeg.exe"))
-		paths = append(paths, "ffmpeg.exe")
+		paths = append(paths, filepath.Join(defaultPath, "base", windowsName))
+		paths = append(paths, filepath.Join(defaultPath, "libs", windowsName))
+		paths = append(paths, filepath.Join(defaultPath, "engine", windowsName))
+		paths = append(paths, filepath.Join(defaultPath, windowsName))
+		paths = append(paths, windowsName)
 	}
 	return utils.GetFirstExistedFile(paths...)
 }
 
+func GetFfmpegPath() string {
+	return GetThirdPartyApp("ffmpeg")
+}
+
+func GetPandocPath() string {
+	return GetThirdPartyApp("pandoc")
+}
+
 func GetVulinboxPath() string {
-	defaultPath := GetDefaultYakitProjectsDir()
-	var paths []string
-	if runtime.GOOS == "windows" {
-		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox.exe"))
-		paths = append(paths, filepath.Join(defaultPath, "vulinbox.exe"))
-		paths = append(paths, "vulinbox.exe")
-	} else {
-		paths = append(paths, filepath.Join(defaultPath, "libs", "vulinbox"))
-		paths = append(paths, filepath.Join(defaultPath, "base", "vulinbox"))
-		paths = append(paths, filepath.Join(defaultPath, "engine", "vulinbox"))
-		paths = append(paths, filepath.Join(defaultPath, "vulinbox"))
-		paths = append(paths, "vulinbox")
-		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "vulinbox"))
-		paths = append(paths, filepath.Join("/", "bin", "vulinbox"))
-		paths = append(paths, filepath.Join("/", "usr", "bin", "vulinbox"))
-	}
-	return utils.GetFirstExistedFile(paths...)
+	return GetThirdPartyApp("vulinbox")
 }
 
 func GetLlamaServerPath() string {
@@ -173,8 +183,142 @@ func GetLlamaServerPath() string {
 	return utils.GetFirstExistedFile(paths...)
 }
 
-func GetAIModelPath() string {
+func GetPage2ImgBinaryPath() string {
 	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "page2img.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "page2img.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "page2img.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "page2img.exe"))
+		paths = append(paths, "page2img.exe")
+	} else {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "page2img"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "page2img"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "page2img"))
+		paths = append(paths, filepath.Join(defaultPath, "page2img"))
+		paths = append(paths, "page2img")
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "page2img"))
+		paths = append(paths, filepath.Join("/", "bin", "page2img"))
+		paths = append(paths, filepath.Join("/", "usr", "bin", "page2img"))
+	}
+	return utils.GetFirstExistedFile(paths...)
+}
+
+func GetAIModelPath() []string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	paths = append(paths, filepath.Join(defaultPath, "libs", "models"))
+	paths = append(paths, filepath.Join(defaultPath, "libs", "aimodel"))
+	paths = append(paths, filepath.Join(defaultPath, "models"))
+	paths = append(paths, filepath.Join(defaultPath, "aimodel"))
+
+	// 确保至少有一个目录存在，优先创建 libs/models
 	modelsDir := filepath.Join(defaultPath, "libs", "models")
-	return modelsDir
+	_ = os.MkdirAll(modelsDir, os.ModePerm)
+
+	return paths
+}
+
+// GetAIModelFilePath 是一个辅助函数，用于查找指定的模型文件
+func GetAIModelFilePath(filename string) string {
+	modelPaths := GetAIModelPath()
+	var filePaths []string
+	for _, basePath := range modelPaths {
+		filePaths = append(filePaths, filepath.Join(basePath, filename))
+	}
+	return utils.GetFirstExistedFile(filePaths...)
+}
+
+// GetDefaultAIModelDir 获取默认的AI模型目录（用于下载等操作）
+func GetDefaultAIModelDir() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	return filepath.Join(defaultPath, "libs", "models")
+}
+
+func GetWhisperModelSmallPath() string {
+	return GetAIModelFilePath("whisper-small-q8.gguf")
+}
+
+func GetWhisperModelTinyPath() string {
+	return GetAIModelFilePath("whisper-tiny-q5.gguf")
+}
+
+func GetWhisperModelMediumPath() string {
+	return GetAIModelFilePath("whisper-medium-q5.gguf")
+}
+
+func GetQwen3Embedding0_6BQ4_0ModelPath() string {
+	return GetAIModelFilePath("Qwen3-Embedding-0.6B-Q4_K_M.gguf")
+}
+
+func GetWhisperModelBasePath() string {
+	return GetAIModelFilePath("whisper-base-q8.gguf")
+}
+
+func GetWhisperServerBinaryPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-server.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-server.exe"))
+		paths = append(paths, "whisper-server.exe")
+	} else {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-server"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-server"))
+		paths = append(paths, "whisper-server")
+		paths = append(paths, filepath.Join("/", "usr", "local", "bin", "whisper-server"))
+		paths = append(paths, filepath.Join("/", "bin", "whisper-server"))
+		paths = append(paths, filepath.Join("/", "usr", "bin", "whisper-server"))
+	}
+	return utils.GetFirstExistedFile(paths...)
+}
+
+func GetWhisperSileroVADPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "libs", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "base", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "engine", "silero-vad-v5.1.2.bin"))
+	paths = append(paths, filepath.Join(defaultPath, "silero-vad-v5.1.2.bin"))
+	paths = append(paths, "silero-vad-v5.1.2.bin")
+	return utils.GetFirstExistedFile(paths...)
+}
+
+func GetWhisperCliBinaryPath() string {
+	defaultPath := GetDefaultYakitProjectsDir()
+	var paths []string
+	if runtime.GOOS == "windows" {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-cli.exe"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-cli.exe"))
+		paths = append(paths, "whisper-cli.exe")
+	} else {
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper.cpp", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "libs", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper.cpp", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "base", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper.cpp", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "engine", "whisper-cli"))
+		paths = append(paths, filepath.Join(defaultPath, "whisper-cli"))
+		paths = append(paths, "whisper-cli")
+	}
+	return utils.GetFirstExistedFile(paths...)
 }

@@ -322,4 +322,30 @@ mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]
 			zeroScore: false,
 		})
 	})
+	t.Run("bad syntax prog should not panic backend", func(t *testing.T) {
+		TestSmokingEvaluatePlugin(testCase{
+			code: `
+    select {
+    case resp = <-doneChan:
+    case <-time.after(timeout * 1000):
+      yakit.Warn("请求超时，放弃本次请求: %s %s", method, url)
+      resp = nil
+    }
+
+    debugLogRequest(method, url, headers, body)
+    debugLogResponse(resp)
+
+    if resp != nil && resp.statusCode() < 500 {
+      break
+    }
+    time.sleep(delay)
+  }
+  return resp
+}
+`,
+			err:       "编译失败",
+			codeTyp:   "yak",
+			zeroScore: true,
+		})
+	})
 }

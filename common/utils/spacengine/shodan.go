@@ -2,8 +2,9 @@ package spacengine
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -42,6 +43,13 @@ func ServiceProviderToChineseName(i string) string {
 }
 
 func ShodanQuery(key string, filter string, maxPage, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	return ShodanQueryWithConfig(key, filter, maxPage, maxRecord, nil, domains...)
+}
+
+func ShodanQueryWithConfig(key string, filter string, maxPage, maxRecord int, config *base.QueryConfig, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	if config == nil {
+		config = &base.QueryConfig{}
+	}
 	var client *shodan.ShodanClient
 	if len(domains) > 0 && domains[0] != "" {
 		client = shodan.NewClientEx(key, domains[0])
@@ -108,6 +116,12 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int, domains ...s
 				return
 			}
 
+			// 如果当前页没有数据，停止翻页
+			if len(match.Matches) == 0 {
+				nextFinished = true
+				break
+			}
+
 			for _, d := range match.Matches {
 				ip, port := utils.Uint32ToIPv4(uint32(d.IP)), d.Port
 				log.Debugf("shodan fetch: %s",
@@ -150,6 +164,11 @@ func ShodanQuery(key string, filter string, maxPage, maxRecord int, domains ...s
 				if maxRecord > 0 && count >= maxRecord {
 					nextFinished = true
 				}
+			}
+
+			// 在翻页之间应用随机延迟
+			if !nextFinished && page < maxPage {
+				base.ApplyRandomDelay(config.RandomDelayRange)
 			}
 		}
 	}()

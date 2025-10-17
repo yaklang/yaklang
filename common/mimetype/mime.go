@@ -3,6 +3,7 @@ package mimetype
 import (
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/mimecharset"
 	"mime"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/mimetype/mimeutil/magic"
 )
@@ -26,6 +27,14 @@ type MIME struct {
 // String returns the string representation of the MIME type, e.g., "application/zip".
 func (m *MIME) String() string {
 	return m.mime
+}
+
+func (m *MIME) IsImage() bool {
+	return strings.HasPrefix(strings.ToLower(m.String()), "image")
+}
+
+func (m *MIME) IsVideo() bool {
+	return strings.HasPrefix(strings.ToLower(m.String()), "video")
 }
 
 func (m *MIME) Charset() string {

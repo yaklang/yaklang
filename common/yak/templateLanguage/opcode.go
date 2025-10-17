@@ -20,13 +20,13 @@ type Instruction struct {
 	Opcode     Opcode
 	Attributes map[string]string
 	Text       string
-	Range      memedit.RangeIf
+	Range      *memedit.Range
 
 	ifBuilder *IfBuilder
 }
 
-func newInstruction(opcode Opcode, insRange ...memedit.RangeIf) *Instruction {
-	var r memedit.RangeIf
+func newInstruction(opcode Opcode, insRange ...*memedit.Range) *Instruction {
+	var r *memedit.Range
 	if len(insRange) > 0 {
 		r = insRange[0]
 	}

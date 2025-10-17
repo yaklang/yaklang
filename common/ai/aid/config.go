@@ -3,15 +3,15 @@ package aid
 import (
 	"bytes"
 	"context"
-	"fmt"
-	"github.com/yaklang/yaklang/common/jsonextractor"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"math/rand/v2"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/jsonextractor"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/consts"
@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 
 	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/fstools"
@@ -30,29 +31,16 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type AICaller interface {
-	callAI(*AIRequest) (*AIResponse, error)
-}
-
-var _ AICaller = &Coordinator{}
-var _ AICaller = &planRequest{}
-var _ AICaller = &aiTask{}
-
-type AgreePolicyType string
-
-const (
-	AgreePolicyYOLO AgreePolicyType = "yolo"
-	// auto: auto agree, should with interval at least 10 seconds
-	AgreePolicyAuto AgreePolicyType = "auto"
-	// manual: block until user agree
-	AgreePolicyManual AgreePolicyType = "manual"
-	// ai: use ai to agree, is ai is not agree, will use manual
-	AgreePolicyAI AgreePolicyType = "ai"
-	// ai-auto: use ai to agree, if ai is not agree, will use auto in auto interval
-	AgreePolicyAIAuto AgreePolicyType = "ai-auto"
-)
+var _ aicommon.AICaller = &Coordinator{}
+var _ aicommon.AICaller = &planRequest{}
+var _ aicommon.AICaller = &AiTask{}
+var _ aicommon.AICallerConfigIf = &Config{}
 
 type Config struct {
+	*aicommon.KeyValueConfig
+	*aicommon.Emitter
+	*aicommon.BaseCheckpointableStorage
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -69,7 +57,7 @@ type Config struct {
 	hotpatchOptionChan *chanx.UnlimitedChan[Option]
 
 	eventInputChan chan *InputEvent
-	epm            *endpointManager
+	epm            *aicommon.EndpointManager
 
 	// plan mocker
 	planMocker               func(*Config) *PlanResponse
@@ -77,18 +65,16 @@ type Config struct {
 	planUserInteractMaxCount int64 // max user interact count before planning, default is 3
 
 	// origin ai callback
-	originalAICallback AICallbackType //!!!! provide branch tasks
-
-	// need to think
-	coordinatorAICallback AICallbackType
-	planAICallback        AICallbackType
-
-	// no need to think, low level
-	taskAICallback AICallbackType
+	originalAICallback    aicommon.AICallbackType //!!!! provide branch tasks
+	coordinatorAICallback aicommon.AICallbackType // need to think
+	planAICallback        aicommon.AICallbackType
+	taskAICallback        aicommon.AICallbackType // no need to think, low level
 
 	// asyncGuardian can auto collect event handler data
-	guardian     *asyncGuardian
-	eventHandler func(e *Event)
+	guardian     *aicommon.AsyncGuardian
+	eventHandler func(e *schema.AiOutputEvent)
+
+	saveEvent bool
 
 	// tool manager
 	aiToolManager       *buildinaitools.AiToolManager
@@ -96,14 +82,10 @@ type Config struct {
 
 	// memory
 	persistentMemory          []string
-	memory                    *Memory
-	timelineRecordLimit       int
+	memory                    *PromptContextProvider
 	timelineContentSizeLimit  int
 	timelineTotalContentLimit int
 	keywords                  []string // task keywords, maybe tools name ,help ai to plan
-
-	// stream waitgroup
-	streamWaitGroup *sync.WaitGroup
 
 	debugPrompt bool
 	debugEvent  bool
@@ -112,7 +94,7 @@ type Config struct {
 	allowRequireForUserInteract bool
 
 	// do not use it directly, use doAgree() instead
-	agreePolicy         AgreePolicyType
+	agreePolicy         aicommon.AgreePolicyType
 	agreeInterval       time.Duration
 	agreeAIScore        float64
 	agreeRiskCtrl       *riskControl
@@ -132,7 +114,7 @@ type Config struct {
 	aiTransactionAutoRetry int64
 
 	resultHandler          func(*Config)
-	extendedActionCallback map[string]func(config *Config, action *Action)
+	extendedActionCallback map[string]func(config *Config, action *aicommon.Action)
 
 	promptHook     func(string) string
 	generateReport bool
@@ -142,6 +124,70 @@ type Config struct {
 	maxTaskContinue int64
 
 	aiTaskRuntime *runtime
+
+	disableOutputEventType []string
+}
+
+func (c *Config) GetAllowUserInteraction() bool {
+	return c.allowRequireForUserInteract
+}
+
+func (c *Config) GetTimelineContentSizeLimit() int64 {
+	return int64(c.timelineContentSizeLimit)
+}
+
+func (c *Config) GetUserInteractiveLimitedTimes() int64 {
+	return int64(c.planUserInteractMaxCount)
+}
+
+func (c *Config) GetMaxIterationCount() int64 {
+	return int64(c.maxTaskContinue)
+}
+
+func (c *Config) GetAllowUserInteracction() bool {
+	return c.allowRequireForUserInteract
+}
+
+func (c *Config) GetRuntimeId() string {
+	return c.id
+}
+
+func (c *Config) Feed(endpointId string, params aitool.InvokeParams) {
+	if c.epm != nil {
+		c.epm.Feed(endpointId, params)
+	}
+}
+
+func (c *Config) CallAfterReview(seq int64, reviewQuestion string, userInput aitool.InvokeParams) {
+	c.memory.PushUserInteraction(aicommon.UserInteractionStage_Review, seq, reviewQuestion, string(utils.Jsonify(userInput)))
+}
+
+func (c *Config) CallAfterInteractiveEventReleased(eventID string, invoke aitool.InvokeParams) {
+	c.memory.StoreInteractiveUserInput(eventID, invoke)
+}
+
+func (c *Config) CallAIResponseOutputFinishedCallback(s string) {
+	c.ProcessExtendedActionCallback(s)
+}
+
+func (c *Config) NewAIResponse() *aicommon.AIResponse {
+	return aicommon.NewAIResponse(c)
+}
+
+func (c *Config) GetAITransactionAutoRetryCount() int64 {
+	return c.aiTransactionAutoRetry
+}
+
+func (c *Config) GetContext() context.Context {
+	return c.ctx
+}
+
+func (c *Config) GetEmitter() *aicommon.Emitter {
+	return c.Emitter
+}
+
+func (c *Config) GetEndpointManager() *aicommon.EndpointManager {
+	return c.epm
 }
 
 func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []string]) ([]*searchtools.KeywordSearchResult, error) {
@@ -170,8 +216,8 @@ func (c *Config) HandleSearch(query string, items *omap.OrderedMap[string, []str
 	}
 	var callResults []*searchtools.KeywordSearchResult
 
-	err = c.callAiTransaction(prompt, c.callAI, func(response *AIResponse) error {
-		action, err := ExtractActionFromStream(response.GetUnboundStreamReader(false), "keyword_search")
+	err = c.callAiTransaction(prompt, c.CallAI, func(response *aicommon.AIResponse) error {
+		action, err := aicommon.ExtractActionFromStream(response.GetUnboundStreamReader(false), "keyword_search")
 		if err != nil {
 			log.Errorf("extract aitool-keyword-search action failed: %v", err)
 			return utils.Errorf("extract aitool-keyword-search failed: %v", err)
@@ -236,6 +282,9 @@ func (c *Config) Done() {
 
 func (c *Config) Wait() {
 	c.wg.Wait()
+	log.Info("aid.Config 's wg is waiting done, all tasks finished, start to check stream...")
+	c.WaitForStream()
+	log.Info("aid.Config 's all stream waitgroup is done, all tasks finished")
 	return
 }
 
@@ -247,12 +296,12 @@ func (c *Config) GetSequenceStart() int64 {
 	return c.idSequence
 }
 
-func (c *Config) CallAI(request *AIRequest) (*AIResponse, error) {
-	return c.callAI(request)
+func (c *Config) getCurrentTaskPlan() *AiTask {
+	return c.aiTaskRuntime.RootTask
 }
 
-func (c *Config) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+func (c *Config) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
 		c.taskAICallback,
 		c.coordinatorAICallback,
 		c.planAICallback,
@@ -265,11 +314,11 @@ func (c *Config) callAI(request *AIRequest) (*AIResponse, error) {
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
-func (c *Config) setAgreePolicy(policy AgreePolicyType) {
+func (c *Config) setAgreePolicy(policy aicommon.AgreePolicyType) {
 	c.agreePolicy = policy
 }
 
-func (c *Config) outputConsumptionCallback(current int) {
+func (c *Config) CallAIResponseConsumptionCallback(current int) {
 	atomic.AddInt64(c.outputConsumption, int64(current))
 }
 
@@ -281,12 +330,21 @@ func (c *Config) GetInputConsumption() int64 {
 	return atomic.LoadInt64(c.inputConsumption)
 }
 
-func (c *Config) GetMemory() *Memory {
+func (c *Config) GetMemory() *PromptContextProvider {
 	return c.memory
 }
 
 func (c *Config) GetOutputConsumption() int64 {
 	return atomic.LoadInt64(c.outputConsumption)
+}
+
+func (c *Config) IsCtxDone() bool {
+	select {
+	case <-c.ctx.Done():
+		return true
+	default:
+		return false
+	}
 }
 
 func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
@@ -295,45 +353,8 @@ func (c *Config) SetSyncCallback(i SyncType, callback func() any) {
 	c.syncMap[string(i)] = callback
 }
 
-func (c *Config) emit(e *Event) {
-	select {
-	case <-c.ctx.Done():
-		return
-	default:
-	}
-	c.m.Lock()
-	defer c.m.Unlock()
-
-	if c.guardian != nil {
-		c.guardian.feed(e)
-	}
-
-	if c.eventHandler == nil {
-		if e.IsStream {
-			if c.debugEvent {
-				fmt.Print(string(e.StreamDelta))
-			}
-			return
-		}
-
-		if e.Type == EVENT_TYPE_CONSUMPTION {
-			if c.debugEvent {
-				log.Info(e.String())
-			}
-			return
-		}
-		if c.debugEvent {
-			log.Info(e.String())
-		} else {
-			log.Info(utils.ShrinkString(e.String(), 200))
-		}
-		return
-	}
-	c.eventHandler(e)
-}
-
 func (c *Config) ProcessExtendedActionCallback(resp string) {
-	actions := ExtractAllAction(resp)
+	actions := aicommon.ExtractAllAction(resp)
 	for _, action := range actions {
 		if cb, ok := c.extendedActionCallback[action.Name()]; ok {
 			cb(c, action)
@@ -342,8 +363,8 @@ func (c *Config) ProcessExtendedActionCallback(resp string) {
 }
 
 func (c *Config) ReleaseInteractiveEvent(eventID string, invoke aitool.InvokeParams) {
-	c.emitInteractiveRelease(eventID, invoke)
-	c.memory.StoreInteractiveUserInput(eventID, invoke)
+	c.EmitInteractiveRelease(eventID, invoke)
+	c.CallAfterInteractiveEventReleased(eventID, invoke)
 }
 
 func initDefaultTools(c *Config) error { // set config default tools
@@ -355,7 +376,7 @@ func initDefaultTools(c *Config) error { // set config default tools
 }
 
 func initDefaultAICallback(c *Config) error { // set config default tools
-	defaultAICallback := AIChatToAICallbackType(ai.Chat)
+	defaultAICallback := aicommon.AIChatToAICallbackType(ai.Chat)
 	if defaultAICallback == nil {
 		return nil
 	}
@@ -390,7 +411,7 @@ func (c *Config) loadToolsViaOptions() error {
 	return nil
 }
 
-func newConfig(ctx context.Context) *Config {
+func NewConfig(ctx context.Context) *Config {
 	offset := rand.Int64N(3000)
 	id := uuid.New().String()
 	return newConfigEx(ctx, id, offset)
@@ -398,7 +419,7 @@ func newConfig(ctx context.Context) *Config {
 
 func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	var idGenerator = new(int64)
-	log.Infof("coordinator with %v offset: %v", id, offsetSeq)
+	log.Debugf("coordinator with %v offset: %v", id, offsetSeq)
 
 	if ctx == nil {
 		ctx = context.Background()
@@ -407,21 +428,22 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	ctx, cancel := context.WithCancel(ctx)
 
 	c := &Config{
-		ctx: ctx, cancel: cancel,
-		idSequence: atomic.AddInt64(idGenerator, offsetSeq),
 		idGenerator: func() int64 {
 			return atomic.AddInt64(idGenerator, 1)
 		},
-		agreePolicy:                 AgreePolicyManual,
+		KeyValueConfig:              aicommon.NewKeyValueConfig(),
+		ctx:                         ctx,
+		cancel:                      cancel,
+		idSequence:                  atomic.AddInt64(idGenerator, offsetSeq),
+		agreePolicy:                 aicommon.AgreePolicyManual,
 		agreeAIScore:                0.5,
 		agreeRiskCtrl:               new(riskControl),
 		agreeInterval:               10 * time.Second,
 		m:                           new(sync.Mutex),
 		id:                          id,
-		epm:                         newEndpointManagerContext(ctx),
-		streamWaitGroup:             new(sync.WaitGroup),
+		epm:                         aicommon.NewEndpointManagerContext(ctx),
 		memory:                      nil, // default mem cannot create in config
-		guardian:                    newAsyncGuardian(ctx, id),
+		guardian:                    aicommon.NewAsyncGuardian(ctx, id),
 		syncMutex:                   new(sync.RWMutex),
 		syncMap:                     make(map[string]func() any),
 		inputConsumption:            new(int64),
@@ -430,13 +452,12 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 		aiAutoRetry:                 5,
 		aiTransactionAutoRetry:      5,
 		allowRequireForUserInteract: true,
-		timelineRecordLimit:         10,
 		timelineContentSizeLimit:    30 * 1024,
 		aiToolManagerOption:         make([]buildinaitools.ToolManagerOption, 0),
 		planUserInteractMaxCount:    3,
 		maxTaskContinue:             10,
 	}
-	c.epm.config = c // review
+	c.epm.SetConfig(c)
 	if err := initDefaultTools(c); err != nil {
 		log.Errorf("init default tools: %v", err)
 	}
@@ -444,6 +465,13 @@ func newConfigEx(ctx context.Context, id string, offsetSeq int64) *Config {
 	if err := initDefaultAICallback(c); err != nil {
 		log.Errorf("init default ai callback: %v", err)
 	}
+
+	c.Emitter = aicommon.NewEmitter(c.id, func(e *schema.AiOutputEvent) error {
+		c.emitBaseHandler(e)
+		return nil
+	})
+	c.BaseCheckpointableStorage = aicommon.NewCheckpointableStorageWithDB(c.id, consts.GetGormProjectDatabase())
+
 	return c
 }
 
@@ -471,12 +499,12 @@ func WithSequence(seq int64) Option {
 	}
 }
 
-func WithExtendedActionCallback(name string, cb func(config *Config, action *Action)) Option {
+func WithExtendedActionCallback(name string, cb func(config *Config, action *aicommon.Action)) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
 		if config.extendedActionCallback == nil {
-			config.extendedActionCallback = make(map[string]func(config *Config, action *Action))
+			config.extendedActionCallback = make(map[string]func(config *Config, action *aicommon.Action))
 		}
 		config.extendedActionCallback[name] = cb
 		return nil
@@ -507,18 +535,18 @@ func WithAgreeYOLO(i ...bool) Option {
 		defer config.m.Unlock()
 		if len(i) > 0 {
 			if i[0] {
-				config.setAgreePolicy(AgreePolicyYOLO)
+				config.setAgreePolicy(aicommon.AgreePolicyYOLO)
 			} else {
-				config.setAgreePolicy(AgreePolicyManual)
+				config.setAgreePolicy(aicommon.AgreePolicyManual)
 			}
 		} else {
-			config.setAgreePolicy(AgreePolicyYOLO)
+			config.setAgreePolicy(aicommon.AgreePolicyYOLO)
 		}
 		return nil
 	}
 }
 
-func WithAgreePolicy(policy AgreePolicyType) Option {
+func WithAgreePolicy(policy aicommon.AgreePolicyType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -531,7 +559,7 @@ func WithAIAgree() Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.setAgreePolicy(AgreePolicyAI)
+		config.setAgreePolicy(aicommon.AgreePolicyAI)
 		return nil
 	}
 }
@@ -540,7 +568,7 @@ func WithAgreeManual(cb ...func(context.Context, *Config) (aitool.InvokeParams, 
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.setAgreePolicy(AgreePolicyManual)
+		config.setAgreePolicy(aicommon.AgreePolicyManual)
 		if len(cb) > 0 {
 			config.agreeManualCallback = cb[0]
 		}
@@ -549,11 +577,20 @@ func WithAgreeManual(cb ...func(context.Context, *Config) (aitool.InvokeParams, 
 	}
 }
 
+func WithToolManagerOptions(i ...buildinaitools.ToolManagerOption) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.aiToolManagerOption = append(config.aiToolManagerOption, i...)
+		return nil
+	}
+}
+
 func WithAgreeAuto(interval time.Duration) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
-		config.setAgreePolicy(AgreePolicyAIAuto)
+		config.setAgreePolicy(aicommon.AgreePolicyAIAuto)
 		config.agreeInterval = interval
 		return nil
 	}
@@ -572,7 +609,7 @@ func WithAllowRequireForUserInteract(opts ...bool) Option {
 	}
 }
 
-func WithAICallback(cb AICallbackType) Option {
+func WithAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -594,7 +631,7 @@ func WithToolManager(manager *buildinaitools.AiToolManager) Option {
 	}
 }
 
-func WithMemory(m *Memory) Option {
+func WithMemory(m *PromptContextProvider) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -604,7 +641,22 @@ func WithMemory(m *Memory) Option {
 	}
 }
 
-func WithTaskAICallback(cb AICallbackType) Option {
+func WithTimelineInstance(m *aicommon.Timeline) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		m.ClearRuntimeConfig()
+		if config.memory != nil {
+			config.memory.SetTimelineInstance(m)
+		} else {
+			config.memory = GetDefaultMemory()
+			config.memory.SetTimelineInstance(m)
+		}
+		return nil
+	}
+}
+
+func WithTaskAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -613,7 +665,7 @@ func WithTaskAICallback(cb AICallbackType) Option {
 	}
 }
 
-func WithCoordinatorAICallback(cb AICallbackType) Option {
+func WithCoordinatorAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -622,7 +674,7 @@ func WithCoordinatorAICallback(cb AICallbackType) Option {
 	}
 }
 
-func WithPlanAICallback(cb AICallbackType) Option {
+func WithPlanAICallback(cb aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -771,7 +823,7 @@ func WithDebugPrompt(i ...bool) Option {
 	}
 }
 
-func WithEventHandler(h func(e *Event)) Option {
+func WithEventHandler(h func(e *schema.AiOutputEvent)) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -845,11 +897,14 @@ func WithToolKeywords(i ...string) Option {
 	}
 }
 
+var depNotifyOnce = utils.NewOnce()
+
+// Deprecated: use WithTimelineContentLimit instead
 func WithTimeLineLimit(i int) Option {
 	return func(config *Config) error {
-		config.m.Lock()
-		defer config.m.Unlock()
-		config.timelineRecordLimit = i
+		depNotifyOnce.Do(func() {
+			log.Warn("WithTimeLineLimit is deprecated, use WithTimelineContentLimit instead")
+		})
 		return nil
 	}
 }
@@ -892,6 +947,15 @@ func WithDisableToolUse(i ...bool) Option {
 		config.m.Lock()
 		defer config.m.Unlock()
 
+		if config == nil {
+			log.Error("BUG: config cannot be empty in aid.Config Option")
+			return nil
+		}
+
+		if config.memory == nil {
+			config.memory = GetDefaultMemory()
+		}
+
 		if len(i) <= 0 {
 			config.memory.DisableTools = true
 		} else {
@@ -923,7 +987,7 @@ func WithAITransactionRetry(t int) Option {
 	}
 }
 
-func WithRiskControlForgeName(forgeName string, callbackType AICallbackType) Option {
+func WithRiskControlForgeName(forgeName string, callbackType aicommon.AICallbackType) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -934,7 +998,7 @@ func WithRiskControlForgeName(forgeName string, callbackType AICallbackType) Opt
 	}
 }
 
-func WithGuardianEventTrigger(eventTrigger EventType, callback GuardianEventTrigger) Option {
+func WithGuardianEventTrigger(eventTrigger schema.EventType, callback aicommon.GuardianEventTrigger) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -942,11 +1006,11 @@ func WithGuardianEventTrigger(eventTrigger EventType, callback GuardianEventTrig
 		if config.guardian == nil {
 			return utils.Error("BUG: guardian cannot be empty (ASYNC Guardian)")
 		}
-		return config.guardian.registerEventTrigger(eventTrigger, callback)
+		return config.guardian.RegisterEventTrigger(eventTrigger, callback)
 	}
 }
 
-func WithGuardianMirrorStreamMirror(streamName string, callback GuardianMirrorStreamTrigger) Option {
+func WithGuardianMirrorStreamMirror(streamName string, callback aicommon.GuardianMirrorStreamTrigger) Option {
 	return func(config *Config) error {
 		config.m.Lock()
 		defer config.m.Unlock()
@@ -954,7 +1018,7 @@ func WithGuardianMirrorStreamMirror(streamName string, callback GuardianMirrorSt
 		if config.guardian == nil {
 			return utils.Error("BUG: guardian cannot be empty (ASYNC Guardian)")
 		}
-		return config.guardian.registerMirrorEventTrigger(streamName, callback)
+		return config.guardian.RegisterMirrorStreamTrigger(streamName, callback)
 	}
 }
 
@@ -990,7 +1054,7 @@ func WithForgeName(forgeName string) Option {
 
 func WithTaskAnalysis(b bool) Option {
 	return func(config *Config) error {
-		return WithGuardianEventTrigger(EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *Event, emitter GuardianEmitter, caller AICaller) {
+		return WithGuardianEventTrigger(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE, func(event *schema.AiOutputEvent, emitter aicommon.GuardianEmitter, caller aicommon.AICaller) {
 			var plansUUID string
 			var planTree string
 			type analyzeItem struct {
@@ -1038,7 +1102,7 @@ func WithTaskAnalysis(b bool) Option {
 				obj := action.GetInvokeParams("params")
 				desc := obj.GetString("description")
 				keywords := obj.GetStringSlice("keywords")
-				emitter.EmitJson(EVENT_PLAN_TASK_ANALYSIS, "task-analyst", map[string]any{
+				emitter.EmitJson(schema.EVENT_PLAN_TASK_ANALYSIS, "task-analyst", map[string]any{
 					"plans_id":    currentUUID,
 					"description": desc,
 					"keywords":    keywords,
@@ -1095,6 +1159,27 @@ func WithPlanUserInteractMaxCount(i int64) Option {
 			i = 3
 		}
 		config.planUserInteractMaxCount = i
+		return nil
+	}
+}
+
+func WithDisableOutputEvent(typeString ...string) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		if config.disableOutputEventType == nil {
+			config.disableOutputEventType = make([]string, 0)
+		}
+		config.disableOutputEventType = append(config.disableOutputEventType, typeString...)
+		return nil
+	}
+}
+
+func WithSaveEvent(b bool) Option {
+	return func(config *Config) error {
+		config.m.Lock()
+		defer config.m.Unlock()
+		config.saveEvent = b
 		return nil
 	}
 }

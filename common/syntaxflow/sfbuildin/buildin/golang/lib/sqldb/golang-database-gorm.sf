@@ -5,119 +5,99 @@ desc(
 	lib: 'golang-database-gorm'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   GORM 是 Golang 中广泛使用的 ORM 库，它简化了数据库操作并提供了丰富的功能。然而，不当的使用可能导致安全风险，例如 SQL 注入、连接泄漏或错误的权限配置。尽管 GORM 提供了参数化查询等内置防护机制，但如果开发者直接拼接用户输入到查询条件中，仍然可能引入注入漏洞。
-
+GORM 是 Golang 中广泛使用的 ORM 库，它简化了数据库操作并提供了丰富的功能。然而，不当的使用可能导致安全风险，例如 SQL 注入、连接泄漏或错误的权限配置。尽管 GORM 提供了参数化查询等内置防护机制，但如果开发者直接拼接用户输入到查询条件中，仍然可能引入注入漏洞。
 2. **触发场景**
-   下面是一个存在潜在问题的代码示例：
-   ```go
-   package main
-
-   import (
-       "gorm.io/driver/sqlite"
-       "gorm.io/gorm"
-       "log"
-       "net/http"
-   )
-
-   type User struct {
-       ID   uint
-       Name string
-   }
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-       db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
-       if err != nil {
-           log.Fatal(err)
-       }
-
-       userInput := r.URL.Query().Get("name")
-       var users []User
-
-       // 不安全的查询方式
-       db.Raw("SELECT * FROM users WHERE name = " + userInput).Scan(&users)
-       for _, user := range users {
-           log.Println(user.Name)
-       }
-   }
-
-   func main() {
-       http.HandleFunc("/", handler)
-       log.Fatal(http.ListenAndServe(":8080", nil))
-   }
-   ```
-   攻击者可以通过 URL 参数 `?name=1' OR '1'='1` 来绕过逻辑验证，进而窃取所有用户数据。
-
+下面是一个存在潜在问题的代码示例：
+```go
+package main
+import (
+"gorm.io/driver/sqlite"
+"gorm.io/gorm"
+"log"
+"net/http"
+)
+type User struct {
+ID   uint
+Name string
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
+if err != nil {
+log.Fatal(err)
+}
+userInput := r.URL.Query().Get("name")
+var users []User
+// 不安全的查询方式
+db.Raw("SELECT * FROM users WHERE name = " + userInput).Scan(&users)
+for _, user := range users {
+log.Println(user.Name)
+}
+}
+func main() {
+http.HandleFunc("/", handler)
+log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+攻击者可以通过 URL 参数 `?name=1' OR '1'='1` 来绕过逻辑验证，进而窃取所有用户数据。
 3. **潜在影响**
-   - 数据库中的敏感信息（如用户凭证、隐私数据）可能被泄露。
-   - 通过恶意构造的输入执行任意 SQL 语句，破坏数据库结构或篡改数据。
-   - 可能导致服务中断或进一步渗透至服务器系统。
-
+- 数据库中的敏感信息（如用户凭证、隐私数据）可能被泄露。
+- 通过恶意构造的输入执行任意 SQL 语句，破坏数据库结构或篡改数据。
+- 可能导致服务中断或进一步渗透至服务器系统。
 DESC
 	rule_id: "5a878cb7-49c0-45e7-9689-ed17055f8544"
 	title_zh: "审计Golang GORM库使用"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用 GORM 内置的安全查询方法
-   GORM 提供了多种安全查询方法（如 `Where` 和 `Find`），它们会自动对输入进行参数化处理，从而避免 SQL 注入。
-   ```go
-   package main
-
-   import (
-       "gorm.io/driver/sqlite"
-       "gorm.io/gorm"
-       "log"
-       "net/http"
-   )
-
-   type User struct {
-       ID   uint
-       Name string
-   }
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-       db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
-       if err != nil {
-           log.Fatal(err)
-       }
-
-       userInput := r.URL.Query().Get("name")
-       var users []User
-
-       // 安全查询方式
-       db.Where("name = ?", userInput).Find(&users)
-       for _, user := range users {
-           log.Println(user.Name)
-       }
-   }
-
-   func main() {
-       http.HandleFunc("/", handler)
-       log.Fatal(http.ListenAndServe(":8080", nil))
-   }
-   ```
-
+GORM 提供了多种安全查询方法（如 `Where` 和 `Find`），它们会自动对输入进行参数化处理，从而避免 SQL 注入。
+```go
+package main
+import (
+"gorm.io/driver/sqlite"
+"gorm.io/gorm"
+"log"
+"net/http"
+)
+type User struct {
+ID   uint
+Name string
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
+if err != nil {
+log.Fatal(err)
+}
+userInput := r.URL.Query().Get("name")
+var users []User
+// 安全查询方式
+db.Where("name = ?", userInput).Find(&users)
+for _, user := range users {
+log.Println(user.Name)
+}
+}
+func main() {
+http.HandleFunc("/", handler)
+log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
 #### 2. 输入校验与过滤
-   对所有用户输入进行严格的格式和范围校验，确保其符合预期。
-   ```go
-   if !isValidInput(userInput) {
-       http.Error(w, "Invalid input", http.StatusBadRequest)
-       return
-   }
-
-   func isValidInput(input string) bool {
-       match, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, input)
-       return match
-   }
-   ```
-
+对所有用户输入进行严格的格式和范围校验，确保其符合预期。
+```go
+if !isValidInput(userInput) {
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
+}
+func isValidInput(input string) bool {
+match, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, input)
+return match
+}
+```
 #### 3. 避免直接调用 Raw 方法
-   如果必须使用 `Raw` 方法，请确保始终使用参数化查询。
-   ```go
-   db.Raw("SELECT * FROM users WHERE name = ?", userInput).Scan(&users)
-   ```
+如果必须使用 `Raw` 方法，请确保始终使用参数化查询。
+```go
+db.Raw("SELECT * FROM users WHERE name = ?", userInput).Scan(&users)
+```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89](https://cwe.mitre.org/data/definitions/89.html)
@@ -126,6 +106,7 @@ REFERENCE
 )
 
 gorm?{<fullTypeName>?{have: 'gorm.io/gorm'}} as $entry;
+gorm?{<fullTypeName>?{have: 'github.com/jinzhu/gorm'}} as $entry;
 $entry.Open <getCall> as $db;
 $db <getMembers> as $output;
 
@@ -133,6 +114,103 @@ alert $output for {
 	level: "info",
 	title: "Audit Golang GORM Usage",
 	title_zh: "审计Golang GORM库使用",
+	message: "审计发现Golang GORM库的使用，并提示开发人员关注其查询方式是否存在安全隐患。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用 GORM 内置的安全查询方法
+GORM 提供了多种安全查询方法（如 `Where` 和 `Find`），它们会自动对输入进行参数化处理，从而避免 SQL 注入。
+```go
+package main
+import (
+"gorm.io/driver/sqlite"
+"gorm.io/gorm"
+"log"
+"net/http"
+)
+type User struct {
+ID   uint
+Name string
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
+if err != nil {
+log.Fatal(err)
+}
+userInput := r.URL.Query().Get("name")
+var users []User
+// 安全查询方式
+db.Where("name = ?", userInput).Find(&users)
+for _, user := range users {
+log.Println(user.Name)
+}
+}
+func main() {
+http.HandleFunc("/", handler)
+log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+#### 2. 输入校验与过滤
+对所有用户输入进行严格的格式和范围校验，确保其符合预期。
+```go
+if !isValidInput(userInput) {
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
+}
+func isValidInput(input string) bool {
+match, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, input)
+return match
+}
+```
+#### 3. 避免直接调用 Raw 方法
+如果必须使用 `Raw` 方法，请确保始终使用参数化查询。
+```go
+db.Raw("SELECT * FROM users WHERE name = ?", userInput).Scan(&users)
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+GORM 是 Golang 中广泛使用的 ORM 库，它简化了数据库操作并提供了丰富的功能。然而，不当的使用可能导致安全风险，例如 SQL 注入、连接泄漏或错误的权限配置。尽管 GORM 提供了参数化查询等内置防护机制，但如果开发者直接拼接用户输入到查询条件中，仍然可能引入注入漏洞。
+2. **触发场景**
+下面是一个存在潜在问题的代码示例：
+```go
+package main
+import (
+"gorm.io/driver/sqlite"
+"gorm.io/gorm"
+"log"
+"net/http"
+)
+type User struct {
+ID   uint
+Name string
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+db, err := gorm.Open(sqlite.Open("example.db"), &gorm.Config{})
+if err != nil {
+log.Fatal(err)
+}
+userInput := r.URL.Query().Get("name")
+var users []User
+// 不安全的查询方式
+db.Raw("SELECT * FROM users WHERE name = " + userInput).Scan(&users)
+for _, user := range users {
+log.Println(user.Name)
+}
+}
+func main() {
+http.HandleFunc("/", handler)
+log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+攻击者可以通过 URL 参数 `?name=1' OR '1'='1` 来绕过逻辑验证，进而窃取所有用户数据。
+3. **潜在影响**
+- 数据库中的敏感信息（如用户凭证、隐私数据）可能被泄露。
+- 通过恶意构造的输入执行任意 SQL 语句，破坏数据库结构或篡改数据。
+- 可能导致服务中断或进一步渗透至服务器系统。
+DESC
+	name: "output",
 }
 
 desc(

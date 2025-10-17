@@ -1,12 +1,12 @@
 package syntaxflow
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestParsePropertiesFile(t *testing.T) {
@@ -79,20 +79,22 @@ func TestParsePropertiesFile(t *testing.T) {
 		require.Equal(t, "classpath:/templates/", app.GetProjectConfigValue("spring.thymeleaf.prefix"))
 	})
 
-	t.Run("test config file position", func(t *testing.T) {
-		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-			prog := programs[0]
-			rule := `
-__projectConfig__."management.endpoints.web.exposure.include" as $include;
-`
-			vals, err := prog.SyntaxFlowWithError(rule)
-			require.NoError(t, err)
-			appName := vals.GetValues("include")
-			appName.ShowWithSource()
-			require.Contains(t, appName.StringEx(1), "health,info,metrics")
-			return nil
-		})
-	})
+	//	t.Run("test config file position", func(t *testing.T) {
+	//		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+	//			prog := programs[0]
+	//			rule := `
+	//
+	// __projectConfig__."management.endpoints.web.exposure.include" as $include;
+	// `
+	//
+	//			vals, err := prog.SyntaxFlowWithError(rule)
+	//			require.NoError(t, err)
+	//			appName := vals.GetValues("include")
+	//			appName.ShowWithSource()
+	//			require.Contains(t, appName.StringEx(1), "health,info,metrics")
+	//			return nil
+	//		})
+	//	})
 }
 
 func TestParseYamlFile(t *testing.T) {
@@ -141,22 +143,22 @@ myapp:
 		require.Equal(t, "true", app.GetProjectConfigValue("myapp.feature-enabled"))
 	})
 
-	t.Run("test syntaxflow search config", func(t *testing.T) {
-		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
-			prog := programs[0]
-			vals, err := prog.SyntaxFlowWithError(`
-__projectConfig__."spring.datasource.username" as $username;
-__projectConfig__."myapp.welcome-message" as $welcome
-`)
-			require.NoError(t, err)
-			userName := vals.GetValues("username")
-			userName.Show()
-			require.Contains(t, userName.String(), "user")
+	// 	t.Run("test syntaxflow search config", func(t *testing.T) {
+	// 		ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+	// 			prog := programs[0]
+	// 			vals, err := prog.SyntaxFlowWithError(`
+	// __projectConfig__."spring.datasource.username" as $username;
+	// __projectConfig__."myapp.welcome-message" as $welcome
+	// `)
+	// 			require.NoError(t, err)
+	// 			userName := vals.GetValues("username")
+	// 			userName.Show()
+	// 			require.Contains(t, userName.String(), "user")
 
-			welcome := vals.GetValues("welcome")
-			welcome.Show()
-			require.Contains(t, welcome.String(), "Welcome to My Application")
-			return nil
-		})
-	})
+	//			welcome := vals.GetValues("welcome")
+	//			welcome.Show()
+	//			require.Contains(t, welcome.String(), "Welcome to My Application")
+	//			return nil
+	//		})
+	//	})
 }

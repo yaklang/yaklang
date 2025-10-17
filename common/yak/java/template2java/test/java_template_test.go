@@ -2,15 +2,16 @@ package test
 
 import (
 	"fmt"
+	"path/filepath"
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/java/template2java"
-	"path/filepath"
-	"testing"
 )
 
 func checkJavaFront(t *testing.T, code string) {
-	_, err := java2ssa.Frontend(code, false)
+	_, err := java2ssa.Frontend(code)
 	require.NoError(t, err)
 }
 
@@ -28,12 +29,12 @@ func TestCreateJavaTemplate(t *testing.T) {
 			`out.print(var1);`,
 		}},
 		{"++dmo.jsp.", "../com/org", "demo", []string{
-			"package com.org;",
+			"package tmp2java_com.org;",
 			"public class dmo_jsp_",
 		}},
 		{"qqq.ftl", "/com.org/A", "demo", []string{
 			"public class qqq_ftl",
-			"package com.org.A;",
+			"package tmp2java_com.org.A;",
 		}},
 	}
 

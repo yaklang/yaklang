@@ -1,0 +1,368 @@
+desc(
+	title: "Check PHP Insecure File Operations"
+	title_zh: "检测PHP不安全的文件操作"
+	type: vul
+	risk: "file-operation"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+未经验证的用户输入（如通过GET或POST请求接收到的文件名、路径等）直接用于文件系统相关的函数（如`copy`, `link`, `symlink`, `rename`, `fopen`, `fread`, `file_get_contents`等），可能导致攻击者通过构造恶意输入，控制程序对任意文件进行读取、写入、删除、复制、移动、甚至是创建符号链接等操作。这可能导致敏感信息泄露、数据损坏、拒绝服务，甚至远程代码执行。
+2. **触发场景**
+当应用程序直接将用户提供的路径或文件名传递给文件操作函数时，如果没有进行充分的输入验证和过滤，攻击者就可以利用此漏洞。例如，用户可以输入`../../etc/passwd`来读取系统敏感文件，或者输入一个恶意文件的路径来覆盖现有文件。以下是一个存在风险的示例代码:
+```php
+<?php
+$origin = $_GET["origin"];
+$destination = $_GET["destination"];
+copy($origin,$destination);
+?>
+```
+攻击者可以构造请求，例如:`?origin=../../etc/passwd&destination=./output.txt`，将系统密码文件复制到web可访问的目录，导致敏感信息泄露。
+3. **潜在影响**
+- **敏感信息泄露**: 攻击者可以读取配置文件、源代码、用户数据等敏感信息。
+- **数据篡改或破坏**: 攻击者可以修改、删除甚至格式化服务器上的文件。
+- **拒绝服务**: 攻击者可以通过删除关键文件或写入大量无用数据导致服务不可用。
+- **权限绕过**: 通过创建符号链接或硬链接，攻击者可能绕过某些文件访问控制。
+- **远程代码执行**: 在某些情况下，如果攻击者可以控制写入文件的内容，结合其他漏洞（如文件包含），可能导致远程代码执行。
+DESC
+	rule_id: "7e2c4412-9a6f-4095-a84f-beb680e56fbf"
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对所有用户输入进行严格验证和过滤
+在将用户输入用于文件操作函数之前，务必进行严格的验证和过滤。这包括但不限于：
+* **合法性检查**: 验证文件或路径是否存在，是否符合预期的命名规范（如不允许特殊字符、不允许`../`目录穿越符等）。
+* **白名单或黑名单过滤**: 仅允许访问特定目录下的文件，或者禁止访问某些敏感文件和目录。
+* **文件名规范化**: 使用函数如`realpath()`来解析用户输入的路径，获取其绝对路径，并检查该路径是否在允许的范围内。
+#### 2. 避免用户直接控制整个文件路径
+尽量不要让用户直接控制用于文件操作的完整路径。如果必须基于用户输入来确定文件，应该只允许用户提供文件名或部分路径，并将其与应用程序内部定义的安全目录相结合。
+#### 3. 使用安全的API
+了解和使用PHP提供的更安全的文件操作函数或库，这些函数可能内置了更多的安全检查。
+#### 4. 设置合适的文件权限
+确保Web服务器运行的用户只拥有访问必要文件和目录的最小权限，限制其对其他敏感系统文件的访问能力。
+#### 5. 示例代码 - 使用白名单和`realpath`
+```php
+<?php
+$allowed_dirs = ['/var/www/data/', '/var/www/uploads/']; // 允许操作的目录白名单
+$filename = $_GET["filename"];
+// 使用realpath解析路径，检查是否在允许的目录内
+$real_filepath = realpath($allowed_dirs[0] . $filename);
+if ($real_filepath && strpos($real_filepath, $allowed_dirs[0]) === 0) {
+// 路径合法，执行文件操作
+// 例如: readfile($real_filepath);
+echo "Reading file: " . $real_filepath;
+} else {
+// 路径非法，拒绝请求
+die("Invalid file path!");
+}
+?>
+```
+#### 6. 示例代码 - 过滤目录穿越符
+```php
+<?php
+$filename = $_GET["filename"];
+// 过滤目录穿越符
+$filtered_filename = str_replace(['../', './'], '', $filename);
+// 将过滤后的文件名与安全目录结合
+$safe_filepath = '/var/www/data/' . $filtered_filename;
+// 执行文件操作，但仍需谨慎考虑其他攻击向量
+// 例如: readfile($safe_filepath);
+echo "Attempting to read: " . $safe_filepath;
+?>
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+[CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
+[PHP manual for file system functions](https://www.php.net/manual/en/book.filesystem.php)
+REFERENCE
+)
+/copy|(sym)?link|rename|fopen|fread|file_get_contents/ as $function
+
+<include('php-param')> as $params;
+<include('php-tp-all-extern-variable-param-source')> as $params
+
+$function(* as $allParams)
+
+$allParams?{<self> #{include: <<<CODE
+* & $params
+CODE}->} as $sink
+
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call} as $__next__
+CODE)> as $high
+
+alert $high for {
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+未经验证的用户输入（如通过GET或POST请求接收到的文件名、路径等）直接用于文件系统相关的函数（如`copy`, `link`, `symlink`, `rename`, `fopen`, `fread`, `file_get_contents`等），可能导致攻击者通过构造恶意输入，控制程序对任意文件进行读取、写入、删除、复制、移动、甚至是创建符号链接等操作。这可能导致敏感信息泄露、数据损坏、拒绝服务，甚至远程代码执行。
+2. **触发场景**
+当应用程序直接将用户提供的路径或文件名传递给文件操作函数时，如果没有进行充分的输入验证和过滤，攻击者就可以利用此漏洞。例如，用户可以输入`../../etc/passwd`来读取系统敏感文件，或者输入一个恶意文件的路径来覆盖现有文件。以下是一个存在风险的示例代码:
+```php
+<?php
+$origin = $_GET["origin"];
+$destination = $_GET["destination"];
+copy($origin,$destination);
+?>
+```
+攻击者可以构造请求，例如:`?origin=../../etc/passwd&destination=./output.txt`，将系统密码文件复制到web可访问的目录，导致敏感信息泄露。
+3. **潜在影响**
+- **敏感信息泄露**: 攻击者可以读取配置文件、源代码、用户数据等敏感信息。
+- **数据篡改或破坏**: 攻击者可以修改、删除甚至格式化服务器上的文件。
+- **拒绝服务**: 攻击者可以通过删除关键文件或写入大量无用数据导致服务不可用。
+- **权限绕过**: 通过创建符号链接或硬链接，攻击者可能绕过某些文件访问控制。
+- **远程代码执行**: 在某些情况下，如果攻击者可以控制写入文件的内容，结合其他漏洞（如文件包含），可能导致远程代码执行。
+DESC
+	level: "high",
+	title: "PHP Direct File Operation Without Validation Vulnerability Was Detected",
+	title_zh: "检测到PHP未经验证的文件操作漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对所有用户输入进行严格验证和过滤
+在将用户输入用于文件操作函数之前，务必进行严格的验证和过滤。这包括但不限于：
+* **合法性检查**: 验证文件或路径是否存在，是否符合预期的命名规范（如不允许特殊字符、不允许`../`目录穿越符等）。
+* **白名单或黑名单过滤**: 仅允许访问特定目录下的文件，或者禁止访问某些敏感文件和目录。
+* **文件名规范化**: 使用函数如`realpath()`来解析用户输入的路径，获取其绝对路径，并检查该路径是否在允许的范围内。
+#### 2. 避免用户直接控制整个文件路径
+尽量不要让用户直接控制用于文件操作的完整路径。如果必须基于用户输入来确定文件，应该只允许用户提供文件名或部分路径，并将其与应用程序内部定义的安全目录相结合。
+#### 3. 使用安全的API
+了解和使用PHP提供的更安全的文件操作函数或库，这些函数可能内置了更多的安全检查。
+#### 4. 设置合适的文件权限
+确保Web服务器运行的用户只拥有访问必要文件和目录的最小权限，限制其对其他敏感系统文件的访问能力。
+#### 5. 示例代码 - 使用白名单和`realpath`
+```php
+<?php
+$allowed_dirs = ['/var/www/data/', '/var/www/uploads/']; // 允许操作的目录白名单
+$filename = $_GET["filename"];
+// 使用realpath解析路径，检查是否在允许的目录内
+$real_filepath = realpath($allowed_dirs[0] . $filename);
+if ($real_filepath && strpos($real_filepath, $allowed_dirs[0]) === 0) {
+// 路径合法，执行文件操作
+// 例如: readfile($real_filepath);
+echo "Reading file: " . $real_filepath;
+} else {
+// 路径非法，拒绝请求
+die("Invalid file path!");
+}
+?>
+```
+#### 6. 示例代码 - 过滤目录穿越符
+```php
+<?php
+$filename = $_GET["filename"];
+// 过滤目录穿越符
+$filtered_filename = str_replace(['../', './'], '', $filename);
+// 将过滤后的文件名与安全目录结合
+$safe_filepath = '/var/www/data/' . $filtered_filename;
+// 执行文件操作，但仍需谨慎考虑其他攻击向量
+// 例如: readfile($safe_filepath);
+echo "Attempting to read: " . $safe_filepath;
+?>
+```
+SOLUTION
+	risk: "文件操作",
+	name: "high",
+	message: "检测到PHP未经验证的文件操作漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+}
+$sink<dataflow(include=<<<CODE
+* & $params as $__next__
+CODE,exclude=<<<CODE
+*?{opcode: call && <self><getCallee> & $filter} as $__next__
+CODE)> as $mid
+
+alert $mid for {
+	title: "PHP Insufficient Parameter Filtering Risk Was Detected",
+	title_zh: "检测到PHP参数过滤不完整风险",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对所有用户输入进行严格验证和过滤
+在将用户输入用于文件操作函数之前，务必进行严格的验证和过滤。这包括但不限于：
+* **合法性检查**: 验证文件或路径是否存在，是否符合预期的命名规范（如不允许特殊字符、不允许`../`目录穿越符等）。
+* **白名单或黑名单过滤**: 仅允许访问特定目录下的文件，或者禁止访问某些敏感文件和目录。
+* **文件名规范化**: 使用函数如`realpath()`来解析用户输入的路径，获取其绝对路径，并检查该路径是否在允许的范围内。
+#### 2. 避免用户直接控制整个文件路径
+尽量不要让用户直接控制用于文件操作的完整路径。如果必须基于用户输入来确定文件，应该只允许用户提供文件名或部分路径，并将其与应用程序内部定义的安全目录相结合。
+#### 3. 使用安全的API
+了解和使用PHP提供的更安全的文件操作函数或库，这些函数可能内置了更多的安全检查。
+#### 4. 设置合适的文件权限
+确保Web服务器运行的用户只拥有访问必要文件和目录的最小权限，限制其对其他敏感系统文件的访问能力。
+#### 5. 示例代码 - 使用白名单和`realpath`
+```php
+<?php
+$allowed_dirs = ['/var/www/data/', '/var/www/uploads/']; // 允许操作的目录白名单
+$filename = $_GET["filename"];
+// 使用realpath解析路径，检查是否在允许的目录内
+$real_filepath = realpath($allowed_dirs[0] . $filename);
+if ($real_filepath && strpos($real_filepath, $allowed_dirs[0]) === 0) {
+// 路径合法，执行文件操作
+// 例如: readfile($real_filepath);
+echo "Reading file: " . $real_filepath;
+} else {
+// 路径非法，拒绝请求
+die("Invalid file path!");
+}
+?>
+```
+#### 6. 示例代码 - 过滤目录穿越符
+```php
+<?php
+$filename = $_GET["filename"];
+// 过滤目录穿越符
+$filtered_filename = str_replace(['../', './'], '', $filename);
+// 将过滤后的文件名与安全目录结合
+$safe_filepath = '/var/www/data/' . $filtered_filename;
+// 执行文件操作，但仍需谨慎考虑其他攻击向量
+// 例如: readfile($safe_filepath);
+echo "Attempting to read: " . $safe_filepath;
+?>
+```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+未经验证的用户输入（如通过GET或POST请求接收到的文件名、路径等）直接用于文件系统相关的函数（如`copy`, `link`, `symlink`, `rename`, `fopen`, `fread`, `file_get_contents`等），可能导致攻击者通过构造恶意输入，控制程序对任意文件进行读取、写入、删除、复制、移动、甚至是创建符号链接等操作。这可能导致敏感信息泄露、数据损坏、拒绝服务，甚至远程代码执行。
+2. **触发场景**
+当应用程序直接将用户提供的路径或文件名传递给文件操作函数时，如果没有进行充分的输入验证和过滤，攻击者就可以利用此漏洞。例如，用户可以输入`../../etc/passwd`来读取系统敏感文件，或者输入一个恶意文件的路径来覆盖现有文件。以下是一个存在风险的示例代码:
+```php
+<?php
+$origin = $_GET["origin"];
+$destination = $_GET["destination"];
+copy($origin,$destination);
+?>
+```
+攻击者可以构造请求，例如:`?origin=../../etc/passwd&destination=./output.txt`，将系统密码文件复制到web可访问的目录，导致敏感信息泄露。
+3. **潜在影响**
+- **敏感信息泄露**: 攻击者可以读取配置文件、源代码、用户数据等敏感信息。
+- **数据篡改或破坏**: 攻击者可以修改、删除甚至格式化服务器上的文件。
+- **拒绝服务**: 攻击者可以通过删除关键文件或写入大量无用数据导致服务不可用。
+- **权限绕过**: 通过创建符号链接或硬链接，攻击者可能绕过某些文件访问控制。
+- **远程代码执行**: 在某些情况下，如果攻击者可以控制写入文件的内容，结合其他漏洞（如文件包含），可能导致远程代码执行。
+DESC
+	level: "mid",
+	name: "mid",
+	message: "检测到PHP文件操作中可能存在参数过滤不完整的情况，需进一步审计确认。",
+	risk: "文件操作",
+}
+$sink - $high - $mid  as $low
+
+alert $low for {
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对所有用户输入进行严格验证和过滤
+在将用户输入用于文件操作函数之前，务必进行严格的验证和过滤。这包括但不限于：
+* **合法性检查**: 验证文件或路径是否存在，是否符合预期的命名规范（如不允许特殊字符、不允许`../`目录穿越符等）。
+* **白名单或黑名单过滤**: 仅允许访问特定目录下的文件，或者禁止访问某些敏感文件和目录。
+* **文件名规范化**: 使用函数如`realpath()`来解析用户输入的路径，获取其绝对路径，并检查该路径是否在允许的范围内。
+#### 2. 避免用户直接控制整个文件路径
+尽量不要让用户直接控制用于文件操作的完整路径。如果必须基于用户输入来确定文件，应该只允许用户提供文件名或部分路径，并将其与应用程序内部定义的安全目录相结合。
+#### 3. 使用安全的API
+了解和使用PHP提供的更安全的文件操作函数或库，这些函数可能内置了更多的安全检查。
+#### 4. 设置合适的文件权限
+确保Web服务器运行的用户只拥有访问必要文件和目录的最小权限，限制其对其他敏感系统文件的访问能力。
+#### 5. 示例代码 - 使用白名单和`realpath`
+```php
+<?php
+$allowed_dirs = ['/var/www/data/', '/var/www/uploads/']; // 允许操作的目录白名单
+$filename = $_GET["filename"];
+// 使用realpath解析路径，检查是否在允许的目录内
+$real_filepath = realpath($allowed_dirs[0] . $filename);
+if ($real_filepath && strpos($real_filepath, $allowed_dirs[0]) === 0) {
+// 路径合法，执行文件操作
+// 例如: readfile($real_filepath);
+echo "Reading file: " . $real_filepath;
+} else {
+// 路径非法，拒绝请求
+die("Invalid file path!");
+}
+?>
+```
+#### 6. 示例代码 - 过滤目录穿越符
+```php
+<?php
+$filename = $_GET["filename"];
+// 过滤目录穿越符
+$filtered_filename = str_replace(['../', './'], '', $filename);
+// 将过滤后的文件名与安全目录结合
+$safe_filepath = '/var/www/data/' . $filtered_filename;
+// 执行文件操作，但仍需谨慎考虑其他攻击向量
+// 例如: readfile($safe_filepath);
+echo "Attempting to read: " . $safe_filepath;
+?>
+```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+未经验证的用户输入（如通过GET或POST请求接收到的文件名、路径等）直接用于文件系统相关的函数（如`copy`, `link`, `symlink`, `rename`, `fopen`, `fread`, `file_get_contents`等），可能导致攻击者通过构造恶意输入，控制程序对任意文件进行读取、写入、删除、复制、移动、甚至是创建符号链接等操作。这可能导致敏感信息泄露、数据损坏、拒绝服务，甚至远程代码执行。
+2. **触发场景**
+当应用程序直接将用户提供的路径或文件名传递给文件操作函数时，如果没有进行充分的输入验证和过滤，攻击者就可以利用此漏洞。例如，用户可以输入`../../etc/passwd`来读取系统敏感文件，或者输入一个恶意文件的路径来覆盖现有文件。以下是一个存在风险的示例代码:
+```php
+<?php
+$origin = $_GET["origin"];
+$destination = $_GET["destination"];
+copy($origin,$destination);
+?>
+```
+攻击者可以构造请求，例如:`?origin=../../etc/passwd&destination=./output.txt`，将系统密码文件复制到web可访问的目录，导致敏感信息泄露。
+3. **潜在影响**
+- **敏感信息泄露**: 攻击者可以读取配置文件、源代码、用户数据等敏感信息。
+- **数据篡改或破坏**: 攻击者可以修改、删除甚至格式化服务器上的文件。
+- **拒绝服务**: 攻击者可以通过删除关键文件或写入大量无用数据导致服务不可用。
+- **权限绕过**: 通过创建符号链接或硬链接，攻击者可能绕过某些文件访问控制。
+- **远程代码执行**: 在某些情况下，如果攻击者可以控制写入文件的内容，结合其他漏洞（如文件包含），可能导致远程代码执行。
+DESC
+	level: "low",
+	title: "PHP Potential Access Control Bypass Risk Was Detected",
+	title_zh: "检测到PHP潜在访问控制绕过风险",
+	message: "检测到PHP文件操作中可能存在潜在访问控制绕过的情况，需进一步排查过滤函数是否存在被绕过的风险。",
+	risk: "文件操作",
+	name: "low",
+}
+desc(
+	lang: "php"
+	alert_min: 1
+	"file:///unsafe.php": <<<TEXT
+<?php
+    $origin = $_GET["origin"];
+    $destination = $_GET["destination"];
+    copy($origin,$destination);
+TEXT
+	"safefile://SafeFileOperationWhiteList.php": <<<CODE
+<?php
+    $allowed_dirs = ['/var/www/data/', '/var/www/uploads/']; // 允许操作的目录白名单
+    $filename = $_GET["filename"];
+
+    // 使用realpath解析路径，检查是否在允许的目录内
+    $real_filepath = realpath($allowed_dirs[0] . $filename);
+
+    if ($real_filepath && strpos($real_filepath, $allowed_dirs[0]) === 0) {
+        // 路径合法，执行文件操作
+        echo "Reading file safely from: " . $real_filepath;
+        // readfile($real_filepath); // 实际的文件读取操作，此处仅为示例
+    } else {
+        // 路径非法，拒绝请求
+        die("Invalid file path!");
+    }
+?>
+CODE
+	"safefile://SafeFileOperationFilterTraversal.php": <<<CODE
+<?php
+    $filename = $_GET["filename"];
+
+    // 过滤目录穿越符，移除 '..' 和 '.'
+    $filtered_filename = str_replace(['../', './', '\\', '/'], '', $filename); // 也需考虑Windows路径分隔符
+
+    // 将过滤后的文件名与安全目录结合，避免用户直接控制路径
+    $safe_filepath = '/var/www/data/' . $filtered_filename . '.log'; // 示例：限制文件类型或后缀
+
+    // 确保文件存在且在预期目录，并执行文件操作
+    if (file_exists($safe_filepath) && is_file($safe_filepath) && strpos(realpath($safe_filepath), '/var/www/data/') === 0) {
+        echo "Attempting to read safely from: " . $safe_filepath;
+        // readfile($safe_filepath); // 实际的文件读取操作，此处仅为示例
+    } else {
+        die("Invalid file access attempt!");
+    }
+?>
+CODE
+)

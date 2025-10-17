@@ -26,15 +26,16 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
-	"github.com/yaklang/yaklang/common/gmsm/gmtls"
-	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
-	"github.com/yaklang/yaklang/common/minimartian/h2"
-	"github.com/yaklang/yaklang/common/utils"
 	"math/big"
 	"net"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/minimartian/h2"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/log"
 )
@@ -123,9 +124,9 @@ func NewAuthority(name, organization string, validity time.Duration) (*x509.Cert
 
 type ConfigOption func(*Config) error
 
-func WithObsoleteTLS(ca *gmx509.Certificate, privateKey interface{}) ConfigOption {
+func WithObsoleteTLS(ca, gmCA *gmx509.Certificate, privateKey, gmPrivateKey interface{}) ConfigOption {
 	return func(c *Config) error {
-		config, err := NewObsoleteTLSConfig(ca, privateKey)
+		config, err := NewObsoleteTLSConfig(ca, gmCA, privateKey, gmPrivateKey)
 		if err != nil {
 			return err
 		}
@@ -272,8 +273,27 @@ func (c *Config) ObsoleteTLS(hostname string, h2Verify bool) *gmtls.Config {
 			if host == "" {
 				host = hostname
 			}
+			gmFlag := false
+			// 检查支持协议中是否包含GMSSL
+			for _, v := range clientHello.SupportedVersions {
+				if v == gmtls.VersionGMSSL {
+					gmFlag = true
+					break
+				}
+			}
+			if gmFlag && !c.obsoleteConfig.disableMimicGMServer {
+				return c.obsoleteConfig.getSigningCert(host)
+			} else {
+				return c.obsoleteConfig.cert(host)
+			}
+		},
+		GetKECertificate: func(clientHello *gmtls.ClientHelloInfo) (*gmtls.Certificate, error) {
+			host := clientHello.ServerName
+			if host == "" {
+				host = hostname
+			}
 
-			return c.obsoleteConfig.cert(host)
+			return c.obsoleteConfig.getEncryptionCert(host)
 		},
 		NextProtos: nextProtos,
 	}

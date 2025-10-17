@@ -11,7 +11,6 @@ desc(
 
 2. **触发场景**
 当Spring Boot应用使用模板引擎渲染视图，并将用户输入的数据直接或间接（如通过Model对象）传递到模板中进行显示时，如果模板引擎的默认配置或开发者未显式开启或使用安全转义功能，就可能存在XSS漏洞。
-
 例如，在FreeMarker模板中，如果变量 `${name}` 包含了恶意脚本，而FreeMarker的auto_escaping未开启或被关闭，那么恶意脚本就会被直接输出到HTML中：
 ```html
 <h1>Hello, ${name}!</h1>
@@ -32,15 +31,12 @@ DESC
 
 1. **启用模板引擎的安全转义功能**
 大多数现代模板引擎都提供了内置的安全转义机制，可以自动对输出的数据进行HTML实体编码，从而防止恶意脚本的执行。务必检查并确保模板引擎的这一功能已启用。
-
 - **FreeMarker**: 确保 `auto_escaping` 设置为 `true`。可以通过在FreeMarker配置中设置，或者在模板文件的顶部使用 `<#ftl auto_escaping=true>` 来开启。
 ```java
 // Spring Boot application.properties or application.yml
 spring.freemarker.settings.auto_escaping=true
 ```
-
 - **Thymeleaf**: Thymeleaf 默认对大部分表达式进行转义（如 `${...}`），但对于原始HTML输出（如 `[(${...})]`）不会转义。除非特殊需要，应优先使用默认转义的表达式。如果需要输出HTML，应确保内容是安全的或者进行适当的过滤。
-
 - **Velocity**: 配置Velocity引擎以启用HTML转义。
 
 2. **对所有用户输入进行严格的过滤和校验**
@@ -79,6 +75,47 @@ alert $res for {
 	title: "Check Java Spring Boot's Template Engine XSS Vulnerability",
 	title_zh: "检测Java Spring Boot框架模板引擎XSS漏洞",
 	level: "high",
+	name: "res",
+	solution: <<<SOLUTION
+### 修复建议
+1. **启用模板引擎的安全转义功能**
+大多数现代模板引擎都提供了内置的安全转义机制，可以自动对输出的数据进行HTML实体编码，从而防止恶意脚本的执行。务必检查并确保模板引擎的这一功能已启用。
+- **FreeMarker**: 确保 `auto_escaping` 设置为 `true`。可以通过在FreeMarker配置中设置，或者在模板文件的顶部使用 `<#ftl auto_escaping=true>` 来开启。
+```java
+// Spring Boot application.properties or application.yml
+spring.freemarker.settings.auto_escaping=true
+```
+- **Thymeleaf**: Thymeleaf 默认对大部分表达式进行转义（如 `${...}`），但对于原始HTML输出（如 `[(${...})]`）不会转义。除非特殊需要，应优先使用默认转义的表达式。如果需要输出HTML，应确保内容是安全的或者进行适当的过滤。
+- **Velocity**: 配置Velocity引擎以启用HTML转义。
+2. **对所有用户输入进行严格的过滤和校验**
+在将用户输入传递给模板引擎之前，对输入数据进行严格的过滤和校验，移除或转义潜在的恶意字符。
+3. **避免在模板中直接输出用户可控的HTML**
+如果业务需求需要输出HTML内容，应考虑使用安全的HTML过滤库，如OWASP Java HTML Sanitizer，对要输出的HTML进行清理，只允许安全的HTML标签和属性。
+4. **最小权限原则**
+限制用户在模板中可以执行的操作，避免允许用户上传或控制模板文件本身。
+5. **输出编码**
+即使模板引擎提供了转义功能，也应了解其工作原理和限制。在某些特殊情况下，可能需要结合上下文敏感的转义（Context-Aware Escaping）。
+SOLUTION
+	risk: "XSS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+跨站脚本攻击（XSS）是一种常见的网络安全漏洞，允许攻击者将恶意脚本注入到被攻击者信任的Web页面中。当用户访问包含恶意脚本的页面时，恶意脚本会在用户的浏览器上执行。在Java Spring Boot应用程序中，如果使用了模板引擎（如Thymeleaf、FreeMarker、Velocity等），并且在渲染模板时未能对用户可控的数据进行适当的安全转义，攻击者就可以通过构造包含恶意脚本的输入数据，使其在最终生成的HTML页面中被执行。
+2. **触发场景**
+当Spring Boot应用使用模板引擎渲染视图，并将用户输入的数据直接或间接（如通过Model对象）传递到模板中进行显示时，如果模板引擎的默认配置或开发者未显式开启或使用安全转义功能，就可能存在XSS漏洞。
+例如，在FreeMarker模板中，如果变量 `${name}` 包含了恶意脚本，而FreeMarker的auto_escaping未开启或被关闭，那么恶意脚本就会被直接输出到HTML中：
+```html
+<h1>Hello, ${name}!</h1>
+```
+攻击者输入 `<script>alert('XSS')</script>`，则在页面上会弹窗，更严重的攻击可能窃取用户Cookie、劫持会话等。类似的漏洞也存在于Thymeleaf等其他模板引擎。
+3. **潜在影响**
+- **用户数据泄露**: 攻击者可以窃取用户的敏感信息，如登录凭证、个人身份信息等。
+- **会话劫持**: 攻击者可以窃取用户的会话Cookie，冒充用户进行操作。
+- **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站或其他恶意网站。
+- **Defacement**: 攻击者可以修改网页内容。
+- **传播恶意软件**: 通过驱动器下载攻击（Drive-by Download）诱骗用户下载恶意软件。
+- **与CSRF结合**: 利用XSS执行恶意请求，绕过CSRF防护。
+DESC
 }
 
 
@@ -119,4 +156,38 @@ public class GreetingController {
        }
 }
 EOF
+	"safefile://SafeFreeMarkerController.java": <<<CODE
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
+@Controller
+public class SafeFreeMarkerController {
+
+    @GetMapping("/safeGreetingFreeMarker")
+    public String safeGreeting(@RequestParam("name") String name, Model model) {
+        // FreeMarker在spring.freemarker.settings.auto_escaping=true时默认进行HTML转义
+        // 因此直接将用户输入放入model是安全的
+        model.addAttribute("userName", name);
+        return "safeGreetingFreeMarker";
+    }
+}
+
+CODE
+	"safefile://SafeFreeMarkerTemplate.ftl": <<<CODE
+<#ftl auto_escaping=true>
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Safe FreeMarker Greeting</title>
+</head>
+<body>
+    <h1>Hello, ${userName}!</h1>
+    <p>This content is supposed to be safe: ${safeContent}.</p>
+    <p>Using no-escape interpolation for known safe content: <#noescape>${userHtml}</#noescape></p>
+</body>
+</html>
+
+CODE
 )

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -21,7 +22,7 @@ import (
 )
 
 // TaskResponseCallback 定义Task执行过程中响应回调函数类型
-type TaskResponseCallback func(ctx *Memory, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
+type TaskResponseCallback func(ctx *PromptContextProvider, details ...aispec.ChatDetail) (continueThinking bool, prompt string, err error)
 
 // TaskProgress 记录任务执行的进度信息
 type TaskProgress struct {
@@ -31,14 +32,15 @@ type TaskProgress struct {
 	CurrentGoal    string `json:"current_goal"`    // 当前任务的目标
 }
 
-type aiTask struct {
-	config *Config
+type AiTask struct {
+	*aicommon.Emitter
+	*Config
 
 	Index      string    `json:"index"`
 	Name       string    `json:"name"`
 	Goal       string    `json:"goal"`
-	ParentTask *aiTask   `json:"parent_task"`
-	Subtasks   []*aiTask `json:"subtasks"`
+	ParentTask *AiTask   `json:"parent_task"`
+	Subtasks   []*AiTask `json:"subtasks"`
 
 	ResponseCallback TaskResponseCallback `json:"-"` // 响应回调函数
 
@@ -62,52 +64,124 @@ type aiTask struct {
 	TaskContinueCount int64 `json:"task_continue_count"` // 任务继续执行的次数
 }
 
-func (t *aiTask) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
-		t.config.taskAICallback,
-		t.config.coordinatorAICallback,
-		t.config.planAICallback,
+func (t *AiTask) GetSummary() string {
+	if t.TaskSummary != "" {
+		return t.TaskSummary
+	}
+	if t.ShortSummary != "" {
+		return t.ShortSummary
+	}
+	if t.LongSummary != "" {
+		return t.LongSummary
+	}
+	if t.StatusSummary != "" {
+		return t.StatusSummary
+	}
+	return ""
+}
+
+func (t *AiTask) GetSuccessCallCount() int {
+	count := 0
+	t.toolCallResultIds.ForEach(func(i int64, v *aitool.ToolResult) bool {
+		if v.Success {
+			count++
+		}
+		return true
+	})
+	return count
+}
+
+func (t *AiTask) GetFailCallCount() int {
+	count := 0
+	t.toolCallResultIds.ForEach(func(i int64, v *aitool.ToolResult) bool {
+		if !v.Success {
+			count++
+		}
+		return true
+	})
+	return count
+}
+
+func (t *AiTask) GetEmitter() *aicommon.Emitter {
+	if t.Emitter == nil {
+		return t.Config.GetEmitter()
+	}
+	return t.Emitter
+
+}
+
+func (t *AiTask) GetIndex() string {
+	return t.Index
+}
+
+func (t *AiTask) GetName() string {
+	return t.Name
+}
+
+var _ aicommon.AITask = (*AiTask)(nil)
+
+func (t *AiTask) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
+		t.Config.taskAICallback,
+		t.Config.coordinatorAICallback,
+		t.Config.planAICallback,
 	} {
 		if cb == nil {
 			continue
 		}
-		return cb(t.config, request)
+		return cb(t.Config, request)
 	}
 	return nil, utils.Error("no any ai callback is set, cannot found ai config")
 }
 
-func (t *aiTask) PushToolCallResult(i *aitool.ToolResult) {
+func (t *AiTask) PushToolCallResult(i *aitool.ToolResult) {
 	t.toolCallResultIds.Set(i.GetID(), i)
-	t.config.memory.PushToolCallResults(i)
+	t.Config.memory.PushToolCallResults(i)
 	atomic.AddInt64(&t.ToolCallCount, 1)
 }
 
 // MarshalJSON 实现自定义的JSON序列化，跳过AICallback字段
-func (t aiTask) MarshalJSON() ([]byte, error) {
-	type TaskAlias aiTask // 创建一个别名类型以避免递归调用
+func (t *AiTask) MarshalJSON() ([]byte, error) {
+	type TaskAlias AiTask // 创建一个别名类型以避免递归调用
+	var progress string
+	if t.executed {
+		progress = "success"
+	} else if t.executing {
+		progress = "in-progress"
+	}
 
 	// 创建一个不包含AICallback的结构体
 	return json.Marshal(struct {
-		Index    string    `json:"index"`
-		Name     string    `json:"name"`
-		Goal     string    `json:"goal"`
-		Subtasks []*aiTask `json:"subtasks,omitempty"`
+		Index                string    `json:"index"`
+		Name                 string    `json:"name"`
+		Goal                 string    `json:"goal"`
+		Subtasks             []*AiTask `json:"subtasks,omitempty"`
+		Progress             string    `json:"progress"` // 添加进度字段
+		Summary              string    `json:"summary"`
+		TotalToolCallCount   int64     `json:"total_tool_call_count"`
+		SuccessToolCallCount int       `json:"success_tool_call_count"`
+		FailToolCallCount    int       `json:"fail_tool_call_count"`
 	}{
-		Index:    t.Index,
-		Name:     t.Name,
-		Goal:     t.Goal,
-		Subtasks: t.Subtasks,
+		Index:                t.Index,
+		Name:                 t.Name,
+		Goal:                 t.Goal,
+		Subtasks:             t.Subtasks,
+		Progress:             progress,
+		Summary:              t.GetSummary(),
+		TotalToolCallCount:   t.ToolCallCount,
+		SuccessToolCallCount: t.GetSuccessCallCount(),
+		FailToolCallCount:    t.GetFailCallCount(),
 	})
 }
 
 // UnmarshalJSON 实现自定义的JSON反序列化，跳过AICallback字段
-func (t *aiTask) UnmarshalJSON(data []byte) error {
+func (t *AiTask) UnmarshalJSON(data []byte) error {
 	// 创建一个临时结构体，不包含AICallback
 	aux := struct {
 		Index    string    `json:"index"`
 		Name     string    `json:"name"`
 		Goal     string    `json:"goal"`
-		Subtasks []*aiTask `json:"subtasks,omitempty"`
+		Subtasks []*AiTask `json:"subtasks,omitempty"`
 	}{}
 
 	if err := json.Unmarshal(data, &aux); err != nil {
@@ -132,7 +206,7 @@ func ExtractPlan(c *Config, rawResponse string) (*PlanResponse, error) {
 	return &PlanResponse{RootTask: at}, nil
 }
 
-func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*aiTask, error) {
+func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*AiTask, error) {
 	for _, item := range jsonextractor.ExtractObjectIndexes(rawResponse) {
 		start, end := item[0], item[1]
 		taskJSON := rawResponse[start:end]
@@ -140,7 +214,7 @@ func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*aiTas
 		// 尝试解析为新的 aiTask schema 结构
 		var planObj struct {
 			Action       string    `json:"@action"`
-			NextPlanTask []*aiTask `json:"next_plans"`
+			NextPlanTask []*AiTask `json:"next_plans"`
 		}
 
 		err := json.Unmarshal([]byte(taskJSON), &planObj)
@@ -154,7 +228,7 @@ func ExtractNextPlanTaskFromRawResponse(c *Config, rawResponse string) ([]*aiTas
 // _assignHierarchicalIndicesRecursive 递归地为任务及其子任务分配层级索引。
 // currentTask 是当前要处理的任务。
 // currentIndex 是为 currentTask 计算好的索引字符串 (例如 "1", "1-2", "1-2-3")。
-func _assignHierarchicalIndicesRecursive(currentTask *aiTask, currentIndex string) {
+func _assignHierarchicalIndicesRecursive(currentTask *AiTask, currentIndex string) {
 	if currentTask == nil {
 		return
 	}
@@ -171,7 +245,7 @@ func _assignHierarchicalIndicesRecursive(currentTask *aiTask, currentIndex strin
 // GenerateIndex 为任务树生成层级索引。
 // 调用此方法的任务 (a) 所在树的根节点索引将被设为 "1"。
 // 其子任务将相应地获得如 "1-1", "1-2" 等索引，孙任务如 "1-1-1" 等。
-func (a *aiTask) GenerateIndex() {
+func (a *AiTask) GenerateIndex() {
 	if a == nil {
 		return
 	}
@@ -191,18 +265,18 @@ func (a *aiTask) GenerateIndex() {
 }
 
 // ExtractTaskFromRawResponse 从原始响应中提取Task
-func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask, err error) {
+func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *AiTask, err error) {
 	defer func() {
 		if retTask == nil {
 			return
 		}
 		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *aiTask)
-		propagateConfig = func(task *aiTask) {
+		var propagateConfig func(task *AiTask)
+		propagateConfig = func(task *AiTask) {
 			if task == nil {
 				return
 			}
-			task.config = c
+			task.Config = c
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -238,11 +312,11 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask,
 		}
 		if err == nil && planObj.Action == "plan" && len(planObj.Tasks) > 0 {
 			// 创建主任务
-			mainTask := &aiTask{
-				config:   c,
+			mainTask := &AiTask{
+				Config:   c,
 				Name:     planObj.MainTask,
 				Goal:     planObj.MainTaskGoal,
-				Subtasks: make([]*aiTask, 0),
+				Subtasks: make([]*AiTask, 0),
 				metadata: map[string]interface{}{
 					"query": planObj.Query,
 				},
@@ -257,8 +331,8 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask,
 				// 如果有多个子任务，使用除第一个外的所有任务作为子任务
 				if len(planObj.Tasks) > 1 {
 					for _, subtask := range planObj.Tasks[1:] {
-						mainTask.Subtasks = append(mainTask.Subtasks, &aiTask{
-							config:            c,
+						mainTask.Subtasks = append(mainTask.Subtasks, &AiTask{
+							Config:            c,
 							Name:              subtask.SubtaskName,
 							Goal:              subtask.SubtaskGoal,
 							ParentTask:        mainTask,
@@ -270,8 +344,8 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask,
 			} else {
 				// 主任务名称存在，将所有任务作为子任务
 				for _, subtask := range planObj.Tasks {
-					mainTask.Subtasks = append(mainTask.Subtasks, &aiTask{
-						config:            c,
+					mainTask.Subtasks = append(mainTask.Subtasks, &AiTask{
+						Config:            c,
 						Name:              subtask.SubtaskName,
 						Goal:              subtask.SubtaskGoal,
 						ParentTask:        mainTask,
@@ -287,7 +361,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask,
 		}
 
 		// 尝试直接解析为单个 aiTask 对象
-		var simpleTask aiTask
+		var simpleTask AiTask
 		err = json.Unmarshal([]byte(taskJSON), &simpleTask)
 		if err != nil {
 			log.Debugf("Failed to parse taskJSON as simpleTask: %v. JSON: %s", err, taskJSON)
@@ -306,9 +380,9 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask,
 		}
 		if err == nil {
 			if name, ok := taskMap["name"].(string); ok && name != "" {
-				taskIns := &aiTask{
+				taskIns := &AiTask{
 					Name:              name,
-					config:            c,
+					Config:            c,
 					metadata:          map[string]interface{}{},
 					toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
 				}
@@ -321,7 +395,7 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask,
 					for _, st := range subtasks {
 						if subtaskMap, ok := st.(map[string]interface{}); ok {
 							if stName, ok := subtaskMap["name"].(string); ok && stName != "" {
-								subtask := &aiTask{
+								subtask := &AiTask{
 									Name:              stName,
 									metadata:          map[string]interface{}{},
 									toolCallResultIds: omap.NewOrderedMap(make(map[int64]*aitool.ToolResult)),
@@ -347,18 +421,18 @@ func ExtractTaskFromRawResponse(c *Config, rawResponse string) (retTask *aiTask,
 	return
 }
 
-func (t *aiTask) SingleLineStatusSummary() string {
+func (t *AiTask) SingleLineStatusSummary() string {
 	return strings.ReplaceAll(t.StatusSummary, "\n", " ")
 }
 
-func (t *aiTask) QuoteName() string {
+func (t *AiTask) QuoteName() string {
 	return strconv.Quote(t.Name)
 }
 
-func (t *aiTask) QuoteGoal() string {
+func (t *AiTask) QuoteGoal() string {
 	return strconv.Quote(t.Goal)
 }
 
-func (t *aiTask) CanContinue() bool {
-	return t.TaskContinueCount < t.config.maxTaskContinue
+func (t *AiTask) CanContinue() bool {
+	return t.TaskContinueCount < t.Config.maxTaskContinue
 }

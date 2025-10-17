@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
 )
@@ -179,6 +180,16 @@ func ValidStringMatchMode(mode int) StringMatchMode {
 		return MatchHave
 	}
 	return -1
+}
+
+func (m StringMatchMode) String() string {
+	switch m {
+	case MatchHave:
+		return "have"
+	case MatchHaveAny:
+		return "any"
+	}
+	return "have"
 }
 
 type ConditionFilterMode int
@@ -375,7 +386,7 @@ func (v *SyntaxFlowVisitor) EmitGetCall() {
 
 func (v *SyntaxFlowVisitor) Show() {
 	for _, c := range v.codes {
-		fmt.Println(c.String())
+		log.Infof(c.String())
 	}
 }
 

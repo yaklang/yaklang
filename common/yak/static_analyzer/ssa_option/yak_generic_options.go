@@ -14,12 +14,12 @@ var (
 	)
 	sliceTOrString = ssa.NewOrType(
 		sliceT,
-		ssa.GetStringType(),
+		ssa.CreateStringType(),
 	)
 	sliceTOrMapUTOrString = ssa.NewOrType(
 		sliceT,
 		mapUT,
-		ssa.GetStringType(),
+		ssa.CreateStringType(),
 	)
 )
 
@@ -101,7 +101,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 					sliceTOrMapUT,
 					ssa.NewFunctionTypeDefine("",
 						[]ssa.Type{ssa.TypeT},
-						[]ssa.Type{ssa.GetBooleanType()},
+						[]ssa.Type{ssa.CreateBooleanType()},
 						false),
 				}, []ssa.Type{sliceT}, false),
 				b, id, v)
@@ -113,7 +113,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 					sliceTOrMapUT,
 					ssa.NewFunctionTypeDefine("",
 						[]ssa.Type{ssa.TypeT},
-						[]ssa.Type{ssa.GetBooleanType()},
+						[]ssa.Type{ssa.CreateBooleanType()},
 						false),
 				}, []ssa.Type{ssa.TypeT}, false),
 				b, id, v)
@@ -126,7 +126,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceTOrMapUTOrString,
 					ssa.TypeT,
-				}, []ssa.Type{ssa.GetBooleanType()}, false),
+				}, []ssa.Type{ssa.CreateBooleanType()}, false),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.IndexOf", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -135,7 +135,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceTOrString,
 					ssa.TypeT,
-				}, []ssa.Type{ssa.GetBooleanType()}, false),
+				}, []ssa.Type{ssa.CreateBooleanType()}, false),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.Difference", setCalculateHandler),
@@ -147,7 +147,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceT,
 					sliceT,
-				}, []ssa.Type{ssa.GetBooleanType()}, false),
+				}, []ssa.Type{ssa.CreateBooleanType()}, false),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.IsEqual", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -156,7 +156,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					ssa.TypeT,
 					ssa.TypeT,
-				}, []ssa.Type{ssa.GetBooleanType()}, false),
+				}, []ssa.Type{ssa.CreateBooleanType()}, false),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.Chunk", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -164,7 +164,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 			return genericFuncHandler(
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceT,
-					ssa.GetNumberType(),
+					ssa.CreateNumberType(),
 				}, []ssa.Type{ssa.NewSliceType(sliceT)}, false),
 				b, id, v)
 		}),
@@ -213,8 +213,8 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 			// ToFloat64(x number) (number, bool)
 			return genericFuncHandler(
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
-					ssa.GetNumberType(),
-				}, []ssa.Type{ssa.GetNumberType(), ssa.GetBooleanType()}, false),
+					ssa.CreateNumberType(),
+				}, []ssa.Type{ssa.CreateNumberType(), ssa.CreateBooleanType()}, false),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.Shuffle", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -238,7 +238,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 			return genericFuncHandler(
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceT,
-				}, []ssa.Type{ssa.GetNumberType()}, false),
+				}, []ssa.Type{ssa.CreateNumberType()}, false),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.All", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -246,7 +246,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 			return genericFuncHandler(
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					ssa.TypeT,
-				}, []ssa.Type{ssa.GetBooleanType()}, true),
+				}, []ssa.Type{ssa.CreateBooleanType()}, true),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.Max", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -271,7 +271,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceT,
 					ssa.TypeT,
-				}, []ssa.Type{ssa.GetNumberType()}, true),
+				}, []ssa.Type{ssa.CreateNumberType()}, true),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.Every", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -280,7 +280,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceT,
 					ssa.TypeT,
-				}, []ssa.Type{ssa.GetNumberType()}, true),
+				}, []ssa.Type{ssa.CreateNumberType()}, true),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.Any", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -288,7 +288,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 			return genericFuncHandler(
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					ssa.TypeT,
-				}, []ssa.Type{ssa.GetNumberType()}, true),
+				}, []ssa.Type{ssa.CreateNumberType()}, true),
 				b, id, v)
 		}),
 		ssaapi.WithExternBuildValueHandler("x.Sort", func(b *ssa.FunctionBuilder, id string, v any) ssa.Value {
@@ -297,9 +297,9 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
 					sliceT,
 					ssa.NewFunctionTypeDefine("", []ssa.Type{
-						ssa.GetNumberType(), ssa.GetNumberType(),
+						ssa.CreateNumberType(), ssa.CreateNumberType(),
 					},
-						[]ssa.Type{ssa.GetBooleanType()}, false),
+						[]ssa.Type{ssa.CreateBooleanType()}, false),
 				}, []ssa.Type{}, false),
 				b, id, v)
 		}),
@@ -307,7 +307,7 @@ func genericXLibraryFunctionOption() []ssaapi.Option {
 			// If(bool,T,U) T|U
 			return genericFuncHandler(
 				ssa.NewFunctionTypeDefine(id, []ssa.Type{
-					ssa.GetBooleanType(),
+					ssa.CreateBooleanType(),
 					ssa.TypeT,
 					ssa.TypeU,
 				}, []ssa.Type{

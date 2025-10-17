@@ -6,102 +6,87 @@ desc(
 	risk: "error-handling"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在软件开发中，不当的异常处理，尤其是使用空 `catch` 块（即在捕获异常后不执行任何操作，例如 `catch (Exception e) { }`）是一种严重的安全隐患。这种做法会 silently 地忽略异常，导致应用程序层面对潜在的问题毫无察觉，甚至可能掩盖能够被攻击者利用的深层漏洞。开发者经常基于错误的假设（如“这种情况永远不会发生”）而忽略异常处理，这极其危险。
-
+在软件开发中，不当的异常处理，尤其是使用空 `catch` 块（即在捕获异常后不执行任何操作，例如 `catch (Exception e) { }`）是一种严重的安全隐患。这种做法会 silently 地忽略异常，导致应用程序层面对潜在的问题毫无察觉，甚至可能掩盖能够被攻击者利用的深层漏洞。开发者经常基于错误的假设（如“这种情况永远不会发生”）而忽略异常处理，这极其危险。
 空 `catch` 块会导致关键的诊断信息丢失，例如异常类型、错误消息和堆栈跟踪，这些都是调试和问题定位的重要信息。这不仅使得排查问题变得异常困难，还可能导致应用程序在异常发生后以一种不一致或损坏的状态继续运行。这种状态可能引发数据损坏、系统崩溃或不可预知的行为，为攻击者提供了可乘之机。例如，攻击者可能利用未处理的异常来触发拒绝服务（DoS）攻击，访问未经授权的数据，或者通过精心构造的输入来利用系统逻辑中的其他漏洞。
-
 此外，由于缺乏异常日志，安全团队无法及时发现异常模式或攻击迹象，进一步增加了系统被攻破的风险。在当前日益复杂的网络安全威胁环境下，任何被忽略的异常都可能成为攻击者的突破口，因此，解决空 `catch` 块问题对于确保应用程序和数据安全至关重要。
-
 2. **触发场景**
-   当代码中使用了 `try-catch` 块来处理可能发生的异常，但 `catch` 块内部为空，没有任何异常处理、记录或上报逻辑时，就会触发此规则。这通常发生在开发者不确定如何处理特定异常，或者错误地认为某些异常不会发生时。
-
-   ```java
-   // 存在漏洞的代码示例：NoSuchMethodException 被忽略
-   class SocketHookUtils {
-       static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
-           while (clazz != null) {
-               try {
-                   Method method = clazz.getDeclaredMethod(findName, args);
-                   method.setAccessible(true);
-                   return method;
-               } catch (NoSuchMethodException e) { // 异常被捕获但未处理或记录
-                   clazz = clazz.getSuperclass();
-               }
-           }
-           return null;
-       }
-   }
-   ```
-
-   ```java
-   // 存在漏洞的代码示例：SocketException 被忽略
-   public class SocketHook {
-       public static void startHook() throws IOException {
-           try{
-               Socket.setSocketImplFactory(new SocketHookFactory());
-           }catch (SocketException ignored){ // 异常被捕获但被忽略
-           }
-       }
-   }
-   ```
-
+当代码中使用了 `try-catch` 块来处理可能发生的异常，但 `catch` 块内部为空，没有任何异常处理、记录或上报逻辑时，就会触发此规则。这通常发生在开发者不确定如何处理特定异常，或者错误地认为某些异常不会发生时。
+```java
+// 存在漏洞的代码示例：NoSuchMethodException 被忽略
+class SocketHookUtils {
+static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+while (clazz != null) {
+try {
+Method method = clazz.getDeclaredMethod(findName, args);
+method.setAccessible(true);
+return method;
+} catch (NoSuchMethodException e) { // 异常被捕获但未处理或记录
+clazz = clazz.getSuperclass();
+}
+}
+return null;
+}
+}
+```
+```java
+// 存在漏洞的代码示例：SocketException 被忽略
+public class SocketHook {
+public static void startHook() throws IOException {
+try{
+Socket.setSocketImplFactory(new SocketHookFactory());
+}catch (SocketException ignored){ // 异常被捕获但被忽略
+}
+}
+}
+```
 3. **潜在影响**
-   - 应用程序无法正常处理错误情况，导致程序行为异常或崩溃。
-   - 错误信息丢失，严重阻碍调试和问题排查。
-   - 掩盖了潜在的安全漏洞，攻击者可能利用这些漏洞。
-   - 无法及时发现和响应异常事件，增加了被攻击的风险。
-   - 导致系统状态不一致，可能引发数据丢失或损坏。
+- 应用程序无法正常处理错误情况，导致程序行为异常或崩溃。
+- 错误信息丢失，严重阻碍调试和问题排查。
+- 掩盖了潜在的安全漏洞，攻击者可能利用这些漏洞。
+- 无法及时发现和响应异常事件，增加了被攻击的风险。
+- 导致系统状态不一致，可能引发数据丢失或损坏。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 为了解决空 `catch` 块导致的错误处理不当问题，并提升应用程序的整体安全性，建议采取以下综合措施，避免使用空 `catch` 块：
-
 1. **不要使用空Catch块：** 这是最基本且必须遵守的原则。每一个 `catch` 块都应执行有意义的处理操作，例如记录异常信息、向上层抛出更具体的异常或执行回滚操作等。切勿悄无声息地忽略异常。即使在某些情况下你认为异常可以被忽略，至少应该记录一条日志表明异常已被捕获和忽略，以供将来分析。同时，避免使用过于宽泛的异常类型（如 `catch (Exception e)`），应该捕获更具体的异常类型。
-
 2. **记录详细的异常信息：** 在 `catch` 块中，应详细记录异常信息，包括异常类型、错误消息、堆栈跟踪以及相关的上下文数据（如出错时的输入参数、用户ID等）。使用成熟的日志框架（如 Log4j, SLF4j, java.util.logging）来确保日志的完整性和可追溯性。良好的日志记录对于调试、监控和安全审计至关重要。
-
-   ```java
-   // 修复代码示例：记录详细异常信息
-   class SocketHookUtils {
-       static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
-           while (clazz != null) {
-               try {
-                   Method method = clazz.getDeclaredMethod(findName, args);
-                   method.setAccessible(true);
-                   return method;
-               } catch (NoSuchMethodException e) {
-                   // 记录异常信息，例如使用 Logger
-                   Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName, e);
-                   clazz = clazz.getSuperclass();
-               }
-           }
-           return null;
-       }
-   }
-   ```
-
+```java
+// 修复代码示例：记录详细异常信息
+class SocketHookUtils {
+static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+while (clazz != null) {
+try {
+Method method = clazz.getDeclaredMethod(findName, args);
+method.setAccessible(true);
+return method;
+} catch (NoSuchMethodException e) {
+// 记录异常信息，例如使用 Logger
+Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName, e);
+clazz = clazz.getSuperclass();
+}
+}
+return null;
+}
+}
+```
 3. **向上层抛出异常或包装异常：** 如果当前代码层无法完全处理异常，或者更上层的调用者需要知晓此异常，应将异常重新抛出，或者将捕获到的异常包装在一个更具业务意义的新异常中向上层传递。这样可以确保异常不会在低层被吞没，使得调用者可以根据异常类型执行相应的处理或回滚逻辑。
-
-   ```java
-   // 修复代码示例：向上层抛出异常
-   public class SocketHook {
-       public static void startHook() throws IOException {
-           try{
-               Socket.setSocketImplFactory(new SocketHookFactory());
-           }catch (SocketException e){
-               // 记录异常并向上抛出
-               Logger.getLogger(SocketHook.class.getName()).log(Level.SEVERE, "Failed to set SocketImplFactory", e);
-               throw e; // 或者 throw new YourBusinessException("初始化Socket失败", e);
-           }
-       }
-   }
-   ```
-
+```java
+// 修复代码示例：向上层抛出异常
+public class SocketHook {
+public static void startHook() throws IOException {
+try{
+Socket.setSocketImplFactory(new SocketHookFactory());
+}catch (SocketException e){
+// 记录异常并向上抛出
+Logger.getLogger(SocketHook.class.getName()).log(Level.SEVERE, "Failed to set SocketImplFactory", e);
+throw e; // 或者 throw new YourBusinessException("初始化Socket失败", e);
+}
+}
+}
+```
 4. **建立集中化的日志管理和监控：** 将所有应用程序的日志汇总到集中化的日志管理系统（如 ELK Stack, Splunk）中，并配置监控和告警规则。这样可以对异常模式进行实时分析，及时发现潜在的安全威胁或服务中断。例如，当某种特定类型的异常在短时间内大量出现时，可以触发告警。
-
 通过以上措施的综合实施，可以显著提升应用程序的鲁棒性和安全性，减少因异常处理不当而带来的风险。需要注意的是，异常处理策略应根据具体的业务场景和异常类型来确定，没有一种通用的处理方式适用于所有情况。
 SOLUTION
 	rule_id: "761c9e67-552c-44bf-a241-e90829057c88"
@@ -114,218 +99,194 @@ REFERENCE
 $catch.body?{!<scanInstruction()>} as $no_instruction_catch_body
 
 alert $no_instruction_catch_body for {
-	title: "Check Java Empty Catch Block",
-	title_zh: "不应该编写空的Catch块",
-	solution: <<<CODE
+	title: "Java Empty Catch Block Vulnerability Was Detected",
+	title_zh: "检测到Java空Catch块漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 为了解决空 `catch` 块导致的错误处理不当问题，并提升应用程序的整体安全性，建议采取以下综合措施，避免使用空 `catch` 块：
-
 1. **不要使用空Catch块：** 这是最基本且必须遵守的原则。每一个 `catch` 块都应执行有意义的处理操作，例如记录异常信息、向上层抛出更具体的异常或执行回滚操作等。切勿悄无声息地忽略异常。即使在某些情况下你认为异常可以被忽略，至少应该记录一条日志表明异常已被捕获和忽略，以供将来分析。同时，避免使用过于宽泛的异常类型（如 `catch (Exception e)`），应该捕获更具体的异常类型。
-
 2. **记录详细的异常信息：** 在 `catch` 块中，应详细记录异常信息，包括异常类型、错误消息、堆栈跟踪以及相关的上下文数据（如出错时的输入参数、用户ID等）。使用成熟的日志框架（如 Log4j, SLF4j, java.util.logging）来确保日志的完整性和可追溯性。良好的日志记录对于调试、监控和安全审计至关重要。
-
-   ```java
-   // 修复代码示例：记录详细异常信息
-   class SocketHookUtils {
-       static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
-           while (clazz != null) {
-               try {
-                   Method method = clazz.getDeclaredMethod(findName, args);
-                   method.setAccessible(true);
-                   return method;
-               } catch (NoSuchMethodException e) {
-                   // 记录异常信息，例如使用 Logger
-                   Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName, e);
-                   clazz = clazz.getSuperclass();
-               }
-           }
-           return null;
-       }
-   }
-   ```
-
+```java
+// 修复代码示例：记录详细异常信息
+class SocketHookUtils {
+static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+while (clazz != null) {
+try {
+Method method = clazz.getDeclaredMethod(findName, args);
+method.setAccessible(true);
+return method;
+} catch (NoSuchMethodException e) {
+// 记录异常信息，例如使用 Logger
+Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName, e);
+clazz = clazz.getSuperclass();
+}
+}
+return null;
+}
+}
+```
 3. **向上层抛出异常或包装异常：** 如果当前代码层无法完全处理异常，或者更上层的调用者需要知晓此异常，应将异常重新抛出，或者将捕获到的异常包装在一个更具业务意义的新异常中向上层传递。这样可以确保异常不会在低层被吞没，使得调用者可以根据异常类型执行相应的处理或回滚逻辑。
-
-   ```java
-   // 修复代码示例：向上层抛出异常
-   public class SocketHook {
-       public static void startHook() throws IOException {
-           try{
-               Socket.setSocketImplFactory(new SocketHookFactory());
-           }catch (SocketException e){
-               // 记录异常并向上抛出
-               Logger.getLogger(SocketHook.class.getName()).log(Level.SEVERE, "Failed to set SocketImplFactory", e);
-               throw e; // 或者 throw new YourBusinessException("初始化Socket失败", e);
-           }
-       }
-   }
-   ```
-
+```java
+// 修复代码示例：向上层抛出异常
+public class SocketHook {
+public static void startHook() throws IOException {
+try{
+Socket.setSocketImplFactory(new SocketHookFactory());
+}catch (SocketException e){
+// 记录异常并向上抛出
+Logger.getLogger(SocketHook.class.getName()).log(Level.SEVERE, "Failed to set SocketImplFactory", e);
+throw e; // 或者 throw new YourBusinessException("初始化Socket失败", e);
+}
+}
+}
+```
 4. **建立集中化的日志管理和监控：** 将所有应用程序的日志汇总到集中化的日志管理系统（如 ELK Stack, Splunk）中，并配置监控和告警规则。这样可以对异常模式进行实时分析，及时发现潜在的安全威胁或服务中断。例如，当某种特定类型的异常在短时间内大量出现时，可以触发告警。
-
 通过以上措施的综合实施，可以显著提升应用程序的鲁棒性和安全性，减少因异常处理不当而带来的风险。需要注意的是，异常处理策略应根据具体的业务场景和异常类型来确定，没有一种通用的处理方式适用于所有情况。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在软件开发中，不当的异常处理，尤其是使用空 `catch` 块（即在捕获异常后不执行任何操作，例如 `catch (Exception e) { }`）是一种严重的安全隐患。这种做法会 silently 地忽略异常，导致应用程序层面对潜在的问题毫无察觉，甚至可能掩盖能够被攻击者利用的深层漏洞。开发者经常基于错误的假设（如“这种情况永远不会发生”）而忽略异常处理，这极其危险。
-
+在软件开发中，不当的异常处理，尤其是使用空 `catch` 块（即在捕获异常后不执行任何操作，例如 `catch (Exception e) { }`）是一种严重的安全隐患。这种做法会 silently 地忽略异常，导致应用程序层面对潜在的问题毫无察觉，甚至可能掩盖能够被攻击者利用的深层漏洞。开发者经常基于错误的假设（如“这种情况永远不会发生”）而忽略异常处理，这极其危险。
 空 `catch` 块会导致关键的诊断信息丢失，例如异常类型、错误消息和堆栈跟踪，这些都是调试和问题定位的重要信息。这不仅使得排查问题变得异常困难，还可能导致应用程序在异常发生后以一种不一致或损坏的状态继续运行。这种状态可能引发数据损坏、系统崩溃或不可预知的行为，为攻击者提供了可乘之机。例如，攻击者可能利用未处理的异常来触发拒绝服务（DoS）攻击，访问未经授权的数据，或者通过精心构造的输入来利用系统逻辑中的其他漏洞。
-
 此外，由于缺乏异常日志，安全团队无法及时发现异常模式或攻击迹象，进一步增加了系统被攻破的风险。在当前日益复杂的网络安全威胁环境下，任何被忽略的异常都可能成为攻击者的突破口，因此，解决空 `catch` 块问题对于确保应用程序和数据安全至关重要。
-
 2. **触发场景**
-   当代码中使用了 `try-catch` 块来处理可能发生的异常，但 `catch` 块内部为空，没有任何异常处理、记录或上报逻辑时，就会触发此规则。这通常发生在开发者不确定如何处理特定异常，或者错误地认为某些异常不会发生时。
-
-   ```java
-   // 存在漏洞的代码示例：NoSuchMethodException 被忽略
-   class SocketHookUtils {
-       static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
-           while (clazz != null) {
-               try {
-                   Method method = clazz.getDeclaredMethod(findName, args);
-                   method.setAccessible(true);
-                   return method;
-               } catch (NoSuchMethodException e) { // 异常被捕获但未处理或记录
-                   clazz = clazz.getSuperclass();
-               }
-           }
-           return null;
-       }
-   }
-   ```
-
-   ```java
-   // 存在漏洞的代码示例：SocketException 被忽略
-   public class SocketHook {
-       public static void startHook() throws IOException {
-           try{
-               Socket.setSocketImplFactory(new SocketHookFactory());
-           }catch (SocketException ignored){ // 异常被捕获但被忽略
-           }
-       }
-   }
-   ```
-
+当代码中使用了 `try-catch` 块来处理可能发生的异常，但 `catch` 块内部为空，没有任何异常处理、记录或上报逻辑时，就会触发此规则。这通常发生在开发者不确定如何处理特定异常，或者错误地认为某些异常不会发生时。
+```java
+// 存在漏洞的代码示例：NoSuchMethodException 被忽略
+class SocketHookUtils {
+static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+while (clazz != null) {
+try {
+Method method = clazz.getDeclaredMethod(findName, args);
+method.setAccessible(true);
+return method;
+} catch (NoSuchMethodException e) { // 异常被捕获但未处理或记录
+clazz = clazz.getSuperclass();
+}
+}
+return null;
+}
+}
+```
+```java
+// 存在漏洞的代码示例：SocketException 被忽略
+public class SocketHook {
+public static void startHook() throws IOException {
+try{
+Socket.setSocketImplFactory(new SocketHookFactory());
+}catch (SocketException ignored){ // 异常被捕获但被忽略
+}
+}
+}
+```
 3. **潜在影响**
-   - 应用程序无法正常处理错误情况，导致程序行为异常或崩溃。
-   - 错误信息丢失，严重阻碍调试和问题排查。
-   - 掩盖了潜在的安全漏洞，攻击者可能利用这些漏洞。
-   - 无法及时发现和响应异常事件，增加了被攻击的风险。
-   - 导致系统状态不一致，可能引发数据丢失或损坏。
-CODE
+- 应用程序无法正常处理错误情况，导致程序行为异常或崩溃。
+- 错误信息丢失，严重阻碍调试和问题排查。
+- 掩盖了潜在的安全漏洞，攻击者可能利用这些漏洞。
+- 无法及时发现和响应异常事件，增加了被攻击的风险。
+- 导致系统状态不一致，可能引发数据丢失或损坏。
+DESC
 	level: "low",
+	risk: "错误处理",
+	name: "no_instruction_catch_body",
+	message: "检测到Java代码中存在空Catch块，从数据源（source）到污染汇聚点（sink）间没有发现任何过滤函数信息。",
 }
 
 $catch?{!.body & $no_instruction_catch_body} as $normal_catch 
 $normal_catch.exception as $exception 
 $exception?{!(<getUsers()>?{!opcode:catch})} as $unuse_exception 
 alert $unuse_exception for {
-	title_zh: "在非空Catch块中没有对异常进行任何处理",
-	solution: <<<CODE
+	title_zh: "检测到Java非空Catch块未处理异常漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 为了解决空 `catch` 块导致的错误处理不当问题，并提升应用程序的整体安全性，建议采取以下综合措施，避免使用空 `catch` 块：
-
 1. **不要使用空Catch块：** 这是最基本且必须遵守的原则。每一个 `catch` 块都应执行有意义的处理操作，例如记录异常信息、向上层抛出更具体的异常或执行回滚操作等。切勿悄无声息地忽略异常。即使在某些情况下你认为异常可以被忽略，至少应该记录一条日志表明异常已被捕获和忽略，以供将来分析。同时，避免使用过于宽泛的异常类型（如 `catch (Exception e)`），应该捕获更具体的异常类型。
-
 2. **记录详细的异常信息：** 在 `catch` 块中，应详细记录异常信息，包括异常类型、错误消息、堆栈跟踪以及相关的上下文数据（如出错时的输入参数、用户ID等）。使用成熟的日志框架（如 Log4j, SLF4j, java.util.logging）来确保日志的完整性和可追溯性。良好的日志记录对于调试、监控和安全审计至关重要。
-
-   ```java
-   // 修复代码示例：记录详细异常信息
-   class SocketHookUtils {
-       static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
-           while (clazz != null) {
-               try {
-                   Method method = clazz.getDeclaredMethod(findName, args);
-                   method.setAccessible(true);
-                   return method;
-               } catch (NoSuchMethodException e) {
-                   // 记录异常信息，例如使用 Logger
-                   Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName, e);
-                   clazz = clazz.getSuperclass();
-               }
-           }
-           return null;
-       }
-   }
-   ```
-
+```java
+// 修复代码示例：记录详细异常信息
+class SocketHookUtils {
+static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+while (clazz != null) {
+try {
+Method method = clazz.getDeclaredMethod(findName, args);
+method.setAccessible(true);
+return method;
+} catch (NoSuchMethodException e) {
+// 记录异常信息，例如使用 Logger
+Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName, e);
+clazz = clazz.getSuperclass();
+}
+}
+return null;
+}
+}
+```
 3. **向上层抛出异常或包装异常：** 如果当前代码层无法完全处理异常，或者更上层的调用者需要知晓此异常，应将异常重新抛出，或者将捕获到的异常包装在一个更具业务意义的新异常中向上层传递。这样可以确保异常不会在低层被吞没，使得调用者可以根据异常类型执行相应的处理或回滚逻辑。
-
-   ```java
-   // 修复代码示例：向上层抛出异常
-   public class SocketHook {
-       public static void startHook() throws IOException {
-           try{
-               Socket.setSocketImplFactory(new SocketHookFactory());
-           }catch (SocketException e){
-               // 记录异常并向上抛出
-               Logger.getLogger(SocketHook.class.getName()).log(Level.SEVERE, "Failed to set SocketImplFactory", e);
-               throw e; // 或者 throw new YourBusinessException("初始化Socket失败", e);
-           }
-       }
-   }
-   ```
-
+```java
+// 修复代码示例：向上层抛出异常
+public class SocketHook {
+public static void startHook() throws IOException {
+try{
+Socket.setSocketImplFactory(new SocketHookFactory());
+}catch (SocketException e){
+// 记录异常并向上抛出
+Logger.getLogger(SocketHook.class.getName()).log(Level.SEVERE, "Failed to set SocketImplFactory", e);
+throw e; // 或者 throw new YourBusinessException("初始化Socket失败", e);
+}
+}
+}
+```
 4. **建立集中化的日志管理和监控：** 将所有应用程序的日志汇总到集中化的日志管理系统（如 ELK Stack, Splunk）中，并配置监控和告警规则。这样可以对异常模式进行实时分析，及时发现潜在的安全威胁或服务中断。例如，当某种特定类型的异常在短时间内大量出现时，可以触发告警。
-
 通过以上措施的综合实施，可以显著提升应用程序的鲁棒性和安全性，减少因异常处理不当而带来的风险。需要注意的是，异常处理策略应根据具体的业务场景和异常类型来确定，没有一种通用的处理方式适用于所有情况。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在软件开发中，不当的异常处理，尤其是使用空 `catch` 块（即在捕获异常后不执行任何操作，例如 `catch (Exception e) { }`）是一种严重的安全隐患。这种做法会 silently 地忽略异常，导致应用程序层面对潜在的问题毫无察觉，甚至可能掩盖能够被攻击者利用的深层漏洞。开发者经常基于错误的假设（如“这种情况永远不会发生”）而忽略异常处理，这极其危险。
-
+在软件开发中，不当的异常处理，尤其是使用空 `catch` 块（即在捕获异常后不执行任何操作，例如 `catch (Exception e) { }`）是一种严重的安全隐患。这种做法会 silently 地忽略异常，导致应用程序层面对潜在的问题毫无察觉，甚至可能掩盖能够被攻击者利用的深层漏洞。开发者经常基于错误的假设（如“这种情况永远不会发生”）而忽略异常处理，这极其危险。
 空 `catch` 块会导致关键的诊断信息丢失，例如异常类型、错误消息和堆栈跟踪，这些都是调试和问题定位的重要信息。这不仅使得排查问题变得异常困难，还可能导致应用程序在异常发生后以一种不一致或损坏的状态继续运行。这种状态可能引发数据损坏、系统崩溃或不可预知的行为，为攻击者提供了可乘之机。例如，攻击者可能利用未处理的异常来触发拒绝服务（DoS）攻击，访问未经授权的数据，或者通过精心构造的输入来利用系统逻辑中的其他漏洞。
-
 此外，由于缺乏异常日志，安全团队无法及时发现异常模式或攻击迹象，进一步增加了系统被攻破的风险。在当前日益复杂的网络安全威胁环境下，任何被忽略的异常都可能成为攻击者的突破口，因此，解决空 `catch` 块问题对于确保应用程序和数据安全至关重要。
-
 2. **触发场景**
-   当代码中使用了 `try-catch` 块来处理可能发生的异常，但 `catch` 块内部为空，没有任何异常处理、记录或上报逻辑时，就会触发此规则。这通常发生在开发者不确定如何处理特定异常，或者错误地认为某些异常不会发生时。
-
-   ```java
-   // 存在漏洞的代码示例：NoSuchMethodException 被忽略
-   class SocketHookUtils {
-       static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
-           while (clazz != null) {
-               try {
-                   Method method = clazz.getDeclaredMethod(findName, args);
-                   method.setAccessible(true);
-                   return method;
-               } catch (NoSuchMethodException e) { // 异常被捕获但未处理或记录
-                   clazz = clazz.getSuperclass();
-               }
-           }
-           return null;
-       }
-   }
-   ```
-
-   ```java
-   // 存在漏洞的代码示例：SocketException 被忽略
-   public class SocketHook {
-       public static void startHook() throws IOException {
-           try{
-               Socket.setSocketImplFactory(new SocketHookFactory());
-           }catch (SocketException ignored){ // 异常被捕获但被忽略
-           }
-       }
-   }
-   ```
-
+当代码中使用了 `try-catch` 块来处理可能发生的异常，但 `catch` 块内部为空，没有任何异常处理、记录或上报逻辑时，就会触发此规则。这通常发生在开发者不确定如何处理特定异常，或者错误地认为某些异常不会发生时。
+```java
+// 存在漏洞的代码示例：NoSuchMethodException 被忽略
+class SocketHookUtils {
+static Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+while (clazz != null) {
+try {
+Method method = clazz.getDeclaredMethod(findName, args);
+method.setAccessible(true);
+return method;
+} catch (NoSuchMethodException e) { // 异常被捕获但未处理或记录
+clazz = clazz.getSuperclass();
+}
+}
+return null;
+}
+}
+```
+```java
+// 存在漏洞的代码示例：SocketException 被忽略
+public class SocketHook {
+public static void startHook() throws IOException {
+try{
+Socket.setSocketImplFactory(new SocketHookFactory());
+}catch (SocketException ignored){ // 异常被捕获但被忽略
+}
+}
+}
+```
 3. **潜在影响**
-   - 应用程序无法正常处理错误情况，导致程序行为异常或崩溃。
-   - 错误信息丢失，严重阻碍调试和问题排查。
-   - 掩盖了潜在的安全漏洞，攻击者可能利用这些漏洞。
-   - 无法及时发现和响应异常事件，增加了被攻击的风险。
-   - 导致系统状态不一致，可能引发数据丢失或损坏。
-CODE
+- 应用程序无法正常处理错误情况，导致程序行为异常或崩溃。
+- 错误信息丢失，严重阻碍调试和问题排查。
+- 掩盖了潜在的安全漏洞，攻击者可能利用这些漏洞。
+- 无法及时发现和响应异常事件，增加了被攻击的风险。
+- 导致系统状态不一致，可能引发数据丢失或损坏。
+DESC
 	level: "low",
-	title: "Check Java Empty Catch Block",
+	title: "Java Non-empty Catch Block Without Handling Exception Vulnerability Was Detected",
+	message: "检测到Java代码中非空Catch块未对异常进行任何处理，可能存在潜在的安全隐患。",
+	risk: "错误处理",
+	name: "unuse_exception",
 }
 
 desc(
@@ -351,6 +312,166 @@ class SocketHookUtils {
     }
 }
 CODE
+	"safefile://SafeExceptionHandling.java": <<<CODE
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class SafeExceptionHandling {
+    private static final Logger logger = Logger.getLogger(SafeExceptionHandling.class.getName());
+
+    public void performOperationSafe() {
+        try {
+            // 模拟一个可能抛出异常的操作
+            int result = 10 / 0; // 这会抛出ArithmeticException
+            System.out.println("Result: " + result);
+        } catch (ArithmeticException e) {
+            // 捕获特定异常并记录详细信息
+            logger.log(Level.SEVERE, "Arithmetic error occurred during division:", e);
+            // 可以选择进行一些恢复操作，或者向上层抛出新异常
+            // throw new CustomAppException("Failed to perform arithmetic operation", e);
+        } catch (Exception e) {
+            // 捕获更广泛的异常，作为最后的处理，并记录
+            logger.log(Level.SEVERE, "An unexpected error occurred:", e);
+            // 同样，可以执行恢复或告知用户
+        }
+    }
+
+    public void fileReadExample(String filePath) throws IOException {
+        try {
+            // 尝试读取文件，可能抛出IOException
+            java.io.FileInputStream fis = new java.io.FileInputStream(filePath);
+            fis.close();
+        } catch (IOException e) {
+            // 记录异常并重新抛出，让调用者处理
+            logger.log(Level.WARNING, "Error reading file: " + filePath, e);
+            throw e; // 将异常向上层抛出
+        }
+    }
+
+    static class SocketHookUtils {
+        static java.lang.reflect.Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+            while (clazz != null) {
+                try {
+                    java.lang.reflect.Method method = clazz.getDeclaredMethod(findName, args);
+                    method.setAccessible(true);
+                    return method;
+                } catch (NoSuchMethodException e) {
+                    // 记录异常信息，而不是忽略
+                    Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName + " in class " + clazz.getName(), e);
+                    clazz = clazz.getSuperclass(); // 继续向上查找
+                }
+            }
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeExceptionHandling safeHandler = new SafeExceptionHandling();
+        safeHandler.performOperationSafe();
+
+        try {
+            safeHandler.fileReadExample("nonexistent_file.txt");
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        // 示例：使用finally块确保资源关闭
+        java.io.BufferedReader reader = null;
+        try {
+            reader = new java.io.BufferedReader(new java.io.FileReader("some_file.txt"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error reading file in finally example:", e);
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    logger.log(Level.SEVERE, "Error closing reader:", e); // 即使在finally中也处理异常
+                }
+            }
+        }
+    }
+}
+CODE
+	"safefile://NoEmptyCatchLogAndThrow.java": <<<CODE
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class NoEmptyCatchLogAndThrow {
+
+    private static final Logger LOGGER = Logger.getLogger(NoEmptyCatchLogAndThrow.class.getName());
+
+    public static void startHook() throws IOException {
+        try {
+            // 模拟设置Socket工厂的操作
+            // Socket.setSocketImplFactory(new SocketHookFactory());
+            throw new SocketException("Simulated Socket Exception");
+        } catch (SocketException e) {
+            // 捕获SocketException，记录详细日志并重新抛出
+            LOGGER.log(Level.SEVERE, "Failed to set SocketImplFactory due to SocketException", e);
+            throw e; // 将原始异常重新抛出
+        } catch (IOException e) {
+            // 捕获更通用的IOException，记录并封装为自定义异常抛出
+            LOGGER.log(Level.SEVERE, "An I/O error occurred during socket operation", e);
+            throw new RuntimeException("Critical I/O Failure", e); // 封装为运行时异常抛出
+        }
+    }
+
+    public static void processData() throws MyBusinessException {
+        try {
+            // 模拟一些数据处理，可能抛出异常
+            if (System.currentTimeMillis() % 2 == 0) {
+                throw new IllegalArgumentException("Invalid input data");
+            }
+            System.out.println("Data processed successfully.");
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.WARNING, "Invalid argument for data processing", e);
+            // 可以选择恢复，或者转换为业务异常
+            throw new MyBusinessException("Input validation failed", e);
+        } catch (Exception e) {
+            // 捕获所有未处理的异常，记录并转化为业务异常
+            LOGGER.log(Level.SEVERE, "An unexpected error occurred during data processing", e);
+            throw new MyBusinessException("General processing error", e);
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            startHook();
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        try {
+            processData();
+        } catch (MyBusinessException e) {
+            System.out.println("Caught MyBusinessException in main: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.out.println("  Caused by: " + e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage());
+            }
+        }
+    }
+}
+
+// 自定义业务异常类
+class MyBusinessException extends Exception {
+    public MyBusinessException(String message) {
+        super(message);
+    }
+
+    public MyBusinessException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+CODE
 )
 
 desc(
@@ -368,6 +489,166 @@ public class SocketHook {
             Socket.setSocketImplFactory(new SocketHookFactory());
         }catch (SocketException ignored){
         }
+    }
+}
+CODE
+	"safefile://SafeExceptionHandling.java": <<<CODE
+import java.io.IOException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class SafeExceptionHandling {
+    private static final Logger logger = Logger.getLogger(SafeExceptionHandling.class.getName());
+
+    public void performOperationSafe() {
+        try {
+            // 模拟一个可能抛出异常的操作
+            int result = 10 / 0; // 这会抛出ArithmeticException
+            System.out.println("Result: " + result);
+        } catch (ArithmeticException e) {
+            // 捕获特定异常并记录详细信息
+            logger.log(Level.SEVERE, "Arithmetic error occurred during division:", e);
+            // 可以选择进行一些恢复操作，或者向上层抛出新异常
+            // throw new CustomAppException("Failed to perform arithmetic operation", e);
+        } catch (Exception e) {
+            // 捕获更广泛的异常，作为最后的处理，并记录
+            logger.log(Level.SEVERE, "An unexpected error occurred:", e);
+            // 同样，可以执行恢复或告知用户
+        }
+    }
+
+    public void fileReadExample(String filePath) throws IOException {
+        try {
+            // 尝试读取文件，可能抛出IOException
+            java.io.FileInputStream fis = new java.io.FileInputStream(filePath);
+            fis.close();
+        } catch (IOException e) {
+            // 记录异常并重新抛出，让调用者处理
+            logger.log(Level.WARNING, "Error reading file: " + filePath, e);
+            throw e; // 将异常向上层抛出
+        }
+    }
+
+    static class SocketHookUtils {
+        static java.lang.reflect.Method findMethod(Class<?> clazz, String findName, Class<?>[] args) {
+            while (clazz != null) {
+                try {
+                    java.lang.reflect.Method method = clazz.getDeclaredMethod(findName, args);
+                    method.setAccessible(true);
+                    return method;
+                } catch (NoSuchMethodException e) {
+                    // 记录异常信息，而不是忽略
+                    Logger.getLogger(SocketHookUtils.class.getName()).log(Level.WARNING, "Method not found: " + findName + " in class " + clazz.getName(), e);
+                    clazz = clazz.getSuperclass(); // 继续向上查找
+                }
+            }
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeExceptionHandling safeHandler = new SafeExceptionHandling();
+        safeHandler.performOperationSafe();
+
+        try {
+            safeHandler.fileReadExample("nonexistent_file.txt");
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        // 示例：使用finally块确保资源关闭
+        java.io.BufferedReader reader = null;
+        try {
+            reader = new java.io.BufferedReader(new java.io.FileReader("some_file.txt"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        } catch (IOException e) {
+            logger.log(Level.SEVERE, "Error reading file in finally example:", e);
+        } finally {
+            if (reader != null) {
+                try {
+                    reader.close();
+                } catch (IOException e) {
+                    logger.log(Level.SEVERE, "Error closing reader:", e); // 即使在finally中也处理异常
+                }
+            }
+        }
+    }
+}
+CODE
+	"safefile://NoEmptyCatchLogAndThrow.java": <<<CODE
+import java.io.IOException;
+import java.net.Socket;
+import java.net.SocketException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+public class NoEmptyCatchLogAndThrow {
+
+    private static final Logger LOGGER = Logger.getLogger(NoEmptyCatchLogAndThrow.class.getName());
+
+    public static void startHook() throws IOException {
+        try {
+            // 模拟设置Socket工厂的操作
+            // Socket.setSocketImplFactory(new SocketHookFactory());
+            throw new SocketException("Simulated Socket Exception");
+        } catch (SocketException e) {
+            // 捕获SocketException，记录详细日志并重新抛出
+            LOGGER.log(Level.SEVERE, "Failed to set SocketImplFactory due to SocketException", e);
+            throw e; // 将原始异常重新抛出
+        } catch (IOException e) {
+            // 捕获更通用的IOException，记录并封装为自定义异常抛出
+            LOGGER.log(Level.SEVERE, "An I/O error occurred during socket operation", e);
+            throw new RuntimeException("Critical I/O Failure", e); // 封装为运行时异常抛出
+        }
+    }
+
+    public static void processData() throws MyBusinessException {
+        try {
+            // 模拟一些数据处理，可能抛出异常
+            if (System.currentTimeMillis() % 2 == 0) {
+                throw new IllegalArgumentException("Invalid input data");
+            }
+            System.out.println("Data processed successfully.");
+        } catch (IllegalArgumentException e) {
+            LOGGER.log(Level.WARNING, "Invalid argument for data processing", e);
+            // 可以选择恢复，或者转换为业务异常
+            throw new MyBusinessException("Input validation failed", e);
+        } catch (Exception e) {
+            // 捕获所有未处理的异常，记录并转化为业务异常
+            LOGGER.log(Level.SEVERE, "An unexpected error occurred during data processing", e);
+            throw new MyBusinessException("General processing error", e);
+        }
+    }
+
+    public static void main(String[] args) {
+        try {
+            startHook();
+        } catch (IOException e) {
+            System.out.println("Caught IOException in main: " + e.getMessage());
+        }
+
+        try {
+            processData();
+        } catch (MyBusinessException e) {
+            System.out.println("Caught MyBusinessException in main: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.out.println("  Caused by: " + e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage());
+            }
+        }
+    }
+}
+
+// 自定义业务异常类
+class MyBusinessException extends Exception {
+    public MyBusinessException(String message) {
+        super(message);
+    }
+
+    public MyBusinessException(String message, Throwable cause) {
+        super(message, cause);
     }
 }
 CODE

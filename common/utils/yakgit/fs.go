@@ -116,7 +116,7 @@ func fetchRespos(res *git.Repository, commitHash string) (*filesys.VirtualFS, er
 // fs, err := git.FileSystemFromCommit("path/to/repo", "2871a988b2ed7ec10a1fd45eca248a96a99a8560")
 // ```
 func FromCommit(repos string, commitHash string) (filesys_interface.FileSystem, error) {
-	res, err := git.PlainOpen(repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func FromCommit(repos string, commitHash string) (filesys_interface.FileSystem, 
 // fs, err := git.FileSystemFromCommits("path/to/repo", "54165a396a219d085980dca623ae1ff6582033ad", "2871a988b2ed7ec10a1fd45eca248a96a99a8560")
 // ```
 func FromCommits(repos string, commitHashes ...string) (filesys_interface.FileSystem, error) {
-	res, err := git.PlainOpen(repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return nil, err
 	}
@@ -180,11 +180,13 @@ func FromCommits(repos string, commitHashes ...string) (filesys_interface.FileSy
 // fs := git.FileSystemFromCommitRange("path/to/repo", "2871a988b2ed7ec10a1fd45eca248a96a99a8560", "54165a396a219d085980dca623ae1ff6582033ad")~
 // ```
 func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error) {
-	res, err := git.PlainOpen(repos)
+	log.Infof("start to open plain git repos: %s", repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Infof("start to fetch start & end rev-parse")
 	start, err = RevParse(repos, start)
 	if err != nil {
 		return nil, err
@@ -204,11 +206,16 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 		return nil, utils.Wrap(err, "get end commit")
 	}
 
+	log.Infof("start to fetch base virtual-fs from start: %v", start)
 	basevfs, err := fetchRespos(res, start)
 	if err != nil {
 		return nil, err
 	}
 
+	log.Infof(
+		"start to fetch start and end file tree, from: %v to %v",
+		utils.ShrinkString(start, 16), utils.ShrinkString(end, 16),
+	)
 	// 获取两个commit的tree
 	startTree, err := startCommit.Tree()
 	if err != nil {
@@ -220,6 +227,7 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 	}
 
 	// 计算diff
+	log.Infof("start to calc diff-tree from %v to %v", utils.ShrinkString(start, 16), utils.ShrinkString(end, 16))
 	changes, err := startTree.Diff(endTree)
 	if err != nil {
 		return nil, utils.Wrap(err, "calculate diff")
@@ -274,7 +282,7 @@ func FromCommitRange(repos string, start, end string) (*filesys.VirtualFS, error
 }
 
 func GetHeadHash(repos string) string {
-	res, err := git.PlainOpen(repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return ""
 	}
@@ -288,7 +296,7 @@ func GetHeadHash(repos string) string {
 }
 
 func GetHeadBranch(repos string) string {
-	res, err := git.PlainOpen(repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return ""
 	}
@@ -334,7 +342,7 @@ func findChildren(res *git.Repository, commitHash plumbing.Hash) ([]*object.Comm
 }
 
 func GetBranchRange(repos string, branchName string) (start, end string, err error) {
-	res, err := git.PlainOpen(repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		err = utils.Errorf("open repos: %v failed: %v", repos, err)
 		return
@@ -374,7 +382,7 @@ func GetBranchRange(repos string, branchName string) (start, end string, err err
 }
 
 func GetParentCommitHash(repos string, commit string) (string, error) {
-	res, err := git.PlainOpen(repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return "", utils.Errorf("open repos: %v failed: %v", repos, err)
 	}
@@ -398,7 +406,7 @@ func GetParentCommitHash(repos string, commit string) (string, error) {
 }
 
 func Glance(repos string) string {
-	res, err := git.PlainOpen(repos)
+	res, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return ""
 	}
@@ -433,6 +441,63 @@ func Glance(repos string) string {
 		}
 	}
 	return buf.String()
+}
+
+func revParseOptimized(repo *git.Repository, rev string) (string, error) {
+	// 核心步骤：直接使用 go-git 内置的、经过优化的 revision 解析器。
+	// 这个函数能高效处理完整哈希、短哈希、引用名(HEAD, main, v1.0)、相对引用(HEAD~2)等。
+	// 这是最快、最正确的路径。
+	hash, err := repo.ResolveRevision(plumbing.Revision(rev))
+	if err == nil {
+		// 成功解析，直接返回完整哈希字符串。
+		return hash.String(), nil
+	}
+
+	// 如果 ResolveRevision 返回错误，我们需要判断错误类型。
+	// 常见的错误是 ErrReferenceNotFound 或 ErrObjectNotFound。
+	// 这意味着 rev 不是一个已知的引用或对象。
+	// 在这种情况下，我们可以选择性地实现一些自定义的、更宽松的模糊匹配逻辑。
+	// 注意：原始代码中的许多模糊匹配逻辑 `ResolveRevision` 已经覆盖了。
+	// 这里的备用逻辑仅用于处理 `ResolveRevision` 无法处理的边缘情况或自定义别名。
+	if errors.Is(err, plumbing.ErrReferenceNotFound) || errors.Is(err, plumbing.ErrObjectNotFound) {
+		// （可选）如果需要比 ResolveRevision 更宽松的模糊匹配，可以在这里实现。
+		// 例如，不带远程前缀的远程分支名等。
+		// 但在大多数标准场景下, ResolveRevision 已经足够。
+		// 此处保留原始代码中的部分遍历逻辑作为“最后手段”。
+		log.Printf("ResolveRevision failed for '%s': %v. Falling back to fuzzy matching...", rev, err)
+		return fuzzyMatchReference(repo, rev)
+	}
+
+	// 对于其他类型的错误（如仓库损坏等），直接返回。
+	return "", fmt.Errorf("failed to parse revision '%s': %w", rev, err)
+}
+
+// fuzzyMatchReference 是一种成本较高的备用方案，用于在标准解析失败时进行模糊匹配。
+func fuzzyMatchReference(repo *git.Repository, rev string) (string, error) {
+	refs, err := repo.References()
+	if err != nil {
+		return "", fmt.Errorf("failed to get references for fuzzy matching: %w", err)
+	}
+	defer refs.Close()
+
+	var matchedRef *plumbing.Reference
+	errStopIteration := errors.New("reference found")
+
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		// 检查短名称是否匹配，例如 "main"
+		if ref.Name().Short() == rev {
+			matchedRef = ref
+			return errStopIteration
+		}
+		// 可以添加更多自定义的模糊匹配规则...
+		return nil
+	})
+
+	if matchedRef != nil {
+		return matchedRef.Hash().String(), nil
+	}
+
+	return "", fmt.Errorf("cannot parse revision '%s' with any method", rev)
 }
 
 func revParse(repo *git.Repository, rev string) (string, error) {
@@ -564,11 +629,11 @@ func revParse(repo *git.Repository, rev string) (string, error) {
 }
 
 func RevParse(repos string, rev string) (string, error) {
-	repo, err := git.PlainOpen(repos)
+	repo, err := GitOpenRepositoryWithCache(repos)
 	if err != nil {
 		return "", utils.Errorf("open: %v failed: %v", repos, err)
 	}
-	return revParse(repo, rev)
+	return revParseOptimized(repo, rev)
 }
 
 func ShortHashToFullHash(repo *git.Repository, hash string) (string, error) {
@@ -607,7 +672,7 @@ func ShortHashToFullHash(repo *git.Repository, hash string) (string, error) {
 // GetCommitHashEx 获取完整的commit hash
 // 如果hash不是完整的commit hash,则尝试查找匹配的commit hash
 func GetCommitHashEx(repo *git.Repository, hash string) (*object.Commit, error) {
-	hash, err := revParse(repo, hash)
+	hash, err := revParseOptimized(repo, hash)
 	if err != nil {
 		return nil, utils.Errorf("rev-parse err: %v", err)
 	}

@@ -43,13 +43,15 @@ Content-Length: 5
 12321`)
 
 target = f`${host}:${port}`
-
-result = nuclei.Scan(target, nuclei.rawTemplate(pocTpl))~
 count := 0
-for r in result {
-count++
+for range 3 {
+    result = nuclei.Scan(target, nuclei.rawTemplate(pocTpl))~
+    for r in result {
+        count++
+    }
 }
 
 dump(count)
+// nulcei scan 设计防止相同的漏洞被重复报告，因此 count 为 1
 assert count == 1;
 

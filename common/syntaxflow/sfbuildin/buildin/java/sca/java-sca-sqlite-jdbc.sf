@@ -4,21 +4,16 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 sqlite-jdbc 是一个用于 Java 应用程序与 SQLite 数据库进行交互的库。在 sqlite-jdbc 3.36.0 之前的版本中存在由于 JDBC 连接字符串解析不当导致的 SQL 注入漏洞（CVE-2020-15358）。攻击者可以通过在 JDBC URL 中注入恶意的 SQL 语句，利用该漏洞执行任意 SQL 命令。
-
 2. **触发场景**
 当应用程序使用受影响版本的 sqlite-jdbc 库，并且 JDBC 连接字符串的部分或全部来源于用户可控的输入时，攻击者可以构造恶意的 JDBC URL，例如在数据库文件路径中注入 SQL Payload。
-
 ```java
 String dbPath = request.getParameter("db"); // 用户输入
 String url = "jdbc:sqlite:" + dbPath; // 拼接用户输入到 JDBC URL
 Connection connection = DriverManager.getConnection(url);
 ```
-
 攻击者可以输入 `database.sqlite?journal_mode=DELETE;DROP TABLE sensitive_data;--` 到 `db` 参数中，导致连接时执行恶意的 SQL 语句。
-
 3. **潜在影响**
 - 数据库中的敏感信息（如用户数据、配置信息）被泄露。
 - 数据库中的数据被篡改或删除。
@@ -28,38 +23,32 @@ DESC
 	rule_id: "3ffebcee-b93d-4a61-a78b-42ab110c0639"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 sqlite-jdbc 版本
 将 `sqlite-jdbc` 库升级到 3.36.0 或之后的版本。新版本中修复了 JDBC URL 解析相关的漏洞，包括 CVE-2020-15358。这是最直接且有效的修复方法。
-
 ```xml
 <dependency>
-    <groupId>org.xerial</groupId>
-    <artifactId>sqlite-jdbc</artifactId>
-    <version>3.40.1.0</version> <!-- 使用安全的版本 -->
+<groupId>org.xerial</groupId>
+<artifactId>sqlite-jdbc</artifactId>
+<version>3.40.1.0</version> <!-- 使用安全的版本 -->
 </dependency>
 ```
-
 ```gradle
 // Gradle 示例
 implementation 'org.xerial:sqlite-jdbc:3.40.1.0' // 使用安全的版本
 ```
 确保项目构建配置中使用的是修复后的版本。
-
 #### 2. 避免将用户输入直接用于构造 JDBC URL
 如果无法立即升级库版本，应避免将用户输入的任何部分直接拼接到 JDBC URL 中。对用于构造 URL 的输入进行严格的白名单校验或硬编码数据库路径。
-
 ```java
 // 修复代码示例
 String dbName = request.getParameter("dbName"); // 用户输入数据库名称
 // 仅允许预定义的数据库名称
 if (!("users.sqlite".equals(dbName) || "products.sqlite".equals(dbName))) {
-    throw new IllegalArgumentException("Invalid database name");
+throw new IllegalArgumentException("Invalid database name");
 }
 String url = "jdbc:sqlite:" + dbName; // 使用校验后的或硬编码的名称
-Connection connection = DriverManager.getConnection(url); 
+Connection connection = DriverManager.getConnection(url);
 ```
-
 #### 3. 对用户输入进行严格过滤和转义
 对所有用户提供的输入进行严格的清洗、校验和转义，特别是涉及到文件路径、数据库名称等敏感信息时，防止恶意字符和 SQL 语法的注入。
 SOLUTION
@@ -76,66 +65,52 @@ alert $vuln_sqlite_jdbc for {
 	cve: "CVE-2020-15358",
 	title: "SCA: Check Java sqlite-jdbc Vulnerability",
 	title_zh: "SCA: 检测 Java sqlite-jdbc 依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 sqlite-jdbc 版本
 将 `sqlite-jdbc` 库升级到 3.36.0 或之后的版本。新版本中修复了 JDBC URL 解析相关的漏洞，包括 CVE-2020-15358。这是最直接且有效的修复方法。
-
 ```xml
 <dependency>
-    <groupId>org.xerial</groupId>
-    <artifactId>sqlite-jdbc</artifactId>
-    <version>3.40.1.0</version> <!-- 使用安全的版本 -->
+<groupId>org.xerial</groupId>
+<artifactId>sqlite-jdbc</artifactId>
+<version>3.40.1.0</version> <!-- 使用安全的版本 -->
 </dependency>
 ```
-
 ```gradle
 // Gradle 示例
 implementation 'org.xerial:sqlite-jdbc:3.40.1.0' // 使用安全的版本
 ```
 确保项目构建配置中使用的是修复后的版本。
-
 #### 2. 避免将用户输入直接用于构造 JDBC URL
 如果无法立即升级库版本，应避免将用户输入的任何部分直接拼接到 JDBC URL 中。对用于构造 URL 的输入进行严格的白名单校验或硬编码数据库路径。
-
 ```java
 // 修复代码示例
 String dbName = request.getParameter("dbName"); // 用户输入数据库名称
 // 仅允许预定义的数据库名称
 if (!("users.sqlite".equals(dbName) || "products.sqlite".equals(dbName))) {
-    throw new IllegalArgumentException("Invalid database name");
+throw new IllegalArgumentException("Invalid database name");
 }
 String url = "jdbc:sqlite:" + dbName; // 使用校验后的或硬编码的名称
-Connection connection = DriverManager.getConnection(url); 
+Connection connection = DriverManager.getConnection(url);
 ```
-
 #### 3. 对用户输入进行严格过滤和转义
 对所有用户提供的输入进行严格的清洗、校验和转义，特别是涉及到文件路径、数据库名称等敏感信息时，防止恶意字符和 SQL 语法的注入。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 sqlite-jdbc 是一个用于 Java 应用程序与 SQLite 数据库进行交互的库。在 sqlite-jdbc 3.36.0 之前的版本中存在由于 JDBC 连接字符串解析不当导致的 SQL 注入漏洞（CVE-2020-15358）。攻击者可以通过在 JDBC URL 中注入恶意的 SQL 语句，利用该漏洞执行任意 SQL 命令。
-
 2. **触发场景**
 当应用程序使用受影响版本的 sqlite-jdbc 库，并且 JDBC 连接字符串的部分或全部来源于用户可控的输入时，攻击者可以构造恶意的 JDBC URL，例如在数据库文件路径中注入 SQL Payload。
-
 ```java
 String dbPath = request.getParameter("db"); // 用户输入
 String url = "jdbc:sqlite:" + dbPath; // 拼接用户输入到 JDBC URL
 Connection connection = DriverManager.getConnection(url);
 ```
-
-攻击者可以输入 `database.sqlite?journal_mode=DELETE;DROP TABLE sensitive_data;--` 到 `db` 参数中，导致连接时执行恶意的 SQL 语句。
-
-3. **潜在影响**
-- 数据库中的敏感信息（如用户数据、配置信息）被泄露。
-- 数据库中的数据被篡改或删除。
-- 拒绝服务攻击导致应用程序不可用。
-- 在某些情况下，可能通过其他漏洞利用进一步获取系统权限。
-CODE
+攻击者可以输入 `database.sqlite?journal_mode=DELETE;DROP TABLE sensitive_data;--` 到 `db` 参数中，导致连接时执行恶意的 SQL 语。
+DESC
 	level: "high",
 	message: "SCA: sqlite-jdbc versions between 3.8.9 and 3.36.0 have an SQL injection vulnerability",
+	name: "vuln_sqlite_jdbc",
+	risk: "SCA",
 }

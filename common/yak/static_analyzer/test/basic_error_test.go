@@ -3,6 +3,8 @@ package test
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
@@ -86,6 +88,25 @@ func TestFunctionCallParameterLength(t *testing.T) {
 		`, []string{
 			ssa4analyze.ArgumentTypeError(1, "[]string", "string", "codec.DecodeBase64"),
 		})
+	})
+}
+
+func TestFunctionCallGeneric(t *testing.T) {
+	t.Run("test append generic", func(t *testing.T) {
+		check(t, `
+slice1 = []
+slice2 = []
+slice1 = append(slice1, "a")
+slice2 = append(slice2, 1)
+		`, []string{})
+	})
+	t.Run("test append generic 2", func(t *testing.T) {
+		check(t, `
+slice1 = ["a"]
+slice2 = [1]
+slice1.Append("a")
+slice2.Append(1)
+		`, []string{})
 	})
 }
 
@@ -245,6 +266,7 @@ for i in infos {
 		`, []string{})
 	})
 }
+
 func TestHandlerError(t *testing.T) {
 	t.Run("test handler1", func(t *testing.T) {
 		code := `func c(){
@@ -279,5 +301,71 @@ if bb{
     return true
 }`
 		check(t, code, []string{"Error Unhandled ", "Error Unhandled "})
+	})
+	t.Run("map member access in complex situation", func(t *testing.T) {
+		code := `
+	# input your yak code
+println("Hello Yak World!")
+func getWays(){
+    w = infoMap["Include_Key_Word"][0]
+    results := {}
+    if w.Way {
+        if !results.Has("discard") {
+            results.discard = make(map[string][]string)
+        }
+        return results
+    }else{
+        w.Include_Key_Word_Way = w.Has("Include_Key_Word_Way") ? w.Include_Key_Word_Way : ""
+        if w.Include_Key_Word_Way == ""{
+            return results
+        }
+        if  w.Include_Key_Word_Way!="" {
+            if !results.Has("discard") {
+                results.discard = make(map[string][]string)
+            }
+            results.discard.Header = make([]string, 0)
+        }
+    }
+    
+    return results
+}
+`
+		check(t, code, []string{"Can't find definition of this variable infoMap both inside and outside the function.", "map literal not have map pairs"})
+	})
+	t.Run("simple map member access", func(t *testing.T) {
+		code := `
+results := {}
+if !results.Has("discard") {
+     results.discard = make(map[string][]string)
+}
+results.discard.Header = make([]string, 0)
+results.discard.Header = append(results.discard.Header, "1")
+`
+		check(t, code, []string{"map literal not have map pairs"})
+	})
+
+	t.Run("panic: keywords cause freevalue fail generation in loop", func(t *testing.T) {
+		check(t, `
+func assignParam(Packet,Pname,Pvalue,funcname){
+    pap := "ReplaceHTTPPacketQueryParam"
+    for k,v := range ParamsFull {
+        if k == Pname {
+            // 爆红没事
+            Packet = poc[pap](Packet,Pname,Pvalue/*type: map[string]string*/)
+            break
+        }else{
+            // 爆红没事
+            Packet = poc[pap](Packet,Pname,Pvalue)
+            break
+        }
+    }
+    return Packet
+}
+p = ""
+println(assignParam(p,"_method","123","当前方法"))
+		`, []string{
+			ssa.BindingNotFoundInCall("ParamsFull"),
+			ssa.BindingNotFound("ParamsFull", memedit.NewRange(memedit.NewPosition(18, 9), memedit.NewPosition(18, 46))),
+		})
 	})
 }

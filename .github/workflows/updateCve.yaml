@@ -19,9 +19,20 @@ jobs:
       - name: Check out code into the Go module directory
         uses: actions/checkout@v2
 
-      - name: Dependence
+      - name: Set up Go 1.x
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: "./go.mod"
+        id: go
+
+      - name: Init Module
         run: |
-          wget -q -O './yak' https://aliyun-oss.yaklang.com/yak/1.3.7-beta3/yak_linux_amd64 && chmod +x ./yak
+          go mod tidy
+
+      - name: Build yak 
+        run: |
+          go build -o ./yak ./common/yak/cmd/yak.go
+          chmod +x ./yak
 
       - name: LoadCVE-Description
         run: mkdir -p ~/yakit-projects && wget -O ~/yakit-projects/default-cve-description.db.gzip https://cve-db.oss-cn-beijing.aliyuncs.com/default-cve-description.db.gzip

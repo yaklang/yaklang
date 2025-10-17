@@ -18,19 +18,41 @@ var INNER_CLASS_SPLIT = "$"
 // ========================================== For SSAAPI ==========================================
 
 type SSABuilder struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
-var Builder ssa.Builder = &SSABuilder{}
+var _ ssa.Builder = (*SSABuilder)(nil)
 
-func (*SSABuilder) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(),
 	}
-	build := &builder{
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigSupportClass(true),
+		ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
+}
+
+func (s *SSABuilder) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".java"
+}
+
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, s)
+}
+
+func (*SSABuilder) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
+	ast, ok := raw.(javaparser.ICompilationUnitContext)
+	if !ok {
+		return utils.Errorf("invalid AST type: %T, expected javaparser.ICompilationUnitContext", raw)
+	}
+	build := &singleFileBuilder{
 		FunctionBuilder:   b,
-		ast:               ast,
 		constMap:          make(map[string]ssa.Value),
 		fullTypeNameMap:   make(map[string][]string),
 		allImportPkgSlice: make([][]string, 0),
@@ -52,9 +74,8 @@ func (*SSABuilder) GetLanguage() consts.Language {
 
 // ========================================== Build Front End ==========================================
 
-type builder struct {
+type singleFileBuilder struct {
 	*ssa.FunctionBuilder
-	ast      javaparser.ICompilationUnitContext
 	constMap map[string]ssa.Value
 
 	// for full type name
@@ -67,24 +88,26 @@ type builder struct {
 	isInController bool
 }
 
-func Frontend(src string, force bool) (javaparser.ICompilationUnitContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuilder) (javaparser.ICompilationUnitContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := javaparser.NewJavaLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := javaparser.NewJavaParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.CompilationUnit()
-	if force || len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return nil, utils.Errorf("parse AST FrontEnd error: %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
-func (b *builder) AssignConst(name string, value ssa.Value) bool {
+func (b *singleFileBuilder) AssignConst(name string, value ssa.Value) bool {
 	if ConstValue, ok := b.constMap[name]; ok {
 		log.Warnf("const %v has been defined value is %v", name, ConstValue.String())
 		return false
@@ -94,21 +117,21 @@ func (b *builder) AssignConst(name string, value ssa.Value) bool {
 	return true
 }
 
-func (b *builder) ReadConst(name string) (ssa.Value, bool) {
+func (b *singleFileBuilder) ReadConst(name string) (ssa.Value, bool) {
 	v, ok := b.constMap[name]
 	return v, ok
 }
 
-func (b *builder) AssignClassConst(className, key string, value ssa.Value) {
+func (b *singleFileBuilder) AssignClassConst(className, key string, value ssa.Value) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	b.AssignConst(name, value)
 }
-func (b *builder) ReadClassConst(className, key string) (ssa.Value, bool) {
+func (b *singleFileBuilder) ReadClassConst(className, key string) (ssa.Value, bool) {
 	name := fmt.Sprintf("%s_%s", className, key)
 	return b.ReadConst(name)
 }
 
-func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
+func (b *singleFileBuilder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 	t := b.StoreFunctionBuilder()
 	b.LoadBuilder(s)
 	return func() {
@@ -116,11 +139,11 @@ func (b *builder) SwitchFunctionBuilder(s *ssa.StoredFunctionBuilder) func() {
 	}
 }
 
-func (b *builder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
+func (b *singleFileBuilder) LoadBuilder(s *ssa.StoredFunctionBuilder) {
 	b.FunctionBuilder = s.Current
 	b.LoadFunctionBuilder(s.Store)
 }
 
-func (b *builder) initImport() {
+func (b *singleFileBuilder) initImport() {
 	b.allImportPkgSlice = append(b.allImportPkgSlice, []string{"java", "lang", "*"})
 }

@@ -5,76 +5,62 @@ desc(
 	risk:"path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   文件下载漏洞，特别是路径遍历（Path Traversal）漏洞，通常发生在应用程序在处理用户请求的文件下载时，未对用户提供的文件名或路径进行严格的过滤和验证，直接将其用于构建文件系统路径。攻击者可以通过构造包含`../`或其他目录遍历字符的恶意输入，访问到服务器上预期之外的文件，例如敏感配置文件、源代码或系统文件。
-
+文件下载漏洞，特别是路径遍历（Path Traversal）漏洞，通常发生在应用程序在处理用户请求的文件下载时，未对用户提供的文件名或路径进行严格的过滤和验证，直接将其用于构建文件系统路径。攻击者可以通过构造包含`../`或其他目录遍历字符的恶意输入，访问到服务器上预期之外的文件，例如敏感配置文件、源代码或系统文件。
 2. **触发场景**
-   在Spring Boot应用中，如果Controller层直接接收用户输入（如URL路径或请求参数）作为文件名，并将其拼接到文件存储路径中，再使用Java的文件I/O操作（如`new File()`）进行文件访问或读取，就可能触发该漏洞。
-
-   ```java
-   @GetMapping("/download/{filename}")
-   public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String filename) {
-       // 存在漏洞的代码示例：直接拼接用户输入
-       File file = new File("path/to/your/files/" + filename);
-       // ... 文件处理和返回
-   }
-   ```
-   如果用户输入 `../sensitive_config.xml`，则最终访问的文件路径可能变为 `path/to/your/sensitive_config.xml`。
-
+在Spring Boot应用中，如果Controller层直接接收用户输入（如URL路径或请求参数）作为文件名，并将其拼接到文件存储路径中，再使用Java的文件I/O操作（如`new File()`）进行文件访问或读取，就可能触发该漏洞。
+```java
+@GetMapping("/download/{filename}")
+public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String filename) {
+// 存在漏洞的代码示例：直接拼接用户输入
+File file = new File("path/to/your/files/" + filename);
+// ... 文件处理和返回
+}
+```
+如果用户输入 `../sensitive_config.xml`，则最终访问的文件路径可能变为 `path/to/your/sensitive_config.xml`。
 3. **潜在影响**
-    - **信息泄露：** 攻击者可以下载服务器上的敏感文件，如配置文件（包含数据库密码、API密钥等）、源代码、日志文件或用户数据文件。
-    - **拒绝服务：** 攻击者可能尝试访问大型文件或特殊设备文件，导致服务器资源耗尽。
-    - **进一步攻击：** 获取的敏感信息可能被用于进一步的攻击，例如通过泄露的凭证访问数据库或利用配置信息发现其他漏洞。
+- **信息泄露：** 攻击者可以下载服务器上的敏感文件，如配置文件（包含数据库密码、API密钥等）、源代码、日志文件或用户数据文件。
+- **拒绝服务：** 攻击者可能尝试访问大型文件或特殊设备文件，导致服务器资源耗尽。
+- **进一步攻击：** 获取的敏感信息可能被用于进一步的攻击，例如通过泄露的凭证访问数据库或利用配置信息发现其他漏洞。
 DESC
 	rule_id: "41bfcaa6-f47e-4843-8bf0-9575eea4ee7a"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 白名单过滤与校验文件名
 只允许下载特定目录下的特定类型文件，或者维护一个允许下载的文件名白名单。对用户输入的文件名进行严格的校验，确保文件名不包含目录分隔符或特殊字符。
-
 ```java
 @GetMapping("/download/{filename}")
 public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String filename) {
-    // 修复代码示例：白名单过滤和校验
-
-    // 1. 校验文件名，防止目录遍历
-    if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
-        return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
-    }
-
-    // 2. 结合安全的基础目录构建完整路径
-    String baseDir = "/path/to/your/secure/files/";
-    File file = new File(baseDir + filename);
-
-    // 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
-    try {
-        if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
-            return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
-        }
-    } catch (IOException e) {
-        return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
-    }
-
-    // 4. 校验文件是否存在等其他逻辑
-    if (!file.exists() || !file.isFile()) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    }
-
-    // 设置响应头和返回文件
-    HttpHeaders headers = new HttpHeaders();
-    headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
-
-    return ResponseEntity.ok()
-            .headers(headers)
-            .body(new FileSystemResource(file));
+// 修复代码示例：白名单过滤和校验
+// 1. 校验文件名，防止目录遍历
+if (filename.contains("..") || filename.contains("/") || filename.contains("\")) {
+return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
+}
+// 2. 结合安全的基础目录构建完整路径
+String baseDir = "/path/to/your/secure/files/";
+File file = new File(baseDir + filename);
+// 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
+try {
+if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
+return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
+}
+} catch (IOException e) {
+return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
+}
+// 4. 校验文件是否存在等其他逻辑
+if (!file.exists() || !file.isFile()) {
+return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+}
+// 设置响应头和返回文件
+HttpHeaders headers = new HttpHeaders();
+headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+return ResponseEntity.ok()
+.headers(headers)
+.body(new FileSystemResource(file));
 }
 ```
-
 #### 2. 使用安全的API或框架功能
 优先使用框架或库提供的、已内置安全防护的文件下载功能。例如，Spring框架提供的资源处理机制可以更安全地处理文件访问。
-
 #### 3. 对用户输入进行编码
 在某些情况下，如果文件下载不是通过文件名直接进行的，而是通过其他标识符（如文件ID），则应确保用户输入的标识符经过适当的编码或验证。
 SOLUTION
@@ -96,83 +82,52 @@ $entry -{
 CODE
 }->;
 alert $sink for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 白名单过滤与校验文件名
 只允许下载特定目录下的特定类型文件，或者维护一个允许下载的文件名白名单。对用户输入的文件名进行严格的校验，确保文件名不包含目录分隔符或特殊字符。
-
 ```java
 @GetMapping("/download/{filename}")
 public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String filename) {
-    // 修复代码示例：白名单过滤和校验
-
-    // 1. 校验文件名，防止目录遍历
-    if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
-        return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
-    }
-
-    // 2. 结合安全的基础目录构建完整路径
-    String baseDir = "/path/to/your/secure/files/";
-    File file = new File(baseDir + filename);
-
-    // 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
-    try {
-        if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
-            return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
-        }
-    } catch (IOException e) {
-        return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
-    }
-
-    // 4. 校验文件是否存在等其他逻辑
-    if (!file.exists() || !file.isFile()) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    }
-
-    // 设置响应头和返回文件
-    HttpHeaders headers = new HttpHeaders();
-    headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
-
-    return ResponseEntity.ok()
-            .headers(headers)
-            .body(new FileSystemResource(file));
+// 修复代码示例：白名单过滤和校验
+// 1. 校验文件名，防止目录遍历
+if (filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+return ResponseEntity.badRequest().build(); // 拒绝包含非法字符的文件名
+}
+// 2. 结合安全的基础目录构建完整路径
+String baseDir = "/path/to/your/secure/files/";
+File file = new File(baseDir + filename);
+// 3. 进一步校验文件是否确实位于安全的基础目录内（重要！）
+try {
+if (!file.getCanonicalPath().startsWith(new File(baseDir).getCanonicalPath())) {
+return ResponseEntity.badRequest().build(); // 文件路径不在允许的目录下
+}
+} catch (IOException e) {
+return ResponseEntity.internalServerError().build(); // 处理文件路径标准化异常
+}
+// 4. 校验文件是否存在等其他逻辑
+if (!file.exists() || !file.isFile()) {
+return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+}
+// 设置响应头和返回文件
+HttpHeaders headers = new HttpHeaders();
+headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + file.getName());
+return ResponseEntity.ok()
+.headers(headers)
+.body(new FileSystemResource(file));
 }
 ```
-
 #### 2. 使用安全的API或框架功能
 优先使用框架或库提供的、已内置安全防护的文件下载功能。例如，Spring框架提供的资源处理机制可以更安全地处理文件访问。
-
 #### 3. 对用户输入进行编码
 在某些情况下，如果文件下载不是通过文件名直接进行的，而是通过其他标识符（如文件ID），则应确保用户输入的标识符经过适当的编码或验证。
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   文件下载漏洞，特别是路径遍历（Path Traversal）漏洞，通常发生在应用程序在处理用户请求的文件下载时，未对用户提供的文件名或路径进行严格的过滤和验证，直接将其用于构建文件系统路径。攻击者可以通过构造包含`../`或其他目录遍历字符的恶意输入，访问到服务器上预期之外的文件，例如敏感配置文件、源代码或系统文件。
-
-2. **触发场景**
-   在Spring Boot应用中，如果Controller层直接接收用户输入（如URL路径或请求参数）作为文件名，并将其拼接到文件存储路径中，再使用Java的文件I/O操作（如`new File()`）进行文件访问或读取，就可能触发该漏洞。
-
-   ```java
-   @GetMapping("/download/{filename}")
-   public ResponseEntity<FileSystemResource> downloadFile(@PathVariable String filename) {
-       // 存在漏洞的代码示例：直接拼接用户输入
-       File file = new File("path/to/your/files/" + filename);
-       // ... 文件处理和返回
-   }
-   ```
-   如果用户输入 `../sensitive_config.xml`，则最终访问的文件路径可能变为 `path/to/your/sensitive_config.xml`。
-
-3. **潜在影响**
-    - **信息泄露：** 攻击者可以下载服务器上的敏感文件，如配置文件（包含数据库密码、API密钥等）、源代码、日志文件或用户数据文件。
-    - **拒绝服务：** 攻击者可能尝试访问大型文件或特殊设备文件，导致服务器资源耗尽。
-    - **进一步攻击：** 获取的敏感信息可能被用于进一步的攻击，例如通过泄露的凭证访问数据库或利用配置信息发现其他漏洞。
-CODE
+SOLUTION
 	level: "warning",
-	title: "Check Java Springboot File Download Vulnerability",
-	title_zh: "检测Java Springboot文件下载漏洞",
+	title: "Java Springboot File Download Path Traversal Vulnerability Was Detected",
+	title_zh: "检测到Java Springboot文件下载路径遍历漏洞",
+	name: "sink",
+	message: "检测到Java Springboot文件下载路径遍历漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "路径遍历",
 }
 
 

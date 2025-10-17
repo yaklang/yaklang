@@ -1,0 +1,168 @@
+__DESC__ = "一个用于解析Office文档（PPT、DOC、Excel）为纯文本的工具，支持提取文档内容并转换为可读文本格式，适用于文档内容分析、文本提取和数据处理等场景。"
+__VERBOSE_NAME__ = "Office文档解析为文本"
+__KEYWORDS__ = "office文档解析,文本提取,ppt解析,doc解析,excel解析,文档内容提取,office parser,document parsing,text extraction,文件解析,内容分析,数据提取"
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数：输入文件路径和输出设置
+inputFile := cli.String("input", cli.setRequired(true), cli.setHelp("input office file path (.ppt, .pptx, .doc, .docx, .xls, .xlsx)"))
+outputFile := cli.String("output", cli.setRequired(false), cli.setHelp("output text file path, if not specified, will print to console"))
+includeMetadata := cli.Bool("metadata", cli.setRequired(false), cli.setDefault(true), cli.setHelp("include metadata information in output, default true"))
+
+cli.check()
+
+yakit.Info("Parsing office file: %v", inputFile)
+
+// 检查输入文件是否存在
+if !file.IsExisted(inputFile) {
+    yakit.Error("Input file %v does not exist", inputFile)
+    return
+}
+
+// 获取文件扩展名并验证
+ext := file.GetExt(inputFile)
+supportedExts := [".ppt", ".pptx", ".pptm", ".doc", ".docx", ".xls", ".xlsx"]
+isSupported := false
+for supportedExt in supportedExts {
+    if ext == supportedExt {
+        isSupported = true
+        break
+    }
+}
+
+if !isSupported {
+    yakit.Error("Unsupported file format: %v. Supported formats: %v", ext, str.Join(supportedExts, ", "))
+    return
+}
+
+// Excel文件解析函数
+readExcelFile = (p) => {
+    res = fileparser.ParseFile(p)~
+    if res == nil || res['table'] == nil {
+        return ""
+    }
+    
+    tableFiles = res['table']
+    var resItem
+    resItem = []
+    
+    for i in tableFiles {
+        name = i.Metadata['sheet_name']
+        if name == "" {
+            name = "Unknown Sheet"
+        }
+        tableInfo = "Sheet Name: %s\n%s" % [name, string(i.BinaryData)]
+        resItem = append(resItem, tableInfo)
+    }
+    return str.Join(resItem, "\n\n")
+}
+
+// PPT/DOC文件解析函数
+readOfficeFile = (p) => {
+    res = fileparser.ParseFile(p)~
+    if res == nil {
+        return ""
+    }
+    
+    var content
+    content = ""
+    
+    // 提取文本内容
+    if res['text'] != nil {
+        textFiles = res['text']
+        var textParts
+        textParts = []
+        
+        for textFile in textFiles {
+            if includeMetadata && textFile.Metadata != nil {
+                metaInfo = "File: %s (Count: %s)\n" % [textFile.FileName, textFile.Metadata['count']]
+                textParts = append(textParts, metaInfo)
+            }
+            textParts = append(textParts, string(textFile.BinaryData))
+        }
+        content = str.Join(textParts, "\n")
+    }
+    
+    // 提取表格内容
+    if res['table'] != nil {
+        tableFiles = res['table']
+        var tableParts
+        tableParts = []
+        
+        for tableFile in tableFiles {
+            if includeMetadata && tableFile.Metadata != nil {
+                metaInfo = "\nTables (Count: %s):\n" % tableFile.Metadata['count']
+                tableParts = append(tableParts, metaInfo)
+            }
+            tableParts = append(tableParts, string(tableFile.BinaryData))
+        }
+        
+        if len(tableParts) > 0 {
+            content += "\n" + str.Join(tableParts, "\n")
+        }
+    }
+    
+    return content
+}
+
+// 根据文件类型选择解析方法
+var extractedText
+switch ext {
+case ".xls", ".xlsx":
+    yakit.Info("Parsing Excel file...")
+    extractedText = readExcelFile(inputFile)
+case ".ppt", ".pptx", ".pptm", ".doc", ".docx":
+    yakit.Info("Parsing %v file...", ext)
+    extractedText = readOfficeFile(inputFile)
+default:
+    yakit.Error("Internal error: unsupported file type %v", ext)
+    return
+}
+
+if extractedText == "" {
+    yakit.Warn("No text content extracted from file: %v", inputFile)
+    return
+}
+
+yakit.Info("Text extraction completed. Extracted %v characters", len(extractedText))
+
+// 输出处理
+if outputFile != "" {
+    // 保存到文件
+    yakit.Info("Saving extracted text to: %v", outputFile)
+    
+    // 确保输出目录存在
+    outputDir := file.GetDirPath(outputFile)
+    if outputDir != "" && !file.IsExisted(outputDir) {
+        yakit.Info("Creating output directory: %v", outputDir)
+        err := file.MkdirAll(outputDir)
+        if err != nil {
+            yakit.Error("Failed to create output directory %v: %v", outputDir, err)
+            return
+        }
+    }
+    
+    // 写入文件
+    err := file.Save(outputFile, extractedText)
+    if err != nil {
+        yakit.Error("Failed to save extracted text to %v: %v", outputFile, err)
+        return
+    }
+    
+    // 获取输出文件信息
+    info, err := file.Stat(outputFile)
+    if err != nil {
+        yakit.Warn("Text saved but failed to get output file info: %v", err)
+    } else {
+        yakit.Info("Text saved successfully. Output file: %v, Size: %v bytes", outputFile, info.Size())
+        yakit.File(outputFile, yakit.fileWriteAction(info.Size(), "extract", "office document text extraction"))
+    }
+} else {
+    // 输出到控制台
+    yakit.Info("Extracted text content:")
+    yakit.Info("--- BEGIN EXTRACTED TEXT ---")
+    yakit.Info(extractedText)
+    yakit.Info("--- END EXTRACTED TEXT ---")
+}
+
+yakit.Info("Office document parsing completed successfully")

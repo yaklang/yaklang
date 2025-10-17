@@ -9,6 +9,10 @@ import (
 
 // value
 func setMemberCallRelationship(obj, key, member Value) {
+	if utils.IsNil(obj) || utils.IsNil(key) || utils.IsNil(member) {
+		log.Debugf("BUG: setMemberCallRelationship called with nil value: %v, %v, %v", obj, key, member)
+		return
+	}
 	obj.AddMember(key, member)
 	if !member.IsMember() {
 		//todo：fix one value for more object-key
@@ -19,7 +23,10 @@ func setMemberCallRelationship(obj, key, member Value) {
 
 	handlerMemberCall := func(obj Value) {
 		for _, edgeID := range obj.(*Phi).Edge {
-			edgeValue := obj.GetValueById(edgeID)
+			edgeValue, ok := obj.GetValueById(edgeID)
+			if !ok || edgeValue == nil {
+				continue
+			}
 			if _, ok := edgeValue.GetMember(key); ok { // 避免循环
 				continue
 			}
@@ -34,9 +41,12 @@ func setMemberCallRelationship(obj, key, member Value) {
 		}
 	}
 
-	if phi, ok := obj.(*Phi); ok {
+	if phi, ok := ToPhi(obj); ok {
 		for _, edgeId := range phi.Edge {
-			edgeValue := obj.GetValueById(edgeId)
+			edgeValue, ok := obj.GetValueById(edgeId)
+			if !ok || edgeValue == nil {
+				continue
+			}
 			if und, ok := ToUndefined(edgeValue); ok { // 遇到库类和return phi value
 				if und.Kind == UndefinedValueValid || und.Kind == UndefinedValueReturn {
 					handlerMemberCall(obj)
@@ -60,6 +70,10 @@ type checkMemberResult struct {
 
 // check can member call, return member name and type
 func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMemberResult) {
+	if utils.IsNil(value) || utils.IsNil(key) {
+		log.Errorf("BUG: checkCanMemberCallExist called with nil value: %v, %v", value, key)
+		return
+	}
 	ret.exist = true
 	ret.ObjType = value.GetType()
 	if constInst, ok := ToConstInst(key); ok {
@@ -79,7 +93,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			ret.typ = objTyp.FieldType
 			return
 		case BytesTypeKind, StringTypeKind:
-			ret.typ = BasicTypes[NumberTypeKind]
+			ret.typ = CreateNumberType()
 			return
 		default:
 			ret.typ = CreateAnyType()
@@ -127,7 +141,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			log.Errorf("checkCanMemberCall: %v is structTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if TypeCompare(BasicTypes[StringTypeKind], key.GetType()) {
+		if TypeCompare(CreateStringType(), key.GetType()) {
 			if fieldTyp := typ.GetField(key); fieldTyp != nil {
 				ret.typ = fieldTyp
 				return
@@ -143,7 +157,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			log.Errorf("checkCanMemberCall: %v is TupleTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
+		if TypeCompare(CreateNumberType(), key.GetType()) {
 			if fieldTyp := typ.GetField(key); fieldTyp != nil {
 				ret.typ = fieldTyp
 				return
@@ -173,7 +187,7 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			log.Errorf("checkCanMemberCall: %v is SliceTypeKind but is not a ObjectType", value.GetType())
 			break
 		}
-		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
+		if TypeCompare(CreateNumberType(), key.GetType()) {
 			if typ.FieldType.GetTypeKind() == AnyTypeKind {
 				if fieldTyp := typ.GetField(key); fieldTyp != nil {
 					ret.typ = fieldTyp
@@ -186,8 +200,8 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			// type check error
 		}
 	case BytesTypeKind, StringTypeKind: // number
-		if TypeCompare(BasicTypes[NumberTypeKind], key.GetType()) {
-			ret.typ = BasicTypes[NumberTypeKind]
+		if TypeCompare(CreateNumberType(), key.GetType()) {
+			ret.typ = CreateNumberType()
 			return
 		} else {
 			// type check error
@@ -205,6 +219,30 @@ func checkCanMemberCallExist(value, key Value, function ...bool) (ret checkMembe
 			ret.typ = member.GetType()
 			return
 		}
+	case OrTypeKind:
+		// 拆开 OrType
+		orTyp, _ := value.GetType().(*OrType)
+		var mergedTypes []Type
+		var found bool
+		for _, subTyp := range orTyp.GetTypes() {
+			// 构造一个假的 Value 但类型替换成子类型
+			fakeVal := value
+			fakeVal.SetType(subTyp)
+			subRes := checkCanMemberCallExist(fakeVal, key, function...)
+			if subRes.exist {
+				found = true
+			}
+			if !utils.IsNil(subRes.typ) {
+				mergedTypes = append(mergedTypes, subRes.typ)
+			}
+		}
+		ret.exist = found
+		if len(mergedTypes) == 1 {
+			ret.typ = mergedTypes[0]
+		} else if len(mergedTypes) > 1 {
+			ret.typ = NewOrType(mergedTypes...)
+		}
+		return ret
 	case NullTypeKind:
 	default:
 	}
@@ -235,6 +273,9 @@ func setMemberVerboseName(member Value) {
 }
 
 func GetKeyString(key Value) string {
+	// if utils.IsNil(key) {
+	// 	return ""
+	// }
 	text := ""
 	if ci, ok := ToConstInst(key); ok {
 		text = ci.String()
@@ -279,5 +320,8 @@ func (b *FunctionBuilder) CheckMemberCallNilValue(value, key Value, funcName str
 	return nil
 }
 func getExternLibMemberCall(value, key Value) string {
-	return fmt.Sprintf("%s.%s", value.GetName(), key.String())
+	if key.GetName() == "" {
+		return fmt.Sprintf("%s.%s", value.GetName(), key.String())
+	}
+	return fmt.Sprintf("%s.%s", value.GetName(), key.GetName())
 }

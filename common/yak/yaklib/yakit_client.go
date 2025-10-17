@@ -42,7 +42,7 @@ func NewVirtualYakitClient(h func(i *ypb.ExecResult) error) *YakitClient {
 	remoteClient := NewYakitClient("")
 	remoteClient.send = func(i interface{}) error { // 对于脚本传递的消息，需要封装成 ExecResult
 		result := YakitOutputToExecResult(i)
-		if result != nil {
+		if h != nil && result != nil {
 			return h(result)
 		}
 		return fmt.Errorf("convert to ExecResult failed: `%v`", i)
@@ -185,6 +185,7 @@ func SetEngineClient(e *antlr4yak.Engine, client *YakitClient) {
 	e.OverrideRuntimeGlobalVariables(map[string]any{
 		"yakit": GetExtYakitLibByClient(client),
 		"risk": map[string]any{
+			"Save":                      YakitSaveRiskBuilder(client),
 			"NewRisk":                   YakitNewRiskBuilder(client),
 			"CheckDNSLogByToken":        yakit.YakitNewCheckDNSLogByToken(yakit.YakitPluginInfo{}),
 			"CheckHTTPLogByToken":       yakit.YakitNewCheckHTTPLogByToken(yakit.YakitPluginInfo{}),

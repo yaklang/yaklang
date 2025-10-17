@@ -124,7 +124,10 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 	DisasmValue := func(ids ...int64) string {
 		return strings.Join(
 			lo.Map(ids, func(id int64, _ int) string {
-				value := v.GetValueById(id)
+				value, ok := v.GetValueById(id)
+				if !ok || value == nil {
+					return fmt.Sprintf("<nil:%d>", id)
+				}
 				return liner.DisasmValue(value)
 			}),
 			",",
@@ -211,7 +214,10 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 	case *ErrorHandler:
 		return "error-handler"
 	case *ErrorCatch:
-		return fmt.Sprintf("error-catch(%s)", liner.DisasmValue(v.GetValueById(v.Exception)))
+		if exception, ok := v.GetValueById(v.Exception); ok && exception != nil {
+			return fmt.Sprintf("error-catch(%s)", liner.DisasmValue(exception))
+		}
+		return fmt.Sprintf("error-catch(<nil:%d>)", v.Exception)
 	case *If:
 		return fmt.Sprintf("if (%s)", DisasmValue(v.Cond))
 	case *Loop:
@@ -219,14 +225,20 @@ func lineDisASM(v Instruction, liner DisasmLiner) (ret string) {
 	case *Switch:
 		return fmt.Sprintf("switch(%s)", DisasmValue(v.Cond))
 	case *LazyInstruction:
-		switch liner.(type) {
-		case *NameDisasmLiner:
-			return v.ir.ReadableNameShort
-		case *FullDisasmLiner:
-			return v.ir.ReadableName
-		default:
-			return ""
-		}
+		// switch liner.(type) {
+		// case *NameDisasmLiner:
+		// 	if s := v.ir.ReadableNameShort; s != "" {
+		// 		return s
+		// 	}
+		// case *FullDisasmLiner:
+		// 	// if s := v.ir.ReadableName; s != "" {
+		// 	// 	return s
+		// 	// }
+		// default:
+		// 	// return ""
+		// }
+		return lineDisASM(v.Self(), liner)
+
 	default:
 		return ""
 	}

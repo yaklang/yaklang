@@ -181,9 +181,9 @@ desc(
 alert $output for {
 	title: "a",
 	level: "high",
-	desc: <<<CODE
+	desc: <<<DESC
 This is a test alert description .
-CODE
+DESC
 }
 `
 		CheckFormatDesc(t, rule, rule)
@@ -201,9 +201,9 @@ desc(
 alert $output for {
 	title: "a",
 	level: "high",
-	desc: <<<CODE
+	desc: <<<DESC
 description: %s .
-CODE
+DESC
 }
 `
 		CheckFormatDesc(t, rule, rule)

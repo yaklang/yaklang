@@ -4,14 +4,16 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/yaklang/yaklang/common/consts"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
@@ -21,6 +23,14 @@ type HandshakeConn interface {
 	net.Conn
 	HandshakeContext(ctx context.Context) error
 }
+
+type HostCertMapping struct {
+	HostPattern  string // 支持glob: *.example.com, api-*.com
+	Certificate  gmtls.Certificate
+	UCertificate utls.Certificate
+}
+
+var hostCertMappings []HostCertMapping
 
 var (
 	// tls Conn
@@ -147,7 +157,15 @@ var (
 	clientRootCA              = x509.NewCertPool()
 )
 
-func LoadP12Bytes(p12bytes []byte, password string) error {
+func LoadP12Bytes(p12bytes []byte, password string, hostPattern string) error {
+	hostCertMapping := HostCertMapping{
+		HostPattern: hostPattern,
+	}
+	defer func() {
+		if hostCertMapping.HostPattern != "" && (!funk.IsEmpty(hostCertMapping.Certificate) || !funk.IsEmpty(hostCertMapping.UCertificate)) {
+			hostCertMappings = append(hostCertMappings, hostCertMapping)
+		}
+	}()
 	cCert, cKey, ca, err := tlsutils.LoadP12ToPEM(p12bytes, password)
 	if err != nil {
 		return err
@@ -164,10 +182,14 @@ func LoadP12Bytes(p12bytes []byte, password string) error {
 			}
 		}
 		presetClientCertificates = append(presetClientCertificates, client)
+		hostCertMapping.Certificate = client
 	}
 	{
 		client, err := utls.X509KeyPair(cCert, cKey)
 		if err != nil {
+			if strings.Contains(err.Error(), "unsupported elliptic curve") {
+				return nil
+			}
 			return err
 		}
 		for _, caBytes := range ca {
@@ -177,6 +199,7 @@ func LoadP12Bytes(p12bytes []byte, password string) error {
 			}
 		}
 		presetUClientCertificates = append(presetUClientCertificates, client)
+		hostCertMapping.UCertificate = client
 	}
 
 	return nil
@@ -206,6 +229,11 @@ func LoadCertificatesConfig(i any) error {
 				return nil
 			}
 			ret.GetClientCertificate = func(info *utls.CertificateRequestInfo) (*utls.Certificate, error) {
+				for _, certMap := range hostCertMappings {
+					if utils.MatchAnyOfGlob(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.UCertificate) {
+						return &certMap.UCertificate, nil
+					}
+				}
 				for _, cert := range presetUClientCertificates {
 					err := info.SupportsCertificate(&cert)
 					if err != nil {
@@ -238,23 +266,32 @@ func LoadCertificatesConfig(i any) error {
 			if len(presetClientCertificates) == 0 {
 				return nil
 			}
+			//ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
+			// 服务端请求客户端证书时，如果客户端没有配置证书，是否能完成握手取决于服务器的配置
+			//if len(presetClientCertificates) == 0 {
+			//	log.Warn("server request client certificate, but no client certificate configured")
+			//	// sendClientCertificate 不允许发送 nil，否则会 panic 所以尝试发送一个空的证书
+			//	// 这个解决方案可能会导致服务器拒绝握手，因为它可能会试图验证一个空的证书。
+			//	// 如果服务器配置为VerifyClientCertIfGiven，并且它期望如果客户端提供了证书就必须是有效的，那么这个方法可能会失败。
+			//	return &tls.Certificate{}, nil
+			//}
+			//		for _, cert := range presetClientCertificates {
+			//			err := info.SupportsCertificate(&cert)
+			//			if err != nil {
+			//				continue
+			//			}
+			//			return &cert, nil
+			//		}
+			//		return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(presetClientCertificates), info.Version)
+			//	}
+			ret.Certificates = presetClientCertificates
 			ret.GetClientCertificate = func(info *gmtls.CertificateRequestInfo) (*gmtls.Certificate, error) {
-				// 服务端请求客户端证书时，如果客户端没有配置证书，是否能完成握手取决于服务器的配置
-				//if len(presetClientCertificates) == 0 {
-				//	log.Warn("server request client certificate, but no client certificate configured")
-				//	// sendClientCertificate 不允许发送 nil，否则会 panic 所以尝试发送一个空的证书
-				//	// 这个解决方案可能会导致服务器拒绝握手，因为它可能会试图验证一个空的证书。
-				//	// 如果服务器配置为VerifyClientCertIfGiven，并且它期望如果客户端提供了证书就必须是有效的，那么这个方法可能会失败。
-				//	return &tls.Certificate{}, nil
-				//}
-				for _, cert := range presetClientCertificates {
-					err := info.SupportsCertificate(&cert)
-					if err != nil {
-						continue
+				for _, certMap := range hostCertMappings {
+					if utils.MatchAnyOfGlob(ret.ServerName, certMap.HostPattern) && !funk.IsEmpty(certMap.Certificate) {
+						return &certMap.Certificate, nil
 					}
-					return &cert, nil
 				}
-				return nil, utils.Errorf("all [%v] certificates are tested, no one is supported for %v", len(presetClientCertificates), info.Version)
+				return new(gmtls.Certificate), nil
 			}
 		}
 		return nil
@@ -264,4 +301,11 @@ func LoadCertificatesConfig(i any) error {
 		log.Warnf("invalid tlsConfig type %T", i)
 		return nil
 	}
+}
+
+func ResetPresetCertificates() {
+	presetClientCertificates = presetClientCertificates[:0]
+	presetUClientCertificates = presetUClientCertificates[:0]
+	hostCertMappings = hostCertMappings[:0]
+	clientRootCA = x509.NewCertPool()
 }

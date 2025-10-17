@@ -166,6 +166,14 @@ func ToJump(v Instruction) (*Jump, bool) {
 	return j, ok
 }
 
+func ToTypeValue(v Instruction) (*TypeValue, bool) {
+	if lz, isLZ := ToLazyInstruction(v); isLZ {
+		return ToTypeValue(lz.Self())
+	}
+	t, ok := v.(*TypeValue)
+	return t, ok
+}
+
 // type cover
 
 func ToObjectType(t Type) (*ObjectType, bool)        { o, ok := t.(*ObjectType); return o, ok }

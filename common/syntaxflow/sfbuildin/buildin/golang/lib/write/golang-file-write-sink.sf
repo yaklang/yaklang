@@ -1,0 +1,89 @@
+desc(
+	title: "Audit Golang File Write Sink"
+	type: audit
+	level: info
+	lib: 'golang-file-write-sink'
+	desc: <<<DESC
+### 规则描述
+
+1. **规则目的**
+该规则用于审计Go语言代码中文件写入功能的使用情况。它属于`golang-file-write-sink`库规则（`lib`类型），需配合其他规则（如数据源跟踪规则）共同检测文件写入相关的安全漏洞，提供核心的敏感数据写入文件能力的识别。
+
+2. **规则详细**
+- **作为基础检测库**
+该规则主要用于标识Go语言中执行文件写入操作的函数作为潜在的“汇点”（Sink）。这些函数本身不是漏洞，但当它们接收到未经验证或恶意控制的输入时，可能导致安全问题的发生，例如敏感信息泄露到文件中、文件内容被篡改或任意文件被覆盖删除等。
+- **覆盖常见文件写入函数**
+该规则通过包含 ('include') 其他规则来覆盖Go标准库中常用的文件写入相关模块和函数：
+  * 包含 `golang-file-write-bufio`: 审计 `bufio` 包中与缓冲写入相关的函数。
+  * 包含 `golang-file-write-ioutil`: 审计早期版本中 `io/ioutil` 包（现已部分迁移到 `io` 和 `os` 包）中方便的文件写入函数，例如 `WriteFile`。
+  * 包含 `golang-file-write-os`: 审计 `os` 包中直接进行文件写入操作的函数，例如 `File.Write`、`File.WriteString` 等。
+通过识别这些汇点，静态分析工具可以追踪用户输入或敏感数据是否流向这些文件写入函数，从而检测潜在的**敏感信息泄露**、**任意文件写入/覆盖**等漏洞。此规则是构建精确文件操作安全分析的基础组件。
+
+3. **触发场景**
+```go
+// 存在风险的代码示例
+func writeToFile(filename string, data []byte) error {
+return ioutil.WriteFile(filename, data, 0644)
+}
+```
+如果攻击者能够控制`filename`或`data`参数，可能会导致任意文件写入或覆盖关键系统文件。
+
+4. **潜在影响**
+- 敏感信息被意外写入文件并泄露。
+- 攻击者通过控制文件路径覆盖系统重要文件。
+- 文件内容被篡改影响业务逻辑或系统稳定性。
+DESC
+	rule_id: "9e76eebf-5e33-4b13-811d-613a9846fa6d"
+	title_zh: "审计Golang文件写入功能汇点"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 验证文件路径和名称
+确保文件路径和名称经过严格校验，避免用户输入直接传递至文件写入操作。
+```go
+func safeWriteToFile(basePath, filename string, data []byte) error {
+if !strings.HasPrefix(filename, basePath) {
+return errors.New("非法文件路径")
+}
+return ioutil.WriteFile(filename, data, 0644)
+}
+```
+
+#### 2. 使用安全的文件写入方法
+尽量避免使用可能引发危险操作的文件写入函数，优先选择明确权限限制的安全方法。
+```go
+func writeFileWithPerm(filename string, data []byte) error {
+file, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+if err != nil {
+return err
+}
+defer file.Close()
+_, err = file.Write(data)
+return err
+}
+```
+
+#### 3. 数据内容过滤
+对写入文件的数据内容进行必要的清理或转义处理，防止恶意内容注入。
+```go
+import "html"
+func sanitizeInput(input string) string {
+return html.EscapeString(input)
+}
+```
+结合以上方法，全面增强文件写入操作的安全性。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+<include('golang-file-write-bufio')> as $output;
+<include('golang-file-write-ioutil')> as $output;
+<include('golang-file-write-os')> as $output;
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang File Write Sink",
+	title_zh: "审计Golang文件写入功能汇点",
+}

@@ -1,0 +1,231 @@
+desc(
+	title: "Audit Golang gin-context Package Usage"
+	type: audit
+	level: info
+	lib: 'golang-gin-context'
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   在Golang的gin框架中，`gin.Context`对象提供了处理HTTP请求和响应的功能。如果未对用户输入进行验证或转义，攻击者可能利用这些输入执行恶意操作。例如，在处理GET或POST参数时，若直接将用户输入拼接到系统命令中，可能导致命令注入攻击。
+
+2. **触发场景**
+   下面是一个存在漏洞的代码示例：
+   ```go
+   package main
+   import (
+       "encoding/base64"
+       "fmt"
+       "github.com/gin-gonic/gin"
+       "net/http"
+       "os/exec"
+   )
+
+   func CMD1(c *gin.Context) {
+       var ipaddr string
+       // 根据请求方法获取参数
+       if c.Request.Method == "GET" {
+           ipaddr = c.Query("ip")
+       } else if c.Request.Method == "POST" {
+           ipaddr = c.PostForm("ip")
+       }
+       Command := fmt.Sprintf("ping -c 4 %s", ipaddr)
+       output, err := exec.Command("/bin/sh", "-c", Command).Output()
+       if err != nil {
+           fmt.Println(err)
+           return
+       }
+       c.JSON(200, gin.H{
+           "success": string(output),
+       })
+   }
+   ```
+   用户通过`ip`参数提交恶意输入（如`127.0.0.1; rm -rf /`），该输入被直接拼接到系统命令中，造成命令注入。
+
+3. **潜在影响**
+   - 攻击者可以执行任意系统命令，破坏服务器环境。
+   - 可能导致敏感数据泄露、服务中断或系统完全被控制。
+   - 如果漏洞被广泛利用，可能会引发大规模的安全事件。
+
+DESC
+	rule_id: "7c85dcea-a0f0-e8bb-3a35-1a059ed05d04"
+	title_zh: "审计Golang gin-context库的使用"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 输入验证
+在处理用户输入之前，必须对其进行严格的验证，保证其符合预期格式和范围。
+```go
+package main
+import (
+    "github.com/gin-gonic/gin"
+    "net/http"
+    "regexp"
+)
+
+func SafeHandle(c *gin.Context) {
+    ip := c.Query("ip")
+    match, _ := regexp.MatchString(`^(\d{1,3}\.){3}\d{1,3}$`, ip)
+    if !match {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid IP address"})
+        return
+    }
+    // 安全地处理请求
+}
+```
+
+#### 2. 使用安全API
+避免直接拼接用户输入到系统命令中，使用安全的API来完成任务。
+```go
+package main
+import (
+    "github.com/gin-gonic/gin"
+    "net"
+)
+
+func SafePing(c *gin.Context) {
+    ip := c.Query("ip")
+    parsedIP := net.ParseIP(ip)
+    if parsedIP == nil {
+        c.JSON(400, gin.H{"error": "Invalid IP address"})
+        return
+    }
+    // 执行安全的ping操作
+}
+```
+
+#### 3. 最小化权限
+确保运行服务的用户权限最小化，即使发生命令注入，也不会对系统造成毁灭性影响。
+
+#### 4. 定期更新依赖
+及时更新gin框架以及其他相关依赖，防止因已知漏洞被利用。
+
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-20: Improper Input Validation](https://cwe.mitre.org/data/definitions/20.html)
+[Gin Web Framework Documentation](https://gin-gonic.com/docs/)
+REFERENCE
+)
+
+*.Query(* #-> as $param) 
+*.DefaultQuery(* #-> as $param) 
+*.GetQuery(* #-> as $param) 
+*.QueryArray(* #-> as $param) 
+*.GetQueryArray(* #-> as $param) 
+*.PostForm(* #-> as $param) 
+*.DefaultPostForm(* #-> as $param) 
+*.GetPostForm(* #-> as $param) 
+*.PostFormArray(* #-> as $param) 
+*.GetPostFormArray(* #-> as $param) 
+gin.Context as $param
+$param?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} #-> as $output
+$param?{<fullTypeName>?{have: 'github.com/godzeo/go-gin-vul'}} #-> as $output
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang gin-context Package Usage",
+	title_zh: "审计Golang gin-context库的使用",
+	name: "output",
+	message: "审计到Golang gin-context库的使用，可能存在未验证用户输入的安全风险。",
+	solution: <<<SOLUTION
+### 修复建议
+为了解决这个问题，建议采取以下措施：
+
+1. 对所有用户输入进行严格的验证和过滤，确保输入数据符合预期的格式和范围。
+2. 使用安全的API和函数来处理用户输入，避免使用可能导致安全问题的函数。
+3. 定期更新和审计代码，确保使用了最新的库和补丁。
+
+以下是一个修复的代码示例：
+
+```go
+package main
+import (
+    "github.com/gin-gonic/gin"
+    "net/http"
+)
+func SafeHandle(c *gin.Context) {
+    // 示例：验证用户输入
+    ip := c.Query("ip")
+    if ip != "expected_value" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid IP"})
+        return
+    }
+    // 安全地处理请求
+}
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   gin-context在处理HTTP请求时，如果用户输入的数据没有被正确地验证或转义，攻击者可能会利用这些数据执行不安全的操作。
+2. **触发场景**
+   当使用gin-context处理用户输入，并且未对输入数据进行适当的验证或处理时。例如：
+   ```go
+   package main
+   import (
+       "encoding/base64"
+       "fmt"
+       "github.com/gin-gonic/gin"
+       "net/http"
+       "os/exec"
+   )
+   func CMD1(c *gin.Context) {
+       var ipaddr string
+       if c.Request.Method == "GET" {
+           ipaddr = c.Query("ip")
+       } else if c.Request.Method == "POST" {
+           ipaddr = c.PostForm("ip")
+       }
+       Command := fmt.Sprintf("ping -c 4 %s", ipaddr)
+       output, err := exec.Command("/bin/sh", "-c", Command).Output()
+       if err != nil {
+           fmt.Println(err)
+           return
+       }
+       c.JSON(200, gin.H{
+           "success": string(output),
+       })
+   }
+   ```
+3. **潜在影响**
+   - 可能导致信息泄露、系统被攻击者控制等安全问题。
+DESC
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://user_input.go': <<<PARAM
+package main
+
+import (
+	"encoding/base64"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"os/exec"
+)
+
+func CMD1(c *gin.Context) {
+
+	var ipaddr string
+	// Check the request method
+	if c.Request.Method == "GET" {
+		ipaddr = c.Query("ip")
+	} else if c.Request.Method == "POST" {
+		ipaddr = c.PostForm("ip")
+	}
+
+	Command := fmt.Sprintf("ping -c 4 %s", ipaddr)
+	output, err := exec.Command("/bin/sh", "-c", Command).Output()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"success": string(output),
+	})
+}
+PARAM
+)

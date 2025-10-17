@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
@@ -46,31 +45,32 @@ func (s *Server) StartVulinbox(req *ypb.StartVulinboxRequest, stream ypb.Yak_Sta
 }
 
 func (s *Server) IsVulinboxReady(ctx context.Context, req *ypb.IsVulinboxReadyRequest) (*ypb.IsVulinboxReadyResponse, error) {
-	p := consts.GetVulinboxPath()
-	if p == "" {
+	rsp, err := s.IsThirdPartyBinaryReady(ctx, &ypb.IsThirdPartyBinaryReadyRequest{
+		Name: "vulinbox",
+	})
+	if err != nil {
+		return &ypb.IsVulinboxReadyResponse{Ok: false, Reason: err.Error()}, nil
+	}
+	if rsp.GetError() != "" {
 		return &ypb.IsVulinboxReadyResponse{
-			Ok: false, Reason: "vulinbox is not installed",
+			Ok:     rsp.GetIsReady(),
+			Reason: rsp.GetError(),
 		}, nil
 	}
-
+	if !rsp.GetIsReady() {
+		return &ypb.IsVulinboxReadyResponse{
+			Ok:     false,
+			Reason: "vulinbox is not installed",
+		}, nil
+	}
 	return &ypb.IsVulinboxReadyResponse{Ok: true}, nil
 }
 
 func (s *Server) InstallVulinbox(req *ypb.InstallVulinboxRequest, stream ypb.Yak_InstallVulinboxServer) error {
-	err := s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
-		if utils.IsWindows() {
-			return "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_windows_amd64.exe", "vulinbox.exe", nil
-		}
-
-		if utils.IsLinux() {
-			return "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_linux_amd64", "vulinbox", nil
-		}
-
-		if utils.IsMac() {
-			return "https://yaklang.oss-cn-beijing.aliyuncs.com/vulinbox/latest/vulinbox_darwin_amd64", "vulinbox", nil
-		}
-
-		return "", "", utils.Error("unsupported os: " + runtime.GOOS)
+	err := s.InstallThirdPartyBinary(&ypb.InstallThirdPartyBinaryRequest{
+		Name:  "vulinbox",
+		Proxy: req.GetProxy(),
+		Force: true,
 	}, stream)
 	if err != nil {
 		return err

@@ -5,39 +5,34 @@ desc(
 	risk: XXE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   使用 STAX（Streaming API for XML）处理 XML 数据时，`XMLInputFactory` 的默认配置可能支持外部实体加载（External Entities）和 DTD（Document Type Definition）。未禁用这些特性会导致应用程序容易受到 XML 外部实体（XXE）攻击。
-   攻击者可以在恶意的 XML 文件中通过 `<!ENTITY>` 声明引用外部资源，`XMLInputFactory` 在解析时会尝试加载这些外部资源。这可能导致敏感文件被读取、向外部服务发起请求（SSRF）、甚至在某些配置下执行系统命令。
-
+使用 STAX（Streaming API for XML）处理 XML 数据时，`XMLInputFactory` 的默认配置可能支持外部实体加载（External Entities）和 DTD（Document Type Definition）。未禁用这些特性会导致应用程序容易受到 XML 外部实体（XXE）攻击。
+攻击者可以在恶意的 XML 文件中通过 `<!ENTITY>` 声明引用外部资源，`XMLInputFactory` 在解析时会尝试加载这些外部资源。这可能导致敏感文件被读取、向外部服务发起请求（SSRF）、甚至在某些配置下执行系统命令。
 2. **触发场景**
-   以下代码示例展示了使用 `XMLInputFactory.newInstance()` 创建工厂并直接解析输入流，而未禁用外部实体和 DTD 支持：
-   ```java
-   import javax.xml.stream.XMLInputFactory;
-   import javax.xml.stream.XMLStreamException;
-   import javax.xml.stream.XMLStreamReader;
-
-   public class Example {
-       public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
-           final XMLInputFactory factory = XMLInputFactory.newInstance(); // 未设置安全属性
-           final XMLStreamReader xmlReader;
-           if (charEncoding != null) {
-               xmlReader = factory.createXMLStreamReader(stream, charEncoding);
-           } else {
-               xmlReader = factory.createXMLStreamReader(stream);
-           }
-           // ... 后续解析逻辑 ...
-       }
-   }
-   ```
-   攻击者可以构造包含外部实体引用的恶意 XML 作为输入流，导致应用程序尝试加载外部资源。
-
+以下代码示例展示了使用 `XMLInputFactory.newInstance()` 创建工厂并直接解析输入流，而未禁用外部实体和 DTD 支持：
+```java
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+public class Example {
+public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
+final XMLInputFactory factory = XMLInputFactory.newInstance(); // 未设置安全属性
+final XMLStreamReader xmlReader;
+if (charEncoding != null) {
+xmlReader = factory.createXMLStreamReader(stream, charEncoding);
+} else {
+xmlReader = factory.createXMLStreamReader(stream);
+}
+// ... 后续解析逻辑 ...
+}
+}
+```
+攻击者可以构造包含外部实体引用的恶意 XML 作为输入流，导致应用程序尝试加载外部资源。
 3. **潜在影响**
-   - **敏感文件泄露**: 攻击者可以通过文件协议（`file://`）读取服务器上的任意文件（例如 `/etc/passwd`）。
-   - **服务端请求伪造 (SSRF)**: 攻击者可以通过 HTTP 等协议向内部网络或其他服务发起请求。
-   - **拒绝服务 (DoS)**: 攻击者可以构造递归或无限循环的实体引用，导致解析器陷入死循环或消耗大量资源，造成服务不可用。
-   - **端口扫描**: 通过错误信息或延迟差异，攻击者可以探测内部网络的开放端口。
-
+- **敏感文件泄露**: 攻击者可以通过文件协议（`file://`）读取服务器上的任意文件（例如 `/etc/passwd`）。
+- **服务端请求伪造 (SSRF)**: 攻击者可以通过 HTTP 等协议向内部网络或其他服务发起请求。
+- **拒绝服务 (DoS)**: 攻击者可以构造递归或无限循环的实体引用，导致解析器陷入死循环或消耗大量资源，造成服务不可用。
+- **端口扫描**: 通过错误信息或延迟差异，攻击者可以探测内部网络的开放端口。
 DESC
 	rule_id: "4b416d51-56a5-4424-a7e3-79514d453483"
 	reference: <<<REFERENCE
@@ -46,43 +41,35 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体和 DTD 支持
 最有效的防御措施是在创建 `XMLInputFactory` 实例后，立即通过 `setProperty()` 方法明确禁用可能导致 XXE 漏洞的特性。建议禁用外部实体支持 (`IS_SUPPORTING_EXTERNAL_ENTITIES`) 和 DTD 支持 (`SUPPORT_DTD`)。
-
 ```java
 // 修复代码示例
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import java.io.InputStream;
-
 public class Example {
-    public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
-        final XMLInputFactory factory = XMLInputFactory.newInstance();
-
-        // 明确禁用外部实体支持
-        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-        // 明确禁用 DTD 支持 (虽然通常禁用外部实体后DTD中外部引用已无效，但作为防御深度推荐禁用)
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-
-        final XMLStreamReader xmlReader;
-        if (charEncoding != null) {
-            xmlReader = factory.createXMLStreamReader(stream, charEncoding);
-        } else {
-            xmlReader = factory.createXMLStreamReader(stream);
-        }
-        // ... 后续解析逻辑 ...
-    }
+public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
+final XMLInputFactory factory = XMLInputFactory.newInstance();
+// 明确禁用外部实体支持
+factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+// 明确禁用 DTD 支持 (虽然通常禁用外部实体后DTD中外部引用已无效，但作为防御深度推荐禁用)
+factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+final XMLStreamReader xmlReader;
+if (charEncoding != null) {
+xmlReader = factory.createXMLStreamReader(stream, charEncoding);
+} else {
+xmlReader = factory.createXMLStreamReader(stream);
+}
+// ... 后续解析逻辑 ...
+}
 }
 ```
-
 #### 2. 使用安全配置的工厂方法 (如果可用)
 查看您使用的 STAX 实现是否提供了更安全的工厂创建方法或配置选项。有些库可能提供预先配置好的安全工厂。
-
 #### 3. 输入验证和沙箱
 对所有 XML 输入进行严格的合法性验证。如果必须处理包含外部引用的 XML，考虑使用沙箱环境或更严格的解析设置，限制解析器对外部资源的访问。
-
 SOLUTION
 )
 
@@ -101,84 +88,75 @@ $toCheckCall - $excludeCall as $vulnCall;
 check $vulnCall;
 
 alert $vulnCall for {
-	title: "Check Java STAX XMLInputFactory Unsafe Use",
-	title_zh: "检测 Java STAX XMLInputFactory 不安全使用",
-	solution: <<<CODE
+	title: "Java STAX XMLInputFactory Unsafe Use Vulnerability Was Detected",
+	title_zh: "检测到 Java STAX XMLInputFactory 不安全使用漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体和 DTD 支持
 最有效的防御措施是在创建 `XMLInputFactory` 实例后，立即通过 `setProperty()` 方法明确禁用可能导致 XXE 漏洞的特性。建议禁用外部实体支持 (`IS_SUPPORTING_EXTERNAL_ENTITIES`) 和 DTD 支持 (`SUPPORT_DTD`)。
-
 ```java
 // 修复代码示例
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import java.io.InputStream;
-
 public class Example {
-    public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
-        final XMLInputFactory factory = XMLInputFactory.newInstance();
-
-        // 明确禁用外部实体支持
-        factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
-        // 明确禁用 DTD 支持 (虽然通常禁用外部实体后DTD中外部引用已无效，但作为防御深度推荐禁用)
-        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
-
-        final XMLStreamReader xmlReader;
-        if (charEncoding != null) {
-            xmlReader = factory.createXMLStreamReader(stream, charEncoding);
-        } else {
-            xmlReader = factory.createXMLStreamReader(stream);
-        }
-        // ... 后续解析逻辑 ...
-    }
+public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
+final XMLInputFactory factory = XMLInputFactory.newInstance();
+// 明确禁用外部实体支持
+factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+// 明确禁用 DTD 支持 (虽然通常禁用外部实体后DTD中外部引用已无效，但作为防御深度推荐禁用)
+factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
+final XMLStreamReader xmlReader;
+if (charEncoding != null) {
+xmlReader = factory.createXMLStreamReader(stream, charEncoding);
+} else {
+xmlReader = factory.createXMLStreamReader(stream);
+}
+// ... 后续解析逻辑 ...
+}
 }
 ```
-
 #### 2. 使用安全配置的工厂方法 (如果可用)
 查看您使用的 STAX 实现是否提供了更安全的工厂创建方法或配置选项。有些库可能提供预先配置好的安全工厂。
-
 #### 3. 输入验证和沙箱
 对所有 XML 输入进行严格的合法性验证。如果必须处理包含外部引用的 XML，考虑使用沙箱环境或更严格的解析设置，限制解析器对外部资源的访问。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   使用 STAX（Streaming API for XML）处理 XML 数据时，`XMLInputFactory` 的默认配置可能支持外部实体加载（External Entities）和 DTD（Document Type Definition）。未禁用这些特性会导致应用程序容易受到 XML 外部实体（XXE）攻击。
-   攻击者可以在恶意的 XML 文件中通过 `<!ENTITY>` 声明引用外部资源，`XMLInputFactory` 在解析时会尝试加载这些外部资源。这可能导致敏感文件被读取、向外部服务发起请求（SSRF）、甚至在某些配置下执行系统命令。
-
+使用 STAX（Streaming API for XML）处理 XML 数据时，`XMLInputFactory` 的默认配置可能支持外部实体加载（External Entities）和 DTD（Document Type Definition）。未禁用这些特性会导致应用程序容易受到 XML 外部实体（XXE）攻击。
+攻击者可以在恶意的 XML 文件中通过 `<!ENTITY>` 声明引用外部资源，`XMLInputFactory` 在解析时会尝试加载这些外部资源。这可能导致敏感文件被读取、向外部服务发起请求（SSRF）、甚至在某些配置下执行系统命令。
 2. **触发场景**
-   以下代码示例展示了使用 `XMLInputFactory.newInstance()` 创建工厂并直接解析输入流，而未禁用外部实体和 DTD 支持：
-   ```java
-   import javax.xml.stream.XMLInputFactory;
-   import javax.xml.stream.XMLStreamException;
-   import javax.xml.stream.XMLStreamReader;
-
-   public class Example {
-       public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
-           final XMLInputFactory factory = XMLInputFactory.newInstance(); // 未设置安全属性
-           final XMLStreamReader xmlReader;
-           if (charEncoding != null) {
-               xmlReader = factory.createXMLStreamReader(stream, charEncoding);
-           } else {
-               xmlReader = factory.createXMLStreamReader(stream);
-           }
-           // ... 后续解析逻辑 ...
-       }
-   }
-   ```
-   攻击者可以构造包含外部实体引用的恶意 XML 作为输入流，导致应用程序尝试加载外部资源。
-
+以下代码示例展示了使用 `XMLInputFactory.newInstance()` 创建工厂并直接解析输入流，而未禁用外部实体和 DTD 支持：
+```java
+import javax.xml.stream.XMLInputFactory;
+import javax.xml.stream.XMLStreamException;
+import javax.xml.stream.XMLStreamReader;
+public class Example {
+public static void parseXml(InputStream stream, String charEncoding) throws XMLStreamException {
+final XMLInputFactory factory = XMLInputFactory.newInstance(); // 未设置安全属性
+final XMLStreamReader xmlReader;
+if (charEncoding != null) {
+xmlReader = factory.createXMLStreamReader(stream, charEncoding);
+} else {
+xmlReader = factory.createXMLStreamReader(stream);
+}
+// ... 后续解析逻辑 ...
+}
+}
+```
+攻击者可以构造包含外部实体引用的恶意 XML 作为输入流，导致应用程序尝试加载外部资源。
 3. **潜在影响**
-   - **敏感文件泄露**: 攻击者可以通过文件协议（`file://`）读取服务器上的任意文件（例如 `/etc/passwd`）。
-   - **服务端请求伪造 (SSRF)**: 攻击者可以通过 HTTP 等协议向内部网络或其他服务发起请求。
-   - **拒绝服务 (DoS)**: 攻击者可以构造递归或无限循环的实体引用，导致解析器陷入死循环或消耗大量资源，造成服务不可用。
-   - **端口扫描**: 通过错误信息或延迟差异，攻击者可以探测内部网络的开放端口。
-CODE
+- **敏感文件泄露**: 攻击者可以通过文件协议（`file://`）读取服务器上的任意文件（例如 `/etc/passwd`）。
+- **服务端请求伪造 (SSRF)**: 攻击者可以通过 HTTP 等协议向内部网络或其他服务发起请求。
+- **拒绝服务 (DoS)**: 攻击者可以构造递归或无限循环的实体引用，导致解析器陷入死循环或消耗大量资源，造成服务不可用。
+- **端口扫描**: 通过错误信息或延迟差异，攻击者可以探测内部网络的开放端口。
+DESC
 	level: "high",
-	message: "STAX XMLInputFactory() Unsafe Use",
+	message: "检测到 Java STAX XMLInputFactory 不安全使用漏洞，未禁用外部实体和 DTD 支持。",
+	name: "vulnCall",
+	risk: "XXE",
 }
 
 desc(

@@ -7,129 +7,117 @@ desc(
 	cwe: "CWE-460"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在 Java 中，`finally` 块通常用来执行必要的资源清理操作，例如关闭文件流、数据库连接等，无论 `try` 块是否抛出异常都会执行。然而，如果在 `finally` 块中本身又抛出了一个新的异常，这个新的异常将会取代并覆盖掉 `try` 或 `catch` 块中可能抛出的原始异常。这意味着原始异常的信息将会丢失，并且 `finally` 块中所有后续的代码（包括重要的资源清理代码）都将不会被执行。这会导致资源泄漏，并使调试变得困难，因为真正的错误原因（原始异常）被隐藏了（对应 CWE-460: Improper Cleanup on Thrown Exception）。
-
+在 Java 中，`finally` 块通常用来执行必要的资源清理操作，例如关闭文件流、数据库连接等，无论 `try` 块是否抛出异常都会执行。然而，如果在 `finally` 块中本身又抛出了一个新的异常，这个新的异常将会取代并覆盖掉 `try` 或 `catch` 块中可能抛出的原始异常。这意味着原始异常的信息将会丢失，并且 `finally` 块中所有后续的代码（包括重要的资源清理代码）都将不会被执行。这会导致资源泄漏，并使调试变得困难，因为真正的错误原因（原始异常）被隐藏了（对应 CWE-460: Improper Cleanup on Thrown Exception）。
 2. **触发场景**
-   当 `finally` 块中包含可能抛出异常的代码，并且 `try` 或 `catch` 块中也抛出了异常时，就会触发此问题。例如，在关闭资源时如果再次发生异常，且该异常未被妥善处理，就可能覆盖先前的异常，导致资源清理不完全。
-
-   ```java
-   public void processData() throws SomeBusinessException {
-       Connection conn = null;
-       try {
-           conn = dataSource.getConnection();
-           // ... 处理数据，可能抛出 SomeBusinessException
-           if (someCondition) {
-               throw new SomeBusinessException("Processing failed");
-           }
-       } catch (SQLException e) {
-           // 处理 SQL 异常
-           log.error("Database error", e);
-       } finally {
-           if (conn != null) {
-               try {
-                   conn.close(); // 如果 conn.close() 抛出 SQLException
-               } catch (SQLException e) {
-                   log.error("Error closing connection", e);
-                   throw new RuntimeException("Cleanup failed", e); // 在 finally 中抛出新异常
-               }
-           }
-       }
-   }
-   ```
-
-   在上述示例中，如果 `try` 块抛出了 `SomeBusinessException`，同时 `conn.close()` 也抛出了 `SQLException`，那么 `catch (SQLException e)` 块中的 `throw new RuntimeException(...)` 将会覆盖掉原始的 `SomeBusinessException`，导致调用者只能捕获到一个 `RuntimeException`，而丢失了真正的业务异常信息。
-
+当 `finally` 块中包含可能抛出异常的代码，并且 `try` 或 `catch` 块中也抛出了异常时，就会触发此问题。例如，在关闭资源时如果再次发生异常，且该异常未被妥善处理，就可能覆盖先前的异常，导致资源清理不完全。
+```java
+public void processData() throws SomeBusinessException {
+Connection conn = null;
+try {
+conn = dataSource.getConnection();
+// ... 处理数据，可能抛出 SomeBusinessException
+if (someCondition) {
+throw new SomeBusinessException("Processing failed");
+}
+} catch (SQLException e) {
+// 处理 SQL 异常
+log.error("Database error", e);
+} finally {
+if (conn != null) {
+try {
+conn.close(); // 如果 conn.close() 抛出 SQLException
+} catch (SQLException e) {
+log.error("Error closing connection", e);
+throw new RuntimeException("Cleanup failed", e); // 在 finally 中抛出新异常
+}
+}
+}
+}
+```
+在上述示例中，如果 `try` 块抛出了 `SomeBusinessException`，同时 `conn.close()` 也抛出了 `SQLException`，那么 `catch (SQLException e)` 块中的 `throw new RuntimeException(...)` 将会覆盖掉原始的 `SomeBusinessException`，导致调用者只能捕获到一个 `RuntimeException`，而丢失了真正的业务异常信息。
 3. **潜在影响**
-   - **资源泄漏**: `finally` 块中剩余的清理代码可能无法执行，导致文件句柄、网络连接、数据库连接等资源无法释放，最终消耗完系统资源，影响应用程序性能甚至导致崩溃。
-   - **错误原因信息丢失**: 原始的异常信息被覆盖，使得程序员难以定位和调试真正的错误根源。
-   - **程序行为不可预测**: 异常处理逻辑被破坏，增加代码的复杂性和维护难度。
-   - **系统稳定性下降**: 资源泄漏和错误处理问题可能导致系统不稳定，难以可靠运行。
+- **资源泄漏**: `finally` 块中剩余的清理代码可能无法执行，导致文件句柄、网络连接、数据库连接等资源无法释放，最终消耗完系统资源，影响应用程序性能甚至导致崩溃。
+- **错误原因信息丢失**: 原始的异常信息被覆盖，使得程序员难以定位和调试真正的错误根源。
+- **程序行为不可预测**: 异常处理逻辑被破坏，增加代码的复杂性和维护难度。
+- **系统稳定性下降**: 资源泄漏和错误处理问题可能导致系统不稳定，难以可靠运行。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免在 `finally` 块中抛出新的异常**:
-   `finally` 块应该专注于资源清理，不应引入新的可能抛出异常的逻辑。如果清理操作本身可能抛出异常，应该在其内部进行捕获和处理，而不是在 `finally` 的顶层抛出。如果必须向上传播异常，可以考虑将异常添加到原始异常中（例如使用 Java 7+ 的 `addSuppressed` 方法）或者记录日志后吞掉。
-
-   ```java
-   // 修复代码示例 1：在 finally 内部捕获并处理清理异常
-   public void processDataSafe1() throws SomeBusinessException {
-       Connection conn = null;
-       try {
-           conn = dataSource.getConnection();
-           // ... 处理数据，可能抛出 SomeBusinessException
-           if (someCondition) {
-               throw new SomeBusinessException("Processing failed");
-           }
-       } catch (SQLException e) {
-           // 处理 SQL 异常
-           log.error("Database error", e);
-           // 可以选择重新抛出或者处理
-           // throw new RuntimeException("Database operation failed", e);
-       } finally {
-           if (conn != null) {
-               try {
-                   conn.close();
-               } catch (SQLException e) {
-                   // 仅仅记录清理异常，不向外抛出
-                   log.error("Error closing connection", e);
-               }
-           }
-       }
-   }
-   ```
-
+`finally` 块应该专注于资源清理，不应引入新的可能抛出异常的逻辑。如果清理操作本身可能抛出异常，应该在其内部进行捕获和处理，而不是在 `finally` 的顶层抛出。如果必须向上传播异常，可以考虑将异常添加到原始异常中（例如使用 Java 7+ 的 `addSuppressed` 方法）或者记录日志后吞掉。
+```java
+// 修复代码示例 1：在 finally 内部捕获并处理清理异常
+public void processDataSafe1() throws SomeBusinessException {
+Connection conn = null;
+try {
+conn = dataSource.getConnection();
+// ... 处理数据，可能抛出 SomeBusinessException
+if (someCondition) {
+throw new SomeBusinessException("Processing failed");
+}
+} catch (SQLException e) {
+// 处理 SQL 异常
+log.error("Database error", e);
+// 可以选择重新抛出或者处理
+// throw new RuntimeException("Database operation failed", e);
+} finally {
+if (conn != null) {
+try {
+conn.close();
+} catch (SQLException e) {
+// 仅仅记录清理异常，不向外抛出
+log.error("Error closing connection", e);
+}
+}
+}
+}
+```
 2. **利用 `try-with-resources` 语句 (Java 7+):**
-   对于实现了 `AutoCloseable` 接口的资源（大多数 Java 标准库资源都实现了此接口），强烈建议使用 `try-with-resources` 语句。这种结构可以确保资源在 `try` 块执行完毕后自动关闭，并且如果发生异常，会自动处理异常的堆栈管理，原始异常不会被清理异常覆盖。
-
-   ```java
-   // 修复代码示例 2：使用 try-with-resources
-   public void processDataSafe2() throws SQLException {
-       // 假设 Connection 实现了 AutoCloseable
-       try (Connection conn = dataSource.getConnection()) {
-           // ... 处理数据，可能抛出 SQLException 或其他异常
-           // conn 在 try 块结束时会自动关闭
-       } catch (SQLException e) {
-           log.error("Database error", e);
-           throw e; // 在 catch 块中处理或抛出异常
-       }
-       // finally 块在这里不再需要手动关闭资源
-   }
-   ```
-
-3. **在 `catch` 块中重新抛出异常**: 
-   如果需要在发生特定异常后立即停止并向上传播原始错误，那么应该在相应的 `catch` 块中重新抛出捕获到的异常，而不是依赖 `finally` 块。
-
-   ```java
-   // 修复代码示例 3：在 catch 块中重新抛出
-   public void processDataSafe3() throws SomeBusinessException, SQLException {
-       Connection conn = null;
-       try {
-           conn = dataSource.getConnection();
-           // ... 处理数据
-           if (someCondition) {
-               throw new SomeBusinessException("Processing failed"); // 原始异常
-           }
-       } catch (SQLException e) {
-           log.error("Database error before processing", e);
-           throw e; // 在 catch 块中重新抛出 SQLException
-       } finally {
-           if (conn != null) {
-               try {
-                   conn.close();
-               } catch (SQLException e) {
-                   log.error("Error closing connection", e);
-                   // 不要在这里重新抛出 
-               }
-           }
-       }
-   }
-   ```
-
-4. **代码审查和静态分析**: 
-   定期进行代码审查，特别关注 `finally` 块中的异常处理逻辑。使用IRify自动检测在 `finally` 块中抛出异常的模式，并在开发流程中强制执行这些最佳实践。
+对于实现了 `AutoCloseable` 接口的资源（大多数 Java 标准库资源都实现了此接口），强烈建议使用 `try-with-resources` 语句。这种结构可以确保资源在 `try` 块执行完毕后自动关闭，并且如果发生异常，会自动处理异常的堆栈管理，原始异常不会被清理异常覆盖。
+```java
+// 修复代码示例 2：使用 try-with-resources
+public void processDataSafe2() throws SQLException {
+// 假设 Connection 实现了 AutoCloseable
+try (Connection conn = dataSource.getConnection()) {
+// ... 处理数据，可能抛出 SQLException 或其他异常
+// conn 在 try 块结束时会自动关闭
+} catch (SQLException e) {
+log.error("Database error", e);
+throw e; // 在 catch 块中处理或抛出异常
+}
+// finally 块在这里不再需要手动关闭资源
+}
+```
+3. **在 `catch` 块中重新抛出异常**:
+如果需要在发生特定异常后立即停止并向上传播原始错误，那么应该在相应的 `catch` 块中重新抛出捕获到的异常，而不是依赖 `finally` 块。
+```java
+// 修复代码示例 3：在 catch 块中重新抛出
+public void processDataSafe3() throws SomeBusinessException, SQLException {
+Connection conn = null;
+try {
+conn = dataSource.getConnection();
+// ... 处理数据
+if (someCondition) {
+throw new SomeBusinessException("Processing failed"); // 原始异常
+}
+} catch (SQLException e) {
+log.error("Database error before processing", e);
+throw e; // 在 catch 块中重新抛出 SQLException
+} finally {
+if (conn != null) {
+try {
+conn.close();
+} catch (SQLException e) {
+log.error("Error closing connection", e);
+// 不要在这里重新抛出
+}
+}
+}
+}
+```
+4. **代码审查和静态分析**:
+定期进行代码审查，特别关注 `finally` 块中的异常处理逻辑。使用IRify自动检测在 `finally` 块中抛出异常的模式，并在开发流程中强制执行这些最佳实践。
 SOLUTION
 	rule_id: "eb8a8bf3-96d4-4d35-b953-3efa848c4aaa"
 	reference: <<<REFERENCE
@@ -142,9 +130,89 @@ $try.finally as $finally
 $finally<scanInstruction>?{opcode:throw} as $throw  
 
 alert $throw for {
-	title: "Check Java Improper Cleanup on Thrown Exception Vulnerability",
-	title_zh: "检测Java异常抛出时资源未清理漏洞",
+	title: "Java Improper Cleanup on Thrown Exception Vulnerability Was Detected",
+	title_zh: "检测到Java异常抛出时资源未清理漏洞",
 	level: "mid",
+	risk: "资源未清理",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在 Java 中，`finally` 块通常用来执行必要的资源清理操作，例如关闭文件流、数据库连接等，无论 `try` 块是否抛出异常都会执行。然而，如果在 `finally` 块中本身又抛出了一个新的异常，这个新的异常将会取代并覆盖掉 `try` 或 `catch` 块中可能抛出的原始异常。这意味着原始异常的信息将会丢失，并且 `finally` 块中所有后续的代码（包括重要的资源清理代码）都将不会被执行。这会导致资源泄漏，并使调试变得困难。
+2. **触发场景**
+当 `finally` 块中包含可能抛出异常的代码，并且 `try` 或 `catch` 块中也抛出了异常时，就会触发此问题。例如，在关闭资源时如果再次发生异常，且该异常未被妥善处理，就可能覆盖先前的异常，导致资源清理不完全。
+```java
+public void processData() throws SomeBusinessException {
+    Connection conn = null;
+    try {
+        conn = dataSource.getConnection();
+        if (someCondition) {
+            throw new SomeBusinessException("Processing failed");
+        }
+    } catch (SQLException e) {
+        log.error("Database error", e);
+    } finally {
+        if (conn != null) {
+            try {
+                conn.close();
+            } catch (SQLException e) {
+                log.error("Error closing connection", e);
+                throw new RuntimeException("Cleanup failed", e);
+            }
+        }
+    }
+}
+```
+3. **潜在影响**
+- **资源泄漏**: `finally` 块中剩余的清理代码可能无法执行，导致文件句柄、网络连接、数据库连接等资源无法释放。
+- **错误原因信息丢失**: 原始的异常信息被覆盖，使得程序员难以定位和调试真正的错误根源。
+- **程序行为不可预测**: 异常处理逻辑被破坏，增加代码的复杂性和维护难度。
+DESC
+	name: "throw",
+	message: "检测到Java代码中finally块存在异常覆盖问题，可能导致资源泄漏和错误信息丢失。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **避免在 `finally` 块中抛出新的异常**:
+`finally` 块应该专注于资源清理，不应引入新的可能抛出异常的逻辑。如果清理操作本身可能抛出异常，应该在其内部进行捕获和处理。
+```java
+// 修复代码示例 1：在 finally 内部捕获并处理清理异常
+public void processDataSafe1() throws SomeBusinessException {
+    Connection conn = null;
+    try {
+        conn = dataSource.getConnection();
+        if (someCondition) {
+            throw new SomeBusinessException("Processing failed");
+        }
+    } catch (SQLException e) {
+        log.error("Database error", e);
+    } finally {
+        if (conn != null) {
+            try {
+                conn.close();
+            } catch (SQLException e) {
+                log.error("Error closing connection", e);
+            }
+        }
+    }
+}
+```
+2. **利用 `try-with-resources` 语句 (Java 7+):**
+对于实现了 `AutoCloseable` 接口的资源，强烈建议使用 `try-with-resources` 语句。这种结构可以确保资源在 `try` 块执行完毕后自动关闭。
+```java
+// 修复代码示例 2：使用 try-with-resources
+public void processDataSafe2() throws SQLException {
+    try (Connection conn = dataSource.getConnection()) {
+        // conn 在 try 块结束时会自动关闭
+    } catch (SQLException e) {
+        log.error("Database error", e);
+        throw e;
+    }
+}
+```
+3. **在 `catch` 块中重新抛出异常**:
+如果需要在发生特定异常后立即停止并向上传播原始错误，那么应该在相应的 `catch` 块中重新抛出捕获到的异常。
+4. **代码审查和静态分析**:
+定期进行代码审查，特别关注 `finally` 块中的异常处理逻辑。
+SOLUTION
 }
 
 desc(

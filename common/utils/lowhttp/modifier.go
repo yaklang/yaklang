@@ -18,6 +18,7 @@ import (
 
 	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
 
+	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/samber/lo"
@@ -27,6 +28,48 @@ import (
 	"github.com/yaklang/yaklang/common/utils/multipart"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
+
+// OrderedParam 表示一个有序的参数项
+type OrderedParam struct {
+	Key    string
+	Values []string
+}
+
+// OrderedParams 保持参数的插入顺序
+type OrderedParams struct {
+	Items []OrderedParam
+}
+
+// NewOrderedParams 创建一个新的有序参数集合
+func NewOrderedParams() *OrderedParams {
+	return &OrderedParams{
+		Items: make([]OrderedParam, 0),
+	}
+}
+
+// Add 添加一个参数，如果参数已存在则追加值
+func (op *OrderedParams) Add(key, value string) {
+	for i := range op.Items {
+		if op.Items[i].Key == key {
+			op.Items[i].Values = append(op.Items[i].Values, value)
+			return
+		}
+	}
+	// 如果参数不存在，添加新参数
+	op.Items = append(op.Items, OrderedParam{
+		Key:    key,
+		Values: []string{value},
+	})
+}
+
+// ToMap 转换为传统的map格式（用于兼容性）
+func (op *OrderedParams) ToMap() map[string][]string {
+	result := make(map[string][]string)
+	for _, item := range op.Items {
+		result[item.Key] = item.Values
+	}
+	return result
+}
 
 var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
 
@@ -114,16 +157,12 @@ func SetHTTPPacketUrl(packet []byte, rawURL string) []byte {
 // `, "GET /test HTTP/1.1")) // 向 example.com 发起请求，修改请求报文的第一行，请求/test路径
 // ```
 func ReplaceHTTPPacketFirstLine(packet []byte, firstLine string) []byte {
-	var isChunked bool
-	header := []string{firstLine}
+	headers := []string{firstLine}
 	_, body := SplitHTTPPacket(packet, nil, nil, func(line string) string {
-		if !isChunked {
-			isChunked = IsChunkedHeaderLine(line)
-		}
-		header = append(header, line)
+		headers = append(headers, line)
 		return line
 	})
-	return ReplaceHTTPPacketBody([]byte(strings.Join(header, CRLF)+CRLF), body, isChunked)
+	return append([]byte(strings.Join(headers, CRLF)+CRLF+CRLF), body...)
 }
 
 // ReplaceHTTPPacketMethod 是一个辅助函数，用于改变请求报文，修改请求方法
@@ -453,14 +492,42 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode, autoAddContentType b
 	var isChunked bool
 
 	headersRaw, bodyRaw := SplitHTTPPacket(packet, nil, nil)
-	bodyString := string(bodyRaw)
-	u := ParseQueryParams(bodyString, WithDisableAutoEncode(noAutoEncode))
-	callback(u)
-	newBody := u.Encode()
+	contentType := GetHTTPPacketHeader(packet, "Content-Type")
 
-	newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), isChunked)
-	// auto add content-type if not exist
-	if autoAddContentType && GetHTTPPacketHeader(packet, "Content-Type") == "" {
+	// 使用 GetParamsFromBody 智能解析不同类型的POST数据
+	params, useRaw, err := GetParamsFromBody(contentType, bodyRaw)
+	if err != nil || useRaw {
+		// 如果解析失败或需要使用原始数据，回退到原有逻辑
+		bodyString := string(bodyRaw)
+		u := ParseQueryParams(bodyString, WithDisableAutoEncode(noAutoEncode))
+		callback(u)
+		newBody := u.Encode()
+		newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), isChunked)
+		return handleAutoContentType(newPacket, packet, newBody, autoAddContentType)
+	}
+
+	// 将解析出的参数转换为 QueryParams 格式，保持顺序
+	u := &QueryParams{Items: make([]*QueryParamItem, 0), NoAutoEncode: noAutoEncode}
+	for _, param := range params.Items {
+		for _, value := range param.Values {
+			u.Items = append(u.Items, &QueryParamItem{
+				Key:          param.Key,
+				Value:        value,
+				NoAutoEncode: noAutoEncode,
+			})
+		}
+	}
+
+	// 调用回调函数进行参数修改
+	callback(u)
+
+	// 根据原始 Content-Type 重新构建响应体
+	return reconstructBody(headersRaw, contentType, u, autoAddContentType, packet)
+}
+
+// handleAutoContentType 处理自动添加Content-Type的逻辑
+func handleAutoContentType(newPacket []byte, originalPacket []byte, newBody string, autoAddContentType bool) []byte {
+	if autoAddContentType && GetHTTPPacketHeader(originalPacket, "Content-Type") == "" {
 		if strings.HasPrefix(newBody, "{") && strings.HasSuffix(newBody, "}") {
 			newPacket = ReplaceHTTPPacketHeader(newPacket, "Content-Type", "application/json")
 		} else if strings.HasPrefix(newBody, "<") && strings.HasSuffix(newBody, ">") {
@@ -470,6 +537,44 @@ func handleHTTPPacketPostParam(packet []byte, noAutoEncode, autoAddContentType b
 		}
 	}
 	return newPacket
+}
+
+// reconstructBody 根据Content-Type重新构建响应体
+func reconstructBody(headersRaw, contentType string, u *QueryParams, autoAddContentType bool, originalPacket []byte) []byte {
+	if strings.Contains(strings.ToLower(contentType), "application/json") {
+		return reconstructJSONBody(headersRaw, u)
+	} else if strings.Contains(strings.ToLower(contentType), "application/xml") {
+		// 对于XML，暂时使用form-encoded格式，可以后续扩展
+		newBody := u.Encode()
+		newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), false)
+		return handleAutoContentType(newPacket, originalPacket, newBody, autoAddContentType)
+	} else {
+		// 默认使用form-encoded格式
+		newBody := u.Encode()
+		newPacket := ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), false)
+		return handleAutoContentType(newPacket, originalPacket, newBody, autoAddContentType)
+	}
+}
+
+// reconstructJSONBody 重新构建JSON格式的响应体
+func reconstructJSONBody(headersRaw string, u *QueryParams) []byte {
+	jsonData := make(map[string]interface{})
+
+	// 将QueryParams转换为JSON对象
+	for _, item := range u.Items {
+		if item.Key != "" {
+			jsonData[item.Key] = item.Value
+		}
+	}
+
+	// 序列化为JSON
+	if jsonBytes, err := json.Marshal(jsonData); err == nil {
+		return ReplaceHTTPPacketBody([]byte(headersRaw), jsonBytes, false)
+	}
+
+	// 如果序列化失败，使用form-encoded格式
+	newBody := u.Encode()
+	return ReplaceHTTPPacketBody([]byte(headersRaw), []byte(newBody), false)
 }
 
 // ReplaceAllHTTPPacketPostParams 是一个辅助函数，用于改变请求报文，修改所有 POST 请求参数，如果不存在则会增加，其接收一个 map[string]string 类型的参数，其中 key 为 POST 请求参数名，value 为 POST 请求参数值
@@ -1010,6 +1115,7 @@ func handleHTTPRequestForm(packet []byte, fixMethod bool, fixContentType bool, c
 // ```
 func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 	return handleHTTPRequestForm(packet, true, true, func(_ string, multipartReader *multipart.Reader, multipartWriter *multipart.Writer) bool {
+		keyExists := false
 		if multipartReader != nil {
 			// copy part
 			for {
@@ -1021,6 +1127,7 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 				var reader io.Reader = part
 				if part.FormName() == key {
 					reader = strings.NewReader(value)
+					keyExists = true
 				}
 				partWriter, err := multipartWriter.CreatePart(part.Header)
 				if err != nil {
@@ -1031,8 +1138,9 @@ func ReplaceHTTPPacketFormEncoded(packet []byte, key, value string) []byte {
 					break
 				}
 			}
-		} else if multipartWriter != nil {
-			// append form
+		}
+		if multipartWriter != nil && !keyExists {
+			// append form only if key doesn't exist
 			multipartWriter.WriteField(key, value)
 		}
 
@@ -1330,8 +1438,8 @@ func ParseMultiPartFormWithCallback(req []byte, callback func(part *multipart.Pa
 	return nil
 }
 
-func GetParamsFromBody(contentType string, body []byte) (params map[string][]string, useRaw bool, err error) {
-	params = make(map[string][]string)
+func GetParamsFromBody(contentType string, body []byte) (params *OrderedParams, useRaw bool, err error) {
+	params = NewOrderedParams()
 	// 这是为了处理复杂json/xml的情况
 	handleUnmarshalValues := func(v any) ([]string, []string) {
 		var keys, values []string
@@ -1359,24 +1467,22 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 		}
 		return []string{""}, []string{utils.InterfaceToString(v)}
 	}
-	handleUnmarshalResults := func(tempMap map[string]any) map[string][]string {
-		params := make(map[string][]string, len(tempMap))
+	handleUnmarshalResults := func(tempMap map[string]any, orderedParams *OrderedParams) {
 		for k, v := range tempMap {
 			extraKeys, extraValues := handleUnmarshalValues(v)
 			for i, key := range extraKeys {
 				if key == "" {
-					params[k] = append(params[k], extraValues[i])
+					orderedParams.Add(k, extraValues[i])
 					continue
 				}
 				finalKey := fmt.Sprintf("%s[%s]", k, key)
-				params[finalKey] = append(params[finalKey], extraValues[i])
+				orderedParams.Add(finalKey, extraValues[i])
 			}
 		}
-		return params
 	}
 
 	// try post form
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		mr := multipart.NewReader(bytes.NewReader(body))
 		for {
 			part, err := mr.NextPart()
@@ -1394,48 +1500,59 @@ func GetParamsFromBody(contentType string, body []byte) (params map[string][]str
 					return nil, false, err
 				}
 				key := part.FormName()
-				params[key] = append(params[key], string(content))
+				params.Add(key, string(content))
 			}
 		}
 	}
 
 	// try json
-	var tempMap map[string]any
-	if len(params) == 0 {
-		err = json.Unmarshal(body, &tempMap)
-		if err == nil {
-			params = handleUnmarshalResults(tempMap)
+	if len(params.Items) == 0 {
+		// 使用gjson判断是否为有效的JSON
+		if gjson.ValidBytes(body) {
+			parsed := gjson.ParseBytes(body)
+			if parsed.IsObject() {
+				// 只有JSON对象才尝试解析为参数
+				var tempMap map[string]any
+				err = json.Unmarshal(body, &tempMap)
+				if err == nil {
+					handleUnmarshalResults(tempMap, params)
+				}
+			} else {
+				// 对于有效JSON但不是对象的情况（如字符串、数组、数字等），直接返回错误，不继续后续解析
+				useRaw = true
+				return
+			}
 		}
 	}
 
 	// try xml
-	if len(params) == 0 {
-		tempMap = xml_tools.XmlLoads(body)
+	if len(params.Items) == 0 {
+		tempMap := xml_tools.XmlLoads(body)
 		if len(tempMap) > 0 {
-			params = handleUnmarshalResults(tempMap)
+			handleUnmarshalResults(tempMap, params)
 		}
 	}
 
 	// try post values
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		queryParams := ParseQueryParams(string(body))
 		if len(queryParams.Items) > 0 {
 			for _, item := range queryParams.Items {
 				if len(item.Key) == 0 {
 					continue
 				}
-				// use raw values
-				params[item.Key] = append(params[item.Key], item.ValueRaw)
+				// use raw values, 保持 ParseQueryParams 的顺序
+				params.Add(item.Key, item.ValueRaw)
 			}
 		}
 	}
 
-	if len(params) == 0 {
+	if len(params.Items) == 0 {
 		// 这个flag位用于标记是否调用者直接使用原始的body, 这用于默认情况
 		useRaw = true
 	}
 
-	if len(params) > 0 {
+	if len(params.Items) > 0 {
 		err = nil
 	}
 	return

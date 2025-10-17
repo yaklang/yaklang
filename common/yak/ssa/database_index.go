@@ -4,22 +4,22 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveVariableIndexByName(name string, inst Instruction) {
-	SaveVariableIndex(inst, name, "")
+func SaveVariableIndexByName(name string, inst Instruction) *ssadb.IrIndex {
+	return SaveVariableIndex(inst, name, "")
 }
 
-func SaveVariableIndexByMember(member string, inst Instruction) {
-	SaveVariableIndex(inst, "", member)
+func SaveVariableIndexByMember(member string, inst Instruction) *ssadb.IrIndex {
+	return SaveVariableIndex(inst, "", member)
 }
 
-func SaveVariableIndex(inst Instruction, name, member string) {
+func SaveVariableIndex(inst Instruction, name, member string) *ssadb.IrIndex {
 	if inst.GetId() == -1 {
-		return
+		return nil
 	}
 	prog := inst.GetProgram()
+	progName := prog.GetApplication().GetProgramName()
 
-	index := ssadb.CreateIndex()
-	defer ssadb.SaveIrIndex(index)
+	index := ssadb.CreateIndex(progName)
 
 	// index
 	index.ProgramName = prog.GetApplication().Name
@@ -30,7 +30,7 @@ func SaveVariableIndex(inst Instruction, name, member string) {
 		// variable and scope
 		value, ok := inst.(Value)
 		if !ok {
-			return
+			return nil
 		}
 		variable := value.GetVariable(name)
 		if variable != nil {
@@ -46,19 +46,21 @@ func SaveVariableIndex(inst Instruction, name, member string) {
 		}
 
 	}
+	return index
 }
 
-func SaveClassIndex(name string, inst Instruction) {
+func SaveClassIndex(name string, inst Instruction) *ssadb.IrIndex {
 	if inst.GetId() == -1 {
-		return
+		return nil
 	}
 	prog := inst.GetProgram()
+	progName := prog.GetApplication().GetProgramName()
 
-	index := ssadb.CreateIndex()
-	defer ssadb.SaveIrIndex(index)
+	index := ssadb.CreateIndex(progName)
 
 	// index
 	index.ProgramName = prog.GetApplication().Name
 	index.ValueID = inst.GetId()
 	index.ClassName = name
+	return index
 }

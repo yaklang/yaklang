@@ -1,0 +1,132 @@
+__DESC__ = "该forge根据提供的流量文本，利用AI模型生成详细的WEB告警分析报告。报告内容包括告警概述、初步分析、真实性判断、攻击原理分析、潜在影响评估、解决方案建议和应急策略。生成的报告为Markdown格式，并可选择转换为Word文档，方便用户查阅和分享，解决网络安全分析中告警报告生成和管理效率低下的问题。"
+__VERBOSE_NAME__ = "流量日志分析生成报告"
+__KEYWORDS__ = "告警分析,安全报告,流量分析,web告警,markdown转word,安全审计"
+
+// flowtext = cli.Text("flowText", cli.setRequired(true), cli.setHelp("需要分析的日志文本"))
+filePaths = cli.FileNames("filePath", cli.setRequired(true),cli.setHelp("长文本文件"), cli.setVerboseName("流量日志路径(支持execl格式)"))
+outputDir = cli.String("outputdir", cli.setVerboseName("报告输出目录"))
+cli.check()
+
+readExcelFile = (p)=>{
+    res,err = fileparser.ParseFile(p)
+    if err!= nil {
+        return file.ReadFile(p)~
+    }
+    res = res['table']
+    resItem = []
+    for i in res{
+        name = i.Metadata['sheet_name']
+        tableInfo = "Sheet Name: %s" % name+"\n"+string(i.BinaryData)
+        resItem.Append(tableInfo)
+    }
+    return str.Join(resItem,"\n")
+}
+
+prompt = <<<prompt
+你是一名资深运维安全技术专家，擅长通过分析 web 日志定位服务器漏洞并制定修复方案。请根据提供的日志，生成一份面向专业运维人员的技术分析报告，重点是根据服务器分析对应服务器存不存在风险，服务器开放的服务或组件有没有危险，版本存不存在漏洞，是否需要更新组件和服务。
+
+# 概述
+服务组件：(apache)
+可能漏洞类型（如 SQL 注入、文件上传漏洞等）
+受影响的服务器资产（IP 地址、部署服务、应用 URL 等）
+漏洞风险等级（参考 CVSS 评分或内部评级标准）
+# 漏洞定位分析
+从请求报文中发现的漏洞特征
+指出触发漏洞的关键参数及传递方式
+漏洞涉及的后端处理路径（如脚本文件、配置项位置）
+# 影响范围评估
+受漏洞影响的系统模块或功能
+评估可能波及的数据范围（如用户表、配置文件等）
+对服务器运行稳定性的潜在影响
+# 漏洞成因分析
+从代码层面或配置层面说明漏洞产生的原因
+列举可能存在问题的配置项或代码片段示例
+# 修复方案
+紧急修复措施（含操作命令、配置修改内容）
+说明修复后的验证方法（含测试命令、预期结果）
+长期解决方案（如版本升级、架构调整等）
+# 运维人员排查步骤
+日志分析的具体路径和筛选命令
+漏洞扫描工具的使用方法及参数
+系统检查的关键操作步骤（如文件完整性校验、权限核查）
+# 长期防护策略
+建议部署的自动化防护工具及配置方法
+制定服务器监控指标及告警阈值
+明确运维规范（如漏洞修复 SLA、定期检查周期）
+
+请确保报告内容具备较强的可操作性，包含具体的命令、路径、配置示例等技术细节，采用 Markdown 格式编写，便于运维人员直接参考执行。
+prompt
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramString("report-content", jsonschema.description("分析生成出来的Mark Down 格式报告"))
+)
+
+
+runAiForgeForFile = (params,name,progress)=>{
+    yakit.StatusCard("文档进度", "%d/%d" % progress)
+    yakit.StatusCard("执行进度", "正在解析文档")
+    flowtext = readExcelFile(name)
+    yakit.StatusCard("执行进度", "正在分析生成md格式报告")
+    res = liteforge.Execute(sprintf("%s \n input:\n %v", prompt,flowtext), liteforge.output(schema))~
+    yakit.StatusCard("执行进度", "生成md格式报告成功")
+	reportString = res.GetString("report-content")
+    yakit.Markdown(reportString)
+    name := str.RandStr(10) + ".md"
+    path = file.Join(yakit.GetHomeTempDir(),name)
+    err = file.Save(path, str.Unquote(reportString)~)
+    if err != nil {
+        yakit.Error("save file fail :%v",err)
+        return err
+    }
+    yakit.StatusCard("md报告保存路径", path)
+
+
+    yakit.StatusCard("执行进度", "开始转化格式成 word 文档")
+    outputPath,err := pandoc.SimpleConvertMarkdownFileToDocxContext(context.Background(), path)
+    if err != nil {
+        yakit.Error("pandoc convert file fail :%v",err)
+        return err
+    }
+    if outputDir != "" {
+        tmpDir,fileName = file.Split(outputPath)
+        newPath  = file.Join(outputDir,fileName)
+        err = file.Mv(outputPath,newPath)
+        if err == nil {
+            outputPath = newPath
+        }
+    }
+
+    yakit.StatusCard("执行进度", sprintf("word文档转化成功: [path:%s]", outputPath))
+    return outputPath
+}
+
+forgeHandle = func(params) {
+    allFiles = []
+    for filePath in filePaths{
+        if !file.IsExisted(filePath) {
+            yakit.Error("路径 %s 不存在， 跳过检测" % filePath)
+            continue
+        }
+        if file.IsDir(filePath) {
+            fileInfos,err = file.ReadFileInfoInDirectory(filePath)
+            if err {
+                yakit.Error("读取目录 %s 失败， 跳过检测" % filePath)
+                continue
+            }
+            for info in fileInfos{
+                if info.IsDir{
+                    continue
+                }
+                allFiles.Append(info.Path)
+            }
+        }else {
+            allFiles.Append(filePath)
+        }
+    }
+    yakit.Info("目标路径共 %d 个文件待检测" % len(allFiles))
+
+    for index,filePath = range allFiles {
+        runAiForgeForFile(params,filePath,[index+1,len(allFiles)])
+    }
+}
+

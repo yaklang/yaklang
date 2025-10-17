@@ -3,10 +3,12 @@ package aid
 import (
 	_ "embed"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"sync/atomic"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
-	"sync/atomic"
 )
 
 type planRequest struct {
@@ -32,8 +34,8 @@ func (pr *planRequest) GetInteractCount() int64 {
 	return atomic.LoadInt64(pr.interactCount)
 }
 
-func (pr *planRequest) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+func (pr *planRequest) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
 		pr.config.planAICallback,
 		pr.config.coordinatorAICallback,
 		pr.config.taskAICallback,
@@ -47,10 +49,10 @@ func (pr *planRequest) callAI(request *AIRequest) (*AIResponse, error) {
 }
 
 type PlanResponse struct {
-	RootTask *aiTask `json:"root_task"`
+	RootTask *AiTask `json:"root_task"`
 }
 
-func (p *PlanResponse) recursiveMergeSubtask(subtask *aiTask, callback func(i *aiTask) error, stopped *utils.AtomicBool) {
+func (p *PlanResponse) recursiveMergeSubtask(subtask *AiTask, callback func(i *AiTask) error, stopped *utils.AtomicBool) {
 	if subtask == nil || (stopped != nil && stopped.IsSet()) {
 		return
 	}
@@ -74,13 +76,13 @@ func (p *PlanResponse) MergeSubtask(parentIndex string, name string, goal string
 	}
 	p.RootTask.GenerateIndex()
 
-	p.recursiveMergeSubtask(p.RootTask, func(i *aiTask) error {
+	p.recursiveMergeSubtask(p.RootTask, func(i *AiTask) error {
 		if i.Index != parentIndex {
 			return nil
 		}
 
-		i.Subtasks = append(i.Subtasks, &aiTask{
-			config:     p.RootTask.config,
+		i.Subtasks = append(i.Subtasks, &AiTask{
+			Config:     p.RootTask.Config,
 			Name:       name,
 			Goal:       goal,
 			ParentTask: i,
@@ -102,7 +104,7 @@ func (pr *planRequest) GenerateFirstPlanPrompt() (string, error) {
 	}
 }
 
-func (c *Config) newPlanResponse(rootTask *aiTask) *PlanResponse {
+func (c *Config) newPlanResponse(rootTask *AiTask) *PlanResponse {
 	c.SetSyncCallback(SYNC_TYPE_PLAN, func() any {
 		return rootTask
 	})
@@ -126,15 +128,15 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		return nil, fmt.Errorf("生成规划 prompt 失败: %v", err)
 	}
 
-	var rootTask = &aiTask{}
+	var rootTask = &AiTask{}
 	defer func() {
 		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *aiTask)
-		propagateConfig = func(task *aiTask) {
+		var propagateConfig func(task *AiTask)
+		propagateConfig = func(task *AiTask) {
 			if task == nil {
 				return
 			}
-			task.config = pr.config
+			task.Config = pr.config
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -147,16 +149,20 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 		rootTask.GenerateIndex()
 	}()
 
-	var interactAction *Action
+	var interactAction *aicommon.Action
 
 	needInteract := func() bool {
 		return interactAction != nil && interactAction.ActionType() == "require-user-interact"
 	}
 
 	err = pr.config.callAiTransaction(
-		prompt, pr.callAI,
-		func(rsp *AIResponse) error {
-			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, pr.config), "plan", "require-user-interact")
+		prompt, pr.CallAI,
+		func(rsp *aicommon.AIResponse) error {
+			stream := rsp.GetOutputStreamReader("plan", false, pr.config.GetEmitter())
+			//stream = io.TeeReader(stream, os.Stdout)
+			//raw, err := io.ReadAll(stream)
+			//action, err := ExtractAction(string(raw), "plan", "require-user-interact")
+			action, err := aicommon.ExtractActionFromStream(stream, "plan", "require-user-interact")
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}
@@ -168,8 +174,8 @@ func (pr *planRequest) Invoke() (*PlanResponse, error) {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
 					}
-					rootTask.Subtasks = append(rootTask.Subtasks, &aiTask{
-						config: pr.config,
+					rootTask.Subtasks = append(rootTask.Subtasks, &AiTask{
+						Config: pr.config,
 						Name:   subtask.GetAnyToString("subtask_name"),
 						Goal:   subtask.GetAnyToString("subtask_goal"),
 					})

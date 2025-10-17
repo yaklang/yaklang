@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -1298,4 +1300,424 @@ func (s *Server) MigratePayloads(req *ypb.Empty, stream ypb.Yak_MigratePayloadsS
 
 	feedback(1)
 	return err
+}
+
+func GetPayloadFile(ctx context.Context, fileName string) ([]byte, bool, error) {
+	var size int64
+	{
+		if state, err := os.Stat(fileName); err != nil {
+			return nil, false, utils.Wrap(err, "query payload from file error")
+		} else {
+			size += state.Size()
+		}
+	}
+
+	lineCh, err := utils.FileLineReaderWithContext(fileName, ctx)
+	if err != nil {
+		return nil, false, utils.Errorf("failed to read file: %s", err)
+	}
+
+	var handlerSize int64 = 0
+
+	buf := bytes.NewBuffer(make([]byte, 0, size))
+	for line := range lineCh {
+		lineStr := string(line)
+		if unquoted, err := strconv.Unquote(lineStr); err == nil {
+			lineStr = unquoted
+		}
+		lineStr += "\n"
+		handlerSize += int64(len(lineStr) + 1)
+		buf.WriteString(lineStr)
+		if size > FiveMB && handlerSize > FiftyKB {
+			// If file is larger than 5MB, read only the first 50KB
+			return bytes.TrimRight(buf.Bytes(), "\n"), true, nil
+		}
+	}
+
+	return bytes.TrimRight(buf.Bytes(), "\n"), false, nil
+}
+
+func (s *Server) ExportPayloadBatch(req *ypb.ExportPayloadBatchRequest, stream ypb.Yak_ExportAllPayloadServer) error {
+	groups := strings.Split(req.GetGroup(), ",")
+	savePath := req.GetSavePath()
+	if len(groups) == 0 {
+		return utils.Errorf("export payload error: group(s) required")
+	}
+	if savePath == "" {
+		return utils.Errorf("export payload error: save path required")
+	}
+
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	// 判断 savePath 是目录
+	fileInfo, err := os.Stat(savePath)
+	if err != nil {
+		return utils.Wrap(err, "invalid save path")
+	}
+	if !fileInfo.IsDir() {
+		return utils.Errorf("export payload error: savePath must be a directory")
+	}
+
+	totalPayloads := 0
+	groupPayloadCounts := make(map[string]int)
+	for _, group := range groups {
+		db := s.GetProfileDatabase().Model(&schema.Payload{}).Where("`group` = ?", group)
+		var count int64
+		if err := db.Count(&count).Error; err != nil {
+			return utils.Wrapf(err, "count payloads failed for group %s", group)
+		}
+		groupPayloadCounts[group] = int(count)
+		totalPayloads += int(count)
+	}
+
+	if totalPayloads == 0 {
+		return utils.Errorf("no payloads found for specified group(s)")
+	}
+
+	progressWritten := 0
+
+	for _, group := range groups {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		filename := filepath.Join(savePath, fmt.Sprintf("%s.csv", group))
+		isCSV := strings.HasSuffix(filename, ".csv")
+
+		file, err := utils.NewFileLineWriter(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+		if err != nil {
+			return utils.Wrapf(err, "cannot open file: %s", filename)
+		}
+
+		if isCSV {
+			file.WriteLineString("content,hit_count")
+		}
+
+		query := s.GetProfileDatabase().Where("`group` = ?", group)
+
+		gen := yakit.YieldPayloads(query, ctx)
+
+		bomHandled := false
+		groupSize := 0
+		for p := range gen {
+			content := p.GetContent()
+			if content == "" {
+				continue
+			}
+			if !bomHandled {
+				content = utils.RemoveBOMForString(content)
+				bomHandled = true
+			}
+			hitCount := int64(0)
+			if p.HitCount != nil {
+				hitCount = *p.HitCount
+			}
+
+			var n int
+			if isCSV {
+				n, _ = file.WriteLineString(fmt.Sprintf("%s,%d", content, hitCount))
+			} else {
+				n, _ = file.WriteLineString(content)
+			}
+			groupSize += n
+
+			progressWritten++
+			stream.Send(&ypb.GetAllPayloadResponse{
+				Progress: float64(progressWritten) / float64(totalPayloads),
+			})
+		}
+
+		file.Close()
+
+		stream.Send(&ypb.GetAllPayloadResponse{
+			Progress: float64(progressWritten) / float64(totalPayloads),
+		})
+	}
+
+	stream.Send(&ypb.GetAllPayloadResponse{Progress: 1})
+
+	return nil
+}
+
+func (s *Server) UploadPayloadToOnline(req *ypb.UploadPayloadToOnlineRequest, stream ypb.Yak_UploadPayloadToOnlineServer) error {
+	if req.Token == "" || req.Group == "" {
+		return utils.Errorf("empty token")
+	}
+
+	db := s.GetProfileDatabase()
+	db = bizhelper.ExactQueryString(db, "`group`", req.GetGroup())
+	db = bizhelper.ExactQueryString(db, "folder", req.GetFolder())
+
+	var payloads []*schema.Payload
+	if err := db.Find(&payloads).Error; err != nil {
+		return utils.Errorf("query payloads failed: %s", err)
+	}
+
+	// 初始进度通知
+	payloadSendProgress(stream, 0, "准备上传payload...", "info")
+	// 进度跟踪
+	total := len(payloads)
+	var (
+		successCount int32
+		errorCount   int32
+	)
+
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+
+	for i, p := range payloads {
+		progress := float64(i) / float64(len(payloads))
+
+		data, err := json.Marshal(p)
+		if err != nil {
+			errorCount++
+			payloadSendProgress(stream, progress, fmt.Sprintf("marshal payload [%s] failed: %v", p.Group, err), "error")
+			continue
+		}
+
+		// 文件内容处理
+		var fileContent []byte
+		if *p.IsFile {
+			content, isBigFile, err := GetPayloadFile(stream.Context(), *p.Content)
+			if err != nil {
+				errorCount++
+				payloadSendProgress(stream, progress, fmt.Sprintf("get file content [%s] failed: %v", p.Group, err), "error")
+				continue
+			}
+
+			if isBigFile {
+				errorCount++
+				payloadSendProgress(stream, progress, "big file are not uploaded to online", "error")
+				continue
+			}
+			fileContent = content
+		}
+
+		// 清理文件内容
+		defer func() {
+			if fileContent != nil {
+				fileContent = nil
+			}
+		}()
+
+		if err := client.UploadPayloadsToOnline(stream.Context(), req.Token, data, fileContent); err != nil {
+			errorCount++
+			payloadSendProgress(stream, progress, fmt.Sprintf("upload payload [%s] failed: %v", p.Group, err), "error")
+			continue
+		}
+
+		successCount++
+		payloadSendProgress(stream, progress, fmt.Sprintf("payload [%s] uploaded successfully", p.Group), "success")
+	}
+
+	msg, msgType := generateFinalMessage(total, int(successCount), int(errorCount))
+
+	return payloadSendProgress(stream, 1.0, msg, msgType)
+}
+
+func (s *Server) DownloadPayload(req *ypb.DownloadPayloadRequest, stream ypb.Yak_DownloadPayloadServer) error {
+	if req.Token == "" {
+		return utils.Errorf("empty token")
+	}
+	if req.Group == "" && req.Folder == "" {
+		return utils.Errorf("empty group and folder")
+	}
+
+	// 初始化下载客户端
+	client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+	ch := client.DownloadBatchPayloads(stream.Context(), req.Token, req.GetGroup(), req.GetFolder())
+	if ch == nil {
+		return utils.Error("download stream initialization failed")
+	}
+
+	// 初始进度通知
+	if err := payloadSendProgress(stream, 0, "开始下载payload...", "info"); err != nil {
+		return err
+	}
+
+	var (
+		successCount    int32
+		errorCount      int32
+		total           int64
+		count, progress float64
+	)
+
+	for payloadIns := range ch.Chan {
+		total = payloadIns.Total
+		if total > 0 {
+			progress = count / float64(total)
+		}
+		count++
+
+		err := client.SavePayload(s.GetProfileDatabase(), payloadIns.PayloadData)
+		if err != nil {
+			errorCount++
+			payloadSendProgress(stream, progress, fmt.Sprintf("保存失败 [%s]: %v", payloadIns.PayloadData.Group, err), "error")
+		} else {
+			successCount++
+			payloadSendProgress(stream, progress, fmt.Sprintf("保存成功 [%s]", payloadIns.PayloadData.Group), "success")
+		}
+
+	}
+
+	msg := fmt.Sprintf("下载完成: 成功 %d, 失败 %d", successCount, errorCount)
+	msgType := "success"
+	if errorCount > 0 {
+		msgType = "warning"
+	}
+	if successCount == 0 && errorCount > 0 {
+		msgType = "error"
+	}
+
+	return payloadSendProgress(stream, 1.0, msg, msgType)
+}
+
+func payloadSendProgress(stream interface {
+	Send(*ypb.DownloadProgress) error
+}, progress float64, message, messageType string) error {
+	return stream.Send(&ypb.DownloadProgress{
+		Progress:    progress,
+		Message:     message,
+		MessageType: messageType,
+	})
+}
+
+func generateFinalMessage(total, success, error int) (string, string) {
+	switch {
+	case total == 0:
+		return "无有效payload可上传", "warning"
+	case success == 0 && error > 0:
+		return fmt.Sprintf("全部上传失败: %d 条记录", error), "error"
+	case error == 0:
+		return fmt.Sprintf("全部上传成功: %d 条记录", success), "success"
+	default:
+		return fmt.Sprintf("部分成功: %d 成功, %d 失败", success, error), "warning"
+	}
+}
+
+func countFileLines(path string) (int, error) {
+	lineC, err := utils.FileLineReader(path)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for range lineC {
+		n++
+	}
+	return n, nil
+}
+
+func (s *Server) ExportPayloadDBAndFile(req *ypb.ExportPayloadDBAndFileRequest, stream ypb.Yak_ExportPayloadDBAndFileServer) error {
+	groups := req.GetGroups()
+	saveDir := req.GetSavePath()
+
+	if len(groups) == 0 {
+		return utils.Errorf("export error: groups is empty")
+	}
+	if saveDir == "" {
+		return utils.Errorf("export error: save dir is empty")
+	}
+
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+
+	payloads, err := yakit.GetPayload(s.GetProfileDatabase(), groups)
+	if err != nil {
+		return utils.Wrap(err, "get payloads failed")
+	}
+
+	totalCount := 0
+	for _, p := range payloads {
+		if *p.IsFile {
+			if p.Content == nil {
+				return utils.Errorf("file payload content is nil for group %s", p.Group)
+			}
+			lc, err := countFileLines(*p.Content)
+			if err != nil {
+				return utils.Wrapf(err, "count file lines failed for %s", *p.Content)
+			}
+			totalCount += lc
+		} else {
+			var count int64
+			if err := s.GetProfileDatabase().Model(&schema.Payload{}).
+				Where("`group` = ?", p.Group).Count(&count).Error; err != nil {
+				return utils.Wrapf(err, "count db payloads failed for group %s", p.Group)
+			}
+			totalCount += int(count)
+		}
+	}
+
+	if totalCount == 0 {
+		return utils.Errorf("no payloads found")
+	}
+
+	written := 0
+
+	for _, p := range payloads {
+		if *p.IsFile {
+			// --- 文件型 group txt ---
+			src := *p.Content
+			dst := filepath.Join(saveDir, fmt.Sprintf("%s.txt", p.Group))
+			writer, _ := utils.NewFileLineWriter(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+
+			lineC, _ := utils.FileLineReader(src)
+			bomHandled := false
+			for line := range lineC {
+				if !bomHandled {
+					line = utils.RemoveBOM(line)
+					bomHandled = true
+				}
+				lineStr := string(line)
+				if unquoted, err := strconv.Unquote(lineStr); err == nil {
+					lineStr = unquoted
+				}
+				writer.WriteLineString(lineStr)
+
+				written++
+				stream.Send(&ypb.GetAllPayloadResponse{
+					Progress: float64(written) / float64(totalCount),
+				})
+			}
+
+			writer.Close()
+		} else {
+			// --- 数据库型 group csv ---
+			dst := filepath.Join(saveDir, fmt.Sprintf("%s.csv", p.Group))
+			writer, _ := utils.NewFileLineWriter(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+			writer.WriteLineString("content,hit_count")
+
+			gen := yakit.YieldPayloads(
+				s.GetProfileDatabase().Where("`group` = ?", p.Group),
+				ctx,
+			)
+
+			bomHandled := false
+			for item := range gen {
+				content := item.GetContent()
+				if content == "" {
+					continue
+				}
+				if !bomHandled {
+					content = utils.RemoveBOMForString(content)
+					bomHandled = true
+				}
+				hitCount := int64(0)
+				if item.HitCount != nil {
+					hitCount = *item.HitCount
+				}
+				writer.WriteLineString(fmt.Sprintf("%s,%d", content, hitCount))
+
+				written++
+				stream.Send(&ypb.GetAllPayloadResponse{
+					Progress: float64(written) / float64(totalCount),
+				})
+			}
+			writer.Close()
+		}
+	}
+
+	stream.Send(&ypb.GetAllPayloadResponse{Progress: 1})
+	return nil
 }

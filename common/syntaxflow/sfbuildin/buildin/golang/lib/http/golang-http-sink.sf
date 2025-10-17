@@ -5,106 +5,85 @@ desc(
 	lib: "golang-http-sink"
 	desc: <<<DESC
 ### 规则描述
-
 1. **规则原理**
-   该规则旨在审计Golang应用程序中与处理HTTP响应输出相关的代码。通过识别将数据写入HTTP响应体或生成HTTP响应的核心函数，可以检测潜在的Web漏洞，例如反射型跨站脚本（XSS）、注入漏洞或其他直接通过HTTP响应返回敏感信息的问题。
-
+该规则旨在审计Golang应用程序中与处理HTTP响应输出相关的代码。通过识别将数据写入HTTP响应体或生成HTTP响应的核心函数，可以检测潜在的Web漏洞，例如反射型跨站脚本（XSS）、注入漏洞或其他直接通过HTTP响应返回敏感信息的问题。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```go
+// 存在漏洞的代码示例
+```go
 package main
-
 import (
-	"net/http"
+"net/http"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	// 从查询参数中获取用户输入
-	name := r.URL.Query().Get("name")
-
-	// 直接将用户输入插入到 HTML 中
-	tmpl := "<h1>Hello," + name + "!</h1>"
-	w.Write([]byte(tmpl))
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 直接将用户输入插入到 HTML 中
+tmpl := "<h1>Hello," + name + "!</h1>"
+w.Write([]byte(tmpl))
 }
-
 func main() {
-	http.HandleFunc("/", handler)
-	http.ListenAndServe(":8080", nil)
+http.HandleFunc("/", handler)
+http.ListenAndServe(":8080", nil)
 }
-   ```
-   在上述代码中，用户输入直接拼接到HTML内容并写入HTTP响应体。攻击者可以通过构造恶意输入（如`<script>alert('XSS')</script>`），实现跨站脚本攻击。
-
+```
+在上述代码中，用户输入直接拼接到HTML内容并写入HTTP响应体。攻击者可以通过构造恶意输入（如`<script>alert('XSS')</script>`），实现跨站脚本攻击。
 3. **潜在影响**
-   - 攻击者可注入恶意脚本窃取用户会话信息或劫持用户账户。
-   - 敏感数据可能被泄露给未授权的第三方。
-   - 恶意脚本可能导致进一步的安全风险，例如网络钓鱼、恶意软件传播等。
-
+- 攻击者可注入恶意脚本窃取用户会话信息或劫持用户账户。
+- 敏感数据可能被泄露给未授权的第三方。
+- 恶意脚本可能导致进一步的安全风险，例如网络钓鱼、恶意软件传播等。
 4. **结合数据流分析**
-   单独使用时，此规则仅标记可能的输出位置。其真正威力在于与数据流分析相结合。通过跟踪用户输入（如请求参数、请求体）是否流入这些输出函数，可以有效地识别潜在的反射型跨站脚本 (XSS) 漏洞、注入漏洞或其他直接通过 HTTP 响应返回敏感信息的问题。
+单独使用时，此规则仅标记可能的输出位置。其真正威力在于与数据流分析相结合。通过跟踪用户输入（如请求参数、请求体）是否流入这些输出函数，可以有效地识别潜在的反射型跨站脚本 (XSS) 漏洞、注入漏洞或其他直接通过 HTTP 响应返回敏感信息的问题。
 DESC
 	rule_id: "8031a101-c500-4444-ac4d-193be6ed6e0f"
 	title_zh: "审计Golang HTTP输出点"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用安全的模板引擎
 通过使用Go语言内置的`html/template`包自动转义用户输入，避免直接拼接HTML内容。
 ```go
 package main
-
 import (
-	"html/template"
-	"net/http"
+"html/template"
+"net/http"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	// 从查询参数中获取用户输入
-	name := r.URL.Query().Get("name")
-
-	// 定义安全模板
-	tmpl := template.Must(template.New("example").Parse("<h1>Hello, {{.}}!</h1>"))
-
-	// 渲染模板并输出到HTTP响应
-	tmpl.Execute(w, template.HTML(name))
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 定义安全模板
+tmpl := template.Must(template.New("example").Parse("<h1>Hello, {{.}}!</h1>"))
+// 渲染模板并输出到HTTP响应
+tmpl.Execute(w, template.HTML(name))
 }
-
 func main() {
-	http.HandleFunc("/", handler)
-	http.ListenAndServe(":8080", nil)
+http.HandleFunc("/", handler)
+http.ListenAndServe(":8080", nil)
 }
 ```
-
 #### 2. 输入合法性校验
 对用户输入实施严格的校验和过滤，确保其符合预期格式。
 ```go
 package main
-
 import (
-	"net/http"
-	"regexp"
+"net/http"
+"regexp"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	// 从查询参数中获取用户输入
-	name := r.URL.Query().Get("name")
-
-	// 校验输入是否为字母数字
-	match, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, name)
-	if !match {
-		http.Error(w, "Invalid input", http.StatusBadRequest)
-		return
-	}
-
-	// 输出安全内容
-	w.Write([]byte("<h1>Hello, " + name + "!</h1>"))
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 校验输入是否为字母数字
+match, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, name)
+if !match {
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
 }
-
+// 输出安全内容
+w.Write([]byte("<h1>Hello, " + name + "!</h1>"))
+}
 func main() {
-	http.HandleFunc("/", handler)
-	http.ListenAndServe(":8080", nil)
+http.HandleFunc("/", handler)
+http.ListenAndServe(":8080", nil)
 }
 ```
-
 #### 3. 配合数据流分析工具
 使用静态分析工具跟踪用户输入流向，定位潜在的风险点，并加以修复。
 SOLUTION
@@ -121,6 +100,91 @@ alert $output for {
 	level: "info",
 	title: "Audit Golang HTTP Sink",
 	title_zh: "审计Golang HTTP输出点",
+	message: "发现Golang HTTP输出点信息，需结合数据流分析确认潜在风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用安全的模板引擎
+通过使用Go语言内置的`html/template`包自动转义用户输入，避免直接拼接HTML内容。
+```go
+package main
+import (
+"html/template"
+"net/http"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 定义安全模板
+tmpl := template.Must(template.New("example").Parse("<h1>Hello, {{.}}!</h1>"))
+// 渲染模板并输出到HTTP响应
+tmpl.Execute(w, template.HTML(name))
+}
+func main() {
+http.HandleFunc("/", handler)
+http.ListenAndServe(":8080", nil)
+}
+```
+#### 2. 输入合法性校验
+对用户输入实施严格的校验和过滤，确保其符合预期格式。
+```go
+package main
+import (
+"net/http"
+"regexp"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 校验输入是否为字母数字
+match, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, name)
+if !match {
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
+}
+// 输出安全内容
+w.Write([]byte("<h1>Hello, " + name + "!</h1>"))
+}
+func main() {
+http.HandleFunc("/", handler)
+http.ListenAndServe(":8080", nil)
+}
+```
+#### 3. 配合数据流分析工具
+使用静态分析工具跟踪用户输入流向，定位潜在的风险点，并加以修复。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+1. **规则原理**
+该规则旨在审计Golang应用程序中与处理HTTP响应输出相关的代码。通过识别将数据写入HTTP响应体或生成HTTP响应的核心函数，可以检测潜在的Web漏洞，例如反射型跨站脚本（XSS）、注入漏洞或其他直接通过HTTP响应返回敏感信息的问题。
+2. **触发场景**
+// 存在漏洞的代码示例
+```go
+package main
+import (
+"net/http"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 直接将用户输入插入到 HTML 中
+tmpl := "<h1>Hello," + name + "!</h1>"
+w.Write([]byte(tmpl))
+}
+func main() {
+http.HandleFunc("/", handler)
+http.ListenAndServe(":8080", nil)
+}
+```
+在上述代码中，用户输入直接拼接到HTML内容并写入HTTP响应体。攻击者可以通过构造恶意输入（如`<script>alert('XSS')</script>`），实现跨站脚本攻击。
+3. **潜在影响**
+- 攻击者可注入恶意脚本窃取用户会话信息或劫持用户账户。
+- 敏感数据可能被泄露给未授权的第三方。
+- 恶意脚本可能导致进一步的安全风险，例如网络钓鱼、恶意软件传播等。
+4. **结合数据流分析**
+单独使用时，此规则仅标记可能的输出位置。其真正威力在于与数据流分析相结合。通过跟踪用户输入（如请求参数、请求体）是否流入这些输出函数，可以有效地识别潜在的反射型跨站脚本 (XSS) 漏洞、注入漏洞或其他直接通过 HTTP 响应返回敏感信息的问题。
+DESC
+	name: "output",
 }
 
 desc(

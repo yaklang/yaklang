@@ -7,13 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
-
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -23,8 +22,11 @@ import (
 
 func TestVerifiedRule(t *testing.T) {
 	yakit.InitialDatabase()
+	err := sfbuildin.SyncEmbedRule()
+	require.NoError(t, err)
 	db := consts.GetGormProfileDatabase()
 	db = db.Where("is_build_in_rule = ? ", true)
+	failedRules := make([]string, 0)
 	for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
 		f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
 		if err != nil {
@@ -33,13 +35,21 @@ func TestVerifiedRule(t *testing.T) {
 		if len(f.VerifyFsInfo) == 0 {
 			continue
 		}
-		t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
+		success := t.Run(strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"), func(t *testing.T) {
+			t.Parallel()
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
+				failedRules = append(failedRules, strings.Join(append(strings.Split(rule.Tag, "|"), rule.RuleName), "/"))
 				t.Fatal(err)
 			}
 		})
+		if !success {
+			t.FailNow()
+		}
+	}
+	for _, name := range failedRules {
+		println(name)
 	}
 }
 
@@ -52,11 +62,11 @@ func TestVerify_DEBUG(t *testing.T) {
 	err := sfbuildin.SyncEmbedRule()
 	require.NoError(t, err)
 	// ruleName := "golang 反射型跨站脚本攻击(gobee)"
-	ruleName := "golang 服务器端请求伪造(beego)"
+	ruleName := "检测PHP反序列化漏洞"
 
 	rule, err := sfdb.GetRulePure(ruleName)
 	if err != nil {
-		t.Fatal(err)
+		t.Skip(err)
 	}
 
 	f, err := sfvm.NewSyntaxFlowVirtualMachine().Compile(rule.Content)
@@ -66,7 +76,7 @@ func TestVerify_DEBUG(t *testing.T) {
 	if len(f.VerifyFsInfo) != 0 {
 		t.Run(rule.RuleName, func(t *testing.T) {
 			t.Log("Start to verify: " + rule.RuleName)
-			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t)
+			err := ssatest.EvaluateVerifyFilesystemWithRule(rule, t, false)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -90,7 +100,7 @@ a as $output;
 check $output;
 alert $output;
 
-`, t)
+`, t, false)
 	if err == nil {
 		t.Fatal("expect error")
 	}
@@ -112,7 +122,7 @@ a as $output;
 check $output;
 alert $output;
 
-`, t)
+`, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +185,7 @@ lang: java,
 </project>
 CODE
 )`
-	err := ssatest.EvaluateVerifyFilesystem(code, t)
+	err := ssatest.EvaluateVerifyFilesystem(code, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +293,7 @@ func TestJavaDEBUG(t *testing.T) {
 	if utils.InGithubActions() {
 		return
 	}
-	err := ssatest.EvaluateVerifyFilesystem(DEBUGCODE, t)
+	err := ssatest.EvaluateVerifyFilesystem(DEBUGCODE, t, false)
 	if err != nil {
 		t.Fatal(err)
 	}

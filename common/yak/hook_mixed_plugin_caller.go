@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/filter"
@@ -23,6 +24,86 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+var defaultInvalidSuffix = []string{
+	".js",
+	".css",
+	".xml",
+	".jpg", ".jpeg", ".png",
+	".mp3", ".mp4", ".ico", ".bmp",
+	".flv", ".aac", ".ogg", ".avi",
+	".svg", ".gif", ".woff", ".woff2",
+	".doc", ".docx", ".pptx",
+	".ppt", ".pdf",
+	".swf",
+	".json",
+}
+
+var staticContentTypes = []string{
+	// JavaScript
+	"text/javascript",
+	"application/javascript",
+	"application/x-javascript",
+	"application/ecmascript",
+
+	// CSS
+	"text/css",
+
+	// Images
+	"image/jpeg",
+	"image/jpg",
+	"image/png",
+	"image/gif",
+	"image/webp",
+	"image/svg+xml",
+	"image/bmp",
+	"image/x-icon", // ICO 文件
+	"image/vnd.microsoft.icon",
+
+	// Fonts
+	"font/woff",
+	"font/woff2",
+	"font/ttf",
+	"font/otf",
+	"application/font-woff",
+	"application/font-woff2",
+	"application/x-font-ttf",
+	"application/x-font-otf",
+	"font/opentype",
+
+	// Media (Video & Audio)
+	"video/mp4",
+	"video/webm",
+	"video/ogg",
+	"video/x-msvideo",  // AVI
+	"video/x-matroska", // MKV
+	"audio/mpeg",
+	"audio/ogg",
+	"audio/wav",
+	"audio/webm",
+	"audio/x-wav",
+}
+
+var dynamicContentTypes = []string{
+	// JSON data formats
+	"application/json",         // JSON data, usually API responses
+	"application/vnd.api+json", // JSON:API format
+	"application/hal+json",     // HAL format
+	"application/stream+json",  // Streaming JSON
+
+	// XML data formats
+	"application/xml", // XML data
+	"text/xml",        // Alternative XML format
+
+	// Form and submission data
+	"application/x-www-form-urlencoded", // Form submission content type
+	"multipart/form-data",               // Form file upload content type
+
+	// Binary and stream data
+	"application/octet-stream", // Binary stream, usually file downloads, dynamically generated
+	"application/x-protobuf",   // Protobuf binary data
+	"application/grpc",         // gRPC communication content type
+}
 
 const (
 	// func mirrorHTTPFlow(isHttps, url, request, response, body)
@@ -69,7 +150,8 @@ const (
 	HOOK_CLAER = "clear"
 
 	// httpflow analyze
-	HOOK_Analyze_HTTPFlow = "analyzeHTTPFlow"
+	HOOK_Analyze_HTTPFlow        = "analyzeHTTPFlow"
+	HOOK_OnAnalyzeHTTPFlowFinish = "onAnalyzeHTTPFlowFinish"
 
 	/*
 		hijackSaveHTTPFlow = func(flow, forward, drop) {
@@ -102,6 +184,7 @@ var (
 		HOOK_AfterRequest,
 		// httpFlow analyze
 		HOOK_Analyze_HTTPFlow,
+		HOOK_OnAnalyzeHTTPFlowFinish,
 	}
 	HotPatchScriptName = "@HotPatchCode"
 )
@@ -301,13 +384,35 @@ func (c *MixPluginCaller) SetConcurrent(i int) error {
 	return c.GetNativeCaller().SetConcurrent(i)
 }
 
+// SetLongRunningThreshold 设置插件长时间运行阈值（秒）
+func (c *MixPluginCaller) SetLongRunningThreshold(seconds int) {
+	if c.callers != nil {
+		c.callers.SetLongRunningThreshold(seconds)
+	}
+}
+
+// GetLongRunningThreshold 获取插件长时间运行阈值（秒）
+func (c *MixPluginCaller) GetLongRunningThreshold() int {
+	if c.callers != nil {
+		return c.callers.GetLongRunningThreshold()
+	}
+	return consts.PluginCallDurationThresholdSeconds
+}
+
 func (c *MixPluginCaller) Wait() {
 	defer c.websiteFilter.Close()
 
 	waitChan := make(chan struct{})
 
 	go func() {
-		defer close(waitChan)
+		defer func() {
+			close(waitChan)
+			if r := recover(); r != nil {
+				if errMsg := utils.InterfaceToString(r); errMsg != "" {
+					log.Error(errMsg)
+				}
+			}
+		}()
 
 		log.Debugf("start to wait local mix caller...")
 		c.swg.Wait()
@@ -340,8 +445,80 @@ func (c *MixPluginCaller) IsPassed(target string) bool {
 		return true
 	}
 	f := c.pluginScanFilter
-
 	return utils.IncludeExcludeChecker(f.IncludePluginScanURIs, f.ExcludePluginScanURIs, target)
+}
+
+func (c *MixPluginCaller) IsStatic(rawUrl string, req, rsp []byte) bool {
+	for _, d := range defaultInvalidSuffix {
+		if strings.HasSuffix(strings.Split(strings.ToLower(rawUrl), "?")[0], d) {
+			return true
+		}
+	}
+
+	contentTypeReq := lowhttp.GetHTTPPacketHeader(req, "Content-Type")
+	contentTypeRsp := lowhttp.GetHTTPPacketHeader(rsp, "Content-Type")
+	// acceptHeader := lowhttp.GetHTTPPacketHeader(request, "Accept")
+
+	// hasDynamicType := false
+	// hasStaticType := false
+	// if acceptHeader != "" {
+	// 	contentTypes := lowhttp.SplitContentTypesFromAcceptHeader(acceptHeader)
+	// 	if len(contentTypes) > 0 {
+	// 		for _, ct := range contentTypes {
+	// 			if isStaticContentType(ct) {
+	// 				hasStaticType = true
+	// 			}
+	// 			if isDynamicContentType(ct) {
+	// 				hasDynamicType = true
+	// 			}
+	// 		}
+	// 	}
+	// 	if hasDynamicType && hasStaticType {
+	// 		return false
+	// 	}
+	// 	if hasStaticType && !hasDynamicType {
+	// 		return true
+	// 	}
+	// }
+
+	check := func(contentType string) bool {
+		if contentType != "" {
+			if isDynamicContentType(contentType) {
+				return false
+			}
+			if isStaticContentType(contentType) {
+				return true
+			}
+		}
+		return false
+	}
+
+	if check(contentTypeReq) {
+		return true
+	}
+	if check(contentTypeRsp) {
+		return true
+	}
+
+	return false
+}
+
+func isDynamicContentType(contentType string) bool {
+	for _, dynamicType := range dynamicContentTypes {
+		if strings.Contains(contentType, dynamicType) {
+			return true
+		}
+	}
+	return false
+}
+
+func isStaticContentType(contentType string) bool {
+	for _, staticType := range staticContentTypes {
+		if strings.Contains(contentType, staticType) {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *MixPluginCaller) FeedbackOrdinary(i interface{}) {
@@ -666,108 +843,32 @@ func (m *MixPluginCaller) CallHijackResponseEx(
 	m.CallHijackResponseExWithCtx(context.Background(), isHttps, u, getRequest, getResponse, reject, drop)
 }
 
-func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []byte) string {
-	freq, err := getFuzzHTTPRequestByCache(req)
-	if err != nil {
-		return ""
+func (m *MixPluginCaller) CallAnalyzeHTTPFlow(
+	runtimeCtx context.Context,
+	flow *schema.HTTPFlow,
+	extract func(ruleName string, httpFlow *schema.HTTPFlow, content ...string),
+) {
+	if m.callers.ShouldCallByName(HOOK_Analyze_HTTPFlow) {
+		m.callers.Call(
+			HOOK_Analyze_HTTPFlow,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItems(flow, extract),
+		)
 	}
-	var params []string
-	fuzzParams := freq.GetCommonParams()
-	for _, r := range fuzzParams {
-		params = append(params, utils.CalcMd5(r.Position(), r.Name()))
-	}
-	sort.Strings(params)
-	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), strings.Join(params, ","), "path-params")
 }
 
-func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) string {
-	freq, err := getFuzzHTTPRequestByCache(req)
-	if err != nil {
-		return ""
+func (m *MixPluginCaller) CallOnAnalyzeHTTPFlowFinish(
+	runtimeCtx context.Context,
+	totalCount int64,
+	matchedCount int64,
+) {
+	if m.callers.ShouldCallByName(HOOK_OnAnalyzeHTTPFlowFinish) {
+		m.callers.Call(
+			HOOK_OnAnalyzeHTTPFlowFinish,
+			WithCallConfigRuntimeCtx(runtimeCtx),
+			WithCallConfigItems(totalCount, matchedCount),
+		)
 	}
-	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), "path")
-}
-
-var ttlHTTPRequestCache = utils.NewTTLCache[*mutate.FuzzHTTPRequest](30 * time.Minute)
-
-func getFuzzHTTPRequestByCache(req []byte) (*mutate.FuzzHTTPRequest, error) {
-	hash := utils.CalcSha1(req)
-	reqIns, ok := ttlHTTPRequestCache.Get(hash)
-	if ok {
-		return reqIns, nil
-	}
-	reqIns, err := mutate.NewFuzzHTTPRequest(req)
-	if err != nil {
-		return nil, err
-	}
-	ttlHTTPRequestCache.SetWithTTL(hash, reqIns, 30*time.Minute)
-	return reqIns, nil
-}
-
-func calcNewWebsiteHash(urlIns *url.URL, host, port interface{}, req []byte) string {
-	freq, err := getFuzzHTTPRequestByCache(req)
-	if err != nil {
-		return ""
-	}
-	return utils.CalcSha1(urlIns.Scheme, host, port, freq.GetMethod(), "new-website")
-}
-
-func calcTargetHash(host, port interface{}) string {
-	return utils.CalcSha1(host, port)
-}
-
-func (m *MixPluginCaller) GetFingerprintMatcher() *fp.Matcher {
-	m.fingerprintMatcherOnce.Do(func() {
-		m.fingerprintMatcher, _ = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
-	})
-	return m.fingerprintMatcher
-}
-
-func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("panic from port-scan plugin: %s", err)
-		}
-	}()
-	callers := m.callers
-	wg := new(sync.WaitGroup)
-	if callers.ShouldCallByName(HOOK_PortScanHandle) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					log.Errorf("HandleServiceScanResult call HOOK_PortScanHandle failed: %v", err)
-				}
-			}()
-			callers.CallByName(HOOK_PortScanHandle, r)
-		}()
-	}
-	if callers.ShouldCallByName(HOOK_NucleiScanHandle) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					log.Errorf("HandleServiceScanResult call HOOK_NucleiScanHandle failed: %v", err)
-				}
-			}()
-			callers.CallByName(HOOK_NucleiScanHandle, utils.HostPort(r.Target, r.Port))
-		}()
-	}
-	if callers.ShouldCallByName(HOOK_NaslScanHandle) {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			defer func() {
-				if err := recover(); err != nil {
-					log.Errorf("HandleServiceScanResult call HOOK_NaslScanHandle failed: %v", err)
-				}
-			}()
-			callers.CallByName(HOOK_NaslScanHandle, utils.HostPort(r.Target, r.Port))
-		}()
-	}
-	wg.Wait()
 }
 
 func (m *MixPluginCaller) MirrorHTTPFlowWithCtx(
@@ -945,13 +1046,121 @@ func (m *MixPluginCaller) mirrorHTTPFlow(
 			return
 		}
 	}
+
 	if callers.ShouldCallByName(HOOK_MirrorFilteredHTTPFlow) {
+		if m.IsStatic(u, req, rsp) {
+			return
+		}
 		callers.Call(HOOK_MirrorFilteredHTTPFlow,
 			WithCallConfigRuntimeCtx(runtimeCtx),
 			WithCallConfigForceSync(forceSync),
 			WithCallConfigItems(isHttps, u, req, rsp, body),
 		)
 	}
+}
+
+func calcWebsitePathParamsHash(urlIns *url.URL, host, port interface{}, req []byte) string {
+	freq, err := getFuzzHTTPRequestByCache(req)
+	if err != nil {
+		return ""
+	}
+	var params []string
+	fuzzParams := freq.GetCommonParams()
+	for _, r := range fuzzParams {
+		params = append(params, utils.CalcMd5(r.Position(), r.Name()))
+	}
+	sort.Strings(params)
+	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), strings.Join(params, ","), "path-params")
+}
+
+func calcWebsitePathHash(urlIns *url.URL, host, port interface{}, req []byte) string {
+	freq, err := getFuzzHTTPRequestByCache(req)
+	if err != nil {
+		return ""
+	}
+	return utils.CalcSha1(urlIns.Scheme, freq.GetMethod(), host, port, freq.GetPathWithoutQuery(), "path")
+}
+
+var ttlHTTPRequestCache = utils.NewTTLCache[*mutate.FuzzHTTPRequest](30 * time.Minute)
+
+func getFuzzHTTPRequestByCache(req []byte) (*mutate.FuzzHTTPRequest, error) {
+	hash := utils.CalcSha1(req)
+	reqIns, ok := ttlHTTPRequestCache.Get(hash)
+	if ok {
+		return reqIns, nil
+	}
+	reqIns, err := mutate.NewFuzzHTTPRequest(req)
+	if err != nil {
+		return nil, err
+	}
+	ttlHTTPRequestCache.SetWithTTL(hash, reqIns, 30*time.Minute)
+	return reqIns, nil
+}
+
+func calcNewWebsiteHash(urlIns *url.URL, host, port interface{}, req []byte) string {
+	freq, err := getFuzzHTTPRequestByCache(req)
+	if err != nil {
+		return ""
+	}
+	return utils.CalcSha1(urlIns.Scheme, host, port, freq.GetMethod(), "new-website")
+}
+
+func calcTargetHash(host, port interface{}) string {
+	return utils.CalcSha1(host, port)
+}
+
+func (m *MixPluginCaller) GetFingerprintMatcher() *fp.Matcher {
+	m.fingerprintMatcherOnce.Do(func() {
+		m.fingerprintMatcher, _ = fp.NewDefaultFingerprintMatcher(fp.NewConfig(fp.WithDatabaseCache(true), fp.WithCache(true)))
+	})
+	return m.fingerprintMatcher
+}
+
+func (m *MixPluginCaller) HandleServiceScanResult(r *fp.MatchResult) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("panic from port-scan plugin: %s", err)
+		}
+	}()
+	callers := m.callers
+	wg := new(sync.WaitGroup)
+	if callers.ShouldCallByName(HOOK_PortScanHandle) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("HandleServiceScanResult call HOOK_PortScanHandle failed: %v", err)
+				}
+			}()
+			callers.CallByName(HOOK_PortScanHandle, r)
+		}()
+	}
+	if callers.ShouldCallByName(HOOK_NucleiScanHandle) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("HandleServiceScanResult call HOOK_NucleiScanHandle failed: %v", err)
+				}
+			}()
+			callers.CallByName(HOOK_NucleiScanHandle, utils.HostPort(r.Target, r.Port))
+		}()
+	}
+	if callers.ShouldCallByName(HOOK_NaslScanHandle) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("HandleServiceScanResult call HOOK_NaslScanHandle failed: %v", err)
+				}
+			}()
+			callers.CallByName(HOOK_NaslScanHandle, utils.HostPort(r.Target, r.Port))
+		}()
+	}
+	wg.Wait()
 }
 
 func (m *MixPluginCaller) HijackSaveHTTPFlow(flow *schema.HTTPFlow, reject func(httpFlow *schema.HTTPFlow), drop func()) {
@@ -983,17 +1192,88 @@ func (m *MixPluginCaller) GetNativeCaller() *YakToCallerManager {
 	return m.callers
 }
 
-func (m *MixPluginCaller) CallAnalyzeHTTPFlow(
-	runtimeCtx context.Context,
-	flow *schema.HTTPFlow,
-	extract func(ruleName string, httpFlow *schema.HTTPFlow, content ...string),
-) {
-	if m.callers.ShouldCallByName(HOOK_Analyze_HTTPFlow) {
-		m.callers.Call(
-			HOOK_Analyze_HTTPFlow,
-			WithCallConfigRuntimeCtx(runtimeCtx),
-			WithCallConfigItems(flow, extract),
-		)
+// EnableExecutionTracing 启用插件执行跟踪
+func (m *MixPluginCaller) EnableExecutionTracing(enable bool) {
+	if m.callers != nil {
+		m.callers.EnableExecutionTracing(enable)
+	}
+}
+
+// IsExecutionTracingEnabled 检查是否启用了插件执行跟踪
+func (m *MixPluginCaller) IsExecutionTracingEnabled() bool {
+	if m.callers != nil {
+		return m.callers.IsExecutionTracingEnabled()
+	}
+	return false
+}
+
+// GetExecutionTracker 获取执行跟踪器
+func (m *MixPluginCaller) GetExecutionTracker() *PluginExecutionTracker {
+	if m.callers != nil {
+		return m.callers.GetExecutionTracker()
+	}
+	return nil
+}
+
+// AddExecutionTraceCallback 添加执行跟踪回调
+func (m *MixPluginCaller) AddExecutionTraceCallback(callback func(*PluginExecutionTrace)) (callbackID string, remove func()) {
+	if m.callers != nil {
+		return m.callers.AddExecutionTraceCallback(callback)
+	}
+	return "", nil
+}
+
+// GetAllExecutionTraces 获取所有执行跟踪
+func (m *MixPluginCaller) GetAllExecutionTraces() []*PluginExecutionTrace {
+	if m.callers != nil {
+		return m.callers.GetAllExecutionTraces()
+	}
+	return nil
+}
+
+// GetExecutionTracesByPlugin 根据插件ID获取执行跟踪
+func (m *MixPluginCaller) GetExecutionTracesByPlugin(pluginID string) []*PluginExecutionTrace {
+	if m.callers != nil {
+		return m.callers.GetExecutionTracesByPlugin(pluginID)
+	}
+	return nil
+}
+
+// GetExecutionTracesByHook 根据Hook名获取执行跟踪
+func (m *MixPluginCaller) GetExecutionTracesByHook(hookName string) []*PluginExecutionTrace {
+	if m.callers != nil {
+		return m.callers.GetExecutionTracesByHook(hookName)
+	}
+	return nil
+}
+
+// GetRunningExecutionTraces 获取正在运行的执行跟踪
+func (m *MixPluginCaller) GetRunningExecutionTraces() []*PluginExecutionTrace {
+	if m.callers != nil {
+		return m.callers.GetRunningExecutionTraces()
+	}
+	return nil
+}
+
+// CancelExecutionTrace 取消指定的执行跟踪
+func (m *MixPluginCaller) CancelExecutionTrace(traceID string) bool {
+	if m.callers != nil {
+		return m.callers.CancelExecutionTrace(traceID)
+	}
+	return false
+}
+
+// CancelAllExecutionTraces 取消所有执行跟踪
+func (m *MixPluginCaller) CancelAllExecutionTraces() {
+	if m.callers != nil {
+		m.callers.CancelAllExecutionTraces()
+	}
+}
+
+// CleanupCompletedExecutionTraces 清理已完成的执行跟踪
+func (m *MixPluginCaller) CleanupCompletedExecutionTraces(olderThan time.Duration) {
+	if m.callers != nil {
+		m.callers.CleanupCompletedExecutionTraces(olderThan)
 	}
 }
 

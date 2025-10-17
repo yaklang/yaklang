@@ -62,6 +62,53 @@ func makeArgs(ctx context.Context, execParams []*ypb.ExecParamItem) []string {
 	return args
 }
 
+func BuildLiteForgeExecOption(anyOptions ...any) []any {
+	var liteForgeExecOpts []any
+
+	var extendAIDOptions []aid.Option
+	var ag = NewAgent()
+	for _, opt := range anyOptions {
+		switch o := opt.(type) {
+		case aiforge.LiteForgeExecOption:
+			liteForgeExecOpts = append(liteForgeExecOpts, o)
+		case aid.Option:
+			extendAIDOptions = append(extendAIDOptions, o)
+		case AIAgentOption:
+			if err := o(ag); err != nil {
+				log.Errorf("failed to apply agent option: %v", err)
+				continue
+			}
+		}
+	}
+	extendAIDOptions = append(ag.AIDOptions(), extendAIDOptions...)
+	liteForgeExecOpts = append(liteForgeExecOpts, aiforge.LiteForgeExecWithContext(ag.ctx))
+	for _, opt := range extendAIDOptions {
+		liteForgeExecOpts = append(liteForgeExecOpts, opt)
+	}
+	return liteForgeExecOpts
+}
+
+func BuildLiteForgeCreateOption(anyOptions ...any) []aiforge.LiteForgeOption {
+	var extendAIDOptions []aid.Option
+	var liteForgeOpts []aiforge.LiteForgeOption
+	var aiagent = NewAgent()
+	for _, opt := range anyOptions {
+		switch o := opt.(type) {
+		case aiforge.LiteForgeOption:
+			liteForgeOpts = append(liteForgeOpts, o)
+		case aid.Option:
+			extendAIDOptions = append(extendAIDOptions, o)
+		case AIAgentOption:
+			if err := o(aiagent); err != nil {
+				log.Errorf("failed to apply agent option: %v", err)
+				continue
+			}
+		}
+	}
+	extendAIDOptions = append(aiagent.AIDOptions(), extendAIDOptions...)
+	return append(liteForgeOpts, aiforge.WithExtendLiteForge_AIDOption(extendAIDOptions...))
+}
+
 func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 	nIns.GetVM().RegisterMapMemberCallHandler("aiagent", "ExecuteForge", func(i interface{}) interface{} {
 		ofunc, ok := i.(func(forgeName string, i any, opts ...any) (any, error))
@@ -112,6 +159,17 @@ func BindAIConfigToEngine(nIns *antlr4yak.Engine, agentOptions ...any) {
 			return func(name string, opts ...any) (*aiforge.LiteForge, error) {
 				opts = append(agentOptions, opts...)
 				return originFunc(name, opts...)
+			}
+		}
+		return i
+	})
+
+	nIns.GetVM().RegisterMapMemberCallHandler("liteforge", "Execute", func(i interface{}) interface{} {
+		originFunc, ok := i.(func(query string, opts ...any) (*aiforge.ForgeResult, error))
+		if ok {
+			return func(query string, opts ...any) (*aiforge.ForgeResult, error) {
+				opts = append(BuildLiteForgeExecOption(agentOptions...), opts...)
+				return originFunc(query, opts...)
 			}
 		}
 		return i

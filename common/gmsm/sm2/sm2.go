@@ -121,6 +121,10 @@ func KeyExchangeA(klen int, ida, idb []byte, priA *PrivateKey, pubB *PublicKey, 
 	return keyExchange(klen, ida, idb, priA, pubB, rpri, rpubB, true)
 }
 
+func KeyExchange(klen int, ida, idb []byte, pri *PrivateKey, pub *PublicKey, rpri *PrivateKey, rpub *PublicKey, thisIsA bool) (k, s1, s2 []byte, err error) {
+	return keyExchange(klen, ida, idb, pri, pub, rpri, rpub, thisIsA)
+}
+
 //****************************************************************************//
 
 func Sm2Sign(priv *PrivateKey, msg, uid []byte, random io.Reader) (r, s *big.Int, err error) {
@@ -612,15 +616,31 @@ func randFieldElement(c elliptic.Curve, random io.Reader) (k *big.Int, err error
 	}
 	params := c.Params()
 	b := make([]byte, params.BitSize/8+8)
-	_, err = io.ReadFull(random, b)
-	if err != nil {
-		return
+
+	for i := 0; i < 10; i++ {
+		_, err = io.ReadFull(random, b)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if all bytes are zero, which indicates an RNG failure.
+		isAllZeros := true
+		for _, B := range b {
+			if B != 0 {
+				isAllZeros = false
+				break
+			}
+		}
+		if !isAllZeros {
+			k = new(big.Int).SetBytes(b)
+			n := new(big.Int).Sub(params.N, one)
+			k.Mod(k, n)
+			k.Add(k, one)
+			return k, nil
+		}
 	}
-	k = new(big.Int).SetBytes(b)
-	n := new(big.Int).Sub(params.N, one)
-	k.Mod(k, n)
-	k.Add(k, one)
-	return
+
+	return nil, errors.New("failed to get non-zero random bytes after 10 retries")
 }
 
 func GenerateKey(random io.Reader) (*PrivateKey, error) {
@@ -630,21 +650,41 @@ func GenerateKey(random io.Reader) (*PrivateKey, error) {
 	}
 	params := c.Params()
 	b := make([]byte, params.BitSize/8+8)
-	_, err := io.ReadFull(random, b)
-	if err != nil {
-		return nil, err
+	var err error
+
+	for i := 0; i < 10; i++ {
+		_, err = io.ReadFull(random, b)
+		if err != nil {
+			return nil, err
+		}
+
+		// Check if all bytes are zero, which indicates an RNG failure.
+		isAllZeros := true
+		for _, B := range b {
+			if B != 0 {
+				isAllZeros = false
+				break
+			}
+		}
+		if isAllZeros {
+			continue
+		}
+
+		k := new(big.Int).SetBytes(b)
+		n := new(big.Int).Sub(params.N, two)
+		k.Mod(k, n)
+		k.Add(k, one)
+		priv := new(PrivateKey)
+		priv.PublicKey.Curve = c
+		priv.D = k
+		priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(k.Bytes())
+
+		if priv.PublicKey.Curve.IsOnCurve(priv.PublicKey.X, priv.PublicKey.Y) {
+			return priv, nil
+		}
 	}
 
-	k := new(big.Int).SetBytes(b)
-	n := new(big.Int).Sub(params.N, two)
-	k.Mod(k, n)
-	k.Add(k, one)
-	priv := new(PrivateKey)
-	priv.PublicKey.Curve = c
-	priv.D = k
-	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(k.Bytes())
-
-	return priv, nil
+	return nil, errors.New("failed to generate valid key after 10 retries")
 }
 
 type zr struct {

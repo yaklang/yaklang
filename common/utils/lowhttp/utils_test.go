@@ -43,6 +43,26 @@ teadfasdfasd
 	_ = req
 }
 
+func TestFixRequestWithExtraBlank(t *testing.T) {
+	req := FixHTTPRequest([]byte(`
+GET / HTTP/1.1
+Host: www.baidu.com` + "\r\n  \r\n" + `teadfasdfasd`))
+	spew.Dump(req)
+	if !strings.Contains(string(req), "Content-Length: 12\r\n\r\nteadfasdfasd") {
+		t.Fatal("blank split in request error")
+	}
+}
+
+func TestFixRequestWithoutExtraBlank(t *testing.T) {
+	req := FixHTTPRequest([]byte(`
+GET / HTTP/1.1
+Host: www.baidu.com` + "\r\n\r\n" + `teadfasdfasd`))
+	spew.Dump(req)
+	if !strings.Contains(string(req), "Content-Length: 12\r\n\r\nteadfasdfasd") {
+		t.Fatal("blank split in request error")
+	}
+}
+
 func TestSplitHTTPHeader(t *testing.T) {
 	key, value := SplitHTTPHeader("abc")
 	if !(key == "abc" && value == "") {

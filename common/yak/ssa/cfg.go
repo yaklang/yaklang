@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
@@ -50,7 +51,10 @@ func (b *BasicBlock) IsBlock(name string) bool {
 
 func (b *BasicBlock) GetBlockById(name string) *BasicBlock {
 	for _, id := range b.Preds {
-		prev := b.GetValueById(id)
+		prev, ok := b.GetValueById(id)
+		if !ok || prev == nil {
+			continue
+		}
 		if prev.IsBlock(name) {
 			result, ok := ToBasicBlock(prev)
 			if !ok {
@@ -219,6 +223,9 @@ func (lb *LoopBuilder) Finish() {
 		var conditionValue Value
 		if lb.condition != nil {
 			conditionValue = lb.condition()
+		}
+		if utils.IsNil(conditionValue) {
+			conditionValue = SSABuild.EmitConstInst(true)
 		}
 		// SSABuild.EmitJump(body)
 		SSABuild.EmitLoop(body, exit, conditionValue)
@@ -449,7 +456,7 @@ func (t *TryBuilder) BuildTryBlock(f func()) {
 }
 
 func defaultExceptionParameterType(v Value) {
-	v.SetType(BasicTypes[ErrorTypeKind])
+	v.SetType(CreateErrorType())
 }
 
 func (t *TryBuilder) BuildErrorCatch(
@@ -556,8 +563,11 @@ func (t *TryBuilder) Finish() {
 
 	builder.CurrentBlock = tryBlock
 	builder.EmitJump(target)
-	for _, catch := range errorHandler.Catch {
-		catch := errorHandler.GetValueById(catch)
+	for _, catchId := range errorHandler.Catch {
+		catch, ok := errorHandler.GetValueById(catchId)
+		if !ok || catch == nil {
+			continue
+		}
 		builder.CurrentBlock = catch.GetBlock()
 		builder.EmitJump(target)
 	}

@@ -1,0 +1,38 @@
+# Background
+Current Time: {{ .CurrentTime }} OS/Arch: {{ .OSArch }}
+{{ if .WorkingDir }}working dir: {{ .WorkingDir }}{{ end }}
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
+
+{{ if .AIForgeList }}{{ if .AllowPlan }}
+
+{{/*================================================================================================================*/}}
+# AI Blueprint(AI Forge)
+
+AI 蓝图（也称应用体或 Forge）是一种强大的机制，旨在帮助你高效完成复杂、重复性或标准化的任务。核心原理是将多步骤工作流或者方法论封装任务规划器，够显著提升效率、保证输出一致性。
+
+以下是本系统可以使用的AI蓝图列表：
+{{ .AIForgeList }}
+{{ end }}{{ end }}
+
+{{ if .Tools }}# 工具调用系统
+本系统提供了一系列强大的工具，帮助你高效完成各种任务。工具的使用过程分为以下三个步骤：**申请工具 -> 查看参数 -> 执行工具**。通过规范化的流程，你可以快速调用所需功能并获得准确结果。**使用工具的目的是让 AI 能够处理超出普通对话范围的复杂任务，如执行命令、搜索信息或分析数据，从而提升任务完成的精度和效率。**
+
+使用工具可以：**扩展能力范围：**，**精准解决问题：**，**自动化与效率：**
+
+You have access to {{ .ToolsCount }} built-in tools. Here are the top {{ .TopToolsCount }} most important tools:
+
+{{ range .TopTools }}* `{{ .Name }}`: {{ .Description }}
+{{ end }}{{ if .HasMoreTools }}...{{ end }}
+
+Use 'tools_search' to discover additional tools for specific tasks.如果上述工具无法满足需求，请使用 'tools_search' 搜索工具来发现一些没有在列表中的工具。
+{{ end }}
+
+{{/*================================================================================================================*/}}
+{{ if .ConversationMemory }}# Cumulative Memory
+{{ .ConversationMemory }}
+{{ end }}
+
+{{ if .Timeline }}# Timeline Memory
+{{ .Timeline }}
+{{ end }}
+

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	gol "github.com/yaklang/yaklang/common/yak/antlr4go/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -47,7 +48,11 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 			prog := b.GetProgram()
 			application := prog.Application
-			global := application.GlobalScope
+
+			global := application.GlobalVariablesBlueprint.Container()
+			if global == nil {
+				return
+			}
 
 			initHandler := func(name string) {
 				variable := b.CreateMemberCallVariable(global, b.EmitConstInstPlaceholder(name))
@@ -64,15 +69,19 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			}
 			if lib == nil {
 				lib = prog.NewLibrary(pkgPath[0], pkgPath)
+				// Initialize library's GlobalVariablesBlueprint container with the package scope
+				if lib.GlobalVariablesBlueprint != nil {
+					pkgScope := b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
+					lib.GlobalVariablesBlueprint.InitializeWithContainer(pkgScope)
+				}
 			}
 			defer func() {
 				lib.VisitAst(ast)
 			}()
 			lib.PushEditor(prog.GetCurrentEditor())
-			lib.GlobalScope = b.ReadMemberCallValue(global, b.EmitConstInstPlaceholder(pkgNameCurrent))
-
 			init := lib.GetAndCreateFunction(pkgNameCurrent, string(ssa.MainFunctionName))
 			init.SetType(ssa.NewFunctionType("", []ssa.Type{ssa.CreateAnyType()}, ssa.CreateAnyType(), false))
+			// builder := lib.GetAndCreateFunctionBuilder(lib.GetCurrentEditor().GetUrl(), string(ssa.MainFunctionName))
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
 
 			if builder != nil {
@@ -86,6 +95,25 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					}
 					b.FunctionBuilder = currentBuilder
 				}()
+			}
+
+			store := b.StoreFunctionBuilder()
+			b.AddGlobalVariable("", func() ssa.Value {
+				switchHandler := b.SwitchFunctionBuilder(store)
+				defer func() {
+					switchHandler()
+				}()
+				b.handleImportPackage()
+				return nil
+			})
+		}
+
+		for _, impo := range ast.AllImportDecl() {
+			names, paths := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+
+			for i, name := range names {
+				pathl := strings.Split(paths[i], "/")
+				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
 			}
 		}
 
@@ -113,16 +141,16 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
 				continue
 			}
-			if o, ok := s.(*ssa.ObjectType); ok {
-				for pn, _ := range o.AnonymousField {
-					pbp := b.GetBluePrint(pn)
-					if pbp == nil {
-						b.NewError(ssa.Warn, TAG, StructNotFind(n))
-						pbp = b.CreateBlueprint(pn)
-					}
-					bp.AddParentBlueprint(pbp)
-				}
-			}
+			// if o, ok := s.(*ssa.ObjectType); ok {
+			// 	for pn, _ := range o.AnonymousField {
+			// 		pbp := b.GetBluePrint(pn)
+			// 		if pbp == nil {
+			// 			b.NewError(ssa.Warn, TAG, StructNotFind(n))
+			// 			pbp = b.CreateBlueprint(pn)
+			// 		}
+			// 		bp.AddParentBlueprint(pbp)
+			// 	}
+			// }
 
 			if i, ok := s.(*ssa.InterfaceType); ok {
 				store := b.StoreFunctionBuilder()
@@ -130,7 +158,6 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 				if !ok {
 					continue
 				}
-				// fun, _ := ssa.ToFunction(bp.Constructor)
 				log.Infof("add interface funcName = %s", fun.GetName())
 				fun.AddLazyBuilder(func() {
 					log.Infof("build interface funcName = %s", fun.GetName())
@@ -138,42 +165,36 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 					defer func() {
 						switchHandler()
 					}()
+
+					interfaceBp := b.GetBluePrint(n)
+					if interfaceBp == nil {
+						b.NewError(ssa.Error, TAG, NotCreateBluePrint(n))
+						return
+					}
+
+					processedTypes := make(map[string]bool)
 					for funcName, _ := range i.GetMethod() {
 						for typeName, t := range b.GetStructAll() {
 							if t.GetTypeKind() == ssa.InterfaceTypeKind {
 								continue
 							}
+							if processedTypes[typeName] {
+								continue
+							}
 							if _, ok := t.GetMethod()[funcName]; ok {
-								childBp := b.GetBluePrint(typeName)
-								if childBp == nil {
+								implBp := b.GetBluePrint(typeName)
+								if implBp == nil {
 									b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
 									continue
 								}
-								parentBp := b.GetBluePrint(n)
-								if parentBp == nil {
-									b.NewError(ssa.Error, TAG, NotCreateBluePrint(typeName))
-									continue
-								}
-								parentBp.AddParentBlueprint(childBp)
+								implBp.AddInterfaceBlueprint(interfaceBp)
+								processedTypes[typeName] = true
 							}
 						}
 					}
 				}, false)
 			}
 		}
-
-		for _, impo := range ast.AllImportDecl() {
-			names, paths := b.buildImportDecl(impo.(*gol.ImportDeclContext))
-
-			for i, name := range names {
-				pathl := strings.Split(paths[i], "/")
-				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
-				if lib, _ := b.GetImportPackage(name); lib != nil {
-					b.GetProgram().ImportAll(lib)
-				}
-			}
-		}
-
 		exportHandler()
 	} else {
 		if packag, ok := ast.PackageClause().(*gol.PackageClauseContext); ok {
@@ -187,6 +208,15 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 			defer func() {
 				lib.VisitAst(ast)
 			}()
+
+			for _, impo := range ast.AllImportDecl() {
+				names, _ := b.buildImportDecl(impo.(*gol.ImportDeclContext))
+				for _, name := range names {
+					if lib, _ := b.GetImportPackage(name); lib != nil {
+						b.GetProgram().ImportAll(lib)
+					}
+				}
+			}
 			builder := lib.GetAndCreateFunctionBuilder(pkgNameCurrent, string(ssa.MainFunctionName))
 
 			if builder != nil {
@@ -399,7 +429,14 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 				if b.GetFromCmap(id) {
 					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
-				b.AddGlobalVariable(id, b.GetDefaultValue(ssaTyp))
+				store := b.StoreFunctionBuilder()
+				b.AddGlobalVariable(id, func() ssa.Value {
+					switchHandler := b.SwitchFunctionBuilder(store)
+					defer func() {
+						switchHandler()
+					}()
+					return b.GetDefaultValue(ssaTyp)
+				})
 				recoverRange()
 			}
 		} else {
@@ -410,10 +447,17 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 					b.NewError(ssa.Warn, TAG, CannotAssign())
 				}
 			}
+
+			store := b.StoreFunctionBuilder()
 			for i, value := range rightList {
-				rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
-				rightvl = append(rightvl, rightv)
-				b.AddGlobalVariable(leftList[i].GetText(), rightv)
+				b.AddGlobalVariable(leftList[i].GetText(), func() ssa.Value {
+					switchHandler := b.SwitchFunctionBuilder(store)
+					defer func() {
+						switchHandler()
+					}()
+					rightv, _ := b.buildExpression(value.(*gol.ExpressionContext), false)
+					return rightv
+				})
 			}
 		}
 	} else {
@@ -490,16 +534,16 @@ func (b *astbuilder) AssignList(leftVariables []*ssa.Variable, rightVariables []
 		}
 
 		for i := range leftVariables {
-			if i >= length {
-				value := b.ReadValue(leftVariables[i].GetName())
-				b.AssignVariable(leftVariables[i], value)
-				continue
-			}
+			// if i >= length {
+			// 	value := b.ReadValue(leftVariables[i].GetName())
+			// 	b.AssignVariable(leftVariables[i], value)
+			// 	continue
+			// }
 
-			if length == 1 {
-				b.AssignVariable(leftVariables[i], c)
-				continue
-			}
+			// if length == 1 {
+			// 	b.AssignVariable(leftVariables[i], c)
+			// 	continue
+			// }
 			value := b.ReadMemberCallValue(c, b.EmitConstInstPlaceholder(i))
 			b.AssignVariable(leftVariables[i], value)
 		}
@@ -662,8 +706,11 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}
@@ -688,8 +735,6 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		b.handleImportPackage()
-
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
@@ -706,7 +751,7 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 
 		b.SetGlobal = false
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block)
+			b.buildBlock(block, true)
 		}
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
@@ -786,8 +831,11 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}
@@ -827,8 +875,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		b.handleImportPackage()
-
 		if para, ok := fun.Signature().(*gol.SignatureContext); ok {
 			params, result = b.buildSignature(para)
 		}
@@ -841,7 +887,7 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 
 		b.SetGlobal = false
 		if block, ok := fun.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block)
+			b.buildBlock(block, true)
 		}
 		b.Finish()
 		b.FunctionBuilder = b.PopFunction()
@@ -956,7 +1002,7 @@ func (b *astbuilder) buildParameterDecl(para *gol.ParameterDeclContext) []ssa.Ty
 				if len(bp.ParentBlueprints) == 0 {
 					continue
 				}
-				if exlib := b.PeekValue(bp.ParentBlueprints[0].Name); exlib != nil {
+				if exlib := b.PeekValueInRoot(bp.ParentBlueprints[0].Name); exlib != nil {
 					method := bp.GetMagicMethod(ssa.Constructor, b.FunctionBuilder)
 					lv := b.CreateMemberCallVariable(exlib, method)
 					b.AssignVariable(lv, p)
@@ -1087,7 +1133,7 @@ func (b *astbuilder) buildResultParameterDecl(para *gol.ParameterDeclContext) ([
 	return []ssa.Value{zero}, []ssa.Type{ssatyp}
 }
 
-func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
+func (b *astbuilder) buildBlock(block *gol.BlockContext, buildGlobal bool, syntaxBlocks ...bool) {
 	syntaxBlock := false
 	if len(syntaxBlocks) > 0 {
 		syntaxBlock = syntaxBlocks[0]
@@ -1106,23 +1152,14 @@ func (b *astbuilder) buildBlock(block *gol.BlockContext, syntaxBlocks ...bool) {
 		return
 	}
 
-	handleGlobal := func() {
-		if global := b.GetProgram().GlobalScope; global != nil && !b.SetGlobal {
-			b.SetGlobal = true
-			for i, m := range global.GetAllMember() {
-				variable := b.CreateLocalVariable(i.String())
-				b.AssignVariable(variable, m)
-			}
-		}
-	}
-
 	if syntaxBlock {
 		b.BuildSyntaxBlock(func() {
-			handleGlobal()
 			b.buildStatementList(s)
 		})
 	} else {
-		handleGlobal()
+		if buildGlobal {
+			b.LoadGlobalVariable()
+		}
 		b.buildStatementList(s)
 	}
 }
@@ -1182,7 +1219,7 @@ func (b *astbuilder) buildStatement(stmt *gol.StatementContext) {
 	}
 
 	if s, ok := stmt.Block().(*gol.BlockContext); ok {
-		b.buildBlock(s, true)
+		b.buildBlock(s, false, true)
 	}
 
 	if s, ok := stmt.BreakStmt().(*gol.BreakStmtContext); ok {
@@ -1344,11 +1381,6 @@ func (b *astbuilder) buildLabeledStmt(stmt *gol.LabeledStmtContext) {
 	}
 
 	LabelBuilder := b.GetLabelByName(text)
-	if LabelBuilder == nil {
-		LabelBuilder = b.BuildLabel(text)
-		b.labels[text] = LabelBuilder
-	}
-
 	block := LabelBuilder.GetBlock()
 	LabelBuilder.Build()
 	b.AddLabel(text, block)
@@ -1624,16 +1656,16 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 		cond := e
 		loop.SetCondition(func() ssa.Value {
 			var condition ssa.Value
-			if cond == nil {
+			if utils.IsNil(cond) {
 				condition = b.EmitConstInst(true)
 			} else {
 				// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 				// defer recoverRange()
 				condition, _ = b.buildExpression(cond, false)
-				if condition == nil {
-					condition = b.EmitConstInst(true)
-					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-				}
+			}
+			if utils.IsNil(condition) {
+				condition = b.EmitConstInst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 			}
 			return condition
 		})
@@ -1651,18 +1683,22 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 			cond := expr
 			loop.SetCondition(func() ssa.Value {
 				var condition ssa.Value
-				if cond == nil {
+				if utils.IsNil(cond) {
 					condition = b.EmitConstInst(true)
 				} else {
 					// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 					// defer recoverRange()
 					condition, _ = b.buildExpression(cond, false)
-					if condition == nil {
-						condition = b.EmitConstInst(true)
-						// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-					}
+				}
+				if utils.IsNil(condition) {
+					condition = b.EmitConstInst(true)
+					// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 				}
 				return condition
+			})
+		} else {
+			loop.SetCondition(func() ssa.Value {
+				return b.EmitConstInst(true)
 			})
 		}
 
@@ -1681,14 +1717,13 @@ func (b *astbuilder) buildForStmt(stmt *gol.ForStmtContext) {
 	} else {
 		// for range
 		loop.SetCondition(func() ssa.Value {
-			condition := b.EmitConstInst(true)
-			return condition
+			return b.EmitConstInst(true)
 		})
 	}
 	//  build body
 	loop.SetBody(func() {
 		if block, ok := stmt.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block)
+			b.buildBlock(block, false)
 		}
 	})
 
@@ -1724,6 +1759,10 @@ func (b *astbuilder) buildForRangeStmt(stmt *gol.RangeClauseContext, loop *ssa.L
 				b.AssignVariable(lefts[1], field)
 			}
 		}
+		if utils.IsNil(ok) {
+			ok = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+		}
 		return ok
 	})
 }
@@ -1756,7 +1795,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 					return rvalue
 				},
 				func() {
-					b.buildBlock(stmt.Block(0).(*gol.BlockContext))
+					b.buildBlock(stmt.Block(0).(*gol.BlockContext), false)
 				},
 			)
 		}
@@ -1764,7 +1803,7 @@ func (b *astbuilder) buildIfStmt(stmt *gol.IfStmtContext) {
 		if stmt.ELSE() != nil {
 			if elseBlock, ok := stmt.Block(1).(*gol.BlockContext); ok {
 				return func() {
-					b.buildBlock(elseBlock)
+					b.buildBlock(elseBlock, false)
 				}
 			} else if elifstmt, ok := stmt.IfStmt().(*gol.IfStmtContext); ok {
 				build := build(elifstmt)
@@ -1995,7 +2034,9 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		libName := qul.IDENTIFIER(0).GetText()
 		typName := qul.IDENTIFIER(1).GetText()
 		lib, path := b.GetImportPackage(libName)
-		path = path + "/" + typName
+		if path != "" {
+			path = path + "/" + typName
+		}
 
 		if lib != nil && path != "" {
 			if _, ok := lib.GetExportType(libName); !ok {
@@ -2027,7 +2068,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		if exportType == nil {
 			exportType = ssa.CreateAnyType()
 		}
-		return exportType
+		return HandleFullTypeNames(exportType, []string{path})
 	} else {
 		name := tname.IDENTIFIER().GetText()
 		ssatyp := ssa.GetTypeByStr(name)
@@ -2085,8 +2126,11 @@ func (b *astbuilder) buildMethodSpec(stmt *gol.MethodSpecContext, interfacetyp *
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}

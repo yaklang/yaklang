@@ -27,7 +27,9 @@ type RuleFormat struct {
 	once   sync.Once
 
 	// requireDescKeyType map[SFDescKeyType]bool // 第一个desc语句中需要的desc item key类型，没有会补全
-	requireDescKeyType *omap.OrderedMap[SFDescKeyType, bool] // 第一个desc语句中需要的desc item key类型，没有会补全
+	requireDescKeyType      *omap.OrderedMap[SFDescKeyType, bool] // 第一个desc语句中需要的desc item key类型，没有会补全
+	requireAlertDescKeyType *omap.OrderedMap[SFDescKeyType, bool]
+
 	// desc handler
 	descHandler  func(key, value string) string
 	alertHandler func(name, key, value string) string
@@ -79,13 +81,26 @@ func RuleFormatWithRuleID(ruleID string) RuleFormatOption {
 	}
 }
 
-func RuleFormatWithRequireDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
+// RuleFormatWithRequireInfoDescKeyType 指定info desc必须要有的key，没有的话会使用ai补全
+func RuleFormatWithRequireInfoDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
 	return func(f *RuleFormat) {
 		if f.requireDescKeyType == nil {
 			f.requireDescKeyType = omap.NewEmptyOrderedMap[SFDescKeyType, bool]()
 		}
 		for _, t := range typ {
 			f.requireDescKeyType.Set(t, false)
+		}
+	}
+}
+
+// RuleFormatWithRequireAlertDescKeyType 指定alert desc必须要有的key，没有的话会使用ai补全
+func RuleFormatWithRequireAlertDescKeyType(typ ...SFDescKeyType) RuleFormatOption {
+	return func(f *RuleFormat) {
+		if f.requireAlertDescKeyType == nil {
+			f.requireAlertDescKeyType = omap.NewEmptyOrderedMap[SFDescKeyType, bool]()
+		}
+		for _, t := range typ {
+			f.requireAlertDescKeyType.Set(t, false)
 		}
 	}
 }
@@ -108,7 +123,7 @@ func FormatRule(ruleContent string, opts ...RuleFormatOption) (rule string, err 
 		}
 	}()
 	compileErrors := make([]error, 0)
-	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end memedit.PositionIf) {
+	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end *memedit.Position) {
 		compileErrors = append(compileErrors, antlr4util.NewSourceCodeError(msg, start, end))
 	})
 	errLis := antlr4util.NewErrorListener(func(self *antlr4util.ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {
@@ -159,7 +174,7 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 			if descCount == 0 {
 				f.VisitInfoDescription(stmt.DescriptionStatement())
 			} else {
-				f.VisitDescription(stmt.DescriptionStatement())
+				f.VisitTestDescription(stmt.DescriptionStatement())
 			}
 			descCount++
 		case *sf.AlertContext:
@@ -176,6 +191,7 @@ func (f *RuleFormat) Visit(flow sf.IFlowContext, editor *memedit.MemEditor) {
 	}
 
 }
+
 func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 	alertStmt, ok := alert.(*sf.AlertStatementContext)
 	if !ok || alertStmt == nil {
@@ -211,7 +227,22 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 			if strings.Contains(value, "MISSING") {
 				log.Warnf("desc item %s value is missing, please check the rule: %s", key, f.ruleID)
 			}
-			alertMsg.Set(strings.ToLower(key), value)
+			descType := ValidDescItemKeyType(key)
+			if descType == SFDescKeyType_Unknown {
+				alertMsg.Set(key, value)
+			} else {
+				// 标准化key的名字
+				alertMsg.Set(string(descType), value)
+			}
+		}
+	}
+
+	// 检测缺少的desc key
+	for _, keyTyp := range f.getAllRequireAlertDescKey() {
+		key := string(keyTyp)
+		_, b := alertMsg.Get(key)
+		if !b {
+			alertMsg.Set(key, "")
 		}
 	}
 	f.Write("alert $%s", variable)
@@ -221,25 +252,25 @@ func (f *RuleFormat) VisitAlertStatement(alert sf.IAlertStatementContext) {
 	}
 
 	f.Write(" for {\n")
-	alertMsg.ForEach(func(key, value string) bool {
-		if value == "" {
-			return true
-		}
+	alertMsg.ForEach(func(key string, value string) bool {
 		newVal := f.alertHandler(variable, key, value)
 		if lo.Contains([]string{"none", ""}, newVal) {
 			return true
 		}
-		switch key {
-		case "desc", "solution":
-			res := fmt.Sprintf(`	%s: <<<CODE
+		typ := ValidDescItemKeyType(key)
+
+		// 复杂类型使用heredoc
+		if IsComplexDescType(typ) {
+			upperKey := strings.ToUpper(key)
+			res := fmt.Sprintf(`	%s: <<<%s
 %s
-CODE
-`, key, newVal)
+%s
+`, key, upperKey, newVal, upperKey)
 			if strings.Contains(res, "MISSING") {
 				log.Warnf("alert item %s value is missing, please check the rule: %s", key, res)
 			}
 			f.Write(res)
-		default:
+		} else {
 			res := fmt.Sprintf("\t%s: \"%s\",\n", key, newVal)
 			if strings.Contains(res, "MISSING") {
 				log.Warnf("alert item %s value is missing, please check the rule: %s", key, res)
@@ -251,7 +282,7 @@ CODE
 	f.Write("}\n")
 }
 
-// VisitInfoDescription针对第一个desc语句进行处理，主要补全一些规则描述性信息
+// VisitInfoDescription 针对第一个desc语句进行处理，主要补全一些规则描述性信息
 func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) {
 	i, _ := desc.(*sf.DescriptionStatementContext)
 	if i == nil {
@@ -274,23 +305,20 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			}
 
 			descType := ValidDescItemKeyType(key)
-			if descType == SFDescKeyType_Solution {
-				log.Info("b")
-			}
 			// 记录访问过的desc item key类型，以便后续确认还缺少哪些key
 			f.visitRequireInfoDescKeyType(descType)
 			// 不进行字段补全
-			if f.descHandler == nil || !f.needCompletion(descType) {
+			if f.descHandler == nil || !f.infoDescNeedCompletion(descType) {
 				f.Write("\t%s\n", f.GetTextFromToken(item))
 				continue
 			}
 
 			// 区分StringLiteral、HereDoc和NumberLiteral
-			if valueItem.StringLiteral() != nil && !IsComplexInfoDescType(descType) {
+			if valueItem.StringLiteral() != nil && !IsComplexDescType(descType) {
 				value := f.VisitStringLiteral(valueItem.StringLiteral())
 				value = f.descHandler(key, value)
 				f.Write("\t%s: \"%s\"\n", key, value)
-			} else if valueItem.StringLiteral() != nil && IsComplexInfoDescType(descType) {
+			} else if valueItem.StringLiteral() != nil && IsComplexDescType(descType) {
 				// 虽然原规则使用StringLiteral写，但是descType是复杂类型，AI补全的可能是复杂文本
 				// 所以这里使用heredoc
 				value := f.VisitStringLiteral(valueItem.StringLiteral())
@@ -332,9 +360,14 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 		}
 	}
 
-	// 补充没有的字段
+	// 补充没有的字段（但不包括测试用例，测试用例应该在第二个desc中）
 	if toAdd := f.getDescKeyTypesToAdd(); toAdd != nil {
 		for _, keyType := range toAdd {
+			// 跳过测试用例，测试用例应该在第二个desc中处理
+			if IsTestCaseKey(string(keyType)) {
+				continue
+			}
+
 			if keyType == SFDescKeyType_Rule_Id {
 				f.Write("\t%s: \"%s\"\n", string(keyType), f.ruleID)
 				continue
@@ -342,7 +375,7 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 			if f.descHandler != nil {
 				value := f.descHandler(string(keyType), "")
 				// 复杂文本使用heredoc
-				if IsComplexInfoDescType(keyType) {
+				if IsComplexDescType(keyType) {
 					upperKey := strings.ToUpper(string(keyType))
 					f.Write("\t%s: <<<%s\n", string(keyType), upperKey)
 					f.Write("%s\n", value)
@@ -359,7 +392,8 @@ func (f *RuleFormat) VisitInfoDescription(desc sf.IDescriptionStatementContext) 
 	f.Write(")\n")
 }
 
-func (f *RuleFormat) VisitDescription(desc sf.IDescriptionStatementContext) {
+// VisitTestDescription 处理除了第一个以外的desc，也就是测试
+func (f *RuleFormat) VisitTestDescription(desc sf.IDescriptionStatementContext) {
 	i, _ := desc.(*sf.DescriptionStatementContext)
 	if i == nil {
 		return
@@ -375,6 +409,19 @@ func (f *RuleFormat) VisitDescription(desc sf.IDescriptionStatementContext) {
 			f.Write("\t%s\n", f.GetTextFromToken(item))
 		}
 	}
+	// 补充测试用例（针对后续desc）
+	if testCasesToAdd := f.getTestCasesToAdd(); testCasesToAdd != nil {
+		for _, testCaseKey := range testCasesToAdd {
+			if f.descHandler != nil {
+				value := f.descHandler(testCaseKey, "")
+				upperKey := "CODE"
+				f.Write("\t\"%s\": <<<%s\n", testCaseKey, upperKey)
+				f.Write("%s\n", value)
+				f.Write("%s\n", upperKey)
+			}
+		}
+	}
+
 	f.Write(")\n")
 }
 
@@ -434,7 +481,7 @@ func (f *RuleFormat) VisitCrlfHereDoc(raw sf.ICrlfHereDocContext) string {
 	}
 }
 
-func (f *RuleFormat) needCompletion(descType SFDescKeyType) bool {
+func (f *RuleFormat) infoDescNeedCompletion(descType SFDescKeyType) bool {
 	if f == nil || f.requireDescKeyType == nil {
 		return false
 	}
@@ -461,6 +508,56 @@ func (f *RuleFormat) getDescKeyTypesToAdd() []SFDescKeyType {
 	f.requireDescKeyType.ForEach(func(i SFDescKeyType, v bool) bool {
 		if !v {
 			ret = append(ret, i)
+		}
+		return true
+	})
+	return ret
+}
+
+func (f *RuleFormat) getAllRequireAlertDescKey() []SFDescKeyType {
+	if f.requireAlertDescKeyType == nil {
+		return []SFDescKeyType{}
+	}
+	return lo.MapToSlice(f.requireAlertDescKeyType.GetMap(), func(key SFDescKeyType, value bool) SFDescKeyType {
+		return key
+	})
+}
+
+// IsTestCaseKey 判断是否是测试用例key
+func IsTestCaseKey(key string) bool {
+	return strings.Contains(key, "://") && (strings.HasPrefix(key, "file://") ||
+		strings.HasPrefix(key, "fs://") ||
+		strings.HasPrefix(key, "filesystem://") ||
+		strings.HasPrefix(key, "safefile://") ||
+		strings.HasPrefix(key, "safe-file://") ||
+		strings.HasPrefix(key, "negative-file://") ||
+		strings.HasPrefix(key, "negativefs://") ||
+		strings.HasPrefix(key, "safe-fs://") ||
+		strings.HasPrefix(key, "safefilesystem://") ||
+		strings.HasPrefix(key, "safe-filesystem://") ||
+		strings.HasPrefix(key, "safe://") ||
+		strings.HasPrefix(key, "safefs://") ||
+		strings.HasPrefix(key, "nfs://"))
+}
+
+// needTestCaseCompletion 检查是否需要补全测试用例
+func (f *RuleFormat) needTestCaseCompletion(key string) bool {
+	if f == nil || f.requireDescKeyType == nil {
+		return false
+	}
+	_, ok := f.requireDescKeyType.Get(SFDescKeyType(key))
+	return ok
+}
+
+// getTestCasesToAdd 获取需要添加的测试用例
+func (f *RuleFormat) getTestCasesToAdd() []string {
+	if f.requireDescKeyType == nil {
+		return nil
+	}
+	var ret []string
+	f.requireDescKeyType.ForEach(func(i SFDescKeyType, v bool) bool {
+		if !v && IsTestCaseKey(string(i)) {
+			ret = append(ret, string(i))
 		}
 		return true
 	})

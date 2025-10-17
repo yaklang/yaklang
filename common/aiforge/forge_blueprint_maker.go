@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -49,6 +51,7 @@ func (c *YakForgeBlueprintAIDOptionsConfig) ToOptions() []aid.Option {
 type YakForgeBlueprintConfig struct {
 	// prompt
 	Name             string `json:"name,omitempty"`
+	VerboseName      string `json:"verbose_name"`
 	InitPrompt       string `json:"init_prompt,omitempty"`
 	PersistentPrompt string `json:"persistent_prompt,omitempty"`
 	PlanPrompt       string `json:"plan_prompt,omitempty"`
@@ -106,6 +109,7 @@ func (c *YakForgeBlueprintConfig) WithSchemaForge(forge *schema.AIForge) *YakFor
 	c.Description = forge.Description
 	c.Actions = forge.Actions
 	c.ForgeContent = forge.ForgeContent
+	c.CLIParameterRuleYaklangCode = forge.Params
 	return c
 }
 func (c *YakForgeBlueprintConfig) WithActionName(name string) *YakForgeBlueprintConfig {
@@ -192,8 +196,12 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 		tools = yakscripttools.GetYakScriptAiTools(strings.Split(config.Tools, ",")...)
 	}
 	name := config.Name
+	cliCode := config.CLIParameterRuleYaklangCode
+	if cliCode == "" {
+		cliCode = config.ForgeContent
+	}
 	blueprint := NewForgeBlueprint(name,
-		WithOriginYaklangCliCode(config.CLIParameterRuleYaklangCode),
+		WithOriginYaklangCliCode(cliCode),
 		WithToolKeywords(strings.Split(config.ToolKeywords, ",")),
 		WithTools(tools...),
 		WithInitializePrompt(config.InitPrompt),
@@ -213,7 +221,7 @@ func (c *YakForgeBlueprintConfig) Build() (*ForgeBlueprint, error) {
 				actionName = actions[0]
 				alias = actions[1:]
 			}
-			action, err := aid.ExtractAction(s, actionName, alias...)
+			action, err := aicommon.ExtractAction(s, actionName, alias...)
 			if err != nil {
 				log.Errorf("Failed to extract action from smart: %s", err)
 				return

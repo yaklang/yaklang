@@ -86,7 +86,12 @@ func (s *SyntaxFlowVirtualMachine) Load(rule *schema.SyntaxFlowRule) (*SFFrame, 
 		if err != nil {
 			return nil, false, utils.Errorf("SyntaxFlow compile error: %v", err)
 		}
-		return frame, true, nil
+		// compile only with rule.Content will lose original rule schema info
+		// so set it back here
+		newFrame := newSfFrameEx(s.vars, rule.Content, frame.Codes, rule, s.config)
+		newFrame.config = s.config
+		newFrame.vm = s
+		return newFrame, true, nil
 	}
 }
 
@@ -106,7 +111,7 @@ func (s *SyntaxFlowVirtualMachine) Compile(text string) (frame *SFFrame, ret err
 			frame = nil
 		}
 	}()
-	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end memedit.PositionIf) {
+	errHandler := antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, end *memedit.Position) {
 		s.compileErrors = append(s.compileErrors, antlr4util.NewSourceCodeError(msg, start, end))
 	})
 	errLis := antlr4util.NewErrorListener(func(self *antlr4util.ErrorListener, recognizer antlr.Recognizer, offendingSymbol interface{}, line, column int, msg string, e antlr.RecognitionException) {

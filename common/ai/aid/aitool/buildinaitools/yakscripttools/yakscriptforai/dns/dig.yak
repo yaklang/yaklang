@@ -1,11 +1,63 @@
 __DESC__ = "一个用于执行多种DNS查询的工具，包括A、AAAA、NS、AXFR和TXT记录，根据提供的域名进行查询并显示结果。"
-
+__VERBOSE_NAME__ = "DNS查询工具"
 __KEYWORDS__ = "domain name,域名解析,a记录,dns查询,dns helper,aaaa record,ns record,txt record,network tools,internet protocols,aaaa记录,dns queries,网络工具,ns记录,txt记录,域名信息,dns lookup,a record,axfr记录"
 
 target = cli.String("domain", cli.setRequired(true), cli.setHelp("the target domain u want to check")) //"www.example.com"
+dnsType = cli.String("type", cli.setRequired(false), cli.setHelp("the record type you want to check, use '*' to query all, or some specific type name like 'A', 'NS' ... "))
+dnsServersRaw = cli.String("dns-servers", cli.setRequired(false), cli.setHelp("what dns server u want to use, default 8.8.8.8,1.1.1.1, multi-servers use comma ',' split "))
+
 cli.check()
 
 yakit.AutoInitYakit()
+
+dnsServers = str.Split(dnsServersRaw, ",")
+
+switch str.ToUpper(dnsType) {
+case "A":
+    yakit.Info("query dns[A] for %v", target)
+    count := 0
+    for i in dns.QueryIPAll(target, dns.dnsServers(dnsServers...)) {
+        count++
+        yakit.Info("DNS[A] for %v is %v", target, i)
+    }
+    if count <= 0 {
+        yakit.Info("No A record found in %v", target)
+    }
+    return
+case "NS":
+    yakit.Info("query dns[MX] for %v", target)
+    count := 0
+    for i in dns.QueryNS(target /*type: string*/, dns.dnsServers(dnsServers...)) {
+        count++
+        yakit.Info("DNS[NS] for %v is %v", target, i)
+    }
+    if count <= 0 {
+        yakit.Info("No NS record found in %v", target)
+    }
+    return
+case "TXT":
+    yakit.Info("query dns[TXT] for %v", target)
+    count := 0
+    for i in dns.QueryTXT(target /*type: string*/, dns.dnsServers(dnsServers...)) {
+        count++
+        yakit.Info("DNS[TXT] for %v is %v", target, i)
+    }
+    if count <= 0 {
+        yakit.Info("No TXT record found in %v", target)
+    }
+    return
+case "AXFR":
+    yakit.Info("query dns AXFR for %v", target)
+    count := 0
+    for i in dns.QuertAxfr(target /*type: string*/, dns.dnsServers(dnsServers...)) {
+        count++
+        yakit.Info("DNS[AXFR] for %v is %v", target, i)
+    }
+    if count <= 0 {
+        yakit.Info("No AXFR record found in %v", target)
+    }
+    return
+}
 
 yakit.Info("start to check NS/A/AAAA/AXFR/TXT records for %v", target)
 

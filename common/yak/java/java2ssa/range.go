@@ -2,7 +2,7 @@ package java2ssa
 
 import "github.com/yaklang/yaklang/common/yak/ssa"
 
-func (y *builder) SetRange(token ssa.CanStartStopToken) func() {
+func (y *singleFileBuilder) SetRange(token ssa.CanStartStopToken) func() {
 	if y == nil {
 		return func() {}
 	}

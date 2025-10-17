@@ -4,20 +4,15 @@ desc(
 	type:security
 	desc: <<<DESC
 ### 规则描述
-
 该规则用于检测 Java 代码中对 `java.util.zip.ZipFile` 和 `org.apache.commons.compress.archivers.zip.ZipFile` 类中返回对象的方法调用后，是否对返回值进行了后续处理，例如赋值给变量或进一步操作。如果调用的返回对象没有被使用，可能导致潜在的资源泄露或逻辑错误。
-
 ### 触发场景
-
 在处理压缩文件时，开发者可能调用 ZipFile 类中的方法来获取特定条目（Entry）的输入流或其他信息。如果对这些方法的返回值（例如 `getInputStream()` 返回的 `InputStream` 对象）没有进行后续处理，如读取数据、关闭流，或者将返回值赋值给一个变量以便后续使用，就会触发此规则。
-
 ```java
 package org.example;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.io.InputStream;
 import java.io.IOException;
-
 public class ZipFileExample {
     public static void main(String[] args) {
         String zipFilePath = "example.zip";
@@ -25,7 +20,6 @@ public class ZipFileExample {
             java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
             ZipEntry entry = entries.nextElement();
             zipFile.getInputStream(entry); // 未检查或使用返回值
-            
             org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
             commonsZipFile.getInputStream(entry); // 未检查或使用返回值
         } catch (IOException e) {
@@ -34,71 +28,64 @@ public class ZipFileExample {
     }
 }
 ```
-
 ### 潜在影响
-
 未检查或使用返回值可能导致以下问题：
-
-*   **资源泄露**: 某些方法返回的资源（如输入流）如果没有被正确关闭，可能导致文件句柄或其他系统资源的泄露，长期运行可能耗尽系统资源。
-*   **逻辑错误**: 如果方法的返回值是操作结果或状态指示，未检查可能导致程序逻辑出现错误。
-*   **性能问题**: 创建了对象或资源却没有使用，浪费计算资源。
-
+- **资源泄露**: 某些方法返回的资源（如输入流）如果没有被正确关闭，可能导致文件句柄或其他系统资源的泄露，长期运行可能耗尽系统资源。
+- **逻辑错误**: 如果方法的返回值是操作结果或状态指示，未检查可能导致程序逻辑出现错误。
+- **性能问题**: 创建了对象或资源却没有使用，浪费计算资源。
 因此，在调用这些返回对象的方法后，建议检查返回值并根据需要进行处理（例如，赋值给变量进行后续操作，确保资源被正确管理和释放）。
 DESC
 	rule_id: "dc9276ba-671d-4160-9544-51849fc6b72d"
 	solution: <<<SOLUTION
 ### 修复建议
-
-1.  **检查并使用返回值:** 对于返回对象的 API 调用，请确保将返回值赋值给一个变量，并在后续代码中使用该变量进行处理。对于返回流（如 `getInputStream`），请确保在使用完毕后关闭流，通常使用 try-with-resources 语句可以有效管理流的关闭。
-
-    ```java
-    // 修复代码示例
-    package org.example;
-    import java.util.zip.ZipEntry;
-    import java.util.zip.ZipFile;
-    import java.io.InputStream;
-    import java.io.IOException;
-
-    public class ZipFileExampleFixed {
-        public static void main(String[] args) {
-            String zipFilePath = "example.zip";
-            try (ZipFile zipFile = new ZipFile(zipFilePath)) {
-                java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
-                if (entries.hasMoreElements()) {
-                    ZipEntry entry = entries.nextElement();
-                    // 检查并使用返回值，使用 try-with-resources 确保流关闭
-                    try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
-                        // 对 entryInputStream 进行处理，例如读取数据
-                         int data = entryInputStream.read();
-                         while(data != -1) {
-                             System.out.print((char) data);
-                             data = entryInputStream.read();
-                         }
+#### 1. 检查并使用返回值
+对于返回对象的 API 调用，请确保将返回值赋值给一个变量，并在后续代码中使用该变量进行处理。对于返回流（如 `getInputStream`），请确保在使用完毕后关闭流，通常使用 try-with-resources 语句可以有效管理流的关闭。
+```java
+// 修复代码示例
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+public class ZipFileExampleFixed {
+    public static void main(String[] args) {
+        String zipFilePath = "example.zip";
+        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            if (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                // 检查并使用返回值，使用 try-with-resources 确保流关闭
+                try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
+                    // 对 entryInputStream 进行处理，例如读取数据
+                    int data = entryInputStream.read();
+                    while(data != -1) {
+                        System.out.print((char) data);
+                        data = entryInputStream.read();
                     }
                 }
-
-                org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
-                if (commonsZipFile.entries().hasMoreElements()){
-                     ZipEntry entry2 = commonsZipFile.entries().nextElement();
-                    try (InputStream entryInputStream = commonsZipFile.getInputStream(entry2)) {
-                        // 对 entryInputStream 进行处理
-                        int data = entryInputStream.read();
-                         while(data != -1) {
-                             System.out.print((char) data);
-                             data = entryInputStream.read();
-                         }
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
             }
+            org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
+            if (commonsZipFile.entries().hasMoreElements()){
+                ZipEntry entry2 = commonsZipFile.entries().nextElement();
+                try (InputStream entryInputStream = commonsZipFile.getInputStream(entry2)) {
+                    // 对 entryInputStream 进行处理
+                    int data = entryInputStream.read();
+                    while(data != -1) {
+                        System.out.print((char) data);
+                        data = entryInputStream.read();
+                    }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
-    ```
-
-2.  **仔细阅读 API 文档:** 在使用第三方库或标准库中的方法时，仔细阅读其 API 文档，了解方法的返回值及其含义，确保正确处理返回值。
-
-3.  **代码审查:** 定期进行代码审查，以发现未检查返回值的潜在问题。
+}
+```
+#### 2. 仔细阅读 API 文档
+在使用第三方库或标准库中的方法时，仔细阅读其 API 文档，了解方法的返回值及其含义，确保正确处理返回值。
+#### 3. 定期进行代码审查
+定期进行代码审查，以发现未检查返回值的潜在问题。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-252: Unchecked Return Value](https://cwe.mitre.org/data/definitions/252.html)
@@ -110,212 +97,182 @@ $toCheck?{<typeName>?{have:'java.util.zip.ZipFile' }}?{!<getUsers>} as $weak1;
 alert $weak1 for {
 	title: "Check Java Zip Unchecked Return Value",
 	title_zh: "检测Java Zip未检查返回值的API",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
-1.  **检查并使用返回值:** 对于返回对象的 API 调用，请确保将返回值赋值给一个变量，并在后续代码中使用该变量进行处理。对于返回流（如 `getInputStream`），请确保在使用完毕后关闭流，通常使用 try-with-resources 语句可以有效管理流的关闭。
-
-    ```java
-    // 修复代码示例
-    package org.example;
-    import java.util.zip.ZipEntry;
-    import java.util.zip.ZipFile;
-    import java.io.InputStream;
-    import java.io.IOException;
-
-    public class ZipFileExampleFixed {
-        public static void main(String[] args) {
-            String zipFilePath = "example.zip";
-            try (ZipFile zipFile = new ZipFile(zipFilePath)) {
-                java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
-                if (entries.hasMoreElements()) {
-                    ZipEntry entry = entries.nextElement();
-                    // 检查并使用返回值，使用 try-with-resources 确保流关闭
-                    try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
-                        // 对 entryInputStream 进行处理，例如读取数据
-                         int data = entryInputStream.read();
-                         while(data != -1) {
-                             System.out.print((char) data);
-                             data = entryInputStream.read();
-                         }
-                    }
-                }
-
-                org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
-                if (commonsZipFile.entries().hasMoreElements()){
-                     ZipEntry entry2 = commonsZipFile.entries().nextElement();
-                    try (InputStream entryInputStream = commonsZipFile.getInputStream(entry2)) {
-                        // 对 entryInputStream 进行处理
-                        int data = entryInputStream.read();
-                         while(data != -1) {
-                             System.out.print((char) data);
-                             data = entryInputStream.read();
-                         }
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-    ```
-
-2.  **仔细阅读 API 文档:** 在使用第三方库或标准库中的方法时，仔细阅读其 API 文档，了解方法的返回值及其含义，确保正确处理返回值。
-
-3.  **代码审查:** 定期进行代码审查，以发现未检查返回值的潜在问题。
-CODE
-	desc: <<<CODE
+1. **检查并使用返回值:** 对于返回对象的 API 调用，请确保将返回值赋值给一个变量，并在后续代码中使用该变量进行处理。对于返回流（如 `getInputStream`），请确保在使用完毕后关闭流，通常使用 try-with-resources 语句可以有效管理流的关闭。
+```java
+// 修复代码示例
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+public class ZipFileExampleFixed {
+public static void main(String[] args) {
+String zipFilePath = "example.zip";
+try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+if (entries.hasMoreElements()) {
+ZipEntry entry = entries.nextElement();
+// 检查并使用返回值，使用 try-with-resources 确保流关闭
+try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
+// 对 entryInputStream 进行处理，例如读取数据
+int data = entryInputStream.read();
+while(data != -1) {
+System.out.print((char) data);
+data = entryInputStream.read();
+}
+}
+}
+org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
+if (commonsZipFile.entries().hasMoreElements()){
+ZipEntry entry2 = commonsZipFile.entries().nextElement();
+try (InputStream entryInputStream = commonsZipFile.getInputStream(entry2)) {
+// 对 entryInputStream 进行处理
+int data = entryInputStream.read();
+while(data != -1) {
+System.out.print((char) data);
+data = entryInputStream.read();
+}
+}
+}
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+2. **仔细阅读 API 文档:** 在使用第三方库或标准库中的方法时，仔细阅读其 API 文档，了解方法的返回值及其含义，确保正确处理返回值。
+3. **代码审查:** 定期进行代码审查，以发现未检查返回值的潜在问题。
+SOLUTION
+	desc: <<<DESC
 ### 规则描述
-
 该规则用于检测 Java 代码中对 `java.util.zip.ZipFile` 和 `org.apache.commons.compress.archivers.zip.ZipFile` 类中返回对象的方法调用后，是否对返回值进行了后续处理，例如赋值给变量或进一步操作。如果调用的返回对象没有被使用，可能导致潜在的资源泄露或逻辑错误。
-
 ### 触发场景
-
 在处理压缩文件时，开发者可能调用 ZipFile 类中的方法来获取特定条目（Entry）的输入流或其他信息。如果对这些方法的返回值（例如 `getInputStream()` 返回的 `InputStream` 对象）没有进行后续处理，如读取数据、关闭流，或者将返回值赋值给一个变量以便后续使用，就会触发此规则。
-
 ```java
 package org.example;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.io.InputStream;
 import java.io.IOException;
-
 public class ZipFileExample {
-    public static void main(String[] args) {
-        String zipFilePath = "example.zip";
-        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
-            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
-            ZipEntry entry = entries.nextElement();
-            zipFile.getInputStream(entry); // 未检查或使用返回值
-            
-            org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
-            commonsZipFile.getInputStream(entry); // 未检查或使用返回值
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+public static void main(String[] args) {
+String zipFilePath = "example.zip";
+try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+ZipEntry entry = entries.nextElement();
+zipFile.getInputStream(entry); // 未检查或使用返回值
+org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
+commonsZipFile.getInputStream(entry); // 未检查或使用返回值
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 ### 潜在影响
-
 未检查或使用返回值可能导致以下问题：
-
-*   **资源泄露**: 某些方法返回的资源（如输入流）如果没有被正确关闭，可能导致文件句柄或其他系统资源的泄露，长期运行可能耗尽系统资源。
-*   **逻辑错误**: 如果方法的返回值是操作结果或状态指示，未检查可能导致程序逻辑出现错误。
-*   **性能问题**: 创建了对象或资源却没有使用，浪费计算资源。
-
+- **资源泄露**: 某些方法返回的资源（如输入流）如果没有被正确关闭，可能导致文件句柄或其他系统资源的泄露，长期运行可能耗尽系统资源。
+- **逻辑错误**: 如果方法的返回值是操作结果或状态指示，未检查可能导致程序逻辑出现错误。
+- **性能问题**: 创建了对象或资源却没有使用，浪费计算资源。
 因此，在调用这些返回对象的方法后，建议检查返回值并根据需要进行处理（例如，赋值给变量进行后续操作，或者确保资源被正确管理和释放）。
-CODE
+DESC
 	level: "info",
 	risk: "api-abuse",
 	message: "发现Java java.util.zip.ZipFile未检查返回值的API",
+	name: "weak1",
 }
 
 $toCheck?{<typeName>?{have:'org.apache.commons.compress.archivers.zip.ZipFile'}}?{!<getUsers>} as $weak2;
 alert $weak2 for {
 	title_zh: "检测Java Zip未检查返回值的API",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
-1.  **检查并使用返回值:** 对于返回对象的 API 调用，请确保将返回值赋值给一个变量，并在后续代码中使用该变量进行处理。对于返回流（如 `getInputStream`），请确保在使用完毕后关闭流，通常使用 try-with-resources 语句可以有效管理流的关闭。
-
-    ```java
-    // 修复代码示例
-    package org.example;
-    import java.util.zip.ZipEntry;
-    import java.util.zip.ZipFile;
-    import java.io.InputStream;
-    import java.io.IOException;
-
-    public class ZipFileExampleFixed {
-        public static void main(String[] args) {
-            String zipFilePath = "example.zip";
-            try (ZipFile zipFile = new ZipFile(zipFilePath)) {
-                java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
-                if (entries.hasMoreElements()) {
-                    ZipEntry entry = entries.nextElement();
-                    // 检查并使用返回值，使用 try-with-resources 确保流关闭
-                    try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
-                        // 对 entryInputStream 进行处理，例如读取数据
-                         int data = entryInputStream.read();
-                         while(data != -1) {
-                             System.out.print((char) data);
-                             data = entryInputStream.read();
-                         }
-                    }
-                }
-
-                org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
-                if (commonsZipFile.entries().hasMoreElements()){
-                     ZipEntry entry2 = commonsZipFile.entries().nextElement();
-                    try (InputStream entryInputStream = commonsZipFile.getInputStream(entry2)) {
-                        // 对 entryInputStream 进行处理
-                        int data = entryInputStream.read();
-                         while(data != -1) {
-                             System.out.print((char) data);
-                             data = entryInputStream.read();
-                         }
-                    }
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-    }
-    ```
-
-2.  **仔细阅读 API 文档:** 在使用第三方库或标准库中的方法时，仔细阅读其 API 文档，了解方法的返回值及其含义，确保正确处理返回值。
-
-3.  **代码审查:** 定期进行代码审查，以发现未检查返回值的潜在问题。
-CODE
-	desc: <<<CODE
+1. **检查并使用返回值:** 对于返回对象的 API 调用，请确保将返回值赋值给一个变量，并在后续代码中使用该变量进行处理。对于返回流（如 `getInputStream`），请确保在使用完毕后关闭流，通常使用 try-with-resources 语句可以有效管理流的关闭。
+```java
+// 修复代码示例
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+public class ZipFileExampleFixed {
+public static void main(String[] args) {
+String zipFilePath = "example.zip";
+try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+if (entries.hasMoreElements()) {
+ZipEntry entry = entries.nextElement();
+// 检查并使用返回值，使用 try-with-resources 确保流关闭
+try (InputStream entryInputStream = zipFile.getInputStream(entry)) {
+// 对 entryInputStream 进行处理，例如读取数据
+int data = entryInputStream.read();
+while(data != -1) {
+System.out.print((char) data);
+data = entryInputStream.read();
+}
+}
+}
+org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
+if (commonsZipFile.entries().hasMoreElements()){
+ZipEntry entry2 = commonsZipFile.entries().nextElement();
+try (InputStream entryInputStream = commonsZipFile.getInputStream(entry2)) {
+// 对 entryInputStream 进行处理
+int data = entryInputStream.read();
+while(data != -1) {
+System.out.print((char) data);
+data = entryInputStream.read();
+}
+}
+}
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+2. **仔细阅读 API 文档:** 在使用第三方库或标准库中的方法时，仔细阅读其 API 文档，了解方法的返回值及其含义，确保正确处理返回值。
+3. **代码审查:** 定期进行代码审查，以发现未检查返回值的潜在问题。
+SOLUTION
+	desc: <<<DESC
 ### 规则描述
-
 该规则用于检测 Java 代码中对 `java.util.zip.ZipFile` 和 `org.apache.commons.compress.archivers.zip.ZipFile` 类中返回对象的方法调用后，是否对返回值进行了后续处理，例如赋值给变量或进一步操作。如果调用的返回对象没有被使用，可能导致潜在的资源泄露或逻辑错误。
-
 ### 触发场景
-
 在处理压缩文件时，开发者可能调用 ZipFile 类中的方法来获取特定条目（Entry）的输入流或其他信息。如果对这些方法的返回值（例如 `getInputStream()` 返回的 `InputStream` 对象）没有进行后续处理，如读取数据、关闭流，或者将返回值赋值给一个变量以便后续使用，就会触发此规则。
-
 ```java
 package org.example;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.io.InputStream;
 import java.io.IOException;
-
 public class ZipFileExample {
-    public static void main(String[] args) {
-        String zipFilePath = "example.zip";
-        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
-            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
-            ZipEntry entry = entries.nextElement();
-            zipFile.getInputStream(entry); // 未检查或使用返回值
-            
-            org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
-            commonsZipFile.getInputStream(entry); // 未检查或使用返回值
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+public static void main(String[] args) {
+String zipFilePath = "example.zip";
+try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+ZipEntry entry = entries.nextElement();
+zipFile.getInputStream(entry); // 未检查或使用返回值
+org.apache.commons.compress.archivers.zip.ZipFile commonsZipFile = new org.apache.commons.compress.archivers.zip.ZipFile("another.zip");
+commonsZipFile.getInputStream(entry); // 未检查或使用返回值
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 ### 潜在影响
-
 未检查或使用返回值可能导致以下问题：
-
 *   **资源泄露**: 某些方法返回的资源（如输入流）如果没有被正确关闭，可能导致文件句柄或其他系统资源的泄露，长期运行可能耗尽系统资源。
 *   **逻辑错误**: 如果方法的返回值是操作结果或状态指示，未检查可能导致程序逻辑出现错误。
 *   **性能问题**: 创建了对象或资源却没有使用，浪费计算资源。
-
 因此，在调用这些返回对象的方法后，建议检查返回值并根据需要进行处理（例如，赋值给变量进行后续操作，或者确保资源被正确管理和释放）。
-CODE
+DESC
 	level: "low",
 	risk: "api-abuse",
 	message: "发现Java org.apache.commons.compress.archivers.zip.ZipFile未检查返回值的API",
 	title: "Check Java Zip Unchecked Return Value",
+	name: "weak2",
 }
 
 desc(
@@ -343,6 +300,91 @@ public class ZipFileExample {
     }
 }
 TEXT
+	"safefile://SafeJavaZipInputStreamHandling.java": <<<CODE
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+
+public class SafeJavaZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_example.zip";
+        String outputFilePath = "extracted_content.txt";
+
+        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = zipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeApacheCommonsZipInputStreamHandling.java": <<<CODE
+package org.example;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+import java.util.Enumeration;
+
+public class SafeApacheCommonsZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_another.zip";
+        String outputFilePath = "extracted_commons_content.txt";
+
+        try (ZipFile commonsZipFile = new ZipFile(zipFilePath)) {
+            Enumeration<ZipArchiveEntry> entries = commonsZipFile.getEntries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipArchiveEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = commonsZipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry in commons-compress: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the commons-compress zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
 
 desc(
@@ -367,5 +409,90 @@ public class ApacheCommonsZipFileExample {
     }
 }
 TEXT
+	"safefile://SafeJavaZipInputStreamHandling.java": <<<CODE
+package org.example;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+
+public class SafeJavaZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_example.zip";
+        String outputFilePath = "extracted_content.txt";
+
+        try (ZipFile zipFile = new ZipFile(zipFilePath)) {
+            java.util.Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = zipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeApacheCommonsZipInputStreamHandling.java": <<<CODE
+package org.example;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import java.io.InputStream;
+import java.io.IOException;
+import java.io.FileOutputStream;
+import java.util.Enumeration;
+
+public class SafeApacheCommonsZipInputStreamHandling {
+    public static void main(String[] args) {
+        String zipFilePath = "safe_another.zip";
+        String outputFilePath = "extracted_commons_content.txt";
+
+        try (ZipFile commonsZipFile = new ZipFile(zipFilePath)) {
+            Enumeration<ZipArchiveEntry> entries = commonsZipFile.getEntries();
+
+            // 确保创建至少一个条目用于测试
+            // (实际测试中zipFilePath需要指向一个真实的zip文件)
+            if (entries.hasMoreElements()) {
+                ZipArchiveEntry entry = entries.nextElement();
+                // 安全的反向测试用例：使用try-with-resources确保InputStream被正确关闭。
+                // 并显式地处理了返回值，例如读取内容并写入文件。
+                try (InputStream entryInputStream = commonsZipFile.getInputStream(entry);
+                     FileOutputStream fos = new FileOutputStream(outputFilePath)) {
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = entryInputStream.read(buffer)) != -1) {
+                        fos.write(buffer, 0, bytesRead);
+                    }
+                    System.out.println("Content from " + entry.getName() + " extracted to " + outputFilePath);
+                } catch (IOException e) {
+                    System.err.println("Error processing entry in commons-compress: " + e.getMessage());
+                }
+            } else {
+                System.out.println("No entries found in the commons-compress zip file.");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
 

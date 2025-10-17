@@ -11,19 +11,19 @@ Apache Shiro 是一个广泛使用的 Java 安全框架，提供认证、授权�
 2. **触发场景**
 攻击者构造特定的请求，绕过 shiro 的认证机制，直接访问应用程序中需要身份认证才能访问的功能或数据。这通常发生在攻击者能够发送恶意构造的 HTTP 请求到受 shiro 保护的 Web 应用程序时。
 
-3. **潜在影响**
-利用此漏洞，攻击者可能：
-- 未经授权访问敏感数据。
-- 执行敏感操作，如修改配置、删除数据等。
-- 绕过内部访问控制策略，对系统造成更严重的破坏。
-
-例如，攻击者可以通过以下方式尝试发起攻击：
+示例代码：
 ```http
 GET /protected-resource HTTP/1.1
 Host: vulnerable-app.com
 Authorization: Bearer <malicious-payload>
 ```
 通过上述伪造的认证信息，攻击者可以获取未授权的资源访问权限。
+
+3. **潜在影响**
+利用此漏洞，攻击者可能：
+- 未经授权访问敏感数据。
+- 执行敏感操作，如修改配置、删除数据等。
+- 绕过内部访问控制策略，对系统造成更严重的破坏。
 DESC
 	rule_id: "e39dd33c-1224-4b9c-b8c9-06c5a3fa6251"
 	title_zh: "SCA: 检测Java shiro-core 依赖漏洞"
@@ -36,9 +36,9 @@ DESC
 **Maven 示例:**
 ```xml
 <dependency>
-    <groupId>org.apache.shiro</groupId>
-    <artifactId>shiro-core</artifactId>
-    <version>1.10.2</version> <!-- 升级到1.10.2或更高版本 -->
+  <groupId>org.apache.shiro</groupId>
+  <artifactId>shiro-core</artifactId>
+  <version>1.10.2</version> <!-- 升级到1.10.2或更高版本 -->
 </dependency>
 ```
 
@@ -62,52 +62,46 @@ __dependency__.*shiro*core.version as $ver;
 __dependency__.*shiro*spring.version as $ver;
 $ver in (,1.10.1] as $vuln_shiro_core;
 alert $vuln_shiro_core for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 shiro-core 版本**
 尽快将 Apache Shiro 的 shiro-core 依赖升级到不受 CVE-2023-22602 影响的版本。根据官方公告，1.10.2 及更高版本已经修复了此漏洞。建议升级到最新的稳定版本。
-
 **Maven 示例:**
 ```xml
 <dependency>
-    <groupId>org.apache.shiro</groupId>
-    <artifactId>shiro-core</artifactId>
-    <version>1.10.2</version> <!-- 升级到1.10.2或更高版本 -->
+<groupId>org.apache.shiro</groupId>
+<artifactId>shiro-core</artifactId>
+<version>1.10.2</version> <!-- 升级到1.10.2或更高版本 -->
 </dependency>
 ```
-
 **Gradle 示例:**
 ```gradle
 implementation 'org.apache.shiro:shiro-core:1.10.2' // 升级到1.10.2或更高版本
 ```
-
 2. **审查和加强访问控制策略**
 虽然升级版本是首要措施，但排查受影响的版本。同时，建议仔细审查应用程序的访问控制配置，确保关键功能和数据都有严格的访问限制，并且依赖于 shiro 的正确认证和授权机制。
-
 3. **监控异常行为**
 加强对应用程序日志和安全事件的监控，及时发现和响应潜在的攻击行为或异常访问尝试。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 Apache Shiro 是一个广泛使用的 Java 安全框架，提供认证、授权、加密和会话管理等功能。在 shiro-core 的 1.10.0 和 1.10.1 版本中，存在一个经过身份认证绕过即可触发的漏洞（CVE-2023-22602）。该漏洞是由于 Shiro 在处理某些精心构造的请求时，未能正确验证用户身份，导致攻击者可以在未授权的情况下访问受保护的资源。
-
 2. **触发场景**
 攻击者构造特定的请求，绕过 shiro 的认证机制，直接访问应用程序中需要身份认证才能访问的功能或数据。这通常发生在攻击者能够发送恶意构造的 HTTP 请求到受 shiro 保护的 Web 应用程序时。
-
 3. **潜在影响**
 利用此漏洞，攻击者可能：
 - 未经授权访问敏感数据。
 - 执行敏感操作，如修改配置、删除数据等。
 - 绕过内部访问控制策略，对系统造成更严重的破坏。
-CODE
+DESC
 	level: "high",
 	message: "SCA: shiro-core versions between 1.10.0 and 1.10.1 have an authentication bypass vulnerability",
 	cve: "CVE-2023-22602",
 	title: "SCA: Check Java shiro-core Vulnerability",
 	title_zh: "SCA: 检测Java shiro-core 依赖漏洞",
+	name: "vuln_shiro_core",
+	risk: "SCA",
 }
 
 desc(
@@ -181,5 +175,49 @@ desc(
         </dependency>
     </dependencies>
 </project>
+CODE
+	"safefile://pom_shiro_safe_version.xml": <<<CODE
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>secure-shiro-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- shiro-core 升级到 1.10.2 或更高版本，修复已知漏洞 -->
+        <dependency>
+            <groupId>org.apache.shiro</groupId>
+            <artifactId>shiro-core</artifactId>
+            <version>1.10.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.shiro</groupId>
+            <artifactId>shiro-spring</artifactId>
+            <version>1.10.2</version>
+        </dependency>
+        <!-- 其他依赖 -->
+    </dependencies>
+</project>
+CODE
+	"safefile://build_gradle_shiro_safe_version.gradle": <<<CODE
+plugins {
+    id 'java'
+}
+
+group 'com.example'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // shiro-core 升级到 1.10.2 或更高版本，修复已知漏洞
+    implementation 'org.apache.shiro:shiro-core:1.10.2'
+    implementation 'org.apache.shiro:shiro-spring:1.10.2'
+    // 其他依赖
+}
 CODE
 )

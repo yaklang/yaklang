@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"testing"
 
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
@@ -60,7 +61,7 @@ func TestBasic_BasicObject(t *testing.T) {
 }
 
 func TestBasic_BasicObjectEx(t *testing.T) {
-	ssatest.CheckSyntaxFlowContain(t,`
+	ssatest.CheckSyntaxFlowContain(t, `
 		package main
 
 		type Queue struct {
@@ -80,8 +81,8 @@ func TestBasic_BasicObjectEx(t *testing.T) {
 	`, `
 		b #-> as $target
 	`, map[string][]string{
-			"target": {"1"},
-		},
+		"target": {"1"},
+	},
 		ssaapi.WithLanguage(ssaapi.GO),
 	)
 }
@@ -112,7 +113,7 @@ func TestBasic_Phi(t *testing.T) {
 	)
 }
 
-func TestBasic_BasicStruct(t *testing.T){
+func TestBasic_BasicStruct(t *testing.T) {
 	ssatest.CheckSyntaxFlowContain(t,
 		`package main
 
@@ -131,8 +132,114 @@ func main (){
 	`, `
 	println(* #-> as $a)
 	`, map[string][]string{
-			"a":  {"1"},
+			"a": {"1"},
 		},
 		ssaapi.WithLanguage(ssaapi.GO),
 	)
+}
+
+func TestParameter_MemberCall(t *testing.T) {
+	t.Run("membercall normal", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("test.go", `package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "net/http"
+    "path/filepath"
+    "strings"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("file")
+    content := ioutil.ReadFile(userInput)
+    w.Write(content)
+}
+`)
+
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.ReadFile(* #-> as $output)
+		`, map[string][]string{
+			"output": {"\"file\"", "Parameter-r"},
+		}, true, ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+
+	t.Run("method normal", func(t *testing.T) {
+		code := `
+package main
+
+type Context struct{
+}
+
+func (c* Context)Cors1() {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			*.Header()?{have: "Access-Control-Allow-Origin"} as $header
+			$header<getCallee>(,,* #-> as $output)
+		`, map[string][]string{
+			"output": {"\"*\""},
+		},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+
+	t.Run("get membercall with specific parameters", func(t *testing.T) {
+		code := `
+package main
+
+import "github.com/gin-gonic/gin"
+
+func Cors1(c *gin.Context) {
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+}
+		`
+		ssatest.CheckSyntaxFlow(t, code, `
+			gin.Context as $sink;
+			$sink.Header()?{have: "Access-Control-Allow-Origin"} as $header
+			$header<getCallee>(,,* #-> as $output)
+		`, map[string][]string{
+			"output": {"\"*\""},
+		},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
+}
+
+func TestMutiReturn_TopDef_Syntaxflow(t *testing.T) {
+	t.Run("muti return topdef", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowContain(t, `
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+func main() {
+    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+		file, handler, err := r.FormFile("file")
+		os.Create(handler.Filename)
+	})
+}
+
+		`, `
+os?{<fullTypeName>?{have: 'os'}} as $entry
+$entry.Create(* #-> as $sink) 
+			`,
+			map[string][]string{
+				"sink": {"Parameter-r"},
+			},
+			ssaapi.WithLanguage(ssaapi.GO),
+		)
+	})
 }

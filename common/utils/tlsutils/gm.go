@@ -5,16 +5,18 @@ import (
 	cryptoRand "crypto/rand"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
 	"github.com/yaklang/yaklang/common/gmsm/sm2"
-	"math/big"
-	"time"
 
 	cryptorand "crypto/rand"
-)
 
-import "github.com/yaklang/yaklang/common/gmsm/x509"
+	"github.com/yaklang/yaklang/common/gmsm/x509"
+)
 
 func GetX509GMServerTlsConfigWithAuth(ca, server, serverKey []byte, auth bool) (*gmtls.Config, error) {
 	p := x509.NewCertPool()
@@ -22,14 +24,19 @@ func GetX509GMServerTlsConfigWithAuth(ca, server, serverKey []byte, auth bool) (
 		return nil, errors.New("append ca pem error")
 	}
 
-	serverPair, err := gmtls.X509KeyPair(server, serverKey)
+	signCert, err := gmtls.X509KeyPair(server, serverKey)
+	if err != nil {
+		return nil, err
+	}
+
+	encryptCert, err := gmtls.X509KeyPair(server, serverKey)
 	if err != nil {
 		return nil, err
 	}
 
 	config := gmtls.Config{
 		GMSupport:    &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
-		Certificates: []gmtls.Certificate{serverPair},
+		Certificates: []gmtls.Certificate{signCert, encryptCert},
 		ClientCAs:    p,
 	}
 	if auth {
@@ -85,8 +92,15 @@ func GetX509GMServerTlsConfigWithOnly(ca, server, serverKey []byte, auth bool) (
 	//return gmtls.NewBasicAutoSwitchConfig(&signCertPair, &encipherCertPair, &rsaKey)
 
 }
-
 func SignGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notAfter time.Time, auth bool) ([]byte, []byte, error) {
+	return signGMServerCrtNKeyWithParams(ca, privateKey, cn, notAfter, auth, true)
+}
+
+func SignGMClientCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notAfter time.Time, auth bool) ([]byte, []byte, error) {
+	return signGMServerCrtNKeyWithParams(ca, privateKey, cn, notAfter, auth, false)
+}
+
+func signGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notAfter time.Time, auth bool, isServerAuth bool) ([]byte, []byte, error) {
 	// 解析 ca 的 key
 	var pkey *sm2.PrivateKey
 	var err error
@@ -118,14 +132,19 @@ func SignGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notA
 		NotBefore: time.Unix(946656000, 0),
 		NotAfter:  notAfter,
 
-		KeyUsage: x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
-		ExtKeyUsage: []x509.ExtKeyUsage{
-			x509.ExtKeyUsageServerAuth,
-		},
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
 		BasicConstraintsValid: true,
 		IsCA:                  false,
+		SignatureAlgorithm:    x509.SM2WithSM3,
 	}
-	if !auth {
+
+	if auth {
+		if isServerAuth {
+			template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
+		} else {
+			template.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth}
+		}
+	} else {
 		template.ExtKeyUsage = nil
 	}
 
@@ -150,7 +169,7 @@ func SignGMServerCrtNKeyWithParams(ca []byte, privateKey []byte, cn string, notA
 	return certBuffer.Bytes(), sPrivBytes, nil
 }
 
-func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
+func generateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 	pkey, err := sm2.GenerateKey(cryptoRand.Reader)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "sm2.GenerateKey(cryptoRand.Reader)")
@@ -165,7 +184,12 @@ func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 	template := x509.Certificate{
 		SerialNumber: sid,
 		Subject: pkix.Name{
-			CommonName: commonName,
+			Country:            []string{commonName},
+			Province:           []string{commonName},
+			Locality:           []string{commonName},
+			Organization:       []string{commonName},
+			OrganizationalUnit: []string{commonName},
+			CommonName:         commonName,
 		},
 		NotBefore: time.Unix(946656000, 0),
 		NotAfter:  time.Now().Add(time.Hour * 24 * 365 * 99),
@@ -177,6 +201,7 @@ func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 		},
 		BasicConstraintsValid: true,
 		IsCA:                  true,
+		SignatureAlgorithm:    x509.SM2WithSM3,
 	}
 	derBytes, err := x509.CreateCertificate(&template, &template, pkey.Public().(*sm2.PublicKey), pkey)
 	if err != nil {
@@ -192,6 +217,28 @@ func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-
 	return certBuf.Bytes(), pKeyBytes, nil
+}
+
+var certGenMutex sync.Mutex
+
+func GenerateGMSelfSignedCertKey(commonName string) ([]byte, []byte, error) {
+	certGenMutex.Lock()
+	defer certGenMutex.Unlock()
+
+	var ca, key []byte
+	var err error
+	for i := 0; i < 5; i++ {
+		// Attempt to generate a self-signed certificate and key
+		ca, key, err = generateGMSelfSignedCertKey(commonName)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "generateGMSelfSignedCertKey")
+		}
+		_, verifyErr := gmtls.X509KeyPair(ca, key)
+		if verifyErr != nil {
+			continue
+		}
+		return ca, key, nil
+	}
+	return nil, nil, errors.Wrap(err, "generateGMSelfSignedCertKey max retries exceeded")
 }

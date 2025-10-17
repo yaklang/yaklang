@@ -1,0 +1,201 @@
+desc(
+	title: "Audit C Dangerous Input Functions"
+	title_zh: "审计C语言中的危险输入函数"
+	type: audit
+	severity: high
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   缓冲区溢出漏洞是由于C语言中使用不安全的输入函数（如`gets()`、`scanf()`系列函数）时，未对输入数据的长度进行有效限制，导致攻击者可以输入超出目标缓冲区大小的数据，覆盖相邻内存区域。这种漏洞可能被利用来执行任意代码、劫持程序流程或导致程序崩溃。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   void vulnerable_function() {
+       char buffer[64];
+       printf("Enter your input: ");
+       scanf("%s", buffer);
+       printf("Buffer contents: %s\n", buffer);
+   }
+   int main() {
+       vulnerable_function();
+       return 0;
+   }
+   ```
+   攻击者输入超过64个字符的数据时，将导致缓冲区溢出，可能覆盖返回地址或其他关键数据。
+
+3. **潜在影响**
+   - 远程代码执行：攻击者可能通过精心构造的输入数据覆盖返回地址，执行任意代码。
+   - 程序崩溃：导致服务不可用。
+   - 信息泄露：覆盖敏感数据或内存布局信息。
+DESC
+	rule_id: "49b36a64-d6d1-4a78-a5a7-c97fbb9c8bfa"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全的输入函数
+   替换`gets()`、`scanf()`等危险函数为`fgets()`等安全替代品。
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   void safer_function() {
+       char buffer[64];
+       printf("Enter your input: ");
+       fgets(buffer, sizeof(buffer), stdin);
+       buffer[strcspn(buffer, "\n")] = '\0';
+       printf("Buffer contents: %s\n", buffer);
+   }
+   int main() {
+       safer_function();
+       return 0;
+   }
+   ```
+
+#### 2. 输入长度检查
+   在使用不安全函数时，严格限制输入长度。
+   ```c
+   char buffer[64];
+   if (scanf("%63s", buffer) != 1) {
+       // 处理错误
+   }
+   ```
+
+#### 3. 使用现代C库
+   考虑使用现代C库或框架，如glibc的安全函数或第三方安全库。
+
+#### 4. 编译器保护
+   启用编译器的缓冲区溢出保护选项（如GCC的`-fstack-protector`）。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-120: Buffer Copy without Checking Size of Input ('Classic Buffer Overflow')](https://cwe.mitre.org/data/definitions/120.html)
+[OWASP Buffer Overflow](https://owasp.org/www-community/vulnerabilities/Buffer_Overflow)
+REFERENCE
+)
+
+gets()    as $high;
+scanf(*<slice(index=0)>?{have: "%s"} as $high);
+vscanf(*<slice(index=1)>?{have: "%s"} as $high);
+fscanf(*<slice(index=1)>?{have: "%s"} as $high);
+vfscanf(*<slice(index=1)>?{have: "%s"} as $high);
+sscanf(*<slice(index=1)>?{have: "%s"} as $high);
+vsscanf(*<slice(index=1)>?{have: "%s"} as $high);
+
+alert $high for {
+	level: "high",
+	type: "vuln",
+	title: "C Dangerous Input Function Vulnerability Was Detected",
+	title_zh: "检测到C语言中的危险输入函数漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   由于应用程序直接使用了不安全的输入函数（如`gets()`、`scanf()`等），这些函数不会检查输入的长度，容易导致缓冲区溢出。攻击者可以构造超长输入覆盖相邻内存区域，从而执行任意代码或导致程序崩溃。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```c
+   #include <stdio.h>
+   void vulnerable_function() {
+       char buffer[64];
+       printf("Enter your input: ");
+       scanf("%s", buffer);
+       printf("Buffer contents: %s\n", buffer);
+   }
+   int main() {
+       vulnerable_function();
+       return 0;
+   }
+   ```
+   攻击者输入超过64字节的数据可导致缓冲区溢出，可能覆盖返回地址或关键变量。
+
+3. **潜在影响**
+   - 程序崩溃（拒绝服务）。
+   - 执行任意代码（远程代码执行）。
+   - 泄露敏感信息（如内存内容）。
+DESC
+	name: "high",
+	message: "检测到C语言中使用危险的输入函数（如`gets()`、`scanf()`等）可能导致缓冲区溢出漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全的输入函数
+替换`gets()`、`scanf()`等危险函数为安全的替代品，如`fgets()`、`getline()`等。
+```c
+#include <stdio.h>
+#include <string.h>
+void safer_function() {
+    char buffer[64];
+    printf("Enter your input: ");
+    fgets(buffer, sizeof(buffer), stdin);
+    buffer[strcspn(buffer, "\n")] = '\0';
+    printf("Buffer contents: %s\n", buffer);
+}
+int main() {
+    safer_function();
+    return 0;
+}
+```
+
+#### 2. 输入长度限制
+对用户输入实施严格的长度限制，确保不会超过目标缓冲区大小。
+```c
+#include <stdio.h>
+#define MAX_INPUT 64
+void safe_input() {
+    char buffer[MAX_INPUT + 1];
+    printf("Enter your input (max %d chars): ", MAX_INPUT);
+    if (fgets(buffer, sizeof(buffer), stdin) != NULL) {
+        buffer[strcspn(buffer, "\n")] = '\0';
+        printf("Safe buffer: %s\n", buffer);
+    }
+}
+```
+
+#### 3. 使用现代C库
+考虑使用现代C库（如Safe C）或高级语言（如Rust）减少此类风险。
+SOLUTION
+	risk: "缓冲区溢出",
+}
+
+desc(
+	lang: c
+	alert_high: 1
+	'file://unsafe.c': <<<UNSAFE
+#include <stdio.h>
+
+void vulnerable_function() {
+    char buffer[64];
+    
+    printf("Enter your input: ");
+    scanf("%s", buffer);
+    
+    printf("Buffer contents: %s\n", buffer);
+}
+
+int main() {
+    vulnerable_function();
+    return 0;
+}
+UNSAFE
+	'safefile://safe.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+
+void safer_function() {
+    char buffer[64];
+    
+    printf("Enter your input: ");
+    fgets(buffer, sizeof(buffer), stdin); 
+    
+    buffer[strcspn(buffer, "\n")] = '\0';
+    printf("Buffer contents: %s\n", buffer);
+}
+
+int main() {
+    safer_function();
+    return 0;
+}
+SAFE
+)
+

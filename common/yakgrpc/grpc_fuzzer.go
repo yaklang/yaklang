@@ -274,9 +274,9 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 	}()
 	// runtimeID
 	var runtimeID string
-	if fallback, ok := stream.(*httpFuzzerFallback); ok {
+	if wrapperStream, ok := stream.(*WrapperHTTPFuzzerStream); ok {
 		// runtimeID from webfuzzer sequence
-		runtimeID = fallback.runtimeID
+		runtimeID = wrapperStream.fallback.runtimeID
 	} else {
 		runtimeID = uuid.NewString()
 	}
@@ -488,7 +488,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				if len(oldIDs) == 0 { // 尝试修复
 					oldIDs = []uint{uint(historyID)}
 				}
-				_, _, getMirrorHTTPFlowParams, _ := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
+				_, _, getMirrorHTTPFlowParams, _, _ := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
 				var extractorResults []*ypb.KVPair
 				for resp := range yakit.YieldWebFuzzerResponseByTaskIDs(s.GetProjectDatabase(), stream.Context(), oldIDs, true) {
 					respModel, err := resp.ToGRPCModel()
@@ -766,6 +766,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 			mutate.WithPoolOpt_RandomSession(true),
 			mutate.WithPoolOpt_UseConnPool(!req.GetDisableUseConnPool()),
 			mutate.WithPoolOpt_SaveHTTPFlow(false),
+			mutate.WithPoolOpt_NoReadMultiResponse(req.GetNoReadMultiResponse()),
 			//mutate.WithPoolOpt_ConnPool(true),
 		}
 
@@ -774,8 +775,8 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 		}
 
 		if !req.GetDisableHotPatch() {
-			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
-			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler))
+			beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker := yak.MutateHookCaller(stream.Context(), req.GetHotPatchCode(), nil)
+			httpPoolOpts = append(httpPoolOpts, mutate.WithPoolOpt_HookCodeCaller(beforeRequest, afterRequest, mirrorHTTPFlow, retryHandler, customFailureChecker))
 		}
 
 		if req.GetOverwriteSNI() {
@@ -882,6 +883,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 				rsp.TaskId = int64(taskID)
 				rsp.Payloads = payloads
 				rsp.RuntimeID = runtimeID
+				rsp.ResponseRaw = result.ResponseRaw
 				if result.LowhttpResponse != nil && result.LowhttpResponse.TraceInfo != nil {
 					SetFuzzerRespTraceInfo(rsp, result.LowhttpResponse.TraceInfo)
 					rsp.RemoteAddr = result.LowhttpResponse.RemoteAddr
@@ -1210,7 +1212,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 							}
 						}
 					}
-					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.HiddenIndex, redirectRsp)
+					// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), redirectRes.Uuid, redirectRsp)
 					yakit.SaveWebFuzzerResponseEx(int(task.ID), redirectRes.HiddenIndex, redirectRsp)
 					redirectRsp.TaskId = int64(taskID)
 					err := feedbackResponse(redirectRsp, false)
@@ -1224,7 +1226,7 @@ func (s *Server) HTTPFuzzer(req *ypb.FuzzerRequest, stream ypb.Yak_HTTPFuzzerSer
 					rsp.RequestRaw = redirectPacket[len(redirectPacket)-1].Request
 				}
 			}
-			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
+			// yakit.SaveWebFuzzerResponse(s.GetProjectDatabase(), int(task.ID), result.LowhttpResponse.Uuid, rsp)
 			yakit.SaveWebFuzzerResponseEx(int(task.ID), result.LowhttpResponse.HiddenIndex, rsp)
 			rsp.TaskId = int64(taskID)
 			rsp.Discard = discard
@@ -1357,10 +1359,10 @@ func (s *Server) HTTPRequestMutate(ctx context.Context, req *ypb.HTTPRequestMuta
 	// post params
 	postParams, _, _ := lowhttp.GetParamsFromBody(contentType, body)
 	if totalParams == nil {
-		totalParams = make(map[string][]string, len(postParams))
+		totalParams = make(map[string][]string)
 	}
-	for k, v := range postParams {
-		totalParams[k] = append(totalParams[k], v...)
+	for _, param := range postParams.Items {
+		totalParams[param.Key] = append(totalParams[param.Key], param.Values...)
 	}
 
 	switch method {

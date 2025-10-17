@@ -1,5 +1,5 @@
 __DESC__ = "获取指定文件的基本元信息，包括判断是否为目录、文件大小、文件权限模式以及最后修改时间。"
-
+__VERBOSE_NAME__ = "文件元信息查询"
 __KEYWORDS__ = "修改时间,directory,file size,file metadata,文件大小,文件权限,文件元数据,文件属性,file information,file permissions,modified time,文件信息,目录检查"
 
 yakit.AutoInitYakit()
@@ -11,4 +11,5 @@ if err != nil {
     yakit.Error("stat failed: %v", err)
     return
 }
+yakit.File(filename, yakit.fileStatusAction(info))
 yakit.Info("dir:%v size:%v mod:%v modify_time:%v", info.IsDir(), info.Size(), info.Mode(), info.ModTime())

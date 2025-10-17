@@ -1,11 +1,13 @@
 package filesys
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
-	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"fmt"
 	"io/fs"
 	"os"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
 type UnifiedFSConfig struct {
@@ -66,7 +68,7 @@ func (u *UnifiedFS) Join(elem ...string) string {
 }
 
 func (u *UnifiedFS) PathSplit(name string) (string, string) {
-	return splitWithSeparator(name, u.GetSeparators())
+	return SplitWithSeparator(name, u.GetSeparators())
 }
 
 func (u *UnifiedFS) Base(name string) string {
@@ -214,6 +216,10 @@ func (u *UnifiedFS) convertToVirtualPath(name string) string {
 		virtualPath = strings.TrimSuffix(virtualPath, ext) + virtualExt
 	}
 	return virtualPath
+}
+
+func (f *UnifiedFS) String() string {
+	return fmt.Sprintf("%s",f.fs)
 }
 
 type UnifiedDirEntry struct {

@@ -10,6 +10,9 @@ import (
 )
 
 func TestGRPCMUSTPASS_COMMON_DiagnoseNetwork(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("skip in github actions, because it may not have access to the internet")
+	}
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)
@@ -42,6 +45,9 @@ func TestGRPCMUSTPASS_COMMON_DiagnoseNetwork(t *testing.T) {
 }
 
 func TestGRPCMUSTPASS_COMMON_DIAGNOSE_DNS(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip("skip in github actions, because it may not have access to the internet")
+	}
 	client, err := NewLocalClient()
 	if err != nil {
 		t.Fatal(err)

@@ -20,7 +20,7 @@ import (
 )
 
 type SSABuild struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
 var Builder ssa.Builder = &SSABuild{}
@@ -29,22 +29,25 @@ func (*SSABuild) FilterPreHandlerFile(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".php" || extension == ".lock"
 }
-func (s *SSABuild) Create() ssa.Builder {
-	return &SSABuild{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
-			ssa.WithLanguageConfigSupportConstMethod(true),
-			ssa.WithLanguageConfigBind(true),
-			ssa.WithLanguageConfigTryBuildValue(true),
-			ssa.WithLanguageConfigSupportClass(true),
-			ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
-			ssa.WithLanguageConfigVirtualImport(true),
-			ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
-				//php 默认应该include所有内容
-				return true
-			}),
-			ssa.WithLanguageBuilder(s),
-		),
+
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuild{
+		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
 	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigSupportConstMethod(true),
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigTryBuildValue(true),
+		ssa.WithLanguageConfigSupportClass(true),
+		ssa.WithLanguageConfigIsSupportClassStaticModifier(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageConfigShouldBuild(func(filename string) bool {
+			//php 默认应该include所有内容
+			return true
+		}),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
@@ -59,10 +62,14 @@ func initHandler(fb *ssa.FunctionBuilder) {
 		}
 	}
 	initHandler("_SERVER")
-	fb.GetProgram().GlobalScope = container
+
+	prog := fb.GetProgram()
+	if prog.GlobalVariablesBlueprint != nil {
+		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
+	}
 }
 
-func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, builder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := builder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -71,23 +78,15 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 	if prog.ExtraFile == nil {
 		prog.ExtraFile = make(map[string]string)
 	}
+	path := editor.GetUrl()
 	if !s.FilterPreHandlerFile(path) {
 		return nil
 	}
-	dirname, filename := fileSystem.PathSplit(path)
-	_ = dirname
-	_ = filename
+	filename := editor.GetFilename()
 	if filepath.Ext(filename) == ".lock" && filename == "composer.lock" {
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Warnf("read pom.xml error: %v", err)
-			return nil
-		}
-		editor := memedit.NewMemEditor(string(raw))
-		editor.SetUrl(path)
 		builder.SetEditor(editor)
 		vfs := filesys.NewVirtualFs()
-		vfs.AddFile(filename, string(raw))
+		vfs.AddFile(filename, editor.GetSourceCode())
 		pkgs, err := sca.ScanFilesystem(vfs)
 		if err != nil {
 			log.Warnf("scan pom.xml error: %v", err)
@@ -96,24 +95,30 @@ func (s *SSABuild) PreHandlerProject(fileSystem fi.FileSystem, builder *ssa.Func
 		prog.SCAPackages = append(prog.SCAPackages, pkgs...)
 		builder.GenerateDependence(pkgs, filename)
 	} else {
-		file, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Errorf("read file %s error: %v", path, err)
-			return nil
-		}
-		prog.Build(path, memedit.NewMemEditor(string(file)), builder)
+		prog.Build(ast, editor, builder)
 	}
 	return nil
 }
 
-func (s *SSABuild) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
+func (s *SSABuild) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
-func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
-	ast, err := FrondEnd(src, force)
-	if err != nil {
-		return err
+func (s *SSABuild) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".php"
+}
+
+func (s *SSABuild) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, s)
+}
+
+// func (s *ssa.BasicBlock) BuildFromAst()
+
+func (s *SSABuild) BuildFromAST(raw ssa.FrontAST, b *ssa.FunctionBuilder) error {
+	ast, ok := raw.(phpparser.IHtmlDocumentContext)
+	if !ok {
+		return utils.Errorf("invalid AST type: %T, expected phpparser.IHtmlDocumentContext", raw)
 	}
 	// log.Infof("parse AST FrontEnd success: %s", ast.ToStringTree(ast.GetParser().GetRuleNames(), ast.GetParser()))
 	b.WithExternValue(phpBuildIn)
@@ -146,7 +151,13 @@ func (s *SSABuild) Build(src string, force bool, b *ssa.FunctionBuilder) error {
 	if mainApp.CurrentIncludingStack.Len() <= 0 {
 		childProgram := b.GetProgram().GetSubProgram(b.GetEditor().GetPureSourceHash())
 		functionBuilder := childProgram.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
-		startParse(functionBuilder)
+		functionBuilder.AddLazyBuilder(func() {
+			// b.GetProgram().SetPreHandler(false)
+			startParse(functionBuilder)
+		}, true)
+		if b.GetProgram().PreHandler() {
+			startParse(functionBuilder)
+		}
 	} else {
 		//模拟preHandler和正式handler
 		b.GetProgram().SetPreHandler(true)
@@ -176,21 +187,23 @@ type builder struct {
 	currentInclude map[string]struct{}
 }
 
-func FrondEnd(src string, force bool) (phpparser.IHtmlDocumentContext, error) {
+func Frontend(src string, builders ...*SSABuild) (phpparser.IHtmlDocumentContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(builders) > 0 {
+		builder = builders[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := phpparser.NewPHPLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := phpparser.NewPHPParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.HtmlDocument()
-	if force || len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 func (b *builder) AssignConst(name string, value ssa.Value) bool {

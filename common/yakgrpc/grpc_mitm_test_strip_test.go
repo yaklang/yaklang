@@ -5,12 +5,13 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"testing"
 )
 
 func TestReplaceString(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `Cookie: \w+\=\w+`,
 		NoReplace:        false,
@@ -23,7 +24,7 @@ func TestReplaceString(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, "", []byte(`GET / HTTP/1.1
+	matched, data, _ := replacer.Hook(true, false, "", []byte(`GET / HTTP/1.1
 Host: www.baidu.com
 Cookie: abc=123
 
@@ -36,7 +37,7 @@ Cookie: abc=123
 }
 
 func TestReplaceString2(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `Cookie: BAIDUID_BFESS=[^\n]*`,
 		NoReplace:        false,
@@ -49,7 +50,7 @@ func TestReplaceString2(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
+	matched, data, _ := replacer.Hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9
@@ -70,7 +71,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 }
 
 func TestReplaceString23(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `\{"product": ".+?"`,
 		NoReplace:        false,
@@ -84,7 +85,7 @@ func TestReplaceString23(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
+	matched, data, _ := replacer.Hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9
@@ -105,7 +106,7 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 }
 
 func TestReplaceString233(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `百度`,
 		NoReplace:        false,
@@ -119,7 +120,7 @@ func TestReplaceString233(t *testing.T) {
 		Disabled:         false,
 		VerboseName:      "",
 	})
-	matched, data, _ := replacer.hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
+	matched, data, _ := replacer.Hook(true, false, "", []byte(`GET /content-search.xml HTTP/1.1
 Host: www.baidu.com
 Accept-Encoding: gzip, deflate, br
 Accept-Language: zh-CN,zh;q=0.9

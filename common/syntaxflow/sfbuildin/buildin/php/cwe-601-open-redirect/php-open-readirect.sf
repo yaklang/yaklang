@@ -6,27 +6,23 @@ desc(
 	type: "audit"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 开放重定向漏洞（Open Redirect）是指应用程序接收用户提供的、未经严格验证的URL作为重定向目标，并将用户导向该URL。攻击者可以利用这一特性，构造恶意链接，将用户重定向到钓鱼网站、恶意软件下载页面或其他恶意资源，从而实施网络钓鱼诈骗、传播恶意软件或窃取用户凭证等。
-
 2. **触发场景**
 当应用程序使用HTTP响应头中的`Location`字段或者通过脚本（如JavaScript的`window.location`）进行页面重定向，并且重定向的目标地址直接或间接地来源于用户输入（如URL参数、表单提交数据）时，如果没有对输入进行充分的验证和过滤，就可能存在开放重定向漏洞。
 例如，以下PHP代码直接使用GET参数作为重定向目标：
 ```php
 <?php
-    $url = $_GET["url"];
-    header("Location: ".$url);
+$url = $_GET["url"];
+header("Location: ".$url);
 ?>
 ```
 攻击者可以构造类似于 `http://vulnerable-site.com/redirect.php?url=http://malicious-site.com` 的链接，诱导用户点击后被重定向到恶意网站。
-
 3. **潜在影响**
 - **网络钓鱼**：用户被重定向到外观相似的钓鱼网站，诱骗其输入敏感信息（如用户名、密码、银行卡号）。
 - **恶意软件传播**：用户被重定向到包含恶意软件下载或利用工具的网站。
 - **绕过安全策略**：在某些情况下，开放重定向可能被用来绕过同源策略（Same-Origin Policy）或其他安全限制，例如通过将恶意代码嵌入合法域名的URL中。
 - **损害网站信誉**：网站可能被攻击者滥用作为钓鱼攻击的跳板，损害其用户信任和品牌声誉。
-
 DESC
 	rule_id: "65934f87-f276-44cc-826a-3480b5a57ff5"
 	reference: <<<REFERENCE
@@ -35,42 +31,34 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 仅允许重定向到预定义的合法域名列表
 维护一个允许进行重定向的合法域名白名单，并在执行重定向前严格检查用户提供的目标URL是否在该白名单中。
 ```php
 <?php
-    $allowed_domains = ['example.com', 'another-safe-domain.org'];
-    $redirect_url = $_GET["url"];
-
-    $host = parse_url($redirect_url, PHP_URL_HOST);
-
-    if (in_array($host, $allowed_domains)) {
-        header("Location: " . $redirect_url);
-        exit();
-    } else {
-        // 处理非法重定向尝试，例如重定向到默认页或显示错误信息
-        header("Location: /default_page.php");
-        exit();
-    }
+$allowed_domains = ['example.com', 'another-safe-domain.org'];
+$redirect_url = $_GET["url"];
+$host = parse_url($redirect_url, PHP_URL_HOST);
+if (in_array($host, $allowed_domains)) {
+header("Location: " . $redirect_url);
+exit();
+} else {
+// 处理非法重定向尝试，例如重定向到默认页或显示错误信息
+header("Location: /default_page.php");
+exit();
+}
 ?>
 ```
-
 #### 2. 对用户输入进行严格验证和净化
 如果无法使用 Strict White List，可以采取以下措施：
 - **检查URL的Schema**：确保Schema是 `http` 或 `https`，拒绝其他协议，如 `file://`, `javascript:`等。
 - **检查Host**：确保Host 是合法域名，避免 `//` 开头或者 `@`等绕过方式。
 - **检查绝对URL**：优先考虑相对URL重定向，如果必须使用绝对URL，进行上述Host验证。
-
 #### 3. 在重定向目标中使用安全的Token或ID
 应用程序生成一个安全的、唯一的Token或ID，与期望的重定向目标关联起来（存储在session或数据库中）。用户提供Token而不是完整的URL。应用程序接收Token后查找对应的合法URL进行重定向。
-
 #### 4. 告知用户正在进行外部重定向
 在执行外部重定向前，显示一个提示页面，告知用户即将离开当前网站并将要访问的目标URL，让用户确认是否继续。
-
 #### 5. 避免依赖客户端重定向
 如果可能，尽量使用服务器端重定向（如HTTP Location头），避免使用客户端脚本进行的重定向，因为客户端脚本更容易受到绕过或篡改。
-
 SOLUTION
 )
 
@@ -95,69 +83,62 @@ CODE)> as $high
 alert $high for {
 	title: "Check PHP Unvalidated Redirect Vulnerability",
 	title_zh: "检测PHP未验证重定向漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 仅允许重定向到预定义的合法域名列表
 维护一个允许进行重定向的合法域名白名单，并在执行重定向前严格检查用户提供的目标URL是否在该白名单中。
 ```php
 <?php
-    $allowed_domains = ['example.com', 'another-safe-domain.org'];
-    $redirect_url = $_GET["url"];
-
-    $host = parse_url($redirect_url, PHP_URL_HOST);
-
-    if (in_array($host, $allowed_domains)) {
-        header("Location: " . $redirect_url);
-        exit();
-    } else {
-        // 处理非法重定向尝试，例如重定向到默认页或显示错误信息
-        header("Location: /default_page.php");
-        exit();
-    }
+$allowed_domains = ['example.com', 'another-safe-domain.org'];
+$redirect_url = $_GET["url"];
+$host = parse_url($redirect_url, PHP_URL_HOST);
+if (in_array($host, $allowed_domains)) {
+header("Location: " . $redirect_url);
+exit();
+} else {
+// 处理非法重定向尝试，例如重定向到默认页或显示错误信息
+header("Location: /default_page.php");
+exit();
+}
 ?>
 ```
-
 #### 2. 对用户输入进行严格验证和净化
 如果无法使用 Strict White List，可以采取以下措施：
 - **检查URL的Schema**：确保Schema是 `http` 或 `https`，拒绝其他协议，如 `file://`, `javascript:`等。
 - **检查Host**：确保Host 是合法域名，避免 `//` 开头或者 `@`等绕过方式。
 - **检查绝对URL**：优先考虑相对URL重定向，如果必须使用绝对URL，进行上述Host验证。
-
 #### 3. 在重定向目标中使用安全的Token或ID
 应用程序生成一个安全的、唯一的Token或ID，与期望的重定向目标关联起来（存储在session或数据库中）。用户提供Token而不是完整的URL。应用程序接收Token后查找对应的合法URL进行重定向。
-
 #### 4. 告知用户正在进行外部重定向
 在执行外部重定向前，显示一个提示页面，告知用户即将离开当前网站并将要访问的目标URL，让用户确认是否继续。
-
 #### 5. 避免依赖客户端重定向
 如果可能，尽量使用服务器端重定向（如HTTP Location头），避免使用客户端脚本进行的重定向，因为客户端脚本更容易受到绕过或篡改。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 开放重定向漏洞（Open Redirect）是指应用程序接收用户提供的、未经严格验证的URL作为重定向目标，并将用户导向该URL。攻击者可以利用这一特性，构造恶意链接，将用户重定向到钓鱼网站、恶意软件下载页面或其他恶意资源，从而实施网络钓鱼诈骗、传播恶意软件或窃取用户凭证等。
-
 2. **触发场景**
 当应用程序使用HTTP响应头中的`Location`字段或者通过脚本（如JavaScript的`window.location`）进行页面重定向，并且重定向的目标地址直接或间接地来源于用户输入（如URL参数、表单提交数据）时，如果没有对输入进行充分的验证和过滤，就可能存在开放重定向漏洞。
 例如，以下PHP代码直接使用GET参数作为重定向目标：
 ```php
 <?php
-    $url = $_GET["url"];
-    header("Location: ".$url);
+$url = $_GET["url"];
+header("Location: ". $url);
 ?>
 ```
 攻击者可以构造类似于 `http://vulnerable-site.com/redirect.php?url=http://malicious-site.com` 的链接，诱导用户点击后被重定向到恶意网站。
-
 3. **潜在影响**
 - **网络钓鱼**：用户被重定向到外观相似的钓鱼网站，诱骗其输入敏感信息（如用户名、密码、银行卡号）。
 - **恶意软件传播**：用户被重定向到包含恶意软件下载或利用工具的网站。
 - **绕过安全策略**：在某些情况下，开放重定向可能被用来绕过同源策略（Same-Origin Policy）或其他安全限制，例如通过将恶意代码嵌入合法域名的URL中。
 - **损害网站信誉**：网站可能被攻击者滥用作为钓鱼攻击的跳板，损害其用户信任和品牌声誉。
-CODE
+DESC
 	level: "high",
 	type: "vuln",
+	name: "high",
+	message: "检测到PHP代码中存在未经验证的重定向漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "开放重定向",
 }
 $all<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -169,38 +150,46 @@ $highAndMid - $high as $mid
 alert $mid for {
 	title: "Check PHP Insufficient Redirect Validation",
 	title_zh: "检测PHP重定向验证不充分",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于审计PHP代码中可能导致开放重定向的安全漏洞，主要聚焦于重定向逻辑中存在一定程度的数据校验但防护仍然不足的情况。
-
 ### 规则详细
 1. **作为中级风险规则**
 此规则属于中等风险检测规则，通常用于发现部分经过过滤但仍存在潜在绕过可能性的重定向逻辑。
-
 2. **覆盖范围**
 针对通过用户输入动态设置重定向目标但存在部分防御措施（如简单过滤或初步校验）的代码路径，进一步分析是否存在安全缺陷。
-CODE
+DESC
 	level: "mid",
 	type: "mid",
+	name: "mid",
+	message: "检测到PHP代码中存在一定程度的重定向验证逻辑，但防护仍然不足，可能存在潜在绕过风险。",
+	solution: <<<SOLUTION
+由于规则为中危级别，建议进一步审查过滤函数是否存在潜在缺陷，并根据业务需求优化重定向逻辑的安全性。例如，增强白名单校验、增加额外的安全层（如Token机制）以及避免依赖简单过滤逻辑。
+SOLUTION
+	risk: "开放重定向",
 }
 $sink - $high - $mid as $low
 
 alert $low for {
 	title_zh: "检测PHP重定向验证潜在绕过风险",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于识别PHP代码中已具备基本的重定向验证机制但仍可能存在高级绕过风险的代码路径。
-
 ### 规则详细
 1. **作为低级风险规则**
 此规则适用于已实现基础过滤逻辑但需要进一步审查是否存在复杂攻击场景的代码路径。
-
 2. **覆盖范围**
 检测那些已应用一定安全控制（如白名单过滤、Schema验证）但可能存在边缘情况绕过的重定向逻辑。
-CODE
+DESC
 	level: "low",
 	type: "low",
 	title: "Check PHP Potential Redirect Validation Bypass",
+	solution: <<<SOLUTION
+由于规则为低危级别，建议对现有过滤机制进行安全性评估，检查是否存在边缘情况可能导致绕过。同时，可考虑引入更严格的验证逻辑（如完整白名单、Token绑定）以提高重定向安全性。
+SOLUTION
+	risk: "开放重定向",
+	name: "low",
+	message: "检测到PHP代码中已具备基本重定向验证机制，但仍需排查复杂攻击场景下的高级绕过风险。",
 }
 desc(
 	lang: "php"

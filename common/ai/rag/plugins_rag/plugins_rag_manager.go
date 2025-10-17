@@ -3,11 +3,13 @@ package plugins_rag
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -17,11 +19,11 @@ import (
 
 // PluginsRagManager 插件 RAG 管理器
 type PluginsRagManager struct {
-	db             *gorm.DB        // 数据库连接
-	ragSystem      *rag.RAGSystem  // RAG 系统
-	collectionName string          // 集合名称
-	mu             sync.RWMutex    // 互斥锁
-	indexedPlugins map[string]bool // 已索引的插件 ID
+	db             *gorm.DB       // 数据库连接
+	RagSystem      *rag.RAGSystem // RAG 系统
+	collectionName string         // 集合名称
+	mu             sync.RWMutex   // 互斥锁
+	metadataFile   string         // 元数据文件
 }
 
 // PluginMetadata 插件元数据结构
@@ -33,13 +35,33 @@ type PluginMetadata struct {
 }
 
 // NewPluginsRagManager 创建一个新的插件 RAG 管理器
-func NewPluginsRagManager(db *gorm.DB, ragSystem *rag.RAGSystem, collectionName string) *PluginsRagManager {
+func NewPluginsRagManager(db *gorm.DB, ragSystem *rag.RAGSystem, collectionName string, metadataFile string) *PluginsRagManager {
 	return &PluginsRagManager{
 		db:             db,
-		ragSystem:      ragSystem,
+		RagSystem:      ragSystem,
 		collectionName: collectionName,
-		indexedPlugins: make(map[string]bool),
+		metadataFile:   metadataFile,
 	}
+}
+
+// NewSQLitePluginsRagManager 创建一个基于 SQLite 向量存储的插件 RAG 管理器
+func NewSQLitePluginsRagManager(db *gorm.DB, collectionName string, modelName string, dimension int, metadataFile string, opts ...aispec.AIConfigOption) (*PluginsRagManager, error) {
+	if collectionName == "" {
+		collectionName = PLUGIN_RAG_COLLECTION_NAME
+	}
+
+	ragOptions := []any{}
+	for _, opt := range opts {
+		ragOptions = append(ragOptions, opt)
+	}
+
+	ragSystem, err := rag.CreateOrLoadCollection(db, collectionName, "用于储存 Yaklang 插件的 RAG 系统", ragOptions...)
+	if err != nil {
+		return nil, utils.Errorf("创建基于 SQLite 的 RAG 系统失败: %v", err)
+	}
+
+	// 创建插件 RAG 管理器
+	return NewPluginsRagManager(db, ragSystem, collectionName, metadataFile), nil
 }
 
 // IndexAllPlugins 索引所有未被忽略的插件
@@ -52,21 +74,9 @@ func (m *PluginsRagManager) IndexAllPlugins() error {
 
 	log.Infof("开始索引 %d 个插件到 RAG 系统", len(scripts))
 
-	// 复制已索引插件列表以避免并发问题
-	m.mu.RLock()
-	indexedPlugins := make(map[string]bool)
-	for k, v := range m.indexedPlugins {
-		indexedPlugins[k] = v
-	}
-	m.mu.RUnlock()
-
 	// 使用生产者消费者模型处理索引
 	scriptChan := make(chan schema.YakScript, 50)  // 插件通道
 	metadataChan := make(chan *PluginMetadata, 50) // 元数据通道
-	errorChan := make(chan error, 1)               // 错误通道
-	doneChan := make(chan struct{})                // 完成通道
-	resultChan := make(chan map[string]bool)       // 结果通道
-	producerWg := sync.WaitGroup{}                 // 生产者等待组
 
 	// 创建一个计数器来跟踪进度
 	var processedCount int32
@@ -89,7 +99,7 @@ func (m *PluginsRagManager) IndexAllPlugins() error {
 				current := processedCount
 				progressMutex.Unlock()
 				if totalCount > 0 {
-					percentage := float64(current) / float64(totalCount) * 100
+					percentage := float32(current) / float32(totalCount) * 100
 					log.Infof("索引进度: %.2f%% (%d/%d)", percentage, current, totalCount)
 				}
 			case <-progressDone:
@@ -99,61 +109,61 @@ func (m *PluginsRagManager) IndexAllPlugins() error {
 	}()
 
 	// 启动消费者协程
-	go m.indexConsumer(metadataChan, errorChan, doneChan, resultChan)
+	consumerCount := 3
+	consumerWg := sync.WaitGroup{} // 消费者等待组
+	for i := 0; i < consumerCount; i++ {
+		consumerWg.Add(1)
+		go func(consumerID int) {
+			defer consumerWg.Done()
+			m.indexPlugins(metadataChan, func(key string) {
+				processedCount += 1
+				progressMutex.Lock()
+				progressMutex.Unlock()
+			})
+		}(i)
+	}
 
+	allMetadatas := []*PluginMetadata{}
 	// 启动多个生产者协程
-	producerCount := 3
+	producerCount := 1
+	producerWg := sync.WaitGroup{} // 生产者等待组
 	for i := 0; i < producerCount; i++ {
 		producerWg.Add(1)
 		go func(producerID int) {
 			defer producerWg.Done()
-			m.metadataProducer(producerID, scriptChan, indexedPlugins, metadataChan, errorChan)
+			m.generateMetadata(producerID, scriptChan, func(meta *PluginMetadata) {
+				progressMutex.Lock()
+				defer progressMutex.Unlock()
+				metadataChan <- meta
+				allMetadatas = append(allMetadatas, meta)
+				if m.metadataFile != "" {
+					content, err := json.Marshal(allMetadatas)
+					if err != nil {
+						log.Errorf("序列化元数据失败: %v", err)
+					}
+					os.WriteFile(m.metadataFile, content, 0644)
+				}
+			})
 		}(i)
 	}
 
-	// 将插件发送到脚本通道
-	go func() {
-		for _, script := range scripts {
-			// 跳过已经索引的插件
-			if indexedPlugins[script.ScriptName] {
-				progressMutex.Lock()
-				processedCount++
-				progressMutex.Unlock()
-				continue
-			}
-			scriptChan <- script
-		}
-		close(scriptChan) // 关闭脚本通道，表示没有更多脚本
-
-		// 等待所有生产者完成
-		producerWg.Wait()
-		close(metadataChan) // 关闭元数据通道
-	}()
-
-	// 等待处理完成或错误
-	var newIndexed map[string]bool
-	select {
-	case err := <-errorChan:
-		close(progressDone)
-		return err
-	case newIndexed = <-resultChan:
-		// 更新已索引插件列表
-		m.mu.Lock()
-		for id := range newIndexed {
-			m.indexedPlugins[id] = true
-			progressMutex.Lock()
-			processedCount++
-			progressMutex.Unlock()
-		}
-		m.mu.Unlock()
-		close(progressDone)
-		log.Infof("完成插件索引，共索引 %d 个插件", len(m.indexedPlugins))
-		return nil
+	for _, script := range scripts {
+		scriptChan <- script
 	}
+	close(scriptChan) // 关闭脚本通道，表示没有更多脚本
+
+	// 等待所有生产者完成
+	producerWg.Wait()
+	// 等待所有消费者完成
+	consumerWg.Wait()
+	close(metadataChan) // 关闭元数据通道
+	close(progressDone)
+	log.Infof("完成插件索引，共索引 %d 个插件", processedCount)
+	return nil
 }
 
-// metadataProducer 生产者：生成插件元数据
-func (m *PluginsRagManager) metadataProducer(producerID int, scriptChan <-chan schema.YakScript, indexedPlugins map[string]bool, metadataChan chan<- *PluginMetadata, errorChan chan<- error) {
+// generateMetadata 生产者：生成插件元数据
+func (m *PluginsRagManager) generateMetadata(producerID int, scriptChan <-chan schema.YakScript, onMetadataGenerated func(meta *PluginMetadata)) {
 	for script := range scriptChan {
 		// 处理单个插件，最多重试5次
 		maxRetries := 5
@@ -184,9 +194,7 @@ func (m *PluginsRagManager) metadataProducer(producerID int, scriptChan <-chan s
 			}
 
 			// 准备插件元数据
-			metaMap := map[string]any{
-				"id": yakScript.Id,
-			}
+			metaMap := map[string]any{}
 
 			// 准备插件内容，组合多个字段以提高搜索质量
 			documentContent := fmt.Sprintf(`脚本名称: %s
@@ -207,7 +215,7 @@ func (m *PluginsRagManager) metadataProducer(producerID int, scriptChan <-chan s
 				DocumentContent: documentContent,
 			}
 
-			metadataChan <- pluginMeta
+			onMetadataGenerated(pluginMeta)
 			success = true
 			log.Infof("生产者 %d: 成功生成插件 %s 的元数据", producerID, script.ScriptName)
 		}
@@ -219,44 +227,17 @@ func (m *PluginsRagManager) metadataProducer(producerID int, scriptChan <-chan s
 	}
 }
 
-// indexConsumer 消费者：处理元数据并索引
-func (m *PluginsRagManager) indexConsumer(metadataChan <-chan *PluginMetadata, errorChan chan<- error, doneChan chan<- struct{}, resultChan chan<- map[string]bool) {
-	var wg sync.WaitGroup
-	workerCount := 3 // 设置工作协程数量
-
-	// 使用并发安全的map来收集已索引的插件
-	var resultMu sync.Mutex
-	successfullyIndexed := make(map[string]bool)
-
-	// 创建工作协程池
-	for i := 0; i < workerCount; i++ {
-		wg.Add(1)
-		go func(workerID int) {
-			defer wg.Done()
-
-			for meta := range metadataChan {
-				// 尝试索引该插件，最多重试5次
-				if err := m.indexSinglePlugin(meta); err != nil {
-					log.Warnf("工作协程 %d: 索引插件 %s 失败: %v", workerID, meta.ScriptName, err)
-					continue
-				}
-
-				// 记录成功索引的插件ID
-				resultMu.Lock()
-				successfullyIndexed[meta.ScriptName] = true
-				resultMu.Unlock()
-
-				log.Infof("工作协程 %d: 成功索引插件: %s", workerID, meta.ScriptName)
-			}
-		}(i)
+// indexPlugins 消费者：处理元数据并索引
+func (m *PluginsRagManager) indexPlugins(metadataChan <-chan *PluginMetadata, onIndexFinished func(key string)) {
+	for meta := range metadataChan {
+		// 尝试索引该插件，最多重试5次
+		if err := m.indexSinglePlugin(meta); err != nil {
+			log.Warnf("索引插件 %s 失败: %v", meta.ScriptName, err)
+			continue
+		}
+		onIndexFinished(meta.ScriptName)
+		log.Infof("成功索引插件: %s", meta.ScriptName)
 	}
-
-	// 等待所有工作协程完成
-	wg.Wait()
-
-	// 发送结果并关闭通道
-	resultChan <- successfullyIndexed
-	close(doneChan)
 }
 
 // IndexPlugin 索引单个插件
@@ -336,9 +317,6 @@ func (m *PluginsRagManager) IndexPlugin(scriptName string) error {
 		return err
 	}
 
-	// 标记为已索引
-	m.indexedPlugins[scriptName] = true
-
 	return nil
 }
 
@@ -364,15 +342,8 @@ func (m *PluginsRagManager) indexSinglePlugin(meta *PluginMetadata) error {
 }
 
 func (m *PluginsRagManager) indexSinglePluginOnce(meta *PluginMetadata) error {
-	// 创建文档
-	doc := rag.Document{
-		ID:       meta.DocID,
-		Content:  meta.DocumentContent,
-		Metadata: meta.Metadata,
-	}
-
 	// 添加到 RAG 系统
-	err := m.ragSystem.AddDocuments(doc)
+	err := m.RagSystem.Add(meta.DocID, meta.DocumentContent, rag.WithDocumentRawMetadata(meta.Metadata))
 	if err != nil {
 		return utils.Errorf("添加插件文档到 RAG 系统失败: %v", err)
 	}
@@ -385,22 +356,25 @@ type PluginSearchResult struct {
 	Score  float64
 }
 
-func (m *PluginsRagManager) SearchPluginsIds(query string, limit int) ([]int64, error) {
+func (m *PluginsRagManager) SearchPluginsIds(query string, page, limit int) (int, []string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// 搜索 RAG 系统
-	results, err := m.ragSystem.Query(query, limit)
+	results, err := m.RagSystem.QueryWithPage(query, page, limit)
 	if err != nil {
-		return nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
+		return 0, nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
 	}
-	ids := make([]int64, 0)
+
+	// 文档 id 和插件 id 相同
+	var ids []string
 	for _, result := range results {
-		if id, ok := result.Document.Metadata["id"].(float64); ok {
-			ids = append(ids, int64(id))
-		}
+		ids = append(ids, result.Document.ID)
 	}
-	return ids, nil
+	total, err := m.RagSystem.CountDocuments()
+	if err != nil {
+		return 0, nil, utils.Errorf("获取文档总数失败: %v", err)
+	}
+	return total, ids, nil
 }
 
 // SearchPlugins 使用自然语言搜索插件
@@ -408,13 +382,8 @@ func (m *PluginsRagManager) SearchPlugins(query string, limit int) ([]*PluginSea
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	// 检查是否有插件被索引
-	// if len(m.indexedPlugins) == 0 {
-	// 	return nil, utils.Errorf("尚未索引任何插件，请先调用 IndexAllPlugins")
-	// }
-
 	// 搜索 RAG 系统
-	results, err := m.ragSystem.Query(query, limit)
+	results, err := m.RagSystem.QueryWithPage(query, 1, limit)
 	if err != nil {
 		return nil, utils.Errorf("搜索 RAG 系统失败: %v", err)
 	}
@@ -425,87 +394,37 @@ func (m *PluginsRagManager) SearchPlugins(query string, limit int) ([]*PluginSea
 	}
 
 	// 提取插件 ID 并查询完整插件信息
-	var scriptIDs []int64
-	var idToScore = make(map[int64]float64)
+	var scriptNames []string
+	var idToScore = make(map[string]float64)
 	for _, result := range results {
-		if id, ok := result.Document.Metadata["id"].(float64); ok {
-			scriptIDs = append(scriptIDs, int64(id))
-			idToScore[int64(id)] = result.Score
-		}
+		scriptNames = append(scriptNames, result.Document.ID)
+		idToScore[result.Document.ID] = result.Score
 	}
 
 	// 查询插件
 	var scripts []schema.YakScript
-	if err := m.db.Where("id IN (?)", scriptIDs).Find(&scripts).Error; err != nil {
+	if err := m.db.Where("script_name IN (?)", scriptNames).Find(&scripts).Error; err != nil {
 		return nil, utils.Errorf("查询插件详情失败: %v", err)
 	}
 
 	// 将插件转换为 YakScript 格式并按相关性排序
-	scriptMap := make(map[int64]*ypb.YakScript)
+	scriptMap := make(map[string]*ypb.YakScript)
 	for _, script := range scripts {
-		scriptMap[int64(script.ID)] = script.ToGRPCModel()
+		scriptMap[script.ScriptName] = script.ToGRPCModel()
 	}
 
 	// 按相关性排序结果
 	var sortedScripts []*PluginSearchResult
 	for _, result := range results {
-		if id, ok := result.Document.Metadata["id"].(float64); ok {
-			if script, exists := scriptMap[int64(id)]; exists {
-				// 添加相似度得分
-				sortedScripts = append(sortedScripts, &PluginSearchResult{
-					Script: script,
-					Score:  result.Score,
-				})
-			}
+		scriptName := result.Document.ID
+		if script, exists := scriptMap[scriptName]; exists {
+			// 添加相似度得分
+			sortedScripts = append(sortedScripts, &PluginSearchResult{
+				Script: script,
+				Score:  result.Score,
+			})
 		}
 	}
 
 	return sortedScripts, nil
-}
-
-// RemovePlugin 从 RAG 系统中移除插件
-func (m *PluginsRagManager) RemovePlugin(scriptName string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// 生成文档 ID
-	docID := scriptName
-
-	// 从 RAG 系统中删除
-	err := m.ragSystem.DeleteDocuments(docID)
-	if err != nil {
-		return utils.Errorf("从 RAG 系统中删除插件失败: %v", err)
-	}
-
-	// 从已索引集合中移除
-	delete(m.indexedPlugins, scriptName)
-
-	return nil
-}
-
-// GetIndexedPluginsCount 获取已索引的插件数量
-func (m *PluginsRagManager) GetIndexedPluginsCount() int {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return len(m.indexedPlugins)
-}
-
-// Clear 清空所有索引的插件
-func (m *PluginsRagManager) Clear() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// 删除所有文档
-	for id := range m.indexedPlugins {
-		docID := id
-		if err := m.ragSystem.DeleteDocuments(docID); err != nil {
-			log.Warnf("删除插件文档 %s 失败: %v", docID, err)
-		}
-	}
-
-	// 清空已索引的插件集合
-	m.indexedPlugins = make(map[string]bool)
-
-	return nil
 }

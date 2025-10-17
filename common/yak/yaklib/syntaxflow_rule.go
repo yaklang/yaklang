@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -50,6 +51,7 @@ type OnlineSyntaxFlowRule struct {
 	Tag           string                                           `json:"tag"`
 	AlertDesc     schema.MapEx[string, *schema.SyntaxFlowDescInfo] `json:"alert_desc"`
 	CVE           string                                           `json:"cve"`
+	CWE           []string                                         `json:"cwe"`
 	RiskType      string                                           `json:"risk_type"`
 	Hash          string                                           `json:"hash"`
 	GroupName     []string                                         `json:"groupName"`
@@ -183,6 +185,7 @@ func (s *OnlineClient) downloadOnlineSyntaxFlowRule(
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, false),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return nil, nil, utils.Errorf("SyntaxFlowRule UploadToOnline failed: http error")

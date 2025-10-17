@@ -1,0 +1,321 @@
+desc(
+	title: "Audit Golang File Write Path Function (os)"
+	type: audit
+	level: info
+	lib: 'golang-file-write-path-os'
+	desc: <<<DESC
+### 规则描述
+
+1. **规则目的**
+   该规则用于审计Golang程序中未经验证的文件写入操作，这些操作可能导致路径穿越漏洞。攻击者可通过构造恶意输入（如包含`../`的路径），访问或覆盖任意文件，从而造成敏感信息泄露、程序稳定性受损或恶意代码执行。
+
+2. **触发场景**
+   在使用`os.WriteFile`等函数时，如果未对用户提供的文件路径进行严格的输入校验和限制，攻击者可能通过路径穿越（例如`../../etc/passwd`）访问系统关键文件。以下是一个示例代码：
+   ```go
+   package main
+   import (
+       "fmt"
+       "net/http"
+       "os"
+   )
+
+   func writeFile(w http.ResponseWriter, r *http.Request) {
+       filePath := r.URL.Query().Get("file") // 用户控制的路径
+       content := r.URL.Query().Get("content")
+       err := os.WriteFile(filePath, []byte(content), 0644)
+       if err != nil {
+           fmt.Fprintf(w, "Error: %v", err)
+           return
+       }
+       fmt.Fprintf(w, "File written successfully")
+   }
+
+   func main() {
+       http.HandleFunc("/write", writeFile)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
+   如果攻击者请求`/write?file=../../etc/passwd&content=malicious_data`，可能导致系统密码文件被篡改。
+
+3. **潜在影响**
+   - 敏感数据被泄露或篡改（例如配置文件、日志文件）。
+   - 关键系统文件被覆盖或破坏，导致服务中断。
+   - 攻击者可能植入恶意脚本或后门，进一步控制服务器。
+
+DESC
+	rule_id: "8fa1347d-c895-4652-8fc7-08b5f022eab2"
+	title_zh: "审计Golang文件写入函数(os)"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 对文件路径进行严格校验
+确保用户提供的文件路径仅限于合法目录范围内，并阻止绝对路径或相对路径穿越。例如，可以使用安全路径拼接函数来防止路径穿越：
+```go
+func safeJoin(basePath, filePath string) (string, error) {
+    // 禁止绝对路径
+    if filepath.IsAbs(filePath) {
+        return "", errors.New("absolute path not allowed")
+    }
+    resolvedPath := filepath.Join(basePath, filePath)
+    // 验证最终路径是否仍在基础目录下
+    if !strings.HasPrefix(resolvedPath, basePath) {
+        return "", errors.New("path traversal detected")
+    }
+    return resolvedPath, nil
+}
+```
+在调用`os.WriteFile`之前，先通过`safelyJoin`函数验证目标路径。
+
+#### 2. 使用临时文件生成方法
+对于需要动态生成文件的场景，推荐直接使用Go标准库中的`ioutil.TempFile`或`os.CreateTemp`，由操作系统负责分配唯一的安全路径：
+```go
+package main
+import (
+    "fmt"
+    "io/ioutil"
+    "os"
+)
+
+func main() {
+    file, err := ioutil.TempFile("", "prefix-")
+    if err != nil {
+        fmt.Printf("Error creating temp file: %v\n", err)
+        return
+    }
+    defer file.Close()
+    defer os.Remove(file.Name()) // 清理临时文件
+    fmt.Printf("Created temporary file: %s\n", file.Name())
+    _, err = file.WriteString("This is temporary and safe content.")
+    if err != nil {
+        fmt.Printf("Error writing to temp file: %v\n", err)
+        return
+    }
+    fmt.Println("Content written to temp file successfully.")
+}
+```
+
+#### 3. 实现更细粒度的路径清理逻辑
+对于复杂场景，可以通过正则表达式或其他方式移除路径中的非法字符，确保路径符合预期格式：
+```go
+func cleanPath(p string) string {
+    p = filepath.Clean(p)
+    re, _ := regexp.Compile(`(?:\.\.[\\/]|\\)`) // 移除`../`或`\`
+    p = re.ReplaceAllString(p, "")
+    return p
+}
+```
+结合清理逻辑与路径验证，可显著降低风险。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+os?{<fullTypeName>?{have: 'os'}} as $os
+$os.WriteFile(*<slice(index=0)> #-> as $output)
+
+alert $output for {
+	title_zh: "未验证的文件写入操作",
+	level: "info",
+	title: "Unvalidated File Write Path Operation",
+	message: "发现Golang中未经验证的文件写入路径操作，可能存在路径穿越风险。",
+	solution: <<<SOLUTION
+### 安全建议
+为了避免未经验证的文件写入操作，建议对传入的文件路径进行严格的验证，确保其位于安全的目录内，且用户没有权限写入非法路径。
+
+#### 示例代码：
+```go
+func safeJoin(basePath, filePath string) (string, error) {
+    // 实现安全路径拼接，确保filePath不是相对路径，防止路径穿越
+    if filepath.IsAbs(filePath) {
+        return "", errors.New("file path must be relative")
+    }
+    return filepath.Join(basePath, filePath), nil
+}
+```
+在写入文件之前，使用`safeJoin`函数验证并拼接路径，确保文件写入操作的安全性。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+该规则用于审计Golang程序中未经验证的文件写入操作，这些操作可能导致路径穿越漏洞。攻击者可能利用此漏洞写入任意文件，从而导致敏感信息泄露、程序稳定性受损或恶意代码执行。
+
+### 规则详细
+1. **作为基础检测库**
+   属于`golang-file-write-path-os`库规则（`lib`类型），通过分析代码中调用`os.WriteFile`函数的情况，结合文件路径参数的来源，识别潜在的安全风险。
+2. **覆盖高危写入操作**
+   检测以下操作场景：
+   - 文件路径是否经过验证；
+   - 是否存在路径穿越的风险。
+
+### 参考资料
+- [CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+DESC
+	name: "output",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
+func writeFile(w http.ResponseWriter, r *http.Request) {
+    filePath := r.URL.Query().Get("file")
+    content := r.URL.Query().Get("content")
+
+    // 解析并验证文件路径
+    safePath, err := safeJoin("/var/www/uploads", filePath)
+    if err != nil {
+        fmt.Fprintf(w, "Invalid file path")
+        return
+    }
+
+    // 写入文件内容
+    err = os.WriteFile(safePath, []byte(content), 0644)
+    if err != nil {
+        fmt.Fprintf(w, "Error: %v", err)
+        return
+    }
+
+    fmt.Fprintf(w, "File written successfully")
+}
+
+func main() {
+    http.HandleFunc("/write", writeFile)
+    http.ListenAndServe(":8080", nil)
+}
+
+PARAM
+	"safefile://SafeFileWriteWithValidation.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"path/filepath"
+	"regexp"
+)
+
+// cleanPath 确保路径只包含预期的字符，并移除多余的斜杠
+func cleanPath(p string) string {
+	// 移除路径开头和结尾的所有斜杠
+	p = filepath.Clean(p)
+	// 确保没有跨目录访问的尝试 (e.g., ../)
+	re, _ := regexp.Compile(`(?:\.{2}[\\/]|\\)`)
+	p = re.ReplaceAllString(p, "")
+	return p
+}
+
+// safeWriteFile 确保文件写入是在允许的目录下，避免路径穿越
+func safeWriteFile(baseDir, filename string, data []byte) error {
+	if filepath.IsAbs(filename) { // 禁止绝对路径
+		return fmt.Errorf("absolute path not allowed")
+	}
+
+	cleanedFilename := cleanPath(filename)
+	if cleanedFilename == "" || cleanedFilename == "." || cleanedFilename == ".." {
+		return fmt.Errorf("invalid filename")
+	}
+
+	finalPath := filepath.Join(baseDir, cleanedFilename)
+	// 再次验证最终路径是否仍在baseDir下
+	// This is crucial to prevent cases where cleanPath might be bypassed or incomplete
+	resolvedPath, err := filepath.Abs(finalPath)
+	if err != nil {
+		return fmt.Errorf("failed to resolve path: %w", err)
+	}
+	resolvedBaseDir, err := filepath.Abs(baseDir)
+	if err != nil {
+		return fmt.Errorf("failed to resolve base directory: %w", err)
+	}
+
+	if !strings.HasPrefix(resolvedPath, resolvedBaseDir) {
+		return fmt.Errorf("attempted path traversal detected")
+	}
+
+	return os.WriteFile(finalPath, data, 0644) // 使用os.WriteFile但路径经过严格验证
+}
+
+func main() {
+	baseDirectory := "/tmp/uploads"
+	// 确保目录存在
+	_ = os.MkdirAll(baseDirectory, 0755)
+
+	// 示例1: 安全的写入操作
+	err := safeWriteFile(baseDirectory, "my_safe_file.txt", []byte("This is safe content."))
+	if err != nil {
+		fmt.Printf("Error writing safe file: %v\n", err)
+	} else {
+		fmt.Println("Safe file written successfully.")
+	}
+
+	// 示例2: 尝试路径穿越 (应该被阻止)
+	err = safeWriteFile(baseDirectory, "../secret/passwd.txt", []byte("trying to write passwd"))
+	if err != nil {
+		fmt.Printf("Error writing malicious file (expected): %v\n", err)
+	} else {
+		fmt.Println("Malicious file written (unexpected)!")
+	}
+
+	// 示例3: 尝试写入绝对路径 (应该被阻止)
+	err = safeWriteFile(baseDirectory, "/etc/passwd", []byte("trying to write absolute path"))
+	if err != nil {
+		fmt.Printf("Error writing absolute path file (expected): %v\n", err)
+	} else {
+		fmt.Println("Absolute path file written (unexpected)!")
+	}
+}
+
+CODE
+	"safefile://SafeFileWriteToTemp.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"os"
+)
+
+func main() {
+	// 直接使用 ioutil.TempFile 创建临时文件，由系统生成安全的文件名和路径
+	// 这种方式是最安全的，因为它完全避免了用户控制的文件名和路径，
+	// 从而杜绝了路径穿越和任意文件写入的风险。
+	file, err := ioutil.TempFile("", "prefix-")
+	if err != nil {
+		fmt.Printf("Error creating temp file: %v\n", err)
+		return
+	}
+	defer file.Close()
+	defer os.Remove(file.Name()) // 使用完后清理临时文件
+
+	fmt.Printf("Created temporary file: %s\n", file.Name())
+
+	_, err = file.WriteString("This is temporary and safe content.")
+	if err != nil {
+		fmt.Printf("Error writing to temp file: %v\n", err)
+		return
+	}
+	fmt.Println("Content written to temp file successfully.")
+
+	// 同样可以使用 os.CreateTemp
+	file2, err := os.CreateTemp("", "another-prefix-")
+	if err != nil {
+		fmt.Printf("Error creating another temp file: %v\n", err)
+		return
+	}
+	defer file2.Close()
+	defer os.Remove(file2.Name()) // 使用完后清理临时文件
+	fmt.Printf("Created another temporary file: %s\n", file2.Name())
+}
+
+CODE
+)

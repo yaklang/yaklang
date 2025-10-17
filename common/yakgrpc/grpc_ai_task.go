@@ -2,20 +2,21 @@ package yakgrpc
 
 import (
 	"context"
-	"encoding/json"
-	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/chanx"
-	"github.com/yaklang/yaklang/common/utils/reducer"
-	"github.com/yaklang/yaklang/common/yak"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
+	"fmt"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
+	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid"
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type aiChatType func(string, ...aispec.AIConfigOption) (string, error)
@@ -26,25 +27,17 @@ func RegisterMockAIChat(c aiChatType) {
 	mockedAIChat = c
 }
 
-var triageCache = reducer.NewReducer(10, func(data []string) string {
-	result, err := yak.ExecuteForge("fragment_summarizer", map[string]any{
-		"textSnippet": strings.Join(data, "\n"),
-	}, aid.WithAgreeYOLO(true))
-	if err != nil {
-		return ""
-	}
-	return utils.InterfaceToString(result)
-})
-
 var RedirectForge = "redirect_forge"
 
 func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	firstMsg, err := stream.Recv()
 	if err != nil {
+		log.Errorf("recv first msg failed: %v", err)
 		return utils.Errorf("recv first msg failed: %v", err)
 	}
 
 	if !firstMsg.IsStart {
+		log.Info("first msg is not start")
 		return utils.Error("first msg is not start")
 	}
 	startParams := firstMsg.Params
@@ -53,37 +46,28 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 	defer cancel()
 
 	inputEvent := make(chan *aid.InputEvent, 1000)
-
 	var currentCoordinatorId = startParams.CoordinatorId
 	var coordinatorIdOnce sync.Once
+	var sendEvent = func(e *schema.AiOutputEvent) {
+		if e.Timestamp <= 0 {
+			e.Timestamp = time.Now().Unix() // fallback
+		}
+		coordinatorIdOnce.Do(func() {
+			currentCoordinatorId = e.CoordinatorId
+		})
+		if e.CoordinatorId != currentCoordinatorId {
+			fmt.Printf("e.CoordinatorId [%s] != currentCoordinatorId [%s]\n", e.CoordinatorId, currentCoordinatorId)
+		}
+		err := stream.Send(e.ToGRPC())
+		if err != nil {
+			log.Errorf("send event failed: %v", err)
+		}
+	}
+
 	var aidOption = []aid.Option{
+		aid.WithSaveEvent(true),
 		aid.WithTaskAnalysis(true),
-		aid.WithEventHandler(func(e *aid.Event) {
-			if e.Timestamp <= 0 {
-				e.Timestamp = time.Now().Unix() // fallback
-			}
-			coordinatorIdOnce.Do(func() {
-				currentCoordinatorId = e.CoordinatorId
-			})
-			event := &ypb.AIOutputEvent{
-				CoordinatorId:   e.CoordinatorId,
-				Type:            string(e.Type),
-				NodeId:          utils.EscapeInvalidUTF8Byte([]byte(e.NodeId)),
-				IsSystem:        e.IsSystem,
-				IsStream:        e.IsStream,
-				IsReason:        e.IsReason,
-				StreamDelta:     e.StreamDelta,
-				IsJson:          e.IsJson,
-				Content:         e.Content,
-				Timestamp:       e.Timestamp,
-				TaskIndex:       e.TaskIndex,
-				DisableMarkdown: e.DisableMarkdown,
-			}
-			err := stream.Send(event)
-			if err != nil {
-				log.Errorf("send event failed: %v", err)
-			}
-		}),
+		aid.WithEventHandler(sendEvent),
 		aid.WithEventInputChan(inputEvent),
 	}
 
@@ -96,44 +80,8 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 		for {
 			event, err := stream.Recv()
 			if err != nil {
-				log.Errorf("receive event failed: %v", err)
+				log.Errorf("receive event failed (for sync messages): %v", err)
 				return
-			}
-			if event.IsSyncMessage {
-				t, ok := aid.ParseSyncType(event.GetSyncType())
-				if !ok {
-					log.Errorf("parse sync type failed, got: %v", event.GetSyncType())
-					continue
-				}
-				select {
-				case inputEvent <- &aid.InputEvent{
-					IsSyncInfo: true,
-					SyncType:   t,
-				}:
-					continue
-				case <-baseCtx.Done():
-					return
-				}
-			}
-
-			if event.IsInteractiveMessage {
-				var params = make(aitool.InvokeParams)
-				err := json.Unmarshal([]byte(event.InteractiveJSONInput), &params)
-				if err != nil {
-					log.Errorf("unmarshal interactive json input failed: %v", err)
-					continue
-				}
-				inEvent := &aid.InputEvent{
-					IsInteractive: true,
-					Id:            event.InteractiveId,
-					Params:        params,
-				}
-				select {
-				case inputEvent <- inEvent:
-					continue
-				case <-baseCtx.Done():
-					return
-				}
 			}
 
 			if event.IsConfigHotpatch {
@@ -157,6 +105,19 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 					hotpatchBroadcaster.Submit(updateOption)
 				}
 			}
+
+			result, err := aid.ConvertAIInputEventToAIDInputEvent(event)
+			if err != nil {
+				log.Errorf("Failed to convert AI input event to AID input event: %v", err)
+				continue
+			}
+
+			select {
+			case inputEvent <- result:
+				continue
+			case <-baseCtx.Done():
+				return
+			}
 		}
 	}()
 
@@ -171,42 +132,38 @@ func (s *Server) StartAITask(stream ypb.Yak_StartAITaskServer) error {
 
 	var res any
 	if forgeName != "" {
-		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
+		log.Infof("forgeName is %v, start call yak.ExecuteForge", forgeName)
+		res, err = yak.ExecuteForge(forgeName, params, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), sendEvent, aidOption...)...)
 		if err != nil {
 			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
 			return err
 		}
+		log.Infof("run ai forge[%s] success, result res: %v", forgeName, res)
 	} else {
-		triageCache.Push(utils.InterfaceToString(params))
-		res, err = yak.ExecuteForge("forge_triage", map[string]any{
-			"query":   params,
-			"context": triageCache.Dump(),
-		}, buildAIAgentOption(baseCtx, startParams.GetCoordinatorId(), aidOption...)...)
+		log.Info("call without forgeName, use 'forge_triage' as default")
+
+		cod, err := aid.NewCoordinatorContext(baseCtx, utils.InterfaceToString(params), append(aidOption, aid.WithCoordinatorId(currentCoordinatorId))...)
 		if err != nil {
-			log.Errorf("run ai forge[%s] failed: %v", forgeName, err)
+			log.Errorf("create ai coordinator failed: %v", err)
 			return err
 		}
-		if res != nil {
-			var redirectParam = &ypb.AIStartParams{
-				ForgeName: strings.ToLower(utils.InterfaceToString(res)),
-			}
-			redirectParamJson, err := json.Marshal(redirectParam)
-			if err != nil {
-				return err
-			}
-			err = stream.Send(&ypb.AIOutputEvent{
-				CoordinatorId: currentCoordinatorId,
-				Type:          RedirectForge,
-				Content:       redirectParamJson,
-				Timestamp:     time.Now().Unix(),
-				IsJson:        true,
-			})
+		err = cod.Run()
+		if err != nil {
+			log.Errorf("run ai coordinator failed: %v", err)
+			return err
 		}
+	}
+	if res != nil {
+		stream.Send(&ypb.AIOutputEvent{
+			CoordinatorId: currentCoordinatorId,
+			IsReason:      true,
+			Content:       utils.InterfaceToBytes(res),
+		})
 	}
 	return nil
 }
 
-func buildAIAgentOption(ctx context.Context, CoordinatorId string, extendOption ...aid.Option) []any {
+func buildAIAgentOption(ctx context.Context, CoordinatorId string, agentEventHandler func(e *schema.AiOutputEvent), extendOption ...aid.Option) []any {
 	agentOption := []any{
 		yak.WithContext(ctx),
 	}
@@ -216,6 +173,10 @@ func buildAIAgentOption(ctx context.Context, CoordinatorId string, extendOption 
 
 	if len(extendOption) > 0 {
 		agentOption = append(agentOption, yak.WithExtendAIDOptions(extendOption...))
+	}
+
+	if agentEventHandler != nil {
+		agentOption = append(agentOption, yak.WithAiAgentEventHandler(agentEventHandler))
 	}
 
 	return agentOption
@@ -255,16 +216,25 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	}
 
 	if startParams.GetUseDefaultAIConfig() {
-		wrapperChat := aid.AIChatToAICallbackType(ai.Chat)
-		aidOption = append(aidOption, aid.WithAICallback(func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+		wrapperChat := aicommon.AIChatToAICallbackType(ai.Chat)
+		aidOption = append(aidOption, aid.WithAICallback(func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			//fmt.Println(req.GetPrompt())
 			//time.Sleep(100 * time.Millisecond)
 			return wrapperChat(config, req)
 		}))
 	}
 
+	if serviceName := startParams.GetAIService(); serviceName != "" {
+		callback, err := localModelAICallbackByServiceName(serviceName)
+		if err != nil {
+			log.Errorf("load ai service failed: %v", err)
+		} else {
+			aidOption = append(aidOption, aid.WithAICallback(callback))
+		}
+	}
+
 	if mockedAIChat != nil {
-		aidOption = append(aidOption, aid.WithAICallback(aid.AIChatToAICallbackType(mockedAIChat)))
+		aidOption = append(aidOption, aid.WithAICallback(aicommon.AIChatToAICallbackType(mockedAIChat)))
 	}
 
 	if startParams.GetDisallowRequireForUserPrompt() {
@@ -312,4 +282,16 @@ func buildAIDOption(startParams *ypb.AIStartParams) []aid.Option {
 	}
 
 	return aidOption
+}
+
+func localModelAICallbackByServiceName(serviceName string) (func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error), error) {
+	// localmodelManager := localmodel.GetManager()
+	// service, err := localmodelManager.GetServiceStatus(startParams.GetAIService())
+	// if err != nil {
+	// }
+	chat, err := ai.LoadChater(serviceName)
+	if err != nil {
+		return nil, fmt.Errorf("load ai service failed: %v", err)
+	}
+	return aicommon.AIChatToAICallbackType(chat), nil
 }

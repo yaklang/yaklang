@@ -1,0 +1,329 @@
+基于体检结果，请按照以下JSON格式输出主机体检报告，所有信息使用中文
+
+{{ .Memory.OS }}-{{ .Memory.Arch }}-{{ .Memory.Now }}
+{{ .Memory.Progress }}
+{{ .Memory.PersistentMemory }}
+
+```schema
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["@action", "scan_summary", "system_info", "resource_status", "security_issues", "recommendations"],
+  "properties": {
+    "@action": {
+      "const": "hostscan_result"
+    },
+    "scan_summary": {
+      "type": "object",
+      "required": ["target", "scan_time", "scan_duration", "overall_health", "total_issues"],
+      "properties": {
+        "target": {
+          "type": "string",
+          "description": "体检目标主机"
+        },
+        "scan_time": {
+          "type": "string",
+          "description": "体检时间"
+        },
+        "scan_duration": {
+          "type": "string",
+          "description": "体检耗时"
+        },
+        "overall_health": {
+          "type": "string",
+          "enum": ["Excellent", "Good", "Fair", "Poor", "Critical"],
+          "description": "系统整体健康度"
+        },
+        "total_issues": {
+          "type": "integer",
+          "description": "发现的问题总数"
+        }
+      }
+    },
+    "system_info": {
+      "type": "object",
+      "required": ["os", "version", "architecture", "hostname", "uptime"],
+      "properties": {
+        "os": {
+          "type": "string",
+          "description": "操作系统类型"
+        },
+        "version": {
+          "type": "string",
+          "description": "系统版本"
+        },
+        "architecture": {
+          "type": "string",
+          "description": "系统架构"
+        },
+        "hostname": {
+          "type": "string",
+          "description": "主机名"
+        },
+        "uptime": {
+          "type": "string",
+          "description": "系统运行时间"
+        }
+      }
+    },
+    "resource_status": {
+      "type": "object",
+      "required": ["cpu", "memory", "disk", "network"],
+      "properties": {
+        "cpu": {
+          "type": "object",
+          "required": ["usage_percent", "cores", "load_average"],
+          "properties": {
+            "usage_percent": {
+              "type": "number",
+              "description": "CPU使用率百分比"
+            },
+            "cores": {
+              "type": "integer",
+              "description": "CPU核心数"
+            },
+            "load_average": {
+              "type": "array",
+              "items": {"type": "number"},
+              "description": "系统负载平均值"
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "required": ["total", "used", "available", "usage_percent"],
+          "properties": {
+            "total": {
+              "type": "string",
+              "description": "总内存"
+            },
+            "used": {
+              "type": "string",
+              "description": "已用内存"
+            },
+            "available": {
+              "type": "string",
+              "description": "可用内存"
+            },
+            "usage_percent": {
+              "type": "number",
+              "description": "内存使用率百分比"
+            }
+          }
+        },
+        "disk": {
+          "type": "object",
+          "required": ["total", "used", "available", "usage_percent"],
+          "properties": {
+            "total": {
+              "type": "string",
+              "description": "总磁盘空间"
+            },
+            "used": {
+              "type": "string",
+              "description": "已用磁盘空间"
+            },
+            "available": {
+              "type": "string",
+              "description": "可用磁盘空间"
+            },
+            "usage_percent": {
+              "type": "number",
+              "description": "磁盘使用率百分比"
+            }
+          }
+        },
+        "network": {
+          "type": "object",
+          "required": ["interfaces", "active_connections"],
+          "properties": {
+            "interfaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {"type": "string"},
+                  "ip": {"type": "string"},
+                  "status": {"type": "string"}
+                }
+              },
+              "description": "网络接口信息"
+            },
+            "active_connections": {
+              "type": "integer",
+              "description": "活跃连接数"
+            }
+          }
+        }
+      }
+    },
+    "open_ports": {
+      "type": "array",
+      "description": "开放的端口列表",
+      "items": {
+        "type": "object",
+        "required": ["port", "protocol", "service", "status"],
+        "properties": {
+          "port": {
+            "type": "integer",
+            "description": "端口号"
+          },
+          "protocol": {
+            "type": "string",
+            "description": "协议类型"
+          },
+          "service": {
+            "type": "string",
+            "description": "服务名称"
+          },
+          "version": {
+            "type": "string",
+            "description": "服务版本"
+          },
+          "status": {
+            "type": "string",
+            "description": "端口状态"
+          }
+        }
+      }
+    },
+    "processes": {
+      "type": "array",
+      "description": "关键进程信息",
+      "items": {
+        "type": "object",
+        "required": ["name", "pid", "cpu_percent", "memory_usage", "status"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "进程名称"
+          },
+          "pid": {
+            "type": "integer",
+            "description": "进程ID"
+          },
+          "cpu_percent": {
+            "type": "number",
+            "description": "CPU使用率"
+          },
+          "memory_usage": {
+            "type": "string",
+            "description": "内存使用量"
+          },
+          "status": {
+            "type": "string",
+            "description": "进程状态"
+          }
+        }
+      }
+    },
+    "security_issues": {
+      "type": "object",
+      "required": ["critical", "high", "medium", "low"],
+      "properties": {
+        "critical": {
+          "type": "array",
+          "description": "严重问题列表",
+          "items": {
+            "type": "object",
+            "required": ["title", "description", "impact", "recommendation"],
+            "properties": {
+              "title": {"type": "string"},
+              "description": {"type": "string"},
+              "impact": {"type": "string"},
+              "recommendation": {"type": "string"}
+            }
+          }
+        },
+        "high": {
+          "type": "array",
+          "description": "高危问题列表",
+          "items": {
+            "type": "object",
+            "required": ["title", "description", "impact", "recommendation"],
+            "properties": {
+              "title": {"type": "string"},
+              "description": {"type": "string"},
+              "impact": {"type": "string"},
+              "recommendation": {"type": "string"}
+            }
+          }
+        },
+        "medium": {
+          "type": "array",
+          "description": "中等问题列表",
+          "items": {
+            "type": "object",
+            "required": ["title", "description", "impact", "recommendation"],
+            "properties": {
+              "title": {"type": "string"},
+              "description": {"type": "string"},
+              "impact": {"type": "string"},
+              "recommendation": {"type": "string"}
+            }
+          }
+        },
+        "low": {
+          "type": "array",
+          "description": "轻微问题列表",
+          "items": {
+            "type": "object",
+            "required": ["title", "description", "impact", "recommendation"],
+            "properties": {
+              "title": {"type": "string"},
+              "description": {"type": "string"},
+              "impact": {"type": "string"},
+              "recommendation": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "object",
+      "required": ["immediate", "short_term", "long_term"],
+      "properties": {
+        "immediate": {
+          "type": "array",
+          "description": "需要立即执行的修复措施",
+          "items": {
+            "type": "object",
+            "required": ["issue", "solution", "expected_result"],
+            "properties": {
+              "issue": {"type": "string"},
+              "solution": {"type": "string"},
+              "expected_result": {"type": "string"}
+            }
+          }
+        },
+        "short_term": {
+          "type": "array",
+          "description": "短期优化建议",
+          "items": {
+            "type": "object",
+            "required": ["issue", "solution", "expected_result"],
+            "properties": {
+              "issue": {"type": "string"},
+              "solution": {"type": "string"},
+              "expected_result": {"type": "string"}
+            }
+          }
+        },
+        "long_term": {
+          "type": "array",
+          "description": "长期改进建议",
+          "items": {
+            "type": "object",
+            "required": ["issue", "solution", "expected_result"],
+            "properties": {
+              "issue": {"type": "string"},
+              "solution": {"type": "string"},
+              "expected_result": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  }
+}
+``` 

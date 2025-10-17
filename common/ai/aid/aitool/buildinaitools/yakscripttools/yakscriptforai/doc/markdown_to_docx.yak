@@ -1,0 +1,83 @@
+__DESC__ = "一个用于将Markdown文件转换为Word文档(.docx)的工具，基于pandoc进行文档格式转换，支持指定输出目录和自定义输出文件名，适用于文档处理、报告生成和格式转换等场景。"
+__VERBOSE_NAME__ = "Markdown转DOCX工具"
+__KEYWORDS__ = "markdown转换,docx文档,文档转换,pandoc,word文档,document conversion,markdown to docx,file conversion,报告生成,文档处理,格式转换,文档导出"
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数：输入文件路径和输出设置
+inputFile := cli.String("input", cli.setRequired(true), cli.setHelp("input markdown file path (.md file)"))
+outputDir := cli.String("output-dir", cli.setRequired(false), cli.setHelp("output directory for the converted docx file, default to same directory as input file"))
+outputName := cli.String("output-name", cli.setRequired(false), cli.setHelp("custom output file name (without extension), default uses input file name"))
+
+cli.check()
+
+yakit.Info("Converting markdown to docx: %v", inputFile)
+
+// 检查输入文件是否存在
+if !file.IsExisted(inputFile) {
+    yakit.Error("Input file %v does not exist", inputFile)
+    return
+}
+
+// 执行pandoc转换
+outputPath, err := pandoc.SimpleConvertMarkdownFileToDocxContext(context.Background(), inputFile)
+if err != nil {
+    yakit.Error("Pandoc convert file failed: %v", err)
+    return
+}
+
+yakit.Info("Initial conversion completed: %v", outputPath)
+
+// 处理输出目录和文件名设置
+finalOutputPath := outputPath
+if outputDir != "" || outputName != "" {
+    var newPath
+    var fileName
+    
+    if outputName != "" {
+        // 使用自定义文件名
+        fileName = outputName + ".docx"
+    } else {
+        // 使用原始文件名
+        _, fileName = file.Split(outputPath)
+    }
+    
+    if outputDir != "" {
+        // 确保输出目录存在
+        if !file.IsExisted(outputDir) {
+            yakit.Info("Creating output directory: %v", outputDir)
+            err := file.MkdirAll(outputDir)
+            if err != nil {
+                yakit.Error("Failed to create output directory %v: %v", outputDir, err)
+                return
+            }
+        }
+        newPath = file.Join(outputDir, fileName)
+    } else {
+        // 使用输入文件所在目录
+        inputDir := file.GetDirPath(inputFile)
+        newPath = file.Join(inputDir, fileName)
+    }
+    
+    // 移动文件到目标位置
+    if newPath != outputPath {
+        err = file.Mv(outputPath, newPath)
+        if err != nil {
+            yakit.Error("Failed to move file from %v to %v: %v", outputPath, newPath, err)
+            return
+        }
+        finalOutputPath = newPath
+        yakit.Info("File moved to: %v", finalOutputPath)
+    }
+}
+
+// 获取输出文件信息
+info, err := file.Stat(finalOutputPath)
+if err != nil {
+    yakit.Warn("Conversion completed but failed to get output file info: %v", err)
+} else {
+    yakit.Info("Conversion successful! Output file: %v, Size: %v bytes", finalOutputPath, info.Size())
+    yakit.File(finalOutputPath, yakit.fileWriteAction(info.Size(), "convert", "markdown to docx conversion"))
+}
+
+yakit.Info("Markdown to DOCX conversion completed successfully: %v", finalOutputPath)

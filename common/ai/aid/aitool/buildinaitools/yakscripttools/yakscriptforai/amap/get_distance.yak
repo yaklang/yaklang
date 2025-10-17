@@ -1,5 +1,5 @@
 __DESC__ = "根据提供的起点和终点，使用高德地图API计算并显示两点之间的行车距离和预计耗时。"
-
+__VERBOSE_NAME__ = "高德：路径距离和耗时计算"
 __KEYWORDS__ = "路径规划,高德地图,距离计算,耗时计算,地理信息,交通工具,导航工具"
 
 ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))

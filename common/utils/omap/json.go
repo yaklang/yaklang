@@ -3,6 +3,7 @@ package omap
 import (
 	"bytes"
 	"encoding/json"
+
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -41,7 +42,7 @@ func (v *OrderedMap[T, V]) UnmarshalJSON(raw []byte) error {
 				return true
 			}
 			var keyResult T
-			err = json.Unmarshal([]byte(key.Raw), &key)
+			err = json.Unmarshal([]byte(key.Raw), &keyResult)
 			if err != nil {
 				return true
 			}

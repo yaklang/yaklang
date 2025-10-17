@@ -353,7 +353,7 @@ func TestFuzzPostRaw(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 empty`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostRaw(iFuzztag).Results()
@@ -369,7 +369,7 @@ func TestFuzzPostParams(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 a=b`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostParams(key, iFuzztag).Results()
@@ -386,7 +386,7 @@ func TestDuplicate_FuzzPostParams(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 a=b&a=c`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostParams(key, iFuzztag, 1).Results()
@@ -404,7 +404,7 @@ func TestFuzzPostBase64Params(t *testing.T) {
 	excepts := QuickMutateSimple(fmt.Sprintf("{{base64(%s)}}", iFuzztag))
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 a=b`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostBase64Params(key, iFuzztag).Results()
@@ -420,7 +420,7 @@ func TestFuzzPostJson(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 {"b":"0"}`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostJson(jsonPath, iFuzztag).Results()
@@ -440,7 +440,7 @@ func TestFuzzPostJsonPathParams(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 a={"c":{"d":"123"}}`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostJsonPathParams(key, jsonPath, iFuzztag).Results()
@@ -462,7 +462,7 @@ func TestDuplicate_FuzzPostJsonPathParams(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 a=1&a={"c":{"d":"123"}}`)
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostJsonPathParams(key, jsonPath, iFuzztag, 1).Results()
@@ -489,7 +489,7 @@ func TestFuzzPostBase64JsonPathParams(t *testing.T) {
 	})
 	raw := []byte(fmt.Sprintf(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 a=%s`, rawParam))
 	freq := MustNewFuzzHTTPRequest(raw)
 	results := freq.FuzzPostBase64JsonPathParams(key, jsonPath, iFuzztag).Results()
@@ -508,7 +508,7 @@ func TestFuzzPostXMLParams(t *testing.T) {
 	excepts := QuickMutateSimple(iFuzztag)
 	raw := []byte(`POST / HTTP/1.1
 Host: www.baidu.com
-	
+
 <?xml version="1.0"?>
 <bookstore>
   <book>

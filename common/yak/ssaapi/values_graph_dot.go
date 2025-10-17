@@ -2,81 +2,29 @@ package ssaapi
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/utils/dot"
-	"github.com/yaklang/yaklang/common/utils/graph"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
-type EdgeType string
-
-const (
-	EdgeTypeDependOn    = "depend_on"
-	EdgeTypeEffectOn    = "effect_on"
-	EdgeTypePredecessor = "predecessor"
-)
-
-func ValidEdgeType(edge string) EdgeType {
-	switch edge {
-	case "depend_on":
-		return EdgeTypeDependOn
-	case "effect_on":
-		return EdgeTypeEffectOn
-	case "predecessor":
-		return EdgeTypePredecessor
-	}
-	return ""
-}
-
-type ValueGraph struct {
+type DotGraph struct {
 	*dot.Graph
-
-	Value2Node     map[*Value]int   // ssaapi.Value -> node-id
-	marshaledValue map[int]struct{} // node-id ->  ssaapi.value
-	Node2Value     map[int]*Value
-
-	// hash(from-to) -> edge-type
-	// hash(to-from) -> edge-type
-	EdgeCache map[string]string
+	value2Node map[*Value]int // ssaapi.Value -> node-id
+	dot        string
 }
 
-func NewValueGraph(v ...*Value) *ValueGraph {
+func NewDotGraph() *DotGraph {
 	graphGraph := dot.New()
 	graphGraph.MakeDirected()
 	graphGraph.GraphAttribute("rankdir", "BT")
-	g := &ValueGraph{
-		Graph:          graphGraph,
-		Value2Node:     make(map[*Value]int),
-		marshaledValue: make(map[int]struct{}),
-		Node2Value:     make(map[int]*Value),
-		EdgeCache:      make(map[string]string),
+	return &DotGraph{
+		Graph:      graphGraph,
+		value2Node: make(map[*Value]int),
 	}
-	for _, value := range v {
-		graph.BuildGraphWithDFS[int, *Value](
-			context.Background(),
-			value,
-			g.createNode,
-			g.getNeighbors,
-			g.handleEdge,
-		)
-	}
-	return g
 }
 
-func (g *ValueGraph) Dot() string {
-	var buf bytes.Buffer
-	g.GenerateDOT(&buf)
-	return buf.String()
-}
-
-func (g *ValueGraph) ShowDot() {
-	var buf bytes.Buffer
-	g.GenerateDOT(&buf)
-	fmt.Println(buf.String())
-}
+var _ Graph = (*DotGraph)(nil)
 
 func removeEscapes(s string) string {
 	s = strings.ReplaceAll(s, "\t", "")
@@ -84,147 +32,120 @@ func removeEscapes(s string) string {
 	return s
 }
 
-func (g *ValueGraph) createNode(value *Value) (int, error) {
-	// nodeId := g.AddNode(value.GetVerboseName())
-	// s := fmt.Sprintf("%s_%d_%d", value.GetVerboseName(), value.GetId(), nodeId)
-	// g.SetNode(nodeId, s)
+func (g *DotGraph) GetGraphKind() GraphKind {
+	return GraphKindShow
+}
 
-	nodeId := 0
+func (g *DotGraph) createNode(value *Value, isEntry ...bool) int {
+	if node, ok := g.value2Node[value]; ok {
+		return node
+	}
+	entry := false
+	if len(isEntry) > 0 {
+		entry = isEntry[0]
+	}
+	// nodeId := 0
+	code := ""
 	if r := value.GetRange(); r != nil {
-		code := r.GetText()
+		code = r.GetText()
 		if len(code) > 100 {
 			code = code[:100] + "..."
 		}
 		code = removeEscapes(code)
-		nodeId = g.AddNode(code)
 	} else {
-		nodeId = g.AddNode(value.GetVerboseName())
+		code = value.GetVerboseName()
 	}
-
-	g.Node2Value[nodeId] = value
-	g.Value2Node[value] = nodeId
-	return nodeId, nil
+	if entry {
+		code = fmt.Sprintf("<entry>%s</entry>", code)
+	}
+	nodeId := g.AddNode(code)
+	g.value2Node[value] = nodeId
+	return nodeId
 }
 
-func (g *ValueGraph) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
-	if value == nil {
-		return nil
+func (g *DotGraph) CreateEdge(edge Edge) error {
+	fromNode := g.createNode(edge.From)
+	toNode := g.createNode(edge.To)
+
+	var (
+		edgeLabel string
+		step      int64
+	)
+
+	edgeLabel = string(edge.Kind)
+	if edge.Msg != nil {
+		if label, ok := edge.Msg["label"].(string); ok {
+			edgeLabel = label
+		}
+		if s, ok := edge.Msg["step"].(int); ok {
+			step = int64(s)
+		}
+	}
+	if step > 0 {
+		edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
 	}
 
-	var res []*graph.Neighbor[*Value]
-	for _, v := range value.GetDependOn() {
-		res = append(res, graph.NewNeighbor(v, EdgeTypeDependOn))
-	}
-	for _, v := range value.GetEffectOn() {
-		res = append(res, graph.NewNeighbor(v, EdgeTypeEffectOn))
-	}
+	// if IsDataFlowLabel(edgeLabel) {
+	// 	// skip top-def bottom-use  edge label
+	// 	// have dataflow edge already
+	// 	return nil
+	// }
 
-	for _, predecessor := range value.GetPredecessors() {
-		if predecessor.Node == nil {
-			continue
-		}
-		if IsDataFlowLabel(predecessor.Info.Label) && len(res) > 0 {
-			continue
-		}
-		neighbor := graph.NewNeighbor(predecessor.Node, EdgeTypePredecessor)
-		neighbor.AddExtraMsg("label", predecessor.Info.Label)
-		neighbor.AddExtraMsg("step", predecessor.Info.Step)
-		res = append(res, neighbor)
+	dotEdge := g.AddEdge(fromNode, toNode, edgeLabel)
+	if edge.Kind == EdgeTypePredecessor {
+		g.EdgeAttribute(dotEdge, "color", "red")
+		g.EdgeAttribute(dotEdge, "fontcolor", "red")
+		g.EdgeAttribute(dotEdge, "penwidth", "3.0")
 	}
-	return res
+	return nil
 }
 
-func IsDataFlowType(typ string) bool {
-	return typ == EdgeTypeDependOn || typ == EdgeTypeEffectOn
+func (g *DotGraph) String() string {
+	if g.dot != "" {
+		return g.dot
+	}
+	var buf bytes.Buffer
+	g.GenerateDOT(&buf)
+	g.dot = buf.String()
+	return g.dot
 }
 
-func (g *ValueGraph) handleEdge(fromNode int, toNode int, edgeType string, extraMsg map[string]any) {
-	if IsDataFlowType(edgeType) {
-		// avoid duplicate  dataflow edge
-		hash := codec.Sha256(fromNode + toNode)
-		if typ, ok := g.EdgeCache[hash]; ok && IsDataFlowType(typ) {
-			return
-		}
-		g.EdgeCache[hash] = edgeType
+func (g *DotGraph) NodeName(v *Value) string {
+	id, ok := g.value2Node[v]
+	if !ok {
+		return ""
 	}
-
-	switch ValidEdgeType(edgeType) {
-	case EdgeTypeDependOn:
-		g.AddEdge(toNode, fromNode, edgeType)
-	case EdgeTypeEffectOn:
-		g.AddEdge(toNode, fromNode, edgeType)
-	case EdgeTypePredecessor:
-		edges := g.GetEdges(toNode, fromNode)
-		var (
-			edgeLabel string
-			step      int64
-		)
-		if extraMsg != nil {
-			edgeLabel = extraMsg["label"].(string)
-			step = int64(extraMsg["step"].(int))
-		}
-		if step > 0 {
-			edgeLabel = fmt.Sprintf(`step[%v]: %v`, step, edgeLabel)
-		}
-		if len(edges) > 0 {
-			for _, edge := range edges {
-				g.EdgeAttribute(edge, "color", "red")
-				g.EdgeAttribute(edge, "fontcolor", "red")
-				g.EdgeAttribute(edge, "penwidth", "3.0")
-				g.EdgeAttribute(edge, "label", edgeLabel)
-			}
-		} else {
-			edgeId := g.AddEdge(toNode, fromNode, edgeLabel)
-			g.EdgeAttribute(edgeId, "color", "red")
-			g.EdgeAttribute(edgeId, "fontcolor", "red")
-			g.EdgeAttribute(edgeId, "penwidth", "3.0")
-		}
-	}
+	return dot.NodeName(id)
 }
 
-func (g *ValueGraph) DeepFirstGraphPrev(value *Value) [][]string {
-	nodeID, ok := g.Value2Node[value]
+func (g *DotGraph) NodeCount() int {
+	return len(g.value2Node)
+}
+func (g *DotGraph) ForEach(f func(string, *Value)) {
+	for value, id := range g.value2Node {
+		idStr := dot.NodeName(id)
+		f(idStr, value)
+	}
+}
+func (g *DotGraph) DeepFirstGraphPrev(value *Value) [][]string {
+	nodeID, ok := g.value2Node[value]
 	if !ok {
 		return nil
 	}
 	return dot.GraphPathPrevWithFilter(g.Graph, nodeID, func(edge *dot.Edge) bool {
-		// only use predecessor edge draw path
-		return edge.Attribute("color") == "red"
+		return true
 	})
 }
 
-func (g *ValueGraph) DeepFirstGraphNext(value *Value) [][]string {
-	nodeID, ok := g.Value2Node[value]
+func (g *DotGraph) DeepFirstGraphNext(value *Value) [][]string {
+	nodeID, ok := g.value2Node[value]
 	if !ok {
 		return nil
 	}
 	return dot.GraphPathNext(g.Graph, nodeID)
 }
 
-func (V Values) ShowDot() Values {
-	for _, v := range V {
-		v.ShowDot()
-	}
-	return V
-}
-
-func (v Values) DotGraphs() []string {
-	var ret []string
-	for _, val := range v {
-		ret = append(ret, val.DotGraph())
-	}
-	return ret
-}
-
-func (v *Value) DotGraph() string {
-	vg := NewValueGraph(v)
-	var buf bytes.Buffer
-	vg.GenerateDOT(&buf)
-	return buf.String()
-}
-
-func (v *Value) ShowDot() *Value {
-	dotGraph := v.DotGraph()
-	fmt.Println(dotGraph)
-	return v
+func (g *DotGraph) Show() {
+	// dot.ShowDotGraphToAsciiArt(g.String())
+	log.Infof(g.String())
 }

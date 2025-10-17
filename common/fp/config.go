@@ -111,6 +111,8 @@ type Config struct {
 	// once
 	fingerprintRulesOnce    sync.Once
 	webFingerprintRulesOnce sync.Once
+
+	WebScanDisableConnPool bool // 是否禁用 Web 扫描的连接池，默认值为 false
 }
 
 func (c *Config) IsFiltered(host string, port int) bool {

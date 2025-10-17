@@ -14,12 +14,13 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/jsonpath"
 	"hash"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/jsonpath"
 
 	"github.com/samber/lo"
 	xml_tools "github.com/yaklang/yaklang/common/utils/yakxml/xml-tools"
@@ -441,6 +442,71 @@ func (flow *CodecExecFlow) AESDecrypt(key string, keyType string, IV string, ivT
 }
 
 // Tag = "加密"
+// CodecName = "AES-GCM加密"
+// Desc = """AES-GCM (Galois/Counter Mode) 是一种认证加密模式，它同时提供数据的机密性和完整性保护。GCM模式结合了CTR模式的加密和GMAC的认证，是现代密码学中广泛使用的安全加密方式。输出格式为: nonce + ciphertext + tag (当nonce为空时自动生成并包含在输出中)。"""
+// Params = [
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "nonce", Type = "inputSelect", Required = false ,Label = "Nonce/IV", Connector ={ Name = "nonceType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "Nonce格式"} },
+// { Name = "nonceSize", Type = "select", DefaultValue = "12", Options = ["12", "16"], Required = true, Label = "Nonce长度"},
+// { Name = "output", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "输出格式"}
+// ]
+func (flow *CodecExecFlow) AESGCMEncrypt(key string, keyType string, nonce string, nonceType string, nonceSize string, output outputType) error {
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeNonce := decodeData([]byte(nonce), nonceType)
+
+	var nonceSizeInt int
+	switch nonceSize {
+	case "12":
+		nonceSizeInt = 12
+	case "16":
+		nonceSizeInt = 16
+	default:
+		nonceSizeInt = 12
+	}
+
+	data, err := codec.AESGCMEncryptWithNonceSize(decodeKey, flow.Text, decodeNonce, nonceSizeInt)
+	if err != nil {
+		return err
+	}
+
+	flow.Text = encodeData(data, output)
+	return nil
+}
+
+// Tag = "解密"
+// CodecName = "AES-GCM解密"
+// Desc = """AES-GCM (Galois/Counter Mode) 是一种认证加密模式，它同时提供数据的机密性和完整性保护。GCM模式结合了CTR模式的加密和GMAC的认证，是现代密码学中广泛使用的安全加密方式。输入格式应为: nonce + ciphertext + tag 或者单独的 ciphertext (如果nonce单独提供)。"""
+// Params = [
+// { Name = "key", Type = "inputSelect", Required = true,Label = "Key", Connector ={ Name = "keyType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "key格式"} },
+// { Name = "nonce", Type = "inputSelect", Required = false ,Label = "Nonce/IV", Connector ={ Name = "nonceType", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true ,Label = "Nonce格式"} },
+// { Name = "nonceSize", Type = "select", DefaultValue = "12", Options = ["12", "16"], Required = true, Label = "Nonce长度"},
+// { Name = "input", Type = "select", DefaultValue = "hex", Options = ["hex", "raw", "base64"], Required = true,Label = "输入格式"}
+// ]
+func (flow *CodecExecFlow) AESGCMDecrypt(key string, keyType string, nonce string, nonceType string, nonceSize string, input outputType) error {
+	decodeKey := decodeData([]byte(key), keyType)
+	decodeNonce := decodeData([]byte(nonce), nonceType)
+	inputText := decodeData(flow.Text, input)
+
+	var nonceSizeInt int
+	switch nonceSize {
+	case "12":
+		nonceSizeInt = 12
+	case "16":
+		nonceSizeInt = 16
+	default:
+		nonceSizeInt = 12
+	}
+
+	dec, err := codec.AESGCMDecryptWithNonceSize(decodeKey, inputText, decodeNonce, nonceSizeInt)
+	if err != nil {
+		return err
+	}
+
+	flow.Text = dec
+	return nil
+}
+
+// Tag = "加密"
 // CodecName = "SM4对称加密"
 // Desc = """SM4是一个128位的块密码，目前被确定为中国的国家标准（GB/T 32907-2016）。支持多种块密码模式。"""
 // Params = [
@@ -598,6 +664,60 @@ func (flow *CodecExecFlow) TripleDESDecrypt(key string, keyType string, IV strin
 	}
 	flow.Text = dec
 	return nil
+}
+
+// Tag = "加密"
+// CodecName = "SM2加密"
+// Desc = """​​SM2​​ 是中国国家密码管理局（OSCCA）于 2010 年发布的一种基于​​椭圆曲线密码学（Elliptic Curve Cryptography, ECC）​​的公钥密码算法标准，属于​​国家商用密码体系（SM系列算法）​​中的重要组成部分。"""
+// Params = [
+// { Name = "pubKey", Type = "text", Required = true,Label = "公钥"},
+// { Name = "encryptSchema", Type = "select",DefaultValue = "C1C2C3", Options = ["ASN1", "C1C2C3", "C1C3C2"], Required = true, Label = "编码格式"},
+// ]
+func (flow *CodecExecFlow) SM2Encrypt(pubKey string, encryptSchema string) error {
+	var data []byte
+	var err error
+
+	switch encryptSchema { // choose alg
+	case "ASN1":
+		data, err = codec.SM2EncryptASN1([]byte(pubKey), []byte(flow.Text))
+	case "C1C2C3":
+		data, err = codec.SM2EncryptC1C2C3([]byte(pubKey), []byte(flow.Text))
+	case "C1C3C2":
+		data, err = codec.SM2EncryptC1C3C2([]byte(pubKey), []byte(flow.Text))
+	default:
+	}
+	if err == nil {
+		flow.Text = data
+	}
+
+	return err
+}
+
+// Tag = "解密"
+// CodecName = "SM2解密"
+// Desc = """​​SM2​​ 是中国国家密码管理局（OSCCA）于 2010 年发布的一种基于​​椭圆曲线密码学（Elliptic Curve Cryptography, ECC）​​的公钥密码算法标准，属于​​国家商用密码体系（SM系列算法）​​中的重要组成部分。"""
+// Params = [
+// { Name = "priKey", Type = "text", Required = true,Label = "私钥"},
+// { Name = "decryptSchema", Type = "select",DefaultValue = "C1C2C3", Options = ["ASN1", "C1C2C3", "C1C3C2"], Required = true, Label = "编码格式"},
+// ]
+func (flow *CodecExecFlow) SM2Decrypt(priKey string, decryptSchema string) error {
+	var data []byte
+	var err error
+
+	switch decryptSchema { // choose alg
+	case "ASN1":
+		data, err = codec.SM2DecryptASN1([]byte(priKey), []byte(flow.Text))
+	case "C1C2C3":
+		data, err = codec.SM2DecryptC1C2C3([]byte(priKey), []byte(flow.Text))
+	case "C1C3C2":
+		data, err = codec.SM2DecryptC1C3C2([]byte(priKey), []byte(flow.Text))
+	default:
+	}
+	if err == nil {
+		flow.Text = data
+	}
+
+	return err
 }
 
 // Tag = "加密"
@@ -1477,11 +1597,11 @@ func (flow *CodecExecFlow) HTTPRequestMutate(transform string) error {
 	// post params
 	postParams, _, _ := lowhttp.GetParamsFromBody(contentType, body)
 	if totalParams == nil {
-		totalParams = make(map[string][]string, len(postParams))
+		totalParams = make(map[string][]string)
 	}
-	if len(postParams) > 0 {
-		for k, v := range postParams {
-			totalParams[k] = append(totalParams[k], v...)
+	if len(postParams.Items) > 0 {
+		for _, param := range postParams.Items {
+			totalParams[param.Key] = append(totalParams[param.Key], param.Values...)
 		}
 	}
 
@@ -1516,14 +1636,20 @@ func (flow *CodecExecFlow) HTTPRequestMutate(transform string) error {
 			if !onlyUsePostParams {
 				opts = append(opts, poc.WithReplaceHttpPacketQueryParamRaw(""))
 			}
-			if len(totalParams) > 0 {
-				params := totalParams
+			if len(totalParams) > 0 || (onlyUsePostParams && len(postParams.Items) > 0) {
 				if onlyUsePostParams {
-					params = postParams
-				}
-				for k, values := range params {
-					for _, v := range values {
-						opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+					// 使用有序的 postParams
+					for _, param := range postParams.Items {
+						for _, v := range param.Values {
+							opts = append(opts, poc.WithAppendHttpPacketUploadFile(param.Key, "", v, ""))
+						}
+					}
+				} else {
+					// 使用 totalParams map
+					for k, values := range totalParams {
+						for _, v := range values {
+							opts = append(opts, poc.WithAppendHttpPacketUploadFile(k, "", v, ""))
+						}
 					}
 				}
 			} else {

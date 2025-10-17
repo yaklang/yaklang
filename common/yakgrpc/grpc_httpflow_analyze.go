@@ -3,11 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"fmt"
-	"github.com/samber/lo"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/samber/lo"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
@@ -18,6 +19,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -92,6 +94,10 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 	if request.GetSource() != nil {
 		opts = append(opts, WithDataSource(request.GetSource()))
 	}
+	// 添加匹配器
+	if len(request.GetMatchers()) > 0 {
+		opts = append(opts, WithMatchers(request.GetMatchers()))
+	}
 
 	manger, err := NewHTTPFlowAnalyzeManger(
 		s.GetProfileDatabase(),
@@ -130,7 +136,7 @@ func (s *Server) AnalyzeHTTPFlow(request *ypb.AnalyzeHTTPFlowRequest, stream ypb
 }
 
 type HTTPFlowAnalyzeManger struct {
-	*mitmReplacer
+	*yakit.MitmReplacer
 	analyzeId    string
 	client       *yaklib.YakitClient
 	stream       HTTPFlowAnalyzeRequestStream
@@ -140,10 +146,14 @@ type HTTPFlowAnalyzeManger struct {
 	concurrency  int                     // 并发处理数量
 	dedup        bool                    // 是否对单条数据进行去重
 
+	// 匹配器相关
+	matchers []*YakFuzzerMatcher
+
 	matchedHTTPFlowCount   int64
 	extractedHTTPFlowCount int64
 	allHTTPFlowCount       int64
 	handledHTTPFlowCount   int64
+	discardFlowCount       int64
 }
 
 type HTTPFlowAnalyzeMangerOption func(*HTTPFlowAnalyzeManger)
@@ -175,6 +185,17 @@ func WithDataSource(source *ypb.AnalyzedDataSource) HTTPFlowAnalyzeMangerOption 
 	}
 }
 
+func WithMatchers(matchers []*ypb.HTTPResponseMatcher) HTTPFlowAnalyzeMangerOption {
+	return func(m *HTTPFlowAnalyzeManger) {
+		if len(matchers) > 0 {
+			m.matchers = make([]*YakFuzzerMatcher, 0)
+			for _, matcher := range matchers {
+				m.matchers = append(m.matchers, NewHttpFlowMatcherFromGRPCModel(matcher))
+			}
+		}
+	}
+}
+
 func NewHTTPFlowAnalyzeManger(
 	MITMReplacerConfigDb *gorm.DB,
 	ctx context.Context,
@@ -185,7 +206,7 @@ func NewHTTPFlowAnalyzeManger(
 ) (*HTTPFlowAnalyzeManger, error) {
 	m := &HTTPFlowAnalyzeManger{
 		analyzeId:    analyzeId,
-		mitmReplacer: NewMITMReplacerFromDB(MITMReplacerConfigDb),
+		MitmReplacer: yakit.NewMITMReplacerFromDB(MITMReplacerConfigDb),
 		client:       client,
 		stream:       stream,
 		ctx:          ctx,
@@ -260,6 +281,7 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromRawPacket(db *gorm.DB) error 
 	}
 	m.notifyHandleFlowNum()
 	m.notifyProcess(1)
+	m.OnFinish()
 	return nil
 }
 
@@ -287,6 +309,13 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 			if f == nil {
 				return
 			}
+			// 执行匹配器
+			discard := m.executeMatchers(f)
+			if discard {
+				atomic.AddInt64(&m.discardFlowCount, 1)
+				m.notifyDiscardFlowNum()
+				return
+			}
 			// 处理websocket流量
 			if f.IsWebsocket {
 				m.handleWebsocket(db, f)
@@ -297,11 +326,20 @@ func (m *HTTPFlowAnalyzeManger) AnalyzeHTTPFlowFromDb(db *gorm.DB) {
 			if err := m.ExecReplacerRule(db, f); err != nil {
 				log.Errorf("AnalyzeHTTPFlowFromDb ExecReplacerRule failed: %s", err)
 			}
-
 		}(flow)
 	}
 	swg.Wait()
-	return
+	m.OnFinish()
+}
+
+func (m *HTTPFlowAnalyzeManger) OnFinish() {
+	if m.pluginCaller != nil {
+		m.pluginCaller.CallOnAnalyzeHTTPFlowFinish(
+			m.ctx,
+			atomic.LoadInt64(&m.allHTTPFlowCount),
+			atomic.LoadInt64(&m.matchedHTTPFlowCount),
+		)
+	}
 }
 
 func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFlow) error {
@@ -314,7 +352,7 @@ func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFl
 	if err != nil {
 		return err
 	}
-	handleColorAndTag := func(rule *MITMReplaceRule, wsFlow *schema.WebsocketFlow) {
+	handleColorAndTag := func(rule *yakit.MITMReplaceRule, wsFlow *schema.WebsocketFlow) {
 		err := yakit.HandleAnalyzedHTTPFlowsColorAndTag(
 			db,
 			flow,
@@ -327,7 +365,7 @@ func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFl
 		yakit.HandleAnalyzedWebsocketFlowsColorAndTag(db, wsFlow, rule.GetColor(), rule.GetExtraTag()...)
 	}
 	for _, wsFlow := range wsFlows {
-		for _, rule := range m._mirrorRules {
+		for _, rule := range m.GetRawMirrorRules() {
 			if !rule.EnableForRequest && !rule.EnableForResponse {
 				continue
 			}
@@ -336,7 +374,7 @@ func (m *HTTPFlowAnalyzeManger) handleWebsocket(db *gorm.DB, flow *schema.HTTPFl
 				log.Errorf("unquote websocket data failed: %v", err)
 				continue
 			}
-			match, err := rule.matchRawSimple([]byte(data))
+			match, err := rule.MatchRawSimple([]byte(data))
 			if err != nil {
 				log.Errorf("match package failed: %v", err)
 				continue
@@ -378,6 +416,7 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, flow *schema.HTTPFlow)
 		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
 		m.notifyResult(analyzed, extractDatas, flow)
 		m.notifyMatchedHTTPFlowNum()
+
 	}
 
 	if m.pluginCaller != nil {
@@ -386,10 +425,10 @@ func (m *HTTPFlowAnalyzeManger) ExecHotPatch(db *gorm.DB, flow *schema.HTTPFlow)
 }
 
 func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPFlow) error {
-	if !m.haveRules() {
+	if !m.HaveRules() {
 		return nil
 	}
-	extractData := func(pattern string, rule *MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []schema.ExtractedData {
+	extractData := func(pattern string, rule *yakit.MITMReplaceRule, flow *schema.HTTPFlow, isReq bool) []schema.ExtractedData {
 		modelFull, err := model.ToHTTPFlowGRPCModelFull(flow)
 		if err != nil {
 			return nil
@@ -434,7 +473,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 		}
 		return extractedData
 	}
-	getAnalyzedHTTPFlow := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) *schema.AnalyzedHTTPFlow {
+	getAnalyzedHTTPFlow := func(rule *yakit.MITMReplaceRule, flow *schema.HTTPFlow) *schema.AnalyzedHTTPFlow {
 		atomic.AddInt64(&m.matchedHTTPFlowCount, 1)
 		m.notifyMatchedHTTPFlowNum()
 		analyzeResult := &schema.AnalyzedHTTPFlow{
@@ -451,7 +490,7 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 			log.Infof("save analyze result failed: %s", err)
 		}
 	}
-	handleColorAndTag := func(rule *MITMReplaceRule, flow *schema.HTTPFlow) {
+	handleColorAndTag := func(rule *yakit.MITMReplaceRule, flow *schema.HTTPFlow) {
 		err := yakit.HandleAnalyzedHTTPFlowsColorAndTag(
 			db,
 			flow,
@@ -462,12 +501,13 @@ func (m *HTTPFlowAnalyzeManger) ExecReplacerRule(db *gorm.DB, flow *schema.HTTPF
 			log.Infof("handle analyzed http flows color and tag failed: %s", err)
 		}
 	}
-	for _, rule := range m._mirrorRules {
-		re, err := rule.compile()
+	for _, rule := range m.GetRawMirrorRules() {
+		re, err := rule.Compile()
 		if err != nil {
 			continue
 		}
 		pattern := re.String()
+
 		if rule.EffectiveURL != "" {
 			yakRegexp := regexp_utils.DefaultYakRegexpManager.GetYakRegexp(rule.EffectiveURL)
 			matchString, _ := yakRegexp.MatchString(flow.Url)
@@ -527,6 +567,10 @@ func (m *HTTPFlowAnalyzeManger) notifyHandleFlowNum() {
 		atomic.LoadInt64(&m.allHTTPFlowCount)))
 }
 
+func (m *HTTPFlowAnalyzeManger) notifyDiscardFlowNum() {
+	m.client.StatusCard("跳过分析数", atomic.LoadInt64(&m.discardFlowCount))
+}
+
 func (m *HTTPFlowAnalyzeManger) notifyResult(
 	result *schema.AnalyzedHTTPFlow,
 	extractedData []schema.ExtractedData,
@@ -547,6 +591,30 @@ func (m *HTTPFlowAnalyzeManger) notifyResult(
 
 	m.stream.Send(&ypb.AnalyzeHTTPFlowResponse{
 		RuleData:         ruleData,
-		ExtractedContent: content,
+		ExtractedContent: utils.EscapeInvalidUTF8Byte([]byte(content)),
 	})
+}
+
+// executeMatchers 执行匹配器
+func (m *HTTPFlowAnalyzeManger) executeMatchers(flow *schema.HTTPFlow) (discard bool) {
+	if len(m.matchers) == 0 {
+		return false
+	}
+
+	rspRaw := flow.GetResponse()
+	if rspRaw == "" {
+		return false
+	}
+
+	matched, hitColors, discard := MatchColor(m.matchers, &httptpl.RespForMatch{RawPacket: []byte(rspRaw)}, nil)
+
+	if matched && len(hitColors) > 0 {
+		flow.AddTag(hitColors...)
+		err := yakit.UpdateHTTPFlowTags(consts.GetGormProjectDatabase(), flow)
+		if err != nil {
+			log.Errorf("update http flow tags failed: %s", err)
+		}
+	}
+
+	return discard
 }

@@ -6,9 +6,10 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
+type GeneralChatter func(string, ...AIConfigOption) (string, error)
+
 type Chatter interface {
 	Chat(string, ...any) (string, error)
-	ChatEx([]ChatDetail, ...any) ([]ChatChoice, error)
 	ChatStream(string) (io.Reader, error)
 }
 
@@ -85,5 +86,5 @@ type AIClient interface {
 }
 
 type EmbeddingCaller interface {
-	Embedding(string) ([]float64, error)
+	Embedding(string) ([]float32, error)
 }

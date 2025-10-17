@@ -1,0 +1,333 @@
+__DESC__ = "该forge用于处理和分析日志数据，能够创建和管理日志事件（web_log_events）和实体（entities）数据库。它支持从文本或文件读取日志，通过AIReducer批量处理日志以识别实体和格式化事件，并能将解析后的web请求事件输入AI代理进行行为分析和风险评估，同时更新实体信息，最终实现对日志数据的结构化存储、分析及潜在威胁的监控。"
+__VERBOSE_NAME__ = "日志监控与分析"
+__KEYWORDS__ = "日志处理,日志分析,数据库管理,事件监控,风险评估,实体识别,威胁检测,数据存储,web请求,日志结构化"
+
+func RunSQLMigrations(eventDb) {
+    createWebLogTableSQL := `
+        CREATE TABLE IF NOT EXISTS web_log_events (
+            id            INTEGER PRIMARY KEY,
+            source_ip       TEXT,
+            request_method  TEXT,
+            request_uri     TEXT,
+            event_time      DATETIME,
+            user_agent      TEXT,
+            status_code     TEXT,
+            inferred_status TEXT,
+            error_message   TEXT,
+            log_type        TEXT
+        );
+    `
+    err := eventDb.Exec(createWebLogTableSQL).Error
+    if err != nil {
+        return err
+    }
+
+// Migration script for entities
+    entitiesSQL := `
+         CREATE TABLE IF NOT EXISTS entities (
+            id         INTEGER PRIMARY KEY,
+            value      TEXT,
+            type       TEXT,
+            remark     TEXT,
+            CONSTRAINT idx_value_type UNIQUE (value, type)
+        );
+    `
+
+    return eventDb.Exec(entitiesSQL).Error
+}
+
+func NewWebLogEventDB() {
+    eventDB, err := db.OpenTempSqliteDatabase()
+    if err != nil {
+        return nil, err
+    }
+
+    err = RunSQLMigrations(eventDB)
+    if err != nil {
+        return nil, err
+    }
+
+    return eventDB, nil
+}
+
+func parseISO(isoTime) {
+    t, _ = time.Parse("2006-01-02T15:04:05Z07:00", isoTime)
+    return t
+}
+
+func SaveEvent(eventDb, event) {
+    sql := `
+		INSERT INTO web_log_events
+		(source_ip, request_method, request_uri, event_time, user_agent, status_code, inferred_status, error_message, log_type)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    result := eventDb.Exec(
+        sql,
+        event.SourceIP,
+        event.RequestMethod,
+        event.RequestURI,
+        event.EventTime,
+        event.UserAgent,
+        event.StatusCode,
+        event.InferredStatus,
+        event.ErrorMessage,
+        event.LogType,
+    )
+    return result.Error
+}
+
+func QueryRecentEventRawSQL(eventDb, sourceIP, duration) {
+    sql := "SELECT * FROM web_log_events WHERE source_ip = ?"
+    result, err = db.ScanResult(eventDb, sql, sourceIP)
+    return result, err
+}
+
+func SaveEntityRawSQL(eventDb, entity) {
+    sql := `
+		INSERT INTO entities (value, type, remark)
+		VALUES (?, ?, ?)
+		ON CONFLICT(value, type) DO UPDATE SET
+			remark = excluded.remark
+            `
+    return eventDb.Exec(sql, entity.Value, entity.Type, entity.Remark).Error
+}
+
+func UpdateEntityRemarkRawSQL(eventDb, entity, remark) {
+    sql := `UPDATE entities SET remark = ? WHERE value = ? AND "type" = ?`
+    result := eventDb.Exec(sql, remark, entity.Value, entity.Type)
+    return result.Error
+}
+
+filePaths = cli.FileNames("filePath", cli.setHelp("长文本文件"), cli.setVerboseName("分析目标文件"))
+chunkBatch = cli.Int("chunk", cli.setHelp("日志分片长度"), cli.setVerboseName("日志分片大小（行）"), cli.setDefault(20))
+concurrency = cli.Int("concurrency", cli.setHelp("ai并发调用限制"), cli.setVerboseName("ai并发调用限制"), cli.setDefault(20))
+triggerSec = cli.Int("triggerSec", cli.setHelp("ai分析实体行为触发器触发间隔"), cli.setVerboseName("触发器触发间隔（秒）"), cli.setDefault(30))
+triggerCount = cli.Int("triggerCount", cli.setHelp("ai分析实体行为触发器触发次数"), cli.setVerboseName("触发器触发次数"), cli.setDefault(20))
+separator = cli.String("separator", cli.setHelp("日志切割符"), cli.setVerboseName("切割单条日志的分隔符"), cli.setDefault("\n"))
+cli.check()
+
+if chunkBatch <= 0 {
+    chunkBatch = 20
+}
+
+if concurrency <= 0 {
+    concurrency = 20
+}
+
+filePath = filePaths[0]
+yakit.Info("start log monitor params filepath:[%s] ; chunk:[%d] ; concurrency:[%d] ; triggersec:[%d];triggerCount:[%d] separator:[%s]", filePaths,chunkBatch,concurrency,triggerSec,triggerCount,separator)
+
+
+text = ""
+forgeHandle = func(params) {
+    log.Info("start to build aiagent.NewExecutor with name: web_log_monitor, with options: nil")
+    cod,err :=  aiagent.NewExecutor("web_log_monitor",nil)
+    if err != nil {
+        log.Error("%v", err)
+        return err
+    }
+    aidConfig = cod.GetConfig()
+
+
+    var reader
+    if text != "" {
+        reader = str.NewReader(text)
+    } else if filePath != "" {
+        yakit.Info("start to open file: %s", filePath)
+        reader, err = file.OpenFile(filePath, file.O_RDONLY, 0x777)
+        if err != nil {
+            aidConfig.EmitStream("打开文件失败",sprintf("打开文件[%s]失败: %v",filePath,err))
+            yakit.Error("open file %s failed: %v", filePath, err)
+            return err
+        }
+        aidConfig.EmitStream("打开文件成功",sprintf("打开文件[%s]成功",filePath))
+        defer reader.Close()
+    } else {
+        yakit.Error("text or filePath is all empty")
+        aidConfig.EmitStream("打开文件失败", "没有提供有效的文本或文件路径")
+        return nil
+    }
+
+    yakit.Info("start to build web log event db")
+    aidConfig.EmitStream("开始构建web日志事件数据库", "正在创建web日志事件数据库")
+    logDb, err = NewWebLogEventDB()
+    if err != nil {
+        aidConfig.EmitStream("构建web日志事件数据库失败", sprintf("创建web日志事件数据库失败: %v", err))
+        yakit.Error("web log event db build err: %v", err)
+        return err
+    }
+
+    yakit.Info("start to build x.NewEventWatcher with trigger count: 20")
+    aidConfig.EmitStream("开始构建事件监控器", sprintf("设置触发间隔为%d秒，触发次数为%d次", triggerSec, triggerCount))
+    ew := x.NewEventWatcher(context.Background(), time.ParseDuration(sprintf("%ds",triggerSec))~, triggerCount)
+
+    update := func(attackType, entityValue) {
+        yakit.Info("start to update type: %v with value: %#v", attackType, entityValue)
+        entity := {"Value": entityValue, "Type": "ip_address"}
+        err := UpdateEntityRemarkRawSQL(
+            logDb,
+            entity,
+            sprintf("Detected %s attack from %s", attackType, entityValue),
+        )
+        if err != nil {
+            log.Error("UpdateEntityRemark failed: %v", err)
+            return
+        }
+    }
+
+    entityMarshal := func(e) {
+        return {"Value": e.GetString("entity_value"), "Type": e.GetString("entity_type"), "Remark": ""}
+    }
+
+    eventMarshal := func(e) {
+        return {"SourceIP": e.GetString("source_ip"), "RequestMethod": e.GetString("request_method"), "RequestURI": e.GetString("request_uri"), "EventTime": parseISO(e.GetString("timestamp")), "UserAgent": e.GetString("user_agent"), "StatusCode": e.GetInt("status_code"), "InferredStatus": e.GetString("inferred_status"), "ErrorMessage": e.GetString("error_message"), "LogType": e.GetString("log_type")}
+    }
+
+    foundRiskList = []
+    riskIP = []
+    analyzeLog := func(sourceIP) {
+        yakit.Info("start to analyze web request with ip: %#v", sourceIP)
+        event, err := QueryRecentEventRawSQL(logDb, sourceIP, time.ParseDuration("1h")~)
+        if err != nil {
+            yakit.Error("queyr recent event raw sql: %v", err)
+            return
+        }
+
+        if len(event) == 0 {
+            return
+        }
+
+        eventJsonString, err := json.Marshal(event)
+        if err != nil {
+            return
+        }
+
+        aidConfig.EmitStream(sprintf("分析目标[%s]行为",sourceIP),eventJsonString)
+        shrinked := len(eventJsonString) > 100 ? sprint(string(eventJsonString[:100])) : eventJsonString
+        yakit.Info("start to call event_analyzer with len:%v data: %#v", len(eventJsonString), shrinked)
+        res, err := aiagent.ExecuteForge("event_analyzer", eventJsonString)
+        if err != nil {
+            yakit.Info("execute event analyzer failed: %v", err)
+            return
+        }
+
+        reportIns = res
+        dump(reportIns)
+        yakit.Info("fetch result: %v", reportIns)
+        if reportIns.GetBool("is_malicious") {
+            riskIns = risk.CreateRisk(
+                sourceIP,
+                risk.title(sprintf("detect %s %s", sourceIP, reportIns.GetString("attack_type"))),
+                risk.description(reportIns.GetString("behavior_summary")),
+                risk.solution("ban corresponding IP address"),
+                risk.level("mid"),
+                risk.details(reportIns.GetStringSlice("key_evidence")),
+            )
+            risk.Save(riskIns)
+            foundRiskList = append(foundRiskList, riskIns)
+            riskIP = append(riskIP, sourceIP)
+        }
+        update(reportIns.GetString("attack_type"), sourceIP)
+    }
+    var cacheBuffer = make([]string, 0)
+
+    swg := sync.NewSizedWaitGroup(concurrency)
+    count := 0
+    byteCount := 0
+    entityCountTotal := 0
+    index := 0
+
+    yakit.Info("start to build aireducer.NewReducerFromReader with reader: %v, chunkBatch: %d", reader, chunkBatch)
+    aidConfig.EmitStream("开始处理日志数据", sprintf("日志分片大小设置为%d行", chunkBatch))
+    reducer := aireducer.NewReducerFromReader(
+        reader,
+        aireducer.reducerCallback(func(config, memory, chunk) {
+            count+=1
+            byteCount += chunk.BytesSize()
+
+            shrinked := len(chunk.Data()) > 200 ? string(chunk.Data()[:200]) : string(chunk.Data())
+            yakit.Info("ai-reducer start to handle chunk[%v], len: %v data: %#v", count, chunk.BytesSize(), string(shrinked))
+            cacheBuffer = append(cacheBuffer, string(chunk.Data()))
+            if len(cacheBuffer) < chunkBatch {
+                return nil
+            }
+            index += 1
+            currentIndex := index
+
+            defer func() {
+                cacheBuffer = make([]string, 0)
+            }()
+            logBuffer := str.Join(cacheBuffer, "\n")
+            swg.Add(2)
+            go func() {
+                defer swg.Done()
+                res, err := aiagent.ExecuteForge("entity_identify", logBuffer, aiagent.disableOutputType("stream"))
+                if err != nil {
+                    return
+                }
+
+                aidConfig.EmitStream(sprintf("解析日志分块[%d]实体",currentIndex),sprintf("解析到实体%d条",len(res)))
+                for _, params := range res {
+                    entityCountTotal += 1
+                    err := SaveEntityRawSQL(logDb, entityMarshal(params))
+                    if err != nil {
+                        log.Error("failed to save entity: %v", err)
+                        return
+                    }
+                }
+            }()
+
+            go func() {
+                defer swg.Done()
+                res, err := aiagent.ExecuteForge("log_event_formatter", logBuffer,aiagent.disableOutputType("stream"))
+                if err != nil {
+                    return
+                }
+
+                aidConfig.EmitStream(sprintf("解析日志分块[%d]事件",currentIndex),sprintf("解析日志事件%d条",len(res)))
+                for _, params := range res {
+                    event := eventMarshal(params)
+                    err := SaveEvent(logDb, event)
+                    if err != nil {
+                        log.Error("failed to save event: %v", err)
+                        return
+                    }
+                    if event.LogType == "WEB_REQUEST" {
+                        ew.Watch(event.SourceIP,analyzeLog ,func(key) {
+                            aidConfig.EmitStream("开始监控目标",sprintf("监控访问目标：[%s], 检测足够相关事件后分析目标行为",key))
+                        })
+                    }
+
+                }
+            }()
+            return nil
+        }),
+        aireducer.separator(separator),
+        aireducer.memory(aiagent.GetDefaultMemory()),
+    )~
+
+    if len(cacheBuffer) > 0 {
+        yakit.Info("ai-reducer has some left cache buffer, start to handle it")
+    }
+
+    aidConfig.EmitStream(sprintf("开始分析日志目标[%s]",filePaths),"")
+    err = reducer.Run()
+    swg.Wait()
+    if err != nil {
+        aidConfig.EmitStream("日志处理失败", sprintf("处理日志时发生错误: %v", err))
+        return err
+    }
+    aidConfig.EmitStream("日志处理完成", sprintf("所有日志分片已成功处理, 实体和事件已保存到数据库，总处理分片数: %d, 总处理字节数：%v，日志内解析出实体数：%v", count, byteCount, entityCountTotal))
+    if len(foundRiskList) > 0 {
+        aidConfig.EmitStream("检测出日志中存在风险", sprintf("检测到%d个潜在风险IP，其中解析危险报警：%v", len(riskIP), len(foundRiskList)))
+        for i in foundRiskList {
+            riskIns = i
+            result = json.dumps(riskIns, json.withIndent("  "))
+            aidConfig.EmitStream(sprintf("风险IP: %s", riskIns.IP), string(result))
+        }
+    } else {
+        aidConfig.EmitStream("日志检测完毕-未发现明显风险", "没有检测到潜在风险IP")
+    }
+
+
+    return nil
+}

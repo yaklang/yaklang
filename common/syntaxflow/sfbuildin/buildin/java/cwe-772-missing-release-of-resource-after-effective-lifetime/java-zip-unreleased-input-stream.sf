@@ -91,14 +91,22 @@ public class SafeZipReadWithFinally {
                         }
                     } finally {
                         if (is != null) {
-                            try { is.close(); } catch (IOException e) { /* Log or handle exception */ }
+                            try {
+                                is.close();
+                            } catch (IOException e) {
+                                // Log or handle exception
+                            }
                         }
                     }
                 }
             }
         } finally {
             if (zipFile != null) {
-                try { zipFile.close(); } catch (IOException e) { /* Log or handle exception */ }
+                try {
+                    zipFile.close();
+                } catch (IOException e) {
+                    // Log or handle exception
+                }
             }
         }
     }
@@ -146,6 +154,136 @@ $safe<getPredecessors()> as $safeGetInputStream;
 $getInputStream - $safeGetInputStream as $weak;
 alert $weak for {
 	message: "检测到ZipFile.getInputStream()未释放资源",
+	name: "weak",
+	title: "Check Java Zip GetInputStream Unreleased Resource",
+	title_zh: "检测Java Zip GetInputStream资源未释放",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用 try-with-resources 自动关闭资源 (Java 7+，推荐)
+这是最简洁和推荐的方法。`InputStream` 和 `ZipFile` 都实现了 `java.lang.AutoCloseable` 接口，可以放在 `try` 语句后的括号中，JVM 会确保它们在 `try` 块结束（无论正常完成或发生异常）时自动调用 `close()` 方法。
+```java
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+public class SafeZipReadWithResources {
+    public static void main(String[] args) throws IOException {
+        String zipFilePath = "your_file.zip"; // 替换为实际ZIP文件路径
+        try (ZipFile zipFile = new ZipFile(new File(zipFilePath))) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (!entry.isDirectory()) {
+                    System.out.println("Safely processing " + entry.getName());
+                    try (InputStream is = zipFile.getInputStream(entry)) {
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = is.read(buffer)) != -1) {
+                            // 处理数据...
+                        }
+                    } // InputStream自动在 try块结束时关闭
+                }
+            }
+        } // ZipFile自动在 try块结束时关闭
+    }
+}
+```
+#### 2. 使用 try-finally 确保关闭资源
+在 Java 7 之前的版本，或者在某些复杂场景下，可以使用 `try-finally` 结构来手动关闭资源。这要求在 `finally` 块中检查资源是否为 `null` 并调用 `close()` 方法，同时最好在 `close()` 调用周围加上 `try-catch` 以避免关闭过程中抛出的异常影响主逻辑或覆盖原始异常。
+```java
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+public class SafeZipReadWithFinally {
+    public static void main(String[] args) throws IOException {
+        String zipFilePath = "your_file.zip"; // 替换为实际ZIP文件路径
+        ZipFile zipFile = null;
+        try {
+            zipFile = new ZipFile(new File(zipFilePath));
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+                if (!entry.isDirectory()) {
+                    InputStream is = null;
+                    try {
+                        is = zipFile.getInputStream(entry);
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = is.read(buffer)) != -1) {
+                            // 处理数据...
+                        }
+                    } finally {
+                        if (is != null) {
+                            try { is.close(); } catch (IOException e) { /* Log or handle exception */ }
+                        }
+                    }
+                }
+            }
+        } finally {
+            if (zipFile != null) {
+                try { zipFile.close(); } catch (IOException e) { /* Log or handle exception */ }
+            }
+        }
+    }
+}
+```
+#### 3. 封装资源处理逻辑
+将 ZIP 条目处理逻辑封装到专门的方法或类中，确保在方法内部正确管理资源的生命周期。
+#### 4. 使用 Apache Commons Compress 工具类
+如果使用了 Apache Commons Compress 库，可以结合 `try-with-resources` 使用其工具类简化流的处理，但仍需确保 `InputStream` 被正确关闭。
+```java
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.io.IOUtils;
+public class SafeZipReadWithApacheCommons {
+    public static void main(String[] args) throws IOException {
+        String zipFilePath = "your_file.zip"; // 替换为实际ZIP文件路径
+        try (ZipFile zipFile = new ZipFile(new File(zipFilePath))) {
+            ZipArchiveEntry entry = zipFile.getEntry("some_entry.txt");
+            if (entry != null && !entry.isDirectory()) {
+                try (InputStream is = zipFile.getInputStream(entry)) {
+                    byte[] content = IOUtils.toByteArray(is);
+                    // 处理数据...
+                } // InputStream自动关闭
+            }
+        } // ZipFile自动关闭
+    }
+}
+```
+SOLUTION
+	risk: "资源泄漏",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   应用程序通过 `ZipFile.getInputStream()` 方法获取 ZIP 文件条目的输入流后，未正确关闭这些 `InputStream` 资源。每次调用 `getInputStream()` 都会创建一个新的输入流，必须单独关闭，即使关闭了父级 `ZipFile` 对象也不足以完全释放相关资源。
+   这属于 CWE-772（有效生命周期后未释放资源）漏洞，可能导致文件句柄和内存资源泄漏。
+2. **触发场景**
+   ```java
+   ZipFile zipFile = new ZipFile(new File("example.zip"));
+   InputStream is = zipFile.getInputStream(zipFile.getEntry("file.txt"));
+   // 读取数据，但未关闭 InputStream
+   byte[] buffer = new byte[1024];
+   int bytesRead;
+   while ((bytesRead = is.read(buffer)) != -1) {
+       // 处理数据...
+   }
+   // 未显式关闭 InputStream
+   ```
+3. **潜在影响**
+   - 文件句柄泄漏，可能导致"Too many open files"错误
+   - 内存泄漏，特别是处理大型 ZIP 文件或多个 ZIP 文件时
+   - 系统资源不断消耗，应用程序性能随时间逐渐下降
+   - 在长时间运行的应用中更为严重，可能导致应用程序崩溃
+   - 处理大量 ZIP 条目时可能迅速耗尽系统资源
+DESC
 }
 
 desc(
@@ -343,5 +481,74 @@ desc(
             }
         }
     }
+CODE
+	"safefile://SafeZipReadWithCommonsIO.java": <<<CODE
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry;
+import org.apache.commons.compress.archivers.zip.ZipFile;
+import org.apache.commons.io.IOUtils;
+
+public class SafeZipReadWithCommonsIO {
+    public static void main(String[] args) throws IOException {
+        String zipFilePath = "example.zip"; // 替换为实际ZIP文件路径
+        try (ZipFile zipFile = new ZipFile(new File(zipFilePath))) {
+            ZipArchiveEntry entry = (ZipArchiveEntry) zipFile.getEntry("some_entry.txt");
+            if (entry != null && !entry.isDirectory()) {
+                // 使用Apache Commons IO的IOUtils工具类，它内部会正确关闭流
+                try (InputStream is = zipFile.getInputStream(entry)) {
+                    byte[] content = IOUtils.toByteArray(is);
+                    System.out.println("Safely read content from " + entry.getName() + ": " + content.length + " bytes.");
+                    // 处理数据...
+                } // InputStream自动关闭，由try-with-resources保证
+            }
+        } // ZipFile自动关闭，由try-with-resources保证
+    }
+}
+
+CODE
+	"safefile://SafeZipStreamProcessor.java": <<<CODE
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Enumeration;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+
+public class SafeZipStreamProcessor {
+
+    // 模拟一个处理ZipEntry内容的方法
+    private static void processEntryContent(InputStream is) throws IOException {
+        byte[] buffer = new byte[1024];
+        int bytesRead;
+        while ((bytesRead = is.read(buffer)) != -1) {
+            // 实际的数据处理逻辑
+            // System.out.println("Read " + bytesRead + " bytes.");
+        }
+    }
+
+    public static void main(String[] args) throws IOException {
+        String zipFilePath = "example.zip"; // 替换为实际ZIP文件路径
+
+        try (ZipFile zipFile = new ZipFile(new File(zipFilePath))) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
+
+                if (!entry.isDirectory()) {
+                    System.out.println("Processing ZIP entry: " + entry.getName());
+                    // 对于每一个从getInputStream()获取的InputStream，都使用try-with-resources确保其关闭
+                    try (InputStream entryStream = zipFile.getInputStream(entry)) {
+                        processEntryContent(entryStream);
+                    } // entryStream 在此自动关闭
+                }
+            }
+        } // zipFile 在此自动关闭
+        System.out.println("Zip file processing completed safely.");
+    }
+}
+
 CODE
 )

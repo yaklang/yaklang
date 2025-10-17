@@ -414,6 +414,8 @@ public class Test extends Parent {
 			require.NoError(t, err)
 			method := values.GetValues("method")
 			require.NotEmpty(t, method)
+			require.Greater(t, len(method), 1, "method should have only one value")
+			require.NotNil(t, method[0].GetRange(), "method should have range")
 			methodRange := method[0].GetRange().GetText()
 			require.Equal(t, methodRange, "method",
 				"method should have method name")

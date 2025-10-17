@@ -275,8 +275,8 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	/*
 		设置内容替换模块，通过正则驱动
 	*/
-	replacer := NewMITMReplacer(func() []*ypb.MITMContentReplacer {
-		result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	replacer := yakit.NewMITMReplacer(func() []*ypb.MITMContentReplacer {
+		result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
 		if result != "" {
 			var rules []*ypb.MITMContentReplacer
 			_ = json.Unmarshal([]byte(result), &rules)
@@ -286,16 +286,16 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 		return nil
 	})
-	replacer.AutoSaveCallback(func(items ...*MITMReplaceRule) {
+	replacer.AutoSaveCallback(func(items ...*yakit.MITMReplaceRule) {
 		if len(items) <= 0 {
-			yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, "[]")
+			yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, "[]")
 			return
 		}
 		raw, err := json.Marshal(items)
 		if err != nil {
 			return
 		}
-		yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(raw))
+		yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, string(raw))
 	})
 
 	recoverFilterAndReplacerSend := func() {
@@ -683,7 +683,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		defer func() {
 			wsFlow := yakit.BuildWebsocketFlow(true, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
-			replacer.hookColorWs(finalResult, wsFlow)
+			replacer.HookColorWs(finalResult, wsFlow)
 			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
 				if err != nil {
 					log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -851,9 +851,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			*/
 
 			// 处理响应规则
-			if replacer.haveHijackingRules() {
+			if replacer.HaveHijackingRules() {
 
-				rules, rspHooked, dropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
+				rules, rspHooked, dropped := replacer.Hook(false, true, httpctx.GetRequestURL(req), rsp)
 				if dropped {
 					httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 					log.Warn("response should be dropped(VIA replacer.hook)")
@@ -870,7 +870,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		}
 
 		// 非自动转发的情况下处理替换器
-		rules, rsp1, shouldBeDropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
+		rules, rsp1, shouldBeDropped := replacer.Hook(false, true, httpctx.GetRequestURL(req), rsp)
 		if shouldBeDropped {
 			log.Warn("response should be dropped(VIA replacer.hook)")
 			httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
@@ -1008,7 +1008,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 
 		defer func() {
 			wsFlow := yakit.BuildWebsocketFlow(false, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
-			replacer.hookColorWs(finalResult, wsFlow)
+			replacer.HookColorWs(finalResult, wsFlow)
 			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
 				if err != nil {
 					log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -1215,7 +1215,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			}
 		}()
 
-		rules, req1, shouldBeDropped := replacer.hook(true, false, httpctx.GetRequestURL(originReqIns), req, isHttps)
+		rules, req1, shouldBeDropped := replacer.Hook(true, false, httpctx.GetRequestURL(originReqIns), req, isHttps)
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
@@ -1573,7 +1573,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 		// replacer hook color
 		if replacer != nil {
 			go func() {
-				extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
+				extracted = replacer.HookColor(plainRequest, plainResponse, req, flow)
 				close(colorCh)
 				for _, e := range extracted {
 					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
@@ -1696,8 +1696,17 @@ func (s *Server) DownloadMITMCert(ctx context.Context, _ *ypb.Empty) (*ypb.MITMC
 	return &ypb.MITMCert{CaCerts: ca, LocalFile: crep.GetDefaultCaFilePath()}, nil
 }
 
+func (s *Server) DownloadMITMGMCert(ctx context.Context, _ *ypb.Empty) (*ypb.MITMCert, error) {
+	crep.InitMITMCert()
+	ca, _, err := crep.GetDefaultGMCaAndKey()
+	if err != nil {
+		return nil, utils.Errorf("fetch default GM ca/key failed: %s", err)
+	}
+	return &ypb.MITMCert{CaCerts: ca, LocalFile: crep.GetDefaultGMCaFilePath()}, nil
+}
+
 func (s *Server) ExportMITMReplacerRules(ctx context.Context, _ *ypb.Empty) (*ypb.ExportMITMReplacerRulesResponse, error) {
-	result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
 	if result != "" {
 		var replacers []*ypb.MITMContentReplacer
 		err := json.Unmarshal([]byte(result), &replacers)
@@ -1732,7 +1741,7 @@ func (s *Server) ImportMITMReplacerRules(ctx context.Context, req *ypb.ImportMIT
 	}
 
 	if replace {
-		err := yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(req.GetJsonRaw()))
+		err := yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, string(req.GetJsonRaw()))
 		if err != nil {
 			return nil, err
 		}
@@ -1740,7 +1749,7 @@ func (s *Server) ImportMITMReplacerRules(ctx context.Context, req *ypb.ImportMIT
 	}
 
 	var existed []*ypb.MITMContentReplacer
-	result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
 	if result != "" {
 		_ = json.Unmarshal([]byte(result), &existed)
 	}
@@ -1753,7 +1762,7 @@ func (s *Server) ImportMITMReplacerRules(ctx context.Context, req *ypb.ImportMIT
 	if err != nil {
 		return nil, err
 	}
-	_ = yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(raw))
+	_ = yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, string(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -1765,7 +1774,7 @@ func (s *Server) SetCurrentRules(c context.Context, req *ypb.MITMContentReplacer
 	if err != nil {
 		return nil, err
 	}
-	err = yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(raw))
+	err = yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, string(raw))
 	if err != nil {
 		return nil, err
 	}
@@ -1773,7 +1782,7 @@ func (s *Server) SetCurrentRules(c context.Context, req *ypb.MITMContentReplacer
 }
 
 func (s *Server) GetCurrentRules(c context.Context, req *ypb.Empty) (*ypb.MITMContentReplacers, error) {
-	result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
 	var rules []*ypb.MITMContentReplacer
 	_ = json.Unmarshal([]byte(result), &rules)
 	return &ypb.MITMContentReplacers{Rules: rules}, nil
@@ -1781,7 +1790,7 @@ func (s *Server) GetCurrentRules(c context.Context, req *ypb.Empty) (*ypb.MITMCo
 
 func (s *Server) QueryMITMReplacerRules(ctx context.Context, req *ypb.QueryMITMReplacerRulesRequest) (*ypb.QueryMITMReplacerRulesResponse, error) {
 	// 所有替换规则
-	result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
 	var allRules []*ypb.MITMContentReplacer
 	if result != "" {
 		err := json.Unmarshal([]byte(result), &allRules)

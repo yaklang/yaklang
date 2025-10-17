@@ -1,39 +1,36 @@
 desc(
-	title: "Detect Golang CORS Misconfiguration Vulnerability (beego)"
-	title_zh: "检测Golang CORS配置错误漏洞 (beego)"
+	title: "Detect Golang CORS Misconfiguration Vulnerability in Beego"
+	title_zh: "检测Golang CORS配置错误漏洞(beego)"
 	type: vuln
 	severity: high
-	risk: ssti
+	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   CORS（跨域资源共享）是一种浏览器安全机制，用于控制哪些资源可以被跨域访问。当CORS策略配置不当时（如允许任意来源`Access-Control-Allow-Origin: *`或反射用户提供的`Origin`头），攻击者可利用该漏洞从其他域窃取敏感数据，甚至实施跨站请求伪造（CSRF）攻击。
-
+CORS（跨域资源共享）是一种浏览器安全机制，用于控制哪些资源可以被跨域访问。当CORS策略配置不当时（如允许任意来源`Access-Control-Allow-Origin: *`或反射用户提供的`Origin`头），攻击者可利用该漏洞从其他域窃取敏感数据，甚至实施跨站请求伪造（CSRF）攻击。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```go
-   package main
-
-   import (
-       "github.com/beego/beego/v2/server/web"
-   )
-
-   func (c *CorsVuln1Controller) Get() {
-       origin := c.Ctx.Request.Header.Get("Origin")
-       c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
-       c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
-       c.Data["json"] = map[string]string{"username": "admin", "password": "admin@123"}
-       c.ServeJSON()
-   }
-   ```
-   在上述代码中，服务器直接反射了客户端发送的`Origin`头，并将其设置为`Access-Control-Allow-Origin`响应头值。如果攻击者构造恶意请求，则可以从目标网站窃取用户敏感信息。
-
+// 存在漏洞的代码示例
+```go
+package main
+import (
+"github.com/beego/beego/v2/server/web"
+)
+type CorsVuln1Controller struct {
+beego.Controller
+}
+func (c *CorsVuln1Controller) Get() {
+origin := c.Ctx.Request.Header.Get("Origin")
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
+c.Data["json"] = map[string]string{"username": "admin", "password": "admin@123"}
+c.ServeJSON()
+}
+```
+在上述代码中，服务器直接反射了客户端发送的`Origin`头，并将其设置为`Access-Control-Allow-Origin`响应头值。如果攻击者构造恶意请求，则可以从目标网站窃取用户敏感信息。
 3. **潜在影响**
-   - 跨域数据泄露：攻击者可以通过恶意站点获取用户的隐私数据。
-   - CSRF攻击：攻击者可能结合其他漏洞发起跨站请求伪造攻击，执行未经授权的操作。
-   - 破坏应用隔离性：过度宽松的CORS策略可能导致不同域之间的隔离失效，引发更广泛的安全问题。
-
+- 跨域数据泄露：攻击者可以通过恶意站点获取用户的隐私数据。
+- CSRF攻击：攻击者可能结合其他漏洞发起跨站请求伪造攻击，执行未经授权的操作。
+- 破坏应用隔离性：过度宽松的CORS策略可能导致不同域之间的隔离失效，引发更广泛的安全问题。
 DESC
 	rule_id: "a9f2254c-7a3d-4ea9-9830-6ca98bde8cd8"
 	reference: <<<REFERENCE
@@ -42,72 +39,142 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 配置严格的CORS策略
-   明确指定允许访问的可信域名，避免使用通配符`*`或反射`Origin`头。
-   ```go
-   func (c *CorsSafeController) Get() {
-       allowedOrigins := map[string]bool{
-           "https://trusted-domain.com": true,
-           "https://another-trusted-domain.com": true,
-       }
-       origin := c.Ctx.Request.Header.Get("Origin")
-       if allowedOrigins[origin] {
-           c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
-       } else {
-           c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "")
-       }
-       c.Data["json"] = map[string]string{"message": "CORS policy applied"}
-       c.ServeJSON()
-   }
-   ```
-
+明确指定允许访问的可信域名，避免使用通配符`*`或反射`Origin`头。
+```go
+func (c *CorsSafeController) Get() {
+allowedOrigins := map[string]bool{
+"https://trusted-domain.com": true,
+"https://another-trusted-domain.com": true,
+}
+origin := c.Ctx.Request.Header.Get("Origin")
+if allowedOrigins[origin] {
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+} else {
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "")
+}
+c.Data["json"] = map[string]string{"message": "CORS policy applied"}
+c.ServeJSON()
+}
+```
 #### 2. 避免使用`Access-Control-Allow-Credentials: true`与通配符
-   如果必须启用凭据支持，请确保只允许特定域名。
-   ```go
-   c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
-   c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "https://trusted-domain.com")
-   ```
-
+如果必须启用凭据支持，请确保只允许特定域名。
+```go
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "https://trusted-domain.com")
+```
 #### 3. 使用中间件进行统一管理
-   对于复杂的应用程序，推荐将CORS逻辑封装到独立的中间件模块。
-   ```go
-   func corsMiddleware(next http.Handler) http.Handler {
-       return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-           allowedOrigins := map[string]bool{
-               "https://trusted-domain.com": true,
-           }
-           origin := r.Header.Get("Origin")
-           if allowedOrigins[origin] {
-               w.Header().Set("Access-Control-Allow-Origin", origin)
-           }
-           next.ServeHTTP(w, r)
-       })
-   }
-   ```
-
+对于复杂的应用程序，推荐将CORS逻辑封装到独立的中间件模块。
+```go
+func corsMiddleware(next http.Handler) http.Handler {
+return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+allowedOrigins := map[string]bool{
+"https://trusted-domain.com": true,
+}
+origin := r.Header.Get("Origin")
+if allowedOrigins[origin] {
+w.Header().Set("Access-Control-Allow-Origin", origin)
+}
+next.ServeHTTP(w, r)
+})
+}
+```
 SOLUTION
 )
 
-.Ctx.Request.Header.Get(* as $sink)
+.Ctx.Request.Header.Get #-> as $beego 
+$beego?{<fullTypeName>?{have: 'github.com/beego/beego/v2/server/web'}} as $input;
 
-$sink -{ 
-	include:`*?{opcode:const}?{have: "Origin"}`,
-}-> as $data;
+.Ctx.ResponseWriter.Header().Set()?{have: "Access-Control-Allow-Origin"} as $header
+$header<getCallee>(<slice(index=2)>* #-> as $output)
 
-$data?{have:".Ctx.ResponseWriter.Header"} as $high
+$output & $input as $high
 
 alert $high for {
 	type: "vuln",
-	title: "CORS detected",
-	title_zh: "检测到CORS",
+	title: "Golang CORS Misconfiguration Vulnerability Was Detected",
+	title_zh: "检测到Golang CORS配置错误漏洞",
 	level: "high",
+	name: "high",
+	message: "检测到Golang Beego框架中的CORS配置错误漏洞，服务端反射了未验证的`Origin`头，可能导致敏感数据泄露和跨站攻击。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 配置严格的CORS策略
+明确指定允许访问的可信域名，避免使用通配符`*`或反射`Origin`头。
+```go
+func (c *CorsSafeController) Get() {
+allowedOrigins := map[string]bool{
+"https://trusted-domain.com": true,
+"https://another-trusted-domain.com": true,
+}
+origin := c.Ctx.Request.Header.Get("Origin")
+if allowedOrigins[origin] {
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+} else {
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "")
+}
+c.Data["json"] = map[string]string{"message": "CORS policy applied"}
+c.ServeJSON()
+}
+```
+#### 2. 避免使用`Access-Control-Allow-Credentials: true`与通配符
+如果必须启用凭据支持，请确保只允许特定域名。
+```go
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", "https://trusted-domain.com")
+```
+#### 3. 使用中间件进行统一管理
+对于复杂的应用程序，推荐将CORS逻辑封装到独立的中间件模块。
+```go
+func corsMiddleware(next http.Handler) http.Handler {
+return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+allowedOrigins := map[string]bool{
+"https://trusted-domain.com": true,
+}
+origin := r.Header.Get("Origin")
+if allowedOrigins[origin] {
+w.Header().Set("Access-Control-Allow-Origin", origin)
+}
+next.ServeHTTP(w, r)
+})
+}
+```
+SOLUTION
+	risk: "CORS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+CORS（跨域资源共享）是一种浏览器安全机制，用于控制哪些资源可以被跨域访问。当CORS策略配置不当时（如允许任意来源`Access-Control-Allow-Origin: *`或反射用户提供的`Origin`头），攻击者可利用该漏洞从其他域窃取敏感数据，甚至实施跨站请求伪造（CSRF）攻击。
+2. **触发场景**
+// 存在漏洞的代码示例
+```go
+package main
+import (
+"github.com/beego/beego/v2/server/web"
+)
+type CorsVuln1Controller struct {
+beego.Controller
+}
+func (c *CorsVuln1Controller) Get() {
+origin := c.Ctx.Request.Header.Get("Origin")
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
+c.Data["json"] = map[string]string{"username": "admin", "password": "admin@123"}
+c.ServeJSON()
+}
+```
+在上述代码中，服务器直接反射了客户端发送的`Origin`头，并将其设置为`Access-Control-Allow-Origin`响应头值。如果攻击者构造恶意请求，则可以从目标网站窃取用户敏感信息。
+3. **潜在影响**
+- 跨域数据泄露：攻击者可以通过恶意站点获取用户的隐私数据。
+- CSRF攻击：攻击者可能结合其他漏洞发起跨站请求伪造攻击，执行未经授权的操作。
+- 破坏应用隔离性：过度宽松的CORS策略可能导致不同域之间的隔离失效，引发更广泛的安全问题。
+DESC
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -116,6 +183,10 @@ import (
 
 	beego "github.com/beego/beego/v2/server/web"
 )
+
+type CorsVuln1Controller struct {
+    beego.Controller
+}
 
 func (c *CorsVuln1Controller) Get() {
 	origin := c.Ctx.Request.Header.Get("Origin")
@@ -135,4 +206,36 @@ func (c *CorsVuln1Controller) Get() {
 }
 
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"encoding/json"
+	"go-sec-code/utils"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type CorsVuln1Controller struct {
+    beego.Controller
+}
+
+func (c *CorsVuln1Controller) Get() {
+	origin := "Origin"
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE, UPDATE")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Headers", "Origin, X-Requested-With, X-Extra-Header, Content-Type, Accept, Authorization")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Cache-Control, Content-Language, Content-Type")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Credentials", "true")
+	jsonp := make(map[string]interface{})
+	jsonp["username"] = "admin"
+	jsonp["password"] = "admin@123"
+	data, err := json.Marshal(jsonp)
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write(data)
+}
+
+SAFE
 )

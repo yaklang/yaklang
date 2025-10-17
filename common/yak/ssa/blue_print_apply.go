@@ -12,7 +12,7 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 	if !this.IsObject() {
 		return
 	}
-	blue := NewBlueprint("")
+	blue := NewBlueprint(objectTyp.Name)
 
 	for key, member := range this.GetAllMember() {
 		// if not function , just append this field to normal field
@@ -144,5 +144,6 @@ func (c *Blueprint) Apply(obj Value) Type {
 		}
 	}
 
+	objTyp.fullTypeName = c.GetFullTypeNames()
 	return objTyp
 }

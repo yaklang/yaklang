@@ -1085,7 +1085,24 @@ func (s *Server) SaveCodecFlow(ctx context.Context, req *ypb.CustomizeCodecFlow)
 		WorkFlow:   flowByte,
 		WorkFlowUI: req.GetWorkFlowUI(),
 	}
-	err = yakit.CreateOrUpdateCodecFlow(s.GetProfileDatabase(), cf)
+	err = yakit.CreateCodecFlow(s.GetProfileDatabase(), cf)
+	if err != nil {
+		return nil, err
+	}
+	return &ypb.Empty{}, nil
+}
+
+func (s *Server) UpdateCodecFlow(ctx context.Context, req *ypb.UpdateCodecFlowRequest) (*ypb.Empty, error) {
+	flowByte, err := json.Marshal(req.GetWorkFlow())
+	if err != nil {
+		return nil, err
+	}
+	cf := &schema.CodecFlow{
+		FlowName:   req.GetFlowName(),
+		WorkFlow:   flowByte,
+		WorkFlowUI: req.GetWorkFlowUI(),
+	}
+	err = yakit.UpdateCodecFlow(s.GetProfileDatabase(), cf)
 	if err != nil {
 		return nil, err
 	}

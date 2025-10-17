@@ -68,25 +68,21 @@ func topDefCheckMustWithOpts(t *testing.T, code string, varName string, want []a
 }
 
 func TestBasic_BasicObject(t *testing.T) {
-	ssatest.Check(t, `
-	a = {}; 
-	a.b = 1; 
-	a.c = 3; 
-	d = a.c + a.b
-	`,
-		ssatest.CheckTopDef_Contain("d", []string{"3", "1"}),
-	)
+	ssatest.CheckTopDef(t, `
+       a = {}; 
+       a.b = 1; 
+       a.c = 3; 
+       d = a.c + a.b
+       `, "d", []string{"3", "1"}, true)
 }
 
 func TestBasic_BasicObject2(t *testing.T) {
-	ssatest.Check(t, `
-	a = ()=>{return {}}; 
-	a.b = 1; 
-	a.c = 3; 
-	d = a.c + a.b
-	`,
-		ssatest.CheckTopDef_Contain("d", []string{"3", "1"}),
-	)
+	ssatest.CheckTopDef(t, `
+       a = ()=>{return {}}; 
+       a.b = 1; 
+       a.c = 3; 
+       d = a.c + a.b
+       `, "d", []string{"3", "1"}, true)
 }
 
 func TestBasic_BasicObject_Trace(t *testing.T) {
@@ -569,8 +565,12 @@ func TestObject_Make(t *testing.T) {
 		m = []string{"i","j"}
 		print(m[1])
 		`
-		ssatest.CheckSyntaxFlowContain(t, code, `e"j" --> as $target`, map[string][]string{
-			"target": {`Undefined-print("j")`},
-		}, ssaapi.WithLanguage(ssaapi.Yak))
+		ssatest.CheckSyntaxFlowContain(t, code,
+			`
+			e"j" as $j
+			$j --> as $target
+			`, map[string][]string{
+				"target": {`Undefined-print("j")`},
+			}, ssaapi.WithLanguage(ssaapi.Yak))
 	})
 }

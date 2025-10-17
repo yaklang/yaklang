@@ -1307,8 +1307,8 @@ func TestGetFullHTTPRequestQueryParam(t *testing.T) {
 	}{
 		{
 			origin: `GET /?a=1&b=2 HTTP/1.1
-Host: www.baidu.com
-`,
+		Host: www.baidu.com
+		`,
 
 			expected: map[string][]string{
 				"a": {"1"},
@@ -1317,11 +1317,21 @@ Host: www.baidu.com
 		},
 		{
 			origin: `GET /?a=1&a=2 HTTP/1.1
+		Host: www.baidu.com
+		`,
+
+			expected: map[string][]string{
+				"a": {"1", "2"},
+			},
+		},
+		{
+			origin: `GET /?a&b=2 HTTP/1.1
 Host: www.baidu.com
 `,
 
 			expected: map[string][]string{
-				"a": {"1", "2"},
+				"a": {""},
+				"b": {"2"},
 			},
 		},
 	}
@@ -1769,6 +1779,21 @@ a=1`,
 				"\r\n\r\na=1&b=2",
 			},
 		},
+		{
+			origin: `POST / HTTP/1.1
+Host: www.baidu.com
+Content-Type: application/json
+
+{"a":1,"b":2}`,
+			key:   "c",
+			value: "3",
+			whitelists: []string{
+				"Content-Type: application/json",
+				`"a":"1"`,
+				`"b":"2"`,
+				`"c":"3"`,
+			},
+		},
 	}
 	for _, testcase := range testcases {
 
@@ -1962,6 +1987,23 @@ func TestReplaceHTTPPacketFormEncoded(t *testing.T) {
 		{
 			// replace
 			origin: `POST / HTTP/1.1
+		Host: www.baidu.com
+		Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+		------WebKitFormBoundary7MA4YWxkTrZu0gW
+		Content-Disposition: form-data; name="a"
+
+		1
+		------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
+			oldKey:          "a",
+			oldValue:        "1",
+			key:             "a",
+			value:           "2",
+			exceptFormCount: 1,
+		},
+		{
+			// replace
+			origin: `POST / HTTP/1.1
 Host: www.baidu.com
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
 
@@ -1972,7 +2014,7 @@ Content-Disposition: form-data; name="a"
 ------WebKitFormBoundary7MA4YWxkTrZu0gW--`,
 			oldKey:          "a",
 			oldValue:        "1",
-			key:             "a",
+			key:             "b",
 			value:           "2",
 			exceptFormCount: 1,
 		},
@@ -2011,6 +2053,206 @@ Content-Disposition: form-data; name="a"
 	}
 }
 
+func TestReplaceHTTPPacketFormEncodedMultipleCalls(t *testing.T) {
+	// 测试多次调用同一个key不会产生重复字段
+	raw := `POST / HTTP/1.1
+Host: example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryJ5VMHqyPTW0aM97D
+Content-Length: 46
+
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D
+Content-Disposition: form-data; name="user"
+
+11111111
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D--`
+
+	// 第一次调用：应该添加新字段
+	result1 := ReplaceHTTPPacketFormEncoded([]byte(raw), "a", "123")
+
+	// 第二次调用：应该替换现有字段，不应该添加新字段
+	result2 := ReplaceHTTPPacketFormEncoded(result1, "a", "456")
+
+	// 第三次调用：应该替换现有字段，不应该添加新字段
+	result3 := ReplaceHTTPPacketFormEncoded(result2, "a", "789")
+
+	// 解析最终结果，检查字段数量
+	blocks := strings.SplitN(string(result3), "\r\n\r\n", 2)
+	body := blocks[1]
+	multipartReader := multipart.NewReader(bytes.NewBufferString(body))
+
+	// 统计字段数量
+	fieldCount := 0
+	fields := make(map[string]string)
+
+	for {
+		part, err := multipartReader.NextPart()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			t.Fatal(err)
+		}
+
+		fieldCount++
+		fieldName := part.FormName()
+		buf := new(bytes.Buffer)
+		io.Copy(buf, part)
+		fields[fieldName] = buf.String()
+	}
+
+	// 应该只有2个字段：user 和 a
+	require.Equal(t, 2, fieldCount, "应该只有2个字段")
+	require.Equal(t, "11111111", fields["user"], "user字段值应该保持不变")
+	require.Equal(t, "789", fields["a"], "a字段值应该是最后一次设置的值")
+}
+
+func TestReplaceHTTPPacketFormEncodedReplaceExisting(t *testing.T) {
+	// 测试替换现有字段的情况
+	raw := `POST / HTTP/1.1
+Host: example.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryJ5VMHqyPTW0aM97D
+
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D
+Content-Disposition: form-data; name="existing"
+
+old_value
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D--`
+
+	result := ReplaceHTTPPacketFormEncoded([]byte(raw), "existing", "new_value")
+
+	// 解析结果
+	blocks := strings.SplitN(string(result), "\r\n\r\n", 2)
+	body := blocks[1]
+	multipartReader := multipart.NewReader(bytes.NewBufferString(body))
+
+	// 检查字段
+	part, err := multipartReader.NextPart()
+	require.NoError(t, err)
+	require.Equal(t, "existing", part.FormName())
+
+	buf := new(bytes.Buffer)
+	io.Copy(buf, part)
+	require.Equal(t, "new_value", buf.String())
+
+	// 应该没有更多字段
+	_, err = multipartReader.NextPart()
+	require.Error(t, err)
+	require.True(t, errors.Is(err, io.EOF))
+}
+
+func TestReplaceHTTPPacketFormEncodedAddNew(t *testing.T) {
+	// 测试添加新字段的情况
+	raw := `POST / HTTP/1.1
+Host: example.com
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryJ5VMHqyPTW0aM97D
+
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D
+Content-Disposition: form-data; name="existing"
+
+old_value
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D--`
+
+	result := ReplaceHTTPPacketFormEncoded([]byte(raw), "new_field", "new_value")
+
+	// 解析结果
+	blocks := strings.SplitN(string(result), "\r\n\r\n", 2)
+	body := blocks[1]
+	multipartReader := multipart.NewReader(bytes.NewBufferString(body))
+
+	// 检查字段
+	fields := make(map[string]string)
+	for {
+		part, err := multipartReader.NextPart()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			t.Fatal(err)
+		}
+
+		buf := new(bytes.Buffer)
+		io.Copy(buf, part)
+		fields[part.FormName()] = buf.String()
+	}
+
+	// 应该有两个字段
+	require.Equal(t, 2, len(fields))
+	require.Equal(t, "old_value", fields["existing"])
+	require.Equal(t, "new_value", fields["new_field"])
+}
+
+func TestReplaceHTTPPacketFormEncodedWithDotInFieldName(t *testing.T) {
+	// 测试包含点号的字段名，验证多次替换不会产生重复字段
+	raw := `POST / HTTP/1.1
+Host: example.com
+User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryJ5VMHqyPTW0aM97D
+Content-Length: 46
+
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D
+Content-Disposition: form-data; name="user.mark"
+
+11111111
+------WebKitFormBoundaryJ5VMHqyPTW0aM97D--`
+
+	// 解析multipart数据的辅助函数
+	parseMultipartFields := func(data []byte) map[string]string {
+		blocks := strings.SplitN(string(data), "\r\n\r\n", 2)
+		if len(blocks) < 2 {
+			return nil
+		}
+		body := blocks[1]
+		multipartReader := multipart.NewReader(bytes.NewBufferString(body))
+
+		fields := make(map[string]string)
+		for {
+			part, err := multipartReader.NextPart()
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+				t.Fatal(err)
+			}
+
+			buf := new(bytes.Buffer)
+			io.Copy(buf, part)
+			fields[part.FormName()] = buf.String()
+		}
+		return fields
+	}
+
+	// 第一次替换
+	result1 := ReplaceHTTPPacketFormEncoded([]byte(raw), "user.mark", "123")
+	fields1 := parseMultipartFields(result1)
+
+	// 验证第一次替换结果
+	require.Equal(t, 1, len(fields1), "第一次替换后应该只有1个字段")
+	require.Equal(t, "123", fields1["user.mark"], "user.mark字段值应该是123")
+
+	// 第二次替换
+	result2 := ReplaceHTTPPacketFormEncoded(result1, "user.mark", "1234")
+	fields2 := parseMultipartFields(result2)
+
+	// 验证第二次替换结果
+	require.Equal(t, 1, len(fields2), "第二次替换后应该只有1个字段")
+	require.Equal(t, "1234", fields2["user.mark"], "user.mark字段值应该是1234")
+
+	// 第三次替换
+	result3 := ReplaceHTTPPacketFormEncoded(result2, "user.mark", "12345")
+	fields3 := parseMultipartFields(result3)
+
+	// 验证第三次替换结果
+	require.Equal(t, 1, len(fields3), "第三次替换后应该只有1个字段")
+	require.Equal(t, "12345", fields3["user.mark"], "user.mark字段值应该是12345")
+
+	// 额外验证：确保没有产生重复字段
+	// 通过检查multipart body中"user.mark"的出现次数
+	body3 := strings.SplitN(string(result3), "\r\n\r\n", 2)[1]
+	userMarkCount := strings.Count(body3, `name="user.mark"`)
+	require.Equal(t, 1, userMarkCount, "multipart body中应该只出现一次user.mark字段")
+}
+
 func TestAppendHTTPPacketFormEncoded(t *testing.T) {
 	compare := func(mutlipartReader *multipart.Reader, key, value string) {
 		part, err := mutlipartReader.NextPart()
@@ -2041,18 +2283,18 @@ func TestAppendHTTPPacketFormEncoded(t *testing.T) {
 	}{
 		{
 			origin: `GET / HTTP/1.1
-Host: www.baidu.com
-`,
+		Host: www.baidu.com
+		`,
 			key:   "a",
 			value: "1",
 		},
 		{
 			origin: `POST / HTTP/1.1
-Host: www.baidu.com
-Content-Type: application/x-www-form-urlencoded
-Content-Length: 7
+		Host: www.baidu.com
+		Content-Type: application/x-www-form-urlencoded
+		Content-Length: 7
 
-a=1&b=2`,
+		a=1&b=2`,
 			key:   "a",
 			value: "1",
 		},
@@ -2511,7 +2753,8 @@ Content-Disposition: form-data; name="b"
 	}
 	for _, testcase := range testcases {
 		t.Run(testcase.name, func(t *testing.T) {
-			actualParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
+			actualOrderedParams, actualUseRaw, actualError := GetParamsFromBody(testcase.contentType, []byte(testcase.body))
+			actualParams := actualOrderedParams.ToMap()
 
 			require.Equalf(t, testcase.expected.params, actualParams, "[%s] GetParamsFromBody failed:", testcase.name)
 

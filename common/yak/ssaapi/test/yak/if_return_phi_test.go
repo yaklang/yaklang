@@ -8,19 +8,18 @@ import (
 )
 
 func TestIFReturnPhi(t *testing.T) {
-	ssatest.Check(t, `
+	code := `
 a = 1
 if b{ return}
 d = dump(a)
-`, func(prog *ssaapi.Program) error {
-		prog.Ref("d").GetTopDefs().Show()
-		result, err := prog.SyntaxFlowWithError("d #{until: `* ?{opcode: phi}`}-> * as $result; check $result;")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(result.GetErrors()) > 0 {
-			t.Fatal(result.GetErrors())
-		}
-		return nil
+`
+
+	rule := `
+d #{until: "* ?{opcode: phi}"}-> * as $result; 
+check $result;
+`
+
+	ssatest.CheckSyntaxFlow(t, code, rule, map[string][]string{
+		"result": {"phi(a)[Undefined-a,1]"},
 	}, ssaapi.WithLanguage(ssaapi.Yak))
 }

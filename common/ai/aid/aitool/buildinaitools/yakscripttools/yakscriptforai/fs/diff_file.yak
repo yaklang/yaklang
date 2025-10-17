@@ -1,0 +1,110 @@
+__DESC__ = "一个用于比较两个文件内容差异的工具，支持生成详细的差异报告。适用于文件版本对比、代码审查等场景。"
+__VERBOSE_NAME__ = "文件差异比较工具"
+__KEYWORDS__ = "file diff,文件差异,文件比较,diff comparison,文件对比,text comparison,差异分析,版本对比,代码审查"
+
+/*
+文件差异比较工具
+
+功能特点：
+1. 比较两个文件的详细差异
+   - 支持文本文件和二进制文件的差异比较
+   - 生成标准 diff 格式的差异报告，包括添加、删除和修改的部分
+
+2. 参数说明：
+   --file1: 第一个文件路径 (必需)
+   --file2: 第二个文件路径 (必需)
+
+使用示例：
+1. 比较两个文本文件的差异：
+   yak diff_file.yak --file1 old_version.txt --file2 new_version.txt
+
+2. 比较两个代码文件：
+   yak diff_file.yak --file1 main.go --file2 main_v2.go
+
+3. 比较配置文件：
+   yak diff_file.yak --file1 config.old --file2 config.new
+
+注意事项：
+- 支持任意类型的文件比较，包括文本和二进制文件
+- 差异报告采用标准 diff 格式，易于阅读和理解
+- 如果文件不存在会报错
+- 大文件比较时会消耗较多内存
+- 使用 Yak 内置的 diff.Diff 函数进行高效比较
+*/
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+file1 := cli.String("file1", cli.setRequired(true), cli.setHelp("first file path to compare"))
+file2 := cli.String("file2", cli.setRequired(true), cli.setHelp("second file path to compare"))
+
+cli.check()
+
+yakit.Info("Comparing files: %v vs %v", file1, file2)
+
+// 检查文件是否存在
+if !file.IsExisted(file1) {
+    yakit.Error("File1 does not exist: %v", file1)
+    return
+}
+
+if !file.IsExisted(file2) {
+    yakit.Error("File2 does not exist: %v", file2)
+    return
+}
+
+// 读取文件内容
+content1, err := file.ReadFile(file1)
+if err != nil {
+    yakit.Error("Failed to read file1 %v: %v", file1, err)
+    return
+}
+
+content2, err := file.ReadFile(file2)
+if err != nil {
+    yakit.Error("Failed to read file2 %v: %v", file2, err)
+    return
+}
+
+// 获取文件信息
+info1, err := file.Stat(file1)
+if err != nil {
+    yakit.Warn("Failed to get file1 info: %v", err)
+} else {
+    yakit.Info("File1 (%v): %v bytes", file1, info1.Size())
+}
+
+info2, err := file.Stat(file2)
+if err != nil {
+    yakit.Warn("Failed to get file2 info: %v", err)
+} else {
+    yakit.Info("File2 (%v): %v bytes", file2, info2.Size())
+}
+
+// 如果文件内容相同，直接输出结果
+if string(content1) == string(content2) {
+    yakit.Info("Files are identical - no differences found")
+    return
+}
+
+// 使用 diff.Diff 生成差异
+diffResult := diff.Diff(string(content1), string(content2))~
+
+if diffResult == "" {
+    yakit.Info("Files are identical - no differences found")
+} else {
+    // 计算差异行数（粗略统计）
+    lines := str.Split(diffResult, "\n")
+    diffLines := 0
+    for line in lines {
+        if len(line) > 0 && (line[0] == '+' || line[0] == '-') {
+            diffLines++
+        }
+    }
+
+    yakit.Info("Found %v difference lines", diffLines)
+    yakit.Info("=== DIFF RESULT ===")
+    yakit.Info(diffResult)
+}
+
+yakit.Info("File comparison completed")

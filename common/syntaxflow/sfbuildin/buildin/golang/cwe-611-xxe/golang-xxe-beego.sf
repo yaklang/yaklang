@@ -1,113 +1,96 @@
 desc(
-	title: "Detect Golang XXE Vulnerability in Beego Framework"
-	title_zh: "检测Golang Beego框架中的XXE漏洞"
+	title: "Detect Golang XML External Entity (XXE) Vulnerability in Beego Framework"
+	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞"
 	type: vuln
 	level: high
+	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XXE（XML External Entity）漏洞（CWE-611）是由于应用程序在解析XML数据时未禁用外部实体解析。攻击者可以通过构造恶意的XML输入，利用外部实体读取服务器上的敏感文件（如`/etc/passwd`），或者执行其他危险操作，例如发起SSRF（Server-Side Request Forgery）攻击。
-
+XXE（XML External Entity）漏洞（CWE-611）是由于应用程序在解析XML数据时未禁用外部实体解析。攻击者可以通过构造恶意的XML输入，利用外部实体读取服务器上的敏感文件（如`/etc/passwd`），或者执行其他危险操作，例如发起SSRF（Server-Side Request Forgery）攻击。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```go
+```go
 package main
-
 import (
-	"bytes"
-	"github.com/beevik/etree"
-	"github.com/lestrrat-go/libxml2/parser"
+"bytes"
+"github.com/beevik/etree"
+"github.com/lestrrat-go/libxml2/parser"
 )
-
 func main() {
-	// 攻击者提供的恶意XML数据
-	maliciousXML := `<?xml version="1.0"?>
-	<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-	<foo>&xxe;</foo>`
-
-	p := parser.New(parser.XMLParseNoEnt)
-	doc, err := p.ParseReader(bytes.NewReader([]byte(maliciousXML)))
-	if err != nil {
-		panic(err)
-	}
-	defer doc.Free()
-	root, _ := doc.DocumentElement()
-	println(root.TextContent())
+// 攻击者提供的恶意XML数据
+maliciousXML := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<foo>&xxe;</foo>`
+p := parser.New(parser.XMLParseNoEnt)
+doc, err := p.ParseReader(bytes.NewReader([]byte(maliciousXML)))
+if err != nil {
+panic(err)
 }
-   ```
-   在上述代码中，攻击者通过构造包含外部实体的恶意XML数据，利用`parser.XMLParseNoEnt`选项解析XML文档，导致服务器返回`/etc/passwd`文件的内容。
-
+defer doc.Free()
+root, _ := doc.DocumentElement()
+println(root.TextContent())
+}
+```
+在上述代码中，攻击者通过构造包含外部实体的恶意XML数据，利用`parser.XMLParseNoEnt`选项解析XML文档，导致服务器返回`/etc/passwd`文件的内容。
 3. **潜在影响**
-   - 攻击者可以读取服务器上的任意文件，泄露敏感信息。
-   - 可能被用于发起SSRF攻击，进一步扩大攻击面。
-   - 若攻击者能够结合其他漏洞（如RCE），可能导致服务器被完全控制。
-
+- 攻击者可以读取服务器上的任意文件，泄露敏感信息。
+- 可能被用于发起SSRF攻击，进一步扩大攻击面。
+- 若攻击者能够结合其他漏洞（如RCE），可能导致服务器被完全控制。
 DESC
 	rule_id: "0bf612c9-cfcc-4f26-b41d-6d0dffb525e8"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体解析
-   在使用XML解析库时，应明确禁用外部实体解析功能，以防止XXE攻击。
-   ```go
+在使用XML解析库时，应明确禁用外部实体解析功能，以防止XXE攻击。
+```go
 package main
-
 import (
-	"bytes"
-	"github.com/lestrrat-go/libxml2/parser"
+"bytes"
+"github.com/lestrrat-go/libxml2/parser"
 )
-
 func main() {
-	// 安全的XML解析配置
-	maliciousXML := `<?xml version="1.0"?>
-	<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-	<foo>&xxe;</foo>`
-
-	p := parser.New(parser.XMLParseNoEnt | parser.XMLParseDTDLoad) // 禁用外部实体加载
-	doc, err := p.ParseReader(bytes.NewReader([]byte(maliciousXML)))
-	if err != nil {
-		panic(err)
-	}
-	defer doc.Free()
-	root, _ := doc.DocumentElement()
-	println(root.TextContent())
+// 安全的XML解析配置
+maliciousXML := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<foo>&xxe;</foo>`
+p := parser.New(parser.XMLParseNoEnt | parser.XMLParseDTDLoad) // 禁用外部实体加载
+doc, err := p.ParseReader(bytes.NewReader([]byte(maliciousXML)))
+if err != nil {
+panic(err)
 }
-   ```
-
+defer doc.Free()
+root, _ := doc.DocumentElement()
+println(root.TextContent())
+}
+```
 #### 2. 使用安全的XML解析库
-   考虑使用更安全的XML解析库或工具，例如Go自带的`encoding/xml`包，该包默认不支持外部实体解析。
-   ```go
+考虑使用更安全的XML解析库或工具，例如Go自带的`encoding/xml`包，该包默认不支持外部实体解析。
+```go
 package main
-
 import (
-	"encoding/xml"
-	"fmt"
+"encoding/xml"
+"fmt"
 )
-
 func main() {
-	data := `<?xml version="1.0"?>
-	<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-	<foo>&xxe;</foo>`
-
-	var result map[string]string
-	err := xml.Unmarshal([]byte(data), &result)
-	if err != nil {
-		fmt.Println("Error:", err)
-	} else {
-		fmt.Println("Parsed XML:", result)
-	}
+data := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<foo>&xxe;</foo>`
+var result map[string]string
+err := xml.Unmarshal([]byte(data), &result)
+if err != nil {
+fmt.Println("Error:", err)
+} else {
+fmt.Println("Parsed XML:", result)
 }
-   ```
-
+}
+```
 #### 3. 输入验证与过滤
-   对用户输入的XML数据进行严格验证，确保其符合预期格式和结构。
-   ```go
-   if !isValidXML(inputXML) {
-       return errors.New("Invalid XML input")
-   }
-   ```
-
+对用户输入的XML数据进行严格验证，确保其符合预期格式和结构。
+```go
+if !isValidXML(inputXML) {
+return errors.New("Invalid XML input")
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-611: Improper Restriction of XML External Entity Reference](https://cwe.mitre.org/data/definitions/611.html)
@@ -123,103 +106,94 @@ $param?{have: "XMLParseNoEnt"} as $high
 alert $high for {
 	title: "Check Golang XML External Entity (XXE) Vulnerability in Beego",
 	title_zh: "检测Golang Beego框架中的XML外部实体(XXE)漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体解析
 在解析XML时，显式禁用外部实体解析以防止恶意输入。
 ```go
 package main
-
 import (
-	"bytes"
-	"github.com/beevik/etree"
+"bytes"
+"github.com/beevik/etree"
 )
-
 func safeParseXML(input []byte) {
-	// 使用安全的解析器配置
-	doc := etree.NewDocument()
-	doc.ReadSettings.Entity = false // 禁用外部实体解析
-	err := doc.ReadFrom(bytes.NewReader(input))
-	if err != nil {
-		panic(err)
-	}
+// 使用安全的解析器配置
+doc := etree.NewDocument()
+doc.ReadSettings.Entity = false // 禁用外部实体解析
+err := doc.ReadFrom(bytes.NewReader(input))
+if err != nil {
+panic(err)
+}
 }
 ```
-
 #### 2. 验证和清理用户输入
 对所有用户提供的XML数据进行验证，并确保其符合预期结构。
 ```go
 func validateXML(input []byte) bool {
-	// 定义允许的XML模式或结构
-	allowedSchema := "<your-xml-schema>"
-	// 验证XML是否符合定义的模式
-	return isValidAgainstSchema(input, allowedSchema)
+// 定义允许的XML模式或结构
+allowedSchema := "<your-xml-schema>"
+// 验证XML是否符合定义的模式
+return isValidAgainstSchema(input, allowedSchema)
 }
 ```
-
 #### 3. 使用更安全的库
 考虑使用默认更安全的XML解析库，例如 `encoding/xml`，它默认不解析外部实体。
 ```go
 package main
-
 import (
-	"encoding/xml"
-	"fmt"
+"encoding/xml"
+"fmt"
 )
-
 func parseWithEncodingXML(input []byte) {
-	type Example struct {
-		Content string `xml:"content"`
-	}
-	var example Example
-	err := xml.Unmarshal(input, &example)
-	if err != nil {
-		fmt.Println("Error parsing XML:", err)
-	}
+type Example struct {
+Content string `xml:"content"`
+}
+var example Example
+err := xml.Unmarshal(input, &example)
+if err != nil {
+fmt.Println("Error parsing XML:", err)
+}
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XXE（XML External Entity）漏洞（CWE-611）是指应用程序在解析XML时未禁用外部实体解析，攻击者可以通过构造恶意XML文件加载服务器上的敏感文件（如 `/etc/passwd`），甚至可能执行远程代码。
-
+XXE（XML External Entity）漏洞（CWE-611）是指应用程序在解析XML时未禁用外部实体解析，攻击者可以通过构造恶意XML文件加载服务器上的敏感文件（如 `/etc/passwd`），甚至可能执行远程代码。
 2. **触发场景**
-   ```go
-   package main
-
-   import (
-       "bytes"
-       "github.com/beevik/etree"
-   )
-
-   func vulnerableParse(input []byte) {
-       doc := etree.NewDocument()
-       doc.ReadSettings.Entity = true // 外部实体解析开启
-       err := doc.ReadFrom(bytes.NewReader(input))
-       if err != nil {
-           panic(err)
-       }
-   }
-   ```
-   攻击者可以传入恶意XML，例如：
-   ```xml
-   <!DOCTYPE foo [
-       <!ENTITY xxe SYSTEM "file:///etc/passwd">
-   ]>
-   <foo>&xxe;</foo>
-   ```
-   这将导致服务器泄露敏感信息。
-
+```go
+package main
+import (
+"bytes"
+"github.com/beevik/etree"
+)
+func vulnerableParse(input []byte) {
+doc := etree.NewDocument()
+doc.ReadSettings.Entity = true // 外部实体解析开启
+err := doc.ReadFrom(bytes.NewReader(input))
+if err != nil {
+panic(err)
+}
+}
+```
+攻击者可以传入恶意XML，例如：
+```xml
+<!DOCTYPE foo [
+<!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<foo>&xxe;</foo>
+```
+这将导致服务器泄露敏感信息。
 3. **潜在影响**
-   - 泄露服务器上的任意文件，包括系统配置文件、密钥等。
-   - 执行远程代码或发起SSRF（服务器端请求伪造）攻击。
-   - 可能导致服务器被完全控制。
-CODE
+- 泄露服务器上的任意文件，包括系统配置文件、密钥等。
+- 执行远程代码或发起SSRF（服务器端请求伪造）攻击。
+- 可能导致服务器被完全控制。
+DESC
 	level: "high",
 	type: "vuln",
+	name: "high",
+	message: "检测到Golang Beego框架中存在未禁用外部实体解析的XXE漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "XXE",
 }
 
 desc(
@@ -262,4 +236,85 @@ func (c *XXEVuln1Controller) Post() {
 }
 
 UNSAFE
+	"safefile://SafeXMLProcessingUsingEncodingXML.go": <<<CODE
+package main
+
+import (
+	"encoding/xml"
+	"fmt"
+)
+
+func main() {
+	// Go的标准库encoding/xml默认不支持外部实体解析，因此是安全的
+	data := `<?xml version="1.0"?>
+	<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+	<foo>&xxe;</foo>`
+
+	var result map[string]string
+	// Unmarshal会忽略外部实体，不会触发XXE
+	err := xml.Unmarshal([]byte(data), &result)
+	if err != nil {
+		fmt.Println("Error parsing XML (expected for malformed XML, but not XXE):", err)
+		// 对于包含DOCTYPE的这种格式，Unmarshal可能会报错，但关键是它不会去解析SYSTEM实体
+	} else {
+		fmt.Println("Parsed XML:", result)
+	}
+
+	// 示例：解析一个简单的、不含外部实体的XML
+	safeData := `<root><item>Hello</item></root>`
+	var safeResult struct{ Item string `xml:"item"` }
+	err = xml.Unmarshal([]byte(safeData), &safeResult)
+	if err != nil {
+		fmt.Println("Error parsing safe XML:", err)
+	} else {
+		fmt.Println("Parsed safe XML:", safeResult.Item)
+	}
+}
+CODE
+	"safefile://SafeXMLProcessingWithLibxml2DisabledDTDLoad.go": <<<CODE
+package main
+
+import (
+	"bytes"
+	"fmt"
+	"github.com/lestrrat-go/libxml2/parser"
+)
+
+func main() {
+	// 攻击者提供的恶意XML数据
+	maliciousXML := `<?xml version="1.0"?>
+	<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+	<foo>&xxe;</foo>`
+
+	// 使用libxml2/parser，但明确禁用XMLParseDTDLoad和XMLParseNoEnt
+	// XMLParseNoEnt 意为不扩展实体，这对于防止XXE至关重要
+	// XMLParseDTDLoad 意为不加载外部DTD，这也是防止XXE的关键
+	// 注意：规则中触发点是parser.XMLParseNoEnt，但为了彻底安全，应该禁用DTD加载
+	// 在这里，我们故意不设置XMLParseNoEnt，而是使用安全的XMLParseDTDLoad
+	// 因为规则是针对 'parser.XMLParseNoEnt' 的存在而告警，所以这里不包含它以示安全
+	p := parser.New(parser.XMLParseDTDNoLoad) // 禁用DTD加载
+	doc, err := p.ParseReader(bytes.NewReader([]byte(maliciousXML)))
+	if err != nil {
+		fmt.Println("Error parsing XML (expected or normal):", err)
+		// 在禁用DTD加载和实体扩展的情况下，解析包含引用的DTD可能会报错，这是正常且安全的行为
+	} else {
+		defer doc.Free()
+		root, _ := doc.DocumentElement()
+		fmt.Println("Parsed content (should not contain /etc/passwd):", root.TextContent())
+		// 确认安全，不会输出/etc/passwd内容
+	}
+
+	// 示例：解析一个简单的、不含外部实体的XML
+	safeData := `<root><item>Safe Content</item></root>`
+	safeParser := parser.New()
+	docSafe, errSafe := safeParser.ParseReader(bytes.NewReader([]byte(safeData)))
+	if errSafe != nil {
+		fmt.Println("Error parsing safe XML:", errSafe)
+	} else {
+		defer docSafe.Free()
+		rootSafe, _ := docSafe.DocumentElement()
+		fmt.Println("Parsed safe content:", rootSafe.TextContent())
+	}
+}
+CODE
 )

@@ -1,0 +1,218 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "@action",
+    "cumulative_summary"
+  ],
+  "properties": {
+    "@action": {
+      "const": "object",
+      "description": "set '@action' can help the AI identify the output json object",
+      "type": "string"
+    },
+    "cumulative_summary": {
+      "description": "A rich, human-readable summary synthesizing all the structured information. It should incorporate the scene context, key elements, and their primary relationships to tell a coherent story.",
+      "type": "string"
+    },
+    "relationships": {
+      "description": "A graph of relationships connecting the elements, forming a scene graph.",
+      "items": {
+        "properties": {
+          "confidence": {
+            "description": "Confidence in the relationship's accuracy.",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "object_id": {
+            "description": "The ID of the target element (e.g., 'v_02').",
+            "type": "string"
+          },
+          "predicate": {
+            "description": "The verb or preposition connecting the subject and object, e.g., 'is_riding', 'is_wearing'.",
+            "type": "string"
+          },
+          "spatial_qualifier": {
+            "description": "Describes the spatial nature of the relationship, e.g., 'on_top_of', 'next_to'.",
+            "type": "string"
+          },
+          "subject_id": {
+            "description": "The ID of the source element (e.g., 'v_01').",
+            "type": "string"
+          },
+          "temporal_qualifier": {
+            "description": "Describes the time-based nature of the relationship.",
+            "enum": [
+              "starts",
+              "ends",
+              "continuous",
+              "momentary"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "subject_id",
+          "predicate",
+          "object_id"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "scene_context": {
+      "description": "Describes the overall context and high-level interpretation of the entire scene.",
+      "properties": {
+        "inferred_intent": {
+          "description": "The inferred purpose or intent of the image, e.g., 'advertisement', 'documentary_photo', 'personal_photo', 'education'.",
+          "type": "string"
+        },
+        "location_type": {
+          "description": "The general type of location, e.g., 'outdoors_urban', 'indoors_office'.",
+          "type": "string"
+        },
+        "overall_emotion": {
+          "description": "The perceived mood or emotion of the scene, e.g., 'calm', 'chaotic', 'energetic'.",
+          "type": "string"
+        },
+        "time_of_day": {
+          "description": "The estimated time of day.",
+          "enum": [
+            "daylight",
+            "dusk",
+            "night",
+            "dawn",
+            "unkown"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "location_type",
+        "time_of_day"
+      ],
+      "type": "object"
+    },
+    "text_elements": {
+      "description": "a list of all text blocks identified via OCR",
+      "items": {
+        "properties": {
+          "bounding_box": {
+            "description": "Coordinates [x_min, y_min, x_max, y_max] based on a 1000x1000 coordinate system where (0,0) is the top-left corner.",
+            "items": {
+              "type": "number"
+            },
+            "maxLength": 4,
+            "minLength": 4,
+            "type": "array"
+          },
+          "confidence": {
+            "description": "The model's confidence in the OCR accuracy.",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "id": {
+            "description": "Unique identifier for the text element, starting with 't_'.",
+            "example": "t_1, t_2, t_0",
+            "type": "string"
+          },
+          "role": {
+            "description": "The functional role of the text.",
+            "enum": [
+              "title",
+              "caption",
+              "logo",
+              "label",
+              "paragraph"
+            ],
+            "type": "string"
+          },
+          "text": {
+            "description": "The transcribed text content. For large body text sections, convert the OCR output to Markdown, preserving formulas and tables. For all other smaller text snippets and isolated fragments, output them as plain text. if many main paragraphs are present, merge them into the ONE paragraph element.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "role",
+          "bounding_box"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "visual_elements": {
+      "description": "A list of all distinct visual objects identified in the scene.",
+      "items": {
+        "properties": {
+          "attributes": {
+            "description": "A key-value map of stable, objective properties like color, material, or type.",
+            "type": "object"
+          },
+          "bounding_box": {
+            "description": "Coordinates [x_min, y_min, x_max, y_max] based on a 1000x1000 coordinate system where (0,0) is the top-left corner.",
+            "items": {
+              "type": "number"
+            },
+            "maxLength": 4,
+            "minLength": 4,
+            "type": "array"
+          },
+          "confidence": {
+            "description": "The model's confidence in the label's accuracy.",
+            "maximum": 1,
+            "minimum": 0,
+            "type": "number"
+          },
+          "description": {
+            "description": "A brief, human-readable sentence describing the element and its key visual features.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Unique identifier for the visual element, starting with 'v_' followed by a number.",
+            "example": "v_1, v_2",
+            "type": "string"
+          },
+          "label": {
+            "description": "A single, concise noun for the object, e.g., 'person', 'car', 'tree'.",
+            "type": "string"
+          },
+          "role": {
+            "description": "The element's importance in the scene.",
+            "enum": [
+              "main",
+              "supporting",
+              "background"
+            ],
+            "type": "string"
+          },
+          "segmentation_mask": {
+            "description": "Placeholder for Run-Length Encoded (RLE) or polygon data for the object's precise outline.",
+            "type": "string"
+          },
+          "state": {
+            "description": "A list of dynamic states or actions, e.g., 'running', 'sleeping', 'on_fire'.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "confidence",
+          "description",
+          "role",
+          "bounding_box"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "additionalProperties": true
+}

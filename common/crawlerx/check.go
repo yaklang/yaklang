@@ -3,6 +3,7 @@
 package crawlerx
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
@@ -139,12 +140,36 @@ func unLimitLevelRepeatCheckGenerator(extraParams ...string) func(HijackRequest)
 // scan range
 //
 
+var boardDomainCompilerStr = "^http(s?)://([^/]*?\\.)?%s/"
+
 func scanRangeFunctionGenerate(targetUrl string, scanRange scanRangeLevel) func(string) bool {
 	rangeFunction, ok := generalScanRangeMap[scanRange]
 	if !ok {
 		return nil
 	}
 	rangeUrl := rangeFunction(targetUrl)
+	if len(rangeUrl) > 0 && !strings.HasPrefix(rangeUrl[0], "http") {
+		regs := make([]*regexp.Regexp, 0, len(rangeUrl))
+		for _, url := range rangeUrl {
+			reg, err := regexp.Compile(fmt.Sprintf(boardDomainCompilerStr, url))
+			if err != nil {
+				log.Debugf("reg %s compiler error: %v", url, err)
+				continue
+			}
+			regs = append(regs, reg)
+		}
+		return func(checkUrl string) bool {
+			if StringSuffixList(checkUrl, extraUrlKeywords) {
+				return true
+			}
+			for _, reg := range regs {
+				if reg.MatchString(checkUrl) {
+					return true
+				}
+			}
+			return false
+		}
+	}
 	return func(checkUrl string) bool {
 		if StringSuffixList(checkUrl, extraUrlKeywords) {
 			return true
@@ -162,6 +187,16 @@ func generalMainDomainRange(targetUrl string) []string {
 	ranges = append(ranges, url.Scheme+"://"+url.Host)
 	if !strings.HasPrefix(url.Host, "www.") {
 		ranges = append(ranges, url.Scheme+"://www."+url.Host)
+	}
+	return ranges
+}
+
+func generalBoardDomainRange(targetUrl string) []string {
+	url, _ := u.Parse(targetUrl)
+	ranges := make([]string, 0)
+	items := strings.Split(url.Host, ".")
+	if len(items) > 1 {
+		ranges = append(ranges, fmt.Sprintf("%s.%s", items[len(items)-2], items[len(items)-1]))
 	}
 	return ranges
 }

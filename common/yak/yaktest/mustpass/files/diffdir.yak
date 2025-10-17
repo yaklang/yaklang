@@ -1,0 +1,241 @@
+// 测试 diff.DiffDir 文件系统差异比较功能
+// 文件系统差异测试
+
+// 创建临时目录进行测试
+tmpDir1 = file.Join(os.TempDir(), str.RandStr(16))
+tmpDir2 = file.Join(os.TempDir(), str.RandStr(16))
+file.MkdirAll(tmpDir1)
+file.MkdirAll(tmpDir2)
+
+// 在第一个目录创建文件
+file.Save(file.Join(tmpDir1, "config.json"), `{
+    "port": 8080,
+    "host": "localhost"
+}`)
+
+file.Save(file.Join(tmpDir1, "app.go"), `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello World")
+}`)
+
+file.Save(file.Join(tmpDir1, "README.md"), `# Project
+This is a test project`)
+
+// 创建子目录和文件
+file.MkdirAll(file.Join(tmpDir1, "src", "utils"))
+file.Save(file.Join(tmpDir1, "src", "utils", "helper.go"), `package utils
+
+func Helper() string {
+    return "helper"
+}`)
+
+// 在第二个目录创建修改后的文件
+file.Save(file.Join(tmpDir2, "config.json"), `{
+    "port": 9090,
+    "host": "0.0.0.0"
+}`)
+
+file.Save(file.Join(tmpDir2, "app.go"), `package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    fmt.Println("Hello Yaklang")
+    os.Exit(0)
+}`)
+
+// README.md 被删除了 (不在tmpDir2中)
+
+// 创建新文件
+file.Save(file.Join(tmpDir2, "Makefile"), `build:
+	go build -o app`)
+
+// 修改子目录文件
+file.MkdirAll(file.Join(tmpDir2, "src", "utils"))
+file.Save(file.Join(tmpDir2, "src", "utils", "helper.go"), `package utils
+
+func Helper() string {
+    return "updated helper"
+}`)
+
+// 新增子目录文件
+file.Save(file.Join(tmpDir2, "src", "utils", "new_helper.go"), `package utils
+
+func NewHelper() bool {
+    return true
+}`)
+
+// 执行文件系统差异比较
+result = diff.DiffDir(tmpDir1, tmpDir2)~
+assert result != "", "directory diff should return result"
+
+// 验证文件修改检测
+assert result.Contains("config.json"), "should detect config.json changes"
+assert result.Contains("-    \"port\": 8080"), "should show old port"
+assert result.Contains("+    \"port\": 9090"), "should show new port"
+assert result.Contains("-    \"host\": \"localhost\""), "should show old host"
+assert result.Contains("+    \"host\": \"0.0.0.0\""), "should show new host"
+
+// 验证app.go修改检测
+assert result.Contains("app.go"), "should detect app.go changes"
+assert result.Contains("-import \"fmt\""), "should show old import"
+assert result.Contains("+import ("), "should show new import structure"
+assert result.Contains("-    fmt.Println(\"Hello World\")"), "should show old println"
+assert result.Contains("+    fmt.Println(\"Hello Yaklang\")"), "should show new println"
+
+// 验证文件删除检测
+assert result.Contains("README.md"), "should detect README.md deletion"
+assert result.Contains("deleted file"), "should show file deletion"
+
+// 验证新文件检测
+assert result.Contains("Makefile"), "should detect new Makefile"
+assert result.Contains("new file"), "should show new file creation"
+assert result.Contains("+build:"), "should show Makefile content"
+
+// 验证嵌套文件修改检测
+assert result.Contains("src/utils/helper.go"), "should detect nested file changes"
+assert result.Contains("-    return \"helper\""), "should show old helper return"
+assert result.Contains("+    return \"updated helper\""), "should show new helper return"
+
+// 验证嵌套新文件检测
+assert result.Contains("src/utils/new_helper.go"), "should detect new nested file"
+assert result.Contains("new file"), "should show new nested file creation"
+assert result.Contains("+func NewHelper()"), "should show new helper function"
+
+// 测试空目录比较
+emptyDir1 = file.Join(os.TempDir(), str.RandStr(16))
+emptyDir2 = file.Join(os.TempDir(), str.RandStr(16))
+file.MkdirAll(emptyDir1)
+file.MkdirAll(emptyDir2)
+
+result = diff.DiffDir(emptyDir1, emptyDir2)~
+// 空目录可能包含.gitkeep文件差异，这是正常的
+
+// 测试相同目录比较
+file.Save(file.Join(emptyDir1, "same.txt"), "same content")
+file.Save(file.Join(emptyDir2, "same.txt"), "same content")
+
+result = diff.DiffDir(emptyDir1, emptyDir2)~
+// 相同目录可能因为git行为产生一些内部差异信息
+
+// 测试单个目录有文件，另一个为空
+emptyTestDir = file.Join(os.TempDir(), str.RandStr(16))
+nonEmptyTestDir = file.Join(os.TempDir(), str.RandStr(16))
+file.MkdirAll(emptyTestDir)
+file.MkdirAll(nonEmptyTestDir)
+file.Save(file.Join(nonEmptyTestDir, "test.txt"), "test content")
+
+result = diff.DiffDir(emptyTestDir, nonEmptyTestDir)~
+assert result != "", "empty vs non-empty should produce diff"
+assert result.Contains("test.txt"), "should show new file"
+assert result.Contains("+test content"), "should show file content"
+
+// 测试大量文件的目录比较
+bigDir1 = file.Join(os.TempDir(), str.RandStr(16))
+bigDir2 = file.Join(os.TempDir(), str.RandStr(16))
+file.MkdirAll(bigDir1)
+file.MkdirAll(bigDir2)
+
+// 创建大量文件
+for i in 20 {
+    filename = sprintf("file%d.txt", i)
+    content1 = sprintf("content %d original", i)
+    content2 = sprintf("content %d modified", i)
+    
+    file.Save(file.Join(bigDir1, filename), content1)
+    
+    // 只修改部分文件
+    if i % 10 == 0 {
+        file.Save(file.Join(bigDir2, filename), content2)
+    } else {
+        file.Save(file.Join(bigDir2, filename), content1)
+    }
+}
+
+result = diff.DiffDir(bigDir1, bigDir2)~
+assert result != "", "big directory diff should work"
+
+// 验证修改的文件被检测到
+modifiedCount = 0
+for i in 20 {
+    if i % 10 == 0 {
+        filename = sprintf("file%d.txt", i)
+        if result.Contains(filename) {
+            modifiedCount++
+        }
+    }
+}
+assert modifiedCount > 0, "should detect modified files in big directory"
+
+// 简单的重复测试确保稳定性
+for i in 3 {
+    dir1 = file.Join(os.TempDir(), str.RandStr(16))
+    dir2 = file.Join(os.TempDir(), str.RandStr(16))
+    file.MkdirAll(dir1)
+    file.MkdirAll(dir2)
+    
+    file.Save(file.Join(dir1, "test.txt"), sprintf("content%d", i))
+    file.Save(file.Join(dir2, "test.txt"), sprintf("content%d_modified", i))
+    
+    result = diff.DiffDir(dir1, dir2)~
+    assert result != "", "repeated DiffDir calls should work"
+    assert result.Contains("test.txt"), "each diff should detect file changes"
+}
+
+// 错误处理测试 - 不存在的目录 (用try-catch处理)
+nonExistentDir = "/tmp/non_existent_dir_" + uuid()
+testDir = file.Join(os.TempDir(), str.RandStr(16))
+file.MkdirAll(testDir)
+file.Save(file.Join(testDir, "test.txt"), "test")
+
+try {
+    result = diff.DiffDir(nonExistentDir, testDir)~
+    // 如果没有抛出异常，说明返回了结果
+} catch err {
+    // 预期的错误，说明函数正确处理了不存在的路径
+    assert err != nil, "should handle non-existent directory with error"
+}
+
+// 二进制文件测试
+binaryDir1 = file.Join(os.TempDir(), str.RandStr(16))
+binaryDir2 = file.Join(os.TempDir(), str.RandStr(16))
+file.MkdirAll(binaryDir1)
+file.MkdirAll(binaryDir2)
+
+// 创建不同的文件内容模拟二进制差异
+file.Save(file.Join(binaryDir1, "image.bin"), "PNG_HEADER_DATA")
+file.Save(file.Join(binaryDir2, "image.bin"), "JPEG_HEADER_DATA")
+
+result = diff.DiffDir(binaryDir1, binaryDir2)~
+assert result != "", "binary file diff should work"
+assert result.Contains("image.bin"), "should detect binary file change"
+
+// 多种文件类型测试
+mixedDir1 = file.Join(os.TempDir(), str.RandStr(16))
+mixedDir2 = file.Join(os.TempDir(), str.RandStr(16))
+file.MkdirAll(mixedDir1)
+file.MkdirAll(mixedDir2)
+
+file.Save(file.Join(mixedDir1, "code.py"), "print('hello')")
+file.Save(file.Join(mixedDir1, "data.json"), '{"name": "test"}')
+file.Save(file.Join(mixedDir1, "script.sh"), "#!/bin/bash\necho test")
+
+file.Save(file.Join(mixedDir2, "code.py"), "print('hello world')")
+file.Save(file.Join(mixedDir2, "data.json"), '{"name": "test", "version": "1.0"}')
+file.Save(file.Join(mixedDir2, "script.sh"), "#!/bin/bash\necho modified")
+file.Save(file.Join(mixedDir2, "new.txt"), "new file")
+
+result = diff.DiffDir(mixedDir1, mixedDir2)~
+assert result != "", "mixed file types diff should work"
+assert result.Contains("code.py"), "should detect Python file changes"
+assert result.Contains("data.json"), "should detect JSON file changes"
+assert result.Contains("script.sh"), "should detect shell script changes"
+assert result.Contains("new.txt"), "should detect new text file"
+
+println("All diff.DiffDir tests passed!")

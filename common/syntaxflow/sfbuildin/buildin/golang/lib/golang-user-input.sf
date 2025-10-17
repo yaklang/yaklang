@@ -1,0 +1,176 @@
+desc(
+	title: "Audit Golang User Input"
+	type: audit
+	level: info
+	lib: 'golang-user-input'
+	desc: <<<DESC
+### 规则描述
+
+1. **规则目的**
+   本规则旨在帮助开发者识别和审查Golang代码中可能存在的未经验证或过滤的用户输入点。用户输入是许多安全风险的起点，包括但不限于命令注入、SQL注入、跨站脚本攻击（XSS）等。通过分析代码中的关键函数调用和用户数据流动路径，该规则能够有效定位潜在的安全漏洞。
+
+2. **触发场景**
+   在Golang应用程序中，当用户输入直接参与关键操作（如数据库查询、外部命令执行或HTTP响应生成）时，如果没有进行严格的验证或参数化处理，可能会导致安全问题。例如：
+   ```go
+   package main
+   import (
+       "fmt"
+       "net/http"
+       "os/exec"
+   )
+
+   func handler(w http.ResponseWriter, r *http.Request) {
+       userInput := r.URL.Query().Get("cmd")
+       out, err := exec.Command(userInput).Output() // 直接使用用户输入执行系统命令
+       if err != nil {
+           fmt.Fprintf(w, "Error: %s", err)
+           return
+       }
+       fmt.Fprintf(w, "Command output: %s", out)
+   }
+
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
+   攻击者可以传入恶意构造的`cmd`参数（如`rm -rf /`），从而对系统造成严重危害。
+
+3. **潜在影响**
+   - 数据库敏感信息泄露、篡改或删除。
+   - 执行任意系统命令，可能导致主机被完全控制。
+   - 恶意脚本注入，窃取用户会话或隐私数据。
+
+4. **规则详细**
+   - 该规则属于`golang-user-input`库规则（`lib`类型），用于配合其他规则共同检测用户输入相关的安全问题。
+   - 它覆盖了常见的用户输入来源，如HTTP请求参数、Header字段、表单数据等，并跟踪这些输入的后续使用情况。
+   - 如果发现未经过滤或验证的用户输入，规则将生成告警提示开发者进一步处理。
+DESC
+	rule_id: "ed507ba1-538b-7c40-98b3-f82e7ba8af9c"
+	title_zh: "审计Golang用户输入"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 对用户输入进行校验
+严格检查用户输入的类型、格式和范围，确保其符合预期。
+```go
+package main
+import (
+    "fmt"
+    "net/http"
+    "regexp"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("cmd")
+    matched, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, userInput) // 校验仅允许字母和数字
+    if !matched {
+        fmt.Fprintf(w, "Invalid input")
+        return
+    }
+    fmt.Fprintf(w, "Valid input: %s", userInput)
+}
+
+func main() {
+    http.HandleFunc("/", handler)
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+#### 2. 使用参数化查询避免SQL注入
+对于数据库操作，优先使用参数化查询或ORM框架。
+```go
+// 示例：使用参数化查询
+import (
+    "database/sql"
+    _ "github.com/go-sql-driver/mysql"
+)
+
+func queryUser(db *sql.DB, id string) {
+    var name string
+    err := db.QueryRow("SELECT name FROM users WHERE id = ?", id).Scan(&name)
+    if err != nil {
+        panic(err)
+    }
+    fmt.Println(name)
+}
+```
+
+#### 3. 避免直接执行外部命令
+尽量减少对外部命令的直接调用，如果必须调用，请使用白名单机制。
+```go
+// 示例：使用白名单限制命令
+allowedCommands := map[string]bool{
+    "ls": true,
+    "pwd": true,
+}
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("cmd")
+    if !allowedCommands[userInput] {
+        fmt.Fprintf(w, "Command not allowed")
+        return
+    }
+    out, err := exec.Command(userInput).Output()
+    if err != nil {
+        fmt.Fprintf(w, "Error: %s", err)
+        return
+    }
+    fmt.Fprintf(w, "Command output: %s", out)
+}
+```
+
+#### 4. 使用安全编码实践
+利用Golang内置的或第三方库提供的安全功能，对用户输入进行转义和编码。
+```go
+// 示例：HTML转义防止XSS
+import (
+    "html/template"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+    userInput := r.URL.Query().Get("input")
+    safeInput := template.HTMLEscapeString(userInput)
+    fmt.Fprintf(w, "Your input: %s", safeInput)
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+)
+
+<include('golang-http-sink')> as $output;
+<include('golang-gin-context')> as $output;
+
+.GetString(*<slice(index=0)> #-> as $beego);
+.Ctx.Request.Header.Get #-> as $beego 
+$beego?{<fullTypeName>?{have: 'github.com/beego/beego/v2/server/web'}} as $output;
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang User Input",
+	title_zh: "审计Golang用户输入",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://user_input.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "os/exec"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+}
+PARAM
+)

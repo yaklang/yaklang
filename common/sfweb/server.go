@@ -21,17 +21,20 @@ import (
 )
 
 type ServerConfig struct {
-	Host          string
-	ChatGLMAPIKey string
-	Port          int
-	Debug         bool
-	Https         bool
-	ServerCrtPath string
-	ServerKeyPath string
+	Host               string
+	ChatGLMAPIKey      string
+	Port               int
+	Debug              bool
+	Https              bool
+	ServerCrtPath      string
+	ServerKeyPath      string
+	WebSocketRateLimit time.Duration
 }
 
 func NewServerConfig() *ServerConfig {
-	return &ServerConfig{}
+	return &ServerConfig{
+		WebSocketRateLimit: 10 * time.Millisecond,
+	}
 }
 
 type ServerOpt func(*ServerConfig)

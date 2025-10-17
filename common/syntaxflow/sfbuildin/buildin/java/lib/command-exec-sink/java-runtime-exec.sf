@@ -27,9 +27,9 @@ DESC
 ```java
 String userInput = request.getParameter("cmd");
 if (userInput.matches("^[a-zA-Z0-9]+$")) {
-    Runtime.getRuntime().exec(userInput);
+Runtime.getRuntime().exec(userInput);
 } else {
-    throw new IllegalArgumentException("非法输入");
+throw new IllegalArgumentException("非法输入");
 }
 ```
 #### 2. 使用白名单
@@ -38,9 +38,9 @@ if (userInput.matches("^[a-zA-Z0-9]+$")) {
 List<String> allowedCommands = Arrays.asList("ls", "pwd", "whoami");
 String userInput = request.getParameter("cmd");
 if (allowedCommands.contains(userInput)) {
-    Runtime.getRuntime().exec(userInput);
+Runtime.getRuntime().exec(userInput);
 } else {
-    throw new IllegalArgumentException("不允许的命令");
+throw new IllegalArgumentException("不允许的命令");
 }
 ```
 #### 3. 参数化命令
@@ -60,7 +60,58 @@ REFERENCE
 Runtime.getRuntime().exec(,* as $output);
 alert $output for {
 	level: "high",
-	title: "Detect Java Command Execution Vulnerability",
-	title_zh: "检测Java命令执行漏洞",
+	title: "Java Command Execution Vulnerability Was Detected",
+	title_zh: "检测到Java命令执行漏洞",
+	name: "output",
+	message: "检测到Java命令执行漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 输入验证
+对用户输入进行严格的验证和过滤，确保输入仅包含预期的字符和格式。
+```java
+String userInput = request.getParameter("cmd");
+if (userInput.matches("^[a-zA-Z0-9]+$")) {
+Runtime.getRuntime().exec(userInput);
+} else {
+throw new IllegalArgumentException("非法输入");
+}
+```
+#### 2. 使用白名单
+限制用户输入只能从一组预定义的命令中选择。
+```java
+List<String> allowedCommands = Arrays.asList("ls", "pwd", "whoami");
+String userInput = request.getParameter("cmd");
+if (allowedCommands.contains(userInput)) {
+Runtime.getRuntime().exec(userInput);
+} else {
+throw new IllegalArgumentException("不允许的命令");
+}
+```
+#### 3. 参数化命令
+如果必须使用动态命令，考虑使用参数化命令以减少风险。
+```java
+String command = "ls";
+String[] args = {"-l", "-a"};
+Process process = Runtime.getRuntime().exec(new String[]{command, args});
+```
+通过以上措施，可显著降低命令执行漏洞的风险。
+SOLUTION
+	risk: "命令执行",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+命令执行漏洞是指攻击者可以通过操纵应用程序来执行任意系统命令，这种风险在使用`Runtime.getRuntime().exec()`方法时尤为显著。如果用户输入未经过严格验证或过滤，攻击者可以利用该方法直接执行恶意命令，从而对目标系统造成严重威胁。
+2. **触发场景**
+// 存在漏洞的代码示例
+```java
+String userInput = request.getParameter("cmd");
+Runtime.getRuntime().exec(userInput); // 直接执行用户输入
+```
+攻击者可以通过构造特定的输入执行任意命令，例如获取敏感文件、修改系统配置或运行恶意软件。
+3. **潜在影响**
+- 攻击者可能完全控制受感染的系统，包括但不限于读取、修改或删除数据。
+- 可能导致敏感信息泄露，如数据库凭证或其他机密文件。
+- 系统稳定性受到威胁，恶意命令可能导致服务中断或资源耗尽。
+DESC
 }
 

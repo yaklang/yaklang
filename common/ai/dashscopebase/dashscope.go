@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
 	"io"
 	"net/http/httputil"
 	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/go-funk"
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 
@@ -55,10 +56,6 @@ func (d *DashScopeGateway) Chat(s string, function ...any) (string, error) {
 	}
 	io.Copy(&buf, reader)
 	return buf.String(), nil
-}
-
-func (d *DashScopeGateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, utils.Error("not implemented: dashscope is not supported openai style chat ex")
 }
 
 func (d *DashScopeGateway) ChatStream(s string) (io.Reader, error) {
@@ -313,7 +310,19 @@ func (d *DashScopeGateway) StructuredStream(s string, function ...any) (chan *ai
 	return objChannel, nil
 }
 
+func (d *DashScopeGateway) newLoadOption(opt ...aispec.AIConfigOption) {
+	config := aispec.NewDefaultAIConfig(opt...)
+	d.config = config
+	d.dashscopeAPIKey = config.APIKey
+
+	d.endpointUrl = aispec.GetBaseURLFromConfigEx(d.config, "https://dashscope.aliyuncs.com", "/api/v1/apps/"+strings.TrimSpace(d.dashscopeAppId)+"/completion", false)
+}
+
 func (d *DashScopeGateway) LoadOption(opt ...aispec.AIConfigOption) {
+	if aispec.EnableNewLoadOption {
+		d.newLoadOption(opt...)
+		return
+	}
 	config := aispec.NewDefaultAIConfig(opt...)
 	urlStr := `https://dashscope.aliyuncs.com/api/v1/apps/` + strings.TrimSpace(d.dashscopeAppId) + `/completion`
 	if config.BaseURL != "" {
@@ -342,6 +351,12 @@ func (d *DashScopeGateway) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	}
 	if d.config.Timeout > 0 {
 		opts = append(opts, poc.WithConnectTimeout(d.config.Timeout))
+	}
+	if d.config.Host != "" {
+		opts = append(opts, poc.WithHost(d.config.Host))
+	}
+	if d.config.Port > 0 {
+		opts = append(opts, poc.WithPort(d.config.Port))
 	}
 	return opts, nil
 }

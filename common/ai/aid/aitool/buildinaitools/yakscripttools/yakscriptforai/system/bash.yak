@@ -1,0 +1,96 @@
+__DESC__ = "一个跨平台的Shell命令执行工具，支持bash、cmd、powershell等多种shell类型，允许用户在受控环境中执行任意shell命令，支持超时控制和输出捕获，适用于系统管理、自动化脚本执行和运维操作。"
+__VERBOSE_NAME__ = "跨平台Shell命令执行工具"
+__KEYWORDS__ = "shell command,bash,cmd,powershell,命令行工具,系统管理,自动化脚本,运维工具,shell script,command execution,系统操作,终端命令,system administration,automation tools,操作系统,跨平台命令"
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数：超时时间、shell类型和要执行的命令
+timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the shell command, default 10, timeout cannot be zero and below"), cli.setDefault(10))
+shellType := cli.String("shell", cli.setRequired(false), cli.setHelp("shell type: bash, cmd, powershell. Auto-detect if not specified (linux/mac: bash, windows: cmd)"), cli.setDefault(""))
+command := cli.String("command", cli.setRequired(true), cli.setHelp("the shell command you want to execute"))
+
+cli.check()
+
+// 获取操作系统类型
+osType = os.OS
+
+// 根据系统类型和用户设置确定shell类型
+if shellType == "" {
+    switch osType {
+    case "windows":
+        shellType = "cmd"
+        yakit.Info("Auto-detected Windows, using cmd shell")
+    case "linux", "darwin":
+        shellType = "bash"
+        yakit.Info("Auto-detected %v, using bash shell", osType)
+    default:
+        shellType = "bash"
+        yakit.Info("Unknown OS %v, defaulting to bash shell", osType)
+    }
+} else {
+    yakit.Info("Using specified shell: %v", shellType)
+}
+
+yakit.Info("Executing %v command: %#v", shellType, command)
+
+// 验证超时参数，确保不为零或负数
+if timeoutSeconds <= 0 {
+    timeoutSeconds = 10
+}
+
+// 创建带超时的上下文，保护系统资源
+ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSeconds) + "s")~)
+
+// 根据shell类型构建相应的命令执行器
+var cmd
+var err
+switch shellType {
+case "bash":
+    cmd, err = exec.CommandContext(ctx, "bash -c %#v" % command)
+case "cmd":
+    cmd, err = exec.CommandContext(ctx, "cmd /c %v" % command)
+case "powershell":
+    cmd, err = exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command %s" % command)
+default:
+    yakit.Error("Unsupported shell type: %v. Supported types: bash, cmd, powershell", shellType)
+    return
+}
+
+if err != nil {
+    yakit.Error("Failed to create %v command: %v", shellType, err)
+    return
+}
+
+// 创建输出缓冲区以捕获命令结果
+stdoutbuf = bufio.NewBuffer()
+stderrbuf = bufio.NewBuffer()
+cmd.Stdout = stdoutbuf
+cmd.Stderr = stderrbuf
+
+// 执行命令并处理结果
+err = cmd.Run()
+if err != nil {
+    yakit.Error("%v command execution failed: %v", shellType, err)
+}
+
+toUtf8 = (s)=>{
+    res,err = codec.GBKSafe(s)
+    if err {
+        return s
+    }
+    return res
+}
+
+// 输出执行结果
+count := 0
+if stdoutbuf.Len() > 0 {
+    count++
+    yakit.Info("Stdout:\n%v", toUtf8(stdoutbuf.String()))
+}
+if stderrbuf.Len() > 0 {
+    count++
+    yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
+}
+if count <= 0 {
+    yakit.Info("No output found, %v command execution failed or output is empty", shellType)
+}

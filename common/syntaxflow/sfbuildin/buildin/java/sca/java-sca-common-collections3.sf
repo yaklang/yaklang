@@ -4,61 +4,47 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   此规则用于检查 Java 项目中是否使用了存在安全漏洞的 Apache Commons Collections 库版本。Apache Commons Collections 是一个流行的 Java 库，提供了许多额外的集合数据类型，用于扩展 Java 标准库中的集合框架。版本 3.2.1 及更早版本中存在一个不安全的反序列化漏洞（CVE-2015-6420）。当应用程序接收并反序列化包含恶意构造的 `InvokerTransformer` 对象的输入时，如果应用程序未对反序列化过程进行适当的安全限制，攻击者可以通过精心构造的序列化数据，在服务器端执行任意代码。这是由于 `InvokerTransformer` 可以通过反射机制调用任意对象的方法，包括危险的方法如 `Runtime.getRuntime().exec()`。
-
+此规则用于检查 Java 项目中是否使用了存在安全漏洞的 Apache Commons Collections 库版本。Apache Commons Collections 是一个流行的 Java 库，提供了许多额外的集合数据类型，用于扩展 Java 标准库中的集合框架。版本 3.2.1 及更早版本中存在一个不安全的反序列化漏洞（CVE-2015-6420）。当应用程序接收并反序列化包含恶意构造的 `InvokerTransformer` 对象的输入时，如果应用程序未对反序列化过程进行适当的安全限制，攻击者可以通过精心构造的序列化数据，在服务器端执行任意代码。这是由于 `InvokerTransformer` 可以通过反射机制调用任意对象的方法，包括危险的方法如 `Runtime.getRuntime().exec()`。
 2. **触发场景**
-   当应用程序从不可信的源（例如网络请求、文件读取、缓存、消息队列等）接收到经过序列化处理的数据，并使用 Java 的标准反序列化机制（如 `ObjectInputStream.readObject()` 方法）将其反序列化时，如果应用程序依赖了受影响版本的 Apache Commons Collections 库，并且序列化数据由攻击者控制，攻击者可以构造恶意序列化数据，触发反序列化漏洞。
-   **示例场景:**
-   - Web 应用程序处理用户上传的序列化对象。
-   - 分布式系统通过 RMI、JMS 或其他协议传输序列化对象。
-   - 应用程序从文件或数据库读取序列化配置或状态信息。
-   
-   ```java
-   // 存在漏洞的代码示例 (假设攻击者控制了InputStream is)
-   ObjectInputStream ois = new ObjectInputStream(is);
-   Object obj = ois.readObject(); // 如果obj是恶意构造的Commons Collections对象，可能触发代码执行
-   ```
-
+当应用程序从不可信的源（例如网络请求、文件读取、缓存、消息队列等）接收到经过序列化处理的数据，并使用 Java 的标准反序列化机制（如 `ObjectInputStream.readObject()` 方法）将其反序列化时，如果应用程序依赖了受影响版本的 Apache Commons Collections 库，并且序列化数据由攻击者控制，攻击者可以构造恶意序列化数据，触发反序列化漏洞。
+**示例场景:**
+- Web 应用程序处理用户上传的序列化对象。
+- 分布式系统通过 RMI、JMS 或其他协议传输序列化对象。
+- 应用程序从文件或数据库读取序列化配置或状态信息。
+```java
+// 存在漏洞的代码示例 (假设攻击者控制了InputStream is)
+ObjectInputStream ois = new ObjectInputStream(is);
+Object obj = ois.readObject(); // 如果obj是恶意构造的Commons Collections对象，可能触发代码执行
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**：攻击者可以在服务器上执行任意系统命令，完全控制受影响的系统。
-   - **数据泄露或破坏**：执行任意代码后，攻击者可以访问、修改或删除服务器上的敏感数据。
-   - **系统权限提升**：利用 RCE 漏洞进一步获取更高的系统权限。
-   - **作为跳板进行内网渗透**：利用受控服务器攻击内网中的其他系统。
-
+- **远程代码执行 (RCE)**：攻击者可以在服务器上执行任意系统命令，完全控制受影响的系统。
+- **数据泄露或破坏**：执行任意代码后，攻击者可以访问、修改或删除服务器上的敏感数据。
+- **系统权限提升**：利用 RCE 漏洞进一步获取更高的系统权限。
+- **作为跳板进行内网渗透**：利用受控服务器攻击内网中的其他系统。
 为了避免潜在的安全风险，建议升级到不受此漏洞影响的最新版本。
 DESC
 	rule_id: "22d585c5-0182-4b2e-b137-05e30b26f2b0"
 	title_zh: "SCA: 检测Java commons-collections 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Apache Commons Collections 库版本
 这是解决此漏洞最直接和推荐的方法。请将 Apache Commons Collections 库升级到不再受此漏洞影响的版本。对于 3.x 系列，推荐升级到 3.2.2 或更高版本；对于 4.x 系列，此漏洞在设计上已得到解决，推荐升级到 4.0 或更高版本。
-
 #### 2. 避免对来自不可信源的数据进行反序列化
 除非绝对必要且能确保数据的来源和完整性，否则应尽量避免直接对来自外部或不可信源的序列化数据进行反序列化。
-
 #### 3. 使用安全的反序列化机制或白名单/黑名单机制
 如果必须进行反序列化，可以考虑使用更安全的反序列化库，或者在反序列化过程中实现严格的类白名单或黑名单策略，只允许反序列化已知安全的类。例如，可以使用 Apache Commons IO 的 `ValidatingObjectInputStream` 来限制允许反序列化的类。
-
 ```java
 // 使用 Apache Commons IO 的 ValidatingObjectInputStream 实现白名单
 import org.apache.commons.io.input.ValidatingObjectInputStream;
-
 // ...
-
 ObjectInputStream ois = new ValidatingObjectInputStream(is);
 // 添加允许反序列化的类名或包名前缀
 ((ValidatingObjectInputStream) ois).accept(java.util.ArrayList.class.getName());
 ((ValidatingObjectInputStream) ois).accept("com.example.myapp.*");
-
 Object obj = ois.readObject();
 // ...
- 
 ```
-
 #### 4. 最小化应用程序运行权限
 即使发生漏洞利用，限制应用程序运行的系统权限可以减轻潜在的损害。
 SOLUTION
@@ -76,4 +62,50 @@ alert $vuln_commons_collections for {
 	cve: "CVE-2015-6420",
 	message: "SCA: commons-collections version 3.2.1 has an unsafe deserialization vulnerability",
 	title: "SCA: Check Java commons-collections Vulnerability",
+	name: "vuln_commons_collections",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 升级 Apache Commons Collections 库版本
+这是解决此漏洞最直接和推荐的方法。请将 Apache Commons Collections 库升级到不再受此漏洞影响的版本。对于 3.x 系列，推荐升级到 3.2.2 或更高版本；对于 4.x 系列，此漏洞在设计上已得到解决，推荐升级到 4.0 或更高版本。
+#### 2. 避免对来自不可信源的数据进行反序列化
+除非绝对必要且能确保数据的来源和完整性，否则应尽量避免直接对来自外部或不可信源的序列化数据进行反序列化。
+#### 3. 使用安全的反序列化机制或白名单/黑名单机制
+如果必须进行反序列化，可以考虑使用更安全的反序列化库，或者在反序列化过程中实现严格的类白名单或黑名单策略，只允许反序列化已知安全的类。例如，可以使用 Apache Commons IO 的 `ValidatingObjectInputStream` 来限制允许反序列化的类。
+```java
+// 使用 Apache Commons IO 的 ValidatingObjectInputStream 实现白名单
+import org.apache.commons.io.input.ValidatingObjectInputStream;
+// ...
+ObjectInputStream ois = new ValidatingObjectInputStream(is);
+// 添加允许反序列化的类名或包名前缀
+((ValidatingObjectInputStream) ois).accept(java.util.ArrayList.class.getName());
+((ValidatingObjectInputStream) ois).accept("com.example.myapp.*");
+Object obj = ois.readObject();
+// ...
+```
+#### 4. 最小化应用程序运行权限
+即使发生漏洞利用，限制应用程序运行的系统权限可以减轻潜在的损害。
+SOLUTION
+	risk: "SCA",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+此规则用于检查 Java 项目中是否使用了存在安全漏洞的 Apache Commons Collections 库版本。Apache Commons Collections 是一个流行的 Java 库，提供了许多额外的集合数据类型，用于扩展 Java 标准库中的集合框架。版本 3.2.1 及更早版本中存在一个不安全的反序列化漏洞（CVE-2015-6420）。当应用程序接收并反序列化包含恶意构造的 `InvokerTransformer` 对象的输入时，如果应用程序未对反序列化过程进行适当的安全限制，攻击者可以通过精心构造的序列化数据，在服务器端执行任意代码。这是由于 `InvokerTransformer` 可以通过反射机制调用任意对象的方法，包括危险的方法如 `Runtime.getRuntime().exec()`。
+2. **触发场景**
+当应用程序从不可信的源（例如网络请求、文件读取、缓存、消息队列等）接收到经过序列化处理的数据，并使用 Java 的标准反序列化机制（如 `ObjectInputStream.readObject()` 方法）将其反序列化时，如果应用程序依赖了受影响版本的 Apache Commons Collections 库，并且序列化数据由攻击者控制，攻击者可以构造恶意序列化数据，触发反序列化漏洞。
+**示例场景:**
+- Web 应用程序处理用户上传的序列化对象。
+- 分布式系统通过 RMI、JMS 或其他协议传输序列化对象。
+- 应用程序从文件或数据库读取序列化配置或状态信息。
+```java
+// 存在漏洞的代码示例 (假设攻击者控制了InputStream is)
+ObjectInputStream ois = new ObjectInputStream(is);
+Object obj = ois.readObject(); // 如果obj是恶意构造的Commons Collections对象，可能触发代码执行
+```
+3. **潜在影响**
+- **远程代码执行 (RCE)**：攻击者可以在服务器上执行任意系统命令，完全控制受影响的系统。
+- **数据泄露或破坏**：执行任意代码后，攻击者可以访问、修改或删除服务器上的敏感数据。
+- **系统权限提升**：利用 RCE 漏洞进一步获取更高的系统权限。
+- **作为跳板进行内网渗透**：利用受控服务器攻击内网中的其他系统。
+为了避免潜在的安全风险，建议升级到不受此漏洞影响的最新版本。
+DESC
 }

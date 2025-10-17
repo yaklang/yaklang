@@ -1,13 +1,13 @@
 package yaklib
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"io/ioutil"
-	"net/http"
-	"net/url"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
 type UploadHotPatchTemplateToOnlineRequest struct {
@@ -32,10 +32,6 @@ type ResponseErr struct {
 }
 
 func (s *OnlineClient) UploadHotPatchTemplateToOnline(ctx context.Context, token string, data []byte) error {
-	urlIns, err := url.Parse(s.genUrl("/api/hot/patch/template"))
-	if err != nil {
-		return utils.Errorf("parse url-instance failed: %s", err)
-	}
 	raw, err := json.Marshal(UploadHotPatchTemplateToOnlineRequest{
 		Content: data,
 	})
@@ -43,20 +39,19 @@ func (s *OnlineClient) UploadHotPatchTemplateToOnline(ctx context.Context, token
 		return utils.Errorf("marshal params failed: %s", err)
 	}
 
-	req, err := http.NewRequest("POST", urlIns.String(), bytes.NewBuffer(raw))
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/hot/patch/template"),
+		poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, true),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
+	)
 	if err != nil {
-		return utils.Errorf(err.Error())
+		return utils.Wrapf(err, "UploadHotPatchTemplateToOnline failed: http error")
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", token)
-	rsp, err := s.client.Do(req)
-	if err != nil {
-		return utils.Errorf(" HTTP Post %v failed: %v ", urlIns.String(), err)
-	}
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 
-	defer rsp.Body.Close()
-
-	rawResponse, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
 		return utils.Errorf("read body failed: %s", err)
 	}
@@ -72,12 +67,8 @@ func (s *OnlineClient) UploadHotPatchTemplateToOnline(ctx context.Context, token
 }
 
 func (s *OnlineClient) DownloadHotPatchTemplate(
-	name, templateType string,
+	token, name, templateType string,
 ) (*HotPatchTemplate, error) {
-	urlIns, err := url.Parse(s.genUrl("/api/hot/patch/template/download"))
-	if err != nil {
-		return nil, utils.Errorf("parse url-instance failed: %s", err)
-	}
 
 	raw, err := json.Marshal(DownloadHotPatchTemplateRequest{
 		Name:         name,
@@ -86,14 +77,19 @@ func (s *OnlineClient) DownloadHotPatchTemplate(
 	if err != nil {
 		return nil, utils.Errorf("marshal params failed: %s", err)
 	}
-	rsp, err := s.client.Post(urlIns.String(), "application/json", bytes.NewBuffer(raw))
+
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/hot/patch/template/download"),
+		poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, true),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
+	)
 	if err != nil {
-		return nil, utils.Errorf("HTTP Post %v failed: %v ", urlIns.String(), err)
+		return nil, utils.Wrapf(err, "DownloadHotPatchTemplate failed: http error")
 	}
-
-	defer rsp.Body.Close()
-
-	rawResponse, err := ioutil.ReadAll(rsp.Body)
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 	if err != nil {
 		return nil, utils.Errorf("read body failed: %s", err)
 	}

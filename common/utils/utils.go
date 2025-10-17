@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
+	"github.com/jinzhu/gorm"
+	_ "github.com/mattn/go-sqlite3"
 
 	uuid "github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
@@ -99,6 +101,38 @@ func SnakeString(s string) string {
 func TimeoutContext(d time.Duration) context.Context {
 	ctx, _ := context.WithTimeout(context.Background(), d)
 	return ctx
+}
+
+func GetContextKeyString(ctx context.Context, key string) string {
+	if ctx == nil {
+		return ""
+	}
+	if v := ctx.Value(key); v != nil {
+		return InterfaceToString(v)
+	}
+	return ""
+}
+
+func GetContextKeyBool(ctx context.Context, key string) bool {
+	if ctx == nil {
+		return false
+	}
+	if v := ctx.Value(key); v != nil {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func SetContextKey(ctx context.Context, key string, value any) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if value == nil {
+		return ctx
+	}
+	return context.WithValue(ctx, key, value)
 }
 
 func FloatSecondDuration(f float64) time.Duration {
@@ -505,4 +539,13 @@ func IndexAllSubstrings(s string, patterns ...string) (result [][2]int) {
 		}
 	}
 	return
+}
+
+func CreateTempTestDatabaseInMemory() (*gorm.DB, error) {
+	uuid := uuid.New().String()
+	db, err := gorm.Open("sqlite3", "file::memory-"+uuid+"?mode=memory&cache=shared")
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
 }

@@ -24,7 +24,7 @@ DESCRIPTION
 ### 修复建议
 
 #### 1. 使用 try-with-resources 自动关闭 ResultSet (Java 7+)
-利用 Java 7 引入的 try-with-resources 语法，确保 `ResultSet`、`Statement` 和 `Connection` 在 try 块结束时自动关闭。
+利用 Java 7 引入的 try-with-resources 语法，可以确保 `ResultSet`、`Statement` 和 `Connection` 在 try 块结束时自动关闭。
 ```java
 try (
     Connection conn = dataSource.getConnection();
@@ -38,7 +38,7 @@ try (
 ```
 
 #### 2. 使用 try-finally 手动关闭 ResultSet
-在早于 Java 7 的版本或特定场景下，使用 try-finally 块手动关闭资源。务必在 finally 块中以资源获取的**逆序**关闭 `ResultSet`、`Statement` 和 `Connection`，并在关闭操作中捕获并处理 `SQLException`。
+在早于 Java 7 的版本或特定场景下，可以使用 try-finally 块手动关闭资源。务必在 finally 块中以资源获取的**逆序**关闭 `ResultSet`、`Statement` 和 `Connection`，并在关闭操作中捕获并处理 `SQLException`。
 ```java
 Connection conn = null;
 Statement stmt = null;
@@ -47,12 +47,10 @@ try {
     conn = dataSource.getConnection();
     stmt = conn.createStatement();
     rs = stmt.executeQuery("SELECT * FROM users");
-
     while (rs.next()) {
         // 处理结果...
     }
 } finally {
-    // 按照资源获取的逆序关闭
     if (rs != null) try { rs.close(); } catch (SQLException e) { /* 记录日志 */ }
     if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ }
     if (conn != null) try { conn.close(); } catch (SQLException e) { /* 记录日志 */ }
@@ -66,12 +64,9 @@ try (
     Connection conn = dataSource.getConnection();
     Statement stmt = conn.createStatement()
 ) {
-    // 第一个查询
     try (ResultSet rs1 = stmt.executeQuery("SELECT * FROM table1")) {
         // 处理 rs1...
     } // rs1 自动关闭
-
-    // 第二个查询 (前一个 ResultSet 已关闭)
     try (ResultSet rs2 = stmt.executeQuery("SELECT * FROM table2")) {
         // 处理 rs2...
     } // rs2 自动关闭
@@ -110,6 +105,107 @@ alert $weak for {
 	message: "检测到java.sql.ResultSet未释放资源",
 	title: "Unreleased ResultSet Resource",
 	title_zh: "未释放的ResultSet资源",
+	risk: "资源泄漏",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   应用程序通过 `Statement.executeQuery()` 方法执行 SQL 查询，获取 ResultSet 对象后未正确关闭这些资源。ResultSet 对象持有数据库资源，如游标和结果集数据。即使关闭了父级 Statement 对象，最佳实践仍然要求显式关闭每个 ResultSet 对象，以确保及时释放资源。
+2. **触发场景**
+   ```java
+   Connection conn = null;
+   Statement stmt = null;
+   try {
+       conn = dataSource.getConnection();
+       stmt = conn.createStatement();
+       ResultSet rs = stmt.executeQuery("SELECT id, name FROM employees");
+       while (rs.next()) {
+           int id = rs.getInt("id");
+           String name = rs.getString("name");
+           System.out.println(id + ": " + name);
+       }
+       // 错误: 未关闭 ResultSet
+       // rs.close(); 应该在这里调用
+   } finally {
+       if (stmt != null) try { stmt.close(); } catch (SQLException e) {}
+       if (conn != null) try { conn.close(); } catch (SQLException e) {}
+   }
+   ```
+3. **潜在影响**
+   - 未关闭的 ResultSet 对象会占用数据库和应用程序内存资源。
+   - 可能导致数据库游标泄漏，许多数据库系统对每个连接的活动游标数有限制。
+   - 长时间运行的查询结果集如未关闭，会长时间占用服务器端资源。
+   - 在高并发环境中，游标泄漏可能迅速耗尽数据库资源。
+   - 可能导致应用程序性能下降和稳定性问题。
+DESC
+	name: "weak",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用 try-with-resources 自动关闭 ResultSet (Java 7+)
+利用 Java 7 引入的 try-with-resources 语法，确保 `ResultSet`、`Statement` 和 `Connection` 在 try 块结束时自动关闭。
+```java
+try (
+    Connection conn = dataSource.getConnection();
+    Statement stmt = conn.createStatement();
+    ResultSet rs = stmt.executeQuery("SELECT * FROM users")
+) {
+    while (rs.next()) {
+        // 处理结果...
+    }
+} // ResultSet、Statement 和 Connection 会自动关闭
+```
+#### 2. 使用 try-finally 手动关闭 ResultSet
+在早于 Java 7 的版本或特定场景下，使用 try-finally 块手动关闭资源。务必在 finally 块中以资源获取的**逆序**关闭 `ResultSet`、`Statement` 和 `Connection`，并在关闭操作中捕获并处理 `SQLException`。
+```java
+Connection conn = null;
+Statement stmt = null;
+ResultSet rs = null;
+try {
+    conn = dataSource.getConnection();
+    stmt = conn.createStatement();
+    rs = stmt.executeQuery("SELECT * FROM users");
+    while (rs.next()) {
+        // 处理结果...
+    }
+} finally {
+    // 按照资源获取的逆序关闭
+    if (rs != null) try { rs.close(); } catch (SQLException e) { /* 记录日志 */ }
+    if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ }
+    if (conn != null) try { conn.close(); } catch (SQLException e) { /* 记录日志 */ }
+}
+```
+#### 3. 在循环中执行多个查询时确保关闭前一个 ResultSet
+如果在一个方法内部执行多个查询并返回 `ResultSet`，必须在前一个 `ResultSet` 被新的 `ResultSet` 覆盖之前关闭它。使用嵌套的 try-with-resources 是一个清晰的解决方案。
+```java
+try (
+    Connection conn = dataSource.getConnection();
+    Statement stmt = conn.createStatement()
+) {
+    // 第一个查询
+    try (ResultSet rs1 = stmt.executeQuery("SELECT * FROM table1")) {
+        // 处理 rs1...
+    } // rs1 自动关闭
+    // 第二个查询 (前一个 ResultSet 已关闭)
+    try (ResultSet rs2 = stmt.executeQuery("SELECT * FROM table2")) {
+        // 处理 rs2...
+    } // rs2 自动关闭
+}
+```
+#### 4. 使用数据访问框架自动管理 ResultSet 资源
+推荐使用成熟的数据访问框架（如 Spring JdbcTemplate, Hibernate, MyBatis）来处理数据库操作。这些框架通常会自动管理资源的生命周期，包括 `ResultSet` 的关闭，从而减少手动资源管理的错误。
+```java
+// 使用 Spring JdbcTemplate
+JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+List<User> users = jdbcTemplate.query(
+    "SELECT * FROM users",
+    (rs, rowNum) -> new User(
+        rs.getLong("id"),
+        rs.getString("name")
+    )
+);
+// JdbcTemplate 会自动管理 ResultSet 的关闭
+```
+
+SOLUTION
 }
 
 desc(
@@ -261,5 +357,79 @@ desc(
             } // Connection 自动关闭
         }
     }
+CODE
+	"safefile://SafePreparedStatementResultSet.java": <<<CODE
+import java.sql.*;
+import javax.sql.DataSource;
+
+public class SafePreparedStatementResultSet {
+
+    private DataSource dataSource;
+
+    /**
+     * 使用 PreparedStatement 和 try-with-resources 自动管理 ResultSet、PreparedStatement 和 Connection。
+     * 这是最推荐的实践，简洁且避免资源泄漏。
+     */
+    public void safePreparedStatementWithResources() throws SQLException {
+        String sql = "SELECT id, name FROM users WHERE age > ?";
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                pstmt.setInt(1, 25);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        // 处理用户数据
+                        System.out.println("User: " + rs.getString("name"));
+                    }
+                } // ResultSet 会在这里自动关闭
+            } // PreparedStatement 会在这里自动关闭
+        } // Connection 会在这里自动关闭
+    }
+}
+
+CODE
+	"safefile://SafeManualCloseWithLogging.java": <<<CODE
+import java.sql.*;
+import javax.sql.DataSource;
+import java.util.logging.Logger;
+
+public class SafeManualCloseWithLogging {
+
+    private static final Logger LOGGER = Logger.getLogger(SafeManualCloseWithLogging.class.getName());
+    private DataSource dataSource;
+
+    /**
+     * 使用 try-finally 结构手动关闭 ResultSet、Statement 和 Connection，并处理关闭时可能出现的 SQLException。
+     * 遵循资源获取的反向顺序关闭资源，并在每个关闭操作中捕获异常并记录日志，避免异常屏蔽。
+     */
+    public void safeManualCloseResultSet() {
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            conn = dataSource.getConnection();
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT product_id, product_name FROM products");
+
+            while (rs.next()) {
+                // 处理产品数据
+                System.out.println("Product: " + rs.getString("product_name"));
+            }
+        } catch (SQLException e) {
+            LOGGER.severe("Database error: " + e.getMessage());
+        } finally {
+            // 按照获取的逆序关闭资源
+            if (rs != null) {
+                try { rs.close(); } catch (SQLException e) { LOGGER.warning("Error closing ResultSet: " + e.getMessage()); }
+            }
+            if (stmt != null) {
+                try { stmt.close(); } catch (SQLException e) { LOGGER.warning("Error closing Statement: " + e.getMessage()); }
+            }
+            if (conn != null) {
+                try { conn.close(); } catch (SQLException e) { LOGGER.warning("Error closing Connection: " + e.getMessage()); }
+            }
+        }
+    }
+}
+
 CODE
 )

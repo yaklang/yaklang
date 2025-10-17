@@ -26,7 +26,8 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	func(https bool, originReq []byte, req []byte) []byte,
 	func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte,
 	func([]byte, []byte, map[string]string) map[string]string,
-	func(bool, int, []byte, []byte) bool,
+	func(bool, int, []byte, []byte, func(...[]byte)),
+	func(bool, []byte, []byte, func(string)),
 ) {
 	// 发送数据包之前的 hook
 	scriptEngine := NewScriptEngine(2)
@@ -70,7 +71,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	engine, err = scriptEngine.ExecuteEx(raw, make(map[string]interface{}))
 	if err != nil {
 		log.Errorf("eval hookCode failed: %s", err)
-		return nil, nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 
 	before, beforeRequestOk := engine.GetVar("beforeRequest")
@@ -104,12 +105,18 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 		retryHandlerInstanceNumIn = ret.GetNumIn()
 	}
 
+	customFailureCheckerInstance, customFailureCheckerOk := engine.GetVar("customFailureChecker")
+	customFailureCheckerInstanceNumIn := 4
+	if ret, ok := customFailureCheckerInstance.(*yakvm.Function); ok {
+		customFailureCheckerInstanceNumIn = ret.GetNumIn()
+	}
 	hookLock := new(sync.Mutex)
 
 	var hookBefore func(https bool, originReq []byte, req []byte) []byte = nil
 	var hookAfter func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte = nil
 	var mirrorFlow func(req []byte, rsp []byte, handle map[string]string) map[string]string = nil
-	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte) bool = nil
+	var retryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) = nil
+	var customFailureChecker func(https bool, req []byte, rsp []byte, fail func(string)) = nil
 
 	if beforeRequestOk {
 		hookBefore = func(https bool, originReq []byte, req []byte) []byte {
@@ -213,7 +220,7 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 	}
 
 	if retryHandlerOk {
-		retryHandler = func(https bool, retryCount int, req []byte, rsp []byte) bool {
+		retryHandler = func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) {
 			hookLock.Lock()
 			defer hookLock.Unlock()
 
@@ -224,26 +231,47 @@ func MutateHookCaller(ctx context.Context, raw string, caller YakitCallerIf, par
 			}()
 
 			if engine != nil {
-				params := []any{https, req, rsp}
-				if retryHandlerInstanceNumIn > 2 {
-					params = []any{https, req, rsp}
-				} else if retryHandlerInstanceNumIn == 2 {
-					params = []any{req, rsp}
-				} else {
-					params = []any{rsp}
+				params := []any{https, retryCount, req, rsp, retryFunc}
+				if retryHandlerInstanceNumIn == 4 {
+					params = []any{retryCount, req, rsp, retryFunc}
+				} else if retryHandlerInstanceNumIn == 3 {
+					params = []any{req, rsp, retryFunc}
 				}
-				result, err := engine.CallYakFunction(context.Background(), "retryHandler", params)
+				_, err := engine.CallYakFunction(context.Background(), "retryHandler", params)
 				if err != nil {
 					log.Infof("eval retryHandler hook failed: %s", err)
 				}
-
-				return utils.InterfaceToBoolean(result)
 			}
-			return false
+			return
 		}
 	}
 
-	return hookBefore, hookAfter, mirrorFlow, retryHandler
+	if customFailureCheckerOk {
+		customFailureChecker = func(https bool, req []byte, rsp []byte, fail func(string)) {
+			hookLock.Lock()
+			defer hookLock.Unlock()
+
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("customFailureChecker(request, response) data panic: %s", err)
+				}
+			}()
+
+			if engine != nil {
+				params := []any{https, req, rsp, fail}
+				if customFailureCheckerInstanceNumIn == 3 {
+					params = []any{req, rsp, fail}
+				} else if customFailureCheckerInstanceNumIn == 2 {
+					params = []any{rsp, fail}
+				}
+				_, err := engine.CallYakFunction(context.Background(), "customFailureChecker", params)
+				if err != nil {
+					log.Infof("eval customFailureChecker hook failed: %s", err)
+				}
+			}
+		}
+	}
+	return hookBefore, hookAfter, mirrorFlow, retryHandler, customFailureChecker
 }
 
 func MutateWithParamsGetter(raw string) func() *mutate.RegexpMutateCondition {

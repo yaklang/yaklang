@@ -4,46 +4,39 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进行复制以及操作 JavaBean。commons-beanutils 库的某些版本存在一个不安全的反序列化漏洞。当应用程序使用易受攻击版本的 Commons BeanUtils 库对不可信数据进行反序列化时，攻击者可以通过构造恶意的序列化输入数据，利用该漏洞在目标系统上执行任意代码。这通常发生在调用 `BeanUtils.populate()` 或其他涉及对象属性设置的方法时，如果输入数据来源于用户可控的外部源（如HTTP请求参数、配置文件或消息队列），且其中包含了恶意的序列化对象图。
-
+Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进行复制以及操作 JavaBean。commons-beanutils 库的某些版本存在一个不安全的反序列化漏洞。当应用程序使用易受攻击版本的 Commons BeanUtils 库对不可信数据进行反序列化时，攻击者可以通过构造恶意的序列化输入数据，利用该漏洞在目标系统上执行任意代码。这通常发生在调用 `BeanUtils.populate()` 或其他涉及对象属性设置的方法时，如果输入数据来源于用户可控的外部源（如HTTP请求参数、配置文件或消息队列），且其中包含了恶意的序列化对象图。
 2. **触发场景**
-   该漏洞通常在处理用户提交的数据并使用易受攻击版本的 Commons BeanUtils 进行属性填充或反序列化时触发。例如，一个Web应用程序接收用户提交的表单数据，并直接使用 `BeanUtils.populate()` 将数据填充到JavaBean对象中，如果用户可以控制输入数据的内容，就可能注入恶意的序列化对象。
-   易受攻击的版本范围通常包括 1.9.2 到 1.9.4。攻击者通常会利用 RMI、HTTP Invoker、JMS、socket 通信等场景中的反序列化点来传递恶意负载。
-
+该漏洞通常在处理用户提交的数据并使用易受攻击版本的 Commons BeanUtils 进行属性填充或反序列化时触发。例如，一个Web应用程序接收用户提交的表单数据，并直接使用 `BeanUtils.populate()` 将数据填充到JavaBean对象中，如果用户可以控制输入数据的内容，就可能注入恶意的序列化对象。
+易受攻击的版本范围通常包括 1.9.2 到 1.9.4。攻击者通常会利用 RMI、HTTP Invoker、JMS、socket 通信等场景中的反序列化点来传递恶意负载。
 3. **潜在影响**
-   - **远程代码执行（RCE）**: 攻击者可以在目标服务器上执行任意操作系统命令或代码。
-   - **数据泄露**: 攻击者可能能够访问和窃取敏感数据。
-   - **拒绝服务（DoS）**: 攻击者可能通过消耗系统资源导致服务不可用。
-   - **系统渗透**: 作为攻击链的一部分，进一步渗透到内部网络或更高权限的系统。
+- **远程代码执行（RCE）**: 攻击者可以在目标服务器上执行任意操作系统命令或代码。
+- **数据泄露**: 攻击者可能能够访问和窃取敏感数据。
+- **拒绝服务（DoS）**: 攻击者可能通过消耗系统资源导致服务不可用。
+- **系统渗透**: 作为攻击链的一部分，进一步渗透到内部网络或更高权限的系统。
 DESC
 	rule_id: "fa7f6bb4-ca33-4080-af72-5a9e56eb0993"
 	title_zh: "SCA: 检测Java Commons BeanUtils 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Apache Commons BeanUtils 版本**
-   尽快将 Apache Commons BeanUtils 库升级到没有该漏洞的最新安全版本。例如，升级到 1.9.5 或更高版本，这些版本已经修复了相关的反序列化安全问题。
-
+尽快将 Apache Commons BeanUtils 库升级到没有该漏洞的最新安全版本。例如，升级到 1.9.5 或更高版本，这些版本已经修复了相关的反序列化安全问题。
 2. **避免在不可信的数据源上进行反序列化**
-   - 如果必须对来自外部或不可信来源的数据进行反序列化，考虑使用更安全的反序列化机制或对数据进行严格的验证和过滤。
-   - 避免使用 `BeanUtils.populate()` 方法直接处理来自不可信来源的复杂对象或嵌套值。
-
+- 如果必须对来自外部或不可信来源的数据进行反序列化，考虑使用更安全的反序列化机制或对数据进行严格的验证和过滤。
+- 避免使用 `BeanUtils.populate()` 方法直接处理来自不可信来源的复杂对象或嵌套值。
 3. **使用白名单或黑名单限制可被反序列化的类**
-   在某些场景下，可以通过配置JVM参数或使用特定的反序列化框架（如 Fastjson 的 `ParserConfig.setAutoType()` 配置）来限制允许反序列化的类，阻止恶意类的实例化。
-   例如，为 Fastjson 设置安全的 autoType 模式：
-   ```java
-   ParserConfig.getGlobalInstance().setAutoTypeSupport(false);
-   ```
-   或者使用白名单：
-   ```java
-   ParserConfig.getGlobalInstance().addAutoTypeDeny("com.sun."); // 示例：拒绝 sun 包下的类
-   ParserConfig.getGlobalInstance().addAutoTypeAccept("com.yourcompany.model."); // 示例：只允许指定包下的类
-   ```
-
+在某些场景下，可以通过配置JVM参数或使用特定的反序列化框架（如 Fastjson 的 `ParserConfig.setAutoType()` 配置）来限制允许反序列化的类，阻止恶意类的实例化。
+例如，为 Fastjson 设置安全的 autoType 模式：
+```java
+ParserConfig.getGlobalInstance().setAutoTypeSupport(false);
+```
+或者使用白名单：
+```java
+ParserConfig.getGlobalInstance().addAutoTypeDeny("com.sun."); // 示例：拒绝 sun 包下的类
+ParserConfig.getGlobalInstance().addAutoTypeAccept("com.yourcompany.model."); // 示例：只允许指定包下的类
+```
 4. **最小化反序列化接口的暴露**
-   审查应用程序中所有涉及反序列化的代码路径，仅在必要且数据来源可信的情况下使用反序列化功能。
+审查应用程序中所有涉及反序列化的代码路径，仅在必要且数据来源可信的情况下使用反序列化功能。
 SOLUTION
 	reference: <<<REFERENCE
 [CVE-2019-10086](https://nvd.nist.gov/vuln/detail/CVE-2019-10086)
@@ -57,47 +50,42 @@ alert $vuln_commons_beanutils for {
 	message: "SCA: commons-beanutils versions between 1.9.2 and 1.9.4 have an unsafe deserialization vulnerability",
 	title: "SCA: Check Java Commons BeanUtils Vulnerability",
 	title_zh: "SCA: 检测Java Commons BeanUtils 依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Apache Commons BeanUtils 版本**
-   尽快将 Apache Commons BeanUtils 库升级到没有该漏洞的最新安全版本。例如，升级到 1.9.5 或更高版本，这些版本已经修复了相关的反序列化安全问题。
-
+尽快将 Apache Commons BeanUtils 库升级到没有该漏洞的最新安全版本。例如，升级到 1.9.5 或更高版本，这些版本已经修复了相关的反序列化安全问题。
 2. **避免在不可信的数据源上进行反序列化**
-   - 如果必须对来自外部或不可信来源的数据进行反序列化，考虑使用更安全的反序列化机制或对数据进行严格的验证和过滤。
-   - 避免使用 `BeanUtils.populate()` 方法直接处理来自不可信来源的复杂对象或嵌套值。
-
+- 如果必须对来自外部或不可信来源的数据进行反序列化，考虑使用更安全的反序列化机制或对数据进行严格的验证和过滤。
+- 避免使用 `BeanUtils.populate()` 方法直接处理来自不可信来源的复杂对象或嵌套值。
 3. **使用白名单或黑名单限制可被反序列化的类**
-   在某些场景下，可以通过配置JVM参数或使用特定的反序列化框架（如 Fastjson 的 `ParserConfig.setAutoType()` 配置）来限制允许反序列化的类，阻止恶意类的实例化。
-   例如，为 Fastjson 设置安全的 autoType 模式：
-   ```java
-   ParserConfig.getGlobalInstance().setAutoTypeSupport(false);
-   ```
-   或者使用白名单：
-   ```java
-   ParserConfig.getGlobalInstance().addAutoTypeDeny("com.sun."); // 示例：拒绝 sun 包下的类
-   ParserConfig.getGlobalInstance().addAutoTypeAccept("com.yourcompany.model."); // 示例：只允许指定包下的类
-   ```
-
+在某些场景下，可以通过配置JVM参数或使用特定的反序列化框架（如 Fastjson 的 `ParserConfig.setAutoType()` 配置）来限制允许反序列化的类，阻止恶意类的实例化。
+例如，为 Fastjson 设置安全的 autoType 模式：
+```java
+ParserConfig.getGlobalInstance().setAutoTypeSupport(false);
+```
+或者使用白名单：
+```java
+ParserConfig.getGlobalInstance().addAutoTypeDeny("com.sun."); // 示例：拒绝 sun 包下的类
+ParserConfig.getGlobalInstance().addAutoTypeAccept("com.yourcompany.model."); // 示例：只允许指定包下的类
+```
 4. **最小化反序列化接口的暴露**
-   审查应用程序中所有涉及反序列化的代码路径，仅在必要且数据来源可信的情况下使用反序列化功能。
-CODE
-	desc: <<<CODE
+审查应用程序中所有涉及反序列化的代码路径，仅在必要且数据来源可信的情况下使用反序列化功能。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进行复制以及操作 JavaBean。commons-beanutils 库的某些版本存在一个不安全的反序列化漏洞。当应用程序使用易受攻击版本的 Commons BeanUtils 库对不可信数据进行反序列化时，攻击者可以通过构造恶意的序列化输入数据，利用该漏洞在目标系统上执行任意代码。这通常发生在调用 `BeanUtils.populate()` 或其他涉及对象属性设置的方法时，如果输入数据来源于用户可控的外部源（如HTTP请求参数、配置文件或消息队列），且其中包含了恶意的序列化对象图。
-
+Apache Commons BeanUtils 是一个 Java 库，用于在 JavaBean 属性之间进行复制以及操作 JavaBean。commons-beanutils 库的某些版本存在一个不安全的反序列化漏洞。当应用程序使用易受攻击版本的 Commons BeanUtils 库对不可信数据进行反序列化时，攻击者可以通过构造恶意的序列化输入数据，利用该漏洞在目标系统上执行任意代码。这通常发生在调用 `BeanUtils.populate()` 或其他涉及对象属性设置的方法时，如果输入数据来源于用户可控的外部源（如HTTP请求参数、配置文件或消息队列），且其中包含了恶意的序列化对象图。
 2. **触发场景**
-   该漏洞通常在处理用户提交的数据并使用易受攻击版本的 Commons BeanUtils 进行属性填充或反序列化时触发。例如，一个Web应用程序接收用户提交的表单数据，并直接使用 `BeanUtils.populate()` 将数据填充到JavaBean对象中，如果用户可以控制输入数据的内容，就可能注入恶意的序列化对象。
-   易受攻击的版本范围通常包括 1.9.2 到 1.9.4。攻击者通常会利用 RMI、HTTP Invoker、JMS、socket 通信等场景中的反序列化点来传递恶意负载。
-
+该漏洞通常在处理用户提交的数据并使用易受攻击版本的 Commons BeanUtils 进行属性填充或反序列化时触发。例如，一个Web应用程序接收用户提交的表单数据，并直接使用 `BeanUtils.populate()` 将数据填充到JavaBean对象中，如果用户可以控制输入数据的内容，就可能注入恶意的序列化对象。
+易受攻击的版本范围通常包括 1.9.2 到 1.9.4。攻击者通常会利用 RMI、HTTP Invoker、JMS、socket 通信等场景中的反序列化点来传递恶意负载。
 3. **潜在影响**
-   - **远程代码执行（RCE）**: 攻击者可以在目标服务器上执行任意操作系统命令或代码。
-   - **数据泄露**: 攻击者可能能够访问和窃取敏感数据。
-   - **拒绝服务（DoS）**: 攻击者可能通过消耗系统资源导致服务不可用。
-   - **系统渗透**: 作为攻击链的一部分，进一步渗透到内部网络或更高权限的系统。
-CODE
+- **远程代码执行（RCE）**: 攻击者可以在目标服务器上执行任意操作系统命令或代码。
+- **数据泄露**: 攻击者可能能够访问和窃取敏感数据。
+- **拒绝服务（DoS）**: 攻击者可能通过消耗系统资源导致服务不可用。
+- **系统渗透**: 作为攻击链的一部分，进一步渗透到内部网络或更高权限的系统。
+DESC
 	level: "high",
 	cve: "CVE-2019-10086",
+	risk: "SCA",
+	name: "vuln_commons_beanutils",
 }

@@ -1,15 +1,13 @@
 desc(
-	title: "Detect PHP Variable Coverage Vulnerability"
+	title: "Detect PHP Variable Overwrite Vulnerability"
 	title_zh: "检测PHP变量覆盖漏洞"
 	type: audit
 	level: low
 	risk: 'variable_coverage'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 变量覆盖漏洞是指应用程序未能正确处理用户输入，导致用户输入的数据覆盖了程序中的原有变量。攻击者可以利用这一漏洞修改程序运行时的变量值，从而改变程序的执行流程、绕过身份验证、泄露敏感信息甚至执行任意代码。这种漏洞通常发生在程序使用了如 `extract()` 函数，或者对 `$_GET`、`$_POST`、`$_REQUEST`、`$_COOKIE` 等超全局变量处理不当。
-
 2. **触发场景**
 当程序直接或间接使用用户输入来设置或覆盖变量时，可能触发变量覆盖漏洞。例如，以下代码使用了 `extract($_GET)`，如果用户通过GET请求传入 `id=new_value`，则程序中的 `$id` 变量将被覆盖。
 ```php
@@ -20,7 +18,6 @@ echo $id;
 ?>
 ```
 攻击者发送 `?id=hacked` 的GET请求，原本的代码逻辑可能被改变。
-
 3. **潜在影响**
 - 敏感信息泄露：覆盖控制查询条件的变量，导致泄露所有数据。
 - 权限绕过：覆盖用于身份验证或权限判断的变量。
@@ -30,13 +27,10 @@ DESC
 	rule_id: "c290ad96-9b08-4adf-811e-74f059d2c75e"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用高风险函数
 尽量避免使用 `extract()`、`parse_str()` 等可以直接将用户输入转化为变量的函数。如果必须使用，务必确保输入数据是可信的或经过严格的过滤和校验。
-
 #### 2. 对用户输入进行严格过滤和校验
 在使用用户输入设置变量前，对输入进行类型、格式、长度等方面的校验，并使用过滤函数（如 `htmlspecialchars()`、`strip_tags()` 等）对数据进行清理，尤其是在输出到页面时。
-
 #### 3. 使用白名单过滤变量
 如果需要从用户输入中获取特定变量，使用白名单的方式明确指定允许使用的变量名，而不是直接将所有输入转化为变量。例如，手动从超全局变量中获取所需参数。
 ```php
@@ -44,19 +38,17 @@ DESC
 $allowed_params = ['username', 'email'];
 $user_data = [];
 foreach ($allowed_params as $param) {
-    if (isset($_GET[$param])) {
-        // 对获取到的参数进行过滤和校验
-        $user_data[$param] = htmlspecialchars($_GET[$param]);
-    }
+if (isset($_GET[$param])) {
+// 对获取到的参数进行过滤和校验
+$user_data[$param] = htmlspecialchars($_GET[$param]);
+}
 }
 // 使用$user_data数组中的数据，而不是直接使用$username, $email等变量
 print_r($user_data);
 ?>
 ```
-
 #### 4. 限制变量作用域
 在使用可能引入外部输入的函数时，限制变量的作用域，例如在函数内部使用局部变量，避免覆盖全局变量。
-
 #### 5. 开启 safe_mode (已废弃)
 虽然 `safe_mode` 在PHP 5.3中已被废弃并在PHP 5.4中移除，但在旧版本中可以作为一种缓解措施。它限制了某些可能导致变量覆盖的操作。
 SOLUTION
@@ -82,12 +74,10 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 变量覆盖漏洞是指应用程序未能正确处理用户输入，导致用户输入的数据覆盖了程序中的原有变量。攻击者可以利用这一漏洞修改程序运行时的变量值，从而改变程序的执行流程、绕过身份验证、泄露敏感信息甚至执行任意代码。这种漏洞通常发生在程序使用了如 `extract()` 函数，或者对 `$_GET`、`$_POST`、`$_REQUEST`、`$_COOKIE` 等超全局变量处理不当。
-
 2. **触发场景**
 当程序直接或间接使用用户输入来设置或覆盖变量时，可能触发变量覆盖漏洞。例如，以下代码使用了 `extract($_GET)`，如果用户通过GET请求传入 `id=new_value`，则程序中的 `$id` 变量将被覆盖。
 ```php
@@ -98,26 +88,22 @@ echo $id;
 ?>
 ```
 攻击者发送 `?id=hacked` 的GET请求，原本的代码逻辑可能被改变。
-
 3. **潜在影响**
 - 敏感信息泄露：覆盖控制查询条件的变量，导致泄露所有数据。
 - 权限绕过：覆盖用于身份验证或权限判断的变量。
 - 代码执行：如果覆盖的变量影响到文件包含或代码执行函数，可能导致远程代码执行。
 - 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
-CODE
+DESC
 	level: "high",
 	type: "vuln",
 	title: "Unfiltered PHP Variable Overwrite Detected",
 	title_zh: "未过滤PHP变量覆盖",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用高风险函数
 尽量避免使用 `extract()`、`parse_str()` 等可以直接将用户输入转化为变量的函数。如果必须使用，务必确保输入数据是可信的或经过严格的过滤和校验。
-
 #### 2. 对用户输入进行严格过滤和校验
 在使用用户输入设置变量前，对输入进行类型、格式、长度等方面的校验，并使用过滤函数（如 `htmlspecialchars()`、`strip_tags()` 等）对数据进行清理，尤其是在输出到页面时。
-
 #### 3. 使用白名单过滤变量
 如果需要从用户输入中获取特定变量，使用白名单的方式明确指定允许使用的变量名，而不是直接将所有输入转化为变量。例如，手动从超全局变量中获取所需参数。
 ```php
@@ -125,19 +111,21 @@ CODE
 $allowed_params = ['username', 'email'];
 $user_data = [];
 foreach ($allowed_params as $param) {
-    if (isset($_GET[$param])) {
-        // 对获取到的参数进行过滤和校验
-        $user_data[$param] = htmlspecialchars($_GET[$param]);
-    }
+if (isset($_GET[$param])) {
+// 对获取到的参数进行过滤和校验
+$user_data[$param] = htmlspecialchars($_GET[$param]);
+}
 }
 // 使用$user_data数组中的数据，而不是直接使用$username, $email等变量
 print_r($user_data);
 ?>
 ```
-
 #### 4. 限制变量作用域
 在使用可能引入外部输入的函数时，限制变量的作用域，例如在函数内部使用局部变量，避免覆盖全局变量。
-CODE
+SOLUTION
+	risk: "变量覆盖",
+	name: "high",
+	message: "检测到PHP变量覆盖漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 $sink<dataflow(include=<<<CODE
 * & $source as $__next__
@@ -150,15 +138,12 @@ alert $middle for {
 	type: "mid",
 	title: "PHP Variable Overwrite with Missing Filter Function",
 	title_zh: "PHP变量覆盖，缺少过滤函数",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用高风险函数
 尽量避免使用 `extract()`、`parse_str()` 等可以直接将用户输入转化为变量的函数。如果必须使用，务必确保输入数据是可信的或经过严格的过滤和校验。
-
 #### 2. 对用户输入进行严格过滤和校验
 在使用用户输入设置变量前，对输入进行类型、格式、长度等方面的校验，并使用过滤函数（如 `htmlspecialchars()`、`strip_tags()` 等）对数据进行清理，尤其是在输出到页面时。
-
 #### 3. 使用白名单过滤变量
 如果需要从用户输入中获取特定变量，使用白名单的方式明确指定允许使用的变量名，而不是直接将所有输入转化为变量。例如，手动从超全局变量中获取所需参数。
 ```php
@@ -166,25 +151,22 @@ alert $middle for {
 $allowed_params = ['username', 'email'];
 $user_data = [];
 foreach ($allowed_params as $param) {
-    if (isset($_GET[$param])) {
-        // 对获取到的参数进行过滤和校验
-        $user_data[$param] = htmlspecialchars($_GET[$param]);
-    }
+if (isset($_GET[$param])) {
+// 对获取到的参数进行过滤和校验
+$user_data[$param] = htmlspecialchars($_GET[$param]);
+}
 }
 // 使用$user_data数组中的数据，而不是直接使用$username, $email等变量
 print_r($user_data);
 ?>
 ```
-
 #### 4. 限制变量作用域
 在使用可能引入外部输入的函数时，限制变量的作用域，例如在函数内部使用局部变量，避免覆盖全局变量。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 变量覆盖漏洞是指应用程序未能正确处理用户输入，导致用户输入的数据覆盖了程序中的原有变量。攻击者可以利用这一漏洞修改程序运行时的变量值，从而改变程序的执行流程、绕过身份验证、泄露敏感信息甚至执行任意代码。这种漏洞通常发生在程序使用了如 `extract()` 函数，或者对 `$_GET`、`$_POST`、`$_REQUEST`、`$_COOKIE` 等超全局变量处理不当。
-
 2. **触发场景**
 当程序直接或间接使用用户输入来设置或覆盖变量时，可能触发变量覆盖漏洞。例如，以下代码使用了 `extract($_GET)`，如果用户通过GET请求传入 `id=new_value`，则程序中的 `$id` 变量将被覆盖。
 ```php
@@ -195,13 +177,15 @@ echo $id;
 ?>
 ```
 攻击者发送 `?id=hacked` 的GET请求，原本的代码逻辑可能被改变。
-
 3. **潜在影响**
 - 敏感信息泄露：覆盖控制查询条件的变量，导致泄露所有数据。
 - 权限绕过：覆盖用于身份验证或权限判断的变量。
 - 代码执行：如果覆盖的变量影响到文件包含或代码执行函数，可能导致远程代码执行。
 - 逻辑错误：改变程序变量，导致非预期的执行结果或拒绝服务。
-CODE
+DESC
+	message: "检测到PHP变量覆盖漏洞，但可能存在过滤函数，需进一步审计确认。",
+	risk: "变量覆盖",
+	name: "middle",
 }
 $sink - $high - $middle  as $low;
 
@@ -209,19 +193,24 @@ alert $low for {
 	type: "low",
 	title: "PHP Variable Overwrite with Filter Function",
 	title_zh: "PHP变量覆盖，检测到过滤函数",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于审计PHP代码中可能导致变量覆盖的安全漏洞。它通过识别直接操作用户输入的关键PHP函数（如`extract`、`parse_str`等），定位未经验证/转义的数据覆盖点，防止攻击者注入恶意脚本窃取用户数据或劫持会话。
-
 ### 规则详细
 1. **作为基础检测库**
 属于`php-variable-coverage`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测变量覆盖漏洞，提供核心函数识别能力。
-
 2. **覆盖高危操作函数**
 检测以下PHP操作函数：
 `extract`, `parse_str`, `import_request_variables`。
-CODE
+DESC
 	level: "low",
+	risk: "信息",
+	name: "low",
+	message: "检测到PHP变量覆盖相关函数，但已存在过滤机制。",
+	solution: <<<SOLUTION
+### 安全建议
+尽管当前代码中包含了过滤机制，仍建议定期审查和更新过滤逻辑以应对新的威胁。此外，请持续关注相关安全实践，确保代码符合最新的安全标准。
+SOLUTION
 }
 
 

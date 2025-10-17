@@ -198,6 +198,14 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 		if f.Config.DisableWebFingerprint {
 			return result, nil
 		}
+
+		if f.Config.DisableWebFingerprint {
+			return result, nil
+		}
+
+		if f.Config.DisableWebFingerprint {
+			return result, nil
+		}
 		if serviceName != "" && serviceName != "tcp" && serviceName != "ssl" && !utils2.MatchAllOfRegexp(serviceName, "(?i)http") {
 			f.log("non-http service detected, skip web detection")
 			return result, nil
@@ -216,7 +224,7 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 	if config.OnlyEnableWebFingerprint {
 		f.log("web-detect first for: %v", utils2.HostPort(host, port))
 		matchResult, err = webFirst()
-	}  else {
+	} else {
 		// 使用预定义的端口范围来决定扫描策略
 		webPortsFilter := utils2.ParseStringToPorts(webPorts)
 		if utils2.IntArrayContains(webPortsFilter, port) {

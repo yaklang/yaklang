@@ -2,7 +2,10 @@ package aid
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -16,8 +19,8 @@ type Coordinator struct {
 	config    *Config
 }
 
-func (c *Coordinator) callAI(request *AIRequest) (*AIResponse, error) {
-	for _, cb := range []AICallbackType{
+func (c *Coordinator) CallAI(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+	for _, cb := range []aicommon.AICallbackType{
 		c.config.coordinatorAICallback,
 		c.config.planAICallback,
 		c.config.taskAICallback,
@@ -36,7 +39,7 @@ func NewCoordinator(userInput string, options ...Option) (*Coordinator, error) {
 
 // NewCoordinator 创建一个新的 Coordinator
 func NewCoordinatorContext(ctx context.Context, userInput string, options ...Option) (*Coordinator, error) {
-	config := newConfig(ctx)
+	config := NewConfig(ctx)
 	for _, opt := range options {
 		err := opt(config)
 		if err != nil {
@@ -46,8 +49,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	if config.memory == nil {
 		config.memory = GetDefaultMemory()
 	}
-	if utils.IsNil(config.memory.timeline.ai) {
-		config.memory.timeline.setAICaller(config)
+	if utils.IsNil(config.memory.timeline.GetAICaller()) {
+		config.memory.timeline.SetAICaller(config)
 	}
 
 	if err := config.loadToolsViaOptions(); err != nil {
@@ -55,11 +58,8 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	}
 	config.startEventLoop(ctx)
 	config.startHotpatchLoop(ctx)
-	config.guardian.setOutputEmitter(config.id, config.eventHandler)
-	config.guardian.setAiCaller(CreateProxyAICaller(config, func(request *AIRequest) *AIRequest {
-		request.detachCheckpoint = true
-		return request
-	}))
+	config.guardian.SetOutputEmitter(config.id, config.eventHandler)
+	config.guardian.SetAICaller(config)
 	c := &Coordinator{
 		config:    config,
 		userInput: userInput,
@@ -69,13 +69,13 @@ func NewCoordinatorContext(ctx context.Context, userInput string, options ...Opt
 	return c, nil
 }
 
-func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *AIResponse) error) error {
-	return c.config.callAiTransaction(prompt, c.callAI, func(rsp *AIResponse) error {
+func (c *Coordinator) CallAITransaction(prompt string, postHandler func(response *aicommon.AIResponse) error, requestOpts ...aicommon.AIRequestOption) error {
+	return c.config.callAiTransaction(prompt, c.CallAI, func(rsp *aicommon.AIResponse) error {
 		if postHandler == nil {
 			return nil
 		}
 		return postHandler(rsp)
-	})
+	}, requestOpts...)
 }
 
 func (c *Coordinator) GetConfig() *Config {
@@ -100,13 +100,13 @@ func (c *Coordinator) Run() error {
 	}
 
 	// 审查
-	ep := c.config.epm.createEndpointWithEventType(EVENT_TYPE_PLAN_REVIEW_REQUIRE)
+	ep := c.config.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
 
-	c.config.EmitRequireReviewForPlan(rsp, ep.id)
-	c.config.doWaitAgree(nil, ep)
+	c.config.EmitRequireReviewForPlan(rsp, ep.GetId())
+	c.config.DoWaitAgree(nil, ep)
 	params := ep.GetParams()
-	c.config.ReleaseInteractiveEvent(ep.id, params)
+	c.config.ReleaseInteractiveEvent(ep.GetId(), params)
 	if params == nil {
 		c.config.EmitError("user review params is nil, plan failed")
 		return utils.Errorf("coordinator: user review params is nil")
@@ -160,12 +160,12 @@ func (c *Coordinator) Run() error {
 			c.config.EmitError("generate report failed: %v", err)
 			return utils.Error("coordinator: generate report failed")
 		}
-		aiRsp, err := c.callAI(NewAIRequest(prompt))
+		aiRsp, err := c.CallAI(aicommon.NewAIRequest(prompt))
 		if err != nil {
 			c.config.EmitError("AICallback failed: %v", err)
 			return utils.Errorf("coordinator: AICallback failed: %v", err)
 		}
-		output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config))
+		output, err := io.ReadAll(aiRsp.GetOutputStreamReader("result", false, c.config.GetEmitter()))
 		if err != nil {
 			c.config.EmitError("read AICallback response failed: %v", err)
 			return utils.Errorf("coordinator: read AICallback response failed: %v", err)

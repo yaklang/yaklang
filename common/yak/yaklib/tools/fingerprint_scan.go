@@ -431,6 +431,25 @@ func _disableDefaultFingerprint(b ...bool) fp.ConfigOption {
 	}
 }
 
+// disableWebScanConnPool servicescan 的配置选项，用于禁用 web 扫描的连接池
+// @param {bool} b 是否禁用连接池，默认为 false
+// @return {ConfigOption} 返回配置选项
+// ```
+// result,err = servicescan.Scan("127.0.0.1", "22-80,443,3389,161", servicescan.disableWebScanConnPool(true)) // 禁用 web 扫描的连接池
+// die(err) // 如果错误非空则报错
+// for res := range result { // 通过遍历管道的形式获取管道中的结果，一旦有结果返回就会执行循环体的代码
+//
+//	   println(res.String()) // 输出结果，调用String方法获取可读
+//	   println(res.String()) // 输出结果，调用String方法获取可读字符串
+//	}
+//
+// ```
+func _disableWebScanConnPool(b bool) fp.ConfigOption {
+	return func(config *fp.Config) {
+		config.WebScanDisableConnPool = b
+	}
+}
+
 var FingerprintScanExports = map[string]interface{}{
 	"Scan":                scanFingerprint,
 	"ScanOne":             scanOneFingerprint,
@@ -493,4 +512,6 @@ var FingerprintScanExports = map[string]interface{}{
 	"withRuleGroup":    fp.WithFingerprintRuleGroup,
 
 	"disableDefaultRule": _disableDefaultFingerprint,
+
+	"disableWebScanConnPool": _disableWebScanConnPool,
 }

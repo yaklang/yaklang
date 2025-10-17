@@ -1,13 +1,16 @@
 package rag
 
 import (
+	"context"
+	"errors"
 	"sort"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// MemoryVectorStore 是一个基于内存的向量存储实现
+// MemoryVectorStore 是一个基于内存的向量存储实现适合储存临时数据，不适合储存大量数据
 type MemoryVectorStore struct {
 	documents map[string]Document // 文档存储，以 ID 为键
 	embedder  EmbeddingClient     // 用于生成查询的嵌入向量
@@ -45,8 +48,16 @@ func (m *MemoryVectorStore) Add(docs ...Document) error {
 	return nil
 }
 
+func (m *MemoryVectorStore) FuzzSearch(ctx context.Context, query string, limit int) (<-chan SearchResult, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (m *MemoryVectorStore) SearchWithFilter(query string, page, limit int, filter func(key string, getDoc func() *Document) bool) ([]SearchResult, error) {
+	return nil, errors.New("not implemented")
+}
+
 // Search 根据查询文本检索相关文档
-func (m *MemoryVectorStore) Search(query string, limit int) ([]SearchResult, error) {
+func (m *MemoryVectorStore) Search(query string, page, limit int) ([]SearchResult, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -65,7 +76,7 @@ func (m *MemoryVectorStore) Search(query string, limit int) ([]SearchResult, err
 	var results []SearchResult
 	for _, doc := range m.documents {
 		// 计算余弦相似度
-		similarity, err := utils.CosineSimilarity(queryEmbedding, doc.Embedding)
+		similarity, err := hnsw.CosineSimilarity(queryEmbedding, doc.Embedding)
 		if err != nil {
 			return nil, utils.Errorf("failed to calculate similarity: %v", err)
 		}
@@ -74,8 +85,6 @@ func (m *MemoryVectorStore) Search(query string, limit int) ([]SearchResult, err
 		results = append(results, SearchResult{
 			Document: doc,
 			Score:    similarity,
-			// 欧几里得距离可以作为额外的距离度量（可选）
-			Distance: 0, // 这里我们只使用余弦相似度
 		})
 	}
 
@@ -84,10 +93,15 @@ func (m *MemoryVectorStore) Search(query string, limit int) ([]SearchResult, err
 		return results[i].Score > results[j].Score
 	})
 
-	// 限制结果数量
-	if limit > 0 && limit < len(results) {
-		results = results[:limit]
+	// 计算分页
+	offset := (page - 1) * limit
+	if offset >= len(results) {
+		return []SearchResult{}, nil
 	}
+	if offset+limit > len(results) {
+		limit = len(results) - offset
+	}
+	results = results[offset : offset+limit]
 
 	return results, nil
 }

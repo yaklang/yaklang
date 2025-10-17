@@ -173,12 +173,11 @@ func (c *processAnalysisManager) getLastCauseCall(typ AnalysisType) (result *Val
 	case *ssa.Call:
 		result = value
 	case *ssa.SideEffect:
-		callSide := ret.GetValueById(ret.CallSite)
-		if typ == TopDefAnalysis {
-			result = value.NewTopDefValue(callSide)
-		} else if typ == BottomUseAnalysis {
-			result = value.NewBottomUseValue(callSide)
+		callSide, ok := ret.GetValueById(ret.CallSite)
+		if !ok {
+			return nil
 		}
+		result = value.NewValue(callSide)
 	}
 	return result
 }
@@ -207,6 +206,10 @@ func needCrossProcess(from *Value, to *Value) bool {
 		return false
 	}
 	return from.GetFunction().GetId() != to.GetFunction().GetId()
+}
+
+func (c *processAnalysisManager) Path() []*Value {
+	return c.nodeStack.Values()
 }
 
 func (c *processAnalysisManager) pushNode(value *Value) {

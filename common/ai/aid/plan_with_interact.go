@@ -1,8 +1,11 @@
 package aid
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/utils"
+)
 
-func (pr *planRequest) handlePlanWithUserInteract(interactAction *Action) (*PlanResponse, error) {
+func (pr *planRequest) handlePlanWithUserInteract(interactAction *aicommon.Action) (*PlanResponse, error) {
 	q := interactAction.GetString("question")
 	opt := interactAction.GetInvokeParamsArray("options")
 	var opts []*RequireInteractiveRequestOption
@@ -24,8 +27,8 @@ func (pr *planRequest) handlePlanWithUserInteract(interactAction *Action) (*Plan
 	_ = params
 
 	pr.config.memory.timeline.PushUserInteraction(
-		UserInteractionStage_BeforePlan,
-		ep.seq,
+		aicommon.UserInteractionStage_BeforePlan,
+		ep.GetSeq(),
 		q,
 		string(utils.Jsonify(params)),
 	)

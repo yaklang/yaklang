@@ -13,7 +13,7 @@ const (
 	SERVLET_TEMPLATE_PREFIX   = "webapp"
 )
 
-func hookJavaEEMemberCallMethod(y *builder, obj ssa.Value, key ssa.Value, args ...ssa.Value) {
+func hookJavaEEMemberCallMethod(y *singleFileBuilder, obj ssa.Value, key ssa.Value, args ...ssa.Value) {
 	typ := obj.GetType()
 	if typ == nil || !strings.Contains(strings.Join(typ.GetFullTypeNames(), "."), SERVLET_PATH) {
 		return

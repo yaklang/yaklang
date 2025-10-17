@@ -15,6 +15,14 @@ import (
 
 var DefaultInputVar = "input"
 
+type ResultSaveKind string
+
+const (
+	resultSaveNone     ResultSaveKind = "none"     // no save
+	resultSaveMemory   ResultSaveKind = "memory"   // in cache
+	resultSaveDatabase ResultSaveKind = "database" // in database
+)
+
 type queryConfig struct {
 	// check if exist in database just use this
 	useCache bool
@@ -27,7 +35,8 @@ type queryConfig struct {
 	rule        *schema.SyntaxFlowRule // use this
 
 	// runtime
-	vm *sfvm.SyntaxFlowVirtualMachine
+	vm    *sfvm.SyntaxFlowVirtualMachine
+	frame *sfvm.SFFrame
 
 	// runtime config
 	opts []sfvm.Option // config
@@ -35,7 +44,7 @@ type queryConfig struct {
 	// parentResult *sfvm.SFFrameResult
 
 	// save
-	save   bool
+	save   ResultSaveKind
 	kind   schema.SyntaxflowResultKind
 	taskID string
 
@@ -47,6 +56,9 @@ type queryConfig struct {
 }
 
 func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
+	if frame := config.frame; frame != nil {
+		return frame, nil
+	}
 	// get vm
 	vm := config.vm
 	if vm == nil {
@@ -154,24 +166,34 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	}))
 
 	// runtime
-	res, err := frame.Feed(value, config.opts...)
+	var res *sfvm.SFFrameResult
+	res, err = frame.Feed(value, config.opts...)
 	if err != nil {
 		return nil, utils.Wrap(err, "SyntaxflowQuery: query rule failed")
 	}
-	ret := CreateResultFromQuery(res)
+
+	var ret *SyntaxFlowResult
+	ret = CreateResultFromQuery(res)
 
 	defer process(1, "end query syntaxflow")
 	if config.program != nil {
 		ret.program = config.program
-		//TODO:  now we not save result without program
-		// save ret
-		if config.save {
+		switch config.save {
+		case resultSaveDatabase:
 			process(float64(total-1)/float64(total), "save result")
 			resultID, err := ret.SaveWithContext(config.ctx, config.kind, config.taskID)
 			_ = resultID
 			if err != nil {
 				return ret, utils.Wrap(err, "SyntaxflowQuery: save to DB failed")
 			}
+			setResultToCache(config.save, ret)
+		case resultSaveMemory:
+			// save to memory
+			id := getResultCacheId()
+			ret.SetResultID(id)
+			ret.CreateRisk()
+			ret.TaskID = config.taskID
+			setResultToCache(config.save, ret)
 		}
 	}
 
@@ -223,10 +245,22 @@ func QueryWithVM(vm *sfvm.SyntaxFlowVirtualMachine) QueryOption {
 	}
 }
 
+func QueryWithFrame(f *sfvm.SFFrame) QueryOption {
+	return func(c *queryConfig) {
+		c.frame = f
+	}
+}
+
 func QueryWithSave(kind schema.SyntaxflowResultKind) QueryOption {
 	return func(c *queryConfig) {
-		c.save = true
+		c.save = resultSaveDatabase
 		c.kind = kind
+	}
+}
+
+func QueryWithMemory() QueryOption {
+	return func(c *queryConfig) {
+		c.save = resultSaveMemory
 	}
 }
 

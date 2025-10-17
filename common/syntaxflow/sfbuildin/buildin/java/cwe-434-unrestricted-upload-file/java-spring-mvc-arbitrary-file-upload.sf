@@ -4,66 +4,52 @@ desc(
 	risk:"任意文件上传",
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 任意文件上传漏洞是指攻击者能够将恶意文件（如WebShell或可执行文件）上传到服务器，并可能通过访问这些文件来执行任意代码或进行其他恶意操作。在基于Spring MVC的应用程序中，如果开发人员在使用`MultipartFile`处理文件上传时，没有对上传的文件名、文件类型、文件内容等进行严格的校验和过滤，就可能导致该漏洞。
-
 具体来说，如果应用程序直接使用用户提供的文件名（例如通过`MultipartFile.getOriginalFilename()`获取）来保存文件，并且文件名中包含路径遍历字符（如`../`）或者允许上传具有可执行扩展名（如`.jsp`, `.php`, `.asp`, `.sh`等）的文件，攻击者就可以上传恶意文件到服务器的任意位置，甚至覆盖现有文件。
-
 2. **触发场景**
 当应用程序接收用户上传的文件时，如果以下条件中的一个或多个未得到满足，则可能存在任意文件上传漏洞：
-
-1.  **未校验文件类型和扩展名:** 应用程序允许上传任何文件扩展名的文件，包括可执行文件。
-2.  **未校验文件内容:** 应用程序未对文件内容进行安全检查，无法识别恶意代码或恶意文件头部。
-3.  **使用用户提供的文件名直接保存:** 直接使用`MultipartFile.getOriginalFilename()`获取的文件名，未对文件名进行清洗过滤。
-4.  **目标保存路径可控:** 如果文件的保存路径部分或完全由用户控制，攻击者可以将文件上传到非预期目录，例如Web目录之外的敏感目录或可执行目录。
-
+- **未校验文件类型和扩展名:** 应用程序允许上传任何文件扩展名的文件，包括可执行文件。
+- **未校验文件内容:** 应用程序未对文件内容进行安全检查，无法识别恶意代码或恶意文件头部。
+- **使用用户提供的文件名直接保存:** 直接使用`MultipartFile.getOriginalFilename()`获取的文件名，未对文件名进行清洗过滤。
+- **目标保存路径可控:** 如果文件的保存路径部分或完全由用户控制，攻击者可以将文件上传到非预期目录，例如Web目录之外的敏感目录或可执行目录。
 3. **潜在影响**
-*   **远程代码执行 (RCE):** 如果成功上传可执行文件（如WebShell），攻击者可以在服务器上执行任意代码，完全控制服务器。
-*   **服务器被控:** 攻击者可以利用上传的恶意文件进一步渗透内网，控制更多服务器资源。
-*   **数据泄露或篡改:** 攻击者可能通过执行代码访问、窃取或篡改数据库及其他敏感文件。
-*   **拒绝服务 (DoS):** 攻击者可能上传超大文件，消耗服务器磁盘空间或带宽，导致服务不可用。
-*   **网站内容被篡改:** 上传恶意文件覆盖网站原有文件，修改网站内容。
+- **远程代码执行 (RCE):** 如果成功上传可执行文件（如WebShell），攻击者可以在服务器上执行任意代码，完全控制服务器。
+- **服务器被控:** 攻击者可以利用上传的恶意文件进一步渗透内网，控制更多服务器资源。
+- **数据泄露或篡改:** 攻击者可能通过执行代码访问、窃取或篡改数据库及其他敏感文件。
+- **拒绝服务 (DoS):** 攻击者可能上传超大文件，消耗服务器磁盘空间或带宽，导致服务不可用。
+- **网站内容被篡改:** 上传恶意文件覆盖网站原有文件，修改网站内容。
 
 DESC
 	rule_id: "2e6a2485-77c7-4b0e-a421-476b5804a941"
 	solution: <<<SOLUTION
 ### 修复建议
-
 为防止任意文件上传漏洞，应采取以下安全措施：
-
-1.  **严格校验文件类型和扩展名:**
-    *   **白名单机制:** 优先使用白名单限制允许上传的文件类型和扩展名，例如只允许上传`.jpg`, `.png`, `.pdf`等非可执行文件。
-    *   **MIME类型校验:** 除了校验扩展名，还应该校验文件的MIME类型，防止攻击者通过修改扩展名绕过校验。
-    *   **文件内容校验 (魔术字节):** 对文件头部进行检查，识别文件的真实类型，防止通过伪造文件头绕过MIME类型或扩展名校验。
-
-2.  **不使用用户提供的文件名:**
-    *   **生成随机文件名:** 在保存文件时，生成一个随机的唯一文件名或使用时间戳等方式，而不是使用用户上传的原始文件名。
-    *   **文件路径过滤:** 如果需要使用用户提供的文件路径信息，必须对路径进行严格的过滤和校验，禁用路径遍历字符（如`../`，`./`等）。
-
-3.  **安全保存路径:**
-    *   将上传的文件保存到应用程序 Web 根目录之外的非可执行目录，避免直接通过URL访问上传的可执行文件。
-    *   确保上传目录的权限设置正确，限制文件的执行权限。
-
-4.  **限制上传文件大小:** 设置文件上传的最大大小限制，防止拒绝服务攻击。
-
-5.  **定期安全扫描:** 对上传目录进行定期或实时的安全扫描，检测是否存在恶意文件。
+1. **严格校验文件类型和扩展名:**
+   - **白名单机制:** 优先使用白名单限制允许上传的文件类型和扩展名，例如只允许上传`.jpg`, `.png`, `.pdf`等非可执行文件。
+   - **MIME类型校验:** 除了校验扩展名，还应该校验文件的MIME类型，防止攻击者通过修改扩展名绕过校验。
+   - **文件内容校验 (魔术字节):** 对文件头部进行检查，识别文件的真实类型，防止通过伪造文件头绕过MIME类型或扩展名校验。
+2. **不使用用户提供的文件名:**
+   - **生成随机文件名:** 在保存文件时，生成一个随机的唯一文件名或使用时间戳等方式，而不是使用用户上传的原始文件名。
+   - **文件路径过滤:** 如果需要使用用户提供的文件路径信息，必须对路径进行严格的过滤和校验，禁用路径遍历字符（如`../`，`./`等）。
+3. **安全保存路径:**
+   - 将上传的文件保存到应用程序 Web 根目录之外的非可执行目录，避免直接通过URL访问上传的可执行文件。
+   - 确保上传目录的权限设置正确，限制文件的执行权限。
+4. **限制上传文件大小:** 设置文件上传的最大大小限制，防止拒绝服务攻击。
+5. **定期安全扫描:** 对上传目录进行定期或实时的安全扫描，检测是否存在恶意文件。
 ```java
 // 示例：生成随机文件名并校验文件类型
 @PostMapping("/upload")
 public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
     // 允许的文件扩展名白名单
     List<String> allowedExtensions = Arrays.asList("jpg", "png", "pdf");
-
     // 获取文件扩展名
     String fileName = file.getOriginalFilename();
     String extension = fileName.substring(fileName.lastIndexOf(".") + 1);
-
     // 检查扩展名是否在白名单中
     if (!allowedExtensions.contains(extension.toLowerCase())) {
         return ResponseEntity.badRequest().body("不允许的文件类型");
     }
-
     // 校验文件内容（魔术字节示例）
     try (InputStream is = file.getInputStream()) {
         byte[] headerBytes = new byte[8];
@@ -75,11 +61,9 @@ public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile fil
     } catch (IOException e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件读取失败");
     }
-
     // 生成随机文件名
     String randomFileName = UUID.randomUUID().toString() + "." + extension;
     Path savePath = Paths.get("/safe/upload/path/" + randomFileName);
-
     // 保存文件
     try {
         Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
@@ -108,6 +92,78 @@ alert $mid for {
 	title_zh: "检测Spring MVC任意文件上传漏洞",
 	level: "mid",
 	message: "发现Java SpringBoot任意文件上传漏洞。",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+任意文件上传漏洞是指攻击者能够将恶意文件（如WebShell或可执行文件）上传到服务器，并可能通过访问这些文件来执行任意代码或进行其他恶意操作。在基于Spring MVC的应用程序中，如果开发人员在使用`MultipartFile`处理文件上传时，没有对上传的文件名、文件类型、文件内容等进行严格的校验和过滤，就可能导致该漏洞。
+具体来说，如果应用程序直接使用用户提供的文件名（例如通过`MultipartFile.getOriginalFilename()`获取）来保存文件，并且文件名中包含路径遍历字符（如`../`）或者允许上传具有可执行扩展名（如`.jsp`, `.php`, `.asp`, `.sh`等）的文件，攻击者就可以上传恶意文件到服务器的任意位置，甚至覆盖现有文件。
+2. **触发场景**
+当应用程序接收用户上传的文件时，如果以下条件中的一个或多个未得到满足，则可能存在任意文件上传漏洞：
+1.  **未校验文件类型和扩展名:** 应用程序允许上传任何文件扩展名的文件，包括可执行文件。
+2.  **未校验文件内容:** 应用程序未对文件内容进行安全检查，无法识别恶意代码或恶意文件头部。
+3.  **使用用户提供的文件名直接保存:** 直接使用`MultipartFile.getOriginalFilename()`获取的文件名，未对文件名进行清洗过滤。
+4.  **目标保存路径可控:** 如果文件的保存路径部分或完全由用户控制，攻击者可以将文件上传到非预期目录，例如Web目录之外的敏感目录或可执行目录。
+3. **潜在影响**
+*   **远程代码执行 (RCE):** 如果成功上传可执行文件（如WebShell），攻击者可以在服务器上执行任意代码，完全控制服务器。
+*   **服务器被控:** 攻击者可以利用上传的恶意文件进一步渗透内网，控制更多服务器资源。
+*   **数据泄露或篡改:** 攻击者可能通过执行代码访问、窃取或篡改数据库及其他敏感文件。
+*   **拒绝服务 (DoS):** 攻击者可能上传超大文件，消耗服务器磁盘空间或带宽，导致服务不可用。
+*   **网站内容被篡改:** 上传恶意文件覆盖网站原有文件，修改网站内容。
+DESC
+	name: "mid",
+	solution: <<<SOLUTION
+### 修复建议
+为防止任意文件上传漏洞，应采取以下安全措施：
+1.  **严格校验文件类型和扩展名:**
+*   **白名单机制:** 优先使用白名单限制允许上传的文件类型和扩展名，例如只允许上传`.jpg`, `.png`, `.pdf`等非可执行文件。
+*   **MIME类型校验:** 除了校验扩展名，还应该校验文件的MIME类型，防止攻击者通过修改扩展名绕过校验。
+*   **文件内容校验 (魔术字节):** 对文件头部进行检查，识别文件的真实类型，防止通过伪造文件头绕过MIME类型或扩展名校验。
+2.  **不使用用户提供的文件名:**
+*   **生成随机文件名:** 在保存文件时，生成一个随机的唯一文件名或使用时间戳等方式，而不是使用用户上传的原始文件名。
+*   **文件路径过滤:** 如果需要使用用户提供的文件路径信息，必须对路径进行严格的过滤和校验，禁用路径遍历字符（如`../`，`./`等）。
+3.  **安全保存路径:**
+*   将上传的文件保存到应用程序 Web 根目录之外的非可执行目录，避免直接通过URL访问上传的可执行文件。
+*   确保上传目录的权限设置正确，限制文件的执行权限。
+4.  **限制上传文件大小:** 设置文件上传的最大大小限制，防止拒绝服务攻击。
+5.  **定期安全扫描:** 对上传目录进行定期或实时的安全扫描，检测是否存在恶意文件。
+```java
+// 示例：生成随机文件名并校验文件类型
+@PostMapping("/upload")
+public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+// 允许的文件扩展名白名单
+List<String> allowedExtensions = Arrays.asList("jpg", "png", "pdf");
+// 获取文件扩展名
+String fileName = file.getOriginalFilename();
+String extension = fileName.substring(fileName.lastIndexOf(".") + 1);
+// 检查扩展名是否在白名单中
+if (!allowedExtensions.contains(extension.toLowerCase())) {
+return ResponseEntity.badRequest().body("不允许的文件类型");
+}
+// 校验文件内容（魔术字节示例）
+try (InputStream is = file.getInputStream()) {
+byte[] headerBytes = new byte[8];
+is.read(headerBytes);
+String headerHex = DatatypeConverter.printHexBinary(headerBytes).toLowerCase();
+if (!headerHex.startsWith("ffd8") && !headerHex.startsWith("8950")) { // JPG/PNG 魔术字节
+return ResponseEntity.badRequest().body("非法文件内容");
+}
+} catch (IOException e) {
+return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件读取失败");
+}
+// 生成随机文件名
+String randomFileName = UUID.randomUUID().toString() + "." + extension;
+Path savePath = Paths.get("/safe/upload/path/" + randomFileName);
+// 保存文件
+try {
+Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+return ResponseEntity.ok("文件上传成功: " + randomFileName);
+} catch (IOException e) {
+return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件保存失败");
+}
+}
+```
+SOLUTION
+	risk: "任意文件上传",
 }
 
 $sink #{
@@ -121,6 +177,78 @@ alert $low for {
 	message: "发现Java SpringBoot可能存在文件上传漏洞",
 	title: "Check Java Spring MVC Arbitrary File Upload Vulnerability",
 	title_zh: "检测Spring MVC任意文件上传漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+为防止任意文件上传漏洞，应采取以下安全措施：
+1.  **严格校验文件类型和扩展名:**
+*   **白名单机制:** 优先使用白名单限制允许上传的文件类型和扩展名，例如只允许上传`.jpg`, `.png`, `.pdf`等非可执行文件。
+*   **MIME类型校验:** 除了校验扩展名，还应该校验文件的MIME类型，防止攻击者通过修改扩展名绕过校验。
+*   **文件内容校验 (魔术字节):** 对文件头部进行检查，识别文件的真实类型，防止通过伪造文件头绕过MIME类型或扩展名校验。
+2.  **不使用用户提供的文件名:**
+*   **生成随机文件名:** 在保存文件时，生成一个随机的唯一文件名或使用时间戳等方式，而不是使用用户上传的原始文件名。
+*   **文件路径过滤:** 如果需要使用用户提供的文件路径信息，必须对路径进行严格的过滤和校验，禁用路径遍历字符（如`../`，`./`等）。
+3.  **安全保存路径:**
+*   将上传的文件保存到应用程序 Web 根目录之外的非可执行目录，避免直接通过URL访问上传的可执行文件。
+*   确保上传目录的权限设置正确，限制文件的执行权限。
+4.  **限制上传文件大小:** 设置文件上传的最大大小限制，防止拒绝服务攻击。
+5.  **定期安全扫描:** 对上传目录进行定期或实时的安全扫描，检测是否存在恶意文件。
+```java
+// 示例：生成随机文件名并校验文件类型
+@PostMapping("/upload")
+public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+// 允许的文件扩展名白名单
+List<String> allowedExtensions = Arrays.asList("jpg", "png", "pdf");
+// 获取文件扩展名
+String fileName = file.getOriginalFilename();
+String extension = fileName.substring(fileName.lastIndexOf(".") + 1);
+// 检查扩展名是否在白名单中
+if (!allowedExtensions.contains(extension.toLowerCase())) {
+return ResponseEntity.badRequest().body("不允许的文件类型");
+}
+// 校验文件内容（魔术字节示例）
+try (InputStream is = file.getInputStream()) {
+byte[] headerBytes = new byte[8];
+is.read(headerBytes);
+String headerHex = DatatypeConverter.printHexBinary(headerBytes).toLowerCase();
+if (!headerHex.startsWith("ffd8") && !headerHex.startsWith("8950")) { // JPG/PNG 魔术字节
+return ResponseEntity.badRequest().body("非法文件内容");
+}
+} catch (IOException e) {
+return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件读取失败");
+}
+// 生成随机文件名
+String randomFileName = UUID.randomUUID().toString() + "." + extension;
+Path savePath = Paths.get("/safe/upload/path/" + randomFileName);
+// 保存文件
+try {
+Files.copy(file.getInputStream(), savePath, StandardCopyOption.REPLACE_EXISTING);
+return ResponseEntity.ok("文件上传成功: " + randomFileName);
+} catch (IOException e) {
+return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件保存失败");
+}
+}
+```
+SOLUTION
+	risk: "任意文件上传",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+任意文件上传漏洞是指攻击者能够将恶意文件（如WebShell或可执行文件）上传到服务器，并可能通过访问这些文件来执行任意代码或进行其他恶意操作。在基于Spring MVC的应用程序中，如果开发人员在使用`MultipartFile`处理文件上传时，没有对上传的文件名、文件类型、文件内容等进行严格的校验和过滤，就可能导致该漏洞。
+具体来说，如果应用程序直接使用用户提供的文件名（例如通过`MultipartFile.getOriginalFilename()`获取）来保存文件，并且文件名中包含路径遍历字符（如`../`）或者允许上传具有可执行扩展名（如`.jsp`, `.php`, `.asp`, `.sh`等）的文件，攻击者就可以上传恶意文件到服务器的任意位置，甚至覆盖现有文件。
+2. **触发场景**
+当应用程序接收用户上传的文件时，如果以下条件中的一个或多个未得到满足，则可能存在任意文件上传漏洞：
+1.  **未校验文件类型和扩展名:** 应用程序允许上传任何文件扩展名的文件，包括可执行文件。
+2.  **未校验文件内容:** 应用程序未对文件内容进行安全检查，无法识别恶意代码或恶意文件头部。
+3.  **使用用户提供的文件名直接保存:** 直接使用`MultipartFile.getOriginalFilename()`获取的文件名，未对文件名进行清洗过滤。
+4.  **目标保存路径可控:** 如果文件的保存路径部分或完全由用户控制，攻击者可以将文件上传到非预期目录，例如Web目录之外的敏感目录或可执行目录。
+3. **潜在影响**
+*   **远程代码执行 (RCE):** 如果成功上传可执行文件（如WebShell），攻击者可以在服务器上执行任意代码，完全控制服务器。
+*   **服务器被控:** 攻击者可以利用上传的恶意文件进一步渗透内网，控制更多服务器资源。
+*   **数据泄露或篡改:** 攻击者可能通过执行代码访问、窃取或篡改数据库及其他敏感文件。
+*   **拒绝服务 (DoS):** 攻击者可能上传超大文件，消耗服务器磁盘空间或带宽，导致服务不可用。
+*   **网站内容被篡改:** 上传恶意文件覆盖网站原有文件，修改网站内容。
+DESC
+	name: "low",
 }
 
 desc(
@@ -224,4 +352,182 @@ TEXT
         }
     }
 TEXT
+	"safefile://SecureFileUploadController.java": <<<CODE
+package org.example.controller;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+@RestController
+public class SecureFileUploadController {
+
+    // 允许的文件类型白名单（非可执行文件）
+    private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("jpg", "jpeg", "png", "gif", "pdf");
+    private static final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    private static final String UPLOAD_DIR = "/tmp/safeuploads/"; // 保存到Web根目录之外的非可执行目录
+
+    @PostMapping("/secureUpload")
+    public ResponseEntity<String> uploadFile(@RequestParam("file") MultipartFile file) {
+        // 1. 检查文件是否为空
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("文件不能为空。");
+        }
+
+        // 2. 限制文件大小，防止DoS攻击
+        if (file.getSize() > MAX_FILE_SIZE) {
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body("文件大小超出限制，最大允许 " + MAX_FILE_SIZE / (1024 * 1024) + "MB。");
+        }
+
+        // 3. 严格校验文件类型和扩展名（白名单机制）
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return ResponseEntity.badRequest().body("文件名无效。");
+        }
+
+        String fileExtension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+            fileExtension = originalFilename.substring(dotIndex + 1).toLowerCase();
+        } else {
+            return ResponseEntity.badRequest().body("文件缺少扩展名或文件名无效。");
+        }
+
+        if (!ALLOWED_EXTENSIONS.contains(fileExtension)) {
+            return ResponseEntity.badRequest().body("不允许的文件类型。");
+        }
+
+        // 4. 进一步校验MIME类型，防止通过修改扩展名绕过
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/") && !contentType.equals("application/pdf")) {
+             // 检查是否是预期之外的MIME类型
+             // 更严格的应该根据fileExtension来判断ContentType是否匹配，例如PNG文件ContentType必须为image/png
+             return ResponseEntity.badRequest().body("文件MIME类型不匹配或不允许。");
+        }
+
+        // 5. 文件内容校验（例如图片文件可以尝试读取其尺寸来验证是否是有效的图片）
+        if (contentType.startsWith("image/")) {
+            try (InputStream is = file.getInputStream()) {
+                BufferedImage image = ImageIO.read(is);
+                if (image == null) {
+                    return ResponseEntity.badRequest().body("文件内容不是有效的图片。");
+                }
+            } catch (IOException e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("读取图片内容失败。");
+            }
+        }
+
+        // 6. 生成随机文件名，避免使用用户提供的文件名导致路径遍历或覆盖现有文件
+        String uniqueFileName = UUID.randomUUID().toString() + "." + fileExtension;
+        Path targetLocation = Paths.get(UPLOAD_DIR).resolve(uniqueFileName);
+
+        try {
+            // 确保上传目录存在
+            Files.createDirectories(targetLocation.getParent());
+            // 保存文件
+            Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
+            return ResponseEntity.ok("文件上传成功。文件名: " + uniqueFileName);
+        } catch (IOException ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件上传失败: " + ex.getMessage());
+        }
+    }
+
+    // 另一种安全示例：直接将MultipartFile保存到安全位置，但仍需文件名和类型校验
+    @PostMapping("/safeUploadAlternative")
+    public ResponseEntity<String> uploadSafe(@RequestParam("file") MultipartFile file) {
+        // 假设这里已经通过其他方法对文件类型和大小进行了严格校验
+        if (file.isEmpty()) {
+            return ResponseEntity.badRequest().body("文件为空。");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+            fileExtension = originalFilename.substring(dotIndex + 1).toLowerCase();
+        }
+
+        // 强制使用固定的安全扩展名，并生成随机文件名
+        String safeFileName = UUID.randomUUID().toString() + ".dat"; //即使是图片也存储为.dat
+        Path targetLocation = Paths.get(UPLOAD_DIR + safeFileName);
+
+        try {
+            Files.createDirectories(targetLocation.getParent());
+            file.transferTo(targetLocation.toFile()); // 使用transferTo进行文件保存
+            return ResponseEntity.ok("文件安全上传成功。文件名: " + safeFileName);
+        } catch (IOException ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("文件安全上传失败: " + ex.getMessage());
+        }
+    }
+}
+CODE
+	"safefile://SafeUploadService.java": <<<CODE
+package org.example.service;
+
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class SafeUploadService {
+
+    private static final List<String> ALLOWED_EXTENSIONS = Arrays.asList("doc", "docx", "xls", "xlsx", "ppt", "pptx"); 
+    private static final String SAFE_UPLOAD_PATH = "/opt/appdata/documents/"; // 数据文件安全存储路径
+
+    public String uploadDocument(MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("上传文件不能为空。");
+        }
+
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        int dotIndex = originalFilename.lastIndexOf('.');
+        if (dotIndex > 0 && dotIndex < originalFilename.length() - 1) {
+            fileExtension = originalFilename.substring(dotIndex + 1).toLowerCase();
+        } else {
+             throw new IllegalArgumentException("文件缺少扩展名或文件名无效。");
+        }
+
+        // 严格的白名单校验，只允许文档类型，避免其他可执行文件
+        if (!ALLOWED_EXTENSIONS.contains(fileExtension)) {
+            throw new IllegalArgumentException("不允许的文件类型: " + fileExtension);
+        }
+
+        // 生成随机文件名，并确保新的文件路径是安全的且不能被Web直接访问
+        String newFileName = UUID.randomUUID().toString() + "." + fileExtension;
+        Path targetPath = Paths.get(SAFE_UPLOAD_PATH, newFileName);
+
+        // 创建目标目录（如果不存在）
+        Files.createDirectories(targetPath.getParent());
+
+        // 将文件内容复制到目标路径
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+        return newFileName; // 返回新生成的文件名或文件路径，但不包含敏感的服务器路径
+    }
+}
+CODE
 )

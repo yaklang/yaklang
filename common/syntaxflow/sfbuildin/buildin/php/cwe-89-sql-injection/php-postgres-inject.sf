@@ -6,101 +6,86 @@ desc(
 	risk: "sqli-inject"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或"注入"SQL命令，干扰正常的数据库查询执行。当应用程序未使用安全的方式（如参数化查询或适当的输入过滤）处理用户输入时，攻击者可以构造包含恶意SQL代码的输入，这些输入被应用程序直接拼接到SQL查询语句中。数据库会按照攻击者构造的恶意语句执行，可能导致非预期的行为，例如绕过身份验证、访问、修改或删除敏感数据，甚至执行系统命令（取决于数据库配置和权限）。此规则特别关注在PHP代码中使用PostgreSQL数据库时，对 `pg_exec`、`pg_query` 和 `pg_execute` 等函数传入未经充分验证或过滤的用户输入，是典型的SQL注入风险点。
-
+SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或"注入"SQL命令，干扰正常的数据库查询执行。当应用程序未使用安全的方式（如参数化查询或适当的输入过滤）处理用户输入时，攻击者可以构造包含恶意SQL代码的输入，这些输入被应用程序直接拼接到SQL查询语句中。数据库会按照攻击者构造的恶意语句执行，可能导致非预期的行为，例如绕过身份验证、访问、修改或删除敏感数据，甚至执行系统命令（取决于数据库配置和权限）。此规则特别关注在PHP代码中使用PostgreSQL数据库时，对 `pg_exec`、`pg_query` 和 `pg_execute` 等函数传入未经充分验证或过滤的用户输入，是典型的SQL注入风险点。
 2. **触发场景**
-   - **直接拼接用户输入到SQL语句中**：将从 `$_GET`、`$_POST`、`$_COOKIE` 或其他外部来源获取的用户数据直接或经过不当处理后与SQL字符串拼接。
-   - **使用未隔离的特殊字符**：用户输入中的单引号 (`'`)、双引号 (`"`)、反斜杠 (`\`) 等特殊字符未被转义或过滤，导致攻击者可以通过闭合或修改SQL语法来改变查询逻辑。
-   - **不当使用逃逸函数或过滤函数**：虽然使用了 `pg_escape_string` 等函数，但可能使用不当（例如只对部分输入进行处理），或者绕过这些过滤机制。
-
-   ```php
-   // 存在风险的代码示例 (高风险)
-   <?php
-       $username = $_COOKIE['user']; // 从外部获取用户输入
-       $conn = pg_connect("host=localhost dbname=test");
-       // 直接拼接用户输入到查询字符串中，未进行充分过滤或参数化
-       $result = pg_query($conn, "SELECT * FROM users WHERE login = '$username'"); 
-   ?>
-
-   // 存在风险的代码示例 (中风险)
-   <?php
-       $email = some_filtering_function($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
-       $conn = pg_connect("host=localhost dbname=test");
-       // 用户输入被用于SQL语句的一部分，虽然经过过滤但仍有风险
-       $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123");
-   ?>
-   ```
-
+- **直接拼接用户输入到SQL语句中**：将从 `$_GET`、`$_POST`、`$_COOKIE` 或其他外部来源获取的用户数据直接或经过不当处理后与SQL字符串拼接。
+- **使用未隔离的特殊字符**：用户输入中的单引号 (`'`)、双引号 (`"`)、反斜杠 (`\`) 等特殊字符未被转义或过滤，导致攻击者可以通过闭合或修改SQL语法来改变查询逻辑。
+- **不当使用逃逸函数或过滤函数**：虽然使用了 `pg_escape_string` 等函数，但可能使用不当（例如只对部分输入进行处理），或者绕过这些过滤机制。
+```php
+// 存在风险的代码示例 (高风险)
+<?php
+$username = $_COOKIE['user']; // 从外部获取用户输入
+$conn = pg_connect("host=localhost dbname=test");
+// 直接拼接用户输入到查询字符串中，未进行充分过滤或参数化
+$result = pg_query($conn, "SELECT * FROM users WHERE login = '$username'");
+?>
+// 存在风险的代码示例 (中风险)
+<?php
+$email = some_filtering_function($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
+$conn = pg_connect("host=localhost dbname=test");
+// 用户输入被用于SQL语句的一部分，虽然经过过滤但仍有风险
+$res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123");
+?>
+```
 3. **潜在影响**
-   - **数据泄露**：恶意用户可能获取所有数据库中的敏感信息。
-   - **数据篡改或删除**：能够修改、增加或删除数据库中的任意数据。
-   - **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
-   - **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
+- **数据泄露**：恶意用户可能获取所有数据库中的敏感信息。
+- **数据篡改或删除**：能够修改、增加或删除数据库中的任意数据。
+- **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
+- **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
 DESC
 	rule_id: "62323f1d-76c2-40da-9058-f497ae7cfc60"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（Prepared Statements）
 这是防止SQL注入最有效的方法。通过预编译SQL语句，将查询逻辑与用户提供的数据分离。数据在绑定到预编译语句时，会被当作纯粹的值来处理，不会被解释为SQL代码的一部分。PHP提供了 `pg_prepare` 和 `pg_execute` 函数来支持参数化查询。
-
 ```php
 // 修复代码示例
 <?php
-    $userId = $_GET['id'];
-    $conn = pg_connect("host=localhost dbname=test") or die("无法连接到数据库");
-
-    // 准备查询，将用户输入作为参数占位符 $1
-    $query = pg_prepare($conn, "get_user_query", 'SELECT * FROM profiles WHERE user_id = $1');
-
-    if ($query) {
-        // 执行查询，将用户输入作为数组绑定到参数
-        $result = pg_execute($conn, "get_user_query", array($userId));
-
-        if ($result) {
-            // 处理查询结果
-            while ($row = pg_fetch_assoc($result)) {
-                print_r($row);
-            }
-            pg_free_result($result);
-        }
-    }
-    pg_close($conn);
+$userId = $_GET['id'];
+$conn = pg_connect("host=localhost dbname=test") or die("无法连接到数据库");
+// 准备查询，将用户输入作为参数占位符 $1
+$query = pg_prepare($conn, "get_user_query", 'SELECT * FROM profiles WHERE user_id = $1');
+if ($query) {
+// 执行查询，将用户输入作为数组绑定到参数
+$result = pg_execute($conn, "get_user_query", array($userId));
+if ($result) {
+// 处理查询结果
+while ($row = pg_fetch_assoc($result)) {
+print_r($row);
+}
+pg_free_result($result);
+}
+}
+pg_close($conn);
 ?>
 ```
-
 #### 2. 严格的输入验证和过滤
 对所有来自外部（用户、文件、其他系统）的输入进行严格的类型、格式和内容的验证。使用白名单过滤允许的字符或模式。虽然参数化查询是首选，但在某些情况下（例如动态构建查询的某些部分），输入过滤是必要的补充。
-
 ```php
 // 示例：验证输入为整数
 <?php
-    $id = $_GET['id'];
-    if (!filter_var($id, FILTER_VALIDATE_INT)) {
-        // 处理非法输入，例如终止脚本或记录错误
-        die("无效的用户ID");
-    }
-    // 现在 $id 可以安全地用于参数化查询
+$id = $_GET['id'];
+if (!filter_var($id, FILTER_VALIDATE_INT)) {
+// 处理非法输入，例如终止脚本或记录错误
+die("无效的用户ID");
+}
+// 现在 $id 可以安全地用于参数化查询
 ?>
 ```
-
 #### 3. 使用数据库特定的转义函数
 如果无法使用参数化查询，务必使用数据库提供的、针对该数据库和字符集安全的转义函数，如 `pg_escape_string()` 或更安全的 `pg_escape_literal()` 或 `pg_escape_identifier()`，根据需要转义字符串或标识符。**请注意，仅使用转义函数并不能完全防止SQL注入，尤其是当用户输入用于设置列名或表名等SQL结构时。应优先使用参数化查询。**
-
 ```php
 // 示例：使用 pg_escape_literal() 转义字符串（仅作为参数化查询的备选，不推荐）
 <?php
-    $unsafe_input = $_POST['comment'];
-    $conn = pg_connect("host=localhost dbname=test");
-    // 使用 pg_escape_literal 转义用户输入
-    $safe_comment = pg_escape_literal($conn, $unsafe_input);
-    // 即使使用了转义，直接拼接字符串仍有潜在风险且复杂，参数化查询更安全可靠。
-    $result = pg_query($conn, "INSERT INTO comments (text) VALUES (" . $safe_comment . ")");
+$unsafe_input = $_POST['comment'];
+$conn = pg_connect("host=localhost dbname=test");
+// 使用 pg_escape_literal 转义用户输入
+$safe_comment = pg_escape_literal($conn, $unsafe_input);
+// 即使使用了转义，直接拼接字符串仍有潜在风险且复杂，参数化查询更安全可靠。
+$result = pg_query($conn, "INSERT INTO comments (text) VALUES (" . $safe_comment . ")");
 ?>
 ```
-
 #### 4. 最小权限原则
 为数据库用户分配最小必需的权限，限制其只能执行应用程序需要的操作。即使发生注入攻击，也能限制攻击者能造成的损害。
 SOLUTION
@@ -131,107 +116,95 @@ CODE)> as $high
 
 alert $high for {
 	title_zh: "PostgreSQL未验证参数注入风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（Prepared Statements）
 这是防止SQL注入最有效的方法。通过预编译SQL语句，将查询逻辑与用户提供的数据分离。数据在绑定到预编译语句时，会被当作纯粹的值来处理，不会被解释为SQL代码的一部分。PHP提供了 `pg_prepare` 和 `pg_execute` 函数来支持参数化查询。
-
 ```php
 // 修复代码示例
 <?php
-    $userId = $_GET['id'];
-    $conn = pg_connect("host=localhost dbname=test") or die("无法连接到数据库");
-
-    // 准备查询，将用户输入作为参数占位符 $1
-    $query = pg_prepare($conn, "get_user_query", 'SELECT * FROM profiles WHERE user_id = $1');
-
-    if ($query) {
-        // 执行查询，将用户输入作为数组绑定到参数
-        $result = pg_execute($conn, "get_user_query", array($userId));
-
-        if ($result) {
-            // 处理查询结果
-            while ($row = pg_fetch_assoc($result)) {
-                print_r($row);
-            }
-            pg_free_result($result);
-        }
-    }
-    pg_close($conn);
+$userId = $_GET['id'];
+$conn = pg_connect("host=localhost dbname=test") or die("无法连接到数据库");
+// 准备查询，将用户输入作为参数占位符 $1
+$query = pg_prepare($conn, "get_user_query", 'SELECT * FROM profiles WHERE user_id = $1');
+if ($query) {
+// 执行查询，将用户输入作为数组绑定到参数
+$result = pg_execute($conn, "get_user_query", array($userId));
+if ($result) {
+// 处理查询结果
+while ($row = pg_fetch_assoc($result)) {
+print_r($row);
+}
+pg_free_result($result);
+}
+}
+pg_close($conn);
 ?>
 ```
-
 #### 2. 严格的输入验证和过滤
 对所有来自外部（用户、文件、其他系统）的输入进行严格的类型、格式和内容的验证。使用白名单过滤允许的字符或模式。虽然参数化查询是首选，但在某些情况下（例如动态构建查询的某些部分），输入过滤是必要的补充。
-
 ```php
 // 示例：验证输入为整数
 <?php
-    $id = $_GET['id'];
-    if (!filter_var($id, FILTER_VALIDATE_INT)) {
-        // 处理非法输入，例如终止脚本或记录错误
-        die("无效的用户ID");
-    }
-    // 现在 $id 可以安全地用于参数化查询
+$id = $_GET['id'];
+if (!filter_var($id, FILTER_VALIDATE_INT)) {
+// 处理非法输入，例如终止脚本或记录错误
+die("无效的用户ID");
+}
+// 现在 $id 可以安全地用于参数化查询
 ?>
 ```
-
 #### 3. 使用数据库特定的转义函数
 如果无法使用参数化查询，务必使用数据库提供的、针对该数据库和字符集安全的转义函数，如 `pg_escape_string()` 或更安全的 `pg_escape_literal()` 或 `pg_escape_identifier()`，根据需要转义字符串或标识符。**请注意，仅使用转义函数并不能完全防止SQL注入，尤其是当用户输入用于设置列名或表名等SQL结构时。应优先使用参数化查询。**
-
 ```php
 // 示例：使用 pg_escape_literal() 转义字符串（仅作为参数化查询的备选，不推荐）
 <?php
-    $unsafe_input = $_POST['comment'];
-    $conn = pg_connect("host=localhost dbname=test");
-    // 使用 pg_escape_literal 转义用户输入
-    $safe_comment = pg_escape_literal($conn, $unsafe_input);
-    // 即使使用了转义，直接拼接字符串仍有潜在风险且复杂，参数化查询更安全可靠。
-    $result = pg_query($conn, "INSERT INTO comments (text) VALUES (" . $safe_comment . ")");
+$unsafe_input = $_POST['comment'];
+$conn = pg_connect("host=localhost dbname=test");
+// 使用 pg_escape_literal 转义用户输入
+$safe_comment = pg_escape_literal($conn, $unsafe_input);
+// 即使使用了转义，直接拼接字符串仍有潜在风险且复杂，参数化查询更安全可靠。
+$result = pg_query($conn, "INSERT INTO comments (text) VALUES (" . $safe_comment . ")");
 ?>
 ```
-
 #### 4. 最小权限原则
 为数据库用户分配最小必需的权限，限制其只能执行应用程序需要的操作。即使发生注入攻击，也能限制攻击者能造成的损害。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或"注入"SQL命令，干扰正常的数据库查询执行。当应用程序未使用安全的方式（如参数化查询或适当的输入过滤）处理用户输入时，攻击者可以构造包含恶意SQL代码的输入，这些输入被应用程序直接拼接到SQL查询语句中。数据库会按照攻击者构造的恶意语句执行，可能导致非预期的行为，例如绕过身份验证、访问、修改或删除敏感数据，甚至执行系统命令（取决于数据库配置和权限）。此规则特别关注在PHP代码中使用PostgreSQL数据库时，对 `pg_exec`、`pg_query` 和 `pg_execute` 等函数传入未经充分验证或过滤的用户输入，是典型的SQL注入风险点。
-
+SQL注入（SQL Injection，简称SQLI）是一种代码注入技术，攻击者通过在应用程序的输入栏中恶意插入或"注入"SQL命令，干扰正常的数据库查询执行。当应用程序未使用安全的方式（如参数化查询或适当的输入过滤）处理用户输入时，攻击者可以构造包含恶意SQL代码的输入，这些输入被应用程序直接拼接到SQL查询语句中。数据库会按照攻击者构造的恶意语句执行，可能导致非预期的行为，例如绕过身份验证、访问、修改或删除敏感数据，甚至执行系统命令（取决于数据库配置和权限）。此规则特别关注在PHP代码中使用PostgreSQL数据库时，对 `pg_exec`、`pg_query` 和 `pg_execute` 等函数传入未经充分验证或过滤的用户输入，是典型的SQL注入风险点。
 2. **触发场景**
-   - **直接拼接用户输入到SQL语句中**：将从 `$_GET`、`$_POST`、`$_COOKIE` 或其他外部来源获取的用户数据直接或经过不当处理后与SQL字符串拼接。
-   - **使用未隔离的特殊字符**：用户输入中的单引号 (`'`)、双引号 (`"`)、反斜杠 (`\`) 等特殊字符未被转义或过滤，导致攻击者可以通过闭合或修改SQL语法来改变查询逻辑。
-   - **不当使用逃逸函数或过滤函数**：虽然使用了 `pg_escape_string` 等函数，但可能使用不当（例如只对部分输入进行处理），或者绕过这些过滤机制。
-
-   ```php
-   // 存在风险的代码示例 (高风险)
-   <?php
-       $username = $_COOKIE['user']; // 从外部获取用户输入
-       $conn = pg_connect("host=localhost dbname=test");
-       // 直接拼接用户输入到查询字符串中，未进行充分过滤或参数化
-       $result = pg_query($conn, "SELECT * FROM users WHERE login = '$username'"); 
-   ?>
-
-   // 存在风险的代码示例 (中风险)
-   <?php
-       $email = some_filtering_function($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
-       $conn = pg_connect("host=localhost dbname=test");
-       // 用户输入被用于SQL语句的一部分，虽然经过过滤但仍有风险
-       $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123");
-   ?>
-   ```
-
+- **直接拼接用户输入到SQL语句中**：将从 `$_GET`、`$_POST`、`$_COOKIE` 或其他外部来源获取的用户数据直接或经过不当处理后与SQL字符串拼接。
+- **使用未隔离的特殊字符**：用户输入中的单引号 (`'`)、双引号 (`"`)、反斜杠 (`\`) 等特殊字符未被转义或过滤，导致攻击者可以通过闭合或修改SQL语法来改变查询逻辑。
+- **不当使用逃逸函数或过滤函数**：虽然使用了 `pg_escape_string` 等函数，但可能使用不当（例如只对部分输入进行处理），或者绕过这些过滤机制。
+```php
+// 存在风险的代码示例 (高风险)
+<?php
+$username = $_COOKIE['user']; // 从外部获取用户输入
+$conn = pg_connect("host=localhost dbname=test");
+// 直接拼接用户输入到查询字符串中，未进行充分过滤或参数化
+$result = pg_query($conn, "SELECT * FROM users WHERE login = '$username'");
+?>
+// 存在风险的代码示例 (中风险)
+<?php
+$email = some_filtering_function($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
+$conn = pg_connect("host=localhost dbname=test");
+// 用户输入被用于SQL语句的一部分，虽然经过过滤但仍有风险
+$res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123");
+?>
+```
 3. **潜在影响**
-   - **数据泄露**：恶意用户可能获取所有数据库中的敏感信息。
-   - **数据篡改或删除**：能够修改、增加或删除数据库中的任意数据。
-   - **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
-   - **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
-CODE
+- **数据泄露**：恶意用户可能获取所有数据库中的敏感信息。
+- **数据篡改或删除**：能够修改、增加或删除数据库中的任意数据。
+- **权限提升**：在某些配置下，可以通过注入语句获取更高权限，甚至执行操作系统命令。
+- **服务中断**：通过注入恶意语句导致数据库崩溃或应用程序异常。
+DESC
 	level: "high",
 	title: "Unvalidated PostgreSQL Parameter Injection",
+	name: "high",
+	message: "检测到PHP PostgreSQL未验证参数注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "SQL注入",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -243,94 +216,84 @@ $highAndMid - $high as $mid
 
 
 alert $mid for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   在处理PostgreSQL数据库操作时，若未对用户输入进行充分过滤或验证，可能会存在SQL注入的风险。尽管部分输入可能已经经过过滤函数处理，但如果过滤不足或使用不当，仍可能存在安全漏洞。
-
+在处理PostgreSQL数据库操作时，若未对用户输入进行充分过滤或验证，可能会存在SQL注入的风险。尽管部分输入可能已经经过过滤函数处理，但如果过滤不足或使用不当，仍可能存在安全漏洞。
 2. **触发场景**
-   - **存在中危问题的代码示例**
-     ```php
-     <?php
-         $email = xxxx($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
-         $res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123"); // 中危漏洞
-     ?>
-     ```
-
+- **存在中危问题的代码示例**
+```php
+<?php
+$email = xxxx($_POST['email']); // 使用了过滤函数，但可能不够充分或被绕过
+$res = pg_exec($conn, "UPDATE accounts SET email = '$email' WHERE id = 123"); // 中危漏洞
+?>
+```
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-   - 通过注入恶意语句导致数据库崩溃或应用程序异常。
-CODE
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+- 通过注入恶意语句导致数据库崩溃或应用程序异常。
+DESC
 	level: "mid",
 	title: "Insufficient PostgreSQL Parameter Filtering",
 	title_zh: "PostgreSQL参数过滤不充分",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（Prepared Statements）
 这是防止SQL注入最有效的方法。通过预编译SQL语句，将查询逻辑与用户提供的数据分离。数据在绑定到预编译语句时，会被当作纯粹的值来处理，不会被解释为SQL代码的一部分。PHP提供了 `pg_prepare` 和 `pg_execute` 函数来支持参数化查询。
-
 ```php
 // 修复代码示例
 <?php
-    $userId = $_GET['id'];
-    $conn = pg_connect("host=localhost dbname=test") or die("无法连接到数据库");
-
-    // 准备查询，将用户输入作为参数占位符 $1
-    $query = pg_prepare($conn, "get_user_query", 'SELECT * FROM profiles WHERE user_id = $1');
-
-    if ($query) {
-        // 执行查询，将用户输入作为数组绑定到参数
-        $result = pg_execute($conn, "get_user_query", array($userId));
-
-        if ($result) {
-            // 处理查询结果
-            while ($row = pg_fetch_assoc($result)) {
-                print_r($row);
-            }
-            pg_free_result($result);
-        }
-    }
-    pg_close($conn);
+$userId = $_GET['id'];
+$conn = pg_connect("host=localhost dbname=test") or die("无法连接到数据库");
+// 准备查询，将用户输入作为参数占位符 $1
+$query = pg_prepare($conn, "get_user_query", 'SELECT * FROM profiles WHERE user_id = $1');
+if ($query) {
+// 执行查询，将用户输入作为数组绑定到参数
+$result = pg_execute($conn, "get_user_query", array($userId));
+if ($result) {
+// 处理查询结果
+while ($row = pg_fetch_assoc($result)) {
+print_r($row);
+}
+pg_free_result($result);
+}
+}
+pg_close($conn);
 ?>
 ```
-
 #### 2. 严格的输入验证和过滤
 对所有来自外部（用户、文件、其他系统）的输入进行严格的类型、格式和内容的验证。使用白名单过滤允许的字符或模式。虽然参数化查询是首选，但在某些情况下（例如动态构建查询的某些部分），输入过滤是必要的补充。
-
 ```php
 // 示例：验证输入为整数
 <?php
-    $id = $_GET['id'];
-    if (!filter_var($id, FILTER_VALIDATE_INT)) {
-        // 处理非法输入，例如终止脚本或记录错误
-        die("无效的用户ID");
-    }
-    // 现在 $id 可以安全地用于参数化查询
+$id = $_GET['id'];
+if (!filter_var($id, FILTER_VALIDATE_INT)) {
+// 处理非法输入，例如终止脚本或记录错误
+die("无效的用户ID");
+}
+// 现在 $id 可以安全地用于参数化查询
 ?>
 ```
-
 #### 3. 使用数据库特定的转义函数
 如果无法使用参数化查询，务必使用数据库提供的、针对该数据库和字符集安全的转义函数，如 `pg_escape_string()` 或更安全的 `pg_escape_literal()` 或 `pg_escape_identifier()`，根据需要转义字符串或标识符。**请注意，仅使用转义函数并不能完全防止SQL注入，尤其是当用户输入用于设置列名或表名等SQL结构时。应优先使用参数化查询。**
-
 ```php
 // 示例：使用 pg_escape_literal() 转义字符串（仅作为参数化查询的备选，不推荐）
 <?php
-    $unsafe_input = $_POST['comment'];
-    $conn = pg_connect("host=localhost dbname=test");
-    // 使用 pg_escape_literal 转义用户输入
-    $safe_comment = pg_escape_literal($conn, $unsafe_input);
-    // 即使使用了转义，直接拼接字符串仍有潜在风险且复杂，参数化查询更安全可靠。
-    $result = pg_query($conn, "INSERT INTO comments (text) VALUES (" . $safe_comment . ")");
+$unsafe_input = $_POST['comment'];
+$conn = pg_connect("host=localhost dbname=test");
+// 使用 pg_escape_literal 转义用户输入
+$safe_comment = pg_escape_literal($conn, $unsafe_input);
+// 即使使用了转义，直接拼接字符串仍有潜在风险且复杂，参数化查询更安全可靠。
+$result = pg_query($conn, "INSERT INTO comments (text) VALUES (" . $safe_comment . ")");
 ?>
 ```
-
 #### 4. 最小权限原则
 为数据库用户分配最小必需的权限，限制其只能执行应用程序需要的操作。即使发生注入攻击，也能限制攻击者能造成的损害。
-CODE
+SOLUTION
+	message: "检测到PHP PostgreSQL参数过滤不充分漏洞，可能存在中危风险，需进一步审计确认。",
+	risk: "SQL注入",
+	name: "mid",
 }
 
 $sink - $high - $mid as $low
@@ -338,19 +301,27 @@ $sink - $high - $mid as $low
 alert $low for {
 	title: "Potential PostgreSQL Access Control Bypass",
 	title_zh: "PostgreSQL访问控制潜在绕过风险",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于审计PHP代码中可能出现的PostgreSQL访问控制潜在绕过风险。它通过识别直接使用用户输入调用PostgreSQL相关函数的情况，定位可能存在的访问控制缺陷，防止攻击者利用信任机制绕过正常的安全防护。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`php-postgres-access-control`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测访问控制问题，提供核心函数识别能力。
-
+属于`php-postgres-access-control`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测访问控制问题，提供核心函数识别能力。
 2. **覆盖高危访问控制函数**
-   检测以下3个PostgreSQL访问控制函数：
-   `pg_exec`, `pg_query`, `pg_execute`。
-CODE
+检测以下3个PostgreSQL访问控制函数：
+`pg_exec`, `pg_query`, `pg_execute`。
+DESC
 	level: "low",
+	name: "low",
+	message: "发现PHP PostgreSQL访问控制潜在绕过风险，提示开发人员关注审计到的信息。",
+	solution: <<<SOLUTION
+### 审计建议
+由于该规则主要用于识别潜在的访问控制缺陷而非明确的漏洞，以下是一些通用的安全建议：
+1. **避免直接使用用户输入**：尽量减少直接使用外部输入调用核心数据库函数的情况，确保每个操作都经过严格验证。
+2. **强制实施最小权限原则**：确保数据库账户仅拥有完成必要功能所需的最低权限，避免滥用信任机制。
+3. **结合其他规则共同审计**：本规则属于基础检测库，需与其他规则（如用户输入跟踪规则）配合使用，才能全面评估访问控制的有效性。
+SOLUTION
+	risk: "信息",
 }
 
 desc(

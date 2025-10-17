@@ -60,11 +60,12 @@ type httpPoolConfig struct {
 
 	// beforeRequest
 	// afterRequest
-	HookBeforeRequest func(https bool, originReq []byte, req []byte) []byte
-	HookAfterRequest  func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
-	MirrorHTTPFlow    func([]byte, []byte, map[string]string) map[string]string
-	RetryHandler      func(https bool, retryCount int, req []byte, rsp []byte) bool
-	MutateHook        func([]byte) [][]byte
+	HookBeforeRequest    func(https bool, originReq []byte, req []byte) []byte
+	HookAfterRequest     func(https bool, originReq []byte, req []byte, originRsp []byte, rsp []byte) []byte
+	MirrorHTTPFlow       func([]byte, []byte, map[string]string) map[string]string
+	RetryHandler         func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
+	CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
+	MutateHook           func([]byte) [][]byte
 
 	// 请求来源
 	Source string
@@ -118,6 +119,8 @@ type httpPoolConfig struct {
 	MaxChunkedLength    int
 	MinChunkDelayTime   time.Duration
 	MaxChunkDelayTime   time.Duration
+
+	NoReadMultiResponse bool
 }
 
 // WithPoolOpt_DNSNoCache is not effective
@@ -211,13 +214,15 @@ func _hoopPool_SetHookCaller(
 	before func(bool, []byte, []byte) []byte,
 	after func(bool, []byte, []byte, []byte, []byte) []byte,
 	extractor func([]byte, []byte, map[string]string) map[string]string,
-	retryHandler func(bool, int, []byte, []byte) bool,
+	retryHandler func(bool, int, []byte, []byte, func(...[]byte)),
+	customFailureChecker func(bool, []byte, []byte, func(string)),
 ) HttpPoolConfigOption {
 	return func(config *httpPoolConfig) {
 		config.HookBeforeRequest = before
 		config.HookAfterRequest = after
 		config.MirrorHTTPFlow = extractor
 		config.RetryHandler = retryHandler
+		config.CustomFailureChecker = customFailureChecker
 	}
 }
 
@@ -595,6 +600,12 @@ func _httpPool_RandomChunkDelayTime(min, max time.Duration) HttpPoolConfigOption
 	}
 }
 
+func _httpPool_NoReadMultiResponse(b bool) HttpPoolConfigOption {
+	return func(config *httpPoolConfig) {
+		config.NoReadMultiResponse = b
+	}
+}
+
 type HttpPoolConfigOption func(config *httpPoolConfig)
 
 type HttpResult struct {
@@ -937,10 +948,15 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 							lowhttp.WithConnPool(config.WithConnPool),
 							lowhttp.WithDebugCount(beforeCount, afterCount),
 							lowhttp.WithSaveHTTPFlow(config.SaveHTTPFlow),
+							lowhttp.WithNoReadMultiResponse(config.NoReadMultiResponse),
 						}
 
 						if config.RetryHandler != nil {
 							lowhttpOptions = append(lowhttpOptions, lowhttp.WithRetryHandler(config.RetryHandler))
+						}
+
+						if config.CustomFailureChecker != nil {
+							lowhttpOptions = append(lowhttpOptions, lowhttp.WithCustomFailureChecker(config.CustomFailureChecker))
 						}
 
 						if config.ConnPool != nil {
@@ -1056,7 +1072,7 @@ func _httpPool(i interface{}, opts ...HttpPoolConfigOption) (chan *HttpResult, e
 								Request:     reqIns,
 								Error:       err,
 								RequestRaw:  targetRequest,
-								ResponseRaw: nil,
+								ResponseRaw: rsp,
 								//DurationMs:      rspInstance.TraceInfo.GetServerDurationMS(),
 								Timestamp:         time.Now().Unix(),
 								Payloads:          payloads,
@@ -1304,4 +1320,5 @@ var (
 	WithPoolOpt_EnableRandomChunked        = _httpPool_enableRandomChunked
 	WithPoolOpt_RandomChunkedLength        = _httpPool_RandomChunkedLength
 	WithPoolOpt_RandomChunkDelayTime       = _httpPool_RandomChunkDelayTime
+	WithPoolOpt_NoReadMultiResponse        = _httpPool_NoReadMultiResponse
 )

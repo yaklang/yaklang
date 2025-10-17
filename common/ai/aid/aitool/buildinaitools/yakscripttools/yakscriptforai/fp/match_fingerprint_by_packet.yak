@@ -1,0 +1,35 @@
+__DESC__ = "一个数据包指纹匹配工具，可以对输入的网络数据包进行指纹识别和匹配，用于识别数据包中包含的服务、协议或应用特征，帮助进行网络流量分析和安全检测。支持直接传入数据包内容或指定文件路径读取文件内容进行匹配。"
+__VERBOSE_NAME__ = "数据包指纹匹配"
+__KEYWORDS__ = "数据包分析,指纹匹配,网络分析,协议识别,服务识别,流量分析,安全检测,packet analysis,fingerprint matching,network analysis,protocol identification,service identification,traffic analysis,security detection,response matching,文件读取,file reading"
+
+packet = cli.Text("packet", cli.setVerboseName("数据包"), cli.setHelp("需要指纹匹配的数据包原文(packet 和 file_path 必须二选一)"))
+file_path = cli.String("file_path", cli.setVerboseName("文件路径"), cli.setHelp("指定文件路径，读取文件内容进行指纹匹配(packet 和 file_path 必须二选一)"))
+cli.check()
+
+// 检查参数：packet 和 file_path 必须二选一
+if packet == "" && file_path == "" {
+    yakit.Error("必须提供 packet 或 file_path 参数之一")
+    return
+}
+
+if packet != "" && file_path != "" {
+    yakit.Error("packet 和 file_path 参数不能同时提供，请选择其中一个")
+    return
+}
+
+// 如果提供了文件路径，读取文件内容
+if file_path != "" {
+    content, err = file.ReadFile(file_path)
+    if err != nil {
+        yakit.Error("读取文件失败: %v", err)
+        return
+    }
+    packet = string(content)
+    yakit.Info("已从文件 %v 读取内容进行指纹匹配", file_path)
+}
+
+res = fp.MatchRsp(packet)
+for i in res {
+    yakit.Info("匹配指纹: %v", i)
+}
+

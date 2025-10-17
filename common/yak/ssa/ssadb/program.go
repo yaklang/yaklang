@@ -16,6 +16,8 @@ type IrProgram struct {
 	gorm.Model
 
 	ProgramName string `json:"program_name" gorm:"unique_index"`
+	ProjectName string `json:"project_name" gorm:"index"`
+
 	Description string `json:"description" gorm:"type:text"`
 
 	Version       string `json:"package_version" gorm:"index"`
@@ -36,7 +38,8 @@ type IrProgram struct {
 	DownStream StringSlice `json:"down_stream_programs" gorm:"type:text"`
 
 	// this  program  contain this file
-	FileList StringMap `json:"file_list" gorm:"type:text"`
+	FileList  StringMap `json:"file_list" gorm:"type:text"`
+	LineCount int       `json:"line_count" gorm:"default:0"`
 
 	// program extra file: *.properties, *.xml, *.json, etc
 	ExtraFile StringMap `json:"extra_file" gorm:"type:text"`
@@ -70,6 +73,10 @@ func GetLibrary(name, version string) (*IrProgram, error) {
 		return nil, err
 	}
 	return &p, nil
+}
+
+func GetApplicationProgram(name string) (*IrProgram, error) {
+	return GetProgram(name, Application)
 }
 
 func GetProgram(name string, kind ProgramKind) (*IrProgram, error) {

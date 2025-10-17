@@ -89,6 +89,13 @@ type BrowserStarter struct {
 
 	aiInputUrl  string
 	aiInputInfo string
+
+	// login related
+	login         bool
+	aiDomain      string
+	aiApiKey      string
+	loginUsername string
+	loginPassword string
 }
 
 func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *BrowserStarter {
@@ -134,6 +141,10 @@ func NewBrowserStarter(browserConfig *BrowserConfig, baseConfig *BaseConfig) *Br
 
 		aiInputUrl:  baseConfig.aiInputUrl,
 		aiInputInfo: baseConfig.aiInputInfo,
+
+		login:         baseConfig.login,
+		loginUsername: baseConfig.username,
+		loginPassword: baseConfig.password,
 	}
 	var ctx context.Context
 	var cancel context.CancelFunc
@@ -347,6 +358,21 @@ func (starter *BrowserStarter) scanCreatedTarget(targetID proto.TargetTargetID) 
 	if starter.extraWaitLoadTime != 0 {
 		time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
 	}
+	// login
+	if starter.login {
+		// login action
+		page = page.Timeout(30 * time.Second)
+		err = starter.Login(page)
+		if err != nil {
+			log.Debugf(`Login error: %v`, err)
+		}
+		//_ = page.WaitLoad()
+		//if starter.extraWaitLoadTime != 0 {
+		//	time.Sleep(time.Duration(starter.extraWaitLoadTime) * time.Millisecond)
+		//}
+		page = page.CancelTimeout()
+		starter.login = false
+	}
 	// session storage
 	if len(starter.baseConfig.sessionStorage) > 0 {
 		for key, value := range starter.baseConfig.sessionStorage {
@@ -423,6 +449,10 @@ func (starter *BrowserStarter) createBrowserHijack(browser *rod.Browser) error {
 			hijack.Request.Req().Header.Set(header.Key, header.Value)
 		}
 		contentType := hijack.Request.Header("Content-Type")
+		if strings.Contains(contentType, "octet-stream") {
+			hijack.Response.Fail(proto.NetworkErrorReasonBlockedByClient)
+			return
+		}
 		if strings.Contains(contentType, "multipart/form-data") {
 			hijack.ContinueRequest(&proto.FetchContinueRequest{})
 			result := SimpleResult{}
@@ -546,6 +576,10 @@ func (starter *BrowserStarter) Start() {
 		return
 	}
 	headlessBrowser := starter.browser
+	_ = proto.BrowserSetDownloadBehavior{
+		Behavior:         proto.BrowserSetDownloadBehaviorBehaviorDeny,
+		BrowserContextID: headlessBrowser.BrowserContextID,
+	}.Call(headlessBrowser)
 	//defer headlessBrowser.MustClose()
 	defer func() {
 		_ = headlessBrowser.Close()
@@ -583,7 +617,8 @@ running:
 				starter.counter.Wait(starter.concurrent)
 			}
 			urlStr, _ := v.(string)
-			p, err := headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
+			var p *rod.Page
+			p, err = headlessBrowser.Page(proto.TargetCreateTarget{URL: "about:blank"})
 			if err != nil {
 				log.Errorf("create page error: %v", err)
 				continue

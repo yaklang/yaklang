@@ -8,32 +8,33 @@ desc(
 
 ### 2.规则详细
 1. **识别`HttpClientUtils`类**
-   规则首先通过`fullTypeName`匹配所有使用到`com.alibaba.druid.util.HttpClientUtils`类的实例。
+规则首先通过`fullTypeName`匹配所有使用到`com.alibaba.druid.util.HttpClientUtils`类的实例。
+
 2. **检测HTTP请求方法**
-   然后，规则进一步检测`HttpClientUtils`实例是否调用了发送HTTP请求的方法，例如`get()`或`post()`。这些方法是发起网络请求的关键点。
+然后，规则进一步检测`HttpClientUtils`实例是否调用了发送HTTP请求的方法，例如`get()`或`post()`。这些方法是发起网络请求的关键点。
+
 3. **作为基础审计库**
-   此规则属于`java-alibaba-druid-httpclientutil`库规则（`lib`类型），其主要目的是作为基础审计规则，帮助定位使用了`HttpClientUtils`进行HTTP请求的代码位置。它本身并不直接检测具体的漏洞，而是为后续更精细的规则提供检测目标。
+此规则属于`java-alibaba-druid-httpclientutil`库规则（`lib`类型），其主要目的是作为基础审计规则，帮助定位使用了`HttpClientUtils`进行HTTP请求的代码位置。它本身并不直接检测具体的漏洞，而是为后续更精细的规则提供检测目标。
+
 4. **潜在风险**
-   尽管`HttpClientUtils`在某些场景下便捷，但在处理复杂的网络环境、需要高级安全特性（如严格的SSL/TLS配置、代理设置、连接池管理等）或面对恶意构造的HTTP响应时，可能不如行业标准库安全可靠。不恰当的使用也可能导致敏感信息泄露或请求伪造。
+尽管`HttpClientUtils`在某些场景下便捷，但在处理复杂的网络环境、需要高级安全特性（如严格的SSL/TLS配置、代理设置、连接池管理等）或面对恶意构造的HTTP响应时，可能不如行业标准库安全可靠。不恰当的使用也可能导致敏感信息泄露或请求伪造。
 
 ### 示例代码
 以下为一个使用`HttpClientUtils`的示例代码：
 ```java
 import com.alibaba.druid.util.HttpClientUtils;
-
 public class HttpClientUtilsExample {
-    public static void main(String[] args) {
-        // 发送 GET 请求
-        String url = "https://api.github.com/users/github";
-        String responseGet = HttpClientUtils.get(url);
-        System.out.println("GET Response: " + responseGet);
-
-        // 发送 POST 请求
-        String postUrl = "http://httpbin.org/post";
-        String postData = "{\"name\":\"DruidUser\",\"job\":\"Developer\"}";
-        String responsePost = HttpClientUtils.post(postUrl, postData);
-        System.out.println("POST Response: " + responsePost);
-    }
+public static void main(String[] args) {
+// 发送 GET 请求
+String url = "https://api.github.com/users/github";
+String responseGet = HttpClientUtils.get(url);
+System.out.println("GET Response: " + responseGet);
+// 发送 POST 请求
+String postUrl = "http://httpbin.org/post";
+String postData = "{\"name\":\"DruidUser\",\"job\":\"Developer\"}";
+String responsePost = HttpClientUtils.post(postUrl, postData);
+System.out.println("POST Response: " + responsePost);
+}
 }
 ```
 DESC
@@ -53,6 +54,84 @@ alert $output for {
 	title: "Audit Java Alibaba Druid HttpClientUtils Uses",
 	title_zh: "审计Java Alibaba Druid HttpClientUtils的使用",
 	level: "mid",
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计Java代码中Alibaba Druid框架的`HttpClientUtils`类使用情况。虽然`HttpClientUtils`类提供方便的HTTP客户端功能，但其设计可能存在一些潜在的安全风险，例如对重定向处理、证书验证等方面可能不如更成熟的HTTP客户端库（如Apache HttpClient或OkHttp）健壮。审计其使用有助于识别可能被攻击者利用的薄弱环节。
+
+### 2.规则详细
+1. **识别`HttpClientUtils`类**
+规则首先通过`fullTypeName`匹配所有使用到`com.alibaba.druid.util.HttpClientUtils`类的实例。
+
+2. **检测HTTP请求方法**
+然后，规则进一步检测`HttpClientUtils`实例是否调用了发送HTTP请求的方法，例如`get()`或`post()`。这些方法是发起网络请求的关键点。
+
+3. **作为基础审计库**
+此规则属于`java-alibaba-druid-httpclientutil`库规则（`lib`类型），其主要目的是作为基础审计规则，帮助定位使用了`HttpClientUtils`进行HTTP请求的代码位置。它本身并不直接检测具体的漏洞，而是为后续更精细的规则提供检测目标。
+
+4. **潜在风险**
+尽管`HttpClientUtils`在某些场景下便捷，但在处理复杂的网络环境、需要高级安全特性（如严格的SSL/TLS配置、代理设置、连接池管理等）或面对恶意构造的HTTP响应时，可能不如行业标准库安全可靠。不恰当的使用也可能导致敏感信息泄露或请求伪造。
+
+### 示例代码
+以下为一个使用`HttpClientUtils`的示例代码：
+```java
+import com.alibaba.druid.util.HttpClientUtils;
+public class HttpClientUtilsExample {
+public static void main(String[] args) {
+// 发送 GET 请求
+String url = "https://api.github.com/users/github";
+String responseGet = HttpClientUtils.get(url);
+System.out.println("GET Response: " + responseGet);
+// 发送 POST 请求
+String postUrl = "http://httpbin.org/post";
+String postData = "{\"name\":\"DruidUser\",\"job\":\"Developer\"}";
+String responsePost = HttpClientUtils.post(postUrl, postData);
+System.out.println("POST Response: " + responsePost);
+}
+}
+```
+DESC
+	name: "output",
+	message: "发现代码中使用了Alibaba Druid框架的HttpClientUtils类，需审查其使用是否符合安全最佳实践。",
+	solution: <<<SOLUTION
+### 安全建议
+#### 1. 使用更健壮的HTTP客户端库
+推荐使用经过广泛验证的HTTP客户端库（如Apache HttpClient或OkHttp），以确保更高的安全性与可靠性。
+
+```java
+// 推荐使用Apache HttpClient示例
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+public class SafeHttpClientUsage {
+public static void main(String[] args) throws Exception {
+String url = "https://example.com/api/data";
+try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+HttpGet request = new HttpGet(url);
+try (CloseableHttpResponse response = httpClient.execute(request)) {
+BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
+StringBuilder result = new StringBuilder();
+String line;
+while ((line = reader.readLine()) != null) {
+result.append(line);
+}
+System.out.println("Apache HttpClient GET Response: " + result.toString());
+}
+}
+}
+}
+```
+
+#### 2. 避免使用HttpClientUtils
+如果项目中不需要特定于`HttpClientUtils`的功能，应考虑完全移除对其的依赖，改用更为成熟和安全的替代方案。
+
+#### 3. 审查现有使用
+对现存代码中使用`HttpClientUtils`的部分进行全面审计，特别是检查其在复杂网络环境下的行为表现，例如SSL/TLS配置、代理支持和连接池管理能力。
+SOLUTION
+	risk: "信息",
 }
 
 
@@ -73,6 +152,44 @@ public class HttpClientUtilsExample {
         String postData = "{\"name\":\"DruidUser\",\"job\":\"Developer\"}";
         String responsePost = HttpClientUtils.post(postUrl, postData);
         System.out.println("POST Response: " + responsePost);
+    }
+}
+CODE
+	"safefile://SafeHttpClientUsage.java": <<<CODE
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+
+// 推荐使用Apache HttpClient或其他更健壮的HTTP客户端库
+public class SafeHttpClientUsage {
+    public static void main(String[] args) throws Exception {
+        String url = "https://example.com/api/data";
+        try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+            HttpGet request = new HttpGet(url);
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                // 确保正确处理响应流
+                BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent(), StandardCharsets.UTF_8));
+                StringBuilder result = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    result.append(line);
+                }
+                System.out.println("Apache HttpClient GET Response: " + result.toString());
+            }
+        }
+    }
+}
+CODE
+	"safefile://NoHttpClientUtilsImport.java": <<<CODE
+// 该文件不导入或使用 com.alibaba.druid.util.HttpClientUtils
+// 因此不会触发规则告警
+public class NoHttpClientUtilsImport {
+    public static void main(String[] args) {
+        System.out.println("This class does not use HttpClientUtils.");
     }
 }
 CODE

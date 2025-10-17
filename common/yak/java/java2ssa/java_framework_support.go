@@ -1,15 +1,16 @@
 package java2ssa
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssa"
 	"path/filepath"
+
+	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
 const FRAMEWORK_DEFAULT_CLASSPATH = "src/main"
 
 type (
-	HookReturnFunc           = func(*builder, ssa.Value)
-	HookMemberCallMethodFunc = func(*builder, ssa.Value, ssa.Value, ...ssa.Value)
+	HookReturnFunc           = func(*singleFileBuilder, ssa.Value)
+	HookMemberCallMethodFunc = func(*singleFileBuilder, ssa.Value, ssa.Value, ...ssa.Value)
 )
 
 type JavaFramework struct {
@@ -55,7 +56,7 @@ func hookMemberCallMethod(hook HookMemberCallMethodFunc) func(*JavaFramework) {
 	}
 }
 
-func (y *builder) HookMemberCallMethod(obj ssa.Value, key ssa.Value, args ...ssa.Value) {
+func (y *singleFileBuilder) HookMemberCallMethod(obj ssa.Value, key ssa.Value, args ...ssa.Value) {
 	if y == nil || y.IsStop() {
 		return
 	}
@@ -70,7 +71,7 @@ func (y *builder) HookMemberCallMethod(obj ssa.Value, key ssa.Value, args ...ssa
 	}
 }
 
-func (y *builder) HookReturn(val ssa.Value) {
+func (y *singleFileBuilder) HookReturn(val ssa.Value) {
 	if y == nil || y.IsStop() {
 		return
 	}
@@ -81,21 +82,21 @@ func (y *builder) HookReturn(val ssa.Value) {
 	}
 }
 
-func (y *builder) SetUIModel(val ssa.Value) {
+func (y *singleFileBuilder) SetUIModel(val ssa.Value) {
 	if y == nil || y.IsStop() {
 		return
 	}
 	y.currentUIModel = val
 }
 
-func (y *builder) GetUIModel() ssa.Value {
+func (y *singleFileBuilder) GetUIModel() ssa.Value {
 	if y == nil || y.IsStop() {
 		return nil
 	}
 	return y.currentUIModel
 }
 
-func (y *builder) ResetUIModel() {
+func (y *singleFileBuilder) ResetUIModel() {
 	if y == nil || y.IsStop() {
 		return
 	}

@@ -7,7 +7,6 @@ import (
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
@@ -27,7 +26,9 @@ func fixupUseChain(node Instruction) {
 func DeleteInst(i Instruction) {
 	_, ok := i.(*anInstruction)
 	if ok {
-		i = i.GetInstructionById(i.GetId())
+		if inst, ok := i.GetInstructionById(i.GetId()); ok && inst != nil {
+			i = inst
+		}
 	}
 
 	b := i.GetBlock()
@@ -163,7 +164,9 @@ func (b *FunctionBuilder) EmitFirst(i Instruction, blocks ...*BasicBlock) {
 	if len(block.Insts) == 0 {
 		b.emit(i)
 	} else {
-		b.EmitInstructionBefore(i, b.GetInstructionById(block.Insts[0]))
+		if inst, ok := b.GetInstructionById(block.Insts[0]); ok && inst != nil {
+			b.EmitInstructionBefore(i, inst)
+		}
 	}
 }
 
@@ -357,6 +360,7 @@ func (f *FunctionBuilder) emitMake(parentI Value, typ Type, low, high, max, Len,
 	}
 	i := NewMake(parentI, typ, low, high, max, Len, Cap)
 	f.emit(i)
+	saveTypeWithValue(i, typ)
 	return i
 }
 
@@ -388,45 +392,75 @@ func (f *FunctionBuilder) EmitConstInstNil() *ConstInst {
 }
 
 func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
-	keys := []Value{f.EmitConstInstPlaceholder("@pointer"), f.EmitConstInstPlaceholder("@value")}
-	values := []Value{f.EmitConstInstPlaceholder(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), o.GetValue()}
+	value := o.GetValue()
+	if value == nil {
+		value = f.ReadValue(o.GetName())
+	}
+	verboseName := value.GetVerboseName()
+	defer value.SetVerboseName(verboseName)
 
-	pointer := f.InterfaceAddFieldBuild(2, func(i int) Value {
+	keys := []Value{f.EmitConstInstPlaceholder("@pointer"), f.EmitConstInstPlaceholder("@value")}
+	values := []Value{f.EmitConstInstPlaceholder(fmt.Sprintf("%s#%d", o.GetName(), o.GetGlobalIndex())), value}
+
+	obj := f.InterfaceAddFieldBuild(2, func(i int) Value {
 		return keys[i]
 	}, func(i int) Value {
 		return values[i]
 	})
+	p := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
+	p.SetKind(ssautil.PointerVariable)
 
-	t := NewObjectType()
+	t := NewPointerType()
 	t.SetName("Pointer")
-	t.SetTypeKind(PointerKind)
-	pointer.SetType(t)
+	obj.SetType(t)
 
-	return pointer
+	return obj
 }
 
-func (f *FunctionBuilder) GetOriginPointer(p Value) *Variable {
-	o := f.CreateMemberCallVariable(p, f.EmitConstInstPlaceholder("@pointer"), true)
+func (f *FunctionBuilder) GetAndCreateOriginPointer(obj Value) *Variable {
+	o := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
+	if o.GetValue() == nil {
+		p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
+		f.AssignVariable(o, p)
+	}
+
 	o.SetKind(ssautil.PointerVariable)
 
 	return o
 }
 
+func (f *FunctionBuilder) GetOriginPointerName(obj Value) string {
+	p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
+
+	n := strings.TrimPrefix(p.String(), "&")
+	originName, _ := SplitName(n)
+	return originName
+}
+
 func (f *FunctionBuilder) GetOriginValue(obj Value) Value {
-	v := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
+	objectValue := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@value"))
 	p := f.ReadMemberCallValue(obj, f.EmitConstInstPlaceholder("@pointer"))
 
 	n := strings.TrimPrefix(p.String(), "&")
 	originName, originGlobalId := SplitName(n)
 
 	scope := f.CurrentBlock.ScopeTable
-	if variable := GetVariablesWithGlobalIndex(scope, originName, originGlobalId); variable != nil {
-		if value := variable.GetValue(); value != nil {
-			return value
+	if variable := GetFristLocalVariableFromScope(scope, originName); variable != nil {
+		if variable.GetGlobalIndex() != originGlobalId {
+			return objectValue
 		}
 	}
 
-	return v
+	if variable := GetFristVariableFromScopeAndParent(scope, originName); variable != nil {
+		if variable.GetCaptured().GetGlobalIndex() != originGlobalId {
+			return objectValue
+		}
+		if originValue := variable.GetValue(); originValue != nil {
+			return originValue
+		}
+	}
+
+	return objectValue
 }
 
 func (f *FunctionBuilder) EmitConstInstWithUnary(i any, un int) *ConstInst {
@@ -445,15 +479,12 @@ func (f *FunctionBuilder) EmitConstInst(i any) *ConstInst {
 }
 
 func (f *FunctionBuilder) emitConstInst(i any, isPlaceholder bool) *ConstInst {
-	safeString := memedit.NewSafeString(i)
-	if safeString.Len() > 1024*5 {
-		i = safeString.SliceBeforeStart(1024 * 5)
-	}
 	ci := NewConst(i, isPlaceholder)
 	f.emit(ci)
 	if ci.IsNormalConst() {
 		f.GetProgram().AddConstInstruction(ci)
 	}
+	saveTypeWithValue(ci, ci.GetType())
 	return ci
 }
 
@@ -568,6 +599,7 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 			Modify:               se.Modify,
 			forceCreate:          se.forceCreate,
 			Variable:             se.Variable,
+			Kind:                 se.Kind,
 			parameterMemberInner: se.parameterMemberInner,
 		}
 
@@ -608,9 +640,15 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
 		bindVariable = func(se *SideEffect) {
 			if se.CallSite > 0 {
-				callSide := f.GetValueById(se.CallSite)
+				callSide, ok := f.GetValueById(se.CallSite)
+				if !ok || callSide == nil {
+					return
+				}
 				if bindId, ok := callSide.(*Call).Binding[name]; ok {
-					bind := f.GetValueById(bindId)
+					bind, ok := f.GetValueById(bindId)
+					if !ok || bind == nil {
+						return
+					}
 					bindVariableId = bind.GetLastVariable().GetCaptured().GetId()
 					_ = bindVariableId
 				}
@@ -627,26 +665,28 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffect(name string, se *SideEffec
 		findVariable()
 
 		edge := []Value{}
-		if phi, ok := ToPhi(f.GetValueById(se.Value)); ok {
-			for _, e := range phi.GetValues() {
-				if se, ok := e.(*SideEffect); ok {
-					bindVariable(se)
-				}
-			}
-			edge = append(edge, phi.GetValues()...)
-			phit := f.EmitPhi(name, edge)
-
-			for i, e := range phit.GetValues() {
-				if p, ok := ToParameter(e); ok && p.IsFreeValue {
-					newParam := NewParam(name, true, f)
-					if bindVariableId == findVariableId {
-						value := variable.GetValue()
-						newParam.defaultValue = value.GetId()
-						phit.Edge[i] = newParam.GetId()
+		if seValue, ok := f.GetValueById(se.Value); ok && seValue != nil {
+			if phi, ok := ToPhi(seValue); ok {
+				for _, e := range phi.GetValues() {
+					if se, ok := e.(*SideEffect); ok {
+						bindVariable(se)
 					}
 				}
+				edge = append(edge, phi.GetValues()...)
+				phit := f.EmitPhi(name, edge)
+
+				for i, e := range phit.GetValues() {
+					if p, ok := ToParameter(e); ok && p.IsFreeValue {
+						newParam := NewParam(name, true, f)
+						if bindVariableId == findVariableId {
+							value := variable.GetValue()
+							newParam.defaultValue = value.GetId()
+							phit.Edge[i] = newParam.GetId()
+						}
+					}
+				}
+				se.Value = phit.GetId()
 			}
-			se.Value = phit.GetId()
 		}
 
 	}
@@ -674,9 +714,11 @@ func (f *FunctionBuilder) CopyValue(v Value) Value {
 				return members[i]
 			})
 	case *Phi:
-		edgeValues := make(Values, len(v.Edge))
-		for i, id := range v.Edge {
-			edgeValues[i] = f.GetValueById(id)
+		edgeValues := make(Values, 0, len(v.Edge))
+		for _, id := range v.Edge {
+			if value, ok := f.GetValueById(id); ok && value != nil {
+				edgeValues = append(edgeValues, value)
+			}
 		}
 		phi := f.EmitPhi(v.name, edgeValues)
 		phi.CFGEntryBasicBlock = v.CFGEntryBasicBlock

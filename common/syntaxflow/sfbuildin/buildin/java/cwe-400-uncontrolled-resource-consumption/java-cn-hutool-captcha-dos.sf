@@ -8,25 +8,21 @@ desc(
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 cn.hutool.captcha库在生成验证码时，允许用户通过参数控制验证码的高度和宽度。如果应用程序直接将用户输入的不可信数据作为验证码的尺寸参数，恶意攻击者可以输入极大的数值，导致服务器在生成图片时消耗大量计算资源和内存，最终引发服务器拒绝服务（DoS）。
-
 2. **触发场景**
 当使用 `cn.hutool.captcha.CaptchaUtil` 或 `cn.hutool.captcha.AbstractCaptcha` 等类创建验证码，并且 `width` 和 `height` 参数直接来源于未经校验的用户输入（例如请求参数），就存在此漏洞。
-
 示例代码:
 ```java
 // 存在漏洞的代码示例
 public void vul(@RequestParam Integer width, @RequestParam Integer height, HttpServletResponse response) throws IOException {
-    // ...
-    // 验证码参数可控 造成拒绝服务攻击
-    ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
-    // ...
+// ...
+// 验证码参数可控 造成拒绝服务攻击
+ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
+// ...
 }
 ```
 在此示例中，`width` 和 `height` 参数直接来源于 `@RequestParam` 注解获取的用户输入，未进行任何合法性校验。
-
 3. **潜在影响**
 - 服务器因大量消耗CPU和内存资源而变得缓慢或崩溃，导致正常的合法用户无法访问服务。
 - 攻击者无需复杂的攻击手段，即可轻易地造成拒绝服务攻击。
@@ -34,31 +30,29 @@ DESC
 	rule_id: "5a737536-4f00-45e7-aa92-75ab7f4bd971"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **对用户输入的验证码尺寸参数进行严格的合法性校验**
 在将用户输入的 `width` 和 `height` 用于创建验证码之前，必须检查其是否在合理的范围内，例如限定最大值。
 ```java
 // 修复代码示例
 public void vul(@RequestParam Integer width, @RequestParam Integer height, HttpServletResponse response) throws IOException {
-    // 对 width 和 height 进行严格校验，例如限定最大值
-    if (width == null || height == null || width <= 0 || height <= 0 || width > 1000 || height > 500) {
-        // 可以返回错误信息或者使用默认值
-        width = 200; // 使用默认值
-        height = 100; // 使用默认值
-        // 或者throw new IllegalArgumentException("无效的验证码尺寸");
-    }
-    response.setContentType("image/jpeg");
-    response.setHeader("Pragma", "no-cache");
-    response.setHeader("Cache-Control", "no-cache");
-    ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
-    try {
-        shearCaptcha.write(response.getOutputStream());
-    } catch (IOException e) {
-        throw new RuntimeException(e);
-    }
+// 对 width 和 height 进行严格校验，例如限定最大值
+if (width == null || height == null || width <= 0 || height <= 0 || width > 1000 || height > 500) {
+// 可以返回错误信息或者使用默认值
+width = 200; // 使用默认值
+height = 100; // 使用默认值
+// 或者throw new IllegalArgumentException("无效的验证码尺寸");
+}
+response.setContentType("image/jpeg");
+response.setHeader("Pragma", "no-cache");
+response.setHeader("Cache-Control", "no-cache");
+ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
+try {
+shearCaptcha.write(response.getOutputStream());
+} catch (IOException e) {
+throw new RuntimeException(e);
+}
 }
 ```
-
 2. **优先使用预定义的或服务内部控制的固定尺寸**
 如果业务场景允许，尽量避免让用户直接控制验证码的尺寸，而是使用应用程序内部预定义的安全固定尺寸。
 SOLUTION
@@ -86,6 +80,59 @@ $sink #{
 alert $mid for {
 	level: "mid",
 	message: "发现Java cn.hutool.captcha验证码拒绝服务漏洞。",
+	name: "mid",
+	title: "Check Java cn.hutool.captcha Uncontrolled Resource Consumption Vulnerability",
+	title_zh: "检测Java cn.hutool.captcha验证码不受控资源消耗漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+1. **对用户输入的验证码尺寸参数进行严格的合法性校验**
+在将用户输入的 `width` 和 `height` 用于创建验证码之前，必须检查其是否在合理的范围内，例如限定最大值。
+```java
+// 修复代码示例
+public void vul(@RequestParam Integer width, @RequestParam Integer height, HttpServletResponse response) throws IOException {
+// 对 width 和 height 进行严格校验，例如限定最大值
+if (width == null || height == null || width <= 0 || height <= 0 || width > 1000 || height > 500) {
+// 可以返回错误信息或者使用默认值
+width = 200; // 使用默认值
+height = 100; // 使用默认值
+// 或者throw new IllegalArgumentException("无效的验证码尺寸");
+}
+response.setContentType("image/jpeg");
+response.setHeader("Pragma", "no-cache");
+response.setHeader("Cache-Control", "no-cache");
+ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
+try {
+shearCaptcha.write(response.getOutputStream());
+} catch (IOException e) {
+throw new RuntimeException(e);
+}
+}
+```
+2. **优先使用预定义的或服务内部控制的固定尺寸**
+如果业务场景允许，尽量避免让用户直接控制验证码的尺寸，而是使用应用程序内部预定义的安全固定尺寸。
+SOLUTION
+	risk: "DDOS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+cn.hutool.captcha库在生成验证码时，允许用户通过参数控制验证码的高度和宽度。如果应用程序直接将用户输入的不可信数据作为验证码的尺寸参数，恶意攻击者可以输入极大的数值，导致服务器在生成图片时消耗大量计算资源和内存，最终引发服务器拒绝服务（DoS）。
+2. **触发场景**
+当使用 `cn.hutool.captcha.CaptchaUtil` 或 `cn.hutool.captcha.AbstractCaptcha` 等类创建验证码，并且 `width` 和 `height` 参数直接来源于未经校验的用户输入（例如请求参数），就存在此漏洞。
+示例代码:
+```java
+// 存在漏洞的代码示例
+public void vul(@RequestParam Integer width, @RequestParam Integer height, HttpServletResponse response) throws IOException {
+// ...
+// 验证码参数可控 造成拒绝服务攻击
+ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
+// ...
+}
+```
+在此示例中，`width` 和 `height` 参数直接来源于 `@RequestParam` 注解获取的用户输入，未进行任何合法性校验。
+3. **潜在影响**
+- 服务器因大量消耗CPU和内存资源而变得缓慢或崩溃，导致正常的合法用户无法访问服务。
+- 攻击者无需复杂的攻击手段，即可轻易地造成拒绝服务攻击。
+DESC
 }
 
 $sink #{
@@ -96,6 +143,59 @@ $result - $mid as $low;
 alert $low for {
 	level: "low",
 	message: "发现可能存在Java cn.hutool.captcha验证码拒绝服务漏洞。",
+	risk: "DDOS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+cn.hutool.captcha库在生成验证码时，允许用户通过参数控制验证码的高度和宽度。如果应用程序直接将用户输入的不可信数据作为验证码的尺寸参数，恶意攻击者可以输入极大的数值，导致服务器在生成图片时消耗大量计算资源和内存，最终引发服务器拒绝服务（DoS）。
+2. **触发场景**
+当使用 `cn.hutool.captcha.CaptchaUtil` 或 `cn.hutool.captcha.AbstractCaptcha` 等类创建验证码，并且 `width` 和 `height` 参数直接来源于未经校验的用户输入（例如请求参数），就存在此漏洞。
+示例代码:
+```java
+// 存在漏洞的代码示例
+public void vul(@RequestParam Integer width, @RequestParam Integer height, HttpServletResponse response) throws IOException {
+// ...
+// 验证码参数可控 造成拒绝服务攻击
+ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
+// ...
+}
+```
+在此示例中，`width` 和 `height` 参数直接来源于 `@RequestParam` 注解获取的用户输入，未进行任何合法性校验。
+3. **潜在影响**
+- 服务器因大量消耗CPU和内存资源而变得缓慢或崩溃，导致正常的合法用户无法访问服务。
+- 攻击者无需复杂的攻击手段，即可轻易地造成拒绝服务攻击。
+DESC
+	name: "low",
+	title: "Check Java cn.hutool.captcha Uncontrolled Resource Consumption Vulnerability",
+	title_zh: "检测Java cn.hutool.captcha验证码不受控资源消耗漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+1. **对用户输入的验证码尺寸参数进行严格的合法性校验**
+在将用户输入的 `width` 和 `height` 用于创建验证码之前，必须检查其是否在合理的范围内，例如限定最大值。
+```java
+// 修复代码示例
+public void vul(@RequestParam Integer width, @RequestParam Integer height, HttpServletResponse response) throws IOException {
+// 对 width 和 height 进行严格校验，例如限定最大值
+if (width == null || height == null || width <= 0 || height <= 0 || width > 1000 || height > 500) {
+// 可以返回错误信息或者使用默认值
+width = 200; // 使用默认值
+height = 100; // 使用默认值
+// 或者throw new IllegalArgumentException("无效的验证码尺寸");
+}
+response.setContentType("image/jpeg");
+response.setHeader("Pragma", "no-cache");
+response.setHeader("Cache-Control", "no-cache");
+ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(width, height,4,3);
+try {
+shearCaptcha.write(response.getOutputStream());
+} catch (IOException e) {
+throw new RuntimeException(e);
+}
+}
+```
+2. **优先使用预定义的或服务内部控制的固定尺寸**
+如果业务场景允许，尽量避免让用户直接控制验证码的尺寸，而是使用应用程序内部预定义的安全固定尺寸。
+SOLUTION
 }
 
 desc(
@@ -138,6 +238,90 @@ import org.springframework.web.multipart.MultipartFile;
         }
     }
 TEXT
+	"safefile://SafeCaptchaGeneration.java": <<<CODE
+package org.example.Dos;
+
+import cn.hutool.captcha.CaptchaUtil;
+import cn.hutool.captcha.ShearCaptcha;
+import org.springframework.web.bind.annotation.RequestParam;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+public class SafeCaptchaGeneration {
+
+    // 修复示例1: 对用户输入的width和height进行严格校验，并限定最大值
+    public void generateCaptchaWithValidation(@RequestParam(required = false) Integer width, @RequestParam(required = false) Integer height, HttpServletResponse response) throws IOException {
+        // 定义安全的默认值
+        int safeWidth = 200;
+        int safeHeight = 100;
+
+        // 校验并设置宽度
+        if (width != null && width > 0 && width <= 1000) { // 设置合理的最大值，例如1000
+            safeWidth = width;
+        } else {
+            // 可以记录日志，或者抛出异常，或者直接使用默认值
+            System.out.println("Invalid width, using default: " + safeWidth);
+        }
+
+        // 校验并设置高度
+        if (height != null && height > 0 && height <= 500) { // 设置合理的最大值，例如500
+            safeHeight = height;
+        } else {
+            System.out.println("Invalid height, using default: " + safeHeight);
+        }
+
+        response.setContentType("image/jpeg");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Cache-Control", "no-cache");
+
+        // 使用校验后的安全参数创建验证码
+        ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(safeWidth, safeHeight, 4, 3);
+        try {
+            shearCaptcha.write(response.getOutputStream());
+        } catch (IOException e) {
+            throw new RuntimeException("Error generating captcha", e);
+        }
+    }
+
+    // 修复示例2: 完全不接受用户输入，使用内部预设的固定尺寸
+    public void generateFixedSizeCaptcha(HttpServletResponse response) throws IOException {
+        // 使用固定的、安全的验证码尺寸，不依赖任何用户输入
+        int fixedWidth = 200;
+        int fixedHeight = 80;
+
+        response.setContentType("image/jpeg");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Cache-Control", "no-cache");
+
+        ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(fixedWidth, fixedHeight, 4, 3);
+        try {
+            shearCaptcha.write(response.getOutputStream());
+        } catch (IOException e) {
+            throw new RuntimeException("Error generating captcha", e);
+        }
+    }
+
+    // 修复示例3: 使用默认构造函数（通常有内部默认尺寸或通过配置文件配置）
+    // 这个示例假设CaptchaUtil的无参或者简化参数的create方法会使用安全的默认值
+    public void generateDefaultCaptcha(HttpServletResponse response) throws IOException {
+        response.setContentType("image/jpeg");
+        response.setHeader("Pragma", "no-cache");
+        response.setHeader("Cache-Control", "no-cache");
+
+        // 注意：这里取决于CaptchaUtil的具体实现，如果createShearCaptcha
+        // 提供了不带width/height参数的重载方法，或者默认参数是安全的。
+        // 此处为了演示不使用用户输入来控制尺寸。
+        // 假设CaptchaUtil.createShearCaptcha()在没有W/H参数时会使用安全的内部默认值。
+        // 实际使用时需要确认API文档。
+        ShearCaptcha shearCaptcha = CaptchaUtil.createShearCaptcha(200, 100, 4, 3); // 硬编码安全值
+        try {
+            shearCaptcha.write(response.getOutputStream());
+        } catch (IOException e) {
+            throw new RuntimeException("Error generating default captcha", e);
+        }
+    }
+}
+CODE
 )
 
 

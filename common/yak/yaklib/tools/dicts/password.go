@@ -3,7 +3,7 @@ package dicts
 import "github.com/yaklang/yaklang/common/utils"
 
 var PasswordTop25 = utils.PrettifyListFromStringSplited(`123456
-12345679
+admin123
 qwerty
 12345678
 111111
@@ -12,11 +12,11 @@ qwerty
 password
 123123
 987654321
-qwertyuiop
+88888888
 mynoob
 123321
 666666
-18atcskd2w
+admin
 7777777
 1q2w3e4r
 654321

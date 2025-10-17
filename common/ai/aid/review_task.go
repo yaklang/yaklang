@@ -3,9 +3,9 @@ package aid
 import (
 	_ "embed"
 	"io"
-	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -13,12 +13,12 @@ import (
 var schemaRePlanSuggestion string
 
 type ReviewSuggestion struct {
-	Value             string `json:"value"`
-	Suggestion        string `json:"prompt"`
-	SuggestionEnglish string `json:"prompt_english"`
-	AllowExtraPrompt  bool   `json:"allow_extra_prompt"`
+	Value            string `json:"value"`
+	Prompt           string `json:"prompt"`
+	PromptEnglish    string `json:"prompt_english"`
+	AllowExtraPrompt bool   `json:"allow_extra_prompt"`
 
-	PromptBuilder    func(task *aiTask, rt *runtime) `json:"-"`
+	PromptBuilder    func(task *AiTask, rt *runtime) `json:"-"`
 	ResponseCallback func(reader io.Reader)          `json:"-"`
 	ParamSchema      string                          `json:"param_schema"`
 }
@@ -33,33 +33,33 @@ type ReviewSuggestion struct {
 // TaskReviewSuggestions 是任务审查时的建议(内置一些常见选项)
 var TaskReviewSuggestions = []*ReviewSuggestion{
 	{
-		Value:             "deeply_think",
-		Suggestion:        "思考不够深入，根据当前上下文，为当前任务拆分更多子任务",
-		SuggestionEnglish: "Not deep enough, split more sub-tasks for the current task according to the current context",
-		AllowExtraPrompt:  true,
-		ParamSchema:       schemaRePlanSuggestion,
+		Value:            "deeply_think",
+		Prompt:           "思考不够深入，根据当前上下文，为当前任务拆分更多子任务",
+		PromptEnglish:    "Not deep enough, split more sub-tasks for the current task according to the current context",
+		AllowExtraPrompt: true,
+		ParamSchema:      schemaRePlanSuggestion,
 	},
 	{
-		Value:             "inaccurate",
-		Suggestion:        "回答不够精准，存在未使用工具导致幻觉，或者工具参数不合适",
-		SuggestionEnglish: "The answer is not accurate enough, there is an illusion caused by not using the tool, or the tool parameters are not appropriate",
-		AllowExtraPrompt:  true,
+		Value:            "inaccurate",
+		Prompt:           "回答不够精准，存在未使用工具导致幻觉，或者工具参数不合适",
+		PromptEnglish:    "The answer is not accurate enough, there is an illusion caused by not using the tool, or the tool parameters are not appropriate",
+		AllowExtraPrompt: true,
 	},
 	{
-		Value:             "continue",
-		Suggestion:        "继续执行任务",
-		SuggestionEnglish: "Continue to execute the task",
+		Value:         "continue",
+		Prompt:        "继续执行任务",
+		PromptEnglish: "Continue to execute the task",
 	},
 	{
-		Value:             "adjust_plan",
-		Suggestion:        "任务需要调整，用户会输入更新后任务建议",
-		SuggestionEnglish: "The task needs to be adjusted, and the user will enter the updated task",
-		AllowExtraPrompt:  true,
-		ParamSchema:       schemaRePlanSuggestion,
+		Value:            "adjust_plan",
+		Prompt:           "任务需要调整，用户会输入更新后任务建议",
+		PromptEnglish:    "The task needs to be adjusted, and the user will enter the updated task",
+		AllowExtraPrompt: true,
+		ParamSchema:      schemaRePlanSuggestion,
 	},
 }
 
-func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
+func (t *AiTask) handleReviewResult(param aitool.InvokeParams) error {
 	// 1. 获取审查建议
 	suggestion := param.GetString("suggestion")
 	if suggestion == "" {
@@ -69,21 +69,25 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 	// 2. 根据审查建议处理
 	switch suggestion {
 	case "deeply_think":
-		t.config.EmitInfo("deeply think")
+		t.EmitInfo("deeply think")
 		err := t.DeepThink(utils.InterfaceToString(param))
 		if err != nil {
-			t.config.EmitError("invoke planRequest failed: %v", err)
+			t.EmitError("invoke planRequest failed: %v", err)
 			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
-		return t.config.aiTaskRuntime.executeSubTask(1, t)
+		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.getCurrentTaskPlan(),
+		})
+
+		return t.aiTaskRuntime.executeSubTask(1, t)
 	case "inaccurate":
-		t.config.EmitInfo("inaccurate")
+		t.EmitInfo("inaccurate")
 		return t.executeTask()
 	case "continue":
-		t.config.EmitInfo("continue")
+		t.EmitInfo("continue")
 		return nil
 	case "end":
-		t.config.EmitInfo("end")
+		t.EmitInfo("end")
 
 		parentTask := t.ParentTask
 		index := -1
@@ -94,78 +98,30 @@ func (t *aiTask) handleReviewResult(param aitool.InvokeParams) error {
 			}
 		}
 		if index == -1 {
-			t.config.EmitError("current task not found in parent task")
+			t.EmitError("current task not found in parent task")
 			return utils.Error("current task not found in parent task")
 		}
 		parentTask.Subtasks = parentTask.Subtasks[:index+1]
+		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.getCurrentTaskPlan(),
+		})
 	case "adjust_plan":
 		suggestion := param.GetString("suggestion")
 		if suggestion == "" {
-			t.config.EmitError("suggestion is empty")
+			t.EmitError("suggestion is empty")
 			return utils.Error("suggestion is empty")
 		}
-		t.config.EmitInfo("adjust plan")
-		planPrompt, err := t.generateDynamicPlanPrompt(suggestion)
+		t.EmitInfo("adjust plan")
+		err := t.AdjustPlan(utils.InterfaceToString(suggestion))
 		if err != nil {
-			t.config.EmitError("error generating dynamic plan prompt: %v", err)
-			return utils.Errorf("error generating dynamic plan prompt: %v", err)
+			t.EmitError("invoke planRequest failed: %v", err)
+			return utils.Errorf("coordinator: invoke planRequest failed: %v", err)
 		}
-
-		err = t.config.callAiTransaction(
-			planPrompt,
-			t.callAI,
-			func(response *AIResponse) error {
-				// 读取 AI 的响应
-				responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.config)
-				taskResponse, err := io.ReadAll(responseReader)
-				if err != nil {
-					t.config.EmitError("error reading AI response: %v", err)
-					return utils.Errorf("error reading AI response: %v", err)
-				}
-				nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.config, string(taskResponse))
-				if err != nil {
-					t.config.EmitError("error extracting task from raw response: %v", err)
-					return utils.Errorf("error extracting task from raw response: %v", err)
-				}
-
-				if len(nextPlanTask) <= 0 {
-					t.config.EmitError("any task not found in next plan")
-					return utils.Errorf("any task not found in next plan task, re-do-plan")
-				}
-
-				// 解析 AI 的响应
-				parentTask := t.ParentTask
-				index := -1
-				for i, subtask := range parentTask.Subtasks {
-					if subtask.Name == t.Name {
-						index = i
-						break
-					}
-				}
-				if index == -1 {
-					t.config.EmitError("current task not found in parent task")
-					return utils.Error("current task not found in parent task")
-				}
-				// 保留之前的任务, 删除后续任务
-				parentTask.Subtasks = parentTask.Subtasks[:index+1]
-				parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(nextPlanTask))
-
-				// 添加新的任务
-				for _, subTask := range nextPlanTask {
-					subTask.config = t.config
-					subTask.ParentTask = parentTask
-					parentTask.Subtasks = append(parentTask.Subtasks, subTask)
-					subTask.config.EmitInfo("new dynamic plan: %s", subTask.Name)
-				}
-				return nil
-			},
-		)
-		if err != nil {
-			t.config.EmitError("error calling AI transaction: %v", err)
-			return utils.Errorf("error calling AI transaction: %v", err)
-		}
+		t.EmitJSON(schema.EVENT_TYPE_PLAN, "system", map[string]any{
+			"root_task": t.getCurrentTaskPlan(),
+		})
 	default:
-		t.config.EmitError("unknown review suggestion: %s", suggestion)
+		t.EmitError("unknown review suggestion: %s", suggestion)
 		return utils.Errorf("unknown review suggestion: %s", suggestion)
 	}
 	return nil

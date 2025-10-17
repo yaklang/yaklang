@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -160,6 +161,8 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 	if err != nil {
 		return "", nil, utils.Errorf("render init prompt failed: %v", err)
 	}
+
+	fmt.Println("initPrompt", initPrompt)
 	persistentPrompt, err := f.renderPersistentPrompt("")
 	if err != nil {
 		return "", nil, utils.Errorf("render persistent prompt failed: %v", err)
@@ -188,12 +191,12 @@ func (f *ForgeBlueprint) GenerateFirstPromptWithMemoryOption(
 				return
 			}
 
-			rsp, err := config.CallAI(aid.NewAIRequest(prompt))
+			rsp, err := config.CallAI(aicommon.NewAIRequest(prompt))
 			if err != nil {
 				f.ResultHandler("", utils.Errorf("render result failed: %v", err))
 				return
 			}
-			rspReader := rsp.GetOutputStreamReader("forge", true, config)
+			rspReader := rsp.GetOutputStreamReader("forge", true, config.GetEmitter())
 			raw, err := io.ReadAll(rspReader)
 			if err == io.EOF {
 				f.ResultHandler(string(raw), nil)

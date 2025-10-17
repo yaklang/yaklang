@@ -191,6 +191,10 @@ func (c *callbackManager) kv(key, data any) {
 		autoData = anyData
 	}
 
+	if c.formatKVCallback != nil {
+		c.formatKVCallback(rawKeyFormatted(key), autoData)
+	}
+
 	switch key.(type) {
 	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
 		keyInt, _ := strconv.ParseInt(fmt.Sprintf("%d", key), 10, 64)
@@ -212,6 +216,10 @@ func (c *callbackManager) kv(key, data any) {
 		if c.onObjectCallback != nil {
 			c.onObjectCallback(mapData)
 		}
+		for _, callback := range c.onConditionalObjectCallback {
+			callback.Feed(mapData)
+		}
+
 		if originKey == nil {
 			if c.onRootMapCallback != nil {
 				c.onRootMapCallback(mapData)

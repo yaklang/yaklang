@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 
@@ -18,7 +19,7 @@ type RiskControlResult struct {
 
 type riskControl struct {
 	buildinForgeName  string
-	buildinAICallback AICallbackType
+	buildinAICallback aicommon.AICallbackType
 	callback          func(*Config, context.Context, io.Reader) *RiskControlResult
 }
 

@@ -2,8 +2,8 @@ package aibp
 
 import (
 	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 )
 
@@ -25,7 +25,7 @@ type SmartSuggestion struct {
 }
 
 type SmartResult struct {
-	action      *aid.Action
+	action      *aicommon.Action
 	Suggestions []*SmartSuggestion
 }
 

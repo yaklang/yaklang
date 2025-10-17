@@ -21,7 +21,10 @@ func NewSimpleChunkWriter(dst *chanx.UnlimitedChan[Chunk]) *SimpleChunkWriter {
 var _ io.WriteCloser = (*SimpleChunkWriter)(nil)
 
 func (w *SimpleChunkWriter) Write(p []byte) (n int, err error) {
-	chunk := NewBufferChunk(p)
+	// Create a copy of the data to avoid sharing the underlying buffer
+	data := make([]byte, len(p))
+	copy(data, p)
+	chunk := NewBufferChunk(data)
 	w.dst.SafeFeed(chunk)
 	return len(p), nil
 }
@@ -31,11 +34,12 @@ func (w *SimpleChunkWriter) Close() error {
 	return nil
 }
 
-func NewChunkChannelFromReader(ctx context.Context, r io.Reader) *chanx.UnlimitedChan[Chunk] {
+func NewChunkChannelFromReader(ctx context.Context, r io.ReadCloser) *chanx.UnlimitedChan[Chunk] {
 	dst := chanx.NewUnlimitedChan[Chunk](ctx, 1000)
 	writer := NewSimpleChunkWriter(dst)
 	go func() {
 		defer writer.Close()
+		defer r.Close()
 		io.Copy(writer, r)
 	}()
 	return dst

@@ -89,6 +89,9 @@ func GetTempTestDatabase() (string, *gorm.DB, error) {
 }
 
 func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
+	if path == "" {
+		return nil, utils.Errorf("database path is empty")
+	}
 	// register sql-extend driver
 	RegisterDriverOnce.Do(registerDriver)
 
@@ -98,17 +101,22 @@ func createAndConfigDatabase(path string, drivers ...string) (*gorm.DB, error) {
 	} else {
 	}
 
+	purePath := path
 	if driver == SQLiteExtend || driver == SQLite {
-		err := checkAndTryFixDatabase(path)
-		if err != nil {
-			return nil, err
-		}
 		path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
 	} else {
 		path = fmt.Sprintf("%s?charset=utf8mb4&parseTime=True&loc=Local", path)
 	}
 
 	db, err := gorm.Open(driver, path)
+	if err != nil && (driver == SQLite || driver == SQLiteExtend) {
+		log.Warnf("open database[%s] with driver[%s] failed: %s, try to check and fix it", purePath, driver, err)
+		err = checkAndTryFixDatabase(purePath)
+		if err != nil {
+			return nil, err
+		}
+		db, err = gorm.Open(driver, path)
+	}
 	if err != nil {
 		return nil, err
 	}

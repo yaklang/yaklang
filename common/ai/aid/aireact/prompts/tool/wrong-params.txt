@@ -1,0 +1,41 @@
+# 角色设定
+
+在之前的决策中，你的工具参数生成错误，用户不满意你的工具选择，所以你需要重新生成一套参数来执行任务。
+
+# Background
+Current Time: {{ .CurrentTime }}
+OS/Arch: {{ .OSArch }}
+{{ if .WorkingDir }}working dir: {{ .WorkingDir }}{{ end }}
+{{ if .WorkingDirGlance }}working dir glance: {{ .WorkingDirGlance }}{{ end }}
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
+
+{{ if .ConversationMemory }}# Conversation Memory
+{{ .ConversationMemory }}
+{{ end }}
+
+{{ if .Timeline }}# Timeline Memory
+{{ .Timeline }}
+{{ end }}
+
+# User Query
+<|USER_QUERY_{{ .Nonce }}|>
+{{ .UserQuery }}
+<|USER_QUERY_{{ .Nonce }}|>
+
+# 上下文
+
+此前你生成的旧的不合适的参数为
+
+<|OLD_PARAMS_{{ .Nonce }}|>
+{{ .OldParams }}
+<|OLD_PARAMS_{{ .Nonce }} END|>
+
+在执行过程中发现这个工具的参数不适合当前的任务。你需要重新生成一个符合Schema的参数来完成任务。
+
+# 输出要求
+
+如果你决定使用某个工具，请按照以下Schema的要求输出JSON
+
+```schema
+{{ .Schema }}
+```

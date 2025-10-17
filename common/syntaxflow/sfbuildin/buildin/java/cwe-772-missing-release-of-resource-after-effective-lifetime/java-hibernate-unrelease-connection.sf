@@ -6,22 +6,41 @@ desc(
 [Hibernate ConnectionProvider 文档](https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/connection/ConnectionProvider.html)
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 REFERENCE
-	desc: <<<DESCRIPTION
- ## 漏洞描述
+	desc: <<<DESC
+### 漏洞描述
 
-    应用程序通过 Hibernate 的 `ConnectionProvider.getConnection()` 方法直接获取数据库连接后，未正确关闭这些连接资源。尽管 Hibernate 通常会管理自己的连接，但当直接使用 ConnectionProvider 接口获取连接时，应用程序需要负责关闭这些连接。
+1. **漏洞原理**
+   当应用程序通过 Hibernate 的 `ConnectionProvider.getConnection()` 方法直接获取数据库连接时，如果未能正确关闭这些连接资源，就会导致资源泄漏。尽管 Hibernate 通常会管理自己的连接池，但当直接使用底层 JDBC 连接时，应用程序需要负责显式关闭这些连接。
 
-    此漏洞会导致数据库连接泄漏，随着时间推移耗尽连接池资源，最终可能导致应用程序无法与数据库建立新连接。
+   如果这些连接没有被及时关闭，它们将无法归还到连接池中，最终耗尽连接池的配额。这可能导致应用程序在高负载情况下无法再与数据库建立新的连接，甚至引发数据库服务拒绝服务（DoS）。
 
-    ## 风险影响
+2. **触发场景**
+   ```java
+   // 存在漏洞的代码示例
+   public List<String> unsafeDirectConnectionUsage() throws HibernateException, SQLException {
+       List<String> results = new ArrayList<>();
+       ConnectionProvider provider = sessionFactory.getConnectionProvider();
+       Connection conn = provider.getConnection(); // 获取底层JDBC连接
+       Statement stmt = conn.createStatement();
+       ResultSet rs = stmt.executeQuery("SELECT username FROM users");
+       while (rs.next()) {
+           results.add(rs.getString("username"));
+       }
+       // 错误：没有关闭ResultSet、Statement和Connection
+       return results;
+   }
+   ```
+   在上述代码中，开发者直接调用了 `provider.getConnection()` 获取底层数据库连接，但并未在操作完成后关闭相关资源（`ResultSet`、`Statement` 和 `Connection`）。这种错误会导致数据库连接持续占用，最终耗尽连接池。
 
-    - 数据库连接持续泄漏，耗尽连接池配额
-    - 应用长时间运行后可能出现 "Too many connections" 错误
-    - 连接未及时归还池，导致其他操作无法获取连接
-    - 服务器资源消耗增加，可能导致性能下降
-    - 在高负载情况下，可能引发数据库服务拒绝服务
+3. **潜在影响**
+   - 数据库连接池资源逐渐耗尽，导致系统无法处理新请求。
+   - 高负载情况下可能引发数据库服务瘫痪。
+   - 应用程序性能下降，服务器资源消耗增加。
+   - 可能导致其他关键操作因无法获取连接而失败。
 
-DESCRIPTION
+### 规则详细
+   该规则用于识别直接从 Hibernate 的 `ConnectionProvider` 接口获取底层连接后未正确释放资源的情况。它通过分析代码中对 `getConnection()` 方法的调用以及后续是否调用 `close()` 方法，定位潜在的资源泄漏风险点。
+DESC
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -29,24 +48,19 @@ DESCRIPTION
 利用 Java 的 try-with-resources 语法，确保 `Connection` 对象在使用完毕后自动调用其 `close()` 方法。
 ```java
 // 修复代码示例
-import net.sf.hibernate.SessionFactory;
-import net.sf.hibernate.connection.ConnectionProvider;
-import java.sql.Connection;
-import java.sql.Statement;
-import java.sql.ResultSet;
-
-public class SafeHibernateCode {
-    private SessionFactory sessionFactory;
-
-    public void safeConnectionWithTryWithResources() throws Exception {
-        ConnectionProvider provider = sessionFactory.getConnectionProvider();
-
-        try (Connection conn = provider.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT * FROM users")) {
-            // 处理结果集...
-        } // 所有资源在此处自动关闭
-    }
+public List<String> safeConnectionWithTryWithResources() throws HibernateException, SQLException {
+    List<String> results = new ArrayList<>();
+    ConnectionProvider provider = sessionFactory.getConnectionProvider();
+    try (
+        Connection conn = provider.getConnection();
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT username FROM users")
+    ) {
+        while (rs.next()) {
+            results.add(rs.getString("username"));
+        }
+    } // 所有资源在此处自动关闭
+    return results;
 }
 ```
 
@@ -54,110 +68,87 @@ public class SafeHibernateCode {
 在 `finally` 块中确保调用 `Connection` 对象的 `close()` 方法。同时需要确保其他相关资源（如 `Statement` 和 `ResultSet`）也被关闭。
 ```java
 // 修复代码示例
-import net.sf.hibernate.SessionFactory;
-import net.sf.hibernate.connection.ConnectionProvider;
-import java.sql.Connection;
-import java.sql.Statement;
-import java.sql.ResultSet;
-
-public class SafeHibernateCode {
-    private SessionFactory sessionFactory;
-
-    public void safeConnectionWithTryFinally() throws Exception {
-        ConnectionProvider provider = sessionFactory.getConnectionProvider();
-        Connection conn = null;
-        Statement stmt = null;
-        ResultSet rs = null;
-
-        try {
-            conn = provider.getConnection();
-            stmt = conn.createStatement();
-            rs = stmt.executeQuery("SELECT * FROM users");
-
-            // 使用结果集...
-        } finally {
-            if (rs != null) { try { rs.close(); } catch (Exception e) { /* log error */ } }
-            if (stmt != null) { try { stmt.close(); } catch (Exception e) { /* log error */ } }
-            if (conn != null) { try { conn.close(); } catch (Exception e) { /* log error */ } }
+public List<String> safeConnectionWithTryFinally() throws HibernateException, SQLException {
+    List<String> results = new ArrayList<>();
+    ConnectionProvider provider = sessionFactory.getConnectionProvider();
+    Connection conn = null;
+    Statement stmt = null;
+    ResultSet rs = null;
+    try {
+        conn = provider.getConnection();
+        stmt = conn.createStatement();
+        rs = stmt.executeQuery("SELECT username FROM users");
+        while (rs.next()) {
+            results.add(rs.getString("username"));
         }
+    } finally {
+        if (rs != null) { try { rs.close(); } catch (SQLException e) { /* 记录日志 */ } }
+        if (stmt != null) { try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ } }
+        if (conn != null) { try { conn.close(); } catch (SQLException e) { /* 记录日志 */ } }
     }
+    return results;
 }
 ```
 
 #### 3. 避免直接使用 `ConnectionProvider` 获取连接
-优先使用 Hibernate 提供的安全 API 来执行数据库操作。让 Hibernate 管理底层连接。
+优先使用 Hibernate 提供的安全 API 来执行数据库操作，让 Hibernate 管理底层连接。
 ```java
 // 推荐做法：使用 Hibernate Session
-import net.sf.hibernate.Session;
-import net.sf.hibernate.Transaction;
-import net.sf.hibernate.SessionFactory;
-
-public class RecommendedHibernateCode {
-    private SessionFactory sessionFactory;
-
-    public void recommendedHibernateSessionUsage() throws Exception {
-        Session session = null;
-        Transaction tx = null;
-
-        try {
-            session = sessionFactory.openSession();
-            tx = session.beginTransaction();
-
-            // 使用 Hibernate 原生 API 或 HQL/JPQL 查询
-            List<?> users = session.createQuery("from User").list();
-
-            // 处理结果...
-            tx.commit();
-        } catch (RuntimeException e) {
-            if (tx != null && tx.isActive()) {
-                tx.rollback();
-            }
-            throw e;
-        } finally {
-            if (session != null) {
-                session.close();
-            }
+public List<String> recommendedHibernateSessionUsage() throws HibernateException {
+    List<String> results = new ArrayList<>();
+    Session session = null;
+    Transaction tx = null;
+    try {
+        session = sessionFactory.openSession();
+        tx = session.beginTransaction();
+        List<?> users = session.createQuery("from User").list();
+        for (Object user : users) {
+            results.add(((User)user).getUsername());
+        }
+        tx.commit();
+    } catch (RuntimeException e) {
+        if (tx != null && tx.isActive()) {
+            tx.rollback();
+        }
+        throw e;
+    } finally {
+        if (session != null) {
+            session.close();
         }
     }
+    return results;
 }
 ```
 
-#### 4. 使用 Hibernate 的 `doWork` 方法安全访问底层连接 (如果确实需要直接使用 JDBC)
+#### 4. 使用 Hibernate 的 `doWork` 方法安全访问底层连接
 通过 `Session.doWork()` 方法，Hibernate 会在回调方法执行期间提供一个连接，并在方法返回后自动管理该连接的释放。
 ```java
 // 推荐：使用 doWork 方法
-import net.sf.hibernate.Session;
-import net.sf.hibernate.HibernateException;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-
-public class SafeDoWorkExample {
-    private SessionFactory sessionFactory;
-
-    public void safeConnectionWithDoWork() throws Exception {
-        Session session = null;
-
-        try {
-            session = sessionFactory.openSession();
-
-            session.doWork(connection -> {
-                try (PreparedStatement stmt = connection.prepareStatement("SELECT * FROM products")) {
-                    ResultSet rs = stmt.executeQuery();
-                    // 处理结果集...
-                } catch (Exception e) {
-                    throw new HibernateException("JDBC operation failed", e);
+public List<String> safeConnectionWithDoWork() throws HibernateException {
+    final List<String> results = new ArrayList<>();
+    Session session = null;
+    try {
+        session = sessionFactory.openSession();
+        session.doWork(connection -> {
+            try (
+                Statement stmt = connection.createStatement();
+                ResultSet rs = stmt.executeQuery("SELECT username FROM users")
+            ) {
+                while (rs.next()) {
+                    results.add(rs.getString("username"));
                 }
-            });
-        } finally {
-            if (session != null) {
-                session.close();
+            } catch (SQLException e) {
+                throw new HibernateException("执行SQL查询失败", e);
             }
+        });
+    } finally {
+        if (session != null) {
+            session.close();
         }
     }
+    return results;
 }
 ```
-
 SOLUTION
 	rule_id: "40fc9df0-6e95-4b7a-b9f6-202b0356fef4"
 )
@@ -175,6 +166,137 @@ $safe<getPredecessors()> as $safeGetConnection;
 $getConnection - $safeGetConnection as $weak;
 alert $weak for {
 	message: "检测到Hibernate Session 未释放资源",
+	risk: "资源泄漏",
+	desc: <<<DESC
+## 漏洞描述
+应用程序通过 Hibernate 的 `ConnectionProvider.getConnection()` 方法直接获取数据库连接后，未正确关闭这些连接资源。尽管 Hibernate 通常会管理自己的连接，但当直接使用 ConnectionProvider 接口获取连接时，应用程序需要负责关闭这些连接。
+此漏洞会导致数据库连接泄漏，随着时间推移耗尽连接池资源，最终可能导致应用程序无法与数据库建立新连接。
+## 风险影响
+- 数据库连接持续泄漏，耗尽连接池配额
+- 应用长时间运行后可能出现 "Too many connections" 错误
+- 连接未及时归还池，导致其他操作无法获取连接
+- 服务器资源消耗增加，可能导致性能下降
+- 在高负载情况下，可能引发数据库服务拒绝服务
+DESC
+	name: "weak",
+	title: "Java Hibernate Connection Unreleased Resource Was Detected",
+	title_zh: "检测到Java Hibernate 数据库Connection资源未释放",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用 `try-with-resources` 自动关闭连接 (推荐，Java 7+)
+利用 Java 的 try-with-resources 语法，确保 `Connection` 对象在使用完毕后自动调用其 `close()` 方法。
+```java
+// 修复代码示例
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.connection.ConnectionProvider;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.sql.ResultSet;
+public class SafeHibernateCode {
+private SessionFactory sessionFactory;
+public void safeConnectionWithTryWithResources() throws Exception {
+ConnectionProvider provider = sessionFactory.getConnectionProvider();
+try (Connection conn = provider.getConnection();
+Statement stmt = conn.createStatement();
+ResultSet rs = stmt.executeQuery("SELECT * FROM users")) {
+// 处理结果集...
+} // 所有资源在此处自动关闭
+}
+}
+```
+#### 2. 使用 `try-finally` 块手动关闭连接
+在 `finally` 块中确保调用 `Connection` 对象的 `close()` 方法。同时需要确保其他相关资源（如 `Statement` 和 `ResultSet`）也被关闭。
+```java
+// 修复代码示例
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.connection.ConnectionProvider;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.sql.ResultSet;
+public class SafeHibernateCode {
+private SessionFactory sessionFactory;
+public void safeConnectionWithTryFinally() throws Exception {
+ConnectionProvider provider = sessionFactory.getConnectionProvider();
+Connection conn = null;
+Statement stmt = null;
+ResultSet rs = null;
+try {
+conn = provider.getConnection();
+stmt = conn.createStatement();
+rs = stmt.executeQuery("SELECT * FROM users");
+// 使用结果集...
+} finally {
+if (rs != null) { try { rs.close(); } catch (Exception e) { /* log error */ } }
+if (stmt != null) { try { stmt.close(); } catch (Exception e) { /* log error */ } }
+if (conn != null) { try { conn.close(); } catch (Exception e) { /* log error */ } }
+}
+}
+}
+```
+#### 3. 避免直接使用 `ConnectionProvider` 获取连接
+优先使用 Hibernate 提供的安全 API 来执行数据库操作。让 Hibernate 管理底层连接。
+```java
+// 推荐做法：使用 Hibernate Session
+import net.sf.hibernate.Session;
+import net.sf.hibernate.Transaction;
+import net.sf.hibernate.SessionFactory;
+public class RecommendedHibernateCode {
+private SessionFactory sessionFactory;
+public void recommendedHibernateSessionUsage() throws Exception {
+Session session = null;
+Transaction tx = null;
+try {
+session = sessionFactory.openSession();
+tx = session.beginTransaction();
+// 使用 Hibernate 原生 API 或 HQL/JPQL 查询
+List<?> users = session.createQuery("from User").list();
+// 处理结果...
+tx.commit();
+} catch (RuntimeException e) {
+if (tx != null && tx.isActive()) {
+tx.rollback();
+}
+throw e;
+} finally {
+if (session != null) {
+session.close();
+}
+}
+}
+}
+```
+#### 4. 使用 Hibernate 的 `doWork` 方法安全访问底层连接 (如果确实需要直接使用 JDBC)
+通过 `Session.doWork()` 方法，Hibernate 会在回调方法执行期间提供一个连接，并在方法返回后自动管理该连接的释放。
+```java
+// 推荐：使用 doWork 方法
+import net.sf.hibernate.Session;
+import net.sf.hibernate.HibernateException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+public class SafeDoWorkExample {
+private SessionFactory sessionFactory;
+public void safeConnectionWithDoWork() throws Exception {
+Session session = null;
+try {
+session = sessionFactory.openSession();
+session.doWork(connection -> {
+try (PreparedStatement stmt = connection.prepareStatement("SELECT * FROM products")) {
+ResultSet rs = stmt.executeQuery();
+// 处理结果集...
+} catch (Exception e) {
+throw new HibernateException("JDBC operation failed", e);
+}
+});
+} finally {
+if (session != null) {
+session.close();
+}
+}
+}
+}
+```
+SOLUTION
 }
 
 
@@ -371,5 +493,112 @@ desc(
             }
         }
     }
+CODE
+	"safefile://SafeHibernateConnectionWithTryFinally.java": <<<CODE
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.HibernateException;
+import net.sf.hibernate.connection.ConnectionProvider;
+import net.sf.hibernate.cfg.Configuration;
+
+public class SafeHibernateConnectionWithTryFinally {
+    private SessionFactory sessionFactory;
+
+    public SafeHibernateConnectionWithTryFinally() {
+        try {
+            Configuration config = new Configuration().configure();
+            sessionFactory = config.buildSessionFactory();
+        } catch (HibernateException e) {
+            throw new RuntimeException("初始化SessionFactory失败", e);
+        }
+    }
+
+    /**
+     * 正确示例1：使用try-finally确保连接关闭
+     * 确保即使在处理过程中发生异常，数据库连接、Statement和ResultSet等资源也能被可靠关闭。
+     */
+    public List<String> safeConnectionWithTryFinally() throws HibernateException, SQLException {
+        List<String> results = new ArrayList<>();
+        ConnectionProvider provider = sessionFactory.getConnectionProvider();
+
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+
+        try {
+            // 获取连接
+            conn = provider.getConnection();
+
+            // 使用连接
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT username FROM users");
+
+            while (rs.next()) {
+                results.add(rs.getString("username"));
+            }
+        } finally {
+            // 按照获取顺序的逆序关闭资源，这是最佳实践
+            if (rs != null) { try { rs.close(); } catch (SQLException e) { /* 记录日志 */ } }
+            if (stmt != null) { try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ } }
+            if (conn != null) { try { conn.close(); } catch (SQLException e) { /* 记录日志 */ } }
+        }
+
+        return results;
+    }
+}
+CODE
+	"safefile://SafeHibernateConnectionWithTryWithResources.java": <<<CODE
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+import java.util.List;
+
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.HibernateException;
+import net.sf.hibernate.connection.ConnectionProvider;
+import net.sf.hibernate.cfg.Configuration;
+
+public class SafeHibernateConnectionWithTryWithResources {
+    private SessionFactory sessionFactory;
+
+    public SafeHibernateConnectionWithTryWithResources() {
+        try {
+            Configuration config = new Configuration().configure();
+            sessionFactory = config.buildSessionFactory();
+        } catch (HibernateException e) {
+            throw new RuntimeException("初始化SessionFactory失败", e);
+        }
+    }
+
+    /**
+     * 正确示例2：使用try-with-resources自动关闭资源（Java 7+）
+     * try-with-resources 语法可以确保所有可自动关闭的资源在块结束时自动关闭，
+     * 极大简化了资源管理代码，并降低了资源泄漏的风险。
+     */
+    public List<String> safeConnectionWithTryWithResources() throws HibernateException, SQLException {
+        List<String> results = new ArrayList<>();
+        ConnectionProvider provider = sessionFactory.getConnectionProvider();
+
+        try (
+            Connection conn = provider.getConnection();
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT username FROM users")
+        ) {
+            while (rs.next()) {
+                results.add(rs.getString("username"));
+            }
+        } // 所有资源在此处自动关闭，无需显式调用 close()
+
+        return results;
+    }
+}
 CODE
 )

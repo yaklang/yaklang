@@ -7,188 +7,164 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
+当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
 
 2. **触发场景**
-
-   *   **直接使用未经验证的外部输入作为 `eval()` 参数：**
-       ```php
-       <?php
-       eval($_GET["code"]);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
-       ```php
-       <?php
-           $func = create_function('$a', $_COOKIE['func_body']);
-           $func(1);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `assert()` 的参数：**
-       ```php
-       <?php
-           assert($_GET['code']);
-       ?>
-       ```
-
+*   **直接使用未经验证的外部输入作为 `eval()` 参数：**
+```php
+<?php
+eval($_GET["code"]);
+?>
+```
+*   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
+```php
+<?php
+$func = create_function('$a', $_COOKIE['func_body']);
+$func(1);
+?>
+```
+*   **使用未经验证的外部输入作为 `assert()` 的参数：**
+```php
+<?php
+assert($_GET['code']);
+?>
+```
 3. **潜在影响**
-    攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
-
+攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
 DESC
 	rule_id: "43d98bb1-1f90-4582-9a43-8570852c2d5b"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免使用危险函数：**
-   尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
+尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
 
 2. **对用户输入进行严格验证和过滤：**
-   如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
+如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
 
 3. **针对 `eval()` 和 `create_function()`：**
-   如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
+如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
 
 4. **针对 `assert()`：**
-   在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
-   ```ini
-   zend.assertions = -1
-   ```
-
+在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
+```ini
+zend.assertions = -1
+```
 5. **代码示例（使用白名单验证和禁用assert）：**
-   ```php
-   <?php
-   // 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
-   // ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
-
-   // 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
-   $expression = $_GET['expr'];
-
-   // 使用白名单验证输入
-   if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
-       die("Invalid characters in expression!");
-   }
-
-   // 使用eval，但确保输入已经过严格验证
-   // 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
-   $result = eval("return " . $expression . ";");
-
-   echo "Result: " . $result;
-
-   // 避免使用 create_function
-   // 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
-   /*
-   // 替代 create_function 的匿名函数示例：
-   $factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
-   if (!is_numeric($factor)) {
-       die("Invalid factor!");
-   }
-   $func = function($a) use ($factor) {
-       return $a * $factor;
-   };
-   echo $func(10);
-   */
-
-   ?>
-   ```
-
+```php
+<?php
+// 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
+// ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
+// 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
+$expression = $_GET['expr'];
+// 使用白名单验证输入
+if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
+die("Invalid characters in expression!");
+}
+// 使用eval，但确保输入已经过严格验证
+// 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
+$result = eval("return " . $expression . ";");
+echo "Result: " . $result;
+// 避免使用 create_function
+// 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
+/*
+// 替代 create_function 的匿名函数示例：
+$factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
+if (!is_numeric($factor)) {
+die("Invalid factor!");
+}
+$func = function($a) use ($factor) {
+return $a * $factor;
+};
+echo $func(10);
+*/
+?>
+```
 SOLUTION
 	reference: <<<REFERENCE
-https://cwe.mitre.org/data/definitions/94.html
+https://cwe.mitre.org/data/definitions/78.html
 REFERENCE
 )
 /^create_function|eval|assert$/ as $evalFunction;
 
 check $evalFunction;
 alert $evalFunction for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
-
+当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
 2. **触发场景**
-
-   *   **直接使用未经验证的外部输入作为 `eval()` 参数：**
-       ```php
-       <?php
-       eval($_GET["code"]);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
-       ```php
-       <?php
-           $func = create_function('$a', $_COOKIE['func_body']);
-           $func(1);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `assert()` 的参数：**
-       ```php
-       <?php
-           assert($_GET['code']);
-       ?>
-       ```
-
+*   **直接使用未经验证的外部输入作为 `eval()` 参数：**
+```php
+<?php
+eval($_GET["code"]);
+?>
+```
+*   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
+```php
+<?php
+$func = create_function('$a', $_COOKIE['func_body']);
+$func(1);
+?>
+```
+*   **使用未经验证的外部输入作为 `assert()` 的参数：**
+```php
+<?php
+assert($_GET['code']);
+?>
+```
 3. **潜在影响**
-    攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
-CODE
+攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
+DESC
 	level: "low",
 	title: "Detected dangerous function, possible code execution risk",
 	title_zh: "检测到危险函数，可能存在代码执行风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免使用危险函数：**
-   尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
-
+尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
 2. **对用户输入进行严格验证和过滤：**
-   如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
-
+如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
 3. **针对 `eval()` 和 `create_function()`：**
-   如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
-
+如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
 4. **针对 `assert()`：**
-   在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
-   ```ini
-   zend.assertions = -1
-   ```
-
+在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
+```ini
+zend.assertions = -1
+```
 5. **代码示例（使用白名单验证和禁用assert）：**
-   ```php
-   <?php
-   // 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
-   // ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
-
-   // 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
-   $expression = $_GET['expr'];
-
-   // 使用白名单验证输入
-   if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
-       die("Invalid characters in expression!");
-   }
-
-   // 使用eval，但确保输入已经过严格验证
-   // 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
-   $result = eval("return " . $expression . ";");
-
-   echo "Result: " . $result;
-
-   // 避免使用 create_function
-   // 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
-   /*
-   // 替代 create_function 的匿名函数示例：
-   $factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
-   if (!is_numeric($factor)) {
-       die("Invalid factor!");
-   }
-   $func = function($a) use ($factor) {
-       return $a * $factor;
-   };
-   echo $func(10);
-   */
-
-   ?>
-   ```
-CODE
+```php
+<?php
+// 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
+// ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
+// 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
+$expression = $_GET['expr'];
+// 使用白名单验证输入
+if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
+die("Invalid characters in expression!");
+}
+// 使用eval，但确保输入已经过严格验证
+// 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
+$result = eval("return " . $expression . ";");
+echo "Result: " . $result;
+// 避免使用 create_function
+// 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
+/*
+// 替代 create_function 的匿名函数示例：
+$factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
+if (!is_numeric($factor)) {
+die("Invalid factor!");
+}
+$func = function($a) use ($factor) {
+return $a * $factor;
+};
+echo $func(10);
+*/
+?>
+```
+SOLUTION
+	name: "evalFunction",
+	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
+	risk: "代码执行",
 }
 <include('php-param')> as $params;
 <include('php-tp-all-extern-variable-param-source')> as $params
@@ -206,94 +182,82 @@ CODE)> as $high
 
 alert $high for {
 	title_zh: "未验证参数注入风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免使用危险函数：**
-   尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
-
+尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
 2. **对用户输入进行严格验证和过滤：**
-   如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
-
+如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
 3. **针对 `eval()` 和 `create_function()`：**
-   如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
-
+如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
 4. **针对 `assert()`：**
-   在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
-   ```ini
-   zend.assertions = -1
-   ```
-
+在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
+```ini
+zend.assertions = -1
+```
 5. **代码示例（使用白名单验证和禁用assert）：**
-   ```php
-   <?php
-   // 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
-   // ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
-
-   // 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
-   $expression = $_GET['expr'];
-
-   // 使用白名单验证输入
-   if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
-       die("Invalid characters in expression!");
-   }
-
-   // 使用eval，但确保输入已经过严格验证
-   // 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
-   $result = eval("return " . $expression . ";");
-
-   echo "Result: " . $result;
-
-   // 避免使用 create_function
-   // 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
-   /*
-   // 替代 create_function 的匿名函数示例：
-   $factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
-   if (!is_numeric($factor)) {
-       die("Invalid factor!");
-   }
-   $func = function($a) use ($factor) {
-       return $a * $factor;
-   };
-   echo $func(10);
-   */
-
-   ?>
-   ```
-CODE
-	desc: <<<CODE
+```php
+<?php
+// 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
+// ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
+// 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
+$expression = $_GET['expr'];
+// 使用白名单验证输入
+if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
+die("Invalid characters in expression!");
+}
+// 使用eval，但确保输入已经过严格验证
+// 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
+$result = eval("return " . $expression . ";");
+echo "Result: " . $result;
+// 避免使用 create_function
+// 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
+/*
+// 替代 create_function 的匿名函数示例：
+$factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
+if (!is_numeric($factor)) {
+die("Invalid factor!");
+}
+$func = function($a) use ($factor) {
+return $a * $factor;
+};
+echo $func(10);
+*/
+?>
+```
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
-
+当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
 2. **触发场景**
-
-   *   **直接使用未经验证的外部输入作为 `eval()` 参数：**
-       ```php
-       <?php
-       eval($_GET["code"]);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
-       ```php
-       <?php
-           $func = create_function('$a', $_COOKIE['func_body']);
-           $func(1);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `assert()` 的参数：**
-       ```php
-       <?php
-           assert($_GET['code']);
-       ?>
-       ```
-
+*   **直接使用未经验证的外部输入作为 `eval()` 参数：**
+```php
+<?php
+eval($_GET["code"]);
+?>
+```
+*   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
+```php
+<?php
+$func = create_function('$a', $_COOKIE['func_body']);
+$func(1);
+?>
+```
+*   **使用未经验证的外部输入作为 `assert()` 的参数：**
+```php
+<?php
+assert($_GET['code']);
+?>
+```
 3. **潜在影响**
-    攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
-CODE
+攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
+DESC
 	level: "high",
 	title: "Unvalidated parameter injection",
+	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
+	risk: "代码执行",
+	name: "high",
 }
 
 $all<dataflow(include=<<<INCLUDE
@@ -307,187 +271,163 @@ $highAndMid - $high as $mid
 alert $mid for {
 	title: "Insufficient parameter filtering",
 	title_zh: "参数过滤不充分，可能存在代码执行风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免使用危险函数：**
-   尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
-
+尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
 2. **对用户输入进行严格验证和过滤：**
-   如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
-
+如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
 3. **针对 `eval()` 和 `create_function()`：**
-   如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
-
+如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
 4. **针对 `assert()`：**
-   在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
-   ```ini
-   zend.assertions = -1
-   ```
-
+在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
+```ini
+zend.assertions = -1
+```
 5. **代码示例（使用白名单验证和禁用assert）：**
-   ```php
-   <?php
-   // 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
-   // ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
-
-   // 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
-   $expression = $_GET['expr'];
-
-   // 使用白名单验证输入
-   if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
-       die("Invalid characters in expression!");
-   }
-
-   // 使用eval，但确保输入已经过严格验证
-   // 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
-   $result = eval("return " . $expression . ";");
-
-   echo "Result: " . $result;
-
-   // 避免使用 create_function
-   // 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
-   /*
-   // 替代 create_function 的匿名函数示例：
-   $factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
-   if (!is_numeric($factor)) {
-       die("Invalid factor!");
-   }
-   $func = function($a) use ($factor) {
-       return $a * $factor;
-   };
-   echo $func(10);
-   */
-
-   ?>
-   ```
-CODE
-	desc: <<<CODE
+```php
+<?php
+// 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
+// ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
+// 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
+$expression = $_GET['expr'];
+// 使用白名单验证输入
+if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
+die("Invalid characters in expression!");
+}
+// 使用eval，但确保输入已经过严格验证
+// 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
+$result = eval("return " . $expression . ";");
+echo "Result: " . $result;
+// 避免使用 create_function
+// 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
+/*
+// 替代 create_function 的匿名函数示例：
+$factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
+if (!is_numeric($factor)) {
+die("Invalid factor!");
+}
+$func = function($a) use ($factor) {
+return $a * $factor;
+};
+echo $func(10);
+*/
+?>
+```
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
-
+当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
 2. **触发场景**
-
-   *   **直接使用未经验证的外部输入作为 `eval()` 参数：**
-       ```php
-       <?php
-       eval($_GET["code"]);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
-       ```php
-       <?php
-           $func = create_function('$a', $_COOKIE['func_body']);
-           $func(1);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `assert()` 的参数：**
-       ```php
-       <?php
-           assert($_GET['code']);
-       ?>
-       ```
-
+*   **直接使用未经验证的外部输入作为 `eval()` 参数：**
+```php
+<?php
+eval($_GET["code"]);
+?>
+```
+*   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
+```php
+<?php
+$func = create_function('$a', $_COOKIE['func_body']);
+$func(1);
+?>
+```
+*   **使用未经验证的外部输入作为 `assert()` 的参数：**
+```php
+<?php
+assert($_GET['code']);
+?>
+```
 3. **潜在影响**
-    攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
-CODE
+攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
+DESC
 	level: "mid",
+	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
+	risk: "代码执行",
+	name: "mid",
 }
 
 $all - $high - $mid as $low
 
 alert $low for {
 	title_zh: "潜在代码执行风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免使用危险函数：**
-   尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
-
+尽可能避免在生产环境中使用 `eval()`、`create_function()`、`assert()` 等高风险函数。多数情况下，可以通过其他更安全的方式来实现相同的功能。
 2. **对用户输入进行严格验证和过滤：**
-   如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
-
+如果确实需要使用到这些函数，必须对所有来源于用户的输入进行严格的验证和过滤，只允许符合预期的字符、格式或类型通过。可以使用白名单验证方法。
 3. **针对 `eval()` 和 `create_function()`：**
-   如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
-
+如果必须使用，确保传入的字符串是硬编码的或经过严格验证和转义，而不是直接拼接用户输入。
 4. **针对 `assert()`：**
-   在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
-   ```ini
-   zend.assertions = -1
-   ```
-
+在生产环境中禁用 `assert()` 函数。可以通过修改 php.ini 文件配置 `zend.assertions = -1` 来禁用。
+```ini
+zend.assertions = -1
+```
 5. **代码示例（使用白名单验证和禁用assert）：**
-   ```php
-   <?php
-   // 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
-   // ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
-
-   // 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
-   $expression = $_GET['expr'];
-
-   // 使用白名单验证输入
-   if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
-       die("Invalid characters in expression!");
-   }
-
-   // 使用eval，但确保输入已经过严格验证
-   // 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
-   $result = eval("return " . $expression . ";");
-
-   echo "Result: " . $result;
-
-   // 避免使用 create_function
-   // 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
-   /*
-   // 替代 create_function 的匿名函数示例：
-   $factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
-   if (!is_numeric($factor)) {
-       die("Invalid factor!");
-   }
-   $func = function($a) use ($factor) {
-       return $a * $factor;
-   };
-   echo $func(10);
-   */
-
-   ?>
-   ```
-CODE
-	desc: <<<CODE
+```php
+<?php
+// 禁用 assert 函数 (通过 php.ini 配置更安全可靠)
+// ini_set('zend.assertions', '-1'); // 不推荐在代码中设置，应在php.ini中设置
+// 假设需要执行一个简单的数学表达式，只允许数字和基本运算符
+$expression = $_GET['expr'];
+// 使用白名单验证输入
+if (!preg_match('/^[0-9+\-*\/\s()]*$/', $expression)) {
+die("Invalid characters in expression!");
+}
+// 使用eval，但确保输入已经过严格验证
+// 注意：即使经过验证，使用 eval 仍然有风险，考虑替代方案
+$result = eval("return " . $expression . ";");
+echo "Result: " . $result;
+// 避免使用 create_function
+// 考虑使用匿名函数 (closures) 或其他设计模式替代 create_function
+/*
+// 替代 create_function 的匿名函数示例：
+$factor = $_COOKIE['factor']; // 假设 factor 经过严格验证
+if (!is_numeric($factor)) {
+die("Invalid factor!");
+}
+$func = function($a) use ($factor) {
+return $a * $factor;
+};
+echo $func(10);
+*/
+?>
+```
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
-
+当 PHP 代码中直接使用了 `eval()`、`create_function()` 或 `assert()` 等函数，并且这些函数的参数可控，来源于未经过充分过滤或验证的外部输入（如 GET、POST、COOKIE 参数），攻击者可以注入恶意代码并执行，从而实现代码执行攻击。
 2. **触发场景**
-
-   *   **直接使用未经验证的外部输入作为 `eval()` 参数：**
-       ```php
-       <?php
-       eval($_GET["code"]);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
-       ```php
-       <?php
-           $func = create_function('$a', $_COOKIE['func_body']);
-           $func(1);
-       ?>
-       ```
-   *   **使用未经验证的外部输入作为 `assert()` 的参数：**
-       ```php
-       <?php
-           assert($_GET['code']);
-       ?>
-       ```
-
+*   **直接使用未经验证的外部输入作为 `eval()` 参数：**
+```php
+<?php
+eval($_GET["code"]);
+?>
+```
+*   **使用未经验证的外部输入作为 `create_function()` 的匿名函数体：**
+```php
+<?php
+$func = create_function('$a', $_COOKIE['func_body']);
+$func(1);
+?>
+```
+*   **使用未经验证的外部输入作为 `assert()` 的参数：**
+```php
+<?php
+assert($_GET['code']);
+?>
+```
 3. **潜在影响**
-    攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
-CODE
+攻击者可以完全控制服务器，执行任意操作系统命令，获取敏感数据，篡改文件，甚至利用服务器作为跳板进行内网渗透。导致服务器失陷，造成严重的安全后果。
+DESC
 	level: "low",
 	title: "Potential code execution risk",
+	name: "low",
+	message: "检测到PHP代码中使用了eval、create_function或assert等危险函数，并且这些函数的参数来源于未经过充分过滤或验证的外部输入。",
+	risk: "代码执行",
 }
 desc(
 	lang: "php"

@@ -149,19 +149,15 @@ HandleExpect100Continue:
 	useTransferEncodingChunked := false
 	defaultClose := (rsp.ProtoMajor == 1 && rsp.ProtoMinor == 0) || rsp.ProtoMajor < 1
 
-	for {
-		lineBytes, err := ReadLine(headerReader)
-		if err != nil {
-			return nil, errors.Wrap(err, "read HTTPResponse header failed")
-		}
-		if len(bytes.TrimSpace(lineBytes)) == 0 {
+	err = ScanHTTPHeaderWithHeaderFolding(headerReader, func(rawHeader []byte) {
+		if len(rawHeader) <= 0 {
 			rawPacket.WriteString(CRLF)
-			break
+			return
 		}
-		rawPacket.Write(lineBytes)
+		rawPacket.Write(rawHeader)
 		rawPacket.WriteString(CRLF)
 
-		before, after, _ := bytes.Cut(lineBytes, []byte{':'})
+		before, after, _ := bytes.Cut(rawHeader, []byte{':'})
 		keyStr := string(before)
 		valStr := strings.TrimLeftFunc(string(after), unicode.IsSpace)
 
@@ -200,9 +196,13 @@ HandleExpect100Continue:
 		}
 		// add header
 		if keyStr == "" || alreadySet {
-			continue
+			return
 		}
 		header[keyStr] = append(header[keyStr], valStr)
+
+	}, nil)
+	if err != nil {
+		return nil, err
 	}
 	rsp.Close = defaultClose
 	rsp.Header = header
@@ -212,6 +212,9 @@ HandleExpect100Continue:
 		headerBytes = rawPacket.Bytes()
 		_, _ = ret.Write(rawPacket.Bytes())
 	}
+
+	noBodyBuffer := httpctx.GetNoBodyBuffer(req)
+
 	var bodyReader io.Reader = originReader
 	if ret := httpctx.GetResponseHeaderCallback(req); ret != nil {
 		if len(headerBytes) <= 0 {
@@ -232,7 +235,12 @@ HandleExpect100Continue:
 	if fixContentLength {
 		// just for bytes condition
 		// by reader
-		raw, _ := io.ReadAll(io.NopCloser(bodyReader))
+		raw := []byte{}
+		if noBodyBuffer {
+			io.Copy(io.Discard, bodyReader)
+		} else {
+			raw, _ = io.ReadAll(io.NopCloser(bodyReader))
+		}
 		rawPacket.Write(raw)
 		if useContentLength && !useTransferEncodingChunked {
 			rsp.ContentLength = int64(len(raw))
@@ -247,7 +255,12 @@ HandleExpect100Continue:
 			log.Debug("content-length and transfer-encoding chunked both exist, try smuggle? use content-length first!")
 			if contentLengthInt > 0 {
 				// smuggle
-				bodyRaw, _ := io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+				bodyRaw := []byte{}
+				if noBodyBuffer {
+					io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+				} else {
+					bodyRaw, _ = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+				}
 				rawPacket.Write(bodyRaw)
 				bodyRawBuf.Write(bodyRaw)
 				if ret := contentLengthInt - len(bodyRaw); ret > 0 {
@@ -255,7 +268,13 @@ HandleExpect100Continue:
 				}
 			} else {
 				// chunked
-				_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				var fixed []byte
+				var err error
+				if noBodyBuffer {
+					_, _, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				} else {
+					_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+				}
 				rawPacket.Write(fixed)
 				if err != nil {
 					return nil, errors.Wrap(err, "chunked decoder error")
@@ -264,7 +283,13 @@ HandleExpect100Continue:
 			}
 		} else if !useContentLength && useTransferEncodingChunked {
 			// handle chunked
-			_, fixed, _, err := codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			var fixed []byte
+			var err error
+			if noBodyBuffer {
+				_, _, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			} else {
+				_, fixed, _, err = codec.HTTPChunkedDecoderWithRestBytes(bodyReader)
+			}
 			rawPacket.Write(fixed)
 			if err != nil {
 				return nil, errors.Wrap(err, "chunked decoder error")
@@ -279,7 +304,12 @@ HandleExpect100Continue:
 					contentLengthInt = 100 * 1000 // no cl ,but maybe has body ,give 100k
 				}
 				if contentLengthInt > 0 {
-					bodyRaw, err := io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+					bodyRaw := []byte{}
+					if noBodyBuffer {
+						io.Copy(io.Discard, io.LimitReader(bodyReader, int64(contentLengthInt)))
+					} else {
+						bodyRaw, err = io.ReadAll(io.NopCloser(io.LimitReader(bodyReader, int64(contentLengthInt))))
+					}
 					rawPacket.Write(bodyRaw)
 					if err != nil && err != io.EOF {
 						return nil, errors.Wrap(err, "read body error")
@@ -439,4 +469,117 @@ func TCPNoDelay(i net.Conn) {
 			tc.SetWriteBuffer(0)
 		}
 	}
+}
+
+const (
+	CommonHeaderStat string = "common-header"
+	HeaderCheckStat         = "header-Check"
+)
+
+func ScanHTTPHeaderWithHeaderFolding(reader io.Reader, headerCallback func(rawHeader []byte), prefix []byte) error {
+	var headerRawCache []byte
+	var currentSata = CommonHeaderStat
+	var headerFoldingPrefix = make([]byte, 0)
+
+	setHeaderFoldingPrefix := func(foldingPrefix []byte) {
+		headerFoldingPrefix = foldingPrefix
+	}
+
+	setCurrentStat := func(stat string) {
+		currentSata = stat
+	}
+
+	pushHeaderRawData := func(raw []byte) {
+		headerRawCache = append(headerRawCache, raw...)
+	}
+
+	emitHeaderRaw := func() {
+		if headerCallback != nil {
+			headerCallback(headerRawCache)
+		}
+		headerRawCache = make([]byte, 0)
+	}
+
+	defer emitHeaderRaw()
+
+	trimPrefix := func(raw []byte) []byte {
+		minLen := Min(len(prefix), len(raw))
+		i := 0
+		for ; i < minLen; i++ {
+			if raw[i] != prefix[i] {
+				break
+			}
+		}
+		return raw[i:]
+	}
+
+	for {
+		lineBytes, err := ReadLine(reader)
+		if err != nil && err != io.EOF {
+			return errors.Wrap(err, "read HTTPResponse header failed")
+		}
+		lineBytes = trimPrefix(lineBytes)
+	Retry:
+		switch currentSata {
+		case CommonHeaderStat:
+			if len(lineBytes) == 0 {
+				return nil
+			}
+			for i, b := range lineBytes {
+				if b != ' ' && b != '\t' {
+					setHeaderFoldingPrefix(lineBytes[:i])
+					break
+				}
+			}
+			pushHeaderRawData(lineBytes)
+			setCurrentStat(HeaderCheckStat)
+		case HeaderCheckStat:
+			checkLine := bytes.TrimPrefix(lineBytes, headerFoldingPrefix)
+			if len(checkLine) > 0 && (checkLine[0] == ' ' || checkLine[0] == '\t') {
+				pushHeaderRawData(append([]byte(CRLF), checkLine...))
+			} else {
+				emitHeaderRaw()
+				setCurrentStat(CommonHeaderStat)
+				goto Retry
+			}
+		}
+	}
+}
+
+func ScanHTTPHeaderSimple(reader io.Reader, headerCallback func(rawHeader []byte), prefix []byte) error {
+	emitHeaderRaw := func(raw []byte) {
+		if headerCallback != nil {
+			headerCallback(raw)
+		}
+	}
+	trimPrefix := func(raw []byte) []byte {
+		minLen := Min(len(prefix), len(raw))
+		i := 0
+		for ; i < minLen; i++ {
+			if raw[i] != prefix[i] {
+				break
+			}
+		}
+		return raw[i:]
+	}
+
+	for {
+		lineBytes, err := ReadLine(reader)
+		if err != nil && err != io.EOF {
+			return errors.Wrap(err, "read HTTPResponse header failed")
+		}
+		lineBytes = trimPrefix(lineBytes)
+		if len(bytes.TrimSpace(lineBytes)) == 0 {
+			emitHeaderRaw(nil)
+			return nil
+		}
+		emitHeaderRaw(lineBytes)
+	}
+}
+
+func ScanHTTPHeader(reader io.Reader, headerCallback func(rawHeader []byte), prefix []byte, isResp bool) error {
+	if isResp {
+		return ScanHTTPHeaderWithHeaderFolding(reader, headerCallback, prefix)
+	}
+	return ScanHTTPHeaderSimple(reader, headerCallback, prefix)
 }

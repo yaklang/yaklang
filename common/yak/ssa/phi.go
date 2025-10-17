@@ -2,9 +2,9 @@ package ssa
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"golang.org/x/exp/slices"
 )
@@ -46,7 +46,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 			ReplaceAllValue(phiValue, header)
 			DeleteInst(phiValue)
 
-			for name, v := range ReplaceMemberCall(phiValue, header) {
+			for name, v := range ReplaceMemberCall(phiValue, phiValue, header) {
 				ret[name] = v
 			}
 
@@ -106,7 +106,7 @@ func SpinHandle(name string, phiValue, header, latch Value) map[string]Value {
 				ret[name] = phi2
 				DeleteInst(phiValue)
 				ReplaceAllValue(phiValue, phi2)
-				for name, v := range ReplaceMemberCall(phiValue, phi2) {
+				for name, v := range ReplaceMemberCall(phiValue, phiValue, phi2) {
 					ret[name] = v
 				}
 				return
@@ -131,16 +131,16 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 	return func(name string, vst []Value) Value {
 		defer func() {
 			if msg := recover(); msg != nil {
-				var buffer = make([]byte, 4096)
-				stack := runtime.Stack(buffer, false)
-				fmt.Println("报错原因：" + string(buffer[:stack]))
+				log.Errorf("generatePhi panic: %s", msg)
 				fmt.Println("name: " + name)
 				for _, value := range vst {
 					fmt.Println("verbose: " + value.GetShortVerboseName())
 				}
+				utils.PrintCurrentGoroutineRuntimeStack()
+
 			}
 		}()
-		if block != nil {
+		if !utils.IsNil(block) {
 			recoverBlock := builder.CurrentBlock
 			builder.CurrentBlock = block
 			defer func() {
@@ -183,13 +183,19 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		}
 		phi := builder.EmitPhi(name, vs)
 		phi.SetType(t)
-		if phi == nil {
+		if utils.IsNil(phi) {
 			return nil
 		}
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(vs[0].GetVerboseName())
-		phi.CFGEntryBasicBlock = cfgEntryBlock.GetId()
+		// 不能直接进行cfgEntryBlock.GetId()，即便GetId会判断receiver为nil
+		// 但是cfgEntryBlock是接口类型，会产生interface panic
+		if !utils.IsNil(cfgEntryBlock) {
+			phi.CFGEntryBasicBlock = cfgEntryBlock.GetId()
+		} else {
+			phi.CFGEntryBasicBlock = -1
+		}
 		return phi
 	}
 }

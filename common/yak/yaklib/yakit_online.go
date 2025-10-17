@@ -12,6 +12,8 @@ import (
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io/ioutil"
@@ -62,6 +64,7 @@ type DownloadOnlinePluginRequest struct {
 	ExcludeTypes  []string             `json:"excludePluginTypes"`
 	FieldKeywords string               `json:"fieldKeywords"`
 	QueryGroup    ypb.QueryPluginGroup `json:"pluginGroup"`
+	Official      []bool               `json:"official"`
 }
 
 type OnlineClient struct {
@@ -548,6 +551,13 @@ func (s *OnlineClient) Save(db *gorm.DB, plugins ...*OnlinePlugin) error {
 	return nil
 }
 
+func (s *OnlineClient) DownloadOnlinePluginsBatchWhere(
+	ctx context.Context, req *ypb.DownloadOnlinePluginsRequest,
+) *OnlineDownloadStream {
+	return s.DownloadOnlinePluginsBatch(ctx, req.Token, req.IsPrivate, req.Keywords, req.PluginType, req.Tags, req.UserName, req.UserId,
+		req.TimeSearch, req.Group, req.ListType, req.Status, req.UUID, req.ScriptName, req.Official)
+}
+
 func (s *OnlineClient) DownloadOnlinePluginsBatch(
 	ctx context.Context, token string,
 	isPrivate []bool,
@@ -562,18 +572,19 @@ func (s *OnlineClient) DownloadOnlinePluginsBatch(
 	status []int64,
 	uuid []string,
 	scriptName []string,
+	official []bool,
 
 ) *OnlineDownloadStream {
-	return s.DownloadNewOnlinePlugins(ctx, token, isPrivate, keywords, pluginType, tags, userName, userId, timeSearch, group, listType, status, uuid, scriptName)
+	return s.DownloadNewOnlinePlugins(ctx, token, isPrivate, keywords, pluginType, tags, userName, userId, timeSearch, group, listType, status, uuid, scriptName, official)
 }
 
 func (s *OnlineClient) DownloadOnlinePluginByPluginName(
 	ctx context.Context, token string, scriptName []string) *OnlineDownloadStream {
-	return s.DownloadNewOnlinePlugins(ctx, token, nil, "", nil, nil, "", 0, "", nil, "", nil, nil, scriptName)
+	return s.DownloadNewOnlinePlugins(ctx, token, nil, "", nil, nil, "", 0, "", nil, "", nil, nil, scriptName, nil)
 }
 
 func (s *OnlineClient) DownloadOnlinePluginByUUID(token, uuid string) (*OnlinePlugin, error) {
-	plugins, _, err := s.downloadNewOnlinePlugins(token, []bool{}, "", nil, nil, "", 0, "", nil, "other", nil, []string{uuid}, nil, 1, 1)
+	plugins, _, err := s.downloadNewOnlinePlugins(token, []bool{}, "", nil, nil, "", 0, "", nil, "other", nil, []string{uuid}, nil, nil, 1, 1)
 	if err != nil {
 		log.Errorf("download yakit plugin failed: %s", err)
 		return nil, utils.Errorf("download yakit plugin failed: %s", err)
@@ -599,6 +610,7 @@ func (s *OnlineClient) DownloadNewOnlinePlugins(
 	status []int64,
 	uuid []string,
 	scriptName []string,
+	official []bool,
 ) *OnlineDownloadStream {
 	var ch = make(chan *OnlinePluginItem, 10)
 	var rsp = &OnlineDownloadStream{
@@ -627,7 +639,7 @@ func (s *OnlineClient) DownloadNewOnlinePlugins(
 
 			// 设置超时处理的问题
 		RETRYDOWNLOAD:
-			plugins, paging, err := s.downloadNewOnlinePlugins(token, isPrivate, keywords, pluginType, tags, userName, userId, timeSearch, group, listType, status, uuid, scriptName, page, 30)
+			plugins, paging, err := s.downloadNewOnlinePlugins(token, isPrivate, keywords, pluginType, tags, userName, userId, timeSearch, group, listType, status, uuid, scriptName, official, page, 30)
 			if err != nil {
 				retry++
 				if retry <= 5 {
@@ -680,12 +692,9 @@ func (s *OnlineClient) downloadNewOnlinePlugins(
 	status []int64,
 	uuid []string,
 	scriptName []string,
+	official []bool,
 	page int, limit int,
 ) ([]*OnlinePlugin, *OnlinePaging, error) {
-	urlIns, err := url.Parse(s.genUrl("/api/plugins/download"))
-	if err != nil {
-		return nil, nil, utils.Errorf("parse url-instance failed: %s", err)
-	}
 
 	raw, err := json.Marshal(DownloadOnlinePluginRequest{
 		UUID:       uuid,
@@ -706,18 +715,25 @@ func (s *OnlineClient) downloadNewOnlinePlugins(
 			UnSetGroup: false,
 			Group:      group,
 		},
+		Official: official,
 	})
 	if err != nil {
 		return nil, nil, utils.Errorf("marshal params failed: %s", err)
 	}
-	rsp, err := s.client.Post(urlIns.String(), "application/json", bytes.NewBuffer(raw))
+
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/plugins/download"),
+		//poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, false),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
+	)
 	if err != nil {
-		return nil, nil, utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
+		return nil, nil, utils.Wrapf(err, "downloadNewOnlinePlugins failed: http error")
 	}
-	rawResponse, err := ioutil.ReadAll(rsp.Body)
-	if err != nil {
-		return nil, nil, utils.Errorf("read body failed: %s", err)
-	}
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
+
 	type PluginDownloadResponse struct {
 		Data     []*OnlinePlugin `json:"data"`
 		Pagemeta *OnlinePaging   `json:"pagemeta"`
@@ -768,10 +784,6 @@ func (s *OnlineClient) SaveToOnline(ctx context.Context, req *ypb.SaveYakScriptT
 
 func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 	token string, scriptName string, pluginType, content, params, help, tags string, enablePluginSelector bool, pluginSelectorTypes string, isGeneralModule, isPrivate bool, riskDetail string, isCorePlugin bool, pluginSupplement, pluginEnvKey string) error {
-	urlIns, err := url.Parse(s.genUrl("/api/plugins"))
-	if err != nil {
-		return utils.Errorf("parse url-instance failed: %s", err)
-	}
 	var (
 		riskDetailJson   []*OnlineRiskDetail
 		paramsJson       []*OnlinePluginParam
@@ -820,21 +832,19 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 		return utils.Errorf("marshal params failed: %s", err)
 	}
 
-	req, err := http.NewRequest("POST", urlIns.String(), bytes.NewBuffer(raw))
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/plugins"),
+		poc.WithReplaceHttpPacketHeader("Authorization", token),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, true),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
+	)
 	if err != nil {
-		return utils.Errorf(err.Error())
+		return utils.Wrapf(err, "SaveYakScriptToOnline failed: http error")
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", token)
-	rsp, err := s.client.Do(req)
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
 
-	if err != nil {
-		return utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
-	}
-	rawResponse, err := ioutil.ReadAll(rsp.Body)
-	if err != nil {
-		return utils.Errorf("read body failed: %s", err)
-	}
 	var responseData map[string]interface{}
 	err = json.Unmarshal(rawResponse, &responseData)
 	if err != nil {
@@ -848,11 +858,6 @@ func (s *OnlineClient) SaveYakScriptToOnline(ctx context.Context,
 }
 
 func (s *OnlineClient) QueryPlugins(req *ypb.QueryOnlinePluginsRequest) ([]*OnlinePlugin, *OnlinePaging, error) {
-	urlIns, err := url.Parse(s.genUrl("/api/query/plugins"))
-	if err != nil {
-		return nil, nil, utils.Errorf("parse url-instance failed: %s", err)
-	}
-
 	raw, err := json.Marshal(DownloadOnlinePluginRequest{
 		Keywords:      req.Data.Keywords,
 		PluginType:    req.Data.PluginType,
@@ -874,14 +879,19 @@ func (s *OnlineClient) QueryPlugins(req *ypb.QueryOnlinePluginsRequest) ([]*Onli
 	if err != nil {
 		return nil, nil, utils.Errorf("marshal params failed: %s", err)
 	}
-	rsp, err := s.client.Post(urlIns.String(), "application/json", bytes.NewBuffer(raw))
+
+	rsp, _, err := poc.DoPOST(
+		fmt.Sprintf("%v/%v", consts.GetOnlineBaseUrl(), "api/query/plugins"),
+		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
+		poc.WithReplaceHttpPacketBody(raw, false),
+		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
+	)
 	if err != nil {
-		return nil, nil, utils.Errorf("HTTP Post %v failed: %v params:%s", urlIns.String(), err, string(raw))
+		return nil, nil, utils.Errorf("QueryPlugins failed: http error")
 	}
-	rawResponse, err := ioutil.ReadAll(rsp.Body)
-	if err != nil {
-		return nil, nil, utils.Errorf("read body failed: %s", err)
-	}
+	rawResponse := lowhttp.GetHTTPPacketBody(rsp.RawPacket)
+
 	type PluginDownloadResponse struct {
 		Data     []*OnlinePlugin `json:"data"`
 		Pagemeta *OnlinePaging   `json:"pagemeta"`

@@ -6,37 +6,35 @@ desc(
 ### 规则描述
 
 1. **规则目的**
-   该规则用于审计使用Apache HttpClient Fluent API发送HTTP请求的代码。Fluent API提供了一种简化发送HTTP请求的方式，但如果没有适当的安全措施，可能会引入安全风险。
+该规则用于审计使用Apache HttpClient Fluent API发送HTTP请求的代码。Fluent API提供了一种简化发送HTTP请求的方式，但如果没有适当的安全措施，可能会引入安全风险。
 
 2. **规则详细**
-   - **作为基础审计库**
-     属于`java-http-fluent-request`库规则(`lib`类型)，用于识别代码中使用了Apache HttpClient Fluent API发送请求的位置。
-   - **识别HTTP请求方法**
-     识别以下HTTP请求方法：`Get`, `Post`, `Put`, `Delete`, `Patch`, `Options`, `Head`, `Trace`。
+- **作为基础审计库**
+属于`java-http-fluent-request`库规则(`lib`类型)，用于识别代码中使用了Apache HttpClient Fluent API发送请求的位置。
+- **识别HTTP请求方法**
+识别以下HTTP请求方法：`Get`, `Post`, `Put`, `Delete`, `Patch`, `Options`, `Head`, `Trace`。
 
 3. **触发场景**
-   ```java
-   package src.main.b;
-   import org.apache.http.client.fluent.Request;
-   import org.apache.http.client.fluent.Response;
-
-   public class FluentGetExample {
-       public static void main(String[] args) {
-           try {
-               // 发送 GET 请求并获取响应
-               Response response = Request.Get("http://httpbin.org/get")
-                       .execute();
-               String responseBody = response.returnContent().asString();
-
-               System.out.println("Response Body:");
-               System.out.println(responseBody);
-           } catch (Exception e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-   在上述示例中，开发者使用了Apache HttpClient Fluent API来发送一个GET请求。如果目标URL或参数被攻击者控制，可能引发SSRF（服务器端请求伪造）等安全问题。
+```java
+package src.main.b;
+import org.apache.http.client.fluent.Request;
+import org.apache.http.client.fluent.Response;
+public class FluentGetExample {
+    public static void main(String[] args) {
+        try {
+            // 发送 GET 请求并获取响应
+            Response response = Request.Get("http://httpbin.org/get")
+                .execute();
+            String responseBody = response.returnContent().asString();
+            System.out.println("Response Body:");
+            System.out.println(responseBody);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+在上述示例中，开发者使用了Apache HttpClient Fluent API来发送一个GET请求。如果目标URL或参数被攻击者控制，可能引发SSRF（服务器端请求伪造）等安全问题。
 DESC
 	rule_id: "9323ce34-f898-40ca-b03d-4e4ffcc16dc8"
 	reference: <<<REFERENCE
@@ -57,8 +55,71 @@ $execMethods(,* as $output);
 <delete(execMethods)>
 alert $output for {
 	title_zh: "审计Java HTTP Fluent Request",
-	level: "mid",
+	level: "info",
 	title: "Audit Java HTTP Fluent Request",
+	message: "发现使用Apache HttpClient Fluent API发送HTTP请求的代码，可能存在SSRF等安全风险。",
+	solution: <<<SOLUTION
+### 安全建议
+目前该规则用于审计使用Apache HttpClient Fluent API发送HTTP请求的代码。以下为相关建议：
+
+#### 1. 验证目标URL
+确保所有通过Fluent API发送的HTTP请求的目标URL是可信的，并且不直接依赖用户输入。
+
+```java
+// 示例：验证外部输入URL是否合法
+String userInputUrl = request.getParameter("url");
+List<String> allowedHosts = Arrays.asList("httpbin.org", "example.com");
+URI uri = new URI(userInputUrl);
+if (!allowedHosts.contains(uri.getHost())) {
+    throw new IllegalArgumentException("非法URL");
+}
+
+// 使用验证后的URL发起请求
+Response response = Request.Get(userInputUrl).execute();
+```
+
+#### 2. 最小化权限
+确保运行HTTP请求的代码具有最小权限，避免因SSRF攻击导致内部服务暴露。
+
+#### 3. 使用更安全的替代方案
+对于敏感场景，考虑使用标准的HttpURLConnection或第三方库（如OkHttp）来代替Fluent API，以减少潜在的安全问题。
+
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+1. **规则目的**
+该规则用于审计使用Apache HttpClient Fluent API发送HTTP请求的代码。Fluent API提供了一种简化发送HTTP请求的方式，但如果没有适当的安全措施，可能会引入安全风险。
+
+2. **规则详细**
+- **作为基础审计库**
+属于`java-http-fluent-request`库规则(`lib`类型)，用于识别代码中使用了Apache HttpClient Fluent API发送请求的位置。
+- **识别HTTP请求方法**
+识别以下HTTP请求方法：`Get`, `Post`, `Put`, `Delete`, `Patch`, `Options`, `Head`, `Trace`。
+
+3. **触发场景**
+```java
+package src.main.b;
+import org.apache.http.client.fluent.Request;
+import org.apache.http.client.fluent.Response;
+public class FluentGetExample {
+    public static void main(String[] args) {
+        try {
+            // 发送 GET 请求并获取响应
+            Response response = Request.Get("http://httpbin.org/get")
+                .execute();
+            String responseBody = response.returnContent().asString();
+            System.out.println("Response Body:");
+            System.out.println(responseBody);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+在上述示例中，开发者使用了Apache HttpClient Fluent API来发送一个GET请求。如果目标URL或参数被攻击者控制，可能引发SSRF（服务器端请求伪造）等安全问题。
+DESC
+	name: "output",
 }
 
 
@@ -107,4 +168,66 @@ public class FluentGetExample {
     }
 }
 TEXT
+	"safefile://SafeHttpClientUsage.java": <<<CODE
+// 这是一个没有使用Apache HttpClient Fluent API的示例
+// 该代码使用标准的HttpURLConnection来发起HTTP请求，不会触发该规则。
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+public class SafeHttpClientUsage {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("https://www.example.com");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String inputLine;
+            StringBuilder content = new StringBuilder();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            connection.disconnect();
+            System.out.println("Response: " + content.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://NonFluentHttpClient.java": <<<CODE
+// 这是一个使用Apache HttpClient，但未使用其Fluent API的示例。
+// 该规则仅针对Fluent API的使用进行审计。
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+
+public class NonFluentHttpClient {
+    public static void main(String[] args) {
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+        HttpGet httpGet = new HttpGet("https://www.google.com");
+
+        try (CloseableHttpResponse response = httpClient.execute(httpGet)) {
+            System.out.println("Response Status: " + response.getStatusLine().getStatusCode());
+            System.out.println("Response Body: " + EntityUtils.toString(response.getEntity()));
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                httpClient.close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+CODE
 )

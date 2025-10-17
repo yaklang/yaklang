@@ -3,6 +3,7 @@ package ssa4analyze
 import (
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"golang.org/x/exp/slices"
 )
@@ -20,13 +21,16 @@ func (t *TypeCheck) Run(prog *ssa.Program) {
 
 	analyzeOnFunction := func(f *ssa.Function) {
 		check := func(instId int64) {
-			inst := f.GetInstructionById(instId)
+			inst, ok := f.GetInstructionById(instId)
+			if !ok {
+				return
+			}
 			t.CheckOnInstruction(inst)
 		}
 		for _, bRaw := range f.Blocks {
-			b := f.GetBasicBlockByID(bRaw)
-			if b == nil {
-				log.Errorf("TypeCheck: %s is not a basic block", b.GetName())
+			b, ok := f.GetBasicBlockByID(bRaw)
+			if !ok || b == nil {
+				log.Errorf("TypeCheck: %d is not a basic block", bRaw)
 				continue
 			}
 
@@ -76,7 +80,10 @@ func (t *TypeCheck) CheckOnInstruction(inst ssa.Instruction) {
 			//phi没有被处理，检查phi edge里面的每一层
 			for _, edge := range phi.Edge {
 				//有一个不处理就报错
-				edge := phi.GetValueById(edge)
+				edge, ok := phi.GetValueById(edge)
+				if !ok {
+					continue
+				}
 				checkError(edge, append(top, phi)...)
 			}
 			return
@@ -184,7 +191,10 @@ func (t *TypeCheck) TypeCheckUndefine(inst *ssa.Undefined) {
 }
 
 func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
-	method := c.GetValueById(c.Method)
+	method, ok := c.GetValueById(c.Method)
+	if !ok {
+		return
+	}
 	funcTyp, ok := method.GetType().(*ssa.FunctionType)
 	isMethod := false
 	if !ok {
@@ -193,9 +203,12 @@ func (t *TypeCheck) TypeCheckCall(c *ssa.Call) {
 	// check argument number
 	func() {
 		wantParaLen := len(funcTyp.Parameter)
-		var gotPara ssa.Types = lo.Map(c.Args, func(argId int64, _ int) ssa.Type {
-			arg := c.GetValueById(argId)
-			return arg.GetType()
+		var gotPara ssa.Types = lo.FilterMap(c.Args, func(argId int64, _ int) (ssa.Type, bool) {
+			arg, ok := c.GetValueById(argId)
+			if !ok || utils.IsNil(arg) {
+				return nil, false
+			}
+			return arg.GetType(), true
 		})
 		gotParaLen := len(c.Args)
 		funName := ""

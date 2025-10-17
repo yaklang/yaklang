@@ -1,0 +1,2176 @@
+[INFO] 2025-05-16 04:37:23 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:23 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:37:23 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:37:23 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:23 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:37:24 [server:239] Received new connection request, source: 127.0.0.1:38786
+[INFO] 2025-05-16 04:37:24 [server:239] Request path: /config/.env
+[INFO] 2025-05-16 04:37:24 [server:239] Raw request content:
+GET /config/.env HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:37:24 [server:253] Unknown request path: /config/.env
+[INFO] 2025-05-16 04:37:25 [server:239] Received new connection request, source: 127.0.0.1:38800
+[INFO] 2025-05-16 04:37:25 [server:239] Request path: /src/.git/config
+[INFO] 2025-05-16 04:37:25 [server:239] Raw request content:
+GET /src/.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:37:25 [server:253] Unknown request path: /src/.git/config
+[INFO] 2025-05-16 04:37:27 [server:239] Received new connection request, source: 127.0.0.1:38802
+[INFO] 2025-05-16 04:37:27 [server:239] Request path: /.env.ci
+[INFO] 2025-05-16 04:37:27 [server:239] Raw request content:
+GET /.env.ci HTTP/1.1
+Host: 47.115.204.7
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:37:27 [server:253] Unknown request path: /.env.ci
+[INFO] 2025-05-16 04:37:28 [server:239] Received new connection request, source: 127.0.0.1:38804
+[INFO] 2025-05-16 04:37:28 [server:239] Request path: /.env.default
+[INFO] 2025-05-16 04:37:28 [server:239] Raw request content:
+GET /.env.default HTTP/1.1
+Host: 47.115.204.7
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+
+
+[31m[ERRO] 2025-05-16 04:37:28 [server:253] Unknown request path: /.env.default
+[INFO] 2025-05-16 04:37:29 [server:239] Received new connection request, source: 127.0.0.1:52018
+[INFO] 2025-05-16 04:37:29 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:37:29 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:37:29 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:37:29 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:29 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:37:29 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:37:29 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:29 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:37:31 [server:239] Received new connection request, source: 127.0.0.1:52026
+[INFO] 2025-05-16 04:37:31 [server:239] Request path: /static../.git/config
+[INFO] 2025-05-16 04:37:31 [server:239] Raw request content:
+GET /static../.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:37:31 [server:253] Unknown request path: /static../.git/config
+[INFO] 2025-05-16 04:37:34 [server:239] Received new connection request, source: 127.0.0.1:52040
+[INFO] 2025-05-16 04:37:34 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:37:34 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:37:34 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:37:34 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:34 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:37:34 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:37:34 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:34 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:37:34 [server:239] Received new connection request, source: 127.0.0.1:52052
+[INFO] 2025-05-16 04:37:34 [server:239] Request path: /api/.git/config
+[INFO] 2025-05-16 04:37:34 [server:239] Raw request content:
+GET /api/.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:37:34 [server:253] Unknown request path: /api/.git/config
+[INFO] 2025-05-16 04:37:36 [server:239] Received new connection request, source: 127.0.0.1:52066
+[INFO] 2025-05-16 04:37:36 [server:239] Request path: /.env.uat
+[INFO] 2025-05-16 04:37:36 [server:239] Raw request content:
+GET /.env.uat HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:37:36 [server:253] Unknown request path: /.env.uat
+[INFO] 2025-05-16 04:37:39 [server:239] Received new connection request, source: 127.0.0.1:34196
+[INFO] 2025-05-16 04:37:39 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:37:39 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:37:39 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:37:39 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:39 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:37:39 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:37:39 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:39 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:37:40 [server:239] Received new connection request, source: 127.0.0.1:34198
+[INFO] 2025-05-16 04:37:40 [server:239] Request path: /.git/config
+[INFO] 2025-05-16 04:37:40 [server:239] Raw request content:
+GET /.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:37:40 [server:253] Unknown request path: /.git/config
+[INFO] 2025-05-16 04:37:41 [server:239] Received new connection request, source: 127.0.0.1:34210
+[INFO] 2025-05-16 04:37:41 [server:239] Request path: /.env.bak
+[INFO] 2025-05-16 04:37:41 [server:239] Raw request content:
+GET /.env.bak HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:37:41 [server:253] Unknown request path: /.env.bak
+[INFO] 2025-05-16 04:37:43 [server:239] Received new connection request, source: 127.0.0.1:34222
+[INFO] 2025-05-16 04:37:43 [server:239] Request path: /.env.dev.local
+[INFO] 2025-05-16 04:37:43 [server:239] Raw request content:
+GET /.env.dev.local HTTP/1.1
+Host: 47.115.204.7
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:37:43 [server:253] Unknown request path: /.env.dev.local
+[INFO] 2025-05-16 04:37:44 [server:239] Received new connection request, source: 127.0.0.1:34230
+[INFO] 2025-05-16 04:37:44 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:37:44 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:37:44 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:37:44 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:44 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:37:44 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:37:44 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:44 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:37:45 [server:239] Received new connection request, source: 127.0.0.1:34242
+[INFO] 2025-05-16 04:37:45 [server:239] Request path: /.env_sample
+[INFO] 2025-05-16 04:37:45 [server:239] Raw request content:
+GET /.env_sample HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:37:45 [server:253] Unknown request path: /.env_sample
+[INFO] 2025-05-16 04:37:49 [server:239] Received new connection request, source: 127.0.0.1:34024
+[INFO] 2025-05-16 04:37:49 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:37:49 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:37:49 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:37:49 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:49 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:37:49 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:37:49 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:49 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:37:50 [server:239] Received new connection request, source: 127.0.0.1:34030
+[INFO] 2025-05-16 04:37:50 [server:239] Request path: /www/.git/config
+[INFO] 2025-05-16 04:37:50 [server:239] Raw request content:
+GET /www/.git/config HTTP/1.1
+Host: 47.115.204.7
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+
+
+[31m[ERRO] 2025-05-16 04:37:50 [server:253] Unknown request path: /www/.git/config
+[INFO] 2025-05-16 04:37:52 [server:239] Received new connection request, source: 127.0.0.1:34040
+[INFO] 2025-05-16 04:37:52 [server:239] Request path: /app/.git/config
+[INFO] 2025-05-16 04:37:52 [server:239] Raw request content:
+GET /app/.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:37:52 [server:253] Unknown request path: /app/.git/config
+[INFO] 2025-05-16 04:37:55 [server:239] Received new connection request, source: 127.0.0.1:34044
+[INFO] 2025-05-16 04:37:55 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:37:55 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:37:55 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:37:55 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:55 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:37:55 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:37:55 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:37:55 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:37:56 [server:239] Received new connection request, source: 127.0.0.1:34058
+[INFO] 2025-05-16 04:37:56 [server:239] Request path: /media../.git/config
+[INFO] 2025-05-16 04:37:56 [server:239] Raw request content:
+GET /media../.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:37:56 [server:253] Unknown request path: /media../.git/config
+[INFO] 2025-05-16 04:38:00 [server:239] Received new connection request, source: 127.0.0.1:57092
+[INFO] 2025-05-16 04:38:00 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:00 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:00 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:00 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:00 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:00 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:00 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:00 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:03 [server:239] Received new connection request, source: 127.0.0.1:57098
+[INFO] 2025-05-16 04:38:03 [server:239] Request path: /assets../.git/config
+[INFO] 2025-05-16 04:38:03 [server:239] Raw request content:
+GET /assets../.git/config HTTP/1.1
+Host: 47.115.204.7
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:38:03 [server:253] Unknown request path: /assets../.git/config
+[INFO] 2025-05-16 04:38:05 [server:239] Received new connection request, source: 127.0.0.1:57108
+[INFO] 2025-05-16 04:38:05 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:05 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:05 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:05 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:05 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:05 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:05 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:05 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:05 [server:239] Received new connection request, source: 127.0.0.1:57112
+[INFO] 2025-05-16 04:38:05 [server:239] Request path: /server/.git/config
+[INFO] 2025-05-16 04:38:05 [server:239] Raw request content:
+GET /server/.git/config HTTP/1.1
+Host: 47.115.204.7
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+
+
+[31m[ERRO] 2025-05-16 04:38:05 [server:253] Unknown request path: /server/.git/config
+[INFO] 2025-05-16 04:38:08 [server:239] Received new connection request, source: 127.0.0.1:57128
+[INFO] 2025-05-16 04:38:08 [server:239] Request path: /media/.git/config
+[INFO] 2025-05-16 04:38:08 [server:239] Raw request content:
+GET /media/.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:38:08 [server:253] Unknown request path: /media/.git/config
+[INFO] 2025-05-16 04:38:09 [server:239] Received new connection request, source: 127.0.0.1:55658
+[INFO] 2025-05-16 04:38:09 [server:239] Request path: /.env.live
+[INFO] 2025-05-16 04:38:09 [server:239] Raw request content:
+GET /.env.live HTTP/1.1
+Host: 47.115.204.7
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+
+
+[31m[ERRO] 2025-05-16 04:38:09 [server:253] Unknown request path: /.env.live
+[INFO] 2025-05-16 04:38:10 [server:239] Received new connection request, source: 127.0.0.1:55662
+[INFO] 2025-05-16 04:38:10 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:10 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:10 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:10 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:10 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:10 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:10 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:10 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:12 [server:239] Received new connection request, source: 127.0.0.1:55674
+[INFO] 2025-05-16 04:38:12 [server:239] Request path: /configuration/.env
+[INFO] 2025-05-16 04:38:12 [server:239] Raw request content:
+GET /configuration/.env HTTP/1.1
+Host: 47.115.204.7
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+
+
+[31m[ERRO] 2025-05-16 04:38:12 [server:253] Unknown request path: /configuration/.env
+[INFO] 2025-05-16 04:38:14 [server:239] Received new connection request, source: 127.0.0.1:55684
+[INFO] 2025-05-16 04:38:14 [server:239] Request path: /.env.template
+[INFO] 2025-05-16 04:38:14 [server:239] Raw request content:
+GET /.env.template HTTP/1.1
+Host: 47.115.204.7
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+
+
+[31m[ERRO] 2025-05-16 04:38:14 [server:253] Unknown request path: /.env.template
+[INFO] 2025-05-16 04:38:15 [server:239] Received new connection request, source: 127.0.0.1:55696
+[INFO] 2025-05-16 04:38:15 [server:239] Request path: /cms/.git/config
+[INFO] 2025-05-16 04:38:15 [server:239] Raw request content:
+GET /cms/.git/config HTTP/1.1
+Host: 47.115.204.7
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+
+
+[31m[ERRO] 2025-05-16 04:38:15 [server:253] Unknown request path: /cms/.git/config
+[INFO] 2025-05-16 04:38:15 [server:239] Received new connection request, source: 127.0.0.1:55706
+[INFO] 2025-05-16 04:38:15 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:15 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:15 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:15 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:15 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:15 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:15 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:15 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:16 [server:239] Received new connection request, source: 127.0.0.1:55714
+[INFO] 2025-05-16 04:38:16 [server:239] Request path: /docker-compose.prod.yml
+[INFO] 2025-05-16 04:38:16 [server:239] Raw request content:
+GET /docker-compose.prod.yml HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:38:16 [server:253] Unknown request path: /docker-compose.prod.yml
+[INFO] 2025-05-16 04:38:16 [server:239] Received new connection request, source: 127.0.0.1:55726
+[INFO] 2025-05-16 04:38:16 [server:239] Request path: /.env.preprod
+[INFO] 2025-05-16 04:38:16 [server:239] Raw request content:
+GET /.env.preprod HTTP/1.1
+Host: 47.115.204.7.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+
+
+[31m[ERRO] 2025-05-16 04:38:16 [server:253] Unknown request path: /.env.preprod
+[INFO] 2025-05-16 04:38:21 [server:239] Received new connection request, source: 127.0.0.1:35460
+[INFO] 2025-05-16 04:38:21 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:21 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true 2025-05-16 04:38:21 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:21 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:21 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:21 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:21 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:21 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:21 [healthy_check:460] Running periodic health check...
+[INFO] 2025-05-16 04:38:21 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 5)
+[INFO] 2025-05-16 04:38:21 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-i...mtyo, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:21 [healthy_check:173] Start to check ai provider healthy status: grok-3 (ID: 25)
+[INFO] 2025-05-16 04:38:21 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: grok-3, no_https: false
+[INFO] 2025-05-16 04:38:21 [healthy_check:173] Start to check ai provider healthy status: gemini-2.5-flash-nothinking (ID: 26)
+[INFO] 2025-05-16 04:38:21 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: gemini-2.5-flash-preview-04-17-nothinking, no_https: false
+[INFO] 2025-05-16 04:38:21 [healthy_check:173] Start to check ai provider healthy status: gemini-2.0-flash (ID: 1)
+[INFO] 2025-05-16 04:38:21 [provider:153] GetAIClient: type: openai, domain: http://api.ai.yaklang.io/v1/chat/completions, key: bair...3jin, model: gemini-2.0-flash, no_https: true
+[INFO] 2025-05-16 04:38:21 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 4)
+[INFO] 2025-05-16 04:38:21 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-b...gfmj, model: deepseek-ai/DeepSeek-V3, no_https: false
+[35m[WARN] 2025-05-16 04:38:21 [stream:65] response status code: 503
+[INFO] 2025-05-16 04:38:21 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-16 04:38:21 [stream:150] error for stream fetching: {"error":{"message":"当前分组 gemini 下对于模型 gemini-2.5-flash-preview-04-17-nothinking 无可用渠道 (request id: ) (request id: 20250516043821650785669hMuWedQA)","type":"aix_api_error","param":"","code":null}}
+[INFO] 2025-05-16 04:38:22 [stream:75] chunk read first byte/token delay: 34.672µs
+[INFO] 2025-05-16 04:38:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 4), 延迟: 813ms
+[INFO] 2025-05-16 04:38:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 6)
+[INFO] 2025-05-16 04:38:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-j...tndr, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:22 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:22 [stream:75] chunk read first byte/token delay: 28.357µs
+[INFO] 2025-05-16 04:38:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 5), 延迟: 1124ms
+[INFO] 2025-05-16 04:38:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 7)
+[INFO] 2025-05-16 04:38:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-t...dgpq, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:22 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:22 [stream:75] chunk read first byte/token delay: 21.984µs
+[INFO] 2025-05-16 04:38:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 6), 延迟: 778ms
+[INFO] 2025-05-16 04:38:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 8)
+[INFO] 2025-05-16 04:38:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-d...prhc, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:22 [stream:75] chunk read first byte/token delay: 644.184176ms
+[INFO] 2025-05-16 04:38:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): gemini-2.0-flash (ID: 1), 延迟: 1606ms
+[INFO] 2025-05-16 04:38:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 9)
+[INFO] 2025-05-16 04:38:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-s...gnud, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:22 [stream:148] finished normal
+[INFO] 2025-05-16 04:38:22 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:22 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:23 [stream:75] chunk read first byte/token delay: 65.307µs
+[INFO] 2025-05-16 04:38:23 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 7), 延迟: 931ms
+[INFO] 2025-05-16 04:38:23 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 10)
+[INFO] 2025-05-16 04:38:23 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-x...zdro, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:23 [stream:75] chunk read first byte/token delay: 118.704µs
+[INFO] 2025-05-16 04:38:23 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 9), 延迟: 677ms
+[INFO] 2025-05-16 04:38:23 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 11)
+[INFO] 2025-05-16 04:38:23 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-n...nusb, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:23 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:23 [exec:827] close reader and writer
+[35m[WARN] 2025-05-16 04:38:23 [stream:65] response status code: 403
+[INFO] 2025-05-16 04:38:23 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-16 04:38:23 [stream:150] error for stream fetching: {"error":{"message":"IP暂时被封无法破盾，请稍后重试或者更换ip (request id: 20250516043821655414546x6TWR7mf)","type":"server_error","param":"","code":null}}
+[INFO] 2025-05-16 04:38:23 [stream:75] chunk read first byte/token delay: 47.142µs
+[INFO] 2025-05-16 04:38:23 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 8), 延迟: 1121ms
+[INFO] 2025-05-16 04:38:23 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 12)
+[INFO] 2025-05-16 04:38:23 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-j...ihqd, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:23 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:24 [stream:75] chunk read first byte/token delay: 45.624µs
+[INFO] 2025-05-16 04:38:24 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 11), 延迟: 645ms
+[INFO] 2025-05-16 04:38:24 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 13)
+[INFO] 2025-05-16 04:38:24 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-p...cfud, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-16 04:38:24 [stream:75] chunk read first byte/token delay: 69.676µs
+[INFO] 2025-05-16 04:38:24 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 10), 延迟: 914ms
+[INFO] 2025-05-16 04:38:24 [healthy_check:173] Start to check ai provider healthy status: qwen-32b (ID: 21)
+[INFO] 2025-05-16 04:38:24 [provider:153] GetAIClient: type: tongyi, domain: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions, key: sk-c...f17d, model: qwen2.5-32b-instruct, no_https: false
+[INFO] 2025-05-16 04:38:24 [gateway:58] load option for tongyi ai
+[INFO] 2025-05-16 04:38:24 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:24 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:24 [stream:75] chunk read first byte/token delay: 18.151µs
+[INFO] 2025-05-16 04:38:24 [healthy_check:203] Health Check Finished (CheckProviderHealth): qwen-32b (ID: 21), 延迟: 469ms
+[INFO] 2025-05-16 04:38:24 [healthy_check:173] Start to check ai provider healthy status: claude-3.7-sonnet (ID: 23)
+[INFO] 2025-05-16 04:38:24 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: claude-3-7-sonnet-20250219, no_https: false
+[INFO] 2025-05-16 04:38:24 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:25 [stream:75] chunk read first byte/token delay: 60.111µs
+[INFO] 2025-05-16 04:38:25 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 12), 延迟: 1412ms
+[INFO] 2025-05-16 04:38:25 [healthy_check:173] Start to check ai provider healthy status: gemini-2.5-pro-nothinking (ID: 24)
+[INFO] 2025-05-16 04:38:25 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: gemini-2.5-pro-preview-05-06-nothinking, no_https: false
+[INFO] 2025-05-16 04:38:25 [exec:827] close reader and writer
+[35m[WARN] 2025-05-16 04:38:25 [stream:65] response status code: 503
+[INFO] 2025-05-16 04:38:25 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-16 04:38:25 [stream:150] error for stream fetching: {"error":{"message":"当前分组 gemini 下对于模型 gemini-2.5-pro-preview-05-06-nothinking 无可用渠道 (request id: ) (request id: 20250516043825768198190RCxb0CAv)","type":"aix_api_error","param":"","code":null}}
+[INFO] 2025-05-16 04:38:26 [server:239] Received new connection request, source: 127.0.0.1:35466
+[INFO] 2025-05-16 04:38:26 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:26 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:26 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:26 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:26 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:26 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:26 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:26 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:26 [stream:75] chunk read first byte/token delay: 61.85µs
+[INFO] 2025-05-16 04:38:26 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 13), 延迟: 2654ms
+[INFO] 2025-05-16 04:38:26 [healthy_check:173] Start to check ai provider healthy status: gemini-2.5-pro-nothinking (ID: 27)
+[INFO] 2025-05-16 04:38:26 [provider:153] GetAIClient: type: openai, domain: api.chataiapi.com, key: sk-P...YF9X, model: gemini-2.5-flash-preview-04-17-nothinking, no_https: false
+[INFO] 2025-05-16 04:38:26 [exec:827] close reader and writer
+[35m[WARN] 2025-05-16 04:38:28 [stream:65] response status code: 429
+[INFO] 2025-05-16 04:38:28 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-16 04:38:28 [stream:150] error for stream fetching: {"error":{"message":"当前分组上游负载已饱和，请稍后再试 (request id: 20250516043827236213581qZEGZA3b)","type":"","param":"","code":429}}
+[INFO] 2025-05-16 04:38:29 [stream:75] chunk read first byte/token delay: 44.331µs
+[INFO] 2025-05-16 04:38:29 [healthy_check:203] Health Check Finished (CheckProviderHealth): claude-3.7-sonnet (ID: 23), 延迟: 5052ms
+[INFO] 2025-05-16 04:38:29 [exec:827] close reader and writer
+[INFO] 2025-05-16 04:38:29 [server:239] Received new connection request, source: 127.0.0.1:42208
+[INFO] 2025-05-16 04:38:29 [server:239] Request path: /.env.config
+[INFO] 2025-05-16 04:38:29 [server:239] Raw request content:
+GET /.env.config HTTP/1.1
+Host: 47.115.204.7
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+
+
+[31m[ERRO] 2025-05-16 04:38:29 [server:253] Unknown request path: /.env.config
+[INFO] 2025-05-16 04:38:31 [server:239] Received new connection request, source: 127.0.0.1:42220
+[INFO] 2025-05-16 04:38:31 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:31 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:31 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:31 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:31 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:31 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:31 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:31 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:32 [server:239] Received new connection request, source: 127.0.0.1:42234
+[INFO] 2025-05-16 04:38:32 [server:239] Request path: /.env.development.local
+[INFO] 2025-05-16 04:38:32 [server:239] Raw request content:
+GET /.env.development.local HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:38:32 [server:253] Unknown request path: /.env.development.local
+[INFO] 2025-05-16 04:38:35 [server:239] Received new connection request, source: 127.0.0.1:42246
+[INFO] 2025-05-16 04:38:35 [server:239] Request path: /.env.save
+[INFO] 2025-05-16 04:38:35 [server:239] Raw request content:
+GET /.env.save HTTP/1.1
+Host: 47.115.204.7
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+
+
+[31m[ERRO] 2025-05-16 04:38:35 [server:253] Unknown request path: /.env.save
+[INFO] 2025-05-16 04:38:36 [server:239] Received new connection request, source: 127.0.0.1:42258
+[INFO] 2025-05-16 04:38:36 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:36 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:36 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:36 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:36 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:36 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:36 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:36 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:38 [server:239] Received new connection request, source: 127.0.0.1:42270
+[INFO] 2025-05-16 04:38:38 [server:239] Request path: /.env.secret
+[INFO] 2025-05-16 04:38:38 [server:239] Raw request content:
+GET /.env.secret HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:38:38 [server:253] Unknown request path: /.env.secret
+[INFO] 2025-05-16 04:38:40 [server:239] Received new connection request, source: 127.0.0.1:52964
+[INFO] 2025-05-16 04:38:40 [server:239] Request path: /.env.staging.local
+[INFO] 2025-05-16 04:38:40 [server:239] Raw request content:
+GET /.env.staging.local HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+
+
+[31m[ERRO] 2025-05-16 04:38:40 [server:253] Unknown request path: /.env.staging.local
+[35m[WARN] 2025-05-16 04:38:41 [healthy_check:132] Health check timed out (20s) for: grok-3
+[35m[WARN] 2025-05-16 04:38:41 [healthy_check:159] Health check failed for grok-3, Latency: 20000ms, Error: health check timeout after 20 seconds for grok-3
+[31m[ERRO] 2025-05-16 04:38:41 [healthy_check:210] Health Check Failed (CheckProviderHealth): grok-3 (ID: 25), ERR: health check timeout after 20 seconds for grok-3, Delay: 20000ms
+[35m[WARN] 2025-05-16 04:38:41 [healthy_check:132] Health check timed out (20s) for: gemini-2.5-flash-nothinking
+[35m[WARN] 2025-05-16 04:38:41 [healthy_check:159] Health check failed for gemini-2.5-flash-nothinking, Latency: 20000ms, Error: health check timeout after 20 seconds for gemini-2.5-flash-nothinking
+[31m[ERRO] 2025-05-16 04:38:41 [healthy_check:210] Health Check Failed (CheckProviderHealth): gemini-2.5-flash-nothinking (ID: 26), ERR: health check timeout after 20 seconds for gemini-2.5-flash-nothinking, Delay: 20000ms
+[INFO] 2025-05-16 04:38:41 [server:239] Received new connection request, source: 127.0.0.1:52966
+[INFO] 2025-05-16 04:38:41 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-16 04:38:41 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-16 04:38:41 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-16 04:38:41 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:41 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-16 04:38:41 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-16 04:38:41 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-16 04:38:41 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-16 04:38:42 [server:239] Received new connection request, source: 127.0.0.1:52982
+[INFO] 2025-05-16 04:38:42 [server:239] Request path: /.env
+[INFO] 2025-05-16 04:38:42 [server:239] Raw request content:
+GET /.env HTTP/1.1
+Host: 47.115.204.7
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+
+
+[31m[ERRO] 2025-05-16 04:38:42 [server:253] Unknown request path: /.env
+[INFO] 2025-05-16 04:38:44 [server:239] Received new connection request, source: 127.0.0.1:52994
+[INFO] 2025-05-16 04:38:44 [server:239] Request path: /.env.dev
+[INFO] 2025-05-16 04:38:44 [server:239] Raw request content:
+GET /.env.dev HTTP/1.1
+Host: 47.115.204.7
+X-Real-Ip: 93.123.109.230
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+
+
+[31m[ERRO] 2025-05-16 04:38:44 [server:253] Unknown request path: /.env.dev
+[35m[WARN] 2025-05-16 04:38:45 [healthy_check:132] Health check timed out (20s) for: gemini-2.5-pro-nothinking
+[35m[WARN] 2025-05-16 04:38:45 [healthy_check:159] Health check failed for gemini-2.5-pro-nothinking, Latency: 20000ms, Error: health check timeout after 20 seconds for gemini-2.5-pro-nothinking
+[31m[ERRO] 2025-05-16 04:38:45 [healthy_check:210] Health Check Failed (CheckProviderHealth): gemini-2.5-pro-nothinking (ID: 24), ERR: health check timeout after 20 seconds for gemini-2.5-pro-nothinking, Delay: 20000ms
+[INFO] 2025-05-16 04:38:46 [server:239] Received new connection request, source: 127.0.0.1:52996
+[INFO] 2025-05-16 04:38:46 [server:239] Request path: /.env.dist
+[INFO] 2025-05-16 04:38:46 [server:239] Raw request content:
+GET /.env.dist HTTP/1.1
+Host: 47.115.204.7
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 93.123.109.230
+X-Forwarded-Proto: https
+User-Agent: l9explore/1.2.2
+Accept-Encoding: gzip
+X-Real-Ip: 93.123.109.230
+
+m"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:54:55 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:54:55 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:54:55 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:54:55 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:54:55 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:54:55 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:00 [server:239] Received new connection request, source: 127.0.0.1:53070
+[INFO] 2025-05-19 23:55:00 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:00 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:00 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:00 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:00 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:00 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:00 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:00 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:05 [server:239] Received new connection request, source: 127.0.0.1:53082
+[INFO] 2025-05-19 23:55:05 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:05 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:05 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:05 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:05 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:05 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:05 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:05 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:10 [server:239] Received new connection request, source: 127.0.0.1:60266
+[INFO] 2025-05-19 23:55:10 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:10 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:10 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:10 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:10 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:10 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:10 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:10 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:15 [server:239] Received new connection request, source: 127.0.0.1:60270
+[INFO] 2025-05-19 23:55:15 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:15 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:15 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:15 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:15 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:15 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:15 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:15 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:21 [server:239] Received new connection request, source: 127.0.0.1:56506
+[INFO] 2025-05-19 23:55:21 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:21 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:21 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:21 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:21 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:21 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:21 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:21 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:26 [server:239] Received new connection request, source: 127.0.0.1:56514
+[INFO] 2025-05-19 23:55:26 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:26 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:26 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:26 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:26 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:26 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:26 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:26 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:31 [server:239] Received new connection request, source: 127.0.0.1:39618
+[INFO] 2025-05-19 23:55:31 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:31 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:31 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:31 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:31 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:31 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:31 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:31 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:36 [server:239] Received new connection request, source: 127.0.0.1:39632
+[INFO] 2025-05-19 23:55:36 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:36 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:36 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:36 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:36 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:36 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:36 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:36 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:41 [server:239] Received new connection request, source: 127.0.0.1:58586
+[INFO] 2025-05-19 23:55:41 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:41 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:41 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:41 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:41 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:41 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:41 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:41 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:47 [server:239] Received new connection request, source: 127.0.0.1:58588
+[INFO] 2025-05-19 23:55:47 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:47 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:47 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:47 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:47 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:47 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:47 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:47 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:52 [server:239] Received new connection request, source: 127.0.0.1:41600
+[INFO] 2025-05-19 23:55:52 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:52 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:52 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:52 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:52 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:52 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:52 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:52 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:55:57 [server:239] Received new connection request, source: 127.0.0.1:41614
+[INFO] 2025-05-19 23:55:57 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:55:57 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:55:57 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:55:57 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:57 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:55:57 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:55:57 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:55:57 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:03 [server:239] Received new connection request, source: 127.0.0.1:59092
+[INFO] 2025-05-19 23:56:03 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:03 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:03 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:03 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:03 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:03 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:03 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:03 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:08 [server:239] Received new connection request, source: 127.0.0.1:59096
+[INFO] 2025-05-19 23:56:08 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:08 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:08 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:08 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:08 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:08 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:08 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:08 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:13 [server:239] Received new connection request, source: 127.0.0.1:38790
+[INFO] 2025-05-19 23:56:13 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:13 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:13 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:13 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:13 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:13 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:13 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:13 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:18 [server:239] Received new connection request, source: 127.0.0.1:33026
+[INFO] 2025-05-19 23:56:18 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:18 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:18 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:18 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:18 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:18 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:18 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:18 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:24 [server:239] Received new connection request, source: 127.0.0.1:33028
+[INFO] 2025-05-19 23:56:24 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:24 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:24 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:24 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:24 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:24 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:24 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:24 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:29 [server:239] Received new connection request, source: 127.0.0.1:38500
+[INFO] 2025-05-19 23:56:29 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:29 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:29 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:29 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:29 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:29 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:29 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:29 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:34 [server:239] Received new connection request, source: 127.0.0.1:38502
+[INFO] 2025-05-19 23:56:34 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:34 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:34 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:34 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:34 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:34 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:34 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:34 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:39 [server:239] Received new connection request, source: 127.0.0.1:37626
+[INFO] 2025-05-19 23:56:39 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:39 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:39 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:39 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:39 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:39 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:39 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:39 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:44 [server:239] Received new connection request, source: 127.0.0.1:37640
+[INFO] 2025-05-19 23:56:44 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:44 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:44 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:44 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:44 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:44 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:44 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:44 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:50 [server:239] Received new connection request, source: 127.0.0.1:37624
+[INFO] 2025-05-19 23:56:50 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:50 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:50 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:50 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:50 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:50 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:50 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:50 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:56:55 [server:239] Received new connection request, source: 127.0.0.1:37628
+[INFO] 2025-05-19 23:56:55 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:56:55 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:56:55 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:56:55 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:55 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:56:55 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:56:55 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:56:55 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:00 [server:239] Received new connection request, source: 127.0.0.1:56174
+[INFO] 2025-05-19 23:57:00 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:00 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:00 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:00 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:00 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:00 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:00 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:00 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:06 [server:239] Received new connection request, source: 127.0.0.1:56190
+[INFO] 2025-05-19 23:57:06 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:06 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:06 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:06 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:06 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:06 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:06 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:06 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:11 [server:239] Received new connection request, source: 127.0.0.1:34154
+[INFO] 2025-05-19 23:57:11 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:11 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:11 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:11 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:11 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:11 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:11 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:11 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:16 [server:239] Received new connection request, source: 127.0.0.1:34156
+[INFO] 2025-05-19 23:57:16 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:16 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:16 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:16 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:16 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:16 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:16 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:16 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:21 [server:239] Received new connection request, source: 127.0.0.1:36964
+[INFO] 2025-05-19 23:57:21 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:21 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:21 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:21 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:21 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:21 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:21 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:21 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:27 [server:239] Received new connection request, source: 127.0.0.1:36976
+[INFO] 2025-05-19 23:57:27 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:27 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:27 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:27 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:27 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:27 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:27 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:27 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:32 [server:239] Received new connection request, source: 127.0.0.1:57888
+[INFO] 2025-05-19 23:57:32 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:32 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:32 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:32 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:32 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:32 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:32 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:32 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:37 [server:239] Received new connection request, source: 127.0.0.1:57896
+[INFO] 2025-05-19 23:57:37 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:37 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:37 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:37 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:37 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:37 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:37 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:37 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:43 [server:239] Received new connection request, source: 127.0.0.1:57228
+[INFO] 2025-05-19 23:57:43 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:43 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:43 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:43 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:43 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:43 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:43 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:43 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:48 [server:239] Received new connection request, source: 127.0.0.1:57242
+[INFO] 2025-05-19 23:57:48 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:48 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:48 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:48 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:48 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:48 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:48 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:48 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:53 [server:239] Received new connection request, source: 127.0.0.1:36558
+[INFO] 2025-05-19 23:57:53 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:53 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:53 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:53 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:53 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:53 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:53 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:53 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:57:58 [server:239] Received new connection request, source: 127.0.0.1:36566
+[INFO] 2025-05-19 23:57:58 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:57:58 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:57:58 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:57:58 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:58 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:57:58 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:57:58 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:57:58 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:03 [server:239] Received new connection request, source: 127.0.0.1:44870
+[INFO] 2025-05-19 23:58:03 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:03 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:03 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:03 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:03 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:03 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:03 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:03 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:09 [server:239] Received new connection request, source: 127.0.0.1:47110
+[INFO] 2025-05-19 23:58:09 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:09 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:09 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:09 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:09 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:09 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:09 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:09 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:14 [server:239] Received new connection request, source: 127.0.0.1:47120
+[INFO] 2025-05-19 23:58:14 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:14 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:14 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:14 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:14 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:14 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:14 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:14 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:19 [server:239] Received new connection request, source: 127.0.0.1:48350
+[INFO] 2025-05-19 23:58:19 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:19 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:19 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:19 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:19 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:19 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:19 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:19 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:21 [healthy_check:460] Running periodic health check...
+[INFO] 2025-05-19 23:58:21 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 6)
+[INFO] 2025-05-19 23:58:21 [healthy_check:173] Start to check ai provider healthy status: gemini-2.0-flash (ID: 1)
+[INFO] 2025-05-19 23:58:21 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-j...tndr, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:21 [provider:153] GetAIClient: type: openai, domain: http://api.ai.yaklang.io/v1/chat/completions, key: bair...3jin, model: gemini-2.0-flash, no_https: true
+[INFO] 2025-05-19 23:58:21 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 4)
+[INFO] 2025-05-19 23:58:21 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-b...gfmj, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:21 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 5)
+[INFO] 2025-05-19 23:58:21 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-i...mtyo, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:21 [healthy_check:173] Start to check ai provider healthy status: gemini-2.5-flash-nothinking (ID: 26)
+[INFO] 2025-05-19 23:58:21 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: gemini-2.5-flash-preview-04-17-nothinking, no_https: false
+[35m[WARN] 2025-05-19 23:58:21 [stream:65] response status code: 403
+[INFO] 2025-05-19 23:58:21 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-19 23:58:21 [stream:150] error for stream fetching: {"error":{"message":"用户已被封禁 (request id: 20250519235821651700658CIdZeJ0a)","type":"new_api_error"}}
+[INFO] 2025-05-19 23:58:21 [stream:75] chunk read first byte/token delay: 360.104405ms
+[INFO] 2025-05-19 23:58:21 [healthy_check:203] Health Check Finished (CheckProviderHealth): gemini-2.0-flash (ID: 1), 延迟: 768ms
+[INFO] 2025-05-19 23:58:21 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 7)
+[INFO] 2025-05-19 23:58:21 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-t...dgpq, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:22 [stream:148] finished normal
+[INFO] 2025-05-19 23:58:22 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:22 [stream:75] chunk read first byte/token delay: 23.06µs
+[INFO] 2025-05-19 23:58:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 6), 延迟: 926ms
+[INFO] 2025-05-19 23:58:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 8)
+[INFO] 2025-05-19 23:58:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-d...prhc, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:22 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:22 [stream:75] chunk read first byte/token delay: 37.992µs
+[INFO] 2025-05-19 23:58:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 4), 延迟: 1161ms
+[INFO] 2025-05-19 23:58:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 9)
+[INFO] 2025-05-19 23:58:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-s...gnud, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:22 [stream:75] chunk read first byte/token delay: 35.332µs
+[INFO] 2025-05-19 23:58:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 5), 延迟: 1211ms
+[INFO] 2025-05-19 23:58:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 10)
+[INFO] 2025-05-19 23:58:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-x...zdro, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:22 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:22 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:22 [stream:75] chunk read first byte/token delay: 71.324µs
+[INFO] 2025-05-19 23:58:22 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 7), 延迟: 881ms
+[INFO] 2025-05-19 23:58:22 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 11)
+[INFO] 2025-05-19 23:58:22 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-n...nusb, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:23 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:23 [stream:75] chunk read first byte/token delay: 67.677µs
+[INFO] 2025-05-19 23:58:23 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 9), 延迟: 912ms
+[INFO] 2025-05-19 23:58:23 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 12)
+[INFO] 2025-05-19 23:58:23 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-j...ihqd, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:23 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:24 [stream:75] chunk read first byte/token delay: 34.567µs
+[INFO] 2025-05-19 23:58:24 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 10), 延迟: 1891ms
+[INFO] 2025-05-19 23:58:24 [healthy_check:173] Start to check ai provider healthy status: deepseek-v3 (ID: 13)
+[INFO] 2025-05-19 23:58:24 [provider:153] GetAIClient: type: siliconflow, domain: https://api.siliconflow.cn/v1/chat/completions, key: sk-p...cfud, model: deepseek-ai/DeepSeek-V3, no_https: false
+[INFO] 2025-05-19 23:58:24 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:24 [stream:75] chunk read first byte/token delay: 56.582µs
+[INFO] 2025-05-19 23:58:24 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 11), 延迟: 1678ms
+[INFO] 2025-05-19 23:58:24 [healthy_check:173] Start to check ai provider healthy status: qwen-32b (ID: 21)
+[INFO] 2025-05-19 23:58:24 [provider:153] GetAIClient: type: tongyi, domain: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions, key: sk-c...f17d, model: qwen2.5-32b-instruct, no_https: false
+[INFO] 2025-05-19 23:58:24 [gateway:58] load option for tongyi ai
+[INFO] 2025-05-19 23:58:24 [stream:75] chunk read first byte/token delay: 51.883µs
+[INFO] 2025-05-19 23:58:24 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 8), 延迟: 2478ms
+[INFO] 2025-05-19 23:58:24 [healthy_check:173] Start to check ai provider healthy status: claude-3.7-sonnet (ID: 23)
+[INFO] 2025-05-19 23:58:24 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: claude-3-7-sonnet-20250219, no_https: false
+[INFO] 2025-05-19 23:58:24 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:24 [server:239] Received new connection request, source: 127.0.0.1:48358
+[INFO] 2025-05-19 23:58:24 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:24 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:24 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:24 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:24 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:24 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:24 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:24 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:24 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:25 [stream:75] chunk read first byte/token delay: 55.912µs
+[INFO] 2025-05-19 23:58:25 [healthy_check:203] Health Check Finished (CheckProviderHealth): qwen-32b (ID: 21), 延迟: 502ms
+[INFO] 2025-05-19 23:58:25 [healthy_check:173] Start to check ai provider healthy status: gemini-2.5-pro-nothinking (ID: 24)
+[INFO] 2025-05-19 23:58:25 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: gemini-2.5-pro-preview-05-06-nothinking, no_https: false
+[35m[WARN] 2025-05-19 23:58:25 [stream:65] response status code: 403
+[INFO] 2025-05-19 23:58:25 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-19 23:58:25 [stream:150] error for stream fetching: {"error":{"message":"用户已被封禁 (request id: 2025051923582543747705H0szUdIz)","type":"new_api_error"}}
+[INFO] 2025-05-19 23:58:25 [exec:827] close reader and writer
+[INFO] 2025-05-19 23:58:25 [stream:75] chunk read first byte/token delay: 23.89µs
+[INFO] 2025-05-19 23:58:25 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 12), 延迟: 2029ms
+[INFO] 2025-05-19 23:58:25 [healthy_check:173] Start to check ai provider healthy status: gemini-2.5-pro-nothinking (ID: 27)
+[INFO] 2025-05-19 23:58:25 [provider:153] GetAIClient: type: openai, domain: api.chataiapi.com, key: sk-P...YF9X, model: gemini-2.5-flash-preview-04-17-nothinking, no_https: false
+[INFO] 2025-05-19 23:58:25 [exec:827] close reader and writer
+[35m[WARN] 2025-05-19 23:58:25 [stream:65] response status code: 403
+[INFO] 2025-05-19 23:58:25 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-19 23:58:25 [stream:150] error for stream fetching: {"error":{"message":"用户已被封禁 (request id: 20250519235825482507231JGddCjBD)","type":"new_api_error"}}
+[35m[WARN] 2025-05-19 23:58:25 [stream:65] response status code: 503
+[INFO] 2025-05-19 23:58:25 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-19 23:58:25 [stream:150] error for stream fetching: {"error":{"message":"当前分组 auto 下对于模型 gemini-2.5-flash-preview-04-17-nothinking 无可用渠道 (request id: 20250519235825701518723DTjaPlpZ)","type":"new_api_error"}}
+[INFO] 2025-05-19 23:58:26 [stream:75] chunk read first byte/token delay: 48.882µs
+[INFO] 2025-05-19 23:58:26 [healthy_check:203] Health Check Finished (CheckProviderHealth): deepseek-v3 (ID: 13), 延迟: 1823ms
+[INFO] 2025-05-19 23:58:26 [healthy_check:173] Start to check ai provider healthy status: grok-3 (ID: 25)
+[INFO] 2025-05-19 23:58:26 [provider:153] GetAIClient: type: openai, domain: tb.etak.cn, key: sk-4...REn1, model: grok-3, no_https: false
+[INFO] 2025-05-19 23:58:26 [exec:827] close reader and writer
+[35m[WARN] 2025-05-19 23:58:26 [stream:65] response status code: 403
+[INFO] 2025-05-19 23:58:26 [exec:827] close reader and writer
+[31m[ERRO] 2025-05-19 23:58:26 [stream:150] error for stream fetching: {"error":{"message":"用户已被封禁 (request id: 20250519235826582010574jFvxPNeo)","type":"new_api_error"}}
+[INFO] 2025-05-19 23:58:29 [server:239] Received new connection request, source: 127.0.0.1:59386
+[INFO] 2025-05-19 23:58:29 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:29 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:29 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:29 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:29 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:29 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:29 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:29 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:35 [server:239] Received new connection request, source: 127.0.0.1:59394
+[INFO] 2025-05-19 23:58:35 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:35 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:35 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:35 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:35 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:35 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:35 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:35 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:40 [server:239] Received new connection request, source: 127.0.0.1:47994
+[INFO] 2025-05-19 23:58:40 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:40 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:40 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:40 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:40 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:40 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:40 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:40 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[35m[WARN] 2025-05-19 23:58:41 [healthy_check:132] Health check timed out (20s) for: gemini-2.5-flash-nothinking
+[35m[WARN] 2025-05-19 23:58:41 [healthy_check:159] Health check failed for gemini-2.5-flash-nothinking, Latency: 20001ms, Error: health check timeout after 20 seconds for gemini-2.5-flash-nothinking
+[31m[ERRO] 2025-05-19 23:58:41 [healthy_check:210] Health Check Failed (CheckProviderHealth): gemini-2.5-flash-nothinking (ID: 26), ERR: health check timeout after 20 seconds for gemini-2.5-flash-nothinking, Delay: 20001ms
+[35m[WARN] 2025-05-19 23:58:44 [healthy_check:132] Health check timed out (20s) for: claude-3.7-sonnet
+[35m[WARN] 2025-05-19 23:58:44 [healthy_check:159] Health check failed for claude-3.7-sonnet, Latency: 20000ms, Error: health check timeout after 20 seconds for claude-3.7-sonnet
+[31m[ERRO] 2025-05-19 23:58:44 [healthy_check:210] Health Check Failed (CheckProviderHealth): claude-3.7-sonnet (ID: 23), ERR: health check timeout after 20 seconds for claude-3.7-sonnet, Delay: 20000ms
+[35m[WARN] 2025-05-19 23:58:45 [healthy_check:132] Health check timed out (20s) for: gemini-2.5-pro-nothinking
+[35m[WARN] 2025-05-19 23:58:45 [healthy_check:159] Health check failed for gemini-2.5-pro-nothinking, Latency: 20000ms, Error: health check timeout after 20 seconds for gemini-2.5-pro-nothinking
+[31m[ERRO] 2025-05-19 23:58:45 [healthy_check:210] Health Check Failed (CheckProviderHealth): gemini-2.5-pro-nothinking (ID: 24), ERR: health check timeout after 20 seconds for gemini-2.5-pro-nothinking, Delay: 20000ms
+[35m[WARN] 2025-05-19 23:58:45 [healthy_check:132] Health check timed out (20s) for: gemini-2.5-pro-nothinking
+[35m[WARN] 2025-05-19 23:58:45 [healthy_check:159] Health check failed for gemini-2.5-pro-nothinking, Latency: 20001ms, Error: health check timeout after 20 seconds for gemini-2.5-pro-nothinking
+[31m[ERRO] 2025-05-19 23:58:45 [healthy_check:210] Health Check Failed (CheckProviderHealth): gemini-2.5-pro-nothinking (ID: 27), ERR: health check timeout after 20 seconds for gemini-2.5-pro-nothinking, Delay: 20001ms
+[INFO] 2025-05-19 23:58:45 [server:239] Received new connection request, source: 127.0.0.1:48006
+[INFO] 2025-05-19 23:58:45 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:45 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:45 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:45 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:45 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:45 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:45 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:45 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[35m[WARN] 2025-05-19 23:58:46 [healthy_check:132] Health check timed out (20s) for: grok-3
+[35m[WARN] 2025-05-19 23:58:46 [healthy_check:159] Health check failed for grok-3, Latency: 20000ms, Error: health check timeout after 20 seconds for grok-3
+[31m[ERRO] 2025-05-19 23:58:46 [healthy_check:210] Health Check Failed (CheckProviderHealth): grok-3 (ID: 25), ERR: health check timeout after 20 seconds for grok-3, Delay: 20000ms
+[INFO] 2025-05-19 23:58:46 [healthy_check:463] Health check completed successfully, checked 17 providers
+[INFO] 2025-05-19 23:58:50 [server:239] Received new connection request, source: 127.0.0.1:49568
+[INFO] 2025-05-19 23:58:50 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:50 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:50 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:50 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:50 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:50 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:50 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:50 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:58:56 [server:239] Received new connection request, source: 127.0.0.1:49576
+[INFO] 2025-05-19 23:58:56 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:58:56 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:58:56 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:58:56 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:56 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:58:56 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:58:56 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:58:56 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:01 [server:239] Received new connection request, source: 127.0.0.1:36176
+[INFO] 2025-05-19 23:59:01 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:01 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:01 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:01 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:01 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:01 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:01 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:01 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:06 [server:239] Received new connection request, source: 127.0.0.1:36188
+[INFO] 2025-05-19 23:59:06 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:06 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:06 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:06 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:06 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:06 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:06 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:06 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:12 [server:239] Received new connection request, source: 127.0.0.1:51278
+[INFO] 2025-05-19 23:59:12 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:12 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:12 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:12 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:12 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:12 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:12 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:12 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:17 [server:239] Received new connection request, source: 127.0.0.1:51294
+[INFO] 2025-05-19 23:59:17 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:17 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:17 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:17 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:17 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:17 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:17 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:17 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:22 [server:239] Received new connection request, source: 127.0.0.1:52476
+[INFO] 2025-05-19 23:59:22 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:22 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:22 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:22 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:22 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:22 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:22 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:22 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:28 [server:239] Received new connection request, source: 127.0.0.1:52492
+[INFO] 2025-05-19 23:59:28 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:28 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:28 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:28 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:28 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:28 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:28 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:28 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:33 [server:239] Received new connection request, source: 127.0.0.1:46626
+[INFO] 2025-05-19 23:59:33 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:33 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:33 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:33 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:33 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:33 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:33 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:33 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:38 [server:239] Received new connection request, source: 127.0.0.1:46636
+[INFO] 2025-05-19 23:59:38 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:38 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:38 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:38 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:38 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:38 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:38 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:38 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:43 [server:239] Received new connection request, source: 127.0.0.1:44314
+[INFO] 2025-05-19 23:59:43 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:43 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:43 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:43 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:43 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:43 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:43 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:43 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:48 [server:239] Received new connection request, source: 127.0.0.1:33570
+[INFO] 2025-05-19 23:59:48 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:48 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:48 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:48 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:48 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:48 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:48 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:48 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:54 [server:239] Received new connection request, source: 127.0.0.1:33584
+[INFO] 2025-05-19 23:59:54 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:54 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:54 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:54 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:54 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:54 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:54 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:54 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-19 23:59:59 [server:239] Received new connection request, source: 127.0.0.1:35916
+[INFO] 2025-05-19 23:59:59 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-19 23:59:59 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-19 23:59:59 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-19 23:59:59 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:59 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-19 23:59:59 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-19 23:59:59 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-19 23:59:59 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-20 00:00:04 [server:239] Received new connection request, source: 127.0.0.1:35924
+[INFO] 2025-05-20 00:00:04 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-20 00:00:04 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+X-Forwarded-Proto: https
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-20 00:00:04 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-20 00:00:04 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-20 00:00:04 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-20 00:00:04 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-20 00:00:04 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-20 00:00:04 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true
+[INFO] 2025-05-20 00:00:09 [server:239] Received new connection request, source: 127.0.0.1:34662
+[INFO] 2025-05-20 00:00:09 [server:239] Request path: /forwarder/add-rules
+[INFO] 2025-05-20 00:00:09 [server:239] Raw request content:
+POST /forwarder/add-rules HTTP/1.1
+Host: aibalance.yaklang.com
+X-Forwarded-Proto: https
+Content-Type: application/json
+X-Real-Ip: 8.211.150.240
+Connection: upgrade
+Connection: upgrade
+X-Forwarded-For: 8.211.150.240
+Content-Length: 487
+
+[{"sni":"openrouter-ai.aibalance.yaklang.io","enable_tls":true,"target":"openrouter.ai"},{"sni":"api-openai-com.aibalance.yaklang.io","enable_tls":true,"target":"api.openai.com"},{"sni":"api-anthropic-com.aibalance.yaklang.io","enable_tls":true,"target":"api.anthropic.com"},{"sni":"api-grok-ai.aibalance.yaklang.io","enable_tls":true,"target":"api.grok.ai"},{"sni":"generativelanguage-googleapis-com.aibalance.yaklang.io","enable_tls":true,"target":"generativelanguage.googleapis.com"}]
+[INFO] 2025-05-20 00:00:09 [server:239] Forwarder: registering with /forwarder/add-rules
+[INFO] 2025-05-20 00:00:09 [forwarder:64] add rule sni: openrouter-ai.aibalance.yaklang.io, target: openrouter.ai, enable_tls: true
+[INFO] 2025-05-20 00:00:09 [forwarder:64] add rule sni: api-openai-com.aibalance.yaklang.io, target: api.openai.com, enable_tls: true
+[INFO] 2025-05-20 00:00:09 [forwarder:64] add rule sni: api-anthropic-com.aibalance.yaklang.io, target: api.anthropic.com, enable_tls: true
+[INFO] 2025-05-20 00:00:09 [forwarder:64] add rule sni: api-grok-ai.aibalance.yaklang.io, target: api.grok.ai, enable_tls: true
+[INFO] 2025-05-20 00:00:09 [forwarder:64] add rule sni: generativelanguage-googleapis-com.aibalance.yaklang.io, target: generativelanguage.googleapis.com, enable_tls: true

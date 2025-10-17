@@ -5,142 +5,122 @@ desc(
 	risk: DDOS
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   该规则用于检测Java代码中使用`Process.waitFor()`方法时未设置超时时间或未主动销毁子进程，可能导致的资源耗尽（DDOS）漏洞。`Process.waitFor()`方法会阻塞当前线程，直到子进程执行完毕。如果子进程由于某种原因（如恶意命令、资源不足等）长时间不终止或永久挂起，调用`waitFor()`方法的Java线程也将一直阻塞，无法释放资源。
-   在多用户或并发场景下，若存在此安全漏洞，攻击者可通过构造恶意输入使应用的子进程进入无限循环或长时间运行状态，进而耗尽服务器线程资源，导致所有合法请求无法得到响应，最终引发拒绝服务（Denial of Service, DOS）或分布式拒绝服务（Distributed Denial of Service, DDOS）攻击。
-   该规则进一步检查在调用`waitFor()`后，是否调用了`process.destroy()`或`process.destroyForcibly()`方法主动终止子进程，如果在没有超时控制的情况下也没有主动终止进程，则会发出告警。
-
+该规则用于检测Java代码中使用`Process.waitFor()`方法时未设置超时时间或未主动销毁子进程，可能导致的资源耗尽（DDOS）漏洞。`Process.waitFor()`方法会阻塞当前线程，直到子进程执行完毕。如果子进程由于某种原因（如恶意命令、资源不足等）长时间不终止或永久挂起，调用`waitFor()`方法的Java线程也将一直阻塞，无法释放资源。
+在多用户或并发场景下，若存在此安全漏洞，攻击者可通过构造恶意输入使应用的子进程进入无限循环或长时间运行状态，进而耗尽服务器线程资源，导致所有合法请求无法得到响应，最终引发拒绝服务（Denial of Service, DOS）或分布式拒绝服务（Distributed Denial of Service, DDOS）攻击。
+该规则进一步检查在调用`waitFor()`后，是否调用了`process.destroy()`或`process.destroyForcibly()`方法主动终止子进程，如果在没有超时控制的情况下也没有主动终止进程，则会发出告警。
 2. **触发场景**
-   当Java程序通过`Runtime.getRuntime().exec()`或`ProcessBuilder`执行外部命令，并且在获取子进程（`Process`对象）后，调用了无参的`process.waitFor()`方法，且没有在合适的时机（如捕获异常或在finally块中）调用`destroy()`或`destroyForcibly()`来强制终止子进程时，就可能存在此漏洞。
-   以下是存在漏洞的代码示例：
-   ```java
-   package org.example.Dos;
-   import javax.servlet.http.*;
-   import javax.servlet.annotation.*;
-   import java.io.IOException;
-
-   @WebServlet("/execute")
-   public class UnsafeProcessServlet extends HttpServlet {
-
-       // 漏洞点：直接执行用户输入的命令，且未设置超时
-       @Override
-       protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-           String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
-           if (command == null || command.isEmpty()) {
-               resp.getWriter().write("Command parameter 'cmd' is required.");
-               return;
-           }
-
-           try {
-               Process process = Runtime.getRuntime().exec(command);
-               int exitCode = process.waitFor(); // 阻塞直到命令执行完成（可能永久挂起！）
-               resp.getWriter().write("Command exited with code: " + exitCode);
-           } catch (InterruptedException e) {
-               resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
-           } finally {
-               // 未强制终止残留进程（风险残留）
-           }
-       }
-   }
-   ```
-   如果攻击者输入命令 `cmd=/usr/bin/yes` (Linux环境下，`yes`命令会一直输出'y') 或其他能导致进程不退出的命令，服务器的线程将一直阻塞在 `process.waitFor()` 调用处，最终耗尽线程资源，引发拒绝服务。
-
+当Java程序通过`Runtime.getRuntime().exec()`或`ProcessBuilder`执行外部命令，并且在获取子进程（`Process`对象）后，调用了无参的`process.waitFor()`方法，且没有在合适的时机（如捕获异常或在finally块中）调用`destroy()`或`destroyForcibly()`来强制终止子进程时，就可能存在此漏洞。
+以下是存在漏洞的代码示例：
+```java
+package org.example.Dos;
+import javax.servlet.http.*;
+import javax.servlet.annotation.*;
+import java.io.IOException;
+@WebServlet("/execute")
+public class UnsafeProcessServlet extends HttpServlet {
+// 漏洞点：直接执行用户输入的命令，且未设置超时
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
+if (command == null || command.isEmpty()) {
+resp.getWriter().write("Command parameter 'cmd' is required.");
+return;
+}
+try {
+Process process = Runtime.getRuntime().exec(command);
+int exitCode = process.waitFor(); // 阻塞直到命令执行完成（可能永久挂起！）
+resp.getWriter().write("Command exited with code: " + exitCode);
+} catch (InterruptedException e) {
+resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
+} finally {
+// 未强制终止残留进程（风险残留）
+}
+}
+}
+```
+如果攻击者输入命令 `cmd=/usr/bin/yes` (Linux环境下，`yes`命令会一直输出'y') 或其他能导致进程不退出的命令，服务器的线程将一直阻塞在 `process.waitFor()` 调用处，最终耗尽线程资源，引发拒绝服务。
 3. **潜在影响**
-   - **拒绝服务 (DOS/DDOS)**：服务器线程池被耗尽，无法响应新的合法请求，服务不可用。
-   - **资源耗尽**：除了线程，子进程本身也可能消耗大量的CPU、内存或磁盘I/O资源，加剧服务中断。
-   - **系统不稳定**：持续高负载和资源争抢可能导致整个系统不稳定甚至崩溃。
+- **拒绝服务 (DOS/DDOS)**：服务器线程池被耗尽，无法响应新的合法请求，服务不可用。
+- **资源耗尽**：除了线程，子进程本身也可能消耗大量的CPU、内存或磁盘I/O资源，加剧服务中断。
+- **系统不稳定**：持续高负载和资源争抢可能导致整个系统不稳定甚至崩溃。
 DESC
 	rule_id: "1b231ae8-df9a-4430-89e4-534620e984bf"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 为`Process.waitFor()`设置超时时间
 使用带有超时参数的`waitFor()`方法，防止线程无限期阻塞。如果在指定时间内子进程未能完成，应强制终止子进程。
 ```java
-   package org.example.Dos;
-
-   import javax.servlet.http.*;
-   import javax.servlet.annotation.*;
-   import java.io.IOException;
-   import java.util.concurrent.TimeUnit;
-   import java.util.concurrent.TimeoutException;
-
-   @WebServlet("/execute-safe")
-   public class SafeProcessServlet extends HttpServlet {
-
-       @Override
-           protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-               String command = req.getParameter("cmd");
-               if (command == null || command.isEmpty()) {
-                   resp.getWriter().write("Command parameter 'cmd' is required.");
-                   return;
-               }
-
-               Process process = null;
-               try {
-                   process = Runtime.getRuntime().exec(command);
-
-                   // 修复点：设置超时（例如 10 秒）
-                   boolean finished = process.waitFor(10, TimeUnit.SECONDS);
-                   if (!finished) {
-                       process.destroyForcibly(); // 强制终止进程
-                       throw new TimeoutException("Command execution timed out.");
-                   }
-
-                   int exitCode = process.exitValue();
-                   resp.getWriter().write("Command exited with code: " + exitCode);
-               } catch (InterruptedException | TimeoutException e) {
-                   resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error: " + e.getMessage());
-               } finally {
-                   if (process != null && process.isAlive()) {
-                       process.destroyForcibly(); // 确保进程终止
-                   }
-               }
-           }
-       }
+package org.example.Dos;
+import javax.servlet.http.*;
+import javax.servlet.annotation.*;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+@WebServlet("/execute-safe")
+public class SafeProcessServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String command = req.getParameter("cmd");
+if (command == null || command.isEmpty()) {
+resp.getWriter().write("Command parameter 'cmd' is required.");
+return;
+}
+Process process = null;
+try {
+process = Runtime.getRuntime().exec(command);
+// 修复点：设置超时（例如 10 秒）
+boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+if (!finished) {
+process.destroyForcibly(); // 强制终止进程
+throw new TimeoutException("Command execution timed out.");
+}
+int exitCode = process.exitValue();
+resp.getWriter().write("Command exited with code: " + exitCode);
+} catch (InterruptedException | TimeoutException e) {
+resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error: " + e.getMessage());
+} finally {
+if (process != null && process.isAlive()) {
+process.destroyForcibly(); // 确保进程终止
+}
+}
+}
+}
 ```
-
 #### 2. 确保在finally块中终止子进程
 即使设置了超时，或者使用了无参的`waitFor()`，也应在`finally`块中调用`process.destroyForcibly()`来确保子进程最终会被清理，即使发生异常。
 ```java
-      package org.example.Dos;
-
-      import javax.servlet.http.*;
-      import javax.servlet.annotation.*;
-      import java.io.IOException;
-      import java.util.concurrent.TimeUnit;
-      import java.util.concurrent.TimeoutException;
-
-      @WebServlet("/execute-safe")
-      public class SafeProcessServlet2 extends HttpServlet {
-
-          @Override
-          protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-              String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
-              if (command == null || command.isEmpty()) {
-                  resp.getWriter().write("Command parameter 'cmd' is required.");
-                  return;
-              }
-
-              Process process = null;
-              try {
-                  process = Runtime.getRuntime().exec(command);
-                  int exitCode = process.waitFor();
-                  //process.destroyForcibly(); // 可以在这里或finally中强制终止
-
-                  resp.getWriter().write("Command exited with code: " + exitCode);
-              } catch (InterruptedException e) {
-                  resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
-              } finally {
-                  if (process != null) {
-                      process.destroyForcibly(); // 确保进程终止
-                  }
-              }
-          }
-      }
+package org.example.Dos;
+import javax.servlet.http.*;
+import javax.servlet.annotation.*;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+@WebServlet("/execute-safe")
+public class SafeProcessServlet2 extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
+if (command == null || command.isEmpty()) {
+resp.getWriter().write("Command parameter 'cmd' is required.");
+return;
+}
+Process process = null;
+try {
+process = Runtime.getRuntime().exec(command);
+int exitCode = process.waitFor();
+process.destroyForcibly();
+resp.getWriter().write("Command exited with code: " + exitCode);
+} catch (InterruptedException e) {
+resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
+} finally {
+if (process != null) {
+process.destroyForcibly(); // 确保进程终止
+}
+}
+}
+}
 ```
-
 #### 3. 避免执行用户提供的完整命令
 如果可能，应避免直接执行用户输入的完整命令字符串。考虑使用白名单机制，仅允许执行预定义的、安全的命令，并对参数进行严格校验和过滤。
 SOLUTION
@@ -163,6 +143,128 @@ alert $result for {
 	type: "vuln",
 	title: "Check Java Unsafe Process WaitFor",
 	title_zh: "检测Java不安全Process WaitFor使用",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+该规则用于检测Java代码中使用`Process.waitFor()`方法时未设置超时时间或未主动销毁子进程，可能导致的资源耗尽（DDOS）漏洞。`Process.waitFor()`方法会阻塞当前线程，直到子进程执行完毕。如果子进程由于某种原因（如恶意命令、资源不足等）长时间不终止或永久挂起，调用`waitFor()`方法的Java线程也将一直阻塞，无法释放资源。
+在多用户或并发场景下，若存在此安全漏洞，攻击者可通过构造恶意输入使应用的子进程进入无限循环或长时间运行状态，进而耗尽服务器线程资源，导致所有合法请求无法得到响应，最终引发拒绝服务（Denial of Service, DOS）或分布式拒绝服务（Distributed Denial of Service, DDOS）攻击。
+该规则进一步检查在调用`waitFor()`后，是否调用了`process.destroy()`或`process.destroyForcibly()`方法主动终止子进程，如果在没有超时控制的情况下也没有主动终止进程，则会发出告警。
+2. **触发场景**
+当Java程序通过`Runtime.getRuntime().exec()`或`ProcessBuilder`执行外部命令，并且在获取子进程（`Process`对象）后，调用了无参的`process.waitFor()`方法，且没有在合适的时机（如捕获异常或在finally块中）调用`destroy()`或`destroyForcibly()`来强制终止子进程时，就可能存在此漏洞。
+以下是存在漏洞的代码示例：
+```java
+package org.example.Dos;
+import javax.servlet.http.*;
+import javax.servlet.annotation.*;
+import java.io.IOException;
+@WebServlet("/execute")
+public class UnsafeProcessServlet extends HttpServlet {
+// 漏洞点：直接执行用户输入的命令，且未设置超时
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
+if (command == null || command.isEmpty()) {
+resp.getWriter().write("Command parameter 'cmd' is required.");
+return;
+}
+try {
+Process process = Runtime.getRuntime().exec(command);
+int exitCode = process.waitFor(); // 阻塞直到命令执行完成（可能永久挂起！）
+resp.getWriter().write("Command exited with code: " + exitCode);
+} catch (InterruptedException e) {
+resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
+} finally {
+// 未强制终止残留进程（风险残留）
+}
+}
+}
+```
+如果攻击者输入命令 `cmd=/usr/bin/yes` (Linux环境下，`yes`命令会一直输出'y') 或其他能导致进程不退出的命令，服务器的线程将一直阻塞在 `process.waitFor()` 调用处，最终耗尽线程资源，引发拒绝服务。
+3. **潜在影响**
+- **拒绝服务 (DOS/DDOS)**：服务器线程池被耗尽，无法响应新的合法请求，服务不可用。
+- **资源耗尽**：除了线程，子进程本身也可能消耗大量的CPU、内存或磁盘I/O资源，加剧服务中断。
+- **系统不稳定**：持续高负载和资源争抢可能导致整个系统不稳定甚至崩溃。
+DESC
+	name: "result",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 为`Process.waitFor()`设置超时时间
+使用带有超时参数的`waitFor()`方法，防止线程无限期阻塞。如果在指定时间内子进程未能完成，应强制终止子进程。
+```java
+package org.example.Dos;
+import javax.servlet.http.*;
+import javax.servlet.annotation.*;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+@WebServlet("/execute-safe")
+public class SafeProcessServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String command = req.getParameter("cmd");
+if (command == null || command.isEmpty()) {
+resp.getWriter().write("Command parameter 'cmd' is required.");
+return;
+}
+Process process = null;
+try {
+process = Runtime.getRuntime().exec(command);
+// 修复点：设置超时（例如 10 秒）
+boolean finished = process.waitFor(10, TimeUnit.SECONDS);
+if (!finished) {
+process.destroyForcibly(); // 强制终止进程
+throw new TimeoutException("Command execution timed out.");
+}
+int exitCode = process.exitValue();
+resp.getWriter().write("Command exited with code: " + exitCode);
+} catch (InterruptedException | TimeoutException e) {
+resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error: " + e.getMessage());
+} finally {
+if (process != null && process.isAlive()) {
+process.destroyForcibly(); // 确保进程终止
+}
+}
+}
+}
+```
+#### 2. 确保在finally块中终止子进程
+即使设置了超时，或者使用了无参的`waitFor()`，也应在`finally`块中调用`process.destroyForcibly()`来确保子进程最终会被清理，即使发生异常。
+```java
+package org.example.Dos;
+import javax.servlet.http.*;
+import javax.servlet.annotation.*;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+@WebServlet("/execute-safe")
+public class SafeProcessServlet2 extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String command = req.getParameter("cmd"); // 用户输入的命令（高危操作！）
+if (command == null || command.isEmpty()) {
+resp.getWriter().write("Command parameter 'cmd' is required.");
+return;
+}
+Process process = null;
+try {
+process = Runtime.getRuntime().exec(command);
+int exitCode = process.waitFor();
+//process.destroyForcibly(); // 可以在这里或finally中强制终止
+resp.getWriter().write("Command exited with code: " + exitCode);
+} catch (InterruptedException e) {
+resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Command interrupted.");
+} finally {
+if (process != null) {
+process.destroyForcibly(); // 确保进程终止
+}
+}
+}
+}
+```
+#### 3. 避免执行用户提供的完整命令
+如果可能，应避免直接执行用户输入的完整命令字符串。考虑使用白名单机制，仅允许执行预定义的、安全的命令，并对参数进行严格校验和过滤。
+SOLUTION
+	risk: "DDOS",
 }
 
 desc(

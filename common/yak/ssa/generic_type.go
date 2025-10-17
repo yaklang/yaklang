@@ -11,7 +11,7 @@ func BindingGenericTypeWithRealType(real, generic Type, symbolsTypeMap map[strin
 			if !TypeCompare(existed, bindType) {
 				errMsg = GenericTypeError(genericSymbol, generic, existed, bindType)
 				// fallback symbol to any
-				symbolsTypeMap[genericSymbol.symbol] = GetAnyType()
+				symbolsTypeMap[genericSymbol.symbol] = CreateAnyType()
 			}
 		} else {
 			symbolsTypeMap[genericSymbol.symbol] = bindType
@@ -28,7 +28,7 @@ func BindingGenericTypeWithRealType(real, generic Type, symbolsTypeMap map[strin
 	switch real.GetTypeKind() {
 	case BytesTypeKind:
 		if t, ok := generic.(*ObjectType); ok && isGenericType(t.FieldType) {
-			setBinding(t.FieldType.(*GenericType), GetByteType())
+			setBinding(t.FieldType.(*GenericType), CreateByteType())
 		}
 		// if T is bytes
 		fallthrough
@@ -110,7 +110,7 @@ func ApplyGenericType(raw Type, symbolsTypeMap map[string]Type) Type {
 		t.FieldType = ApplyGenericType(t.FieldType, symbolsTypeMap)
 		// hook bytes
 		if t.FieldType.GetTypeKind() == ByteTypeKind {
-			cloned = GetBytesType()
+			cloned = CreateBytesType()
 		}
 	case MapTypeKind:
 		t := cloned.(*ObjectType)

@@ -6,99 +6,81 @@ desc(
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在PHP应用程序中，如果开发者使用FTP相关函数（如 `ftp_nlist`、`ftp_pwd`、`ftp_rawlist`、`ftp_systype` 等）来获取FTP服务器的信息，并将这些信息直接或间接输出到前端页面，可能导致敏感信息泄露。这类函数在不恰当使用时，会将通常只在后台处理或调试时需要的数据暴露给未经授权的用户。泄露的信息可能包括但不限于服务器的文件目录结构、当前工作目录路径、服务器操作系统类型、FTP服务器版本等。攻击者可以利用这些信息了解服务器的文件系统布局、软件环境配置、潜在的弱点或敏感文件位置，为后续的攻击（如目录遍历、文件包含、远程代码执行，甚至更复杂的社会工程学攻击）提供重要的情报支持。这种信息泄露虽然不直接导致代码执行，但为攻击者构建更精确和有效的攻击载荷提供了基础。
-
+在PHP应用程序中，如果开发者使用FTP相关函数（如 `ftp_nlist`、`ftp_pwd`、`ftp_rawlist`、`ftp_systype` 等）来获取FTP服务器的信息，并将这些信息直接或间接输出到前端页面，可能导致敏感信息泄露。这类函数在不恰当使用时，会将通常只在后台处理或调试时需要的数据暴露给未经授权的用户。泄露的信息可能包括但不限于服务器的文件目录结构、当前工作目录路径、服务器操作系统类型、FTP服务器版本等。攻击者可以利用这些信息了解服务器的文件系统布局、软件环境配置、潜在的弱点或敏感文件位置，为后续的攻击（如目录遍历、文件包含、远程代码执行，甚至更复杂的社会工程学攻击）提供重要的情报支持。这种信息泄露虽然不直接导致代码执行，但为攻击者构建更精确和有效的攻击载荷提供了基础。
 2. **触发场景**
-   当PHP代码连接到FTP服务器并调用上述函数获取信息后，如果未经严格的安全审查和数据处理，直接将获取到的信息（如目录列表、当前工作目录路径、服务器系统类型等）通过Web输出函数（如 `echo`、`print_r`、`var_dump`）返回给用户时，就会触发信息泄露漏洞。这种场景通常发生在应用程序的调试模式未关闭、错误处理不当、或为了方便开发而在生产环境中保留了调试输出代码时。
-
-   ```php
-   <?php
-       // 不安全FTP操作示例，将敏感信息直接输出到Web页面
-       $ftp_server = 'ftp.example.com';
-       $ftp_user = 'user';
-       $ftp_pass = 'password';
-
-       $conn_id = ftp_connect($ftp_server);
-       if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
-           echo "FTP连接成功。<br>";
-
-           // 风险点1：获取并直接输出当前工作目录
-           $current_dir = ftp_pwd($conn_id);
-           echo "当前工作目录: " . $current_dir . "<br>";
-
-           // 风险点2：列出服务器文件列表并直接输出
-           $files = ftp_nlist($conn_id, ".");
-           echo "当前目录文件列表:<pre>";
-           print_r($files);
-           echo "</pre>";
-
-           // 风险点3：获取服务器类型并直接输出
-           $system_type = ftp_systype($conn_id);
-           echo "FTP服务器类型: " . $system_type . "<br>";
-
-           ftp_close($conn_id);
-       } else {
-           echo "FTP连接失败或认证失败。<br>";
-       }
-   ?>
-   ```
-
+当PHP代码连接到FTP服务器并调用上述函数获取信息后，如果未经严格的安全审查和数据处理，直接将获取到的信息（如目录列表、当前工作目录路径、服务器系统类型等）通过Web输出函数（如 `echo`、`print_r`、`var_dump`）返回给用户时，就会触发信息泄露漏洞。这种场景通常发生在应用程序的调试模式未关闭、错误处理不当、或为了方便开发而在生产环境中保留了调试输出代码时。
+```php
+<?php
+// 不安全FTP操作示例，将敏感信息直接输出到Web页面
+$ftp_server = 'ftp.example.com';
+$ftp_user = 'user';
+$ftp_pass = 'password';
+$conn_id = ftp_connect($ftp_server);
+if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
+echo "FTP连接成功。<br>";
+// 风险点1：获取并直接输出当前工作目录
+$current_dir = ftp_pwd($conn_id);
+echo "当前工作目录: " . $current_dir . "<br>";
+// 风险点2：列出服务器文件列表并直接输出
+$files = ftp_nlist($conn_id, ".");
+echo "当前目录文件列表:<pre>";
+print_r($files);
+echo "</pre>";
+// 风险点3：获取服务器类型并直接输出
+$system_type = ftp_systype($conn_id);
+echo "FTP服务器类型: " . $system_type . "<br>";
+ftp_close($conn_id);
+} else {
+echo "FTP连接失败或认证失败。<br>";
+}
+?>
+```
 3. **潜在影响**
-   - **情报收集**: 攻击者获取FTP服务器的详细信息，包括目录结构、文件名、文件路径、操作系统类型和版本等，这些信息对于后续针对性攻击至关重要。
-   - **增加攻击面**: 暴露的文件结构和敏感文件路径可能增加目录遍历、文件包含、文件上传、或信息泄露等漏洞的风险，帮助攻击者定位潜在的攻击入口。
-   - **提升攻击效率**: 泄露的服务器类型和版本信息有助于攻击者快速识别已知的漏洞或配置缺陷，从而更容易地找到攻击路径。
-   - **合规性问题**: 敏感信息泄露可能违反数据隐私和安全法规，导致法律和经济风险。
+- **情报收集**: 攻击者获取FTP服务器的详细信息，包括目录结构、文件名、文件路径、操作系统类型和版本等，这些信息对于后续针对性攻击至关重要。
+- **增加攻击面**: 暴露的文件结构和敏感文件路径可能增加目录遍历、文件包含、文件上传、或信息泄露等漏洞的风险，帮助攻击者定位潜在的攻击入口。
+- **提升攻击效率**: 泄露的服务器类型和版本信息有助于攻击者快速识别已知的漏洞或配置缺陷，从而更容易地找到攻击路径。
+- **合规性问题**: 敏感信息泄露可能违反数据隐私和安全法规，导致法律和经济风险。
 
 DESC
 	rule_id: "87df2d7a-5473-4438-aa85-706657accf5f"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免直接输出敏感信息到Web页面
 最核心的修复措施是确保从FTP服务器获取的任何敏感信息（如目录列表、文件路径、系统类型、错误日志等）绝不直接通过Web页面回显给用户，尤其是在生产环境中。这些信息应仅在服务器端用于内部逻辑处理或记录，且应受到严格的访问控制。
-
 ```php
 <?php
-    // 修复代码示例：仅在后端处理FTP信息，绝不直接输出到前端
-    $ftp_server = 'ftp.example.com';
-    $ftp_user = 'user';
-    $ftp_pass = 'password';
-
-    $conn_id = ftp_connect($ftp_server);
-    if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
-        // 获取当前工作目录，仅用于内部处理，不输出
-        $current_dir = ftp_pwd($conn_id);
-        error_log("FTP Current Directory: " . $current_dir); // 记录到日志系统
-
-        // 列出服务器文件列表，仅用于内部处理，不输出
-        $files = ftp_nlist($conn_id, ".");
-        error_log("FTP Files: " . json_encode($files)); // 记录到日志系统
-
-        // 获取服务器类型，仅用于内部处理，不输出
-        $system_type = ftp_systype($conn_id);
-        error_log("FTP System Type: " . $system_type); // 记录到日志系统
-
-        // 仅输出业务逻辑需要展示的非敏感信息给用户
-        echo "FTP操作成功完成。";
-
-        ftp_close($conn_id);
-    } else {
-        error_log("FTP连接或认证失败。"); // 将错误记录到日志，不暴露给用户
-        echo "FTP操作失败。请联系管理员。";
-    }
+// 修复代码示例：仅在后端处理FTP信息，绝不直接输出到前端
+$ftp_server = 'ftp.example.com';
+$ftp_user = 'user';
+$ftp_pass = 'password';
+$conn_id = ftp_connect($ftp_server);
+if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
+// 获取当前工作目录，仅用于内部处理，不输出
+$current_dir = ftp_pwd($conn_id);
+error_log("FTP Current Directory: " . $current_dir); // 记录到日志系统
+// 列出服务器文件列表，仅用于内部处理，不输出
+$files = ftp_nlist($conn_id, ".");
+error_log("FTP Files: " . json_encode($files)); // 记录到日志系统
+// 获取服务器类型，仅用于内部处理，不输出
+$system_type = ftp_systype($conn_id);
+error_log("FTP System Type: " . $system_type); // 记录到日志系统
+// 仅输出业务逻辑需要展示的非敏感信息给用户
+echo "FTP操作成功完成。";
+ftp_close($conn_id);
+} else {
+error_log("FTP连接或认证失败。"); // 将错误记录到日志，不暴露给用户
+echo "FTP操作失败。请联系管理员。";
+}
 ?>
 ```
-
 #### 2. 实施严格的访问控制和权限最小化
 为FTP用户配置最小权限原则，仅允许访问其业务所需的特定目录和文件，并禁用不必要的FTP命令（如 `SYST`、`NLST` 等），以限制即使发生信息泄露时攻击者能获取到的数据量和操作范围。定期审查FTP账户权限，确保其与当前业务需求一致。
-
 #### 3. 优先使用更安全的协议替代FTP
 如果业务允许，应优先考虑使用SFTP（SSH File Transfer Protocol）或FTPS（FTP Secure）等加密且更安全的协议来传输文件。这些协议提供了强化的身份验证机制和传输层加密，能够有效防止数据在传输过程中被窃听或篡改，从而显著降低信息泄露的风险。
-
 #### 4. 对所有输出内容进行严格过滤和验证
 即使在需要向特定用户（如管理员）展示FTP相关信息时，也应对这些输出内容进行严格的过滤、转义和验证。确保不包含任何可能被利用于跨站脚本（XSS）或其他注入攻击的恶意字符或格式。例如，对于文件路径，应只展示文件名而不暴露完整的服务器文件系统路径。对于目录列表，应限制展示的深度和敏感性。
+
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-200: Information Exposure](https://cwe.mitre.org/data/definitions/200.html)
@@ -118,9 +100,87 @@ CODE}->} as $sink
 
 
 alert $sink for {
-	title: "Check PHP FTP Information Exposure Vulnerability",
-	title_zh: "检测PHP FTP信息泄露漏洞",
+	title: "PHP FTP Information Exposure Vulnerability Was Detected",
+	title_zh: "检测到PHP FTP信息泄露漏洞",
 	level: "low",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免直接输出敏感信息到Web页面
+最核心的修复措施是确保从FTP服务器获取的任何敏感信息（如目录列表、文件路径、系统类型、错误日志等）绝不直接通过Web页面回显给用户，尤其是在生产环境中。这些信息应仅在服务器端用于内部逻辑处理或记录，且应受到严格的访问控制。
+```php
+<?php
+// 修复代码示例：仅在后端处理FTP信息，绝不直接输出到前端
+$ftp_server = 'ftp.example.com';
+$ftp_user = 'user';
+$ftp_pass = 'password';
+$conn_id = ftp_connect($ftp_server);
+if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
+  // 获取当前工作目录，仅用于内部处理，不输出
+  $current_dir = ftp_pwd($conn_id);
+  error_log("FTP Current Directory: " . $current_dir); // 记录到日志系统
+  // 列出服务器文件列表，仅用于内部处理，不输出
+  $files = ftp_nlist($conn_id, ".");
+  error_log("FTP Files: " . json_encode($files)); // 记录到日志系统
+  // 获取服务器类型，仅用于内部处理，不输出
+  $system_type = ftp_systype($conn_id);
+  error_log("FTP System Type: " . $system_type); // 记录到日志系统
+  // 仅输出业务逻辑需要展示的非敏感信息给用户
+  echo "FTP操作成功完成。";
+  ftp_close($conn_id);
+} else {
+  error_log("FTP连接或认证失败。"); // 将错误记录到日志，不暴露给用户
+  echo "FTP操作失败。请联系管理员。";
+}
+?>
+```
+#### 2. 实施严格的访问控制和权限最小化
+为FTP用户配置最小权限原则，仅允许访问其业务所需的特定目录和文件，并禁用不必要的FTP命令（如 `SYST`、`NLST` 等），以限制即使发生信息泄露时攻击者能获取到的数据量和操作范围。定期审查FTP账户权限，确保其与当前业务需求一致。
+#### 3. 优先使用更安全的协议替代FTP
+如果业务允许，应优先考虑使用SFTP（SSH File Transfer Protocol）或FTPS（FTP Secure）等加密且更安全的协议来传输文件。这些协议提供了强化的身份验证机制和传输层加密，能够有效防止数据在传输过程中被窃听或篡改，从而显著降低信息泄露的风险。
+#### 4. 对所有输出内容进行严格过滤和验证
+即使在需要向特定用户（如管理员）展示FTP相关信息时，也应对这些输出内容进行严格的过滤、转义和验证。确保不包含任何可能被利用于跨站脚本（XSS）或其他注入攻击的恶意字符或格式。例如，对于文件路径，应只展示文件名而不暴露完整的服务器文件系统路径。对于目录列表，应限制展示的深度和敏感性。
+SOLUTION
+	risk: "信息泄露",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在PHP应用程序中，如果开发者使用FTP相关函数（如 `ftp_nlist`、`ftp_pwd`、`ftp_rawlist`、`ftp_systype` 等）来获取FTP服务器的信息，并将这些信息直接或间接输出到前端页面，可能导致敏感信息泄露。这类函数在不恰当使用时，会将通常只在后台处理或调试时需要的数据暴露给未经授权的用户。泄露的信息可能包括但不限于服务器的文件目录结构、当前工作目录路径、服务器操作系统类型、FTP服务器版本等。攻击者可以利用这些信息了解服务器的文件系统布局、软件环境配置、潜在的弱点或敏感文件位置，为后续的攻击（如目录遍历、文件包含、远程代码执行，甚至更复杂的社会工程学攻击）提供重要的情报支持。这种信息泄露虽然不直接导致代码执行，但为攻击者构建更精确和有效的攻击载荷提供了基础。
+2. **触发场景**
+当PHP代码连接到FTP服务器并调用上述函数获取信息后，如果未经严格的安全审查和数据处理，直接将获取到的信息（如目录列表、当前工作目录路径、服务器系统类型等）通过Web输出函数（如 `echo`、`print_r`、`var_dump`）返回给用户时，就会触发信息泄露漏洞。这种场景通常发生在应用程序的调试模式未关闭、错误处理不当、或为了方便开发而在生产环境中保留了调试输出代码时。
+```php
+<?php
+// 不安全FTP操作示例，将敏感信息直接输出到Web页面
+$ftp_server = 'ftp.example.com';
+$ftp_user = 'user';
+$ftp_pass = 'password';
+$conn_id = ftp_connect($ftp_server);
+if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
+  echo "FTP连接成功。<br>";
+  // 风险点1：获取并直接输出当前工作目录
+  $current_dir = ftp_pwd($conn_id);
+  echo "当前工作目录: " . $current_dir . "<br>";
+  // 风险点2：列出服务器文件列表并直接输出
+  $files = ftp_nlist($conn_id, ".");
+  echo "当前目录文件列表:<pre>";
+  print_r($files);
+  echo "</pre>";
+  // 风险点3：获取服务器类型并直接输出
+  $system_type = ftp_systype($conn_id);
+  echo "FTP服务器类型: " . $system_type . "<br>";
+  ftp_close($conn_id);
+} else {
+  echo "FTP连接失败或认证失败。<br>";
+}
+?>
+```
+3. **潜在影响**
+- **情报收集**: 攻击者获取FTP服务器的详细信息，包括目录结构、文件名、文件路径、操作系统类型和版本等，这些信息对于后续针对性攻击至关重要。
+- **增加攻击面**: 暴露的文件结构和敏感文件路径可能增加目录遍历、文件包含、文件上传、或信息泄露等漏洞的风险，帮助攻击者定位潜在的攻击入口。
+- **提升攻击效率**: 泄露的服务器类型和版本信息有助于攻击者快速识别已知的漏洞或配置缺陷，从而更容易地找到攻击路径。
+- **合规性问题**: 敏感信息泄露可能违反数据隐私和安全法规，导致法律和经济风险。
+DESC
+	name: "sink",
+	message: "检测到PHP代码中存在FTP信息泄露漏洞，攻击者可能通过暴露的目录结构和文件信息进一步提升攻击效率。",
 }
 
 desc(
@@ -143,4 +203,80 @@ desc(
     echo "System type: " . ftp_systype($conn);
 ?>
 TEXT
+	"safefile://SecureFtpLogging.php": <<<CODE
+<?php
+    // 场景1: 将FTP操作信息记录到日志文件，不直接输出到用户前端
+    $ftp_server = 'ftp.example.com';
+    $ftp_user = 'user';
+    $ftp_pass = 'password';
+
+    $conn_id = ftp_connect($ftp_server);
+    if ($conn_id && ftp_login($conn_id, $ftp_user, $ftp_pass)) {
+        // 获取当前工作目录，仅用于内部处理，不输出给用户
+        $current_dir = ftp_pwd($conn_id);
+        error_log("FTP Current Directory: " . $current_dir); // 通过日志记录，而不是echo
+
+        // 列出服务器文件列表，仅用于内部处理，不输出给用户
+        $files = ftp_nlist($conn_id, ".");
+        if ($files) {
+            error_log("FTP Files listed: " . implode(", ", $files)); // 记录到日志
+        }
+
+        // 获取服务器类型，仅用于内部处理，不输出给用户
+        $system_type = ftp_systype($conn_id);
+        error_log("FTP System Type: " . $system_type); // 记录到日志
+
+        echo "FTP operation completed successfully."; // 只输出非敏感的业务成功信息
+
+        ftp_close($conn_id);
+    } else {
+        error_log("FTP connection or authentication failed."); // 错误信息记录到日志
+        echo "FTP operation failed. Please contact administrator."; // 统一错误提示
+    }
+?>
+CODE
+	"safefile://SFtpPreferred.php": <<<CODE
+<?php
+    // 场景2: 优先使用SFTP或FTPS等安全协议进行文件传输，而非传统FTP
+    // 本示例为SFTP连接
+    $sftp_host = 'sftp.example.com';
+    $sftp_port = 22;
+    $sftp_user = 'user';
+    $sftp_pwd = 'password';
+
+    try {
+        $connection = ssh2_connect($sftp_host, $sftp_port);
+        if (!$connection) {
+            throw new Exception('Could not connect to SFTP server.');
+        }
+
+        if (!ssh2_auth_password($connection, $sftp_user, $sftp_pwd)) {
+            throw new Exception('SFTP authentication failed.');
+        }
+
+        $sftp = ssh2_sftp($connection);
+        if (!$sftp) {
+            throw new Exception('Could not initialize SFTP subsystem.');
+        }
+
+        // SFTP操作，如果需要获取目录或文件信息，进行严格的权限控制和输出过滤
+        // 例如，只获取文件名列表，不直接暴露完整路径
+        $dir_handle = opendir("ssh2.sftp://{$sftp}/remote/path");
+        if ($dir_handle) {
+            echo "Files in remote path:\n";
+            while (false !== ($file = readdir($dir_handle))) {
+                if ($file != "." && $file != "..") {
+                    echo htmlspecialchars($file) . "\n"; // 对输出进行HTML实体编码，防止XSS
+                }
+            }
+            closedir($dir_handle);
+        }
+        echo "SFTP operation successful.";
+
+    } catch (Exception $e) {
+        error_log("SFTP Error: " . $e->getMessage());
+        echo "SFTP operation failed. Reason: " . htmlspecialchars($e->getMessage()); // 错误信息也应处理
+    }
+?>
+CODE
 )

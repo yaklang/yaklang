@@ -2,6 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -14,8 +15,11 @@ import (
 type Value struct {
 	runtimeCtx    *omap.OrderedMap[ContextID, *Value]
 	ParentProgram *Program
-	EffectOn      Values // this value effect current value     [effectOn -> self]
-	DependOn      Values // this value depend on current value  [self -> dependOn]
+	EffectOn      *utils.SafeMapWithKey[string, *Value]
+	DependOn      *utils.SafeMapWithKey[string, *Value]
+
+	// 唯一标识符
+	uuid string
 
 	// inner data for ssa
 	innerValue ssa.Value
@@ -54,6 +58,76 @@ func (v *Value) getInstruction() ssa.Instruction {
 		return v.innerUser
 	}
 	return nil
+}
+
+func (v *Value) hasDependOn(target *Value) bool {
+	if v == nil {
+		return false
+	}
+	if v.DependOn == nil {
+		return false
+	}
+	_, b := v.DependOn.Get(target.GetUUID())
+	return b
+}
+
+func (v *Value) setDependOn(target *Value) {
+	if v == nil {
+		return
+	}
+	if v.DependOn == nil {
+		v.DependOn = utils.NewSafeMapWithKey[string, *Value]()
+	}
+	v.DependOn.Set(target.GetUUID(), target)
+}
+
+func (v *Value) deleteDependOn(target *Value) {
+	if v == nil || v.DependOn == nil {
+		return
+	}
+	v.DependOn.Delete(target.GetUUID())
+}
+
+func (v *Value) hasEffectOn(target *Value) bool {
+	if v == nil {
+		return false
+	}
+	if v.EffectOn == nil {
+		return false
+	}
+	_, b := v.EffectOn.Get(target.GetUUID())
+	return b
+}
+
+func (v *Value) setEffectOn(target *Value) {
+	if v == nil {
+		return
+	}
+	if v.EffectOn == nil {
+		v.EffectOn = utils.NewSafeMapWithKey[string, *Value]()
+	}
+	v.EffectOn.Set(target.GetUUID(), target)
+}
+
+func (v *Value) deleteEffectOn(target *Value) {
+	if v == nil || v.EffectOn == nil {
+		return
+	}
+	v.EffectOn.Delete(target.GetUUID())
+}
+
+func (v *Value) GetDependOnCount() int {
+	if v == nil || v.DependOn == nil {
+		return 0
+	}
+	return v.DependOn.Count()
+}
+
+func (v *Value) EffectOnCount() int {
+	if v == nil || v.EffectOn == nil {
+		return 0
+	}
+	return v.EffectOn.Count()
 }
 
 func (v *Value) GetAuditNodeId() uint {
@@ -150,6 +224,14 @@ func (v *Value) GetId() int64 {
 		return -1
 	}
 	return v.getInstruction().GetId()
+}
+
+// GetUUID 返回Value的唯一标识符
+func (v *Value) GetUUID() string {
+	if v.IsNil() {
+		return ""
+	}
+	return v.uuid
 }
 
 func (v *Value) GetSSAInst() ssa.Instruction {
@@ -251,21 +333,21 @@ func (v *Value) GetInnerValueVerboseName() string {
 	return inner.GetVerboseName()
 }
 
-func (i *Value) Show() *Value               { fmt.Println(i); return i }
-func (i *Value) ShowWithRange() *Value      { fmt.Println(i.StringWithRange()); return i }
-func (i *Value) ShowWithSourceCode() *Value { fmt.Println(i.StringWithSourceCode()); return i }
+func (i *Value) Show() *Value               { log.Info(i); return i }
+func (i *Value) ShowWithRange() *Value      { log.Info(i.StringWithRange()); return i }
+func (i *Value) ShowWithSourceCode() *Value { log.Info(i.StringWithSourceCode()); return i }
 
 func (v *Value) Compare(other *Value) bool { return ValueCompare(v, other) }
 
 func (v *Value) GetType() *Type {
 	if v.IsNil() {
-		return Any
+		return NewType(ssa.CreateAnyType())
 	}
 	inst := v.getInstruction()
 	if n, ok := inst.(ssa.Typed); ok {
 		return NewType(n.GetType())
 	}
-	return Any
+	return NewType(ssa.CreateAnyType())
 }
 
 func (v *Value) GetTypeKind() ssa.TypeKind {
@@ -281,7 +363,7 @@ func (v *Value) GetTypeKind() ssa.TypeKind {
 	return ssa.AnyTypeKind
 }
 
-func (v *Value) GetRange() memedit.RangeIf {
+func (v *Value) GetRange() *memedit.Range {
 	if v.IsNil() {
 		return nil
 	}
@@ -446,7 +528,10 @@ func (v *Value) GetReturn() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, r := range f.Return {
-			r := f.GetValueById(r)
+			r, ok := f.GetValueById(r)
+			if !ok {
+				continue
+			}
 			ret = append(ret, v.NewValue(r))
 		}
 	}
@@ -460,7 +545,10 @@ func (v *Value) GetParameter(i int) *Value {
 
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		if i < len(f.Params) {
-			param := f.GetValueById(f.Params[i])
+			param, ok := f.GetValueById(f.Params[i])
+			if !ok {
+				return nil
+			}
 			return v.NewValue(param)
 		}
 	}
@@ -470,10 +558,13 @@ func (v *Value) GetFreeValue(name string) *Value {
 	if v.IsNil(true) {
 		return nil
 	}
-	if variable := v.GetVariable(name); variable != nil {
-		if f, ok := ssa.ToFunction(v.innerValue); ok {
-			if fv, ok := f.FreeValues[variable]; ok {
-				fv := f.GetValueById(fv)
+	if f, ok := ssa.ToFunction(v.innerValue); ok {
+		for ver, id := range f.FreeValues {
+			if ver.GetName() == name {
+				fv, ok := f.GetValueById(id)
+				if !ok {
+					return nil
+				}
 				return v.NewValue(fv)
 			}
 		}
@@ -489,7 +580,10 @@ func (v *Value) GetParameters() Values {
 	ret := make(Values, 0)
 	if f, ok := ssa.ToFunction(v.innerValue); ok {
 		for _, param := range f.Params {
-			param := f.GetValueById(param)
+			param, ok := f.GetValueById(param)
+			if !ok {
+				continue
+			}
 			ret = append(ret, v.NewValue(param))
 		}
 	}
@@ -503,7 +597,10 @@ func (v *Value) GetCallArgs() Values {
 
 	if f, ok := ssa.ToCall(v.innerValue); ok {
 		return lo.FilterMap(f.Args, func(itemId int64, index int) (*Value, bool) {
-			item := f.GetValueById(itemId)
+			item, ok := f.GetValueById(itemId)
+			if !ok {
+				return nil, false
+			}
 			return v.NewValue(item), true
 		})
 	}
@@ -531,13 +628,13 @@ func (v *Value) GetConstValue() any {
 	}
 }
 
-func (v *Value) GetConst() *ssa.Const {
+func (v *Value) GetConst() *ssa.ConstInst {
 	if v.IsNil(true) {
 		return nil
 	}
 
 	if cInst, ok := ssa.ToConstInst(v.innerValue); ok {
-		return cInst.Const
+		return cInst
 	} else {
 		return nil
 	}
@@ -650,7 +747,8 @@ func (v *Value) IsFreeValue() bool {
 }
 
 // GetMember get member of object by key
-func (v *Value) GetMember(value *Value) *Value {
+func (v *Value) GetMember(value *Value) []*Value {
+	var ret []*Value
 	if v.IsNil() {
 		return nil
 	}
@@ -660,10 +758,10 @@ func (v *Value) GetMember(value *Value) *Value {
 	node := v.innerValue
 	for name, member := range node.GetAllMember() {
 		if name.String() == key {
-			return v.NewValue(member)
+			ret = append(ret, v.NewValue(member))
 		}
 	}
-	return nil
+	return ret
 }
 
 // GetAllMember get all member of object
@@ -808,7 +906,10 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 			if call == nil || call.Method <= 0 {
 				return
 			}
-			method := call.GetValueById(call.Method)
+			method, ok := call.GetValueById(call.Method)
+			if !ok || method == nil {
+				return
+			}
 			if method.GetId() == id {
 				vs = append(vs, v.NewValue(call))
 				return
@@ -826,9 +927,16 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 				if len(function.ParameterMembers) <= index {
 					break
 				}
-				value := call.GetValueById(valueId)
+				value, ok := call.GetValueById(valueId)
+				if !ok || value == nil {
+					continue
+				}
 				if value.GetId() == id {
-					vs = append(vs, v.NewValue(call.GetValueById(function.ParameterMembers[index])).getCallByEx(tmp)...)
+					paramMember, ok := call.GetValueById(function.ParameterMembers[index])
+					if !ok {
+						continue
+					}
+					vs = append(vs, v.NewValue(paramMember).getCallByEx(tmp)...)
 					return
 				}
 			}
@@ -837,14 +945,21 @@ func (v *Value) getCallByEx(tmp map[int64]struct{}) Values {
 					break
 				}
 				if arg == id {
-					vv := v.NewValue(call.GetValueById(function.Params[index]))
+					param, ok := call.GetValueById(function.Params[index])
+					if !ok {
+						continue
+					}
+					vv := v.NewValue(param)
 					vs = append(vs, vv.getCallByEx(tmp)...)
 					return
 				}
 			}
 			searchBindVariable := func(name string) {
 				for _, valueId := range function.FreeValues {
-					value := call.GetValueById(valueId)
+					value, ok := call.GetValueById(valueId)
+					if !ok || value == nil {
+						continue
+					}
 					if value.GetName() == name {
 						vs = append(vs, v.NewValue(value).getCallByEx(tmp)...)
 						return
@@ -945,41 +1060,72 @@ func (v *Value) GetPredecessors() []*PredecessorValue {
 }
 
 func (v *Value) GetDependOn() Values {
-	if len(v.DependOn) == 0 {
+	if v.DependOn == nil || v.DependOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetDependEdgeOnByFromNodeId(auditNode.ID)
-			var dependOn Values
+			if v.DependOn == nil {
+				v.DependOn = utils.NewSafeMapWithKey[string, *Value]()
+			}
 			for _, id := range nodeIds {
 				d := v.NewValueFromAuditNode(id)
 				if d != nil {
-					dependOn = append(dependOn, d)
+					v.setDependOn(d)
 				}
 			}
-			v.DependOn = dependOn
 		}
 	}
-	return v.DependOn
+	return v.safeMapToValues(v.DependOn)
 }
 
 func (v *Value) GetEffectOn() Values {
-	if len(v.EffectOn) == 0 {
+	if v.EffectOn == nil || v.EffectOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
 			nodeIds := ssadb.GetEffectOnEdgeByFromNodeId(auditNode.ID)
-			var effectOn Values
+			if v.EffectOn == nil {
+				v.EffectOn = utils.NewSafeMapWithKey[string, *Value]()
+			}
 			for _, id := range nodeIds {
 				e := v.NewValueFromAuditNode(id)
 				if e != nil {
-					effectOn = append(effectOn, e)
+					v.EffectOn.Set(e.GetUUID(), e)
 				}
 			}
-			v.EffectOn = effectOn
 		}
 	}
-	return v.EffectOn
+	return v.safeMapToValues(v.EffectOn)
 }
 
-func (v *Value) AnalyzeDepth() int {
-	return v.GetDepth()
+func (v *Value) safeMapToValues(safeMap *utils.SafeMapWithKey[string, *Value]) Values {
+	if safeMap == nil {
+		return Values{}
+	}
+
+	var result Values
+	safeMap.ForEach(func(key string, value *Value) bool {
+		result = append(result, value)
+		return true
+	})
+	return result
+}
+
+func (v *Value) ForEachDependOn(f func(value *Value)) {
+	if v == nil || v.DependOn == nil {
+		return
+	}
+	v.DependOn.ForEach(func(key string, value *Value) bool {
+		f(value)
+		return true
+	})
+}
+
+func (v *Value) ForEachEffectOn(f func(value *Value)) {
+	if v == nil || v.EffectOn == nil {
+		return
+	}
+	v.EffectOn.ForEach(func(key string, value *Value) bool {
+		f(value)
+		return true
+	})
 }
 
 type Values []*Value
@@ -1038,7 +1184,7 @@ func (v Values) Show(b ...bool) Values {
 	if len(b) > 0 && !b[0] {
 		return v
 	}
-	fmt.Println(v.StringEx(0))
+	log.Info(v.StringEx(0))
 	return v
 }
 
@@ -1046,7 +1192,7 @@ func (v Values) ShowWithSource(b ...bool) Values {
 	if len(b) > 0 && !b[0] {
 		return v
 	}
-	fmt.Println(v.StringEx(1))
+	log.Info(v.StringEx(1))
 	return v
 }
 
@@ -1115,8 +1261,46 @@ func (v Values) GetOperands() Values {
 	})
 	return ret
 }
+func (v *Value) ShowDot() {
+	dotStr := v.DotGraph()
+	log.Infof(dotStr)
+	// dot.ShowDotGraphToAsciiArt(dotStr)
+}
 
-func (v Values) DotGraph() string {
-	vg := NewValueGraph(v...)
-	return vg.Dot()
+func (vs Values) ShowDot() Values {
+	dotStr := vs.DotGraph()
+	log.Infof(dotStr)
+	// dot.ShowDotGraphToAsciiArt(dotStr)
+	return vs
+}
+
+func (v *Value) DotGraph() string {
+	dotGraph := v.NewDotGraph()
+	return dotGraph.String()
+}
+
+func (v *Value) NewDotGraph() *DotGraph {
+	dotGraph := NewDotGraph()
+	dotGraph.createNode(v, true)
+	v.GenerateGraph(dotGraph)
+	return dotGraph
+}
+func (vs Values) NewDotGraph() *DotGraph {
+	dotGraph := NewDotGraph()
+	for _, v := range vs {
+		v.GenerateGraph(dotGraph)
+	}
+	return dotGraph
+}
+func (vs Values) DotGraph() string {
+	dotGraph := vs.NewDotGraph()
+	return dotGraph.String()
+}
+
+func (vs Values) Count() int {
+	return len(vs)
+}
+
+func (v *Value) Count() int {
+	return 1
 }

@@ -4,63 +4,11 @@ desc(
 	level: low
 	risk: "path-traversal"
 	desc: <<<DESC
-### 漏洞描述
-
-1. **漏洞原理**
-   当应用程序在处理文件下载功能时，如果未能正确验证或清理用户通过文件下载功能的filename参数传递的文件名，攻击者可以通过构造包含特殊字符（如`../`或`..\`）或绝对路径的文件名，绕过应用程序设定的目录限制，访问服务器文件系统中的任意文件。这些文件可能包含敏感信息，例如配置文件、源代码、用户数据或其他私有文件。
-
-2. **触发场景**
-   此规则主要针对Java文件下载功能中filename参数未进行充分验证的场景。例如，当应用程序直接使用用户提供的filename参数来构造文件路径，而未对其进行规范化或检查是否存在路径遍历字符时，就会触发该漏洞。攻击者可以请求如 `/download?filename=../../etc/passwd` 之类的URL来尝试下载服务器上的敏感文件。
-
-3. **潜在影响**
-    - **敏感数据泄露:** 攻击者可以下载包含密码、API密钥、数据库连接信息等敏感信息的文件。
-    - **代码或配置泄露:** 获取应用程序的源代码或服务器配置文件，有助于攻击者进一步分析系统架构和发现其他漏洞。
-    - **系统信息泄露:** 访问操作系统文件（如`/etc/passwd`），了解系统用户、权限等信息。
-    - **服务中断:** 在某些情况下，攻击者可能通过下载或覆盖关键系统文件导致服务不可用。
-
-此规则通过检测Java代码中File类相关操作是否使用了用户输入的字符串且未进行有效过滤，来识别潜在的路径遍历风险。
+### 漏洞描述\n1. **漏洞原理**\n当应用程序在处理文件下载功能时，如果未能正确验证或清理用户通过文件下载功能的filename参数传递的文件名，攻击者可以通过构造包含特殊字符（如`../`或`..\`）或绝对路径的文件名，绕过应用程序设定的目录限制，访问服务器文件系统中的任意文件。这些文件可能包含敏感信息，例如配置文件、源代码、用户数据或其他私有文件。\n2. **触发场景**\n此规则主要针对Java文件下载功能中filename参数未进行充分验证的场景。例如，当应用程序直接使用用户提供的filename参数来构造文件路径，而未对其进行规范化或检查是否存在路径遍历字符时，就会触发该漏洞。攻击者可以请求如 `/download?filename=../../etc/passwd` 之类的URL来尝试下载服务器上的敏感文件。\n3. **潜在影响**\n- **敏感数据泄露:** 攻击者可以下载包含密码、API密钥、数据库连接信息等敏感信息的文件。\n- **代码或配置泄露:** 获取应用程序的源代码或服务器配置文件，有助于攻击者进一步分析系统架构和发现其他漏洞。\n- **系统信息泄露:** 访问操作系统文件（如`/etc/passwd`），了解系统用户、权限等信息。\n- **服务中断:** 在某些情况下，攻击者可能通过下载或覆盖关键系统文件导致服务不可用。\n此规则通过检测Java代码中File类相关操作是否使用了用户输入的字符串且未进行有效过滤，来识别潜在的路径遍历风险。
 DESC
 	rule_id: "b381b01b-98e3-44f4-b046-7712dcacbe72"
 	solution: <<<SOLUTION
-### 修复建议
-
-#### 1. 对用户输入进行严格验证和清理
-在处理用户提供的filename参数时，务必进行严格的验证和清理。这包括：
-
-* **移除或过滤路径遍历字符:** 过滤或编码文件名中包含 `../` 和 `..\` 等路径遍历字符。
-* **限制允许的文件名字符:** 仅允许合法的字符出现在文件名中，例如字母、数字、下划线等，拒绝或过滤特殊字符。
-* **规范化文件路径:** 在使用用户输入的文件名构建实际文件路径之前，使用Java内置的路径规范化方法（如`File.getCanonicalPath()`或`Paths.get().normalize()`）。这将解析并移除路径中的冗余元素，将相对路径转换为绝对路径。
-* **白名单机制:** 如果可能，优先使用文件名的白名单列表，仅允许下载预定义的可信文件。
-
-```java
-// 示例：使用路径规范化和输入过滤
-String userInputFilename = request.getParameter("filename");
-
-// 移除或过滤危险字符（简单示例，实际应更健壮）
-String cleanedFilename = userInputFilename.replace("../", "").replace("..\\", "");
-
-// 构建安全的文件路径
-File baseDir = new File("/var/uploads/"); // 安全的基础目录
-File requestedFile = new File(baseDir, cleanedFilename);
-
-try {
-    // 使用 getCanonicalPath 进行规范化并检查是否在基础目录下
-    if (!requestedFile.getCanonicalPath().startsWith(baseDir.getCanonicalPath())) {
-        throw new IllegalArgumentException("非法的文件路径");
-    }
-
-    // 现在可以安全地处理 requestedFile
-    // ... 文件下载逻辑 ...
-
-} catch (IOException e) {
-    // 处理异常
-    e.printStackTrace();
-    throw new RuntimeException("文件访问错误");
-}
-```
-
-#### 2. 将用户输入限制在特定目录下
-**不要**直接使用用户提供的文件名作为完整文件路径。结合安全的基础目录和规范化的用户输入名，确保最终生成的文件路径始终位于预期的目录范围内。如上例所示，`baseDir.getCanonicalPath()` 和 `requestedFile.getCanonicalPath()`的比对是关键的安全措施。
+### 修复建议\n#### 1. 对用户输入进行严格验证和清理\n在处理用户提供的filename参数时，务必进行严格的验证和清理。这包括：\n* **移除或过滤路径遍历字符:** 过滤或编码文件名中包含 `../` 和 `..\` 等路径遍历字符。\n* **限制允许的文件名字符:** 仅允许合法的字符出现在文件名中，例如字母、数字、下划线等，拒绝或过滤特殊字符。\n* **规范化文件路径:** 在使用用户输入的文件名构建实际文件路径之前，使用Java内置的路径规范化方法（如`File.getCanonicalPath()`或`Paths.get().normalize()`）。这将解析并移除路径中的冗余元素，将相对路径转换为绝对路径。\n* **白名单机制:** 如果可能，优先使用文件名的白名单列表，仅允许下载预定义的可信文件。\n```java\n// 示例：使用路径规范化和输入过滤\nString userInputFilename = request.getParameter(\"filename\");\n// 移除或过滤危险字符（简单示例，实际应更健壮）\nString cleanedFilename = userInputFilename.replace(\"../\", \"\").replace(\"..\\\\\", \"\");\n// 构建安全的文件路径\nFile baseDir = new File(\"/var/uploads/\"); // 安全的基础目录\nFile requestedFile = new File(baseDir, cleanedFilename);\ntry {\n// 使用 getCanonicalPath 进行规范化并检查是否在基础目录下\nif (!requestedFile.getCanonicalPath().startsWith(baseDir.getCanonicalPath())) {\nthrow new IllegalArgumentException(\"非法的文件路径\");\n}\n// 现在可以安全地处理 requestedFile\n// ... 文件下载逻辑 ...\n} catch (IOException e) {\n// 处理异常\ne.printStackTrace();\nthrow new RuntimeException(\"文件访问错误\");\n}\n```\n#### 2. 将用户输入限制在特定目录下\n**不要**直接使用用户提供的文件名作为完整文件路径。结合安全的基础目录和规范化的用户输入名，确保最终生成的文件路径始终位于预期的目录范围内。如上例所示，`baseDir.getCanonicalPath()` 和 `requestedFile.getCanonicalPath()`的比对是关键的安全措施。
 SOLUTION
 	reference: <<<REFERENCE
 [OWASP Path Traversal](https://owasp.org/www-community/vulnerabilities/Path_Traversal)
@@ -71,71 +19,48 @@ REFERENCE
 )
 
 File().get*() -{
-    until: `* #>?{<string>?{have: 'attachment;', 'filename='}} as $flag`
-}->
+    until: `* #>?{<string>?{have: 'attachment;', 'filename='}} `
+}-> as $flag 
 check $flag;
 $flag-> as $output;
 check $output;
 alert $output for {
-	title: "Detect Java Path Traversal Vulnerability",
-	title_zh: "检测Java路径遍历漏洞",
-	solution: <<<CODE
+	title: "Java Path Traversal Vulnerability Was Detected",
+	title_zh: "检测到Java路径遍历漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 对用户输入进行严格验证和清理
 在处理用户提供的filename参数时，务必进行严格的验证和清理。这包括：
-
 * **移除或过滤路径遍历字符:** 过滤或编码文件名中包含 `../` 和 `..\` 等路径遍历字符。
 * **限制允许的文件名字符:** 仅允许合法的字符出现在文件名中，例如字母、数字、下划线等，拒绝或过滤特殊字符。
 * **规范化文件路径:** 在使用用户输入的文件名构建实际文件路径之前，使用Java内置的路径规范化方法（如`File.getCanonicalPath()`或`Paths.get().normalize()`）。这将解析并移除路径中的冗余元素，将相对路径转换为绝对路径。
 * **白名单机制:** 如果可能，优先使用文件名的白名单列表，仅允许下载预定义的可信文件。
-
 ```java
 // 示例：使用路径规范化和输入过滤
 String userInputFilename = request.getParameter("filename");
-
 // 移除或过滤危险字符（简单示例，实际应更健壮）
 String cleanedFilename = userInputFilename.replace("../", "").replace("..\\", "");
-
 // 构建安全的文件路径
 File baseDir = new File("/var/uploads/"); // 安全的基础目录
 File requestedFile = new File(baseDir, cleanedFilename);
-
 try {
-    // 使用 getCanonicalPath 进行规范化并检查是否在基础目录下
-    if (!requestedFile.getCanonicalPath().startsWith(baseDir.getCanonicalPath())) {
-        throw new IllegalArgumentException("非法的文件路径");
-    }
-
-    // 现在可以安全地处理 requestedFile
-    // ... 文件下载逻辑 ...
-
+// 使用 getCanonicalPath 进行规范化并检查是否在基础目录下
+if (!requestedFile.getCanonicalPath().startsWith(baseDir.getCanonicalPath())) {
+throw new IllegalArgumentException("非法的文件路径");
+}
+// 现在可以安全地处理 requestedFile
+// ... 文件下载逻辑 ...
 } catch (IOException e) {
-    // 处理异常
-    e.printStackTrace();
-    throw new RuntimeException("文件访问错误");
+// 处理异常
+e.printStackTrace();
+throw new RuntimeException("文件访问错误");
 }
 ```
-
 #### 2. 将用户输入限制在特定目录下
 **不要**直接使用用户提供的文件名作为完整文件路径。结合安全的基础目录和规范化的用户输入名，确保最终生成的文件路径始终位于预期的目录范围内。如上例所示，`baseDir.getCanonicalPath()` 和 `requestedFile.getCanonicalPath()`的比对是关键的安全措施。
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   当应用程序在处理文件下载功能时，如果未能正确验证或清理用户通过文件下载功能的filename参数传递的文件名，攻击者可以通过构造包含特殊字符（如`../`或`..\`）或绝对路径的文件名，绕过应用程序设定的目录限制，访问服务器文件系统中的任意文件。这些文件可能包含敏感信息，例如配置文件、源代码、用户数据或其他私有文件。
-
-2. **触发场景**
-   此规则主要针对Java文件下载功能中filename参数未进行充分验证的场景。例如，当应用程序直接使用用户提供的filename参数来构造文件路径，而未对其进行规范化或检查是否存在路径遍历字符时，就会触发该漏洞。攻击者可以请求如 `/download?filename=../../etc/passwd`  之类的URL来尝试下载服务器上的敏感文件。
-
-3. **潜在影响**
-    - **敏感数据泄露:** 攻击者可以下载包含密码、API密钥、数据库连接信息等敏感信息的文件。
-    - **代码或配置泄露:** 获取应用程序的源代码或服务器配置文件，有助于攻击者进一步分析系统架构和发现其他漏洞。
-    - **系统信息泄露:** 访问操作系统文件（如`/etc/passwd`），了解系统用户、权限等信息。
-    - **服务中断:** 在某些情况下，攻击者可能通过下载或覆盖关键系统文件导致服务不可用。
-
-此规则通过检测Java代码中File类相关操作是否使用了用户输入的字符串且未进行有效过滤，来识别潜在的路径遍历风险。
-CODE
+SOLUTION
 	level: "low",
+	name: "output",
+	message: "检测到Java文件下载功能中filename参数未进行充分验证，可能存在路径遍历风险。",
+	risk: "路径遍历",
 }

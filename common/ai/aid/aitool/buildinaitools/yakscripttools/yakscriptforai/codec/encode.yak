@@ -1,5 +1,5 @@
 __DESC__ = "一个支持多种编码方式的文本编码工具，包括 Base64、Base64URL、Base32、Hex、双重URL编码、ASCII、HTML实体、HTMLHex、URL编码和Unicode编码。"
-
+__VERBOSE_NAME__ = "多格式文本编码"
 __KEYWORDS__ = "representation,transformation,数据转换,url编码,双重url编码,unicode编码,hex,url encoding,base32,cipher,编码工具,文本处理,base64,double url encoding,conversion,格式转换,encoding,data format"
 
 tn := cli.String("type", cli.setRequired(true), cli.setHelp("encode method, available options: base64/b64, base64url, base32, hex, doubleurl, quote/ascii, html/htmlentity, htmlhex, url, unicode"))

@@ -4,51 +4,42 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
+Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
 2. **触发场景**
-   该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
-   例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
+该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
+例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
-   - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
-   - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
+- **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
+- **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
+- **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
 DESC
 	rule_id: "0786672a-de59-4a19-8896-206bbded3cf0"
 	title_zh: "SCA: 检测Java Hessian依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
-   将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
-   - 对于 `hessian`，升级到高于 4.0.63 的版本。
-   - 对于 `com.alibaba:hessian-lite`，升级到 3.2.13 或更高版本。
-   - 对于 `com.alipay.sofa:hessian`，升级到 3.5.5 或 4.0.3 及更高版本。
-   - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
-   - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
-   - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
-   **Maven 示例如下：**
-   修改 `pom.xml` 文件中的依赖版本。
-   ```xml
-   <dependency>
-       <groupId>com.alibaba</groupId>
-       <artifactId>hessian-lite</artifactId>
-       <version>3.2.13</version>  <!-- 升级到安全版本 -->
-   </dependency>
-   ```
-
+将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
+- 对于 `hessian`，升级到高于 4.0.63 的版本。
+- 对于 `com.alibaba:hessian-lite`，升级到 3.2.13 或更高版本。
+- 对于 `com.alipay.sofa:hessian`，升级到 3.5.5 或 4.0.3 及更高版本。
+- 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
+- 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
+- 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
+**Maven 示例如下：**
+修改 `pom.xml` 文件中的依赖版本。
+```xml
+<dependency>
+<groupId>com.alibaba</groupId>
+<artifactId>hessian-lite</artifactId>
+<version>3.2.13</version>  <!-- 升级到安全版本 -->
+</dependency>
+```
 2. **限制反序列化能力**
-   如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
+如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
 3. **避免对不可信来源的数据进行反序列化**
-   设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
+设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
 SOLUTION
 	reference: <<<REFERENCE
 [CVE-2021-43297](https://nvd.nist.gov/vuln/detail/CVE-2021-43297)
@@ -61,9 +52,8 @@ REFERENCE
 __dependency__.*hessian.version as $ver;
 $ver in (,4.0.63] as $vuln_hessian;
 alert $vuln_hessian for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -72,7 +62,6 @@ alert $vuln_hessian for {
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -82,36 +71,31 @@ alert $vuln_hessian for {
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
 	level: "critical",
 	message: "SCA: hessian version 4.0.63 has an unsafe deserialization vulnerability",
 	cve: "CVE-2021-43297",
 	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
+	risk: "SCA",
+	name: "vuln_hessian",
 }
 
 // 检查 com.alibaba:hessian-lite 版本小于 3.2.13 的不安全反序列化漏洞
@@ -123,9 +107,8 @@ alert $vuln_hessian_lite for {
 	message: "SCA: com.alibaba:hessian-lite 版本低于 3.2.13 存在不安全的反序列化漏洞",
 	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -134,7 +117,6 @@ alert $vuln_hessian_lite for {
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -144,40 +126,34 @@ alert $vuln_hessian_lite for {
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
+	risk: "SCA",
+	name: "vuln_hessian_lite",
 }
 
 // 检查 com.alibaba:hessian-lite 版本小于 3.2.12 的远程代码执行漏洞
 $ver_hessian_lite in (,3.2.12) as $vuln_hessian_lite_rce;
 alert $vuln_hessian_lite_rce for {
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -186,7 +162,6 @@ alert $vuln_hessian_lite_rce for {
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -196,35 +171,30 @@ alert $vuln_hessian_lite_rce for {
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
 	level: "critical",
 	cve: "CVE-2022-26136",
 	message: "SCA: com.alibaba:hessian-lite 版本低于 3.2.12 存在远程代码执行漏洞",
 	title: "SCA: Check Java Hessian Vulnerability",
+	risk: "SCA",
+	name: "vuln_hessian_lite_rce",
 }
 
 // 检查 com.alipay.sofa:hessian 版本小于 3.5.5 的不安全反序列化漏洞（严重）
@@ -232,9 +202,8 @@ __dependency__.*alipay*hessian.version as $ver_sofa_hessian;
 $ver_sofa_hessian in (,3.5.5) as $vuln_sofa_hessian_critical;
 alert $vuln_sofa_hessian_critical for {
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -243,7 +212,6 @@ alert $vuln_sofa_hessian_critical for {
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -253,43 +221,37 @@ alert $vuln_sofa_hessian_critical for {
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
 	level: "critical",
 	message: "SCA: com.alipay.sofa:hessian 版本低于 3.5.5 存在不安全的反序列化漏洞",
 	title: "SCA: Check Java Hessian Vulnerability",
+	risk: "SCA",
+	name: "vuln_sofa_hessian_critical",
 }
 
 // 检查 com.alipay.sofa:hessian 版本小于 4.0.3 的不安全反序列化漏洞（高）
 $ver_sofa_hessian in (,4.0.3) as $vuln_sofa_hessian_high;
 alert $vuln_sofa_hessian_high for {
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -298,7 +260,6 @@ alert $vuln_sofa_hessian_high for {
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -308,34 +269,29 @@ alert $vuln_sofa_hessian_high for {
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
 	level: "critical",
 	message: "SCA: com.alipay.sofa:hessian 版本低于 4.0.3 存在不安全的反序列化漏洞",
 	title: "SCA: Check Java Hessian Vulnerability",
+	risk: "SCA",
+	name: "vuln_sofa_hessian_high",
 }
 
 // 检查 com.caucho:hessian 存在漏洞的版本区间
@@ -343,31 +299,25 @@ __dependency__.*caucho*hessian.version as $ver_caucho_hessian;
 $ver_caucho_hessian in [2.5.0,2.6.9) as $vuln_caucho_hessian;
 $ver_caucho_hessian in [2.7.0,2.7.8) as $vuln_caucho_hessian;
 alert $vuln_caucho_hessian for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
 	level: "critical",
 	message: "SCA: com.caucho:hessian 版本在 2.5.0 至 2.6.9 和 2.7.0 至 2.7.8 之间存在不安全的反序列化漏洞",
 	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -376,7 +326,6 @@ CODE
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -386,13 +335,13 @@ CODE
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
+SOLUTION
+	risk: "SCA",
+	name: "vuln_caucho_hessian",
 }
 
 // 检查 org.apache.camel:camel-hessian 存在漏洞的版本区间
@@ -402,9 +351,8 @@ $ver_camel_hessian in [2.20.0,2.20.1) as $vuln_camel_hessian;
 alert $vuln_camel_hessian for {
 	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -413,7 +361,6 @@ alert $vuln_camel_hessian for {
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -423,64 +370,53 @@ alert $vuln_camel_hessian for {
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
 	level: "critical",
 	message: "SCA: org.apache.camel:camel-hessian 版本低于 2.19.4 和在 2.20.0 至 2.20.1 之间存在不安全的反序列化漏洞",
+	name: "vuln_camel_hessian",
+	risk: "SCA",
 }
 
 // 检查 org.noear:solon.serialization.hessian 版本小于 2.3.3 的输入验证不当漏洞
 __dependency__."*noear*serialization*hessian".version as $ver_noear_hessian;
 $ver_noear_hessian in (,2.3.3) as $vuln_noear_hessian;
 alert $vuln_noear_hessian for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Hessian是一个轻量级的二进制RPC协议，用于实现跨语言的远程过程调用。然而，在其部分版本中存在不安全的反序列化漏洞。当应用程序接收并反序列化由攻击者精心构造的二进制数据时，可能触发危险的对象方法调用，从而导致远程代码执行（RCE）或拒绝服务（DoS）等安全问题。
-
 2. **触发场景**
    该漏洞通常发生在应用程序使用存在漏洞的 Hessian 库版本，并通过网络接收并反序列化不可信的外部数据时。攻击者可以通过发送恶意的序列化数据包来触发漏洞。
-
    例如，如果项目中使用了受影响版本的 `com.alibaba:hessian-lite` 并对外提供了基于 Hessian 的RPC服务接口，攻击者可以构造恶意请求触发反序列化漏洞。
-
 3. **潜在影响**
    - **远程代码执行 (RCE)**: 攻击者可能在目标服务器上执行任意代码，完全控制服务器。
    - **拒绝服务 (DoS)**: 攻击者可能通过构造大量畸形数据导致服务器资源耗尽，服务不可用。
    - **敏感信息泄露**: 在某些情况下，攻击者可能利用反序列化链读取服务器上的敏感文件内容。
-
 此规则致力于检测Java项目中对 Hessian 库 (包括 `hessian`, `hessian-lite`, `sofa-hessian`, `camel-hessian`, `solon.serialization.hessian`) 的依赖，并识别已知存在不安全反序列化漏洞的版本，以便及时响应和修复。
-CODE
+DESC
 	level: "high",
 	message: "SCA: org.noear:solon.serialization.hessian 版本低于 2.3.3 存在输入验证不当的漏洞",
 	title: "SCA: Check Java Hessian Vulnerability",
 	title_zh: "SCA: 检测Java Hessian依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Hessian 库版本**
    将项目中使用的 Hessian 及其相关库升级到不受已知漏洞影响的最新版本。请查阅官方文档或安全公告，确认修复了相关漏洞的版本号。例如：
    - 对于 `hessian`，升级到高于 4.0.63 的版本。
@@ -489,7 +425,6 @@ CODE
    - 对于 `com.caucho:hessian`，避开 2.5.0 - 2.6.9 和 2.7.0 - 2.7.8 版本区间，升级到修复版本。
    - 对于 `org.apache.camel:camel-hessian`，升级到 2.19.4 或 2.20.1 及更高版本。
    - 对于 `org.noear:solon.serialization.hessian`，升级到 2.3.3 或更高版本。
-
    **Maven 示例如下：**
    修改 `pom.xml` 文件中的依赖版本。
    ```xml
@@ -499,13 +434,13 @@ CODE
        <version>3.2.13</version>  <!-- 升级到安全版本 -->
    </dependency>
    ```
-
 2. **限制反序列化能力**
    如果业务场景允许，考虑限制可被反序列化的类，采用白名单机制，只允许反序列化已知的、安全的类。这可以通过自定义 `ObjectInputStream` 或利用相关库提供的机制来实现。
-
 3. **避免对不可信来源的数据进行反序列化**
    设计系统架构时，尽量避免直接对来自不受信任的外部网络或用户输入的数据进行反序列化操作。
-CODE
+SOLUTION
+	name: "vuln_noear_hessian",
+	risk: "SCA",
 }
 
 desc(
@@ -531,4 +466,44 @@ desc(
     </dependencies>
 </project>
 POM
+	"safefile://pom_hessian_safe.xml": <<<CODE
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>secure-application</artifactId>
+    <version>1.0.0</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.caucho</groupId>
+            <artifactId>hessian</artifactId>
+            <version>4.0.66</version> <!-- 升级到安全版本，高于4.0.63 -->
+        </dependency>
+    </dependencies>
+</project>
+CODE
+	"safefile://pom_hessian_lite_safe.xml": <<<CODE
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>secure-application</artifactId>
+    <version>1.0.0</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>hessian-lite</artifactId>
+            <version>3.2.13</version> <!-- 升级到安全版本，3.2.13或更高 -->
+        </dependency>
+    </dependencies>
+</project>
+CODE
 )

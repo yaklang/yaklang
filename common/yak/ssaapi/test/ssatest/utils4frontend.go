@@ -2,10 +2,11 @@ package ssatest
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"sort"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/consts"
 
@@ -34,9 +35,9 @@ var (
 	language       consts.Language
 )
 
-func SetLanguage(lang consts.Language, build ...ssa.Builder) {
+func SetLanguage(lang consts.Language, build ...ssa.CreateBuilder) {
 	if len(build) > 0 {
-		ssaapi.LanguageBuilders[lang] = build[0]
+		ssaapi.LanguageBuilderCreater[lang] = build[0]
 	}
 	languageOption = ssaapi.WithLanguage(lang)
 	language = lang

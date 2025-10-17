@@ -3,6 +3,8 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"testing"
 	"time"
@@ -13,15 +15,15 @@ import (
 
 func TestCoordinator_TaskReview(t *testing.T) {
 	inputChan := make(chan *InputEvent, 3)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				time.Sleep(100 * time.Millisecond)
@@ -92,12 +94,12 @@ LOOP:
 				break LOOP
 			}
 
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				continue
 			}
 
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
@@ -108,7 +110,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				if a.GetString("tool") == "now" && a.GetString("tool_description") != "" {
@@ -124,12 +126,12 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "now") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "now") {
 				useToolReviewPass = true
 			}
 
 			if useToolReviewPass {
-				if result.Type == EVENT_TYPE_TASK_REVIEW_REQUIRE {
+				if result.Type == schema.EVENT_TYPE_TASK_REVIEW_REQUIRE {
 					fmt.Println("task result:" + result.String())
 					time.Sleep(200 * time.Millisecond)
 					inputChan <- &InputEvent{

@@ -10,6 +10,7 @@ desc(
 ### 规则详细
 1. **作为基础审计库**
    属于`golang-fmt-print`库规则（`lib`类型），主要用于定位所有调用了`fmt`包中打印函数的语句。
+
 2. **覆盖主要打印函数**
    规则目前覆盖了`fmt`包中常用的打印函数，包括：
    - `fmt.Println`
@@ -17,9 +18,23 @@ desc(
    等未来可扩展的其他打印输出函数。
 
 通过识别这些函数的使用位置，可以方便进行后续的分析，例如：
-- 追踪哪些位置输出了调试信息。
-- 检查是否有敏感信息被直接打印到控制台或日志中。
-- 分析代码的执行流程。
+- **追踪哪些位置输出了调试信息**：开发人员常在调试时使用`fmt.Println`或`fmt.Printf`输出变量值，但这些调试信息可能在生产环境中泄露重要数据。
+- **检查是否有敏感信息被直接打印到控制台或日志中**：如果程序中不当使用打印函数，可能会导致用户凭证、API密钥或其他敏感信息暴露。
+- **分析代码的执行流程**：通过查看打印语句的位置，可以帮助理解代码逻辑，发现潜在的问题点。
+
+示例代码：
+```go
+package main
+
+import "fmt"
+
+func main() {
+    username := "admin"
+    password := "s3cr3t" // 敏感信息
+    fmt.Println("Debugging:", username, password) // 直接将敏感信息打印到控制台
+}
+```
+上述代码中的`fmt.Println`将用户名和密码直接输出到控制台，这可能导致敏感信息泄露的风险。
 DESC
 	rule_id: "25ad0819-cae4-408f-ab71-3174d8f1679c"
 	title_zh: "审计Golang fmt打印方法"
@@ -32,11 +47,41 @@ REFERENCE
 )
 
 fmt?{<fullTypeName>?{have: 'fmt'}} as $entry
-$entry.Println(* #-> as $output)
-$entry.Printf(* #-> as $output)
+$entry.Println(* as $output)
+$entry.Printf(* as $output)
 
 alert $output for {
 	title: "Audit Golang fmt Print Method",
 	title_zh: "审计Golang fmt打印方法",
 	level: "info",
+	solution: <<<SOLUTION
+### 安全建议
+由于此规则为信息审计类型，主要用于识别代码中的打印行为。以下是安全建议：
+1. **检查日志输出内容**
+   - 确保敏感数据（如密码、密钥等）不会通过`fmt.Println`或`fmt.Printf`直接输出到控制台或日志。
+2. **限制调试信息输出范围**
+   - 在生产环境中禁用不必要的调试信息打印。
+3. **引入集中化日志管理工具**
+   - 使用专业的日志管理工具（如ELK Stack）对日志进行集中存储和分析，确保安全性与合规性。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+该规则旨在审计Go语言代码中对`fmt`包中打印系列函数（如`Println`、`Printf`等）的使用情况，帮助开发者识别代码中输出信息的位置。这对于代码审计、信息追踪或者查找潜在的日志输出敏感信息等场景非常有用。
+
+### 规则详细
+1. **作为基础审计库**
+   属于`golang-fmt-print`库规则（`lib`类型），主要用于定位所有调用了`fmt`包中打印函数的语句。
+2. **覆盖主要打印函数**
+   规则目前覆盖了`fmt`包中常用的打印函数，包括：
+   - `fmt.Println`
+   - `fmt.Printf`
+   等未来可扩展的其他打印输出函数。
+通过识别这些函数的使用位置，可以方便进行后续的分析，例如：
+- 追踪哪些位置输出了调试信息。
+- 检查是否有敏感信息被直接打印到控制台或日志中。
+- 分析代码的执行流程。
+DESC
+	name: "output",
+	message: "发现Go语言代码中使用fmt包的打印函数，如Println或Printf，可能存在敏感信息输出的风险。",
 }

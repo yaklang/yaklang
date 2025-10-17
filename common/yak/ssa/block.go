@@ -17,7 +17,10 @@ func (f *Function) GetDeferBlock() *BasicBlock {
 	if f.DeferBlock <= 0 {
 		return newDefer()
 	}
-	block := f.GetBasicBlockByID(f.DeferBlock)
+	block, ok := f.GetBasicBlockByID(f.DeferBlock)
+	if !ok || block == nil {
+		return newDefer()
+	}
 	return block
 }
 
@@ -57,7 +60,7 @@ func (f *Function) newBasicBlockEx(name string, isSealed bool, nodAddToBlocks bo
 	} else if name == "entry" {
 		log.Debugf("func$%v entry 's range is nil, set entry block range to empty in first building", f.name)
 	} else {
-		log.Errorf("function$%v 's range is nil, missed block range (%v)", f.name, name)
+		log.Warnf("function$%v 's range is nil, missed block range (%v)", f.name, name)
 	}
 	return b
 }
@@ -105,7 +108,7 @@ func (b *BasicBlock) HaveSubBlock(sub Value) bool {
 	for {
 		subBlock, ok := ToBasicBlock(sub)
 		if !ok || utils.IsNil(subBlock) {
-			log.Errorf("BasicBlock.HaveSubBlock: sub %v is not a basic block", sub)
+			log.Warnf("BasicBlock.HaveSubBlock: sub %v is not a basic block", sub)
 			return false
 		}
 
@@ -113,7 +116,7 @@ func (b *BasicBlock) HaveSubBlock(sub Value) bool {
 			return true
 		}
 
-		sub = subBlock.GetBasicBlockByID(subBlock.Parent)
+		sub, _ = subBlock.GetBasicBlockByID(subBlock.Parent)
 	}
 }
 
@@ -126,7 +129,11 @@ func (b *BasicBlock) Reachable() BasicBlockReachableKind {
 		return BasicBlockUnknown
 	}
 
-	if c, ok := ToConstInst(b.GetInstructionById(b.Condition)); ok {
+	inst, ok := b.GetInstructionById(b.Condition)
+	if !ok {
+		return BasicBlockUnknown
+	}
+	if c, ok := ToConstInst(inst); ok {
 		if c.IsBoolean() {
 			if c.Boolean() {
 				return BasicBlockReachable
@@ -135,7 +142,6 @@ func (b *BasicBlock) Reachable() BasicBlockReachableKind {
 			}
 		}
 	}
-
 	return BasicBlockUnknown
 }
 
@@ -145,5 +151,8 @@ func (b *BasicBlock) AddSucc(succ *BasicBlock) {
 }
 
 func (b *BasicBlock) LastInst() Instruction {
-	return b.GetInstructionById(b.Insts[len(b.Insts)-1])
+	if inst, ok := b.GetInstructionById(b.Insts[len(b.Insts)-1]); ok {
+		return inst
+	}
+	return nil
 }

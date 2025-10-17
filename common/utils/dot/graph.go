@@ -1,9 +1,12 @@
 package dot
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/samber/lo"
 )
 
 // Graph represents a set of nodes, edges and attributes that can be
@@ -147,6 +150,16 @@ func (g *Graph) NodeExisted(label string) (int, bool) {
 	return -1, false
 }
 
+func (g *Graph) GetNodesByLabel(label string) []*node {
+	var ret []*node
+	for _, node := range g.nodes {
+		if node.label == label {
+			ret = append(ret, node)
+		}
+	}
+	return ret
+}
+
 // MakeSameRank causes the specified nodes to be drawn on the same rank.
 // Only effective when using the dot tool.
 func (g *Graph) MakeSameRank(node1, node2 int, others ...int) {
@@ -250,6 +263,9 @@ func (g *Graph) DrawMultipleEdges() {
 // NodeAttribute sets an attribute for the specified node.
 func (g *Graph) NodeAttribute(id int, name, value string) {
 	// TODO: check for errors (id out of range)
+	if name == "" {
+		name = "key"
+	}
 	g.nodes[id].attributes.set(name, value)
 }
 
@@ -354,6 +370,12 @@ func (g *Graph) drawIndent(w io.Writer, indent int) io.Writer {
 
 func (g *Graph) GenerateDOT(w io.Writer) {
 	g.generateDot(0, w)
+}
+
+func (g *Graph) GenerateDOTString() string {
+	var buf bytes.Buffer
+	g.GenerateDOT(&buf)
+	return buf.String()
 }
 
 type attributes struct {
@@ -470,4 +492,205 @@ func (e Edge) generateDOT(w io.Writer, directed bool) {
 
 func (e Edge) Attribute(name string) string {
 	return e.attributes.get(name)
+}
+
+func (e Edge) From() *node {
+	return e.from
+}
+
+func (e Edge) To() *node {
+	return e.to
+}
+
+// IsConnected checks if there is a path from node 'from' to node 'to'
+// Uses depth-first search to find connectivity
+func (g *Graph) IsConnected(fromLabel, toLabel string) bool {
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
+
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
+		return false
+	}
+
+	visited := make(map[int]bool)
+
+	// Check if any fromNode can reach any toNode
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			if g.dfs(fromNode.id, toNode.id, visited) {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// dfs performs depth-first search to find path from start to target
+func (g *Graph) dfs(start, target int, visited map[int]bool) bool {
+	if start == target {
+		return true
+	}
+
+	visited[start] = true
+	startNode := g.registeredNodes[start]
+
+	// Check direct connections
+	for _, nextID := range startNode.nexts {
+		if !visited[nextID] {
+			if g.dfs(nextID, target, visited) {
+				return true
+			}
+		}
+	}
+
+	// For undirected graphs, also check previous connections
+	if !g.directed {
+		for _, prevID := range startNode.prevs {
+			if !visited[prevID] {
+				if g.dfs(prevID, target, visited) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// GetEdgeLabel returns the label of the edge between two nodes
+// If multiple edges exist, returns the first one found
+func (g *Graph) GetEdgeLabel(fromLabel, toLabel string) string {
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
+
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
+		return ""
+	}
+
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id {
+					return edge.Label
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+// GetAllEdgeLabels returns all labels of edges between two nodes
+func (g *Graph) GetAllEdgeLabels(fromLabel, toLabel string) []string {
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
+
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
+		return nil
+	}
+
+	var labels []string
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id {
+					labels = append(labels, edge.Label)
+				}
+			}
+		}
+	}
+
+	return labels
+}
+
+// HasEdgeWithLabel checks if there is an edge between two nodes with the specified label
+func (g *Graph) HasEdgeWithLabel(fromLabel, toLabel, expectedLabel string) bool {
+	fromNodes := g.GetNodesByLabel(fromLabel)
+	toNodes := g.GetNodesByLabel(toLabel)
+
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
+		return false
+	}
+
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if edge.from.id == fromNode.id && edge.to.id == toNode.id && edge.Label == expectedLabel {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+func (g *Graph) HasEdgeContainLabel(fromLabel, toLabel, expectedLabel string) bool {
+	fromNodes := g.GetNodesByLabel(fromLabel)
+
+	if len(fromNodes) == 0 {
+		return false
+	}
+	for _, fromNode := range fromNodes {
+		for _, next := range fromNode.nexts {
+			toNode := g.GetNodeByID(next)
+			if toNode.label == toLabel {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// GetNodeLabel returns the label of a node by its label name
+func (g *Graph) GetNodeLabel(nodeLabel string) string {
+	id, exists := g.NodeExisted(nodeLabel)
+	if !exists {
+		return ""
+	}
+
+	node := g.registeredNodes[id]
+	return node.label
+}
+
+// GetAllNodes returns all node labels in the graph
+func (g *Graph) GetAllNodes() []string {
+	var labels []string
+	for _, node := range g.nodes {
+		labels = append(labels, node.label)
+	}
+	return labels
+}
+
+// GetAllEdges returns all edges in the graph as a slice of edge info
+func (g *Graph) GetAllEdges() []*Edge {
+	return lo.MapToSlice(g.edges, func(key int, value *Edge) *Edge {
+		return value
+	})
+}
+
+// IsNeighbor checks if two nodes are directly connected (neighbors)
+// Returns true if there is a direct edge between the two nodes, false otherwise
+func (g *Graph) IsNeighbor(node1, node2 string) bool {
+	fromNodes := g.GetNodesByLabel(node1)
+	toNodes := g.GetNodesByLabel(node2)
+
+	if len(fromNodes) == 0 || len(toNodes) == 0 {
+		return false
+	}
+
+	// Check for direct edge between any fromNode and any toNode
+	for _, fromNode := range fromNodes {
+		for _, toNode := range toNodes {
+			for _, edge := range g.edges {
+				if (edge.from.id == fromNode.id && edge.to.id == toNode.id) ||
+					(edge.from.id == toNode.id && edge.to.id == fromNode.id) {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
 }

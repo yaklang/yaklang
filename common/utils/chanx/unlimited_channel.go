@@ -2,9 +2,10 @@ package chanx
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/log"
 	"sync/atomic"
 	"time"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // UnlimitedChan is an unbounded chan.
@@ -20,11 +21,20 @@ type UnlimitedChan[T any] struct {
 	cancel   context.CancelFunc
 }
 
+func (c *UnlimitedChan[T]) FeedBlock(item T) {
+	c.innerIn <- item
+}
+
 func (c *UnlimitedChan[T]) SafeFeed(i T) {
 	select {
 	case c.innerIn <- i:
 	case <-time.After(3 * time.Second):
-		log.Error("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak")
+		log.Errorf("timeout for write in *UnlimitedChan, try to solve it to prevent mem-leak: "+
+			"size: in: len(%v)  cap(%v), out len(%v)  cap(%v), buf: len(%v)  cap(%v)",
+			len(c.innerIn), cap(c.innerIn),
+			len(c.innerOut), cap(c.innerOut),
+			c.BufLen(), c.buffer.Capacity(),
+		)
 	}
 }
 
@@ -83,7 +93,10 @@ func NewUnlimitedChanEx[T any](ctx context.Context, in chan T, out chan T, initB
 	validator := make(chan struct{})
 	go process(validator, ctx, in, out, &ch)
 	// if validator write finished, the process is working!
-	validator <- struct{}{}
+	select {
+	case validator <- struct{}{}:
+	case <-ctx.Done():
+	}
 	return &ch
 }
 
@@ -99,7 +112,10 @@ func NewUnlimitedChanSize[T any](ctx context.Context, initInCapacity, initOutCap
 
 	validator := make(chan struct{})
 	go process(validator, ctx, in, out, &ch)
-	validator <- struct{}{}
+	select {
+	case validator <- struct{}{}:
+	case <-ctx.Done():
+	}
 	return &ch
 }
 
@@ -163,7 +179,7 @@ func process[T any](validator chan struct{}, ctx context.Context, in, out chan T
 				case out <- ch.buffer.Peek():
 					ch.buffer.Pop()
 					atomic.AddInt64(&ch.bufCount, -1)
-					log.Info("write to unlimited channel: delta -1")
+					log.Debug("write to unlimited channel: delta -1")
 					if ch.buffer.IsEmpty() && ch.buffer.size > ch.buffer.initialSize { // after burst
 						ch.buffer.Reset()
 						atomic.StoreInt64(&ch.bufCount, 0)

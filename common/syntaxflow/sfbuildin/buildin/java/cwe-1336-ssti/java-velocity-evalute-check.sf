@@ -1,0 +1,259 @@
+desc(
+	title_zh: "检测Java Velocity Evaluate服务端模板注入漏洞"
+	title: "Check Java Velocity Evaluate SSTI Vulnerability"
+	type: vuln
+	level: high
+	risk: ssti
+	harm_zh: "模版注入、如果 Velocity.evaluate 方法的模板参数可被用户控制，将导致服务端模板注入（SSTI）漏洞。攻击者可构造恶意模板指令，在服务端执行任意代码或访问敏感数据，造成严重的安全风险。",
+	harm: "If the template parameter in Velocity.evaluate is user-controllable, it may lead to Server-Side Template Injection (SSTI) vulnerabilities. Attackers can inject malicious template directives to execute arbitrary code or access sensitive data on the server."
+	fix_zh: "建议在调用 Velocity.evaluate 方法前，对模板内容进行严格的输入校验与过滤，并使用安全的模板加载方式，避免直接处理用户输入的模板内容。",
+	fix: <<<FIX
+修复建议：
+1. 禁止直接使用用户输入作为 Velocity.evaluate 的模板内容。
+2. 使用白名单或固定模板文件，避免运行动态构造的模板。
+3. 对输入内容进行严格转义，移除 Velocity 特殊指令（如 #set、#foreach）。
+4. 限制模板引擎的执行权限，避免访问敏感系统资源。
+FIX
+	rule_id: "09226a17-d449-4965-98c6-0ff02d802605"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+Velocity 是一种基于 Java 的模板引擎，用于动态生成 HTML、XML 或其他文本格式的内容。`Velocity.evaluate` 方法允许用户传入自定义模板内容并执行。如果该方法的模板参数直接或间接来源于用户输入且未经过严格验证，则可能导致服务端模板注入（SSTI）漏洞。攻击者可通过构造恶意模板指令，在服务器端执行任意代码或者访问敏感数据，从而对系统造成严重威胁。
+
+2. **触发场景**
+```java
+import org.apache.velocity.app.Velocity;
+import java.util.Properties;
+public class VulnerableApp {
+    public static void main(String[] args) {
+        String userInput = request.getParameter("template"); // 用户输入的模板内容
+        Velocity.init();
+        Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+    }
+}
+```
+在上述代码中，`userInput` 直接作为 `Velocity.evaluate` 的模板参数使用。如果攻击者提供包含恶意指令的模板（如 `#set($cmd='id') $cmd.execute()`），将导致命令执行。
+
+3. **潜在影响**
+- 攻击者可以在服务端执行任意代码，例如读取文件、修改配置或删除数据。
+- 可以访问和窃取敏感数据，包括数据库凭证、用户信息等。
+- 如果应用运行在高权限环境下，攻击者可能进一步控制整个服务器。
+DESC
+	reference: <<<REFERENCE
+[CWE-1336](https://cwe.mitre.org/data/definitions/1336.html)
+[OWASP Server-Side Template Injection](https://owasp.org/www-project-web-security-testing-guide/latest/4-Web_Application_Security_Testing/07-Input_Validation_Testing/15-Testing_for_Server-Side_Template_Injection)
+REFERENCE
+)
+
+<include('java-spring-mvc-param')> as $entry;
+<include('java-servlet-param')> as $entry;
+
+Velocity.evaluate?{<typeName()> ?{have: "org.apache.velocity.app.Velocity"}} as $evaluate
+$evaluate(*<slice(index=4)> as $template)
+
+$template #{
+    until: "* & $entry"
+}-> as $result
+
+$template #{
+    until: "* & $entry",
+    exclude: "*?{opcode:phi}",
+}-> as $mid
+
+alert $mid for {
+	level: "mid",
+	name: "mid",
+	title: "Potential Java Velocity Evaluate SSTI Vulnerability Was Detected",
+	title_zh: "检测到潜在的Java Velocity Evaluate服务端模板注入漏洞",
+	message: "检测到Java Velocity Evaluate服务端模板注入漏洞，但是从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	risk: "SSTI",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 禁止直接使用用户输入作为 Velocity.evaluate 的模板内容。
+```java
+// 避免直接使用用户输入的模板内容
+String userInput = request.getParameter("template");
+if (!isValidTemplate(userInput)) {
+throw new IllegalArgumentException("非法模板内容");
+}
+Velocity.init();
+Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+```
+#### 2. 使用白名单或固定模板文件，避免运行动态构造的模板。
+```java
+// 定义安全的模板文件路径
+String templatePath = "safe-template.vm";
+Velocity.mergeTemplate(templatePath, "UTF-8", context, writer);
+```
+#### 3. 对输入内容进行严格转义，移除 Velocity 特殊指令（如 #set、#foreach）。
+```java
+// 转义特殊字符和指令
+String sanitizedInput = sanitizeVelocityInput(userInput);
+Velocity.evaluate(context, writer, "", sanitizedInput);
+```
+#### 4. 限制模板引擎的执行权限，避免访问敏感系统资源。
+```java
+// 设置沙箱环境以限制模板引擎权限
+Properties props = new Properties();
+props.setProperty("resource.loader", "class");
+props.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
+Velocity.init(props);
+```
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Velocity 是一种基于 Java 的模板引擎，用于动态生成 HTML、XML 或其他文本格式的内容。`Velocity.evaluate` 方法允许用户传入自定义模板内容并执行。如果该方法的模板参数直接或间接来源于用户输入且未经过严格验证，则可能导致服务端模板注入（SSTI）漏洞。攻击者可通过构造恶意模板指令，在服务器端执行任意代码或者访问敏感数据，从而对系统造成严重威胁。
+2. **触发场景**
+```java
+import org.apache.velocity.app.Velocity;
+import java.util.Properties;
+public class VulnerableApp {
+public static void main(String[] args) {
+String userInput = request.getParameter("template"); // 用户输入的模板内容
+Velocity.init();
+Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+}
+}
+```
+在上述代码中，`userInput` 直接作为 `Velocity.evaluate` 的模板参数使用。如果攻击者提供包含恶意指令的模板（如 `#set($cmd='id') $cmd.execute()`），将导致命令执行。
+3. **潜在影响**
+- 攻击者可以在服务端执行任意代码，例如读取文件、修改配置或删除数据。
+- 可以访问和窃取敏感数据，包括数据库凭证、用户信息等。
+- 如果应用运行在高权限环境下，攻击者可能进一步控制整个服务器。
+DESC
+}
+
+$result - $mid as $high
+alert $high for {
+	level: "high",
+	name: "high",
+	title: "Java Velocity Evaluate SSTI Vulnerability Was Detected",
+	title_zh: "检测到Java Velocity Evaluate服务端模板注入漏洞",
+	message: "检测到Java Velocity Evaluate服务端模板注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 禁止直接使用用户输入作为 Velocity.evaluate 的模板内容。
+```java
+// 避免直接使用用户输入的模板内容
+String userInput = request.getParameter("template");
+if (!isValidTemplate(userInput)) {
+throw new IllegalArgumentException("非法模板内容");
+}
+Velocity.init();
+Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+```
+#### 2. 使用白名单或固定模板文件，避免运行动态构造的模板。
+```java
+// 定义安全的模板文件路径
+String templatePath = "safe-template.vm";
+Velocity.mergeTemplate(templatePath, "UTF-8", context, writer);
+```
+#### 3. 对输入内容进行严格转义，移除 Velocity 特殊指令（如 #set、#foreach）。
+```java
+// 转义特殊字符和指令
+String sanitizedInput = sanitizeVelocityInput(userInput);
+Velocity.evaluate(context, writer, "", sanitizedInput);
+```
+#### 4. 限制模板引擎的执行权限，避免访问敏感系统资源。
+```java
+// 设置沙箱环境以限制模板引擎权限
+Properties props = new Properties();
+props.setProperty("resource.loader", "class");
+props.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
+Velocity.init(props);
+```
+SOLUTION
+	risk: "SSTI",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Velocity 是一种基于 Java 的模板引擎，用于动态生成 HTML、XML 或其他文本格式的内容。`Velocity.evaluate` 方法允许用户传入自定义模板内容并执行。如果该方法的模板参数直接或间接来源于用户输入且未经过严格验证，则可能导致服务端模板注入（SSTI）漏洞。攻击者可通过构造恶意模板指令，在服务器端执行任意代码或者访问敏感数据，从而对系统造成严重威胁。
+2. **触发场景**
+```java
+import org.apache.velocity.app.Velocity;
+import java.util.Properties;
+public class VulnerableApp {
+public static void main(String[] args) {
+String userInput = request.getParameter("template"); // 用户输入的模板内容
+Velocity.init();
+Velocity.evaluate(new org.apache.velocity.VelocityContext(), new java.io.StringWriter(), "", userInput);
+}
+}
+```
+在上述代码中，`userInput` 直接作为 `Velocity.evaluate` 的模板参数使用。如果攻击者提供包含恶意指令的模板（如 `#set($cmd='id') $cmd.execute()`），将导致命令执行。
+3. **潜在影响**
+- 攻击者可以在服务端执行任意代码，例如读取文件、修改配置或删除数据。
+- 可以访问和窃取敏感数据，包括数据库凭证、用户信息等。
+- 如果应用运行在高权限环境下，攻击者可能进一步控制整个服务器。
+DESC
+}
+
+desc(
+	lang:java
+	alert_num:1
+	"file://demo.java":<<<CODE
+    package org.joychou.controller;
+
+    import org.apache.velocity.VelocityContext;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.RestController;
+
+    import org.apache.velocity.app.Velocity;
+
+    import java.io.StringWriter;
+
+    @RestController
+    @RequestMapping("/ssti")
+    public class SSTI {
+
+        @GetMapping("/velocity")
+        public void velocity(String template) {
+            Velocity.init();
+
+            VelocityContext context = new VelocityContext();
+
+            context.put("author", "Elliot A.");
+            context.put("address", "217 E Broadway");
+            context.put("phone", "555-1337");
+
+            StringWriter swOut = new StringWriter();
+            Velocity.evaluate(context, swOut, "test", template);
+        }
+    }
+CODE
+	"safefile://demo2.java":<<<CODE
+    package org.joychou.controller;
+
+    import org.apache.velocity.VelocityContext;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.RestController;
+
+    import org.apache.velocity.app.Velocity;
+
+    import java.io.StringWriter;
+
+    @RestController
+    @RequestMapping("/ssti")
+    public class SSTI {
+
+        @GetMapping("/velocity")
+        public void velocity() {
+
+            Velocity.init();
+
+            VelocityContext context = new VelocityContext();
+
+            context.put("author", "Elliot A.");
+            context.put("address", "217 E Broadway");
+            context.put("phone", "555-1337");
+
+            StringWriter swOut = new StringWriter();
+            Velocity.evaluate(context, swOut, "test", "test");
+        }
+    }
+CODE
+)

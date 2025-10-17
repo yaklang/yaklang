@@ -7,48 +7,42 @@ desc(
 	cwe: "CWE-397"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   捕获 `NullPointerException` 在绝大多数情况下是一种不恰当的错误处理方式。它掩盖了潜在的 `null` 指针问题，使得代码中可能存在的逻辑错误或设计缺陷被忽视，从而影响程序的可靠性、可维护性，甚至可能导致安全隐患。
-
+捕获 `NullPointerException` 在绝大多数情况下是一种不恰当的错误处理方式。它掩盖了潜在的 `null` 指针问题，使得代码中可能存在的逻辑错误或设计缺陷被忽视，从而影响程序的可靠性、可维护性，甚至可能导致安全隐患。
 2. **触发场景**
-   例如，在访问对象属性或调用方法前未进行 `null` 检查，导致运行时抛出 `NullPointerException`，并被 `try-catch` 块捕获。
-   ```java
-   try {
-       String data = getDataFromServer(); // 可能返回null
-       System.out.println(data.length()); // 如果data为null，此处抛出NullPointerException
-   } catch (NullPointerException npe) {
-       // 不恰当的处理：仅仅捕获异常，未解决根本问题
-       System.err.println("数据处理出错");
-   }
-   ```
-   在上述场景中，捕获 `NullPointerException` 并不能解决 `getDataFromServer()` 返回 `null` 的问题，程序可能进入非预期状态。
-
+例如，在访问对象属性或调用方法前未进行 `null` 检查，导致运行时抛出 `NullPointerException`，并被 `try-catch` 块捕获。
+```java
+try {
+String data = getDataFromServer(); // 可能返回null
+System.out.println(data.length()); // 如果data为null，此处抛出NullPointerException
+} catch (NullPointerException npe) {
+// 不恰当的处理：仅仅捕获异常，未解决根本问题
+System.err.println("数据处理出错");
+}
+```
+在上述场景中，捕获 `NullPointerException` 并不能解决 `getDataFromServer()` 返回 `null` 的问题，程序可能进入非预期状态。
 3. **潜在影响**
-   - **掩盖bug**：真正导致 `NullPointerException` 的根源问题（如未初始化的变量，错误的逻辑流程）被隐藏，增加调试和修复的难度。
-   - **程序状态不稳定**：捕获异常后程序可能继续运行，但处于一种无效或不一致的状态，导致后续操作失败或产生错误结果。
-   - **影响可靠性**：未处理的 `null` 问题可能在生产环境中导致程序崩溃或意外行为。
-   - **安全风险**：在某些情况下，不当的异常处理可能被攻击者利用，例如通过引发意外的 `NullPointerException` 来绕过安全控制。
+- **掩盖bug**：真正导致 `NullPointerException` 的根源问题（如未初始化的变量，错误的逻辑流程）被隐藏，增加调试和修复的难度。
+- **程序状态不稳定**：捕获异常后程序可能继续运行，但处于一种无效或不一致的状态，导致后续操作失败或产生错误结果。
+- **影响可靠性**：未处理的 `null` 问题可能在生产环境中导致程序崩溃或意外行为。
+- **安全风险**：在某些情况下，不当的异常处理可能被攻击者利用，例如通过引发意外的 `NullPointerException` 来绕过安全控制。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免捕获 `NullPointerException`
 在生产代码中，应致力于在引发 `NullPointerException` 之前解决问题，而不是捕获它。通过在访问对象或调用方法前添加显式的 `null` 检查来防止异常的发生。
 ```java
 // 修复代码示例
 String data = getDataFromServer();
 if (data != null) {
-    System.out.println(data.length());
+System.out.println(data.length());
 } else {
-    // 妥善处理null情况，例如记录日志或返回默认值
-    System.err.println("接收到null数据");
+// 妥善处理null情况，例如记录日志或返回默认值
+System.err.println("接收到null数据");
 }
 ```
-
 #### 2. 修复底层业务逻辑问题
 如果 `NullPointerException` 是由复杂的业务逻辑或不正确的对象状态引起，需要回溯代码，查找并修复导致 `null` 引用产生的根本原因。
-
 #### 3. 使用 `Optional` 类 (Java 8+)
 利用 `java.util.Optional` 类来更优雅地处理可能为 `null` 的值，鼓励链式调用和明确的 `null` 处理逻辑。
 ```java
@@ -57,10 +51,8 @@ Optional<String> optionalData = Optional.ofNullable(getDataFromServer());
 optionalData.ifPresent(data -> System.out.println(data.length()));
 optionalData.orElseThrow(() -> new IllegalArgumentException("接收到null数据"));
 ```
-
 #### 4. 使用更具体的异常类型
 如果确实需要抛出异常来表示某种错误情况，应抛出更具描述性的异常，如 `IllegalArgumentException` 或 `IllegalStateException`。
-
 #### 5. 代码审查和静态分析
 加强代码审查流程，特别关注异常处理部分。利用静态代码分析工具来自动检测捕获 `NullPointerException` 的情况，并将其视为高优先级问题。
 SOLUTION
@@ -77,6 +69,60 @@ alert $null_pointer_exception for {
 	title_zh: "审计Java捕获NullPointerException",
 	level: "mid",
 	title: "Audit Java Catch NullPointerException",
+	message: "检测到Java代码中存在捕获NullPointerException的情况，这可能掩盖潜在的null指针问题，需审查以确保代码的健壮性和安全性。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免捕获 `NullPointerException`
+在生产代码中，应致力于在引发 `NullPointerException` 之前解决问题，而不是捕获它。通过在访问对象或调用方法前添加显式的 `null` 检查来防止异常的发生。
+```java
+// 修复代码示例
+String data = getDataFromServer();
+if (data != null) {
+System.out.println(data.length());
+} else {
+// 妥善处理null情况，例如记录日志或返回默认值
+System.err.println("接收到null数据");
+}
+```
+#### 2. 修复底层业务逻辑问题
+如果 `NullPointerException` 是由复杂的业务逻辑或不正确的对象状态引起，需要回溯代码，查找并修复导致 `null` 引用产生的根本原因。
+#### 3. 使用 `Optional` 类 (Java 8+)
+利用 `java.util.Optional` 类来更优雅地处理可能为 `null` 的值，鼓励链式调用和明确的 `null` 处理逻辑。
+```java
+// 使用 Optional 示例
+Optional<String> optionalData = Optional.ofNullable(getDataFromServer());
+optionalData.ifPresent(data -> System.out.println(data.length()));
+optionalData.orElseThrow(() -> new IllegalArgumentException("接收到null数据"));
+```
+#### 4. 使用更具体的异常类型
+如果确实需要抛出异常来表示某种错误情况，应抛出更具描述性的异常，如 `IllegalArgumentException` 或 `IllegalStateException`。
+#### 5. 代码审查和静态分析
+加强代码审查流程，特别关注异常处理部分。利用静态代码分析工具来自动检测捕获 `NullPointerException` 的情况，并将其视为高优先级问题。
+SOLUTION
+	risk: "中等",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+捕获 `NullPointerException` 在绝大多数情况下是一种不恰当的错误处理方式。它掩盖了潜在的 `null` 指针问题，使得代码中可能存在的逻辑错误或设计缺陷被忽视，从而影响程序的可靠性、可维护性，甚至可能导致安全隐患。
+2. **触发场景**
+例如，在访问对象属性或调用方法前未进行 `null` 检查，导致运行时抛出 `NullPointerException`，并被 `try-catch` 块捕获。
+```java
+try {
+String data = getDataFromServer(); // 可能返回null
+System.out.println(data.length()); // 如果data为null，此处抛出NullPointerException
+} catch (NullPointerException npe) {
+// 不恰当的处理：仅仅捕获异常，未解决根本问题
+System.err.println("数据处理出错");
+}
+```
+在上述场景中，捕获 `NullPointerException` 并不能解决 `getDataFromServer()` 返回 `null` 的问题，程序可能进入非预期状态。
+3. **潜在影响**
+- **掩盖bug**：真正导致 `NullPointerException` 的根源问题（如未初始化的变量，错误的逻辑流程）被隐藏，增加调试和修复的难度。
+- **程序状态不稳定**：捕获异常后程序可能继续运行，但处于一种无效或不一致的状态，导致后续操作失败或产生错误结果。
+- **影响可靠性**：未处理的 `null` 问题可能在生产环境中导致程序崩溃或意外行为。
+- **安全风险**：在某些情况下，不当的异常处理可能被攻击者利用，例如通过引发意外的 `NullPointerException` 来绕过安全控制。
+DESC
+	name: "null_pointer_exception",
 }
 
 

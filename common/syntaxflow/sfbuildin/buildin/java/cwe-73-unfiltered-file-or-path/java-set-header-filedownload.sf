@@ -4,52 +4,24 @@ desc(
 	type: config
 	level: low
 	desc: <<<DESC
-### 风险描述
-
-1. **风险原理**
-该规则用于审计Java代码中通过设置`Content-Disposition` HTTP头部来配置文件下载功能的位置点。攻击者如果能够控制或影响该头部中的文件名参数，可能结合其他漏洞（如路径穿越）进行敏感文件下载或枚举服务器文件结构。即使文件名本身经过编码，如果处理不当或存在其他漏洞，暴露配置点本身也增加了攻击面。
-
-2. **触发场景**
-当Java应用程序使用`HttpServletResponse.setHeader("Content-disposition", ...)`方法，并且该头部的值（特别是`filename`或`filename*`参数）是基于用户输入或与用户输入有关的数据构造时，可能触发该规则。
-
-例如，以下代码片段虽然对文件名进行了URL编码，但如果`realFileName`来源于外部不可信源且未进行严格校验，则仍构成一个配置点，需要关注其后续的安全性。
-```java
-StringBuilder contentDispositionValue = new StringBuilder();
-contentDispositionValue.append("attachment; filename=")
-        .append(percentEncodedFileName)
-        .append(";")
-        .append("filename*=")
-        .append("utf-8''")
-        .append(percentEncodedFileName);
-response.setHeader("Content-disposition", contentDispositionValue.toString());
-```
-
-3. **潜在影响**
-- 攻击者可能通过路径穿越攻击下载任意文件（如果文件名参数未经验证或编码不当）。
-- 即使不存在路径穿越，暴露文件下载的实现方式和文件名构造逻辑也有助于攻击者理解应用结构。
-- 结合其他漏洞，可能导致更严重的攻击。
+### 风险描述\n1. **风险原理**\n该规则用于审计Java代码中通过设置`Content-Disposition` HTTP头部来配置文件下载功能的位置点。攻击者如果能够控制或影响该头部中的文件名参数，可能结合其他漏洞（如路径穿越）进行敏感文件下载或枚举服务器文件结构。即使文件名本身经过编码，如果处理不当或存在其他漏洞，暴露配置点本身也增加了攻击面。\n2. **触发场景**\n当Java应用程序使用`HttpServletResponse.setHeader(\"Content-disposition\", ...)`方法，并且该头部的值（特别是`filename`或`filename*`参数）是基于用户输入或与用户输入有关的数据构造时，可能触发该规则。\n例如，以下代码片段虽然对文件名进行了URL编码，但如果`realFileName`来源于外部不可信源且未进行严格校验，则仍构成一个配置点，需要关注其后续的安全性。\n```java\nStringBuilder contentDispositionValue = new StringBuilder();\ncontentDispositionValue.append(\"attachment; filename=\")\n.append(percentEncodedFileName)\n.append(\"\;\")\n.append(\"filename*=\")\n.append(\"utf-8''\")\n.append(percentEncodedFileName);\nresponse.setHeader(\"Content-disposition\", contentDispositionValue.toString());\n```\n3. **潜在影响**\n- 攻击者可能通过路径穿越攻击下载任意文件（如果文件名参数未经验证或编码不当）。\n- 即使不存在路径穿越，暴露文件下载的实现方式和文件名构造逻辑也有助于攻击者理解应用结构。\n- 结合其他漏洞，可能导致更严重的攻击。
 DESC
 	rule_id: "df1af403-0bc8-4d7e-bcd6-6bb863559f02"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格限制和校验文件名**
-   - 对下载文件名进行白名单限制：仅允许下载特定目录下的文件，并验证文件是否确实存在于该目录中。
-   - 移除或过滤文件名中的特殊字符，特别是路径分隔符（`/`, `\`）和表示上级目录的序列（`..`）。
-   - 避免直接使用用户输入作为文件名或文件名的一部分。如果必须包含用户提供的信息，应对其进行严格的清洗和编码。
-
+- 对下载文件名进行白名单限制：仅允许下载特定目录下的文件，并验证文件是否确实存在于该目录中。
+- 移除或过滤文件名中的特殊字符，特别是路径分隔符（`/`, `\`）和表示上级目录的序列（`..`）。
+- 避免直接使用用户输入作为文件名或文件名的一部分。如果必须包含用户提供的信息，应对其进行严格的清洗和编码。
 2. **使用安全的API或框架**
-   - 考虑使用成熟的文件下载库或框架，它们通常提供了更健壮的安全处理机制。
-
+- 考虑使用成熟的文件下载库或框架，它们通常提供了更健壮的安全处理机制。
 3. **文件名编码处理**
-   - 确保使用正确的、安全的编码方式（如RFC 5987中推荐的`filename*`）处理包含非ASCII字符的文件名。
-   - 示例（基于原始代码片段）：确保`percentEncode`方法能够彻底移除或编码所有潜在恶意字符，并结合文件路径的严格限制。
-
+- 确保使用正确的、安全的编码方式（如RFC 5987中推荐的`filename*`）处理包含非ASCII字符的文件名。
+- 示例（基于原始代码片段）：确保`percentEncode`方法能够彻底移除或编码所有潜在恶意字符，并结合文件路径的严格限制。
 4. **权限检查**
-   - 在提供文件下载服务时，务必对用户进行身份验证和授权检查，确保用户有权下载指定文件。
-
+- 在提供文件下载服务时，务必对用户进行身份验证和授权检查，确保用户有权下载指定文件。
 5. **日志记录**
-   - 记录文件下载请求，特别是文件名参数，以便进行安全审计和事件追踪。
+- 记录文件下载请求，特别是文件名参数，以便进行安全审计和事件追踪。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
@@ -62,7 +34,44 @@ $params?{opcode: const && <string>?{any: disposition,Disposition} } as $flag;
 check $flag;
 $flag<getCall><getCallee> as $sink;
 check $sink;
-alert $sink
+alert $sink for {
+	risk: "路径穿越",
+	name: "sink",
+	title: "Java SetHeader File Download Position Vulnerability Was Detected",
+	title_zh: "检测到Java SetHeader文件下载位置漏洞",
+	message: "检测到Java代码中通过设置Content-Disposition HTTP头部来配置文件下载功能的位置点，未对文件名参数进行严格校验可能存在安全风险。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **严格限制和校验文件名**
+- 对下载文件名进行白名单限制：仅允许下载特定目录下的文件，并验证文件是否确实存在于该目录中。
+- 移除或过滤文件名中的特殊字符，特别是路径分隔符（`/`, `\`）和表示上级目录的序列（`..`）。
+- 避免直接使用用户输入作为文件名或文件名的一部分。如果必须包含用户提供的信息，应对其进行严格的清洗和编码。
+2. **使用安全的API或框架**
+- 考虑使用成熟的文件下载库或框架，它们通常提供了更健壮的安全处理机制。
+3. **文件名编码处理**
+- 确保使用正确的、安全的编码方式（如RFC 5987中推荐的`filename*`）处理包含非ASCII字符的文件名。
+- 示例（基于原始代码片段）：确保`percentEncode`方法能够彻底移除或编码所有潜在恶意字符，并结合文件路径的严格限制。
+4. **权限检查**
+- 在提供文件下载服务时，务必对用户进行身份验证和授权检查，确保用户有权下载指定文件。
+5. **日志记录**
+- 记录文件下载请求，特别是文件名参数，以便进行安全审计和事件追踪。
+```java
+// 示例代码：校验文件名是否合法
+public static boolean isValidFileName(String fileName) {
+    if (fileName == null || fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+        return false;
+    }
+    return true;
+}
+// 示例代码：安全地从预定义目录中获取资源
+Path basePath = Paths.get("./data/downloads/").toAbsolutePath().normalize();
+Path resolvedPath = basePath.resolve(fileName).normalize();
+if (!resolvedPath.startsWith(basePath)) {
+    throw new SecurityException("Invalid file access.");
+}
+```
+SOLUTION
+}
 desc(
 	language: java
 	'file://download.java': <<<TEXT
@@ -134,4 +143,79 @@ public class FileUtils
 }
 
 TEXT
+	"safefile://SafeFileDownloadService.java": <<<CODE
+package com.example.fileservice;
+
+import org.springframework.stereotype.Service;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.Files;
+import java.io.IOException;
+
+@Service
+public class SafeFileDownloadService {
+
+    private final String FILE_STORAGE_DIR = "./data/downloads/"; // 定义安全的下载目录
+
+    /**
+     * 安全的文件下载方法，严格控制文件路径和文件名。
+     * 文件名直接从文件系统中获取，不使用用户输入来构造Content-Disposition头。
+     */
+    public ResponseEntity<Resource> downloadFile(String filename) throws IOException {
+        // 1. 严格校验文件名，防止路径穿越
+        // 假设filename是从数据库或白名单中获取的有效文件名，而不是直接来自用户输入
+        // 如果需要基于用户输入：应进行严格的字符过滤或白名单匹配
+        if (filename == null || filename.contains("..") || filename.contains("/") || filename.contains("\\")) {
+            throw new IllegalArgumentException("Invalid filename.");
+        }
+
+        Path filePath = Paths.get(FILE_STORAGE_DIR).resolve(filename).normalize();
+
+        // 2. 确保文件确实在允许的目录下
+        if (!Files.exists(filePath) || !filePath.getParent().startsWith(Paths.get(FILE_STORAGE_DIR).normalize())) {
+            throw new FileNotFoundException("File not found or not allowed.");
+        }
+
+        Resource resource = new UrlResource(filePath.toUri());
+
+        // 3. 构建Content-Disposition，文件名直接从resource获取，安全可靠
+        // 不再使用response.setHeader("Content-disposition", ...)
+        // Spring会自动处理Content-Disposition，而且文件名是安全的
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+
+    /**
+     * 另一种安全的实践：使用预定义的文件名，或对用户提供文件名进行严格校验和清理。
+     * 此示例仅允许下载特定资源，不接受任意用户输入文件名。
+     */
+    public ResponseEntity<Resource> downloadStaticResource() throws IOException {
+        String staticFileName = "report.pdf"; // 内部预设的文件名
+        Path filePath = Paths.get(FILE_STORAGE_DIR).resolve(staticFileName).normalize();
+
+        if (!Files.exists(filePath) || !filePath.getParent().startsWith(Paths.get(FILE_STORAGE_DIR).normalize())) {
+            throw new FileNotFoundException("Static file not found.");
+        }
+
+        Resource resource = new UrlResource(filePath.toUri());
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+    }
+}
+CODE
+	"safefile://SafeFilenameEncoder.java": <<<CODE
+package com.example.fileservice.util;\n\nimport java.io.UnsupportedEncodingException;\nimport java.net.URLEncoder;\nimport java.nio.charset.StandardCharsets;\nimport java.util.regex.Pattern;\n\npublic class SafeFilenameEncoder {\n\n    // 严格限制允许的文件名字符，例如，只允许字母、数字、点、下划线和连字符\n    private static final Pattern SAFE_FILENAME_PATTERN = Pattern.compile(\"^[a-zA-Z0-9_.-]+$\");\n\n    /**\n     * 对文件名进行严格的清理和编码，确保不会引入危险字符或路径。\n     * 优先使用RFC 5987的filename*编码。\n     *\n     * @param originalFileName 用户提供的原始文件名\n     * @return 经过安全处理和编码后的文件名\n     */\n    public static String encodeForContentDisposition(String originalFileName) {\n        if (originalFileName == null || originalFileName.trim().isEmpty()) {\n            return \"download.bin\"; // 提供一个默认安全文件名\n        }\n\n        // 1. 清理：移除所有不安全或不允许的字符，或只保留白名单字符\n        // 此处示例采取白名单策略\n        String cleanedFileName = originalFileName.replaceAll(\"[^a-zA-Z0-9_.-]\", \"_\");\n\n        // 2. 进一步校验，防止清理后的文件名仍存在问题（例如，开头或结尾是点）\n        if (cleanedFileName.startsWith(\".\") || cleanedFileName.endsWith(\".\")) {\n            cleanedFileName = \"_\" + cleanedFileName + \"_\";\n        }\n        if (cleanedFileName.contains(\"..\")) { // 再次检查双点，尽管前面的替换应该处理了大部分情况\n            cleanedFileName = cleanedFileName.replace(\"..\ confidentiality \", \"_\");\n        }\n\n        // 3. 使用标准编码，推荐RFC 5987 (filename*)\n        String encodedFileNameRfc5987;\n        try {\n            encodedFileNameRfc5987 = URLEncoder.encode(cleanedFileName, StandardCharsets.UTF_8.toString())\n                    .replaceAll(\"\\\\+\", \"%20\"); // 将空格编码为%20，而非+\n        } catch (UnsupportedEncodingException e) {\n            // 理论上不会发生，因为UTF-8是标准字符集\n            encodedFileNameRfc5987 = cleanedFileName; \n        }\n\n        // 4. Fallback for older clients (filename=)\n        String encodedFileNameAscii;\n        try {\n            // 针对ASCII兼容的编码，可能需要更严格的过滤而非替换，或直接使用cleanedFileName\n            encodedFileNameAscii = URLEncoder.encode(cleanedFileName, StandardCharsets.ISO_8859_1.toString());\n        } catch (UnsupportedEncodingException e) {\n            encodedFileNameAscii = cleanedFileName; // Should not happen\n        }\n\n        // 构造Content-Disposition头的值\n        // 优先使用filename*，并提供filename作为回退\n        return String.format(\"attachment; filename=\\\"%s\\\"; filename*=%s''%s\",\n                encodedFileNameAscii, StandardCharsets.UTF_8.name().toLowerCase(), encodedFileNameRfc5987);\n    }\n\n    /**\n     * 示例用法\n     */\n    public static void main(String[] args) {\n        String userInput1 = \"invoice_2023.pdf\";\n        String userInput2 = \"../evil.txt\";\n        String userInput3 = \"测试文件.docx\";\n        String userInput4 = \"file with spaces.zip\";\n\n        System.out.println(\"Input 1: \" + encodeForContentDisposition(userInput1));\n        System.out.println(\"Input 2: \" + encodeForContentDisposition(userInput2));\n        System.out.println(\"Input 3: \" + encodeForContentDisposition(userInput3));\n        System.out.println(\"Input 4: \" + encodeForContentDisposition(userInput4));\n    }\n}
+CODE
 )

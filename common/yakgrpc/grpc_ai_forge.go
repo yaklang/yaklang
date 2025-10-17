@@ -63,7 +63,8 @@ func (s *Server) UpdateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOp
 }
 
 func (s *Server) CreateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOperateMessage, error) {
-	err := yakit.CreateAIForge(s.GetProfileDatabase(), schema.GRPC2AIForge(req))
+	forgeIns := schema.GRPC2AIForge(req)
+	err := yakit.CreateAIForge(s.GetProfileDatabase(), forgeIns)
 	if err != nil {
 		return nil, err
 	}
@@ -71,5 +72,24 @@ func (s *Server) CreateAIForge(ctx context.Context, req *ypb.AIForge) (*ypb.DbOp
 		TableName:  "ai_forge",
 		Operation:  "create",
 		EffectRows: 1,
+		CreateID:   int64(forgeIns.ID),
 	}, nil
+}
+
+func (s *Server) GetAIForge(ctx context.Context, req *ypb.GetAIForgeRequest) (*ypb.AIForge, error) {
+	var forge *schema.AIForge
+	var err error
+	if req.GetID() > 0 {
+		forge, err = yakit.GetAIForgeByID(s.GetProfileDatabase(), req.GetID())
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		forge, err = yakit.GetAIForgeByName(s.GetProfileDatabase(), req.GetForgeName())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return forge.ToGRPC(), nil
 }

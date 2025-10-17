@@ -15,20 +15,20 @@ func (b *FunctionBuilder) AddIncludePath(path string) {
 func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	p := b.GetProgram()
 	includePaths := p.GetIncludeFiles()
-	fs := p.Loader.GetFilesysFileSystem()
-	dir, _ := fs.PathSplit(b.GetEditor().GetFilename())
+	dir := b.GetEditor().GetFolderPath()
 	p.Loader.AddIncludePath(dir)
 	currentMode := b.Included
 	defer func() {
 		b.Included = currentMode
 		p.Loader.SetIncludePaths(includePaths)
 	}()
-	_, data, err := p.Loader.LoadFilePackage(filename, once)
+	_, editor, err := p.Loader.LoadFilePackage(filename, once)
 	if err != nil {
 		return err
 	}
 	mainProgram := b.GetProgram().GetApplication()
-	subProg, exist := mainProgram.UpStream.Get(data.GetPureSourceHash())
+	editor = mainProgram.CreateEditor([]byte(editor.GetSourceCode()), filename)
+	subProg, exist := mainProgram.UpStream.Get(editor.GetPureSourceHash())
 	if exist {
 		subProg.LazyBuild()
 		b.includeStack.Push(subProg)
@@ -39,24 +39,33 @@ func (b *FunctionBuilder) BuildFilePackage(filename string, once bool) error {
 	if !languageConfig.ShouldBuild(filename) {
 		return nil
 	}
-	//todo: modify config parse init build，fix main/@main
-	//目前代码仅仅为yak实现，因为yak不经过lazy build，并且yak的include过于特殊
-	program := mainProgram.createSubProgram(data.GetPureSourceHash(), Library)
+	// todo: modify config parse init build，fix main/@main
+	// 目前代码仅仅为yak实现，因为yak不经过lazy build，并且yak的include过于特殊
+	// program := mainProgram.createSubProgram(editor.GetPureSourceHash(), Library)
+	program := mainProgram
 	builder := program.GetAndCreateFunctionBuilder("", string(MainFunctionName))
-	//模拟编译，编译两次
+	// 模拟编译，编译两次
+	origin := program.PreHandler()
+	defer program.SetPreHandler(origin)
 	program.SetPreHandler(true)
 	languageBuilder := languageConfig.LanguageBuilder
 	if languageBuilder == nil {
 		log.Errorf("language builder is nil")
 		return nil
 	}
-	languageBuilder.PreHandlerFile(data, builder)
+	ast, err := languageBuilder.ParseAST(editor.GetSourceCode())
+	if err != nil {
+		return utils.Errorf("parse file %s error: %v", filename, err)
+	}
+	// mainProgram.SetEditor(filename, editor)
+	// program.cre
+	languageBuilder.PreHandlerFile(ast, editor, builder)
 	program.SetPreHandler(false)
-	err = mainProgram.Build(filename, data, builder)
+	err = mainProgram.Build(ast, editor, builder)
 	if err != nil {
 		return err
 	}
-	mainProgram.LazyBuild()
+	program.LazyBuild()
 	builder.Finish()
 	b.includeStack.Push(program)
 	return nil
@@ -70,6 +79,12 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 	if err != nil {
 		return nil, err
 	}
+
+	languageConfig := p.GetApplication().config
+	languageBuilder := languageConfig.LanguageBuilder
+	if languageBuilder == nil {
+		return nil, utils.Errorf("language builder is nil")
+	}
 	app := p.GetApplication()
 	app.ProcessInfof("Build package %v", name)
 	for v := range ch {
@@ -81,10 +96,15 @@ func (b *FunctionBuilder) BuildDirectoryPackage(name []string, once bool) (*Prog
 			log.Errorf("Build with file loader failed: %s", err)
 			continue
 		}
+		ast, err := languageBuilder.ParseAST(string(raw))
+		if err != nil {
+			log.Errorf("Parse file %s error: %v", v.FileName, err)
+			continue
+		}
 		// var build
 		build := app.Build
 		if build != nil {
-			err = build(v.FileName, memedit.NewMemEditor(string(raw)), b)
+			err = build(ast, memedit.NewMemEditor(string(raw)), b)
 		} else {
 			log.Errorf("BUG: Build function is nil in package %s", p.Name)
 		}

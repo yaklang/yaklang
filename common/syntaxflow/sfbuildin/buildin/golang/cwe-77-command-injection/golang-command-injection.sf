@@ -2,120 +2,105 @@ desc(
 	title: "Detect Golang Command Injection Vulnerability"
 	type: audit
 	severity: high
+	risk: "rce"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
-
+命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
 2. **触发场景**
-   这种漏洞通常发生在以下场景：
-   - 将用户输入直接拼接到命令字符串中，例如 `exec.Command("echo", userInput)`。
-   - 使用不安全的函数或方法构建命令，例如通过字符串拼接或格式化。
-
-   以下是一个存在漏洞的代码示例：
-   ```golang
-   package main
-
-   import (
-       "fmt"
-       "os/exec"
-   )
-
-   func executeCommand(userInput string) {
-       // 不安全的做法：直接将用户输入拼接到命令中
-       cmd := exec.Command("echo", userInput)
-       output, err := cmd.CombinedOutput()
-       if err != nil {
-           fmt.Println("Error:", err)
-           return
-       }
-       fmt.Println(string(output))
-   }
-
-   func main() {
-       var userInput string
-       fmt.Print("Enter your command: ")
-       fmt.Scanln(&userInput) // 接收用户输入
-       executeCommand(userInput)
-   }
-   ```
-
+这种漏洞通常发生在以下场景：
+- 将用户输入直接拼接到命令字符串中，例如 `exec.Command("echo", userInput)`。
+- 使用不安全的函数或方法构建命令，例如通过字符串拼接或格式化。
+以下是一个存在漏洞的代码示例：
+```golang
+package main
+import (
+"fmt"
+"os/exec"
+"net/http"
+)
+func executeCommand(userInput string) {
+// 不安全的做法：直接将用户输入拼接到命令中
+cmd := exec.Command("echo", userInput)
+output, err := cmd.CombinedOutput()
+if err != nil {
+fmt.Println("Error:", err)
+return
+}
+fmt.Println(string(output))
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+cmd := r.URL.Query().Get("cmd")
+executeCommand(cmd)
+}
+func main() {
+http.HandleFunc("/", handler)
+}
+```
 3. **潜在影响**
-   攻击者可以利用命令注入漏洞执行以下操作：
-   - 执行任意系统命令，例如删除文件、修改配置或启动恶意进程。
-   - 访问敏感数据，例如读取系统文件或数据库凭证。
-   - 控制服务器，例如通过反向 Shell 获取服务器权限。
+攻击者可以利用命令注入漏洞执行以下操作：
+- 执行任意系统命令，例如删除文件、修改配置或启动恶意进程。
+- 访问敏感数据，例如读取系统文件或数据库凭证。
+- 控制服务器，例如通过反向 Shell 获取服务器权限。
 DESC
 	rule_id: "c12cbcab-12de-4e6a-8715-4143224a36ed"
 	title_zh: "检测Golang命令注入漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免直接拼接用户输入到命令字符串
 使用 `os/exec` 包的 `Command` 方法时，将用户输入作为独立参数传递，而不是直接拼接到命令字符串中。
-
 ```golang
 package main
-
 import (
-	"fmt"
-	"os/exec"
-	"strings"
+"fmt"
+"os/exec"
+"strings"
 )
-
 func executeCommand(userInput string) {
-	// 安全的做法：将用户输入作为独立参数传递
-	cmd := exec.Command("echo", userInput)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+// 安全的做法：将用户输入作为独立参数传递
+cmd := exec.Command("echo", userInput)
+output, err := cmd.CombinedOutput()
+if err != nil {
+fmt.Println("Error:", err)
+return
 }
-
+fmt.Println(string(output))
+}
 func main() {
-	var userInput string
-	fmt.Print("Enter your command: ")
-	fmt.Scanln(&userInput)
-	executeCommand(userInput)
+var userInput string
+fmt.Print("Enter your command: ")
+fmt.Scanln(&userInput)
+executeCommand(userInput)
 }
 ```
-
 #### 2. 对用户输入进行严格的验证和过滤
 在将用户输入用于执行外部命令之前，对其进行严格的验证和过滤，确保其符合预期格式，并移除或转义潜在的恶意字符。
-
 ```golang
 package main
-
 import (
-	"fmt"
-	"os/exec"
-	"strings"
+"fmt"
+"os/exec"
+"strings"
 )
-
 func executeCommand(userInput string) {
-	// 安全的做法：对用户输入进行清理
-	cleanedInput := strings.TrimSpace(userInput)
-	// 进一步验证和过滤输入...根据具体情况进行适当处理
-	cmd := exec.Command("echo", cleanedInput)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+// 安全的做法：对用户输入进行清理
+cleanedInput := strings.TrimSpace(userInput)
+// 进一步验证和过滤输入...根据具体情况进行适当处理
+cmd := exec.Command("echo", cleanedInput)
+output, err := cmd.CombinedOutput()
+if err != nil {
+fmt.Println("Error:", err)
+return
 }
-
+fmt.Println(string(output))
+}
 func main() {
-	var userInput string
-	fmt.Print("Enter your command: ")
-	fmt.Scanln(&userInput)
-	executeCommand(userInput)
+var userInput string
+fmt.Print("Enter your command: ")
+fmt.Scanln(&userInput)
+executeCommand(userInput)
 }
 ```
-
 #### 3. 谨慎使用 `os/exec` 执行外部命令
 考虑是否有其他更安全的方式实现相同的功能，避免直接执行外部命令。
 SOLUTION
@@ -125,141 +110,129 @@ REFERENCE
 )
 
 <include('golang-os-exec')> as $sink;
-$sink?{have: 'Parameter'} as $check;
+<include('golang-user-input')> as $input;
 
-$check as $high;
+$sink & $input as $high;
 
 alert $high for {
 	type: "vuln",
-	title: "Detect Golang Command Injection Vulnerability",
-	title_zh: "检测Golang命令注入漏洞",
-	solution: <<<CODE
+	title: "Golang Command Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang命令注入漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免直接拼接用户输入到命令字符串
 使用 `os/exec` 包的 `Command` 方法时，将用户输入作为独立参数传递，而不是直接拼接到命令字符串中。
-
 ```golang
 package main
-
 import (
-	"fmt"
-	"os/exec"
-	"strings"
+"fmt"
+"os/exec"
+"strings"
 )
-
 func executeCommand(userInput string) {
-	// 安全的做法：将用户输入作为独立参数传递
-	cmd := exec.Command("echo", userInput)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+// 安全的做法：将用户输入作为独立参数传递
+cmd := exec.Command("echo", userInput)
+output, err := cmd.CombinedOutput()
+if err != nil {
+fmt.Println("Error:", err)
+return
 }
-
+fmt.Println(string(output))
+}
 func main() {
-	var userInput string
-	fmt.Print("Enter your command: ")
-	fmt.Scanln(&userInput)
-	executeCommand(userInput)
+var userInput string
+fmt.Print("Enter your command: ")
+fmt.Scanln(&userInput)
+executeCommand(userInput)
 }
 ```
-
 #### 2. 对用户输入进行严格的验证和过滤
 在将用户输入用于执行外部命令之前，对其进行严格的验证和过滤，确保其符合预期格式，并移除或转义潜在的恶意字符。
-
 ```golang
 package main
-
 import (
-	"fmt"
-	"os/exec"
-	"strings"
+"fmt"
+"os/exec"
+"strings"
 )
-
 func executeCommand(userInput string) {
-	// 安全的做法：对用户输入进行清理
-	cleanedInput := strings.TrimSpace(userInput)
-	// 进一步验证和过滤输入...根据具体情况进行适当处理
-	cmd := exec.Command("echo", cleanedInput)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+// 安全的做法：对用户输入进行清理
+cleanedInput := strings.TrimSpace(userInput)
+// 进一步验证和过滤输入...根据具体情况进行适当处理
+cmd := exec.Command("echo", cleanedInput)
+output, err := cmd.CombinedOutput()
+if err != nil {
+fmt.Println("Error:", err)
+return
 }
-
+fmt.Println(string(output))
+}
 func main() {
-	var userInput string
-	fmt.Print("Enter your command: ")
-	fmt.Scanln(&userInput)
-	executeCommand(userInput)
+var userInput string
+fmt.Print("Enter your command: ")
+fmt.Scanln(&userInput)
+executeCommand(userInput)
 }
 ```
-
 #### 3. 谨慎使用 `os/exec` 执行外部命令
 考虑是否有其他更安全的方式实现相同的功能，避免直接执行外部命令。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
-
+命令注入漏洞（Command Injection）允许攻击者通过输入恶意数据来执行任意命令。在 Golang 应用程序中，如果使用 `os/exec` 包执行外部命令时未对用户输入进行适当的清理和验证，攻击者可以通过构造特殊的输入来执行不受信任的命令，进而控制服务器或访问敏感数据。
 2. **触发场景**
-   这种漏洞通常发生在以下场景：
-   - 将用户输入直接拼接到命令字符串中，例如 `exec.Command("echo", userInput)`。
-   - 使用不安全的函数或方法构建命令，例如通过字符串拼接或格式化。
-
-   以下是一个存在漏洞的代码示例：
-   ```golang
-   package main
-
-   import (
-       "fmt"
-       "os/exec"
-   )
-
-   func executeCommand(userInput string) {
-       // 不安全的做法：直接将用户输入拼接到命令中
-       cmd := exec.Command("echo", userInput)
-       output, err := cmd.CombinedOutput()
-       if err != nil {
-           fmt.Println("Error:", err)
-           return
-       }
-       fmt.Println(string(output))
-   }
-
-   func main() {
-       var userInput string
-       fmt.Print("Enter your command: ")
-       fmt.Scanln(&userInput) // 接收用户输入
-       executeCommand(userInput)
-   }
-   ```
-
+这种漏洞通常发生在以下场景：
+- 将用户输入直接拼接到命令字符串中，例如 `exec.Command("echo", userInput)`。
+- 使用不安全的函数或方法构建命令，例如通过字符串拼接或格式化。
+以下是一个存在漏洞的代码示例：
+```golang
+package main
+import (
+"fmt"
+"os/exec"
+"net/http"
+)
+func executeCommand(userInput string) {
+// 不安全的做法：直接将用户输入拼接到命令中
+cmd := exec.Command("echo", userInput)
+output, err := cmd.CombinedOutput()
+if err != nil {
+fmt.Println("Error:", err)
+return
+}
+fmt.Println(string(output))
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+cmd := r.URL.Query().Get("cmd")
+executeCommand(cmd)
+}
+func main() {
+http.HandleFunc("/", handler)
+}
+```
 3. **潜在影响**
-   攻击者可以利用命令注入漏洞执行以下操作：
-   - 执行任意系统命令，例如删除文件、修改配置或启动恶意进程。
-   - 访问敏感数据，例如读取系统文件或数据库凭证。
-   - 控制服务器，例如通过反向 Shell 获取服务器权限。
-CODE
+攻击者可以利用命令注入漏洞执行以下操作：
+- 执行任意系统命令，例如删除文件、修改配置或启动恶意进程。
+- 访问敏感数据，例如读取系统文件或数据库凭证。
+- 控制服务器，例如通过反向 Shell 获取服务器权限。
+DESC
 	level: "high",
+	name: "high",
+	message: "检测到Golang应用程序中的命令注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "命令注入",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
     "fmt"
     "os/exec"
+	"net/http"
 )
 
 func executeCommand(userInput string) {
@@ -273,19 +246,22 @@ func executeCommand(userInput string) {
     fmt.Println(string(output))
 }
 
+func handler(w http.ResponseWriter, r *http.Request) {
+	cmd := r.URL.Query().Get("cmd")
+  	executeCommand(cmd)
+}
+
 func main() {
-    var userInput string
-    fmt.Print("Enter your command: ")
-    fmt.Scanln(&userInput) // 接收用户输入
-    executeCommand(userInput)
+	http.HandleFunc("/", handler)
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://safe.go': <<<SAFE
 package main
 
 import (
     "fmt"
     "os/exec"
+	"net/http"
 )
 
 func executeCommand(userInput string) {
@@ -299,11 +275,13 @@ func executeCommand(userInput string) {
     fmt.Println(string(output))
 }
 
+func handler(w http.ResponseWriter, r *http.Request) {
+	cmd := r.URL.Query().Get("cmd")
+  	executeCommand(cmd)
+}
+
 func main() {
-    var userInput string
-    fmt.Print("Enter your command: ")
-    fmt.Scanln(&userInput) // 接收用户输入
-    executeCommand(userInput)
+	http.HandleFunc("/", handler)
 }
 SAFE
 )

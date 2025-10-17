@@ -1,5 +1,5 @@
 __DESC__ = "根据用户输入的文本片段生成简洁的总结文本，可以限制总结的字数。"
-
+__VERBOSE_NAME__ = "文本片段总结"
 __KEYWORDS__ = "文本总结,内容提炼,信息提取,字数限制,文本处理,片段总结"
 
 textSnippent = cli.String("textSnippet", cli.setRequired(true), cli.setHelp("文本片段内容"))
@@ -14,38 +14,16 @@ prompt = <<<prompt
 3. **字数限制**：不超过 [%d] 字
 prompt
 
-schema = <<<schema
-{
-"$schema": "http://json-schema.org/draft-07/schema#",
-"type": "object",
-"required": ["@action", "summary"],
-"additionalProperties": false,
-"properties": {
-    "@action": {
-    "const": "summarize",
-    "description": "标识当前操作的具体类型"
-    },
-    "summary": {
-    "type": "string",
-    "description": "总结的文本"
-    }
-}
-}
-schema
+
+
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramString("summary", jsonschema.description("总结的文本"))
+)
 
 
 forgeHandle = func(params) {
-    bp,err = aiagent.CreateLiteForge("fragment-summarizer",
-        aiagent.liteForgePrompt(sprintf(prompt, limit)),
-        aiagent.liteForgeOutputSchemaRaw("summarize",schema)
-    )
-    if err != nil {
-        return err
-    }
-    res,err = bp.Execute(context.Background(),params)
-    if err != nil {
-		return nil
-	}
+    res = liteforge.Execute(sprintf("%s \n 文本片段内容: \n %v", sprintf(prompt, limit),params), liteforge.output(schema))~
 	a = res.GetString("summary")
 	println(a)
     return a

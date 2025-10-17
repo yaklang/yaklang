@@ -3,15 +3,55 @@
 package crawlerx
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/input"
 	"github.com/go-rod/rod/lib/proto"
+	"github.com/yaklang/yaklang/common/crawlerx/forge"
+	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"regexp"
 	"strings"
 	"time"
+)
+
+type ElementInfo struct {
+	Tag        string             `json:"tag"`
+	Attributes []ElementAttribute `json:"types"`
+}
+
+type ElementAttribute struct {
+	Name string   `json:"attribute"`
+	Info []string `json:"info"`
+}
+
+var (
+	clickElementTemplate = []ElementInfo{
+		{
+			Tag: "input", Attributes: []ElementAttribute{
+				{Name: "type", Info: []string{"submit"}},
+			},
+		},
+		{Tag: "button"},
+		{Tag: "[onclick]"},
+	}
+	submitElementTemplate = []ElementInfo{
+		{
+			Tag: "input", Attributes: []ElementAttribute{
+				{Name: "type", Info: []string{"submit"}},
+			},
+		}, {
+			Tag: "button", Attributes: []ElementAttribute{
+				{Name: "type", Info: []string{"submit"}},
+			},
+		},
+	}
 )
 
 var invalidUrl = []string{"", "#", "javascript:;", "#/"}
@@ -89,10 +129,40 @@ func (starter *BrowserStarter) eventActionOnPage(page *rod.Page) error {
 	return nil
 }
 
+func (starter *BrowserStarter) eventActionOnPageV2(page *rod.Page) error {
+	originUrl, _ := getCurrentUrl(page)
+	err := starter.doInput(originUrl, page)
+	if err != nil {
+		return utils.Errorf(`do input error: %v`, err)
+	}
+	err = starter.extraInputElementsOperator(page)
+	if err != nil {
+		return utils.Errorf(`do extra input error: %v`, err)
+	}
+	selectorQueue, err := getEventElements(page)
+	selectorQueue.Range(func(eventSelector string, pos int) bool {
+		//err = starter.eventElementsExploit(page, originUrl, eventSelector)
+		//if err != nil {
+		//	log.Errorf(`Page %v click element %v error: %v`, originUrl, eventSelector, err.Error())
+		//	return false
+		//}
+		var currentSelectors []string
+		currentSelectors, err = starter.eventElementsExploitV2(page, originUrl, eventSelector)
+		if err != nil {
+			log.Errorf(`Page %v click element %v error: %v`, originUrl, eventSelector, err.Error())
+			return false
+		}
+		selectorQueue.Prepend(pos, currentSelectors...)
+		return true
+	})
+	return err
+}
+
 func (starter *BrowserStarter) ActionOnPage(page *rod.Page) error {
 	if starter.vue {
 		log.Debug("determined vue.")
-		return starter.eventActionOnPage(page)
+		//return starter.eventActionOnPage(page)
+		return starter.eventActionOnPageV2(page)
 	}
 	status, err := starter.vueCheck(page)
 	if err != nil {
@@ -100,7 +170,8 @@ func (starter *BrowserStarter) ActionOnPage(page *rod.Page) error {
 	}
 	if status {
 		log.Debug("presume vue")
-		return starter.eventActionOnPage(page)
+		//return starter.eventActionOnPage(page)
+		return starter.eventActionOnPageV2(page)
 	} else {
 		return starter.normalActionOnPage(page)
 	}
@@ -122,19 +193,7 @@ func (starter *BrowserStarter) vueCheck(page *rod.Page) (bool, error) {
 			return false, nil
 		}
 	}
-	submitInfo := map[string]map[string][]string{
-		"input": {
-			"type": {
-				"submit",
-			},
-		},
-		"button": {
-			"type": {
-				"submit",
-			},
-		},
-	}
-	submitElements, err := customizedGetElement(page, submitInfo)
+	submitElements, err := customizedGetElement(page, submitElementTemplate)
 	if err != nil {
 		return false, utils.Errorf(`get submit elements error: %s`, err)
 	}
@@ -222,17 +281,8 @@ func (starter *BrowserStarter) generateGetUrls() func(*rod.Page) ([]string, erro
 
 func (starter *BrowserStarter) generateGetClickElements() func(*rod.Page) ([]string, error) {
 	return func(page *rod.Page) ([]string, error) {
-		searchInfo := map[string]map[string][]string{
-			"input": {
-				"type": {
-					"submit",
-					"button",
-				},
-			},
-			"button": {},
-		}
 		selectors := make([]string, 0)
-		clickElements, err := customizedGetElement(page, searchInfo)
+		clickElements, err := customizedGetElement(page, clickElementTemplate)
 		if err != nil {
 			return selectors, utils.Errorf(`Page %s get click elements error: %s`, page, err)
 		}
@@ -240,16 +290,16 @@ func (starter *BrowserStarter) generateGetClickElements() func(*rod.Page) ([]str
 		elementObj, err := EvalOnPage(page, getOnClickAction)
 		if err != nil {
 			log.Errorf(`page eval check onclick element code error: %v`, err)
-		} else {
-			elementArr := elementObj.Value.Arr()
-			for _, elementGson := range elementArr {
-				elementStr := elementGson.String()
-				if elementStr == "" {
-					continue
-				}
-				if !StringArrayContains(selectors, elementStr) {
-					selectors = append(selectors, elementStr)
-				}
+			return selectors, nil
+		}
+		elementArr := elementObj.Value.Arr()
+		for _, elementGson := range elementArr {
+			elementStr := elementGson.String()
+			if elementStr == "" {
+				continue
+			}
+			if !StringArrayContains(selectors, elementStr) {
+				selectors = append(selectors, elementStr)
 			}
 		}
 		return selectors, nil
@@ -290,6 +340,23 @@ func (starter *BrowserStarter) generateGetEventElements() func(*rod.Page) ([]str
 		}
 		return results, nil
 	}
+}
+
+func getEventElements(page *rod.Page) (*tools.DynamicQueue, error) {
+	var queue = tools.NewDynamicQueue()
+	elementObjs, err := EvalOnPage(page, getClickEventElement)
+	if err != nil {
+		return queue, utils.Errorf(`page get click event listener elements error: %v`, err)
+	}
+	clickableElementArr := elementObjs.Value.Arr()
+	if len(clickableElementArr) == 0 {
+		log.Debug(`page with no event.`)
+		return queue, nil
+	}
+	for _, element := range clickableElementArr {
+		queue.Enqueue(element.String())
+	}
+	return queue, nil
 }
 
 func (starter *BrowserStarter) generateUrlsExploit() func(string, string) error {
@@ -501,6 +568,38 @@ func (starter *BrowserStarter) newEventElementsExploit() func(*rod.Page, string,
 	}
 }
 
+func (starter *BrowserStarter) eventElementsExploitV2(page *rod.Page, originUrl string, selector string) ([]string, error) {
+	var (
+		result []string
+		err    error
+	)
+	status := starter.clickElementOnPageBySelector(page, selector)
+	if !status {
+		return result, nil
+	}
+	currentUrl, _ := getCurrentUrl(page)
+	if currentUrl != "" && currentUrl != originUrl {
+		defer page.NavigateBack()
+		err = starter.urlsExploit(originUrl, currentUrl)
+		if err != nil {
+			return result, utils.Errorf(`Url %v from %v exploit error: %v`, currentUrl, originUrl, err.Error())
+		}
+	}
+	// get event selectors
+	var newSelectorQueue *tools.DynamicQueue
+	newSelectorQueue, err = getEventElements(page)
+	if err != nil {
+		return result, err
+	}
+	//clicks, err := EvalOnPage(page, getClickEventElement)
+	//if err != nil {
+	//	return result, err
+	//}
+	//fmt.Println("clicks: ", clicks)
+	result = newSelectorQueue.ToList()
+	return result, nil
+}
+
 func (starter *BrowserStarter) defaultUploadFile(element *rod.Element) error {
 	if len(starter.fileUpload) == 0 {
 		return utils.Errorf("no upload file set.")
@@ -629,4 +728,194 @@ func getBaseInfo(page *rod.Page) (string, error) {
 		return "", err
 	}
 	return info.Title, nil
+}
+
+const (
+	selectorPrompt = `你是一个网页结构识别助手，你的任务是对于给出的html内容，识别用户名、密码和点击登陆的按钮对应的selector。
+如果有验证码，也需要把验证码输入框和验证码图片的selector返回。
+识别结果格式为JSON格式，具体格式如下：
+{"username":"#username","password":"#password","captcha":"#captcha","captcha_img":"#img","login":"#button"}
+`
+	captchaPrompt = `你是一个验证码识别助手，你的任务是识别验证码，并返回识别结果。
+如果图片是一个算式 就返回算式结果。
+识别结果格式为JSON格式，具体格式如下：
+{"result":"123F"}
+`
+)
+
+type CaptchaResult struct {
+	Result string `json:"result"`
+}
+
+type LoginSelector struct {
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	Captcha    string `json:"captcha"`
+	CaptchaImg string `json:"captcha_img"`
+	Login      string `json:"login"`
+}
+
+type loginFailError struct {
+	err string
+}
+
+func (e *loginFailError) Error() string {
+	return e.err
+}
+
+func NewLoginFailError(info string) error {
+	return &loginFailError{
+		err: info,
+	}
+}
+
+func (starter *BrowserStarter) Login(page *rod.Page) error {
+	var err error
+	for i := 0; i < 3; i++ {
+		err = starter.doLogin(page)
+		var loginErr *loginFailError
+		if !errors.As(err, &loginErr) || err == nil {
+			break
+		}
+	}
+	return err
+}
+
+func (starter *BrowserStarter) doLogin(page *rod.Page) error {
+	html, err := page.HTML()
+	if err != nil {
+		return err
+	}
+	if html == "" || html == "<html><head></head><body></body></html>" {
+		return NewLoginFailError("null html info")
+	}
+	//screenshot before login
+	originScreenShotBytes, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+	})
+	if err != nil {
+		return err
+	}
+	originScreenShot := "data:image/png;base64," + base64.StdEncoding.EncodeToString(originScreenShotBytes)
+	extractor, err := forge.NewLoginElementExtractor()
+	if err != nil {
+		return err
+	}
+	selectors, err := extractor.ExtractLoginElements(page.GetContext(), html)
+	if err != nil {
+		return err
+	}
+	if selectors.UsernameSelector == "" {
+		return nil
+	}
+	var captchaResult string
+	if selectors.CaptchaInputSelector != "" {
+		captchaElements, _ := page.Elements(selectors.CaptchaImageSelector)
+		if len(captchaElements) == 0 {
+			return NewLoginFailError("captcha not found")
+		}
+		captchaElement := captchaElements.First()
+		var captchaElementBytes []byte
+		captchaElementBytes, err = captchaElement.Screenshot(proto.PageCaptureScreenshotFormatPng, 0)
+		if err != nil {
+			return err
+		}
+		captchaBase64 := "data:image/png;base64," + base64.StdEncoding.EncodeToString(captchaElementBytes)
+		captchaResult = starter.getCaptcha(page.GetContext(), captchaBase64)
+	}
+	// input
+	usernameElements, err := page.Elements(selectors.UsernameSelector)
+	if err != nil {
+		return err
+	}
+	if len(usernameElements) != 0 {
+		err = elementInput(usernameElements.First(), starter.loginUsername)
+		if err != nil {
+			return err
+		}
+	}
+	passwordElements, err := page.Elements(selectors.PasswordSelector)
+	if err != nil {
+		return err
+	}
+	if len(passwordElements) != 0 {
+		err = elementInput(passwordElements.First(), starter.loginPassword)
+		if err != nil {
+			return err
+		}
+	}
+	if captchaResult != "" {
+		var captchaElements rod.Elements
+		captchaElements, err = page.Elements(selectors.CaptchaInputSelector)
+		if err != nil {
+			return err
+		}
+		err = elementInput(captchaElements.First(), captchaResult)
+		if err != nil {
+			return err
+		}
+	}
+	time.Sleep(500 * time.Millisecond)
+	loginButtons, err := page.Elements(selectors.LoginButtonSelector)
+	if err != nil {
+		return err
+	}
+	if len(loginButtons) != 0 {
+		err = loginButtons.First().Click(proto.InputMouseButtonLeft, 1)
+		if err != nil {
+			return err
+		}
+	}
+	err = page.WaitLoad()
+	if err != nil {
+		return err
+	}
+	time.Sleep(time.Duration(starter.extraWaitLoadTime+1000) * time.Millisecond)
+	// screenshot after login & png compare
+	currentScreenshotBytes, err := page.Screenshot(false, &proto.PageCaptureScreenshot{
+		Format: proto.PageCaptureScreenshotFormatPng,
+	})
+	if err != nil {
+		return err
+	}
+	currentScreenshot := "data:image/png;base64," + base64.StdEncoding.EncodeToString(currentScreenshotBytes)
+	similarity := tools.GetImgSimilarity(originScreenShot, currentScreenshot)
+	if similarity > 0.7 {
+		return NewLoginFailError(fmt.Sprintf("page similarity too large: %f", similarity))
+	}
+	return nil
+}
+
+func (starter *BrowserStarter) getCaptcha(ctx context.Context, imgBase64 string) (result string) {
+	detector, err := forge.NewCaptchaDetector()
+	if err != nil {
+		log.Debugf("get captcha detector err: %v", err)
+		return
+	}
+	detectResult, err := detector.DetectCaptcha(ctx, imgBase64)
+	if err != nil {
+		log.Debugf("get captcha detector err: %v", err)
+		return
+	}
+	if detectResult.CaptchaType == "math" {
+		result, err = tools.GetCalculateResult(detectResult.CaptchaText)
+		if err != nil {
+			log.Debugf("get captcha result err: %v", err)
+		}
+		return
+	}
+	result = detectResult.CaptchaText
+	return
+}
+
+func elementInput(ele *rod.Element, inputStr string) error {
+	err := ele.SelectAllText()
+	if err != nil {
+		return err
+	}
+	err = ele.Type(input.Backspace)
+	if err != nil {
+		return err
+	}
+	return ele.Input(inputStr)
 }

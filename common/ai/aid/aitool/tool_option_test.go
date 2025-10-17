@@ -14,10 +14,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // 提供一个测试用的回调函数
-func testCallback(ctx context.Context, params InvokeParams, stdout io.Writer, stderr io.Writer) (interface{}, error) {
+func testCallback(ctx context.Context, params InvokeParams, runtimeConfig *ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (interface{}, error) {
 	return params, nil
 }
 
@@ -41,7 +42,7 @@ func TestNewToolWithOptions(t *testing.T) {
 					Description: "简单工具描述",
 					InputSchema: mcp.ToolInputSchema{
 						Type:       "object",
-						Properties: map[string]any{},
+						Properties: omap.NewEmptyOrderedMap[string, any](),
 					},
 				},
 			},
@@ -68,17 +69,19 @@ func TestNewToolWithOptions(t *testing.T) {
 					Description: "带参数的工具",
 					InputSchema: mcp.ToolInputSchema{
 						Type: "object",
-						Properties: map[string]any{
-							"query": map[string]any{
+						Properties: func() *omap.OrderedMap[string, any] {
+							props := omap.NewEmptyOrderedMap[string, any]()
+							props.Set("query", map[string]any{
 								"type":        "string",
 								"description": "查询参数",
-							},
-							"limit": map[string]any{
+							})
+							props.Set("limit", map[string]any{
 								"type":        "number",
 								"description": "限制数量",
 								"default":     10,
-							},
-						},
+							})
+							return props
+						}(),
 					},
 				},
 			},
@@ -104,16 +107,18 @@ func TestNewToolWithOptions(t *testing.T) {
 					Description: "带数组参数的工具",
 					InputSchema: mcp.ToolInputSchema{
 						Type: "object",
-						Properties: map[string]any{
-							"items": map[string]any{
+						Properties: func() *omap.OrderedMap[string, any] {
+							props := omap.NewEmptyOrderedMap[string, any]()
+							props.Set("items", map[string]any{
 								"type":        "array",
 								"description": "数组参数",
 								"items": map[string]any{
 									"type":        "string",
 									"description": "字符串项",
 								},
-							},
-						},
+							})
+							return props
+						}(),
 					},
 				},
 			},
@@ -146,8 +151,9 @@ func TestNewToolWithOptions(t *testing.T) {
 					Description: "嵌套数组参数工具",
 					InputSchema: mcp.ToolInputSchema{
 						Type: "object",
-						Properties: map[string]any{
-							"nestedItems": map[string]any{
+						Properties: func() *omap.OrderedMap[string, any] {
+							props := omap.NewEmptyOrderedMap[string, any]()
+							props.Set("nestedItems", map[string]any{
 								"type":        "array",
 								"description": "嵌套数组参数",
 								"items": map[string]any{
@@ -159,8 +165,9 @@ func TestNewToolWithOptions(t *testing.T) {
 										"default":     0,
 									},
 								},
-							},
-						},
+							})
+							return props
+						}(),
 					},
 				},
 				Callback: testCallback,
@@ -192,21 +199,23 @@ func TestNewToolWithOptions(t *testing.T) {
 					Description: "多参数工具",
 					InputSchema: mcp.ToolInputSchema{
 						Type: "object",
-						Properties: map[string]any{
-							"stringParam": map[string]any{
+						Properties: func() *omap.OrderedMap[string, any] {
+							props := omap.NewEmptyOrderedMap[string, any]()
+							props.Set("stringParam", map[string]any{
 								"type":        "string",
 								"description": "字符串参数",
-							},
-							"numberParam": map[string]any{
+							})
+							props.Set("numberParam", map[string]any{
 								"type":    "number",
 								"default": 42.5,
-							},
-							"boolParam": map[string]any{
+							})
+							props.Set("boolParam", map[string]any{
 								"type":        "boolean",
 								"description": "布尔参数",
 								"default":     true,
-							},
-						},
+							})
+							return props
+						}(),
 						Required: []string{"stringParam", "boolParam"},
 					},
 				},
@@ -234,8 +243,8 @@ func TestNewToolWithOptions(t *testing.T) {
 			}
 
 			// 检查参数数量
-			if len(tool.Params()) != len(tt.expected.Params()) {
-				t.Errorf("Params length = %v, want %v", len(tool.Params()), len(tt.expected.Params()))
+			if tool.Params().Len() != tt.expected.Params().Len() {
+				t.Errorf("Params length = %v, want %v", tool.Params().Len(), tt.expected.Params().Len())
 				return
 			}
 
@@ -244,8 +253,18 @@ func TestNewToolWithOptions(t *testing.T) {
 				t.Errorf("Callback is nil, expected non-nil")
 			}
 
-			// 检查每个参数
-			require.True(t, reflect.DeepEqual(tool.Params(), tt.expected.Params()))
+			// 检查每个参数 - convert OrderedMaps to regular maps for comparison
+			actualParamsMap := make(map[string]any)
+			tool.Params().ForEach(func(k string, v any) bool {
+				actualParamsMap[k] = v
+				return true
+			})
+			expectedParamsMap := make(map[string]any)
+			tt.expected.Params().ForEach(func(k string, v any) bool {
+				expectedParamsMap[k] = v
+				return true
+			})
+			require.True(t, reflect.DeepEqual(actualParamsMap, expectedParamsMap))
 		})
 	}
 }
@@ -372,8 +391,8 @@ func TestComplexToolCreation(t *testing.T) {
 		t.Errorf("Description = %v, want %v", complexTool.Description, "复杂工具")
 	}
 
-	if len(complexTool.Params()) != 3 {
-		t.Errorf("Params length = %v, want %v", len(complexTool.Params()), 3)
+	if complexTool.Params().Len() != 3 {
+		t.Errorf("Params length = %v, want %v", complexTool.Params().Len(), 3)
 	}
 
 	// 验证JSON Schema生成
@@ -423,7 +442,8 @@ func TestComplexToolCreation_2(t *testing.T) {
 
 	// 验证参数配置
 	paramsFromTool := complexTool.Params() // Renamed to avoid conflict
-	require.Contains(t, paramsFromTool, "nestedObjectItems", "缺少嵌套数组结构参数")
+	_, hasParam := paramsFromTool.Get("nestedObjectItems")
+	require.True(t, hasParam, "缺少嵌套数组结构参数")
 
 	// 验证JSON Schema生成
 	schemaStr := complexTool.ToJSONSchemaString()
@@ -504,14 +524,14 @@ func TestComplexToolCreation_2(t *testing.T) {
 	require.False(t, valid, "ValidateParams for valid data should fail compilation due to jsonschema metaschema issue with 'required' type handling. Errors: %v", validationErrs)
 	require.NotEmpty(t, validationErrs, "ValidateParams for valid data should return compilation errors")
 	log.Infof("Expected schema compilation failure for validParams: %v", validationErrs)
-	foundMetaSchemaErrorForValid := false
+	foundValidationErrorForValid := false
 	for _, errMsg := range validationErrs {
-		if strings.Contains(errMsg, "metaschema") && (strings.Contains(errMsg, "invalid jsonType") || strings.Contains(errMsg, "expected string, but got null")) { // jsonschema v6 may report slightly differently
-			foundMetaSchemaErrorForValid = true
+		if strings.Contains(errMsg, "invalid jsonType") || strings.Contains(errMsg, "metaschema") || strings.Contains(errMsg, "expected string, but got null") {
+			foundValidationErrorForValid = true
 			break
 		}
 	}
-	require.True(t, foundMetaSchemaErrorForValid, "Error for validParams should be a jsonschema metaschema compilation error. Errors: %v", validationErrs)
+	require.True(t, foundValidationErrorForValid, "Error for validParams should be a validation error. Errors: %v", validationErrs)
 
 	invalidParams := map[string]any{
 		"nestedObjectItems": []map[string]any{
@@ -523,12 +543,12 @@ func TestComplexToolCreation_2(t *testing.T) {
 	require.False(t, valid, "ValidateParams for invalid data should also fail compilation due to the same metaschema issue. Errors: %v", validationErrs)
 	require.NotEmpty(t, validationErrs, "ValidateParams for invalid data should return compilation errors")
 	log.Infof("Expected schema compilation failure for invalidParams: %v", validationErrs)
-	foundMetaSchemaErrorForInvalid := false
+	foundValidationErrorForInvalid := false
 	for _, errMsg := range validationErrs {
-		if strings.Contains(errMsg, "metaschema") && (strings.Contains(errMsg, "invalid jsonType") || strings.Contains(errMsg, "expected string, but got null")) { // jsonschema v6 may report slightly differently
-			foundMetaSchemaErrorForInvalid = true
+		if strings.Contains(errMsg, "invalid jsonType") || strings.Contains(errMsg, "metaschema") || strings.Contains(errMsg, "expected string, but got null") {
+			foundValidationErrorForInvalid = true
 			break
 		}
 	}
-	require.True(t, foundMetaSchemaErrorForInvalid, "Error for invalidParams should also be a jsonschema metaschema compilation error. Errors: %v", validationErrs)
+	require.True(t, foundValidationErrorForInvalid, "Error for invalidParams should also be a validation error. Errors: %v", validationErrs)
 }

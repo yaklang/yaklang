@@ -4,7 +4,9 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/yak/c2ssa"
 	"github.com/yaklang/yaklang/common/yak/typescript/js2ssa"
+	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
 	"github.com/yaklang/yaklang/common/yak/go2ssa"
@@ -13,7 +15,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa4analyze"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
-	"github.com/yaklang/yaklang/common/yak/yak2ssa"
 )
 
 const (
@@ -22,23 +23,16 @@ const (
 	PHP  = consts.PHP
 	JAVA = consts.JAVA
 	GO   = consts.GO
+	C    = consts.C
 )
 
-var LanguageBuilders = map[consts.Language]ssa.Builder{
-	Yak:  yak2ssa.Builder,
-	JS:   js2ssa.Builder,
-	PHP:  php2ssa.Builder,
-	JAVA: java2ssa.Builder,
-	GO:   go2ssa.Builder,
-}
-
-var AllLanguageBuilders = []ssa.Builder{
-	php2ssa.Builder,
-	java2ssa.Builder,
-
-	yak2ssa.Builder,
-	js2ssa.Builder,
-	go2ssa.Builder,
+var LanguageBuilderCreater = map[consts.Language]ssa.CreateBuilder{
+	Yak:  yak2ssa.CreateBuilder,
+	JS:   js2ssa.CreateBuilder,
+	PHP:  php2ssa.CreateBuilder,
+	JAVA: java2ssa.CreateBuilder,
+	GO:   go2ssa.CreateBuilder,
+	C:    c2ssa.CreateBuilder,
 }
 
 func (c *config) isStop() bool {
@@ -54,29 +48,36 @@ func (c *config) isStop() bool {
 }
 
 func (c *config) parseFile() (ret *Program, err error) {
-	prog, err := c.parseSimple(c.originEditor)
+	var prog *ssa.Program
+	prog, err = c.parseSimple(c.originEditor)
 	if err != nil {
 		return nil, err
 	}
+	c.originEditor.SetProgramName(prog.GetProgramName())
+	prog.SaveEditor(c.originEditor)
 	prog.Finish()
-	if prog.EnableDatabase { // save program
-		prog.UpdateToDatabase()
+	wait := func() {}
+	if prog.DatabaseKind != ssa.ProgramCacheMemory { // save program
+		wait = prog.UpdateToDatabase()
 	}
 	total := prog.Cache.CountInstruction()
 	prog.ProcessInfof("program %s finishing save cache instruction(len:%d) to database", prog.Name, total) // %90
 	prog.Cache.SaveToDatabase()
-	c.SaveConfig()
-	return NewProgram(prog, c), nil
+	wait()
+	p := NewProgram(prog, c)
+	SaveConfig(c, p)
+	return p, nil
 }
 
 func (c *config) feed(prog *ssa.Program, code *memedit.MemEditor) error {
-	builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
-	if err := prog.Build("", code, builder); err != nil {
-		return err
-	}
-	builder.Finish()
-	ssa4analyze.RunAnalyzer(prog)
-	return nil
+	return utils.Errorf("not implemented")
+	// builder := prog.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
+	// if err := prog.Build("", code, builder); err != nil {
+	// 	return err
+	// }
+	// builder.Finish()
+	// ssa4analyze.RunAnalyzer(prog)
+	// return nil
 }
 
 func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error) {
@@ -89,24 +90,27 @@ func (c *config) parseSimple(r *memedit.MemEditor) (ret *ssa.Program, err error)
 		}
 	}()
 	// path is empty, use language or YakLang as default
-	if c.SelectedLanguageBuilder == nil {
-		c.LanguageBuilder = LanguageBuilders[Yak]
+	if c.LanguageBuilder == nil {
+		c.LanguageBuilder = LanguageBuilderCreater[Yak]()
 		log.Debugf("use default language [%s] for empty path", Yak)
-	} else {
-		c.LanguageBuilder = c.SelectedLanguageBuilder
 	}
-	c.LanguageBuilder = c.LanguageBuilder.Create()
-	prog, builder, err := c.init(c.fs)
+
+	prog, builder, err := c.init(c.fs, 1)
 	prog.SetPreHandler(true)
 	c.LanguageBuilder.InitHandler(builder)
 	// builder.SetRangeInit(r)
 	if err != nil {
 		return nil, err
 	}
-	c.LanguageBuilder.PreHandlerFile(r, builder)
+	ast, err := c.LanguageBuilder.ParseAST(r.GetSourceCode())
+	defer c.LanguageBuilder.Clearup()
+	if !c.ignoreSyntaxErr && err != nil {
+		return nil, utils.Errorf("parse file error: %v", err)
+	}
+	c.LanguageBuilder.PreHandlerFile(ast, r, builder)
 	// parse code
 	prog.SetPreHandler(false)
-	if err := prog.Build("", r, builder); err != nil {
+	if err := prog.Build(ast, r, builder); err != nil {
 		return nil, err
 	}
 	builder.Finish()
@@ -142,16 +146,21 @@ func (c *config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 	// TODO: whether to use the same programName for all program ?? when call ParseProject
 	// programName += "-" + path
 	var err error
-	LanguageBuilder := c.SelectedLanguageBuilder
-	if LanguageBuilder != nil {
-		LanguageBuilder, err = processBuilders(LanguageBuilder)
+	languageBuilder := c.LanguageBuilder
+	if languageBuilder != nil {
+		languageBuilder, err = processBuilders(languageBuilder)
 	} else {
 		log.Warn("no language builder specified, try to use all language builders, but it may cause some error and extra file analyzing disabled")
-		LanguageBuilder, err = processBuilders(AllLanguageBuilders...)
+		for _, builder := range LanguageBuilderCreater {
+			languageBuilder, err = processBuilders(builder())
+			if err == nil {
+				break
+			}
+		}
 	}
 	if err != nil {
 		return err
 	}
-	c.LanguageBuilder = LanguageBuilder.Create()
+	c.LanguageBuilder = languageBuilder
 	return nil
 }

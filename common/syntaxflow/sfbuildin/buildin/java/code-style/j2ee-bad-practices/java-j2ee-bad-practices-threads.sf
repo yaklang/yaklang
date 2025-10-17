@@ -16,17 +16,11 @@ DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
 
-在 J2EE 应用中避免直接创建和管理线程，应充分利用容器提供的并发管理机制。
-
 #### 1. 使用容器管理的线程池 (JCA WorkManager)
-
 大多数现代应用服务器都提供了 JCA (Java EE Connector Architecture) WorkManager，它允许应用程序通过容器管理的线程池异步执行任务。这是在 J2EE 应用中执行异步操作的标准和推荐方式。
-
 ```java
-// 示例：通过 WorkManager 提交任务
 @Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
 private WorkManager workManager;
-
 public class MyServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
         try {
@@ -37,14 +31,12 @@ public class MyServlet extends HttpServlet {
         }
     }
 }
-
 class MyWork implements org.jboss.resource.adapter.work.Work {
     @Override
     public void run() {
         // 在容器管理的线程中执行任务逻辑
         System.out.println("Executing task in WorkManager thread");
     }
-
     @Override
     public void release() {
         // 清理资源
@@ -53,27 +45,25 @@ class MyWork implements org.jboss.resource.adapter.work.Work {
 ```
 
 #### 2. 使用 Java EE Concurrency Utilities
-
 Java EE 7 引入了 Concurrency Utilities (JSR 236)，提供了 `ManagedExecutorService`, `ManagedScheduledExecutorService`, `ManagedThreadFactory` 和 `ManagedTask` 等接口，允许应用程序安全地使用容器管理的线程池。
-
 ```java
 @Resource // 注入 ManagedExecutorService
 private ManagedExecutorService executorService;
-
 public class AnotherServlet extends HttpServlet {
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
-         executorService.submit(() -> {
-             // 在容器管理的线程中执行异步任务
-             System.out.println("Executing task in ManagedExecutorService thread");
-         });
+        executorService.submit(() -> {
+            // 在容器管理的线程中执行异步任务
+            System.out.println("Executing task in ManagedExecutorService thread");
+        });
     }
 }
 ```
 
 #### 3. 避免使用 ThreadLocal
-
 在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
 SOLUTION
+	cwe: 668
+	cwe: 362
 )
 
 Thread()?{<typeName>?{have:'java.lang.Thread'}} as $thread;
@@ -83,6 +73,69 @@ alert $thread for {
 	title_zh: "未管理线程使用",
 	level: "info",
 	message: "检测到Java项目中使用了Thread类",
+	solution: <<<SOLUTION
+### 修复建议
+在 J2EE 应用中避免直接创建和管理线程，应充分利用容器提供的并发管理机制。
+#### 1. 使用容器管理的线程池 (JCA WorkManager)
+大多数现代应用服务器都提供了 JCA (Java EE Connector Architecture) WorkManager，它允许应用程序通过容器管理的线程池异步执行任务。这是在 J2EE 应用中执行异步操作的标准和推荐方式。
+```java
+// 示例：通过 WorkManager 提交任务
+@Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
+private WorkManager workManager;
+public class MyServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+try {
+Work task = new MyWork(); // 实现 org.jboss.resource.adapter.work.Work 接口
+workManager.scheduleWork(task); // 提交任务给容器管理的线程池
+} catch (WorkException e) {
+e.printStackTrace();
+}
+}
+}
+class MyWork implements org.jboss.resource.adapter.work.Work {
+@Override
+public void run() {
+// 在容器管理的线程中执行任务逻辑
+System.out.println("Executing task in WorkManager thread");
+}
+@Override
+public void release() {
+// 清理资源
+}
+}
+```
+#### 2. 使用 Java EE Concurrency Utilities
+Java EE 7 引入了 Concurrency Utilities (JSR 236)，提供了 `ManagedExecutorService`, `ManagedScheduledExecutorService`, `ManagedThreadFactory` 和 `ManagedTask` 等接口，允许应用程序安全地使用容器管理的线程池。
+```java
+@Resource // 注入 ManagedExecutorService
+private ManagedExecutorService executorService;
+public class AnotherServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+executorService.submit(() -> {
+// 在容器管理的线程中执行异步任务
+System.out.println("Executing task in ManagedExecutorService thread");
+});
+}
+}
+```
+#### 3. 避免使用 ThreadLocal
+在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
+SOLUTION
+	risk: "代码风格",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+由于 J2EE 标准明确限制在 Web 应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
+2. **触发场景**
+示例代码如下：
+```java
+Thread t = new Thread(() -> {
+// 线程任务
+});
+t.start(); // 直接启动线程
+```
+DESC
+	name: "thread",
 }
 
 ThreadLocal()?{<typeName>?{have:'java.lang.ThreadLocal'}} as $threadLocal;
@@ -91,6 +144,68 @@ alert $threadLocal for {
 	title: "ThreadLocal Usage",
 	title_zh: "ThreadLocal使用",
 	level: "info",
+	solution: <<<SOLUTION
+### 修复建议
+在 J2EE 应用中避免直接创建和管理线程，应充分利用容器提供的并发管理机制。
+#### 1. 使用容器管理的线程池 (JCA WorkManager)
+大多数现代应用服务器都提供了 JCA (Java EE Connector Architecture) WorkManager，它允许应用程序通过容器管理的线程池异步执行任务。这是在 J2EE 应用中执行异步操作的标准和推荐方式。
+```java
+// 示例：通过 WorkManager 提交任务
+@Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
+private WorkManager workManager;
+public class MyServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+try {
+Work task = new MyWork(); // 实现 org.jboss.resource.adapter.work.Work 接口
+workManager.scheduleWork(task); // 提交任务给容器管理的线程池
+} catch (WorkException e) {
+e.printStackTrace();
+}
+}
+}
+class MyWork implements org.jboss.resource.adapter.work.Work {
+@Override
+public void run() {
+// 在容器管理的线程中执行任务逻辑
+System.out.println("Executing task in WorkManager thread");
+}
+@Override
+public void release() {
+// 清理资源
+}
+}
+```
+#### 2. 使用 Java EE Concurrency Utilities
+Java EE 7 引入了 Concurrency Utilities (JSR 236)，提供了 `ManagedExecutorService`, `ManagedScheduledExecutorService`, `ManagedThreadFactory` 和 `ManagedTask` 等接口，允许应用程序安全地使用容器管理的线程池。
+```java
+@Resource // 注入 ManagedExecutorService
+private ManagedExecutorService executorService;
+public class AnotherServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+executorService.submit(() -> {
+// 在容器管理的线程中执行异步任务
+System.out.println("Executing task in ManagedExecutorService thread");
+});
+}
+}
+```
+#### 3. 避免使用 ThreadLocal
+在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
+SOLUTION
+	risk: "代码风格",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+由于 J2EE 标准明确限制在 Web 应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
+2. **触发场景**
+示例代码如下：
+```java
+ThreadLocal<String> threadLocal = new ThreadLocal<>();
+threadLocal.set("value");
+String value = threadLocal.get(); // 可能导致混乱
+```
+DESC
+	name: "threadLocal",
 }
 
 $thread./^(destroy|interrupt|join|resume|start|stop|suspend)$/ as $weak;
@@ -101,11 +216,154 @@ alert $weak for {
 	level: "info",
 	message: "检测到Java项目中使用了Thread类的destroy、interrupt、join、resume、sleep、start、stop、suspend或yield方法",
 	title: "Deprecated Thread Methods",
+	name: "weak",
+	solution: <<<SOLUTION
+### 修复建议
+在 J2EE 应用中避免直接创建和管理线程，应充分利用容器提供的并发管理机制。
+#### 1. 使用容器管理的线程池 (JCA WorkManager)
+大多数现代应用服务器都提供了 JCA (Java EE Connector Architecture) WorkManager，它允许应用程序通过容器管理的线程池异步执行任务。这是在 J2EE 应用中执行异步操作的标准和推荐方式。
+```java
+// 示例：通过 WorkManager 提交任务
+@Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
+private WorkManager workManager;
+public class MyServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+try {
+Work task = new MyWork(); // 实现 org.jboss.resource.adapter.work.Work 接口
+workManager.scheduleWork(task); // 提交任务给容器管理的线程池
+} catch (WorkException e) {
+e.printStackTrace();
+}
+}
+}
+class MyWork implements org.jboss.resource.adapter.work.Work {
+@Override
+public void run() {
+// 在容器管理的线程中执行任务逻辑
+System.out.println("Executing task in WorkManager thread");
+}
+@Override
+public void release() {
+// 清理资源
+}
+}
+```
+#### 2. 使用 Java EE Concurrency Utilities
+Java EE 7 引入了 Concurrency Utilities (JSR 236)，提供了 `ManagedExecutorService`, `ManagedScheduledExecutorService`, `ManagedThreadFactory` 和 `ManagedTask` 等接口，允许应用程序安全地使用容器管理的线程池。
+```java
+@Resource // 注入 ManagedExecutorService
+private ManagedExecutorService executorService;
+public class AnotherServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+executorService.submit(() -> {
+// 在容器管理的线程中执行异步任务
+System.out.println("Executing task in ManagedExecutorService thread");
+});
+}
+}
+```
+#### 3. 避免使用 ThreadLocal
+在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
+SOLUTION
+	risk: "代码风格",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+由于 J2EE 标准明确限制在 Web 应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
+2. **触发场景**
+示例代码如下：
+```java
+Thread t = new Thread(() -> {
+// 线程任务
+});
+t.start(); // 启动线程
+try {
+Thread.sleep(1000); // 让线程休眠
+} catch (InterruptedException e) {
+e.printStackTrace();
+}
+t.stop(); // 停止线程
+```
+DESC
 }
 
 run?{opcode:function}<getInterfaceBlueprint>?{have:'Runnable'} as $run
 alert $run for {
 	message: "检测到Java项目中使用了Runnable接口并且实现了run方法",
+	risk: "代码风格",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+由于 J2EE 标准明确限制在 Web 应用中直接管理线程，因其在容器环境中存在高风险。线程控制不仅实现复杂，更可能引发不可控的容器冲突。即便未触发容器异常，仍可能引发隐蔽性极强的并发问题，包括死锁、竞态条件及资源争用等同步缺陷。
+2. **触发场景**
+示例代码如下：
+```java
+public class MyRunnable implements Runnable {
+@Override
+public void run() {
+// 这里执行一些任务
+System.out.println("Running in a new thread!");
+}
+}
+public class MyServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+Thread t = new Thread(new MyRunnable());
+t.start(); // 直接启动线程，J2EE 不推荐
+}
+}
+```
+DESC
+	name: "run",
+	title: "Runnable Interface Implementation with run Method",
+	title_zh: "实现了Runnable接口并包含run方法",
+	solution: <<<SOLUTION
+### 修复建议
+在 J2EE 应用中避免直接创建和管理线程，应充分利用容器提供的并发管理机制。
+#### 1. 使用容器管理的线程池 (JCA WorkManager)
+大多数现代应用服务器都提供了 JCA (Java EE Connector Architecture) WorkManager，它允许应用程序通过容器管理的线程池异步执行任务。这是在 J2EE 应用中执行异步操作的标准和推荐方式。
+```java
+// 示例：通过 WorkManager 提交任务
+@Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找 WorkManager
+private WorkManager workManager;
+public class MyServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+try {
+Work task = new MyWork(); // 实现 org.jboss.resource.adapter.work.Work 接口
+workManager.scheduleWork(task); // 提交任务给容器管理的线程池
+} catch (WorkException e) {
+e.printStackTrace();
+}
+}
+}
+class MyWork implements org.jboss.resource.adapter.work.Work {
+@Override
+public void run() {
+// 在容器管理的线程中执行任务逻辑
+System.out.println("Executing task in WorkManager thread");
+}
+@Override
+public void release() {
+// 清理资源
+}
+}
+```
+#### 2. 使用 Java EE Concurrency Utilities
+Java EE 7 引入了 Concurrency Utilities (JSR 236)，提供了 `ManagedExecutorService`, `ManagedScheduledExecutorService`, `ManagedThreadFactory` 和 `ManagedTask` 等接口，允许应用程序安全地使用容器管理的线程池。
+```java
+@Resource // 注入 ManagedExecutorService
+private ManagedExecutorService executorService;
+public class AnotherServlet extends HttpServlet {
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+executorService.submit(() -> {
+// 在容器管理的线程中执行异步任务
+System.out.println("Executing task in ManagedExecutorService thread");
+});
+}
+}
+```
+#### 3. 避免使用 ThreadLocal
+在 J2EE 组件中应避免使用 `ThreadLocal`，因为它可能导致在线程池复用线程时数据混乱。如果需要线程局部的数据，考虑使用请求范围或会话范围的对象来存储上下文信息。
+SOLUTION
 }
 
 desc(
@@ -135,6 +393,66 @@ desc(
         }
     }
 CODE
+	"safefile://SafeWorkManagerExample.java": <<<CODE
+// 示例：通过 WorkManager 提交任务，这是 J2EE 标准推荐的异步任务执行方式。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.resource.spi.work.Work;
+import javax.resource.spi.work.WorkException;
+import javax.resource.spi.work.WorkManager;
+
+public class SafeWorkManagerExample extends HttpServlet {
+    @Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找容器管理的 WorkManager
+    private WorkManager workManager;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        try {
+            Work task = new MyWork(); // 实现javax.resource.spi.work.Work接口
+            workManager.scheduleWork(task); // 提交任务给容器管理的线程池，安全地执行异步操作
+            resp.getWriter().println("Task scheduled via WorkManager.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class MyWork implements Work {
+    @Override
+    public void run() {
+        // 在容器管理的线程中执行任务逻辑，避免直接创建和管理线程
+        System.out.println("Executing task in WorkManager thread safely.");
+    }
+
+    @Override
+    public void release() {
+        // 清理资源，由容器管理
+        System.out.println("WorkManager task released.");
+    }
+}
+CODE
+	"safefile://SafeManagedExecutorServiceExample.java": <<<CODE
+// 示例：使用 Java EE Concurrency Utilities (ManagedExecutorService) 执行异步任务。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.enterprise.concurrent.ManagedExecutorService;
+
+public class SafeManagedExecutorServiceExample extends HttpServlet {
+    @Resource // 注入容器管理的 ManagedExecutorService
+    private ManagedExecutorService executorService;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+         executorService.submit(() -> {
+             // 在容器管理的线程中执行异步任务，这是Java EE 7+推荐的做法
+             System.out.println("Executing task in ManagedExecutorService thread safely.");
+         });
+         resp.getWriter().println("Task submitted via ManagedExecutorService.");
+    }
+}
+CODE
 )
 
 desc(
@@ -156,5 +474,65 @@ desc(
           t.start(); // 直接启动线程，J2EE 不推荐
       }
   }
+CODE
+	"safefile://SafeWorkManagerExample.java": <<<CODE
+// 示例：通过 WorkManager 提交任务，这是 J2EE 标准推荐的异步任务执行方式。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.resource.spi.work.Work;
+import javax.resource.spi.work.WorkException;
+import javax.resource.spi.work.WorkManager;
+
+public class SafeWorkManagerExample extends HttpServlet {
+    @Resource(lookup = "java:comp/env/wm/MyWorkManager") // 查找容器管理的 WorkManager
+    private WorkManager workManager;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+        try {
+            Work task = new MyWork(); // 实现javax.resource.spi.work.Work接口
+            workManager.scheduleWork(task); // 提交任务给容器管理的线程池，安全地执行异步操作
+            resp.getWriter().println("Task scheduled via WorkManager.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+class MyWork implements Work {
+    @Override
+    public void run() {
+        // 在容器管理的线程中执行任务逻辑，避免直接创建和管理线程
+        System.out.println("Executing task in WorkManager thread safely.");
+    }
+
+    @Override
+    public void release() {
+        // 清理资源，由容器管理
+        System.out.println("WorkManager task released.");
+    }
+}
+CODE
+	"safefile://SafeManagedExecutorServiceExample.java": <<<CODE
+// 示例：使用 Java EE Concurrency Utilities (ManagedExecutorService) 执行异步任务。
+import javax.annotation.Resource;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.enterprise.concurrent.ManagedExecutorService;
+
+public class SafeManagedExecutorServiceExample extends HttpServlet {
+    @Resource // 注入容器管理的 ManagedExecutorService
+    private ManagedExecutorService executorService;
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) {
+         executorService.submit(() -> {
+             // 在容器管理的线程中执行异步任务，这是Java EE 7+推荐的做法
+             System.out.println("Executing task in ManagedExecutorService thread safely.");
+         });
+         resp.getWriter().println("Task submitted via ManagedExecutorService.");
+    }
+}
 CODE
 )

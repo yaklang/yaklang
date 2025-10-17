@@ -2,10 +2,7 @@ package ssaapi
 
 import (
 	"fmt"
-	"strings"
 	"time"
-
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -13,18 +10,20 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *ssa.FunctionBuilder, error) {
+func (c *config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	programName := c.ProgramName
-	application := ssa.NewProgram(programName, c.enableDatabase, ssa.Application, filesystem, c.programPath, c.cacheTTL...)
+	application := ssa.NewProgram(programName, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize, c.cacheTTL...)
 	application.Language = string(c.language)
-
+	application.ProjectName = c.ProjectName
 	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
 		log.Info(msg)
 	}
+
 	application.Build = func(
-		filePath string, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
+		ast ssa.FrontAST, src *memedit.MemEditor, fb *ssa.FunctionBuilder,
 	) (err error) {
+		filePath := src.GetUrl()
 		application.ProcessInfof("start to compile : %v", filePath)
 		start := time.Now()
 		defer func() {
@@ -52,23 +51,12 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 		}
 		// backup old editor (source code)
 		originEditor := fb.GetEditor()
-		// TODO: check prog.FileList avoid duplicate file save to sourceDB,
-		// in php include just build file in child program, will cause the same file save to sourceDB, when the file include multiple times
-		// this check should be more readable, we should use Editor and `prog.PushEditor..` save sourceDB.
-		if _, exist := application.FileList[filePath]; !exist {
-			if c.enableDatabase {
-				folderName, fileName := filesystem.PathSplit(filePath)
-				folders := strings.Split(folderName, string(filesystem.GetSeparators()))
-				ssadb.SaveFile(fileName, src.GetSourceCode(), programName, folders)
-			}
-		}
 		// include source code will change the context of the origin editor
 		newCodeEditor := src
-		newCodeEditor.SetUrl(filePath)
 		fb.SetEditor(newCodeEditor)
 		if originEditor == nil && newCodeEditor != nil {
-			enter := fb.GetBasicBlockByID(fb.EnterBlock)
-			if enter != nil && enter.GetRange() == nil {
+			enter, ok := fb.GetBasicBlockByID(fb.EnterBlock)
+			if ok && enter != nil && enter.GetRange() == nil {
 				enter.SetRange(src.GetFullRange())
 			}
 		}
@@ -87,17 +75,20 @@ func (c *config) init(filesystem filesys_interface.FileSystem) (*ssa.Program, *s
 			application.PopEditor(save)
 		}()
 
-		if ret := fb.GetEditor(); ret != nil {
-			cache := application.Cache
-			progName := application.GetProgramName()
-			hash := ret.GetIrSourceHash(programName)
-			if cache.IsExistedSourceCodeHash(progName, hash) {
-				c.DatabaseProgramCacheHitter(fb)
-			}
+		if editor := fb.GetEditor(); editor != nil {
+			// cache := application.Cache
+			// progName := application.GetProgramName()
+			// go func() {
+			// 	hash := editor.GetIrSourceHash(programName)
+			// 	if cache.IsExistedSourceCodeHash(progName, hash) {
+			// 		c.DatabaseProgramCacheHitter(fb)
+			// 	}
+			// }()
 		} else {
 			log.Warnf("(BUG or in DEBUG Mode)Range not found for %s", fb.GetName())
 		}
-		return LanguageBuilder.Build(src.GetSourceCode(), c.ignoreSyntaxErr, fb)
+		err = LanguageBuilder.BuildFromAST(ast, fb)
+		return err
 	}
 	builder := application.GetAndCreateFunctionBuilder(string(ssa.MainFunctionName), string(ssa.MainFunctionName))
 	// TODO: this extern info should be set in program

@@ -1,0 +1,96 @@
+## 代码生成输出格式示例
+
+你的工作流程必须遵循以下协议：
+
+*   **初始编码**: 使用 `write_code` 生成初始代码。
+*   **迭代修改**: 后续所有修改都应使用 `modify_code`。
+
+### 诊断优先原则 (Diagnose-Before-Treat Protocol)
+
+1.  在 `modify_code` 后，仔细分析返回的 `lint error`。
+2.  如果错误是 **`SyntaxError`**, **`TypeCheck error`**, 或 **`ExternLib [...] don't has [...]`** 相关的 API 错误，你**必须立即调用 `query_document`**。这是你当前唯一的选择。
+3.  根据下面的查询构造指南来形成你的查询，以确保能找到有效信息。
+4.  只有在通过 `query_document` 获得了新的知识后，你才能再次调用 `modify_code` 进行修复。
+
+**禁止猜测**: 严禁在不理解错误根源的情况下，连续使用 `modify_code` 进行试探性修复。如果你发现自己正在这么做，立即停下并回到第 3 步。
+
+---
+
+### 正确示例 1: `write_code` 动作（创建新代码）
+```json
+{"@action": "write_code", "human_readable_thought": "创建一个简单的端口扫描脚本"}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+yakit.AutoInitYakit()
+
+target := cli.String("target", cli.setRequired(true))
+ports := cli.String("ports", cli.setDefault("80,443"))
+cli.check()
+
+results, err := servicescan.Scan(target, ports)
+die(err)
+
+for result in results {
+    yakit.Info("Found: %v", result.String())
+}
+<|GEN_CODE_END_{{ .Nonce }}|>
+
+### 正确示例 2: `modify_code` 动作（修改现有代码）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25, "modify_code_reason": "修正ZIP文件打开方式 ..."}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+// 打开ZIP文件
+reader, err := zip.OpenReader(zipFilePath)
+if err != nil {
+    yakit.Error("打开ZIP文件失败: %v", err)
+    return
+}
+defer reader.Close()
+<|GEN_CODE_END_{{ .Nonce }}|>
+
+### **示例: `query_document` 动作（当 API 不存在时）**
+
+**场景**: 上一步 `modify_code` 尝试使用 `synscan.timeout(3)`，但收到 `lint error: ExternLib [synscan] don't has [timeout], maybe you meant rateLimit?`。
+
+```json
+{"@action": "query_document", "human_readable_thought": "Linter报错说 synscan 没有 timeout 方法，并提示了 rateLimit。我需要查询 synscan 和 synscan.rateLimit 的正确用法，以了解如何设置超时或速率。", "keywords": ["synscan.Scan", "synscan.rateLimit", "端口扫描"], "case_sensitive": false}
+```
+**这是正确的做法！** AI 识别出 API 错误，并根据 Linter 的提示，**精确地查询**相关模块和函数文档，而不是盲目猜测下一个方法名。**注意：`query_document` 动作不需要 `<|GEN_CODE...|>` 代码块。**
+
+### **示例 4: `query_document` 动作（当遇到语法错误时）**
+
+**场景**: AI 尝试编写 `if err != nil { ... }`，但反复收到 `SyntaxError`。
+
+```json
+{"@action": "query_document", "human_readable_thought": "我反复遇到语法错误，不确定Yaklang中正确的错误处理方式。我将使用关键词和正则表达式来搜索 'die(err)' 和 '~' 操作符的用法示例。", "keywords": ["error handling", "错误处理", "die"], "regexp": ["die\\(err\\)", "~\s*$"]}
+```
+**这也是正确的做法！** AI 认识到自己对基础语法不熟，于是结合**关键词（概念）**和**正则表达式（具体模式）**来查找权威的示例代码，从而学习正确的语法范式。
+
+---
+
+### 错误示例 2：包含行号前缀（绝对禁止！）
+```json
+{"@action": "modify_code", "modify_start_line": 18, "modify_end_line": 25}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+18 | // 打开ZIP文件
+19 | reader, err := zip.OpenReader(zipFilePath)
+<|GEN_CODE_END_{{ .Nonce }}|>
+️ 这种格式是错误的！包含行号会导致语法解析失败！
+
+### **错误示例 3: 收到 API 错误后仍盲目修改**
+
+**场景**: 与正确示例3相同，收到 `lint error: ExternLib [synscan] don't has [timeout]`。
+
+```json
+{"@action": "modify_code", "modify_start_line": 7, "modify_end_line": 7, "modify_code_reason": "timeout 不对，我试试 set_timeout"}
+```
+
+<|GEN_CODE_{{ .Nonce }}|>
+err, results = synscan.Scan(target, ports, synscan.set_timeout(3))
+<|GEN_CODE_END_{{ .Nonce }}|>
+**这是最典型的错误！** AI 在收到明确的 API 错误提示后，没有选择 `query_document` 来学习，而是继续进行无效的猜测性 `modify_code`，这会陷入死循环并浪费大量时间和资源。**必须禁止这种行为！**

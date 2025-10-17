@@ -6,19 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/yak/syntaxflow_scan"
+
 	"github.com/gobwas/glob"
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/utils/bizhelper"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"golang.org/x/exp/slices"
 	"io"
 	"io/fs"
 	"math/rand"
@@ -29,15 +25,25 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfcompletion"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
+	"golang.org/x/exp/slices"
+
 	"github.com/segmentio/ksuid"
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 )
 
@@ -417,64 +423,6 @@ var syntaxFlowCreate = &cli.Command{
 	},
 }
 
-var syntaxFlowTest = &cli.Command{
-	Name:    "syntaxflow-test",
-	Aliases: []string{"sftest", "sf-test"},
-	Action: func(c *cli.Context) error {
-		testingTInstance := utils.NewRequireTestT(func(msg string, args ...any) {
-			log.Errorf(msg, args...)
-		}, func() {})
-
-		fsi := filesys.NewLocalFs()
-
-		checkViaPath := func(pathRaw string) error {
-			err := filesys.Recursive(pathRaw, filesys.WithFileSystem(fsi), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-				if fsi.Ext(s) == ".sf" || fsi.Ext(s) == "sf" {
-					raw, err := fsi.ReadFile(s)
-					if err != nil {
-						return err
-					}
-					err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
-					if err != nil {
-						return err
-					}
-					return nil
-				}
-				return nil
-			}))
-			if err != nil {
-				return err
-			}
-			return nil
-		}
-
-		empty := len(c.Args()) <= 0
-		if empty {
-			return checkViaPath(".")
-		}
-		for _, i := range c.Args() {
-			if utils.IsDir(i) {
-				err := checkViaPath(i)
-				if err != nil {
-					return err
-				}
-			}
-			if ret := utils.GetFirstExistedFile(i); ret != "" {
-				raw, err := fsi.ReadFile(ret)
-				if err != nil {
-					return err
-				}
-				err = ssatest.EvaluateVerifyFilesystem(string(raw), testingTInstance)
-				if err != nil {
-					return err
-				}
-			}
-
-		}
-		return nil
-	},
-}
-
 var syntaxFlowExport = &cli.Command{
 	Name:    "syntaxflow-export",
 	Aliases: []string{"sf-export", "esf"},
@@ -504,22 +452,47 @@ var syntaxFlowImport = &cli.Command{
 	Aliases: []string{"sf-import", "isf"},
 	Flags: []cli.Flag{
 		cli.StringFlag{
-			Name:  "file,f,i",
+			Name:  "file,f,input,i",
 			Usage: "file path",
+		},
+		cli.StringFlag{
+			Name: "format",
+			Usage: `input file format:
+	* json (default: json file)
+	* raw (syntaxflow file)
+		`,
 		},
 	},
 	Action: func(c *cli.Context) error {
-		if c.String("file") == "" {
+		file := c.String("file")
+		format := c.String("format")
+
+		if file == "" {
 			return utils.Error("file is required")
 		}
-		file, err := os.Open(c.String("file"))
+		if format == "" {
+			format = "json"
+		}
+		path, err := os.Open(file)
 		if err != nil {
 			return utils.Wrap(err, "open file failed")
 		}
-		defer file.Close()
-		err = sfdb.ImportDatabase(file)
-		if err != nil {
-			return err
+		defer path.Close()
+
+		switch format {
+		case "json":
+			err = sfdb.ImportDatabase(path)
+			if err != nil {
+				return err
+			}
+		case "raw":
+			rfs := filesys.NewRelLocalFs(file)
+			err := sfbuildin.SyncBuildRuleByFileSystem(rfs, false, func(process float64, ruleName string) {
+				log.Infof("sync input rule: %s, process: %f", ruleName, process)
+			})
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	},
@@ -658,6 +631,224 @@ var syntaxflowCompletion = &cli.Command{
 			Name:  "concurrency,c",
 			Usage: "concurrency of AI completion, default is 5",
 		},
+		cli.DurationFlag{
+			Name:  "skip-recent,recent",
+			Usage: "skip files modified within this duration (e.g., 30m, 1h, 2h30m), default is 0 (no skip)",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		target := c.String("target")
+		typ := c.String("ai-type")
+		key := c.String("api-key")
+		model := c.String("ai-model")
+		proxy := c.String("proxy")
+		concurrency := c.Int("concurrency")
+		domain := c.String("domain")
+		baseUrl := c.String("url")
+		files := c.StringSlice("fs")
+		skipRecent := c.Duration("skip-recent")
+		if concurrency == 0 {
+			concurrency = 5 // default concurrency
+		}
+
+		var aiOpts []aispec.AIConfigOption
+		if model != "" {
+			aiOpts = append(aiOpts, aispec.WithModel(model))
+		}
+		if domain != "" {
+			aiOpts = append(aiOpts, aispec.WithDomain(domain))
+		}
+		if typ != "" {
+			aiOpts = append(aiOpts, aispec.WithType(typ))
+		}
+		if key != "" {
+			aiOpts = append(aiOpts, aispec.WithAPIKey(key))
+		}
+		if proxy != "" {
+			aiOpts = append(aiOpts, aispec.WithProxy(proxy))
+		}
+		if baseUrl != "" {
+			aiOpts = append(aiOpts, aispec.WithBaseURL(baseUrl))
+		}
+
+		swg := new(sync.WaitGroup)
+		errChan := make(chan error, 1)
+		taskChannel := make(chan string, 1)
+		var errors error
+		errorDone := make(chan struct{}, 1)
+		go func() {
+			for err := range errChan {
+				errors = utils.JoinErrors(errors, err)
+			}
+			errorDone <- struct{}{}
+			close(errorDone)
+		}()
+		var taskCount atomic.Int64
+		var processedCount atomic.Int64 // 成功处理的文件数
+		var skippedCount atomic.Int64   // 跳过的文件数
+		var errorCount atomic.Int64     // 处理失败的文件数
+		for i := 0; i < concurrency; i++ {
+			swg.Add(1)
+			go func() {
+				defer swg.Done()
+				for fileName := range taskChannel {
+					if !strings.HasSuffix(fileName, ".sf") {
+						log.Infof("syntaxflow-completion: skipping file %s (not a .sf file)", fileName)
+						continue
+					}
+					raw, err := os.ReadFile(fileName)
+					if err != nil {
+						errorCount.Add(1)
+						log.Errorf("failed to read file %s: %v", fileName, err)
+						continue
+					}
+					rule, err := sfcompletion.CompleteRuleDesc(fileName, string(raw), aiOpts...)
+					if err != nil {
+						errorCount.Add(1)
+						err = utils.Errorf("failed parse complete file %s: %v", fileName, err)
+						errChan <- utils.JoinErrors(err, err)
+						log.Errorf("%v", err)
+						continue
+					}
+					// check format rule
+					if _, err := sfvm.CompileRule(rule); err != nil {
+						errorCount.Add(1)
+						err = utils.Errorf("failed completion sf rule %s: %v\nsf rule: \n%s", fileName, err, rule)
+						errChan <- utils.JoinErrors(err, err)
+						log.Errorf("%v", err)
+						continue
+					}
+					err = os.WriteFile(fileName, []byte(rule), 0o666)
+					if err != nil {
+						errorCount.Add(1)
+						log.Errorf("failed to write file %s: %v", fileName, err)
+						errChan <- utils.Errorf("failed to write file %s: %v", fileName, err)
+						continue
+					}
+					processedCount.Add(1)
+					sleepTime := rand.Intn(5)
+					log.Infof("syntaxflow-completion: completed file %s, sleep for %d seconds", fileName, sleepTime)
+					time.Sleep(time.Second * time.Duration(sleepTime))
+				}
+			}()
+		}
+		// 检查文件是否应该被跳过（最近修改过）
+		shouldSkipFile := func(filePath string) bool {
+			if skipRecent == 0 {
+				return false // 如果没有设置跳过时间，不跳过任何文件
+			}
+
+			fileInfo, err := os.Stat(filePath)
+			if err != nil {
+				log.Errorf("syntaxflow-completion: failed to get file info for %s: %v", filePath, err)
+				return false // 如果无法获取文件信息，不跳过
+			}
+
+			modTime := fileInfo.ModTime()
+			timeSinceModification := time.Since(modTime)
+
+			if timeSinceModification < skipRecent {
+				skippedCount.Add(1)
+				log.Infof("syntaxflow-completion: skipping file %s (modified %v ago, within %v threshold)",
+					filePath, timeSinceModification.Round(time.Second), skipRecent)
+				return true
+			}
+
+			return false
+		}
+
+		addTask := func(target string) {
+			if utils.IsFile(target) {
+				if shouldSkipFile(target) {
+					return
+				}
+				log.Infof("syntaxflow-completion: processing file %s", target)
+				taskChannel <- target
+				taskCount.Add(1)
+			} else if utils.IsDir(target) {
+				log.Infof("syntaxflow-completion: processing directory %s", target)
+				filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+					if shouldSkipFile(s) {
+						return nil
+					}
+					log.Infof("syntaxflow-completion: processing file %s", s)
+					taskChannel <- s
+					taskCount.Add(1)
+					return nil
+				}))
+			} else {
+				log.Errorf("syntaxflow-completion: file %s not found", target)
+			}
+		}
+
+		if target != "" {
+			addTask(target)
+		}
+		for _, f := range files {
+			addTask(f)
+		}
+		close(taskChannel)
+		swg.Wait()
+		close(errChan)
+		<-errorDone
+
+		// 打印统计报告
+		totalFiles := processedCount.Load() + skippedCount.Load() + errorCount.Load()
+		log.Infof("==================== SyntaxFlow Completion Report ====================")
+		log.Infof("Total files found: %d", totalFiles)
+		log.Infof("Successfully processed: %d", processedCount.Load())
+		log.Infof("Skipped (recently modified): %d", skippedCount.Load())
+		log.Infof("Failed with errors: %d", errorCount.Load())
+		if skipRecent > 0 {
+			log.Infof("Skip threshold: files modified within %v", skipRecent)
+		}
+		log.Infof("=====================================================================")
+
+		return errors
+	},
+}
+
+var syntaxflowTestCasesCompletion = &cli.Command{
+	Name:    "syntaxflow-test-cases-completion",
+	Aliases: []string{"sf-test-cases", "sf-tc"},
+	Usage:   "SyntaxFlow Rule Test Cases Completion By AI (Both Positive and Negative)",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "ai-type,type",
+			Usage: "type of AI type",
+		},
+		cli.StringFlag{
+			Name:  "target,t",
+			Usage: "the file or directory to process, if it is a directory, all .sf files will be processed",
+		},
+		cli.StringFlag{
+			Name:  "api-key,key,k",
+			Usage: "api key of AI",
+		},
+		cli.StringFlag{
+			Name:  "ai-model,model,m",
+			Usage: "model of AI",
+		},
+		cli.StringFlag{
+			Name:  "proxy,p",
+			Usage: "proxy of AI",
+		},
+		cli.StringFlag{
+			Name:  "domain,ai-domain",
+			Usage: "domain of ai",
+		},
+		cli.StringFlag{
+			Name:  "baseUrl,url",
+			Usage: "baseUrl of ai",
+		},
+		cli.StringSliceFlag{
+			Name:  "files,fs",
+			Usage: "files to process, if it is a directory, all .sf files will be processed",
+		},
+		cli.IntFlag{
+			Name:  "concurrency,c",
+			Usage: "concurrency of AI completion, default is 3",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		target := c.String("target")
@@ -670,7 +861,7 @@ var syntaxflowCompletion = &cli.Command{
 		baseUrl := c.String("url")
 		files := c.StringSlice("fs")
 		if concurrency == 0 {
-			concurrency = 5 // default concurrency
+			concurrency = 1 // default concurrency, lower than desc completion
 		}
 
 		var aiOpts []aispec.AIConfigOption
@@ -712,7 +903,7 @@ var syntaxflowCompletion = &cli.Command{
 				defer swg.Done()
 				for fileName := range taskChannel {
 					if !strings.HasSuffix(fileName, ".sf") {
-						log.Infof("syntaxflow-completion: skipping file %s (not a .sf file)", fileName)
+						log.Infof("syntaxflow-test-cases-completion: skipping file %s (not a .sf file)", fileName)
 						continue
 					}
 					raw, err := os.ReadFile(fileName)
@@ -720,47 +911,48 @@ var syntaxflowCompletion = &cli.Command{
 						log.Errorf("failed to read file %s: %v", fileName, err)
 						continue
 					}
-					rule, err := sfcompletion.CompleteRuleDesc(fileName, string(raw), aiOpts...)
+					rule, err := sfcompletion.CompleteTestCases(fileName, string(raw), aiOpts...)
 					if err != nil {
-						err = utils.Errorf("failed parse complete file %s: %v", fileName, err)
-						errChan <- utils.JoinErrors(err, err)
+						err = utils.Errorf("failed to complete test cases for file %s: %v", fileName, err)
+						errChan <- err
 						log.Errorf("%v", err)
 						continue
 					}
 					// check format rule
 					if _, err := sfvm.CompileRule(rule); err != nil {
-						err = utils.Errorf("failed completion sf rule %s: %v\nsf rule: \n%s", fileName, err, rule)
-						errChan <- utils.JoinErrors(err, err)
+						err = utils.Errorf("failed to validate completed rule for file %s: %v\nrule content: \n%s", fileName, err, rule)
+						errChan <- err
 						log.Errorf("%v", err)
 						continue
 					}
+
 					err = os.WriteFile(fileName, []byte(rule), 0o666)
 					if err != nil {
 						log.Errorf("failed to write file %s: %v", fileName, err)
 						errChan <- utils.Errorf("failed to write file %s: %v", fileName, err)
 						continue
 					}
-					sleepTime := rand.Intn(5)
-					log.Infof("syntaxflow-completion: completed file %s, sleep for %d seconds", fileName, sleepTime)
+					sleepTime := rand.Intn(3) + 2 // 2-4 seconds sleep
+					log.Infof("syntaxflow-test-cases-completion: completed file %s, sleep for %d seconds", fileName, sleepTime)
 					time.Sleep(time.Second * time.Duration(sleepTime))
 				}
 			}()
 		}
 		addTask := func(target string) {
 			if utils.IsFile(target) {
-				log.Infof("syntaxflow-completion: processing file %s", target)
+				log.Infof("syntaxflow-test-cases-completion: processing file %s", target)
 				taskChannel <- target
 				taskCount.Add(1)
 			} else if utils.IsDir(target) {
-				log.Infof("syntaxflow-completion: processing directory %s", target)
+				log.Infof("syntaxflow-test-cases-completion: processing directory %s", target)
 				filesys.Recursive(target, filesys.WithFileSystem(filesys.NewLocalFs()), filesys.WithFileStat(func(s string, info fs.FileInfo) error {
-					log.Infof("syntaxflow-completion: processing file %s", s)
+					log.Infof("syntaxflow-test-cases-completion: processing file %s", s)
 					taskChannel <- s
 					taskCount.Add(1)
 					return nil
 				}))
 			} else {
-				log.Errorf("syntaxflow-completion: file %s not found", target)
+				log.Errorf("syntaxflow-test-cases-completion: file %s not found", target)
 			}
 		}
 
@@ -853,77 +1045,134 @@ var syntaxFlowSave = &cli.Command{
 var ssaRisk = &cli.Command{
 	Name:    "ssa-risk",
 	Aliases: []string{"ssa-risk", "sr"},
-	Usage:   "output risk information from the database",
+	Usage:   "visualize and format risk report from JSON file",
 	Flags: []cli.Flag{
-
-		// Input {{{
-		// program name
+		cli.StringFlag{
+			Name:  "input,i",
+			Usage: "risk report JSON file to be imported",
+		},
 		cli.StringFlag{
 			Name:  "program,p",
 			Usage: "program name for ssa compiler in db",
 		},
-		// }}}
-
-		// output {{{
+		// 	cli.StringFlag{
+		// 		Name: "format",
+		// 		Usage: `output format:
+		// * sarif - SARIF format output
+		// * irify - IRify format (truncated file content)
+		// * irify-full - IRify format with full file content
+		// * irify-react-report - IRify React report format
+		// 	`,
+		// 	},
+		// TODO: 更详细的过滤器可能要和risk filter对接
 		cli.StringFlag{
-			Name:  "output,o",
-			Usage: "output file, use --format set output file format, default is sarif",
+			Name:  "severity",
+			Usage: "filter by severity level (critical, high, middle, low)",
 		},
-		// TODO: json format
-		// cli.StringFlag{
-		// 	Name:  "format",
-		// 	Usage: "output file format, set with json or sarif(default)",
-		// },
-		// }}}
-
-		// {{ risk
-		// TODO: risk query filter
-		// cli.StringFlag{
-		// 	Name:  "log",
-		// 	Usage: "log level",
-		// },
-		cli.StringSliceFlag{
-			Name:  "task-id,tid",
-			Usage: "task id for ssa compiler in db",
+		cli.StringFlag{
+			Name:  "rule",
+			Usage: "filter by rule name (partial match)",
 		},
-		// }}
+		cli.BoolFlag{
+			Name:  "with-code",
+			Usage: "include code fragments in output",
+		},
 	},
 	Action: func(c *cli.Context) (e error) {
-		defer func() {
-			log.Infof("code scan  done")
-			if err := recover(); err != nil {
-				log.Errorf("code scan failed: %s", err)
-				utils.PrintCurrentGoroutineRuntimeStack()
-				log.Infof("please use yak `ssa-risk` can export rest result")
-				e = utils.Errorf("code scan failed: %s", err)
+		input := c.String("input")
+		program := c.String("program")
+
+		showAll := func(content []byte) error {
+			var report sfreport.Report
+			if err := json.Unmarshal(content, &report); err != nil {
+				return utils.Wrap(err, "failed to parse JSON file")
 			}
-		}()
-		ctx := context.Background()
 
-		// Parse configuration
-		config, err := parseSFScanConfig(c)
-		if err != nil {
-			log.Errorf("parse config failed: %s", err)
-			return err
-		}
-		// Ensure the file is closed after we're done
-		defer config.DeferFunc()
-
-		taskIds := c.StringSlice("task-id")
-
-		prog, err := getProgram(ctx, config)
-		if err != nil {
-			log.Errorf("get program failed: %s", err)
-			return err
+			// format := sfreport.ReportTypeFromString(c.String("format"))
+			severityFilter := c.String("severity-filter")
+			ruleFilter := c.String("rule-filter")
+			withCode := c.Bool("with-code")
+			return outputConsole(os.Stdout, &report, severityFilter, ruleFilter, withCode)
 		}
 
-		ShowResult(config.Format, &ypb.SyntaxFlowResultFilter{
-			ProgramNames: []string{prog.GetProgramName()},
-			TaskIDs:      taskIds,
-			OnlyRisk:     true,
-		}, config.OutputWriter)
+		if input != "" {
+			if !utils.IsFile(input) {
+				return utils.Errorf("input file not found: %v", input)
+			}
+
+			content, err := os.ReadFile(input)
+			if err != nil {
+				return utils.Wrap(err, "failed to read input file")
+			}
+
+			// 检查文件是否为空
+			if len(content) == 0 {
+				fmt.Println("⚠️ Input file is empty (no security risks found)")
+				fmt.Println("This usually means no security risks were detected during the scan")
+				return nil
+			}
+
+			// 检查文件是否包含有效的 JSON
+			if !json.Valid(content) {
+				fmt.Printf("❌ Input file contains invalid JSON\n")
+				fmt.Printf("File content: %s\n", string(content))
+				return utils.Errorf("input file contains invalid JSON")
+			}
+
+			// 尝试解析 JSON 以检查结构
+			var testReport sfreport.Report
+			if err := json.Unmarshal(content, &testReport); err != nil {
+				fmt.Printf("❌ Input file is not a valid risk report JSON\n")
+				fmt.Printf("Parse error: %v\n", err)
+				return utils.Wrap(err, "failed to parse JSON file")
+			}
+
+			return showAll(content)
+		} else if program != "" {
+			config, err := parseSFScanConfig(c)
+			if err != nil {
+				log.Errorf("parse config failed: %s", err)
+				return err
+			}
+			defer config.DeferFunc()
+
+			ctx := context.Background()
+			_ = ctx
+			// prog, err := getProgram(ctx, config)
+			// if err != nil {
+			// 	log.Errorf("get program failed: %s", err)
+			// 	return err
+			// }
+
+			// ruleFilter := &ypb.SyntaxFlowRuleFilter{
+			// 	Language:          []string{prog.GetLanguage()},
+			// 	FilterLibRuleKind: yakit.FilterLibRuleFalse,
+			// }
+
+			var content []byte
+			// riskCh, err := scan(ctx, prog.GetProgramName(), ruleFilter, true)
+			if err != nil {
+				log.Errorf("scan failed: %s", err)
+				// log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
+				return err
+			}
+			opt := []sfreport.Option{}
+			if c.Bool("with-file-content") {
+				opt = append(opt, sfreport.WithFileContent(true))
+			}
+			if c.Bool("with-dataflow-path") {
+				opt = append(opt, sfreport.WithDataflowPath(true))
+			}
+
+			// 创建一个缓冲区来捕获ShowRisk的输出
+			// var buffer bytes.Buffer
+			// ShowRisk(config.Format, riskCh, &buffer, opt...)
+			// content = buffer.Bytes()
+
+			return showAll(content)
+		}
+
 		return nil
-
 	},
 }
 
@@ -948,6 +1197,14 @@ var ssaCodeScan = &cli.Command{
 			Usage: "language for ssa compiler",
 		},
 
+		cli.BoolFlag{
+			Name:  "memory,mem",
+			Usage: "enable memory mode",
+		},
+		cli.StringFlag{
+			Name:  "database,db",
+			Usage: "database path",
+		},
 		// }}}
 
 		// result show option
@@ -964,11 +1221,11 @@ var ssaCodeScan = &cli.Command{
 			Usage: `set rule keyword for filter`,
 		},
 
-		// rule input // todo
-		// cli.StringFlag{
-		// 	Name:  "rule-dir,rdir",
-		// 	Usage: `set rule dir for file`,
-		// },
+		// rule group filter
+		cli.StringSliceFlag{
+			Name:  "rule-group,rg",
+			Usage: `set rule group names for filter (can be used multiple times)`,
+		},
 		// }}}
 
 		// output {{{
@@ -978,10 +1235,40 @@ var ssaCodeScan = &cli.Command{
 			Usage: "output file, default format is sarif",
 		},
 		cli.StringFlag{
-			Name:  "format",
-			Usage: "output file format, set with irify,irify-full or sarif(default)",
+			Name: "format",
+			Usage: `output file format:
+	* sarif (default)
+	* irify (can config with --with-file-content and --with-dataflow-path)
+	* irify-full (with all info)
+	* irify-react-report (save database and generate react report in IRify frontend)
+		`,
+		},
+
+		cli.BoolFlag{
+			Name:  "with-file-content",
+			Usage: "include full file content in the output (only for irify format)",
+		},
+		cli.BoolFlag{
+			Name:  "with-dataflow-path",
+			Usage: "include dataflow path in the output (only for irify format)",
 		},
 		// }}}
+
+		cli.StringFlag{
+			Name:  "pprof",
+			Usage: `enable pprof and save pprof file to the given path`,
+		},
+
+		cli.StringFlag{
+			Name:  "log-level,loglevel",
+			Usage: `set log level, default is info, optional value: debug, info, warn, error`,
+		},
+
+		cli.StringSliceFlag{
+			Name: "exclude-file",
+			Usage: `exclude default file,only support glob mode. eg.
+					targets/*, vendor/*`,
+		},
 	},
 	Action: func(c *cli.Context) (e error) {
 		defer func() {
@@ -994,13 +1281,33 @@ var ssaCodeScan = &cli.Command{
 			}
 		}()
 		ctx := context.Background()
+
+		if pprofFile := c.String("pprof"); pprofFile != "" {
+			ssaprofile.DumpHeapProfileWithInterval(30*time.Second, ssaprofile.WithFileName(pprofFile))
+		}
+
+		if logLevel := c.String("log-level"); logLevel != "" {
+			level, err := log.ParseLevel(logLevel)
+			if err != nil {
+				log.Warnf("parse log level %s failed: %v, use info level", logLevel, err)
+				level = log.InfoLevel
+			}
+			log.SetLevel(level)
+		}
+
 		log.Infof("============= start to scan code ==============")
+
 		ruleTimeStart := time.Now()
 		SyncEmbedRule()
-		ruleTime := time.Now().Sub(ruleTimeStart)
+		ruleTime := time.Since(ruleTimeStart)
 		_ = ruleTime
 		log.Infof("sync rule from embed to database success, cost %v", ruleTime)
 
+		if databaseRaw := c.String("database"); databaseRaw != "" {
+			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseRaw); err != nil {
+				return utils.Errorf("set database by info %s failed: %v", databaseRaw, err)
+			}
+		}
 		// Parse configuration
 		config, err := parseSFScanConfig(c)
 		if err != nil {
@@ -1010,45 +1317,251 @@ var ssaCodeScan = &cli.Command{
 		// Ensure the file is closed after we're done
 		defer config.DeferFunc()
 
-		compileTimeStart := time.Now()
+		// compileTimeStart := time.Now()
 		prog, err := getProgram(ctx, config)
 		if err != nil {
 			log.Errorf("get program failed: %s", err)
 			return err
 		}
-		compileTime := time.Now().Sub(compileTimeStart)
-		log.Infof("get or parse rule success, cost %v", compileTime)
+		// compileTime := time.Since(compileTimeStart)s.
+		// log.Infof("get or parse rule success, cost %v", compileTime)
 
 		log.Infof("================= get or parse rule ================")
-		scanTimeStart := time.Now()
+		// scanTimeStart := time.Now()
 		ruleFilter := &ypb.SyntaxFlowRuleFilter{
 			Language:          []string{prog.GetLanguage()},
+			Keyword:           c.String("rule-keyword"),
 			FilterLibRuleKind: yakit.FilterLibRuleFalse,
 		}
-		ruleFilter.Keyword = c.String("rule-keyword")
 
-		taskId, err := scan(ctx, prog.GetProgramName(), ruleFilter)
+		// Handle rule group filtering
+		if groupNames := c.StringSlice("rule-group"); len(groupNames) > 0 {
+			ruleFilter.GroupNames = groupNames
+		}
+
+		opt := []sfreport.Option{}
+		if c.Bool("with-file-content") {
+			opt = append(opt, sfreport.WithFileContent(true))
+		}
+		if c.Bool("with-dataflow-path") {
+			opt = append(opt, sfreport.WithDataflowPath(true))
+		}
+		reportInstance, err := sfreport.ConvertSyntaxFlowResultToReport(config.Format, opt...)
 		if err != nil {
-			log.Errorf("scan failed: %s", err)
-			log.Infof("you can use `yak ssa-risk -p %s --task-id \"%s\" -o xxx`", prog.GetProgramName(), taskId)
+			log.Errorf("create report instance failed: %s", err)
 			return err
 		}
-		scanTime := time.Now().Sub(scanTimeStart)
-		log.Infof("scan success, task id: %s with program: %s, cost %v", taskId, prog.GetProgramName(), scanTime)
+		err = syntaxflow_scan.StartScan(
+			ctx,
+			syntaxflow_scan.WithProgramNames(prog.GetProgramName()),
+			syntaxflow_scan.WithRuleFilter(ruleFilter),
+			syntaxflow_scan.WithMemory(c.Bool("memory")),
+			syntaxflow_scan.WithReporter(reportInstance),
+			syntaxflow_scan.WithReporterWriter(config.OutputWriter),
+			syntaxflow_scan.WithProcessCallback(func(taskID, status string, progress float64, info *syntaxflow_scan.RuleProcessInfoList) {
+				log.Infof("task %s status: %s, progress: %.2f%%", taskID, status, progress*100)
+				if info == nil || len(info.Rules) == 0 {
+					return
+				}
+				str := "\n"
+				for _, rule := range info.Rules {
+					since := time.Since(time.Unix(rule.UpdateTime, 0))
+					str += fmt.Sprintf("\t %s [progress: %.2f%%, update: %s, status: %s]\n", rule.RuleName, rule.Progress*100, since, rule.Info)
+					// str += fmt.Sprintf("\t%s (progress: %.2f%%, status: %s)\n", rule.RuleName, rule.Progress*100, rule.Info)
+				}
 
-		exportTimeStart := time.Now()
-		ShowResult(config.Format, &ypb.SyntaxFlowResultFilter{
-			TaskIDs:  []string{taskId},
-			OnlyRisk: true,
-		}, config.OutputWriter)
-		exportTime := time.Now().Sub(exportTimeStart)
-		log.Infof("show result success, cost %v", exportTime)
-		// show echo  time
-		log.Infof("finish all time cost:")
-		log.Infof("rule sync: %v", ruleTime)
-		log.Infof("compile: %v", compileTime)
-		log.Infof("scan: %v", scanTime)
-		log.Infof("export: %v", exportTime)
+				log.Infof("rule: %s", str)
+
+			}),
+		)
+		if err != nil {
+			log.Errorf("scan failed: %s", err)
+			return err
+		}
+		ssaprofile.ShowCacheCost()
+		return nil
+	},
+}
+
+var syntaxFlowEvaluate = &cli.Command{
+	Name:    "syntaxflow-evaluate",
+	Aliases: []string{"sf-evaluate"},
+	Usage:   "evaluate SyntaxFlow rule quality and provide score",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "target,t",
+			Usage: "target file or directory to evaluate",
+		},
+		cli.StringFlag{
+			Name:  "output,o",
+			Usage: "output file for evaluation result (json format)",
+		},
+		cli.BoolFlag{
+			Name:  "verbose,v",
+			Usage: "verbose output with detailed problems",
+		},
+		cli.BoolFlag{
+			Name:  "json",
+			Usage: "output in JSON format",
+		},
+	},
+	Action: func(c *cli.Context) error {
+		target := c.String("target")
+		output := c.String("output")
+		verbose := c.Bool("verbose")
+		jsonOutput := c.Bool("json")
+
+		if target == "" {
+			return utils.Error("target file or directory is required")
+		}
+
+		// Check if target exists
+		if !utils.IsFile(target) && !utils.IsDir(target) {
+			return utils.Errorf("target file or directory not found: %v", target)
+		}
+
+		results := make(map[string]*sfanalyzer.SyntaxFlowRuleAnalyzeResult)
+
+		// Process single file or directory
+		if utils.IsFile(target) {
+			if !strings.HasSuffix(target, ".sf") {
+				return utils.Error("target file must be a .sf file")
+			}
+
+			content, err := os.ReadFile(target)
+			if err != nil {
+				return utils.Errorf("failed to read file %s: %v", target, err)
+			}
+			fileName := filepath.Base(target)
+
+			analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content))
+			result := analyzer.Analyze()
+			results[fileName] = result
+		} else {
+			// Process directory
+			err := filesys.Recursive(target, filesys.WithFileStat(func(s string, info fs.FileInfo) error {
+				if !strings.HasSuffix(s, ".sf") {
+					return nil
+				}
+
+				content, err := os.ReadFile(s)
+				if err != nil {
+					log.Errorf("failed to read file %s: %v", s, err)
+					return nil
+				}
+				fileName := filepath.Base(s)
+				analyzer := sfanalyzer.NewSyntaxFlowAnalyzer(string(content))
+				result := analyzer.Analyze()
+				results[fileName] = result
+				return nil
+			}))
+			if err != nil {
+				return utils.Errorf("failed to process directory: %v", err)
+			}
+		}
+
+		if len(results) == 0 {
+			return utils.Error("no .sf files found to evaluate")
+		}
+
+		// Output results
+		if jsonOutput || output != "" {
+			// JSON output
+			jsonData, err := json.MarshalIndent(results, "", "  ")
+			if err != nil {
+				return utils.Errorf("failed to marshal results to JSON: %v", err)
+			}
+
+			if output != "" {
+				err = os.WriteFile(output, jsonData, 0o666)
+				if err != nil {
+					return utils.Errorf("failed to write output file: %v", err)
+				}
+				log.Infof("Evaluation results written to %s", output)
+			} else {
+				fmt.Println(string(jsonData))
+			}
+		} else {
+			// Human-readable output
+			for fileName, result := range results {
+				fmt.Printf("\n=== %s ===\n", fileName)
+				fmt.Printf("得分: %d/%d\n", result.Score, result.MaxScore)
+				grade := sfanalyzer.GetGrade(result.Score)
+				fmt.Printf("等级: %s (%s)\n", grade, sfanalyzer.GetGradeDescription(grade))
+
+				// 始终显示问题概览
+				if len(result.Problems) > 0 {
+					errorCount := 0
+					warningCount := 0
+					infoCount := 0
+
+					for _, problem := range result.Problems {
+						switch problem.Severity {
+						case sfanalyzer.Error:
+							errorCount++
+						case sfanalyzer.Warning:
+							warningCount++
+						case sfanalyzer.Info:
+							infoCount++
+						}
+					}
+
+					fmt.Printf("问题概览: ")
+					if errorCount > 0 {
+						fmt.Printf("%d个错误 ", errorCount)
+					}
+					if warningCount > 0 {
+						fmt.Printf("%d个警告 ", warningCount)
+					}
+					if infoCount > 0 {
+						fmt.Printf("%d个建议 ", infoCount)
+					}
+					fmt.Printf("\n")
+
+					// 简要显示主要问题
+					fmt.Printf("主要问题:\n")
+					for i, problem := range result.Problems {
+						if i >= 3 && !verbose { // 非详细模式只显示前3个问题
+							fmt.Printf("  ... (还有 %d 个问题，使用 -v 查看详情)\n", len(result.Problems)-3)
+							break
+						}
+						fmt.Printf("  • [%s] %s\n", problem.Severity, problem.Description)
+					}
+				} else {
+					fmt.Printf("✓ 未发现问题\n")
+				}
+
+				// 详细模式显示完整信息
+				if verbose && len(result.Problems) > 0 {
+					fmt.Printf("\n详细问题信息:\n")
+					for i, problem := range result.Problems {
+						fmt.Printf("  %d. [%s] %s\n", i+1, problem.Severity, problem.Description)
+						if problem.Suggestion != "" {
+							fmt.Printf("     💡 建议: %s\n", problem.Suggestion)
+						}
+						if problem.Range != nil {
+							fmt.Printf("     📍 位置: 第%d行第%d列 - 第%d行第%d列\n",
+								problem.Range.StartLine, problem.Range.StartColumn,
+								problem.Range.EndLine, problem.Range.EndColumn)
+						}
+						fmt.Printf("\n")
+					}
+				}
+			}
+
+			// Summary
+			if len(results) > 1 {
+				fmt.Printf("\n=== 总结 ===\n")
+				total := 0
+				for _, result := range results {
+					total += result.Score
+				}
+				average := float64(total) / float64(len(results))
+				fmt.Printf("平均得分: %.1f/100\n", average)
+				fmt.Printf("评估文件数: %d\n", len(results))
+			}
+		}
+
 		return nil
 	},
 }
@@ -1301,14 +1814,15 @@ var SSACompilerCommands = []*cli.Command{
 	ssaCompile, // compile program
 
 	// rule manage
-	syntaxFlowCreate,     // create rule template
-	syntaxflowFormat,     //  format syntaxflow rule
-	syntaxflowCompletion, // complete syntaxflow rule with AI
-	syntaxFlowSave,       // save rule to database
-	syntaxFlowTest,       // test rule
-	syntaxFlowExport,     // export rule to file
-	syntaxFlowImport,     // import rule from file
-	syncRule,             // sync rule from embed to database
+	syntaxFlowCreate,              // create rule template
+	syntaxflowFormat,              //  format syntaxflow rule
+	syntaxflowCompletion,          // complete syntaxflow rule with AI
+	syntaxflowTestCasesCompletion, // complete test cases with AI
+	syntaxFlowSave,                // save rule to database
+	syntaxFlowEvaluate,            // evaluate rule quality
+	syntaxFlowExport,              // export rule to file
+	syntaxFlowImport,              // import rule from file
+	syncRule,                      // sync rule from embed to database
 	// risk manage
 	ssaRisk, // export risk report
 
@@ -1362,10 +1876,8 @@ func SyntaxFlowQuery(
 		return execError
 	}
 
-	if result != nil {
-		for _, c := range callbacks {
-			c(result)
-		}
+	for _, c := range callbacks {
+		c(result)
 	}
 
 	log.Infof("syntax flow query result:")
@@ -1375,4 +1887,109 @@ func SyntaxFlowQuery(
 		sfvm.WithShowDot(showDot),
 	)
 	return execError
+}
+
+func outputJSON(writer io.Writer, report *sfreport.Report) error {
+	jsonData, err := json.MarshalIndent(report, "", "  ")
+	if err != nil {
+		return utils.Wrap(err, "failed to marshal JSON")
+	}
+	_, err = writer.Write(jsonData)
+	return err
+}
+
+func outputSARIF(writer io.Writer, report *sfreport.Report) error {
+	fmt.Fprintf(writer, "SARIF format output not fully implemented yet.\n")
+	fmt.Fprintf(writer, "Please use 'irify' or 'irify-full' format for now.\n")
+	return outputJSON(writer, report)
+}
+
+func outputConsole(writer io.Writer, report *sfreport.Report, severityFilter, ruleFilter string, withCode bool) error {
+	filteredRisks := filterRisks(report.Risks, severityFilter, ruleFilter)
+
+	fmt.Fprintf(writer, "=== Scan Report Summary ===\n")
+	fmt.Fprintf(writer, "Scan Time: %s\n", report.ReportTime.Format("2006-01-02T15:04:05-07:00"))
+	fmt.Fprintf(writer, "Program: %s\n", report.ProgramName)
+	fmt.Fprintf(writer, "Language: %s\n", report.ProgramLang)
+	fmt.Fprintf(writer, "Files Scanned: %d\n", report.FileCount)
+	fmt.Fprintf(writer, "Lines of Code: %d\n", report.CodeLineCount)
+	fmt.Fprintf(writer, "Risks Found: %d\n", len(filteredRisks))
+	fmt.Fprintf(writer, "\n")
+
+	fmt.Fprintf(writer, "=== Risk Details ===\n")
+	riskCount := 0
+	for hash, risk := range filteredRisks {
+		riskCount++
+		fmt.Fprintf(writer, "Risk ID: %s\n", hash)
+		fmt.Fprintf(writer, "Title: %s\n", risk.GetTitleVerbose())
+		fmt.Fprintf(writer, "Severity: %s\n", risk.GetSeverity())
+		fmt.Fprintf(writer, "Location: %s:%d\n", risk.GetCodeSourceURL(), risk.GetLine())
+
+		description := risk.GetDescription()
+		if description != "" {
+			cleanDesc := strings.TrimSpace(description)
+			fmt.Fprintf(writer, "Description: %s\n", cleanDesc)
+		}
+
+		solution := risk.GetSolution()
+		if solution != "" {
+			cleanSolution := strings.TrimSpace(solution)
+			if len(cleanSolution) > 200 {
+				cleanSolution = cleanSolution[:200] + "..."
+			}
+			fmt.Fprintf(writer, "Solution: %s\n", cleanSolution)
+		}
+
+		if withCode {
+			fmt.Fprintf(writer, "Affected Code:\n")
+			codeFragment := risk.GetCodeFragment()
+			if codeFragment != "" {
+				codeLines := strings.Split(codeFragment, "\n")
+				for _, line := range codeLines {
+					fmt.Fprintf(writer, "  %s\n", line)
+				}
+			}
+		}
+
+		fmt.Fprintf(writer, "\n")
+	}
+
+	fmt.Fprintf(writer, "=== Affected Files ===\n")
+	for _, file := range report.File {
+		hasFilteredRisks := false
+		filteredFileRisks := []string{}
+		for _, riskHash := range file.Risks {
+			if _, exists := filteredRisks[riskHash]; exists {
+				hasFilteredRisks = true
+				filteredFileRisks = append(filteredFileRisks, riskHash)
+			}
+		}
+
+		if hasFilteredRisks {
+			fmt.Fprintf(writer, "File: %s\n", file.Path)
+			fmt.Fprintf(writer, "Lines: %d\n", file.LineCount)
+			fmt.Fprintf(writer, "Risk IDs: %s\n", strings.Join(filteredFileRisks, ", "))
+			fmt.Fprintf(writer, "\n")
+		}
+	}
+
+	return nil
+}
+
+func filterRisks(risks map[string]*sfreport.Risk, severityFilter, ruleFilter string) map[string]*sfreport.Risk {
+	filtered := make(map[string]*sfreport.Risk)
+
+	for hash, risk := range risks {
+		if severityFilter != "" && !strings.EqualFold(risk.GetSeverity(), severityFilter) {
+			continue
+		}
+
+		if ruleFilter != "" && !strings.Contains(strings.ToLower(risk.GetRuleName()), strings.ToLower(ruleFilter)) {
+			continue
+		}
+
+		filtered[hash] = risk
+	}
+
+	return filtered
 }

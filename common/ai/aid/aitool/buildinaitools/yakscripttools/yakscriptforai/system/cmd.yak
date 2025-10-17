@@ -1,0 +1,62 @@
+__DESC__ = "一个强大的Windows CMD命令执行工具，允许用户在受控环境中执行任意Windows命令行指令，支持超时控制和输出捕获，适用于Windows系统管理、自动化脚本执行和运维操作。"
+__VERBOSE_NAME__ = "Windows命令执行"
+__KEYWORDS__ = "cmd command,windows命令,命令行工具,系统管理,自动化脚本,运维工具,batch script,command execution,系统操作,cmd脚本,终端命令,system administration,automation tools,操作系统,windows命令"
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数：超时时间和要执行的cmd命令
+timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the cmd command, default 10, timeout cannot be zero and below"), cli.setDefault(10))
+command := cli.String("command", cli.setRequired(true), cli.setHelp("the Windows cmd command you want to execute"))
+
+cli.check()
+
+yakit.Info("Executing Windows command: %v", command)
+
+// 验证超时参数，确保不为零或负数
+if timeoutSeconds <= 0 {
+    timeoutSeconds = 10
+}
+
+// 创建带超时的上下文，保护系统资源
+ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSeconds) + "s")~)
+
+// 构建cmd命令执行器，使用Windows的cmd.exe
+cmd, err := exec.CommandContext(ctx, "cmd /c %s" % command)
+if err != nil {
+    yakit.Error("Failed to create command: %v", err)
+    return
+}
+
+// 创建输出缓冲区以捕获命令结果
+stdoutbuf = bufio.NewBuffer()
+stderrbuf = bufio.NewBuffer()
+cmd.Stdout = stdoutbuf
+cmd.Stderr = stderrbuf
+
+// 执行命令并处理结果
+err = cmd.Run()
+if err != nil {
+    yakit.Error("Command execution failed: %v", err)
+}
+
+toUtf8 = (s)=>{
+    res,err = codec.GBKSafe(s)
+    if err {
+        return s
+    }
+    return res
+}
+
+// 输出执行结果
+count := 0
+if stdoutbuf.Len() > 0 {
+    count++
+    yakit.Info("Stdout:\n%v", toUtf8(stdoutbuf.String()))
+}
+if stderrbuf.Len() > 0 {
+    count++
+    yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
+}
+if count <= 0 {
+    yakit.Info("No output found, command execution failed or output is empty")
+}

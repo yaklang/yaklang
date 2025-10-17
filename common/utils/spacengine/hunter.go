@@ -3,7 +3,6 @@ package spacengine
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
@@ -90,6 +89,13 @@ func resultToSpacengineList(filter string, result *gjson.Result) []*base.NetSpac
 }
 
 func HunterQuery(key, query string, maxPage, pageSize, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	return HunterQueryWithConfig(key, query, maxPage, pageSize, maxRecord, nil, domains...)
+}
+
+func HunterQueryWithConfig(key, query string, maxPage, pageSize, maxRecord int, config *base.QueryConfig, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	if config == nil {
+		config = &base.QueryConfig{RandomDelayRange: 3} // 默认3秒延迟，保持兼容性
+	}
 	ch := make(chan *base.NetSpaceEngineResult)
 	var client *hunter.HunterClient
 	if len(domains) > 0 && domains[0] != "" {
@@ -119,7 +125,15 @@ func HunterQuery(key, query string, maxPage, pageSize, maxRecord int, domains ..
 				break
 			}
 			total := gjson.Get(result.Raw, "data.total").Int()
-			for _, record := range resultToSpacengineList(query, result) {
+			records := resultToSpacengineList(query, result)
+
+			// 如果当前页没有数据，停止翻页
+			if len(records) == 0 {
+				nextFinished = true
+				break
+			}
+
+			for _, record := range records {
 				if nextFinished {
 					break
 				}
@@ -137,8 +151,9 @@ func HunterQuery(key, query string, maxPage, pageSize, maxRecord int, domains ..
 				}
 			}
 
+			// 在翻页之间应用随机延迟
 			if !nextFinished {
-				time.Sleep(3 * time.Second)
+				base.ApplyRandomDelay(config.RandomDelayRange)
 			}
 		}
 	}()

@@ -5,15 +5,13 @@ desc(
 	lib: 'golang-os-sink'
 	desc: <<<DESC
 ### 规则描述
-
 #### 1. 规则目的
 该规则用于审计Go语言代码中`os`包的使用情况。`os`包提供了与操作系统进行交互的功能，包含文件操作、目录操作、进程管理、环境变量访问等。审计`os`包的使用有助于识别潜在的风险点，例如不安全的文件操作、任意命令执行、敏感信息泄露等。
-
 #### 2. 规则详细
 - **作为基础审计库**
-  属于`golang-os-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪）共同识别安全风险，提供对`os`包关键函数的识别能力。
+属于`golang-os-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪）共同识别安全风险，提供对`os`包关键函数的识别能力。
 - **覆盖的操作函数**
-  检测以下`os`包中的文件及目录操作函数，这些函数在接收不受信任的输入时可能引发路径穿越或文件权限问题：
+检测以下`os`包中的文件及目录操作函数，这些函数在接收不受信任的输入时可能引发路径穿越或文件权限问题：
   - `Create`: 创建文件
   - `Open`: 打开文件
   - `Remove`: 删除文件或空目录
@@ -21,39 +19,32 @@ desc(
   - `Mkdir`: 创建目录
   - `MkdirAll`: 创建目录及其父目录（如果需要）
   - `ReadDir`: 读取目录内容
-
 通过识别这些关键函数的使用，结合数据流分析，可以追踪不受控的数据是否被用于文件路径、命令参数或其他敏感操作，从而发现潜在的安全漏洞。
-
 #### 3. 漏洞原理
 路径穿越攻击是由于未对用户输入进行严格验证，攻击者可以通过构造特殊路径（如`../../`）访问本不应访问的文件或目录，可能导致敏感信息泄露或系统完整性破坏。
-
 #### 4. 触发场景
 ```go
 package main
-
 import (
-    "net/http"
-    "os"
+"net/http"
+"os"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-    filePath := r.URL.Query().Get("file")
-    file, err := os.Open(filePath) // 直接拼接用户输入
-    if err != nil {
-        http.Error(w, "File not found", http.StatusNotFound)
-        return
-    }
-    defer file.Close()
-    // 返回文件内容
+filePath := r.URL.Query().Get("file")
+file, err := os.Open(filePath) // 直接拼接用户输入
+if err != nil {
+http.Error(w, "File not found", http.StatusNotFound)
+return
 }
-
+defer file.Close()
+// 返回文件内容
+}
 func main() {
-    http.HandleFunc("/read", handler)
-    http.ListenAndServe(":8080", nil)
+http.HandleFunc("/read", handler)
+http.ListenAndServe(":8080", nil)
 }
 ```
 攻击者通过访问`/read?file=../../etc/passwd`可读取系统敏感文件。
-
 #### 5. 潜在影响
 - 敏感文件（如配置文件、密码文件）被非法读取。
 - 系统关键目录或文件被删除、篡改。
@@ -63,75 +54,63 @@ DESC
 	title_zh: "审计Golang os包使用"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用安全库
 建议使用更安全的库来替代直接使用`os`包，例如使用`afero`库来处理文件操作，它提供了更安全的文件操作接口。
-
 ```go
 // 示例：使用afero库进行文件操作
 import (
-    "github.com/spf13/afero"
+"github.com/spf13/afero"
 )
-
 func safeCreateFile(path string) error {
-    fs := afero.NewOsFs()
-    file, err := fs.Create(path)
-    if err != nil {
-        return err
-    }
-    defer file.Close()
-    // 其他文件操作
-    return nil
+fs := afero.NewOsFs()
+file, err := fs.Create(path)
+if err != nil {
+return err
+}
+defer file.Close()
+// 其他文件操作
+return nil
 }
 ```
-
 #### 2. 输入验证
 对用户输入进行严格的验证，确保输入符合预期的格式和范围，避免路径穿越等安全问题。
-
 ```go
 // 示例：验证文件路径
 import (
-    "path/filepath"
-    "strings"
+"path/filepath"
+"strings"
 )
-
 func validateFilePath(basePath, userPath string) (string, error) {
-    fullPath := filepath.Join(basePath, filepath.Base(userPath))
-    if !strings.HasPrefix(fullPath, basePath) {
-        return "", fmt.Errorf("Invalid file path")
-    }
-    return fullPath, nil
+fullPath := filepath.Join(basePath, filepath.Base(userPath))
+if !strings.HasPrefix(fullPath, basePath) {
+return "", fmt.Errorf("Invalid file path")
+}
+return fullPath, nil
 }
 ```
-
 #### 3. 权限控制
 确保文件操作时的权限控制得当，避免权限过高导致的安全风险。
-
 #### 4. 日志记录
 对关键文件操作进行日志记录，便于事后审计和问题追踪。
-
 ```go
 // 示例：记录文件操作日志
 import (
-    "log"
-    "os"
+"log"
+"os"
 )
-
 func logFileOperation(operation, path string) {
-    log.Printf("%s: %s\n", operation, path)
+log.Printf("%s: %s\n", operation, path)
 }
-
 func createFile(path string) error {
-    file, err := os.Create(path)
-    if err != nil {
-        return err
-    }
-    defer file.Close()
-    logFileOperation("Create", path)
-    return nil
+file, err := os.Create(path)
+if err != nil {
+return err
+}
+defer file.Close()
+logFileOperation("Create", path)
+return nil
 }
 ```
-
 #### 5. 使用沙箱环境
 对于高危操作，考虑使用沙箱环境隔离代码运行，防止对主机造成直接影响。
 SOLUTION
@@ -154,6 +133,118 @@ alert $output for {
 	title: "Unvalidated File Operation",
 	title_zh: "未验证的文件操作",
 	level: "info",
+	name: "output",
+	message: "发现Go语言代码中`os`包的文件操作函数使用情况，需审计是否存在路径穿越或权限问题。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用安全库
+建议使用更安全的库来替代直接使用`os`包，例如使用`afero`库来处理文件操作，它提供了更安全的文件操作接口。
+```go
+// 示例：使用afero库进行文件操作
+import (
+"github.com/spf13/afero"
+)
+func safeCreateFile(path string) error {
+fs := afero.NewOsFs()
+file, err := fs.Create(path)
+if err != nil {
+return err
+}
+defer file.Close()
+// 其他文件操作
+return nil
+}
+```
+#### 2. 输入验证
+对用户输入进行严格的验证，确保输入符合预期的格式和范围，避免路径穿越等安全问题。
+```go
+// 示例：验证文件路径
+import (
+"path/filepath"
+"strings"
+)
+func validateFilePath(basePath, userPath string) (string, error) {
+fullPath := filepath.Join(basePath, filepath.Base(userPath))
+if !strings.HasPrefix(fullPath, basePath) {
+return "", fmt.Errorf("Invalid file path")
+}
+return fullPath, nil
+}
+```
+#### 3. 权限控制
+确保文件操作时的权限控制得当，避免权限过高导致的安全风险。
+#### 4. 日志记录
+对关键文件操作进行日志记录，便于事后审计和问题追踪。
+```go
+// 示例：记录文件操作日志
+import (
+"log"
+"os"
+)
+func logFileOperation(operation, path string) {
+log.Printf("%s: %s\n", operation, path)
+}
+func createFile(path string) error {
+file, err := os.Create(path)
+if err != nil {
+return err
+}
+defer file.Close()
+logFileOperation("Create", path)
+return nil
+}
+```
+#### 5. 使用沙箱环境
+对于高危操作，考虑使用沙箱环境隔离代码运行，防止对主机造成直接影响。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+#### 1. 规则目的
+该规则用于审计Go语言代码中`os`包的使用情况。`os`包提供了与操作系统进行交互的功能，包含文件操作、目录操作、进程管理、环境变量访问等。审计`os`包的使用有助于识别潜在的风险点，例如不安全的文件操作、任意命令执行、敏感信息泄露等。
+#### 2. 规则详细
+- **作为基础审计库**
+属于`golang-os-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪）共同识别安全风险，提供对`os`包关键函数的识别能力。
+- **覆盖的操作函数**
+检测以下`os`包中的文件及目录操作函数，这些函数在接收不受信任的输入时可能引发路径穿越或文件权限问题：
+- `Create`: 创建文件
+- `Open`: 打开文件
+- `Remove`: 删除文件或空目录
+- `RemoveAll`: 删除目录及其内容
+- `Mkdir`: 创建目录
+- `MkdirAll`: 创建目录及其父目录（如果需要）
+- `ReadDir`: 读取目录内容
+通过识别这些关键函数的使用，结合数据流分析，可以追踪不受控的数据是否被用于文件路径、命令参数或其他敏感操作，从而发现潜在的安全漏洞。
+#### 3. 漏洞原理
+路径穿越攻击是由于未对用户输入进行严格验证，攻击者可以通过构造特殊路径（如`../../`）访问本不应访问的文件或目录，可能导致敏感信息泄露或系统完整性破坏。
+#### 4. 触发场景
+```go
+package main
+import (
+"net/http"
+"os"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+filePath := r.URL.Query().Get("file")
+file, err := os.Open(filePath) // 直接拼接用户输入
+if err != nil {
+http.Error(w, "File not found", http.StatusNotFound)
+return
+}
+defer file.Close()
+// 返回文件内容
+}
+func main() {
+http.HandleFunc("/read", handler)
+http.ListenAndServe(":8080", nil)
+}
+```
+攻击者通过访问`/read?file=../../etc/passwd`可读取系统敏感文件。
+#### 5. 潜在影响
+- 敏感文件（如配置文件、密码文件）被非法读取。
+- 系统关键目录或文件被删除、篡改。
+- 权限提升或进一步渗透至服务器。
+DESC
 }
 
 desc(

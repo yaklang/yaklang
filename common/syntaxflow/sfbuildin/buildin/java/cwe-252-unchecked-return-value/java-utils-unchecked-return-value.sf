@@ -4,69 +4,59 @@ desc(
 	type:security
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在Java `java.util`库中，部分方法（如`java.util.concurrent.locks.Lock.tryLock()`）会返回一个表示操作结果的状态值（例如布尔值或状态码）。这些返回值通常反映操作是否成功完成。如果开发者调用这些方法后未检查其返回值，则可能导致程序在异常状态下继续运行，从而引发资源泄露、线程安全问题甚至潜在的安全风险。
-
+在Java `java.util`库中，部分方法（如`java.util.concurrent.locks.Lock.tryLock()`）会返回一个表示操作结果的状态值（例如布尔值或状态码）。这些返回值通常反映操作是否成功完成。如果开发者调用这些方法后未检查其返回值，则可能导致程序在异常状态下继续运行，从而引发资源泄露、线程安全问题甚至潜在的安全风险。
 2. **触发场景**
-   ```java
-   // 存在漏洞的代码示例
-   Lock lock = new ReentrantLock();
-   lock.tryLock(); // 忽略返回值
-   // 假设后续代码需要锁保护
-   System.out.println("执行受保护代码...");
-   lock.unlock(); // 如果tryLock未成功获取锁，这里会抛出IllegalMonitorStateException
-   ```
-   上述代码忽略了`tryLock()`的返回值，因此无法确定是否成功获取锁。若未获取锁却继续执行解锁操作，将导致`IllegalMonitorStateException`异常。
-
+```java
+// 存在漏洞的代码示例
+Lock lock = new ReentrantLock();
+lock.tryLock(); // 忽略返回值
+// 假设后续代码需要锁保护
+System.out.println("执行受保护代码...");
+lock.unlock(); // 如果tryLock未成功获取锁，这里会抛出IllegalMonitorStateException
+```
+上述代码忽略了`tryLock()`的返回值，因此无法确定是否成功获取锁。若未获取锁却继续执行解锁操作，将导致`IllegalMonitorStateException`异常。
 3. **潜在影响**
-   - **资源泄露**: 锁未能正确获取却继续执行相关逻辑，可能造成死锁或资源争用。
-   - **错误处理不当**: 程序可能继续在异常状态下运行，产生不可预期的行为。
-   - **安全风险**: 特定场景下（如文件操作、网络通信等），忽略返回值可能导致权限不足或其他重要错误被忽略，为攻击者提供可乘之机。
-
+- **资源泄露**: 锁未能正确获取却继续执行相关逻辑，可能造成死锁或资源争用。
+- **错误处理不当**: 程序可能继续在异常状态下运行，产生不可预期的行为。
+- **安全风险**: 特定场景下（如文件操作、网络通信等），忽略返回值可能导致权限不足或其他重要错误被忽略，为攻击者提供可乘之机。
 DESC
 	rule_id: "7c76f377-c1b8-4ee7-96fd-895515d4302c"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **始终检查返回值**
-   对于返回状态或结果的方法，务必检查其返回值，并根据返回值进行相应处理，特别是在处理锁、资源句柄、数据流等敏感操作时。
-
-   ```java
-   // 修复代码示例 (针对 Lock.tryLock())
-   Lock lock = new ReentrantLock();
-   boolean acquired = lock.tryLock(); // 检查返回值
-   if (acquired) {
-       try {
-           // 执行需要锁保护的代码
-           System.out.println("执行受保护代码...");
-       } finally {
-           lock.unlock(); // 确保在 finally 块中释放锁
-       }
-   } else {
-       // 未能获取锁，执行相应处理，如重试、等待或报错
-       System.out.println("未能立即获取到锁");
-   }
-   ```
-
+对于返回状态或结果的方法，务必检查其返回值，并根据返回值进行相应处理，特别是在处理锁、资源句柄、数据流等敏感操作时。
+```java
+// 修复代码示例 (针对 Lock.tryLock())
+Lock lock = new ReentrantLock();
+boolean acquired = lock.tryLock(); // 检查返回值
+if (acquired) {
+try {
+// 执行需要锁保护的代码
+System.out.println("执行受保护代码...");
+} finally {
+lock.unlock(); // 确保在 finally 块中释放锁
+}
+} else {
+// 未能获取锁，执行相应处理，如重试、等待或报错
+System.out.println("未能立即获取到锁");
+}
+```
 2. **使用`lock()`代替`tryLock()`**
-   如果需要阻塞直到获取到锁，可以使用`lock()`方法，它会阻塞直到获取到锁，无需检查返回值（除非考虑中断）。
-
-   ```java
-   // 示例：使用 lock()
-   Lock lock = new ReentrantLock();
-   lock.lock(); // 阻塞直到获取锁
-   try {
-       // 执行需要锁保护的代码
-       System.out.println("执行受保护代码...");
-   } finally {
-       lock.unlock();
-   }
-   ```
-
+如果需要阻塞直到获取到锁，可以使用`lock()`方法，它会阻塞直到获取到锁，无需检查返回值（除非考虑中断）。
+```java
+// 示例：使用 lock()
+Lock lock = new ReentrantLock();
+lock.lock(); // 阻塞直到获取锁
+try {
+// 执行需要锁保护的代码
+System.out.println("执行受保护代码...");
+} finally {
+lock.unlock();
+}
+```
 3. **规范的异常处理**
-   对于可能抛出异常的方法，使用`try-catch`或`try-with-resources`结构确保错误得到妥善处理。
-
+对于可能抛出异常的方法，使用`try-catch`或`try-with-resources`结构确保错误得到妥善处理。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-252: Unchecked Return Value](https://cwe.mitre.org/data/definitions/252.html)
@@ -78,57 +68,49 @@ alert $weak for {
 	message: "发现Java java.util.concurrent.locks库的Lock.tryLock未检查返回值的API",
 	title: "Check Java Util Unchecked Return Value",
 	title_zh: "检测Java Util库未检查返回值的API",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
-1.  **始终检查返回值**: 对于返回状态或结果的方法，务必检查其返回值，并根据返回值进行相应的处理。特别是在处理锁、资源句柄、数据流等敏感操作时。
-
-    ```java
-    // 修复代码示例 (针对 Lock.tryLock())
-    Lock lock = new ReentrantLock();
-    boolean acquired = lock.tryLock(); // 检查返回值
-    if (acquired) {
-        try {
-            // 执行需要锁保护的代码
-        } finally {
-            lock.unlock(); // 确保在 finally 块中释放锁
-        }
-    } else {
-        // 未能获取锁，执行相应处理，如重试、等待或报错
-        System.out.println("未能立即获取到锁");
-    }
-    ```
-
-2.  **使用`lock()`代替`tryLock()`**: 如果需要阻塞直到获取到锁，可以使用`lock()`方法，它会阻塞直到获取到锁，无需检查返回值（除非考虑中断）。
-
-    ```java
-    // 示例：使用 lock()
-    Lock lock = new ReentrantLock();
-    lock.lock(); // 阻塞直到获取锁
-    try {
-        // 执行需要锁保护的代码
-    } finally {
-        lock.unlock();
-    }
-    ```
-
-3.  **规范的异常处理**: 对于可能抛出异常的方法，使用 `try-catch` 或 `try-with-resources` 结构确保错误得到妥善处理。
-CODE
-	desc: <<<CODE
+1. **始终检查返回值**: 对于返回状态或结果的方法，务必检查其返回值，并根据返回值进行相应的处理。特别是在处理锁、资源句柄、数据流等敏感操作时。
+```java
+// 修复代码示例 (针对 Lock.tryLock())
+Lock lock = new ReentrantLock();
+boolean acquired = lock.tryLock(); // 检查返回值
+if (acquired) {
+try {
+// 执行需要锁保护的代码
+} finally {
+lock.unlock(); // 确保在 finally 块中释放锁
+}
+} else {
+// 未能获取锁，执行相应处理，如重试、等待或报错
+System.out.println("未能立即获取到锁");
+}
+```
+2. **使用`lock()`代替`tryLock()`**: 如果需要阻塞直到获取到锁，可以使用`lock()`方法，它会阻塞直到获取到锁，无需检查返回值（除非考虑中断）。
+```java
+// 示例：使用 lock()
+Lock lock = new ReentrantLock();
+lock.lock(); // 阻塞直到获取锁
+try {
+// 执行需要锁保护的代码
+} finally {
+lock.unlock();
+}
+```
+3. **规范的异常处理**: 对于可能抛出异常的方法，使用 `try-catch` 或 `try-with-resources` 结构确保错误得到妥善处理。
+SOLUTION
+	desc: <<<DESC
 ### 描述
-
 Java的`java.util`库中，尤其是与资源管理、并发控制相关的API，其某些方法会返回一个表示操作结果的值（如布尔值、状态码等），但如果调用方未对这些返回值进行检查和相应的错误处理，可能导致潜在的问题。
-
 ### 影响
-
-1.  **资源泄露**: 例如，在调用`tryLock()`未检查返回值的情况下，如果未能成功获取锁，后续的代码仍可能尝试访问受保护的资源，导致线程安全问题或资源死锁。
-2.  **错误处理不当**: 未检查错误或状态返回值，可能导致程序继续执行在异常状态下，产生未预期的行为或数据错误。
-3.  **安全风险**: 在某些特定场景下（如文件操作、网络通信等），未检查返回值可能错过重要的错误指示，如权限不足、文件未找到等，从而暴露潜在的攻击面。
-
+1. **资源泄露**: 例如，在调用`tryLock()`未检查返回值的情况下，如果未能成功获取锁，后续的代码仍可能尝试访问受保护的资源，导致线程安全问题或资源死锁。
+2. **错误处理不当**: 未检查错误或状态返回值，可能导致程序继续执行在异常状态下，产生未预期的行为或数据错误。
+3. **安全风险**: 在某些特定场景下（如文件操作、网络通信等），未检查返回值可能错过重要的错误指示，如权限不足、文件未找到等，从而暴露潜在的攻击面。
 本规则主要关注`java.util.concurrent.locks.Lock.tryLock()`方法，该方法是非阻塞地尝试获取锁，并返回一个布尔值表示是否成功获取。若未检查其返回值，程序无法得知是否成功获得了锁，可能导致并发错误。
-CODE
+DESC
 	level: "info",
-	risk: "api-abuse",
+	risk: "API误用",
+	name: "weak",
 }
 
 desc(
@@ -145,4 +127,51 @@ public class CustomHostnameVerifier   {
     }
 }
 TEXT
+	"safefile://SafeLockUsageChecked.java": <<<CODE
+package org.example;
+
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class SafeLockUsageChecked {
+    public static void main(String[] args) {
+        Lock lock = new ReentrantLock();
+        boolean acquired = lock.tryLock(); // 检查tryLock的返回值
+        if (acquired) {
+            System.out.println("Lock acquired successfully.");
+            try {
+                // Critical section begins
+                System.out.println("Executing protected code...");
+            } finally {
+                lock.unlock(); // 确保在finally块中释放锁
+                System.out.println("Lock released.");
+            }
+        } else {
+            System.out.println("Could not acquire lock immediately. Handling alternative logic...");
+            // Implement retry, wait, or alternative non-locked logic
+        }
+    }
+}
+CODE
+	"safefile://SafeLockUsageBlocking.java": <<<CODE
+package org.example;
+
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class SafeLockUsageBlocking {
+    public static void main(String[] args) {
+        Lock lock = new ReentrantLock();
+        lock.lock(); // 使用lock()方法，它会阻塞直到获取到锁，因此无需检查返回值（除非考虑中断）
+        System.out.println("Lock acquired successfully (blocking)...");
+        try {
+            // Critical section begins
+            System.out.println("Executing protected code...");
+        } finally {
+            lock.unlock(); // 确保在finally块中释放锁
+            System.out.println("Lock released.");
+        }
+    }
+}
+CODE
 )

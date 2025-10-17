@@ -3,13 +3,14 @@ package screcorder
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"os/exec"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func GetDarwinAvailableAVFoundationScreenDevices() []*ScreenDevice {
@@ -33,6 +34,29 @@ func GetDarwinAvailableAVFoundationScreenDevices() []*ScreenDevice {
 	return nil
 }
 
+func GetWindowsAvailableGDIGrabScreenDevices() []*ScreenDevice {
+	// Windows uses gdigrab with desktop as the input device
+	// No need to enumerate devices as "desktop" is the standard input for screen capture
+	return []*ScreenDevice{
+		{
+			DeviceName:      "Desktop Screen Capture",
+			FfmpegInputName: "desktop",
+			PlatformDemuxer: "gdigrab",
+		},
+	}
+}
+
+func GetAvailableScreenDevices() []*ScreenDevice {
+	switch runtime.GOOS {
+	case "darwin":
+		return GetDarwinAvailableAVFoundationScreenDevices()
+	case "windows", "win32":
+		return GetWindowsAvailableGDIGrabScreenDevices()
+	default:
+		return nil
+	}
+}
+
 func IsAvailable() (bool, error) {
 	path := consts.GetFfmpegPath()
 	if path == "" {
@@ -42,6 +66,11 @@ func IsAvailable() (bool, error) {
 	consts.GetGormCVEDatabase()
 	switch runtime.GOOS {
 	case "darwin":
+		// On macOS, we must request screen recording permission first.
+		if !RequestScreenRecordingPermission() {
+			return false, utils.Error("screen recording permission was denied by the user")
+		}
+
 		path, err := exec.LookPath(path)
 		if err != nil {
 			return false, utils.Errorf("cannot find executable item[%s] failed: %v", path, err)

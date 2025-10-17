@@ -33,6 +33,8 @@ type CacheEx[T any] struct {
 // CacheExWithKey is a synchronized map of items that can auto-expire once stale
 type CacheExWithKey[U comparable, T any] struct {
 	*ttlcache.Cache[U, T]
+	ctx                   context.Context
+	cancel                context.CancelFunc
 	config                *cacheExConfig
 	expireCallback        expireCallback[U, T]
 	newItemCallback       itemCallback[U, T]
@@ -40,17 +42,33 @@ type CacheExWithKey[U comparable, T any] struct {
 	skipTTLExtension      bool
 	evictionCallbackClear func()
 	stopOnce              *sync.Once
+
+	// Single-flight functionality
+	flightEntries map[U]*flightEntry[T]
+	flightMu      sync.RWMutex // Protects access to the 'flightEntries' map
+}
+
+// flightEntry represents a single-flight loading operation
+type flightEntry[T any] struct {
+	data      T          // The actual data stored
+	err       error      // Error if data loading failed
+	preparing bool       // True if data is currently being prepared by one goroutine
+	cond      *sync.Cond // Condition variable to signal when data is ready
+	createdAt time.Time  // Time when the entry was created
 }
 
 // Can only close once
 func (cache *CacheExWithKey[U, T]) Close() {
+	cache.cancel()
 	// close
 	cache.Cache.DeleteAll()
 	cache.Cache.Stop()
 	cache.evictionCallbackClear()
 
-	// reset
-	cache.reset()
+	// Clean up flight entries
+	cache.flightMu.Lock()
+	cache.flightEntries = make(map[U]*flightEntry[T])
+	cache.flightMu.Unlock()
 }
 
 // Set is a thread-safe way to add new items to the map
@@ -126,6 +144,114 @@ func (cache *CacheExWithKey[U, T]) SkipTtlExtensionOnHit(value bool) {
 // Purge will remove all entries
 func (cache *CacheExWithKey[U, T]) Purge() {
 	cache.Cache.DeleteAll()
+
+	// Also clear flight entries
+	cache.flightMu.Lock()
+	cache.flightEntries = make(map[U]*flightEntry[T])
+	cache.flightMu.Unlock()
+}
+
+// GetOrLoad attempts to retrieve data from the cache for the given key.
+// If the data is not present, or is currently being prepared by another goroutine,
+// it will wait for the data to become ready. If no preparation is in progress,
+// it initiates the data preparation using the provided dataLoader function.
+//
+// This method provides single-flight behavior: for a given key, the dataLoader function
+// is executed only once concurrently. Multiple concurrent requests for the same key
+// will wait for the single loading operation to complete and then receive its result.
+//
+// The dataLoader function should be idempotent and thread-safe if it's external,
+// as it will be executed by only one goroutine for a given key at a time.
+func (c *CacheExWithKey[U, T]) GetOrLoad(key U, dataLoader func() (T, error)) (T, error) {
+	// First, try to get from the main cache
+	if item := c.Cache.Get(key); item != nil {
+		return item.Value(), nil
+	}
+
+	// Data not in cache, need to check single-flight mechanism
+	c.flightMu.RLock()
+	entry, found := c.flightEntries[key]
+	c.flightMu.RUnlock()
+
+	if found {
+		// An entry for this key exists in flight.
+		// Acquire the entry's specific mutex to check its state and potentially wait.
+		entry.cond.L.Lock()
+		// If data is being prepared, wait for it to finish.
+		// The loop handles spurious wakeups.
+		for entry.preparing {
+			entry.cond.Wait()
+		}
+		// Data is now ready (or preparation failed).
+		data, err := entry.data, entry.err
+		entry.cond.L.Unlock()
+
+		// If successful, store in main cache
+		if err == nil {
+			c.Cache.Set(key, data, c.ttl)
+		}
+
+		return data, err
+	}
+
+	// Data not found in flight cache, need to create or get an entry for preparation.
+	c.flightMu.Lock() // Acquire a write lock for the flight map
+	// Double-check after acquiring the write lock, in case another goroutine
+	// just created or finished preparing the entry.
+	entry, found = c.flightEntries[key]
+	if !found {
+		// This goroutine is the first to request this key.
+		// Create a new entry and mark it as preparing.
+		entry = &flightEntry[T]{
+			preparing: true,
+			cond:      sync.NewCond(&sync.Mutex{}),
+			createdAt: time.Now(),
+		}
+		c.flightEntries[key] = entry
+	}
+	c.flightMu.Unlock() // Release the write lock for the flight map
+
+	// Now we have the entry (either newly created or found).
+	// Acquire the entry's specific mutex to manage its preparation state.
+	entry.cond.L.Lock()
+	if !entry.preparing {
+		// Another goroutine (that won the race to acquire the global write lock
+		// before us) already finished preparing this entry.
+		// We just return its result.
+		data, err := entry.data, entry.err
+		entry.cond.L.Unlock()
+
+		// If successful, store in main cache
+		if err == nil {
+			c.Cache.Set(key, data, c.ttl)
+		}
+
+		return data, err
+	}
+
+	// If we reach here, it means this goroutine is responsible for
+	// executing the dataLoader function.
+	data, err := dataLoader() // Execute the actual data loading
+
+	// Store the result and signal all waiting goroutines.
+	entry.data = data
+	entry.err = err
+	entry.preparing = false // Mark as no longer preparing
+	entry.cond.Broadcast()  // Signal all goroutines waiting on this entry
+	entry.cond.L.Unlock()   // Release the mutex associated with the condition variable
+
+	// If successful, store in main cache
+	if err == nil {
+		c.Cache.Set(key, data, c.ttl)
+	}
+
+	// Always clean up the flight entry after processing
+	// For errors, we want subsequent calls to retry, so we don't keep the flight entry
+	c.flightMu.Lock()
+	delete(c.flightEntries, key)
+	c.flightMu.Unlock()
+
+	return data, err
 }
 
 func min(duration time.Duration, second time.Duration) time.Duration {
@@ -162,12 +288,15 @@ func NewCacheEx[T any](opt ...cacheExOption) *CacheEx[T] {
 }
 
 func NewCacheExWithKey[U comparable, T any](opt ...cacheExOption) *CacheExWithKey[U, T] {
+	ctx, cancel := context.WithCancel(context.Background())
 	config := &cacheExConfig{}
 	for _, o := range opt {
 		o(config)
 	}
 
 	cache := &CacheExWithKey[U, T]{
+		ctx:    ctx,
+		cancel: cancel,
 		config: config,
 		ttl:    config.ttl,
 	}
@@ -180,16 +309,50 @@ func (c *CacheExWithKey[U, T]) reset() {
 		ttlcache.WithCapacity[U, T](c.config.capacity),
 	)
 
+	// Initialize single-flight fields
+	c.flightEntries = make(map[U]*flightEntry[T])
+
 	c.evictionCallbackClear = c.Cache.OnEviction(func(ctx context.Context, raw_reason ttlcache.EvictionReason, i *ttlcache.Item[U, T]) {
 		reason := EvictionReason(raw_reason)
 		if c.expireCallback != nil {
 			c.expireCallback(i.Key(), i.Value(), reason)
 		}
+
+		// Clean up corresponding flight entry if it exists
+		c.flightMu.Lock()
+		delete(c.flightEntries, i.Key())
+		c.flightMu.Unlock()
 	})
 	c.Cache.OnInsertion(func(ctx context.Context, i *ttlcache.Item[U, T]) {
 		if c.newItemCallback != nil {
 			c.newItemCallback(i.Key(), i.Value())
 		}
 	})
+
+	// Start background cleanup for flight entries
+	go c.cleanupFlightEntries()
+
 	go c.Cache.Start()
+}
+
+// cleanupFlightEntries periodically cleans up old flight entries
+func (c *CacheExWithKey[U, T]) cleanupFlightEntries() {
+	ticker := time.NewTicker(1 * time.Minute) // Clean up every minute
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-c.ctx.Done():
+			return
+		case <-ticker.C:
+			c.flightMu.Lock()
+			cutoff := time.Now().Add(-5 * time.Minute) // Remove entries older than 5 minutes
+			for key, entry := range c.flightEntries {
+				if !entry.preparing && entry.createdAt.Before(cutoff) {
+					delete(c.flightEntries, key)
+				}
+			}
+			c.flightMu.Unlock()
+		}
+	}
 }

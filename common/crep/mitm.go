@@ -8,7 +8,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"embed"
-	_ "embed"
 	"encoding/pem"
 	"fmt"
 	"io/ioutil"
@@ -21,6 +20,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
+	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
@@ -31,13 +35,19 @@ import (
 )
 
 var (
-	initMITMCertOnce              = new(sync.Once)
-	defaultCAFile, defaultKeyFile = "yak-mitm-ca.crt", "yak-mitm-ca.key"
-	defaultCA, defaultKey         []byte
+	initMITMCertOnce                  = new(sync.Once)
+	defaultCAFile, defaultKeyFile     = "yak-mitm-ca.crt", "yak-mitm-ca.key"
+	defaultGMCAFile, defaultGMKeyFile = "yak-mitm-gm-ca.crt", "yak-mitm-gm-ca.key"
+	defaultCA, defaultKey             []byte
+	defaultGMCA, defaultGMKey         []byte
 )
 
 func GetDefaultCaFilePath() string {
 	return defaultCAFile
+}
+
+func GetDefaultGMCaFilePath() string {
+	return defaultGMCAFile
 }
 
 func init() {
@@ -45,6 +55,17 @@ func init() {
 	//_ = os.MkdirAll(homeDir, os.ModePerm)
 	defaultCAFile = filepath.Join(homeDir, defaultCAFile)
 	defaultKeyFile = filepath.Join(homeDir, defaultKeyFile)
+
+	defaultGMCAFile = filepath.Join(homeDir, defaultGMCAFile)
+	defaultGMKeyFile = filepath.Join(homeDir, defaultGMKeyFile)
+}
+
+// DebugSetDefaultGMCAFileAndKey is used for test purpose. To simulate GM cert generation error
+// which can spawn malformed GM certs or can be used to test edge case where gmCA and gmKey are nil
+func DebugSetDefaultGMCAFileAndKey(ca, key []byte) {
+	initMITMCertOnce.Do(func() {})
+	defaultGMCA = ca
+	defaultGMKey = key
 }
 
 func GetDefaultCAAndPrivRaw() ([]byte, []byte) {
@@ -92,13 +113,52 @@ func GetDefaultMITMCAAndPriv() (*x509.Certificate, *rsa.PrivateKey, error) {
 	return caCert, privKey, nil
 }
 
+func GetDefaultMITMCAAndPrivForGM() (*gmx509.Certificate, *sm2.PrivateKey, error) {
+	ca, key, err := GetDefaultGMCaAndKey()
+	if err != nil {
+		return nil, nil, err
+	}
+	p, _ := pem.Decode(ca)
+	caCert, err := gmx509.ParseCertificate(p.Bytes)
+	if err != nil {
+		return nil, nil, utils.Errorf("default ca failed: %s", err)
+	}
+
+	priv, _ := pem.Decode(key)
+	privKey, err := gmx509.ParseSm2PrivateKey(priv.Bytes)
+	if err == nil {
+		return caCert, privKey, nil
+	}
+	privKey, err = gmx509.ParsePKCS8UnecryptedPrivateKey(priv.Bytes)
+	if err != nil {
+		return nil, nil, utils.Errorf("default private key failed: %s", err)
+	}
+	return caCert, privKey, nil
+}
+
 func InitMITMCert() {
 	defaultCA, _ = ioutil.ReadFile(defaultCAFile)
 	defaultKey, _ = ioutil.ReadFile(defaultKeyFile)
 
+	defaultGMCA, _ = ioutil.ReadFile(defaultGMCAFile)
+	defaultGMKey, _ = ioutil.ReadFile(defaultGMKeyFile)
+
 	if defaultCA != nil && defaultKey != nil {
 		log.Debug("Successfully load cert and key from default files")
-		return
+	}
+
+	if defaultGMCA != nil && defaultGMKey != nil {
+		// just check if the cert is valid
+		if _, err := gmtls.X509KeyPair(defaultGMCA, defaultGMKey); err == nil {
+			log.Debug("Successfully load GM cert and key from default files")
+			return
+		} else {
+			log.Infof("detect gm ca certs n key err for parsing, re-generate it, reason: %v", err)
+			_ = os.RemoveAll(defaultGMCAFile)
+			_ = os.RemoveAll(defaultGMKeyFile)
+			defaultGMCA = nil
+			defaultGMKey = nil
+		}
 	}
 
 	if defaultCA == nil || defaultKey == nil {
@@ -117,6 +177,25 @@ func InitMITMCert() {
 		err = ioutil.WriteFile(defaultKeyFile, defaultKey, 0o444)
 		if err != nil {
 			log.Error("write default key failed")
+		}
+	}
+
+	if defaultGMCA == nil || defaultGMKey == nil {
+		var err error
+		defaultGMCA, defaultGMKey, err = tlsutils.GenerateGMSelfSignedCertKey("Yakit MITM GM Root CA")
+		if err != nil {
+			log.Errorf("generate GM default ca/key failed: %s", err)
+			return
+		}
+
+		_ = os.MkdirAll(consts.GetDefaultYakitBaseDir(), 0o777)
+		err = ioutil.WriteFile(defaultGMCAFile, defaultGMCA, 0o444)
+		if err != nil {
+			log.Error("write default GM ca failed")
+		}
+		err = ioutil.WriteFile(defaultGMKeyFile, defaultGMKey, 0o444)
+		if err != nil {
+			log.Error("write default GM key failed")
 		}
 	}
 }
@@ -195,6 +274,13 @@ func GetDefaultCaAndKey() ([]byte, []byte, error) {
 		return nil, nil, utils.Error("cannot set ca/key for mitm")
 	}
 	return defaultCA, defaultKey, nil
+}
+
+func GetDefaultGMCaAndKey() ([]byte, []byte, error) {
+	if defaultGMCA == nil || defaultGMKey == nil {
+		return nil, nil, utils.Error("cannot set GM ca/key for mitm")
+	}
+	return defaultGMCA, defaultGMKey, nil
 }
 
 type ClientCertificationPair struct {
@@ -355,10 +441,32 @@ func (m *MITMServer) initConfig() error {
 	return nil
 }
 
+// handleListenError 处理端口监听失败的错误，提供端口建议
+func handleListenError(addr string, originalErr error) error {
+	host, port, err := utils.ParseStringToHostPort(addr)
+	if err != nil {
+		return utils.Errorf("listen port: %v failed: %s", addr, originalErr)
+	}
+
+	availablePort := utils.FindNearestAvailablePortWithTimeout(host, port, 3*time.Second)
+	var suggestionMsg string
+	if availablePort == 0 {
+		suggestionMsg = "端口被占用，3秒内未找到可用端口，建议尝试重启电脑或使用管理员权限运行"
+	} else {
+		// 判断是附近端口还是系统分配端口
+		if availablePort >= port-10 && availablePort <= port+10 {
+			suggestionMsg = fmt.Sprintf("端口被占用，建议尝试附近可用端口：%d", availablePort)
+		} else {
+			suggestionMsg = fmt.Sprintf("端口被占用，建议尝试系统分配的可用端口：%d", availablePort)
+		}
+	}
+	return utils.Errorf("listen port: %v failed: %s\n\n%s", addr, originalErr, suggestionMsg)
+}
+
 func (m *MITMServer) ServeWithListenedCallback(ctx context.Context, addr string, callback func()) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
-		return utils.Errorf("listen port: %v failed: %s", addr, err)
+		return handleListenError(addr, err)
 	}
 	defer lis.Close()
 
@@ -428,7 +536,7 @@ func NewMITMServer(options ...MITMConfig) (*MITMServer, error) {
 
 	// MITM option configured above
 	if server.mitmConfig == nil { // currently seems it must be nil since no function is exposed to directly create
-		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
+		err := MITM_SetCaCertAndPrivKey(defaultCA, defaultKey, defaultGMCA, defaultGMKey)(server)
 		if err != nil {
 			return nil, utils.Errorf("set ca/key failed: %s", err)
 		}

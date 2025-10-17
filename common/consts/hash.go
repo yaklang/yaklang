@@ -2,7 +2,22 @@
 // nolint: golint
 package consts
 
-const ExistedCorePluginEmbedFSHash string = "e7fb28111fd8e3b7df4686ec8c8bd42f74031e0ccaca9869806494b03256e914"
-const ExistedSyntaxFlowEmbedFSHash string = "ea63f27bfef3b7374a8a4e947406473ec69662e702521a76201094a0d66fae67"
-const ExistedBuildInForgeEmbedFSHash string = "745e9d0cc6df156b18efd0a93958d8857d5c4ff7d989aec3d449a97f5565551d"
-const ExistedBuildInAIToolEmbedFSHash string = "5da16783186920554729e90511391ce4963bce66fd9c0da8d42d857eedf09751"
+// ExistedCorePluginEmbedFSHash contains the SHA256 hash of the embedded core plugin filesystem.
+// This hash is used to verify the integrity of core plugins and detect changes in the plugin bundle.
+// The hash is automatically generated during the build process and should not be manually modified.
+const ExistedCorePluginEmbedFSHash string = "0c8aec2770a2186ddf7e0ad083f0756106607b275243fd7d5b898749566bbbbd"
+
+// ExistedSyntaxFlowEmbedFSHash contains the SHA256 hash of the embedded SyntaxFlow filesystem.
+// This hash is used to verify the integrity of SyntaxFlow rules and templates embedded in the binary.
+// The hash is automatically calculated from the SyntaxFlow rule files during compilation.
+const ExistedSyntaxFlowEmbedFSHash string = "b38f5e6e37aa3e96f3e2aaa6adbd62dbc69dfa9f04aa56876f377783b6145f63"
+
+// ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
+// This hash is used to verify the integrity of the built-in forge templates and resources.
+// The forge system provides templates for code generation and vulnerability testing scenarios.
+const ExistedBuildInForgeEmbedFSHash string = "bbd948ef2d5ae70495c3b8af82cf40f3711dd9a3b2385087aeb1ec5c38eea21a"
+
+// ExistedBuildInAIToolEmbedFSHash contains the SHA256 hash of the embedded AI tool filesystem.
+// This hash is used to verify the integrity of AI-related tools and configurations embedded in the binary.
+// These tools include AI-powered analysis engines and machine learning models for security testing.
+const ExistedBuildInAIToolEmbedFSHash string = "722f1e788c3c5bec722de8cc93403caec9d4e3cf0e572f1a71bc760d6670d97d"

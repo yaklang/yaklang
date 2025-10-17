@@ -4,95 +4,85 @@ desc(
 	risk:sqli
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-
+SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
 2. **触发场景**
-   该规则识别Java代码中，疑似通过字符串拼接方式构造SQL语句，并将其用于数据库查询或执行操作的代码。例如，将用户可控的输入直接或间接拼接到SQL字符串中，可能导致SQL注入。
-
-   ```java
-   String userInput = request.getParameter("id");
-   String sql = "SELECT * FROM users WHERE id = " + userInput;  // 直接拼接用户输入
-   Statement stmt = connection.createStatement();
-   ResultSet rs = stmt.executeQuery(sql);
-   ```
-   或
-   ```java
-   String countSql = "SELECT COUNT(*) FROM qrtz_cron_triggers";
-   if(!StringUtils.isEmpty(quartz.getJobName())){
-       countSql+=" AND job.JOB_NAME = "+quartz.getJobName(); // 在条件判断中拼接用户输入
-   }
-   Long totalCount = dynamicQuery.nativeQueryCount(countSql);
-   ```
-   攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
+该规则识别Java代码中，疑似通过字符串拼接方式构造SQL语句，并将其用于数据库查询或执行操作的代码。例如，将用户可控的输入直接或间接拼接到SQL字符串中，可能导致SQL注入。
+```java
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = " + userInput;  // 直接拼接用户输入
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sql);
+```
+或
+```java
+String countSql = "SELECT COUNT(*) FROM qrtz_cron_triggers";
+if(!StringUtils.isEmpty(quartz.getJobName())){
+countSql+=" AND job.JOB_NAME = "+quartz.getJobName(); // 在条件判断中拼接用户输入
+}
+Long totalCount = dynamicQuery.nativeQueryCount(countSql);
+```
+攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
 3. **潜在影响**
-    - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-    - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-    - 通过数据库提权进一步渗透至服务器或其他系统组件。
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "21d79f98-a435-4c84-81be-055ac21b94ef"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（PreparedStatement）
 通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。这是防止SQL注入最有效的方法。
-
 ```java
 // 修复代码示例
 String userInput = request.getParameter("id");
 String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
 try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-    // 对用户输入进行类型检查和转换，避免恶意输入导致异常
-    try {
-        pstmt.setInt(1, Integer.parseInt(userInput));  // 强制类型转换并绑定参数
-    } catch (NumberFormatException e) {
-        // 处理非数字输入，如抛出异常或返回错误信息
-        throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
-    }
-    ResultSet rs = pstmt.executeQuery();
-    // 处理结果集
+// 对用户输入进行类型检查和转换，避免恶意输入导致异常
+try {
+pstmt.setInt(1, Integer.parseInt(userInput));  // 强制类型转换并绑定参数
+} catch (NumberFormatException e) {
+// 处理非数字输入，如抛出异常或返回错误信息
+throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
+}
+ResultSet rs = pstmt.executeQuery();
+// 处理结果集
 }
 ```
-
 #### 2. 输入合法性校验
 对用户输入实施严格的类型、格式、长度或范围限制，拒绝非法输入。这是一种补充性的安全措施，不能完全替代参数化查询。
-
 ```java
 // 示例：校验输入为数字且范围合法
 String userInput = request.getParameter("id");
 if (!userInput.matches("^[0-9]+$")) {
-    throw new IllegalArgumentException("输入必须为数字");
+throw new IllegalArgumentException("输入必须为数字");
 }
 int id = Integer.parseInt(userInput);
 if (id < 1 || id > 1000) {
-    throw new IllegalArgumentException("ID超出有效范围");
+throw new IllegalArgumentException("ID超出有效范围");
 }
 // 继续使用安全的数据库访问方式（如PreparedStatement）处理合法输入
 String sql = "SELECT * FROM users WHERE id = ?";
 // ... 使用 PreparedStatement ...
 ```
-
 #### 3. 使用ORM框架
 利用ORM（如Hibernate、MyBatis）内置的安全机制，通常会默认使用参数化查询，从而抽象化数据库操作细节，降低SQL注入风险。
-
 ```java
 // MyBatis示例（XML映射文件）
 <select id="getUser" resultType="User">
-    SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
+SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
 </select>
 ```
-
 ```java
 // 调用代码（避免直接拼接）
 String userInput = request.getParameter("id");
 // 对用户输入进行必要的校验和转换
 try {
-    User user = sqlSession.selectOne("getUser", Long.parseLong(userInput));
-    // 处理查询结果
+User user = sqlSession.selectOne("getUser", Long.parseLong(userInput));
+// 处理查询结果
 } catch (NumberFormatException e) {
-    // 处理非数字输入
-    throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
+// 处理非数字输入
+throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
 }
 ```
 SOLUTION
@@ -107,8 +97,8 @@ g"select*" as $sqlConst;
 
 // 检测 SQL 字符串被传入到了某一个执行函数中，执行函数符合常见的 SQL 执行命名规范
 $sqlConst -{
-    until: `*?{opcode: call && <getCallee><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}}as $sink`
-}->;
+    until: `*?{opcode: call && <getCallee><name>?{have: /(?i)(query)|(execut)|(insert)|(native)|(update)/}}`
+}-> as $sink
 check $sink;
 
 // 检测 SQL 字符串是否被 add 操作拼接，add 操作是字符串拼接的常见操作
@@ -119,9 +109,94 @@ check $op;
 alert $op for {
 	level: "mid",
 	type: "audit",
-	severity: "medium",
-	title: "SQL Statement Concatenation Detected",
-	title_zh: "SQL 字符串拼接位置：疑似 SQL 语句拼接并执行到数据库查询的代码",
+	title: "Java SQL Statement Concatenation Vulnerability Was Detected",
+	title_zh: "检测到Java SQL语句拼接漏洞",
+	message: "检测到Java代码中存在SQL语句拼接行为，且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计确认。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数化查询（PreparedStatement）
+通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。这是防止SQL注入最有效的方法。
+```java
+// 修复代码示例
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+// 对用户输入进行类型检查和转换，避免恶意输入导致异常
+try {
+pstmt.setInt(1, Integer.parseInt(userInput));  // 强制类型转换并绑定参数
+} catch (NumberFormatException e) {
+// 处理非数字输入，如抛出异常或返回错误信息
+throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
+}
+ResultSet rs = pstmt.executeQuery();
+// 处理结果集
+}
+```
+#### 2. 输入合法性校验
+对用户输入实施严格的类型、格式、长度或范围限制，拒绝非法输入。这是一种补充性的安全措施，不能完全替代参数化查询。
+```java
+// 示例：校验输入为数字且范围合法
+String userInput = request.getParameter("id");
+if (!userInput.matches("^[0-9]+$")) {
+throw new IllegalArgumentException("输入必须为数字");
+}
+int id = Integer.parseInt(userInput);
+if (id < 1 || id > 1000) {
+throw new IllegalArgumentException("ID超出有效范围");
+}
+// 继续使用安全的数据库访问方式（如PreparedStatement）处理合法输入
+String sql = "SELECT * FROM users WHERE id = ?";
+// ... 使用 PreparedStatement ...
+```
+#### 3. 使用ORM框架
+利用ORM（如Hibernate、MyBatis）内置的安全机制，通常会默认使用参数化查询，从而抽象化数据库操作细节，降低SQL注入风险。
+```java
+// MyBatis示例（XML映射文件）
+<select id="getUser" resultType="User">
+SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
+</select>
+```
+```java
+// 调用代码（避免直接拼接）
+String userInput = request.getParameter("id");
+// 对用户输入进行必要的校验和转换
+try {
+User user = sqlSession.selectOne("getUser", Long.parseLong(userInput));
+// 处理查询结果
+} catch (NumberFormatException e) {
+// 处理非数字输入
+throw new IllegalArgumentException("非法输入：ID 必须为数字", e);
+}
+```
+SOLUTION
+	risk: "SQL注入",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+2. **触发场景**
+该规则识别Java代码中，疑似通过字符串拼接方式构造SQL语句，并将其用于数据库查询或执行操作的代码。例如，将用户可控的输入直接或间接拼接到SQL字符串中，可能导致SQL注入。
+```java
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = " + userInput;  // 直接拼接用户输入
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sql);
+```
+或
+```java
+String countSql = "SELECT COUNT(*) FROM qrtz_cron_triggers";
+if(!StringUtils.isEmpty(quartz.getJobName())){
+countSql+=" AND job.JOB_NAME = "+quartz.getJobName(); // 在条件判断中拼接用户输入
+}
+Long totalCount = dynamicQuery.nativeQueryCount(countSql);
+```
+攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
+3. **潜在影响**
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
+	name: "op",
 }
 
 
@@ -208,4 +283,108 @@ public class JobServiceImpl implements IJobService {
     }
 }
 FILE
+	"safefile://SafePreparedStatement.java": <<<CODE
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SafePreparedStatement {
+
+    public void getUserById(Connection connection, String userIdInput) throws SQLException {
+        // 使用PreparedStatement，将用户输入作为参数绑定，而不是直接拼接
+        String sql = "SELECT * FROM users WHERE id = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            // 对用户输入进行类型校验和转换，确保是数字
+            int id = -1;
+            try {
+                id = Integer.parseInt(userIdInput);
+            } catch (NumberFormatException e) {
+                // 处理非数字输入，例如抛出异常或记录错误
+                System.err.println("Error: Invalid user ID format. Must be an integer.");
+                return;
+            }
+            pstmt.setInt(1, id); // 绑定参数
+            ResultSet rs = pstmt.executeQuery();
+            // 处理结果集
+            while (rs.next()) {
+                System.out.println("User: " + rs.getString("name"));
+            }
+        }
+    }
+
+    public void searchProducts(Connection connection, String keyword) throws SQLException {
+        // PreparedStatement 支持 LIKE 条件下的参数绑定
+        String sql = "SELECT * FROM products WHERE name LIKE ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, "%" + keyword + "%"); // 绑定参数，而不是直接拼接
+            ResultSet rs = pstmt.executeQuery();
+            // 处理结果集
+            while (rs.next()) {
+                System.out.println("Product: " + rs.getString("product_name"));
+            }
+        }
+    }
+}
+CODE
+	"safefile://SafeMyBatisExample.java": <<<CODE
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+// 假设有 User 和 UserMapper 相关的类
+// public class User { private Long id; private String name; /* getters/setters */ }
+// public interface UserMapper { User getUserById(@Param("userId") Long userId); List<User> searchUsers(@Param("keyword") String keyword); }
+
+public class SafeMyBatisExample {
+
+    private final SqlSessionFactory sqlSessionFactory;
+
+    public SafeMyBatisExample(SqlSessionFactory sqlSessionFactory) {
+        this.sqlSessionFactory = sqlSessionFactory;
+    }
+
+    public User getUser(String userIdInput) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            Long userId = null;
+            try {
+                userId = Long.parseLong(userIdInput); // 对输入进行校验和转换
+            } catch (NumberFormatException e) {
+                System.err.println("Error: Invalid user ID format. Must be a long integer.");
+                return null;
+            }
+            // MyBatis使用#{} 或 ${}，推荐使用#{}进行参数化，MyBatis会自动处理PreparedStatement
+            return mapper.getUserById(userId);
+        }
+    }
+
+    public void findUsersByKeyword(String keyword) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            // 对于模糊查询，MyBatis也会正确处理
+            mapper.searchUsers(keyword); // 这里的keyword会作为参数传递
+        }
+    }
+
+    // 模拟UserMapper接口
+    public interface UserMapper {
+        // 假设对应的XML或注解映射文件使用 #{userId} 作为参数
+        User getUserById(Long userId);
+
+        // 假设对应的XML或注解映射文件使用 like CONCAT('%', #{keyword}, '%')
+        // 或者 SQL 中直接使用 like #{keyword}，并在Java代码中添加通配符
+        java.util.List<User> searchUsers(String keyword);
+    }
+
+    // 模拟User类
+    public static class User {
+        private Long id;
+        private String name;
+
+        public Long getId() { return id; }
+        public void setId(Long id) { this.id = id; }
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+    }
+}
+CODE
 )

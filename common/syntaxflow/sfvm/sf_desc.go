@@ -16,10 +16,13 @@ const (
 	SFDescKeyType_Level     SFDescKeyType = "level"
 	SFDescKeyType_Lang      SFDescKeyType = "language"
 	SFDescKeyType_CVE       SFDescKeyType = "cve"
+	SFDescKeyType_CWE       SFDescKeyType = "cwe"
 	SFDescKeyType_Risk      SFDescKeyType = "risk"
 	SFDescKeyType_Solution  SFDescKeyType = "solution"
 	SFDescKeyType_Rule_Id   SFDescKeyType = "rule_id"
 	SFDescKeyType_Reference SFDescKeyType = "reference"
+	SFDescKeyType_Message   SFDescKeyType = "message"
+	SFDescKeyType_Name      SFDescKeyType = "name"
 )
 
 func ValidDescItemKeyType(key string) SFDescKeyType {
@@ -40,6 +43,8 @@ func ValidDescItemKeyType(key string) SFDescKeyType {
 		return SFDescKeyType_Lang
 	case "cve":
 		return SFDescKeyType_CVE
+	case "cwe":
+		return SFDescKeyType_CWE
 	case "risk_type", "risk":
 		return SFDescKeyType_Risk
 	case "solution", "fix":
@@ -48,6 +53,8 @@ func ValidDescItemKeyType(key string) SFDescKeyType {
 		return SFDescKeyType_Rule_Id
 	case "reference", "ref":
 		return SFDescKeyType_Reference
+	case "message", "msg":
+		return SFDescKeyType_Message
 	default:
 		return SFDescKeyType_Unknown
 	}
@@ -65,7 +72,19 @@ func GetSupplyInfoDescKeyType() []SFDescKeyType {
 	}
 }
 
-func IsComplexInfoDescType(typ SFDescKeyType) bool {
+func GetAlertDescKeyType() []SFDescKeyType {
+	return []SFDescKeyType{
+		SFDescKeyType_Name,
+		SFDescKeyType_Title,
+		SFDescKeyType_Title_ZH,
+		SFDescKeyType_Message,
+		SFDescKeyType_Solution,
+		SFDescKeyType_Risk,
+		SFDescKeyType_Desc,
+	}
+}
+
+func IsComplexDescType(typ SFDescKeyType) bool {
 	switch typ {
 	case SFDescKeyType_Desc, SFDescKeyType_Solution, SFDescKeyType_Reference:
 		return true

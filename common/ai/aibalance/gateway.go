@@ -2,9 +2,10 @@ package aibalance
 
 import (
 	"errors"
+	"io"
+
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
-	"io"
 )
 
 type GatewayClient struct {
@@ -49,10 +50,6 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 	)
 }
 
-func (g *GatewayClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
-}
-
 func (g *GatewayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
 	return aispec.ChatBasedExtractData(
 		g.targetUrl,
@@ -68,7 +65,22 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	)
 }
 
+func (g *GatewayClient) newLoadOption(opt ...aispec.AIConfigOption) {
+	config := aispec.NewDefaultAIConfig(opt...)
+	g.config = config
+
+	if g.config.Model == "" {
+		g.config.Model = "deepseek-v3"
+	}
+
+	g.targetUrl = aispec.GetBaseURLFromConfig(g.config, "https://aibalance.yaklang.com", "/v1/chat/completions")
+}
+
 func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
+	if aispec.EnableNewLoadOption {
+		g.newLoadOption(opt...)
+		return
+	}
 	config := aispec.NewDefaultAIConfig(opt...)
 	g.config = config
 
@@ -115,5 +127,11 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		opts = append(opts, poc.WithConnectTimeout(g.config.Timeout))
 	}
 	opts = append(opts, poc.WithTimeout(600))
+	if g.config.Host != "" {
+		opts = append(opts, poc.WithHost(g.config.Host))
+	}
+	if g.config.Port > 0 {
+		opts = append(opts, poc.WithPort(g.config.Port))
+	}
 	return opts, nil
 }

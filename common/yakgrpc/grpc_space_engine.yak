@@ -2,16 +2,20 @@ filter = getFromScope("FILTER", "")
 if filter == "" {
     die("filter empty")
 }
+
 engineType = getFromScope(`ENGINE_TYPE`, "")
 if engineType == "" {
     die("NO ENGINE TYPE SET")
 }
+
 
 scan := getFromScope(`SCAN_VERIFY`, false)
 maxPage = getFromScope(`MAX_PAGE`, 10)
 maxRecord = getFromScope(`MAX_RECORD`, 10000)
 pageSize = getFromScope(`PAGE_SIZE`, 100)
 concurrent = getFromScope(`CONCURRENT`, 20)
+randomDelay = getFromScope("RANDOM_DELAY",0)
+retryTimes = getFromScope("RETRY_TIMES",0)
 
 total = 0
 scanTotal = 0
@@ -31,70 +35,87 @@ deltaActiveTask = i => {
     activeTask += i
 }
 
-go func{
+go func {
     for {
         yakit.StatusCard("获取数据", f`${total}`)
         if scanTotal > 0 {
             yakit.StatusCard("验证扫描", f`${scanTotal}`)
         }
+
         if activeTask > 0 {
             yakit.StatusCard("正在扫描验证", f`${activeTask}`)
         }
+
         sleep(1)
     }
 }
 
+
 tableName = "%v引擎结果" % engineType
 yakit.EnableTable(tableName, ["主机", "端口", "基础指纹", "网站标题"])
 feeddata = (result) => {
-    defer func{ err = recover(); if err != nil { log.error(err)} }
-    var host,port,service,title
+    defer func {
+        err = recover()
+        if err != nil {
+            log.error(err)
+        }
+    }
+    var host, port, service, title
     try {
-        //处理空间引擎
-        host,port = str.ParseStringToHostPort(result.Addr)~
+        host, port = str.ParseStringToHostPort(result.Addr)~
         service = result.Fingerprints
         title = result.HtmlTitle
-    }catch e{
-        //处理端口扫描
+    } catch e {
         host = result.Target
         port = result.Port
         service = result.GetServiceName()
         title = result.GetHtmlTitle()
     }
-    yakit.TableData(tableName, {
-        "uuid":str.HostPort(host, port),"主机": host, "端口": port, "基础指纹": service, "网站标题": title,
-    })
+
+    yakit.TableData(
+        tableName,
+        {"uuid": str.HostPort(host, port), "主机": host, "端口": port, "基础指纹": service, "网站标题": title},
+    )
 }
-queryResult,err = spacengine.Query(filter, spacengine.engine(engineType),spacengine.maxRecord(maxRecord),spacengine.maxPage(maxPage),spacengine.pageSize(pageSize))
+queryResult, err = spacengine.Query(
+    filter,
+    spacengine.engine(engineType),
+    spacengine.maxRecord(maxRecord),  // 总记录数限制
+    spacengine.maxPage(maxPage),      // 最大翻页数限制  
+    spacengine.pageSize(pageSize),    // 每页数据量
+    spacengine.randomDelay(randomDelay),        // 随机延迟1-3秒，避免被限频
+    spacengine.retryTimes(retryTimes),         // 失败时重试2次
+)
 if err != nil {
     die("query failed: %v" % err)
 }
+
 for result in queryResult {
-    total ++
+    total++
     feeddata(result)
     if !scan {
-        // db.SavePortFromResult(result)
         continue
     }
+
 
     swg.Add(1)
     deltaScanTotal(1)
     deltaActiveTask(1)
     result := result
-    go func{
+    go func {
         defer swg.Done()
         defer deltaActiveTask(-1)
         try {
             host, port = str.ParseStringToHostPort(result.Addr)~
-            fpResult = servicescan.ScanOne(host, port,servicescan.probeTimeout(3))~
-            feeddata(fpResult) // update table by servicescan result
+            fpResult = servicescan.ScanOne(host, port, servicescan.probeTimeout(3))~
+            feeddata(fpResult)// update table by servicescan result
             db.SavePortFromResult(fpResult)
         } catch err {
-            // db.SavePortFromResult(result)
             log.error("scan %v failed: %s", result.Addr, err)
         }
     }
 }
+
 
 swg.Wait()
 sleep(2)

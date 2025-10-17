@@ -554,9 +554,8 @@ mirrorHTTPFlow = (req, rsp) => {
 	return {"abc": "no right"}
 }
 
-retryHandler = (https, req, rsp) => {
-	if rsp.Contains("no ready") { return true }
-	return false
+retryHandler = (https,retryCount, req, rsp,retry) => {
+	if rsp.Contains("no ready") { retry() }
 }
 
 `,
@@ -623,9 +622,8 @@ mirrorHTTPFlow = (req, rsp) => {
 	return {"abc": "no right"}
 }
 
-retryHandler = (req, rsp) => {
-	if rsp.Contains("no ready") { return true }
-	return false
+retryHandler = (retryCount,req, rsp,retry) => {
+	if rsp.Contains("no ready") { return retry()}
 }
 
 `,
@@ -692,9 +690,8 @@ mirrorHTTPFlow = (req, rsp) => {
 	return {"abc": "no right"}
 }
 
-retryHandler = rsp => {
-	if rsp.Contains("no ready") { return true }
-	return false
+retryHandler = (req, rsp,retry)  => {
+	if rsp.Contains("no ready") { return retry()}
 }
 
 `,
@@ -729,4 +726,172 @@ retryHandler = rsp => {
 	if count < 3 {
 		t.Fatalf("expect 3 retry response, got %v", count)
 	}
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+customFailureChecker = (https, req, rsp, fail) => {
+	if (rsp.Contains(flag)) { fail("错误内容。。。") }
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+
+		spew.Dump(rsp)
+		require.NotEmpty(t, rsp.Reason)
+		require.Contains(t, rsp.Reason, "request failed intentionally by custom failure checker")
+		require.Contains(t, rsp.Reason, "错误内容。。。")
+		require.Contains(t, string(rsp.ResponseRaw), flag) // 强制失败也有响应
+		spew.Dump(rsp.ExtractedResults)
+	}
+	require.Equal(t, 1, responseCount)
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker_3_args(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+customFailureChecker = (req, rsp, fail) => {
+	if (rsp.Contains(flag)) { fail("3 args 错误内容。。。") }
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+		require.NotEmpty(t, rsp.Reason)
+		require.Contains(t, rsp.Reason, "request failed intentionally by custom failure checker")
+		require.Contains(t, rsp.Reason, "3 args 错误内容。。。")
+		require.Contains(t, string(rsp.ResponseRaw), flag)
+
+	}
+	require.Equal(t, 1, responseCount)
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker_2_args(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+customFailureChecker = (rsp, fail) => {
+	if (rsp.Contains(flag)) { fail("2 args 错误内容。。。") }
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+
+		require.NotEmpty(t, rsp.Reason)
+		require.Contains(t, rsp.Reason, "request failed intentionally by custom failure checker")
+		require.Contains(t, rsp.Reason, "2 args 错误内容。。。")
+		require.Contains(t, string(rsp.ResponseRaw), flag)
+
+	}
+	require.Equal(t, 1, responseCount)
+}
+
+func TestGRPCMUSTPASS_HTTPFuzzer_HotPatch_customFailureChecker_no_fail(t *testing.T) {
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	flag := utils.RandStringBytes(16)
+	host, port := utils.DebugMockHTTPHandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(flag))
+	})
+	target := utils.HostPort(host, port)
+	recv, err := client.HTTPFuzzer(utils.TimeoutContextSeconds(10), &ypb.FuzzerRequest{
+		Request: "GET / HTTP/1.1\r\nHost: " + target + "\r\n\r\n{{yak(handle)}}",
+		HotPatchCode: `handle = result => x"{{int(1)}}"
+flag = "` + string(flag) + `"
+
+customFailureChecker = (https, req, rsp, fail) => {
+	// Do not call fail function
+}
+
+`,
+		ForceFuzz: true,
+	})
+	if err != nil {
+		t.Fatalf("expect nil, got %v", err)
+	}
+	responseCount := 0
+	for {
+		rsp, err := recv.Recv()
+		if err != nil {
+			break
+		}
+		responseCount++
+		require.Empty(t, rsp.Reason)
+		require.Contains(t, string(rsp.ResponseRaw), flag)
+	}
+	require.Equal(t, 1, responseCount)
 }

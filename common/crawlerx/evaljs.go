@@ -112,10 +112,24 @@ function getSelector(e){
 		domPath = domPath.toString().replaceAll(',', '>');
 		return domPath
 	}
-    let nodes = document.createNodeIterator(document.getRootNode())
-    let clickSelectors = [];
-    let node = nodes.nextNode();
+    var nodes = document.createNodeIterator(document.getRootNode())
+    var clickSelectors = [];
+    var node = nodes.nextNode();
     while ((node = nodes.nextNode())) {
+		if (
+			!node || 
+			typeof node.getBoundingClientRect !== 'function'
+		) {
+			continue;
+		}
+		var t = node.getBoundingClientRect(), n = window.getComputedStyle(node);
+		if (
+			"none" == n.display ||
+			"hidden" == n.visibility ||
+			!(t.top || t.bottom || t.width || t.height)
+		 ) {
+			continue;
+		}
 		if (node.onclick !== null && node.onclick !== undefined) {
 			var selectorStr = getSelector(node);
 			if (selectorStr !== "") {

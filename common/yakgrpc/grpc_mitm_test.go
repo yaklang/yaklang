@@ -6,13 +6,18 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"github.com/yaklang/yaklang/common/vulinbox"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/crep"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/vulinbox"
 
 	"github.com/google/uuid"
 
@@ -1935,6 +1940,196 @@ func TestGRPCMUSTTPASS_MITM_GM_Prefer(t *testing.T) {
 	})
 }
 
+// TestGRPCMUSTTPASS_MITM_GM_Only_Client 测试客户端只支持国密TLS不允许降级的情况 例如某些金融业app
+func TestGRPCMUSTTPASS_MITM_GM_Only_Client_Transparent(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+
+	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+			"Content-Length:0\r\n\r\n"))
+	})
+	GMTLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+		"Content-Length:0\r\n\r\n")))
+	TLSTarget := fmt.Sprintf("https://%s", utils.HostPort(host, port))
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        mitmHost,
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+
+		// 测试国密TLS连接：客户端 -(GMTLS)-> MITM -(GMTLS)-> 国密服务器
+		gmConfig := &gmtls.Config{
+			GMSupport:          &gmtls.GMSupport{WorkMode: gmtls.ModeGMSSLOnly},
+			InsecureSkipVerify: true,
+			ServerName:         mitmHost,
+		}
+
+		// 直接通过国密TLS连接到MITM代理
+		mitmAddr := utils.HostPort(mitmHost, mitmPort)
+		gmtlsConn, err := gmtls.Dial("tcp", mitmAddr, gmConfig)
+		require.NoError(t, err)
+		defer gmtlsConn.Close()
+
+		// 通过国密TLS连接发送HTTP请求到国密目标
+		targetHost := strings.TrimPrefix(GMTLSTarget, "https://")
+		httpReq := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", GMTLSTarget, targetHost)
+		_, err = gmtlsConn.Write([]byte(httpReq))
+		require.NoError(t, err)
+
+		// 读取响应
+		response := make([]byte, 1024)
+		n, err := gmtlsConn.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
+		// 测试普通TLS目标（通过国密TLS连接到MITM，但目标是普通TLS服务器）
+		gmtlsConn2, err := gmtls.Dial("tcp", mitmAddr, gmConfig)
+		require.NoError(t, err)
+		defer gmtlsConn2.Close()
+
+		// 发送HTTP请求到普通TLS目标
+		targetHost2 := strings.TrimPrefix(TLSTarget, "https://")
+		httpReq2 := fmt.Sprintf("GET %s HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", TLSTarget, targetHost2)
+		_, err = gmtlsConn2.Write([]byte(httpReq2))
+		require.NoError(t, err)
+
+		// 读取响应
+		n, err = gmtlsConn2.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+	})
+}
+
+func TestGRPCMUSTTPASS_MITM_GM_Only_Client_With_HTTPConnect(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	ctx, cancel := context.WithCancel(utils.TimeoutContextSeconds(40))
+	defer cancel()
+
+	mitmHost, mitmPort := "127.0.0.1", utils.GetRandomAvailableTCPPort()
+
+	host, port := utils.DebugMockOnlyGMHTTP(ctx, func(req []byte) []byte {
+		return []byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+			"Content-Length:0\r\n\r\n"))
+	})
+	GMTLSTarget := utils.HostPort(host, port)
+
+	host, port = utils.DebugMockHTTPS([]byte(fmt.Sprintf("HTTP/1.1 200 OK\r\n" +
+		"Content-Length:0\r\n\r\n")))
+	TLSTarget := utils.HostPort(host, port)
+
+	RunMITMTestServerEx(client, ctx, func(stream ypb.Yak_MITMClient) {
+		stream.Send(&ypb.MITMRequest{
+			Host:        mitmHost,
+			Port:        uint32(mitmPort),
+			EnableGMTLS: true,
+			PreferGMTLS: true,
+		})
+	}, func(stream ypb.Yak_MITMClient) {
+		defer cancel()
+
+		// 测试国密TLS目标：客户端 -(TCP)-> MITM -(CONNECT)-> -(GMTLS tunnel)-> 国密服务器
+		mitmAddr := utils.HostPort(mitmHost, mitmPort)
+
+		// 1. 建立到MITM代理的TCP连接
+		proxyConn, err := net.Dial("tcp", mitmAddr)
+		require.NoError(t, err)
+		defer proxyConn.Close()
+
+		// 2. 发送CONNECT请求
+		connectReq := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\nProxy-Connection: keep-alive\r\n\r\n",
+			GMTLSTarget, GMTLSTarget)
+		_, err = proxyConn.Write([]byte(connectReq))
+		require.NoError(t, err)
+
+		// 3. 读取CONNECT响应
+		buf := make([]byte, 1024)
+		n, err := proxyConn.Read(buf)
+		require.NoError(t, err)
+		connectResp := string(buf[:n])
+		require.Contains(t, connectResp, "200") // 期望 "HTTP/1.1 200 Connection established"
+
+		// 4. 在建立的隧道上升级为国密TLS
+		gmConfig := &gmtls.Config{
+			GMSupport:          &gmtls.GMSupport{},
+			InsecureSkipVerify: true,
+			ServerName:         host, // 使用目标服务器的hostname
+		}
+
+		gmtlsConn := gmtls.Client(proxyConn, gmConfig)
+		err = gmtlsConn.Handshake()
+		require.NoError(t, err)
+
+		// 5. 通过国密TLS隧道发送HTTP请求
+		httpReq := fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", GMTLSTarget)
+		_, err = gmtlsConn.Write([]byte(httpReq))
+		require.NoError(t, err)
+
+		// 6. 读取HTTP响应
+		response := make([]byte, 1024)
+		n, err = gmtlsConn.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
+		// 测试普通TLS目标：客户端 -(TCP)-> MITM -(CONNECT)-> -(GMTLS tunnel)-> 普通TLS服务器
+
+		// 1. 建立到MITM代理的新TCP连接
+		proxyConn2, err := net.Dial("tcp", mitmAddr)
+		require.NoError(t, err)
+		defer proxyConn2.Close()
+
+		// 2. 发送CONNECT请求到普通TLS目标
+		connectReq2 := fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\nProxy-Connection: keep-alive\r\n\r\n",
+			TLSTarget, TLSTarget)
+		_, err = proxyConn2.Write([]byte(connectReq2))
+		require.NoError(t, err)
+
+		// 3. 读取CONNECT响应
+		n, err = proxyConn2.Read(buf)
+		require.NoError(t, err)
+		connectResp2 := string(buf[:n])
+		require.Contains(t, connectResp2, "200")
+
+		// 4. 在隧道上建立国密TLS连接（客户端只支持国密）
+		host2, _, _ := net.SplitHostPort(TLSTarget)
+		gmConfig2 := &gmtls.Config{
+			GMSupport:          &gmtls.GMSupport{},
+			InsecureSkipVerify: true,
+			ServerName:         host2,
+		}
+
+		gmtlsConn2 := gmtls.Client(proxyConn2, gmConfig2)
+		err = gmtlsConn2.Handshake()
+		require.NoError(t, err)
+
+		// 5. 发送HTTP请求
+		httpReq2 := fmt.Sprintf("GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n", TLSTarget)
+		_, err = gmtlsConn2.Write([]byte(httpReq2))
+		require.NoError(t, err)
+
+		// 6. 读取响应
+		n, err = gmtlsConn2.Read(response)
+		require.NoError(t, err)
+		require.Contains(t, string(response[:n]), "200 OK")
+
+	}, func(stream ypb.Yak_MITMClient, msg *ypb.MITMResponse) {
+	})
+}
+
 func TestGRPCMUSTPASS_RuleExtractedData(t *testing.T) {
 	client, err := NewLocalClient()
 	require.NoError(t, err)
@@ -2128,4 +2323,454 @@ func TestGRPCMUSTPASS_MITM_MutProxy(t *testing.T) {
 }
 func TestGRPC_MITMPASS_HotPatchProxy(t *testing.T) {
 
+}
+
+func TestGRPCMUSTPASS_MITM_GM_Nil_Certs(t *testing.T) {
+	// 确保MITM证书已初始化
+	crep.InitMITMCert()
+	t.Cleanup(func() {
+		crep.InitMITMCert()
+	})
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var (
+		started                bool
+		httpPassthroughTested  bool
+		httpsPassthroughTested bool
+		gmPassthroughTested    bool
+		httpTest               bool
+		httpsTest              bool
+		gmTest                 bool
+	)
+
+	// 测试场景: 使用默认国密证书（测试重构后的代码能正常工作）
+	// 设置默认国密证书为nil，测试系统能否正常处理
+	crep.DebugSetDefaultGMCAFileAndKey(nil, nil)
+
+	// Mock HTTP服务器
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		httpPassthroughTested = true
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 3
+
+111`))
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, body)
+		return rsp
+	})
+
+	// Mock HTTPS服务器
+	mockHttpsHost, mockHttpsPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+		httpsPassthroughTested = true
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 3
+
+111`))
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, body)
+		return rsp
+	})
+
+	// Mock GM-HTTPS服务器
+	mockGMHost, mockGMPort := utils.DebugMockGMHTTP(ctx, func(req []byte) []byte {
+		gmPassthroughTested = true
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 3
+
+111`))
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, body)
+		return rsp
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://127.0.0.1:" + fmt.Sprint(mitmPort)
+
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 启动MITM服务器，启用国密TLS但不传递自定义证书
+	// 这将测试我们重构后的代码能否在国密证书为默认或nil时正常工作
+	stream.Send(&ypb.MITMRequest{
+		Host:             "127.0.0.1",
+		Port:             uint32(mitmPort),
+		Recover:          true,
+		Forward:          true,
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+		EnableGMTLS:      true,
+		// 不设置certificates字段，让系统使用默认证书
+	})
+
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		if rsp.GetHaveMessage() {
+			msg := string(rsp.GetMessage().GetMessage())
+			log.Infof("MITM消息: %s", msg)
+
+			if strings.Contains(msg, "starting mitm server") && !started {
+				started = true
+				log.Infof("MITM服务器已启动，开始测试连接")
+
+				token := utils.RandStringBytes(100)
+
+				// 测试HTTP连接
+				params := map[string]any{
+					"packet": lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /nil-cert-http-`+token+` HTTP/1.1
+Host: www.example.com
+
+`+token), "Host", utils.HostPort(mockHost, mockPort)),
+					"proxy": proxy,
+					"token": token,
+					"host":  mockHost,
+					"port":  mockPort,
+				}
+
+				_, err := yak.NewScriptEngine(10).ExecuteEx(`
+log.info("开始测试HTTP连接")
+packet := getParam("packet")
+host, port = getParam("host"), getParam("port")
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port))~
+if rsp.Contains(getParam("token")) {
+	log.info("HTTP连接测试成功")
+} else {
+	dump(rsp)
+	die("HTTP连接测试失败!")
+}
+`, params)
+				if err == nil {
+					httpTest = true
+				} else {
+					log.Errorf("HTTP连接测试失败: %v", err)
+				}
+
+				// 测试HTTPS连接
+				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /nil-cert-https-`+token+` HTTP/1.1
+Host: www.example.com
+
+`+token), "Host", utils.HostPort(mockHttpsHost, mockHttpsPort))
+				params["host"] = mockHttpsHost
+				params["port"] = mockHttpsPort
+
+				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+log.info("开始测试HTTPS连接")
+packet := getParam("packet")
+host, port = getParam("host"), getParam("port")
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.https(true))~
+if rsp.Contains(getParam("token")) {
+	log.info("HTTPS连接测试成功")
+} else {
+	dump(rsp)
+	die("HTTPS连接测试失败!")
+}
+`, params)
+				if err == nil {
+					httpsTest = true
+				} else {
+					log.Errorf("HTTPS连接测试失败: %v", err)
+				}
+
+				// 测试GM-HTTPS连接
+				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /nil-cert-gmhttps-`+token+` HTTP/1.1
+Host: www.example.com
+
+`+token), "Host", utils.HostPort(mockGMHost, mockGMPort))
+				params["host"] = mockGMHost
+				params["port"] = mockGMPort
+
+				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+log.info("开始测试GM-HTTPS连接")
+packet := getParam("packet")
+host, port = getParam("host"), getParam("port")
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.https(true))~
+if rsp.Contains(getParam("token")) {
+	log.info("GM-HTTPS连接测试成功")
+} else {
+	dump(rsp)
+	die("GM-HTTPS连接测试失败!")
+}
+`, params)
+				if err == nil {
+					gmTest = true
+				} else {
+					log.Errorf("GM-HTTPS连接测试失败: %v", err)
+				}
+				break
+			}
+		}
+	}
+
+	// 验证测试结果
+	if !started {
+		t.Errorf("MITM服务器启动失败")
+		return
+	}
+
+	if !httpPassthroughTested {
+		t.Errorf("HTTP Mock服务器未接收到请求")
+	}
+
+	if !httpsPassthroughTested {
+		t.Errorf("HTTPS Mock服务器未接收到请求")
+	}
+
+	if !gmPassthroughTested {
+		t.Errorf("GM-HTTPS Mock服务器未接收到请求")
+	}
+
+	if !httpTest {
+		t.Errorf("HTTP代理测试失败")
+	}
+
+	if !httpsTest {
+		t.Errorf("HTTPS代理测试失败")
+	}
+
+	if !gmTest {
+		t.Errorf("GM-HTTPS代理测试失败")
+	}
+
+	log.Infof("✓ 测试完成: MITM在nil国密证书配置下能正常代理各种连接类型")
+}
+
+func TestGRPCMUSTPASS_MITM_GM_Invalid_Certs(t *testing.T) {
+	// 确保MITM证书已初始化
+	crep.InitMITMCert()
+	t.Cleanup(func() {
+		crep.InitMITMCert()
+	})
+
+	client, err := NewLocalClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	var (
+		started                bool
+		httpPassthroughTested  bool
+		httpsPassthroughTested bool
+		gmPassthroughTested    bool
+		httpTest               bool
+		httpsTest              bool
+		gmTest                 bool
+	)
+
+	// 测试场景: 使用RSA证书充当国密证书（测试重构后的代码能正常处理无效证书）
+	// 设置RSA证书作为国密证书，测试系统能否正常处理无效证书
+	rsaCA, rsaKey, err := crep.GetDefaultCaAndKey()
+	rsaCA = utils.InterfaceToBytes("invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	crep.DebugSetDefaultGMCAFileAndKey(rsaCA, rsaKey)
+
+	// Mock HTTP服务器
+	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
+		httpPassthroughTested = true
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 3
+
+111`))
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, body)
+		return rsp
+	})
+
+	// Mock HTTPS服务器
+	mockHttpsHost, mockHttpsPort := utils.DebugMockHTTPSEx(func(req []byte) []byte {
+		httpsPassthroughTested = true
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 3
+
+111`))
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, body)
+		return rsp
+	})
+
+	// Mock GM-HTTPS服务器
+	mockGMHost, mockGMPort := utils.DebugMockGMHTTP(ctx, func(req []byte) []byte {
+		gmPassthroughTested = true
+		rsp, _, _ := lowhttp.FixHTTPResponse([]byte(`HTTP/1.1 200 OK
+Content-Type: text/html
+Content-Length: 3
+
+111`))
+		_, body := lowhttp.SplitHTTPHeadersAndBodyFromPacket(req)
+		rsp = lowhttp.ReplaceHTTPPacketBodyFast(rsp, body)
+		return rsp
+	})
+
+	mitmPort := utils.GetRandomAvailableTCPPort()
+	proxy := "http://127.0.0.1:" + fmt.Sprint(mitmPort)
+
+	stream, err := client.MITM(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 启动MITM服务器，启用国密TLS
+	// 这将测试我们重构后的代码能否在国密证书无效时正常工作
+	stream.Send(&ypb.MITMRequest{
+		Host:             "127.0.0.1",
+		Port:             uint32(mitmPort),
+		Recover:          true,
+		Forward:          true,
+		SetAutoForward:   true,
+		AutoForwardValue: true,
+		EnableGMTLS:      true,
+		// 不设置certificates字段，让系统使用默认证书（此时是无效的RSA证书）
+	})
+	for {
+		rsp, err := stream.Recv()
+		if err != nil {
+			break
+		}
+
+		if rsp.GetHaveMessage() {
+			msg := string(rsp.GetMessage().GetMessage())
+			log.Infof("MITM消息: %s", msg)
+
+			if strings.Contains(msg, "starting mitm server") {
+				started = true
+				log.Infof("MITM服务器已启动，开始测试连接")
+				token := utils.RandStringBytes(100)
+
+				// 测试HTTP连接
+				params := map[string]any{
+					"packet": lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /invalid-cert-http-`+token+` HTTP/1.1
+Host: www.example.com
+
+`+token), "Host", utils.HostPort(mockHost, mockPort)),
+					"proxy": proxy,
+					"token": token,
+					"host":  mockHost,
+					"port":  mockPort,
+				}
+
+				_, err := yak.NewScriptEngine(10).ExecuteEx(`
+log.info("开始测试HTTP连接")
+packet := getParam("packet")
+host, port = getParam("host"), getParam("port")
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port))~
+if rsp.Contains(getParam("token")) {
+	log.info("HTTP连接测试成功")
+} else {
+	dump(rsp)
+	die("HTTP连接测试失败!")
+}
+`, params)
+				if err == nil {
+					httpTest = true
+				} else {
+					log.Errorf("HTTP连接测试失败: %v", err)
+				}
+
+				// 测试HTTPS连接
+				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /invalid-cert-https-`+token+` HTTP/1.1
+Host: www.example.com
+
+`+token), "Host", utils.HostPort(mockHttpsHost, mockHttpsPort))
+				params["host"] = mockHttpsHost
+				params["port"] = mockHttpsPort
+
+				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+log.info("开始测试HTTPS连接")
+packet := getParam("packet")
+host, port = getParam("host"), getParam("port")
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.https(true))~
+if rsp.Contains(getParam("token")) {
+	log.info("HTTPS连接测试成功")
+} else {
+	dump(rsp)
+	die("HTTPS连接测试失败!")
+}
+`, params)
+				if err == nil {
+					httpsTest = true
+				} else {
+					log.Errorf("HTTPS连接测试失败: %v", err)
+				}
+
+				// 测试GM-HTTPS连接
+				params["packet"] = lowhttp.ReplaceHTTPPacketHeader([]byte(`GET /invalid-cert-gmhttps-`+token+` HTTP/1.1
+Host: www.example.com
+
+`+token), "Host", utils.HostPort(mockGMHost, mockGMPort))
+				params["host"] = mockGMHost
+				params["port"] = mockGMPort
+
+				_, err = yak.NewScriptEngine(10).ExecuteEx(`
+log.info("开始测试GM-HTTPS连接")
+packet := getParam("packet")
+host, port = getParam("host"), getParam("port")
+rsp, req = poc.HTTP(string(packet), poc.proxy(getParam("proxy")), poc.host(host), poc.port(port), poc.https(true))~
+if rsp.Contains(getParam("token")) {
+	log.info("GM-HTTPS连接测试成功")
+} else {
+	dump(rsp)
+	die("GM-HTTPS连接测试失败!")
+}
+`, params)
+				if err == nil {
+					gmTest = true
+				} else {
+					log.Errorf("GM-HTTPS连接测试失败: %v", err)
+				}
+				break
+			}
+		}
+	}
+	// 验证测试结果
+	if !started {
+		t.Errorf("MITM服务器启动失败")
+		return
+	}
+
+	if !httpPassthroughTested {
+		t.Errorf("HTTP Mock服务器未接收到请求")
+	}
+
+	if !httpsPassthroughTested {
+		t.Errorf("HTTPS Mock服务器未接收到请求")
+	}
+
+	if !gmPassthroughTested {
+		t.Errorf("GM-HTTPS Mock服务器未接收到请求")
+	}
+
+	if !httpTest {
+		t.Errorf("HTTP代理测试失败")
+	}
+
+	if !httpsTest {
+		t.Errorf("HTTPS代理测试失败")
+	}
+
+	if !gmTest {
+		t.Errorf("GM-HTTPS代理测试失败")
+	}
+
+	log.Infof("✓ 测试完成: MITM在无效国密证书配置下能正常代理各种连接类型")
 }

@@ -4,13 +4,28 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/aireducer"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/aiforge"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/utils/pandocutils"
+	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
+
+	"github.com/pkg/errors"
+	"github.com/tevino/abool"
+	"github.com/yaklang/yaklang/common/mediautils"
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/thirdparty_bin"
+	"github.com/yaklang/yaklang/common/utils/imageutils"
+
+	"github.com/yaklang/yaklang/common/aireducer"
+	"github.com/yaklang/yaklang/common/fp/fingerprint"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
@@ -21,6 +36,9 @@ import (
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/fileparser"
+
+	"github.com/yaklang/yaklang/common/utils/fileparser/excelparser"
+
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/pprofutils"
 
@@ -52,13 +70,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils/comparer"
 	"github.com/yaklang/yaklang/common/utils/htmlquery"
 	"github.com/yaklang/yaklang/common/xhtml"
+	"github.com/yaklang/yaklang/common/yak/antlr4nasl"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"github.com/yaklang/yaklang/common/yak/httptpl"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yakdoc"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
-	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/container"
 	"github.com/yaklang/yaklang/common/yak/yaklib/tools"
@@ -67,23 +85,16 @@ import (
 	"github.com/yaklang/yaklang/common/yso"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	"github.com/tevino/abool"
 
 	"github.com/yaklang/yaklang/common/omnisearch"
 
-	_ "github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin" // 导入 builtin 包
+	"github.com/yaklang/yaklang/common/yak/yaklang/lib/builtin"
 )
 
 var (
 	CRYPTO_KEY_SIZE    = 16
 	initYaklangLibOnce sync.Once
-	naslExports        interface{}
 )
-
-func SetNaslExports(lib map[string]interface{}) {
-	naslExports = lib
-}
 
 func init() {
 	initYaklangLib()
@@ -124,6 +135,8 @@ func initYaklangLib() {
 	yaklang.Import("os", yaklib.SystemExports)
 	yaklang.Import("file", yaklib.FileExport)
 	yaklang.Import("fileparser", fileparser.Exports)
+	//excel
+	yaklang.Import("excel", excelparser.ExcelExports)
 	yaklang.Import("filesys", filesys.Exports)
 	yaklang.Import("re", yaklib.RegexpExport)
 	yaklang.Import("re2", yaklib.Regexp2Export)
@@ -212,7 +225,7 @@ func initYaklangLib() {
 	yaklang.Import("dyn", EvalExports)
 	// nuclei
 	yaklang.Import("nuclei", httptpl.Exports)
-	yaklang.Import("nasl", naslExports)
+	yaklang.Import("nasl", antlr4nasl.Exports)
 
 	// jwt
 	yaklang.Import("jwt", authhack.JWTExports)
@@ -313,6 +326,8 @@ func initYaklangLib() {
 	yaklang.Import("ai", ai.Exports)
 
 	yaklang.Import("aiagent", AIAgentExport)
+	yaklang.Import("liteforge", aiforge.LiteForgeExport)
+	yaklang.Import("jsonschema", aitool.SchemaGeneratorExports)
 
 	yaklang.Import("aireducer", aireducer.Exports)
 
@@ -350,6 +365,21 @@ func initYaklangLib() {
 
 	// amap
 	yaklang.Import("amap", amap.YakExport)
+
+	// fp
+	yaklang.Import("fp", fingerprint.Exports)
+
+	// mimetype
+	yaklang.Import("mimetype", mimetype.Exports)
+	yaklang.Import("imageutils", imageutils.Exports)
+	yaklang.Import("ffmpeg", mediautils.FfmpegExports)
+	yaklang.Import("whisper", mediautils.WhisperExports)
+	yaklang.Import("pandoc", pandocutils.Exports)
+
+	yaklang.Import("toolbox", thirdparty_bin.Exports)
+
+	yaklang.Import("rag", RagExports)
+	yaklang.Import("diff", yakdiff.Exports)
 }
 
 type ScriptEngine struct {
@@ -379,6 +409,8 @@ type ScriptEngine struct {
 	debug         bool
 	debugInit     func(*yakvm.Debugger)
 	debugCallback func(*yakvm.Debugger)
+
+	callFuncCallback func(caller *yakvm.Value, wavy bool, args []*yakvm.Value)
 }
 
 func (s *ScriptEngine) GetTaskByTaskID(id string) (*Task, error) {
@@ -438,6 +470,10 @@ func (e *ScriptEngine) init() {
 
 func (e *ScriptEngine) RegisterEngineHooks(f func(engine *antlr4yak.Engine) error) {
 	e.engineHooks = append(e.engineHooks, f)
+}
+
+func (e *ScriptEngine) SetCallFuncCallback(f func(caller *yakvm.Value, wavy bool, args []*yakvm.Value)) {
+	e.callFuncCallback = f
 }
 
 func (e *ScriptEngine) SetYakitClient(client *yaklib.YakitClient) {
@@ -532,6 +568,7 @@ func (e *ScriptEngine) exec(ctx context.Context, id string, code string, params 
 	engine.SetDebugMode(e.debug)
 	engine.SetDebugCallback(e.debugCallback)
 	engine.SetDebugInit(e.debugInit)
+	engine.SetCallFuncCallback(e.callFuncCallback)
 
 	vars := make(map[string]any)
 	vars["id"] = id

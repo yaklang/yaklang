@@ -350,7 +350,6 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 			successRate = float64(p.SuccessCount) / float64(p.TotalRequests) * 100
 		}
 
-		// --- 开始修改：计算 HealthStatusClass ---
 		var healthClass string
 		if !p.IsFirstCheckCompleted {
 			healthClass = "unknown"
@@ -359,7 +358,6 @@ func (c *ServerConfig) servePortal(conn net.Conn) {
 		} else {
 			healthClass = "unhealthy"
 		}
-		// --- 结束修改 ---
 
 		// Add to provider list
 		data.Providers = append(data.Providers, ProviderData{

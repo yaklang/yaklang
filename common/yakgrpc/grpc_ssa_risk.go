@@ -3,10 +3,12 @@ package yakgrpc
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 
 	"github.com/samber/lo"
@@ -16,10 +18,30 @@ import (
 )
 
 func (s *Server) QuerySSARisks(ctx context.Context, req *ypb.QuerySSARisksRequest) (*ypb.QuerySSARisksResponse, error) {
-	p, risks, err := yakit.QuerySSARisk(s.GetSSADatabase(), req.GetFilter(), req.GetPagination())
+	var risks []*schema.SSARisk
+	var p *bizhelper.Paginator
+	var err error
+
+	filter := req.GetFilter()
+	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
+		baseline := &ypb.SSARiskDiffItem{
+			ProgramName:   strings.Join(filter.GetProgramName(), ","),
+			RiskRuntimeId: strings.Join(filter.GetRuntimeID(), ","),
+		}
+		filter.SSARiskDiffRequest.BaseLine = baseline
+		res, err := yakit.DoRiskDiff(ctx, baseline, dr.GetCompare())
+		if err != nil {
+			return nil, err
+		}
+		for re := range res {
+			_ = re
+		}
+	}
+	p, risks, err = yakit.QuerySSARisk(s.GetSSADatabase(), filter, req.GetPagination())
 	if err != nil {
 		return nil, err
 	}
+
 	return &ypb.QuerySSARisksResponse{
 		Pagination: req.Pagination,
 		Total:      int64(p.TotalRecord),

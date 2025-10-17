@@ -1,0 +1,57 @@
+# AI Blueprint Parameter Generation
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
+You need to generate parameters for the AI Blueprint '{{ .BlueprintName }}'.
+
+Blueprint Description: {{ .BlueprintDescription }}
+
+{{ if .BlueprintSchema }}Blueprint Schema:
+```json
+{{ .BlueprintSchema }}
+```
+{{ end }}
+
+{{ if .OriginalQuery }}# Original User Query
+User's original request: {{ .OriginalQuery }}
+{{ end }}
+
+{{ if .CumulativeSummary }}# Task Context & Memory
+Overall task context: {{ .CumulativeSummary }}
+{{ end }}
+
+{{ if .OldParams }}<|OLD_PARAMS_{{ .Nonce }}|>
+{{ .OldParams }}
+<|OLD_PARAMS_END{{ .Nonce }}|>{{ end }}{{ if .ExtraPrompt }}
+<|EXTRA_INSTRUCT{{ .Nonce }}|>
+用户对上述 OLD_PARAMS 有修改需求：{{ .ExtraPrompt }}
+<|EXTRA_INSTRUCT{{ .Nonce }}|>{{ end }}
+
+# Task Progress
+Current iteration: {{ .CurrentIteration }}/{{ .MaxIterations }}
+This blueprint call is part of a multi-step ReAct process. Consider how this blueprint execution contributes to completing the overall user task.
+
+{{ if .Timeline }}# Recent Timeline
+{{ .Timeline }}
+{{ end }}
+
+# Instructions
+Generate appropriate parameters for this blueprint call based on the context above.
+
+IMPORTANT CONSIDERATIONS:
+- Consider the original user query and overall task context when generating parameters
+- This blueprint execution should contribute to completing the user's original request
+- The cumulative summary contains the evolving context - use this to understand what has been accomplished so far
+- After this blueprint execution, the ReAct loop will determine if the task is complete or if further actions are needed
+- Generate parameters that will produce meaningful results toward task completion
+
+RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Example):
+
+```json
+{
+  "@action": "call-ai-blueprint",
+  "blueprint": "blueprint_name",
+  "params": {
+    "param1": "value1",
+    "param2": "value2"
+  }
+}
+```

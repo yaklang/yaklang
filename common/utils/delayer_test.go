@@ -6,7 +6,8 @@ import (
 )
 
 func TestNewFloatSecondsDelayWaiter(t *testing.T) {
-	delayer, err := NewFloatSecondsDelayWaiterSingle(1)
+	// 将延迟时间从1秒减少到0.01秒（10毫秒）以优化测试性能
+	delayer, err := NewFloatSecondsDelayWaiterSingle(0.01)
 	if err != nil {
 		panic(err)
 	}

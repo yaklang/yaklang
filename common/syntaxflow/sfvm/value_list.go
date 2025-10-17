@@ -2,10 +2,12 @@ package sfvm
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/utils/memedit"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils/memedit"
+	"github.com/yaklang/yaklang/common/utils/pipeline"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -22,7 +24,7 @@ func NewValues(values []ValueOperator) ValueOperator {
 }
 
 func (v *ValueList) IsEmpty() bool {
-	if v.Values == nil || len(v.Values) == 0 {
+	if len(v.Values) == 0 {
 		return true
 	}
 	return false
@@ -36,6 +38,28 @@ type ValueList struct {
 	Values []ValueOperator
 }
 
+func (v *ValueList) Count() int {
+	return len(v.Values)
+}
+
+func (v *ValueList) pipeLineRun(f func(ValueOperator) (ValueOperator, error)) (ValueOperator, error) {
+	ctx := context.Background()
+	size := v.Count()
+	pipe := pipeline.NewPipe(ctx, size, func(v ValueOperator) (ValueOperator, error) {
+		var err error
+		var value ValueOperator
+		value, err = f(v)
+		return value, err
+	})
+	v.Recursive(func(operator ValueOperator) error {
+		pipe.Feed(operator)
+		return nil
+	})
+	pipe.Close()
+	data := NewValues(lo.ChannelToSlice(pipe.Out()))
+	return data, nil
+}
+
 func (v *ValueList) CompareConst(comparator *ConstComparator) []bool {
 	var res []bool
 	v.Recursive(func(operator ValueOperator) error {
@@ -46,7 +70,7 @@ func (v *ValueList) CompareConst(comparator *ConstComparator) []bool {
 	return res
 }
 
-func (v *ValueList) NewConst(i any, rng ...memedit.RangeIf) ValueOperator {
+func (v *ValueList) NewConst(i any, rng ...*memedit.Range) ValueOperator {
 	var result ValueOperator
 	v.Recursive(func(operator ValueOperator) error {
 		result = operator.NewConst(i, rng...)
@@ -154,32 +178,14 @@ func (v *ValueList) Recursive(f func(operator ValueOperator) error) error {
 }
 
 func (v *ValueList) GetCalled() (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		called, err := v.GetCalled()
-		if err != nil {
-			continue
-		}
-		res = append(res, called)
-	}
-	return NewValues(res), nil
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.GetCalled()
+	})
 }
 
 func (v *ValueList) GetFields() (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		fields, err := v.GetFields()
-		if err != nil {
-			continue
-		}
-		res = append(res, fields)
-	}
-	return NewValues(res), nil
-}
-
-func (v *ValueList) ForEach(h func(i any)) {
-	funk.ForEach(v.Values, func(i any) {
-		h(i)
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.GetFields()
 	})
 }
 
@@ -200,62 +206,33 @@ func (v *ValueList) String() string {
 }
 
 func (v *ValueList) GetCallActualParams(i int, b bool) (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		def, err := v.GetCallActualParams(i, b)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, def)
-	}
-	return NewValues(res), nil
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.GetCallActualParams(i, b)
+	})
 }
 
 func (v *ValueList) GetSyntaxFlowDef() (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		def, err := v.GetSyntaxFlowDef()
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, def)
-	}
-	return NewValues(res), nil
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.GetSyntaxFlowDef()
+	})
 }
 
 func (v *ValueList) GetSyntaxFlowUse() (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		use, err := v.GetSyntaxFlowUse()
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, use)
-	}
-	return NewValues(res), nil
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.GetSyntaxFlowUse()
+	})
 }
+
 func (v *ValueList) GetSyntaxFlowTopDef(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		topDef, err := v.GetSyntaxFlowTopDef(sfResult, sfConfig, config...)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, topDef)
-	}
-	return NewValues(res), nil
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.GetSyntaxFlowTopDef(sfResult, sfConfig, config...)
+	})
 }
 
 func (v *ValueList) GetSyntaxFlowBottomUse(sfResult *SFFrameResult, sfConfig *Config, config ...*RecursiveConfigItem) (ValueOperator, error) {
-	var res []ValueOperator
-	for _, v := range v.Values {
-		bottomUse, err := v.GetSyntaxFlowBottomUse(sfResult, sfConfig, config...)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, bottomUse)
-	}
-	return NewValues(res), nil
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.GetSyntaxFlowBottomUse(sfResult, sfConfig, config...)
+	})
 }
 
 func (v *ValueList) ListIndex(i int) (ValueOperator, error) {
@@ -274,69 +251,34 @@ func (v *ValueList) IsList() bool {
 }
 
 func (v *ValueList) ExactMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
-	var res []ValueOperator
-	for _, value := range v.Values {
-		match, next, err := value.ExactMatch(ctx, mod, s)
-		if err != nil {
-			return false, nil, err
-		}
-		if match {
-			if next != nil {
-				res = append(res, next)
-			}
-		}
-	}
-	return len(res) > 0, NewValues(res), nil
+	ret, err := v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		match, nextValue, err := vo.ExactMatch(ctx, mod, s)
+		_ = match
+		return nextValue, err
+	})
+	return ValuesLen(ret) > 0, ret, err
 }
 
 func (v *ValueList) GlobMatch(ctx context.Context, mod int, s string) (bool, ValueOperator, error) {
-	var res []ValueOperator
-	for _, value := range v.Values {
-		match, next, err := value.GlobMatch(ctx, mod, s)
-		if err != nil {
-			return false, nil, err
-		}
-		if match {
-			if next != nil {
-				res = append(res, next)
-			}
-		}
-	}
-	return len(res) > 0, NewValues(res), nil
+	ret, err := v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		match, nextValue, err := vo.GlobMatch(ctx, mod, s)
+		_ = match
+		return nextValue, err
+	})
+	return ValuesLen(ret) > 0, ret, err
 }
 
 func (v *ValueList) RegexpMatch(ctx context.Context, mod int, regexp string) (bool, ValueOperator, error) {
-	var res []ValueOperator
-	for _, value := range v.Values {
-		match, next, err := value.RegexpMatch(ctx, mod, regexp)
-		if err != nil {
-			return false, nil, err
-		}
-		if match {
-			if next != nil {
-				res = append(res, next)
-			}
-		}
-	}
-	return len(res) > 0, NewValues(res), nil
+	ret, err := v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		match, nextValue, err := vo.RegexpMatch(ctx, mod, regexp)
+		_ = match
+		return nextValue, err
+	})
+	return ValuesLen(ret) > 0, ret, err
 }
 
 func (v *ValueList) FileFilter(path string, mode string, rule1 map[string]string, rule2 []string) (ValueOperator, error) {
-	var res []ValueOperator
-	var errs error
-	for _, value := range v.Values {
-		filtered, err := value.FileFilter(path, mode, rule1, rule2)
-		if err != nil {
-			errs = utils.JoinErrors(errs, err)
-			// return nil, err
-			continue
-		}
-		if filtered != nil {
-			res = append(res, filtered)
-		}
-	}
-	if errs != nil {
-		return nil, errs
-	}
-	return NewValues(res), nil
+	return v.pipeLineRun(func(vo ValueOperator) (ValueOperator, error) {
+		return vo.FileFilter(path, mode, rule1, rule2)
+	})
 }

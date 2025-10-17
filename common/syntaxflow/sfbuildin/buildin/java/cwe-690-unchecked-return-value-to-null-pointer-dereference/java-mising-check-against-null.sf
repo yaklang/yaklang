@@ -1,5 +1,5 @@
 desc(
-	title_zh: "检测Java 未检查返回值是否为null导致空指针解引用"
+	title_zh: "检测Java未检查返回值是否为null导致空指针解引用漏洞"
 	title: "Check Java Unchecked Return Value to Null Pointer Dereference"
 	risk:"空指针",
 	level:low
@@ -12,70 +12,72 @@ DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
 
-1. **对可能返回 `null` 的方法结果务必进行检查：**
-   在使用方法返回值之前，添加 `null` 检查判断其是否为 `null`。如果为 `null`，则采取适当的错误处理或备用逻辑。
-   ```java
-   public void safeMethod1() {
-       String homeDir = System.getProperty("user.home.custom");
+#### 1. 对可能返回`null`的方法结果务必进行检查：
+在使用方法返回值之前，添加`null`检查判断其是否为`null`。如果为`null`，则采取适当的错误处理或备用逻辑。
+```java
+public void safeMethod1() {
+    String homeDir = System.getProperty("user.home.custom");
+    // 使用 if 检查 null
+    if (homeDir != null) {
+        int length = homeDir.length();
+        System.out.println("Home directory length: " + length);
+    } else {
+        System.out.println("Home directory not set");
+    }
+}
+```
 
-       if (homeDir != null) {
-           int length = homeDir.length();
-           System.out.println("Home directory length: " + length);
-       } else {
-           System.out.println("Home directory not set");
-       }
-   }
-   ```
+#### 2. 使用防御式编程，为可能的`null`值提供默认替代：
+在获取到可能为`null`的值后，使用三元运算符或逻辑判断为其赋予一个默认值，确保后续操作不会遇到`null`。
+```java
+public void safeMethod2() {
+    String homeDir = System.getProperty("config.path");
+    homeDir = (homeDir != null) ? homeDir : "default/path";
+    // 现在可以安全使用
+    System.out.println("Configuration path: " + homeDir);
+}
+```
 
-2. **使用防御式编程，为可能的 `null` 值提供默认替代：**
-   在获取到可能为 `null` 的值后，使用三元运算符或逻辑判断为其赋予一个默认值，确保后续操作不会遇到 `null`。
-   ```java
-   public void safeMethod2() {
-       String homeDir = System.getProperty("config.path");
-       homeDir = (homeDir != null) ? homeDir : "default/path";
-       System.out.println("Configuration path: " + homeDir);
-   }
-   ```
+#### 3. 考虑使用辅助库（如Apache Commons Lang的`StringUtils`）：
+利用成熟的第三方库提供的工具方法，如`StringUtils.isEmpty()`、`StringUtils.defaultString()`等，能够简洁高效地处理`null`值。
+```java
+import org.apache.commons.lang3.StringUtils;
+public void safeMethod3() {
+    String homeDir = System.getProperty("user.home.custom");
+    // 使用 StringUtils.isNotEmpty 检查
+    if (!StringUtils.isEmpty(homeDir)) {
+        int length = homeDir.length();
+        System.out.println("Home directory length: " + length);
+    } else {
+        System.out.println("Home directory not set or empty");
+    }
+}
+```
 
-3. **考虑使用辅助库（如 Apache Commons Lang 的 `StringUtils`）：**
-   利用成熟的第三方库提供的工具方法，如 `StringUtils.isEmpty()`、`StringUtils.defaultString()` 等，能够简洁高效地处理 `null` 值。
-   ```java
-   import org.apache.commons.lang3.StringUtils;
+#### 4. 对于Java 8+项目，可使用`Optional`：
+`Optional`类提供了一种更函数式的、避免显式`null`检查的方式来处理可能为`null`的值。
+```java
+import java.util.Optional;
+public void safeMethodOptional() {
+    String resource = Class.getResource("/config.properties").toString(); // Example of method potentially returning null URL
+    Optional.ofNullable(resource).ifPresent(r -> {
+        // 处理资源，仅当 resource 非 null 时执行
+        System.out.println("Resource found: " + r);
+    });
+}
+```
 
-   public void safeMethod3() {
-       String homeDir = System.getProperty("user.home.custom");
-
-       if (!StringUtils.isEmpty(homeDir)) {
-           int length = homeDir.length();
-           System.out.println("Home directory length: " + length);
-       } else {
-           System.out.println("Home directory not set or empty");
-       }
-   }
-   ```
-
-4. **对于 Java 8+ 项目，可使用 `Optional`：**
-   `Optional` 类提供了一种更函数式的、避免显式 `null` 检查的方式来处理可能为 `null` 的值。
-   ```java
-   import java.util.Optional;
-
-   public void safeMethodOptional() {
-       String resource = Class.getResource("/config.properties").toString();
-       Optional.ofNullable(resource).ifPresent(r -> {
-           System.out.println("Resource found: " + r);
-       });
-   }
-   ```
-
-5. **使用带默认值的 API 方法（如果可用）：**
-   一些 API 方法本身提供了带默认值的重载版本，优先使用这些方法可以直接避免返回 `null`。
-   ```java
-   public void safeMethod4() {
-       String homeDir = System.getProperty("user.home.custom", "/default/home");
-       int length = homeDir.length();
-       System.out.println("Home directory length: " + length);
-   }
-   ```
+#### 5. 使用带默认值的API方法（如果可用）：
+一些API方法本身提供了带默认值的重载版本，优先使用这些方法可以直接避免返回`null`。
+```java
+public void safeMethod4() {
+    // 直接使用带默认值的方法，确保不会返回 null
+    String homeDir = System.getProperty("user.home.custom", "/default/home");
+    // 现在可以安全使用
+    int length = homeDir.length();
+    System.out.println("Home directory length: " + length);
+}
+```
 SOLUTION
 	rule_id: "44c752d4-9249-49af-8d0a-e6ad3d767e07"
 )
@@ -164,110 +166,98 @@ $toCheck?{.*()<var(memberCall)>} as $haveMemberCall
 $haveMemberCall?{!<getUsers(depth=2)>?{opcode:if} && !<getUsers(depth=3)>?{opcode:if}} as $weak
 alert $weak for {
 	title: "Check Java Unchecked Return Value to Null Pointer Dereference",
-	title_zh: "检测Java 未检测返回值是否为null导致空指针",
-	solution: <<<CODE
+	title_zh: "检测Java 未检查返回值是否为null导致空指针解引用",
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **对可能返回`null`的方法结果务必进行检查：**
-   在使用方法返回值之前，添加`null`检查判断其是否为`null`。如果为`null`，则采取适当的错误处理或备用逻辑。
-   ```java
-   public void safeMethod1() {
-       String homeDir = System.getProperty("user.home.custom");
-
-       // 使用 if 检查 null
-       if (homeDir != null) {
-           int length = homeDir.length();
-           System.out.println("Home directory length: " + length);
-       } else {
-           System.out.println("Home directory not set");
-       }
-   }
-   ```
-
+在使用方法返回值之前，添加`null`检查判断其是否为`null`。如果为`null`，则采取适当的错误处理或备用逻辑。
+```java
+public void safeMethod1() {
+String homeDir = System.getProperty("user.home.custom");
+// 使用 if 检查 null
+if (homeDir != null) {
+int length = homeDir.length();
+System.out.println("Home directory length: " + length);
+} else {
+System.out.println("Home directory not set");
+}
+}
+```
 2. **使用防御式编程，为可能的`null`值提供默认替代：**
-   在获取到可能为`null`的值后，使用三元运算符或逻辑判断为其赋予一个默认值，确保后续操作不会遇到`null`。
-   ```java
-   public void safeMethod2() {
-       String homeDir = System.getProperty("config.path");
-       homeDir = (homeDir != null) ? homeDir : "default/path";
-       // 现在可以安全使用 homeDir
-       System.out.println("Configuration path: " + homeDir);
-   }
-   ```
-
+在获取到可能为`null`的值后，使用三元运算符或逻辑判断为其赋予一个默认值，确保后续操作不会遇到`null`。
+```java
+public void safeMethod2() {
+String homeDir = System.getProperty("config.path");
+homeDir = (homeDir != null) ? homeDir : "default/path";
+// 现在可以安全使用 homeDir
+System.out.println("Configuration path: " + homeDir);
+}
+```
 3. **考虑使用辅助库（如Apache Commons Lang的`StringUtils`）：**
-   利用成熟的第三方库提供的工具方法，如`StringUtils.isEmpty()`、`StringUtils.defaultString()`等，能够简洁高效地处理`null`值。
-   ```java
-   import org.apache.commons.lang3.StringUtils;
-
-   public void safeMethod3() {
-       String homeDir = System.getProperty("user.home.custom");
-
-       // 使用 StringUtils.isNotEmpty 检查
-       if (!StringUtils.isEmpty(homeDir)) {
-           int length = homeDir.length();
-           System.out.println("Home directory length: " + length);
-       } else {
-           System.out.println("Home directory not set or empty");
-       }
-   }
-   ```
-
+利用成熟的第三方库提供的工具方法，如`StringUtils.isEmpty()`、`StringUtils.defaultString()`等，能够简洁高效地处理`null`值。
+```java
+import org.apache.commons.lang3.StringUtils;
+public void safeMethod3() {
+String homeDir = System.getProperty("user.home.custom");
+// 使用 StringUtils.isNotEmpty 检查
+if (!StringUtils.isEmpty(homeDir)) {
+int length = homeDir.length();
+System.out.println("Home directory length: " + length);
+} else {
+System.out.println("Home directory not set or empty");
+}
+}
+```
 4. **对于Java 8+项目，可使用`Optional`：**
-   `Optional`类提供了一种更函数式的、避免显式`null`检查的方式来处理可能为`null`的值。
-   ```java
-   import java.util.Optional;
-
-   public void safeMethodOptional() {
-       String resource = Class.getResource("/config.properties").toString(); // Example of method potentially returning null URL
-       Optional.ofNullable(resource).ifPresent(r -> {
-           // 处理资源，仅当 resource 非 null 时执行
-           System.out.println("Resource found: " + r);
-       });
-   }
-   ```
-
+`Optional`类提供了一种更函数式的、避免显式`null`检查的方式来处理可能为`null`的值。
+```java
+import java.util.Optional;
+public void safeMethodOptional() {
+String resource = Class.getResource("/config.properties").toString(); // Example of method potentially returning null URL
+Optional.ofNullable(resource).ifPresent(r -> {
+// 处理资源，仅当 resource 非 null 时执行
+System.out.println("Resource found: " + r);
+});
+}
+```
 5. **使用带默认值的API方法 (如果可用)：**
-   一些API方法本身提供了带默认值的重载版本，优先使用这些方法可以直接避免返回`null`。
-   ```java
-   public void safeMethod4() {
-       // 直接使用带默认值的方法，确保不会返回 null
-       String homeDir = System.getProperty("user.home.custom", "/default/home");
-
-       // 现在可以安全使用
-       int length = homeDir.length();
-       System.out.println("Home directory length: " + length);
-   }
-   ```
-CODE
-	desc: <<<CODE
+一些API方法本身提供了带默认值的重载版本，优先使用这些方法可以直接避免返回`null`。
+```java
+public void safeMethod4() {
+// 直接使用带默认值的方法，确保不会返回 null
+String homeDir = System.getProperty("user.home.custom", "/default/home");
+// 现在可以安全使用
+int length = homeDir.length();
+System.out.println("Home directory length: " + length);
+}
+```
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   某些方法（如 `System.getProperty()`、`request.getParameter()`、`Class.getResource()`）可能返回 `null`。直接使用这些返回值而不检查是否为 `null` 可能导致空指针异常（`NullPointerException`），造成程序崩溃或意外行为。这属于 CWE-476（空指针解引用）安全问题。
-
+某些方法（如 `System.getProperty()`、`request.getParameter()`、`Class.getResource()`）可能返回 `null`。直接使用这些返回值而不检查是否为 `null` 可能导致空指针异常（`NullPointerException`），造成程序崩溃或意外行为。这属于 CWE-476（空指针解引用）安全问题。
 2. **触发场景**
-   ```java
-   public class RiskyExample {
-       public static void main(String[] args) {
-           // 获取可能为 null 的系统属性
-           String homeDir = System.getProperty("user.home.custom");
-
-           // 直接使用，没有检查 null
-           // 如果属性不存在，将导致 NullPointerException
-           int length = homeDir.length();  // allocated -> used 转换，触发错误
-           System.out.println("Home directory length: " + length);
-       }
-   }
-   ```
-
+```java
+public class RiskyExample {
+public static void main(String[] args) {
+// 获取可能为 null 的系统属性
+String homeDir = System.getProperty("user.home.custom");
+// 直接使用，没有检查 null
+// 如果属性不存在，将导致 NullPointerException
+int length = homeDir.length();  // allocated -> used 转换，触发错误
+System.out.println("Home directory length: " + length);
+}
+}
+```
 3. **潜在影响**
-   - 程序运行时抛出 `NullPointerException`，可能导致服务中断。
-   - 系统行为变得不可预测，影响用户体验。
-   - 在极端情况下，攻击者可能利用此问题进行拒绝服务攻击（DoS）。
-CODE
+- 程序运行时抛出 `NullPointerException`，可能导致服务中断。
+- 系统行为变得不可预测，影响用户体验。
+- 在极端情况下，攻击者可能利用此问题进行拒绝服务攻击（DoS）。
+DESC
 	level: "low",
 	message: "检测到未检查返回值可能导致空指针异常",
+	risk: "空指针",
+	name: "weak",
 }
 
 desc(
@@ -349,6 +339,30 @@ desc(
 
     }
 CODE
+	"safefile://SafeSystemGetPropertyIfCheck.java": <<<CODE
+public class SafeSystemGetPropertyIfCheck {
+    public void safeMethod() {
+        String homeDir = System.getProperty("user.home.custom");
+        // 使用 if 检查 null，是推荐的安全实现方式
+        if (homeDir != null) {
+            int length = homeDir.length();
+            System.out.println("Home directory length: " + length);
+        } else {
+            System.out.println("Home directory not set");
+        }
+    }
+}
+CODE
+	"safefile://SafeSystemGetPropertyTernaryOperator.java": <<<CODE
+public class SafeSystemGetPropertyTernaryOperator {
+    public void safeMethod() {
+        String configPath = System.getProperty("config.path");
+        // 使用三元运算符为可能为null的值提供默认替代
+        configPath = (configPath != null) ? configPath : "default/path";
+        System.out.println("Configuration path: " + configPath);
+    }
+}
+CODE
 )
 
 desc(
@@ -388,5 +402,29 @@ desc(
            return property.contains("windows");
        }
    }
+CODE
+	"safefile://SafeSystemGetPropertyIfCheck.java": <<<CODE
+public class SafeSystemGetPropertyIfCheck {
+    public void safeMethod() {
+        String homeDir = System.getProperty("user.home.custom");
+        // 使用 if 检查 null，是推荐的安全实现方式
+        if (homeDir != null) {
+            int length = homeDir.length();
+            System.out.println("Home directory length: " + length);
+        } else {
+            System.out.println("Home directory not set");
+        }
+    }
+}
+CODE
+	"safefile://SafeSystemGetPropertyTernaryOperator.java": <<<CODE
+public class SafeSystemGetPropertyTernaryOperator {
+    public void safeMethod() {
+        String configPath = System.getProperty("config.path");
+        // 使用三元运算符为可能为null的值提供默认替代
+        configPath = (configPath != null) ? configPath : "default/path";
+        System.out.println("Configuration path: " + configPath);
+    }
+}
 CODE
 )

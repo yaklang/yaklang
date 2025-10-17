@@ -122,14 +122,13 @@ func TestStmt_spin(t *testing.T) {
 	t.Run("for Spin array", func(t *testing.T) {
 		test.CheckPrintlnValue(`package A
 
-
 	func main() {
-		var str = []string{
+		var strg = []string{
 			"hello world",
 		}
 
 		for true {
-			println(str[0])
+			println(strg[0])
 		}
 	}
 		`, []string{"\"hello world\""}, t)
@@ -347,13 +346,13 @@ func TestStmt_spin(t *testing.T) {
 
 	t.Run("for Spin array global", func(t *testing.T) {
 		test.CheckPrintlnValue(`package  A
-	var str = []string{
+	var strg = []string{
 		"hello world",
 	}
 
 	func main() {
 		for true {
-			println(str[0])
+			println(strg[0])
 		}
 	}
 		`, []string{"\"hello world\""}, t)
@@ -366,11 +365,11 @@ func TestStmt_spin(t *testing.T) {
 	    s string
 	}
 
-	var str = A{s: "hello world"}
+	var strg = A{s: "hello world"}
 	
 	func main() {
 		for true {
-			println(str.s)
+			println(strg.s)
 		}
 	}
 		`, []string{"\"hello world\""}, t)
@@ -753,13 +752,10 @@ func TestFuntion_normol(t *testing.T) {
 		func main(){
 			mapt := make(map[string]string)
 			println(mapt)
-		}`, []string{"Function-make(typeValue(map[string]string))"}, t)
+		}`, []string{"make(map[string]string)"}, t)
 	})
 
-	t.Run("member-call method ", func(t *testing.T) {
-
-		// TODO: need fix with lazy builder
-		t.Skip()
+	t.Run("member-call method", func(t *testing.T) {
 		test.CheckPrintlnValue(`package main
 		
 			type test struct{
@@ -770,16 +766,16 @@ func TestFuntion_normol(t *testing.T) {
 			func (t* test)add() (int,int) {
 			}
 
-
 			func main(){
 				a := test{a: 6, b: 7}
 				println(a.add())
 			}
 			`, []string{
-			"Undefined-a.add(valid)(make(struct {number,number})) member[6,7]",
+			"Undefined-a.add(valid)(make(struct {number,number}))",
 		}, t)
 	})
-	t.Run("member-call top-def ", func(t *testing.T) {
+
+	t.Run("member-call top-def", func(t *testing.T) {
 		test.CheckSyntaxFlow(t, `package main
 		
 			type test struct{
@@ -853,7 +849,7 @@ func TestMethod_normol(t *testing.T) {
 		println(u.Name)
 	}
 
-		`, []string{"side-effect(Parameter-id, u.Id)", "side-effect(Parameter-name, u.Name)"}, t)
+		`, []string{"side-effect(1, u.Id)", "side-effect(\"yaklang\", u.Name)"}, t)
 	})
 
 	t.Run("method check name", func(t *testing.T) {

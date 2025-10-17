@@ -6,30 +6,24 @@ desc(
 	risk: "unserialize"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 `unserialize()` 函数在 PHP 中用于将已存储的表示形式（序列化字符串）转换回 PHP 的值或对象。当应用程序使用 `unserialize()` 处理来自不可信源（如用户输入、网络请求）的数据时，攻击者可以构造恶意的序列化字符串，其中包含特殊类的对象或属性。当 `unserialize()` 函数尝试实例化这些对象时，可能会触发对象内部的魔术方法（如 `__wakeup()`、`__destruct()`、`__toString()` 等）。攻击者可以利用这些魔术方法在反序列化过程中执行任意代码、读写文件、进行XXE注入、SSRF等攻击，这称为PHP对象注入或反序列化漏洞。
-
 2. **触发场景**
 当应用程序从用户输入（$_GET, $_POST, $_COOKIE等）、文件、数据库、缓存等读取序列化数据，并直接或间接调用 `unserialize()` 函数进行处理时，就可能存在反序列化漏洞。例如：
-
 ```php
 <?php
 // 存在漏洞的代码示例
 class Example {
-    public $file;
-    public function __destruct() {
-        unlink($this->file); // 危险操作：删除文件
-    }
+public $file;
+public function __destruct() {
+unlink($this->file); // 危险操作：删除文件
 }
-
+}
 $data = $_GET['data']; // 从用户输入获取序列化数据
 unserialize($data); // 直接反序列化用户输入
-
 ?>
 ```
 攻击者构造 `O:7:"Example":1:{s:4:"file";s:9:"/tmp/test";}` 作为 `data` 参数输入，即可触发 `__destruct()` 方法删除 `/tmp/test` 文件。
-
 3. **潜在影响**
 - **任意代码执行 (RCE)**：攻击者通过控制对象属性和魔术方法，能够执行系统命令或任意PHP代码。
 - **文件操作**：导致任意文件读取、写入或删除。
@@ -41,58 +35,44 @@ DESC
 	rule_id: "43175d39-14f0-42bc-a054-3e29998a802a"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 `unserialize()` 处理不可信数据
 最安全的做法是完全避免对来自客户端或外部源的数据使用 `unserialize()`。如果必须处理序列化数据，应确保数据源是完全可信的（例如：数据是内部生成并签名的）。
-
 ```php
 <?php
 // 避免直接反序列化不可信输入
 // $data = $_GET['data']; // 不安全
 // unserialize($data); // 不安全
-
 // 改用其他安全的数据交换格式（如 JSON）
 $data = $_GET['data'];
 $jsonData = json_decode($data, true);
-
 // 或者使用安全的序列化库，例如 igbinary 并进行签名验证
 // if (verify_signature($data)) {
 //     $object = igbinary_unserialize($data);
 // }
 ?>
 ```
-
 #### 2. 对反序列化输入进行严格过滤和验证
 如果确实需要使用 `unserialize()`，务必在之前对输入数据进行严格的格式、内容和类型检查。可以使用白名单方式限制允许反序列化的类和属性。
-
 ```php
 <?php
 // 修复代码示例：使用白名单限制反序列化的类
 $data = $_GET['data'];
-
 // 仅允许反序列化 MyApp\SafeClass 类
 $options = ['allowed_classes' => ['MyApp\SafeClass']];
 $object = unserialize($data, $options);
-
 // 修复代码示例：检查数据格式和内容
 if (!is_string($data) || !is_valid_serialized_format($data)) {
-    die("Invalid serialized data");
+die("Invalid serialized data");
 }
-
 // 进行更精细的属性值检查...
-
 $object = unserialize($data);
 // 对反序列化后的对象进行进一步校验...
-
 ?>
 ```
-
 #### 3. 禁止危险的魔术方法
 在某些情况下，可以通过禁用可能被滥用的魔术方法来降低风险，但这可能影响应用程序的正常功能，且不是根治方法。
-
 #### 4. 更新PHP版本并关注安全公告
 确保PHP版本是最新的稳定版本，及时应用安全补丁，因为PHP本身在处理反序列化时也可能存在漏洞。
-
 #### 5. 使用其他序列化方式
 考虑使用更安全的数据表示方式，例如 JSON、XML 或 Protocol Buffers，并使用相应的安全解析函数进行处理。这些格式通常不会自动实例化对象或触发魔术方法，降低了对象注入的风险。
 SOLUTION
@@ -122,98 +102,81 @@ CODE)> as $high
 alert $high for {
 	title: "PHP Unserialization Vulnerability - High Risk",
 	title_zh: "PHP反序列化漏洞 - 高风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 `unserialize()` 处理不可信数据
 最安全的做法是完全避免对来自客户端或外部源的数据使用 `unserialize()`。如果必须处理序列化数据，应确保数据源是完全可信的（例如：数据是内部生成并签名的）。
-
 ```php
 <?php
 // 避免直接反序列化不可信输入
 // $data = $_GET['data']; // 不安全
 // unserialize($data); // 不安全
-
 // 改用其他安全的数据交换格式（如 JSON）
 $data = $_GET['data'];
 $jsonData = json_decode($data, true);
-
 // 或者使用安全的序列化库，例如 igbinary 并进行签名验证
 // if (verify_signature($data)) {
 //     $object = igbinary_unserialize($data);
 // }
 ?>
 ```
-
 #### 2. 对反序列化输入进行严格过滤和验证
 如果确实需要使用 `unserialize()`，务必在之前对输入数据进行严格的格式、内容和类型检查。可以使用白名单方式限制允许反序列化的类和属性。
-
 ```php
 <?php
 // 修复代码示例：使用白名单限制反序列化的类
 $data = $_GET['data'];
-
 // 仅允许反序列化 MyApp\SafeClass 类
 $options = ['allowed_classes' => ['MyApp\SafeClass']];
 $object = unserialize($data, $options);
-
 // 修复代码示例：检查数据格式和内容
 if (!is_string($data) || !is_valid_serialized_format($data)) {
-    die("Invalid serialized data");
+die("Invalid serialized data");
 }
-
 // 进行更精细的属性值检查...
-
 $object = unserialize($data);
 // 对反序列化后的对象进行进一步校验...
-
 ?>
 ```
-
 #### 3. 禁止危险的魔术方法
 在某些情况下，可以通过禁用可能被滥用的魔术方法来降低风险，但这可能影响应用程序的正常功能，且不是根治方法。
-
 #### 4. 更新PHP版本并关注安全公告
 确保PHP版本是最新的稳定版本，及时应用安全补丁，因为PHP本身在处理反序列化时也可能存在漏洞。
-
 #### 5. 使用其他序列化方式
 考虑使用更安全的数据表示方式，例如 JSON、XML 或 Protocol Buffers，并使用相应的安全解析函数进行处理。这些格式通常不会自动实例化对象或触发魔术方法，降低了对象注入的风险。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 `unserialize()` 函数在 PHP 中用于将已存储的表示形式（序列化字符串）转换回 PHP 的值或对象。当应用程序使用 `unserialize()` 处理来自不可信源（如用户输入、网络请求）的数据时，攻击者可以构造恶意的序列化字符串，其中包含特殊类的对象或属性。当 `unserialize()` 函数尝试实例化这些对象时，可能会触发对象内部的魔术方法（如 `__wakeup()`、`__destruct()`、`__toString()` 等）。攻击者可以利用这些魔术方法在反序列化过程中执行任意代码、读写文件、进行XXE注入、SSRF等攻击，这称为PHP对象注入或反序列化漏洞。
-
 2. **触发场景**
 当应用程序从用户输入（$_GET, $_POST, $_COOKIE等）、文件、数据库、缓存等读取序列化数据，并直接或间接调用 `unserialize()` 函数进行处理时，就可能存在反序列化漏洞。例如：
-
 ```php
 <?php
 // 存在漏洞的代码示例
 class Example {
-    public $file;
-    public function __destruct() {
-        unlink($this->file); // 危险操作：删除文件
-    }
+public $file;
+public function __destruct() {
+unlink($this->file); // 危险操作：删除文件
 }
-
+}
 $data = $_GET['data']; // 从用户输入获取序列化数据
 unserialize($data); // 直接反序列化用户输入
-
 ?>
 ```
 攻击者构造 `O:7:"Example":1:{s:4:"file";s:9:"/tmp/test";}` 作为 `data` 参数输入，即可触发 `__destruct()` 方法删除 `/tmp/test` 文件。
-
 3. **潜在影响**
 - **任意代码执行 (RCE)**：攻击者通过控制对象属性和魔术方法，能够执行系统命令或任意PHP代码。
 - **文件操作**：导致任意文件读取、写入或删除。
 - **权限绕过**：修改对象状态，绕过应用程序的访问控制。
 - **拒绝服务 (DoS)**：构造特殊序列化字符串，导致服务器崩溃或资源耗尽。
 - **其他漏洞触发**：通过反序列化触发其他类型的漏洞，如XXE、SSRF等。
-CODE
+DESC
 	level: "high",
 	type: "vuln",
+	name: "high",
+	message: "检测到PHP反序列化漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "反序列化",
 }
 
 $sink<dataflow(include=<<<CODE
@@ -227,98 +190,81 @@ $highAndMid - $high as $mid
 alert $mid for {
 	title: "PHP Unserialization Vulnerability - Medium Risk",
 	title_zh: "PHP反序列化漏洞 - 中风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 `unserialize()` 处理不可信数据
 最安全的做法是完全避免对来自客户端或外部源的数据使用 `unserialize()`。如果必须处理序列化数据，应确保数据源是完全可信的（例如：数据是内部生成并签名的）。
-
 ```php
 <?php
 // 避免直接反序列化不可信输入
 // $data = $_GET['data']; // 不安全
 // unserialize($data); // 不安全
-
 // 改用其他安全的数据交换格式（如 JSON）
 $data = $_GET['data'];
 $jsonData = json_decode($data, true);
-
 // 或者使用安全的序列化库，例如 igbinary 并进行签名验证
 // if (verify_signature($data)) {
 //     $object = igbinary_unserialize($data);
 // }
 ?>
 ```
-
 #### 2. 对反序列化输入进行严格过滤和验证
 如果确实需要使用 `unserialize()`，务必在之前对输入数据进行严格的格式、内容和类型检查。可以使用白名单方式限制允许反序列化的类和属性。
-
 ```php
 <?php
 // 修复代码示例：使用白名单限制反序列化的类
 $data = $_GET['data'];
-
 // 仅允许反序列化 MyApp\SafeClass 类
 $options = ['allowed_classes' => ['MyApp\SafeClass']];
 $object = unserialize($data, $options);
-
 // 修复代码示例：检查数据格式和内容
 if (!is_string($data) || !is_valid_serialized_format($data)) {
-    die("Invalid serialized data");
+die("Invalid serialized data");
 }
-
 // 进行更精细的属性值检查...
-
 $object = unserialize($data);
 // 对反序列化后的对象进行进一步校验...
-
 ?>
 ```
-
 #### 3. 禁止危险的魔术方法
 在某些情况下，可以通过禁用可能被滥用的魔术方法来降低风险，但这可能影响应用程序的正常功能，且不是根治方法。
-
 #### 4. 更新PHP版本并关注安全公告
 确保PHP版本是最新的稳定版本，及时应用安全补丁，因为PHP本身在处理反序列化时也可能存在漏洞。
-
 #### 5. 使用其他序列化方式
 考虑使用更安全的数据表示方式，例如 JSON、XML 或 Protocol Buffers，并使用相应的安全解析函数进行处理。这些格式通常不会自动实例化对象或触发魔术方法，降低了对象注入的风险。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 `unserialize()` 函数在 PHP 中用于将已存储的表示形式（序列化字符串）转换回 PHP 的值或对象。当应用程序使用 `unserialize()` 处理来自不可信源（如用户输入、网络请求）的数据时，攻击者可以构造恶意的序列化字符串，其中包含特殊类的对象或属性。当 `unserialize()` 函数尝试实例化这些对象时，可能会触发对象内部的魔术方法（如 `__wakeup()`、`__destruct()`、`__toString()` 等）。攻击者可以利用这些魔术方法在反序列化过程中执行任意代码、读写文件、进行XXE注入、SSRF等攻击，这称为PHP对象注入或反序列化漏洞。
-
 2. **触发场景**
 当应用程序从用户输入（$_GET, $_POST, $_COOKIE等）、文件、数据库、缓存等读取序列化数据，并直接或间接调用 `unserialize()` 函数进行处理时，就可能存在反序列化漏洞。例如：
-
 ```php
 <?php
 // 存在漏洞的代码示例
 class Example {
-    public $file;
-    public function __destruct() {
-        unlink($this->file); // 危险操作：删除文件
-    }
+public $file;
+public function __destruct() {
+unlink($this->file); // 危险操作：删除文件
 }
-
+}
 $data = $_GET['data']; // 从用户输入获取序列化数据
 unserialize($data); // 直接反序列化用户输入
-
 ?>
 ```
 攻击者构造 `O:7:"Example":1:{s:4:"file";s:9:"/tmp/test";}` 作为 `data` 参数输入，即可触发 `__destruct()` 方法删除 `/tmp/test` 文件。
-
 3. **潜在影响**
 - **任意代码执行 (RCE)**：攻击者通过控制对象属性和魔术方法，能够执行系统命令或任意PHP代码。
 - **文件操作**：导致任意文件读取、写入或删除。
 - **权限绕过**：修改对象状态，绕过应用程序的访问控制。
 - **拒绝服务 (DoS)**：构造特殊序列化字符串，导致服务器崩溃或资源耗尽。
 - **其他漏洞触发**：通过反序列化触发其他类型的漏洞，如XXE、SSRF等。
-CODE
+DESC
 	level: "mid",
 	type: "mid",
+	message: "检测到PHP反序列化漏洞，但可能存在过滤函数，需进一步审计确认。",
+	risk: "反序列化",
+	name: "mid",
 }
 
 $sink - $mid - $high as $low
@@ -327,108 +273,94 @@ alert $low for {
 	type: "low",
 	title: "PHP Unserialization Vulnerability - Low Risk",
 	title_zh: "PHP反序列化漏洞 - 低风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 `unserialize()` 处理不可信数据
 最安全的做法是完全避免对来自客户端或外部源的数据使用 `unserialize()`。如果必须处理序列化数据，应确保数据源是完全可信的（例如：数据是内部生成并签名的）。
-
 ```php
 <?php
 // 避免直接反序列化不可信输入
 // $data = $_GET['data']; // 不安全
 // unserialize($data); // 不安全
-
 // 改用其他安全的数据交换格式（如 JSON）
 $data = $_GET['data'];
 $jsonData = json_decode($data, true);
-
 // 或者使用安全的序列化库，例如 igbinary 并进行签名验证
 // if (verify_signature($data)) {
 //     $object = igbinary_unserialize($data);
 // }
 ?>
 ```
-
 #### 2. 对反序列化输入进行严格过滤和验证
 如果确实需要使用 `unserialize()`，务必在之前对输入数据进行严格的格式、内容和类型检查。可以使用白名单方式限制允许反序列化的类和属性。
-
 ```php
 <?php
 // 修复代码示例：使用白名单限制反序列化的类
 $data = $_GET['data'];
-
 // 仅允许反序列化 MyApp\SafeClass 类
 $options = ['allowed_classes' => ['MyApp\SafeClass']];
 $object = unserialize($data, $options);
-
 // 修复代码示例：检查数据格式和内容
 if (!is_string($data) || !is_valid_serialized_format($data)) {
-    die("Invalid serialized data");
+die("Invalid serialized data");
 }
-
 // 进行更精细的属性值检查...
-
 $object = unserialize($data);
 // 对反序列化后的对象进行进一步校验...
-
 ?>
 ```
-
 #### 3. 禁止危险的魔术方法
 在某些情况下，可以通过禁用可能被滥用的魔术方法来降低风险，但这可能影响应用程序的正常功能，且不是根治方法。
-
 #### 4. 更新PHP版本并关注安全公告
 确保PHP版本是最新的稳定版本，及时应用安全补丁，因为PHP本身在处理反序列化时也可能存在漏洞。
-
 #### 5. 使用其他序列化方式
 考虑使用更安全的数据表示方式，例如 JSON、XML 或 Protocol Buffers，并使用相应的安全解析函数进行处理。这些格式通常不会自动实例化对象或触发魔术方法，降低了对象注入的风险。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 `unserialize()` 函数在 PHP 中用于将已存储的表示形式（序列化字符串）转换回 PHP 的值或对象。当应用程序使用 `unserialize()` 处理来自不可信源（如用户输入、网络请求）的数据时，攻击者可以构造恶意的序列化字符串，其中包含特殊类的对象或属性。当 `unserialize()` 函数尝试实例化这些对象时，可能会触发对象内部的魔术方法（如 `__wakeup()`、`__destruct()`、`__toString()` 等）。攻击者可以利用这些魔术方法在反序列化过程中执行任意代码、读写文件、进行XXE注入、SSRF等攻击，这称为PHP对象注入或反序列化漏洞。
-
 2. **触发场景**
 当应用程序从用户输入（$_GET, $_POST, $_COOKIE等）、文件、数据库、缓存等读取序列化数据，并直接或间接调用 `unserialize()` 函数进行处理时，就可能存在反序列化漏洞。例如：
-
 ```php
 <?php
 // 存在漏洞的代码示例
 class Example {
-    public $file;
-    public function __destruct() {
-        unlink($this->file); // 危险操作：删除文件
-    }
+public $file;
+public function __destruct() {
+unlink($this->file); // 危险操作：删除文件
 }
-
+}
 $data = $_GET['data']; // 从用户输入获取序列化数据
 unserialize($data); // 直接反序列化用户输入
-
 ?>
 ```
 攻击者构造 `O:7:"Example":1:{s:4:"file";s:9:"/tmp/test";}` 作为 `data` 参数输入，即可触发 `__destruct()` 方法删除 `/tmp/test` 文件。
-
 3. **潜在影响**
 - **任意代码执行 (RCE)**：攻击者通过控制对象属性和魔术方法，能够执行系统命令或任意PHP代码。
 - **文件操作**：导致任意文件读取、写入或删除。
 - **权限绕过**：修改对象状态，绕过应用程序的访问控制。
 - **拒绝服务 (DoS)**：构造特殊序列化字符串，导致服务器崩溃或资源耗尽。
 - **其他漏洞触发**：通过反序列化触发其他类型的漏洞，如XXE、SSRF等。
-CODE
+DESC
 	level: "low",
+	message: "检测到PHP反序列化漏洞，但路径中已包含过滤机制，需检查过滤函数是否存在潜在缺陷。",
+	risk: "反序列化",
+	name: "low",
 }
 unserialize?(*?{!opcode: const}) as $info
 alert $info for {
 	title_zh: "检测到PHP反序列化函数",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 描述
 该规则用于检测PHP代码中是否存在反序列化函数 `unserialize()` 的调用。虽然该调用本身并不一定意味着安全问题，但其存在可能表明潜在的安全隐患，特别是当反序列化处理的数据来源于不可信来源时。建议开发者审查相关代码，确保未对不可信数据进行反序列化操作。
-CODE
+DESC
 	level: "info",
 	type: "info",
 	title: "PHP Unserialization Function Detected",
+	risk: "信息",
+	name: "info",
+	message: "检测到PHP反序列化函数 `unserialize()` 调用，建议开发者审查相关代码。",
 }
 desc(
 	lang: php

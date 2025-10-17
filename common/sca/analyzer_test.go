@@ -113,6 +113,41 @@ func Check(pkgs, wantPkgs []*dxtypes.Package, name string, t *testing.T) {
 	}
 }
 
+// CheckContains 验证期望的包是否都包含在实际结果中（用于处理传递依赖的情况）
+func CheckContains(pkgs, wantPkgs []*dxtypes.Package, name string, t *testing.T) {
+	// 创建实际包的映射，方便查找
+	actualPkgs := make(map[string]*dxtypes.Package)
+	for _, pkg := range pkgs {
+		key := pkg.Name + "@" + pkg.Version
+		actualPkgs[key] = pkg
+	}
+
+	// 检查每个期望的包是否在实际结果中
+	for _, wantPkg := range wantPkgs {
+		key := wantPkg.Name + "@" + wantPkg.Version
+		actualPkg, found := actualPkgs[key]
+		if !found {
+			t.Fatalf("%s: expected package not found: %s@%s", name, wantPkg.Name, wantPkg.Version)
+		}
+
+		// 验证许可证 - 只有当期望的许可证不为空时才验证
+		if len(wantPkg.License) > 0 {
+			if slices.CompareFunc(actualPkg.License, wantPkg.License, strings.Compare) != 0 {
+				t.Fatalf("%s: pkg %s license error: %v(got) != %v(want)", name, wantPkg.Name, actualPkg.License, wantPkg.License)
+			}
+		}
+
+		// 验证验证状态 - 只有当期望的验证状态不为空时才验证
+		if wantPkg.Verification != "" {
+			if actualPkg.Verification != wantPkg.Verification {
+				t.Fatalf("%s: pkg %s verification error: %v(got) != %v(want)", name, wantPkg.Name, actualPkg.Verification, wantPkg.Verification)
+			}
+		}
+	}
+
+	t.Logf("%s: Successfully found all %d expected packages in %d total packages", name, len(wantPkgs), len(pkgs))
+}
+
 func Run(tc testcase) []*dxtypes.Package {
 	t := tc.t
 	fmt.Printf("TestCase: %s\n===============================\n", tc.name)
@@ -710,8 +745,11 @@ func TestJavaPom(t *testing.T) {
 			matchType:      1,
 			matchedFileMap: map[string]string{},
 			wantPkgs:       JavaPom2Pkgs,
+			skipCheck:      true, // 跳过默认检查，使用自定义检查
 		}
-		Run(tc)
+		pkgs := Run(tc)
+		// 使用CheckContains检查期望的包是否都包含在实际结果中（处理传递依赖）
+		CheckContains(pkgs, JavaPom2Pkgs, t.Name(), t)
 	})
 
 	t.Run("positive-requirement", func(t *testing.T) {

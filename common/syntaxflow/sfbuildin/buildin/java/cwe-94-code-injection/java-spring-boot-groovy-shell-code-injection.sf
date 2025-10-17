@@ -5,40 +5,35 @@ desc(
 	risk: "code-execution"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，当应用程序使用Groovy脚本引擎（如 `groovy.lang.GroovyShell` 或 `groovy.script.GroovyScriptEngine`）执行动态生成的Groovy代码时，如果未对来自外部（如用户输入）的数据进行充分的验证和过滤，攻击者可以通过构造恶意的Groovy脚本 payload，将其注入到待执行的代码中。Groovy引擎会解析并执行这些恶意脚本，从而导致在服务器端执行任意代码。
-
+Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，当应用程序使用Groovy脚本引擎（如 `groovy.lang.GroovyShell` 或 `groovy.script.GroovyScriptEngine`）执行动态生成的Groovy代码时，如果未对来自外部（如用户输入）的数据进行充分的验证和过滤，攻击者可以通过构造恶意的Groovy脚本 payload，将其注入到待执行的代码中。Groovy引擎会解析并执行这些恶意脚本，从而导致在服务器端执行任意代码。
 2. **触发场景**
-   当应用程序直接或间接将用户可控的输入作为参数传递给 `GroovyShell.evaluate()`、`GroovyShell.parse()` 后调用 `Script.run()` 或 `GroovyShell.run()` 等方法时，会触发此漏洞。常见的触发场景包括：
-   * 动态执行用户提供的 Groovy 代码片段。
-   * 基于用户输入构建动态脚本内容。
-   * 在特定功能模块（如规则引擎、表达式计算）中使用了 Groovy 且未对输入进行安全处理。
-
-   以下是示例代码，展示了直接将用户输入 `$payload` 传递给 `GroovyShell.evaluate()` 方法的场景：
-   ```java
-   import groovy.lang.GroovyShell;
-   import org.springframework.web.bind.annotation.GetMapping;
-   import org.springframework.web.bind.annotation.RequestParam;
-   import org.springframework.web.bind.annotation.RestController;
-
-   @RestController
-   public class GroovyController {
-       @GetMapping("/execute")
-       public String executeGroovy(@RequestParam String payload) {
-           GroovyShell shell = new GroovyShell();
-           Object result = shell.evaluate(payload); // 漏洞点：直接执行用户输入的payload
-           return "Result: " + result.toString();
-       }
-   }
-   ```
-   攻击者可以提交类似 `payload=println('Hello from injected code!')` 或 `payload=''.execute('ls -l').text` 的输入，导致服务器执行相应的 Groovy 或系统命令。
-
+当应用程序直接或间接将用户可控的输入作为参数传递给 `GroovyShell.evaluate()`、`GroovyShell.parse()` 后调用 `Script.run()` 或 `GroovyShell.run()` 等方法时，会触发此漏洞。常见的触发场景包括：
+* 动态执行用户提供的 Groovy 代码片段。
+* 基于用户输入构建动态脚本内容。
+* 在特定功能模块（如规则引擎、表达式计算）中使用了 Groovy 且未对输入进行安全处理。
+以下是示例代码，展示了直接将用户输入 `$payload` 传递给 `GroovyShell.evaluate()` 方法的场景：
+```java
+import groovy.lang.GroovyShell;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+@RestController
+public class GroovyController {
+@GetMapping("/execute")
+public String executeGroovy(@RequestParam String payload) {
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(payload); // 漏洞点：直接执行用户输入的payload
+return "Result: " + result.toString();
+}
+}
+```
+攻击者可以提交类似 `payload=println('Hello from injected code!')` 或 `payload=''.execute('ls -l').text` 的输入，导致服务器执行相应的 Groovy 或系统命令。
 3. **潜在影响**
-   * **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，获得对服务器的完全控制。
-   * **数据泄露:** 攻击者可以读取、修改或删除服务器上的敏感文件和数据。
-   * **拒绝服务 (DoS):** 攻击者可以执行资源消耗型操作，导致服务不可用。
-   * **进一步渗透:** 攻击者可以利用受控服务器作为跳板，对内网其他系统进行攻击。
+* **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，获得对服务器的完全控制。
+* **数据泄露:** 攻击者可以读取、修改或删除服务器上的敏感文件和数据。
+* **拒绝服务 (DoS):** 攻击者可以执行资源消耗型操作，导致服务不可用。
+* **进一步渗透:** 攻击者可以利用受控服务器作为跳板，对内网其他系统进行攻击。
 DESC
 	fix: <<<FIX
     在使用Groovy脚本引擎时，确保对输入进行严格的验证和过滤。避免直接执行用户输入的Groovy代码，或者使用安全的沙箱环境来限制代码的执行权限。此外，可以考虑使用其他更安全的脚本语言或框架来实现动态脚本执行的需求。
@@ -63,101 +58,88 @@ alert $high for {
 	risk: "Groovy-Shell代码执行",
 	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability",
 	title_zh: "检测Java Spring Boot Groovy Shell代码注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 验证和过滤输入
 在使用Groovy脚本引擎时，应对所有用户可控的输入进行严格的验证和过滤。避免直接执行未经验证的用户输入。
-
 ```java
 // 示例：通过白名单机制限制允许的字符集
 public static boolean isValidInput(String input) {
-    return input.matches("[a-zA-Z0-9\s]+\");
+return input.matches("[a-zA-Z0-9\s]+");
 }
-
 @GetMapping("/execute")
 public String executeGroovy(@RequestParam String payload) {
-    if (!isValidInput(payload)) {
-        return "Invalid input";
-    }
-    GroovyShell shell = new GroovyShell();
-    Object result = shell.evaluate(payload);
-    return "Result: " + result.toString();
+if (!isValidInput(payload)) {
+return "Invalid input";
+}
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(payload);
+return "Result: " + result.toString();
 }
 ```
-
 #### 2. 使用沙箱环境
 为Groovy脚本引擎创建一个安全的沙箱环境，限制其可访问的方法、类或变量。
-
 ```java
 // 示例：配置自定义的GroovyClassLoader以限制权限
 import groovy.lang.GroovyClassLoader;
-
 public class SafeGroovyShell {
-    public static void main(String[] args) throws Exception {
-        GroovyClassLoader loader = new GroovyClassLoader();
-        loader.setAllowedClasses(new Class[]{String.class, Integer.class}); // 设置允许加载的类
-        Class<?> scriptClass = loader.parseClass("println 'Hello World' from Safe Environment");
-        Script script = (Script) scriptClass.getDeclaredConstructor().newInstance();
-        script.run();
-    }
+public static void main(String[] args) throws Exception {
+GroovyClassLoader loader = new GroovyClassLoader();
+loader.setAllowedClasses(new Class[]{String.class, Integer.class}); // 设置允许加载的类
+Class<?> scriptClass = loader.parseClass("println 'Hello World' from Safe Environment");
+Script script = (Script) scriptClass.getDeclaredConstructor().newInstance();
+script.run();
+}
 }
 ```
-
 #### 3. 替换危险方法
 如果业务逻辑需要动态执行脚本，请考虑替换更安全的实现方式，例如使用表达式求值库（如SpEL）而非Groovy。
-
 ```java
 // 示例：使用Spring Expression Language (SpEL)
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-
 @GetMapping("/safe-evaluate")
 public String safeEvaluate(@RequestParam String expression) {
-    ExpressionParser parser = new SpelExpressionParser();
-    Object result = parser.parseExpression(expression).getValue();
-    return "Result: " + result.toString();
+ExpressionParser parser = new SpelExpressionParser();
+Object result = parser.parseExpression(expression).getValue();
+return "Result: " + result.toString();
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，当应用程序使用Groovy脚本引擎（如 `groovy.lang.GroovyShell` 或 `groovy.script.GroovyScriptEngine`）执行动态生成的Groovy代码时，如果未对来自外部（如用户输入）的数据进行充分的验证和过滤，攻击者可以通过构造恶意的Groovy脚本 payload，将其注入到待执行的代码中。Groovy引擎会解析并执行这些恶意脚本，从而导致在服务器端执行任意代码。
-
+Java Spring Boot Groovy Shell代码注入漏洞是指在Java Spring Boot应用程序中，当应用程序使用Groovy脚本引擎（如 `groovy.lang.GroovyShell` 或 `groovy.script.GroovyScriptEngine`）执行动态生成的Groovy代码时，如果未对来自外部（如用户输入）的数据进行充分的验证和过滤，攻击者可以通过构造恶意的Groovy脚本 payload，将其注入到待执行的代码中。Groovy引擎会解析并执行这些恶意脚本，从而导致在服务器端执行任意代码。
 2. **触发场景**
-   当应用程序直接或间接将用户可控的输入作为参数传递给 `GroovyShell.evaluate()`、`GroovyShell.parse()` 后调用 `Script.run()` 或 `GroovyShell.run()` 等方法时，会触发此漏洞。常见的触发场景包括：
-   * 动态执行用户提供的 Groovy 代码片段。
-   * 基于用户输入构建动态脚本内容。
-   * 在特定功能模块（如规则引擎、表达式计算）中使用了 Groovy 且未对输入进行安全处理。
-
-   以下是示例代码，展示了直接将用户输入 `$payload` 传递给 `GroovyShell.evaluate()` 方法的场景：
-   ```java
-   import groovy.lang.GroovyShell;
-   import org.springframework.web.bind.annotation.GetMapping;
-   import org.springframework.web.bind.annotation.RequestParam;
-   import org.springframework.web.bind.annotation.RestController;
-
-   @RestController
-   public class GroovyController {
-       @GetMapping("/execute")
-       public String executeGroovy(@RequestParam String payload) {
-           GroovyShell shell = new GroovyShell();
-           Object result = shell.evaluate(payload); // 漏洞点：直接执行用户输入的payload
-           return "Result: " + result.toString();
-       }
-   }
-   ```
-   攻击者可以提交类似 `payload=println('Hello from injected code!')` 或 `payload=''.execute('ls -l').text` 的输入，导致服务器执行相应的 Groovy 或系统命令。
-
+当应用程序直接或间接将用户可控的输入作为参数传递给 `GroovyShell.evaluate()`、`GroovyShell.parse()` 后调用 `Script.run()` 或 `GroovyShell.run()` 等方法时，会触发此漏洞。常见的触发场景包括：
+* 动态执行用户提供的 Groovy 代码片段。
+* 基于用户输入构建动态脚本内容。
+* 在特定功能模块（如规则引擎、表达式计算）中使用了 Groovy 且未对输入进行安全处理。
+以下是示例代码，展示了直接将用户输入 `$payload` 传递给 `GroovyShell.evaluate()` 方法的场景：
+```java
+import groovy.lang.GroovyShell;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+@RestController
+public class GroovyController {
+@GetMapping("/execute")
+public String executeGroovy(@RequestParam String payload) {
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(payload); // 漏洞点：直接执行用户输入的payload
+return "Result: " + result.toString();
+}
+}
+```
+攻击者可以提交类似 `payload=println('Hello from injected code!')` 或 `payload=''.execute('ls -l').text` 的输入，导致服务器执行相应的 Groovy 或系统命令。
 3. **潜在影响**
-   * **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，获得对服务器的完全控制。
-   * **数据泄露:** 攻击者可以读取、修改或删除服务器上的敏感文件和数据。
-   * **拒绝服务 (DoS):** 攻击者可以执行资源消耗型操作，导致服务不可用。
-   * **进一步渗透:** 攻击者可以利用受控服务器作为跳板，对内网其他系统进行攻击。
-CODE
+* **远程代码执行 (RCE):** 攻击者可以在服务器上执行任意操作系统命令，获得对服务器的完全控制。
+* **数据泄露:** 攻击者可以读取、修改或删除服务器上的敏感文件和数据。
+* **拒绝服务 (DoS):** 攻击者可以执行资源消耗型操作，导致服务不可用。
+* **进一步渗透:** 攻击者可以利用受控服务器作为跳板，对内网其他系统进行攻击。
+DESC
 	level: "high",
+	name: "high",
 }
 
 $sink #{
@@ -170,84 +152,74 @@ alert $low for {
 	message: "发现Java Spring Boot Groovy Shell代码注入漏洞,并且没有任何数据流过滤。",
 	title: "Detect Java Spring Boot Groovy Shell Code Injection Vulnerability with Limited Risk",
 	title_zh: "检测具有有限风险的Java Spring Boot Groovy Shell代码注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 由于该路径已包含一定的过滤机制，但仍然存在潜在风险，因此建议检查现有的过滤函数是否存在缺陷，并进一步加强安全措施。
-
 #### 1. 审查当前过滤逻辑
 确保现有过滤逻辑覆盖所有可能的恶意输入模式，尤其是针对系统命令、反射调用等高危行为。
-
 ```java
 // 示例：增强现有的过滤器逻辑
 public static boolean isSafePayload(String payload) {
-    List<String> dangerousPatterns = Arrays.asList("execute", "Runtime", "Process", "getClass");
-    for (String pattern : dangerousPatterns) {
-        if (payload.contains(pattern)) {
-            return false;
-        }
-    }
-    return true;
+List<String> dangerousPatterns = Arrays.asList("execute", "Runtime", "Process", "getClass");
+for (String pattern : dangerousPatterns) {
+if (payload.contains(pattern)) {
+return false;
 }
-
+}
+return true;
+}
 @GetMapping("/filtered-execute")
 public String filteredExecute(@RequestParam String payload) {
-    if (!isSafePayload(payload)) {
-        return "Unsafe input detected";
-    }
-    GroovyShell shell = new GroovyShell();
-    Object result = shell.evaluate(payload);
-    return "Result: " + result.toString();
+if (!isSafePayload(payload)) {
+return "Unsafe input detected";
+}
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(payload);
+return "Result: " + result.toString();
 }
 ```
-
 #### 2. 引入日志监控
 添加对Groovy脚本执行的日志记录功能，以便及时发现异常活动。
-
 ```java
 // 示例：启用日志监控
 import lombok.extern.slf4j.Slf4j;
-
 @Slf4j
 @RestController
 public class MonitoredGroovyController {
-    @GetMapping("/monitored-execute")
-    public String monitoredExecute(@RequestParam String payload) {
-        log.info("Executing Groovy script: {}", payload);
-        GroovyShell shell = new GroovyShell();
-        Object result = shell.evaluate(payload);
-        return "Result: " + result.toString();
-    }
+@GetMapping("/monitored-execute")
+public String monitoredExecute(@RequestParam String payload) {
+log.info("Executing Groovy script: {}", payload);
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(payload);
+return "Result: " + result.toString();
+}
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   尽管路径已包含一定的过滤机制，但由于过滤不全面或存在绕过手段，仍可能导致攻击者利用Groovy脚本引擎执行恶意代码。
-
+尽管路径已包含一定的过滤机制，但由于过滤不全面或存在绕过手段，仍可能导致攻击者利用Groovy脚本引擎执行恶意代码。
 2. **触发场景**
-   如果过滤规则未能阻止特定的危险模式（如系统命令、反射调用），则攻击者可能通过精心构造的输入绕过防护。
-
-   以下是一个示例代码，展示如何通过模糊测试找到过滤规则中的盲点：
-   ```java
-   String payload = "''.execute('whoami').text";
-   if (isSafePayload(payload)) {
-       GroovyShell shell = new GroovyShell();
-       Object result = shell.evaluate(payload);
-       System.out.println(result);
-   } else {
-       System.out.println("Payload blocked by filter.");
-   }
-   ```
-
+如果过滤规则未能阻止特定的危险模式（如系统命令、反射调用），则攻击者可能通过精心构造的输入绕过防护。
+以下是一个示例代码，展示如何通过模糊测试找到过滤规则中的盲点：
+```java
+String payload = "''.execute('whoami').text";
+if (isSafePayload(payload)) {
+GroovyShell shell = new GroovyShell();
+Object result = shell.evaluate(payload);
+System.out.println(result);
+} else {
+System.out.println("Payload blocked by filter.");
+}
+```
 3. **潜在影响**
-   * **部分远程代码执行 (RCE):** 攻击者可能仅能执行有限的操作，但仍足以造成一定危害。
-   * **信息泄露:** 可能暴露关键系统信息。
-   * **隐蔽攻击:** 攻击者可能利用低风险路径作为突破口，逐步扩大攻击范围。
-CODE
+* **部分远程代码执行 (RCE):** 攻击者可能仅能执行有限的操作，但仍足以造成一定危害。
+* **信息泄露:** 可能暴露关键系统信息。
+* **隐蔽攻击:** 攻击者可能利用低风险路径作为突破口，逐步扩大攻击范围。
+DESC
 	level: "low",
+	name: "low",
 }
 
 desc(
@@ -342,4 +314,83 @@ public class CodeController {
     }
 }
 TEXT
+	"safefile://SafeGroovyControllerFiltered.java": <<<CODE
+package com.example.safegroovy;
+
+import groovy.lang.GroovyShell;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class SafeGroovyControllerFiltered {
+
+    // 模拟一个严格的输入验证方法，只允许安全的字符，并禁止可能构成Groovy代码的特殊字符
+    private boolean isValidGroovyInput(String input) {
+        // 检查是否包含任何Groovy代码执行相关的关键字或特殊字符
+        // 这是一个白名单示例，实际应用中可能需要更复杂的正则表达式
+        if (input == null || input.isEmpty()) {
+            return true;
+        }
+        // 允许数字、字母、空格和基本算术符号，排除"'", "`", ";", "(", ")", "{", "}", "]", "[", "\", "$", "!", "@", "#", "&", "|", ".", ":", "?", "<", ">"
+        // 确保 GroovyShell.evaluate() 接收到的只是数据而非可执行代码
+        return input.matches("^[a-zA-Z0-9+\-*/%=\s,]+" +
+                             "$|^$"); // 允许空字符串或只包含数字、字母、基本数学符号、空格和逗号
+    }
+
+    @GetMapping("/safeExecuteFiltered")
+    public String safeExecuteGroovyFiltered(@RequestParam String payload) {
+        // 强制对用户输入进行严格验证，只允许安全的、非代码的输入
+        if (!isValidGroovyInput(payload)) {
+            return "Error: Unsafe characters or potential code detected in payload. Input rejected.";
+        }
+        // 即使进行了过滤，出于安全考虑，最好也避免直接使用 GroovyShell.evaluate() 处理用户输入。
+        // 此处为示范，展示在强烈过滤下的使用场景。实际应考虑替代方案。
+        GroovyShell shell = new GroovyShell();
+        try {
+            // 如果payload是纯数据（比如一个简单的数学表达式，如"1+2"），evaluate可能仍然返回结果。
+            // 但如果payload因为过滤而变得无意义，可能会抛出异常或返回意外结果。
+            Object result = shell.evaluate(payload);
+            return "Result: " + (result != null ? result.toString() : "null (filtered)");
+        } catch (Exception e) {
+            // 捕获Groovy执行时的异常，防止因为无效输入导致应用崩溃
+            return "Error executing Groovy (possibly due to filtered input making it invalid): " + e.getMessage();
+        }
+    }
+}
+CODE
+	"safefile://SafeGroovyControllerSpEL.java": <<<CODE
+package com.example.safegroovy;
+
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * 使用Spring Expression Language (SpEL) 作为更安全的替代方案，避免直接使用GroovyShell执行用户输入。
+ * SpEL本身有其安全性考量，但通常比直接的GroovyShell在沙箱化方面有更多控制和限制。
+ */
+@RestController
+public class SafeGroovyControllerSpEL {
+
+    @GetMapping("/safeEvaluateSpEL")
+    public String safeEvaluateSpel(@RequestParam String expression) {
+        // 推荐使用SpEL等表达式语言，而不是Groovy Shell，来处理有限逻辑的动态表达式。
+        // SpEL虽然强大，但在处理用户输入时仍需注意避免高危操作，例如 T(java.lang.Runtime).getRuntime().exec(...)
+        try {
+            ExpressionParser parser = new SpelExpressionParser();
+            // 这里的"expression"假定为用户输入的表达式，例如 "'Hello ' + #name"
+            // 为了安全，应限制允许的SpEL功能，例如不允许访问反射、静态方法等。
+            // 在实际应用中，通常会结合SpEL的StandardEvaluationContext，限制可调用的方法和类型。
+            // 示例：Object result = parser.parseExpression(expression).getValue(new StandardEvaluationContext(new MyContextObject()), Object.class);
+            Object result = parser.parseExpression(expression).getValue();
+            return "Result from SpEL: " + result.toString();
+        } catch (Exception e) {
+            return "Error evaluating SpEL expression: " + e.getMessage();
+        }
+    }
+}
+CODE
 )

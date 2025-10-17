@@ -6,10 +6,10 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   `java.net.URL.openConnection()` 和 `java.net.URL.openStream()` 方法在建立网络连接时，如果未对输入的URL进行严格校验或处理，可能导致SSRF（服务器端请求伪造）等安全问题。攻击者可能利用这些方法访问内部资源、绕过防火墙或发起拒绝服务攻击。
+`java.net.URL.openConnection()` 和 `java.net.URL.openStream()` 方法在建立网络连接时，如果未对输入的URL进行严格校验或处理，可能导致SSRF（服务器端请求伪造）等安全问题。攻击者可能利用这些方法访问内部资源、绕过防火墙或发起拒绝服务攻击。
 
 2. **触发场景**
-   ```java
+```java
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,13 +28,14 @@ public class HttpGetExample {
             BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
             String line;
             StringBuilder response = new StringBuilder();
+
             while ((line = reader.readLine()) != null) {
                 response.append(line);
                 response.append('\r');
             }
+
             reader.close(); // 未在finally块中关闭资源
             System.out.println("Response: " + response.toString());
-
             connection.disconnect(); // 未在finally块中关闭连接
         } catch (IOException e) { // 未针对不同类型的异常进行精细处理
             e.printStackTrace();
@@ -42,13 +43,12 @@ public class HttpGetExample {
     }
 }
 ```
-   在上述代码中，`openConnection()` 调用未验证用户提供的URL，且未设置连接超时参数，导致潜在的安全风险。
+在上述代码中，`openConnection()` 调用未验证用户提供的URL，且未设置连接超时参数，导致潜在的安全风险。
 
 3. **潜在影响**
-   - 攻击者可以伪造恶意请求访问内部系统资源（如Redis、数据库、文件系统等），造成敏感信息泄露。
-   - 缺乏超时设置可能引发拒绝服务攻击，影响应用程序稳定性。
-   - 使用不安全协议（如HTTP）传输数据可能导致中间人攻击或数据被窃取。
-
+- 攻击者可以伪造恶意请求访问内部系统资源（如Redis、数据库、文件系统等），造成敏感信息泄露。
+- 缺乏超时设置可能引发拒绝服务攻击，影响应用程序稳定性。
+- 使用不安全协议（如HTTP）传输数据可能导致中间人攻击或数据被窃取。
 DESC
 	rule_id: "ac4cd901-cba2-4e21-86fa-7eb6d68c834c"
 	title_zh: "审计Java URL连接使用"
@@ -98,10 +98,12 @@ try {
     try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
         String line;
         StringBuilder response = new StringBuilder();
+
         while ((line = reader.readLine()) != null) {
             response.append(line);
             response.append('\r');
         }
+
         System.out.println("Response: " + response.toString());
     } finally {
         if (connection != null) {
@@ -131,6 +133,110 @@ alert $output for {
 	level: "info",
 	title: "Audit Java URL Connection Use",
 	title_zh: "审计Java URL连接使用",
+	message: "发现Java URL连接使用审计提示信息，并提供关于如何改进连接使用方式的安全建议。",
+	solution: <<<SOLUTION
+### 审计建议
+#### 1. 优先使用HTTPS
+建立连接时，优先使用`https://`协议，确保数据传输加密和安全。
+#### 2. 验证用户提供的URL
+如果URL是基于用户输入构建的，需要对输入进行严格校验和过滤，防止SSRF等攻击。
+#### 3. 设置连接超时和读取超时
+设置适当的超时时间，避免因为网络问题导致长时间等待，影响应用程序可用性。
+```java
+// 修复代码示例：设置超时时间
+import java.net.HttpURLConnection;
+import java.net.URL;
+// ...
+URL url = new URL("https://secure-example.com"); // 使用HTTPS
+HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+connection.setConnectTimeout(5000); // 设置连接超时5秒
+connection.setReadTimeout(5000);    // 设置读取超时5秒
+// ...
+```
+#### 4. 完善异常处理
+捕获并处理可能发生的各种IOException，或使用try-with-resources语句确保资源正确关闭。
+```java
+// 修复代码示例：使用try-with-resources关闭资源
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+// ...
+try {
+URL url = new URL("https://secure-example.com");
+HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+connection.setConnectTimeout(5000); // 设置连接超时5秒
+connection.setReadTimeout(5000);    // 设置读取超时5秒
+connection.setRequestMethod("GET");
+connection.setRequestProperty("Accept", "application/json");
+try (BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
+String line;
+StringBuilder response = new StringBuilder();
+while ((line = reader.readLine()) != null) {
+response.append(line);
+response.append('\r');
+}
+System.out.println("Response: " + response.toString());
+} finally {
+if (connection != null) {
+connection.disconnect();
+}
+}
+} catch (IOException e) {
+// 更精细的异常处理或记录日志
+e.printStackTrace();
+}
+// ...
+```
+#### 5. 使用更高级的HTTP客户端库
+考虑使用功能更丰富且通常提供更多安全特性的第三方库，如Apache HttpClient、OkHttp等。
+#### 6. 结合其他安全规则进行审计
+结合检测SSRF、路径遍历等相关安全规则，对URL的构造来源和使用方式进行全面审计。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+`java.net.URL.openConnection()` 和 `java.net.URL.openStream()` 方法在建立网络连接时，如果未对输入的URL进行严格校验或处理，可能导致SSRF（服务器端请求伪造）等安全问题。攻击者可能利用这些方法访问内部资源、绕过防火墙或发起拒绝服务攻击。
+2. **触发场景**
+```java
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+public class HttpGetExample {
+public static void main(String[] args) {
+try {
+URL url = new URL("http://example.com"); // 潜在风险：使用了HTTP而非HTTPS
+HttpURLConnection connection = (HttpURLConnection) url.openConnection(); // 审计点
+connection.setRequestMethod("GET");
+connection.setRequestProperty("Accept", "application/json");
+connection.connect(); // 未设置连接和读取超时
+BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+String line;
+StringBuilder response = new StringBuilder();
+while ((line = reader.readLine()) != null) {
+response.append(line);
+response.append('\r');
+}
+reader.close(); // 未在finally块中关闭资源
+System.out.println("Response: " + response.toString());
+connection.disconnect(); // 未在finally块中关闭连接
+} catch (IOException e) { // 未针对不同类型的异常进行精细处理
+e.printStackTrace();
+}
+}
+}
+```
+在上述代码中，`openConnection()` 调用未验证用户提供的URL，且未设置连接超时参数，导致潜在的安全风险。
+3. **潜在影响**
+- 攻击者可以伪造恶意请求访问内部系统资源（如Redis、数据库、文件系统等），造成敏感信息泄露。
+- 缺乏超时设置可能引发拒绝服务攻击，影响应用程序稳定性。
+- 使用不安全协议（如HTTP）传输数据可能导致中间人攻击或数据被窃取。
+DESC
+	name: "output",
 }
 
 
@@ -199,4 +305,75 @@ public class SimpleWebReader {
 }
 
 TEXT
+	"safefile://SafeHttpClientExample.java": <<<CODE
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
+import org.apache.http.util.EntityUtils;
+import javax.net.ssl.SSLContext;
+
+public class SafeHttpClientExample {
+    public static void main(String[] args) throws Exception {
+        // 使用Apache HttpClient而不是java.net.URL，并配置SSLContext
+        SSLContext sslContext = SSLContextBuilder.create()
+                .loadTrustMaterial(null, (chain, authType) -> true) // 信任所有证书（仅用于测试，生产环境应使用CA证书）
+                .build();
+
+        try (CloseableHttpClient httpClient = HttpClients.custom()
+                .setSSLContext(sslContext)
+                .setSSLHostnameVerifier(NoopHostnameVerifier.INSTANCE) // 禁用主机名验证（仅用于测试）
+                .build()) {
+
+            HttpGet request = new HttpGet("https://api.example.com/data"); // 优先使用HTTPS
+            request.addHeader("Accept", "application/json");
+
+            try (CloseableHttpResponse response = httpClient.execute(request)) {
+                System.out.println("Response Status: " + response.getStatusLine().getStatusCode());
+                System.out.println("Response Body: " + EntityUtils.toString(response.getEntity()));
+            }
+        }
+    }
+}
+CODE
+	"safefile://SafeOkHttpExample.java": <<<CODE
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import java.io.IOException;
+import java.util.concurrent.TimeUnit;
+
+public class SafeOkHttpExample {
+    private static final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS) // 设置连接超时
+            .readTimeout(10, TimeUnit.SECONDS)    // 设置读取超时
+            .writeTimeout(10, TimeUnit.SECONDS)   // 设置写入超时
+            .build();
+
+    public String fetchData(String url) throws IOException {
+        // 使用OkHttp库进行HTTP请求，该库不直接使用java.net.URL.openConnection()或openStream()
+        Request request = new Request.Builder()
+                .url(url)
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
+            return response.body().string();
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeOkHttpExample example = new SafeOkHttpExample();
+        try {
+            // 优先使用HTTPS，并且OkHttp自带连接池和超时管理
+            String data = example.fetchData("https://secure.api.com/status");
+            System.out.println("Fetched data: " + data);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

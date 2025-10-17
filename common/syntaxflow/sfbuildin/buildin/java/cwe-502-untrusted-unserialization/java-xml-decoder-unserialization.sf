@@ -8,54 +8,43 @@ desc(
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XMLDecoder反序列化漏洞是由于应用程序使用 `java.beans.XMLDecoder` 类从不受信任的来源反序列化XML数据时，如果未对输入进行严格过滤和安全控制，攻击者可以构造恶意的XML数据，利用XMLDecoder的特性执行任意代码。攻击者通过这种方式可以控制服务器执行恶意命令，导致敏感数据泄露、系统被控等严重安全问题。
-
+XMLDecoder反序列化漏洞是由于应用程序使用 `java.beans.XMLDecoder` 类从不受信任的来源反序列化XML数据时，如果未对输入进行严格过滤和安全控制，攻击者可以构造恶意的XML数据，利用XMLDecoder的特性执行任意代码。攻击者通过这种方式可以控制服务器执行恶意命令，导致敏感数据泄露、系统被控等严重安全问题。
 2. **触发场景**
-   当应用程序接收来自用户或其他不可信源的XML数据，并使用 `XMLDecoder` 的 `readObject()` 等方法进行处理时，就可能存在此漏洞。例如，一个Web应用程序接收POST请求体中的XML数据，直接将其传递给 `XMLDecoder`。
-
-   ```java
-   import java.beans.XMLDecoder;
-   import java.io.ByteArrayInputStream;
-   import java.io.InputStream;
-
-   public class XMLDecoderExample {
-       public static void main(String[] args) throws Exception {
-           String maliciousXml = "<java version=\"1.8.0_151\" class=\"java.beans.XMLDecoder\"><body><object class=\"java.lang.ProcessBuilder\"><array class=\"java.lang.String\" length=\"3\"><void index=\"0\"> <string>calc.exe</string></void><void index=\"1\"><string></string></void><void index=\"2\"><string></string></void></array><void method=\"start\"/></object></body></java>";
-           InputStream is = new ByteArrayInputStream(maliciousXml.getBytes());
-           XMLDecoder decoder = new XMLDecoder(is);
-           decoder.readObject(); // 存在脆弱点
-           decoder.close();
-       }
-   }
-   ```
-
+当应用程序接收来自用户或其他不可信源的XML数据，并使用 `XMLDecoder` 的 `readObject()` 等方法进行处理时，就可能存在此漏洞。例如，一个Web应用程序接收POST请求体中的XML数据，直接将其传递给 `XMLDecoder`。
+```java
+import java.beans.XMLDecoder;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+public class XMLDecoderExample {
+  public static void main(String[] args) throws Exception {
+    String maliciousXml = "<java version=\"1.8.0_151\" class=\"java.beans.XMLDecoder\"><body><object class=\"java.lang.ProcessBuilder\"><array class=\"java.lang.String\" length=\"3\"><void index=\"0\"> <string>calc.exe</string></void><void index=\"1\"><string></string></void><void index=\"2\"><string></string></void></array><void method=\"start\"/></object></body></java>";
+    InputStream is = new ByteArrayInputStream(maliciousXml.getBytes());
+    XMLDecoder decoder = new XMLDecoder(is);
+    decoder.readObject(); // 存在脆弱点
+    decoder.close();
+  }
+}
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令。
-   - **数据泄露**: 攻击者可以读取或窃取敏感数据。
-   - **服务器控制权的丢失**: 攻击者可能完全控制受影响的服务器。
-   - **拒绝服务 (DoS)**: 攻击者可能构造特殊payload导致应用程序崩溃。
-
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令。
+- **数据泄露**: 攻击者可以读取或窃取敏感数据。
+- **服务器控制权的丢失**: 攻击者可能完全控制受影响的服务器。
+- **拒绝服务 (DoS)**: 攻击者可能构造特殊payload导致应用程序崩溃。
 审计的类:
 - java.beans.XMLDecoder
-
 审计的方法:
 - readObject()
 DESC
 	rule_id: "200aa9fd-172e-4099-9016-a4a88ef7bdb9"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 XMLDecoder 处理不可信输入
 尽可能避免使用 `XMLDecoder` 来解析来自外部、不可信来源的XML数据。如果业务逻辑必须使用到 `XMLDecoder`，应优先考虑其他更安全的序列化/反序列化机制，例如使用安全的库或协议，或者在传输层使用加密保护数据。
-
 #### 2. 白名单机制验证反序列化对象类型
 如果无法完全避免使用 `XMLDecoder` 处理外部输入，必须实现严格的白名单机制，只允许反序列化已知且非常安全的对象类型。拒绝所有不在白名单列表中的对象类型进行反序列化，从而阻止恶意对象的实例化和执行。这通常需要自定义 `XMLDecoder` 的 `setOwner()` 方法或使用其他方式拦截对象的创建。
-
 #### 3. 对输入数据进行严格的格式和内容校验
 在将外部XML数据传递给 `XMLDecoder` 之前，对XML数据的格式、结构和内容进行严格的校验。拒绝任何不符合预期的XML数据，例如包含可疑标签、属性或特殊字符的数据。虽然这并不能完全阻止复杂的反序列化攻击，但可以增加攻击的难度并检测一些简单的恶意Payload。
-
 ```java
 // 修复代码示例 (概念性白名单示例)
 import java.beans.XMLDecoder;
@@ -63,44 +52,34 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
-
 public class SafeXMLDecoderExample {
-
-    // 允许反序列化的安全对象类型白名单
-    private static final Set<String> ALLOWED_CLASSES = new HashSet<>();
-
-    static {
-        ALLOWED_CLASSES.add("java.lang.String");
-        ALLOWED_CLASSES.add("java.util.ArrayList");
-        // ... 添加其他允许的安全类型
-    }
-
-    public static void main(String[] args) throws Exception {
-        String safeXml = "<java><body><string>hello</string></body></java>";
-        InputStream is = new ByteArrayInputStream(safeXml.getBytes());
-
-        // 使用自定义InputStream或解析器先预处理，检查标签和class属性
-        // 另一种方式是自定义XMLDecoder的工厂或Owner，拦截对象创建
-        
-        // 这里的示例仅为概念，实际实现需要更复杂的逻辑来拦截和检查对象创建
-        // 更安全的做法是解析XML到DOM/SAX树，然后手动处理数据，而不是直接反序列化
-
-        XMLDecoder decoder = new XMLDecoder(is);
-        // 实际应用中需要在此处或更底层进行类型检查和过滤
-        Object obj = decoder.readObject();
-        System.out.println(obj);
-        decoder.close();
-    }
-    
-    // 实际的拦截和检查可能需要更深入地Hook XMLDecoder的内部行为
-    // 或者限制可用的方法调用等，这通常需要更复杂的安全编程。
-    // 更建议使用SAX或StAX解析XML，避免使用XMLDecoder处理不可信数据。
+  // 允许反序列化的安全对象类型白名单
+  private static final Set<String> ALLOWED_CLASSES = new HashSet<>();
+  static {
+    ALLOWED_CLASSES.add("java.lang.String");
+    ALLOWED_CLASSES.add("java.util.ArrayList");
+    // ... 添加其他允许的安全类型
+  }
+  public static void main(String[] args) throws Exception {
+    String safeXml = "<java><body><string>hello</string></body></java>";
+    InputStream is = new ByteArrayInputStream(safeXml.getBytes());
+    // 使用自定义InputStream或解析器先预处理，检查标签和class属性
+    // 另一种方式是自定义XMLDecoder的工厂或Owner，拦截对象创建
+    // 这里的示例仅为概念，实际实现需要更复杂的逻辑来拦截和检查对象创建
+    // 更安全的做法是解析XML到DOM/SAX树，然后手动处理数据，而不是直接反序列化
+    XMLDecoder decoder = new XMLDecoder(is);
+    // 实际应用中需要在此处或更底层进行类型检查和过滤
+    Object obj = decoder.readObject();
+    System.out.println(obj);
+    decoder.close();
+  }
+  // 实际的拦截和检查可能需要更深入地Hook XMLDecoder的内部行为
+  // 或者限制可用的方法调用等，这通常需要更复杂的安全编程。
+  // 更建议使用SAX或StAX解析XML，避免使用XMLDecoder处理不可信数据。
 }
 ```
-
 #### 4. 升级或禁用存在漏洞的库和功能
 确保应用程序使用的Java版本和相关库没有已知的 `XMLDecoder` 或其他反序列化漏洞。如果存在漏洞，应及时升级到安全版本或考虑禁用相关功能。
-
 #### 5. 考虑使用更安全的替代方案
 替代 `XMLDecoder` 处理结构化数据，可以考虑使用更安全的序列化格式（如JSON）配合安全的解析库，并对接收的数据进行严格的schema校验和内容过滤。
 SOLUTION
@@ -119,59 +98,48 @@ $sink #{
 }->as  $high;
 
 alert $high for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XMLDecoder反序列化漏洞是由于应用程序使用 `java.beans.XMLDecoder` 类从不受信任的来源反序列化XML数据时，如果未对输入进行严格过滤和安全控制，攻击者可以构造恶意的XML数据，利用XMLDecoder的特性执行任意代码。攻击者通过这种方式可以控制服务器执行恶意命令，导致敏感数据泄露、系统被控等严重安全问题。
-
+XMLDecoder反序列化漏洞是由于应用程序使用 `java.beans.XMLDecoder` 类从不受信任的来源反序列化XML数据时，如果未对输入进行严格过滤和安全控制，攻击者可以构造恶意的XML数据，利用XMLDecoder的特性执行任意代码。攻击者通过这种方式可以控制服务器执行恶意命令，导致敏感数据泄露、系统被控等严重安全问题。
 2. **触发场景**
-   当应用程序接收来自用户或其他不可信源的XML数据，并使用 `XMLDecoder` 的 `readObject()` 等方法进行处理时，就可能存在此漏洞。例如，一个Web应用程序接收POST请求体中的XML数据，直接将其传递给 `XMLDecoder`。
-
-   ```java
-   import java.beans.XMLDecoder;
-   import java.io.ByteArrayInputStream;
-   import java.io.InputStream;
-
-   public class XMLDecoderExample {
-       public static void main(String[] args) throws Exception {
-           String maliciousXml = "<java version=\"1.8.0_151\" class=\"java.beans.XMLDecoder\"><body><object class=\"java.lang.ProcessBuilder\"><array class=\"java.lang.String\" length=\"3\"><void index=\"0\"> <string>calc.exe</string></void><void index=\"1\"><string></string></void><void index=\"2\"><string></string></void></array><void method=\"start\"/></object></body></java>";
-           InputStream is = new ByteArrayInputStream(maliciousXml.getBytes());
-           XMLDecoder decoder = new XMLDecoder(is);
-           decoder.readObject(); // 存在脆弱点
-           decoder.close();
-       }
-   }
-   ```
-
+当应用程序接收来自用户或其他不可信源的XML数据，并使用 `XMLDecoder` 的 `readObject()` 等方法进行处理时，就可能存在此漏洞。例如，一个Web应用程序接收POST请求体中的XML数据，直接将其传递给 `XMLDecoder`。
+```java
+import java.beans.XMLDecoder;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+public class XMLDecoderExample {
+public static void main(String[] args) throws Exception {
+String maliciousXml = "<java version=\"1.8.0_151\" class=\"java.beans.XMLDecoder\"><body><object class=\"java.lang.ProcessBuilder\"><array class=\"java.lang.String\" length=\"3\"><void index=\"0\"> <string>calc.exe</string></void><void index=\"1\"><string></string></void><void index=\"2\"><string></string></void></array><void method=\"start\"/></object></body></java>";
+InputStream is = new ByteArrayInputStream(maliciousXml.getBytes());
+XMLDecoder decoder = new XMLDecoder(is);
+decoder.readObject(); // 存在脆弱点
+decoder.close();
+}
+}
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令。
-   - **数据泄露**: 攻击者可以读取或窃取敏感数据。
-   - **服务器控制权的丢失**: 攻击者可能完全控制受影响的服务器。
-   - **拒绝服务 (DoS)**: 攻击者可能构造特殊payload导致应用程序崩溃。
-
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令。
+- **数据泄露**: 攻击者可以读取或窃取敏感数据。
+- **服务器控制权的丢失**: 攻击者可能完全控制受影响的服务器。
+- **拒绝服务 (DoS)**: 攻击者可能构造特殊payload导致应用程序崩溃。
 审计的类:
 - java.beans.XMLDecoder
-
 审计的方法:
 - readObject()
-CODE
+DESC
 	level: "high",
-	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
-	title: "Check Java XMLDecoder Unserialization Vulnerability",
-	title_zh: "检测Java XMLDecoder反序列化漏洞",
-	solution: <<<CODE
+	message: "发现Java XMLDecoder反序列化漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	title: "Java XMLDecoder Unserialization Vulnerability Was Detected",
+	title_zh: "检测到Java XMLDecoder反序列化漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 XMLDecoder 处理不可信输入
 尽可能避免使用 `XMLDecoder` 来解析来自外部、不可信来源的XML数据。如果业务逻辑必须使用到 `XMLDecoder`，应优先考虑其他更安全的序列化/反序列化机制，例如使用安全的库或协议，或者在传输层使用加密保护数据。
-
 #### 2. 白名单机制验证反序列化对象类型
 如果无法完全避免使用 `XMLDecoder` 处理外部输入，必须实现严格的白名单机制，只允许反序列化已知且非常安全的对象类型。拒绝所有不在白名单列表中的对象类型进行反序列化，从而阻止恶意对象的实例化和执行。这通常需要自定义 `XMLDecoder` 的 `setOwner()` 方法或使用其他方式拦截对象的创建。
-
 #### 3. 对输入数据进行严格的格式和内容校验
 在将外部XML数据传递给 `XMLDecoder` 之前，对XML数据的格式、结构和内容进行严格的校验。拒绝任何不符合预期的XML数据，例如包含可疑标签、属性或特殊字符的数据。虽然这并不能完全阻止复杂的反序列化攻击，但可以增加攻击的难度并检测一些简单的恶意Payload。
-
 ```java
 // 修复代码示例 (概念性白名单示例)
 import java.beans.XMLDecoder;
@@ -179,47 +147,39 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.util.HashSet;
 import java.util.Set;
-
 public class SafeXMLDecoderExample {
-
-    // 允许反序列化的安全对象类型白名单
-    private static final Set<String> ALLOWED_CLASSES = new HashSet<>();
-
-    static {
-        ALLOWED_CLASSES.add("java.lang.String");
-        ALLOWED_CLASSES.add("java.util.ArrayList");
-        // ... 添加其他允许的安全类型
-    }
-
-    public static void main(String[] args) throws Exception {
-        String safeXml = "<java><body><string>hello</string></body></java>";
-        InputStream is = new ByteArrayInputStream(safeXml.getBytes());
-
-        // 使用自定义InputStream或解析器先预处理，检查标签和class属性
-        // 另一种方式是自定义XMLDecoder的工厂或Owner，拦截对象创建
-        
-        // 这里的示例仅为概念，实际实现需要更复杂的逻辑来拦截和检查对象创建
-        // 更安全的做法是解析XML到DOM/SAX树，然后手动处理数据，而不是直接反序列化
-
-        XMLDecoder decoder = new XMLDecoder(is);
-        // 实际应用中需要在此处或更底层进行类型检查和过滤
-        Object obj = decoder.readObject();
-        System.out.println(obj);
-        decoder.close();
-    }
-    
-    // 实际的拦截和检查可能需要更深入地Hook XMLDecoder的内部行为
-    // 或者限制可用的方法调用等，这通常需要更复杂的安全编程。
-    // 更建议使用SAX或StAX解析XML，避免使用XMLDecoder处理不可信数据。
+// 允许反序列化的安全对象类型白名单
+private static final Set<String> ALLOWED_CLASSES = new HashSet<>();
+static {
+ALLOWED_CLASSES.add("java.lang.String");
+ALLOWED_CLASSES.add("java.util.ArrayList");
+// ... 添加其他允许的安全类型
+}
+public static void main(String[] args) throws Exception {
+String safeXml = "<java><body><string>hello</string></body></java>";
+InputStream is = new ByteArrayInputStream(safeXml.getBytes());
+// 使用自定义InputStream或解析器先预处理，检查标签和class属性
+// 另一种方式是自定义XMLDecoder的工厂或Owner，拦截对象创建
+// 这里的示例仅为概念，实际实现需要更复杂的逻辑来拦截和检查对象创建
+// 更安全的做法是解析XML到DOM/SAX树，然后手动处理数据，而不是直接反序列化
+XMLDecoder decoder = new XMLDecoder(is);
+// 实际应用中需要在此处或更底层进行类型检查和过滤
+Object obj = decoder.readObject();
+System.out.println(obj);
+decoder.close();
+}
+// 实际的拦截和检查可能需要更深入地Hook XMLDecoder的内部行为
+// 或者限制可用的方法调用等，这通常需要更复杂的安全编程。
+// 更建议使用SAX或StAX解析XML，避免使用XMLDecoder处理不可信数据。
 }
 ```
-
 #### 4. 升级或禁用存在漏洞的库和功能
 确保应用程序使用的Java版本和相关库没有已知的 `XMLDecoder` 或其他反序列化漏洞。如果存在漏洞，应及时升级到安全版本或考虑禁用相关功能。
-
 #### 5. 考虑使用更安全的替代方案
 替代 `XMLDecoder` 处理结构化数据，可以考虑使用更安全的序列化格式（如JSON）配合安全的解析库，并对接收的数据进行严格的schema校验和内容过滤。
-CODE
+SOLUTION
+	risk: "反序列化漏洞",
+	name: "high",
 }
 
 $sink #{
@@ -230,18 +190,27 @@ $result - $high as $low;
 
 alert $low for {
 	level: "low",
-	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
-	title: "Check Java XMLDecoder Unserialization Vulnerability with Limited Filtering",
-	title_zh: "检测具有有限过滤的Java XMLDecoder反序列化漏洞",
-	desc: <<<CODE
+	message: "发现Java XMLDecoder反序列化漏洞，但是从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	title: "Java XMLDecoder Unserialization Vulnerability with Limited Filtering Was Detected",
+	title_zh: "检测到具有有限过滤的Java XMLDecoder反序列化漏洞",
+	desc: <<<DESC
 该规则用于识别可能存在的 `java.beans.XMLDecoder` 反序列化漏洞，但由于路径中已包含一定数据流过滤，因此风险较低。
-
 尽管如此，仍需注意以下几点以进一步降低风险：
 1. 确保现有过滤逻辑足够严格，能够有效防御常见的反序列化攻击。
 2. 定期审查过滤函数的实现，避免出现逻辑缺陷或绕过情形。
 3. 考虑替换为更安全的序列化机制（如JSON），并在必要时结合模式校验以增强安全性。
 4. 如果发现过滤逻辑不足以应对新威胁，请及时升级或增强防护措施。
-CODE
+DESC
+	solution: <<<SOLUTION
+该规则用于识别可能存在的 `java.beans.XMLDecoder` 反序列化漏洞，但由于路径中已包含一定数据流过滤，因此风险较低。
+尽管如此，仍需注意以下几点以进一步降低风险：
+1. 确保现有过滤逻辑足够严格，能够有效防御常见的反序列化攻击。
+2. 定期审查过滤函数的实现，避免出现逻辑缺陷或绕过情形。
+3. 考虑替换为更安全的序列化机制（如JSON），并在必要时结合模式校验以增强安全性。
+4. 如果发现过滤逻辑不足以应对新威胁，请及时升级或增强防护措施。
+SOLUTION
+	risk: "反序列化漏洞",
+	name: "low",
 }
 
 desc(
@@ -302,5 +271,70 @@ public class XMLDecoderController {
     }
 }
 TEXT
+	"safefile://SafeXMLProcessing.java": <<<CODE
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.xml.sax.SAXException;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
+public class SafeXMLProcessing {
+    public static void main(String[] args) {
+        // 使用 DOM Parser 安全地处理 XML，而不是 XMLDecoder
+        String safeXml = "<data><user>safeUser</user><value>123</value></data>";
+        try {
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            // 禁用DTD加载，防止XXE
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            factory.setXIncludeAware(false);
+            factory.setExpandEntityReferences(false);
+
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document document = builder.parse(new ByteArrayInputStream(safeXml.getBytes(StandardCharsets.UTF_8)));
+            document.normalizeDocument();
+
+            // 安全地从XML中提取数据
+            Element root = document.getDocumentElement();
+            System.out.println("Root element: " + root.getNodeName());
+            System.out.println("User: " + root.getElementsByTagName("user").item(0).getTextContent());
+            System.out.println("Value: " + root.getElementsByTagName("value").item(0).getTextContent());
+
+        } catch (ParserConfigurationException | IOException | SAXException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://XMLDecoderWithTrustedInput.java": <<<CODE
+import java.beans.XMLDecoder;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+
+public class XMLDecoderWithTrustedInput {
+    public static void main(String[] args) {
+        // 假设这里是来自受信任内部源的XML数据
+        // 在实际应用中，这意味着XML内容是硬编码的、来自安全配置或经过严格验证的
+        String trustedXml = "<java><string>Hello, World!</string></java>";
+
+        try (InputStream is = new ByteArrayInputStream(trustedXml.getBytes(StandardCharsets.UTF_8));
+             XMLDecoder decoder = new XMLDecoder(is)) {
+            // 仅当XML数据来源完全可信且内容已知时才使用XMLDecoder
+            Object obj = decoder.readObject();
+            System.out.println("Deserialized object: " + obj);
+        } catch (Exception e) {
+            // 即使是受信任的输入也应该有错误处理
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )
 

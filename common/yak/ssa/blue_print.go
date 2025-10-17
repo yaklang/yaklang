@@ -2,6 +2,7 @@ package ssa
 
 import (
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 type BlueprintFieldKind int
@@ -64,6 +65,7 @@ type BlueprintRelationKind string
 
 // Blueprint is a class blueprint, it is used to create a new class
 type Blueprint struct {
+	id   int64
 	Name string
 
 	Kind         BlueprintKind
@@ -84,7 +86,7 @@ type Blueprint struct {
 	// _container is an inner ssa.Valueorigin cls container
 	_container Value
 
-	Tokenizer CanStartStopToken // 标记blueprint声明的位置
+	Range *memedit.Range
 
 	ParentBlueprints    []*Blueprint
 	InterfaceBlueprints []*Blueprint
@@ -92,11 +94,19 @@ type Blueprint struct {
 	fullTypeName []string
 
 	// lazy
-	lazyBuilder
+	*LazyBuilder
+}
+
+func (b *Blueprint) GetId() int64 {
+	return b.id
+}
+func (b *Blueprint) SetId(id int64) {
+	b.id = id
 }
 
 func NewBlueprint(name string) *Blueprint {
 	class := &Blueprint{
+		id:           -1,
 		Name:         name,
 		Kind:         BlueprintNone,
 		NormalMember: make(map[string]Value),
@@ -108,6 +118,7 @@ func NewBlueprint(name string) *Blueprint {
 		MagicMethod:  make(map[BlueprintMagicMethodKind]Value),
 
 		fullTypeName: make([]string, 0),
+		LazyBuilder:  NewLazyBuilder("Blueprint:" + name),
 	}
 	return class
 }
@@ -397,7 +408,7 @@ func (c *Blueprint) storeField(name string, val Value, _type BlueprintFieldKind)
 	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInstPlaceholder(name)))
 }
 
-func (b *Blueprint) InitializeWithContainer(con *Make) error {
+func (b *Blueprint) InitializeWithContainer(con Value) error {
 	if b._container != nil {
 		return utils.Errorf("the container is already initialized id:(%v)", b._container.GetId())
 	}

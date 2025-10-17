@@ -8,73 +8,66 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   Apache Commons Email是一个用于发送电子邮件的Java库。在使用SimpleEmail发送邮件时，建立与其他邮件服务器（如SMTP服务器）的SSL/TLS连接通常是为了保证通信的机密性和完整性。然而，如果应用程序没有正确配置或显式地跳过对服务器端SSL证书的身份验证，就可能存在SSL证书验证绕过漏洞。这意味着客户端（SimpleEmail）不会检查连接到的服务器是否拥有与其声明的域名相匹配且由可信机构颁发的有效证书。攻击者可以利用这一点进行中间人攻击（Man-in-the-Middle, MitM），通过伪造邮件服务器的SSL证书来劫持客户端的加密连接，从而窃听、篡改或重定向邮件内容。
+Apache Commons Email 是一个用于发送电子邮件的 Java 库。在使用 `SimpleEmail` 发送邮件时，建立与其他邮件服务器（如 SMTP 服务器）的 SSL/TLS 连接通常是为了保证通信的机密性和完整性。然而，如果应用程序没有正确配置或显式地跳过对服务器端 SSL 证书的身份验证，就可能存在 SSL 证书验证绕过漏洞。这意味着客户端（`SimpleEmail`）不会检查连接到的服务器是否拥有与其声明的域名相匹配且由可信机构颁发的有效证书。攻击者可以利用这一点进行中间人攻击（Man-in-the-Middle, MitM），通过伪造邮件服务器的 SSL 证书来劫持客户端的加密连接，从而窃听、篡改或重定向邮件内容。
 
 2. **触发场景**
-   当应用程序使用 `org.apache.commons.mail.SimpleEmail` 类进行邮件发送，并通过SSL/TLS进行连接时，如果没有调用 `setSSLCheckServerIdentity(true)` 方法或者调用了 `setSSLCheckServerIdentity(false)`，则会触发此漏洞。
-   ```java
-   import org.apache.commons.mail.SimpleEmail;
-   import org.apache.commons.mail.EmailException;
-
-   public class MailSender {
-       public static void main(String[] args) {
-           SimpleEmail email = new SimpleEmail();
-           email.setHostName("smtp.example.com");
-           email.setSmtpPort(587);
-           // ... 其他配置（用户名、密码、From、To、Subject、Msg）
-           email.setTLS(true); // 启用TLS，但未设置检查服务器身份
-           // 漏洞点：未调用 email.setSSLCheckServerIdentity(true);
-           try {
-               email.send();
-               System.out.println("邮件发送成功！");
-           } catch (EmailException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-
+当应用程序使用 `org.apache.commons.mail.SimpleEmail` 类进行邮件发送，并通过 SSL/TLS 进行连接时，如果没有调用 `setSSLCheckServerIdentity(true)` 方法或者调用了 `setSSLCheckServerIdentity(false)`，则会触发此漏洞。
+```java
+import org.apache.commons.mail.SimpleEmail;
+import org.apache.commons.mail.EmailException;
+public class MailSender {
+  public static void main(String[] args) {
+    SimpleEmail email = new SimpleEmail();
+    email.setHostName("smtp.example.com");
+    email.setSmtpPort(587);
+    // ... 其他配置（用户名、密码、From、To、Subject、Msg）
+    email.setTLS(true); // 启用 TLS，但未设置检查服务器身份
+    // 漏洞点：未调用 email.setSSLCheckServerIdentity(true);
+    try {
+      email.send();
+      System.out.println("邮件发送成功！");
+    } catch (EmailException e) {
+      e.printStackTrace();
+    }
+  }
+}
+```
 3. **潜在影响**
-   - **信息泄露**: 攻击者可以解密并阅读通过此连接发送的敏感邮件内容。
-   - **数据篡改**: 攻击者可以在传输过程中修改邮件内容、发件人或收件人信息。
-   - **服务中断或滥用**: 攻击者可能通过劫持连接来干扰正常的邮件发送流程，甚至利用被劫持的连接发送垃圾邮件或进行钓鱼攻击。
+- **信息泄露**: 攻击者可以解密并阅读通过此连接发送的敏感邮件内容。
+- **数据篡改**: 攻击者可以在传输过程中修改邮件内容、发件人或收件人信息。
+- **服务中断或滥用**: 攻击者可能通过劫持连接来干扰正常的邮件发送流程，甚至利用被劫持的连接发送垃圾邮件或进行钓鱼攻击。
 DESC
 	rule_id: "6bb49996-bb3b-4bd5-bb33-8c9ca0e912ce"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **启用服务器身份校验**
-   在使用 `SimpleEmail` 并通过SSL/TLS连接时，务必调用 `setSSLCheckServerIdentity(true)` 方法。这将强制客户端验证服务器的SSL证书是否与其连接的域名匹配，并检查证书是否由受信任的证书颁发机构签发。
-   ```java
-   import org.apache.commons.mail.SimpleEmail;
-   import org.apache.commons.mail.EmailException;
-
-   public class MailSenderSecured {
-       public static void main(String[] args) {
-           SimpleEmail email = new SimpleEmail();
-           email.setHostName("smtp.example.com");
-           email.setSmtpPort(587);
-           // ... 其他配置（用户名、密码、From、To、Subject、Msg）
-           email.setTLS(true);
-           email.setSSLCheckServerIdentity(true); // 关键修复：启用证书身份校验
-           try {
-               email.send();
-               System.out.println("邮件发送成功！");
-           } catch (EmailException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-
+在使用 `SimpleEmail` 并通过 SSL/TLS 连接时，务必调用 `setSSLCheckServerIdentity(true)` 方法。这将强制客户端验证服务器的 SSL 证书是否与其连接的域名匹配，并检查证书是否由受信任的证书颁发机构签发。
+```java
+import org.apache.commons.mail.SimpleEmail;
+import org.apache.commons.mail.EmailException;
+public class MailSenderSecured {
+  public static void main(String[] args) {
+    SimpleEmail email = new SimpleEmail();
+    email.setHostName("smtp.example.com");
+    email.setSmtpPort(587);
+    // ... 其他配置（用户名、密码、From、To、Subject、Msg）
+    email.setTLS(true);
+    email.setSSLCheckServerIdentity(true); // 关键修复：启用证书身份校验
+    try {
+      email.send();
+      System.out.println("邮件发送成功！");
+    } catch (EmailException e) {
+      e.printStackTrace();
+    }
+  }
+}
+```
 2. **使用信任存储**
-   确保应用程序运行环境中配置了正确的信任存储（Truststore），其中包含所有受信任的根证书和中间证书颁发机构。Java默认会使用系统或JRE自带的信任存储，但在某些特定部署环境下，可能需要手动配置或加载特定的信任存储。
-
-3. **检查Commons Email版本**
-   确保使用的Apache Commons Email库是最新版本，以获取最新的安全修复和特性。
-
+确保应用程序运行环境中配置了正确的信任存储（Truststore），其中包含所有受信任的根证书和中间证书颁发机构。Java 默认会使用系统或 JRE 自带的信任存储，但在某些特定部署环境下，可能需要手动配置或加载特定的信任存储。
+3. **检查 Commons Email 版本**
+确保使用的 Apache Commons Email 库是最新版本，以获取最新的安全修复和特性。
 4. **谨慎处理 SSL/TLS 相关配置**
-   避免在任何情况下禁用SSL/TLS证书校验（例如，不要调用 setSSLOnConnect() 或 setTLS() 并将端口设置为不需要SSL的端口，除非你完全理解风险）。不要使用不安全的协议或配置，例如纯粹的SMTP连接而没有加密。
+避免在任何情况下禁用 SSL/TLS 证书校验（例如，不要调用 `setSSLOnConnect()` 或 `setTLS()` 并将端口设置为不需要 SSL 的端口，除非你完全理解风险）。不要使用不安全的协议或配置，例如纯粹的 SMTP 连接而没有加密。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-297: Improper Validation of Certificate with Host Mismatch](https://cwe.mitre.org/data/definitions/297.html)
@@ -85,82 +78,75 @@ SimpleEmail()?{<typeName>?{have:'org.apache.commons.mail'}} as $simpleEmail;
 check $simpleEmail;
 $simpleEmail?{!(.setSSLCheckServerIdentity)} as $sink;
 alert $sink for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **启用服务器身份校验**
-   在使用 `SimpleEmail` 并通过SSL/TLS连接时，务必调用 `setSSLCheckServerIdentity(true)` 方法。这将强制客户端验证服务器的SSL证书是否与其连接的域名匹配，并检查证书是否由受信任的证书颁发机构签发。
-   ```java
-   import org.apache.commons.mail.SimpleEmail;
-   import org.apache.commons.mail.EmailException;
-
-   public class MailSenderSecured {
-       public static void main(String[] args) {
-           SimpleEmail email = new SimpleEmail();
-           email.setHostName("smtp.example.com");
-           email.setSmtpPort(587);
-           // ... 其他配置（用户名、密码、From、To、Subject、Msg）
-           email.setTLS(true);
-           email.setSSLCheckServerIdentity(true); // 关键修复：启用证书身份校验
-           try {
-               email.send();
-               System.out.println("邮件发送成功！");
-           } catch (EmailException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-
+在使用 `SimpleEmail` 并通过SSL/TLS连接时，务必调用 `setSSLCheckServerIdentity(true)` 方法。这将强制客户端验证服务器的SSL证书是否与其连接的域名匹配，并检查证书是否由受信任的证书颁发机构签发。
+```java
+import org.apache.commons.mail.SimpleEmail;
+import org.apache.commons.mail.EmailException;
+public class MailSenderSecured {
+public static void main(String[] args) {
+SimpleEmail email = new SimpleEmail();
+email.setHostName("smtp.example.com");
+email.setSmtpPort(587);
+// ... 其他配置（用户名、密码、From、To、Subject、Msg）
+email.setTLS(true);
+email.setSSLCheckServerIdentity(true); // 关键修复：启用证书身份校验
+try {
+email.send();
+System.out.println("邮件发送成功！");
+} catch (EmailException e) {
+e.printStackTrace();
+}
+}
+}
+```
 2. **使用信任存储**
-   确保应用程序运行环境中配置了正确的信任存储（Truststore），其中包含所有受信任的根证书和中间证书颁发机构。Java默认会使用系统或JRE自带的信任存储，但在某些特定部署环境下，可能需要手动配置或加载特定的信任存储。
-
+确保应用程序运行环境中配置了正确的信任存储（Truststore），其中包含所有受信任的根证书和中间证书颁发机构。Java默认会使用系统或JRE自带的信任存储，但在某些特定部署环境下，可能需要手动配置或加载特定的信任存储。
 3. **检查Commons Email版本**
-   确保使用的Apache Commons Email库是最新版本，以获取最新的安全修复和特性。
-
+确保使用的Apache Commons Email库是最新版本，以获取最新的安全修复和特性。
 4. **谨慎处理 SSL/TLS 相关配置**
-   避免在任何情况下禁用SSL/TLS证书校验（例如，不要调用 setSSLOnConnect() 或 setTLS() 并将端口设置为不需要SSL的端口， unless you are absolutely sure and understand the risks, typically this is not recommended）。不要使用不安全的协议或配置，例如纯粹的SMTP连接而没有加密。
-CODE
-	desc: <<<CODE
+避免在任何情况下禁用SSL/TLS证书校验（例如，不要调用 setSSLOnConnect() 或 setTLS() 并将端口设置为不需要SSL的端口，除非你完全理解风险）。不要使用不安全的协议或配置，例如纯粹的SMTP连接而没有加密。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Apache Commons Email是一个用于发送电子邮件的Java库。在使用SimpleEmail发送邮件时，建立与其他邮件服务器（如SMTP服务器）的SSL/TLS连接通常是为了保证通信的机密性和完整性。然而，如果应用程序没有正确配置或显式地跳过对服务器端SSL证书的身份验证，就可能存在SSL证书验证绕过漏洞。这意味着客户端（SimpleEmail）不会检查连接到的服务器是否拥有与其声明的域名相匹配且由可信机构颁发的有效证书。攻击者可以利用这一点进行中间人攻击（Man-in-the-Middle, MitM），通过伪造邮件服务器的SSL证书来劫持客户端的加密连接，从而 eavesdrop、篡改或重定向邮件内容。
-
+Apache Commons Email是一个用于发送电子邮件的Java库。在使用SimpleEmail发送邮件时，建立与其他邮件服务器（如SMTP服务器）的SSL/TLS连接通常是为了保证通信的机密性和完整性。然而，如果应用程序没有正确配置或显式地跳过对服务器端SSL证书的身份验证，就可能存在SSL证书验证绕过漏洞。这意味着客户端（SimpleEmail）不会检查连接到的服务器是否拥有与其声明的域名相匹配且由可信机构颁发的有效证书。攻击者可以利用这一点进行中间人攻击（Man-in-the-Middle, MitM），通过伪造邮件服务器的SSL证书来劫持客户端的加密连接，从而窃听、篡改或重定向邮件内容。
 2. **触发场景**
-   当应用程序使用 `org.apache.commons.mail.SimpleEmail` 类进行邮件发送，并通过SSL/TLS进行连接时，如果没有调用 `setSSLCheckServerIdentity(true)` 方法或者调用了 `setSSLCheckServerIdentity(false)`，则会触发此漏洞。
-   ```java
-   import org.apache.commons.mail.SimpleEmail;
-   import org.apache.commons.mail.EmailException;
-
-   public class MailSender {
-       public static void main(String[] args) {
-           SimpleEmail email = new SimpleEmail();
-           email.setHostName("smtp.example.com");
-           email.setSmtpPort(587);
-           // ... 其他配置（用户名、密码、From、To、Subject、Msg）
-           email.setTLS(true); // 启用TLS，但未设置检查服务器身份
-           // 漏洞点：未调用 email.setSSLCheckServerIdentity(true);
-           try {
-               email.send();
-               System.out.println("邮件发送成功！");
-           } catch (EmailException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-
+当应用程序使用 `org.apache.commons.mail.SimpleEmail` 类进行邮件发送，并通过SSL/TLS进行连接时，如果没有调用 `setSSLCheckServerIdentity(true)` 方法或者调用了 `setSSLCheckServerIdentity(false)`，则会触发此漏洞。
+```java
+import org.apache.commons.mail.SimpleEmail;
+import org.apache.commons.mail.EmailException;
+public class MailSender {
+public static void main(String[] args) {
+SimpleEmail email = new SimpleEmail();
+email.setHostName("smtp.example.com");
+email.setSmtpPort(587);
+// ... 其他配置（用户名、密码、From、To、Subject、Msg）
+email.setTLS(true); // 启用TLS，但未设置检查服务器身份
+// 漏洞点：未调用 email.setSSLCheckServerIdentity(true);
+try {
+email.send();
+System.out.println("邮件发送成功！");
+} catch (EmailException e) {
+e.printStackTrace();
+}
+}
+}
+```
 3. **潜在影响**
-   - **信息泄露**: 攻击者可以解密并阅读通过此连接发送的敏感邮件内容。
-   - **数据篡改**: 攻击者可以在传输过程中修改邮件内容、发件人或收件人信息。
-   - **服务中断或滥用**: 攻击者可能通过劫持连接来干扰正常的邮件发送流程，甚至利用被劫持的连接发送垃圾邮件或进行钓鱼攻击。
-CODE
+- **信息泄露**: 攻击者可以解密并阅读通过此连接发送的敏感邮件内容。
+- **数据篡改**: 攻击者可以在传输过程中修改邮件内容、发件人或收件人信息。
+- **服务中断或滥用**: 攻击者可能通过劫持连接来干扰正常的邮件发送流程，甚至利用被劫持的连接发送垃圾邮件或进行钓鱼攻击。
+DESC
 	level: "info",
 	message_zh: "SimpleEmail 未验证务器的SSL证书",
 	message: "SimpleEmail has not verified the server’s security certificate.",
 	title: "Check Java SimpleEmail Certificate Verification",
 	title_zh: "检测Java SimpleEmail证书校验",
+	name: "sink",
+	risk: "证书验证绕过",
 }
 
 
@@ -197,4 +183,66 @@ public class MailSender {
     }
 }
 UNSAFE
+	"safefile://SecureMailSender.java": <<<CODE
+package org.example;
+
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.Email;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.SimpleEmail;
+
+public class SecureMailSender {
+    public static void main(String[] args) {
+        Email email = new SimpleEmail();
+        email.setHostName("smtp.example.com");
+        email.setSmtpPort(587);
+        email.setAuthenticator(new DefaultAuthenticator("your-email@example.com", "your-password"));
+        email.setTLS(true);
+        // 关键修复：启用证书身份校验，确保安全
+        email.setSSLCheckServerIdentity(true);
+        try {
+            email.setFrom("your-email@example.com");
+            email.addTo("recipient-email@example.com");
+            email.setSubject("安全邮件主题");
+            email.setMsg("这是安全邮件的正文内容，已启用证书校验。");
+
+            email.send();
+            System.out.println("邮件发送成功且已校验服务器身份！");
+        } catch (EmailException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://NonTLSMailSender.java": <<<CODE
+package org.example;
+
+import org.apache.commons.mail.DefaultAuthenticator;
+import org.apache.commons.mail.Email;
+import org.apache.commons.mail.EmailException;
+import org.apache.commons.mail.SimpleEmail;
+
+public class NonTLSMailSender {
+    public static void main(String[] args) {
+        Email email = new SimpleEmail();
+        email.setHostName("smtp.example.com");
+        email.setSmtpPort(25); // 使用非TLS/SSL端口，不涉及到证书校验
+        email.setAuthenticator(new DefaultAuthenticator("your-email@example.com", "your-password"));
+        // 不启用TLS，因此规则不适用，不会触发告警
+        // email.setTLS(true); 
+        try {
+            email.setFrom("your-email@example.com");
+            email.addTo("recipient-email@example.com");
+            email.setSubject("非加密邮件主题");
+            email.setMsg("这是非加密邮件的正文内容。");
+
+            email.send();
+            System.out.println("邮件发送成功 (非加密)！
+");
+        } catch (EmailException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

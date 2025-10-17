@@ -2,16 +2,19 @@ package bizhelper
 
 import (
 	"context"
+	"database/sql"
 	"strings"
 
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type YieldModelConfig struct {
 	Size          int
 	IndexField    string
 	CountCallback func(int)
+	Limit         int
 }
 
 func NewYieldModelConfig() *YieldModelConfig {
@@ -41,7 +44,14 @@ func WithYieldModel_PageSize(size int) YieldModelOpts {
 	}
 }
 
+func WithYieldModel_Limit(l int) YieldModelOpts {
+	return func(c *YieldModelConfig) {
+		c.Limit = l
+	}
+}
+
 func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts) chan T {
+
 	var t T
 	db = db.Table(db.NewScope(t).TableName())
 
@@ -51,17 +61,40 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 	}
 
 	outC := make(chan T)
-
+	total := 0
 	go func() {
 		defer close(outC)
 
-		paginator := NewFastPaginator(db, cfg.Size, WithFastPaginator_IndexField(cfg.IndexField))
+		index := 1
+
+		next := func(res *[]T) (bool, error) {
+			defer func() {
+				index++
+			}()
+			_, newDb := PagingByPagination(db, &ypb.Paging{
+				Page:  int64(index),
+				Limit: int64(cfg.Size),
+			}, res)
+			if newDb.Error != nil {
+				return false, newDb.Error
+			}
+			if len(*res) == 0 {
+				return false, nil
+			}
+			return true, nil
+		}
+
+		tmp := []T{}
+		paginator, _ := PagingByPagination(db, &ypb.Paging{
+			Page:  1,
+			Limit: 1,
+		}, &tmp)
 		if cfg.CountCallback != nil {
-			cfg.CountCallback(paginator.totalRecord)
+			cfg.CountCallback(paginator.TotalRecord)
 		}
 		for {
 			var items []T
-			if err, ok := paginator.Next(&items); !ok {
+			if ok, err := next(&items); !ok {
 				break
 			} else if err != nil {
 				log.Errorf("paging failed: %s", err)
@@ -73,6 +106,10 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 				case <-ctx.Done():
 					return
 				case outC <- d:
+					total++
+					if cfg.Limit > 0 && total >= cfg.Limit {
+						return
+					}
 				}
 			}
 		}
@@ -119,30 +156,10 @@ func YieldModelToMapEx(ctx context.Context, db *gorm.DB, countCallback func(int)
 				return
 			default:
 			}
-			columns := make([]interface{}, len(cols))
-			columnPointers := make([]interface{}, len(cols))
-			for i := range columns {
-
-				columnPointers[i] = &columns[i]
-			}
-
-			if err := rows.Scan(columnPointers...); err != nil {
-				return
-			}
-
-			m := make(map[string]interface{})
-			for i, colName := range cols {
-				val := columnPointers[i].(*interface{})
-				m[colName] = *val
-				colDBType := strings.ToLower(colTypes[i].DatabaseTypeName())
-				if colDBType == "bool" || colDBType == "boolean" {
-					v := (*val).(int64)
-					if v == 1 {
-						m[colName] = true
-					} else {
-						m[colName] = false
-					}
-				}
+			m, err := RawToMap(rows, cols, colTypes)
+			if err != nil {
+				log.Errorf("failed to convert row to map: %s", err)
+				continue
 			}
 			select {
 			case <-ctx.Done():
@@ -152,4 +169,33 @@ func YieldModelToMapEx(ctx context.Context, db *gorm.DB, countCallback func(int)
 		}
 	}()
 	return outC, nil
+}
+
+func RawToMap(rows *sql.Rows, cols []string, colTypes []*sql.ColumnType) (map[string]any, error) {
+	columns := make([]interface{}, len(cols))
+	columnPointers := make([]interface{}, len(cols))
+	for i := range columns {
+
+		columnPointers[i] = &columns[i]
+	}
+
+	if err := rows.Scan(columnPointers...); err != nil {
+		return nil, err
+	}
+
+	m := make(map[string]interface{})
+	for i, colName := range cols {
+		val := columnPointers[i].(*interface{})
+		m[colName] = *val
+		colDBType := strings.ToLower(colTypes[i].DatabaseTypeName())
+		if colDBType == "bool" || colDBType == "boolean" {
+			v := (*val).(int64)
+			if v == 1 {
+				m[colName] = true
+			} else {
+				m[colName] = false
+			}
+		}
+	}
+	return m, nil
 }

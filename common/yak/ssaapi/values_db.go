@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/jinzhu/gorm"
-
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/graph"
+	"github.com/yaklang/yaklang/common/utils/asyncdb"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssaprofile"
 )
 
 const (
@@ -26,16 +27,35 @@ const (
 )
 
 type saveValueCtx struct {
-	db *gorm.DB
+	database *auditDatabase
 	ssadb.AuditNodeStatus
 
 	ctx        context.Context
 	entryValue *Value
 
 	visitedNode map[*Value]*ssadb.AuditNode
+
+	isMemoryCompile bool
+}
+
+func newSaveValueCtx(opts ...SaveValueOption) *saveValueCtx {
+	saveValueConfig := &saveValueCtx{
+		visitedNode: make(map[*Value]*ssadb.AuditNode),
+		ctx:         context.Background(),
+	}
+	for _, o := range opts {
+		o(saveValueConfig)
+	}
+	return saveValueConfig
 }
 
 type SaveValueOption func(c *saveValueCtx)
+
+func OptionSaveValue_Database(db *auditDatabase) SaveValueOption {
+	return func(c *saveValueCtx) {
+		c.database = db
+	}
+}
 
 func OptionSaveValue_TaskID(taskID string) SaveValueOption {
 	return func(c *saveValueCtx) {
@@ -55,6 +75,11 @@ func OptionSaveValue_ResultID(resultID uint) SaveValueOption {
 	}
 }
 
+func OptionSaveValue_IsMemoryCompile(bool2 bool) SaveValueOption {
+	return func(c *saveValueCtx) {
+		c.isMemoryCompile = bool2
+	}
+}
 func OptionSaveValue_ResultVariable(variable string) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.ResultVariable = variable
@@ -64,12 +89,6 @@ func OptionSaveValue_ResultVariable(variable string) SaveValueOption {
 func OptionSaveValue_ResultIndex(index uint) SaveValueOption {
 	return func(c *saveValueCtx) {
 		c.ResultIndex = index
-	}
-}
-
-func OptionSaveValue_ResultAlert(alertMsg string) SaveValueOption {
-	return func(c *saveValueCtx) {
-		c.ResultAlertMsg = alertMsg
 	}
 }
 
@@ -97,197 +116,296 @@ func OptionSaveValue_ProgramName(name string) SaveValueOption {
 	}
 }
 
+var defaultSize = 100
+
 func SaveValue(value *Value, opts ...SaveValueOption) error {
-	db := ssadb.GetDB()
-	if db == nil {
-		return utils.Error("db is nil")
+	saveValueConfig := newSaveValueCtx(opts...)
+	saveValueConfig.entryValue = value
+
+	if saveValueConfig.database == nil {
+		db := ssadb.GetDB()
+		if db == nil {
+			return utils.Error("db is nil")
+		}
+		database := newAuditDatabase(saveValueConfig.ctx, db, defaultSize)
+		saveValueConfig.database = database
+		defer func() {
+			database.Close()
+		}()
 	}
-	saveValueConfig := &saveValueCtx{
-		db:          db,
-		entryValue:  value,
-		visitedNode: make(map[*Value]*ssadb.AuditNode),
-	}
-	for _, o := range opts {
-		o(saveValueConfig)
-	}
+
 	if saveValueConfig.ProgramName == "" {
 		return utils.Error("program info is empty")
 	}
-	// log.Infof("SaveValue: %v: %v", ctx, value)
-	err := graph.BuildGraphWithDFS[*ssadb.AuditNode, *Value](
-		saveValueConfig.ctx,
-		value,
-		saveValueConfig.SaveNode,
-		saveValueConfig.getNeighbors,
-		saveValueConfig.SaveEdge,
-	)
+	graph := NewDBGraph(saveValueConfig)
+	graph.getOrCreateNode(value, true)
+	err := value.GenerateGraph(graph, saveValueConfig.ctx)
 	return err
 }
 
-func (s *saveValueCtx) SaveNode(value *Value) (*ssadb.AuditNode, error) {
-	if node, ok := s.visitedNode[value]; ok {
+type DBGraph struct {
+	*saveValueCtx
+}
+
+var _ Graph = (*DBGraph)(nil)
+
+func NewDBGraph(ctx *saveValueCtx) *DBGraph {
+	return &DBGraph{
+		saveValueCtx: ctx,
+	}
+}
+
+func (g *DBGraph) GetGraphKind() GraphKind {
+	return GraphKindDump
+}
+
+func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNode, error) {
+	entry := false
+	if len(isEntry) > 0 {
+		entry = isEntry[0]
+	}
+	if node, ok := g.visitedNode[value]; ok {
 		return node, nil
 	}
 	if value == nil {
 		return nil, utils.Error("value is nil")
 	}
 
-	an := &ssadb.AuditNode{
-		AuditNodeStatus: s.AuditNodeStatus,
-		IsEntryNode:     value == s.entryValue,
-		IRCodeID:        value.GetId(),
-		TmpStartOffset:  -1,
-		TmpEndOffset:    -1,
-	}
-	if value.GetId() == -1 {
+	setTmpValue := func(an *ssadb.AuditNode, v *Value) {
 		R := value.GetRange()
 		an.TmpValue = yakunquote.TryUnquote(value.String())
 		if R != nil {
 			editor := R.GetEditor()
 			if editor == nil {
 				log.Errorf("%v: CreateOffset: rng or editor is nil", value.GetVerboseName())
-				return an, nil
+				return
 			}
-			hash := editor.GetIrSourceHash(value.GetProgramName())
+			hash := editor.GetIrSourceHash()
 			an.TmpValueFileHash = hash
 			an.TmpStartOffset = R.GetStartOffset()
 			an.TmpEndOffset = R.GetEndOffset()
 		}
 	}
-	if ret := s.db.Save(an).Error; ret != nil {
-		return nil, utils.Wrap(ret, "save AuditNode")
+	an := g.database.GetNode()
+	if an == nil {
+		return nil, utils.Error("get AuditNode failed")
 	}
-	s.visitedNode[value] = an
+
+	saveIrSource := func(v *Value) {
+		inst := v.getInstruction()
+		if inst == nil {
+			return
+		}
+		r := inst.GetRange()
+		editor := r.GetEditor()
+		if editor == nil {
+			log.Errorf("%v: saveIrSource: rng or editor is nil", v.GetVerboseName())
+			return
+		}
+		irSource := ssadb.MarshalFile(editor)
+		g.database.SaveIrSource(irSource)
+	}
+
+	switch {
+	case g.isMemoryCompile:
+		an.IRCodeID = -1
+		setTmpValue(an, value)
+		saveIrSource(value)
+		an.AuditNodeStatus = g.AuditNodeStatus
+		an.IsEntryNode = entry
+	default:
+		an.AuditNodeStatus = g.AuditNodeStatus
+		an.IsEntryNode = entry
+		an.IRCodeID = value.GetId()
+		if value.GetId() == -1 {
+			setTmpValue(an, value)
+		}
+	}
+	g.database.SaveNode(an)
+	g.visitedNode[value] = an
 	return an, nil
 }
 
-func (s *saveValueCtx) getNeighbors(value *Value) []*graph.Neighbor[*Value] {
-	if value == nil {
-		return nil
+func (g *DBGraph) CreateEdge(edge Edge) error {
+	fromNode, err := g.getOrCreateNode(edge.From)
+	if err != nil {
+		return utils.Errorf("create from node failed: %v", err)
+	}
+	toNode, err := g.getOrCreateNode(edge.To)
+	if err != nil {
+		return utils.Errorf("create to node failed: %v", err)
 	}
 
-	var res []*graph.Neighbor[*Value]
-	for _, pred := range value.GetPredecessors() {
-		if pred.Node == nil {
-			continue
-		}
-		label := pred.Info.Label
-		if IsDataFlowLabel(label) {
-			var neighbor *graph.Neighbor[*Value]
-			if s.saveDataFlow(pred.Node, value, label) {
-				neighbor = graph.NewNeighbor(pred.Node, "") // ignore this edge in dot graph
-			} else {
-				neighbor = graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
-			}
-			neighbor.AddExtraMsg("label", pred.Info.Label)
-			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
-			res = append(res, neighbor)
-		} else {
-			neighbor := graph.NewNeighbor(pred.Node, EdgeTypePredecessor)
-			neighbor.AddExtraMsg("label", pred.Info.Label)
-			neighbor.AddExtraMsg("step", int64(pred.Info.Step))
-			res = append(res, neighbor)
-		}
+	saveEdge := func(edge *ssadb.AuditEdge) error {
+		return ssaprofile.ProfileAddWithError(true, "dbgraph_create_edge", func() error {
+			g.database.SaveEdge(edge)
+			return nil
+		})
 	}
-	return res
-}
-
-// from is the source node, to is the target node, from -> xxx -> to
-func (s *saveValueCtx) saveDataFlow(from *Value, to *Value, label string) bool {
-	var getNext func(v *Value) []*Value
-	var saveNode func(from, to *ssadb.AuditNode)
-
-	switch label {
-	case Predecessors_TopDefLabel:
-		getNext = func(v *Value) []*Value {
-			return v.GetDependOn()
-		}
-		saveNode = func(from, to *ssadb.AuditNode) {
-			s.SaveEdge(from, to, EdgeTypeDependOn, nil)
-			s.SaveEdge(to, from, EdgeTypeEffectOn, nil)
-		}
-	case Predecessors_BottomUseLabel:
-		getNext = func(v *Value) []*Value {
-			return v.GetEffectOn()
-		}
-		saveNode = func(from, to *ssadb.AuditNode) {
-			s.SaveEdge(from, to, EdgeTypeEffectOn, nil)
-			s.SaveEdge(to, from, EdgeTypeDependOn, nil)
-		}
-	default:
-		return false
-	}
-
-	var paths [][]*Value
-	ctx, cancel := context.WithTimeout(context.Background(), MAXTime)
-	_ = cancel
-	paths = graph.GraphPathWithTarget(ctx, from, to, func(v *Value) []*Value {
-		return getNext(v)
-	})
-
-	totalElements := 0
-	for _, innerSlice := range paths {
-		totalElements += len(innerSlice) // 累加所有内层切片长度
-	}
-
-	if totalElements == 0 {
-		log.Warnf("saveDataFlow:  paths is empty, maybe timeout")
-		return false
-	}
-	if totalElements > MaxPathElements {
-		log.Warnf("saveDataFlow:  paths is too many: %v", totalElements)
-		return false
-	}
-
-	for _, path := range paths {
-		// log.Infof("saveDataFlow: %v", path)
-		// save dataflow path
-		for i := 0; i < len(path)-1; i++ {
-			fromNode, err := s.SaveNode(path[i])
-			if err != nil {
-				log.Errorf("failed to save node: %v", err)
-				continue
-			}
-
-			toNode, err := s.SaveNode(path[i+1])
-			if err != nil {
-				log.Errorf("failed to save node: %v", err)
-				continue
-			}
-			saveNode(fromNode, toNode)
-		}
-	}
-
-	return true
-}
-
-func (s *saveValueCtx) SaveEdge(from *ssadb.AuditNode, to *ssadb.AuditNode, edgeType string, extraMsg map[string]interface{}) {
-	if from == nil || to == nil {
-		return
-	}
-	switch ValidEdgeType(edgeType) {
+	msg := edge.Msg
+	switch edge.Kind {
 	case EdgeTypeDependOn:
-		edge := from.CreateDependsOnEdge(s.ProgramName, to.ID)
-		if err := s.db.Save(edge).Error; err != nil {
+		edge := fromNode.CreateDependsOnEdge(g.ProgramName, toNode.ID)
+		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	case EdgeTypeEffectOn:
-		edge := from.CreateEffectsOnEdge(s.ProgramName, to.ID)
-		if err := s.db.Save(edge).Error; err != nil {
+		edge := fromNode.CreateEffectsOnEdge(g.ProgramName, toNode.ID)
+		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
+	// case EdgeTypeDataflow:
+	// 	edge := fromNode.CreateDataFlowEdge(g.ProgramName, toNode.ID)
+	// 	if err := saveEdge(edge); err != nil {
+	// 		log.Errorf("save AuditEdge failed: %v", err)
+	// 	}
 	case EdgeTypePredecessor:
 		var (
 			label string
 			step  int64
 		)
-		if extraMsg != nil {
-			label = extraMsg["label"].(string)
-			step = extraMsg["step"].(int64)
+		if msg != nil {
+			if l, ok := msg["label"].(string); ok {
+				label = l
+			}
+			if s, ok := msg["step"].(int64); ok {
+				step = s
+			}
 		}
-		edge := from.CreatePredecessorEdge(s.ProgramName, to.ID, step, label)
-		if err := s.db.Save(edge).Error; err != nil {
+		edge := fromNode.CreatePredecessorEdge(g.ProgramName, toNode.ID, step, label)
+		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	}
+	return nil
+
+}
+
+type auditDatabase struct {
+	fetch      *asyncdb.Fetch[*ssadb.AuditNode]
+	nodeSave   *asyncdb.Save[*ssadb.AuditNode]
+	edgeSave   *asyncdb.Save[*ssadb.AuditEdge]
+	editorSave *asyncdb.Save[*ssadb.IrSource]
+}
+
+func (a *auditDatabase) GetNode() *ssadb.AuditNode {
+	// get node from fetch, if err retry 10 times
+	for i := 0; i < 10; i++ {
+		node, err := a.fetch.Fetch()
+		if err == nil {
+			return node
+		}
+		log.Warnf("fetch AuditNode failed: %v", err)
+		time.Sleep(time.Millisecond * 100)
+	}
+	return nil
+}
+
+func (a *auditDatabase) SaveNode(node *ssadb.AuditNode) {
+	if node == nil {
+		return
+	}
+	a.nodeSave.Save(node)
+}
+
+func (a *auditDatabase) SaveEdge(edge *ssadb.AuditEdge) {
+	if edge == nil {
+		return
+	}
+	a.edgeSave.Save(edge)
+}
+
+func (a *auditDatabase) SaveIrSource(editor *ssadb.IrSource) {
+	if editor == nil {
+		return
+	}
+	a.editorSave.Save(editor)
+}
+
+func (a *auditDatabase) Close() {
+	a.fetch.DeleteRest(func(an []*ssadb.AuditNode) {
+		if len(an) == 0 {
+			return
+		}
+		db := ssadb.GetDB()
+		ssadb.DeleteAuditNode(db, an...)
+	})
+	a.nodeSave.Close()
+	a.edgeSave.Close()
+	a.editorSave.Close()
+}
+
+func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase {
+	ret := &auditDatabase{}
+
+	fetchSize := size
+	saveSize := size * 2
+
+	ret.fetch = asyncdb.NewFetch[*ssadb.AuditNode](func(ctx context.Context, fetchSize int) <-chan *ssadb.AuditNode {
+		out := make(chan *ssadb.AuditNode, fetchSize)
+		go func() {
+			defer close(out)
+			utils.GormTransaction(db, func(tx *gorm.DB) error {
+				i := 0
+				for i < fetchSize {
+					node := &ssadb.AuditNode{}
+					if ret := tx.Create(node).Error; ret != nil {
+						log.Errorf("create empty AuditNode failed: %v", ret)
+						continue
+					}
+					i++
+					out <- node
+				}
+				return nil
+			})
+		}()
+		return out
+	}, asyncdb.WithContext(ctx), asyncdb.WithFetchSize(fetchSize), asyncdb.WithName("AuditNode"))
+
+	ret.nodeSave = asyncdb.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
+		if len(ae) == 0 {
+			return
+		}
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, e := range ae {
+				if ret := tx.Save(e).Error; ret != nil {
+					log.Errorf("save AuditNode failed: %v", ret)
+				}
+			}
+			return nil
+		})
+		return
+	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(saveSize), asyncdb.WithName("AuditNode"))
+
+	ret.edgeSave = asyncdb.NewSave[*ssadb.AuditEdge](func(ae []*ssadb.AuditEdge) {
+		if len(ae) == 0 {
+			return
+		}
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, e := range ae {
+				if ret := tx.Save(e).Error; ret != nil {
+					log.Errorf("save AuditEdge failed: %v", ret)
+				}
+			}
+			return nil
+		})
+		return
+	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(saveSize), asyncdb.WithName("AuditEdge"))
+
+	ret.editorSave = asyncdb.NewSave[*ssadb.IrSource](func(ae []*ssadb.IrSource) {
+		if len(ae) == 0 {
+			return
+		}
+		utils.GormTransaction(db, func(tx *gorm.DB) error {
+			for _, e := range ae {
+				if ret := tx.Save(e).Error; ret != nil {
+					log.Errorf("save AuditEdge failed: %v", ret)
+				}
+			}
+			return nil
+		})
+		return
+	}, asyncdb.WithContext(ctx), asyncdb.WithSaveSize(size), asyncdb.WithName("SourceFile"))
+
+	return ret
 }

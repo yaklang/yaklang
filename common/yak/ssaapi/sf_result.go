@@ -1,7 +1,11 @@
 package ssaapi
 
 import (
+	"fmt"
 	"sort"
+	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -12,6 +16,9 @@ import (
 )
 
 type SyntaxFlowResult struct {
+	id       uint
+	saveKind ResultSaveKind
+	TaskID   string
 	// result
 	memResult *sfvm.SFFrameResult
 	dbResult  *ssadb.AuditResult
@@ -26,20 +33,55 @@ type SyntaxFlowResult struct {
 	alertVariable []string
 	variable      *orderedmap.OrderedMap // string - int
 
+	size int // value size
 	// message info
 	checkMsg []string
 
 	unName Values
 
-	riskMap map[string]*schema.SSARisk
+	riskMap      map[string]*schema.SSARisk
+	riskCountMap map[string]int64
 	// cache
 	riskGRPCCache []*ypb.SSARisk
 }
 
 func createEmptyResult() *SyntaxFlowResult {
 	return &SyntaxFlowResult{
-		symbol:  make(map[string]Values),
-		riskMap: make(map[string]*schema.SSARisk),
+		symbol:       make(map[string]Values),
+		riskMap:      make(map[string]*schema.SSARisk),
+		riskCountMap: make(map[string]int64),
+	}
+}
+
+var resultCacheId = atomic.NewInt64(1)
+
+func getResultCacheId() uint {
+	return uint(resultCacheId.Inc())
+}
+
+var resultCache = utils.NewTTLCache[*SyntaxFlowResult](10 * time.Minute)
+
+func CreateResultFromCache(kind ResultSaveKind, id uint64) *SyntaxFlowResult {
+	if kind == resultSaveNone {
+		return nil
+	}
+	name := fmt.Sprintf("%s-%d", kind, id)
+	if res, ok := resultCache.Get(name); ok {
+		res.saveKind = kind
+		return res
+	}
+	return nil
+}
+
+func setResultToCache(kind ResultSaveKind, res *SyntaxFlowResult) {
+	// resultCache.Set(res.GetResultID(), res)
+	if kind == resultSaveNone {
+		return
+	}
+	res.saveKind = kind
+	name := fmt.Sprintf("%s-%d", kind, res.GetResultID())
+	if name != "" {
+		resultCache.Set(name, res)
 	}
 }
 
@@ -49,6 +91,7 @@ func CreateResultFromQuery(res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret.rule = res.GetRule()
 	return ret
 }
+
 func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowResult {
 	ret := createEmptyResult()
 	ret.program = prog
@@ -59,8 +102,10 @@ func CreateResultWithProg(prog *Program, res *sfvm.SFFrameResult) *SyntaxFlowRes
 
 func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 	r.memResult = res
+	size := 0
 	sortFunc := func(vo sfvm.ValueOperator) sfvm.ValueOperator {
 		values := (SyntaxFlowVariableToValues(vo))
+		size += len(values)
 		sort.Slice(values, func(i, j int) bool {
 			// sort by file
 			valueI := values[i]
@@ -91,6 +136,7 @@ func (r *SyntaxFlowResult) setMemoryResult(res *sfvm.SFFrameResult) {
 		return s, sortFunc(vo), nil
 	})
 	res.UnNameValue = sortFunc(res.UnNameValue)
+	r.size = size
 }
 
 func (r *SyntaxFlowResult) GetSFResult() *sfvm.SFFrameResult {
@@ -182,6 +228,36 @@ func (r *SyntaxFlowResult) GetProgramName() string {
 	return ""
 }
 
+func (r *SyntaxFlowResult) GetProgramLang() string {
+	if r == nil {
+		return ""
+	}
+	if r.program != nil {
+		return r.program.GetLanguage()
+	}
+	return ""
+}
+
+func (r *SyntaxFlowResult) GetFileCount() int {
+	if r == nil {
+		return 0
+	}
+	if r.program != nil {
+		return len(r.program.Program.FileList)
+	}
+	return 0
+}
+
+func (r *SyntaxFlowResult) GetLineCount() int {
+	if r == nil {
+		return 0
+	}
+	if r.program != nil {
+		return r.program.Program.LineCount
+	}
+	return 0
+}
+
 func (r *SyntaxFlowResult) GetRule() *schema.SyntaxFlowRule {
 	return r.rule
 }
@@ -191,4 +267,16 @@ func (r *SyntaxFlowResult) IsDatabase() bool {
 		return true
 	}
 	return false
+}
+
+func (r *SyntaxFlowResult) GetRiskCountMap() map[string]int64 {
+	return r.riskCountMap
+}
+
+// IsProgMemoryCompile 判断program是否是内存编译的
+func (r *SyntaxFlowResult) IsProgMemoryCompile() bool {
+	if r == nil || r.program == nil {
+		return false
+	}
+	return !r.program.HasSavedDB()
 }

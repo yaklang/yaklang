@@ -6,77 +6,66 @@ desc(
 	risk:ssti
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在Java Spring Framework中，当处理`ModelAndView`时，如果直接将未经充分过滤或验证的`String`类型用户输入作为模板变量添加到`ModelAndView`中，并且后续模板引擎存在模板注入的风险，就可能导致服务器端模板注入（SSTI）漏洞。攻击者可以通过构造恶意输入，在模板中注入代码，从而在服务器端执行任意指令。
-
+在Java Spring Framework中，当处理`ModelAndView`时，如果直接将未经充分过滤或验证的`String`类型用户输入作为模板变量添加到`ModelAndView`中，并且后续模板引擎存在模板注入的风险，就可能导致服务器端模板注入（SSTI）漏洞。攻击者可以通过构造恶意输入，在模板中注入代码，从而在服务器端执行任意指令。
 2. **触发场景**
-   如下代码示例，当`addObject`的第二个参数直接来源于用户输入（如通过方法参数`String id`传入），且该参数未经过滤或编码就直接传递给了模板。如果所使用的模板引擎（如FreeMarker, Velocity, Thymeleaf等在特定配置下）对传入的字符串没有严格的安全处理，攻击者可以输入如 `${T(java.lang.Runtime).getRuntime().exec('calc.exe')}` 等恶意表达式，使得模板引擎在渲染时执行该表达式。
-
-   ```java
-   @GetMapping(MODEL + "/edit.do")
-   @Function("org.edit")
-   public ModelAndView edit2(String id) {
-       ModelAndView view = new ModelAndView("/admin/org/edit2.html");
-       view.addObject("org", id); // 直接将用户输入的String类型变量添加到ModelAndView
-       return view;
-   }
-   ```
-
+如下代码示例，当`addObject`的第二个参数直接来源于用户输入（如通过方法参数`String id`传入），且该参数未经过滤或编码就直接传递给了模板。如果所使用的模板引擎（如FreeMarker, Velocity, Thymeleaf等在特定配置下）对传入的字符串没有严格的安全处理，攻击者可以输入如 `${T(java.lang.Runtime).getRuntime().exec('calc.exe')}` 等恶意表达式，使得模板引擎在渲染时执行该表达式。
+```java
+@GetMapping(MODEL + "/edit.do")
+@Function("org.edit")
+public ModelAndView edit2(String id) {
+ModelAndView view = new ModelAndView("/admin/org/edit2.html");
+view.addObject("org", id); // 直接将用户输入的String类型变量添加到ModelAndView
+return view;
+}
+```
 3. **潜在影响**
-   - 攻击者可以在服务器上执行任意系统命令，导致服务器被完全控制。
-   - 敏感数据泄露，如数据库凭证、配置文件信息等。
-   - 拒绝服务，通过执行资源消耗型操作导致服务器崩溃。
-   - 作为进一步攻击的跳板，影响同一网络内的其他系统。
-
+- 攻击者可以在服务器上执行任意系统命令，导致服务器被完全控制。
+- 敏感数据泄露，如数据库凭证、配置文件信息等。
+- 拒绝服务，通过执行资源消耗型操作导致服务器崩溃。
+- 作为进一步攻击的跳板，影响同一网络内的其他系统。
 ### 规则目的和规则详细
-   该规则旨在审计Java Spring Framework中是否存在将未经安全处理的`String`类型用户输入直接绑定到`ModelAndView`对象的情况，以预防潜在的SSTI漏洞。覆盖以下关键风险点：
-   - `ModelAndView.addObject`方法调用中，直接传递用户输入作为值。
-   - 用户输入未经过滤、验证或转义处理。
-
+该规则旨在审计Java Spring Framework中是否存在将未经安全处理的`String`类型用户输入直接绑定到`ModelAndView`对象的情况，以预防潜在的SSTI漏洞。覆盖以下关键风险点：
+- `ModelAndView.addObject`方法调用中，直接传递用户输入作为值。
+- 用户输入未经过滤、验证或转义处理。
 DESC
 	rule_id: "0257563a-689d-4f55-9aa7-6ffcbb4df95f"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免直接将用户输入添加到模板上下文
 除非绝对必要，否则尽量避免将原始的用户输入（特别是`String`类型）直接绑定到`ModelAndView`中。如果必须绑定，请确保输入已经过严格的白名单过滤或编码。
-
 #### 2. 对用户输入执行严格的过滤和验证
 对所有用户输入进行严格的合法性校验。根据预期的值类型、格式、长度和允许的字符集进行验证。例如，如果预期是数字ID，则应尝试将其转换为数字类型，而不是保留为字符串。
-
-   ```java
-   // 修复代码示例：转换为Long类型并进行业务校验
-   @GetMapping(MODEL + "/edit.do")
-   @Function("org.edit")
-   public ModelAndView edit(String id) {
-       ModelAndView view = new ModelAndView("/admin/org/edit.html");
-       try {
-           Long orgId = Long.parseLong(id); // 尝试转换为数字类型
-           // 进行进一步的业务逻辑校验，如是否存在此ID对应的组织
-           CoreOrg org = orgConsoleService.queryById(orgId);
-           if (org != null) {
-                view.addObject("org", org);
-           } else {
-               // 处理ID不存在的情况，返回错误或重定向
-           }
-       } catch (NumberFormatException e) {
-           // 处理ID不是数字的情况，返回错误或重定向
-       }
-       return view;
-   }
-   ```
-
+```java
+// 修复代码示例：转换为Long类型并进行业务校验
+@GetMapping(MODEL + "/edit.do")
+@Function("org.edit")
+public ModelAndView edit(String id) {
+ModelAndView view = new ModelAndView("/admin/org/edit.html");
+try {
+Long orgId = Long.parseLong(id); // 尝试转换为数字类型
+// 进行进一步的业务逻辑校验，如是否存在此ID对应的组织
+CoreOrg org = orgConsoleService.queryById(orgId);
+if (org != null) {
+view.addObject("org", org);
+} else {
+// 处理ID不存在的情况，返回错误或重定向
+}
+} catch (NumberFormatException e) {
+// 处理ID不是数字的情况，返回错误或重定向
+}
+return view;
+}
+```
 #### 3. 对模板引擎进行安全配置
 了解所使用的模板引擎的安全特性，并进行相应的安全配置。例如，在Velocity中禁止直接访问Java类或方法；在FreeMarker中配置沙箱环境或禁用不安全指令。尽量使用自动转义功能的模板引擎，并确保其已启用。
-
 #### 4. 使用更安全的视图技术
 考虑使用不受SSTI影响的视图技术，如纯JSON视图、Spring RESTful接口返回数据等，将数据与视图渲染分离。
 SOLUTION
 	reference: <<<REFERENCE
-- [OWASP：Template Injection](https://owasp.org/www-community/attacks/Server_Side_Template_Injection)
-- [CWE-1336: Improper Neutralization of Special Elements used in a Template Engine ('Template Injection')](https://cwe.mitre.org/data/definitions/1336.html)
-- [Spring Framework Documentation](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-views)
+[OWASP：Template Injection](https://owasp.org/www-community/attacks/Server_Side_Template_Injection)
+[CWE-1336: Improper Neutralization of Special Elements used in a Template Engine ('Template Injection')](https://cwe.mitre.org/data/definitions/1336.html)
+[Spring Framework Documentation](https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-views)
 REFERENCE
 )
 
@@ -85,8 +74,8 @@ $param<getFunc><getReturns> as $returns;
 $returns?{<typeName>?{have: "ModelAndView"}} as $result;
 $result.addObject(,,* as $sourceEntry);
 $sourceEntry<show> #{
-    until: `* & $param as $source`,
-}->;
+    until: `* & $param `,
+}-> as $source;
 $source<dataflow(exclude=<<<CODE
 *?{opcode: call}
 CODE)> as $filteredSource
@@ -97,6 +86,61 @@ alert $filteredSource for {
 	level: "mid",
 	message: "Identified Java Spring Framework code handling ModelAndView with String type parameter",
 	message_zh: "识别到 Java Spring Framework 中处理 ModelAndView 时直接传入 String 类型参数",
+	risk: "SSTI",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在Java Spring Framework中，当处理`ModelAndView`时，如果直接将未经充分过滤或验证的`String`类型用户输入作为模板变量添加到`ModelAndView`中，并且后续模板引擎存在模板注入的风险，就可能导致服务器端模板注入（SSTI）漏洞。攻击者可以通过构造恶意输入，在模板中注入代码，从而在服务器端执行任意指令。
+2. **触发场景**
+如下代码示例，当`addObject`的第二个参数直接来源于用户输入（如通过方法参数`String id`传入），且该参数未经过滤或编码就直接传递给了模板。如果所使用的模板引擎（如FreeMarker, Velocity, Thymeleaf等在特定配置下）对传入的字符串没有严格的安全处理，攻击者可以输入如 `${T(java.lang.Runtime).getRuntime().exec('calc.exe')}` 等恶意表达式，使得模板引擎在渲染时执行该表达式。
+```java
+@GetMapping(MODEL + "/edit.do")
+@Function("org.edit")
+public ModelAndView edit2(String id) {
+ModelAndView view = new ModelAndView("/admin/org/edit2.html");
+view.addObject("org", id); // 直接将用户输入的String类型变量添加到ModelAndView
+return view;
+}
+```
+3. **潜在影响**
+- 攻击者可以在服务器上执行任意系统命令，导致服务器被完全控制。
+- 敏感数据泄露，如数据库凭证、配置文件信息等。
+- 拒绝服务，通过执行资源消耗型操作导致服务器崩溃。
+- 作为进一步攻击的跳板，影响同一网络内的其他系统。
+DESC
+	name: "filteredSource",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免直接将用户输入添加到模板上下文
+除非绝对必要，否则尽量避免将原始的用户输入（特别是`String`类型）直接绑定到`ModelAndView`中。如果必须绑定，请确保输入已经过严格的白名单过滤或编码。
+#### 2. 对用户输入执行严格的过滤和验证
+对所有用户输入进行严格的合法性校验。根据预期的值类型、格式、长度和允许的字符集进行验证。例如，如果预期是数字ID，则应尝试将其转换为数字类型，而不是保留为字符串。
+```java
+// 修复代码示例：转换为Long类型并进行业务校验
+@GetMapping(MODEL + "/edit.do")
+@Function("org.edit")
+public ModelAndView edit(String id) {
+ModelAndView view = new ModelAndView("/admin/org/edit.html");
+try {
+Long orgId = Long.parseLong(id); // 尝试转换为数字类型
+// 进行进一步的业务逻辑校验，如是否存在此ID对应的组织
+CoreOrg org = orgConsoleService.queryById(orgId);
+if (org != null) {
+view.addObject("org", org);
+} else {
+// 处理ID不存在的情况，返回错误或重定向
+}
+} catch (NumberFormatException e) {
+// 处理ID不是数字的情况，返回错误或重定向
+}
+return view;
+}
+```
+#### 3. 对模板引擎进行安全配置
+了解所使用的模板引擎的安全特性，并进行相应的安全配置。例如，在Velocity中禁止直接访问Java类或方法；在FreeMarker中配置沙箱环境或禁用不安全指令。尽量使用自动转义功能的模板引擎，并确保其已启用。
+#### 4. 使用更安全的视图技术
+考虑使用不受SSTI影响的视图技术，如纯JSON视图、Spring RESTful接口返回数据等，将数据与视图渲染分离。
+SOLUTION
 }
 
 
@@ -124,5 +168,114 @@ public class OrgConsoleController {
         return view;
     }
 }
+CODE
+	"safefile://SafeModelAndViewHandling.java": <<<CODE
+package com.ibeetl.admin.console.web;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.servlet.ModelAndView;
+import com.ibeetl.admin.core.entity.CoreOrg;
+import com.ibeetl.admin.core.service.CoreOrgService;
+
+@Controller
+public class SafeOrgConsoleController {
+
+    private CoreOrgService orgConsoleService;
+
+    // 修复代码示例：将String转换为Long类型并进行业务校验，避免SSTI
+    @GetMapping("/org/edit.do")
+    // @Function("org.edit") // 假设这个注解不影响核心逻辑
+    public ModelAndView editSafe(String id) {
+        ModelAndView view = new ModelAndView("/admin/org/edit.html");
+        try {
+            Long orgId = Long.parseLong(id); // 尝试转换为数字类型
+            // 进行进一步的业务逻辑校验，如是否存在此ID对应的组织
+            CoreOrg org = orgConsoleService.queryById(orgId); // 假设queryById接受Long
+            if (org != null) {
+                view.addObject("org", org); // 添加的是对象，而不是原始用户输入String
+            } else {
+                // 处理ID不存在的情况，返回错误或重定向
+                view.addObject("error", "Organization not found");
+            }
+        } catch (NumberFormatException e) {
+            // 处理ID不是数字的情况，返回错误或重定向
+            view.addObject("error", "Invalid ID format");
+        }
+        return view;
+    }
+
+    // 安全示例：传入非用户输入的固定字符串或枚举值
+    @GetMapping("/admin/dashboard")
+    public ModelAndView showDashboard() {
+        ModelAndView view = new ModelAndView("/admin/dashboard.html");
+        view.addObject("title", "Admin Dashboard"); // 固定字符串，不来源于用户输入
+        return view;
+    }
+
+    // 安全示例：传入复杂对象，而非原始String类型输入
+    @GetMapping("/user/profile")
+    public ModelAndView viewUserProfile(String userId) {
+        ModelAndView view = new ModelAndView("/user/profile.html");
+        try {
+            Long id = Long.parseLong(userId);
+            User user = userService.getUserById(id); // 假设userService存在
+            if (user != null) {
+                view.addObject("user", user); // addObject的是一个User对象
+            } else {
+                view.addObject("message", "User not found");
+            }
+        } catch (NumberFormatException e) {
+            view.addObject("message", "Invalid User ID");
+        }
+        return view;
+    }
+
+    // 安全示例：ModelAndView的参数是基本类型或封装类型，非String用户输入
+    @GetMapping("/settings")
+    public ModelAndView showSettings(int page) {
+        ModelAndView view = new ModelAndView("/settings.html");
+        view.addObject("currentPage", page); // int类型参数，非String用户输入，更安全
+        return view;
+    }
+
+    // 另一个安全示例：即便接收String，也确保addObject的值来源于内部处理或已转义
+    @GetMapping("/report")
+    public ModelAndView generateReport(String reportType) {
+        ModelAndView view = new ModelAndView("/report.html");
+        // 假设reportType是有限的枚举，经过了严格校验
+        if ("monthly".equals(reportType) || "yearly".equals(reportType)) {
+            String safeReport = getSafeReportData(reportType); // 内部生成或安全处理
+            view.addObject("reportContent", safeReport);
+        } else {
+            view.addObject("error", "Invalid report type");
+        }
+        return view;
+    }
+
+    private String getSafeReportData(String type) {
+        // 模拟从数据库或其他安全来源获取数据，并确保编码
+        return "Report data for " + type + " generated successfully.";
+    }
+
+    // 假设存在这些服务类，使其代码可编译
+    interface CoreOrgService {
+        CoreOrg queryById(Long id);
+    }
+
+    class CoreOrg { /*...*/ }
+
+    interface UserService {
+        User getUserById(Long id);
+    }
+
+    class User { /*...*/ }
+
+    // Placeholder for MODEL constant
+    private static final String MODEL = "/model";
+    private UserService userService;
+
+}
+
 CODE
 )

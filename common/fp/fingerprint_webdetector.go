@@ -28,8 +28,6 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	//////////////////////////////////////////////////////////////////////////
 	// 首先执行各种 IoT 设备的配置检测(优先级最高)
 	f.log("starting web fingerprint detection")
-	iotDetectCtx, cancel := context.WithTimeout(ctx, config.ProbeTimeout)
-	defer cancel()
 
 	//////////////////////////////////////////////////////////////////////////
 	////////////////////////////// IoT 设备优化 ///////////////////////////////
@@ -41,14 +39,14 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	}
 	var inspectResults []*netx.TLSInspectResult
 	var tlsChecked bool
-	isOpen, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPort(iotDetectCtx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+	isOpen, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPort(ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 	if err != nil {
 		if !isOpen {
 			f.log("port is closed: %v", err)
 			return &MatchResult{
 				Target: host,
 				Port:   port,
-				State:  CLOSED,
+				State:  result.State,
 				Reason: err.Error(),
 				Fingerprint: &FingerprintInfo{
 					IP:                ip.String(),
@@ -186,7 +184,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 			var ok bool
 			var flow []*lowhttp.RedirectFlow
 			var err error
-			ok, tlsChecked, inspectResults, flow, err = f.fetchBannerFromHostPortWithTLSSkipped(tlsChecked, iotDetectCtx, packet, inspectResults, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+			ok, tlsChecked, inspectResults, flow, err = f.fetchBannerFromHostPortWithTLSSkipped(tlsChecked, ctx, packet, inspectResults, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -196,7 +194,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 			f := utils2.GetLastElement(flow)
 			return f.Response, nil
 		}
-		cpes := f.matcher.MatchResource(iotDetectCtx, f.Config.GetWebFingerprintRules(), func(path string) (*rule.MatchResource, error) {
+		cpes := f.matcher.MatchResource(ctx, f.Config.ProbesMax, f.Config.GetWebFingerprintRules(), func(path string) (*rule.MatchResource, error) {
 			res := &rule.MatchResource{
 				Protocol: "http",
 				Port:     port,
@@ -294,7 +292,7 @@ func (f *Matcher) fetchBannerFromHostPortWithTLSSkipped(checkedTls bool, baseCtx
 	_ error,
 ) {
 	f.log("start to fetch banner from host: %v port: %v", host, port)
-	ctx, cancel := context.WithTimeout(baseCtx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(baseCtx, f.Config.ProbeTimeout)
 	defer cancel()
 
 	connectTimeout := 10 * time.Second
@@ -342,6 +340,7 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 		lowhttp.WithJsRedirect(true),
 		lowhttp.WithProxy(proxy...),
 		lowhttp.WithConnectTimeout(connectTimeout),
+		lowhttp.WithConnPool(f.Config.WebScanDisableConnPool),
 	)
 	if err != nil {
 		f.log("HTTP request failed: %v", err)

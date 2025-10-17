@@ -30,7 +30,14 @@ func MatchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 
 func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Opcode) []Instruction {
 	var insts []Instruction
-	if prog.EnableDatabase {
+	switch prog.DatabaseKind {
+	case ProgramCacheMemory:
+		for _, inst := range prog.Cache.InstructionCache.GetAll() {
+			if slices.Contains(opcodes, inst.GetOpcode()) {
+				insts = append(insts, inst)
+			}
+		}
+	case ProgramCacheDBRead, ProgramCacheDBWrite:
 		ch := ssadb.SearchIrCodeByOpcodes(ssadb.GetDBInProgram(prog.Name), ctx,
 			lo.Map(opcodes, func(opcode Opcode, index int) int {
 				return int(opcode)
@@ -44,16 +51,9 @@ func matchInstructionByOpcodes(ctx context.Context, prog *Program, opcodes ...Op
 			}
 			insts = append(insts, inst)
 		}
-		return insts
-	}
-
-	for _, cache := range prog.Cache.InstructionCache.GetAll() {
-		inst := cache.inst
-		if slices.Contains(opcodes, inst.GetOpcode()) {
-			insts = append(insts, inst)
-		}
 	}
 	return insts
+
 }
 
 func matchInstructionsByVariable(
@@ -62,9 +62,44 @@ func matchInstructionsByVariable(
 	compareMode, matchMode int,
 	name string,
 ) (res []Instruction) {
+	var ret []Instruction
+	tmp := make(map[int64]struct{})
+	addRes := func(insts ...Instruction) {
+		for _, inst := range insts {
+			if _, ok := tmp[inst.GetId()]; !ok {
+				ret = append(ret, inst)
+				tmp[inst.GetId()] = struct{}{}
+			}
+		}
+	}
 	// all application in database, just use sql
-	if prog.EnableDatabase {
-		var insts []Instruction
+	switch prog.DatabaseKind {
+	case ProgramCacheMemory:
+		// from cache
+		var check func(string) bool
+		// check := func(s string) bool {
+		switch compareMode {
+		case ssadb.ExactCompare:
+			check = func(s string) bool { return s == name }
+		case ssadb.GlobCompare:
+			matcher, err := glob.Compile(name)
+			if err != nil {
+				return
+			}
+			check = func(s string) bool {
+				return matcher.Match(s)
+			}
+		case ssadb.RegexpCompare:
+			matcher, err := regexp.Compile(name)
+			if err != nil {
+				return
+			}
+			check = func(s string) bool { return matcher.MatchString(s) }
+		default:
+			return
+		}
+		addRes(prog.Cache._getByVariableEx(matchMode, check)...)
+	case ProgramCacheDBRead, ProgramCacheDBWrite:
 		ch := ssadb.SearchVariable(ssadb.GetDBInProgram(prog.Name), ctx, compareMode, matchMode, name)
 		for ir := range ch {
 			inst, err := NewLazyInstructionFromIrCode(ir, prog)
@@ -73,50 +108,13 @@ func matchInstructionsByVariable(
 				continue
 			}
 			// inst := prog.Cache.newLazyInstructionWithoutCache(int64(id.ID))
-			insts = append(insts, inst)
-		}
-		return insts
-	}
-
-	res = make([]Instruction, 0)
-	tmp := make(map[int64]struct{})
-	addRes := func(insts ...Instruction) {
-		for _, inst := range insts {
-			if _, ok := tmp[inst.GetId()]; !ok {
-				res = append(res, inst)
-				tmp[inst.GetId()] = struct{}{}
-			}
+			addRes(inst)
 		}
 	}
-
-	// from cache
-	var check func(string) bool
-	// check := func(s string) bool {
-	switch compareMode {
-	case ssadb.ExactCompare:
-		check = func(s string) bool { return s == name }
-	case ssadb.GlobCompare:
-		matcher, err := glob.Compile(name)
-		if err != nil {
-			return
-		}
-		check = func(s string) bool {
-			return matcher.Match(s)
-		}
-	case ssadb.RegexpCompare:
-		matcher, err := regexp.Compile(name)
-		if err != nil {
-			return
-		}
-		check = func(s string) bool { return matcher.MatchString(s) }
-	default:
-		return
-	}
-	addRes(prog.Cache._getByVariableEx(matchMode, check)...)
-	return res
+	return ret
 }
 
-func (c *Cache) _getByVariableEx(
+func (c *ProgramCache) _getByVariableEx(
 	mod int,
 	checkValue func(string) bool,
 ) []Instruction {

@@ -2,10 +2,12 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
@@ -13,6 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -434,6 +437,104 @@ func TestGRPCCodecFlowFuzztag(t *testing.T) {
 			t.Fatal("fuzztag exec failed")
 		}
 		require.Equal(t, expected, res[0])
+	})
+}
+
+func TestGRPCCodecFlow_Normal(t *testing.T) {
+	workFlow := []*ypb.CodecWork{
+		{
+			CodecType:  "Base64Encode",
+			Script:     "",
+			PluginName: "",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "Alphabet",
+					Value: "standard",
+				},
+			},
+		},
+	}
+	workFlow2 := []*ypb.CodecWork{
+		{
+			CodecType:  "URLEncode",
+			Script:     "",
+			PluginName: "",
+			Params: []*ypb.ExecParamItem{
+				{
+					Key:   "fullEncode",
+					Value: "true",
+				},
+			},
+		},
+	}
+	client, err := NewLocalClient(true)
+	if err != nil {
+		panic(err)
+	}
+
+	t.Run("test save", func(t *testing.T) {
+		flowName := utils.RandStringBytes(10)
+		defer func() {
+			yakit.DeleteCodecFlow(consts.GetGormProfileDatabase(), flowName)
+		}()
+		_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.CustomizeCodecFlow{
+				FlowName: flowName,
+				WorkFlow: workFlow,
+			},
+		)
+		require.NoError(t, err)
+		_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.CustomizeCodecFlow{
+				FlowName: flowName,
+				WorkFlow: workFlow,
+			},
+		)
+		require.Error(t, err, fmt.Sprintf("Codec Flow: %s already exists", flowName))
+	})
+
+	t.Run("test update", func(t *testing.T) {
+		flowName := utils.RandStringBytes(10)
+		defer func() {
+			yakit.DeleteCodecFlow(consts.GetGormProfileDatabase(), flowName)
+		}()
+		_, err = client.UpdateCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.UpdateCodecFlowRequest{
+				FlowId:   uuid.New().String(),
+				FlowName: flowName,
+				WorkFlow: workFlow,
+			},
+		)
+		require.Error(t, err, fmt.Sprintf("Codec Flow: %s not find", flowName))
+		_, err = client.SaveCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.CustomizeCodecFlow{
+				FlowName: flowName,
+				WorkFlow: workFlow,
+			},
+		)
+		require.NoError(t, err)
+		_, err = client.UpdateCodecFlow(utils.TimeoutContextSeconds(1),
+			&ypb.UpdateCodecFlowRequest{
+				FlowName: flowName,
+				WorkFlow: workFlow2,
+			},
+		)
+		require.NoError(t, err)
+		codecFlow, err := yakit.GetCodecFlowByName(consts.GetGormProfileDatabase(), flowName)
+		jsonData, _ := json.Marshal(workFlow2)
+		require.NoError(t, err)
+		require.Equal(t, codecFlow.WorkFlow, jsonData)
+
+		// codecFlows, err := yakit.GetAllCodecFlow(consts.GetGormProfileDatabase())
+		// jsonData, _ = json.Marshal(workFlow2)
+		// require.NoError(t, err)
+		// require.Equal(t, codecFlows[0].WorkFlow, jsonData)
+
+		// codecFlow, err = yakit.GetCodecFlowByID(consts.GetGormProfileDatabase(), flowID_find)
+		// jsonData, _ = json.Marshal(workFlow2)
+		// require.NoError(t, err)
+		// require.Equal(t, codecFlow.WorkFlow, jsonData)
+
 	})
 }
 

@@ -8,10 +8,27 @@ REFERENCE
 	description: <<<DESCRIPTION
 该规则用于检测Java项目中是否使用了System.out输出流。System.out是Java中的标准输出流，通常用于打印调试信息或日志。然而，在生产环境中使用System.out输出流可能会导致性能问题和安全隐患。建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
 DESCRIPTION
-	solution: <<<FIX
-建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
-FIX
+	solution: <<<SOLUTION
+### 安全建议
+建议使用日志框架（如Log4j、SLF4J等）来替代`System.out`输出流，以便更好地管理日志记录和输出。
+```java
+// 示例：使用SLF4J记录日志
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class Example {
+    private static final Logger logger = LoggerFactory.getLogger(Example.class);
+
+    public static void main(String[] args) {
+        logger.info("This is an info message");
+        logger.debug("This is a debug message");
+    }
+}
+```
+SOLUTION
 	rule_id: "e1315696-3f1e-404c-9906-06c1db41a6b0"
+	cwe: 532
+	cwe: 215
 )
 
 System.out.print*() as $out;
@@ -21,5 +38,43 @@ alert $out for {
 	level: "info",
 	message: "检测到Java项目中使用了System.out输出流",
 	title: "Java System.out Usage Detected",
+	solution: <<<SOLUTION
+### 安全建议
+建议使用日志框架（如Log4j、SLF4J等）来替代System.out输出流，以便更好地管理日志记录和输出。
+```java
+// 示例：使用SLF4J记录日志
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+public class Example {
+private static final Logger logger = LoggerFactory.getLogger(Example.class);
+public static void main(String[] args) {
+logger.info("This is an info message");
+logger.debug("This is a debug message");
+}
+}
+```
+SOLUTION
+	risk: "代码风格",
+	desc: <<<DESC
+### 规则目的
+该规则用于检测Java项目中是否使用了System.out输出流。System.out是Java中的标准输出流，通常用于打印调试信息或日志。
+### 风险与影响
+1. **风险原理**
+在生产环境中使用System.out输出流可能会导致性能问题和安全隐患。例如，频繁的日志输出可能会影响应用程序的运行速度，同时敏感信息可能被直接打印到控制台。
+2. **触发场景**
+```java
+public class Main {
+public static void main(String[] args) {
+System.out.println("Debugging information");
+}
+}
+```
+上述代码展示了如何通过System.out输出调试信息，这种方式不适合生产环境。
+3. **潜在影响**
+- 可能暴露敏感数据（如密码、用户信息等）。
+- 影响系统整体性能，尤其是在高并发环境下。
+- 不便于集中管理日志内容，难以追踪和排查问题。
+DESC
+	name: "out",
 }
 

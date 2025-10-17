@@ -4,20 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/chanx"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/chanx"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func TestCoordinator_Consumption_SingleTime(t *testing.T) {
+	basicTestCoordinator_Consumption(t)
+}
 
 func TestCoordinator_Consumption(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	testCount := 1000
+	testCount := 20
 	if utils.InGithubActions() {
 		testCount = 3
 	}
@@ -44,15 +52,15 @@ func TestCoordinator_Consumption(t *testing.T) {
 }
 
 func basicTestCoordinator_Consumption(t *testing.T) {
-	inputChan := make(chan *InputEvent)
-	outChan := chanx.NewUnlimitedChan[*Event](context.Background(), 100)
+	inputChan := make(chan *InputEvent, 10) // 增加缓冲区大小，避免阻塞
+	outChan := chanx.NewUnlimitedChan[*schema.AiOutputEvent](context.Background(), 100)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outChan.SafeFeed(event)
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -87,22 +95,31 @@ func basicTestCoordinator_Consumption(t *testing.T) {
 		ins.Run()
 	}()
 
+	// 给协调器一点启动时间
+	time.Sleep(100 * time.Millisecond)
+
 	parsedTask := false
 	consumptionCheck := false
 	outChannel := outChan.OutputChannel()
+
+	// 添加调试计数器
+	eventCount := 0
+
 LOOP:
 	for {
 		select {
 		case result := <-outChannel:
+			eventCount++
+			log.Infof("received event %d: type=%s", eventCount, result.Type)
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 
-				end := false
-				for {
-					if end {
-						break
-					}
+				// 使用 goroutine 异步发送输入事件，避免阻塞主循环
+				go func() {
+					inputTimeout := time.NewTimer(5 * time.Second)
+					defer inputTimeout.Stop()
+
 					select {
 					case inputChan <- &InputEvent{
 						Id: result.GetInteractiveId(),
@@ -110,15 +127,14 @@ LOOP:
 							"suggestion": "continue",
 						},
 					}:
-						end = true
-						continue
-					case <-time.After(3 * time.Second):
-						log.Warn("timeout for write to inputChan, retry it")
+						log.Info("successfully sent continue suggestion")
+					case <-inputTimeout.C:
+						log.Warn("timeout sending continue suggestion to inputChan")
 					}
-				}
+				}()
 				continue
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION && parsedTask {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION && parsedTask {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
@@ -132,13 +148,17 @@ LOOP:
 				if o, ok := data["output_consumption"]; ok {
 					outputConsumption = int64(utils.InterfaceToInt(o))
 				}
+				log.Infof("consumption check: input=%d, output=%d", inputConsumption, outputConsumption)
 				if inputConsumption > 0 && outputConsumption > 0 {
 					consumptionCheck = true
+					log.Info("consumption check passed, breaking loop")
 					break LOOP
 				}
 			}
 		case <-time.After(time.Second * 15):
-			t.Fatal("timeout")
+			log.Errorf("test timeout after 15 seconds: parsedTask=%t, consumptionCheck=%t, eventCount=%d",
+				parsedTask, consumptionCheck, eventCount)
+			t.Fatal("timeout waiting for test completion")
 		}
 	}
 

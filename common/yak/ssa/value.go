@@ -71,6 +71,15 @@ func (b *FunctionBuilder) PeekValueInThisFunction(name string) Value {
 	return b.readValueEx(name, false, false)
 }
 
+// for ExternLib
+func (b *FunctionBuilder) PeekValueInRoot(name string) Value {
+	root := b
+	for p := b.parentBuilder; p != nil; p = p.parentBuilder {
+		root = p
+	}
+	return root.readValueEx(name, false, false)
+}
+
 func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
 	// read value from include stack
 	var value Value
@@ -79,8 +88,8 @@ func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
 		if mainFunc == nil || mainFunc.ExitBlock == 0 {
 			return true
 		}
-		block := b.GetBasicBlockByID(mainFunc.ExitBlock)
-		if block == nil {
+		block, ok := b.GetBasicBlockByID(mainFunc.ExitBlock)
+		if !ok {
 			return true
 		}
 		if ret := ReadVariableFromScope(block.ScopeTable, name); ret != nil && ret.Value != nil {
@@ -102,7 +111,12 @@ func (b *FunctionBuilder) readValueEx(
 ) Value {
 	scope := b.CurrentBlock.ScopeTable
 	program := b.GetProgram()
+	local := GetFristLocalVariableFromScopeAndParent(scope, name)
+
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
+		if local != nil && ret.GetCaptured().GetGlobalIndex() != local.GetGlobalIndex() {
+			ret = local
+		}
 		if b.CurrentRange != nil {
 			ret.AddRange(b.CurrentRange, false)
 			// set offset variable
@@ -198,63 +212,67 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 	}
 	scope := b.CurrentBlock.ScopeTable
 	if variable.IsPointer() {
-		variable.SetPointHandle(func(value Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
-			tmp := b.CurrentBlock.ScopeTable
-			defer func() {
-				b.CurrentBlock.ScopeTable = tmp
-			}()
+		// variable.SetPointHandler(func(valueTmp Value, scopet ssautil.ScopedVersionedTableIF[Value]) {
+		// 	tmp := b.CurrentBlock.ScopeTable
+		// 	defer func() {
+		// 		b.CurrentBlock.ScopeTable = tmp
+		// 	}()
 
-			b.CurrentBlock.ScopeTable = scopet
-			obj := variable.object
+		// 	b.CurrentBlock.ScopeTable = scopet
+		// 	obj := variable.object
 
-			v := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@value"))
-			p := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@pointer"))
-			p.SetKind(ssautil.PointerVariable)
-			scopet.AssignVariable(v, value)
-			if p.GetValue() == nil {
-				scopet.AssignVariable(p, variable.GetValue())
-			}
+		// 	v := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@value"))
+		// 	p := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@pointer"))
+		// 	p.SetKind(ssautil.PointerVariable)
+		// 	scopet.AssignVariable(v, value)
+		// 	if p.GetValue() == nil {
+		// 		scopet.AssignVariable(p, variable.GetValue())
+		// 	}
 
-			n := strings.TrimPrefix(variable.GetValue().String(), "&")
-			originName, originGlobalId := SplitName(n)
+		// 	n := strings.TrimPrefix(variable.GetValue().String(), "&")
+		// 	originName, originGlobalId := SplitName(n)
+		// 	_ = originGlobalId
 
-			newValue := b.CopyValue(value)
-			newValue.SetName(originName)
-			newValue.SetVerboseName(originName)
+		// 	newValue := b.CopyValue(value)
+		// 	newValue.SetName(originName)
+		// 	newValue.SetVerboseName(originName)
 
-			if ret := GetFristLocalVariableFromScope(scopet, originName); ret != nil && ret.GetGlobalIndex() != originGlobalId {
+		// 	newVariable := b.CreateVariableById(originName)
+		// 	if v := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
+		// 		newVariable.SetCaptured(v)
+		// 	}
+		// 	scopet.AssignVariable(newVariable, newValue)
+		// })
+		// variable.PointHandler(value, scope)
 
-			} else {
-				scopet.AssignVariable(b.CreateVariable(originName), newValue)
-			}
+		obj := variable.object
 
-			p.SetPointHandle(func(value Value, scopett ssautil.ScopedVersionedTableIF[Value]) {
-				tmp := b.CurrentBlock.ScopeTable
-				defer func() {
-					b.CurrentBlock.ScopeTable = tmp
-				}()
-				b.CurrentBlock.ScopeTable = scopet
+		v := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@value"))
+		p := b.CreateMemberCallVariable(obj, b.EmitConstInstPlaceholder("@pointer"))
+		p.SetKind(ssautil.PointerVariable)
+		scope.AssignVariable(v, value)
+		if p.GetValue() == nil {
+			scope.AssignVariable(p, variable.GetValue())
+		}
 
-				v := b.ReadMemberCallValue(obj, b.EmitConstInstPlaceholder("@value"))
-				p := b.ReadMemberCallValue(obj, b.EmitConstInstPlaceholder("@pointer"))
+		n := strings.TrimPrefix(variable.GetValue().String(), "&")
+		originName, originGlobalId := SplitName(n)
 
-				n := strings.TrimPrefix(p.String(), "&")
-				originName, _ := SplitName(n)
+		newValue := b.CopyValue(value)
+		newValue.SetName(originName)
+		newValue.SetVerboseName(originName)
 
-				b.CurrentBlock.ScopeTable = scopett
-
-				variable := b.CreateVariable(originName)
-				newValue := b.CopyValue(v)
-				newValue.SetName(originName)
-				newValue.SetVerboseName(originName)
-				b.AssignVariable(variable, newValue)
-			})
-		})
-		variable.PointHandle(value, scope)
+		if newVariable := b.CreateVariableGlobalIndex(originName, originGlobalId); v != nil {
+			b.AssignVariable(newVariable, newValue)
+			newVariable.SetCross(true)
+		}
 	} else {
 		scope.AssignVariable(variable, value)
 	}
 
+	if val, ok := b.RefParameter[variable.GetName()]; ok {
+		b.AddForceSideEffect(variable, value, val.Index, val.Kind)
+	}
 	if value.GetName() == variable.GetName() {
 		if value.GetOpcode() == SSAOpcodeFreeValue || value.GetOpcode() == SSAOpcodeParameter {
 			return
@@ -283,10 +301,9 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			parentValue.AddOccultation(para)
 		}
 	}
-	if val, ok := b.RefParameter[variable.GetName()]; ok {
-		b.AddForceSideEffect(variable.GetName(), value, val.Index)
+	if _, ok := b.RefParameter[variable.GetName()]; !ok {
+		b.CheckMemberSideEffect(variable, value)
 	}
-	b.CheckAndSetSideEffect(variable, value)
 
 	if !value.IsExtern() || value.GetName() != variable.GetName() {
 		// if value not extern instance
@@ -307,7 +324,7 @@ func (b *FunctionBuilder) CreateVariableForce(name string, pos ...CanStartStopTo
 }
 
 func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopToken) *Variable {
-	if variable := b.getCrossScopeVariable(name); variable != nil {
+	if variable, ok := b.getCrossScopeVariable(name); ok {
 		if value := variable.GetValue(); value != nil {
 			return variable
 		}
@@ -315,8 +332,41 @@ func (b *FunctionBuilder) CreateVariableCross(name string, pos ...CanStartStopTo
 	return b.createVariableEx(name, false, pos...)
 }
 
+func (b *FunctionBuilder) CreateVariableGlobalIndex(name string, globalIndex int) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+
+	newVariable := b.CreateVariableById(name)
+	for _, v := range GetAllVariablesFromScopeAndParent(scope, name) {
+		if v.GetGlobalIndex() == globalIndex {
+			newVariable.SetCaptured(v)
+		}
+	}
+	return newVariable
+}
+
+func (b *FunctionBuilder) CreateVariableById(name string, pos ...CanStartStopToken) *Variable {
+	scope := b.CurrentBlock.ScopeTable
+
+	ret := scope.CreateVariable(name, false)
+	variable := ret.(*Variable)
+
+	r := b.CurrentRange
+	if r == nil && len(pos) > 0 {
+		r = b.GetCurrentRange(pos[0])
+	}
+	if r != nil {
+		variable.SetDefRange(r)
+	}
+	// set offset variable for program
+	program := b.GetProgram()
+	if program != nil {
+		program.SetOffsetVariable(variable, b.CurrentRange)
+	}
+	return variable
+}
+
 func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) *Variable {
-	if variable := b.getCurrentScopeVariable(name); variable != nil {
+	if variable, ok := b.getCurrentScopeVariable(name); ok {
 		if value := variable.GetValue(); value != nil {
 			if _, ok := ToConstInst(value); ok {
 				return variable
@@ -334,7 +384,9 @@ func (b *FunctionBuilder) CreateVariable(name string, pos ...CanStartStopToken) 
 
 func (b *FunctionBuilder) createVariableEx(name string, isLocal bool, pos ...CanStartStopToken) *Variable {
 	scope := b.CurrentBlock.ScopeTable
-
+	if utils.IsNil(scope) {
+		return nil
+	}
 	ret := scope.CreateVariable(name, isLocal)
 	variable := ret.(*Variable)
 
@@ -453,18 +505,18 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	return nil, false
 }
 
-func (b *FunctionBuilder) getCurrentScopeVariable(name string) *Variable {
+func (b *FunctionBuilder) getCurrentScopeVariable(name string) (*Variable, bool) {
 	scope := b.CurrentBlock.ScopeTable
 	if variable := ReadVariableFromScope(scope, name); variable != nil {
-		return variable
+		return variable, true
 	}
-	return nil
+	return nil, false
 }
 
-func (b *FunctionBuilder) getCrossScopeVariable(name string) *Variable {
+func (b *FunctionBuilder) getCrossScopeVariable(name string) (*Variable, bool) {
 	scope := b.CurrentBlock.ScopeTable
 	if variable := ReadVariableFromScopeAndParent(scope, name); variable != nil {
-		return variable
+		return variable, true
 	}
-	return nil
+	return nil, false
 }

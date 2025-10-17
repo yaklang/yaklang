@@ -22,6 +22,7 @@ func GetYakScript(fs embed.FS, name string) (string, error) {
 
 type YakScriptMetadata struct {
 	Name        string
+	VerboseName string
 	Description string
 	Keywords    []string
 }
@@ -50,8 +51,23 @@ func ParseYakScriptMetadataProg(name string, prog *ssaapi.Program) (*YakScriptMe
 		}
 		keywords = append(keywords, strings.Split(data, ",")...)
 	})
+	// __VERBOSE_NAME__
+	var verboseName string
+	prog.Ref("__VERBOSE_NAME__").ForEach(func(value *ssaapi.Value) {
+		if !value.IsConstInst() {
+			return
+		}
+		data, err := strconv.Unquote(value.String())
+		if err != nil {
+			data = value.String()
+		}
+		if verboseName == "" {
+			verboseName = data
+		}
+	})
 	return &YakScriptMetadata{
 		Name:        name,
+		VerboseName: verboseName,
 		Description: strings.Join(desc, "; "),
 		Keywords:    keywords,
 	}, nil

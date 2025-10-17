@@ -6,66 +6,60 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   在Java应用程序中，异常处理是必不可少的部分。`printStackTrace()`方法是Exception类的一个常用方法，它会将异常的详细信息，包括异常类型、异常发生的位置（类名、方法名、行号）以及完整的异常调用堆栈打印到标准错误输出或指定的输出流。在开发和调试阶段，这对于定位问题非常有用。
-
-   然而，在生产环境中，直接将异常堆栈信息暴露给用户或日志系统（如果日志系统未正确配置）可能导致敏感信息泄露。异常堆栈可能包含有关应用程序内部结构、使用的库版本、文件路径、数据库连接信息（如果异常发生在数据库操作时）或其他业务敏感信息。这些信息可能被恶意攻击者利用来了解应用程序的弱点或进行进一步的攻击，例如路径遍历、信息收集甚至远程代码执行（如果结合其他漏洞）。
+在Java应用程序中，异常处理是必不可少的部分。`printStackTrace()`方法是Exception类的一个常用方法，它会将异常的详细信息，包括异常类型、异常发生的位置（类名、方法名、行号）以及完整的异常调用堆栈打印到标准错误输出或指定的输出流。在开发和调试阶段，这对于定位问题非常有用。
+然而，在生产环境中，直接将异常堆栈信息暴露给用户或日志系统（如果日志系统未正确配置）可能导致敏感信息泄露。异常堆栈可能包含有关应用程序内部结构、使用的库版本、文件路径、数据库连接信息（如果异常发生在数据库操作时）或其他业务敏感信息。这些信息可能被恶意攻击者利用来了解应用程序的弱点或进行进一步的攻击，例如路径遍历、信息收集甚至远程代码执行（如果结合其他漏洞）。
 
 2. **触发场景**
-   当程序发生异常时，如果在异常处理逻辑中直接调用了`printStackTrace()`方法，并且该输出信息没有被适当限制或屏蔽，就可能导致信息泄露。这常见于以下场景：
-   - 全局异常处理器中直接调用`e.printStackTrace()`。
-   - 在单个`try-catch`块中捕获异常后直接调用`e.printStackTrace()`。
-   - 将生产服务器的标准错误输出重定向到用户可见的日志文件或直接显示在页面上。
-
-   ```java
-   // 存在风险的代码示例
-   @RestControllerAdvice
-   @Slf4j
-   public class GlobalExceptionHandler {
-      @ExceptionHandler(MyException.class)
-       public Result error(MyException e){
-           log.error(e.getMessage());
-           e.printStackTrace(); // 直接打印堆栈信息
-           return Result.error().code(e.getCode()).message(e.getMsg());
-       }
-   }
-   ```
-   在这个示例中，当`MyException`发生时，完整的异常堆栈信息会被打印出来，如果这个信息被用户获取，就可能造成信息泄露。
+当程序发生异常时，如果在异常处理逻辑中直接调用了`printStackTrace()`方法，并且该输出信息没有被适当限制或屏蔽，就可能导致信息泄露。这常见于以下场景：
+- 全局异常处理器中直接调用`e.printStackTrace()`。
+- 在单个`try-catch`块中捕获异常后直接调用`e.printStackTrace()`。
+- 将生产服务器的标准错误输出重定向到用户可见的日志文件或直接显示在页面上。
+```java
+// 存在风险的代码示例
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+    @ExceptionHandler(MyException.class)
+    public Result error(MyException e){
+        log.error(e.getMessage());
+        e.printStackTrace(); // 直接打印堆栈信息
+        return Result.error().code(e.getCode()).message(e.getMsg());
+    }
+}
+```
+在这个示例中，当`MyException`发生时，完整的异常堆栈信息会被打印出来，如果这个信息被用户获取，就可能造成信息泄露。
 
 3. **潜在影响**
-   - 应用程序的内部架构和技术细节被攻击者窥探。
-   - 文件系统路径、数据库连接信息、内部API调用等敏感配置信息泄露。
-   - 帮助攻击者识别应用程序存在的其他潜在漏洞（如特定的库版本漏洞）。
-   - 在某些情况下，结合其他技术手段，可能导致更严重的攻击，如数据泄露或系统控制权的获取。
+- 应用程序的内部架构和技术细节被攻击者窥探。
+- 文件系统路径、数据库连接信息、内部API调用等敏感配置信息泄露。
+- 帮助攻击者识别应用程序存在的其他潜在漏洞（如特定的库版本漏洞）。
+- 在某些情况下，结合其他技术手段，可能导致更严重的攻击，如数据泄露或系统控制权的获取。
 DESC
 	rule_id: "833b8047-ac75-4834-adc9-d36a2216357f"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用日志框架记录异常**
-   在生产环境中，应该使用成熟的日志框架（如Logback、Log4j2）来记录异常信息，而不是直接使用`printStackTrace()`。日志框架提供了灵活的配置选项，可以控制日志的输出级别、输出目标（文件、控制台、远程服务）、日志格式等。在记录异常时，通常会记录异常类型、消息，日志框架会自动包含堆栈信息，但这些信息应该只输出到安全、受控的日志文件中，而不是直接暴露给终端用户。
-   ```java
-   // 修复代码示例：使用日志框架
-   @RestControllerAdvice
-   @Slf4j
-   public class GlobalExceptionHandler {
-      @ExceptionHandler(MyException.class)
-       public Result error(MyException e){
-           // 使用日志框架记录异常，日志级别可根据实际情况调整
-           log.error("An error occurred: {}", e.getMessage(), e); // 将异常对象作为最后一个参数传递，日志框架会自动记录堆栈
-           // 向用户返回一个友好的错误信息，不包含内部异常细节
-           return Result.error().code(e.getCode()).message("服务器内部错误，请稍后再试。");
-       }
-   }
-   ```
-
+在生产环境中，应该使用成熟的日志框架（如Logback、Log4j2）来记录异常信息，而不是直接使用`printStackTrace()`。日志框架提供了灵活的配置选项，可以控制日志的输出级别、输出目标（文件、控制台、远程服务）、日志格式等。在记录异常时，通常会记录异常类型、消息，日志框架会自动包含堆栈信息，但这些信息应该只输出到安全、受控的日志文件中，而不是直接暴露给终端用户。
+```java
+// 修复代码示例：使用日志框架
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+    @ExceptionHandler(MyException.class)
+    public Result error(MyException e){
+        // 使用日志框架记录异常，日志级别可根据实际情况调整
+        log.error("An error occurred: {}", e.getMessage(), e); // 将异常对象作为最后一个参数传递，日志框架会自动记录堆栈
+        // 向用户返回一个友好的错误信息，不包含内部异常细节
+        return Result.error().code(e.getCode()).message("服务器内部错误，请稍后再试。");
+    }
+}
+```
 2. **向用户返回通用错误信息**
-   向用户返回的错误信息应该尽量通用和友好，不包含任何内部技术细节。可以为用户提供一个错误参考ID，以便内部人员根据ID查询详细的日志信息。
-
+向用户返回的错误信息应该尽量通用和友好，不包含任何内部技术细节。可以为用户提供一个错误参考ID，以便内部人员根据ID查询详细的日志信息。
 3. **配置日志级别和输出**
-   在生产环境的日志配置中，确保敏感级别的异常堆栈只输出到安全的文件或日志收集系统。避免将详细的异常信息直接打印到控制台或Web页面上。
-
+在生产环境的日志配置中，确保敏感级别的异常堆栈只输出到安全的文件或日志收集系统。避免将详细的异常信息直接打印到控制台或Web页面上。
 4. **自定义异常处理**
-   对于特定的业务异常，可以创建自定义异常类，并为这些异常提供更具业务含义的错误信息，避免暴露底层技术细节。
+对于特定的业务异常，可以创建自定义异常类，并为这些异常提供更具业务含义的错误信息，避免暴露底层技术细节。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-209: Information Exposure Through An Error Message](https://cwe.mitre.org/data/definitions/209.html)
@@ -77,10 +71,65 @@ check $sink then "发现PrintStackTrace打印异常堆栈信息"
 alert $sink for {
 	level: "low",
 	message: "通过PrintStackTrace泄露信息",
-	severity: "low",
-	risk: "info-exposure",
+	risk: "信息泄露",
 	title: "Check Java Information Exposure Through PrintStackTrace",
 	title_zh: "检查Java通过PrintStackTrace泄露信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在Java应用程序中，异常处理是必不可少的部分。`printStackTrace()`方法是Exception类的一个常用方法，它会将异常的详细信息，包括异常类型、异常发生的位置（类名、方法名、行号）以及完整的异常调用堆栈打印到标准错误输出或指定的输出流。在开发和调试阶段，这对于定位问题非常有用。
+然而，在生产环境中，直接将异常堆栈信息暴露给用户或日志系统（如果日志系统未正确配置）可能导致敏感信息泄露。异常堆栈可能包含有关应用程序内部结构、使用的库版本、文件路径、数据库连接信息（如果异常发生在数据库操作时）或其他业务敏感信息。这些信息可能被恶意攻击者利用来了解应用程序的弱点或进行进一步的攻击，例如路径遍历、信息收集甚至远程代码执行（如果结合其他漏洞）。
+2. **触发场景**
+当程序发生异常时，如果在异常处理逻辑中直接调用了`printStackTrace()`方法，并且该输出信息没有被适当限制或屏蔽，就可能导致信息泄露。这常见于以下场景：
+- 全局异常处理器中直接调用`e.printStackTrace()`。
+- 在单个`try-catch`块中捕获异常后直接调用`e.printStackTrace()`。
+- 将生产服务器的标准错误输出重定向到用户可见的日志文件或直接显示在页面上。
+```java
+// 存在风险的代码示例
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+@ExceptionHandler(MyException.class)
+public Result error(MyException e){
+log.error(e.getMessage());
+e.printStackTrace(); // 直接打印堆栈信息
+return Result.error().code(e.getCode()).message(e.getMsg());
+}
+}
+```
+在这个示例中，当`MyException`发生时，完整的异常堆栈信息会被打印出来，如果这个信息被用户获取，就可能造成信息泄露。
+3. **潜在影响**
+- 应用程序的内部架构和技术细节被攻击者窥探。
+- 文件系统路径、数据库连接信息、内部API调用等敏感配置信息泄露。
+- 帮助攻击者识别应用程序存在的其他潜在漏洞（如特定的库版本漏洞）。
+- 在某些情况下，结合其他技术手段，可能导致更严重的攻击，如数据泄露或系统控制权的获取。
+DESC
+	name: "sink",
+	solution: <<<SOLUTION
+### 修复建议
+1. **使用日志框架记录异常**
+在生产环境中，应该使用成熟的日志框架（如Logback、Log4j2）来记录异常信息，而不是直接使用`printStackTrace()`。日志框架提供了灵活的配置选项，可以控制日志的输出级别、输出目标（文件、控制台、远程服务）、日志格式等。在记录异常时，通常会记录异常类型、消息，日志框架会自动包含堆栈信息，但这些信息应该只输出到安全、受控的日志文件中，而不是直接暴露给终端用户。
+```java
+// 修复代码示例：使用日志框架
+@RestControllerAdvice
+@Slf4j
+public class GlobalExceptionHandler {
+@ExceptionHandler(MyException.class)
+public Result error(MyException e){
+// 使用日志框架记录异常，日志级别可根据实际情况调整
+log.error("An error occurred: {}", e.getMessage(), e); // 将异常对象作为最后一个参数传递，日志框架会自动记录堆栈
+// 向用户返回一个友好的错误信息，不包含内部异常细节
+return Result.error().code(e.getCode()).message("服务器内部错误，请稍后再试。");
+}
+}
+```
+2. **向用户返回通用错误信息**
+向用户返回的错误信息应该尽量通用和友好，不包含任何内部技术细节。可以为用户提供一个错误参考ID，以便内部人员根据ID查询详细的日志信息。
+3. **配置日志级别和输出**
+在生产环境的日志配置中，确保敏感级别的异常堆栈只输出到安全的文件或日志收集系统。避免将详细的异常信息直接打印到控制台或Web页面上。
+4. **自定义异常处理**
+对于特定的业务异常，可以创建自定义异常类，并为这些异常提供更具业务含义的错误信息，避免暴露底层技术细节。
+SOLUTION
 }
 
 desc(
@@ -98,4 +147,88 @@ public class GlobalExceptionHandler {
     }
 }
 UNSAFE
+	"safefile://SafeGlobalExceptionHandler.java": <<<CODE
+// 修复代码示例：使用日志框架记录异常，不直接暴露printStackTrace
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+public class SafeGlobalExceptionHandler {
+    private static final Logger log = LoggerFactory.getLogger(SafeGlobalExceptionHandler.class);
+
+    @ExceptionHandler(MyException.class)
+    public Result error(MyException e) {
+        // 使用日志框架记录异常，将异常对象作为最后一个参数传递，日志框架会自动记录堆栈，但不会直接输出到用户可见的界面
+        log.error("An application error occurred: {}. Error code: {}", e.getMessage(), e.getCode(), e);
+        // 向用户返回一个友好的错误信息，不包含内部异常细节
+        return Result.error().code(e.getCode()).message("服务器内部错误，请稍后再试。");
+    }
+
+    // 模拟的Result类，用于示例
+    static class Result {
+        private int code;
+        private String message;
+
+        public static Result error() {
+            return new Result();
+        }
+
+        public Result code(int code) {
+            this.code = code;
+            return this;
+        }
+
+        public Result message(String message) {
+            this.message = message;
+            return this;
+        }
+    }
+
+    // 模拟的MyException类，用于示例
+    static class MyException extends RuntimeException {
+        private int code;
+
+        public MyException(String message, int code) {
+            super(message);
+            this.code = code;
+        }
+
+        public int getCode() {
+            return code;
+        }
+    }
+}
+CODE
+	"safefile://SafeTryCatchBlock.java": <<<CODE
+// 安全的try-catch块：只记录错误到日志，不进行printStackTrace()
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class SafeTryCatchBlock {
+    private static final Logger log = LoggerFactory.getLogger(SafeTryCatchBlock.class);
+
+    public void performOperation() {
+        try {
+            // 模拟可能抛出异常的操作
+            int result = 10 / 0; // 这将导致ArithmeticException
+            System.out.println(result);
+        } catch (ArithmeticException e) {
+            // 使用日志框架记录异常，而不是直接printStackTrace()
+            log.error("Arithmetic error occurred: {}", e.getMessage(), e);
+            // 可以选择抛出自定义业务异常或进行其他安全处理
+            // throw new CustomBusinessException("Calculation failed", e);
+        } catch (Exception e) {
+            // 捕获更广泛的异常，同样使用日志记录
+            log.error("An unexpected error occurred: {}", e.getMessage(), e);
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeTryCatchBlock example = new SafeTryCatchBlock();
+        example.performOperation();
+    }
+}
+CODE
 )

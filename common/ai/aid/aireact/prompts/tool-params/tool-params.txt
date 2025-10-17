@@ -1,0 +1,50 @@
+# Tool Parameter Generation
+{{ if .DynamicContext }}{{ .DynamicContext }} {{end}}
+You need to generate parameters for the tool '{{ .ToolName }}'.
+
+Tool Description: {{ .ToolDescription }}
+
+{{ if .ToolSchema }}Tool Schema:
+```json
+{{ .ToolSchema }}
+```
+{{ end }}
+
+{{ if .OriginalQuery }}# Original User Query
+User's original request: {{ .OriginalQuery }}
+{{ end }}
+
+{{ if .CumulativeSummary }}# Task Context & Memory
+Overall task context: {{ .CumulativeSummary }}
+{{ end }}
+
+# Task Progress
+Current iteration: {{ .CurrentIteration }}/{{ .MaxIterations }}
+This tool call is part of a multi-step ReAct process. Consider how this tool execution contributes to completing the overall user task.
+
+{{ if .Timeline }}# Recent Timeline
+{{ .Timeline }}
+{{ end }}
+
+# Instructions
+Generate appropriate parameters for this tool call based on the context above.
+
+IMPORTANT CONSIDERATIONS:
+- Consider the original user query and overall task context when generating parameters
+- This tool execution should contribute to completing the user's original request
+- The cumulative summary contains the evolving context - use this to understand what has been accomplished so far
+- After this tool execution, the ReAct loop will determine if the task is complete or if further actions are needed
+- Generate parameters that will produce meaningful results toward task completion
+
+RESPONSE FORMAT: Respond with a JSON object following the @action pattern(Example):
+
+```json
+{
+  "@action": "call-tool",
+  "tool": "toolname_yet",
+  "params": {
+    "param1": "value1",
+    "param2": "value2"
+  }
+}
+```

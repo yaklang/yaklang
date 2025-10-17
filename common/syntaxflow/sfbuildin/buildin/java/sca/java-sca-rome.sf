@@ -4,53 +4,45 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XXE（XML外部实体注入）漏洞源于应用程序在解析XML输入时，未禁用外部实体引用功能。攻击者可以通过在XML文件中定义或引用外部实体，使得解析器加载并处理外部资源，如本地文件、外部URL等。在易受攻击的环境中，这可能导致服务器文件内容泄露、内网端口扫描、执行外部命令（如果配置允许）或拒绝服务攻击。
-
+XXE（XML外部实体注入）漏洞源于应用程序在解析XML输入时，未禁用外部实体引用功能。攻击者可以通过在XML文件中定义或引用外部实体，使得解析器加载并处理外部资源，如本地文件、外部URL等。在易受攻击的环境中，这可能导致服务器文件内容泄露、内网端口扫描、执行外部命令（如果配置允许）或拒绝服务攻击。
 2. **触发场景**
-   Apache Rome库在处理包含外部实体引用的XML RSS或Atom Feeds时，若未正确配置XML解析器禁用外部实体，则存在XXE漏洞。攻击者可构造恶意的Feed内容，诱导应用解析，加载恶意外部实体。受影响的版本为1.0到1.15.0。
-
-   示例（概念）：
-   ```xml
-   <?xml version="1.0" encoding="ISO-8859-1"?>
-   <!DOCTYPE foo [
-     <!ELEMENT foo ANY>
-     <!ENTITY xxe SYSTEM "file:///etc/passwd">
-   ]>
-   <feed>
-     <title>&xxe;</title>
-     ...
-   </feed>
-   ```
-   当使用受影响版本的Rome库解析此Feed时，若未禁用外部实体，解析器可能尝试读取 `/etc/passwd` 文件内容并将其插入到 `title` 标签中，从而导致信息泄露。
-
+Apache Rome库在处理包含外部实体引用的XML RSS或Atom Feeds时，若未正确配置XML解析器禁用外部实体，则存在XXE漏洞。攻击者可构造恶意的Feed内容，诱导应用解析，加载恶意外部实体。受影响的版本为1.0到1.15.0。
+示例（概念）：
+```xml
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE foo [
+<!ELEMENT foo ANY>
+<!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<feed>
+<title>&xxe;</title>
+...
+</feed>
+```
+当使用受影响版本的Rome库解析此Feed时，若未禁用外部实体，解析器可能尝试读取 `/etc/passwd` 文件内容并将其插入到 `title` 标签中，从而导致信息泄露。
 3. **潜在影响**
-   - **信息泄露**: 读取服务器上的任意文件，包括配置文件、源代码、敏感凭据等。
-   - **内网端口扫描**: 通过构建特定的URI，探测内网服务。
-   - **拒绝服务**: 通过递归引用或加载大文件耗尽系统资源。
-   - **远程代码执行**: 如果服务器环境允许，结合其他漏洞或配置错误可能导致远程代码执行。
+- **信息泄露**: 读取服务器上的任意文件，包括配置文件、源代码、敏感凭据等。
+- **内网端口扫描**: 通过构建特定的URI，探测内网服务。
+- **拒绝服务**: 通过递归引用或加载大文件耗尽系统资源。
+- **远程代码执行**: 如果服务器环境允许，结合其他漏洞或配置错误可能导致远程代码执行。
 DESC
 	rule_id: "b1dde704-ebb1-4f6e-b95c-b50670da230f"
 	title_zh: "SCA: 检测Java rome XXE漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Rome 库版本
 将 Apache Rome 库升级到已修复 XXE 漏洞的版本。官方在 1.16.0 版本及更高版本中默认禁用了外部实体解析，从而有效地阻止了此类攻击。
-
 ```java
 // Maven dependency update example
 <dependency>
-    <groupId>com.rometools</groupId>
-    <artifactId>rome</artifactId>
-    <version>1.16.0</version> <!-- 或者更高版本 -->
+<groupId>com.rometools</groupId>
+<artifactId>rome</artifactId>
+<version>1.16.0</version> <!-- 或者更高版本 -->
 </dependency>
 ```
-
 #### 2. 显式禁用 XML 解析器中的外部实体功能（针对旧版本或需要自定义解析器的场景）
 即使升级库版本是首选方法，但在某些情况下，如果必须使用旧版本或需要自定义XML解析逻辑，应显式配置解析器以禁用外部实体、DTD解析和外部schema加载。
-
 ```java
 // 使用 SAXParserFactory 配置示例
 SAXParserFactory spf = SAXParserFactory.newInstance();
@@ -62,7 +54,6 @@ SAXParser saxParser = spf.newSAXParser();
 XMLReader xmlReader = saxParser.getXMLReader();
 // 使用配置好的 xmlReader 处理 XML 输入
 ```
-
 ```java
 // 使用 DocumentBuilderFactory 配置示例
 DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -74,10 +65,8 @@ dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true); //
 DocumentBuilder db = dbf.newDocumentBuilder();
 // 使用配置好的 db 处理 XML 输入
 ```
-
 #### 3. 限制或验证输入
 如果可能，对接收到的XML输入进行严格的验证或解析前进行过滤，确保不包含恶意的实体引用。
-
 #### 4. 最小化权限
 运行应用程序的用户应具有最小化的文件系统和网络访问权限，以限制即使发生XXE攻击时的潜在损害。
 SOLUTION
@@ -96,4 +85,72 @@ alert $vuln_rome for {
 	cve: "CVE-2020-15250",
 	title: "SCA: Check Java rome XXE Vulnerability",
 	title_zh: "SCA: 检测Java rome XXE漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 升级 Rome 库版本
+将 Apache Rome 库升级到已修复 XXE 漏洞的版本。官方在 1.16.0 版本及更高版本中默认禁用了外部实体解析，从而有效地阻止了此类攻击。
+```java
+// Maven dependency update example
+<dependency>
+<groupId>com.rometools</groupId>
+<artifactId>rome</artifactId>
+<version>1.16.0</version> <!-- 或者更高版本 -->
+</dependency>
+```
+#### 2. 显式禁用 XML 解析器中的外部实体功能（针对旧版本或需要自定义解析器的场景）
+即使升级库版本是首选方法，但在某些情况下，如果必须使用旧版本或需要自定义XML解析逻辑，应显式配置解析器以禁用外部实体、DTD解析和外部schema加载。
+```java
+// 使用 SAXParserFactory 配置示例
+SAXParserFactory spf = SAXParserFactory.newInstance();
+spf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+spf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+spf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+spf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true); // 禁用 DOCTYPE 声明
+SAXParser saxParser = spf.newSAXParser();
+XMLReader xmlReader = saxParser.getXMLReader();
+// 使用配置好的 xmlReader 处理 XML 输入
+```
+```java
+// 使用 DocumentBuilderFactory 配置示例
+DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+dbf.setExpandEntityReferences(false); // 禁用实体引用扩展
+dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+dbf.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true); // 禁用 DOCTYPE 声明
+DocumentBuilder db = dbf.newDocumentBuilder();
+// 使用配置好的 db 处理 XML 输入
+```
+#### 3. 限制或验证输入
+如果可能，对接收到的XML输入进行严格的验证或解析前进行过滤，确保不包含恶意的实体引用。
+#### 4. 最小化权限
+运行应用程序的用户应具有最小化的文件系统和网络访问权限，以限制即使发生XXE攻击时的潜在损害。
+SOLUTION
+	risk: "XXE",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+XXE（XML外部实体注入）漏洞源于应用程序在解析XML输入时，未禁用外部实体引用功能。攻击者可以通过在XML文件中定义或引用外部实体，使得解析器加载并处理外部资源，如本地文件、外部URL等。在易受攻击的环境中，这可能导致服务器文件内容泄露、内网端口扫描、执行外部命令（如果配置允许）或拒绝服务攻击。
+2. **触发场景**
+Apache Rome库在处理包含外部实体引用的XML RSS或Atom Feeds时，若未正确配置XML解析器禁用外部实体，则存在XXE漏洞。攻击者可构造恶意的Feed内容，诱导应用解析，加载恶意外部实体。受影响的版本为1.0到1.15.0。
+示例（概念）：
+```xml
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE foo [
+<!ELEMENT foo ANY>
+<!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<feed>
+<title>&xxe;</title>
+...
+</feed>
+```
+当使用受影响版本的Rome库解析此Feed时，若未禁用外部实体，解析器可能尝试读取 `/etc/passwd` 文件内容并将其插入到 `title` 标签中，从而导致信息泄露。
+3. **潜在影响**
+- **信息泄露**: 读取服务器上的任意文件，包括配置文件、源代码、敏感凭据等。
+- **内网端口扫描**: 通过构建特定的URI，探测内网服务。
+- **拒绝服务**: 通过递归引用或加载大文件耗尽系统资源。
+- **远程代码执行**: 如果服务器环境允许，结合其他漏洞或配置错误可能导致远程代码执行。
+DESC
+	name: "vuln_rome",
 }

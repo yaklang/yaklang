@@ -5,41 +5,33 @@ desc(
 	lib: 'golang-os-exec'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在Go语言中，`os/exec`包用于执行外部命令。如果开发者直接将不受信任的用户输入传递给`exec.Command`函数，则可能导致命令注入漏洞。攻击者可以通过控制输入参数，插入恶意命令并执行，从而危害系统安全。
-
+在Go语言中，`os/exec`包用于执行外部命令。如果开发者直接将不受信任的用户输入传递给`exec.Command`函数，则可能导致命令注入漏洞。攻击者可以通过控制输入参数，插入恶意命令并执行，从而危害系统安全。
 2. **触发场景**
-   ```go
+```go
 package main
-
 import (
-	"fmt"
-	"os/exec"
+    "fmt"
+    "os/exec"
 )
-
 func main() {
-	// 创建一个命令
-	cmd := exec.Command("ls", "-l") // 在 Unix/Linux 系统中，使用 "dir" 对于 Windows 系统
-
-	// 执行命令并获取输出
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	// 打印输出
-	fmt.Println(string(output))
+    // 创建一个命令
+    cmd := exec.Command("ls", "-l") // 在 Unix/Linux 系统中，使用 "dir" 对于 Windows 系统
+    // 执行命令并获取输出
+    output, err := cmd.Output()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    // 打印输出
+    fmt.Println(string(output))
 }
 ```
-   如果用户能够控制`exec.Command`的第一个或第二个参数（例如通过动态拼接字符串），则可能引入命令注入风险。
-
+如果用户能够控制`exec.Command`的第一个或第二个参数（例如通过动态拼接字符串），则可能引入命令注入风险。
 3. **潜在影响**
-   - 攻击者可以执行任意命令，导致系统被入侵。
-   - 可能泄露敏感信息或导致数据被篡改。
-   - 系统稳定性受到影响，可能导致服务中断。
-
+- 攻击者可以执行任意命令，导致系统被入侵。
+- 可能泄露敏感信息或导致数据被篡改。
+- 系统稳定性受到影响，可能导致服务中断。
 DESC
 	rule_id: "c56c4a74-1d8a-4f91-a10f-11394b58506a"
 	reference: <<<REFERENCE
@@ -48,144 +40,132 @@ REFERENCE
 	title_zh: "审计Golang OS Exec命令使用"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化命令
 通过使用参数化命令，避免直接将用户输入拼接到命令中，从而减少命令注入的风险。
 ```go
 func safeCommand(input string) {
-	cmd := exec.Command("program", input)
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+    cmd := exec.Command("program", input)
+    output, err := cmd.Output()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println(string(output))
 }
 ```
-
 #### 2. 输入验证
 对用户输入进行严格的验证，确保输入符合预期的格式和范围。
 ```go
 func validateInput(input string) bool {
-	// 示例：验证输入只包含字母和数字
-	return regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(input)
+    // 示例：验证输入只包含字母和数字
+    return regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(input)
 }
 ```
-
 #### 3. 使用安全库
 考虑使用更安全的库来执行外部命令，例如使用`shlex`库来处理命令参数。
 ```go
 import "github.com/alecthomas/shlex"
-
 func safeExec(input string) {
-	args, err := shlex.Split(input)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	cmd := exec.Command(args[0], args[1:]...)
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+    args, err := shlex.Split(input)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    cmd := exec.Command(args[0], args[1:]...)
+    output, err := cmd.Output()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println(string(output))
 }
 ```
 SOLUTION
 )
 
 exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
-$entry.Command(* as $output) 
+$entry.Command(* #-> as $output) 
 
 alert $output for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化命令
 通过使用参数化命令，避免直接将用户输入拼接到命令中，从而减少命令注入的风险。
 ```go
 func safeCommand(input string) {
-	cmd := exec.Command("program", input)
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+    cmd := exec.Command("program", input)
+    output, err := cmd.Output()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println(string(output))
 }
 ```
-
 #### 2. 输入验证
 对用户输入进行严格的验证，确保输入符合预期的格式和范围。
 ```go
 func validateInput(input string) bool {
-	// 示例：验证输入只包含字母和数字
-	return regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(input)
+    // 示例：验证输入只包含字母和数字
+    return regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(input)
 }
 ```
-
 #### 3. 使用安全库
 考虑使用更安全的库来执行外部命令，例如使用`shlex`库来处理命令参数。
 ```go
 import "github.com/alecthomas/shlex"
-
 func safeExec(input string) {
-	args, err := shlex.Split(input)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	cmd := exec.Command(args[0], args[1:]...)
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-	fmt.Println(string(output))
+    args, err := shlex.Split(input)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    cmd := exec.Command(args[0], args[1:]...)
+    output, err := cmd.Output()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    fmt.Println(string(output))
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在Go语言中，`os/exec`包用于执行外部命令。如果应用程序直接将用户输入拼接到命令字符串中而未进行适当的过滤或参数化处理，攻击者可能通过构造特殊输入篡改原始命令逻辑。这可能导致任意代码执行的问题，威胁系统的安全性。
-
+在Go语言中，`os/exec`包用于执行外部命令。如果应用程序直接将用户输入拼接到命令字符串中而未进行适当的过滤或参数化处理，攻击者可能通过构造特殊输入篡改原始命令逻辑。这可能导致任意代码执行的问题，威胁系统的安全性。
 2. **触发场景**
-   ```go
+```go
 package main
-
 import (
-	"fmt"
-	"os/exec"
+    "fmt"
+    "os/exec"
 )
-
 func main() {
-	// 创建一个命令
-	cmd := exec.Command("ls", "-l") // 在 Unix/Linux 系统中，使用 "dir" 对于 Windows 系统
-
-	// 执行命令并获取输出
-	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return
-	}
-
-	// 打印输出
-	fmt.Println(string(output))
+    // 创建一个命令
+    cmd := exec.Command("ls", "-l") // 在 Unix/Linux 系统中，使用 "dir" 对于 Windows 系统
+    // 执行命令并获取输出
+    output, err := cmd.Output()
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    // 打印输出
+    fmt.Println(string(output))
 }
 ```
 攻击者可以通过控制输入参数（如提供`; rm -rf /`）插入恶意命令，进一步危害系统。
-
 3. **潜在影响**
-   - 攻击者可以执行任意命令，导致系统被入侵。
-   - 可能泄露敏感信息或导致数据被篡改。
-   - 影响系统稳定性，可能导致服务中断。
-CODE
+- 攻击者可以执行任意命令，导致系统被入侵。
+- 可能泄露敏感信息或导致数据被篡改。
+- 影响系统稳定性，可能导致服务中断。
+DESC
 	level: "high",
-	title: "Unvalidated Command Execution",
-	title_zh: "未验证的命令执行",
+	title: "Golang Command Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang命令注入漏洞",
+	message: "检测到Go语言中os/exec包的未验证命令执行漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "命令注入",
+	name: "output",
 }
 
 desc(

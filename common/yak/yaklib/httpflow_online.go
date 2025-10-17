@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"sync"
 )
 
 type QueryHTTPFlowOnlineRequest struct {
@@ -17,6 +18,30 @@ type QueryHTTPFlowOnlineRequest struct {
 	ProjectDescription  string `json:"projectDescription"`
 	ExternalModule      string `json:"externalModule"`
 	ExternalProjectCode string `json:"externalProjectCode"`
+}
+
+var (
+	syncMu   sync.Mutex
+	syncing  bool
+	syncTask string // "auto" or "manual"
+)
+
+func StartSync(taskType string) (bool, string) {
+	syncMu.Lock()
+	defer syncMu.Unlock()
+	if syncing {
+		return false, syncTask
+	}
+	syncing = true
+	syncTask = taskType
+	return true, syncTask
+}
+
+func EndSync() {
+	syncMu.Lock()
+	defer syncMu.Unlock()
+	syncing = false
+	syncTask = ""
 }
 
 func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, params *ypb.HTTPFlowsToOnlineRequest, content []byte) error {
@@ -37,6 +62,7 @@ func (s *OnlineClient) UploadHTTPFlowToOnline(ctx context.Context, params *ypb.H
 		poc.WithReplaceHttpPacketHeader("Content-Type", "application/json"),
 		poc.WithReplaceHttpPacketBody(raw, true),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
+		poc.WithSave(false),
 	)
 	if err != nil {
 		return utils.Wrapf(err, "UploadToOnline failed: http error")

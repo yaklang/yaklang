@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/samber/lo"
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -12,10 +13,10 @@ import (
 )
 
 type anInstruction struct {
-	fun   Value
+	fun   *Function
 	prog  *Program
-	block Instruction
-	R     memedit.RangeIf
+	block *BasicBlock
+	R     *memedit.Range
 	// scope *Scope
 
 	name        string
@@ -25,9 +26,28 @@ type anInstruction struct {
 	isAnnotation bool
 	isExtern     bool
 	isFromDB     bool
+
+	// str               string
+	// readableName      string
+	// readableNameShort string
 }
 
 var _ Instruction = (*anInstruction)(nil)
+
+func (v *anInstruction) RefreshString() {
+	inst := v.Self()
+	if utils.IsNil(inst) {
+		return
+	}
+	if op := inst.GetOpcode(); op == SSAOpcodeFunction || op == SSAOpcodeBasicBlock {
+		// v.str = "[" + inst.GetOpcode().String() + "]" + inst.GetName()
+	} else {
+		// v.str = inst.String()
+		// v.readableName = LineDisASM(inst)
+	}
+
+	// v.readableNameShort = LineShortDisASM(inst)
+}
 
 func (v *anInstruction) GetSourceCode() string {
 	r := v.GetRange()
@@ -83,13 +103,17 @@ func (i *anInstruction) IsFromDB() bool { return i.isFromDB }
 func (i *anInstruction) SetIsFromDB(b bool) { i.isFromDB = b }
 
 func (i *anInstruction) Self() Instruction {
-	return i
+	inst, _ := i.GetProgram().GetInstructionById(i.GetId())
+	return inst
 }
 
 func (i *anInstruction) ReplaceValue(Value, Value) {
 }
 
 func (i *anInstruction) GetVerboseName() string {
+	if utils.IsNil(i) {
+		return ""
+	}
 	if i.verboseName != "" {
 		return i.verboseName
 	}
@@ -100,6 +124,9 @@ func (i *anInstruction) GetVerboseName() string {
 }
 
 func (i *anInstruction) GetShortVerboseName() string {
+	if utils.IsNil(i) {
+		return ""
+	}
 	if i.name != "" {
 		return i.name
 	}
@@ -110,8 +137,8 @@ func (i *anInstruction) SetVerboseName(verbose string) {
 	i.verboseName = verbose
 }
 
-func NewInstruction() anInstruction {
-	return anInstruction{
+func NewInstruction() *anInstruction {
+	return &anInstruction{
 		id: -1,
 	}
 }
@@ -173,14 +200,14 @@ func (a *anInstruction) GetBlock() *BasicBlock {
 }
 
 // source code position
-func (c *anInstruction) GetRange() memedit.RangeIf {
+func (c *anInstruction) GetRange() *memedit.Range {
 	if c.R != nil {
 		return c.R
 	}
 	return nil
 }
 
-func (c *anInstruction) SetRange(pos memedit.RangeIf) {
+func (c *anInstruction) SetRange(pos *memedit.Range) {
 	// if c.Pos == nil {
 	c.R = pos
 	// }
@@ -206,8 +233,18 @@ func (c *anInstruction) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 // func (a *anInstruction) SetScope(s *Scope) { a.scope = s }
 
 // variable
-func (a *anInstruction) SetName(v string) { a.name = v }
-func (a *anInstruction) GetName() string  { return a.name }
+func (a *anInstruction) SetName(v string) {
+	if utils.IsNil(a) {
+		return
+	}
+	a.name = v
+}
+func (a *anInstruction) GetName() string {
+	if utils.IsNil(a) {
+		return ""
+	}
+	return a.name
+}
 
 // id
 func (a *anInstruction) SetId(id int64) { a.id = id }
@@ -225,27 +262,33 @@ func (a *anInstruction) LineDisasm() string { return "" }
 func (a *anInstruction) GetOpcode() Opcode { return SSAOpcodeUnKnow } // cover by instruction
 
 func (a *anInstruction) String() string {
-	this := a.GetValueById(a.GetId())
+	this, ok := a.GetValueById(a.GetId())
+	if !ok {
+		return ""
+	}
 	return fmt.Sprintf("Instruction: %s %s", SSAOpcode2Name[this.GetOpcode()], this.GetName())
 }
 
 var _ Instruction = (*anInstruction)(nil)
 
 type anValue struct {
-	anInstruction
+	*anInstruction
 
 	typ      Type
 	userList []int64
 
-	object int64
-	key    int64
-	member *omap.OrderedMap[int64, int64] // map[Value]Value
+	object     int64
+	key        int64
+	member     *omap.OrderedMap[int64, int64] // map[Value]Value
+	memberOnce sync.Once
 
-	variables *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variables     *omap.OrderedMap[string, *Variable] // map[string]*Variable
+	variablesOnce sync.Once
 
 	// mask is a map, key is variable name, value is variable value
 	// it record the variable is masked by closure function or some scope changed
-	mask *omap.OrderedMap[string, int64]
+	mask     *omap.OrderedMap[int64, int64]
+	maskOnce sync.Once
 
 	pointer   []int64 // the pointer is point to this value
 	reference int64   // the value is pointed by this value
@@ -253,15 +296,12 @@ type anValue struct {
 	occultation []int64
 }
 
-func NewValue() anValue {
-	return anValue{
-		anInstruction: NewInstruction(),
-		typ:           CreateAnyType(),
-		userList:      make([]int64, 0),
-		member:        omap.NewOrderedMap(map[int64]int64{}),
+var defaultAnyType = CreateAnyType()
 
-		variables: omap.NewOrderedMap(map[string]*Variable{}),
-		mask:      omap.NewOrderedMap(map[string]int64{}),
+func NewValue() *anValue {
+	return &anValue{
+		anInstruction: NewInstruction(),
+		typ:           defaultAnyType,
 	}
 }
 
@@ -274,7 +314,8 @@ func (n *anValue) SetObject(v Value) {
 }
 
 func (n *anValue) GetObject() Value {
-	return n.GetValueById(n.object)
+	obj, _ := n.GetValueById(n.object)
+	return obj
 }
 
 func (n *anValue) SetKey(k Value) {
@@ -282,46 +323,80 @@ func (n *anValue) SetKey(k Value) {
 }
 
 func (n *anValue) GetKey() Value {
-	return n.GetValueById(n.key)
+	key, _ := n.GetValueById(n.key)
+	return key
+}
+
+func (n *anValue) getMemberMap(create ...bool) *omap.OrderedMap[int64, int64] {
+	shouldCreate := false
+	if len(create) > 0 {
+		shouldCreate = create[0]
+	}
+	if n.member == nil && shouldCreate {
+		n.memberOnce.Do(func() {
+			n.member = omap.NewOrderedMap(map[int64]int64{})
+		})
+	}
+	return n.member
 }
 
 func (n *anValue) IsObject() bool {
-	if n.member == nil {
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
 		return false
 	}
-	return n.member.Len() != 0
+	return memberMap.Len() != 0
 }
 
 func (n *anValue) AddMember(k, v Value) {
-	// n.member = append(n.member, v)
-	// n.member[k] = v
-	n.member.Set(k.GetId(), v.GetId())
+	n.getMemberMap(true).Set(k.GetId(), v.GetId())
 }
 
 func (n *anValue) DeleteMember(k Value) {
-	n.member.Delete(k.GetId())
+	memberMap := n.getMemberMap()
+	if memberMap != nil {
+		memberMap.Delete(k.GetId())
+	}
 }
 
 func (n *anValue) GetMember(key Value) (Value, bool) {
-	ret, ok := n.member.Get(key.GetId())
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return nil, false
+	}
+	ret, ok := memberMap.Get(key.GetId())
 	if !ok {
 		return nil, false
 	}
-	return n.GetValueById(ret), true
+	val, ok := n.GetValueById(ret)
+	return val, ok
 }
 
 func (n *anValue) GetIndexMember(i int) (Value, bool) {
-	id, ok := n.member.GetByIndex(i)
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return nil, false
+	}
+	id, ok := memberMap.GetByIndex(i)
 	if !ok {
 		return nil, false
 	}
-	return n.GetValueById(id), ok
+	val, ok := n.GetValueById(id)
+	return val, ok
 }
 
 func (n *anValue) GetStringMember(key string) (Value, bool) {
-	for _, id := range n.member.Keys() {
-		i := n.GetValueById(id)
-		lit, ok := i.(*ConstInst)
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return nil, false
+	}
+	keys := memberMap.Keys()
+	for index := len(keys) - 1; index >= 0; index-- {
+		i, ok := n.GetValueById(keys[index])
+		if !ok {
+			continue
+		}
+		lit, ok := ToConstInst(i)
 		if !ok {
 			continue
 		}
@@ -333,8 +408,15 @@ func (n *anValue) GetStringMember(key string) (Value, bool) {
 }
 
 func (n *anValue) SetStringMember(key string, v Value) {
-	for _, id := range n.member.Keys() {
-		i := n.GetValueById(id)
+	memberMap := n.getMemberMap(true)
+	if memberMap == nil {
+		return
+	}
+	for _, id := range memberMap.Keys() {
+		i, ok := n.GetValueById(id)
+		if !ok {
+			continue
+		}
 		lit, ok := i.(*ConstInst)
 		if !ok {
 			continue
@@ -346,28 +428,50 @@ func (n *anValue) SetStringMember(key string, v Value) {
 }
 
 func (n *anValue) GetAllMember() map[Value]Value {
-	return lo.MapEntries(n.member.GetMap(), func(key int64, value int64) (Value, Value) {
-		k := n.GetValueById(key)
-		v := n.GetValueById(value)
-		if utils.IsNil(v) {
-			log.Errorf("BUG in anValue.GetAllMember(), value is nil for key: %v", key)
+	m := n.getMemberMap()
+	if m == nil {
+		return make(map[Value]Value)
+	}
+	ret := make(map[Value]Value, m.Len())
+	for key, value := range m.GetMap() {
+		k, ok1 := n.GetValueById(key)
+		v, ok2 := n.GetValueById(value)
+		if !ok1 || !ok2 {
+			log.Warnf("BUG in anValue.GetAllMember(), is nil key[%d](%v) member[%d](%v)", key, k, value, v)
+			continue
 		}
-		return k, v
-		// return n.GetValueById(key), n.GetValueById(value)
-	})
+		ret[k] = v
+	}
+	return ret
 }
 
 func (n *anValue) ForEachMember(fn func(Value, Value) bool) {
-	n.member.ForEach(func(i, v int64) bool {
-		return fn(n.GetValueById(i), n.GetValueById(v))
+	memberMap := n.getMemberMap()
+	if memberMap == nil {
+		return
+	}
+	memberMap.ForEach(func(i, v int64) bool {
+		val1, ok1 := n.GetValueById(i)
+		val2, ok2 := n.GetValueById(v)
+		if !ok1 || !ok2 {
+			return true
+		}
+		return fn(val1, val2)
 	})
 }
 
 func (n *anValue) String() string { return "" }
 
 // has/get user and value
-func (n *anValue) HasUsers() bool  { return len(n.userList) != 0 }
-func (n *anValue) GetUsers() Users { return n.GetUsersByIDs(n.userList) }
+func (n *anValue) HasUsers() bool {
+	return n.userList != nil && len(n.userList) != 0
+}
+func (n *anValue) GetUsers() Users {
+	if len(n.userList) == 0 {
+		return nil
+	}
+	return n.GetUsersByIDs(n.userList)
+}
 
 // for Value
 func (n *anValue) AddUser(u User) {
@@ -378,6 +482,9 @@ func (n *anValue) AddUser(u User) {
 }
 
 func (n *anValue) RemoveUser(u User) {
+	if len(n.userList) == 0 {
+		return
+	}
 	n.userList = utils.RemoveSliceItem(n.userList, u.GetId())
 }
 
@@ -400,7 +507,12 @@ func (n *anValue) SetType(typ Type) {
 		return
 	}
 
-	value := n.GetValueById(n.GetId())
+	value, ok := n.GetValueById(n.GetId())
+	if !ok {
+		n.typ = typ
+		return
+	}
+	saveTypeWithValue(value, typ)
 
 	switch t := typ.(type) {
 	case *Blueprint:
@@ -423,44 +535,90 @@ func (n *anValue) SetType(typ Type) {
 	}
 }
 
+func (a *anValue) getVariablesMap(create ...bool) *omap.OrderedMap[string, *Variable] {
+	shouldCreate := false
+	if len(create) > 0 {
+		shouldCreate = create[0]
+	}
+	if a.variables == nil && shouldCreate {
+		a.variablesOnce.Do(func() {
+			a.variables = omap.NewOrderedMap(map[string]*Variable{})
+		})
+	}
+	return a.variables
+}
+
 func (a *anValue) GetVariable(name string) *Variable {
-	if ret, ok := a.variables.Get(name); ok {
-		return ret
-	} else {
-		if a.IsFromDB() {
-			v := GetVariableFromDB(a.GetId(), name)
-			a.AddVariable(v)
-			return v
+	variablesMap := a.getVariablesMap()
+	if variablesMap != nil {
+		if ret, ok := variablesMap.Get(name); ok {
+			return ret
 		}
+	}
+	if a.IsFromDB() {
+		v := GetVariableFromDB(a.GetId(), name)
+		a.AddVariable(v)
+		return v
 	}
 	return nil
 }
 
 func (a *anValue) GetLastVariable() *Variable {
-	_, v, _ := a.variables.Last()
+	variablesMap := a.getVariablesMap()
+	if variablesMap == nil {
+		return nil
+	}
+	_, v, _ := variablesMap.Last()
 	return v
 }
 
 func (a *anValue) GetAllVariables() map[string]*Variable {
-	return a.variables.GetMap()
+	variablesMap := a.getVariablesMap()
+	if variablesMap == nil {
+		return make(map[string]*Variable)
+	}
+	return variablesMap.GetMap()
 }
 
 func (a *anValue) AddVariable(v *Variable) {
 	name := v.GetName()
-	a.variables.Set(name, v)
-	a.variables.BringKeyToLastOne(name)
+	m := a.getVariablesMap(true)
+	m.Set(name, v)
+	m.BringKeyToLastOne(name)
+}
+
+func (i *anValue) getMaskMap(create ...bool) *omap.OrderedMap[int64, int64] {
+	shouldCreate := false
+	if len(create) > 0 {
+		shouldCreate = create[0]
+	}
+	if i.mask == nil && shouldCreate {
+		i.maskOnce.Do(func() {
+			i.mask = omap.NewOrderedMap(map[int64]int64{})
+		})
+	}
+	return i.mask
 }
 
 func (i *anValue) AddMask(v Value) {
-	i.mask.Add(v.GetId())
+	id := v.GetId()
+	i.getMaskMap(true).Set(id, id)
 }
 
 func (i *anValue) GetMask() []Value {
-	return i.GetValuesByIDs(i.mask.Values())
+	maskMap := i.getMaskMap()
+	if maskMap == nil {
+		return nil
+	}
+	return i.GetValuesByIDs(maskMap.Values())
 }
 
 func (i *anValue) Masked() bool {
-	return i.mask.Len() != 0
+	maskMap := i.getMaskMap()
+	if maskMap == nil {
+		return false
+	}
+	return maskMap.Len() != 0
 }
 
 func (i *anValue) SetReference(v Value) {
@@ -468,7 +626,8 @@ func (i *anValue) SetReference(v Value) {
 }
 
 func (i *anValue) GetReference() Value {
-	return i.GetValueById(i.reference)
+	ref, _ := i.GetValueById(i.reference)
+	return ref
 }
 
 func (i *anValue) AddPointer(v Value) {
@@ -493,10 +652,13 @@ func (i *anValue) FlatOccultation() []Value {
 
 	handler = func(i *anValue) {
 		for _, id := range i.occultation {
-			v := i.GetValueById(id)
+			v, ok := i.GetValueById(id)
+			if !ok {
+				continue
+			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
-				handler(&p.anValue)
+				handler(p.anValue)
 			}
 		}
 	}

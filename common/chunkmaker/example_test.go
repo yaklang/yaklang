@@ -17,7 +17,7 @@ func ExampleNewChunkMaker_basic() {
 
 	pr, pw := utils.NewPipe()
 
-	cm, err := chunkmaker.NewChunkMaker(pr, chunkmaker.WithChunkSize(chunkSize))
+	cm, err := chunkmaker.NewTextChunkMaker(pr, chunkmaker.WithChunkSize(chunkSize))
 	if err != nil {
 		log.Fatalf("Failed to create ChunkMaker: %v", err)
 	}
@@ -55,7 +55,7 @@ func ExampleNewChunkMaker_withTimeTrigger() {
 
 	pr, pw := utils.NewPipe()
 
-	cm, err := chunkmaker.NewChunkMaker(pr,
+	cm, err := chunkmaker.NewTextChunkMaker(pr,
 		chunkmaker.WithChunkSize(chunkSize),
 		chunkmaker.WithTimeTriggerSeconds(triggerSeconds),
 	)
@@ -115,7 +115,7 @@ func ExampleNewChunkMaker_utf8() {
 	pr, pw := utils.NewPipe()
 
 	// Note: By default, if input is valid UTF-8, ChunkSize is interpreted as rune count.
-	cm, err := chunkmaker.NewChunkMaker(pr, chunkmaker.WithChunkSize(chunkRuneSize))
+	cm, err := chunkmaker.NewTextChunkMaker(pr, chunkmaker.WithChunkSize(chunkRuneSize))
 	if err != nil {
 		log.Fatalf("Failed to create ChunkMaker: %v", err)
 	}
@@ -154,12 +154,12 @@ func ExampleNewChunkMaker_utf8() {
 // ExampleNewChunkMaker_invalidChunkSize demonstrates error handling for invalid ChunkSize.
 func ExampleNewChunkMaker_invalidChunkSize() {
 	pr, _ := utils.NewPipe()
-	_, err := chunkmaker.NewChunkMaker(pr, chunkmaker.WithChunkSize(0))
+	_, err := chunkmaker.NewTextChunkMaker(pr, chunkmaker.WithChunkSize(0))
 	if err != nil {
 		fmt.Printf("Error: %s\n", strings.Split(err.Error(), ": ")[1]) // Simplify error for consistent example output
 	}
 
-	_, err = chunkmaker.NewChunkMaker(pr, chunkmaker.WithChunkSize(-5))
+	_, err = chunkmaker.NewTextChunkMaker(pr, chunkmaker.WithChunkSize(-5))
 	if err != nil {
 		fmt.Printf("Error: %s\n", strings.Split(err.Error(), ": ")[1])
 	}
@@ -171,12 +171,12 @@ func ExampleNewChunkMaker_invalidChunkSize() {
 // ExampleNewChunkMaker_invalidTimeTrigger demonstrates error handling for invalid timeTriggerInterval.
 func ExampleNewChunkMaker_invalidTimeTrigger() {
 	pr, _ := utils.NewPipe()
-	_, err := chunkmaker.NewChunkMaker(pr, chunkmaker.WithChunkSize(10), chunkmaker.WithTimeTriggerSeconds(0))
+	_, err := chunkmaker.NewTextChunkMaker(pr, chunkmaker.WithChunkSize(10), chunkmaker.WithTimeTriggerSeconds(0))
 	if err != nil {
 		fmt.Printf("Error: %s\n", strings.Split(err.Error(), ": ")[1]) // Simplify error for consistent example output
 	}
 
-	_, err = chunkmaker.NewChunkMaker(pr, chunkmaker.WithChunkSize(10), chunkmaker.WithTimeTriggerSeconds(-0.1))
+	_, err = chunkmaker.NewTextChunkMaker(pr, chunkmaker.WithChunkSize(10), chunkmaker.WithTimeTriggerSeconds(-0.1))
 	if err != nil {
 		fmt.Printf("Error: %s\n", strings.Split(err.Error(), ": ")[1])
 	}
@@ -192,7 +192,7 @@ func ExampleNewChunkMaker_withPrevNBytes() {
 
 	pr, pw := utils.NewPipe() // Use a pipe to simulate io.Reader input
 
-	cm, err := chunkmaker.NewChunkMaker(pr, chunkmaker.WithChunkSize(chunkSize))
+	cm, err := chunkmaker.NewTextChunkMaker(pr, chunkmaker.WithChunkSize(chunkSize))
 	if err != nil {
 		log.Fatalf("Failed to create ChunkMaker: %v", err)
 	}

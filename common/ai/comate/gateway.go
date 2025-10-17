@@ -159,10 +159,6 @@ func (c *Client) Chat(s string, function ...any) (string, error) {
 	return buf.String(), nil
 }
 
-func (c *Client) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, utils.Error("not implemented: comate is not supported openai style chat ex")
-}
-
 func (c *Client) ChatStream(s string) (io.Reader, error) {
 	return c.question(s)
 }
@@ -179,7 +175,7 @@ func (c *Client) ExtractData(data string, desc string, fields map[string]any) (m
 func (c *Client) LoadOption(opt ...aispec.AIConfigOption) {
 	config := aispec.NewDefaultAIConfig(opt...)
 
-	log.Info("load option for comate ai")
+	log.Debug("load option for comate ai")
 	c.config = config
 
 	if c.config.Model == "" {

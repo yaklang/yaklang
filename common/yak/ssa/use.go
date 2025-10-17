@@ -35,8 +35,8 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 			continue
 		}
 		user.ReplaceValue(v, to)
-		if ex, ok := ToExternLib(user); ok {
-			ReplaceMemberCall(ex, to)
+		if t, ok := ToExternLib(user); ok {
+			ReplaceMemberCall(t, v, to)
 		}
 
 		to.AddUser(user)
@@ -45,6 +45,8 @@ func ReplaceValue(v Value, to Value, skip func(Instruction) bool) {
 	for _, user := range deleteInst {
 		v.RemoveUser(user)
 	}
+	v.RefreshString()
+	to.RefreshString()
 }
 
 // ----------- Function
@@ -76,7 +78,12 @@ func (p *Phi) GetControlFlowConditions() []Value {
 		return nil
 	}
 
-	block, ok := ToBasicBlock(p.GetInstructionById(p.CFGEntryBasicBlock))
+	inst, ok := p.GetInstructionById(p.CFGEntryBasicBlock)
+	if !ok {
+		log.Warnf("phi's cfg block enter is not a valid instruction")
+		return nil
+	}
+	block, ok := ToBasicBlock(inst)
 	if !ok {
 		log.Warnf("phi's cfg block enter is not a valid *BasicBlock")
 		return nil
@@ -88,7 +95,8 @@ func (p *Phi) GetControlFlowConditions() []Value {
 	return lo.FilterMap(relative, func(ins Instruction, i int) (Value, bool) {
 		switch ret := ins.(type) {
 		case *If:
-			return p.GetValueById(ret.Cond), true
+			val, ok := p.GetValueById(ret.Cond)
+			return val, ok
 		default:
 			result, ok := ret.(Value)
 			if ok {
@@ -123,15 +131,20 @@ func (c *ConstInst) HasValues() bool {
 
 func (c *ConstInst) GetValues() Values {
 	if c.Origin > 0 {
-		return c.GetValueById(c.Origin).GetValues()
-	} else {
-		return nil
+		val, ok := c.GetValueById(c.Origin)
+		if ok {
+			return val.GetValues()
+		}
 	}
+	return nil
 }
 
 func (c *ConstInst) ReplaceValue(v Value, to Value) {
 	if c.Origin > 0 {
-		c.GetUsersByID(c.Origin).ReplaceValue(v, to)
+		user, ok := c.GetUsersByID(c.Origin)
+		if ok {
+			user.ReplaceValue(v, to)
+		}
 	}
 }
 
@@ -169,10 +182,14 @@ func (u *UnOp) ReplaceValue(v Value, to Value) {
 func (c *Call) HasValues() bool { return true }
 func (c *Call) GetValues() Values {
 	ret := make(Values, 0, len(c.Args)+len(c.Binding)+1)
-	ret = append(ret, c.GetValueById(c.Method))
+	if method, ok := c.GetValueById(c.Method); ok {
+		ret = append(ret, method)
+	}
 	ret = append(ret, c.GetValuesByIDs(c.Args)...)
 	for _, v := range c.Binding {
-		ret = append(ret, c.GetValueById(v))
+		if val, ok := c.GetValueById(v); ok {
+			ret = append(ret, val)
+		}
 	}
 	return ret
 }
@@ -352,7 +369,10 @@ func (l *Jump) GetValues() Values {
 	if l.To == 0 {
 		return nil
 	}
-	return []Value{l.GetValueById(l.To)}
+	if val, ok := l.GetValueById(l.To); ok {
+		return []Value{val}
+	}
+	return nil
 }
 func (l *Jump) ReplaceValue(v Value, to Value) {
 	if l.To == v.GetId() {
@@ -371,12 +391,16 @@ func (sw *Switch) GetValues() Values {
 	lo.ForEach(sw.Label,
 		func(label SwitchLabel, _ int) {
 			if v := label.Value; v != 0 {
-				ret = append(ret, sw.GetValueById(v))
+				if val, ok := sw.GetValueById(v); ok {
+					ret = append(ret, val)
+				}
 			}
 		},
 	)
 	if sw.Cond != 0 {
-		ret = append(ret, sw.GetValueById(sw.Cond))
+		if val, ok := sw.GetValueById(sw.Cond); ok {
+			ret = append(ret, val)
+		}
 	}
 	return ret
 }
@@ -400,17 +424,25 @@ func (e *ErrorHandler) GetValues() Values {
 	var vs Values
 	for _, c := range e.Catch {
 		if c != 0 {
-			vs = append(vs, e.GetValueById(c))
+			if val, ok := e.GetValueById(c); ok {
+				vs = append(vs, val)
+			}
 		}
 	}
 	if e.Final != 0 {
-		vs = append(vs, e.GetValueById(e.Final))
+		if val, ok := e.GetValueById(e.Final); ok {
+			vs = append(vs, val)
+		}
 	}
 	if e.Done != 0 {
-		vs = append(vs, e.GetValueById(e.Done))
+		if val, ok := e.GetValueById(e.Done); ok {
+			vs = append(vs, val)
+		}
 	}
 	if e.Try != 0 {
-		vs = append(vs, e.GetValueById(e.Try))
+		if val, ok := e.GetValueById(e.Try); ok {
+			vs = append(vs, val)
+		}
 	}
 	return vs
 }
@@ -440,10 +472,14 @@ func (e *ErrorCatch) HasValues() bool { return true }
 func (e *ErrorCatch) GetValues() Values {
 	var vs Values
 	if e.CatchBody != 0 {
-		vs = append(vs, e.GetValueById(e.CatchBody))
+		if val, ok := e.GetValueById(e.CatchBody); ok {
+			vs = append(vs, val)
+		}
 	}
 	if e.Exception != 0 {
-		vs = append(vs, e.GetValueById(e.Exception))
+		if val, ok := e.GetValueById(e.Exception); ok {
+			vs = append(vs, val)
+		}
 	}
 	return vs
 }

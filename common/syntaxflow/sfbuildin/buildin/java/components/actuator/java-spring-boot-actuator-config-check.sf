@@ -4,110 +4,120 @@ desc(
 	type:config
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   Spring Boot Actuator提供了一系列生产环境就绪的功能，如监控和管理。如果配置不当，Actuator端点可能暴露敏感信息，例如应用程序配置、环境变量、健康检查详情等。攻击者利用这些暴露的信息可能获取数据库凭证、API密钥或其他攻击所需的信息。此外，如果将Actuator端点与Spring Security配置不当（例如，通过`permitAll()`或`ignoring()`方法放行），攻击者可以未经认证访问这些敏感端点。
-
+Spring Boot Actuator 提供了一系列生产环境就绪的功能，如监控和管理。如果配置不当，Actuator 端点可能暴露敏感信息，例如应用程序配置、环境变量、健康检查详情等。攻击者利用这些暴露的信息可能获取数据库凭证、API密钥或其他攻击所需的信息。
 2. **触发场景**
-   - `application.properties` 或 `application.yml` 中设置 `management.security.enabled=false` 或 `endpoints.health.sensitive=false`（在Spring Boot 2.x及之前版本中可能导致敏感信息暴露）。
-   - Spring Security 配置中使用了 `http.authorizeRequests().antMatchers("/actuator/**").permitAll()` 或 `web.ignoring().antMatchers("/actuator/**")`，允许未经认证访问Actuator端点。
-
-   ```java
-   // 示例一：Spring Security配置放行Actuator端点
-   @Override
-   protected void configure(HttpSecurity http) throws Exception {
-       http
-               .authorizeRequests()
-               .antMatchers("/actuator/**").permitAll() // 不安全配置
-               .anyRequest().authenticated();
-        // ... 其他配置
-   }
-   ```
-
-   ```java
-   // 示例二：WebSecurity忽略Actuator端点
-    @Override
-    public void configure(WebSecurity web) throws Exception {
-        web
-            .ignoring()
-            .antMatchers("/actuator/**"); // 不安全配置
-    }
-   ```
-
+- `application.properties` 或 `application.yml` 中设置 `management.security.enabled=false` 或 `endpoints.health.sensitive=false`（在Spring Boot 2.x及之前版本中可能导致敏感信息暴露）。
+- Spring Security 配置中使用了 `http.authorizeRequests().antMatchers("/actuator/**").permitAll()` 或 `web.ignoring().antMatchers("/actuator/**")`，允许未经认证访问Actuator端点。
+```java
+// 示例一：Spring Security配置放行Actuator端点
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .authorizeRequests()
+        .antMatchers("/actuator/**").permitAll() // 不安全配置
+        .anyRequest().authenticated();
+}
+```
+```java
+// 示例二：WebSecurity忽略Actuator端点
+@Override
+public void configure(WebSecurity web) throws Exception {
+    web
+        .ignoring()
+        .antMatchers("/actuator/**"); // 不安全配置
+}
+```
 3. **潜在影响**
-   - 敏感配置信息（如数据库连接字符串、中间件凭据、API密钥）泄露。
-   - 系统环境变量、类路径详情、线程转储等诊断信息泄露，可能帮助攻击者进行进一步攻击。
-   - 允许攻击者访问Actuator提供的其他管理功能（如果启用），如JVM信息、Metrics等，增加攻击面。
-   - 在某些情况下，结合其他漏洞，泄露的信息可能导致更严重的攻击，如远程代码执行。
-
+- 敏感配置信息（如数据库连接字符串、中间件凭据、API密钥）泄露。
+- 系统环境变量、类路径详情、线程转储等诊断信息泄露，可能帮助攻击者进行进一步攻击。
+- 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
+- 在某些情况下，结合其他漏洞，泄露的信息可能导致更严重的攻击，如远程代码执行。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **启用Spring Security对Actuator端点的保护**
-   确保Spring Security配置覆盖Actuator端点，并要求适当的认证和授权。避免使用 `permitAll()` 或 `ignoring()` 直接放行关键Actuator端点。
-   ```java
-   // 修复代码示例：要求认证才能访问Actuator端点
-   @Override
-   protected void configure(HttpSecurity http) throws Exception {
-       http
-               .authorizeRequests()
-               .antMatchers("/actuator/**").authenticated() // 需要认证
-               .anyRequest().authenticated()
-               .and()
-               .httpBasic(); // 或者使用其他认证方式
-        // ... 其他配置
-   }
-   ```
-
+确保Spring Security配置覆盖Actuator端点，并要求适当的认证和授权。避免使用 `permitAll()` 或 `ignoring()` 直接放行关键Actuator端点。
+```java
+// 修复代码示例：要求认证才能访问Actuator端点
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+    http
+        .authorizeRequests()
+        .antMatchers("/actuator/**").authenticated() // 需要认证
+        .anyRequest().authenticated()
+        .and()
+        .httpBasic(); // 或者使用其他认证方式
+}
+```
 2. **配置Actuator端点暴露**
-   明确指定哪些Actuator端点可以暴露以及通过何种方式暴露（如Web或JMX），最小化攻击面。
-   - **Spring Boot 2.x及以上：** 使用 `management.endpoints.web.exposure.include` 和 `management.endpoints.web.exposure.exclude` 来控制暴露的端点。默认只暴露 `health` 和 `info`。
-     ```properties
-     # application.properties
-     management.endpoints.web.exposure.include=health,info
-     management.endpoints.web.exposure.exclude=env,beans
-     ```
-   - **Spring Boot 1.x:**  `management.security.enabled` 默认是true，确保不要设置为false。`endpoints.health.sensitive` 默认是true。在新版本中已弃用。
-
+明确指定哪些Actuator端点可以暴露以及通过何种方式暴露（如Web或JMX），最小化攻击面。
+- **Spring Boot 2.x及以上：** 使用 `management.endpoints.web.exposure.include` 和 `management.endpoints.web.exposure.exclude` 来控制暴露的端点。
+```properties
+# application.properties
+management.endpoints.web.exposure.include=health,info
+management.endpoints.web.exposure.exclude=env,beans
+```
 3. **使用HTTPS保护Actuator端点**
-   确保所有通过网络暴露的Actuator端点都通过HTTPS强制加密通信，防止中间人攻击窃取信息。
-
+确保所有通过网络暴露的Actuator端点都通过HTTPS强制加密通信，防止中间人攻击窃取信息。
 4. **限制网络访问**
-   在网络层面限制只有内部网络或特定的IP地址可以访问Actuator端点，不将其暴露在公共互联网上。
-
+在网络层面限制只有内部网络或特定的IP地址可以访问Actuator端点，不将其暴露在公共互联网上。
 SOLUTION
 	rule_id: "084c0adc-69ef-42ed-aeb4-5c24603634af"
 	reference: <<<REFERENCE
 [Spring Boot Actuator文档](https://docs.spring.io/spring-boot/docs/current/reference/html/actuator.html)
 REFERENCE
+	cwe: 200
+	cwe: 16
 )
 
-__projectConfig__."management.security.enabled"?{have:'false'} as $weak;
-__projectConfig__."endpoints.health.sensitive"?{have:'false'} as $weak;
+${*.properties}.re(/management\.security\.enabled=false/) as $weak;
+${*.properties}.re(/endpoints\.health\.sensitive=false/) as $weak;
 check $weak then "Java Spring Boot Actuator配置存在安全风险"
 
 alert $weak for {
 	title_zh: "检查Java Spring Boot Actuator配置",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   Spring Boot Actuator提供了一系列生产环境就绪的功能，如监控和管理。如果配置不当，Actuator端点可能暴露敏感信息，例如应用程序配置、环境变量、健康检查详情等。攻击者利用这些暴露的信息可能获取数据库凭证、API密钥或其他攻击所需的信息。
-
+Spring Boot Actuator提供了一系列生产环境就绪的功能，如监控和管理。如果配置不当，Actuator端点可能暴露敏感信息，例如应用程序配置、环境变量、健康检查详情等。攻击者利用这些暴露的信息可能获取数据库凭证、API密钥或其他攻击所需的信息。
 2. **触发场景**
-   - `application.properties` 或 `application.yml` 中设置 `management.security.enabled=false` 或 `endpoints.health.sensitive=false`（在Spring Boot 2.x及之前版本中可能导致敏感信息暴露）。
-
+- `application.properties` 或 `application.yml` 中设置 `management.security.enabled=false` 或 `endpoints.health.sensitive=false`（在Spring Boot 2.x及之前版本中可能导致敏感信息暴露）。
 3. **潜在影响**
-   - 敏感配置信息（如数据库连接字符串、中间件凭据、API密钥）泄露。
-   - 系统环境变量、类路径详情、线程转储等诊断信息泄露，可能帮助攻击者进行进一步攻击。
-   - 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
-
-CODE
+- 敏感配置信息（如数据库连接字符串、中间件凭据、API密钥）泄露。
+- 系统环境变量、类路径详情、线程转储等诊断信息泄露，可能帮助攻击者进行进一步攻击。
+- 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
+DESC
 	level: "low",
-	risk: "info-exposure",
+	risk: "信息泄露",
 	message: "Java Spring Boot Actuator配置存在安全风险",
 	title: "Check Java Spring Boot Actuator Config",
+	solution: <<<SOLUTION
+### 修复建议
+1. **启用Spring Security对Actuator端点的保护**
+确保Spring Security配置覆盖Actuator端点，并要求适当的认证和授权。避免使用 `permitAll()` 或 `ignoring()` 直接放行关键Actuator端点。
+```java
+// 修复代码示例：要求认证才能访问Actuator端点
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.authorizeRequests()
+.antMatchers("/actuator/**").authenticated() // 需要认证
+.anyRequest().authenticated()
+.and()
+.httpBasic(); // 或者使用其他认证方式
+}
+```
+2. **配置Actuator端点暴露**
+明确指定哪些Actuator端点可以暴露以及通过何种方式暴露（如Web或JMX），最小化攻击面。
+- **Spring Boot 2.x及以上：** 使用 `management.endpoints.web.exposure.include` 和 `management.endpoints.web.exposure.exclude` 来控制暴露的端点。
+```properties
+# application.properties
+management.endpoints.web.exposure.include=health,info
+management.endpoints.web.exposure.exclude=env,beans
+```
+SOLUTION
+	name: "weak",
 }
 
 WebSecurity?{<typeName>?{have:'org.springframework.security.config.annotation.web.builders.WebSecurity'}} as $webSecurity;
@@ -123,63 +133,55 @@ $allow#{
 alert $sink for {
 	title: "Check Java Spring Boot Actuator Config",
 	title_zh: "检查Java Spring Boot Actuator配置",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **启用Spring Security对Actuator端点的保护**
-   确保Spring Security配置覆盖Actuator端点，并要求适当的认证和授权。避免使用 `permitAll()` 或 `ignoring()` 直接放行关键Actuator端点。
-   ```java
-   // 修复代码示例：要求认证才能访问Actuator端点
-   @Override
-   protected void configure(HttpSecurity http) throws Exception {
-       http
-               .authorizeRequests()
-               .antMatchers("/actuator/**").authenticated() // 需要认证
-               .anyRequest().authenticated()
-               .and()
-               .httpBasic(); // 或者使用其他认证方式
-   }
-   ```
-
+确保Spring Security配置覆盖Actuator端点，并要求适当的认证和授权。避免使用 `permitAll()` 或 `ignoring()` 直接放行关键Actuator端点。
+```java
+// 修复代码示例：要求认证才能访问Actuator端点
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.authorizeRequests()
+.antMatchers("/actuator/**").authenticated() // 需要认证
+.anyRequest().authenticated() // 其他请求需要认证
+.and()
+.httpBasic(); // 使用 HTTP Basic 认证
+}
+```
 2. **配置Actuator端点暴露**
-   明确指定哪些Actuator端点可以暴露以及通过何种方式暴露（如Web或JMX），最小化攻击面。
-   - **Spring Boot 2.x及以上：** 使用 `management.endpoints.web.exposure.include` 和 `management.endpoints.web.exposure.exclude` 来控制暴露的端点。
-     ```properties
-     # application.properties
-     management.endpoints.web.exposure.include=health,info
-     management.endpoints.web.exposure.exclude=env,beans
-     ```
-
-CODE
-	desc: <<<CODE
+明确指定哪些Actuator端点可以暴露以及通过何种方式暴露（如Web或JMX），最小化攻击面。
+- **Spring Boot 2.x及以上：** 使用 `management.endpoints.web.exposure.include` 和 `management.endpoints.web.exposure.exclude` 来控制暴露的端点。
+```properties
+# application.properties
+management.endpoints.web.exposure.include=health,info
+```
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   Spring Boot Actuator提供了一系列生产环境就绪的功能，如监控和管理。如果配置不当，Actuator端点可能暴露敏感信息，例如应用程序配置、环境变量、健康检查详情等。攻击者利用这些暴露的信息可能获取数据库凭证、API密钥或其他攻击所需的信息。
-
+Spring Boot Actuator提供了一系列生产环境就绪的功能，如监控和管理。如果配置不当，Actuator端点可能暴露敏感信息，例如应用程序配置、环境变量、健康检查详情等。攻击者利用这些暴露的信息可能获取数据库凭证、API密钥或其他攻击所需的信息。
 2. **触发场景**
-   - Spring Security 配置中使用了 `http.authorizeRequests().antMatchers("/actuator/**").permitAll()` 或 `web.ignoring().antMatchers("/actuator/**")`，允许未经认证访问Actuator端点。
-
-   ```java
-   // 示例一：Spring Security配置放行Actuator端点
-   @Override
-   protected void configure(HttpSecurity http) throws Exception {
-       http
-               .authorizeRequests()
-               .antMatchers("/actuator/**").permitAll() // 不安全配置
-               .anyRequest().authenticated();
-   }
-   ```
-
+- Spring Security 配置中使用了 `http.authorizeRequests().antMatchers("/actuator/**").permitAll()` 或 `web.ignoring().antMatchers("/actuator/**")`，允许未经认证访问Actuator端点。
+```java
+// 示例一：Spring Security配置放行Actuator端点
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.authorizeRequests()
+.antMatchers("/actuator/**").permitAll() // 不安全配置
+.anyRequest().authenticated();
+}
+```
 3. **潜在影响**
-   - 敏感配置信息（如数据库连接字符串、中间件凭据、API密钥）泄露。
-   - 系统环境变量、类路径详情、线程转储等诊断信息泄露，可能帮助攻击者进行进一步攻击。
-   - 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
-
-CODE
+- 敏感配置信息（如数据库连接字符串、中间件凭据、API密钥）泄露。
+- 系统环境变量、类路径详情、线程转储等诊断信息泄露，可能帮助攻击者进行进一步攻击。
+- 允许攻击者访问Actuator提供的其他管理功能，增加攻击面。
+DESC
 	level: "mid",
 	message: "Java Spring Boot Actuator配置存在安全风险,并且Spring Security默认允许所有请求访问Actuator端点。",
-	risk: "info-exposure",
+	risk: "信息泄露",
+	name: "sink",
 }
 
 desc(
@@ -216,44 +218,91 @@ TEXT
 )
 
 desc(
-	lang:java
-	alert_num:3
-	"file://application.yml":<<<TEXT
-    spring:
-      application:
-        name: springsecuritydemo
-    management:
-      security:
-        enabled: false
-    endpoints:
-      health:
-        sensitive: false
-TEXT
-	"file://springSecurity.java":<<<TEXT
-package org.example.springsecuritydemo;
+	"safefile://SecureApplicationProperties.properties": <<<CODE
+# application.properties
+spring.application.name=secure-app
+# 默认情况下 management.security.enabled 为 true，无需显式设置
+# management.endpoints.web.exposure.include 默认只暴露 health 和 info，是安全的默认配置
+management.endpoints.web.exposure.include=health,info
 
-import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.builders.WebSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+CODE
+	"safefile://SecureApplicationYml.yml": <<<CODE
+# application.yml
+spring:
+  application:
+    name: secure-app
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
 
-@Configuration
-@EnableWebSecurity
-public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
-    @Override
-    public void configure(WebSecurity web) throws Exception {
-        web
-            .ignoring()
-            .antMatchers("/actuator/**"); // Ignore Actuator endpoints for security checks
-    }
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http
-            .authorizeRequests()
-                .anyRequest().authenticated() // Any other request must be authenticated
-            .and()
-            .httpBasic(); // Use HTTP Basic authentication
-    }
-}
-TEXT
+CODE
+)
+
+// 
+// TODO: query project config with yml file 
+// desc(
+// 	lang:java
+// 	alert_num:3
+// 	"file://application.yml":<<<TEXT
+//     spring:
+//       application:
+//         name: springsecuritydemo
+//     management:
+//       security:
+//         enabled: false
+//     endpoints:
+//       health:
+//         sensitive: false
+// TEXT
+// 	"file://springSecurity.java":<<<TEXT
+// package org.example.springsecuritydemo;// 
+
+// import org.springframework.context.annotation.Configuration;
+// import org.springframework.security.config.annotation.web.builders.WebSecurity;
+// import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+// import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;// 
+
+// @Configuration
+// @EnableWebSecurity
+// public class InsecureSecurityConfig extends WebSecurityConfigurerAdapter {
+//     @Override
+//     public void configure(WebSecurity web) throws Exception {
+//         web
+//             .ignoring()
+//             .antMatchers("/actuator/**"); // Ignore Actuator endpoints for security checks
+//     }
+//     @Override
+//     protected void configure(HttpSecurity http) throws Exception {
+//         http
+//             .authorizeRequests()
+//                 .anyRequest().authenticated() // Any other request must be authenticated
+//             .and()
+//             .httpBasic(); // Use HTTP Basic authentication
+//     }
+// }
+// TEXT
+// )
+desc(
+	"safefile://SecureApplicationProperties.properties": <<<CODE
+# application.properties
+spring.application.name=secure-app
+# 默认情况下 management.security.enabled 为 true，无需显式设置
+# management.endpoints.web.exposure.include 默认只暴露 health 和 info，是安全的默认配置
+management.endpoints.web.exposure.include=health,info
+
+CODE
+	"safefile://SecureApplicationYml.yml": <<<CODE
+# application.yml
+spring:
+  application:
+    name: secure-app
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "health,info"
+
+CODE
 )

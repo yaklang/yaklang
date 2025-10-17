@@ -20,6 +20,9 @@ import (
 
 var CookiejarPool sync.Map
 
+func RemoveCookiejar(session interface{}) {
+	CookiejarPool.Delete(session)
+}
 func GetCookiejar(session interface{}) http.CookieJar {
 	var jar http.CookieJar
 

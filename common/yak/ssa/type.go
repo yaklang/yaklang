@@ -11,15 +11,6 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-func init() {
-	BasicTypes[ErrorTypeKind].AddMethod("Error", NewFunctionWithType("error.Error", NewFunctionTypeDefine(
-		"error.Error",
-		[]Type{BasicTypes[ErrorTypeKind]},
-		[]Type{BasicTypes[StringTypeKind]},
-		false,
-	)))
-}
-
 const MAXTypeCompareDepth = 10
 
 func typeEqualEx(t1, t2 Type, depth int) bool {
@@ -85,6 +76,18 @@ func typeEqualEx(t1, t2 Type, depth int) bool {
 	}
 
 	return t1kind == t2kind
+}
+
+func clean(input []string) []string {
+	seen := make(map[string]bool)
+	var output []string
+	for _, name := range input {
+		if !seen[name] {
+			seen[name] = true
+			output = append(output, name)
+		}
+	}
+	return output
 }
 
 func TypeEqual(t1, t2 Type) bool {
@@ -181,7 +184,7 @@ func typeCompareEx(t1, t2 Type, depth int) bool {
 		}
 		if t2kind == SliceTypeKind {
 			if o, ok := ToObjectType(t2); ok {
-				return typeCompareEx(GetByteType(), o.FieldType, depth)
+				return typeCompareEx(CreateByteType(), o.FieldType, depth)
 			}
 		}
 	case StringTypeKind:
@@ -289,6 +292,9 @@ func IsObjectType(t Type) bool {
 }
 
 type Type interface {
+	GetId() int64
+	SetId(int64)
+
 	String() string        // only string
 	PkgPathString() string // package path string
 	RawString() string     // string contain inner information
@@ -399,6 +405,7 @@ const (
 )
 
 type baseType struct {
+	id           int64
 	method       map[string]*Function
 	methodGetter func() map[string]*Function
 	methodOnce   sync.Once
@@ -407,6 +414,13 @@ type baseType struct {
 
 func NewBaseType() *baseType {
 	return &baseType{}
+}
+
+func (b *baseType) SetId(id int64) {
+	b.id = id
+}
+func (b *baseType) GetId() int64 {
+	return b.id
 }
 
 func (b *baseType) SetMethodGetter(f func() map[string]*Function) {
@@ -495,7 +509,10 @@ func (b *BasicType) AddFullTypeName(name string) {
 	if b == nil {
 		return
 	}
-	b.fullTypeName = append(b.fullTypeName, name)
+
+	if !lo.Contains(b.fullTypeName, name) {
+		b.fullTypeName = append(b.fullTypeName, name)
+	}
 }
 
 func (b *BasicType) GetFullTypeNames() []string {
@@ -509,7 +526,7 @@ func (b *BasicType) SetFullTypeNames(names []string) {
 	if b == nil {
 		return
 	}
-	b.fullTypeName = names
+	b.fullTypeName = clean(names)
 }
 
 func (b *BasicType) IsAny() bool {
@@ -539,18 +556,6 @@ func (b *BasicType) GetName() string {
 // func (b *BasicType) GetAllKey() []string {
 // 	return lo.Keys(b.method)
 // }
-
-var BasicTypes = map[TypeKind]*BasicType{
-	NumberTypeKind:    NewBasicType(NumberTypeKind, "number"),
-	StringTypeKind:    NewBasicType(StringTypeKind, "string"),
-	ByteTypeKind:      NewBasicType(ByteTypeKind, "byte"),
-	BytesTypeKind:     NewBasicType(BytesTypeKind, "bytes"),
-	BooleanTypeKind:   NewBasicType(BooleanTypeKind, "boolean"),
-	UndefinedTypeKind: NewBasicType(UndefinedTypeKind, "undefined"),
-	NullTypeKind:      NewBasicType(NullTypeKind, "null"),
-	AnyTypeKind:       NewBasicType(AnyTypeKind, "any"),
-	ErrorTypeKind:     NewBasicType(ErrorTypeKind, "error"),
-}
 
 func CreateNumberType() Type {
 	return NewBasicType(NumberTypeKind, "number")
@@ -585,69 +590,45 @@ func CreateAnyType() Type {
 }
 
 func CreateErrorType() Type {
-	return NewBasicType(ErrorTypeKind, "error")
-}
-
-func GetNumberType() Type {
-	return BasicTypes[NumberTypeKind]
-}
-
-func GetByteType() Type {
-	return BasicTypes[ByteTypeKind]
-}
-
-func GetStringType() Type {
-	return BasicTypes[StringTypeKind]
-}
-
-func GetBytesType() Type {
-	return BasicTypes[BytesTypeKind]
-}
-
-func GetBooleanType() Type {
-	return BasicTypes[BooleanTypeKind]
-}
-
-func GetUndefinedType() Type {
-	return BasicTypes[UndefinedTypeKind]
-}
-
-func GetNullType() Type {
-	return BasicTypes[NullTypeKind]
-}
-
-func GetAnyType() Type {
-	return CreateAnyType()
-}
-
-func GetErrorType() Type {
-	return BasicTypes[ErrorTypeKind]
+	ret := NewBasicType(ErrorTypeKind, "error")
+	ret.AddMethod("Error", NewFunctionWithType("error.Error", NewFunctionTypeDefine(
+		"error.Error",
+		[]Type{ret},
+		[]Type{CreateStringType()},
+		false,
+	)))
+	return ret
 }
 
 func GetType(i any) Type {
+	if utils.IsNil(i) {
+		return CreateNullType()
+	}
 	if typ := GetTypeByStr(reflect.TypeOf(i).String()); typ != nil {
 		return typ
 	} else {
-		return GetAnyType()
+		return CreateAnyType()
 	}
 }
 
 func GetTypeByStr(typ string) Type {
 	switch typ {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64", "uintptr":
-		return BasicTypes[NumberTypeKind]
+		return CreateNumberType()
 	case "float", "float32", "float64", "double", "complex128", "complex64":
-		return BasicTypes[NumberTypeKind]
+		return CreateNumberType()
 	case "string":
-		return BasicTypes[StringTypeKind]
+		return CreateStringType()
 	case "bool":
-		return BasicTypes[BooleanTypeKind]
+		return CreateBooleanType()
+	case "char":
+		return CreateByteType()
 	case "bytes", "[]uint8", "[]byte":
-		return BasicTypes[BytesTypeKind]
+		return CreateBytesType()
 	case "interface {}", "var", "any":
 		return CreateAnyType()
 	case "error":
-		return BasicTypes[ErrorTypeKind]
+		return CreateErrorType()
 	default:
 		return nil
 	}
@@ -677,7 +658,9 @@ func (a *AliasType) AddFullTypeName(name string) {
 	if a == nil {
 		return
 	}
-	a.fullTypeName = append(a.fullTypeName, name)
+	if !lo.Contains(a.fullTypeName, name) {
+		a.fullTypeName = append(a.fullTypeName, name)
+	}
 }
 
 func (a *AliasType) GetFullTypeNames() []string {
@@ -691,7 +674,7 @@ func (a *AliasType) SetFullTypeNames(names []string) {
 	if a == nil {
 		return
 	}
-	a.fullTypeName = names
+	a.fullTypeName = clean(names)
 }
 
 // func (b *AliasType) GetAllKey() []string {
@@ -813,7 +796,7 @@ func (i *InterfaceType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	i.fullTypeName = names
+	i.fullTypeName = clean(names)
 }
 
 // ====================== chan type
@@ -829,7 +812,9 @@ func (c *ChanType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = append(c.fullTypeName, name)
+	if !lo.Contains(c.fullTypeName, name) {
+		c.fullTypeName = append(c.fullTypeName, name)
+	}
 }
 
 func (c *ChanType) GetFullTypeNames() []string {
@@ -843,7 +828,7 @@ func (c *ChanType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = names
+	c.fullTypeName = clean(names)
 }
 
 // func (b *ChanType) GetAllKey() []string {
@@ -911,7 +896,9 @@ func (i *ObjectType) AddFullTypeName(name string) {
 	if i == nil {
 		return
 	}
-	i.fullTypeName = append(i.fullTypeName, name)
+	if !lo.Contains(i.fullTypeName, name) {
+		i.fullTypeName = append(i.fullTypeName, name)
+	}
 }
 
 func (i *ObjectType) GetFullTypeNames() []string {
@@ -925,7 +912,7 @@ func (i *ObjectType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	i.fullTypeName = names
+	i.fullTypeName = clean(names)
 }
 
 func (i *ObjectType) SetName(name string) {
@@ -961,7 +948,7 @@ func NewObjectType() *ObjectType {
 func NewSliceType(elem Type) *ObjectType {
 	i := NewObjectType()
 	i.Kind = SliceTypeKind
-	i.KeyTyp = BasicTypes[NumberTypeKind]
+	i.KeyTyp = CreateNumberType()
 	i.FieldType = elem
 	return i
 }
@@ -977,6 +964,12 @@ func NewMapType(key, field Type) *ObjectType {
 func NewStructType() *ObjectType {
 	i := NewObjectType()
 	i.Kind = StructTypeKind
+	return i
+}
+
+func NewPointerType() *ObjectType {
+	i := NewObjectType()
+	i.Kind = PointerKind
 	return i
 }
 
@@ -1159,7 +1152,9 @@ func (f *FunctionType) AddFullTypeName(name string) {
 	if f == nil {
 		return
 	}
-	f.fullTypeName = append(f.fullTypeName, name)
+	if !lo.Contains(f.fullTypeName, name) {
+		f.fullTypeName = append(f.fullTypeName, name)
+	}
 }
 
 func (f *FunctionType) GetFullTypeNames() []string {
@@ -1173,14 +1168,14 @@ func (f *FunctionType) SetFullTypeNames(names []string) {
 	if f == nil {
 		return
 	}
-	f.fullTypeName = names
+	f.fullTypeName = clean(names)
 }
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
 
 func CalculateType(ts []Type) Type {
 	if len(ts) == 0 {
-		return BasicTypes[NullTypeKind]
+		return CreateNullType()
 	} else if len(ts) == 1 {
 		return ts[0]
 	} else {
@@ -1312,7 +1307,9 @@ func (c *GenericType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = append(c.fullTypeName, name)
+	if !lo.Contains(c.fullTypeName, name) {
+		c.fullTypeName = append(c.fullTypeName, name)
+	}
 }
 
 func (c *GenericType) GetFullTypeNames() []string {
@@ -1326,7 +1323,7 @@ func (c *GenericType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = names
+	c.fullTypeName = clean(names)
 }
 
 func (c *GenericType) GetTypeKind() TypeKind {
@@ -1502,22 +1499,71 @@ func (c *OrType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = names
+	c.fullTypeName = clean(names)
 }
 
 func (c *OrType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	c.fullTypeName = append(c.fullTypeName, name)
+	if !lo.Contains(c.fullTypeName, name) {
+		c.fullTypeName = append(c.fullTypeName, name)
+	}
 }
 
 func (c *OrType) GetTypeKind() TypeKind {
+	// var typ Type
+
+	// var checkAllTypes func(*OrType) bool
+	// checkAllTypes = func(or *OrType) bool {
+	// 	for _, t := range or.types {
+	// 		switch t := t.(type) {
+	// 		case *OrType:
+	// 			checkAllTypes(t)
+	// 		default:
+	// 			if typ == nil {
+	// 				typ = t
+	// 				continue
+	// 			}
+	// 			if typ.GetTypeKind() != t.GetTypeKind() {
+	// 				return false
+	// 			}
+	// 		}
+	// 	}
+	// 	return true
+	// }
+	// if checkAllTypes(c) {
+	// 	return typ.GetTypeKind()
+	// } else {
 	return OrTypeKind
+	// }
 }
 
 func (c *OrType) GetTypes() Types {
-	return c.types
+	var rets Types
+	types := make(map[Type]bool)
+
+	var checkAllTypes func(*OrType)
+	checkAllTypes = func(or *OrType) {
+		for _, t := range or.types {
+			switch t := t.(type) {
+			case *OrType:
+				checkAllTypes(t)
+			default:
+				if _, ok := types[t]; ok {
+					return
+				}
+				types[t] = true
+			}
+		}
+	}
+	checkAllTypes(c)
+	for t, _ := range types {
+		rets = append(rets, t)
+	}
+
+	return rets
+	// return c.types
 }
 
 func NewOrType(types ...Type) Type {

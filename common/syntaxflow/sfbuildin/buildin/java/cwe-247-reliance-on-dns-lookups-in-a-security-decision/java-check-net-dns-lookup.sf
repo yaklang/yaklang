@@ -1,78 +1,179 @@
 desc(
-	title_zh: "检测Java java.net.InetAddress 进行DNS查询"
-	title: "Check Java java.net.InetAddress DNS Lookup"
+	title_zh: "检测Java java.net.InetAddress 在安全决策中的DNS查询"
+	title: "Check Java java.net.InetAddress DNS Lookup in Security Decisions"
 	risk:"api-abuse"
 	reference: <<<REFERENCE
 [CWE-247: Reliance on DNS Lookups in a Security Decision](https://cwe.mitre.org/data/definitions/247.html)
 [Oracle JavaDocs: java.net.InetAddress](https://docs.oracle.com/javase/8/docs/api/java/net/InetAddress.html)
 REFERENCE
-	desc: <<<DESCRIPTION
-该规则检测对 java.net.InetAddress 类方法的误用，这些方法在与认证相关的安全决策中依赖 DNS 查询，可能导致安全风险。
-该规则审计的类:
-- java.net.InetAddress
-DESCRIPTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在安全决策中依赖DNS查找（如主机名解析）可能导致安全隐患。攻击者可能利用DNS欺骗、缓存投毒等技术伪造域名解析结果，从而绕过基于主机名或IP地址的认证机制。例如，攻击者可以将恶意服务器的IP地址映射到受信任的域名，进而伪装成合法用户。
+2. **触发场景**
+```java
+import java.net.InetAddress;
+import java.io.IOException;
+public class UnsafeAuthExample {
+    public void authenticateClient(String clientIP) {
+        try {
+            // 根据客户端 IP 获取主机名
+            InetAddress addr = InetAddress.getByName(clientIP);
+            String hostname = addr.getHostName();
+            // 基于主机名进行认证（不安全）
+            if (hostname.endsWith(".trusted-domain.com")) {
+                System.out.println("认证成功！");
+                grantAccess();
+            } else {
+                System.out.println("认证失败！");
+                denyAccess();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+上述代码通过`getHostName()`方法获取客户端IP对应的主机名，并基于主机名后缀判断是否允许访问。然而，由于DNS解析结果不可靠，攻击者可以通过伪造DNS记录绕过该限制。
+3. **潜在影响**
+- 攻击者可能伪装成可信主机，获取未经授权的系统访问权限。
+- 机密数据泄露或被篡改。
+- 系统完整性受到威胁，进一步扩大攻击面。
+DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
-1. **避免在安全决策中依赖DNS查找结果**
-   不要使用`java.net.InetAddress`的`getHostName()`、`getCanonicalHostName()`等方法的结果来作为认证或授权的依据。IP地址本身也可能因网络配置或转发而存在不确定性。
-
-2. **使用更安全的身份验证和授权机制**
-   - 考虑使用基于证书的身份验证（如SSL/TLS客户端证书）。
-   - Implement robust user authentication mechanisms (e.g., username/password, OAuth, SAML).
-   - 基于来源IP的限制，应谨慎使用，并结合其他安全措施。
-
-3. **进行适当的输入验证**
-   对所有用户提供的输入（包括IP地址或主机名）进行严格的验证和清理，以免被用于其他漏洞利用。
-
-4. **修复代码示例（针对上述触发场景）**
-   避免依赖主机名进行认证。如果必须限制来自特定网络的访问，考虑使用更可靠的IP地址范围限制，而不是依赖反向DNS。
-
-   ```java
-   import java.net.InetAddress;
-   import java.net.UnknownHostException;
-   import java.io.IOException;
-
-   public class SaferAuthExample {
-       public void authenticateClient(String clientIP) {
-           try {
-               InetAddress addr = InetAddress.getByName(clientIP);
-               if (isInInternalNetwork(addr)) {
-                   System.out.println("认证成功！来源IP在内部网段。");
-                   grantAccess();
-               } else {
-                   System.out.println("认证失败！来源IP不在内部网段。");
-                   denyAccess();
-               }
-           } catch (UnknownHostException e) {
-               System.out.println("认证失败！无法解析IP。");
-               denyAccess();
-           } catch (IOException e) {
-               e.printStackTrace();
-               denyAccess();
-           }
-       }
-
-       private boolean isInInternalNetwork(InetAddress addr) {
-           return addr.isSiteLocalAddress();
-       }
-
-       private void grantAccess() { /* ... */ }
-       private void denyAccess() { /* ... */ }
-   }
-   ```
-   **请注意**：仅仅基于IP地址进行认证也不总是完全安全的，因为IP地址可以被欺骗或通过代理转发。最安全的做法是结合多种认证和授权机制。
+#### 1. 避免在安全决策中依赖DNS查找结果
+不要使用`java.net.InetAddress`的`getHostName()`、`getCanonicalHostName()`等方法的结果来作为认证或授权的依据。IP地址本身也可能因网络配置或转发而存在不确定性。
+#### 2. 使用更安全的身份验证和授权机制
+- 考虑使用基于证书的身份验证（如SSL/TLS客户端证书）。
+- 实施强大的用户身份验证机制（如用户名/密码、OAuth、SAML）。
+- 对来源IP的限制应谨慎使用，并结合其他安全措施。
+#### 3. 进行适当的输入验证
+对所有用户提供的输入（包括IP地址或主机名）进行严格的验证和清理，以免被用于其他漏洞利用。
+#### 4. 修复代码示例（针对上述触发场景）
+避免依赖主机名进行认证。如果必须限制来自特定网络的访问，考虑使用更可靠的IP地址范围限制，而不是依赖反向DNS。
+```java
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.io.IOException;
+public class SaferAuthExample {
+    public void authenticateClient(String clientIP) {
+        try {
+            InetAddress addr = InetAddress.getByName(clientIP);
+            if (isInInternalNetwork(addr)) {
+                System.out.println("认证成功！来源IP在内部网段。");
+                grantAccess();
+            } else {
+                System.out.println("认证失败！来源IP不在内部网段。");
+                denyAccess();
+            }
+        } catch (UnknownHostException e) {
+            System.out.println("认证失败！无法解析IP。");
+            denyAccess();
+        } catch (IOException e) {
+            e.printStackTrace();
+            denyAccess();
+        }
+    }
+    private boolean isInInternalNetwork(InetAddress addr) {
+        return addr.isSiteLocalAddress();
+    }
+    private void grantAccess() { /* ... */ }
+    private void denyAccess() { /* ... */ }
+}
+```
+**请注意**：仅仅基于IP地址进行认证也不总是完全安全的，因为IP地址可以被欺骗或通过代理转发。最安全的做法是结合多种认证和授权机制。
 SOLUTION
 	rule_id: "7501f545-a313-4bb7-b6bb-48aab80cb284"
 )
 
 InetAddress?{<typeName>?{have:'java.net'}}./(get.*By.*|getLocalHost|getLoopbackAddress)/ as $weak;
 alert $weak for {
-	risk: "api-abuse",
+	risk: "DNS查询依赖",
 	message: "发现Java java.net.InetAddress 进行DNS查询",
 	title: "Check Java java.net.InetAddress DNS Lookup",
 	title_zh: "检测Java java.net.InetAddress 进行DNS查询",
 	level: "low",
+	name: "weak",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免在安全决策中依赖DNS查找结果
+不要使用`java.net.InetAddress`的`getHostName()`、`getCanonicalHostName()`等方法的结果来作为认证或授权的依据。IP地址本身也可能因网络配置或转发而存在不确定性。
+#### 2. 使用更安全的身份验证和授权机制
+- 考虑使用基于证书的身份验证（如SSL/TLS客户端证书）。
+- 实施强大的用户身份验证机制（如用户名/密码、OAuth、SAML）。
+- 对来源IP的限制应谨慎使用，并结合其他安全措施。
+#### 3. 进行适当的输入验证
+对所有用户提供的输入（包括IP地址或主机名）进行严格的验证和清理，以免被用于其他漏洞利用。
+#### 4. 修复代码示例（针对上述触发场景）
+避免依赖主机名进行认证。如果必须限制来自特定网络的访问，考虑使用更可靠的IP地址范围限制，而不是依赖反向DNS。
+```java
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.io.IOException;
+public class SaferAuthExample {
+public void authenticateClient(String clientIP) {
+try {
+InetAddress addr = InetAddress.getByName(clientIP);
+if (isInInternalNetwork(addr)) {
+System.out.println("认证成功！来源IP在内部网段。");
+grantAccess();
+} else {
+System.out.println("认证失败！来源IP不在内部网段。");
+denyAccess();
+}
+} catch (UnknownHostException e) {
+System.out.println("认证失败！无法解析IP。");
+denyAccess();
+} catch (IOException e) {
+e.printStackTrace();
+denyAccess();
+}
+}
+private boolean isInInternalNetwork(InetAddress addr) {
+return addr.isSiteLocalAddress();
+}
+private void grantAccess() { /* ... */ }
+private void denyAccess() { /* ... */ }
+}
+```
+**请注意**：仅仅基于IP地址进行认证也不总是完全安全的，因为IP地址可以被欺骗或通过代理转发。最安全的做法是结合多种认证和授权机制。
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在安全决策中依赖DNS查找（如主机名解析）可能导致安全隐患。攻击者可能利用DNS欺骗、缓存投毒等技术伪造域名解析结果，从而绕过基于主机名或IP地址的认证机制。例如，攻击者可以将恶意服务器的IP地址映射到受信任的域名，进而伪装成合法用户。
+2. **触发场景**
+// 存在漏洞的代码示例
+```java
+import java.net.InetAddress;
+import java.io.IOException;
+public class UnsafeAuthExample {
+public void authenticateClient(String clientIP) {
+try {
+// 根据客户端 IP 获取主机名
+InetAddress addr = InetAddress.getByName(clientIP);
+String hostname = addr.getHostName();
+// 基于主机名进行认证（不安全）
+if (hostname.endsWith(".trusted-domain.com")) {
+System.out.println("认证成功！");
+grantAccess();
+} else {
+System.out.println("认证失败！");
+denyAccess();
+}
+} catch (IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+上述代码通过`getHostName()`方法获取客户端IP对应的主机名，并基于主机名后缀判断是否允许访问。然而，由于DNS解析结果不可靠，攻击者可以通过伪造DNS记录绕过该限制。
+3. **潜在影响**
+- 攻击者可能伪装成可信主机，获取未经授权的系统访问权限。
+- 机密数据泄露或被篡改。
+- 系统完整性受到威胁，进一步扩大攻击面。
+DESC
 }
 
 

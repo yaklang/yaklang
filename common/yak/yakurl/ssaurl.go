@@ -1,7 +1,6 @@
 package yakurl
 
 import (
-	"bytes"
 	"sort"
 	"strconv"
 	"strings"
@@ -9,7 +8,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/dot"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -259,7 +257,7 @@ func (a *SyntaxFlowAction) Get(params *ypb.RequestYakURLParams) (resp *ypb.Reque
 			if v == nil || err != nil {
 				continue
 			}
-			codeRange, source := ssaapi.CoverCodeRange(programName, v.GetRange())
+			codeRange, source := ssaapi.CoverCodeRange(v.GetRange())
 			if query.haveRange && codeRange.URL == "" {
 				continue
 			}
@@ -376,76 +374,14 @@ func Variable2Response(result *ssaapi.SyntaxFlowResult, url *ypb.YakURL) []*ypb.
 	return resources
 }
 
-//func coverCodeRange(programName string, r memedit.RangeIf) (*ssaapi.CodeRange, string) {
-//	// url := ""
-//	source := ""
-//	ret := &ssaapi.CodeRange{
-//		URL:            "",
-//		StartLine:      0,
-//		StartColumn:    0,
-//		EndLine:        0,
-//		EndColumn:      0,
-//		SourceCodeLine: 0,
-//	}
-//	if r == nil {
-//		return ret, source
-//	}
-//	if editor := r.GetEditor(); editor != nil {
-//		ret.URL = fmt.Sprintf("/%s/%s", programName, editor.GetFilename())
-//		source = editor.GetTextFromRangeContext(r, ssaapi.CodeContextLine)
-//	}
-//	if start := r.GetStart(); start != nil {
-//		ret.StartLine = int64(start.GetLine())
-//		ret.StartColumn = int64(start.GetColumn())
-//	}
-//	if end := r.GetEnd(); end != nil {
-//		ret.EndLine = int64(end.GetLine())
-//		ret.EndColumn = int64(end.GetColumn())
-//	}
-//	if start := ret.StartLine - ssaapi.CodeContextLine - 1; start > 0 {
-//		ret.SourceCodeLine = start
-//	}
-//	return ret, source
-//}
-
-type NodeInfo struct {
-	NodeID          string            `json:"node_id"`
-	IRCode          string            `json:"ir_code"`
-	SourceCode      string            `json:"source_code"`
-	SourceCodeStart int               `json:"source_code_start"`
-	CodeRange       *ssaapi.CodeRange `json:"code_range"`
-}
-
-func coverNodeInfos(graph *ssaapi.ValueGraph, programName string) []*NodeInfo {
-	res := make([]*NodeInfo, 0, len(graph.Node2Value))
-	for id, node := range graph.Node2Value {
-		codeRange, source := ssaapi.CoverCodeRange(programName, node.GetRange())
-		ret := &NodeInfo{
-			NodeID:     dot.NodeName(id),
-			IRCode:     node.String(),
-			SourceCode: source,
-			CodeRange:  codeRange,
-		}
-		res = append(res, ret)
-	}
-	return res
-}
-
 func Value2Response(programName string, value *ssaapi.Value, msg string, url *ypb.YakURL) *ypb.YakURLResource {
-	vg := ssaapi.NewValueGraph(value)
-	nodeID := vg.Value2Node[value]
-	nodeInfos := coverNodeInfos(vg, programName)
-	graphLines := vg.DeepFirstGraphPrev(value)
-
-	var buf bytes.Buffer
-	vg.GenerateDOT(&buf)
-	dotString := buf.String()
+	graphInfo := value.GetGraphInfo()
 	res := createNewRes(url, 0, []extra{
-		{"node_id", dot.NodeName(nodeID)},
-		{"graph", dotString},
-		{"graph_info", nodeInfos},
+		{"node_id", graphInfo.NodeID},
+		{"graph", graphInfo.Graph},
+		{"graph_info", graphInfo.GraphInfo},
 		{"message", msg},
-		{"graph_line", graphLines},
+		{"graph_line", graphInfo.GraphPath},
 	})
 
 	res.ResourceType = "information"

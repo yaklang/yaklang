@@ -9,69 +9,54 @@ desc(
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   `GroovyShell`允许应用程序动态执行Groovy脚本，如果输入的脚本内容来自不可信的外部来源且未经充分校验和过滤，攻击者可以注入恶意代码，导致服务器执行任意命令。这种远程代码执行（RCE）漏洞可能引发严重后果。
-
+`GroovyShell`允许应用程序动态执行Groovy脚本，如果输入的脚本内容来自不可信的外部来源且未经充分校验和过滤，攻击者可以注入恶意代码，导致服务器执行任意命令。这种远程代码执行（RCE）漏洞可能引发严重后果。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   String userInput = request.getParameter("script"); // 未过滤的用户输入
-   GroovyShell shell = new GroovyShell();
-   shell.evaluate(userInput); // 直接执行用户输入的脚本
-   ```
-   攻击者可以通过构造特殊的Groovy脚本，例如执行系统命令或访问敏感文件，从而控制服务器或窃取数据。
-
+// 存在漏洞的代码示例
+```java
+String userInput = request.getParameter("script"); // 未过滤的用户输入
+GroovyShell shell = new GroovyShell();
+shell.evaluate(userInput); // 直接执行用户输入的脚本
+```
+攻击者可以通过构造特殊的Groovy脚本，例如执行系统命令或访问敏感文件，从而控制服务器或窃取数据。
 3. **潜在影响**
-   - 执行任意系统命令，可能导致服务器被完全控制。
-   - 泄露敏感信息，如数据库密码、用户数据等。
-   - 通过服务器进一步渗透内网。
-
-
+- 执行任意系统命令，可能导致服务器被完全控制。
+- 泄露敏感信息，如数据库密码、用户数据等。
+- 通过服务器进一步渗透内网。
 DESC
 	rule_id: "0018c56b-b5f7-49fc-80f4-d1b9a5f718e5"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 GroovyShell 执行不受信任的代码
 如果可能，应彻底避免使用`GroovyShell`来执行来自终端用户的、未经严格验证和沙箱化的代码。考虑使用更安全的、专为执行表达式设计的库（如`AviatorScript`, `JEXL`）或采用更严格的代码沙箱机制。
-
 #### 2. 对用户输入进行严格的过滤和校验
 如果必须使用`GroovyShell`执行用户提供的代码，务必对输入内容进行极致的过滤和校验。仅允许执行白名单中的、已知安全的Groovy代码片段或结构，拒绝任何包含可执行系统命令、文件操作、网络访问等敏感操作的代码。
-
 #### 3. 使用安全沙箱
 配置`GroovyShell`的安全策略或使用Java的安全管理器 (`SecurityManager`) 对Groovy脚本的执行环境进行限制，例如限制文件访问、网络访问、系统属性读取等。请注意，构建一个足够安全的沙箱环境非常复杂且容易出错，需要深入理解Groovy的执行机制和潜在的逃逸技术。
-
 #### 4. 最小权限原则
 运行应用程序的系统用户应遵循最小权限原则，限制其对操作系统资源的访问权限，即使命令执行成功，也能最小化攻击的影响范围。
-
 #### 示例代码 (仅为示意，沙箱机制实现复杂，需谨慎使用)：
-
 ```java
 import java.security.Policy;
 import java.security.Permission;
 import java.security.Permissions;
 import groovy.lang.GroovyShell;
-
 // 创建一个简单的安全策略，严格限制权限
 class RestrictedPolicy extends Policy {
-    @Override
-    public Permissions getPermissions(java.security.CodeSource codesource) {
-        Permissions perms = new Permissions();
-        // 仅允许读写位于特定路径的文件，具体路径需要根据应用实际情况调整
-        perms.add(new java.io.FilePermission("/secure/path/-", "read,write"));
-        return perms;
-    }
+@Override
+public Permissions getPermissions(java.security.CodeSource codesource) {
+Permissions perms = new Permissions();
+// 仅允许读写位于特定路径的文件，具体路径需要根据应用实际情况调整
+perms.add(new java.io.FilePermission("/secure/path/-", "read,write"));
+return perms;
 }
-
+}
 // 设置安全策略
 Policy.setPolicy(new RestrictedPolicy());
-
 // 使用GroovyShell执行代码
 GroovyShell shell = new GroovyShell();
 shell.evaluate("println 'Hello, World'");
 ```
-
 SOLUTION
 )
 
@@ -111,73 +96,62 @@ $groovy.parse?{*().run}(*<slice(index=1)> as $output);
 // run(GroovyCodeSource source, List<String> args)  # 不审计
 $groovy.run(*<slice(index=1)>?{<typeName>?{any:'File','Reader','String'}} as $output);
 alert $output for {
-	level: "high",
+	level: "info",
 	title: "Audit Java GroovyShell Code Execution Sink",
 	title_zh: "审计Java GroovyShell 代码执行Sink点",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 GroovyShell 执行不受信任的代码
 如果可能，应彻底避免使用`GroovyShell`来执行来自终端用户的、未经严格验证和沙箱化的代码。考虑使用更安全的、专为执行表达式设计的库（如`AviatorScript`, `JEXL`）或采用更严格的代码沙箱机制。
-
 #### 2. 对用户输入进行严格的过滤和校验
 如果必须使用`GroovyShell`执行用户提供的代码，务必对输入内容进行极致的过滤和校验。仅允许执行白名单中的、已知安全的Groovy代码片段或结构，拒绝任何包含可执行系统命令、文件操作、网络访问等敏感操作的代码。
-
 #### 3. 使用安全沙箱
 配置`GroovyShell`的安全策略或使用Java的安全管理器 (`SecurityManager`) 对Groovy脚本的执行环境进行限制，例如限制文件访问、网络访问、系统属性读取等。请注意，构建一个足够安全的沙箱环境非常复杂且容易出错，需要深入理解Groovy的执行机制和潜在的逃逸技术。
-
 #### 4. 最小权限原则
 运行应用程序的系统用户应遵循最小权限原则，限制其对操作系统资源的访问权限，即使命令执行成功，也能最小化攻击的影响范围。
-
 #### 示例代码 (仅为示意，沙箱机制实现复杂，需谨慎使用)：
-
 ```java
 import java.security.Policy;
 import java.security.Permission;
 import java.security.Permissions;
-import java.security.AllPermission;
 import groovy.lang.GroovyShell;
-
 // 创建一个简单的安全策略，严格限制权限
 class RestrictedPolicy extends Policy {
-    @Override
-    public Permissions getPermissions(java.security.CodeSource codesource) {
-        Permissions perms = new Permissions();
-        // 仅允许读写位于特定路径的文件，具体路径需要根据应用实际情况调整
-        perms.add(new java.io.FilePermission("/secure/path/-", "read,write"));
-        return perms;
-    }
+@Override
+public Permissions getPermissions(java.security.CodeSource codesource) {
+Permissions perms = new Permissions();
+// 仅允许读写位于特定路径的文件，具体路径需要根据应用实际情况调整
+perms.add(new java.io.FilePermission("/secure/path/-", "read,write"));
+return perms;
 }
-
+}
 // 设置安全策略
 Policy.setPolicy(new RestrictedPolicy());
-
 // 使用GroovyShell执行代码
 GroovyShell shell = new GroovyShell();
 shell.evaluate("println 'Hello, World'");
 ```
-
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   `GroovyShell`允许应用程序动态执行Groovy脚本，如果输入的脚本内容来自不可信的外部来源且未经充分校验和过滤，攻击者可以注入恶意代码，导致服务器执行任意命令。
-
+`GroovyShell`允许应用程序动态执行Groovy脚本，如果输入的脚本内容来自不可信的外部来源且未经充分校验和过滤，攻击者可以注入恶意代码，导致服务器执行任意命令。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   String userInput = request.getParameter("script"); // 未过滤的用户输入
-   GroovyShell shell = new GroovyShell();
-   shell.evaluate(userInput); // 直接执行用户输入的脚本
-   ```
-   攻击者可以通过构造特殊的Groovy脚本，执行任意系统命令。
-
+// 存在漏洞的代码示例
+```java
+String userInput = request.getParameter("script"); // 未过滤的用户输入
+GroovyShell shell = new GroovyShell();
+shell.evaluate(userInput); // 直接执行用户输入的脚本
+```
+攻击者可以通过构造特殊的Groovy脚本，执行任意系统命令。
 3. **潜在影响**
-   - 执行任意系统命令，可能导致服务器被完全控制。
-   - 泄露敏感信息，如数据库密码、用户数据等。
-   - 通过服务器进一步渗透内网。
-CODE
+- 执行任意系统命令，可能导致服务器被完全控制。
+- 泄露敏感信息，如数据库密码、用户数据等。
+- 通过服务器进一步渗透内网。
+DESC
+	risk: "信息",
+	name: "output",
+	message: "发现Java GroovyShell代码执行Sink点，该规则用于审计代码中是否存在潜在的远程代码执行风险。",
 }
 
 
@@ -273,5 +247,117 @@ public class CodeController {
     }
 
 }
+CODE
+	"safefile://SafeGroovyExpressionExecution.java": <<<CODE
+import org.codehaus.groovy.control.CompilerConfiguration;
+import groovy.lang.GroovyShell;
+import groovy.lang.Script;
+
+public class SafeGroovyExpressionExecution {
+
+    public static void main(String[] args) {
+        // 规则检测 GroovyShell 的 evaluate/parse/run 方法，尤其是当输入源是外部时。
+        // 这里我们使用一个硬编码的、安全的Groovy表达式，并且不涉及文件或外部输入。
+        String safeExpression = "2 + 2";
+        
+        try {
+            GroovyShell shell = new GroovyShell();
+            Object result = shell.evaluate(safeExpression);
+            System.out.println("Safe expression result: " + result);
+
+            // 另一个安全的场景：执行预编译的、内部定义的脚本
+            String anotherSafeScript = "println 'Hello from safe script!'";
+            Script script = shell.parse(anotherSafeScript);
+            script.run();
+
+            // 避免run方法接收外部输入的File, Reader, String
+            // 这里的run方法是Script对象的run方法，且Script内容是内部定义的
+            // shell.run()方法如果参数不是GroovyCodeSource，则会触发
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void executeKnownGroovyScript(String scriptContent) {
+        // 假设scriptContent是经过严格白名单验证的，不含恶意的Groovy代码。
+        // 这种情况下，如果能确保输入安全，也可以避免触发规则。
+        // 但更安全的做法是避免动态执行。
+        if (isScriptContentSafe(scriptContent)) {
+            GroovyShell shell = new GroovyShell();
+            shell.evaluate(scriptContent);
+        }
+    }
+
+    private boolean isScriptContentSafe(String content) {
+        // 这是防止规则触发的关键点：这里需要实现严格的白名单或沙箱校验逻辑。
+        // 实际应用中，这通常非常复杂，且容易出错。
+        // 简单示例：只允许纯数学表达式
+        return content.matches("^[0-9+\-*/() .\\s]*$");
+    }
+
+    public void useLimitedGroovyShell() {
+        // 通过CompilerConfiguration限制Groovyshell的功能
+        CompilerConfiguration config = new CompilerConfiguration();
+        // 例如，禁止某些操作，如System.exit(), File I/O等
+        // config.setScriptBaseClass(SecureScriptDelegating.class.getName()); // 需要自定义安全基类
+        // config.addCompilationCustomizers(new SecureASTCustomizer()); // 更多AST转换安全限制
+
+        GroovyShell secureShell = new GroovyShell(config);
+        try {
+            // 即使执行外部内容，也因为配置了严格限制而相对安全
+            // 但这通常无法完全避免所有风险，只是提高了攻击门槛
+            secureShell.evaluate("println 'This is executed in a more secure shell.'");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+CODE
+	"safefile://NonGroovyShellEvaluation.java": <<<CODE
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import javax.script.ScriptException;
+
+public class NonGroovyShellEvaluation {
+
+    public static void main(String[] args) {
+        // 规则专门检测groovy.lang.GroovyShell，因此改用其他脚本引擎。
+        // 使用JavaScript引擎作为替代，因为它不属于GroovyShell的检测范围。
+        ScriptEngineManager manager = new ScriptEngineManager();
+        ScriptEngine engine = manager.getEngineByName("JavaScript");
+
+        if (engine != null) {
+            String userInput = "console.log('Hello from JavaScript!');"; // 假设这是经过验证的用户输入
+            try {
+                engine.eval(userInput);
+                System.out.println("JavaScript executed safely.");
+            } catch (ScriptException e) {
+                System.err.println("Script execution error: " + e.getMessage());
+            }
+        } else {
+            System.err.println("JavaScript engine not found.");
+        }
+    }
+
+    public void executeSafeExpressionUsingJEXL(String expression) {
+        // 使用Apache JEXL等专门设计用于安全表达式评估的库。
+        // 这种库通常不具备完整的图灵完备性，难以执行任意代码。
+        // 例如： org.apache.commons.jexl3.JexlBuilder().create().createExpression(expression).evaluate(null);
+        // (示例代码因为依赖未引入而注释，但说明了理念)
+        System.out.println("Using a safe expression library like JEXL (conceptual). Expression: " + expression);
+    }
+
+    public void executePredefinedBusinessLogic() {
+        // 避免动态执行用户输入。所有业务逻辑都应预先定义在代码中。
+        System.out.println("Executing predefined business logic, no dynamic script execution.");
+        int a = 10;
+        int b = 20;
+        int sum = a + b;
+        System.out.println("Sum: " + sum);
+    }
+}
+
 CODE
 )

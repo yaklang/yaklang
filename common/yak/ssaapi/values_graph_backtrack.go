@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"bytes"
 	"fmt"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/omap"
@@ -28,7 +27,7 @@ func (v *Value) recursive(visited map[*Value]struct{}, itemGetter func(value *Va
 func (v *Value) RecursiveDepends(h func(value *Value) error) {
 	visited := make(map[*Value]struct{})
 	v.recursive(visited, func(value *Value) []*Value {
-		return value.DependOn
+		return value.GetDependOn()
 	}, h)
 }
 
@@ -36,14 +35,14 @@ func (v *Value) RecursiveDepends(h func(value *Value) error) {
 func (v *Value) RecursiveEffects(h func(value *Value) error) {
 	visited := make(map[*Value]struct{})
 	v.recursive(visited, func(value *Value) []*Value {
-		return value.EffectOn
+		return value.GetEffectOn()
 	}, h)
 }
 
 func (v *Value) RecursiveDependsAndEffects(h func(value *Value) error) {
 	visited := make(map[*Value]struct{})
 	v.recursive(visited, func(value *Value) []*Value {
-		return append(value.DependOn, value.EffectOn...)
+		return append(value.GetDependOn(), value.GetEffectOn()...)
 	}, h)
 }
 
@@ -65,7 +64,8 @@ func (v *Value) RecursiveDependsAndEffects(h func(value *Value) error) {
 // strict common dependencies.
 func FindStrictCommonDepends(val Values) Values {
 	for _, v := range val {
-		if len(v.DependOn) == 0 && len(v.EffectOn) == 0 {
+		if (v.DependOn == nil || v.DependOn.Count() == 0) &&
+			(v.EffectOn == nil || v.EffectOn.Count() == 0) {
 			v.GetTopDefs()
 		}
 	}
@@ -109,7 +109,8 @@ func FindStrictCommonDepends(val Values) Values {
 // dependencies by rebuilding the top-level definition.
 func FindFlexibleCommonDepends(val Values) Values {
 	for _, v := range val {
-		if len(v.DependOn) == 0 && len(v.EffectOn) == 0 {
+		if (v.DependOn == nil || v.DependOn.Count() == 0) &&
+			(v.EffectOn == nil || v.EffectOn.Count() == 0) {
 			v.GetTopDefs()
 		}
 	}
@@ -130,7 +131,6 @@ func FindFlexibleCommonDepends(val Values) Values {
 		// rebuild the top defs
 		from.GetTopDefs()
 		from.RecursiveDepends(func(value *Value) error {
-
 			if value.GetId() == to.GetId() {
 				common = append(common, value)
 			}
@@ -162,14 +162,15 @@ func (v *Value) Backtrack() *omap.OrderedMap[string, *Value] {
 	for current != nil {
 		deps := current.DependOn
 		var p *Value
-		if len(deps) > 0 {
-			for _, result := range deps {
+		if deps != nil && deps.Count() > 0 {
+			deps.ForEach(func(key string, result *Value) bool {
 				if _, ok := visited[result.GetId()]; !ok {
 					visited[result.GetId()] = true
 					p = result
-					break
+					return false // break
 				}
-			}
+				return true // continue
+			})
 		} else {
 			break
 		}
@@ -192,18 +193,18 @@ func (v *Value) ShowBacktrack() {
 	buf.WriteString("===================== Backtrack from [t" + fmt.Sprint(v.GetId()) + "]`" + v.String() + "` =====================: \n\n")
 	if om == nil || om.Len() <= 0 {
 		buf.WriteString("empty parent\n")
-		fmt.Println(buf.String())
+		log.Infof(buf.String())
 		return
 	}
 
-	for index, track := range om.Values() {
-		if track == nil {
-			continue
-		}
-		indent := strings.Repeat(" ", index*2) + fmt.Sprintf("[depth:%2d]->", track.GetDepth())
-		buf.WriteString(indent + track.String() + "\n")
-	}
-	fmt.Println(buf.String())
+	// for index, track := range om.Values() {
+	// 	if track == nil {
+	// 		continue
+	// 	}
+	// 	indent := strings.Repeat(" ", index*2) + fmt.Sprintf("[depth:%2d]->", track.GetDepth())
+	// 	buf.WriteString(indent + track.String() + "\n")
+	// }
+	log.Infof(buf.String())
 }
 
 // FlexibleDepends is used to get all the dependencies of the value

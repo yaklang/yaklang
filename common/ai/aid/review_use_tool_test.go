@@ -3,6 +3,8 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"testing"
 	"time"
@@ -13,15 +15,15 @@ import (
 
 func TestCoordinator_ToolUseReview(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -76,7 +78,7 @@ LOOP:
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -86,7 +88,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
@@ -102,7 +104,7 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") {
 				useToolReviewPass = true
 				break LOOP
 			}

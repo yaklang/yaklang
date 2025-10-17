@@ -1,0 +1,351 @@
+desc(
+	title: "Audit Golang File Read ioutil Methods"
+	type: audit
+	level: info
+	lib: 'golang-file-read-ioutil'
+	desc: <<<DESC
+### 规则目的
+该规则主要用于审计Golang代码中使用 `io/ioutil` 包进行文件读取的操作，重点识别可能导致性能问题或已被废弃的函数调用。
+
+### 规则详细
+1. **作为基础检测库**
+   属于 `golang-file-read-ioutil` 基础库规则（`lib` 类型），用于识别 `io/ioutil` 包中的文件读取相关函数。通常需要结合更高级别的规则（如数据流跟踪规则）来检测潜在安全风险或性能问题。
+2. **识别相关函数**
+   规则识别 `io/ioutil` 包中的以下两个主要函数：
+   - `ReadAll`：从 `io.Reader` 中读取所有数据到内存。
+   - `ReadFile`：一次性将整个文件内容加载到内存。
+3. **潜在问题**
+   - **内存占用过高**：`ReadAll` 和 `ReadFile` 方法会将整个文件或数据流一次性加载到内存中。在处理大型文件时，这可能导致内存消耗激增，引发性能瓶颈甚至内存溢出。
+   - **使用已废弃功能**：`io/ioutil` 包已在 Go 1.16 中被正式标记为废弃，推荐使用 `os` 和 `io` 包中的替代方法。
+4. **触发场景**
+   ```go
+   package main
+   import (
+       "io/ioutil"
+       "log"
+   )
+   func main() {
+       // 使用 ioutil.ReadFile 读取大文件
+       content, err := ioutil.ReadFile("largefile.txt")
+       if err != nil {
+           log.Fatalf("Error reading file: %s", err)
+       }
+       // 处理 content
+   }
+   ```
+   上述代码在处理小型文件时表现正常，但如果 `largefile.txt` 文件非常大，则可能耗尽内存。
+5. **审计意义**
+   该规则有助于识别代码中潜在的性能风险和使用已废弃功能的点，提示开发者考虑使用更流式化或推荐的文件读取方法。
+DESC
+	rule_id: "21f220e7-4e85-4113-ada9-a3c1cffae028"
+	title_zh: "审计Golang ioutil文件读取方法"
+	solution: <<<SOLUTION
+### 解决方案
+#### 推荐使用 os 包中的替代方法
+对于 `ioutil.ReadFile`，推荐使用 `os.ReadFile`，其功能和用法与 `ioutil.ReadFile` 相似，但属于较新的标准库。
+```go
+// 示例：使用 os.ReadFile 读取文件
+content, err := os.ReadFile("filename.txt")
+if err != nil {
+    // 处理错误
+}
+// 使用 content
+```
+#### 对于大型文件，采用流式读取或分块读取
+对于 `ioutil.ReadAll` 读取整个 `io.Reader` 的情况，如果涉及大型数据流，应避免一次性加载到内存。可以考虑使用 `io.Copy` 或手动使用 `io.Reader` 接口结合缓冲区进行分块读取。
+```go
+// 示例：使用 io.Copy 将文件内容复制到 os.Stdout
+file, err := os.Open("largefile.txt")
+if err != nil {
+    // 处理错误
+}
+defer file.Close()
+if _, err := io.Copy(os.Stdout, file); err != nil {
+    // 处理错误
+}
+```
+```go
+// 示例：使用 bufio.Reader 进行分块读取
+file, err := os.Open("largefile.txt")
+if err != nil {
+    // 处理错误
+}
+defer file.Close()
+bufferSize := 4096 // 定义缓冲区大小
+reader := bufio.NewReader(file)
+buffer := make([]byte, bufferSize)
+for {
+    n, err := reader.Read(buffer)
+    if err != nil && err != io.EOF {
+        // 处理错误
+        break
+    }
+    if n == 0 {
+        break
+    }
+    // Process the buffer[:n]
+    // 例如：fmt.Println(string(buffer[:n]))
+}
+```
+通过采用流式或分块读取的方式，可以有效降低内存消耗，提高程序处理大型文件时的性能和稳定性。
+SOLUTION
+	reference: <<<REFERENCE
+[Go io/ioutil Documentation (Deprecated)](https://pkg.go.dev/io/ioutil)
+REFERENCE
+)
+
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.ReadAll().* as $output
+$entry.ReadFile().* as $output
+
+alert $output for {
+	title: "Audit Golang File Read ioutil Methods",
+	title_zh: "审计Golang ioutil文件读取方法",
+	solution: <<<SOLUTION
+### 解决方案
+#### 推荐使用 os 包中的替代方法
+对于 `ioutil.ReadFile`，推荐使用 `os.ReadFile`，其功能和用法与 `ioutil.ReadFile` 相似，但属于较新的标准库。
+```go
+// 示例：使用 os.ReadFile 读取文件
+content, err := os.ReadFile("filename.txt")
+if err != nil {
+// 处理错误
+}
+// 使用 content
+```
+#### 对于大型文件，采用流式读取或分块读取
+对于 `ioutil.ReadAll` 读取整个 `io.Reader` 的情况，如果涉及大型数据流，应避免一次性加载到内存。可以考虑使用 `io.Copy` 或手动使用 `io.Reader` 接口结合缓冲区进行分块读取。
+```go
+// 示例：使用 io.Copy 将文件内容复制到 os.Stdout
+file, err := os.Open("largefile.txt")
+if err != nil {
+// 处理错误
+}
+defer file.Close()
+if _, err := io.Copy(os.Stdout, file); err != nil {
+// 处理错误
+}
+```
+```go
+// 示例：使用 bufio.Reader 进行分块读取
+file, err := os.Open("largefile.txt")
+if err != nil {
+// 处理错误
+}
+defer file.Close()
+bufferSize := 4096 // 定义缓冲区大小
+reader := bufio.NewReader(file)
+buffer := make([]byte, bufferSize)
+for {
+n, err := reader.Read(buffer)
+if err != nil && err != io.EOF {
+// 处理错误
+break
+}
+if n == 0 {
+break
+}
+// Process the buffer[:n]
+// 例如：fmt.Println(string(buffer[:n]))
+}
+```
+通过采用流式或分块读取的方式，可以有效降低内存消耗，提高程序处理大型文件时的性能和稳定性。
+SOLUTION
+	desc: <<<DESC
+### 规则目的
+该规则主要用于审计Golang代码中使用 `io/ioutil` 包进行文件读取的操作。
+### 规则详细
+1. **作为基础检测库**
+属于 `golang-file-read-ioutil` 基础库规则（`lib` 类型），用于识别 `io/ioutil` 包中的文件读取相关函数。通常需要结合更高级别的规则（如数据流跟踪规则）来检测潜在安全风险或性能问题。
+2. **识别相关函数**
+规则识别 `io/ioutil` 包中的 `ReadAll` 和 `ReadFile` 方法的调用。
+3. **潜在问题**
+尽管 `io/ioutil` 包提供了便捷的文件读取功能，但 `ReadAll` 和 `ReadFile` 方法会将整个文件内容一次性加载到内存中。这在处理大型文件时可能导致内存占用过高，引发性能瓶颈甚至内存溢出。此外，`io/ioutil` 中的部分函数已被废弃，推荐使用 `os` 和 `io` 包中的替代方法。
+4. **审计意义**
+该规则有助于识别代码中潜在的性能风险和使用已废弃功能的点，提示开发者考虑使用更流式化或推荐的文件读取方法。
+DESC
+	level: "info",
+	message: "发现Golang代码中使用了 io/ioutil 包的 ReadAll 或 ReadFile 方法，可能存在性能问题或使用了废弃功能。",
+	risk: "信息",
+	name: "output",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://fileread.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+func main() {
+	// 要写入的文件名
+	fileName := "example.txt"
+
+	// 写入数据到文件
+	data := []byte("Hello, Go Programming!\nThis is a simple file I/O example.")
+	err := ioutil.WriteFile(fileName, data, 0644) // 0644 是文件权限
+	if err != nil {
+		log.Fatalf("Error writing to file: %s", err)
+		return
+	}
+	fmt.Println("Data written to file successfully.")
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading from file: %s", err)
+		return
+	}
+
+	// 打印文件内容
+	fmt.Println("File content:")
+	fmt.Println(string(content))
+}
+
+PARAM
+	"safefile://SafeReadFromFile.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"bufio"
+	"log"
+)
+
+func main() {
+	// -------------- 示例 1: 使用 os.ReadFile 替代 ioutil.ReadFile --------------
+	fileNameOS := "smallfile_os.txt"
+	dataOS := []byte("Hello from os.ReadFile!")
+
+	err := os.WriteFile(fileNameOS, dataOS, 0644)
+	if err != nil {
+		log.Fatalf("Error writing to %s: %s", fileNameOS, err)
+	}
+	fmt.Printf("Data written to %s successfully.\n", fileNameOS)
+
+	contentOS, err := os.ReadFile(fileNameOS)
+	if err != nil {
+		log.Fatalf("Error reading from %s: %s", fileNameOS, err)
+	}
+	fmt.Printf("Content from %s: %s\n", fileNameOS, string(contentOS))
+
+	// -------------- 示例 2: 使用 io.Copy 处理大型文件，避免一次性加载 --------------
+	fileNameLarge := "largefile_copy.txt"
+	// 创建一个模拟的大文件，这里只写入少量内容，实际应用中可能是数GB
+	largeFile, err := os.Create(fileNameLarge)
+	if err != nil {
+		log.Fatalf("Error creating %s: %s", fileNameLarge, err)
+	}
+	for i := 0; i < 1000; i++ {
+		_, _ = largeFile.WriteString("This is a line of content for a large file simulation.\n")
+	}
+	largeFile.Close()
+	fmt.Printf("Large file %s created for streaming example.\n", fileNameLarge)
+
+	// 使用 io.Copy 将文件内容复制到 os.Stdout (流式处理，不一次性载入内存)
+	fileToCopy, err := os.Open(fileNameLarge)
+	if err != nil {
+		log.Fatalf("Error opening %s for copying: %s", fileNameLarge, err)
+	}
+	defer fileToCopy.Close()
+
+	fmt.Printf("\n--- Content of %s via io.Copy (truncated for console) ---\n", fileNameLarge)
+	// 为了不刷屏，这里只复制前1KB到stdout
+	if _, err := io.CopyN(os.Stdout, fileToCopy, 1024); err != nil && err != io.EOF {
+		log.Fatalf("Error copying from %s: %s", fileNameLarge, err)
+	}
+	fmt.Println("\n--- End of io.Copy example ---")
+
+	// -------------- 示例 3: 使用 bufio.Reader 进行分块读取 --------------
+	fileNameBuffered := "buffered_read.txt"
+	// 创建一个模拟文件
+	bufferedFile, err := os.Create(fileNameBuffered)
+	if err != nil {
+		log.Fatalf("Error creating %s: %s", fileNameBuffered, err)
+	}
+	for i := 0; i < 50; i++ {
+		_, _ = bufferedFile.WriteString(fmt.Sprintf("Buffered line %d: This is content for buffered reading.\n", i))
+	}
+	bufferedFile.Close()
+	fmt.Printf("Buffered file %s created for chunked reading example.\n", fileNameBuffered)
+
+	fileToRead, err := os.Open(fileNameBuffered)
+	if err != nil {
+		log.Fatalf("Error opening %s for buffered reading: %s", fileNameBuffered, err)
+	}
+	defer fileToRead.Close()
+
+	bufferSize := 128 // 设置一个较小的缓冲区大小以便观察分块读取效果
+	reader := bufio.NewReader(fileToRead)
+	buffer := make([]byte, bufferSize)
+	
+	fmt.Printf("\n--- Content of %s via bufio.Reader (chunked) ---\n", fileNameBuffered)
+	for {
+		n, err := reader.Read(buffer) // 读取到缓冲区
+		if n > 0 {
+			// 处理读取到的数据: buffer[:n]
+			fmt.Printf("Read %d bytes: %s\n", n, string(buffer[:n]))
+		}
+		if err != nil {
+			if err == io.EOF {
+				break // 文件结束
+			}
+			log.Fatalf("Error during buffered read from %s: %s", fileNameBuffered, err)
+		}
+	}
+	fmt.Println("--- End of bufio.Reader example ---")
+
+	// 清理创建的文件
+	_ = os.Remove(fileNameOS)
+	_ = os.Remove(fileNameLarge)
+	_ = os.Remove(fileNameBuffered)
+}
+
+CODE
+	"safefile://NoIoutilImport.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"os"
+	"log"
+)
+
+func main() {
+	// 这个文件不导入 io/ioutil 包，因此不会触发规则。
+
+	fileName := "no_ioutil_example.txt"
+	data := []byte("This file is read without io/ioutil.")
+
+	// 使用os包写入文件
+	err := os.WriteFile(fileName, data, 0644) 
+	if err != nil {
+		log.Fatalf("Error writing to file: %s", err)
+		return
+	}
+	fmt.Println("Data written to file successfully using os package.")
+
+	// 使用os包读取文件内容
+	content, err := os.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading from file: %s", err)
+		return
+	}
+
+	fmt.Println("File content:")
+	fmt.Println(string(content))
+
+	// 清理文件
+	_ = os.Remove(fileName)
+}
+
+CODE
+)

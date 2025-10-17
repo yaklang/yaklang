@@ -1,6 +1,6 @@
 desc(
-	title_zh: "检测 Spring Framework 控制器模板路径 SSTI 注入漏洞"
-	title: "Check Spring Framework Controller Template Path SSTI Injection"
+	title_zh: "检测Spring控制器中未调用的SSTI漏洞"
+	title: "Check Java SSTI in Spring Controller Without Call"
 	type: vuln
 	risk: ssti
 	desc: <<<DESC
@@ -8,30 +8,30 @@ desc(
 
 1. **漏洞原理**
 服务器端模板注入（Server-Side Template Injection, SSTI）是指攻击者能够将恶意代码注入到模板中，并在服务器端执行。当应用程序使用模板引擎（如 FreeMarker, Thymeleaf, Velocity 等）动态生成网页内容，并且直接或间接将用户可控的输入作为模板的一部分进行解析时，就可能触发 SSTI 漏洞。攻击者通过精心构造输入，可以打破模板语法限制，执行任意代码，获取系统敏感信息，甚至控制服务器。
-
 在 Spring MVC 框架中，如果控制器（Controller）方法直接返回用户可控的字符串作为逻辑视图名（Logical View Name），并且该视图名会被模板解析器（View Resolver）处理，则存在 SSTI 风险。尤其是一些模板引擎在解析视图名时，如果没有严格的沙箱机制或输入过滤，用户的恶意输入可能被当做模板指令执行。
 
 2. **触发场景**
 以下是常见的触发场景：
-    - 控制器方法直接返回 `@RequestParam` 或 `@PathVariable` 获取的用户输入字符串。
-    - 控制器方法在返回的视图名中拼接了用户输入，且未对输入进行充分过滤或转义。
-    - 使用 `ModelAndView` 或 `Model` 对象，将用户输入作为视图名的一部分传递给模板引擎。
+- 控制器方法直接返回 `@RequestParam` 或 `@PathVariable` 获取的用户输入字符串。
+- 控制器方法在返回的视图名中拼接了用户输入，且未对输入进行充分过滤或转义。
+- 使用 `ModelAndView` 或 `Model` 对象，将用户输入作为视图名的一部分传递给模板引擎。
 
-    // 存在漏洞的代码示例 (参考 demo.java 中的 viewPage 方法)
-    ```java
-    @GetMapping("/view")
-    public String viewPage(@RequestParam String page, Model model) {
-        // 这里直接使用用户提供的参数作为模板名，这是不安全的
-        return page;
-    }
-    ```
-    攻击者可以尝试提交类似 `page=__${T(java.lang.Runtime).getRuntime().exec('calc.exe')}__` 的输入，如果模板引擎（如 Thymeleaf）配置不当，可能导致代码执行。
+// 存在漏洞的代码示例 (参考 demo.java 中的 viewPage 方法)
+```java
+@GetMapping("/view")
+public String viewPage(@RequestParam String page, Model model) {
+// 这里直接使用用户提供的参数作为模板名，这是不安全的
+return page;
+}
+```
+攻击者可以尝试提交类似 `page=__${T(java.lang.Runtime).getRuntime().exec('calc.exe')}__` 的输入，如果模板引擎（如 Thymeleaf）配置不当，可能导致代码执行。
 
 3. **潜在影响**
-    - **敏感信息泄露：** 攻击者可以读取服务器上的文件内容（如配置文件、源代码等）。
-    - **远程代码执行：** 在某些情况下，攻击者可以直接在服务器上执行任意命令。
-    - **系统控制：** 攻击者可能利用漏洞获取服务器权限，完全控制受影响的系统。
-    - **服务中断：** 错误的或恶意的模板指令可能导致应用程序崩溃或拒绝服务。
+- **敏感信息泄露：** 攻击者可以读取服务器上的文件内容（如配置文件、源代码等）。
+- **远程代码执行：** 在某些情况下，攻击者可以直接在服务器上执行任意命令。
+- **系统控制：** 攻击者可能利用漏洞获取服务器权限，完全控制受影响的系统。
+- **服务中断：** 错误的或恶意的模板指令可能导致应用程序崩溃或拒绝服务。
+
 DESC
 	rule_id: "4ada07d0-74e5-4d76-9d7d-4576610ee88e"
 	solution: <<<SOLUTION
@@ -39,45 +39,42 @@ DESC
 
 #### 1. 避免用户控制视图名
 最根本的修复方法是避免让用户直接或间接控制返回的视图名。硬编码视图名是安全的方式。
-
 ```java
 // 修复代码示例 (将硬编码视图名 "home")
 @GetMapping("/view")
 public String viewPage(@RequestParam String page, Model model) {
-    // 硬编码视图名，忽略用户输入 page
-    return "home"; 
+// 硬编码视图名，忽略用户输入 page
+return "home";
 }
 ```
 或者使用预定义的、不可变的视图名列表进行校验。
-
 ```java
 // 修复代码示例 (参考 demo.java 中的 viewPage4 方法的改进版本)
 @GetMapping("/view4")
 public String viewPage4(@RequestParam String page, Model model) {
-    List<String> allowedPages = Arrays.asList("home", "about", "contact");
-    // 对用户输入进行严格匹配，并返回白名单中的视图名
-    if (allowedPages.contains(page.toLowerCase())) {
-        return page.toLowerCase(); // 返回小写版本的白名单视图名
-    }
-    // 如果输入不在白名单中，返回错误页面或者默认页面
-    return "error"; 
+List<String> allowedPages = Arrays.asList("home", "about", "contact");
+// 对用户输入进行严格匹配，并返回白名单中的视图名
+if (allowedPages.contains(page.toLowerCase())) {
+return page.toLowerCase(); // 返回小写版本的白名单视图名
+}
+// 如果输入不在白名单中，返回错误页面或者默认页面
+return "error";
 }
 ```
 
 #### 2. 对用户输入进行严格的输入验证和过滤
 如果业务需求确实需要部分基于用户输入决定视图，必须对用户输入进行严格的白名单验证、过滤或转义。只允许预期中的字符或格式，拒绝任何可能包含模板语法或特殊字符的输入。
-
 ```java
 // 修复代码示例 (对输入进行更严格的过滤和校验)
 @GetMapping("/view2")
 public String viewPage2(@RequestParam String page, Model model) {
-    // 允许只包含字母、数字和下划线的页面名
-    if (!page.matches("^[a-zA-Z0-9_]+$")) {
-        // 输入不符合要求，返回错误或者抛出异常
-        return "errorPage"; 
-    }
-    // 可以在这里添加白名单检查，确保页面名是预期的
-    return page;
+// 允许只包含字母、数字和下划线的页面名
+if (!page.matches("^[a-zA-Z0-9_]+$")) {
+// 输入不符合要求，返回错误或者抛出异常
+return "errorPage";
+}
+// 可以在这里添加白名单检查，确保页面名是预期的
+return page;
 }
 ```
 
@@ -86,14 +83,13 @@ public String viewPage2(@RequestParam String page, Model model) {
 
 #### 4. 避免直接返回用户输入的字符串
 如果控制器方法只是需要返回纯文本内容而不是视图，应使用 `@ResponseBody` 注解或 `ResponseEntity`，这样 Spring 不会将返回值视为视图名进行解析。
-
 ```java
 // 修复代码示例 (使用 @ResponseBody 返回纯文本)
 @ResponseBody
 @GetMapping("/safe/viewer")
 public String viewPage3(@RequestParam String page, Model model) {
-    // 使用 @ResponseBody，返回的字符串会被直接写入响应体，而不是作为视图名解析
-    return page;
+// 使用 @ResponseBody，返回的字符串会被直接写入响应体，而不是作为视图名解析
+return page;
 }
 ```
 SOLUTION
@@ -107,9 +103,9 @@ REFERENCE
 Controller.__ref__<getMembers>?{.annotation.*Mapping && !.annotation.ResponseBody} as $entryMethods;
 $entryMethods<getReturns>?{<typeName>?{have: String}} as $sink;
 $sink #{
-    until: `* & $params as $source`,
+    until: `* & $params `,
     exclude: `*?{opcode: phi}`,
-}->;
+}-> as $source;
 $source<dataflow(<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $haveCall;
@@ -118,102 +114,91 @@ $source - $haveCall as $withoutCall;
 alert $withoutCall for {
 	title: "Check Java SSTI in Spring Controller Without Call",
 	title_zh: "检测Spring控制器中未调用的SSTI漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免用户控制视图名
 最根本的修复方法是避免让用户直接或间接控制返回的视图名。硬编码视图名是安全的方式。
-
 ```java
 // 修复代码示例 (将硬编码视图名 "home")
 @GetMapping("/view")
 public String viewPage(@RequestParam String page, Model model) {
-    // 硬编码视图名，忽略用户输入 page
-    return "home"; 
+// 硬编码视图名，忽略用户输入 page
+return "home";
 }
 ```
 或者使用预定义的、不可变的视图名列表进行校验。
-
 ```java
 // 修复代码示例 (参考 demo.java 中的 viewPage4 方法的改进版本)
 @GetMapping("/view4")
 public String viewPage4(@RequestParam String page, Model model) {
-    List<String> allowedPages = Arrays.asList("home", "about", "contact");
-    // 对用户输入进行严格匹配，并返回白名单中的视图名
-    if (allowedPages.contains(page.toLowerCase())) {
-        return page.toLowerCase(); // 返回小写版本的白名单视图名
-    }
-    // 如果输入不在白名单中，返回错误页面或者默认页面
-    return "error"; 
+List<String> allowedPages = Arrays.asList("home", "about", "contact");
+// 对用户输入进行严格匹配，并返回白名单中的视图名
+if (allowedPages.contains(page.toLowerCase())) {
+return page.toLowerCase(); // 返回小写版本的白名单视图名
+}
+// 如果输入不在白名单中，返回错误页面或者默认页面
+return "error";
 }
 ```
-
 #### 2. 对用户输入进行严格的输入验证和过滤
 如果业务需求确实需要部分基于用户输入决定视图，必须对用户输入进行严格的白名单验证、过滤或转义。只允许预期中的字符或格式，拒绝任何可能包含模板语法或特殊字符的输入。
-
 ```java
 // 修复代码示例 (对输入进行更严格的过滤和校验)
 @GetMapping("/view2")
 public String viewPage2(@RequestParam String page, Model model) {
-    // 允许只包含字母、数字和下划线的页面名
-    if (!page.matches("^[a-zA-Z0-9_]+$")) {
-        // 输入不符合要求，返回错误或者抛出异常
-        return "errorPage"; 
-    }
-    // 可以在这里添加白名单检查，确保页面名是预期的
-    return page;
+// 允许只包含字母、数字和下划线的页面名
+if (!page.matches("^[a-zA-Z0-9_]+$")) {
+// 输入不符合要求，返回错误或者抛出异常
+return "errorPage";
+}
+// 可以在这里添加白名单检查，确保页面名是预期的
+return page;
 }
 ```
-
 #### 3. 使用安全的模板引擎配置或沙箱机制
 对于使用的模板引擎，确保其配置是安全的，例如禁用表达式求值功能，或者启用并正确配置沙箱机制（如果模板引擎支持）。沙箱机制可以限制模板能够访问的对象和方法，从而降低代码执行的风险。
-
 #### 4. 避免直接返回用户输入的字符串
 如果控制器方法只是需要返回纯文本内容而不是视图，应使用 `@ResponseBody` 注解或 `ResponseEntity`，这样 Spring 不会将返回值视为视图名进行解析。
-
 ```java
 // 修复代码示例 (使用 @ResponseBody 返回纯文本)
 @ResponseBody
 @GetMapping("/safe/viewer")
 public String viewPage3(@RequestParam String page, Model model) {
-    // 使用 @ResponseBody，返回的字符串会被直接写入响应体，而不是作为视图名解析
-    return page;
+// 使用 @ResponseBody，返回的字符串会被直接写入响应体，而不是作为视图名解析
+return page;
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 服务器端模板注入（Server-Side Template Injection, SSTI）是指攻击者能够将恶意代码注入到模板中，并在服务器端执行。当应用程序使用模板引擎（如 FreeMarker, Thymeleaf, Velocity 等）动态生成网页内容，并且直接或间接将用户可控的输入作为模板的一部分进行解析时，就可能触发 SSTI 漏洞。攻击者通过精心构造输入，可以打破模板语法限制，执行任意代码，获取系统敏感信息，甚至控制服务器。
-
 在 Spring MVC 框架中，如果控制器（Controller）方法直接返回用户可控的字符串作为逻辑视图名（Logical View Name），并且该视图名会被模板解析器（View Resolver）处理，则存在 SSTI 风险。尤其是一些模板引擎在解析视图名时，如果没有严格的沙箱机制或输入过滤，用户的恶意输入可能被当做模板指令执行。
-
 2. **触发场景**
 以下是常见的触发场景：
-    - 控制器方法直接返回 `@RequestParam` 或 `@PathVariable` 获取的用户输入字符串。
-    - 控制器方法在返回的视图名中拼接了用户输入，且未对输入进行充分过滤或转义。
-    - 使用 `ModelAndView` 或 `Model` 对象，将用户输入作为视图名的一部分传递给模板引擎。
-
-    // 存在漏洞的代码示例 (参考 demo.java 中的 viewPage 方法)
-    ```java
-    @GetMapping("/view")
-    public String viewPage(@RequestParam String page, Model model) {
-        // 这里直接使用用户提供的参数作为模板名，这是不安全的
-        return page;
-    }
-    ```
-    攻击者可以尝试提交类似 `page=__${T(java.lang.Runtime).getRuntime().exec('calc.exe')}__` 的输入，如果模板引擎（如 Thymeleaf）配置不当，可能导致代码执行。
-
+- 控制器方法直接返回 `@RequestParam` 或 `@PathVariable` 获取的用户输入字符串。
+- 控制器方法在返回的视图名中拼接了用户输入，且未对输入进行充分过滤或转义。
+- 使用 `ModelAndView` 或 `Model` 对象，将用户输入作为视图名的一部分传递给模板引擎。
+// 存在漏洞的代码示例 (参考 demo.java 中的 viewPage 方法)
+```java
+@GetMapping("/view")
+public String viewPage(@RequestParam String page, Model model) {
+// 这里直接使用用户提供的参数作为模板名，这是不安全的
+return page;
+}
+```
+攻击者可以尝试提交类似 `page=__${T(java.lang.Runtime).getRuntime().exec('calc.exe')}__` 的输入，如果模板引擎（如 Thymeleaf）配置不当，可能导致代码执行。
 3. **潜在影响**
-    - **敏感信息泄露：** 攻击者可以读取服务器上的文件内容（如配置文件、源代码等）。
-    - **远程代码执行：** 在某些情况下，攻击者可以直接在服务器上执行任意命令。
-    - **系统控制：** 攻击者可能利用漏洞获取服务器权限，完全控制受影响的系统。
-    - **服务中断：** 错误的或恶意的模板指令可能导致应用程序崩溃或拒绝服务。
-CODE
+- **敏感信息泄露：** 攻击者可以读取服务器上的文件内容（如配置文件、源代码等）。
+- **远程代码执行：** 在某些情况下，攻击者可以直接在服务器上执行任意命令。
+- **系统控制：** 攻击者可能利用漏洞获取服务器权限，完全控制受影响的系统。
+- **服务中断：** 错误的或恶意的模板指令可能导致应用程序崩溃或拒绝服务。
+DESC
 	level: "high",
 	type: "vuln",
 	message: "Template Path Injection(Direct Use of User Input)",
+	risk: "SSTI",
+	name: "withoutCall",
 }
 
 
@@ -229,124 +214,113 @@ $haveCall - $filteredSink as $unsafeFilteredSink;
 alert $unsafeFilteredSink for {
 	title: "Check Java SSTI in Spring Controller With Filtered Input",
 	title_zh: "检测Spring控制器中经过过滤但仍存在风险的SSTI漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免用户控制视图名
 最根本的修复方法是避免让用户直接或间接控制返回的视图名。硬编码视图名是安全的方式。
-
 ```java
 // 修复代码示例 (将硬编码视图名 "home")
 @GetMapping("/view")
 public String viewPage(@RequestParam String page, Model model) {
-    // 硬编码视图名，忽略用户输入 page
-    return "home"; 
+// 硬编码视图名，忽略用户输入 page
+return "home";
 }
 ```
 或者使用预定义的、不可变的视图名列表进行校验。
-
 ```java
 // 修复代码示例 (参考 demo.java 中的 viewPage4 方法的改进版本)
 @GetMapping("/view4")
 public String viewPage4(@RequestParam String page, Model model) {
-    List<String> allowedPages = Arrays.asList("home", "about", "contact");
-    // 对用户输入进行严格匹配，并返回白名单中的视图名
-    if (allowedPages.contains(page.toLowerCase())) {
-        return page.toLowerCase(); // 返回小写版本的白名单视图名
-    }
-    // 如果输入不在白名单中，返回错误页面或者默认页面
-    return "error"; 
+List<String> allowedPages = Arrays.asList("home", "about", "contact");
+// 对用户输入进行严格匹配，并返回白名单中的视图名
+if (allowedPages.contains(page.toLowerCase())) {
+return page.toLowerCase(); // 返回小写版本的白名单视图名
+}
+// 如果输入不在白名单中，返回错误页面或者默认页面
+return "error";
 }
 ```
-
 #### 2. 对用户输入进行严格的输入验证和过滤
 如果业务需求确实需要部分基于用户输入决定视图，必须对用户输入进行严格的白名单验证、过滤或转义。只允许预期中的字符或格式，拒绝任何可能包含模板语法或特殊字符的输入。
-
 ```java
 // 修复代码示例 (对输入进行更严格的过滤和校验)
 @GetMapping("/view2")
 public String viewPage2(@RequestParam String page, Model model) {
-    // 允许只包含字母、数字和下划线的页面名
-    if (!page.matches("^[a-zA-Z0-9_]+$")) {
-        // 输入不符合要求，返回错误或者抛出异常
-        return "errorPage"; 
-    }
-    // 可以在这里添加白名单检查，确保页面名是预期的
-    return page;
+// 允许只包含字母、数字和下划线的页面名
+if (!page.matches("^[a-zA-Z0-9_]+$")) {
+// 输入不符合要求，返回错误或者抛出异常
+return "errorPage";
+}
+// 可以在这里添加白名单检查，确保页面名是预期的
+return page;
 }
 ```
-
 #### 3. 使用安全的模板引擎配置或沙箱机制
 对于使用的模板引擎，确保其配置是安全的，例如禁用表达式求值功能，或者启用并正确配置沙箱机制（如果模板引擎支持）。沙箱机制可以限制模板能够访问的对象和方法，从而降低代码执行的风险。
-
 #### 4. 避免直接返回用户输入的字符串
 如果控制器方法只是需要返回纯文本内容而不是视图，应使用 `@ResponseBody` 注解或 `ResponseEntity`，这样 Spring 不会将返回值视为视图名进行解析。
-
 ```java
 // 修复代码示例 (使用 @ResponseBody 返回纯文本)
 @ResponseBody
 @GetMapping("/safe/viewer")
 public String viewPage3(@RequestParam String page, Model model) {
-    // 使用 @ResponseBody，返回的字符串会被直接写入响应体，而不是作为视图名解析
-    return page;
+// 使用 @ResponseBody，返回的字符串会被直接写入响应体，而不是作为视图名解析
+return page;
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 服务器端模板注入（Server-Side Template Injection, SSTI）是指攻击者能够将恶意代码注入到模板中，并在服务器端执行。当应用程序使用模板引擎（如 FreeMarker, Thymeleaf, Velocity 等）动态生成网页内容，并且直接或间接将用户可控的输入作为模板的一部分进行解析时，就可能触发 SSTI 漏洞。攻击者通过精心构造输入，可以打破模板语法限制，执行任意代码，获取系统敏感信息，甚至控制服务器。
-
 在 Spring MVC 框架中，如果控制器（Controller）方法直接返回用户可控的字符串作为逻辑视图名（Logical View Name），并且该视图名会被模板解析器（View Resolver）处理，则存在 SSTI 风险。尤其是一些模板引擎在解析视图名时，如果没有严格的沙箱机制或输入过滤，用户的恶意输入可能被当做模板指令执行。
-
 2. **触发场景**
 以下是常见的触发场景：
-    - 控制器方法直接返回 `@RequestParam` 或 `@PathVariable` 获取的用户输入字符串。
-    - 控制器方法在返回的视图名中拼接了用户输入，且未对输入进行充分过滤或转义。
-    - 使用 `ModelAndView` 或 `Model` 对象，将用户输入作为视图名的一部分传递给模板引擎。
-
-    // 存在漏洞的代码示例 (参考 demo.java 中的 viewPage 方法)
-    ```java
-    @GetMapping("/view")
-    public String viewPage(@RequestParam String page, Model model) {
-        // 这里直接使用用户提供的参数作为模板名，这是不安全的
-        return page;
-    }
-    ```
-    攻击者可以尝试提交类似 `page=__${T(java.lang.Runtime).getRuntime().exec('calc.exe')}__` 的输入，如果模板引擎（如 Thymeleaf）配置不当，可能导致代码执行。
-
+- 控制器方法直接返回 `@RequestParam` 或 `@PathVariable` 获取的用户输入字符串。
+- 控制器方法在返回的视图名中拼接了用户输入，且未对输入进行充分过滤或转义。
+- 使用 `ModelAndView` 或 `Model` 对象，将用户输入作为视图名的一部分传递给模板引擎。
+// 存在漏洞的代码示例 (参考 demo.java 中的 viewPage 方法)
+```java
+@GetMapping("/view")
+public String viewPage(@RequestParam String page, Model model) {
+// 这里直接使用用户提供的参数作为模板名，这是不安全的
+return page;
+}
+```
+攻击者可以尝试提交类似 `page=__${T(java.lang.Runtime).getRuntime().exec('calc.exe')}__` 的输入，如果模板引擎（如 Thymeleaf）配置不当，可能导致代码执行。
 3. **潜在影响**
-    - **敏感信息泄露：** 攻击者可以读取服务器上的文件内容（如配置文件、源代码等）。
-    - **远程代码执行：** 在某些情况下，攻击者可以直接在服务器上执行任意命令。
-    - **系统控制：** 攻击者可能利用漏洞获取服务器权限，完全控制受影响的系统。
-    - **服务中断：** 错误的或恶意的模板指令可能导致应用程序崩溃或拒绝服务。
-CODE
+- **敏感信息泄露：** 攻击者可以读取服务器上的文件内容（如配置文件、源代码等）。
+- **远程代码执行：** 在某些情况下，攻击者可以直接在服务器上执行任意命令。
+- **系统控制：** 攻击者可能利用漏洞获取服务器权限，完全控制受影响的系统。
+- **服务中断：** 错误的或恶意的模板指令可能导致应用程序崩溃或拒绝服务。
+DESC
 	level: "mid",
 	message: "Template Path Injection(Filtered Use of User Input)",
 	type: "vuln",
+	name: "unsafeFilteredSink",
+	risk: "SSTI",
 }
 
 alert $filteredSink for {
 	type: "audit",
 	title: "Audit Java SSTI in Spring Controller With Filtered Input",
 	title_zh: "审计Spring控制器中已过滤的SSTI防护措施",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于审计Java代码中针对SSTI漏洞的过滤机制。它通过识别是否存在有效的输入过滤函数，判断现有防护措施是否足以防止模板注入攻击。
-
 ### 规则详细
 1. **输入过滤机制**
 检测是否有对用户输入进行有效过滤的函数或方法，例如白名单校验、正则表达式匹配等。
 2. **覆盖关键过滤操作**
 检测以下几种常见过滤模式：
-   - 白名单校验输入是否为预期值。
-   - 正则表达式过滤非法字符。
-   - 前缀或后缀校验。
-
-CODE
+- 白名单校验输入是否为预期值。
+- 正则表达式过滤非法字符。
+- 前缀或后缀校验。
+DESC
 	level: "low",
 	message: "The String or Content Filter is used. It is recommended to use the filter to prevent SSTI.",
+	risk: "信息",
+	name: "filteredSink",
 }
 
 

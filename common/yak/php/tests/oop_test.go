@@ -162,7 +162,7 @@ func TestOOP_static_method(t *testing.T) {
 		Foo::aStaticMethod = "bar";
 		?>
 		`
-		_, err := php2ssa.FrondEnd(code, false)
+		_, err := php2ssa.Frontend(code)
 		require.Error(t, err)
 	})
 

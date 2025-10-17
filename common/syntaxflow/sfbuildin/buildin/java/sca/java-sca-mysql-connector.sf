@@ -63,56 +63,51 @@ $ver in [8.0.17,8.0.27] as $vuln_mysql_connector_java;
 alert $vuln_mysql_connector_java for {
 	title: "SCA: Check Java Mysql Connector Vulnerability",
 	title_zh: "SCA: 检测Java jdbc mysql-connector 依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **更新 `mysql-connector-java` 版本**
-   将项目依赖中的 `mysql-connector-java` 版本更新到不受漏洞影响的版本。根据已公开的信息，建议更新到8.0.28或更高版本，或者使用其他稳定的、修复了该漏洞的版本。
-   ```xml
-   <!-- 更新依赖版本 -->
-   <dependency>
-       <groupId>mysql</groupId>
-       <artifactId>mysql-connector-java</artifactId>
-       <version>8.0.28</version>
-   </dependency>
-   ```
-
+将项目依赖中的 `mysql-connector-java` 版本更新到不受漏洞影响的版本。根据已公开的信息，建议更新到8.0.28或更高版本，或者使用其他稳定的、修复了该漏洞的版本。
+```xml
+<!-- 更新依赖版本 -->
+<dependency>
+<groupId>mysql</groupId>
+<artifactId>mysql-connector-java</artifactId>
+<version>8.0.28</version>
+</dependency>
+```
 2. **检查项目中的依赖树**
-   如果项目使用了依赖管理工具（如Maven、Gradle），使用命令检查 `mysql-connector-java` 的版本，确保没有引入受影响的传递性依赖。例如使用Maven命令 `mvn dependency:tree`。
-
+如果项目使用了依赖管理工具（如Maven、Gradle），使用命令检查 `mysql-connector-java` 的版本，确保没有引入受影响的传递性依赖。例如使用Maven命令 `mvn dependency:tree`。
 3. **配置安全的数据库连接参数**
-   虽然更新版本是最直接的修复方法，但在无法立即升级的情况下，可以检查和调整数据库连接字符串的参数，限制潜在的信息泄露面。但这种方法并不能完全消除风险，强烈建议优先升级版本。
-
+虽然更新版本是最直接的修复方法，但在无法立即升级的情况下，可以检查和调整数据库连接字符串的参数，限制潜在的信息泄露面。但这种方法并不能完全消除风险，强烈建议优先升级版本。
 4. **最小化数据库权限**
-   为应用使用的数据库用户仅赋予必需的最小权限，限制即使信息被泄露，攻击者能够造成的损害。
-CODE
-	desc: <<<CODE
+为应用使用的数据库用户仅赋予必需的最小权限，限制即使信息被泄露，攻击者能够造成的损害。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   该规则用于检查Java项目中 `mysql-connector-java` 库的版本，以确定是否存在已知的安全漏洞。`mysql-connector-java` 是一个用于Java应用程序与MySQL数据库进行交互的官方连接器。特定版本的 `mysql-connector-java` (如8.0.17到8.0.27) 存在信息泄露漏洞，攻击者可以利用此漏洞获取敏感信息，对系统的安全性构成威胁。
-
+该规则用于检查Java项目中 `mysql-connector-java` 库的版本，以确定是否存在已知的安全漏洞。`mysql-connector-java` 是一个用于Java应用程序与MySQL数据库进行交互的官方连接器。特定版本的 `mysql-connector-java` (如8.0.17到8.0.27) 存在信息泄露漏洞，攻击者可以利用此漏洞获取敏感信息，对系统的安全性构成威胁。
 2. **触发场景**
-   当使用了受影响版本的 `mysql-connector-java` (版本号在8.0.17到8.0.27之间)时，例如项目依赖中包含:
-   ```xml
-   <dependency>
-       <groupId>mysql</groupId>
-       <artifactId>mysql-connector-java</artifactId>
-       <version>8.0.25</version>
-   </dependency>
-   ```
-   或者在Java代码中加载了该版本的驱动:
-   ```java
-   Class.forName("com.mysql.cj.jdbc.Driver");
-   ```
-   攻击者可以通过特定的查询或连接参数，利用该版本中的漏洞获取敏感信息。
-
+当使用了受影响版本的 `mysql-connector-java` (版本号在8.0.17到8.0.27之间)时，例如项目依赖中包含:
+```xml
+<dependency>
+<groupId>mysql</groupId>
+<artifactId>mysql-connector-java</artifactId>
+<version>8.0.25</version>
+</dependency>
+```
+或者在Java代码中加载了该版本的驱动:
+```java
+Class.forName("com.mysql.cj.jdbc.Driver");
+```
+攻击者可以通过特定的查询或连接参数，利用该版本中的漏洞获取敏感信息。
 3. **潜在影响**
-   - 数据库中的敏感信息（如用户名、密码、数据库结构、存储过程等）可能被泄露。
-   - 攻击者可能基于泄露的信息进一步进行针对性攻击，如SQL注入、未授权访问等。
-   - 系统的整体安全性受到威胁。
-CODE
+- 数据库中的敏感信息（如用户名、密码、数据库结构、存储过程等）可能被泄露。
+- 攻击者可能基于泄露的信息进一步进行针对性攻击，如SQL注入、未授权访问等。
+- 系统的整体安全性受到威胁。
+DESC
 	level: "mid",
 	cve: "CVE-2021-2471",
 	message: "SCA: mysql-connector-java versions between 8.0.17 and 8.0.27 have an information disclosure vulnerability",
+	risk: "SCA",
+	name: "vuln_mysql_connector_java",
 }

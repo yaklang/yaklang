@@ -186,30 +186,30 @@ func RuleCliDefault(prog *ssaapi.Program) *result.StaticAnalyzeResults {
 		return "", true
 	}
 
-	checkCliDefault("cli.String", []*ssaapi.Type{ssaapi.String}, nil)
-	checkCliDefault("cli.StringSlice", []*ssaapi.Type{ssaapi.String}, nil)
-	checkCliDefault("cli.Bool", []*ssaapi.Type{ssaapi.Boolean}, nil)
-	checkCliDefault("cli.Int", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, intCallback)
-	checkCliDefault("cli.Integer", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, intCallback)
-	checkCliDefault("cli.Double", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, floatCallback) // 需要区分 int 和 double
-	checkCliDefault("cli.Float", []*ssaapi.Type{ssaapi.Number, ssaapi.String}, floatCallback)  // 需要区分 int 和 double
-	checkCliDefault("cli.Url", []*ssaapi.Type{ssaapi.Any}, urlsCallback)
-	checkCliDefault("cli.Urls", []*ssaapi.Type{ssaapi.Any}, urlsCallback)
-	checkCliDefault("cli.Port", []*ssaapi.Type{ssaapi.Any}, portsCallback)
-	checkCliDefault("cli.Ports", []*ssaapi.Type{ssaapi.Any}, portsCallback)
-	checkCliDefault("cli.Net", []*ssaapi.Type{ssaapi.Any}, hostCallback)
-	checkCliDefault("cli.Network", []*ssaapi.Type{ssaapi.Any}, hostCallback)
-	checkCliDefault("cli.Host", []*ssaapi.Type{ssaapi.Any}, hostCallback)
-	checkCliDefault("cli.Hosts", []*ssaapi.Type{ssaapi.Any}, hostCallback)
-	checkCliDefault("cli.File", []*ssaapi.Type{ssaapi.String}, fileCallback)
-	checkCliDefault("cli.FileOrContent", []*ssaapi.Type{ssaapi.String}, fileOrContentCallback)
-	checkCliDefault("cli.LineDict", []*ssaapi.Type{ssaapi.String}, fileOrContentCallback)
-	checkCliDefault("cli.YakitPlugin", []*ssaapi.Type{ssaapi.String}, fileCallback)
-	checkCliDefault("cli.Have", []*ssaapi.Type{ssaapi.String}, nil)
-	checkCliDefault("cli.HTTPPacket", []*ssaapi.Type{ssaapi.String}, nil)
-	checkCliDefault("cli.YakCode", []*ssaapi.Type{ssaapi.String}, nil)
-	checkCliDefault("cli.Text", []*ssaapi.Type{ssaapi.String}, nil)
-	checkCliDefault("cli.Json", []*ssaapi.Type{ssaapi.String}, nil)
+	checkCliDefault("cli.String", []*ssaapi.Type{String}, nil)
+	checkCliDefault("cli.StringSlice", []*ssaapi.Type{String}, nil)
+	checkCliDefault("cli.Bool", []*ssaapi.Type{Boolean}, nil)
+	checkCliDefault("cli.Int", []*ssaapi.Type{Number, String}, intCallback)
+	checkCliDefault("cli.Integer", []*ssaapi.Type{Number, String}, intCallback)
+	checkCliDefault("cli.Double", []*ssaapi.Type{Number, String}, floatCallback) // 需要区分 int 和 double
+	checkCliDefault("cli.Float", []*ssaapi.Type{Number, String}, floatCallback)  // 需要区分 int 和 double
+	checkCliDefault("cli.Url", []*ssaapi.Type{Any}, urlsCallback)
+	checkCliDefault("cli.Urls", []*ssaapi.Type{Any}, urlsCallback)
+	checkCliDefault("cli.Port", []*ssaapi.Type{Any}, portsCallback)
+	checkCliDefault("cli.Ports", []*ssaapi.Type{Any}, portsCallback)
+	checkCliDefault("cli.Net", []*ssaapi.Type{Any}, hostCallback)
+	checkCliDefault("cli.Network", []*ssaapi.Type{Any}, hostCallback)
+	checkCliDefault("cli.Host", []*ssaapi.Type{Any}, hostCallback)
+	checkCliDefault("cli.Hosts", []*ssaapi.Type{Any}, hostCallback)
+	checkCliDefault("cli.File", []*ssaapi.Type{String}, fileCallback)
+	checkCliDefault("cli.FileOrContent", []*ssaapi.Type{String}, fileOrContentCallback)
+	checkCliDefault("cli.LineDict", []*ssaapi.Type{String}, fileOrContentCallback)
+	checkCliDefault("cli.YakitPlugin", []*ssaapi.Type{String}, fileCallback)
+	checkCliDefault("cli.Have", []*ssaapi.Type{String}, nil)
+	checkCliDefault("cli.HTTPPacket", []*ssaapi.Type{String}, nil)
+	checkCliDefault("cli.YakCode", []*ssaapi.Type{String}, nil)
+	checkCliDefault("cli.Text", []*ssaapi.Type{String}, nil)
+	checkCliDefault("cli.Json", []*ssaapi.Type{String}, nil)
 	return ret
 }
 

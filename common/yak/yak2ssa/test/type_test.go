@@ -154,7 +154,7 @@ func TestYaklangGenericFunc(t *testing.T) {
 a = [1]
 target = append(a, 2, 3)
 cache = append(a, 4, 5)`,
-			ssa.NewSliceType(ssa.GetNumberType()))
+			ssa.NewSliceType(ssa.CreateNumberType()))
 	})
 
 	t.Run("append-bytes", func(t *testing.T) {
@@ -162,28 +162,28 @@ cache = append(a, 4, 5)`,
 a = b"asd"
 b = b"qwe"
 target = append(a, b...)`,
-			ssa.GetBytesType())
+			ssa.CreateBytesType())
 	})
 
 	t.Run("append-bytes-with-bytes-fallback", func(t *testing.T) {
 		test.CheckType(t, `
 		a = b"asd"
 		target = append(a, b"qwe", b"zxc")`,
-			ssa.NewSliceType(ssa.GetAnyType()))
+			ssa.NewSliceType(ssa.CreateAnyType()))
 	})
 
 	t.Run("append-string", func(t *testing.T) {
 		test.CheckType(t, `
 a = ["a"]
 target = append(a, "b", "c")`,
-			ssa.NewSliceType(ssa.GetStringType()))
+			ssa.NewSliceType(ssa.CreateStringType()))
 	})
 
 	t.Run("Keys-string", func(t *testing.T) {
 		test.CheckType(t, `
 a = {"a":1, "b":2}
 target = Keys(a)`,
-			ssa.NewSliceType(ssa.GetStringType()),
+			ssa.NewSliceType(ssa.CreateStringType()),
 			ssaapi.WithExternValue(map[string]any{
 				"Keys": func(i interface{}) interface{} {
 					// ...
@@ -207,7 +207,7 @@ a = make([]chan string, 0)
 a = append(a, make(chan string))
 a = append(a, make(chan string))
 target = Test(a)`,
-			ssa.NewSliceType(ssa.GetStringType()),
+			ssa.NewSliceType(ssa.CreateStringType()),
 			ssaapi.WithExternValue(map[string]any{
 				"Test": func(i interface{}) interface{} {
 					// ...
@@ -230,7 +230,7 @@ target = Test(a)`,
 a = {"a":1, "b":2}
 target = Test(a, func(i) { return int(i) })
 `,
-			ssa.NewSliceType(ssa.GetNumberType()),
+			ssa.NewSliceType(ssa.CreateNumberType()),
 			ssaapi.WithExternValue(map[string]any{
 				"Test": func(i interface{}, fc func(i interface{}) interface{}) interface{} {
 					// func(Or([]T | Map[U]T), func(T) K) []K

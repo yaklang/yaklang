@@ -238,3 +238,69 @@ func TestGRPCMUSTPASS_ExportNoteWithSameTitle(t *testing.T) {
 	_, ok = checkFileMap[fmt.Sprintf("%s(2)", title)]
 	require.True(t, ok)
 }
+
+func TestGRPCMUSTPASS_NoteFileNameSanitization(t *testing.T) {
+	ctx := utils.TimeoutContextSeconds(2)
+
+	// 测试包含特殊字符的标题
+	specialTitles := []string{
+		"test//note",                          // 双斜杠
+		"test/note",                           // 单斜杠
+		"test\\note",                          // 反斜杠
+		"test:note",                           // 冒号
+		"test*note",                           // 星号
+		"test?note",                           // 问号
+		"test\"note",                          // 双引号
+		"test<note",                           // 小于号
+		"test>note",                           // 大于号
+		"test|note",                           // 管道符
+		"test//note//with//multiple//slashes", // 多个斜杠
+		"   test note   ",                     // 前后空格
+		"test___note",                         // 多个下划线
+		"",                                    // 空标题
+		"   ",                                 // 只有空格
+	}
+
+	expectedTitles := []string{
+		"test_note",                       // 双斜杠替换为单下划线
+		"test_note",                       // 单斜杠替换为下划线
+		"test_note",                       // 反斜杠替换为下划线
+		"test_note",                       // 冒号替换为下划线
+		"test_note",                       // 星号替换为下划线
+		"test_note",                       // 问号替换为下划线
+		"test_note",                       // 双引号替换为下划线
+		"test_note",                       // 小于号替换为下划线
+		"test_note",                       // 大于号替换为下划线
+		"test_note",                       // 管道符替换为下划线
+		"test_note_with_multiple_slashes", // 多个斜杠替换为下划线
+		"test_note",                       // 前后空格被移除
+		"test_note",                       // 多个下划线合并为单个
+		"untitled",                        // 空标题替换为默认值
+		"untitled",                        // 只有空格替换为默认值
+	}
+
+	// 先清理所有相关的脏数据
+	for _, title := range specialTitles {
+		_ = deleteNote(ctx, title)
+	}
+	for _, title := range expectedTitles {
+		_ = deleteNote(ctx, title)
+	}
+
+	for i, title := range specialTitles {
+		content := fmt.Sprintf("content for %s", title)
+		err := createNote(ctx, title, content)
+		require.NoError(t, err, "Failed to create note with title: %s", title)
+
+		// 查询创建的记事本
+		resp, err := queryNote(ctx, expectedTitles[i])
+		require.NoError(t, err, "Failed to query note with sanitized title: %s", expectedTitles[i])
+		require.Len(t, resp.Data, 1, "Expected exactly one note for title: %s", expectedTitles[i])
+		require.Equal(t, expectedTitles[i], resp.Data[0].Title, "Title not properly sanitized for: %s", title)
+		require.Equal(t, content, resp.Data[0].Content, "Content not preserved for: %s", title)
+
+		// 清理测试数据
+		err = deleteNote(ctx, expectedTitles[i])
+		require.NoError(t, err, "Failed to delete note with sanitized title: %s", expectedTitles[i])
+	}
+}

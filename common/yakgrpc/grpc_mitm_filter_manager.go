@@ -138,7 +138,7 @@ func (m *MITMFilter) updateMatcher() {
 
 func (m *MITMFilter) Recover() {
 	m.Update(defaultMITMFilterData)
-	err := m.SaveToDb(MITMFilterKeyRecords)
+	err := m.SaveToDb(yakit.MITMFilterKeyRecords)
 	if err != nil {
 		log.Errorf("recover mitm filter failed: %s", err)
 	}
@@ -146,7 +146,7 @@ func (m *MITMFilter) Recover() {
 
 func (m *MITMFilter) RecoverHijackFIlter() {
 	m.Update(nil)
-	err := m.SaveToDb(MITMHijackFilterKeyRecords)
+	err := m.SaveToDb(yakit.MITMHijackFilterKeyRecords)
 	if err != nil {
 		log.Errorf("recover mitm hijack filter failed: %s", err)
 	}
@@ -254,7 +254,7 @@ func getInitFilterManager(db *gorm.DB, key string) (*MITMFilter, error) {
 func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
 	// project first
 	for _, db := range []*gorm.DB{projectDB, profileDB} {
-		result, err := getInitFilterManager(db, MITMFilterKeyRecords)
+		result, err := getInitFilterManager(db, yakit.MITMFilterKeyRecords)
 		if err != nil || result == nil {
 			continue
 		}
@@ -267,7 +267,7 @@ func GetMITMFilterManager(projectDB, profileDB *gorm.DB) *MITMFilter {
 }
 
 func GetMITMHijackFilterManager(projectDB *gorm.DB) *MITMFilter {
-	filter, _ := getInitFilterManager(projectDB, MITMHijackFilterKeyRecords)
+	filter, _ := getInitFilterManager(projectDB, yakit.MITMHijackFilterKeyRecords)
 	if filter != nil {
 		return filter
 	}
@@ -308,7 +308,7 @@ func (m *MITMFilter) Save(keys ...string) {
 }
 
 func (m *MITMFilter) SaveToDb(keys ...string) error {
-	key := MITMFilterKeyRecords
+	key := yakit.MITMFilterKeyRecords
 	if len(keys) > 0 {
 		key = keys[0]
 	}

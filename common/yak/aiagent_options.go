@@ -2,6 +2,8 @@ package yak
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/schema"
 	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -21,6 +23,8 @@ type Agent struct {
 
 	ExtendAIDOptions []aid.Option
 	AiForgeOptions   []aiforge.Option
+
+	AgentEventHandler func(e *schema.AiOutputEvent)
 }
 
 func NewAgent(iopts ...any) *Agent {
@@ -87,6 +91,13 @@ var (
 			return nil
 		}
 	}
+
+	WithAiAgentEventHandler = func(handler func(e *schema.AiOutputEvent)) AIAgentOption {
+		return func(ag *Agent) error {
+			ag.AgentEventHandler = handler
+			return nil
+		}
+	}
 	WithOffsetSeq                    = aid.WithSequence
 	WithTool                         = aid.WithTool
 	WithExtendedActionCallback       = aid.WithExtendedActionCallback
@@ -116,16 +127,18 @@ var (
 	WithGenerateReport               = aid.WithGenerateReport
 	WithResultHandler                = aid.WithResultHandler
 	WithAppendPersistentMemory       = aid.WithAppendPersistentMemory
-	WithTimeLineLimit                = aid.WithTimeLineLimit
-	WithTimelineContentLimit         = aid.WithTimelineContentLimit
-	WithPlanMocker                   = aid.WithPlanMocker
-	WithForgeParams                  = aid.WithForgeParams
-	WithDisableToolUse               = aid.WithDisableToolUse
-	WithAIAutoRetry                  = aid.WithAIAutoRetry
-	WithAITransactionRetry           = aid.WithAITransactionRetry
+
+	// Deprecated: use WithTimelineContentLimit instead
+	WithTimeLineLimit        = aid.WithTimeLineLimit
+	WithTimelineContentLimit = aid.WithTimelineContentLimit
+	WithPlanMocker           = aid.WithPlanMocker
+	WithForgeParams          = aid.WithForgeParams
+	WithDisableToolUse       = aid.WithDisableToolUse
+	WithAIAutoRetry          = aid.WithAIAutoRetry
+	WithAITransactionRetry   = aid.WithAITransactionRetry
+	WithDisableOutputType    = aid.WithDisableOutputEvent
 
 	// aiforge options
-	WithAIDOptions           = aiforge.WithAIDOptions
 	WithForgePlanMocker      = aiforge.WithPlanMocker
 	WithInitializePrompt     = aiforge.WithInitializePrompt
 	WithResultPrompt         = aiforge.WithResultPrompt
@@ -141,34 +154,27 @@ var (
 	WithLiteForgeRequireParams   = aiforge.WithLiteForge_RequireParams
 	WithLiteForgeOutputMemoryOP  = aiforge.WithLiteForge_OutputMemoryOP
 	WithLiteForgeOutputSchemaRaw = aiforge.WithLiteForge_OutputSchemaRaw
+
+	// aitools
+	AllYakScriptTools = yakscripttools.GetAllYakScriptAiTools
 )
 
 func NewLiteForge(name string, opts ...any) (*aiforge.LiteForge, error) {
-	var extendAIDOptions []aid.Option
-	var liteForgeOpts []aiforge.LiteForgeOption
-	for _, opt := range opts {
-		switch o := opt.(type) {
-		case aiforge.LiteForgeOption:
-			liteForgeOpts = append(liteForgeOpts, o)
-		case aid.Option:
-			extendAIDOptions = append(extendAIDOptions, o)
-		}
-	}
-	return aiforge.NewLiteForge(name, append(liteForgeOpts, aiforge.WithExtendLiteForge_AIDOption(extendAIDOptions...))...)
+	return aiforge.NewLiteForge(name, BuildLiteForgeCreateOption(opts...)...)
 }
 
 func NewForgeBlueprint(name string, opts ...any) *aiforge.ForgeBlueprint {
 	ag := NewAgent(opts...)
 	ag.ForgeName = name
 	aiforgeOpts := slices.Clone(ag.AiForgeOptions)
-	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIDOptions(ag.ExtendAIDOptions...))
+	aiforgeOpts = append(aiforgeOpts, aiforge.WithAIDOptions(ag.AIDOptions()...))
 	return aiforge.NewForgeBlueprint(name, aiforgeOpts...)
 }
 func NewExecutorFromForge(forge *aiforge.ForgeBlueprint, i any, opts ...any) (*aid.Coordinator, error) {
 	ag := NewAgent(opts...)
 	ag.ForgeName = forge.Name
 	params := aiforge.Any2ExecParams(i)
-	return forge.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
+	return forge.CreateCoordinator(context.Background(), params, ag.AIDOptions()...)
 }
 func NewExecutorFromJson(json string, i any, opts ...any) (*aid.Coordinator, error) {
 	bp, err := aiforge.NewYakForgeBlueprintConfigFromJson(json)
@@ -182,7 +188,7 @@ func NewForgeExecutor(name string, i any, opts ...any) (*aid.Coordinator, error)
 	params := aiforge.Any2ExecParams(i)
 	ag := NewAgent(opts...)
 	bp := NewForgeBlueprint(name, opts...)
-	ins, err := bp.CreateCoordinator(context.Background(), params, ag.ExtendAIDOptions...)
+	ins, err := bp.CreateCoordinator(context.Background(), params, ag.AIDOptions()...)
 	if err != nil {
 		return nil, err
 	}

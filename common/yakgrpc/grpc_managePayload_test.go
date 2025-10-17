@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -878,4 +879,198 @@ func TestPayload(t *testing.T) {
 		got = string(rsp2.Data)
 		comparePayload(got, want, t)
 	})
+
+	t.Run("ExportPayloadBatch", func(t *testing.T) {
+		group1, group2 := uuid.NewString(), uuid.NewString()
+		data1 := "payload1\npayload2"
+		data2 := "payload3\npayload4"
+
+		save2database(local, t, group1, "", data1)
+		save2database(local, t, group2, "", data2)
+		defer func() {
+			deleteGroup(local, t, group1)
+			deleteGroup(local, t, group2)
+		}()
+
+		// 创建临时目录
+		dir, err := os.MkdirTemp("", "export-dir")
+		if err != nil {
+			t.Fatal("create temp dir failed:", err)
+		}
+		defer os.RemoveAll(dir)
+
+		// 执行导出操作
+		streamCtx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+
+		stream, err := local.ExportPayloadBatch(streamCtx, &ypb.ExportPayloadBatchRequest{
+			Group:    fmt.Sprintf("%s,%s", group1, group2),
+			SavePath: dir,
+		})
+		if err != nil {
+			t.Fatal("export payload failed:", err)
+		}
+
+		// 验证进度报告
+		var progresses []float64
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				t.Fatal("stream recv error:", err)
+			}
+			progresses = append(progresses, res.Progress)
+		}
+
+		if len(progresses) < 2 {
+			t.Fatal("progress events too few, expected at least 2")
+		}
+		if progresses[len(progresses)-1] != 1.0 {
+			t.Fatalf("final progress not 1.0, got: %f", progresses[len(progresses)-1])
+		}
+
+		// 验证生成的文件
+		expectedFiles := []string{
+			filepath.Join(dir, group1+".csv"),
+			filepath.Join(dir, group2+".csv"),
+		}
+
+		for _, file := range expectedFiles {
+			if _, err := os.Stat(file); os.IsNotExist(err) {
+				t.Fatalf("file not created: %s", file)
+			}
+		}
+
+		// 验证文件内容
+		testCases := []struct {
+			file    string
+			content string
+			expect  []string
+		}{
+			{
+				file:    expectedFiles[0],
+				content: data1,
+				expect:  []string{"content,hit_count", "payload1,0", "payload2,0"},
+			},
+			{
+				file:    expectedFiles[1],
+				content: data2,
+				expect:  []string{"content,hit_count", "payload3,0", "payload4,0"},
+			},
+		}
+
+		for _, tc := range testCases {
+			contentBytes, err := os.ReadFile(tc.file)
+			if err != nil {
+				t.Fatal("read file failed:", err)
+			}
+
+			lines := strings.Split(strings.TrimSpace(string(contentBytes)), "\n")
+			if len(lines) != len(tc.expect) {
+				t.Fatalf("line count mismatch in %s: expected %d, got %d",
+					tc.file, len(tc.expect), len(lines))
+			}
+
+			for i, line := range lines {
+				if line != tc.expect[i] {
+					t.Fatalf("content mismatch in %s line %d:\nExpect: %q\nGot:    %q",
+						tc.file, i+1, tc.expect[i], line)
+				}
+			}
+		}
+	})
+
+	t.Run("ExportPayloadDBAndFile", func(t *testing.T) {
+		data := "123\n456\n"
+		// 文件型 group
+		groupFile1, groupFile2 := uuid.NewString(), uuid.NewString()
+		save2file(local, t, groupFile1, "", data)
+		save2file(local, t, groupFile2, "", data)
+
+		// 数据库型 group
+		groupDB1, groupDB2 := uuid.NewString(), uuid.NewString()
+		save2database(local, t, groupDB1, "", data)
+		save2database(local, t, groupDB2, "", data)
+
+		saveDir, err := os.MkdirTemp("", "temp-payload")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			deleteGroup(local, t, groupFile1)
+			deleteGroup(local, t, groupFile2)
+			deleteGroup(local, t, groupDB1)
+			deleteGroup(local, t, groupDB2)
+			os.RemoveAll(saveDir)
+		}()
+
+		groups := []string{groupFile1, groupFile2, groupDB1, groupDB2}
+		results := exportBatchPayload(local, t, groups, saveDir)
+
+		// 校验文件型 group
+		for _, g := range []string{groupFile1, groupFile2} {
+			content, ok := results[g+".txt"]
+			if !ok {
+				t.Fatalf("expected txt result for group %s", g)
+			}
+			comparePayload(content, data, t)
+		}
+
+		// 校验数据库型 group
+		for _, g := range []string{groupDB1, groupDB2} {
+			content, ok := results[g+".csv"]
+			if !ok {
+				t.Fatalf("expected csv result for group %s", g)
+			}
+			lines := strings.Split(strings.TrimSpace(content), "\n")
+			if len(lines) != 1+len(strings.Split(strings.TrimSpace(data), "\n")) {
+				t.Fatalf("unexpected csv line count for group %s: got %d", g, len(lines))
+			}
+			if lines[0] != "content,hit_count" {
+				t.Fatalf("expected csv header in group %s, got %s", g, lines[0])
+			}
+		}
+	})
+
+}
+
+func exportBatchPayload(local ypb.YakClient, t *testing.T, groups []string, saveDir string) map[string]string {
+	t.Helper()
+	client, err := local.ExportPayloadDBAndFile(context.Background(), &ypb.ExportPayloadDBAndFileRequest{
+		Groups:   groups,
+		SavePath: saveDir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for {
+		re, err := client.Recv()
+		if err != nil {
+			t.Log("batch export stream end:", err)
+			break
+		}
+		t.Log("progress:", re.Progress)
+	}
+
+	// 读取导出结果
+	results := make(map[string]string)
+	for _, g := range groups {
+		// 文件型 group → txt，数据库型 group → csv
+		txtPath := filepath.Join(saveDir, fmt.Sprintf("%s.txt", g))
+		csvPath := filepath.Join(saveDir, fmt.Sprintf("%s.csv", g))
+
+		if _, err := os.Stat(txtPath); err == nil {
+			content, _ := os.ReadFile(txtPath)
+			results[g+".txt"] = string(content)
+		} else if _, err := os.Stat(csvPath); err == nil {
+			content, _ := os.ReadFile(csvPath)
+			results[g+".csv"] = string(content)
+		} else {
+			t.Fatalf("no exported file found for group %s", g)
+		}
+	}
+	return results
 }

@@ -7,6 +7,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"math/rand"
+	"net/http"
+	"net/url"
+	"path"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"time"
+	"unicode/utf8"
+
 	"github.com/davecgh/go-spew/spew"
 	"github.com/samber/lo"
 	"github.com/segmentio/ksuid"
@@ -25,17 +38,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/model"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math/rand"
-	"net/http"
-	"net/url"
-	"path"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"sync/atomic"
-	"time"
-	"unicode/utf8"
 )
 
 var (
@@ -50,6 +52,12 @@ var (
 	Hijack_Status_Response = "hijacking response"
 	Hijack_Status_Waiting  = "wait hijack"
 	Hijack_Status_WS       = "hijacking ws"
+)
+
+var (
+	mitmPluginCallerGlobal *yak.MixPluginCaller
+	// 添加生命周期通知机制
+	mitmPluginCallerNotifyChan chan struct{}
 )
 
 func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
@@ -178,14 +186,20 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		disableWebsocketCompression = firstReq.GetDisableWebsocketCompression()
 		randomJA3                   = firstReq.GetRandomJA3()
 		filterWebSocket             = utils.NewBool(firstReq.GetFilterWebsocket())
+		pluginConcurrency           = firstReq.GetPluginConcurrency()
 	)
+
+	if pluginConcurrency <= 0 {
+		pluginConcurrency = 20
+	}
+
 	downstreamProxy, err := getDownstreamProxy(firstReq)
 	if err != nil {
 		return err
 	}
 
 	hostMapping := make(map[string]string)
-	for _, pair := range firstReq.Hosts {
+	for _, pair := range firstReq.GetHostsMapping() {
 		hostMapping[pair.GetKey()] = pair.GetValue()
 	}
 
@@ -225,8 +239,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	/*
 		设置内容替换模块，通过正则驱动
 	*/
-	replacer := NewMITMReplacer(func() []*ypb.MITMContentReplacer {
-		result := yakit.GetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords)
+	replacer := yakit.NewMITMReplacer(func() []*ypb.MITMContentReplacer {
+		result := yakit.GetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords)
 		if result != "" {
 			var rules []*ypb.MITMContentReplacer
 			_ = json.Unmarshal([]byte(result), &rules)
@@ -237,16 +251,16 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		return nil
 	})
 
-	replacer.AutoSaveCallback(func(items ...*MITMReplaceRule) {
+	replacer.AutoSaveCallback(func(items ...*yakit.MITMReplaceRule) {
 		if len(items) <= 0 {
-			yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, "[]")
+			yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, "[]")
 			return
 		}
 		raw, err := json.Marshal(items)
 		if err != nil {
 			return
 		}
-		yakit.SetKey(s.GetProfileDatabase(), MITMReplacerKeyRecords, string(raw))
+		yakit.SetKey(s.GetProfileDatabase(), yakit.MITMReplacerKeyRecords, string(raw))
 	})
 
 	recoverFilterAndReplacerSend := func() {
@@ -266,9 +280,17 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	mitmPluginCaller.SetFeedback(execFeedback)
 	mitmPluginCaller.SetDividedContext(true)
-	mitmPluginCaller.SetConcurrent(20)
+	mitmPluginCaller.SetConcurrent(int(pluginConcurrency))
 	mitmPluginCaller.SetLoadPluginTimeout(10)
 	mitmPluginCaller.SetCallPluginTimeout(consts.GetGlobalCallerCallPluginTimeout())
+
+	mitmPluginCallerGlobal = mitmPluginCaller
+	mitmPluginCallerNotifyChan = make(chan struct{})
+	defer func() {
+		close(mitmPluginCallerNotifyChan)
+		mitmPluginCallerGlobal = nil
+	}()
+
 	if downstreamProxy != nil {
 		mitmPluginCaller.SetProxy(downstreamProxy...)
 	}
@@ -571,7 +593,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		defer func() {
 			wsFlow := yakit.BuildWebsocketFlow(true, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
-			replacer.hookColorWs(finalResult, wsFlow)
+			replacer.HookColorWs(finalResult, wsFlow)
 			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
 				if err != nil {
 					log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -717,8 +739,8 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		*/
 
 		// 处理响应规则
-		if replacer.haveHijackingRules() {
-			rules, rspHooked, dropped := replacer.hook(false, true, httpctx.GetRequestURL(req), rsp)
+		if replacer.HaveHijackingRules() {
+			rules, rspHooked, dropped := replacer.Hook(false, true, httpctx.GetRequestURL(req), rsp)
 			if dropped {
 				httpctx.SetContextValueInfoFromRequest(req, httpctx.RESPONSE_CONTEXT_KEY_IsDropped, true)
 				log.Warn("response should be dropped(VIA replacer.hook)")
@@ -838,7 +860,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 
 		defer func() {
 			wsFlow := yakit.BuildWebsocketFlow(false, wshash, requireWsFrameIndexByWSHash(wshash), finalResult[:])
-			replacer.hookColorWs(finalResult, wsFlow)
+			replacer.HookColorWs(finalResult, wsFlow)
 			yakit.SaveWebsocketFlowEx(s.GetProjectDatabase(), wsFlow, func(err error) {
 				if err != nil {
 					log.Warnf("save websocket flow(from server) failed: %s", err)
@@ -982,7 +1004,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 		}()
 
-		rules, req1, shouldBeDropped := replacer.hook(true, false, httpctx.GetRequestURL(originReqIns), req, isHttps)
+		rules, req1, shouldBeDropped := replacer.Hook(true, false, httpctx.GetRequestURL(originReqIns), req, isHttps)
 		if shouldBeDropped {
 			httpctx.SetContextValueInfoFromRequest(originReqIns, httpctx.REQUEST_CONTEXT_KEY_IsDropped, true)
 			log.Warn("MITM: request dropped by hook (VIA replacer.hook)")
@@ -1304,7 +1326,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		// replacer hook color
 		if replacer != nil {
 			go func() {
-				extracted = replacer.hookColor(plainRequest, plainResponse, req, flow)
+				extracted = replacer.HookColor(plainRequest, plainResponse, req, flow)
 				close(colorCh)
 				for _, e := range extracted {
 					err = yakit.CreateOrUpdateExtractedDataEx(-1, e)
@@ -1410,6 +1432,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	err = mServer.ServeWithListenedCallback(streamCtx, utils.HostPort(host, port), func() {
 		feedbackToUser("MITM 服务器已启动 / starting mitm server")
 	})
+
 	if err != nil {
 		log.Errorf("close mitm server for %s, reason: %v", addr, err)
 		return err
@@ -1523,4 +1546,359 @@ func (m *manualHijackManager) broadcastNeedLock(req *ypb.SingleManualHijackContr
 	for _, ch := range m.messageChan {
 		ch <- req
 	}
+}
+
+// PluginTrace 实现插件执行跟踪的双向流服务
+func (s *Server) PluginTrace(stream ypb.Yak_PluginTraceServer) error {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("plugin trace panic: %v", err)
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(stream.Context())
+	defer cancel()
+	log.Info("插件跟踪流连接建立")
+
+	emptyResp := &ypb.PluginTraceResponse{
+		ResponseType: "control_result",
+		Success:      false,
+	}
+
+	var mitmPluginCaller *yak.MixPluginCaller
+
+	// 检测MixPluginCaller是否可用，不可用则定期检测
+	for {
+		mitmPluginCaller = mitmPluginCallerGlobal
+		if mitmPluginCaller == nil || mitmPluginCallerNotifyChan == nil {
+			log.Debug("MITM 插件管理器未初始化，返回空trace列表，等待后端启动MITMv2...")
+			_ = stream.Send(emptyResp)
+			// 等待1秒后重试
+			select {
+			case <-time.After(time.Second):
+				continue
+			case <-ctx.Done():
+				log.Info("client close the plugin trace stream during plugin caller check loop")
+				return nil
+			}
+		} else {
+			// 检测到可用，进入正常trace推送逻辑
+			break
+		}
+	}
+
+	go func() {
+		select {
+		case <-mitmPluginCallerNotifyChan:
+			log.Info("plugin trace shutdown due to MITM closed")
+			cancel()
+		}
+	}()
+
+	// 进入正常trace推送逻辑
+	manager := mitmPluginCaller.GetNativeCaller()
+
+	// 创建trace更新通道，增大容量以处理高并发
+	traceUpdateChan := make(chan *yak.PluginExecutionTrace, 1000)
+
+	// 用于跟踪已推送给前端的trace
+	pushedTraces := make(map[string]bool) // traceID -> isPushed
+	pushedTracesMutex := sync.RWMutex{}
+
+	debouncedLog, _ := lo.NewDebounce(time.Second*5, func() { log.Warn("trace update channel is full, dropping trace update") })
+
+	// 设置callback，推送状态变更（不包括running状态的时间检测）
+	_, removeCallback := manager.AddExecutionTraceCallback(func(trace *yak.PluginExecutionTrace) {
+		pushedTracesMutex.Lock()
+		defer pushedTracesMutex.Unlock()
+
+		wasPushed := pushedTraces[trace.TraceID]
+		shouldPush := false
+
+		switch trace.Status {
+		case yak.PluginStatusCancelled:
+			// cancelled状态总是推送（可能是用户手动取消或系统取消）
+			shouldPush = true
+		case yak.PluginStatusFailed:
+			// failed状态总是推送（可能是长时间运行后失败）
+			shouldPush = true
+		case yak.PluginStatusCompleted:
+			// 如果这个trace之前已经推送过（因为长时间运行），现在完成了，需要推送完成状态
+			// 前端收到completed状态后应该清除这条trace
+			shouldPush = wasPushed
+		case yak.PluginStatusRunning:
+			// running状态不在这里处理，由定时检查处理
+			shouldPush = false
+		}
+
+		if shouldPush {
+			// 记录已推送状态
+			pushedTraces[trace.TraceID] = true
+
+			select {
+			case traceUpdateChan <- trace:
+			case <-ctx.Done():
+				log.Info("trace won't sent to client due to stream close")
+				return
+			default:
+				debouncedLog()
+			}
+
+			if trace.Status != yak.PluginStatusRunning {
+				delete(pushedTraces, trace.TraceID)
+			}
+		}
+	})
+	if removeCallback != nil {
+		defer func() {
+			removeCallback()
+			log.Info("plugin trace callback removed")
+		}()
+	}
+	// 启动goroutine处理trace批量更新推送和定时stats推送
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("trace update goroutine panic: %v", err)
+			}
+			log.Info("trace push goroutine exit")
+		}()
+
+		// 批量处理的缓冲区
+		traceBatch := make([]*yak.PluginExecutionTrace, 0, 50)
+
+		// 定时器：2秒推送一次stats
+		statsTicker := time.NewTicker(2 * time.Second)
+		defer statsTicker.Stop()
+
+		// 批量处理定时器：500ms收集一批trace进行推送
+		batchTicker := time.NewTicker(500 * time.Millisecond)
+		defer batchTicker.Stop()
+
+		// 长时间运行trace检测定时器：每1秒检查一次
+		longRunningTicker := time.NewTicker(1 * time.Second)
+		defer longRunningTicker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+
+			case trace, ok := <-traceUpdateChan:
+				if !ok {
+					return
+				}
+				// 收集trace到批处理缓冲区
+				traceBatch = append(traceBatch, trace)
+
+				// 如果批次达到上限，立即发送
+				if len(traceBatch) >= 50 {
+					s.sendTraceBatch(stream, traceBatch)
+					traceBatch = traceBatch[:0] // 清空缓冲区
+				}
+
+			case <-batchTicker.C:
+				// 定时发送批次（即使没有达到上限）
+				if len(traceBatch) > 0 {
+					s.sendTraceBatch(stream, traceBatch)
+					traceBatch = traceBatch[:0] // 清空缓冲区
+				}
+
+			case <-statsTicker.C:
+				// 定时推送统计信息
+				stats := s.getPluginTraceStats(manager)
+				resp := &ypb.PluginTraceResponse{
+					ResponseType: "stats_update",
+					Stats:        stats,
+					Success:      true,
+				}
+
+				if err := stream.Send(resp); err != nil {
+					log.Warnf("发送stats更新失败: %v", err)
+					return
+				}
+
+			case <-longRunningTicker.C:
+				// 检查长时间运行的trace
+				s.checkLongRunningTraces(manager, traceUpdateChan, &pushedTraces, &pushedTracesMutex)
+			}
+		}
+	}()
+
+	// 处理客户端请求
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				log.Info("plugin trace stream closed")
+				return nil
+			}
+			log.Warnf("PluginTrace Recv error: %v", err)
+			return nil
+		}
+
+		response := s.handlePluginTraceRequest(manager, req)
+		_ = stream.Send(response)
+	}
+}
+
+// handlePluginTraceRequest 处理插件跟踪请求
+func (s *Server) handlePluginTraceRequest(manager *yak.YakToCallerManager, req *ypb.PluginTraceRequest) *ypb.PluginTraceResponse {
+	switch req.ControlMode {
+	case "start_stream":
+		manager.EnableExecutionTracing(req.EnableTracing)
+		return &ypb.PluginTraceResponse{
+			ResponseType: "control_result",
+			Success:      true,
+		}
+
+	case "cancel_trace":
+		// 取消特定的跟踪
+		if req.TraceID == "" {
+			return &ypb.PluginTraceResponse{
+				ResponseType: "control_result",
+				Success:      false,
+				Message:      "TraceID不能为空",
+			}
+		}
+
+		success := manager.CancelExecutionTrace(req.TraceID)
+		message := "取消成功"
+		if !success {
+			message = "取消失败：找不到指定的跟踪记录"
+		}
+
+		return &ypb.PluginTraceResponse{
+			ResponseType: "control_result",
+			Success:      success,
+			Message:      message,
+		}
+
+	case "stop_stream":
+		// 客户端请求停止流
+		manager.EnableExecutionTracing(false)
+		return &ypb.PluginTraceResponse{
+			ResponseType: "control_result",
+			Success:      true,
+			Message:      "流已停止",
+		}
+
+	case "set_tracing":
+		manager.EnableExecutionTracing(req.EnableTracing)
+		return &ypb.PluginTraceResponse{
+			ResponseType: "control_result",
+			Success:      true,
+		}
+
+	default:
+		return &ypb.PluginTraceResponse{
+			ResponseType: "control_result",
+			Success:      false,
+			Message:      "未知的控制模式: " + req.ControlMode,
+		}
+	}
+}
+
+// checkLongRunningTraces 检查长时间运行的trace并推送给前端
+func (s *Server) checkLongRunningTraces(manager *yak.YakToCallerManager, traceUpdateChan chan *yak.PluginExecutionTrace, pushedTraces *map[string]bool, pushedTracesMutex *sync.RWMutex) {
+	pushedTracesMutex.Lock()
+	defer pushedTracesMutex.Unlock()
+
+	// 获取所有Running状态的trace
+	allTraces := manager.GetRunningExecutionTraces()
+
+	for _, trace := range allTraces {
+		// 只检查running状态的trace
+		if trace.Status != yak.PluginStatusRunning {
+			continue
+		}
+
+		// 检查运行时间是否超过阈值，使用管理器中的可配置阈值
+		if !trace.StartTime.IsZero() {
+			elapsed := time.Since(trace.StartTime)
+			threshold := manager.GetLongRunningThreshold()
+			if elapsed > time.Duration(threshold)*time.Second {
+				// 标记为已推送
+				(*pushedTraces)[trace.TraceID] = true
+
+				// 推送到通道
+				select {
+				case traceUpdateChan <- trace:
+					log.Debugf("检测到长时间运行的trace: %s, 运行时间: %v, 阈值: %ds", trace.TraceID, elapsed, threshold)
+				default:
+					log.Warn("trace update channel is full, dropping long running trace update")
+				}
+			}
+		}
+	}
+}
+
+// sendTraceBatch 批量发送trace更新
+// 前端处理逻辑说明：
+// - running状态：显示在trace列表中，可提供取消按钮
+// - cancelled状态：更新对应trace为已取消状态
+// - failed状态：更新对应trace为失败状态，显示错误信息
+// - completed状态：从trace列表中移除该trace（因为正常完成不需要用户关注）
+func (s *Server) sendTraceBatch(stream ypb.Yak_PluginTraceServer, traces []*yak.PluginExecutionTrace) {
+	if len(traces) == 0 {
+		return
+	}
+
+	pbTraces := make([]*ypb.PluginExecutionTrace, 0, len(traces))
+	for _, trace := range traces {
+		argsBytes, _ := json.Marshal(trace.Args)
+		var durationMS int64
+		if trace.EndTime.IsZero() { // trace still running
+			durationMS = time.Now().Sub(trace.StartTime).Milliseconds()
+		} else {
+			durationMS = trace.EndTime.Sub(trace.StartTime).Milliseconds()
+		}
+		pbTrace := &ypb.PluginExecutionTrace{
+			TraceID:       trace.TraceID,
+			PluginID:      trace.PluginID,
+			HookName:      trace.HookName,
+			Status:        string(trace.Status),
+			StartTime:     trace.StartTime.Unix(),
+			EndTime:       trace.EndTime.Unix(),
+			ExecutionArgs: argsBytes,
+			ErrorMessage:  trace.Error,
+			DurationMs:    durationMS,
+			RuntimeId:     "", // 暂时为空
+		}
+		pbTraces = append(pbTraces, pbTrace)
+	}
+
+	resp := &ypb.PluginTraceResponse{
+		ResponseType: "trace_update",
+		Traces:       pbTraces,
+		Success:      true,
+	}
+
+	if err := stream.Send(resp); err != nil {
+		log.Warnf("发送trace批量更新失败: %v", err)
+	}
+}
+
+// getPluginTraceStats 获取插件跟踪统计信息
+func (s *Server) getPluginTraceStats(manager *yak.YakToCallerManager) *ypb.PluginTraceStats {
+	traces := manager.GetAllExecutionTraces()
+
+	stats := &ypb.PluginTraceStats{
+		TotalTraces: int64(len(traces)),
+	}
+
+	for _, trace := range traces {
+		switch trace.Status {
+		case yak.PluginStatusRunning:
+			stats.RunningTraces++
+		case yak.PluginStatusCompleted:
+			stats.CompletedTraces++
+		case yak.PluginStatusFailed:
+			stats.FailedTraces++
+		case yak.PluginStatusCancelled:
+			stats.CancelledTraces++
+		}
+	}
+
+	return stats
 }

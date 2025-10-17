@@ -36,23 +36,23 @@ func Test_CrossFunction(t *testing.T) {
 	})
 
 	t.Run("multiple return first", func(t *testing.T) {
-		ssatest.Check(t, `package main
+		code := `
+		package main
+		func f1() (int,int) {
+			return 1,2
+		}
 
-			func f1() (int,int) {
-				return 1,2
-			}
-
-			func main(){
-				c,d := f1()
-			}
-		`,
-			ssatest.CheckTopDef_Equal("c", []string{"1"}),
+		func main(){
+			c,d := f1()
+		}
+		`
+		ssatest.CheckTopDef(t, code, "c", []string{"1"}, false,
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
 
 	t.Run("multiple return second", func(t *testing.T) {
-		ssatest.Check(t, `package main
+		ssatest.CheckTopDef(t, `package main
 
 			func f1() (int,int) {
 				return 1,2
@@ -62,7 +62,7 @@ func Test_CrossFunction(t *testing.T) {
 				c,d := f1()
 			}
 		`,
-			ssatest.CheckTopDef_Equal("d", []string{"2"}),
+			"d", []string{"2"}, false,
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
@@ -88,7 +88,7 @@ func Test_CrossFunction(t *testing.T) {
 	})
 
 	t.Run("multiple default return first", func(t *testing.T) {
-		ssatest.Check(t, `package main
+		ssatest.CheckTopDef(t, `package main
 
 			func f1() (a,b int) {
 				a = 1
@@ -100,13 +100,13 @@ func Test_CrossFunction(t *testing.T) {
 				c,d := f1()
 			}
 		`,
-			ssatest.CheckTopDef_Equal("c", []string{"1"}),
+			"c", []string{"1"}, false,
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
 
 	t.Run("multiple default return second", func(t *testing.T) {
-		ssatest.Check(t, `package main
+		ssatest.CheckTopDef(t, `package main
 
 			func f1() (a,b int) {
 				a = 1
@@ -118,7 +118,7 @@ func Test_CrossFunction(t *testing.T) {
 				c,d := f1()
 			}
 		`,
-			ssatest.CheckTopDef_Equal("d", []string{"2"}),
+			"d", []string{"2"}, false,
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})
@@ -126,13 +126,13 @@ func Test_CrossFunction(t *testing.T) {
 
 func Test_Function_Global(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
-		ssatest.Check(t, `package main
+		ssatest.CheckTopDef(t, `package main
 		var a = 1
 
 		func main(){
 			b := a
 		}
-		`, ssatest.CheckTopDef_Equal("b", []string{"1"}),
+		`, "b", []string{"1"}, false,
 			ssaapi.WithLanguage(ssaapi.GO),
 		)
 	})

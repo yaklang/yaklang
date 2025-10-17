@@ -8,71 +8,68 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-该漏洞源于滥用 Java 的反射 API（如 `setAccessible(true)`）强行修改类/方法/字段的访问修饰符（如 private/protected），绕过 Java 语言层面的访问控制机制。攻击者可能利用此特性访问或修改敏感内部状态，导致非预期的行为和潜在的安全风险。
+   该漏洞源于滥用 Java 的反射 API（如 `setAccessible(true)`）强行修改类/方法/字段的访问修饰符（如 private/protected），绕过 Java 语言层面的访问控制机制。攻击者可能利用此特性访问或修改敏感内部状态，导致非预期的行为和潜在的安全风险。
 
 2. **触发场景**
-攻击者可能通过构造恶意的反射链，利用 `setAccessible(true)` 访问或修改应用程序的内部状态。例如，攻击者可能通过反射修改 Tomcat 的 `filterConfigs` 字段注入恶意过滤器，访问 Spring 框架内部缓存窃取用户会话，或者篡改数据库连接池配置实现中间人攻击。这些行为违反最小权限原则，且具有以下风险：权限提升、隐蔽后门和兼容性破坏。
+   攻击者可能通过构造恶意的反射链，利用 `setAccessible(true)` 访问或修改应用程序的内部状态。例如，攻击者可能通过反射修改 Tomcat 的 `filterConfigs` 字段注入恶意过滤器，访问 Spring 框架内部缓存窃取用户会话，或者篡改数据库连接池配置实现中间人攻击。这些行为违反最小权限原则，且具有以下风险：权限提升、隐蔽后门和兼容性破坏。
 
-   ```java
-   // 存在漏洞的代码示例
-   public class SensitiveClass {
-       private String sensitiveField = "confidential";
+```java
+// 存在漏洞的代码示例
+public class SensitiveClass {
+    private String sensitiveField = "confidential";
 
-       public void printSensitiveField() {
-           System.out.println(sensitiveField);
-       }
-   }
+    public void printSensitiveField() {
+        System.out.println(sensitiveField);
+    }
+}
 
-   public class Attacker {
-       public static void main(String[] args) throws Exception {
-           SensitiveClass instance = new SensitiveClass();
-           // Attempt to access private field directly (will fail without reflection)
-           // String value = instance.sensitiveField;
-
-           // Access private field using reflection and setAccessible(true)
-           Field field = SensitiveClass.class.getDeclaredField("sensitiveField");
-           field.setAccessible(true); // Bypass access control
-           String value = (String) field.get(instance);
-           System.out.println("Accessed sensitive field: " + value);
-
-           // Modify private field using reflection
-           field.set(instance, "modified confidential");
-           instance.printSensitiveField();
-       }
-   }
-   ```
+public class Attacker {
+    public static void main(String[] args) throws Exception {
+        SensitiveClass instance = new SensitiveClass();
+        // 尝试直接访问私有字段（未使用反射时将失败）
+        // String value = instance.sensitiveField;
+        // 使用反射并调用 setAccessible(true) 来访问私有字段
+        Field field = SensitiveClass.class.getDeclaredField("sensitiveField");
+        field.setAccessible(true); // 绕过访问控制
+        String value = (String) field.get(instance);
+        System.out.println("Accessed sensitive field: " + value);
+        // 使用反射修改私有字段
+        field.set(instance, "modified confidential");
+        instance.printSensitiveField();
+    }
+}
+```
 
 3. **潜在影响**
-- **权限提升**：攻击者通过反射链构造利用代码，可能获得系统级权限，对系统造成更严重的破坏。
-- **兼容性破坏**：框架内部字段名或结构变更会导致反射代码崩溃，影响程序的稳定性和可用性。
+   - **权限提升**：攻击者通过反射链构造利用代码，可能获得系统级权限，对系统造成更严重的破坏。
+   - **兼容性破坏**：框架内部字段名或结构变更会导致反射代码崩溃，影响程序的稳定性和可用性。
+
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 
 #### 1. 优先使用官方 API
-避免直接使用反射操作框架或库的内部类和字段。优先使用官方提供的 API 或扩展点，它们通常更稳定且受官方维护。
-
-例如，在使用 Spring Boot 时，应使用 `FilterRegistrationBean` 替代直接操作 Tomcat 内部类来注册过滤器。
+   避免直接使用反射操作框架或库的内部类和字段。优先使用官方提供的 API 或扩展点，它们通常更稳定且受官方维护。
+   例如，在使用 Spring Boot 时，应使用 `FilterRegistrationBean` 替代直接操作 Tomcat 内部类来注册过滤器。
 
 #### 2. 禁止非必要反射
-通过代码审查规则、静态代码分析工具或自定义 lint 规则，禁止或标记 `setAccessible(true)` 的使用。只允许在极少数确实需要反射的场景下使用，并确保其使用是安全的。
+   通过代码审查规则、静态代码分析工具或自定义 lint 规则，禁止或标记 `setAccessible(true)` 的使用。只允许在极少数确实需要反射的场景下使用，并确保其使用是安全的。
 
 #### 3. 严格校验调用源
-如果必须使用反射，应限制反射的调用范围，确保只有受信任的代码库才能进行反射操作。可以通过注解（如 `@org.springframework.stereotype.Service` ）标记允许使用反射的类或方法，并通过代码逻辑或静态分析强制执行此限制。
-
-另外， **严禁将用户输入直接用于构造反射的目标**，例如使用 `Class.forName(request.getParameter("className"))`，这会允许攻击者实例化任意类，导致严重的安全问题。
+   如果必须使用反射，应限制反射的调用范围，确保只有受信任的代码库才能进行反射操作。可以通过注解（如 `@org.springframework.stereotype.Service` ）标记允许使用反射的类或方法，并通过代码逻辑或静态分析强制执行此限制。
+   另外， **严禁将用户输入直接用于构造反射的目标**，例如使用 `Class.forName(request.getParameter("className"))`，这会允许攻击者实例化任意类，导致严重的安全问题。
 
 #### 4. 最小化攻击面
-在使用 `setAccessible(true)` 后，应尽快将其恢复为 `false`，以最小化访问窗口。在 `try-finally` 块中执行此操作可以确保在发生异常时也能恢复访问控制。
+   在使用 `setAccessible(true)` 后，应尽快将其恢复为 `false`，以最小化访问窗口。在 `try-finally` 块中执行此操作可以确保在发生异常时也能恢复访问控制。
 
 ```java
 // 修复代码示例
 try {
     Field field = target.getClass().getDeclaredField("sensitiveField");
     field.setAccessible(true);
-    // Perform operations with the field
+    // 对字段进行操作
     Object value = field.get(target);
-    // ... other operations
+    // ...其他操作
 } finally {
     if (field != null) {
         field.setAccessible(false); // 强制恢复访问控制
@@ -81,12 +78,11 @@ try {
 ```
 
 #### 5. 启用运行时保护
-配置 Java Security Manager，限制 `ReflectPermission("suppressAccessChecks")` 权限，从而阻止或限制对 `setAccessible(true)` 的调用。虽然 Security Manager 在现代应用中较少使用，但在某些场景下仍可提供一层额外的保护。
-
-对于 JDK 16 及以上版本，可以在 JVM 参数中添加 `--illegal-access=deny` 或 `--illegal-access=permit` 来控制深度反射的行为。`deny` 会阻止非法访问，而 `permit` 只会发出警告。
+   配置 Java Security Manager，限制 `ReflectPermission("suppressAccessChecks")` 权限，从而阻止或限制对 `setAccessible(true)` 的调用。虽然 Security Manager 在现代应用中较少使用，但在某些场景下仍可提供一层额外的保护。
+   对于 JDK 16 及以上版本，可以在 JVM 参数中添加 `--illegal-access=deny` 或 `--illegal-access=permit` 来控制深度反射的行为。`deny` 会阻止非法访问，而 `permit` 只会发出警告。
 
 #### 6. 自动化检测
-使用IRify来自动检测代码中的反射滥用模式。持续的自动化检测有助于及时发现和修复潜在的漏洞。
+   使用 IRify 来自动检测代码中的反射滥用模式。持续的自动化检测有助于及时发现和修复潜在的漏洞。
 SOLUTION
 	rule_id: "718cb86d-8629-4382-be43-03ce36c07a3b"
 	reference: <<<REFERENCE
@@ -111,6 +107,12 @@ desc(
 	"file://x.java": <<<CODE
 package org.joychou.config;
 
+import org.apache.catalina.core.StandardContext; // For StandardContext
+import org.apache.catalina.loader.WebappClassLoaderBase; // For WebappClassLoaderBase
+import javax.servlet.Filter; // For the Filter interface
+import java.lang.reflect.Field; // For Field
+import java.util.Map; // For Map
+
 public class TomcatFilterMemShell implements Filter {
     static{
         try {
@@ -130,7 +132,62 @@ public class TomcatFilterMemShell implements Filter {
             Configs.setAccessible(true);
             // 获取当前tomcat标准上下文中已经存在的filterConfigs
             Map filterConfigs = (Map) Configs.get(standardContext);
+        }catch (Exception e) {
+
         }
+   }
+}
+CODE
+	"safefile://SafeReflectionUse.java": <<<CODE
+// Safe and controlled reflection use. setAccessible(true) is immediately followed by setAccessible(false).
+import java.lang.reflect.Field;
+
+public class SafeReflectionUse {
+    private String secret = "my_secret_data";
+
+    public String getSecretWithControlledReflection() {
+        Field field = null;
+        try {
+            field = SafeReflectionUse.class.getDeclaredField("secret");
+            field.setAccessible(true); // Temporarily allow access
+            String value = (String) field.get(this);
+            return value;
+        } catch (NoSuchFieldException | IllegalAccessException e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            if (field != null) {
+                field.setAccessible(false); // Restore access control immediately
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        SafeReflectionUse instance = new SafeReflectionUse();
+        System.out.println("Secret: " + instance.getSecretWithControlledReflection());
+    }
+}
+CODE
+	"safefile://StandardAPIUsage.java": <<<CODE
+// Illustrates using standard Java APIs instead of reflection for common tasks.
+// This class has no reflection usage that bypasses access control.
+public class StandardAPIUsage {
+    private String privateData = "accessible_via_method";
+
+    // Public getter method is the standard and safe way to expose private data.
+    public String getPrivateData() {
+        return privateData;
+    }
+
+    public void setPrivateData(String data) {
+        this.privateData = data;
+    }
+
+    public static void main(String[] args) {
+        StandardAPIUsage obj = new StandardAPIUsage();
+        System.out.println("Data accessed via public method: " + obj.getPrivateData());
+        obj.setPrivateData("new_data");
+        System.out.println("Data updated via public method: " + obj.getPrivateData());
     }
 }
 CODE

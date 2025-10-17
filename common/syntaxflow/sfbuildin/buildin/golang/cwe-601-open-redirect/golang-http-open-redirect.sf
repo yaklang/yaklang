@@ -1,0 +1,315 @@
+desc(
+	title: "Check Golang Open Redirect Vulnerability in Http"
+	title_zh: "检测Golang开放重定向漏洞(http)"
+	type: audit
+	level: high
+	risk: "url-redirect"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+开放重定向漏洞（CWE-601）是一种严重的安全漏洞，当应用程序在进行页面重定向时，未对重定向目标地址进行充分的安全验证，攻击者可以构造恶意的重定向链接，将用户导向钓鱼网站、恶意软件下载页面或其他不受信任的外部域名。这会使用户面临信息泄露（如窃取Cookie、Session ID）、执行恶意代码或遭受钓鱼攻击的风险。漏洞通常发生在应用程序根据用户提供的URL参数（例如`redirect_to`, `url`, `next`等）决定重定向目标时，直接使用用户输入而未验证其合法性。
+2. **触发场景**
+当Go语言应用程序使用`net/http`包的`http.Redirect()`函数进行页面跳转，且重定向的目标地址直接或间接来源于用户可控的输入时，就可能存在开放重定向漏洞。例如，从URL查询参数、POST请求体或HTTP头中获取的URL未经过白名单验证、同源策略检查或协议/格式校验就被直接用于重定向。
+```go
+package main
+import (
+	"net/http"
+	"net/url"
+	"strings"
+)
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+	// 从查询参数中获取重定向目标
+	target := r.URL.Query().Get("url")
+	// 直接将用户输入的 target 用于重定向
+	http.Redirect(w, r, target, http.StatusFound)
+}
+// 示例中未使用的验证函数，实际应用中需要更严格的实现
+func isValidRedirectTarget(target string) bool {
+	// ... 验证逻辑 ...
+	return true
+}
+func main() {
+	http.HandleFunc("/redirect", redirectHandler)
+	http.ListenAndServe(":8080", nil)
+}
+```
+攻击者可以构造 `http://example.com/redirect?url=http://malicious.com` 这样的URL，用户点击后会被重定向到恶意网站。
+3. **潜在影响**
+- **钓鱼攻击**: 攻击者利用合法网站的域名进行重定向，增加用户信任度，诱导用户输入敏感信息（如用户名、密码、银行卡信息）。
+- **会话劫持**: 通过重定向到恶意网站并利用JavaScript获取用户Session Cookie，实现会话劫持。
+- **恶意软件传播**: 将用户重定向到包含恶意软件下载链接的页面。
+- **绕过安全策略**: 在某些情况下，可利用开放重定向绕过网站的Referer检查或其他安全限制。
+DESC
+	rule_id: "56ab7848-f020-4e02-baba-9b2d92a2be78"
+	solution: <<<SOLUTION
+### 修复建议
+1. **白名单验证**
+最安全的修复方式是维护一个允许重定向的目标域名或路径的白名单。只允许应用程序重定向到白名单中的地址。
+```go
+// 部分修复代码示例：白名单验证
+func isValidRedirectTarget(target string) bool {
+	allowedHosts := []string{"yourdomain.com", "anotherdomain.com"}
+	u, err := url.Parse(target)
+	if err != nil {
+		return false
+	}
+	// 检查协议必须为 http 或 https
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	// 检查是否在允许的主机列表中
+	for _, host := range allowedHosts {
+		if u.Host == host {
+			return true
+		}
+	}
+	return false
+}
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+	target := r.URL.Query().Get("url")
+	if !isValidRedirectTarget(target) {
+		http.Error(w, "Invalid redirect target", http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, target, http.StatusFound)
+}
+```
+2. **同源检查或相对路径重定向**
+如果重定向始终应该发生在应用程序内部，可以强制要求重定向目标是相对路径，或者验证目标URL的主机和服务端口与当前应用程序相同。
+```go
+// 部分修复代码示例：同源检查（简易版）
+func isSameOrigin(targetURL, currentHost string) bool {
+	u, err := url.Parse(targetURL)
+	if err != nil {
+		return false
+	}
+	// 如果是相对路径则允许
+	if u.Host == "" && u.Path != "" {
+		return true
+	}
+	// 检查主机是否一致
+	return u.Host == currentHost
+}
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+	target := r.URL.Query().Get("url")
+	currentHost := r.Host // 获取当前请求的主机
+	if !isSameOrigin(target, currentHost) {
+		http.Error(w, "Redirect target must be same origin", http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, target, http.StatusFound)
+}
+```
+3. **不允许用户控制重定向目标**
+如果可能，避免让用户直接控制重定向的目标地址。例如，如果需要重定向到登录前的页面，可以将登录前的页面URL存储在Session中，登录成功后再从Session中取出并重定向。
+4. **强制使用固定重定向目标**
+对于某些特定功能需要重定向的情况（如登录成功后统一跳转到用户中心），直接硬编码或从安全的后端配置中获取重定向目标，而不是从用户输入获取。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP开放重定向漏洞](https://owasp.org/www-community/attacks/Redirects_and_Forwards_Cheat_Sheet)
+[CWE-601: URL Redirection to Untrusted Site ('Open Redirect')](https://cwe.mitre.org/data/definitions/601.html)
+REFERENCE
+)
+
+<include('golang-http-sink')> as $sink
+
+http?{<fullTypeName>?{have: 'net/http'}} as $http;
+$http.Redirect(*<slice(index=2)> #-> as $param);
+
+$param.URL.Query() as $target
+$target.Get() #->?{!opcode:const} as $high
+
+alert $high for {
+	title: "Check Golang Open Redirect Vulnerability",
+	title_zh: "检测Golang开放重定向漏洞 (http)",
+	solution: <<<SOLUTION
+### 修复建议
+1. **白名单验证**
+最安全的修复方式是维护一个允许重定向的目标域名或路径的白名单。只允许应用程序重定向到白名单中的地址。
+```go
+// 部分修复代码示例：白名单验证
+func isValidRedirectTarget(target string) bool {
+    allowedHosts := []string{"yourdomain.com", "anotherdomain.com"}
+    u, err := url.Parse(target)
+    if err != nil {
+        return false
+    }
+    // 检查协议必须为 http 或 https
+    if u.Scheme != "http" && u.Scheme != "https" {
+        return false
+    }
+    // 检查是否在允许的主机列表中
+    for _, host := range allowedHosts {
+        if u.Host == host {
+            return true
+        }
+    }
+    return false
+}
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+    target := r.URL.Query().Get("url")
+    if !isValidRedirectTarget(target) {
+        http.Error(w, "Invalid redirect target", http.StatusBadRequest)
+        return
+    }
+    http.Redirect(w, r, target, http.StatusFound)
+}
+```
+2. **同源检查或相对路径重定向**
+如果重定向始终应该发生在应用程序内部，可以强制要求重定向目标是相对路径，或者验证目标URL的主机和服务端口与当前应用程序相同。
+```go
+// 部分修复代码示例：同源检查（简易版）
+func isSameOrigin(targetURL, currentHost string) bool {
+    u, err := url.Parse(targetURL)
+    if err != nil {
+        return false
+    }
+    // 如果是相对路径则允许
+    if u.Host == "" && u.Path != "" {
+        return true
+    }
+    // 检查主机是否一致
+    return u.Host == currentHost
+}
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+    target := r.URL.Query().Get("url")
+    currentHost := r.Host // 获取当前请求的主机
+    if !isSameOrigin(target, currentHost) {
+        http.Error(w, "Redirect target must be same origin", http.StatusBadRequest)
+        return
+    }
+    http.Redirect(w, r, target, http.StatusFound)
+}
+```
+3. **不允许用户控制重定向目标**
+如果可能，避免让用户直接控制重定向的目标地址。例如，如果需要重定向到登录前的页面，可以将登录前的页面URL存储在Session中，登录成功后再从Session中取出并重定向。
+4. **强制使用固定重定向目标**
+对于某些特定功能需要重定向的情况（如登录成功后统一跳转到用户中心），直接硬编码或从安全的后端配置中获取重定向目标，而不是从用户输入获取。
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+开放重定向漏洞（CWE-601）是一种严重的安全漏洞，当应用程序在进行页面重定向时，未对重定向目标地址进行充分的安全验证，攻击者可以构造恶意的重定向链接，将用户导向钓鱼网站、恶意软件下载页面或其他不受信任的外部域名。这会使用户面临信息泄露（如窃取Cookie、Session ID）、执行恶意代码或遭受钓鱼攻击的风险。漏洞通常发生在应用程序根据用户提供的URL参数（例如`redirect_to`, `url`, `next`等）决定重定向目标时，直接使用用户输入而未验证其合法性。
+2. **触发场景**
+当Go语言应用程序使用`net/http`包的`http.Redirect()`函数进行页面跳转，且重定向的目标地址直接或间接来源于用户可控的输入时，就可能存在开放重定向漏洞。例如，从URL查询参数、POST请求体或HTTP头中获取的URL未经过白名单验证、同源策略检查或协议/格式校验就被直接用于重定向。
+```go
+package main
+import (
+    "net/http"
+    "net/url"
+    "strings"
+)
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+    // 从查询参数中获取重定向目标
+    target := r.URL.Query().Get("url")
+    // 直接将用户输入的 target 用于重定向
+    http.Redirect(w, r, target, http.StatusFound)
+}
+// 示例中未使用的验证函数，实际应用中需要更严格的实现
+func isValidRedirectTarget(target string) bool {
+    // ... 验证逻辑 ...
+    return true
+}
+func main() {
+    http.HandleFunc("/redirect", redirectHandler)
+    http.ListenAndServe(":8080", nil)
+}
+```
+攻击者可以构造 `http://example.com/redirect?url=http://malicious.com` 这样的URL，用户点击后会被重定向到恶意网站。
+3. **潜在影响**
+- **钓鱼攻击**: 攻击者利用合法网站的域名进行重定向，增加用户信任度，诱导用户输入敏感信息（如用户名、密码、银行卡信息）。
+- **会话劫持**: 通过重定向到恶意网站并利用JavaScript获取用户Session Cookie，实现会话劫持。
+- **恶意软件传播**: 将用户重定向到包含恶意软件下载链接的页面。
+- **绕过安全策略**: 在某些情况下，可利用开放重定向绕过网站的Referer检查或其他安全限制。
+DESC
+	level: "high",
+	type: "vuln",
+	name: "high",
+	message: "检测到Go语言HTTP开放重定向漏洞，且从数据源（source）到污染汇聚点（sink）间未发现任何过滤函数信息。",
+	risk: "URL重定向",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'safefile://unsafe.go': <<<UNSAFE
+package main
+
+import (
+    "net/http"
+    "net/url"
+    "strings"
+)
+
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+    // 从查询参数中获取重定向目标
+    target := r.URL.Query().Get("url")
+
+    // 验证目标 URL 是否合法
+    // if !isValidRedirectTarget(target) {
+    //     http.Error(w, "Invalid redirect target", http.StatusBadRequest)
+    //     return
+    // }
+
+    // 重定向到目标 URL
+    http.Redirect(w, r, target, http.StatusFound)
+}
+
+
+func main() {
+    http.HandleFunc("/redirect", redirectHandler)
+    http.ListenAndServe(":8080", nil)
+}
+
+UNSAFE
+	'file://safe.go': <<<SAFE
+package main
+
+import (
+    "net/http"
+    "net/url"
+    "strings"
+)
+
+func redirectHandler(w http.ResponseWriter, r *http.Request) {
+    // 从查询参数中获取重定向目标
+    target := r.URL.Query().Get("url")
+
+    // 验证目标 URL 是否合法
+    // if !isValidRedirectTarget(target) {
+    //     http.Error(w, "Invalid redirect target", http.StatusBadRequest)
+    //     return
+    // }
+
+    // 重定向到目标 URL
+    http.Redirect(w, r, target, http.StatusFound)
+}
+
+// 验证重定向目标是否合法
+func isValidRedirectTarget(target string) bool {
+    // 解析目标 URL
+    u, err := url.Parse(target)
+    if err != nil {
+        return false
+    }
+
+    // 只允许重定向到同一域名下的地址
+    if u.Host != "" && u.Host != "localhost:8080" {
+        return false
+    }
+
+    // 只允许 HTTP 和 HTTPS 协议
+    if u.Scheme != "http" && u.Scheme != "https" {
+        return false
+    }
+
+    return true
+}
+
+func main() {
+    http.HandleFunc("/redirect", redirectHandler)
+    http.ListenAndServe(":8080", nil)
+}
+
+SAFE
+)

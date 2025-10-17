@@ -1,0 +1,37 @@
+__DESC__ = "该Forge能够接收多条原始日志文本，并将其解析成结构化的JSON对象。它不仅能识别Web请求日志和应用/系统日志等类型，还能根据日志内容智能推断请求的逻辑状态（如“未找到”），即使日志中没有明确的HTTP状态码。最终输出统一格式的日志事件列表，包含日志类型、时间戳、推断状态和错误信息等关键字段。"
+__VERBOSE_NAME__ = "日志事件解析与结构化"
+__KEYWORDS__ = "日志解析,日志结构化,日志分析,状态推断,安全日志,错误日志,WEB请求,系统日志"
+
+prompt = <<<prompt
+你是一个顶级的日志分析专家和网络安全分析师。你的核心任务是接收一个包含多条、格式可能不同的原始日志文本块，然后将每一条日志都解析成一个结构化的 JSON 对象。
+你的能力必须超越简单的文本提取，你需要做到：
+1.  **识别日志类型**：判断每条日志是标准的“Web请求日志”还是“应用/系统日志”。
+2.  **智能状态推断**：对于没有明确 HTTP 状态码的日志（尤其是应用错误日志），你需要根据错误信息内容来推断请求的逻辑状态。例如，如果日志文本包含 “Unknown request path” 或 “file not found”，你应该能推断出这是一个“未找到 (NOT_FOUND)”的状态，类似于 HTTP 404。
+prompt
+
+
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("logs",
+        jsonschema.paramString("log_type",
+            jsonschema.description("对日志内容的分类，判断其主要类型。"),
+            jsonschema.enum("WEB_REQUEST","APPLICATION_ERROR","SYSTEM_INFO","UNKNOWN")
+        ),
+        jsonschema.paramString("timestamp", jsonschema.description("ISO 8601 格式的日志时间戳")),
+        jsonschema.paramString("source_ip", jsonschema.description("发起请求的客户端 IP 地址。如果日志中没有，则为 null。")),
+        jsonschema.paramString("request_method",jsonschema.description("HTTP 请求方法。如果日志非请求类型，则为 null。")),
+        jsonschema.paramString("request_uri", jsonschema.description("完整的请求 URI。如果日志中无法提取，则为空")),
+        jsonschema.paramInt("status_code", jsonschema.description("日志中明确记录的 HTTP 状态码。如果没有，则为 0")),
+        jsonschema.paramString("inferred_status", jsonschema.description("根据日志内容推断出的请求逻辑状态，这在 status_code 为 null 时尤其重要。"),jsonschema.enum("SUCCESSFUL","NOT_FOUND","FORBIDDEN","SERVER_ERROR","CLIENT_ERROR","NOT_APPLICABLE","UNKNOWN")),
+        jsonschema.paramString("error_message", jsonschema.description("从日志中提取的关键错误信息文本。如果没有，则为 null。")),
+        jsonschema.paramString("user_agent", jsonschema.description("客户端的 User-Agent。如果没有，则为 null。"))
+    )
+)
+
+
+
+forgeHandle = func(params) {
+    res = liteforge.Execute(sprintf("%s\n input:\n%v", params), liteforge.output(schema))~
+    return res.GetInvokeParamsArray("logs")
+}
+

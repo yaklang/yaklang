@@ -1,0 +1,83 @@
+desc(
+	title: "Audit Golang File Write Path Sink"
+	type: audit
+	level: info
+	lib: 'golang-file-write-path-sink'
+	desc: <<<DESC
+### 规则描述
+
+1. **规则目的**
+   本规则旨在审计Go语言代码中涉及文件写入操作的安全性，重点检查是否存在路径遍历漏洞。路径遍历漏洞通常发生在攻击者通过构造恶意输入，绕过限制访问非预期的系统文件或目录时。
+
+2. **触发场景**
+   以下为可能引发路径遍历问题的代码示例：
+   ```go
+   func writeFile(userInput string) error {
+       filePath := "/var/www/html/" + userInput
+       err := ioutil.WriteFile(filePath, []byte("content"), 0644)
+       if err != nil {
+           return err
+       }
+       return nil
+   }
+   ```
+   如果用户输入`../../etc/passwd`，则可能导致写入系统关键文件。
+
+3. **潜在影响**
+   - 攻击者可以通过路径遍历漏洞读取或篡改敏感文件，例如`/etc/passwd`、`/etc/shadow`等。
+   - 恶意文件写入可能导致远程代码执行（RCE）或其他破坏性后果。
+   - 系统完整性受损，进而导致数据泄露或服务中断。
+
+4. **规则详细**
+   该规则会检测使用Go语言标准库中的文件写入函数，包括但不限于以下方法：
+   - `os.Create`
+   - `ioutil.WriteFile`
+   - `bufio.NewWriter`
+   并确保这些函数不会因不当的路径处理而被利用。
+
+DESC
+	rule_id: "f2b7e07c-b395-4638-97d2-5010fe410ae3"
+	title_zh: "审计Golang文件写入功能汇点"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 路径规范化与验证
+   在进行任何文件写入操作之前，必须对路径进行严格的验证和清理，确保其始终位于安全基目录内。
+   ```go
+   // 修复代码示例
+   safePath := "/var/www/html"
+   userInput := "../../etc/passwd"
+   basePath := path.Clean(path.Join(safePath, userInput))
+   if !strings.HasPrefix(basePath, safePath) {
+       return errors.New("invalid path")
+   }
+   err := ioutil.WriteFile(basePath, []byte("content"), 0644)
+   if err != nil {
+       // 处理错误
+   }
+   ```
+
+#### 2. 最小权限原则
+   应用程序在运行过程中应遵循最小权限原则，仅赋予必要的文件系统访问权限。这样即使路径验证失败，攻击者也无法访问或修改关键文件。
+
+#### 3. 使用安全封装库
+   建议开发团队封装一套安全文件操作库，统一管理文件写入逻辑，并强制执行路径校验和权限控制。
+
+#### 4. 日志记录与监控
+   对所有涉及文件写入的操作添加日志记录，特别是针对异常路径的尝试。及时发现并响应潜在的攻击行为。
+
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+<include('golang-file-write-path-bufio')> as $output;
+<include('golang-file-write-path-ioutil')> as $output;
+<include('golang-file-write-path-os')> as $output;
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang File Write Sink",
+	title_zh: "审计Golang文件写入功能汇点",
+}

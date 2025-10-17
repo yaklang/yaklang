@@ -10,7 +10,7 @@ import (
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 )
 
-func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) interface{} {
+func (y *singleFileBuilder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -63,7 +63,7 @@ func (y *builder) VisitCompilationUnit(raw javaparser.ICompilationUnitContext) i
 	return nil
 }
 
-func (y *builder) VisitImportDeclaration(raw javaparser.IImportDeclarationContext) (packagePath []string, static bool, importAll bool) {
+func (y *singleFileBuilder) VisitImportDeclaration(raw javaparser.IImportDeclarationContext) (packagePath []string, static bool, importAll bool) {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil, false, false
 	}
@@ -83,7 +83,7 @@ func (y *builder) VisitImportDeclaration(raw javaparser.IImportDeclarationContex
 	return res, static, importAll
 }
 
-func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationContext) []string {
+func (y *singleFileBuilder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationContext) []string {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -104,7 +104,7 @@ func (y *builder) VisitPackageDeclaration(raw javaparser.IPackageDeclarationCont
 	y.selfPkgPath = selfPkgPath
 	return packagePath
 }
-func (b *builder) SwitchProg(functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) func() {
+func (b *singleFileBuilder) SwitchProg(functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) func() {
 	//log.Infof("lazyBuilder current File: %s", currentFile)
 	currentfb := b.FunctionBuilder
 	currenteditor := b.FunctionBuilder.GetEditor()
@@ -116,7 +116,7 @@ func (b *builder) SwitchProg(functionBuilder *ssa.FunctionBuilder, editor *memed
 	}
 }
 
-func (y *builder) VisitPackageName(raw javaparser.IPackageNameContext) []string {
+func (y *singleFileBuilder) VisitPackageName(raw javaparser.IPackageNameContext) []string {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -129,7 +129,7 @@ func (y *builder) VisitPackageName(raw javaparser.IPackageNameContext) []string 
 	}
 }
 
-func (y *builder) VisitQualifiedName(raw javaparser.IQualifiedNameContext) []string {
+func (y *singleFileBuilder) VisitQualifiedName(raw javaparser.IQualifiedNameContext) []string {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}

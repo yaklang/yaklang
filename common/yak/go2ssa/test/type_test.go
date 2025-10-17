@@ -137,7 +137,7 @@ world`+"`"+`)
 			println(ch2)
 		}
 			
-		`, []string{"Function-make(typeValue(chan number))", "Function-make(typeValue(chan string))"}, t)
+		`, []string{"make(chan number)", "make(chan string)"}, t)
 	})
 
 	t.Run("struct", func(t *testing.T) {
@@ -211,6 +211,21 @@ world`+"`"+`)
 		`, []string{
 			"ParameterMember-parameter[0].Add(Parameter-i)", "ParameterMember-parameter[0].Sub(Parameter-i)",
 		}, t)
+	})
+
+	t.Run("make", func(t *testing.T) {
+
+		test.CheckPrintlnValue(`package main
+
+		func main(){
+			var a []int = make([]int, 10)
+			var b []string = make([]string, 10)
+
+			println(a)
+			println(b)
+		}
+			
+		`, []string{"make([]number)", "make([]string)"}, t)
 	})
 }
 

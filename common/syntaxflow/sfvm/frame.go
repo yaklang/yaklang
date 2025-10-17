@@ -60,6 +60,7 @@ type SFFrame struct {
 type VerifyFileSystem struct {
 	vfs       filesys_interface.FileSystem
 	checkInfo map[string]string
+	language  consts.Language
 }
 
 func (s *SFFrame) GetResult() *SFFrameResult {
@@ -68,6 +69,10 @@ func (s *SFFrame) GetResult() *SFFrameResult {
 
 func (v *VerifyFileSystem) GetVirtualFs() filesys_interface.FileSystem {
 	return v.vfs
+}
+
+func (v *VerifyFileSystem) GetLanguage() consts.Language {
+	return v.language
 }
 
 func (v *VerifyFileSystem) GetExtraInfo(key string, backup ...string) string {
@@ -128,79 +133,81 @@ func NewSFFrame(vars *omap.OrderedMap[string, ValueOperator], text string, codes
 	return newSfFrameEx(vars, text, codes, nil, nil)
 }
 
-func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() (consts.Language, []*VerifyFileSystem, error) {
-	val, err := consts.ValidateLanguage(s.rule.Language)
+func (s *SFFrame) ExtractVerifyFilesystemAndLanguage() ([]*VerifyFileSystem, error) {
+	ruleLanguage, err := consts.ValidateLanguage(s.rule.Language)
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
 
 	var result []*VerifyFileSystem
 	hasVerifyFs := false
-	for _, desc := range s.VerifyFsInfo {
-		if len(desc.verifyFilesystem) == 0 {
+	for _, verifyFSInfo := range s.VerifyFsInfo {
+		if len(verifyFSInfo.verifyFilesystem) == 0 {
 			continue
 		}
 		hasVerifyFs = true
+		language := ruleLanguage
+		if l := verifyFSInfo.language; l != "" {
+			language, _ = consts.ValidateLanguage(l)
+		}
 		verify := &VerifyFileSystem{}
 		vfs := filesys.NewVirtualFs()
-		for name, content := range desc.verifyFilesystem {
-			if val == "" {
+		for name, content := range verifyFSInfo.verifyFilesystem {
+			if language == "" {
 				lidx := strings.LastIndex(name, ".")
 				if lidx > 0 {
-					val, _ = consts.ValidateLanguage(name[lidx+1:])
+					language, _ = consts.ValidateLanguage(name[lidx+1:])
 				}
 			}
 			vfs.AddFile(name, content)
 		}
+
 		verify.vfs = vfs
-		verify.checkInfo = desc.rawDesc
+		verify.language = language
+		verify.checkInfo = verifyFSInfo.rawDesc
 		result = append(result, verify)
 	}
 	if !hasVerifyFs {
-		return val, result, nil
+		return result, nil
 	}
-	// 有verify fs就要检查是否有语言
-	if val == "" {
-		return val, result, utils.Wrap(err, "validator language not found")
-	}
-	return val, result, nil
+	return result, nil
 }
 
-func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() (consts.Language, []*VerifyFileSystem, error) {
-	val, err := consts.ValidateLanguage(s.rule.Language)
+func (s *SFFrame) ExtractNegativeFilesystemAndLanguage() ([]*VerifyFileSystem, error) {
+	ruleLanguage, err := consts.ValidateLanguage(s.rule.Language)
 	if err != nil {
 		log.Warnf("validate language failed: %s", err)
 	}
 	var result []*VerifyFileSystem
-	for _, desc := range s.VerifyFsInfo {
-		if len(desc.negativeFilesystem) == 0 {
+	for _, verifyFSInfo := range s.VerifyFsInfo {
+		if len(verifyFSInfo.negativeFilesystem) == 0 {
 			continue
+		}
+		language := ruleLanguage
+		if l := verifyFSInfo.language; l != "" {
+			language, _ = consts.ValidateLanguage(l)
 		}
 		verify := &VerifyFileSystem{}
 		vfs := filesys.NewVirtualFs()
-		for name, content := range desc.negativeFilesystem {
-			if val == "" {
+		for name, content := range verifyFSInfo.negativeFilesystem {
+			if language == "" {
 				lidx := strings.LastIndex(name, ".")
 				if lidx > 0 {
-					val, _ = consts.ValidateLanguage(name[lidx+1:])
+					language, _ = consts.ValidateLanguage(name[lidx+1:])
 				}
 			}
 			vfs.AddFile(name, content)
 		}
 		verify.vfs = vfs
-		verify.checkInfo = desc.rawDesc
+		verify.checkInfo = verifyFSInfo.rawDesc
+		verify.language = language
 		result = append(result, verify)
 	}
-	if val == "" {
-		return val, result, utils.Wrap(err, "validator language not found")
-	}
-	return val, result, nil
+	return result, nil
 }
 
 func (s *SFFrame) Flush() {
-	if s.result == nil {
-		s.result = NewSFResult(s.rule, s.config) // TODO: This code affects the reentrancy of the function
-	}
+	s.result = NewSFResult(s.rule, s.config)
 	s.stack = utils.NewStack[ValueOperator]()
 	s.errorSkipStack = utils.NewStack[*errorSkipContext]()
 	s.conditionStack = utils.NewStack[[]bool]()
@@ -241,6 +248,11 @@ func (s *SFFrame) WithPredecessorContext(label string) AnalysisContextOption {
 	}
 }
 
+func (s *SFFrame) ProcessCallback(msg string, args ...any) {
+	if s.config.processCallback != nil {
+		s.config.processCallback(s.idx, fmt.Sprintf(msg, args...))
+	}
+}
 func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 	s.predCounter = 0
 	defer func() {
@@ -257,15 +269,13 @@ func (s *SFFrame) exec(feedValue ValueOperator) (ret error) {
 		}
 	}()
 	for {
-		if s.config.processCallback != nil {
-			var msg string
-			if s.idx < len(s.Codes) {
-				msg = s.Codes[s.idx].String()
-			} else {
-				msg = "exec rule finished"
-			}
-			s.config.processCallback(s.idx, msg)
+		var msg string
+		if s.idx < len(s.Codes) {
+			msg = s.Codes[s.idx].String()
+		} else {
+			msg = "exec rule finished"
 		}
+		s.ProcessCallback(msg)
 		if s.idx >= len(s.Codes) {
 			break
 		}
@@ -507,7 +517,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 					}
 					return nil
 				})
-				results.AppendPredecessor(operator, s.WithPredecessorContext("recursive search "+i.UnaryStr))
+				results.AppendPredecessor(value, s.WithPredecessorContext("recursive search "+i.UnaryStr))
 				next = append(next, results)
 				if have {
 					return true
@@ -752,6 +762,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowUse() failed: %v", err)
 		}
+		vals.AppendPredecessor(value, s.WithPredecessorContext("getUser"))
 		s.debugSubLog("<< push users")
 		s.stack.Push(vals)
 	case OpGetBottomUsers:
@@ -787,6 +798,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return utils.Wrap(CriticalError, "BUG: get top defs failed, empty stack")
 		}
 		s.debugSubLog("- call TopDefs")
+		s.ProcessCallback("get topdef %v(%v)", ValuesLen(value), i.SyntaxFlowConfig)
 		vals, err := value.GetSyntaxFlowTopDef(s.result, s.config, i.SyntaxFlowConfig...)
 		if err != nil {
 			return utils.Errorf("Call .GetSyntaxFlowTopDef() failed: %v", err)
@@ -873,7 +885,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 		//	}
 		//	m[item.Key] = item.Value
 		//})
-		s.result.AlertSymbolTable[i.UnaryStr] = value
+		s.result.AlertSymbolTable.Set(i.UnaryStr, value)
 		//alStr := i.ValueByIndex(0)
 		//if alStr != "" {
 		//	m["__extra__"] = alStr
@@ -1200,7 +1212,7 @@ func (s *SFFrame) execStatement(i *SFI) error {
 			return nil
 		}
 		s.debugLog(">> pop")
-		m1 := make(map[int64]ValueOperator)
+		m1 := make(map[int64]ValueOperator, ValuesLen(vs))
 		_ = vs.Recursive(func(operator ValueOperator) error {
 			id, ok := fetchId(operator)
 			if ok {
@@ -1364,7 +1376,7 @@ func (s *SFFrame) debugLog(i string, item ...any) {
 	prefix := strings.Repeat("\t", filterStackLen)
 	prefix = "sf" + fmt.Sprintf("%4d", s.idx) + "| " + prefix
 	for _, line := range strings.Split(fmt.Sprintf(i, item...), "\n") {
-		fmt.Print(prefix + line + "\n")
+		log.Infof(prefix + line)
 	}
 }
 

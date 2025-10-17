@@ -46,10 +46,19 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	handleIfEdge := func(i *ssa.If) {
-		cond := i.GetValueById(i.Cond)
+		cond, ok := i.GetValueById(i.Cond)
+		if !ok {
+			return
+		}
 		fromBlock := i.GetBlock()
-		trueBlock := i.GetBasicBlockByID(i.True)
-		falseBlock := i.GetBasicBlockByID(i.False)
+		trueBlock, ok := i.GetBasicBlockByID(i.True)
+		if !ok {
+			return
+		}
+		falseBlock, ok := i.GetBasicBlockByID(i.False)
+		if !ok {
+			return
+		}
 		if utils.IsNil(cond) || cond.GetOpcode() == ssa.SSAOpcodeConstInst {
 			cond.NewError(ssa.Warn, BCTag, ConditionIsConst("if"))
 		}
@@ -57,7 +66,10 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		newEdge(falseBlock, fromBlock, newUnOp(ssa.OpNot, cond, i.GetBlock()))
 	}
 	handleLoopEdge := func(l *ssa.Loop) {
-		cond := l.GetValueById(l.Cond)
+		cond, ok := l.GetValueById(l.Cond)
+		if !ok {
+			return
+		}
 		canReach := func() bool {
 			if l.Key <= 0 || l.Init <= 0 || l.Cond <= 0 {
 				return true
@@ -69,11 +81,23 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 			var x, y ssa.Value
 
 			if l.Key == cond.X {
-				x = l.GetValueById(l.Init)
-				y = l.GetValueById(cond.Y)
+				x, ok = l.GetValueById(l.Init)
+				if !ok {
+					return true
+				}
+				y, ok = l.GetValueById(cond.Y)
+				if !ok {
+					return true
+				}
 			} else {
-				x = l.GetValueById(cond.X)
-				y = l.GetValueById(l.Init)
+				x, ok = l.GetValueById(cond.X)
+				if !ok {
+					return true
+				}
+				y, ok = l.GetValueById(l.Init)
+				if !ok {
+					return true
+				}
 			}
 			canReach := newBinOp(cond.Op, x, y, cond.GetBlock())
 			can, ok := canReach.(*ssa.ConstInst)
@@ -83,8 +107,14 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 			return true
 		}
 		from := l.GetBlock()
-		bodyBlock := l.GetBasicBlockByID(l.Body)
-		exitBlock := l.GetBasicBlockByID(l.Exit)
+		bodyBlock, ok := l.GetBasicBlockByID(l.Body)
+		if !ok {
+			return
+		}
+		exitBlock, ok := l.GetBasicBlockByID(l.Exit)
+		if !ok {
+			return
+		}
 		if !canReach() {
 			newEdge(bodyBlock, from, ssa.NewConst(false))
 			newEdge(exitBlock, from, ssa.NewConst(true))
@@ -96,14 +126,23 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 	handleSwitchEdge := func(sw *ssa.Switch) {
 		fromBlock := sw.GetBlock()
-		switchCondition := sw.GetValueById(sw.Cond)
+		switchCondition, ok := sw.GetValueById(sw.Cond)
+		if !ok {
+			return
+		}
 		if utils.IsNil(switchCondition) || switchCondition.GetOpcode() == ssa.SSAOpcodeConstInst {
 			sw.NewError(ssa.Warn, BCTag, ConditionIsConst("switch"))
 		}
 		var defaultCond ssa.Value
 		for _, lab := range sw.Label {
-			value := sw.GetValueById(lab.Value)
-			dest := sw.GetBasicBlockByID(lab.Dest)
+			value, ok := sw.GetValueById(lab.Value)
+			if !ok {
+				continue
+			}
+			dest, ok := sw.GetBasicBlockByID(lab.Dest)
+			if !ok {
+				continue
+			}
 			var cond ssa.Value
 			if utils.IsNil(switchCondition) {
 				cond = value
@@ -121,11 +160,14 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 		newEdge(sw.DefaultBlock, fromBlock, defaultCond)
 	}
 
-	fixupBlockPos := func(b *ssa.BasicBlock) memedit.RangeIf {
-		var start memedit.PositionIf
-		var end memedit.PositionIf
+	fixupBlockPos := func(b *ssa.BasicBlock) *memedit.Range {
+		var start *memedit.Position
+		var end *memedit.Position
 		for _, instId := range b.Insts {
-			inst := b.GetInstructionById(instId)
+			inst, ok := b.GetInstructionById(instId)
+			if !ok {
+				continue
+			}
 			// inst.GetPosition == nil, this inst is edge
 			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
@@ -142,7 +184,10 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 		for i := len(b.Insts) - 1; i >= 0; i-- {
 			instId := b.Insts[i]
-			inst := b.GetInstructionById(instId)
+			inst, ok := b.GetInstructionById(instId)
+			if !ok {
+				continue
+			}
 			if ssa.IsControlInstruction(inst) && inst.GetRange() != nil {
 				continue
 			}
@@ -157,7 +202,10 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 		var editor *memedit.MemEditor
 		for _, instId := range b.Insts {
-			inst := b.GetInstructionById(instId)
+			inst, ok := b.GetInstructionById(instId)
+			if !ok {
+				continue
+			}
 			if pos := inst.GetRange(); pos != nil {
 				editor = pos.GetEditor()
 				break
@@ -176,14 +224,17 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	for _, bRaw := range fun.Blocks {
 		// fix block position
 		// b.SetRange(fixupBlockPos(b))
-		block := fun.GetBasicBlockByID(bRaw)
-		if block == nil {
-			log.Warnf("function %s has a non-block instruction: %s", fun.GetName(), block.GetName())
+		block, ok := fun.GetBasicBlockByID(bRaw)
+		if !ok {
+			log.Warnf("function %s has a non-block instruction: %d", fun.GetName(), bRaw)
 			continue
 		}
 
 		for _, instId := range block.Insts {
-			inst := block.GetInstructionById(instId)
+			inst, ok := block.GetInstructionById(instId)
+			if !ok {
+				continue
+			}
 			switch inst := inst.(type) {
 			// call function
 			case *ssa.Call:
@@ -207,11 +258,11 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 	}
 
 	// handler
-	enter := fun.GetBasicBlockByID(fun.EnterBlock)
-	if enter != nil {
+	enter, ok := fun.GetBasicBlockByID(fun.EnterBlock)
+	if ok && enter != nil {
 		enter.SetReachable(true)
 	} else {
-		log.Warnf("BUG: function %s has a non-block instruction: %s", fun.GetName(), enter.GetName())
+		log.Warnf("BUG: function %s has a non-block instruction: %d", fun.GetName(), fun.EnterBlock)
 	}
 
 	// deep first search
@@ -240,15 +291,17 @@ func (s *BlockCondition) RunOnFunction(fun *ssa.Function) {
 
 		// dfs
 		for _, succId := range bb.Succs {
-			succBlock := bb.GetBasicBlockByID(succId)
-			handlerBlock(succBlock)
+			succBlock, ok := bb.GetBasicBlockByID(succId)
+			if ok {
+				handlerBlock(succBlock)
+			}
 		}
 	}
 
 	for _, bb := range fun.Blocks {
-		block := fun.GetBasicBlockByID(bb)
-		if block == nil {
-			log.Warnf("function %s has a non-block instruction: %s", fun.GetName(), block.GetName())
+		block, ok := fun.GetBasicBlockByID(bb)
+		if !ok || block == nil {
+			log.Warnf("function %s has a non-block instruction: %d", fun.GetName(), bb)
 			continue
 		}
 		handlerBlock(block)
@@ -263,7 +316,7 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 				edgeCond = value
 			}
 		}
-		cond := block.GetValueById(from.Condition)
+		cond, _ := block.GetValueById(from.Condition)
 		if edgeCond == nil {
 			return cond
 		} else {
@@ -282,7 +335,11 @@ func (s *BlockCondition) calcCondition(block *ssa.BasicBlock) ssa.Value {
 	// handler normal
 	var cond ssa.Value
 	for _, id := range block.Preds {
-		preRaw := block.GetValueById(id)
+		preRaw, ok := block.GetValueById(id)
+		if !ok {
+			log.Warn("BUG: pre is not *ssa.BasicBlock (id not found)")
+			continue
+		}
 		pre, ok := preRaw.(*ssa.BasicBlock)
 		if !ok {
 			log.Warn("BUG: pre is not *ssa.BasicBlock")

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -97,6 +98,24 @@ func WithSSARiskFilterSearch(search string) SSARiskFilterOption {
 	}
 }
 
+func WithSSARiskFilterCompare(taskID1, taskID2 string) SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		if taskID1 == "" || taskID2 == "" {
+			return
+		}
+		sf.SSARiskDiffRequest = &ypb.SSARiskDiffRequest{
+			BaseLine: &ypb.SSARiskDiffItem{RiskRuntimeId: taskID1},
+			Compare:  &ypb.SSARiskDiffItem{RiskRuntimeId: taskID2},
+		}
+	}
+}
+
+func WithSSARiskIncremental() SSARiskFilterOption {
+	return func(sf *ypb.SSARisksFilter) {
+		sf.Incremental = true
+	}
+}
+
 func WithSSARiskFilterTaskID(taskID string) SSARiskFilterOption {
 	return func(sf *ypb.SSARisksFilter) {
 		if taskID == "" {
@@ -123,10 +142,66 @@ func NewSSARiskFilter(opts ...SSARiskFilterOption) *ypb.SSARisksFilter {
 	return filter
 }
 
+func filterSSARiskByIncremental(db *gorm.DB, runtimeId ...string) *gorm.DB {
+	if len(runtimeId) == 0 {
+		// 查询所有未处置的漏洞
+		var disposedFeatureHashes []string
+		err := db.New().Model(&schema.SSARiskDisposals{}).
+			Pluck("DISTINCT risk_feature_hash", &disposedFeatureHashes).Error
+		if err != nil {
+			log.Errorf("Failed to query disposed feature hashes: %v", err)
+			return db
+		}
+		db = db.Where("risk_feature_hash NOT IN (?)", disposedFeatureHashes)
+		return db
+	} else if len(runtimeId) == 1 {
+		var baseTask schema.SyntaxFlowScanTask
+		if err := db.New().Where("task_id = ?", runtimeId).First(&baseTask).Error; err != nil {
+			return db
+		}
+		var validFeatureHashes []string
+		subWhere := `
+		NOT EXISTS (
+			SELECT 1
+			FROM ssa_risk_disposals
+			JOIN syntax_flow_scan_tasks base_task ON ssa_risk_disposals.task_id = base_task.task_id
+			WHERE ssa_risk_disposals.risk_feature_hash = ssa_risks.risk_feature_hash
+			  AND base_task.scan_batch <= ?
+		)
+	`
+		err := db.New().
+			Model(&schema.SSARisk{}).
+			Where("ssa_risks.runtime_id = ? AND ssa_risks.risk_feature_hash != ''", runtimeId).
+			Where(subWhere, baseTask.ScanBatch).
+			Pluck("DISTINCT ssa_risks.risk_feature_hash", &validFeatureHashes).Error
+		if err != nil {
+			log.Errorf("Failed to query valid feature hashes: %v", err)
+			return db
+		}
+		return db.Where("risk_feature_hash IN (?)", validFeatureHashes)
+	}
+	return db
+}
+
+func filterSSARiskByCompare(db *gorm.DB, baselineTaskID, compareTaskID string) *gorm.DB {
+	if baselineTaskID == "" || compareTaskID == "" {
+		return db
+	}
+	var compareHash []string
+	db.New().Model(&schema.SSARisk{}).
+		Where("runtime_id = ?", compareTaskID).
+		Where("risk_feature_hash != ''").
+		Pluck("risk_feature_hash", &compareHash)
+	if len(compareHash) > 0 {
+		db = db.Where("risk_feature_hash NOT IN (?)", compareHash)
+	}
+	return db
+}
 func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if filter == nil {
 		return db
 	}
+
 	db = bizhelper.ExactQueryInt64ArrayOr(db, "id", filter.GetID())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "program_name", filter.GetProgramName())
 	db = bizhelper.ExactOrQueryStringArrayOr(db, "function_name", filter.GetFunctionName())
@@ -155,6 +230,22 @@ func FilterSSARisk(db *gorm.DB, filter *ypb.SSARisksFilter) *gorm.DB {
 	if filter.GetBeforeCreatedAt() > 0 {
 		db = bizhelper.QueryByTimeRangeWithTimestamp(db, "created_at", 0, filter.GetBeforeCreatedAt())
 	}
+
+	if disposalStatuses := filter.GetLatestDisposalStatus(); len(disposalStatuses) > 0 {
+		db = bizhelper.ExactOrQueryStringArrayOr(db, "latest_disposal_status", disposalStatuses)
+	}
+
+	if dr := filter.GetSSARiskDiffRequest(); dr != nil {
+		baselineTaskID := dr.GetBaseLine().GetRiskRuntimeId()
+		compareTaskID := dr.GetCompare().GetRiskRuntimeId()
+		db = filterSSARiskByCompare(db, baselineTaskID, compareTaskID)
+	}
+
+	if filter.GetIncremental() {
+		runtimeIDs := filter.GetRuntimeID()
+		db = filterSSARiskByIncremental(db, runtimeIDs...)
+	}
+
 	return db
 }
 
@@ -224,4 +315,23 @@ func QuerySSARiskCount(DB *gorm.DB, filter *ypb.SSARisksFilter) (int, error) {
 
 func YieldSSARisk(db *gorm.DB, ctx context.Context) chan *schema.SSARisk {
 	return bizhelper.YieldModel[*schema.SSARisk](ctx, db, bizhelper.WithYieldModel_PageSize(100))
+}
+
+type SSARiskLevelCount struct {
+	Count    int64  `json:"count"`
+	Severity string `json:"severity"`
+}
+
+func GetSSARiskLevelCount(DB *gorm.DB, filter *ypb.SSARisksFilter) ([]*SSARiskLevelCount, error) {
+	db := DB.Model(&schema.SSARisk{})
+	// db = db.Debug()
+
+	db = FilterSSARisk(db, filter)
+	db = db.Select("severity as severity, COUNT(*) as count").Group("severity")
+
+	var v []*SSARiskLevelCount
+	if err := db.Scan(&v).Error; err != nil {
+		return nil, utils.Errorf("scan failed: %v", err)
+	}
+	return v, nil
 }

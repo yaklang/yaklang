@@ -1,0 +1,195 @@
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramString(
+        "key",
+        jsonschema.description("基础Key，设置一下"),
+        jsonschema.raw("required", "true"),
+        jsonschema.required(true),
+        jsonschema.raw("x-rules", "test"),
+    ),
+    jsonschema.paramObject(
+        "objtest",
+        jsonschema.paramInt("intTest", jsonschema.description("测试nestedd")),
+        jsonschema.description("this description is for object"),
+    ),
+)
+println(result)
+/*
+var SchemaGeneratorExports = map[string]any{
+	"NewObjectSchema":      newObjectSchema,
+	"NewObjectArraySchema": newObjectArraySchema,
+
+	"paramString":             WithStringParam,
+	"paramInt":                WithIntegerParam,
+	"paramBool":               WithBoolParam,
+	"paramNumber":             WithNumberParam,
+	"paramStringArray":        WithStringArrayParam,
+	"paramNumberArray":        WithNumberArrayParam,
+	"paramKeyValuePairsArray": WithKVPairsParam,
+	"paramObject":             _withParamObject,
+	"paramRaw":                WithRawParam,
+
+	"description": WithParam_Description,
+	"required":    WithParam_Required,
+	"min":         WithParam_Min,
+	"max":         WithParam_Max,
+	"maxLength":   WithParam_MaxLength,
+	"minLength":   WithParam_MinLength,
+	"const":       WithParam_Const,
+	"enum":        WithParam_Enum,
+	"title":       WithParam_Title,
+	"raw":         WithParam_Raw,
+	"example":     WithParam_Example,
+}
+
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": [
+    "key"
+  ],
+  "properties": {
+    "key": {
+      "description": "基础Key，设置一下",
+      "type": "string",
+      "x-rules": "test"
+    },
+    "objtest": {
+      "description": "this description is for object",
+      "properties": {
+        "intTest": {
+          "description": "测试nestedd",
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}
+*/
+
+assert "测试nestedd" in result
+
+result = jsonschema.NewObjectSchema(
+    // 1. 定义一个名为 "key" 的字符串参数
+    jsonschema.paramString(
+        "key",
+        jsonschema.description("基础Key，设置一下"), // 2. 为 "key" 添加描述
+        jsonschema.required(true),               // 3. 将 "key" 标记为必需
+        jsonschema.raw("x-rules", "test"),       // 4. 添加一个自定义的 `x-rules` 字段
+    ),
+    // 5. 定义一个名为 "objtest" 的对象参数
+    jsonschema.paramObject(
+        "objtest",
+        // 6. 在 "objtest" 内部，定义一个名为 "intTest" 的整数参数
+        jsonschema.paramInt("intTest", jsonschema.description("测试nestedd")),
+        jsonschema.description("this description is for object"), // 7. 为 "objtest" 本身添加描述
+    ),
+)
+println(result)
+
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramString("username",
+        jsonschema.description("User's login name"),
+    ),
+)
+assert `"username": {` in result
+assert `"type": "string"` in result
+assert `"description": "User's login name"` in result
+assert `"required"` not in result  // 默认非必需
+
+
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramInt("age",
+        jsonschema.description("User's age"),
+        jsonschema.required(true),
+        jsonschema.min(18),
+        jsonschema.max(120),
+    ),
+)
+assert `"required": [` in result && "age" in result // 检查格式化的 required 数组
+assert `"type": "integer"` in result
+assert `"minimum": 18` in result
+assert `"maximum": 120` in result
+
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramObject("objtest",
+        jsonschema.description("this description is for object"),
+        jsonschema.paramInt("intTest", jsonschema.description("测试nestedd")),
+    ),
+)
+assert `"objtest": {` in result
+assert `"description": "this description is for object"` in result
+assert `"properties": {` in result
+assert `"intTest": {` in result
+assert `"description": "测试nestedd"` in result
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramStringArray("tags",
+        jsonschema.description("A list of tags"),
+    ),
+)
+assert `"tags": {` in result
+assert `"type": "array"` in result
+assert `"items": {` in result
+assert `"type": "string"` in result
+
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramString("status",
+        jsonschema.description("The current status"),
+        jsonschema.enum("pending", "processing", "completed", "failed"),
+    ),
+)
+assert `"enum": [` in result
+assert `"pending"` in result
+assert `"completed"` in result
+
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramString("api_key",
+        jsonschema.raw("x-internal-level", "secret"),
+        jsonschema.raw("format", "password"), // 例如给 UI 的提示
+    ),
+)
+assert `"x-internal-level": "secret"` in result
+assert `"format": "password"` in result
+result = jsonschema.NewObjectSchema(
+    jsonschema.paramString("id",
+        jsonschema.description("Unique identifier"),
+        jsonschema.required(true),
+        jsonschema.minLength(5),
+    ),
+    jsonschema.paramObject("user_profile",
+        jsonschema.description("User's profile data"),
+        jsonschema.required(true),
+        jsonschema.paramString("name", jsonschema.required(true)),
+        jsonschema.paramInt("level", jsonschema.min(1)),
+    ),
+    jsonschema.paramStringArray("roles",
+        jsonschema.description("List of user roles"),
+        jsonschema.min(1), // 通过`min`选项函数实现 `minItems`
+    ),
+)
+println(result)
+// assert `"required": [ "id",\n    "user_profile"\n  ]` in result // 多个必需项
+assert `"minLength": 5` in result
+assert `"user_profile": {` in result
+assert `"properties": {` in result
+assert `"name": {` in result // 检查嵌套的 name
+assert `"level": {` in result // 检查嵌套的 level
+assert `"minimum": 1` in result // 检查 roles 的 minItems(假设 min 映射到 minItems)
+
+
+
+
+
+
+
+
+println(result)
+
+
+a = jsonschema.NewObjectSchema(jsonschema.paramString("key"), jsonschema.paramString("@action", jsonschema.raw("const", "aaa"), jsonschema.required(true)))
+println(a)
+
+result = json.FindPath(a, "$..properties..const")
+assert result == "aaa"

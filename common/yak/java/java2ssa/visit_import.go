@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
+func (y *singleFileBuilder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 	if y == nil || i == nil || y.IsStop() {
 		return
 	}
@@ -28,9 +28,7 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 			}
 		}
 		_, _, _ = pkgNames, static, all
-		if y.PreHandler() {
-			continue
-		}
+
 		var prog *ssa.Program
 		var className string
 		// found package
@@ -40,10 +38,12 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 			valName := pkgNames[len(pkgNames)-1]
 			if library, _ := y.GetProgram().GetLibrary(strings.Join(pkg, ".")); library != nil {
 				prog = library
-				if all {
-					_ = y.GetProgram().ImportTypeStaticAll(prog, className)
-				} else {
-					_ = y.GetProgram().ImportTypeStaticMemberFromLib(prog, className, valName)
+				if !y.PreHandler() {
+					if all {
+						_ = y.GetProgram().ImportTypeStaticAll(prog, className)
+					} else {
+						_ = y.GetProgram().ImportTypeStaticMemberFromLib(prog, className, valName)
+					}
 				}
 			}
 		} else {
@@ -65,11 +65,13 @@ func (y *builder) VisitAllImport(i *javaparser.CompilationUnitContext) {
 			log.Warnf("Dependencies Missed: Import package %v but not found", pkgNames)
 			continue
 		}
+		prog.PushEditor(y.GetEditor())
 		// get class
 		if all {
 			_ = y.GetProgram().ImportAll(prog)
 		} else {
 			_ = y.GetProgram().ImportTypeFromLib(prog, className, pkgImport)
 		}
+		prog.PopEditor(false)
 	}
 }

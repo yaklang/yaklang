@@ -6,93 +6,78 @@ desc(
 	risk: "info-exposure"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   JSON（JavaScript Object Notation）是一种轻量级的数据交换格式，广泛用于Web应用中。在某些场景下，开发人员可能无意中将敏感数据（如密码、内部路径等）通过JSON暴露给外部用户。例如，当应用程序返回包含服务器内部结构或机密信息的JSON响应时，攻击者可以利用这些信息进行进一步的渗透测试和攻击。
-
+JSON（JavaScript Object Notation）是一种轻量级的数据交换格式，广泛用于Web应用中。在某些场景下，开发人员可能无意中将敏感数据（如密码、内部路径等）通过JSON暴露给外部用户。例如，当应用程序返回包含服务器内部结构或机密信息的JSON响应时，攻击者可以利用这些信息进行进一步的渗透测试和攻击。
 2. **触发场景**
-   ```go
+```go
 package main
-
 import (
-	"encoding/json"
-	"net/http"
+    "encoding/json"
+    "net/http"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"username": "admin",
-		"password": "admin@123",
-	}
-	jsonData, _ := json.Marshal(data)
-	w.Write(jsonData)
+    data := map[string]interface{}{
+        "username": "admin",
+        "password": "admin@123",
+    }
+    jsonData, _ := json.Marshal(data)
+    w.Write(jsonData)
 }
-
 func main() {
-	http.HandleFunc("/api", handler)
-	http.ListenAndServe(":8080", nil)
+    http.HandleFunc("/api", handler)
+    http.ListenAndServe(":8080", nil)
 }
-   ```
-   在上述代码中，`password`字段被直接编码到JSON响应中并返回给客户端，这可能导致敏感信息泄露。
-
+```
+在上述代码中，`password`字段被直接编码到JSON响应中并返回给客户端，这可能导致敏感信息泄露。
 3. **潜在影响**
-   - 泄露服务器内部文件路径、目录结构等敏感信息。
-   - 攻击者可识别服务器的操作系统类型，为后续攻击提供线索。
-   - 敏感信息（如密码、令牌等）可能被窃取，导致账户被劫持或进一步攻击。
-
+- 泄露服务器内部文件路径、目录结构等敏感信息。
+- 攻击者可识别服务器的操作系统类型，为后续攻击提供线索。
+- 敏感信息（如密码、令牌等）可能被窃取，导致账户被劫持或进一步攻击。
 DESC
 	rule_id: "80849d1b-19fd-44ca-91be-9fdbd4af1fe3"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免直接返回敏感数据
-   应用程序应避免将敏感数据（如密码、API密钥等）直接返回给客户端。如果必须传递特定数据，应确保对其进行加密或脱敏处理。
-   ```go
+应用程序应避免将敏感数据（如密码、API密钥等）直接返回给客户端。如果必须传递特定数据，应确保对其进行加密或脱敏处理。
+```go
 package main
-
 import (
-	"encoding/json"
-	"net/http"
+    "encoding/json"
+    "net/http"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"username": "admin",
-		// 不返回密码字段
-	}
-	jsonData, _ := json.Marshal(data)
-	w.Write(jsonData)
+    data := map[string]interface{}{
+        "username": "admin",
+        // 不返回密码字段
+    }
+    jsonData, _ := json.Marshal(data)
+    w.Write(jsonData)
 }
-
 func main() {
-	http.HandleFunc("/api", handler)
-	http.ListenAndServe(":8080", nil)
+    http.HandleFunc("/api", handler)
+    http.ListenAndServe(":8080", nil)
 }
-   ```
-
+```
 #### 2. 数据脱敏
-   对于需要返回的敏感数据，可以通过脱敏的方式隐藏其真实内容。
-   ```go
+对于需要返回的敏感数据，可以通过脱敏的方式隐藏其真实内容。
+```go
 func maskSensitiveData(input string) string {
-	if len(input) < 4 {
-		return "****"
-	}
-	return "****" + input[len(input)-4:]
+    if len(input) < 4 {
+        return "****"
+    }
+    return "****" + input[len(input)-4:]
 }
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	data := map[string]interface{}{
-		"username": "admin",
-		"password": maskSensitiveData("admin@123"),
-	}
-	jsonData, _ := json.Marshal(data)
-	w.Write(jsonData)
+    data := map[string]interface{}{
+        "username": "admin",
+        "password": maskSensitiveData("admin@123"),
+    }
+    jsonData, _ := json.Marshal(data)
+    w.Write(jsonData)
 }
-   ```
-
+```
 #### 3. 使用标准化的安全框架
-   推荐使用经过安全验证的框架或库统一管理敏感信息的输出，以减少人为疏漏。
-
+推荐使用经过安全验证的框架或库统一管理敏感信息的输出，以减少人为疏漏。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-200](https://cwe.mitre.org/data/definitions/200.html)
@@ -111,55 +96,10 @@ alert $low for {
 	type: "vuln",
 	title: "Detect Golang Json Information Exposure",
 	title_zh: "检测到Golang Json信息泄露",
-	solution: <<<CODE
-### 修复建议
-#### 1. 避免敏感信息序列化
-在使用`json.Marshal`等函数时，避免将包含敏感信息（如密码、密钥等）的结构体或映射直接序列化为JSON字符串。
-```go
-// 示例：过滤敏感字段
-type SafeUser struct {
-	Username string `json:"username"`
-	Password string `json:"-"` // 使用 `-` 忽略字段
-}
-
-user := SafeUser{
-	Username: "admin",
-	Password: "admin@123", // 密码不会被序列化
-}
-data, err := json.Marshal(user)
-if err != nil {
-	panic(err)
-}
-fmt.Println(string(data)) // 输出中不包含密码字段
-```
-
-#### 2. 添加数据脱敏逻辑
-对可能暴露敏感信息的数据进行脱敏处理，例如隐藏部分字符。
-```go
-// 示例：对密码字段脱敏
-func maskSensitiveData(data map[string]interface{}) map[string]interface{} {
-	if pwd, ok := data["password"].(string); ok {
-		data["password"] = "*****" // 替换为掩码值
-	}
-	return data
-}
-
-jsonp := map[string]interface{}{
-	"username": "admin",
-	"password": "admin@123",
-}
-maskedJsonp := maskSensitiveData(jsonp)
-data, err := json.Marshal(maskedJsonp)
-if err != nil {
-	panic(err)
-}
-fmt.Println(string(data)) // 密码字段被替换为 *****
-```
-
-#### 3. 审查输出内容
-确保所有通过API返回的数据都经过审查，并仅包含必要的非敏感信息。
-CODE
-	desc: <<<CODE
+	solution: <<<SOLUTION
+### 修复建议\n#### 1. 避免敏感信息序列化\n在使用`json.Marshal`等函数时，避免将包含敏感信息（如密码、密钥等）的结构体或映射直接序列化为JSON字符串。\n```go\n// 示例：过滤敏感字段\ntype SafeUser struct {\nUsername string `json:\"username\"\`\nPassword string `json:\"-\"` // 使用 `-` 忽略字段\n}\nuser := SafeUser{\nUsername: \"admin\",\nPassword: \"admin@123\", // 密码不会被序列化\n}\ndata, err := json.Marshal(user)\nif err != nil {\npanic(err)\n}\nfmt.Println(string(data)) // 输出中不包含密码字段\n```\n#### 2. 添加数据脱敏逻辑\n对可能暴露敏感信息的数据进行脱敏处理，例如隐藏部分字符。\n```go\n// 示例：对密码字段脱敏\nfunc maskSensitiveData(data map[string]interface{}) map[string]interface{} {\nif pwd, ok := data[\"password\"].(string); ok {\ndata[\"password\"] = \"*****\" // 替换为掩码值\n}\nreturn data\n}\njsonp := map[string]interface{}{\n\"username\": \"admin\",\n\"password\": \"admin@123\",\n}\nmaskedJsonp := maskSensitiveData(jsonp)\ndata, err := json.Marshal(maskedJsonp)\nif err != nil {\npanic(err)\n}\nfmt.Println(string(data)) // 密码字段被替换为 *****\n```\n#### 3. 审查输出内容\n确保所有通过API返回的数据都经过审查，并仅包含必要的非敏感信息。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
 由于应用程序在使用`json.Marshal`等函数时未对敏感信息进行过滤或脱敏处理，攻击者可能通过构造特定请求获取服务器上的敏感数据。这些数据包括但不限于目录结构、工作路径以及系统类型等。
@@ -167,24 +107,22 @@ CODE
 // 存在漏洞的代码示例
 ```go
 package main
-
 import (
-	"encoding/json"
-	"github.com/beego/beego/v2/server/web"
+"encoding/json"
+"github.com/beego/beego/v2/server/web"
 )
-
 func (c *JsonpVuln1Controller) Get() {
-	callback := c.GetString("callback")
-	c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
-	jsonp := make(map[string]interface{})
-	jsonp["username"] = "admin"
-	jsonp["password"] = "admin@123" // 包含敏感信息
-	data, err := json.Marshal(jsonp)
-	output := callback + "(" + string(data) + ")"
-	if err != nil {
-		panic(err)
-	}
-	c.Ctx.ResponseWriter.Write([]byte(output))
+callback := c.GetString("callback")
+c.Ctx.ResponseWriter.Header().Set("Content-Type", "application/javascript")
+jsonp := make(map[string]interface{})
+jsonp["username"] = "admin"
+jsonp["password"] = "admin@123" // 包含敏感信息
+data, err := json.Marshal(jsonp)
+output := callback + "(" + string(data) + ")"
+if err != nil {
+panic(err)
+}
+c.Ctx.ResponseWriter.Write([]byte(output))
 }
 ```
 攻击者可以通过调用该接口获取包含用户名和密码的JSONP响应，进一步利用这些信息发起后续攻击。
@@ -192,13 +130,16 @@ func (c *JsonpVuln1Controller) Get() {
 - 目录结构、工作路径等敏感信息泄露，导致攻击者能够更好地了解系统架构。
 - 用户凭证（如密码）泄露，可能导致账户被非法访问。
 - 攻击者可利用获取到的信息辅助后续攻击，例如提权或横向移动。
-CODE
+DESC
+	message: "检测到Golang JSON信息泄露漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "信息泄露",
+	name: "low",
 }
 
 desc(
 	lang: golang
 	alert_low: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -223,4 +164,117 @@ func (c *JsonpVuln1Controller) Get() {
 }
 
 UNSAFE
+	"safefile://SafeUserSerialization.go": <<<CODE
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+// User represents a user with sensitive fields tagged to be ignored.
+type User struct {
+	Username string `json:"username"`
+	Password string `json:"-"` // The `json:"-"` tag ignores this field during JSON marshaling
+	Email    string `json:"email"`
+}
+
+// MaskedUser represents a user with sensitive fields explicitly masked.
+type MaskedUser struct {
+	Username string `json:"username"`	
+	Password string `json:"password"` // Password will be masked manually
+	Email    string `json:"email"`
+}
+
+func safeHandler(w http.ResponseWriter, r *http.Request) {
+	// Case 1: Using struct tags to explicitly ignore sensitive fields
+	user := User{
+		Username: "safe_user",
+		Password: "very_secret_password",
+		Email:    "safe@example.com",
+	}
+	jsonData, err := json.Marshal(user)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
+	fmt.Println("SafeUserSerialization (ignored field): ", string(jsonData))
+
+	// Case 2: Manually removing sensitive fields from a map before marshaling
+	dataMap := map[string]interface{}{
+		"username": "another_safe_user",
+		"password": "another_secret",
+		"email":    "another_safe@example.com",
+	}
+	// Delete the sensitive field before marshaling
+	delete(dataMap, "password") 
+	jsonDataMap, err := json.Marshal(dataMap)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonDataMap)
+	fmt.Println("SafeUserSerialization (map delete): ", string(jsonDataMap))
+
+	// Case 3: Masking sensitive fields before marshaling
+	maskedUserData := MaskedUser{
+		Username: "masked_user",
+		Password: "********", // Masked password
+		Email:    "masked@example.com",
+	}
+	jsonDataMasked, err := json.Marshal(maskedUserData)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Write(jsonDataMasked)
+	fmt.Println("SafeUserSerialization (masked field): ", string(jsonDataMasked))
+}
+
+func main() {
+	http.HandleFunc("/api/safe", safeHandler)
+	http.ListenAndServe(":8081", nil)
+}
+CODE
+	"safefile://SafeStructWithoutPassword.go": <<<CODE
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/http"
+)
+
+// UserProfile struct only contains non-sensitive information
+type UserProfile struct {
+	Username string `json:"username"`
+	Email    string `json:"email"`
+}
+
+func userProfileHandler(w http.ResponseWriter, r *http.Request) {
+	// Create a user profile without the password field
+	profile := UserProfile{
+		Username: "test_user",
+		Email:    "test@example.com",
+	}
+
+	jsonData, err := json.Marshal(profile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonData)
+	fmt.Println("SafeStructWithoutPassword: ", string(jsonData))
+}
+
+func main() {
+	http.HandleFunc("/api/userprofile", userProfileHandler)
+	http.ListenAndServe(":8082", nil)
+}
+CODE
 )

@@ -45,6 +45,7 @@ type VersionedIF[T versionedValue] interface {
 
 	// local
 	GetLocal() bool
+	GetCross() bool
 
 	// capture
 	CaptureInScope(ScopedVersionedTableIF[T]) (VersionedIF[T], bool)
@@ -68,9 +69,9 @@ type VersionedIF[T versionedValue] interface {
 	GetKind() VariableKind
 	SetKind(VariableKind)
 
-	PointHandle(T, ScopedVersionedTableIF[T])
-	SetPointHandle(f func(T, ScopedVersionedTableIF[T]))
-	GetPointHandle() func(T, ScopedVersionedTableIF[T])
+	PointHandler(T, ScopedVersionedTableIF[T])
+	SetPointHandler(f func(T, ScopedVersionedTableIF[T]))
+	GetPointHandler() func(T, ScopedVersionedTableIF[T])
 }
 
 type VariableKind int
@@ -83,11 +84,13 @@ const (
 type Versioned[T versionedValue] struct {
 	// origin desc the variable's last or renamed version
 	captureVariable VersionedIF[T]
+	lock            sync.RWMutex
 	versionIndex    int64
 	globalIndex     int
 	lexicalName     string
 
 	local bool
+	cross bool
 
 	// the version of variable in current scope
 	scope ScopedVersionedTableIF[T]
@@ -95,8 +98,8 @@ type Versioned[T versionedValue] struct {
 	isAssigned *utils.AtomicBool
 	Value      T
 
-	kind        VariableKind
-	pointHandle func(T, ScopedVersionedTableIF[T])
+	kind         VariableKind
+	pointHandler func(T, ScopedVersionedTableIF[T])
 }
 
 func (v *Versioned[T]) GetId() int64 {
@@ -111,52 +114,53 @@ func (v *Versioned[T]) SetScope(s ScopedVersionedTableIF[T]) {
 }
 
 var (
-	lazyInstructionBuilder             func(id int64) (SSAValue, error)
-	lazyInstructionBuilderRegisterOnce = new(sync.Once)
+// lazyInstructionBuilder             func(id int64) (SSAValue, error)
+// lazyInstructionBuilderRegisterOnce = new(sync.Once)
 )
 
-func NewLazyInstruction(id int64) (SSAValue, error) {
-	if lazyInstructionBuilder == nil {
-		return nil, utils.Error("lazyInstructionBuilder is not registered")
-	}
-	return lazyInstructionBuilder(id)
-}
+// func NewLazyInstruction(id int64) (SSAValue, error) {
+// 	if lazyInstructionBuilder == nil {
+// 		return nil, utils.Error("lazyInstructionBuilder is not registered")
+// 	}
+// 	return lazyInstructionBuilder(id)
+// }
 
-func RegisterLazyInstructionBuilder(builder func(id int64) (SSAValue, error)) {
-	lazyInstructionBuilderRegisterOnce.Do(func() {
-		lazyInstructionBuilder = builder
-	})
-}
+// func RegisterLazyInstructionBuilder(builder func(id int64) (SSAValue, error)) {
+// 	lazyInstructionBuilderRegisterOnce.Do(func() {
+// 		lazyInstructionBuilder = builder
+// 	})
+// }
 
 func (v *Versioned[T]) UnmarshalJSON(raw []byte) error {
-	if v == nil {
-		return nil
-	}
-	params := make(map[string]any)
-	err := json.Unmarshal(raw, &params)
-	if err != nil {
-		return err
-	}
-	capId := v.versionIndex
-	_ = capId
+	//TODO:
+	// if v == nil {
+	// 	return nil
+	// }
+	// params := make(map[string]any)
+	// err := json.Unmarshal(raw, &params)
+	// if err != nil {
+	// 	return err
+	// }
+	// capId := v.versionIndex
+	// _ = capId
 
-	v.versionIndex = utils.MapGetInt64(params, "version_index")
-	v.globalIndex = utils.MapGetIntEx(params, "global_index")
-	v.lexicalName = utils.MapGetString(params, "lexical_name")
-	v.local = utils.MapGetBool(params, "local")
-	v.isAssigned = utils.NewAtomicBool()
-	v.isAssigned.SetTo(utils.MapGetBool(params, "is_assigned"))
+	// v.versionIndex = utils.MapGetInt64(params, "version_index")
+	// v.globalIndex = utils.MapGetIntEx(params, "global_index")
+	// v.lexicalName = utils.MapGetString(params, "lexical_name")
+	// v.local = utils.MapGetBool(params, "local")
+	// v.isAssigned = utils.NewAtomicBool()
+	// v.isAssigned.SetTo(utils.MapGetBool(params, "is_assigned"))
 
-	valIdx := utils.MapGetIntEx(params, "value")
-	// lazy value for ssa.Value
-	if valIdx > 0 {
-		raw, err := NewLazyInstruction(int64(valIdx))
-		if err != nil {
-			log.Warnf("TBD or BUG: lazy value for ssa.Value: %v, reason: %v", valIdx, err)
-		} else {
-			v.Value = raw.(T)
-		}
-	}
+	// valIdx := utils.MapGetIntEx(params, "value")
+	// // lazy value for ssa.Value
+	// if valIdx > 0 {
+	// 	raw, err := NewLazyInstruction(int64(valIdx))
+	// 	if err != nil {
+	// 		log.Warnf("TBD or BUG: lazy value for ssa.Value: %v, reason: %v", valIdx, err)
+	// 	} else {
+	// 		v.Value = raw.(T)
+	// 	}
+	// }
 
 	// lazy scope, scope 可能是不需要的，
 	// 因为一般在反序列化这个结果的过程中，
@@ -201,24 +205,24 @@ func NewVersioned[T versionedValue](globalIndex int, name string, local bool, sc
 	return ret
 }
 
-func (v *Versioned[T]) SetPointHandle(f func(T, ScopedVersionedTableIF[T])) {
-	v.pointHandle = f
+func (v *Versioned[T]) SetPointHandler(f func(T, ScopedVersionedTableIF[T])) {
+	v.pointHandler = f
 }
 
-func (v *Versioned[T]) GetPointHandle() func(T, ScopedVersionedTableIF[T]) {
-	return v.pointHandle
+func (v *Versioned[T]) GetPointHandler() func(T, ScopedVersionedTableIF[T]) {
+	return v.pointHandler
 }
 
-func (v *Versioned[T]) PointHandle(value T, scope ScopedVersionedTableIF[T]) {
-	if v.pointHandle != nil {
-		v.pointHandle(value, scope)
+func (v *Versioned[T]) PointHandler(value T, scope ScopedVersionedTableIF[T]) {
+	if v.pointHandler != nil {
+		v.pointHandler(value, scope)
 	}
 }
 
 func (v *Versioned[T]) PointHandleOnce(value T, scope ScopedVersionedTableIF[T]) {
-	if v.pointHandle != nil {
-		v.pointHandle(value, scope)
-		v.pointHandle = nil
+	if v.pointHandler != nil {
+		v.pointHandler(value, scope)
+		v.pointHandler = nil
 	}
 }
 
@@ -275,15 +279,27 @@ func (v *Versioned[T]) GetName() string {
 	return v.lexicalName
 }
 func (v *Versioned[T]) SetVersion(version int64) {
+	v.lock.Lock()
+	defer v.lock.Unlock()
 	v.versionIndex = version
 }
 
 func (v *Versioned[T]) GetVersion() int64 {
+	v.lock.RLock()
+	defer v.lock.RUnlock()
 	return v.versionIndex
 }
 
 func (v *Versioned[T]) GetLocal() bool {
 	return v.local
+}
+
+func (v *Versioned[T]) SetCross(c bool) {
+	v.cross = c
+}
+
+func (v *Versioned[T]) GetCross() bool {
+	return v.cross
 }
 
 func (v *Versioned[T]) CaptureInScope(base ScopedVersionedTableIF[T]) (VersionedIF[T], bool) {
@@ -293,7 +309,10 @@ func (v *Versioned[T]) CaptureInScope(base ScopedVersionedTableIF[T]) (Versioned
 		// just skip
 		return nil, false
 	}
-	if baseVariable.GetCaptured() != v.GetCaptured() {
+	if baseVariable.GetCaptured().GetGlobalIndex() != v.GetCaptured().GetGlobalIndex() {
+		if v.GetCross() {
+			return nil, true
+		}
 		return nil, false
 	}
 

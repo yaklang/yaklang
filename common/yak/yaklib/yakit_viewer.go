@@ -10,10 +10,12 @@ import (
 func init() {
 	YakitExports["EnableWebsiteTrees"] = yakitEnableCrawlerViewer
 	YakitExports["EnableTable"] = yakitEnableFixedTable
+	YakitExports["EnableDotGraphTab"] = yakitEnableDotGraphTab
 	YakitExports["EnableText"] = yakitEnableText
 	YakitExports["TableData"] = yakitTableData
 	YakitExports["StatusCard"] = yakitStatusCard
 	YakitExports["TextTabData"] = yakitTextTabData
+	YakitExports["OutputDotGraph"] = yakitDotGraphData
 }
 
 type YakitFeature struct {
@@ -37,6 +39,15 @@ func yakitEnableFixedTable(tableName string, columns []string) {
 		Params: map[string]interface{}{
 			"table_name": tableName,
 			"columns":    columns,
+		},
+	})
+}
+
+func yakitEnableDotGraphTab(tabName string) {
+	yakitClientInstance.Output(&YakitFeature{
+		Feature: "dot-graph-tab",
+		Params: map[string]interface{}{
+			"tab_name": tabName,
 		},
 	})
 }
@@ -68,6 +79,21 @@ func yakitTableData(tableName string, data any) *YakitFixedTableData {
 		yakitClientInstance.Output(tableData)
 	}
 	return nil
+}
+
+type YakitDotGraphData struct {
+	TabName string `json:"tab_name"`
+	Data    string `json:"data"`
+}
+
+func yakitDotGraphData(tabName string, data string) {
+	tabData := &YakitDotGraphData{
+		TabName: tabName,
+		Data:    data,
+	}
+	if yakitClientInstance != nil {
+		yakitClientInstance.Output(tabData)
+	}
 }
 
 type YakitTextTabData struct {

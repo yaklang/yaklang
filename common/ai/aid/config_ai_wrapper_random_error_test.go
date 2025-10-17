@@ -3,18 +3,21 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestCoordinator_RandomAICallbackError(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 
 	m := new(sync.Mutex)
 	var errLimit int64 = 2
@@ -23,10 +26,10 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			m.Lock()
 			defer m.Unlock()
 
@@ -37,7 +40,7 @@ func TestCoordinator_RandomAICallbackError(t *testing.T) {
 				count = new(int64)
 			}
 
-			rsp := config.NewAIResponse()
+			rsp := aicommon.NewAIResponse(config)
 			rsp.EmitOutputStream(strings.NewReader(`
 {
     "@action": "plan",
@@ -80,17 +83,30 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
-				parsedTask = true
-				inputChan <- &InputEvent{
-					Id: result.GetInteractiveId(),
-					Params: aitool.InvokeParams{
-						"suggestion": "continue",
-					},
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				// 解析JSON数据
+				var data = map[string]any{}
+				err := json.Unmarshal([]byte(result.Content), &data)
+				if err != nil {
+					t.Fatal(err)
 				}
-				continue
+
+				// 检查是否包含预期的任务描述
+				if plansRaw, ok := data["plans"]; ok {
+					plansJson, _ := json.Marshal(plansRaw)
+					if strings.Contains(string(plansJson), `将最大文件的路径和大小以可读格式输出`) {
+						parsedTask = true
+						inputChan <- &InputEvent{
+							Id: result.GetInteractiveId(),
+							Params: aitool.InvokeParams{
+								"suggestion": "continue",
+							},
+						}
+						continue
+					}
+				}
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
@@ -114,7 +130,7 @@ LOOP:
 				}
 			}
 
-			if consumptionCheck && result.Type == EVENT_TYPE_PONG {
+			if consumptionCheck && result.Type == schema.EVENT_TYPE_PONG {
 				pingPongCheck = true
 				inputChan <- &InputEvent{
 					IsSyncInfo: true,
@@ -123,7 +139,7 @@ LOOP:
 				continue
 			}
 
-			if pingPongCheck && result.Type == EVENT_TYPE_PLAN {
+			if pingPongCheck && result.Type == schema.EVENT_TYPE_PLAN {
 				var i = make(aitool.InvokeParams, 0)
 				if err := json.Unmarshal([]byte(result.Content), &i); err != nil {
 					t.Fatal(err)

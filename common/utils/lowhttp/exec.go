@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	utls "github.com/refraction-networking/utls"
 	"github.com/samber/lo"
@@ -61,6 +62,14 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	for _, opt := range opts {
 		opt(option)
 	}
+
+	if option.Session == nil {
+		sessionId := uuid.New().String()
+		option.Session = sessionId
+		opts = append(opts, WithSession(option.Session))
+		defer RemoveCookiejar(sessionId)
+	}
+
 	if option.WithConnPool && option.ConnPool == nil {
 		option.ConnPool = DefaultLowHttpConnPool
 	}
@@ -90,7 +99,6 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	if redirectTimes > 0 {
 		lastPacket := raw
-		method := GetHTTPRequestMethod(r)
 		statusCode := GetStatusCodeFromResponse(lastPacket.Response)
 
 		for i := 0; i < redirectTimes; i++ {
@@ -110,7 +118,7 @@ func HTTP(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			targetUrl := MergeUrlFromHTTPRequest(r, target, forceHttps)
 
 			// should not extract response cookie
-			r, err = UrlToRequestPacketEx(method, targetUrl, r, forceHttps, statusCode)
+			r, err = BuildRedirectRequest(targetUrl, r, lastPacket.IsHttps, statusCode)
 			if err != nil {
 				log.Errorf("met error in redirect: %v", err)
 				response.RawPacket = lastPacket.Response // 保留原始报文
@@ -180,71 +188,28 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 	for _, opt := range opts {
 		opt(option)
 	}
-
-	/*
-		init option config
-	*/
-	var (
-		https                = option.Https
-		forceHttp2           = option.Http2
-		forceHttp3           = option.Http3
-		gmTLS                = option.GmTLS
-		onlyGMTLS            = option.GmTLSOnly
-		preferGMTLS          = option.GmTLSPrefer
-		host                 = option.Host
-		port                 = option.Port
-		requestPacket        = option.Packet
-		timeout              = option.Timeout
-		connectTimeout       = option.ConnectTimeout
-		maxRetryTimes        = option.RetryTimes
-		retryInStatusCode    = option.RetryInStatusCode
-		retryNotInStatusCode = option.RetryNotInStatusCode
-		retryHandler         = option.RetryHandler
-		retryWaitTime        = option.RetryWaitTime
-		retryMaxWaitTime     = option.RetryMaxWaitTime
-		noFixContentLength   = option.NoFixContentLength
-		proxy                = option.Proxy
-		saveHTTPFlow         = option.SaveHTTPFlow
-		saveHTTPFlowSync     = option.SaveHTTPFlowSync
-		saveHTTPFlowHandler  = option.SaveHTTPFlowHandler
-		session              = option.Session
-		ctx                  = option.Ctx
-		traceInfo            = newLowhttpTraceInfo()
-		response             = newLowhttpResponse(traceInfo)
-		source               = option.RequestSource
-		dnsServers           = option.DNSServers
-		dnsHosts             = option.EtcHosts
-		connPool             = option.ConnPool
-		withConnPool         = option.WithConnPool
-		sni                  = option.SNI
-		payloads             = option.Payloads
-		tags                 = option.Tags
-		firstAuth            = true
-		reqIns               = option.NativeHTTPRequestInstance
-		maxContentLength     = option.MaxContentLength
-		randomJA3FingerPrint = option.RandomJA3FingerPrint
-		clientHelloSpec      = option.ClientHelloSpec
-		dialer               = option.Dialer
-	)
-
+	retryHandler := option.RetryHandler
 	retry := func(rsp *LowhttpResponse, rawBytes []byte, retryTimes int) bool {
 		if retryHandler != nil {
 			rspRaw, _, err := FixHTTPResponse(rawBytes)
 			if err != nil {
 				rspRaw = rawBytes
 			}
-			var httpsFlag = https
-			var rawReq = requestPacket
-			if utils.IsNil(response) {
-				httpsFlag = rsp.Https
-				rawReq = rsp.RawRequest
-			}
-			return retryHandler(httpsFlag, retryTimes, rawReq, rspRaw)
+			var httpsFlag = option.Https
+			var rawReq = option.Packet
+			var retryFlag bool
+			retryHandler(httpsFlag, retryTimes, rawReq, rspRaw, func(i ...[]byte) {
+				if len(i) > 0 {
+					option.Packet = i[0]
+				}
+				retryFlag = true
+			})
+			return retryFlag
 		} else {
 			statusCode := GetStatusCodeFromResponse(rawBytes)
-			if len(retryNotInStatusCode) > 0 {
+			if len(option.RetryNotInStatusCode) > 0 {
 				var retryNotIn = true
-				for _, sc := range retryNotInStatusCode { // black list first
+				for _, sc := range option.RetryNotInStatusCode { // black list first
 					if statusCode == sc || (statusCode >= 300 && statusCode < 400) { // 3xx code can't retry
 						retryNotIn = false
 						break
@@ -255,13 +220,85 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 				}
 			}
 			// in statuscode
-			for _, sc := range retryInStatusCode {
+			for _, sc := range option.RetryInStatusCode {
 				if statusCode == sc {
 					return true
 				}
 			}
 			return false
 		}
+	}
+	retryTimes := 0
+	for {
+		response, err := HTTPWithoutRetry(option)
+		if err != nil {
+			return response, err
+		}
+		if retry(response, response.RawPacket, retryTimes) && (retryTimes < option.RetryTimes || retryHandler != nil) {
+			retryTimes += 1
+			time.Sleep(utils.JitterBackoff(option.RetryWaitTime, option.RetryMaxWaitTime, retryTimes))
+			log.Infof("retry reconnect because [%d / %d]", retryTimes, option.RetryMaxWaitTime)
+			continue
+		}
+		return response, nil
+	}
+}
+
+func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
+	var (
+		https                   = option.Https
+		forceHttp2              = option.Http2
+		forceHttp3              = option.Http3
+		gmTLS                   = option.GmTLS
+		onlyGMTLS               = option.GmTLSOnly
+		preferGMTLS             = option.GmTLSPrefer
+		host                    = option.Host
+		port                    = option.Port
+		requestPacket           = option.Packet
+		timeout                 = option.Timeout
+		connectTimeout          = option.ConnectTimeout
+		maxRetryTimes           = option.RetryTimes
+		customFailureChecker    = option.CustomFailureChecker
+		retryWaitTime           = option.RetryWaitTime
+		retryMaxWaitTime        = option.RetryMaxWaitTime
+		noFixContentLength      = option.NoFixContentLength
+		proxy                   = option.Proxy
+		saveHTTPFlow            = option.SaveHTTPFlow
+		saveHTTPFlowSync        = option.SaveHTTPFlowSync
+		saveHTTPFlowHandlerList = option.SaveHTTPFlowHandler
+		session                 = option.Session
+		ctx                     = option.Ctx
+		traceInfo               = newLowhttpTraceInfo()
+		response                = newLowhttpResponse(traceInfo)
+		source                  = option.RequestSource
+		dnsServers              = option.DNSServers
+		dnsHosts                = option.EtcHosts
+		connPool                = option.ConnPool
+		withConnPool            = option.WithConnPool
+		sni                     = option.SNI
+		payloads                = option.Payloads
+		tags                    = option.Tags
+		firstAuth               = true
+		reqIns                  = option.NativeHTTPRequestInstance
+		maxContentLength        = option.MaxContentLength
+		randomJA3FingerPrint    = option.RandomJA3FingerPrint
+		clientHelloSpec         = option.ClientHelloSpec
+		dialer                  = option.Dialer
+	)
+
+	failureChecker := func(rsp *LowhttpResponse) error {
+		if customFailureChecker != nil && rsp != nil {
+			var failureMsg string
+			var hasFailed bool
+			customFailureChecker(rsp.Https, rsp.RawRequest, rsp.BareResponse, func(msg string) {
+				failureMsg = msg
+				hasFailed = true
+			})
+			if hasFailed {
+				return utils.Errorf("request failed intentionally by custom failure checker: %s", failureMsg)
+			}
+		}
+		return nil
 	}
 
 	connectTimeout = 2 * time.Second
@@ -301,6 +338,13 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 		httpctx.SetResponseMaxContentLength(reqIns, maxContentLength)
 	}
 
+	if option.NoBodyBuffer {
+		httpctx.SetNoBodyBuffer(reqIns, true)
+	}
+
+	if option.UseMITMRule && mitmReplacerLabelingHTTPFlowFunc != nil {
+		saveHTTPFlowHandlerList = append(saveHTTPFlowHandlerList, mitmReplacerLabelingHTTPFlowFunc)
+	}
 	/*
 		save http flow defer
 	*/
@@ -310,8 +354,10 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 			response.TooLargeLimit = int64(maxContentLength)
 		}
 
-		if saveHTTPFlowHandler != nil {
-			saveHTTPFlowHandler(response)
+		if saveHTTPFlowHandlerList != nil {
+			for _, f := range saveHTTPFlowHandlerList {
+				f(response)
+			}
 		}
 
 		if response == nil || !saveHTTPFlow {
@@ -545,8 +591,7 @@ func HTTPWithoutRedirect(opts ...LowhttpOpt) (*LowhttpResponse, error) {
 
 	// https://github.com/mattn/go-ieproxy
 	var (
-		conn       net.Conn
-		retryTimes int
+		conn net.Conn
 	)
 	if len(proxy) == 1 && proxy[0] == "" {
 		proxy = proxy[1:]
@@ -778,14 +823,9 @@ RECONNECT:
 			}
 			httpctx.SetBareResponseBytes(reqIns, responsePacket)
 			response.RawPacket = responsePacket
-			// status code retry
-			if retry(response, responsePacket, retryTimes) && (retryTimes < maxRetryTimes || retryHandler != nil) {
-				retryTimes += 1
-				time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
-				log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
-				goto RECONNECT
-			}
-			return response, nil
+
+			err = failureChecker(response)
+			return response, err
 		}
 	}
 	//log.Infof("dns time + dial time cost: %v", time.Since(dnsStart))
@@ -803,7 +843,7 @@ RECONNECT:
 			requestPacket = option.BeforeDoRequest(requestPacket)
 		}
 		if oldVersionProxyChecking {
-			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
+			requestPacket, err = BuildLegacyProxyRequest(requestPacket, https)
 			if err != nil {
 				return nil, err
 			}
@@ -864,7 +904,7 @@ RECONNECT:
 		currentRPS.Add(1)
 
 		if oldVersionProxyChecking {
-			requestPacket, err = BuildLegacyProxyRequest(requestPacket)
+			requestPacket, err = BuildLegacyProxyRequest(requestPacket, https)
 			if err != nil {
 				return response, err
 			}
@@ -894,7 +934,9 @@ RECONNECT:
 		if option != nil && option.BodyStreamReaderHandler != nil {
 			reader, writer := utils.NewBufPipe(nil)
 			defer func() {
-				log.Infof("close reader and writer")
+				utils.Debug(func() {
+					log.Infof("close reader and writer")
+				})
 				writer.Close()
 			}()
 			waitBodyStreamReaderHandledCallEnd.Add(1)
@@ -914,6 +956,11 @@ RECONNECT:
 
 				packetReader := bufio.NewReader(reader)
 				responseHeader := bytes.NewBufferString("")
+				var responseHeaderWriter io.Writer = responseHeader
+				if option.NoBodyBuffer {
+					responseHeaderWriter = io.MultiWriter(responseHeaderWriter, &responseRaw)
+				}
+
 				for {
 					line, err := utils.BufioReadLine(packetReader)
 					if err != nil {
@@ -927,7 +974,8 @@ RECONNECT:
 					//	log.Infof("stream handler start to handle header: %v", time.Since(startHandlerStream))
 					//})
 
-					responseHeader.WriteString(string(line) + "\r\n")
+					responseHeaderWriter.Write(line)
+					responseHeaderWriter.Write([]byte("\r\n"))
 					if len(line) == 0 {
 						go func() {
 							io.Copy(bodyWriter, packetReader)
@@ -948,7 +996,11 @@ RECONNECT:
 					option.BodyStreamReaderHandler(responseHeader.Bytes(), bodyReader)
 				}
 			}()
-			mirrorWriter = io.MultiWriter(&responseRaw, writer)
+			if option.NoBodyBuffer {
+				mirrorWriter = writer
+			} else {
+				mirrorWriter = io.MultiWriter(&responseRaw, writer)
+			}
 		}
 
 		httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
@@ -1027,7 +1079,7 @@ RECONNECT:
 			firstResponse.Request = reqIns
 
 			// handle response
-			for noFixContentLength { // 尝试读取pipeline/smuggle响应包
+			for noFixContentLength && !option.NoReadMultiResponse { // 尝试读取pipeline/smuggle响应包
 				// log.Infof("checking next(pipeline/smuggle) response...")
 				nextResponse, err := utils.ReadHTTPResponseFromBufioReaderConn(httpResponseReader, conn, nil)
 				var nextRespClose bool
@@ -1078,12 +1130,15 @@ RECONNECT:
 		cookiejar.SetCookies(urlIns, firstResponse.Cookies())
 	}
 
-	// status code retry
-	if retry(response, rawBytes, retryTimes) && (retryTimes < maxRetryTimes || retryHandler != nil) {
-		retryTimes += 1
-		time.Sleep(utils.JitterBackoff(retryWaitTime, retryMaxWaitTime, retryTimes))
-		log.Infof("retry reconnect because [%d / %d]", retryTimes, maxRetryTimes)
-		goto RECONNECT
+	// 将请求中的cookie更新到cookiejar中
+	if session != nil && reqIns != nil {
+		reqCookies := reqIns.Cookies()
+		for _, cookie := range reqCookies {
+			// 限制domain为当前域, path为当前路径
+			cookie.Domain = urlIns.Hostname()
+			cookie.Path = urlIns.Path
+		}
+		cookiejar.SetCookies(urlIns, reqCookies)
 	}
 
 	response.BareResponse = rawBytes
@@ -1116,10 +1171,14 @@ RECONNECT:
 			response.FixContentType = fixHeader
 		}
 		response.RawPacket = rspRaw
-		return response, nil
+
+		err = failureChecker(response)
+		return response, err
 	}
 
 	// 如果不修复的话，默认服务器返回的东西也有点复杂，不适合做其他处理
 	response.RawPacket = rawBytes
-	return response, nil
+
+	err = failureChecker(response)
+	return response, err
 }

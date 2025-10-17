@@ -5,73 +5,63 @@ desc(
 	risk:"任意文件删除"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   任意文件删除漏洞发生在应用程序允许用户控制文件名或文件路径，并在执行文件删除操作时未对用户输入进行充分验证和限制。攻击者可以通过构造恶意的路径或文件名，删除系统上的任意文件，包括敏感数据、配置文件、甚至系统运行所依赖的关键文件。
-
+任意文件删除漏洞发生在应用程序允许用户控制文件名或文件路径，并在执行文件删除操作时未对用户输入进行充分验证和限制。攻击者可以通过构造恶意的路径或文件名，删除系统上的任意文件，包括敏感数据、配置文件、甚至系统运行所依赖的关键文件。
 2. **触发场景**
-   当Spring Boot应用程序直接使用用户通过请求参数或其他不可信来源提供的数据作为`java.io.File.delete()`、`java.nio.file.Files.delete()`、`org.springframework.util.FileSystemUtils.deleteRecursively()`等文件删除方法的参数时，会触发此漏洞。例如，一个接收用户提交的文件名并尝试删除该文件的接口，如果未对文件名进行有效过滤和路径规范化，攻击者可以提交类似`../../../../etc/passwd`或`C:\Windows\System32\config\SAM`这样的路径来删除系统文件。
-
-   ```java
-   @GetMapping("/deleteFile")
-   public String deleteFile(@RequestParam String filename) {
-       File file = new File(filename); // 风险点：直接使用用户输入 constructing File object
-       if (file.delete()) {
-           return "File deleted successfully";
-       } else {
-           return "Failed to delete file";
-       }
-   }
-   ```
-
+当Spring Boot应用程序直接使用用户通过请求参数或其他不可信来源提供的数据作为`java.io.File.delete()`、`java.nio.file.Files.delete()`、`org.springframework.util.FileSystemUtils.deleteRecursively()`等文件删除方法的参数时，会触发此漏洞。例如，一个接收用户提交的文件名并尝试删除该文件的接口，如果未对文件名进行有效过滤和路径规范化，攻击者可以提交类似`../../../../etc/passwd`或`C:\Windows\System32\config\SAM`这样的路径来删除系统文件。
+```java
+@GetMapping("/deleteFile")
+public String deleteFile(@RequestParam String filename) {
+    File file = new File(filename); // 风险点：直接使用用户输入 constructing File object
+    if (file.delete()) {
+        return "File deleted successfully";
+    } else {
+        return "Failed to delete file";
+    }
+}
+```
 3. **潜在影响**
-   - 删除敏感或机密文件，导致数据泄露或隐私泄露。
-   - 删除应用程序配置文件或数据库文件，导致服务中断或配置被破坏。
-   - 删除系统关键文件，导致操作系统不稳定或瘫痪。
-   - 在某些情况下，任意文件删除可能与文件上传等其他漏洞链结合，实现远程代码执行。
+- 删除敏感或机密文件，导致数据泄露或隐私泄露。
+- 删除应用程序配置文件或数据库文件，导致服务中断或配置被破坏。
+- 删除系统关键文件，导致操作系统不稳定或瘫痪。
+- 在某些情况下，任意文件删除可能与文件上传等其他漏洞链结合，实现远程代码执行。
 DESC
 	rule_id: "52765bd8-011f-49f1-a492-c8f172b3acdc"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格验证用户输入**
-   绝不允许直接使用用户提供的文件名或路径进行文件删除操作。所有用户输入都必须经过严格的白名单验证，只允许删除特定目录下的特定类型文件，并且对路径进行规范化处理，防止路径遍历（Path Traversal）攻击。
-
+绝不允许直接使用用户提供的文件名或路径进行文件删除操作。所有用户输入都必须经过严格的白名单验证，只允许删除特定目录下的特定类型文件，并且对路径进行规范化处理，防止路径遍历（Path Traversal）攻击。
 2. **使用安全的文件操作API和方法**
-   - **不要直接使用`new File(filename)`构造File对象，而是使用安全的目录和文件名组合。**
-   - 使用`java.nio.file.Path`和`java.nio.file.Files`进行文件操作，结合`resolve()`方法安全地处理子路径，并配合`normalize()`方法消除路径中的`..`等。
-   - 使用Spring框架提供的安全文件操作工具类，如果存在的话，并遵循其推荐用法。
-
-   ```java
-   // 修复或建议的代码示例
-   @GetMapping("/deleteFile")
-   public String deleteFile(@RequestParam String filename) {
-       // 1. 定义允许操作的根目录
-       Path baseDir = Paths.get("/path/to/safe/directory"); 
-       // 2. 校验文件名格式，防止恶意字符
-       if (!filename.matches("^[a-zA-Z0-9_.-]+$")) {
-            return "Invalid filename";
-       }
-       // 3. 安全地组合路径并进行规范化
-       Path filePath = baseDir.resolve(filename).normalize().toAbsolutePath();
-
-       // 4. 确保规范化后的路径仍然在允许的根目录下，防止路径遍历
-       if (!filePath.startsWith(baseDir.toAbsolutePath())) {
-            return "Access denied: Path traversal attempt";
-       }
-
-       try {
-           Files.deleteIfExists(filePath); // 使用安全的NIO Files API
-           return "File deleted successfully";
-       } catch (IOException e) {
-           // Log exception
-           return "Failed to delete file: " + e.getMessage();
-       }
-   }
-   ```
-
+- **不要直接使用`new File(filename)`构造File对象，而是使用安全的目录和文件名组合。**
+- 使用`java.nio.file.Path`和`java.nio.file.Files`进行文件操作，结合`resolve()`方法安全地处理子路径，并配合`normalize()`方法消除路径中的`..`等。
+- 使用Spring框架提供的安全文件操作工具类，如果存在的话，并遵循其推荐用法。
+```java
+// 修复或建议的代码示例
+@GetMapping("/deleteFile")
+public String deleteFile(@RequestParam String filename) {
+    // 1. 定义允许操作的根目录
+    Path baseDir = Paths.get("/path/to/safe/directory");
+    // 2. 校验文件名格式，防止恶意字符
+    if (!filename.matches("^[a-zA-Z0-9_.-]+$")) {
+        return "Invalid filename";
+    }
+    // 3. 安全地组合路径并进行规范化
+    Path filePath = baseDir.resolve(filename).normalize().toAbsolutePath();
+    // 4. 确保规范化后的路径仍然在允许的根目录下，防止路径遍历
+    if (!filePath.startsWith(baseDir.toAbsolutePath())) {
+        return "Access denied: Path traversal attempt";
+    }
+    try {
+        Files.deleteIfExists(filePath); // 使用安全的NIO Files API
+        return "File deleted successfully";
+    } catch (IOException e) {
+        // Log exception
+        return "Failed to delete file: " + e.getMessage();
+    }
+}
+```
 3. **最小权限原则**
-   运行应用程序的用户或服务应仅拥有操作必要文件和目录的权限，限制其对系统关键文件的访问和删除能力。
+运行应用程序的用户或服务应仅拥有操作必要文件和目录的权限，限制其对系统关键文件的访问和删除能力。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
@@ -90,77 +80,47 @@ $sink #{
 alert $high for {
 	title: "Detect Java Spring Boot Arbitrary File Deletion",
 	title_zh: "检测 Java Spring Boot 任意文件删除",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格验证用户输入**
-   绝不允许直接使用用户提供的文件名或路径进行文件删除操作。所有用户输入都必须经过严格的白名单验证，只允许删除特定目录下的特定类型文件，并且对路径进行规范化处理，防止路径遍历（Path Traversal）攻击。
-
+绝不允许直接使用用户提供的文件名或路径进行文件删除操作。所有用户输入都必须经过严格的白名单验证，只允许删除特定目录下的特定类型文件，并且对路径进行规范化处理，防止路径遍历（Path Traversal）攻击。
 2. **使用安全的文件操作API和方法**
-   - **不要直接使用`new File(filename)`构造File对象，而是使用安全的目录和文件名组合。**
-   - 使用`java.nio.file.Path`和`java.nio.file.Files`进行文件操作，结合`resolve()`方法安全地处理子路径，并配合`normalize()`方法消除路径中的`..`等。
-   - 使用Spring框架提供的安全文件操作工具类，如果存在的话，并遵循其推荐用法。
-
-   ```java
-   // 修复或建议的代码示例
-   @GetMapping("/deleteFile")
-   public String deleteFile(@RequestParam String filename) {
-       // 1. 定义允许操作的根目录
-       Path baseDir = Paths.get("/path/to/safe/directory"); 
-       // 2. 校验文件名格式，防止恶意字符
-       if (!filename.matches("^[a-zA-Z0-9_.-]+$")) {
-            return "Invalid filename";
-       }
-       // 3. 安全地组合路径并进行规范化
-       Path filePath = baseDir.resolve(filename).normalize().toAbsolutePath();
-
-       // 4. 确保规范化后的路径仍然在允许的根目录下，防止路径遍历
-       if (!filePath.startsWith(baseDir.toAbsolutePath())) {
-            return "Access denied: Path traversal attempt";
-       }
-
-       try {
-           Files.deleteIfExists(filePath); // 使用安全的NIO Files API
-           return "File deleted successfully";
-       } catch (IOException e) {
-           // Log exception
-           return "Failed to delete file: " + e.getMessage();
-       }
-   }
-   ```
-
+- **不要直接使用`new File(filename)`构造File对象，而是使用安全的目录和文件名组合。**
+- 使用`java.nio.file.Path`和`java.nio.file.Files`进行文件操作，结合`resolve()`方法安全地处理子路径，并配合`normalize()`方法消除路径中的`..`等。
+- 使用Spring框架提供的安全文件操作工具类，如果存在的话，并遵循其推荐用法。
+```java
+// 修复或建议的代码示例
+@GetMapping("/deleteFile")
+public String deleteFile(@RequestParam String filename) {
+// 1. 定义允许操作的根目录
+Path baseDir = Paths.get("/path/to/safe/directory");
+// 2. 校验文件名格式，防止恶意字符
+if (!filename.matches("^[a-zA-Z0-9_.-]+$")) {
+return "Invalid filename";
+}
+// 3. 安全地组合路径并进行规范化
+Path filePath = baseDir.resolve(filename).normalize().toAbsolutePath();
+// 4. 确保规范化后的路径仍然在允许的根目录下，防止路径遍历
+if (!filePath.startsWith(baseDir.toAbsolutePath())) {
+return "Access denied: Path traversal attempt";
+}
+try {
+Files.deleteIfExists(filePath); // 使用安全的NIO Files API
+return "File deleted successfully";
+} catch (IOException e) {
+// Log exception
+return "Failed to delete file: " + e.getMessage();
+}
+}
+```
 3. **最小权限原则**
-   运行应用程序的用户或服务应仅拥有操作必要文件和目录的权限，限制其对系统关键文件的访问和删除能力。
-CODE
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   任意文件删除漏洞发生在应用程序允许用户控制文件名或文件路径，并在执行文件删除操作时未对用户输入进行充分验证和限制。攻击者可以通过构造恶意的路径或文件名，删除系统上的任意文件，包括敏感数据、配置文件、甚至系统运行所依赖的关键文件。
-
-2. **触发场景**
-   当Spring Boot应用程序直接使用用户通过请求参数或其他不可信来源提供的数据作为`java.io.File.delete()`、`java.nio.file.Files.delete()`、`org.springframework.util.FileSystemUtils.deleteRecursively()`等文件删除方法的参数时，会触发此漏洞。例如，一个接收用户提交的文件名并尝试删除该文件的接口，如果未对文件名进行有效过滤和路径规范化，攻击者可以提交类似`../../../../etc/passwd`或`C:\Windows\System32\config\SAM`这样的路径来删除系统文件。
-
-   ```java
-   @GetMapping("/deleteFile")
-   public String deleteFile(@RequestParam String filename) {
-       File file = new File(filename); // 风险点：直接使用用户输入 constructing File object
-       if (file.delete()) {
-           return "File deleted successfully";
-       } else {
-           return "Failed to delete file";
-       }
-   }
-   ```
-3. **潜在影响**
-   - 删除敏感或机密文件，导致数据泄露或隐私泄露。
-   - 删除应用程序配置文件或数据库文件，导致服务中断或配置被破坏。
-   - 删除系统关键文件，导致操作系统不稳定或瘫痪。
-   - 在某些情况下，任意文件删除可能与文件上传等其他漏洞链结合，实现远程代码执行。
-CODE
+运行应用程序的用户或服务应仅拥有操作必要文件和目录的权限，限制其对系统关键文件的访问和删除能力。
+SOLUTION
 	level: "high",
 	type: "vuln",
 	message: "发现Java Spring Boot应用中的任意文件删除漏洞。",
+	name: "high",
+	risk: "任意文件删除",
 }
 
 
@@ -174,20 +134,19 @@ alert $low for {
 	type: "vuln",
 	title: "Detect Java Spring Boot Arbitrary File Deletion",
 	title_zh: "检测 Java Spring Boot 任意文件删除",
-	desc: <<<CODE
+	level: "low",
+	name: "low",
+	solution: <<<SOLUTION
 ### 规则目的
 该规则用于识别Java Spring Boot应用中可能存在任意文件删除漏洞的风险。它通过分析用户输入是否直接流入文件删除操作点，定位未经验证/过滤的数据路径，帮助开发人员发现潜在的安全隐患。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`java-delete-filename-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测任意文件删除漏洞，提供核心函数识别能力。
-
+属于`java-delete-filename-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测任意文件删除漏洞，提供核心函数识别能力。
 2. **覆盖高危文件删除函数**
-   检测以下Java文件删除方法：
-   `java.io.File.delete`, `java.nio.file.Files.delete`, `org.springframework.util.FileSystemUtils.deleteRecursively`。
-
+检测以下Java文件删除方法：
+`java.io.File.delete`, `java.nio.file.Files.delete`, `org.springframework.util.FileSystemUtils.deleteRecursively`。
 3. **触发条件**
-   本规则主要关注用户输入是否直接或间接流入上述文件删除方法，且未经过充分的验证和过滤。例如，当用户的输入参数直接传递给这些方法时，将触发告警。
-CODE
-	level: "low",
+本规则主要关注用户输入是否直接或间接流入上述文件删除方法，且未经过充分的验证和过滤。例如，当用户的输入参数直接传递给这些方法时，将触发告警。
+SOLUTION
+	risk: "任意文件删除",
 }

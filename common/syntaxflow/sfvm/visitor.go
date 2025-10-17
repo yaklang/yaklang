@@ -20,6 +20,7 @@ type SyntaxFlowVisitor struct {
 }
 
 type VerifyFsInfo struct {
+	language           string
 	rawDesc            map[string]string
 	verifyFilesystem   map[string]string
 	negativeFilesystem map[string]string

@@ -2,8 +2,10 @@ package yakcliconvert_test
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/stretchr/testify/require"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -48,8 +50,16 @@ cli.check()
 		require.Equal(t, typ, v["type"])
 		return v
 	}
+	checkOrderedMap := func(om *omap.OrderedMap[string, any], name string, typ string) map[string]any {
+		i, ok := om.Get(name)
+		require.True(t, ok)
+		v, ok := i.(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, typ, v["type"])
+		return v
+	}
 	check := func(name string, typ string) map[string]any {
-		return checkEx(tool.InputSchema.Properties, name, typ)
+		return checkOrderedMap(tool.InputSchema.Properties, name, typ)
 	}
 
 	check("a", "integer")

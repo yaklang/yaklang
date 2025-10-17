@@ -2,8 +2,9 @@ package spacengine
 
 import (
 	fmt "fmt"
-	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/spacengine/base"
 
 	"github.com/tidwall/gjson"
 	"github.com/yaklang/yaklang/common/log"
@@ -12,6 +13,13 @@ import (
 )
 
 func QuakeQuery(key string, filter string, maxPage, maxRecord int, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	return QuakeQueryWithConfig(key, filter, maxPage, maxRecord, nil, domains...)
+}
+
+func QuakeQueryWithConfig(key string, filter string, maxPage, maxRecord int, config *base.QueryConfig, domains ...string) (chan *base.NetSpaceEngineResult, error) {
+	if config == nil {
+		config = &base.QueryConfig{}
+	}
 	var client *quake.QuakeClient
 	if len(domains) > 0 && domains[0] != "" {
 		client = quake.NewClientEx(key, domains[0])
@@ -42,6 +50,12 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int, domains ...st
 				break
 			}
 			data := result.Get("data").Array()
+
+			// 如果当前页没有数据，停止翻页
+			if len(data) == 0 {
+				nextFinished = true
+				break
+			}
 
 			for _, d := range data {
 				if nextFinished {
@@ -156,6 +170,11 @@ func QuakeQuery(key string, filter string, maxPage, maxRecord int, domains ...st
 				if maxRecord > 0 && count >= maxRecord {
 					nextFinished = true
 				}
+			}
+
+			// 在翻页之间应用随机延迟
+			if !nextFinished && page < maxPage-1 {
+				base.ApplyRandomDelay(config.RandomDelayRange)
 			}
 		}
 	}()

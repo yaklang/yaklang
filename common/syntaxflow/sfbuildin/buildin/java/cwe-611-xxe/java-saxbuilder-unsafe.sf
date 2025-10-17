@@ -5,48 +5,42 @@ desc(
 	risk:XXE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时。当XML解析器配置不当，允许处理外部实体引用时，攻击者可以通过构造恶意的XML文档，引用系统文件、URL或其他资源，从而实现信息泄露、拒绝服务、服务端请求伪造（SSRF）甚至执行任意代码。
-   SAXBuilder 是一个常用的 Java XML 解析库 JDOM 的一部分。默认情况下，某些版本的 SAXBuilder 可能没有完全禁用外部实体处理，使得应用程序容易受到 XXE 攻击。当 SAXBuilder 解析包含外部实体引用的 XML 文档时，会尝试加载并处理这些外部资源。
-
+XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时。当XML解析器配置不当，允许处理外部实体引用时，攻击者可以通过构造恶意的XML文档，引用系统文件、URL或其他资源，从而实现信息泄露、拒绝服务、服务端请求伪造（SSRF）甚至执行任意代码。
+SAXBuilder 是一个常用的 Java XML 解析库 JDOM 的一部分。默认情况下，某些版本的 SAXBuilder 可能没有完全禁用外部实体处理，使得应用程序容易受到 XXE 攻击。当 SAXBuilder 解析包含外部实体引用的 XML 文档时，会尝试加载并处理这些外部资源。
 2. **触发场景**
-   当应用程序使用 `org.jdom2.input.SAXBuilder` 解析用户提供的 XML 数据，并且未对解析器进行安全配置（例如禁用外部实体加载）时，就可能存在 XXE 漏洞。攻击者可以提交包含恶意DTD（文档类型定义）或直接在XML内部定义外部实体的文档。
-
-   例如，以下代码片段展示了不安全的使用方式：
-   ```java
-   import org.jdom2.Document;
-   import org.jdom2.input.SAXBuilder;
-   import java.io.IOException;
-   import java.io.StringReader;
-   import org.jdom2.JDOMException;
-
-   public class SAXBuilderUnsafe {
-       public void parseXml(String xml) {
-           SAXBuilder builder = new SAXBuilder(); // 未进行安全配置
-           try {
-               Document doc = builder.build(new StringReader(xml)); // 解析用户输入的xml
-               // ... 处理文档 ...
-           } catch (JDOMException | IOException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-   攻击者可以提交如下XML：
-   ```xml
-   <!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
-   <root>&xxe;</root>
-   ```
-   解析时，SAXBuilder 会尝试读取 `/etc/passwd` 文件的内容，并将其嵌入到 `<root>` 元素中，从而导致信息泄露。
-
+当应用程序使用 `org.jdom2.input.SAXBuilder` 解析用户提供的 XML 数据，并且未对解析器进行安全配置（例如禁用外部实体加载）时，就可能存在 XXE 漏洞。攻击者可以提交包含恶意DTD（文档类型定义）或直接在XML内部定义外部实体的文档。
+例如，以下代码片段展示了不安全的使用方式：
+```java
+import org.jdom2.Document;
+import org.jdom2.input.SAXBuilder;
+import java.io.IOException;
+import java.io.StringReader;
+import org.jdom2.JDOMException;
+public class SAXBuilderUnsafe {
+public void parseXml(String xml) {
+SAXBuilder builder = new SAXBuilder(); // 未进行安全配置
+try {
+Document doc = builder.build(new StringReader(xml)); // 解析用户输入的xml
+// ... 处理文档 ...
+} catch (JDOMException | IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+攻击者可以提交如下XML：
+```xml
+<!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<root>&xxe;</root>
+```
+解析时，SAXBuilder 会尝试读取 `/etc/passwd` 文件的内容，并将其嵌入到 `<root>` 元素中，从而导致信息泄露。
 3. **潜在影响**
-   - **信息泄露**: 读取服务器上的敏感文件（如 `/etc/passwd`, 配置文件, 私钥等）。
-   - **拒绝服务（DoS）**: 通过引用大型外部资源或嵌套实体，消耗服务器资源导致服务不可用。
-   - **服务端请求伪造（SSRF）**: 攻击者可利用XXE漏洞促使服务器向内部或外部网络中的任意URL发起请求。
-   - **端口扫描和横向移动**: 通过错误消息或时间延迟技术，攻击者可以探测内部网络的服务和端口状态。
-   - **远程代码执行**: 在特定条件下，结合其他漏洞或服务配置不当，XXE甚至可能导致远程代码执行。
-
+- **信息泄露**: 读取服务器上的敏感文件（如 `/etc/passwd`, 配置文件, 私钥等）。
+- **拒绝服务（DoS）**: 通过引用大型外部资源或嵌套实体，消耗服务器资源导致服务不可用。
+- **服务端请求伪造（SSRF）**: 攻击者可利用XXE漏洞促使服务器向内部或外部网络中的任意URL发起请求。
+- **端口扫描和横向移动**: 通过错误消息或时间延迟技术，攻击者可以探测内部网络的服务和端口状态。
+- **远程代码执行**: 在特定条件下，结合其他漏洞或服务配置不当，XXE甚至可能导致远程代码执行。
 总之，SAXBuilder 未经安全配置的使用是将应用程序暴露在多种严重风险之下。
 DESC
 	rule_id: "b97c29a5-9d04-4234-8cec-f58115c2b44b"
@@ -55,45 +49,40 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 为了防止 SAXBuilder 导致的 XXE 漏洞，最有效的措施是禁用对外部实体的处理。可以通过 `setFeature` 方法来配置 SAXBuilder。
-
 1. **禁用外部通用实体和参数实体**
-   使用以下代码片段配置 SAXBuilder，明确禁用外部通用实体和外部参数实体是应对 XXE 攻击的标准方法。
-   ```java
-   import org.jdom2.Document;
-   import org.jdom2.Element;
-   import org.jdom2.input.SAXBuilder;
-   import java.io.IOException;
-   import java.io.StringReader;
-   import org.jdom2.JDOMException;
-
-   public class SafeSAXBuilderExample {
-       public void parseXmlSafely(String xml) {
-           SAXBuilder saxBuilder = new SAXBuilder();
-           try {
-               // 禁用外部通用实体
-               saxBuilder.setFeature("http://xml.org/sax/features/external-general-entities", false);
-               // 禁用外部参数实体
-               saxBuilder.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-               // 如果需要，还可以进一步禁用其他安全风险相关的特性，例如DTP内部子集的外部引用
-               // saxBuilder.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-
-               Document document = saxBuilder.build(new StringReader(xml));
-               Element root = document.getRootElement();
-               System.out.println(root.getName());
-           } catch (JDOMException | IOException e) {
-               e.printStackTrace();
-           } catch (Exception e) { // 捕获 setFeature 异常
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-   通过设置这些特性为 `false`，SAXBuilder 将忽略 XML 文档中的外部实体引用，从而阻止 XXE 攻击的发生。
-
+使用以下代码片段配置 SAXBuilder，明确禁用外部通用实体和外部参数实体是应对 XXE 攻击的标准方法。
+```java
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.input.SAXBuilder;
+import java.io.IOException;
+import java.io.StringReader;
+import org.jdom2.JDOMException;
+public class SafeSAXBuilderExample {
+public void parseXmlSafely(String xml) {
+SAXBuilder saxBuilder = new SAXBuilder();
+try {
+// 禁用外部通用实体
+saxBuilder.setFeature("http://xml.org/sax/features/external-general-entities", false);
+// 禁用外部参数实体
+saxBuilder.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+// 如果需要，还可以进一步禁用其他安全风险相关的特性，例如DTP内部子集的外部引用
+// saxBuilder.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+Document document = saxBuilder.build(new StringReader(xml));
+Element root = document.getRootElement();
+System.out.println(root.getName());
+} catch (JDOMException | IOException e) {
+e.printStackTrace();
+} catch (Exception e) { // 捕获 setFeature 异常
+e.printStackTrace();
+}
+}
+}
+```
+通过设置这些特性为 `false`，SAXBuilder 将忽略 XML 文档中的外部实体引用，从而阻止 XXE 攻击的发生。
 2. **考虑使用其他更安全的XML解析库或方法**
-   某些库或更高版本的解析器默认提供更好的安全配置。在考虑使用其他 XML 解析库时，务必查阅其文档以了解其安全特性和推荐的安全配置。
+某些库或更高版本的解析器默认提供更好的安全配置。在考虑使用其他 XML 解析库时，务必查阅其文档以了解其安全特性和推荐的安全配置。
 SOLUTION
 )
 
@@ -104,98 +93,89 @@ $builder?{<typeName>?{have: SAXBuilder} && !.setFeature* }./((build*)|(parse*))/
 check $vulnCall;
 
 alert $vulnCall for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 为了防止 SAXBuilder 导致的 XXE 漏洞，最有效的措施是禁用对外部实体的处理。可以通过 `setFeature` 方法来配置 SAXBuilder。
-
 1. **禁用外部通用实体和参数实体**
-   使用以下代码片段配置 SAXBuilder，明确禁用外部通用实体和外部参数实体是应对 XXE 攻击的标准方法。
-   ```java
-   import org.jdom2.Document;
-   import org.jdom2.Element;
-   import org.jdom2.input.SAXBuilder;
-   import java.io.IOException;
-   import java.io.StringReader;
-   import org.jdom2.JDOMException;
-
-   public class SafeSAXBuilderExample {
-       public void parseXmlSafely(String xml) {
-           SAXBuilder saxBuilder = new SAXBuilder();
-           try {
-               // 禁用外部通用实体
-               saxBuilder.setFeature("http://xml.org/sax/features/external-general-entities", false);
-               // 禁用外部参数实体
-               saxBuilder.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-               // 如果需要，还可以进一步禁用其他安全风险相关的特性，例如DTP内部子集的外部引用
-               // saxBuilder.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-
-               Document document = saxBuilder.build(new StringReader(xml));
-               Element root = document.getRootElement();
-               System.out.println(root.getName());
-           } catch (JDOMException | IOException e) {
-               e.printStackTrace();
-           } catch (Exception e) { // 捕获 setFeature 异常
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-   通过设置这些特性为 `false`，SAXBuilder 将忽略 XML 文档中的外部实体引用，从而阻止 XXE 攻击的发生。
-
+使用以下代码片段配置 SAXBuilder，明确禁用外部通用实体和外部参数实体是应对 XXE 攻击的标准方法。
+```java
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.input.SAXBuilder;
+import java.io.IOException;
+import java.io.StringReader;
+import org.jdom2.JDOMException;
+public class SafeSAXBuilderExample {
+public void parseXmlSafely(String xml) {
+SAXBuilder saxBuilder = new SAXBuilder();
+try {
+// 禁用外部通用实体
+saxBuilder.setFeature("http://xml.org/sax/features/external-general-entities", false);
+// 禁用外部参数实体
+saxBuilder.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+// 如果需要，还可以进一步禁用其他安全风险相关的特性，例如DTP内部子集的外部引用
+// saxBuilder.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+Document document = saxBuilder.build(new StringReader(xml));
+Element root = document.getRootElement();
+System.out.println(root.getName());
+} catch (JDOMException | IOException e) {
+e.printStackTrace();
+} catch (Exception e) { // 捕获 setFeature 异常
+e.printStackTrace();
+}
+}
+}
+```
+通过设置这些特性为 `false`，SAXBuilder 将忽略 XML 文档中的外部实体引用，从而阻止 XXE 攻击的发生。
 2. **考虑使用其他更安全的XML解析库或方法**
-   某些库或更高版本的解析器默认提供更好的安全配置。在考虑使用其他 XML 解析库时，务必查阅其文档以了解其安全特性和推荐的安全配置。
-CODE
-	desc: <<<CODE
+某些库或更高版本的解析器默认提供更好的安全配置。在考虑使用其他 XML 解析库时，务必查阅其文档以了解其安全特性和推荐的安全配置。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时。当XML解析器配置不当，允许处理外部实体引用时，攻击者可以通过构造恶意的XML文档，引用系统文件、URL或其他资源，从而实现信息泄露、拒绝服务、服务端请求伪造（SSRF）甚至执行任意代码。
-   SAXBuilder 是一个常用的 Java XML 解析库 JDOM 的一部分。默认情况下，某些版本的 SAXBuilder 可能没有完全禁用外部实体处理，使得应用程序容易受到 XXE 攻击。当 SAXBuilder 解析包含外部实体引用的 XML 文档时，会尝试加载并处理这些外部资源。
-
+XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时。当XML解析器配置不当，允许处理外部实体引用时，攻击者可以通过构造恶意的XML文档，引用系统文件、URL或其他资源，从而实现信息泄露、拒绝服务、服务端请求伪造（SSRF）甚至执行任意代码。
+SAXBuilder 是一个常用的 Java XML 解析库 JDOM 的一部分。默认情况下，某些版本的 SAXBuilder 可能没有完全禁用外部实体处理，使得应用程序容易受到 XXE 攻击。当 SAXBuilder 解析包含外部实体引用的 XML 文档时，会尝试加载并处理这些外部资源。
 2. **触发场景**
-   当应用程序使用 `org.jdom2.input.SAXBuilder` 解析用户提供的 XML 数据，并且未对解析器进行安全配置（例如禁用外部实体加载）时，就可能存在 XXE 漏洞。攻击者可以提交包含恶意DTD（文档类型定义）或直接在XML内部定义外部实体的文档。
-
-   例如，以下代码片段展示了不安全的使用方式：
-   ```java
-   import org.jdom2.Document;
-   import org.jdom2.input.SAXBuilder;
-   import java.io.IOException;
-   import java.io.StringReader;
-   import org.jdom2.JDOMException;
-
-   public class SAXBuilderUnsafe {
-       public void parseXml(String xml) {
-           SAXBuilder builder = new SAXBuilder(); // 未进行安全配置
-           try {
-               Document doc = builder.build(new StringReader(xml)); // 解析用户输入的xml
-               // ... 处理文档 ...
-           } catch (JDOMException | IOException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-   攻击者可以提交如下XML：
-   ```xml
-   <!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
-   <root>&xxe;</root>
-   ```
-   解析时，SAXBuilder 会尝试读取 `/etc/passwd` 文件的内容，并将其嵌入到 `<root>` 元素中，从而导致信息泄露。
-
+当应用程序使用 `org.jdom2.input.SAXBuilder` 解析用户提供的 XML 数据，并且未对解析器进行安全配置（例如禁用外部实体加载）时，就可能存在 XXE 漏洞。攻击者可以提交包含恶意DTD（文档类型定义）或直接在XML内部定义外部实体的文档。
+例如，以下代码片段展示了不安全的使用方式：
+```java
+import org.jdom2.Document;
+import org.jdom2.input.SAXBuilder;
+import java.io.IOException;
+import java.io.StringReader;
+import org.jdom2.JDOMException;
+public class SAXBuilderUnsafe {
+public void parseXml(String xml) {
+SAXBuilder builder = new SAXBuilder(); // 未进行安全配置
+try {
+Document doc = builder.build(new StringReader(xml)); // 解析用户输入的xml
+// ... 处理文档 ...
+} catch (JDOMException | IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+攻击者可以提交如下XML：
+```xml
+<!DOCTYPE foo [ <!ENTITY xxe SYSTEM "file:///etc/passwd"> ]>
+<root>&xxe;</root>
+```
+解析时，SAXBuilder 会尝试读取 `/etc/passwd` 文件的内容，并将其嵌入到 `<root>` 元素中，从而导致信息泄露。
 3. **潜在影响**
-   - **信息泄露**: 读取服务器上的敏感文件（如 `/etc/passwd`, 配置文件, 私钥等）。
-   - **拒绝服务（DoS）**: 通过引用大型外部资源或嵌套实体，消耗服务器资源导致服务不可用。
-   - **服务端请求伪造（SSRF）**: 攻击者可利用XXE漏洞促使服务器向内部或外部网络中的任意URL发起请求。
-   - **端口扫描和横向移动**: 通过错误消息或时间延迟技术，攻击者可以探测内部网络的服务和端口状态。
-   - **远程代码执行**: 在特定条件下，结合其他漏洞或服务配置不当，XXE甚至可能导致远程代码执行。
-
+- **信息泄露**: 读取服务器上的敏感文件（如 `/etc/passwd`, 配置文件, 私钥等）。
+- **拒绝服务（DoS）**: 通过引用大型外部资源或嵌套实体，消耗服务器资源导致服务不可用。
+- **服务端请求伪造（SSRF）**: 攻击者可利用XXE漏洞促使服务器向内部或外部网络中的任意URL发起请求。
+- **端口扫描和横向移动**: 通过错误消息或时间延迟技术，攻击者可以探测内部网络的服务和端口状态。
+- **远程代码执行**: 在特定条件下，结合其他漏洞或服务配置不当，XXE甚至可能导致远程代码执行。
 总之，SAXBuilder 未经安全配置的使用是将应用程序暴露在多种严重风险之下。
-CODE
+DESC
 	level: "mid",
 	message: "SAXBuilder() Unsafe Use in Context Sink",
 	title: "Check Java SAXBuilder Unsafe Use",
 	title_zh: "检测 Java SAXBuilder 非安全使用",
+	name: "vulnCall",
+	risk: "XXE",
 }
 
 desc(
@@ -220,7 +200,7 @@ UNSAFE
 
 desc(
 	lang: "java"
-	"file://safefile.java": <<<SAFE
+	"safefile://safefile.java": <<<SAFE
 import org.jdom2.Document;
 import org.jdom2.Element;
 import org.jdom2.input.SAXBuilder;

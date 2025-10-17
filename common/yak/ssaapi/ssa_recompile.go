@@ -9,8 +9,8 @@ import (
 )
 
 // save to Profile SSAProgram
-func (c *config) SaveConfig() {
-	if c.enableDatabase {
+func SaveConfig(c *config, prog *Program) {
+	if c.databaseKind != ssa.ProgramCacheMemory {
 		irProg, err := ssadb.GetProgram(c.ProgramName, ssa.Application)
 		if err != nil {
 			log.Errorf("irProg is nil, save config failed: %v", err)
@@ -22,6 +22,11 @@ func (c *config) SaveConfig() {
 		irProg.ConfigInput = c.info
 		irProg.PeepholeSize = c.peepholeSize
 		ssadb.UpdateProgram(irProg)
+	} else {
+		// only memory
+		if c.ProgramName != "" {
+			SetProgramCache(prog, c.programSaveTTL)
+		}
 	}
 }
 

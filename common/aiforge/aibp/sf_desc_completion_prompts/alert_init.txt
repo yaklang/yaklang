@@ -7,6 +7,7 @@
 3. 需要先记录alert的数量，确保输出前和输出后的数量相等。
 4. 需要根据**风险等级结构**来决定是否修改alert信息。
 5. 当补充完成后，alert数量必须和之前相等，不能出现多或少的情况。
+6. **任何alert块都需要被处理到！**
 
 ## 风险信息标准
 
@@ -15,50 +16,58 @@
     alert $NAME for{
         name: "$NAME",
         level: "",
+        risk:"",
+        desc:"",
+        message: "",
         solution: "",
-        desc: "",
         title: "",
         title_zh: "",
     }
 ```
     1. 需要严格根据结构来进行补充，$NAME不需要进行改变。
     2. 需要在补充后输出整个风险等级结构，而不只是输出部分补全内容。
-    3. 需要补充出for结构后的所有内容，包括level、solution、desc、title、title_zh等字段。
-    4. solution、desc、title、title_zh等字段需要严格按照描述信息标准来进行补充。
-    5. solution、desc、title、title_zh等字段不能缺省，必须进行补充且不能为空/null/none等表示空的字符。
+    3. 需要补充出for结构后的所有内容，包括name、level、risk、solution、title、title_zh、desc等字段。
+    4. level、risk、solution、title、title_zh、desc等字段需要严格按照描述信息标准来进行补充。
+    5. level、risk、solution、title、title_zh、desc等字段不能缺省，必须进行补充且不能为空/null/none等表示空的字符。
     6. 需要参考下面的示例，示例中给出了正确补充后的结果和错误补充后的结果。
 ### title
-	1. 这个字段是规则的英文标题，简洁明了地描述规则的目的。为了显示规则的目的，一般名称为动词+语言+目的。
-    2. 动词可以使用:Check,Find,Detect,Audit,Identify等。
-    3. 语言可以使用:Java,Golang,PHP等。
+	1. 这个字段是规则的英文标题，简洁明了地描述本次alert发现漏洞的标题。为了明确展示alert标题，一般名称为语言+漏洞/信息+动作。
+    2. 语言可以使用:Java,Golang,PHP,JavaScript等。
+    3. 漏洞/信息，意味着该规则发现了某种漏洞：如SQL注入，或者某种信息：如代码不规范、查找某种过滤函数等。
+    3. 动作可以使用:Discovered,Found,Detected等,意味着某个漏洞被检测到或者某个信息被发现。
     4. 规则目的有很多种，可以是检测漏洞、审计代码、识别风险或者是单纯搜索信息。
     5. 如果遇到用来审计依赖漏洞的规则，可以在使用统一的前缀"SCA:"。
 
 #### 示例:
 ```
-  Check Java LDAP Injection Vulnerability(检测漏洞)
-  Find PHP XSS Escape Method(查找方法,这种命名一般用于lib规则)
-  SCA: Check Java commons-collections Vulnerability(审计依赖漏洞)
+  Java LDAP Injection Vulnerability Was Detected(检测漏洞)
+  PHP XSS Escape Method Was Found(查找方法,这种命名一般用于lib规则)
+  SCA: Java commons-collections Vulnerability Was Detected(审计依赖漏洞)
 ```
 
 ### title_zh
-	1. 这个字段是规则的中文标题，它是title的中文翻译。为了显示规则的目的，一般名称为动词+语言+目的。
-    2. 第一位动词可以使用:检测,查找,发现,审计等。
-    3. 第二位语言可以使用:Java,Golang,PHP等。
-    4. 规则目的有很多种，可以是检测漏洞、审计代码、识别风险等。
-    5. 如果遇到用来审计依赖漏洞的规则，可以在使用统一的前缀"SCA:"。
+	1. 这个字段是规则的中文标题，简洁明了地描述本次alert发现漏洞的标题。为了明确展示alert标题，一般名称为动作+语言+漏洞/信息。
+    2. 动作可以使用:发现、检测、查找等,意味着某个漏洞被检测到或者某个信息被发现。
+    3. 语言可以使用:Java,Golang,PHP,JavaScript等。
+    4. 漏洞/信息，意味着该规则发现了某种漏洞：如SQL注入，或者某种信息：如代码不规范、查找某种过滤函数等。
+    5. 规则目的有很多种，可以是检测漏洞、审计代码、识别风险或者是单纯搜索信息。
+    6. 如果遇到用来审计依赖漏洞的规则，可以在使用统一的前缀"SCA:"。
 
 #### 示例:
 ```
-  检测Java LDAP注入漏洞(检测漏洞)
-  查找PHP XSS转义方法(查找方法,这种命名一般用于lib规则)
-  SCA: 检测Java commons-collections 依赖漏洞(审计依赖漏洞)
+  检测到Java LDAP注入漏洞(检测漏洞)
+  查找到PHP XSS转义方法(查找方法,这种命名一般用于lib规则)
+  SCA: 检测到Java commons-collections 依赖漏洞(审计依赖漏洞)
 ```
+
 ### desc
-   1. 这个字段用来描述规则的目的和作用，总字数不少于300字。
-   2. 针对检测漏洞的规则，需要使用markdown格式描述漏洞原理、触发场景和潜在影响；针对识别风险的规则，需要使用markdown格式描述风险原理、触发场景和潜在影响；针对审计依赖漏洞的规则，需要使用markdown格式描述漏洞原理、触发场景和潜在影响。
-   3. 如果规则不用来检测漏洞，只是用来查找代码或审计代码，则需要使用markdown格式描述**规则目的**和**规则详细**。
-   4. 如果触发场景有示例代码，可以写示例代码。
+   1. 这个字段用来描述单次漏洞提示（alert）的详细信息。
+   2. 一个规则内，可能触发多次alert，每次alert触发的内容不一样（漏洞类型不一样、漏洞风险不一样）。因此需要使用这个字段详细描述本次alert为什么会触发。
+   3. 该字段内容需要与**level**进行关联，不同危险程度的漏洞描述不一样。
+   4. 该字段需要与审计规则上下文相关联，根据规则检测内容给出具体描述信息。
+   5. 使用markdown格式描述漏洞原理、触发场景和潜在影响；针对识别风险的规则，需要使用markdown格式描述风险原理、触发场景和潜在影响；针对审计依赖漏洞的规则，需要使用markdown格式描述漏洞原理、触发场景和潜在影响；  如果规则不用来检测漏洞，只是用来查找代码或审计代码，则需要使用markdown格式描述**规则目的**和**规则详细**。
+
+
 #### 漏洞规则示例
 ```text
     ### 漏洞描述
@@ -97,10 +106,10 @@
 
 ### solution
   1. 这个字段用来描述规则的解决方案或修复建议,使用markdown格式分点陈述漏洞的修复方法。
-  2. 当规则为检测漏洞或者识别风险的时候才需要有这个字段，否则返回none。
+  2. 当规则为检测漏洞或者识别风险的时候返回的是修复方式，否则返回安全建议。
   3. 请注意，对于漏洞规则，需要给出修复代码示例，代码示例需要和规则审计的语言、内容有关系。
-  4. 字数不少于300字。
-
+  4. 需要根据不同的**level**给出不同的修复方式，例如**严重/高危（critical/high）**漏洞需要给出具体如何修复的方式；**中低危（mid/low）**需要排查过滤函数是否有被绕过的风险。**信息(info)**则需要审计人员进行具体的分析。
+  5. 该字段需要与审计规则上下文相关联，根据规则检测内容给出具体修复示例。
 #### 示例
 ```text
     ### 修复建议
@@ -156,6 +165,33 @@ low：路径已包含过滤机制，通常无需处理，但可检查过滤函�
 info：这通常是一个信息，常常用于依赖库，比如desc块还有lib的常常alert-level为info。
 ```
 
+### message
+    1. 这个字段用来描述单次漏洞提示（alert）的信息。
+    2. 需要使用一句简短的话进行概括，让人容易理解该alert项提示了什么漏洞或者展示了什么信息。
+    3. message信息需要与**level**进行关联，例如**严重/高危（critical/high）**漏洞提示审计人员迅速排除并修复；**中低危（mid/low）**需要提示审计人员排查过滤函数是否有被绕过的风险。**信息(info)**则需要提示审计人员关注审计到的信息。
+
+#### 示例
+```text
+  检测到Java MyBatis SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。
+  检测到Java LDAP 注入漏洞，但是从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。
+  发现PHP XSS过滤函数信息
+```
+
+### risk
+    1. 这个字段用来描述单次漏洞提示（alert）的风险。
+    2. 漏洞风险使用简短的中文进行表示。(如果是英文就修改为中文)
+    3. 风险类型可以参考CWE、OWASP等规范。
+    4. 如果本次提示用于提示信息而不是漏洞，那么风险类型为"信息"
+    5. 如果是SCA等alert的漏洞不止一种漏洞风险，那么risk就填检测漏洞类型。比如SCA规则的Risk就可以写作SCA。
+
+#### 示例
+```text
+  1. SQL注入
+  2. XSS
+  3. 信息
+  4. SCA
+```
+
 ### 补全案例：
 
 这是一个补充前后的示例
@@ -189,7 +225,7 @@ info：这通常是一个信息，常常用于依赖库，比如desc块还有lib
 
     /*
     下面案例是一个错误补充的案例.
-    错误原因: 没有将title、title_zh、solution、desc等字段补充完整，且level字段没有使用枚举值。
+    错误原因: 没有将title、title_zh、solution、message、risk等字段补充完整，且level字段没有使用枚举值。
     */
     alert $high_variable for {
             title: "",
@@ -199,16 +235,21 @@ info：这通常是一个信息，常常用于依赖库，比如desc块还有lib
             desc: <<<CODE
             CODE
             level: "",
+            risk:"",
+            message:"",
     }
     /*
     下面案例是一个补充后的正确补充案例.
     */
     alert $high_variable for {
         name: "high_variable",
-        title: 'Unvalidated MySQL Parameter Injection',
-        title_zh: 'MySQL未验证参数注入风险',
+        title: 'PHP Unvalidated MySQL Parameter Injection Vulnerability Was Found',
+        title_zh: '发现PHP MySQL未验证参数注入漏洞',
+        risk:'SQL注入',
+        message:'发现PHP MySQL未验证参数注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息',
         level: 'high',
-        solution: '### 修复建议
+        solution: <<<SOLUTION
+        ### 修复建议
         #### 1. 使用参数化查询（PreparedStatement）通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
 
         ```php    // 修复代码示例
@@ -229,287 +270,34 @@ info：这通常是一个信息，常常用于依赖库，比如desc块还有lib
         }
         ```
 
-        #### 3. 使用ORM框架通过ORM（如Laravel, ThinkPHP）内置的安全机制自动处理参数化，避免手动拼接SQL。# 指令
-                                                                         你是一个专业的网络安全技术人员，你能够通过我给你的静态代码审计规则，规则的alert中，。
-
-                                                                         ## 处理步骤
-                                                                         1. 阅读理解静态代码审计文件名、规则内容、文件相对路径。
-                                                                         2. 文件内容的第一个desc用来描述该静态代码审计规则的信息。在第一个desc后面，可能会有多个alert，也可能没有。
-                                                                         3. 需要先记录alert的数量，确保输出前和输出后的数量相等。
-                                                                         4. 需要根据**风险等级结构**来决定是否修改alert信息。
-                                                                         5. 当补充完成后，alert数量必须和之前相等，不能出现多或少的情况。
-
-                                                                         ## 风险信息标准
-
-                                                                         ### 结构
-                                                                         ```
-                                                                             alert $NAME for{
-                                                                                 name: "$NAME",
-                                                                                 level: "",
-                                                                                 solution: "",
-                                                                                 desc: "",
-                                                                                 title: "",
-                                                                                 title_zh: "",
-                                                                             }
-                                                                         ```
-                                                                             1. 需要严格根据结构来进行补充，$NAME不需要进行改变。
-                                                                             2. 需要在补充后输出整个风险等级结构，而不只是输出部分补全内容。
-                                                                             3. 需要补充出for结构后的所有内容，包括level、solution、desc、title、title_zh等字段。
-                                                                             4. solution、desc、title、title_zh等字段需要严格按照描述信息标准来进行补充。
-                                                                             5. solution、desc、title、title_zh等字段不能缺省，必须进行补充且不能为空/null/none等表示空的字符。
-                                                                             6. 需要参考下面的示例，示例中给出了正确补充后的结果和错误补充后的结果。
-                                                                         ### title
-                                                                         	1. 这个字段是规则的英文标题，简洁明了地描述规则的目的。为了显示规则的目的，一般名称为动词+语言+目的。
-                                                                             2. 动词可以使用:Check,Find,Detect,Audit,Identify等。
-                                                                             3. 语言可以使用:Java,Golang,PHP等。
-                                                                             4. 规则目的有很多种，可以是检测漏洞、审计代码、识别风险或者是单纯搜索信息。
-                                                                             5. 如果遇到用来审计依赖漏洞的规则，可以在使用统一的前缀"SCA:"。
-
-                                                                         #### 示例:
-                                                                         ```
-                                                                           Check Java LDAP Injection Vulnerability(检测漏洞)
-                                                                           Find PHP XSS Escape Method(查找方法,这种命名一般用于lib规则)
-                                                                           SCA: Check Java commons-collections Vulnerability(审计依赖漏洞)
-                                                                         ```
-
-                                                                         ### title_zh
-                                                                         	1. 这个字段是规则的中文标题，它是title的中文翻译。为了显示规则的目的，一般名称为动词+语言+目的。
-                                                                             2. 第一位动词可以使用:检测,查找,发现,审计等。
-                                                                             3. 第二位语言可以使用:Java,Golang,PHP等。
-                                                                             4. 规则目的有很多种，可以是检测漏洞、审计代码、识别风险等。
-                                                                             5. 如果遇到用来审计依赖漏洞的规则，可以在使用统一的前缀"SCA:"。
-
-                                                                         #### 示例:
-                                                                         ```
-                                                                           检测Java LDAP注入漏洞(检测漏洞)
-                                                                           查找PHP XSS转义方法(查找方法,这种命名一般用于lib规则)
-                                                                           SCA: 检测Java commons-collections 依赖漏洞(审计依赖漏洞)
-                                                                         ```
-                                                                         ### desc
-                                                                            1. 这个字段用来描述规则的目的和作用，总字数不少于300字。
-                                                                            2. 针对检测漏洞的规则，需要使用markdown格式描述漏洞原理、触发场景和潜在影响；针对识别风险的规则，需要使用markdown格式描述风险原理、触发场景和潜在影响；针对审计依赖漏洞的规则，需要使用markdown格式描述漏洞原理、触发场景和潜在影响。
-                                                                            3. 如果规则不用来检测漏洞，只是用来查找代码或审计代码，则需要使用markdown格式描述**规则目的**和**规则详细**。
-                                                                            4. 如果触发场景有示例代码，可以写示例代码。
-                                                                         #### 漏洞规则示例
-                                                                         ```text
-                                                                             ### 漏洞描述
-
-                                                                             1. **漏洞原理**
-                                                                                SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-
-                                                                             2. **触发场景**
-                                                                                // 存在漏洞的代码示例
-                                                                                ```java
-                                                                                String userInput = request.getParameter("id");
-                                                                                String sql = "SELECT * FROM users WHERE id = " + userInput;  // 直接拼接用户输入
-                                                                                Statement stmt = connection.createStatement();
-                                                                                ResultSet rs = stmt.executeQuery(sql);
-                                                                                ```
-                                                                             攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
-                                                                             3. **潜在影响**
-                                                                                 - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-                                                                                 - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-                                                                                 - 通过数据库提权进一步渗透至服务器或其他系统组件。
-                                                                         ```
-
-                                                                         #### 审计规则示例
-                                                                         ```text
-                                                                             ### 1.规则目的
-                                                                             该规则用于审计PHP代码中可能导致XSS（跨站脚本攻击）的安全漏洞。它通过识别直接输出用户输入的关键PHP函数（如`echo`、`print`等），定位未经验证/转义的数据输出点，防止攻击者注入恶意脚本窃取用户数据或劫持会话。
-
-                                                                             ### 2.规则详细
-                                                                             1. **作为基础检测库**
-                                                                                属于`php-xss-method`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测XSS漏洞，提供核心函数识别能力。
-
-                                                                             2. **覆盖高危输出函数**
-                                                                                检测以下10个PHP输出函数：
-                                                                                `echo`, `print`, `print_r`, `exit`, `die`, `sprint`, `var_dump`, `var_export`, `show_source`, `highlight_file`。
-                                                                         ```
-
-                                                                         ### solution
-                                                                           1. 这个字段用来描述规则的解决方案或修复建议,使用markdown格式分点陈述漏洞的修复方法。
-                                                                           2. 当规则为检测漏洞或者识别风险的时候才需要有这个字段，否则返回none。
-                                                                           3. 请注意，对于漏洞规则，需要给出修复代码示例，代码示例需要和规则审计的语言、内容有关系。
-                                                                           4. 字数不少于300字。
-
-                                                                         #### 示例
-                                                                         ```text
-                                                                             ### 修复建议
-
-                                                                             #### 1. 使用参数化查询（PreparedStatement）
-                                                                             通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
-                                                                             ```java
-                                                                             // 修复代码示例
-                                                                             String userInput = request.getParameter("id");
-                                                                             String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
-                                                                             try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-                                                                                 pstmt.setInt(1, Integer.parseInt(userInput));  // 强制类型转换并绑定参数
-                                                                                 ResultSet rs = pstmt.executeQuery();
-                                                                                 // 处理结果集
-                                                                             }
-                                                                             ```
-
-                                                                             #### 2. 输入合法性校验
-                                                                             对用户输入实施类型、格式或范围限制，拒绝非法输入。
-                                                                             ```java
-                                                                             // 示例：校验输入为数字且范围合法
-                                                                             if (!userInput.matches("^[0-9]+$")) {
-                                                                                 throw new IllegalArgumentException("输入必须为数字");
-                                                                             }
-                                                                             int id = Integer.parseInt(userInput);
-                                                                             if (id < 1 || id > 1000) {
-                                                                                 throw new IllegalArgumentException("ID超出有效范围");
-                                                                             }
-                                                                             ```
-
-                                                                             #### 3. 使用ORM框架
-                                                                             通过ORM（如Hibernate、MyBatis）内置的安全机制自动处理参数化，避免手动拼接SQL。
-                                                                             ```java
-                                                                             // MyBatis示例（XML映射文件）
-                                                                             <select id="getUser" resultType="User">
-                                                                                 SELECT * FROM users WHERE id = #{userId}  <!-- 安全参数占位符 -->
-                                                                             </select>
-                                                                             ```
-                                                                             ```java
-                                                                             // 调用代码（避免直接拼接）
-                                                                             User user = sqlSession.selectOne("getUser", Long.parseLong(userInput));
-                                                                             ```
-                                                                         ```
-
-                                                                         ### level
-                                                                             1. 这个字段是一个枚举字段，枚举值分别为: high/middle/low/info。
-                                                                             2. 当规则的desc块中有lib时，该字段设置为info。
-
-                                                                         ```
-                                                                         high：路径无任何防护，漏洞不应存在，需立即修复。
-                                                                         mid：路径存在一定数据转换，可能安全，建议安全人员进一步审查或与开发人员沟通确认。
-                                                                         low：路径已包含过滤机制，通常无需处理，但可检查过滤函数是否存在潜在缺陷。
-                                                                         info：这通常是一个信息，常常用于依赖库，比如desc块还有lib的常常alert-level为info。
-                                                                         ```
-
-                                                                         ### 补全案例：
-
-                                                                         这是一个补充前后的示例
-
-                                                                          /*
-                                                                             下面几个案例为补充前可能的格式:
-                                                                             */
-
-                                                                             //补充前案例1:
-                                                                             alert $high_variable for{
-                                                                                 level: "high",
-                                                                                 solution: "",
-                                                                                 title_zh: "MYSQL注入漏洞",
-                                                                             }
-
-                                                                             //补充前案例2:
-                                                                             alert $high_variable;
-
-                                                                             //补充前案例3:
-                                                                             alert $high_variable for {
-                                                                             	title: "",
-                                                                             	title_zh: "",
-                                                                             	solution: <<<CODE
-
-                                                                             CODE
-                                                                             	desc: <<<CODE
-
-                                                                             CODE
-                                                                             	level: "",
-                                                                             }
-
-                                                                             /*
-                                                                             下面案例是一个错误补充的案例.
-                                                                             错误原因: 没有将title、title_zh、solution、desc等字段补充完整，且level字段没有使用枚举值。
-                                                                             */
-                                                                             alert $high_variable for {
-                                                                                     title: "",
-                                                                                     title_zh: "",
-                                                                                     solution: <<<CODE
-                                                                                     CODE
-                                                                                     desc: <<<CODE
-                                                                                     CODE
-                                                                                     level: "",
-                                                                             }
-                                                                             /*
-                                                                             下面案例是一个补充后的正确补充案例.
-                                                                             */
-                                                                             alert $high_variable for {
-                                                                                 name: "high_variable",
-                                                                                 title: 'Unvalidated MySQL Parameter Injection',
-                                                                                 title_zh: 'MySQL未验证参数注入风险',
-                                                                                 level: 'high',
-                                                                                 solution: '### 修复建议
-                                                                                 #### 1. 使用参数化查询（PreparedStatement）通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
-
-                                                                                 ```php    // 修复代码示例
-                                                                                 $id = $_GET['id'];
-                                                                                 $mysqli = new mysqli("localhost", "user", "password", "database");
-                                                                                 $stmt = $mysqli->prepare("SELECT * FROM users WHERE id = ?"); // 使用占位符
-                                                                                 $stmt->bind_param("i", $id); // 绑定参数，指定类型为整数
-                                                                                 $stmt->execute();
-                                                                                 $result = $stmt->get_result();       // 处理结果集
-                                                                                 ```
-                                                                                 #### 2. 输入合法性校验对用户输入实施类型、格式或范围限制，拒绝非法输入。
-
-                                                                                 ```php
-                                                                                 // 示例：校验输入为数字且范围合法
-                                                                                 $id = (int)$_GET['id']; // 强制类型转换
-                                                                                  if(!is_int($id)){
-                                                                                       throw new Exception("id 必须要是int类型");
-                                                                                 }
-                                                                                 ```
-
-                                                                                 #### 3. 使用ORM框架通过ORM（如Laravel, ThinkPHP）内置的安全机制自动处理参数化，避免手动拼接SQL。
-
-                                                                                 ```php
-                                                                                     DB::table('users')->where('id', $id)->get();
-                                                                                  ```',
-                                                                                 desc: '### 漏洞描述
-                                                                                 1.  **漏洞原理**
-                                                                                     由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-                                                                                 2. **触发场景**
-                                                                                     // 存在漏洞的代码示例
-                                                                                     ```php
-                                                                                     $id = $_GET['id']; // 未过滤的用户输入
-                                                                                     $query = "SELECT * FROM users WHERE id = " . $id; // 直接拼接
-                                                                                     $result = mysql_query($query);
-                                                                                     ```
-                                                                                     攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
-                                                                                 3. **潜在影响**
-                                                                                 - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-                                                                                 - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-                                                                                 - 通过数据库提权进一步渗透至服务器或其他系统组件。'
-                                                                             }
-
-                                                                         ## 语言类型定义
-                                                                         - Golang
-                                                                         - Java
-                                                                         - PHP
-                                                                         - General(通用型语言规则)
-
+        #### 3. 使用ORM框架通过ORM（如Laravel, ThinkPHP）内置的安全机制自动处理参数化，避免手动拼接SQL。
         ```php
             DB::table('users')->where('id', $id)->get();
-         ```',
-        desc: '### 漏洞描述
-        1.  **漏洞原理**
-            由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-        2. **触发场景**
-            // 存在漏洞的代码示例
-            ```php
-            $id = $_GET['id']; // 未过滤的用户输入
-            $query = "SELECT * FROM users WHERE id = " . $id; // 直接拼接
-            $result = mysql_query($query);
-            ```
-            攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
-        3. **潜在影响**
-        - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-        - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-        - 通过数据库提权进一步渗透至服务器或其他系统组件。'
+         ```
+SOLUTION
+       desc: <<<DESC
+       ### 漏洞描述
+             1.  **漏洞原理**
+                 由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+             2. **触发场景**
+                 // 存在漏洞的代码示例
+                 ```php
+                 $id = $_GET['id']; // 未过滤的用户输入
+                 $query = "SELECT * FROM users WHERE id = " . $id; // 直接拼接
+                 $result = mysql_query($query);
+                 ```
+                 攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
+             3. **潜在影响**
+             - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+             - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+             - 通过数据库提权进一步渗透至服务器或其他系统组件。'
+DESC
     }
 
 ## 语言类型定义
 - Golang
 - Java
 - PHP
+- JavaScript
+- C
 - General(通用型语言规则)

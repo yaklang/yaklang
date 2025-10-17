@@ -1,0 +1,498 @@
+__DESC__ = "专门用于分析chall.pcapng等网络安全挑战PCAP文件的工具，支持解密隐蔽通信、提取flag、识别网络工具行为。"
+__VERBOSE_NAME__ = "挑战PCAP分析工具"
+__KEYWORDS__ = "challenge,ctf,网络安全挑战,隐蔽通信,flag提取,网络工具分析,流量解密,恶意行为检测"
+
+/*
+挑战PCAP分析工具
+
+功能特点：
+1. 专门针对CTF和网络安全挑战的PCAP分析
+   - 识别隐蔽通信通道
+   - 提取隐藏的flag和敏感信息
+   - 分析网络工具的使用痕迹
+   - 解密加密通信内容
+
+2. 高级分析功能：
+   - DNS隧道检测和解密
+   - HTTP头信息分析
+   - TCP流重组和payload提取
+   - 协议逆向分析
+   - 编码内容自动识别和解码
+
+3. flag提取：
+   - 自动识别flag格式
+   - 提取base64/hex编码的flag
+   - 从网络流量中提取隐藏信息
+   - 支持多种flag格式识别
+
+4. 参数说明：
+   --file: PCAP文件路径 (必需)
+   --extract-flags: 自动提取flag (可选，默认true，可选值: true/false)
+   --decode-all: 尝试解码所有可疑内容 (可选，默认true，可选值: true/false)
+   --verbose: 详细输出模式 (可选，默认false，可选值: true/false)
+   --enable-reassembly: 启用TCP数据流重组 (可选，默认true，可选值: true/false)
+   --max-packets: 最大处理数据包数量，默认100000 (可选)
+
+使用示例：
+1. 分析挑战PCAP文件：
+   yak analyze_challenge_pcap.yak --file chall.pcapng
+
+2. 详细分析模式：
+   yak analyze_challenge_pcap.yak --file chall.pcapng --verbose
+
+3. 禁用自动flag提取：
+   yak analyze_challenge_pcap.yak --file chall.pcapng --extract-flags false
+
+注意事项：
+- 专门为网络安全挑战和CTF设计
+- 支持多种隐蔽通信方式的检测
+- 自动保存发现的flag和敏感信息
+- 详细分析可能需要较长时间
+- 输出包含flag提取结果和通信分析
+*/
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+pcapFile := cli.String("file", cli.setRequired(true), cli.setHelp("challenge PCAP file to analyze"))
+extractFlagsStr := cli.String("extract-flags", cli.setDefault("true"), cli.setHelp("automatically extract flags (default: true)"))
+decodeAllStr := cli.String("decode-all", cli.setDefault("true"), cli.setHelp("attempt to decode all suspicious content (default: true)"))
+verboseStr := cli.String("verbose", cli.setDefault("false"), cli.setHelp("verbose output mode (default: false)"))
+enableReassemblyStr := cli.String("enable-reassembly", cli.setDefault("true"), cli.setHelp("enable TCP stream reassembly (default: true)"))
+maxPackets := cli.Int("max-packets", cli.setDefault(100000), cli.setHelp("maximum packets to analyze (default: 100000)"))
+
+cli.check()
+
+// 解析布尔值参数
+extractFlags := parseBool(extractFlagsStr)
+decodeAll := parseBool(decodeAllStr)
+verbose := parseBool(verboseStr)
+enableReassembly := parseBool(enableReassemblyStr)
+
+yakit.Info("Starting challenge PCAP analysis for file: %v", pcapFile)
+yakit.Info("Configuration: extract-flags=%v, decode-all=%v, verbose=%v, reassembly=%v", extractFlags, decodeAll, verbose, enableReassembly)
+
+// 检查文件是否存在
+if !file.IsExisted(pcapFile) {
+    yakit.Error("PCAP file does not exist: %v", pcapFile)
+    return
+}
+
+// 创建临时输出文件
+tempFile := sprintf("/tmp/challenge_pcap_analysis_%v.txt", time.Now().Unix())
+detailedOutputParts := []
+
+// 初始化分析结果
+challengeResults := {
+    "packets_analyzed": 0,
+    "flags_found": [],
+    "suspicious_traffic": [],
+    "decoded_content": [],
+    "network_tools": [],
+    "hidden_channels": [],
+    "extracted_data": [],
+}
+
+// 进度打印控制变量
+lastProgressTime := time.Now()
+progressInterval := 5.0 // 每5秒打印一次进度
+processingStopped := false
+
+// flag模式识别
+flagPatterns := [
+    "flag\\{[^{}]*\\}",
+    "CTF\\{[^{}]*\\}",
+    "[Ff][Ll][Aa][Gg]\\{[^{}]*\\}",
+    "([a-zA-Z0-9]{8}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{12})", // UUID格式
+    "([a-zA-Z0-9+/=]{20,})", // base64-like strings
+    "0x[0-9a-fA-F]{8,}", // hex values
+]
+
+// 网络工具特征
+networkTools := [
+    "nmap", "masscan", "zmap", "dirb", "gobuster", "ffuf",
+    "sqlmap", "burp", "wireshark", "tcpdump", "ettercap",
+    "metasploit", "cobalt", "empire", "covenant", "sliver",
+    "nc ", "netcat", "ncat", "socat", "ssh", "scp", "rsync",
+    "wget", "curl", "python", "perl", "ruby", "php",
+    "bash", "sh", "powershell", "cmd.exe",
+]
+
+// 隐蔽通道检测
+hiddenChannels := [
+    "TXT", "NULL", "CNAME", "MX", "SRV", // DNS隧道
+    "CONNECT", "Proxy-Authorization", // HTTP隧道
+    "tor", "i2p", "freenet", // 匿名网络
+    "VPN", "SSH", "SSL", // 加密隧道
+]
+
+// 高级数据包分析函数
+analyzeChallengePacket = func(packet) {
+    if processingStopped {
+        return
+    }
+
+    challengeResults["packets_analyzed"]++
+
+    if challengeResults["packets_analyzed"] > maxPackets {
+        yakit.Warn("Reached maximum packet limit (%v), stopping analysis. Total packets processed: %v", maxPackets, challengeResults["packets_analyzed"])
+        detailedOutputParts = append(detailedOutputParts, sprintf("Reached maximum packet limit (%v), stopping analysis\n", maxPackets))
+        processingStopped = true
+        return
+    }
+
+    // 定期打印进度（每5秒一次）
+    elapsed := time.Since(lastProgressTime).Seconds()
+    if elapsed >= progressInterval {
+        yakit.Info("Progress: %v packets processed, %v flags found", challengeResults["packets_analyzed"], len(challengeResults["flags_found"]))
+        lastProgressTime = time.Now()
+    }
+
+    if packet == nil {
+        return
+    }
+
+    data := packet.Data()
+    if data == nil || len(data) == 0 {
+        return
+    }
+
+    packetStr := string(data)
+    packetHex := codec.EncodeToHex(data)
+
+    // 记录详细的数据包信息
+    detailedOutputParts = append(detailedOutputParts, sprintf("=== Packet %v ===\n", challengeResults["packets_analyzed"]))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Data size: %v bytes\n", len(data)))
+
+    if packet != nil {
+        packetInfo := packet.String()
+        detailedOutputParts = append(detailedOutputParts, sprintf("Packet info: %v\n", packetInfo))
+    }
+
+    if verbose {
+        yakit.Info("Analyzing packet %v (%v bytes)", challengeResults["packets_analyzed"], len(data))
+    }
+
+    suspicious := false
+
+    // 1. flag提取（简化的字符串匹配）
+    if extractFlags {
+        // 直接检测常见的flag格式
+        flagPrefixes := ["flag{", "CTF{", "FLAG{", "Flag{"]
+        for prefix in flagPrefixes {
+            if packetStr.Contains(prefix) {
+                // 找到flag开始位置
+                startIdx := packetStr.Index(prefix)
+                if startIdx >= 0 {
+                    // 查找对应的结束括号
+                    remaining := packetStr[startIdx:]
+                    endIdx := remaining.Index("}")
+                    if endIdx > 0 {
+                        flag := remaining[:endIdx+1]
+                        challengeResults["flags_found"] = append(challengeResults["flags_found"], {
+                            "flag": flag,
+                            "pattern": "string_match",
+                            "packet": challengeResults["packets_analyzed"],
+                            "context": packetStr,
+                        })
+                        yakit.Info("🚩 FLAG FOUND: %v", flag)
+                        suspicious = true
+                    }
+                }
+            }
+        }
+
+        // 检测可能的编码flag
+        if len(data) > 10 {
+            // 尝试base64解码
+            decoded, err := codec.DecodeBase64(string(data))
+            if err == nil {
+                decodedStr := string(decoded)
+                for prefix in flagPrefixes {
+                    if decodedStr.Contains(prefix) {
+                        startIdx := decodedStr.Index(prefix)
+                        if startIdx >= 0 {
+                            remaining := decodedStr[startIdx:]
+                            endIdx := remaining.Index("}")
+                            if endIdx > 0 {
+                                flag := remaining[:endIdx+1]
+                                challengeResults["flags_found"] = append(challengeResults["flags_found"], {
+                                    "flag": flag,
+                                    "encoding": "base64",
+                                    "packet": challengeResults["packets_analyzed"],
+                                    "context": decodedStr,
+                                })
+                                yakit.Info("🚩 FLAG FOUND (base64 decoded): %v", flag)
+                                suspicious = true
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 尝试hex解码（简化版，避免类型转换错误）
+            // hexDecoded, err := codec.DecodeHex(string(data))
+            // if err == nil {
+            //     hexStr := string(hexDecoded)
+            //     for prefix in flagPrefixes {
+            //         if hexStr.Contains(prefix) {
+            //             startIdx := hexStr.Index(prefix)
+            //             if startIdx >= 0 {
+            //                 remaining := hexStr[startIdx:]
+            //                 endIdx := remaining.Index("}")
+            //                 if endIdx > 0 {
+            //                     flag := remaining[:endIdx+1]
+            //                     challengeResults["flags_found"] = append(challengeResults["flags_found"], {
+            //                         "flag": flag,
+            //                         "encoding": "hex",
+            //                         "packet": challengeResults["packets_analyzed"],
+            //                         "context": hexStr,
+            //                     })
+            //                     yakit.Info("🚩 FLAG FOUND (hex decoded): %v", flag)
+            //                     suspicious = true
+            //                 }
+            //             }
+            //         }
+            //     }
+            // }
+        }
+    }
+
+    // 2. 网络工具检测
+    for tool in networkTools {
+        if packetStr.Contains(tool) {
+            challengeResults["network_tools"] = append(challengeResults["network_tools"], {
+                "tool": tool,
+                "packet": challengeResults["packets_analyzed"],
+                "context": packetStr,
+            })
+            suspicious = true
+        }
+    }
+
+    // 3. 隐蔽通道检测
+    for channel in hiddenChannels {
+        if packetStr.Contains(channel) {
+            challengeResults["hidden_channels"] = append(challengeResults["hidden_channels"], {
+                "channel_type": channel,
+                "packet": challengeResults["packets_analyzed"],
+                "context": packetStr,
+            })
+            suspicious = true
+        }
+    }
+
+    // 4. 通用解码尝试
+    if decodeAll && len(data) > 4 {
+        // 检测并解码base64内容
+        base64Decoded, err := codec.DecodeBase64(string(data))
+        if err == nil && len(base64Decoded) > 0 {
+            decodedStr := string(base64Decoded)
+            if len(decodedStr) != len(string(data)) { // 确保是有效的解码
+                challengeResults["decoded_content"] = append(challengeResults["decoded_content"], {
+                    "encoding": "base64",
+                    "original": string(data),
+                    "decoded": decodedStr,
+                    "packet": challengeResults["packets_analyzed"],
+                })
+                suspicious = true
+            }
+        }
+
+        // 检测高熵数据（暂时禁用）
+        // entropy := calculateEntropy(data)
+        // if entropy > 7.8 {
+        //     challengeResults["suspicious_traffic"] = append(challengeResults["suspicious_traffic"], {
+        //         "type": "high_entropy",
+        //         "entropy": entropy,
+        //         "packet": challengeResults["packets_analyzed"],
+        //         "size": len(data),
+        //     })
+        //     yakit.Info("🔐 High entropy traffic detected (entropy: %.2f)", entropy)
+        //     suspicious = true
+        // }
+    }
+
+    // 5. 提取可疑数据
+    if suspicious {
+        challengeResults["extracted_data"] = append(challengeResults["extracted_data"], {
+            "packet": challengeResults["packets_analyzed"],
+            "data": data,
+            "hex": packetHex,
+            "text": packetStr,
+        })
+    }
+
+    // 总是添加数据预览（不管是否可疑）
+    if len(packetStr) > 0 {
+        if len(packetStr) <= 200 {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Text preview: %v\n", sdump(packetStr)))
+        } else {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Data size: %v bytes, preview: %v...\n", len(packetStr), sdump(packetStr[:100])))
+        }
+    }
+    detailedOutputParts = append(detailedOutputParts, sprintf("---\n\n"))
+}
+
+// 简化的熵计算函数（使用字节分布）- 简化版避免类型问题
+calculateEntropy = func(data) {
+    if len(data) < 10 {
+        return 0.0
+    }
+
+    // 简单的熵估计：计算唯一字节数与总字节数的比例
+    uniqueCount := 0
+    seen := {}
+
+    for i := 0; i < len(data); i++ {
+        if seen[data[i]] == nil {
+            seen[data[i]] = true
+            uniqueCount++
+        }
+    }
+
+    return float64(uniqueCount) / float64(len(data))
+}
+
+// TCP数据重组回调函数
+onChallengeFlowDataFrameReassembled = func(flow, conn, frame) {
+    if processingStopped {
+        return
+    }
+
+    challengeResults["packets_analyzed"]++
+
+    if frame == nil || frame.Payload == nil || len(frame.Payload) == 0 {
+        return
+    }
+
+    frameData := frame.Payload
+    frameStr := string(frameData)
+    frameHex := codec.EncodeToHex(frameData)
+
+    // 记录详细的TCP重组信息
+    detailedOutputParts = append(detailedOutputParts, sprintf("=== TCP Reassembled Frame ===\n"))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Flow: %v -> %v\n", flow.ClientConn, flow.ServerConn))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Frame size: %v bytes\n", len(frameData)))
+    detailedOutputParts = append(detailedOutputParts, sprintf("Connection hash: %v\n", frame.ConnHash))
+
+    // 分析重组后的数据内容
+    suspiciousContent := false
+    suspiciousFindings := []
+
+    // 检查命令注入和网络工具特征
+    suspiciousPatterns := [
+        "cmd.exe", "/bin/bash", "powershell", "wget", "curl",
+        "nc ", "netcat", "ncat", "socat", "ssh ", "scp ",
+        "system(", "exec(", "eval(", "popen(",
+        "whoami", "hostname", "ipconfig", "ifconfig",
+        "cat ", "ls ", "dir ", "type ", "copy ",
+    ]
+
+    for pattern in suspiciousPatterns {
+        if frameStr.Contains(pattern) {
+            suspiciousFindings = append(suspiciousFindings, sprintf("Suspicious pattern: %v", pattern))
+            suspiciousContent = true
+        }
+    }
+
+    // 检查HTTP流量
+    if frameStr.Contains("HTTP/") || frameStr.Contains("GET ") || frameStr.Contains("POST ") {
+        suspiciousFindings = append(suspiciousFindings, "HTTP traffic detected")
+        suspiciousContent = true
+    }
+
+    // 尝试base64解码
+    if decodeAll && len(frameData) > 10 {
+        decoded, err := codec.DecodeBase64(string(frameData))
+        if err == nil && len(decoded) > 0 {
+            suspiciousFindings = append(suspiciousFindings, sprintf("Base64 decoded content: %v", string(decoded)))
+            suspiciousContent = true
+            challengeResults["decoded_content"] = append(challengeResults["decoded_content"], {
+                "encoding": "base64",
+                "original": string(frameData),
+                "decoded": string(decoded),
+                "packet": challengeResults["packets_analyzed"],
+            })
+        }
+    }
+
+    if suspiciousContent {
+        detailedOutputParts = append(detailedOutputParts, "Suspicious content detected in reassembled frame:\n")
+
+        for finding in suspiciousFindings {
+            detailedOutputParts = append(detailedOutputParts, sprintf("  - %v\n", finding))
+        }
+    }
+
+    // 数据预览
+    if len(frameStr) > 0 {
+        if len(frameStr) <= 200 {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data: %v\n", sdump(frameStr)))
+        } else {
+            detailedOutputParts = append(detailedOutputParts, sprintf("Frame data preview: %v...\n", sdump(frameStr[:100])))
+        }
+    }
+
+    detailedOutputParts = append(detailedOutputParts, sprintf("Frame hex: %v\n", frameHex[:min(200, len(frameHex))]))
+    detailedOutputParts = append(detailedOutputParts, "\n")
+}
+
+// 设置PCAP分析选项
+options := []
+
+// 根据参数决定是否启用数据重组
+if enableReassembly {
+    options = append(options, pcapx.pcap_onFlowDataFrame(onChallengeFlowDataFrameReassembled))
+}
+
+// 添加数据包处理函数
+options = append(options, pcapx.pcap_everyPacket(analyzeChallengePacket))
+
+// 执行PCAP文件分析
+err := pcapx.OpenPcapFile(pcapFile, options...)
+if err != nil {
+    yakit.Error("Failed to analyze PCAP file: %v", err)
+    return
+}
+
+// 保存详细结果到文件
+if len(detailedOutputParts) > 0 {
+    outputContent := str.Join(detailedOutputParts, "")
+    err := file.Save(tempFile, outputContent)
+    if err != nil {
+        yakit.Warn("Failed to save detailed results to file: %v", err)
+    } else {
+        yakit.Info("Detailed challenge analysis saved to: %v", tempFile)
+    }
+}
+
+// 输出分析结果
+yakit.Info("=== Challenge PCAP Analysis Results ===")
+yakit.Info("Packets analyzed: %v", challengeResults["packets_analyzed"])
+yakit.Info("Flags found: %v", len(challengeResults["flags_found"]))
+yakit.Info("Network tools detected: %v", len(challengeResults["network_tools"]))
+yakit.Info("Hidden channels found: %v", len(challengeResults["hidden_channels"]))
+yakit.Info("Decoded content: %v", len(challengeResults["decoded_content"]))
+yakit.Info("Suspicious traffic: %v", len(challengeResults["suspicious_traffic"]))
+yakit.Info("Extracted data packets: %v", len(challengeResults["extracted_data"]))
+
+// 详细输出flag
+if len(challengeResults["flags_found"]) > 0 {
+    yakit.Info("=== FLAGS FOUND ===")
+    for flag in challengeResults["flags_found"] {
+        yakit.Info("🚩 %v (packet %v)", flag["flag"], flag["packet"])
+        if flag["encoding"] != nil {
+            yakit.Info("   Encoding: %v", flag["encoding"])
+        }
+    }
+}
+
+// 总结
+if len(challengeResults["flags_found"]) > 0 {
+    yakit.Info("🎉 Analysis completed! Found %v potential flags.", len(challengeResults["flags_found"]))
+} else {
+    yakit.Info("🤔 Analysis completed. No obvious flags found, but check the extracted data for hidden information.")
+}
+
+yakit.Info("Challenge PCAP analysis completed successfully!")

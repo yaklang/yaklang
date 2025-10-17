@@ -3,11 +3,15 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"sync/atomic"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 var (
@@ -17,8 +21,11 @@ var (
 	taskSkipped     = "task-skipped"
 )
 
-func (t *aiTask) execute() error {
-	t.config.memory.StoreCurrentTask(t)
+func (t *AiTask) execute() error {
+	if t.IsCtxDone() {
+		return utils.Errorf("context is done")
+	}
+	t.memory.StoreCurrentTask(t)
 	// 生成初始执行任务的prompt
 	prompt, err := t.generateTaskPrompt()
 	if err != nil {
@@ -26,17 +33,18 @@ func (t *aiTask) execute() error {
 	}
 
 	// 调用AI回调函数
-	t.config.EmitPrompt("task_execute", prompt)
+	t.EmitPrompt("task_execute", prompt)
 
 	var response string
-	var action *Action
+	var action *aicommon.Action
 	var directlyAnswer string
 	var directlyAnswerLong string
-	err = t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+	err = t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		request.SetTaskIndex(t.Index)
-		return t.callAI(request)
-	}, func(rsp *AIResponse) error {
-		responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config))
+		return t.CallAI(request)
+	}, func(rsp *aicommon.AIResponse) error {
+		stream := rsp.GetOutputStreamReader("execute", false, t.Emitter)
+		responseBytes, err := io.ReadAll(stream)
 		if err != nil {
 			return fmt.Errorf("error reading AI response: %w", err)
 		}
@@ -45,7 +53,7 @@ func (t *aiTask) execute() error {
 			return utils.Errorf("AI response is empty, retry it or check your AI model")
 		}
 
-		action, err = ExtractAction(response, "direct-answer", `require-tool`)
+		action, err = aicommon.ExtractAction(response, "direct-answer", `require-tool`)
 		if err != nil {
 			return utils.Errorf("error extracting @action (direct-answer/require-tool): %w， check miss \"@action\" field in object or @action bad str value", err)
 		}
@@ -56,12 +64,12 @@ func (t *aiTask) execute() error {
 			if directlyAnswer == "" {
 				return utils.Errorf("error: direct answer is empty, retry it until direct answer finished")
 			}
-			t.config.ProcessExtendedActionCallback(directlyAnswer)
+			t.ProcessExtendedActionCallback(directlyAnswer)
 			directlyAnswerLong = action.GetString("direct_answer_long")
 			if directlyAnswerLong == "" {
 				log.Errorf("error: direct answer long is empty, retry it until direct answer finished")
 			}
-			t.config.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
+			t.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
 		} else if action.GetString("@action") == "require-tool" {
 			toolName := action.GetString("tool")
 			if toolName == "" {
@@ -81,7 +89,7 @@ TOOLREQUIRED:
 	for {
 		toolRequired := t.getToolRequired(response)
 		if len(toolRequired) == 0 {
-			t.config.EmitInfo("no tool required in task: %#v", t.Name)
+			t.EmitInfo("no tool required in task: %#v", t.Name)
 			break
 		}
 
@@ -94,11 +102,11 @@ TOOLREQUIRED:
 			if err != nil {
 				return fmt.Errorf("error generating aiTask prompt: %w", err)
 			}
-			err = t.config.callAiTransaction(prompt, func(request *AIRequest) (*AIResponse, error) {
+			err = t.callAiTransaction(prompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				request.SetTaskIndex(t.Index)
-				return t.callAI(request)
-			}, func(rsp *AIResponse) error {
-				responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.config))
+				return t.CallAI(request)
+			}, func(rsp *aicommon.AIResponse) error {
+				responseBytes, err := io.ReadAll(rsp.GetOutputStreamReader("execute", false, t.Emitter))
 				if err != nil {
 					return fmt.Errorf("error reading AI response: %w", err)
 				}
@@ -107,7 +115,7 @@ TOOLREQUIRED:
 					return utils.Errorf("AI response is empty, retry it or check your AI model")
 				}
 
-				action, err = ExtractAction(response, "direct-answer")
+				action, err = aicommon.ExtractAction(response, "direct-answer")
 				if err != nil {
 					return utils.Errorf("error extracting @action (direct-answer): %w， check miss \"@action\" field in object or @action bad str value", err)
 				}
@@ -115,45 +123,47 @@ TOOLREQUIRED:
 				if directlyAnswer == "" {
 					return utils.Errorf("error: direct answer is empty, retry it until direct answer finished")
 				}
-				t.config.ProcessExtendedActionCallback(directlyAnswer)
+				t.ProcessExtendedActionCallback(directlyAnswer)
 				directlyAnswerLong = action.GetString("direct_answer_long")
 				if directlyAnswerLong == "" {
 					log.Errorf("error: direct answer long is empty, retry it until direct answer finished")
 				}
-				t.config.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
+				t.EmitInfo("task[%v] finished, directly answer: %v", t.Name, directlyAnswer)
 				return nil
 			})
 			break TOOLREQUIRED
 		}
-		if err != nil {
-			t.config.EmitError("error calling tool: %v", err)
+		if err != nil || result == nil {
+			t.EmitError("error calling tool: %v with result %v:", err, result)
 			return err
 		}
 		if !targetTool.NoNeedTimelineRecorded {
-			result.ID = t.config.AcquireId()
+			result.ID = t.AcquireId()
 			t.PushToolCallResult(result)
 		}
 
 		action, err := t.toolResultDecision(result, targetTool)
 		if err != nil {
-			t.config.EmitError("error calling tool: %v", err)
+			t.EmitError("error calling tool: %v", err)
 			return err
 		}
+
+		t.EmitToolCallSummary(result.ToolCallID, SelectSummary(t, result))
 
 		switch action {
 		case taskContinue:
 			atomic.AddInt64(&t.TaskContinueCount, 1)
-			t.config.EmitInfo("require more tool in task: %#v", t.Name)
+			t.EmitInfo("require more tool in task: %#v", t.Name)
 			moreToolPrompt, err := t.generateTaskPrompt()
 			if err != nil {
 				log.Errorf("error generating aiTask prompt: %v", err)
 				break TOOLREQUIRED
 			}
-			err = t.config.callAiTransaction(moreToolPrompt, func(request *AIRequest) (*AIResponse, error) {
+			err = t.callAiTransaction(moreToolPrompt, func(request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				request.SetTaskIndex(t.Index)
-				return t.callAI(request)
-			}, func(responseReader *AIResponse) error {
-				responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.config))
+				return t.CallAI(request)
+			}, func(responseReader *aicommon.AIResponse) error {
+				responseBytes, err := io.ReadAll(responseReader.GetOutputStreamReader("execute", false, t.GetEmitter()))
 				if err != nil {
 					return fmt.Errorf("error reading AI response: %w", err)
 				}
@@ -168,16 +178,16 @@ TOOLREQUIRED:
 			}
 			continue
 		case taskProceedNext:
-			t.config.EmitInfo("task[%v] finished", t.Name)
+			t.EmitInfo("task[%v] finished", t.Name)
 			break TOOLREQUIRED
 		case taskFailed:
-			t.config.EmitError("task[%v] failed", t.Name)
+			t.EmitError("task[%v] failed", t.Name)
 			break TOOLREQUIRED
 		case taskSkipped:
-			t.config.EmitInfo("task[%v] skipped, continue to next task", t.Name)
+			t.EmitInfo("task[%v] skipped, continue to next task", t.Name)
 			break TOOLREQUIRED
 		default:
-			t.config.EmitError("unknown action: %v, skip tool require", action)
+			t.EmitError("unknown action: %v, skip tool require", action)
 			break TOOLREQUIRED
 		}
 	}
@@ -193,24 +203,24 @@ TOOLREQUIRED:
 		var shortSummary = ""
 		var longSummary = ""
 
-		t.config.EmitInfo("start to execute task-summary action")
+		t.EmitInfo("start to execute task-summary action")
 		// 处理总结回调
 		summaryPromptWellFormed, err := t.GenerateTaskSummaryPrompt()
 		if err != nil {
-			t.config.EmitError("error generating summary prompt: %v", err)
+			t.EmitError("error generating summary prompt: %v", err)
 			return fmt.Errorf("error generating summary prompt: %w", err)
 		}
 
-		err = t.config.callAiTransaction(summaryPromptWellFormed, t.callAI, func(summaryReader *AIResponse) error {
-			summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.config))
+		err = t.callAiTransaction(summaryPromptWellFormed, t.CallAI, func(summaryReader *aicommon.AIResponse) error {
+			summaryBytes, err := io.ReadAll(summaryReader.GetOutputStreamReader("summary", false, t.GetEmitter()))
 			if err != nil {
-				t.config.EmitError("error reading summary: %v", err)
+				t.EmitError("error reading summary: %v", err)
 				return fmt.Errorf("error reading summary: %w", err)
 			}
 
-			action, err := ExtractAction(string(summaryBytes), "summary")
+			action, err := aicommon.ExtractAction(string(summaryBytes), "summary")
 			if err != nil {
-				t.config.EmitError("error extracting action: %v", err)
+				t.EmitError("error extracting action: %v", err)
 			}
 
 			if action != nil {
@@ -238,23 +248,40 @@ TOOLREQUIRED:
 	return nil
 }
 
+func (t *AiTask) executeTaskPushTaskIndex() error {
+	// 在执行任务之前，推送事件到事件栈
+	t.Emitter = t.GetEmitter().PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
+		if event.TaskIndex == "" {
+			event.TaskIndex = t.Index
+		}
+		return event
+	})
+	defer func() {
+		t.Emitter = t.GetEmitter().PopEventProcesser()
+	}()
+
+	// 执行实际的任务
+	return t.executeTask()
+}
+
 // executeTask 实际执行任务并返回结果
-func (t *aiTask) executeTask() error {
+func (t *AiTask) executeTask() error {
 	if err := t.execute(); err != nil {
 		return err
 	}
 	// start to wait for user review
-	ep := t.config.epm.createEndpointWithEventType(EVENT_TYPE_TASK_REVIEW_REQUIRE)
+	ep := t.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TASK_REVIEW_REQUIRE)
 	ep.SetDefaultSuggestionContinue()
-	t.config.EmitInfo("start to wait for user review current task")
+	t.EmitInfo("start to wait for user review current task")
 
-	t.config.EmitRequireReviewForTask(t, ep.id)
-	t.config.doWaitAgree(nil, ep)
+	t.EmitRequireReviewForTask(t, ep.GetId())
+	t.DoWaitAgree(nil, ep)
 	// user review finished, find params
 	reviewResult := ep.GetParams()
-	t.config.ReleaseInteractiveEvent(ep.id, reviewResult)
-	t.config.EmitInfo("start to handle review task event: %v", ep.id)
+	t.ReleaseInteractiveEvent(ep.GetId(), reviewResult)
+	t.EmitInfo("start to handle review task event: %v", ep.GetId())
 	err := t.handleReviewResult(reviewResult)
+	t.CallAfterReview(ep.GetSeq(), "请审查当前任务的执行结果", reviewResult)
 	if err != nil {
 		log.Warnf("error handling review result: %v", err)
 	}
@@ -262,14 +289,30 @@ func (t *aiTask) executeTask() error {
 	return nil
 }
 
-func (t *aiTask) GenerateTaskSummaryPrompt() (string, error) {
+func (t *AiTask) GenerateTaskSummaryPrompt() (string, error) {
 	summaryTemplate := template.Must(template.New("summary").Parse(__prompt_TaskSummary))
 	var buf bytes.Buffer
 	err := summaryTemplate.Execute(&buf, map[string]any{
-		"Memory": t.config.memory,
+		"Memory": t.memory,
 	})
 	if err != nil {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func SelectSummary(task *AiTask, callResult *aitool.ToolResult) string {
+	if callResult.ShrinkResult != "" {
+		return callResult.ShrinkResult
+	}
+	if callResult.ShrinkSimilarResult != "" {
+		return callResult.ShrinkSimilarResult
+	}
+	if task.TaskSummary != "" {
+		return task.TaskSummary
+	}
+	if task.StatusSummary != "" {
+		return task.StatusSummary
+	}
+	return string(utils.Jsonify(callResult.Data))
 }

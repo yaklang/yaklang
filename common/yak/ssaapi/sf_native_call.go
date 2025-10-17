@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"fmt"
-	"path"
 	"regexp"
 	"strconv"
 	"strings"
@@ -195,7 +194,9 @@ func init() {
 			}
 			call, isCall := ssa.ToCall(value)
 			if isCall {
-				getRoot(call.GetValueById(call.Method))
+				if method, ok := call.GetValueById(call.Method); ok && method != nil {
+					getRoot(method)
+				}
 				return
 			}
 			obj := value.GetObject()
@@ -418,7 +419,9 @@ func init() {
 			result = temp
 		}
 		if len(result) > 0 {
-			return true, sfvm.NewValues(result), nil
+			vs := sfvm.NewValues(result)
+			vs.AppendPredecessor(v, frame.WithPredecessorContext(fmt.Sprintf("getUsers(depth=%d)", depth)))
+			return true, vs, nil
 		}
 		return false, nil, nil
 	}), nc_desc("获取值的Users"))
@@ -489,9 +492,8 @@ func init() {
 	// <getFullFileName(filename="xxx")>
 	registerNativeCall(NativeCall_GetFullFileName, nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 		var rs []sfvm.ValueOperator
-		fileMap := make(map[string]struct{})
-		fname := params.GetString("filename")
-		if fname == "" {
+		targetName := params.GetString("filename")
+		if targetName == "" {
 			return false, nil, utils.Errorf("filename is empty")
 		}
 		program, err := fetchProgram(v)
@@ -503,46 +505,26 @@ func init() {
 			return false, nil, utils.Errorf("program is nil")
 		}
 		matchFilename := func(f func(filename string) bool) {
-			for name, _ := range p.FileList {
-				if f(name) {
-					_, ok := fileMap[name]
-					if !ok {
-						memeditor := &memedit.MemEditor{}
-						fileMap[name] = struct{}{}
-						if program.enableDatabase {
-							memeditor, err = ssadb.GetEditorByFileName(path.Join("/", program.GetProgramName(), name))
-							if err != nil {
-								log.Errorf("get ir source from hash failed: %v", err)
-								continue
-							}
-						} else {
-							editor, b := program.Program.GetEditor(name)
-							if b {
-								memeditor = editor
-							} else {
-								log.Errorf("get editor failed")
-								continue
-							}
-						}
-						rs = append(rs, program.NewConstValue(name, memeditor.GetFullRange()))
-					}
+			program.ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
+				if !f(s) {
+					return true
 				}
-			}
+				rs = append(rs, program.NewConstValue(s, me.GetFullRange()))
+				return true
+			})
 		}
-		compile, err := glob.Compile(fname)
-		if err == nil {
+		if compile, err := glob.Compile(targetName); err == nil {
 			matchFilename(func(filename string) bool {
 				return compile.Match(filename)
 			})
 		}
-		r, err := regexp.Compile(fname)
-		if err == nil {
+		if r, err := regexp.Compile(targetName); err == nil {
 			matchFilename(func(filename string) bool {
 				return r.MatchString(filename)
 			})
 		}
 		matchFilename(func(filename string) bool {
-			return strings.ToLower(filename) == strings.ToLower(fname)
+			return strings.EqualFold(filename, targetName)
 		})
 		return true, sfvm.NewValues(rs), nil
 	}))
@@ -568,7 +550,7 @@ func init() {
 				if editor == nil {
 					log.Errorf("node editor is nil")
 				}
-				_, exist := prog.FileList[editor.GetFilename()]
+				_, exist := prog.FileList[editor.GetUrl()]
 				if exist {
 					rs = append(rs, program.NewConstValue(editor.GetFilename(), editor.GetFullRange()))
 				} else {
@@ -595,7 +577,10 @@ func init() {
 			if !flag {
 				return nil
 			}
-			enter := function.GetBasicBlockByID(function.EnterBlock)
+			enter, ok := function.GetBasicBlockByID(function.EnterBlock)
+			if !ok || enter == nil {
+				return nil
+			}
 			result1 := searchAlongBasicBlock(enter.GetBlock(), prog, frame, params, Next)
 			result = append(result, result1...)
 			return nil
@@ -856,7 +841,7 @@ func init() {
 			result, _ := frame.GetSFResult()
 			if result != nil {
 				result.SymbolTable.Delete(name)
-				delete(result.AlertSymbolTable, name)
+				result.AlertSymbolTable.Delete(name)
 				delete(result.GetRule().AlertDesc, name)
 			}
 		}
@@ -929,7 +914,7 @@ func init() {
 		idx := 0
 		_ = v.Recursive(func(operator sfvm.ValueOperator) error {
 			if ret, ok := operator.(*Value); ok {
-				fmt.Printf("-%3d: %v\n", idx, ret.String())
+				log.Debugf("-%3d: %v\n", idx, ret.String())
 				idx++
 			}
 			return nil
@@ -1029,7 +1014,7 @@ func init() {
 		nc_func(func(v sfvm.ValueOperator, frame *sfvm.SFFrame, actualParams *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
 			var vals []sfvm.ValueOperator
 			var tmpMap = make(map[string]struct{})
-			addVals := func(val *Value, typ string, rangeIf memedit.RangeIf) {
+			addVals := func(val *Value, typ string, rangeIf *memedit.Range) {
 				if typ == "" {
 					return
 				}
@@ -1091,10 +1076,15 @@ func init() {
 						return nil
 					}
 					for _, param := range rets.Params {
-						param := rets.GetValueById(param)
+						param, ok := rets.GetValueById(param)
+						if !ok || param == nil {
+							continue
+						}
 						newVal := val.NewValue(param)
-						newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
-						vals = append(vals, newVal)
+						if newVal != nil {
+							newVal.AppendPredecessor(val, frame.WithPredecessorContext("getFormalParams"))
+							vals = append(vals, newVal)
+						}
 					}
 				}
 				return nil
@@ -1123,16 +1113,24 @@ func init() {
 					return nil
 				}
 				for _, ret := range funcIns.Return {
-					ret := funcIns.GetValueById(ret)
+					ret, ok := funcIns.GetValueById(ret)
+					if !ok || ret == nil {
+						continue
+					}
 					retVal, ok := ssa.ToReturn(ret)
 					if !ok {
 						continue
 					}
 					for _, retIns := range retVal.Results {
-						retIns := funcIns.GetValueById(retIns)
+						retIns, ok := funcIns.GetValueById(retIns)
+						if !ok || retIns == nil {
+							continue
+						}
 						new := val.NewValue(retIns)
-						new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
-						vals = append(vals, new)
+						if new != nil {
+							new.AppendPredecessor(val, frame.WithPredecessorContext("getReturns"))
+							vals = append(vals, new)
+						}
 					}
 				}
 				return nil

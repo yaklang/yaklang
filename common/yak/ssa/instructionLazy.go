@@ -1,21 +1,22 @@
 package ssa
 
 import (
+	"sync"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-func init() {
-	ssautil.RegisterLazyInstructionBuilder(func(id int64) (ssautil.SSAValue, error) {
-		return NewLazyValue(id)
-	})
-}
+// func init() {
+// 	ssautil.RegisterLazyInstructionBuilder(func(id int64) (ssautil.SSAValue, error) {
+// 		return NewLazyValue(id)
+// 	})
+// }
 
 type LazyInstruction struct {
 	// self
-	Instruction
+	Instruction Instruction
 	Value
 	User
 	// cache
@@ -24,9 +25,11 @@ type LazyInstruction struct {
 	variable    map[string]*Variable
 	ir          *ssadb.IrCode
 	programName string
-	cache       *Cache
+	cache       *ProgramCache
 	prog        *Program
 	Modify      bool
+
+	once sync.Once
 }
 
 var (
@@ -35,17 +38,17 @@ var (
 	_ User        = (*LazyInstruction)(nil)
 )
 
-func NewLazyValue(id int64) (Value, error) {
-	inst, err := NewLazyEx(id, ToValue)
+func NewLazyValue(prog *Program, id int64) (Value, error) {
+	inst, err := NewLazyEx(prog, id, ToValue)
 	if err != nil {
 		return nil, err
 	}
 	return inst, nil
 }
 
-func NewLazyEx[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
+func NewLazyEx[T Instruction](prog *Program, id int64, Cover func(Instruction) (T, bool)) (T, error) {
 	var zero T
-	lz, err := NewLazyInstruction(id)
+	lz, err := NewLazyInstruction(prog, id)
 	if err != nil {
 		return zero, err
 	}
@@ -57,9 +60,9 @@ func NewLazyEx[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, e
 	return inst, nil
 }
 
-func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T, bool)) (T, error) {
+func NewInstructionWithCover[T Instruction](prog *Program, id int64, Cover func(Instruction) (T, bool)) (T, error) {
 	var zero T
-	lz, err := NewLazyInstruction(id)
+	lz, err := NewLazyInstruction(prog, id)
 	if err != nil {
 		return zero, err
 	}
@@ -72,16 +75,16 @@ func NewInstructionFromLazy[T Instruction](id int64, Cover func(Instruction) (T,
 }
 
 // // NewLazyInstruction : create a new lazy instruction, only create in cache
-func NewLazyInstruction(id int64) (Instruction, error) {
+func NewLazyInstruction(prog *Program, id int64) (Instruction, error) {
 	ir := ssadb.GetIrCodeById(ssadb.GetDB(), id)
 	if ir == nil {
 		return nil, utils.Error("IrCode is nil")
 	}
-	prog, ok := GetProgramFromPool(ir.ProgramName)
-	if !ok {
-		log.Errorf("program not found: %s", ir.ProgramName)
-		return nil, utils.Errorf("program not found: %s", ir.ProgramName)
-	}
+	// prog, ok := GetProgramFromPool(ir.ProgramName)
+	// if !ok {
+	// log.Errorf("program not found: %s", ir.ProgramName)
+	// return nil, utils.Errorf("program not found: %s", ir.ProgramName)
+	// }
 	return NewLazyInstructionFromIrCode(ir, prog)
 }
 
@@ -97,8 +100,8 @@ func NewLazyInstructionFromIrCode(ir *ssadb.IrCode, prog *Program, ignoreCache .
 			return inst, nil
 		}
 	}
-	if ir == nil || ir.ID == 0 {
-		log.Infof("ircode is nil or id is 0")
+	if ir.ID == 0 {
+		log.Infof("ircode id is 0")
 	}
 	lz := &LazyInstruction{
 		id:          ir.GetIdInt64(),
@@ -142,39 +145,36 @@ func (lz *LazyInstruction) IsBlock(name string) bool {
 
 // create real-instruction from lazy-instruction
 func (lz *LazyInstruction) check() {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Errorf("panic: %v", err)
-			utils.PrintCurrentGoroutineRuntimeStack()
-		}
-	}()
-	if utils.IsNil(lz.Instruction) {
-		inst := CreateInstruction(Opcode(lz.GetOpcode()))
-		if inst == nil {
-			ir := ssadb.GetIrCodeById(ssadb.GetDB(), lz.id)
-			if ir != nil && ir.Opcode != 0 {
-				log.Infof("bb")
+	lz.once.Do(func() {
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("panic: %v", err)
+				utils.PrintCurrentGoroutineRuntimeStack()
 			}
+		}()
+		var inst Instruction
+		if utils.IsNil(lz.Instruction) {
+			inst = CreateInstruction(Opcode(lz.GetOpcode()))
+			if inst == nil {
+				log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
+				return
+			}
+			inst.SetProgram(lz.prog)
+			lz.cache.IrCodeToInstruction(inst, lz.ir, lz.cache)
+			lz.Instruction = inst
+		}
+		if utils.IsNil(lz.Value) {
+			if value, ok := ToValue(lz.Instruction); ok {
+				lz.Value = value
+			}
+		}
+		if utils.IsNil(lz.User) {
+			if user, ok := ToUser(lz.Instruction); ok {
+				lz.User = user
+			}
+		}
+	})
 
-			log.Infof("unknown opcode: %d: %s", lz.GetOpcode(), lz.ir.OpcodeName)
-			return
-		}
-		inst.SetProgram(lz.prog)
-		lz.Instruction = inst
-		lz.cache.IrCodeToInstruction(inst, lz.ir)
-		// set range for instruction
-		lz.GetRange()
-	}
-	if utils.IsNil(lz.Value) {
-		if value, ok := ToValue(lz.Instruction); ok {
-			lz.Value = value
-		}
-	}
-	if utils.IsNil(lz.User) {
-		if user, ok := ToUser(lz.Instruction); ok {
-			lz.User = user
-		}
-	}
 }
 
 func (lz *LazyInstruction) ShouldSave() bool {
@@ -229,6 +229,15 @@ func (lz *LazyInstruction) GetOpcode() Opcode {
 		return SSAOpcodeUnKnow
 	}
 	return Opcode(lz.ir.Opcode)
+}
+
+func (lz *LazyInstruction) RefreshString() {
+	lz.check()
+	if utils.IsNil(lz.Instruction) {
+		log.Errorf("BUG: lazyInstruction IrCode is nil")
+		return
+	}
+	lz.Instruction.RefreshString()
 }
 
 func (lz *LazyInstruction) String() string {
@@ -408,22 +417,25 @@ func (lz *LazyInstruction) SetId(id int64) {
 	lz.Instruction.SetId(id)
 }
 
-func (lz *LazyInstruction) GetRange() memedit.RangeIf {
+func (lz *LazyInstruction) GetRange() *memedit.Range {
 	lz.check()
-	if utils.IsNil(lz.Instruction) {
+	return lz.getRange(lz.Self())
+}
+func (lz *LazyInstruction) getRange(inst Instruction) *memedit.Range {
+	if utils.IsNil(inst) {
 		return nil
 	}
-	if lz.Instruction.GetRange() == nil {
+	if inst.GetRange() == nil {
 		editor, start, end, err := lz.ir.GetStartAndEndPositions()
 		if err != nil {
-			switch ret := lz.Self().(type) {
+			switch ret := inst.(type) {
 			case *BasicBlock:
 				// check if block has no instruction
-				var startRng memedit.RangeIf
+				var startRng *memedit.Range
 				if len(ret.Insts) > 0 {
 					for _, startId := range ret.Insts {
-						startInst := lz.prog.GetInstructionById(startId)
-						if startInst == nil {
+						startInst, ok := lz.prog.GetInstructionById(startId)
+						if !ok || startInst == nil {
 							continue
 						}
 						if rng := startInst.GetRange(); rng != nil {
@@ -433,8 +445,8 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					}
 				} else {
 					for _, startId := range ret.Preds {
-						startInst := lz.prog.GetInstructionById(startId)
-						if startInst == nil {
+						startInst, ok := lz.prog.GetInstructionById(startId)
+						if !ok || startInst == nil {
 							continue
 						}
 						if rng := startInst.GetRange(); rng != nil {
@@ -444,13 +456,13 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					}
 				}
 
-				var endRng memedit.RangeIf
+				var endRng *memedit.Range
 				if len(ret.Insts) > 0 {
 					// Iterate from the last instruction to find the end range
 					for i := len(ret.Insts) - 1; i >= 0; i-- {
 						endInstId := ret.Insts[i]
-						endInst := lz.prog.GetInstructionById(endInstId)
-						if endInst == nil {
+						endInst, ok := lz.prog.GetInstructionById(endInstId)
+						if !ok || endInst == nil {
 							continue
 						}
 						if rng := endInst.GetRange(); rng != nil {
@@ -460,8 +472,8 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					}
 				} else {
 					for _, endId := range ret.Succs {
-						endInst := lz.prog.GetInstructionById(endId)
-						if endInst == nil {
+						endInst, ok := lz.prog.GetInstructionById(endId)
+						if !ok || endInst == nil {
 							continue
 						}
 						if rng := endInst.GetRange(); rng != nil {
@@ -471,34 +483,34 @@ func (lz *LazyInstruction) GetRange() memedit.RangeIf {
 					}
 				}
 				if startRng != nil && endRng != nil {
-					log.Infof("use pred start range and succ end range for %v(%T)", lz.GetId(), lz.Self())
+					log.Infof("use pred start range and succ end range for %v(%T)", inst.GetId(), inst)
 					fallbackRange := memedit.NewRange(startRng.GetStart(), endRng.GetEnd())
 					fallbackRange.SetEditor(startRng.GetEditor())
-					lz.Instruction.SetRange(fallbackRange)
+					inst.SetRange(fallbackRange)
 					return fallbackRange
 				}
 
 				if startRng != nil {
-					log.Infof("just use pred start range for %v(%T)", lz.GetId(), lz.Self())
-					lz.Instruction.SetRange(startRng)
+					log.Infof("just use pred start range for %v(%T)", inst.GetId(), inst)
+					inst.SetRange(startRng)
 					return startRng
 				}
 
 				if endRng != nil {
-					log.Infof("just use succ end range for %v(%T)", lz.GetId(), lz.Self())
-					lz.Instruction.SetRange(endRng)
+					log.Infof("just use succ end range for %v(%T)", inst.GetId(), inst)
+					inst.SetRange(endRng)
 					return endRng
 				}
 			}
-			log.Warnf("LazyInstruction(%T).GetRange failed: %v", lz.Self(), err)
+			log.Warnf("LazyInstruction(%T).GetRange failed: %v", inst, err)
 			return nil
 		}
-		lz.Instruction.SetRange(editor.GetRangeByPosition(start, end))
+		inst.SetRange(editor.GetRangeByPosition(start, end))
 	}
-	return lz.Instruction.GetRange()
+	return inst.GetRange()
 }
 
-func (lz *LazyInstruction) SetRange(r memedit.RangeIf) {
+func (lz *LazyInstruction) SetRange(r *memedit.Range) {
 	lz.check()
 	if utils.IsNil(lz.Instruction) {
 		return
@@ -799,20 +811,20 @@ func (lz *LazyInstruction) FlatOccultation() []Value {
 	handler = func(i *anValue) {
 		for _, vId := range i.occultation {
 			// Corrected: Use GetValueById from the program's cache
-			v := lz.GetValueById(vId)
-			if v == nil {
+			v, ok := lz.GetValueById(vId)
+			if !ok || v == nil {
 				continue
 			}
 			ret = append(ret, v)
 			if p, ok := ToPhi(v); ok {
-				handler(&p.anValue)
+				handler(p.anValue)
 			}
 		}
 	}
 	if u, ok := ToUndefined(lz.Value); ok {
-		handler(&u.anValue)
+		handler(u.anValue)
 	} else if e, ok := ToExternLib(lz.Value); ok {
-		handler(&e.anValue)
+		handler(e.anValue)
 	}
 
 	return ret

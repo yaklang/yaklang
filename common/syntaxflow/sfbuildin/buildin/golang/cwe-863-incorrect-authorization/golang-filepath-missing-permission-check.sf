@@ -1,130 +1,106 @@
 desc(
 	title: "Detect Golang Path Traversal Vulnerability"
+	title_zh: "检测Golang路径穿越漏洞"
 	type: audit
 	level: low
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当应用程序未对用户提供的文件路径进行充分的验证和授权检查时，就会出现文件路径未授权漏洞。攻击者可以构造包含特殊字符（如 `../` 或 `..\`）的恶意路径，从而突破应用程序设定的目录限制，访问、篡改或删除系统中的任意文件。这是一种典型的路径穿越（Path Traversal）攻击。
-
+当应用程序未对用户提供的文件路径进行充分的验证和授权检查时，就会出现文件路径未授权漏洞。攻击者可以构造包含特殊字符（如 `../` 或 `..\`）的恶意路径，从而突破应用程序设定的目录限制，访问、篡改或删除系统中的任意文件。这是一种典型的路径穿越（Path Traversal）攻击。
 2. **触发场景**
-   此漏洞通常发生在需要处理用户上传文件、访问用户指定文件或删除文件的场景。例如，应用程序接受用户输入的文件名或文件ID，并将其直接或简单拼接后用于文件操作 API（如 `os.Open`, `os.Remove`, `os.Stat` 等），而没有对拼接后的最终路径进行规范化、路径穿越检测以及针对当前用户的权限检查。
-
-   ```go
-   package main
-
-   import (
-       "fmt"
-       "net/http"
-       "os"
-   )
-
-   func deleteFile(w http.ResponseWriter, r *http.Request) {
-       // 从请求中直接获取用户输入的文件路径，未进行任何验证或授权检查
-       filePath := r.URL.Query().Get("file_id")
-
-       // 潜在危险的文件操作，如果 filePath 包含 "../"，可能删除应用程序目录之外的文件
-       err := os.Remove(filePath)
-       if err != nil {
-           fmt.Fprintf(w, "Failed to delete file: %v", err)
-           return
-       }
-
-       fmt.Fprintf(w, "File deleted successfully")
-   }
-
-   func main() {
-       http.HandleFunc("/delete", deleteFile)
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-
-3. **潜在影响**
-   - **敏感信息泄露**: 攻击者可以访问配置文件、源代码、用户数据等敏感文件。
-   - **数据篡改或丢失**: 攻击者可以修改、删除或上传恶意文件。
-   - **远程代码执行**: 如果应用程序还存在其他漏洞（如文件包含），路径穿越可能导致远程代码执行。
-   - **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
-DESC
-	rule_id: "838bdd38-5913-46ed-88f7-8eced02db2bd"
-	title_zh: "检测Golang路径穿越漏洞"
-	solution: <<<SOLUTION
-### 修复建议
-
-#### 1. 严格校验用户输入
-在将用户输入用于文件路径之前，必须进行严格的合法性校验。只接受预期的字符集和格式。
-
-#### 2. 规范化并验证最终路径
-将用户输入与基础目录拼接后，对最终路径进行规范化处理（例如使用 `filepath.Clean`），然后检查规范化后的路径是否仍在预期的安全目录之下。避免直接使用用户输入的相对路径。
-
+此漏洞通常发生在需要处理用户上传文件、访问用户指定文件或删除文件的场景。例如，应用程序接受用户输入的文件名或文件ID，并将其直接或简单拼接后用于文件操作 API（如 `os.Open`、`os.Remove`、`os.Stat` 等），而没有对拼接后的最终路径进行规范化、路径穿越检测以及针对当前用户的权限检查。
 ```go
 package main
-
 import (
-	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
+    "fmt"
+    "net/http"
+    "os"
 )
-
-var baseDir = "./safe_files/"
-
-func deleteFileSafe(w http.ResponseWriter, r *http.Request) {
-	fileName := r.URL.Query().Get("file_id")
-	if fileName == "" {
-		http.Error(w, "File ID is required", http.StatusBadRequest)
-		return
-	}
-
-	// 拼接基础目录和文件名
-	fullPath := filepath.Join(baseDir, fileName)
-
-	// 规范化处理（去除 "../" 等）
-	cleanPath := filepath.Clean(fullPath)
-
-	// 验证规范化后的路径是否仍然在基础目录下
-	// 注意：这里需要更健壮的检查，确保 cleanPath 确实以 baseDir 开头且 baseDir 是其父目录
-	if !strings.HasPrefix(cleanPath, baseDir) {
-		http.Error(w, "Invalid file path", http.StatusBadRequest)
-		return
-	}
-
-	// 检查用户是否有权限删除此文件（例如，根据用户身份和文件所有者）
-	// 这一步需要根据具体的业务逻辑实现授权校验
-	// if !hasPermission(r.Header.Get("User"), cleanPath) {
-	//     http.Error(w, "Permission denied", http.StatusForbidden)
-	//     return
-	// }
-
-	// 检查文件是否存在
-	if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
-		fmt.Fprintf(w, "File not found")
-		return
-	}
-
-	// 执行安全的文件删除操作
-	err := os.Remove(cleanPath)
-	if err != nil {
-		fmt.Fprintf(w, "Failed to delete file: %v", err)
-		return
-	}
-
-	fmt.Fprintf(w, "File deleted successfully")
+func deleteFile(w http.ResponseWriter, r *http.Request) {
+    // 从请求中直接获取用户输入的文件路径，未进行任何验证或授权检查
+    filePath := r.URL.Query().Get("file_id")
+    // 潜在危险的文件操作，如果 filePath 包含 "../"，可能删除应用程序目录之外的文件
+    err := os.Remove(filePath)
+    if err != nil {
+        fmt.Fprintf(w, "Failed to delete file: %v", err)
+        return
+    }
+    fmt.Fprintf(w, "File deleted successfully")
 }
-
+func main() {
+    http.HandleFunc("/delete", deleteFile)
+    http.ListenAndServe(":8080", nil)
+}
+```
+3. **潜在影响**
+- **敏感信息泄露**: 攻击者可以访问配置文件、源代码、用户数据等敏感文件。
+- **数据篡改或丢失**: 攻击者可以修改、删除或上传恶意文件。
+- **远程代码执行**: 如果应用程序还存在其他漏洞（如文件包含），路径穿越可能导致远程代码执行。
+- **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
+DESC
+	rule_id: "838bdd38-5913-46ed-88f7-8eced02db2bd"
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 严格校验用户输入
+在将用户输入用于文件路径之前，必须进行严格的合法性校验。只接受预期的字符集和格式。
+#### 2. 规范化并验证最终路径
+将用户输入与基础目录拼接后，对最终路径进行规范化处理（例如使用 `filepath.Clean`），然后检查规范化后的路径是否仍在预期的安全目录之下。避免直接使用用户输入的相对路径。
+```go
+package main
+import (
+    "fmt"
+    "net/http"
+    "os"
+    "path/filepath"
+    "strings"
+)
+var baseDir = "./safe_files/"
+func deleteFileSafe(w http.ResponseWriter, r *http.Request) {
+    fileName := r.URL.Query().Get("file_id")
+    if fileName == "" {
+        http.Error(w, "File ID is required", http.StatusBadRequest)
+        return
+    }
+    // 拼接基础目录和文件名
+    fullPath := filepath.Join(baseDir, fileName)
+    // 规范化处理（去除 "../" 等）
+    cleanPath := filepath.Clean(fullPath)
+    // 验证规范化后的路径是否仍然在基础目录下
+    // 注意：这里需要更健壮的检查，确保 cleanPath 确实以 baseDir 开头且 baseDir 是其父目录
+    if !strings.HasPrefix(cleanPath, baseDir) {
+        http.Error(w, "Invalid file path", http.StatusBadRequest)
+        return
+    }
+    // 检查用户是否有权限删除此文件（例如，根据用户身份和文件所有者）
+    // 这一步需要根据具体的业务逻辑实现授权校验
+    // if !hasPermission(r.Header.Get("User"), cleanPath) {
+    //     http.Error(w, "Permission denied", http.StatusForbidden)
+    //     return
+    // }
+    // 检查文件是否存在
+    if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
+        fmt.Fprintf(w, "File not found")
+        return
+    }
+    // 执行安全的文件删除操作
+    err := os.Remove(cleanPath)
+    if err != nil {
+        fmt.Fprintf(w, "Failed to delete file: %v", err)
+        return
+    }
+    fmt.Fprintf(w, "File deleted successfully")
+}
 // 授权检查函数示例（需要具体实现）
 // func hasPermission(user string, filePath string) bool {
 //     // 检查 user 是否有权限操作 filePath
 //     return true // 示例总是返回 true
 // }
-
 func main() {
-	http.HandleFunc("/delete", deleteFileSafe)
-	http.ListenAndServe(":8080", nil)
+    http.HandleFunc("/delete", deleteFileSafe)
+    http.ListenAndServe(":8080", nil)
 }
 ```
-
 #### 3. 实施基于角色的访问控制（RBAC）或属性基础的访问控制（ABAC）
 除了路径验证，还应根据当前用户的身份和权限，判断其是否有权访问或操作指定的文件。文件操作应与用户授权体系相结合。
 SOLUTION
@@ -135,143 +111,92 @@ REFERENCE
 
 <include('golang-file-path')> as $path;
 <include('golang-os-sink')> as $sink;
+<include('golang-user-input')> as $input;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
+$path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
-$sink #{exclude: `$safe`}-> as $low;
+$sink - $safe as $data;
+$data & $input as $low;
 
 alert $low for {
-	desc: <<<CODE
-### 漏洞描述
-
-1. **漏洞原理**
-   当应用程序未对用户提供的文件路径进行充分的验证和授权检查时，就会出现文件路径未授权漏洞。攻击者可以构造包含特殊字符（如 `../` 或 `..\`）的恶意路径，从而突破应用程序设定的目录限制，访问、篡改或删除系统中的任意文件。这是一种典型的路径穿越（Path Traversal）攻击。
-
-2. **触发场景**
-   此漏洞通常发生在需要处理用户上传文件、访问用户指定文件或删除文件的场景。例如，应用程序接受用户输入的文件名或文件ID，并将其直接或简单拼接后用于文件操作 API（如 `os.Open`, `os.Remove`, `os.Stat` 等），而没有对拼接后的最终路径进行规范化、路径穿越检测以及针对当前用户的权限检查。
-
-   ```go
-   package main
-
-   import (
-       "fmt"
-       "net/http"
-       "os"
-   )
-
-   func deleteFile(w http.ResponseWriter, r *http.Request) {
-       // 从请求中直接获取用户输入的文件路径，未进行任何验证或授权检查
-       filePath := r.URL.Query().Get("file_id")
-
-       // 潜在危险的文件操作，如果 filePath 包含 "../"，可能删除应用程序目录之外的文件
-       err := os.Remove(filePath)
-       if err != nil {
-           fmt.Fprintf(w, "Failed to delete file: %v", err)
-           return
-       }
-
-       fmt.Fprintf(w, "File deleted successfully")
-   }
-
-   func main() {
-       http.HandleFunc("/delete", deleteFile)
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-
-3. **潜在影响**
-   - **敏感信息泄露**: 攻击者可以访问配置文件、源代码、用户数据等敏感文件。
-   - **数据篡改或丢失**: 攻击者可以修改、删除或上传恶意文件。
-   - **远程代码执行**: 如果应用程序还存在其他漏洞（如文件包含），路径穿越可能导致远程代码执行。
-   - **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
-CODE
+	desc: <<<DESC
+### 漏洞描述\n1. **漏洞原理**\n当应用程序未对用户提供的文件路径进行充分的验证和授权检查时，就会出现文件路径未授权漏洞。攻击者可以构造包含特殊字符（如 `../` 或 `..\`）的恶意路径，从而突破应用程序设定的目录限制，访问、篡改或删除系统中的任意文件。这是一种典型的路径穿越（Path Traversal）攻击。\n2. **触发场景**\n此漏洞通常发生在需要处理用户上传文件、访问用户指定文件或删除文件的场景。例如，应用程序接受用户输入的文件名或文件ID，并将其直接或简单拼接后用于文件操作 API（如 `os.Open`, `os.Remove`, `os.Stat` 等），而没有对拼接后的最终路径进行规范化、路径穿越检测以及针对当前用户的权限检查。\n```go\npackage main\nimport (\n\"fmt\"\n\"net/http\"\n\"os\"\n)\nfunc deleteFile(w http.ResponseWriter, r *http.Request) {\n// 从请求中直接获取用户输入的文件路径，未进行任何验证或授权检查\nfilePath := r.URL.Query().Get(\"file_id\")\n// 潜在危险的文件操作，如果 filePath 包含 \"../\"，可能删除应用程序目录之外的文件\nerr := os.Remove(filePath)\nif err != nil {\nfmt.Fprintf(w, \"Failed to delete file: %v\", err)\nreturn\n}\nfmt.Fprintf(w, \"File deleted successfully\")\n}\nfunc main() {\nhttp.HandleFunc(\"/delete\", deleteFile)\nhttp.ListenAndServe(\":8080\", nil)\n}\n```\n3. **潜在影响**\n- **敏感信息泄露**: 攻击者可以访问配置文件、源代码、用户数据等敏感文件。\n- **数据篡改或丢失**: 攻击者可以修改、删除或上传恶意文件。\n- **远程代码执行**: 如果应用程序还存在其他漏洞（如文件包含），路径穿越可能导致远程代码执行。\n- **拒绝服务**: 通过删除关键系统文件，可能导致应用程序或整个系统瘫痪。
+DESC
 	level: "low",
 	type: "vuln",
 	title: "Detect Golang Path Traversal Vulnerability",
 	title_zh: "检测Golang路径穿越漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格校验用户输入
 在将用户输入用于文件路径之前，必须进行严格的合法性校验。只接受预期的字符集和格式。
-
 #### 2. 规范化并验证最终路径
 将用户输入与基础目录拼接后，对最终路径进行规范化处理（例如使用 `filepath.Clean`），然后检查规范化后的路径是否仍在预期的安全目录之下。避免直接使用用户输入的相对路径。
-
 ```go
 package main
-
 import (
-	"fmt"
-	"net/http"
-	"os"
-	"path/filepath"
-	"strings"
+"fmt"
+"net/http"
+"os"
+"path/filepath"
+"strings"
 )
-
 var baseDir = "./safe_files/"
-
 func deleteFileSafe(w http.ResponseWriter, r *http.Request) {
-	fileName := r.URL.Query().Get("file_id")
-	if fileName == "" {
-		http.Error(w, "File ID is required", http.StatusBadRequest)
-		return
-	}
-
-	// 拼接基础目录和文件名
-	fullPath := filepath.Join(baseDir, fileName)
-
-	// 规范化处理（去除 "../" 等）
-	cleanPath := filepath.Clean(fullPath)
-
-	// 验证规范化后的路径是否仍然在基础目录下
-	// 注意：这里需要更健壮的检查，确保 cleanPath 确实以 baseDir 开头且 baseDir 是其父目录
-	if !strings.HasPrefix(cleanPath, baseDir) {
-		http.Error(w, "Invalid file path", http.StatusBadRequest)
-		return
-	}
-
-	// 检查用户是否有权限删除此文件（例如，根据用户身份和文件所有者）
-	// 这一步需要根据具体的业务逻辑实现授权校验
-	// if !hasPermission(r.Header.Get("User"), cleanPath) {
-	//     http.Error(w, "Permission denied", http.StatusForbidden)
-	//     return
-	// }
-
-	// 检查文件是否存在
-	if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
-		fmt.Fprintf(w, "File not found")
-		return
-	}
-
-	// 执行安全的文件删除操作
-	err := os.Remove(cleanPath)
-	if err != nil {
-		fmt.Fprintf(w, "Failed to delete file: %v", err)
-		return
-	}
-
-	fmt.Fprintf(w, "File deleted successfully")
+fileName := r.URL.Query().Get("file_id")
+if fileName == "" {
+http.Error(w, "File ID is required", http.StatusBadRequest)
+return
 }
-
+// 拼接基础目录和文件名
+fullPath := filepath.Join(baseDir, fileName)
+// 规范化处理（去除 "../" 等）
+cleanPath := filepath.Clean(fullPath)
+// 验证规范化后的路径是否仍然在基础目录下
+// 注意：这里需要更健壮的检查，确保 cleanPath 确实以 baseDir 开头且 baseDir 是其父目录
+if !strings.HasPrefix(cleanPath, baseDir) {
+http.Error(w, "Invalid file path", http.StatusBadRequest)
+return
+}
+// 检查用户是否有权限删除此文件（例如，根据用户身份和文件所有者）
+// 这一步需要根据具体的业务逻辑实现授权校验
+// if !hasPermission(r.Header.Get("User"), cleanPath) {
+//     http.Error(w, "Permission denied", http.StatusForbidden)
+//     return
+// }
+// 检查文件是否存在
+if _, err := os.Stat(cleanPath); os.IsNotExist(err) {
+fmt.Fprintf(w, "File not found")
+return
+}
+// 执行安全的文件删除操作
+err := os.Remove(cleanPath)
+if err != nil {
+fmt.Fprintf(w, "Failed to delete file: %v", err)
+return
+}
+fmt.Fprintf(w, "File deleted successfully")
+}
 // 授权检查函数示例（需要具体实现）
 // func hasPermission(user string, filePath string) bool {
 //     // 检查 user 是否有权限操作 filePath
 //     return true // 示例总是返回 true
 // }
-
 func main() {
-	http.HandleFunc("/delete", deleteFileSafe)
-	http.ListenAndServe(":8080", nil)
+http.HandleFunc("/delete", deleteFileSafe)
+http.ListenAndServe(":8080", nil)
 }
 ```
-
 #### 3. 实施基于角色的访问控制（RBAC）或属性基础的访问控制（ABAC）
 除了路径验证，还应根据当前用户的身份和权限，判断其是否有权访问或操作指定的文件。文件操作应与用户授权体系相结合。
-CODE
+SOLUTION
+	message: "检测到Golang路径穿越漏洞，但可能存在过滤函数，需进一步审计确认。",
+	risk: "路径穿越",
+	name: "low",
 }
 
 desc(
@@ -311,8 +236,4 @@ func main() {
     http.ListenAndServe(":8080", nil)
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
-
-
-SAFE
 )

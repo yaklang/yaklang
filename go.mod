@@ -11,7 +11,6 @@ require (
 	github.com/CycloneDX/cyclonedx-go v0.7.2
 	github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49
 	github.com/PuerkitoBio/goquery v1.6.0
-	github.com/alfg/mp4 v0.0.0-20210728035756-55ea58c08aeb
 	github.com/aliyun/aliyun-oss-go-sdk v2.2.7+incompatible
 	github.com/andybalholm/brotli v1.0.6
 	github.com/antchfx/xmlquery v1.3.1
@@ -22,6 +21,7 @@ require (
 	github.com/bcicen/jstream v0.0.0-20190220045926-16c1f8af81c2
 	github.com/beevik/etree v1.5.0
 	github.com/bytedance/mockey v1.2.14
+	github.com/chzyer/readline v1.5.1
 	github.com/cloudflare/circl v1.3.7
 	github.com/corpix/uarand v0.2.0
 	github.com/dave/jennifer v1.4.1
@@ -31,7 +31,6 @@ require (
 	github.com/denisenkom/go-mssqldb v0.12.3
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13
-	github.com/disintegration/imaging v1.6.2
 	github.com/dlclark/regexp2 v1.11.0
 	github.com/docker/docker v25.0.6+incompatible
 	github.com/docker/go-connections v0.4.0
@@ -45,7 +44,7 @@ require (
 	github.com/go-git/go-git/v5 v5.13.0
 	github.com/go-ldap/ldap v3.0.3+incompatible
 	github.com/go-pg/pg/v10 v10.14.0
-	github.com/go-rod/rod v0.112.9
+	github.com/go-rod/rod v0.116.2
 	github.com/go-sql-driver/mysql v1.5.0
 	github.com/go-viper/mapstructure/v2 v2.2.1
 	github.com/gobwas/glob v0.2.3
@@ -121,11 +120,12 @@ require (
 	github.com/yaklang/fastgocaptcha v1.0.4
 	github.com/yaklang/pcap v1.0.5
 	github.com/ysmood/gson v0.7.3
-	github.com/ysmood/leakless v0.8.0
+	github.com/ysmood/leakless v0.9.0
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.33.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
+	golang.org/x/image v0.18.0
 	golang.org/x/mod v0.19.0
 	golang.org/x/net v0.35.0
 	golang.org/x/sys v0.36.0
@@ -235,8 +235,9 @@ require (
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
-	github.com/ysmood/fetchup v0.2.2 // indirect
+	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
+	github.com/ysmood/got v0.40.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.47.0 // indirect
@@ -246,7 +247,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.34.0 // indirect
 	go.uber.org/mock v0.4.0 // indirect
 	golang.org/x/arch v0.11.0 // indirect
-	golang.org/x/image v0.18.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241015192408-796eee8c2d53 // indirect

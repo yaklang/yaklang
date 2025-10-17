@@ -6,32 +6,27 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 加密算法的安全性高度依赖于密钥的强度，而密钥长度是决定密钥强度最重要的因素之一。对于RSA等非对称加密算法而言，密钥长度不足会导致攻击者通过暴力破解或查表攻击等方式，在合理的时间内计算出私钥，从而解密敏感数据或伪造签名。
-
 2. **触发场景**
 当Java代码使用 `java.security.spec.RSAKeyGenParameterSpec` 类生成RSA密钥时，如果在初始化 `KeyPairGenerator` 时指定的密钥长度小于当前推荐的安全长度（通常为2048位），就会触发此规则。这通常出现在开发者对加密安全缺乏充分了解或出于性能考虑的情况下。
-
 ```java
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.RSAKeyGenParameterSpec;
 import java.math.BigInteger;
-
 public class InsecureRSAKeyGeneration {
-    public static void main(String[] args) throws Exception {
-        // 使用1024位的密钥长度生成RSA密钥对 (不安全)
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        RSAKeyGenParameterSpec spec = new RSAKeyGenParameterSpec(1024, BigInteger.valueOf(65537)); // 触发告警
-        keyPairGenerator.initialize(spec);
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
-        // ...
-    }
+public static void main(String[] args) throws Exception {
+// 使用1024位的密钥长度生成RSA密钥对 (不安全)
+KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+RSAKeyGenParameterSpec spec = new RSAKeyGenParameterSpec(1024, BigInteger.valueOf(65537)); // 触发告警
+keyPairGenerator.initialize(spec);
+KeyPair keyPair = keyPairGenerator.generateKeyPair();
+// ...
+}
 }
 ```
-
 3. **潜在影响**
 使用弱密钥长度进行加密的数据面临被破解的风险。这可能导致：
 - 敏感数据被泄露（如用户密码、金融信息、商业机密）。
@@ -41,32 +36,27 @@ DESC
 	rule_id: "238e7158-0746-4178-9d00-36ff473eeafd"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **增加密钥长度**
 根据当前的密码学标准和安全建议，使用RSA算法时，密钥长度至少应为2048位。对于长期存储或需要更高安全性的数据，建议使用3072位或更高的密钥长度。
-
 ```java
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.RSAKeyGenParameterSpec;
 import java.math.BigInteger;
-
 public class SecureRSAKeyGeneration {
-    public static void main(String[] args) throws Exception {
-        // 使用2048位的密钥长度生成RSA密钥对 (安全)
-        KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
-        RSAKeyGenParameterSpec spec = new RSAKeyGenParameterSpec(2048, BigInteger.valueOf(65537)); // 修复方法：使用2048或更高的密钥长度
-        keyPairGenerator.initialize(spec);
-        KeyPair keyPair = keyPairGenerator.generateKeyPair();
-        // ...
-    }
+public static void main(String[] args) throws Exception {
+// 使用2048位的密钥长度生成RSA密钥对 (安全)
+KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+RSAKeyGenParameterSpec spec = new RSAKeyGenParameterSpec(2048, BigInteger.valueOf(65537)); // 修复方法：使用2048或更高的密钥长度
+keyPairGenerator.initialize(spec);
+KeyPair keyPair = keyPairGenerator.generateKeyPair();
+// ...
+}
 }
 ```
-
 2. **查阅最新密码学指南**
 定期查阅国家密码管理局官网的核心密码学标准，了解不同算法、不同安全级别所需的推荐密钥长度，并根据应用场景选择合适的密钥长度。
-
 3. **考虑使用更强的算法**
 对于需要更高性能或安全性的场景，可以考虑使用椭圆曲线密码学（ECC）等算法，其在相同的安全级别下通常使用更短的密钥长度。同时确保使用的ECC曲线也是安全的。
 SOLUTION
@@ -86,6 +76,63 @@ alert $risk for {
 	title_zh: "检测Java弱加密 - 密钥长度不足",
 	level: "low",
 	message: "发现Java代码中使用不足2048位的RSA密钥长度",
+	solution: <<<SOLUTION
+### 修复建议
+1. **增加密钥长度**
+根据当前的密码学标准和安全建议，使用RSA算法时，密钥长度至少应为2048位。对于长期存储或需要更高安全性的数据，建议使用3072位或更高的密钥长度。
+```java
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.RSAKeyGenParameterSpec;
+import java.math.BigInteger;
+public class SecureRSAKeyGeneration {
+public static void main(String[] args) throws Exception {
+// 使用2048位的密钥长度生成RSA密钥对 (安全)
+KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+RSAKeyGenParameterSpec spec = new RSAKeyGenParameterSpec(2048, BigInteger.valueOf(65537)); // 修复方法：使用2048或更高的密钥长度
+keyPairGenerator.initialize(spec);
+KeyPair keyPair = keyPairGenerator.generateKeyPair();
+// ...
+}
+}
+```
+2. **查阅最新密码学指南**
+定期查阅国家密码管理局官网的核心密码学标准，了解不同算法、不同安全级别所需的推荐密钥长度，并根据应用场景选择合适的密钥长度。
+3. **考虑使用更强的算法**
+对于需要更高性能或安全性的场景，可以考虑使用椭圆曲线密码学（ECC）等算法，其在相同的安全级别下通常使用更短的密钥长度。同时确保使用的ECC曲线也是安全的。
+SOLUTION
+	risk: "弱加密",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+加密算法的安全性高度依赖于密钥的强度，而密钥长度是决定密钥强度最重要的因素之一。对于RSA等非对称加密算法而言，密钥长度不足会导致攻击者通过暴力破解或查表攻击等方式，在合理的时间内计算出私钥，从而解密敏感数据或伪造签名。
+2. **触发场景**
+当Java代码使用 `java.security.spec.RSAKeyGenParameterSpec` 类生成RSA密钥时，如果在初始化 `KeyPairGenerator` 时指定的密钥长度小于当前推荐的安全长度（通常为2048位），就会触发此规则。这通常出现在开发者对加密安全缺乏充分了解或出于性能考虑的情况下。
+```java
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.NoSuchAlgorithmException;
+import java.security.spec.RSAKeyGenParameterSpec;
+import java.math.BigInteger;
+public class InsecureRSAKeyGeneration {
+public static void main(String[] args) throws Exception {
+// 使用1024位的密钥长度生成RSA密钥对 (不安全)
+KeyPairGenerator keyPairGenerator = KeyPairGenerator.getInstance("RSA");
+RSAKeyGenParameterSpec spec = new RSAKeyGenParameterSpec(1024, BigInteger.valueOf(65537)); // 触发告警
+keyPairGenerator.initialize(spec);
+KeyPair keyPair = keyPairGenerator.generateKeyPair();
+// ...
+}
+}
+```
+3. **潜在影响**
+使用弱密钥长度进行加密的数据面临被破解的风险。这可能导致：
+- 敏感数据被泄露（如用户密码、金融信息、商业机密）。
+- 数字签名被伪造，从而影响数据完整性和身份认证。
+- 传输层安全（TLS/SSL）连接被降级或破解，导致中间人攻击。
+DESC
+	name: "risk",
 }
 
 desc(

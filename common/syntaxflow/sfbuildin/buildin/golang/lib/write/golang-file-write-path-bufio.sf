@@ -1,0 +1,331 @@
+desc(
+	title: "Audit Golang File Write With Bufio"
+	type: audit
+	level: info
+	lib: 'golang-file-write-path-bufio'
+	desc: <<<DESC
+### 规则描述
+
+1. **规则目的**
+   该规则用于审计Golang代码中通过`bufio.NewWriter`方法执行文件写入操作的场景。重点检查是否存在潜在路径穿越（Path Traversal）漏洞，例如用户输入未经过适当验证或过滤直接被用作文件路径的一部分。此类漏洞可能导致攻击者绕过预期目录访问或修改敏感文件。
+
+2. **触发场景**
+   当开发人员在代码中使用`bufio.NewWriter`及其相关方法（如`WriteString`）时，如果目标路径来源于用户输入且未经过充分净化，则可能触发此规则警报。
+
+   示例代码：
+   ```go
+   package main
+   import (
+       "bufio"
+       "fmt"
+       "os"
+   )
+
+   func main() {
+       userInput := "../../etc/passwd" // 模拟恶意用户输入
+       file, err := os.Create(userInput)
+       if err != nil {
+           fmt.Println("Error creating file:", err)
+           return
+       }
+       defer file.Close()
+
+       writer := bufio.NewWriter(file)
+       _, err = writer.WriteString("Malicious Content")
+       if err != nil {
+           fmt.Println("Error writing to file:", err)
+           return
+       }
+       writer.Flush()
+   }
+   ```
+
+3. **潜在影响**
+   - 攻击者可以通过路径穿越利用技术访问系统关键文件（如`/etc/passwd`），窃取敏感数据。
+   - 可能导致未经授权的数据修改或删除。
+   - 在极端情况下，甚至可以完全控制服务器。
+
+4. **规则详细**
+   - 核心检测点为`bufio.NewWriter`方法的调用。
+   - 如果输出路径由用户输入派生，则会发出警告。
+   - 提供安全替代方案示例，建议避免使用易受攻击的方法。
+DESC
+	rule_id: "58ce930c-65fc-4045-b511-904bcddeb4ed"
+	title_zh: "审计Golang使用bufio进行文件写入的代码"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 输入验证与清理
+确保所有用户输入都经过严格的验证和清理，以防止路径穿越攻击。例如，拒绝包含`../`或其他特殊字符的输入。
+```go
+func sanitizePath(input string) (string, error) {
+    if strings.Contains(input, "../") || strings.HasPrefix(input, "/") {
+        return "", fmt.Errorf("invalid path: potential path traversal detected")
+    }
+    return input, nil
+}
+```
+
+#### 2. 使用绝对路径
+尽量使用绝对路径而非相对路径，并限制文件操作只能在指定的安全目录内完成。
+```go
+const baseDir = "/var/safe/directory/"
+
+func createFilePath(filename string) (string, error) {
+    fullPath := filepath.Join(baseDir, filename)
+    if !strings.HasPrefix(fullPath, baseDir) {
+        return "", fmt.Errorf("path traversal attempt detected")
+    }
+    return fullPath, nil
+}
+```
+
+#### 3. 避免危险API
+尽量避免使用容易引发问题的API（如`bufio.NewWriter`）。改用更安全的方法，例如`ioutil.WriteFile`或`os.WriteFile`。
+```go
+err := ioutil.WriteFile("safe_file.txt", []byte("Safe content"), 0644)
+if err != nil {
+    log.Fatalf("Failed to write file: %v", err)
+}
+```
+
+#### 4. 最小权限原则
+运行程序时遵循最小权限原则，仅授予必要的文件操作权限，从而减少潜在损害。
+
+#### 5. 采用现代框架
+考虑使用支持自动输入验证和参数化处理的现代框架，进一步降低风险。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+)
+
+bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
+$entry.NewWriter(* #-> as $output);
+
+alert $output for {
+	title: "Audit Golang File Write With Bufio",
+	title_zh: "审计Golang使用bufio进行文件写入的代码",
+	level: "info",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+
+func main() {
+    // 写入文件
+    writeToFile("example.txt", []string{"Hello, World!", "Welcome to Go programming.", "This is a buffered I/O example."})
+
+    // 读取文件
+    readFromFile("example.txt")
+}
+
+// writeToFile 使用 bufio 写入文本到文件
+func writeToFile(filename string, lines []string) {
+    // 创建或打开文件
+    file, err := os.Create(filename)
+    if err != nil {
+        fmt.Println("Error creating file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的写入器
+    writer := bufio.NewWriter(file)
+
+    // 写入每一行
+    for _, line := range lines {
+        _, err := writer.WriteString(line + "\n")
+        if err != nil {
+            fmt.Println("Error writing to file:", err)
+            return
+        }
+    }
+
+    // 确保所有缓冲的数据都写入文件
+    if err := writer.Flush(); err != nil {
+        fmt.Println("Error flushing to file:", err)
+        return
+    }
+
+    fmt.Println("Data written to", filename)
+}
+
+// readFromFile 使用 bufio 逐行读取文件
+func readFromFile(filename string) {
+    // 打开文件
+    file, err := os.Open(filename)
+    if err != nil {
+        fmt.Println("Error opening file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的读取器
+    reader := bufio.NewReader(file)
+
+    // 逐行读取文件
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil {
+            break // EOF 或其他错误
+        }
+        fmt.Print(line) // 打印读取的行
+    }
+
+    if err != nil && err.Error() != "EOF" {
+        fmt.Println("Error reading file:", err)
+        return
+    }
+}
+PARAM
+	"safefile://SafeFileWriteExample.go": <<<CODE
+package main
+
+import (
+    "fmt"
+    "io/ioutil"
+    "os"
+    "path/filepath"
+)
+
+// main函数仅为示例，实际编写中可能不会直接执行文件操作
+func main() {
+    // 示例：使用ioutil.WriteFile进行简单文件写入
+    safeWriteUsingIOUtil("safe_example_ioutil.txt", []byte("This is a safe write with ioutil."))
+
+    // 示例：使用os.WriteFile进行文件写入，不涉及bufio.NewWriter
+    safeWriteUsingOSWriteFile("safe_example_os.txt", []byte("This is another safe write with os.WriteFile."))
+
+    // 示例：创建目录或文件时，不使用用户输入直接作为路径
+    safeDirCreation("safe_dir")
+
+    // 示例：使用Path Traversal防御，但该规则不检测Taint Flow，仅检测bufio.NewWriter，
+    // 所以只要不使用bufio.NewWriter就是安全的
+    // safeWriteWithInputValidation("validated_file.txt", "../user_input_path.txt", []byte("Some data"))
+}
+
+// safeWriteUsingIOUtil 使用 ioutil.WriteFile 进行文件写入，不使用 bufio.NewWriter。
+// 这避开了规则对 bufio.NewWriter 的直接检测。
+func safeWriteUsingIOUtil(filename string, data []byte) {
+    err := ioutil.WriteFile(filename, data, 0644)
+    if err != nil {
+        fmt.Printf("Error writing file %s with ioutil: %v\n", filename, err)
+        return
+    }
+    fmt.Printf("Successfully wrote to %s using ioutil.WriteFile\n", filename)
+}
+
+// safeWriteUsingOSWriteFile 使用 os.WriteFile 进行文件写入，不使用 bufio.NewWriter。
+// 同样避开了规则的直接检测点。
+func safeWriteUsingOSWriteFile(filename string, data []byte) {
+    err := os.WriteFile(filename, data, 0644)
+    if err != nil {
+        fmt.Printf("Error writing file %s with os.WriteFile: %v\n", filename, err)
+        return
+    }
+    fmt.Printf("Successfully wrote to %s using os.WriteFile\n", filename)
+}
+
+// safeDirCreation 演示了安全的目录创建，不涉及文件内容写入，且不使用 bufio。NewWriter。
+func safeDirCreation(dirName string) {
+    err := os.MkdirAll(filepath.Join("./", dirName), 0755)
+    if err != nil {
+        fmt.Printf("Error creating directory %s: %v\n", dirName, err)
+        return
+    }
+    fmt.Printf("Successfully created directory %s\n", dirName)
+}
+
+// 这里故意不提供带有输入验证的bufio写入函数，因为规则的核心是检测bufio.NewWriter而非路径。
+// 如果规则检测的是路径污染，则此函数会是正向或反向测试的重点。
+// func safeWriteWithInputValidation(baseDir, userInputFilename string, data []byte) {
+// 	cleanedFilename := filepath.Clean(userInputFilename)
+// 	if strings.HasPrefix(cleanedFilename, "..") || strings.HasPrefix(cleanedFilename, "/") {
+// 		fmt.Println("Path traversal attempt detected!")
+// 		return
+// 	}
+// 
+// 	fullPath := filepath.Join(baseDir, cleanedFilename)
+// 	file, err := os.Create(fullPath)
+// 	if err != nil {
+// 		fmt.Printf("Error creating file: %v\n", err)
+// 		return
+// 	}
+// 	defer file.Close()
+// 
+// 	writer := bufio.NewWriter(file) // 即使有验证，只要用了NewWriter，仍会被本规则命中
+// 	_, err = writer.Write(data)
+// 	if err != nil {
+// 		fmt.Printf("Error writing data: %v\n", err)
+// 		return
+// 	}
+// 	writer.Flush()
+// 	fmt.Printf("Successfully wrote to %s\n", fullPath)
+// }
+CODE
+	"safefile://FileOperationsWithoutBufio.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	// 示例：直接使用 os.File 的 Write 方法
+	writeDirectlyToFile("direct_write.txt", []byte("This is a direct write without bufio.NewWriter."))
+
+	// 示例：使用 os.Create 和 io.Copy 但不涉及 bufio
+	copyContentToFile("copy_target.txt")
+}
+
+// writeDirectlyToFile 直接使用 os.File 的 Write 方法进行文件写入。
+// 这避开了规则对 bufio.NewWriter 的检测。
+func writeDirectlyToFile(filename string, data []byte) {
+	file, err := os.Create(filename)
+	if err != nil {
+		fmt.Printf("Error creating file %s: %v\n", filename, err)
+		return
+	}
+	defer file.Close()
+
+	_, err = file.Write(data)
+	if err != nil {
+		fmt.Printf("Error writing to file %s directly: %v\n", filename, err)
+		return
+	}
+	fmt.Printf("Successfully wrote to %s directly with os.File.Write\n", filename)
+}
+
+// copyContentToFile 演示了如何将一些内容复制到文件，但核心操作不是通过 bufio.NewWriter 完成。
+// 而是直接通过 os.File 写，或者通过其他不使用 bufio 的库。
+// 这里的重点是规避 bufio.NewWriter 的使用。
+func copyContentToFile(filename string) {
+    file, err := os.Create(filename)
+    if err != nil {
+        fmt.Printf("Error creating file %s for copy: %v\n", filename, err)
+        return
+    }
+    defer file.Close()
+
+    sampleContent := []byte("This content is copied using standard file operations, not buffered in the problematic way.")
+    _, err = file.Write(sampleContent)
+    if err != nil {
+        fmt.Printf("Error writing sample content to %s: %v\n", filename, err)
+        return
+    }
+    fmt.Printf("Successfully copied content to %s without bufio.NewWriter\n", filename)
+}
+
+CODE
+)

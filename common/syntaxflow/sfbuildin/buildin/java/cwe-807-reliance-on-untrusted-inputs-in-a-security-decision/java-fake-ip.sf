@@ -1,0 +1,173 @@
+desc(
+	title_zh: "检测Java中通过不可信请求头导致的IP伪造漏洞"
+	title: "Detect Java IP Spoofing Vulnerability via Untrusted Headers"
+	type: vuln
+	level: middle
+	fix_zh: "建议在获取客户端真实 IP 时，结合服务器端获取的远程地址进行比对，并在可信任的反向代理或负载均衡器处统一设置真实 IP 信息，防止攻击者直接伪造请求头。",
+	fix: <<<FIX
+修复建议：
+1. 不要直接信任 `X-Real-IP` 和 `X-Forwarded-For` 请求头的值。
+2. 在获取客户端 IP 时，优先使用服务器端的 `request.getRemoteAddr()`。
+3. 仅在已知可信的反向代理或负载均衡器后，才解析并信任相关请求头。
+4. 对 IP 地址进行格式和来源的严格验证。
+FIX
+	rule_id: "eece5652-e36e-413a-a657-abdd4ae55bbd"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   应用程序在进行安全决策时，直接信任来自客户端的某些HTTP请求头（如`X-Real-IP`或`X-Forwarded-For`）来判断用户的真实IP地址，而未进行严格的验证。攻击者可以伪造这些请求头，从而欺骗服务器识别错误的IP地址。这种行为可能导致访问控制绕过、日志记录错误甚至安全策略失效。
+
+2. **触发场景**
+   下面是一个存在漏洞的代码示例：
+   ```java
+   String clientIp = request.getHeader("X-Forwarded-For");
+   if (clientIp == null) {
+       clientIp = request.getRemoteAddr();
+   }
+   // 使用clientIp进行安全决策
+   if (isTrustedIp(clientIp)) {
+       allowAccess();
+   } else {
+       denyAccess();
+   }
+   ```
+   攻击者可以通过在HTTP请求中添加伪造的`X-Forwarded-For`字段，例如设置为可信的IP地址（如`192.168.1.1`），从而绕过访问限制。
+
+3. **潜在影响**
+   - 绕过基于IP的访问控制策略，例如白名单或黑名单。
+   - 错误的日志记录导致无法追踪真实攻击来源。
+   - 安全策略失效，进一步可能被用于提权或横向移动。
+
+DESC
+	reference: <<<REFERENCE
+[CWE-807](https://cwe.mitre.org/data/definitions/807.html)
+[OWASP: Unvalidated Input](https://owasp.org/www-community/vulnerabilities/Unvalidated_Input)
+REFERENCE
+)
+
+<include('java-spring-mvc-param')> as $entry;
+<include('java-servlet-param')> as $entry;
+
+HttpServletRequest?{opcode: param}?{<typeName>?{have: 'javax.servlet.http.HttpServletRequest'}} as $req
+/(do(Get|Post|Delete|Filter|[A-Z]\w+))|(service)/<getFormalParams>?{!have: this && opcode: param} as $req;
+
+$req.getHeader(, * as $headerKey)
+$headerKey ?{have: "X-Real-IP" || have: "X-Forwarded-For"} as $fakeIp
+
+alert $fakeIp for {
+	level: "middle",
+	name: "fakeIp",
+	title: "Java IP Spoofing Vulnerability Was Detected",
+	title_zh: "检测到Java IP伪造漏洞",
+	message: "检测到代码直接获取 `X-Real-IP` 或 `X-Forwarded-For` 请求头，可能导致 IP 伪造漏洞。",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 不要直接信任请求头中的值
+不要直接使用 `X-Real-IP` 和 `X-Forwarded-For` 请求头的值作为客户端的真实 IP。
+
+```java
+// 示例：优先使用服务器端的远程地址
+String clientIp = request.getRemoteAddr();
+```
+
+#### 2. 校验可信反向代理或负载均衡器
+仅在已知可信的反向代理或负载均衡器后，解析并信任相关请求头的值。例如：
+
+```java
+// 配置可信代理列表
+List<String> trustedProxies = Arrays.asList("192.168.1.1", "10.0.0.1");
+
+// 获取真实 IP
+String ip = request.getHeader("X-Forwarded-For");
+if (ip != null && trustedProxies.contains(request.getRemoteAddr())) {
+    clientIp = ip.split(",")[0].trim(); // 取第一个非代理 IP
+} else {
+    clientIp = request.getRemoteAddr();
+}
+```
+
+#### 3. 对 IP 地址进行格式验证
+确保解析出的 IP 地址符合标准 IPv4 或 IPv6 格式，并拒绝非法输入。
+
+```java
+// 示例：校验 IP 格式
+public boolean isValidIpAddress(String ip) {
+    try {
+        return InetAddress.getByName(ip) != null;
+    } catch (UnknownHostException e) {
+        return false;
+    }
+}
+```
+
+通过以上措施，可以有效防止攻击者利用伪造的请求头实现 IP 欺骗，从而保障系统的安全性。
+SOLUTION
+	risk: "IP伪造",
+}
+
+desc(
+	lang:java
+	alert_num:1
+	"file://demo.java":<<<CODE
+    package org.joychou.controller;
+
+    import org.apache.commons.lang.StringUtils;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.ResponseBody;
+    import org.springframework.web.bind.annotation.RestController;
+
+    import javax.servlet.http.HttpServletRequest;
+
+
+    @RestController
+    @RequestMapping("/ip")
+    public class IPForge {
+
+        @RequestMapping("/noproxy")
+        public static String noProxy(HttpServletRequest request) {
+            return request.getRemoteAddr();
+        }
+
+
+        @RequestMapping("/proxy")
+        @ResponseBody
+        public static String proxy(HttpServletRequest request) {
+            String ip = request.getHeader("X-Real-IP");
+            if (StringUtils.isNotBlank(ip)) {
+                return ip;
+            } else {
+                String remoteAddr = request.getRemoteAddr();
+                if (StringUtils.isNotBlank(remoteAddr)) {
+                    return remoteAddr;
+                }
+            }
+            return "";
+        }
+    }
+CODE
+	"safefile://demo2.java":<<<CODE
+     package org.joychou.controller;
+
+        import org.apache.commons.lang.StringUtils;
+        import org.springframework.web.bind.annotation.RequestMapping;
+        import org.springframework.web.bind.annotation.ResponseBody;
+        import org.springframework.web.bind.annotation.RestController;
+
+        import javax.servlet.http.HttpServletRequest;
+
+
+        @RestController
+        @RequestMapping("/ip")
+        public class IPForge {
+
+            @RequestMapping("/noproxy")
+            public static String noProxy(HttpServletRequest request) {
+                return request.getRemoteAddr();
+            }
+
+
+
+CODE
+)

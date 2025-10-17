@@ -3,14 +3,15 @@ package information
 import (
 	"encoding/json"
 	"fmt"
+	"math"
+	"strconv"
+	"strings"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/cve/cveresources"
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"math"
-	"strconv"
-	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/cli"
@@ -152,6 +153,9 @@ func newCliParameter(name, typ, methodTyp string) *CliParameter {
 }
 
 func ParseCliParameter(prog *ssaapi.Program) ([]*CliParameter, []*UIInfo, []string) {
+	if prog == nil {
+		return nil, nil, nil
+	}
 	// prog.Show()
 	params := make([]*CliParameter, 0)
 	uiInfos := make([]*UIInfo, 0)

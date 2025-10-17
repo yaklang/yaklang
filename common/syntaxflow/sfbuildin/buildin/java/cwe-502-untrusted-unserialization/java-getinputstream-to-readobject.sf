@@ -6,164 +6,140 @@ desc(
 	risk: '反序列化漏洞',
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java原生反序列化漏洞是指应用程序使用`java.io.ObjectInputStream`的`readObject()`方法从不受信任的数据源（如用户输入、网络连接、文件等）反序列化对象时，攻击者可以通过构造恶意的序列化字节流，在目标Java虚拟机中执行任意代码或指令。
-   这是因为反序列化过程中，`readObject()`方法可能会动态地调用被反序列化对象的特定魔术方法（如`readObject`、`readResolve`、`finalize`等）来实现对象状态的恢复或自定义逻辑。如果这些魔术方法存在可利用的逻辑（例如执行系统命令、文件操作、数据库连接等），并且相关的依赖库（ gadgets）在应用的classpath中，攻击者就可以链式触发这些方法，最终实现恶意代码执行。
-
+Java原生反序列化漏洞是指应用程序使用`java.io.ObjectInputStream`的`readObject()`方法从不受信任的数据源（如用户输入、网络连接、文件等）反序列化对象时，攻击者可以通过构造恶意的序列化字节流，在目标Java虚拟机中执行任意代码或指令。
+这是因为反序列化过程中，`readObject()`方法可能会动态地调用被反序列化对象的特定魔术方法（如`readObject`、`readResolve`、`finalize`等）来实现对象状态的恢复或自定义逻辑。如果这些魔术方法存在可利用的逻辑（例如执行系统命令、文件操作、数据库连接等），并且相关的依赖库（gadgets）在应用的classpath中，攻击者就可以链式触发这些方法，最终实现恶意代码执行。
 2. **触发场景**
-   该漏洞通常在以下场景中出现：
-   - 应用程序接收并反序列化来自网络请求（如HTTP POST请求体、TCP连接）的序列化数据，且未对来源进行充分信任或对数据进行校验。
-   - 应用程序从文件、数据库等存储介质读取序列化对象，而这些介质的数据内容可能被外部控制或篡改。
-   - 使用了基于原生反序列化的中间件、框架或协议（如RMI、JMS、某些RPC框架），且服务端口对外暴露或处理包含恶意序列化数据的请求。
-
-   **示例代码（SpringMVC）:**
-   ```java
-   import org.springframework.web.bind.annotation.PostMapping;
-   import org.springframework.web.bind.annotation.RequestBody;
-   import org.springframework.web.bind.annotation.RestController;
-   import java.io.*;
-
-   @RestController
-   public class VulnerableController {
-
-       @PostMapping("/deserialize")
-       public String deserializeObject(@RequestBody byte[] data) { // 直接接收并处理用户提供的序列化数据
-           try {
-               ByteArrayInputStream bis = new ByteArrayInputStream(data);
-               ObjectInputStream ois = new ObjectInputStream(bis);
-               Object obj = ois.readObject(); // 存在漏洞点
-               ois.close();
-               return "Deserialization successful: " + obj.toString();
-           } catch (IOException | ClassNotFoundException e) {
-               e.printStackTrace();
-               return "Error during deserialization: " + e.getMessage();
-           }
-       }
-   }
-   ```
-   **示例代码（Servlet）:**
-   ```java
-   import javax.servlet.ServletException;
-   import javax.servlet.annotation.WebServlet;
-   import javax.servlet.http.HttpServlet;
-   import javax.servlet.http.HttpServletRequest;
-   import javax.servlet.http.HttpServletResponse;
-   import java.io.*;
-
-   @WebServlet("/vulnerable")
-   public class VulnerableServlet extends HttpServlet {
-
-       protected void doPost(HttpServletRequest request, HttpServletResponse response)
-               throws ServletException, IOException {
-           try {
-               ObjectInputStream ois = new ObjectInputStream(request.getInputStream()); // 直接从请求输入流反序列化
-               Object obj = ois.readObject(); // 存在漏洞点
-               ois.close();
-               response.getWriter().println("Deserialization successful: " + obj.toString());
-           } catch (ClassNotFoundException e) {
-               e.printStackTrace();
-               response.getWriter().println("Error during deserialization: " + e.getMessage());
-           }
-       }
-   }
-   ```
-   该规则主要检测将用户输入流直接传给`ObjectInputStream`或者直接调用`ObjectInputStream.readObject()`的地方。
-
+该漏洞通常在以下场景中出现：
+- 应用程序接收并反序列化来自网络请求（如HTTP POST请求体、TCP连接）的序列化数据，且未对来源进行充分信任或对数据进行校验。
+- 应用程序从文件、数据库等存储介质读取序列化对象，而这些介质的数据内容可能被外部控制或篡改。
+- 使用了基于原生反序列化的中间件、框架或协议（如RMI、JMS、某些RPC框架），且服务端口对外暴露或处理包含恶意序列化数据的请求。
+**示例代码（SpringMVC）:**
+```java
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import java.io.*;
+@RestController
+public class VulnerableController {
+@PostMapping("/deserialize")
+public String deserializeObject(@RequestBody byte[] data) { // 直接接收并处理用户提供的序列化数据
+try {
+ByteArrayInputStream bis = new ByteArrayInputStream(data);
+ObjectInputStream ois = new ObjectInputStream(bis);
+Object obj = ois.readObject(); // 存在漏洞点
+ois.close();
+return "Deserialization successful: " + obj.toString();
+} catch (IOException | ClassNotFoundException e) {
+e.printStackTrace();
+return "Error during deserialization: " + e.getMessage();
+}
+}
+}
+```
+**示例代码（Servlet）:**
+```java
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+@WebServlet("/vulnerable")
+public class VulnerableServlet extends HttpServlet {
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws ServletException, IOException {
+try {
+ObjectInputStream ois = new ObjectInputStream(request.getInputStream()); // 直接从请求输入流反序列化
+Object obj = ois.readObject(); // 存在漏洞点
+ois.close();
+response.getWriter().println("Deserialization successful: " + obj.toString());
+} catch (ClassNotFoundException e) {
+e.printStackTrace();
+response.getWriter().println("Error during deserialization: " + e.getMessage());
+}
+}
+}
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**：攻击者能够在服务器上执行任意操作系统命令或代码，这是最严重的影响，可能导致服务器被完全控制。
-   - **敏感数据泄露**：攻击者可能触发反序列化过程中的特定逻辑，导致读取服务器上的敏感文件或访问敏感数据。
-   - **拒绝服务 (DoS)**：构造恶意序列化数据可能导致反序列化过程无限循环或消耗大量资源，使应用程序崩溃或停止响应。
-   - **应用逻辑绕过**：攻击者可能通过构造特定对象绕过应用程序的安全检查或业务逻辑。
+- **远程代码执行 (RCE)**：攻击者能够在服务器上执行任意操作系统命令或代码，这是最严重的影响，可能导致服务器被完全控制。
+- **敏感数据泄露**：攻击者可能触发反序列化过程中的特定逻辑，导致读取服务器上的敏感文件或访问敏感数据。
+- **拒绝服务 (DoS)**：构造恶意序列化数据可能导致反序列化过程无限循环或消耗大量资源，使应用程序崩溃或停止响应。
+- **应用逻辑绕过**：攻击者可能通过构造特定对象绕过应用程序的安全检查或业务逻辑。
 DESC
 	rule_id: "faa71bd7-8156-4997-b0c3-aa53f6b71d5a"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免从不受信任的源进行原生反序列化**
-   如果可能，尽量避免使用`ObjectInputStream.readObject()`处理来自外部或不可信源的数据。原生Java序列化机制设计初衷是为了方便进程内或受信任环境下的对象传输，而非用于跨网络或不可信边界的数据交换。
-
+如果可能，尽量避免使用`ObjectInputStream.readObject()`处理来自外部或不可信源的数据。原生Java序列化机制设计初衷是为了方便进程内或受信任环境下的对象传输，而非用于跨网络或不可信边界的数据交换。
 2. **使用安全的序列化/反序列化库**
-   考虑使用更安全的、不基于JVM原生对象的序列化协议或库，例如：
-   - **JSON** (Jackson, Gson)
-   - **XML** (JAXB)
-   - **Protocol Buffers**
-   - **Apache Avro**
-   - **MessagePack**
-   这些格式通常不包含可执行的代码或复杂的对象图，大大降低了反序列化攻击的风险。
-
-   **示例：使用Jackson进行JSON反序列化（安全）**
-   ```java
-   import com.fasterxml.jackson.databind.ObjectMapper;
-
-   // ... 获取用户输入的JSON字符串
-   String jsonInput = "{\"name\":\"Test\", \"age\":30}";
-
-   ObjectMapper mapper = new ObjectMapper();
-   // 直接将JSON字符串反序列化为POJO对象，不会触发任意代码执行
-   YourObject obj = mapper.readValue(jsonInput, YourObject.class);
-   ```
-
+考虑使用更安全的、不基于JVM原生对象的序列化协议或库，例如：
+- **JSON** (Jackson, Gson)
+- **XML** (JAXB)
+- **Protocol Buffers**
+- **Apache Avro**
+- **MessagePack**
+这些格式通常不包含可执行的代码或复杂的对象图，大大降低了反序列化攻击的风险。
+**示例：使用Jackson进行JSON反序列化（安全）**
+```java
+import com.fasterxml.jackson.databind.ObjectMapper;
+// ... 获取用户输入的JSON字符串
+String jsonInput = "{\"name\":\"Test\", \"age\":30}";
+ObjectMapper mapper = new ObjectMapper();
+// 直接将JSON字符串反序列化为POJO对象，不会触发任意代码执行
+YourObject obj = mapper.readValue(jsonInput, YourObject.class);
+```
 3. **实现白名单或黑名单过滤**
-   如果必须使用原生反序列化，可以通过重写`ObjectInputStream.resolveClass()`方法，仅允许反序列化特定安全类，或者通过设置序列化过滤器（Java 9+）来实现白名单或黑名单控制可反序列化的类。
-
-   **示例：使用白名单过滤（Java 9+）**
-   ```java
-   import java.io.ObjectInputStream;
-   import java.io.InputStream;
-   import java.io.ObjectInputFilter;
-   import java.util.Set;
-
-   public class SecureObjectInputStream extends ObjectInputStream {
-
-       private static final Set<String> ALLOWED_CLASSES = Set.of("com.example.YourSafeClass", "java.lang.String", "java.util.Date"); // 定义允许反序列化的类白名单
-
-       public SecureObjectInputStream(InputStream in) throws IOException {
-           super(in);
-           // 设置对象输入过滤器
-           ObjectInputFilter filter = ObjectInputFilter.Config.createFilter("maxdepth=10;maxbytes=10000;java.lang.String;com.example.YourSafeClass");
-           ObjectInputFilter.Config.setObjectInputFilter(this, filter);
-
-           // 或者更细粒度的检查（Java 9+ Filter API）
-           /*setObjectInputFilter((info) -> {
-               Class<?> cl = info.serialClass();
-               if (cl != null) {
-                   String name = cl.getName();
-                   // 检查类名是否在白名单中
-                   if (ALLOWED_CLASSES.contains(name)) {
-                       return ObjectInputFilter.Status.ALLOWED;
-                   }
-                   // 检查数组类型元素是否在白名单中
-                   if (name.startsWith("[") && ALLOWED_CLASSES.contains(name.substring(name.lastIndexOf('[') + 1))) {
-                        return ObjectInputFilter.Status.ALLOWED;
-                   }
-               }
-               System.out.println("Rejected Class: " + cl);
-               return ObjectInputFilter.Status.REJECTED;
-           });*/
-       }
-
-       // Java 8 及以下版本可以通过重写 resolveClass 实现过滤
-       /*@Override
-       protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-           String className = desc.getName();
-           if (!ALLOWED_CLASSES.contains(className)) {
-              throw new InvalidClassException("Unauthorized deserialization attempt", className);
-           }
-           return super.resolveClass(desc);
-       }*/
-   }
-   ```
-   使用时： `ObjectInputStream ois = new SecureObjectInputStream(bis);`
-
+如果必须使用原生反序列化，可以通过重写`ObjectInputStream.resolveClass()`方法，仅允许反序列化特定安全类，或者通过设置序列化过滤器（Java 9+）来实现白名单或黑名单控制可反序列化的类。
+**示例：使用白名单过滤（Java 9+）**
+```java
+import java.io.ObjectInputStream;
+import java.io.InputStream;
+import java.io.ObjectInputFilter;
+import java.util.Set;
+public class SecureObjectInputStream extends ObjectInputStream {
+private static final Set<String> ALLOWED_CLASSES = Set.of("com.example.YourSafeClass", "java.lang.String", "java.util.Date"); // 定义允许反序列化的类白名单
+public SecureObjectInputStream(InputStream in) throws IOException {
+super(in);
+// 设置对象输入过滤器
+ObjectInputFilter filter = ObjectInputFilter.Config.createFilter("maxdepth=10;maxbytes=10000;java.lang.String;com.example.YourSafeClass");
+ObjectInputFilter.Config.setObjectInputFilter(this, filter);
+// 或者更细粒度的检查（Java 9+ Filter API）
+/*setObjectInputFilter((info) -> {
+Class<?> cl = info.serialClass();
+if (cl != null) {
+String name = cl.getName();
+// 检查类名是否在白名单中
+if (ALLOWED_CLASSES.contains(name)) {
+return ObjectInputFilter.Status.ALLOWED;
+}
+// 检查数组类型元素是否在白名单中
+if (name.startsWith("[") && ALLOWED_CLASSES.contains(name.substring(name.lastIndexOf('[') + 1))) {
+return ObjectInputFilter.Status.ALLOWED;
+}
+}
+System.out.println("Rejected Class: " + cl);
+return ObjectInputFilter.Status.REJECTED;
+});*/
+}
+// Java 8 及以下版本可以通过重写 resolveClass 实现过滤
+/*@Override
+protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
+String className = desc.getName();
+if (!ALLOWED_CLASSES.contains(className)) {
+throw new InvalidClassException("Unauthorized deserialization attempt", className);
+}
+return super.resolveClass(desc);
+}*/
+}
+```
+使用时： `ObjectInputStream ois = new SecureObjectInputStream(bis);`
 4. **对输入数据进行完整性检查和验证**
-   即使是原生反序列化，在反序列化之前对输入数据进行签名验证、加密或其他完整性/合法性检查，确保数据来自可信来源且未被篡改。
-
+即使使用原生反序列化，在反序列化之前对输入数据进行签名验证、加密或其他完整性/合法性检查，确保数据来自可信来源且未被篡改。
 5. **限制可用的Gadgets**
-   移除应用程序classpath中不必要的、已知可被利用的库文件，从而减少可供攻击者利用的Gadget链。
-
+移除应用程序classpath中不必要的、已知可被利用的库文件，从而减少可供攻击者利用的Gadget链。
 6. **最小化权限**
-   运行应用程序的服务应具有最小的权限，即使发生RCE，也能限制攻击者对系统的进一步损害。
+运行应用程序的服务应具有最小的权限，即使发生RCE，也能限制攻击者对系统的进一步损害。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-502: Deserialization of Untrusted Data](https://cwe.mitre.org/data/definitions/502.html)
@@ -180,6 +156,118 @@ alert $readObj for {
 	level: "info",
 	message: "发现使用ObjectInputStream的readObject()方法进行反序列化操作，可能存在反序列化漏洞",
 	title: "Check Java Native Deserialization Vulnerability",
+	solution: <<<SOLUTION
+### 修复建议
+1. **避免从不受信任的源进行原生反序列化**
+如果可能，尽量避免使用`ObjectInputStream.readObject()`处理来自外部或不可信源的数据。原生Java序列化机制设计初衷是为了方便进程内或受信任环境下的对象传输，而非用于跨网络或不可信边界的数据交换。
+2. **使用安全的序列化/反序列化库**
+考虑使用更安全的、不基于JVM原生对象的序列化协议或库，例如：
+- **JSON** (Jackson, Gson)
+- **XML** (JAXB)
+- **Protocol Buffers**
+- **Apache Avro**
+- **MessagePack**
+这些格式通常不包含可执行的代码或复杂的对象图，大大降低了反序列化攻击的风险。
+**示例：使用Jackson进行JSON反序列化（安全）**
+```java
+import com.fasterxml.jackson.databind.ObjectMapper;
+// ... 获取用户输入的JSON字符串
+String jsonInput = "{\"name\":\"Test\", \"age\":30}";
+ObjectMapper mapper = new ObjectMapper();
+// 直接将JSON字符串反序列化为POJO对象，不会触发任意代码执行
+YourObject obj = mapper.readValue(jsonInput, YourObject.class);
+```
+3. **实现白名单或黑名单过滤**
+如果必须使用原生反序列化，可以通过重写`ObjectInputStream.resolveClass()`方法，仅允许反序列化特定安全类，或者通过设置序列化过滤器（Java 9+）来实现白名单或黑名单控制可反序列化的类。
+**示例：使用白名单过滤（Java 9+）**
+```java
+import java.io.ObjectInputStream;
+import java.io.InputStream;
+import java.io.ObjectInputFilter;
+import java.util.Set;
+public class SecureObjectInputStream extends ObjectInputStream {
+private static final Set<String> ALLOWED_CLASSES = Set.of("com.example.YourSafeClass", "java.lang.String", "java.util.Date"); // 定义允许反序列化的类白名单
+public SecureObjectInputStream(InputStream in) throws IOException {
+super(in);
+// 设置对象输入过滤器
+ObjectInputFilter filter = ObjectInputFilter.Config.createFilter("maxdepth=10;maxbytes=10000;java.lang.String;com.example.YourSafeClass");
+ObjectInputFilter.Config.setObjectInputFilter(this, filter);
+}
+}
+```
+4. **对输入数据进行完整性检查和验证**
+即使是原生反序列化，在反序列化之前对输入数据进行签名验证、加密或其他完整性/合法性检查，确保数据来自可信来源且未被篡改。
+5. **限制可用的Gadgets**
+移除应用程序classpath中不必要的、已知可被利用的库文件，从而减少可供攻击者利用的Gadget链。
+6. **最小化权限**
+运行应用程序的服务应具有最小的权限，即使发生RCE，也能限制攻击者对系统的进一步损害。
+SOLUTION
+	risk: "反序列化漏洞",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Java原生反序列化漏洞是指应用程序使用`java.io.ObjectInputStream`的`readObject()`方法从不受信任的数据源（如用户输入、网络连接、文件等）反序列化对象时，攻击者可以通过构造恶意的序列化字节流，在目标Java虚拟机中执行任意代码或指令。
+这是因为反序列化过程中，`readObject()`方法可能会动态地调用被反序列化对象的特定魔术方法（如`readObject`、`readResolve`、`finalize`等）来实现对象状态的恢复或自定义逻辑。如果这些魔术方法存在可利用的逻辑（例如执行系统命令、文件操作、数据库连接等），并且相关的依赖库（ gadgets）在应用的classpath中，攻击者就可以链式触发这些方法，最终实现恶意代码执行。
+2. **触发场景**
+该漏洞通常在以下场景中出现：
+- 应用程序接收并反序列化来自网络请求（如HTTP POST请求体、TCP连接）的序列化数据，且未对来源进行充分信任或对数据进行校验。
+- 应用程序从文件、数据库等存储介质读取序列化对象，而这些介质的数据内容可能被外部控制或篡改。
+- 使用了基于原生反序列化的中间件、框架或协议（如RMI、JMS、某些RPC框架），且服务端口对外暴露或处理包含恶意序列化数据的请求。
+**示例代码（SpringMVC）:**
+```java
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import java.io.*;
+@RestController
+public class VulnerableController {
+@PostMapping("/deserialize")
+public String deserializeObject(@RequestBody byte[] data) { // 直接接收并处理用户提供的序列化数据
+try {
+ByteArrayInputStream bis = new ByteArrayInputStream(data);
+ObjectInputStream ois = new ObjectInputStream(bis);
+Object obj = ois.readObject(); // 存在漏洞点
+ois.close();
+return "Deserialization successful: " + obj.toString();
+} catch (IOException | ClassNotFoundException e) {
+e.printStackTrace();
+return "Error during deserialization: " + e.getMessage();
+}
+}
+}
+```
+**示例代码（Servlet）:**
+```java
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+@WebServlet("/vulnerable")
+public class VulnerableServlet extends HttpServlet {
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws ServletException, IOException {
+try {
+ObjectInputStream ois = new ObjectInputStream(request.getInputStream()); // 直接从请求输入流反序列化
+Object obj = ois.readObject(); // 存在漏洞点
+ois.close();
+response.getWriter().println("Deserialization successful: " + obj.toString());
+} catch (ClassNotFoundException e) {
+e.printStackTrace();
+response.getWriter().println("Error during deserialization: " + e.getMessage());
+}
+}
+}
+```
+该规则主要检测将用户输入流直接传给`ObjectInputStream`或者直接调用`ObjectInputStream.readObject()`的地方。
+3. **潜在影响**
+- **远程代码执行 (RCE)**：攻击者能够在服务器上执行任意操作系统命令或代码，这是最严重的影响，可能导致服务器被完全控制。
+- **敏感数据泄露**：攻击者可能触发反序列化过程中的特定逻辑，导致读取服务器上的敏感文件或访问敏感数据。
+- **拒绝服务 (DoS)**：构造恶意序列化数据可能导致反序列化过程无限循环或消耗大量资源，使应用程序崩溃或停止响应。
+- **应用逻辑绕过**：攻击者可能通过构造特定对象绕过应用程序的安全检查或业务逻辑。
+DESC
+	name: "readObj",
 }
 
 
@@ -196,6 +284,118 @@ alert $mid for {
 	title_zh: "检测Java原生反序列化漏洞",
 	level: "mid",
 	message: "发现从用户可控输入到ObjectInputStream的readObject的数据流，可能存在反序列化漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+1. **避免从不受信任的源进行原生反序列化**
+如果可能，尽量避免使用`ObjectInputStream.readObject()`处理来自外部或不可信源的数据。原生Java序列化机制设计初衷是为了方便进程内或受信任环境下的对象传输，而非用于跨网络或不可信边界的数据交换。
+2. **使用安全的序列化/反序列化库**
+考虑使用更安全的、不基于JVM原生对象的序列化协议或库，例如：
+- **JSON** (Jackson, Gson)
+- **XML** (JAXB)
+- **Protocol Buffers**
+- **Apache Avro**
+- **MessagePack**
+这些格式通常不包含可执行的代码或复杂的对象图，大大降低了反序列化攻击的风险。
+**示例：使用Jackson进行JSON反序列化（安全）**
+```java
+import com.fasterxml.jackson.databind.ObjectMapper;
+// ... 获取用户输入的JSON字符串
+String jsonInput = "{\"name\":\"Test\", \"age\":30}";
+ObjectMapper mapper = new ObjectMapper();
+// 直接将JSON字符串反序列化为POJO对象，不会触发任意代码执行
+YourObject obj = mapper.readValue(jsonInput, YourObject.class);
+```
+3. **实现白名单或黑名单过滤**
+如果必须使用原生反序列化，可以通过重写`ObjectInputStream.resolveClass()`方法，仅允许反序列化特定安全类，或者通过设置序列化过滤器（Java 9+）来实现白名单或黑名单控制可反序列化的类。
+**示例：使用白名单过滤（Java 9+）**
+```java
+import java.io.ObjectInputStream;
+import java.io.InputStream;
+import java.io.ObjectInputFilter;
+import java.util.Set;
+public class SecureObjectInputStream extends ObjectInputStream {
+private static final Set<String> ALLOWED_CLASSES = Set.of("com.example.YourSafeClass", "java.lang.String", "java.util.Date"); // 定义允许反序列化的类白名单
+public SecureObjectInputStream(InputStream in) throws IOException {
+super(in);
+// 设置对象输入过滤器
+ObjectInputFilter filter = ObjectInputFilter.Config.createFilter("maxdepth=10;maxbytes=10000;java.lang.String;com.example.YourSafeClass");
+ObjectInputFilter.Config.setObjectInputFilter(this, filter);
+}
+}
+```
+4. **对输入数据进行完整性检查和验证**
+即使是原生反序列化，在反序列化之前对输入数据进行签名验证、加密或其他完整性/合法性检查，确保数据来自可信来源且未被篡改。
+5. **限制可用的Gadgets**
+移除应用程序classpath中不必要的、已知可被利用的库文件，从而减少可供攻击者利用的Gadget链。
+6. **最小化权限**
+运行应用程序的服务应具有最小的权限，即使发生RCE，也能限制攻击者对系统的进一步损害。
+SOLUTION
+	risk: "反序列化漏洞",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Java原生反序列化漏洞是指应用程序使用`java.io.ObjectInputStream`的`readObject()`方法从不受信任的数据源（如用户输入、网络连接、文件等）反序列化对象时，攻击者可以通过构造恶意的序列化字节流，在目标Java虚拟机中执行任意代码或指令。
+这是因为反序列化过程中，`readObject()`方法可能会动态地调用被反序列化对象的特定魔术方法（如`readObject`、`readResolve`、`finalize`等）来实现对象状态的恢复或自定义逻辑。如果这些魔术方法存在可利用的逻辑（例如执行系统命令、文件操作、数据库连接等），并且相关的依赖库（ gadgets）在应用的classpath中，攻击者就可以链式触发这些方法，最终实现恶意代码执行。
+2. **触发场景**
+该漏洞通常在以下场景中出现：
+- 应用程序接收并反序列化来自网络请求（如HTTP POST请求体、TCP连接）的序列化数据，且未对来源进行充分信任或对数据进行校验。
+- 应用程序从文件、数据库等存储介质读取序列化对象，而这些介质的数据内容可能被外部控制或篡改。
+- 使用了基于原生反序列化的中间件、框架或协议（如RMI、JMS、某些RPC框架），且服务端口对外暴露或处理包含恶意序列化数据的请求。
+**示例代码（SpringMVC）:**
+```java
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+import java.io.*;
+@RestController
+public class VulnerableController {
+@PostMapping("/deserialize")
+public String deserializeObject(@RequestBody byte[] data) { // 直接接收并处理用户提供的序列化数据
+try {
+ByteArrayInputStream bis = new ByteArrayInputStream(data);
+ObjectInputStream ois = new ObjectInputStream(bis);
+Object obj = ois.readObject(); // 存在漏洞点
+ois.close();
+return "Deserialization successful: " + obj.toString();
+} catch (IOException | ClassNotFoundException e) {
+e.printStackTrace();
+return "Error during deserialization: " + e.getMessage();
+}
+}
+}
+```
+**示例代码（Servlet）:**
+```java
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.*;
+@WebServlet("/vulnerable")
+public class VulnerableServlet extends HttpServlet {
+protected void doPost(HttpServletRequest request, HttpServletResponse response)
+throws ServletException, IOException {
+try {
+ObjectInputStream ois = new ObjectInputStream(request.getInputStream()); // 直接从请求输入流反序列化
+Object obj = ois.readObject(); // 存在漏洞点
+ois.close();
+response.getWriter().println("Deserialization successful: " + obj.toString());
+} catch (ClassNotFoundException e) {
+e.printStackTrace();
+response.getWriter().println("Error during deserialization: " + e.getMessage());
+}
+}
+}
+```
+该规则主要检测将用户输入流直接传给`ObjectInputStream`或者直接调用`ObjectInputStream.readObject()`的地方。
+3. **潜在影响**
+- **远程代码执行 (RCE)**：攻击者能够在服务器上执行任意操作系统命令或代码，这是最严重的影响，可能导致服务器被完全控制。
+- **敏感数据泄露**：攻击者可能触发反序列化过程中的特定逻辑，导致读取服务器上的敏感文件或访问敏感数据。
+- **拒绝服务 (DoS)**：构造恶意序列化数据可能导致反序列化过程无限循环或消耗大量资源，使应用程序崩溃或停止响应。
+- **应用逻辑绕过**：攻击者可能通过构造特定对象绕过应用程序的安全检查或业务逻辑。
+DESC
+	name: "mid",
 }
 
 

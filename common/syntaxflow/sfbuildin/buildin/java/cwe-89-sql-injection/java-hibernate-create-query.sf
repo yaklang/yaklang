@@ -6,12 +6,9 @@ desc(
 	risk: sqli
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
    Java Hibernate是一个流行的对象关系映射（ORM）框架。当开发者在使用`Session.createQuery()`或`Session.createNativeQuery()`等方法构建HQL或SQL查询时，如果直接将用户可控的输入字符串与查询语句进行拼接，而未采用参数化查询或进行充分的过滤和转义，就会引入SQL注入漏洞。攻击者可以构造包含恶意SQL代码的输入，这些代码会被解释成原始查询的一部分并执行，从而绕过应用程序的访问控制，访问、修改或删除数据库中的敏感信息。
-
 2. **触发场景**
-   以下场景在使用Hibernate构建查询语句时容易触发SQL注入：
    - **直接拼接用户输入到HQL或SQL字符串中**：
      ```java
      String userInput = request.getParameter("username");
@@ -31,21 +28,18 @@ desc(
      String sql = "SELECT * FROM users WHERE user_id = " + userId; // 直接拼接，存在注入风险
      Query query = session.createNativeQuery(sql);
      ```
-
 3. **潜在影响**
-   - **数据泄露**：攻击者可以通过注入恶意SQL语句读取数据库中的任意数据，包括用户凭证、个人信息、商业机密等。
-   - **数据篡改或删除**：攻击者可以修改或删除数据库中的数据，导致业务逻辑错误或服务不可用。
-   - **权限绕过**：攻击者可能通过注入SQL语句绕过登录验证或其他权限控制。
-   - **拒绝服务**：攻击者可能通过构造复杂的SQL语句导致数据库负载过高，影响正常服务。
-   - **更深层次的攻击**：在某些情况下，攻击者甚至可能利用数据库的特性执行操作系统命令或进行横向渗透。
+   - 数据库敏感信息（如用户凭证、个人信息、商业机密）被窃取。
+   - 攻击者可修改或删除数据，导致业务中断或逻辑错误。
+   - 绕过登录验证或其他权限控制，进一步渗透系统。
+   - 高复杂度SQL注入可能导致拒绝服务（DoS），增加服务器负载。
+   - 在极端情况下，攻击者甚至可能利用数据库特性执行操作系统命令，危害整个服务器环境。
 DESC
 	rule_id: "3c87f027-8ccb-487d-8183-b2773ceba895"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（推荐）
 这是防止SQL注入最有效和最推荐的方法。Hibernate的HQL和Criteria API都支持参数化查询。使用参数占位符（如HQL中的`:paramName`或原生SQL中的`?`）和相应的`setParameter()`方法来绑定用户输入。
-
 ```java
 // 修复代码示例 (HQL)
 String userInput = request.getParameter("username");
@@ -54,7 +48,6 @@ Query query = session.createQuery(hql);
 query.setParameter("username", userInput); // 绑定用户输入
 List<User> users = query.list();
 ```
-
 ```java
 // 修复代码示例 (Native SQL)
 String userId = request.getParameter("id");
@@ -63,12 +56,9 @@ Query query = session.createNativeQuery(sql);
 query.setParameter(1, Integer.parseInt(userId)); // 绑定用户输入，注意类型转换
 List<Object[]> resultList = query.getResultList();
 ```
-
 对于Criteria API，其本身就是参数化的，不易受到SQL注入的影响，是构建复杂查询的更安全选择。
-
 #### 2. 输入验证和过滤
 虽然参数化查询是首选，但在某些特殊情况下（如动态字段名），可能无法完全避免字符串拼接。此时，必须对用户输入进行严格的验证和过滤。
-
 - **白名单验证**：对于用作字段名或排序方式的输入，应使用白名单机制，只允许一组预定义的、安全的字段名或排序方式。
 ```java
 String sortField = request.getParameter("sort");
@@ -79,16 +69,14 @@ if (!allowedSortFields.contains(sortField)) {
 String sortOrder = request.getParameter("order");
 List<String> allowedSortOrders = Arrays.asList("ASC", "DESC");
 if (!allowedSortOrders.contains(sortOrder)) {
-     throw new IllegalArgumentException("Invalid sort order");
+    throw new IllegalArgumentException("Invalid sort order");
 }
 String hql = "FROM User ORDER BY " + sortField + " " + sortOrder;
 Query query = session.createQuery(hql);
 ```
 - **输入过滤和转义**：根据数据库类型和预期的输入格式，对用户输入中的特殊字符进行转义或过滤。但这是一种容易出错且不推荐的方法，因为它难以覆盖所有可能的注入变体。
-
 #### 3. 避免使用`createNativeQuery`拼接SQL
 如果可能，优先使用HQL或Criteria API，它们更好地支持参数化。
-
 #### 4. 最小权限原则
 为应用程序使用的数据库账户配置最小必需的权限，以限制即使发生注入攻击时造成的损害。
 SOLUTION
@@ -100,14 +88,14 @@ REFERENCE
 .create*Query(,* as $query,);
 $query?{!opcode: const} as $mixQuery;<delete(query)>
 $mixQuery #{
-    until: `*?{opcode: param && !<typeName>?{any: /(?i)bool/,/(?i)float/,/(?i)double/,/(?i)int/} } as $params`,
-}->;
+    until: `*?{opcode: param && !<typeName>?{any: /(?i)bool/,/(?i)float/,/(?i)double/,/(?i)int/} } `,
+}-> as $params;
 $params<dataflow(<<<CODE
-*?{opcode: add} as $op;
-$op-> as $opParam;
-$op#> as $opParam;
-$opParam?{opcode: const} as $__next__;
-<delete(opParam)><delete(op)>
+    *?{opcode: add} as $op;
+    $op-> as $opParam;
+    $op#> as $opParam;
+    $opParam?{opcode: const} as $__next__;
+    <delete(opParam)><delete(op)>
 CODE)> as $unsafeParams;
 
 alert $unsafeParams for {
@@ -115,12 +103,10 @@ alert $unsafeParams for {
 	message: "SQL concatenation is used in the query creation, which may lead to SQL injection vulnerabilities.",
 	title: "Check Java Hibernate SQL Injection Vulnerability",
 	title_zh: "检测Java Hibernate SQL注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（推荐）
 这是防止SQL注入最有效和最推荐的方法。Hibernate的HQL和Criteria API都支持参数化查询。使用参数占位符（如HQL中的`:paramName`或原生SQL中的`?`）和相应的`setParameter()`方法来绑定用户输入。
-
 ```java
 // 修复代码示例 (HQL)
 String userInput = request.getParameter("username");
@@ -129,7 +115,6 @@ Query query = session.createQuery(hql);
 query.setParameter("username", userInput); // 绑定用户输入
 List<User> users = query.list();
 ```
-
 ```java
 // 修复代码示例 (Native SQL)
 String userId = request.getParameter("id");
@@ -138,71 +123,65 @@ Query query = session.createNativeQuery(sql);
 query.setParameter(1, Integer.parseInt(userId)); // 绑定用户输入，注意类型转换
 List<Object[]> resultList = query.getResultList();
 ```
-
 对于Criteria API，其本身就是参数化的，不易受到SQL注入的影响，是构建复杂查询的更安全选择。
-
 #### 2. 输入验证和过滤
 虽然参数化查询是首选，但在某些特殊情况下（如动态字段名），可能无法完全避免字符串拼接。此时，必须对用户输入进行严格的验证和过滤。
-
 - **白名单验证**：对于用作字段名或排序方式的输入，应使用白名单机制，只允许一组预定义的、安全的字段名或排序方式。
 ```java
 String sortField = request.getParameter("sort");
 List<String> allowedSortFields = Arrays.asList("id", "username", "email");
 if (!allowedSortFields.contains(sortField)) {
-    throw new IllegalArgumentException("Invalid sort field");
+throw new IllegalArgumentException("Invalid sort field");
 }
 String sortOrder = request.getParameter("order");
 List<String> allowedSortOrders = Arrays.asList("ASC", "DESC");
 if (!allowedSortOrders.contains(sortOrder)) {
-     throw new IllegalArgumentException("Invalid sort order");
+throw new IllegalArgumentException("Invalid sort order");
 }
 String hql = "FROM User ORDER BY " + sortField + " " + sortOrder;
 Query query = session.createQuery(hql);
 ```
 - **输入过滤和转义**：根据数据库类型和预期的输入格式，对用户输入中的特殊字符进行转义或过滤。但这是一种容易出错且不推荐的方法，因为它难以覆盖所有可能的注入变体。
-
 #### 3. 避免使用`createNativeQuery`拼接SQL
 如果可能，优先使用HQL或Criteria API，它们更好地支持参数化。
-
 #### 4. 最小权限原则
 为应用程序使用的数据库账户配置最小必需的权限，以限制即使发生注入攻击时造成的损害。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java Hibernate是一个流行的对象关系映射（ORM）框架。当开发者在使用`Session.createQuery()`或`Session.createNativeQuery()`等方法构建HQL或SQL查询时，如果直接将用户可控的输入字符串与查询语句进行拼接，而未采用参数化查询或进行充分的过滤和转义，就会引入SQL注入漏洞。攻击者可以构造包含恶意SQL代码的输入，这些代码会被解释成原始查询的一部分并执行，从而绕过应用程序的访问控制，访问、修改或删除数据库中的敏感信息。
-
+Java Hibernate是一个流行的对象关系映射（ORM）框架。当开发者在使用`Session.createQuery()`或`Session.createNativeQuery()`等方法构建HQL或SQL查询时，如果直接将用户可控的输入字符串与查询语句进行拼接，而未采用参数化查询或进行充分的过滤和转义，就会引入SQL注入漏洞。攻击者可以构造包含恶意SQL代码的输入，这些代码会被解释成原始查询的一部分并执行，从而绕过应用程序的访问控制，访问、修改或删除数据库中的敏感信息。
 2. **触发场景**
-   以下场景在使用Hibernate构建查询语句时容易触发SQL注入：
-   - **直接拼接用户输入到HQL或SQL字符串中**：
-     ```java
-     String userInput = request.getParameter("username");
-     String hql = "FROM User WHERE username = '" + userInput + "'"; // 直接拼接，存在注入风险
-     Query query = session.createQuery(hql);
-     ```
-   - **动态构造ORDER BY或WHERE子句并拼接用户输入作为字段名或排序方式**：
-     ```java
-     String sortField = request.getParameter("sort");
-     String sortOrder = request.getParameter("order");
-     String hql = "FROM User ORDER BY " + sortField + " " + sortOrder; // 直接拼接字段名或排序方式，存在注入风险
-     Query query = session.createQuery(hql);
-     ```
-   - **使用`createNativeQuery`并拼接用户输入到原生SQL中**：
-     ```java
-     String userId = request.getParameter("id");
-     String sql = "SELECT * FROM users WHERE user_id = " + userId; // 直接拼接，存在注入风险
-     Query query = session.createNativeQuery(sql);
-     ```
-
+以下场景在使用Hibernate构建查询语句时容易触发SQL注入：
+- **直接拼接用户输入到HQL或SQL字符串中**：
+```java
+String userInput = request.getParameter("username");
+String hql = "FROM User WHERE username = '" + userInput + "'"; // 直接拼接，存在注入风险
+Query query = session.createQuery(hql);
+```
+- **动态构造ORDER BY或WHERE子句并拼接用户输入作为字段名或排序方式**：
+```java
+String sortField = request.getParameter("sort");
+String sortOrder = request.getParameter("order");
+String hql = "FROM User ORDER BY " + sortField + " " + sortOrder; // 直接拼接字段名或排序方式，存在注入风险
+Query query = session.createQuery(hql);
+```
+- **使用`createNativeQuery`并拼接用户输入到原生SQL中**：
+```java
+String userId = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE user_id = " + userId; // 直接拼接，存在注入风险
+Query query = session.createNativeQuery(sql);
+```
 3. **潜在影响**
-   - **数据泄露**：攻击者可以通过注入恶意SQL语句读取数据库中的任意数据，包括用户凭证、个人信息、商业机密等。
-   - **数据篡改或删除**：攻击者可以修改或删除数据库中的数据，导致业务逻辑错误或服务不可用。
-   - **权限绕过**：攻击者可能通过注入SQL语句绕过登录验证或其他权限控制。
-   - **拒绝服务**：攻击者可能通过构造复杂的SQL语句导致数据库负载过高，影响正常服务。
-   - **更深层次的攻击**：在某些情况下，攻击者甚至可能利用数据库的特性执行操作系统命令或进行横向渗透。
-CODE
+- **数据泄露**：攻击者可以通过注入恶意SQL语句读取数据库中的任意数据，包括用户凭证、个人信息、商业机密等。
+- **数据篡改或删除**：攻击者可以修改或删除数据库中的数据，导致业务逻辑错误或服务不可用。
+- **权限绕过**：攻击者可能通过注入SQL语句绕过登录验证或其他权限控制。
+- **拒绝服务**：攻击者可能通过构造复杂的SQL语句导致数据库负载过高，影响正常服务。
+- **更深层次的攻击**：在某些情况下，攻击者甚至可能利用数据库的特性执行操作系统命令或进行横向渗透。
+DESC
 	level: "high",
+	name: "unsafeParams",
+	risk: "SQL注入",
 }
 
 desc(
@@ -290,6 +269,82 @@ public class UserManager {
             Query<User> query = session.createQuery(hql, User.class);
             query.setParameter("username", username);
             return query.uniqueResult();
+        } finally {
+            session.close();
+        }
+    }
+}
+CODE
+)
+desc(
+	lang: java
+	"safefile://SafeUserSearch.java": <<<CODE
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import org.hibernate.query.Query;
+import java.util.List;
+
+public class SafeUserSearch {
+    private SessionFactory sessionFactory;
+
+    public SafeUserSearch() {
+        sessionFactory = new Configuration().configure().buildSessionFactory();
+    }
+
+    public static class User {
+        private int id;
+        private String username;
+        private String email;
+        private String role;
+    }
+
+    // 安全的用户搜索方法 - 使用命名参数绑定
+    public List<User> searchUsersSafe(String searchTerm) {
+        Session session = sessionFactory.openSession();
+        try {
+            // 安全：使用命名参数进行查询，避免直接拼接用户输入
+            String hql = "FROM User WHERE username LIKE :searchTerm1 OR email LIKE :searchTerm2";
+            Query<User> query = session.createQuery(hql, User.class);
+            query.setParameter("searchTerm1", "%" + searchTerm + "%");
+            query.setParameter("searchTerm2", "%" + searchTerm + "%");
+            return query.list();
+        } finally {
+            session.close();
+        }
+    }
+}
+CODE
+	"safefile://SafeUserRoleUpdate.java": <<<CODE
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import org.hibernate.query.Query;
+
+public class SafeUserRoleUpdate {
+    private SessionFactory sessionFactory;
+
+    public SafeUserRoleUpdate() {
+        sessionFactory = new Configuration().configure().buildSessionFactory();
+    }
+
+    // 安全的用户角色更新方法 - 使用原生SQL的位置参数绑定
+    public void updateUserRoleSafe(int userId, String newRole) {
+        Session session = sessionFactory.openSession();
+        try {
+            session.beginTransaction();
+            // 安全：使用原生SQL的位置参数进行更新，避免直接拼接用户输入
+            String sql = "UPDATE User SET role = ? WHERE id = ?";
+            session.createNativeQuery(sql)
+                   .setParameter(1, newRole) // 参数索引从1开始
+                   .setParameter(2, userId)
+                   .executeUpdate();
+            session.getTransaction().commit();
+        } catch (Exception e) {
+            if (session.getTransaction() != null) {
+                session.getTransaction().rollback();
+            }
+            e.printStackTrace();
         } finally {
             session.close();
         }

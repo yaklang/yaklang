@@ -23,20 +23,6 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-func init() {
-	//yakit.RegisterPostInitDatabaseFunction(func() error {
-	//	db := consts.GetGormProfileDatabase()
-	//	currentId, err := bizhelper.GetTableCurrentId(db, "general_rules")
-	//	if err != nil {
-	//		return err
-	//	}
-	//	if currentId > 0 { // already initialized
-	//		return nil
-	//	}
-	//	//return yakit.InsertBuiltinGeneralRules(db)
-	//})
-}
-
 type RuleBlock struct {
 	Probe   *NmapProbe
 	Matched []*NmapMatch

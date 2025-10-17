@@ -4,58 +4,47 @@ desc(
 	severity: high
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言使用 Reform 框架时，如果直接将用户输入拼接到 SQL 查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
-
 2. **触发场景**
 SQL 注入漏洞通常发生在以下场景：
 * 用户输入被直接拼接到 SQL 查询字符串中，例如 `reformDB.Select(&users, "SELECT * FROM users WHERE name = '" + username + "'")`。
 * 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
-
 ```go
 package main
-
 import (
-	"database/sql"
-	"fmt"
-	"log"
-	"net/http"
-
-	"github.com/hedonist/reform"
-	_ "github.com/lib/pq"
+"database/sql"
+"fmt"
+"log"
+"net/http"
+"github.com/hedonist/reform"
+_ "github.com/lib/pq"
 )
-
 type User struct {
-	ID   uint
-	Name string
-	Age  int
+ID   uint
+Name string
+Age  int
 }
-
 func login(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-
-	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	reformDB := reform.NewDB(db, reform.Postgres)
-
-	var users []User
-	// 不安全的查询
-	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
-	_, err = reformDB.Select(&users, query) // 直接拼接用户输入导致SQL注入
-	if err != nil {
-		log.Fatal(err)
-	}
-	// ...
+username := r.FormValue("username")
+db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+if err != nil {
+log.Fatal(err)
 }
-
+defer db.Close()
+reformDB := reform.NewDB(db, reform.Postgres)
+var users []User
+// 不安全的查询
+query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+_, err = reformDB.Select(&users, query) // 直接拼接用户输入导致SQL注入
+if err != nil {
+log.Fatal(err)
+}
+// ...
+}
 func main() {
-	http.HandleFunc("/login", login)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+http.HandleFunc("/login", login)
+log.Fatal(http.ListenAndServe(":8080", nil))
 }
 ```
 3. **潜在影响**
@@ -63,70 +52,58 @@ func main() {
 * 攻击者可以执行任意数据库命令，包括潜在的操作系统命令（取决于数据库配置）。
 * 攻击者可能绕过身份验证或授权机制。
 * 攻击者可能利用数据库漏洞进行进一步攻击。
-
 DESC
 	rule_id: "b06e92a2-0ff3-40a0-966e-7f0e4fe05480"
 	title_zh: "检测Golang Reform SQL注入漏洞"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用 Reform 提供的参数化查询方法
 Reform 框架提供了安全的参数化查询方法，如 `FindBy` 或 `FindOne`. 避免手动拼接 SQL 语句。
-
 ```go
 // 修复代码示例：使用 FindOne 安全地查询用户
 func login(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-
-	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	reformDB := reform.NewDB(db, reform.Postgres)
-
-	var user User
-	// 安全的查询：使用 FindOne 和参数
-	err = reformDB.FindOne(&user, "name", username) // Reform 会自动处理参数化
-	if err != nil {
-		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
-		} else {
-			log.Fatal(err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	fmt.Fprintf(w, "Welcome, %s!", user.Name)
+username := r.FormValue("username")
+db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+if err != nil {
+log.Fatal(err)
 }
-
+defer db.Close()
+reformDB := reform.NewDB(db, reform.Postgres)
+var user User
+// 安全的查询：使用 FindOne 和参数
+err = reformDB.FindOne(&user, "name", username) // Reform 会自动处理参数化
+if err != nil {
+if err == sql.ErrNoRows {
+http.Error(w, "User not found", http.StatusNotFound)
+} else {
+log.Fatal(err)
+http.Error(w, "Internal server error", http.StatusInternalServerError)
+}
+return
+}
+fmt.Fprintf(w, "Welcome, %s!", user.Name)
+}
 // 或者使用 Select 的参数化方式 (如果需要更灵活的查询)
 func searchUsers(w http.ResponseWriter, r *http.Request) {
-	searchName := r.FormValue("name")
-
-	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	reformDB := reform.NewDB(db, reform.Postgres)
-
-	var users []User
-	// 安全的 Select 查询 with args
-	_, err = reformDB.Select(&users, "SELECT * FROM users WHERE name = ?", searchName) // Reform 将 `?` 视为占位符
-	if err != nil {
-		log.Fatal(err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	// ... 处理结果
+searchName := r.FormValue("name")
+db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+if err != nil {
+log.Fatal(err)
+}
+defer db.Close()
+reformDB := reform.NewDB(db, reform.Postgres)
+var users []User
+// 安全的 Select 查询 with args
+_, err = reformDB.Select(&users, "SELECT * FROM users WHERE name = ?", searchName) // Reform 将 `?` 视为占位符
+if err != nil {
+log.Fatal(err)
+http.Error(w, "Internal server error", http.StatusInternalServerError)
+return
+}
+// ... 处理结果
 }
 ```
-
 #### 2. 对用户输入进行严格的过滤和验证
 在将用户输入用于任何数据库操作之前，始终对其进行严格的验证和过滤。根据预期的输入类型（例如，限制为数字、特定字符集），拒绝或净化不符合标准的输入。
 SOLUTION
@@ -138,6 +115,7 @@ REFERENCE
 
 <include('golang-database-reform')> as $sink;
 $sink.Select(*<slice(index=2)> as $param)
+$sink.Where(*<slice(index=2)> #-> as $param);
 $param #{
     include: <<<CODE
 <self>?{have: 'Parameter'}
@@ -145,123 +123,100 @@ CODE
 }-> as $high
 
 alert $high for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用 Reform 提供的参数化查询方法
 Reform 框架提供了安全的参数化查询方法，如 `FindBy` 或 `FindOne`. 避免手动拼接 SQL 语句。
-
 ```go
 // 修复代码示例：使用 FindOne 安全地查询用户
 func login(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-
-	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	reformDB := reform.NewDB(db, reform.Postgres)
-
-	var user User
-	// 安全的查询：使用 FindOne 和参数
-	err = reformDB.FindOne(&user, "name", username) // Reform 会自动处理参数化
-	if err != nil {
-		if err == sql.ErrNoRows {
-			http.Error(w, "User not found", http.StatusNotFound)
-		} else {
-			log.Fatal(err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
-		}
-		return
-	}
-
-	fmt.Fprintf(w, "Welcome, %s!", user.Name)
+username := r.FormValue("username")
+db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+if err != nil {
+log.Fatal(err)
 }
-
+defer db.Close()
+reformDB := reform.NewDB(db, reform.Postgres)
+var user User
+// 安全的查询：使用 FindOne 和参数
+err = reformDB.FindOne(&user, "name", username) // Reform 会自动处理参数化
+if err != nil {
+if err == sql.ErrNoRows {
+http.Error(w, "User not found", http.StatusNotFound)
+} else {
+log.Fatal(err)
+http.Error(w, "Internal server error", http.StatusInternalServerError)
+}
+return
+}
+fmt.Fprintf(w, "Welcome, %s!", user.Name)
+}
 // 或者使用 Select 的参数化方式 (如果需要更灵活的查询)
 func searchUsers(w http.ResponseWriter, r *http.Request) {
-	searchName := r.FormValue("name")
-
-	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	reformDB := reform.NewDB(db, reform.Postgres)
-
-	var users []User
-	// 安全的 Select 查询 with args
-	_, err = reformDB.Select(&users, "SELECT * FROM users WHERE name = ?", searchName) // Reform 将 `?` 视为占位符
-	if err != nil {
-		log.Fatal(err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
-	// ... 处理结果
+searchName := r.FormValue("name")
+db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+if err != nil {
+log.Fatal(err)
+}
+defer db.Close()
+reformDB := reform.NewDB(db, reform.Postgres)
+var users []User
+// 安全的 Select 查询 with args
+_, err = reformDB.Select(&users, "SELECT * FROM users WHERE name = ?", searchName) // Reform 将 `?` 视为占位符
+if err != nil {
+log.Fatal(err)
+http.Error(w, "Internal server error", http.StatusInternalServerError)
+return
+}
+// ... 处理结果
 }
 ```
-
 #### 2. 对用户输入进行严格的过滤和验证
 在将用户输入用于任何数据库操作之前，始终对其进行严格的验证和过滤。根据预期的输入类型（例如，限制为数字、特定字符集），拒绝或净化不符合标准的输入。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言使用 Reform 框架时，如果直接将用户输入拼接到 SQL 查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
-
 2. **触发场景**
 SQL 注入漏洞通常发生在以下场景：
 * 用户输入被直接拼接到 SQL 查询字符串中，例如 `reformDB.Select(&users, "SELECT * FROM users WHERE name = '" + username + "'")`。
 * 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
-
 ```go
 package main
-
 import (
-	"database/sql"
-	"fmt"
-	"log"
-	"net/http"
-
-	"github.com/hedonist/reform"
-	_ "github.com/lib/pq"
+"database/sql"
+"fmt"
+"log"
+"net/http"
+"github.com/hedonist/reform"
+_ "github.com/lib/pq"
 )
-
 type User struct {
-	ID   uint
-	Name string
-	Age  int
+ID   uint
+Name string
+Age  int
 }
-
 func login(w http.ResponseWriter, r *http.Request) {
-	username := r.FormValue("username")
-
-	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-
-	reformDB := reform.NewDB(db, reform.Postgres)
-
-	var users []User
-	// 不安全的查询
-	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
-	_, err = reformDB.Select(&users, query) // 直接拼接用户输入导致SQL注入
-	if err != nil {
-		log.Fatal(err)
-	}
-	// ...
+username := r.FormValue("username")
+db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+if err != nil {
+log.Fatal(err)
 }
-
+defer db.Close()
+reformDB := reform.NewDB(db, reform.Postgres)
+var users []User
+// 不安全的查询
+query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+_, err = reformDB.Select(&users, query) // 直接拼接用户输入导致SQL注入
+if err != nil {
+log.Fatal(err)
+}
+// ...
+}
 func main() {
-	http.HandleFunc("/login", login)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+http.HandleFunc("/login", login)
+log.Fatal(http.ListenAndServe(":8080", nil))
 }
 ```
 3. **潜在影响**
@@ -269,17 +224,20 @@ func main() {
 * 攻击者可以执行任意数据库命令，包括潜在的操作系统命令（取决于数据库配置）。
 * 攻击者可能绕过身份验证或授权机制。
 * 攻击者可能利用数据库漏洞进行进一步攻击。
-CODE
+DESC
 	level: "high",
 	type: "vuln",
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
+	title: "Golang Reform SQL Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang Reform SQL注入漏洞",
+	risk: "SQL注入",
+	name: "high",
+	message: "检测到Golang Reform SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -330,6 +288,57 @@ func main() {
 	http.HandleFunc("/login", login)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
-
 UNSAFE
+	'file://safe.go': <<<SAFE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/hedonist/reform"
+	_ "github.com/lib/pq" // 使用 PostgreSQL 驱动
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := "username"
+	password := "password"
+
+	// 连接到数据库
+	db, err := sql.Open("postgres", "user=youruser dbname=yourdb sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// 创建 Reform 实例
+	reformDB := reform.NewDB(db, reform.Postgres)
+
+	// 不安全的查询
+	var users []User
+	query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+	_, err = reformDB.Select(&users, query)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+SAFE
 )

@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"errors"
+
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -12,6 +14,43 @@ func CreateOrUpdateCodecFlow(db *gorm.DB, flow *schema.CodecFlow) error {
 		return utils.Errorf("create/update Codec Flow failed: %s", db.Error)
 	}
 	return nil
+}
+
+func CreateCodecFlow(db *gorm.DB, flow *schema.CodecFlow) error {
+	var existingFlow schema.CodecFlow
+	result := db.Model(&schema.CodecFlow{}).
+		Where("flow_name = ?", flow.FlowName).
+		First(&existingFlow)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			if err := db.Create(flow).Error; err != nil {
+				return utils.Errorf("create Codec Flow failed: %s", err)
+			}
+			return nil
+		}
+		return utils.Errorf("query Codec Flow failed: %s", result.Error)
+	}
+
+	return utils.Errorf("Codec Flow: %s already exists", flow.FlowName)
+}
+
+func UpdateCodecFlow(db *gorm.DB, flow *schema.CodecFlow) error {
+	var existingFlow schema.CodecFlow
+	result := db.Model(&schema.CodecFlow{}).
+		Where("flow_name = ?", flow.FlowName).
+		First(&existingFlow)
+
+	if result.Error == nil {
+		if err := db.Model(&schema.CodecFlow{}).
+			Where("flow_name = ?", flow.FlowName).
+			Updates(flow).Error; err != nil {
+			return utils.Errorf("update Codec Flow failed: %s", err)
+		}
+		return nil
+	}
+
+	return utils.Errorf("Codec Flow: %s not find", flow.FlowName)
 }
 
 func DeleteCodecFlow(db *gorm.DB, flowName string) error {
@@ -29,6 +68,14 @@ func ClearCodecFlow(db *gorm.DB) error {
 	}
 	return nil
 }
+
+// func GetCodecFlowByID(db *gorm.DB, flowID string) (*schema.CodecFlow, error) {
+// 	var flow schema.CodecFlow
+// 	if db := db.Model(&schema.CodecFlow{}).Where("flow_id = ?", flowID).First(&flow); db.Error != nil {
+// 		return nil, db.Error
+// 	}
+// 	return &flow, nil
+// }
 
 func GetCodecFlowByName(db *gorm.DB, flowName string) (*schema.CodecFlow, error) {
 	var flow schema.CodecFlow

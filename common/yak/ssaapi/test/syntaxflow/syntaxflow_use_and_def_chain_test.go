@@ -9,12 +9,12 @@ import (
 
 func checkDirectlyConnect(t *testing.T, v1 ssaapi.Values, v2 *ssaapi.Value) {
 	for _, v := range v1 {
-		for _, e := range v.EffectOn {
-			require.NotEqual(t, e.GetId(), v2.GetId())
-		}
-		for _, d := range v.DependOn {
-			require.NotEqual(t, d.GetId(), v2.GetId())
-		}
+		v.ForEachEffectOn(func(value *ssaapi.Value) {
+			require.NotEqual(t, value.GetId(), v2.GetId())
+		})
+		v.ForEachDependOn(func(value *ssaapi.Value) {
+			require.NotEqual(t, value.GetId(), v2.GetId())
+		})
 	}
 }
 

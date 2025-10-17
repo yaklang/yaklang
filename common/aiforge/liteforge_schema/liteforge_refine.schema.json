@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RAG Embedding Source",
+  "description": "一个经过清洗和提炼的数据结构，旨在为RAG（检索增强生成）系统提供优化的数据块。它将详细的场景分析转化为语义连贯、易于嵌入的单元，并包含用于高级检索的结构化元数据。",
+  "type": "object",
+  "required": [
+    "@action",
+    "source_metadata",
+    "content_type",
+    "embedding_text",
+    "structured_metadata"
+  ],
+  "properties": {
+    "@action": {
+      "const": "object",
+      "description": "set '@action' can help the AI identify the output json object",
+      "type": "string"
+    },
+    "rag_source_list": {
+      "description": "一个包含RAG源的列表，每个源都包含详细的元数据和内容。",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "embedding_text",
+          "title"
+        ],
+        "properties": {
+          "embedding_text": {
+            "description": "一个自包含的、百科全书式的知识片段，为语义检索和RAG生成进行了深度优化。此文本不是对原始输入的叙事性总结，而是对其背后概念、原理、意义或关系的提炼与解释。其写作风格应正式、客观，旨在作为独立的知识单元服务于问答系统，能够直接回答关于'是什么'、'为什么'和'怎么样'的问题。它将概念从具体实例中抽象出来，并清晰地阐述它们。",
+            "type": "string"
+          },
+          "content_type": {
+            "description": "内容的载体类型，决定了如何解释和使用其结构化元数据。",
+            "type": "string",
+            "enum": [
+              "narrative",
+              "instructive",
+              "descriptive",
+              "argumentative",
+              "commercial"
+            ]
+          },
+          "title": {
+            "description": "该数据块的推断标题。",
+            "type": "string"
+          },
+          "structured_metadata": {
+            "description": "用于支持RAG中元数据过滤和混合搜索的结构化信息。",
+            "type": "object",
+            "properties": {
+              "summary": {
+                "description": "一句话核心摘要，通常是'embedding_text'的精简版。",
+                "type": "string"
+              },
+              "keywords": {
+                "description": "与此数据块相关的关键词列表，可从元素标签、属性和文本中提取。",
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "key_entities": {
+                "description": "识别出的核心实体及其类型，是场景中最重要的人、事、物。",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "contextual_attributes": {
+                "description": "一个灵活的、用于描述内容上下文属性的数组。每个对象代表一类上下文信息，无论原始内容是叙事性、教学性还是其他类型。这为不同内容类型提供了统一的结构化元数据格式。",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "category": {
+                      "description": "上下文属性的类别。这是一个受控词汇表，例如 'Characters', 'Setting', 'PlotPoints', 'Emotions', 'MainConcepts', 'KeyCodes', 'Tools', 'Steps'等。",
+                      "type": "string"
+                    },
+                    "details": {
+                      "description": "该类别的具体内容列表。",
+                      "type": "array",
+                      "items": { "type": "string" }
+                    }
+                  },
+                  "required": ["category", "details"]
+                }
+              }
+            },
+            "required": ["summary", "keywords", "key_entities"]
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": false
+}

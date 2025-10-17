@@ -2,17 +2,18 @@ package java2ssa
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/yakunquote"
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils/yakunquote"
 
 	"github.com/yaklang/yaklang/common/log"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
+func (y *singleFileBuilder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -77,7 +78,7 @@ func (y *builder) VisitLiteral(raw javaparser.ILiteralContext) ssa.Value {
 }
 
 // integer literal
-func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa.Value {
+func (y *singleFileBuilder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -107,11 +108,11 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 		resultInt64, err = strconv.ParseInt(intStr, 10, 64)
 	}
 	if err != nil {
-		log.Errorf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("const parse %s as integer literal... is to large for int64: %v", originIntStr, err))
+		log.Warnf("javaast %s: %s", y.CurrentRange.String(), fmt.Sprintf("const parse %s as integer literal... is to large for int64: %v", originIntStr, err))
 		// big.NewInt(0).SetString()
 		// return nil
 		v := y.EmitConstInst(intStr)
-		v.SetType(ssa.GetNumberType())
+		v.SetType(ssa.CreateNumberType())
 		return v
 	}
 	if resultInt64 > math.MaxInt {
@@ -121,7 +122,7 @@ func (y *builder) VisitIntegerLiteral(raw javaparser.IIntegerLiteralContext) ssa
 	}
 }
 
-func (y *builder) VisitFloatLiteral(raw javaparser.IFloatLiteralContext) ssa.Value {
+func (y *singleFileBuilder) VisitFloatLiteral(raw javaparser.IFloatLiteralContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}

@@ -1,0 +1,139 @@
+__DESC__ = "检测环境变量PATH中是否存在指定的命令，用于确认系统工具的可用性。支持检测单个命令或多个命令的存在状态，可指定是否显示详细的PATH信息。适用于脚本执行前的环境检查、依赖工具验证和自动化部署。"
+__VERBOSE_NAME__ = "命令可用性检测"
+__KEYWORDS__ = "command availability,path检测,环境变量,命令存在性,系统工具,dependency check,依赖检查,环境检查,工具验证,command validation,executable check,PATH环境变量,系统命令,which命令,where命令"
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数
+commands := cli.String("commands", cli.setRequired(true), cli.setHelp("要检测的命令名称，多个命令用逗号分隔，例如: 'git,python,node'"))
+verbose := cli.Bool("verbose", cli.setRequired(false), cli.setHelp("是否显示详细的检测信息"), cli.setDefault(false))
+
+cli.check()
+
+yakit.Info("开始检测命令可用性...")
+
+// 分割命令列表
+commandList := str.Split(commands, ",")
+if len(commandList) == 0 {
+    yakit.Error("未提供有效的命令列表")
+    return
+}
+
+// 检测结果统计
+totalCommands := len(commandList)
+availableCommands := []
+unavailableCommands := []
+details := []
+
+// 获取当前操作系统类型
+osType := os.OS
+yakit.Info("当前操作系统: %v", osType)
+
+// 根据操作系统选择检测命令
+checkCommand := "which"
+if str.Contains(str.ToLower(osType), "windows") {
+    checkCommand = "where"
+}
+
+// 检测每个命令
+for _, command :=range commandList {
+    command = str.TrimSpace(command)
+    if command == "" {
+        continue
+    }
+
+    if verbose {
+        yakit.Info("正在检测命令: %s", command)
+    }
+
+    // 构建检测命令
+    cmd := ""
+    if str.Contains(str.ToLower(osType), "windows") {
+        // Windows 使用 where 命令
+        cmd = sprintf("where %s", command)
+    } else {
+        // Unix/Linux/macOS 使用 which 命令
+        cmd = sprintf("which %s", command)
+    }
+
+    // 执行检测命令
+    dur = time.ParseDuration("5s")~
+    ctx, cancel := context.WithTimeout(context.Background(), dur)
+    defer cancel()
+
+    result, err := exec.CommandContext(ctx, cmd)
+    if err != nil {
+        unavailableCommands = append(unavailableCommands, command)
+        details = append(details, {
+            "command": command,
+            "path": "",
+        })
+        if verbose {
+            yakit.Error("命令 '%s' 不可用: %v", command, err)
+        }
+        continue
+    }
+
+    // 检查执行结果
+    output ,err:= result.Output()
+    if err == nil && len(output) > 0 {
+        availableCommands = append(availableCommands, command)
+        commandPath := str.TrimSpace(string(output))
+        
+        details = append(details, {
+            "command": command,
+            "path": commandPath,
+        })
+
+        yakit.Info("✓ 命令 '%s' 可用，路径: %s", command, commandPath)
+    } else {
+        unavailableCommands = append(unavailableCommands, command)
+        details = append(details, {
+            "command": command,
+            "path": "",
+        })
+        if verbose {
+            yakit.Error("✗ 命令 '%s' 不可用", command)
+        }
+    }
+}
+
+// 输出检测结果摘要
+yakit.Info("=== 命令可用性检测结果 ===")
+yakit.Info("总计检测命令数: %d", totalCommands)
+yakit.Info("可用命令数: %d", len(availableCommands))
+yakit.Info("不可用命令数: %d", len(unavailableCommands))
+
+if len(availableCommands) > 0 {
+    yakit.Info("可用命令列表: %s", str.Join(availableCommands, ", "))
+}
+
+if len(unavailableCommands) > 0 {
+    yakit.Error("不可用命令列表: %s", str.Join(unavailableCommands, ", "))
+}
+
+// 如果需要详细信息，显示PATH环境变量
+if verbose {
+    pathEnv := os.Getenv("PATH")
+    if pathEnv != "" {
+        yakit.Info("当前PATH环境变量:")
+        pathList := str.Split(pathEnv, string(os.PathSeparator))
+        for i, path := range pathList {
+            yakit.Info("  [%d] %s", i+1, path)
+        }
+    }
+}
+
+// 返回检测结果的JSON格式数据以供其他工具使用
+resultData := {
+    "total_commands": totalCommands,
+    "available_commands": availableCommands,
+    "unavailable_commands": unavailableCommands,
+    "availability_rate": float64(len(availableCommands)) / float64(totalCommands),
+    "os_type": osType,
+    "check_command": checkCommand,
+    "detail": details,
+}
+
+yakit.Output(resultData)
+yakit.Info("检测完成，可用率: %.2f%%", resultData["availability_rate"] * 100)

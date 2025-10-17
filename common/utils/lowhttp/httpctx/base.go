@@ -176,6 +176,14 @@ func SetBareRequestBytes(r *http.Request, bytes []byte) {
 	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes, string(bytes))
 }
 
+func GetNoBodyBuffer(r *http.Request) bool {
+	return GetContextBoolInfoFromRequest(r, REQUEST_CONTEXT_KEY_NoBodyBuffer)
+}
+
+func SetNoBodyBuffer(r *http.Request, b bool) {
+	SetContextValueInfoFromRequest(r, REQUEST_CONTEXT_KEY_NoBodyBuffer, b)
+}
+
 func GetBareRequestBytes(r *http.Request) []byte {
 	return []byte(GetContextStringInfoFromRequest(r, REQUEST_CONTEXT_KEY_RequestBareBytes))
 }
@@ -242,6 +250,7 @@ func SetBareResponseBytesForce(r *http.Request, bytes []byte) {
 const REQUEST_CONTEXT_INFOMAP = "InfoMap"
 
 const (
+	REQUEST_CONTEXT_KEY_NoBodyBuffer                 = "noBodyBuffer"
 	REQUEST_CONTEXT_KEY_IsHttps                      = "isHttps"
 	REQUEST_CONTEXT_KEY_IsDropped                    = "isRequestDropped"
 	RESPONSE_CONTEXT_KEY_IsDropped                   = "isResponseDropped"
@@ -271,6 +280,7 @@ const (
 	REQUEST_CONTEXT_KEY_RequestIsStrippedGzip        = "requestIsStrippedGzip"
 	RESPONSE_CONTEXT_KEY_ShouldBeHijackedFromRequest = "shouldBeHijackedFromRequest"
 	REQUEST_CONTEXT_KEY_ProcessName                  = "ProcessName"
+	REQUEST_CONTEXT_ConnectToHTTPS                   = "connectTOHTTPS" // used for CONNECT to HTTPS request
 	REQUEST_CONTEXT_KEY_ConnectedTo                  = "connectedTo"
 	REQUEST_CONTEXT_KEY_ConnectedToPort              = "connectedToPort"
 	REQUEST_CONTEXT_KEY_ConnectedToHost              = "connectedToHost"

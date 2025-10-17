@@ -2,10 +2,14 @@ package aid
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"io"
+	"slices"
 	"strings"
 	"text/template"
+
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 
@@ -13,9 +17,9 @@ import (
 )
 
 // generate task prompt just can direct answer.
-func (t *aiTask) generateDirectAnswerPrompt() (string, error) {
+func (t *AiTask) generateDirectAnswerPrompt() (string, error) {
 	templateData := map[string]interface{}{
-		"Memory": t.config.memory,
+		"Memory": t.memory,
 	}
 
 	// 解析prompt模板
@@ -35,15 +39,15 @@ func (t *aiTask) generateDirectAnswerPrompt() (string, error) {
 }
 
 // generateTaskPrompt 生成执行任务的prompt
-func (t *aiTask) generateTaskPrompt() (string, error) {
+func (t *AiTask) generateTaskPrompt() (string, error) {
 	// 创建模板数据
-	alltools, err := t.config.aiToolManager.GetEnableTools()
+	alltools, err := t.aiToolManager.GetEnableTools()
 	if err != nil {
 		return "", fmt.Errorf("error getting all tools: %w", err)
 	}
 	templateData := map[string]interface{}{
 		"Tools":  alltools,
-		"Memory": t.config.memory,
+		"Memory": t.memory,
 	}
 
 	// 解析prompt模板
@@ -63,7 +67,7 @@ func (t *aiTask) generateTaskPrompt() (string, error) {
 }
 
 // generateRequireToolResponsePrompt 生成描述工具参数的 Prompt
-func (t *aiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, toolName string) (string, error) {
+func (t *AiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, toolName string) (string, error) {
 	if targetTool == nil {
 		return "", fmt.Errorf("找不到名为 '%s' 的工具", toolName)
 	}
@@ -72,7 +76,7 @@ func (t *aiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, tool
 	toolJSONSchema := targetTool.ToJSONSchemaString()
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Memory":         t.config.memory,
+		"Memory":         t.memory,
 		"Tool":           targetTool,
 		"ToolJSONSchema": toolJSONSchema,
 	}
@@ -94,9 +98,9 @@ func (t *aiTask) generateRequireToolResponsePrompt(targetTool *aitool.Tool, tool
 }
 
 // generateToolCallResponsePrompt 生成描述工具调用结果的 Prompt
-func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
+func (t *AiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targetTool *aitool.Tool) (string, error) {
 	templatedata := map[string]any{
-		"Memory": t.config.memory,
+		"Memory": t.memory,
 		"Tool":   targetTool,
 		"Result": result,
 	}
@@ -112,7 +116,7 @@ func (t *aiTask) generateToolCallResponsePrompt(result *aitool.ToolResult, targe
 	return promptBuilder.String(), nil
 }
 
-func (t *aiTask) generateToolCallResultsPrompt() (string, error) {
+func (t *AiTask) generateToolCallResultsPrompt() (string, error) {
 	templatedata := map[string]interface{}{
 		"ToolCallResults": t.toolCallResultIds.Values(),
 	}
@@ -128,10 +132,10 @@ func (t *aiTask) generateToolCallResultsPrompt() (string, error) {
 	return promptBuilder.String(), nil
 }
 
-func (t *aiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
+func (t *AiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	// 创建模板数据
 	templateData := map[string]interface{}{
-		"Memory":    t.config.memory,
+		"Memory":    t.memory,
 		"UserInput": userInput,
 	}
 
@@ -151,14 +155,14 @@ func (t *aiTask) generateDynamicPlanPrompt(userInput string) (string, error) {
 	return promptBuilder.String(), nil
 }
 
-func (t *aiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
-	return t.config.quickBuildPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
-		"Memory":    t.config.memory,
+func (t *AiTask) GenerateDeepThinkPlanPrompt(suggestion string) (string, error) {
+	return t.quickBuildPrompt(__prompt_DeepthinkTaskListPrompt, map[string]any{
+		"Memory":    t.memory,
 		"UserInput": suggestion,
 	})
 }
 
-func (t *aiTask) DeepThink(suggestion string) error {
+func (t *AiTask) DeepThink(suggestion string) error {
 	prompt, err := t.GenerateDeepThinkPlanPrompt(suggestion)
 	if err != nil {
 		return fmt.Errorf("生成深入思考划分子任务 prompt 失败: %v", err)
@@ -166,12 +170,12 @@ func (t *aiTask) DeepThink(suggestion string) error {
 
 	defer func() {
 		// Ensure config is propagated to the new task and its subtasks
-		var propagateConfig func(task *aiTask)
-		propagateConfig = func(task *aiTask) {
+		var propagateConfig func(task *AiTask)
+		propagateConfig = func(task *AiTask) {
 			if task == nil {
 				return
 			}
-			task.config = t.config
+			task.Config = t.Config
 			if task.toolCallResultIds == nil {
 				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
 			}
@@ -184,10 +188,10 @@ func (t *aiTask) DeepThink(suggestion string) error {
 		t.GenerateIndex()
 	}()
 
-	err = t.config.callAiTransaction(
-		prompt, t.callAI,
-		func(rsp *AIResponse) error {
-			action, err := ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, t.config), "plan", "require-user-interact")
+	err = t.callAiTransaction(
+		prompt, t.CallAI,
+		func(rsp *aicommon.AIResponse) error {
+			action, err := aicommon.ExtractActionFromStream(rsp.GetOutputStreamReader("plan", false, t.GetEmitter()), "plan", "require-user-interact")
 			if err != nil {
 				return utils.Error("parse @action field from AI response failed: " + err.Error())
 			}
@@ -197,8 +201,8 @@ func (t *aiTask) DeepThink(suggestion string) error {
 					if subtask.GetAnyToString("subtask_name") == "" {
 						continue
 					}
-					t.Subtasks = append(t.Subtasks, &aiTask{
-						config: t.config,
+					t.Subtasks = append(t.Subtasks, &AiTask{
+						Config: t.Config,
 						Name:   subtask.GetAnyToString("subtask_name"),
 						Goal:   subtask.GetAnyToString("subtask_goal"),
 					})
@@ -212,9 +216,91 @@ func (t *aiTask) DeepThink(suggestion string) error {
 		},
 	)
 	if err != nil {
-		t.config.EmitError(err.Error())
+		t.EmitError(err.Error())
 		return err
 	}
 
+	return nil
+}
+
+func (t *AiTask) AdjustPlan(suggestion string) error {
+	planPrompt, err := t.generateDynamicPlanPrompt(suggestion)
+	if err != nil {
+		t.EmitError("error generating dynamic plan prompt: %v", err)
+		return utils.Errorf("error generating dynamic plan prompt: %v", err)
+	}
+	defer func() {
+		// Ensure config is propagated to the new task and its subtasks
+		var propagateConfig func(task *AiTask)
+		propagateConfig = func(task *AiTask) {
+			if task == nil {
+				return
+			}
+			task.Config = t.Config
+			if task.toolCallResultIds == nil {
+				task.toolCallResultIds = omap.NewOrderedMap(make(map[int64]*aitool.ToolResult))
+			}
+			for _, sub := range task.Subtasks {
+				sub.ParentTask = task // Ensure parent is set
+				propagateConfig(sub)
+			}
+		}
+		propagateConfig(t)
+		t.GenerateIndex()
+	}()
+
+	err = t.callAiTransaction(
+		planPrompt,
+		t.CallAI,
+		func(response *aicommon.AIResponse) error {
+			// 读取 AI 的响应
+			responseReader := response.GetOutputStreamReader("dynamic-plan", false, t.GetEmitter())
+			taskResponse, err := io.ReadAll(responseReader)
+			if err != nil {
+				t.EmitError("error reading AI response: %v", err)
+				return utils.Errorf("error reading AI response: %v", err)
+			}
+			nextPlanTask, err := ExtractNextPlanTaskFromRawResponse(t.Config, string(taskResponse))
+			if err != nil {
+				t.EmitError("error extracting task from raw response: %v", err)
+				return utils.Errorf("error extracting task from raw response: %v", err)
+			}
+
+			if len(nextPlanTask) <= 0 {
+				t.EmitError("any task not found in next plan")
+				return utils.Errorf("any task not found in next plan task, re-do-plan")
+			}
+
+			// 解析 AI 的响应
+			parentTask := t.ParentTask
+			index := -1
+			for i, subtask := range parentTask.Subtasks {
+				if subtask.Name == t.Name {
+					index = i
+					break
+				}
+			}
+			if index == -1 {
+				t.EmitError("current task not found in parent task")
+				return utils.Error("current task not found in parent task")
+			}
+			// 保留之前的任务, 删除后续任务
+			parentTask.Subtasks = parentTask.Subtasks[:index+1]
+			parentTask.Subtasks = slices.Grow(parentTask.Subtasks, len(parentTask.Subtasks)+len(nextPlanTask))
+
+			// 添加新的任务
+			for _, subTask := range nextPlanTask {
+				subTask.Config = t.Config
+				subTask.ParentTask = parentTask
+				parentTask.Subtasks = append(parentTask.Subtasks, subTask)
+				subTask.Config.EmitInfo("new dynamic plan: %s", subTask.Name)
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		t.EmitError("error calling AI transaction: %v", err)
+		return utils.Errorf("error calling AI transaction: %v", err)
+	}
 	return nil
 }

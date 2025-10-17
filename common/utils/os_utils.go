@@ -14,6 +14,7 @@ import (
 	"os/user"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	ws "github.com/gorilla/websocket"
@@ -51,6 +52,27 @@ RESET:
 		} else {
 			goto RESET
 		}
+	}
+}
+
+func GetRandomAvailableTCPPortWithCtx(ctx context.Context, host string) int {
+	portChan := make(chan int, 1)
+	go func() {
+		lis, err := net.Listen("tcp", host+":0")
+		if err == nil {
+			port := lis.Addr().(*net.TCPAddr).Port
+			_ = lis.Close()
+			portChan <- port
+		} else {
+			portChan <- 0
+		}
+	}()
+
+	select {
+	case port := <-portChan:
+		return port
+	case <-ctx.Done():
+		return 0
 	}
 }
 
@@ -99,6 +121,60 @@ func IsPortAvailable(host string, p int) bool {
 	}
 	_ = lis.Close()
 	return true
+}
+
+// IsPortAvailableWithTimeout 使用超时检查端口是否可用
+func IsPortAvailableWithTimeout(host string, port int, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	resultChan := make(chan bool, 1)
+	go func() {
+		addr := HostPort(host, port)
+		lis, err := net.Listen("tcp", addr)
+		if err != nil {
+			resultChan <- false
+			return
+		}
+		_ = lis.Close()
+		resultChan <- true
+	}()
+
+	select {
+	case result := <-resultChan:
+		return result
+	case <-ctx.Done():
+		return false
+	}
+}
+
+func FindNearestAvailablePortWithTimeout(host string, originalPort int, timeout time.Duration) int {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	portCheckTimeout := 100 * time.Millisecond
+	start := originalPort - 10
+	if start < 1 {
+		start = 1
+	}
+	end := originalPort + 10
+	if end > 65535 {
+		end = 65535
+	}
+	for p := start; p <= end; p++ {
+		select {
+		case <-ctx.Done():
+			return 0
+		default:
+		}
+
+		if p != originalPort && IsPortAvailableWithTimeout(host, p, portCheckTimeout) {
+			return p
+		}
+	}
+
+	// 系统随机分配的端口
+	return GetRandomAvailableTCPPortWithCtx(ctx, host)
 }
 
 func IsTCPPortOpen(host string, p int) bool {
@@ -190,7 +266,7 @@ func InTestcase() bool {
 }
 
 func Debug(f func()) {
-	if InDebugMode() {
+	if InDebugMode() || testing.Testing() {
 		f()
 	}
 }
@@ -488,7 +564,8 @@ func TLSConfigSetCheckServerName(tlsConfig *tls.Config, host string) *tls.Config
 }
 
 func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string, https, h2, gmtlsFlag, onlyGmtls, keepAlive bool, checkServerName bool, handle func([]byte) []byte) (string, int) {
-	time.Sleep(100 * time.Millisecond)
+	// Increase initial wait time for better stability in CI environments
+	time.Sleep(200 * time.Millisecond)
 	host, port, _ := ParseStringToHostPort(addr)
 	go func() {
 		var (
@@ -512,12 +589,12 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			copied := *origin
 			copied.NextProtos = []string{"h2"}
 			lis, err = tls.Listen("tcp", addr, &copied)
-		} else if gmtlsFlag {
-			log.Infof("gmtlsFlag: %v", gmtlsFlag)
-			lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
 		} else if onlyGmtls {
 			log.Infof("onlyGmtlsFlag: %v", onlyGmtls)
 			lis, err = gmtls.Listen("tcp", addr, GetDefaultOnlyGMTLSConfig(5))
+		} else if gmtlsFlag {
+			log.Infof("gmtlsFlag: %v", gmtlsFlag)
+			lis, err = gmtls.Listen("tcp", addr, GetDefaultGMTLSConfig(5))
 		} else {
 			lis, err = net.Listen("tcp", addr)
 		}
@@ -536,35 +613,61 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 				log.Error("h2 only support https")
 			}
 
-			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-				r, err := HttpDumpWithBody(request, true)
-				if err != nil {
-					log.Error(err)
-					return
-				}
-				fmt.Println(string(r))
-				if handle != nil {
-					raw := handle(r)
-					writer.Write(raw)
-					return
-				}
-				writer.Write([]byte("HELLO HTTP2"))
-			})}
-			err := http2.ConfigureServer(srv, &http2.Server{})
+			// Configure HTTP2 server with better settings for stability
+			h2Server := &http2.Server{
+				MaxConcurrentStreams: 100,
+				IdleTimeout:          30 * time.Second,
+				MaxReadFrameSize:     1 << 20, // 1MB
+			}
+
+			srv := &http.Server{
+				Addr:         HostPort(host, port),
+				ReadTimeout:  10 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  30 * time.Second,
+				Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+					// Add small delay to reduce race conditions
+					time.Sleep(1 * time.Millisecond)
+
+					r, err := HttpDumpWithBody(request, true)
+					if err != nil {
+						log.Error(err)
+						writer.WriteHeader(500)
+						return
+					}
+					fmt.Println(string(r))
+					if handle != nil {
+						raw := handle(r)
+						writer.Write(raw)
+						return
+					}
+					writer.Write([]byte("HELLO HTTP2"))
+				}),
+			}
+
+			err := http2.ConfigureServer(srv, h2Server)
 			if err != nil {
 				log.Error(err)
 				return
 			}
+
+			// Use a channel to ensure server is ready before returning
+			ready := make(chan struct{})
 			go func() {
 				log.Infof("START TO SERVE HTTP2")
+				close(ready)
 				srv.Serve(lis)
 			}()
+
+			// Wait for server to be ready
+			<-ready
+			time.Sleep(50 * time.Millisecond) // Additional time for server to fully initialize
 			return
 		}
 
 		if gmtlsFlag || onlyGmtls {
 			if !https {
-				log.Error("gmtls only support https")
+				panic("gmtls only support https")
 			}
 
 			srv := &http.Server{Addr: HostPort(host, port), Handler: http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -583,7 +686,7 @@ func DebugMockHTTPServerWithContextWithAddress(ctx context.Context, addr string,
 			})}
 
 			go func() {
-				log.Infof("START TO SERVE GMTLS HTTP SERVER")
+				log.Infof("START TO SERVE GMTLS HTTP SERVER at %s", srv.Addr)
 				srv.Serve(lis)
 			}()
 			return
@@ -723,6 +826,80 @@ func DebugMockEchoWs(point string) (string, int) {
 
 	go func() {
 		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatal(err)
+		}
+	}()
+
+	err := WaitConnect(addr, 3)
+	if err != nil {
+		panic(err)
+	}
+
+	return host, port
+}
+
+func DebugMockEchoWss(point string) (string, int) {
+	addr := GetRandomLocalAddr()
+	time.Sleep(time.Millisecond * 300)
+	host, port, _ := ParseStringToHostPort(addr)
+
+	upgrader := ws.Upgrader{
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		EnableCompression: true, // 启用压缩
+	}
+
+	http.HandleFunc("/"+point, func(w http.ResponseWriter, r *http.Request) {
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		defer conn.Close()
+
+		for {
+			mt, message, err := conn.ReadMessage()
+			if err != nil && message == nil {
+				// 检查WebSocket是否正常关闭
+				if ws.IsCloseError(err, ws.CloseNormalClosure, ws.CloseGoingAway) {
+					log.Infof("Websocket closed normally: %v", err)
+				} else {
+					log.Errorf("read: %v", err)
+				}
+				return
+			}
+			serverMessage := []byte("server: " + string(message))
+			if err := conn.WriteMessage(mt, serverMessage); err != nil {
+				log.Errorf("write: %v", err)
+				return
+			}
+		}
+	})
+
+	server := &http.Server{Addr: addr}
+
+	go func() {
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		origin := GetDefaultTLSConfig(5)
+		copied := *origin
+		lis, err := tls.Listen("tcp", HostPort(host, port), &copied)
+		if err != nil {
+			panic(err)
+		}
+		go func() {
+			select {
+			case <-ctx.Done():
+			}
+			lis.Close()
+		}()
+
+		go func() {
+			log.Infof("START TO SERVE HTTP2")
+		}()
+
+		err = server.Serve(lis)
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}

@@ -2,11 +2,12 @@ package utils
 
 import (
 	"context"
+	"sync/atomic"
 	"time"
 )
 
 type CoolDown struct {
-	du     time.Duration
+	du     int64
 	ctx    context.Context
 	cancel func()
 
@@ -14,9 +15,11 @@ type CoolDown struct {
 }
 
 func NewCoolDownContext(d time.Duration, ctx context.Context) *CoolDown {
-	cd := &CoolDown{du: d}
+	cd := &CoolDown{du: int64(d)}
 	cd.ctx, cd.cancel = context.WithCancel(ctx)
-	cd.coreChan = make(chan interface{}, 0)
+	cd.coreChan = make(chan interface{}, 1)
+
+	cd.coreChan <- nil
 
 	go func() {
 		exitForCtx := func() {
@@ -28,11 +31,14 @@ func NewCoolDownContext(d time.Duration, ctx context.Context) *CoolDown {
 		}
 
 		for {
+			duration := time.Duration(atomic.LoadInt64(&cd.du))
+			time.Sleep(duration)
 			exitForCtx()
-			cd.coreChan <- nil
-			time.Sleep(cd.du)
-
-			exitForCtx()
+			select {
+			case cd.coreChan <- nil:
+			case <-cd.ctx.Done():
+				return
+			}
 		}
 	}()
 	return cd
@@ -58,7 +64,7 @@ func Spinlock(t float64, h func() bool) error {
 }
 
 func (c *CoolDown) Reset(d time.Duration) {
-	c.du = d
+	atomic.StoreInt64(&c.du, int64(d))
 }
 
 func (c *CoolDown) Do(f func()) {

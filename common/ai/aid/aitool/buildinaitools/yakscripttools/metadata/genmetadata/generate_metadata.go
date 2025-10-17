@@ -144,3 +144,37 @@ func generateMetadata(code string, promptFormat string, debug bool) (*GenerateRe
 		Keywords:    keywords,
 	}, nil
 }
+
+func UpdateYakScriptMetaData(name string, content string, forceUpdate bool) (string, *metadata.YakScriptMetadata, error) {
+	metadataIns, err := metadata.ParseYakScriptMetadata(name, content)
+	if err != nil {
+		log.Errorf("Failed to parse metadata for %s: %v", name, err)
+		return content, nil, err
+	}
+
+	// 检查是否需要生成元数据
+	needUpdate := forceUpdate || len(metadataIns.Keywords) == 0 || metadataIns.Description == ""
+	if needUpdate { // 从代码中生成描述和关键词
+		generatedMetadata, err := GenerateMetadataFromCodeContent(name, string(content))
+		if err != nil {
+			log.Errorf("Failed to generate metadata for tool: %s error: %v", metadataIns.Name, err)
+			return content, nil, err
+		}
+
+		// 如果原元数据缺失，使用生成的元数据
+		if metadataIns.Description == "" || forceUpdate {
+			metadataIns.Description = generatedMetadata.Description
+			log.Infof("Generated description for %s: %s", name, metadataIns.Description)
+		}
+
+		if len(metadataIns.Keywords) == 0 || forceUpdate {
+			metadataIns.Keywords = generatedMetadata.Keywords
+			log.Infof("Generated keywords for %s: %v", name, metadataIns.Keywords)
+		}
+
+		// 生成带有新Description和Keywords的脚本内容
+		newContent := metadata.GenerateScriptWithMetadata(string(content), metadataIns.Description, metadataIns.Keywords)
+		content = newContent
+	}
+	return content, metadataIns, err
+}

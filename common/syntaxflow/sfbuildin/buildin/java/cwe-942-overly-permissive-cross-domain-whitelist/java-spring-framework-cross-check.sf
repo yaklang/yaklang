@@ -5,36 +5,31 @@ desc(
 	risk:"不安全配置",
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **风险原理**
-   该规则用于检测Java Spring框架在使用 `@CrossOrigin` 注解时，设置了过于宽松的 `origins = "*"` 配置。`@CrossOrigin` 注解用于处理跨域请求（CORS），允许客户端的JavaScript或其他代码从不同的域访问服务器资源。将 `origins` 设置为 `"*"` 意味着服务器将接受来自任何域的跨域请求，这通常是极不安全的配置。
-
+该规则用于检测Java Spring框架在使用 `@CrossOrigin` 注解时，设置了过于宽松的 `origins = "*"` 配置。`@CrossOrigin` 注解用于处理跨域请求（CORS），允许客户端的JavaScript或其他代码从不同的域访问服务器资源。将 `origins` 设置为 `"*"` 意味着服务器将接受来自任何域的跨域请求，这通常是极不安全的配置。
 2. **触发场景**
-   在 Spring 应用程序的 Controller 类或方法级别上，使用 `@CrossOrigin(origins = "*")` 注解，例如：
-   ```java
-   import org.springframework.web.bind.annotation.CrossOrigin;
-   import org.springframework.web.bind.annotation.RequestMapping;
-   import org.springframework.web.bind.annotation.RestController;
-
-   @RestController
-   @RequestMapping("/api")
-   @CrossOrigin(origins = "*") // 过于宽松的配置
-   public class SomeController {
-       // ...
-   }
-   ```
-   当应用程序部署后，任何网站或攻击者都可以通过 JavaScript 发起带有凭证（如 Cookie、HTTP 认证或 SSL 客户端证书）的跨域请求到此端点，如果服务器允许携带凭证 (`allowCredentials = true`，虽然默认是 false，但当 `origins = "*"` 时，`allowCredentials` 会被强制设置为 false 并抛出异常，但仍有风险），则可能导致多种安全问题。
-
+在 Spring 应用程序的 Controller 类或方法级别上，使用 `@CrossOrigin(origins = "*")` 注解，例如：
+```java
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+@RestController
+@RequestMapping("/api")
+@CrossOrigin(origins = "*") // 过于宽松的配置
+public class SomeController {
+// ...
+}
+```
+当应用程序部署后，任何网站或攻击者都可以通过 JavaScript 发起带有凭证（如 Cookie、HTTP 认证或 SSL 客户端证书）的跨域请求到此端点，如果服务器允许携带凭证 (`allowCredentials = true`，虽然默认是 false，但当 `origins = "*"` 时，`allowCredentials` 会被强制设置为 false 并抛出异常，但仍有风险），则可能导致多种安全问题。
 3. **潜在影响**
-   - **敏感数据泄露**: 如果 API 返回敏感数据，恶意网站可以通过跨域请求获取这些数据。
-   - **CSRF 攻击**: 尽管设置 `origins = "*"` 会禁止 `allowCredentials = true`，在某些特定场景下，攻击者仍然可能利用此配置结合其他漏洞发起 CSRF 攻击，例如利用服务器端重定向等。
-   - **服务端资源滥用**: 攻击者可以利用此配置发起大量请求，对服务器资源造成压力。
-   - **浏览器同源策略绕过**: 彻底绕过了浏览器的同源策略安全限制，允许任何外部脚本与应用程序进行交互。
+- **敏感数据泄露**: 如果 API 返回敏感数据，恶意网站可以通过跨域请求获取这些数据。
+- **CSRF 攻击**: 尽管设置 `origins = "*"` 会禁止 `allowCredentials = true`，在某些特定场景下，攻击者仍然可能利用此配置结合其他漏洞发起 CSRF 攻击，例如利用服务器端重定向等。
+- **服务端资源滥用**: 攻击者可以利用此配置发起大量请求，对服务器资源造成压力。
+- **浏览器同源策略绕过**: 彻底绕过了浏览器的同源策略安全限制，允许任何外部脚本与应用程序进行交互。
 DESC
 	rule_id: "bc50fb1a-9e00-46f8-985e-39f3a01a5853"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 明确指定允许的源（Origins）
 避免使用通配符 `"*"`。根据实际需求，仅允许来自可信域的跨域请求。
 ```java
@@ -43,7 +38,7 @@ DESC
 @RequestMapping("/api")
 @RestController
 public class SomeController {
-    // ...
+// ...
 }
 ```
 如果需要允许来自多个域的请求，可以配置一个字符串数组：
@@ -53,31 +48,27 @@ public class SomeController {
 @RequestMapping("/api")
 @RestController
 public class AnotherController {
-    // ...
+// ...
 }
 ```
-
 #### 2. 在全局配置中设置 CORS 策略
 Spring 提供了更集中和灵活的 CORS 配置方式，可以在配置类中统一管理应用的 CORS 策略，而不是在每个 Controller 或方法上单独配置。
-
 ```java
 // 修复代码示例：全局 CORS 配置
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
-
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**") // 对所有路径生效
-                .allowedOrigins("https://example.com", "https://trusted-domain.org") // 明确允许的源
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // 允许的HTTP方法
-                .allowedHeaders("*") // 允许所有Header
-                .allowCredentials(true) // 是否允许发送Cookie等凭证
-                .maxAge(3600); // 缓存时间
-    }
+@Override
+public void addCorsMappings(CorsRegistry registry) {
+registry.addMapping("/**") // 对所有路径生效
+.allowedOrigins("https://example.com", "https://trusted-domain.org") // 明确允许的源
+.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // 允许的HTTP方法
+.allowedHeaders("*") // 允许所有Header
+.allowCredentials(true) // 是否允许发送Cookie等凭证
+.maxAge(3600); // 缓存时间
+}
 }
 ```
 这种方式更加推荐，因为它提供了更精细的控制，并且避免了在多个地方重复配置。始终确保只允许来自可信域的跨域请求，并根据需要配置允许的 HTTP 方法、Header 和凭证信息。
@@ -94,6 +85,77 @@ alert $result for {
 	title_zh: "检测Java Spring Framework跨域白名单过于宽松",
 	level: "low",
 	message: "发现Java Spring Framework跨域白名单过于宽松",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 明确指定允许的源（Origins）
+避免使用通配符 "*"。根据实际需求，仅允许来自可信域的跨域请求。
+```java
+// 修复代码示例：仅允许来自 example.com 的请求
+@CrossOrigin(origins = "https://example.com")
+@RequestMapping("/api")
+@RestController
+public class SomeController {
+// ...
+}
+```
+如果需要允许来自多个域的请求，可以配置一个字符串数组：
+```java
+// 修复代码示例：允许来自 example.com 和另一个trusted-domain.org 的请求
+@CrossOrigin(origins = {"https://example.com", "https://trusted-domain.org"})
+@RequestMapping("/api")
+@RestController
+public class AnotherController {
+// ...
+}
+```
+#### 2. 在全局配置中设置 CORS 策略
+Spring 提供了更集中和灵活的 CORS 配置方式，可以在配置类中统一管理应用的 CORS 策略，而不是在每个 Controller 或方法上单独配置。
+```java
+// 修复代码示例：全局 CORS 配置
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+@Override
+public void addCorsMappings(CorsRegistry registry) {
+registry.addMapping("/**") // 对所有路径生效
+.allowedOrigins("https://example.com", "https://trusted-domain.org") // 明确允许的源
+.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // 允许的HTTP方法
+.allowedHeaders("*") // 允许所有Header
+.allowCredentials(true) // 是否允许发送Cookie等凭证
+.maxAge(3600); // 缓存时间
+}
+}
+```
+这种方式更加推荐，因为它提供了更精细的控制，并且避免了在多个地方重复配置。始终确保只允许来自可信域的跨域请求，并根据需要配置允许的 HTTP 方法、Header 和凭证信息。
+SOLUTION
+	risk: "不安全配置",
+	desc: <<<DESC
+### 漏洞描述
+1. **风险原理**
+该规则用于检测Java Spring框架在使用 `@CrossOrigin` 注解时，设置了过于宽松的 `origins = "*"` 配置。`@CrossOrigin` 注解用于处理跨域请求（CORS），允许客户端的JavaScript或其他代码从不同的域访问服务器资源。将 `origins` 设置为 `"*"` 意味着服务器将接受来自任何域的跨域请求，这通常是极不安全的配置。
+2. **触发场景**
+在 Spring 应用程序的 Controller 类或方法级别上，使用 `@CrossOrigin(origins = "*")` 注解，例如：
+```java
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+@RestController
+@RequestMapping("/api")
+@CrossOrigin(origins = "*") // 过于宽松的配置
+public class SomeController {
+// ...
+}
+```
+当应用程序部署后，任何网站或攻击者都可以通过 JavaScript 发起带有凭证（如 Cookie、HTTP 认证或 SSL 客户端证书）的跨域请求到此端点，如果服务器允许携带凭证 (`allowCredentials = true`，虽然默认是 false，但当 `origins = "*"` 时，`allowCredentials` 会被强制设置为 false 并抛出异常，但仍有风险），则可能导致多种安全问题。
+3. **潜在影响**
+- **敏感数据泄露**: 如果 API 返回敏感数据，恶意网站可以通过跨域请求获取这些数据。
+- **CSRF 攻击**: 尽管设置 `origins = "*"` 会禁止 `allowCredentials = true`，在某些特定场景下，攻击者仍然可能利用此配置结合其他漏洞发起 CSRF 攻击，例如利用服务器端重定向等。
+- **服务端资源滥用**: 攻击者可以利用此配置发起大量请求，对服务器资源造成压力。
+- **浏览器同源策略绕过**: 彻底绕过了浏览器的同源策略安全限制，允许任何外部脚本与应用程序进行交互。
+DESC
+	name: "result",
 }
 
 desc(
@@ -119,6 +181,42 @@ public class BackUpController {
     }
 }
 USE
+	"safefile://SafeSpecificOriginController.java": <<<CODE
+package org.example.moudels.file.controller;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api")
+// 明确指定允许的源，而不是使用通用通配符"*"
+@CrossOrigin(origins = "https://trusted-domain.com") 
+public class SafeSpecificOriginController {
+    @RequestMapping("/data")
+    public String getData() {
+        return "Sensitive data";
+    }
+}
+CODE
+	"safefile://SafeMultipleOriginsController.java": <<<CODE
+package org.example.moudels.file.controller;
+
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/v2/api")
+// 明确指定多个允许的源
+@CrossOrigin(origins = {"https://trusted-domain1.com", "https://trusted-domain2.org"})
+public class SafeMultipleOriginsController {
+    @RequestMapping("/info")
+    public String getInfo() {
+        return "Some information";
+    }
+}
+CODE
 )
 
 

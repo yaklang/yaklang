@@ -1,0 +1,93 @@
+__DESC__ = "该forge旨在作为网络安全威胁情报分析师，对特定IP在短时间内产生的所有事件进行综合分析，判断其行为是否具有恶意性。它会从整体行为模式、请求频率与数量、响应状态、URI模式、恶意载荷和用户代理等多个维度进行深入分析，并生成详细的恶意行为分析报告，包括恶意性判断、置信度、行为总结、攻击类型和关键证据。"
+__VERBOSE_NAME__ = "IP实体恶意行为分析"
+__KEYWORDS__ = "威胁情报,网络安全,ip分析,恶意行为检测,事件分析,安全报告,攻击分类,实时分析,威胁检测,日志分析"
+
+prompt = <<<prompt
+# 角色与目标
+
+你是一位顶级的网络安全威胁情报分析师。你的任务是基于一个 IP 实体在近期（例如5分钟内）产生的所有相关事件，进行深入分析，以判断其行为是否具有恶意性。
+
+你将收到一个 JSON 数组，其中包含了该 IP 相关的所有事件记录（已经过初步解析）。你需要综合分析整个事件序列，而不是孤立地看待单条日志。
+
+# 分析维度与指导原则
+
+在分析时，你必须综合考量以下几个关键维度：
+
+1.  **整体行为模式 (Overall Behavior Pattern):**
+    *   这是随机的、无规律的访问，还是系统性的、有明确目标的探测？
+    *   请求之间是否存在逻辑关联（例如，正常用户会访问首页 -> 产品页 -> 详情页）？
+
+2.  **请求频率与数量 (Request Frequency & Volume):**
+    *   在短时间内是否存在爆发式的高频请求？（例如，几秒内上百次请求）
+    *   需要综合考虑是否是正常的请求，如果是一定限度对优先页面上的正常访问，则可能是正常用户行为。
+
+3.  **响应状态分析 (Response Status Analysis):**
+    *   分析 `status_code` 和 `inferred_status` 字段。
+    *   是否存在大量的 4xx 错误（如 404 Not Found, 403 Forbidden）？这通常是扫描和暴力破解的强烈信号。
+    *   是否触发了 5xx 服务器错误？这可能意味着攻击载荷正在使应用后端崩溃。
+
+4.  **URI 模式与意图 (URI Pattern & Intent):**
+    *   请求的 `request_uri` 是否包含大量不同的、不存在的路径？
+    *   是否在尝试访问常见的后台路径、敏感文件或漏洞利用路径？（例如: `/admin`, `/wp-login.php`, `/.env`, `/config.json`, `/phpmyadmin/`）
+
+5.  **恶意载荷检测 (Malicious Payload Detection):**
+    *   仔细检查 `request_uri` 是否包含典型的攻击载荷特征，如：
+        *   **SQL注入:** `union select`, `' or 1=1`, `sleep()`
+        *   **跨站脚本(XSS):** `<script>`, `onerror`, `alert()`
+        *   **命令注入:** `cat /etc/passwd`, `whoami`, `|/bin/sh`
+        *   **目录遍历/文件包含:** `../`, `../../`, `..%2F`
+
+6.  **用户代理 (User-Agent) 分析:**
+    *   User-Agent 是否为已知的扫描工具（如 `sqlmap`, `nmap`, `zgrab`, `masscan`）或非典型的客户端（如 `curl`, `python-requests`）？
+
+prompt
+
+
+# 假设存在一个与你示例中类似的 jsonschema 助手库
+# from your_library import jsonschema
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObject("report",
+
+        jsonschema.title("IP实体恶意行为分析报告"),
+
+        jsonschema.required(),
+
+
+        jsonschema.paramBool("is_malicious",
+            jsonschema.description("最终裁决：该 IP 的行为是否是恶意的。"),
+            jsonschema.required()
+        ),
+        # paramNumber 用于创建数字类型属性
+        jsonschema.paramNumber("confidence_score",
+            jsonschema.description("你对裁决的置信度，从 0.0 (完全不确定) 到 1.0 (完全确定)。"),
+            jsonschema.min(0),
+            jsonschema.max(1),
+        ),
+        jsonschema.paramString("behavior_summary",
+            jsonschema.description("用一两句中文总结该 IP 的核心行为模式和你的判断依据。")
+        ),
+        jsonschema.paramString("attack_type",
+            jsonschema.description("如果行为是恶意的，请归类其最主要的攻击类型。"),
+            jsonschema.enum([
+                "WEB_SCANNING",
+                "BRUTE_FORCE",
+                "SQL_INJECTION",
+                "XSS_ATTACK",
+                "COMMAND_INJECTION",
+                "BENIGN",
+                "UNKNOWN"
+            ])
+        ),
+        jsonschema.paramStringArray("key_evidence",
+            jsonschema.description("提供1到3条最能支撑你判断的原始日志 (`raw_log`) 作为关键佐证。")
+        )
+    )
+)
+
+
+
+forgeHandle = func(params) {
+    res = liteforge.Execute(sprintf("%s \n input:\n %v", prompt,params), liteforge.output(schema))~
+    return res.GetInvokeParams("report")
+}

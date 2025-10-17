@@ -7,52 +7,47 @@ desc(
 ### 规则描述
 
 1. **规则目的**
-   该规则旨在审计 Golang 代码中与 LDAP (Lightweight Directory Access Protocol) 服务器建立连接的关键操作。它通过识别对 `gopkg.in/ldap.v2`、`github.com/nmcclain/ldap` 或 `github.com/go-ldap/ldap` 等常见 LDAP 库的 `Dial()` 方法的调用，定位与 LDAP 服务器进行通信的潜在汇点。这些连接点是进行 LDAP 操作的基础，对于后续审计 LDAP 绑定、搜索等操作中的潜在安全风险至关重要。
+该规则旨在审计 Golang 代码中与 LDAP (Lightweight Directory Access Protocol) 服务器建立连接的关键操作。它通过识别对 `gopkg.in/ldap.v2`、`github.com/nmcclain/ldap` 或 `github.com/go-ldap/ldap` 等常见 LDAP 库的 `Dial()` 方法的调用，定位与 LDAP 服务器进行通信的潜在汇点。这些连接点是进行 LDAP 操作的基础，对于后续审计 LDAP 绑定、搜索等操作中的潜在安全风险至关重要。
 
 2. **规则详细**
-   - **作为基础检测库**：属于 `golang-ldap-sink` 库规则 (`lib` 类型)，需配合其他规则（如用户输入跟踪规则）共同审计 LDAP 操作中的安全问题，提供 LDAP 连接点的识别能力。
-   - **覆盖主流 LDAP 库**：规则检测以下 Go 语言中常用的 LDAP 库的连接方法：
-     - `gopkg.in/ldap.v2`
-     - `github.com/nmcclain/ldap`
-     - `github.com/go-ldap/ldap`
-   - **识别连接方法**：规则通过识别对上述库中 `Dial()` 或其他建立 LDAP 连接的方法调用，标记出代码中与外部 LDAP 服务器交互的起始点。
+- **作为基础检测库**：属于 `golang-ldap-sink` 库规则 (`lib` 类型)，需配合其他规则（如用户输入跟踪规则）共同审计 LDAP 操作中的安全问题，提供 LDAP 连接点的识别能力。
+- **覆盖主流 LDAP 库**：规则检测以下 Go 语言中常用的 LDAP 库的连接方法：
+  - `gopkg.in/ldap.v2`
+  - `github.com/nmcclain/ldap`
+  - `github.com/go-ldap/ldap`
+- **识别连接方法**：规则通过识别对上述库中 `Dial()` 或其他建立 LDAP 连接的方法调用，标记出代码中与外部 LDAP 服务器交互的起始点。
 
 3. **触发场景**
-   ```go
-   package main
-
-   import (
-       "log"
-       ldap "gopkg.in/ldap.v2"
-   )
-
-   func authenticate(username, password string) bool {
-       l, err := ldap.Dial("tcp", "ldap.example.com:389") // 潜在的 LDAP 注入风险
-       if err != nil {
-           log.Fatalf("Failed to connect to LDAP server: %s", err)
-       }
-       defer l.Close()
-
-       err = l.Bind("cn=admin,dc=example,dc=com", password)
-       if err != nil {
-           log.Fatalf("Failed to bind: %s", err)
-       }
-
-       return true
-   }
-   ```
-   上述代码示例展示了直接调用 `Dial()` 方法连接到 LDAP 服务器的情况，但未对用户输入进行严格校验，可能导致潜在的 LDAP 注入风险。
+```go
+package main
+import (
+"log"
+ldap "gopkg.in/ldap.v2"
+)
+func authenticate(username, password string) bool {
+l, err := ldap.Dial("tcp", "ldap.example.com:389") // 潜在的 LDAP 注入风险
+if err != nil {
+log.Fatalf("Failed to connect to LDAP server: %s", err)
+}
+defer l.Close()
+err = l.Bind("cn=admin,dc=example,dc=com", password)
+if err != nil {
+log.Fatalf("Failed to bind: %s", err)
+}
+return true
+}
+```
+上述代码示例展示了直接调用 `Dial()` 方法连接到 LDAP 服务器的情况，但未对用户输入进行严格校验，可能导致潜在的 LDAP 注入风险。
 
 4. **潜在影响**
-   - 攻击者可以通过构造恶意的 LDAP 查询实现非授权访问或获取敏感信息。
-   - 可能被利用来执行任意查询操作，例如枚举目录结构或修改数据。
-   - 如果绑定账户权限过高，攻击者可能进一步渗透系统。
+- 攻击者可以通过构造恶意的 LDAP 查询实现非授权访问或获取敏感信息。
+- 可能被利用来执行任意查询操作，例如枚举目录结构或修改数据。
+- 如果绑定账户权限过高，攻击者可能进一步渗透系统。
 DESC
 	rule_id: "a284316a-5ca8-4f87-a325-fbf8e487d27e"
-	title_zh: "查找 Golang LDAP 连接汇点"
+	title_zh: "查找Golang LDAP连接汇点"
 	solution: <<<SOLUTION
 ### 审计建议
-
 该规则用于识别 LDAP 连接点，本身不直接指示漏洞。但在后续使用与此库规则结合的规则审计时，如出现 LDAP 注入等漏洞，则应按照以下建议进行修复：
 
 #### 1. 对用户输入进行严格校验和过滤
@@ -73,45 +68,43 @@ DESC
 #### 6. 示例：安全地构造 LDAP 查询 (Go 伪代码)
 ```go
 import (
-	"fmt"
-	"strings"
-	ldap "github.com/go-ldap/ldap"
+"fmt"
+"strings"
+ldap "github.com/go-ldap/ldap"
 )
-
 // Insecure example (vulnerable to injection)
 func insecureSearch(l *ldap.Conn, username string) {
-	filter := fmt.Sprintf("(uid=%s)", username) // Direct string formatting
-	searchRequest := ldap.NewSearchRequest(
-		"ou=users,dc=example,dc=com",
-		ldap.ScopeWholeSubtree,
-		ldap.NeverDerefAliases,
-		0, 0, false,
-		filter,
-		[]string{"dn"},
-		nil,
-	)
-	_, err := l.Search(searchRequest)
-	// error handling and result processing
+filter := fmt.Sprintf("(uid=%s)", username) // Direct string formatting
+searchRequest := ldap.NewSearchRequest(
+"ou=users,dc=example,dc=com",
+ldap.ScopeWholeSubtree,
+ldap.NeverDerefAliases,
+0, 0, false,
+filter,
+[]string{"dn"},
+nil,
+)
+_, err := l.Search(searchRequest)
+// error handling and result processing
 }
 
 // Secure example (using proper escaping)
 func secureSearch(l *ldap.Conn, username string) {
-	// Example of manual escaping (refer to RFC 4515 for complete escaping rules)
-	escapedUsername := ldap.EscapeFilter(username) // Use library provided escaping if available
-	// Or implement manually based on RFC 4515
-
-	filter := fmt.Sprintf("(uid=%s)", escapedUsername) // Use escaped input
-	searchRequest := ldap.NewSearchRequest(
-		"ou=users,dc=example,dc=com",
-		ldap.ScopeWholeSubtree,
-		ldap.NeverDerefAliases,
-		0, 0, false,
-		filter,
-		[]string{"dn"},
-		nil,
-	)
-	_, err := l.Search(searchRequest)
-	// error handling and result processing
+// Example of manual escaping (refer to RFC 4515 for complete escaping rules)
+escapeUsername := ldap.EscapeFilter(username) // Use library provided escaping if available
+// Or implement manually based on RFC 4515
+filter := fmt.Sprintf("(uid=%s)", escapeUsername) // Use escaped input
+searchRequest := ldap.NewSearchRequest(
+"ou=users,dc=example,dc=com",
+ldap.ScopeWholeSubtree,
+ldap.NeverDerefAliases,
+0, 0, false,
+filter,
+[]string{"dn"},
+nil,
+)
+_, err := l.Search(searchRequest)
+// error handling and result processing
 }
 ```
 **注意:** 上述安全示例中的 `ldap.EscapeFilter` 是一个通用转义的伪代码表示，实际应用中应查找所使用的 LDAP 库是否提供官方的转义或参数化接口，或者参考 RFC 4515 标准自行实现完整的 LDAP 过滤器转义逻辑。
@@ -132,6 +125,102 @@ alert $output for {
 	level: "info",
 	title: "Find Golang LDAP Dial Sink",
 	title_zh: "查找 Golang LDAP 连接汇点",
+	name: "output",
+	message: "发现Golang代码中使用LDAP连接点的相关信息，请关注其潜在的安全风险。",
+	solution: <<<SOLUTION
+### 审计建议
+该规则用于识别 LDAP 连接点，本身不直接指示漏洞。但在后续使用与此库规则结合的规则审计时，如出现 LDAP 注入等漏洞，则应按照以下建议进行修复：
+#### 1. 对用户输入进行严格校验和过滤
+在将用户输入用于构造 LDAP 查询之前，始终对输入数据进行严格的验证和过滤，确保其符合预期的格式和内容，不包含可能破坏 LDAP 查询结构的特殊字符。
+#### 2. 使用参数化查询或转义特殊字符
+如果 LDAP 库支持参数化查询，优先使用参数化查询方式构建 LDAP 查询，将用户输入作为参数传递，而非直接拼接到查询字符串中。如果不支持参数化查询，必须手动对用户输入中的 LDAP 特殊字符进行转义，防止输入数据被解释为 LDAP 查询的控制指令。
+#### 3. 最小权限原则
+用于执行 LDAP 操作的账户应遵循最小权限原则，仅授予必要的读写权限，限制其对敏感信息的访问能力。
+#### 4. 限制可搜索范围和返回字段
+在进行 LDAP 搜索时，应明确指定搜索的起始 DN (Distinguished Name) 和搜索范围，限制不必要的搜索范围。同时，仅请求必要的属性字段，避免返回敏感信息。
+#### 5. 错误处理和日志记录
+应妥善处理 LDAP 操作过程中可能出现的错误，避免将详细的错误信息暴露给攻击者。同时，记录 LDAP 操作的关键日志，便于审计和安全分析。
+#### 6. 示例：安全地构造 LDAP 查询 (Go 伪代码)
+```go
+import (
+"fmt"
+"strings"
+ldap "github.com/go-ldap/ldap"
+)
+// Insecure example (vulnerable to injection)
+func insecureSearch(l *ldap.Conn, username string) {
+filter := fmt.Sprintf("(uid=%s)", username) // Direct string formatting
+searchRequest := ldap.NewSearchRequest(
+"ou=users,dc=example,dc=com",
+ldap.ScopeWholeSubtree,
+ldap.NeverDerefAliases,
+0, 0, false,
+filter,
+[]string{"dn"},
+nil,
+)
+_, err := l.Search(searchRequest)
+// error handling and result processing
+}
+// Secure example (using proper escaping)
+func secureSearch(l *ldap.Conn, username string) {
+// Example of manual escaping (refer to RFC 4515 for complete escaping rules)
+escapedUsername := ldap.EscapeFilter(username) // Use library provided escaping if available
+// Or implement manually based on RFC 4515
+filter := fmt.Sprintf("(uid=%s)", escapedUsername) // Use escaped input
+searchRequest := ldap.NewSearchRequest(
+"ou=users,dc=example,dc=com",
+ldap.ScopeWholeSubtree,
+ldap.NeverDerefAliases,
+0, 0, false,
+filter,
+[]string{"dn"},
+nil,
+)
+_, err := l.Search(searchRequest)
+// error handling and result processing
+}
+```
+**注意:** 上述安全示例中的 `ldap.EscapeFilter` 是一个通用转义的伪代码表示，实际应用中应查找所使用的 LDAP 库是否提供官方的转义或参数化接口，或者参考 RFC 4515 标准自行实现完整的 LDAP 过滤器转义逻辑。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+1. **规则目的**
+该规则旨在审计 Golang 代码中与 LDAP (Lightweight Directory Access Protocol) 服务器建立连接的关键操作。它通过识别对 `gopkg.in/ldap.v2`、`github.com/nmcclain/ldap` 或 `github.com/go-ldap/ldap` 等常见 LDAP 库的 `Dial()` 方法的调用，定位与 LDAP 服务器进行通信的潜在汇点。这些连接点是进行 LDAP 操作的基础，对于后续审计 LDAP 绑定、搜索等操作中的潜在安全风险至关重要。
+2. **规则详细**
+- **作为基础检测库**：属于 `golang-ldap-sink` 库规则 (`lib` 类型)，需配合其他规则（如用户输入跟踪规则）共同审计 LDAP 操作中的安全问题，提供 LDAP 连接点的识别能力。
+- **覆盖主流 LDAP 库**：规则检测以下 Go 语言中常用的 LDAP 库的连接方法：
+  - `gopkg.in/ldap.v2`
+  - `github.com/nmcclain/ldap`
+  - `github.com/go-ldap/ldap`
+- **识别连接方法**：规则通过识别对上述库中 `Dial()` 或其他建立 LDAP 连接的方法调用，标记出代码中与外部 LDAP 服务器交互的起始点。
+3. **触发场景**
+```go
+package main
+import (
+"log"
+ldap "gopkg.in/ldap.v2"
+)
+func authenticate(username, password string) bool {
+l, err := ldap.Dial("tcp", "ldap.example.com:389") // 潜在的 LDAP 注入风险
+if err != nil {
+log.Fatalf("Failed to connect to LDAP server: %s", err)
+}
+defer l.Close()
+err = l.Bind("cn=admin,dc=example,dc=com", password)
+if err != nil {
+log.Fatalf("Failed to bind: %s", err)
+}
+return true
+}
+```
+上述代码示例展示了直接调用 `Dial()` 方法连接到 LDAP 服务器的情况，但未对用户输入进行严格校验，可能导致潜在的 LDAP 注入风险。
+4. **潜在影响**
+- 攻击者可以通过构造恶意的 LDAP 查询实现非授权访问或获取敏感信息。
+- 可能被利用来执行任意查询操作，例如枚举目录结构或修改数据。
+- 如果绑定账户权限过高，攻击者可能进一步渗透系统。
+DESC
 }
 
 desc(
@@ -182,4 +271,66 @@ func authenticate(username, password string) bool {
 }
 
 PARAM
+	"safefile://SafeNoLdapDialExample.go": <<<CODE
+// SafeNoLdapDialExample.go
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("This Go application does not import or use any LDAP libraries.")
+	fmt.Println("Therefore, it does not call any Dial() methods from common LDAP packages.")
+}
+
+// 场景一：完全不使用LDAP库
+// 这种方式直接避免了所有LDAP相关的检测点，是最直接的反向测试用例。
+// 代码不引入 'gopkg.in/ldap.v2', 'github.com/nmcclain/ldap' 或 'github.com/go-ldap/ldap' 任何一个包，
+// 自然也就不会调用它们的 Dial () 方法。
+
+CODE
+	"safefile://SafeCustomNetDialer.go": <<<CODE
+// SafeCustomNetDialer.go
+package main
+
+import (
+	"net"
+	"log"
+	"time"
+)
+
+// 场景二：使用Go标准库的net.Dialer进行网络连接，不涉及LDAP协议
+// 规则特异性地检测是几个特定LDAP库的Dial()方法。
+// 而这里使用的是Go标准库 `net` 包的 `Dialer`，它返回的是一个 `net.Conn` 接口，
+// 不会与规则中匹配的 `$entry.Dial()` (其中 $entry 是特定的LDAP包类型) 模式冲突。
+func main() {
+	// 使用Go标准库的net.Dial，而不是LDAP库的Dial
+	conn, err := net.DialTimeout("tcp", "example.com:80", 5*time.Second)
+	if err != nil {
+		log.Printf("Failed to connect: %v\n", err)
+		return
+	}
+	defer conn.Close()
+
+	fmt.Printf("Successfully connected to %s\n", conn.RemoteAddr().String())
+	// 进行一些非LDAP相关的网络通信
+
+	// 或者使用更底层的net.Dialer
+	dialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	conn2, err := dialer.Dial("tcp", "another.example.com:443")
+	if err != nil {
+		log.Printf("Failed to connect with Dialer: %v\n", err)
+		return
+	}
+	defer conn2.Close()
+	fmt.Printf("Successfully connected to %s using Dialer\n", conn2.RemoteAddr().String())
+}
+
+
+CODE
 )

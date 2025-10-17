@@ -2,84 +2,72 @@ desc(
 	title: "Detect Golang Reflected XSS using template.HTML"
 	type: audit
 	severity: high
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。
-
+反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。
 2. **触发场景**
-   当 Go 语言模板引擎中使用 `template.HTML` 类型来包装用户输入时，模板引擎会认为这段内容是安全的 HTML，从而跳过自动转义。如果用户输入包含恶意脚本，并且被 `template.HTML` 包装后直接渲染到页面上，就会触发反射型 XSS。
-   ```go
-   // 存在漏洞的代码示例
-   import (
-   	"html/template"
-   	"net/http"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-   	tmpl := template.Must(template.New("example").Parse(`
-           <html>
-           <body>
-               <h1>Hello, {{ .Name }}</h1>
-           </body>
-           </html>
-       `))
-
-   	data := struct {
-   		Name string
-   	}{
-   		Name: template.HTML(r.FormValue("name")), // 直接使用 template.HTML 包装用户输入
-   	}
-
-   	tmpl.Execute(w, data)
-   }
-   ```
-   攻击者构造类似 `?name=<script>alert('XSS')</script>` 的URL，如果未对用户输入进行其他安全处理，该脚本将在受害者浏览器中执行。
-
+当 Go 语言模板引擎中使用 `template.HTML` 类型来包装用户输入时，模板引擎会认为这段内容是安全的 HTML，从而跳过自动转义。如果用户输入包含恶意脚本，并且被 `template.HTML` 包装后直接渲染到页面上，就会触发反射型 XSS。
+```go
+// 存在漏洞的代码示例
+import (
+"html/template"
+"net/http"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+tmpl := template.Must(template.New("example").Parse(`
+<html>
+<body>
+<h1>Hello, {{ .Name }}</h1>
+</body>
+</html>
+`))
+data := struct {
+Name string
+}{
+Name: template.HTML(r.FormValue("name")), // 直接使用 template.HTML 包装用户输入
+}
+tmpl.Execute(w, data)
+}
+```
+攻击者构造类似 `?name=<script>alert('XSS')</script>` 的URL，如果未对用户输入进行其他安全处理，该脚本将在受害者浏览器中执行。
 3. **潜在影响**
-   - 窃取用户Cookie或其他敏感信息。
-   - 执行任意JavaScript代码，例如进行钓鱼攻击或页面篡改。
-   - 会话劫持，攻击者冒充用户进行操作。
+- 窃取用户Cookie或其他敏感信息。
+- 执行任意JavaScript代码，例如进行钓鱼攻击或页面篡改。
+- 会话劫持，攻击者冒充用户进行操作。
 DESC
-	rule_id: "bbd6022f-3cb9-4e59-a61a-ad28ed0f58a0"
+	rule_id: "f8fd1761-df87-496b-9aef-9a78b1566642"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 `template.HTML` 包装不可信的用户输入
 除非能够确定输入内容是完全安全的 HTML，否则不要使用 `template.HTML` 来包装用户输入。Go 语言的 `html/template` 包默认会对非 `template.HTML` 类型的内容进行自动转义，这是防御 XSS 的最有效方式。
 ```go
 // 修复代码示例
 import (
-	"html/template"
-	"net/http"
+"html/template"
+"net/http"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.New("example").Parse(`
-        <html>
-        <body>
-            <h1>Hello, {{ .Name }}</h1>
-        </body>
-        </html>
-    `))
-
-	data := struct {
-		Name string // 使用普通字符串类型
-	}{
-		Name: r.FormValue("name"), // 直接使用用户输入（字符串）
-	}
-
-	tmpl.Execute(w, data) // 模板引擎会自动转义 Name
+tmpl := template.Must(template.New("example").Parse(`
+<html>
+<body>
+<h1>Hello, {{ .Name }}</h1>
+</body>
+</html>
+`))
+data := struct {
+Name string // 使用普通字符串类型
+}{
+Name: r.FormValue("name"), // 直接使用用户输入（字符串）
+}
+tmpl.Execute(w, data) // 模板引擎会自动转义 Name
 }
 ```
-
 #### 2. 对用户输入进行严格的过滤和校验
 在将用户输入嵌入到任何输出之前，对其进行严格的过滤和校验。移除或转义潜在的恶意 HTML 标签、属性和 JavaScript 代码。可以使用成熟的安全库来辅助进行过滤。
-
 #### 3. 使用 Content Security Policy (CSP)
 配置合适的 CSP 头，限制浏览器只能执行来自指定源的脚本和加载资源，从而降低 XSS 攻击的风险，即使发生 XSS 漏洞，其危害也会受到限制。
-
 #### 4. 对于必须输出 HTML 片段的场景
 如果业务确实需要在模板中输出用户提供的部分 HTML 内容，应考虑使用专门的 HTML 清洗（sanitization）库，例如 `github.com/microcosm-cc/bluemonday`，而不是简单地使用 `template.HTML`。
 SOLUTION
@@ -89,106 +77,106 @@ REFERENCE
 	title_zh: "检测Golang模板引擎中的反射型XSS漏洞"
 )
 
-<include('golang-template')> as $template;
-$template.New as $new;
-$new().Parse() -> as $param
-$param.Execute(* as $target) 
-$target #{include: `*?{have: 'template.HTML'}`}-> as $high;
+<include('golang-template-html')> as $template;
+$template.New() as $new
 
-template.HTML(* #-> as $source)
-$source?{have: '.GetSession'} as $high
+$new.Must() as $tmpl
+$new.ParseFiles().* as $tmpl
+$template.Must() as $tmpl
+$template.ParseFiles().* as $tmpl
+
+$tmpl.Execute(* #-> as $target);
+$target.HTML as $high;
+
+$tmpl.ExecuteTemplate(*<slice(index=3)> #-> as $target2);
+$target2 -->?{have: "template.HTML"} as $high;
+
+<include('golang-template-text')> as $temptext;
+$temptext.New().Parse() as $target3;
+$temptext.ParseFiles().* -> as $target3;
+$target3.Execute as $high;
 
 alert $high for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用 `template.HTML` 包装不可信的用户输入
 除非能够确定输入内容是完全安全的 HTML，否则不要使用 `template.HTML` 来包装用户输入。Go 语言的 `html/template` 包默认会对非 `template.HTML` 类型的内容进行自动转义，这是防御 XSS 的最有效方式。
 ```go
 // 修复代码示例
 import (
-	"html/template"
-	"net/http"
+"html/template"
+"net/http"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	tmpl := template.Must(template.New("example").Parse(`
-        <html>
-        <body>
-            <h1>Hello, {{ .Name }}</h1>
-        </body>
-        </html>
-    `))
-
-	data := struct {
-		Name string // 使用普通字符串类型
-	}{
-		Name: r.FormValue("name"), // 直接使用用户输入（字符串）
-	}
-
-	tmpl.Execute(w, data) // 模板引擎会自动转义 Name
+tmpl := template.Must(template.New("example").Parse(`
+<html>
+<body>
+<h1>Hello, {{ .Name }}</h1>
+</body>
+</html>
+`))
+data := struct {
+Name string // 使用普通字符串类型
+}{
+Name: r.FormValue("name"), // 直接使用用户输入（字符串）
+}
+tmpl.Execute(w, data) // 模板引擎会自动转义 Name
 }
 ```
-
 #### 2. 对用户输入进行严格的过滤和校验
 在将用户输入嵌入到任何输出之前，对其进行严格的过滤和校验。移除或转义潜在的恶意 HTML 标签、属性和 JavaScript 代码。可以使用成熟的安全库来辅助进行过滤。
-
 #### 3. 使用 Content Security Policy (CSP)
 配置合适的 CSP 头，限制浏览器只能执行来自指定源的脚本和加载资源，从而降低 XSS 攻击的风险，即使发生 XSS 漏洞，其危害也会受到限制。
-
 #### 4. 对于必须输出 HTML 片段的场景
 如果业务确实需要在模板中输出用户提供的部分 HTML 内容，应考虑使用专门的 HTML 清洗（sanitization）库，例如 `github.com/microcosm-cc/bluemonday`，而不是简单地使用 `template.HTML`。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。
-
+反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。
 2. **触发场景**
-   当 Go 语言模板引擎中使用 `template.HTML` 类型来包装用户输入时，模板引擎会认为这段内容是安全的 HTML，从而跳过自动转义。如果用户输入包含恶意脚本，并且被 `template.HTML` 包装后直接渲染到页面上，就会触发反射型 XSS。
-   ```go
-   // 存在漏洞的代码示例
-   import (
-   	"html/template"
-   	"net/http"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-   	tmpl := template.Must(template.New("example").Parse(`
-           <html>
-           <body>
-               <h1>Hello, {{ .Name }}</h1>
-           </body>
-           </html>
-       `))
-
-   	data := struct {
-   		Name string
-   	}{
-   		Name: template.HTML(r.FormValue("name")), // 直接使用 template.HTML 包装用户输入
-   	}
-
-   	tmpl.Execute(w, data)
-   }
-   ```
-   攻击者构造类似 `?name=<script>alert('XSS')</script>` 的URL，如果未对用户输入进行其他安全处理，该脚本将在受害者浏览器中执行。
-
+当 Go 语言模板引擎中使用 `template.HTML` 类型来包装用户输入时，模板引擎会认为这段内容是安全的 HTML，从而跳过自动转义。如果用户输入包含恶意脚本，并且被 `template.HTML` 包装后直接渲染到页面上，就会触发反射型 XSS。
+```go
+// 存在漏洞的代码示例
+import (
+"html/template"
+"net/http"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+tmpl := template.Must(template.New("example").Parse(`
+<html>
+<body>
+<h1>Hello, {{ .Name }}</h1>
+</body>
+</html>
+`))
+data := struct {
+Name string
+}{
+Name: template.HTML(r.FormValue("name")), // 直接使用 template.HTML 包装用户输入
+}
+tmpl.Execute(w, data)
+}
+```
+攻击者构造类似 `?name=<script>alert('XSS')</script>` 的URL，如果未对用户输入进行其他安全处理，该脚本将在受害者浏览器中执行。
 3. **潜在影响**
-   - 窃取用户Cookie或其他敏感信息。
-   - 执行任意JavaScript代码，例如进行钓鱼攻击或页面篡改。
-   - 会话劫持，攻击者冒充用户进行操作。
-CODE
+- 窃取用户Cookie或其他敏感信息。
+- 执行任意JavaScript代码，例如进行钓鱼攻击或页面篡改。
+- 会话劫持，攻击者冒充用户进行操作。
+DESC
 	level: "high",
 	type: "vuln",
-	title: "Reflected XSS detected",
-	title_zh: "检测到反射XSS",
+	title: "Golang Reflected XSS Vulnerability Was Detected",
+	title_zh: "检测到Golang反射型XSS漏洞",
+	name: "high",
+	message: "检测到Go语言模板引擎中的反射型XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "XSS",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package example
 
 import (
@@ -219,4 +207,35 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package example
+
+import (
+	"html/template"
+	"net/http"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	tmpl := template.Must(template.New("example").Parse(`
+        <html>
+        <body>
+            <h1>Hello, {{ .Name }}</h1>
+        </body>
+        </html>
+    `))
+
+	data := struct {
+		Name string
+	}{
+		Name: r.FormValue("name"), // 从用户输入获取 name 参数
+	}
+
+	tmpl.Execute(w, data) // 自动对输出进行转义
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+	http.ListenAndServe(":8080", nil)
+}
+SAFE
 )

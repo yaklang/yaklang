@@ -1,5 +1,5 @@
 __DESC__ = "一个用于获取骑行导航路径规划的工具，根据起始点和目的地（可选城市）调用高德地图服务进行路径计算，并输出规划的路径信息，包括总距离、总时长以及详细的骑行步骤。"
-
+__VERBOSE_NAME__ = "高德：骑行导航路径规划"
 __KEYWORDS__ = "骑行导航,路径规划,高德地图,位置服务,出行规划,导航信息"
 
 ori = cli.String("origin",cli.setHelp("Starting point of the route planning"), cli.setRequired(true))

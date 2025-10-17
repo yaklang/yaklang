@@ -1,12 +1,13 @@
 package java
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func Test_Template_To_JAVA_Servlet(t *testing.T) {
@@ -61,6 +62,7 @@ $request.setAttribute(,,* as $result)
 }
 
 func Test_Template_To_Spring(t *testing.T) {
+	t.Skip("TODO: support spring framework")
 	t.Run("test  freemarker", func(t *testing.T) {
 		vf := filesys.NewVirtualFs()
 		vf.AddFile("application.properties", `

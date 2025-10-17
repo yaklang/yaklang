@@ -5,66 +5,55 @@ desc(
 	risk: XSS
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这是因为`@RestController`注解默认将方法的返回值直接写入HTTP响应体，而不会经过模板引擎等进行自动化转义。
-
+跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这是因为`@RestController`注解默认将方法的返回值直接写入HTTP响应体，而不会经过模板引擎等进行自动化转义。
 2. **触发场景**
-   当Spring Boot应用程序使用`@RestController`注解处理HTTP请求，并且方法直接返回用户可控的字符串（如通过`@RequestParam`、`@RequestBody`或其他方式获取的输入）时，如果没有对该输入进行任何安全处理（如HTML转义），则可能触发反射型XSS漏洞。攻击者可以在用户输入中注入恶意HTML或JavaScript代码。
-   ```java
-   import org.springframework.web.bind.annotation.*;
-
-   @RestController
-   @RequestMapping("/xss")
-   public class XSSController {
-
-       @GetMapping("/echo")
-       public String echo(@RequestParam("input") String input) {
-           return "Your input: " + input; // 未对输入进行转义
-       }
-   }
-   ```
-   攻击者访问 `/xss/echo?input=<script>alert('XSS')</script>`，恶意脚本将在用户的浏览器中执行。
-
+当Spring Boot应用程序使用`@RestController`注解处理HTTP请求，并且方法直接返回用户可控的字符串（如通过`@RequestParam`、`@RequestBody`或其他方式获取的输入）时，如果没有对该输入进行任何安全处理（如HTML转义），则可能触发反射型XSS漏洞。攻击者可以在用户输入中注入恶意HTML或JavaScript代码。
+```java
+import org.springframework.web.bind.annotation.*;
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+@GetMapping("/echo")
+public String echo(@RequestParam("input") String input) {
+return "Your input: " + input; // 未对输入进行转义
+}
+}
+```
+攻击者访问 `/xss/echo?input=<script>alert('XSS')</script>`，恶意脚本将在用户的浏览器中执行。
 3. **潜在影响**
-   * **会话劫持**: 攻击者可以窃取用户的Cookie，从而劫持用户会话，冒充用户执行操作。
-   * **敏感信息泄露**: 攻击者可以利用JavaScript获取用户在页面上的敏感信息（如表单数据）。
-   * **页面篡改**: 攻击者可以修改页面内容，误导用户。
-   * **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
-   * **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
+* **会话劫持**: 攻击者可以窃取用户的Cookie，从而劫持用户会话，冒充用户执行操作。
+* **敏感信息泄露**: 攻击者可以利用JavaScript获取用户在页面上的敏感信息（如表单数据）。
+* **页面篡改**: 攻击者可以修改页面内容，误导用户。
+* **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
+* **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
 DESC
 	rule_id: "cad09b46-5b0f-4c43-9b43-2b786b9c625f"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **HTML转义（HTML Escaping）**
-   对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
-   ```java
-   // 修复代码示例 (使用Spring自带的HtmlUtils)
-   import org.springframework.web.bind.annotation.*;
-   import org.springframework.web.util.HtmlUtils;
-
-   @RestController
-   @RequestMapping("/xss")
-   public class XSSController {
-
-       @GetMapping("/echo")
-       public String echo(@RequestParam("input") String input) {
-           String safeInput = HtmlUtils.htmlEscape(input);
-           return "Your input: " + safeInput;
-       }
-   }
-   ```
-   也可以使用其他库或方法进行HTML转义。
-
+对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
+```java
+// 修复代码示例 (使用Spring自带的HtmlUtils)
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.HtmlUtils;
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+@GetMapping("/echo")
+public String echo(@RequestParam("input") String input) {
+String safeInput = HtmlUtils.htmlEscape(input);
+return "Your input: " + safeInput;
+}
+}
+```
+也可以使用其他库或方法进行HTML转义。
 2. **使用安全的视图技术（对于Controller而不是RestController）**
-   虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
-
+虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
 3. **输入验证和过滤**
-   在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
-
+在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
 4. **内容安全策略 (CSP)**
-   部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
+部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
 SOLUTION
 	reference: <<<REFERENCE
 [跨站脚本（XSS）](https://owasp.org/www-community/xss/)
@@ -83,8 +72,8 @@ ResponseBody.__ref__?{.annotation.*Mapping} as $entryMethods;
 
 $entryMethods<getReturns> as $sink;
 $sink #{
-    until: `* & $params as $source`,
-}->;
+    until: `* & $params `,
+}-> as $source;
 $source<dataflow(<<<CODE
 *?{opcode: call} as $__next__
 CODE)> as $haveCall;
@@ -93,70 +82,62 @@ $source - $haveCall as $withoutCall;
 alert $withoutCall for {
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **HTML转义（HTML Escaping）**
-   对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
-   ```java
-   // 修复代码示例 (使用Spring自带的HtmlUtils)
-   import org.springframework.web.bind.annotation.*;
-   import org.springframework.web.util.HtmlUtils;
-
-   @RestController
-   @RequestMapping("/xss")
-   public class XSSController {
-
-       @GetMapping("/echo")
-       public String echo(@RequestParam("input") String input) {
-           String safeInput = HtmlUtils.htmlEscape(input);
-           return "Your input: " + safeInput;
-       }
-   }
-   ```
-   也可以使用其他库或方法进行HTML转义。
-
+对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
+```java
+// 修复代码示例 (使用Spring自带的HtmlUtils)
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.HtmlUtils;
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+@GetMapping("/echo")
+public String echo(@RequestParam("input") String input) {
+String safeInput = HtmlUtils.htmlEscape(input);
+return "Your input: " + safeInput;
+}
+}
+```
+也可以使用其他库或方法进行HTML转义。
 2. **使用安全的视图技术（对于Controller而不是RestController）**
-   虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
-
+虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
 3. **输入验证和过滤**
-   在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
-
+在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
 4. **内容安全策略 (CSP)**
-   部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
-CODE
-	desc: <<<CODE
+部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这是因为`@RestController`注解默认将方法的返回值直接写入HTTP响应体，而不会经过模板引擎等进行自动化转义。
-
+跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这是因为`@RestController`注解默认将方法的返回值直接写入HTTP响应体，而不会经过模板引擎等进行自动化转义。
 2. **触发场景**
-   当Spring Boot应用程序使用`@RestController`注解处理HTTP请求，并且方法直接返回用户可控的字符串（如通过`@RequestParam`、`@RequestBody`或其他方式获取的输入）时，如果没有对该输入进行任何安全处理（如HTML转义），则可能触发反射型XSS漏洞。攻击者可以在用户输入中注入恶意HTML或JavaScript代码。
-   ```java
-   import org.springframework.web.bind.annotation.*;
-
-   @RestController
-   @RequestMapping("/xss")
-   public class XSSController {
-
-       @GetMapping("/echo")
-       public String echo(@RequestParam("input") String input) {
-           return "Your input: " + input; // 未对输入进行转义
-       }
-   }
-   ```
-   攻击者访问 `/xss/echo?input=<script>alert('XSS')</script>`，恶意脚本将在用户的浏览器中执行。
-
+当Spring Boot应用程序使用`@RestController`注解处理HTTP请求，并且方法直接返回用户可控的字符串（如通过`@RequestParam`、`@RequestBody`或其他方式获取的输入）时，如果没有对该输入进行任何安全处理（如HTML转义），则可能触发反射型XSS漏洞。攻击者可以在用户输入中注入恶意HTML或JavaScript代码。
+```java
+import org.springframework.web.bind.annotation.*;
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+@GetMapping("/echo")
+public String echo(@RequestParam("input") String input) {
+return "Your input: " + input; // 未对输入进行转义
+}
+}
+```
+攻击者访问 `/xss/echo?input=<script>alert('XSS')</script>`，恶意脚本将在用户的浏览器中执行。
 3. **潜在影响**
-   * **会话劫持**: 攻击者可以窃取用户的Cookie，从而劫持用户会话，冒充用户执行操作。
-   * **敏感信息泄露**: 攻击者可以利用JavaScript获取用户在页面上的敏感信息（如表单数据）。
-   * **页面篡改**: 攻击者可以修改页面内容，误导用户。
-   * **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
-   * **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
-CODE
+* **会话劫持**: 攻击者可以窃取用户的Cookie，从而劫持用户会话，冒充用户执行操作。
+* **敏感信息泄露**: 攻击者可以利用JavaScript获取用户在页面上的敏感信息（如表单数据）。
+* **页面篡改**: 攻击者可以修改页面内容，误导用户。
+* **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
+* **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
+DESC
 	level: "high",
 	type: "vuln",
+	risk: "XSS",
+	name: "withoutCall",
+	message: "检测到Java SpringBoot RestController XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 
 
@@ -171,110 +152,103 @@ CODE)> as $filteredSink;
 
 $haveCall - $filteredSink as $unsafeFilteredSink;
 alert $unsafeFilteredSink for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **HTML转义（HTML Escaping）**
-   对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
-   ```java
-   // 修复代码示例 (使用Spring自带的HtmlUtils)
-   import org.springframework.web.bind.annotation.*;
-   import org.springframework.web.util.HtmlUtils;
-
-   @RestController
-   @RequestMapping("/xss")
-   public class XSSController {
-
-       @GetMapping("/echo")
-       public String echo(@RequestParam("input") String input) {
-           String safeInput = HtmlUtils.htmlEscape(input);
-           return "Your input: " + safeInput;
-       }
-   }
-   ```
-   也可以使用其他库或方法进行HTML转义。
-
+对所有用户输入在输出到HTTP响应体之前进行HTML转义。这将把输入中的特殊HTML字符（如`<`, `>`, `&`, `"`, `'`）转换为其对应的HTML实体，从而阻止浏览器将其解释为HTML或JavaScript代码。
+```java
+// 修复代码示例 (使用Spring自带的HtmlUtils)
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.HtmlUtils;
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+@GetMapping("/echo")
+public String echo(@RequestParam("input") String input) {
+String safeInput = HtmlUtils.htmlEscape(input);
+return "Your input: " + safeInput;
+}
+}
+```
+也可以使用其他库或方法进行HTML转义。
 2. **使用安全的视图技术（对于Controller而不是RestController）**
-   虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
-
+虽然规则主要针对`@RestController`，但如果使用`@Controller`返回视图（如JSP、Thymeleaf、FreeMarker），应确保使用的视图技术默认或配置为对变量进行自动化转义。
 3. **输入验证和过滤**
-   在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
-
+在处理用户输入时，进行严格的输入验证和过滤，移除或限制潜在的恶意字符或模式。例如，如果期望输入是纯文本，则可以过滤掉所有HTML和JavaScript标签。
 4. **内容安全策略 (CSP)**
-   部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
-CODE
-	desc: <<<CODE
+部署内容安全策略（CSP）HTTP响应头，限制浏览器可以加载的资源的来源，即使发生XSS漏洞，也能降低其潜在危害。例如，可以配置为只允许执行来自特定域的脚本。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这是因为`@RestController`注解默认将方法的返回值直接写入HTTP响应体，而不会经过模板引擎等进行自动化转义。
-
+跨站脚本攻击（XSS）是一种常见的安全漏洞，攻击者通过在应用程序中注入恶意脚本，能够在其他用户的浏览器中执行这些脚本。在Spring Boot的RestController中，如果未对用户输入进行适当的过滤或转义，并将其直接输出到HTTP响应中，那么攻击者可能会利用这一点来发动XSS攻击。这是因为`@RestController`注解默认将方法的返回值直接写入HTTP响应体，而不会经过模板引擎等进行自动化转义。
 2. **触发场景**
-   当Spring Boot应用程序使用`@RestController`注解处理HTTP请求，并且方法直接返回用户可控的字符串（如通过`@RequestParam`、`@RequestBody`或其他方式获取的输入）时，如果没有对该输入进行任何安全处理（如HTML转义），则可能触发反射型XSS漏洞。攻击者可以在用户输入中注入恶意HTML或JavaScript代码。
-   ```java
-   import org.springframework.web.bind.annotation.*;
-
-   @RestController
-   @RequestMapping("/xss")
-   public class XSSController {
-
-       @GetMapping("/echo")
-       public String echo(@RequestParam("input") String input) {
-           return "Your input: " + input; // 未对输入进行转义
-       }
-   }
-   ```
-   攻击者访问 `/xss/echo?input=<script>alert('XSS')</script>`，恶意脚本将在用户的浏览器中执行。
-
+当Spring Boot应用程序使用`@RestController`注解处理HTTP请求，并且方法直接返回用户可控的字符串（如通过`@RequestParam`、`@RequestBody`或其他方式获取的输入）时，如果没有对该输入进行任何安全处理（如HTML转义），则可能触发反射型XSS漏洞。攻击者可以在用户输入中注入恶意HTML或JavaScript代码。
+```java
+import org.springframework.web.bind.annotation.*;
+@RestController
+@RequestMapping("/xss")
+public class XSSController {
+@GetMapping("/echo")
+public String echo(@RequestParam("input") String input) {
+return "Your input: " + input; // 未对输入进行转义
+}
+}
+```
+攻击者访问 `/xss/echo?input=<script>alert('XSS')</script>`，恶意脚本将在用户的浏览器中执行。
 3. **潜在影响**
-   * **会话劫持**: 攻击者可以窃取用户的Cookie，从而劫持用户会话，冒充用户执行操作。
-   * **敏感信息泄露**: 攻击者可以利用JavaScript获取用户在页面上的敏感信息（如表单数据）。
-   * **页面篡改**: 攻击者可以修改页面内容，误导用户。
-   * **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
-   * **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
-CODE
+* **会话劫持**: 攻击者可以窃取用户的Cookie，从而劫持用户会话，冒充用户执行操作。
+* **敏感信息泄露**: 攻击者可以利用JavaScript获取用户在页面上的敏感信息（如表单数据）。
+* **页面篡改**: 攻击者可以修改页面内容，误导用户。
+* **恶意重定向**: 攻击者可以将用户重定向到钓鱼网站。
+* **客户端的其他恶意行为**: 攻击者可以执行各种JavaScript代码，进行端口扫描、本地文件读取尝试（取决于浏览器和环境）等。
+DESC
 	level: "mid",
 	type: "vuln",
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
+	risk: "XSS",
+	name: "unsafeFilteredSink",
+	message: "检测到Java SpringBoot RestController XSS漏洞，但是从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 }
 
 alert $filteredSink for {
 	level: "low",
-	message: "The String or Content Filter is used. It is recommended to use the filter to prevent XSS.",
+	message: "发现PHP XSS过滤函数信息。",
 	type: "audit",
 	title: "Check Java SpringBoot RestController XSS Vulnerability",
 	title_zh: "检测Java SpringBoot RestController XSS漏洞",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于审计Java Spring Boot RestController中可能导致XSS（跨站脚本攻击）的安全漏洞。它通过识别直接输出用户输入的关键函数（例如返回原始字符串），定位未经验证/转义的数据输出点，防止攻击者注入恶意脚本窃取用户数据或劫持会话。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`java-spring-mvc-param`库规则（`lib`类型），需配合其他规则共同检测XSS漏洞，提供核心函数识别能力。
-
+属于`java-spring-mvc-param`库规则（`lib`类型），需配合其他规则共同检测XSS漏洞，提供核心函数识别能力。
 2. **覆盖高危输出函数**
-   检测以下情况：
-   - 用户输入未经过滤直接返回。
-   - 返回值包含潜在危险字符。
-
+检测以下情况：
+- 用户输入未经过滤直接返回。
+- 返回值包含潜在危险字符。
 3. **触发场景**
-   ```java
-   @RestController
-   public class ExampleController {
-       @GetMapping("/vul")
-       public String vulnerableMethod(@RequestParam String input) {
-           return input; // 直接返回用户输入
-       }
-   }
-   ```
-   上述代码未对用户输入进行任何转义或过滤，存在XSS风险。
-
+```java
+@RestController
+public class ExampleController {
+@GetMapping("/vul")
+public String vulnerableMethod(@RequestParam String input) {
+return input; // 直接返回用户输入
+}
+}
+```
+上述代码未对用户输入进行任何转义或过滤，存在XSS风险。
 4. **潜在影响**
-   - 数据窃取：攻击者可以通过注入恶意脚本窃取用户数据。
-   - 页面篡改：攻击者可以修改页面内容误导用户。
-   - 会话劫持：攻击者可以通过脚本窃取用户的Cookie，冒充用户身份。
-CODE
+- 数据窃取：攻击者可以通过注入恶意脚本窃取用户数据。
+- 页面篡改：攻击者可以修改页面内容误导用户。
+- 会话劫持：攻击者可以通过脚本窃取用户的Cookie，冒充用户身份。
+DESC
+	solution: <<<SOLUTION
+无需特别修复，但需要审计人员对当前代码逻辑进行分析，确保过滤机制存在且无法被绕过。
+SOLUTION
+	risk: "信息",
+	name: "filteredSink",
 }
 
 

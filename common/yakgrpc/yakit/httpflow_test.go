@@ -3,6 +3,7 @@ package yakit
 import (
 	"database/sql"
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -281,6 +282,135 @@ func TestHTTPFlow_StatusCode(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, flows, 0)
 	})
+
+	// Test ExcludeStatusCode field
+	t.Run("exclude single status code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 4) // Should exclude 200, keep 201,202,203,204
+		for _, flow := range flows {
+			require.NotEqual(t, int64(200), flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude multiple status codes", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200,201,202",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 2) // Should exclude 200,201,202, keep 203,204
+		for _, flow := range flows {
+			require.NotContains(t, []int64{200, 201, 202}, flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude status code range", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-202",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 2) // Should exclude 200,201,202, keep 203,204
+		for _, flow := range flows {
+			require.NotContains(t, []int64{200, 201, 202}, flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude range and single code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-201,204",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 2) // Should exclude 200,201,204, keep 202,203
+		for _, flow := range flows {
+			require.NotContains(t, []int64{200, 201, 204}, flow.StatusCode)
+		}
+	})
+
+	t.Run("exclude all status codes", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-204",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 0) // Should exclude all
+	})
+
+	t.Run("exclude non-existent status code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "404",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Should exclude nothing, keep all 200-204
+	})
+
+	t.Run("exclude with prefix -", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "-200",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Invalid format should return normal results
+	})
+
+	t.Run("exclude with suffix -", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "200-",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Invalid format should return normal results
+	})
+
+	t.Run("exclude invalid format", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				ExcludeStatusCode: "abc",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 5) // Invalid format should return normal results
+	})
+
+	t.Run("exclude combined with include status code", func(t *testing.T) {
+		_, flows, err := QueryHTTPFlow(
+			consts.GetGormProjectDatabase(),
+			&ypb.QueryHTTPFlowRequest{
+				Keyword:           token,
+				StatusCode:        "200-204",
+				ExcludeStatusCode: "202",
+			})
+		require.NoError(t, err)
+		require.Len(t, flows, 4) // Include 200-204, exclude 202, should get 200,201,203,204
+		for _, flow := range flows {
+			require.NotEqual(t, int64(202), flow.StatusCode)
+			require.Contains(t, []int64{200, 201, 203, 204}, flow.StatusCode)
+		}
+	})
+
 }
 
 func TestQueryHTTPFlowsProcessNames(t *testing.T) {
@@ -440,6 +570,71 @@ func TestExcludeKeywords(t *testing.T) {
 	t.Logf("query with exclude keywords cost: %v", time.Since(start))
 	require.NoError(t, err)
 	require.Len(t, httpflows, 1)
+}
+
+func TestFilterHTTPFlowByDomain(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+
+	// 创建测试数据
+	token := utils.RandString(10)
+	var ids []int64
+
+	testFlows := []*schema.HTTPFlow{
+		{Url: fmt.Sprintf("https://baidu.com/%s", token)},
+		{Url: fmt.Sprintf("http://127.0.0.1:8080/%s", token)},
+		{Url: fmt.Sprintf("https://www.google.com/%s", token)},
+	}
+
+	// 插入测试数据
+	for _, flow := range testFlows {
+		err := InsertHTTPFlow(db, flow)
+		require.NoError(t, err)
+		ids = append(ids, int64(flow.ID))
+	}
+
+	// 清理测试数据
+	defer func() {
+		if len(ids) > 0 {
+			DeleteHTTPFlow(db, &ypb.DeleteHTTPFlowRequest{Id: ids})
+		}
+	}()
+
+	// 测试模糊匹配功能
+	t.Run("模糊匹配 - du 匹配 baidu.com", func(t *testing.T) {
+		filteredDB := FilterHTTPFlowByDomain(db.Where("url LIKE ?", "%"+token+"%"), "du")
+		var results []*schema.HTTPFlow
+		err := filteredDB.Find(&results).Error
+		require.NoError(t, err)
+		require.Len(t, results, 1, "应该匹配到1个包含'du'的域名")
+
+		parsedURL, err := url.Parse(results[0].Url)
+		require.NoError(t, err)
+		require.Equal(t, "baidu.com", parsedURL.Host, "应该匹配到baidu.com")
+	})
+
+	t.Run("模糊匹配 - 127 匹配 127.0.0.1", func(t *testing.T) {
+		filteredDB := FilterHTTPFlowByDomain(db.Where("url LIKE ?", "%"+token+"%"), "127")
+		var results []*schema.HTTPFlow
+		err := filteredDB.Find(&results).Error
+		require.NoError(t, err)
+		require.Len(t, results, 1, "应该匹配到1个包含'127'的IP地址")
+
+		parsedURL, err := url.Parse(results[0].Url)
+		require.NoError(t, err)
+		require.Equal(t, "127.0.0.1:8080", parsedURL.Host, "应该匹配到127.0.0.1:8080")
+	})
+
+	t.Run("模糊匹配 - google 匹配 www.google.com", func(t *testing.T) {
+		filteredDB := FilterHTTPFlowByDomain(db.Where("url LIKE ?", "%"+token+"%"), "google")
+		var results []*schema.HTTPFlow
+		err := filteredDB.Find(&results).Error
+		require.NoError(t, err)
+		require.Len(t, results, 1, "应该匹配到1个包含'google'的域名")
+
+		parsedURL, err := url.Parse(results[0].Url)
+		require.NoError(t, err)
+		require.Equal(t, "www.google.com", parsedURL.Host, "应该匹配到www.google.com")
+	})
 }
 
 func TestKeywordType(t *testing.T) {

@@ -1,0 +1,145 @@
+version: "1.0"
+description: "Third-party binary tools configuration"
+baseurl: "https://oss-qn.yaklang.com"
+
+binaries:
+  - name: "yaklang-aikb"
+    description: "Yaklang AIKB - A comprehensive knowledge base for AI"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/ai-knowledge-base/yaklang-aikb.zip"
+        bin_path: "yaklang-aikb.zip"
+  - name: "vulinbox"
+    description: "Yaklang Vulnerability Testing Box - A comprehensive vulnerability testing platform"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      linux-amd64:
+        url: "/vulinbox/latest/vulinbox_linux_amd64"
+        bin_path: "vulinbox"
+      "darwin-*":  # 使用glob模式匹配所有macOS平台 (darwin-amd64, darwin-arm64等)
+        url: "/vulinbox/latest/vulinbox_darwin_amd64"
+        bin_path: "vulinbox"
+      windows-amd64:
+        url: "/vulinbox/latest/vulinbox_windows_amd64.exe"
+        bin_path: "vulinbox.exe"
+  - name: "ffmpeg"
+    description: "FFmpeg - A complete, cross-platform solution to record, convert and stream audio and video"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      darwin-*:
+        url: "/ffmpeg/ffmpeg-v6.0-darwin-amd64"
+        bin_path: "ffmpeg"
+      windows-*:
+        url: "/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
+        bin_path: "ffmpeg.exe"
+  - name: "llama-server"
+    description: "Llama Server - A server for running Llama models"
+    version: "latest"
+    install_type: "archive"
+    download_info_map:
+      darwin-amd64:
+        url: "/llama.cpp/llama-b6209-bin-macos-x64.zip"
+        pick: "build/bin/*"
+        bin_dir: "llama-server"
+        bin_path: "llama-server/llama-server"
+      darwin-arm64:
+        url: "/llama.cpp/llama-b6209-bin-macos-arm64.zip"
+        pick: "build/bin/*"
+        bin_dir: "llama-server"
+        bin_path: "llama-server/llama-server"
+      windows-amd64:
+        url: "/llama.cpp/llama-b6209-bin-win-cpu-x64.zip"
+        pick: "*"
+        bin_dir: "llama-server"
+        bin_path: "llama-server/llama-server.exe"
+      linux-amd64:
+        url: "/llama.cpp/llama-b6209-bin-ubuntu-x64.zip"
+        pick: "*"
+        bin_dir: "llama-server"
+        bin_path: "llama-server/llama-server"
+  - name: "page2image"
+    description: "Page2Image - A tool for converting web pages to images"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "darwin-amd64":
+        url: "/page2img/2025-08-20/page2img-darwin-amd64"
+        bin_path: "page2img"
+      "darwin-arm64":
+        url: "/page2img/2025-08-20/page2img-darwin-arm64"
+        bin_path: "page2img"
+      "windows-amd64":
+        url: "/page2img/2025-08-20/page2img-windows-amd64.exe"
+        bin_path: "page2img.exe"
+      "linux-amd64":
+        url: "/page2img/2025-08-20/page2img-linux-amd64"
+        bin_path: "page2img"
+  - name: "pandoc"
+    description: "pandoc - A tool for file covert"
+    version: "latest"
+    install_type: "archive"
+    download_info_map:
+      "darwin-arm64":
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/pandoc/pandoc-darwin-arm64.zip"
+        pick: "pandoc"
+        bin_path: "pandoc"
+      "windows-amd64":
+        url: "https://yaklang.oss-cn-beijing.aliyuncs.com/pandoc/pandoc-windows-amd64.zip"
+        pick: "pandoc.exe"
+        bin_path: "pandoc.exe"
+  - name: "whisper.cpp"
+    description: "Whisper.cpp - A fast and accurate speech-to-text model"
+    version: "latest"
+    install_type: "archive"
+    download_info_map:
+      "darwin-amd64":
+        url: "/whisper.cpp/20250729/whisper.cpp-macos-amd64.zip"
+        pick: "*"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli"
+      "darwin-arm64":
+        url: "/whisper.cpp/20250729/whisper.cpp-macos-arm64.zip"
+        pick: "*"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli"
+      "windows-amd64":
+        url: "/whisper.cpp/20250729/whisper.cpp-windows-amd64.zip"
+        pick: "*"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli.exe"
+      "linux-amd64":
+        url: "/whisper.cpp/20250729/whisper.cpp-linux-amd64.zip"
+        pick: "*"
+        bin_dir: "whisper.cpp"
+        bin_path: "whisper.cpp/whisper-cli"
+  - name: "model-whisper-medium-q5"
+    tags: "aimodel"
+    description: "Whisper Medium Q5 model"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/gguf/whisper-medium-q5.gguf"
+        bin_path: "aimodel/whisper-medium-q5.gguf"
+  - name: "model-Qwen3-Embedding-0.6B-Q8"
+    tags: "aimodel,embedding"
+    description: "Qwen3 Embedding model Q8_K_M"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/gguf/Qwen3-Embedding-0.6B-Q8_0.gguf"
+        bin_path: "aimodel/Qwen3-Embedding-0.6B-Q8_0.gguf"
+  - name: "model-Qwen3-Embedding-0.6B-Q4"
+    tags: "aimodel,embedding"
+    description: "Qwen3 Embedding model Q4_K_M"
+    version: "latest"
+    install_type: "bin"
+    download_info_map:
+      "*":
+        url: "/gguf/Qwen3-Embedding-0.6B-Q4_K_M.gguf"
+        bin_path: "aimodel/Qwen3-Embedding-0.6B-Q4_K_M.gguf"

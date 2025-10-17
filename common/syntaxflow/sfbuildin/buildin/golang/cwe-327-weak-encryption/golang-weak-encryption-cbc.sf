@@ -1,0 +1,549 @@
+desc(
+	title: "Detect Golang Weak Encryption Using AES-CBC Mode"
+	title_zh: "检测Golang使用AES-CBC弱加密模式"
+	type: vuln
+	severity: mid
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   AES-CBC（Cipher Block Chaining）模式是一种对称加密模式，但它不提供密文完整性验证（无认证），因此容易遭受填充预言攻击（Padding Oracle Attack）和数据篡改攻击。攻击者可以在不知道密钥的情况下，通过观察解密错误逐字节恢复明文，或篡改密文而不被检测。CBC模式的安全性依赖于填充的正确性，而填充错误可能泄露关键信息。
+
+2. **触发场景**
+   ```go
+   // 案例 1: 使用 CBC 模式加密（不安全）
+   func EncryptAESCBC(plaintext, key []byte) ([]byte, error) {
+       block, err := aes.NewCipher(key)
+       if err != nil {
+           return nil, err
+       }
+       plaintext = PKCS7Padding(plaintext, aes.BlockSize)
+       ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+       iv := ciphertext[:aes.BlockSize]
+       if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+           return nil, err
+       }
+       mode := cipher.NewCBCEncrypter(block, iv) // ← 漏洞点
+       mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+       return ciphertext, nil
+   }
+   ```
+   攻击者可以利用填充错误信息（如`invalid padding`）逐步恢复明文或篡改数据。
+
+3. **潜在影响**
+   - 敏感数据（如密码、API密钥）可能被窃取。
+   - 数据可能被篡改而不被检测。
+   - 可能导致认证绕过或权限提升。
+DESC
+	rule_id: "c0a39d53-a8ab-4c1f-be60-ab20e0f19f34"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用 AES-GCM（Galois/Counter Mode）加密
+AES-GCM 提供了认证加密（AEAD），可以同时保证数据的机密性和完整性。
+```go
+// 方案 1: 使用 AES-GCM 加密（推荐）
+func EncryptAESGCM(plaintext, key []byte) ([]byte, error) {
+    block, err := aes.NewCipher(key)
+    if err != nil {
+        return nil, err
+    }
+    gcm, err := cipher.NewGCM(block)
+    if err != nil {
+        return nil, err
+    }
+    nonce := make([]byte, gcm.NonceSize())
+    if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+        return nil, err
+    }
+    ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+    return ciphertext, nil
+}
+```
+
+#### 2. 使用 ChaCha20-Poly1305 加密
+ChaCha20-Poly1305 是一种高效的认证加密算法，适合替代 AES-GCM。
+```go
+// 方案 3: 使用 ChaCha20-Poly1305（备选认证加密）
+func EncryptChaCha20Poly1305(plaintext, key []byte) ([]byte, error) {
+    aead, err := chacha20poly1305.New(key)
+    if err != nil {
+        return nil, err
+    }
+    nonce := make([]byte, aead.NonceSize())
+    if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+        return nil, err
+    }
+    ciphertext := aead.Seal(nonce, nonce, plaintext, nil)
+    return ciphertext, nil
+}
+```
+
+#### 3. 强制代码审查和测试
+- 禁止在项目中使用 CBC 模式。
+- 使用自动化工具（如本规则）检测 CBC 模式的使用。
+- 对现有代码进行审计和替换。
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
+)
+
+cipher?{<fullTypeName>?{have: 'crypto/cipher'}} as $cipher
+aes?{<fullTypeName>?{have: 'crypto/aes'}} as $aes
+
+$cipher.NewCBCEncrypter(* #-> as $block, * #-> as $iv) as $cbc_encrypter;
+$cipher.NewCBCDecrypter(* #-> as $block, * #-> as $iv) as $cbc_decrypter;
+
+$cbc_encrypter as $weak_cbc;
+$cbc_decrypter as $weak_cbc;
+
+$weak_cbc as $mid;
+
+alert $mid for {
+	type: "vuln",
+	title: "Golang Weak Encryption Using AES-CBC Mode Detected",
+	title_zh: "检测到Golang使用AES-CBC弱加密模式",
+	level: "mid",
+	name: "mid",
+	message: "检测到使用 AES-CBC 弱加密模式，可能遭受填充预言攻击或数据篡改，建议立即替换为认证加密模式。",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用AES-GCM模式（推荐）
+```go
+// AES-GCM加密示例
+block, _ := aes.NewCipher(key)
+gcm, _ := cipher.NewGCM(block)
+nonce := make([]byte, gcm.NonceSize())
+rand.Read(nonce)
+ciphertext := gcm.Seal(nonce, nonce, plaintext, nil) // 自动认证
+
+// AES-GCM解密
+nonce := ciphertext[:gcm.NonceSize()]
+plaintext, err := gcm.Open(nil, nonce, ciphertext[gcm.NonceSize():], nil)
+if err != nil {
+    return nil, err // 认证失败
+}
+```
+
+#### 2. 使用ChaCha20-Poly1305（高性能备选）
+```go
+// 需安装：go get golang.org/x/crypto/chacha20poly1305
+aead, _ := chacha20poly1305.New(key)
+nonce := make([]byte, aead.NonceSize())
+rand.Read(nonce)
+ciphertext := aead.Seal(nonce, nonce, plaintext, nil)
+
+// 解密
+nonce := ciphertext[:aead.NonceSize()]
+plaintext, err := aead.Open(nil, nonce, ciphertext[aead.NonceSize():], nil)
+```
+
+#### 3. 强制迁移措施
+- 审计所有`cipher.NewCBCEncrypter/Decrypter`调用
+- 为遗留系统添加HMAC验证（先加密后认证）
+- 定期轮换加密密钥
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   AES-CBC（Cipher Block Chaining）模式虽然提供数据机密性，但不提供密文完整性验证（无认证）。这种弱点使攻击者能够篡改数据而不被检测，并通过填充预言攻击（Padding Oracle Attack）逐字节恢复明文。在现代安全实践中，应使用认证加密模式（如AES-GCM或ChaCha20-Poly1305）来同时保障机密性和完整性。
+
+2. **触发场景**
+   ```go
+   // 漏洞示例：使用CBC模式加密
+   block, _ := aes.NewCipher(key)
+   iv := ciphertext[:aes.BlockSize]
+   mode := cipher.NewCBCEncrypter(block, iv) // ← 风险点
+   mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+   
+   // 漏洞示例：使用CBC模式解密（暴露填充错误）
+   mode := cipher.NewCBCDecrypter(block, iv)
+   mode.CryptBlocks(ciphertext, ciphertext)
+   plaintext, err := PKCS7UnPadding(ciphertext) // ← 可能泄露填充错误
+   ```
+
+3. **潜在影响**
+   - 敏感数据（如密码、API密钥）可能被窃取
+   - 攻击者可篡改加密数据而不触发异常
+   - 通过侧信道攻击（如时序分析）恢复密钥或明文
+DESC
+	risk: "弱加密漏洞",
+}
+
+desc(
+	lang: golang
+	alert_mid: 2
+	'file://unsafe_aes_cbc.go': <<<UNSAFE
+package main
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"errors"
+	"io"
+)
+
+// 案例 1: 使用 CBC 模式加密（不安全）
+func EncryptAESCBC(plaintext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// 添加 PKCS7 填充
+	plaintext = PKCS7Padding(plaintext, aes.BlockSize)
+	
+	ciphertext := make([]byte, aes.BlockSize+len(plaintext))
+	iv := ciphertext[:aes.BlockSize]
+	
+	if _, err := io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, err
+	}
+
+	// 危险：使用 CBC 模式加密
+	mode := cipher.NewCBCEncrypter(block, iv) // ← 漏洞点
+	mode.CryptBlocks(ciphertext[aes.BlockSize:], plaintext)
+	
+	return ciphertext, nil
+}
+
+// 案例 2: 使用 CBC 模式解密（不安全）
+func DecryptAESCBC(ciphertext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(ciphertext) < aes.BlockSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	iv := ciphertext[:aes.BlockSize]
+	ciphertext = ciphertext[aes.BlockSize:]
+
+	if len(ciphertext)%aes.BlockSize != 0 {
+		return nil, errors.New("ciphertext is not a multiple of block size")
+	}
+
+	// 危险：使用 CBC 模式解密
+	mode := cipher.NewCBCDecrypter(block, iv) // ← 漏洞点
+	mode.CryptBlocks(ciphertext, ciphertext)
+	
+	// 移除填充 - 可能泄露填充错误信息（Padding Oracle）
+	plaintext, err := PKCS7UnPadding(ciphertext)
+	if err != nil {
+		return nil, err // ← 攻击者可以利用这个错误
+	}
+	
+	return plaintext, nil
+}
+
+// 案例 3: 处理敏感数据但使用 CBC
+func EncryptPassword(password string, key []byte) ([]byte, error) {
+	// 危险：密码使用 CBC 加密，容易被攻击
+	return EncryptAESCBC([]byte(password), key)
+}
+
+func EncryptAPIKey(apiKey string, key []byte) ([]byte, error) {
+	// 危险：API 密钥使用 CBC 加密
+	return EncryptAESCBC([]byte(apiKey), key)
+}
+
+// PKCS7 填充
+func PKCS7Padding(data []byte, blockSize int) []byte {
+	padding := blockSize - len(data)%blockSize
+	padtext := make([]byte, padding)
+	for i := range padtext {
+		padtext[i] = byte(padding)
+	}
+	return append(data, padtext...)
+}
+
+// PKCS7 去填充 - 填充预言攻击的来源
+func PKCS7UnPadding(data []byte) ([]byte, error) {
+	length := len(data)
+	if length == 0 {
+		return nil, errors.New("invalid padding")
+	}
+	
+	padding := int(data[length-1])
+	if padding > length || padding > 16 {
+		return nil, errors.New("invalid padding") // ← 攻击者可以利用这个错误
+	}
+	
+	// 验证填充
+	for i := 0; i < padding; i++ {
+		if data[length-1-i] != byte(padding) {
+			return nil, errors.New("invalid padding") // ← 填充预言
+		}
+	}
+	
+	return data[:length-padding], nil
+}
+
+func main() {
+	key := make([]byte, 32) // AES-256
+	io.ReadFull(rand.Reader, key)
+	
+	// 加密敏感数据
+	encrypted, _ := EncryptPassword("mySecretPassword", key)
+	
+	// 解密
+	decrypted, err := DecryptAESCBC(encrypted, key)
+	if err != nil {
+		// 攻击者可以通过观察这个错误来恢复明文
+		println("Decryption failed:", err.Error())
+	}
+}
+UNSAFE
+	'safefile://safe_aes_gcm.go': <<<SAFE
+package main
+
+import (
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"errors"
+	"io"
+	"log"
+)
+
+// 方案 1: 使用 AES-GCM 加密（推荐）
+func EncryptAESGCM(plaintext, key []byte) ([]byte, error) {
+	// 1. 创建 AES cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 创建 GCM 模式
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	// 3. 生成随机 nonce
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	// 4. 加密并认证
+	// Seal 自动加密数据并附加认证标签
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	
+	return ciphertext, nil
+}
+
+// 使用 AES-GCM 解密
+func DecryptAESGCM(ciphertext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce := ciphertext[:nonceSize]
+	ciphertext = ciphertext[nonceSize:]
+
+	// Open 自动验证认证标签
+	// 如果密文被篡改，会返回错误
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err // 认证失败！
+	}
+
+	return plaintext, nil
+}
+
+// 方案 2: 使用 AES-GCM 并支持附加认证数据
+func EncryptAESGCMWithAAD(plaintext, key, additionalData []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	// 附加认证数据（AAD）不会被加密，但会被认证
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, additionalData)
+	
+	return ciphertext, nil
+}
+
+func DecryptAESGCMWithAAD(ciphertext, key, additionalData []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce := ciphertext[:nonceSize]
+	ciphertext = ciphertext[nonceSize:]
+
+	// AAD 必须匹配，否则认证失败
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, additionalData)
+	if err != nil {
+		return nil, err
+	}
+
+	return plaintext, nil
+}
+
+// 安全地加密敏感数据
+func EncryptPassword(password string, key []byte) ([]byte, error) {
+	// 安全：使用 GCM 加密密码
+	return EncryptAESGCM([]byte(password), key)
+}
+
+func EncryptAPIKey(apiKey string, key []byte) ([]byte, error) {
+	// 安全：使用 GCM 加密 API 密钥
+	// 可以添加 AAD 来绑定上下文信息
+	aad := []byte("api-key-v1")
+	return EncryptAESGCMWithAAD([]byte(apiKey), key, aad)
+}
+
+func main() {
+	// 生成安全的密钥
+	key := make([]byte, 32) // AES-256
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		log.Fatal(err)
+	}
+	
+	// 加密
+	plaintext := []byte("sensitive data")
+	encrypted, err := EncryptAESGCM(plaintext, key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	// 解密
+	decrypted, err := DecryptAESGCM(encrypted, key)
+	if err != nil {
+		log.Println("Authentication failed! Data may have been tampered with.")
+		return
+	}
+	
+	log.Printf("Decrypted: %s\n", decrypted)
+}
+SAFE
+	'safefile://safe_chacha20_poly1305.go': <<<SAFE
+package main
+
+import (
+	"crypto/rand"
+	"errors"
+	"io"
+	"log"
+	
+	"golang.org/x/crypto/chacha20poly1305"
+)
+
+// 方案 3: 使用 ChaCha20-Poly1305（备选认证加密）
+func EncryptChaCha20Poly1305(plaintext, key []byte) ([]byte, error) {
+	// 密钥必须是 32 字节
+	if len(key) != chacha20poly1305.KeySize {
+		return nil, errors.New("invalid key size, must be 32 bytes")
+	}
+
+	// 创建 ChaCha20-Poly1305 AEAD
+	aead, err := chacha20poly1305.New(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// 生成随机 nonce（12 字节）
+	nonce := make([]byte, aead.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	// 加密并认证
+	ciphertext := aead.Seal(nonce, nonce, plaintext, nil)
+	return ciphertext, nil
+}
+
+func DecryptChaCha20Poly1305(ciphertext, key []byte) ([]byte, error) {
+	if len(key) != chacha20poly1305.KeySize {
+		return nil, errors.New("invalid key size, must be 32 bytes")
+	}
+
+	aead, err := chacha20poly1305.New(key)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := aead.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce := ciphertext[:nonceSize]
+	ciphertext = ciphertext[nonceSize:]
+
+	// 解密并验证认证标签
+	plaintext, err := aead.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err // 认证失败
+	}
+
+	return plaintext, nil
+}
+
+func main() {
+	// 生成 32 字节密钥
+	key := make([]byte, chacha20poly1305.KeySize)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		log.Fatal(err)
+	}
+	
+	plaintext := []byte("ChaCha20-Poly1305 is fast and secure!")
+	
+	// 加密
+	encrypted, err := EncryptChaCha20Poly1305(plaintext, key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	
+	// 解密
+	decrypted, err := DecryptChaCha20Poly1305(encrypted, key)
+	if err != nil {
+		log.Println("Authentication failed!")
+		return
+	}
+	
+	log.Printf("Decrypted: %s\n", decrypted)
+}
+SAFE
+)
+

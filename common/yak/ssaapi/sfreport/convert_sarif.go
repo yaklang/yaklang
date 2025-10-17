@@ -17,6 +17,10 @@ type SarifReport struct {
 	report *sarif.Report
 }
 
+func (r *SarifReport) AddSyntaxFlowRisks(risks []*schema.SSARisk) {
+	log.Errorf("The sarif format cannot specify only a single risk for generation")
+}
+
 func NewSarifReport() (*SarifReport, error) {
 	sarifReport, err := sarif.New(sarif.Version210, false)
 	if err != nil {
@@ -39,7 +43,7 @@ func (r *SarifReport) AddSyntaxFlowResult(result *ssaapi.SyntaxFlowResult) bool 
 	return false
 }
 
-func (r *SarifReport) PrettyWrite(writer io.Writer) error {
+func (r *SarifReport) Save(writer io.Writer) error {
 	return r.report.PrettyWrite(writer)
 }
 
@@ -191,7 +195,7 @@ func (s *SarifContext) CreateCodeFlowsFromPredecessor(v *ssaapi.Value) {
 	s.createCodeFlowsFromPredecessor(v)
 }
 
-func (s *SarifContext) CreateLocation(artifactId int, rg memedit.RangeIf) *sarif.Location {
+func (s *SarifContext) CreateLocation(artifactId int, rg *memedit.Range) *sarif.Location {
 	return sarif.NewLocation().
 		WithPhysicalLocation(
 			sarif.NewPhysicalLocation().WithArtifactLocation(

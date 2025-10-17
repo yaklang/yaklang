@@ -14,16 +14,16 @@ const (
 )
 
 type basicBlockInfo struct {
-	currentBlock    *ssa.BasicBlock
-	prog            *Program
-	frame           *sfvm.SFFrame
-	recursiveConfig *RecursiveConfig
-	visited         map[int64]struct{}
-	direction       direction
-	hasInclude      bool
-	results         []sfvm.ValueOperator
-	isFinish        bool
-	index           int
+	currentBlock *ssa.BasicBlock
+	prog         *Program
+	frame        *sfvm.SFFrame
+	matchCheck   *sfCheck
+	visited      map[int64]struct{}
+	direction    direction
+	hasInclude   bool
+	results      []sfvm.ValueOperator
+	isFinish     bool
+	index        int
 }
 
 var nativeCallScan = func(direction direction) func(v sfvm.ValueOperator, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (bool, sfvm.ValueOperator, error) {
@@ -57,13 +57,13 @@ func searchAlongBasicBlock(
 	direction direction,
 ) []sfvm.ValueOperator {
 	basicBlockInfo := &basicBlockInfo{
-		prog:            prog,
-		frame:           frame,
-		recursiveConfig: nil,
-		visited:         make(map[int64]struct{}),
-		direction:       direction,
-		results:         make([]sfvm.ValueOperator, 0),
-		isFinish:        false,
+		prog:       prog,
+		frame:      frame,
+		matchCheck: nil,
+		visited:    make(map[int64]struct{}),
+		direction:  direction,
+		results:    make([]sfvm.ValueOperator, 0),
+		isFinish:   false,
 	}
 	basicBlockInfo.createRecursiveConfig(frame, params)
 	basicBlockInfo.searchBlock(value)
@@ -76,7 +76,7 @@ func (b *basicBlockInfo) createRecursiveConfig(frame *sfvm.SFFrame, params *sfvm
 		log.Warnf("Get sfResult error:%s", err)
 		return
 	}
-	b.recursiveConfig, b.hasInclude = CreateRecursiveConfigFromNativeCallParams(sfResult, frame.GetConfig(), params)
+	b.matchCheck = CreateCheckFromNativeCallParam(sfResult, frame.GetConfig(), params)
 }
 
 func (b *basicBlockInfo) searchBlock(value ssa.Value) {
@@ -107,16 +107,20 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 	switch b.direction {
 	case Previous:
 		for _, pred := range block.Preds {
-			pred := block.GetValueById(pred)
-			b.searchBlock(pred)
+			pred, ok := block.GetValueById(pred)
+			if ok && pred != nil {
+				b.searchBlock(pred)
+			}
 			if b.isFinish {
 				break
 			}
 		}
 	case Next:
 		for _, succ := range block.Succs {
-			succ := block.GetValueById(succ)
-			b.searchBlock(succ)
+			succ, ok := block.GetValueById(succ)
+			if ok && succ != nil {
+				b.searchBlock(succ)
+			}
 			if b.isFinish {
 				break
 			}
@@ -132,11 +136,14 @@ func (b *basicBlockInfo) searchBlock(value ssa.Value) {
 
 func (b *basicBlockInfo) searchInsts(block *ssa.BasicBlock) {
 	for _, inst := range block.Insts {
-		inst := block.GetInstructionById(inst)
+		inst, ok := block.GetInstructionById(inst)
+		if !ok {
+			continue
+		}
 		if jump, ok := ssa.ToJump(inst); ok {
 			_ = jump
-			block := block.GetBasicBlockByID(jump.To)
-			if block != nil && b.currentBlock.HaveSubBlock(block) {
+			block, ok := block.GetBasicBlockByID(jump.To)
+			if ok && block != nil && b.currentBlock.HaveSubBlock(block) {
 				b.searchInsts(block)
 			}
 			continue
@@ -146,28 +153,17 @@ func (b *basicBlockInfo) searchInsts(block *ssa.BasicBlock) {
 			log.Warnf("NewValue error: %s", err)
 			continue
 		}
-		if b.recursiveConfig.configItems == nil {
+		if b.matchCheck.Empty() {
 			b.results = append(b.results, value)
 			continue
-		} else {
-			matchedConfig := b.recursiveConfig.compileAndRun(value)
-			if _, ok := matchedConfig[sfvm.RecursiveConfig_Include]; ok {
-				b.results = append(b.results, value)
-				continue
-			}
-			if _, ok := matchedConfig[sfvm.RecursiveConfig_Until]; ok {
-				b.isFinish = true
-				break
-			}
-			if _, ok := matchedConfig[sfvm.RecursiveConfig_Exclude]; ok {
-				// nothing todo
-				// this value skip
-				continue
-			}
-			if !b.hasInclude {
-				// if has include, only match value can save to results
-				b.results = append(b.results, value)
-			}
+		}
+
+		if b.matchCheck.CheckUntil(value) {
+			b.isFinish = true
+			break
+		}
+		if b.matchCheck.CheckMatch(value) {
+			b.results = append(b.results, value)
 		}
 	}
 }

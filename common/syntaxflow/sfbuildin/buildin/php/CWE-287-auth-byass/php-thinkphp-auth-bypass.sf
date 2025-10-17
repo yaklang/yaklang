@@ -15,25 +15,25 @@ desc(
    - 直接从请求参数获取用户标识而未验证其合法性
    - 认证逻辑存在缺陷，如可预测的令牌或可绕过的条件检查
 
-   ```php
-   // 存在漏洞的代码示例
-   namespace app\index\controller;
-   use think\Controller;
-
-   class User extends Controller {
-       public function deleteUser() {
-           $userId = input('user_id'); // 未经验证的用户输入
-           // 直接执行删除操作，未检查当前用户权限
-           $this->model->where('id', $userId)->delete();
-       }
-   }
-   ```
+```php
+// 存在漏洞的代码示例
+namespace app\index\controller;
+use think\Controller;
+class User extends Controller {
+    public function deleteUser() {
+        $userId = input('user_id'); // 未经验证的用户输入
+        // 直接执行删除操作，未检查当前用户权限
+        $this->model->where('id', $userId)->delete();
+    }
+}
+```
 
 3. **潜在影响**
    - 未授权访问敏感功能或数据
    - 恶意用户可提升自身权限
    - 系统关键功能被未授权操纵
    - 可能导致数据泄露或系统完整性破坏
+
 DESC
 	rule_id: "f0c086d0-c004-4367-abd7-d16ca50de3d9"
 	solution: <<<SOLUTION
@@ -41,6 +41,7 @@ DESC
 
 #### 1. 实施严格的中间件验证
 在ThinkPHP中应当为所有需要认证的路由应用认证中间件：
+
 ```php
 // 定义认证中间件
 class AuthMiddleware {
@@ -58,6 +59,7 @@ Route::rule('user/profile', 'user/profile')->middleware(AuthMiddleware::class);
 
 #### 2. 实现权限控制系统
 对于敏感操作应当实现细粒度的权限控制：
+
 ```php
 // 在控制器中检查权限
 public function deleteUser() {
@@ -70,6 +72,7 @@ public function deleteUser() {
 
 #### 3. 参数安全处理
 对所有的用户输入进行严格验证：
+
 ```php
 // 使用验证器确保参数安全
 $validate = Validate::rule('user_id', 'require|number|gt:0');
@@ -119,5 +122,90 @@ class User extends Controller
         }
     }
 }
+CODE
+	"safefile://AuthMiddleware.php": <<<CODE
+<?php
+namespace app\middleware;
+use think\facade\Request;
+
+class AuthMiddleware
+{
+    public function handle($request, \Closure $next)
+    {
+        // 检查用户是否已登录，例如检查session中是否存在user_id
+        if (!session('user_id')) {
+            // 如果未登录，重定向到登录页面或返回未授权响应
+            return redirect('/login');
+        }
+        // 用户已登录，继续处理请求
+        return $next($request);
+    }
+}
+
+CODE
+	"safefile://SecureUserController.php": <<<CODE
+<?php
+namespace app\index\controller;
+use think\Controller;
+use think\facade\Validate;
+
+class SecureUser extends Controller
+{
+    // 构造函数，可用于在控制器级别应用中间件或检查。
+    protected $middleware = ['AuthMiddleware']; // 假设已定义 AuthMiddleware
+
+    public function deleteUser()
+    {
+        // 1. 严格的输入验证：使用ThinkPHP的验证器确保user_id是有效的。
+        $validate = Validate::rule('user_id', 'require|number|gt:0');
+        if (!$validate->check(input())) {
+            // 如果验证失败，抛出异常或返回错误信息。
+            throw new \think\exception\ValidateException('Invalid User ID');
+        }
+
+        $userIdToDelete = input('user_id');
+
+        // 2. 权限控制：确保当前登录用户有权限删除指定用户。
+        // 假设 auth() 方法返回当前登录用户对象，can() 检查权限。
+        // 这里只是示例，实际业务逻辑可能更复杂，例如检查是否是自己或管理员。
+        if (!auth()->user()->isAdmin() && auth()->user()->getId() != $userIdToDelete) {
+            throw new \think\exception\UnauthorizedException('No permission to delete this user.');
+        }
+
+        // 3. 安全删除逻辑：执行删除操作。
+        // 使用安全的方式获取模型实例并执行删除，避免SQL注入等问题。
+        try {
+            $this->model('user')->where('id', $userIdToDelete)->delete();
+            return json(['code' => 0, 'msg' => 'User deleted successfully.']);
+        } catch (\Exception $e) {
+            return json(['code' => 1, 'msg' => 'Failed to delete user: ' . $e->getMessage()]);
+        }
+    }
+
+    // 另一个使用了权限检查的示例方法
+    public function updateProfile()
+    {
+        // 假设 AuthMiddleware 已经确保了用户登录
+        $userId = auth()->user()->getId(); // 从认证信息中获取当前用户ID
+        $name = input('name');
+        $email = input('email');
+
+        // 验证输入
+        $validate = Validate::rule('name', 'require|max:255')
+                            ->rule('email', 'require|email');
+        if (!$validate->check(input())) {
+            throw new \think\exception\ValidateException($validate->getError());
+        }
+
+        // 更新用户资料
+        try {
+            $this->model('user')->where('id', $userId)->update(['name' => $name, 'email' => $email]);
+            return json(['code' => 0, 'msg' => 'Profile updated successfully.']);
+        } catch (\Exception $e) {
+            return json(['code' => 1, 'msg' => 'Failed to update profile: ' . $e->getMessage()]);
+        }
+    }
+}
+
 CODE
 )

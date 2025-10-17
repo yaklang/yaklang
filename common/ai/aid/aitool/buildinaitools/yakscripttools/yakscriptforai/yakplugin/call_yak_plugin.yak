@@ -1,0 +1,73 @@
+__DESC__ = "一个Yak插件调用器，可以通过指定插件名称来执行插件，可以指定多个插件名，使用逗号分隔，支持传递HTTP请求包等参数，并提供反馈机制来显示插件执行结果（调用时url参数和requestPacket必须传入其中一个）。"
+__VERBOSE_NAME__ = "Yak插件调用器"
+__KEYWORDS__ = "插件调用,MITM插件,插件执行,HTTP请求,插件管理,反馈机制,plugin caller,mitm plugin,plugin execution,http request,plugin management,feedback mechanism,yak plugin,hook manager"
+
+pluginNames = cli.String("names", cli.setVerboseName("插件名列表"),cli.setHelp("插件名列表，多个插件之间使用逗号分隔"),cli.setRequired(true))
+
+targetUrl = cli.Text("url",cli.setVerboseName("请求URL"), cli.setHelp("指定请求URL，用于插件调用"))
+reqPacket = cli.Text("requestPacket",cli.setVerboseName("请求报文"), cli.setHelp("指定请求包报文，用于插件调用，插件会通过此报文对目标发起请求"))
+isHttpsStr = cli.String("isHttps",cli.setVerboseName("是否是https站点"), cli.setHelp("目标是否是https站点"))
+isHttps = isHttpsStr == "true"
+mitmParamsIsOk = true
+if reqPacket == ""{
+    if targetUrl != ""{
+        isHttps,req,err = poc.ParseUrlToHTTPRequestRaw("GET", targetUrl)
+        if err{
+            yakit.Error("解析URL，生成请求包出错: %v" % err)
+            return
+        }
+        reqPacket = req
+    }else{
+        mitmParamsIsOk = false
+    }
+}
+
+cli.check()
+
+pluginNameList = str.Split(pluginNames, ",")
+
+manager, err = hook.NewMixPluginCaller()
+if err != nil {
+    yakit.Error("创建mix plugin caller失败: %v", err)
+    return
+}
+manager.SetFeedback(func(i){
+    msg = json.loads(i.Message)
+    data = msg.content.data
+    level = msg.content.level 
+    switch msg.content.level{
+    case "info":
+        yakit.Info(data)
+    case "error":
+        yakit.Error(data)
+    default:
+        yakit.Info("收到信息，不支持的信息类型: [%s] %s",level,data)
+    }
+})
+for plugin in pluginNameList{
+    manager.LoadPlugin(plugin)
+}
+callMitmPlugin = (reqPacket)=>{
+    if !mitmParamsIsOk{
+        return "参数不正确"
+    }
+
+    reqIns,err = str.ParseStringToHTTPRequest(reqPacket)
+    if err{
+        return "解析请求包失败: %v" % err
+    }
+    url = reqIns.URL.String()
+    body = poc.GetHTTPPacketBody(reqPacket)
+
+    rsp,req,err = poc.HTTP(reqPacket, poc.https(isHttps))
+    if err {
+        return "请求目标失败: %v" % err
+    }
+    manager.MirrorHTTPFlow(isHttps, url, req, rsp, body)
+}
+err = callMitmPlugin(reqPacket)
+if err {
+    yakit.Error("调用插件失败: %v", err)
+    return
+}
+manager.Wait()

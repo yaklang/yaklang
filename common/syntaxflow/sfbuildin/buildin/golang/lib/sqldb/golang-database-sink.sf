@@ -5,33 +5,29 @@ desc(
 	lib: 'golang-database-sink'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-
+SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```go
-   userInput := r.URL.Query().Get("id")
-   query := fmt.Sprintf("SELECT * FROM users WHERE id = %s", userInput)  // 直接拼接用户输入
-   rows, err := db.Query(query)
-   if err != nil {
-       log.Fatal(err)
-   }
-   defer rows.Close()
-   ```
-   攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
-
+// 存在漏洞的代码示例
+```go
+userInput := r.URL.Query().Get("id")
+query := fmt.Sprintf("SELECT * FROM users WHERE id = %s", userInput)  // 直接拼接用户输入
+rows, err := db.Query(query)
+if err != nil {
+log.Fatal(err)
+}
+defer rows.Close()
+```
+攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "0243f5ea-a5c8-4e03-a06d-78a2c9c8ff82"
 	title_zh: "审计Golang数据库函数"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（PreparedStatement）
 通过预编译SQL语句并绑定用户输入，隔离代码与数据，避免恶意输入篡改逻辑。
 ```go
@@ -39,30 +35,28 @@ userInput := r.URL.Query().Get("id")
 query := "SELECT * FROM users WHERE id = ?"  // 使用占位符
 err := db.QueryRow(query, userInput).Scan(&result)
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 ```
-
 #### 2. 输入合法性校验
 对用户输入实施类型、格式或范围限制，拒绝非法输入。
 ```go
 userInput := r.URL.Query().Get("id")
 if !isValidNumber(userInput) {
-    http.Error(w, "Invalid input", http.StatusBadRequest)
-    return
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
 }
 func isValidNumber(input string) bool {
-    _, err := strconv.Atoi(input)
-    return err == nil
+_, err := strconv.Atoi(input)
+return err == nil
 }
 ```
-
 #### 3. 使用ORM框架
 通过ORM（如GORM）内置的安全机制自动处理参数化，避免手动拼接SQL。
 ```go
 type User struct {
-    ID   int
-    Name string
+ID   int
+Name string
 }
 var user User
 db.Where("id = ?", userInput).First(&user)
@@ -78,7 +72,9 @@ REFERENCE
 <include('golang-database-reform')> as $output;
 <include('golang-database-sql')> as $output;
 <include('golang-database-sqlx')> as $output;
-<include('golang-database-from-param')> as $output;
+sql.DB as $output;
+
+$output<getFunc><getCall>.* as $output
 
 alert $output for {
 	title: "Audit Golang Database Sink",

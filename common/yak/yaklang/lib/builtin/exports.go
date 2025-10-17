@@ -37,9 +37,9 @@ var YaklangBaseLib = map[string]interface{}{
 	"set":       Set,
 	"make":      Make,
 	"close":     CloseChan,
-
-	"max": Max,
-	"min": Min,
+	"max":       Max,
+	"min":       Min,
+	"error":     utils.Error,
 
 	"undefined": yaklangspec.Undefined,
 

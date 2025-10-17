@@ -41,7 +41,7 @@ func UpdateAIForgeByName(db *gorm.DB, name string, forge *schema.AIForge) error 
 
 func UpdateAIForgeByID(db *gorm.DB, id uint, forge *schema.AIForge) error {
 	db = db.Model(&schema.AIForge{})
-	if db := db.Where("id = ?", id).Updates(&schema.AIForge{}); db.Error != nil {
+	if db := db.Where("id = ?", id).Updates(forge); db.Error != nil {
 		return utils.Errorf("update AI Forge failed: %s", db.Error)
 	}
 	return nil
@@ -85,14 +85,29 @@ func GetAIForgeByName(db *gorm.DB, name string) (*schema.AIForge, error) {
 	return &forge, nil
 }
 
+func GetAIForgeByID(db *gorm.DB, id int64) (*schema.AIForge, error) {
+	var forge schema.AIForge
+	if db := db.Where("id = ?", id).First(&forge); db.Error != nil {
+		return nil, db.Error
+	}
+	return &forge, nil
+}
+
 func FilterAIForge(db *gorm.DB, filter *ypb.AIForgeFilter) *gorm.DB {
 	db = db.Model(&schema.AIForge{})
+	if filter.GetShowTemporary() {
+		db = db.Where("is_temporary = ?", true)
+	}
 	db = bizhelper.FuzzQueryLike(db, "forge_name", filter.GetForgeName())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "forge_name", filter.GetForgeNames())
 	db = bizhelper.ExactQueryString(db, "forge_type", filter.GetForgeType())
 	db = bizhelper.FuzzSearchEx(db, []string{
 		"forge_name", "forge_content", "init_prompt", "persistent_prompt", "plan_prompt", "result_prompt",
 	}, filter.GetKeyword(), false)
 	db = bizhelper.ExactQueryStringArrayOr(db, "tags", filter.GetTag())
+	if filter.GetId() > 0 {
+		db = bizhelper.ExactQueryInt64(db, "id", filter.GetId())
+	}
 	return db
 }
 

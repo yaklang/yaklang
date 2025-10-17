@@ -6,44 +6,37 @@ desc(
 	risk: "unsafe-ftp-parameter-validation"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 当应用程序在调用FTP相关函数（如 `ftp_chdir`, `ftp_delete`, `ftp_put`, `ftp_get`, `ftp_rename` 等）时，未对用户提供的文件名、路径或参数进行充分的验证和过滤，攻击者可以构造恶意输入。
 这可能导致以下问题：
 - **路径穿越 (Path Traversal/Directory Traversal)**: 攻击者利用 `../` 等序列访问FTP服务器上预期目录之外的文件和目录。
 - **文件覆盖/删除**: 攻击者通过操纵文件名或路径来覆盖或删除任意文件。
 - **权限绕过/文件泄露**: 在某些情况下，恶意参数可能导致绕过FTP权限限制，访问敏感文件或执行未授权操作。
-
 2. **触发场景**
 该规则主要检测用户可控的输入（如来自 `$_GET`, `$_POST`, `$_REQUEST` 等超全局变量）直接或间接作为FTP函数参数的情况，并且缺乏有效的安全过滤措施。例如，直接将用户输入的路径字符串传递给 `ftp_delete` 函数，而未检查其中是否包含恶意构造的路径穿越字符。
-
 ```php
 <?php
 // 高风险案例（直接使用未过滤参数）
 function deleteFile() {
-    $file = $_GET['file']; // 直接接收用户输入
-    ftp_delete($ftp_conn, $file); // 触发高风险告警
+$file = $_GET['file']; // 直接接收用户输入
+ftp_delete($ftp_conn, $file); // 触发高风险告警
 }
-
 // 中风险案例（过滤不充分）
 function uploadFile() {
-    $path = $_POST['path'];
-    $filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
-    ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
+$path = $_POST['path'];
+$filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
+ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
 }
-
 // 低风险案例（存在潜在绕过，需审计过滤逻辑）
 function createDir() {
-    $dir = sanitizeInput($_GET['dir']);
-    ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
+$dir = sanitizeInput($_GET['dir']);
+ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
 }
-
 function sanitizeInput($input) {
-    return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
+return preg_replace('/\..\//', '', $input); // 未处理URL编码路径
 }
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者可能在FTP服务器上读写、修改或删除任意文件，导致数据损坏、丢失或敏感信息泄露。
 - 攻击者可能利用路径穿越漏洞访问受限目录，获取配置文件、日志或源代码等敏感信息。
@@ -52,48 +45,41 @@ DESC
 	rule_id: "4e4aa781-f02e-48f2-9d71-2e17b89b218c"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 对用户输入进行严格验证和过滤
 在将用户输入传递给FTP函数之前，进行严格的输入验证和过滤，只允许合法的字符和路径结构。使用白名单方法优于黑名单方法。
-
 ```php
 <?php
 // 修复代码示例：严格路径验证
 function safeDeleteFile() {
-    $file = $_GET['file'];
-    if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
-        ftp_delete($ftp_conn, $file);
-    } else {
-        // 处理非法输入，如记录日志或返回错误
-        error_log("Invalid FTP file path attempted: " . $file);
-        echo "Error: Invalid file path.";
-    }
+$file = $_GET['file'];
+if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
+ftp_delete($ftp_conn, $file);
+} else {
+// 处理非法输入，如记录日志或返回错误
+error_log("Invalid FTP file path attempted: " . $file);
+echo "Error: Invalid file path.";
 }
-
+}
 function isValidFtpPath($path) {
-    // 示例验证逻辑：
-    // 1. 检查路径是否包含 '..' 进行路径穿越
-    if (strpos($path, '..') !== false) {
-        return false;
-    }
-    // 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
-    // if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
-    //     return false;
-    // }
-    return true;
+// 示例验证逻辑：
+// 1. 检查路径是否包含 '..' 进行路径穿越
+if (strpos($path, '..') !== false) {
+return false;
+}
+// 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
+// if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
+//     return false;
+// }
+return true;
 }
 ?>
 ```
-
 #### 2. 使用绝对路径或已严格控制的相对路径
 尽量避免使用用户可控的相对路径。如果必须使用相对路径，确保其受限于一个已知的、受限的根目录，并且用户无法通过操纵输入逃离该目录。
-
 #### 3. 对文件名和路径进行编码和解码
 根据FTP协议和服务器的实际情况，对文件名和路径进行适当的URL编码或FTP特定的编码解码，以确保特殊字符被正确处理而不是被解释为路径分隔符或命令。
-
 #### 4. 限制FTP用户权限
 为进行文件操作的FTP用户配置最小必需的权限，限制其只能访问和操作特定目录下的文件，即使存在参数注入漏洞，也能限制潜在的危害范围。
-
 #### 5. 定期更新和审计代码
 定期对处理用户输入的代码进行安全审计，并及时应用框架和库的安全更新。
 SOLUTION
@@ -125,101 +111,90 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-	title: "Unvalidated FTP Parameter Injection",
-	title_zh: "FTP未验证参数注入风险",
-	solution: <<<CODE
+	title: "PHP Unvalidated FTP Parameter Injection Vulnerability Was Found",
+	title_zh: "发现PHP未验证FTP参数注入漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 对用户输入进行严格验证和过滤
 在将用户输入传递给FTP函数之前，进行严格的输入验证和过滤，只允许合法的字符和路径结构。使用白名单方法优于黑名单方法。
-
 ```php
 <?php
 // 修复代码示例：严格路径验证
 function safeDeleteFile() {
-    $file = $_GET['file'];
-    if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
-        ftp_delete($ftp_conn, $file);
-    } else {
-        // 处理非法输入，如记录日志或返回错误
-        error_log("Invalid FTP file path attempted: " . $file);
-        echo "Error: Invalid file path.";
-    }
+$file = $_GET['file'];
+if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
+ftp_delete($ftp_conn, $file);
+} else {
+// 处理非法输入，如记录日志或返回错误
+error_log("Invalid FTP file path attempted: " . $file);
+echo "Error: Invalid file path.";
 }
-
+}
 function isValidFtpPath($path) {
-    // 示例验证逻辑：
-    // 1. 检查路径是否包含 '..' 进行路径穿越
-    if (strpos($path, '..') !== false) {
-        return false;
-    }
-    // 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
-    // if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
-    //     return false;
-    // }
-    return true;
+// 示例验证逻辑：
+// 1. 检查路径是否包含 '..' 进行路径穿越
+if (strpos($path, '..') !== false) {
+return false;
+}
+// 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
+// if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
+//     return false;
+// }
+return true;
 }
 ?>
 ```
-
-#### 2. 使用绝对路径或已严格控制的相対路径
+#### 2. 使用绝对路径或已严格控制的相对路径
 尽量避免使用用户可控的相对路径。如果必须使用相对路径，确保其受限于一个已知的、受限的根目录，并且用户无法通过操纵输入逃离该目录。
-
 #### 3. 对文件名和路径进行编码和解码
 根据FTP协议和服务器的实际情况，对文件名和路径进行适当的URL编码或FTP特定的编码解码，以确保特殊字符被正确处理而不是被解释为路径分隔符或命令。
-
 #### 4. 限制FTP用户权限
 为进行文件操作的FTP用户配置最小必需的权限，限制其只能访问和操作特定目录下的文件，即使存在参数注入漏洞，也能限制潜在的危害范围。
-
 #### 5. 定期更新和审计代码
 定期对处理用户输入的代码进行安全审计，并及时应用框架和库的安全更新。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 当应用程序在调用FTP相关函数（如 `ftp_chdir`, `ftp_delete`, `ftp_put`, `ftp_get`, `ftp_rename` 等）时，未对用户提供的文件名、路径或参数进行充分的验证和过滤，攻击者可以构造恶意输入。
 这可能导致以下问题：
 - **路径穿越 (Path Traversal/Directory Traversal)**: 攻击者利用 `../` 等序列访问FTP服务器上预期目录之外的文件和目录。
 - **文件覆盖/删除**: 攻击者通过操纵文件名或路径来覆盖或删除任意文件。
 - **权限绕过/文件泄露**: 在某些情况下，恶意参数可能导致绕过FTP权限限制，访问敏感文件或执行未授权操作。
-
 2. **触发场景**
 该规则主要检测用户可控的输入（如来自 `$_GET`, `$_POST`, `$_REQUEST` 等超全局变量）直接或间接作为FTP函数参数的情况，并且缺乏有效的安全过滤措施。例如，直接将用户输入的路径字符串传递给 `ftp_delete` 函数，而未检查其中是否包含恶意构造的路径穿越字符。
-
 ```php
 <?php
 // 高风险案例（直接使用未过滤参数）
 function deleteFile() {
-    $file = $_GET['file']; // 直接接收用户输入
-    ftp_delete($ftp_conn, $file); // 触发高风险告警
+$file = $_GET['file']; // 直接接收用户输入
+ftp_delete($ftp_conn, $file); // 触发高风险告警
 }
-
 // 中风险案例（过滤不充分）
 function uploadFile() {
-    $path = $_POST['path'];
-    $filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
-    ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
+$path = $_POST['path'];
+$filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
+ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
 }
-
 // 低风险案例（存在潜在绕过，需审计过滤逻辑）
 function createDir() {
-    $dir = sanitizeInput($_GET['dir']);
-    ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
+$dir = sanitizeInput($_GET['dir']);
+ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
 }
-
 function sanitizeInput($input) {
-    return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
+return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
 }
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者可能在FTP服务器上读写、修改或删除任意文件，导致数据损坏、丢失或敏感信息泄露。
 - 攻击者可能利用路径穿越漏洞访问受限目录，获取配置文件、日志或源代码等敏感信息。
 - 在某些FTP配置和场景下，可能导致进一步的服务器访问权限绕过或远程代码执行。
-CODE
+DESC
 	level: "high",
+	risk: "路径穿越",
+	name: "high",
+	message: "检测到PHP未验证FTP参数注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -232,151 +207,176 @@ $highAndMid - $high as $mid
 alert $mid for {
 	title: "Insufficient FTP Parameter Filtering",
 	title_zh: "FTP参数过滤不充分",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 当应用程序在调用FTP相关函数（如 `ftp_chdir`, `ftp_delete`, `ftp_put`, `ftp_get`, `ftp_rename` 等）时，未对用户提供的文件名、路径或参数进行充分的验证和过滤，攻击者可以构造恶意输入。
 这可能导致以下问题：
 - **路径穿越 (Path Traversal/Directory Traversal)**: 攻击者利用 `../` 等序列访问FTP服务器上预期目录之外的文件和目录。
 - **文件覆盖/删除**: 攻击者通过操纵文件名或路径来覆盖或删除任意文件。
 - **权限绕过/文件泄露**: 在某些情况下，恶意参数可能导致绕过FTP权限限制，访问敏感文件或执行未授权操作。
-
 2. **触发场景**
 该规则主要检测用户可控的输入（如来自 `$_GET`, `$_POST`, `$_REQUEST` 等超全局变量）直接或间接作为FTP函数参数的情况，并且缺乏有效的安全过滤措施。例如，直接将用户输入的路径字符串传递给 `ftp_delete` 函数，而未检查其中是否包含恶意构造的路径穿越字符。
-
 ```php
 <?php
 // 高风险案例（直接使用未过滤参数）
 function deleteFile() {
-    $file = $_GET['file']; // 直接接收用户输入
-    ftp_delete($ftp_conn, $file); // 触发高风险告警
+$file = $_GET['file']; // 直接接收用户输入
+ftp_delete($ftp_conn, $file); // 触发高风险告警
 }
-
 // 中风险案例（过滤不充分）
 function uploadFile() {
-    $path = $_POST['path'];
-    $filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
-    ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
+$path = $_POST['path'];
+$filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
+ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
 }
-
 // 低风险案例（存在潜在绕过，需审计过滤逻辑）
 function createDir() {
-    $dir = sanitizeInput($_GET['dir']);
-    ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
+$dir = sanitizeInput($_GET['dir']);
+ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
 }
-
 function sanitizeInput($input) {
-    return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
+return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
 }
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者可能在FTP服务器上读写、修改或删除任意文件，导致数据损坏、丢失或敏感信息泄露。
 - 攻击者可能利用路径穿越漏洞访问受限目录，获取配置文件、日志或源代码等敏感信息。
 - 在某些FTP配置和场景下，可能导致进一步的服务器访问权限绕过或远程代码执行。
-CODE
+DESC
 	level: "mid",
+	risk: "路径穿越",
+	name: "mid",
+	message: "检测到PHP FTP参数过滤不充分，可能存在潜在绕过风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对用户输入进行严格验证和过滤
+在将用户输入传递给FTP函数之前，进行严格的输入验证和过滤，只允许合法的字符和路径结构。使用白名单方法优于黑名单方法。
+```php
+<?php
+// 修复代码示例：严格路径验证
+function safeDeleteFile() {
+$file = $_GET['file'];
+if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
+ftp_delete($ftp_conn, $file);
+} else {
+// 处理非法输入，如记录日志或返回错误
+error_log("Invalid FTP file path attempted: " . $file);
+echo "Error: Invalid file path.";
+}
+}
+function isValidFtpPath($path) {
+// 示例验证逻辑：
+// 1. 检查路径是否包含 '..' 进行路径穿越
+if (strpos($path, '..') !== false) {
+return false;
+}
+// 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
+// if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
+//     return false;
+// }
+return true;
+}
+?>
+```
+#### 2. 使用绝对路径或已严格控制的相对路径
+尽量避免使用用户可控的相对路径。如果必须使用相对路径，确保其受限于一个已知的、受限的根目录，并且用户无法通过操纵输入逃离该目录。
+#### 3. 对文件名和路径进行编码和解码
+根据FTP协议和服务器的实际情况，对文件名和路径进行适当的URL编码或FTP特定的编码解码，以确保特殊字符被正确处理而不是被解释为路径分隔符或命令。
+#### 4. 限制FTP用户权限
+为进行文件操作的FTP用户配置最小必需的权限，限制其只能访问和操作特定目录下的文件，即使存在参数注入漏洞，也能限制潜在的危害范围。
+#### 5. 定期更新和审计代码
+定期对处理用户输入的代码进行安全审计，并及时应用框架和库的安全更新。
+SOLUTION
 }
 $sink - $high - $mid as $low
 
 alert $low for {
 	title_zh: "FTP访问控制潜在绕过风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 对用户输入进行严格验证和过滤
 在将用户输入传递给FTP函数之前，进行严格的输入验证和过滤，只允许合法的字符和路径结构。使用白名单方法优于黑名单方法。
-
 ```php
 <?php
 // 修复代码示例：严格路径验证
 function safeDeleteFile() {
-    $file = $_GET['file'];
-    if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
-        ftp_delete($ftp_conn, $file);
-    } else {
-        // 处理非法输入，如记录日志或返回错误
-        error_log("Invalid FTP file path attempted: " . $file);
-        echo "Error: Invalid file path.";
-    }
+$file = $_GET['file'];
+if (isValidFtpPath($file)) { // 使用自定义函数验证路径合法性
+ftp_delete($ftp_conn, $file);
+} else {
+// 处理非法输入，如记录日志或返回错误
+error_log("Invalid FTP file path attempted: " . $file);
+echo "Error: Invalid file path.";
 }
-
+}
 function isValidFtpPath($path) {
-    // 示例验证逻辑：
-    // 1. 检查路径是否包含 '..' 进行路径穿越
-    if (strpos($path, '..') !== false) {
-        return false;
-    }
-    // 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
-    // if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
-    //     return false;
-    // }
-    return true;
+// 示例验证逻辑：
+// 1. 检查路径是否包含 '..' 进行路径穿越
+if (strpos($path, '..') !== false) {
+return false;
+}
+// 2. 根据实际需求添加更多验证，如只允许在特定目录下操作，或验证文件名/目录名符合预期格式
+// if (!preg_match('/^[a-zA-Z0-9_\/\-]+\.txt$/', $path)) { // 示例：只允许特定格式和扩展名的文件
+//     return false;
+// }
+return true;
 }
 ?>
 ```
-
-#### 2. 使用绝对路径或已严格控制的相対路径
+#### 2. 使用绝对路径或已严格控制的相对路径
 尽量避免使用用户可控的相对路径。如果必须使用相对路径，确保其受限于一个已知的、受限的根目录，并且用户无法通过操纵输入逃离该目录。
-
 #### 3. 对文件名和路径进行编码和解码
 根据FTP协议和服务器的实际情况，对文件名和路径进行适当的URL编码或FTP特定的编码解码，以确保特殊字符被正确处理而不是被解释为路径分隔符或命令。
-
 #### 4. 限制FTP用户权限
 为进行文件操作的FTP用户配置最小必需的权限，限制其只能访问和操作特定目录下的文件，即使存在参数注入漏洞，也能限制潜在的危害范围。
-
 #### 5. 定期更新和审计代码
 定期对处理用户输入的代码进行安全审计，并及时应用框架和库的安全更新。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 当应用程序在调用FTP相关函数（如 `ftp_chdir`, `ftp_delete`, `ftp_put`, `ftp_get`, `ftp_rename` 等）时，未对用户提供的文件名、路径或参数进行充分的验证和过滤，攻击者可以构造恶意输入。
 这可能导致以下问题：
 - **路径穿越 (Path Traversal/Directory Traversal)**: 攻击者利用 `../` 等序列访问FTP服务器上预期目录之外的文件和目录。
 - **文件覆盖/删除**: 攻击者通过操纵文件名或路径来覆盖或删除任意文件。
 - **权限绕过/文件泄露**: 在某些情况下，恶意参数可能导致绕过FTP权限限制，访问敏感文件或执行未授权操作。
-
 2. **触发场景**
 该规则主要检测用户可控的输入（如来自 `$_GET`, `$_POST`, `$_REQUEST` 等超全局变量）直接或间接作为FTP函数参数的情况，并且缺乏有效的安全过滤措施。例如，直接将用户输入的路径字符串传递给 `ftp_delete` 函数，而未检查其中是否包含恶意构造的路径穿越字符。
-
 ```php
 <?php
 // 高风险案例（直接使用未过滤参数）
 function deleteFile() {
-    $file = $_GET['file']; // 直接接收用户输入
-    ftp_delete($ftp_conn, $file); // 触发高风险告警
+$file = $_GET['file']; // 直接接收用户输入
+ftp_delete($ftp_conn, $file); // 触发高风险告警
 }
-
 // 中风险案例（过滤不充分）
 function uploadFile() {
-    $path = $_POST['path'];
-    $filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
-    ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
+$path = $_POST['path'];
+$filtered = str_replace('../', '', $path); // 简单过滤（不足以防御URL编码的路径遍历）
+ftp_fput($ftp_conn, $filtered, $fp); // 触发中风险告警（可绕过）
 }
-
 // 低风险案例（存在潜在绕过，需审计过滤逻辑）
 function createDir() {
-    $dir = sanitizeInput($_GET['dir']);
-    ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
+$dir = sanitizeInput($_GET['dir']);
+ftp_mkdir($ftp_conn, $dir); // 触发低风险告警
 }
-
 function sanitizeInput($input) {
-    return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
+return preg_replace('/\.\.\//', '', $input); // 未处理URL编码路径
 }
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者可能在FTP服务器上读写、修改或删除任意文件，导致数据损坏、丢失或敏感信息泄露。
 - 攻击者可能利用路径穿越漏洞访问受限目录，获取配置文件、日志或源代码等敏感信息。
 - 在某些FTP配置和场景下，可能导致进一步的服务器访问权限绕过或远程代码执行。
-CODE
+DESC
 	level: "low",
 	title: "Potential FTP Access Control Bypass",
+	risk: "路径穿越",
+	name: "low",
+	message: "检测到PHP FTP访问控制潜在绕过风险。",
 }
 desc(
 	lang: "php"
@@ -409,4 +409,124 @@ function sanitizeInput($input) {
 }
 ?>
 TEXT
+	"safefile://SafeFtpPathValidation.php": <<<CODE
+<?php
+// 连接FTP服务器的示例
+$ftp_conn = ftp_connect("ftp.example.com");
+ftp_login($ftp_conn, "username", "password");
+
+/**
+ * 严格验证FTP路径的函数，采用白名单或严格过滤策略
+ * 确保路径不包含恶意字符，并限制在特定目录内
+ */
+function isValidFtpPath($path) {
+    // 1. 检查是否包含路径穿越字符 '..' 或 './'
+    if (strpos($path, '..') !== false || strpos($path, './') !== false) {
+        return false;
+    }
+    // 2. 检查路径是否以斜杠开头，暗示绝对路径，否则进一步限制
+    // 假设只允许操作 /web_data/ 目录下的文件或子目录，路径必须以 /web_data/ 开头
+    if (!preg_match('/^\/[a-zA-Z0-9_\/\-]+\/?$/', $path)) { // 更严格的字符集匹配
+        return false;
+    }
+    // 3. 检查路径是否包含非法字符
+    if (preg_match('/[^a-zA-Z0-9_\/\-.]/', $path)) { // 允许有限的字符
+        return false;
+    }
+    // 4. 可以添加更多业务逻辑，例如限制文件扩展名等
+    return true;
+}
+
+// 场景一：安全的文件删除操作
+// 用户输入经过严格验证，避免路径穿越
+function safeDeleteFile($ftp_conn_param, $file) {
+    // 严格验证用户输入的文件路径
+    if (isValidFtpPath($file)) {
+        // 使用绝对路径或已知安全路径
+        $full_path = "/var/www/html/ftp_data/safe_files/" . basename($file); // basename用于获取文件名，避免目录穿越
+        // 确保文件确实存在于预期目录，避免删除意外文件
+        // (实际应用中，还需要更多检查，例如文件是否属于当前用户等)
+        if (ftp_delete($ftp_conn_param, $full_path)) {
+            echo "File deleted safely: " . $full_path . "\n";
+        } else {
+            echo "Failed to delete file: " . $full_path . "\n";
+        }
+    } else {
+        error_log("Attempted invalid FTP path for deletion: " . $file);
+        echo "Error: Invalid file path specified.\n";
+    }
+}
+
+// 场景二：安全的文件上传操作 (ftp_fput)
+// 使用白名单或预定义路径，避免路径穿越
+function safeUploadFile($ftp_conn_param, $local_file, $remote_path) {
+    if (isValidFtpPath($remote_path) && file_exists($local_file)) {
+        $remote_full_path = "/var/www/html/ftp_uploads/" . basename($remote_path); // 确保上传到指定目录
+        if (ftp_fput($ftp_conn_param, $remote_full_path, fopen($local_file, 'r'), FTP_ASCII)) {
+            echo "File uploaded safely to: " . $remote_full_path . "\n";
+        } else {
+            echo "Failed to upload file to: " . $remote_full_path . "\n";
+        }
+    } else {
+        error_log("Attempted invalid FTP path for upload or local file not found.");
+        echo "Error: Invalid remote path or local file not found.\n";
+    }
+}
+
+// 场景三：安全创建目录 (ftp_mkdir)
+// 使用硬编码或严格验证的目录名
+function safeCreateDirectory($ftp_conn_param, $dir_name) {
+    // 严格验证目录名，不允许特殊字符或路径分隔符
+    if (preg_match('/^[a-zA-Z0-9_\-]+$/', $dir_name)) {
+        $full_dir_path = "/usr/local/ftp_dirs/" . $dir_name; // 硬编码父目录
+        if (ftp_mkdir($ftp_conn_param, $full_dir_path)) {
+            echo "Directory created safely: " . $full_dir_path . "\n";
+        } else {
+            echo "Failed to create directory: " . $full_dir_path . "\n";
+        }
+    } else {
+        error_log("Attempted to create directory with invalid name: " . $dir_name);
+        echo "Error: Invalid directory name.\n";
+    }
+}
+
+// 示例调用 - 避免直接使用用户输入
+// 假设 $conn 是已连接的FTP资源
+$conn = $ftp_conn; 
+
+safeDeleteFile($conn,"report.txt"); // hardcoded filename
+safeUploadFile($conn, "./localfile.txt", "data/image.jpg"); // hardcoded remote path, local file assumed safe
+safeCreateDirectory($conn, "new_project"); // hardcoded directory name
+
+// 使用已验证的变量，而不是 $_GET, $_POST
+$safe_user_input_file = "user_data/docs/clean_doc.pdf";
+if (isValidFtpPath($safe_user_input_file)) {
+    safeDeleteFile($conn, $safe_user_input_file);
+}
+
+// 关闭FTP连接
+ftp_close($ftp_conn);
+?>
+CODE
+	"safefile://NoFtpOperations.php": <<<CODE
+<?php
+// 此文件不执行任何FTP操作
+// 该文件仅包含普通的PHP代码，不涉及任何FTP函数。
+
+function processData($input) {
+    // 模拟数据处理
+    $result = strtolower($input);
+    return $result;
+}
+
+$data = "Some User Input";
+$processed_data = processData($data);
+echo "Processed data: " . $processed_data . "\n";
+
+// 即使有用户输入，也没有传递给任何FTP函数，因此不会触发告警
+$user_query = $_GET['search'] ?? 'default';
+echo "Search query: " . htmlspecialchars($user_query) . "\n";
+
+?>
+CODE
 )

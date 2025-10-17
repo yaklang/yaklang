@@ -5,26 +5,22 @@ desc(
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   文件路径或名称的外部控制（CWE-73）是一种常见但危险的安全问题。该漏洞源于应用程序未能对用户输入进行严格的校验或过滤，导致攻击者可以通过构造恶意输入来操作文件系统。例如：通过目录遍历攻击访问敏感文件、删除关键数据或覆盖文件以执行任意代码。
-
+文件路径或名称的外部控制（CWE-73）是一种常见但危险的安全问题。该漏洞源于应用程序未能对用户输入进行严格的校验或过滤，导致攻击者可以通过构造恶意输入来操作文件系统。例如：通过目录遍历攻击访问敏感文件、删除关键数据或覆盖文件以执行任意代码。
 2. **触发场景**
-   以下是一个存在漏洞的代码示例：
-   ```php
-   <?php
-       $a = $_GET['filename'];
-       // 直接使用未经任何过滤的GET参数打开目录
-       opendir($a);
-   ?>
-   ```
-   攻击者可以通过提供类似`../../etc/passwd`的输入，读取系统关键文件；或者提供`../../index.php`，覆盖或删除网站核心文件。
-
+以下是一个存在漏洞的代码示例：
+```php
+<?php
+$a = $_GET['filename'];
+// 直接使用未经任何过滤的GET参数打开目录
+opendir($a);
+?>
+```
+攻击者可以通过提供类似`../../etc/passwd`的输入，读取系统关键文件；或者提供`../../index.php`，覆盖或删除网站核心文件。
 3. **潜在影响**
-   - 敏感信息泄露：攻击者可以访问配置文件、日志文件等包含敏感数据的文件。
-   - 数据破坏：攻击者可能删除或修改重要文件，导致业务中断。
-   - 服务器控制权丧失：通过上传恶意脚本或覆盖现有文件，攻击者可能完全控制服务器。
-
+- 敏感信息泄露：攻击者可以访问配置文件、日志文件等包含敏感数据的文件。
+- 数据破坏：攻击者可能删除或修改重要文件，导致业务中断。
+- 服务器控制权丧失：通过上传恶意脚本或覆盖现有文件，攻击者可能完全控制服务器。
 DESC
 	rule_id: "a6f3be4b-5f16-46d8-8e0b-9182e5078345"
 	reference: <<<REFERENCE
@@ -32,54 +28,40 @@ DESC
 REFERENCE
 	solution: <<<SOLUTION
 ### 修复建议
-
 防止PHP中未过滤文件或路径操作漏洞的核心在于对所有用户输入进行严格的校验和过滤，确保文件路径或名称符合预期。
-
 #### 1. 输入严格过滤与校验
-
 *   **白名单校验**：如果可能，使用允许的文件名或路径的白名单列表进行严格匹配。这是最安全的方式。
 *   **路径规范化**：在将用户输入的路径用于文件系统操作之前，使用`realpath()`或类似的函数来解析和规范化路径，消除其中的`..`，防止目录遍历攻击。并检查规范化后的路径是否处于预期的安全目录范围内。
 *   **移除或禁止特殊字符**：过滤掉文件名或路径中可能导致问题的特殊字符，如斜杠`/`或`\`、点`.`、冒号`:`、空字节`\0`以及其他 shell 元字符。
-
 ```php
 <?php
 // 修复代码示例：使用 realpath() 和检查目录范围
 $filename = $_GET['filename'];
 $base_dir = '/var/www/html/uploads/'; // 限制文件操作在指定目录下
-
 // 规范化用户提供的路径
 $real_path = realpath($base_dir . $filename);
-
 // 检查规范化后的路径是否仍然在预期的安全目录下
 if ($real_path !== false && strpos($real_path, $base_dir) === 0) {
-    // 文件路径安全，可以进行文件操作
-    // 例如： stat($real_path);
-
-    // 示例：安全地打开目录
-    if (is_dir($real_path)) {
-        $dir_handle = opendir($real_path);
-        // ... 处理目录 ...
-    }
-
+// 文件路径安全，可以进行文件操作
+// 例如： stat($real_path);
+// 示例：安全地打开目录
+if (is_dir($real_path)) {
+$dir_handle = opendir($real_path);
+// ... 处理目录 ...
+}
 } else {
-    // 非法路径或路径超出范围
-    die('非法文件或目录');
+// 非法路径或路径超出范围
+die('非法文件或目录');
 }
 ?>
 ```
-
 #### 2. 限制文件操作范围
-
 *   **工作目录限制**：使用`chroot()`函数将PHP进程的工作目录限定在一个安全的根目录中，限制其对文件系统的访问范围（注意：`chroot`需要root权限，且配置复杂，可能不适用于所有场景）。
 *   **使用特定API**：优先使用专门处理用户上传文件或生成临时文件的APIs，如`move_uploaded_file()`，这些函数通常提供了更安全的处理机制。
-
 #### 3. 文件上传的安全处理
-
 *   **更改文件名**：上传文件时不要直接使用客户端提供的文件名和扩展名，应生成一个唯一且不可预测的新文件名，并存储原始文件名在数据库中。
 *   **严格校验文件类型**：同时依靠MIME类型检查、文件内容签名检查和文件扩展名校验来判断文件的真实类型，避免通过更改扩展名绕过检查。
-
 #### 4. 最小权限原则
-
 确保运行PHP的操作系统用户只拥有执行所需操作的最小文件系统权限。
 SOLUTION
 )
@@ -100,82 +82,68 @@ CODE,exclude=<<<CODE
 CODE)> as $high
 
 alert $high for {
-	title: "Unsafe File Operation Without Validation",
-	title_zh: "未经验证的文件操作",
-	solution: <<<CODE
+	title: "PHP Unsafe File Operation Without Validation Was Detected",
+	title_zh: "检测到PHP未经验证的文件操作漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 防止PHP中未过滤文件或路径操作漏洞的核心在于对所有用户输入进行严格的校验和过滤，确保文件路径或名称符合预期。
-
 #### 1. 输入严格过滤与校验
-
 *   **白名单校验**：如果可能，使用允许的文件名或路径的白名单列表进行严格匹配。这是最安全的方式。
 *   **路径规范化**：在将用户输入的路径用于文件系统操作之前，使用`realpath()`或类似的函数来解析和规范化路径，消除其中的`..`，防止目录遍历攻击。并检查规范化后的路径是否处于预期的安全目录范围内。
 *   **移除或禁止特殊字符**：过滤掉文件名或路径中可能导致问题的特殊字符，如斜杠`/`或`\`、点`.`、冒号`:`、空字节`\0`以及其他 shell 元字符。
-
 ```php
 <?php
 // 修复代码示例：使用 realpath() 和检查目录范围
 $filename = $_GET['filename'];
 $base_dir = '/var/www/html/uploads/'; // 限制文件操作在指定目录下
-
 // 规范化用户提供的路径
 $real_path = realpath($base_dir . $filename);
-
 // 检查规范化后的路径是否仍然在预期的安全目录下
 if ($real_path !== false && strpos($real_path, $base_dir) === 0) {
-    // 文件路径安全，可以进行文件操作
-    // 例如： stat($real_path);
-
-    // 示例：安全地打开目录
-    if (is_dir($real_path)) {
-        $dir_handle = opendir($real_path);
-        // ... 处理目录 ...
-    }
-
+// 文件路径安全，可以进行文件操作
+// 例如： stat($real_path);
+// 示例：安全地打开目录
+if (is_dir($real_path)) {
+$dir_handle = opendir($real_path);
+// ... 处理目录 ...
+}
 } else {
-    // 非法路径或路径超出范围
-    die('非法文件或目录');
+// 非法路径或路径超出范围
+die('非法文件或目录');
 }
 ?>
 ```
-
 #### 2. 限制文件操作范围
-
 *   **工作目录限制**：使用`chroot()`函数将PHP进程的工作目录限定在一个安全的根目录中，限制其对文件系统的访问范围（注意：`chroot`需要root权限，且配置复杂，可能不适用于所有场景）。
 *   **使用特定API**：优先使用专门处理用户上传文件或生成临时文件的APIs，如`move_uploaded_file()`，这些函数通常提供了更安全的处理机制。
-
 #### 3. 文件上传的安全处理
-
 *   **更改文件名**：上传文件时不要直接使用客户端提供的文件名和扩展名，应生成一个唯一且不可预测的新文件名，并存储原始文件名在数据库中。
 *   **严格校验文件类型**：同时依靠MIME类型检查、文件内容签名检查和文件扩展名校验来判断文件的真实类型，避免通过更改扩展名绕过检查。
-
 #### 4. 最小权限原则
-
 确保运行PHP的操作系统用户只拥有执行所需操作的最小文件系统权限。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   PHP代码中未过滤的文件或路径操作可能导致严重的安全风险。攻击者可以通过构造恶意输入执行文件包含、目录遍历、文件删除、文件上传覆盖等操作，从而获取敏感信息、执行任意代码甚至完全控制服务器。
-
+PHP代码中未过滤的文件或路径操作可能导致严重的安全风险。攻击者可以通过构造恶意输入执行文件包含、目录遍历、文件删除、文件上传覆盖等操作，从而获取敏感信息、执行任意代码甚至完全控制服务器。
 2. **触发场景**
-   ```php
-   <?php
-       $a = $_GET['filename'];
-       // 存在漏洞的代码：直接使用未经任何过滤的GET参数打开目录
-       opendir($a);
-   ?>
-   ```
-   攻击者可利用该漏洞读取或操作任意文件，例如通过传递 `../../etc/passwd` 来访问敏感文件。
-
+```php
+<?php
+$a = $_GET['filename'];
+// 存在漏洞的代码：直接使用未经任何过滤的GET参数打开目录
+opendir($a);
+?>
+```
+攻击者可利用该漏洞读取或操作任意文件，例如通过传递 `../../etc/passwd` 来访问敏感文件。
 3. **潜在影响**
-   - 数据泄露：攻击者能够读取系统敏感文件。
-   - 任意代码执行：通过文件包含或覆盖关键文件实现代码执行。
-   - 服务器控制：攻击者可能获得服务器的完全控制权。
-CODE
+- 数据泄露：攻击者能够读取系统敏感文件。
+- 任意代码执行：通过文件包含或覆盖关键文件实现代码执行。
+- 服务器控制：攻击者可能获得服务器的完全控制权。
+DESC
 	level: "high",
+	risk: "目录遍历",
+	name: "high",
+	message: "检测到PHP未经验证的文件操作漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 $sink<dataflow(include=<<<CODE
 * & $params as $__next__
@@ -185,88 +153,88 @@ CODE)> as $highAndMid
 
 $highAndMid - $high as $mid
 alert $mid for {
-	title: "Insecure File Type Detection",
-	title_zh: "不安全的文件类型检测",
-	solution: <<<CODE
+	title: "PHP Insecure File Type Detection Was Found",
+	title_zh: "发现PHP不安全的文件类型检测",
+	solution: <<<SOLUTION
 ### 修复建议
-
 针对部分过滤但不完善的场景，必须进一步完善过滤机制以防止潜在绕过。
-
 #### 1. 强化过滤机制
-   - **多重校验**：结合文件扩展名、MIME类型以及文件内容签名等多种方式校验文件类型。
-   - **拒绝危险扩展**：明确禁止常见危险扩展名，例如 `.php`, `.phtml`, `.htaccess` 等。
-
+- **多重校验**：结合文件扩展名、MIME类型以及文件内容签名等多种方式校验文件类型。
+- **拒绝危险扩展**：明确禁止常见危险扩展名，例如 `.php`, `.phtml`, `.htaccess` 等。
 ```php
 <?php
 function isSafeFile($filename) {
-    $dangerousExtensions = ['.php', '.phtml', '.htaccess'];
-    foreach ($dangerousExtensions as $ext) {
-        if (stripos($filename, $ext) !== false) {
-            return false;
-        }
-    }
-    return true;
+$dangerousExtensions = ['.php', '.phtml', '.htaccess'];
+foreach ($dangerousExtensions as $ext) {
+if (stripos($filename, $ext) !== false) {
+return false;
 }
-
+}
+return true;
+}
 $filename = $_FILES['file']['name'];
 if (!isSafeFile($filename)) {
-    die('危险文件类型');
+die('危险文件类型');
 }
 // 安全处理文件
 ?>
 ```
-
 #### 2. 使用白名单策略
-   仅允许已知安全的文件类型，拒绝其他所有类型。
-
+仅允许已知安全的文件类型，拒绝其他所有类型。
 #### 3. 定期审查过滤逻辑
-   审计现有过滤逻辑是否存在新的绕过方法，及时更新规则以应对新威胁。
-CODE
-	desc: <<<CODE
+审计现有过滤逻辑是否存在新的绕过方法，及时更新规则以应对新威胁。
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   当外部输入经过部分过滤但过滤机制不完善时，仍可能存在被绕过的风险。例如，仅检查文件扩展名而忽略文件内容签名，可能导致攻击者通过修改文件头绕过检测。
-
+当外部输入经过部分过滤但过滤机制不完善时，仍可能存在被绕过的风险。例如，仅检查文件扩展名而忽略文件内容签名，可能导致攻击者通过修改文件头绕过检测。
 2. **触发场景**
-   ```php
-   <?php
-       $filename = $_FILES['file']['name'];
-       if (strpos($filename, '.jpg') !== false) {
-           move_uploaded_file($_FILES['file']['tmp_name'], '/uploads/' . $filename);
-       } else {
-           die('Invalid file type');
-       }
-   ?>
-   ```
-   攻击者可通过伪造文件头或扩展名绕过简单的类型检测。
-
+```php
+<?php
+$filename = $_FILES['file']['name'];
+if (strpos($filename, '.jpg') !== false) {
+move_uploaded_file($_FILES['file']['tmp_name'], '/uploads/' . $filename);
+} else {
+die('Invalid file type');
+}
+?>
+```
+攻击者可通过伪造文件头或扩展名绕过简单的类型检测。
 3. **潜在影响**
-   - 文件上传后可能被执行为恶意脚本。
-   - 系统敏感资源面临被篡改或窃取的风险。
-CODE
+- 文件上传后可能被执行为恶意脚本。
+- 系统敏感资源面临被篡改或窃取的风险。
+DESC
 	level: "mid",
+	name: "mid",
+	message: "发现PHP文件类型检测存在部分过滤但不完善的情况，可能存在被绕过的风险。",
+	risk: "文件上传",
 }
 $all - $high - $mid as $low
 alert $low for {
-	title: "Potential File Storage Path Misconfiguration",
-	title_zh: "潜在的文件存储路径配置问题",
-	desc: <<<CODE
+	title: "PHP Potential File Storage Path Misconfiguration Was Detected",
+	title_zh: "检测到PHP潜在的文件存储路径配置问题",
+	desc: <<<DESC
 ### 1. 规则目的
-   该规则用于识别PHP代码中可能存在的文件存储路径配置问题。尽管当前路径已包含过滤机制，但仍需检查过滤函数是否存在潜在缺陷。
-
+该规则用于识别PHP代码中可能存在的文件存储路径配置问题。尽管当前路径已包含过滤机制，但仍需检查过滤函数是否存在潜在缺陷。
 ### 2. 规则详细
-   1. **作为基础检测库**
-      属于`php-file-path-misconfig`库规则（`lib`类型），需配合其他规则（如数据流分析规则）共同检测路径配置问题，提供核心函数识别能力。
-
-   2. **覆盖高危配置场景**
-      检测以下PHP文件操作函数：
-      `opendir`, `file_get_contents`, `file_put_contents`, `unlink`, `rename` 等。
-
-   3. **区分不同风险等级**
-      根据数据流分析结果和过滤情况，规则可能区分出高、中、低不同风险等级的告警。
-CODE
+1. **作为基础检测库**
+属于`php-file-path-misconfig`库规则（`lib`类型），需配合其他规则（如数据流分析规则）共同检测路径配置问题，提供核心函数识别能力。
+2. **覆盖高危配置场景**
+检测以下PHP文件操作函数：
+`opendir`, `file_get_contents`, `file_put_contents`, `unlink`, `rename` 等。
+3. **区分不同风险等级**
+根据数据流分析结果和过滤情况，规则可能区分出高、中、低不同风险等级的告警。
+DESC
 	level: "low",
+	name: "low",
+	message: "检测到PHP文件存储路径可能存在配置问题，尽管当前路径已包含过滤机制，但仍需检查过滤函数是否存在潜在缺陷。",
+	solution: <<<SOLUTION
+### 安全建议
+1. **审计现有过滤逻辑**：定期审查路径配置规则，确保不存在逻辑漏洞或潜在绕过。
+2. **区分不同风险等级**：根据过滤情况和数据流分析结果，确认是否存在更高风险的告警。
+3. **配合其他规则共同检测**：本规则属于基础库规则的一部分，需与其他规则（如数据流分析规则）结合使用，以提高检测准确性。
+SOLUTION
+	risk: "信息",
 }
 desc(
 	lang: "php"

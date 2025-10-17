@@ -13,6 +13,8 @@ import (
 	"errors"
 	"io"
 	"math/big"
+
+	x509gm "github.com/yaklang/yaklang/common/gmsm/x509"
 )
 
 var (
@@ -64,6 +66,9 @@ func decodePkcs8ShroudedKeyBag(asn1Data, password []byte) (privateKey interface{
 		if err.Error() == "x509: PKCS#8 wrapping contained private key with unknown algorithm: 1.2.840.10040.4.1" {
 			return parseDSAPrivateKey(pkData)
 		}
+		if err.Error() == "x509: failed to parse EC private key embedded in PKCS#8: x509: unknown elliptic curve" {
+			return x509gm.ParsePKCS8PrivateKey(pkData, nil)
+		}
 		return nil, errors.New("pkcs12: error parsing PKCS#8 private key: " + err.Error())
 	}
 
@@ -110,7 +115,7 @@ func parseDSAPrivateKey(data []byte) (*dsa.PrivateKey, error) {
 
 func encodePkcs8ShroudedKeyBag(rand io.Reader, privateKey interface{}, algoID asn1.ObjectIdentifier, password []byte, iterations int, saltLen int) (asn1Data []byte, err error) {
 	var pkData []byte
-	if pkData, err = x509.MarshalPKCS8PrivateKey(privateKey); err != nil {
+	if pkData, err = x509gm.MarshalPKCS8PrivateKey(privateKey); err != nil {
 		return nil, errors.New("pkcs12: error encoding PKCS#8 private key: " + err.Error())
 	}
 

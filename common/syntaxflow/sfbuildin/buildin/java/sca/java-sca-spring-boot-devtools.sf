@@ -12,14 +12,10 @@ DESCRIPTION
 	rule_id: "2e7fd1d6-962f-48ac-a8dd-369272833d06"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 在生产环境中排除 Devtools 依赖
 确保在构建用于生产环境的打包件（JAR 或 WAR）时，`spring-boot-starter-devtools` 依赖被正确排除。通常可以通过构建工具的配置来实现。
-
 **Maven 示例 (pom.xml):**
-
 在 `dependency` 定义中添加 `<optional>true</optional>` 或者 `<scope>runtime</scope>` 并结合特定的构建 profile 来排除。
-
 ```xml
 <dependencies>
     <dependency>
@@ -29,7 +25,6 @@ DESCRIPTION
         <optional>true</optional>
     </dependency>
 </dependencies>
-
 <profiles>
     <profile>
         <id>prod</id>
@@ -48,23 +43,17 @@ DESCRIPTION
 </profiles>
 ```
 构建生产环境打包件时，激活 `prod` profile：`mvn clean package -P prod`
-
 **Gradle 示例 (build.gradle):**
-
 使用 `developmentOnly` 配置或者在生产构建任务中排除。
-
 ```gradle
 dependencies {
     developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
 }
 ```
-
 #### 2. 确保远程调试关闭
 如果在某些场景下仍需构建包含 Devtools 的包，务必确保远程调试功能在生产环境中是关闭的。通过设置配置属性 `spring.devtools.remote.secret` 为空或不配置相关的远程 Devtools 属性。
-
 #### 3. 配置生产环境 Profile
 使用 Spring Profile 区分开发和生产环境，并在生产环境下禁用 Devtools 的相关配置。
-
 ```properties
 # application-prod.properties
 spring.devtools.restart.enabled=false
@@ -80,99 +69,86 @@ check $weak;
 alert $weak for {
 	title: "Detected Java Spring Boot Devtools Usage",
 	title_zh: "检测到Java Spring Boot Devtools的使用",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 在生产环境中排除 Devtools 依赖
 确保在构建用于生产环境的打包件（JAR或WAR）时，`spring-boot-starter-devtools` 依赖被正确排除。通常可以通过构建工具的配置来实现。
-
 **Maven 示例 (pom.xml):**
-
 在 `dependency` 定义中添加 `<optional>true</optional>` 或者 `<scope>runtime</scope>` 并结合特定的构建 profile 来排除。
-
 ```xml
 <dependencies>
-    <dependency>
-        <groupId>org.springframework.boot</groupId>
-        <artifactId>spring-boot-starter-devtools</artifactId>
-        <scope>runtime</scope>  <!-- 或者 <optional>true</optional> -->
-        <optional>true</optional>
-    </dependency>
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-devtools</artifactId>
+<scope>runtime</scope>  <!-- 或者 <optional>true</optional> -->
+<optional>true</optional>
+</dependency>
 </dependencies>
-
 <!-- 使用 profile 在生产环境激活时不包含 devtools -->
 <profiles>
-    <profile>
-        <id>prod</id>
-        <build>
-            <plugins>
-                <plugin>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-maven-plugin</artifactId>
-                    <configuration>
-                        <excludeDevtools>true</excludeDevtools>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </build>
-    </profile>
+<profile>
+<id>prod</id>
+<build>
+<plugins>
+<plugin>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-maven-plugin</artifactId>
+<configuration>
+<excludeDevtools>true</excludeDevtools>
+</configuration>
+</plugin>
+</plugins>
+</build>
+</profile>
 </profiles>
 ```
-
 构建生产环境打包件时，激活 `prod` profile：`mvn clean package -P prod`
-
 **Gradle 示例 (build.gradle):**
-
 使用 `developmentOnly` 配置或者在生产构建任务中排除。
-
 ```gradle
 dependencies {
-    developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
+developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
 }
 ```
-
 #### 2. 确保远程调试关闭
 如果在某些场景下仍需构建包含 Devtools 的包，务必确保远程调试功能在生产环境中是关闭的。通过设置配置属性 `spring.devtools.remote.secret` 为空或不配置相关的远程 Devtools 属性。
-
 #### 3. 配置生产环境 Profile
 使用 Spring Profile 区分开发和生产环境，并在生产环境下禁用 Devtools 的相关配置。
-
 ```properties
 # application-prod.properties
 spring.devtools.restart.enabled=false
 spring.devtools.livereload.enabled=false
 spring.devtools.remote.enabled=false
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 规则目的
 该规则用于检测Java项目中是否使用了Spring Boot Devtools并确认其使用的上下文环境。Devtools 是一个为开发者提升效率的工具，但不适合在生产环境中使用。误用可能导致安全风险或性能问题。
-
 ### 规则详细
 1. **作为审计依赖漏洞规则**
-   属于`sca`类型规则，它通过检查依赖管理文件（如`pom.xml`或`build.gradle`），定位是否存在`spring-boot-starter-devtools`依赖项。
-
+属于`sca`类型规则，它通过检查依赖管理文件（如`pom.xml`或`build.gradle`），定位是否存在`spring-boot-starter-devtools`依赖项。
 2. **触发条件**
-   - 检测到`pom.xml`文件中存在以下依赖声明：
-     ```xml
-     <dependency>
-         <groupId>org.springframework.boot</groupId>
-         <artifactId>spring-boot-starter-devtools</artifactId>
-     </dependency>
-     ```
-   - 或检测到`build.gradle`文件中存在以下依赖声明：
-     ```gradle
-     dependencies {
-         developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
-     }
-     ```
-
+- 检测到`pom.xml`文件中存在以下依赖声明：
+```xml
+<dependency>
+<groupId>org.springframework.boot</groupId>
+<artifactId>spring-boot-starter-devtools</artifactId>
+</dependency>
+```
+- 或检测到`build.gradle`文件中存在以下依赖声明：
+```gradle
+dependencies {
+developmentOnly 'org.springframework.boot:spring-boot-starter-devtools'
+}
+```
 3. **潜在影响**
-   - 如果未正确排除，可能导致生产环境加载开发者工具，引发不必要的性能开销。
-   - 远程调试功能若未关闭，可能允许攻击者利用未授权的远程连接入侵系统。
-CODE
+- 如果未正确排除，可能导致生产环境加载开发者工具，引发不必要的性能开销。
+- 远程调试功能若未关闭，可能允许攻击者利用未授权的远程连接入侵系统。
+DESC
 	level: "info",
 	message: "检测到Java Spring Boot Devtools的使用",
+	risk: "SCA",
+	name: "weak",
 }
 
 desc(
@@ -199,5 +175,114 @@ desc(
 
     </project>
 
+CODE
+	"safefile://pom_no_devtools.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.5.4</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>secure-app</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>secure-app</name>
+    <description>Demo project for Spring Boot without Devtools</description>
+
+    <properties>
+        <java.version>11</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- 明确不包含 spring-boot-starter-devtools 依赖 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+CODE
+	"safefile://pom_devtools_optional.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.5.4</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>secure-app</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>secure-app</name>
+    <description>Demo project for Spring Boot with optional Devtools</description>
+
+    <properties>
+        <java.version>11</java.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Devtools 依赖被标记为可选（optional），在生产构建时不会包含 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <!-- 明确排除 devtools 以避免误报，尽管 optional:true 已经生效 -->
+                    <excludeDevtools>true</excludeDevtools>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
 CODE
 )

@@ -43,7 +43,7 @@ func TestGRPCMUSTPASS_HTTPFuzzer_RenderDangerousFuzztag(t *testing.T) {
 
 	packet := fmt.Sprintf(`POST /post HTTP/1.1
 Host: %s
-	
+
 {{file(%s)}}|{{codec(%s)}}`, utils.HostPort(host, port), fileName, scriptName)
 
 	client, err := NewLocalClient()

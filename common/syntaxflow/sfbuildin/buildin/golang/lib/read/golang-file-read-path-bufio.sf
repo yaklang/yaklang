@@ -1,0 +1,290 @@
+desc(
+	title: "Audit Golang File Read Path bufio"
+	type: audit
+	level: info
+	lib: 'golang-file-read-path-bufio'
+	desc: <<<DESC
+### 规则描述
+该规则用于审计Golang代码中使用`bufio`包进行文件读取操作时的路径安全性。它通过识别直接读取文件路径的代码片段，确保这些路径没有潜在的安全风险。例如，直接从用户输入中读取文件路径可能导致任意文件读取漏洞，攻击者可以读取系统上的敏感文件。
+
+#### 漏洞原理
+在Golang中，`bufio`包提供了带缓冲的I/O功能，常与`os.File`结合使用以高效读取文件内容。然而，如果程序将未经验证的用户输入直接作为文件路径传递给`bufio.NewReader`、`ReadString`等函数调用，可能会导致任意文件读取漏洞（Arbitrary File Read）。这类漏洞允许攻击者访问服务器上存储的敏感文件，例如配置文件、私钥或用户数据。
+
+#### 触发场景
+示例代码：
+```go
+package main
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+func main() {
+    // 用户输入的文件名
+    var userInput string
+    fmt.Print("Enter file name: ")
+    fmt.Scanln(&userInput)
+
+    // 打开文件
+    file, err := os.Open(userInput) // 直接使用用户输入作为文件路径
+    if err != nil {
+        fmt.Println("Error opening file:", err)
+        return
+    }
+    defer file.Close()
+
+    // 创建一个带缓冲的读取器
+    reader := bufio.NewReader(file)
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil {
+            break
+        }
+        fmt.Print(line)
+    }
+}
+```
+在这个例子中，攻击者可以输入类似`../../../../etc/passwd`这样的路径来读取系统关键文件。
+
+#### 潜在影响
+- 攻击者能够读取未经授权的文件，包括但不限于密码文件、密钥文件或其他敏感信息。
+- 如果系统中存在其他安全漏洞（如目录遍历），攻击者可能进一步扩大攻击范围。
+- 可能导致企业面临合规性问题和声誉损失。
+DESC
+	rule_id: "1103769b-8b69-48f5-a8a3-64b109940f1a"
+	solution: <<<SOLUTION
+### 修复建议
+为了防止因直接使用用户输入作为文件路径而导致的任意文件读取漏洞，以下是具体的修复建议：
+
+#### 1. 避免直接使用用户输入作为文件路径
+当需要从用户输入中读取文件时，应对其进行严格的验证，确保它符合预期的格式和范围。例如，可以使用正则表达式限制文件名只能包含字母、数字和下划线。
+```go
+import "regexp"
+
+func isValidFileName(filename string) bool {
+    matched, _ := regexp.MatchString(`^[a-zA-Z0-9_]+$`, filename)
+    return matched
+}
+
+// 示例：验证用户输入
+var userInput string
+fmt.Print("Enter file name: ")
+fmt.Scanln(&userInput)
+if !isValidFileName(userInput) {
+    fmt.Println("Invalid file name")
+    return
+}
+```
+
+#### 2. 使用安全的文件读取方法
+推荐使用Go标准库中的`os.ReadFile`或`ioutil.ReadFile`（在Go 1.16及以上版本中已迁移至`os.ReadFile`）等安全方法进行文件读取，这些方法会自动处理路径相关问题。
+```go
+package main
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    data, err := os.ReadFile("safe_file.txt") // 安全地读取文件
+    if err != nil {
+        fmt.Println("Error reading file:", err)
+        return
+    }
+    fmt.Printf("File content:\n%s\n", data)
+}
+```
+
+#### 3. 对文件路径进行清理和验证
+在使用用户输入作为文件路径之前，应该对其进行清理和验证。例如，使用`filepath.Clean`规范化路径，并使用`filepath.Abs`获取绝对路径，确保路径不包含`..`等可能用于路径穿越的序列。
+```go
+import (
+    "fmt"
+    "path/filepath"
+)
+
+func sanitizePath(inputPath string) (string, error) {
+    cleanPath := filepath.Clean(inputPath) // 规范化路径
+    absPath, err := filepath.Abs(cleanPath) // 获取绝对路径
+    if err != nil {
+        return "", err
+    }
+    if absPath != "/expected/valid/path" { // 确保路径在受控范围内
+        return "", fmt.Errorf("invalid path")
+    }
+    return absPath, nil
+}
+
+// 示例：清理用户输入
+var userInput string
+fmt.Print("Enter file name: ")
+fmt.Scanln(&userInput)
+safePath, err := sanitizePath(userInput)
+if err != nil {
+    fmt.Println("Invalid or unsafe path:", err)
+    return
+}
+fmt.Println("Safe path:", safePath)
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22](https://cwe.mitre.org/data/definitions/22.html)
+[Go bufio Package Documentation](https://pkg.go.dev/bufio)
+REFERENCE
+	title_zh: "审计Golang文件读取路径bufio包使用"
+)
+
+bufio?{<fullTypeName>?{have: 'bufio'}} as $entry;
+$entry.NewReader(* #-> as $output);
+
+alert $output for {
+	title: "Audit Golang File Read Path bufio",
+	title_zh: "审计Golang文件读取路径bufio包使用",
+	level: "info",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://fileread.go': <<<PARAM
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "os"
+)
+
+func main() {
+    // 写入文件
+    writeToFile("example.txt", []string{"Hello, World!", "Welcome to Go programming.", "This is a buffered I/O example."})
+
+    // 读取文件
+    readFromFile("example.txt")
+}
+
+// writeToFile 使用 bufio 写入文本到文件
+func writeToFile(filename string, lines []string) {
+    // 创建或打开文件
+    file, err := os.Create(filename)
+    if err != nil {
+        fmt.Println("Error creating file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的写入器
+    writer := bufio.NewWriter(file)
+
+    // 写入每一行
+    for _, line := range lines {
+        _, err := writer.WriteString(line + "\n")
+        if err != nil {
+            fmt.Println("Error writing to file:", err)
+            return
+        }
+    }
+
+    // 确保所有缓冲的数据都写入文件
+    if err := writer.Flush(); err != nil {
+        fmt.Println("Error flushing to file:", err)
+        return
+    }
+
+    fmt.Println("Data written to", filename)
+}
+
+// readFromFile 使用 bufio 逐行读取文件
+func readFromFile(filename string) {
+    // 打开文件
+    file, err := os.Open(filename)
+    if err != nil {
+        fmt.Println("Error opening file:", err)
+        return
+    }
+    defer file.Close() // 确保在函数结束时关闭文件
+
+    // 创建一个带缓冲的读取器
+    reader := bufio.NewReader(file)
+
+    // 逐行读取文件
+    for {
+        line, err := reader.ReadString('\n')
+        if err != nil {
+            break // EOF 或其他错误
+        }
+        fmt.Print(line) // 打印读取的行
+    }
+
+    if err != nil && err.Error() != "EOF" {
+        fmt.Println("Error reading file:", err)
+        return
+    }
+}
+PARAM
+	"safefile://SafeFileReadOs.go": <<<CODE
+// 使用 os.ReadFile 函数进行文件读取，避免直接使用 bufio.NewReader
+// os.ReadFile 是 Go 标准库提供的安全便捷的文件读取方式，不需要手动创建带缓冲的读取器。
+// 规则主要检测 bufio.NewReader 的调用，因此使用 os.ReadFile 可以有效规避。
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	// 创建一个测试文件
+	err := os.WriteFile("test_safe_os_read.txt", []byte("Hello from os.ReadFile!"), 0644)
+	if err != nil {
+		fmt.Println("Error creating test file:", err)
+		return
+	}
+
+	// 安全：使用 os.ReadFile 进行文件读取
+	data, err := os.ReadFile("test_safe_os_read.txt")
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	fmt.Printf("Content read securely with os.ReadFile:\n%s\n", data)
+
+	// 清理测试文件
+	os.Remove("test_safe_os_read.txt")
+}
+
+CODE
+	"safefile://SafeFileReadIoutil.go": <<<CODE
+// 使用 ioutil.ReadFile 函数进行文件读取（在 Go 1.16+ 中，ioutil 多数功能已迁移到 os 包）。
+// 即使在 Go 1.16+，为了向后兼容，ioutil.ReadFile 仍然存在且可用，它不直接实例化 bufio.NewReader。
+// 此示例旨在展示另一种不触发规则的内置安全读取方式。
+package main
+
+import (
+	"fmt"
+	"io/ioutil" // 在 Go 1.16+ 中，通常推荐使用 os.ReadFile
+	"os"
+)
+
+func main() {
+	// 创建一个测试文件
+	err := os.WriteFile("test_safe_ioutil_read.txt", []byte("Hello from ioutil.ReadFile!"), 0644)
+	if err != nil {
+		fmt.Println("Error creating test file:", err)
+		return
+	}
+
+	// 安全：使用 ioutil.ReadFile 进行文件读取
+	data, err := ioutil.ReadFile("test_safe_ioutil_read.txt")
+	if err != nil {
+		fmt.Println("Error reading file:", err)
+		return
+	}
+	fmt.Printf("Content read securely with ioutil.ReadFile:\n%s\n", data)
+
+	// 清理测试文件
+	os.Remove("test_safe_ioutil_read.txt")
+}
+
+CODE
+)

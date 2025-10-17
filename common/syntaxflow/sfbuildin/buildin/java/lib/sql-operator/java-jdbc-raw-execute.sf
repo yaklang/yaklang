@@ -7,66 +7,58 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   在Java应用中直接使用 `DriverManager.getConnection().createStatement().executeQuery()` 方法执行由用户输入或外部来源控制的SQL语句时，存在SQL注入的风险。这是因为 `Statement` 对象在执行SQL时，会将整个SQL字符串直接发送到数据库进行解析和执行。如果SQL字符串是简单地将用户输入进行拼接，攻击者就可以通过构造恶意的输入，修改原始SQL语句的逻辑，从而执行任意恶意的数据库操作。
+在Java应用中直接使用 `DriverManager.getConnection().createStatement().executeQuery()` 方法执行由用户输入或外部来源控制的SQL语句时，存在SQL注入的风险。这是因为 `Statement` 对象在执行SQL时，会将整个SQL字符串直接发送到数据库进行解析和执行。如果SQL字符串是简单地将用户输入进行拼接，攻击者就可以通过构造恶意的输入，修改原始SQL语句的逻辑，从而执行任意恶意的数据库操作。
 
 2. **触发场景**
-   当应用程序接收来自用户（如网页表单、URL参数等）的数据，并将这些数据未经充分验证或清理，直接拼接到SQL查询字符串中，然后使用 `Statement.executeQuery()` 执行时，就可能触发SQL注入。
-
-   // 存在漏洞的代码示例
-   ```java
-   String userId = request.getParameter("id");
-   String query = "SELECT * FROM users WHERE id = " + userId; // 直接拼接用户输入
-   Statement stmt = connection.createStatement();
-   ResultSet rs = stmt.executeQuery(query);
-   // ... 处理结果
-   ```
-   攻击者可能输入 `1 OR 1=1` 导致绕过身份验证或获取所有用户数据，或输入 `1; DROP TABLE users; --` 尝试删除用户表。
+当应用程序接收来自用户（如网页表单、URL参数等）的数据，并将这些数据未经充分验证或清理，直接拼接到SQL查询字符串中，然后使用 `Statement.executeQuery()` 执行时，就可能触发SQL注入。
+// 存在漏洞的代码示例
+```java
+String userId = request.getParameter("id");
+String query = "SELECT * FROM users WHERE id = " + userId; // 直接拼接用户输入
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(query);
+// ... 处理结果
+```
+攻击者可能输入 `1 OR 1=1` 导致绕过身份验证或获取所有用户数据，或输入 `1; DROP TABLE users; --` 尝试删除用户表。
 
 3. **潜在影响**
-   - **数据泄露**: 攻击者可以读取、复制或窃取数据库中的敏感信息，如用户凭证、个人身份信息、商业秘密等。
-   - **数据篡改**: 攻击者可以修改、插入或删除数据库中的数据，破坏数据的完整性和可用性。
-   - **拒绝服务**: 攻击者可能执行耗时的查询或恶意的数据库操作，导致数据库性能下降或无法访问。
-   - **权限提升**: 在某些情况下，攻击者可能通过SQL注入漏洞获取数据库管理员权限，进一步控制整个数据库系统，甚至通过数据库服务提权至操作系统层面。
-
+- **数据泄露**: 攻击者可以读取、复制或窃取数据库中的敏感信息，如用户凭证、个人身份信息、商业秘密等。
+- **数据篡改**: 攻击者可以修改、插入或删除数据库中的数据，破坏数据的完整性和可用性。
+- **拒绝服务**: 攻击者可能执行耗时的查询或恶意的数据库操作，导致数据库性能下降或无法访问。
+- **权限提升**: 在某些情况下，攻击者可能通过SQL注入漏洞获取数据库管理员权限，进一步控制整个数据库系统，甚至通过数据库服务提权至操作系统层面。
 DESC
 	rule_id: "8d3da580-d25b-48d7-9e50-1087ea447522"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（PreparedStatement）
 强烈推荐使用 `PreparedStatement` 来执行SQL查询。`PreparedStatement` 会预编译SQL语句，并将用户输入作为参数绑定到预编译的语句中。这种方式可以有效区分代码和数据，数据库在执行时会严格按照参数值处理，而不会将其解析为SQL代码的一部分。
-
 ```java
 // 修复代码示例
 String userId = request.getParameter("id");
 String query = "SELECT * FROM users WHERE id = ?"; // 使用参数占位符
 try (PreparedStatement pstmt = connection.prepareStatement(query)) {
-    // 对用户输入进行适当的类型转换（如Integer.parseInt）并绑定参数
-    pstmt.setInt(1, Integer.parseInt(userId)); 
-    ResultSet rs = pstmt.executeQuery();
-    // ... 处理结果
+// 对用户输入进行适当的类型转换（如Integer.parseInt）并绑定参数
+pstmt.setInt(1, Integer.parseInt(userId));
+ResultSet rs = pstmt.executeQuery();
+// ... 处理结果
 }
 catch (NumberFormatException e) {
-    // 处理用户输入不是数字的情况，避免异常
-    System.err.println("Invalid user ID format: " + userId);
-    // 可以返回错误信息给用户或进行其他处理
+// 处理用户输入不是数字的情况，避免异常
+System.err.println("Invalid user ID format: " + userId);
+// 可以返回错误信息给用户或进行其他处理
 }
 catch (SQLException e) {
-    // 处理数据库操作异常
-    e.printStackTrace();
-    // 记录日志或返回错误信息
+// 处理数据库操作异常
+e.printStackTrace();
+// 记录日志或返回错误信息
 }
 ```
-
 #### 2. 输入验证与清理
 在将用户输入用于SQL查询之前，始终对其进行严格的验证和清理。这包括检查数据类型、长度、格式和允许的字符集。可以根据具体的业务需求和预期的输入类型，使用正则表达式、白名单过滤或转义特殊字符等方法。尽管输入验证是重要的防御层，但不能完全替代参数化查询。
-
 #### 3. 使用ORM框架 (如 Hibernate, MyBatis)
 使用成熟的ORM（对象关系映射）框架是另一种推荐的方式。ORM框架通常内置了对SQL注入的防御机制，它们会负责将对象操作转换为安全的数据库操作（通常通过参数化查询实现），开发者无需手动处理SQL语句和参数绑定。
-
 #### 4. 最小权限原则
 为数据库用户配置最小必要的权限，限制其只能访问和操作所需的数据表和功能。即使发生SQL注入，也能限制攻击者能够造成的损害范围。
-
 SOLUTION
 	reference: <<<REFERENCE
 [OWASP SQL Injection](https://owasp.org/www-community/attacks/SQL_Injection)
@@ -84,32 +76,63 @@ $sink as $output;
 alert $output for {
 	title: "Check Java JDBC Statement ExecuteQuery Call",
 	title_zh: "检测 Java JDBC Statement.executeQuery 调用",
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在Java应用中直接使用 `DriverManager.getConnection().createStatement().executeQuery()` 方法执行由用户输入或外部来源控制的SQL语句时，存在SQL注入的风险。这是因为 `Statement` 对象在执行SQL时，会将整个SQL字符串直接发送到数据库进行解析和执行。如果SQL字符串是简单地将用户输入进行拼接，攻击者就可以通过构造恶意的输入，修改原始SQL语句的逻辑，从而执行任意恶意的数据库操作。
-
+在Java应用中直接使用 `DriverManager.getConnection().createStatement().executeQuery()` 方法执行由用户输入或外部来源控制的SQL语句时，存在SQL注入的风险。这是因为 `Statement` 对象在执行SQL时，会将整个SQL字符串直接发送到数据库进行解析和执行。如果SQL字符串是简单地将用户输入进行拼接，攻击者就可以通过构造恶意的输入，修改原始SQL语句的逻辑，从而执行任意恶意的数据库操作。
 2. **触发场景**
-   当应用程序接收来自用户（如网页表单、URL参数等）的数据，并将这些数据未经充分验证或清理，直接拼接到SQL查询字符串中，然后使用 `Statement.executeQuery()` 执行时，就可能触发SQL注入。
-
-   // 存在漏洞的代码示例
-   ```java
-   String userId = request.getParameter("id");
-   String query = "SELECT * FROM users WHERE id = " + userId; // 直接拼接用户输入
-   Statement stmt = connection.createStatement();
-   ResultSet rs = stmt.executeQuery(query);
-   // ... 处理结果
-   ```
-   攻击者可能输入 `1 OR 1=1` 导致绕过身份验证或获取所有用户数据，或输入 `1; DROP TABLE users; --` 尝试删除用户表。
-
+当应用程序接收来自用户（如网页表单、URL参数等）的数据，并将这些数据未经充分验证或清理，直接拼接到SQL查询字符串中，然后使用 `Statement.executeQuery()` 执行时，就可能触发SQL注入。
+// 存在漏洞的代码示例
+```java
+String userId = request.getParameter("id");
+String query = "SELECT * FROM users WHERE id = " + userId; // 直接拼接用户输入
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(query);
+// ... 处理结果
+```
+攻击者可能输入 `1 OR 1=1` 导致绕过身份验证或获取所有用户数据，或输入 `1; DROP TABLE users; --` 尝试删除用户表。
 3. **潜在影响**
-   - **数据泄露**: 攻击者可以读取、复制或窃取数据库中的敏感信息，如用户凭证、个人身份信息、商业秘密等。
-   - **数据篡改**: 攻击者可以修改、插入或删除数据库中的数据，破坏数据的完整性和可用性。
-   - **拒绝服务**: 攻击者可能执行耗时的查询或恶意的数据库操作，导致数据库性能下降或无法访问。
-   - **权限提升**: 在某些情况下，攻击者可能通过SQL注入漏洞获取数据库管理员权限，进一步控制整个数据库系统，甚至通过数据库服务提权至操作系统层面。
-CODE
+- **数据泄露**: 攻击者可以读取、复制或窃取数据库中的敏感信息，如用户凭证、个人身份信息、商业秘密等。
+- **数据篡改**: 攻击者可以修改、插入或删除数据库中的数据，破坏数据的完整性和可用性。
+- **拒绝服务**: 攻击者可能执行耗时的查询或恶意的数据库操作，导致数据库性能下降或无法访问。
+- **权限提升**: 在某些情况下，攻击者可能通过SQL注入漏洞获取数据库管理员权限，进一步控制整个数据库系统，甚至通过数据库服务提权至操作系统层面。
+DESC
 	level: "info",
+	message: "检测到 Java JDBC Statement.executeQuery 调用，可能存在 SQL 注入风险，相关信息需要进一步审查。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数化查询（PreparedStatement）
+强烈推荐使用 `PreparedStatement` 来执行SQL查询。`PreparedStatement` 会预编译SQL语句，并将用户输入作为参数绑定到预编译的语句中。这种方式可以有效区分代码和数据，数据库在执行时会严格按照参数值处理，而不会将其解析为SQL代码的一部分。
+```java
+// 修复代码示例
+String userId = request.getParameter("id");
+String query = "SELECT * FROM users WHERE id = ?"; // 使用参数占位符
+try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+// 对用户输入进行适当的类型转换（如Integer.parseInt）并绑定参数
+pstmt.setInt(1, Integer.parseInt(userId));
+ResultSet rs = pstmt.executeQuery();
+// ... 处理结果
+}
+catch (NumberFormatException e) {
+// 处理用户输入不是数字的情况，避免异常
+System.err.println("Invalid user ID format: " + userId);
+// 可以返回错误信息给用户或进行其他处理
+}
+catch (SQLException e) {
+// 处理数据库操作异常
+e.printStackTrace();
+// 记录日志或返回错误信息
+}
+```
+#### 2. 输入验证与清理
+在将用户输入用于SQL查询之前，始终对其进行严格的验证和清理。这包括检查数据类型、长度、格式和允许的字符集。可以根据具体的业务需求和预期的输入类型，使用正则表达式、白名单过滤或转义特殊字符等方法。尽管输入验证是重要的防御层，但不能完全替代参数化查询。
+#### 3. 使用ORM框架 (如 Hibernate, MyBatis)
+使用成熟的ORM（对象关系映射）框架是另一种推荐的方式。ORM框架通常内置了对SQL注入的防御机制，它们会负责将对象操作转换为安全的数据库操作（通常通过参数化查询实现），开发者无需手动处理SQL语句和参数绑定。
+#### 4. 最小权限原则
+为数据库用户配置最小必要的权限，限制其只能访问和操作所需的数据表和功能。即使发生SQL注入，也能限制攻击者能够造成的损害范围。
+SOLUTION
+	risk: "信息",
+	name: "output",
 }
 
 
@@ -152,4 +175,46 @@ public class JdbcExample {
     }
 }
 UNSAFE
+	"safefile://SafePreparedStatementExample.java": <<<CODE
+import java.sql.*;
+import jakarta.servlet.http.HttpServletRequest;
+
+public class SafePreparedStatementExample {
+    public void getUserDataSafe(HttpServletRequest request, Connection connection) {
+        String userId = request.getParameter("id");
+        String query = "SELECT * FROM users WHERE id = ?"; // 使用参数占位符
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            // 对用户输入进行适当的类型转换（如Integer.parseInt）并绑定参数
+            // 确保用户输入是数字，防止NumberFormatException
+            int id = Integer.parseInt(userId);
+            pstmt.setInt(1, id);
+            ResultSet rs = pstmt.executeQuery();
+            // ... 处理结果
+        } catch (NumberFormatException e) {
+            // 处理用户输入不是数字的情况
+            System.err.println("Invalid user ID format: " + userId);
+        } catch (SQLException e) {
+            // 处理数据库操作异常
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafePreparedStatementNoReqParamExample.java": <<<CODE
+import java.sql.*;
+
+public class SafePreparedStatementNoReqParamExample {
+    public void getUserDataFromDatabase(int userId, Connection connection) {
+        String query = "SELECT * FROM products WHERE product_id = ?"; // 使用参数占位符
+        try (PreparedStatement pstmt = connection.prepareStatement(query)) {
+            pstmt.setInt(1, userId); // 直接绑定已验证的整数参数
+            ResultSet rs = pstmt.executeQuery();
+            // ... 处理结果
+        } catch (SQLException e) {
+            // 处理数据库操作异常
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

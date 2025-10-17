@@ -260,10 +260,7 @@ func MapGetMapRawOr(m map[string]interface{}, key string, value map[string]inter
 
 	r, ok := m[key]
 	if ok {
-		data, typeOk := r.(map[string]interface{})
-		if typeOk {
-			return data
-		}
+		return InterfaceToGeneralMap(r)
 	}
 	return value
 }

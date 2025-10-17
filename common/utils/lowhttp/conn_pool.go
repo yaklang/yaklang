@@ -583,11 +583,10 @@ func (pc *persistConn) readLoop() {
 
 		count++
 		var responseRaw bytes.Buffer
-		var respPacket []byte
 		var respClose bool
+		var respPacket = respBuffer.Bytes()
 		if resp != nil {
 			respClose = resp.Close
-			respPacket = respBuffer.Bytes()
 		}
 		if len(respPacket) > 0 {
 			responseRaw.Write(respPacket)

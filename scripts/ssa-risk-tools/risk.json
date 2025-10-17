@@ -1,0 +1,158 @@
+{
+  "report_type": "irify",
+  "engine_version": "dev",
+  "report_time": "2025-09-23T11:47:57.1949691+08:00",
+  "program_name": "fs.zip(2025-0923-11:47)",
+  "program_lang": "golang",
+  "description": "",
+  "repository_url": "",
+  "file_count": 5,
+  "code_line_count": 5076,
+  "scan_start_time": "2025-09-23T11:47:57.1949691+08:00",
+  "scan_end_time": "2025-09-23T11:47:57.1949691+08:00",
+  "RiskNums": 4,
+  "Rules": [
+    {
+      "rule_name": "golang-database-init.sf",
+      "language": "golang",
+      "title": "Audit Golang Database Operations in Init Function",
+      "title_zh": "审计Golang中Init函数内的数据库操作",
+      "description": "### 规则目的\r\n\r\n该规则用于审计Golang代码中在`init`函数内执行数据库操作的情况。`init`函数在Go程序启动时自动执行，如果在其中进行数据库操作可能导致程序启动失败或不可预期的行为，尤其是在依赖项未完全初始化时。\r\n\r\n### 规则详细\r\n\r\n1. **风险原理**\r\n   - `init`函数在Go程序启动时自动执行，且执行顺序依赖包导入顺序，难以控制。\r\n   - 若在`init`函数中进行数据库操作，可能在依赖项（如数据库连接池）未完全初始化时触发错误，导致程序崩溃。\r\n   - 此类操作还可能隐藏性能问题，因`init`函数阻塞会拖慢程序启动速度。\r\n\r\n2. **触发场景**\r\n   ```go\r\n   package main\r\n   import (\r\n       \"github.com/yaklang/yaklang/common/consts\"\r\n   )\r\n   func init() {\r\n       db := consts.GetGormProfileDatabase()\r\n       autoAutomigrateVectorStoreDocument(db) // 直接在此迁移数据库\r\n   }\r\n   ```\r\n   上述代码可能在数据库连接未建立时调用`GetGormProfileDatabase`，引发空指针异常。\r\n\r\n3. **潜在影响**\r\n   - 程序启动失败，影响服务可用性。\r\n   - 难以调试的初始化顺序问题。\r\n   - 隐藏的性能瓶颈。",
+      "solution": "### 修复建议\r\n\r\n#### 1. 使用延迟初始化钩子\r\n通过注册回调函数，在数据库初始化完成后执行操作，避免直接依赖`init`函数。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc init() {\r\n    yakit.RegisterPostInitDatabaseFunction(func() error {\r\n        autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n        return nil\r\n    })\r\n}\r\n```\r\n\r\n#### 2. 显式初始化控制\r\n将数据库操作移至主函数或显式初始化流程中，确保依赖项已就绪。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc main() {\r\n    // 显式初始化数据库\r\n    if err := consts.InitializeDatabase(); err != nil {\r\n        panic(err)\r\n    }\r\n    // 安全执行迁移\r\n    autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n}\r\n```\r\n\r\n#### 3. 添加健康检查\r\n对`init`中的数据库操作添加重试机制和超时控制。\r\n```go\r\nfunc init() {\r\n    go func() {\r\n        for i := 0; i \u003c 3; i++ {\r\n            if db := consts.GetGormProfileDatabase(); db != nil {\r\n                autoAutomigrateVectorStoreDocument(db)\r\n                return\r\n            }\r\n            time.Sleep(1 * time.Second)\r\n        }\r\n        log.Println(\"数据库初始化超时\")\r\n    }()\r\n}\r\n```",
+      "severity": "info",
+      "content": "desc(\r\n\ttitle: \"Audit Golang Database Operations in Init Function\"\r\n\ttitle_zh: \"审计Golang中Init函数内的数据库操作\"\r\n\ttype: vuln\r\n\trule_id: \"5d658a56-db56-4973-85b2-e2ad06ed09e8\"\r\n\trisk: \"\"\r\n\tdesc: \u003c\u003c\u003cDESC\r\n### 规则目的\r\n\r\n该规则用于审计Golang代码中在`init`函数内执行数据库操作的情况。`init`函数在Go程序启动时自动执行，如果在其中进行数据库操作可能导致程序启动失败或不可预期的行为，尤其是在依赖项未完全初始化时。\r\n\r\n### 规则详细\r\n\r\n1. **风险原理**\r\n   - `init`函数在Go程序启动时自动执行，且执行顺序依赖包导入顺序，难以控制。\r\n   - 若在`init`函数中进行数据库操作，可能在依赖项（如数据库连接池）未完全初始化时触发错误，导致程序崩溃。\r\n   - 此类操作还可能隐藏性能问题，因`init`函数阻塞会拖慢程序启动速度。\r\n\r\n2. **触发场景**\r\n   ```go\r\n   package main\r\n   import (\r\n       \"github.com/yaklang/yaklang/common/consts\"\r\n   )\r\n   func init() {\r\n       db := consts.GetGormProfileDatabase()\r\n       autoAutomigrateVectorStoreDocument(db) // 直接在此迁移数据库\r\n   }\r\n   ```\r\n   上述代码可能在数据库连接未建立时调用`GetGormProfileDatabase`，引发空指针异常。\r\n\r\n3. **潜在影响**\r\n   - 程序启动失败，影响服务可用性。\r\n   - 难以调试的初始化顺序问题。\r\n   - 隐藏的性能瓶颈。\r\nDESC\r\n\tsolution: \u003c\u003c\u003cSOLUTION\r\n### 修复建议\r\n\r\n#### 1. 使用延迟初始化钩子\r\n通过注册回调函数，在数据库初始化完成后执行操作，避免直接依赖`init`函数。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc init() {\r\n    yakit.RegisterPostInitDatabaseFunction(func() error {\r\n        autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n        return nil\r\n    })\r\n}\r\n```\r\n\r\n#### 2. 显式初始化控制\r\n将数据库操作移至主函数或显式初始化流程中，确保依赖项已就绪。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc main() {\r\n    // 显式初始化数据库\r\n    if err := consts.InitializeDatabase(); err != nil {\r\n        panic(err)\r\n    }\r\n    // 安全执行迁移\r\n    autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n}\r\n```\r\n\r\n#### 3. 添加健康检查\r\n对`init`中的数据库操作添加重试机制和超时控制。\r\n```go\r\nfunc init() {\r\n    go func() {\r\n        for i := 0; i \u003c 3; i++ {\r\n            if db := consts.GetGormProfileDatabase(); db != nil {\r\n                autoAutomigrateVectorStoreDocument(db)\r\n                return\r\n            }\r\n            time.Sleep(1 * time.Second)\r\n        }\r\n        log.Println(\"数据库初始化超时\")\r\n    }()\r\n}\r\n```\r\nSOLUTION\r\n\treference: \u003c\u003c\u003cREFERENCE\r\nnone\r\nREFERENCE\r\n)\r\n\r\nconsts?{have: ExternLib}?{\u003cfullTypeName\u003e?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;\r\n$consts.*Database as $database;\r\n$database\u003cgetFunc\u003e?{have: \"init\"} as $high;\r\n\r\nalert $high for {\r\n\ttitle: \"Audit Golang Database Operations in Init Function\",\r\n\ttitle_zh: \"审计Golang中Init函数内的数据库操作\",\r\n\tlevel: \"high\",\r\n\ttype: \"vuln\",\r\n\trisk: \"\",\r\n\tname: \"high\",\r\n}\r\n\r\ndesc(\r\n\tlang: golang\r\n\talert_high: 1\r\n\t'file://unsafe.go': \u003c\u003c\u003cUNSAFE\r\npackage main\r\n\r\nimport (\r\n\t\"github.com/yaklang/yaklang/common/consts\"\r\n)\r\n\r\nfunc init() {\r\n\tdb := consts.GetGormProfileDatabase()\r\n\tautoAutomigrateVectorStoreDocument(db)\r\n}\r\nUNSAFE\r\n\t'safefile://safe.go': \u003c\u003c\u003cSAFE\r\npackage main\r\n\r\nimport (\r\n\t\"github.com/yaklang/yaklang/common/consts\"\r\n)\r\n\r\nfunc init() {\r\n\tyakit.RegisterPostInitDatabaseFunction(func() error {\r\n\t\tautoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n\t\treturn nil\r\n\t})\r\n}\r\nSAFE\r\n)\r\n\r\nconsts?{have: ExternLib}?{\u003cfullTypeName\u003e?{have: 'github.com/yaklang/yaklang/common/consts'}} as $consts;\r\n$consts.*Database as $database;\r\n$database\u003cgetFunc\u003e as $level1;\r\n$level1\u003cgetCall\u003e?{!have: 'RegisterPostInitDatabaseFunction'}\u003cgetFunc\u003e as $level2\r\n$level2\u003cgetCall\u003e?{!have: 'RegisterPostInitDatabaseFunction'}\u003cgetFunc\u003e as $level3\r\n$level3\u003cgetCall\u003e?{!have: 'RegisterPostInitDatabaseFunction'}\u003cgetFunc\u003e as $level4\r\n\r\n$level1 as $level\r\n$level2 as $level\r\n$level3 as $level\r\n$level4 as $level\r\n$level?{have: \"init\"} as $mid;\r\n\r\nalert $mid for {\r\n\ttitle: \"Audit Golang Database Operations in Init Function\",\r\n\ttitle_zh: \"审计Golang中Init函数内的数据库操作\",\r\n\tlevel: \"mid\",\r\n\ttype: \"vuln\",\r\n\trisk: \"\",\r\n\tname: \"mid\",\r\n}\r\n\r\ndesc(\r\n\tlang: golang\r\n\talert_mid: 1\r\n\t'file://unsafe.go': \u003c\u003c\u003cUNSAFE\r\npackage main\r\n\r\nimport (\r\n\t\"github.com/yaklang/yaklang/common/consts\"\r\n)\r\n\r\nfunc init() {\r\n    go func() {\r\n    \tdb := consts.GetGormProfileDatabase()\r\n\t    autoAutomigrateVectorStoreDocument(db)\r\n    }()\r\n}\r\nUNSAFE\r\n\t'safefile://safe.go': \u003c\u003c\u003cSAFE\r\npackage main\r\n\r\nimport (\r\n\t\"github.com/yaklang/yaklang/common/consts\"\r\n)\r\n\r\nfunc init() {\r\n\tyakit.RegisterPostInitDatabaseFunction(func() error {\r\n\t\tautoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n\t\treturn nil\r\n\t})\r\n}\r\nSAFE\r\n)\r\n\r\n",
+      "risks": [
+        "3df0329b7d2ff33d30e74ad7f283f8bf30e906e2",
+        "9320e5a28985cb4a7cd0509fbdfcdffa0dac1467",
+        "ddefc8cf83f8de6ee75492ac28ace191fd898e3a",
+        "b515d8b49d5255b9ab70cc1283af1d373ad319f7"
+      ]
+    }
+  ],
+  "Risks": {
+    "3df0329b7d2ff33d30e74ad7f283f8bf30e906e2": {
+      "id": 0,
+      "hash": "3df0329b7d2ff33d30e74ad7f283f8bf30e906e2",
+      "title": "Audit Golang Database Operations in Init Function",
+      "title_verbose": "审计Golang中Init函数内的数据库操作",
+      "description": "### 规则目的\r\n\r\n该规则用于审计Golang代码中在`init`函数内执行数据库操作的情况。`init`函数在Go程序启动时自动执行，如果在其中进行数据库操作可能导致程序启动失败或不可预期的行为，尤其是在依赖项未完全初始化时。\r\n\r\n### 规则详细\r\n\r\n1. **风险原理**\r\n   - `init`函数在Go程序启动时自动执行，且执行顺序依赖包导入顺序，难以控制。\r\n   - 若在`init`函数中进行数据库操作，可能在依赖项（如数据库连接池）未完全初始化时触发错误，导致程序崩溃。\r\n   - 此类操作还可能隐藏性能问题，因`init`函数阻塞会拖慢程序启动速度。\r\n\r\n2. **触发场景**\r\n   ```go\r\n   package main\r\n   import (\r\n       \"github.com/yaklang/yaklang/common/consts\"\r\n   )\r\n   func init() {\r\n       db := consts.GetGormProfileDatabase()\r\n       autoAutomigrateVectorStoreDocument(db) // 直接在此迁移数据库\r\n   }\r\n   ```\r\n   上述代码可能在数据库连接未建立时调用`GetGormProfileDatabase`，引发空指针异常。\r\n\r\n3. **潜在影响**\r\n   - 程序启动失败，影响服务可用性。\r\n   - 难以调试的初始化顺序问题。\r\n   - 隐藏的性能瓶颈。",
+      "solution": "### 修复建议\r\n\r\n#### 1. 使用延迟初始化钩子\r\n通过注册回调函数，在数据库初始化完成后执行操作，避免直接依赖`init`函数。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc init() {\r\n    yakit.RegisterPostInitDatabaseFunction(func() error {\r\n        autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n        return nil\r\n    })\r\n}\r\n```\r\n\r\n#### 2. 显式初始化控制\r\n将数据库操作移至主函数或显式初始化流程中，确保依赖项已就绪。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc main() {\r\n    // 显式初始化数据库\r\n    if err := consts.InitializeDatabase(); err != nil {\r\n        panic(err)\r\n    }\r\n    // 安全执行迁移\r\n    autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n}\r\n```\r\n\r\n#### 3. 添加健康检查\r\n对`init`中的数据库操作添加重试机制和超时控制。\r\n```go\r\nfunc init() {\r\n    go func() {\r\n        for i := 0; i \u003c 3; i++ {\r\n            if db := consts.GetGormProfileDatabase(); db != nil {\r\n                autoAutomigrateVectorStoreDocument(db)\r\n                return\r\n            }\r\n            time.Sleep(1 * time.Second)\r\n        }\r\n        log.Println(\"数据库初始化超时\")\r\n    }()\r\n}\r\n```",
+      "severity": "high",
+      "risk_type": "",
+      "details": "",
+      "cve": "",
+      "cwe": [],
+      "time": "0001-01-01T00:00:00Z",
+      "language": "golang",
+      "code_source_url": "/fs.zip(2025-0923-11:47)/test_init.go",
+      "line": 7,
+      "code_range": "{\"url\":\"/fs.zip(2025-0923-11:47)/test_init.go\",\"start_line\":7,\"start_column\":1,\"end_line\":10,\"end_column\":2,\"source_code_line\":3}",
+      "code_fragment": "\t\"github.com/yaklang/yaklang/common/consts\"\n)\n\nfunc init() {\n\tdb := consts.GetGormProfileDatabase()\n\tautoAutomigrateVectorStoreDocument(db)\n}\n\n",
+      "function_name": "init",
+      "rule_name": "golang-database-init.sf",
+      "program_name": "fs.zip(2025-0923-11:47)",
+      "latest_disposal_status": ""
+    },
+    "9320e5a28985cb4a7cd0509fbdfcdffa0dac1467": {
+      "id": 0,
+      "hash": "9320e5a28985cb4a7cd0509fbdfcdffa0dac1467",
+      "title": "Audit Golang Database Operations in Init Function",
+      "title_verbose": "审计Golang中Init函数内的数据库操作",
+      "description": "### 规则目的\r\n\r\n该规则用于审计Golang代码中在`init`函数内执行数据库操作的情况。`init`函数在Go程序启动时自动执行，如果在其中进行数据库操作可能导致程序启动失败或不可预期的行为，尤其是在依赖项未完全初始化时。\r\n\r\n### 规则详细\r\n\r\n1. **风险原理**\r\n   - `init`函数在Go程序启动时自动执行，且执行顺序依赖包导入顺序，难以控制。\r\n   - 若在`init`函数中进行数据库操作，可能在依赖项（如数据库连接池）未完全初始化时触发错误，导致程序崩溃。\r\n   - 此类操作还可能隐藏性能问题，因`init`函数阻塞会拖慢程序启动速度。\r\n\r\n2. **触发场景**\r\n   ```go\r\n   package main\r\n   import (\r\n       \"github.com/yaklang/yaklang/common/consts\"\r\n   )\r\n   func init() {\r\n       db := consts.GetGormProfileDatabase()\r\n       autoAutomigrateVectorStoreDocument(db) // 直接在此迁移数据库\r\n   }\r\n   ```\r\n   上述代码可能在数据库连接未建立时调用`GetGormProfileDatabase`，引发空指针异常。\r\n\r\n3. **潜在影响**\r\n   - 程序启动失败，影响服务可用性。\r\n   - 难以调试的初始化顺序问题。\r\n   - 隐藏的性能瓶颈。",
+      "solution": "### 修复建议\r\n\r\n#### 1. 使用延迟初始化钩子\r\n通过注册回调函数，在数据库初始化完成后执行操作，避免直接依赖`init`函数。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc init() {\r\n    yakit.RegisterPostInitDatabaseFunction(func() error {\r\n        autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n        return nil\r\n    })\r\n}\r\n```\r\n\r\n#### 2. 显式初始化控制\r\n将数据库操作移至主函数或显式初始化流程中，确保依赖项已就绪。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc main() {\r\n    // 显式初始化数据库\r\n    if err := consts.InitializeDatabase(); err != nil {\r\n        panic(err)\r\n    }\r\n    // 安全执行迁移\r\n    autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n}\r\n```\r\n\r\n#### 3. 添加健康检查\r\n对`init`中的数据库操作添加重试机制和超时控制。\r\n```go\r\nfunc init() {\r\n    go func() {\r\n        for i := 0; i \u003c 3; i++ {\r\n            if db := consts.GetGormProfileDatabase(); db != nil {\r\n                autoAutomigrateVectorStoreDocument(db)\r\n                return\r\n            }\r\n            time.Sleep(1 * time.Second)\r\n        }\r\n        log.Println(\"数据库初始化超时\")\r\n    }()\r\n}\r\n```",
+      "severity": "high",
+      "risk_type": "",
+      "details": "",
+      "cve": "",
+      "cwe": [],
+      "time": "0001-01-01T00:00:00Z",
+      "language": "golang",
+      "code_source_url": "/fs.zip(2025-0923-11:47)/test_init2.go",
+      "line": 7,
+      "code_range": "{\"url\":\"/fs.zip(2025-0923-11:47)/test_init2.go\",\"start_line\":7,\"start_column\":1,\"end_line\":12,\"end_column\":2,\"source_code_line\":3}",
+      "code_fragment": "\t\"github.com/yaklang/yaklang/common/consts\"\n)\n\nfunc init() {\n\tgo func() {\n\t\tdb := consts.GetGormProfileDatabase()\n\t\tautoAutomigrateVectorStoreDocument(db)\n\t}()\n}\n\n",
+      "function_name": "init",
+      "rule_name": "golang-database-init.sf",
+      "program_name": "fs.zip(2025-0923-11:47)",
+      "latest_disposal_status": ""
+    },
+    "b515d8b49d5255b9ab70cc1283af1d373ad319f7": {
+      "id": 0,
+      "hash": "b515d8b49d5255b9ab70cc1283af1d373ad319f7",
+      "title": "Audit Golang Database Operations in Init Function",
+      "title_verbose": "审计Golang中Init函数内的数据库操作",
+      "description": "### 规则目的\r\n\r\n该规则用于审计Golang代码中在`init`函数内执行数据库操作的情况。`init`函数在Go程序启动时自动执行，如果在其中进行数据库操作可能导致程序启动失败或不可预期的行为，尤其是在依赖项未完全初始化时。\r\n\r\n### 规则详细\r\n\r\n1. **风险原理**\r\n   - `init`函数在Go程序启动时自动执行，且执行顺序依赖包导入顺序，难以控制。\r\n   - 若在`init`函数中进行数据库操作，可能在依赖项（如数据库连接池）未完全初始化时触发错误，导致程序崩溃。\r\n   - 此类操作还可能隐藏性能问题，因`init`函数阻塞会拖慢程序启动速度。\r\n\r\n2. **触发场景**\r\n   ```go\r\n   package main\r\n   import (\r\n       \"github.com/yaklang/yaklang/common/consts\"\r\n   )\r\n   func init() {\r\n       db := consts.GetGormProfileDatabase()\r\n       autoAutomigrateVectorStoreDocument(db) // 直接在此迁移数据库\r\n   }\r\n   ```\r\n   上述代码可能在数据库连接未建立时调用`GetGormProfileDatabase`，引发空指针异常。\r\n\r\n3. **潜在影响**\r\n   - 程序启动失败，影响服务可用性。\r\n   - 难以调试的初始化顺序问题。\r\n   - 隐藏的性能瓶颈。",
+      "solution": "### 修复建议\r\n\r\n#### 1. 使用延迟初始化钩子\r\n通过注册回调函数，在数据库初始化完成后执行操作，避免直接依赖`init`函数。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc init() {\r\n    yakit.RegisterPostInitDatabaseFunction(func() error {\r\n        autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n        return nil\r\n    })\r\n}\r\n```\r\n\r\n#### 2. 显式初始化控制\r\n将数据库操作移至主函数或显式初始化流程中，确保依赖项已就绪。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc main() {\r\n    // 显式初始化数据库\r\n    if err := consts.InitializeDatabase(); err != nil {\r\n        panic(err)\r\n    }\r\n    // 安全执行迁移\r\n    autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n}\r\n```\r\n\r\n#### 3. 添加健康检查\r\n对`init`中的数据库操作添加重试机制和超时控制。\r\n```go\r\nfunc init() {\r\n    go func() {\r\n        for i := 0; i \u003c 3; i++ {\r\n            if db := consts.GetGormProfileDatabase(); db != nil {\r\n                autoAutomigrateVectorStoreDocument(db)\r\n                return\r\n            }\r\n            time.Sleep(1 * time.Second)\r\n        }\r\n        log.Println(\"数据库初始化超时\")\r\n    }()\r\n}\r\n```",
+      "severity": "middle",
+      "risk_type": "",
+      "details": "",
+      "cve": "",
+      "cwe": [],
+      "time": "0001-01-01T00:00:00Z",
+      "language": "golang",
+      "code_source_url": "/fs.zip(2025-0923-11:47)/test_init2.go",
+      "line": 7,
+      "code_range": "{\"url\":\"/fs.zip(2025-0923-11:47)/test_init2.go\",\"start_line\":7,\"start_column\":1,\"end_line\":12,\"end_column\":2,\"source_code_line\":3}",
+      "code_fragment": "\t\"github.com/yaklang/yaklang/common/consts\"\n)\n\nfunc init() {\n\tgo func() {\n\t\tdb := consts.GetGormProfileDatabase()\n\t\tautoAutomigrateVectorStoreDocument(db)\n\t}()\n}\n\n",
+      "function_name": "init",
+      "rule_name": "golang-database-init.sf",
+      "program_name": "fs.zip(2025-0923-11:47)",
+      "latest_disposal_status": ""
+    },
+    "ddefc8cf83f8de6ee75492ac28ace191fd898e3a": {
+      "id": 0,
+      "hash": "ddefc8cf83f8de6ee75492ac28ace191fd898e3a",
+      "title": "Audit Golang Database Operations in Init Function",
+      "title_verbose": "审计Golang中Init函数内的数据库操作",
+      "description": "### 规则目的\r\n\r\n该规则用于审计Golang代码中在`init`函数内执行数据库操作的情况。`init`函数在Go程序启动时自动执行，如果在其中进行数据库操作可能导致程序启动失败或不可预期的行为，尤其是在依赖项未完全初始化时。\r\n\r\n### 规则详细\r\n\r\n1. **风险原理**\r\n   - `init`函数在Go程序启动时自动执行，且执行顺序依赖包导入顺序，难以控制。\r\n   - 若在`init`函数中进行数据库操作，可能在依赖项（如数据库连接池）未完全初始化时触发错误，导致程序崩溃。\r\n   - 此类操作还可能隐藏性能问题，因`init`函数阻塞会拖慢程序启动速度。\r\n\r\n2. **触发场景**\r\n   ```go\r\n   package main\r\n   import (\r\n       \"github.com/yaklang/yaklang/common/consts\"\r\n   )\r\n   func init() {\r\n       db := consts.GetGormProfileDatabase()\r\n       autoAutomigrateVectorStoreDocument(db) // 直接在此迁移数据库\r\n   }\r\n   ```\r\n   上述代码可能在数据库连接未建立时调用`GetGormProfileDatabase`，引发空指针异常。\r\n\r\n3. **潜在影响**\r\n   - 程序启动失败，影响服务可用性。\r\n   - 难以调试的初始化顺序问题。\r\n   - 隐藏的性能瓶颈。",
+      "solution": "### 修复建议\r\n\r\n#### 1. 使用延迟初始化钩子\r\n通过注册回调函数，在数据库初始化完成后执行操作，避免直接依赖`init`函数。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc init() {\r\n    yakit.RegisterPostInitDatabaseFunction(func() error {\r\n        autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n        return nil\r\n    })\r\n}\r\n```\r\n\r\n#### 2. 显式初始化控制\r\n将数据库操作移至主函数或显式初始化流程中，确保依赖项已就绪。\r\n```go\r\npackage main\r\nimport (\r\n    \"github.com/yaklang/yaklang/common/consts\"\r\n)\r\nfunc main() {\r\n    // 显式初始化数据库\r\n    if err := consts.InitializeDatabase(); err != nil {\r\n        panic(err)\r\n    }\r\n    // 安全执行迁移\r\n    autoAutomigrateVectorStoreDocument(consts.GetGormProfileDatabase())\r\n}\r\n```\r\n\r\n#### 3. 添加健康检查\r\n对`init`中的数据库操作添加重试机制和超时控制。\r\n```go\r\nfunc init() {\r\n    go func() {\r\n        for i := 0; i \u003c 3; i++ {\r\n            if db := consts.GetGormProfileDatabase(); db != nil {\r\n                autoAutomigrateVectorStoreDocument(db)\r\n                return\r\n            }\r\n            time.Sleep(1 * time.Second)\r\n        }\r\n        log.Println(\"数据库初始化超时\")\r\n    }()\r\n}\r\n```",
+      "severity": "middle",
+      "risk_type": "",
+      "details": "",
+      "cve": "",
+      "cwe": [],
+      "time": "0001-01-01T00:00:00Z",
+      "language": "golang",
+      "code_source_url": "/fs.zip(2025-0923-11:47)/test_init.go",
+      "line": 7,
+      "code_range": "{\"url\":\"/fs.zip(2025-0923-11:47)/test_init.go\",\"start_line\":7,\"start_column\":1,\"end_line\":10,\"end_column\":2,\"source_code_line\":3}",
+      "code_fragment": "\t\"github.com/yaklang/yaklang/common/consts\"\n)\n\nfunc init() {\n\tdb := consts.GetGormProfileDatabase()\n\tautoAutomigrateVectorStoreDocument(db)\n}\n\n",
+      "function_name": "init",
+      "rule_name": "golang-database-init.sf",
+      "program_name": "fs.zip(2025-0923-11:47)",
+      "latest_disposal_status": ""
+    }
+  },
+  "File": [
+    {
+      "path": "/fs.zip(2025-0923-11:47)/test_init.go",
+      "length": 165,
+      "hash": {
+        "md5": "17bda4cec57a1e586df979dda09fdc59",
+        "sha1": "c8cc37acf53a554bb5099cb8fc2b9df84ee4b1df",
+        "sha256": "3d051f53b6b01a04067e4204646ecd814841492a4cc6659073796e3dc001c014"
+      },
+      "content": "package main\n\nimport (\n\t\"github.com/yaklang/yaklang/common/consts\"\n)\n\nfunc init() {\n\tdb := consts.Ge...",
+      "line_count": 11,
+      "risks": [
+        "3df0329b7d2ff33d30e74ad7f283f8bf30e906e2",
+        "ddefc8cf83f8de6ee75492ac28ace191fd898e3a"
+      ]
+    },
+    {
+      "path": "/fs.zip(2025-0923-11:47)/test_init2.go",
+      "length": 185,
+      "hash": {
+        "md5": "60ce80da7b39e89f3382a901ff6d12b8",
+        "sha1": "43a8271113e19e82aef3e87e18bce3890513a8b5",
+        "sha256": "ddf0506e0e92412f91f7e30cafa75319e6a8b61bbfca8b51f4585a34d1a2a412"
+      },
+      "content": "package main\n\nimport (\n\t\"github.com/yaklang/yaklang/common/consts\"\n)\n\nfunc init() {\n\tgo func() {\n\t\td...",
+      "line_count": 13,
+      "risks": [
+        "9320e5a28985cb4a7cd0509fbdfcdffa0dac1467",
+        "b515d8b49d5255b9ab70cc1283af1d373ad319f7"
+      ]
+    }
+  ]
+}

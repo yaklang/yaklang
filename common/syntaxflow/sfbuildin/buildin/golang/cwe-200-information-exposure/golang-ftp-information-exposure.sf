@@ -7,11 +7,9 @@ desc(
 
 1. **漏洞原理**
 在Golang应用程序中，使用标准库或其他第三方库（如`github.com/jlaffaye/ftp`）提供的FTP客户端功能时，如果没有对输出进行适当的限制或过滤，可能会泄露服务器的敏感信息。这包括：
-
-  - **目录结构暴露**: 调用`List()`或其他类似函数时，未经授权的用户可能获取服务器文件系统的目录和文件列表。
-  - **当前工作路径泄露**: 调用`CurrentDir()`等函数时，泄露当前FTP连接所在服务器的绝对或相对路径。
-  - **服务器系统类型识别**: 调用`SystemType()`等函数时，泄露服务器操作系统的类型信息。
-
+- **目录结构暴露**: 调用`List()`或其他类似函数时，未经授权的用户可能获取服务器文件系统的目录和文件列表。
+- **当前工作路径泄露**: 调用`CurrentDir()`等函数时，泄露当前FTP连接所在服务器的绝对或相对路径。
+- **服务器系统类型识别**: 调用`SystemType()`等函数时，泄露服务器操作系统的类型信息。
 这些信息通常被攻击者用于信息收集阶段，帮助他们更好地了解目标环境，寻找进一步攻击点。
 
 2. **触发场景**
@@ -19,22 +17,39 @@ desc(
 
 3. **潜在影响**
 攻击者利用泄露的信息可以：
-  - 枚举服务器文件和目录，发现潜在的敏感文件或配置。
-  - 了解服务器路径结构，辅助进行路径穿越或文件操作攻击。
-  - 识别服务器操作系统类型，从而针对性地利用已知漏洞。
-  - 在某些情况下，泄露的信息可能提供关于内部网络结构或应用程序逻辑的线索。
+- 枚举服务器文件和目录，发现潜在的敏感文件或配置。
+- 了解服务器路径结构，辅助进行路径穿越或文件操作攻击。
+- 识别服务器操作系统类型，从而针对性地利用已知漏洞。
+- 在某些情况下，泄露的信息可能提供关于内部网络结构或应用程序逻辑的线索。
 DESC
 	rule_id: "4c742090-cd2c-456b-b8e5-4cb2740abbbd"
 	title_zh: "检测Golang FTP信息泄露"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **限制输出范围和深度**
 在调用`List()`等函数时，应严格限制用户或程序能够访问的目录范围。避免列出整个文件系统或敏感目录的内容。对于仅需要获取特定文件信息的情况，考虑使用更精确的函数。
-
+```go
+// 示例：限制列出目录范围
+func listFiles(conn *ftp.ServerConn, dir string) {
+    allowedDir := "/var/www/uploads"
+    if !strings.HasPrefix(dir, allowedDir) {
+        fmt.Println("Access denied: directory not allowed")
+        return
+    }
+    entries, err := conn.List(dir)
+    if err != nil {
+        fmt.Println("Failed to list files:", err)
+        return
+    }
+    for _, entry := range entries {
+        if !strings.HasPrefix(entry.Name, ".") {
+            fmt.Println(entry.Name)
+        }
+    }
+}
+```
 2. **过滤和脱敏敏感信息**
 在将FTP操作的输出（如目录列表、当前路径、系统类型）记录到日志或显示给用户之前，对敏感信息进行过滤、截断或脱敏处理。例如，对于系统类型，可以只记录简略信息或用通用描述代替。
-
 ```go
 // 示例：在获取系统类型后进行脱敏处理
 func getSystemType(conn *ftp.ServerConn) {
@@ -43,45 +58,17 @@ func getSystemType(conn *ftp.ServerConn) {
         fmt.Println("Failed to get system type:", err)
         return
     }
-
-    // 根据匹配到的关键字进行脱敏
     if strings.Contains(systemType, "UNIX") || strings.Contains(systemType, "Windows") {
         fmt.Println("System type: [REDACTED]") // 脱敏输出
     } else {
         fmt.Println("System type:", systemType) // 输出非敏感或未知信息
     }
 }
-
-// 示例：限制列出目录范围
-func listFiles(conn *ftp.ServerConn, dir string) {
-    allowedDir := "/var/www/uploads"
-    // 检查请求的目录是否在允许的范围内
-    if !strings.HasPrefix(dir, allowedDir) {
-        fmt.Println("Access denied: directory not allowed")
-        return
-    }
-
-    entries, err := conn.List(dir)
-    if err != nil {
-        fmt.Println("Failed to list files:", err)
-        return
-    }
-
-    // 过滤掉隐藏文件（以'.'开头的文件）
-    for _, entry := range entries {
-        if !strings.HasPrefix(entry.Name, ".") {
-            fmt.Println(entry.Name)
-        }
-    }
-}
 ```
-
 3. **实施精细的权限控制**
 确保用于FTP连接的账户具有最小必要的权限。例如，如果只需要上传文件，则账户不应具有列出目录或读取其他文件的权限。
-
 4. **避免在非必要场景使用FTP**
 考虑使用更安全的协议（如SFTP、FTPS），它们提供了加密和更强的认证机制，降低了信息泄露和中间人攻击的风险。
-
 5. **日志安全管理**
 如果必须记录FTP操作的详细信息，确保相关的日志文件存储在安全的位置，并且只有授权人员才能访问。
 SOLUTION
@@ -92,103 +79,95 @@ REFERENCE
 
 <include('golang-fmt-print')> as $sink;
 
-$sink.List() as $low;
-$sink.CurrentDir() as $low;
-$sink.SystemType() as $low;
+ftp.ServerConn?{<fullTypeName>?{have: 'github.com/jlaffaye/ftp'}} as $conn
+$conn.List() as $key;
+$conn.CurrentDir() as $key;
+$conn.SystemType() as $key;
+
+$sink #{
+    until: `* & $key`
+}-> as $low;
 
 alert $low for {
-	title_zh: "检测到FTP信息泄露",
-	solution: <<<CODE
+	title_zh: "检测到Golang FTP信息泄露",
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **限制输出范围和深度**
 在调用`List()`等函数时，应严格限制用户或程序能够访问的目录范围。避免列出整个文件系统或敏感目录的内容。对于仅需要获取特定文件信息的情况，考虑使用更精确的函数。
-
 2. **过滤和脱敏敏感信息**
 在将FTP操作的输出（如目录列表、当前路径、系统类型）记录到日志或显示给用户之前，对敏感信息进行过滤、截断或脱敏处理。例如，对于系统类型，可以只记录简略信息或用通用描述代替。
-
 ```go
 // 示例：在获取系统类型后进行脱敏处理
-
 func getSystemType(conn *ftp.ServerConn) {
-    systemType, err := conn.SystemType()
-    if err != nil {
-        fmt.Println("Failed to get system type:", err)
-        return
-    }
-
-    // 根据匹配到的关键字进行脱敏
-    if strings.Contains(systemType, "UNIX") || strings.Contains(systemType, "Windows") {
-        fmt.Println("System type: [REDACTED]") // 脱敏输出
-    } else {
-        fmt.Println("System type:", systemType) // 输出非敏感或未知信息
-    }
+systemType, err := conn.SystemType()
+if err != nil {
+fmt.Println("Failed to get system type:", err)
+return
 }
-
+// 根据匹配到的关键字进行脱敏
+if strings.Contains(systemType, "UNIX") || strings.Contains(systemType, "Windows") {
+fmt.Println("System type: [REDACTED]") // 脱敏输出
+} else {
+fmt.Println("System type:", systemType) // 输出非敏感或未知信息
+}
+}
 // 示例：限制列出目录范围
 func listFiles(conn *ftp.ServerConn, dir string) {
-    allowedDir := "/var/www/uploads"
-    // 检查请求的目录是否在允许的范围内
-    if !strings.HasPrefix(dir, allowedDir) {
-        fmt.Println("Access denied: directory not allowed")
-        return
-    }
-
-    entries, err := conn.List(dir)
-    if err != nil {
-        fmt.Println("Failed to list files:", err)
-        return
-    }
-
-    // 过滤掉隐藏文件（以'.'开头的文件）
-    for _, entry := range entries {
-        if !strings.HasPrefix(entry.Name, ".") {
-            fmt.Println(entry.Name)
-        }
-    }
+allowedDir := "/var/www/uploads"
+// 检查请求的目录是否在允许的范围内
+if !strings.HasPrefix(dir, allowedDir) {
+fmt.Println("Access denied: directory not allowed")
+return
+}
+entries, err := conn.List(dir)
+if err != nil {
+fmt.Println("Failed to list files:", err)
+return
+}
+// 过滤掉隐藏文件（以'.'开头的文件）
+for _, entry := range entries {
+if !strings.HasPrefix(entry.Name, ".") {
+fmt.Println(entry.Name)
+}
+}
 }
 ```
-
 3. **实施精细的权限控制**
 确保用于FTP连接的账户具有最小必要的权限。例如，如果只需要上传文件，则账户不应具有列出目录或读取其他文件的权限。
-
 4. **避免在非必要场景使用FTP**
 考虑使用更安全的协议（如SFTP、FTPS），它们提供了加密和更强的认证机制，降低了信息泄露和中间人攻击的风险。
-
 5. **日志安全管理**
 如果必须记录FTP操作的详细信息，确保相关的日志文件存储在安全的位置，并且只有授权人员才能访问。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 在Golang应用程序中，使用标准库或其他第三方库（如`github.com/jlaffaye/ftp`）提供的FTP客户端功能时，如果没有对输出进行适当的限制或过滤，可能会泄露服务器的敏感信息。这包括：
-
-  - **目录结构暴露**: 调用`List()`或其他类似函数时，未经授权的用户可能获取服务器文件系统的目录和文件列表。
-  - **当前工作路径泄露**: 调用`CurrentDir()`等函数时，泄露当前FTP连接所在服务器的绝对或相对路径。
-  - **服务器系统类型识别**: 调用`SystemType()`等函数时，泄露服务器操作系统的类型信息。
-
+- **目录结构暴露**: 调用`List()`或其他类似函数时，未经授权的用户可能获取服务器文件系统的目录和文件列表。
+- **当前工作路径泄露**: 调用`CurrentDir()`等函数时，泄露当前FTP连接所在服务器的绝对或相对路径。
+- **服务器系统类型识别**: 调用`SystemType()`等函数时，泄露服务器操作系统的类型信息。
 这些信息通常被攻击者用于信息收集阶段，帮助他们更好地了解目标环境，寻找进一步攻击点。
-
 2. **触发场景**
 当应用程序连接到FTP服务器并执行了上述可能泄露信息的函数（如`List()`, `CurrentDir()`, `SystemType()`），并且其输出被直接或间接（通过日志、调试信息等）暴露给了非受信的用户或环境时，就可能触发信息泄露。例如，一个内部工具在处理用户上传文件时，将处理过程中的FTP目录列表或当前路径信息打印到日志中，而这些日志又被非法访问。
-
 3. **潜在影响**
 攻击者利用泄露的信息可以：
-  - 枚举服务器文件和目录，发现潜在的敏感文件或配置。
-  - 了解服务器路径结构，辅助进行路径穿越或文件操作攻击。
-  - 识别服务器操作系统类型，从而针对性地利用已知漏洞。
-  - 在某些情况下，泄露的信息可能提供关于内部网络结构或应用程序逻辑的线索。
-CODE
+- 枚举服务器文件和目录，发现潜在的敏感文件或配置。
+- 了解服务器路径结构，辅助进行路径穿越或文件操作攻击。
+- 识别服务器操作系统类型，从而针对性地利用已知漏洞。
+- 在某些情况下，泄露的信息可能提供关于内部网络结构或应用程序逻辑的线索。
+DESC
 	level: "low",
 	type: "vuln",
-	title: "FTP Information Exposure",
+	title: "Golang FTP Information Exposure Vulnerability Was Detected",
+	message: "检测到Golang FTP信息泄露，可能存在目录结构暴露、当前工作路径泄露以及服务器系统类型识别的风险。",
+	risk: "信息泄露",
+	name: "low",
 }
 
 desc(
 	lang: golang
 	alert_low: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -276,4 +255,151 @@ func getSystemType(conn *ftp.ServerConn) {
 }
 
 UNSAFE
+	"safefile://SafeFtpClient.go": <<<CODE
+// SafeFtpClient.go
+package main
+
+import (
+	"fmt"
+	"github.com/jlaffaye/ftp"
+	"log"
+	"strings"
+	"time"
+)
+
+func main() {
+	// 示例：连接到 FTP 服务器，但并不执行任何可能泄露信息的函数
+	conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+		return
+	}
+	defer conn.Quit()
+
+	err = conn.Login("username", "password")
+	if err != nil {
+		log.Fatalf("Failed to login: %v", err)
+		return
+	}
+	defer conn.Logout()
+
+	// 不执行 List(), CurrentDir(), SystemType() 等可能泄露信息的函数
+	fmt.Println("FTP connection established securely without information exposure.")
+
+	// 示例：仅用于上传文件，不执行列表或查询操作
+	// uploadFile(conn, "local_file.txt", "remote_path/file.txt")
+}
+
+// uploadFile 辅助函数，不包含信息泄露风险
+func uploadFile(conn *ftp.ServerConn, localPath, remotePath string) {
+	// 实现文件上传逻辑
+	fmt.Printf("Uploading %s to %s... (placeholder)
+", localPath, remotePath)
+}
+
+CODE
+	"safefile://SafeFilteredOutput.go": <<<CODE
+// SafeFilteredOutput.go
+package main
+
+import (
+	"fmt"
+	"github.com/jlaffaye/ftp"
+	"log"
+	"strings"
+	"time"
+)
+
+func main() {
+	conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
+	if err != nil {
+		log.Fatalf("Failed to connect: %v", err)
+		return
+	}
+	defer conn.Quit()
+
+	err = conn.Login("username", "password")
+	if err != nil {
+		log.Fatalf("Failed to login: %v", err)
+		return
+	}
+	defer conn.Logout()
+
+	// 获取系统类型并进行脱敏处理
+	getSystemTypeSafely(conn)
+
+	// 尝试列出文件，但限制范围且过滤输出
+	listFilesSafely(conn, "/var/www/uploads")
+
+	// 获取当前目录，但仅在安全范围内才展示，否则脱敏
+	getCurrentDirSafely(conn)
+}
+
+// getSystemTypeSafely 获取系统类型并进行脱敏处理
+func getSystemTypeSafely(conn *ftp.ServerConn) {
+	systemType, err := conn.SystemType()
+	if err != nil {
+		fmt.Println("INFO: Failed to get system type, potentially not supported or connection issue.", err)
+		return
+	}
+
+	// 对敏感关键词进行脱敏
+	if strings.Contains(strings.ToLower(systemType), "unix") || strings.Contains(strings.ToLower(systemType), "windows") {
+		fmt.Println("System type: [REDACTED_OS]") // 脱敏输出
+	} else {
+		// 对于其他非特定OS信息，或者通用信息，可以考虑输出
+		fmt.Printf("System type: %s (non-sensitive or general info)
+", systemType) 
+	}
+}
+
+// listFilesSafely 限制列出目录范围并过滤敏感文件
+func listFilesSafely(conn *ftp.ServerConn, requestedDir string) {
+	// 严格限制允许列出的目录前缀
+	allowedPrefix := "/safe_data/" 
+
+	// 确保请求的目录在允许范围内，防止路径遍历
+	if !strings.HasPrefix(requestedDir, allowedPrefix) {
+		fmt.Printf("ERROR: Access denied for directory: %s. Only directories under %s are allowed.
+", requestedDir, allowedPrefix)
+		return
+	}
+
+	entries, err := conn.List(requestedDir)
+	if err != nil {
+		fmt.Printf("ERROR: Failed to list files in %s: %v
+", requestedDir, err)
+		return
+	}
+
+	fmt.Printf("Listing files in %s (filtered):
+", requestedDir)
+	for _, entry := range entries {
+		// 过滤掉隐藏文件和潜在敏感文件（如配置文件或特定扩展名）
+		if !strings.HasPrefix(entry.Name, ".") &&
+			!strings.HasSuffix(entry.Name, ".env") &&
+			!strings.HasSuffix(entry.Name, ".conf") {
+			fmt.Println(" - ", entry.Name)
+		}
+	}
+}
+
+// getCurrentDirSafely 获取当前目录并进行安全检查和脱敏
+func getCurrentDirSafely(conn *ftp.ServerConn) {
+	dir, err := conn.CurrentDir()
+	if err != nil {
+		fmt.Println("ERROR: Failed to get current directory:", err)
+		return
+	}
+
+	// 仅在当前目录是预设的安全目录时才显示，否则脱敏
+	if strings.HasPrefix(dir, "/var/www/safe_temp") {
+		fmt.Printf("Current directory: %s
+", dir)
+	} else {
+		fmt.Println("Current directory: [REDACTED_PATH]")
+	}
+}
+
+CODE
 )

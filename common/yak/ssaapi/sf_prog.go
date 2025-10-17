@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
+
 	"github.com/yaklang/yaklang/common/jsonpath"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"regexp"
 
 	"github.com/gobwas/glob"
 	"github.com/samber/lo"
@@ -24,7 +25,7 @@ func (p *Program) CompareConst(comparator *sfvm.ConstComparator) []bool {
 	return []bool{false}
 }
 
-func (p *Program) NewConst(i any, rng ...memedit.RangeIf) sfvm.ValueOperator {
+func (p *Program) NewConst(i any, rng ...*memedit.Range) sfvm.ValueOperator {
 	return p.NewConstValue(i, rng...)
 }
 
@@ -371,30 +372,43 @@ func NewFileFilter(file, matchType string, match []string) *FileFilter {
 	}
 }
 
-func (p *Program) ForEachFile(callBack func(string, *memedit.MemEditor)) {
-	for filename, data := range p.Program.ExtraFile {
-		if e, ok := p.Program.GetEditor(filename); ok {
-			editor := e
-			callBack(filename, editor)
-			continue
-		}
+func (p *Program) getEditor(filename, hash string) (*memedit.MemEditor, error) {
+	if editor, ok := p.Program.GetEditor(filename); ok {
+		return editor, nil
+	}
 
-		var err error
-		var editor *memedit.MemEditor
-		if p.Program.EnableDatabase {
-			// if have database, get source code from database
-			editor, err = ssadb.GetIrSourceFromHash(data)
-			if err != nil {
-				log.Errorf("get ir source from hash error: %s", err)
-				// continue
-			}
-		} else {
-			// if no database, get source code from memory
-			editor = memedit.NewMemEditor(data)
-			editor.SetUrl(filename)
-		}
+	if p.Program.DatabaseKind == ssa.ProgramCacheMemory {
+		return nil, utils.Errorf("get editor by filename %s not found", filename)
+	}
+	// if have database, get source code from database
+	if editor, err := ssadb.GetIrSourceFromHash(hash); err != nil {
+		return nil, utils.Errorf("get ir source from hash error: %s", err)
+	} else {
 		p.Program.SetEditor(filename, editor)
-		callBack(filename, editor)
+		return editor, nil
+	}
+}
+
+func (p *Program) ForEachExtraFile(callBack func(string, *memedit.MemEditor) bool) {
+	p.foreach(p.Program.ExtraFile, callBack)
+}
+
+func (p *Program) ForEachAllFile(callBack func(string, *memedit.MemEditor) bool) {
+	p.foreach(p.Program.FileList, callBack)
+}
+func (p *Program) foreach(file2Hash map[string]string, callBack func(string, *memedit.MemEditor) bool) {
+	handler := func(filename, hash string) bool {
+		editor, err := p.getEditor(filename, hash)
+		if err != nil {
+			log.Errorf("get editor [%s] not found: %v", filename, err)
+			return true
+		}
+		return callBack(filename, editor)
+	}
+	for filename, hash := range file2Hash {
+		if !handler(filename, hash) {
+			break
+		}
 	}
 }
 
@@ -419,9 +433,9 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 	}
 
 	matchFile := false
-	p.ForEachFile(func(s string, me *memedit.MemEditor) {
+	p.ForEachAllFile(func(s string, me *memedit.MemEditor) bool {
 		if me == nil {
-			return
+			return true
 		}
 		offsetMap := memedit.NewRuneOffsetMap(me.GetSourceCode())
 		if filter.matchFile(s) {
@@ -433,6 +447,7 @@ func (p *Program) FileFilter(path string, match string, rule map[string]string, 
 				}
 			}
 		}
+		return true
 	})
 	if len(res) == 0 {
 		if matchFile {

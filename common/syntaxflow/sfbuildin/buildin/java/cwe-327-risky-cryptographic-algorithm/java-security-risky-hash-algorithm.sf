@@ -18,15 +18,12 @@ REFERENCE
    ```java
    import java.security.MessageDigest;
    import java.security.NoSuchAlgorithmException;
-
    public class UnsafeHashExample {
        public static void main(String[] args) throws NoSuchAlgorithmException {
            // 使用不安全的MD5算法
            MessageDigest md5 = MessageDigest.getInstance("MD5");
-
            // 使用不安全的SHA-1算法
            MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
-
            // 使用不安全的MD4算法 (如果JCA提供者支持)
            // MessageDigest md4 = MessageDigest.getInstance("MD4");
        }
@@ -34,13 +31,12 @@ REFERENCE
    ```
 
 3. **潜在影响**
-   * 数据篡改：攻击者可能伪造数据使其具有与原始数据相同的哈希值，从而绕过完整性校验。
-   * 密码破解：对于使用不安全哈希算法存储的用户密码，攻击者可能更容易通过彩虹表、碰撞等方式进行破解。
-   * 电子签名伪造：如果电子签名使用了不安全哈希算法，签名可能被伪造。
+   - 数据篡改：攻击者可能伪造数据使其具有与原始数据相同的哈希值，从而绕过完整性校验。
+   - 密码破解：对于使用不安全哈希算法存储的用户密码，攻击者可能更容易通过彩虹表、碰撞等方式进行破解。
+   - 电子签名伪造：如果电子签名使用了不安全哈希算法，签名可能被伪造。
 
 ### 风险描述
-
-使用不安全的加密算法，特别是哈希算法，是潜在的安全风险。尽管某些场景下可能只是用于非安全相关的用途（例如，作为唯一的ID），但在涉及数据完整性、身份验证或密钥派生等安全敏感的应用中，使用这些算法将引入严重漏洞。
+   使用不安全的加密算法，特别是哈希算法，是潜在的安全风险。尽管某些场景下可能只是用于非安全相关的用途（例如，作为唯一的ID），但在涉及数据完整性、身份验证或密钥派生等安全敏感的应用中，使用这些算法将引入严重漏洞。
 DESC
 	rule_id: "225be977-0ab7-4f04-af7f-b8ba50fb529f"
 	solution: <<<SOLUTION
@@ -52,21 +48,22 @@ DESC
    // 修复代码示例
    import java.security.MessageDigest;
    import java.security.NoSuchAlgorithmException;
-
    public class SafeHashExample {
        public static void main(String[] args) throws NoSuchAlgorithmException {
            // 使用安全的SHA-256算法
            MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
-
            // 使用安全的SHA-512算法
            MessageDigest sha512 = MessageDigest.getInstance("SHA-512");
        }
    }
    ```
+
 2. **升级安全库或框架**
    确保项目使用的 Java 加密架构 (JCA) 提供者是最新的版本，可能禁用了已知的弱算法。
+
 3. **审视算法使用场景和目的**
    如果哈希算法用于安全敏感的目的（如密码存储、数字签名、完整性校验），必须使用强算法。如果仅用于非安全目的（如简单的唯一标识），可以考虑MD5等，但仍需警惕可能的冲突风险。
+
 4. **对于密码存储，使用加盐（Salting）和迭代（Hashing Iterations）**
    即使使用了安全的哈希算法，对于密码存储，也应该结合随机的盐值（Salting）和足够的迭代次数（Hashing Iterations），进一步增强安全性，抵御彩虹表攻击和暴力破解。
 SOLUTION
@@ -82,7 +79,60 @@ alert $sink for {
 	title: "Check Java java.security use of broken or risky hash algorithm",
 	title_zh: "检测Java java.security使用不安全的哈希算法",
 	level: "low",
-	message: "Find the use of broken or risky encryption algorithm",
+	message: "发现使用了已知存在风险或损坏的加密算法，例如MD2、MD4、MD5、SHA-0、SHA-1等。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **使用安全的哈希算法**
+替换代码中使用的不安全哈希算法，选用目前被认为是安全的算法，如 SHA-256, SHA-384, SHA-512。
+```java
+// 修复代码示例
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+public class SafeHashExample {
+public static void main(String[] args) throws NoSuchAlgorithmException {
+// 使用安全的SHA-256算法
+MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+// 使用安全的SHA-512算法
+MessageDigest sha512 = MessageDigest.getInstance("SHA-512");
+}
+}
+```
+2. **升级安全库或框架**
+确保项目使用的 Java 加密架构 (JCA) 提供者是最新的版本，可能禁用了已知的弱算法。
+3. **审视算法使用场景和目的**
+如果哈希算法用于安全敏感的目的（如密码存储、数字签名、完整性校验），必须使用强算法。如果仅用于非安全目的（如简单的唯一标识），可以考虑MD5等，但仍需警惕可能的冲突风险。
+4. **对于密码存储，使用加盐（Salting）和迭代（Hashing Iterations）**
+即使使用了安全的哈希算法，对于密码存储，也应该结合随机的盐值（Salting）和足够的迭代次数（Hashing Iterations），进一步增强安全性，抵御彩虹表攻击和暴力破解。
+SOLUTION
+	risk: "不安全加密算法",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在使用`java.security.MessageDigest`进行哈希计算时，如果指定了已知的不安全或已废弃的哈希算法（如MD2、MD4、MD5、SHA-0、SHA-1、RIPEMD160、SHA等），这些算法由于其固有的密码学弱点，可能存在碰撞、预映像攻击等风险。攻击者可能伪造数据使其具有与原始数据相同的哈希值，从而绕过完整性校验。
+2. **触发场景**
+当在 Java 代码中通过 `MessageDigest.getInstance()` 方法使用了不安全的哈希算法时，例如：
+```java
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+public class UnsafeHashExample {
+public static void main(String[] args) throws NoSuchAlgorithmException {
+// 使用不安全的MD5算法
+MessageDigest md5 = MessageDigest.getInstance("MD5");
+// 使用不安全的SHA-1算法
+MessageDigest sha1 = MessageDigest.getInstance("SHA-1");
+// 使用不安全的MD4算法 (如果JCA提供者支持)
+// MessageDigest md4 = MessageDigest.getInstance("MD4");
+}
+}
+```
+3. **潜在影响**
+* 数据篡改：攻击者可能伪造数据使其具有与原始数据相同的哈希值，从而绕过完整性校验。
+* 密码破解：对于使用不安全哈希算法存储的用户密码，攻击者可能更容易通过彩虹表、碰撞等方式进行破解。
+* 电子签名伪造：如果电子签名使用了不安全哈希算法，签名可能被伪造。
+### 风险描述
+使用不安全的加密算法，特别是哈希算法，是潜在的安全风险。尽管某些场景下可能只是用于非安全相关的用途（例如，作为唯一的ID），但在涉及数据完整性、身份验证或密钥派生等安全敏感的应用中，使用这些算法将引入严重漏洞。
+DESC
+	name: "sink",
 }
 
 desc(
@@ -161,4 +211,137 @@ desc(
 
      }
 EOF
+	"safefile://SafeHashExample.java": <<<CODE
+// 导入必要的安全API
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+public class SafeHashExample {
+
+    /**
+     * 使用安全的SHA-256算法对输入字符串进行哈希。
+     * 这是推荐的哈希算法之一，用于确保数据的完整性或安全的密码存储。
+     * @param input 需要哈希的字符串
+     * @return 哈希后的Base64编码字符串
+     * @throws NoSuchAlgorithmException 如果JCA提供者不支持SHA-256算法
+     */
+    public static String hashWithSHA256(String input) throws NoSuchAlgorithmException {
+        // 使用GetInstanve()方法初始化一个MessageDigest实例
+        // 指定“SHA-256”，这是一个被认为是安全的哈希算法
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] hashedBytes = digest.digest(input.getBytes());
+        // 将字节数组转换为Base64编码的字符串以便于存储和传输
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    /**
+     * 使用推荐的SHA-512算法进行哈希计算。
+     * SHA-512提供了比SHA-256更长的哈希输出，进一步增强了安全性。
+     * @param input 需要哈希的字符串
+     * @return 哈希后的Base64编码字符串
+     * @throws NoSuchAlgorithmException 如果JCA提供者不支持SHA-512算法
+     */
+    public static String hashWithSHA512(String input) throws NoSuchAlgorithmException {
+        // 使用“SHA-512”，提供更强的碰撞抵抗能力
+        MessageDigest digest = MessageDigest.getInstance("SHA-512");
+        byte[] hashedBytes = digest.digest(input.getBytes());
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    /**
+     * 这是一个使用安全哈希算法并结合“盐值（salt）”和“迭代（iterations）”进行密码存储的示例。
+     * 这种方法可以有效抵御彩虹表攻击和暴力破解。
+     * @param password 明文密码
+     * @param salt 随机生成的盐值
+     * @param iterations 哈希迭代次数
+     * @return 哈希后的Base64编码密码
+     * @throws NoSuchAlgorithmException 如果算法不可用
+     */
+    public static String hashPasswordWithSaltAndIterations(String password, byte[] salt, int iterations) throws NoSuchAlgorithmException {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        digest.reset();
+        digest.update(salt);
+        // 首次哈希
+        byte[] hashedBytes = digest.digest(password.getBytes());
+        // 执行多次哈希迭代
+        for (int i = 0; i < iterations; i++) {
+            digest.reset();
+            hashedBytes = digest.digest(hashedBytes);
+        }
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    public static void main(String[] args) {
+        try {
+            String data = "This is a secret message.";
+            System.out.println("SHA-256 Hash: " + hashWithSHA256(data));
+            System.out.println("SHA-512 Hash: " + hashWithSHA512(data));
+
+            String password = "mySecretPassword123";
+            // 模拟生成随机盐值
+            byte[] salt = new byte[16];
+            new java.security.SecureRandom().nextBytes(salt);
+            int iterations = 10000; // 设置足够高的迭代次数
+            System.out.println("Password Hash with Salt & Iterations (SHA-256): " + hashPasswordWithSaltAndIterations(password, salt, iterations));
+
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage() + ". Please ensure the JCA provider supports the algorithms.");
+        }
+    }
+}
+CODE
+	"safefile://SafeHashEnum.java": <<<CODE
+// 导入必要的安全API
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+public class SafeHashEnum {
+
+    // 定义一个枚举来管理安全的哈希算法，避免直接使用字符串
+    public enum SecureHashAlgorithm {
+        SHA256("SHA-256"),
+        SHA384("SHA-384"),
+        SHA512("SHA-512");
+
+        private final String algorithmName;
+
+        SecureHashAlgorithm(String algorithmName) {
+            this.algorithmName = algorithmName;
+        }
+
+        public String getAlgorithmName() {
+            return algorithmName;
+        }
+    }
+
+    /**
+     * 封装哈希逻辑，只接受安全的算法枚举。
+     * @param algorithm SecureHashAlgorithm 枚举值
+     * @param input 需要哈希的字符串
+     * @return 哈希后的Base64编码字符串
+     * @throws NoSuchAlgorithmException 如果算法名称无效（尽管这里通过枚举确保了有效性）
+     */
+    public static String generateHash(SecureHashAlgorithm algorithm, String input) throws NoSuchAlgorithmException {
+        // 从枚举中获取算法名称
+        MessageDigest digest = MessageDigest.getInstance(algorithm.getAlgorithmName());
+        byte[] hashedBytes = digest.digest(input.getBytes());
+        return Base64.getEncoder().encodeToString(hashedBytes);
+    }
+
+    public static void main(String[] args) {
+        try {
+            String data = "Yet another secure data string.";
+
+            // 通过枚举调用安全的哈希算法
+            System.out.println("SHA-384 Hash: " + generateHash(SecureHashAlgorithm.SHA384, data));
+            System.out.println("SHA-512 Hash (from enum): " + generateHash(SecureHashAlgorithm.SHA512, data));
+
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage() + ". Ensure algorithms are supported.");
+        }
+    }
+}
+CODE
 )

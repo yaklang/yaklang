@@ -6,72 +6,60 @@ desc(
 	risk: crlf
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   CRLF注入漏洞（Carriage Return Line Feed Injection）是一种利用特殊控制字符（`\r\n`）篡改HTTP协议数据流的攻击方式。当应用程序未对用户输入进行严格的过滤或转义时，攻击者可以通过注入这些控制字符，破坏HTTP协议结构。例如，在HTTP响应头部中注入额外的头字段或内容，导致HTTP响应拆分、头部伪造等严重后果。
-
+CRLF注入漏洞（Carriage Return Line Feed Injection）是一种利用特殊控制字符（`\r\n`）篡改HTTP协议数据流的攻击方式。当应用程序未对用户输入进行严格的过滤或转义时，攻击者可以通过注入这些控制字符，破坏HTTP协议结构。例如，在HTTP响应头部中注入额外的头字段或内容，导致HTTP响应拆分、头部伪造等严重后果。
 2. **触发场景**
-   ```go
-   package main
-
-   import (
-       "github.com/beego/beego/v2/server/web"
-   )
-
-   type CRLFSafe1Controller struct {
-       web.Controller
-   }
-
-   func (c *CRLFSafe1Controller) Get() {
-       header := c.GetString("header")
-       c.Ctx.ResponseWriter.Header().Set("header", header)
-       c.Ctx.ResponseWriter.Write([]byte(""))
-   }
-   ```
-   在上述代码中，如果`header`参数的值为`test\r\nSet-Cookie: MaliciousCookie=12345`，则可能导致恶意HTTP头部注入。
-
+```go
+package main
+import (
+"github.com/beego/beego/v2/server/web"
+)
+type CRLFSafe1Controller struct {
+web.Controller
+}
+func (c *CRLFSafe1Controller) Get() {
+header := c.GetString("header")
+c.Ctx.ResponseWriter.Header().Set("header", header)
+c.Ctx.ResponseWriter.Write([]byte(""))
+}
+```
+在上述代码中，如果`header`参数的值为`test\r\nSet-Cookie: MaliciousCookie=12345`，则可能导致恶意HTTP头部注入。
 3. **潜在影响**
-   - 攻击者可以利用该漏洞在HTTP响应中插入恶意头部或内容，实施缓存投毒、会话劫持或其他中间人攻击。
-   - 可能被用来绕过安全机制，例如伪造身份验证信息或篡改响应内容。
-   - 影响系统的完整性和安全性，进一步可能危害整个Web应用生态。
-
+- 攻击者可以利用该漏洞在HTTP响应中插入恶意头部或内容，实施缓存投毒、会话劫持或其他中间人攻击。
+- 可能被用来绕过安全机制，例如伪造身份验证信息或篡改响应内容。
+- 影响系统的完整性和安全性，进一步可能危害整个Web应用生态。
 DESC
 	rule_id: "dc8b9d04-3d71-4ca3-9820-95d21c57b945"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 输入校验与清理
-   对所有用户输入进行严格的校验与清理，确保输入中不包含非法字符（如`\r\n`）。可以使用正则表达式或其他验证工具。
-   ```go
-   func sanitizeInput(input string) string {
-       // 移除非法字符
-       return strings.ReplaceAll(strings.ReplaceAll(input, "\r", ""), "\n", "")
-   }
-
-   func (c *CRLFSafe1Controller) Get() {
-       header := sanitizeInput(c.GetString("header"))
-       c.Ctx.ResponseWriter.Header().Set("header", header)
-       c.Ctx.ResponseWriter.Write([]byte(""))
-   }
-   ```
-
+对所有用户输入进行严格的校验与清理，确保输入中不包含非法字符（如`\r\n`）。可以使用正则表达式或其他验证工具。
+```go
+func sanitizeInput(input string) string {
+// 移除非法字符
+return strings.ReplaceAll(strings.ReplaceAll(input, "\r", ""), "\n", "")
+}
+func (c *CRLFSafe1Controller) Get() {
+header := sanitizeInput(c.GetString("header"))
+c.Ctx.ResponseWriter.Header().Set("header", header)
+c.Ctx.ResponseWriter.Write([]byte(""))
+}
+```
 #### 2. 使用安全库或框架
-   借助框架内置的安全机制，避免直接操作原始HTTP头部。例如，Beego框架提供了多种安全功能，开发者应优先使用官方推荐方法设置头部。
-   ```go
-   func (c *CRLFSafe1Controller) Get() {
-       header := c.GetString("header")
-       if !strings.ContainsAny(header, "\r\n") {
-           c.Ctx.ResponseWriter.Header().Set("header", header)
-       } else {
-           c.Ctx.ResponseWriter.WriteHeader(400) // 返回错误状态码
-       }
-       c.Ctx.ResponseWriter.Write([]byte(""))
-   }
-   ```
-
+借助框架内置的安全机制，避免直接操作原始HTTP头部。例如，Beego框架提供了多种安全功能，开发者应优先使用官方推荐方法设置头部。
+```go
+func (c *CRLFSafe1Controller) Get() {
+header := c.GetString("header")
+if !strings.ContainsAny(header, "\r\n") {
+c.Ctx.ResponseWriter.Header().Set("header", header)
+} else {
+c.Ctx.ResponseWriter.WriteHeader(400) // 返回错误状态码
+}
+c.Ctx.ResponseWriter.Write([]byte(""))
+}
+```
 #### 3. 启用WAF防护
-   部署Web应用防火墙（WAF），通过规则引擎拦截恶意请求，增强系统安全性。
-
+部署Web应用防火墙（WAF），通过规则引擎拦截恶意请求，增强系统安全性。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-93](https://cwe.mitre.org/data/definitions/93.html)
@@ -79,7 +67,7 @@ SOLUTION
 REFERENCE
 )
 
-.GetString(* as $sink)
+.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web/Controller"}}(* as $sink)
 $sink -{ 
 	include:`*?{opcode:const}?{have: "header"}`,
 }-> as $data;
@@ -87,100 +75,87 @@ $sink -{
 $data?{have:".Ctx.ResponseWriter.Header"} as $high
 
 alert $high for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 对用户输入进行严格的校验和过滤
 确保所有用户输入的字段都不包含非法字符（如`\r`、`\n`）。使用正则表达式或其他验证工具来检查输入数据。
-
 ```go
 // 示例：校验输入是否包含CRLF字符
 func isValidInput(input string) bool {
-	return !strings.ContainsAny(input, "\r\n")
+return !strings.ContainsAny(input, "\r\n")
 }
-
 header := c.GetString("header")
 if !isValidInput(header) {
-	http.Error(w, "Invalid input", http.StatusBadRequest)
-	return
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
 }
 c.Ctx.ResponseWriter.Header().Set("header", header)
 ```
-
 #### 2. 使用安全的HTTP头设置方法
 避免直接将用户输入嵌入到HTTP头中。可以借助框架提供的安全方法或中间件对输入数据进行清理。
-
 ```go
 // 示例：通过白名单机制设置允许的头部字段
 allowedHeaders := map[string]bool{
-	"Content-Type": true,
-	"Authorization": true,
+"Content-Type": true,
+"Authorization": true,
 }
-
 headerKey := c.GetString("headerKey")
 headerValue := c.GetString("headerValue")
 if allowedHeaders[headerKey] {
-	c.Ctx.ResponseWriter.Header().Set(headerKey, headerValue)
+c.Ctx.ResponseWriter.Header().Set(headerKey, headerValue)
 } else {
-	http.Error(w, "Header not allowed", http.StatusBadRequest)
+http.Error(w, "Header not allowed", http.StatusBadRequest)
 }
 ```
-
 #### 3. 配置Web服务器的安全策略
 在Web服务器层面启用严格的安全配置，例如限制HTTP响应拆分、禁用不安全的协议行为等。
-
 ```nginx
 # 示例：Nginx配置防止CRLF注入
 server {
-	add_header X-Content-Type-Options nosniff;
-	add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+add_header X-Content-Type-Options nosniff;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 CRLF注入漏洞（Carriage Return Line Feed Injection）是一种利用特殊控制字符（`\r\n`）篡改HTTP协议数据流的攻击方式。攻击者通过注入这些字符，可以破坏协议结构，导致HTTP响应拆分、头部伪造等严重后果。
-
 2. **触发场景**
 以下是一个存在漏洞的代码示例：
-
 ```go
 package main
-
 import (
-	beego "github.com/beego/beego/v2/server/web"
+beego "github.com/beego/beego/v2/server/web"
 )
-
 type CRLFSafe1Controller struct {
-	beego.Controller
+beego.Controller
 }
-
 func (c *CRLFSafe1Controller) Get() {
-	header := c.GetString("header")
-	c.Ctx.ResponseWriter.Header().Set("header", header)
-	c.Ctx.ResponseWriter.Write([]byte(""))
+header := c.GetString("header")
+c.Ctx.ResponseWriter.Header().Set("header", header)
+c.Ctx.ResponseWriter.Write([]byte(""))
 }
 ```
 在此代码中，攻击者可以通过提交包含`\r\n`的恶意输入，例如`header=Set-Cookie:malicious=value`，从而篡改HTTP头部并插入恶意Cookie。
-
 3. **潜在影响**
 - 攻击者能够伪造HTTP响应，实施缓存投毒攻击。
 - 可能导致用户会话被劫持或敏感信息泄露。
 - 通过篡改头部内容，攻击者还可以执行跨站脚本攻击（XSS）或其他更复杂的攻击链。
-
-CODE
+DESC
 	level: "high",
 	type: "vuln",
 	title: "CRLF Injection detected",
 	title_zh: "检测到CRLF注入",
+	message: "检测到Golang Beego框架中的CRLF注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "CRLF注入",
+	name: "high",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -198,4 +173,54 @@ func (c *CRLFSafe1Controller) Get() {
 }
 	
 UNSAFE
+	"safefile://SafeInputValidation.go": <<<CODE
+// 方式一：对用户输入进行严格的校验和过滤，移除CRLF字符
+package main
+
+import (
+	"net/http"
+	"strings"
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type SafeInputValidationController struct {
+	beego.Controller
+}
+
+// sanitizeInput 移除输入中的CRLF字符
+func sanitizeInput(input string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(input, "\r", ""), "\n", "")
+}
+
+func (c *SafeInputValidationController) Get() {
+	header := c.GetString("header")
+	// 严格校验和清理用户输入，确保不包含CRLF字符
+	sanitizedHeader := sanitizeInput(header)
+
+	// 只有清理后的输入才被用于设置HTTP头部
+	c.Ctx.ResponseWriter.Header().Set("X-Custom-Header", sanitizedHeader)
+	c.Ctx.ResponseWriter.Write([]byte(""))
+}
+
+CODE
+	"safefile://UseFixedHeaderValue.go": <<<CODE
+// 方式二：使用固定、预定义或内部生成的安全头部值，不接受用户输入作为header值
+package main
+
+import (
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type FixedHeaderController struct {
+	beego.Controller
+}
+
+func (c *FixedHeaderController) Get() {
+	// 使用固定、安全的HTTP头部值，不从用户请求中获取
+	const safeHeaderValue = "SafeApplicationIdentifier"
+	c.Ctx.ResponseWriter.Header().Set("X-Application-ID", safeHeaderValue)
+	c.Ctx.ResponseWriter.Write([]byte(""))
+}
+
+CODE
 )

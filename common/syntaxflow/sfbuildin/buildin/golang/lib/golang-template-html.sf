@@ -1,0 +1,197 @@
+desc(
+	title: "Audit Golang html/template Usage"
+	type: audit
+	level: info
+	lib: 'golang-template-html'
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+`html/template`包在Go语言中被设计为防止跨站脚本（XSS）攻击，但不当的动态内容处理可能引入安全风险。例如，开发者如果直接拼接用户输入到模板中并渲染，则可能导致恶意代码执行。
+
+2. **触发场景**
+// 存在漏洞的代码示例
+```go
+package main
+import (
+"fmt"
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 直接拼接用户输入到模板中
+tmpl := fmt.Sprintf("Hello, %s!", username)
+// 渲染模板
+t := template.Must(template.New("greet").Parse(tmpl))
+t.Execute(w, nil)
+})
+http.ListenAndServe(":8080", nil)
+}
+```
+攻击者通过访问`/greet?name=%3Cscript%3Ealert('XSS')%3C/script%3E`，可以在页面中注入JavaScript代码，导致跨站脚本攻击。
+
+3. **潜在影响**
+- 用户会话被劫持，敏感信息被盗取。
+- 恶意脚本可以修改页面内容或重定向用户至钓鱼网站。
+- 在某些情况下，甚至可能利用浏览器漏洞进一步渗透系统。
+DESC
+	rule_id: "d47f5ca9-7bab-441d-bc3b-8c642bac9e97"
+	reference: <<<REFERENCE
+[Go html/template documentation](https://pkg.go.dev/html/template)
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+REFERENCE
+	title_zh: "审计Golang html/template使用"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用`html/template`内置的安全机制
+`html/template`包自动对特殊字符进行转义，因此避免直接拼接用户输入。
+```go
+package main
+import (
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 定义安全模板
+const tmpl = "Hello, {{.Name}}!"
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 渲染模板时使用安全上下文
+t := template.Must(template.New("greet").Parse(tmpl))
+t.Execute(w, map[string]string{"Name": username})
+})
+http.ListenAndServe(":8080", nil)
+}
+```
+
+#### 2. 对用户输入进行严格的验证和清理
+验证用户输入是否符合预期格式，并限制其范围。
+```go
+// 示例：校验用户名只包含字母和数字
+if !regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(username) {
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
+}
+```
+
+#### 3. 避免使用`text/template`包
+如果需要渲染HTML内容，请始终使用`html/template`而非`text/template`，因为后者不会自动转义特殊字符。
+SOLUTION
+)
+
+template?{<fullTypeName>?{have: 'html/template'}} as $output
+*temp*?{<fullTypeName>?{have: 'html/template'}} as $output
+Template?{<fullTypeName>?{have: 'html/template'}} as $output
+*Temp*?{<fullTypeName>?{have: 'html/template'}} as $output
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang html/template Usage",
+	title_zh: "审计Golang html/template使用",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用`html/template`内置的安全机制
+`html/template`包自动对特殊字符进行转义，因此避免直接拼接用户输入。
+```go
+package main
+import (
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 定义安全模板
+const tmpl = "Hello, {{.Name}}!"
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 渲染模板时使用安全上下文
+t := template.Must(template.New("greet").Parse(tmpl))
+t.Execute(w, map[string]string{"Name": username})
+})
+http.ListenAndServe(":8080", nil)
+}
+```
+#### 2. 对用户输入进行严格的验证和清理
+验证用户输入是否符合预期格式，并限制其范围。
+```go
+// 示例：校验用户名只包含字母和数字
+if !regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(username) {
+http.Error(w, "Invalid input", http.StatusBadRequest)
+return
+}
+```
+#### 3. 避免使用`html/template`包
+如果需要渲染HTML内容，请始终使用`html/template`而非`text/template`，因为后者不会自动转义特殊字符。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+`html/template`包在Go语言中被设计为防止跨站脚本（XSS）攻击，但不当的动态内容处理可能引入安全风险。例如，开发者如果直接拼接用户输入到模板中并渲染，则可能导致恶意代码执行。
+2. **触发场景**
+// 存在漏洞的代码示例
+```go
+package main
+import (
+"fmt"
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 直接拼接用户输入到模板中
+tmpl := fmt.Sprintf("Hello, %s!", username)
+// 渲染模板
+t := template.Must(template.New("greet").Parse(tmpl))
+t.Execute(w, nil)
+})
+http.ListenAndServe(":8080", nil)
+}
+```
+攻击者通过访问`/greet?name=%3Cscript%3Ealert('XSS')%3C/script%3E`，可以在页面中注入JavaScript代码，导致跨站脚本攻击。
+3. **潜在影响**
+- 用户会话被劫持，敏感信息被盗取。
+- 恶意脚本可以修改页面内容或重定向用户至钓鱼网站。
+- 在某些情况下，甚至可能利用浏览器漏洞进一步渗透系统。
+DESC
+	name: "output",
+	message: "审计到Golang html/template使用情况，可能存在不安全的动态内容处理。",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://template.go': <<<PARAM
+package main
+
+import (
+    "fmt"
+    "html/template"
+    "net/http"
+)
+
+func main() {
+    http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+        // 获取用户输入
+        username := r.URL.Query().Get("name")
+
+        // 直接拼接用户输入到模板中
+        tmpl := fmt.Sprintf("Hello, %s!", username)
+
+        // 渲染模板
+        t := template.Must(template.New("greet").Parse(tmpl))
+        t.Execute(w, nil)
+    })
+
+    http.ListenAndServe(":8080", nil)
+}
+
+PARAM
+)

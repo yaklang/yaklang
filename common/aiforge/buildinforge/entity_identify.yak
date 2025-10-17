@@ -1,0 +1,56 @@
+__DESC__ = "该forge作为一个安全日志分析工具，能够从提供的日志条目中识别并提取多种类型的安全实体，例如IP地址、用户名、主机名、进程名、文件路径、URL等。它将所有识别出的唯一实体汇总成一个扁平化的JSON数组。"
+__VERBOSE_NAME__ = "安全日志实体识别"
+__KEYWORDS__ = "安全日志,实体识别,日志分析,数据提取,威胁情报"
+
+prompt = <<<prompt
+你是一位顶级的安全日志分析专家，同时也是命名实体识别（NER）领域的专家。你的任务是仔细阅读下面这批日志条目，提取所有相关的安全实体，并将它们汇总成一个扁平化的列表。你的输出必须是一个单一的JSON数组。数组中的每个对象代表一个唯一的被识别实体。如果同一个实体（例如同一个IP地址）在多条日志或同一条日志中出现多次，它在最终的数组中应该只出现一次。
+##  实体定义 (Schema)
+以下是你必须识别的实体类型。如果某个实体不属于这些类别，请忽略它。
+*   `ip_address`: IPv4或IPv6地址。
+*   `username`: 用户账户名。
+*   `hostname`: 主机、服务器或设备名。
+*   `process_name`: 可执行文件或进程名。
+*   `file_path`: 完整或部分文件路径。
+*   `file_name`: 单个文件名。
+*   `url`: 统一资源定位符。
+*   `domain_name`: 完全限定域名。
+*   `error_code`: 特定的状态码或错误码。
+*   `event_id`: 系统特定的事件标识符。
+*   `port_number`: 网络端口号。
+
+prompt
+
+
+schema = jsonschema.ActionObject(
+    jsonschema.paramObjectArray("entities",
+        jsonschema.title("一批日志中提取出的所有实体的扁平化列表。"),
+        jsonschema.required(),
+        jsonschema.paramString("entity_type",
+            jsonschema.description("被提取实体的类别。"),
+            jsonschema.enum([
+                "ip_address",
+                "username",
+                "hostname",
+                "process_name",
+                "file_path",
+                "file_name",
+                "url",
+                "domain_name",
+                "error_code",
+                "event_id",
+                "port_number"
+            ]),
+            jsonschema.required()
+        ),
+        jsonschema.paramString("entity_value",
+            jsonschema.description("被提取实体的具体值。"),
+            jsonschema.required()
+        )
+    )
+)
+
+
+forgeHandle = func(params) {
+    res = liteforge.Execute(sprintf("%s\n input:\n%v", params), liteforge.output(schema))~
+    return res.GetInvokeParamsArray("entities")
+}

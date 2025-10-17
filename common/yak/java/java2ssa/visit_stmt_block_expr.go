@@ -18,7 +18,7 @@ const (
 	DEFAULT                 = "default"
 )
 
-func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
+func (y *singleFileBuilder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -37,7 +37,7 @@ func (y *builder) VisitBlock(raw javaparser.IBlockContext) interface{} {
 	return nil
 }
 
-func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) interface{} {
+func (y *singleFileBuilder) VisitBlockStatement(raw javaparser.IBlockStatementContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -59,7 +59,7 @@ func (y *builder) VisitBlockStatement(raw javaparser.IBlockStatementContext) int
 	return nil
 }
 
-func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
+func (y *singleFileBuilder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -653,7 +653,7 @@ func (y *builder) VisitExpression(raw javaparser.IExpressionContext) ssa.Value {
 	return y.EmitConstInstNil()
 }
 
-func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) ssa.Value {
+func (y *singleFileBuilder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.Value) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -721,7 +721,7 @@ func (y *builder) VisitMethodCall(raw javaparser.IMethodCallContext, object ssa.
 
 }
 
-func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
+func (y *singleFileBuilder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -775,7 +775,7 @@ func (y *builder) VisitPrimary(raw javaparser.IPrimaryContext) ssa.Value {
 	return y.EmitUndefined(raw.GetText())
 }
 
-func (y *builder) VisitBlockOrState(raw javaparser.IBlockOrStateContext) {
+func (y *singleFileBuilder) VisitBlockOrState(raw javaparser.IBlockOrStateContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -793,7 +793,7 @@ func (y *builder) VisitBlockOrState(raw javaparser.IBlockOrStateContext) {
 	}
 }
 
-func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
+func (y *singleFileBuilder) VisitStatement(raw javaparser.IStatementContext) {
 	if y.IsBlockFinish() {
 		return
 	}
@@ -1025,7 +1025,7 @@ func (y *builder) VisitStatement(raw javaparser.IStatementContext) {
 	}
 }
 
-func (y *builder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclarationContext) interface{} {
+func (y *singleFileBuilder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclarationContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1039,7 +1039,7 @@ func (y *builder) VisitLocalTypeDeclaration(raw javaparser.ILocalTypeDeclaration
 	return nil
 }
 
-func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDeclarationContext) {
+func (y *singleFileBuilder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDeclarationContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1069,7 +1069,7 @@ func (y *builder) VisitLocalVariableDeclaration(raw javaparser.ILocalVariableDec
 	return
 }
 
-func (y *builder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclaratorContext) string {
+func (y *singleFileBuilder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclaratorContext) string {
 	name := uuid.NewString()[:4]
 	if y == nil || raw == nil || y.IsStop() {
 		return name
@@ -1088,7 +1088,7 @@ func (y *builder) OnlyVisitVariableDeclaratorName(raw javaparser.IVariableDeclar
 	name = id.Identifier().GetText()
 	return name
 }
-func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, leftType ssa.Type) (name string, value ssa.Value) {
+func (y *singleFileBuilder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorContext, leftType ssa.Type) (name string, value ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1142,7 +1142,7 @@ func (y *builder) VisitVariableDeclarator(raw javaparser.IVariableDeclaratorCont
 	}
 }
 
-func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerContext) ssa.Value {
+func (y *singleFileBuilder) VisitVariableInitializer(raw javaparser.IVariableInitializerContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1162,7 +1162,7 @@ func (y *builder) VisitVariableInitializer(raw javaparser.IVariableInitializerCo
 	return nil
 }
 
-func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
+func (y *singleFileBuilder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1181,7 +1181,7 @@ func (y *builder) VisitArguments(raw javaparser.IArgumentsContext) []ssa.Value {
 	return args
 }
 
-func (y *builder) VisitExpressionList(raw javaparser.IExpressionListContext) []ssa.Value {
+func (y *singleFileBuilder) VisitExpressionList(raw javaparser.IExpressionListContext) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1201,7 +1201,7 @@ func (y *builder) VisitExpressionList(raw javaparser.IExpressionListContext) []s
 	return values
 }
 
-func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) {
+func (y *singleFileBuilder) VisitStatementList(raw javaparser.IStatementListContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1218,7 +1218,7 @@ func (y *builder) VisitStatementList(raw javaparser.IStatementListContext) {
 	}
 }
 
-func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBuilder {
+func (y *singleFileBuilder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBuilder {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1248,6 +1248,10 @@ func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBu
 			}
 			_, field, ok := y.EmitNext(value, false)
 			y.AssignVariable(variable, field)
+			if utils.IsNil(ok) {
+				ok = y.EmitConstInst(true)
+				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
+			}
 			return ok
 		})
 		return loop
@@ -1272,7 +1276,7 @@ func (y *builder) VisitForControl(raw javaparser.IForControlContext) *ssa.LoopBu
 	return loop
 }
 
-func (y *builder) VisitForInit(raw javaparser.IForInitContext) []ssa.Value {
+func (y *singleFileBuilder) VisitForInit(raw javaparser.IForInitContext) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1309,7 +1313,7 @@ func (y *builder) VisitForInit(raw javaparser.IForInitContext) []ssa.Value {
 	return value
 }
 
-func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
+func (y *singleFileBuilder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1375,7 +1379,7 @@ func (y *builder) VisitIfStmt(raw javaparser.IIfstmtContext) interface{} {
 	return nil
 }
 
-func (y *builder) VisitSwitchExpression(raw javaparser.ISwitchExpressionContext, isExpression bool) ssa.Value {
+func (y *singleFileBuilder) VisitSwitchExpression(raw javaparser.ISwitchExpressionContext, isExpression bool) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1562,7 +1566,7 @@ func (y *builder) VisitSwitchExpression(raw javaparser.ISwitchExpressionContext,
 
 }
 
-func (y *builder) VisitGuardedPattern(raw javaparser.IGuardedPatternContext) []ssa.Value {
+func (y *singleFileBuilder) VisitGuardedPattern(raw javaparser.IGuardedPatternContext) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1577,7 +1581,7 @@ func (y *builder) VisitGuardedPattern(raw javaparser.IGuardedPatternContext) []s
 
 }
 
-func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListContext) {
+func (y *singleFileBuilder) VisitBlockStatementList(raw javaparser.IBlockStatementListContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1595,7 +1599,7 @@ func (y *builder) VisitBlockStatementList(raw javaparser.IBlockStatementListCont
 	}
 }
 
-func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassVariable string) ssa.Value {
+func (y *singleFileBuilder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClassVariable string) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1637,7 +1641,7 @@ func (y *builder) VisitInnerCreator(raw javaparser.IInnerCreatorContext, outClas
 
 }
 
-func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, constructorCall ssa.Value) {
+func (y *singleFileBuilder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, constructorCall ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil, nil
 	}
@@ -1680,7 +1684,7 @@ func (y *builder) VisitCreator(raw javaparser.ICreatorContext) (obj ssa.Value, c
 	return obj, nil
 }
 
-func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, parentName string) []ssa.Value {
+func (y *singleFileBuilder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext, parentName string) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1718,7 +1722,7 @@ func (y *builder) VisitClassCreatorRest(raw javaparser.IClassCreatorRestContext,
 	return args
 }
 
-func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext, p ssa.Type) ssa.Value {
+func (y *singleFileBuilder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext, p ssa.Type) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1752,7 +1756,7 @@ func (y *builder) VisitArrayCreatorRest(raw javaparser.IArrayCreatorRestContext,
 
 }
 
-func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type {
+func (y *singleFileBuilder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return ssa.CreateAnyType()
 	}
@@ -1818,7 +1822,7 @@ func (y *builder) VisitCreatedName(raw javaparser.ICreatedNameContext) ssa.Type 
 	return class
 }
 
-func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext) ssa.Value {
+func (y *singleFileBuilder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -1840,7 +1844,7 @@ func (y *builder) VisitLambdaExpression(raw javaparser.ILambdaExpressionContext)
 	return newFunc
 }
 
-func (y *builder) VisitLambdaParameters(raw javaparser.ILambdaParametersContext) {
+func (y *singleFileBuilder) VisitLambdaParameters(raw javaparser.ILambdaParametersContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1861,7 +1865,7 @@ func (y *builder) VisitLambdaParameters(raw javaparser.ILambdaParametersContext)
 	}
 }
 
-func (y *builder) VisitLamdaBody(raw javaparser.ILambdaBodyContext) {
+func (y *singleFileBuilder) VisitLamdaBody(raw javaparser.ILambdaBodyContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1877,7 +1881,7 @@ func (y *builder) VisitLamdaBody(raw javaparser.ILambdaBodyContext) {
 	}
 }
 
-func (y *builder) VisitLambdaLVTIList(raw javaparser.ILambdaLVTIListContext) {
+func (y *singleFileBuilder) VisitLambdaLVTIList(raw javaparser.ILambdaLVTIListContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1891,7 +1895,7 @@ func (y *builder) VisitLambdaLVTIList(raw javaparser.ILambdaLVTIListContext) {
 	}
 }
 
-func (y *builder) VisitLambdaLVTIParameter(raw javaparser.ILambdaLVTIParameterContext) {
+func (y *singleFileBuilder) VisitLambdaLVTIParameter(raw javaparser.ILambdaLVTIParameterContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -1911,7 +1915,7 @@ func (y *builder) VisitLambdaLVTIParameter(raw javaparser.ILambdaLVTIParameterCo
 	}
 }
 
-func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariable ...bool) (variable *ssa.Variable, value ssa.Value) {
+func (y *singleFileBuilder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariable ...bool) (variable *ssa.Variable, value ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -2004,7 +2008,7 @@ func (y *builder) VisitIdentifier(raw javaparser.IIdentifierContext, wantVariabl
 	return
 }
 
-func (y *builder) VisitResourceSpecification(raw javaparser.IResourceSpecificationContext) []ssa.Value {
+func (y *singleFileBuilder) VisitResourceSpecification(raw javaparser.IResourceSpecificationContext) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -2020,7 +2024,7 @@ func (y *builder) VisitResourceSpecification(raw javaparser.IResourceSpecificati
 	return nil
 }
 
-func (y *builder) VisitResources(raw javaparser.IResourcesContext) []ssa.Value {
+func (y *singleFileBuilder) VisitResources(raw javaparser.IResourcesContext) []ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -2037,7 +2041,7 @@ func (y *builder) VisitResources(raw javaparser.IResourcesContext) []ssa.Value {
 	return values
 }
 
-func (y *builder) VisitResource(raw javaparser.IResourceContext) ssa.Value {
+func (y *singleFileBuilder) VisitResource(raw javaparser.IResourceContext) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -2083,7 +2087,7 @@ func (y *builder) VisitResource(raw javaparser.IResourceContext) ssa.Value {
 	return value
 }
 
-func (y *builder) VisitSwitchStatement(raw javaparser.ISwitchStatementContext) {
+func (y *singleFileBuilder) VisitSwitchStatement(raw javaparser.ISwitchStatementContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -2144,7 +2148,7 @@ func (y *builder) VisitSwitchStatement(raw javaparser.ISwitchStatementContext) {
 	SwitchBuilder.Finish()
 }
 
-func (y *builder) VisitSwitchBlockStatementGroup(raw javaparser.ISwitchBlockStatementGroupContext) (labelType JavaSwitchLabel, labelValues func() ssa.Values, visitStatement func()) {
+func (y *singleFileBuilder) VisitSwitchBlockStatementGroup(raw javaparser.ISwitchBlockStatementGroupContext) (labelType JavaSwitchLabel, labelValues func() ssa.Values, visitStatement func()) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -2165,7 +2169,7 @@ func (y *builder) VisitSwitchBlockStatementGroup(raw javaparser.ISwitchBlockStat
 	return
 }
 
-func (y *builder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwitchLabel, func() ssa.Values) {
+func (y *singleFileBuilder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwitchLabel, func() ssa.Values) {
 	if y == nil || raw == nil || y.IsStop() {
 		return "", nil
 	}
@@ -2190,7 +2194,7 @@ func (y *builder) VisitSwitchLabel(raw javaparser.ISwitchLabelContext) (JavaSwit
 	return "", nil
 }
 
-func (y *builder) VisitLeftSliceCall(raw javaparser.ILeftSliceCallContext, object ssa.Value) *ssa.Variable {
+func (y *singleFileBuilder) VisitLeftSliceCall(raw javaparser.ILeftSliceCallContext, object ssa.Value) *ssa.Variable {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -2204,7 +2208,7 @@ func (y *builder) VisitLeftSliceCall(raw javaparser.ILeftSliceCallContext, objec
 	return y.CreateMemberCallVariable(object, index)
 }
 
-func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext, object ssa.Value) *ssa.Variable {
+func (y *singleFileBuilder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext, object ssa.Value) *ssa.Variable {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -2218,7 +2222,7 @@ func (y *builder) VisitLeftMemberCall(raw javaparser.ILeftMemberCallContext, obj
 	return y.CreateMemberCallVariable(object, y.EmitConstInstPlaceholder(name))
 }
 
-func (y *builder) GetOuterClassFieldVariable(name string) *ssa.Variable {
+func (y *singleFileBuilder) GetOuterClassFieldVariable(name string) *ssa.Variable {
 	bp := y.MarkedThisClassBlueprint
 	if bp == nil {
 		return nil
@@ -2242,7 +2246,7 @@ func (y *builder) GetOuterClassFieldVariable(name string) *ssa.Variable {
 	return nil
 }
 
-func (y *builder) VisitExplicitGenericInvocation(raw javaparser.IExplicitGenericInvocationContext, obj ssa.Value) ssa.Value {
+func (y *singleFileBuilder) VisitExplicitGenericInvocation(raw javaparser.IExplicitGenericInvocationContext, obj ssa.Value) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -2256,7 +2260,7 @@ func (y *builder) VisitExplicitGenericInvocation(raw javaparser.IExplicitGeneric
 	return y.VisitMethodCall(i.MethodCall(), obj)
 }
 
-func (y *builder) VisitPattern(raw javaparser.IPatternContext, value ssa.Value) ssa.Type {
+func (y *singleFileBuilder) VisitPattern(raw javaparser.IPatternContext, value ssa.Value) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}

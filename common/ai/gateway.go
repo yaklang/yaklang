@@ -2,9 +2,10 @@ package ai
 
 import (
 	"errors"
-	"github.com/yaklang/yaklang/common/ai/aibalance"
 	"io"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aibalance"
 
 	"github.com/yaklang/yaklang/common/ai/dashscopebase"
 	"github.com/yaklang/yaklang/common/ai/deepseek"
@@ -20,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/ollama"
 	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/ai/tongyi"
+	"github.com/yaklang/yaklang/common/ai/volcengine"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -38,6 +40,15 @@ func init() {
 	})
 	aispec.Register("tongyi", func() aispec.AIClient {
 		return &tongyi.GetawayClient{}
+	})
+	aispec.Register("volcengine", func() aispec.AIClient {
+		return &volcengine.GetawayClient{
+			ExtraOptions: []aispec.AIConfigOption{
+				aispec.WithEnableThinkingEx("thinking", map[string]any{
+					"type": "disabled",
+				}),
+			},
+		}
 	})
 	aispec.Register("comate", func() aispec.AIClient {
 		return &comate.Client{}
@@ -103,10 +114,6 @@ func (g *Gateway) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ErrHandler(g.Config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.Config.Images...),
 	)
-}
-
-func (g *Gateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.TargetUrl, g.Config.Model, details, function, g.AIClient.BuildHTTPOptions, g.Config.StreamHandler)
 }
 
 func (g *Gateway) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
@@ -232,13 +239,21 @@ func Moonshot(opts ...aispec.AIConfigOption) aispec.AIClient {
 	return agent
 }
 
+func Volcengine(opts ...aispec.AIConfigOption) aispec.AIClient {
+	agent := createAIGateway("volcengine")
+	if agent != nil {
+		agent.LoadOption(opts...)
+	}
+	return agent
+}
+
 func GetPrimaryAgent() aispec.AIClient {
 	var agent aispec.AIClient
 
 	t := consts.GetAIPrimaryType()
 	if t == "" {
 		for _, defaultType := range []string{
-			"openai", "chatglm", "moonshot", "tongyi", "comate",
+			"openai", "chatglm", "moonshot", "tongyi", "volcengine", "comate",
 		} {
 			agent = createAIGateway(defaultType)
 			if agent == nil {
@@ -252,29 +267,6 @@ func GetPrimaryAgent() aispec.AIClient {
 	return agent
 }
 
-func ChatStream(msg string, opts ...aispec.AIConfigOption) (io.Reader, error) {
-	config := aispec.NewDefaultAIConfig(opts...)
-	var responseStream io.Reader
-	var err error
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
-		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
-		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
-			return false
-		}
-		responseStream, err = gateway.ChatStream(msg)
-		if err != nil {
-			log.Warnf("chat stream by %s failed: %s", typ, err)
-			return false
-		}
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-	return responseStream, nil
-}
-
 func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var responseRsp string
@@ -282,9 +274,10 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
+			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false
 		}
+		log.Infof("start to chat completions by %v", typ)
 		responseRsp, err = gateway.Chat(msg)
 		if err != nil {
 			log.Warnf("chat by %s failed: %s", typ, err)
@@ -298,34 +291,13 @@ func Chat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 	return responseRsp, nil
 }
 
-func ChatEx(details []aispec.ChatDetail, opts ...aispec.AIConfigOption) (responseChoice []aispec.ChatChoice, err error) {
-	config := aispec.NewDefaultAIConfig(opts...)
-	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
-		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
-		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
-			return false
-		}
-		responseChoice, err = gateway.ChatEx(details)
-		if err != nil {
-			log.Warnf("chat by %s failed: %s", typ, err)
-			return false
-		}
-		return true
-	})
-	if err != nil {
-		return nil, err
-	}
-	return
-}
-
 func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec.StructuredData, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	var selectedGateway aispec.AIClient
 	tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
+			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false
 		}
 
@@ -353,6 +325,9 @@ func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec
 func ListModels(opts ...aispec.AIConfigOption) ([]*aispec.ModelMeta, error) {
 	config := aispec.NewDefaultAIConfig(opts...)
 	client := GetAI(config.Type, opts...)
+	if utils.IsNil(client) {
+		return nil, utils.Error("List AI model failed:unknown AI type")
+	}
 	return client.GetModelList()
 }
 
@@ -370,7 +345,7 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	err = tryCreateAIGateway(config.Type, func(typ string, gateway aispec.AIClient) bool {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
-			log.Warnf("check valid by %s failed: %s", typ, err)
+			log.Debugf("check valid by %s failed: %s", typ, err)
 			return false
 		}
 		var ok bool
@@ -394,6 +369,21 @@ func FunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) (map[s
 	return responseRsp, nil
 }
 
+func LoadChater(name string) (aispec.GeneralChatter, error) {
+	gateway, ok := aispec.Lookup(name)
+	if !ok {
+		return nil, errors.New("not found valid ai agent")
+	}
+	return func(msg string, opts ...aispec.AIConfigOption) (string, error) {
+		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(name)}, opts...)...)
+		if err := gateway.CheckValid(); err != nil {
+			log.Warnf("check valid by %s failed: %s", name, err)
+			return "", err
+		}
+		return gateway.Chat(msg)
+	}, nil
+}
+
 var Exports = map[string]any{
 	"OpenAI":   OpenAI,
 	"ChatGLM":  ChatGLM,
@@ -405,6 +395,7 @@ var Exports = map[string]any{
 	"ListModels":              ListModels,
 	"ListModelByProviderType": ListModelByProviderType,
 
+	"thinking":           aispec.WithEnableThinking,
 	"timeout":            aispec.WithTimeout,
 	"proxy":              aispec.WithProxy,
 	"model":              aispec.WithModel,

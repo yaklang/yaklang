@@ -5,108 +5,94 @@ desc(
 	risk_type:"url-redirect"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   URL重定向漏洞（Open Redirect）是一种常见的Web安全漏洞。当应用程序接收用户提供的URL作为参数，并在未经充分验证的情况下直接将用户重定向到该URL时，就可能发生此漏洞。攻击者可以构造一个包含恶意网站URL的参数，诱导用户点击链接，从而将用户重定向到钓鱼网站、恶意软件下载页面或其他欺诈性网站。在Java Web应用中，如果使用`HttpServletResponse.sendRedirect()`方法或Spring MVC的`redirect:`前缀返回视图时，未对用户提供的重定向目标URL进行严格的校验和限制，就可能存在该漏洞。
-
+URL重定向漏洞（Open Redirect）是一种常见的Web安全漏洞。当应用程序接收用户提供的URL作为参数，并在未经充分验证的情况下直接将用户重定向到该URL时，就可能发生此漏洞。攻击者可以构造一个包含恶意网站URL的参数，诱导用户点击链接，从而将用户重定向到钓鱼网站、恶意软件下载页面或其他欺诈性网站。
+在Java Web应用中，如果使用`HttpServletResponse.sendRedirect()`方法或Spring MVC的`redirect:`前缀返回视图时，未对用户提供的重定向目标URL进行严格的校验和限制，就可能存在该漏洞。
 2. **触发场景**
-   - **直接使用用户输入的URL进行重定向：**
-     当代码直接将请求参数中的值作为重定向目标时，例如：
-     ```java
-     String targetUrl = request.getParameter("url");
-     response.sendRedirect(targetUrl);
-     ```
-     攻击者可以构造 `?url=http://malicious-site.com` 导致重定向到恶意网站。
-
-   - **使用用户输入作为重定向URL的一部分且未严格过滤：**
-     虽然不是直接全部使用用户输入，但在构建重定向URL时拼接用户输入，且缺乏充分过滤，也可能绕过校验。
-     ```java
-     String site = request.getParameter("site");
-     return "redirect:http://" + site + ".example.com/welcome"; // 如果site包含特殊字符，可能被绕过
-     ```
-     攻击者可能构造 `?site=malicious-site.com/..`
-
+- **直接使用用户输入的URL进行重定向：**
+当代码直接将请求参数中的值作为重定向目标时，例如：
+```java
+String targetUrl = request.getParameter("url");
+response.sendRedirect(targetUrl);
+```
+攻击者可以构造 `?url=http://malicious-site.com` 导致重定向到恶意网站。
+- **使用用户输入作为重定向URL的一部分且未严格过滤：**
+虽然不是直接全部使用用户输入，但在构建重定向URL时拼接用户输入，且缺乏充分过滤，也可能绕过校验。
+```java
+String site = request.getParameter("site");
+return "redirect:http://" + site + ".example.com/welcome"; // 如果site包含特殊字符，可能被绕过
+```
+攻击者可能构造 `?site=malicious-site.com/..`
 3. **潜在影响**
-   - **网络钓鱼：** 攻击者将用户重定向到外观逼真但虚假的登录页面，窃取用户凭据。
-   - **恶意软件分发：** 将用户重定向到包含恶意软件下载链接的页面。
-   - **XSS攻击辅助：** 在某些特定配置下，开放重定向可以被利用来绕过Same-Origin Policy，辅助实施XSS攻击。
-   - **绕过安全检查：** 可能被用于绕过一些基于来源判断的安全检查或统计。
+- **网络钓鱼：** 攻击者将用户重定向到外观逼真但虚假的登录页面，窃取用户凭据。
+- **恶意软件分发：** 将用户重定向到包含恶意软件下载链接的页面。
+- **XSS攻击辅助：** 在某些特定配置下，开放重定向可以被利用来绕过Same-Origin Policy，辅助实施XSS攻击。
+- **绕过安全检查：** 可能被用于绕过一些基于来源判断的安全检查或统计。
 
 DESC
 	rule_id: "56a91b23-787c-4c35-a4b9-dcf51521c20f"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 仅允许重定向到站内页面
 最安全的做法是避免将用户提供的外部URL作为重定向目标。如果业务需要重定向，应该只允许重定向到当前应用内部的相对路径或预定义的允许列表中的页面。
-
 #### 2. 维护一个允许的重定向目标列表
 如果需要重定向到外部网站，应该维护一个硬编码的白名单（允许列表）包含所有合法的重定向目标URL。接收到用户输入的URL时，检查它是否在白名单列表中。如果不在，则拒绝重定向或重定向到默认页面。
-
 #### 3. 对用户输入的URL进行严格验证
 如果无法使用白名单，必须对用户输入的URL进行严格校验。这包括：
-   - **校验URL协议：** 仅允许 `http://` 或 `https://` 协议，禁止 `javascript:`、`data:` 等协议。
-   - **校验域名/主机：** 确保重定向目标的主机属于预期的信任域名列表。
-   - **避免双重编码：** 有些攻击可能利用URL编码或双重编码绕过简单的字符串匹配检查。在进行校验前应先对URL进行解码。
-   - **使用URL解析库：** 使用标准的URL解析库（如Java的 `java.net.URL`）来解析和校验URL的各个组成部分，而不是简单地进行字符串操作，这可以避免很多解析类的问题。
-
+- **校验URL协议：** 仅允许 `http://` 或 `https://` 协议，禁止 `javascript:`、`data:` 等协议。
+- **校验域名/主机：** 确保重定向目标的主机属于预期的信任域名列表。
+- **避免双重编码：** 有些攻击可能利用URL编码或双重编码绕过简单的字符串匹配检查。在进行校验前应先对URL进行解码。
+- **使用URL解析库：** 使用标准的URL解析库（如Java的 `java.net.URL`）来解析和校验URL的各个组成部分，而不是简单地进行字符串操作，这可以避免很多解析类的问题。
 #### 4. 使用安全框架提供的重定向功能
 许多Web框架提供了更安全的重定向机制，这些机制可能内置了对开放重定向的防护措施。例如，Spring框架的 `RedirectView` 在构建时可以配置 `setExposeModelAttributes(false)` 以防止模型属性泄露。
-
 #### 5. 修复代码示例 (使用白名单示例)
 ```java
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.view.RedirectView;
-
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-
 @Controller
 public class SecureRedirectController {
-
-    // 定义允许重定向的域名白名单
-    private static final Set<String> ALLOWED_DOMAINS = new HashSet<>(Arrays.asList(
-        "example.com",
-        "anothersite.com"
-    ));
-
-    @GetMapping("/safeRedirect")
-    public RedirectView safeRedirect(@RequestParam String targetUrl) {
-        try {
-            // 使用URL解析库校验域名
-            java.net.URL url = new java.net.URL(targetUrl);
-            if (ALLOWED_DOMAINS.contains(url.getHost())) {
-                // 检查协议是否合法 (可选，但推荐)
-                 if (url.getProtocol().equals("http") || url.getProtocol().equals("https")) {
-                    return new RedirectView(targetUrl);
-                 } else {
-                     // 协议非法
-                     return new RedirectView("/errorPage?msg=InvalidProtocol");
-                 }
-            } else {
-                // 域名不在白名单中，重定向到默认页面或错误页面
-                return new RedirectView("/errorPage?msg=InvalidDomain");
-            }
-
-        } catch (Exception e) {
-            // URL格式错误或其他异常，重定向到错误页面
-            return new RedirectView("/errorPage?msg=InvalidURLFormat");
-        }
-    }
-
-    @GetMapping("/safeRelativeRedirect")
-    public String safeRelativeRedirect(@RequestParam String targetPath) {
-        // 仅允许重定向到相对路径 (此处仅为示例，实际应用中应更严格校验targetPath)
-        // 确保targetPath不包含如 "http://" 或 ".." 等跳出当前应用范围的内容
-        if (targetPath.startsWith("/") && !targetPath.contains("..")) {
-             return "redirect:" + targetPath;
-        } else {
-             return "redirect:/errorPage?msg=InvalidPath";
-        }
-    }
+// 定义允许重定向的域名白名单
+private static final Set<String> ALLOWED_DOMAINS = new HashSet<>(Arrays.asList(
+"example.com",
+"anothersite.com"
+));
+@GetMapping("/safeRedirect")
+public RedirectView safeRedirect(@RequestParam String targetUrl) {
+try {
+// 使用URL解析库校验域名
+java.net.URL url = new java.net.URL(targetUrl);
+if (ALLOWED_DOMAINS.contains(url.getHost())) {
+// 检查协议是否合法 (可选，但推荐)
+if (url.getProtocol().equals("http") || url.getProtocol().equals("https")) {
+return new RedirectView(targetUrl);
+} else {
+// 协议非法
+return new RedirectView("/errorPage?msg=InvalidProtocol");
+}
+} else {
+// 域名不在白名单中，重定向到默认页面或错误页面
+return new RedirectView("/errorPage?msg=InvalidDomain");
+}
+} catch (Exception e) {
+// URL格式错误或其他异常，重定向到错误页面
+return new RedirectView("/errorPage?msg=InvalidURLFormat");
+}
+}
+@GetMapping("/safeRelativeRedirect")
+public String safeRelativeRedirect(@RequestParam String targetPath) {
+// 仅允许重定向到相对路径 (此处仅为示例，实际应用中应更严格校验targetPath)
+// 确保targetPath不包含如 "http://" 或 ".." 等跳出当前应用范围的内容
+if (targetPath.startsWith("/") && !targetPath.contains("..")) {
+return "redirect:" + targetPath;
+} else {
+return "redirect:/errorPage?msg=InvalidPath";
+}
+}
 }
 ```
 在上述示例中，`safeRedirect` 方法通过白名单校验目标URL的域名，`safeRelativeRedirect` 限制重定向到应用内的相对路径。实际应用中应根据具体需求选择和组合这些防御方法。
@@ -128,29 +114,216 @@ RedirectView?{<typeName>?{have:'org.springframework.web.servlet.view'}}(,* as $s
 check $sink;
 
 $sink #{
-    include:`* & $source`,
+    until:`* & $source`,
     exclude:`*?{opcode:call}?{!<self> & $source}?{!<self> & $sink}`,
     exclude:`*?{opcode:phi}`,
-}->as $result;
+}->as $high;
 
-alert $result for {
+alert $high for {
 	level: "high",
 	type: "vuln",
-	message: "Find direct URL redirect vulnerability for java",
-	title: "Check Java URL Redirect Vulnerability",
-	title_zh: "检测Java URL重定向漏洞",
+	message: "发现Java URL直接重定向漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	title: "Java URL Redirect Vulnerability Was Detected",
+	title_zh: "检测到Java URL重定向漏洞",
+	name: "high",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 仅允许重定向到站内页面
+最安全的做法是避免将用户提供的外部URL作为重定向目标。如果业务需要重定向，应该只允许重定向到当前应用内部的相对路径或预定义的允许列表中的页面。
+#### 2. 维护一个允许的重定向目标列表
+如果需要重定向到外部网站，应该维护一个硬编码的白名单（允许列表）包含所有合法的重定向目标URL。接收到用户输入的URL时，检查它是否在白名单列表中。如果不在，则拒绝重定向或重定向到默认页面。
+#### 3. 对用户输入的URL进行严格验证
+如果无法使用白名单，必须对用户输入的URL进行严格校验。这包括：
+- **校验URL协议：** 仅允许 `http://` 或 `https://` 协议，禁止 `javascript:`、`data:` 等协议。
+- **校验域名/主机：** 确保重定向目标的主机属于预期的信任域名列表。
+- **避免双重编码：** 有些攻击可能利用URL编码或双重编码绕过简单的字符串匹配检查。在进行校验前应先对URL进行解码。
+- **使用URL解析库：** 使用标准的URL解析库（如Java的 `java.net.URL`）来解析和校验URL的各个组成部分，而不是简单地进行字符串操作，这可以避免很多解析类的问题。
+#### 4. 使用安全框架提供的重定向功能
+许多Web框架提供了更安全的重定向机制，这些机制可能内置了对开放重定向的防护措施。例如，Spring框架的 `RedirectView` 在构建时可以配置 `setExposeModelAttributes(false)` 以防止模型属性泄露。
+#### 5. 修复代码示例 (使用白名单示例)
+```java
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.view.RedirectView;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+@Controller
+public class SecureRedirectController {
+// 定义允许重定向的域名白名单
+private static final Set<String> ALLOWED_DOMAINS = new HashSet<>(Arrays.asList(
+"example.com",
+"anothersite.com"
+));
+@GetMapping("/safeRedirect")
+public RedirectView safeRedirect(@RequestParam String targetUrl) {
+try {
+// 使用URL解析库校验域名
+java.net.URL url = new java.net.URL(targetUrl);
+if (ALLOWED_DOMAINS.contains(url.getHost())) {
+// 检查协议是否合法 (可选，但推荐)
+if (url.getProtocol().equals("http") || url.getProtocol().equals("https")) {
+return new RedirectView(targetUrl);
+} else {
+// 协议非法
+return new RedirectView("/errorPage?msg=InvalidProtocol");
+}
+} else {
+// 域名不在白名单中，重定向到默认页面或错误页面
+return new RedirectView("/errorPage?msg=InvalidDomain");
+}
+} catch (Exception e) {
+// URL格式错误或其他异常，重定向到错误页面
+return new RedirectView("/errorPage?msg=InvalidURLFormat");
+}
+}
+@GetMapping("/safeRelativeRedirect")
+public String safeRelativeRedirect(@RequestParam String targetPath) {
+// 仅允许重定向到相对路径 (此处仅为示例，实际应用中应更严格校验targetPath)
+// 确保targetPath不包含如 "http://" 或 ".." 等跳出当前应用范围的内容
+if (targetPath.startsWith("/") && !targetPath.contains("..")) {
+return "redirect:" + targetPath;
+} else {
+return "redirect:/errorPage?msg=InvalidPath";
+}
+}
+}
+```
+在上述示例中，`safeRedirect` 方法通过白名单校验目标URL的域名，`safeRelativeRedirect` 限制重定向到应用内的相对路径。实际应用中应根据具体需求选择和组合这些防御方法。
+SOLUTION
+	risk: "URL重定向",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+URL重定向漏洞（Open Redirect）是一种常见的Web安全漏洞。当应用程序接收用户提供的URL作为参数，并在未经充分验证的情况下直接将用户重定向到该URL时，就可能发生此漏洞。攻击者可以构造一个包含恶意网站URL的参数，诱导用户点击链接，从而将用户重定向到钓鱼网站、恶意软件下载页面或其他欺诈性网站。在Java Web应用中，如果使用`HttpServletResponse.sendRedirect()`方法或Spring MVC的`redirect:`前缀返回视图时，未对用户提供的重定向目标URL进行严格的校验和限制，就可能存在该漏洞。
+2. **触发场景**
+- **直接使用用户输入的URL进行重定向：**
+当代码直接将请求参数中的值作为重定向目标时，例如：
+```java
+String targetUrl = request.getParameter("url");
+response.sendRedirect(targetUrl);
+```
+攻击者可以构造 `?url=http://malicious-site.com` 导致重定向到恶意网站。
+- **使用用户输入作为重定向URL的一部分且未严格过滤：**
+虽然不是直接全部使用用户输入，但在构建重定向URL时拼接用户输入，且缺乏充分过滤，也可能绕过校验。
+```java
+String site = request.getParameter("site");
+return "redirect:http://" + site + ".example.com/welcome"; // 如果site包含特殊字符，可能被绕过
+```
+攻击者可能构造 `?site=malicious-site.com/..`
+3. **潜在影响**
+- **网络钓鱼：** 攻击者将用户重定向到外观逼真但虚假的登录页面，窃取用户凭据。
+- **恶意软件分发：** 将用户重定向到包含恶意软件下载链接的页面。
+- **XSS攻击辅助：** 在某些特定配置下，开放重定向可以被利用来绕过Same-Origin Policy，辅助实施XSS攻击。
+- **绕过安全检查：** 可能被用于绕过一些基于来源判断的安全检查或统计。
+DESC
 }
 
-
+$sink #{
+    until:`* & $source`,
+}->as $result;
 $result - $high  as $low;
 alert $low for {
-	message: "Find possible URL redirect vulnerability for java",
-	title: "Check Java URL Redirect Vulnerability",
-	title_zh: "检测Java URL重定向漏洞",
+	message: "发现Java URL重定向漏洞，但是从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	title: "Java URL Redirect Vulnerability Was Detected",
+	title_zh: "检测到Java URL重定向漏洞",
 	level: "low",
 	type: "vuln",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 仅允许重定向到站内页面
+最安全的做法是避免将用户提供的外部URL作为重定向目标。如果业务需要重定向，应该只允许重定向到当前应用内部的相对路径或预定义的允许列表中的页面。
+#### 2. 维护一个允许的重定向目标列表
+如果需要重定向到外部网站，应该维护一个硬编码的白名单（允许列表）包含所有合法的重定向目标URL。接收到用户输入的URL时，检查它是否在白名单列表中。如果不在，则拒绝重定向或重定向到默认页面。
+#### 3. 对用户输入的URL进行严格验证
+如果无法使用白名单，必须对用户输入的URL进行严格校验。这包括：
+- **校验URL协议：** 仅允许 `http://` 或 `https://` 协议，禁止 `javascript:`、`data:` 等协议。
+- **校验域名/主机：** 确保重定向目标的主机属于预期的信任域名列表。
+- **避免双重编码：** 有些攻击可能利用URL编码或双重编码绕过简单的字符串匹配检查。在进行校验前应先对URL进行解码。
+- **使用URL解析库：** 使用标准的URL解析库（如Java的 `java.net.URL`）来解析和校验URL的各个组成部分，而不是简单地进行字符串操作，这可以避免很多解析类的问题。
+#### 4. 使用安全框架提供的重定向功能
+许多Web框架提供了更安全的重定向机制，这些机制可能内置了对开放重定向的防护措施。例如，Spring框架的 `RedirectView` 在构建时可以配置 `setExposeModelAttributes(false)` 以防止模型属性泄露。
+#### 5. 修复代码示例 (使用白名单示例)
+```java
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.view.RedirectView;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+@Controller
+public class SecureRedirectController {
+// 定义允许重定向的域名白名单
+private static final Set<String> ALLOWED_DOMAINS = new HashSet<>(Arrays.asList(
+"example.com",
+"anothersite.com"
+));
+@GetMapping("/safeRedirect")
+public RedirectView safeRedirect(@RequestParam String targetUrl) {
+try {
+// 使用URL解析库校验域名
+java.net.URL url = new java.net.URL(targetUrl);
+if (ALLOWED_DOMAINS.contains(url.getHost())) {
+// 检查协议是否合法 (可选，但推荐)
+if (url.getProtocol().equals("http") || url.getProtocol().equals("https")) {
+return new RedirectView(targetUrl);
+} else {
+// 协议非法
+return new RedirectView("/errorPage?msg=InvalidProtocol");
 }
-
+} else {
+// 域名不在白名单中，重定向到默认页面或错误页面
+return new RedirectView("/errorPage?msg=InvalidDomain");
+}
+} catch (Exception e) {
+// URL格式错误或其他异常，重定向到错误页面
+return new RedirectView("/errorPage?msg=InvalidURLFormat");
+}
+}
+@GetMapping("/safeRelativeRedirect")
+public String safeRelativeRedirect(@RequestParam String targetPath) {
+// 仅允许重定向到相对路径 (此处仅为示例，实际应用中应更严格校验targetPath)
+// 确保targetPath不包含如 "http://" 或 ".." 等跳出当前应用范围的内容
+if (targetPath.startsWith("/") && !targetPath.contains("..")) {
+return "redirect:" + targetPath;
+} else {
+return "redirect:/errorPage?msg=InvalidPath";
+}
+}
+}
+```
+在上述示例中，`safeRedirect` 方法通过白名单校验目标URL的域名，`safeRelativeRedirect` 限制重定向到应用内的相对路径。实际应用中应根据具体需求选择和组合这些防御方法。
+SOLUTION
+	risk: "URL重定向",
+	name: "low",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+URL重定向漏洞（Open Redirect）是一种常见的Web安全漏洞。当应用程序接收用户提供的URL作为参数，并在未经充分验证的情况下直接将用户重定向到该URL时，就可能发生此漏洞。攻击者可以构造一个包含恶意网站URL的参数，诱导用户点击链接，从而将用户重定向到钓鱼网站、恶意软件下载页面或其他欺诈性网站。在Java Web应用中，如果使用`HttpServletResponse.sendRedirect()`方法或Spring MVC的`redirect:`前缀返回视图时，未对用户提供的重定向目标URL进行严格的校验和限制，就可能存在该漏洞。
+2. **触发场景**
+- **直接使用用户输入的URL进行重定向：**
+当代码直接将请求参数中的值作为重定向目标时，例如：
+```java
+String targetUrl = request.getParameter("url");
+response.sendRedirect(targetUrl);
+```
+攻击者可以构造 `?url=http://malicious-site.com` 导致重定向到恶意网站。
+- **使用用户输入作为重定向URL的一部分且未严格过滤：**
+虽然不是直接全部使用用户输入，但在构建重定向URL时拼接用户输入，且缺乏充分过滤，也可能绕过校验。
+```java
+String site = request.getParameter("site");
+return "redirect:http://" + site + ".example.com/welcome"; // 如果site包含特殊字符，可能被绕过
+```
+攻击者可能构造 `?site=malicious-site.com/..`
+3. **潜在影响**
+- **网络钓鱼：** 攻击者将用户重定向到外观逼真但虚假的登录页面，窃取用户凭据。
+- **恶意软件分发：** 将用户重定向到包含恶意软件下载链接的页面。
+- **XSS攻击辅助：** 在某些特定配置下，开放重定向可以被利用来绕过Same-Origin Policy，辅助实施XSS攻击。
+- **绕过安全检查：** 可能被用于绕过一些基于来源判断的安全检查或统计。
+DESC
+}
 
 desc(
 	alert_min:3

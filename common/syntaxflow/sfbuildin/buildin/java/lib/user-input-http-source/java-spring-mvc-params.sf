@@ -12,12 +12,37 @@ REFERENCE
 该规则用于识别Java Spring MVC框架中控制器（Controller）层处理方法的用户可控输入参数。这些参数是数据流分析的起点，对于检测多种Web安全漏洞至关重要。
 
 ### 规则详细
-该规则属于查找代码或审计代码的规则，旨在全面覆盖Spring MVC中获取用户输入的常见方式，包括：
+1. **声明式参数绑定（注解方式）**：
+   - 通过 `@RequestParam`, `@PathVariable`, `@RequestHeader`, `@CookieValue`, `@RequestBody`, `@RequestPart`, `@MatrixVariable`, `@SessionAttribute`, `@RequestAttribute`, `@ModelAttribute` 等注解，将用户输入绑定到方法参数上。
+   - 这些注解简化了从HTTP请求中提取数据到Java方法参数的过程，但也是潜在的攻击入口点。
 
-1. **声明式参数绑定（注解方式）**：识别通过 `@RequestParam`, `@PathVariable`, `@RequestHeader`, `@CookieValue`, `@RequestBody`, `@RequestPart`, `@MatrixVariable`, `@SessionAttribute`, `@RequestAttribute`, `@ModelAttribute` 等注解绑定到方法参数上的用户输入。这些注解简化了从HTTP请求中提取数据到Java方法参数的过程，但也是潜在的攻击入口点。
-2. **原生请求处理（HttpServletRequest/ServletRequest）**：识别直接通过 `javax.servlet.http.HttpServletRequest` 或 `javax.servlet.ServletRequest` 对象获取用户输入的场景。这包括调用 `getParameter()`, `getParameterValues()`, `getParameterNames()`, `getHeader()`, `getHeaderNames()`, `getCookies()` 等方法。虽然Spring MVC鼓励使用注解方式，但在某些场景下，开发者仍可能直接操作原生请求对象获取更原始或复杂的输入。
+2. **原生请求处理（HttpServletRequest/ServletRequest）**：
+   - 直接通过 `javax.servlet.http.HttpServletRequest` 或 `javax.servlet.ServletRequest` 对象获取用户输入。
+   - 包括调用 `getParameter()`, `getParameterValues()`, `getParameterNames()`, `getHeader()`, `getHeaderNames()`, `getCookies()` 等方法。
+   - 尽管Spring MVC鼓励使用注解方式，但在某些场景下，开发者仍可能直接操作原生请求对象获取更原始或复杂的输入。
 
-这条规则作为基础性的“污染源”（source）查找规则，主要用于构建更复杂的Web漏洞（如SQL注入、XSS、命令注入、路径遍历等）的数据流分析链。通过准确识别所有可能的输入点，可以确保后续的流分析能够覆盖到应用程序处理用户输入的所有关键位置。
+3. **基础性“污染源”查找规则**：
+   - 本规则作为数据流分析链的基础，可支持后续检测SQL注入、XSS、命令注入、路径遍历等漏洞。
+   - 准确识别所有可能的输入点，确保覆盖应用程序处理用户输入的所有关键位置。
+
+#### 示例代码
+```java
+// 用户输入绑定示例
+@GetMapping("/request-param")
+@ResponseBody
+public String getUserInput(@RequestParam String username) {
+    return "用户名: " + username;
+}
+```
+```java
+// 原生请求处理示例
+@GetMapping("/raw-request")
+@ResponseBody
+public String getRawInput(HttpServletRequest request) {
+    String value = request.getParameter("input");
+    return "用户输入值: " + value;
+}
+```
 DESC
 	rule_id: "1314089e-e030-4436-89d2-2aabe2758683"
 	solution: <<<SOLUTION
@@ -62,7 +87,27 @@ $request.get*() as $output;
 alert $output for {
 	title: "Find Java Spring MVC Controller User Controllable Input Parameters",
 	title_zh: "查找Java Spring MVC 控制层用户可控输入参数",
-	level: "mid",
+	level: "info",
+	solution: <<<SOLUTION
+### 安全建议
+由于该规则用于审计代码并识别可能的用户输入点，因此无需进行修复。但需要注意以下几点：
+1. 确保所有用户输入均通过严格的验证和过滤。
+2. 使用注解（如`@RequestParam`、`@PathVariable`等）时，明确指定类型和范围限制。
+3. 在处理`HttpServletRequest`对象时，避免直接拼接未经验证的用户输入。
+4. 对于复杂场景，建议结合流分析工具进一步检测潜在漏洞。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+该规则用于识别Java Spring MVC框架中控制器（Controller）层处理方法的用户可控输入参数。这些参数是数据流分析的起点，对于检测多种Web安全漏洞至关重要。
+### 规则详细
+该规则属于查找代码或审计代码的规则，旨在全面覆盖Spring MVC中获取用户输入的常见方式，包括：
+1. **声明式参数绑定（注解方式）**：识别通过 `@RequestParam`, `@PathVariable`, `@RequestHeader`, `@CookieValue`, `@RequestBody`, `@RequestPart`, `@MatrixVariable`, `@SessionAttribute`, `@RequestAttribute`, `@ModelAttribute` 等注解绑定到方法参数上的用户输入。这些注解简化了从HTTP请求中提取数据到Java方法参数的过程，但也是潜在的攻击入口点。
+2. **原生请求处理（HttpServletRequest/ServletRequest）**：识别直接通过 `javax.servlet.http.HttpServletRequest` 或 `javax.servlet.ServletRequest` 对象获取用户输入的场景。这包括调用 `getParameter()`, `getParameterValues()`, `getParameterNames()`, `getHeader()`, `getHeaderNames()`, `getCookies()` 等方法。虽然Spring MVC鼓励使用注解方式，但在某些场景下，开发者仍可能直接操作原生请求对象获取更原始或复杂的输入。
+这条规则作为基础性的“污染源”（source）查找规则，主要用于构建更复杂的Web漏洞（如SQL注入、XSS、命令注入、路径遍历等）的数据流分析链。通过准确识别所有可能的输入点，可以确保后续的流分析能够覆盖到应用程序处理用户输入的所有关键位置。
+DESC
+	name: "output",
+	message: "发现Java Spring MVC控制层的用户可控输入参数，需要进一步确认是否存在潜在的安全风险。",
 }
 
 
@@ -170,6 +215,60 @@ public class ParameterBindingExamples {
 
 }
 TEXT
+	"safefile://SafeControllerNoUserInput.java": <<<CODE
+// 安全的代码示例：不接收任何用户输入参数的Controller方法
+package org.example.moudels.userinput;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+@Controller
+@RequestMapping("/safe-no-input")
+public class SafeControllerNoUserInput {
+
+    // 该方法不接收任何来自HTTP请求的用户输入，因此是安全的
+    @GetMapping("/status")
+    @ResponseBody
+    public String getStatus() {
+        return "Application is running smoothly.";
+    }
+
+    // 该方法使用硬编码值，不依赖用户输入
+    @GetMapping("/fixed-message")
+    @ResponseBody
+    public String getFixedMessage() {
+        String message = "This is a fixed, non-user-controllable message.";
+        return message;
+    }
+}
+
+CODE
+	"safefile://SafeServiceNoDirectRequest.java": <<<CODE
+// 安全的代码示例：Service层或不直接处理HttpServletRequest的方法
+package org.example.service;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public class SafeServiceNoDirectRequest {
+
+    // 该方法接收一个由Controller层经过严格验证和净化后的参数，而不是直接来自HTTP请求
+    public String processSafeInput(String cleanData) {
+        // 假设cleanData已经被Controller层或拦截器净化，不包含恶意内容
+        return "Processed safe data: " + cleanData;
+    }
+
+    // 该方法只进行内部计算，不涉及任何用户输入
+    public int calculateFixedValue() {
+        int a = 10;
+        int b = 20;
+        return a + b;
+    }
+}
+
+CODE
 )
 
 desc(
@@ -289,4 +388,58 @@ public class ServletParamsExamples {
 
 }
 TEXT
+	"safefile://SafeControllerNoUserInput.java": <<<CODE
+// 安全的代码示例：不接收任何用户输入参数的Controller方法
+package org.example.moudels.userinput;
+
+import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+@Controller
+@RequestMapping("/safe-no-input")
+public class SafeControllerNoUserInput {
+
+    // 该方法不接收任何来自HTTP请求的用户输入，因此是安全的
+    @GetMapping("/status")
+    @ResponseBody
+    public String getStatus() {
+        return "Application is running smoothly.";
+    }
+
+    // 该方法使用硬编码值，不依赖用户输入
+    @GetMapping("/fixed-message")
+    @ResponseBody
+    public String getFixedMessage() {
+        String message = "This is a fixed, non-user-controllable message.";
+        return message;
+    }
+}
+
+CODE
+	"safefile://SafeServiceNoDirectRequest.java": <<<CODE
+// 安全的代码示例：Service层或不直接处理HttpServletRequest的方法
+package org.example.service;
+
+import org.springframework.stereotype.Service;
+
+@Service
+public class SafeServiceNoDirectRequest {
+
+    // 该方法接收一个由Controller层经过严格验证和净化后的参数，而不是直接来自HTTP请求
+    public String processSafeInput(String cleanData) {
+        // 假设cleanData已经被Controller层或拦截器净化，不包含恶意内容
+        return "Processed safe data: " + cleanData;
+    }
+
+    // 该方法只进行内部计算，不涉及任何用户输入
+    public int calculateFixedValue() {
+        int a = 10;
+        int b = 20;
+        return a + b;
+    }
+}
+
+CODE
 )

@@ -1,0 +1,1092 @@
+desc(
+	title: "Check C File Upload Vulnerability"
+	type: audit
+	severity: mid
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   文件上传漏洞发生在C语言应用程序允许用户上传文件时，未对上传的文件进行适当的验证和限制。攻击者可以利用此漏洞上传恶意文件（如可执行文件、脚本文件、包含恶意代码的文档等），从而实现远程代码执行、文件系统访问、拒绝服务攻击等。在C语言中，这通常涉及CGI程序、Web服务器模块或文件处理应用程序中的文件接收和存储逻辑。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <stdlib.h>
+   #include <string.h>
+   
+   // 不安全的文件上传处理
+   void vulnerable_file_upload(const char *filename, const char *content, size_t content_size) {
+       char filepath[512];
+       
+       // 直接使用用户提供的文件名，未进行验证
+       sprintf(filepath, "/var/www/uploads/%s", filename);
+       
+       FILE *file = fopen(filepath, "wb");
+       if (!file) {
+           printf("Error: Cannot create file\n");
+           return;
+       }
+       
+       // 直接写入用户提供的内容，未进行验证
+       fwrite(content, 1, content_size, file);
+       fclose(file);
+       
+       printf("File uploaded successfully: %s\n", filepath);
+   }
+   
+   // CGI文件上传处理
+   void vulnerable_cgi_upload() {
+       char *content_type = getenv("CONTENT_TYPE");
+       char *content_length_str = getenv("CONTENT_LENGTH");
+       
+       if (!content_type || !strstr(content_type, "multipart/form-data")) {
+           return;
+       }
+       
+       int content_length = atoi(content_length_str);
+       char *buffer = malloc(content_length + 1);
+       fread(buffer, 1, content_length, stdin);
+       
+       // 简化的multipart解析（实际应用中更复杂）
+       char *filename_start = strstr(buffer, "filename=\"");
+       if (filename_start) {
+           filename_start += 10;
+           char *filename_end = strchr(filename_start, '"');
+           
+           char filename[256];
+           strncpy(filename, filename_start, filename_end - filename_start);
+           filename[filename_end - filename_start] = '\0';
+           
+           // 查找文件内容
+           char *content_start = strstr(buffer, "\r\n\r\n") + 4;
+           char *content_end = strstr(content_start, "\r\n--");
+           
+           // 直接保存文件，未进行任何验证
+           char filepath[512];
+           sprintf(filepath, "/tmp/%s", filename);
+           
+           FILE *file = fopen(filepath, "wb");
+           if (file) {
+               fwrite(content_start, 1, content_end - content_start, file);
+               fclose(file);
+               printf("Content-Type: text/html\r\n\r\n");
+               printf("<html><body><h1>File uploaded: %s</h1></body></html>", filename);
+           }
+       }
+       
+       free(buffer);
+   }
+   
+   // 基于扩展名的错误验证
+   int vulnerable_extension_check(const char *filename) {
+       // 仅检查扩展名，容易被绕过
+       const char *ext = strrchr(filename, '.');
+       if (!ext) return 0;
+       
+       // 不完整的黑名单，容易绕过
+       if (strcmp(ext, ".exe") == 0 || strcmp(ext, ".bat") == 0) {
+           return 0; // 禁止
+       }
+       
+       return 1; // 允许
+   }
+   ```
+   攻击者可以上传`.php`、`.jsp`、`.asp`等脚本文件，或使用双扩展名如`malicious.php.txt`绕过检查。
+
+3. **潜在影响**
+   - **远程代码执行**: 上传并执行恶意脚本或可执行文件。
+   - **文件系统访问**: 通过路径遍历访问或覆盖系统文件。
+   - **拒绝服务攻击**: 上传大文件耗尽磁盘空间或内存。
+   - **恶意软件传播**: 将服务器作为恶意软件分发平台。
+   - **数据泄露**: 上传文件可能包含用于数据窃取的脚本。
+DESC
+	rule_id: "f1e8d3b7-4c9a-4f2e-8b1d-6a5c9e2f7b4d"
+	title_zh: "检测C语言文件上传漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 文件类型和扩展名验证
+实施严格的文件类型白名单验证。
+```c
+#include <stdio.h>
+#include <string.h>
+#include <ctype.h>
+
+// 允许上传的文件扩展名白名单
+const char *allowed_extensions[] = {
+    ".jpg", ".jpeg", ".png", ".gif", ".bmp",
+    ".pdf", ".txt", ".doc", ".docx",
+    ".zip", ".tar", ".gz",
+    NULL
+};
+
+// 允许的MIME类型白名单
+const char *allowed_mime_types[] = {
+    "image/jpeg", "image/png", "image/gif",
+    "application/pdf", "text/plain",
+    "application/zip",
+    NULL
+};
+
+// 验证文件扩展名
+int is_allowed_extension(const char *filename) {
+    if (!filename) return 0;
+    
+    const char *ext = strrchr(filename, '.');
+    if (!ext) return 0;
+    
+    // 转换为小写进行比较
+    char lower_ext[16];
+    strncpy(lower_ext, ext, sizeof(lower_ext) - 1);
+    lower_ext[sizeof(lower_ext) - 1] = '\0';
+    
+    for (int i = 0; lower_ext[i]; i++) {
+        lower_ext[i] = tolower(lower_ext[i]);
+    }
+    
+    // 检查是否在白名单中
+    for (int i = 0; allowed_extensions[i]; i++) {
+        if (strcmp(lower_ext, allowed_extensions[i]) == 0) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+// 验证MIME类型
+int is_allowed_mime_type(const char *mime_type) {
+    if (!mime_type) return 0;
+    
+    for (int i = 0; allowed_mime_types[i]; i++) {
+        if (strcmp(mime_type, allowed_mime_types[i]) == 0) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+```
+
+#### 2. 文件内容验证
+检查文件头（魔数）验证真实文件类型。
+```c
+// 文件头魔数验证
+typedef struct {
+    const char *extension;
+    const unsigned char *magic;
+    size_t magic_len;
+} file_magic_t;
+
+static file_magic_t file_magics[] = {
+    {".jpg",  (unsigned char*)"\xFF\xD8\xFF", 3},
+    {".jpeg", (unsigned char*)"\xFF\xD8\xFF", 3},
+    {".png",  (unsigned char*)"\x89\x50\x4E\x47", 4},
+    {".gif",  (unsigned char*)"GIF8", 4},
+    {".pdf",  (unsigned char*)"%PDF", 4},
+    {".zip",  (unsigned char*)"PK\x03\x04", 4},
+    {NULL, NULL, 0}
+};
+
+int verify_file_magic(const char *filename, const unsigned char *content, size_t content_size) {
+    const char *ext = strrchr(filename, '.');
+    if (!ext || content_size < 4) return 0;
+    
+    // 转换扩展名为小写
+    char lower_ext[16];
+    strncpy(lower_ext, ext, sizeof(lower_ext) - 1);
+    lower_ext[sizeof(lower_ext) - 1] = '\0';
+    for (int i = 0; lower_ext[i]; i++) {
+        lower_ext[i] = tolower(lower_ext[i]);
+    }
+    
+    // 查找对应的魔数
+    for (int i = 0; file_magics[i].extension; i++) {
+        if (strcmp(lower_ext, file_magics[i].extension) == 0) {
+            if (content_size >= file_magics[i].magic_len &&
+                memcmp(content, file_magics[i].magic, file_magics[i].magic_len) == 0) {
+                return 1;
+            }
+            return 0;
+        }
+    }
+    
+    return 0;
+}
+```
+
+#### 3. 安全的文件名处理
+生成安全的文件名并防止路径遍历。
+```c
+#include <time.h>
+#include <sys/stat.h>
+
+// 生成安全的文件名
+char* generate_safe_filename(const char *original_filename) {
+    if (!original_filename) return NULL;
+    
+    // 提取扩展名
+    const char *ext = strrchr(original_filename, '.');
+    char extension[16] = "";
+    if (ext && strlen(ext) < sizeof(extension)) {
+        strcpy(extension, ext);
+    }
+    
+    // 生成基于时间戳的唯一文件名
+    time_t now = time(NULL);
+    static int counter = 0;
+    counter++;
+    
+    char *safe_filename = malloc(64);
+    snprintf(safe_filename, 64, "upload_%ld_%d%s", now, counter, extension);
+    
+    return safe_filename;
+}
+
+// 验证文件路径安全性
+int is_safe_filepath(const char *filepath) {
+    if (!filepath) return 0;
+    
+    // 检查路径遍历攻击
+    if (strstr(filepath, "../") || strstr(filepath, "..\\") ||
+        strstr(filepath, "/..") || strstr(filepath, "\\..")) {
+        return 0;
+    }
+    
+    // 检查绝对路径
+    if (filepath[0] == '/' || (filepath[1] == ':' && filepath[2] == '\\')) {
+        return 0;
+    }
+    
+    // 检查空字节注入
+    for (int i = 0; filepath[i]; i++) {
+        if (filepath[i] == '\0') {
+            return 0;
+        }
+    }
+    
+    return 1;
+}
+
+// 创建安全的上传目录
+int create_upload_directory(const char *base_dir) {
+    struct stat st;
+    
+    if (stat(base_dir, &st) != 0) {
+        // 目录不存在，创建它
+        if (mkdir(base_dir, 0755) != 0) {
+            return 0;
+        }
+    } else if (!S_ISDIR(st.st_mode)) {
+        // 路径存在但不是目录
+        return 0;
+    }
+    
+    return 1;
+}
+```
+
+#### 4. 文件大小和数量限制
+实施文件大小和上传频率限制。
+```c
+#define MAX_FILE_SIZE (10 * 1024 * 1024)  // 10MB
+#define MAX_FILES_PER_SESSION 5
+
+typedef struct {
+    time_t last_upload;
+    int upload_count;
+} upload_session_t;
+
+static upload_session_t session = {0, 0};
+
+int check_upload_limits(size_t file_size) {
+    time_t now = time(NULL);
+    
+    // 检查文件大小
+    if (file_size > MAX_FILE_SIZE) {
+        return 0;
+    }
+    
+    // 重置会话计数器（每小时）
+    if (now - session.last_upload > 3600) {
+        session.upload_count = 0;
+    }
+    
+    // 检查上传频率
+    if (session.upload_count >= MAX_FILES_PER_SESSION) {
+        return 0;
+    }
+    
+    session.upload_count++;
+    session.last_upload = now;
+    return 1;
+}
+```
+
+#### 5. 完整的安全文件上传实现
+```c
+int secure_file_upload(const char *original_filename, 
+                      const char *mime_type,
+                      const unsigned char *content, 
+                      size_t content_size) {
+    
+    // 1. 检查上传限制
+    if (!check_upload_limits(content_size)) {
+        printf("Upload limit exceeded\n");
+        return 0;
+    }
+    
+    // 2. 验证文件扩展名
+    if (!is_allowed_extension(original_filename)) {
+        printf("File type not allowed\n");
+        return 0;
+    }
+    
+    // 3. 验证MIME类型
+    if (!is_allowed_mime_type(mime_type)) {
+        printf("MIME type not allowed\n");
+        return 0;
+    }
+    
+    // 4. 验证文件内容
+    if (!verify_file_magic(original_filename, content, content_size)) {
+        printf("File content validation failed\n");
+        return 0;
+    }
+    
+    // 5. 生成安全文件名
+    char *safe_filename = generate_safe_filename(original_filename);
+    if (!safe_filename) {
+        printf("Failed to generate safe filename\n");
+        return 0;
+    }
+    
+    // 6. 构造安全文件路径
+    const char *upload_dir = "/var/www/uploads";
+    char filepath[512];
+    snprintf(filepath, sizeof(filepath), "%s/%s", upload_dir, safe_filename);
+    
+    if (!is_safe_filepath(filepath)) {
+        printf("Unsafe file path\n");
+        free(safe_filename);
+        return 0;
+    }
+    
+    // 7. 创建上传目录
+    if (!create_upload_directory(upload_dir)) {
+        printf("Failed to create upload directory\n");
+        free(safe_filename);
+        return 0;
+    }
+    
+    // 8. 保存文件
+    FILE *file = fopen(filepath, "wb");
+    if (!file) {
+        printf("Failed to create file\n");
+        free(safe_filename);
+        return 0;
+    }
+    
+    size_t written = fwrite(content, 1, content_size, file);
+    fclose(file);
+    
+    if (written != content_size) {
+        printf("Failed to write complete file\n");
+        unlink(filepath); // 删除不完整的文件
+        free(safe_filename);
+        return 0;
+    }
+    
+    printf("File uploaded successfully: %s\n", safe_filename);
+    free(safe_filename);
+    return 1;
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-434: Unrestricted Upload of File with Dangerous Type](https://cwe.mitre.org/data/definitions/434.html)
+[OWASP File Upload Security](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+REFERENCE
+)
+
+<include('c-user-input')> as $user_input;
+<include('c-file-path')> as $file_ops;
+
+fopen(*<slice(index=0)> as $file_create);
+fwrite(*<slice(index=0)> as $file_write);
+fprintf(*<slice(index=1)> as $file_write);
+
+$file_create?{* #{ until: `* & $user_input`}-> } as $mid
+$file_write?{* #{ until: `* & $user_input`}-> } as $mid
+$file_ops?{* #{ until: `* & $user_input`}-> } as $mid
+
+alert $mid for {
+	level: "mid",
+	type: "vuln",
+	title: "C File Upload Vulnerability Was Detected",
+	title_zh: "检测到C语言文件上传漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   文件上传漏洞是由于应用程序允许用户上传文件时，未对上传的文件进行适当的验证和限制。攻击者可以利用此漏洞上传恶意文件，实现远程代码执行、文件系统访问等攻击。
+
+2. **触发场景**
+   检测到用户输入被直接用于文件创建或写入操作：
+   ```c
+   // 危险示例
+   FILE *file = fopen(user_filename, "wb");
+   fwrite(user_content, 1, content_size, file);
+   fprintf(file, "%s", user_data);
+   ```
+   攻击者可以上传恶意文件或使用路径遍历攻击。
+
+3. **潜在影响**
+   - 远程代码执行，上传并执行恶意脚本或可执行文件
+   - 文件系统访问，通过路径遍历访问或覆盖系统文件
+   - 拒绝服务攻击，上传大文件耗尽磁盘空间
+   - 恶意软件传播，将服务器作为恶意软件分发平台
+DESC
+	message: "检测到C语言代码中存在文件上传漏洞，用户输入被直接用于文件操作",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 文件类型白名单验证
+```c
+const char *allowed_extensions[] = {".jpg", ".png", ".pdf", ".txt", NULL};
+
+int is_allowed_extension(const char *filename) {
+    if (!filename) return 0;
+    
+    const char *ext = strrchr(filename, '.');
+    if (!ext) return 0;
+    
+    for (int i = 0; allowed_extensions[i]; i++) {
+        if (strcasecmp(ext, allowed_extensions[i]) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+```
+
+#### 2. 文件内容验证（魔数检查）
+```c
+int verify_file_magic(const char *filename, const unsigned char *content, size_t size) {
+    const char *ext = strrchr(filename, '.');
+    if (!ext || size < 4) return 0;
+    
+    if (strcasecmp(ext, ".jpg") == 0 || strcasecmp(ext, ".jpeg") == 0) {
+        return (content[0] == 0xFF && content[1] == 0xD8 && content[2] == 0xFF);
+    }
+    if (strcasecmp(ext, ".png") == 0) {
+        return (memcmp(content, "\x89PNG", 4) == 0);
+    }
+    if (strcasecmp(ext, ".pdf") == 0) {
+        return (memcmp(content, "%PDF", 4) == 0);
+    }
+    
+    return 0;
+}
+```
+
+#### 3. 生成安全文件名
+```c
+char* generate_safe_filename(const char *original_filename) {
+    const char *ext = strrchr(original_filename, '.');
+    char extension[16] = "";
+    if (ext && strlen(ext) < sizeof(extension)) {
+        strcpy(extension, ext);
+    }
+    
+    time_t now = time(NULL);
+    static int counter = 0;
+    counter++;
+    
+    char *safe_filename = malloc(64);
+    snprintf(safe_filename, 64, "upload_%ld_%d%s", now, counter, extension);
+    
+    return safe_filename;
+}
+```
+
+#### 4. 文件大小限制
+```c
+#define MAX_FILE_SIZE (10 * 1024 * 1024)  // 10MB
+
+int check_file_size(size_t file_size) {
+    return file_size <= MAX_FILE_SIZE;
+}
+```
+
+#### 5. 安全的文件路径处理
+```c
+int is_safe_filepath(const char *filepath) {
+    if (!filepath) return 0;
+    
+    // 检查路径遍历
+    if (strstr(filepath, "../") || strstr(filepath, "..\\")) {
+        return 0;
+    }
+    
+    // 检查绝对路径
+    if (filepath[0] == '/') {
+        return 0;
+    }
+    
+    return 1;
+}
+```
+SOLUTION
+	risk: "文件上传",
+	name: "mid",
+}
+
+alert $medium for {
+	level: "medium",
+	type: "vuln",
+	title: "C File Operation with User Input Was Detected",
+	title_zh: "检测到C语言文件操作使用用户输入",
+	desc: <<<DESC
+### 漏洞描述
+检测到用户输入被用于文件操作，可能存在路径遍历或文件上传相关的安全风险。
+DESC
+	message: "检测到用户输入被用于文件操作，建议进行输入验证和路径安全检查",
+	solution: <<<SOLUTION
+### 修复建议
+1. 验证文件路径，防止路径遍历攻击
+2. 限制文件操作的目录范围
+3. 对文件名进行安全过滤
+4. 实施适当的访问控制
+SOLUTION
+	risk: "文件操作",
+	name: "medium",
+}
+
+desc(
+	lang: c
+	alert_mid: 1
+	'file://unsafe_upload.c': <<<UNSAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// 不安全的文件上传处理
+void vulnerable_file_upload(const char *filename, const char *content, size_t content_size) {
+    char filepath[512];
+    
+    // 直接使用用户提供的文件名，未进行验证
+    sprintf(filepath, "/var/www/uploads/%s", filename);
+    
+    printf("Uploading file to: %s\n", filepath);
+    
+    FILE *file = fopen(filepath, "wb");
+    if (!file) {
+        printf("Error: Cannot create file\n");
+        return;
+    }
+    
+    // 直接写入用户提供的内容，未进行验证
+    fwrite(content, 1, content_size, file);
+    fclose(file);
+    
+    printf("File uploaded successfully: %s\n", filepath);
+}
+
+// CGI文件上传处理
+void vulnerable_cgi_upload() {
+    char *content_type = getenv("CONTENT_TYPE");
+    char *content_length_str = getenv("CONTENT_LENGTH");
+    
+    if (!content_type || !strstr(content_type, "multipart/form-data")) {
+        return;
+    }
+    
+    int content_length = atoi(content_length_str);
+    if (content_length <= 0 || content_length > 100000000) { // 100MB limit
+        return;
+    }
+    
+    char *buffer = malloc(content_length + 1);
+    if (!buffer) return;
+    
+    fread(buffer, 1, content_length, stdin);
+    buffer[content_length] = '\0';
+    
+    // 简化的multipart解析
+    char *filename_start = strstr(buffer, "filename=\"");
+    if (filename_start) {
+        filename_start += 10;
+        char *filename_end = strchr(filename_start, '"');
+        if (!filename_end) {
+            free(buffer);
+            return;
+        }
+        
+        char filename[256];
+        size_t filename_len = filename_end - filename_start;
+        if (filename_len >= sizeof(filename)) filename_len = sizeof(filename) - 1;
+        strncpy(filename, filename_start, filename_len);
+        filename[filename_len] = '\0';
+        
+        // 查找文件内容
+        char *content_start = strstr(buffer, "\r\n\r\n");
+        if (content_start) {
+            content_start += 4;
+            char *content_end = strstr(content_start, "\r\n--");
+            if (!content_end) content_end = buffer + content_length;
+            
+            // 直接保存文件，未进行任何验证
+            char filepath[512];
+            sprintf(filepath, "/tmp/%s", filename);
+            
+            FILE *file = fopen(filepath, "wb");
+            if (file) {
+                fwrite(content_start, 1, content_end - content_start, file);
+                fclose(file);
+                
+                printf("Content-Type: text/html\r\n\r\n");
+                printf("<html><body>");
+                printf("<h1>File uploaded successfully!</h1>");
+                printf("<p>Filename: %s</p>", filename);
+                printf("<p>Size: %ld bytes</p>", content_end - content_start);
+                printf("</body></html>");
+            }
+        }
+    }
+    
+    free(buffer);
+}
+
+// 基于扩展名的错误验证
+int vulnerable_extension_check(const char *filename) {
+    if (!filename) return 0;
+    
+    const char *ext = strrchr(filename, '.');
+    if (!ext) return 0;
+    
+    // 不完整的黑名单，容易绕过
+    if (strcmp(ext, ".exe") == 0 || strcmp(ext, ".bat") == 0 || strcmp(ext, ".sh") == 0) {
+        return 0; // 禁止
+    }
+    
+    return 1; // 允许其他所有类型
+}
+
+// 不安全的文件写入
+void vulnerable_file_write(const char *user_filename, const char *user_data) {
+    FILE *file = fopen(user_filename, "w");
+    if (file) {
+        // 直接写入用户数据
+        fprintf(file, "%s", user_data);
+        fclose(file);
+        printf("Data written to file: %s\n", user_filename);
+    }
+}
+
+// 处理用户上传的配置文件
+void vulnerable_config_upload(const char *config_data) {
+    // 直接写入配置文件，可能被攻击者利用
+    FILE *config_file = fopen("/etc/myapp/config.conf", "w");
+    if (config_file) {
+        fprintf(config_file, "%s", config_data);
+        fclose(config_file);
+        printf("Configuration updated\n");
+    }
+}
+
+int main(int argc, char **argv) {
+    // 模拟从各种来源获取文件名和内容
+    char *upload_filename = getenv("UPLOAD_FILENAME");
+    char *upload_content = getenv("UPLOAD_CONTENT");
+    char *config_data = getenv("CONFIG_DATA");
+    
+    if (upload_filename && upload_content) {
+        size_t content_size = strlen(upload_content);
+        
+        // 使用有缺陷的扩展名检查
+        if (vulnerable_extension_check(upload_filename)) {
+            vulnerable_file_upload(upload_filename, upload_content, content_size);
+        } else {
+            printf("File type not allowed\n");
+        }
+    }
+    
+    // 处理CGI上传
+    char *request_method = getenv("REQUEST_METHOD");
+    if (request_method && strcmp(request_method, "POST") == 0) {
+        vulnerable_cgi_upload();
+    }
+    
+    // 处理命令行参数
+    if (argc >= 3) {
+        vulnerable_file_write(argv[1], argv[2]);
+    }
+    
+    // 处理配置更新
+    if (config_data) {
+        vulnerable_config_upload(config_data);
+    }
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_upload.c': <<<SAFE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <ctype.h>
+
+#define MAX_FILE_SIZE (10 * 1024 * 1024)  // 10MB
+#define MAX_FILENAME_LENGTH 255
+#define UPLOAD_DIR "/var/www/uploads"
+
+// 允许上传的文件扩展名白名单
+const char *allowed_extensions[] = {
+    ".jpg", ".jpeg", ".png", ".gif", ".bmp",
+    ".pdf", ".txt", ".doc", ".docx",
+    ".zip", ".tar", ".gz",
+    NULL
+};
+
+// 文件魔数验证
+typedef struct {
+    const char *extension;
+    const unsigned char *magic;
+    size_t magic_len;
+} file_magic_t;
+
+static file_magic_t file_magics[] = {
+    {".jpg",  (unsigned char*)"\xFF\xD8\xFF", 3},
+    {".jpeg", (unsigned char*)"\xFF\xD8\xFF", 3},
+    {".png",  (unsigned char*)"\x89\x50\x4E\x47", 4},
+    {".gif",  (unsigned char*)"GIF8", 4},
+    {".pdf",  (unsigned char*)"%PDF", 4},
+    {".zip",  (unsigned char*)"PK\x03\x04", 4},
+    {NULL, NULL, 0}
+};
+
+// 验证文件扩展名
+int is_allowed_extension(const char *filename) {
+    if (!filename) return 0;
+    
+    const char *ext = strrchr(filename, '.');
+    if (!ext) return 0;
+    
+    // 转换为小写进行比较
+    char lower_ext[16];
+    strncpy(lower_ext, ext, sizeof(lower_ext) - 1);
+    lower_ext[sizeof(lower_ext) - 1] = '\0';
+    
+    for (int i = 0; lower_ext[i]; i++) {
+        lower_ext[i] = tolower(lower_ext[i]);
+    }
+    
+    // 检查是否在白名单中
+    for (int i = 0; allowed_extensions[i]; i++) {
+        if (strcmp(lower_ext, allowed_extensions[i]) == 0) {
+            return 1;
+        }
+    }
+    
+    return 0;
+}
+
+// 验证文件内容（魔数检查）
+int verify_file_magic(const char *filename, const unsigned char *content, size_t content_size) {
+    if (!filename || !content || content_size < 4) return 0;
+    
+    const char *ext = strrchr(filename, '.');
+    if (!ext) return 0;
+    
+    // 转换扩展名为小写
+    char lower_ext[16];
+    strncpy(lower_ext, ext, sizeof(lower_ext) - 1);
+    lower_ext[sizeof(lower_ext) - 1] = '\0';
+    for (int i = 0; lower_ext[i]; i++) {
+        lower_ext[i] = tolower(lower_ext[i]);
+    }
+    
+    // 查找对应的魔数
+    for (int i = 0; file_magics[i].extension; i++) {
+        if (strcmp(lower_ext, file_magics[i].extension) == 0) {
+            if (content_size >= file_magics[i].magic_len &&
+                memcmp(content, file_magics[i].magic, file_magics[i].magic_len) == 0) {
+                return 1;
+            }
+            return 0;
+        }
+    }
+    
+    // 对于没有魔数验证的文件类型，允许通过（如.txt）
+    if (strcmp(lower_ext, ".txt") == 0) {
+        return 1;
+    }
+    
+    return 0;
+}
+
+// 生成安全的文件名
+char* generate_safe_filename(const char *original_filename) {
+    if (!original_filename) return NULL;
+    
+    // 提取扩展名
+    const char *ext = strrchr(original_filename, '.');
+    char extension[16] = "";
+    if (ext && strlen(ext) < sizeof(extension)) {
+        strcpy(extension, ext);
+        // 转换为小写
+        for (int i = 0; extension[i]; i++) {
+            extension[i] = tolower(extension[i]);
+        }
+    }
+    
+    // 生成基于时间戳的唯一文件名
+    time_t now = time(NULL);
+    static int counter = 0;
+    counter++;
+    
+    char *safe_filename = malloc(64);
+    if (!safe_filename) return NULL;
+    
+    snprintf(safe_filename, 64, "upload_%ld_%d%s", now, counter, extension);
+    
+    return safe_filename;
+}
+
+// 验证文件路径安全性
+int is_safe_filepath(const char *filepath) {
+    if (!filepath) return 0;
+    
+    // 检查路径遍历攻击
+    if (strstr(filepath, "../") || strstr(filepath, "..\\") ||
+        strstr(filepath, "/..") || strstr(filepath, "\\..")) {
+        return 0;
+    }
+    
+    // 检查绝对路径
+    if (filepath[0] == '/' || (strlen(filepath) > 2 && filepath[1] == ':' && filepath[2] == '\\')) {
+        return 0;
+    }
+    
+    // 检查文件名长度
+    if (strlen(filepath) > MAX_FILENAME_LENGTH) {
+        return 0;
+    }
+    
+    // 检查危险字符
+    const char *dangerous_chars = "<>:\"|?*\r\n\t";
+    for (int i = 0; filepath[i]; i++) {
+        if (strchr(dangerous_chars, filepath[i])) {
+            return 0;
+        }
+    }
+    
+    return 1;
+}
+
+// 创建上传目录
+int create_upload_directory(const char *dir_path) {
+    struct stat st;
+    
+    if (stat(dir_path, &st) != 0) {
+        // 目录不存在，创建它
+        if (mkdir(dir_path, 0755) != 0) {
+            perror("mkdir");
+            return 0;
+        }
+    } else if (!S_ISDIR(st.st_mode)) {
+        // 路径存在但不是目录
+        printf("Error: %s exists but is not a directory\n", dir_path);
+        return 0;
+    }
+    
+    return 1;
+}
+
+// 安全的文件上传函数
+int secure_file_upload(const char *original_filename, 
+                      const unsigned char *content, 
+                      size_t content_size) {
+    
+    // 1. 基本验证
+    if (!original_filename || !content || content_size == 0) {
+        printf("Error: Invalid input parameters\n");
+        return 0;
+    }
+    
+    // 2. 检查文件大小
+    if (content_size > MAX_FILE_SIZE) {
+        printf("Error: File too large (max %d bytes)\n", MAX_FILE_SIZE);
+        return 0;
+    }
+    
+    // 3. 验证文件扩展名
+    if (!is_allowed_extension(original_filename)) {
+        printf("Error: File type not allowed\n");
+        return 0;
+    }
+    
+    // 4. 验证文件内容
+    if (!verify_file_magic(original_filename, content, content_size)) {
+        printf("Error: File content validation failed\n");
+        return 0;
+    }
+    
+    // 5. 生成安全文件名
+    char *safe_filename = generate_safe_filename(original_filename);
+    if (!safe_filename) {
+        printf("Error: Failed to generate safe filename\n");
+        return 0;
+    }
+    
+    // 6. 构造安全文件路径
+    char filepath[512];
+    snprintf(filepath, sizeof(filepath), "%s/%s", UPLOAD_DIR, safe_filename);
+    
+    if (!is_safe_filepath(filepath)) {
+        printf("Error: Unsafe file path\n");
+        free(safe_filename);
+        return 0;
+    }
+    
+    // 7. 创建上传目录
+    if (!create_upload_directory(UPLOAD_DIR)) {
+        printf("Error: Failed to create upload directory\n");
+        free(safe_filename);
+        return 0;
+    }
+    
+    // 8. 保存文件
+    FILE *file = fopen(filepath, "wb");
+    if (!file) {
+        printf("Error: Failed to create file\n");
+        free(safe_filename);
+        return 0;
+    }
+    
+    size_t written = fwrite(content, 1, content_size, file);
+    fclose(file);
+    
+    if (written != content_size) {
+        printf("Error: Failed to write complete file\n");
+        unlink(filepath); // 删除不完整的文件
+        free(safe_filename);
+        return 0;
+    }
+    
+    printf("File uploaded successfully: %s\n", safe_filename);
+    printf("Original filename: %s\n", original_filename);
+    printf("File size: %zu bytes\n", content_size);
+    
+    free(safe_filename);
+    return 1;
+}
+
+// 安全的CGI文件上传处理
+void safe_cgi_upload() {
+    char *content_type = getenv("CONTENT_TYPE");
+    char *content_length_str = getenv("CONTENT_LENGTH");
+    
+    if (!content_type || !strstr(content_type, "multipart/form-data")) {
+        printf("Content-Type: text/html\r\n\r\n");
+        printf("<html><body><h1>Error: Invalid content type</h1></body></html>");
+        return;
+    }
+    
+    if (!content_length_str) {
+        printf("Content-Type: text/html\r\n\r\n");
+        printf("<html><body><h1>Error: No content length</h1></body></html>");
+        return;
+    }
+    
+    int content_length = atoi(content_length_str);
+    if (content_length <= 0 || content_length > MAX_FILE_SIZE) {
+        printf("Content-Type: text/html\r\n\r\n");
+        printf("<html><body><h1>Error: Invalid content length</h1></body></html>");
+        return;
+    }
+    
+    char *buffer = malloc(content_length + 1);
+    if (!buffer) {
+        printf("Content-Type: text/html\r\n\r\n");
+        printf("<html><body><h1>Error: Memory allocation failed</h1></body></html>");
+        return;
+    }
+    
+    size_t bytes_read = fread(buffer, 1, content_length, stdin);
+    buffer[bytes_read] = '\0';
+    
+    // 简化的multipart解析（实际应用中应使用专门的库）
+    char *filename_start = strstr(buffer, "filename=\"");
+    if (filename_start) {
+        filename_start += 10;
+        char *filename_end = strchr(filename_start, '"');
+        if (filename_end) {
+            char filename[256];
+            size_t filename_len = filename_end - filename_start;
+            if (filename_len >= sizeof(filename)) filename_len = sizeof(filename) - 1;
+            strncpy(filename, filename_start, filename_len);
+            filename[filename_len] = '\0';
+            
+            // 查找文件内容
+            char *content_start = strstr(buffer, "\r\n\r\n");
+            if (content_start) {
+                content_start += 4;
+                char *content_end = strstr(content_start, "\r\n--");
+                if (!content_end) content_end = buffer + bytes_read;
+                
+                size_t file_size = content_end - content_start;
+                
+                printf("Content-Type: text/html\r\n\r\n");
+                printf("<html><body>");
+                
+                if (secure_file_upload(filename, (unsigned char*)content_start, file_size)) {
+                    printf("<h1>File uploaded successfully!</h1>");
+                    printf("<p>Original filename: %s</p>", filename);
+                    printf("<p>File size: %zu bytes</p>", file_size);
+                } else {
+                    printf("<h1>File upload failed!</h1>");
+                    printf("<p>Please check the file type and size.</p>");
+                }
+                
+                printf("</body></html>");
+            }
+        }
+    }
+    
+    free(buffer);
+}
+
+int main() {
+    printf("Content-Type: text/html\r\n\r\n");
+    printf("<html><head><title>Secure File Upload</title></head><body>");
+    printf("<h1>Secure File Upload System</h1>");
+    
+    char *request_method = getenv("REQUEST_METHOD");
+    if (request_method && strcmp(request_method, "POST") == 0) {
+        safe_cgi_upload();
+    } else {
+        printf("<form method=\"post\" enctype=\"multipart/form-data\">");
+        printf("<p>Select file to upload:</p>");
+        printf("<input type=\"file\" name=\"upload_file\" required>");
+        printf("<br><br>");
+        printf("<input type=\"submit\" value=\"Upload File\">");
+        printf("</form>");
+        
+        printf("<p><strong>Allowed file types:</strong> ");
+        for (int i = 0; allowed_extensions[i]; i++) {
+            printf("%s ", allowed_extensions[i]);
+        }
+        printf("</p>");
+        printf("<p><strong>Maximum file size:</strong> %d MB</p>", MAX_FILE_SIZE / (1024 * 1024));
+    }
+    
+    printf("</body></html>");
+    
+    return 0;
+}
+SAFE
+)

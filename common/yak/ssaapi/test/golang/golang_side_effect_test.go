@@ -708,7 +708,7 @@ func main() {
 	t.Run("value can find side-effect member", func(t *testing.T) {
 		ssatest.CheckSyntaxFlow(t, code, `
 			sql?{<fullTypeName>?{have: 'database/sql'}} as $entry;
-			$entry.Open()  as $db;
+			$entry.Open()<getMembers> as $db;
 			$db.* as $output;
 			$output(, * as $sink);
 	`, map[string][]string{

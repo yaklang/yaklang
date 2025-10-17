@@ -2,10 +2,11 @@ package yakgrpc
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -16,6 +17,7 @@ import (
 	"github.com/yaklang/yaklang/common/screcorder"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -31,6 +33,23 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 		Pagination: req.GetPagination(),
 		Data: funk.Map(data, func(i *schema.ScreenRecorder) *ypb.ScreenRecorder {
 			before, after := AfterAndBeforeIsExit(int64(i.ID))
+
+			// Format duration from milliseconds to HH:MM:SS format
+			var formattedDuration string
+			if i.Duration != "" {
+				if durationMs, err := strconv.ParseInt(i.Duration, 10, 64); err == nil {
+					seconds := durationMs / 1000
+					hours := seconds / 3600
+					minutes := (seconds % 3600) / 60
+					secs := seconds % 60
+					formattedDuration = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, secs)
+				} else {
+					formattedDuration = "00:00:00" // fallback
+				}
+			} else {
+				formattedDuration = "00:00:00"
+			}
+
 			return &ypb.ScreenRecorder{
 				Id:        int64(i.ID),
 				Filename:  i.Filename,
@@ -40,7 +59,7 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 				UpdatedAt: i.UpdatedAt.Unix(),
 				VideoName: i.VideoName,
 				Cover:     i.Cover,
-				Duration:  i.Duration,
+				Duration:  formattedDuration,
 				Before:    before,
 				After:     after,
 			}
@@ -50,15 +69,25 @@ func (s *Server) QueryScreenRecorders(ctx context.Context, req *ypb.QueryScreenR
 }
 
 func (s *Server) IsScrecorderReady(ctx context.Context, req *ypb.IsScrecorderReadyRequest) (*ypb.IsScrecorderReadyResponse, error) {
-	ok, reason := screcorder.IsAvailable()
-	if reason != nil {
+	rsp, err := s.IsThirdPartyBinaryReady(ctx, &ypb.IsThirdPartyBinaryReadyRequest{
+		Name: "ffmpeg",
+	})
+	if err != nil {
+		return &ypb.IsScrecorderReadyResponse{Ok: false, Reason: err.Error()}, nil
+	}
+	if rsp.GetError() != "" {
 		return &ypb.IsScrecorderReadyResponse{
-			Ok: ok, Reason: fmt.Sprint(reason),
+			Ok:     rsp.GetIsReady(),
+			Reason: rsp.GetError(),
 		}, nil
 	}
-	return &ypb.IsScrecorderReadyResponse{
-		Ok: ok,
-	}, nil
+	if !rsp.GetIsReady() {
+		return &ypb.IsScrecorderReadyResponse{
+			Ok:     false,
+			Reason: "ffmpeg is not installed",
+		}, nil
+	}
+	return &ypb.IsScrecorderReadyResponse{Ok: true}, nil
 }
 
 type DownloadStream interface {
@@ -67,20 +96,10 @@ type DownloadStream interface {
 }
 
 func (s *Server) InstallScrecorder(req *ypb.InstallScrecorderRequest, stream ypb.Yak_InstallScrecorderServer) error {
-	return s.DownloadWithStream(req.GetProxy(), func() (urlStr string, name string, err error) {
-		var targetUrl string
-		var filename string
-		switch runtime.GOOS {
-		case "darwin":
-			targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-darwin-amd64"
-			filename = "ffmpeg"
-		case "windows":
-			targetUrl = "https://yaklang.oss-accelerate.aliyuncs.com/ffmpeg/ffmpeg-v6.0-windows-amd64.exe"
-			filename = "ffmpeg.exe"
-		default:
-			return "", "", utils.Error("unsupported os: " + runtime.GOOS)
-		}
-		return targetUrl, filename, nil
+	return s.InstallThirdPartyBinary(&ypb.InstallThirdPartyBinaryRequest{
+		Name:  "ffmpeg",
+		Proxy: req.GetProxy(),
+		Force: true,
 	}, stream)
 }
 
@@ -112,40 +131,33 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 
 	if req.GetCoefficientPTS() > 0 {
 		opts = append(opts, screcorder.WithCoefficientPTS(req.GetCoefficientPTS()))
+	} else {
+		// Default to 1x speed if not specified
+		opts = append(opts, screcorder.WithCoefficientPTS(1.0))
 	}
 
-	if req.GetDisableMouse() {
-		opts = append(opts, screcorder.WithMouseCapture(req.GetDisableMouse()))
-	}
+	// Fix mouse capture logic: DisableMouse should disable mouse capture
+	opts = append(opts, screcorder.WithMouseCapture(!req.GetDisableMouse()))
 
 	if req.GetResolutionSize() != "" {
 		opts = append(opts, screcorder.WithResolutionSize(req.GetResolutionSize()))
 	}
-	recorder := screcorder.NewRecorder(opts...)
-	go func() {
-		select {
-		case <-stream.Context().Done():
-			recorder.Stop()
-		}
-	}()
-	recorder.OnFileAppended(func(r string) {
-		duration := screcorder.VideoDuration(r)
-		base64Images, err := screcorder.VideoCoverBase64(r)
-		if err != nil {
-			log.Errorf("convert video to base64 failed: %v, use default(empty)", err)
-		}
-		record := &schema.ScreenRecorder{
-			Filename:  r,
-			Project:   proj.ProjectName,
-			Cover:     base64Images,
-			VideoName: filepath.Base(r),
-			Duration:  duration,
-		}
-		err = yakit.CreateOrUpdateScreenRecorder(consts.GetGormProjectDatabase(), record.CalcHash(), record)
-		if err != nil {
-			log.Errorf("save screen recorder failed: %v", err)
-		}
-	})
+
+	cfg := screcorder.NewDefaultConfig()
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	devices := screcorder.GetAvailableScreenDevices()
+	if len(devices) == 0 {
+		return utils.Errorf("no screen device found")
+	}
+	dev := devices[0]
+
+	recorder, err := screcorder.NewScreenRecorder(cfg, dev)
+	if err != nil {
+		return err
+	}
 
 	projectPath := filepath.Join(consts.GetDefaultYakitProjectsDir(), "records")
 	if utils.GetFirstExistedFile(projectPath) == "" {
@@ -153,22 +165,57 @@ func (s *Server) StartScrecorder(req *ypb.StartScrecorderRequest, stream ypb.Yak
 	}
 
 	var recordName = filepath.Join(projectPath, fmt.Sprintf("screen_records_%v.mp4", utils.DatetimePretty2()))
-	err = recorder.Start(recordName)
+	err = recorder.Start(context.Background())
 	if err != nil {
 		return utils.Errorf("start to execute screen recorder failed: %s", err)
 	}
 
-	select {
-	case <-stream.Context().Done():
-		recorder.Stop()
-	}
+	// Wait for context cancellation and stop recording
+	<-stream.Context().Done()
+	recorder.Stop()
 
 	for {
-		if !recorder.IsRunning() {
+		if !recorder.IsRecording() {
 			break
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
+
+	// move file
+	tmpFilename := recorder.Filename()
+	defer os.Remove(tmpFilename)
+
+	err = utils.CopyFile(tmpFilename, recordName)
+	if err != nil {
+		return err
+	}
+
+	duration, err := ffmpegutils.GetVideoDuration(recordName)
+	if err != nil {
+		log.Warnf("get video duration failed: %v", err)
+		// Set duration to 0 if failed to parse
+		duration = 0
+	}
+	frameData, err := ffmpegutils.ExtractSpecificFrame(recordName, 1)
+	if err != nil {
+		log.Errorf("convert video to base64 failed: %v, use default(empty)", err)
+	}
+	var base64Images string
+	if frameData != nil {
+		base64Images = base64.StdEncoding.EncodeToString(frameData)
+	}
+	record := &schema.ScreenRecorder{
+		Filename:  recordName,
+		Project:   proj.ProjectName,
+		Cover:     base64Images,
+		VideoName: filepath.Base(recordName),
+		Duration:  fmt.Sprintf("%d", duration.Milliseconds()),
+	}
+	err = yakit.CreateOrUpdateScreenRecorder(consts.GetGormProjectDatabase(), record.CalcHash(), record)
+	if err != nil {
+		log.Errorf("save screen recorder failed: %v", err)
+	}
+
 	return nil
 }
 
@@ -242,6 +289,23 @@ func (s *Server) GetOneScreenRecorders(ctx context.Context, req *ypb.GetOneScree
 	}
 	var before, after bool
 	before, after = AfterAndBeforeIsExit(int64(data.ID))
+
+	// Format duration from milliseconds to HH:MM:SS format
+	var formattedDuration string
+	if data.Duration != "" {
+		if durationMs, err := strconv.ParseInt(data.Duration, 10, 64); err == nil {
+			seconds := durationMs / 1000
+			hours := seconds / 3600
+			minutes := (seconds % 3600) / 60
+			secs := seconds % 60
+			formattedDuration = fmt.Sprintf("%02d:%02d:%02d", hours, minutes, secs)
+		} else {
+			formattedDuration = "00:00:00" // fallback
+		}
+	} else {
+		formattedDuration = "00:00:00"
+	}
+
 	return &ypb.ScreenRecorder{
 		Id:        int64(data.ID),
 		Filename:  data.Filename,
@@ -251,6 +315,7 @@ func (s *Server) GetOneScreenRecorders(ctx context.Context, req *ypb.GetOneScree
 		UpdatedAt: data.UpdatedAt.Unix(),
 		VideoName: data.VideoName,
 		Cover:     data.Cover,
+		Duration:  formattedDuration,
 		Before:    before,
 		After:     after,
 	}, nil

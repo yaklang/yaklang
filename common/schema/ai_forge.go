@@ -1,13 +1,17 @@
 package schema
 
 import (
-	"github.com/jinzhu/gorm"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
+
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 type AIForge struct {
 	gorm.Model
+
+	ForgeVerboseName   string
 	ForgeName          string `gorm:"unique_index"`
 	ForgeContent       string
 	ForgeType          string // "yak" or "json"
@@ -24,6 +28,8 @@ type AIForge struct {
 	PersistentPrompt string
 	PlanPrompt       string
 	ResultPrompt     string
+
+	IsTemporary bool // for temporary use, will be cleaned up later
 }
 
 func (a *AIForge) GetName() string {
@@ -56,21 +62,22 @@ func (a *AIForge) AfterDelete(tx *gorm.DB) (err error) {
 	return nil
 }
 
-//todo  schema2grpc model
-
+// todo  schema2grpc model
 func (a *AIForge) ToGRPC() *ypb.AIForge {
 	return &ypb.AIForge{
+		Id:                 int64(a.ID),
 		ForgeName:          a.ForgeName,
+		ForgeVerboseName:   a.ForgeVerboseName,
 		ForgeContent:       a.ForgeContent,
 		ForgeType:          a.ForgeType,
 		ParamsUIConfig:     a.ParamsUIConfig,
 		Params:             a.Params,
 		UserPersistentData: a.UserPersistentData,
 		Description:        a.Description,
-		ToolNames:          strings.Split(a.Tools, ","),
-		ToolKeywords:       strings.Split(a.ToolKeywords, ","),
+		ToolNames:          utils.StringSplitAndStrip(a.Tools, ","),
+		ToolKeywords:       utils.StringSplitAndStrip(a.ToolKeywords, ","),
 		Action:             a.Actions,
-		Tag:                strings.Split(a.Tags, ","),
+		Tag:                utils.StringSplitAndStrip(a.Tags, ","),
 		InitPrompt:         a.InitPrompt,
 		PersistentPrompt:   a.PersistentPrompt,
 		PlanPrompt:         a.PlanPrompt,
@@ -79,7 +86,7 @@ func (a *AIForge) ToGRPC() *ypb.AIForge {
 }
 
 func GRPC2AIForge(forge *ypb.AIForge) *AIForge {
-	return &AIForge{
+	forgeIns := &AIForge{
 		ForgeName:          forge.GetForgeName(),
 		ForgeContent:       forge.GetForgeContent(),
 		ForgeType:          forge.GetForgeType(),
@@ -96,4 +103,6 @@ func GRPC2AIForge(forge *ypb.AIForge) *AIForge {
 		PlanPrompt:         forge.GetPlanPrompt(),
 		ResultPrompt:       forge.GetResultPrompt(),
 	}
+	forgeIns.ID = uint(forge.Id)
+	return forgeIns
 }

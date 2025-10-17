@@ -203,13 +203,14 @@ func GetConnectedToHostPortFromHTTPRequest(t *http.Request) (string, error) {
 		if err != nil {
 			return "", err
 		}
-
-		var result string
-		if https {
-			result = strings.TrimSuffix(hostport, ":443")
-		} else {
-			result = strings.TrimSuffix(hostport, ":80")
-		}
+		result := hostport
+		//var result string
+		//if https {
+		//	result = strings.TrimSuffix(hostport, ":443")
+		//} else {
+		//	result = strings.TrimSuffix(hostport, ":80")
+		//}
+		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_ConnectToHTTPS, https)
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedTo, result)
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost, ExtractHost(result))
 		httpctx.SetContextValueInfoFromRequest(t, httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort, port)
@@ -222,31 +223,40 @@ func generateConnectedToFromHTTPRequest(t *http.Request) (bool, string, int, err
 	if t == nil {
 		return false, "", 0, Error("nil http request")
 	}
-
-	var port int
-	isHttps := (t.TLS != nil) || t.URL.Scheme == "https" || t.URL.Scheme == "wss"
-	if isHttps {
-		port = 443
-	} else {
-		port = 80
-	}
-
 	host := t.Host
 	if host == "" {
 		host = t.URL.Host
 	}
+	var port int
+	var hostname string
+
 	if ret := strings.LastIndex(host, ":"); ret > 0 {
-		var hostname string
 		hostname, port = host[:ret], codec.Atoi(host[ret+1:])
-		if port > 0 {
-			return isHttps, HostPort(hostname, port), port, nil
-		}
-		return false, "", 0, Errorf("invalid host: %v, cannot parse to host:port", host)
+	} else {
+		hostname = host
 	}
-	if ret := HostPort(host, port); strings.HasPrefix(ret, ":") {
+
+	var https = port == 443
+	if t.URL.Scheme != "" {
+		if t.URL.Scheme == "https" || t.URL.Scheme == "wss" {
+			https = true
+		} else {
+			https = false
+		}
+	}
+
+	if port <= 0 {
+		if https {
+			port = 443
+		} else {
+			port = 80
+		}
+	}
+
+	if ret := HostPort(hostname, port); strings.HasPrefix(ret, ":") {
 		return false, "", 0, Errorf("invalid host:port(%v) from %v", ret, host)
 	} else {
-		return isHttps, ret, port, nil
+		return https, ret, port, nil
 	}
 }
 
@@ -289,6 +299,7 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	rawPacket.WriteString(CRLF)
 
 	// handle proto
+	perfix, firstLine, _ := CutBytesPrefixFunc(firstLine, NotSpaceRune)
 	method, uri, proto, ok := ParseHTTPRequestLine(string(firstLine))
 	if ok {
 		req.Method = method
@@ -325,14 +336,11 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 	useContentLength := false
 	contentLengthInt := 0
 	useTransferEncodingChunked := false
-	for {
-		lineBytes, err := BufioReadLine(reader)
-		if err != nil && err != io.EOF {
-			return nil, Errorf(`Read Request Header Failed: %s`, err)
-		}
-		if len(bytes.TrimSpace(lineBytes)) == 0 {
+
+	_ = ScanHTTPHeader(reader, func(lineBytes []byte) {
+		if len(lineBytes) == 0 {
 			rawPacket.WriteString(CRLF)
-			break
+			return
 		}
 		rawPacket.Write(lineBytes)
 		rawPacket.WriteString(CRLF)
@@ -373,14 +381,14 @@ func readHTTPRequestFromBufioReader(reader *bufio.Reader, fixContentLength bool,
 
 		// add header
 		if keyStr == "" {
-			continue
+			return
 		}
 		if isSingletonHeader {
 			header[keyStr] = append(header[keyStr], valStr)
-			continue
+			return
 		}
 		header[keyStr] = append(header[keyStr], valStr)
-	}
+	}, perfix, false)
 
 	// uri is very complex
 	// utf8 valid or not

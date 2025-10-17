@@ -2,9 +2,12 @@ package chunkmaker
 
 import (
 	"bytes"
-	"github.com/yaklang/yaklang/common/utils"
+	"fmt"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/yaklang/yaklang/common/mimetype"
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/chanx"
 )
@@ -12,38 +15,99 @@ import (
 type Chunk interface {
 	IsUTF8() bool
 	Data() []byte
+	Dump() string
+	DumpWithOverlap(i int) string
 	BytesSize() int64
 	RunesSize() int64
 	HaveLastChunk() bool
 	LastChunk() Chunk
 	PrevNBytes(n int) []byte
+	PrevNBytesUntil(sep []byte, n int) ([]byte, bool)
+	MIMEType() *mimetype.MIME
+	IsTheLastChunk() bool // 是否是最后一个 chunk
+	SetIsTheLastChunk(bool)
+	VerboseMessage() string
+	SetPreviousChunk(Chunk)
 }
 
 type BufferChunk struct {
 	mu *sync.RWMutex
 
-	isUTF8   bool
-	buffer   *bytes.Buffer
-	bytesize int64
-	runesize int64
-	prev     Chunk // 指向前一个 Chunk
+	isUTF8         bool
+	buffer         *bytes.Buffer
+	bytesize       int64
+	runesize       int64
+	prev           Chunk // 指向前一个 Chunk
+	mimeType       *mimetype.MIME
+	isTheLastChunk bool
+	verboseMessage string // 附加消息
+}
+
+func (c *BufferChunk) Dump() string {
+	return c.DumpWithOverlap(0)
+}
+
+func (c *BufferChunk) DumpWithOverlap(i int) string {
+	data := c.Data()
+	if c.HaveLastChunk() == false || i <= 0 {
+		return string(data)
+	}
+
+	overlapBytes := c.PrevNBytes(i)
+	b := bytes.Buffer{}
+	nonce := utils.RandStringBytes(4)
+	if len(overlapBytes) > 0 {
+		b.WriteString(fmt.Sprintf("<|OVERLAP[%v]|>\n", nonce))
+		b.WriteString(utils.EscapeInvalidUTF8Byte(overlapBytes))
+		b.WriteString(fmt.Sprintf("\n<|OVERLAP_END[%v]|>\n", nonce))
+	}
+	b.Write(data)
+	return b.String()
+}
+
+func (c *BufferChunk) SetPreviousChunk(prev Chunk) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.prev = prev
+}
+
+func (c *BufferChunk) VerboseMessage() string {
+	return c.verboseMessage
+}
+
+func (c *BufferChunk) IsTheLastChunk() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.isTheLastChunk
+}
+
+func (c *BufferChunk) SetIsTheLastChunk(isLast bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.isTheLastChunk = isLast
 }
 
 var _ Chunk = (*BufferChunk)(nil)
 
 func NewBufferChunk(buffer []byte) *BufferChunk {
+	return NewBufferChunkEx(buffer, mimetype.Detect(buffer), "")
+}
+
+func NewBufferChunkEx(buffer []byte, mimeType *mimetype.MIME, verbose string) *BufferChunk {
 	bc := &BufferChunk{
 		mu:       new(sync.RWMutex),
 		isUTF8:   utf8.Valid(buffer),
 		buffer:   bytes.NewBuffer(buffer),
 		bytesize: int64(len(buffer)),
 		prev:     nil, // 新创建的 chunk 默认没有前一个 chunk
+		mimeType: mimeType,
 	}
 	if bc.isUTF8 {
 		bc.runesize = int64(len([]rune(string(buffer))))
 	} else {
 		bc.runesize = bc.bytesize
 	}
+	bc.verboseMessage = verbose
 	return bc
 }
 
@@ -120,19 +184,25 @@ func (c *BufferChunk) FlushFullChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chun
 	}
 }
 
-func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string) {
+func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunkSize int64, sep string, haveTheLastChunk bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	var chunks []Chunk
+	emitChunk := func(chunk Chunk) {
+		chunks = append(chunks, chunk)
+	}
+
 	if c.isUTF8 {
 		// use runes size
-		remainingData := RuneHandler([]rune(c.buffer.String()), chunkSize, []rune(sep), func(runes []rune) {
+		totalRunes := []rune(c.buffer.String())
+		remainingData := RuneHandler(totalRunes, chunkSize, []rune(sep), func(runes []rune) {
 			chunk := NewBufferChunk([]byte(string(runes)))
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		})
 		if len(remainingData) > 0 {
 			chunk := NewBufferChunk([]byte(string(remainingData)))
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		}
 		// 完全重置buffer
 		c.buffer.Reset()
@@ -143,11 +213,11 @@ func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunk
 		// use bytes size
 		remainingData := BytesHandler(c.buffer.Bytes(), chunkSize, []byte(sep), func(dataBytes []byte) {
 			chunk := NewBufferChunk(dataBytes)
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		})
 		if len(remainingData) > 0 {
 			chunk := NewBufferChunk(remainingData)
-			dst.SafeFeed(chunk)
+			emitChunk(chunk)
 		}
 
 		// 完全重置buffer
@@ -156,7 +226,14 @@ func (c *BufferChunk) FlushAllChunkSizeTo(dst *chanx.UnlimitedChan[Chunk], chunk
 		c.bytesize = 0
 		c.runesize = 0
 	}
+	for idx, chunkInstance := range chunks {
+		if idx == len(chunks)-1 && haveTheLastChunk {
+			chunkInstance.SetIsTheLastChunk(true)
+		}
+		dst.SafeFeed(chunkInstance)
+	}
 }
+
 func (c *BufferChunk) Write(i []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -266,4 +343,19 @@ func (c *BufferChunk) PrevNBytes(n int) []byte {
 	}
 
 	return finalBuffer.Bytes()
+}
+
+func (c *BufferChunk) PrevNBytesUntil(sep []byte, n int) ([]byte, bool) {
+	buffer := c.PrevNBytes(n)
+	if len(sep) == 0 {
+		return buffer, true
+	}
+	if index := bytes.LastIndex(buffer, sep); index != -1 {
+		return buffer[index:], true
+	}
+	// 遍历完所有 chunk
+	return nil, false
+}
+func (c *BufferChunk) MIMEType() *mimetype.MIME {
+	return c.mimeType
 }

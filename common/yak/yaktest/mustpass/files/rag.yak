@@ -1,0 +1,141 @@
+// EnableMockMode
+rag.EnableMockMode()
+
+// =================================================================
+// 1. SETUP: Create the collection and add all mock documents
+// =================================================================
+// We create one collection to serve as our "Company Knowledge Base" for all subsequent tests.
+println("--- Setting up the Knowledge Base ---")
+collectionName = "KnowledgeBase-" + randstr(10)
+collection = rag.GetCollection(collectionName, rag.ragDescription("A test knowledge base for company info"))~
+
+// Add a diverse set of documents to the collection
+collection.Add(
+    "doc-product-ai", 
+    "Our flagship product, 'Visionary AI Suite', offers advanced image recognition and natural language processing. The official API endpoint is api.company.com/v1/visionary.",
+)~
+collection.Add(
+    "doc-product-nlp", 
+    "We provide a range of natural language processing tools, including sentiment analysis and text summarization, designed for enterprise customers.",
+)~
+collection.Add(
+    "doc-tech-infra", 
+    "The company's core cloud infrastructure is built on Microsoft Azure, ensuring high scalability and security for all our customer-facing products.",
+)~
+collection.Add(
+    "doc-policy-pto", 
+    "All full-time employees are entitled to 20 days of paid time off (PTO) annually. Please submit leave requests through the 'HR-Connect' portal at least one week in advance.",
+)~
+collection.Add(
+    "doc-policy-remote", 
+    "Our flexible remote work policy allows employees to work from home up to three days per week, subject to manager approval and team requirements.",
+)~
+collection.Add(
+    "doc-news-q3", 
+    "In our successful third quarter, we celebrated the launch of the 'Visionary AI Suite', which drove a 15% increase in quarterly revenue.",
+)~
+
+println("")
+
+
+// =================================================================
+// 2. TEST: Top-N Retrieval for Exact Match
+// A user asks about a specific product. We verify the correct document
+// is retrieved within the top 3 results returned.
+// =================================================================
+println("--- Test 1: Top-N Retrieval for Exact Match ---")
+queryForProduct = "What is the Visionary AI Suite?"
+// Query for the Top 3 results with a reasonable confidence threshold.
+resultsProduct = collection.Query(queryForProduct, 3, 0.7)~
+
+// First, assert that we received at least one result.
+assert len(resultsProduct) > 0, "Expected at least one result for the product query"
+
+// Now, search within the results for our target document.
+foundTargetDoc = false
+var targetResult // This will store the result object once we find it.
+
+for _, r := range resultsProduct {
+    println(f`[${r.Document.ID}]`, r.Document.Content, r.Score)
+    if r.Document.ID == "doc-product-ai" {
+        foundTargetDoc = true
+        targetResult = r
+        break // Exit the loop once we've found our document.
+    }
+}
+
+
+// Assert that the target document was found in the list. This is the key check.
+assert foundTargetDoc, "The required document 'doc-product-ai' was not found in the top 3 results."
+
+// Now that we have the specific document, we can run detailed assertions on it.
+assert "image recognition" in targetResult.Document.Content, "Found document's content should match product description"
+assert targetResult.Score > 0.7, "The score for the correct document should still be very high"
+
+println("PASS: Correctly retrieved 'doc-product-ai' within the top 3 results.")
+println("Found Document -> ID:", targetResult.Document.ID, "| Score:", targetResult.Score)
+println("")
+println("--- Full Top-3 Context ---")
+// Optional: Print all returned results for context and debugging.
+for i, res := range resultsProduct {
+    println("Rank", i+1, "->", res.Document.ID, "| Score:", res.Score)
+}
+println("")
+
+
+
+// =================================================================
+// 3. TEST: Semantic Search & Ranking (top_k=2)
+// A user asks a broader question that matches two documents with different relevance.
+// =================================================================
+println("--- Test 2: Semantic Search & Ranking ---")
+queryForRanking = "Everything about the Visionary AI Suite"
+resultsRanking = collection.Query(queryForRanking, 2, 0.5)~
+
+// Assertions for Ranking
+assert len(resultsRanking) == 2, "Expected two relevant documents"
+// The primary product document should be ranked higher than the news article.
+for i in resultsRanking {
+    println("In Semantic Search TopK2 Ranking: ", i.Document.ID, "|", i.Document.Content, i.Score)
+}
+// -- FIXED ASSERTIONS --
+// The primary product document must be ranked first.
+assert resultsRanking[0].Document.ID == "doc-product-ai", "The primary product doc should be ranked first"
+// The document describing a core feature (NLP) is the second most relevant.
+assert resultsRanking[1].Document.ID == "doc-product-nlp", "The NLP feature document should be ranked second"
+// The score of the main doc must be higher than the feature doc.
+assert resultsRanking[0].Score > resultsRanking[1].Score, "The score of the main doc must be higher than the feature doc"
+println("PASS: Correctly ranked the primary document above the related feature document.")
+println("Rank 1:", resultsRanking[0].Document.ID, "| Score:", resultsRanking[0].Score)
+println("Rank 2:", resultsRanking[1].Document.ID, "| Score:", resultsRanking[1].Score)
+println("")
+
+// =================================================================
+// 4. TEST: Disambiguation between similar documents
+// A user asks about "time off", which should be distinguished from "remote work".
+// =================================================================
+println("--- Test 3: Disambiguation ---")
+queryForPolicy = "How long can I take paid leave?"
+resultsPolicy = collection.Query(queryForPolicy, 1, 0.6)~
+
+// Assertions for Disambiguation
+assert len(resultsPolicy) == 1, "Expected a single, unambiguous policy document"
+assert resultsPolicy[0].Document.ID == "doc-policy-pto", "Expected the PTO policy, not the remote work policy"
+assert "20 days of paid time off" in resultsPolicy[0].Document.Content, "Content should mention PTO"
+assert "remote work" not in resultsPolicy[0].Document.Content, "Content should NOT be about the remote policy"
+println("PASS: Correctly disambiguated between two similar HR policies.")
+println(resultsPolicy[0].Document.Content, resultsPolicy[0].Score)
+println("")
+
+// =================================================================
+// 5. TEST: Handling of an irrelevant query
+// A user asks something completely unrelated to the knowledge base.
+// =================================================================
+println("--- Test 4: Irrelevant Query ---")
+queryIrrelevant = "What's the best recipe for baking a cake? 讲讲量子力学？"
+resultsIrrelevant = collection.Query(queryIrrelevant, 1, 0.9)~ // Use a high score threshold
+
+// Assertion for Irrelevance
+assert len(resultsIrrelevant) == 0, "Expected no results for a completely out-of-domain query"
+println("PASS: Correctly returned no results for an irrelevant query.")
+println("")

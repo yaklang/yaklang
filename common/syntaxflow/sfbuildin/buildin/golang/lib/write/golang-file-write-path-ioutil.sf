@@ -1,0 +1,280 @@
+desc(
+	title: "Audit Golang File Write Path using ioutil"
+	type: audit
+	level: info
+	lib: 'golang-file-write-path-ioutil'
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   路径穿越漏洞（Path Traversal）是由于应用程序未对用户输入的文件路径进行严格的验证，攻击者可以通过构造特殊路径（如使用`../`向上导航），访问或修改服务器上的任意文件。这种情况在文件写入操作中尤为危险，因为攻击者可以利用该漏洞覆盖关键系统文件。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```go
+   package main
+   import (
+       "io/ioutil"
+       "log"
+       "net/http"
+   )
+
+   func handler(w http.ResponseWriter, r *http.Request) {
+       fileName := r.URL.Query().Get("file") // 攻击者控制的文件名
+       data := []byte("malicious content")
+       err := ioutil.WriteFile(fileName, data, 0644)
+       if err != nil {
+           log.Fatalf("Error writing to file: %s", err)
+       }
+   }
+
+   func main() {
+       http.HandleFunc("/write", handler)
+       log.Fatal(http.ListenAndServe(":8080", nil))
+   }
+   ```
+   如果攻击者提供类似`../../etc/passwd`作为文件名参数，可能导致服务器关键配置文件被篡改。
+
+3. **潜在影响**
+   - 系统关键文件（如配置文件、日志文件等）被非法修改或删除。
+   - 敏感数据泄露，例如存储在服务器上的用户凭证或隐私信息。
+   - 攻击者可能通过替换系统文件进一步提升权限，完全控制服务器。
+
+DESC
+	rule_id: "e329969f-7a20-489b-ba66-7033bb57d446"
+	reference: <<<REFERENCE
+[ioutil package - io/ioutil - Go Packages (go.dev)](https://pkg.go.dev/io/ioutil)
+[CWE-22: Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')](https://cwe.mitre.org/data/definitions/22.html)
+REFERENCE
+	title_zh: "审计Golang文件写入(ioutil)"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 验证用户提供的路径参数
+   对用户输入的路径参数进行全面验证，确保其符合预期格式和范围。拒绝包含向上导航组件（如`../`）的路径。
+   ```go
+   import (
+       "path/filepath"
+       "strings"
+   )
+
+   func isValidPath(baseDir, userInput string) bool {
+       cleanedPath := filepath.Clean(userInput) // 清理路径
+       if strings.Contains(cleanedPath, "..") || !strings.HasPrefix(cleanedPath, baseDir) {
+           return false
+       }
+       return true
+   }
+   ```
+
+#### 2. 限制写入操作的目录范围
+   确保文件写入仅限于与应用程序相关的特定目录内，避免攻击者访问其他敏感目录。
+   ```go
+   const AllowedBaseDir = "/var/app/uploads" // 定义允许的基目录
+
+   func writeToFile(fileName string, data []byte) error {
+       fullPath := filepath.Join(AllowedBaseDir, fileName) // 确保路径安全
+       return ioutil.WriteFile(fullPath, data, 0644)
+   }
+   ```
+
+#### 3. 使用更安全的文件处理方法
+   Go语言提供了更安全的文件处理方式，例如使用`os`包代替`ioutil`包。相比`ioutil.WriteFile`，`os.Create`或`os.OpenFile`更加可控。
+   ```go
+   package main
+   import (
+       "fmt"
+       "os"
+   )
+
+   func main() {
+       fileName := "safe_file.txt"
+       data := []byte("This content is written using os package.")
+       file, err := os.Create(fileName)
+       if err != nil {
+           fmt.Printf("Error creating file: %s\n", err)
+           return
+       }
+       defer file.Close()
+       _, err = file.Write(data)
+       if err != nil {
+           fmt.Printf("Error writing to file: %s\n", err)
+           return
+       }
+       fmt.Println("Data written to file successfully using os.Create and file.Write.")
+   }
+   ```
+
+SOLUTION
+)
+
+ioutil?{<fullTypeName>?{have: 'io/ioutil'}} as $entry
+$entry.WriteAll(*<slice(index=0)> #-> as $output)
+$entry.WriteFile(*<slice(index=0)> #-> as $output)
+
+alert $output for {
+	title_zh: "审计Golang文件写入(ioutil)",
+	level: "info",
+	title: "Audit Golang File Write Path using ioutil",
+	solution: <<<SOLUTION
+### 安全建议
+为了避免路径穿越漏洞，应确保文件写入操作时使用的路径是安全的。这可以通过以下方式实现：
+
+#### 1. 验证路径参数
+对传入的路径参数进行验证，确保它们不包含向上导航的组件（如`..`）。
+
+```go
+import "path/filepath"
+
+func isValidPath(baseDir, userPath string) bool {
+    fullPath := filepath.Join(baseDir, userPath)
+    return strings.HasPrefix(fullPath, baseDir)
+}
+```
+
+#### 2. 限制写入目录
+限制写入操作只能在与应用程序相关的目录内进行。
+
+```go
+const allowedBaseDir = "/var/app/uploads/"
+
+func writeFileSafely(filename string, data []byte) error {
+    fullPath := filepath.Join(allowedBaseDir, filename)
+    if !strings.HasPrefix(fullPath, allowedBaseDir) {
+        return fmt.Errorf("invalid path")
+    }
+    return ioutil.WriteFile(fullPath, data, 0644)
+}
+```
+
+#### 3. 使用更安全的方法
+使用Go语言的`path/filepath`包清洁和解析路径，避免直接拼接用户输入。
+
+```go
+import "path/filepath"
+
+func cleanAndWrite(baseDir, userPath string, data []byte) error {
+    safePath := filepath.Clean(filepath.Join(baseDir, userPath))
+    if !strings.HasPrefix(safePath, baseDir) {
+        return fmt.Errorf("invalid path")
+    }
+    return ioutil.WriteFile(safePath, data, 0644)
+}
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计Golang代码中使用ioutil包进行文件写入的操作。文件写入操作可能因不正确的路径限制而导致路径穿越漏洞，使得攻击者可以访问或修改服务器上的任意文件。规则通过检测`ioutil.WriteFile`和`ioutil.WriteAll`函数的调用，来识别潜在的不安全文件写入路径。
+
+### 2.规则详细
+- **触发场景**
+  规则匹配到`ioutil.WriteFile`或`ioutil.WriteAll`函数的调用，并分析传入的路径参数是否可能存在路径穿越风险。
+
+```go
+// 示例：存在潜在路径穿越风险的代码
+fileName := req.FormValue("filename") // 用户控制的文件名
+err := ioutil.WriteFile(fileName, data, 0644)
+if err != nil {
+    log.Fatalf("Error writing to file: %s", err)
+}
+```
+- **潜在影响**
+  - 攻击者可以通过构造特殊路径（如`../../etc/passwd`）覆盖系统关键文件。
+  - 敏感配置文件被篡改可能导致服务中断或数据泄露。
+DESC
+	name: "output",
+	message: "发现Golang代码中使用ioutil包进行文件写入操作，需进一步审查路径是否存在安全隐患。",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://filewrite.go': <<<PARAM
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+)
+
+func main() {
+	// 要写入的文件名
+	fileName := "example.txt"
+
+	// 写入数据到文件
+	data := []byte("Hello, Go Programming!\nThis is a simple file I/O example.")
+	err := ioutil.WriteFile(fileName, data, 0644) // 0644 是文件权限
+	if err != nil {
+		log.Fatalf("Error writing to file: %s", err)
+		return
+	}
+	fmt.Println("Data written to file successfully.")
+
+	// 读取文件内容
+	content, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		log.Fatalf("Error reading from file: %s", err)
+		return
+	}
+
+	// 打印文件内容
+	fmt.Println("File content:")
+	fmt.Println(string(content))
+}
+
+PARAM
+	"safefile://SafeFilePathHandling.go": <<<CODE
+// NoIoutilWriteCall.go
+package main
+
+import (
+	"fmt"
+	"os"
+	// "io/ioutil" // 不导入 ioutil 包，或者只用于 ReadFile 等安全操作
+)
+
+func main() {
+	// 此示例不使用 ioutil.WriteFile 或 ioutil.WriteAll
+	// 而是使用 os.Create 或 os.OpenFile 来进行文件写入，
+	// 从而避免触发针对 ioutil 写入函数的规则。
+
+	fileName := "custom_file.txt"
+	data := []byte("This content is written using os package.")
+
+	file, err := os.Create(fileName) // 使用 os.Create 创建文件
+	if err != nil {
+		fmt.Printf("Error creating file: %s\n", err)
+		return
+	}
+	defer file.Close() // 确保文件关闭
+
+	_, err = file.Write(data) // 使用文件对象的 Write 方法写入数据
+	if err != nil {
+		fmt.Printf("Error writing to file: %s\n", err)
+		return
+	}
+	fmt.Println("Data written to file successfully using os.Create and file.Write.")
+
+	// 另一个例子：使用 os.OpenFile 实现追加写入
+	appendFileName := "append_log.txt"
+	appendData := []byte("\nAppended log entry.")
+	appendFile, err := os.OpenFile(appendFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Error opening file for append: %s\n", err)
+		return
+	}
+	defer appendFile.Close()
+
+	_, err = appendFile.Write(appendData)
+	if err != nil {
+		fmt.Printf("Error appending to file: %s\n", err)
+		return
+	}
+	fmt.Println("Data appended to file successfully using os.OpenFile.")
+}
+
+CODE
+)

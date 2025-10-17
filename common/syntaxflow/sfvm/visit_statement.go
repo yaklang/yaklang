@@ -22,6 +22,17 @@ func mustUnquoteSyntaxFlowString(text string) string {
 	return text
 }
 
+func formatCWE(value string) string {
+	if strings.HasPrefix(value, "CWE-") {
+		return value
+		// y.rule.CWE = append(y.rule.CWE, value)
+	} else if strings.HasPrefix(value, "cwe-") {
+		return "CWE-" + strings.TrimPrefix(value, "cwe-")
+	} else {
+		return "CWE-" + (value)
+	}
+}
+
 func (y *SyntaxFlowVisitor) VisitCheckStatement(raw sf.ICheckStatementContext) interface{} {
 	if y == nil || raw == nil {
 		return nil
@@ -66,7 +77,7 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 	}
 
 	extraDesc := NewExtraDesc()
-	haveDesc := false
+	haveFileSystem := false
 	for _, item := range i.DescriptionItems().(*sf.DescriptionItemsContext).AllDescriptionItem() {
 		ret, ok := item.(*sf.DescriptionItemContext)
 		if !ok || ret.Comment() != nil { // skip comment
@@ -102,9 +113,14 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 		case SFDescKeyType_Level:
 			y.rule.Severity = schema.ValidSeverityType(value)
 		case SFDescKeyType_Lang:
-			y.rule.Language = value
+			if y.rule.Language == "" {
+				y.rule.Language = value
+			}
+			extraDesc.language = value
 		case SFDescKeyType_CVE:
 			y.rule.CVE = value
+		case SFDescKeyType_CWE:
+			y.rule.CWE = append(y.rule.CWE, formatCWE(value))
 		case SFDescKeyType_Risk:
 			y.rule.RiskType = value
 		case SFDescKeyType_Solution:
@@ -112,8 +128,9 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 		case SFDescKeyType_Rule_Id:
 			y.rule.RuleId = value
 		default:
-			haveDesc = true
 			if strings.Contains(key, "://") {
+				haveFileSystem = true
+				// add to file
 				urlIns, _ := url.Parse(key)
 				if urlIns != nil {
 					switch ret := urlIns.Scheme; ret {
@@ -121,25 +138,23 @@ func (y *SyntaxFlowVisitor) VisitDescriptionStatement(raw sf.IDescriptionStateme
 						if strings.HasPrefix(key, ret+"://") {
 							filename := strings.TrimPrefix(key, ret+"://")
 							extraDesc.verifyFilesystem[filename] = value
-							continue
 						}
-					case "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
+					case "safe", "safe-file", "safefile", "safe-fs", "safefs", "safe-filesystem", "safefilesystem", "negative-file", "negativefs", "nfs":
 						if strings.HasPrefix(key, ret+"://") {
 							filename := strings.TrimPrefix(key, ret+"://")
 							extraDesc.negativeFilesystem[filename] = value
-							continue
 						}
 					}
 				}
+			} else {
+				extraDesc.rawDesc[key] = value
 			}
-			extraDesc.rawDesc[key] = value
 		}
-		if haveDesc {
-			y.verifyFsInfo = append(y.verifyFsInfo, extraDesc)
-		}
-		y.EmitAddDescription(key, value)
+		// y.EmitAddDescription(key, value)
 	}
-
+	if haveFileSystem {
+		y.verifyFsInfo = append(y.verifyFsInfo, extraDesc)
+	}
 	return nil
 }
 
@@ -177,23 +192,27 @@ func (y *SyntaxFlowVisitor) VisitAlertStatement(raw sf.IAlertStatementContext) {
 					}
 				}
 				if value != "" {
-					switch keyLower := strings.ToLower(key); keyLower {
-					case "title":
+					switch keyType := ValidDescItemKeyType(strings.ToLower(key)); keyType {
+					case SFDescKeyType_Title:
 						extra.Title = value
-					case "title_zh":
+					case SFDescKeyType_Title_ZH:
 						extra.TitleZh = value
-					case "description", "desc", "note":
+					case SFDescKeyType_Desc:
 						extra.Description = value
-					case "type", "purpose":
+					case SFDescKeyType_Type:
 						extra.Purpose = schema.ValidPurpose(value)
-					case "level", "severity", "sev":
+					case SFDescKeyType_Level:
 						extra.Severity = schema.ValidSeverityType(value)
-					case "message", "msg":
+					case SFDescKeyType_Message:
 						extra.Msg = value
-					case "cve":
+					case SFDescKeyType_CWE:
+						extra.CWE = append(extra.CWE, formatCWE(value))
+					case SFDescKeyType_CVE:
 						extra.CVE = value
-					case "risk_type", "risk":
+					case SFDescKeyType_Risk:
 						extra.RiskType = value
+					case SFDescKeyType_Solution:
+						extra.Solution = value
 					default:
 						extra.ExtraInfo[key] = value
 					}

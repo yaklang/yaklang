@@ -7,11 +7,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
-	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
 	"net"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
 
 	log "github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minimartian"
@@ -92,56 +94,100 @@ func MITM_MutualTLSClient(crt, key []byte, cas ...[]byte) MITMConfig {
 	}
 }
 
-func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
+// parseGMCertificate 解析国密证书，返回证书和私钥，如果解析失败返回nil
+func parseGMCertificate(gmCA, gmKey []byte) (*gmx509.Certificate, interface{}) {
+	if gmCA == nil || gmKey == nil {
+		return nil, nil
+	}
+
+	// 尝试直接解析PEM格式
+	gmC, err := gmtls.X509KeyPair(gmCA, gmKey)
+	if err == nil {
+		return extractGMCertAndKey(gmC)
+	}
+
+	// 尝试解析DER格式
+	return parseGMCertificateFromDER(gmCA, gmKey)
+}
+
+// extractGMCertAndKey 从gmtls.Certificate中提取证书和私钥
+func extractGMCertAndKey(gmC gmtls.Certificate) (*gmx509.Certificate, interface{}) {
+	gmCert, err := gmx509.ParseCertificate(gmC.Certificate[0])
+	if err != nil {
+		log.Warnf("parse gmx509 cert failed: %s", err)
+		return nil, nil
+	}
+	return gmCert, gmC.PrivateKey
+}
+
+// parseGMCertificateFromDER 从DER格式解析国密证书
+func parseGMCertificateFromDER(gmCA, gmKey []byte) (*gmx509.Certificate, interface{}) {
+	caDer, err := gmx509.ParseCertificate(gmCA)
+	if err != nil {
+		log.Warnf("parse GM ca as [der] format failed: %s", err)
+		return nil, nil
+	}
+
+	keyDer, err := gmx509.ParsePKCS8PrivateKey(gmKey, nil)
+	if err != nil {
+		log.Warnf("parse GM key as [der] format pkcs8 pkey failed: %s", err)
+		return nil, nil
+	}
+
+	keyRawBytes, err := gmx509.MarshalSm2PrivateKey(keyDer, nil)
+	if err != nil {
+		log.Warnf("marshal GM key as [der] format pkey failed: %s", err)
+		return nil, nil
+	}
+
+	gmCAPem := pem.EncodeToMemory(&pem.Block{Type: `CERTIFICATE`, Bytes: caDer.Raw})
+	gmKeyPem := pem.EncodeToMemory(&pem.Block{Type: `PRIVATE KEY`, Bytes: keyRawBytes})
+
+	gmC, err := gmtls.X509KeyPair(gmCAPem, gmKeyPem)
+	if err != nil {
+		log.Warnf("parse GM ca and privKey (DER) failed: %s", err)
+		return nil, nil
+	}
+
+	return extractGMCertAndKey(gmC)
+}
+
+func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) MITMConfig {
 	return func(server *MITMServer) error {
-		if ca == nil || key == nil {
-			return MITM_SetCaCertAndPrivKey(defaultCA, defaultKey)(server)
+		if (ca == nil || key == nil) && (defaultCA != nil && defaultKey != nil) {
+			return MITM_SetCaCertAndPrivKey(defaultCA, defaultKey, gmCA, gmKey)(server)
 		}
 
+		if (gmCA == nil || gmKey == nil) && (defaultGMCA != nil && defaultGMKey != nil) {
+			return MITM_SetCaCertAndPrivKey(ca, key, defaultGMCA, defaultGMKey)(server)
+		}
+
+		// 解析普通证书
 		c, err := tls.X509KeyPair(ca, key)
 		if err != nil {
-			// if not pem blocks
-			// try to parse as der
-			caDer, err := x509.ParseCertificate(ca)
+			c, err = parseRegularCertificateFromDER(ca, key)
 			if err != nil {
-				return utils.Errorf("parse ca[pem/der] failed: %s", err)
-			}
-			ca = pem.EncodeToMemory(&pem.Block{Type: `CERTIFICATE`, Bytes: caDer.Raw})
-			keyDer, err := x509.ParsePKCS8PrivateKey(key)
-			if err != nil {
-				log.Warnf("parse key[pem/der] pkcs8 pkey failed: %s", err)
-				keyDer, err = x509.ParsePKCS1PrivateKey(key)
-				if err != nil {
-					return utils.Errorf("parse key[pem/der] pkcs1/pkcs8 pkey failed: %s", err)
-				}
-				// pkcs1
-				key = pem.EncodeToMemory(&pem.Block{Type: `RSA PRIVATE KEY`, Bytes: x509.MarshalPKCS1PrivateKey(keyDer.(*rsa.PrivateKey))})
-			} else {
-				// pkcs8
-				keyRawBytes, err := x509.MarshalPKCS8PrivateKey(keyDer)
-				if err != nil {
-					return utils.Errorf("marshal key[pem/der] pkcs8 pkey failed: %s", err)
-				}
-				key = pem.EncodeToMemory(&pem.Block{Type: `PRIVATE KEY`, Bytes: keyRawBytes})
-			}
-			c, err = tls.X509KeyPair(ca, key)
-			if err != nil {
-				return utils.Errorf("parse ca and privKey (DER) failed: %s", err)
+				return err
 			}
 		}
 
+		// 解析国密证书（允许为nil或解析失败） 这里其实有点问题 这里国密库对证书解析做了兼容性处理 只要公私钥类型一致就没问题 但是应该验证是否为国密证书
+		gmCert, gmPrivateKey := parseGMCertificate(gmCA, gmKey)
+
+		// 提取普通证书
 		cert, err := x509.ParseCertificate(c.Certificate[0])
 		if err != nil {
 			return utils.Errorf("extract x509 cert failed: %s", err)
 		}
 
-		// compatible obsolete tls version
-		var opts []mitm.ConfigOption
-		gmCert, err := gmx509.ParseCertificate(c.Certificate[0])
+		gmx509FormCert, err := gmx509.ParseCertificate(c.Certificate[0])
 		if err != nil {
-			log.Errorf("parse gmx509 cert failed: %s", err)
-		} else {
-			opts = append(opts, mitm.WithObsoleteTLS(gmCert, c.PrivateKey))
+			return utils.Errorf("extract x509 cert failed: %s", err)
+		}
+
+		// 配置mitm选项
+		opts := []mitm.ConfigOption{
+			mitm.WithObsoleteTLS(gmx509FormCert, gmCert, c.PrivateKey, gmPrivateKey),
 		}
 
 		mc, err := mitm.NewConfig(cert, c.PrivateKey, opts...)
@@ -153,22 +199,8 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 		mc.SetOrganization("MITMServer")
 		mc.SetValidity(time.Hour * 24 * 90)
 
-		// add default config for H2 support
-		defaultH2Config := new(h2.Config)
-		if log.GetLevel() == log.DebugLevel {
-			defaultH2Config.EnableDebugLogs = true // for DEBUG and DEV only
-		}
-
-		certPool, err := x509.SystemCertPool()
-		if err != nil {
-			log.Fatal("Failed to retrieve system certificates pool")
-		}
-		certPool.AddCert(cert) // even though user may not add yak certificate yet, we add it manually
-
-		defaultH2Config.RootCAs = certPool
-		defaultH2Config.AllowedHostsFilter = func(_ string) bool { return true }
-
-		mc.SetH2Config(defaultH2Config)
+		// 配置H2支持
+		setupH2Config(mc, cert)
 
 		server.caCert = ca
 		server.caKey = key
@@ -176,6 +208,65 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte) MITMConfig {
 
 		return nil
 	}
+}
+
+// parseRegularCertificateFromDER 从DER格式解析普通证书
+func parseRegularCertificateFromDER(ca, key []byte) (tls.Certificate, error) {
+	caDer, err := x509.ParseCertificate(ca)
+	if err != nil {
+		return tls.Certificate{}, utils.Errorf("parse ca as [der] format failed: %s", err)
+	}
+
+	caPem := pem.EncodeToMemory(&pem.Block{Type: `CERTIFICATE`, Bytes: caDer.Raw})
+	keyPem, err := parseRegularPrivateKeyFromDER(key)
+	if err != nil {
+		return tls.Certificate{}, err
+	}
+
+	return tls.X509KeyPair(caPem, keyPem)
+}
+
+// parseRegularPrivateKeyFromDER 从DER格式解析普通私钥
+func parseRegularPrivateKeyFromDER(key []byte) ([]byte, error) {
+	keyDer, err := x509.ParsePKCS8PrivateKey(key)
+	if err != nil {
+		// 尝试PKCS1格式
+		keyDer, err = x509.ParsePKCS1PrivateKey(key)
+		if err != nil {
+			return nil, utils.Errorf("parse key as [der] format pkcs1/pkcs8 pkey failed: %s", err)
+		}
+		// PKCS1格式
+		return pem.EncodeToMemory(&pem.Block{
+			Type:  `RSA PRIVATE KEY`,
+			Bytes: x509.MarshalPKCS1PrivateKey(keyDer.(*rsa.PrivateKey)),
+		}), nil
+	}
+
+	// PKCS8格式
+	keyRawBytes, err := x509.MarshalPKCS8PrivateKey(keyDer)
+	if err != nil {
+		return nil, utils.Errorf("marshal key as [der] format pkcs8 pkey failed: %s", err)
+	}
+	return pem.EncodeToMemory(&pem.Block{Type: `PRIVATE KEY`, Bytes: keyRawBytes}), nil
+}
+
+// setupH2Config 配置H2支持
+func setupH2Config(mc *mitm.Config, cert *x509.Certificate) {
+	defaultH2Config := new(h2.Config)
+	if log.GetLevel() == log.DebugLevel {
+		defaultH2Config.EnableDebugLogs = true
+	}
+
+	certPool, err := x509.SystemCertPool()
+	if err != nil {
+		log.Fatal("Failed to retrieve system certificates pool")
+	}
+	certPool.AddCert(cert)
+
+	defaultH2Config.RootCAs = certPool
+	defaultH2Config.AllowedHostsFilter = func(_ string) bool { return true }
+
+	mc.SetH2Config(defaultH2Config)
 }
 
 func MITM_SetVia(s string) MITMConfig {

@@ -1,44 +1,38 @@
 desc(
 	title: "Detect Java Reflection Call Security Vulnerability via getClass() and getMethod()"
-	title_zh: "检测 Java 反射调用的潜在威胁"
+	title_zh: "检测 Java 反射调用安全漏洞（getClass() 和 getMethod()）"
 	type: audit
 	severity: mid
 	risk: rce
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java反射机制，特别是通过`getClass()`和`getMethod()`方法，允许程序在运行时探索和调用任意类的方法。如果方法名或参数等信息来源于不受信任的用户输入，攻击者可能通过构造恶意输入，控制调用的方法或参数，从而执行未经授权的操作。
-   这种漏洞通常发生在程序根据用户提供的字符串动态加载类或调用方法时，缺乏充分的输入验证和权限控制。
-
+Java反射机制，特别是通过`getClass()`和`getMethod()`方法，允许程序在运行时探索和调用任意类的方法。如果方法名或参数等信息来源于不受信任的用户输入，攻击者可能通过构造恶意输入，控制调用的方法或参数，从而执行未经授权的操作。
+这种漏洞通常发生在程序根据用户提供的字符串动态加载类或调用方法时，缺乏充分的输入验证和权限控制。
 2. **触发场景**
-   当应用程序根据用户输入（例如，通过请求参数获取的方法名）使用反射调用方法时，可能触发此漏洞。
-   // 存在漏洞的代码示例
-   ```java
-   String methodName = request.getParameter("methodName");
-   try {
-       Class<?> clazz = Class.forName("com.example.SomeService");
-       Method method = clazz.getMethod(methodName); // methodName来自用户输入
-       method.invoke(clazz.newInstance());
-   } catch (Exception e) {
-       // 异常处理
-   }
-   ```
-   在上面的示例中，如果攻击者将`methodName`设置为`"getRuntime"`或`"exec"`等危险方法，并控制后续的参数，则可能导致远程代码执行。
-
+当应用程序根据用户输入（例如，通过请求参数获取的方法名）使用反射调用方法时，可能触发此漏洞。
+```java
+String methodName = request.getParameter("methodName");
+try {
+Class<?> clazz = Class.forName("com.example.SomeService");
+Method method = clazz.getMethod(methodName); // methodName来自用户输入
+method.invoke(clazz.newInstance());
+} catch (Exception e) {
+// 异常处理
+}
+```
+在上面的示例中，如果攻击者将`methodName`设置为`"getRuntime"`或`"exec"`等危险方法，并控制后续的参数，则可能导致远程代码执行。
 3. **潜在影响**
-    - 攻击者可以调用任意可访问的方法，绕过应用程序的业务逻辑和安全限制。
-    - 可能通过调用系统命令执行相关的方法（如`java.lang.Runtime.exec()`），导致远程代码执行（RCE）。
-    - 泄露敏感信息（如果反射调用了读取系统配置或私有数据的方法）。
-    - 拒绝服务（如果攻击者通过反射调用导致资源耗尽或崩溃）。
+- 攻击者可以调用任意可访问的方法，绕过应用程序的业务逻辑和安全限制。
+- 可能通过调用系统命令执行相关的方法（如`java.lang.Runtime.exec()`），导致远程代码执行（RCE）。
+- 泄露敏感信息（如果反射调用了读取系统配置或私有数据的方法）。
+- 拒绝服务（如果攻击者通过反射调用导致资源耗尽或崩溃）。
 DESC
 	rule_id: "2672e2d2-77c4-44a4-8685-816fdf55f72d"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用用户输入作为反射调用的方法名或参数
 尽量避免根据用户提供的字符串来动态确定反射调用哪个方法或传递哪些参数。如果必须这样做，应采用白名单机制，只允许调用预定义的安全方法，并对参数进行严格的验证和过滤。
-
 #### 2. 严格验证和过滤用户输入
 对用于反射调用的所有用户输入进行严格验证，确保其符合预期的格式、类型和范围。使用正则表达式、类型转换、枚举值校验等方法。
 ```java
@@ -46,25 +40,22 @@ DESC
 String methodName = request.getParameter("methodName");
 // 白名单定义允许调用的方法
 Set<String> allowedMethods = new HashSet<>(Arrays.asList("safeMethod1", "safeMethod2"));
-
 if (methodName != null && allowedMethods.contains(methodName)) {
-    try {
-        Class<?> clazz = Class.forName("com.example.SomeService");
-        Method method = clazz.getMethod(methodName);
-        method.invoke(clazz.newInstance());
-    } catch (Exception e) {
-        // 安全地处理反射异常
-        System.err.println("反射调用失败: " + e.getMessage());
-    }
+try {
+Class<?> clazz = Class.forName("com.example.SomeService");
+Method method = clazz.getMethod(methodName);
+method.invoke(clazz.newInstance());
+} catch (Exception e) {
+// 安全地处理反射异常
+System.err.println("反射调用失败: " + e.getMessage());
+}
 } else {
-    // 拒绝非法的方法名
-    throw new IllegalArgumentException("不允许的方法名");
+// 拒绝非法的方法名
+throw new IllegalArgumentException("不允许的方法名");
 }
 ```
-
 #### 3. 使用安全沙箱或权限控制
 如果应用程序运行环境支持，可以考虑使用Java安全管理器（SecurityManager）或类似的沙箱机制，限制反射操作的权限，例如不允许调用执行系统命令的方法。
-
 #### 4. 最小化反射的使用
 评估是否确实需要使用反射。许多情况下，可以通过接口、抽象类或工厂模式等更安全的设计模式替代反射，从而降低风险。
 SOLUTION
@@ -80,16 +71,14 @@ $entry #{
 }->;
 alert $params for {
 	level: "mid",
-	message: "Java Reflection Call Security Vulnerability via getClass() and getMethod()",
+	message: "检测到 Java 反射调用安全漏洞（getClass() 和 getMethod()），并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 	type: "audit",
 	title: "Detect Java Reflection Call Security Vulnerability via getClass() and getMethod()",
 	title_zh: "检测 Java 反射调用安全漏洞（getClass() 和 getMethod()）",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免使用用户输入作为反射调用的方法名或参数
 尽量避免根据用户提供的字符串来动态确定反射调用哪个方法或传递哪些参数。如果必须这样做，应采用白名单机制，只允许调用预定义的安全方法，并对参数进行严格的验证和过滤。
-
 #### 2. 严格验证和过滤用户输入
 对用于反射调用的所有用户输入进行严格验证，确保其符合预期的格式、类型和范围。使用正则表达式、类型转换、枚举值校验等方法。
 ```java
@@ -97,56 +86,52 @@ alert $params for {
 String methodName = request.getParameter("methodName");
 // 白名单定义允许调用的方法
 Set<String> allowedMethods = new HashSet<>(Arrays.asList("safeMethod1", "safeMethod2"));
-
 if (methodName != null && allowedMethods.contains(methodName)) {
-    try {
-        Class<?> clazz = Class.forName("com.example.SomeService");
-        Method method = clazz.getMethod(methodName);
-        method.invoke(clazz.newInstance());
-    } catch (Exception e) {
-        // 安全地处理反射异常
-        System.err.println("反射调用失败: " + e.getMessage());
-    }
+try {
+Class<?> clazz = Class.forName("com.example.SomeService");
+Method method = clazz.getMethod(methodName);
+method.invoke(clazz.newInstance());
+} catch (Exception e) {
+// 安全地处理反射异常
+System.err.println("反射调用失败: " + e.getMessage());
+}
 } else {
-    // 拒绝非法的方法名
-    throw new IllegalArgumentException("不允许的方法名");
+// 拒绝非法的方法名
+throw new IllegalArgumentException("不允许的方法名");
 }
 ```
-
 #### 3. 使用安全沙箱或权限控制
 如果应用程序运行环境支持，可以考虑使用Java安全管理器（SecurityManager）或类似的沙箱机制，限制反射操作的权限，例如不允许调用执行系统命令的方法。
-
 #### 4. 最小化反射的使用
 评估是否确实需要使用反射。许多情况下，可以通过接口、抽象类或工厂模式等更安全的设计模式替代反射，从而降低风险。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Java反射机制，特别是通过`getClass()`和`getMethod()`方法，允许程序在运行时探索和调用任意类的方法。如果方法名或参数等信息来源于不受信任的用户输入，攻击者可能通过构造恶意输入，控制调用的方法或参数，从而执行未经授权的操作。
-   这种漏洞通常发生在程序根据用户提供的字符串动态加载类或调用方法时，缺乏充分的输入验证和权限控制。
-
+Java反射机制，特别是通过`getClass()`和`getMethod()`方法，允许程序在运行时探索和调用任意类的方法。如果方法名或参数等信息来源于不受信任的用户输入，攻击者可能通过构造恶意输入，控制调用的方法或参数，从而执行未经授权的操作。
+这种漏洞通常发生在程序根据用户提供的字符串动态加载类或调用方法时，缺乏充分的输入验证和权限控制。
 2. **触发场景**
-   当应用程序根据用户输入（例如，通过请求参数获取的方法名）使用反射调用方法时，可能触发此漏洞。
-   // 存在漏洞的代码示例
-   ```java
-   String methodName = request.getParameter("methodName");
-   try {
-       Class<?> clazz = Class.forName("com.example.SomeService");
-       Method method = clazz.getMethod(methodName); // methodName来自用户输入
-       method.invoke(clazz.newInstance());
-   } catch (Exception e) {
-       // 异常处理
-   }
-   ```
-   在上面的示例中，如果攻击者将`methodName`设置为`"getRuntime"`或`"exec"`等危险方法，并控制后续的参数，则可能导致远程代码执行。
-
+当应用程序根据用户输入（例如，通过请求参数获取的方法名）使用反射调用方法时，可能触发此漏洞。
+// 存在漏洞的代码示例
+```java
+String methodName = request.getParameter("methodName");
+try {
+Class<?> clazz = Class.forName("com.example.SomeService");
+Method method = clazz.getMethod(methodName); // methodName来自用户输入
+method.invoke(clazz.newInstance());
+} catch (Exception e) {
+// 异常处理
+}
+```
+在上面的示例中，如果攻击者将`methodName`设置为`"getRuntime"`或`"exec"`等危险方法，并控制后续的参数，则可能导致远程代码执行。
 3. **潜在影响**
-    - 攻击者可以调用任意可访问的方法，绕过应用程序的业务逻辑和安全限制。
-    - 可能通过调用系统命令执行相关的方法（如`java.lang.Runtime.exec()`），导致远程代码执行（RCE）。
-    - 泄露敏感信息（如果反射调用了读取系统配置或私有数据的方法）。
-    - 拒绝服务（如果攻击者通过反射调用导致资源耗尽或崩溃）。
-CODE
+- 攻击者可以调用任意可访问的方法，绕过应用程序的业务逻辑和安全限制。
+- 可能通过调用系统命令执行相关的方法（如`java.lang.Runtime.exec()`），导致远程代码执行（RCE）。
+- 泄露敏感信息（如果反射调用了读取系统配置或私有数据的方法）。
+- 拒绝服务（如果攻击者通过反射调用导致资源耗尽或崩溃）。
+DESC
+	risk: "远程代码执行",
+	name: "params",
 }
 
 
@@ -200,4 +185,69 @@ public class ChickenJob implements Job, Serializable {
     }
 }
 EOF
+	"safefile://SafeReflectionMethodCall.java": <<<CODE
+// 修复代码示例：使用白名单和严格验证，确保方法名只来自硬编码的白名单。\n// 这是针对规则描述中提供的修复建议的实现。\npackage com.example.secureapp;\n\nimport javax.servlet.http.HttpServletRequest;\nimport java.lang.reflect.Method;\nimport java.util.Arrays;\nimport java.util.Set;\nimport java.util.HashSet;\n\npublic class SafeReflectionMethodCall {\n\n    // 模拟的 SomeService 类\n    public static class SomeService {\n        public void safeMethod1() {\n            System.out.println(\"Executing safeMethod1.\");\n        }\n\n        public void safeMethod2(String param) {\n            System.out.println(\"Executing safeMethod2 with param: \" + param);\n        }\n\n        public void unsafeMethod() {\n            // 这是一个不应该被反射调用的方法\n            System.out.println(\"Executing unsafeMethod - this should not be called via reflection if not whitelisted.\");\n        }\n    }\n\n    public void processRequest(HttpServletRequest request) {\n        // 从用户输入中获取方法名，但进行严格白名单校验\n        String methodName = request.getParameter(\"methodName\");\n\n        // 白名单定义允许调用的方法\n        // 只允许调用已知且安全的方法\n        Set<String> allowedMethods = new HashSet<>(Arrays.asList(\"safeMethod1\", \"safeMethod2\"));\n\n        long startTime = System.nanoTime(); // 记录开始时间用于性能测试\n\n        if (methodName != null && allowedMethods.contains(methodName)) {\n            String param = request.getParameter(\"param\"); // 假设safeMethod2有参数\n            try {\n                Class<?> clazz = SomeService.class; // 直接指定类，不从用户输入获取类名\n                Method method = null;\n\n                if (\"safeMethod2\".equals(methodName)) {\n                    // 对于有参数的方法，需要指定参数类型\n                    method = clazz.getMethod(methodName, String.class);\n                    method.invoke(clazz.newInstance(), param); // 传递安全参数\n                } else {\n                    method = clazz.getMethod(methodName);\n                    method.invoke(clazz.newInstance());\n                }\n\n                System.out.println(\"Reflection call successful: \" + methodName);\n            } catch (NoSuchMethodException e) {\n                // Method not found, possibly due to incorrect signature or not in whitelist\n                System.err.println(\"NoSuchMethodException: \" + methodName + \" - \" + e.getMessage());\n                throw new IllegalArgumentException(\"不允许或未找到的方法: \" + methodName);\n            } catch (IllegalAccessException e) {\n                // Security manager might prevent access, or method is not public\n                System.err.println(\"IllegalAccessException: \" + e.getMessage());\n                throw new SecurityException(\"反射访问被拒绝\");\n            } catch (java.lang.reflect.InvocationTargetException e) {\n                // Original method threw an exception\n                System.err.println(\"InvocationTargetException (Method threw an exception): \" + e.getTargetException().getMessage());\n                throw new RuntimeException(\"方法执行出错\", e.getTargetException());\n            } catch (Exception e) {\n                // 捕获其他所有异常，进行安全处理\n                System.err.println(\"Generic Reflection Exception: \" + e.getMessage());\n                throw new RuntimeException(\"反射调用失败\", e);\n            }\n        } else {\n            // 拒绝非法的方法名，抛出异常或返回错误信息\n            System.err.println(\"Attempt to call disallowed method: \" + methodName);\n            throw new IllegalArgumentException(\"不允许的方法名: \" + (methodName == null ? \"null\" : methodName));\n        }\n        long endTime = System.nanoTime();\n        System.out.println(\"Reflection call executed in \" + (endTime - startTime) + \" ns\");\n    }\n\n    // 另外一个安全示例：不使用反射或反射源于静态配置\n    public void staticMethodCall() {\n        SomeService service = new SomeService();\n        service.safeMethod1(); // 直接调用已知安全方法\n    }\n\n    // 示例：反射但方法名固定，不来自用户输入\n    public void fixedReflectionCall() {\n        try {\n            Class<?> clazz = SomeService.class;\n            Method method = clazz.getMethod(\"safeMethod1\"); // 方法名硬编码\n            method.invoke(clazz.newInstance());\n            System.out.println(\"Fixed reflection call successful.\");\n        } catch (Exception e) {\n            System.err.println(\"Error in fixed reflection call: \" + e.getMessage());\n        }\n    }\n\n    // 示例：使用接口或工厂模式替代反射，提高安全性\n    interface Action {\n        void execute();\n    }\n\n    static class SafeAction1 implements Action {\n        @Override\n        public void execute() {\n            System.out.println(\"Executing SafeAction1 via interface.\");\n        }\n    }\n\n    static class SafeAction2 implements Action {\n        @Override\n        public void execute() {\n            System.out.println(\"Executing SafeAction2 via interface.\");\n        }\n    }\n\n    public Action getAction(String actionName) {\n        // 使用工厂模式，根据输入返回预定义的接口实现\n        if (\"action1\".equals(actionName)) {\n            return new SafeAction1();\n        } else if (\"action2\".equals(actionName)) {\n            return new SafeAction2();\n        } else {\n            throw new IllegalArgumentException(\"Invalid action name\");\n        }\n    }\n\n    // 模拟主函数以测试\n    public static void main(String[] args) {\n        SafeReflectionMethodCall tester = new SafeReflectionMethodCall();\n\n        // 模拟一个请求带参数\n        HttpServletRequest mockRequest = new MockHttpServletRequest(\"safeMethod1\", null);\n        try {\n            tester.processRequest(mockRequest);\n        } catch (Exception e) {\n            System.out.println(\"Caught expected exception for safeMethod1 (mock): \" + e.getMessage());\n        }\n\n        // 模拟一个带参数的方法调用\n        mockRequest = new MockHttpServletRequest(\"safeMethod2\", \"testParam\");\n        try {\n            tester.processRequest(mockRequest);\n        } catch (Exception e) {\n            System.out.println(\"Caught expected exception for safeMethod2 (mock): \" + e.getMessage());\n        }\n\n        // 模拟一个非法的方法调用\n        mockRequest = new MockHttpServletRequest(\"deleteFile\", null);\n        try {\n            tester.processRequest(mockRequest);\n        } catch (IllegalArgumentException e) {\n            System.out.println(\"Caught expected exception for disallowed method: \" + e.getMessage());\n        }\n\n        // 模拟不存在的方法调用\n        mockRequest = new MockHttpServletRequest(\"nonExistentMethod\", null);\n        try {\n            tester.processRequest(mockRequest);\n        } catch (IllegalArgumentException e) {\n            System.out.println(\"Caught expected exception for nonExistentMethod: \" + e.getMessage());\n        }\n\n        // 测试静态方法调用和固定反射调用\n        tester.staticMethodCall();\n        tester.fixedReflectionCall();\n\n        // 测试工厂模式\n        try {\n            tester.getAction(\"action1\").execute();\n            tester.getAction(\"action2\").execute();\n            tester.getAction(\"invalidAction\").execute();\n        } catch (IllegalArgumentException e) {\n            System.out.println(\"Caught expected exception for invalid action: \" + e.getMessage());\n        }\n    }\n\n    // 简单的HttpServletRequest模拟类\n    static class MockHttpServletRequest implements HttpServletRequest {\n        private final String methodName;\n        private final String param;\n\n        public MockHttpServletRequest(String methodName, String param) {\n            this.methodName = methodName;\n            this.param = param;\n        }\n\n        @Override\n        public String getParameter(String name) {\n            if (\"methodName\".equals(name)) {\n                return methodName;\n            } else if (\"param\".equals(name)) {\n                return param;\n            }\n            return null;\n        }\n\n        // 其他方法省略，此处仅为示例提供getParameter\n\n        @Override\n        public String getAuthType() { return null; }\n\n        @Override\n        public String getContextPath() { return null; }\n\n        @Override\n        public String getRemoteUser() { return null; }\n\n        @Override\n        public java.security.Principal getUserPrincipal() { return null; }\n\n        @Override\n        public boolean isUserInRole(String role) { return false; }\n\n        @Override\n        public java.util.Enumeration<String> getAuthTypeHeaders() { return null; }\n\n        @Override\n        public long getDateHeader(String name) { return 0; }\n\n        @Override\n        public String getHeader(String name) { return null; }\n\n        @Override\n        public java.util.Enumeration<String> getHeaders(String name) { return null; }\n\n        @Override\n        public java.util.Enumeration<String> getHeaderNames() { return null; }\n\n        @Override\n        public int getIntHeader(String name) { return 0; }\n\n        @Override\n        public String getMethod() { return null; }\n\n        @Override\n        public String getPathInfo() { return null; }\n\n        @Override\n        public String getPathTranslated() { return null; }\n\n        @Override\n        public String getQueryString() { return null; }\n\n        @Override\n        public String getRemoteAddr() { return null; }\n\n        @Override\n        public String getRemoteHost() { return null; }\n\n        @Override\n        public String getRequestURI() { return null; }\n\n        @Override\n        public StringBuffer getRequestURL() { return null; }\n\n        @Override\n        public String getServletPath() { return null; }\n\n        @Override\n        public int getServerPort() { return 0; }\n\n        @Override\n        public String getScheme() { return null; }\n\n        @Override\n        public String getServerName() { return null; }\n\n        @Override\n        public String getProtocol() { return null; }\n\n        @Override\n        public String getLocalAddr() { return null; }\n\n        @Override\n        public String getLocalName() { return null; }\n\n        @Override
+        public int getLocalPort() { return 0; }\n\n        @Override
+        public java.io.BufferedReader getReader() throws java.io.IOException { return null; }\n\n        @Override
+        public String getRemotePortHeaders() { return null; }\n\n        @Override
+        public String getRemotePortHeaderValues() { return null; }\n\n        @Override
+        public java.util.Map<String, String[]> getParameterMap() { return null; }\n\n        @Override
+        public java.util.Enumeration<String> getParameterNames() { return null; }\n\n        @Override
+        public String[] getParameterValues(String name) { return null; }\n\n        @Override
+        public String getCharacterEncoding() { return null; }\n\n        @Override
+        public void setCharacterEncoding(String env) throws java.io.UnsupportedEncodingException { }\n\n        @Override
+        public int getContentLength() { return 0; }\n\n        @Override
+        public long getContentLengthLong() { return 0; }\n\n        @Override
+        public String getContentType() { return null; }\n\n        @Override
+        public java.io.ServletInputStream getInputStream() throws java.io.IOException { return null; }\n\n        @Override
+        public String getLocale() { return null; }\n\n        @Override
+        public java.util.Enumeration<String> getLocales() { return null; }\n\n        @Override
+        public boolean isSecure() { return false; }\n\n        @Override
+        public javax.servlet.RequestDispatcher getRequestDispatcher(String path) { return null; }\n\n        @Override
+        public String getRealPath(String path) { return null; }\n\n        @Override
+        public int getRemotePort() { return 0; }\n\n        @Override
+        public String getLocalNameHeaders() { return null; }\n\n        @Override
+        public String getLocalNameHeaderValues() { return null; }\n\n        @Override
+        public String getLocalPortHeaders() { return null; }\n\n        @Override
+        public String getLocalPortHeaderValues() { return null; }\n\n        @Override
+        public String getRemoteAddrHeaders() { return null; }\n\n        @Override
+        public String getRemoteAddrHeaderValues() { return null; }\n\n        @Override
+        public String getRemoteHostHeaders() { return null; }\n\n        @Override
+        public String getRemoteHostHeaderValues() { return null; }\n\n        @Override
+        public javax.servlet.ServletContext getServletContext() { return null; }\n\n        @Override
+        public javax.servlet.AsyncContext startAsync() throws IllegalStateException { return null; }\n\n        @Override
+        public javax.servlet.AsyncContext startAsync(javax.servlet.ServletRequest servletRequest, javax.servlet.ServletResponse servletResponse) throws IllegalStateException { return null; }\n\n        @Override
+        public boolean isAsyncStarted() { return false; }\n\n        @Override
+        public boolean isAsyncSupported() { return false; }\n\n        @Override
+        public javax.servlet.AsyncContext getAsyncContext() { return null; }\n\n        @Override
+        public String getRequestId() { return null; }\n\n        @Override
+        public String getProtocolRequestId() { return null; }\n\n        @Override
+        public javax.servlet.ServletConnection getServletConnection() { return null; }\n\n        @Override
+        public Object getAttribute(String name) { return null; }\n\n        @Override
+        public java.util.Enumeration<String> getAttributeNames() { return null; }\n\n        @Override
+        public void setAttribute(String name, Object o) { }\n\n        @Override
+        public void removeAttribute(String name) { }\n\n        @Override
+        public javax.servlet.DispatcherType getDispatcherType() { return null; }\n    }\n}\n
+CODE
+	"safefile://SafeReflectionMethodDirectUse.java": <<<CODE
+// 最佳实践：避免使用反射，如果可以直接调用方法。
+package com.example.secureapp;
+
+public class SafeReflectionMethodDirectUse {
+
+    public void safeExecution() {
+        // 直接调用而不是使用反射，这是最安全的做法。
+        Service.doSafeOperation();
+        System.out.println("Direct method call is secure.");
+    }
+
+    // 模拟的服务类
+    static class Service {
+        public static void doSafeOperation() {
+            System.out.println("Performing a safe and authorized operation.");
+        }
+    }
+}
+
+CODE
 )

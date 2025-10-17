@@ -3,7 +3,6 @@ package filesys
 import (
 	"bytes"
 	"embed"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"io/fs"
 	"os"
@@ -12,6 +11,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -22,7 +23,7 @@ type embedFs struct {
 }
 
 func (f *embedFs) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, f.GetSeparators())
+	return SplitWithSeparator(s, f.GetSeparators())
 }
 
 func (f *embedFs) Ext(s string) string {
@@ -66,6 +67,11 @@ func (f *embedFs) MkdirAll(string, os.FileMode) error          { return utils.Er
 func (f *embedFs) ExtraInfo(string) map[string]any             { return nil }
 func (f *embedFs) Base(p string) string                        { return path.Base(p) }
 
+func (f *embedFs) String() string {
+	// TODO
+	return ""
+}
+
 func NewEmbedFS(fs embed.FS) fi.FileSystem {
 	return &embedFs{fs}
 }
@@ -97,7 +103,7 @@ type LocalFs struct {
 }
 
 func (f *LocalFs) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, f.GetSeparators())
+	return SplitWithSeparator(s, f.GetSeparators())
 }
 
 func (f *LocalFs) Ext(s string) string {
@@ -145,3 +151,5 @@ func (f *LocalFs) Delete(name string) error                     { return os.Remo
 func (f *LocalFs) MkdirAll(name string, perm os.FileMode) error { return os.MkdirAll(name, perm) }
 func (f *LocalFs) ExtraInfo(string) map[string]any              { return nil }
 func (f *LocalFs) Base(p string) string                         { return filepath.Base(p) }
+
+func (f *LocalFs) String() string { return "" }

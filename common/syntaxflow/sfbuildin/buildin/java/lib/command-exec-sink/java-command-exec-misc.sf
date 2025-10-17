@@ -26,15 +26,12 @@ DESC
 	title_zh: "查找Java第三方库命令执行Sink"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免直接拼接用户输入到命令中
 永远不要将不受信任的用户输入直接拼接到用于执行外部命令的字符串中。即使是看似无害的输入，攻击者也可能通过特殊构造的字符串来修改命令的逻辑。
-
 ```java
 // 示例：不安全的做法（存在命令注入风险）
 String userInput = request.getParameter("cmd");
 Process process = Runtime.getRuntime().exec("ls " + userInput);
-
 // 示例：推荐做法（使用参数化或避免直接执行）
 // 方法一：如果需要执行固定命令，尽量避免执行外部进程
 // 方法二：如果必须执行，使用参数列表而不是单个字符串
@@ -45,14 +42,11 @@ Process process = pb.start();
 
 #### 2. 使用允许以参数列表形式指定命令的API
 优先使用那些允许将命令及其参数分开传递的API，例如Java标准库中的`ProcessBuilder`。这些API通常会更安全地处理特殊字符和空格，防止命令注入。
-
 对于规则中提到的第三方库，查找并使用它们提供的参数列表或命令构建器API。
-
 ```java
 // Apache Commons Exec Parameter Example
 CommandLine commandLine = new CommandLine("ls");
 commandLine.addArgument(userInput); // 将用户输入作为单独的参数添加
-
 // System-Command-Executor Parameter Example
 CommandBuilder commandBuilder = new CommandBuilder("ls");
 commandBuilder.withArgs(userInput); // 将用户输入作为参数添加
@@ -60,12 +54,11 @@ commandBuilder.withArgs(userInput); // 将用户输入作为参数添加
 
 #### 3. 对用户输入进行严格的白名单校验或清理
 如果无法避免将用户输入用于构建命令，必须对其进行严格的验证和清理。优先使用白名单机制，只允许已知且安全的字符或模式。如果必须允许某些特殊字符，确保它们不会被解释为命令分隔符或参数。
-
 ```java
 // 示例：基本白名单校验（不允许特殊命令字符）
 String userInput = request.getParameter("filename");
 if (!userInput.matches("^[a-zA-Z0-9_.-]+$")) {
-    throw new IllegalArgumentException("Invalid filename");
+throw new IllegalArgumentException("Invalid filename");
 }
 ProcessBuilder pb = new ProcessBuilder("cat", userInput);
 ```
@@ -114,6 +107,67 @@ alert $output for {
 	title: "Detect Java Thirdparty CommandLine Executing Sink",
 	title_zh: "查找Java第三方库命令执行Sink",
 	level: "mid",
+	message: "检测到Java代码中通过第三方库（如Apache Commons Exec、Picocli等）可能存在命令执行漏洞，需进一步审计确认。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免直接拼接用户输入到命令中
+永远不要将不受信任的用户输入直接拼接到用于执行外部命令的字符串中。即使是看似无害的输入，攻击者也可能通过特殊构造的字符串来修改命令的逻辑。
+```java
+// 示例：不安全的做法（存在命令注入风险）
+String userInput = request.getParameter("cmd");
+Process process = Runtime.getRuntime().exec("ls " + userInput);
+// 示例：推荐做法（使用参数化或避免直接执行）
+// 方法一：如果需要执行固定命令，尽量避免执行外部进程
+// 方法二：如果必须执行，使用参数列表而不是单个字符串
+String directory = request.getParameter("dir");
+ProcessBuilder pb = new ProcessBuilder("ls", directory); // 将目录作为参数传递
+Process process = pb.start();
+```
+#### 2. 使用允许以参数列表形式指定命令的API
+优先使用那些允许将命令及其参数分开传递的API，例如Java标准库中的`ProcessBuilder`。这些API通常会更安全地处理特殊字符和空格，防止命令注入。
+对于规则中提到的第三方库，查找并使用它们提供的参数列表或命令构建器API。
+```java
+// Apache Commons Exec Parameter Example
+CommandLine commandLine = new CommandLine("ls");
+commandLine.addArgument(userInput); // 将用户输入作为单独的参数添加
+// System-Command-Executor Parameter Example
+CommandBuilder commandBuilder = new CommandBuilder("ls");
+commandBuilder.withArgs(userInput); // 将用户输入作为参数添加
+```
+#### 3. 对用户输入进行严格的白名单校验或清理
+如果无法避免将用户输入用于构建命令，必须对其进行严格的验证和清理。优先使用白名单机制，只允许已知且安全的字符或模式。如果必须允许某些特殊字符，确保它们不会被解释为命令分隔符或参数。
+```java
+// 示例：基本白名单校验（不允许特殊命令字符）
+String userInput = request.getParameter("filename");
+if (!userInput.matches("^[a-zA-Z0-9_.-]+$")) {
+throw new IllegalArgumentException("Invalid filename");
+}
+ProcessBuilder pb = new ProcessBuilder("cat", userInput);
+```
+#### 4. 最小化执行命令的权限
+如果可能，以具有最低所需权限的用户身份执行外部命令，以限制潜在攻击的影响范围。
+#### 5. 代码安全审查
+对所有涉及执行外部命令的代码进行严格的安全审查，特别关注数据流，确保不受信任的数据不会流入命令执行点。
+SOLUTION
+	risk: "命令注入",
+	desc: <<<DESC
+### 规则目的
+该规则旨在查找Java代码中第三方库中可能导致命令执行的Sink点。通过识别对`java-command-exec-sink`库的引用以及特定的第三方库（如Apache Commons Exec、Picocli、System-Command-Executor、zt-exec、NuProcess、org.apache.hadoop.util.Shell等）中用于执行外部命令的方法，本规则旨在帮助开发者和安全审计人员发现潜在的命令执行漏洞。
+### 规则详细
+1. **作为基础检测库**
+属于`java-command-exec-sink`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测命令执行漏洞，提供核心函数识别能力。
+2. **覆盖高危执行点**
+检测以下第三方库中可能的命令执行点：
+- **Apache Commons Exec**: `CommandLine.parse()`，通常与执行器结合使用。
+- **Picocli**: 可能存在通过参数执行命令的场景。
+- **System-Command-Executor**: `CommandBuilder`及其构建命令和参数的方法。
+- **zt-exec**: `ProcessExecutor.execute()`方法。
+- **NuProcess**: `NuProcessBuilder`类。
+- **org.apache.hadoop.util.Shell**: `ShellCommandExecutor`。
+此外，还包含对`java-process-builder-sink`库的引用，覆盖了Java标准库的`ProcessBuilder`等执行点。
+通过识别这些关键的Sink点，可以构建完整的数据流分析，追踪不受信任的用户输入是否能够控制这些命令执行方法，从而判断是否存在命令执行漏洞。
+DESC
+	name: "output",
 }
 
 

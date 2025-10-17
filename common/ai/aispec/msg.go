@@ -15,7 +15,7 @@ type ChatMessage struct {
 	Model          string       `json:"model"`
 	Messages       []ChatDetail `json:"messages"`
 	Stream         bool         `json:"stream"`
-	EnableThinking bool         `json:"enable_thinking"`
+	EnableThinking bool         `json:"enable_thinking,omitempty"`
 }
 
 type ChatDetail struct {
@@ -91,7 +91,7 @@ type ChatError struct {
 	Code    string `json:"code"`
 }
 
-func NewChatMessage(model string, messages []ChatDetail, more ...any) *ChatMessage {
+func NewChatMessage(model string, messages []ChatDetail, dummy ...any) *ChatMessage {
 	return &ChatMessage{
 		Model:    model,
 		Messages: messages,

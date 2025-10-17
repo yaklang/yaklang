@@ -394,27 +394,9 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
 		return
 	}
-	value := strings.TrimPrefix(auth, "Bearer ")
-	c.logInfo("Extracted key from authentication info: %s", value)
-	if value == "" {
-		c.logError("No valid authentication info provided")
-		conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
-		return
-	}
-
-	key, ok := c.Keys.Get(value)
-	if !ok {
-		c.logError("No matching key configuration found: %s", value)
-		conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
-		return
-	}
-
-	c.logInfo("Successfully verified key: %s", key.Key)
-	_ = key
-	_ = body
 
 	var bodyIns aispec.ChatMessage
-	err := json.Unmarshal([]byte(body), &bodyIns)
+	err := json.Unmarshal(body, &bodyIns)
 	if err != nil {
 		c.logError("Failed to parse request body: %v", err)
 		conn.Write([]byte("HTTP/1.1 400 Bad Request\r\n\r\n"))
@@ -426,6 +408,60 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	modelName := bodyIns.Model
 	c.logInfo("Requested model: %s", modelName)
+	isFreeModel := strings.HasSuffix(modelName, "-free")
+	if isFreeModel {
+		c.logInfo("Request is for a free model, skipping key verification.")
+	}
+
+	var key *Key
+	var apiKeyForStat string
+
+	if isFreeModel {
+		apiKeyForStat = "free-user"
+	} else {
+		value := strings.TrimPrefix(auth, "Bearer ")
+		c.logInfo("Extracted key from authentication info: %s", value)
+		if value == "" {
+			c.logError("No valid authentication info provided")
+			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+			return
+		}
+
+		var ok bool
+		key, ok = c.Keys.Get(value)
+		if !ok {
+			c.logError("No matching key configuration found: %s", value)
+			conn.Write([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"))
+			return
+		}
+		apiKeyForStat = key.Key
+		c.logInfo("Successfully verified key: %s", key.Key)
+
+		// Authorization check
+		allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
+		if !ok {
+			c.logError("Key[%v] has no allowed models configured", key.Key)
+			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			return
+		}
+
+		isAllowed, ok := allowedModels[modelName]
+		if !ok {
+			allowedModelKeys := make([]string, 0, len(allowedModels))
+			for k := range allowedModels {
+				allowedModelKeys = append(allowedModelKeys, k)
+			}
+			c.logError("Key[%v] requested model %s is not in allowed list, allowed models: %v", key.Key, modelName, allowedModelKeys)
+			conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+			return
+		}
+
+		if !isAllowed {
+			c.logError("Key[%v] requested model %s is not allowed", key.Key, modelName)
+			conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
+			return
+		}
+	}
 
 	var prompt bytes.Buffer
 	var imageContent []*aispec.ChatContent
@@ -477,39 +513,15 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 
 	c.logInfo("Built prompt length: %d with image content: %d", prompt.Len(), len(imageContent))
 
-	allowedModels, ok := c.KeyAllowedModels.Get(key.Key)
-	if !ok {
-		c.logError("Key[%v] has no allowed models configured", key.Key)
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-		return
-	}
+	// model, ok := c.Models.Get(modelName)
+	// if !ok {
+	// 	c.logError("No model configuration found: %s", modelName)
+	// 	conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+	// 	return
+	// }
 
-	isAllowed, ok := allowedModels[modelName]
-	if !ok {
-		allowedModelKeys := make([]string, 0, len(allowedModels))
-		for k := range allowedModels {
-			allowedModelKeys = append(allowedModelKeys, k)
-		}
-		c.logError("Key[%v] requested model %s is not in allowed list, allowed models: %v", key.Key, modelName, allowedModelKeys)
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-		return
-	}
-
-	if !isAllowed {
-		c.logError("Key[%v] requested model %s is not allowed", key.Key, modelName)
-		conn.Write([]byte("HTTP/1.1 403 Forbidden\r\n\r\n"))
-		return
-	}
-
-	model, ok := c.Models.Get(modelName)
-	if !ok {
-		c.logError("No model configuration found: %s", modelName)
-		conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-		return
-	}
-
-	c.logInfo("Key[%v] requesting model %s, starting to forward request", key.Key, modelName)
-	_ = model
+	// c.logInfo("Key[%v] requesting model %s, starting to forward request", apiKeyForStat, modelName)
+	// _ = model
 
 	// 使用 PeekOrderedProviders 获取按优先级排序的提供者列表
 	providers := c.Entrypoints.PeekOrderedProviders(modelName)
@@ -541,8 +553,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		sendHeaderOnce := sync.Once{}
 		sendHeader := func() {
 			c.logInfo("Successfully obtained AI client, starting to send response header")
-			var header string
-			header = "HTTP/1.1 200 OK\r\n" +
+			var header = "HTTP/1.1 200 OK\r\n" +
 				"Content-Type: application/json\r\n" +
 				"Transfer-Encoding: chunked\r\n" +
 				"\r\n"
@@ -556,7 +567,7 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		pr, pw := utils.NewBufPipe(nil)
 		rr, rw := utils.NewBufPipe(nil)
 
-		writer := NewChatJSONChunkWriter(conn, key.Key, modelName)
+		writer := NewChatJSONChunkWriter(conn, apiKeyForStat, modelName)
 		client, err := provider.GetAIClientWithImages(
 			imageContent,
 			func(reader io.Reader) {
@@ -712,16 +723,18 @@ func (c *ServerConfig) serveChatCompletions(conn net.Conn, rawPacket []byte) {
 		}()
 
 		// Update API Key statistics using actual success
-		go func() {
-			inputBytes := int64(prompt.Len())
-			outputBytes := total
-			if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
-				c.logError("Failed to update API key statistics: %v", err)
-			} else {
-				c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes, success=%v",
-					utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, requestSucceeded)
-			}
-		}()
+		if !isFreeModel {
+			go func() {
+				inputBytes := int64(prompt.Len())
+				outputBytes := total
+				if err := UpdateAiApiKeyStats(key.Key, inputBytes, outputBytes, requestSucceeded); err != nil {
+					c.logError("Failed to update API key statistics: %v", err)
+				} else {
+					c.logInfo("API key statistics updated: key=%s, input=%d bytes, output=%d bytes, success=%v",
+						utils.ShrinkString(key.Key, 8), inputBytes, outputBytes, requestSucceeded)
+				}
+			}()
+		}
 
 		bandwidth := float64(0)
 		if endDuration.Seconds() > 0 {
@@ -790,11 +803,15 @@ func (c *ServerConfig) serveModels(key *Key, conn net.Conn) {
 
 	// 为每个模型创建 ModelMeta
 	for _, name := range modelNames {
+		// 免费模型始终对所有用户可见
+		// 对于非免费模型，如果提供了 key，则检查权限
+		isFreeModel := strings.HasSuffix(name, "-free")
 		if key != nil {
-			if _, ok := key.AllowedModels[name]; !ok {
+			if _, ok := key.AllowedModels[name]; !ok && !isFreeModel {
 				continue
 			}
 		}
+
 		response.Data = append(response.Data, &ModelMeta{ // 使用指针
 			ID:      name,
 			Object:  "model",

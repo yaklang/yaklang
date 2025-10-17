@@ -3,13 +3,14 @@ package tests
 import (
 	"embed"
 	"fmt"
+	"path"
+	"strings"
+	"testing"
+
 	"github.com/antlr/antlr4/runtime/Go/antlr/v4"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
-	"path"
-	"strings"
-	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/php/php2ssa"
@@ -66,7 +67,7 @@ func validateSource(t *testing.T, filename string, src string) {
 		}
 		spew.Dump(errListener.GetErrors())
 
-		_, err := php2ssa.FrondEnd(src, false)
+		_, err := php2ssa.Frontend(src)
 		require.Nil(t, err, "parse AST FrontEnd error: %v", err)
 	})
 }

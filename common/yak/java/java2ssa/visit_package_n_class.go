@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
-func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
+func (y *singleFileBuilder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -67,7 +67,7 @@ func (y *builder) VisitTypeDeclaration(raw javaparser.ITypeDeclarationContext) {
 
 }
 
-func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.Blueprint) ssa.Value {
+func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext, outClass *ssa.Blueprint) ssa.Value {
 	if y == nil || raw == nil || y.IsStop() {
 		return y.EmitEmptyContainer()
 	}
@@ -158,7 +158,7 @@ func (y *builder) VisitClassDeclaration(raw javaparser.IClassDeclarationContext,
 	return container
 }
 
-func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Blueprint) interface{} {
+func (y *singleFileBuilder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Blueprint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -178,7 +178,7 @@ func (y *builder) VisitClassBody(raw javaparser.IClassBodyContext, class *ssa.Bl
 	return nil
 }
 
-func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext) {
+func (y *singleFileBuilder) VisitFormalParameters(raw javaparser.IFormalParametersContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -200,7 +200,7 @@ func (y *builder) VisitFormalParameters(raw javaparser.IFormalParametersContext)
 
 }
 
-func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.Blueprint) {
+func (y *singleFileBuilder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContext, modifiers javaparser.IModifiersContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -269,7 +269,7 @@ func (y *builder) VisitMemberDeclaration(raw javaparser.IMemberDeclarationContex
 
 	return
 }
-func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
+func (y *singleFileBuilder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -298,7 +298,7 @@ func (y *builder) VisitTypeType(raw javaparser.ITypeTypeContext) ssa.Type {
 	return t
 }
 
-func (y *builder) VisitCatchType(raw javaparser.ICatchTypeContext) ssa.Type {
+func (y *singleFileBuilder) VisitCatchType(raw javaparser.ICatchTypeContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -322,7 +322,7 @@ func (y *builder) VisitCatchType(raw javaparser.ICatchTypeContext) ssa.Type {
 	return ssa.NewOrType(types...)
 }
 
-func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceTypeContext) ssa.Type {
+func (y *singleFileBuilder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceTypeContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -375,7 +375,7 @@ func (y *builder) VisitClassOrInterfaceType(raw javaparser.IClassOrInterfaceType
 	}
 }
 
-func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
+func (y *singleFileBuilder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -404,7 +404,7 @@ func (y *builder) VisitPrimitiveType(raw javaparser.IPrimitiveTypeContext) ssa.T
 	return t
 }
 
-func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.Blueprint) interface{} {
+func (y *singleFileBuilder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, class *ssa.Blueprint) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -443,7 +443,7 @@ func (y *builder) VisitEnumDeclaration(raw javaparser.IEnumDeclarationContext, c
 	return nil
 }
 
-func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.Blueprint) {
+func (y *singleFileBuilder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -482,7 +482,7 @@ func (y *builder) VisitEnumConstants(raw javaparser.IEnumConstantsContext, class
 
 }
 
-func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.Blueprint) {
+func (y *singleFileBuilder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -504,7 +504,7 @@ func (y *builder) VisitEnumConstant(raw javaparser.IEnumConstantContext, class *
 	return
 }
 
-func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.Blueprint) {
+func (y *singleFileBuilder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarationsContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -518,7 +518,7 @@ func (y *builder) VisitEnumBodyDeclarations(raw javaparser.IEnumBodyDeclarations
 	}
 }
 
-func (y *builder) VisitClassBodyDeclaration(
+func (y *singleFileBuilder) VisitClassBodyDeclaration(
 	raw javaparser.IClassBodyDeclarationContext,
 	class *ssa.Blueprint,
 ) {
@@ -546,7 +546,7 @@ func (y *builder) VisitClassBodyDeclaration(
 	return
 }
 
-func (y *builder) VisitAnnotationTypeDeclaration(raw javaparser.IAnnotationTypeDeclarationContext) interface{} {
+func (y *singleFileBuilder) VisitAnnotationTypeDeclaration(raw javaparser.IAnnotationTypeDeclarationContext) interface{} {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -560,7 +560,7 @@ func (y *builder) VisitAnnotationTypeDeclaration(raw javaparser.IAnnotationTypeD
 	return nil
 }
 
-func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContext) (string, []ssa.Value) {
+func (y *singleFileBuilder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContext) (string, []ssa.Value) {
 	if y == nil || raw == nil || y.IsStop() {
 		return "", nil
 	}
@@ -576,7 +576,7 @@ func (y *builder) VisitRecordDeclaration(raw javaparser.IRecordDeclarationContex
 	}
 }
 
-func (y *builder) VisitMethodDeclaration(
+func (y *singleFileBuilder) VisitMethodDeclaration(
 	raw javaparser.IMethodDeclarationContext,
 	class *ssa.Blueprint,
 	modify javaparser.IModifiersContext,
@@ -639,7 +639,7 @@ func (y *builder) VisitMethodDeclaration(
 	return
 }
 
-func (y *builder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
+func (y *singleFileBuilder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -653,7 +653,7 @@ func (y *builder) VisitMethodBody(raw javaparser.IMethodBodyContext) {
 	y.VisitBlock(i.Block())
 }
 
-func (y *builder) VisitTypeTypeOrVoid(raw javaparser.ITypeTypeOrVoidContext) ssa.Type {
+func (y *singleFileBuilder) VisitTypeTypeOrVoid(raw javaparser.ITypeTypeOrVoidContext) ssa.Type {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -671,7 +671,7 @@ func (y *builder) VisitTypeTypeOrVoid(raw javaparser.ITypeTypeOrVoidContext) ssa
 
 }
 
-func (y *builder) VisitFormalParameterList(raw javaparser.IFormalParameterListContext) {
+func (y *singleFileBuilder) VisitFormalParameterList(raw javaparser.IFormalParameterListContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -692,7 +692,7 @@ func (y *builder) VisitFormalParameterList(raw javaparser.IFormalParameterListCo
 	}
 }
 
-func (y *builder) VisitReceiverParameter(raw javaparser.IReceiverParameterContext) {
+func (y *singleFileBuilder) VisitReceiverParameter(raw javaparser.IReceiverParameterContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -708,7 +708,7 @@ func (y *builder) VisitReceiverParameter(raw javaparser.IReceiverParameterContex
 	// todo 接口的形参
 }
 
-func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (typeCallbacks, insCallbacks []func(ssa.Value)) {
+func (y *singleFileBuilder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (typeCallbacks, insCallbacks []func(ssa.Value)) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -749,7 +749,7 @@ func (y *builder) VisitFormalParameter(raw javaparser.IFormalParameterContext) (
 	return
 }
 
-func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext, wantVariable ...bool) (string, *ssa.Variable, int) {
+func (y *singleFileBuilder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorIdContext, wantVariable ...bool) (string, *ssa.Variable, int) {
 	bracketLevel := 0
 	if y == nil || raw == nil || y.IsStop() {
 		return "", nil, bracketLevel
@@ -780,7 +780,7 @@ func (y *builder) VisitVariableDeclaratorId(raw javaparser.IVariableDeclaratorId
 	return name, nil, bracketLevel
 }
 
-func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterContext) {
+func (y *singleFileBuilder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterContext) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -816,7 +816,7 @@ func (y *builder) VisitLastFormalParameter(raw javaparser.ILastFormalParameterCo
 	}
 }
 
-func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext) (typeCallback, insCallback func(ssa.Value)) {
+func (y *singleFileBuilder) VisitVariableModifier(raw javaparser.IVariableModifierContext) (typeCallback, insCallback func(ssa.Value)) {
 	typeCallback = func(ssa.Value) {}
 	insCallback = func(ssa.Value) {}
 
@@ -836,7 +836,7 @@ func (y *builder) VisitVariableModifier(raw javaparser.IVariableModifierContext)
 	return y.VisitAnnotation(i.Annotation())
 }
 
-func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContext) [][]string {
+func (y *singleFileBuilder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContext) [][]string {
 	if y == nil || raw == nil || y.IsStop() {
 		return nil
 	}
@@ -858,7 +858,7 @@ func (y *builder) VisitQualifiedNameList(raw javaparser.IQualifiedNameListContex
 	return qualifiedNames
 }
 
-func (y *builder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.Blueprint) {
+func (y *singleFileBuilder) VisitConstructorDeclaration(raw javaparser.IConstructorDeclarationContext, class *ssa.Blueprint) {
 	if y == nil || raw == nil || y.IsStop() {
 		return
 	}
@@ -901,7 +901,7 @@ type Ithrows interface {
 	QualifiedNameList() javaparser.IQualifiedNameListContext
 }
 
-func (y *builder) VisitThrowsClause(i Ithrows) []ssa.Value {
+func (y *singleFileBuilder) VisitThrowsClause(i Ithrows) []ssa.Value {
 	if i.THROWS() == nil {
 		return nil
 	}

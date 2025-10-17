@@ -1,24 +1,113 @@
 desc(
-	title: "Audit Golang HTTP Source"
+	title: "Audit Golang HTTP Input Points"
 	type: audit
 	level: info
 	lib: "golang-http-source"
 	desc: <<<DESC
 ### 规则目的
-
-该规则旨在审计Golang应用程序中与处理HTTP响应输出相关的代码。
+该规则旨在审计Golang应用程序中与处理HTTP请求输入相关的代码，特别是通过`r.URL.Query().Get()`获取用户输入的部分。未能对用户输入进行充分验证或转义可能导致诸如跨站脚本攻击（XSS）、路径遍历、SQL注入等安全问题。
 
 ### 规则详细
+1. **作为基础检测库**
+   属于 `golang-http-source` 库规则（`lib` 类型），通常配合其他规则（如数据流跟踪规则）共同审计潜在的Web漏洞，提供关键HTTP请求输入的识别能力。
 
-1.  **作为基础审计库**
-    属于 `golang-http-source` 库规则（`lib` 类型），通常配合其他规则（如数据源跟踪规则）共同审计潜在的Web漏洞，提供关键HTTP请求输入的识别能力。
+2. **覆盖高危输入场景**
+   - 检测从URL查询参数中直接获取用户输入的方法调用，例如：`r.URL.Query().Get()`。
+   - 提供示例代码以帮助开发者理解哪些操作可能触发规则。
+
+3. **触发场景示例代码**
+   ```go
+   package main
+   import (
+       "net/http"
+       "html/template"
+   )
+   func handler(w http.ResponseWriter, r *http.Request) {
+       // 从查询参数中获取用户输入
+       name := r.URL.Query().Get("name")
+       // 直接将用户输入插入到 HTML 中
+       tmpl := "<h1>Hello," + name + "!</h1>"
+       w.Write([]byte(tmpl))
+   }
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
+   在上述代码中，如果用户提交恶意输入（如 `<script>alert('XSS')</script>`），将导致跨站脚本攻击（XSS）。
+
+4. **潜在影响**
+   - 攻击者可以注入恶意脚本窃取用户会话或敏感信息。
+   - 可能导致非预期的行为，例如权限提升或服务中断。
+
 DESC
 	title_zh: "审计Golang HTTP输入点"
 	solution: <<<SOLUTION
-none
+### 修复建议
+#### 1. 对输入进行严格验证和转义
+在使用用户输入之前，应对其进行严格的验证和转义，避免直接输出到HTML页面。
+```go
+package main
+import (
+    "net/http"
+    "html/template"
+)
+func handler_safe(w http.ResponseWriter, r *http.Request) {
+    // 安全：不直接从查询参数获取高风险输入进行拼接
+    name := template.HTMLEscapeString(r.URL.Query().Get("name"))
+    tmpl := "<h1>Hello," + name + "!</h1>"
+    w.Write([]byte(tmpl))
+}
+func main() {
+    http.HandleFunc("/", handler_safe)
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+#### 2. 使用预编译模板
+通过Go语言的`html/template`包，利用预编译模板自动转义用户输入中的危险字符。
+```go
+package main
+import (
+    "net/http"
+    "html/template"
+)
+func handler_safe(w http.ResponseWriter, r *http.Request) {
+    tmpl := template.Must(template.New("index").Parse(`<h1>Hello, {{.Name}}!</h1>`))
+    data := struct{
+        Name string
+    }{
+        Name: r.URL.Query().Get("name"),
+    }
+    tmpl.Execute(w, data)
+}
+func main() {
+    http.HandleFunc("/", handler_safe)
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+#### 3. 避免直接依赖URL查询参数
+尽可能减少直接依赖`r.URL.Query().Get()`获取输入，改用更安全的方式，例如表单数据或路径段。
+```go
+package main
+import (
+    "net/http"
+    "fmt"
+)
+func handler_path_segment(w http.ResponseWriter, r *http.Request) {
+    pathSegments := r.URL.Path
+    fmt.Fprintf(w, "You requested path: %s", pathSegments)
+}
+func main() {
+    http.HandleFunc("/path", handler_path_segment)
+    http.ListenAndServe(":8082", nil)
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
-none
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
+[OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
 REFERENCE
 	rule_id: "e5a96a40-e3fb-4903-8d27-281d77a5b753"
 )
@@ -28,7 +117,86 @@ REFERENCE
 http.Request.URL.Query().Get() as $output 
 
 
-alert $output
+alert $output for {
+	title: "Golang HTTP Input Source Audit Information Was Found",
+	title_zh: "发现Golang HTTP输入点审计信息",
+	message: "发现Golang HTTP输入点审计信息，规则用于识别潜在的Web漏洞和HTTP请求输入。",
+	solution: <<<SOLUTION
+### 安全建议
+该规则为信息类规则，主要用于帮助开发人员和安全审计人员了解代码中可能存在的HTTP输入点。
+
+#### 1. 使用安全编码实践
+避免直接从 `r.URL.Query().Get()` 获取用户输入并拼接到HTML中。例如：
+```go
+// 不安全示例
+name := r.URL.Query().Get("name")
+tmpl := "<h1>Hello," + name + "!</h1>"
+w.Write([]byte(tmpl))
+```
+应使用模板引擎或其他安全方式处理动态内容：
+```go
+// 安全示例
+tmpl := template.Must(template.New("index").Parse(`<h1>Hello, {{.Name}}!</h1>`))
+data := struct{ Name string }{ Name: "Safe User" }
+tmpl.Execute(w, data)
+```
+
+#### 2. 输入校验
+对所有用户输入进行严格的白名单校验，确保其符合预期格式。例如：
+```go
+// 校验输入是否为字母数字
+name := r.URL.Query().Get("name")
+if !regexp.MustCompile(`^[a-zA-Z0-9]+$`).MatchString(name) {
+    http.Error(w, "Invalid input", http.StatusBadRequest)
+    return
+}
+```
+
+#### 3. 避免直接暴露用户输入
+尽量避免直接暴露用户输入，可通过预定义逻辑或静态响应代替。例如：
+```go
+// 提供静态响应
+w.Write([]byte("This is a static content page."))
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+#### 1. **规则目的**
+该规则旨在审计Golang应用程序中与处理HTTP响应输出相关的代码。
+
+#### 2. **规则详细**
+1. **作为基础审计库**
+属于 `golang-http-source` 库规则（`lib` 类型），通常配合其他规则（如数据源跟踪规则）共同审计潜在的Web漏洞，提供关键HTTP请求输入的识别能力。
+
+#### 3. **触发场景**
+以下代码示例展示了潜在风险点：
+```go
+package main
+import (
+    "net/http"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+    // 从查询参数中获取用户输入
+    name := r.URL.Query().Get("name")
+    // 直接将用户输入插入到 HTML 中
+    tmpl := "<h1>Hello," + name + "!</h1>"
+    w.Write([]byte(tmpl))
+}
+func main() {
+    http.HandleFunc("/", handler)
+    http.ListenAndServe(":8080", nil)
+}
+```
+上述代码未对用户输入进行任何过滤，攻击者可以通过构造恶意输入注入脚本，导致XSS等安全问题。
+
+#### 4. **潜在影响**
+- 用户输入未经验证直接拼接到HTML中，可能导致跨站脚本攻击（XSS）。
+- 攻击者可以利用漏洞窃取用户会话、劫持账户或植入恶意脚本。
+- 进一步渗透可能导致敏感数据泄露或服务器被控制。
+DESC
+	name: "output",
+}
 desc(
 	lang: golang
 	alert_min: 1
@@ -55,4 +223,118 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeHttpRequestHandling.go": <<<CODE
+package main
+
+import (
+	"net/http"
+	"html/template"
+	"net/url"
+)
+
+// handler_safe 使用 http.ServeContent 或预编译模板来安全处理静态内容或已知动态内容
+// 避免直接从URL查询参数获取用户输入并直接插入HTML
+func handler_safe(w http.ResponseWriter, r *http.Request) {
+	// 安全：不直接从查询参数获取高风险输入进行拼接
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	tmpl := template.Must(template.New("index").Parse(`<h1>Hello, Secure User!</h1><p>This is a safe response.</p>`))
+	tmpl.Execute(w, nil)
+}
+
+// handler_safe_param 处理已知安全参数，不触发规则检测
+func handler_safe_param(w http.ResponseWriter, r *http.Request) {
+	// 安全：不使用 r.URL.Query().Get()作为 alert 目标，或者对输入进行严格白名单校验
+	// 假设我们只关心一个固定的路径参数，且不直接暴露用户输入
+	path := r.URL.Path
+	// 仅打印路径，不将其作为潜在的注入点
+	w.Write([]byte("Request path: " + path))
+}
+
+// handler_safe_form 处理表单数据，这些数据通常通过POST请求体而非URL查询参数传递
+// 避免 r.URL.Query().Get() 的直接使用
+func handler_safe_form(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "POST" {
+		r.ParseForm()
+		// 安全：从表单数据中获取，而非 URL 查询参数，除非规则也检测 r.FormValue
+		// 这里的目的在于避开 r.URL.Query().Get() 的直接检测
+		name := r.FormValue("name") 
+		w.Write([]byte("Hello from POST, " + name + "!"))
+	} else {
+		http.ServeFile(w, r, "form.html") // 提供一个简单的HTML表单
+	}
+}
+
+// main_safe 用于演示上述安全处理方法
+func main_safe() {
+	http.HandleFunc("/safe_static", handler_safe)
+	http.HandleFunc("/safe_param", handler_safe_param)
+	http.HandleFunc("/safe_form", handler_safe_form)
+
+	http.ListenAndServe(":8081", nil)
+}
+
+// 这是一个不包含任何 r.URL.Query().Get() 调用，纯粹的静态HTTP服务
+func handler_no_query_param(w http.ResponseWriter, r *http.Request) {
+	w.Write([]byte("This is a static content page."))
+}
+
+func main() {
+	http.HandleFunc("/static", handler_no_query_param)
+	http.ListenAndServe(":8080", nil)
+}
+
+// form.html (为了完整性，虽然不是Go代码，但可能需要)
+/*
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Form Example</title>
+</head>
+<body>
+    <form method="POST" action="/safe_form">
+        <label for="name">Name:</label><br>
+        <input type="text" id="name" name="name"><br><br>
+        <input type="submit" value="Submit">
+    </form>
+</body>
+</html>
+*/
+CODE
+	"safefile://SafeGolangHttpMethods.go": <<<CODE
+package main
+
+import (
+	"net/http"
+	"fmt"
+)
+
+// handler_path_segment 处理路径段而不是查询参数
+func handler_path_segment(w http.ResponseWriter, r *http.Request) {
+	// 安全：直接访问路径，而不是 Query().Get()
+	// 这不会触发规则，因为规则明确检测 Query().Get()
+	pathSegments := r.URL.Path
+	fmt.Fprintf(w, "You requested path: %s", pathSegments)
+}
+
+// handler_header_access 访问HTTP头信息，而不是查询参数
+func handler_header_access(w http.ResponseWriter, r *http.Request) {
+	// 安全：访问 HTTP Header，规则未检测此项
+	userAgent := r.Header.Get("User-Agent")
+	fmt.Fprintf(w, "Your User-Agent is: %s", userAgent)
+}
+
+// handler_static_response 提供硬编码的静态响应
+func handler_static_response(w http.ResponseWriter, r *http.Request) {
+	// 安全：完全不处理任何输入，提供静态内容
+	fmt.Fprint(w, "This is a safe, static response.")
+}
+
+func main() {
+	http.HandleFunc("/path", handler_path_segment)
+	http.HandleFunc("/header", handler_header_access)
+	http.HandleFunc("/static", handler_static_response)
+
+	http.ListenAndServe(":8082", nil)
+}
+CODE
 )

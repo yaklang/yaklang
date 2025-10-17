@@ -2,6 +2,13 @@ package yaklib
 
 import (
 	"context"
+	"fmt"
+	"github.com/google/uuid"
+	"github.com/jinzhu/gorm"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils/bizhelper"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -165,6 +172,77 @@ var DatabaseExports = map[string]interface{}{
 	},
 
 	"saveHTTPFlowWithTags": yakit.CreateHTTPFlowWithTags,
+
+	// operate origin database
+	"OpenDatabase":           OpenDatabase,
+	"OpenSqliteDatabase":     OpenSqliteDatabase,
+	"OpenTempSqliteDatabase": OpenTempSqliteDatabase,
+
+	"ScanResult": ScanResult,
+
+	"SaveAIYakScript": func(tool *schema.AIYakTool) error {
+		db := consts.GetGormProfileDatabase()
+		if db == nil {
+			return utils.Error("empty database connection")
+		}
+		_, err := yakit.SaveAIYakTool(db, tool)
+		return err
+	},
+}
+
+func OpenDatabase(dialect string, source string) (*gorm.DB, error) {
+	db, err := gorm.Open(dialect, source)
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func OpenSqliteDatabase(path string) (*gorm.DB, error) {
+	if exist, err := utils.PathExists(path); err != nil {
+		return nil, err
+	} else if !exist {
+		_, err := os.Create(path)
+		if err != nil {
+			return nil, err
+		}
+	}
+	path = fmt.Sprintf("%s?cache=shared&mode=rwc", path)
+	return OpenDatabase("sqlite3", path)
+}
+
+func OpenTempSqliteDatabase() (*gorm.DB, error) {
+	path := filepath.Join(consts.GetDefaultYakitBaseTempDir(), uuid.New().String())
+	return OpenSqliteDatabase(path)
+}
+
+func ScanResult(db *gorm.DB, query string, args ...interface{}) ([]map[string]interface{}, error) {
+	if db == nil {
+		return nil, utils.Error("empty database connection")
+	}
+	var res = make([]map[string]interface{}, 0)
+	rows, err := db.Raw(query, args...).Rows()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, err
+	}
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		m, err := bizhelper.RawToMap(rows, cols, colTypes)
+		if err != nil {
+			log.Errorf("failed to convert row to map: %s", err)
+			continue
+		}
+		res = append(res, m)
+	}
+	return res, nil
 }
 
 func _deleteYakScriptByName(i string) error {

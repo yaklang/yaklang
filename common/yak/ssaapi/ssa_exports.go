@@ -8,7 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/gobwas/glob"
 
@@ -25,15 +29,17 @@ import (
 type ProcessFunc func(msg string, process float64)
 
 type config struct {
-	enableDatabase bool
+	databaseKind   ssa.ProgramCacheKind
+	programSaveTTL time.Duration
+	// project
+	ProjectName string
 	// program
 	ProgramName        string
 	ProgramDescription string
 
 	// language
-	language                consts.Language
-	SelectedLanguageBuilder ssa.Builder
-	LanguageBuilder         ssa.Builder
+	language        consts.Language
+	LanguageBuilder ssa.Builder
 
 	// other compile options
 	feedCode        bool
@@ -76,12 +82,16 @@ type config struct {
 	excludeFile func(path, filename string) bool
 
 	logLevel string
+
+	astSequence ssareducer.ASTSequenceType
+	// for concurrency
+	concurrency int
 }
 
 func defaultConfig(opts ...Option) (*config, error) {
 	c := &config{
 		language:                   "",
-		SelectedLanguageBuilder:    nil,
+		LanguageBuilder:            nil,
 		originEditor:               memedit.NewMemEditor(""),
 		fs:                         filesys.NewLocalFs(),
 		programPath:                ".",
@@ -95,7 +105,8 @@ func defaultConfig(opts ...Option) (*config, error) {
 		excludeFile: func(path, filename string) bool {
 			return false
 		},
-		logLevel: "error",
+		logLevel:    "error",
+		astSequence: ssareducer.OutOfOrder,
 	}
 
 	for _, opt := range opts {
@@ -143,6 +154,13 @@ func (c *config) Processf(process float64, format string, arg ...any) {
 		c.process(msg, process)
 	} else {
 		log.Info(msg, process)
+	}
+}
+
+func WithASTOrder(sequence ssareducer.ASTSequenceType) Option {
+	return func(c *config) error {
+		c.astSequence = sequence
+		return nil
 	}
 }
 
@@ -257,11 +275,11 @@ func WithLanguage(language consts.Language) Option {
 			return nil
 		}
 		c.language = language
-		if parser, ok := LanguageBuilders[language]; ok {
-			c.SelectedLanguageBuilder = parser
+		if create, ok := LanguageBuilderCreater[language]; ok {
+			c.LanguageBuilder = create()
 		} else {
 			log.Errorf("SSA not support language %s", language)
-			c.SelectedLanguageBuilder = nil
+			c.LanguageBuilder = nil
 		}
 		return nil
 	}
@@ -377,7 +395,50 @@ func WithProgramDescription(desc string) Option {
 func WithProgramName(name string) Option {
 	return func(c *config) error {
 		c.ProgramName = name
-		c.enableDatabase = true
+		c.databaseKind = ssa.ProgramCacheDBWrite
+		return nil
+	}
+}
+
+func WithProjectName(name string) Option {
+	return func(c *config) error {
+		project, err := yakit.LoadSSAProjectBuilderByName(name)
+		if err != nil {
+			return err
+		}
+		cc := project.GetCompileConfig()
+		if cc == nil {
+			return utils.Errorf("projectName %s compile config is nil", name)
+		}
+		WithReCompile(cc.ReCompile)(c)
+		WithStrictMode(cc.StrictMode)(c)
+		WithPeepholeSize(cc.PeepholeSize)(c)
+		excludeOptions, err := DefaultExcludeFunc(cc.ExcludeFiles)
+		if err != nil {
+			return err
+		}
+		excludeOptions(c)
+		WithConcurrency(int(cc.Concurrency))(c)
+		if cc.MemoryCompile {
+			WithMemory()(c)
+		}
+		return nil
+	}
+}
+
+func WithMemory(ttl ...time.Duration) Option {
+	return func(c *config) error {
+		c.databaseKind = ssa.ProgramCacheMemory
+		if len(ttl) > 0 {
+			c.programSaveTTL = ttl[0]
+		}
+		return nil
+	}
+}
+
+func WithConcurrency(concurrency int) Option {
+	return func(c *config) error {
+		c.concurrency = concurrency
 		return nil
 	}
 }
@@ -413,10 +474,15 @@ func getUnifiedSeparatorFs(fs fi.FileSystem) fi.FileSystem {
 	)
 }
 
-var ttlSSAParseCache = createCache(10 * time.Second)
+var ttlSSAParseCache = createCache(30 * time.Minute)
 
-func createCache(ttl time.Duration) *utils.CacheWithKey[string, *Program] {
-	cache := utils.NewTTLCacheWithKey[string, *Program](ttl)
+type programResult struct {
+	prog *Program
+	err  error
+}
+
+func createCache(ttl time.Duration) *utils.CacheWithKey[string, *programResult] {
+	cache := utils.NewTTLCacheWithKey[string, *programResult](ttl)
 	return cache
 }
 
@@ -446,20 +512,27 @@ func ParseFromReader(input io.Reader, opts ...Option) (*Program, error) {
 
 	hash := config.CalcHash()
 	if config.EnableCache {
-		if prog, ok := ttlSSAParseCache.Get(hash); ok {
-			return prog, nil
+		// Use single-flight behavior to ensure only one parsing operation per hash
+		result, err := ttlSSAParseCache.GetOrLoad(hash, func() (*programResult, error) {
+			ret, err := config.parseFile()
+			return &programResult{
+				prog: ret,
+				err:  err,
+			}, nil
+		})
+		if err != nil {
+			return nil, err
 		}
+		return result.prog, result.err
+	} else {
 	}
 
 	ret, err := config.parseFile()
-	if err == nil && config.EnableCache {
-		ttlSSAParseCache.SetWithTTL(hash, ret, 30*time.Minute)
-	}
 	return ret, err
 }
 
 func (p *Program) Feed(code io.Reader) error {
-	if p.config == nil || !p.config.feedCode || p.config.SelectedLanguageBuilder == nil {
+	if p.config == nil || !p.config.feedCode || p.config.LanguageBuilder == nil {
 		return utils.Errorf("not support language %s", p.config.language)
 	}
 
@@ -496,7 +569,12 @@ var Exports = map[string]any{
 	"ParseProject":       ParseProject,
 	"NewFromProgramName": FromDatabase,
 	"NewProgramFromDB":   FromDatabase,
+	// "NewRiskCompare":     NewSSAComparator[*schema.SSARisk],
+	// "NewRiskCompareItem": NewSSARiskComparisonItem,
 
+	"withProjectName": WithProjectName,
+
+	"withConcurrency":        WithConcurrency,
 	"withLanguage":           WithRawLanguage,
 	"withConfigInfo":         WithConfigInfo,
 	"withExternLib":          WithExternLib,
@@ -511,6 +589,19 @@ var Exports = map[string]any{
 	"withPeepholeSize":       WithPeepholeSize,
 	"withExcludeFile":        WithExcludeFile,
 	"withDefaultExcludeFunc": DefaultExcludeFunc,
+	"withMemory":             WithMemory,
+
+	//diff compare
+	// "withDiffProgName":          DiffWithProgram,
+	// "withDiffRuleName":          DiffWithRuleName,
+	// "withDiffVariableName":      DiffWithVariableName,
+	// "withDiffRuntimeId":         DiffWithRuntimeId,
+	// "withGenerateHash":          WithSSARiskComparisonInfoGenerate,
+	// "withCompareResultCallback": WithSSARiskDiffResultHandler,
+	// "withDefaultRiskSave":       WithSSARiskDiffSaveResultHandler,
+	//diff compare kind
+	"progName":  schema.Program,
+	"runtimeId": schema.RuntimeId,
 
 	// language:
 	"Javascript": JS,

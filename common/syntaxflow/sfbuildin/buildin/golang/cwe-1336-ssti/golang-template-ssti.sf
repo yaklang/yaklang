@@ -2,99 +2,81 @@ desc(
 	title: "Check Golang Server-Side Template Injection Vulnerability"
 	type: audit
 	severity: high
+	risk: "ssti"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。当应用程序将用户可控的数据或请求参数直接用于动态生成或修改模板内容，而没有进行适当的安全处理（如转义或验证）时，攻击者就可以通过注入模板引擎可识别的特殊语法来执行任意操作。这可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
-
+在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。当应用程序将用户可控的数据或请求参数直接用于动态生成或修改模板内容，而没有进行适当的安全处理（如转义或验证）时，攻击者就可以通过注入模板引擎可识别的特殊语法来执行任意操作。这可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
 2. **触发场景**
-   SSTI 漏洞通常发生在以下场景：
-   - 用户输入直接嵌入模板：将用户输入直接拼接到模板字符串中，例如 `tmpl := fmt.Sprintf("Hello, %s!", username)`。
-   - 未转义用户输入：未对用户输入进行转义或过滤，导致模板引擎将其解析为可执行的代码。
-
-   ```go
-   package main
-
-   import (
-       "fmt"
-       "html/template"
-       "net/http"
-   )
-
-   func main() {
-       http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
-           // 获取用户输入
-           username := r.URL.Query().Get("name")
-
-           // 直接拼接用户输入到模板中，存在SSTI风险
-           tmpl := fmt.Sprintf("Hello, %s!", username)
-
-           // 渲染模板
-           t := template.Must(template.New("greet").Parse(tmpl))
-           t.Execute(w, nil)
-       })
-
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-   攻击者可以通过注入模板语法来执行恶意代码，例如在`name`参数中输入 `{{ 7 * 7 }}`，服务端会将 `Hello, {{ 7 * 7 }}!` 作为模板进行解析，并输出 `Hello, 49!`，验证了SSTI的存在。如果模板引擎或上下文提供了危险函数，更可能导致任意命令执行。
-   
+SSTI 漏洞通常发生在以下场景：
+- 用户输入直接嵌入模板：将用户输入直接拼接到模板字符串中，例如 `tmpl := fmt.Sprintf("Hello, %s!", username)`。
+- 未转义用户输入：未对用户输入进行转义或过滤，导致模板引擎将其解析为可执行的代码。
+```go
+package main
+import (
+"fmt"
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 直接拼接用户输入到模板中，存在SSTI风险
+tmpl := fmt.Sprintf("Hello, %s!", username)
+// 渲染模板
+t := template.Must(template.New("greet").Parse(tmpl))
+t.Execute(w, nil)
+})
+http.ListenAndServe(":8080", nil)
+}
+```
+攻击者可以通过注入模板语法来执行恶意代码，例如在`name`参数中输入 `{{ 7 * 7 }}`，服务端会将 `Hello, {{ 7 * 7 }}!` 作为模板进行解析，并输出 `Hello, 49!`，验证了SSTI的存在。如果模板引擎或上下文提供了危险函数，更可能导致任意命令执行。
 3. **潜在影响**
-    - **任意代码执行:** 攻击者可以利用模板引擎的功能调用系统命令或执行任意代码，完全控制服务器。
-    - **敏感信息泄露:** 攻击者可以通过模板语法访问应用配置、文件内容或环境变量等敏感数据。
-    - **服务中断:** 攻击者可能通过注入恶意负载导致模板解析出错或资源耗尽，使服务不可用。
-    - **权限绕过:** 在某些情况下，SSTI可能被用于绕过应用程序的访问控制逻辑。
+- **任意代码执行:** 攻击者可以利用模板引擎的功能调用系统命令或执行任意代码，完全控制服务器。
+- **敏感信息泄露:** 攻击者可以通过模板语法访问应用配置、文件内容或环境变量等敏感数据。
+- **服务中断:** 攻击者可能通过注入恶意负载导致模板解析出错或资源耗尽，使服务不可用。
+- **权限绕过:** 在某些情况下，SSTI可能被用于绕过应用程序的访问控制逻辑。
 DESC
 	rule_id: "215e8ad8-2977-4cd4-9446-d0040ffec286"
 	title_zh: "检测Golang服务器端模板注入漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免将用户输入直接用于生成模板字符串**
-   不要直接将用户可控的数据拼接到用于解析模板的字符串中。尽量使用固定的模板结构，并将用户输入作为数据传递给模板引擎进行渲染。
-
-   ```go
-   package main
-
-   import (
-       "html/template"
-       "net/http"
-   )
-
-   func main() {
-       http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
-           // 获取用户输入
-           username := r.URL.Query().Get("name")
-
-           // 使用安全的模板变量替换
-           t := template.Must(template.New("greet").Parse("Hello, {{ . }}!"))
-           // 将用户输入作为数据传递，模板引擎会自动处理转义
-           t.Execute(w, username)
-       })
-
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-
+不要直接将用户可控的数据拼接到用于解析模板的字符串中。尽量使用固定的模板结构，并将用户输入作为数据传递给模板引擎进行渲染。
+```go
+package main
+import (
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 使用安全的模板变量替换
+t := template.Must(template.New("greet").Parse("Hello, {{ . }}!"))
+// 将用户输入作为数据传递，模板引擎会自动处理转义
+t.Execute(w, username)
+})
+http.ListenAndServe(":8080", nil)
+}
+```
 2. **对用户输入进行严格的输入验证和过滤**
-   在将用户输入传递给模板引擎之前，对其进行严格的验证和过滤。根据预期的输入类型（如字符串、数字），检查其是否包含异常字符或模板语法标记。可以使用正则表达式或其他过滤函数移除或转义潜在的恶意内容。
-
+在将用户输入传递给模板引擎之前，对其进行严格的验证和过滤。根据预期的输入类型（如字符串、数字），检查其是否包含异常字符或模板语法标记。可以使用正则表达式或其他过滤函数移除或转义潜在的恶意内容。
 3. **使用安全的模板引擎和自动上下文转义**
-   选择具备自动上下文感知转义功能的模板引擎，例如 Go 标准库的 `html/template`。这些引擎能够根据输出的HTML上下文自动对数据进行HTML实体转义，从而防止XSS（跨站脚本）等相关漏洞。
-
+选择具备自动上下文感知转义功能的模板引擎，例如 Go 标准库的 `html/template`。这些引擎能够根据输出的HTML上下文自动对数据进行HTML实体转义，从而防止XSS（跨站脚本）等相关漏洞。
 4. **限制模板引擎的功能**
-   如果可能，限制模板引擎能够访问的对象和函数。移除或禁用可能允许执行系统命令、访问文件系统或调用危险函数的模板功能。
-
+如果可能，限制模板引擎能够访问的对象和函数。移除或禁用可能允许执行系统命令、访问文件系统或调用危险函数的模板功能。
 5. **使用最小权限原则**
-   运行应用程序的进程应使用具有最小必要权限的账户，以限制即使发生SSTI漏洞，攻击者能够造成的损害范围。
+运行应用程序的进程应使用具有最小必要权限的账户，以限制即使发生SSTI漏洞，攻击者能够造成的损害范围。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-1336: Server-Side Template Injection](https://cwe.mitre.org/data/definitions/1336.html)
 REFERENCE
 )
 
-<include('golang-template')> as $sink;
+<include('golang-template-html')> as $sink;
 <include('golang-http-source')> as $source
 
 $sink.Must(* #{
@@ -108,95 +90,79 @@ $target #{
 
 
 alert $high for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。当应用程序将用户可控的数据或请求参数直接用于动态生成或修改模板内容，而没有进行适当的安全处理（如转义或验证）时，攻击者就可以通过注入模板引擎可识别的特殊语法来执行任意操作。这可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
-
+在 Go 语言中，CWE-1336（Server-Side Template Injection, SSTI）漏洞通常发生在使用模板引擎时，未对用户输入进行严格过滤，导致攻击者可以注入恶意代码。当应用程序将用户可控的数据或请求参数直接用于动态生成或修改模板内容，而没有进行适当的安全处理（如转义或验证）时，攻击者就可以通过注入模板引擎可识别的特殊语法来执行任意操作。这可能导致任意代码执行、敏感信息泄露或服务中断，因此属于高风险漏洞。
 2. **触发场景**
-   SSTI 漏洞通常发生在以下场景：
-   - 用户输入直接嵌入模板：将用户输入直接拼接到模板字符串中，例如 `tmpl := fmt.Sprintf("Hello, %s!", username)`。
-   - 未转义用户输入：未对用户输入进行转义或过滤，导致模板引擎将其解析为可执行的代码。
-
-   ```go
-   package main
-
-   import (
-       "fmt"
-       "html/template"
-       "net/http"
-   )
-
-   func main() {
-       http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
-           // 获取用户输入
-           username := r.URL.Query().Get("name")
-
-           // 直接拼接用户输入到模板中，存在SSTI风险
-           tmpl := fmt.Sprintf("Hello, %s!", username)
-
-           // 渲染模板
-           t := template.Must(template.New("greet").Parse(tmpl))
-           t.Execute(w, nil)
-       })
-
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-   攻击者可以通过注入模板语法来执行恶意代码，例如在`name`参数中输入 `{{ 7 * 7 }}`，服务端会将 `Hello, {{ 7 * 7 }}!` 作为模板进行解析，并输出 `Hello, 49!`，验证了SSTI的存在。如果模板引擎或上下文提供了危险函数，更可能导致任意命令执行。
-   
+SSTI 漏洞通常发生在以下场景：
+- 用户输入直接嵌入模板：将用户输入直接拼接到模板字符串中，例如 `tmpl := fmt.Sprintf("Hello, %s!", username)`。
+- 未转义用户输入：未对用户输入进行转义或过滤，导致模板引擎将其解析为可执行的代码。
+```go
+package main
+import (
+"fmt"
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 直接拼接用户输入到模板中，存在SSTI风险
+tmpl := fmt.Sprintf("Hello, %s!", username)
+// 渲染模板
+t := template.Must(template.New("greet").Parse(tmpl))
+t.Execute(w, nil)
+})
+http.ListenAndServe(":8080", nil)
+}
+```
+攻击者可以通过注入模板语法来执行恶意代码，例如在`name`参数中输入 `{{ 7 * 7 }}`，服务端会将 `Hello, {{ 7 * 7 }}!` 作为模板进行解析，并输出 `Hello, 49!`，验证了SSTI的存在。如果模板引擎或上下文提供了危险函数，更可能导致任意命令执行。
 3. **潜在影响**
-    - **任意代码执行:** 攻击者可以利用模板引擎的功能调用系统命令或执行任意代码，完全控制服务器。
-    - **敏感信息泄露:** 攻击者可以通过模板语法访问应用配置、文件内容或环境变量等敏感数据。
-    - **服务中断:** 攻击者可能通过注入恶意负载导致模板解析出错或资源耗尽，使服务不可用。
-    - **权限绕过:** 在某些情况下，SSTI可能被用于绕过应用程序的访问控制逻辑。
-CODE
+- **任意代码执行:** 攻击者可以利用模板引擎的功能调用系统命令或执行任意代码，完全控制服务器。
+- **敏感信息泄露:** 攻击者可以通过模板语法访问应用配置、文件内容或环境变量等敏感数据。
+- **服务中断:** 攻击者可能通过注入恶意负载导致模板解析出错或资源耗尽，使服务不可用。
+- **权限绕过:** 在某些情况下，SSTI可能被用于绕过应用程序的访问控制逻辑。
+DESC
 	level: "high",
 	type: "vuln",
-	title: "SSTI detected",
-	title_zh: "检测到SSTI",
-	solution: <<<CODE
+	title: "Golang Server-Side Template Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang服务器端模板注入漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **避免将用户输入直接用于生成模板字符串**
-   不要直接将用户可控的数据拼接到用于解析模板的字符串中。尽量使用固定的模板结构，并将用户输入作为数据传递给模板引擎进行渲染。
-
-   ```go
-   package main
-
-   import (
-       "html/template"
-       "net/http"
-   )
-
-   func main() {
-       http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
-           // 获取用户输入
-           username := r.URL.Query().Get("name")
-
-           // 使用安全的模板变量替换
-           t := template.Must(template.New("greet").Parse("Hello, {{ . }}!"))
-           // 将用户输入作为数据传递，模板引擎会自动处理转义
-           t.Execute(w, username)
-       })
-
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-
+不要直接将用户可控的数据拼接到用于解析模板的字符串中。尽量使用固定的模板结构，并将用户输入作为数据传递给模板引擎进行渲染。
+```go
+package main
+import (
+"html/template"
+"net/http"
+)
+func main() {
+http.HandleFunc("/greet", func(w http.ResponseWriter, r *http.Request) {
+// 获取用户输入
+username := r.URL.Query().Get("name")
+// 使用安全的模板变量替换
+t := template.Must(template.New("greet").Parse("Hello, {{ . }}!"))
+// 将用户输入作为数据传递，模板引擎会自动处理转义
+t.Execute(w, username)
+})
+http.ListenAndServe(":8080", nil)
+}
+```
 2. **对用户输入进行严格的输入验证和过滤**
-   在将用户输入传递给模板引擎之前，对其进行严格的验证和过滤。根据预期的输入类型（如字符串、数字），检查其是否包含异常字符或模板语法标记。可以使用正则表达式或其他过滤函数移除或转义潜在的恶意内容。
-
+在将用户输入传递给模板引擎之前，对其进行严格的验证和过滤。根据预期的输入类型（如字符串、数字），检查其是否包含异常字符或模板语法标记。可以使用正则表达式或其他过滤函数移除或转义潜在的恶意内容。
 3. **使用安全的模板引擎和自动上下文转义**
-   选择具备自动上下文感知转义功能的模板引擎，例如 Go 标准库的 `html/template`。这些引擎能够根据输出的HTML上下文自动对数据进行HTML实体转义，从而防止XSS（跨站脚本）等相关漏洞。
-
+选择具备自动上下文感知转义功能的模板引擎，例如 Go 标准库的 `html/template`。这些引擎能够根据输出的HTML上下文自动对数据进行HTML实体转义，从而防止XSS（跨站脚本）等相关漏洞。
 4. **限制模板引擎的功能**
-   如果可能，限制模板引擎能够访问的对象和函数。移除或禁用可能允许执行系统命令、访问文件系统或调用危险函数的模板功能。
-
+如果可能，限制模板引擎能够访问的对象和函数。移除或禁用可能允许执行系统命令、访问文件系统或调用危险函数的模板功能。
 5. **使用最小权限原则**
-   运行应用程序的进程应使用具有最小必要权限的账户，以限制即使发生SSTI漏洞，攻击者能够造成的损害范围。
-CODE
+运行应用程序的进程应使用具有最小必要权限的账户，以限制即使发生SSTI漏洞，攻击者能够造成的损害范围。
+SOLUTION
+	risk: "服务器端模板注入",
+	name: "high",
+	message: "检测到Go语言模板引擎中的服务器端模板注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 
 desc(
@@ -227,7 +193,7 @@ func main() {
     http.ListenAndServe(":8080", nil)
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://main.go': <<<SAFE
 package main
 
 import (

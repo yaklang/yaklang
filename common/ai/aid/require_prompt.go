@@ -2,10 +2,14 @@ package aid
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/log"
 	"io"
 	"strings"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 // CreateRequireUserInteract 创建一个需要用户输入的提示工具
@@ -78,23 +82,23 @@ type RequireInteractiveRequest struct {
 	Options []*RequireInteractiveRequestOption `json:"options"`
 }
 
-func (c *Config) RequireUserPromptWithEndpointResult(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *Endpoint, error) {
+func (c *Config) RequireUserPromptWithEndpointResult(prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *aicommon.Endpoint, error) {
 	return c.RequireUserPromptWithEndpointResultEx(c.ctx, prompt, opts...)
 }
 
-func (c *Config) RequireUserPromptWithEndpointResultEx(ctx context.Context, prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *Endpoint, error) {
-	ep := c.epm.createEndpointWithEventType(EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
+func (c *Config) RequireUserPromptWithEndpointResultEx(ctx context.Context, prompt string, opts ...*RequireInteractiveRequestOption) (aitool.InvokeParams, *aicommon.Endpoint, error) {
+	ep := c.epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 
 	req := &RequireInteractiveRequest{
-		Id:      ep.id,
+		Id:      ep.GetId(),
 		Prompt:  prompt,
 		Options: opts,
 	}
-	c.EmitRequireUserInteractive(req, ep.id)
-	c.doWaitAgreeWithPolicy(ctx, AgreePolicyManual, ep)
+	c.EmitRequireUserInteractive(req, ep.GetId())
+	c.doWaitAgreeWithPolicy(ctx, aicommon.AgreePolicyManual, ep)
 	params := ep.GetParams()
-	c.ReleaseInteractiveEvent(ep.id, params)
+	c.ReleaseInteractiveEvent(ep.GetId(), params)
 	return params, ep, nil
 }
 
@@ -104,17 +108,17 @@ func (c *Config) RequireUserPrompt(prompt string, opts ...*RequireInteractiveReq
 }
 
 func (c *Config) EmitRequireUserInteractive(i *RequireInteractiveRequest, id string) {
-	if ep, ok := c.epm.loadEndpoint(id); ok {
+	if ep, ok := c.epm.LoadEndpoint(id); ok {
 		ep.SetReviewMaterials(map[string]any{
 			"id":      i.Id,
 			"prompt":  i.Prompt,
 			"options": i.Options,
 		})
-		err := c.submitCheckpointRequest(ep.checkpoint, i)
+		err := c.SubmitCheckpointRequest(ep.GetCheckpoint(), i)
 		if err != nil {
 			log.Errorf("Failed to submit checkpoint request: %v", err)
 		}
 	}
 
-	c.emitInteractiveJson(id, EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
+	c.EmitInteractiveJSON(id, schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE, "require-user-interact", i)
 }

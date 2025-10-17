@@ -1,0 +1,64 @@
+__DESC__ = "一个强大的PowerShell命令执行工具，允许用户在受控环境中执行任意PowerShell脚本和命令，支持超时控制和输出捕获，适用于Windows高级系统管理、自动化脚本执行和DevOps操作。"
+__VERBOSE_NAME__ = "Windows PowerShell命令执行"
+__KEYWORDS__ = "powershell command,ps1脚本,windows管理,命令行工具,系统管理,自动化脚本,运维工具,powershell script,command execution,系统操作,ps脚本,终端命令,system administration,automation tools,操作系统,windows高级命令,devops工具"
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数：超时时间和要执行的PowerShell命令
+timeoutSeconds := cli.Int("timeout", cli.setRequired(false), cli.setHelp("the timeout seconds for the PowerShell command, default 10, timeout cannot be zero and below"), cli.setDefault(10))
+command := cli.String("command", cli.setRequired(true), cli.setHelp("the PowerShell command or script you want to execute"))
+
+cli.check()
+
+yakit.Info("Executing PowerShell command: %v", command)
+
+// 验证超时参数，确保不为零或负数
+if timeoutSeconds <= 0 {
+    timeoutSeconds = 10
+}
+
+// 创建带超时的上下文，保护系统资源
+ctx, cancel = context.WithTimeout(context.Background(), time.ParseDuration(sprint(timeoutSeconds) + "s")~)
+
+// 构建PowerShell命令执行器，使用Windows PowerShell
+// 使用 -NoProfile 避免加载用户配置文件，-ExecutionPolicy Bypass 允许执行脚本
+// -Command 参数用于执行命令
+cmd, err := exec.CommandContext(ctx, "powershell.exe -NoProfile -ExecutionPolicy Bypass -Command %s" % command)
+if err != nil {
+    yakit.Error("Failed to create PowerShell command: %v", err)
+    return
+}
+
+// 创建输出缓冲区以捕获命令结果
+stdoutbuf = bufio.NewBuffer()
+stderrbuf = bufio.NewBuffer()
+cmd.Stdout = stdoutbuf
+cmd.Stderr = stderrbuf
+
+// 执行命令并处理结果
+err = cmd.Run()
+if err != nil {
+    yakit.Error("PowerShell command execution failed: %v", err)
+}
+
+toUtf8 = (s)=>{
+    res,err = codec.GBKSafe(s)
+    if err {
+        return s
+    }
+    return res
+}
+
+// 输出执行结果
+count := 0
+if stdoutbuf.Len() > 0 {
+    count++
+    yakit.Info("Stdout:\n%v", toUtf8(stdoutbuf.String()))
+}
+if stderrbuf.Len() > 0 {
+    count++
+    yakit.Info("Stderr:\n%v", toUtf8(stderrbuf.String()))
+}
+if count <= 0 {
+    yakit.Info("No output found, PowerShell command execution failed or output is empty")
+}

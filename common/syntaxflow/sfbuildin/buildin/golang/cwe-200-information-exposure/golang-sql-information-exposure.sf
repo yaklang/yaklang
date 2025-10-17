@@ -4,92 +4,80 @@ desc(
 	severity: low
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL信息泄露漏洞通常不是由 SQL 注入本身引起，而是由于应用程序在执行特定 SQL 查询时，将数据库或服务器的敏感信息（而非业务数据）作为查询结果返回给用户或日志中。这些查询可能被硬编码在代码中，或者通过不安全的输入方式构建。泄露的信息可能包括数据库的名称、版本、操作系统信息、甚至文件路径，这些信息对于攻击者进行下一步的攻击（如选择攻击手法、判断攻击目标环境）至关重要。
-
+SQL信息泄露漏洞通常不是由 SQL 注入本身引起，而是由于应用程序在执行特定 SQL 查询时，将数据库或服务器的敏感信息（而非业务数据）作为查询结果返回给用户或日志中。这些查询可能被硬编码在代码中，或者通过不安全的输入方式构建。泄露的信息可能包括数据库的名称、版本、操作系统信息、甚至文件路径，这些信息对于攻击者进行下一步的攻击（如选择攻击手法、判断攻击目标环境）至关重要。
 2. **触发场景**
-   当 Golang 应用程序执行包含以下敏感查询的 SQL 语句，并且查询结果被输出到用户界面、API 响应、日志文件或错误信息中时，可能发生信息泄露：
-   - 查询数据库版本（如 `SELECT version()`）
-   - 查询当前数据库名称（如 `SELECT current_database()`）
-   - 查询文件路径或目录结构（如通过某些数据库函数，尽管在标准 SQL 中不常见，但在特定数据库扩展或错误处理中可能出现）
-   - 查询操作系统信息等
-
-   ```go
-   // 存在漏洞的代码示例
-   func getCurrentDatabase(db *sql.DB) {
-       var dbName string
-       // 直接查询数据库名称并输出
-       err := db.QueryRow("SELECT current_database()").Scan(&dbName)
-       if err != nil {
-           fmt.Println("Failed to get current database:", err)
-           return
-       }
-       fmt.Println("Current database:", dbName) // 泄露数据库名称
-   }
-
-   func getServerVersion(db *sql.DB) {
-       var version string
-       // 直接查询数据库版本并输出
-       err := db.QueryRow("SELECT version()").Scan(&version)
-       if err != nil {
-           fmt.Println("Failed to get server version:", err)
-           return
-       }
-       fmt.Println("Server version:", version) // 泄露服务器版本信息
-   }
-   ```
-
+当 Golang 应用程序执行包含以下敏感查询的 SQL 语句，并且查询结果被输出到用户界面、API 响应、日志文件或错误信息中时，可能发生信息泄露：
+- 查询数据库版本（如 `SELECT version()`）
+- 查询当前数据库名称（如 `SELECT current_database()`）
+- 查询文件路径或目录结构（如通过某些数据库函数，尽管在标准 SQL 中不常见，但在特定数据库扩展或错误处理中可能出现）
+- 查询操作系统信息等
+```go
+// 存在漏洞的代码示例
+func getCurrentDatabase(db *sql.DB) {
+var dbName string
+// 直接查询数据库名称并输出
+err := db.QueryRow("SELECT current_database()").Scan(&dbName)
+if err != nil {
+fmt.Println("Failed to get current database:", err)
+return
+}
+fmt.Println("Current database:", dbName) // 泄露数据库名称
+}
+func getServerVersion(db *sql.DB) {
+var version string
+// 直接查询数据库版本并输出
+err := db.QueryRow("SELECT version()").Scan(&version)
+if err != nil {
+fmt.Println("Failed to get server version:", err)
+return
+}
+fmt.Println("Server version:", version) // 泄露服务器版本信息
+}
+```
 3. **潜在影响**
-   攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻击的风险。
+攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻击的风险。
 DESC
 	rule_id: "a549400b-af87-4955-b792-5dbb1fcce409"
 	title_zh: "检测Golang SQL信息泄露"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免在生产环境中执行或泄露敏感的数据库查询结果
 不要在应用程序中硬编码或允许执行会返回敏感系统信息的 SQL 查询，除非是必要的管理功能且仅限于授权用户和安全的环境。确保这些查询的结果或任何包含系统信息的错误消息不会被发送到外部。
-
 #### 2. 过滤或模糊化输出的敏感信息
 如果确实需要执行包含敏感信息的查询（例如用于内部监控），在将结果输出到日志或任何可能被外部看到的渠道之前，对敏感信息进行过滤、删除或模糊化处理。
-
 ```go
 // 修复代码示例：过滤敏感数据库名称
 func getCurrentDatabase(db *sql.DB) {
-    var dbName string
-    err := db.QueryRow("SELECT current_database()").Scan(&dbName)
-    if err != nil {
-        fmt.Println("Failed to get current database:", err)
-        return
-    }
-
-    // 对敏感数据库名称进行过滤或替换
-    if dbName == "sensitive_production_db" { // 示例：假设"sensitive_production_db"是敏感名称
-        fmt.Println("Current database: [REDACTED]")
-    } else {
-        fmt.Println("Current database:", dbName)
-    }
+var dbName string
+err := db.QueryRow("SELECT current_database()").Scan(&dbName)
+if err != nil {
+fmt.Println("Failed to get current database:", err)
+return
 }
-
+// 对敏感数据库名称进行过滤或替换
+if dbName == "sensitive_production_db" { // 示例：假设"sensitive_production_db"是敏感名称
+fmt.Println("Current database: [REDACTED]")
+} else {
+fmt.Println("Current database:", dbName)
+}
+}
 // 修复代码示例：模糊化服务器版本信息
 func getServerVersion(db *sql.DB) {
-    var version string
-    err := db.QueryRow("SELECT version()").Scan(&version)
-    if err != nil {
-        fmt.Println("Failed to get server version:", err)
-        return
-    }
-
-    // 检查是否包含特定数据库类型，然后模糊化
-    if strings.Contains(version, "PostgreSQL") || strings.Contains(version, "MySQL") { // 示例：识别常见数据库类型
-        fmt.Println("Server version: [REDACTED]") // 不泄露具体版本号
-    } else {
-        fmt.Println("Server version:", version)
-    }
+var version string
+err := db.QueryRow("SELECT version()").Scan(&version)
+if err != nil {
+fmt.Println("Failed to get server version:", err)
+return
+}
+// 检查是否包含特定数据库类型，然后模糊化
+if strings.Contains(version, "PostgreSQL") || strings.Contains(version, "MySQL") { // 示例：识别常见数据库类型
+fmt.Println("Server version: [REDACTED]") // 不泄露具体版本号
+} else {
+fmt.Println("Server version:", version)
+}
 }
 ```
-
 #### 3. 最小化日志或错误输出中的敏感信息
 配置日志系统，避免在日志中记录包含敏感系统信息的 SQL 查询结果或详细的错误堆栈信息，尤其是那些可能暴露在外部的日志。对于外部用户，提供通用的错误消息，而不是详细的技术错误。
 SOLUTION
@@ -101,6 +89,7 @@ REFERENCE
 <include('golang-database-sink')> as $sink;
 
 $sink.QueryRow(* #-> as $param)
+$sink.Query(* #-> as $param)
 
 $param #{ 
 	include:`*?{opcode:const}?{have:'SELECT current_database()'}`,
@@ -110,105 +99,96 @@ $param #{
 }-> as $low;
 
 alert $low for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL信息泄露漏洞通常不是由 SQL 注入本身引起，而是由于应用程序在执行特定 SQL 查询时，将数据库或服务器的敏感信息（而非业务数据）作为查询结果返回给用户或日志中。这些查询可能被硬编码在代码中，或者通过不安全的输入方式构建。泄露的信息可能包括数据库的名称、版本、操作系统信息、甚至文件路径，这些信息对于攻击者进行下一步的攻击（如选择攻击手法、判断攻击目标环境）至关重要。
-
+SQL信息泄露漏洞通常不是由 SQL 注入本身引起，而是由于应用程序在执行特定 SQL 查询时，将数据库或服务器的敏感信息（而非业务数据）作为查询结果返回给用户或日志中。这些查询可能被硬编码在代码中，或者通过不安全的输入方式构建。泄露的信息可能包括数据库的名称、版本、操作系统信息、甚至文件路径，这些信息对于攻击者进行下一步的攻击（如选择攻击手法、判断攻击目标环境）至关重要。
 2. **触发场景**
-   当 Golang 应用程序执行包含以下敏感查询的 SQL 语句，并且查询结果被输出到用户界面、API 响应、日志文件或错误信息中时，可能发生信息泄露：
-   - 查询数据库版本（如 `SELECT version()`）
-   - 查询当前数据库名称（如 `SELECT current_database()`）
-   - 查询文件路径或目录结构（如通过某些数据库函数，尽管在标准 SQL 中不常见，但在特定数据库扩展或错误处理中可能出现）
-   - 查询操作系统信息等
-
-   ```go
-   // 存在漏洞的代码示例
-   func getCurrentDatabase(db *sql.DB) {
-       var dbName string
-       // 直接查询数据库名称并输出
-       err := db.QueryRow("SELECT current_database()").Scan(&dbName)
-       if err != nil {
-           fmt.Println("Failed to get current database:", err)
-           return
-       }
-       fmt.Println("Current database:", dbName) // 泄露数据库名称
-   }
-
-   func getServerVersion(db *sql.DB) {
-       var version string
-       // 直接查询数据库版本并输出
-       err := db.QueryRow("SELECT version()").Scan(&version)
-       if err != nil {
-           fmt.Println("Failed to get server version:", err)
-           return
-       }
-       fmt.Println("Server version:", version) // 泄露服务器版本信息
-   }
-   ```
-
+当 Golang 应用程序执行包含以下敏感查询的 SQL 语句，并且查询结果被输出到用户界面、API 响应、日志文件或错误信息中时，可能发生信息泄露：
+- 查询数据库版本（如 `SELECT version()`）
+- 查询当前数据库名称（如 `SELECT current_database()`）
+- 查询文件路径或目录结构（如通过某些数据库函数，尽管在标准 SQL 中不常见，但在特定数据库扩展或错误处理中可能出现）
+- 查询操作系统信息等
+```go
+// 存在漏洞的代码示例
+func getCurrentDatabase(db *sql.DB) {
+var dbName string
+// 直接查询数据库名称并输出
+err := db.QueryRow("SELECT current_database()").Scan(&dbName)
+if err != nil {
+fmt.Println("Failed to get current database:", err)
+return
+}
+fmt.Println("Current database:", dbName) // 泄露数据库名称
+}
+func getServerVersion(db *sql.DB) {
+var version string
+// 直接查询数据库版本并输出
+err := db.QueryRow("SELECT version()").Scan(&version)
+if err != nil {
+fmt.Println("Failed to get server version:", err)
+return
+}
+fmt.Println("Server version:", version) // 泄露服务器版本信息
+}
+```
 3. **潜在影响**
-   攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻擊的风险。
-CODE
+攻击者利用泄露的信息可以更好地了解目标系统的架构、所使用的数据库类型和版本、操作系统等，从而辅助他们选择更具针对性的攻击手段，例如利用已知漏洞、进行字典攻击等。间接增加了被攻击的风险。
+DESC
 	level: "low",
 	type: "vuln",
 	title: "Detect Golang SQL Information Exposure",
 	title_zh: "检测Golang SQL信息泄露",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免在生产环境中执行或泄露敏感的数据库查询结果
 不要在应用程序中硬编码或允许执行会返回敏感系统信息的 SQL 查询，除非是必要的管理功能且仅限于授权用户和安全的环境。确保这些查询的结果或任何包含系统信息的错误消息不会被发送到外部。
-
 #### 2. 过滤或模糊化输出的敏感信息
 如果确实需要执行包含敏感信息的查询（例如用于内部监控），在将结果输出到日志或任何可能被外部看到的渠道之前，对敏感信息进行过滤、删除或模糊化处理。
-
 ```go
 // 修复代码示例：过滤敏感数据库名称
 func getCurrentDatabase(db *sql.DB) {
-    var dbName string
-    err := db.QueryRow("SELECT current_database()").Scan(&dbName)
-    if err != nil {
-        fmt.Println("Failed to get current database:", err)
-        return
-    }
-
-    // 对敏感数据库名称进行过滤或替换
-    if dbName == "sensitive_production_db" { // 示例：假设"sensitive_production_db"是敏感名称
-        fmt.Println("Current database: [REDACTED]")
-    } else {
-        fmt.Println("Current database:", dbName)
-    }
+var dbName string
+err := db.QueryRow("SELECT current_database()").Scan(&dbName)
+if err != nil {
+fmt.Println("Failed to get current database:", err)
+return
 }
-
+// 对敏感数据库名称进行过滤或替换
+if dbName == "sensitive_production_db" { // 示例：假设"sensitive_production_db"是敏感名称
+fmt.Println("Current database: [REDACTED]")
+} else {
+fmt.Println("Current database:", dbName)
+}
+}
 // 修复代码示例：模糊化服务器版本信息
 func getServerVersion(db *sql.DB) {
-    var version string
-    err := db.QueryRow("SELECT version()").Scan(&version)
-    if err != nil {
-        fmt.Println("Failed to get server version:", err)
-        return
-    }
-
-    // 检查是否包含特定数据库类型，然后模糊化
-    if strings.Contains(version, "PostgreSQL") || strings.Contains(version, "MySQL") { // 示例：识别常见数据库类型
-        fmt.Println("Server version: [REDACTED]") // 不泄露具体版本号
-    } else {
-        fmt.Println("Server version:", version)
-    }
+var version string
+err := db.QueryRow("SELECT version()").Scan(&version)
+if err != nil {
+fmt.Println("Failed to get server version:", err)
+return
+}
+// 检查是否包含特定数据库类型，然后模糊化
+if strings.Contains(version, "PostgreSQL") || strings.Contains(version, "MySQL") { // 示例：识别常见数据库类型
+fmt.Println("Server version: [REDACTED]") // 不泄露具体版本号
+} else {
+fmt.Println("Server version:", version)
+}
 }
 ```
-
 #### 3. 最小化日志或错误输出中的敏感信息
 配置日志系统，避免在日志中记录包含敏感系统信息的 SQL 查询结果或详细的错误堆栈信息，尤其是那些可能暴露在外部的日志。对于外部用户，提供通用的错误消息，而不是详细的技术错误。
-CODE
+SOLUTION
+	name: "low",
+	message: "检测到Golang应用程序中存在SQL信息泄露风险，查询结果可能暴露敏感系统信息。",
+	risk: "信息泄露",
 }
 
 desc(
 	lang: golang
 	alert_low: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -287,4 +267,61 @@ func getServerVersion(db *sql.DB) {
 }
 
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "database/sql"
+    "fmt"
+    _ "github.com/lib/pq"
+    "strings"
+)
+
+func main() {
+    // 连接到 PostgreSQL 数据库
+    connStr := "user=username dbname=mydb sslmode=disable"
+    db, err := sql.Open("postgres", connStr)
+    if err != nil {
+        fmt.Println("Failed to connect to database:", err)
+        return
+    }
+    defer db.Close()
+
+    // 列出表（防止目录结构暴露）
+    listTables(db)
+
+    // 获取当前数据库（防止路径泄露）
+    getCurrentDatabase(db)
+
+    // 获取服务器版本（防止系统类型识别）
+    getServerVersion(db)
+}
+
+func listTables(db *sql.DB) {
+    rows, err := db.Query("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name NOT LIKE 'pg_%'")
+    if err != nil {
+        fmt.Println("Failed to list tables:", err)
+        return
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var tableName string
+        if err := rows.Scan(&tableName); err != nil {
+            fmt.Println("Failed to scan table name:", err)
+            return
+        }
+        fmt.Println("Table:", tableName)
+    }
+}
+
+func getCurrentDatabase(db *sql.DB) {
+  
+}
+
+func getServerVersion(db *sql.DB) {
+    
+}
+
+SAFE
 )

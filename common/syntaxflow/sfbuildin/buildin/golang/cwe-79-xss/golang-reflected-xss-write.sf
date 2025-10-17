@@ -2,46 +2,36 @@ desc(
 	title: "Check Golang Reflected XSS Vulnerability"
 	type: audit
 	severity: high
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。
-
 在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。此漏洞具有高风险，因为它允许攻击者绕过同源策略，执行任意 JavaScript 代码，对受害者进行攻击。
-
 2. **触发场景**
 反射型 XSS 漏洞通常发生在以下场景：
-
 用户输入被直接嵌入到 HTML 页面中，例如通过字符串拼接生成 HTML 内容。
 未对用户输入进行 HTML 转义，导致恶意脚本被浏览器解析执行。
 以下是存在漏洞的 Go 代码示例：
-
 ```go
 package main
-
 import (
-	"net/http"
-	"html/template"
+"net/http"
+"html/template"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	// 从查询参数中获取用户输入
-	name := r.URL.Query().Get("name")
-
-	// 直接将用户输入插入到 HTML 中
-	tmpl := `<h1>Hello, ` + name + `!</h1>`
-	w.Write([]byte(tmpl))
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 直接将用户输入插入到 HTML 中
+tmpl := `<h1>Hello, ` + name + `!</h1>`
+w.Write([]byte(tmpl))
 }
-
 func main() {
-	http.HandleFunc("/", handler);
-	http.ListenAndServe(":8080", nil);
+http.HandleFunc("/", handler);
+http.ListenAndServe(":8080", nil);
 }
 ```
-
 如上所示，程序从用户请求的参数中获取 `name` 的值，并直接将其拼接到 HTML 模版中。如果攻击者构造 `name` 参数为 `<script>alert('XSS')</script>`，则在浏览器中打开该页面时就会执行弹窗脚本。
-
 3. **潜在影响**
 - 攻击者可以窃取用户的 Cookies 和 Session 信息，导致会话劫持。
 - 攻击者可以冒充受害者执行操作。
@@ -52,198 +42,163 @@ DESC
 	title_zh: "检测Golang反射型XSS漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用模板引擎或内置转义函数**
-   使用Go标准库中的`html/template`等模板引擎，它们在渲染时会自动对用户输入进行HTML实体转义，防止恶意脚本执行。
-   ```go
-   // 修复代码示例
-   package main
-
-   import (
-   	"net/http"
-   	"html/template"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-   	// 从查询参数中获取用户输入
-   	name := r.URL.Query().Get("name")
-
-   	// 使用模板引擎和占位符进行安全输出
-   	tmpl, _ := template.New("hello").Parse(`<h1>Hello, {{.}}!</h1>`) // 使用 {{.}} 占位符
-   	tmpl.Execute(w, name) // 将name参数传递给模板进行渲染和转义
-   }
-
-   func main() {
-   	http.HandleFunc("/", handler);
-   	http.ListenAndServe(":8080", nil);
-   }
-   ```
-   或者使用内置的 `html.EscapeString` 函数手动进行转义：
-   ```go
-   // 修复代码示例（手动转义）
-   package main
-
-   import (
-   	"net/http"
-   	"html"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-   	// 从查询参数中获取用户输入
-   	name := r.URL.Query().Get("name")
-
-   	// 手动对用户输入进行HTML转义
-   	escapedName := html.EscapeString(name)
-   
-   	// 将转义后的输入嵌入到HTML中
-   	tmpl := `<h1>Hello, ` + escapedName + `!</h1>`
-   	w.Write([]byte(tmpl))
-   }
-
-   func main() {
-   	http.HandleFunc("/", handler);
-   	http.ListenAndServe(":8080", nil);
-   }
-   ```
-
+使用Go标准库中的`html/template`等模板引擎，它们在渲染时会自动对用户输入进行HTML实体转义，防止恶意脚本执行。
+```go
+// 修复代码示例
+package main
+import (
+"net/http"
+"html/template"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 使用模板引擎和占位符进行安全输出
+tmpl, _ := template.New("hello").Parse(`<h1>Hello, {{.}}!</h1>`) // 使用 {{.}} 占位符
+tmpl.Execute(w, name) // 将name参数传递给模板进行渲染和转义
+}
+func main() {
+http.HandleFunc("/", handler);
+http.ListenAndServe(":8080", nil);
+}
+```
+或者使用内置的 `html.EscapeString` 函数手动进行转义：
+```go
+// 修复代码示例（手动转义）
+package main
+import (
+"net/http"
+"html"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 手动对用户输入进行HTML转义
+escapedName := html.EscapeString(name)
+// 将转义后的输入嵌入到HTML中
+tmpl := `<h1>Hello, ` + escapedName + `!</h1>`
+w.Write([]byte(tmpl))
+}
+func main() {
+http.HandleFunc("/", handler);
+http.ListenAndServe(":8080", nil);
+}
+```
 2. **输入验证和过滤**
-   对用户输入进行严格的验证和过滤，只允许合法的字符、格式或内容通过。虽然不能完全阻止XSS，但可以降低风险。
-
+对用户输入进行严格的验证和过滤，只允许合法的字符、格式或内容通过。虽然不能完全阻止XSS，但可以降低风险。
 3. **设置HTTP头增强安全性**
-   设置 Content-Security-Policy (CSP) 等 HTTP 头，限制浏览器加载和执行资源的来源，减少XSS攻击的潜在影响。
+设置 Content-Security-Policy (CSP) 等 HTTP 头，限制浏览器加载和执行资源的来源，减少XSS攻击的潜在影响。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-79](https://cwe.mitre.org/data/definitions/79.html)
 REFERENCE
 )
 
-
-http.Request as $source 
+<include('golang-user-input')> as $input;
 <include('golang-http-sink')> as $output;
-$output.Write(* as $sink)
-$sink #{
-	until: "* & $source",
-}-> as $high 
+$output.Write(<slice(index=1)>* #-> as $sink)
+$sink & $input as $high 
 
 alert $high for {
-	title: "Reflected XSS detected",
-	title_zh: "检测到反射XSS",
-	solution: <<<CODE
+	title: "Golang Reflected XSS Vulnerability Was Detected",
+	title_zh: "检测到Golang反射型XSS漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用模板引擎或内置转义函数**
-   使用Go标准库中的`html/template`等模板引擎，它们在渲染时会自动对用户输入进行HTML实体转义，防止恶意脚本执行。
-   ```go
-   // 修复代码示例
-   package main
-
-   import (
-   	"net/http"
-   	"html/template"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-   	// 从查询参数中获取用户输入
-   	name := r.URL.Query().Get("name")
-
-   	// 使用模板引擎和占位符进行安全输出
-   	tmpl, _ := template.New("hello").Parse(`<h1>Hello, {{.}}!</h1>`) // 使用 {{.}} 占位符
-   	tmpl.Execute(w, name) // 将name参数传递给模板进行渲染和转义
-   }
-
-   func main() {
-   	http.HandleFunc("/", handler);
-   	http.ListenAndServe(":8080", nil);
-   }
-   ```
-   或者使用内置的 `html.EscapeString` 函数手动进行转义：
-   ```go
-   // 修复代码示例（手动转义）
-   package main
-
-   import (
-   	"net/http"
-   	"html"
-   )
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-   	// 从查询参数中获取用户输入
-   	name := r.URL.Query().Get("name")
-
-   	// 手动对用户输入进行HTML转义
-   	escapedName := html.EscapeString(name)
-   
-   	// 将转义后的输入嵌入到HTML中
-   	tmpl := `<h1>Hello, ` + escapedName + `!</h1>`
-   	w.Write([]byte(tmpl))
-   }
-
-   func main() {
-   	http.HandleFunc("/", handler);
-   	http.ListenAndServe(":8080", nil);
-   }
-   ```
-
+使用Go标准库中的`html/template`等模板引擎，它们在渲染时会自动对用户输入进行HTML实体转义，防止恶意脚本执行。
+```go
+// 修复代码示例
+package main
+import (
+"net/http"
+"html/template"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 使用模板引擎和占位符进行安全输出
+tmpl, _ := template.New("hello").Parse(`<h1>Hello, {{.}}!</h1>`) // 使用 {{.}} 占位符
+tmpl.Execute(w, name) // 将name参数传递给模板进行渲染和转义
+}
+func main() {
+http.HandleFunc("/", handler);
+http.ListenAndServe(":8080", nil);
+}
+```
+或者使用内置的 `html.EscapeString` 函数手动进行转义：
+```go
+// 修复代码示例（手动转义）
+package main
+import (
+"net/http"
+"html"
+)
+func handler(w http.ResponseWriter, r *http.Request) {
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 手动对用户输入进行HTML转义
+escapedName := html.EscapeString(name)
+// 将转义后的输入嵌入到HTML中
+tmpl := `<h1>Hello, ` + escapedName + `!</h1>`
+w.Write([]byte(tmpl))
+}
+func main() {
+http.HandleFunc("/", handler);
+http.ListenAndServe(":8080", nil);
+}
+```
 2. **输入验证和过滤**
-   对用户输入进行严格的验证和过滤，只允许合法的字符、格式或内容通过。虽然不能完全阻止XSS，但可以降低风险。
-
+对用户输入进行严格的验证和过滤，只允许合法的字符、格式或内容通过。虽然不能完全阻止XSS，但可以降低风险。
 3. **设置HTTP头增强安全性**
-   设置 Content-Security-Policy (CSP) 等 HTTP 头，限制浏览器加载和执行资源的来源，减少XSS攻击的潜在影响。
-CODE
-	desc: <<<CODE
+设置 Content-Security-Policy (CSP) 等 HTTP 头，限制浏览器加载和执行资源的来源，减少XSS攻击的潜在影响。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 反射型跨站脚本攻击（Reflected XSS）是一种常见的 Web 安全漏洞，攻击者通过构造包含恶意脚本的 URL，诱使受害者点击该链接。当受害者浏览器加载该页面时，恶意脚本会被执行，从而允许攻击者窃取受害者的敏感信息或执行其他恶意操作。
-
 在 Go 语言编写的 Web 应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到 HTML 页面中，就可能导致反射型 XSS 漏洞。此漏洞具有高风险，因为它允许攻击者绕过同源策略，执行任意 JavaScript 代码，对受害者进行攻击。
-
 2. **触发场景**
 反射型 XSS 漏洞通常发生在以下场景：
-
 用户输入被直接嵌入到 HTML 页面中，例如通过字符串拼接生成 HTML 内容。
 未对用户输入进行 HTML 转义，导致恶意脚本被浏览器解析执行。
 以下是存在漏洞的 Go 代码示例：
-
 ```go
 package main
-
 import (
-	"net/http"
-	"html/template"
+"net/http"
+"html/template"
 )
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	// 从查询参数中获取用户输入
-	name := r.URL.Query().Get("name")
-
-	// 直接将用户输入插入到 HTML 中
-	tmpl := `<h1>Hello, ` + name + `!</h1>`
-	w.Write([]byte(tmpl))
+// 从查询参数中获取用户输入
+name := r.URL.Query().Get("name")
+// 直接将用户输入插入到 HTML 中
+tmpl := `<h1>Hello, ` + name + `!</h1>`
+w.Write([]byte(tmpl))
 }
-
 func main() {
-	http.HandleFunc("/", handler);
-	http.ListenAndServe(":8080", nil);
+http.HandleFunc("/", handler);
+http.ListenAndServe(":8080", nil);
 }
 ```
-
 如上所示，程序从用户请求的参数中获取 `name` 的值，并直接将其拼接到 HTML 模版中。如果攻击者构造 `name` 参数为 `<script>alert('XSS')</script>`，则在浏览器中打开该页面时就会执行弹窗脚本。
-
 3. **潜在影响**
--   攻击者可以窃取用户的 Cookies 和 Session 信息，导致会话劫持。
--   攻击者可以冒充受害者执行操作。
--   攻击者可以对用户进行钓鱼攻击，获取敏感信息。
--   攻击者可以篡改网页内容，进行恶意植入或传播恶意软件。
-CODE
+- 攻击者可以窃取用户的 Cookies 和 Session 信息，导致会话劫持。
+- 攻击者可以冒充受害者执行操作。
+- 攻击者可以对用户进行钓鱼攻击，获取敏感信息。
+- 攻击者可以篡改网页内容，进行恶意植入或传播恶意软件。
+DESC
 	level: "high",
 	type: "vuln",
+	message: "检测到Golang反射型XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "XSS",
+	name: "high",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -265,4 +220,26 @@ func main() {
 	http.ListenAndServe(":8080", nil)
 }
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"net/http"
+	"html/template"
+)
+
+func handler(w http.ResponseWriter, r *http.Request) {
+	// 从查询参数中获取用户输入
+	name := "name"
+
+	// 直接将用户输入插入到 HTML 中
+	tmpl := `<h1>Hello, ` + name + `!</h1>`
+	w.Write([]byte(tmpl))
+}
+
+func main() {
+	http.HandleFunc("/", handler)
+	http.ListenAndServe(":8080", nil)
+}
+SAFE
 )

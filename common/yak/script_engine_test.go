@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/orderedmap"
+	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 	"testing"
 	"time"
 
@@ -53,4 +54,24 @@ b = "a" in o`
 		flag = getVar
 	}
 	require.True(t, true, flag)
+}
+
+func TestScriptEngine_YakScript_callback(t *testing.T) {
+	code := ` 
+	println("a")
+`
+	engine := NewScriptEngine(10)
+	var nativeOk bool
+	engine.SetCallFuncCallback(func(caller *yakvm.Value, wavy bool, args []*yakvm.Value) {
+		if caller.GetLiteral() == "println" {
+			nativeOk = true
+		}
+	})
+	_, err := engine.ExecuteExWithContext(context.Background(), code, map[string]any{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(2 * time.Second)
+
+	require.True(t, nativeOk)
 }

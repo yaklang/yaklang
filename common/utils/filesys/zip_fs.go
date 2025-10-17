@@ -160,7 +160,7 @@ func (z *ZipFS) GetSeparators() rune {
 }
 
 func (z *ZipFS) PathSplit(s string) (string, string) {
-	return splitWithSeparator(s, z.GetSeparators())
+	return SplitWithSeparator(s, z.GetSeparators())
 }
 
 func (z *ZipFS) Ext(i string) string {
@@ -189,6 +189,11 @@ func (z *ZipFS) ReadFile(name string) ([]byte, error) {
 	}
 	defer rc.Close()
 	return io.ReadAll(rc)
+}
+
+func (f *ZipFS) String() string {
+	// TODO
+	return ""
 }
 
 type ZipDirEntry struct {

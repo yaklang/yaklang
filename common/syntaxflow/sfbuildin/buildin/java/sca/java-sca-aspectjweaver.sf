@@ -4,48 +4,39 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   此规则用于检查Java项目中是否存在aspectjweaver库的已知漏洞版本。aspectjweaver是一个用于Java的AOP（面向切面编程）库，它允许开发者在不修改源代码的情况下向程序添加横切关注点。如果项目中使用的aspectjweaver版本低于1.9.6，则可能存在反射性文件下载漏洞（CVE-2020-5398）。该漏洞是由于在处理某些特殊输入时，aspectjweaver未对用户提供的文件名进行充分的安全校验，导致攻击者可以构造恶意的文件名，利用反射机制下载并执行任意文件，从而危害系统的安全性。
-
+此规则用于检查Java项目中是否存在aspectjweaver库的已知漏洞版本。aspectjweaver是一个用于Java的AOP（面向切面编程）库，它允许开发者在不修改源代码的情况下向程序添加横切关注点。如果项目中使用的aspectjweaver版本低于1.9.6，则可能存在反射性文件下载漏洞（CVE-2020-5398）。该漏洞是由于在处理某些特殊输入时，aspectjweaver未对用户提供的文件名进行充分的安全校验，导致攻击者可以构造恶意的文件名，利用反射机制下载并执行任意文件，从而危害系统的安全性。
 2. **触发场景**
-   当攻击者可以控制加载到使用存在漏洞版本的aspectjweaver库的应用中的某些数据或配置时，即可触发该漏洞。攻击者可以构造特定的输入，使得应用在处理时触发反射性文件下载逻辑，下载并执行恶意文件。具体的触发方式取决于应用如何集成和使用aspectjweaver以及攻击者可控的输入点。
-
+当攻击者可以控制加载到使用存在漏洞版本的aspectjweaver库的应用中的某些数据或配置时，即可触发该漏洞。攻击者可以构造特定的输入，使得应用在处理时触发反射性文件下载逻辑，下载并执行恶意文件。具体的触发方式取决于应用如何集成和使用aspectjweaver以及攻击者可控的输入点。
 3. **潜在影响**
-   - **任意文件下载与执行：** 攻击者可以下载服务器上的敏感文件，导致信息泄露。
-   - **远程代码执行：** 通过下载并执行恶意可执行文件或脚本，攻击者可以在服务器上执行任意代码，完全控制受影响的系统。
-   - **系统瘫痪或数据破坏：** 攻击者可以利用获取的权限对系统进行破坏，导致服务中断或数据丢失。
+- **任意文件下载与执行：** 攻击者可以下载服务器上的敏感文件，导致信息泄露。
+- **远程代码执行：** 通过下载并执行恶意可执行文件或脚本，攻击者可以在服务器上执行任意代码，完全控制受影响的系统。
+- **系统瘫痪或数据破坏：** 攻击者可以利用获取的权限对系统进行破坏，导致服务中断或数据丢失。
 DESC
 	rule_id: "5472c76a-afe4-4abf-b19d-dce382ff1b4a"
 	title_zh: "SCA: 检测Java Aspectjweaver 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **升级 Aspectjweaver 版本**
-   将项目中的 aspectjweaver 库升级到安全版本1.9.6及以上。这是最直接有效的修复方法。请检查项目的构建文件（如Maven的`pom.xml`或Gradle的`build.gradle`）中的aspectjweaver依赖，并将其版本号更新到最新安全版本。
-   
-   **Maven示例:**
-   ```xml
-   <dependency>
-       <groupId>org.aspectj</groupId>
-       <artifactId>aspectjweaver</artifactId>
-       <version>1.9.6</version> <!-- 更新到安全版本 -->
-   </dependency>
-   ```
-   
-   **Gradle示例:**
-   ```groovy
-   implementation 'org.aspectj:aspectjweaver:1.9.6' // 更新到安全版本
-   ```
-
+将项目中的 aspectjweaver 库升级到安全版本1.9.6及以上。这是最直接有效的修复方法。请检查项目的构建文件（如Maven的`pom.xml`或Gradle的`build.gradle`）中的aspectjweaver依赖，并将其版本号更新到最新安全版本。
+**Maven示例:**
+```xml
+<dependency>
+<groupId>org.aspectj</groupId>
+<artifactId>aspectjweaver</artifactId>
+<version>1.9.6</version> <!-- 更新到安全版本 -->
+</dependency>
+```
+**Gradle示例:**
+```groovy
+implementation 'org.aspectj:aspectjweaver:1.9.6' // 更新到安全版本
+```
 2. **限制对输入数据的处理**
-   如果无法立即升级库版本，应审查应用中所有涉及处理用户输入并可能与aspectjweaver交互的部分。对来自不可信源的输入进行严格的校验和过滤，确保输入符合预期的格式和内容，避免包含潜在的恶意构造。
-
+如果无法立即升级库版本，应审查应用中所有涉及处理用户输入并可能与aspectjweaver交互的部分。对来自不可信源的输入进行严格的校验和过滤，确保输入符合预期的格式和内容，避免包含潜在的恶意构造。
 3. **实施最小权限原则**
-   运行应用程序的服务应具有最小的必要权限，以限制即使漏洞被利用时攻击者所能造成的影响范围。
-
+运行应用程序的服务应具有最小的必要权限，以限制即使漏洞被利用时攻击者所能造成的影响范围。
 4. **监控与日志记录**
-   加强对应用日志和系统日志的监控，及时发现异常的文件下载或执行行为。记录详细的日志信息，以便在发生安全事件时进行追溯和取证。
+加强对应用日志和系统日志的监控，及时发现异常的文件下载或执行行为。记录详细的日志信息，以便在发生安全事件时进行追溯和取证。
 SOLUTION
 	reference: <<<REFERENCE
 [CVE-2020-5398](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-5398)
@@ -60,4 +51,40 @@ alert $vuln_aspectjweaver for {
 	level: "mid",
 	cve: "CVE-2020-5398",
 	message: "SCA: aspectjweaver version 1.9.5 has a reflective file download vulnerability",
+	solution: <<<SOLUTION
+### 修复建议
+1. **升级 Aspectjweaver 版本**
+将项目中的 aspectjweaver 库升级到安全版本1.9.6及以上。这是最直接有效的修复方法。请检查项目的构建文件（如Maven的`pom.xml`或Gradle的`build.gradle`）中的aspectjweaver依赖，并将其版本号更新到最新安全版本。
+**Maven示例:**
+```xml
+<dependency>
+<groupId>org.aspectj</groupId>
+<artifactId>aspectjweaver</artifactId>
+<version>1.9.6</version> <!-- 更新到安全版本 -->
+</dependency>
+```
+**Gradle示例:**
+```groovy
+implementation 'org.aspectj:aspectjweaver:1.9.6' // 更新到安全版本
+```
+2. **限制对输入数据的处理**
+如果无法立即升级库版本，应审查应用中所有涉及处理用户输入并可能与aspectjweaver交互的部分。对来自不可信源的输入进行严格的校验和过滤，确保输入符合预期的格式和内容，避免包含潜在的恶意构造。
+3. **实施最小权限原则**
+运行应用程序的服务应具有最小的必要权限，以限制即使漏洞被利用时攻击者所能造成的影响范围。
+4. **监控与日志记录**
+加强对应用日志和系统日志的监控，及时发现异常的文件下载或执行行为。记录详细的日志信息，以便在发生安全事件时进行追溯和取证。
+SOLUTION
+	risk: "SCA",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+此规则用于检查Java项目中是否存在aspectjweaver库的已知漏洞版本。aspectjweaver是一个用于Java的AOP（面向切面编程）库，它允许开发者在不修改源代码的情况下向程序添加横切关注点。如果项目中使用的aspectjweaver版本低于1.9.6，则可能存在反射性文件下载漏洞（CVE-2020-5398）。该漏洞是由于在处理某些特殊输入时，aspectjweaver未对用户提供的文件名进行充分的安全校验，导致攻击者可以构造恶意的文件名，利用反射机制下载并执行任意文件，从而危害系统的安全性。
+2. **触发场景**
+当攻击者可以控制加载到使用存在漏洞版本的aspectjweaver库的应用中的某些数据或配置时，即可触发该漏洞。攻击者可以构造特定的输入，使得应用在处理时触发反射性文件下载逻辑，下载并执行恶意文件。具体的触发方式取决于应用如何集成和使用aspectjweaver以及攻击者可控的输入点。
+3. **潜在影响**
+- **任意文件下载与执行：** 攻击者可以下载服务器上的敏感文件，导致信息泄露。
+- **远程代码执行：** 通过下载并执行恶意可执行文件或脚本，攻击者可以在服务器上执行任意代码，完全控制受影响的系统。
+- **系统瘫痪或数据破坏：** 攻击者可以利用获取的权限对系统进行破坏，导致服务中断或数据丢失。
+DESC
+	name: "vuln_aspectjweaver",
 }

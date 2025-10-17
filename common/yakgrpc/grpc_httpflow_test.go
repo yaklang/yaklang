@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/bytedance/mockey"
+	"github.com/stretchr/testify/assert"
+	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"io"
 	"net/http"
 	"os"
@@ -1107,8 +1111,9 @@ func TestHTTPFlowFieldGroup(t *testing.T) {
 	require.NoError(t, err)
 
 	// create httpflow
+	originTag := uuid.NewString()
 	url1 := fmt.Sprintf("http://%s.com", utils.RandStringBytes(5))
-	flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1))
+	flow, err := yakit.CreateHTTPFlow(yakit.CreateHTTPFlowWithURL(url1), yakit.CreateHTTPFlowWithTags(originTag))
 	require.NoError(t, err)
 	err = yakit.InsertHTTPFlow(consts.GetGormProjectDatabase(), flow)
 	require.NoError(t, err)
@@ -1125,6 +1130,18 @@ func TestHTTPFlowFieldGroup(t *testing.T) {
 	// set uuidTag and check
 	uuidTag := uuid.NewString()
 	{
+		// test set empty for tag
+		_, err = client.SetTagForHTTPFlow(context.Background(), &ypb.SetTagForHTTPFlowRequest{
+			Id:   int64(flow.ID),
+			Tags: nil,
+		})
+		require.NoError(t, err)
+
+		// query from db
+		flow, err = yakit.GetHTTPFlow(consts.GetGormProjectDatabase(), int64(flow.ID))
+		require.NoError(t, err)
+		require.Empty(t, flow.Tags)
+
 		_, err = client.SetTagForHTTPFlow(context.Background(), &ypb.SetTagForHTTPFlowRequest{
 			Id:   int64(flow.ID),
 			Tags: []string{uuidTag},
@@ -1213,5 +1230,54 @@ Content-Length: 10
 			Id: []int64{int64(id)},
 		})
 		require.NoError(t, err)
+	})
+}
+
+func TestDoHTTPFlowsToOnline(t *testing.T) {
+	db := consts.GetGormProjectDatabase()
+	token := utils.RandStringBytes(5)
+	url1 := "http://" + token + ".com"
+	flow1, err := yakit.CreateHTTPFlow(
+		yakit.CreateHTTPFlowWithURL(url1),
+		yakit.CreateHTTPFlowWithRequestRaw([]byte("GET / HTTP/1.1\r\nHost: "+token+".com\r\n\r\n"+token)),
+	)
+
+	require.NoError(t, err)
+	require.NoError(t, yakit.InsertHTTPFlow(db, flow1))
+	defer yakit.DeleteHTTPFlowByID(db, int64(flow1.ID))
+
+	mockey.PatchConvey("skip token check", t, func() {
+		mockClient := new(yaklib.OnlineClient)
+
+		// 总是成功返回
+		mockey.Mock((*yaklib.OnlineClient).UploadHTTPFlowToOnline).
+			To(func(_ *yaklib.OnlineClient, ctx context.Context, req *ypb.HTTPFlowsToOnlineRequest, data []byte) error {
+				var tmp HTTPFlowShare
+				_ = json.Unmarshal(data, &tmp)
+				return nil
+			}).Build()
+
+		mockey.Mock(yaklib.NewOnlineClient).
+			To(func(baseUrl string) *yaklib.OnlineClient {
+				return mockClient
+			}).Build()
+
+		server := &TestServerWrapper{
+			Server:       &Server{},
+			onlineClient: yaklib.OnlineClient{},
+		}
+
+		toOnlineReq := &ypb.HTTPFlowsToOnlineRequest{
+			Token:       "test-token",
+			ProjectName: "test-project",
+		}
+
+		success, failed, err := server.DoHTTPFlowsSync(context.Background(), db, toOnlineReq)
+
+		// 验证结果
+		assert.NoError(t, err)
+		assert.NotNil(t, success)
+		assert.Contains(t, success, flow1.Hash)
+		assert.Empty(t, failed)
 	})
 }

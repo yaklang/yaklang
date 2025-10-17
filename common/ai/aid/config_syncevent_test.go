@@ -3,7 +3,9 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
@@ -12,14 +14,14 @@ import (
 
 func TestCoordinator_SyncPing(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -63,7 +65,7 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(100 * time.Millisecond)
 				inputChan <- &InputEvent{
@@ -74,7 +76,7 @@ LOOP:
 				}
 				continue
 			}
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				var data = map[string]any{}
 				err := json.Unmarshal([]byte(result.Content), &data)
 				if err != nil {
@@ -98,7 +100,7 @@ LOOP:
 				}
 			}
 
-			if consumptionCheck && result.Type == EVENT_TYPE_PONG {
+			if consumptionCheck && result.Type == schema.EVENT_TYPE_PONG {
 				pingPongCheck = true
 				break LOOP
 			}

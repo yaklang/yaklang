@@ -4,102 +4,85 @@ desc(
 	risk:"rce"
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   该规则旨在识别 Java Spring Framework 应用中处理文件上传及潜在的文件保存操作。当应用程序允许用户上传文件时，如果未对上传的文件进行严格的类型、大小、内容等安全检查，且直接将文件保存到 Web 可访问的目录或与执行环境相关的目录中，就可能引入文件上传漏洞（CWE-434：Unrestricted Upload of File with Dangerous Type）。攻击者可以上传恶意文件（例如，包含 WebShell 的脚本文件、可执行文件或恶意文档），并通过访问该文件在服务器上执行任意代码、窃取敏感信息或进一步渗透系统。
-
+该规则旨在识别 Java Spring Framework 应用中处理文件上传及潜在的文件保存操作。当应用程序允许用户上传文件时，如果未对上传的文件进行严格的类型、大小、内容等安全检查，且直接将文件保存到 Web 可访问的目录或与执行环境相关的目录中，就可能引入文件上传漏洞（CWE-434：Unrestricted Upload of File with Dangerous Type）。攻击者可以上传恶意文件（例如，包含 WebShell 的脚本文件、可执行文件或恶意文档），并通过访问该文件在服务器上执行任意代码、窃取敏感信息或进一步渗透系统。
 2. **触发场景**
-   规则检测到使用了 `org.springframework.web.multipart.MultipartFile` 等文件上传接口，并通过 `getInputStream()` 获取输入流后，调用了常见的表示文件保存或拷贝操作的方法，如 `save`、`copy`、`transfer`、`fileutil` 等。这表明存在文件上传的处理流程，但规则本身不判断是否存在漏洞，仅标记存在文件上传及保存的代码逻辑，需要进一步人工审计或结合其他规则（例如，用于检测文件类型校验、目录限制等）来确认是否存在实际的漏洞。以下是一个可能的触发场景示例（存在漏洞的代码，仅用于说明规则检测到文件上传和保存的行为）：
-
-   ```java
-   @PostMapping("/upload")
-   public String handleFileUpload(@RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes) {
-       if (!file.isEmpty()) {
-           try {
-               // 未进行文件类型校验，直接保存
-               Path filepath = Paths.get("/path/to/uploadDir/", file.getOriginalFilename());
-               
-               // 直接使用transferTo保存文件，忽略安全检查
-               file.transferTo(filepath.toFile()); 
-
-               redirectAttributes.addFlashAttribute("message", "You successfully uploaded " + file.getOriginalFilename() + "!");
-           } catch (Exception e) {
-               redirectAttributes.addFlashAttribute("message", "Failed to upload " + file.getOriginalFilename() + " => " + e.getMessage());
-           }
-       } else {
-           redirectAttributes.addFlashAttribute("message", "Failed to upload because the file was empty.");
-       }
-
-       return "redirect:/uploadStatus";
-   }
-   ```
-
+规则检测到使用了 `org.springframework.web.multipart.MultipartFile` 等文件上传接口，并通过 `getInputStream()` 获取输入流后，调用了常见的表示文件保存或拷贝操作的方法，如 `save`、`copy`、`transfer`、`fileutil` 等。这表明存在文件上传的处理流程，但规则本身不判断是否存在漏洞，仅标记存在文件上传及保存的代码逻辑，需要进一步人工审计或结合其他规则（例如，用于检测文件类型校验、目录限制等）来确认是否存在实际的漏洞。以下是一个可能的触发场景示例（存在漏洞的代码，仅用于说明规则检测到文件上传和保存的行为）：
+```java
+@PostMapping("/upload")
+public String handleFileUpload(@RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes) {
+if (!file.isEmpty()) {
+try {
+// 未进行文件类型校验，直接保存
+Path filepath = Paths.get("/path/to/uploadDir/", file.getOriginalFilename());
+// 直接使用transferTo保存文件，忽略安全检查
+file.transferTo(filepath.toFile());
+redirectAttributes.addFlashAttribute("message", "You successfully uploaded " + file.getOriginalFilename() + "!");
+} catch (Exception e) {
+redirectAttributes.addFlashAttribute("message", "Failed to upload " + file.getOriginalFilename() + " => " + e.getMessage());
+}
+} else {
+redirectAttributes.addFlashAttribute("message", "Failed to upload because the file was empty.");
+}
+return "redirect:/uploadStatus";
+}
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**：如果上传恶意脚本（如 `.jsp`, `.php` 文件）并保存到 Web 目录，攻击者可通过访问该文件执行任意服务器端代码。
-   - **拒绝服务 (DoS)**：攻击者可能上传大量或超大文件，耗尽服务器存储空间或带宽。
-   - **数据泄露或篡改**：上传恶意文件可能破坏现有数据或用于进一步获取敏感信息。
-
+- **远程代码执行 (RCE)**：如果上传恶意脚本（如 `.jsp`, `.php` 文件）并保存到 Web 目录，攻击者可通过访问该文件执行任意服务器端代码。
+- **拒绝服务 (DoS)**：攻击者可能上传大量或超大文件，耗尽服务器存储空间或带宽。
+- **数据泄露或篡改**：上传恶意文件可能破坏现有数据或用于进一步获取敏感信息。
 该规则属于审计性质，旨在帮助安全人员快速定位代码中处理文件上传的核心逻辑，以便进行有针对性的安全审计。
 DESC
 	rule_id: "5a5c7d06-ece9-4a26-879c-e6e91d73b01e"
 	solution: <<<SOLUTION
 ### 修复建议
-
 针对文件上传功能，应遵循以下安全实践来防止文件上传漏洞：
-
 1. **严格的文件类型校验**
-   - **白名单限制**：只允许特定类型的文件上传，例如只允许图片 (`.jpg`, `.png`) 或特定文档 (`.pdf`, `.doc`)。基于文件扩展名校验通常不够安全，应结合 MIME 类型和服务端文件内容魔数（Magic Bytes）进行校验，确保文件内容的真实类型符合预期。
-   ```java
-   // 示例：白名单校验文件扩展名（基础校验）
-   String originalFilename = file.getOriginalFilename();
-   String fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
-   Set<String> allowedExtensions = new HashSet<>(Arrays.asList("jpg", "png", "gif", "pdf"));
-   if (!allowedExtensions.contains(fileExtension)) {
-       throw new IllegalArgumentException("不允许上传的文件类型: " + fileExtension);
-   }
-   
-   // 示例：结合MIME类型校验（更可靠）
-   String contentType = file.getContentType();
-   Set<String> allowedContentTypes = new HashSet<>(Arrays.asList("image/jpeg", "image/png", "application/pdf"));
-   if (!allowedContentTypes.contains(contentType)) {
-       throw new IllegalArgumentException("不允许上传的内容类型: " + contentType);
-   }
-   // 更安全的做法还需要读取文件头部的魔数进一步确定文件类型
-   ```
-
+- **白名单限制**：只允许特定类型的文件上传，例如只允许图片 (`.jpg`, `.png`) 或特定文档 (`.pdf`, `.doc`)。基于文件扩展名校验通常不够安全，应结合 MIME 类型和服务端文件内容魔数（Magic Bytes）进行校验，确保文件内容的真实类型符合预期。
+```java
+// 示例：白名单校验文件扩展名（基础校验）
+String originalFilename = file.getOriginalFilename();
+String fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+Set<String> allowedExtensions = new HashSet<>(Arrays.asList("jpg", "png", "gif", "pdf"));
+if (!allowedExtensions.contains(fileExtension)) {
+throw new IllegalArgumentException("不允许上传的文件类型: " + fileExtension);
+}
+// 示例：结合MIME类型校验（更可靠）
+String contentType = file.getContentType();
+Set<String> allowedContentTypes = new HashSet<>(Arrays.asList("image/jpeg", "image/png", "application/pdf"));
+if (!allowedContentTypes.contains(contentType)) {
+throw new IllegalArgumentException("不允许上传的内容类型: " + contentType);
+}
+// 更安全的做法还需要读取文件头部的魔数进一步确定文件类型
+```
 2. **限制文件大小**
-   - 对上传文件的大小进行限制，防止 DoS 攻击。Spring Framework 通常可以在配置中设置最大文件大小。
-   ```java
-   // 在 application.properties 或 application.yml 中配置
-   # application.properties
-   spring.servlet.multipart.max-file-size=10MB
-   spring.servlet.multipart.max-request-size=100MB
-   ```
-
+- 对上传文件的大小进行限制，防止 DoS 攻击。Spring Framework 通常可以在配置中设置最大文件大小。
+```java
+// 在 application.properties 或 application.yml 中配置
+# application.properties
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=100MB
+```
 3. **安全的文件保存路径**
-   - 将上传的文件保存到非 Web 可访问的目录，或者保存到 Web 可访问目录但通过程序重命名文件并进行访问控制。
-   - 避免将文件名直接使用用户上传的文件名，应重新生成安全的文件名（例如，使用 UUID）或对文件名进行严格过滤，防止路径穿越攻击。
-   ```java
-   // 示例：生成UUID作为新文件名并保存到指定安全目录
-   String uniqueFileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename(); // 可以在此基础上进一步过滤originalFilename
-   Path uploadPath = Paths.get("/usr/local/app/uploads"); // 非Web可访问目录
-   Path filepath = uploadPath.resolve(uniqueFileName);
-   
-   try {
-       Files.createDirectories(uploadPath); // 创建目录如果不存在
-       file.transferTo(filepath);
-       // 记录文件路径并保存到数据库，通过应用程序进行访问控制
-   } catch (IOException e) {
-       // 处理异常
-   }
-   ```
-
+- 将上传的文件保存到非 Web 可访问的目录，或者保存到 Web 可访问目录但通过程序重命名文件并进行访问控制。
+- 避免将文件名直接使用用户上传的文件名，应重新生成安全的文件名（例如，使用 UUID）或对文件名进行严格过滤，防止路径穿越攻击。
+```java
+// 示例：生成UUID作为新文件名并保存到指定安全目录
+String uniqueFileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename(); // 可以在此基础上进一步过滤originalFilename
+Path uploadPath = Paths.get("/usr/local/app/uploads"); // 非Web可访问目录
+Path filepath = uploadPath.resolve(uniqueFileName);
+try {
+Files.createDirectories(uploadPath); // 创建目录如果不存在
+file.transferTo(filepath);
+// 记录文件路径并保存到数据库，通过应用程序进行访问控制
+} catch (IOException e) {
+// 处理异常
+}
+```
 4. **对文件内容进行安全扫描**
-   - 对上传的文件进行病毒扫描、恶意代码扫描或敏感信息扫描。
-
+- 对上传的文件进行病毒扫描、恶意代码扫描或敏感信息扫描。
 5. **目录穿越防护**
-   - 确保在构建文件保存路径时，对用户提供的任何与路径相关的输入（如文件名、目录名）进行严格的清理或过滤，防止攻击者通过 `../` 等方式进行目录穿越。
-
+- 确保在构建文件保存路径时，对用户提供的任何与路径相关的输入（如文件名、目录名）进行严格的清理或过滤，防止攻击者通过 `../` 等方式进行目录穿越。
 执行以上安全措施可以显著降低文件上传功能带来的安全风险。
 SOLUTION
 	reference: <<<REFERENCE
@@ -115,6 +98,90 @@ alert $result for {
 	level: "mid",
 	message: "Identified Java Spring Framework code handling file upload and possible file saving location",
 	message_zh: "识别到 Java Spring Framework 中处理文件上传的代码和可能的文件落地点",
+	solution: <<<SOLUTION
+### 修复建议
+针对文件上传功能，应遵循以下安全实践来防止文件上传漏洞：
+1. **严格的文件类型校验**
+- **白名单限制**：只允许特定类型的文件上传，例如只允许图片 (`.jpg`, `.png`) 或特定文档 (`.pdf`, `.doc`)。基于文件扩展名校验通常不够安全，应结合 MIME 类型和服务端文件内容魔数（Magic Bytes）进行校验，确保文件内容的真实类型符合预期。
+```java
+// 示例：白名单校验文件扩展名（基础校验）
+String originalFilename = file.getOriginalFilename();
+String fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+Set<String> allowedExtensions = new HashSet<>(Arrays.asList("jpg", "png", "gif", "pdf"));
+if (!allowedExtensions.contains(fileExtension)) {
+throw new IllegalArgumentException("不允许上传的文件类型: " + fileExtension);
+}
+// 示例：结合MIME类型校验（更可靠）
+String contentType = file.getContentType();
+Set<String> allowedContentTypes = new HashSet<>(Arrays.asList("image/jpeg", "image/png", "application/pdf"));
+if (!allowedContentTypes.contains(contentType)) {
+throw new IllegalArgumentException("不允许上传的内容类型: " + contentType);
+}
+// 更安全的做法还需要读取文件头部的魔数进一步确定文件类型
+```
+2. **限制文件大小**
+- 对上传文件的大小进行限制，防止 DoS 攻击。Spring Framework 通常可以在配置中设置最大文件大小。
+```java
+// 在 application.properties 或 application.yml 中配置
+# application.properties
+spring.servlet.multipart.max-file-size=10MB
+spring.servlet.multipart.max-request-size=100MB
+```
+3. **安全的文件保存路径**
+- 将上传的文件保存到非 Web 可访问的目录，或者保存到 Web 可访问目录但通过程序重命名文件并进行访问控制。
+- 避免将文件名直接使用用户上传的文件名，应重新生成安全的文件名（例如，使用 UUID）或对文件名进行严格过滤，防止路径穿越攻击。
+```java
+// 示例：生成UUID作为新文件名并保存到指定安全目录
+String uniqueFileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename(); // 可以在此基础上进一步过滤originalFilename
+Path uploadPath = Paths.get("/usr/local/app/uploads"); // 非Web可访问目录
+Path filepath = uploadPath.resolve(uniqueFileName);
+try {
+Files.createDirectories(uploadPath); // 创建目录如果不存在
+file.transferTo(filepath);
+// 记录文件路径并保存到数据库，通过应用程序进行访问控制
+} catch (IOException e) {
+// 处理异常
+}
+```
+4. **对文件内容进行安全扫描**
+- 对上传的文件进行病毒扫描、恶意代码扫描或敏感信息扫描。
+5. **目录穿越防护**
+- 确保在构建文件保存路径时，对用户提供的任何与路径相关的输入（如文件名、目录名）进行严格的清理或过滤，防止攻击者通过 `../` 等方式进行目录穿越。
+执行以上安全措施可以显著降低文件上传功能带来的安全风险。
+SOLUTION
+	risk: "远程代码执行",
+	desc: <<<DESC
+### 风险描述
+1. **风险原理**
+该规则旨在识别 Java Spring Framework 应用中处理文件上传及潜在的文件保存操作。当应用程序允许用户上传文件时，如果未对上传的文件进行严格的类型、大小、内容等安全检查，且直接将文件保存到 Web 可访问的目录或与执行环境相关的目录中，就可能引入文件上传漏洞（CWE-434：Unrestricted Upload of File with Dangerous Type）。攻击者可以上传恶意文件（例如，包含 WebShell 的脚本文件、可执行文件或恶意文档），并通过访问该文件在服务器上执行任意代码、窃取敏感信息或进一步渗透系统。
+2. **触发场景**
+规则检测到使用了 `org.springframework.web.multipart.MultipartFile` 等文件上传接口，并通过 `getInputStream()` 获取输入流后，调用了常见的表示文件保存或拷贝操作的方法，如 `save`、`copy`、`transfer`、`fileutil` 等。这表明存在文件上传的处理流程，但规则本身不判断是否存在漏洞，仅标记存在文件上传及保存的代码逻辑，需要进一步人工审计或结合其他规则（例如，用于检测文件类型校验、目录限制等）来确认是否存在实际的漏洞。以下是一个可能的触发场景示例（存在漏洞的代码，仅用于说明规则检测到文件上传和保存的行为）：
+```java
+@PostMapping("/upload")
+public String handleFileUpload(@RequestParam("file") MultipartFile file, RedirectAttributes redirectAttributes) {
+if (!file.isEmpty()) {
+try {
+// 未进行文件类型校验，直接保存
+Path filepath = Paths.get("/path/to/uploadDir/", file.getOriginalFilename());
+// 直接使用transferTo保存文件，忽略安全检查
+file.transferTo(filepath.toFile());
+redirectAttributes.addFlashAttribute("message", "You successfully uploaded " + file.getOriginalFilename() + "!");
+} catch (Exception e) {
+redirectAttributes.addFlashAttribute("message", "Failed to upload " + file.getOriginalFilename() + " => " + e.getMessage());
+}
+} else {
+redirectAttributes.addFlashAttribute("message", "Failed to upload because the file was empty.");
+}
+return "redirect:/uploadStatus";
+}
+```
+3. **潜在影响**
+- **远程代码执行 (RCE)**：如果上传恶意脚本（如 `.jsp`, `.php` 文件）并保存到 Web 目录，攻击者可通过访问该文件执行任意服务器端代码。
+- **拒绝服务 (DoS)**：攻击者可能上传大量或超大文件，耗尽服务器存储空间或带宽。
+- **数据泄露或篡改**：上传恶意文件可能破坏现有数据或用于进一步获取敏感信息。
+该规则属于审计性质，旨在帮助安全人员快速定位代码中处理文件上传的核心逻辑，以便进行有针对性的安全审计。
+DESC
+	name: "result",
 }
 
 
@@ -348,5 +415,132 @@ public class FileSystemContorller {
        return view;
    }
 }
+CODE
+	"safefile://SafeFileUploadController.java": <<<CODE
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
+public class SafeFileUploadController {
+
+    private static final String UPLOAD_DIR = "/opt/app/uploads/"; // 非web可访问的安全目录
+
+    @PostMapping("/safeUpload")
+    public String handleFileUpload(@RequestParam("file") MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            return "Upload failed: File is empty.";
+        }
+
+        // 1. 严格的文件类型校验 - 白名单与MIME类型双重校验
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+        if (originalFilename != null && originalFilename.lastIndexOf(".") != -1) {
+            fileExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1).toLowerCase();
+        }
+
+        Set<String> allowedExtensions = new HashSet<>(Arrays.asList("jpg", "jpeg", "png", "gif", "pdf"));
+        if (!allowedExtensions.contains(fileExtension)) {
+            return "Upload failed: Disallowed file extension '" + fileExtension + "'.";
+        }
+
+        String contentType = file.getContentType();
+        Set<String> allowedContentTypes = new HashSet<>(Arrays.asList("image/jpeg", "image/png", "image/gif", "application/pdf"));
+        if (!allowedContentTypes.contains(contentType)) {
+            return "Upload failed: Disallowed content type '" + contentType + "'.";
+        }
+
+        // TODO: 更安全的做法是读取文件头部魔数进行校验
+
+        // 2. 限制文件大小 (在Spring配置中已设置，代码中可再次检查)
+        final long MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+        if (file.getSize() > MAX_FILE_SIZE) {
+            return "Upload failed: File size exceeds limit (5MB).";
+        }
+
+        // 3. 安全的文件保存路径 - 生成UUID避免文件名冲突和路径穿越
+        // 对原始文件名进行清理，防止意外字符，但主要还是依靠UUID保障安全
+        String safeOriginalFilename  = Paths.get(originalFilename).getFileName().toString();
+        String uniqueFileName = UUID.randomUUID().toString() + "_" + safeOriginalFilename;
+        Path uploadPath = Paths.get(UPLOAD_DIR);
+        Path filepath = uploadPath.resolve(uniqueFileName);
+
+        try {
+            Files.createDirectories(uploadPath); // 确保目录存在
+            file.transferTo(filepath); // 安全地保存文件
+
+            // 4. 对文件内容进行安全扫描 (此处仅为占位符，实际需集成安全扫描服务)
+            // scanFileForMaliciousContent(filepath);
+
+            return "Upload successful: " + uniqueFileName;
+        } catch (IOException e) {
+            return "Upload failed: Could not save file. " + e.getMessage();
+        }
+    }
+    
+    // 示例：不触发规则的其他文件操作，不涉及InputStream到保存操作
+    public String deleteFile(String fileName) {
+        // ... 删除文件的逻辑，不涉及敏感操作
+        return "File deleted: " + fileName;
+    }
+}
+
+CODE
+	"safefile://ImageUploadService.java": <<<CODE
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+
+@Service
+public class ImageUploadService {
+
+    private static final String IMAGE_UPLOAD_DIR = "/var/images/"; // 图片文件专用存储目录
+
+    public boolean uploadImage(MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            return false;
+        }
+
+        // 1. 严格校验文件MIME类型
+        String contentType = file.getContentType();
+        if (contentType == null || !(contentType.equals("image/jpeg") || contentType.equals("image/png") || contentType.equals("image/gif"))) {
+            throw new IllegalArgumentException("Invalid image type: " + contentType);
+        }
+
+        // 2. 检查是否真的是图片文件（通过尝试读取图片）
+        try (var is = file.getInputStream()) {
+            BufferedImage image = ImageIO.read(is);
+            if (image == null) {
+                throw new IllegalArgumentException("File is not a valid image.");
+            } 
+            is.reset(); // 重置输入流以便后续写入文件
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Failed to read image content.", e);
+        }
+
+        // 3. 生成安全文件名并保存到指定目录
+        String uniqueFileName = UUID.randomUUID().toString() + "." + contentType.substring(contentType.indexOf('/') + 1);
+        Path targetLocation = Paths.get(IMAGE_UPLOAD_DIR).resolve(uniqueFileName);
+        Files.createDirectories(targetLocation.getParent());
+
+        // 使用Files.copy而非transferTo，更能控制IO过程
+        Files.copy(file.getInputStream(), targetLocation);
+        return true;
+    }
+}
+
 CODE
 )

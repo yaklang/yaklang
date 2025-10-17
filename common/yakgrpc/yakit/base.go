@@ -1,6 +1,8 @@
 package yakit
 
 import (
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -10,8 +12,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+type initializingCallback struct {
+	Note string
+	Fn   func() error
+}
+
 var (
-	__initializingDatabase []func() error
+	__initializingDatabase []*initializingCallback
 	__mutexForInit         = new(sync.Mutex)
 )
 
@@ -30,7 +37,7 @@ func init() {
 				err := f(consts.GetGormProjectDatabase())
 				elapsed := time.Since(start)
 				if elapsed > 2*time.Second {
-					log.Warnf("SQL execution took too long: %v", elapsed)
+					log.Warnf("SQL execution took too long: %v, function: %+v", elapsed, f)
 				}
 				count++
 				if count%1000 == 0 {
@@ -46,18 +53,38 @@ func init() {
 	}()
 }
 
-func RegisterPostInitDatabaseFunction(f func() error) {
+func RegisterPostInitDatabaseFunction(f func() error, notes ...string) {
 	__mutexForInit.Lock()
 	defer __mutexForInit.Unlock()
-	__initializingDatabase = append(__initializingDatabase, f)
+	__initializingDatabase = append(__initializingDatabase, &initializingCallback{
+		Note: strings.Join(notes, ";"),
+		Fn:   f,
+	})
 }
 
 func CallPostInitDatabase() error {
-	for _, f := range __initializingDatabase {
-		err := f()
+	start := time.Now()
+	for idx, f := range __initializingDatabase {
+		if f == nil || f.Fn == nil {
+			continue
+		}
+		currentFuncStart := time.Now()
+		err := f.Fn()
+		elapsed := time.Since(currentFuncStart)
+		if elapsed > 1*time.Second {
+			node := f.Note
+			if node == "" {
+				node = fmt.Sprint(idx)
+			}
+			log.Warnf("call post function[%v] took too long: %v", node, elapsed)
+		}
 		if err != nil {
 			return err
 		}
+	}
+	elapsed := time.Since(start)
+	if elapsed > 2*time.Second {
+		log.Warnf("call post functions took too long: %v", elapsed)
 	}
 	return nil
 }

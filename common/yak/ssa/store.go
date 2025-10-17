@@ -28,8 +28,8 @@ func (b *FunctionBuilder) LoadFunctionBuilder(s *FunctionBuilder) {
 func (b *FunctionBuilder) StoreFunctionBuilder() *StoredFunctionBuilder {
 	fb := &FunctionBuilder{
 		Function: &Function{
-			anValue: anValue{
-				anInstruction: anInstruction{
+			anValue: &anValue{
+				anInstruction: &anInstruction{
 					// fun:          b.anInstruction.fun,
 					prog: b.anInstruction.prog,
 					// block:        b.anInstruction.block,
@@ -86,7 +86,7 @@ func (b *FunctionBuilder) StoreFunctionBuilder() *StoredFunctionBuilder {
 		// RefParameter:               b.RefParameter,
 		// target:       b.target,
 		// labels:       b.labels,
-		// CurrentBlock: b.CurrentBlock,
+		CurrentBlock: b.CurrentBlock,
 		CurrentRange: b.CurrentRange,
 		// CurrentFile:  b.CurrentFile,
 		// parentScope:  b.parentScope,

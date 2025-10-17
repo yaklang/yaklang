@@ -96,7 +96,18 @@ REFERENCE
 
 <include('java-spring-mvc-param')> as $source;
 <include("java-common-filter")>() as $filter
-<mybatisSink>#{
+<mybatisSink> as $sink
+
+alert $sink for {
+	title: "Detect Java MyBatis/iBatis XML Weak ('${...}') Params to Spring Params",
+	title_zh: "检测 Java MyBatis/iBatis XML Mapper 不安全(${...})参数",
+	level: "low",
+	solution: <<<SOLUTION
+检测到Java MyBatis/iBatis XML Mapper 不安全(${...})参数，请检测是否安全的使用
+SOLUTION
+}
+
+$sink#{
     until: `* &  $source`,
 }-> as $result
 $result?{<typeName>?{!any: Long,Integer, Boolean,Double}} as $all
@@ -122,7 +133,7 @@ alert $high for {
 }
 desc(
 	language: java
-	alert_num:1
+	alert_num:2
 	'file://Controller.java': <<<TEXT
 package com.mycompany.myapp;
 
@@ -223,6 +234,104 @@ TEXT
     </delete>
 </mapper>
 TEXT
+	"safefile://SafeUserMapper.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id} 
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=#{id} 
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+
+    <select id="findByUserNameVuln02" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE username LIKE CONCAT('%', #{username}, '%') 
+    </select>
+
+    <select id="findByUserNameVuln03" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users
+        <if test="order != null">
+            ORDER BY #{orderField} ASC 
+        </if>
+    </select>
+
+    <select id="searchUsersByName" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE name = #{name}
+    </select>
+
+</mapper>
+CODE
+	"safefile://SafeUserService.java": <<<CODE
+package com.mycompany.myapp;
+
+import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public User getUserById(Long id) {
+        return userMapper.getUser(id);
+    }
+
+    public void addNewUser(User user) {
+        userMapper.insertUser(user);
+    }
+
+    public void updateUserRecord(User user) {
+        userMapper.updateUser(user);
+    }
+
+    public void removeUser(Long id) {
+        userMapper.deleteUser(id);
+    }
+
+    public List<User> getAllUsers() {
+        return userMapper.getAllUsers();
+    }
+
+    public List<User> findUsersByUsername(String username) {
+        // 使用参数化查询，或在Service层进行安全的SQL构建
+        return userMapper.findByUserNameVuln02(username);
+    }
+
+    public List<User> findUsersOrderedBy(String orderField) {
+        // 对于ORDER BY等敏感字段，进行白名单校验
+        if (!isValidOrderField(orderField)) {
+            throw new IllegalArgumentException("Invalid order field: " + orderField);
+        }
+        // 在MyBatis中，如果ORDER BY需要动态字段，通常需要白名单验证后拼接或使用When/Choose
+        // 这里假设已经通过安全机制处理了orderField
+        return userMapper.findByUserNameVuln03(orderField);
+    }
+
+    private boolean isValidOrderField(String field) {
+        // 假设只有这些字段可以用于排序
+        return field.equals("id") || field.equals("name") || field.equals("email");
+    }
+}
+CODE
 )
 
 desc(
@@ -346,5 +455,160 @@ TEXT
             select * from users order by id asc limit 1
         </select>
     </mapper>
+TEXT
+	"safefile://SafeUserMapper.xml": <<<CODE
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id} 
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=#{id} 
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+
+    <select id="findByUserNameVuln02" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE username LIKE CONCAT('%', #{username}, '%') 
+    </select>
+
+    <select id="findByUserNameVuln03" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users
+        <if test="order != null">
+            ORDER BY #{orderField} ASC 
+        </if>
+    </select>
+
+    <select id="searchUsersByName" parameterType="String" resultMap="UserResult">
+        SELECT * FROM users WHERE name = #{name}
+    </select>
+
+</mapper>
+CODE
+	"safefile://SafeUserService.java": <<<CODE
+package com.mycompany.myapp;
+
+import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.List;
+
+@Service
+public class UserService {
+
+    @Autowired
+    private UserMapper userMapper;
+
+    public User getUserById(Long id) {
+        return userMapper.getUser(id);
+    }
+
+    public void addNewUser(User user) {
+        userMapper.insertUser(user);
+    }
+
+    public void updateUserRecord(User user) {
+        userMapper.updateUser(user);
+    }
+
+    public void removeUser(Long id) {
+        userMapper.deleteUser(id);
+    }
+
+    public List<User> getAllUsers() {
+        return userMapper.getAllUsers();
+    }
+
+    public List<User> findUsersByUsername(String username) {
+        // 使用参数化查询，或在Service层进行安全的SQL构建
+        return userMapper.findByUserNameVuln02(username);
+    }
+
+    public List<User> findUsersOrderedBy(String orderField) {
+        // 对于ORDER BY等敏感字段，进行白名单校验
+        if (!isValidOrderField(orderField)) {
+            throw new IllegalArgumentException("Invalid order field: " + orderField);
+        }
+        // 在MyBatis中，如果ORDER BY需要动态字段，通常需要白名单验证后拼接或使用When/Choose
+        // 这里假设已经通过安全机制处理了orderField
+        return userMapper.findByUserNameVuln03(orderField);
+    }
+
+    private boolean isValidOrderField(String field) {
+        // 假设只有这些字段可以用于排序
+        return field.equals("id") || field.equals("name") || field.equals("email");
+    }
+}
+CODE
+)
+
+desc(
+	language: java
+	alert_num:1
+	'file://UserMapper.java': <<<TEXT
+package com.mycompany.myapp;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+
+import java.util.List;
+
+@Mapper
+public interface UserMapper {
+
+    User getUser(@Param("id") Long id);
+
+    void insertUser(User user);
+
+    void updateUser(User user);
+
+    void deleteUser(@Param("id") Long id);
+
+    List<User> getAllUsers(); // 可选，获取所有用户
+}
+TEXT
+	'file://sqlmap.xml': <<<TEXT
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mycompany.myapp.UserMapper">
+    <resultMap id="UserResult" type="com.mycompany.myapp.User">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="email" column="email" />
+    </resultMap>
+
+    <select id="getUser" resultMap="UserResult">
+        SELECT * FROM User WHERE id = #{id}
+    </select>
+
+    <insert id="insertUser" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO User (name, email) VALUES (#{name}, #{email})
+    </insert>
+
+    <update id="updateUser">
+        UPDATE User SET name=#{name}, email=#{email} WHERE id=${id}
+    </update>
+
+    <delete id="deleteUser">
+        DELETE FROM User WHERE id=#{id}
+    </delete>
+</mapper>
 TEXT
 )

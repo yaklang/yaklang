@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 	"net/http"
 	"strings"
 	"testing"
@@ -32,7 +35,7 @@ const (
 )
 
 func TestGRPCMUSTPASS_HookColorWithRequest(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `百度`,
 		NoReplace:        true,
@@ -62,14 +65,14 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 		t.Fatal(err)
 	}
 
-	extractedData := replacer.hookColor(requestBytes, []byte(""), req, &schema.HTTPFlow{})
+	extractedData := replacer.HookColor(requestBytes, []byte(""), req, &schema.HTTPFlow{})
 	if len(extractedData) == 0 {
 		t.Fatal("no data extracted")
 	}
 }
 
 func TestGRPCMUSTPASS_HookColorWithResponse(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:              `(?i)(access[_-]?(key|secret|id)|accesskey(secret|id)|secret[_-]?(key|id))`,
 		NoReplace:         true,
@@ -95,7 +98,7 @@ secret-id:`)
 		t.Fatal(err)
 	}
 
-	extractedData := replacer.hookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
+	extractedData := replacer.HookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
 	if len(extractedData) == 0 {
 		t.Fatal("no data extracted")
 	}
@@ -166,7 +169,7 @@ func TestGRPCMUSTPASS_MatchScope(t *testing.T) {
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			replacer := NewMITMReplacer()
+			replacer := yakit.NewMITMReplacer()
 			rule := &ypb.MITMContentReplacer{
 				Rule:        `test.*`,
 				NoReplace:   true,
@@ -206,7 +209,7 @@ testBody`
 			for _, re := range []string{"testUri\\w*", "testHeader\\w*", "testBody\\w*"} {
 				rule.Rule = re
 				replacer.SetRules(rule)
-				extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &schema.HTTPFlow{})
+				extractedData := replacer.HookColor([]byte(reqRaw), responseBytes, req, &schema.HTTPFlow{})
 				if len(extractedData) == 1 {
 					matchRes = append(matchRes, extractedData[0].Data)
 				} else {
@@ -232,7 +235,7 @@ func TestGRPCMUSTPASS_MatchGroup(t *testing.T) {
 		EnableForResponse: true,
 		EnableForURI:      true,
 	}
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	responseBytes := []byte(`HTTP/1.1 200 OK
 Content-Type: application/json; charset=utf-8
 Date: Tue, 10 Oct 2023 07:28:15 GMT
@@ -275,7 +278,7 @@ testBody`
 		t.Run(testCase.name, func(t *testing.T) {
 			rule.Rule = testCase.re
 			replacer.SetRules(rule)
-			extractedData := replacer.hookColor([]byte(reqRaw), responseBytes, req, &schema.HTTPFlow{})
+			extractedData := replacer.HookColor([]byte(reqRaw), responseBytes, req, &schema.HTTPFlow{})
 			assert.Equal(t, extractedData[0].Data, testCase.expect)
 		})
 	}
@@ -367,7 +370,7 @@ testBody`
 		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			replacer := NewMITMReplacer()
+			replacer := yakit.NewMITMReplacer()
 			rule := &ypb.MITMContentReplacer{
 				Rule:        `test.*`,
 				NoReplace:   false,
@@ -408,7 +411,7 @@ testBody`
 				} else {
 					packet = responseBytes
 				}
-				_, modified, _ := replacer.hook(rule.EnableForRequest, rule.EnableForResponse, "", packet)
+				_, modified, _ := replacer.Hook(rule.EnableForRequest, rule.EnableForResponse, "", packet)
 				packetLines := strings.Split(string(modified), "\n")
 				targetLine := expectLines[i] - 1
 				if targetLine == -1 {
@@ -432,7 +435,7 @@ Accept-Language: zh-CN,zh;q=0.9
 Content-Length: 23
 
 testBody`
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	rule := &ypb.MITMContentReplacer{
 		Rule:        `test.*`,
 		NoReplace:   false,
@@ -472,7 +475,7 @@ testBody`
 		t.Run(testCase.name, func(t *testing.T) {
 			ConfigRuleByFlags(rule, testCase.flags)
 			replacer.SetRules(rule)
-			_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
+			_, modifiedPacket, _ := replacer.Hook(true, false, "", []byte(reqRaw))
 			packetLines := strings.Split(string(modifiedPacket), "\n")
 			p := 0
 			m := map[int]struct{}{}
@@ -493,7 +496,7 @@ testBody`
 
 // TestExtraHeaders if header content the config header, replace it. Otherwise, add the config header
 func TestExtraHeaders(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:              `POST`,
 		NoReplace:         false,
@@ -517,19 +520,19 @@ func TestExtraHeaders(t *testing.T) {
 	reqRaw := `POST /testUri HTTP/1.1
 Host: www.baidu.com
 aa: 1`
-	_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
+	_, modifiedPacket, _ := replacer.Hook(true, false, "", []byte(reqRaw))
 	assert.NotContains(t, string(modifiedPacket), "aa: 1")
 	assert.Contains(t, string(modifiedPacket), "aa: a")
 	reqRaw = `POST /testUri HTTP/1.1
 Host: www.baidu.com`
-	_, modifiedPacket, _ = replacer.hook(true, false, "", []byte(reqRaw))
+	_, modifiedPacket, _ = replacer.Hook(true, false, "", []byte(reqRaw))
 	assert.NotContains(t, string(modifiedPacket), "aa: 1")
 	assert.Contains(t, string(modifiedPacket), "aa: a")
 }
 
 // TestExtraCookie if cookie content the config cookie, replace it. Otherwise, add the config cookie
 func TestExtraCookie(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:              `POST`,
 		NoReplace:         false,
@@ -560,18 +563,18 @@ func TestExtraCookie(t *testing.T) {
 	reqRaw := `POST /testUri HTTP/1.1
 Host: www.baidu.com
 Cookie: cc=1`
-	_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
+	_, modifiedPacket, _ := replacer.Hook(true, false, "", []byte(reqRaw))
 	assert.Contains(t, string(modifiedPacket), "Cookie: cc=1; aa=a")
 	reqRaw = `POST /testUri HTTP/1.1
 Host: www.baidu.com
 `
-	_, modifiedPacket, _ = replacer.hook(true, false, "", []byte(reqRaw))
+	_, modifiedPacket, _ = replacer.Hook(true, false, "", []byte(reqRaw))
 	assert.Contains(t, string(modifiedPacket), "Cookie: aa=a")
 }
 
 // TestMatchPatternMatchHeaderAndBody verify the situation that pattern matched data content header and body
 func TestMatchPatternMatchHeaderAndBody(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:              "\r\n\r\n.*",
 		NoReplace:         false,
@@ -592,7 +595,7 @@ header: 1
 
 body
 `))
-	_, modifiedPacket, _ := replacer.hook(true, false, "", []byte(reqRaw))
+	_, modifiedPacket, _ := replacer.Hook(true, false, "", []byte(reqRaw))
 	require.Contains(t, string(modifiedPacket), "Content-Length: 6==ok==")
 	// if !strings.Contains(string(modifiedPacket), "Content-Length: 6==ok==\n") {
 	// 	t.Fatalf("replace failed: %s", string(modifiedPacket))
@@ -608,7 +611,7 @@ func ConfigRuleByFlags(rule *ypb.MITMContentReplacer, ruleFlag int) {
 }
 
 func TestGRPCMUSTPASS_HookColorWithRequestAndResponse(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:              `test`,
 		NoReplace:         true,
@@ -636,7 +639,7 @@ test`)
 	reqRaw, err := utils.DumpHTTPRequest(req, true)
 	require.NoError(t, err)
 
-	extractedData := replacer.hookColor(reqRaw, responseBytes, req, &schema.HTTPFlow{})
+	extractedData := replacer.HookColor(reqRaw, responseBytes, req, &schema.HTTPFlow{})
 	require.Len(t, extractedData, 2)
 }
 
@@ -656,9 +659,9 @@ Content-Length: 4`))
 	reqHeaderRaw, _ := lowhttp.SplitHTTPPacketFast(reqRaw)
 
 	testOffset := func(t *testing.T, name string, rule *ypb.MITMContentReplacer, wantLen, wantOffset int) {
-		replacer := NewMITMReplacer()
+		replacer := yakit.NewMITMReplacer()
 		replacer.SetRules(rule)
-		extractedData := replacer.hookColor(reqRaw, responseBytes, req, &schema.HTTPFlow{})
+		extractedData := replacer.HookColor(reqRaw, responseBytes, req, &schema.HTTPFlow{})
 		require.Lenf(t, extractedData, wantLen, "testcase name: %s", name)
 		require.Equalf(t, wantOffset, extractedData[0].DataIndex, "testcase name: %s", name)
 	}
@@ -708,11 +711,11 @@ Content-Length: 4`))
 var defaultRule string
 
 func TestGRPCMUSTPASS_HookColorTimeout(t *testing.T) {
-	err := yakit.SetKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords, defaultRule)
+	err := yakit.SetKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords, defaultRule)
 	if err != nil {
 		return
 	}
-	defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords)
+	defer yakit.DelKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords)
 	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-length:10000\r\n\r\n" + strings.Repeat("a", 10000))
 	})
@@ -741,11 +744,11 @@ Host: www.example.com
 }
 
 func TestGRPCMUSTPASS_MITMV2_HookColorTimeout(t *testing.T) {
-	err := yakit.SetKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords, defaultRule)
+	err := yakit.SetKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords, defaultRule)
 	if err != nil {
 		return
 	}
-	defer yakit.DelKey(consts.GetGormProfileDatabase(), MITMReplacerKeyRecords)
+	defer yakit.DelKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords)
 	mockHost, mockPort := utils.DebugMockHTTPEx(func(req []byte) []byte {
 		return []byte("HTTP/1.1 200 OK\r\nContent-length:10000\r\n\r\n" + strings.Repeat("a", 10000))
 	})
@@ -775,7 +778,7 @@ Host: www.example.com
 
 // TestGRPCMUSTPASS_ReplaceRuleAndMirrorRule fix the bug that the mirror rule not work when the replace rule is enable
 func TestGRPCMUSTPASS_ReplaceRuleAndMirrorRule(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `百度`,
 		NoReplace:        false,
@@ -816,17 +819,17 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	if err != nil {
 		t.Fatal(err)
 	}
-	rules, _, _ := replacer.hook(true, false, "", requestBytes)
+	rules, _, _ := replacer.Hook(true, false, "", requestBytes)
 	httpctx.AppendMatchedRule(req, rules...)
 	flow := &schema.HTTPFlow{}
-	replacer.hookColor(requestBytes, []byte(""), req, flow)
+	replacer.HookColor(requestBytes, []byte(""), req, flow)
 	tags := strings.Split(flow.Tags, "|")
 	assert.Equal(t, 2, len(tags))
 }
 
 // TestGRPCMUSTPASS_ExtraRepeat fix the bug that the ExtraRepeat flow does not have the right tags and color
 func TestGRPCMUSTPASS_ExtraRepeat(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `百度`,
 		NoReplace:        false,
@@ -859,18 +862,18 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 	defer func() {
 		yakit.RegisterLowHTTPSaveCallback()
 	}()
-	replacer.hook(true, false, "", requestBytes)
+	replacer.Hook(true, false, "", requestBytes)
 	replacer.WaitTasks()
 	assert.Equal(t, "[重发]tag1|YAKIT_COLOR_red", tags)
-	replacer.rules[0].ExtraTag = nil
-	replacer.hook(true, false, "", requestBytes)
+	replacer.GetRawRules()[0].ExtraTag = nil
+	replacer.Hook(true, false, "", requestBytes)
 	tags = ""
 	replacer.WaitTasks()
 	assert.Equal(t, "[重发]|YAKIT_COLOR_red", tags)
 }
 
 func TestGRPCMUSTPASS_HookColorWithNoColorBefore(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(
 		&ypb.MITMContentReplacer{
 			Rule:             `example.com`,
@@ -905,7 +908,7 @@ Host: example.com
 	req, err := lowhttp.ParseBytesToHttpRequest(requestBytes)
 	require.NoError(t, err)
 	flow := &schema.HTTPFlow{}
-	matchRules, modifiedBytes, isDrop := replacer.hook(true, false, "", requestBytes)
+	matchRules, modifiedBytes, isDrop := replacer.Hook(true, false, "", requestBytes)
 	require.False(t, isDrop)
 	require.Len(t, matchRules, 1)
 	require.Equal(t, "file=", matchRules[0].Rule)
@@ -913,7 +916,7 @@ Host: example.com
 	// 模拟 hook替换完成后，添加tag
 	httpctx.SetMatchedRule(req, matchRules)
 
-	extractedData := replacer.hookColor(requestBytes, []byte(""), req, flow)
+	extractedData := replacer.HookColor(requestBytes, []byte(""), req, flow)
 	require.Len(t, extractedData, 1)
 	require.Equal(t, "YAKIT_COLOR_RED|example", flow.Tags)
 }
@@ -921,7 +924,7 @@ Host: example.com
 func TestGRPCMUSTPASS_ReplaceWithEffectiveURL(t *testing.T) {
 	urlToken := utils.RandStringBytes(10)
 	token := utils.RandStringBytes(10)
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `百度`,
 		Result:           token,
@@ -947,11 +950,11 @@ User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 
 {"product": "百度"}`)
 
-	_, res, drop := replacer.hook(true, false, "http://www.baidu.com/", requestBytes)
+	_, res, drop := replacer.Hook(true, false, "http://www.baidu.com/", requestBytes)
 	require.NotContains(t, string(res), token)
 	require.False(t, drop)
 
-	_, res, drop = replacer.hook(true, false, "http://www.baidu.com/"+urlToken, requestBytes)
+	_, res, drop = replacer.Hook(true, false, "http://www.baidu.com/"+urlToken, requestBytes)
 	require.Contains(t, string(res), token)
 	require.False(t, drop)
 }
@@ -962,7 +965,7 @@ func TestGRPCMUSTPASS_ReplaceWithHeaderCookie(t *testing.T) {
 	oldCookieValue := "BAIDUID_BFESS=D541A87Daaa50ACC658F7405F62B195D8AA:FG=1; ZFY=Xx1VJGFY2aaHQ2vrOIEsC83loAk0wEEIPY3nVfBgtxymQ:C"
 	wantCookieValue := fmt.Sprintf("%s=%s", utils.RandStringBytes(10), utils.RandStringBytes(10))
 	extraCookieKey, extraCookieValue := utils.RandStringBytes(10), utils.RandStringBytes(10)
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:             `www\.baidu\.com`,
 		Result:           ``,
@@ -993,7 +996,7 @@ Cookie: %s
 
 `, oldCookieValue))
 
-	_, res, drop := replacer.hook(true, false, "http://www.baidu.com/", requestBytes)
+	_, res, drop := replacer.Hook(true, false, "http://www.baidu.com/", requestBytes)
 	require.False(t, drop)
 	require.Contains(t, string(res), wantCookieValue)
 	require.NotContains(t, string(res), oldCookieValue)
@@ -1002,7 +1005,7 @@ Cookie: %s
 }
 
 func TestGRPCMUSTPASS_HookColorWithRegexpGroup(t *testing.T) {
-	replacer := NewMITMReplacer()
+	replacer := yakit.NewMITMReplacer()
 	replacer.SetRules(&ypb.MITMContentReplacer{
 		Rule:              `(a)(b)(c)`,
 		NoReplace:         true,
@@ -1028,7 +1031,7 @@ abc`)
 		t.Fatal(err)
 	}
 
-	extractedData := replacer.hookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
+	extractedData := replacer.HookColor([]byte(""), responseBytes, req, &schema.HTTPFlow{})
 	require.Len(t, extractedData, 1)
 	require.Equal(t, "a, b, c", extractedData[0].Data)
 }
@@ -1239,7 +1242,7 @@ Content-Length: 15
 "/path/to/file"`
 
 	// Create MITM Rule - Try with a simpler regex that should work correctly
-	rule := &MITMReplaceRule{
+	rule := &yakit.MITMReplaceRule{
 		MITMContentReplacer: &ypb.MITMContentReplacer{
 			Rule:              `(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;|*()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:\w)(?:[\?|#][^"|']{0,}|)))(?:"|')`, // Simple pattern to match quoted strings and capture the content
 			EnableForResponse: true,                                                                                                                                                                                                                                                                                                                                               // Enable for response
@@ -1278,4 +1281,62 @@ Content-Length: 15
 	assert.False(t, packetInfo.IsRequest, "PacketInfo should be marked as response")
 
 	t.Logf("Match result: %s", results[0].MatchResult)
+}
+
+func TestMITMReplaceRule_UseInlowhttp(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	// Test data from user - this is a response
+	bodyRaw := `HTTP/1.1 200 OK
+Date: Thu, 26 Jun 2025 07:30:37 GMT
+Content-Type: text/plain; charset=utf-8
+Content-Length: 15
+
+"/path/to/file"`
+
+	// Create MITM Rule - Try with a simpler regex that should work correctly
+
+	var ruleVerbose = uuid.NewString()
+	var rules []*ypb.MITMContentReplacer
+	rules = append(rules, &ypb.MITMContentReplacer{
+		Rule:              `(?:"|')(((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})|((?:/|\.\./|\./)[^"'><,;|*()(%%$^/\\\[\]][^"'><,;|()]{1,})|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{1,}\.(?:[a-zA-Z]{1,4}|action)(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-/]{1,}/[a-zA-Z0-9_\-/]{3,}(?:[\?|#][^"|']{0,}|))|([a-zA-Z0-9_\-]{1,}\.(?:\w)(?:[\?|#][^"|']{0,}|)))(?:"|')`, // Simple pattern to match quoted strings and capture the content
+		EnableForResponse: true,                                                                                                                                                                                                                                                                                                                                               // Enable for response
+		EnableForBody:     true,                                                                                                                                                                                                                                                                                                                                               // Enable for body matching
+		EnableForRequest:  false,                                                                                                                                                                                                                                                                                                                                              // Disable for request
+		EnableForHeader:   false,                                                                                                                                                                                                                                                                                                                                              // Disable for header
+		EnableForURI:      false,                                                                                                                                                                                                                                                                                                                                              // Disable for URI
+		RegexpGroups:      []int64{1},                                                                                                                                                                                                                                                                                                                                         // Explicitly specify to extract group 1
+		VerboseName:       ruleVerbose,
+		Color:             "cyan",
+		NoReplace:         true,
+	})
+
+	marshal, err := json.Marshal(rules)
+	require.NoError(t, err, "Marshal should not return error")
+	originReplacer := yakit.GetKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords)
+	t.Cleanup(func() {
+		yakit.SetKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords, originReplacer)
+	})
+	err = yakit.SetKey(consts.GetGormProfileDatabase(), yakit.MITMReplacerKeyRecords, string(marshal))
+	require.NoError(t, err, "SetKey should not return error")
+
+	runtimeid := uuid.NewString()
+	host, port := utils.DebugMockHTTP([]byte(bodyRaw))
+	_, _, err = poc.DoGET(fmt.Sprintf("http://%s:%d", host, port), poc.WithMITMRule(true), poc.WithRuntimeId(runtimeid))
+	require.NoError(t, err, "DoGET should not return error")
+
+	client, err := NewLocalClient()
+	require.NoError(t, err, "NewLocalClient should not return error")
+	flows, err := QueryHTTPFlows(ctx, client, &ypb.QueryHTTPFlowRequest{
+		RuntimeId: runtimeid,
+	}, 1)
+	require.NoError(t, err, "QueryHTTPFlow should not return error")
+	require.Contains(t, flows.GetData()[0].Tags, schema.FLOW_COLOR_CYAN)
+	_, data, err := yakit.QueryExtractedDataPagination(consts.GetGormProjectDatabase(), &ypb.QueryMITMRuleExtractedDataRequest{
+		Filter: &ypb.ExtractedDataFilter{
+			RuleVerbose: []string{ruleVerbose},
+		},
+	})
+	require.NoError(t, err, "QueryExtractedData should not return error")
+	require.GreaterOrEqual(t, len(data), 1, "QueryExtractedData should return extracted data")
 }

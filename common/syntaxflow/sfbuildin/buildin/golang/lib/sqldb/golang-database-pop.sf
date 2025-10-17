@@ -5,104 +5,92 @@ desc(
 	lib: 'golang-database-pop'
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
-
+SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
 2. **触发场景**
-   使用`github.com/gobuffalo/pop`库时，如果未能正确使用参数化查询，可能导致SQL注入风险。例如：
-   ```go
-   func main() {
-       db, err := pop.Connect("development")
-       if err != nil {
-           log.Fatal("Could not connect to the database:", err)
-       }
-
-       userInput := "1 OR 1=1"
-       var users []User
-       err = db.RawQuery("SELECT * FROM users WHERE id = ?", userInput).All(&users)
-       if err != nil {
-           log.Fatal("Could not retrieve users:", err)
-       }
-       fmt.Println(users)
-   }
-   ```
-   攻击者可以通过`RawQuery`方法直接拼接用户输入，导致恶意SQL被执行。
-
+使用`github.com/gobuffalo/pop`库时，如果未能正确使用参数化查询，可能导致SQL注入风险。例如：
+```go
+func main() {
+db, err := pop.Connect("development")
+if err != nil {
+log.Fatal("Could not connect to the database:", err)
+}
+userInput := "1 OR 1=1"
+var users []User
+err = db.RawQuery("SELECT * FROM users WHERE id = ?", userInput).All(&users)
+if err != nil {
+log.Fatal("Could not retrieve users:", err)
+}
+fmt.Println(users)
+}
+```
+攻击者可以通过`RawQuery`方法直接拼接用户输入，导致恶意SQL被执行。
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
 ### 规则目的
 此规则旨在审计使用`github.com/gobuffalo/pop`库的Go语言项目中数据库操作的安全性。`pop`库是一个流行的Go ORM（对象关系映射）库，用于在Go应用程序中方便地管理数据库操作。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`golang-database-pop`库规则（`lib`类型）。该规则主要用于识别代码中`pop.Connect`的调用，以及通过该连接获取的数据库对象及其成员（如方法和属性）。它可以帮助开发者或审计工具快速定位数据库连接建立以及后续数据库操作的关键位置。
+属于`golang-database-pop`库规则（`lib`类型）。该规则主要用于识别代码中`pop.Connect`的调用，以及通过该连接获取的数据库对象及其成员（如方法和属性）。它可以帮助开发者或审计工具快速定位数据库连接建立以及后续数据库操作的关键位置。
 2. **识别连接对象**
-   规则通过`pop?{<fullTypeName>?{have: 'github.com/gobuffalo/pop'}} as $entry;` 语句识别代码中导入并使用的`pop`库。接着，通过`$entry.Connect <getCall> as $db;` 语句找到对`pop.Connect`方法的调用，并将返回的数据库连接对象标记为 `$db`。最后，`$db <getMembers> as $output;` 获取该数据库连接对象 `$db` 的所有可访问成员（方法和字段），这些成员通常包含执行各种数据库操作（如查询、插入、更新、删除、迁移等）的方法。
+规则通过`pop?{<fullTypeName>?{have: 'github.com/gobuffalo/pop'}} as $entry;` 语句识别代码中导入并使用的`pop`库。接着，通过`$entry.Connect <getCall> as $db;` 语句找到对`pop.Connect`方法的调用，并将返回的数据库连接对象标记为 `$db`。最后，`$db <getMembers> as $output;` 获取该数据库连接对象 `$db` 的所有可访问成员（方法和字段），这些成员通常包含执行各种数据库操作（如查询、插入、更新、删除、迁移等）的方法。
 DESC
 	rule_id: "98e2fca4-960c-4e90-8f1a-00098a97c2c8"
-	title_zh: "审计 Go 语言 Database Pop 库使用"
+	title_zh: "审计Golang Database Pop库使用"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用ORM内置安全机制
 `pop`库提供了内置的参数化查询功能，避免手动拼接SQL。应优先使用ORM提供的方法进行数据库操作，而非直接执行SQL语句。
 ```go
 func main() {
-    db, err := pop.Connect("development")
-    if err != nil {
-        log.Fatal("Could not connect to the database:", err)
-    }
-
-    userInput := "1 OR 1=1"
-    var users []User
-    // 使用ORM内置的安全方法
-    err = db.Where("id = ?", userInput).All(&users)
-    if err != nil {
-        log.Fatal("Could not retrieve users:", err)
-    }
-    fmt.Println(users)
+db, err := pop.Connect("development")
+if err != nil {
+log.Fatal("Could not connect to the database:", err)
+}
+userInput := "1 OR 1=1"
+var users []User
+// 使用ORM内置的安全方法
+err = db.Where("id = ?", userInput).All(&users)
+if err != nil {
+log.Fatal("Could not retrieve users:", err)
+}
+fmt.Println(users)
 }
 ```
-
 #### 2. 输入合法性校验
 对用户输入实施类型、格式或范围限制，拒绝非法输入。
 ```go
 func validateInput(input string) error {
-    if !regexp.MustCompile(`^[0-9]+$`).MatchString(input) {
-        return fmt.Errorf("输入必须为数字")
-    }
-    return nil
+if !regexp.MustCompile(`^[0-9]+$`).MatchString(input) {
+return fmt.Errorf("输入必须为数字")
 }
-
+return nil
+}
 func main() {
-    userInput := "1 OR 1=1"
-    if err := validateInput(userInput); err != nil {
-        log.Fatal(err)
-    }
+userInput := "1 OR 1=1"
+if err := validateInput(userInput); err != nil {
+log.Fatal(err)
+}
 }
 ```
-
 #### 3. 使用预编译查询
 通过`RawQuery`方法结合参数化占位符实现安全的SQL查询。
 ```go
 func main() {
-    db, err := pop.Connect("development")
-    if err != nil {
-        log.Fatal("Could not connect to the database:", err)
-    }
-
-    userInput := "1 OR 1=1"
-    var users []User
-    // 使用预编译查询
-    err = db.RawQuery("SELECT * FROM users WHERE id = ?", userInput).All(&users)
-    if err != nil {
-        log.Fatal("Could not retrieve users:", err)
-    }
-    fmt.Println(users)
+db, err := pop.Connect("development")
+if err != nil {
+log.Fatal("Could not connect to the database:", err)
+}
+userInput := "1 OR 1=1"
+var users []User
+// 使用预编译查询
+err = db.RawQuery("SELECT * FROM users WHERE id = ?", userInput).All(&users)
+if err != nil {
+log.Fatal("Could not retrieve users:", err)
+}
+fmt.Println(users)
 }
 ```
 SOLUTION

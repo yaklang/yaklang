@@ -6,54 +6,42 @@ desc(
 	risk:'不安全加密算法',
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   PBE（Password-Based Encryption）是一种基于密码的加密算法，通过将用户提供的密码与一个随机的盐（Salt）结合，并经过多次迭代生成加密密钥。盐的目的是为了增加密码的复杂性，防止攻击者通过预先计算的哈希表（如彩虹表）进行破解。硬编码的盐意味着所有使用该代码的用户或系统都共享同一个固定盐值。一旦攻击者获取了该盐值，将极大地降低破解密文所需的时间和计算资源。
-
+PBE（Password-Based Encryption）是一种基于密码的加密算法，通过将用户提供的密码与一个随机的盐（Salt）结合，并经过多次迭代生成加密密钥。盐的目的是为了增加密码的复杂性，防止攻击者通过预先计算的哈希表（如彩虹表）进行破解。硬编码的盐意味着所有使用该代码的用户或系统都共享同一个固定盐值。一旦攻击者获取了该盐值，将极大地降低破解密文所需的时间和计算资源。
 2. **触发场景**
-   当 Java 代码中使用 `javax.crypto.spec.PBEParameterSpec` 类，并且其构造函数中传入的 `salt` 参数是一个硬编码为常量、字面量数组或未经过随机生成器初始化的 byte 数组时，就会触发此规则。例如：
-   ```java
-   private static final byte[] FIXED_SALT = { ... }; // 硬编码的盐值
-   AlgorithmParameterSpec paramSpec = new PBEParameterSpec(FIXED_SALT, ITERATION_COUNT);
-   ```
-   在这种情况下，`FIXED_SALT` 的值在编译时就已经确定且无法改变，任何拥有代码或者了解系统内部实现细节的攻击者都可以轻易获得这个盐值。
-
+当 Java 代码中使用 `javax.crypto.spec.PBEParameterSpec` 类，并且其构造函数中传入的 `salt` 参数是一个硬编码为常量、字面量数组或未经过随机生成器初始化的 byte 数组时，就会触发此规则。例如：
+```java
+private static final byte[] FIXED_SALT = { ... }; // 硬编码的盐值
+AlgorithmParameterSpec paramSpec = new PBEParameterSpec(FIXED_SALT, ITERATION_COUNT);
+```
+在这种情况下，`FIXED_SALT` 的值在编译时就已经确定且无法改变，任何拥有代码或者了解系统内部实现细节的攻击者都可以轻易获得这个盐值。
 3. **潜在影响**
-   - **降低密码破解难度:** 攻击者可以利用已知的硬编码盐值对截获的密文进行离线攻击，结合弱密码策略，可以大幅度提高破解速度和成功率。
-   - **影响系统安全性:** 如果PBE用于加密敏感数据（如用户凭证、秘密密钥、配置文件），硬编码盐值使得这些敏感信息更容易被解密，导致数据泄露、身份冒用等严重安全问题。
-   - **违反安全最佳实践:** 硬编码密码学参数违反了机密性和完整性的安全原则，不符合现代加密实践的要求。
-
+- **降低密码破解难度:** 攻击者可以利用已知的硬编码盐值对截获的密文进行离线攻击，结合弱密码策略，可以大幅度提高破解速度和成功率。
+- **影响系统安全性:** 如果PBE用于加密敏感数据（如用户凭证、秘密密钥、配置文件），硬编码盐值使得这些敏感信息更容易被解密，导致数据泄露、身份冒用等严重安全问题。
+- **违反安全最佳实践:** 硬编码密码学参数违反了机密性和完整性的安全原则，不符合现代加密实践的要求。
 ### 规则目的
-
 该规则的目的在于识别并标记 Java 项目中使用了硬编码 PBE 盐值的情况，提醒开发者修复这一安全弱点，鼓励使用随机生成的盐值来增强密码学操作的安全性。
 DESC
 	rule_id: "195c4be8-ab65-4755-9369-67df5911d6b3"
 	solution: <<<SOLUTION
 ### 修复建议
-
 解决硬编码PBE盐值问题的核心是使用随机、唯一的盐值。对于PBE加密的每一次操作，都应该生成一个新的、随机的盐值。
-
 #### 1. 使用安全的随机数生成器生成盐值
-
 在 Java 中，推荐使用 `java.security.SecureRandom` 类来生成加密所需的随机盐值。`SecureRandom` 提供了密码学上强的随机数生成器。
 ```java
 import java.security.SecureRandom;
 import javax.crypto.spec.PBEParameterSpec;
-
 private static final int SALT_LENGTH = 8; // 建议盐值长度至少为8字节
 private static final int ITERATION_COUNT = 65536; // 增加迭代次数提高安全性
-
 public AlgorithmParameterSpec createPBEParameters(int iterationCount) {
-    byte[] salt = new byte[SALT_LENGTH];
-    SecureRandom random = new SecureRandom(); // 使用安全的随机数生成器
-    random.nextBytes(salt); // 生成随机盐
-    return new PBEParameterSpec(salt, iterationCount);
+byte[] salt = new byte[SALT_LENGTH];
+SecureRandom random = new SecureRandom(); // 使用安全的随机数生成器
+random.nextBytes(salt); // 生成随机盐
+return new PBEParameterSpec(salt, iterationCount);
 }
 ```
-
 #### 2. 将盐值与密文一起存储
 由于盐值是公开的（不需要保密），并且解密时需要使用与加密时相同的盐值，因此通常将生成的随机盐值与对应的密文一起存储。
-
 #### 3. 增加迭代次数
 更高的迭代次数会显著增加密钥派生所需的时间和计算资源，这使得暴力破解更加困难，即使攻击者知道了盐值。现代推荐的迭代次数通常在数万到数十万之间，具体取决于可接受的计算延迟。
 SOLUTION
@@ -74,6 +62,48 @@ alert $risk for {
 	message: "发现Java代码中使用硬编码的PBE盐值",
 	title: "Detect Java Risky Hardcoded PBE Salt",
 	title_zh: "检测Java 哈希算法使用硬编码的PBE盐值",
+	name: "risk",
+	solution: <<<SOLUTION
+### 修复建议
+解决硬编码PBE盐值问题的核心是使用随机、唯一的盐值。对于PBE加密的每一次操作，都应该生成一个新的、随机的盐值。
+#### 1. 使用安全的随机数生成器生成盐值
+在 Java 中，推荐使用 `java.security.SecureRandom` 类来生成加密所需的随机盐值。`SecureRandom` 提供了密码学上强的随机数生成器。
+```java
+import java.security.SecureRandom;
+import javax.crypto.spec.PBEParameterSpec;
+private static final int SALT_LENGTH = 8; // 建议盐值长度至少为8字节
+private static final int ITERATION_COUNT = 65536; // 增加迭代次数提高安全性
+public AlgorithmParameterSpec createPBEParameters(int iterationCount) {
+byte[] salt = new byte[SALT_LENGTH];
+SecureRandom random = new SecureRandom(); // 使用安全的随机数生成器
+random.nextBytes(salt); // 生成随机盐
+return new PBEParameterSpec(salt, iterationCount);
+}
+```
+#### 2. 将盐值与密文一起存储
+由于盐值是公开的（不需要保密），并且解密时需要使用与加密时相同的盐值，因此通常将生成的随机盐值与对应的密文一起存储。
+#### 3. 增加迭代次数
+更高的迭代次数会显著增加密钥派生所需的时间和计算资源，这使得暴力破解更加困难，即使攻击者知道了盐值。现代推荐的迭代次数通常在数万到数十万之间，具体取决于可接受的计算延迟。
+SOLUTION
+	risk: "不安全加密算法",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+PBE（Password-Based Encryption）是一种基于密码的加密算法，通过将用户提供的密码与一个随机的盐（Salt）结合，并经过多次迭代生成加密密钥。盐的目的是为了增加密码的复杂性，防止攻击者通过预先计算的哈希表（如彩虹表）进行破解。硬编码的盐意味着所有使用该代码的用户或系统都共享同一个固定盐值。一旦攻击者获取了该盐值，将极大地降低破解密文所需的时间和计算资源。
+2. **触发场景**
+当 Java 代码中使用 `javax.crypto.spec.PBEParameterSpec` 类，并且其构造函数中传入的 `salt` 参数是一个硬编码为常量、字面量数组或未经过随机生成器初始化的 byte 数组时，就会触发此规则。例如：
+```java
+private static final byte[] FIXED_SALT = { ... }; // 硬编码的盐值
+AlgorithmParameterSpec paramSpec = new PBEParameterSpec(FIXED_SALT, ITERATION_COUNT);
+```
+在这种情况下，`FIXED_SALT` 的值在编译时就已经确定且无法改变，任何拥有代码或者了解系统内部实现细节的攻击者都可以轻易获得这个盐值。
+3. **潜在影响**
+- **降低密码破解难度:** 攻击者可以利用已知的硬编码盐值对截获的密文进行离线攻击，结合弱密码策略，可以大幅度提高破解速度和成功率。
+- **影响系统安全性:** 如果PBE用于加密敏感数据（如用户凭证、秘密密钥、配置文件），硬编码盐值使得这些敏感信息更容易被解密，导致数据泄露、身份冒用等严重安全问题。
+- **违反安全最佳实践:** 硬编码密码学参数违反了机密性和完整性的安全原则，不符合现代加密实践的要求。
+### 规则目的
+该规则的目的在于识别并标记 Java 项目中使用了硬编码 PBE 盐值的情况，提醒开发者修复这一安全弱点，鼓励使用随机生成的盐值来增强密码学操作的安全性。
+DESC
 }
 
 desc(

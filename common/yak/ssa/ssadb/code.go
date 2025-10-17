@@ -90,7 +90,7 @@ type IrCode struct {
 	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
 
 	// type
-	TypeID int `json:"type_id"`
+	TypeID int64 `json:"type_id"`
 
 	// reference
 	Point   int64      `json:"point" gorm:"type:text"`
@@ -196,7 +196,7 @@ func (r *IrCode) GetExtraInfo() map[string]any {
 	return results
 }
 
-func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, memedit.PositionIf, memedit.PositionIf, error) {
+func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Position, *memedit.Position, error) {
 	editor, err := GetIrSourceFromHash(r.SourceCodeHash)
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
@@ -226,4 +226,22 @@ func (r *IrCode) GetSourceCodeContext(n int) string {
 		return ""
 	}
 	return result
+}
+
+func DeleteIrCode(DB *gorm.DB, id ...int64) error {
+	// log.Errorf("DeleteIrType: %d", len(id))
+	if len(id) == 0 {
+		return utils.Errorf("delete type from database id is empty")
+	}
+	return utils.GormTransaction(DB, func(tx *gorm.DB) error {
+		// split each 999
+		for i := 0; i < len(id); i += 999 {
+			end := i + 999
+			if end > len(id) {
+				end = len(id)
+			}
+			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&IrCode{})
+		}
+		return nil
+	})
 }

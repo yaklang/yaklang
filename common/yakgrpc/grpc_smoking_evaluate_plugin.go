@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"math/rand"
 	"strings"
 	"sync"
@@ -12,8 +13,9 @@ import (
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfanalyzer"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
-	"github.com/yaklang/yaklang/common/yak/static_analyzer/information"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/embed"
 	"golang.org/x/exp/slices"
@@ -71,12 +73,23 @@ func (s *Server) SmokingEvaluatePlugin(ctx context.Context, req *ypb.SmokingEval
 		pluginCode = req.GetCode()
 	)
 	if pluginCode == "" {
-		ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
-		if err != nil {
-			return nil, err
+		// full plugin code by name
+		switch pluginType {
+		case schema.SCRIPT_TYPE_SYNTAXFLOW:
+			rule, err := sfdb.QueryRuleByName(s.GetSSADatabase(), pluginName)
+			if err != nil {
+				return nil, err
+			}
+			pluginCode = rule.Content
+			pluginType = "syntaxflow"
+		default:
+			ins, err := yakit.GetYakScriptByName(s.GetProfileDatabase(), pluginName)
+			if err != nil {
+				return nil, err
+			}
+			pluginCode = ins.Content
+			pluginType = ins.Type
 		}
-		pluginCode = ins.Content
-		pluginType = ins.Type
 	}
 	pluginTestingServer := NewPluginTestingEchoServer(ctx)
 	return s.EvaluatePlugin(ctx, pluginCode, pluginType, pluginTestingServer)
@@ -165,6 +178,12 @@ func BuildPluginTestingJunkData() []byte {
 
 // 只在评分中使用
 func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType string, pluginTestingServer *PluginTestingEchoServer) (*ypb.SmokingEvaluatePluginResponse, error) {
+	if pluginType == schema.SCRIPT_TYPE_SYNTAXFLOW {
+		sfAnalyzer := sfanalyzer.NewSyntaxFlowAnalyzer(pluginCode)
+		sfAnalyzeRes := sfAnalyzer.Analyze()
+		return sfAnalyzeRes.GetResponse(), nil
+	}
+
 	defer pluginTestingServer.ClearRequestsHistory()
 	host, port := pluginTestingServer.Host, pluginTestingServer.Port
 	testDomain := utils.RandStringBytes(60) + ".com"
@@ -196,20 +215,21 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 
 	var hasParameter bool
 	var hasHttpRequest bool
-	if pluginType != "nuclei" {
+	if pluginType != schema.SCRIPT_TYPE_NUCLEI {
 		prog, err := static_analyzer.SSAParse(pluginCode, pluginType)
 		if err != nil {
 			pushSuggestion(`静态代码检测失败`, "ssa 编译失败", nil, Error)
+		} else {
+			parameters, _, _ := information.ParseCliParameter(prog)
+			if len(parameters) > 0 {
+				hasParameter = true
+			}
+			hasHttpRequest = information.GetHTTPRequestCount(prog) > 0
 		}
-		parameters, _, _ := information.ParseCliParameter(prog)
-		if len(parameters) > 0 {
-			hasParameter = true
-		}
-		hasHttpRequest = information.GetHTTPRequestCount(prog) > 0
 	}
 	// static analyze
 	if slices.Contains([]string{
-		"mitm", "port-scan", "codec", "yak",
+		schema.SCRIPT_TYPE_MITM, schema.SCRIPT_TYPE_PORT_SCAN, schema.SCRIPT_TYPE_CODEC, schema.SCRIPT_TYPE_YAK,
 	}, pluginType) {
 		staticResults := yak.StaticAnalyze(pluginCode,
 			yak.WithStaticAnalyzePluginType(pluginType),
@@ -241,7 +261,7 @@ func (s *Server) EvaluatePlugin(ctx context.Context, pluginCode, pluginType stri
 	}
 
 	if !hasParameter && slices.Contains([]string{
-		"mitm", "port-scan", "nuclei",
+		schema.SCRIPT_TYPE_MITM, schema.SCRIPT_TYPE_PORT_SCAN, schema.SCRIPT_TYPE_NUCLEI,
 	}, pluginType) { // echo debug script
 		getMockParam := func() []*ypb.KVPair {
 			var params []*ypb.KVPair

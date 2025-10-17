@@ -9,65 +9,56 @@ REFERENCE
 	rule_id: "76220d53-28f1-45e2-bc45-b059e76739dd"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **限制输入长度**
-   在处理用户输入并将其用于StringBuilder之前，务必对输入的字符串长度进行严格限制。设定一个合理的上限，并丢弃或拒绝超过长度限制的输入。
-   ```java
-   // 修复代码示例
-   import javax.servlet.http.*;
-   import java.io.*;
-
-   public class ExampleServlet extends HttpServlet {
-       protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-           String userInput = req.getParameter("data");
-           final int MAX_INPUT_LENGTH = 1024; // 定义最大允许长度
-           if (userInput != null && userInput.length() <= MAX_INPUT_LENGTH) { // 做了长度校验
-               StringBuilder sb = new StringBuilder();
-               sb.append(userInput); // 安全
-               resp.getWriter().write(sb.toString());
-           } else {
-               resp.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Input too large"); // 返回适当的错误码
-           }
-       }
-   }
-   ```
-
+在处理用户输入并将其用于StringBuilder之前，务必对输入的字符串长度进行严格限制。设定一个合理的上限，并丢弃或拒绝超过长度限制的输入。
+```java
+// 修复代码示例
+import javax.servlet.http.*;
+import java.io.*;
+public class ExampleServlet extends HttpServlet {
+protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String userInput = req.getParameter("data");
+final int MAX_INPUT_LENGTH = 1024; // 定义最大允许长度
+if (userInput != null && userInput.length() <= MAX_INPUT_LENGTH) { // 做了长度校验
+StringBuilder sb = new StringBuilder();
+sb.append(userInput); // 安全
+resp.getWriter().write(sb.toString());
+} else {
+resp.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Input too large"); // 返回适当的错误码
+}
+}
+}
+```
 2. **限制StringBuilder容量**
-   如果业务场景允许，可以在创建StringBuilder时预设一个合理的初始容量，或者在append/insert大量数据时进行分批处理，避免一次性append/insert超长字符串。
-
+如果业务场景允许，可以在创建StringBuilder时预设一个合理的初始容量，或者在append/insert大量数据时进行分批处理，避免一次性append/insert超长字符串。
 3. **使用更安全的替代方案**
-   对于某些场景，可以考虑使用其他更适合处理不确定长度输入的机制，或者对输入内容进行进一步的结构化或校验，而不是简单地进行字符串拼接。
-
+对于某些场景，可以考虑使用其他更适合处理不确定长度输入的机制，或者对输入内容进行进一步的结构化或校验，而不是简单地进行字符串拼接。
 4. **监控资源使用**
-   部署资源监控（如CPU、内存）机制，及时发现异常的资源消耗情况，以便快速响应和定位问题。
+部署资源监控（如CPU、内存）机制，及时发现异常的资源消耗情况，以便快速响应和定位问题。
 SOLUTION
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当Java应用程序使用`StringBuilder`或`StringBuffer`类处理来自不可信源（如用户输入）的超长字符串时，如果未对输入长度进行限制，恶意攻击者可以提交一个非常大的字符串。`StringBuilder`在进行拼接、插入等操作时，可能需要进行内部数组的频繁扩容或大量的数据复制，这会消耗大量的CPU和内存资源。当并发请求量大或者输入字符串长度巨大时，可能导致服务器资源耗尽，从而引发拒绝服务（Denial of Service, DoS）攻击，影响应用程序的可用性。
-
+当Java应用程序使用`StringBuilder`或`StringBuffer`类处理来自不可信源（如用户输入）的超长字符串时，如果未对输入长度进行限制，恶意攻击者可以提交一个非常大的字符串。`StringBuilder`在进行拼接、插入等操作时，可能需要进行内部数组的频繁扩容或大量的数据复制，这会消耗大量的CPU和内存资源。当并发请求量大或者输入字符串长度巨大时，可能导致服务器资源耗尽，从而引发拒绝服务（Denial of Service, DoS）攻击，影响应用程序的可用性。
 2. **触发场景**
-   以下代码示例展示了典型的DoS触发场景：应用程序直接将用户通过HTTP请求参数传入的字符串append到`StringBuilder`中，且未对输入长度进行任何校验。
-   ```java
-   import javax.servlet.http.*;
-   import java.io.*;
-
-   public class ExampleServlet extends HttpServlet {
-       protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-           String userInput = req.getParameter("data"); // 用户输入
-           StringBuilder sb = new StringBuilder();
-           sb.append(userInput); // 未做任何长度或内容校验，存在 DoS 风险
-           resp.getWriter().write(sb.toString());
-       }
-   }
-   ```
-   攻击者可以发送一个包含数十兆甚至数百兆字符的`data`参数请求，触发服务器端的`StringBuilder`进行大量内存分配和数据操作，导致性能急剧下降甚至崩溃。
-
+以下代码示例展示了典型的DoS触发场景：应用程序直接将用户通过HTTP请求参数传入的字符串append到`StringBuilder`中，且未对输入长度进行任何校验。
+```java
+import javax.servlet.http.*;
+import java.io.*;
+public class ExampleServlet extends HttpServlet {
+protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String userInput = req.getParameter("data"); // 用户输入
+StringBuilder sb = new StringBuilder();
+sb.append(userInput); // 未做任何长度或内容校验，存在 DoS 风险
+resp.getWriter().write(sb.toString());
+}
+}
+```
+攻击者可以发送一个包含数十兆甚至数百兆字符的`data`参数请求，触发服务器端的`StringBuilder`进行大量内存分配和数据操作，导致性能急剧下降甚至崩溃。
 3. **潜在影响**
-   - **服务器资源耗尽**: 大量内存和CPU资源被消耗，导致服务器响应缓慢或无法响应正常用户的请求。
-   - **服务不可用**: 极端情况下，可能导致整个应用程序或服务宕机。
-   - **经济损失**: 服务中断可能导致业务无法正常进行，造成经济和声誉损失。
+- **服务器资源耗尽**: 大量内存和CPU资源被消耗，导致服务器响应缓慢或无法响应正常用户的请求。
+- **服务不可用**: 极端情况下，可能导致整个应用程序或服务宕机。
+- **经济损失**: 服务中断可能导致业务无法正常进行，造成经济和声誉损失。
 DESC
 )
 
@@ -88,6 +79,61 @@ alert $result for {
 	title_zh: "检测Java StringBuilder 拒绝服务漏洞",
 	level: "mid",
 	message: "发现Java的java.lang.StringBuilder可能存在ddos漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+1. **限制输入长度**
+在处理用户输入并将其用于StringBuilder之前，务必对输入的字符串长度进行严格限制。设定一个合理的上限，并丢弃或拒绝超过长度限制的输入。
+```java
+// 修复代码示例
+import javax.servlet.http.*;
+import java.io.*;
+public class ExampleServlet extends HttpServlet {
+protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String userInput = req.getParameter("data");
+final int MAX_INPUT_LENGTH = 1024; // 定义最大允许长度
+if (userInput != null && userInput.length() <= MAX_INPUT_LENGTH) { // 做了长度校验
+StringBuilder sb = new StringBuilder();
+sb.append(userInput); // 安全
+resp.getWriter().write(sb.toString());
+} else {
+resp.sendError(HttpServletResponse.SC_REQUEST_ENTITY_TOO_LARGE, "Input too large"); // 返回适当的错误码
+}
+}
+}
+```
+2. **限制StringBuilder容量**
+如果业务场景允许，可以在创建StringBuilder时预设一个合理的初始容量，或者在append/insert大量数据时进行分批处理，避免一次性append/insert超长字符串。
+3. **使用更安全的替代方案**
+对于某些场景，可以考虑使用其他更适合处理不确定长度输入的机制，或者对输入内容进行进一步的结构化或校验，而不是简单地进行字符串拼接。
+4. **监控资源使用**
+部署资源监控（如CPU、内存）机制，及时发现异常的资源消耗情况，以便快速响应和定位问题。
+SOLUTION
+	risk: "DDOS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+当Java应用程序使用`StringBuilder`或`StringBuffer`类处理来自不可信源（如用户输入）的超长字符串时，如果未对输入长度进行限制，恶意攻击者可以提交一个非常大的字符串。`StringBuilder`在进行拼接、插入等操作时，可能需要进行内部数组的频繁扩容或大量的数据复制，这会消耗大量的CPU和内存资源。当并发请求量大或者输入字符串长度巨大时，可能导致服务器资源耗尽，从而引发拒绝服务（Denial of Service, DoS）攻击，影响应用程序的可用性。
+2. **触发场景**
+以下代码示例展示了典型的DoS触发场景：应用程序直接将用户通过HTTP请求参数传入的字符串append到`StringBuilder`中，且未对输入长度进行任何校验。
+```java
+import javax.servlet.http.*;
+import java.io.*;
+public class ExampleServlet extends HttpServlet {
+protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+String userInput = req.getParameter("data"); // 用户输入
+StringBuilder sb = new StringBuilder();
+sb.append(userInput); // 未做任何长度或内容校验，存在 DoS 风险
+resp.getWriter().write(sb.toString());
+}
+}
+```
+攻击者可以发送一个包含数十兆甚至数百兆字符的`data`参数请求，触发服务器端的`StringBuilder`进行大量内存分配和数据操作，导致性能急剧下降甚至崩溃。
+3. **潜在影响**
+- **服务器资源耗尽**: 大量内存和CPU资源被消耗，导致服务器响应缓慢或无法响应正常用户的请求。
+- **服务不可用**: 极端情况下，可能导致整个应用程序或服务宕机。
+- **经济损失**: 服务中断可能导致业务无法正常进行，造成经济和声誉损失。
+DESC
+	name: "result",
 }
 
 desc(

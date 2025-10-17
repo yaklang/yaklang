@@ -6,9 +6,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+
 	"github.com/go-rod/rod/lib/utils"
 	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -41,9 +42,9 @@ var finishJson = `{
 
 var summaryJson = `result is 2`
 
-func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aid.AICallbackType {
+func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aicommon.AICallbackType {
 	step := 0
-	return func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()
 		defer rsp.Close()
 		switch step {
@@ -54,12 +55,12 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aid
 			if planFlag != "" && !strings.Contains(req.GetPrompt(), planFlag) {
 				t.Fatalf("plan flag not found in prompt: %s", req.GetPrompt())
 			}
-			rsp.EmitReasonStream(strings.NewReader(planJson))
+			rsp.EmitOutputStream(strings.NewReader(planJson))
 		case 1:
 			if persistentFlag != "" && !strings.Contains(req.GetPrompt(), persistentFlag) {
 				t.Fatalf("persistent flag not found in prompt: %s", req.GetPrompt())
 			}
-			rsp.EmitReasonStream(strings.NewReader(finishJson))
+			rsp.EmitOutputStream(strings.NewReader(finishJson))
 		default:
 		}
 		step++
@@ -69,6 +70,7 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aid
 
 func RunTestForge(t *testing.T, forge *schema.AIForge, initFlag, persistentFlag string) (any, error) {
 	db := consts.GetGormProfileDatabase()
+	forge.IsTemporary = true
 	err := yakit.CreateOrUpdateAIForgeByName(db, forge.ForgeName, forge)
 	if err != nil {
 		return nil, err
@@ -101,9 +103,7 @@ func TestBuildForgeFromYak(t *testing.T) {
 		ForgeContent: `query = cli.String("query", cli.setRequired(true), cli.setHelp("query"))
 cli.check()
 init = "帮我计算表达式的值` + initFlag + `"
-persis = <<<persistent
-一定要算准一点` + persistentFlag + `
-persistent
+persis = "一定要算准一点` + persistentFlag + `"
 
 forgeHandle = func(params) {
 	result = ""

@@ -11,7 +11,7 @@ import (
 
 func NewRecoveredCoordinator(
 	ctx context.Context,
-	pt *schema.AiCoordinatorRuntime,
+	pt *schema.AIAgentRuntime,
 	options ...Option,
 ) (*Coordinator, error) {
 	if pt.Uuid == "" {
@@ -21,7 +21,7 @@ func NewRecoveredCoordinator(
 }
 
 func NewFastRecoverCoordinatorContext(ctx context.Context, uuid string, opt ...Option) (*Coordinator, error) {
-	rt, err := yakit.GetCoordinatorRuntime(consts.GetGormProjectDatabase(), uuid)
+	rt, err := yakit.GetAgentRuntime(consts.GetGormProjectDatabase(), uuid)
 	if err != nil {
 		return nil, utils.Errorf("coordinator: get runtime failed: %v", err)
 	}

@@ -2,6 +2,7 @@ package aiforge
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
@@ -15,7 +16,7 @@ var forgeMutex = new(sync.RWMutex)
 var forges = make(map[string]ForgeExecutor)
 
 type ForgeResult struct {
-	*aid.Action
+	*aicommon.Action
 	Formated any
 	Forge    *ForgeBlueprint
 }
@@ -50,7 +51,7 @@ func RegisterAIDBuildInForge(i string, params ...LiteForgeOption) error {
 	if err != nil {
 		return utils.Errorf("build lite forge failed: %v", err)
 	}
-	return aid.RegisterAIDBuildinForge(i, func(c context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*aid.Action, error) {
+	return aid.RegisterAIDBuildinForge(i, func(c context.Context, params []*ypb.ExecParamItem, opts ...aid.Option) (*aicommon.Action, error) {
 		result, err := lf.Execute(c, params, opts...)
 		if err != nil {
 			return nil, err

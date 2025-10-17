@@ -14,6 +14,16 @@ const (
 	MAXTYPELEVEL = 15
 )
 
+func (b *FunctionBuilder) WithExternSideEffect(es map[string][]uint) {
+	m := make(map[string]func(b *FunctionBuilder, id string, v any) (value Value))
+
+	b.GetProgram().ExternSideEffect = es
+	for n, _ := range es {
+		m[n] = BuildFunctionWithSideEffect
+	}
+	b.WithExternBuildValueHandler(m)
+}
+
 func (b *FunctionBuilder) WithExternValue(vs map[string]any) {
 	b.GetProgram().ExternInstance = vs
 }
@@ -53,7 +63,9 @@ func TryGetSimilarityKey(table []string, name string) string {
 
 func (ex *ExternLib) BuildField(key string) Value {
 	if id, ok := ex.MemberMap[key]; ok {
-		return ex.GetValueById(id)
+		if value, ok := ex.GetValueById(id); ok {
+			return value
+		}
 	}
 	b := ex.builder
 	if v, ok := ex.table[key]; ok {
@@ -91,9 +103,6 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		// create variable for extern value
 		variable := ret.GetVariable(name)
 		if variable == nil {
-			// b.AssignVariable(
-			// 	b.CreateMemberCallVariable(extern, key), ret,
-			// )
 			ret.AddVariable(b.CreateMemberCallVariable(extern, key))
 		} else {
 			variable.AddRange(b.CurrentRange, true)
@@ -104,10 +113,24 @@ func (b *FunctionBuilder) TryBuildExternLibValue(extern *ExternLib, key Value) V
 		return ret
 	}
 
+	if lib, _ := b.GetProgram().GetLibrary(extern.GetName()); !utils.IsNil(lib) {
+		text := key.GetName()
+		if text == "" {
+			text = key.String()
+		}
+		if g, ok := lib.GetGlobalVariable(text); ok {
+			return g
+		}
+	}
+
 	// try build field for phi
 	if phiIns, ok := ToPhi(key); ok {
 		if ret := b.tryBuildExternFieldForPhi(extern, phiIns, make(map[int64]struct{})); ret != nil {
 			return ret
+		} else {
+			if m, ok := extern.GetMember(key); ok {
+				return m
+			}
 		}
 	} else {
 		want := b.TryGetSimilarityKey(extern.GetName(), key.String())
@@ -248,8 +271,8 @@ func (prog *Program) BuildValueFromAny(b *FunctionBuilder, id string, v any) (va
 	} else {
 		switch itype.Kind() {
 		case reflect.Func:
-			f := NewFunctionWithType(str, prog.CoverReflectFunctionType(itype, 0))
-			value = f
+			funcType := prog.CoverReflectFunctionType(itype, 0)
+			value = NewFunctionWithType(str, funcType)
 		default:
 			value = NewUndefined(str)
 			value.SetType(prog.handlerType(itype, 0))
@@ -307,7 +330,7 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 	// before this check, code will not recursive.
 	// check level
 	if level >= MAXTYPELEVEL {
-		return GetAnyType()
+		return CreateAnyType()
 	}
 	level++
 	// below this code, will recursive
@@ -336,6 +359,9 @@ func (prog *Program) handlerType(typ reflect.Type, level int) Type {
 		case reflect.Func:
 			ret = prog.CoverReflectFunctionType(typ, level)
 		case reflect.Pointer:
+			// t := NewPointerType()
+			// t.SetName("Pointer")
+			// return t
 			ret = prog.handlerType(typ.Elem(), level)
 			return ret
 		case reflect.UnsafePointer:
@@ -417,4 +443,52 @@ func (b *FunctionBuilder) TryBuildValueWithoutParent(name string, value Value) {
 		variable := head.CreateVariable(name, false)
 		head.AssignVariable(variable, value)
 	}
+}
+
+func BuildFunctionWithSideEffect(b *FunctionBuilder, id string, v any) (value Value) {
+	itype := reflect.TypeOf(v)
+	prog := b.GetProgram()
+	str := id
+
+	switch itype.Kind() {
+	case reflect.Func:
+		funcType := prog.CoverReflectFunctionType(itype, 0)
+		value = NewFunctionWithType(str, funcType)
+		if se, ok := prog.ExternSideEffect[str]; ok {
+			var modify Value
+			for i, k := range se {
+				switch k {
+				case uint(SideEffectIn):
+					p := b.NewParam("in")
+					p.FormalParameterIndex = i
+					modify = p
+				}
+			}
+			for i, k := range se {
+				if modify == nil {
+					modify = b.EmitMakeBuildWithType(CreateAnyType(), nil, nil)
+				}
+				switch k {
+				case uint(SideEffectOut):
+					funcType.SideEffects = append(funcType.SideEffects, &FunctionSideEffect{
+						Name:        "out",
+						VerboseName: "",
+						Modify:      modify.GetId(),
+						Variable:    b.CreateVariable("out"),
+						forceCreate: true,
+						Kind:        PointerSideEffect,
+						parameterMemberInner: &parameterMemberInner{
+							MemberCallKind:        ParameterCall,
+							MemberCallObjectIndex: i,
+						},
+					},
+					)
+				}
+			}
+		}
+	}
+	if b != nil {
+		value.SetRange(b.CurrentRange)
+	}
+	return
 }

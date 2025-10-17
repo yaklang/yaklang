@@ -679,8 +679,8 @@ func init() {
 			}
 			return nil
 		},
-		Description:         "重复一个字符串或者一个次数，例如：`{{repeat(abc|3)}}`，结果为：abcabcabc，或者`{{repeat(3)}}`，结果是重复三次",
-		TagNameVerbose:      "重复生成字符串",
+		Description:         "生成字符串数组，例如：`{{repeat(abc|3)}}` 会产生 `['abc','abc','abc']`；若写成 `{{repeat(3)}}` 则产生 `['','','']`。在 WebFuzzer 中，可通过 `{{repeat(n)}}` 指定重复发送 n 个包。",
+		TagNameVerbose:      "生成字符串数组",
 		ArgumentDescription: "{{optional(string_split(abc:字符串))}}{{number(3:重复次数)}}",
 	})
 
@@ -1020,7 +1020,7 @@ func init() {
 		Alias:               []string{"re:n", "regex:n", "regexp:n"},
 		Description:         "使用正则生成所有可能的字符中的随机n个",
 		TagNameVerbose:      "正则生成n条数据",
-		ArgumentDescription: "{{string([a-z0-9]:正则表达式)}}{{optional(number(1:数量))}}",
+		ArgumentDescription: "{{string_split([a-z0-9]:正则表达式)}}{{optional(number(1:数量))}}",
 	})
 	AddFuzzTagToGlobal(&FuzzTagDescription{
 		TagName: "rangechar",

@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	projectDataBase *gorm.DB
-	profileDatabase *gorm.DB
+	projectDataBase    *gorm.DB
+	profileDatabase    *gorm.DB
+	defaultSSADataBase *gorm.DB
 )
 
 func init() {
@@ -67,9 +68,22 @@ var ProfileTables = []interface{}{
 	&AiApiKeys{},    // for aibalance
 	&LoginSession{}, // for aibalance
 	&AIYakTool{},
+
+	&Snippets{}, // Snippets
+	// SSA Projects Config Info
+	&SSAProject{},
 }
 
 var databaseSchemas = map[uint8][]any{
+	KEY_SCHEMA_YAKIT_DATABASE:           nil,
+	KEY_SCHEMA_PROFILE_DATABASE:         nil,
+	KEY_SCHEMA_CVE_DATABASE:             nil,
+	KEY_SCHEMA_CVE_DESCRIPTION_DATABASE: nil,
+	KEY_SCHEMA_VULINBOX_DATABASE:        nil,
+	KEY_SCHEMA_SSA_DATABASE:             nil,
+}
+
+var databasePatches = map[uint8][]func(db *gorm.DB){
 	KEY_SCHEMA_YAKIT_DATABASE:           nil,
 	KEY_SCHEMA_PROFILE_DATABASE:         nil,
 	KEY_SCHEMA_CVE_DATABASE:             nil,
@@ -109,8 +123,16 @@ var ProjectTables = []interface{}{
 	&Note{},
 
 	// AI
-	&AiCoordinatorRuntime{},
+	&AIAgentRuntime{},
 	&AiCheckpoint{},
+	&AiOutputEvent{},
+	&AiProcess{},
+	&AIMemoryEntity{},
+	&AIMemoryCollection{},
+
+	// project level vector collection
+	&VectorStoreCollection{},
+	&VectorStoreDocument{},
 }
 
 func RegisterDatabaseSchema(key uint8, schema ...any) {
@@ -133,6 +155,25 @@ func AutoMigrate(db *gorm.DB, key uint8) {
 	}
 }
 
+func RegisterDatabasePatch(key uint8, patch func(db *gorm.DB)) {
+	if _, ok := databasePatches[key]; !ok {
+		panic("Database schema key invalid")
+	}
+
+	databasePatches[key] = append(databasePatches[key], patch)
+}
+
+func ApplyPatches(db *gorm.DB, key uint8) {
+	if patches, ok := databasePatches[key]; ok {
+		for _, patch := range patches {
+			if patch == nil {
+				continue
+			}
+			patch(db)
+		}
+	}
+}
+
 // set from consts package
 func SetGormProjectDatabase(d *gorm.DB) {
 	projectDataBase = d
@@ -143,10 +184,18 @@ func SetGormProfileDatabase(d *gorm.DB) {
 	profileDatabase = d
 }
 
+func SetDefaultSSADatabase(d *gorm.DB) {
+	defaultSSADataBase = d
+}
+
 func GetGormProfileDatabase() *gorm.DB {
 	return profileDatabase
 }
 
 func GetGormProjectDatabase() *gorm.DB {
 	return projectDataBase
+}
+
+func GetDefaultSSADatabase() *gorm.DB {
+	return defaultSSADataBase
 }

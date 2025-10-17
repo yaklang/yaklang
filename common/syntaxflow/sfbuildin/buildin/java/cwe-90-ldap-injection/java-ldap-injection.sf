@@ -7,24 +7,23 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-LDAP（轻量级目录访问协议）注入是一种安全漏洞，当应用程序在构造LDAP查询时，直接将用户可控的输入拼接到查询字符串中，而未进行有效的过滤或转义，攻击者可以构造恶意的输入，修改LDAP查询的逻辑或内容。这可能导致攻击者绕过身份验证、访问受限信息，甚至修改或删除目录服务中的数据。
-
-在Java应用程序中，常见的触发场景是使用`javax.naming.directory.InitialDirContext.search()`等方法时，将从用户请求（如HTTP请求参数）中获取的数据直接或间接拼接到搜索过滤器字符串中。
+   LDAP（轻量级目录访问协议）注入是一种安全漏洞，当应用程序在构造LDAP查询时，直接将用户可控的输入拼接到查询字符串中，而未进行有效的过滤或转义，攻击者可以构造恶意的输入，修改LDAP查询的逻辑或内容。这可能导致攻击者绕过身份验证、访问受限信息，甚至修改或删除目录服务中的数据。
+   在Java应用程序中，常见的触发场景是使用`javax.naming.directory.InitialDirContext.search()`等方法时，将从用户请求（如HTTP请求参数）中获取的数据直接或间接拼接到搜索过滤器字符串中。
 
 2. **触发场景**
-// 存在漏洞的代码示例
-```java
-String username = request.getParameter("username");
-String searchFilter = "(&(objectClass=user)(sAMAccountName=" + username + "))"; // 用户输入直接拼接
-NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchCtls);
-```
-攻击者可以通过输入如 `*))` 或 `)(|(displayName=*` 等恶意字符串，改变`searchFilter`的逻辑，可能导致枚举所有用户或绕过特定用户的查找。
+   // 存在漏洞的代码示例
+   ```java
+   String username = request.getParameter("username");
+   String searchFilter = "(&(objectClass=user)(sAMAccountName=" + username + "))"; // 用户输入直接拼接
+   NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchCtls);
+   ```
+   攻击者可以通过输入如 `*))` 或 `)(|(displayName=*` 等恶意字符串，改变`searchFilter`的逻辑，可能导致枚举所有用户或绕过特定用户的查找。
 
 3. **潜在影响**
-- **信息泄露**: 攻击者可以构造查询，获取目录服务中存储的敏感信息，如用户名、电子邮件地址、电话号码等。
-- **身份验证绕过**: 攻击者可能通过构造恶意过滤器，绕过基于LDAP的身份验证机制。
-- **数据篡改或删除**: 在某些配置下，攻击者可能能够执行写操作，修改或删除目录服务中的数据。
-- **拒绝服务**: 攻击者可能构造复杂的查询，导致目录服务资源耗尽，引发拒绝服务。
+   - **信息泄露**: 攻击者可以构造查询，获取目录服务中存储的敏感信息，如用户名、电子邮件地址、电话号码等。
+   - **身份验证绕过**: 攻击者可能通过构造恶意过滤器，绕过基于LDAP的身份验证机制。
+   - **数据篡改或删除**: 在某些配置下，攻击者可能能够执行写操作，修改或删除目录服务中的数据。
+   - **拒绝服务**: 攻击者可能构造复杂的查询，导致目录服务资源耗尽，引发拒绝服务。
 
 DESC
 	rule_id: "cbf59495-e46c-45aa-9a10-e7c90559a17c"
@@ -32,25 +31,26 @@ DESC
 ### 修复建议
 
 #### 1. 使用参数化查询（Parameterized Search）
-使用参数化查询是防御LDAP注入最有效的方法。JNDI API支持参数化查询，通过使用占位符并在单独的参数数组中提供绑定值，可以确保用户输入被视为数据而不是LDAP语法的一部分。
-```java
-// 修复代码示例
-String username = request.getParameter("username");
-// 使用占位符 {0}
-String searchFilter = "(&(objectClass=user)(sAMAccountName={0}))";
-// 在单独的数组中提供参数值
-Object[] searchArguments = new Object[]{username};
-NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchArguments, searchCtls);
-```
+   使用参数化查询是防御LDAP注入最有效的方法。JNDI API支持参数化查询，通过使用占位符并在单独的参数数组中提供绑定值，可以确保用户输入被视为数据而不是LDAP语法的一部分。
+   ```java
+   // 修复代码示例
+   String username = request.getParameter("username");
+   // 使用占位符 {0}
+   String searchFilter = "(&(objectClass=user)(sAMAccountName={0}))";
+   // 在单独的数组中提供参数值
+   Object[] searchArguments = new Object[]{username};
+   NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchArguments, searchCtls);
+   ```
 
 #### 2. 对用户输入进行严格过滤和转义
-如果无法使用参数化查询，必须对用户输入进行严格的过滤和转义。这包括移除或转义所有可能被解释为LDAP特殊字符的输入，如`()`, `*`, `\`, `/`, `+`, `,`, `;`, `=`, `!`, `<`, `>`, `|`, `&`, `.` 等。
+   如果无法使用参数化查询，必须对用户输入进行严格的过滤和转义。这包括移除或转义所有可能被解释为LDAP特殊字符的输入，如`()`, `*`, `\`, `/`, `+`, `,`, `;`, `=`, `!`, `<`, `>`, `|`, `&`, `.` 等。
 
 #### 3. 最小权限原则
-为执行LDAP查询的应用程序账户设置最小权限，限制其能够执行的操作（仅搜索）和能够访问的数据范围，即使发生注入，也能限制攻击者的影响范围。
+   为执行LDAP查询的应用程序账户设置最小权限，限制其能够执行的操作（仅搜索）和能够访问的数据范围，即使发生注入，也能限制攻击者的影响范围。
 
 #### 4. 输入合法性校验
-对用户输入进行严格的合法性校验，确保输入符合预期的格式、类型和长度范围，拒绝所有不符合规范的输入。
+   对用户输入进行严格的合法性校验，确保输入符合预期的格式、类型和长度范围，拒绝所有不符合规范的输入。
+
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-90: Improper Neutralization of Data from an Untrusted Source in LDAP Query ('LDAP Injection')](https://cwe.mitre.org/data/definitions/90.html)
@@ -73,9 +73,8 @@ $result<dataflow(
 )> as $high 
 
 alert $high for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（Parameterized Search）
 使用参数化查询是防御LDAP注入最有效的方法。JNDI API支持参数化查询，通过使用占位符并在单独的参数数组中提供绑定值，可以确保用户输入被视为数据而不是LDAP语法的一部分。
 ```java
@@ -87,24 +86,18 @@ String searchFilter = "(&(objectClass=user)(sAMAccountName={0}))";
 Object[] searchArguments = new Object[]{username};
 NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchArguments, searchCtls);
 ```
-
 #### 2. 对用户输入进行严格过滤和转义
-如果无法使用参数化查询，必须对用户输入进行严格的过滤和转义。这包括移除或转义所有可能被解释为LDAP特殊字符的输入，如`()`, `*`, `\`, `/`, `+`, `,`, `;`, `=`, `!`, `<`, `>`, `|`, `&`, `.` 等。
-
+如果无法使用参数化查询，必须对用户输入进行严格的过滤和转义。这包括移除或转义所有可能被解释为LDAP特殊字符的输入，如`()`，`*`，`\`，`/`，`+`，`,`，`;`，`=`，`!`，`<`，`>`，`|`，`&`，`.` 等。
 #### 3. 最小权限原则
 为执行LDAP查询的应用程序账户设置最小权限，限制其能够执行的操作（仅搜索）和能够访问的数据范围，即使发生注入，也能限制攻击者的影响范围。
-
 #### 4. 输入合法性校验
 对用户输入进行严格的合法性校验，确保输入符合预期的格式、类型和长度范围，拒绝所有不符合规范的输入。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 LDAP（轻量级目录访问协议）注入是一种安全漏洞，当应用程序在构造LDAP查询时，直接将用户可控的输入拼接到查询字符串中，而未进行有效的过滤或转义，攻击者可以构造恶意的输入，修改LDAP查询的逻辑或内容。这可能导致攻击者绕过身份验证、访问受限信息，甚至修改或删除目录服务中的数据。
-
 在Java应用程序中，常见的触发场景是使用`javax.naming.directory.InitialDirContext.search()`等方法时，将从用户请求（如HTTP请求参数）中获取的数据直接或间接拼接到搜索过滤器字符串中。
-
 2. **触发场景**
 // 存在漏洞的代码示例
 ```java
@@ -113,27 +106,27 @@ String searchFilter = "(&(objectClass=user)(sAMAccountName=" + username + "))"; 
 NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchCtls);
 ```
 攻击者可以通过输入如 `*))` 或 `)(|(displayName=*` 等恶意字符串，改变`searchFilter`的逻辑，可能导致枚举所有用户或绕过特定用户的查找。
-
 3. **潜在影响**
 - **信息泄露**: 攻击者可以构造查询，获取目录服务中存储的敏感信息，如用户名、电子邮件地址、电话号码等。
 - **身份验证绕过**: 攻击者可能通过构造恶意过滤器，绕过基于LDAP的身份验证机制。
 - **数据篡改或删除**: 在某些配置下，攻击者可能能够执行写操作，修改或删除目录服务中的数据。
 - **拒绝服务**: 攻击者可能构造复杂的查询，导致目录服务资源耗尽，引发拒绝服务。
-CODE
+DESC
 	level: "high",
 	message: "发现Java代码中存在LDAP注入漏洞，并且数据流中间没有进行任何过滤。",
-	title: "Check Java LDAP Injection Vulnerability",
-	title_zh: "检测Java LDAP注入漏洞",
+	title: "Java LDAP Injection Vulnerability Was Detected",
+	title_zh: "检测到Java LDAP注入漏洞",
+	risk: "LDAP注入",
+	name: "high",
 }
 
 
 $result - $high  as $low;
 alert $low for {
-	title: "Check Java LDAP Injection Vulnerability",
-	title_zh: "检测Java LDAP注入漏洞",
-	solution: <<<CODE
+	title: "Java LDAP Injection Vulnerability Was Detected",
+	title_zh: "检测到Java LDAP注入漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（Parameterized Search）
 使用参数化查询是防御LDAP注入最有效的方法。JNDI API支持参数化查询，通过使用占位符并在单独的参数数组中提供绑定值，可以确保用户输入被视为数据而不是LDAP语法的一部分。
 ```java
@@ -145,24 +138,18 @@ String searchFilter = "(&(objectClass=user)(sAMAccountName={0}))";
 Object[] searchArguments = new Object[]{username};
 NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchArguments, searchCtls);
 ```
-
 #### 2. 对用户输入进行严格过滤和转义
-如果无法使用参数化查询，必须对用户输入进行严格的过滤和转义。这包括移除或转义所有可能被解释为LDAP特殊字符的输入，如`()`, `*`, `\`, `/`, `+`, `,`, `;`, `=`, `!`, `<`, `>`, `|`, `&`, `.` 等。
-
+如果无法使用参数化查询，必须对用户输入进行严格的过滤和转义。这包括移除或转义所有可能被解释为LDAP特殊字符的输入，如`()`，`*`，`\`，`/`，`+`，`,`，`;`，`=`，`!`，`<`，`>`，`|`，`&`，`.` 等。
 #### 3. 最小权限原则
 为执行LDAP查询的应用程序账户设置最小权限，限制其能够执行的操作（仅搜索）和能够访问的数据范围，即使发生注入，也能限制攻击者的影响范围。
-
 #### 4. 输入合法性校验
 对用户输入进行严格的合法性校验，确保输入符合预期的格式、类型和长度范围，拒绝所有不符合规范的输入。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 LDAP（轻量级目录访问协议）注入是一种安全漏洞，当应用程序在构造LDAP查询时，直接将用户可控的输入拼接到查询字符串中，而未进行有效的过滤或转义，攻击者可以构造恶意的输入，修改LDAP查询的逻辑或内容。这可能导致攻击者绕过身份验证、访问受限信息，甚至修改或删除目录服务中的数据。
-
 在Java应用程序中，常见的触发场景是使用`javax.naming.directory.InitialDirContext.search()`等方法时，将从用户请求（如HTTP请求参数）中获取的数据直接或间接拼接到搜索过滤器字符串中。
-
 2. **触发场景**
 // 存在漏洞的代码示例
 ```java
@@ -171,15 +158,16 @@ String searchFilter = "(&(objectClass=user)(sAMAccountName=" + username + "))"; 
 NamingEnumeration answer = ctx.search("dc=example,dc=com", searchFilter, searchCtls);
 ```
 攻击者可以通过输入如 `*))` 或 `)(|(displayName=*` 等恶意字符串，改变`searchFilter`的逻辑，可能导致枚举所有用户或绕过特定用户的查找。
-
 3. **潜在影响**
 - **信息泄露**: 攻击者可以构造查询，获取目录服务中存储的敏感信息，如用户名、电子邮件地址、电话号码等。
 - **身份验证绕过**: 攻击者可能通过构造恶意过滤器，绕过基于LDAP的身份验证机制。
 - **数据篡改或删除**: 在某些配置下，攻击者可能能够执行写操作，修改或删除目录服务中的数据。
 - **拒绝服务**: 攻击者可能构造复杂的查询，导致目录服务资源耗尽，引发拒绝服务。
-CODE
+DESC
 	level: "low",
 	message: "发现Java代码中可能存在LDAP注入漏洞。",
+	risk: "LDAP注入",
+	name: "low",
 }
 
 

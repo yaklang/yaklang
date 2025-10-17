@@ -10,11 +10,13 @@ import (
 // 测试 SQLiteVectorStore
 func TestSQLiteVectorStore(t *testing.T) {
 	// 创建模拟嵌入器
-	mockEmbed := &MockEmbedder{}
+	mockEmbed := NewMockEmbedder(func(text string) ([]float32, error) {
+		return []float32{1.0, 0.0, 0.0}, nil
+	})
 
 	db := consts.GetGormProfileDatabase()
 	// 创建 SQLite 向量存储
-	store, err := NewSQLiteVectorStore(db, "test_collection", "Qwen3-Embedding-0.6B-Q8_0", 1024, mockEmbed)
+	store, err := NewSQLiteVectorStoreHNSW("test_collection", "test", "Qwen3-Embedding-0.6B-Q4_K_M", 1024, mockEmbed, db)
 	assert.NoError(t, err)
 	defer store.Remove()
 
@@ -24,13 +26,13 @@ func TestSQLiteVectorStore(t *testing.T) {
 			ID:        "doc1",
 			Content:   "Yaklang是一种安全研究编程语言",
 			Metadata:  map[string]any{"source": "Yaklang介绍"},
-			Embedding: []float64{1.0, 0.0, 0.0},
+			Embedding: []float32{1.0, 0.0, 0.0},
 		},
 		{
 			ID:        "doc2",
 			Content:   "RAG是一种结合检索和生成的AI技术",
 			Metadata:  map[string]any{"source": "RAG介绍"},
-			Embedding: []float64{0.0, 1.0, 0.0},
+			Embedding: []float32{0.0, 1.0, 0.0},
 		},
 	}
 
@@ -50,7 +52,7 @@ func TestSQLiteVectorStore(t *testing.T) {
 	assert.Equal(t, "doc1", doc.ID)
 
 	// 测试搜索
-	results, err := store.Search("什么是Yaklang", 5)
+	results, err := store.Search("什么是Yaklang", 1, 5)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(results))
 	assert.Equal(t, "doc1", results[0].Document.ID)     // 第一个结果应该是Yaklang文档

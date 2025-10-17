@@ -2,18 +2,15 @@ package antlr4nasl
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak"
 	"github.com/yaklang/yaklang/common/yak/antlr4nasl/script_core"
-	"strings"
 )
 
-func init() {
-	yak.SetNaslExports(Exports)
-}
 func QueryAllScripts(script ...any) []*script_core.NaslScriptInfo {
 	queryCondition := map[string]any{}
 	if len(script) > 0 {
@@ -109,4 +106,5 @@ var Exports = map[string]any{
 	"riskHandle":      script_core.WithRiskHandle,
 	"proxy":           script_core.WithProxy,
 	"conditions":      script_core.WithConditions,
+	"sourcePaths":     script_core.WithSourcePath,
 }

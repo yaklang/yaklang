@@ -99,6 +99,19 @@ func TestAutoUpdateAiList(t *testing.T) {
 		yakit.ConfigureNetWork(cfg)
 	}()
 
+	expectListGetter := func(latterCall ...string) []string {
+		allList := aispec.RegisteredAIGateways()
+		result := make([]string, 0)
+		result = append(result, latterCall...)
+
+		for _, v := range allList {
+			if !utils.StringArrayContains(latterCall, v) {
+				result = append(result, v)
+			}
+		}
+		return result
+	}
+
 	aispec.Register("comate", func() aispec.AIClient { // override the comate gateway, because it wast lots of time to fetch the token
 		return nil
 	})
@@ -111,21 +124,21 @@ func TestAutoUpdateAiList(t *testing.T) {
 	if cfg == nil {
 		t.Fail()
 	}
-	assert.Equal(t, []string{"openai", "chatglm", "comate", "moonshot", "tongyi"}, cfg.AiApiPriority) // check update new ai type
+	assert.Equal(t, expectListGetter("openai", "chatglm"), cfg.AiApiPriority) // check update new ai type
 
 	// test order of ai type
 	cfg.AiApiPriority = []string{"comate", "chatglm"}
 	yakit.ConfigureNetWork(cfg)
 	Chat("你好", aispec.WithDomain("127.0.0.1"), aispec.WithTimeout(0.01))
 	cfg = yakit.GetNetworkConfig()
-	assert.Equal(t, []string{"comate", "chatglm", "openai", "moonshot", "tongyi"}, cfg.AiApiPriority)
+	assert.Equal(t, expectListGetter("comate", "chatglm"), cfg.AiApiPriority)
 
 	// test auto remove not registered ai type
 	cfg.AiApiPriority = []string{"invalidAI", "moonshot", "invalidAI2", "chatglm"}
 	yakit.ConfigureNetWork(cfg)
 	Chat("你好", aispec.WithDomain("127.0.0.1"), aispec.WithTimeout(0.01))
 	cfg = yakit.GetNetworkConfig()
-	assert.Equal(t, []string{"moonshot", "chatglm", "comate", "openai", "tongyi"}, cfg.AiApiPriority)
+	assert.Equal(t, expectListGetter("moonshot", "chatglm"), cfg.AiApiPriority)
 }
 
 type TestGateway struct {
@@ -149,10 +162,6 @@ func (t *TestGateway) StructuredStream(s string, function ...any) (chan *aispec.
 func (t *TestGateway) Chat(s string, function ...any) (string, error) {
 	t.config.StreamHandler(nil)
 	return "ok", nil
-}
-
-func (t *TestGateway) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, nil
 }
 
 func (t *TestGateway) ChatStream(s string) (io.Reader, error) {

@@ -5,90 +5,74 @@ desc(
 	lib: "golang-http-gin"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   使用Gin框架构建的Go语言Web应用程序可能存在多种安全风险，例如不当的输入验证、未授权的资源访问或敏感信息泄露。这些风险可能源于开发人员对用户输入的信任处理不足，或者在请求处理逻辑中缺乏严格的权限控制。
-
+使用Gin框架构建的Go语言Web应用程序可能存在多种安全风险，例如不当的输入验证、未授权的资源访问或敏感信息泄露。这些风险可能源于开发人员对用户输入的信任处理不足，或者在请求处理逻辑中缺乏严格的权限控制。
 2. **触发场景**
-   ```go
+```go
 package main
-
 import (
-    "github.com/gin-gonic/gin"
+"github.com/gin-gonic/gin"
 )
-
 func main() {
-    router := gin.Default()
-
-    // 存在潜在风险的代码示例
-    router.GET("/user/:id", func(c *gin.Context) {
-        id := c.Param("id")
-        c.JSON(200, gin.H{"userID": id})  // 直接输出用户输入内容
-    })
-
-    router.Run(":8080")
+router := gin.Default()
+// 存在潜在风险的代码示例
+router.GET("/user/:id", func(c *gin.Context) {
+id := c.Param("id")
+c.JSON(200, gin.H{"userID": id})  // 直接输出用户输入内容
+})
+router.Run(":8080")
 }
 ```
-   在上述代码中，攻击者可以通过传入恶意参数（如`../../etc/passwd`）实现路径遍历，获取系统文件内容；或者通过构造特殊字符导致程序崩溃。
-
+在上述代码中，攻击者可以通过传入恶意参数（如`../../etc/passwd`）实现路径遍历，获取系统文件内容；或者通过构造特殊字符导致程序崩溃。
 3. **潜在影响**
-   - 敏感数据（如用户凭证、隐私信息）被窃取。
-   - 数据库查询语句被篡改，导致数据泄露或破坏。
-   - 系统命令被执行，造成服务器被完全控制。
-
+- 敏感数据（如用户凭证、隐私信息）被窃取。
+- 数据库查询语句被篡改，导致数据泄露或破坏。
+- 系统命令被执行，造成服务器被完全控制。
 ### 规则详细
 该规则属于`golang-http-gin`库规则（`lib`类型），主要目的是识别使用Gin框架注册的HTTP请求处理函数（HandlerFunc）。规则通过以下步骤实现其目的：
 1. 定位到Gin框架的入口点 `gin?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}}`。
 2. 找到通过 `Default()` 方法创建的默认引擎实例。
 3. 追踪默认引擎实例上注册的所有HTTP方法（如GET, POST, PUT, DELETE等）及其对应的处理函数。
 4. 提取这些处理函数的参数信息，通常这些参数包含了`*gin.Context`类型，这个类型提供了访问请求和响应的能力，是后续进行数据流分析的关键起点。
-
 定期审计请求处理逻辑是确保Web应用程序安全性的重要步骤，通过识别所有的处理函数，为进一步的漏洞检测和安全审计奠定基础。
-
 **关联其他规则:** 识别出的`*gin.Context`对象可以作为起点，通过数据流分析追踪用户输入（如Form, Query, JSON等）如何被使用，以及敏感数据（如数据库查询、文件操作、Command Execution等）如何被输出，从而发现诸如SQL注入、XSS、命令注入等漏洞。
 DESC
 	rule_id: "0f451c28-265e-4e72-af5b-c50c7006848f"
 	title_zh: "审计Golang Gin HTTP Handler"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 验证并清理用户输入
 通过检查和过滤所有用户输入，确保其符合预期格式和范围，避免非法输入。
 ```go
 // 示例：校验输入是否为数字
 if !regexp.MustCompile(`^[0-9]+$`).MatchString(id) {
-    c.JSON(400, gin.H{"error": "Invalid input"})
-    return
+c.JSON(400, gin.H{"error": "Invalid input"})
+return
 }
 ```
-
 #### 2. 实现细粒度的权限控制
 针对每个HTTP端点，明确设置访问权限，防止未经授权的操作。
 ```go
 // 示例：基于用户角色的权限控制
 if !isAuthorized(c, "admin") {
-    c.JSON(403, gin.H{"error": "Forbidden"})
-    return
+c.JSON(403, gin.H{"error": "Forbidden"})
+return
 }
 ```
-
 #### 3. 避免直接输出用户输入
 在将用户输入返回给客户端之前，对其进行适当的转义或编码。
 ```go
 // 示例：HTML转义
 import "html"
-
-escapedID := html.EscapeString(id)
+escapeID := html.EscapeString(id)
 c.JSON(200, gin.H{"userID": escapedID})
 ```
-
 #### 4. 使用中间件增强安全性
 利用Gin内置的安全中间件（如CORS、CSRF防护）来提高整体安全性。
 ```go
 // 示例：启用CORS中间件
 router.Use(cors.Default())
 ```
-
 通过以上措施，可以有效降低因不当处理用户输入而导致的安全风险。
 SOLUTION
 	reference: <<<REFERENCE
@@ -104,8 +88,81 @@ $handle<getFormalParams> as $output
 
 alert $output for {
 	title: "Audit Golang Gin HTTP Handler",
-	title_zh: "审计Golang gin HTTP Handler",
+	title_zh: "审计Golang Gin HTTP Handler",
 	level: "info",
+	name: "output",
+	message: "发现Golang Gin HTTP Handler的注册逻辑，需进一步审计其处理函数是否存在安全风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证并清理用户输入
+通过检查和过滤所有用户输入，确保其符合预期格式和范围，避免非法输入。
+```go
+// 示例：校验输入是否为数字
+if !regexp.MustCompile(`^[0-9]+$`).MatchString(id) {
+    c.JSON(400, gin.H{"error": "Invalid input"})
+    return
+}
+```
+#### 2. 实现细粒度的权限控制
+针对每个HTTP端点，明确设置访问权限，防止未经授权的操作。
+```go
+// 示例：基于用户角色的权限控制
+if !isAuthorized(c, "admin") {
+    c.JSON(403, gin.H{"error": "Forbidden"})
+    return
+}
+```
+#### 3. 避免直接输出用户输入
+在将用户输入返回给客户端之前，对其进行适当的转义或编码。
+```go
+// 示例：HTML转义
+import "html"
+escapeID := html.EscapeString(id)
+c.JSON(200, gin.H{"userID": escapeID})
+```
+#### 4. 使用中间件增强安全性
+利用Gin内置的安全中间件（如CORS、CSRF防护）来提高整体安全性。
+```go
+// 示例：启用CORS中间件
+router.Use(cors.Default())
+```
+通过以上措施，可以有效降低因不当处理用户输入而导致的安全风险。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+使用Gin框架构建的Go语言Web应用程序可能存在多种安全风险，例如不当的输入验证、未授权的资源访问或敏感信息泄露。这些风险可能源于开发人员对用户输入的信任处理不足，或者在请求处理逻辑中缺乏严格的权限控制。
+2. **触发场景**
+```go
+package main
+import (
+    "github.com/gin-gonic/gin"
+)
+func main() {
+    router := gin.Default()
+    // 存在潜在风险的代码示例
+    router.GET("/user/:id", func(c *gin.Context) {
+        id := c.Param("id")
+        c.JSON(200, gin.H{"userID": id})  // 直接输出用户输入内容
+    })
+    router.Run(":8080")
+}
+```
+在上述代码中，攻击者可以通过传入恶意参数（如`../../etc/passwd`）实现路径遍历，获取系统文件内容；或者通过构造特殊字符导致程序崩溃。
+3. **潜在影响**
+- 敏感数据（如用户凭证、隐私信息）被窃取。
+- 数据库查询语句被篡改，导致数据泄露或破坏。
+- 系统命令被执行，造成服务器被完全控制。
+### 规则详细
+该规则属于`golang-http-gin`库规则（`lib`类型），主要目的是识别使用Gin框架注册的HTTP请求处理函数（HandlerFunc）。规则通过以下步骤实现其目的：
+1. 定位到Gin框架的入口点 `gin?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}}`。
+2. 找到通过 `Default()` 方法创建的默认引擎实例。
+3. 追踪默认引擎实例上注册的所有HTTP方法（如GET, POST, PUT, DELETE等）及其对应的处理函数。
+4. 提取这些处理函数的参数信息，通常这些参数包含了`*gin.Context`类型，这个类型提供了访问请求和响应的能力，是后续进行数据流分析的关键起点。
+定期审计请求处理逻辑是确保Web应用程序安全性的重要步骤，通过识别所有的处理函数，为进一步的漏洞检测和安全审计奠定基础。
+**关联其他规则:** 识别出的`*gin.Context`对象可以作为起点，通过数据流分析追踪用户输入（如Form, Query, JSON等）如何被使用，以及敏感数据（如数据库查询、文件操作、Command Execution等）如何被输出，从而发现诸如SQL注入、XSS、命令注入等漏洞。
+DESC
 }
 
 desc(
@@ -196,4 +253,176 @@ func main() {
     router.Run(":8080")
 }
 PARAM
+	"safefile://SafeGinNonHTTPRegistration.go": <<<CODE
+// common/syntaxflow/sfbuildin/buildin/golang/lib/http/golang-http-handlefunc-gin.sf
+// 本用例旨在测试规则对Gin框架HTTP Handler注册的检测逻辑。
+// 规则检测的是通过gin.Default()创建的路由器实例上注册的HTTP方法（如GET, POST等）及其对应的处理函数。
+// 这个测试用例通过不使用gin.Default()或其链式调用来注册路由，而是仅仅实例化gin.Engine，
+// 或者通过其他非HTTP注册的方式，例如自定义的调度器，来确保不会被规则捕获。
+// 虽然这在实际Gin应用中并不常见，但它展示了如何通过避免规则的特定匹配模式来规避检测。
+
+package main
+
+import (
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"sync"
+	"time"
+)
+
+// 模拟一个不依赖Gin HTTP路由的独立处理器
+type CustomProcessor struct {
+	mu sync.Mutex
+	data map[string]string
+}
+
+func NewCustomProcessor() *CustomProcessor {
+	return &CustomProcessor{
+		data: make(map[string]string),
+	}
+}
+
+func (cp *CustomProcessor) Process(key, value string) string {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	cp.data[key] = value
+	return fmt.Sprintf("Processed: %s = %s at %s", key, value, time.Now().Format(time.RFC3339))
+}
+
+func main() {
+	// 1. 不创建或运行gin.Default()或类似的HTTP路由注册
+	// 仅仅实例化Gin引擎，但不注册任何HTTP Handlerfunc
+	// gin.New() 返回一个没有默认中间件的引擎实例，不主动调用GET/POST等方法注册路由，则不会触发
+	engine := gin.New()
+
+	// 可以选择性地添加一些中间件，但不涉及业务路由注册
+	engine.Use(gin.Recovery())
+
+	// 2. 核心：不使用gin.Engine的HTTP方法（GET, POST, PUT, DELETE等）注册HandlerFunc
+	// 规则明确指出 `router.*(*<slice(index=2)> as $handle)` 来匹配HTTP方法注册。
+	// 因此，不调用这些方法，就不会有HandlerFunc被匹配。
+
+	// 示例：使用一个完全独立于Gin HTTP路由的处理器。
+	// 即使 Gin 引擎存在，但没有与其绑定的 HTTP 业务逻辑。
+	processor := NewCustomProcessor()
+	result := processor.Process("example_key", "example_value")
+	fmt.Println(result)
+
+	// 可以启动一个HTTP服务器，但该服务器的路由并非由Gin处理，
+	// 或是仅提供一个健康检查等简单的、无HandlerFunc的接口。
+	// 或者，为了完全规避，根本不启动Gin的Run方法，仅作库使用。
+
+	// 如果需要启动HTTP服务器且不触发Gin路由检测，可以使用Go标准库的http包直接处理。
+	// 这种方式完全绕开了Gin的路由注册机制，因此规则无法检测。
+
+	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintf(w, "Service Status: OK\n")
+	})
+
+	fmt.Println("Server listening on :8081 for status checks via net/http")
+	// 故意不调用 engine.Run() 来启动 Gin 服务器
+	// 如果调用，即使没有 gin.GET/POST，规则也可能因为上下文分析到 gin.Engine 实例而被误报，
+	// 但这条规则特别关注GET/POST等方法注册的HandlerFunc。
+
+	// http.ListenAndServe(":8081", nil)
+	// 为了避免假阳性，这里将 ListenAndServe 注释掉，防止Gin引擎的运行隐式触发检测。
+
+	// 或者，如果Gin引擎必须被创建和使用，但其核心业务逻辑不通过规则检测的方式注册，
+	// 这里的关键是确保规则中的 `$default.*(*<slice(index=2)> as $handle)` 无法匹配到任何调用。
+	// 例如，如果HandlerFn是动态注册的，或者通过反射而非直接方法调用，也可能规避。
+
+	// 这里通过不调用 Gin 的路由注册方法来规避检测。
+
+}
+
+// 注意：此代码不是一个完整的、可运行的Gin应用，其目的是为了展示如何不触发该规则的Gin Handler检测。
+// 在实际生产环境中很少会这样使用Gin库。
+
+CODE
+	"safefile://SafeGinDynamicRouter.go": <<<CODE
+// common/syntaxflow/sfbuildin/buildin/golang/lib/http/golang-http-handlefunc-gin.sf
+// 本用例的目的是测试规则对Gin框架HTTP Handler注册的检测能力，特别是当路由注册方式
+// 不那么直接时（例如通过反射、插件化机制或条件性注册）。
+// 规则的关键检测点在于 `$default.*(*<slice(index=2)> as $handle)`，它期望找到像
+// `router.GET("/path", handlerFunc)` 这样直接通过方法调用注册的HandlerFunc。
+// 此用例尝试通过更间接的方式定义和使用Gin Handler，但避免直接调用 Gin 引擎的 GET/POST 等方法来
+// 注册固定路径的 handler，从而规避规则检测。
+
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
+
+type RouteInfo struct {
+	Method  string
+	Path    string
+	Handler func(*gin.Context) interface{}
+}
+
+// 模拟一个从外部配置加载路由信息并动态注册的场景
+// 这里的关键在于，外部配置通常不会在编译时被规则分析工具追溯。
+// 而且，我们不会直接在 main 函数中 'router.GET'。
+func loadRoutesFromConfig() []RouteInfo {
+
+	// 通常这里会从文件、数据库或API加载
+	// 为了示例，我们硬编码一些路由信息
+	return []RouteInfo{
+		{
+			Method: "GET",
+			Path:   "/api/v1/config",
+			Handler: func(c *gin.Context) interface{} {
+				return gin.H{"status": "Config loaded"}
+			},
+		},
+		{
+			Method: "POST",
+			Path:   "/api/v1/data",
+			Handler: func(c *gin.Context) interface{} {
+				var req map[string]interface{}
+				c.BindJSON(&req)
+				return gin.H{"received": req, "message": "Data processed"}
+			},
+		},
+	}
+}
+
+// 此函数旨在将 HandlerFunc 包装起来，使其不直接作为 Gin 路由方法的参数出现
+// 从而增加分析难度，减少直接匹配的可能性。
+func wrapHandler(h func(*gin.Context) interface{}) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		res := h(c)
+		c.JSON(http.StatusOK, res)
+	}
+}
+
+func main() {
+	r := gin.New()
+
+	// 不直接调用 r.GET, r.POST 等方法在 main 函数中注册
+	// 而是通过一个循环和 map 来间接注册
+
+	configuredRoutes := loadRoutesFromConfig()
+	for _, route := range configuredRoutes {
+		switch route.Method {
+		case "GET":
+			r.GET(route.Path, wrapHandler(route.Handler))
+		case "POST":
+			r.POST(route.Path, wrapHandler(route.Handler))
+		// ... other methods
+		default:
+			fmt.Printf("Unsupported method for path %s: %s\n", route.Path, route.Method)
+		}
+	}
+
+	// 启动服务器
+	fmt.Println("Server listening on :8080. Access /api/v1/config or /api/v1/data")
+	r.Run(":8080")
+}
+
+CODE
 )

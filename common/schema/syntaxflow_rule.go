@@ -4,8 +4,9 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -42,6 +43,7 @@ func GetAllSFSupportLanguage() []string {
 		"javaScript",
 		"php",
 		"golang",
+		"c",
 		"general", // 通用规则
 	}
 }
@@ -50,8 +52,8 @@ const (
 	SFR_SEVERITY_INFO     SyntaxFlowSeverity = "info"
 	SFR_SEVERITY_LOW      SyntaxFlowSeverity = "low"
 	SFR_SEVERITY_WARNING  SyntaxFlowSeverity = "middle"
-	SFR_SEVERITY_CRITICAL SyntaxFlowSeverity = "critical"
 	SFR_SEVERITY_HIGH     SyntaxFlowSeverity = "high"
+	SFR_SEVERITY_CRITICAL SyntaxFlowSeverity = "critical"
 )
 
 func GetAllSFSeverityTypes() []string {
@@ -90,7 +92,7 @@ func ValidSeverityType(i any) SyntaxFlowSeverity {
 		return SFR_SEVERITY_CRITICAL
 	case "high", "h", "error":
 		return SFR_SEVERITY_HIGH
-	case "low":
+	case "low", "l":
 		return SFR_SEVERITY_LOW
 	default:
 		return SFR_SEVERITY_INFO
@@ -146,9 +148,10 @@ type SyntaxFlowDescInfo struct {
 	// audit / vuln / config / security / information
 	Purpose SyntaxFlowRulePurposeType `json:"purpose"`
 
-	OnlyMsg   bool   `json:"only_msg"`
-	Msg       string `json:"msg"`
-	CVE       string `json:"cve"`
+	OnlyMsg   bool        `json:"only_msg"`
+	Msg       string      `json:"msg"`
+	CVE       string      `json:"cve"`
+	CWE       StringArray `json:"cwe"`
 	RiskType  string
 	ExtraInfo map[string]string `json:"extra_info"`
 }
@@ -207,6 +210,7 @@ type SyntaxFlowRule struct {
 	Description string
 	Tag         string
 	AlertDesc   MapEx[string, *SyntaxFlowDescInfo] `gorm:"type:text"`
+	CWE         StringArray                        `gorm:"type:text" json:"cwe"`
 	CVE         string
 	// yak or sf
 	RiskType string

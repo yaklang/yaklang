@@ -6,13 +6,52 @@ desc(
 [CWE-327](https://cwe.mitre.org/data/definitions/327.html)
 [Java AlgorithmParameters Documentation](https://docs.oracle.com/javase/8/docs/api/java/security/AlgorithmParameters.html)
 REFERENCE
-	desc: <<<DESCRIPTION
-该规则用于检测Java代码中是否使用了不安全的加密算法。使用已破解或存在风险的加密算法可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。
-- 规则审计的类：
-    java.security.AlgorithmParameters
-- 规则审计的方法：
-    getInstance()
-DESCRIPTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   使用已破解或存在风险的加密算法（如DES、3DES、RC4等）会导致敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，可能无法为数据提供足够的安全性。例如，DES算法由于密钥长度较短，容易受到暴力破解攻击；而RC4算法则因其随机性不足和存在已知偏差被逐步淘汰。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```java
+   import javax.crypto.spec.IvParameterSpec;
+   import java.security.AlgorithmParameters;
+   import java.security.SecureRandom;
+   public class WeakAlgorithmParametersExample {
+       public static void main(String[] args) {
+           try {
+               // 创建 DES 算法参数实例
+               AlgorithmParameters params = AlgorithmParameters.getInstance("DES"); // 使用不安全的 DES 算法
+               // 创建初始化向量
+               byte[] iv = new byte[8]; // DES 使用 8 字节的初始化向量
+               new SecureRandom().nextBytes(iv);
+               IvParameterSpec ivSpec = new IvParameterSpec(iv);
+               // 初始化算法参数 - 这里会触发规则检查
+               params.init(ivSpec);
+               // 获取参数编码
+               byte[] encodedParams = params.getEncoded();
+               // 使用这些参数
+               System.out.println("Algorithm: " + params.getAlgorithm());
+               System.out.println("Parameter encoding length: " + encodedParams.length);
+           } catch (Exception e) {
+               e.printStackTrace();
+           }
+       }
+   }
+   ```
+   在上述代码中，`AlgorithmParameters.getInstance("DES")` 使用了弱加密算法 DES，这可能导致加密数据易受攻击。
+
+3. **潜在影响**
+   - 敏感数据（如用户凭证、隐私信息等）因加密算法脆弱而被窃取。
+   - 数据完整性遭到破坏，攻击者可以篡改加密消息。
+   - 加密通信被破解，导致机密性丧失。
+
+### 规则详细
+- 审计对象：`java.security.AlgorithmParameters` 类及其 `getInstance()` 方法。
+- 目标语言：Java。
+- 检测内容：调用 `getInstance()` 方法时传入的参数是否属于危险算法（如 DES、3DES、RC4 等）。
+DESC
 	rule_id: "fa6435fb-0def-4db7-9201-6223941859d4"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -25,12 +64,11 @@ DESCRIPTION
 ```java
 // 修复代码示例：使用更安全的 AES 算法
 import java.security.AlgorithmParameters;
-
 public class SecureAlgorithmParametersExample {
     public static void main(String[] args) {
         try {
             // 使用更安全的 AES 算法，并指定合适的模式和Padding（例如 AES/CBC/PKCS5Padding）
-            AlgorithmParameters params = AlgorithmParameters.getInstance("AES"); 
+            AlgorithmParameters params = AlgorithmParameters.getInstance("AES");
             System.out.println("Using Algorithm: " + params.getAlgorithm());
         } catch (Exception e) {
             e.printStackTrace();
@@ -43,7 +81,7 @@ public class SecureAlgorithmParametersExample {
 及时更新Java运行时环境(JRE)以及相关的安全提供者库，以确保使用了最新的、已知无弱点的密码学实现。
 
 #### 4. 安全配置审计
-定期审计应用程序中使用的加密算法和配置，确保符合最新的安全标准和最佳实践。
+定期审计应用程序中使用的加密算法和配置，确保符合最新的安全标准和最佳实践，比如NIST发布的加密算法指南。
 SOLUTION
 )
 
@@ -58,6 +96,72 @@ alert $sink for {
 	title_zh: "检测Java java.security.AlgorithmParameters使用不安全的加密算法",
 	level: "low",
 	message: "发现Java代码中使用了不安全的加密算法",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+由于使用已破解或存在风险的加密算法，敏感数据可能面临泄露的风险。这些算法因存在已知漏洞或弱点，无法为数据提供足够的安全性。
+2. **触发场景**
+// 存在漏洞的代码示例
+```java
+import javax.crypto.spec.IvParameterSpec;
+import java.security.AlgorithmParameters;
+import java.security.SecureRandom;
+public class WeakAlgorithmParametersExample {
+public static void main(String[] args) {
+try {
+// 创建 DES 算法参数实例
+AlgorithmParameters params = AlgorithmParameters.getInstance("DES"); // 使用不安全的 DES 算法
+// 创建初始化向量
+byte[] iv = new byte[8]; // DES 使用 8 字节的初始化向量
+new SecureRandom().nextBytes(iv);
+IvParameterSpec ivSpec = new IvParameterSpec(iv);
+// 初始化算法参数 - 这里会触发规则检查
+params.init(ivSpec);
+// 获取参数编码
+byte[] encodedParams = params.getEncoded();
+// 使用这些参数
+System.out.println("Algorithm: " + params.getAlgorithm());
+System.out.println("Parameter encoding length: " + encodedParams.length);
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
+}
+```
+攻击者可以利用此漏洞获取敏感信息，影响系统安全。
+3. **潜在影响**
+- 敏感数据可能被窃取。
+- 数据完整性受到影响。
+- 可能导致进一步的安全性问题。
+DESC
+	name: "sink",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 弃用弱加密算法
+停止使用被认为不安全或已被破解的加密算法。避免在 `AlgorithmParameters.getInstance()` 方法中指定此类算法。
+#### 2. 采用现代强加密算法
+改用当前业界推荐的强加密算法，例如高级加密标准（AES）。在选择算法时，应考虑算法的强度、密钥长度、工作模式以及Padding方案。
+```java
+// 修复代码示例：使用更安全的 AES 算法
+import java.security.AlgorithmParameters;
+public class SecureAlgorithmParametersExample {
+public static void main(String[] args) {
+try {
+// 使用更安全的 AES 算法，并指定合适的模式和Padding（例如 AES/CBC/PKCS5Padding）
+AlgorithmParameters params = AlgorithmParameters.getInstance("AES");
+System.out.println("Using Algorithm: " + params.getAlgorithm());
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
+}
+```
+#### 3. 保持依赖更新
+及时更新Java运行时环境(JRE)以及相关的安全提供者库，以确保使用了最新的、已知无弱点的密码学实现。
+#### 4. 安全配置审计
+定期审计应用程序中使用的加密算法和配置，确保符合最新的安全标准和最佳实践。
+SOLUTION
+	risk: "不安全加密算法",
 }
 
 desc(
@@ -94,5 +198,41 @@ desc(
             }
         }
     }
+CODE
+	"safefile://SecureAESAlgorithmParameters.java": <<<CODE
+// 安全的代码示例：使用AES算法作为推荐加密算法
+import java.security.AlgorithmParameters;
+import java.security.NoSuchAlgorithmException;
+
+public class SecureAESAlgorithmParameters {
+    public static void main(String[] args) {
+        try {
+            // 使用更安全的 AES 算法。此方式不会触发告警，因为AES是公认的强加密算法。
+            AlgorithmParameters params = AlgorithmParameters.getInstance("AES");
+            System.out.println("Successfully initialized AlgorithmParameters with: " + params.getAlgorithm());
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SHA256WithRSAAlgorithmParameters.java": <<<CODE
+// 安全的代码示例：使用SHA256WithRSA算法，通常用于数字签名，不涉及加密模式
+import java.security.AlgorithmParameters;
+import java.security.NoSuchAlgorithmException;
+
+public class SHA256WithRSAAlgorithmParameters {
+    public static void main(String[] args) {
+        try {
+            // 使用 SHA256WithRSA，这是一种用于签名而非通用数据加密的算法，不属于弱加密算法。
+            AlgorithmParameters params = AlgorithmParameters.getInstance("SHA256WithRSA");
+            System.out.println("Successfully initialized AlgorithmParameters with: " + params.getAlgorithm());
+        } catch (NoSuchAlgorithmException e) {
+            System.err.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
 CODE
 )

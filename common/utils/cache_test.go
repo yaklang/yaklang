@@ -7,7 +7,8 @@ import (
 )
 
 func TestTTLCache(t *testing.T) {
-	c := NewTTLCache[int](10 * time.Minute)
+	// 将TTL时间减少到1分钟以加速测试
+	c := NewTTLCache[int](1 * time.Minute)
 
 	isNewItemCallback := false
 	expirationCallbackCount, wantExpirationCallbackCount := uint64(0), uint64(2)
@@ -19,12 +20,14 @@ func TestTTLCache(t *testing.T) {
 		atomic.AddUint64(&expirationCallbackCount, 1)
 	})
 
-	c.SetWithTTL("one", 1, 1*time.Second)
-	c.SetWithTTL("four", 4, 1*time.Second)
+	// 将TTL设置为100毫秒以加速测试
+	c.SetWithTTL("one", 1, 100*time.Millisecond)
+	c.SetWithTTL("four", 4, 100*time.Millisecond)
 	if v, ok := c.Get("one"); !ok || v != 1 {
 		t.Fatal("TTLCache get/set failed")
 	}
-	time.Sleep(1500 * time.Millisecond) // 1.5s
+	// 减少睡眠时间从1.5秒到150毫秒
+	time.Sleep(150 * time.Millisecond)
 	if _, ok := c.Get("one"); ok {
 		t.Fatal("TTLCache live time failed")
 	}
@@ -46,9 +49,11 @@ func TestTTLCache(t *testing.T) {
 
 	// 2s: test skip reset TTL
 	c.SkipTtlExtensionOnHit(true)
-	time.Sleep(500 * time.Millisecond)
+	// 减少睡眠时间从500毫秒到50毫秒
+	time.Sleep(50 * time.Millisecond)
 	c.Get("four")
-	time.Sleep(600 * time.Millisecond)
+	// 减少睡眠时间从600毫秒到60毫秒
+	time.Sleep(60 * time.Millisecond)
 	// after 1.1s, four should be expired
 	if _, ok := c.Get("four"); ok {
 		t.Fatal("TTLCache SkipTtlExtensionOnHit failed, want disable reset ttl, but not")
@@ -124,7 +129,8 @@ func TestLRUCache(t *testing.T) {
 }
 
 func TestCombinedCache(t *testing.T) {
-	c := NewCacheEx[int](WithCacheCapacity(2), WithCacheTTL(10*time.Minute))
+	// 将缓存TTL减少到1分钟以加速测试
+	c := NewCacheEx[int](WithCacheCapacity(2), WithCacheTTL(1*time.Minute))
 
 	isNewItemCallback := false
 	expirationCallbackCount := uint64(0)
@@ -143,23 +149,28 @@ func TestCombinedCache(t *testing.T) {
 		}
 	})
 
-	c.SetWithTTL("one", 1, 1*time.Second)     // 1
-	c.SetWithTTL("four", 4, 1*time.Second)    // 4 1
-	if v, ok := c.Get("one"); !ok || v != 1 { // 1 4
+	// 将TTL设置为100毫秒以加速测试
+	c.SetWithTTL("one", 1, 100*time.Millisecond)  // 1
+	c.SetWithTTL("four", 4, 100*time.Millisecond) // 4 1
+	if v, ok := c.Get("one"); !ok || v != 1 {     // 1 4
 		t.Fatal("CombinedCache get/set failed")
 	}
-	time.Sleep(1500 * time.Millisecond) // 1.5 * second // expiration 1 and 4
-	if _, ok := c.Get("one"); ok {      // 1 expiration
+	// 减少睡眠时间从1.5秒到150毫秒
+	time.Sleep(150 * time.Millisecond) // expiration 1 and 4
+	if _, ok := c.Get("one"); ok {     // 1 expiration
 		t.Fatal("CombinedCache TTL live time failed")
 	}
 	if _, ok := c.Get("four"); ok { // 4 expiration
 		t.Fatal("CombinedCache SetCheckExpirationCallback failed, want reset ttl, but not")
 	}
 
-	c.SetWithTTL("one", 1, 1*time.Second) // 1
-	time.Sleep(600 * time.Millisecond)    // 0.6s
-	c.Set("four", 4)                      // 4 1
-	time.Sleep(600 * time.Millisecond)    // 1.2s // 1 expiration
+	// 将TTL设置为100毫秒
+	c.SetWithTTL("one", 1, 100*time.Millisecond) // 1
+	// 减少睡眠时间从600毫秒到60毫秒
+	time.Sleep(60 * time.Millisecond) // 0.06s
+	c.Set("four", 4)                  // 4 1
+	// 减少睡眠时间从600毫秒到60毫秒
+	time.Sleep(60 * time.Millisecond) // 0.12s // 1 expiration
 	if _, ok := c.Get("one"); ok {
 		t.Fatal("CombinedCache TTL live time failed")
 	}
@@ -192,7 +203,8 @@ func TestCombinedCache(t *testing.T) {
 		t.Fatalf("CombinedCache Purge failed: want size = 0 but got %d", len(all))
 	}
 
-	time.Sleep(1 * time.Second) // wait all callback done
+	// 减少睡眠时间从1秒到100毫秒
+	time.Sleep(100 * time.Millisecond) // wait all callback done
 
 	if !isNewItemCallback {
 		t.Fatal("CombinedCache SetNewItemCallback failed, want callback SetNewItemCallback but not")

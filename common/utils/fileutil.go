@@ -421,6 +421,28 @@ func GetLatestFile(dir, suffix string) (filename string, err error) {
 	return fileTimesMap[fileTimes[len(fileTimes)-1]], nil
 }
 
+// GetFileSha256 计算文件的SHA256值
+func GetFileSha256(filepath string) string {
+	var f *os.File
+	var err error
+	var sha256Value string = ""
+	if _, err = os.Stat(filepath); err != nil {
+		return ""
+	}
+
+	if f, err = os.Open(filepath); err != nil {
+		return ""
+	}
+	defer f.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, f); err != nil {
+		return ""
+	}
+	sha256Value = hex.EncodeToString(hasher.Sum(nil))
+	return sha256Value
+}
+
 func GetFileMd5(filepath string) string {
 	var f *os.File
 	var err error
@@ -544,4 +566,63 @@ func IsSubPath(sub, parent string) bool {
 		return true
 	}
 	return false
+}
+
+// FileExists checks if a file exists and is not a directory.
+func FileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
+}
+
+type CRLFtoLFReader struct {
+	// source 是底层的原始 reader
+	source io.Reader
+	// sawCR 用于记录上一次 Read 操作的最后一个字节是否是 '\r'
+	sawCR bool
+}
+
+// NewCRLFtoLFReader 是 CRLFtoLFReader 的构造函数。
+func NewCRLFtoLFReader(source io.Reader) *CRLFtoLFReader {
+	return &CRLFtoLFReader{source: source}
+}
+
+// Read 实现了 io.Reader 接口。
+// 这是实现转换逻辑的核心。
+func (r *CRLFtoLFReader) Read(p []byte) (n int, err error) {
+	rawN, rawErr := r.source.Read(p)
+	if rawN == 0 {
+		return 0, rawErr
+	}
+
+	if r.sawCR && p[0] == '\n' {
+		copy(p, p[1:rawN])
+		rawN--
+		if rawN == 0 {
+			return 0, rawErr
+		}
+	}
+	r.sawCR = false
+
+	writePos := 0
+	for readPos := 0; readPos < rawN; readPos++ {
+		if p[readPos] == '\r' {
+			if readPos+1 == rawN {
+				r.sawCR = true // 设置状态，留到下一次 Read 时处理
+				continue       // 跳过这个 \r，不把它写入
+			}
+
+			// 如果 \r 后面跟着 \n
+			if p[readPos+1] == '\n' {
+				continue // 同样跳过这个 \r，\n 会在下一次循环中被正常写入
+			}
+		}
+
+		p[writePos] = p[readPos]
+		writePos++
+	}
+
+	return writePos, rawErr
 }

@@ -138,6 +138,7 @@ service Yak {
   rpc GetMITMFilter(Empty) returns (SetMITMFilterRequest);
   rpc ResetMITMFilter(Empty) returns (SetMITMFilterRequest); //重置MITM启动前的过滤器
   rpc DownloadMITMCert(Empty) returns (MITMCert);
+  rpc DownloadMITMGMCert(Empty) returns (MITMCert);
 
   rpc MITMV2(stream MITMV2Request) returns (stream MITMV2Response);
 
@@ -221,6 +222,7 @@ service Yak {
   rpc ExportHTTPFlows(ExportHTTPFlowsRequest) returns(QueryHTTPFlowResponse);
   rpc HTTPFlowsToOnline(HTTPFlowsToOnlineRequest) returns (Empty);
   rpc QueryHTTPFlowsProcessNames(QueryHTTPFlowRequest) returns (QueryHTTPFlowsProcessNamesResponse);
+  rpc HTTPFlowsToOnlineBatch(HTTPFlowsToOnlineBatchRequest) returns (HTTPFlowsToOnlineBatchResponse);
 
   // 流量分析器
   rpc AnalyzeHTTPFlow(AnalyzeHTTPFlowRequest) returns (stream AnalyzeHTTPFlowResponse);
@@ -276,12 +278,19 @@ service Yak {
   // 分析一个 HTTP 请求详情
   rpc HTTPRequestAnalyzer(HTTPRequestAnalysisMaterial) returns (HTTPRequestAnalysis);
 
+  // 用户自定义代码补全
+  rpc CreateSnippet(SnippetsRequest) returns (Empty);
+  rpc UpdateSnippet(EditSnippetsRequest) returns (Empty);
+  rpc DeleteSnippets(QuerySnippetsRequest) returns (Empty);
+  rpc QuerySnippets(QuerySnippetsRequest) returns (SnippetsResponse);
+
   // 编码解码
   rpc Codec(CodecRequest) returns (CodecResponse);
   rpc NewCodec(CodecRequestFlow) returns (CodecResponse);
   rpc GetAllCodecMethods(Empty) returns(CodecMethods);
 
   rpc SaveCodecFlow(CustomizeCodecFlow) returns (Empty);
+  rpc UpdateCodecFlow(UpdateCodecFlowRequest) returns (Empty);
   rpc DeleteCodecFlow(DeleteCodecFlowRequest) returns (Empty);
   rpc GetAllCodecFlow(Empty) returns (GetCodecFlowResponse);
   rpc PacketPrettifyHelper(PacketPrettifyHelperRequest) returns (PacketPrettifyHelperResponse);
@@ -324,6 +333,14 @@ service Yak {
   rpc ConvertPayloadGroupToDatabase(NameRequest) returns (stream SavePayloadProgress);
   // 迁移旧的payload
   rpc MigratePayloads(Empty) returns (stream SavePayloadProgress);
+
+  // 批量导payload 数据库 已废弃
+  rpc ExportPayloadBatch(ExportPayloadBatchRequest) returns (stream GetAllPayloadResponse);
+  rpc UploadPayloadToOnline(UploadPayloadToOnlineRequest) returns (stream DownloadProgress);
+  rpc DownloadPayload(DownloadPayloadRequest) returns (stream DownloadProgress);
+  // 批量导payload所有
+  rpc ExportPayloadDBAndFile(ExportPayloadDBAndFileRequest) returns (stream GetAllPayloadResponse);
+
 
   // 自动生成补全
   rpc GetYakitCompletionRaw(Empty) returns (YakitCompletionRawResponse);
@@ -455,7 +472,7 @@ service Yak {
   rpc QueryReports(QueryReportsRequest) returns(QueryReportsResponse);
   rpc QueryReport(QueryReportRequest) returns (Report);
   rpc DeleteReport(DeleteReportRequest) returns (Empty);
-  rpc QueryAvailableReportFrom(Empty) returns (Fields); // no implement 
+  rpc QueryAvailableReportFrom(Empty) returns (Fields); // no implement
 
   rpc DownloadReport(DownloadReportRequest) returns (Empty);
 
@@ -793,8 +810,25 @@ service Yak {
   rpc UpdateSSARiskTags(UpdateSSARiskTagsRequest)returns(DbOperateMessage);
   rpc GetSSARiskFieldGroup(Empty) returns (SSARiskFieldGroupResponse);
   rpc NewSSARiskRead(NewSSARiskReadRequest) returns (NewSSARiskReadResponse);
+  // SSA risk diff
+  rpc SSARiskDiff(SSARiskDiffRequest) returns (stream SSARiskDiffResponse);
+  // SSA Risk Disposal CURD
+  rpc CreateSSARiskDisposals(CreateSSARiskDisposalsRequest) returns (CreateSSARiskDisposalsResponse);
+  rpc QuerySSARiskDisposals(QuerySSARiskDisposalsRequest) returns (QuerySSARiskDisposalsResponse);
+  rpc UpdateSSARiskDisposals(UpdateSSARiskDisposalsRequest) returns (UpdateSSARiskDisposalsResponse);
+  rpc DeleteSSARiskDisposals(DeleteSSARiskDisposalsRequest) returns (DeleteSSARiskDisposalsResponse);
+  rpc GetSSARiskDisposal(GetSSARiskDisposalRequest) returns (GetSSARiskDisposalResponse);
 
   rpc SSARiskFeedbackToOnline(SSARiskFeedbackToOnlineRequest) returns (Empty);
+
+  // SSA Report
+  rpc GenerateSSAReport(GenerateSSAReportRequest) returns (GenerateSSAReportResponse);
+
+  // SSA Project CRUD
+  rpc CreateSSAProject(CreateSSAProjectRequest) returns (CreateSSAProjectResponse);
+  rpc UpdateSSAProject(UpdateSSAProjectRequest) returns (UpdateSSAProjectResponse);
+  rpc DeleteSSAProject(DeleteSSAProjectRequest) returns (DeleteSSAProjectResponse);
+  rpc QuerySSAProject(QuerySSAProjectRequest) returns (QuerySSAProjectResponse);
 
   rpc GetAllPluginEnv(Empty) returns (PluginEnvData);
   rpc QueryPluginEnv(QueryPluginEnvRequest) returns (PluginEnvData);
@@ -843,8 +877,11 @@ service Yak {
   rpc ExportNote(ExportNoteRequest) returns (stream ExportNoteResponse);
 
   // AI Task
+  rpc StartAIReAct(stream AIInputEvent) returns(stream AIOutputEvent);
   rpc StartAITask(stream AIInputEvent) returns(stream AIOutputEvent);
   rpc QueryAITask(AITaskQueryRequest) returns (AITaskQueryResponse);
+  rpc DeleteAITask(AITaskDeleteRequest) returns (DbOperateMessage);
+  rpc QueryAIEvent(AIEventQueryRequest) returns (AIEventQueryResponse);
 
   rpc StartAITriage(stream AITriageInputEvent) returns(stream AIOutputEvent);
 
@@ -853,6 +890,7 @@ service Yak {
   rpc UpdateAIForge(AIForge) returns (DbOperateMessage);
   rpc DeleteAIForge(AIForgeFilter) returns (DbOperateMessage);
   rpc QueryAIForge(QueryAIForgeRequest) returns (QueryAIForgeResponse);
+  rpc GetAIForge(GetAIForgeRequest) returns (AIForge);
 
   // mcp server
   rpc StartMcpServer(StartMcpServerRequest) returns(stream StartMcpServerResponse);
@@ -861,6 +899,8 @@ service Yak {
   rpc GetAIToolList(GetAIToolListRequest) returns(GetAIToolListResponse);
   rpc DeleteAITool(DeleteAIToolRequest) returns(DbOperateMessage);
   rpc SaveAITool(SaveAIToolRequest) returns(DbOperateMessage);
+  rpc SaveAIToolV2(SaveAIToolRequest) returns(SaveAIToolV2Response);
+  rpc UpdateAITool(UpdateAIToolRequest) returns(DbOperateMessage);
   rpc ToggleAIToolFavorite(ToggleAIToolFavoriteRequest) returns(ToggleAIToolFavoriteResponse);
   rpc AIToolGenerateMetadata(AIToolGenerateMetadataRequest) returns(AIToolGenerateMetadataResponse);
 
@@ -869,9 +909,623 @@ service Yak {
   rpc IsLocalModelReady(IsLocalModelReadyRequest) returns (IsLocalModelReadyResponse);
   rpc InstallLlamaServer(InstallLlamaServerRequest) returns (stream ExecResult);
   rpc StartLocalModel(StartLocalModelRequest) returns (stream ExecResult);
+  rpc StopLocalModel(StopLocalModelRequest) returns (GeneralResponse);
+
   rpc DownloadLocalModel(DownloadLocalModelRequest) returns (stream ExecResult);
   rpc GetSupportedLocalModels(Empty) returns (GetSupportedLocalModelsResponse);
+  rpc AddLocalModel(AddLocalModelRequest) returns (GeneralResponse);
+  rpc DeleteLocalModel(DeleteLocalModelRequest) returns (GeneralResponse);
+  rpc UpdateLocalModel(UpdateLocalModelRequest) returns (GeneralResponse);
+  rpc GetAllStartedLocalModels(Empty) returns (GetAllStartedLocalModelsResponse);
+  rpc ClearAllModels(ClearAllModelsRequest) returns (GeneralResponse);
+
+  rpc IsSearchVectorDatabaseReady(IsSearchVectorDatabaseReadyRequest) returns (IsSearchVectorDatabaseReadyResponse);
+  rpc InitSearchVectorDatabase(InitSearchVectorDatabaseRequest) returns (stream ExecResult);
+  rpc GetAllVectorStoreCollections(Empty) returns (GetAllVectorStoreCollectionsResponse);
+  rpc GetAllVectorStoreCollectionsWithFilter(GetAllVectorStoreCollectionsWithFilterRequest) returns (GetAllVectorStoreCollectionsWithFilterResponse);
+  rpc DeleteSearchVectorDatabase(DeleteSearchVectorDatabaseRequest) returns (GeneralResponse);
+  rpc UpdateVectorStoreCollection(UpdateVectorStoreCollectionRequest) returns (GeneralResponse);
+  rpc ListVectorStoreEntries(ListVectorStoreEntriesRequest) returns (ListVectorStoreEntriesResponse);
+  rpc CreateVectorStoreEntry(CreateVectorStoreEntryRequest) returns (GeneralResponse);
+  rpc GetDocumentByVectorStoreEntryID(GetDocumentByVectorStoreEntryIDRequest) returns (GetDocumentByVectorStoreEntryIDResponse);
+
+  // 第三方应用管理
+  rpc ListThirdPartyBinary(Empty) returns (ListThirdPartyBinaryResponse);
+  rpc InstallThirdPartyBinary(InstallThirdPartyBinaryRequest) returns (stream ExecResult);
+  rpc UninstallThirdPartyBinary(UninstallThirdPartyBinaryRequest) returns (GeneralResponse);
+  rpc IsThirdPartyBinaryReady(IsThirdPartyBinaryReadyRequest) returns (IsThirdPartyBinaryReadyResponse);
+  rpc StartThirdPartyBinary(StartThirdPartyBinaryRequest) returns (stream ExecResult);
+
+  // 插件执行跟踪双向流服务
+  rpc PluginTrace(stream PluginTraceRequest) returns (stream PluginTraceResponse);
+
+  // Knowledge Base
+  rpc GetKnowledgeBaseNameList(Empty) returns(GetKnowledgeBaseNameListResponse);
+  rpc GetKnowledgeBase(GetKnowledgeBaseRequest) returns(GetKnowledgeBaseResponse);
+  rpc GetKnowledgeBaseTypeList(Empty) returns(GetKnowledgeBaseTypeListResponse);
+  rpc DeleteKnowledgeBase(DeleteKnowledgeBaseRequest) returns(GeneralResponse);
+  rpc CreateKnowledgeBase(CreateKnowledgeBaseRequest) returns(GeneralResponse);
+  rpc UpdateKnowledgeBase(UpdateKnowledgeBaseRequest) returns(GeneralResponse);
+
+  rpc DeleteKnowledgeBaseEntry(DeleteKnowledgeBaseEntryRequest) returns(GeneralResponse);
+  rpc CreateKnowledgeBaseEntry(CreateKnowledgeBaseEntryRequest) returns(GeneralResponse);
+  rpc UpdateKnowledgeBaseEntry(UpdateKnowledgeBaseEntryRequest) returns(GeneralResponse);
+  rpc SearchKnowledgeBaseEntry(SearchKnowledgeBaseEntryRequest) returns(SearchKnowledgeBaseEntryResponse);
+  rpc QueryKnowledgeBaseByAI(QueryKnowledgeBaseByAIRequest) returns(stream QueryKnowledgeBaseByAIResponse);
+
+  rpc BuildVectorIndexForKnowledgeBase(BuildVectorIndexForKnowledgeBaseRequest) returns(GeneralResponse);
+  rpc BuildVectorIndexForKnowledgeBaseEntry(BuildVectorIndexForKnowledgeBaseEntryRequest) returns(GeneralResponse);
+
+  // Entity Repository
+  rpc ListEntityRepository(Empty) returns(ListEntityRepositoryResponse);
+
+  rpc QueryEntity(QueryEntityRequest) returns (QueryEntityResponse);
+  rpc DeleteEntity(DeleteEntityRequest) returns (DbOperateMessage);
+  rpc QueryRelationship(QueryRelationshipRequest) returns (QueryRelationshipResponse);
+  rpc QuerySubERM(QuerySubERMRequest) returns (QuerySubERMResponse);
+  rpc GenerateERMDot(GenerateERMDotRequest) returns (GenerateERMDotResponse);
+
+  // Export and Import Knowledge Base
+  rpc ExportKnowledgeBase(ExportKnowledgeBaseRequest) returns (stream GeneralProgress);
+  rpc ImportKnowledgeBase(ImportKnowledgeBaseRequest) returns (stream GeneralProgress);
+
+  rpc AddMCPServer(AddMCPServerRequest) returns (GeneralResponse);
+  rpc DeleteMCPServer(DeleteMCPServerRequest) returns (GeneralResponse);
+  rpc UpdateMCPServer(UpdateMCPServerRequest) returns (GeneralResponse);
+  rpc GetAllMCPServers(GetAllMCPServersRequest) returns (GetAllMCPServersResponse);
+
+  // RAG Collection Search
+  rpc RAGCollectionSearch(RAGCollectionSearchRequest) returns (stream RAGCollectionSearchResponse);
 }
+
+message ExportKnowledgeBaseRequest {
+  int64 KnowledgeBaseId = 1;
+  string TargetPath = 2;
+}
+
+message ImportKnowledgeBaseRequest {
+  string NewKnowledgeBaseName = 1;
+  string InputPath = 2;
+}
+
+message GeneralProgress {
+  double Percent = 1;
+  string Message = 2;
+  string MessageType = 3;
+}
+
+message RAGCollectionSearchRequest {
+  string CollectionName = 1;
+  string Query = 2;
+  uint64 Limit = 3;
+  repeated string EnhancePlan = 4;
+  repeated string DocumentType = 5;
+  float SimilarityThreshold = 6; // 0.0 - 1.0
+  int64 Concurrency = 7;
+}
+
+message RAGCollectionSearchResponse {
+  string Type = 1; // knowledge / entity / relationship / khop
+  KnowledgeBaseEntry Knowledge = 2;
+  Entity Entity = 3;
+  Relationship Relationship = 4;
+  string KhopPath = 5;
+  float Similarity = 6;
+  string EnhancePlan = 7;
+}
+
+message AddMCPServerRequest {
+  string Name = 1;
+  string Type = 2;
+  string URL = 3;
+  string Command = 4;
+  bool Enable = 5;
+}
+
+message DeleteMCPServerRequest {
+  int64 ID = 1;
+}
+
+message UpdateMCPServerRequest {
+  int64 ID = 1;
+  string Name = 2;
+  string Type = 3;
+  string URL = 4;
+  string Command = 5;
+  bool Enable = 6;
+}
+
+// 支持分页查询
+message GetAllMCPServersRequest {
+  string Keyword = 1;
+  int64 ID = 2;
+  Paging Pagination = 3;
+  bool IsEnable = 5;
+  bool IsShowToolList = 4;
+}
+
+message MCPServerToolParamInfo {
+  string Type = 1;
+  string Description = 2;
+  string Default = 3;
+  bool Required = 4;
+  string Name = 5;
+}
+
+message MCPServerTool {
+  string Name = 1;
+  string Description = 2;
+  repeated MCPServerToolParamInfo Params = 3;
+}
+
+message MCPServer {
+  int64 ID = 1;
+  string Name = 2;
+  string Type = 3;
+  string URL = 4;
+  string Command = 5;
+  bool Enable = 7;
+  repeated MCPServerTool Tools = 6;
+}
+
+message GetAllMCPServersResponse {
+  repeated MCPServer MCPServers = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+message EntityRepository {
+  int64 ID = 1;
+  string Name = 2;
+  string Description = 3;
+  string HiddenIndex = 4;
+}
+
+message ListEntityRepositoryResponse {
+  repeated EntityRepository EntityRepositories = 1;
+}
+
+message Entity {
+  uint64 ID = 1;
+  string Type = 2;
+  string Name = 3;
+  string Description = 4;
+  uint64 BaseID = 5;
+  string BaseIndex = 9;
+  repeated KVPair Attributes = 6;
+  string  Rationale = 7;
+  string  HiddenIndex = 8;
+}
+
+message EntityFilter {
+  uint64  BaseID = 1;
+  string BaseIndex = 6;
+  string ReposName = 8;
+  repeated uint64 IDs = 2;
+  repeated string Types = 3;
+  repeated string Names = 4;
+  repeated string HiddenIndex = 5;
+  repeated string RuntimeID = 7;
+  repeated string Keywords = 9;
+}
+
+message QueryEntityRequest {
+  EntityFilter Filter = 1;
+  Paging Pagination = 2;
+}
+
+message QueryEntityResponse {
+  repeated Entity Entities = 1;
+  Paging Pagination = 2;
+  uint64 Total = 3;
+}
+
+message DeleteEntityRequest {
+  EntityFilter Filter = 1;
+}
+
+message Relationship {
+  uint64 ID = 1;
+  string Type = 2;
+  uint64 SourceEntityID = 3;
+  uint64 TargetEntityID = 4;
+  repeated KVPair Attributes = 5;
+  string Rationale = 6;
+
+  string SourceEntityIndex = 7;
+  string TargetEntityIndex = 8;
+}
+
+message RelationshipFilter {
+  uint64 BaseID = 1;
+
+  string BaseIndex = 10;
+
+  repeated uint64 IDs = 2;
+  repeated string Types = 3;
+  repeated uint64 SourceEntityIDs = 4;
+  repeated uint64 TargetEntityIDs = 5;
+  repeated uint64 AboutEntityIDs = 6; // Source or Target
+
+  repeated string SourceEntityIndex = 7;
+  repeated string TargetEntityIndex = 8;
+  repeated string AboutEntityIndex = 9; // Source or Target
+
+  repeated string UUIDS = 11;
+
+  repeated string RuntimeID = 12;
+}
+
+message QueryRelationshipRequest {
+  RelationshipFilter Filter = 1;
+  Paging Pagination = 2;
+}
+
+message QueryRelationshipResponse {
+  repeated Relationship Relationships = 1;
+  Paging Pagination = 2;
+  uint64 Total = 3;
+}
+
+message QuerySubERMRequest {
+  EntityFilter Filter = 1;
+  uint64 Depth = 2;
+}
+
+message QuerySubERMResponse {
+  repeated Entity Entities = 1;
+  repeated Relationship Relationships = 2;
+}
+
+message GenerateERMDotRequest {
+  EntityFilter Filter = 1;
+  uint64 Depth = 2;
+}
+
+message GenerateERMDotResponse {
+  string Dot = 1;
+}
+
+message StartedLocalModelInfo {
+  string Name = 1;
+  string ModelType = 2;
+  string Host = 3;
+  int32 Port = 4;
+}
+message GetAllStartedLocalModelsResponse {
+  repeated StartedLocalModelInfo Models = 1;
+}
+
+message ClearAllModelsRequest {
+  bool DeleteSourceFile = 1;
+}
+
+message UpdateLocalModelRequest {
+  string Name = 1;
+  string ModelType = 2;
+  string Description = 3;
+  string Path = 4;
+}
+
+message AddLocalModelRequest {
+  string Name = 1;
+  string ModelType = 2;
+  string Description = 3;
+  string Path = 4;
+}
+
+message DeleteLocalModelRequest {
+  string Name = 1;
+  bool DeleteSourceFile = 2;
+}
+
+message StopLocalModelRequest {
+  string ModelName = 1;
+}
+
+message LocalModelStatus {
+  string Status = 2;
+  string Host = 3;
+  int32 Port = 4;
+  string Model = 5;
+  string ModelPath = 6;
+  string LlamaServerPath = 7;
+  int32 ContextSize = 8;
+  bool ContBatching = 9;
+  int32 BatchSize = 10;
+  int32 Threads = 11;
+  bool Detached = 12;
+  bool Debug = 13;
+  string Pooling = 14;
+  int32 StartupTimeout = 15;
+  repeated string Args = 16;
+}
+
+message ThirdPartyBinary {
+  string Name = 1;
+  bool SupportCurrentPlatform = 2;
+  string Description = 3;
+  string InstallPath = 4;
+  string DownloadURL = 5;
+}
+
+message ListThirdPartyBinaryResponse {
+  repeated ThirdPartyBinary Binaries = 1;
+}
+
+message InstallThirdPartyBinaryRequest {
+  string Name = 1;
+  string Proxy = 2;
+  bool Force = 3;
+}
+
+message UninstallThirdPartyBinaryRequest {
+  string Name = 1;
+}
+
+message IsThirdPartyBinaryReadyRequest {
+  string Name = 1;
+}
+
+message IsThirdPartyBinaryReadyResponse {
+  bool IsReady = 1;
+  string Error = 2;
+}
+
+message StartThirdPartyBinaryRequest {
+  string Name = 1;
+  repeated string Args = 2;
+}
+
+message BuildVectorIndexForKnowledgeBaseEntryRequest {
+  int64 KnowledgeBaseEntryId = 1;
+  string KnowledgeBaseEntryHiddenIndex = 13;
+  int64 KnowledgeBaseId = 12;
+
+  string BaseUrl = 2;
+  string ApiKey = 3;
+  string Proxy = 4;
+
+  string ModelName = 5;
+  int32 Dimension = 6;
+  int32 M = 7;
+  float Ml = 8;
+  int32 EfSearch = 9;
+  int32 EfConstruct = 10;
+  string DistanceFuncType = 11;
+
+  string RelatedEntityUUIDS = 14;
+}
+
+message BuildVectorIndexForKnowledgeBaseRequest {
+  int64 KnowledgeBaseId = 1;
+
+  string BaseUrl = 2;
+  string ApiKey = 3;
+  string Proxy = 4;
+
+  string ModelName = 5;
+  int32 Dimension = 6;
+  int32 M = 7;
+  float Ml = 8;
+  int32 EfSearch = 9;
+  int32 EfConstruct = 10;
+  string DistanceFuncType = 11;
+}
+
+message GetKnowledgeBaseNameListResponse {
+  repeated string KnowledgeBaseNames = 1;
+}
+
+message KnowledgeBaseType{
+  string Name = 1;
+  string Description = 2;
+  string Value = 3;
+}
+
+
+message GetKnowledgeBaseTypeListResponse{
+  repeated KnowledgeBaseType KnowledgeBaseTypes = 1;
+}
+
+message GetKnowledgeBaseRequest {
+  int64 KnowledgeBaseId = 1;
+  string Keyword = 2;
+  Paging Pagination = 3;
+}
+
+message KnowledgeBaseInfo {
+  int64 ID = 1;
+  string KnowledgeBaseName = 2;
+  string KnowledgeBaseDescription = 3;
+  string KnowledgeBaseType = 4;
+}
+
+message GetKnowledgeBaseResponse {
+  repeated KnowledgeBaseInfo KnowledgeBases = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+message CreateKnowledgeBaseRequest {
+  string KnowledgeBaseName = 1;
+  string KnowledgeBaseDescription = 2;
+  string KnowledgeBaseType = 3;
+}
+
+message UpdateKnowledgeBaseRequest {
+  int64 KnowledgeBaseId = 1;
+  string KnowledgeBaseName = 2;
+  string KnowledgeBaseDescription = 3;
+  string KnowledgeBaseType = 4;
+}
+
+message DeleteKnowledgeBaseEntryRequest {
+  int64 KnowledgeBaseEntryId = 1;
+  string KnowledgeBaseEntryHiddenIndex = 3;
+  int64 KnowledgeBaseId = 2;
+}
+
+message SearchKnowledgeBaseEntryRequest {
+  int64 KnowledgeBaseId = 1;
+  string Keyword = 2;
+  Paging Pagination = 3;
+}
+
+message QueryKnowledgeBaseByAIRequest {
+  string Query = 1;
+  string EnhancePlan = 2;
+  int64 KnowledgeBaseID = 3;
+  bool QueryAllCollections = 4;
+}
+
+message QueryKnowledgeBaseByAIResponse {
+  string Message = 1;
+  string MessageType = 2;
+  string Data = 3;
+}
+
+message SearchKnowledgeBaseEntryResponse {
+  repeated KnowledgeBaseEntry KnowledgeBaseEntries = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+message CreateKnowledgeBaseEntryRequest {
+  int64 KnowledgeBaseID = 1;
+  string KnowledgeTitle = 2;
+  string KnowledgeType = 3;
+  int32 ImportanceScore = 4;
+  repeated string Keywords = 5;
+  string KnowledgeDetails = 6;
+  string Summary = 7;
+  int32 SourcePage = 8;
+  repeated string PotentialQuestions = 9;
+  repeated float PotentialQuestionsVector = 10;
+}
+
+message UpdateKnowledgeBaseEntryRequest {
+  int64 KnowledgeBaseID = 1;
+  int64 KnowledgeBaseEntryID = 2;
+  string KnowledgeBaseEntryHiddenIndex = 11;
+  string KnowledgeTitle = 3;
+  string KnowledgeType = 4;
+  int32 ImportanceScore = 5;
+  repeated string Keywords = 6;
+  string KnowledgeDetails = 7;
+  string Summary = 8;
+  int32 SourcePage = 9;
+  repeated string PotentialQuestions = 10;
+}
+
+message KnowledgeBaseEntry {
+  int64 ID = 1;
+  int64 KnowledgeBaseId = 2;
+  string KnowledgeTitle = 3;
+  string KnowledgeType = 4;
+  int32 ImportanceScore = 5;
+  repeated string Keywords = 6;
+  string KnowledgeDetails = 7;
+  string Summary = 8;
+  int32 SourcePage = 9;
+  repeated string PotentialQuestions = 10;
+  repeated float PotentialQuestionsVector = 11;
+  string HiddenIndex = 12;
+  string RelatedEntityUUIDS = 13;
+}
+
+message DeleteKnowledgeBaseRequest {
+  int64 KnowledgeBaseId = 1;
+}
+
+message DeleteSearchVectorDatabaseRequest {
+  repeated string CollectionNames = 1;
+}
+
+message VectorStoreCollection{
+  string Name = 1;
+  string Description = 2;
+  int64 ID = 3;
+  string ModelName = 4;
+  int32 Dimension = 5;
+  int32 M = 6;
+  float Ml = 7;
+  int32 EfSearch = 8;
+  int32 EfConstruct = 9;
+  string DistanceFuncType = 10;
+}
+
+message ListVectorStoreEntriesRequest {
+  int64 CollectionID = 1;
+  string Keyword = 2;
+  Paging Pagination = 3;
+  string CollectionName = 4;
+}
+
+message CreateVectorStoreEntryRequest {
+  string UID = 1;
+  string Content = 2;
+  string Metadata = 3;
+}
+
+message VectorStoreEntry {
+  int64 ID = 1;
+  string UID = 2;
+  string Content = 3;
+  string Metadata = 4;
+  repeated float Embedding = 5;
+}
+
+
+message ListVectorStoreEntriesResponse {
+  repeated VectorStoreEntry Entries = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+message GetDocumentByVectorStoreEntryIDRequest {
+  int64 ID = 1;
+}
+
+message GetDocumentByVectorStoreEntryIDResponse {
+  KnowledgeBaseEntry Document = 1;
+}
+
+message UpdateVectorStoreCollectionRequest {
+  string Name = 1;
+  string Description = 2;
+  int64 ID = 3;
+}
+
+// 带分页
+message GetAllVectorStoreCollectionsWithFilterRequest {
+  string Keyword = 1;
+  int64 ID = 2;
+  Paging Pagination = 3;
+}
+
+message GetAllVectorStoreCollectionsWithFilterResponse {
+  repeated VectorStoreCollection Collections = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
+}
+
+message GetAllVectorStoreCollectionsResponse {
+  repeated VectorStoreCollection Collections = 1;
+}
+message IsSearchVectorDatabaseReadyRequest{
+  repeated string CollectionNames = 1;
+}
+message IsSearchVectorDatabaseReadyResponse {
+  bool IsReady = 1;
+  repeated string NotReadyCollectionNames = 2;
+  string Message = 3;
+}
+
+message InitSearchVectorDatabaseRequest {
+  string Proxy = 1;
+  repeated string CollectionNames = 2;
+}
+
 
 message GetToolSetListResponse {
   repeated ToolSetInfo ToolSetList = 1;
@@ -906,12 +1560,30 @@ message SaveAIToolRequest {
   repeated string Keywords = 5;
 }
 
+message SaveAIToolV2Response{
+  bool IsSuccess = 1;
+  string Message = 2;
+  AITool AITool = 3;
+}
+
+message UpdateAIToolRequest {
+  int64 ID = 1;
+  string Name = 2;
+  string Description = 3;
+  string Content = 4;
+  string ToolPath = 5;
+  repeated string Keywords = 6;
+}
+
+
 message DeleteAIToolRequest {
   repeated string ToolNames = 1;
+  repeated int64 IDs = 2;
 }
 
 message ToggleAIToolFavoriteRequest {
   string ToolName = 1;
+  int64 ID = 2;
 }
 
 message ToggleAIToolFavoriteResponse {
@@ -926,6 +1598,8 @@ message AITool {
   string ToolPath = 4;
   repeated string Keywords = 5;
   bool IsFavorite = 6;
+  int64 ID = 7;
+  string VerboseName = 8; // 给用户看的展示名称
 }
 
 message GetAIToolListResponse {
@@ -937,6 +1611,7 @@ message GetAIToolListResponse {
 message GetAIToolListRequest {
   string Query = 1;
   string ToolName = 2;
+  int64 ToolID = 5;
   Paging Pagination = 3;
   bool OnlyFavorites = 4;
 }
@@ -949,10 +1624,22 @@ message AIOutputEvent {
   bool IsReason = 6;
   bytes StreamDelta = 7;
   bool IsJson = 8;
+  bool IsResult = 15;
   bytes Content = 9;
   int64 Timestamp = 10;
   string TaskIndex = 11;
   bool DisableMarkdown = 13;
+  bool IsSync = 12; // 是否是同步消息
+  string SyncID = 14; // 用于同步消息的 ID
+  string EventUUID = 16; // 事件的唯一ID, used via stream stream-finished
+  I18n NodeIdVerbose = 17; // 用于展示的节点ID，可能是节点名称
+  string ContentType = 18; // markdown / yaklang_code / plain_code
+  string CallToolID = 19; // 如果是调用工具相关的事件，那么这里是调用的ID
+}
+
+message I18n {
+  string Zh = 1;
+  string En = 2;
 }
 
 message AIInputEvent {
@@ -969,6 +1656,10 @@ message AIInputEvent {
 
   bool IsSyncMessage = 6;
   string SyncType = 7;
+  string SyncJsonInput = 10;
+
+  bool IsFreeInput = 11;
+  string FreeInput = 12;
 }
 
 
@@ -1009,6 +1700,8 @@ message AIStartParams {
   repeated ExecParamItem ForgeParams = 6;
 
   // 是否禁用人机交互（AI 可能会主动问人问题）
+  // 在 AI ReAct 中，他对应的是 EnableUserInteract
+  // 在 AI Coordinator 中，还是原来的样子
   bool DisallowRequireForUserPrompt = 7;
 
   // Review 政策
@@ -1056,10 +1749,41 @@ message AIStartParams {
   bool AllowGenerateReport = 24;
 
   int64 TaskMaxContinueCount = 25;
+
+  // 选择 AI 服务
+  string AIService = 26;
+
+  int64 ReActMaxIteration = 27;
+
+  // 限制 Timeline 的最大条目和最大内容大小（bytes）
+  int64 TimelineItemLimit = 28; // 已经废弃，功能不可用了，只需要关注 TimelineContentSizeLimit 就好
+  int64 TimelineContentSizeLimit = 29;
+
+  // 用户交互的最大次数限制,超过这个次数，AI 将不再被允许问用户问题
+  int64 UserInteractLimit = 30;
 }
 
 message AITaskFilter {
+  repeated string Name = 1;
+  repeated string Keyword = 2;
+  repeated string ForgeName = 3;
+  repeated string CoordinatorId = 5;
+}
 
+message AIEventFilter {
+  repeated string EventUUIDS = 1;
+  repeated string  EventType = 2;
+  repeated string CoordinatorId = 3;
+}
+
+
+message AIEventQueryRequest {
+  AIEventFilter Filter = 1;
+  string  ProcessID = 2;
+}
+
+message AIEventQueryResponse {
+  repeated AIOutputEvent Events = 1;
 }
 
 message AITaskQueryRequest {
@@ -1073,6 +1797,10 @@ message AITaskQueryResponse {
   int64 Total = 3;
 }
 
+message AITaskDeleteRequest {
+  AITaskFilter Filter = 1;
+}
+
 message AITask {
   string CoordinatorId = 1;
   string Name = 2;
@@ -1083,10 +1811,13 @@ message AITask {
 
 message AIForgeFilter {
   string ForgeName = 1;
+  repeated string ForgeNames = 11;
   string ForgeType = 2; // enum: yak or config
   string Keyword = 3;
   // tag
   repeated string Tag = 4;
+  int64 Id = 5;
+  bool ShowTemporary = 6; // 是否展示临时 forge，默认不展示
 }
 
 message AIForge {
@@ -1106,6 +1837,7 @@ message AIForge {
   string PersistentPrompt = 14; // 持久化提示语
   string PlanPrompt = 15; // 计划提示语
   string ResultPrompt = 16; // 结果提示语
+  string ForgeVerboseName = 17; // 给用户看的展示名称
 }
 
 message QueryAIForgeRequest {
@@ -1117,6 +1849,11 @@ message QueryAIForgeResponse {
   Paging Pagination = 1;
   repeated AIForge Data = 2;
   int64 Total = 3;
+}
+
+message GetAIForgeRequest {
+  int64 ID = 1;
+  string ForgeName = 2;
 }
 
 message StartMcpServerRequest {
@@ -1178,6 +1915,8 @@ message FetchPortAssetFromSpaceEngineRequest {
   bool ScanBeforeSave = 6;
   string Proxy = 7;
   int64 Concurrent = 8;
+  uint32 RandomDelay = 9;
+  uint32 RetryTimes = 10;
 }
 
 message DeleteHybridScanTaskRequest {
@@ -1696,8 +2435,10 @@ message SmokingEvaluatePluginRequest {
   string PluginName = 2;
 
   string Code = 3;
+  // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
   string PluginType = 4;
 }
+
 
 message SmokingEvaluateResult {
   string Item = 1;
@@ -1711,6 +2452,7 @@ message SmokingEvaluatePluginResponse {
   int64 Score = 1;
   repeated SmokingEvaluateResult Results = 2;
 }
+
 
 message IsVulinboxReadyRequest {
 
@@ -2632,9 +3374,37 @@ message SavePayloadProgress {
   string Message = 10;
 }
 
+message ExportPayloadBatchRequest {
+  string Group = 1;
+  string SavePath = 2;
+}
+
+message UploadPayloadToOnlineRequest {
+  string Token = 1;
+  string Group = 2;
+  string Folder = 3;
+}
+
+message DownloadPayloadRequest {
+  string Token = 1;
+  string Group = 2;
+  string Folder = 3;
+}
+
+message DownloadProgress {
+  double Progress = 1;
+  string Message = 2;
+  string MessageType = 3;
+}
+
 message DeletePluginByUserIDRequest {
   int64 UserID = 1;
   string OnlineBaseUrl = 2;
+}
+
+message ExportPayloadDBAndFileRequest {
+  repeated string Groups = 1;
+  string SavePath = 2;
 }
 
 message DeleteLocalPluginsByWhereRequest {
@@ -2695,6 +3465,7 @@ message DownloadOnlinePluginsRequest {
   repeated string ScriptName = 13;
   repeated string ExcludeTypes = 14;
   string FieldKeywords = 15;
+  repeated bool Official = 16;
 }
 
 message QueryPluginGroup {
@@ -4666,6 +5437,39 @@ message TagsAndType {
   int32 Total = 2;
 }
 
+message SnippetsFilter {
+  repeated string Name = 1;
+}
+
+message SnippetsRequest {
+  string Name = 1;
+  string Code = 2;
+  string Description = 3;
+  string State = 4;
+  string Level = 5;
+}
+
+message EditSnippetsRequest {
+  string Target = 1;
+  string Name = 2;
+  string Code = 3;
+  string Description = 4;
+  string State = 5;
+  string Level = 6;
+}
+
+message QuerySnippetsRequest {
+  SnippetsFilter Filter = 1;
+}
+
+message SnippetsResponse {
+  repeated string Names = 1;
+  repeated string Codes = 2;
+  repeated string Descriptions = 3;
+  repeated string States = 4;
+  repeated string Levels = 5;
+}
+
 message CodecRequest {
   string Text = 1;
   string Type = 2;
@@ -4695,6 +5499,13 @@ message CustomizeCodecFlow{
   string FlowName = 1;
   repeated CodecWork WorkFlow = 2;
   string WorkFlowUI = 3;
+}
+
+message UpdateCodecFlowRequest {
+  string FlowId = 1;
+  string FlowName = 2;
+  repeated CodecWork WorkFlow = 3;
+  string WorkFlowUI = 4;
 }
 
 message DeleteCodecFlowRequest {
@@ -5037,6 +5848,8 @@ message FuzzerRequest {// last index 68
   int64 RandomChunkedMaxLength = 66;
   int64 RandomChunkedMinDelay = 67;
   int64 RandomChunkedMaxDelay = 68;
+
+  bool NoReadMultiResponse = 69;
 }
 
 message MutateMethod {
@@ -5272,6 +6085,7 @@ message QueryHTTPFlowRequest {
   repeated int64 AnalyzedIds = 46;
 
   string PayloadKeyword = 47;
+  string ExcludeStatusCode = 48; // 排除状态码
 }
 
 message HTTPFlowsToOnlineRequest {
@@ -5282,12 +6096,24 @@ message HTTPFlowsToOnlineRequest {
   string ExternalProjectCode = 5;
 }
 
+message HTTPFlowsToOnlineBatchRequest {
+  HTTPFlowsToOnlineRequest ToOnlineWhere = 1;
+  QueryHTTPFlowRequest UploadHTTPFlowsWhere = 2;
+}
+
+message HTTPFlowsToOnlineBatchResponse {
+  int64 SuccessCount = 1;
+  int64 FailedCount = 2;
+}
+
 message AnalyzeHTTPFlowRequest{
   string HotPatchCode = 1;
   repeated MITMContentReplacer Replacers = 2;
   AnalyzeHTTPFlowConfig Config = 3 ;
   // 分析数据源
   AnalyzedDataSource Source = 4;
+  // 响应匹配器
+  repeated HTTPResponseMatcher Matchers = 5;
 }
 
 message AnalyzedDataSource {
@@ -5325,10 +6151,10 @@ message HTTPFlowRuleData{
   int64 HTTPFlowId = 2;
   string RuleVerboseName = 3;
   string Rule = 4;
-  int64 StatusCode =5;
+  int64 StatusCode = 5;
   string Url = 6;
   string Method = 7;
-  string IPAddress= 8;
+  string IPAddress = 8;
 }
 
 message ExportHTTPFlowsRequest {
@@ -5679,6 +6505,7 @@ message Certificate {
   // pkcs12path need a .p12 or .pfx file
   bytes Pkcs12Bytes = 4;
   bytes Pkcs12Password = 5;
+  string Host = 6;
 }
 
 message MITMContentReplacer {
@@ -5946,6 +6773,8 @@ message RenderHTTPFuzzerPacketResponse {
 
 message SmokingEvaluatePluginBatchRequest {
   repeated string ScriptNames = 1;
+  // "syntaxflow" | "nuclei" | "mitm" | "port-scan" | "codec" | "yak"
+  string PluginType = 2;
 }
 
 message SmokingEvaluatePluginBatchResponse {
@@ -6088,6 +6917,7 @@ message DbOperateMessage {
   string Operation = 2; // 操作 (增删改查)
   int64 EffectRows = 3; // 影响行数
   string ExtraMessage = 4; // 额外信息
+  int64 CreateID = 5;
 }
 
 message CPE {
@@ -6236,6 +7066,7 @@ message AlertMessage{
   string Tag = 10;
   map<string, string> Extra = 11;
 }
+
 message  SyntaxFlowRuleInput{
   string RuleName = 1; // RuleName作为索引，因此不能update RuleName
   string Content = 2;
@@ -6265,7 +7096,6 @@ message SyntaxFlowRuleFilter {
   string FilterLibRuleKind = 14; // "lib"library规则，"noLib"非library规则，空为所有规则
 }
 
-
 message SSAProgram{
   // basic info
   int64 CreateAt = 1;
@@ -6283,10 +7113,30 @@ message SSAProgram{
   uint32 Id = 13;
   // risk number
   int64 CriticalRiskNumber = 10;
-  int64 HighRiskNumber = 9;    
-  int64 WarnRiskNumber = 11;   
-  int64 LowRiskNumber = 12;    
-  int64 InfoRiskNumber = 14; 
+  int64 HighRiskNumber = 9;
+  int64 WarnRiskNumber = 11;
+  int64 LowRiskNumber = 12;
+  int64 InfoRiskNumber = 14;
+}
+
+message SSARiskDiffItem{
+  string ProgramName = 1;
+  string RuleName = 2;
+  string Variable = 3;
+  string RiskRuntimeId = 4;
+}
+
+message SSARiskDiffRequest{
+  SSARiskDiffItem BaseLine = 1; // 原项目
+  SSARiskDiffItem Compare = 2; // 被对比的项目
+  bool DefaultCompare = 3;
+}
+
+message SSARiskDiffResponse{
+  SSARisk BaseRisk = 1;
+  SSARisk CompareRisk = 2;
+  string RuleName = 3;
+  string Status = 4;
 }
 
 message SSAProgramInput {
@@ -6459,11 +7309,19 @@ message SyntaxFlowScanRequest{
 
   // for new rule scan task
   SyntaxFlowRuleInput RuleInput = 6; // 用于新建规则时的调试功能
+  // 并发，默认5
+  uint32  Concurrency = 7;
+
+  // compile data only in memory 
+  bool Memory = 8;
+  // 根据项目扫描
+  uint64 SSAProjectId = 9;
 }
 
 message QuerySyntaxFlowScanTaskRequest{
   Paging Pagination = 1;
   SyntaxFlowScanTaskFilter Filter = 2;
+  bool ShowDiffRisk = 3;
 }
 
 message SyntaxFlowScanTaskFilter{
@@ -6504,6 +7362,18 @@ message SyntaxFlowScanTask {
 
   SyntaxFlowScanRequest Config = 14;
   string Kind = 15; // "debug" | "scan"
+  // diff
+  int64 NewRiskCount = 16;
+  int64 InfoCount = 17;
+  int64 LowCount = 18;
+  int64 WarningCount = 19;
+  int64 CriticalCount = 20;
+  int64 HighCount = 21;
+  int64 NewInfoCount = 22;
+  int64 NewLowCount = 23;
+  int64 NewWarningCount = 24;
+  int64 NewCriticalCount = 25;
+  int64 NewHighCount = 26;
 }
 
 message DeleteSyntaxFlowScanTaskRequest{
@@ -6578,6 +7448,7 @@ message SyntaxFlowResult {
 
   string RuleContent = 12;
   string Kind = 13; // "query" | "debug" | "scan"
+  string SaveKind = 14; // "memory" | "database"  
 }
 
 message DeleteSyntaxFlowResultRequest{
@@ -6669,6 +7540,7 @@ message SSARisk {
   bool IsPotential = 17;
 
   string CVE = 18;
+  repeated string CWE = 31;
   string CveAccessVector = 19;
   string CveAccessComplexity = 20;
   string Tags = 21;
@@ -6685,6 +7557,7 @@ message SSARisk {
   // other mesg
   string Solution = 28;
   string Description = 29 ;
+  string LatestDisposalStatus = 30; // 最新处置状态 not_set | is_issue | not_issue | suspicious
 }
 
 message SSARisksFilter {
@@ -6705,6 +7578,10 @@ message SSARisksFilter {
   repeated string FunctionName = 14;
   int64 BeforeCreatedAt = 15;
   int64 AfterCreatedAt = 16;
+  repeated string LatestDisposalStatus = 17;  // not_set | is_issue | not_issue | suspicious
+  SSARiskDiffRequest SSARiskDiffRequest = 18;
+  // 增量查询
+  bool Incremental = 19;
 }
 
 message QuerySSARisksRequest {
@@ -6754,6 +7631,77 @@ message SSARiskFeedbackToOnlineRequest {
   string Token = 1;
   SSARisksFilter Filter = 2;
 }
+
+message SSARiskDisposalData{
+  int64 Id = 1 ;
+  int64 CreatedAt = 2;
+  int64 UpdatedAt = 3;
+
+  string Status = 4;
+  string Comment = 5;
+
+  int64 RiskId = 6;
+  string TaskName = 7;         // 任务名称，追踪处置来自哪次扫描任务
+}
+
+message SSARiskDisposalsFilter {
+  repeated int64 ID = 1;
+  repeated string Status = 2;
+  repeated int64 RiskId = 3;
+
+  // for fuzz search
+  string Search = 4;
+}
+
+message CreateSSARiskDisposalsRequest {
+  repeated int64 RiskIds = 1;
+  string Status = 2;
+  string Comment = 3;
+}
+
+message CreateSSARiskDisposalsResponse {
+  repeated SSARiskDisposalData Data = 1;
+}
+
+message QuerySSARiskDisposalsRequest {
+  Paging  Pagination = 1;
+  SSARiskDisposalsFilter Filter = 2;
+}
+
+message QuerySSARiskDisposalsResponse {
+  Paging Pagination = 1;
+  repeated SSARiskDisposalData Data = 2;
+  int64 Total = 3;
+}
+
+message UpdateSSARiskDisposalsRequest {
+  SSARiskDisposalsFilter Filter = 1;
+  string User = 2;
+  string Status = 3;
+  string Comment = 4;
+}
+
+message UpdateSSARiskDisposalsResponse {
+  repeated SSARiskDisposalData Data = 1;
+}
+
+message DeleteSSARiskDisposalsRequest {
+  SSARiskDisposalsFilter Filter = 1;
+}
+
+message DeleteSSARiskDisposalsResponse {
+  DbOperateMessage Message = 1;
+}
+
+message GetSSARiskDisposalRequest{
+  int64 RiskId = 1;
+  string RiskHash = 2;
+}
+
+message GetSSARiskDisposalResponse{
+  repeated SSARiskDisposalData Data = 1;
+}
+
 
 message ExportSyntaxFlowsRequest {
   SyntaxFlowRuleFilter Filter = 1;
@@ -6841,6 +7789,7 @@ message UploadHotPatchTemplateToOnlineRequest {
 message DownloadHotPatchTemplateRequest {
   string Name = 1;
   string Type = 2; // fuzzer/mitm/httpflow-analyze
+  string Token = 3;
 }
 message ExportHTTPFlowStreamRequest {
   QueryHTTPFlowRequest Filter = 1;
@@ -6981,6 +7930,13 @@ message StartLocalModelRequest {
   string ModelName = 1;
   string Host = 2;
   int32 Port = 3;
+  int32 ContextSize = 4;
+  int32 BatchSize = 5;
+  int32 Threads = 6;
+  bool Debug = 8;
+  string Pooling = 9;
+  int64 StartupTimeoutMs = 10;
+  repeated string Args = 11;
 }
 
 message DownloadLocalModelRequest {
@@ -6995,6 +7951,10 @@ message LocalModelConfig {
   string DownloadURL = 4;
   string Description = 5;
   int32 DefaultPort = 6;
+  bool IsLocal = 7;
+  bool IsReady = 8;
+  string Path = 9;
+  LocalModelStatus Status = 10;
 }
 
 message GetSupportedLocalModelsResponse {
@@ -7027,6 +7987,7 @@ message MITMV2Request{
   bool EnableProxyAuth = 12;
   repeated string DnsServers = 13;
   repeated KVPair hosts = 14;
+  repeated KVPair HostsMapping = 46;
 
   // max content-length
   int64 MaxContentLength = 15;
@@ -7095,6 +8056,7 @@ message MITMV2Request{
   SingleManualHijackControlMessage ManualHijackMessage = 44;
 
   bool RecoverContext = 45; // recover mitm context plugin config...
+  int64 PluginConcurrency = 47; // 设置插件并发数，默认30
 }
 
 message MITMV2Response {
@@ -7167,9 +8129,147 @@ message SingleManualHijackInfoMessage{
 }
 
 message QueryMITMReplacerRulesRequest{
-  string KeyWord =1;
+  string KeyWord = 1;
 }
 
 message QueryMITMReplacerRulesResponse{
   MITMContentReplacers Rules = 1;
+}
+
+// 插件执行跟踪相关消息定义
+message PluginExecutionTrace {
+  string TraceID = 1;
+  string PluginID = 2;
+  string HookName = 3;
+  string Status = 4; // "pending", "running", "completed", "failed", "cancelled"
+  int64 StartTime = 5;
+  int64 EndTime = 6;
+  bytes ExecutionArgs = 7; // JSON encoded arguments
+  string ErrorMessage = 8;
+  int64 DurationMs = 9;
+  string RuntimeId = 10;
+}
+
+message PluginTraceRequest {
+  // 控制字段
+  string ControlMode = 1; // "start_stream", "stop_stream", "cancel_trace", "set_tracing"
+  // 取消特定Trace
+  string TraceID = 2;
+  // Tracing开关 打开PluginTrace流不代表启用了插件Trace
+  bool EnableTracing = 3;
+}
+
+message PluginTraceResponse {
+  // 响应类型
+  string ResponseType = 1; // "trace_update", "control_result"
+  // 跟踪列表
+  repeated PluginExecutionTrace Traces = 2;
+  // 控制操作结果
+  bool Success = 3;
+  string Message = 4;
+  // 统计信息
+  PluginTraceStats Stats = 5;
+}
+
+message PluginTraceStats {
+  int64 TotalTraces = 1;
+  int64 RunningTraces = 2;
+  int64 CompletedTraces = 3;
+  int64 FailedTraces = 4;
+  int64 CancelledTraces = 5;
+}
+
+// SSA Report Messages
+message GenerateSSAReportRequest {
+  string TaskID = 1;     // SSA扫描TaskID
+  string ReportName = 2;    // 报告名称
+}
+
+message GenerateSSAReportResponse {
+  bool Success = 1;         // 是否成功
+  string Message = 2;       // 消息
+  string ReportData = 3;    // 报告数据（当格式不是yakit时）
+}
+
+// SSA Project Messages
+message SSAProject {
+  int64 ID = 1;
+  int64 CreatedAt = 2;
+  int64 UpdatedAt = 3;
+  // 项目基础信息
+  string ProjectName = 4;
+  string Language = 5;
+  string Description = 6;
+  repeated string Tags = 7;
+  // 源代码来源
+  string CodeSourceConfig = 8;
+  // 编译配置选项
+  SSAProjectCompileConfig CompileConfig = 9;
+  // 扫描配置选项
+  SSAProjectScanConfig ScanConfig = 10;
+  // 规则策略配置
+  SSAProjectScanRuleConfig RuleConfig = 11;
+}
+
+message SSAProjectCompileConfig{
+  bool StrictMode = 1;
+  int64 PeepholeSize = 2;
+  repeated string ExcludeFiles = 3;
+  bool ReCompile = 4;
+  bool Memory = 5;
+  uint32  Concurrency = 6;
+}
+
+message SSAProjectScanConfig{
+  uint32 Concurrency = 1;
+  bool Memory = 2;
+  bool IgnoreLanguage = 3;
+}
+
+message SSAProjectScanRuleConfig{
+  SyntaxFlowRuleFilter RuleFilter = 1;
+}
+
+message SSAProjectFilter {
+  repeated int64 IDs = 1;
+  repeated string ProjectNames = 2;
+  string SearchKeyword = 3;
+  repeated string Languages = 4;
+}
+
+message CreateSSAProjectRequest {
+  SSAProject Project = 1;
+}
+
+message CreateSSAProjectResponse {
+  SSAProject Project = 1;
+  DbOperateMessage Message = 2;
+}
+
+message UpdateSSAProjectRequest {
+  SSAProject Project = 1;
+}
+
+message UpdateSSAProjectResponse {
+  SSAProject Project = 1;
+  DbOperateMessage Message = 2;
+}
+
+message DeleteSSAProjectRequest {
+  SSAProjectFilter Filter = 1;
+}
+
+message DeleteSSAProjectResponse {
+  DbOperateMessage Message = 1;
+}
+
+message QuerySSAProjectRequest {
+  SSAProjectFilter Filter = 1;
+  Paging Pagination = 2;
+}
+
+message QuerySSAProjectResponse {
+  repeated SSAProject Projects = 1;
+  Paging Pagination = 2;
+  int64 Total = 3;
 }

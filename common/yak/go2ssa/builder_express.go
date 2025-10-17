@@ -36,7 +36,7 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 		}
 	}
 
-	fmt.Printf("exp = %v\n", exp.GetText())
+	// fmt.Printf("exp = %v\n", exp.GetText())
 
 	if ret := exp.PrimaryExpr(); ret != nil {
 		return b.buildPrimaryExpression(ret.(*gol.PrimaryExprContext), islValue)
@@ -187,7 +187,13 @@ func (b *astbuilder) buildExpression(exp *gol.ExpressionContext, islValue bool) 
 			switch op.GetText() {
 			case "*":
 				if op1.GetType().GetTypeKind() == ssa.PointerKind {
-					return nil, b.GetOriginPointer(op1)
+					return nil, b.GetAndCreateOriginPointer(op1)
+				} else if p, ok := ssa.ToParameter(op1); ok && !p.IsFreeValue {
+					if op1Var := getVariable(exp, 0); op1Var != nil {
+						b.ReferenceParameter(op1Var.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+						// b.AssignVariable(op1Var, op1)
+						return nil, op1Var
+					}
 				}
 			}
 		}
@@ -233,6 +239,13 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 						handleObjectType(rv, typ)
 					}
 					return
+				} else if p, ok := ssa.ToParameter(rv); ok && !p.IsFreeValue {
+					if key := typ.GetKeybyName(text); key != nil {
+						leftv = b.CreateMemberCallVariable(rv, key)
+						b.ReferenceParameter(leftv.GetName(), p.FormalParameterIndex, ssa.PointerSideEffect)
+						// TODO: 匿名结构体指针使用其他逻辑实现，需要兼容
+						return
+					}
 				}
 
 				if key := typ.GetKeybyName(text); key != nil {
@@ -263,6 +276,17 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 		if ret := exp.Arguments(); ret != nil {
 			rv, _ := b.buildPrimaryExpression(exp.PrimaryExpr().(*gol.PrimaryExprContext), false, true)
 			args := b.buildArgumentsExpression(ret.(*gol.ArgumentsContext))
+			if rv.GetName() == "make" {
+				rightv = b.InterfaceAddFieldBuild(0, func(i int) ssa.Value {
+					return b.EmitConstInst(0)
+				}, func(i int) ssa.Value {
+					return b.EmitConstInst(0)
+				})
+				if len(args) > 0 {
+					rightv.SetType(args[0].GetType())
+				}
+				return rightv, nil
+			}
 			rightv = b.EmitCall(b.NewCall(rv, args))
 			return rightv, leftv
 		}
@@ -286,11 +310,11 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 				_ = a
 			}
 
-			readMemberCall := func(rv, key ssa.Value) ssa.Value {
+			readMemberCall := func(rv, key ssa.Value) (ssa.Value, bool) {
 				if len(isFunction) > 0 && isFunction[0] {
-					return b.ReadMemberCallMethod(rv, key)
+					return b.ReadMemberCallMethod(rv, key), false
 				}
-				return b.ReadMemberCallValue(rv, key)
+				return b.ReadMemberCallValue(rv, key), true
 			}
 
 			handleObjectType = func(rv ssa.Value, typ *ssa.ObjectType) {
@@ -309,16 +333,13 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 						/*
 						 a.A.b
 						*/
-						rvt := rv
 						if key := a.GetKeybyName(text); !utils.IsNil(key) {
-							rvt = b.ReadMemberCallValueByName(rv, n)
-							if rvt == nil {
-								rvt = readMemberCall(rv, key)
-								rightv = rvt
-								break
+							rightv = b.ReadMemberCallValueByName(rv, n)
+							if rightv == nil {
+								rightv, _ = readMemberCall(rv, b.EmitConstInstPlaceholder(text))
 							}
 						}
-						handleObjectType(rvt, a)
+						handleObjectType(rightv, a)
 					}
 				}
 			}
@@ -330,8 +351,12 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			}
 
 			if rightv == nil {
-				rightv = readMemberCall(rv, b.EmitConstInstPlaceholder(text))
-				rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
+				var ok bool
+				if rightv, ok = readMemberCall(rv, b.EmitConstInstPlaceholder(text)); ok {
+					rightv.SetType(HandleFullTypeNames(rv.GetType(), rv.GetType().GetFullTypeNames()))
+				} else {
+					rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
+				}
 			}
 			// log.Infof("rightv = %v", rightv)
 			// log.Infof("rightv type = %v", rightv.GetType())
@@ -476,6 +501,9 @@ func (b *astbuilder) buildOperandExpression(exp *gol.OperandContext, IslValue bo
 		if id := exp.OperandName(); id != nil {
 			leftv = b.buildOperandNameL(id.(*gol.OperandNameContext), false)
 		}
+		if literal := exp.Literal(); literal != nil {
+			rightv = b.buildLiteral(literal.(*gol.LiteralContext))
+		}
 	}
 	return rightv, leftv
 }
@@ -492,9 +520,6 @@ func (b *astbuilder) buildOperandNameL(name *gol.OperandNameContext, isLocal boo
 		if b.GetFromCmap(text) {
 			b.NewError(ssa.Warn, TAG, "cannot assign to const value")
 		}
-		/*if v, ok := b.GetGlobalVariableL(text); ok {
-			return v
-		}*/
 		if isLocal {
 			return b.CreateLocalVariable(text)
 		} else {
@@ -520,20 +545,26 @@ func (b *astbuilder) buildOperandNameR(name *gol.OperandNameContext) ssa.Value {
 			return b.EmitConstInstPlaceholder(c)
 		}
 
-		v := b.PeekValue(text)
-		if v == nil {
-			v = b.GetGlobalVariableR(text)
-		}
-		if v != nil {
+		if v := b.PeekValue(text); !utils.IsNil(v) {
 			return v
 		}
 
-		v = b.GetFunc(text, "")
-		if v.(*ssa.Function) == nil {
-			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
-			return b.ReadValue(text)
+		if g := b.GetGlobalVariableR(text); !utils.IsNil(g) {
+			return g
 		}
-		return v
+
+		if f, ok := b.GetFunc(text, ""); ok {
+			return f
+		}
+
+		if v := b.PeekValueInRoot(text); !utils.IsNil(v) {
+			if ex, ok := ssa.ToExternLib(v); ok {
+				return ex
+			}
+		}
+
+		b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find variable %s in current scope", text))
+		return b.ReadValue(text)
 	}
 
 	b.NewError(ssa.Error, TAG, Unreachable())

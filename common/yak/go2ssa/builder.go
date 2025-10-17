@@ -19,24 +19,30 @@ import (
 )
 
 type SSABuilder struct {
-	*ssa.PreHandlerInit
+	*ssa.PreHandlerBase
 }
 
 var Builder = &SSABuilder{}
 
-func (s *SSABuilder) Create() ssa.Builder {
-	return &SSABuilder{
-		PreHandlerInit: ssa.NewPreHandlerInit(initHandler).WithLanguageConfigOpts(
-			ssa.WithLanguageConfigBind(true),
-			ssa.WithLanguageConfigVirtualImport(true),
-			ssa.WithLanguageBuilder(s),
-		),
+func CreateBuilder() ssa.Builder {
+	builder := &SSABuilder{
+		PreHandlerBase: ssa.NewPreHandlerBase(initHandler),
 	}
+	builder.WithLanguageConfigOpts(
+		ssa.WithLanguageConfigBind(true),
+		ssa.WithLanguageConfigVirtualImport(true),
+		ssa.WithLanguageBuilder(builder),
+	)
+	return builder
 }
 
 func initHandler(fb *ssa.FunctionBuilder) {
 	container := fb.EmitEmptyContainer()
-	fb.GetProgram().GlobalScope = container
+
+	prog := fb.GetProgram()
+	if prog.GlobalVariablesBlueprint != nil {
+		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
+	}
 }
 
 func (*SSABuilder) FilterPreHandlerFile(path string) bool {
@@ -44,11 +50,11 @@ func (*SSABuilder) FilterPreHandlerFile(path string) bool {
 	return extension == ".go" || extension == ".mod"
 }
 
-func (s *SSABuilder) PreHandlerFile(editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
-	builder.GetProgram().GetApplication().Build("", editor, builder)
+func (s *SSABuilder) PreHandlerFile(ast ssa.FrontAST, editor *memedit.MemEditor, builder *ssa.FunctionBuilder) {
+	builder.GetProgram().GetApplication().Build(ast, editor, builder)
 }
 
-func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder *ssa.FunctionBuilder, path string) error {
+func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAST, functionBuilder *ssa.FunctionBuilder, editor *memedit.MemEditor) error {
 	prog := functionBuilder.GetProgram()
 	if prog == nil {
 		log.Errorf("program is nil")
@@ -58,23 +64,10 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 		prog.ExtraFile = make(map[string]string)
 	}
 
-	dirname, filename := fileSystem.PathSplit(path)
-	_ = dirname
-	_ = filename
-	file, err := fileSystem.ReadFile(path)
-	if err != nil {
-		log.Errorf("read file %s error: %v", path, err)
-		return nil
-	}
-
+	filename := editor.GetFilename()
 	// go.mod
 	if strings.TrimLeft(filename, string(fileSystem.GetSeparators())) == "go.mod" {
-		raw, err := fileSystem.ReadFile(path)
-		if err != nil {
-			log.Warnf("read go.mod error: %v", err)
-			return nil
-		}
-		text := string(raw)
+		text := editor.GetSourceCode()
 		pattern := `module(.*?)\n`
 		re, err := regexp.Compile(pattern)
 		if err != nil {
@@ -88,15 +81,24 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, functionBuilder
 			prog.ExtraFile["go.mod"] = path[:len(path)-1]
 		}
 	}
-	prog.Build(path, memedit.NewMemEditor(string(file)), functionBuilder)
+	prog.Build(ast, editor, functionBuilder)
 	prog.GetIncludeFiles()
 	return nil
 }
 
-func (s *SSABuilder) Build(src string, force bool, builder *ssa.FunctionBuilder) error {
-	ast, err := Frontend(src, force)
-	if err != nil {
-		return err
+func (s *SSABuilder) FilterParseAST(path string) bool {
+	extension := filepath.Ext(path)
+	return extension == ".go"
+}
+
+func (s *SSABuilder) ParseAST(src string) (ssa.FrontAST, error) {
+	return Frontend(src, s)
+}
+
+func (s *SSABuilder) BuildFromAST(raw ssa.FrontAST, builder *ssa.FunctionBuilder) error {
+	ast, ok := raw.(*gol.SourceFileContext)
+	if !ok {
+		return utils.Errorf("invalid AST type: expected *gol.SourceFileContext, got %T", raw)
 	}
 
 	SpecialTypes := map[string]ssa.Type{
@@ -145,21 +147,23 @@ type astbuilder struct {
 	SetGlobal      bool
 }
 
-func Frontend(src string, must bool) (*gol.SourceFileContext, error) {
+func Frontend(src string, ssabuilder ...*SSABuilder) (*gol.SourceFileContext, error) {
+	var builder *ssa.PreHandlerBase
+	if len(ssabuilder) > 0 {
+		builder = ssabuilder[0].PreHandlerBase
+	}
 	errListener := antlr4util.NewErrorListener()
 	lexer := gol.NewGoLexer(antlr.NewInputStream(src))
 	lexer.RemoveErrorListeners()
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := gol.NewGoParser(tokenStream)
+	ssa.ParserSetAntlrCache(parser.BaseParser, builder)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.SourceFile().(*gol.SourceFileContext)
-	if must || len(errListener.GetErrors()) == 0 {
-		return ast, nil
-	}
-	return nil, utils.Errorf("parse AST FrontEnd error : %v", errListener.GetErrorString())
+	return ast, errListener.Error()
 }
 
 func (b *astbuilder) AddToCmap(key string) {
@@ -189,47 +193,6 @@ func (*SSABuilder) GetLanguage() consts.Language {
 	return consts.GO
 }
 
-func (b *astbuilder) AddGlobalVariable(name string, value ssa.Value) {
-	scope := b.CurrentBlock.ScopeTable
-	for _, v := range scope.GetAllVariables() {
-		if object := v.GetValue().GetObject(); object != nil && object.GetId() == value.GetId() {
-			variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInstPlaceholder(v.GetName()))
-			b.AssignVariable(variable, v.GetValue())
-		}
-	}
-	variable := b.CreateMemberCallVariable(b.GetProgram().GlobalScope, b.EmitConstInstPlaceholder(name))
-	b.AssignVariable(variable, value)
-}
-
-func (b *astbuilder) CheckGlobalVariablePhi(l *ssa.Variable, r ssa.Value) bool {
-	name := l.GetName()
-	for i, _ := range b.GetProgram().GlobalScope.GetAllMember() {
-		if i.String() == name {
-			b.GetProgram().GlobalScope.GetAllMember()[i] = r
-			return true
-		}
-	}
-	return false
-}
-
-func (b *astbuilder) GetGlobalVariableL(name string) (*ssa.Variable, bool) {
-	var variable *ssa.Variable
-	return variable, false
-}
-
-func (b *astbuilder) GetGlobalVariableR(name string) ssa.Value {
-	member, _ := b.GetProgram().GlobalScope.GetStringMember(name)
-	return member
-}
-
-func (b *astbuilder) GetGlobalVariables() map[string]ssa.Value {
-	var variables = make(map[string]ssa.Value)
-	for i, m := range b.GetProgram().GlobalScope.GetAllMember() {
-		variables[i.String()] = m
-	}
-	return variables
-}
-
 func (b *astbuilder) AddResultDefault(name string) {
 	result := b.result[b.Function.GetName()]
 	if result == nil {
@@ -251,6 +214,13 @@ func (b *astbuilder) SetImportPackage(useName, trueName string, path string, pos
 		Pos:  pos,
 	}
 	b.importMap[useName] = p
+}
+
+func (b *astbuilder) CheckImportPackage(n string) bool {
+	if _, ok := b.importMap[n]; ok {
+		return true
+	}
+	return false
 }
 
 func (b *astbuilder) GetImportPackage(n string) (*ssa.Program, string) {
@@ -283,8 +253,9 @@ func (b *astbuilder) GetImportPackageUser(n string) (*ssa.Program, string) {
 
 func (b *astbuilder) GetLabelByName(name string) *ssa.LabelBuilder {
 	if b.labels[name] == nil {
-		return nil
+		b.labels[name] = b.BuildLabel(name)
 	}
+
 	return b.labels[name]
 }
 

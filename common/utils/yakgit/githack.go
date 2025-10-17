@@ -178,7 +178,7 @@ func GitHack(remoteRepoURL string, localPath string, opts ...Option) (finalErr e
 	}
 
 	// 打开存储库
-	repo, err := git.PlainOpen(tempDirPath)
+	repo, err := GitOpenRepositoryWithCache(tempDirPath)
 	if err != nil {
 		return utils.Wrap(err, "open git repo error")
 	}

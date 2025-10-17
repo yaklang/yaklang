@@ -10,7 +10,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
 	"github.com/yaklang/yaklang/common/utils"
-	"golang.org/x/exp/slices"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -19,23 +18,9 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
-var progPool = utils.NewSafeMap[*Program]()
-
-func GetProgramFromPool(name string) (*Program, bool) {
-	if prog, ok := progPool.Get(name); ok {
-		return prog, true
-	}
-	if prog, err := GetProgram(name, Application); err == nil {
-		progPool.Set(name, prog)
-		return prog, true
-	} else {
-		return nil, false
-	}
-}
-
 func NewProgram(
-	ProgramName string, enableDatabase bool, kind ssadb.ProgramKind,
-	fs fi.FileSystem, programPath string,
+	ProgramName string, databaseKind ProgramCacheKind, kind ssadb.ProgramKind,
+	fs fi.FileSystem, programPath string, fileSize int,
 	ttl ...time.Duration,
 ) *Program {
 	prog := &Program{
@@ -54,6 +39,7 @@ func NewProgram(
 		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
 		FileList:                make(map[string]string),
+		LineCount:               0,
 		cacheExternInstance:     make(map[string]Value),
 		externType:              make(map[string]Type),
 		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
@@ -65,12 +51,16 @@ func NewProgram(
 		CurrentIncludingStack:   utils.NewStack[string](),
 		config:                  NewLanguageConfig(),
 	}
+
+	prog.GlobalVariablesBlueprint = NewBlueprint("__GlobalVariables__")
+	prog.GlobalVariablesBlueprint.SetKind(BlueprintClass)
+	prog.Blueprint.Set("__GlobalVariables__", prog.GlobalVariablesBlueprint)
+
 	if kind == Application {
 		prog.Application = prog
-		prog.Cache = NewDBCache(prog, enableDatabase, ttl...)
-		progPool.Set(ProgramName, prog)
+		prog.Cache = NewDBCache(prog, databaseKind, fileSize, ttl...)
 	}
-	prog.EnableDatabase = enableDatabase
+	prog.DatabaseKind = databaseKind
 	prog.Loader = ssautil.NewPackageLoader(
 		ssautil.WithFileSystem(fs),
 		ssautil.WithIncludePath(programPath),
@@ -78,12 +68,46 @@ func NewProgram(
 	)
 	return prog
 }
+
+func NewTmpProgram(ProgramName string) *Program {
+	prog := &Program{
+		Name:                    ProgramName,
+		ProgramKind:             Application,
+		LibraryFile:             make(map[string][]string),
+		UpStream:                omap.NewEmptyOrderedMap[string, *Program](),
+		DownStream:              make(map[string]*Program),
+		errors:                  make([]*SSAError, 0),
+		astMap:                  make(map[string]struct{}),
+		OffsetMap:               make(map[int]*OffsetItem),
+		OffsetSortedSlice:       make([]int, 0),
+		Funcs:                   omap.NewEmptyOrderedMap[string, *Function](),
+		Blueprint:               omap.NewEmptyOrderedMap[string, *Blueprint](),
+		BlueprintStack:          utils.NewStack[*Blueprint](),
+		editorStack:             omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		editorMap:               omap.NewOrderedMap(make(map[string]*memedit.MemEditor)),
+		FileList:                make(map[string]string),
+		LineCount:               0,
+		cacheExternInstance:     make(map[string]Value),
+		externType:              make(map[string]Type),
+		externBuildValueHandler: make(map[string]func(b *FunctionBuilder, id string, v any) (value Value)),
+		ExternInstance:          make(map[string]any),
+		ExternLib:               make(map[string]map[string]any),
+		importDeclares:          omap.NewOrderedMap(make(map[string]*importDeclareItem)),
+		ProjectConfig:           make(map[string]*ProjectConfig),
+		Template:                make(map[string]tl.TemplateGeneratedInfo),
+		CurrentIncludingStack:   utils.NewStack[string](),
+		config:                  NewLanguageConfig(),
+	}
+	prog.Application = prog
+	prog.DatabaseKind = ProgramCacheMemory
+	return prog
+}
 func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path ...string) *Program {
 	fs := prog.Loader.GetFilesysFileSystem()
 	fullPath := prog.GetCurrentEditor().GetFilename()
 	endPath := fs.Join(path...)
 	programPath, _, _ := strings.Cut(fullPath, endPath)
-	subProg := NewProgram(name, prog.EnableDatabase, kind, fs, programPath)
+	subProg := NewProgram(name, prog.DatabaseKind, kind, fs, programPath, 0)
 	subProg.Application = prog.Application
 	subProg.config = prog.config
 
@@ -92,6 +116,7 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 
 	subProg.LibraryFile = prog.LibraryFile
 	subProg.FileList = prog.FileList
+	subProg.LineCount = prog.LineCount
 	subProg.editorStack = prog.editorStack.Copy()
 	// subProg.editorStack = prog.editorStack
 	subProg.externType = prog.externType
@@ -100,9 +125,6 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.ExternLib = prog.ExternLib
 	subProg.ExportType = make(map[string]Type)
 	subProg.ExportValue = make(map[string]Value)
-
-	//todo: 这里需要加一个测试
-	subProg.GlobalScope = prog.GlobalScope
 
 	// up-down stream and application
 	prog.AddUpStream(subProg)
@@ -149,8 +171,8 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	currentEditor := prog.GetCurrentEditor()
 	// this program has current file
 	hasFile := func(p *Program) bool {
-		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
-			if hash == currentEditor.SourceCodeMd5() {
+		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
+			if hash == currentEditor.GetIrSourceHash() {
 				return true
 			}
 		}
@@ -166,26 +188,26 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 		app.AddUpStream(p)
 		return p, hasFile(p)
 	}
-	if !app.EnableDatabase {
-		return nil, false
-	}
-	version := ""
-	if p := app.GetSCAPackageByName(name); p != nil {
-		version = p.Version
-	} else {
-		return nil, false
-	}
+	// if !app.EnableDatabase {
+	return nil, false
+	// }
+	// version := ""
+	// if p := app.GetSCAPackageByName(name); p != nil {
+	// 	version = p.Version
+	// } else {
+	// 	return nil, false
+	// }
 	// library in  database, load and set relation
-	p, err := GetLibrary(name, version)
-	if err != nil {
-		return nil, false
-	}
-	app.AddUpStream(p)
-	if !slices.Contains(p.irProgram.UpStream, name) {
-		// update up-down stream
-		prog.AddUpStream(p)
-	}
-	return p, hasFile(p)
+	// p, err := GetLibrary(name, version)
+	// if err != nil {
+	// 	return nil, false
+	// }
+	// app.AddUpStream(p)
+	// if !slices.Contains(p.irProgram.UpStream, name) {
+	// 	// update up-down stream
+	// 	prog.AddUpStream(p)
+	// }
+	// return p, hasFile(p)
 }
 
 func (prog *Program) AddUpStream(sub *Program) {
@@ -237,8 +259,8 @@ func (prog *Program) EachFunction(handler func(*Function)) {
 	handFunc = func(f *Function) {
 		handler(f)
 		for _, id := range f.ChildFuncs {
-			child := f.GetValueById(id)
-			if child == nil {
+			child, ok := f.GetValueById(id)
+			if !ok || child == nil {
 				log.Warnf("function %s child %d not found in function %s", f.GetName(), id, f.GetName())
 				continue
 			}
@@ -286,7 +308,6 @@ func (prog *Program) Finish() {
 		v.Finish()
 		return true
 	})
-	progPool.Delete(prog.GetProgramName())
 }
 
 func (prog *Program) SearchIndexAndOffsetByOffset(searchOffset int) (index int, offset int) {
@@ -317,19 +338,16 @@ func (prog *Program) GetFrontValueByOffset(searchOffset int) (offset int, value 
 	return offset, value
 }
 
+func (p *Program) ShouldVisit(path string) bool {
+	return p.editorMap.Have(path)
+}
+
 func (p *Program) GetEditor(url string) (*memedit.MemEditor, bool) {
 	return p.editorMap.Get(url)
 }
 
 func (p *Program) SetEditor(url string, me *memedit.MemEditor) {
 	p.editorMap.Set(url, me)
-}
-
-func (p *Program) PushEditor(e *memedit.MemEditor) {
-	p.editorStack.Push(e)
-	if !p.PreHandler() {
-		p.SetEditor(e.GetFilename(), e)
-	}
 }
 
 func (p *Program) GetIncludeFiles() []string {
@@ -339,6 +357,12 @@ func (p *Program) GetIncludeFileNum() int {
 	return p.editorMap.Len()
 }
 
+func (p *Program) PushEditor(e *memedit.MemEditor) {
+	p.editorStack.Push(e)
+	if !p.PreHandler() {
+		p.SetEditor(e.GetUrl(), e)
+	}
+}
 func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return nil
@@ -356,7 +380,8 @@ func (p *Program) PopEditor(save bool) {
 	}
 	e := p.editorStack.Pop()
 	if save && e != nil {
-		p.FileList[e.GetFilename()] = e.SourceCodeMd5()
+		p.FileList[e.GetUrl()] = e.GetIrSourceHash()
+		p.LineCount += e.GetLineCount()
 	}
 }
 

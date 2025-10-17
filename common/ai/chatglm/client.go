@@ -44,7 +44,22 @@ func (g *GLMClient) ChatStream(msg string) (io.Reader, error) {
 	)
 }
 
+func (g *GLMClient) newLoadOption(opt ...aispec.AIConfigOption) {
+	config := aispec.NewDefaultAIConfig(opt...)
+	g.config = config
+
+	if g.config.Model == "" {
+		g.config.Model = "glm-4-flash"
+	}
+
+	g.targetUrl = aispec.GetBaseURLFromConfig(g.config, "https://open.bigmodel.cn", "/api/paas/v4/chat/completions")
+}
+
 func (g *GLMClient) LoadOption(opt ...aispec.AIConfigOption) {
+	if aispec.EnableNewLoadOption {
+		g.newLoadOption(opt...)
+		return
+	}
 	config := aispec.NewDefaultAIConfig(opt...)
 	g.config = config
 
@@ -98,6 +113,12 @@ func (g *GLMClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		opts = append(opts, poc.WithConnectTimeout(g.config.Timeout))
 	}
 	opts = append(opts, poc.WithTimeout(600))
+	if g.config.Host != "" {
+		opts = append(opts, poc.WithHost(g.config.Host))
+	}
+	if g.config.Port > 0 {
+		opts = append(opts, poc.WithPort(g.config.Port))
+	}
 	return opts, nil
 }
 
@@ -111,10 +132,6 @@ func (g *GLMClient) Chat(s string, f ...any) (string, error) {
 		aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 	)
-}
-
-func (g *GLMClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
 }
 
 func (g *GLMClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {

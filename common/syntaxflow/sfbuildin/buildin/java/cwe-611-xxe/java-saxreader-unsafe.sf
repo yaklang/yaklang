@@ -8,28 +8,26 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时，没有禁止外部实体引用。攻击者可以通过构造恶意XML，引用本地文件或远程资源，导致敏感信息泄露、执行任意代码（部分情况下）、拒绝服务等。
-
-   `SAXReader` 是 Apache Commons Digester 库中用于解析 XML 文档的类。如果 `SAXReader` 实例在使用时未明确设置安全策略，例如未禁用外部实体解析（通过`.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)`）或未设置自定义的实体解析器（通过`.setEntityResolver(...)`），则应用程序可能容易受到 XXE 攻击。
+XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时，没有禁止外部实体引用。攻击者可以通过构造恶意XML，引用本地文件或远程资源，导致敏感信息泄露、执行任意代码（部分情况下）、拒绝服务等。
+`SAXReader` 是 Apache Commons Digester 库中用于解析 XML 文档的类。如果 `SAXReader` 实例在使用时未明确设置安全策略，例如未禁用外部实体解析（通过`.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)`）或未设置自定义的实体解析器（通过`.setEntityResolver(...)`），则应用程序可能容易受到 XXE 攻击。
 
 2. **触发场景**
-   攻击者向应用发送包含恶意外部实体引用的XML数据，应用程序使用存在漏洞的 `SAXReader` 实例解析此XML，从而触发XXE攻击。
-
-   例如，一个应用程序接收用户提交的XML报文并使用默认配置的`SAXReader`进行解析：
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE root [
-   <!ENTITY xxe SYSTEM "file:///etc/passwd">
-   ]>
-   <root>&xxe;</root>
-   ```
-   在没有禁用外部实体解析的情况下，`SAXReader`会尝试读取 `/etc/passwd` 文件，并将其内容包含在解析结果中，从而导致文件内容泄露。
+攻击者向应用发送包含恶意外部实体引用的XML数据，应用程序使用存在漏洞的 `SAXReader` 实例解析此XML，从而触发XXE攻击。
+例如，一个应用程序接收用户提交的XML报文并使用默认配置的`SAXReader`进行解析：
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE root [
+<!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<root>&xxe;</root>
+```
+在没有禁用外部实体解析的情况下，`SAXReader`会尝试读取 `/etc/passwd` 文件，并将其内容包含在解析结果中，从而导致文件内容泄露。
 
 3. **潜在影响**
-   - 敏感数据泄露（如文件内容、系统信息）
-   - 拒绝服务（通过引用大量资源或缓慢资源）
-   - 服务器端请求伪造（SSRF）（通过引用内网资源）
-   - 在一些特定条件下可能导致任意代码执行（通过引用包含恶意代码的文件）
+- 敏感数据泄露（如文件内容、系统信息）
+- 拒绝服务（通过引用大量资源或缓慢资源）
+- 服务器端请求伪造（SSRF）（通过引用内网资源）
+- 在一些特定条件下可能导致任意代码执行（通过引用包含恶意代码的文件）
 DESC
 	rule_id: "bac3b5b7-9ff9-4534-ae1d-4ff2128c6e57"
 	solution: <<<SOLUTION
@@ -43,27 +41,24 @@ import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.io.SAXReader;
 import org.xml.sax.SAXException;
-
 import java.io.File;
-
 public class SAXReaderSafe {
-    public void parseXml(String xml) {
-        SAXReader reader = new SAXReader();
-        try {
-            // 禁用DOCTYPE声明，从而禁用外部实体
-            reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            // 可选：禁用外部通用实体和参数实体
-            reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-
-            Document doc = reader.read(new File(xml));
-            System.out.println(doc.getRootElement().getName());
-        } catch (DocumentException e) {
-            e.printStackTrace();
-        } catch (SAXException e) {
-            e.printStackTrace();
-        }
-    }
+public void parseXml(String xml) {
+SAXReader reader = new SAXReader();
+try {
+// 禁用DOCTYPE声明，从而禁用外部实体
+reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+// 可选：禁用外部通用实体和参数实体
+reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+Document doc = reader.read(new File(xml));
+System.out.println(doc.getRootElement().getName());
+} catch (DocumentException e) {
+e.printStackTrace();
+} catch (SAXException e) {
+e.printStackTrace();
+}
+}
 }
 ```
 
@@ -72,13 +67,12 @@ public class SAXReaderSafe {
 ```java
 // 仅为示例伪代码，需实现org.xml.sax.EntityResolver接口
 public class CustomEntityResolver implements EntityResolver {
-    @Override
-    public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
-        // 拒绝对外部资源的引用
-        throw new SAXException("External entity reference not allowed.");
-    }
+@Override
+public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
+// 拒绝对外部资源的引用
+throw new SAXException("External entity reference not allowed.");
 }
-
+}
 // 在SAXReader中使用自定义解析器
 SAXReader reader = new SAXReader();
 reader.setEntityResolver(new CustomEntityResolver());
@@ -103,9 +97,8 @@ alert $vulnCall for {
 	message: "SAXReader() Unsafe Use in Context Sink",
 	title: "Check Java SAXReader Unsafe Use",
 	title_zh: "检测 Java SAXReader 未安全使用",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体解析
 在创建 `SAXReader` 实例后，立即禁用外部实体解析功能。这是防止 XXE 攻击最直接有效的方法。
 ```java
@@ -114,83 +107,74 @@ import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.io.SAXReader;
 import org.xml.sax.SAXException;
-
 import java.io.File;
-
 public class SAXReaderSafe {
-    public void parseXml(String xml) {
-        SAXReader reader = new SAXReader();
-        try {
-            // 禁用DOCTYPE声明，从而禁用外部实体
-            reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-            // 可选：禁用外部通用实体和参数实体
-            reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-
-            Document doc = reader.read(new File(xml));
-            System.out.println(doc.getRootElement().getName());
-        } catch (DocumentException e) {
-            e.printStackTrace();
-        } catch (SAXException e) {
-            e.printStackTrace();
-        }
-    }
+public void parseXml(String xml) {
+SAXReader reader = new SAXReader();
+try {
+// 禁用DOCTYPE声明，从而禁用外部实体
+reader.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+// 可选：禁用外部通用实体和参数实体
+reader.setFeature("http://xml.org/sax/features/external-general-entities", false);
+reader.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+Document doc = reader.read(new File(xml));
+System.out.println(doc.getRootElement().getName());
+} catch (DocumentException e) {
+e.printStackTrace();
+} catch (SAXException e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 #### 2. 设置安全的实体解析器
 如果业务确实需要处理DOCTYPE，可以提供一个自定义的实体解析器，只解析预定义的实体，拒绝对外部资源的引用。
 ```java
 // 仅为示例伪代码，需实现org.xml.sax.EntityResolver接口
 public class CustomEntityResolver implements EntityResolver {
-    @Override
-    public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
-        // 拒绝对外部资源的引用
-        throw new SAXException("External entity reference not allowed.");
-    }
+@Override
+public InputSource resolveEntity(String publicId, String systemId) throws SAXException, IOException {
+// 拒绝对外部资源的引用
+throw new SAXException("External entity reference not allowed.");
 }
-
+}
 // 在SAXReader中使用自定义解析器
 SAXReader reader = new SAXReader();
 reader.setEntityResolver(new CustomEntityResolver());
 ```
-
 #### 3. 输入验证与过滤
 在解析XML之前，对XML内容进行基本的验证和过滤，移除或拒绝包含DOCTYPE声明或外部实体引用的XML。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时，没有禁止外部实体引用。攻击者可以通过构造恶意XML，引用本地文件或远程资源，导致敏感信息泄露、执行任意代码（部分情况下）、拒绝服务等。
-
-   `SAXReader` 是 Apache Commons Digester 库中用于解析 XML 文档的类。如果 `SAXReader` 实例在使用时未明确设置安全策略，例如未禁用外部实体解析（通过`.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)`）或未设置自定义的实体解析器（通过`.setEntityResolver(...)`），则应用程序可能容易受到 XXE 攻击。
-
+XML外部实体注入（XXE）漏洞发生在应用程序解析XML输入时，没有禁止外部实体引用。攻击者可以通过构造恶意XML，引用本地文件或远程资源，导致敏感信息泄露、执行任意代码（部分情况下）、拒绝服务等。
+`SAXReader` 是 Apache Commons Digester 库中用于解析 XML 文档的类。如果 `SAXReader` 实例在使用时未明确设置安全策略，例如未禁用外部实体解析（通过`.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)`）或未设置自定义的实体解析器（通过`.setEntityResolver(...)`），则应用程序可能容易受到 XXE 攻击。
 2. **触发场景**
-   攻击者向应用发送包含恶意外部实体引用的XML数据，应用程序使用存在漏洞的 `SAXReader` 实例解析此XML，从而触发XXE攻击。
-
-   例如，一个应用程序接收用户提交的XML报文并使用默认配置的`SAXReader`进行解析：
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE root [
-   <!ENTITY xxe SYSTEM "file:///etc/passwd">
-   ]>
-   <root>&xxe;</root>
-   ```
-   在没有禁用外部实体解析的情况下，`SAXReader`会尝试读取 `/etc/passwd` 文件，并将其内容包含在解析结果中，从而导致文件内容泄露。
-
+攻击者向应用发送包含恶意外部实体引用的XML数据，应用程序使用存在漏洞的 `SAXReader` 实例解析此XML，从而触发XXE攻击。
+例如，一个应用程序接收用户提交的XML报文并使用默认配置的`SAXReader`进行解析：
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE root [
+<!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<root>&xxe;</root>
+```
+在没有禁用外部实体解析的情况下，`SAXReader`会尝试读取 `/etc/passwd` 文件，并将其内容包含在解析结果中，从而导致文件内容泄露。
 3. **潜在影响**
-   - 敏感数据泄露（如文件内容、系统信息）
-   - 拒绝服务（通过引用大量资源或缓慢资源）
-   - 服务器端请求伪造（SSRF）（通过引用内网资源）
-   - 在一些特定条件下可能导致任意代码执行（通过引用包含恶意代码的文件）
-CODE
+- 敏感数据泄露（如文件内容、系统信息）
+- 拒绝服务（通过引用大量资源或缓慢资源）
+- 服务器端请求伪造（SSRF）（通过引用内网资源）
+- 在一些特定条件下可能导致任意代码执行（通过引用包含恶意代码的文件）
+DESC
+	name: "vulnCall",
+	risk: "XXE",
 }
 
 desc(
 	lang: "java"
 	alert_num: 1
-	"file://safefile.java": <<<UNSAFE
+	"file://unsafefile.java": <<<UNSAFE
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.io.SAXReader;
@@ -213,7 +197,7 @@ UNSAFE
 
 desc(
 	lang: "java"
-	"file://safe.java": <<<SAFE
+	"safefile://safe.java": <<<SAFE
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
 import org.dom4j.io.SAXReader;

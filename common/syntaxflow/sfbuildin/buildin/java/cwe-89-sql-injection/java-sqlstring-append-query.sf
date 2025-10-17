@@ -4,33 +4,29 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   该规则旨在检测Java代码中通过`StringBuilder`或`StringBuffer`等类拼接SQL查询字符串的模式。当应用程序直接将用户输入或其他不可信的数据拼接到SQL语句中时，如果输入没有经过适当的过滤或参数化处理，就可能导致SQL注入漏洞。攻击者可以通过构造恶意输入来改变SQL语句的执行逻辑，从而绕过身份验证、窃取敏感数据、甚至破坏数据库。
-
+该规则旨在检测Java代码中通过`StringBuilder`或`StringBuffer`等类拼接SQL查询字符串的模式。当应用程序直接将用户输入或其他不可信的数据拼接到SQL语句中时，如果输入没有经过适当的过滤或参数化处理，就可能导致SQL注入漏洞。攻击者可以通过构造恶意输入来改变SQL语句的执行逻辑，从而绕过身份验证、窃取敏感数据、甚至破坏数据库。
 2. **触发场景**
-   以下代码示例展示了常见的字符串拼接导致SQL注入的场景：
-   ```java
-   StringBuilder sqlString = new StringBuilder();
-   sqlString.append("SELECT * FROM users WHERE username = '").append(userInput).append("'");
-   // 执行拼接后的SQL语句
-   Statement stmt = connection.createStatement();
-   ResultSet rs = stmt.executeQuery(sqlString.toString());
-   ```
-   如果`userInput`是攻击者可控的，例如用户登录时输入的用户名，攻击者可以输入 `' OR '1'='1` 来绕过密码验证，或者输入 `' OR '1'='1'; DROP TABLE users; --` 来删除用户表。本规则特指检测`StringBuilder`或`StringBuffer`的`append`方法用于拼接SQL语句，并进一步通过启发式判断（如检查是否包含`WHERE`关键字）来提高准确性。
-
+以下代码示例展示了常见的字符串拼接导致SQL注入的场景：
+```java
+StringBuilder sqlString = new StringBuilder();
+sqlString.append("SELECT * FROM users WHERE username = '").append(userInput).append("'");
+// 执行拼接后的SQL语句
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sqlString.toString());
+```
+如果`userInput`是攻击者可控的，例如用户登录时输入的用户名，攻击者可以输入 `' OR '1'='1` 来绕过密码验证，或者输入 `' OR '1'='1'; DROP TABLE users; --` 来删除用户表。本规则特指检测`StringBuilder`或`StringBuffer`的`append`方法用于拼接SQL语句，并进一步通过启发式判断（如检查是否包含`WHERE`关键字）来提高准确性。
 3. **潜在影响**
-   - **数据泄露**: 攻击者可以读取数据库中的任意敏感数据。
-   - **数据篡改**: 攻击者可以修改或删除数据库中的数据。
-   - **权限绕过**: 攻击者可以绕过应用程序的认证或授权机制。
-   - **拒绝服务**: 攻击者可以通过执行耗费资源的查询或操作导致数据库性能下降甚至崩溃。
-   - **进一步渗透**: 在某些情况下，攻击者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
+- **数据泄露**: 攻击者可以读取数据库中的任意敏感数据。
+- **数据篡改**: 攻击者可以修改或删除数据库中的数据。
+- **权限绕过**: 攻击者可以绕过应用程序的认证或授权机制。
+- **拒绝服务**: 攻击者可以通过执行耗费资源的查询或操作导致数据库性能下降甚至崩溃。
+- **进一步渗透**: 在某些情况下，攻击者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
 DESC
 	rule_id: "b86d3bfb-98d4-437d-bf7b-d5c43e012425"
 	title_zh: "检测Java SQL字符串拼接查询"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询（PreparedStatement）
 强烈建议使用Java的`PreparedStatement`对象来执行SQL查询。`PreparedStatement`通过将SQL语句模板与参数值分离，可以有效地防止SQL注入。数据库驱动程序会负责将参数值安全地绑定到SQL语句中，而不是直接拼接到字符串中。
 ```java
@@ -38,41 +34,38 @@ DESC
 String userInput = request.getParameter("id");
 String sql = "SELECT * FROM users WHERE id = ?"; // 使用问号作为参数占位符
 try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-    // 根据参数类型设置参数值，setInt会自动处理类型转换和转义
-    pstmt.setInt(1, Integer.parseInt(userInput)); 
-    try (ResultSet rs = pstmt.executeQuery()) {
-        // 处理查询结果
-    }
+// 根据参数类型设置参数值，setInt会自动处理类型转换和转义
+pstmt.setInt(1, Integer.parseInt(userInput));
+try (ResultSet rs = pstmt.executeQuery()) {
+// 处理查询结果
+}
 }
 ```
-
 #### 2. 使用ORM（对象关系映射）框架
 使用成熟的ORM框架，如Hibernate、MyBatis等，可以显著降低SQL注入的风险。ORM框架通常内置了参数化查询的支持，开发者可以直接操作对象，而由框架负责生成安全的SQL语句。
 ```java
 // MyBatis 示例 (Mapper XML 文件)
 <select id="getUserById" resultType="User">
-    SELECT * FROM users WHERE id = #{userId}  <!-- MyBatis的安全参数占位符 -->
+SELECT * FROM users WHERE id = #{userId}  <!-- MyBatis的安全参数占位符 -->
 </select>
 ```
 ```java
-// 调用代码 (避免手动拼接)
+// 调用代码 (避免手动拼接) 
 // UserMapper 是 MyBatis 生成的接口
 User user = userMapper.getUserById(Integer.parseInt(userInput));
 ```
-
 #### 3. 输入验证与过滤 (作为辅助手段)
 虽然参数化查询是首选的防御方法，但对用户输入进行严格的验证和过滤也是重要的安全实践。根据预期的输入类型，校验输入的格式、长度和内容。例如，如果期望一个数字，则只接受数字输入并进行类型转换。如果需要接受字符串，则对特殊字符进行过滤或转义，但这通常不如参数化查询可靠。
 ```java
 // 示例：简单检查输入是否为数字
 String userInput = request.getParameter("id");
-if (!userInput.matches("\d+")) {
-    // 输入不是数字，拒绝请求或抛出异常
-    throw new IllegalArgumentException("Invalid input: ID must be a number.");
+if (!userInput.matches("\\d+")) {
+// 输入不是数字，拒绝请求或抛出异常
+throw new IllegalArgumentException("Invalid input: ID must be a number.");
 }
 int id = Integer.parseInt(userInput);
 // 接下来使用参数化查询
 ```
-
 #### 4. 代码审查和安全培训
 开发团队应定期进行代码安全审查，特别关注涉及数据库操作的代码段。同时，为开发人员提供SQL Injection等常见Web安全漏洞的培训，提高其安全编码意识。
 SOLUTION
@@ -90,8 +83,76 @@ $params?{!opcode: const}#{
 }->
 alert $flag for {
 	level: "low",
-	title: "Check Java SQL String Append Query",
-	title_zh: "检测Java SQL字符串拼接查询",
+	title: "Java SQL String Append Query Was Detected",
+	title_zh: "检测到Java SQL字符串拼接查询",
+	name: "flag",
+	message: "检测到Java SQL字符串拼接查询行为，可能存在SQL注入风险，建议排查过滤机制的有效性。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数化查询（PreparedStatement）
+强烈建议使用Java的`PreparedStatement`对象来执行SQL查询。`PreparedStatement`通过将SQL语句模板与参数值分离，可以有效地防止SQL注入。数据库驱动程序会负责将参数值安全地绑定到SQL语句中，而不是直接拼接到字符串中。
+```java
+// 修复代码示例 (使用 PreparedStatement)
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?"; // 使用问号作为参数占位符
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+// 根据参数类型设置参数值，setInt会自动处理类型转换和转义
+pstmt.setInt(1, Integer.parseInt(userInput));
+try (ResultSet rs = pstmt.executeQuery()) {
+// 处理查询结果
+}
+}
+```
+#### 2. 使用ORM（对象关系映射）框架
+使用成熟的ORM框架，如Hibernate、MyBatis等，可以显著降低SQL注入的风险。ORM框架通常内置了参数化查询的支持，开发者可以直接操作对象，而由框架负责生成安全的SQL语句。
+```java
+// MyBatis 示例 (Mapper XML 文件)
+<select id="getUserById" resultType="User">
+SELECT * FROM users WHERE id = #{userId}  <!-- MyBatis的安全参数占位符 -->
+</select>
+```
+```java
+// 调用代码 (避免手动拼接)
+// UserMapper 是 MyBatis 生成的接口
+User user = userMapper.getUserById(Integer.parseInt(userInput));
+```
+#### 3. 输入验证与过滤 (作为辅助手段)
+虽然参数化查询是首选的防御方法，但对用户输入进行严格的验证和过滤也是重要的安全实践。根据预期的输入类型，校验输入的格式、长度和内容。例如，如果期望一个数字，则只接受数字输入并进行类型转换。如果需要接受字符串，则对特殊字符进行过滤或转义，但这通常不如参数化查询可靠。
+```java
+// 示例：简单检查输入是否为数字
+String userInput = request.getParameter("id");
+if (!userInput.matches("\d+")) {
+// 输入不是数字，拒绝请求或抛出异常
+throw new IllegalArgumentException("Invalid input: ID must be a number.");
+}
+int id = Integer.parseInt(userInput);
+// 接下来使用参数化查询
+```
+#### 4. 代码审查和安全培训
+开发团队应定期进行代码安全审查，特别关注涉及数据库操作的代码段。同时，为开发人员提供SQL Injection等常见Web安全漏洞的培训，提高其安全编码意识。
+SOLUTION
+	risk: "SQL注入",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+该规则旨在检测Java代码中通过`StringBuilder`或`StringBuffer`等类拼接SQL查询字符串的模式。当应用程序直接将用户输入或其他不可信的数据拼接到SQL语句中时，如果输入没有经过适当的过滤或参数化处理，就可能导致SQL注入漏洞。攻击者可以通过构造恶意输入来改变SQL语句的执行逻辑，从而绕过身份验证、窃取敏感数据、甚至破坏数据库。
+2. **触发场景**
+以下代码示例展示了常见的字符串拼接导致SQL注入的场景：
+```java
+StringBuilder sqlString = new StringBuilder();
+sqlString.append("SELECT * FROM users WHERE username = '").append(userInput).append("'");
+// 执行拼接后的SQL语句
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sqlString.toString());
+```
+如果`userInput`是攻击者可控的，例如用户登录时输入的用户名，攻击者可以输入 `' OR '1'='1` 来绕过密码验证，或者输入 `' OR '1'='1'; DROP TABLE users; --` 来删除用户表。本规则特指检测`StringBuilder`或`StringBuffer`的`append`方法用于拼接SQL语句，并进一步通过启发式判断（如检查是否包含`WHERE`关键字）来提高准确性。
+3. **潜在影响**
+- **数据泄露**: 攻击者可以读取数据库中的任意敏感数据。
+- **数据篡改**: 攻击者可以修改或删除数据库中的数据。
+- **权限绕过**: 攻击者可以绕过应用程序的认证或授权机制。
+- **拒绝服务**: 攻击者可以通过执行耗费资源的查询或操作导致数据库性能下降甚至崩溃。
+- **进一步渗透**: 在某些情况下，攻击者可以利用数据库的特性执行操作系统命令或读取文件，从而进一步攻击服务器。
+DESC
 }
 
 
@@ -279,4 +340,82 @@ public class DataScopeAspect
     }
 }
 TEXT
+	"safefile://SafePreparedStatement.java": <<<CODE
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SafePreparedStatement {
+
+    public static void main(String[] args) {
+        String userId = "123"; // 模拟用户输入
+        String username = "john_doe"; // 模拟用户输入
+
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "")) {
+            // 1. 使用PreparedStatement防止SQL注入
+            String sqlSelect = "SELECT * FROM users WHERE id = ? AND username = ?";
+            try (PreparedStatement pstmt = connection.prepareStatement(sqlSelect)) {
+                pstmt.setInt(1, Integer.parseInt(userId)); // 整数类型直接设置
+                pstmt.setString(2, username); // 字符串类型直接设置
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    System.out.println("Query result for prepared statement:");
+                    while (rs.next()) {
+                        System.out.println("ID: " + rs.getInt("id") + ", Name: " + rs.getString("username"));
+                    }
+                }
+            }
+
+            // 2. 更新操作也使用PreparedStatement
+            String sqlUpdate = "UPDATE users SET email = ? WHERE id = ?";
+            String newEmail = "new.email@example.com";
+            try (PreparedStatement pstmtUpdate = connection.prepareStatement(sqlUpdate)) {
+                pstmtUpdate.setString(1, newEmail);
+                pstmtUpdate.setInt(2, Integer.parseInt(userId));
+                int affectedRows = pstmtUpdate.executeUpdate();
+                System.out.println("Affected rows for update: " + affectedRows);
+            }
+            
+            // 3. 插入操作也使用PreparedStatement
+            String sqlInsert = "INSERT INTO users (id, username, email) VALUES (?, ?, ?)";
+            int newId = 456;
+            String newUsername = "jane_doe";
+            String janeEmail = "jane.doe@example.com";
+            try (PreparedStatement pstmtInsert = connection.prepareStatement(sqlInsert)) {
+                pstmtInsert.setInt(1, newId);
+                pstmtInsert.setString(2, newUsername);
+                pstmtInsert.setString(3, janeEmail);
+                int affectedRows = pstmtInsert.executeUpdate();
+                System.out.println("Affected rows for insert: " + affectedRows);
+            }
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } catch (NumberFormatException e) {
+            System.err.println("Invalid user ID format: " + e.getMessage());
+        }
+    }
+
+    // 辅助方法，用于模拟数据库连接和表创建
+    static {
+        try (Connection connection = DriverManager.getConnection("jdbc:h2:mem:testdb;INIT=RUNSCRIPT FROM 'classpath:init.sql'", "sa", "")) {
+            // Database is initialized via init.sql
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://init.sql": <<<CODE
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255)
+);
+
+INSERT INTO users (id, username, email) VALUES (123, 'john_doe', 'john.doe@example.com');
+INSERT INTO users (id, username, email) VALUES (789, 'alice', 'alice@example.com');
+
+CODE
 )

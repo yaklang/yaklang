@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-var linkCompilerStr = `((?:[a-zA-Z]{1,10}://|//)[a-zA-Z0-9\-\_]{1,}\.[a-zA-Z]{2,}[^'"\s]{0,})|(\"(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\")|(\'(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\')|href="([a-zA-Z0-9\.\/][^'"\s]*?)"|src="([a-zA-Z0-9\.\/][^'"\s]*?)"`
+var linkCompilerStr = `((?:[a-zA-Z]{1,10}://|//)[a-zA-Z0-9\-\_]{1,}\.[a-zA-Z]{2,}[^'"\s]{0,})|(\"(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\")|(\'(?:/|\./|\.\./)[^"'><,;|*()(%%$^/\\\[\]\s][a-zA-Z0-9\-_\.\~\!\*\(\);\:@&\=\+$,\/?#\[\]]{1,}\')|href="([a-zA-Z0-9\.\/][^'"\s]*?)"|src="([a-zA-Z0-9\.\/][^'"\s]*?)"|data-url="([a-zA-Z0-9\.\/][^'"\s]*?)"`
 
 var tempJsLinkCompilers = []string{
 	`\.post\(\s*(\'[^\s]*?\'|\"[^\s]*?\")`,
@@ -53,6 +53,8 @@ func analysisHtmlInfo(urlStr, textStr string) []string {
 			subString = originResult[5 : len(originResult)-1]
 		} else if strings.HasPrefix(originResult, "\"") || strings.HasPrefix(originResult, "'") {
 			subString = originResult[1 : len(originResult)-1]
+		} else if strings.HasPrefix(originResult, "data-url") {
+			subString = originResult[10 : len(originResult)-1]
 		} else {
 			subString = originResult
 		}
@@ -68,6 +70,12 @@ func analysisHtmlInfo(urlStr, textStr string) []string {
 
 func analysisJsInfo(urlStr, textStr string) []string {
 	links := make([]string, 0)
+	if strings.HasSuffix(urlStr, ".min.js") {
+		return links
+	}
+	if isPopularJSLibrary(urlStr) {
+		return links
+	}
 	urlObj, err := url.Parse(urlStr)
 	if err != nil {
 		return links
@@ -79,7 +87,8 @@ func analysisJsInfo(urlStr, textStr string) []string {
 		for _, originResult := range originResults {
 			originResult = removeSpaceReg.ReplaceAllString(originResult, ``)
 			subString := originResult[compiler.Before : len(originResult)-compiler.After]
-			tempObj, err := urlObj.Parse(subString)
+			var tempObj *url.URL
+			tempObj, err = urlObj.Parse(subString)
 			if err != nil {
 				log.Errorf("url %s parse %s error: %s", urlObj.String(), subString, err)
 				continue
@@ -88,4 +97,15 @@ func analysisJsInfo(urlStr, textStr string) []string {
 		}
 	}
 	return links
+}
+
+var popularJavaScriptLibraryFiles = []string{"react", "vue", "angular", "jquery", "lodash", "bootstrap", "express", "d3", "moment", "axios", "three", "socket.io", "underscore", "ember", "backbone", "redux", "meteor", "next", "nuxt", "gatsby", "svelte", "preact", "material-ui", "ant-design", "bulma", "semantic-ui", "foundation", "tailwind", "styled-components", "apollo", "graphql", "mobx", "knockout", "mithril", "aurelia", "stimulus", "alpine", "inferno", "riot", "cypress", "rxjs", "zone", "hammerjs", "yarn", "npm", "webpack", "babel", "gulp", "grunt", "browserify", "rollup", "eslint", "prettier", "stylelint", "typescript", "coffeescript", "polymer", "lit-element", "lit-html", "stencil", "dojo", "extjs", "raphael", "paper", "fabric", "konva", "anime", "mojs", "velocity", "greensock", "scrollmagic", "popmotion", "lazy", "immutable", "ramda", "bacon", "bluebird", "q", "when", "leaflet", "openlayers", "mapbox-gl", "highcharts", "amcharts", "chart", "echarts", "zrender", "dimple", "c3", "dc", "nvd3", "plottable", "sigma", "vivagraphjs", "jointjs", "cytoscape", "vis", "gojs", "fabric", "paper", "color"}
+
+func isPopularJSLibrary(libraryFileName string) bool {
+	for _, lib := range popularJavaScriptLibraryFiles {
+		if strings.Contains(lib, strings.ToLower(libraryFileName)) {
+			return true
+		}
+	}
+	return false
 }

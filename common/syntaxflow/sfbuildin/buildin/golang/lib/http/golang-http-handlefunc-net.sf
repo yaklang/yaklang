@@ -5,11 +5,9 @@ desc(
 	lib: "golang-http-net"
 	desc: <<<DESC
 ### 规则目的
-
 该规则用于审计Golang应用程序中基于`net/http`标准库构建的HTTP服务，识别和标注处理传入HTTP请求的函数（Handlers）。通过分析`http.HandleFunc`或类似方式注册的回调函数，该规则能够帮助开发者快速定位HTTP请求处理的核心逻辑。
 
 ### 规则详细
-
 1. **基础审计库**
    属于`golang-http-net`基础库规则，旨在提供HTTP请求处理入口点的识别能力。它通过识别使用`net/http`包定义或注册的HTTP处理函数，为后续更深入的代码分析（如参数输入验证、数据流跟踪等）提供基础。
 
@@ -28,27 +26,23 @@ desc(
 ```go
 // 示例代码
 package main
-
 import (
     "fmt"
     "net/http"
 )
-
 func main() {
     http.HandleFunc("/hello", helloHandler) // 注册处理函数
     fmt.Println("Server is running on http://localhost:8080")
     http.ListenAndServe(":8080", nil)
 }
-
 func helloHandler(w http.ResponseWriter, r *http.Request) {
     name := r.URL.Query().Get("name") // 获取查询参数
     w.Write([]byte("Hello, " + name))  // 直接返回响应
 }
 ```
-
 DESC
 	rule_id: "5b66527b-f4e9-4784-ae3b-167983d77675"
-	title_zh: "审计 Golang net/http 请求处理函数"
+	title_zh: "审计Golang net/http请求处理函数"
 	solution: <<<SOLUTION
 none
 SOLUTION
@@ -61,10 +55,66 @@ http?{<fullTypeName>?{have: 'net/http'}} as $entry;
 $entry.HandleFunc(*<slice(index=1)> as $handle);
 $handle<getFormalParams> as $output
 
+$entry.ResponseWriter as $output
+$entry.Request as $output
+
 alert $output for {
 	title: "Audit Golang net/http Handlers",
-	title_zh: "审计 Golang net/http 请求处理函数",
+	title_zh: "审计Golang net/http请求处理函数",
 	level: "info",
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+1. **规则目的**
+   该规则用于审计Golang应用程序中基于`net/http`标准库构建的HTTP服务，识别和标注处理传入HTTP请求的函数（Handlers）。通过分析`http.HandleFunc`或类似方式注册的回调函数，该规则能够帮助开发者快速定位HTTP请求处理的核心逻辑。
+2. **触发场景**
+   ```go
+   package main
+   import (
+       "fmt"
+       "net/http"
+   )
+   func main() {
+       http.HandleFunc("/hello", helloHandler) // 注册处理函数
+       fmt.Println("Server is running on http://localhost:8080")
+       http.ListenAndServe(":8080", nil)
+   }
+   func helloHandler(w http.ResponseWriter, r *http.Request) {
+       name := r.URL.Query().Get("name") // 获取查询参数
+       w.Write([]byte("Hello, " + name))  // 直接返回响应
+   }
+   ```
+   HTTP请求处理函数是攻击者输入进入系统的主要入口点，未经过滤的输入可能导致多种安全漏洞，例如命令注入、SQL注入、XSS、敏感信息泄露、HTTP头注入等。
+3. **潜在影响**
+   - 攻击者可通过构造恶意输入篡改业务逻辑，导致非预期行为。
+   - 敏感信息可能由于不当处理而被泄露。
+   - 可能引入远程代码执行等严重后果。
+DESC
+	name: "output",
+	message: "发现Golang net/http请求处理函数的相关信息，建议进一步审计以确认是否存在潜在漏洞。",
+	solution: <<<SOLUTION
+### 安全建议
+1. **输入验证**
+   对所有用户输入进行有效性校验，确保输入符合预期格式、类型和范围。
+   ```go
+   // 示例：基本输入验证
+   if name == "" || len(name) > 255 {
+       http.Error(w, "Invalid input", http.StatusBadRequest)
+       return
+   }
+   ```
+2. **数据流跟踪**
+   使用静态分析工具跟踪用户输入在代码中的传播路径，识别可能的高危操作（如执行命令、数据库查询等）。
+3. **特定漏洞检测**
+   结合其他规则（如SQL注入、XSS等），针对性地分析处理函数中的逻辑问题。
+4. **使用安全编码实践**
+   避免直接拼接用户输入，尽量使用参数化查询或安全的库方法。
+   ```go
+   // 示例：避免直接返回未经处理的用户输入
+   response := html.EscapeString(fmt.Sprintf("Hello, %s!", name))
+   w.Write([]byte(response))
+   ```
+SOLUTION
 }
 
 desc(
@@ -119,4 +169,101 @@ func handlePost(w http.ResponseWriter, r *http.Request) {
 }
 
 PARAM
+	"safefile://SafeNetHttpServer.go": <<<CODE
+// SafeNetHttpServer.go
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"time"
+)
+
+// 此文件不直接使用 http.HandleFunc 进行路由注册，
+// 而是通过创建 http.ServeMux 并显式注册 Handler。
+// 这是一种避免直接`http.HandleFunc`检测的编程方式，虽然功能等价，但语法上不同。
+// 规则侧重于`http.HandleFunc`的使用，因此通过`http.NewServeMux()`和`mux.Handle()`可以规避直接匹配。
+
+func main() {
+	mux := http.NewServeMux()
+
+	// 使用 mux.Handle 注册实现了 http.Handler 接口的结构体或自定义函数
+	// 避免直接使用 `http.HandleFunc` (function wrapper)
+	mux.Handle("/safehello", &safeHelloHandler{message: "Hello from safe handler"})
+	mux.Handle("/about", http.HandlerFunc(aboutHandler))
+
+	// 使用 http.Server 替代 http.ListenAndServe，提供更多配置选项
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      mux,           // 指定处理多路复用器
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  30 * time.Second,
+	}
+
+	fmt.Println("Server is running on http://localhost:8080")
+	// 启动服务器
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		fmt.Printf("Server failed: %s\n", err)
+	}
+}
+
+// safeHelloHandler 实现了 http.Handler 接口
+type safeHelloHandler struct {
+	message string
+}
+
+func (h *safeHelloHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, h.message)
+}
+
+// aboutHandler 是一个普通的Http Handler函数，通过http.HandlerFunc包装后注册
+// 虽然这里也使用了http.HandlerFunc，但其注册方式是通过`mux.Handle`而不是`http.HandleFunc`
+// 规则检测的是`$entry.HandleFunc(*<slice(index=1) as $handle)`，这里的`$entry`是http包，
+// 因此直接调用`http.HandleFunc`才会被检测。
+func aboutHandler(w http.ResponseWriter, r *http.Request) {
+    fmt.Fprintf(w, "This is the about page. Method: %s", r.Method)
+}
+
+CODE
+	"safefile://ThirdPartyRouterExample.go": <<<CODE
+// ThirdPartyRouterExample.go
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/gorilla/mux"
+)
+
+// 该示例使用了一个流行的第三方路由库 Gorilla Mux，
+// 完全绕过了 Go 标准库的 http.HandleFunc 注册机制。
+// 规则专注于 net/http 包本身的 HandleFunc 调用，
+// 因此使用外部路由库可以安全地避开检测。
+
+func main() {
+	r := mux.NewRouter()
+
+	// 使用 Gorilla Mux 的 HandleFunc 方法来注册路由
+	// 这不是 Go 标准库的 http.HandleFunc
+	r.HandleFunc("/api/users", getUsersHandler).Methods("GET")
+	r.HandleFunc("/api/users/{id}", getUserByIdHandler).Methods("GET", "PUT", "DELETE")
+
+	fmt.Println("Server is running on http://localhost:8080/api")
+	log.Fatal(http.ListenAndServe(":8080", r))
+}
+
+func getUsersHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Listing all users")
+}
+
+func getUserByIdHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	userID := vars["id"]
+	fmt.Fprintf(w, "Getting user with ID: %s", userID)
+}
+
+CODE
 )

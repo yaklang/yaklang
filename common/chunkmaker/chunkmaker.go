@@ -1,72 +1,82 @@
 package chunkmaker
 
 import (
-	"fmt"
-	"io"
-	"sync"
+	"context"
+	"time"
 
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/chanx"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-type ChunkMaker struct {
-	_loopOnce sync.Once
-
-	config *Config
-	src    *chanx.UnlimitedChan[Chunk]
-	dst    *chanx.UnlimitedChan[Chunk]
+type ChunkMaker interface {
+	Close() error
+	OutputChannel() <-chan Chunk
 }
 
-func NewChunkMakerEx(
-	input *chanx.UnlimitedChan[Chunk],
-	c *Config,
-) (*ChunkMaker, error) {
-	cm := &ChunkMaker{
-		src:    input,
-		dst:    chanx.NewUnlimitedChan[Chunk](c.ctx, 1000),
-		config: c,
-	}
+type Config struct {
+	ctx                 context.Context
+	cancel              context.CancelFunc
+	chunkSize           int64
+	enableTimeTrigger   bool
+	timeTriggerInterval time.Duration
 
-	syncChan := make(chan struct{})
-	cm._loopOnce.Do(func() {
-		go cm.loop(syncChan)
-	})
-	select {
-	case _, ok := <-syncChan:
-		if !ok {
-			log.Debug("syncChan passed")
+	// separator for chunk data
+	separator string
+}
+
+type Option func(c *Config)
+
+func WithTimeTrigger(interval time.Duration) Option {
+	return func(c *Config) {
+		if interval <= 0 {
+			return
 		}
+		c.enableTimeTrigger = true
+		c.timeTriggerInterval = interval
 	}
-	return cm, nil
 }
 
-func NewChunkMaker(dst io.Reader, opts ...Option) (*ChunkMaker, error) {
-	c := NewConfig(opts...)
-	if c.chunkSize <= 0 {
-		return nil, fmt.Errorf("NewChunkMaker: ChunkSize must be positive, got %d", c.chunkSize)
+func WithSeparatorTrigger(separator string) Option {
+	return func(c *Config) {
+		c.separator = separator
 	}
-	if c.enableTimeTrigger && c.timeTriggerInterval <= 0 {
-		return nil, fmt.Errorf("NewChunkMaker: timeTriggerInterval must be positive when time trigger is enabled, got %v", c.timeTriggerInterval)
-	}
-
-	if c.chunkSize <= 0 && !c.enableTimeTrigger {
-		return nil, fmt.Errorf("NewChunkMaker: ChunkSize must be positive or time trigger must be enabled")
-	}
-
-	inputSrc := NewChunkChannelFromReader(c.ctx, dst)
-	return NewChunkMakerEx(inputSrc, c)
 }
 
-func (cm *ChunkMaker) Write(p []byte) (n int, err error) {
-	cm.src.SafeFeed(NewBufferChunk(p))
-	return len(p), nil
+func WithTimeTriggerSeconds(interval float64) Option {
+	return func(c *Config) {
+		c.enableTimeTrigger = true
+		c.timeTriggerInterval = utils.FloatSecondDuration(interval)
+	}
 }
 
-func (cm *ChunkMaker) Close() error {
-	cm.src.Close()
-	return nil
+func WithCtx(ctx context.Context) Option {
+	return func(c *Config) {
+		c.ctx = ctx
+	}
 }
 
-func (cm *ChunkMaker) OutputChannel() <-chan Chunk {
-	return cm.dst.OutputChannel()
+func NewConfig(opts ...Option) *Config {
+	c := &Config{
+		chunkSize: 1024 * 4,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	if c.ctx == nil {
+		c.ctx, c.cancel = context.WithCancel(context.Background())
+	}
+
+	if c.cancel == nil && c.ctx != nil {
+		// wrapper with cancel
+		c.ctx, c.cancel = context.WithCancel(c.ctx)
+	}
+
+	return c
+}
+
+func WithChunkSize(size int64) Option {
+	return func(c *Config) {
+		c.chunkSize = size
+	}
 }

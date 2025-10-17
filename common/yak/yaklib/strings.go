@@ -2,11 +2,13 @@ package yaklib
 
 import (
 	"encoding/json"
+	"io"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/xhtml"
 
 	"github.com/yaklang/yaklang/common/domainextractor"
@@ -578,6 +580,47 @@ var StringsExport = map[string]interface{}{
 
 	"TextReaderSplit": utils.DefaultTextSplitter.SplitReader,
 	"TextSplit":       utils.DefaultTextSplitter.Split,
+
+	"ShrinkString":                _shrinkString,
+	"AddPrefixLineNumber":         prefixLineNumber,
+	"AddPrefixLineNumberToReader": prefixLineNumberReader,
+	"RenderTemplate":              RenderTemplate,
+}
+
+func RenderTemplate(i string, m any) string {
+	result, err := utils.RenderTemplate(i, m)
+	if err != nil {
+		log.Warnf("failed to render template: %v", err)
+		if result == "" {
+			return i
+		}
+		return result
+	}
+	return result
+}
+
+func prefixLineNumberReader(i any) io.Reader {
+	switch ret := i.(type) {
+	case io.Reader:
+		return utils.PrefixLinesWithLineNumbersReader(ret)
+	}
+	result := utils.InterfaceToString(i)
+	return utils.PrefixLinesWithLineNumbersReader(strings.NewReader(result))
+}
+
+func prefixLineNumber(i any) string {
+	return utils.PrefixLinesWithLineNumbers(i)
+}
+
+// str.ShrinkString 将会把一个字符串压缩成一个设定一个长度下的较短的字符串
+// Example:
+// ```
+// result = str.ShrinkString("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", 20)
+// println(result)
+// /* output: aaaaaaaaaa...aaaaaaaaaa */
+// ```
+func _shrinkString(i any, size int) string {
+	return utils.ShrinkString(i, size)
 }
 
 func init() {

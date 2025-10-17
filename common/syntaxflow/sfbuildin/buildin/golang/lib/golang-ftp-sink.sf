@@ -9,23 +9,20 @@ desc(
 
 ### 2. 规则详细
 1. **作为基础检测库**
-   属于`golang-ftp-sink`库规则（`lib`类型），主要用于识别代码中是否引入并使用了`github.com/jlaffaye/ftp`包及其相关函数，例如FTP连接的`Dial`、用户登录的`Login`等操作。
+属于`golang-ftp-sink`库规则（`lib`类型），主要用于识别代码中是否引入并使用了`github.com/jlaffaye/ftp`包及其相关函数，例如FTP连接的`Dial`、用户登录的`Login`等操作。
 
 2. **识别潜在的敏感操作点**
-   该规则通过识别对`Dial`函数的调用及其后续结果 (`$output`)，可以帮助分析人员快速定位到程序中进行FTP连接操作的代码段。这对于安全审计过程中识别潜在的硬编码凭据、明文传输敏感数据等风险点非常有用。
+该规则通过识别对`Dial`函数的调用及其后续结果 (`$output`)，可以帮助分析人员快速定位到程序中进行FTP连接操作的代码段。这对于安全审计过程中识别潜在的硬编码凭据、明文传输敏感数据等风险点非常有用。
 
 3. **示例代码分析**
-   规则附带的示例代码展示了如何连接到一个FTP服务器 (`ftp.Dial`) 并进行用户登录 (`conn.Login`)。这种模式在实际应用中可能包含敏感信息，例如服务器地址、用户名和密码，是审计过程中需要重点关注的部分。
-
+规则附带的示例代码展示了如何连接到一个FTP服务器 (`ftp.Dial`) 并进行用户登录 (`conn.Login`)。这种模式在实际应用中可能包含敏感信息，例如服务器地址、用户名和密码，是审计过程中需要重点关注的部分。
 ```go
 package main
-
 import (
     "fmt"
     "github.com/jlaffaye/ftp"
     "time"
 )
-
 func main() {
     // 连接到 FTP 服务器
     conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
@@ -34,7 +31,6 @@ func main() {
         return
     }
     defer conn.Quit()
-
     // 登录
     err = conn.Login("username", "password") // 潜在的敏感信息点
     if err != nil {
@@ -42,11 +38,9 @@ func main() {
         return
     }
     defer conn.Logout()
-
     fmt.Println("Connected and logged in successfully")
 }
 ```
-
 该规则的审计结果可以用于进一步分析是否存在以下风险：
 * 硬编码敏感信息：如FTP服务器地址、用户名、密码直接写在代码中。
 * 使用不安全的连接：例如，未通过TLS/SSL等方式加密FTP连接，导致传输过程中的数据可能被窃听。
@@ -58,7 +52,7 @@ DESC
 none
 SOLUTION
 	reference: <<<REFERENCE
-none
+https://pkg.go.dev/github.com/jlaffaye/ftp
 REFERENCE
 )
 
@@ -69,6 +63,91 @@ alert $output for {
 	level: "info",
 	title: "Audit Golang FTP Library Usage",
 	title_zh: "审计Golang FTP库使用情况",
+	message: "发现使用`github.com/jlaffaye/ftp`库的FTP连接代码，可能存在硬编码凭据、明文传输敏感数据等风险。",
+	solution: <<<SOLUTION
+### 安全建议
+#### 1. 避免硬编码敏感信息
+将FTP服务器地址、用户名和密码存储在环境变量或外部配置文件中，而不是直接写入代码。
+```go
+package main
+import (
+"fmt"
+"github.com/jlaffaye/ftp"
+"os"
+"time"
+)
+func main() {
+server := os.Getenv("FTP_SERVER")
+user := os.Getenv("FTP_USER")
+pass := os.Getenv("FTP_PASS")
+conn, err := ftp.Dial(server, ftp.DialWithTimeout(5*time.Second))
+if err != nil {
+fmt.Println("Failed to connect:", err)
+return
+}
+defer conn.Quit()
+err = conn.Login(user, pass)
+if err != nil {
+fmt.Println("Failed to login:", err)
+return
+}
+defer conn.Logout()
+fmt.Println("Connected and logged in successfully")
+}
+```
+#### 2. 使用加密连接
+尽可能使用支持加密协议（如FTPS）的库，避免明文传输敏感数据。
+#### 3. 改善错误处理
+确保对每个错误处理分支提供清晰的日志记录，并避免泄露过多内部信息给最终用户。
+```go
+if err != nil {
+log.Printf("Error during FTP login: %v", err)
+return
+}
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1. 规则目的
+该规则主要用于审计Go语言代码中对`github.com/jlaffaye/ftp`包的使用情况。此库提供了Go语言连接和操作FTP服务器的功能，常用于实现文件传输等场景。
+### 2. 规则详细
+1. **作为基础检测库**
+属于`golang-ftp-sink`库规则（`lib`类型），主要用于识别代码中是否引入并使用了`github.com/jlaffaye/ftp`包及其相关函数，例如FTP连接的`Dial`、用户登录的`Login`等操作。
+2. **识别潜在的敏感操作点**
+该规则通过识别对`Dial`函数的调用及其后续结果 (`$output`)，可以帮助分析人员快速定位到程序中进行FTP连接操作的代码段。这对于安全审计过程中识别潜在的硬编码凭据、明文传输敏感数据等风险点非常有用。
+3. **示例代码分析**
+规则附带的示例代码展示了如何连接到一个FTP服务器 (`ftp.Dial`) 并进行用户登录 (`conn.Login`)。这种模式在实际应用中可能包含敏感信息，例如服务器地址、用户名和密码，是审计过程中需要重点关注的部分。
+```go
+package main
+import (
+"fmt"
+"github.com/jlaffaye/ftp"
+"time"
+)
+func main() {
+// 连接到 FTP 服务器
+conn, err := ftp.Dial("ftp.example.com:21", ftp.DialWithTimeout(5*time.Second))
+if err != nil {
+fmt.Println("Failed to connect:", err)
+return
+}
+defer conn.Quit()
+// 登录
+err = conn.Login("username", "password") // 潜在的敏感信息点
+if err != nil {
+fmt.Println("Failed to login:", err)
+return
+}
+defer conn.Logout()
+fmt.Println("Connected and logged in successfully")
+}
+```
+该规则的审计结果可以用于进一步分析是否存在以下风险：
+* 硬编码敏感信息：如FTP服务器地址、用户名、密码直接写在代码中。
+* 使用不安全的连接：例如，未通过TLS/SSL等方式加密FTP连接，导致传输过程中的数据可能被窃听。
+* 错误的错误处理：例如，在连接或登录失败时未进行适当的处理，可能导致信息泄露。
+DESC
+	name: "output",
 }
 
 desc(
@@ -104,4 +183,47 @@ func main() {
 }
 
 PARAM
+	"safefile://SafeUsageNoFtp.go": <<<CODE
+// SafeUsageNoFtp.go
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	// 此代码不使用github.com/jlaffaye/ftp库，因此不会触发FTP相关的规则告警。
+	fmt.Println("This is a safe program that does not interact with FTP.")
+}
+CODE
+	"safefile://SafeUsageOtherLibrary.go": <<<CODE
+// SafeUsageOtherLibrary.go
+package main
+
+import (
+	"fmt"
+	"github.com/dutchcoders/goftp"
+	"time"
+)
+
+func main() {
+	// 使用其他FTP库（例如github.com/dutchcoders/goftp）而不是github.com/jlaffaye/ftp，
+	// 避免触发针对特定库的规则。
+
+	config := goftp.Config{
+		User:     "username",
+		Password: "password",
+		Timeout:  5 * time.Second,
+	}
+
+	client, err := goftp.Dial("ftp.example.com:21", &config)
+	if err != nil {
+		fmt.Println("Failed to connect using goftp:", err)
+		return
+	}
+	defer client.Close()
+
+	fmt.Println("Connected and logged in successfully using goftp")
+}
+CODE
 )

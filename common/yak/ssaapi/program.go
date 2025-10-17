@@ -2,16 +2,17 @@ package ssaapi
 
 import (
 	"context"
-	"runtime"
+	"fmt"
 	"sort"
 	"time"
+
+	"go.uber.org/atomic"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/samber/lo"
 
 	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
@@ -22,13 +23,13 @@ type Program struct {
 	Program   *ssa.Program
 	irProgram *ssadb.IrProgram
 	// DBCache *ssa.Cache
-	config *config
-
+	config         *config
 	enableDatabase bool
 	// come from database will affect search operation
 	comeFromDatabase bool
 	//value cache
 	nodeId2ValueCache *utils.CacheWithKey[uint, *Value]
+	id                *atomic.Int64
 }
 
 type Programs []*Program
@@ -77,8 +78,9 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 	p := &Program{
 		Program:           prog,
 		config:            config,
-		enableDatabase:    config.enableDatabase,
+		enableDatabase:    config.databaseKind != ssa.ProgramCacheMemory,
 		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
+		id:                atomic.NewInt64(0),
 	}
 
 	// if config.DatabaseProgramName == "" {
@@ -86,6 +88,17 @@ func NewProgram(prog *ssa.Program, config *config) *Program {
 	// } else {
 	// 	p.DBCache = ssa.GetCacheFromPool(config.DatabaseProgramName)
 	// }
+	return p
+}
+
+func NewTmpProgram(name string) *Program {
+	p := &Program{
+		Program:           ssa.NewTmpProgram(name),
+		config:            &config{},
+		enableDatabase:    false,
+		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
+		id:                atomic.NewInt64(0),
+	}
 	return p
 }
 
@@ -149,21 +162,11 @@ func (p *Program) GetAllOffsetItemsBefore(offset int) []*ssa.OffsetItem {
 	)
 }
 
-func (v *Value) NewTopDefValue(value ssa.Value) *Value {
-	iv := v.NewValue(value)
-	return iv.AppendEffectOn(v)
-}
-
-func (v *Value) NewBottomUseValue(value ssa.Value) *Value {
-	iv := v.NewValue(value)
-	return iv.AppendDependOn(v)
-}
-
-func (v *Value) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
+func (v *Value) NewConstValue(i any, rng ...*memedit.Range) *Value {
 	return v.ParentProgram.NewConstValue(i, rng...)
 }
 
-func (p *Program) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
+func (p *Program) NewConstValue(i any, rng ...*memedit.Range) *Value {
 	value := ssa.NewConst(i)
 	if len(rng) > 0 {
 		value.SetRange(rng[0])
@@ -175,7 +178,9 @@ func (p *Program) NewConstValue(i any, rng ...memedit.RangeIf) *Value {
 
 // normal from ssa value
 func (v *Value) NewValue(value ssa.Instruction) *Value {
-	iv, err := v.ParentProgram.NewValue(value)
+	var iv *Value
+	var err error
+	iv, err = v.ParentProgram.NewValue(value)
 	if err != nil {
 		log.Errorf("NewValue: new value failed: %v", err)
 		return nil
@@ -185,13 +190,20 @@ func (v *Value) NewValue(value ssa.Instruction) *Value {
 
 func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 	if utils.IsNil(inst) {
-		var raw = make([]byte, 2048)
-		runtime.Stack(raw, false)
-		return nil, utils.Errorf("instruction is nil: %s", string(raw))
+		// var raw = make([]byte, 2048)
+		// runtime.Stack(raw, false)
+		// return nil, utils.Errorf("instruction is nil: %s", string(raw))
+		return nil, utils.Errorf("isntruction is nil ")
 	}
-	v := &Value{
-		runtimeCtx:    omap.NewEmptyOrderedMap[ContextID, *Value](),
+	var v *Value
+	var uuidStr string
+	uuidStr = fmt.Sprintf("uuid-%d", p.id.Inc())
+	v = &Value{
+		runtimeCtx:    nil,
 		ParentProgram: p,
+		uuid:          uuidStr,
+		EffectOn:      nil,
+		DependOn:      nil,
 	}
 
 	// if lazy, get the real inst
@@ -213,8 +225,8 @@ func (p *Program) NewValue(inst ssa.Instruction) (*Value, error) {
 
 // from ssa id  (IrCode)
 func (p *Program) GetValueById(id int64) (*Value, error) {
-	val := p.Program.GetInstructionById(id)
-	if val == nil {
+	val, ok := p.Program.GetInstructionById(id)
+	if !ok || val == nil {
 		return nil, utils.Errorf("instruction not found: %d", id)
 	}
 	v, err := p.NewValue(val)
@@ -255,18 +267,18 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 	}
 	// if auditNode is -1,check it.
 	if auditNode.IRCodeID == -1 {
-		var rangeIf memedit.RangeIf
+		var rangeIf *memedit.Range
 		var memEditor *memedit.MemEditor
 		if auditNode.TmpValueFileHash != "" {
 			memEditor, err = ssadb.GetIrSourceFromHash(auditNode.TmpValueFileHash)
 			if err != nil {
 				log.Errorf("NewValueFromDB: get ir source from hash failed: %v", err)
-				return nil
-			}
-			if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
-				rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
 			} else {
-				rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+				if auditNode.TmpStartOffset == -1 || auditNode.TmpEndOffset == -1 {
+					rangeIf = memEditor.GetRangeOffset(0, memEditor.CodeLength())
+				} else {
+					rangeIf = memEditor.GetRangeOffset(auditNode.TmpStartOffset, auditNode.TmpEndOffset)
+				}
 			}
 		}
 		val := p.NewConstValue(auditNode.TmpValue, rangeIf)
@@ -284,4 +296,8 @@ func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
 	p.nodeId2ValueCache.Set(nodeID, val)
 
 	return val
+}
+
+func (p *Program) HasSavedDB() bool {
+	return p.enableDatabase
 }

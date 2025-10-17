@@ -16,12 +16,10 @@ desc(
 import javax.el.ExpressionFactory;
 import javax.el.StandardELContext;
 import javax.el.ValueExpression;
-
 public class Example {
     public static void main(String[] args) {
         ExpressionFactory factory = ExpressionFactory.newInstance();
         StandardELContext context = new StandardELContext(factory);
-
         String userInput = "${''.getClass().forName('java.lang.Runtime').getMethod('exec', ''.getClass()).invoke(null, 'calc.exe')}"; // 恶意用户输入
         ValueExpression expression = factory.createValueExpression(context, userInput, Object.class);
         expression.getValue(context); // 执行恶意表达式
@@ -37,13 +35,11 @@ DESC
 
 #### 1. 避免使用用户输入构造 EL 表达式
 最安全的做法是避免将用户输入直接或间接拼接到 `createValueExpression` 方法的 EL 表达式字符串中。如果必须使用用户输入影响 EL 表达式的执行，应考虑使用安全的方式传递数据。
-
 ```java
 // 修复代码示例：避免直接使用用户输入构造 EL 表达式
 // 假设需要根据用户输入决定某个变量的值，而不是直接注入表达式
 String userInput = request.getParameter("param");
 Integer value = Integer.parseInt(userInput); // 对输入进行严格校验和转换
-
 context.setVariable("userInputControlledValue", factory.createValueExpression(value, Integer.class));
 ValueExpression expression = factory.createValueExpression(context, "${fixedExpression + userInputControlledValue}", Integer.class); // 使用固定的表达式和受控的变量
 Integer result = (Integer) expression.getValue(context);
@@ -52,11 +48,9 @@ response.getWriter().write("结果: " + result);
 
 #### 2. 对 EL 表达式输入进行严格的验证和过滤
 如果无法完全避免用户输入，则必须对用于构造 EL 表达式的输入进行极其严格的验证和过滤。这包括：
-
 *   **白名单机制:** 只允许非常有限且明确定义的字符集、函数或结构出现在表达式中。
 *   **上下文隔离:** 确保用户输入仅作为数据值传递到 EL 上下文中，而不是作为可执行的表达式部分。
 *   **沙箱环境:** 如果可能，考虑在受限的、沙箱化的环境中执行表达式。
-
 ```java
 // 示例：对用户输入进行简单的白名单过滤（通常不够健壮，仅作示例）
 String userInputExpressionPart = request.getParameter("expr");
@@ -83,6 +77,66 @@ alert $params for {
 	title: "Unvalidated EL Expression Injection",
 	title_zh: "未验证的EL表达式注入风险",
 	level: "low",
+	message: "检测到Java EL表达式注入风险，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计确认。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免使用用户输入构造 EL 表达式
+最安全的做法是避免将用户输入直接或间接拼接到 `createValueExpression` 方法的 EL 表达式字符串中。如果必须使用用户输入影响 EL 表达式的执行，应考虑使用安全的方式传递数据。
+```java
+// 修复代码示例：避免直接使用用户输入构造 EL 表达式
+// 假设需要根据用户输入决定某个变量的值，而不是直接注入表达式
+String userInput = request.getParameter("param");
+Integer value = Integer.parseInt(userInput); // 对输入进行严格校验和转换
+context.setVariable("userInputControlledValue", factory.createValueExpression(value, Integer.class));
+ValueExpression expression = factory.createValueExpression(context, "${fixedExpression + userInputControlledValue}", Integer.class); // 使用固定的表达式和受控的变量
+Integer result = (Integer) expression.getValue(context);
+response.getWriter().write("结果: " + result);
+```
+#### 2. 对 EL 表达式输入进行严格的验证和过滤
+如果无法完全避免用户输入，则必须对用于构造 EL 表达式的输入进行极其严格的验证和过滤。这包括：
+*   **白名单机制:** 只允许非常有限且明确定义的字符集、函数或结构出现在表达式中。
+*   **上下文隔离:** 确保用户输入仅作为数据值传递到 EL 上下文中，而不是作为可执行的表达式部分。
+*   **沙箱环境:** 如果可能，考虑在受限的、沙箱化的环境中执行表达式。
+```java
+// 示例：对用户输入进行简单的白名单过滤（通常不够健壮，仅作示例）
+String userInputExpressionPart = request.getParameter("expr");
+// 假设只允许数字和基本的数学运算符（+ - * /）
+if (!userInputExpressionPart.matches("^[0-9+\-*/()\s]*$")) {
+    throw new IllegalArgumentException("非法字符在表达式中");
+}
+String fullExpression = "${fixedPart + " + userExpressionPart + "}";
+ValueExpression expression = factory.createValueExpression(context, fullExpression, Object.class);
+// ... 执行和处理结果，并对结果进行二次验证
+```
+#### 3. 升级和使用安全的 EL 实现
+确保使用的 EL 实现是最新且已修复已知漏洞的版本。一些框架或库可能提供更安全的表达式处理方式。
+SOLUTION
+	risk: "EL表达式注入",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   Java EL 表达式注入漏洞通常是由于应用程序未对用户输入进行严格的过滤或验证，直接将不可信的用户输入传递给 `ExpressionFactory.createValueExpression` 方法。攻击者可以通过构造恶意的 EL 表达式来执行任意代码，从而危及应用程序的安全。
+2. **触发场景**
+   ```java
+   import javax.el.ExpressionFactory;
+   import javax.el.StandardELContext;
+   import javax.el.ValueExpression;
+   public class Example {
+       public static void main(String[] args) {
+           ExpressionFactory factory = ExpressionFactory.newInstance();
+           StandardELContext context = new StandardELContext(factory);
+           String userInput = "${''.getClass().forName('java.lang.Runtime').getMethod('exec', ''.getClass()).invoke(null, 'calc.exe')}"; // 恶意用户输入
+           ValueExpression expression = factory.createValueExpression(context, userInput, Object.class);
+           expression.getValue(context); // 执行恶意表达式
+       }
+   }
+   ```
+   攻击者可通过以上方式在系统中执行任意命令。
+3. **潜在影响**
+   - 可能导致任意代码执行，例如执行系统命令、读取敏感文件等。
+   - 应用程序可能被完全控制，造成数据泄露或其他恶意操作。
+DESC
+	name: "params",
 }
 
 desc(

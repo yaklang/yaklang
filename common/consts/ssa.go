@@ -25,12 +25,33 @@ const (
 	PHP     Language = "php"
 	JAVA    Language = "java"
 	GO      Language = "golang"
+	C       Language = "c"
 	TS      Language = "ts"
 	General Language = "general"
 )
 
+func (l Language) GetFileExt() string {
+	switch l {
+	case Yak:
+		return ".yak"
+	case JAVA:
+		return ".java"
+	case GO:
+		return ".go"
+	case TS:
+		return ".ts"
+	case JS:
+		return ".js"
+	case C:
+		return ".c"
+	case PHP:
+		return ".php"
+	default:
+		return ""
+	}
+}
 func GetAllSupportedLanguages() []Language {
-	return []Language{Yak, JS, PHP, JAVA, GO}
+	return []Language{Yak, JS, PHP, JAVA, GO, C}
 }
 
 func ValidateLanguage(language string) (Language, error) {
@@ -45,6 +66,8 @@ func ValidateLanguage(language string) (Language, error) {
 		return JS, nil
 	case "go", "golang":
 		return GO, nil
+	case "c", "clang":
+		return C, nil
 	}
 	return "", errors.Errorf("unsupported language: %s", language)
 }
@@ -126,6 +149,8 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 		return err
 	}
 	ssaDatabase = db
+	// 同步更新 schema 包中的默认 SSA 数据库
+	schema.SetDefaultSSADatabase(db)
 	return nil
 }
 
@@ -146,6 +171,8 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 
 func SetGormSSAProjectDatabase(db *gorm.DB) {
 	ssaDatabase = db
+	// 同步更新 schema 包中的默认 SSA 数据库
+	schema.SetDefaultSSADatabase(db)
 }
 
 func GetGormDefaultSSADataBase() *gorm.DB {

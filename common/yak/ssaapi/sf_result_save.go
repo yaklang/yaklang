@@ -2,7 +2,6 @@ package ssaapi
 
 import (
 	"context"
-	"time"
 
 	"github.com/jinzhu/gorm"
 	"github.com/samber/lo"
@@ -12,8 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
-
-var ResultCache *utils.CacheWithKey[uint, *SyntaxFlowResult] = utils.NewTTLCacheWithKey[uint, *SyntaxFlowResult](time.Minute * 10)
 
 func LoadResultByRuleContent(programName, ruleContent string, kind schema.SyntaxflowResultKind) (*SyntaxFlowResult, error) {
 	result := ssadb.GetResultByRuleContent(programName, ruleContent, kind)
@@ -29,7 +26,7 @@ func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 		// Skip cache when force is true
 	} else {
 		// check cache
-		if result, ok := ResultCache.Get(resultID); ok {
+		if result := CreateResultFromCache(resultSaveDatabase, uint64(resultID)); result != nil {
 			return result, nil
 		}
 	}
@@ -42,8 +39,6 @@ func LoadResultByID(resultID uint, force ...bool) (*SyntaxFlowResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	// set cache
-	ResultCache.Set(resultID, result)
 	return result, nil
 }
 
@@ -73,7 +68,7 @@ func loadResult(result *ssadb.AuditResult) (*SyntaxFlowResult, error) {
 	res.rule = rule
 	prog, err := FromDatabase(result.ProgramName)
 	if err != nil {
-		return nil, utils.Errorf("load program %s error: %v", result.ProgramName, err)
+		log.Errorf("load program %s error: %v, create a empty program", result.ProgramName, err)
 	}
 	res.program = prog
 	return res, nil
@@ -110,12 +105,20 @@ func (r *SyntaxFlowResult) SaveWithContext(ctx context.Context, kind schema.Synt
 	return r.save(ctx, kind, TaskIDs...)
 }
 
-func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResultKind, TaskIDs ...string) (uint, error) {
+func (r *SyntaxFlowResult) save(
+	ctx context.Context,
+	kind schema.SyntaxflowResultKind,
+	TaskIDs ...string,
+) (uint, error) {
 	if r == nil || r.memResult == nil || r.program == nil {
 		return 0, utils.Error("result or program  is nil")
 	}
+	if len(TaskIDs) > 0 {
+		r.TaskID = TaskIDs[0]
+	}
 	// result
 	result := ssadb.CreateResult(TaskIDs...)
+	r.id = result.ID
 	result.CheckMsg = r.GetCheckMsg()
 	result.Errors = r.GetErrors()
 
@@ -139,6 +142,10 @@ func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResul
 	if err := r.saveValue(ctx, result); err != nil {
 		errs = utils.JoinErrors(errs, err)
 	}
+
+	r.variable.ForEach(func(key string, value any) {
+		r.riskCountMap[key] = int64(value.(int))
+	})
 	result.RiskCount = uint64(len(r.riskMap))
 	result.RiskHashs = lo.MapValues(r.riskMap, func(risk *schema.SSARisk, name string) string {
 		return risk.Hash
@@ -149,12 +156,28 @@ func (r *SyntaxFlowResult) save(ctx context.Context, kind schema.SyntaxflowResul
 	r.dbResult = result
 	return result.ID, errs
 }
+func (r *SyntaxFlowResult) CreateRisk() error {
+	if r == nil {
+		return utils.Errorf("SyntaxFlowResult is nil")
+	}
 
+	r.GetAlertValues().ForEach(func(i string, v Values) bool {
+		for index, v := range v {
+			r.SaveRisk(i, index, v, false)
+		}
+		return true
+	})
+
+	return nil
+}
 func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditResult) error {
 	// result := r.dbResult
 	if result == nil {
 		return utils.Error("result is nil")
 	}
+
+	database := newAuditDatabase(ctx, ssadb.GetDB(), r.size*10)
+	defer database.Close() // wait for save finish
 	// values
 	var err error
 	opts := []SaveValueOption{
@@ -169,22 +192,37 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 		OptionSaveValue_ProgramName(result.ProgramName),
 		// ctx
 		OptionSaveValue_Context(ctx),
+		// database
+		OptionSaveValue_Database(database),
+		OptionSaveValue_IsMemoryCompile(r.IsProgMemoryCompile()),
 	}
 	saveVariable := func(name string, values Values) {
 		opts := append(opts, OptionSaveValue_ResultVariable(name))
 
-		// save un value variable
+		// save no value variable
 		if len(values) == 0 {
 			result.UnValueVariable = append(result.UnValueVariable, name)
 			return
 		}
-		//非search才存入到risk数据库中
-		if msg, ok := r.GetAlertMsg(name); ok && result.Kind != schema.SFResultKindSearch {
-			opts = append(opts, OptionSaveValue_ResultAlert(msg))
+
+		switch result.Kind {
+		case schema.SFResultKindDebug:
+			// debug模式下，所有变量都存数据库
+		case schema.SFResultKindSearch:
+			// search模式下，不保存到risk数据库
+		case schema.SFResultKindScan:
+			// scan模式下，只存有风险的变量
+			if msg, ok := r.GetAlertMsg(name); ok {
+				_ = msg
+			} else {
+				result.UnValueVariable = append(result.UnValueVariable, name)
+				return
+			}
 		}
+
 		// save variable that has value
 		for index, v := range values {
-			hash := r.SaveRisk(name, index, v, result)
+			hash := r.SaveRisk(name, index, v, true)
 			if hash != "" {
 				opts = append(opts, OptionSaveValue_ResultRiskHash(hash))
 			}
@@ -203,8 +241,20 @@ func (r *SyntaxFlowResult) saveValue(ctx context.Context, result *ssadb.AuditRes
 }
 
 func (r *SyntaxFlowResult) GetGRPCModelResult() *ypb.SyntaxFlowResult {
-	if r == nil || r.dbResult == nil {
+	if r == nil {
 		return nil
 	}
-	return r.dbResult.ToGRPCModel()
+	var ret *ypb.SyntaxFlowResult
+	if r.dbResult != nil {
+		ret = r.dbResult.ToGRPCModel()
+	}
+	if r.memResult != nil {
+		ret = r.memResult.ToGRPCModel()
+	}
+	if ret != nil {
+		ret.ResultID = uint64(r.id)
+		ret.TaskID = r.TaskID
+		ret.SaveKind = string(r.GetResultSaveKind())
+	}
+	return ret
 }

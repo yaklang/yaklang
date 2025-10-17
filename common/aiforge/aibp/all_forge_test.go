@@ -2,6 +2,7 @@ package aibp
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"os"
 	"testing"
 
@@ -15,7 +16,7 @@ var IsMockCallback = false
 
 func ExecuteForge(forgeName string, i any, iopts ...any) (any, error) {
 	yakit.CallPostInitDatabase()
-	var aiCallback aid.AICallbackType
+	var aiCallback aicommon.AICallbackType
 	if IsMockCallback {
 		data, err := os.ReadFile(fmt.Sprintf("/tmp/%s.json", forgeName))
 		if err != nil {

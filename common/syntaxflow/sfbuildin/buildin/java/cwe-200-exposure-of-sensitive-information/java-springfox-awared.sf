@@ -4,80 +4,71 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   Springfox 是一个用于生成 Spring Boot 应用程序的 API 文档的库，主要与 Swagger 结合使用。它通过注解和配置来自动生成 API 文档，并提供一个用户友好的界面来查看和测试 API。
-   如果Springfox配置不当，例如未对敏感接口进行鉴权或隐藏，或者未限制访问端点，可能导致敏感信息泄露，例如数据库连接信息、应用程序内部结构、用户凭证管理接口等。
-
+Springfox 是一个用于生成 Spring Boot 应用程序的 API 文档的库，主要与 Swagger 结合使用。它通过注解和配置来自动生成 API 文档，并提供一个用户友好的界面来查看和测试 API。
+如果Springfox配置不当，例如未对敏感接口进行鉴权或隐藏，或者未限制访问端点，可能导致敏感信息泄露，例如数据库连接信息、应用程序内部结构、用户凭证管理接口等。
 2. **触发场景**
-   当 Springfox 配置中API文档未设置访问权限或者默认暴露敏感端点时，攻击者可以直接访问 `/swagger-ui.html` 或 `/v2/api-docs` 等接口，获取到应用程序的详细API文档，从而了解应用程序内部的逻辑和接口调用方式，进一步寻找其他潜在漏洞。
-
-   ```java
-   @EnableSwagger2
-   @Configuration
-   public class SwaggerConfig {
-       @Bean
-       public Docket api() {
-           return new Docket(DocumentationType.SWAGGER_2)
-               .select()
-               .apis(RequestHandlerSelectors.any())
-               .paths(PathSelectors.any())
-               .build();
-       }
-   }
-   ```
-   上述配置将允许访问所有API接口的文档，包括潜在的敏感接口。
-
+当 Springfox 配置中API文档未设置访问权限或者默认暴露敏感端点时，攻击者可以直接访问 `/swagger-ui.html` 或 `/v2/api-docs` 等接口，获取到应用程序的详细API文档，从而了解应用程序内部的逻辑和接口调用方式，进一步寻找其他潜在漏洞。
+```java
+@EnableSwagger2
+@Configuration
+public class SwaggerConfig {
+@Bean
+public Docket api() {
+return new Docket(DocumentationType.SWAGGER_2)
+.select()
+.apis(RequestHandlerSelectors.any())
+.paths(PathSelectors.any())
+.build();
+}
+}
+```
+上述配置将允许访问所有API接口的文档，包括潜在的敏感接口。
 3. **潜在影响**
-   - 泄露应用程序的内部结构、敏感接口信息和参数定义。
-   - 攻击者可以利用泄露的信息进行针对性攻击，如未授权访问、数据窃取等。
-   - 攻击者可能通过测试API文档中提供的接口，发现未公开的漏洞或功能。
+- 泄露应用程序的内部结构、敏感接口信息和参数定义。
+- 攻击者可以利用泄露的信息进行针对性攻击，如未授权访问、数据窃取等。
+- 攻击者可能通过测试API文档中提供的接口，发现未公开的漏洞或功能。
 DESC
 	rule_id: "438dca31-c7d9-46d7-b194-ddff932ad209"
 	title_zh: "审计Java Springfox配置"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 限制Swagger UI和API文档的访问
-   可以使用Spring Security或其他认证/授权框架对 `/swagger-ui.html` 和 `/v2/api-docs` 等路径进行保护，只允许授权用户访问。
-   ```java
-   @Configuration
-   @EnableWebSecurity
-   public class SecurityConfig extends WebSecurityConfigurerAdapter {
-
-       @Override
-       protected void configure(HttpSecurity http) throws Exception {
-           http
-               .authorizeRequests()
-               .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/v2/api-docs", "/webjars/**").authenticated()
-               .anyRequest().permitAll()
-               .and()
-               .formLogin();
-       }
-   }
-   ```
-
+可以使用Spring Security或其他认证/授权框架对 `/swagger-ui.html` 和 `/v2/api-docs` 等路径进行保护，只允许授权用户访问。
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.authorizeRequests()
+.antMatchers("/swagger-ui.html", "/swagger-resources/**", "/v2/api-docs", "/webjars/**").authenticated()
+.anyRequest().permitAll()
+.and()
+.formLogin();
+}
+}
+```
 #### 2. 限制暴露的API范围
-   在Springfox配置中，使用 `apis()` 和 `paths()` 方法精确控制哪些包或路径下的API会被生成文档。避免暴露敏感的管理接口或内部接口。
-   ```java
-   @Bean
-   public Docket api() {
-       return new Docket(DocumentationType.SWAGGER_2)
-           .select()
-           .apis(RequestHandlerSelectors.basePackage("com.yourcompany.api.public")) // 只扫描公开API所在的包
-           .paths(PathSelectors.ant("/api/**")) // 只暴露/api/开头的路径
-           .build();
-   }
-   ```
-
+在Springfox配置中，使用 `apis()` 和 `paths()` 方法精确控制哪些包或路径下的API会被生成文档。避免暴露敏感的管理接口或内部接口。
+```java
+@Bean
+public Docket api() {
+return new Docket(DocumentationType.SWAGGER_2)
+.select()
+.apis(RequestHandlerSelectors.basePackage("com.yourcompany.api.public")) // 只扫描公开API所在的包
+.paths(PathSelectors.ant("/api/**")) // 只暴露/api/开头的路径
+.build();
+}
+```
 #### 3. 在生产环境中关闭Swagger UI
-   在生产环境中，可以通过配置属性关闭Swagger UI和API文档的生成，彻底避免信息泄露风险。
-   ```yaml
-   springfox.documentation.enabled: false
-   ```
-
+在生产环境中，可以通过配置属性关闭Swagger UI和API文档的生成，彻底避免信息泄露风险。
+```yaml
+springfox.documentation.enabled: false
+```
 #### 4. 移除不必要的依赖
-   如果应用程序不需要API文档功能，应移除Springfox和Swagger相关的依赖。
+如果应用程序不需要API文档功能，应移除Springfox和Swagger相关的依赖。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-200: Exposure of Sensitive Information to an Unauthorized Actor](https://cwe.mitre.org/data/definitions/200.html)
@@ -90,6 +81,75 @@ alert $config for {
 	title: "Audit Java Springfox Configuration",
 	title_zh: "审计Java Springfox配置",
 	level: "low",
+	name: "config",
+	message: "检测到Java Springfox配置存在潜在的风险，可能导致敏感信息暴露，建议审计并修复。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 限制Swagger UI和API文档的访问
+可以使用Spring Security或其他认证/授权框架对 `/swagger-ui.html` 和 `/v2/api-docs` 等路径进行保护，只允许授权用户访问。
+```java
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig extends WebSecurityConfigurerAdapter {
+@Override
+protected void configure(HttpSecurity http) throws Exception {
+http
+.authorizeRequests()
+.antMatchers("/swagger-ui.html", "/swagger-resources/**", "/v2/api-docs", "/webjars/**").authenticated()
+.anyRequest().permitAll()
+.and()
+.formLogin();
+}
+}
+```
+#### 2. 限制暴露的API范围
+在Springfox配置中，使用 `apis()` 和 `paths()` 方法精确控制哪些包或路径下的API会被生成文档。避免暴露敏感的管理接口或内部接口。
+```java
+@Bean
+public Docket api() {
+return new Docket(DocumentationType.SWAGGER_2)
+.select()
+.apis(RequestHandlerSelectors.basePackage("com.yourcompany.api.public")) // 只扫描公开API所在的包
+.paths(PathSelectors.ant("/api/**")) // 只暴露/api/开头的路径
+.build();
+}
+```
+#### 3. 在生产环境中关闭Swagger UI
+在生产环境中，可以通过配置属性关闭Swagger UI和API文档的生成，彻底避免信息泄露风险。
+```yaml
+springfox.documentation.enabled: false
+```
+#### 4. 移除不必要的依赖
+如果应用程序不需要API文档功能，应移除Springfox和Swagger相关的依赖。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 风险描述
+1. **风险原理**
+Springfox 是一个用于生成 Spring Boot 应用程序的 API 文档的库，主要与 Swagger 结合使用。它通过注解和配置来自动生成 API 文档，并提供一个用户友好的界面来查看和测试 API。
+如果Springfox配置不当，例如未对敏感接口进行鉴权或隐藏，或者未限制访问端点，可能导致敏感信息泄露，例如数据库连接信息、应用程序内部结构、用户凭证管理接口等。
+2. **触发场景**
+当 Springfox 配置中API文档未设置访问权限或者默认暴露敏感端点时，攻击者可以直接访问 `/swagger-ui.html` 或 `/v2/api-docs` 等接口，获取到应用程序的详细API文档，从而了解应用程序内部的逻辑和接口调用方式，进一步寻找其他潜在漏洞。
+```java
+@EnableSwagger2
+@Configuration
+public class SwaggerConfig {
+@Bean
+public Docket api() {
+return new Docket(DocumentationType.SWAGGER_2)
+.select()
+.apis(RequestHandlerSelectors.any())
+.paths(PathSelectors.any())
+.build();
+}
+}
+```
+上述配置将允许访问所有API接口的文档，包括潜在的敏感接口。
+3. **潜在影响**
+- 泄露应用程序的内部结构、敏感接口信息和参数定义。
+- 攻击者可以利用泄露的信息进行针对性攻击，如未授权访问、数据窃取等。
+- 攻击者可能通过测试API文档中提供的接口，发现未公开的漏洞或功能。
+DESC
 }
 
 
@@ -152,4 +212,57 @@ public class SwaggerAutoConfiguration
     }
 }
 TEXT
+	"safefile://SecureSwaggerConfig.java": <<<CODE
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+import springfox.documentation.builders.PathSelectors;
+
+@Configuration
+@EnableSwagger2
+@EnableWebSecurity
+public class SecureSwaggerConfig extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        // 通过Spring Security保护Swagger UI和API文档路径，只允许认证用户访问
+        http
+            .authorizeRequests()
+            .antMatchers("/swagger-ui.html", "/swagger-resources/**", "/v2/api-docs", "/webjars/**").authenticated()
+            .anyRequest().permitAll()
+            .and()
+            .formLogin();
+    }
+
+    @Bean
+    public Docket api() {
+        // 限制暴露的API范围，只扫描com.yourcompany.api.public包下的API
+        // 并只暴露/api/public/**开头的路径，避免暴露敏感接口
+        return new Docket(DocumentationType.SWAGGER_2)
+            .select()
+            .apis(RequestHandlerSelectors.basePackage("com.yourcompany.api.public")) // 只扫描公开API所在的包
+            .paths(PathSelectors.ant("/api/public/**")) // 只暴露/api/public/开头的路径
+            .build();
+    }
+}
+CODE
+	"safefile://SwaggerDisabledInProd.java": <<<CODE
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
+import springfox.documentation.swagger2.annotations.EnableSwagger2;
+
+@Configuration
+@EnableSwagger2
+@Profile("!prod") // 在非生产环境下开启Swagger，生产环境自动关闭
+public class SwaggerConfigDevelopment {
+    // 此配置仅在非生产环境下生效，生产环境不开启Swagger，从而避免敏感信息泄露
+    // 生产环境中应通过配置文件 spring.profiles.active=prod 来激活此配置
+}
+CODE
 )

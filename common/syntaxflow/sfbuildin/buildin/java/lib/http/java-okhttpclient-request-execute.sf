@@ -12,76 +12,73 @@ REFERENCE
 ### 漏洞描述
 
 1. **漏洞原理**
-   在Java项目中，OkHttpClient是一个广泛使用的HTTP客户端库。如果应用程序直接将用户输入用于构建网络请求（如URL或参数），而未进行严格验证，可能导致SSRF（服务器端请求伪造）风险。攻击者可以利用此漏洞访问内部服务、泄露敏感信息或发起恶意请求。
+在Java项目中，OkHttpClient是一个广泛使用的HTTP客户端库。如果应用程序直接将用户输入用于构建网络请求（如URL或参数），而未进行严格验证，可能导致SSRF（服务器端请求伪造）风险。攻击者可以利用此漏洞访问内部服务、泄露敏感信息或发起恶意请求。
 
 2. **触发场景**
-   - 用户输入被直接用于构造`Request.Builder()`中的URL。
-   - 应用程序通过`newCall().execute()`同步执行外部请求。
+- 用户输入被直接用于构造`Request.Builder()`中的URL。
+- 应用程序通过`newCall().execute()`同步执行外部请求。
 
 **示例代码:**
-
 ```java
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
-
 public class OkHttpClientExample {
-    public static void main(String[] args) {
-        OkHttpClient client = new OkHttpClient();
-        Request request = new Request.Builder()
-                .url("https://api.github.com/users/github")
-                .build();
-        try {
-            // 执行请求
-            Response response = client.newCall(request).execute();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+public static void main(String[] args) {
+OkHttpClient client = new OkHttpClient();
+Request request = new Request.Builder()
+.url("https://api.github.com/users/github")
+.build();
+try {
+// 执行请求
+Response response = client.newCall(request).execute();
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
 }
 ```
 
 ```java
 public class OkHttpClientExample {
-    @RequestMapping(value = "/three")
-    public String Three(@RequestParam(value = "url") String imageUrl) {
-        try {
-            URL url = new URL(imageUrl);
-            OkHttpClient client = new OkHttpClient();
-            com.squareup.okhttp.Request request = new com.squareup.okhttp.Request.Builder().get().url(url).build();
-            Call call = client.newCall(request);
-            Response response = call.execute();
-            return response.toString();
-        } catch (IOException var1) {
-            System.out.println(var1);
-            return "Hello";
-        }
-    }
+@RequestMapping(value = "/three")
+public String Three(@RequestParam(value = "url") String imageUrl) {
+try {
+URL url = new URL(imageUrl);
+OkHttpClient client = new OkHttpClient();
+com.squareup.okhttp.Request request = new com.squareup.okhttp.Request.Builder().get().url(url).build();
+Call call = client.newCall(request);
+Response response = call.execute();
+return response.toString();
+} catch (IOException var1) {
+System.out.println(var1);
+return "Hello";
+}
+}
 }
 ```
 
 3. **潜在影响**
-   - 攻击者可能利用SSRF漏洞访问内部网络资源。
-   - 敏感数据（如元数据服务、配置文件等）可能被泄露。
-   - 可能进一步导致远程代码执行或其他严重后果。
+- 攻击者可能利用SSRF漏洞访问内部网络资源。
+- 敏感数据（如元数据服务、配置文件等）可能被泄露。
+- 可能进一步导致远程代码执行或其他严重后果。
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
 
 #### 1. 验证用户输入
 在使用用户输入构建URL时，应严格验证其有效性和安全性，避免直接使用未经验证的用户输入。
-
 ```java
 // 示例：验证用户输入是否为可信域名
 private boolean isValidUrl(String url) {
-    List<String> allowedDomains = Arrays.asList("example.com", "trusted-domain.com");
-    try {
-        URI uri = new URI(url);
-        String host = uri.getHost();
-        return allowedDomains.contains(host);
-    } catch (URISyntaxException e) {
-        return false;
-    }
+List<String> allowedDomains = Arrays.asList("example.com", "trusted-domain.com");
+try {
+URI uri = new URI(url);
+String host = uri.getHost();
+return allowedDomains.contains(host);
+} catch (URISyntaxException e) {
+return false;
+}
 }
 ```
 
@@ -90,20 +87,18 @@ private boolean isValidUrl(String url) {
 
 #### 3. 限制外部请求的范围
 将外部请求限制在可信的域名列表内，避免应用程序因用户输入而发起不受信任的网络请求。
-
 ```java
 // 示例：限制外部请求到可信域名
 private OkHttpClient createRestrictedClient() {
-    return new OkHttpClient.Builder()
-            .connectionSpecs(Collections.singletonList(ConnectionSpec.MODERN_TLS))
-            .proxy(Proxy.NO_PROXY)
-            .build();
+return new OkHttpClient.Builder()
+.connectionSpecs(Collections.singletonList(ConnectionSpec.MODERN_TLS))
+.proxy(Proxy.NO_PROXY)
+.build();
 }
 ```
 
 #### 4. 监控与日志记录
 对所有外部请求进行监控，并记录详细的日志以便后续分析。
-
 ```java
 // 示例：记录请求日志
 Response response = client.newCall(request).execute();
@@ -117,6 +112,97 @@ alert $output for {
 	title_zh: "审计Java OkHttpClient使用及请求执行",
 	level: "mid",
 	title: "Audit Java OkHttpClient Uses and Executing Request",
+	name: "output",
+	message: "检测到Java OkHttpClient使用过程中可能存在SSRF漏洞风险，并且从数据源（source）到污染汇聚点（sink）间存在过滤函数，需进一步审计确认。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证用户输入
+在使用用户输入构建URL时，应严格验证其有效性和安全性，避免直接使用未经验证的用户输入。
+```java
+// 示例：验证用户输入是否为可信域名
+private boolean isValidUrl(String url) {
+List<String> allowedDomains = Arrays.asList("example.com", "trusted-domain.com");
+try {
+URI uri = new URI(url);
+String host = uri.getHost();
+return allowedDomains.contains(host);
+} catch (URISyntaxException e) {
+return false;
+}
+}
+```
+#### 2. 使用安全的网络请求库
+考虑使用具有更强大安全特性的网络请求库（如Spring的RestTemplate），它提供了更多的安全选项和默认的安全设置。
+#### 3. 限制外部请求的范围
+将外部请求限制在可信的域名列表内，避免应用程序因用户输入而发起不受信任的网络请求。
+```java
+// 示例：限制外部请求到可信域名
+private OkHttpClient createRestrictedClient() {
+return new OkHttpClient.Builder()
+.connectionSpecs(Collections.singletonList(ConnectionSpec.MODERN_TLS))
+.proxy(Proxy.NO_PROXY)
+.build();
+}
+```
+#### 4. 监控与日志记录
+对所有外部请求进行监控，并记录详细的日志以便后续分析。
+```java
+// 示例：记录请求日志
+Response response = client.newCall(request).execute();
+System.out.println("Request to: " + request.url());
+```
+SOLUTION
+	risk: "SSRF",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在Java项目中，OkHttpClient是一个广泛使用的HTTP客户端库。如果应用程序直接将用户输入用于构建网络请求（如URL或参数），而未进行严格验证，可能导致SSRF（服务器端请求伪造）风险。攻击者可以利用此漏洞访问内部服务、泄露敏感信息或发起恶意请求。
+2. **触发场景**
+- 用户输入被直接用于构造`Request.Builder()`中的URL。
+- 应用程序通过`newCall().execute()`同步执行外部请求。
+**示例代码:**
+```java
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+public class OkHttpClientExample {
+public static void main(String[] args) {
+OkHttpClient client = new OkHttpClient();
+Request request = new Request.Builder()
+.url("https://api.github.com/users/github")
+.build();
+try {
+// 执行请求
+Response response = client.newCall(request).execute();
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
+}
+```
+```java
+public class OkHttpClientExample {
+@RequestMapping(value = "/three")
+public String Three(@RequestParam(value = "url") String imageUrl) {
+try {
+URL url = new URL(imageUrl);
+OkHttpClient client = new OkHttpClient();
+com.squareup.okhttp.Request request = new com.squareup.okhttp.Request.Builder().get().url(url).build();
+Call call = client.newCall(request);
+Response response = call.execute();
+return response.toString();
+} catch (IOException var1) {
+System.out.println(var1);
+return "Hello";
+}
+}
+}
+```
+3. **潜在影响**
+- 攻击者可能利用SSRF漏洞访问内部网络资源。
+- 敏感数据（如元数据服务、配置文件等）可能被泄露。
+- 可能进一步导致远程代码执行或其他严重后果。
+DESC
 }
 
 
@@ -137,6 +223,65 @@ public class OkHttpClientExample {
         try {
             // 执行请求
             Response response = client.newCall(request).execute();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeHttpUrlConnectionExample.java": <<<CODE
+// 使用标准的Java HttpURLConnection代替OkHttpClient
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class SafeHttpUrlConnectionExample {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("https://www.example.com"); // 使用固定安全URL
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("GET");
+
+            int status = con.getResponseCode();
+            System.out.println("Response Code: " + status);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            String inputLine;
+            StringBuffer content = new StringBuffer();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            con.disconnect();
+            System.out.println("Response Content: " + content.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeRestTemplateExample.java": <<<CODE
+// 使用Spring Framework的RestTemplate代替OkHttpClient
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
+
+public class SafeRestTemplateExample {
+    public static void main(String[] args) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "https://api.github.com/users/github"; // 目标URL可以是固定的或经过严格验证的
+        
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                url, 
+                HttpMethod.GET, 
+                null, 
+                String.class
+            );
+            System.out.println("Response Status Code: " + response.getStatusCodeValue());
+            System.out.println("Response Body: " + response.getBody());
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -164,6 +309,65 @@ public class OkHttpClientExample {
                 return "Hello";
             }
         }
+}
+CODE
+	"safefile://SafeHttpUrlConnectionExample.java": <<<CODE
+// 使用标准的Java HttpURLConnection代替OkHttpClient
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+
+public class SafeHttpUrlConnectionExample {
+    public static void main(String[] args) {
+        try {
+            URL url = new URL("https://www.example.com"); // 使用固定安全URL
+            HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("GET");
+
+            int status = con.getResponseCode();
+            System.out.println("Response Code: " + status);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream()));
+            String inputLine;
+            StringBuffer content = new StringBuffer();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            con.disconnect();
+            System.out.println("Response Content: " + content.toString());
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeRestTemplateExample.java": <<<CODE
+// 使用Spring Framework的RestTemplate代替OkHttpClient
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
+
+public class SafeRestTemplateExample {
+    public static void main(String[] args) {
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "https://api.github.com/users/github"; // 目标URL可以是固定的或经过严格验证的
+        
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                url, 
+                HttpMethod.GET, 
+                null, 
+                String.class
+            );
+            System.out.println("Response Status Code: " + response.getStatusCodeValue());
+            System.out.println("Response Body: " + response.getBody());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }
 CODE
 )

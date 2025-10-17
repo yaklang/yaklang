@@ -2,15 +2,15 @@ package ssaapi
 
 import (
 	"encoding/xml"
+	"sort"
+	"strings"
+
 	regexp "github.com/dlclark/regexp2"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/xml2"
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
-	"sort"
-	"strings"
 )
 
 var mybatisVarExtractor = regexp.MustCompile(`\$\{\s*([^}]+)\s*}`, regexp.None)
@@ -40,7 +40,7 @@ type mybatisXMLQuery struct {
 
 type checkParam struct {
 	name string
-	rng  memedit.RangeIf
+	rng  *memedit.Range
 }
 
 func newMybatisXMLQuery(mapper *mybatisXMLMapper, id string) *mybatisXMLQuery {
@@ -51,7 +51,7 @@ func newMybatisXMLQuery(mapper *mybatisXMLMapper, id string) *mybatisXMLQuery {
 	}
 }
 
-func (m *mybatisXMLQuery) AddCheckParam(name string, rng memedit.RangeIf) {
+func (m *mybatisXMLQuery) AddCheckParam(name string, rng *memedit.Range) {
 	m.CheckParams = append(m.CheckParams, &checkParam{
 		name: name,
 		rng:  rng,
@@ -68,7 +68,7 @@ func (m *mybatisXMLQuery) Check() []sfvm.ValueOperator {
 	return res
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng memedit.RangeIf) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng *memedit.Range) sfvm.ValueOperator {
 	if m.mapper == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFirst(name string, rng memedit.RangeIf) sfvm
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
-func (m *mybatisXMLQuery) SyntaxFlowFinal(rng memedit.RangeIf) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) SyntaxFlowFinal(rng *memedit.Range) sfvm.ValueOperator {
 	if m.mapper == nil {
 		return nil
 	}
@@ -98,7 +98,7 @@ func (m *mybatisXMLQuery) SyntaxFlowFinal(rng memedit.RangeIf) sfvm.ValueOperato
 	return m.runRuleAndFixRng(token, builder.String(), rng)
 }
 
-func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng memedit.RangeIf) sfvm.ValueOperator {
+func (m *mybatisXMLQuery) runRuleAndFixRng(token string, rule string, rng *memedit.Range) sfvm.ValueOperator {
 	if m == nil || m.mapper == nil {
 		return nil
 	}
@@ -139,20 +139,12 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 	var res []sfvm.ValueOperator
 
 	offset := 0
-	for name, content := range prog.Program.ExtraFile {
-		log.Debugf("start to handling: %v len: %v", name, len(content))
+	prog.ForEachExtraFile(func(s string, me *memedit.MemEditor) bool {
+		name := me.GetFilename()
+		content := me.GetSourceCode()
+		log.Warnf("start to handling: %v len: %v", name, len(content))
 		if !strings.HasSuffix(name, ".xml") {
-			continue
-		}
-		var editor *memedit.MemEditor
-		if len(content) <= 128 {
-			hash := content
-			editor, _ = ssadb.GetIrSourceFromHash(hash)
-			if editor != nil {
-				content = editor.GetSourceCode()
-			}
-		} else {
-			editor = memedit.NewMemEditorWithFileUrl(content, name)
+			return true
 		}
 
 		mapperStack := utils.NewStack[*mybatisXMLMapper]()
@@ -162,7 +154,7 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 		runeOffsetMap := memedit.NewRuneOffsetMap(content)
 		onDirective := xml2.WithDirectiveHandler(func(directive xml.Directive) bool {
 			offset += len(directive)
-			if utils.MatchAnyOfSubString(string(directive), "dtd/mybatis-", "mybatis.org") {
+			if utils.MatchAnyOfSubString(string(directive), "ibatis", "mybatis") {
 				return true
 			}
 			return false
@@ -246,9 +238,9 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 				matchStart := match.Index + runeIndex
 				matchEnd := matchStart + match.Length
 				param := match.String()
-				startPos := editor.GetPositionByOffset(matchStart)
-				endPos := editor.GetPositionByOffset(matchEnd)
-				rng := editor.GetRangeByPosition(startPos, endPos)
+				startPos := me.GetPositionByOffset(matchStart)
+				endPos := me.GetPositionByOffset(matchEnd)
+				rng := me.GetRangeByPosition(startPos, endPos)
 				query.AddCheckParam(param, rng)
 				match, err = mybatisVarExtractor.FindNextMatch(match)
 				if err != nil {
@@ -264,7 +256,9 @@ var nativeCallMybatisXML = func(v sfvm.ValueOperator, frame *sfvm.SFFrame, param
 			})
 		})
 		xml2.Handle(content, onDirective, onStartElement, onEndElement, onCharData)
-	}
+		return true
+	})
+
 	if len(res) > 0 {
 		return true, sfvm.NewValues(res), nil
 	}

@@ -9,6 +9,9 @@ func (v *Frame) call(caller *Value, wavy bool, args []*Value) {
 	if IsUndefined(caller) {
 		panic("runtime error: cannot call undefined(nil) as function")
 	}
+	if v.vm.callFuncCallback != nil {
+		v.vm.callFuncCallback(caller, wavy, args)
+	}
 	if caller.Callable() {
 		v.push(&Value{
 			TypeVerbose: "__call_returns__",
@@ -22,6 +25,9 @@ func (v *Frame) call(caller *Value, wavy bool, args []*Value) {
 func (v *Frame) asyncCall(caller *Value, wavy bool, args []*Value) {
 	if IsUndefined(caller) {
 		panic("runtime error: cannot call undefined(nil) as function")
+	}
+	if v.vm.callFuncCallback != nil {
+		v.vm.callFuncCallback(caller, wavy, args)
 	}
 	if caller.Callable() {
 		v.vm.AsyncStart()

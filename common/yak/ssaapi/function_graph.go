@@ -40,8 +40,8 @@ func NewFunctionCFG(function *ssa.Function) *FunctionCFG {
 
 	// 首先添加所有基本块节点
 	for _, blockInst := range function.Blocks {
-		block := function.GetBasicBlockByID(blockInst)
-		if block == nil {
+		block, ok := function.GetBasicBlockByID(blockInst)
+		if !ok || block == nil {
 			continue
 		}
 		g.addBlockNode(block)
@@ -49,8 +49,8 @@ func NewFunctionCFG(function *ssa.Function) *FunctionCFG {
 
 	// 然后添加边
 	for _, blockInst := range function.Blocks {
-		block := function.GetBasicBlockByID(blockInst)
-		if block == nil {
+		block, ok := function.GetBasicBlockByID(blockInst)
+		if !ok || block == nil {
 			continue
 		}
 		fromNodeId, exists := g.Block2Node[block]
@@ -60,8 +60,8 @@ func NewFunctionCFG(function *ssa.Function) *FunctionCFG {
 
 		// 添加后继边
 		for _, succInst := range block.Succs {
-			succ := function.GetBasicBlockByID(succInst)
-			if succ == nil {
+			succ, ok := function.GetBasicBlockByID(succInst)
+			if !ok || succ == nil {
 				continue
 			}
 			toNodeId, exists := g.Block2Node[succ]
@@ -89,8 +89,8 @@ func (g *FunctionCFG) addBlockNode(block *ssa.BasicBlock) int {
 
 	// 添加块内指令到标签
 	for _, inst := range block.Insts {
-		inst := block.GetInstructionById(inst)
-		if utils.IsNil(inst) {
+		inst, ok := block.GetInstructionById(inst)
+		if !ok || utils.IsNil(inst) {
 			log.Infof("bbbbbbb")
 		}
 		instStr := inst.String()
@@ -127,7 +127,7 @@ func (g *FunctionCFG) Dot() string {
 
 // ShowDot 打印DOT格式的控制流图
 func (g *FunctionCFG) ShowDot() {
-	fmt.Println(g.Dot())
+	log.Infof(g.Dot())
 }
 
 // FunctionDotGraph 为指定函数生成DOT格式的控制流图

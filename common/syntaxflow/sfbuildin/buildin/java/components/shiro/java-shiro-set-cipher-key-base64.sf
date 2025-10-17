@@ -5,92 +5,70 @@ desc(
 	level: warning
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
-
+Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
 2. **触发场景**
-   当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
-
-   示例代码:
-   ```java
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       cookieRememberMeManager.setCookie(rememberMeCookie());
-       cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
-       return cookieRememberMeManager;
-   }
-   ```
-
+当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
+示例代码:
+```java
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+cookieRememberMeManager.setCookie(rememberMeCookie());
+cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
+return cookieRememberMeManager;
+}
+```
 3. **潜在影响**
-   - **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
-   - **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
-   - **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
-
-### 风险识别
-
-该规则主要通过静态代码审计，识别调用 `setCipherKey` 方法时，其参数来源于硬编码的字符串或经过 `Base64.decode` 解码的硬编码 Base64 字符串，从而判断是否存在硬编码加密密钥的风险。
+- **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
+- **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
+- **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
 DESC
 	rule_id: "e93cec31-3449-4339-9cd2-b09745affe96"
 	solution: <<<SOLUTION
 ### 修复建议
-
 解决 Apache Shiro 硬编码加密密钥问题的根本方法是避免在代码或配置文件中直接存储加密密钥，而是采用更安全的密钥管理实践：
-
 1. **使用随机生成的密钥**
-   在应用程序启动时生成一个随机密钥，并将其作为 `cipherKey`。这可以防止密钥被硬编码在代码中。
-   ```java
-   import org.apache.shiro.codec.Base64;
-   import org.apache.shiro.crypto.AesCipherService;
-   import org.apache.shiro.web.mgt.CookieRememberMeManager;
-
-   // ... 其他 Shiro 配置
-
-   @Bean
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       // ... 设置 cookie
-
-       // 生成一个随机密钥
-       AesCipherService cipherService = new AesCipherService();
-       byte[] key = cipherService.generateNewKey().getEncoded();
-       cookieRememberMeManager.setCipherKey(key);
-
-       return cookieRememberMeManager;
-   }
-   ```
-
+在应用程序启动时生成一个随机密钥，并将其作为 `cipherKey`。这可以防止密钥被硬编码在代码中。
+```java
+import org.apache.shiro.codec.Base64;
+import org.apache.shiro.crypto.AesCipherService;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
+// ... 其他 Shiro 配置
+@Bean
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+// ... 设置 cookie
+// 生成一个随机密钥
+AesCipherService cipherService = new AesCipherService();
+byte[] key = cipherService.generateNewKey().getEncoded();
+cookieRememberMeManager.setCipherKey(key);
+return cookieRememberMeManager;
+}
+```
 2. **从安全配置源加载密钥**
-   将密钥存储在环境变量、安全的配置服务器（如Spring Cloud Config Server, HashiCorp Vault）或密钥管理系统（如 AWS KMS, Azure Key Vault）中，并在应用程序启动时动态加载密钥。
-   ```java
-   import org.apache.shiro.codec.Base64;
-   import org.apache.shiro.web.mgt.CookieRememberMeManager;
-   import org.springframework.beans.factory.annotation.Value;
-   import org.springframework.context.annotation.Bean;
-
-   // ... 其他 Shiro 配置和依赖注入
-
-   @Value("${shiro.rememberMe.cipherKey}") // 从外部配置加载密钥
-   private String cipherKeyBase64;
-
-   @Bean
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       // ... 设置 cookie
-
-       // 从配置加载并设置密钥
-       cookieRememberMeManager.setCipherKey(Base64.decode(cipherKeyBase64));
-
-       return cookieRememberMeManager;
-   }
-   ```
-   **注意:** 使用此方法时，仍需确保外部配置源的安全性，防止密钥泄露。
-
+将密钥存储在环境变量、安全的配置服务器（如Spring Cloud Config Server, HashiCorp Vault）或密钥管理系统（如 AWS KMS, Azure Key Vault）中，并在应用程序启动时动态加载密钥。
+```java
+import org.apache.shiro.codec.Base64;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+// ... 其他 Shiro 配置和依赖注入
+@Value("${shiro.rememberMe.cipherKey}") // 从外部配置加载密钥
+private String cipherKeyBase64;
+@Bean
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+// ... 设置 cookie
+// 从配置加载并设置密钥
+cookieRememberMeManager.setCipherKey(Base64.decode(cipherKeyBase64));
+return cookieRememberMeManager;
+}
+```
+**注意:** 使用此方法时，仍需确保外部配置源的安全性，防止密钥泄露。
 3. **升级 Shiro 版本**
-   如果应用程序使用了存在反序列化漏洞的旧版本 Shiro (如 1.2.4 及之前)，务必升级到最新版本，以修复已知的安全漏洞。
-
+如果应用程序使用了存在反序列化漏洞的旧版本 Shiro (如 1.2.4 及之前)，务必升级到最新版本，以修复已知的安全漏洞。
 4. **禁用 RememberMe 功能 (如果不需要)**
-   如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
+如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-321: Use of Hard-Coded Cryptographic Key](https://cwe.mitre.org/data/definitions/321.html)
@@ -100,183 +78,153 @@ REFERENCE
 setCipherKey(*<slice(index=1)> as $key);
 $key?{opcode: call && <getCallee>?{<getObject><name>?{have: Base64} && <name>?{have: 'Base64.decode'}}(, *?{opcode: const}<var(base64EncodedKey)>) } as $sink;
 alert $base64EncodedKey for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
-
+Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
 2. **触发场景**
-   当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
-
-   示例代码:
-   ```java
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       cookieRememberMeManager.setCookie(rememberMeCookie());
-       cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
-       return cookieRememberMeManager;
-   }
-   ```
-
+当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
+示例代码:
+```java
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+cookieRememberMeManager.setCookie(rememberMeCookie());
+cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
+return cookieRememberMeManager;
+}
+```
 3. **潜在影响**
-   - **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
-   - **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
-   - **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
-CODE
+- **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
+- **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
+- **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
+DESC
 	level: "high",
-	title: "Detect Java Shiro Hardcoded Encryption Key",
-	title_zh: "检测Java Shiro硬编码加密密钥",
-	solution: <<<CODE
+	title: "Java Shiro Hardcoded Encryption Key Was Detected",
+	title_zh: "检测到Java Shiro硬编码加密密钥",
+	solution: <<<SOLUTION
 ### 修复建议
-
 解决 Apache Shiro 硬编码加密密钥问题的根本方法是避免在代码或配置文件中直接存储加密密钥，而是采用更安全的密钥管理实践：
-
 1. **使用随机生成的密钥**
-   在应用程序启动时生成一个随机密钥，并将其作为 `cipherKey`。这可以防止密钥被硬编码在代码中。
-   ```java
-   import org.apache.shiro.codec.Base64;
-   import org.apache.shiro.crypto.AesCipherService;
-   import org.apache.shiro.web.mgt.CookieRememberMeManager;
-
-   // ... 其他 Shiro 配置
-
-   @Bean
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       // ... 设置 cookie
-
-       // 生成一个随机密钥
-       AesCipherService cipherService = new AesCipherService();
-       byte[] key = cipherService.generateNewKey().getEncoded();
-       cookieRememberMeManager.setCipherKey(key);
-
-       return cookieRememberMeManager;
-   }
-   ```
-
+在应用程序启动时生成一个随机密钥，并将其作为 `cipherKey`。这可以防止密钥被硬编码在代码中。
+```java
+import org.apache.shiro.codec.Base64;
+import org.apache.shiro.crypto.AesCipherService;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
+// ... 其他 Shiro 配置
+@Bean
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+// ... 设置 cookie
+// 生成一个随机密钥
+AesCipherService cipherService = new AesCipherService();
+byte[] key = cipherService.generateNewKey().getEncoded();
+cookieRememberMeManager.setCipherKey(key);
+return cookieRememberMeManager;
+}
+```
 2. **从安全配置源加载密钥**
-   将密钥存储在环境变量、安全的配置服务器（如Spring Cloud Config Server, HashiCorp Vault）或密钥管理系统（如 AWS KMS, Azure Key Vault）中，并在应用程序启动时动态加载密钥。
-   ```java
-   import org.apache.shiro.codec.Base64;
-   import org.apache.shiro.web.mgt.CookieRememberMeManager;
-   import org.springframework.beans.factory.annotation.Value;
-   import org.springframework.context.annotation.Bean;
-
-   // ... 其他 Shiro 配置和依赖注入
-
-   @Value("${shiro.rememberMe.cipherKey}") // 从外部配置加载密钥
-   private String cipherKeyBase64;
-
-   @Bean
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       // ... 设置 cookie
-
-       // 从配置加载并设置密钥
-       cookieRememberMeManager.setCipherKey(Base64.decode(cipherKeyBase64));
-
-       return cookieRememberMeManager;
-   }
-   ```
-   **注意:** 使用此方法时，仍需确保外部配置源的安全性，防止密钥泄露。
-
+将密钥存储在环境变量、安全的配置服务器（如Spring Cloud Config Server, HashiCorp Vault）或密钥管理系统（如 AWS KMS, Azure Key Vault）中，并在应用程序启动时动态加载密钥。
+```java
+import org.apache.shiro.codec.Base64;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+// ... 其他 Shiro 配置和依赖注入
+@Value("${shiro.rememberMe.cipherKey}") // 从外部配置加载密钥
+private String cipherKeyBase64;
+@Bean
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+// ... 设置 cookie
+// 从配置加载并设置密钥
+cookieRememberMeManager.setCipherKey(Base64.decode(cipherKeyBase64));
+return cookieRememberMeManager;
+}
+```
+**注意:** 使用此方法时，仍需确保外部配置源的安全性，防止密钥泄露。
 3. **升级 Shiro 版本**
-   如果应用程序使用了存在反序列化漏洞的旧版本 Shiro (如 1.2.4 及之前)，务必升级到最新版本，以修复已知的安全漏洞。
-
+如果应用程序使用了存在反序列化漏洞的旧版本 Shiro (如 1.2.4 及之前)，务必升级到最新版本，以修复已知的安全漏洞。
 4. **禁用 RememberMe 功能 (如果不需要)**
-   如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
-CODE
+如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
+SOLUTION
+	risk: "硬编码密钥",
+	name: "base64EncodedKey",
+	message: "检测到Java Shiro硬编码加密密钥，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 
 alert $sink for {
-	title: "Detect Java Shiro Hardcoded Encryption Key",
-	title_zh: "检测Java Shiro硬编码加密密钥",
-	solution: <<<CODE
+	title: "Java Shiro Hardcoded Encryption Key Was Detected",
+	title_zh: "检测到Java Shiro硬编码加密密钥",
+	solution: <<<SOLUTION
 ### 修复建议
-
 解决 Apache Shiro 硬编码加密密钥问题的根本方法是避免在代码或配置文件中直接存储加密密钥，而是采用更安全的密钥管理实践：
-
 1. **使用随机生成的密钥**
-   在应用程序启动时生成一个随机密钥，并将其作为 `cipherKey`。这可以防止密钥被硬编码在代码中。
-   ```java
-   import org.apache.shiro.codec.Base64;
-   import org.apache.shiro.crypto.AesCipherService;
-   import org.apache.shiro.web.mgt.CookieRememberMeManager;
-
-   // ... 其他 Shiro 配置
-
-   @Bean
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       // ... 设置 cookie
-
-       // 生成一个随机密钥
-       AesCipherService cipherService = new AesCipherService();
-       byte[] key = cipherService.generateNewKey().getEncoded();
-       cookieRememberMeManager.setCipherKey(key);
-
-       return cookieRememberMeManager;
-   }
-   ```
-
+在应用程序启动时生成一个随机密钥，并将其作为 `cipherKey`。这可以防止密钥被硬编码在代码中。
+```java
+import org.apache.shiro.codec.Base64;
+import org.apache.shiro.crypto.AesCipherService;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
+// ... 其他 Shiro 配置
+@Bean
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+// ... 设置 cookie
+// 生成一个随机密钥
+AesCipherService cipherService = new AesCipherService();
+byte[] key = cipherService.generateNewKey().getEncoded();
+cookieRememberMeManager.setCipherKey(key);
+return cookieRememberMeManager;
+}
+```
 2. **从安全配置源加载密钥**
-   将密钥存储在环境变量、安全的配置服务器（如Spring Cloud Config Server, HashiCorp Vault）或密钥管理系统（如 AWS KMS, Azure Key Vault）中，并在应用程序启动时动态加载密钥。
-   ```java
-   import org.apache.shiro.codec.Base64;
-   import org.apache.shiro.web.mgt.CookieRememberMeManager;
-   import org.springframework.beans.factory.annotation.Value;
-   import org.springframework.context.annotation.Bean;
-
-   // ... 其他 Shiro 配置和依赖注入
-
-   @Value("${shiro.rememberMe.cipherKey}") // 从外部配置加载密钥
-   private String cipherKeyBase64;
-
-   @Bean
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       // ... 设置 cookie
-
-       // 从配置加载并设置密钥
-       cookieRememberMeManager.setCipherKey(Base64.decode(cipherKeyBase64));
-
-       return cookieRememberMeManager;
-   }
-   ```
-   **注意:** 使用此方法时，仍需确保外部配置源的安全性，防止密钥泄露。
-
+将密钥存储在环境变量、安全的配置服务器（如Spring Cloud Config Server, HashiCorp Vault）或密钥管理系统（如 AWS KMS, Azure Key Vault）中，并在应用程序启动时动态加载密钥。
+```java
+import org.apache.shiro.codec.Base64;
+import org.apache.shiro.web.mgt.CookieRememberMeManager;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Bean;
+// ... 其他 Shiro 配置和依赖注入
+@Value("${shiro.rememberMe.cipherKey}") // 从外部配置加载密钥
+private String cipherKeyBase64;
+@Bean
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+// ... 设置 cookie
+// 从配置加载并设置密钥
+cookieRememberMeManager.setCipherKey(Base64.decode(cipherKeyBase64));
+return cookieRememberMeManager;
+}
+```
+**注意:** 使用此方法时，仍需确保外部配置源的安全性，防止密钥泄露。
 3. **升级 Shiro 版本**
-   如果应用程序使用了存在反序列化漏洞的旧版本 Shiro (如 1.2.4 及之前)，务必升级到最新版本，以修复已知的安全漏洞。
-
+如果应用程序使用了存在反序列化漏洞的旧版本 Shiro (如 1.2.4 及之前)，务必升级到最新版本，以修复已知的安全漏洞。
 4. **禁用 RememberMe 功能 (如果不需要)**
-   如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
-CODE
-	desc: <<<CODE
+如果应用场景不需要记住用户登录状态，可以禁用 RememberMe 功能，从而消除与密钥相关的风险。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
-
+Apache Shiro 是一个广泛使用的 Java 安全框架。当 Shiro 的记住我（RememberMe）功能启用时，它使用一个加密密钥对用户身份信息进行加密和解密，并存储在 cookie 中。如果应用程序开发者在代码中硬编码了这个加密密钥，那么一旦攻击者能够获取到应用程序的源代码或配置文件，他们就可以直接获得这个密钥。攻击者可以使用该硬编码密钥伪造一个 RememberMe cookie，其中包含任意用户或管理员的身份信息，从而绕过身份验证机制，以伪造的身份登录系统。
 2. **触发场景**
-   当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
-
-   示例代码:
-   ```java
-   public CookieRememberMeManager rememberMeManager() {
-       CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
-       cookieRememberMeManager.setCookie(rememberMeCookie());
-       cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
-       return cookieRememberMeManager;
-   }
-   ```
-
+当应用程序使用了 Apache Shiro 框架，并且开启了 RememberMe 功能，同时在 Shiro 的配置类中，例如 `ShiroConfig.java`，通过硬编码的方式设置了 `CookieRememberMeManager` 的 `cipherKey`，就会触发此规则。常见的硬编码方式包括直接在代码中指定密钥字符串，或者使用 `Base64.decode` 方法解码硬编码的 Base64 字符串作为密钥。
+示例代码:
+```java
+public CookieRememberMeManager rememberMeManager() {
+CookieRememberMeManager cookieRememberMeManager = new CookieRememberMeManager();
+cookieRememberMeManager.setCookie(rememberMeCookie());
+cookieRememberMeManager.setCipherKey(Base64.decode("fCq+/xW488hMTCD+cmJ3aQ==")); // 硬编码的密钥
+return cookieRememberMeManager;
+}
+```
 3. **潜在影响**
-   - **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
-   - **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
-   - **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
-CODE
+- **身份认证绕过:** 攻击者可以通过伪造 RememberMe cookie 以任意用户（包括管理员）的身份登录系统。
+- **敏感信息泄露:** 如果 RememberMe cookie 中包含敏感信息，硬编码密钥可能导致这些信息被解密和窃取。
+- **远程代码执行 (特定版本漏洞):** 在 Apache Shiro 1.2.4 版本及之前，结合硬编码密钥，攻击者可以构造恶意的序列化数据在目标服务器上执行任意代码，这是一个非常严重的漏洞。
+DESC
 	level: "mid",
+	name: "sink",
+	message: "检测到Java Shiro硬编码加密密钥，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	risk: "硬编码密钥",
 }
 
 

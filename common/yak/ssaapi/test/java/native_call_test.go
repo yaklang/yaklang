@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -463,62 +464,77 @@ public class A{
 	fs.AddFile("b.java", `package main2;
 public class B{}
 `)
-	ssatest.CheckSyntaxFlowWithFS(t, fs, `A as $output
+
+	t.Run("check syntaxflow ", func(t *testing.T) {
+		ssatest.CheckSyntaxFlowWithFS(t, fs, `
+A as $output
 $output<FilenameByContent> as $sink
 `, map[string][]string{
-		"sink": {"a.java"},
-	}, true, ssaapi.WithLanguage(ssaapi.JAVA))
-	ssatest.CheckWithFS(fs, t, func(programs ssaapi.Programs) error {
-		result, err := programs.SyntaxFlowWithError(`
+			"sink": {"a.java"},
+		}, true, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+
+	t.Run("check syntaxflow with alert", func(t *testing.T) {
+		ssatest.CheckWithFS(fs, t, func(programs ssaapi.Programs) error {
+			result, err := programs.SyntaxFlowWithError(`
 A as $output
 $output<FilenameByContent> as $sink
 alert $output
 `, ssaapi.QueryWithEnableDebug())
-		require.NoError(t, err)
-		_ = result
+			require.NoError(t, err)
+			_ = result
+			require.NotNil(t, result)
+			values := result.GetValues("sink").Show()
+			require.Greater(t, values.Len(), 0)
+			values.Recursive(func(operator sfvm.ValueOperator) error {
+				switch ret := operator.(type) {
+				case *ssaapi.Value:
+					require.True(t, ret.GetRange() != nil && ret.GetRange().GetEditor() != nil)
+					editor := ret.GetRange().GetEditor()
+					require.True(t, editor.GetFilename() == "a.java")
+					require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
+				}
+				return nil
+			})
+			return nil
+		}, ssaapi.WithLanguage(ssaapi.JAVA))
+	})
+}
 
-		values := result.GetValues("sink").Show()
+func TestNativeCall_GetFileFullName(t *testing.T) {
+	t.Run("check file FullName", func(t *testing.T) {
+		fs := filesys.NewVirtualFs()
+		fs.AddFile("/src/main/java/abc.java", `package main;`)
+		fs.AddFile("/src/main/java/bcd.java", `package main2;`)
+		programID := uuid.NewString()
+		programID = strings.ReplaceAll(programID, "a", "b")
+		prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
+		require.NoError(t, err)
+		defer func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), programID)
+		}()
+		result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindSearch))
+		log.Infof("getFullFileName result: %v", result)
+		result.Show()
+		require.NoError(t, err)
+		id := result.GetResultID()
+		dbResult, err := ssaapi.LoadResultByID(id)
+		require.NoError(t, err)
+		log.Infof("dbResult: %v", dbResult)
+		dbResult.Show()
+		values := dbResult.GetValues("sink")
+		require.True(t, !values.IsEmpty())
 		values.Recursive(func(operator sfvm.ValueOperator) error {
 			switch ret := operator.(type) {
 			case *ssaapi.Value:
-				require.True(t, ret.GetRange() != nil && ret.GetRange().GetEditor() != nil)
+				require.True(t, ret.GetRange() != nil)
+				require.True(t, ret.GetRange().GetEditor() != nil)
 				editor := ret.GetRange().GetEditor()
-				require.True(t, editor.GetFilename() == "a.java")
+				require.Contains(t, editor.GetUrl(), "src/main/java/abc.java")
 				require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
 			}
 			return nil
 		})
-		return nil
-	}, ssaapi.WithLanguage(ssaapi.JAVA))
-}
-
-func TestNativeCall_GetFileFullName(t *testing.T) {
-	fs := filesys.NewVirtualFs()
-	fs.AddFile("/src/main/java/abc.java", `package main;`)
-	fs.AddFile("/src/main/java/bcd.java", `package main2;`)
-	programID := uuid.NewString()
-	prog, err := ssaapi.ParseProjectWithFS(fs, ssaapi.WithLanguage(ssaapi.JAVA), ssaapi.WithProgramName(programID))
-	require.NoError(t, err)
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), programID)
-	}()
-	result, err := prog.SyntaxFlowWithError(`<getFullFileName(filename="*/a*")> as $sink`, ssaapi.QueryWithEnableDebug(), ssaapi.QueryWithSave(schema.SFResultKindSearch))
-	require.NoError(t, err)
-	id := result.GetResultID()
-	dbResult, err := ssaapi.LoadResultByID(id)
-	require.NoError(t, err)
-	values := dbResult.GetValues("sink")
-	require.True(t, !values.IsEmpty())
-	values.Recursive(func(operator sfvm.ValueOperator) error {
-		switch ret := operator.(type) {
-		case *ssaapi.Value:
-			require.True(t, ret.GetRange() != nil)
-			require.True(t, ret.GetRange().GetEditor() != nil)
-			editor := ret.GetRange().GetEditor()
-			require.True(t, editor.GetFilename() == "src/main/java/abc.java")
-			require.True(t, editor.GetFullRange().String() == ret.GetRange().String())
-		}
-		return nil
 	})
 }
 

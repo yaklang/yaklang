@@ -4,7 +4,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/x509"
+	"strings"
+
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/gmsm/sm2"
+	x509gm "github.com/yaklang/yaklang/common/gmsm/x509"
 	"github.com/yaklang/yaklang/common/utils/tlsutils/go-pkcs12"
 )
 
@@ -15,7 +19,11 @@ import (
 func BuildP12(certBytes, keyBytes []byte, password string, ca ...[]byte) ([]byte, error) {
 	cert, key, err := ParsePEMCertificateAndKey(certBytes, keyBytes)
 	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "unsupported elliptic curve") {
+			return BuildP12ForGM(certBytes, keyBytes, password, ca...)
+		} else {
+			return nil, err
+		}
 	}
 
 	var caCerts = make([]*x509.Certificate, 0, len(ca))
@@ -28,6 +36,28 @@ func BuildP12(certBytes, keyBytes []byte, password string, ca ...[]byte) ([]byte
 	}
 
 	pfxData, err := pkcs12.Encode(randCrypto.Reader, key, cert, caCerts, password)
+	if err != nil {
+		return nil, err
+	}
+	return pfxData, nil
+}
+
+func BuildP12ForGM(certBytes, keyBytes []byte, password string, ca ...[]byte) ([]byte, error) {
+	cert, key, err := ParsePEMCertificateAndKeyForGM(certBytes, keyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	var caCerts = make([]*x509.Certificate, 0, len(ca))
+	for _, c := range ca {
+		caCert, err := ParseGMPEMCertificate(c)
+		if err != nil {
+			return nil, err
+		}
+		caCerts = append(caCerts, caCert.ToX509Certificate())
+	}
+
+	pfxData, err := pkcs12.Encode(randCrypto.Reader, key, cert.ToX509Certificate(), caCerts, password)
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +78,11 @@ func LoadP12ToPEM(p12Data []byte, password string) (certBytes, keyBytes []byte, 
 	case *ecdsa.PrivateKey:
 		keyTitle = "EC " + keyTitle
 		keyBytesRaw, err = x509.MarshalECPrivateKey(key.(*ecdsa.PrivateKey))
+		if err != nil {
+			return nil, nil, nil, errors.Wrap(err, "marshal ecdsa private key error")
+		}
+	case *sm2.PrivateKey:
+		keyBytesRaw, err = x509gm.MarshalSm2PrivateKey(key.(*sm2.PrivateKey), nil)
 		if err != nil {
 			return nil, nil, nil, errors.Wrap(err, "marshal ecdsa private key error")
 		}

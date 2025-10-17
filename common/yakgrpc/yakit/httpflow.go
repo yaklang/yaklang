@@ -28,6 +28,7 @@ import (
 func init() {
 	RegisterPostInitDatabaseFunction(func() error {
 		RegisterLowHTTPSaveCallback()
+		RegisterLowHTTPLabelingCallback()
 		return nil
 	})
 }
@@ -480,21 +481,25 @@ func UpdateHTTPFlowTags(db *gorm.DB, i *schema.HTTPFlow) (finErr error) {
 			})
 		}
 	}()
-
+	updateData := map[string]interface{}{
+		"tags": i.Tags,
+	}
 	if i.ID > 0 {
 		i.Hash = i.CalcHash()
-		if db = db.Where("id = ?", i.ID).UpdateColumns(schema.HTTPFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
+		updateData["hash"] = i.Hash
+		if db = db.Where("id = ?", i.ID).UpdateColumns(updateData); db.Error != nil {
 			log.Errorf("update tags(by id) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.HiddenIndex != "" {
 		i.Hash = i.CalcHash()
-		if db = db.Where("hidden_index = ?", i.HiddenIndex).UpdateColumn(schema.HTTPFlow{Hash: i.Hash, Tags: tags}); db.Error != nil {
+		updateData["hash"] = i.Hash
+		if db = db.Where("hidden_index = ?", i.HiddenIndex).UpdateColumns(updateData); db.Error != nil {
 			log.Errorf("update tags(by hidden_index) failed: %s", db.Error)
 			return db.Error
 		}
 	} else if i.Hash != "" {
-		if db = db.Where("hash = ?", i.Hash).UpdateColumn("tags", i.Tags); db.Error != nil {
+		if db = db.Where("hash = ?", i.Hash).UpdateColumns(updateData); db.Error != nil {
 			log.Errorf("update tags(by hash) failed: %s", db.Error)
 			return db.Error
 		}
@@ -811,6 +816,21 @@ func FilterHTTPFlow(db *gorm.DB, params *ypb.QueryHTTPFlowRequest) *gorm.DB {
 		} else if len(statusCodeRaw) > 0 {
 			// 如果状态码不合理，应该返回空
 			db = db.Where("true = false")
+		}
+	}
+	excludeStatusCodeRaw := params.GetExcludeStatusCode()
+	if strings.HasPrefix(excludeStatusCodeRaw, "-") || strings.HasSuffix(excludeStatusCodeRaw, "-") {
+		// 排除-200,200-这样的写法
+		// skip
+	} else {
+		excludeStatusCode := utils.ParseStringToPorts(excludeStatusCodeRaw)
+		if len(excludeStatusCode) > 0 {
+			db = bizhelper.ExactExcludeQueryInt64Array(db, "status_code", lo.Map(excludeStatusCode, func(item int, index int) int64 {
+				return int64(item)
+			}))
+		} else if len(excludeStatusCodeRaw) > 0 {
+			// 如果状态码不合理，应该返回空
+			// skip
 		}
 	}
 	if params.GetHaveBody() {

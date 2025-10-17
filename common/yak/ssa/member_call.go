@@ -10,7 +10,9 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	// normal member
 	// use name  peek value
 	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
-		return ret
+		if _, ok := ToParameterMember(ret); !ok {
+			return ret
+		}
 	}
 
 	// default member
@@ -146,9 +148,9 @@ func (b *FunctionBuilder) createDefaultMember(res checkMemberResult, object, key
 		return un
 	}
 	if para, ok := ToParameter(object); ok {
-		if member, ok2 := para.GetStringMember(key.String()); ok2 {
-			return member
-		}
+		// if member, ok2 := para.GetStringMember(key.String()); ok2 {
+		// 	return member
+		// }
 		member := b.NewParameterMember(name, para, key)
 
 		memberHandler(member)
@@ -187,6 +189,9 @@ func (b *FunctionBuilder) checkAndCreateDefaultMember(res checkMemberResult, obj
 
 	currentScope := b.CurrentBlock.ScopeTable
 	objectScope := object.GetBlock().ScopeTable
+	if utils.IsNil(currentScope) || utils.IsNil(objectScope) {
+		return
+	}
 	// is sub-scope and not same, just child scope
 	if currentScope.IsSameOrSubScope(objectScope) && !currentScope.Compare(objectScope) {
 		b.createDefaultMember(res, object, key, false)

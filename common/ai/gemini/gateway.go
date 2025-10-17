@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/go-funk"
-	"github.com/yaklang/yaklang/common/jsonpath"
-	"github.com/yaklang/yaklang/common/utils/bufpipe"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/go-funk"
+	"github.com/yaklang/yaklang/common/jsonpath"
+	"github.com/yaklang/yaklang/common/utils/bufpipe"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/bcicen/jstream"
 	"github.com/davecgh/go-spew/spew"
@@ -30,7 +31,7 @@ const (
 	geminiAPIBaseURL   = "https://generativelanguage.googleapis.com"
 	geminiModelListURL = geminiAPIBaseURL + "/v1beta/models"
 	geminiStreamURL    = geminiAPIBaseURL + "/v1beta/models/%s:streamGenerateContent" // Use v1beta for streaming as well
-	defaultModel       = "gemini-2.0-flash"                                           // 使用 gemini-2.0-flash 模型
+	defaultModel       = "gemini-2.5-flash"                                           // 使用 gemini-2.0-flash 模型
 )
 
 // Part represents a part of the content, typically text.
@@ -235,6 +236,12 @@ func (c *Client) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 	log.Debugf("Setting request timeout: %d seconds", requestTimeout)
 	opts = append(opts, poc.WithTimeout(float64(requestTimeout)))
 
+	if c.config.Host != "" {
+		opts = append(opts, poc.WithHost(c.config.Host))
+	}
+	if c.config.Port > 0 {
+		opts = append(opts, poc.WithPort(c.config.Port))
+	}
 	return opts, nil
 }
 
@@ -533,212 +540,6 @@ func (c *Client) Chat(prompt string, functions ...any) (string, error) {
 
 	return response, nil
 }
-
-// ChatEx sends a multi-turn conversation history and returns the choices.
-func (c *Client) ChatEx(details []aispec.ChatDetail, functions ...any) ([]aispec.ChatChoice, error) {
-	log.Infof("Initiating Gemini ChatEx with %d messages.", len(details))
-	if len(details) == 0 {
-		return nil, errors.New("ChatEx requires at least one message detail")
-	}
-	if len(functions) > 0 {
-		// TODO: Implement function calling support for ChatEx if needed.
-		log.Warnf("Gemini ChatEx: Function calling is not yet implemented.")
-	}
-
-	ctx := c.config.Context
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
-	// Convert aispec.ChatDetail to Gemini Content
-	contents := make([]Content, 0, len(details))
-	for _, detail := range details {
-		role := "user" // Default to user
-		if strings.ToLower(detail.Role) == "assistant" || strings.ToLower(detail.Role) == "model" {
-			role = "model"
-		} else if strings.ToLower(detail.Role) == "system" {
-			log.Warnf("Gemini ChatEx: System role provided, but Gemini uses a dedicated systemInstruction field. Ignoring message role.")
-			// Potentially move this content to req.SystemInstruction if needed, but API might reject it here.
-			continue // Skip system message in main contents for now
-		}
-		contents = append(contents, Content{
-			Parts: []Part{{Text: utils.InterfaceToString(detail.Content)}},
-			Role:  role,
-		})
-	}
-
-	// Handle potential system instruction from the first message if applicable
-	var systemInstruction *Content
-	if len(details) > 0 && strings.ToLower(details[0].Role) == "system" {
-		log.Infof("Using first message as system instruction.")
-		systemInstruction = &Content{Parts: []Part{{Text: utils.InterfaceToString(details[0].Content)}}}
-		if len(contents) > 0 && contents[0].Role == "user" { // Ensure user starts if system instruction is separate
-			// Contents should be ok as is, or Gemini might require user first after system instruction.
-		} else if len(contents) > 0 {
-			log.Warnf("First non-system message role is %s, Gemini might expect 'user' after system instruction.", contents[0].Role)
-		}
-		// Remove the system message from the main contents if we handle it separately
-		// contents = contents[1:] // Be careful if there was only a system message
-	}
-	if len(contents) == 0 && systemInstruction == nil {
-		return nil, errors.New("ChatEx requires non-system messages or a system instruction")
-	}
-	if len(contents) > 0 && contents[len(contents)-1].Role != "user" {
-		log.Warnf("ChatEx: Last message role is not 'user', Gemini API might require a final user message.")
-		// Potentially append a dummy user message? Or let the API handle it.
-	}
-
-	req := GenerateContentRequest{
-		Contents:          contents,
-		SystemInstruction: systemInstruction, // Add system instruction if found
-		// Include default safety/generation config if needed, potentially from c.config
-		GenerationConfig: &GenerationConfig{ // Example defaults
-			Temperature:     1.0,
-			TopP:            0.95,
-			TopK:            64,
-			MaxOutputTokens: 8192,
-		},
-		SafetySettings: []SafetySetting{
-			{Category: "HARM_CATEGORY_HARASSMENT", Threshold: "BLOCK_MEDIUM_AND_ABOVE"},
-			{Category: "HARM_CATEGORY_HATE_SPEECH", Threshold: "BLOCK_MEDIUM_AND_ABOVE"},
-			{Category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", Threshold: "BLOCK_MEDIUM_AND_ABOVE"},
-			{Category: "HARM_CATEGORY_DANGEROUS_CONTENT", Threshold: "BLOCK_MEDIUM_AND_ABOVE"},
-		},
-	}
-
-	// Use internal streaming function
-	rawChunkChan, errChan := c.internalStreamGenerateContent(ctx, req)
-
-	// Collect the full response text and metadata from the stream
-	var fullResponseText strings.Builder
-	var finalUsage *UsageMetadata
-	var finishReason string
-	var safetyRatings []SafetyRating
-	var promptFeedback *PromptFeedback
-	var lastErr error
-
-	processDone := make(chan struct{})
-
-	go func() {
-		defer close(processDone)
-		for {
-			select {
-			case rawChunk, ok := <-rawChunkChan:
-				if !ok {
-					rawChunkChan = nil // Mark as closed
-					if errChan == nil {
-						return
-					} // Exit if both closed
-					continue
-				}
-				lineStr := string(rawChunk)
-				if strings.HasPrefix(lineStr, "data: ") {
-					lineStr = strings.TrimPrefix(lineStr, "data: ")
-					lineStr = strings.TrimSpace(lineStr)
-				}
-				if lineStr == "[" || lineStr == "]" || lineStr == "," {
-					continue
-				}
-
-				var chunkResp StreamGenerateContentResponse
-				if err := json.Unmarshal([]byte(lineStr), &chunkResp); err != nil {
-					log.Warnf("ChatEx: Failed to unmarshal chunk '%s': %v. Skipping.", lineStr, err)
-					continue
-				}
-
-				if chunkResp.UsageMetadata != nil {
-					finalUsage = chunkResp.UsageMetadata
-					log.Debugf("ChatEx: Received usage metadata: %+v", finalUsage)
-				}
-				if chunkResp.PromptFeedback != nil {
-					promptFeedback = chunkResp.PromptFeedback // Store prompt feedback
-					log.Debugf("ChatEx: Received prompt feedback: %+v", promptFeedback)
-				}
-
-				for _, candidate := range chunkResp.Candidates {
-					if candidate.FinishReason != "" {
-						finishReason = candidate.FinishReason
-						log.Debugf("ChatEx: Received finish reason: %s", finishReason)
-					}
-					if len(candidate.SafetyRatings) > 0 {
-						safetyRatings = candidate.SafetyRatings // Store safety ratings
-					}
-					for _, part := range candidate.Content.Parts {
-						if part.Text != "" {
-							fullResponseText.WriteString(part.Text)
-						}
-					}
-				}
-
-			case err, ok := <-errChan:
-				if !ok {
-					errChan = nil // Mark as closed
-					if rawChunkChan == nil {
-						return
-					} // Exit if both closed
-					continue
-				}
-				if err != nil {
-					log.Errorf("Error received from internal stream in ChatEx: %v", err)
-					lastErr = err // Store the last error
-				}
-
-			case <-ctx.Done():
-				log.Warnf("ChatEx context cancelled.")
-				lastErr = ctx.Err()
-				return
-			}
-		}
-	}()
-
-	<-processDone // Wait for processing goroutine to finish
-
-	if lastErr != nil {
-		return nil, fmt.Errorf("error during ChatEx stream processing: %w", lastErr)
-	}
-
-	// Check for blocking reasons from prompt feedback
-	if promptFeedback != nil && promptFeedback.BlockReason != "" {
-		errMsg := fmt.Sprintf("ChatEx prompt blocked: %s. %s", promptFeedback.BlockReason, promptFeedback.BlockReasonMessage)
-		log.Warnf(errMsg)
-		return nil, errors.New(errMsg)
-	}
-	// Check for blocking reasons from safety ratings (though finishReason might also indicate this)
-	for _, rating := range safetyRatings {
-		if rating.Blocked {
-			errMsg := fmt.Sprintf("ChatEx response blocked by safety filter: %s (%s)", rating.Category, rating.Probability)
-			log.Warnf(errMsg)
-			return nil, errors.New(errMsg)
-		}
-	}
-
-	if fullResponseText.Len() == 0 && lastErr == nil && finishReason != "STOP" && finishReason != "MAX_TOKENS" {
-		log.Warnf("ChatEx resulted in an empty response without explicit error and non-standard finish reason: %s", finishReason)
-		// Return error if response is empty and finish reason indicates a problem (e.g., SAFETY, OTHER)
-		if finishReason == "SAFETY" || finishReason == "OTHER" || finishReason == "RECITATION" {
-			return nil, fmt.Errorf("gemini API finished with reason: %s, response empty", finishReason)
-		}
-		// Otherwise, might be ok (e.g. if model genuinely had nothing to say)
-	}
-
-	log.Infof("Gemini ChatEx completed, response length: %d, finish reason: %s", fullResponseText.Len(), finishReason)
-
-	// Construct ChatChoice (Gemini stream typically has one main candidate result)
-	choice := aispec.ChatChoice{
-		Index: 0,
-		Message: aispec.ChatDetail{
-			Role:    "assistant", // Or "model"
-			Content: fullResponseText.String(),
-		},
-		FinishReason: finishReason,
-		// We are not populating Usage directly here as aispec.ChatChoice doesn't have it.
-		// The aispec.ChatCompletion wrapper (if used) might aggregate usage.
-	}
-
-	return []aispec.ChatChoice{choice}, nil
-}
-
-// --- StructuredStreamer Interface Implementation ---
 
 // SupportedStructuredStream indicates that Gemini client can provide structured stream data.
 func (c *Client) SupportedStructuredStream() bool {

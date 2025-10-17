@@ -4,37 +4,32 @@ desc(
 	severity: high
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是一种常见的安全漏洞，发生在应用程序未对用户输入进行充分过滤或参数化处理时。攻击者可以通过构造恶意输入，修改应用程序原本的SQL查询逻辑，从而执行非授权的数据库操作。在Go语言中使用 `sqlx` 库时，如果直接将用户提供的、未经净化的数据拼接到SQL查询字符串中，而非使用其内置的参数化查询机制，将会引入SQL注入风险。这使得攻击者能够绕过身份验证、窃取敏感数据、修改或删除数据库中的信息，甚至在极端情况下获取数据库服务器的控制权。
-
+SQL注入是一种常见的安全漏洞，发生在应用程序未对用户输入进行充分过滤或参数化处理时。攻击者可以通过构造恶意输入，修改应用程序原本的SQL查询逻辑，从而执行非授权的数据库操作。在Go语言中使用 `sqlx` 库时，如果直接将用户提供的、未经净化的数据拼接到SQL查询字符串中，而非使用其内置的参数化查询机制，将会引入SQL注入风险。这使得攻击者能够绕过身份验证、窃取敏感数据、修改或删除数据库中的信息，甚至在极端情况下获取数据库服务器的控制权。
 2. **触发场景**
-   当应用程序直接将来自HTTP请求（如FormValue, QueryParameter）的用户输入或其他外部不可信数据，直接拼接到 `sqlx` 的查询方法（如 `Select`, `Get`, `Exec`, `Query` 等）的SQL语句字符串中时，就存在触发SQL注入的风险。
-
-   ```go
-   // 不安全的查询示例，直接拼接用户输入的username
-   username := r.FormValue("username")
-   var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
-   err = db.Select(&users, query) // 存在SQL注入风险
-   ```
-   攻击者可以输入 `' OR '1'='1`，使得查询变为 `SELECT * FROM users WHERE name = '' OR '1'='1'`，从而绕过用户名验证，查询到所有用户的数据。
-
+当应用程序直接将来自HTTP请求（如FormValue, QueryParameter）的用户输入或其他外部不可信数据，直接拼接到 `sqlx` 的查询方法（如 `Select`, `Get`, `Exec`, `Query` 等）的SQL语句字符串中时，就存在触发SQL注入的风险。
+```go
+// 不安全的查询示例，直接拼接用户输入的username
+username := r.FormValue("username")
+var users []User
+query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+err = db.Select(&users, query) // 存在SQL注入风险
+```
+攻击者可以输入 `' OR '1'='1`，使得查询变为 `SELECT * FROM users WHERE name = '' OR '1'='1'`，从而绕过用户名验证，查询到所有用户的数据。
 3. **潜在影响**
-   - **数据泄露:** 攻击者可以读取数据库中的任意敏感信息，如用户账户、密码哈希、个人资料等。
-   - **数据篡改与删除:** 攻击者可以修改或删除数据库中的数据，破坏数据的完整性。
-   - **绕过认证与授权:** 攻击者可能无需提供合法凭证即可访问受限资源。
-   - **执行任意SQL命令:** 包括但不限于创建/删除表、调用存储过程、执行系统命令等，带来严重的安全威胁。
-   - **拒绝服务:** 通过执行耗时或资源密集型的SQL查询，导致数据库性能下降甚至瘫痪。
+- **数据泄露:** 攻击者可以读取数据库中的任意敏感信息，如用户账户、密码哈希、个人资料等。
+- **数据篡改与删除:** 攻击者可以修改或删除数据库中的数据，破坏数据的完整性。
+- **绕过认证与授权:** 攻击者可能无需提供合法凭证即可访问受限资源。
+- **执行任意SQL命令:** 包括但不限于创建/删除表、调用存储过程、执行系统命令等，带来严重的安全威胁。
+- **拒绝服务:** 通过执行耗时或资源密集型的SQL查询，导致数据库性能下降甚至瘫痪。
 DESC
 	rule_id: "cdc66b17-36b4-4436-813e-9d121964224b"
 	title_zh: "检测Golang Sqlx SQL注入漏洞"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询
 这是防止SQL注入最有效且推荐的方法。`sqlx` 支持多种数据库驱动的参数化查询，可以通过占位符绑定用户输入，确保输入数据被视为数据值而不是SQL代码的一部分。
-
 ```go
 // 修复后的安全查询示例，使用参数化查询
 username := r.FormValue("username")
@@ -43,12 +38,10 @@ var users []User
 query := "SELECT * FROM users WHERE name = ?"
 err = db.Select(&users, query, username) // 将username作为参数传递，由sqlx安全处理
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 ```
-
 或者对于 `sqlx` 推荐的命名参数风格 (`:name`, `:id`):
-
 ```go
 // 使用命名参数的示例
 username := r.FormValue("username")
@@ -57,25 +50,22 @@ query := "SELECT * FROM users WHERE name = :username"
 nargs := map[string]interface{}{"username": username}
 err = db.Select(&users, query, nargs) // 将参数放在map中传递
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 ```
-
 #### 2. 对用户输入进行严格的验证和净化
 在将用户输入用于SQL查询（尽管强烈推荐参数化）之前，应对其进行验证，确保其符合预期的格式、类型或范围。例如，如果期望的是一个整数ID，应尝试将其转换为整数，如果转换失败则拒绝输入。
-
 ```go
 // 示例：验证用户输入的ID是否为数字
 idStr := r.FormValue("id")
 id, err := strconv.Atoi(idStr)
 if err != nil {
-    http.Error(w, "Invalid ID format", http.StatusBadRequest)
-    return
+http.Error(w, "Invalid ID format", http.StatusBadRequest)
+return
 }
 // 接下来使用参数化查询，绑定这个验证过的整数ID
 // ... db.Get(&user, "SELECT * FROM users WHERE id = ?", id) ...
 ```
-
 #### 3. 避免使用字符串格式化函数拼接SQL
 绝对不要使用 `fmt.Sprintf` 或类似的字符串格式化函数直接将用户输入拼接到SQL查询字符串中。
 SOLUTION
@@ -87,16 +77,17 @@ REFERENCE
 )
 
 <include('golang-database-sqlx')> as $sink;
+<include('golang-user-input')> as $input;
+
 $sink.Select(*<slice(index=2)> #-> as $param);
-$param?{have: 'Parameter'} as $high;
+$sink.Where(*<slice(index=2)> #-> as $param);
+$param & $input as $high;
 
 alert $high for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数化查询
 这是防止SQL注入最有效且推荐的方法。`sqlx` 支持多种数据库驱动的参数化查询，可以通过占位符绑定用户输入，确保输入数据被视为数据值而不是SQL代码的一部分。
-
 ```go
 // 修复后的安全查询示例，使用参数化查询
 username := r.FormValue("username")
@@ -105,12 +96,10 @@ var users []User
 query := "SELECT * FROM users WHERE name = ?"
 err = db.Select(&users, query, username) // 将username作为参数传递，由sqlx安全处理
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 ```
-
 或者对于 `sqlx` 推荐的命名参数风格 (`:name`, `:id`):
-
 ```go
 // 使用命名参数的示例
 username := r.FormValue("username")
@@ -119,63 +108,59 @@ query := "SELECT * FROM users WHERE name = :username"
 nargs := map[string]interface{}{"username": username}
 err = db.Select(&users, query, nargs) // 将参数放在map中传递
 if err != nil {
-    log.Fatal(err)
+log.Fatal(err)
 }
 ```
-
 #### 2. 对用户输入进行严格的验证和净化
 在将用户输入用于SQL查询（尽管强烈推荐参数化）之前，应对其进行验证，确保其符合预期的格式、类型或范围。例如，如果期望的是一个整数ID，应尝试将其转换为整数，如果转换失败则拒绝输入。
-
 ```go
 // 示例：验证用户输入的ID是否为数字
 idStr := r.FormValue("id")
 id, err := strconv.Atoi(idStr)
 if err != nil {
-    http.Error(w, "Invalid ID format", http.StatusBadRequest)
-    return
+http.Error(w, "Invalid ID format", http.StatusBadRequest)
+return
 }
 // 接下来使用参数化查询，绑定这个验证过的整数ID
 // ... db.Get(&user, "SELECT * FROM users WHERE id = ?", id) ...
 ```
-
 #### 3. 避免使用字符串格式化函数拼接SQL
 绝对不要使用 `fmt.Sprintf` 或类似的字符串格式化函数直接将用户输入拼接到SQL查询字符串中。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是一种常见的安全漏洞，发生在应用程序未对用户输入进行充分过滤或参数化处理时。攻击者可以通过构造恶意输入，修改应用程序原本的SQL查询逻辑，从而执行非授权的数据库操作。在Go语言中使用 `sqlx` 库时，如果直接将用户提供的、未经净化的数据拼接到SQL查询字符串中，而非使用其内置的参数化查询机制，将会引入SQL注入风险。这使得攻击者能够绕过身份验证、窃取敏感数据、修改或删除数据库中的信息，甚至在极端情况下获取数据库服务器的控制权。
-
+SQL注入是一种常见的安全漏洞，发生在应用程序未对用户输入进行充分过滤或参数化处理时。攻击者可以通过构造恶意输入，修改应用程序原本的SQL查询逻辑，从而执行非授权的数据库操作。在Go语言中使用 `sqlx` 库时，如果直接将用户提供的、未经净化的数据拼接到SQL查询字符串中，而非使用其内置的参数化查询机制，将会引入SQL注入风险。这使得攻击者能够绕过身份验证、窃取敏感数据、修改或删除数据库中的信息，甚至在极端情况下获取数据库服务器的控制权。
 2. **触发场景**
-   当应用程序直接将来自HTTP请求（如FormValue, QueryParameter）的用户输入或其他外部不可信数据，直接拼接到 `sqlx` 的查询方法（如 `Select`, `Get`, `Exec`, `Query` 等）的SQL语句字符串中时，就存在触发SQL注入的风险。
-
-   ```go
-   // 不安全的查询示例，直接拼接用户输入的username
-   username := r.FormValue("username")
-   var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
-   err = db.Select(&users, query) // 存在SQL注入风险
-   ```
-   攻击者可以输入 `' OR '1'='1`，使得查询变为 `SELECT * FROM users WHERE name = '' OR '1'='1'`，从而绕过用户名验证，查询到所有用户的数据。
-
+当应用程序直接将来自HTTP请求（如FormValue, QueryParameter）的用户输入或其他外部不可信数据，直接拼接到 `sqlx` 的查询方法（如 `Select`, `Get`, `Exec`, `Query` 等）的SQL语句字符串中时，就存在触发SQL注入的风险。
+```go
+// 不安全的查询示例，直接拼接用户输入的username
+username := r.FormValue("username")
+var users []User
+query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+err = db.Select(&users, query) // 存在SQL注入风险
+```
+攻击者可以输入 `' OR '1'='1`，使得查询变为 `SELECT * FROM users WHERE name = '' OR '1'='1'`，从而绕过用户名验证，查询到所有用户的数据。
 3. **潜在影响**
-   - **数据泄露:** 攻击者可以读取数据库中的任意敏感信息，如用户账户、密码哈希、个人资料等。
-   - **数据篡改与删除:** 攻击者可以修改或删除数据库中的数据，破坏数据的完整性。
-   - **绕过认证与授权:** 攻击者可能无需提供合法凭证即可访问受限资源。
-   - **执行任意SQL命令:** 包括但不限于创建/删除表、调用存储过程、执行系统命令等，带来严重的安全威胁。
-   - **拒绝服务:** 通过执行耗时或资源密集型的SQL查询，导致数据库性能下降甚至瘫痪。
-CODE
+- **数据泄露:** 攻击者可以读取数据库中的任意敏感信息，如用户账户、密码哈希、个人资料等。
+- **数据篡改与删除:** 攻击者可以修改或删除数据库中的数据，破坏数据的完整性。
+- **绕过认证与授权:** 攻击者可能无需提供合法凭证即可访问受限资源。
+- **执行任意SQL命令:** 包括但不限于创建/删除表、调用存储过程、执行系统命令等，带来严重的安全威胁。
+- **拒绝服务:** 通过执行耗时或资源密集型的SQL查询，导致数据库性能下降甚至瘫痪。
+DESC
 	level: "high",
 	type: "vuln",
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
+	title: "Golang Sqlx SQL Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang Sqlx SQL注入漏洞",
+	message: "检测到Go语言中Sqlx SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "SQL注入",
+	name: "high",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -223,4 +208,105 @@ func main() {
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 UNSAFE
+	"safefile://SafeSqlxSelectNamedParam.go": <<<CODE
+// SafeSqlxSelectNamedParam.go
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func getUserByNameNamedParam(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	dsn := "user:password@tcp(localhost:3306)/dbname"
+	db, err := sqlx.Connect("mysql", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	var users []User
+	// 使用命名参数安全地进行查询
+	query := "SELECT * FROM users WHERE name = :username"
+	nargs := map[string]interface{}{"username": username}
+	err = db.Select(&users, query, nargs)
+
+	if err != nil {
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	for _, user := range users {
+		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/getUserByNameNamedParam", getUserByNameNamedParam)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
+	"safefile://SafeSqlxSelectPositionalParam.go": <<<CODE
+// SafeSqlxSelectPositionalParam.go
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/jmoiron/sqlx"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func getUserByNamePositionalParam(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	dsn := "user:password@tcp(localhost:3306)/dbname"
+	db, err := sqlx.Connect("mysql", dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	var users []User
+	// 使用位置占位符参数化查询，防止SQL注入
+	query := "SELECT * FROM users WHERE name = ?"
+	err = db.Select(&users, query, username)
+
+	if err != nil {
+		log.Printf("Error querying database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	for _, user := range users {
+		fmt.Fprintf(w, "User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/getUserByNamePositionalParam", getUserByNamePositionalParam)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
 )

@@ -6,30 +6,31 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-点击劫持（Clickjacking）是一种视觉欺骗手段。攻击者创建一个看似无害的网页覆盖在目标网页上，通过操骗用户点击覆盖层上的元素，从而在不知情的情况下触发对目标网页的操作。当应用程序禁用了`X-Frame-Options`或设置不当，允许其他网站将自己的页面嵌入到`iframe`中时，就容易发生点击劫持。
+   点击劫持（Clickjacking）是一种视觉欺骗手段。攻击者创建一个看似无害的网页覆盖在目标网页上，通过操骗用户点击覆盖层上的元素，从而在不知情的情况下触发对目标网页的操作。当应用程序禁用了`X-Frame-Options`或设置不当，允许其他网站将自己的页面嵌入到`iframe`中时，就容易发生点击劫持。
 
 2. **触发场景**
-当Spring Security配置中通过`.headers().frameOptions().disable()`明确禁用了`X-Frame-Options`头部或者未进行相关配置时，应用程序页面可以被其他恶意网站通过`iframe`或`frame`的方式嵌入。攻击者可以在自己的恶意网站上创建一个包含目标应用的`iframe`，并在其上方叠加透明的、具有诱导性的元素，诱骗用户点击，从而劫持用户的点击行为，例如劫持登录、提交表单、修改设置等操作。
+   当Spring Security配置中通过`.headers().frameOptions().disable()`明确禁用了`X-Frame-Options`头部或者未进行相关配置时，应用程序页面可以被其他恶意网站通过`iframe`或`frame`的方式嵌入。攻击者可以在自己的恶意网站上创建一个包含目标应用的`iframe`，并在其上方叠加透明的、具有诱导性的元素，诱骗用户点击，从而劫持用户的点击行为，例如劫持登录、提交表单、修改设置等操作。
 
-**存在漏洞的代码示例:**
-```java
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
-{
-    // ... 其他配置
-    return httpSecurity
-            .headers().frameOptions().disable()
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
-}
-```
+   **存在漏洞的代码示例:**
+   ```java
+   @Bean
+   public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
+   {
+       // ... 其他配置
+       return httpSecurity
+           .headers().frameOptions().disable()
+           .and().authorizeRequests()
+           // ... 其他授权配置
+           .build();
+   }
+   ```
 
 3. **潜在影响**
-- **用户敏感操作劫持:** 攻击者可以诱导用户在不知情的情况下进行敏感操作，如修改密码、转账、授权等。
-- **数据泄露:** 通过点击劫持诱导用户点击下载敏感文件或访问泄露敏感信息的页面。
-- **会话劫持:** 配合其他漏洞（如XSS）或钓鱼手段，攻击者可能劫持用户会话。
-- **绕过安全防护:** 在某些情况下，点击劫持可能被用于绕过CSRF防护。
+   - **用户敏感操作劫持:** 攻击者可以诱导用户在不知情的情况下进行敏感操作，如修改密码、转账、授权等。
+   - **数据泄露:** 通过点击劫持诱导用户点击下载敏感文件或访问泄露敏感信息的页面。
+   - **会话劫持:** 配合其他漏洞（如XSS）或钓鱼手段，攻击者可能劫持用户会话。
+   - **绕过安全防护:** 在某些情况下，点击劫持可能被用于绕过CSRF防护。
+
 DESC
 	rule_id: "e0e6ed1e-aa60-4522-a5c0-ae8f0b121b7e"
 	reference: <<<REFERENCE
@@ -43,7 +44,6 @@ REFERENCE
 通过配置Spring Security，启用`X-Frame-Options`头部，并设置合适的值来限制页面被嵌入到其他网页中。
 
 **修复代码示例:**
-
 **方式一：使用 `DENY` 禁止任何网站嵌入**
 ```java
 @Bean
@@ -51,10 +51,10 @@ public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Excepti
 {
     // ... 其他配置
     return httpSecurity
-            .headers().frameOptions().deny()
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
+        .headers().frameOptions().deny()
+        .and().authorizeRequests()
+        // ... 其他授权配置
+        .build();
 }
 ```
 
@@ -65,10 +65,10 @@ public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Excepti
 {
     // ... 其他配置
     return httpSecurity
-            .headers().frameOptions().sameOrigin()
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
+        .headers().frameOptions().sameOrigin()
+        .and().authorizeRequests()
+        // ... 其他授权配置
+        .build();
 }
 ```
 
@@ -82,107 +82,101 @@ public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Excepti
 {
     // ... 其他配置
     return httpSecurity
-            .headers()
-                .contentSecurityPolicy("frame-ancestors 'self' https://example.com;") // 示例：只允许同源或指定域嵌入
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
+        .headers()
+        .contentSecurityPolicy("frame-ancestors 'self' https://example.com;") // 示例：只允许同源或指定域嵌入
+        .and().authorizeRequests()
+        // ... 其他授权配置
+        .build();
 }
 ```
 上述示例中的`frame-ancestors 'self' https://example.com;`表示只允许同源或`https://example.com`网站嵌入页面。根据实际需求调整允许的源。
+
 SOLUTION
 )
 
 .frameOptions()...disable() as $vuln;
 check $vuln;
 alert $vuln for {
-	title: "Check Java Clickjacking Vulnerability",
-	title_zh: "检测Java点击劫持漏洞",
-	solution: <<<CODE
+	title: "Java Clickjacking Vulnerability Was Detected",
+	title_zh: "检测到Java点击劫持漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 开启 `X-Frame-Options` 头部
 通过配置Spring Security，启用`X-Frame-Options`头部，并设置合适的值来限制页面被嵌入到其他网页中。
-
 **修复代码示例:**
-
 **方式一：使用 `DENY` 禁止任何网站嵌入**
 ```java
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
 {
-    // ... 其他配置
-    return httpSecurity
-            .headers().frameOptions().deny()
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
+// ... 其他配置
+return httpSecurity
+.headers().frameOptions().deny()
+.and().authorizeRequests()
+// ... 其他授权配置
+.build();
 }
 ```
-
 **方式二：使用 `SAMEORIGIN` 仅允许同源网站嵌入**
 ```java
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
 {
-    // ... 其他配置
-    return httpSecurity
-            .headers().frameOptions().sameOrigin()
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
+// ... 其他配置
+return httpSecurity
+.headers().frameOptions().sameOrigin()
+.and().authorizeRequests()
+// ... 其他授权配置
+.build();
 }
 ```
-
 #### 2. 使用 `Content-Security-Policy` (CSP)
 CSP 提供了更灵活和强大的控制方式，可以用来更精细地控制哪些域可以嵌入你的内容。通过设置 `frame-ancestors` 指令来限制页面可以被嵌入的源。
-
 **修复代码示例 (可以在Spring Security配置中添加或作为HTTP响应头):**
 ```java
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
 {
-    // ... 其他配置
-    return httpSecurity
-            .headers()
-                .contentSecurityPolicy("frame-ancestors 'self' https://example.com;") // 示例：只允许同源或指定域嵌入
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
+// ... 其他配置
+return httpSecurity
+.headers()
+.contentSecurityPolicy("frame-ancestors 'self' https://example.com;") // 示例：只允许同源或指定域嵌入
+.and().authorizeRequests()
+// ... 其他授权配置
+.build();
 }
 ```
 上述示例中的`frame-ancestors 'self' https://example.com;`表示只允许同源或`https://example.com`网站嵌入页面。根据实际需求调整允许的源。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 点击劫持（Clickjacking）是一种视觉欺骗手段。攻击者创建一个看似无害的网页覆盖在目标网页上，通过操骗用户点击覆盖层上的元素，从而在不知情的情况下触发对目标网页的操作。当应用程序禁用了`X-Frame-Options`或设置不当，允许其他网站将自己的页面嵌入到`iframe`中时，就容易发生点击劫持。
-
 2. **触发场景**
 当Spring Security配置中通过`.headers().frameOptions().disable()`明确禁用了`X-Frame-Options`头部或者未进行相关配置时，应用程序页面可以被其他恶意网站通过`iframe`或`frame`的方式嵌入。攻击者可以在自己的恶意网站上创建一个包含目标应用的`iframe`，并在其上方叠加透明的、具有诱导性的元素，诱骗用户点击，从而劫持用户的点击行为，例如劫持登录、提交表单、修改设置等操作。
-
 **存在漏洞的代码示例:**
 ```java
 @Bean
 public SecurityFilterChain filterChain(HttpSecurity httpSecurity) throws Exception
 {
-    // ... 其他配置
-    return httpSecurity
-            .headers().frameOptions().disable()
-            .and().authorizeRequests()
-            // ... 其他授权配置
-            .build();
+// ... 其他配置
+return httpSecurity
+.headers().frameOptions().disable()
+.and().authorizeRequests()
+// ... 其他授权配置
+.build();
 }
 ```
-
 3. **潜在影响**
 - **用户敏感操作劫持:** 攻击者可以诱导用户在不知情的情况下进行敏感操作，如修改密码、转账、授权等。
 - **数据泄露:** 通过点击劫持诱导用户点击下载敏感文件或访问泄露敏感信息的页面。
 - **会话劫持:** 配合其他漏洞（如XSS）或钓鱼手段，攻击者可能劫持用户会话。
 - **绕过安全防护:** 在某些情况下，点击劫持可能被用于绕过CSRF防护。
-CODE
+DESC
 	level: "low",
+	message: "检测到Java点击劫持漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "点击劫持",
+	name: "vuln",
 }
 
 

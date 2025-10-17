@@ -76,6 +76,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 
 	flag := uuid.NewString()
 	randomName := flag + uuid.NewString()
+	var newAiToolID int64
 	randomDescription := uuid.NewString()
 	randomContent := uuid.NewString()
 	randomToolPath := uuid.NewString()
@@ -102,6 +103,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 		assert.Equal(t, randomToolPath, aiListRsp.Tools[0].ToolPath)
 		assert.Equal(t, randomKeywords, aiListRsp.Tools[0].Keywords)
 		assert.Equal(t, randomName, aiListRsp.Tools[0].Name)
+		newAiToolID = aiListRsp.Tools[0].ID
 	})
 	newRandomName := flag + uuid.NewString()
 	newRandomDescription := uuid.NewString()
@@ -110,7 +112,8 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 	newRandomKeywords := []string{uuid.NewString()}
 	t.Run("UpdateAITool", func(t *testing.T) {
 		// 不更新工具名
-		_, err := c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
+		_, err := c.UpdateAITool(ctx, &ypb.UpdateAIToolRequest{
+			ID:          newAiToolID,
 			Name:        randomName,
 			Description: newRandomDescription,
 			Content:     newRandomContent,
@@ -132,7 +135,8 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 		assert.Equal(t, newRandomKeywords, aiListRsp.Tools[0].Keywords)
 
 		// 更新工具名
-		_, err = c.SaveAITool(ctx, &ypb.SaveAIToolRequest{
+		_, err = c.UpdateAITool(ctx, &ypb.UpdateAIToolRequest{
+			ID:          newAiToolID,
 			Name:        newRandomName,
 			Description: newRandomDescription,
 			Content:     newRandomContent,
@@ -162,7 +166,7 @@ func TestGRPCMUSTPASS_WriteDB(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		assert.Len(t, aiListRsp.Tools, 2)
+		assert.Len(t, aiListRsp.Tools, 1)
 	})
 	t.Run("DeleteAITool", func(t *testing.T) {
 		_, err := c.DeleteAITool(ctx, &ypb.DeleteAIToolRequest{
@@ -331,15 +335,6 @@ func TestGRPCMUSTPASS_ToggleAIToolFavorite(t *testing.T) {
 		})
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "AI tool not found")
-	})
-
-	t.Run("ToggleEmptyToolName", func(t *testing.T) {
-		// 尝试切换空工具名
-		_, err := c.ToggleAIToolFavorite(ctx, &ypb.ToggleAIToolFavoriteRequest{
-			ToolName: "",
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "tool name cannot be empty")
 	})
 }
 

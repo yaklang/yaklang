@@ -15,6 +15,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/davecgh/go-spew/spew"
@@ -59,6 +60,7 @@ func ExtractStrContextByKeyword(raw string, res []string) []string {
 }
 
 var ShrinkString = codec.ShrinkString
+var ShrinkTextBlock = codec.ShrinkTextBlock
 
 func StringBefore(value string, a string) string {
 	pos := strings.Index(value, a)
@@ -117,6 +119,15 @@ func RemoveRepeatUintSlice(slc []uint) []uint {
 	}
 }
 
+// 元素去重
+func RemoveRepeatIntSlice(slc []int) []int {
+	if len(slc) < 1024 {
+		return RemoveRepeatIntSliceByLoop(slc)
+	} else {
+		return RemoveRepeatIntSliceByMap(slc)
+	}
+}
+
 func RemoveRepeatStringSliceByLoop(slc []string) []string {
 	result := []string{}
 	for i := range slc {
@@ -167,6 +178,36 @@ func RemoveRepeatUintSliceByLoop(slc []uint) []uint {
 func RemoveRepeatUintSliceByMap(slc []uint) []uint {
 	result := []uint{}
 	tempMap := map[uint]byte{}
+	for _, e := range slc {
+		l := len(tempMap)
+		tempMap[e] = 0
+		if len(tempMap) != l {
+			result = append(result, e)
+		}
+	}
+	return result
+}
+
+func RemoveRepeatIntSliceByLoop(slc []int) []int {
+	result := []int{}
+	for i := range slc {
+		flag := true
+		for j := range result {
+			if slc[i] == result[j] {
+				flag = false
+				break
+			}
+		}
+		if flag {
+			result = append(result, slc[i])
+		}
+	}
+	return result
+}
+
+func RemoveRepeatIntSliceByMap(slc []int) []int {
+	result := []int{}
+	tempMap := map[int]byte{}
 	for _, e := range slc {
 		l := len(tempMap)
 		tempMap[e] = 0
@@ -1642,4 +1683,202 @@ func RuneIndex(s, sub []rune) int {
 		}
 	}
 	return -1
+}
+
+func CutBytesPrefixFunc(raw []byte, handle func(rune) bool) ([]byte, []byte, bool) {
+	index := bytes.IndexFunc(raw, handle)
+	if index < 0 {
+		return nil, raw, false
+	}
+	return raw[:index], raw[index:], true
+}
+
+func NotSpaceRune(r rune) bool {
+	return !unicode.IsSpace(r)
+}
+
+// PrefixLines 为文本的每一行添加指定前缀
+// 对所有输入（包括单行和多行）都添加前缀
+// Example:
+// ```
+// str.PrefixLines("hello", "> ") // "> hello"
+// str.PrefixLines("line1\nline2", "> ") // "> line1\n> line2"
+// ```
+func PrefixLines(input interface{}, prefix string) string {
+	var content string
+
+	switch v := input.(type) {
+	case string:
+		content = v
+	case io.Reader:
+		data, err := io.ReadAll(v)
+		if err != nil {
+			log.Errorf("failed to read from io.Reader: %v", err)
+			return ""
+		}
+		content = string(data)
+	default:
+		content = InterfaceToString(input)
+	}
+
+	lines := strings.Split(content, "\n")
+	var result []string
+
+	for _, line := range lines {
+		result = append(result, prefix+line)
+	}
+
+	return strings.Join(result, "\n")
+}
+
+// PrefixLinesWithLineNumbers 为文本的每一行添加行号前缀
+// 对所有输入（包括单行和多行）都添加行号前缀
+// Example:
+// ```
+// str.PrefixLinesWithLineNumbers("hello") // "1 | hello"
+// str.PrefixLinesWithLineNumbers("line1\nline2") // "1 | line1\n2 | line2"
+// ```
+func PrefixLinesWithLineNumbers(input interface{}) string {
+	var content string
+
+	switch v := input.(type) {
+	case string:
+		content = v
+	case io.Reader:
+		data, err := io.ReadAll(v)
+		if err != nil {
+			log.Errorf("failed to read from io.Reader: %v", err)
+			return ""
+		}
+		content = string(data)
+	default:
+		content = InterfaceToString(input)
+	}
+
+	lines := strings.Split(content, "\n")
+	var result []string
+
+	for i, line := range lines {
+		result = append(result, fmt.Sprintf("%d | %s", i+1, line))
+	}
+
+	return strings.Join(result, "\n")
+}
+
+// PrefixLinesReader 为文本的每一行添加指定前缀，输入和输出都是 io.Reader
+// 对所有输入（包括单行和多行）都添加前缀，适合处理大文件或流式数据
+// Example:
+// ```
+// reader := strings.NewReader("line1\nline2")
+// prefixedReader := str.PrefixLinesReader(reader, "> ")
+// // 读取 prefixedReader 会得到 "> line1\n> line2"
+// ```
+func PrefixLinesReader(input io.Reader, prefix string) io.Reader {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+
+		// 读取所有内容
+		data, err := io.ReadAll(input)
+		if err != nil {
+			log.Errorf("PrefixLinesReader read error: %v", err)
+			return
+		}
+
+		content := string(data)
+
+		// 为所有行添加前缀
+		lines := strings.Split(content, "\n")
+		for i, line := range lines {
+			if i > 0 {
+				pw.Write([]byte("\n"))
+			}
+			pw.Write([]byte(prefix + line))
+		}
+	}()
+
+	return pr
+}
+
+// PrefixLinesReaderSimple 简化版本的 PrefixLinesReader，总是添加前缀
+// 适合已知是多行文本的场景，使用流式处理
+func PrefixLinesReaderSimple(input io.Reader, prefix string) io.Reader {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+
+		scanner := bufio.NewScanner(input)
+		isFirst := true
+
+		for scanner.Scan() {
+			line := scanner.Text()
+			if !isFirst {
+				pw.Write([]byte("\n"))
+			}
+			pw.Write([]byte(prefix + line))
+			isFirst = false
+		}
+
+		if err := scanner.Err(); err != nil {
+			log.Errorf("PrefixLinesReaderSimple scanner error: %v", err)
+		}
+	}()
+
+	return pr
+}
+
+// PrefixLinesWithLineNumbersReader 为文本的每一行添加行号前缀，输入和输出都是 io.Reader
+// 使用流式处理，逐行读取并添加行号前缀，适合处理大文件或流式数据
+// Example:
+// ```
+// reader := strings.NewReader("line1\nline2")
+// numberedReader := str.PrefixLinesWithLineNumbersReader(reader)
+// // 读取 numberedReader 会得到 "1 | line1\n2 | line2"
+// ```
+func PrefixLinesWithLineNumbersReader(input io.Reader) io.Reader {
+	pr, pw := io.Pipe()
+
+	go func() {
+		defer pw.Close()
+
+		scanner := bufio.NewScanner(input)
+		lineNumber := 1
+		isFirst := true
+		hasContent := false
+
+		for scanner.Scan() {
+			hasContent = true
+			line := scanner.Text()
+			if !isFirst {
+				if _, err := pw.Write([]byte("\n")); err != nil {
+					log.Errorf("PrefixLinesWithLineNumbersReader write newline error: %v", err)
+					return
+				}
+			}
+
+			numberedLine := fmt.Sprintf("%d | %s", lineNumber, line)
+			if _, err := pw.Write([]byte(numberedLine)); err != nil {
+				log.Errorf("PrefixLinesWithLineNumbersReader write line error: %v", err)
+				return
+			}
+
+			lineNumber++
+			isFirst = false
+		}
+
+		// 如果没有内容（空输入），输出带行号的空行以保持兼容性
+		if !hasContent {
+			if _, err := pw.Write([]byte("1 | ")); err != nil {
+				log.Errorf("PrefixLinesWithLineNumbersReader write empty line error: %v", err)
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			log.Errorf("PrefixLinesWithLineNumbersReader scanner error: %v", err)
+		}
+	}()
+
+	return pr
 }

@@ -3,31 +3,33 @@ package aid
 import (
 	"bytes"
 	"context"
-	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
-func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolicy AgreePolicyType, ep *Endpoint) {
-	if ep.checkpoint != nil && ep.checkpoint.Finished { // check ep finished, is recover task or not
+func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolicy aicommon.AgreePolicyType, ep *aicommon.Endpoint) {
+	if ep.GetCheckpoint() != nil && ep.GetCheckpoint().Finished { // check ep finished, is recover task or not
 		return
 	}
 	if ctx == nil {
-		ctx = c.epm.ctx
+		ctx = c.epm.GetContext()
 	}
 	defer func() {
-		if ep.checkpoint != nil {
-			if err := c.submitCheckpointResponse(ep.checkpoint, ep.GetParams()); err != nil {
+		if ep.GetCheckpoint() != nil {
+			if err := c.SubmitCheckpointResponse(ep.GetCheckpoint(), ep.GetParams()); err != nil {
 				log.Errorf("submit review checkpoint to db response err: %v", err)
 			}
 		}
 	}()
 
 	switch doWaitAgreeWithPolicy {
-	case AgreePolicyYOLO:
+	case aicommon.AgreePolicyYOLO:
 		c.EmitInfo("yolo policy auto agree all")
-	case AgreePolicyAuto:
+	case aicommon.AgreePolicyAuto:
 		if c.agreeInterval <= 0 {
 			c.EmitError("auto agree interval is not set")
 			c.agreeInterval = 10 * time.Second
@@ -35,7 +37,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 		if ep.WaitTimeout(c.agreeInterval) {
 			c.EmitInfo("auto agree timeout, use default action: pass")
 		}
-	case AgreePolicyManual:
+	case aicommon.AgreePolicyManual:
 		manualCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		if c.agreeManualCallback != nil { // if agreeManualCallback is not nil, use it help manual agree
@@ -53,7 +55,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 			}()
 		}
 		ep.WaitContext(ctx)
-	case AgreePolicyAI:
+	case aicommon.AgreePolicyAI:
 		if !c.agreeRiskCtrl.enabled() {
 			c.EmitInfo("policy[ai]: ai agree risk control is not enabled, use manual agree (risk control is disabled)")
 			ep.WaitContext(ctx)
@@ -77,7 +79,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 			}
 
 			if result != nil {
-				c.EmitRiskControlPrompt(ep.id, result)
+				c.EmitRiskControlPrompt(ep.GetId(), result)
 			}
 			if c.agreeAIScore > 0 && result.Score >= c.agreeAIScore {
 				c.EmitInfo("ai got risk score: %v >= %v, use manual agree", result.Score, c.agreeAIScore)
@@ -89,7 +91,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 		ep.WaitContext(ctx)
 		cancel()
 		wg.Wait()
-	case AgreePolicyAIAuto:
+	case aicommon.AgreePolicyAIAuto:
 		if c.agreeInterval <= 0 {
 			c.EmitError("auto agree interval is not set")
 			c.agreeInterval = 10 * time.Second
@@ -114,7 +116,7 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 				return
 			}
 			if result != nil && !result.Skipped {
-				c.EmitRiskControlPrompt(ep.id, result)
+				c.EmitRiskControlPrompt(ep.GetId(), result)
 			}
 
 			if c.agreeAIScore > 0 && result.Score >= c.agreeAIScore {
@@ -135,6 +137,6 @@ func (c *Config) doWaitAgreeWithPolicy(ctx context.Context, doWaitAgreeWithPolic
 	}
 }
 
-func (c *Config) doWaitAgree(ctx context.Context, ep *Endpoint) {
+func (c *Config) DoWaitAgree(ctx context.Context, ep *aicommon.Endpoint) {
 	c.doWaitAgreeWithPolicy(ctx, c.agreePolicy, ep)
 }

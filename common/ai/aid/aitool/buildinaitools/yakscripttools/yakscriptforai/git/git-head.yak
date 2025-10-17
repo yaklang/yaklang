@@ -1,5 +1,5 @@
 __DESC__ = "获取指定Git仓库的最新提交(HEAD)的哈希值。如果获取失败，则会发出警告。"
-
+__VERBOSE_NAME__ = "Git HEAD哈希值工具"
 __KEYWORDS__ = "git,仓库,head,哈希,提交,版本控制,信息获取"
 
 yakit.AutoInitYakit()

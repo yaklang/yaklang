@@ -2,137 +2,87 @@ desc(
 	title: "Check Java MultipartFile Path Traversal Vulnerability"
 	type: audit
 	level: warning
-	risk: "path-traversal"
+	risk: "路径穿越"
 	desc: <<<DESC
-### 漏洞描述
-
-1. **漏洞原理**
-   路径遍历（Path Traversal）漏洞发生在应用程序未能充分验证用户提供的路径信息，导致攻击者能够访问受限制的目录之外的文件。当应用程序直接使用用户上传的文件名或其部分内容构建文件保存路径，且未对其中包含的 `../`、`..\` 或者 `/`、`\` 等特殊字符及绝对路径进行有效过滤时，攻击者即可通过构造恶意的文件名来访问、修改甚至删除服务器上的任意文件。在处理`MultipartFile`上传文件时，如果直接使用用户上传的文件名与目标存储路径拼接，就极易引入此类风险。
-
-2. **触发场景**
-   本规则检测的核心场景是Java Spring / Spring Boot 应用中，直接从 `MultipartFile` 获取文件名并与目标路径拼接后使用 `Files.write()` 方法来保存文件。以下是一个典型的存在路径遍历漏洞的代码示例：
-   ```java
-   @PostMapping("/upload")
-   public String handleFileUpload(@RequestParam("file") MultipartFile file) {
-       String uploadDir = "/app/uploads/";
-       // ⚠️ 危险：直接使用用户提供的文件名拼接路径
-       Path filePath = Paths.get(uploadDir, file.getOriginalFilename()); 
-       try {
-           Files.write(filePath, file.getBytes());
-           return "File uploaded successfully: " + filePath.toString();
-       } catch (IOException e) {
-           // 异常处理
-           return "Failed to upload file.";
-       }
-   }
-   ```
-   如果攻击者上传一个文件名为 `../../../../../etc/passwd` 或 `..\..\..\..\..\windows\system.ini` 的文件，而服务器又没有进行适当的路径验证，恶意文件可能被写入到 `/etc/passwd` 或 `c:\windows\system.ini` 等敏感位置，覆盖重要的系统文件。
-
-3. **潜在影响**
-   - **任意文件读写/删除/覆盖**：攻击者可以访问、修改、删除重要的系统文件、配置文件或应用程序文件。
-   - **数据泄露**：如果能访问到包含敏感信息的日志文件、数据库文件或配置文件，可能导致未经授权的数据暴露。
-   - **远程代码执行**：在某些情况下（例如，能够覆盖Web服务器配置文件、包含恶意代码的脚本文件或应用程序的重要类文件），路径遍历可能成为进一步执行任意代码的跳板。
-   - **拒绝服务**：覆盖关键系统文件或应用程序文件可能导致服务崩溃或不可用。
-
-因此，对上传文件的文件名进行严格的净化和路径验证是至关重要的安全措施。
+### 漏洞描述\n1. **漏洞原理**\n路径遍历（Path Traversal）漏洞发生在应用程序未能充分验证用户提供的路径信息，导致攻击者能够访问受限制的目录之外的文件。当应用程序直接使用用户上传的文件名或其部分内容构建文件保存路径，且未对其中包含的 `../`、`..\` 或者 `/`、`\` 等特殊字符及绝对路径进行有效过滤时，攻击者即可通过构造恶意的文件名来访问、修改甚至删除服务器上的任意文件。在处理`MultipartFile`上传文件时，如果直接使用用户上传的文件名与目标存储路径拼接，就极易引入此类风险。\n2. **触发场景**\n本规则检测的核心场景是Java Spring / Spring Boot 应用中，直接从 `MultipartFile` 获取文件名并与目标路径拼接后使用 `Files.write()` 方法来保存文件。以下是一个典型的存在路径遍历漏洞的代码示例：\n```java\n@PostMapping(\"/upload\")\npublic String handleFileUpload(@RequestParam(\"file\") MultipartFile file) {\nString uploadDir = \"/app/uploads/\";\n// ⚠️ 危险：直接使用用户提供的文件名拼接路径\nPath filePath = Paths.get(uploadDir, file.getOriginalFilename());\ntry {\nFiles.write(filePath, file.getBytes());\nreturn \"File uploaded successfully: \" + filePath.toString();\n} catch (IOException e) {\n// 异常处理\nreturn \"Failed to upload file.\";\n}\n}\n```\n如果攻击者上传一个文件名为 `../../../../../etc/passwd` 或 `..\\..\\..\\..\\..\\windows\\system.ini` 的文件，而服务器又没有进行适当的路径验证，恶意文件可能被写入到 `/etc/passwd` 或 `c:\\windows\\system.ini` 等敏感位置，覆盖重要的系统文件。\n3. **潜在影响**\n- **任意文件读写/删除/覆盖**：攻击者可以访问、修改、删除重要的系统文件、配置文件或应用程序文件。\n- **数据泄露**：如果能访问到包含敏感信息的日志文件、数据库文件或配置文件，可能导致未经授权的数据暴露。\n- **远程代码执行**：在某些情况下（例如，能够覆盖Web服务器配置文件、包含恶意代码的脚本文件或应用程序的重要类文件），路径遍历可能成为进一步执行任意代码的跳板。\n- **拒绝服务**：覆盖关键系统文件或应用程序文件可能导致服务崩溃或不可用。\n因此，对上传文件的文件名进行严格的净化和路径验证是至关重要的安全措施。
 DESC
 	rule_id: "15815212-0f58-413f-ad8e-a514778eea85"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. **严格验证和净化文件名**
-
 *   **移除或过滤特殊字符**：禁止文件名中出现 `../`、`..\`、`/`、`\` 等目录跳转或路径分隔符。可以使用正则表达式或其他方法来过滤这些字符。
 *   **仅允许字母、数字和特定符号**：设定允许的文件名字符白名单，拒绝包含其他任何字符的文件名。
 *   **禁用绝对路径**：确保文件名不是一个绝对路径。
 *   **示例代码 (基于Spring)**：
-    ```java
-    import org.springframework.util.StringUtils;
-    import java.nio.file.Path;
-    import java.nio.file.Paths;
-
-    // ... 代码省略 ...
-
-    @PostMapping("/upload")
-    public String handleFileUpload(@RequestParam("file") MultipartFile file) {
-        String uploadDir = "/app/uploads/";
-        String originalFileName = file.getOriginalFilename();
-
-        // ⚠️ 安全修复：净化文件名，移除路径相关字符
-        String cleanFileName = StringUtils.cleanPath(originalFileName);
-        // 进一步校验，例如只允许特定字符集
-        if (!cleanFileName.matches("^[a-zA-Z0-9._-]+")) {
-             throw new IllegalArgumentException("文件名包含非法字符");
-        }
-         // 防止文件名是绝对路径或者以目录分隔符开头
-        if (cleanFileName.contains("../") || cleanFileName.contains("..\\") || cleanFileName.startsWith("/") || cleanFileName.startsWith("\\")) {
-             throw new IllegalArgumentException("文件名包含非法路径引用");
-        }
-
-        Path filePath = Paths.get(uploadDir, cleanFileName);
-        try {
-            Files.write(filePath, file.getBytes());
-            return "File uploaded successfully: " + filePath.toString();
-        } catch (IOException e) {
-            // 异常处理
-            return "Failed to upload file.";
-        }
-    }
-    ```
-
+```java
+import org.springframework.util.StringUtils;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+// ... 代码省略 ...
+@PostMapping("/upload")
+public String handleFileUpload(@RequestParam("file") MultipartFile file) {
+String uploadDir = "/app/uploads/";
+String originalFileName = file.getOriginalFilename();
+// ⚠️ 安全修复：净化文件名，移除路径相关字符
+String cleanFileName = StringUtils.cleanPath(originalFileName);
+// 进一步校验，例如只允许特定字符集
+if (!cleanFileName.matches("^[a-zA-Z0-9._-]+")) {
+throw new IllegalArgumentException("文件名包含非法字符");
+}
+// 防止文件名是绝对路径或者以目录分隔符开头
+if (cleanFileName.contains("../") || cleanFileName.contains("..\\") || cleanFileName.startsWith("/") || cleanFileName.startsWith("\\")) {
+throw new IllegalArgumentException("文件名包含非法路径引用");
+}
+Path filePath = Paths.get(uploadDir, cleanFileName);
+try {
+Files.write(filePath, file.getBytes());
+return "File uploaded successfully: " + filePath.toString();
+} catch (IOException e) {
+// 异常处理
+return "Failed to upload file.";
+}
+}
+```
 #### 2. **使用UUID或其他生成的文件名**
-
-   最安全的方式是完全不使用用户提供的文件名，而是为上传的文件生成一个唯一的随机名称（如UUID），并结合文件的原始扩展名（经过验证）。这样可以完全避免路径遍历问题。
-
-   **示例代码**：
-   ```java
-   import java.util.UUID;
-
-   // ... 代码省略 ...
-
-   @PostMapping("/upload")
-   public String handleFileUpload(@RequestParam("file") MultipartFile file) {
-       String uploadDir = "/app/uploads/";
-       String originalFileName = file.getOriginalFilename();
-
-       // ⚠️ 安全修复：生成UUID作为文件名，并保留原始扩展名
-       String fileExtension = "";
-       int dotIndex = originalFileName.lastIndexOf('.');
-       if (dotIndex > 0 && dotIndex < originalFileName.length() - 1) {
-           fileExtension = originalFileName.substring(dotIndex);
-           // 可选：校验文件扩展名的合法性，防止上传恶意类型的文件
-           if (!isValidExtension(fileExtension)) {
-                throw new IllegalArgumentException("不支持的文件类型");
-           }
-       }
-
-       String newFileName = UUID.randomUUID().toString() + fileExtension;
-       Path filePath = Paths.get(uploadDir, newFileName);
-
-       try {
-           Files.write(filePath, file.getBytes());
-           return "File uploaded successfully: " + filePath.toString();
-       } catch (IOException e) {
-           // 异常处理
-           return "Failed to upload file.";
-       }
-   }
-
-   // 可选：文件扩展名合法性校验方法
-   private boolean isValidExtension(String extension) {
-       // 实现白名单校验，例如：return Arrays.asList(".jpg", ".jpeg", ".png", ".pdf").contains(extension.toLowerCase());
-       return true; // 示例，实际应用中应有具体的校验逻辑
-   }
-   ```
-
+最安全的方式是完全不使用用户提供的文件名，而是为上传的文件生成一个唯一的随机名称（如UUID），并结合文件的原始扩展名（经过验证）。这样可以完全避免路径遍历问题。
+**示例代码**：
+```java
+import java.util.UUID;
+// ... 代码省略 ...
+@PostMapping("/upload")
+public String handleFileUpload(@RequestParam("file") MultipartFile file) {
+String uploadDir = "/app/uploads/";
+String originalFileName = file.getOriginalFilename();
+// ⚠️ 安全修复：生成UUID作为文件名，并保留原始扩展名
+String fileExtension = "";
+int dotIndex = originalFileName.lastIndexOf('.');
+if (dotIndex > 0 && dotIndex < originalFileName.length() - 1) {
+fileExtension = originalFileName.substring(dotIndex);
+// 可选：校验文件扩展名的合法性，防止上传恶意类型的文件
+if (!isValidExtension(fileExtension)) {
+throw new IllegalArgumentException("不支持的文件类型");
+}
+}
+String newFileName = UUID.randomUUID().toString() + fileExtension;
+Path filePath = Paths.get(uploadDir, newFileName);
+try {
+Files.write(filePath, file.getBytes());
+return "File uploaded successfully: " + filePath.toString();
+} catch (IOException e) {
+// 异常处理
+return "Failed to upload file.";
+}
+}
+// 可选：文件扩展名合法性校验方法
+private boolean isValidExtension(String extension) {
+// 实现白名单校验，例如：return Arrays.asList(".jpg", ".jpeg", ".png", ".pdf").contains(extension.toLowerCase());
+return true; // 示例，实际应用中应有具体的校验逻辑
+}
+```
 #### 3. **将文件保存在非Web可访问目录**
-
-   尽量将上传的文件保存在Web服务器根目录之外的目录，并通过应用程序逻辑提供文件访问（例如下载接口），这样即使文件被保存到非预期位置，也无法通过Web直接访问到潜在的敏感文件。
-
+尽量将上传的文件保存在Web服务器根目录之外的目录，并通过应用程序逻辑提供文件访问（例如下载接口），这样即使文件被保存到非预期位置，也无法通过Web直接访问到潜在的敏感文件。
 #### 4. **设置严格的目录权限**
-
-   限制上传文件存储目录的操作系统权限，仅允许应用程序用户具有写入权限，防止攻击者利用其他途径向该目录写入或修改文件。
-
+限制上传文件存储目录的操作系统权限，仅允许应用程序用户具有写入权限，防止攻击者利用其他途径向该目录写入或修改文件。
 综合运用以上多种防御措施，可以有效地防范通过上传文件实现的路径遍历攻击。
 SOLUTION
 	reference: <<<REFERENCE
@@ -145,12 +95,93 @@ REFERENCE
 check $upload;
 Files.write(*?{!opcode: param} as $sink);
 $sink #{
-  until: `*?{<typeName>?{have: MultipartFile}} & $upload as $inter`
-}->
+  until: `*?{<typeName>?{have: MultipartFile}} & $upload `
+}-> as $inter
 
 check $inter then "Upload and Write Files directly" else "No Upload and Files.write"
 alert $inter for {
 	title: "Check Java MultipartFile Path Traversal Vulnerability",
 	title_zh: "检测Java MultipartFile路径穿越漏洞",
 	level: "warning",
+	message: "检测到Java Spring / Spring Boot应用中存在MultipartFile文件名未经过滤直接拼接路径保存文件的风险，可能导致路径遍历攻击。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. **严格验证和净化文件名**
+*   **移除或过滤特殊字符**：禁止文件名中出现 `../`、`..\`、`/`、`\` 等目录跳转或路径分隔符。可以使用正则表达式或其他方法来过滤这些字符。
+*   **仅允许字母、数字和特定符号**：设定允许的文件名字符白名单，拒绝包含其他任何字符的文件名。
+*   **禁用绝对路径**：确保文件名不是一个绝对路径。
+*   **示例代码 (基于Spring)**：
+```java
+import org.springframework.util.StringUtils;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+// ... 代码省略 ...
+@PostMapping("/upload")
+public String handleFileUpload(@RequestParam("file") MultipartFile file) {
+String uploadDir = "/app/uploads/";
+String originalFileName = file.getOriginalFilename();
+// ⚠️ 安全修复：净化文件名，移除路径相关字符
+String cleanFileName = StringUtils.cleanPath(originalFileName);
+// 进一步校验，例如只允许特定字符集
+if (!cleanFileName.matches("^[a-zA-Z0-9._-]+")) {
+throw new IllegalArgumentException("文件名包含非法字符");
+}
+// 防止文件名是绝对路径或者以目录分隔符开头
+if (cleanFileName.contains("../") || cleanFileName.contains("..\\") || cleanFileName.startsWith("/") || cleanFileName.startsWith("\")) {
+throw new IllegalArgumentException("文件名包含非法路径引用");
+}
+Path filePath = Paths.get(uploadDir, cleanFileName);
+try {
+Files.write(filePath, file.getBytes());
+return "File uploaded successfully: " + filePath.toString();
+} catch (IOException e) {
+// 异常处理
+return "Failed to upload file.";
+}
+}
+```
+#### 2. **使用UUID或其他生成的文件名**
+最安全的方式是完全不使用用户提供的文件名，而是为上传的文件生成一个唯一的随机名称（如UUID），并结合文件的原始扩展名（经过验证）。这样可以完全避免路径遍历问题。
+**示例代码**：
+```java
+import java.util.UUID;
+// ... 代码省略 ...
+@PostMapping("/upload")
+public String handleFileUpload(@RequestParam("file") MultipartFile file) {
+String uploadDir = "/app/uploads/";
+String originalFileName = file.getOriginalFilename();
+// ⚠️ 安全修复：生成UUID作为文件名，并保留原始扩展名
+String fileExtension = "";
+int dotIndex = originalFileName.lastIndexOf('.');
+if (dotIndex > 0 && dotIndex < originalFileName.length() - 1) {
+fileExtension = originalFileName.substring(dotIndex);
+// 可选：校验文件扩展名的合法性，防止上传恶意类型的文件
+if (!isValidExtension(fileExtension)) {
+throw new IllegalArgumentException("不支持的文件类型");
+}
+}
+String newFileName = UUID.randomUUID().toString() + fileExtension;
+Path filePath = Paths.get(uploadDir, newFileName);
+try {
+Files.write(filePath, file.getBytes());
+return "File uploaded successfully: " + filePath.toString();
+} catch (IOException e) {
+// 异常处理
+return "Failed to upload file.";
+}
+}
+// 可选：文件扩展名合法性校验方法
+private boolean isValidExtension(String extension) {
+// 实现白名单校验，例如：return Arrays.asList(".jpg", ".jpeg", ".png", ".pdf").contains(extension.toLowerCase());
+return true; // 示例，实际应用中应有具体的校验逻辑
+}
+```
+#### 3. **将文件保存在非Web可访问目录**
+尽量将上传的文件保存在Web服务器根目录之外的目录，并通过应用程序逻辑提供文件访问（例如下载接口），这样即使文件被保存到非预期位置，也无法通过Web直接访问到潜在的敏感文件。
+#### 4. **设置严格的目录权限**
+限制上传文件存储目录的操作系统权限，仅允许应用程序用户具有写入权限，防止攻击者利用其他途径向该目录写入或修改文件。
+综合运用以上多种防御措施，可以有效地防范通过上传文件实现的路径遍历攻击。
+SOLUTION
+	risk: "路径穿越",
+	name: "inter",
 }

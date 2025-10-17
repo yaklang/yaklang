@@ -22,11 +22,10 @@ REFERENCE
 DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
-
 为了避免资源泄漏问题，应确保在使用完 `java.sql.Statement`、`PreparedStatement` 或 `CallableStatement` 后及时关闭它们。以下是几种推荐的修复方式：
 
 #### 1. 使用 try-with-resources (Java 7+)
-这是最推荐的方式，简洁且安全，能够自动处理资源的关闭，即使发生异常。
+这是最推荐的方式，简洁且安全，能够自动处理资源的关闭，即使发生异常也能保证资源被释放。
 ```java
 public void safeStatementUsage() throws SQLException {
     String sql = "SELECT * FROM employees";
@@ -69,11 +68,9 @@ public void safeStatementWithFinally() throws SQLException {
 ```java
 public class SafeJdbcWithSpring {
     private JdbcTemplate jdbcTemplate;
-
     public void setDataSource(DataSource dataSource) {
         this.jdbcTemplate = new JdbcTemplate(dataSource);
     }
-
     public String getEmployeeNameById(int id) {
         return jdbcTemplate.queryForObject(
             "SELECT name FROM employees WHERE id = ?",
@@ -84,7 +81,6 @@ public class SafeJdbcWithSpring {
 }
 ```
 **重要提示:** 在连接池环境下，尽量显式关闭每个 `Statement`，以避免干扰连接复用。
-
 SOLUTION
 	rule_id: "195768f2-de1d-4e9f-9a72-7244efbc0abf"
 )
@@ -102,7 +98,97 @@ $safe<getPredecessors()> as $safeStmt;
 
 $stmt - $safeStmt as $weak;
 alert $weak for {
-	message: "检测到java.sql.Statement未释放资源",
+	message: "检测到java.sql.Statement未释放资源，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+2. **触发场景**
+// 存在漏洞的代码示例
+```java
+Connection conn = dataSource.getConnection();
+Statement stmt = conn.createStatement();
+ResultSet rs = stmt.executeQuery("SELECT * FROM employees");
+while (rs.next()) {
+System.out.println(rs.getString("name"));
+}
+conn.close();
+// 错误: 未调用 stmt.close()
+```
+攻击者可以通过未关闭的 Statement 对象占用数据库和应用程序内存资源，导致游标泄漏或其他性能问题。
+3. **潜在影响**
+- 未关闭的 Statement 对象会占用数据库和应用程序内存资源
+- 可能导致游标泄漏，尤其在某些数据库系统中游标数量有限制
+- 在连接池环境中，未关闭的 Statement 可能会导致连接池资源管理问题
+- 大量未关闭的 Statement 会增加内存占用，可能导致内存溢出
+- 长时间运行的应用程序性能会因资源泄漏而逐渐下降
+DESC
+	name: "weak",
+	title: "Java SQL Statement Resource Leak Vulnerability Was Detected",
+	title_zh: "检测到Java SQL Statement资源未释放漏洞",
+	solution: <<<SOLUTION
+### 修复建议
+为了避免资源泄漏问题，应确保在使用完 `java.sql.Statement`、`PreparedStatement` 或 `CallableStatement` 后及时关闭它们。以下是几种推荐的修复方式：
+
+#### 1. 使用 try-with-resources (Java 7+)
+这是最推荐的方式，简洁且安全，能够自动处理资源的关闭，即使发生异常。
+```java
+public void safeStatementUsage() throws SQLException {
+String sql = "SELECT * FROM employees";
+try (
+Connection conn = dataSource.getConnection();
+Statement stmt = conn.createStatement();
+ResultSet rs = stmt.executeQuery(sql)
+) {
+while (rs.next()) {
+System.out.println(rs.getString("name"));
+}
+} // 自动关闭所有资源
+}
+```
+
+#### 2. 手动关闭资源 (适用于旧版本 Java)
+在不支持 try-with-resources 的环境中，必须在 `finally` 块中手动关闭资源，并按照获取顺序的逆序关闭。
+```java
+public void safeStatementWithFinally() throws SQLException {
+Connection conn = null;
+Statement stmt = null;
+ResultSet rs = null;
+try {
+conn = dataSource.getConnection();
+stmt = conn.createStatement();
+rs = stmt.executeQuery("SELECT * FROM employees");
+while (rs.next()) {
+System.out.println(rs.getString("name"));
+}
+} finally {
+if (rs != null) try { rs.close(); } catch (SQLException e) { /* 记录日志 */ }
+if (stmt != null) try { stmt.close(); } catch (SQLException e) { /* 记录日志 */ }
+if (conn != null) try { conn.close(); } catch (SQLException e) { /* 记录日志 */ }
+}
+}
+```
+
+#### 3. 使用现代数据访问框架/ORM
+推荐使用 Spring JDBC Template、MyBatis 或 Hibernate 等工具，它们内置了资源管理机制，能够自动处理资源的关闭。
+```java
+public class SafeJdbcWithSpring {
+private JdbcTemplate jdbcTemplate;
+public void setDataSource(DataSource dataSource) {
+this.jdbcTemplate = new JdbcTemplate(dataSource);
+}
+public String getEmployeeNameById(int id) {
+return jdbcTemplate.queryForObject(
+"SELECT name FROM employees WHERE id = ?",
+String.class,
+id
+);
+}
+}
+```
+**重要提示:** 在连接池环境下，尽量显式关闭每个 `Statement`，以避免干扰连接复用。
+SOLUTION
+	risk: "资源泄漏",
 }
 
 desc(
@@ -259,5 +345,306 @@ desc(
             }
         }
     }
+CODE
+	"safefile://SafeConnectionManagement.java": <<<CODE
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.PreparedStatement;
+import java.sql.CallableStatement;
+import java.sql.ResultSet;
+
+public class SafeConnectionManagement {
+
+    // 模拟DataSource
+    private static class MockDataSource {
+        public Connection getConnection() throws SQLException {
+            // 实际应用中这里会获取连接池中的连接
+            return DriverManager.getConnection("jdbc:h2:mem:testdb", "sa", "");
+        }
+    }
+
+    private MockDataSource dataSource = new MockDataSource();
+
+    /**
+     * 遵循推荐的try-with-resources，安全地关闭Statement, PreparedStatement 和 CallableStatement。
+     * 适用于Java 7及更高版本，确保资源自动关闭。
+     */
+    public void safeResourceUsageWithTryWithResources() throws SQLException {
+        String sqlSelect = "SELECT * FROM users WHERE id = ?";
+        String sqlCall = "{call get_user_status(?)}";
+        String sqlInsert = "INSERT INTO logs (message) VALUES ('test')";
+
+        try (Connection conn = dataSource.getConnection()) {
+            // 创建并执行Statement，并确保其在try块结束时自动关闭
+            try (Statement stmt = conn.createStatement()) {
+                // 确保数据库中存在表，否则此处会抛异常
+                // stmt.execute("CREATE TABLE IF NOT EXISTS users (id INT, name VARCHAR(255))");
+                // stmt.execute("CREATE TABLE IF NOT EXISTS logs (message VARCHAR(255))");
+                stmt.executeUpdate(sqlInsert); // 确保Statement被使用并正确关闭
+            }
+
+            // 创建并执行PreparedStatement，并确保其在try块结束时自动关闭
+            try (PreparedStatement pstmt = conn.prepareStatement(sqlSelect)) {
+                pstmt.setInt(1, 1);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    while (rs.next()) {
+                        System.out.println("User ID: " + rs.getInt("id"));
+                    }
+                }
+            }
+
+            // 创建并执行CallableStatement，并确保其在try块结束时自动关闭
+            try (CallableStatement cstmt = conn.prepareCall(sqlCall)) {
+                cstmt.setInt(1, 1);
+                cstmt.execute(); // 执行存储过程/函数调用
+            }
+
+            // 仅仅创建Statement对象，但立即关闭它，没有实际使用，但仍是安全做法（无泄漏）
+            conn.createStatement().close();
+
+            // 创建PreparedStatement，没有执行，但确保关闭
+            PreparedStatement unusedPstmt = conn.prepareStatement("SELECT 1");
+            unusedPstmt.close();
+
+        } // Connection也会自动关闭
+    }
+
+    /**
+     * 使用try-finally块手动关闭资源，此方式在Java 7之前常用。
+     * 确保资源按照获取顺序的逆序关闭，并且在关闭时进行null检查以避免NullPointerException。
+     * 即使在执行过程中发生异常，finally块也会被执行，从而关闭资源。
+     */
+    public void safeResourceUsageWithFinally() {
+        Connection conn = null;
+        Statement stmt = null;
+        PreparedStatement pstmt = null;
+        CallableStatement cstmt = null;
+        ResultSet rs = null;
+        try {
+            conn = dataSource.getConnection();
+
+            stmt = conn.createStatement();
+            stmt.executeUpdate("INSERT INTO logs (message) VALUES ('finally_test_stmt')");
+
+            pstmt = conn.prepareStatement("SELECT * FROM users WHERE id = ?");
+            pstmt.setInt(1, 2);
+            rs = pstmt.executeQuery();
+            while (rs.next()) {
+                System.out.println("User from pstmt: " + rs.getString("name"));
+            }
+
+            cstmt = conn.prepareCall("{call get_data(?)}");
+            cstmt.setString(1, "param");
+            cstmt.execute();
+
+        } catch (SQLException e) {
+            System.err.println("Database error: " + e.getMessage());
+        } finally {
+            // 按照逆序关闭资源
+            closeQuietly(rs);
+            closeQuietly(stmt);
+            closeQuietly(pstmt);
+            closeQuietly(cstmt);
+            closeQuietly(conn);
+        }
+    }
+
+    /**
+     * 这是一个实用方法，用于安全地关闭AutoCloseable资源，避免抛出异常。
+     * Typically used within finally blocks.
+     */
+    private void closeQuietly(AutoCloseable resource) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                // 记录日志，例如使用Logger，而不是简单的打印到控制台
+                System.err.println("Failed to close resource: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * 这个方法演示了Statement的生命周期管理，即使是简单的查询，
+     * 也确保了Statement在finally块中被关闭。
+     * 这是一个边界情况，即使没有ResultSet，Statement也需要关闭。
+     */
+    public void safeUpdateStatement() {
+        Connection conn = null;
+        Statement stmt = null;
+        try {
+            conn = dataSource.getConnection();
+            stmt = conn.createStatement();
+            stmt.executeUpdate("UPDATE users SET name = 'updated' WHERE id = 1");
+        } catch (SQLException e) {
+            System.err.println("Error executing update: " + e.getMessage());
+        } finally {
+            closeQuietly(stmt);
+            closeQuietly(conn);
+        }
+    }
+
+    /**
+     * 关闭Connection时也会隐式关闭其持有的Statement，但明确关闭Statement是最佳实践。
+     * 此用例展示：即使只关闭了Connection，如果Statement没有被显式关闭，此规则可能仍然会触发误报。
+     * 但是，SyntaxFlow的规则可能已经足够智能来处理这种情况，此代码片段旨在测试规则对隐式关闭的判断。
+     * 这里假定关闭Connection会自动关闭Statement，所以此用例是不会触发告警的安全用例。
+     */
+    public void safeImplicitStatementCloseOnConnectionClose() {
+        Connection conn = null;
+        Statement stmt = null;
+        try {
+            conn = dataSource.getConnection();
+            stmt = conn.createStatement();
+            stmt.executeQuery("SELECT 1");
+            // 没有显式关闭stmt
+        } catch (SQLException e) {
+            System.err.println("Error: " + e.getMessage());
+        } finally {
+            // 只关闭了Connection
+            closeQuietly(conn);
+        }
+    }
+
+    /**
+     * 结合现代数据访问框架（如Spring JDBC Template）的使用，
+     * 这些框架内部处理了资源的获取和释放，用户无需手动管理。
+     * 这是生产环境中推荐的最佳实践。
+     */
+    // 假设引入了Spring JDBC Template的相关依赖
+    // import org.springframework.jdbc.core.JdbcTemplate;
+    // public void safeWithSpringJdbcTemplate() {
+    //     // JdbcTemplate内部会自动管理Connection, Statement, ResultSet的关闭
+    //     // 此处为伪代码，仅作说明
+    //     // JdbcTemplate jdbcTemplate = new JdbcTemplate(dataSource);
+    //     // String name = jdbcTemplate.queryForObject("SELECT name FROM users WHERE id = ?", String.class, 1);
+    //     // System.out.println("User name from Spring: " + name);
+    // }
+
+    public static void main(String[] args) throws SQLException {
+        SafeConnectionManagement example = new SafeConnectionManagement();
+        // 为了使代码可运行，简单初始化数据库
+        try (Connection conn = example.dataSource.getConnection()) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS users (id INT PRIMARY KEY, name VARCHAR(255))");
+                stmt.execute("INSERT INTO users VALUES (1, 'Alice')");
+                stmt.execute("INSERT INTO users VALUES (2, 'Bob')");
+                stmt.execute("CREATE TABLE IF NOT EXISTS logs (message VARCHAR(255))");
+                // 模拟存储过程 for CallableStatement
+                // H2数据库的存储过程语法可能不同，此处仅作演示
+                // conn.prepareCall("CREATE ALIAS GET_USER_STATUS AS $$ String getUserStatus(int id) { return 'Active'; }$$").execute();
+                // conn.prepareCall("CREATE ALIAS GET_DATA AS $$ String getData(String param) { return 'Data-' + param; }$$").execute();
+            }
+        }
+
+        System.out.println("Running safeResourceUsageWithTryWithResources...");
+        example.safeResourceUsageWithTryWithResources();
+        System.out.println("Running safeResourceUsageWithFinally...");
+        example.safeResourceUsageWithFinally();
+        System.out.println("Running safeUpdateStatement...");
+        example.safeUpdateStatement();
+        System.out.println("Running safeImplicitStatementCloseOnConnectionClose...");
+        example.safeImplicitStatementCloseOnConnectionClose();
+    }
+}
+CODE
+	"safefile://SafeMultiStatementClose.java": <<<CODE
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+public class SafeMultiStatementClose {
+    // 模拟DataSource
+    private static class MockDataSource {
+        public Connection getConnection() throws SQLException {
+            return DriverManager.getConnection("jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1", "sa", "");
+        }
+    }
+    private MockDataSource dataSource = new MockDataSource();
+
+    /**
+     * 演示在一个方法中创建多个Statement，并确保每一个都被正确关闭。
+     * 这对于处理复杂业务逻辑中需要多次数据库操作的情况很重要。
+     */
+    public void safeMultipleStatementsInSingleMethod() {
+        Connection conn = null;
+        Statement stmt1 = null;
+        Statement stmt2 = null;
+        try {
+            conn = dataSource.getConnection();
+            stmt1 = conn.createStatement();
+            stmt1.execute("INSERT INTO temp_table (value) VALUES ('data1')");
+            // 确保stmt1被明确关闭
+            stmt1.close();
+
+            stmt2 = conn.createStatement();
+            stmt2.execute("INSERT INTO temp_table (value) VALUES ('data2')");
+            // 确保stmt2被明确关闭
+            stmt2.close();
+        } catch (SQLException e) {
+            System.err.println("SQL Error: " + e.getMessage());
+        } finally {
+            // 即使在try块中关闭了，finally块的防御性关闭仍然是好的实践
+            // 因为try块中的关闭可能会因为异常而跳过，或者为了在方法结束前确保关闭
+            closeQuietly(stmt1); // 这里的关闭可能已经多余，但无害
+            closeQuietly(stmt2); // 这里的关闭可能已经多余，但无害
+            closeQuietly(conn);
+        }
+    }
+
+    /**
+     * 演示在循环中创建和关闭Statement。
+     * 这种模式常用于批量操作，必须确保每次迭代都关闭资源，否则会导致大量资源泄漏。
+     */
+    public void safeStatementsInLoop(int count) {
+        Connection conn = null;
+        try {
+            conn = dataSource.getConnection();
+            for (int i = 0; i < count; i++) {
+                Statement stmt = null; // 确保每次循环都声明一个新的Statement变量
+                try {
+                    stmt = conn.createStatement();
+                    stmt.execute("INSERT INTO loop_table (id, value) VALUES (" + i + ", 'loop_data')");
+                } catch (SQLException e) {
+                    System.err.println("Loop SQL Error at " + i + ": " + e.getMessage());
+                } finally {
+                    closeQuietly(stmt); // 每次循环都关闭当前的Statement
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Connection Error in loop: " + e.getMessage());
+        } finally {
+            closeQuietly(conn);
+        }
+    }
+
+    private void closeQuietly(AutoCloseable resource) {
+        if (resource != null) {
+            try {
+                resource.close();
+            } catch (Exception e) {
+                System.err.println("Failed to close resource: " + e.getMessage());
+            }
+        }
+    }
+
+    public static void main(String[] args) throws SQLException {
+        SafeMultiStatementClose example = new SafeMultiStatementClose();
+        try (Connection conn = example.dataSource.getConnection()) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE TABLE IF NOT EXISTS temp_table (value VARCHAR(255))");
+                stmt.execute("CREATE TABLE IF NOT EXISTS loop_table (id INT, value VARCHAR(255))");
+            }
+        }
+
+        System.out.println("Running safeMultipleStatementsInSingleMethod...");
+        example.safeMultipleStatementsInSingleMethod();
+        System.out.println("Running safeStatementsInLoop...");
+        example.safeStatementsInLoop(5);
+    }
+}
 CODE
 )

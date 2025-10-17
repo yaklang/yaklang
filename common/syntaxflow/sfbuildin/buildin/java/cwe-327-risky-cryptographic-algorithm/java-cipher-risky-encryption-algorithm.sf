@@ -11,42 +11,34 @@ desc(
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 使用已破解或存在风险的加密算法（如 DES, 3DES-Ede, ARCFOUR/RC4, RC2）可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，计算效率低且安全性低，可能无法为数据提供足够的安全性，且在现代计算能力下容易被暴力破解。
-
 2. **触发场景**
 攻击者可能通过分析加密数据、截获通信或利用已知加密算法的弱点来破解使用不安全或有风险算法加密的数据。例如，在文件存储、数据库加密或网络通信中使用这些算法的场景都可能成为攻击目标。
-
 ```java
 // 存在风险的代码示例
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
-
 public class WeakCipher {
-
-    private static final String ALGORITHM_DES = "DES/ECB/PKCS5Padding";
-    private static final String ALGORITHM_RC4 = "RC4";
-
-    public static String encryptDES(String key, String data) throws Exception {
-        Cipher cipher = Cipher.getInstance(ALGORITHM_DES);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "DES");
-        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
-        byte[] encrypted = cipher.doFinal(data.getBytes());
-        return Base64.getEncoder().encodeToString(encrypted);
-    }
-
-    public static String encryptRC4(String key, String data) throws Exception {
-        Cipher cipher = Cipher.getInstance(ALGORITHM_RC4);
-        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "RC4");
-        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
-        byte[] encrypted = cipher.doFinal(data.getBytes());
-        return Base64.getEncoder().encodeToString(encrypted);
-    }
+private static final String ALGORITHM_DES = "DES/ECB/PKCS5Padding";
+private static final String ALGORITHM_RC4 = "RC4";
+public static String encryptDES(String key, String data) throws Exception {
+Cipher cipher = Cipher.getInstance(ALGORITHM_DES);
+SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "DES");
+cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+byte[] encrypted = cipher.doFinal(data.getBytes());
+return Base64.getEncoder().encodeToString(encrypted);
+}
+public static String encryptRC4(String key, String data) throws Exception {
+Cipher cipher = Cipher.getInstance(ALGORITHM_RC4);
+SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "RC4");
+cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+byte[] encrypted = cipher.doFinal(data.getBytes());
+return Base64.getEncoder().encodeToString(encrypted);
+}
 }
 ```
-
 3. **潜在影响**
 使用弱加密算法可能导致：
 - 敏感信息（如用户凭证、隐私数据、商业机密）被轻易解密并泄露。
@@ -57,41 +49,30 @@ DESC
 	rule_id: "f6e60690-fd58-4130-bef5-ff86b1fd3ec4"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级到更强的加密算法
 建议采用经过时间验证且广泛认可的、具有更高安全强度的对称加密算法，如 AES（高级加密标准）。AES 提供了更长的密钥长度（128, 192 或 256位）和更强的安全性。
-
 ```java
 // 修复代码示例：使用 AES 加密算法
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
 import java.util.Base64;
 import java.security.Key;
-
 public class SecureCipher {
-
-    private static final String ALGORITHM_AES = "AES/ECB/PKCS5Padding"; // 或者使用其他合适的模式如 CBC, GCM
-
-    public static String encryptAES(String key, String data) throws Exception {
-        // 对于 AES 密钥长度通常为 16, 24 或 32 字节 (128, 192, 256 bits)
-        // 确保密钥长度正确且安全生成
-        Key aesKey = new SecretKeySpec(key.getBytes(), "AES");
-        Cipher cipher = Cipher.getInstance(ALGORITHM_AES);
-        cipher.init(Cipher.ENCRYPT_MODE, aesKey);
-        byte[] encrypted = cipher.doFinal(data.getBytes());
-        return Base64.getEncoder().encodeToString(encrypted);
-    }
-
-    // 注意：生产环境密钥应妥善管理，不应硬编码或以不安全的方式存储和传输
+private static final String ALGORITHM_AES = "AES/ECB/PKCS5Padding"; // 或者使用其他合适的模式如 CBC, GCM
+public static String encryptAES(String key, String data) throws Exception {
+Key aesKey = new SecretKeySpec(key.getBytes(), "AES");
+Cipher cipher = Cipher.getInstance(ALGORITHM_AES);
+cipher.init(Cipher.ENCRYPT_MODE, aesKey);
+byte[] encrypted = cipher.doFinal(data.getBytes());
+return Base64.getEncoder().encodeToString(encrypted);
+}
+// 注意：生产环境密钥应妥善管理，不应硬编码或以不安全的方式存储和传输
 }
 ```
-
 #### 2. 选用合适的加密模式和填充方式
 除了算法本身，加密模式（如 CBC, GCM）和填充方式（如 PKCS5Padding, PKCS7Padding）的选择也对安全性至关重要。确保选择适合应用场景的、安全的模式和填充。
-
 #### 3. 安全的密钥管理
 加密强度也取决于密钥的安全性。确保密钥的生成、存储、分发和使用都符合安全最佳实践，避免使用弱密钥或重复使用密钥。
-
 #### 4. 及时更新加密库和依赖
 使用最新版本的加密库和相关的依赖，以获取最新的安全修复和性能改进。
 SOLUTION
@@ -108,6 +89,75 @@ alert $sink for {
 	message: "发现Java代码中使用了不安全的加密算法",
 	title: "Check Java Cipher Weak Encryption Algorithm",
 	title_zh: "检测Java Cipher使用不安全或有风险的加密算法",
+	name: "sink",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 升级到更强的加密算法
+建议采用经过时间验证且广泛认可的、具有更高安全强度的对称加密算法，如 AES（高级加密标准）。AES 提供了更长的密钥长度（128, 192 或 256位）和更强的安全性。
+```java
+// 修复代码示例：使用 AES 加密算法
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+import java.security.Key;
+public class SecureCipher {
+private static final String ALGORITHM_AES = "AES/ECB/PKCS5Padding"; // 或者使用其他合适的模式如 CBC, GCM
+public static String encryptAES(String key, String data) throws Exception {
+// 对于 AES 密钥长度通常为 16, 24 或 32 字节 (128, 192, 256 bits)
+// 确保密钥长度正确且安全生成
+Key aesKey = new SecretKeySpec(key.getBytes(), "AES");
+Cipher cipher = Cipher.getInstance(ALGORITHM_AES);
+cipher.init(Cipher.ENCRYPT_MODE, aesKey);
+byte[] encrypted = cipher.doFinal(data.getBytes());
+return Base64.getEncoder().encodeToString(encrypted);
+}
+// 注意：生产环境密钥应妥善管理，不应硬编码或以不安全的方式存储和传输
+}
+```
+#### 2. 选用合适的加密模式和填充方式
+除了算法本身，加密模式（如 CBC, GCM）和填充方式（如 PKCS5Padding, PKCS7Padding）的选择也对安全性至关重要。确保选择适合应用场景的、安全的模式和填充。
+#### 3. 安全的密钥管理
+加密强度也取决于密钥的安全性。确保密钥的生成、存储、分发和使用都符合安全最佳实践，避免使用弱密钥或重复使用密钥。
+#### 4. 及时更新加密库和依赖
+使用最新版本的加密库和相关的依赖，以获取最新的安全修复和性能改进。
+SOLUTION
+	risk: "不安全加密算法",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+使用已破解或存在风险的加密算法（如 DES, 3DES-Ede, ARCFOUR/RC4, RC2）可能会使敏感数据面临泄露的风险。这些算法由于存在已知的漏洞或弱点，计算效率低且安全性低，可能无法为数据提供足够的安全性，且在现代计算能力下容易被暴力破解。
+2. **触发场景**
+攻击者可能通过分析加密数据、截获通信或利用已知加密算法的弱点来破解使用不安全或有风险算法加密的数据。例如，在文件存储、数据库加密或网络通信中使用这些算法的场景都可能成为攻击目标。
+```java
+// 存在风险的代码示例
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+public class WeakCipher {
+private static final String ALGORITHM_DES = "DES/ECB/PKCS5Padding";
+private static final String ALGORITHM_RC4 = "RC4";
+public static String encryptDES(String key, String data) throws Exception {
+Cipher cipher = Cipher.getInstance(ALGORITHM_DES);
+SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "DES");
+cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+byte[] encrypted = cipher.doFinal(data.getBytes());
+return Base64.getEncoder().encodeToString(encrypted);
+}
+public static String encryptRC4(String key, String data) throws Exception {
+Cipher cipher = Cipher.getInstance(ALGORITHM_RC4);
+SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "RC4");
+cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+byte[] encrypted = cipher.doFinal(data.getBytes());
+return Base64.getEncoder().encodeToString(encrypted);
+}
+}
+```
+3. **潜在影响**
+- 敏感信息（如用户凭证、隐私数据、商业机密）被轻易解密并泄露。
+- 数据完整性被破坏，攻击者可以在不被察觉的情况下修改加密数据。
+- 系统或应用因为加密算法的弱点而更容易受到其他类型的密码学攻击。
+- 不符合行业标准和合规性要求，导致法律和商业风险。
+DESC
 }
 
 desc(
@@ -175,4 +225,109 @@ desc(
             }
     }
 EOF
+	"safefile://SecureAESCipher.java": <<<CODE
+import javax.crypto.Cipher;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+import java.security.Key;
+import java.security.NoSuchAlgorithmException;
+
+public class SecureAESCipher {
+
+    // 使用高级加密标准AES，推荐的加密算法
+    private static final String ALGORITHM_AES_ECB = "AES/ECB/PKCS5Padding";
+    private static final String ALGORITHM_AES_CBC = "AES/CBC/PKCS5Padding";
+    private static final String ALGORITHM_AES_GCM = "AES/GCM/NoPadding";
+
+    /**
+     * 使用AES/ECB/PKCS5Padding进行加密
+     * @param key 加密密钥，需为16、24或32字节（对应128、192或256位AES密钥）
+     * @param data 待加密数据
+     * @return 加密后的Base64编码字符串
+     * @throws Exception 加密过程中可能出现的异常
+     */
+    public static String encryptAES_ECB(String key, String data) throws Exception {
+        // 确保密钥长度正确且安全生成，例如AES 128位需要16字节密钥
+        if (key.getBytes().length != 16 && key.getBytes().length != 24 && key.getBytes().length != 32) {
+            throw new IllegalArgumentException("AES Key length must be 16, 24, or 32 bytes.");
+        }
+        Key aesKey = new SecretKeySpec(key.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance(ALGORITHM_AES_ECB);
+        cipher.init(Cipher.ENCRYPT_MODE, aesKey);
+        byte[] encrypted = cipher.doFinal(data.getBytes());
+        return Base64.getEncoder().encodeToString(encrypted);
+    }
+
+    /**
+     * 使用AES/CBC/PKCS5Padding进行加密
+     * @param key 加密密钥
+     * @param data 待加密数据
+     * @param iv 初始化向量，对于CBC模式是必需的
+     * @return 加密后的Base64编码字符串
+     * @throws Exception 加密过程中可能出现的异常
+     */
+    public static String encryptAES_CBC(String key, String data, byte[] iv) throws Exception {
+        if (key.getBytes().length != 16 && key.getBytes().length != 24 && key.getBytes().length != 32) {
+            throw new IllegalArgumentException("AES Key length must be 16, 24, or 32 bytes.");
+        }
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "AES");
+        Cipher cipher = Cipher.getInstance(ALGORITHM_AES_CBC);
+        // IV必须是16字节
+        javax.crypto.spec.IvParameterSpec ivSpec = new javax.crypto.spec.IvParameterSpec(iv);
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec, ivSpec);
+        byte[] encrypted = cipher.doFinal(data.getBytes());
+        return Base64.getEncoder().encodeToString(encrypted);
+    }
+
+    /**
+     * 这是一个不会触发告警的示例，因为SecretKeySpec初始化时使用了"NonWeakAlg"，
+     * 它不是规则中定义的弱算法（如DES, RC4等）。
+     * 这个方法模拟了一个使用未知或自定义安全算法的场景。
+     *
+     * 注意：在实际应用中，应使用标准的、经过验证的强密码算法，此示例仅用于反向测试。
+     */
+    public static String encryptWithCustomSafeAlgorithm(String key, String data) throws Exception {
+        // 这里的 "NonWeakAlg" 假设是一个未被规则列为弱算法的虚拟算法名，
+        // 实际使用时应替换为AES、Blowfish等标准强算法。
+        SecretKeySpec secretKeySpec = new SecretKeySpec(key.getBytes(), "Blowfish"); // 使用Blowfish算法，该算法不在弱算法列表中
+        // 为了使代码可编译且不触发告警，Cipher.getInstance() 也应使用兼容的算法名
+        Cipher cipher = Cipher.getInstance("Blowfish/ECB/PKCS5Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, secretKeySpec);
+        byte[] encrypted = cipher.doFinal(data.getBytes());
+        return Base64.getEncoder().encodeToString(encrypted);
+    }
+
+    /**
+     * 这是一个使用RSA算法的例子，RSA是公钥密码学算法，与规则关注的对称加密算法不同，
+     * 但同样属于安全的加密实践，不会触发规则告警。
+     */
+    public static String encryptRSA(String data, java.security.PublicKey publicKey) throws Exception {
+        Cipher cipher = Cipher.getInstance("RSA/ECB/PKCS1Padding");
+        cipher.init(Cipher.ENCRYPT_MODE, publicKey);
+        byte[] encrypted = cipher.doFinal(data.getBytes());
+        return Base64.getEncoder().encodeToString(encrypted);
+    }
+
+    /**
+     * 这是一个使用SHA-256进行哈希的例子，哈希不是加密，但经常与加密混淆。
+     * 明确使用消息摘要算法，不会触发加密算法的告警。
+     */
+    public static String hashData(String data) throws NoSuchAlgorithmException {
+        java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+        byte[] hash = md.digest(data.getBytes());
+        StringBuilder hexString = new StringBuilder();
+        for (byte b : hash) {
+            String hex = Integer.toHexString(0xff & b);
+            if (hex.length() == 1) hexString.append('0');
+            hexString.append(hex);
+        }
+        return hexString.toString();
+    }
+
+    // 这是一个不使用javax.crypto.spec.SecretKeySpec的示例，因此不会匹配规则的sink点
+    public static void someOtherSafeMethod() {
+        System.out.println("This method does not involve SecretKeySpec and thus won't be flagged.");
+    }
+}
+CODE
 )

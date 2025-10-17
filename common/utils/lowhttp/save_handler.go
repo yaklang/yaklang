@@ -38,3 +38,22 @@ func SaveLowHTTPResponse(r *LowhttpResponse, saveFlowSync bool) {
 
 	saveHTTPFlowFunc(r, saveFlowSync)
 }
+
+var mitmReplacerLabelingHTTPFlowFunc func(*LowhttpResponse)
+
+func RegisterLabelingHTTPFlowFunc(h func(*LowhttpResponse)) {
+	m := new(sync.Mutex)
+
+	mitmReplacerLabelingHTTPFlowFunc = func(r *LowhttpResponse) {
+		m.Lock()
+		defer m.Unlock()
+
+		defer func() {
+			if err := recover(); err != nil {
+				log.Errorf("call lowhttp.saveHTTPFlowFunc panic: %s", err)
+			}
+		}()
+
+		h(r)
+	}
+}

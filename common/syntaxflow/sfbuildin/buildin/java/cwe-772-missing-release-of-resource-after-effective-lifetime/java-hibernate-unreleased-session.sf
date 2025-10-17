@@ -7,10 +7,32 @@ desc(
 [Hibernate Session API 文档 (Hibernate 2.x)](https://docs.atlassian.com/hibernate2/2.1.8/api/net/sf/hibernate/Session.html)
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)
 REFERENCE
-	desc: <<<DESCRIPTION
-## 漏洞描述
-在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
-DESCRIPTION
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
+
+2. **触发场景**
+   ```java
+   public void unsafeMethod() throws HibernateException {
+       DatabaseConnection conn = new DatabaseConnection();
+       Session session = conn.getSession(); // 获取 Hibernate Session
+       List users = session.find("from User");
+       System.out.println("查询到 " + users.size() + " 个用户");
+       // 错误：没有关闭 session，资源泄漏！
+   }
+   ```
+   攻击者或系统长时间运行后，可能导致数据库连接池耗尽、资源过度消耗等问题。
+
+3. **潜在影响**
+   - 数据库连接池耗尽，无法创建新的连接。
+   - 系统资源（内存、文件描述符等）过度消耗。
+   - 应用程序性能逐渐下降。
+   - 严重情况下可能导致应用程序崩溃或拒绝服务。
+   - 长时间运行的应用中，问题会随时间累积。
+
+DESC
 	rule_id: "b70c9711-31ed-4147-a982-35a6b5605078"
 	solution: <<<SOLUTION
 ### 修复建议
@@ -21,7 +43,6 @@ DESCRIPTION
 public void safeMethodWithTryFinally() throws HibernateException {
     DatabaseConnection conn = new DatabaseConnection();
     Session session = null;
-
     try {
         session = conn.getSession();
         List users = session.find("from User");
@@ -43,7 +64,6 @@ public void safeMethodWithTryFinally() throws HibernateException {
 ```java
 public void safeMethodWithTryWithResources() throws HibernateException {
     DatabaseConnection conn = new DatabaseConnection();
-
     try (Session session = conn.getSession()) {
         List users = session.find("from User");
         System.out.println("查询到 " + users.size() + " 个用户");
@@ -58,7 +78,6 @@ public abstract class BaseHibernateDAO {
     protected Session getSession() throws HibernateException {
         return HibernateUtil.getSessionFactory().getCurrentSession();
     }
-
     protected void executeInTransaction(SessionCallback callback) throws Exception {
         Session session = null;
         Transaction tx = null;
@@ -76,7 +95,6 @@ public abstract class BaseHibernateDAO {
             }
         }
     }
-
     interface SessionCallback {
         void execute(Session session) throws Exception;
     }
@@ -85,7 +103,6 @@ public abstract class BaseHibernateDAO {
 
 #### 4. 利用事务管理框架
 使用 Spring 等框架提供的事务管理功能，它们可以自动管理 Hibernate Session 的生命周期，确保在事务结束时 Session 正确关闭。
-
 SOLUTION
 )
 
@@ -102,122 +119,104 @@ $getSession -{
 $safe<getPredecessors()> as $safeGetSession;
 $getSession - $safeGetSession as $weak;
 alert $weak for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用 try-finally 确保资源释放
-
 始终在 `finally` 块中调用 `session.close()` 方法，以确保不论程序是否抛出异常，Session 资源都能被释放。在关闭前，检查 Session 对象是否为 null。
-
 ```java
 // 修复代码示例 1
 public List getUsersSafeTryFinally() throws HibernateException {
-    DatabaseConnection conn = new DatabaseConnection();
-    Session session = null;
-
-    try {
-        session = conn.getSession();
-        List users = session.find("from User");
-        System.out.println("查询到 " + users.size() + " 个用户");
-        return users;
-    } finally {
-        // 确保 session 总是关闭
-        if (session != null) {
-            try {
-                session.close();
-            } catch (HibernateException e) {
-                // 记录错误或进行适当处理
-                System.err.println("关闭 Session 时出错: " + e.getMessage());
-            }
-        }
-    }
+DatabaseConnection conn = new DatabaseConnection();
+Session session = null;
+try {
+session = conn.getSession();
+List users = session.find("from User");
+System.out.println("查询到 " + users.size() + " 个用户");
+return users;
+} finally {
+// 确保 session 总是关闭
+if (session != null) {
+try {
+session.close();
+} catch (HibernateException e) {
+// 记录错误或进行适当处理
+System.err.println("关闭 Session 时出错: " + e.getMessage());
+}
+}
+}
 }
 ```
-
 #### 2. 使用 try-with-resources (Java 7+)
-
 如果使用的 Hibernate Session 实现了 `AutoCloseable` 接口（现代版本的 Hibernate 通常都实现了），可以使用 try-with-resources 结构，这能更简洁地确保资源在 try 块结束后被自动关闭。
-
 ```java
 // 修复代码示例 2 (需要 Session 实现 AutoCloseable 接口)
 public List getUsersSafeTryWithResources() throws HibernateException {
-    DatabaseConnection conn = new DatabaseConnection();
-
-    // 自动管理资源关闭
-    try (Session session = conn.getSession()) {
-        List users = session.find("from User");
-        System.out.println("查询到 " + users.size() + " 个用户");
-        return users;
-    } // session 自动关闭，无需显式调用 close(),即使发生异常也会调用close()方法
+DatabaseConnection conn = new DatabaseConnection();
+// 自动管理资源关闭
+try (Session session = conn.getSession()) {
+List users = session.find("from User");
+System.out.println("查询到 " + users.size() + " 个用户");
+return users;
+} // session 自动关闭，无需显式调用 close(),即使发生异常也会调用close()方法
 }
 ```
-
 #### 3. 在 DAO 层统一管理会话
-
 在数据访问对象（DAO）层抽象出统一的方法来管理 Session 的生命周期，例如使用模板方法模式，在其中处理 Session 的获取、操作、事务管理和关闭。
-
 ```java
 // 修复代码示例 3 (概念性的 DAO 抽象)
 public abstract class BaseHibernateDAO {
-    // 获取当前会话，通常推荐使用 currentSession()
-    protected Session getSession() throws HibernateException {
-        return HibernateUtil.getSessionFactory().getCurrentSession();
-    }
-
-    // 模板方法，统一处理事务和会话关闭
-    protected void executeInTransaction(SessionCallback callback) throws Exception {
-        Session session = null;
-        Transaction tx = null;
-        try {
-            session = getSession();
-            tx = session.beginTransaction();
-            callback.execute(session); // 执行具体业务逻辑
-            tx.commit();
-        } catch (Exception e) {
-            if (tx != null) tx.rollback(); // 回滚事务
-            throw e;
-        } finally {
-            // 在这里统一关闭会话（如果使用 openSession()）
-            // 如果使用 currentSession()，通常由第三方（如 Spring）或事务管理器管理
-            if (session != null && session.isOpen()) {
-                 // 对于 openSession() 获取的Session，需要在此关闭
-                 // session.close();
-            }
-        }
-    }
-
-    // 回调接口，定义业务操作
-    interface SessionCallback {
-        void execute(Session session) throws Exception;
-    }
+// 获取当前会话，通常推荐使用 currentSession()
+protected Session getSession() throws HibernateException {
+return HibernateUtil.getSessionFactory().getCurrentSession();
+}
+// 模板方法，统一处理事务和会话关闭
+protected void executeInTransaction(SessionCallback callback) throws Exception {
+Session session = null;
+Transaction tx = null;
+try {
+session = getSession();
+tx = session.beginTransaction();
+callback.execute(session); // 执行具体业务逻辑
+tx.commit();
+} catch (Exception e) {
+if (tx != null) tx.rollback(); // 回滚事务
+throw e;
+} finally {
+// 在这里统一关闭会话（如果使用 openSession()）
+// 如果使用 currentSession()，通常由第三方（如 Spring）或事务管理器管理
+if (session != null && session.isOpen()) {
+// 对于 openSession() 获取的Session，需要在此关闭
+// session.close();
+}
+}
+}
+// 回调接口，定义业务操作
+interface SessionCallback {
+void execute(Session session) throws Exception;
+}
 }
 ```
-
 #### 4. 利用事务管理框架
-
 使用 Spring 等框架提供的事务管理功能，它们可以自动管理 Hibernate Session 的生命周期，确保在事务结束时 Session 正确关闭。
-
 #### 5. 审查并关闭所有 openSession 调用
-
 仔细审计代码中所有 `SessionFactory.openSession()` 的调用点，确保它们都被相应的 `session.close()` 调用配对。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ## 漏洞描述
-
 在使用 Hibernate 框架进行数据库操作时，通过 `getSession()` 方法获取的 Session 资源未在使用完毕后正确关闭。这属于 CWE-772（有效生命周期后未释放资源）漏洞，会导致数据库连接资源泄漏。
-
 ## 风险影响
-
 - 数据库连接池耗尽，无法创建新的连接
 - 系统资源（内存、文件描述符等）过度消耗
 - 应用程序性能逐渐下降
 - 严重情况下可能导致应用程序崩溃或拒绝服务
 - 长时间运行的应用中，问题会随时间累积
-CODE
+DESC
 	level: "high",
 	message: "检测到Hibernate Session 未释放资源",
 	title: "Check Java Hibernate Session Unreleased Resource",
 	title_zh: "检测Java Hibernate Session 数据库资源未释放",
+	risk: "资源泄漏",
+	name: "weak",
 }
 
 desc(
@@ -331,5 +330,90 @@ desc(
             }
         }
     }
+CODE
+	"safefile://SafeHibernateUsage1.java": <<<CODE
+import net.sf.hibernate.Session;
+import net.sf.hibernate.SessionFactory;
+import net.sf.hibernate.HibernateException;
+import net.sf.hibernate.cfg.Configuration;
+import java.util.List;
+
+// 推荐使用 try-finally 块确保 Session 资源在任何情况下都被释放
+public class SafeHibernateUsage1 {
+    private static SessionFactory sessionFactory;
+
+    static {
+        try {
+            Configuration config = new Configuration().configure();
+            sessionFactory = config.buildSessionFactory();
+        } catch (HibernateException e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    public List<?> getUsersSafely() {
+        Session session = null;
+        try {
+            session = sessionFactory.openSession();
+            List<?> users = session.createQuery("from User").list();
+            return users;
+        } catch (HibernateException e) {
+            System.err.println("HibernateException: " + e.getMessage());
+            return null;
+        } finally {
+            if (session != null) {
+                try {
+                    session.close(); // 确保 close() 方法被调用
+                } catch (HibernateException e) {
+                    System.err.println("Error closing session: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    public static void shutdown() {
+        if (sessionFactory != null) {
+            sessionFactory.close();
+        }
+    }
+}
+CODE
+	"safefile://SafeHibernateUsage2.java": <<<CODE
+import org.hibernate.Session;
+import org.hibernate.SessionFactory;
+import org.hibernate.cfg.Configuration;
+import java.util.List;
+
+// 现代 Hibernate 及 Java 7+ 环境下的推荐做法：使用 try-with-resources
+// 注意：org.hibernate.Session 从 Hibernate 5.x 开始实现了 AutoCloseable 接口
+public class SafeHibernateUsage2 {
+    private static SessionFactory sessionFactory;
+
+    static {
+        try {
+            // 假设 hibernate.cfg.xml 存在于 classpath 中
+            sessionFactory = new Configuration().configure().buildSessionFactory();
+        } catch (Exception e) {
+            throw new ExceptionInInitializerError(e);
+        }
+    }
+
+    public List<?> getAllProducts() {
+        // try-with-resources 会自动关闭 session，即使发生异常
+        try (Session session = sessionFactory.openSession()) {
+            List<?> products = session.createQuery("from Product").list();
+            return products;
+        } catch (Exception e) {
+            System.err.println("Exception during product retrieval: " + e.getMessage());
+            return null;
+        }
+    }
+
+    public static void shutdown() {
+        if (sessionFactory != null) {
+            sessionFactory.close();
+        }
+    }
+}
 CODE
 )

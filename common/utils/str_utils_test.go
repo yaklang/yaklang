@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"bytes"
+	"io"
 	"strings"
 	"testing"
 
@@ -395,5 +397,403 @@ func BenchmarkUnquoteANSIC(b *testing.B) {
 				_, _ = UnquoteANSIC(tc)
 			}
 		})
+	}
+}
+
+func TestPrefixLines(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    interface{}
+		prefix   string
+		expected string
+	}{
+		{
+			name:     "single line string",
+			input:    "hello",
+			prefix:   "> ",
+			expected: "> hello",
+		},
+		{
+			name:     "multi-line string",
+			input:    "line1\nline2",
+			prefix:   "> ",
+			expected: "> line1\n> line2",
+		},
+		{
+			name:     "three lines with different prefix",
+			input:    "a\nb\nc",
+			prefix:   "# ",
+			expected: "# a\n# b\n# c",
+		},
+		{
+			name:     "empty prefix",
+			input:    "line1\nline2",
+			prefix:   "",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			prefix:   "> ",
+			expected: "> ",
+		},
+		{
+			name:     "string with empty lines",
+			input:    "line1\n\nline3",
+			prefix:   "> ",
+			expected: "> line1\n> \n> line3",
+		},
+		{
+			name:     "io.Reader input",
+			input:    bytes.NewReader([]byte("reader1\nreader2")),
+			prefix:   ">>> ",
+			expected: ">>> reader1\n>>> reader2",
+		},
+		{
+			name:     "io.Reader single line",
+			input:    bytes.NewReader([]byte("single")),
+			prefix:   ">>> ",
+			expected: ">>> single",
+		},
+		{
+			name:     "integer input (interface{})",
+			input:    123,
+			prefix:   "num: ",
+			expected: "num: 123",
+		},
+		{
+			name:     "multiline with tabs and spaces",
+			input:    "	line1\n  line2  \n\tline3\t",
+			prefix:   "* ",
+			expected: "* \tline1\n*   line2  \n* \tline3\t",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := PrefixLines(tt.input, tt.prefix)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPrefixLinesWithLineNumbers(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    interface{}
+		expected string
+	}{
+		{
+			name:     "single line string",
+			input:    "hello",
+			expected: "1 | hello",
+		},
+		{
+			name:     "multi-line string",
+			input:    "line1\nline2",
+			expected: "1 | line1\n2 | line2",
+		},
+		{
+			name:     "three lines",
+			input:    "first\nsecond\nthird",
+			expected: "1 | first\n2 | second\n3 | third",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "1 | ",
+		},
+		{
+			name:     "string with empty lines",
+			input:    "line1\n\nline3",
+			expected: "1 | line1\n2 | \n3 | line3",
+		},
+		{
+			name:     "io.Reader input",
+			input:    bytes.NewReader([]byte("reader1\nreader2\nreader3")),
+			expected: "1 | reader1\n2 | reader2\n3 | reader3",
+		},
+		{
+			name:     "io.Reader single line",
+			input:    bytes.NewReader([]byte("single")),
+			expected: "1 | single",
+		},
+		{
+			name:     "integer input (interface{})",
+			input:    123,
+			expected: "1 | 123",
+		},
+		{
+			name:     "ten lines (test double digit numbers)",
+			input:    "1\n2\n3\n4\n5\n6\n7\n8\n9\n10",
+			expected: "1 | 1\n2 | 2\n3 | 3\n4 | 4\n5 | 5\n6 | 6\n7 | 7\n8 | 8\n9 | 9\n10 | 10",
+		},
+		{
+			name:     "multiline with whitespace",
+			input:    "  line1  \n\tline2\t\n   ",
+			expected: "1 |   line1  \n2 | \tline2\t\n3 |    ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := PrefixLinesWithLineNumbers(tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Benchmark tests for new functions
+func BenchmarkPrefixLines(b *testing.B) {
+	testInput := "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
+	prefix := "> "
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		PrefixLines(testInput, prefix)
+	}
+}
+
+func BenchmarkPrefixLinesWithLineNumbers(b *testing.B) {
+	testInput := "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		PrefixLinesWithLineNumbers(testInput)
+	}
+}
+
+func TestPrefixLinesReader(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		prefix   string
+		expected string
+	}{
+		{
+			name:     "single line string",
+			input:    "hello",
+			prefix:   "> ",
+			expected: "> hello",
+		},
+		{
+			name:     "multi-line string",
+			input:    "line1\nline2",
+			prefix:   "> ",
+			expected: "> line1\n> line2",
+		},
+		{
+			name:     "three lines with different prefix",
+			input:    "a\nb\nc",
+			prefix:   "# ",
+			expected: "# a\n# b\n# c",
+		},
+		{
+			name:     "empty prefix",
+			input:    "line1\nline2",
+			prefix:   "",
+			expected: "line1\nline2",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			prefix:   "> ",
+			expected: "> ",
+		},
+		{
+			name:     "string with empty lines",
+			input:    "line1\n\nline3",
+			prefix:   "> ",
+			expected: "> line1\n> \n> line3",
+		},
+		{
+			name:     "multiline with tabs and spaces",
+			input:    "\tline1\n  line2  \n\tline3\t",
+			prefix:   "* ",
+			expected: "* \tline1\n*   line2  \n* \tline3\t",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := strings.NewReader(tt.input)
+			resultReader := PrefixLinesReader(input, tt.prefix)
+
+			resultData, err := io.ReadAll(resultReader)
+			require.NoError(t, err)
+
+			result := string(resultData)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPrefixLinesReaderSimple(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		prefix   string
+		expected string
+	}{
+		{
+			name:     "single line string (always adds prefix)",
+			input:    "hello",
+			prefix:   "> ",
+			expected: "> hello",
+		},
+		{
+			name:     "multi-line string",
+			input:    "line1\nline2",
+			prefix:   "> ",
+			expected: "> line1\n> line2",
+		},
+		{
+			name:     "three lines",
+			input:    "a\nb\nc",
+			prefix:   "# ",
+			expected: "# a\n# b\n# c",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			prefix:   "> ",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := strings.NewReader(tt.input)
+			resultReader := PrefixLinesReaderSimple(input, tt.prefix)
+
+			resultData, err := io.ReadAll(resultReader)
+			require.NoError(t, err)
+
+			result := string(resultData)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPrefixLinesWithLineNumbersReader(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "single line string",
+			input:    "hello",
+			expected: "1 | hello",
+		},
+		{
+			name:     "multi-line string",
+			input:    "line1\nline2",
+			expected: "1 | line1\n2 | line2",
+		},
+		{
+			name:     "three lines",
+			input:    "first\nsecond\nthird",
+			expected: "1 | first\n2 | second\n3 | third",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "1 | ",
+		},
+		{
+			name:     "string with empty lines",
+			input:    "line1\n\nline3",
+			expected: "1 | line1\n2 | \n3 | line3",
+		},
+		{
+			name:     "ten lines (test double digit numbers)",
+			input:    "1\n2\n3\n4\n5\n6\n7\n8\n9\n10",
+			expected: "1 | 1\n2 | 2\n3 | 3\n4 | 4\n5 | 5\n6 | 6\n7 | 7\n8 | 8\n9 | 9\n10 | 10",
+		},
+		{
+			name:     "multiline with whitespace",
+			input:    "  line1  \n\tline2\t\n   ",
+			expected: "1 |   line1  \n2 | \tline2\t\n3 |    ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := strings.NewReader(tt.input)
+			resultReader := PrefixLinesWithLineNumbersReader(input)
+
+			resultData, err := io.ReadAll(resultReader)
+			require.NoError(t, err)
+
+			result := string(resultData)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPrefixLinesWithLineNumbersReaderStream(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "single line string",
+			input:    "hello",
+			expected: "1 | hello",
+		},
+		{
+			name:     "multi-line string",
+			input:    "line1\nline2",
+			expected: "1 | line1\n2 | line2",
+		},
+		{
+			name:     "three lines",
+			input:    "first\nsecond\nthird",
+			expected: "1 | first\n2 | second\n3 | third",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "1 | ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := strings.NewReader(tt.input)
+			resultReader := PrefixLinesWithLineNumbersReader(input)
+
+			resultData, err := io.ReadAll(resultReader)
+			require.NoError(t, err)
+
+			result := string(resultData)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// Benchmark tests for Reader versions
+func BenchmarkPrefixLinesReader(b *testing.B) {
+	testInput := "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
+	prefix := "> "
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		input := strings.NewReader(testInput)
+		resultReader := PrefixLinesReader(input, prefix)
+		io.ReadAll(resultReader)
+	}
+}
+
+func BenchmarkPrefixLinesWithLineNumbersReader(b *testing.B) {
+	testInput := "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		input := strings.NewReader(testInput)
+		resultReader := PrefixLinesWithLineNumbersReader(input)
+		io.ReadAll(resultReader)
 	}
 }

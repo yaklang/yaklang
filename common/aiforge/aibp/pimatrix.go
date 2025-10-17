@@ -2,8 +2,8 @@ package aibp
 
 import (
 	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/aiforge"
 	"github.com/yaklang/yaklang/common/log"
@@ -22,7 +22,7 @@ var pimatrixResultPrompt string
 var pimatrixPlanMock string
 
 type PIMatrixResult struct {
-	action      *aid.Action
+	action      *aicommon.Action
 	Probability float64 `json:"probability"`
 	Impact      float64 `json:"impact"`
 	Reason      string  `json:"reason"`

@@ -47,8 +47,8 @@ type Instruction interface {
 	SetId(int64)
 
 	// position
-	GetRange() memedit.RangeIf
-	SetRange(memedit.RangeIf)
+	GetRange() *memedit.Range
+	SetRange(*memedit.Range)
 	GetSourceCode() string
 	GetSourceCodeContext(n int) string
 
@@ -72,14 +72,15 @@ type Instruction interface {
 	SetIsFromDB(bool)
 
 	// use program cache
-	GetInstructionById(id int64) Instruction
-	GetValueById(id int64) Value
-	GetUsersByID(id int64) User
+	GetInstructionById(id int64) (Instruction, bool)
+	GetValueById(id int64) (Value, bool)
+	GetUsersByID(id int64) (User, bool)
 	GetValuesByIDs([]int64) Values
 	GetUsersByIDs([]int64) Users
 
 	// string
 	String() string
+	RefreshString() // for refrensh string/name/short-name in *anInstruction
 
 	getAnInstruction() *anInstruction
 }
@@ -190,7 +191,7 @@ type User interface {
 	ReplaceValue(Value, Value)
 }
 
-type Build func(string, *memedit.MemEditor, *FunctionBuilder) error
+type Build func(FrontAST, *memedit.MemEditor, *FunctionBuilder) error
 
 const (
 	Application = ssadb.Application
@@ -205,8 +206,18 @@ const (
 	VirtualFunctionName FunctionName = "@virtual"
 )
 
+type SideEffectType int64
+
+const (
+	NotSideEffect SideEffectType = iota
+	SideEffectIn
+	SideEffectOut
+)
+
 // both instruction and value
 type Program struct {
+	// project
+	ProjectName string
 	// package list
 	Name            string
 	Version         string
@@ -227,17 +238,19 @@ type Program struct {
 	// UpStream   map[string]*Program
 	UpStream *omap.OrderedMap[string, *Program]
 
-	EnableDatabase bool             // for compile, whether use database
-	irProgram      *ssadb.IrProgram // from database program
+	DatabaseKind ProgramCacheKind // for compile, whether use database
+	irProgram    *ssadb.IrProgram // from database program
 
 	// TODO: this four map should need????!
-	editorStack           *omap.OrderedMap[string, *memedit.MemEditor]
-	FileList              map[string]string   // file-name and file hash
+	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
+	FileList    map[string]string // file-name and file hash
+	LineCount   int
+
 	LibraryFile           map[string][]string //library and file relation
 	editorMap             *omap.OrderedMap[string, *memedit.MemEditor]
 	CurrentIncludingStack *utils.Stack[string]
 
-	Cache *Cache
+	Cache *ProgramCache
 
 	/*
 		when build : ref: common/yak/ssa/lazy_builder.go
@@ -256,6 +269,10 @@ type Program struct {
 	BlueprintStack *utils.Stack[*Blueprint]
 	ExportValue    map[string]Value
 	ExportType     map[string]Type
+
+	// GlobalVariablesBlueprint is a virtual Blueprint that wraps global variables,
+	// enabling them to be lazily built through the LazyBuilder mechanism
+	GlobalVariablesBlueprint *Blueprint
 
 	//store import
 
@@ -283,11 +300,11 @@ type Program struct {
 	ProcessInfof func(string, ...any)
 
 	// extern lib
-	GlobalScope             Value            //全局作用域
 	cacheExternInstance     map[string]Value // lib and value
 	externType              map[string]Type
 	externBuildValueHandler map[string]func(b *FunctionBuilder, id string, v any) (value Value)
 	ExternInstance          map[string]any
+	ExternSideEffect        map[string][]uint
 	ExternLib               map[string]map[string]any
 
 	PkgName           string
@@ -304,8 +321,8 @@ type Program struct {
 
 // implement Value
 type Function struct {
-	anValue
-	lazyBuilder
+	*anValue
+	*LazyBuilder
 
 	isMethod   bool
 	methodName string
@@ -383,7 +400,10 @@ func (f *Function) GetMethodName() string {
 func (f *Function) FirstBlockInstruction() []Instruction {
 	if len(f.Blocks) > 0 {
 		firstBlockId := f.Blocks[0]
-		firstBlockValue := f.GetValueById(firstBlockId)
+		firstBlockValue, ok := f.GetValueById(firstBlockId)
+		if !ok || firstBlockValue == nil {
+			return nil
+		}
 		if block, ok := ToBasicBlock(firstBlockValue); ok {
 			return f.GetInstructionsByIDs(block.Insts)
 		} else {
@@ -408,7 +428,7 @@ const (
 
 // implement Value
 type BasicBlock struct {
-	anValue `json:"-"`
+	*anValue `json:"-"`
 
 	Index int
 	// BasicBlock graph
@@ -452,9 +472,12 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 	if jmpId <= 0 || !exists {
 		return nil, false
 	}
-	jmp := b.GetInstructionById(jmpId)
+	jmp, ok := b.GetInstructionById(jmpId)
+	if !ok || jmp == nil {
+		return nil, false
+	}
 
-	_, ok := jmp.(*LazyInstruction)
+	_, ok = jmp.(*LazyInstruction)
 	if ok {
 		jmp = jmp.(*LazyInstruction).Self()
 	}
@@ -465,7 +488,10 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 			log.Warnf("Jump To is nil: %T", ret)
 			return nil, false
 		}
-		to := b.GetInstructionById(ret.To)
+		to, ok := b.GetInstructionById(ret.To)
+		if !ok || to == nil {
+			return nil, false
+		}
 
 		toBlock, ok := ToBasicBlock(to)
 		if !ok {
@@ -477,7 +503,10 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 		if lastId <= 0 || !exists {
 			return nil, false
 		}
-		last := b.GetInstructionById(lastId)
+		last, ok := b.GetInstructionById(lastId)
+		if !ok || last == nil {
+			return nil, false
+		}
 		// fetch essential instructions via jump
 		// if else(elif) condition
 		// for loop condition
@@ -498,15 +527,28 @@ func (b *BasicBlock) IsCFGEnterBlock() ([]Instruction, bool) {
 			}), true
 		case *Switch:
 			log.Warn("Swtich Statement (Condition/Label value should contains jmp) WARNING")
-			return lo.Map(ret.Label, func(label SwitchLabel, i int) Instruction {
-				var result Instruction = b.GetValueById(label.Value)
-				return result
+			return lo.FilterMap(ret.Label, func(label SwitchLabel, i int) (Instruction, bool) {
+				result, ok := b.GetValueById(label.Value)
+				if !ok || result == nil {
+					return nil, false
+				}
+				if inst, ok := result.(Instruction); ok {
+					return inst, true
+				}
+				return nil, false
 			}), true
 		case *Loop:
 			log.Warn("Loop Statement (Condition/Label value should contains jmp) WARNING")
-			return []Instruction{b.GetValueById(ret.Cond)}, true
+			condValue, ok := b.GetValueById(ret.Cond)
+			if !ok || condValue == nil {
+				return nil, false
+			}
+			if condInst, ok := condValue.(Instruction); ok {
+				return []Instruction{condInst}, true
+			}
+			return nil, false
 		default:
-			log.Warnf("unsupoorted CFG Entry Instruction: %T", ret)
+			log.Debugf("unsupoorted CFG Entry Instruction: %T", ret)
 		}
 		return nil, false
 	default:
@@ -531,7 +573,7 @@ var (
 
 // ----------- Phi
 type Phi struct {
-	anValue
+	*anValue
 
 	CFGEntryBasicBlock int64
 
@@ -553,7 +595,7 @@ var (
 
 // ----------- externLib
 type ExternLib struct {
-	anValue
+	*anValue
 
 	table   map[string]any
 	builder *FunctionBuilder
@@ -617,6 +659,9 @@ func newMoreParameterMember(member *ParameterMember, key Value) *parameterMember
 }
 
 func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
+	if utils.IsNil(c) {
+		return nil, false
+	}
 
 	var id int64
 	switch p.MemberCallKind {
@@ -639,7 +684,8 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 			return nil, false
 		}
 		// Changed: Fetch Value using GetValueById
-		return c.GetValueById(c.ArgMember[p.MemberCallObjectIndex]), true
+		obj, ok := c.GetValueById(c.ArgMember[p.MemberCallObjectIndex])
+		return obj, ok
 	case FreeValueMemberCall:
 		id, ok = c.Binding[p.MemberCallObjectName]
 	case CallMemberCall:
@@ -653,13 +699,13 @@ func (p *parameterMemberInner) Get(c *Call) (obj Value, ok bool) {
 		id, ok = c.Args[p.MemberCallObjectIndex], true
 	}
 	if id > 0 {
-		obj = c.GetValueById(id)
+		obj, ok = c.GetValueById(id)
 	}
 	return
 }
 
 type ParameterMember struct {
-	anValue
+	*anValue
 
 	FormalParameterIndex int
 
@@ -673,7 +719,7 @@ var (
 
 // ----------- Parameter
 type Parameter struct {
-	anValue
+	*anValue
 
 	// for FreeValue
 	IsFreeValue  bool
@@ -689,7 +735,8 @@ func (p *Parameter) ReplaceValue(v Value, to Value) {
 	}
 }
 func (p *Parameter) GetDefault() Value {
-	return p.GetValueById(p.defaultValue)
+	val, _ := p.GetValueById(p.defaultValue)
+	return val
 }
 
 func (p *Parameter) SetDefault(v Value) {
@@ -727,7 +774,7 @@ const (
 
 type ConstInst struct {
 	*Const
-	anValue
+	*anValue
 	Unary      int
 	isIdentify bool  // field key
 	Origin     int64 // user
@@ -735,8 +782,6 @@ type ConstInst struct {
 }
 
 // ConstInst cont set Type
-func (c *ConstInst) GetType() Type   { return c.anValue.GetType() }
-func (c *ConstInst) SetType(ts Type) { c.anValue.SetType(ts) }
 func (c *ConstInst) IsNormalConst() bool {
 	if c == nil {
 		return false
@@ -771,7 +816,7 @@ const (
 )
 
 type Undefined struct {
-	anValue
+	*anValue
 	Kind UndefinedKind
 }
 
@@ -797,7 +842,7 @@ var (
 
 // ----------- BinOp
 type BinOp struct {
-	anValue
+	*anValue
 	Op   BinaryOpcode
 	X, Y int64
 }
@@ -810,7 +855,7 @@ var (
 )
 
 type UnOp struct {
-	anValue
+	*anValue
 
 	Op UnaryOpcode
 	X  int64
@@ -829,7 +874,7 @@ var (
 // call instruction call method function  with args as argument
 type Call struct {
 	// call is a value
-	anValue
+	*anValue
 
 	// for call function
 	Method    int64
@@ -858,7 +903,7 @@ var (
 
 // ----------- SideEffect
 type SideEffect struct {
-	anValue
+	*anValue
 	CallSite int64 // call instruction
 	Value    int64 // modify to this value
 }
@@ -878,7 +923,7 @@ var (
 // The Return instruction returns values and control back to the calling
 // function.
 type Return struct {
-	anValue
+	*anValue
 	Results []int64
 }
 
@@ -893,7 +938,7 @@ var (
 
 // ----------- Make
 type Make struct {
-	anValue
+	*anValue
 
 	// when slice
 	low, high, step int64
@@ -913,7 +958,7 @@ var (
 
 // ------------- Next
 type Next struct {
-	anValue
+	*anValue
 	Iter   int64
 	InNext bool // "in" grammar
 }
@@ -929,7 +974,7 @@ var (
 
 // ----------- assert
 type Assert struct {
-	anInstruction
+	*anInstruction
 
 	Cond     int64
 	Msg      string
@@ -945,7 +990,7 @@ var (
 // ----------- Type-cast
 // cast value -> type
 type TypeCast struct {
-	anValue
+	*anValue
 
 	Value int64
 }
@@ -959,7 +1004,7 @@ var (
 
 // ------------- type value
 type TypeValue struct {
-	anValue
+	*anValue
 }
 
 var (
@@ -971,7 +1016,7 @@ var (
 // ================================= Error Handler
 
 type ErrorCatch struct {
-	anValue
+	*anValue
 	CatchBody int64
 	Exception int64
 }
@@ -982,7 +1027,7 @@ var _ Value = (*ErrorCatch)(nil)
 
 // ------------- ErrorHandler
 type ErrorHandler struct {
-	anInstruction
+	*anInstruction
 	Try, Final, Done int64
 	// catch and exception align
 	Catch []int64 // error catch
@@ -994,7 +1039,7 @@ var _ Node = (*ErrorHandler)(nil)
 
 // -------------- PANIC
 type Panic struct {
-	anValue
+	*anValue
 	Info int64
 }
 
@@ -1006,7 +1051,7 @@ var (
 
 // --------------- RECOVER
 type Recover struct {
-	anValue
+	*anValue
 }
 
 var (
@@ -1024,7 +1069,7 @@ var (
 //
 // the block containing Jump instruction only have one successor block
 type Jump struct {
-	anInstruction
+	*anInstruction
 	To int64 // value
 }
 
@@ -1037,7 +1082,7 @@ var _ Node = (*Loop)(nil)
 // of its owning block, depending on the boolean Cond: the first if
 // true, the second if false.
 type If struct {
-	anInstruction
+	*anInstruction
 
 	Cond  int64
 	True  int64
@@ -1062,7 +1107,11 @@ func (i *If) getSiblings(m map[int64]struct{}) []*If {
 		return nil
 	}
 
-	falseBlock, ok := ToBasicBlock(i.GetValueById(i.False))
+	val, ok := i.GetValueById(i.False)
+	if !ok {
+		return nil
+	}
+	falseBlock, ok := ToBasicBlock(val)
 	if !ok || len(falseBlock.Insts) == 0 {
 		return nil
 	}
@@ -1085,7 +1134,7 @@ var (
 // ----------- For
 // for loop
 type Loop struct {
-	anInstruction
+	*anInstruction
 
 	Body, Exit int64 // basic block
 
@@ -1113,7 +1162,7 @@ func NewSwitchLabel(v Value, dest *BasicBlock) SwitchLabel {
 }
 
 type Switch struct {
-	anInstruction
+	*anInstruction
 
 	Cond         int64
 	DefaultBlock *BasicBlock

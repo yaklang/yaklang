@@ -4,18 +4,14 @@ desc(
 	risk: sca
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Jackson-core 是一个流行的 Java 库，用于处理 JSON 数据。在受影响版本的 Jackson-core 中存在拒绝服务（DoS）漏洞（CVE-2022-42003）。该漏洞是由于在处理特定结构或内容的 JSON 数据时，Jackson 反序列化过程存在效率问题或资源消耗过大的缺陷。攻击者可以通过精心构造恶意的 JSON 输入，触发这些缺陷，导致应用程序在尝试解析该 JSON 数据时消耗过度的 CPU、内存或网络资源，最终引发服务器资源枯竭，无法响应正常请求，造成拒绝服务。
-
+Jackson-core 是一个流行的 Java 库，用于处理 JSON 数据。在受影响版本的 Jackson-core 中存在拒绝服务（DoS）漏洞（CVE-2022-42003）。该漏洞是由于在处理特定结构或内容的 JSON 数据时，Jackson 反序列化过程存在效率问题或资源消耗过大的缺陷。攻击者可以通过精心构造恶意的 JSON 输入，触发这些缺陷，导致应用程序在尝试解析该 JSON 数据时消耗过度的 CPU、内存或网络资源，最终引发服务器资源枯竭，无法响应正常请求，造成拒绝服务。
 2. **触发场景**
-   当应用程序使用了受影响版本的 Jackson-core 库，并且允许外部用户输入或接收到攻击者可控的 JSON 数据时，就存在触发风险。攻击者可以向应用程序发送特制的 JSON 负载，诱导 Jackson 库进入资源消耗巨大的处理状态。例如，在接受外部 API 请求、解析用户上传文件或处理队列消息等场景下，如果数据来源不可信且未进行充分验证，则可能被利用。
-
+当应用程序使用了受影响版本的 Jackson-core 库，并且允许外部用户输入或接收到攻击者可控的 JSON 数据时，就存在触发风险。攻击者可以向应用程序发送特制的 JSON 负载，诱导 Jackson 库进入资源消耗巨大的处理状态。例如，在接受外部 API 请求、解析用户上传文件或处理队列消息等场景下，如果数据来源不可信且未进行充分验证，则可能被利用。
 3. **潜在影响**
-   - 应用程序响应缓慢甚至完全停止响应，导致服务中断，影响用户体验和业务可用性。
-   - 消耗服务器大量资源（如 CPU 和内存），影响同一服务器上运行的其他服务或应用程序的性能或稳定性。
-   - 如果攻击持续或规模较大，可能导致整个系统瘫痪，造成严重的经济损失和声誉损害。
-
+- 应用程序响应缓慢甚至完全停止响应，导致服务中断，影响用户体验和业务可用性。
+- 消耗服务器大量资源（如 CPU 和内存），影响同一服务器上运行的其他服务或应用程序的性能或稳定性。
+- 如果攻击持续或规模较大，可能导致整个系统瘫痪，造成严重的经济损失和声誉损害。
 ### 规则详细
 该规则通过检查项目中依赖的 `jackson-core` 库的版本，识别是否存在已知拒绝服务漏洞的版本范围。具体检测版本为 `2.13.0` 到 `2.13.3`（包含边界版本）。如果项目依赖该版本范围内的 `jackson-core` 库，则报警提示存在依赖漏洞。
 DESC
@@ -23,33 +19,27 @@ DESC
 	title_zh: "SCA: 检测Java jackson-core 依赖漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Jackson-core 库版本
 将项目中的 Jackson-core 库升级到不受漏洞影响的最新稳定版本。通常，漏洞会在后续版本中得到修复。建议查阅官方发布说明，确认修复了 CVE-2022-42003 漏洞的具体版本，并进行升级。
-
 **Maven 示例:**
 修改 `pom.xml` 文件，将 `jackson-core` 依赖的版本号更改为最新版本：
 ```xml
 <dependency>
-    <groupId>com.fasterxml.jackson.core</groupId>
-    <artifactId>jackson-core</artifactId>
-    <version>2.14.0</version> <!-- 替换为最新无漏洞版本 -->
+<groupId>com.fasterxml.jackson.core</groupId>
+<artifactId>jackson-core</artifactId>
+<version>2.14.0</version> <!-- 替换为最新无漏洞版本 -->
 </dependency>
 ```
 或者使用 `mvn versions:display-dependency-updates` 查看可用的更新版本。
-
 **Gradle 示例:**
 修改 `build.gradle` 文件：
 ```gradle
 implementation 'com.fasterxml.jackson.core:jackson-core:2.14.0' // 替换为最新无漏洞版本
 ```
-
 #### 2. 限制输入数据大小和复杂度
 在处理外部输入的 JSON 数据时，对数据的大小、嵌套深度、元素数量等设置合理的限制，避免解析超大或过于复杂的 JSON 结构，从而减轻潜在的 DoS 风险。
-
 #### 3. 输入验证与过滤
 对外部输入的 JSON 数据进行严格的合法性校验和过滤，尽量只允许符合预期结构的 JSON 数据通过。对于不可信的来源，可以考虑对 JSON 内容进行初步分析或限制。
-
 #### 4. 监控和日志记录
 加强对应用程序资源使用情况（如 CPU、内存）的监控，及时发现异常的高资源消耗。同时开启并分析 Jackson 相关的日志，以便在出现问题时快速定位原因。
 SOLUTION
@@ -66,53 +56,45 @@ alert $vuln_jackson_core for {
 	message: "SCA: jackson-core versions between 2.13.0 and 2.13.3 have a denial of service vulnerability",
 	title: "SCA: Check Java jackson-core Vulnerability",
 	title_zh: "SCA: 检测Java jackson-core 依赖漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 升级 Jackson-core 库版本
 将项目中的 Jackson-core 库升级到不受漏洞影响的最新稳定版本。通常，漏洞会在后续版本中得到修复。建议查阅官方发布说明，确认修复了 CVE-2022-42003 漏洞的具体版本，并进行升级。
-
 **Maven 示例:**
 修改 `pom.xml` 文件，将 `jackson-core` 依赖的版本号更改为最新版本：
 ```xml
 <dependency>
-    <groupId>com.fasterxml.jackson.core</groupId>
-    <artifactId>jackson-core</artifactId>
-    <version>2.14.0</version> <!-- 替换为最新无漏洞版本 -->
+<groupId>com.fasterxml.jackson.core</groupId>
+<artifactId>jackson-core</artifactId>
+<version>2.14.0</version> <!-- 替换为最新无漏洞版本 -->
 </dependency>
 ```
 或者使用 `mvn versions:display-dependency-updates` 查看可用的更新版本。
-
 **Gradle 示例:**
 修改 `build.gradle` 文件：
 ```gradle
 implementation 'com.fasterxml.jackson.core:jackson-core:2.14.0' // 替换为最新无漏洞版本
 ```
-
 #### 2. 限制输入数据大小和复杂度
 在处理外部输入的 JSON 数据时，对数据的大小、嵌套深度、元素数量等设置合理的限制，避免解析超大或过于复杂的 JSON 结构，从而减轻潜在的 DoS 风险。
-
 #### 3. 输入验证与过滤
 对外部输入的 JSON 数据进行严格的合法性校验和过滤，尽量只允许符合预期结构的 JSON 数据通过。对于不可信的来源，可以考虑对 JSON 内容进行初步分析或限制。
-
 #### 4. 监控和日志记录
 加强对应用程序资源使用情况（如 CPU、内存）的监控，及时发现异常的高资源消耗。同时开启并分析 Jackson 相关的日志，以便在出现问题时快速定位原因。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Jackson-core 是一个流行的 Java 库，用于处理 JSON 数据。在受影响版本的 Jackson-core 中存在拒绝服务（DoS）漏洞（CVE-2022-42003）。该漏洞是由于在处理特定结构或内容的 JSON 数据时，Jackson 反序列化过程存在效率问题或资源消耗过大的缺陷。攻击者可以通过精心构造恶意的 JSON 输入，触发这些缺陷，导致应用程序在尝试解析该 JSON 数据时消耗过度的 CPU、内存或网络资源，最终引发服务器资源枯竭，无法响应正常请求，造成拒绝服务。
-
+Jackson-core 是一个流行的 Java 库，用于处理 JSON 数据。在受影响版本的 Jackson-core 中存在拒绝服务（DoS）漏洞（CVE-2022-42003）。该漏洞是由于在处理特定结构或内容的 JSON 数据时，Jackson 反序列化过程存在效率问题或资源消耗过大的缺陷。攻击者可以通过精心构造恶意的 JSON 输入，触发这些缺陷，导致应用程序在尝试解析该 JSON 数据时消耗过度的 CPU、内存或网络资源，最终引发服务器资源枯竭，无法响应正常请求，造成拒绝服务。
 2. **触发场景**
-   当应用程序使用了受影响版本的 Jackson-core 库，并且允许外部用户输入或接收到攻击者可控的 JSON 数据时，就存在触发风险。攻击者可以向应用程序发送特制的 JSON 负载，诱导 Jackson 库进入资源消耗巨大的处理状态。例如，在接受外部 API 请求、解析用户上传文件或处理队列消息等场景下，如果数据来源不可信且未进行充分验证，则可能被利用。
-
+当应用程序使用了受影响版本的 Jackson-core 库，并且允许外部用户输入或接收到攻击者可控的 JSON 数据时，就存在触发风险。攻击者可以向应用程序发送特制的 JSON 负载，诱导 Jackson 库进入资源消耗巨大的处理状态。例如，在接受外部 API 请求、解析用户上传文件或处理队列消息等场景下，如果数据来源不可信且未进行充分验证，则可能被利用。
 3. **潜在影响**
-   - 应用程序响应缓慢甚至完全停止响应，导致服务中断，影响用户体验和业务可用性。
-   - 消耗服务器大量资源（如 CPU 和内存），影响同一服务器上运行的其他服务或应用程序的性能或稳定性。
-   - 如果攻击持续或规模较大，可能导致整个系统瘫痪，造成严重的经济损失和声誉损害。
-
+- 应用程序响应缓慢甚至完全停止响应，导致服务中断，影响用户体验和业务可用性。
+- 消耗服务器大量资源（如 CPU 和内存），影响同一服务器上运行的其他服务或应用程序的性能或稳定性。
+- 如果攻击持续或规模较大，可能导致整个系统瘫痪，造成严重的经济损失和声誉损害。
 ### 规则详细
 该规则通过检查项目中依赖的 `jackson-core` 库的版本，识别是否存在已知拒绝服务漏洞的版本范围。具体检测版本为 `2.13.0` 到 `2.13.3`（包含边界版本）。如果项目依赖该版本范围内的 `jackson-core` 库，则报警提示存在依赖漏洞。
-CODE
+DESC
+	risk: "SCA",
+	name: "vuln_jackson_core",
 }

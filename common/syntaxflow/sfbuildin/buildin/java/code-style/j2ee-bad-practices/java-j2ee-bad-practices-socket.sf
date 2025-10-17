@@ -6,137 +6,150 @@ desc(
 [CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 [Java Socket Documentation](http://docs.oracle.com/javase/8/docs/api/java/net/Socket.html)
 REFERENCE
-	desc: <<<DESCRIPTION
-在 Web 应用程序中直接使用基于套接字的底层通信协议时，尤其是在与陈旧系统集成的场景中，极易引入安全漏洞。开发自定义通信协议需要自行解决输入/输出信号验证、协议版本兼容性、通信通道加密缺失（如未启用 TLS/SSL）、错误处理机制缺陷、防火墙穿透与网络限制规避、会话管理与重放攻击防护等复杂安全问题。即使使用标准协议，若未正确配置安全机制，攻击者仍可借助公开的协议规范和漏洞库发起定向攻击。
-值得注意的是，主流标准协议（如 HTTP/SMTP）通常拥有成熟的漏洞修复方案，而自定义协议缺乏社区支持和持续安全更新。
-DESCRIPTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+在J2EE环境中直接使用`Socket`类进行网络通信是一种危险的做法，因为这种低级别操作无法充分利用容器提供的高级功能（例如连接池、事务管理、安全性等）。此外，手动处理网络通信容易引入安全漏洞，例如缺乏适当的加密、身份验证不足或资源泄漏等问题。开发自定义通信协议需要自行解决输入/输出信号验证、协议版本兼容性、通信通道加密缺失（如未启用 TLS/SSL）、错误处理机制缺陷、防火墙穿透与网络限制规避、会话管理与重放攻击防护等复杂安全问题。
+2. **触发场景**
+下面是一个示例代码，展示了直接在J2EE组件中初始化`SSLSocket`的情况：
+```java
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+public class BadSocketServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+// 直接在 J2EE 组件中初始化 SSLSocket
+SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+try (SSLSocket socket = (SSLSocket) factory.createSocket("example.com", 443)) {
+resp.getWriter().println("Connected to example.com via SSL socket.");
+}
+}
+}
+```
+3. **潜在影响**
+- 直接使用`Socket`可能导致安全措施缺失，例如没有启用TLS/SSL加密，从而暴露敏感数据。
+- 手动管理网络资源可能导致资源泄漏、性能问题或难以维护的代码。
+- 容器无法对其行为进行有效监控或优化，违背了J2EE设计原则中的“容器托管”理念。
+DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **优先使用容器管理的标准通信机制**
-   - 对于Web服务调用，优先使用JAX-RS（RESTful Web Services）或JAX-WS（SOAP-based Web Services）客户端，它们通常利用容器提供的连接池和安全管理能力。
-   - 对于消息传递，使用JMS（Java Message Service）。
-   - 对于数据库访问，使用JTA（Java Transaction API）和JDBC数据源，通过容器管理连接池和事务。
-   - 对于资源适配，使用JCA（Java EE Connector Architecture）。
-
+- 对于Web服务调用，优先使用JAX-RS（RESTful Web Services）或JAX-WS（SOAP-based Web Services）客户端，它们通常利用容器提供的连接池和安全管理能力。
+- 对于消息传递，使用JMS（Java Message Service）。
+- 对于数据库访问，使用JTA（Java Transaction API）和JDBC数据源，通过容器管理连接池和事务。
+- 对于资源适配，使用JCA（Java EE Connector Architecture）。
 2. **利用成熟的通信框架**
-   如果必须进行底层网络通信，考虑使用经过广泛验证的通信框架，如 Netty 或 Apache MINA。这些框架提供了事件驱动、异步I/O模型，并内置了对TLS/SSL、连接管理等特性的支持，能显著降低自行实现底层通信的风险。
-   ```java
-   // 示例：使用 Apache HttpClient 代替 Socket 手动构建 HTTP 请求
-   import org.apache.http.client.methods.CloseableHttpResponse;
-   import org.apache.http.client.methods.HttpGet;
-   import org.apache.http.impl.client.CloseableHttpClient;
-   import org.apache.http.impl.client.HttpClients;
-   import javax.servlet.http.HttpServlet;
-   import javax.servlet.http.HttpServletRequest;
-   import javax.servlet.http.HttpServletResponse;
-   import java.io.IOException;
-
-   public class SafeHttpGetServlet extends HttpServlet {
-       @Override
-       protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-           try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-               HttpGet request = new HttpGet("https://example.com");
-               try (CloseableHttpResponse response = httpClient.execute(request)) {
-                   // 处理响应
-                   resp.getWriter().println("Status Code: " + response.getStatusLine().getStatusCode());
-               }
-           }
-       }
-   }
-   ```
-
+如果必须进行底层网络通信，考虑使用经过广泛验证的通信框架，如 Netty 或 Apache MINA。这些框架提供了事件驱动、异步I/O模型，并内置了对TLS/SSL、连接管理等特性的支持，能显著降低自行实现底层通信的风险。
+```java
+// 示例：使用 Apache HttpClient 代替 Socket 手动构建 HTTP 请求
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+public class SafeHttpGetServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+HttpGet request = new HttpGet("https://example.com");
+try (CloseableHttpResponse response = httpClient.execute(request)) {
+// 处理响应
+resp.getWriter().println("Status Code: " + response.getStatusLine().getStatusCode());
+}
+}
+}
+}
+```
 3. **强制启用加密和认证**
-   无论使用何种机制，务必强制启用 TLS/SSL 加密通信，并集成适当的身份验证和授权机制，如 OAuth2、JWT 或客户端证书。
-
+无论使用何种机制，务必强制启用 TLS/SSL 加密通信，并集成适当的身份验证和授权机制，如 OAuth2、JWT 或客户端证书。
 4. **通过API网关隔离遗留系统风险**
-   对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
-
+对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
 SOLUTION
 	rule_id: "a6d1d49b-6bd2-4097-a3c9-dfaabe042d54"
+	cwe: 676
 )
 
 *Socket*?{<typeName>?{have:'javax.net'}}  as $weak;
 alert $weak for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   在J2EE环境中直接使用`Socket`类进行网络通信是一种不推荐的做法，因为这种低级别操作无法充分利用容器提供的高级功能（例如连接池、事务管理、安全性等）。此外，手动处理网络通信容易引入安全漏洞，例如缺乏适当的加密、身份验证不足或资源泄漏等问题。
-
+在J2EE环境中直接使用`Socket`类进行网络通信是一种不推荐的做法，因为这种低级别操作无法充分利用容器提供的高级功能（例如连接池、事务管理、安全性等）。此外，手动处理网络通信容易引入安全漏洞，例如缺乏适当的加密、身份验证不足或资源泄漏等问题。
 2. **触发场景**
-   下面是一个示例代码，展示了直接在J2EE组件中初始化`SSLSocket`的情况：
-   ```java
-   import javax.net.ssl.SSLSocket;
-   import javax.net.ssl.SSLSocketFactory;
-   import javax.servlet.http.HttpServlet;
-   import javax.servlet.http.HttpServletRequest;
-   import javax.servlet.http.HttpServletResponse;
-   import java.io.IOException;
-
-   public class BadSocketServlet extends HttpServlet {
-       @Override
-       protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-           // 直接在 J2EE 组件中初始化 SSLSocket
-           SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-           try (SSLSocket socket = (SSLSocket) factory.createSocket("example.com", 443)) {
-               resp.getWriter().println("Connected to example.com via SSL socket.");
-           }
-       }
-   }
-   ```
-
+下面是一个示例代码，展示了直接在J2EE组件中初始化`SSLSocket`的情况：
+```java
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+public class BadSocketServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+// 直接在 J2EE 组件中初始化 SSLSocket
+SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+try (SSLSocket socket = (SSLSocket) factory.createSocket("example.com", 443)) {
+resp.getWriter().println("Connected to example.com via SSL socket.");
+}
+}
+}
+```
 3. **潜在影响**
-   - 直接使用`Socket`可能导致安全措施缺失，例如没有启用TLS/SSL加密，从而暴露敏感数据。
-   - 手动管理网络资源可能导致资源泄漏、性能问题或难以维护的代码。
-   - 容器无法对其行为进行有效监控或优化，违背了J2EE设计原则中的“容器托管”理念。
-CODE
+- 直接使用`Socket`可能导致安全措施缺失，例如没有启用TLS/SSL加密，从而暴露敏感数据。
+- 手动管理网络资源可能导致资源泄漏、性能问题或难以维护的代码。
+- 容器无法对其行为进行有效监控或优化，违背了J2EE设计原则中的“容器托管”理念。
+DESC
 	level: "info",
 	message: "发现Java J2EE 使用socket",
 	title: "Unvalidated Java J2EE Socket Usage",
 	title_zh: "未验证的Java J2EE套接字使用",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **优先使用容器管理的标准通信机制**
-   - 对于Web服务调用，优先使用JAX-RS（RESTful Web Services）或JAX-WS（SOAP-based Web Services）客户端，它们通常利用容器提供的连接池和安全管理能力。
-   - 对于消息传递，使用JMS（Java Message Service）。
-   - 对于数据库访问，使用JTA（Java Transaction API）和JDBC数据源，通过容器管理连接池和事务。
-   - 对于资源适配，使用JCA（Java EE Connector Architecture）。
-
+- 对于Web服务调用，优先使用JAX-RS（RESTful Web Services）或JAX-WS（SOAP-based Web Services）客户端，它们通常利用容器提供的连接池和安全管理能力。
+- 对于消息传递，使用JMS（Java Message Service）。
+- 对于数据库访问，使用JTA（Java Transaction API）和JDBC数据源，通过容器管理连接池和事务。
+- 对于资源适配，使用JCA（Java EE Connector Architecture）。
 2. **利用成熟的通信框架**
-   如果必须进行底层网络通信，考虑使用经过广泛验证的通信框架，如 Netty 或 Apache MINA。这些框架提供了事件驱动、异步I/O模型，并内置了对TLS/SSL、连接管理等特性的支持，能显著降低自行实现底层通信的风险。
-   ```java
-   // 示例：使用 Apache HttpClient 代替 Socket 手动构建 HTTP 请求
-   import org.apache.http.client.methods.CloseableHttpResponse;
-   import org.apache.http.client.methods.HttpGet;
-   import org.apache.http.impl.client.CloseableHttpClient;
-   import org.apache.http.impl.client.HttpClients;
-   import javax.servlet.http.HttpServlet;
-   import javax.servlet.http.HttpServletRequest;
-   import javax.servlet.http.HttpServletResponse;
-   import java.io.IOException;
-
-   public class SafeHttpGetServlet extends HttpServlet {
-       @Override
-       protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-           try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
-               HttpGet request = new HttpGet("https://example.com");
-               try (CloseableHttpResponse response = httpClient.execute(request)) {
-                   // 处理响应
-                   resp.getWriter().println("Status Code: " + response.getStatusLine().getStatusCode());
-               }
-           }
-       }
-   }
-   ```
-
+如果必须进行底层网络通信，考虑使用经过广泛验证的通信框架，如 Netty 或 Apache MINA。这些框架提供了事件驱动、异步I/O模型，并内置了对TLS/SSL、连接管理等特性的支持，能显著降低自行实现底层通信的风险。
+```java
+// 示例：使用 Apache HttpClient 代替 Socket 手动构建 HTTP 请求
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+public class SafeHttpGetServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+try (CloseableHttpClient httpClient = HttpClients.createDefault()) {
+HttpGet request = new HttpGet("https://example.com");
+try (CloseableHttpResponse response = httpClient.execute(request)) {
+// 处理响应
+resp.getWriter().println("Status Code: " + response.getStatusLine().getStatusCode());
+}
+}
+}
+}
+```
 3. **强制启用加密和认证**
-   无论使用何种机制，务必强制启用 TLS/SSL 加密通信，并集成适当的身份验证和授权机制，如 OAuth2、JWT 或客户端证书。
-
+无论使用何种机制，务必强制启用 TLS/SSL 加密通信，并集成适当的身份验证和授权机制，如 OAuth2、JWT 或客户端证书。
 4. **通过API网关隔离遗留系统风险**
-   对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
-CODE
+对于必须与采用非标准协议或存在安全风险的遗留系统交互的场景，考虑在应用外部署API网关或协议转换中间件。应用通过标准的、安全的协议与网关通信，由网关负责与遗留系统进行风险交互。
+SOLUTION
+	name: "weak",
+	risk: "代码风格",
 }
 
 

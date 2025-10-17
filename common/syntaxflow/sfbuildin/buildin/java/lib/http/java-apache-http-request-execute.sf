@@ -5,32 +5,27 @@ desc(
 	desc: <<<DESC
 ### 规则目的
 该规则用于审计Java代码中使用Apache HttpClient执行HTTP请求的安全风险。它通过识别HttpClient的执行点，帮助开发者和管理员识别潜在的SSRF（服务器端请求伪造）攻击风险。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`java-apache-http-client`库规则（`lib`类型），需配合其他规则（如输入验证规则）共同检测SSRF漏洞，提供核心函数识别能力。
-
+属于`java-apache-http-client`库规则（`lib`类型），需配合其他规则（如输入验证规则）共同检测SSRF漏洞，提供核心函数识别能力。
 2. **覆盖高危函数**
-   检测以下HttpClient执行函数：
-   `execute`, `execute(HttpUriRequest)`, `execute(HttpHost, HttpRequest)`。
-
+检测以下HttpClient执行函数：
+`execute`, `execute(HttpUriRequest)`, `execute(HttpHost, HttpRequest)`。
 ### 漏洞描述
 1. **漏洞原理**
-   SSRF漏洞允许攻击者通过操纵应用程序发送的HTTP请求，访问未经授权的内网资源或执行其他恶意操作。
-
+SSRF漏洞允许攻击者通过操纵应用程序发送的HTTP请求，访问未经授权的内网资源或执行其他恶意操作。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   CloseableHttpClient httpClient = HttpClients.createDefault();
-   HttpGet httpGet = new HttpGet("http://attacker.com");
-   CloseableHttpResponse response = httpClient.execute(httpGet);
-   ```
-   攻击者通过构造恶意URL，诱导应用程序访问内网资源。
-
+// 存在漏洞的代码示例
+```java
+CloseableHttpClient httpClient = HttpClients.createDefault();
+HttpGet httpGet = new HttpGet("http://attacker.com");
+CloseableHttpResponse response = httpClient.execute(httpGet);
+```
+攻击者通过构造恶意URL，诱导应用程序访问内网资源。
 3. **潜在影响**
-   - 泄露内网敏感信息。
-   - 执行未经授权的操作。
-   - 作为其他攻击的跳板。
+- 泄露内网敏感信息。
+- 执行未经授权的操作。
+- 作为其他攻击的跳板。
 DESC
 	rule_id: "586fced3-7b78-42b4-a5e2-4b79298b7875"
 	title_zh: "审计Java Apache HttpClient请求执行点"
@@ -38,22 +33,16 @@ DESC
 ### 修复建议
 #### 1. 输入合法性校验
 在构建和执行HTTP请求时，对用户提供的URL或其他参数进行严格的输入验证和过滤。根据预期的协议（e.g., `http`, `https`）、域名、端口和路径格式，拒绝任何不符合规范的输入，防止攻击者注入恶意URL或路径。
-
 #### 2. 限制访问范围
 如果应用程序只需要访问特定的几个内部或外部服务，可以维护一个允许访问的域名或IP地址白名单。在执行HTTP请求前，校验目标地址是否在白名单内，拒绝访问其他未经授权的地址。
-
 #### 3. 禁止重定向
 禁用HttpClient的自动重定向功能，或对重定向的目标地址进行严格检查，确保不会重定向到内部系统或敏感地址。这有助于防止开放重定向漏洞。
-
 #### 4. 使用安全的HTTP客户端配置
 配置HttpClient时，确保使用安全的默认设置，例如合适的连接超时、读取超时和最大连接数限制，以防止拒绝服务攻击（DoS）。
-
 #### 5. 遵循最小权限原则
 应用程序执行HTTP请求所使用的用户或进程应该拥有执行该操作所需的最低权限，限制潜在攻击的影响范围。
-
 #### 6. 日志记录与监控
 记录所有执行的HTTP请求的详细信息，包括目标URL、参数等。建立监控机制，对异常的请求模式（例如请求大量内部地址、高频次的请求）进行告警，及时发现和响应潜在的安全威胁。
-
 #### 7. 避免敏感信息泄露
 在构建HTTP请求时，避免在URL、请求头或请求体中包含敏感信息，特别是用户凭证、会话令牌或其他个人身份信息。如果必须传递敏感信息，使用加密或其他安全机制保护数据传输。
 SOLUTION
@@ -69,39 +58,54 @@ $request<getCallee>?{<fullTypeName>?{have: /Http(Get|Post|Put|Delete|Patch|Optio
 $request<getCallee>?{<fullTypeName>?{have: /BasicHttpRequest/}}(,,* as $output);
 <delete(request)>
 alert $output for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 规则目的
 该规则用于审计Java代码中使用Apache HttpClient执行HTTP请求的安全风险。它通过识别HttpClient的执行点，帮助开发者和管理员识别潜在的SSRF（服务器端请求伪造）攻击风险。
-
 ### 规则详细
 1. **作为基础检测库**
-   属于`java-apache-http-client`库规则（`lib`类型），需配合其他规则（如输入验证规则）共同检测SSRF漏洞，提供核心函数识别能力。
-
+属于`java-apache-http-client`库规则（`lib`类型），需配合其他规则（如输入验证规则）共同检测SSRF漏洞，提供核心函数识别能力。
 2. **覆盖高危函数**
-   检测以下HttpClient执行函数：
-   `execute`, `execute(HttpUriRequest)`, `execute(HttpHost, HttpRequest)`。
-
+检测以下HttpClient执行函数：
+`execute`, `execute(HttpUriRequest)`, `execute(HttpHost, HttpRequest)`。
 ### 漏洞描述
 1. **漏洞原理**
-   SSRF漏洞允许攻击者通过操纵应用程序发送的HTTP请求，访问未经授权的内网资源或执行其他恶意操作。
-
+SSRF漏洞允许攻击者通过操纵应用程序发送的HTTP请求，访问未经授权的内网资源或执行其他恶意操作。
 2. **触发场景**
-   // 存在漏洞的代码示例
-   ```java
-   CloseableHttpClient httpClient = HttpClients.createDefault();
-   HttpGet httpGet = new HttpGet("http://attacker.com");
-   CloseableHttpResponse response = httpClient.execute(httpGet);
-   ```
-   攻击者通过构造恶意URL，诱导应用程序访问内网资源。
-
+// 存在漏洞的代码示例
+```java
+CloseableHttpClient httpClient = HttpClients.createDefault();
+HttpGet httpGet = new HttpGet("http://attacker.com");
+CloseableHttpResponse response = httpClient.execute(httpGet);
+```
+攻击者通过构造恶意URL，诱导应用程序访问内网资源。
 3. **潜在影响**
-   - 泄露内网敏感信息。
-   - 执行未经授权的操作。
-   - 作为其他攻击的跳板。
-CODE
+- 泄露内网敏感信息。
+- 执行未经授权的操作。
+- 作为其他攻击的跳板。
+DESC
 	level: "info",
 	title: "Unvalidated Apache HttpClient Execution",
 	title_zh: "未验证的Apache HttpClient执行风险",
+	risk: "SSRF",
+	name: "output",
+	message: "发现未验证的Apache HttpClient执行风险，可能存在SSRF漏洞，建议进一步审查。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 输入合法性校验
+在构建和执行HTTP请求时，对用户提供的URL或其他参数进行严格的输入验证和过滤。根据预期的协议（e.g., `http`, `https`）、域名、端口和路径格式，拒绝任何不符合规范的输入，防止攻击者注入恶意URL或路径。
+#### 2. 限制访问范围
+如果应用程序只需要访问特定的几个内部或外部服务，可以维护一个允许访问的域名或IP地址白名单。在执行HTTP请求前，校验目标地址是否在白名单内，拒绝访问其他未经授权的地址。
+#### 3. 禁止重定向
+禁用HttpClient的自动重定向功能，或对重定向的目标地址进行严格检查，确保不会重定向到内部系统或敏感地址。这有助于防止开放重定向漏洞。
+#### 4. 使用安全的HTTP客户端配置
+配置HttpClient时，确保使用安全的默认设置，例如合适的连接超时、读取超时和最大连接数限制，以防止拒绝服务攻击（DoS）。
+#### 5. 遵循最小权限原则
+应用程序执行HTTP请求所使用的用户或进程应该拥有执行该操作所需的最低权限，限制潜在攻击的影响范围。
+#### 6. 日志记录与监控
+记录所有执行的HTTP请求的详细信息，包括目标URL、参数等。建立监控机制，对异常的请求模式（例如请求大量内部地址、高频次的请求）进行告警，及时发现和响应潜在的安全威胁。
+#### 7. 避免敏感信息泄露
+在构建HTTP请求时，避免在URL、请求头或请求体中包含敏感信息，特别是用户凭证、会话令牌或其他个人身份信息。如果必须传递敏感信息，使用加密或其他安全机制保护数据传输。
+SOLUTION
 }
 
 
@@ -224,4 +228,65 @@ public class HttpClientExample {
     }
 }
 TEXT
+	"safefile://SafeHttpURLConnectionExample.java": <<<CODE
+// 使用标准的Java HttpURLConnection代替Apache HttpClient
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.IOException;
+
+public class SafeHttpURLConnectionExample {
+
+    public static void main(String[] args) {
+        try {
+            // 安全：使用HttpURLConnection，不使用Apache HttpClient
+            URL url = new URL("https://api.example.com/safe_data");
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("GET");
+
+            int responseCode = connection.getResponseCode();
+            System.out.println("Response Code: " + responseCode);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            String inputLine;
+            StringBuilder content = new StringBuilder();
+            while ((inputLine = in.readLine()) != null) {
+                content.append(inputLine);
+            }
+            in.close();
+            System.out.println("Response Content: " + content.toString());
+
+            connection.disconnect();
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeRestTemplateExample.java": <<<CODE
+// 使用Spring Framework的RestTemplate代替Apache HttpClient
+// 注意：这个例子假设Spring Web依赖已引入
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpMethod;
+
+public class SafeRestTemplateExample {
+
+    public static void main(String[] args) {
+        // 安全：使用RestTemplate，不使用Apache HttpClient的execute方法
+        RestTemplate restTemplate = new RestTemplate();
+        String url = "https://api.example.com/spring_data";
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, null, String.class);
+            System.out.println("Response Status Code: " + response.getStatusCodeValue());
+            System.out.println("Response Body: " + response.getBody());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

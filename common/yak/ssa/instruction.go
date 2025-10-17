@@ -64,7 +64,7 @@ func NewBinOp(op BinaryOpcode, x, y Value) *BinOp {
 		Y:       y.GetId(),
 	}
 	if op >= OpGt && op <= OpIn {
-		b.SetType(BasicTypes[BooleanTypeKind])
+		b.SetType(CreateBooleanType())
 	}
 	return b
 }
@@ -119,6 +119,7 @@ func NewTypeValue(typ Type) *TypeValue {
 	t := &TypeValue{
 		anValue: NewValue(),
 	}
+	t.SetType(typ)
 	return t
 }
 
@@ -172,8 +173,8 @@ func NewExternLib(variable string, builder *FunctionBuilder, table map[string]an
 	}
 	e.SetName(variable)
 	e.SetFunc(builder.Function)
-	block := builder.GetBasicBlockByID(builder.EnterBlock)
-	if block != nil {
+	block, ok := builder.GetBasicBlockByID(builder.EnterBlock)
+	if ok && block != nil {
 		e.SetBlock(block)
 	} else {
 		log.Warnf("ExternLib block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -192,8 +193,8 @@ func NewParam(variable string, isFreeValue bool, builder *FunctionBuilder) *Para
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
 
-	block := builder.GetBasicBlockByID(builder.EnterBlock)
-	if block != nil {
+	block, ok := builder.GetBasicBlockByID(builder.EnterBlock)
+	if ok && block != nil {
 		p.SetBlock(block)
 	} else {
 		log.Warnf("Parameter block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -219,8 +220,8 @@ func NewParamMember(variable string, builder *FunctionBuilder, obj *Parameter, k
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
 
-	block := builder.GetBasicBlockByID(builder.EnterBlock)
-	if block != nil {
+	block, ok := builder.GetBasicBlockByID(builder.EnterBlock)
+	if ok && block != nil {
 		p.SetBlock(block)
 	} else {
 		log.Warnf("NewParamMember block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -237,8 +238,8 @@ func NewMoreParamMember(variable string, builder *FunctionBuilder, member *Param
 	}
 	p.SetName(variable)
 	p.SetFunc(builder.Function)
-	block := builder.GetBasicBlockByID(builder.EnterBlock)
-	if block != nil {
+	block, ok := builder.GetBasicBlockByID(builder.EnterBlock)
+	if ok && block != nil {
 		p.SetBlock(block)
 	} else {
 		log.Warnf("NewParamMember block cannot convert to BasicBlock: %v", builder.EnterBlock)
@@ -276,7 +277,10 @@ func (i *If) AddFalse(f *BasicBlock) {
 func (l *Loop) Finish(init, step []Value) {
 	// check cond
 	check := func(id int64) bool {
-		v := l.GetValueById(id)
+		v, ok := l.GetValueById(id)
+		if !ok || v == nil {
+			return false
+		}
 		if _, ok := ToPhi(v); ok {
 			return true
 		} else {
@@ -284,7 +288,10 @@ func (l *Loop) Finish(init, step []Value) {
 		}
 	}
 
-	cond := l.GetValueById(l.Cond)
+	cond, ok := l.GetValueById(l.Cond)
+	if !ok || cond == nil {
+		return
+	}
 	if b, ok := cond.(*BinOp); ok {
 		// if b.Op < OpGt || b.Op > OpNotEq {
 		// 	l.NewError(Error, SSATAG, "this condition not compare")
@@ -301,7 +308,11 @@ func (l *Loop) Finish(init, step []Value) {
 	if l.Key > 0 {
 		return
 	}
-	tmp := lo.SliceToMap(l.GetValueById(l.Key).GetValues(), func(v Value) (Value, struct{}) { return v, struct{}{} })
+	keyValue, ok := l.GetValueById(l.Key)
+	if !ok || keyValue == nil {
+		return
+	}
+	tmp := lo.SliceToMap(keyValue.GetValues(), func(v Value) (Value, struct{}) { return v, struct{}{} })
 
 	set := func(vs []Value) int64 {
 		for _, v := range vs {

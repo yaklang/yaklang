@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"strings"
@@ -18,7 +20,7 @@ func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
 	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
+	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
@@ -34,26 +36,23 @@ func TestCoordinator_PIMatrix_ToolUseReview_NEG(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return &Action{
-			name:   "",
-			params: p,
-		}, nil
+		return aicommon.NewAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithRiskControlForgeName(utils.RandStringBytes(100), nil), // bad not right risk control
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -109,7 +108,7 @@ LOOP:
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -119,7 +118,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
@@ -135,7 +134,7 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") {
 				useToolReviewPass = true
 				break LOOP
 			}
@@ -163,7 +162,7 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 	riskControlForgeName := utils.RandStringBytes(10)
 	riskControlCalled := false
 	var id []string
-	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
+	err := RegisterAIDBuildinForge(riskControlForgeName, func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
 		if !riskControlCalled {
 			riskControlCalled = true
 		}
@@ -179,26 +178,23 @@ func TestCoordinator_PIMatrix_ToolUseReview(t *testing.T) {
 		p["probability"] = 0.5
 		p["impact"] = 0.5
 		p["reason"] = "test reason"
-		return &Action{
-			name:   "",
-			params: p,
-		}, nil
+		return aicommon.NewAction("", p), nil
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
 		WithRiskControlForgeName(riskControlForgeName, nil),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -255,7 +251,7 @@ LOOP:
 				break LOOP
 			}
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -265,7 +261,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
@@ -281,12 +277,12 @@ LOOP:
 				}
 			}
 
-			if result.Type == EVENT_TYPE_RISK_CONTROL_PROMPT {
+			if result.Type == schema.EVENT_TYPE_RISK_CONTROL_PROMPT {
 				riskControlMsg++
 				continue
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") && riskControlMsg >= 2 {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") && riskControlMsg >= 2 {
 				useToolReviewPass = true
 				break LOOP
 			}
@@ -312,13 +308,10 @@ LOOP:
 
 func TestPIM_Basic(t *testing.T) {
 	UnregisterAIDBuildinForge("pimatrix-mock")
-	err := RegisterAIDBuildinForge("pimatrix-mock", func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*Action, error) {
-		a := &Action{
-			name:   "",
-			params: make(aitool.InvokeParams),
-		}
-		a.params["probability"] = 0.5
-		a.params["impact"] = 0.5
+	err := RegisterAIDBuildinForge("pimatrix-mock", func(c context.Context, params []*ypb.ExecParamItem, opts ...Option) (*aicommon.Action, error) {
+		a := aicommon.NewAction("", nil)
+		a.GetParams().Set("probability", 0.5)
+		a.GetParams().Set("impact", 0.5)
 		return a, nil
 	})
 	if err != nil {

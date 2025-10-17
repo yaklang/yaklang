@@ -1,0 +1,200 @@
+desc(
+	title: "Audit Golang text/template Usage"
+	type: audit
+	level: info
+	lib: 'golang-template-text'
+	desc: <<<DESC
+### 规则描述
+
+1. **规则目的**
+   该规则用于审计Golang代码中`text/template`模板引擎的使用情况。`text/template`是Go语言内置的文本模板渲染库，如果开发人员未能正确处理用户输入并将其嵌入到模板中，可能导致跨站脚本攻击（XSS）。此规则通过检测代码中是否调用了`text/template`相关的函数或方法来触发审计，旨在帮助开发者识别潜在的安全风险。
+
+2. **风险原理**
+   `text/template`允许将动态内容插入到模板中进行渲染。然而，默认情况下，它不会对HTML特殊字符（如`<`, `>`, `&`等）进行自动转义。如果用户输入未经过严格验证和过滤，直接被嵌入到模板中，攻击者可以通过构造恶意输入注入JavaScript代码，从而窃取用户数据或劫持会话。
+
+3. **触发场景**
+   下面是一个存在漏洞的代码示例：
+   ```go
+   package vulinbox
+   import (
+       "bytes"
+       textTemp "text/template"
+   )
+
+   func unsafeTemplate(html string, params map[string]any) ([]byte, error) {
+       temp, err := textTemp.New("TEST").Parse(html)
+       if err != nil {
+           return nil, err
+       }
+       var buf bytes.Buffer
+       err = temp.Execute(&buf, params)
+       if err != nil {
+           return nil, err
+       }
+       return buf.Bytes(), nil
+   }
+   ```
+   在上述代码中，`html`参数可能包含攻击者提供的恶意输入，例如`<script>alert('XSS')</script>`。如果这些输入未经转义，最终会在页面上被执行。
+
+4. **潜在影响**
+   - 用户浏览器执行恶意脚本，导致敏感信息泄露。
+   - 攻击者可以伪造请求、篡改网页内容或诱导用户完成非预期操作。
+   - 影响应用程序的可信度与用户体验。
+
+DESC
+	rule_id: "79d5f8c5-1c60-445f-bd25-08de89391e6e"
+	reference: <<<REFERENCE
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+REFERENCE
+	title_zh: "审计Golang text/template使用"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用`html/template`替代`text/template`
+   Go语言提供了专门用于安全HTML渲染的`html/template`包，它会自动对HTML特殊字符进行转义，防止XSS攻击。
+   ```go
+   package main
+   import (
+       "html/template"
+       "net/http"
+   )
+
+   func main() {
+       http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+           name := r.URL.Query().Get("name")
+           tmpl := template.Must(template.New("hello").Parse("<h1>Hello, {{.Name}}!</h1>"))
+           err := tmpl.Execute(w, struct{ Name string }{Name: name})
+           if err != nil {
+               http.Error(w, err.Error(), http.StatusInternalServerError)
+           }
+       })
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
+
+#### 2. 手动转义输出内容
+   如果必须使用`text/template`，需要手动对用户输入进行HTML实体转义。
+   ```go
+   import (
+       "html"
+       "text/template"
+   )
+
+   func safeTemplate(input string) string {
+       return html.EscapeString(input)
+   }
+   ```
+
+#### 3. 输入验证
+   对所有用户可控输入实施严格的验证和过滤，确保只接受合法的内容。
+   ```go
+   func validateInput(input string) bool {
+       return !strings.ContainsAny(input, "<>&\"")
+   }
+   ```
+
+#### 4. 定期审计代码
+   审查现有代码中的模板使用方式，确保没有遗漏的安全隐患，并遵循最佳实践。
+SOLUTION
+)
+
+template?{<fullTypeName>?{have: 'text/template'}} as $output
+*temp*?{<fullTypeName>?{have: 'text/template'}} as $output
+Template?{<fullTypeName>?{have: 'text/template'}} as $output
+*Temp*?{<fullTypeName>?{have: 'text/template'}} as $output
+
+alert $output for {
+	level: "info",
+	title: "Audit Golang text/template Usage",
+	title_zh: "审计Golang text/template使用",
+	message: "发现Golang text/template库的使用，需进一步确认是否存在安全风险。",
+	solution: <<<SOLUTION
+为了修复可能的XSS漏洞，建议开发者：
+#### 1. 对所有模板进行严格的输入验证和转义，确保所有用户输入都不会被直接渲染在页面上。
+#### 2. 使用text/template时，利用其内置的转义功能，避免用户输入被当作HTML代码执行。
+#### 3. 定期审计代码，确保模板的使用符合安全最佳实践。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计Golang代码中使用text/template的情况。text/template是Golang的一个模板渲染库，如果不正确使用，可能会导致跨站脚本攻击（XSS）。规则通过识别代码中是否使用了text/template库来触发审计，确保开发者了解其使用方式和潜在风险。
+
+### 2.规则详细
+- **作为基础检测库**：属于`golang-template-text`库规则（`lib`类型），需配合其他规则共同检测XSS漏洞，提供核心函数识别能力。
+- **覆盖高危输出函数**：检测以下几种情况的text/template使用：
+  - `template?{<fullTypeName>?{have: 'text/template'}}`
+  - `*temp*?{<fullTypeName>?{have: 'text/template'}}`
+  - `Template?{<fullTypeName>?{have: 'text/template'}}`
+  - `*Temp*?{<fullTypeName>?{have: 'text/template'}}`
+DESC
+	name: "output",
+}
+
+desc(
+	lang: golang
+	alert_min: 1
+	'file://template.go': <<<PARAM
+package vulinbox
+
+import (
+	"bytes"
+	textTemp "text/template"
+)
+
+func unsafeTemplate(html string, params map[string]any) ([]byte, error) {
+	temp, err := textTemp.New("TEST").Parse(html)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	err = temp.Execute(&buf, params)
+	if err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+PARAM
+	"safefile://SafeTemplateUsage.go": <<<CODE
+package main
+
+import (
+	"html/template" // 使用html/template进行安全输出
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// 假设name是用户输入，但通过模板引擎的自动转义进行处理
+		name := r.URL.Query().Get("name")
+
+		// 定义模板，使用Go模板的内置转义功能
+		tmpl := template.Must(template.New("hello").Parse("<h1>Hello, {{.Name}}!</h1>"))
+
+		// 执行模板
+		err := tmpl.Execute(w, struct{ Name string }{Name: name})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+	http.ListenAndServe(":8080", nil)
+}
+
+CODE
+	"safefile://NoTemplateUsage.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"net/http"
+)
+
+func main() {
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// 直接输出字符串，不涉及任何模板渲染
+		fmt.Fprintf(w, "Hello, world!")
+	})
+	http.ListenAndServe(":8080", nil)
+}
+
+CODE
+)

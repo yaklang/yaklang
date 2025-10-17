@@ -2,6 +2,8 @@ package aid
 
 import (
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 	"testing"
 	"time"
@@ -15,14 +17,14 @@ import (
 
 func TestCoordinator_ReviewPlan(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			rsp.EmitOutputStream(strings.NewReader(`
 {
@@ -65,7 +67,7 @@ LOOP:
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
 			spew.Dump(result)
-			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `将最大文件的路径和大小以可读格式输出`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
@@ -89,14 +91,14 @@ LOOP:
 
 func TestCoordinator_ReviewPlan_Incomplete(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -163,7 +165,7 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(time.Millisecond * 50)
 				inputChan <- &InputEvent{
@@ -176,7 +178,7 @@ LOOP:
 			}
 
 			if utils.MatchAllOfSubString(result.String(), "ABC", "CCC", "BCD") &&
-				result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				regeneratePlan = true
 				break LOOP
 			}
@@ -197,15 +199,15 @@ LOOP:
 
 func TestCoordinator_ReviewPlan_Incomplete_2(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	extraPromptToken := utils.RandStringBytes(100)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			fmt.Println(request.GetPrompt())
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -273,7 +275,7 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(time.Millisecond * 50)
 				inputChan <- &InputEvent{
@@ -287,7 +289,7 @@ LOOP:
 			}
 
 			if utils.MatchAllOfSubString(result.String(), "ABC", "CCC", "BCD") &&
-				result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				regeneratePlan = true
 				break LOOP
 			}
@@ -308,15 +310,15 @@ LOOP:
 
 func TestCoordinator_ReviewPlan_CreateSubtask(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 	extraPromptToken := utils.RandStringBytes(100)
 	ins, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			fmt.Println(request.GetPrompt())
 			rsp := config.NewAIResponse()
 			defer func() {
@@ -388,7 +390,7 @@ LOOP:
 		select {
 		case result := <-outputChan:
 			fmt.Println("result:" + result.String())
-			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && !strings.Contains(result.String(), `1-2-2details`) && result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if strings.Contains(result.String(), `目录中占用存储空间最多的文件，并展示其完整路径与大小信息`) && !strings.Contains(result.String(), `1-2-2details`) && result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				parsedTask = true
 				time.Sleep(time.Millisecond * 50)
 				inputChan <- &InputEvent{
@@ -403,7 +405,7 @@ LOOP:
 			}
 
 			if utils.MatchAllOfSubString(result.String(), "ABC1", "ABC2", "1-2-2details", "扫描目录结构") &&
-				result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+				result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				regeneratePlan = true
 				break LOOP
 			}

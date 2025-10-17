@@ -1,0 +1,209 @@
+desc(
+	title: "Detect Golang Reflected XSS Vulnerability in gin.Context"
+	title_zh: "检测Golang在gin.Context框架中的反射型跨站脚本攻击漏洞"
+	type: vuln
+	severity: mid
+	risk: "xss"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   反射型跨站脚本攻击（XSS）是一种攻击方式，攻击者通过在受害者浏览器的地址栏、表单输入等地方注入恶意脚本。当受害者浏览这些注入了恶意脚本的页面时，脚本会在受害者浏览器上执行，从而达到攻击者的目的。例如，窃取用户会话信息或伪造请求。
+
+2. **触发场景**
+   在使用Golang开发web应用时，如果开发者直接将未经过滤或转义的用户输入嵌入到HTML输出中，就可能导致反射型XSS漏洞。例如，以下代码存在漏洞：
+   ```go
+   func XSSReflectedHandler(c *gin.Context) {
+       query := c.Query("q")
+       c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+           "Query": query,
+       })
+   }
+   ```
+   攻击者可以通过URL参数`?q=<script>alert('XSS')</script>`注入恶意脚本，导致脚本执行。
+
+3. **潜在影响**
+   - 用户会话被劫持，攻击者可以冒充受害者身份。
+   - 可以篡改页面内容，误导用户操作。
+   - 可能进一步利用其他漏洞发起更复杂的攻击，例如CSRF或钓鱼攻击。
+
+DESC
+	rule_id: "023f453d-7d0c-4ef8-a105-a53188c9a31e"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 对用户输入进行转义处理
+为了防止恶意脚本执行，必须对所有嵌入到HTML输出的用户输入进行适当转义。在Golang中，可以使用`template.HTMLEscapeString`方法对用户输入进行转义，确保输出到页面的内容不会被浏览器解释为可执行的脚本。
+```go
+query := c.Query("q")
+c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+    "Query": template.HTMLEscapeString(query),
+})
+```
+
+#### 2. 使用安全模板引擎
+Golang自带的HTML模板引擎提供了自动转义功能，推荐始终使用模板引擎来处理动态输出。例如：
+```go
+package api
+import (
+    "html/template"
+    "net/http"
+    "github.com/gin-gonic/gin"
+)
+func SafeHtmlNoXSSHandler(c *gin.Context) {
+    query := c.Query("q")
+    // 使用 template.HTMLEscapeString 对用户输入进行转义，确保安全性
+    c.HTML(http.StatusOK, "index.tmpl", gin.H{
+        "Query": template.HTMLEscapeString(query),
+    })
+}
+```
+
+#### 3. 避免直接嵌入用户输入
+尽量避免直接将用户输入嵌入到HTML响应中。如果可能，使用硬编码内容替代动态内容，或者限制输出范围。例如：
+```go
+func SafeHtmlConstantHandler(c *gin.Context) {
+    // 没有用户输入，直接输出硬编码的HTML内容，不会触发XSS
+    c.HTML(http.StatusOK, "static.tmpl", gin.H{
+        "Title": "Welcome",
+        "Content": "This is a safe and static page.",
+    })
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-79](https://cwe.mitre.org/data/definitions/79.html)
+[OWASP XSS Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html)
+REFERENCE
+)
+
+<include('golang-gin-context')> as $sink;
+$sink.HTML(*<slice(index=3)> #-> as $param)
+$param.HTMLEscapeString(* #-> as $safe)
+$param - $safe as $output
+$output?{!opcode:make} as $target
+$target.Query as $mid
+
+alert $mid for {
+	title: "Golang Reflected XSS Vulnerability Was Detected",
+	title_zh: "检测到Golang反射型XSS漏洞",
+	level: "mid",
+	type: "vuln",
+	name: "mid",
+	message: "检测到Golang在gin.Context框架中的反射型XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+为了修复反射型XSS漏洞，建议对用户输入进行适当的转义处理。在Golang的gin.Context框架中，可以使用`template.HTMLEscapeString`方法对用户输入进行转义，确保输出到页面的内容不会被浏览器解释为可执行的脚本。
+```go
+query := c.Query("q")
+c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+"Query": template.HTMLEscapeString(query),
+})
+```
+在上述代码中，`template.HTMLEscapeString`方法被用来转义用户输入的查询参数`query`，以避免XSS攻击。
+SOLUTION
+	risk: "XSS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+反射型跨站脚本攻击（XSS）是一种攻击方式，攻击者通过在受害者浏览器的地址栏、表单输入等地方注入恶意脚本，当受害者浏览这些注入了恶意脚本的页面时，脚本会在受害者浏览器上执行，从而达到攻击者的目的。
+2. **触发场景**
+// 存在漏洞的代码示例
+```go
+package api
+import (
+"github.com/gin-gonic/gin"
+"net/http"
+)
+func XSSReflectedHandler(c *gin.Context) {
+query := c.Query("q")
+c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+"Query": query,
+})
+}
+```
+攻击者构造恶意URL `http://example.com/?q=<script>alert('XSS')</script>`，当受害者点击该链接时，恶意脚本将在其浏览器中执行。
+3. **潜在影响**
+- 攻击者可以通过注入恶意脚本窃取用户的会话Cookie，进而冒充用户身份。
+- 可能导致敏感信息泄露或未经授权的操作执行。
+DESC
+}
+
+desc(
+	lang: golang
+	alert_mid: 1
+	'file://unsafe.go': <<<UNSAFE
+package api
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/seaung/vhub/pkg/models"
+	"net/http"
+	"time"
+)
+
+// XSSReflectedHandler 处理反射型XSS演示页面
+func XSSReflectedHandler(c *gin.Context) {
+	query := c.Query("q")
+	c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+		"Query": query,
+	})
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package api
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/seaung/vhub/pkg/models"
+	"net/http"
+	"time"
+)
+
+func XSSReflectedHandler(c *gin.Context) {
+	query := c.Query("q")
+	c.HTML(http.StatusOK, "vulns/xss_reflected.tmpl", gin.H{
+		"Query": template.HTMLEscapeString(query),
+	})
+}
+SAFE
+	"safefile://SafeHtmlNoXSS.go": <<<SAFE
+package api
+
+import (
+	"html/template"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// SafeHtmlNoXSSHandler 演示了如何安全地处理HTML输出，避免XSS，使用HTMLEscapeString
+func SafeHtmlNoXSSHandler(c *gin.Context) {
+	query := c.Query("q")
+	// 使用 template.HTMLEscapeString 对用户输入进行转义，确保安全性
+	c.HTML(http.StatusOK, "index.tmpl", gin.H{
+		"Query": template.HTMLEscapeString(query),
+	})
+}
+
+SAFE
+	"safefile://SafeHtmlConstant.go": <<<SAFE
+package api
+
+import (
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// SafeHtmlConstantHandler 演示了不包含用户输入的硬编码HTML输出，本身就是安全的
+func SafeHtmlConstantHandler(c *gin.Context) {
+	// 没有用户输入，直接输出硬编码的HTML内容，不会触发XSS
+	c.HTML(http.StatusOK, "static.tmpl", gin.H{
+		"Title": "Welcome",
+		"Content": "This is a safe and static page.",
+	})
+}
+
+SAFE
+)

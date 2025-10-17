@@ -260,7 +260,13 @@ func GetSSARiskCountFilter(u *ypb.YakURL) (*SSARiskCountFilter, error) {
 	if search := query.Get("search"); search != "" {
 		opts = append(opts, yakit.WithSSARiskFilterSearch(search))
 	}
+	if increment := query.Get("increment"); increment != "" {
+		opts = append(opts, yakit.WithSSARiskIncremental())
+	}
 	if taskID := query.Get("task_id"); taskID != "" {
+		if compare := query.Get("compare"); compare != "" {
+			opts = append(opts, yakit.WithSSARiskFilterCompare(taskID, compare))
+		}
 		opts = append(opts, yakit.WithSSARiskFilterTaskID(taskID))
 	}
 	if resultID := query.Get("result_id"); resultID != "" {

@@ -6,66 +6,59 @@ desc(
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   未经过滤的目录读取漏洞（Path Traversal/Directory Traversal）源于应用程序在处理用户提供的文件或目录路径时，未能对特殊字符（如 `..`、`/`、`\`）进行充分的过滤或验证。攻击者通过构造恶意路径，可以访问到本不应允许访问的文件或目录，例如应用程序的配置文件、源代码，甚至获取系统敏感信息。
-
+未经过滤的目录读取漏洞（Path Traversal/Directory Traversal）源于应用程序在处理用户提供的文件或目录路径时，未能对特殊字符（如 `..`、`/`、`\`）进行充分的过滤或验证。攻击者通过构造恶意路径，可以访问到本不应允许访问的文件或目录，例如应用程序的配置文件、源代码，甚至获取系统敏感信息。
 2. **触发场景**
-   当PHP代码使用用户输入直接作为 `dir()`、`opendir()`、`scandir()` 等目录操作函数的参数，且未对输入进行严格的路径规范化或过滤时，就可能触发此漏洞。例如，以下代码直接使用`$_GET['path']`作为`dir()`的参数：
-   ```php
-   <?php
-   function readDir($path) {
-       $dh = dir($path);
-       while (($file = $dh->read()) !== false) {
-           echo $file . "\n";
-       }
-   }
-   readDir($_GET["path"]);
-   ?>
-   ```
-   攻击者可以通过构造类似 `../../etc/passwd` 的path参数，尝试读取系统密码文件。
-
+当PHP代码使用用户输入直接作为 `dir()`、`opendir()`、`scandir()` 等目录操作函数的参数，且未对输入进行严格的路径规范化或过滤时，就可能触发此漏洞。例如，以下代码直接使用`$_GET['path']`作为`dir()`的参数：
+```php
+<?php
+function readDir($path) {
+    $dh = dir($path);
+    while (($file = $dh->read()) !== false) {
+        echo $file . "\n";
+    }
+}
+readDir($_GET["path"]);
+?>
+```
+攻击者可以通过构造类似 `../../etc/passwd` 的path参数，尝试读取系统密码文件。
 3. **潜在影响**
-   - 泄露服务器上任意文件或目录的内容，包括配置文件、敏感文档、用户数据等。
-   - 进一步结合其他漏洞，可能导致远程代码执行或系统控制权限的获取。
-   - 泄露应用程序源码，帮助攻击者发现其他潜在漏洞。
+- 泄露服务器上任意文件或目录的内容，包括配置文件、敏感文档、用户数据等。
+- 进一步结合其他漏洞，可能导致远程代码执行或系统控制权限的获取。
+- 泄露应用程序源码，帮助攻击者发现其他潜在漏洞。
 DESC
 	rule_id: "bf141248-59ef-4fb0-b521-ff7c8339d44d"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格过滤用户输入**
-   对所有来自用户的输入（如 `$_GET`, `$_POST`, `$_COOKIE` 等）进行严格的过滤和验证。使用白名单方式限制允许访问的目录或文件名，禁止包含特殊字符（如 `..`, `/`, `\`, `%00` 空字节等）。
-
+对所有来自用户的输入（如 `$_GET`, `$_POST`, `$_COOKIE` 等）进行严格的过滤和验证。使用白名单方式限制允许访问的目录或文件名，禁止包含特殊字符（如 `..`, `/`, `\`, `%00` 空字节等）。
 2. **规范化路径**
-   在处理用户输入路径之前，先对其进行规范化。可以使用 `realpath()` 或自定义函数来获取文件的绝对路径，并检查该路径是否在预期的安全范围内。
-   ```php
-   <?php
-   function readDirSafe($path) {
-       // 规范化路径并检查是否在指定根目录下
-       $baseDir = '/var/www/uploads/'; // 指定安全根目录
-       $realPath = realpath($baseDir . '/' . $path);
-       if ($realPath === false || strpos($realPath, $baseDir) !== 0) {
-           // 输入无效或超出范围
-           echo "Invalid path.\n";
-           return;
-       }
-       
-       // 安全地读取目录
-       $dh = dir($realPath);
-       if ($dh) {
-           while (($file = $dh->read()) !== false) {
-               echo $file . "\n";
-           }
-           $dh->close();
-       }
-   }
-   readDirSafe($_GET["path"]);
-   ?>
-   ```
-
+在处理用户输入路径之前，先对其进行规范化。可以使用 `realpath()` 或自定义函数来获取文件的绝对路径，并检查该路径是否在预期的安全范围内。
+```php
+<?php
+function readDirSafe($path) {
+    // 规范化路径并检查是否在指定根目录下
+    $baseDir = '/var/www/uploads/'; // 指定安全根目录
+    $realPath = realpath($baseDir . '/' . $path);
+    if ($realPath === false || strpos($realPath, $baseDir) !== 0) {
+        // 输入无效或超出范围
+        echo "Invalid path.\n";
+        return;
+    }
+    // 安全地读取目录
+    $dh = dir($realPath);
+    if ($dh) {
+        while (($file = $dh->read()) !== false) {
+            echo $file . "\n";
+        }
+        $dh->close();
+    }
+}
+readDirSafe($_GET["path"]);
+?>
+```
 3. **权限控制**
-   确保执行文件操作的进程拥有最小必要的权限，限制其对敏感目录的访问。
+确保执行文件操作的进程拥有最小必要的权限，限制其对敏感目录的访问。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
@@ -85,6 +78,64 @@ alert $sink for {
 	title: "PHP Unfiltered Directory Reading Vulnerability",
 	title_zh: "PHP未过滤目录读取漏洞",
 	level: "high",
+	solution: <<<SOLUTION
+### 修复建议
+1. **严格过滤用户输入**
+对所有来自用户的输入（如 `$_GET`, `$_POST`, `$_COOKIE` 等）进行严格的过滤和验证。使用白名单方式限制允许访问的目录或文件名，禁止包含特殊字符（如 `..`, `/`, `\`, `%00` 空字节等）。
+2. **规范化路径**
+在处理用户输入路径之前，先对其进行规范化。可以使用 `realpath()` 或自定义函数来获取文件的绝对路径，并检查该路径是否在预期的安全范围内。
+```php
+<?php
+function readDirSafe($path) {
+  // 规范化路径并检查是否在指定根目录下
+  $baseDir = '/var/www/uploads/'; // 指定安全根目录
+  $realPath = realpath($baseDir . '/' . $path);
+  if ($realPath === false || strpos($realPath, $baseDir) !== 0) {
+    // 输入无效或超出范围
+    echo "Invalid path.\n";
+    return;
+  }
+  // 安全地读取目录
+  $dh = dir($realPath);
+  if ($dh) {
+    while (($file = $dh->read()) !== false) {
+      echo $file . "\n";
+    }
+    $dh->close();
+  }
+}
+readDirSafe($_GET["path"]);
+?>
+```
+3. **权限控制**
+确保执行文件操作的进程拥有最小必要的权限，限制其对敏感目录的访问。
+SOLUTION
+	risk: "路径遍历",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+未经过滤的目录读取漏洞（Path Traversal/Directory Traversal）源于应用程序在处理用户提供的文件或目录路径时，未能对特殊字符（如 `..`、`/`、`\`）进行充分的过滤或验证。攻击者通过构造恶意路径，可以访问到本不应允许访问的文件或目录，例如应用程序的配置文件、源代码，甚至获取系统敏感信息。
+2. **触发场景**
+当PHP代码使用用户输入直接作为 `dir()`、`opendir()`、`scandir()` 等目录操作函数的参数，且未对输入进行严格的路径规范化或过滤时，就可能触发此漏洞。例如，以下代码直接使用`$_GET['path']`作为`dir()`的参数：
+```php
+<?php
+function readDir($path) {
+  $dh = dir($path);
+  while (($file = $dh->read()) !== false) {
+    echo $file . "\n";
+  }
+}
+readDir($_GET["path"]);
+?>
+```
+攻击者可以通过构造类似 `../../etc/passwd` 的path参数，尝试读取系统密码文件。
+3. **潜在影响**
+- 泄露服务器上任意文件或目录的内容，包括配置文件、敏感文档、用户数据等。
+- 进一步结合其他漏洞，可能导致远程代码执行或系统控制权限的获取。
+- 泄露应用程序源码，帮助攻击者发现其他潜在漏洞。
+DESC
+	name: "sink",
+	message: "检测到PHP未过滤目录读取漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 desc(
 	lang: "php"
@@ -97,5 +148,98 @@ function readDir($path){
     }
 }
 readDir($_GET["path"]);
+CODE
+	"safefile://SafeDirectoryListing.php": <<<CODE
+<?php
+// Test Case 1: 使用realpath()规范化路径并检查是否在安全根目录下
+function readDirSafe($path) {
+    $baseDir = '/var/www/html/safe_files/'; // 定义安全根目录
+    // 确保目录存在，如果不存在则创建
+    if (!is_dir($baseDir)) {
+        mkdir($baseDir, 0755, true);
+    }
+
+    // 构造完整的潜在路径，并规范化
+    $fullPath = realpath($baseDir . '/' . $path);
+
+    // 验证规范化后的路径是否仍然在安全根目录内
+    if ($fullPath === false || strpos($fullPath, $baseDir) !== 0) {
+        echo "Invalid path or path outside allowed directory.\n";
+        return;
+    }
+    
+    // 确保是一个目录，而不是文件
+    if (!is_dir($fullPath)) {
+        echo "Path is not a directory.\n";
+        return;
+    }
+
+    if ($dh = opendir($fullPath)) {
+        while (($file = readdir($dh)) !== false) {
+            if ($file != "." && $file != "..") {
+                echo $file . "\n";
+            }
+        }
+        closedir($dh);
+    } else {
+        echo "Could not open directory.\n";
+    }
+}
+
+// 安全输入示例
+readDirSafe('user_uploads'); // 假设/var/www/html/safe_files/user_uploads 是一个存在的目录
+readDirSafe('.'); // 读取安全根目录下的内容
+readDirSafe('subdir/images'); // 读取子目录，只要在baseDir内
+
+// 模拟潜在的恶意输入，但被安全函数阻止
+// readDirSafe('../../../etc/passwd'); // 会被realPath和strpos检查阻止
+// readDirSafe('/etc/passwd'); // 会被realPath和strpos检查阻止
+?>
+CODE
+	"safefile://WhitelistedDirectoryAccess.php": <<<CODE
+<?php
+// Test Case 2: 使用白名单来限制允许访问的目录
+function readWhitelistedDir($dirName) {
+    $allowedDirs = [
+        'invoices' => '/var/www/html/data/invoices',
+        'reports' => '/var/www/html/data/reports',
+        'temp' => '/tmp/app_data'
+    ];
+
+    // 检查请求的目录名是否在白名单中
+    if (!isset($allowedDirs[$dirName])) {
+        echo "Directory '" . htmlspecialchars($dirName) . "' is not allowed.\n";
+        return;
+    }
+
+    $path = $allowedDirs[$dirName];
+    
+    // 确认路径是真实存在的目录
+    if (!is_dir($path)) {
+        echo "Configured directory '" . htmlspecialchars($dirName) . "' does not exist or is not a directory.\n";
+        return;
+    }
+
+    if ($dh = opendir($path)) {
+        echo "Listing contents of: " . htmlspecialchars($dirName) . "\n";
+        while (($file = readdir($dh)) !== false) {
+            if ($file != "." && $file != "..") {
+                echo $file . "\n";
+            }
+        }
+        closedir($dh);
+    } else {
+        echo "Could not open directory '" . htmlspecialchars($dirName) . "'.\n";
+    }
+}
+
+// 安全输入示例
+readWhitelistedDir('invoices');
+readWhitelistedDir('reports');
+
+// 模拟非法输入，会被白名单检查阻止
+// readWhitelistedDir('../../../etc'); 
+// readWhitelistedDir('config'); 
+?>
 CODE
 )

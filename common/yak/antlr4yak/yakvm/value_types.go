@@ -337,6 +337,9 @@ func (v *Frame) AutoConvertReflectValueByType(
 				}
 				for i := 0; i < outCount; i++ {
 					val := reflectReturn.Index(i)
+					if val.Kind() == reflect.Interface {
+						val = val.Elem()
+					}
 					expectedType := targetType.Out(i)
 					err := v.AutoConvertReflectValueByType(&val, expectedType)
 					if err != nil {

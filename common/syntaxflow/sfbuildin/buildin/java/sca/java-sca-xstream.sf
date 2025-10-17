@@ -6,36 +6,23 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   XStream是一个Java库，用于将Java对象序列化为XML，反之亦然。在某些版本中，XStream存在反序列化漏洞。当应用程序使用易受攻击的XStream版本解析由攻击者控制的XML数据时，攻击者可以构造恶意的XML，在反序列化过程中触发特定Java类的构造函数或方法调用，从而在服务器端执行任意代码。
+XStream是一个用于将Java对象序列化为XML并反序列化的库。在某些版本中，XStream存在反序列化漏洞。当应用程序使用易受攻击版本的XStream解析由攻击者控制的XML数据时，攻击者可以通过构造恶意XML，在反序列化过程中触发特定Java类的构造函数或方法调用，从而执行任意代码。
 
 2. **触发场景**
-   当应用程序使用了存在漏洞版本的XStream库（特别是在 1.4.11.1 到 1.4.17 之间），并且从不受信任的来源接收并反序列化XML数据时，攻击者可以发送精心构造的恶意XML数据来触发此漏洞。例如，在一个依赖XStream进行数据交换的API接口中，如果未对输入的XML进行有效过滤或限制，攻击者便可能通过提交恶意XMLPayload。
-
-   ```java
-   // 示例代码 （存在漏洞的场景）
-   String maliciousXml = "<sorted-set>
-     <dynamic-proxy>
-       <interface>java.lang.Comparable</interface>
-       <handler class=\"beans.infections.FunkyBeanFactory\">
-         <target class=\"java.lang.Runtime\"/>
-         <methodName>exec</methodName>
-         <params>
-           <string>touch /tmp/vulnerable</string>
-         </params>
-       </handler>
-     </dynamic-proxy>
-     <string>foo</string>
-   </sorted-set>";
-   XStream xstream = new XStream();
-   // 关键在于对不受信任数据的反序列化
-   Object obj = xstream.fromXML(maliciousXml);
-   ```
+示例代码（存在漏洞的场景）：
+```java
+String maliciousXml = "<sorted-set>\n<dynamic-proxy>\n<interface>java.lang.Comparable</interface>\n<handler class=\"beans.infections.FunkyBeanFactory\">\n<target class=\"java.lang.Runtime\"/>\n<methodName>exec</methodName>\n<params>\n<string>touch /tmp/vulnerable</string>\n</params>\n</handler>\n</dynamic-proxy>\n<string>foo</string>\n</sorted-set>";
+XStream xstream = new XStream();
+Object obj = xstream.fromXML(maliciousXml);
+```
+当应用程序使用了存在漏洞版本的XStream库（特别是在 1.4.11.1 到 1.4.17 之间），并且从不受信任来源接收并反序列化XML数据时，即可触发该漏洞。
 
 3. **潜在影响**
-   - **远程代码执行（RCE）**: 攻击者可以执行任意系统命令，完全控制服务器。
-   - **数据泄露与篡改**: 攻击者可以访问、修改或删除存储在服务器或数据库中的敏感数据。
-   - **拒绝服务（DoS）**: 攻击者可能通过构造耗费资源的XML导致应用程序崩溃或资源耗尽。
-   - **进一步渗透**: 攻击者可以利用受控服务器作为跳板，对内网其他系统发起攻击。
+- **远程代码执行（RCE）**: 攻击者可以执行任意系统命令，完全控制服务器。
+- **数据泄露与篡改**: 可能访问、修改或删除存储在服务器或数据库中的敏感数据。
+- **拒绝服务（DoS）**: 攻击者可通过构造耗费资源的XML导致应用程序崩溃或资源耗尽。
+- **进一步渗透**: 攻击者可利用受控服务器作为跳板，对内网其他系统发起攻击。
+
 DESC
 	rule_id: "13ffa65e-263b-44d1-842c-52419fbea084"
 	title_zh: "SCA: 检测Java XStream反序列化漏洞"
@@ -43,38 +30,31 @@ DESC
 ### 修复建议
 
 1. **升级XStream库版本**
-   尽快升级XStream库到最新版本，以规避已知的所有反序列化漏洞。新版本通常会包含针对这些漏洞的安全修复或引入更严格的默认安全策略。
-
-   ```xml
-   <!-- Maven 示例：升级 XStream 依赖 -->
-   <dependency>
-       <groupId>com.thoughtworks.xstream</groupId>
-       <artifactId>xstream</artifactId>
-       <version>LATEST_STABLE_VERSION</version> <!-- 替换为最新的稳定版本号 -->
-   </dependency>
-   ```
+尽快升级XStream到最新版本以规避已知的所有反序列化漏洞。新版本通常包含针对这些漏洞的安全修复或更严格的默认安全策略。
+```xml
+<!-- Maven 示例：升级 XStream 依赖 -->
+<dependency>
+<groupId>com.thoughtworks.xstream</groupId>
+<artifactId>xstream</artifactId>
+<version>LATEST_STABLE_VERSION</version> <!-- 替换为最新的稳定版本号 -->
+</dependency>
+```
 
 2. **启用安全模式和类型过滤**
-   XStream 提供了安全框架来限制可反序列化的类。启用安全模式并仅允许反序列化应用程序所需的特定类。
+XStream 提供了安全框架来限制可反序列化的类。启用安全模式并仅允许反序列化应用程序所需的特定类。
+```java
+XStream xstream = new XStream();
+xstream.addPermission(NoTypePermission.NONE);
+xstream.allowTypes(new Class[]{YourClass1.class, YourClass2.class});
+// 或者使用正则匹配允许的包/类
+// xstream.allowTypesByRegex(new String[]{"com\.yourcompany\.model\..*"});
+```
 
-   ```java
-   // 示例代码：启用安全模式并设置白名单
-   XStream xstream = new XStream();
-   // 启用安全模式
-   xstream.addPermission(NoTypePermission.NONE);
-   // 允许反序列化的特定类（替换为你的应用实际需要的类）
-   xstream.addPermission(AnytypePermission.ANY);
-   xstream.allowTypes(new Class[]{YourClass1.class, YourClass2.class});
-
-   // 或者使用正则匹配允许的包/类
-   // xstream.allowTypesByRegex(new String[]{"com\.yourcompany\.model\..*"});
-   ```
-
-3. **避免反序列化不受信任的XML数据**
-   如果可能，尽量避免直接反序列化来自不可信源的任意XML数据。考虑使用更安全的数据交换格式（如JSON）或在接收到XML后进行严格的输入验证和消毒。
+3. **避免反序列化不可信XML数据**
+如果可能，尽量避免直接反序列化来自不可信源的任意XML数据。考虑使用更安全的数据交换格式（如JSON）或对接收到的XML进行严格验证和消毒。
 
 4. **限制网络访问**
-   确保只有受信任的客户端或服务可以访问处理XStream反序列化的接口。
+确保只有受信任的客户端或服务可以访问处理XStream反序列化的接口。
 SOLUTION
 	reference: <<<REFERENCE
 [XStream Security Advisories](https://x-stream.github.io/security.html)
@@ -90,4 +70,67 @@ alert $vuln_xstream for {
 	level: "high",
 	message: "SCA: xstream versions between 1.4.11.1 and 1.4.17 have multiple deserialization vulnerabilities",
 	cve: "CVE-2021-39152",
+	risk: "SCA",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+XStream是一个Java库，用于将Java对象序列化为XML，反之亦然。在某些版本中，XStream存在反序列化漏洞。当应用程序使用易受攻击的XStream版本解析由攻击者控制的XML数据时，攻击者可以构造恶意的XML，在反序列化过程中触发特定Java类的构造函数或方法调用，从而在服务器端执行任意代码。
+2. **触发场景**
+当应用程序使用了存在漏洞版本的XStream库（特别是在 1.4.11.1 到 1.4.17 之间），并且从不受信任的来源接收并反序列化XML数据时，攻击者可以发送精心构造的恶意XML数据来触发此漏洞。例如，在一个依赖XStream进行数据交换的API接口中，如果未对输入的XML进行有效过滤或限制，攻击者便可能通过提交恶意XMLPayload。
+```java
+// 示例代码 （存在漏洞的场景）
+String maliciousXml = "<sorted-set>
+<dynamic-proxy>
+<interface>java.lang.Comparable</interface>
+<handler class=\"beans.infections.FunkyBeanFactory\">
+<target class=\"java.lang.Runtime\"/>
+<methodName>exec</methodName>
+<params>
+<string>touch /tmp/vulnerable</string>
+</params>
+</handler>
+</dynamic-proxy>
+<string>foo</string>
+</sorted-set>";
+XStream xstream = new XStream();
+// 关键在于对不受信任数据的反序列化
+Object obj = xstream.fromXML(maliciousXml);
+```
+3. **潜在影响**
+- **远程代码执行（RCE）**: 攻击者可以执行任意系统命令，完全控制服务器。
+- **数据泄露与篡改**: 攻击者可以访问、修改或删除存储在服务器或数据库中的敏感数据。
+- **拒绝服务（DoS）**: 攻击者可能通过构造耗费资源的XML导致应用程序崩溃或资源耗尽。
+- **进一步渗透**: 攻击者可以利用受控服务器作为跳板，对内网其他系统发起攻击。
+DESC
+	name: "vuln_xstream",
+	solution: <<<SOLUTION
+### 修复建议
+1. **升级XStream库版本** 
+尽快升级XStream库到最新版本，以规避已知的所有反序列化漏洞。新版本通常会包含针对这些漏洞的安全修复或引入更严格的默认安全策略。
+```xml
+<!-- Maven 示例：升级 XStream 依赖 -->
+<dependency>
+<groupId>com.thoughtworks.xstream</groupId>
+<artifactId>xstream</artifactId>
+<version>LATEST_STABLE_VERSION</version> <!-- 替换为最新的稳定版本号 -->
+</dependency>
+```
+2. **启用安全模式和类型过滤** 
+XStream 提供了安全框架来限制可反序列化的类。启用安全模式并仅允许反序列化应用程序所需的特定类。
+```java
+// 示例代码：启用安全模式并设置白名单
+XStream xstream = new XStream();
+// 启用安全模式
+xstream.addPermission(NoTypePermission.NONE);
+// 允许反序列化的特定类（替换为你的应用实际需要的类）
+xstream.addPermission(AnytypePermission.ANY);
+xstream.allowTypes(new Class[]{YourClass1.class, YourClass2.class});
+// 或者使用正则匹配允许的包/类
+// xstream.allowTypesByRegex(new String[]{"com\.yourcompany\.model\..*"});
+```
+3. **避免反序列化不受信任的XML数据** 
+如果可能，尽量避免直接反序列化来自不可信源的任意XML数据。考虑使用更安全的数据交换格式（如JSON）或在接收到XML后进行严格的输入验证和消毒。
+4. **限制网络访问** 
+确保只有受信任的客户端或服务可以访问处理XStream反序列化的接口。
+SOLUTION
 }

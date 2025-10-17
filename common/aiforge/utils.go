@@ -3,6 +3,7 @@ package aiforge
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"io"
 	"os"
 	"path/filepath"
@@ -12,17 +13,16 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/ai"
-	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 )
 
-func MockAICallbackByRecord(content []byte) aid.AICallbackType {
+func MockAICallbackByRecord(content []byte) aicommon.AICallbackType {
 	var chatRecord []string
 	json.Unmarshal(content, &chatRecord)
 	currentPairId := 0
-	return func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()
 		reqPrompt := chatRecord[currentPairId]
 		rspPrompt := chatRecord[currentPairId+1]
@@ -33,7 +33,7 @@ func MockAICallbackByRecord(content []byte) aid.AICallbackType {
 		return rsp, nil
 	}
 }
-func AICallbackRecorder(callback aid.AICallbackType, fileName string) (aid.AICallbackType, func()) {
+func AICallbackRecorder(callback aicommon.AICallbackType, fileName string) (aicommon.AICallbackType, func()) {
 	chatRecord := []string{}
 	saveToFile := func() {
 		f, err := os.Create(fileName)
@@ -44,7 +44,7 @@ func AICallbackRecorder(callback aid.AICallbackType, fileName string) (aid.AICal
 		defer f.Close()
 		json.NewEncoder(f).Encode(chatRecord)
 	}
-	return func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	return func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()
 		reader, writer := io.Pipe()
 		rsp.EmitOutputStream(reader)
@@ -57,7 +57,7 @@ func AICallbackRecorder(callback aid.AICallbackType, fileName string) (aid.AICal
 			if err != nil {
 				log.Errorf("aiCallbackRecorder: callback error: %v", err)
 			}
-			outputReader := originRsp.GetOutputStreamReader("output", false, config)
+			outputReader := originRsp.GetOutputStreamReader("output", false, config.GetEmitter())
 			outputBuf := bytes.Buffer{}
 			io.Copy(&outputBuf, io.TeeReader(outputReader, writer))
 			chatRecord = append(chatRecord, req.GetPrompt(), outputBuf.String())
@@ -66,7 +66,7 @@ func AICallbackRecorder(callback aid.AICallbackType, fileName string) (aid.AICal
 	}, saveToFile
 }
 
-func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeName string, modelName ...string) aid.AICallbackType {
+func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeName string, modelName ...string) aicommon.AICallbackType {
 	var model string
 	if len(modelName) > 0 {
 		model = modelName[0]
@@ -87,11 +87,18 @@ func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeN
 	consts.InitializeYakitDatabase("", "")
 	log.Infof("apikey for tongyi: %v", string(apikey))
 	log.Infof("primary ai engien: %v", consts.GetAIPrimaryType())
-	aiCallback := func(config *aid.Config, req *aid.AIRequest) (*aid.AIResponse, error) {
+	aiCallback := func(config aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 		rsp := config.NewAIResponse()
 		go func() {
 			defer rsp.Close()
 			//fmt.Println(req.GetPrompt())
+			for _, data := range req.GetImageList() {
+				if data.IsBase64 {
+					opts = append(opts, aispec.WithImageBase64(string(data.Data)))
+				} else {
+					opts = append(opts, aispec.WithImageRaw(data.Data))
+				}
+			}
 			opts = append(opts, aispec.WithStreamHandler(func(c io.Reader) {
 				rsp.EmitOutputStream(c)
 			}),
@@ -111,35 +118,35 @@ func getTestSuiteAICallback(fileName string, opts []aispec.AIConfigOption, typeN
 	return aiCallback
 }
 
-func GetOpenRouterAICallback(modelName ...string) aid.AICallbackType {
+func GetOpenRouterAICallback(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"google/gemini-2.0-flash-001"}
 	}
 	return getTestSuiteAICallback("openrouter.txt", nil, "openrouter", modelName...)
 }
 
-func GetOpenRouterAICallbackGemini2_5flash(modelName ...string) aid.AICallbackType {
+func GetOpenRouterAICallbackGemini2_5flash(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"google/gemini-2.5-flash-preview"}
 	}
 	return getTestSuiteAICallback("openrouter.txt", nil, "openrouter", modelName...)
 }
 
-func GetOpenRouterAICallbackFree(modelName ...string) aid.AICallbackType {
+func GetOpenRouterAICallbackFree(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"google/gemini-2.0-flash-exp:free"}
 	}
 	return getTestSuiteAICallback("openrouter.txt", nil, "openrouter", modelName...)
 }
 
-func GetHoldAICallback(modelName ...string) aid.AICallbackType {
+func GetHoldAICallback(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"gemini-2.0-flash"}
 	}
 	return getTestSuiteAICallback("holdai.txt", []aispec.AIConfigOption{aispec.WithDomain("api.holdai.top")}, "openai", modelName...)
 }
 
-func GetOpenRouterAICallbackWithProxy(modelName ...string) aid.AICallbackType {
+func GetOpenRouterAICallbackWithProxy(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"google/gemini-2.0-flash-001"}
 	}
@@ -148,21 +155,21 @@ func GetOpenRouterAICallbackWithProxy(modelName ...string) aid.AICallbackType {
 	}, "openrouter", modelName...)
 }
 
-func GetGLMAICallback(modelName ...string) aid.AICallbackType {
+func GetGLMAICallback(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"glm-4-flash"}
 	}
 	return getTestSuiteAICallback("chatglm.txt", nil, "chatglm", modelName...)
 }
 
-func GetQwenAICallback(modelName ...string) aid.AICallbackType {
+func GetQwenAICallback(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"qwq-32b"}
 	}
 	return getTestSuiteAICallback("tongyi-apikey.txt", nil, "tongyi", modelName...)
 }
 
-func GetAIBalance(modelName ...string) aid.AICallbackType {
+func GetAIBalance(modelName ...string) aicommon.AICallbackType {
 	if len(modelName) == 0 {
 		modelName = []string{"deepseek-v3"}
 	}

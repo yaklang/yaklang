@@ -1,64 +1,56 @@
 desc(
-	title: "Check Golang SQL Injection Vulnerability (GORM)"
+	title: "Check Golang GORM SQL Injection Vulnerability"
 	type: audit
 	severity: high
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意SQL代码。在Go语言中使用GORM框架时，如果直接将用户输入拼接到SQL查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
-
+SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意SQL代码。在Go语言中使用GORM框架时，如果直接将用户输入拼接到SQL查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
 2. **触发场景**
-   SQL注入漏洞通常发生在以下场景：
-   - 用户输入被直接拼接到SQL查询字符串中，例如`db.Raw("SELECT * FROM users WHERE name = '" + username + "'")`。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为SQL命令。
-   - 如下方示例代码中，`username`直接由用户输入获取，并拼接到GORM的`Raw`查询中，未经过任何过滤或参数化处理，存在明显的SQL注入风险。攻击者可以通过构造恶意的`username`输入来执行任意SQL语句。
-   ```go
-   // 不安全的查询
-   var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
-   db.Raw(query).Scan(&users)
-   ```
-
+SQL注入漏洞通常发生在以下场景：
+- 用户输入被直接拼接到SQL查询字符串中，例如`db.Raw("SELECT * FROM users WHERE name = '" + username + "'")`。
+- 未对用户输入进行参数化处理或验证，导致恶意输入被解释为SQL命令。
+```go
+// 不安全的查询
+var users []User
+query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+db.Raw(query).Scan(&users)
+```
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-   - 绕过认证和授权机制。
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+- 绕过认证和授权机制。
 DESC
 	rule_id: "cc9054ac-2c71-4641-84dd-ba12578093b0"
 	title_zh: "检测Golang SQL注入漏洞(GORM)"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用参数化查询（Parameterized Queries）**
-   GORM提供了安全的方法来处理查询中的用户输入，避免直接将用户输入拼接到SQL字符串中。应该优先使用GORM内置的方法，如`Where`、`Find`等，它们底层会处理参数化。
-   ```go
-   // 安全的查询方法一：使用Where子句和结构体
-   var users []User
-   db.Where(&User{Name: username}).Find(&users)
-
-   // 安全的查询方法二：使用Where子句和占位符
-   var users []User
-   db.Where("name = ?", username).Find(&users)
-
-   // 如果必须使用Raw查询，请使用参数化
-   var users []User
-   db.Raw("SELECT * FROM users WHERE name = ?", username).Scan(&users)
-   ```
-
+GORM提供了安全的方法来处理查询中的用户输入，避免直接将用户输入拼接到SQL字符串中。应该优先使用GORM内置的方法，如`Where`、`Find`等，它们底层会处理参数化。
+```go
+// 安全的查询方法一：使用Where子句和结构体
+var users []User
+db.Where(&User{Name: username}).Find(&users)
+// 安全的查询方法二：使用Where子句和占位符
+var users []User
+db.Where("name = ?", username).Find(&users)
+// 如果必须使用Raw查询，请使用参数化
+var users []User
+db.Raw("SELECT * FROM users WHERE name = ?", username).Scan(&users)
+```
 2. **输入合法性校验**
-   在将用户输入用于查询之前，进行严格的合法性校验。例如，如果期望输入是数字，则验证其是否为数字类型。
-   ```go
-   // 示例：校验输入是否为合法用户名格式
-   if !isValidUsername(username) { // 实现isValidUsername函数进行校验
-       http.Error(w, "Invalid username format", http.StatusBadRequest)
-       return
-   }
-   ```
-
+在将用户输入用于查询之前，进行严格的合法性校验。例如，如果期望输入是数字，则验证其是否为数字类型。
+```go
+// 示例：校验输入是否为合法用户名格式
+if !isValidUsername(username) { // 实现isValidUsername函数进行校验
+http.Error(w, "Invalid username format", http.StatusBadRequest)
+return
+}
+```
 3. **避免直接拼接用户输入到SQL语句中**
-   即使是构建复杂的查询，也应尽可能使用GORM提供的方法，避免手动拼接用户输入。
+即使是构建复杂的查询，也应尽可能使用GORM提供的方法，避免手动拼接用户输入。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
@@ -66,76 +58,77 @@ REFERENCE
 )
 
 <include('golang-database-gorm')> as $sink;
+<include('golang-user-input')> as $input;
 $sink.Raw(* #-> as $param);
-$param?{have: 'Parameter'} as $high;
+$sink.Exec( * #-> as $param);
+$sink.Row(* #-> as $param);
+$sink.Rows(* #-> as $param);
+$sink.ScanRows( * #-> as $param);
+
+$param & $input as $high;
 
 alert $high for {
 	type: "vuln",
-	title: "SQL Injection detected",
-	title_zh: "检测到SQL注入",
-	solution: <<<CODE
+	title: "Golang GORM SQL Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang GORM SQL注入漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用参数化查询（Parameterized Queries）**
-   GORM 提供了安全的方法来处理查询中的用户输入，避免直接将用户输入拼接到 SQL 字符串中。应该优先使用 GORM 内置的方法，如 `Where`、`Find` 等，它们底层会处理参数化。
-   ```go
-   // 安全的查询方法一：使用 Where 子句和结构体
-   var users []User
-   db.Where(&User{Name: username}).Find(&users)
-   
-   // 安全的查询方法二：使用 Where 子句和占位符
-   var users []User
-   db.Where("name = ?", username).Find(&users)
-   
-   // 如果必须使用 Raw 查询，请使用参数化
-   var users []User
-   db.Raw("SELECT * FROM users WHERE name = ?", username).Scan(&users)
-   ```
-
+GORM 提供了安全的方法来处理查询中的用户输入，避免直接将用户输入拼接到 SQL 字符串中。应该优先使用 GORM 内置的方法，如 `Where`、`Find` 等，它们底层会处理参数化。
+```go
+// 安全的查询方法一：使用 Where 子句和结构体
+var users []User
+db.Where(&User{Name: username}).Find(&users)
+// 安全的查询方法二：使用 Where 子句和占位符
+var users []User
+db.Where("name = ?", username).Find(&users)
+// 如果必须使用 Raw 查询，请使用参数化
+var users []User
+db.Raw("SELECT * FROM users WHERE name = ?", username).Scan(&users)
+```
 2. **输入合法性校验**
-   在将用户输入用于查询之前，进行严格的合法性校验。例如，如果期望输入是数字，则验证其是否为数字类型。
-   ```go
-   // 示例：校验输入是否为合法用户名格式
-   if !isValidUsername(username) { // 实现 isValidUsername 函数进行校验
-       http.Error(w, "Invalid username format", http.StatusBadRequest)
-       return
-   }
-   ```
-
+在将用户输入用于查询之前，进行严格的合法性校验。例如，如果期望输入是数字，则验证其是否为数字类型。
+```go
+// 示例：校验输入是否为合法用户名格式
+if !isValidUsername(username) { // 实现 isValidUsername 函数进行校验
+http.Error(w, "Invalid username format", http.StatusBadRequest)
+return
+}
+```
 3. **避免直接拼接用户输入到 SQL 语句中**
-   即使是构建复杂的查询，也应尽可能使用 GORM 提供的方法，避免手动拼接用户输入。
-CODE
-	desc: <<<CODE
+即使是构建复杂的查询，也应尽可能使用 GORM 提供的方法，避免手动拼接用户输入。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言中使用 GORM 框架时，如果直接将用户输入拼接到 SQL 查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
-
+SQL注入是一种严重的安全漏洞，它允许攻击者通过操控应用程序的数据库查询，执行任意 SQL 代码。在 Go 语言中使用 GORM 框架时，如果直接将用户输入拼接到 SQL 查询中，而未进行适当的过滤或参数化，攻击者可能会利用此漏洞绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或关闭数据库服务。
 2. **触发场景**
-   SQL 注入漏洞通常发生在以下场景：
-   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.Raw("SELECT * FROM users WHERE name = '" + username + "'")`。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
-   - 如下方示例代码中，`username` 直接由用户输入获取，并拼接到GORM的`Raw`查询中，未经过任何过滤或参数化处理，存在明显的SQL注入风险。攻击者可以通过构造恶意的`username`输入来执行任意SQL语句。
-   ```go
-   // 不安全的查询
-   var users []User
-   query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
-   db.Raw(query).Scan(&users)
-   ```
-
+SQL 注入漏洞通常发生在以下场景：
+- 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.Raw("SELECT * FROM users WHERE name = '" + username + "'")`。
+- 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
+- 如下方示例代码中，`username` 直接由用户输入获取，并拼接到GORM的`Raw`查询中，未经过任何过滤或参数化处理，存在明显的SQL注入风险。攻击者可以通过构造恶意的`username`输入来执行任意SQL语句。
+```go
+// 不安全的查询
+var users []User
+query := fmt.Sprintf("SELECT * FROM users WHERE name = '%s'", username)
+db.Raw(query).Scan(&users)
+```
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-   - 绕过认证和授权机制。
-CODE
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+- 绕过认证和授权机制。
+DESC
 	level: "high",
+	message: "检测到Golang GORM SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "SQL注入",
+	name: "high",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -181,4 +174,98 @@ func main() {
 }
 
 UNSAFE
+	"safefile://SafeGORMQueryWithWhereClause.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	// 连接到数据库（此处简化，实际应用中应从配置加载）
+	dsn := "user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Printf("Failed to connect to database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// 安全的查询方法一：使用Where子句和结构体
+	// GORM底层会自动处理参数化，避免SQL注入
+	var users []User
+	db.Where(&User{Name: username}).Find(&users)
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
+	"safefile://SafeGORMQueryWithWhereClauseWithPlaceholder.go": <<<CODE
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+)
+
+type User struct {
+	ID   uint
+	Name string
+	Age  int
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+
+	// 连接到数据库（此处简化，实际应用中应从配置加载）
+	dsn := "user:password@tcp(localhost:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local"
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Printf("Failed to connect to database: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// 安全的查询方法二：使用Where子句和占位符
+	// GORM会用参数化的方式将用户输入传递给数据库，有效防止SQL注入
+	var users []User
+	db.Where("name = ?", username).Find(&users)
+
+	// 打印结果
+	for _, user := range users {
+		fmt.Printf("User: %s, Age: %d\n", user.Name, user.Age)
+	}
+}
+
+func main() {
+	http.HandleFunc("/login", login)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
 )

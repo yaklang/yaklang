@@ -4,77 +4,60 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   Spring框架的资源处理程序（ResourceHandlerRegistry）用于映射URL路径到特定的静态资源位置（如文件系统路径、Classpath路径等）。如果配置不当，例如将资源处理程序的位置设置为敏感目录（如 `/`、`/../` 等）或者包含敏感信息（如配置文件、源代码等）的目录，攻击者可能通过构造特定的URL路径绕过正常的访问控制，直接访问到这些敏感资源，导致敏感信息泄露。
-
+Spring框架的资源处理程序（ResourceHandlerRegistry）用于映射URL路径到特定的静态资源位置（如文件系统路径、Classpath路径等）。如果配置不当，例如将资源处理程序的位置设置为敏感目录（如 `/`、`/../` 等）或者包含敏感信息（如配置文件、源代码等）的目录，攻击者可能通过构造特定的URL路径绕过正常的访问控制，直接访问到这些敏感资源，导致敏感信息泄露。
 2. **触发场景**
-   当Spring应用配置ResourceHandlerRegistry时，`addResourceLocations()` 方法指定了资源所在的物理路径或Classpath路径。如果该路径指向了应用外部的目录、应用的根目录或者包含了敏感文件的位置，就会存在风险。例如，将`/` 映射到文件系统的根目录，或者将 `/static/**` 映射到包含敏感配置文件的目录。
-
-   ```java
-   @Configuration
-   @EnableWebMvc
-   public class WebConfig implements WebMvcConfigurer {
-
-       @Override
-       public void addResourceHandlers(ResourceHandlerRegistry registry) {
-           // 风险示例：将 / 映射到当前目录，可能暴露应用根目录下的敏感文件
-           registry.addResourceHandler("/")
-                   .addResourceLocations("file:./"); 
-
-           // 风险示例：将 /config/** 映射到包含敏感配置文件的目录
-           registry.addResourceHandler("/config/**")
-                   .addResourceLocations("file:/app/configs/"); 
-       }
-   }
-   ```
-
+当Spring应用配置ResourceHandlerRegistry时，`addResourceLocations()` 方法指定了资源所在的物理路径或Classpath路径。如果该路径指向了应用外部的目录、应用的根目录或者包含了敏感文件的位置，就会存在风险。例如，将`/` 映射到文件系统的根目录，或者将 `/static/**` 映射到包含敏感配置文件的目录。
+```java
+@Configuration
+@EnableWebMvc
+public class WebConfig implements WebMvcConfigurer {
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+// 风险示例：将 / 映射到当前目录，可能暴露应用根目录下的敏感文件
+registry.addResourceHandler("/")
+.addResourceLocations("file:./");
+// 风险示例：将 /config/** 映射到包含敏感配置文件的目录
+registry.addResourceHandler("/config/**")
+.addResourceLocations("file:/app/configs/");
+}
+}
+```
 3. **潜在影响**
-   - 敏感信息泄露，如数据库连接字符串、API密钥、配置文件、内部文档等。
-   - 攻击者获取应用内部结构信息，为后续攻击提供便利。
-   - 如果暴露了可执行文件或脚本，可能被利用执行恶意代码（尽管这种场景不如直接访问敏感文件常见）。
-
+- 敏感信息泄露，如数据库连接字符串、API密钥、配置文件、内部文档等。
+- 攻击者获取应用内部结构信息，为后续攻击提供便利。
+- 如果暴露了可执行文件或脚本，可能被利用执行恶意代码（尽管这种场景不如直接访问敏感文件常见）。
 ### 规则目的
-
 该规则用于检测Spring应用中资源处理程序（ResourceHandlerRegistry）的配置，特别是关注`addResourceLocations()` 方法中指定的路径。通过静态分析查找不安全的资源映射位置，例如指向文件系统根目录、当前目录或其他包含敏感信息的目录，以识别潜在的敏感信息泄露风险。
 DESC
 	rule_id: "afdd05fc-a8f6-4e5c-9b72-d32c47ba0a7a"
 	title_zh: "检测Java Spring资源处理程序位置"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 限制资源处理程序的位置
 确保 `addResourceLocations()` 方法指定的路径仅指向包含静态资源的目录，并且这些目录不包含任何敏感信息。避免将资源处理程序映射到应用根目录、文件系统根目录或包含敏感文件的目录。
-
 ```java
 @Configuration
 @EnableWebMvc
 public class WebConfig implements WebMvcConfigurer {
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 安全示例：仅映射到专门用于静态资源的目录
-        registry.addResourceHandler("/static/**")
-                .addResourceLocations("classpath:/static/"); 
-        
-        // 安全示例：如果需要映射到文件系统，确保路径受控且不含敏感信息
-        // registry.addResourceHandler("/uploads/**")
-        //         .addResourceLocations("file:/opt/app/uploads/"); 
-        
-        // 避免映射到 / 或其他高风险目录
-    }
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+// 安全示例：仅映射到专门用于静态资源的目录
+registry.addResourceHandler("/static/**")
+.addResourceLocations("classpath:/static/");
+// 安全示例：如果需要映射到文件系统，确保路径受控且不含敏感信息
+// registry.addResourceHandler("/uploads/**")
+//         .addResourceLocations("file:/opt/app/uploads/");
+// 避免映射到 / 或其他高风险目录
+}
 }
 ```
-
 #### 2. 最小化资源可见范围
 仅允许访问必要的静态资源。明确定义哪些URL路径应该被资源处理程序处理，避免使用过于宽泛的匹配模式，如 `/**` 映射到敏感位置。
-
 #### 3. 将敏感文件放置在Web根目录之外
 确保所有敏感文件（如配置文件、密钥文件、源代码等）都存储在Web应用可以访问的文件路径之外，或者配置Web服务器（如Tomcat, Nginx）来拒绝访问这些敏感目录。
-
 #### 4. 使用适当的访问控制
 对于需要认证或授权才能访问的资源，不应通过ResourceHandlerRegistry直接暴露，而应通过受保护的Controller来提供访问，并实施适当的权限校验。
-
 #### 5. 审计和审查
 定期审查应用的Spring配置和资源处理程序的设置，确保没有引入新的不安全配置。
 SOLUTION
@@ -83,98 +66,117 @@ SOLUTION
 REFERENCE
 )
 
-addResourceHandlers(*?{<typeName>?{have: ResourceHandlerRegistry,springframework}} as $params);
-check $params;
+addResourceHandlers<getFormalParams()> as $params;
+$params?{<typeName>?{have: ResourceHandlerRegistry,springframework}} as $filtered_params
+check $filtered_params;
 
-$params.addResourceHandler(*<slice(start=1)> as $results);
+$filtered_params.addResourceHandler(*<slice(start=1)> as $results);
 $results ?{have: 'swagger'} as $swaggerVariable;
 alert $swaggerVariable for {
 	title: "Swagger Resource Handler Location",
 	title_zh: "Swagger资源处理程序位置",
-	desc: <<<CODE
+	desc: <<<DESC
 该规则用于检测Spring应用中Swagger相关的资源处理程序配置。Swagger通常用于生成API文档，但如果其资源路径被错误映射到敏感文件或目录，则可能导致信息泄露风险。确保Swagger的资源配置仅指向预期的静态资源目录，避免暴露任何敏感数据或内部实现细节。
-CODE
+DESC
 	level: "info",
-}
-
-alert $params for {
-	solution: <<<CODE
+	message: "检测到Spring应用中Swagger相关的资源配置。确保Swagger的资源路径未指向敏感文件或目录。",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 限制资源处理程序的位置
 确保 `addResourceLocations()` 方法指定的路径仅指向包含静态资源的目录，并且这些目录不包含任何敏感信息。避免将资源处理程序映射到应用根目录、文件系统根目录或包含敏感文件的目录。
-
 ```java
 @Configuration
 @EnableWebMvc
 public class WebConfig implements WebMvcConfigurer {
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 安全示例：仅映射到专门用于静态资源的目录
-        registry.addResourceHandler("/static/**")
-                .addResourceLocations("classpath:/static/"); 
-        
-        // 安全示例：如果需要映射到文件系统，确保路径受控且不含敏感信息
-        // registry.addResourceHandler("/uploads/**")
-        //         .addResourceLocations("file:/opt/app/uploads/"); 
-        
-        // 避免映射到 / 或其他高风险目录
-    }
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+// 安全示例：仅映射到专门用于静态资源的目录
+registry.addResourceHandler("/static/**")
+.addResourceLocations("classpath:/static/");
+// 安全示例：如果需要映射到文件系统，确保路径受控且不含敏感信息
+// registry.addResourceHandler("/uploads/**")
+//         .addResourceLocations("file:/opt/app/uploads/");
+// 避免映射到 / 或其他高风险目录
+}
 }
 ```
-
 #### 2. 最小化资源可见范围
 仅允许访问必要的静态资源。明确定义哪些URL路径应该被资源处理程序处理，避免使用过于宽泛的匹配模式，如 `/**` 映射到敏感位置。
-
 #### 3. 将敏感文件放置在Web根目录之外
 确保所有敏感文件（如配置文件、密钥文件、源代码等）都存储在Web应用可以访问的文件路径之外，或者配置Web服务器（如Tomcat, Nginx）来拒绝访问这些敏感目录。
-
 #### 4. 使用适当的访问控制
 对于需要认证或授权才能访问的资源，不应通过ResourceHandlerRegistry直接暴露，而应通过受保护的Controller来提供访问，并实施适当的权限校验。
-
 #### 5. 审计和审查
 定期审查应用的Spring配置和资源处理程序的设置，确保没有引入新的不安全配置。
-CODE
-	desc: <<<CODE
+SOLUTION
+	risk: "信息",
+	name: "swaggerVariable",
+}
+
+alert $params for {
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 限制资源处理程序的位置
+确保 `addResourceLocations()` 方法指定的路径仅指向包含静态资源的目录，并且这些目录不包含任何敏感信息。避免将资源处理程序映射到应用根目录、文件系统根目录或包含敏感文件的目录。
+```java
+@Configuration
+@EnableWebMvc
+public class WebConfig implements WebMvcConfigurer {
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+// 安全示例：仅映射到专门用于静态资源的目录
+registry.addResourceHandler("/static/**")
+.addResourceLocations("classpath:/static/");
+// 安全示例：如果需要映射到文件系统，确保路径受控且不含敏感信息
+// registry.addResourceHandler("/uploads/**")
+//         .addResourceLocations("file:/opt/app/uploads/");
+// 避免映射到 / 或其他高风险目录
+}
+}
+```
+#### 2. 最小化资源可见范围
+仅允许访问必要的静态资源。明确定义哪些URL路径应该被资源处理程序处理，避免使用过于宽泛的匹配模式，如 `/**` 映射到敏感位置。
+#### 3. 将敏感文件放置在Web根目录之外
+确保所有敏感文件（如配置文件、密钥文件、源代码等）都存储在Web应用可以访问的文件路径之外，或者配置Web服务器（如Tomcat, Nginx）来拒绝访问这些敏感目录。
+#### 4. 使用适当的访问控制
+对于需要认证或授权才能访问的资源，不应通过ResourceHandlerRegistry直接暴露，而应通过受保护的Controller来提供访问，并实施适当的权限校验。
+#### 5. 审计和审查
+定期审查应用的Spring配置和资源处理程序的设置，确保没有引入新的不安全配置。
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   Spring框架的资源处理程序（ResourceHandlerRegistry）用于映射URL路径到特定的静态资源位置（如文件系统路径、Classpath路径等）。如果配置不当，例如将资源处理程序的位置设置为敏感目录（如 `/`、`/../` 等）或者包含敏感信息（如配置文件、源代码等）的目录，攻击者可能通过构造特定的URL路径绕过正常的访问控制，直接访问到这些敏感资源，导致敏感信息泄露。
-
+Spring框架的资源处理程序（ResourceHandlerRegistry）用于映射URL路径到特定的静态资源位置（如文件系统路径、Classpath路径等）。如果配置不当，例如将资源处理程序的位置设置为敏感目录（如 `/`、`/../` 等）或者包含敏感信息（如配置文件、源代码等）的目录，攻击者可能通过构造特定的URL路径绕过正常的访问控制，直接访问到这些敏感资源，导致敏感信息泄露。
 2. **触发场景**
-   当Spring应用配置ResourceHandlerRegistry时，`addResourceLocations()` 方法指定了资源所在的物理路径或Classpath路径。如果该路径指向了应用外部的目录、应用的根目录或者包含了敏感文件的位置，就会存在风险。例如，将`/` 映射到文件系统的根目录，或者将 `/static/**` 映射到包含敏感配置文件的目录。
-
-   ```java
-   @Configuration
-   @EnableWebMvc
-   public class WebConfig implements WebMvcConfigurer {
-
-       @Override
-       public void addResourceHandlers(ResourceHandlerRegistry registry) {
-           // 风险示例：将 / 映射到当前目录，可能暴露应用根目录下的敏感文件
-           registry.addResourceHandler("/")
-                   .addResourceLocations("file:./"); 
-
-           // 风险示例：将 /config/** 映射到包含敏感配置文件的目录
-           registry.addResourceHandler("/config/**")
-                   .addResourceLocations("file:/app/configs/"); 
-       }
-   }
-   ```
-
+当Spring应用配置ResourceHandlerRegistry时，`addResourceLocations()` 方法指定了资源所在的物理路径或Classpath路径。如果该路径指向了应用外部的目录、应用的根目录或者包含了敏感文件的位置，就会存在风险。例如，将`/` 映射到文件系统的根目录，或者将 `/static/**` 映射到包含敏感配置文件的目录。
+```java
+@Configuration
+@EnableWebMvc
+public class WebConfig implements WebMvcConfigurer {
+@Override
+public void addResourceHandlers(ResourceHandlerRegistry registry) {
+// 风险示例：将 / 映射到当前目录，可能暴露应用根目录下的敏感文件
+registry.addResourceHandler("/")
+.addResourceLocations("file:./");
+// 风险示例：将 /config/** 映射到包含敏感配置文件的目录
+registry.addResourceHandler("/config/**")
+.addResourceLocations("file:/app/configs/");
+}
+}
+```
 3. **潜在影响**
-   - 敏感信息泄露，如数据库连接字符串、API密钥、配置文件、内部文档等。
-   - 攻击者获取应用内部结构信息，为后续攻击提供便利。
-   - 如果暴露了可执行文件或脚本，可能被利用执行恶意代码（尽管这种场景不如直接访问敏感文件常见）。
-
+- 敏感信息泄露，如数据库连接字符串、API密钥、配置文件、内部文档等。
+- 攻击者获取应用内部结构信息，为后续攻击提供便利。
+- 如果暴露了可执行文件或脚本，可能被利用执行恶意代码（尽管这种场景不如直接访问敏感文件常见）。
 ### 规则目的
-
 该规则用于检测Spring应用中资源处理程序（ResourceHandlerRegistry）的配置，特别是关注`addResourceLocations()` 方法中指定的路径。通过静态分析查找不安全的资源映射位置，例如指向文件系统根目录、当前目录或其他包含敏感信息的目录，以识别潜在的敏感信息泄露风险。
-CODE
+DESC
 	level: "low",
 	title: "Resource Handler Location",
 	title_zh: "资源处理程序位置",
+	message: "检测到Spring应用的ResourceHandlerRegistry配置可能存在敏感信息泄露风险，需进一步审查。",
+	risk: "敏感信息泄露",
+	name: "params",
 }
 
 
@@ -200,4 +202,57 @@ public class SwaggerWebConfiguration implements WebMvcConfigurer
     }
 }
 TEXT
+	"safefile://SecureResourceConfig.java": <<<CODE
+// 安全示例：仅映射到专门用于静态资源的目录
+// 避免将资源处理程序映射到应用根目录、文件系统根目录或包含敏感文件的目录
+// class: WebConfig
+@Configuration
+@EnableWebMvc
+public class SecureResourceConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 使用classpath资源位置，指向安全的静态资源目录
+        registry.addResourceHandler("/static/**")
+                .addResourceLocations("classpath:/static/"); 
+        
+        // 另一个安全示例：如果需要映射到文件系统，确保路径受控且不含敏感信息
+        // 通常用于用户上传内容等，应严格限制其内容和访问权限
+        registry.addResourceHandler("/user-uploads/**")
+                .addResourceLocations("file:/var/data/app/uploads/"); 
+        
+        // 明确避免暴露敏感路径
+        registry.addResourceHandler("/webjars/**")
+                .addResourceLocations("classpath:/META-INF/resources/webjars/");
+    }
+}
+CODE
+	"safefile://NoSensitivePathConfig.java": <<<CODE
+// 最佳实践：避免使用不明确或可能指向敏感路径的ResourceHandlerRegistry配置
+// class: AnotherWebConfig
+@Configuration
+@EnableWebMvc
+public class NoSensitivePathConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 仅处理应用内部明确定义的静态资源路径
+        registry.addResourceHandler("/images/**")
+                .addResourceLocations("classpath:/my-app/images/"); 
+        
+        registry.addResourceHandler("/js/**")
+                .addResourceLocations("classpath:/my-app/js/"); 
+                
+        registry.addResourceHandler("/css/**")
+                .addResourceLocations("classpath:/my-app/css/");
+                
+        // 不添加任何指向根目录或文件系统不确定位置的资源。
+        // 对于Swagger，使用其推荐的配置，并确保不要将其映射到敏感路径。
+        registry.addResourceHandler("/swagger-ui/index.html")
+                .addResourceLocations("classpath:/META-INF/resources/");
+        registry.addResourceHandler("/swagger-ui/**")
+                .addResourceLocations("classpath:/META-INF/resources/webjars/springfox-swagger-ui/");
+    }
+}
+CODE
 )

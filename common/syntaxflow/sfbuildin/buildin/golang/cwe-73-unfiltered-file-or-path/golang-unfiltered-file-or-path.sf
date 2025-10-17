@@ -1,132 +1,108 @@
 desc(
 	title: "Check Golang Unfiltered File Path Vulnerability"
+	title_zh: "检测Golang未过滤文件路径漏洞"
 	type: audit
 	severity: low
+	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在 Go 语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
-
+未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在 Go 语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
 2. **触发场景**
-   这种漏洞通常发生在文件读取功能中，当应用未能限制用户输入的文件路径时，攻击者可以构造恶意请求来访问服务器上的任意文件，进而获取敏感信息或破坏系统。例如，攻击者可以通过路径遍历（如 `../../etc/passwd`）访问系统文件。
-
-   以下是一个存在漏洞的Go代码示例：
-   ```go
-   package main
-
-   import (
-       "fmt"
-       "io/ioutil"
-       "net/http"
-       "path/filepath"
-   )
-
-   const allowedBasePath = "/allowed/path/"
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-       userInput := r.URL.Query().Get("file")
-
-       // 直接拼接用户输入和基础路径，未进行清理和验证
-       requestedPath := filepath.Join(allowedBasePath, userInput)
-
-       // 读取文件
-       content, err := ioutil.ReadFile(requestedPath)
-       if err != nil {
-           http.Error(w, "File not found", http.StatusNotFound)
-           return
-       }
-
-       // 返回文件内容
-       w.Write(content)
-   }
-
-   func main() {
-       http.HandleFunc("/", handler)
-       fmt.Println("Server is running on :8080")
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-   攻击者可以通过访问 `/` 并提供 `?file=../../etc/passwd` 来尝试读取 `/etc/passwd` 文件。
-
+这种漏洞通常发生在文件读取功能中，当应用未能限制用户输入的文件路径时，攻击者可以构造恶意请求来访问服务器上的任意文件，进而获取敏感信息或破坏系统。例如，攻击者可以通过路径遍历（如 `../../etc/passwd`）访问系统文件。
+以下是一个存在漏洞的Go代码示例：
+```go
+package main
+import (
+"fmt"
+"io/ioutil"
+"net/http"
+"path/filepath"
+)
+const allowedBasePath = "/allowed/path/"
+func handler(w http.ResponseWriter, r *http.Request) {
+userInput := r.URL.Query().Get("file")
+// 直接拼接用户输入和基础路径，未进行清理和验证
+requestedPath := filepath.Join(allowedBasePath, userInput)
+// 读取文件
+content, err := ioutil.ReadFile(requestedPath)
+if err != nil {
+http.Error(w, "File not found", http.StatusNotFound)
+return
+}
+// 返回文件内容
+w.Write(content)
+}
+func main() {
+http.HandleFunc("/", handler)
+fmt.Println("Server is running on :8080")
+http.ListenAndServe(":8080", nil)
+}
+```
+攻击者可以通过访问 `/` 并提供 `?file=../../etc/passwd` 来尝试读取 `/etc/passwd` 文件。
 3. **潜在影响**
-    - 攻击者可以读取服务器上的任意文件，包括敏感配置文件、源代码、数据库连接字符串等。
-    - 在某些情况下，攻击者可能通过上传特定文件然后利用此漏洞执行任意代码，例如通过路径遍历访问上传的WebShell。
-    - 泄露敏感信息可能导致进一步的攻击，如数据库注入、权限提升等。
+- 攻击者可以读取服务器上的任意文件，包括敏感配置文件、源代码、数据库连接字符串等。
+- 在某些情况下，攻击者可能通过上传特定文件然后利用此漏洞执行任意代码，例如通过路径遍历访问上传的WebShell。
+- 泄露敏感信息可能导致进一步的攻击，如数据库注入、权限提升等。
 DESC
 	rule_id: "594bc621-80a3-4f25-81f9-9b7840bdf4f9"
 	reference: <<<REFERENCE
 [CWE-73: External Control of File Name or Path](https://cwe.mitre.org/data/definitions/73.html)
 REFERENCE
-	title_zh: "检测Golang未过滤文件路径漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 为了防止此类漏洞，开发者应始终对用户输入的文件路径进行严格的验证和过滤，确保路径在允许的范围内。具体措施包括：
-
 1. **使用 `filepath.Clean` 清洗路径**
-   使用 `filepath.Clean` 函数可以规范化路径，去除冗余的斜杠、点等，使路径更易于验证和处理。
-
+使用 `filepath.Clean` 函数可以规范化路径，去除冗余的斜杠、点等，使路径更易于验证和处理。
 2. **验证路径是否在允许的基础路径下**
-   在清洗路径后，使用 `strings.HasPrefix` 或其他方法验证用户提供的路径是否位于预定义的、安全的目录之下。拒绝访问基础路径之外的任何路径。
-
+在清洗路径后，使用 `strings.HasPrefix` 或其他方法验证用户提供的路径是否位于预定义的、安全的目录之下。拒绝访问基础路径之外的任何路径。
 3. **避免直接拼接用户输入和基础路径**
-   在将用户输入路径与基础路径结合时，先清洗用户输入，再进行拼接，最后再次清洗和验证最终路径。一种推荐的方式是先将用户输入和基础路径使用 `filepath.Join` 合并，然后对合并后的路径使用 `filepath.Clean` 清洗，最后使用 `strings.HasPrefix` 检查清洗后的路径是否仍然在基础路径下。
-
+在将用户输入路径与基础路径结合时，先清洗用户输入，再进行拼接，最后再次清洗和验证最终路径。一种推荐的方式是先将用户输入和基础路径使用 `filepath.Join` 合并，然后对合并后的路径使用 `filepath.Clean` 清洗，最后使用 `strings.HasPrefix` 检查清洗后的路径是否仍然在基础路径下。
 以下是一个修复后的Go代码示例，展示了如何使用 `filepath.Clean` 和 `strings.HasPrefix` 进行安全处理：
-
 ```go
 package main
-
 import (
-    "fmt"
-    "io/ioutil"
-    "net/http"
-    "path/filepath"
-    "strings"
+"fmt"
+"io/ioutil"
+"net/http"
+"path/filepath"
+"strings"
 )
-
 const allowedBasePath = "/allowed/path/"
-
 func handler(w http.ResponseWriter, r *http.Request) {
-    userInput := r.URL.Query().Get("file")
-
-    // 清洗用户提供的路径
-    cleanedInput := filepath.Clean(userInput)
-
-    // 将清洗后的用户输入与基础路径合并并再次清洗
-    requestedPath := filepath.Join(allowedBasePath, cleanedInput)
-    finalPath := filepath.Clean(requestedPath)
-
-    // 验证最终路径是否在允许的基础路径下
-    if !strings.HasPrefix(finalPath, allowedBasePath) {
-        http.Error(w, "Invalid file path", http.StatusBadRequest)
-        return
-    }
-
-    // 读取文件
-    content, err := ioutil.ReadFile(finalPath)
-    if err != nil {
-        http.Error(w, "File not found", http.StatusNotFound)
-        return
-    }
-
-    // 返回文件内容
-    w.Write(content)
+userInput := r.URL.Query().Get("file")
+// 清洗用户提供的路径
+cleanedInput := filepath.Clean(userInput)
+// 将清洗后的用户输入与基础路径合并并再次清洗
+requestedPath := filepath.Join(allowedBasePath, cleanedInput)
+finalPath := filepath.Clean(requestedPath)
+// 验证最终路径是否在允许的基础路径下
+if !strings.HasPrefix(finalPath, allowedBasePath) {
+http.Error(w, "Invalid file path", http.StatusBadRequest)
+return
 }
-
+// 读取文件
+content, err := ioutil.ReadFile(finalPath)
+if err != nil {
+http.Error(w, "File not found", http.StatusNotFound)
+return
+}
+// 返回文件内容
+w.Write(content)
+}
 func main() {
-    http.HandleFunc("/", handler)
-    fmt.Println("Server is running on :8080")
-    http.ListenAndServe(":8080", nil)
+http.HandleFunc("/", handler)
+fmt.Println("Server is running on :8080")
+http.ListenAndServe(":8080", nil)
 }
 ```
 SOLUTION
 )
 
 <include('golang-file-path')> as $path;
-<include('golang-file-read-sink')> as $sink;
-<include('golang-file-write-sink')> as $sink;
+<include('golang-file-read-path-sink')> as $sink;
+<include('golang-file-write-path-sink')> as $sink;
+<include('golang-user-input')> as $input;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
@@ -134,134 +110,112 @@ $path.IsAbs(* #-> as $check);
 $path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
-$sink #{exclude: `$safe`}-> as $low;
+$sink - $safe as $data;
+$data & $input as $low;
 
 alert $low for {
-	title: "Check Golang Unfiltered File Path Vulnerability",
-	title_zh: "检测Golang未过滤文件路径漏洞",
-	solution: <<<CODE
+	title: "Golang Unfiltered File Path Vulnerability Was Detected",
+	title_zh: "检测到Golang未过滤文件路径漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 为了防止此类漏洞，开发者应始终对用户输入的文件路径进行严格的验证和过滤，确保路径在允许的范围内。具体措施包括：
-
 1. **使用 `filepath.Clean` 清洗路径**
-   使用 `filepath.Clean` 函数可以规范化路径，去除冗余的斜杠、点等，使路径更易于验证和处理。
-
+使用 `filepath.Clean` 函数可以规范化路径，去除冗余的斜杠、点等，使路径更易于验证和处理。
 2. **验证路径是否在允许的基础路径下**
-   在清洗路径后，使用 `strings.HasPrefix` 或其他方法验证用户提供的路径是否位于预定义的、安全的目录之下。拒绝访问基础路径之外的任何路径。
-
+在清洗路径后，使用 `strings.HasPrefix` 或其他方法验证用户提供的路径是否位于预定义的、安全的目录之下。拒绝访问基础路径之外的任何路径。
 3. **避免直接拼接用户输入和基础路径**
-   在将用户输入路径与基础路径结合时，先清洗用户输入，再进行拼接，最后再次清洗和验证最终路径。一种推荐的方式是先将用户输入和基础路径使用 `filepath.Join` 合并，然后对合并后的路径使用 `filepath.Clean` 清洗，最后使用 `strings.HasPrefix` 检查清洗后的路径是否仍然在基础路径下。
-
+在将用户输入路径与基础路径结合时，先清洗用户输入，再进行拼接，最后再次清洗和验证最终路径。一种推荐的方式是先将用户输入和基础路径使用 `filepath.Join` 合并，然后对合并后的路径使用 `filepath.Clean` 清洗，最后使用 `strings.HasPrefix` 检查清洗后的路径是否仍然在基础路径下。
 以下是一个修复后的Go代码示例，展示了如何使用 `filepath.Clean` 和 `strings.HasPrefix` 进行安全处理：
-
 ```go
 package main
-
 import (
-    "fmt"
-    "io/ioutil"
-    "net/http"
-    "path/filepath"
-    "strings"
+"fmt"
+"io/ioutil"
+"net/http"
+"path/filepath"
+"strings"
 )
-
 const allowedBasePath = "/allowed/path/"
-
 func handler(w http.ResponseWriter, r *http.Request) {
-    userInput := r.URL.Query().Get("file")
-
-    // 清洗用户提供的路径
-    cleanedInput := filepath.Clean(userInput)
-
-    // 将清洗后的用户输入与基础路径合并并再次清洗
-    requestedPath := filepath.Join(allowedBasePath, cleanedInput)
-    finalPath := filepath.Clean(requestedPath)
-
-    // 验证最终路径是否在允许的基础路径下
-    if !strings.HasPrefix(finalPath, allowedBasePath) {
-        http.Error(w, "Invalid file path", http.StatusBadRequest)
-        return
-    }
-
-    // 读取文件
-    content, err := ioutil.ReadFile(finalPath)
-    if err != nil {
-        http.Error(w, "File not found", http.StatusNotFound)
-        return
-    }
-
-    // 返回文件内容
-    w.Write(content)
+userInput := r.URL.Query().Get("file")
+// 清洗用户提供的路径
+cleanedInput := filepath.Clean(userInput)
+// 将清洗后的用户输入与基础路径合并并再次清洗
+requestedPath := filepath.Join(allowedBasePath, cleanedInput)
+finalPath := filepath.Clean(requestedPath)
+// 验证最终路径是否在允许的基础路径下
+if !strings.HasPrefix(finalPath, allowedBasePath) {
+http.Error(w, "Invalid file path", http.StatusBadRequest)
+return
 }
-
+// 读取文件
+content, err := ioutil.ReadFile(finalPath)
+if err != nil {
+http.Error(w, "File not found", http.StatusNotFound)
+return
+}
+// 返回文件内容
+w.Write(content)
+}
 func main() {
-    http.HandleFunc("/", handler)
-    fmt.Println("Server is running on :8080")
-    http.ListenAndServe(":8080", nil)
+http.HandleFunc("/", handler)
+fmt.Println("Server is running on :8080")
+http.ListenAndServe(":8080", nil)
 }
 ```
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在 Go 语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
-
+未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在 Go 语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
 2. **触发场景**
-   这种漏洞通常发生在文件读取功能中，当应用未能限制用户输入的文件路径时，攻击者可以构造恶意请求来访问服务器上的任意文件，进而获取敏感信息或破坏系统。例如，攻击者可以通过路径遍历（如 `../../etc/passwd`）访问系统文件。
-
-   以下是一个存在漏洞的Go代码示例：
-   ```go
-   package main
-
-   import (
-       "fmt"
-       "io/ioutil"
-       "net/http"
-       "path/filepath"
-   )
-
-   const allowedBasePath = "/allowed/path/"
-
-   func handler(w http.ResponseWriter, r *http.Request) {
-       userInput := r.URL.Query().Get("file")
-
-       // 直接拼接用户输入和基础路径，未进行清理和验证
-       requestedPath := filepath.Join(allowedBasePath, userInput)
-
-       // 读取文件
-       content, err := ioutil.ReadFile(requestedPath)
-       if err != nil {
-           http.Error(w, "File not found", http.StatusNotFound)
-           return
-       }
-
-       // 返回文件内容
-       w.Write(content)
-   }
-
-   func main() {
-       http.HandleFunc("/", handler)
-       fmt.Println("Server is running on :8080")
-       http.ListenAndServe(":8080", nil)
-   }
-   ```
-   攻击者可以通过访问 `/` 并提供 `?file=../../etc/passwd` 来尝试读取 `/etc/passwd` 文件。
-
+这种漏洞通常发生在文件读取功能中，当应用未能限制用户输入的文件路径时，攻击者可以构造恶意请求来访问服务器上的任意文件，进而获取敏感信息或破坏系统。例如，攻击者可以通过路径遍历（如 `../../etc/passwd`）访问系统文件。
+以下是一个存在漏洞的Go代码示例：
+```go
+package main
+import (
+"fmt"
+"io/ioutil"
+"net/http"
+"path/filepath"
+)
+const allowedBasePath = "/allowed/path/"
+func handler(w http.ResponseWriter, r *http.Request) {
+userInput := r.URL.Query().Get("file")
+// 直接拼接用户输入和基础路径，未进行清理和验证
+requestedPath := filepath.Join(allowedBasePath, userInput)
+// 读取文件
+content, err := ioutil.ReadFile(requestedPath)
+if err != nil {
+http.Error(w, "File not found", http.StatusNotFound)
+return
+}
+// 返回文件内容
+w.Write(content)
+}
+func main() {
+http.HandleFunc("/", handler)
+fmt.Println("Server is running on :8080")
+http.ListenAndServe(":8080", nil)
+}
+```
+攻击者可以通过访问 `/` 并提供 `?file=../../etc/passwd` 来尝试读取 `/etc/passwd` 文件。
 3. **潜在影响**
-    - 攻击者可以读取服务器上的任意文件，包括敏感配置文件、源代码、数据库连接字符串等。
-    - 在某些情况下，攻击者可能通过上传特定文件然后利用此漏洞执行任意代码，例如通过路径遍历访问上传的WebShell。
-    - 泄露敏感信息可能导致进一步的攻击，如数据库注入、权限提升等。
-CODE
+- 攻击者可以读取服务器上的任意文件，包括敏感配置文件、源代码、数据库连接字符串等。
+- 在某些情况下，攻击者可能通过上传特定文件然后利用此漏洞执行任意代码，例如通过路径遍历访问上传的WebShell。
+- 泄露敏感信息可能导致进一步的攻击，如数据库注入、权限提升等。
+DESC
 	level: "low",
 	type: "vuln",
+	risk: "路径遍历",
+	name: "low",
+	message: "检测到Golang未过滤文件路径漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
 }
 
 desc(
 	lang: golang
 	alert_low: 1
-	'unsafe://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -295,7 +249,7 @@ func main() {
     http.ListenAndServe(":8080", nil)
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://safe.go': <<<SAFE
 package main
 
 import (

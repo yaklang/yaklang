@@ -1,0 +1,169 @@
+desc(
+	title: "Check Golang Open Redirect Vulnerability in gin.Context"
+	title_zh: "检测Golang开放重定向漏洞(gin.Context)"
+	type: audit
+	level: high
+	risk: "url-redirect"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   开放重定向漏洞（Open Redirect）是一种常见的Web应用程序安全问题。它通常发生在应用程序允许用户输入直接控制重定向目标URL的情况下。如果攻击者能够操纵重定向的目标URL，他们可以将受害者引导至恶意网站，从而实施钓鱼、信息窃取或恶意软件传播等攻击。
+   在Golang中，特别是使用`gin`框架时，如果开发者在调用`gin.Context.Redirect`方法时未对目标URL进行严格的验证和过滤，就会导致开放重定向漏洞。
+
+2. **触发场景**
+   下面是一个存在开放重定向漏洞的代码示例：
+   ```go
+   package unAuth
+   import "github.com/gin-gonic/gin"
+
+   func Redirect(c *gin.Context) {
+       var loc string
+       if c.Request.Method == "GET" {
+           loc = c.Query("redirect") // 直接从用户输入获取重定向目标
+       } else if c.Request.Method == "POST" {
+           loc = c.PostForm("redirect")
+       }
+       c.Redirect(302, loc) // 未验证用户输入
+   }
+   ```
+   攻击者可以通过构造类似`http://example.com/redirect?redirect=http://malicious-site.com`的请求，诱导用户访问恶意站点。
+
+3. **潜在影响**
+   - 用户可能被重定向到伪造的登录页面，泄露敏感凭证。
+   - 可能被用于传播恶意软件或执行网络钓鱼攻击。
+   - 影响应用程序的声誉，降低用户信任度。
+
+### 规则目的
+该规则旨在检测Golang项目中基于`gin`框架的开放重定向漏洞。通过识别`gin.Context.Redirect`函数调用，并检查其参数是否直接来源于用户输入，帮助开发者及时发现潜在的安全隐患。
+DESC
+	rule_id: "ca510247-27ae-4a3b-8048-9d6433b26653"
+	solution: <<<SOLUTION
+### 修复建议
+为了避免开放重定向漏洞，开发者应采取以下措施：
+
+#### 1. 避免直接使用用户输入作为重定向目标
+不要直接将用户的输入值传递给重定向函数，而是采用固定的白名单机制。
+
+#### 2. 实施白名单验证
+如果必须根据用户输入生成重定向目标URL，则应对输入进行严格验证，确保其仅指向可信域名。
+```go
+func SafeRedirect(c *gin.Context) {
+    allowedDomains := map[string]bool{
+        "https://trusted-domain.com": true,
+        "https://another-trusted-domain.com": true,
+    }
+    loc := c.Query("redirect")
+    if !allowedDomains[loc] {
+        loc = "/default-safe-page" // 默认安全路径
+    }
+    c.Redirect(302, loc)
+}
+```
+
+#### 3. 使用硬编码基础URL与用户输入拼接
+即使需要动态生成重定向目标，也应确保基础URL是硬编码的，而用户输入仅作为查询参数。
+```go
+func SafeRedirectWithBase(c *gin.Context) {
+    baseUrl := "https://baidu.com/path?q="
+    loc := c.Query("redirect")
+    c.Redirect(302, baseUrl+loc) // 安全地拼接用户输入
+}
+```
+以上方法能够有效防止开放重定向漏洞的发生，提高应用的安全性。
+SOLUTION
+	reference: <<<REFERENCE
+[OWASP Open Redirect](https://owasp.org/www-community/vulnerabilities/Open_Redirector)
+[CWE-601](https://cwe.mitre.org/data/definitions/601.html)
+REFERENCE
+)
+
+<include('golang-gin-context')> as $sink 
+$sink.Redirect(*<slice(index=2)> #-> as $param)
+
+$param.Query as $high
+$param.PostForm as $high
+
+alert $high for {
+	title: "Golang Open Redirect Vulnerability Was Detected",
+	title_zh: "检测到Golang开放重定向漏洞",
+	level: "high",
+	type: "vuln",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   开放重定向漏洞（Open Redirect）是一种安全漏洞，它允许攻击者将用户重定向到一个未经授权的、潜在的恶意网站。在Golang中，特别是使用gin框架时，如果重定向的目标URL由用户控制且未经适当验证，就可能出现这种漏洞。
+2. **触发场景**
+   在gin的`Redirect`函数中，目标URL直接来自于用户的输入，如`c.Query("redirect")`或`c.PostForm("redirect")`。
+   ```go
+   package unAuth
+   import "github.com/gin-gonic/gin"
+   func Redirect(c *gin.Context) {
+       var loc string
+       // Check the request method
+       if c.Request.Method == "GET" {
+           loc = c.Query("redirect")
+       } else if c.Request.Method == "POST" {
+           loc = c.PostForm("redirect")
+       }
+       c.Redirect(302, loc)
+   }
+   ```
+3. **潜在影响**
+   - 用户可能被重定向到钓鱼网站，泄露敏感信息。
+   - 可能导致恶意操作被执行，例如伪造登录页面窃取凭证。
+
+DESC
+	name: "high",
+	message: "检测到Golang开放重定向漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+为了避免开放重定向漏洞，应采取以下措施：
+1. **不要直接使用用户输入作为重定向的目标URL**。
+2. 如果必须使用用户输入，应对输入进行白名单验证，确保其指向可信的域名。
+3. 使用安全的URL构建方法，如使用硬编码的基础URL与用户输入拼接。
+**修复代码示例**：
+```go
+func SafeRedirect(c *gin.Context) {
+    baseUrl := "https://baidu.com/path?q="
+    loc := c.Query("redirect")
+    // 对loc进行验证
+    c.Redirect(302, baseUrl+loc)
+}
+```
+SOLUTION
+	risk: "开放重定向",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package unAuth
+
+import "github.com/gin-gonic/gin"
+
+func Redirect(c *gin.Context) {
+	var loc string
+	// Check the request method
+	if c.Request.Method == "GET" {
+		loc = c.Query("redirect")
+	} else if c.Request.Method == "POST" {
+		loc = c.PostForm("redirect")
+	}
+	c.Redirect(302, loc)
+}
+
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package unAuth
+
+import "github.com/gin-gonic/gin"
+
+func SafeRedirect(c *gin.Context) {
+	baseUrl := "https://baidu.com/path?q="
+	c.Redirect(302, baseUrl)
+}
+
+SAFE
+)

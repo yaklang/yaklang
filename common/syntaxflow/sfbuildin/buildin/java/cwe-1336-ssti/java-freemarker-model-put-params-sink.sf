@@ -4,27 +4,23 @@ desc(
 	level: warning
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   Freemarker模板注入（SSTI, Server-Side Template Injection）是一种服务端模板注入漏洞。当应用程序将用户可控的输入直接或间接拼接到Freemarker模板中进行渲染时，攻击者可以构造恶意代码，从而在服务器端执行任意代码，控制服务器。
-
+Freemarker模板注入（SSTI, Server-Side Template Injection）是一种服务端模板注入漏洞。当应用程序将用户可控的输入直接或间接拼接到Freemarker模板中进行渲染时，攻击者可以构造恶意代码，从而在服务器端执行任意代码，控制服务器。
 2. **触发场景**
-   当Freemarker模板通过 `process` 方法渲染，并且数据模型（Map）中包含直接来自用户输入的、未经过滤或 sanitization 的值时，就可能触发此漏洞。例如，如果攻击者可以控制数据模型中的某个键对应的值，并且该值被解释为Freemarker表达式，就可以执行恶意代码。
-   ```java
-   // 存在漏洞的代码示例
-   Map<String, Object> templateData = new HashMap<>();
-   // 用户输入直接作为数据模型的值，且未过滤
-   templateData.put("userInfo", request.getParameter("data"));
-   Template template = cfg.getTemplate("user_profile.ftl");
-   template.process(templateData, out); // 如果data包含恶意freemarker语法，可能导致SSTI
-   ```
-
+当Freemarker模板通过 `process` 方法渲染，并且数据模型（Map）中包含直接来自用户输入的、未经过滤或 sanitization 的值时，就可能触发此漏洞。例如，如果攻击者可以控制数据模型中的某个键对应的值，并且该值被解释为Freemarker表达式，就可以执行恶意代码。
+```java
+// 存在漏洞的代码示例
+Map<String, Object> templateData = new HashMap<>();
+// 用户输入直接作为数据模型的值，且未过滤
+templateData.put("userInfo", request.getParameter("data"));
+Template template = cfg.getTemplate("user_profile.ftl");
+template.process(templateData, out); // 如果data包含恶意freemarker语法，可能导致SSTI
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令，完全控制服务器。
-   - **数据泄露**: 攻击者可以访问服务器上的敏感文件或数据库。
-   - **服务中断**: 攻击者可以破坏或删除文件，导致服务不可用。
-   - **权限提升**: 攻击者可能利用漏洞获取更高的系统权限。
-
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令，完全控制服务器。
+- **数据泄露**: 攻击者可以访问服务器上的敏感文件或数据库。
+- **服务中断**: 攻击者可以破坏或删除文件，导致服务不可用。
+- **权限提升**: 攻击者可能利用漏洞获取更高的系统权限。
 DESC
 	rule_id: "79bb6b64-7a3f-4bdc-9af9-9f68341d16cd"
 	reference: <<<REFERENCE
@@ -33,22 +29,19 @@ REFERENCE
 	title_zh: "检测Java Freemarker模板注入漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格过滤用户输入**
-   在使用用户输入填充数据模型之前，对所有用户输入进行严格的验证和过滤。根据预期的类型、格式和内容进行校验，移除或转义所有可能被解释为Freemarker表达式的特殊字符。
-   ```java
-   // 示例：对用户输入进行清理，只允许字母数字
-   String userInput = request.getParameter("data");
-   String cleanedInput = userInput.replaceAll("[^a-zA-Z0-9 ]", ""); // 移除特殊字符
-   templateData.put("userInfo", cleanedInput);
-   ```
-
+在使用用户输入填充数据模型之前，对所有用户输入进行严格的验证和过滤。根据预期的类型、格式和内容进行校验，移除或转义所有可能被解释为Freemarker表达式的特殊字符。
+```java
+// 示例：对用户输入进行清理，只允许字母数字
+String userInput = request.getParameter("data");
+String cleanedInput = userInput.replaceAll("[^a-zA-Z0-9 ]", ""); // 移除特殊字符
+templateData.put("userInfo", cleanedInput);
+```
 2. **使用安全的API或配置**
-   - **限制模板的可用功能**: 配置Freemarker，禁用或限制可能导致RCE的安全敏感指令和内置函数，例如 `@exec` 或 `eval` 等。
-   - **使用沙箱**: 考虑使用Freemarker提供的沙箱机制来限制模板的执行能力。
-
+- **限制模板的可用功能**: 配置Freemarker，禁用或限制可能导致RCE的安全敏感指令和内置函数，例如 `@exec` 或 `eval` 等。
+- **使用沙箱**: 考虑使用Freemarker提供的沙箱机制来限制模板的执行能力。
 3. **避免直接在模板中处理复杂逻辑**
-   将业务逻辑和数据处理放在Java代码中完成，只将需要显示的纯数据传递给模板。避免在模板中使用复杂的表达式或控制结构。
+将业务逻辑和数据处理放在Java代码中完成，只将需要显示的纯数据传递给模板。避免在模板中使用复杂的表达式或控制结构。
 SOLUTION
 )
 
@@ -59,45 +52,46 @@ check $sink then "Found Freemarker Process Using" else "No Freemarker Process Si
 alert $sink for {
 	title: "Check Java Freemarker SSTI Vulnerability",
 	title_zh: "检测Java Freemarker模板注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **严格过滤用户输入**
-   在使用用户输入填充数据模型之前，对所有用户输入进行严格的验证和过滤。根据预期的类型、格式和内容进行校验，移除或转义所有可能被解释为Freemarker表达式的特殊字符。
-   ```java
-   // 示例：对用户输入进行清理，只允许字母数字
-   String userInput = request.getParameter("data");
-   String cleanedInput = userInput.replaceAll("[^a-zA-Z0-9 ]", ""); // 移除特殊字符
-   templateData.put("userInfo", cleanedInput);
-   ```
+在使用用户输入填充数据模型之前，对所有用户输入进行严格的验证和过滤。根据预期的类型、格式和内容进行校验，移除或转义所有可能被解释为Freemarker表达式的特殊字符。
+```java
+// 示例：对用户输入进行清理，只允许字母数字
+String userInput = request.getParameter("data");
+String cleanedInput = userInput.replaceAll("[^a-zA-Z0-9 ]", ""); // 移除特殊字符
+templateData.put("userInfo", cleanedInput);
+```
 2. **使用安全的API或配置**
-   - **限制模板的可用功能**: 配置Freemarker，禁用或限制可能导致RCE的安全敏感指令和内置函数，例如 `@exec` 或 `eval` 等。
-   - **使用沙箱**: 考虑使用Freemarker提供的沙箱机制来限制模板的执行能力。
+- **限制模板的可用功能**: 配置Freemarker，禁用或限制可能导致RCE的安全敏感指令和内置函数，例如 `@exec` 或 `eval` 等。
+- **使用沙箱**: 考虑使用Freemarker提供的沙箱机制来限制模板的执行能力。
 3. **避免直接在模板中处理复杂逻辑**
-   将业务逻辑和数据处理放在Java代码中完成，只将需要显示的纯数据传递给模板。避免在模板中使用复杂的表达式或控制结构。
-CODE
-	desc: <<<CODE
+将业务逻辑和数据处理放在Java代码中完成，只将需要显示的纯数据传递给模板。避免在模板中使用复杂的表达式或控制结构。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-  Freemarker模板注入（SSTI, Server-Side Template Injection）是一种服务端模板注入漏洞。当应用程序将用户可控的输入直接或间接拼接到Freemarker模板中进行渲染时，攻击者可以构造恶意代码，从而在服务器端执行任意代码，控制服务器。
+Freemarker模板注入（SSTI, Server-Side Template Injection）是一种服务端模板注入漏洞。当应用程序将用户可控的输入直接或间接拼接到Freemarker模板中进行渲染时，攻击者可以构造恶意代码，从而在服务器端执行任意代码，控制服务器。
 2. **触发场景**
-   当Freemarker模板通过 `process` 方法渲染，并且数据模型（Map）中包含直接来自用户输入的、未经过滤或 sanitization 的值时，就可能触发此漏洞。例如，如果攻击者可以控制数据模型中的某个键对应的值，并且该值被解释为Freemarker表达式，就可以执行恶意代码。
-   ```java
-   // 存在漏洞的代码示例
-   Map<String, Object> templateData = new HashMap<>();
-   // 用户输入直接作为数据模型的值，且未过滤
-   templateData.put("userInfo", request.getParameter("data"));
-   Template template = cfg.getTemplate("user_profile.ftl");
-   template.process(templateData, out); // 如果data包含恶意freemarker语法，可能导致SSTI
-   ```
+当Freemarker模板通过 `process` 方法渲染，并且数据模型（Map）中包含直接来自用户输入的、未经过滤或 sanitization 的值时，就可能触发此漏洞。例如，如果攻击者可以控制数据模型中的某个键对应的值，并且该值被解释为Freemarker表达式，就可以执行恶意代码。
+```java
+// 存在漏洞的代码示例
+Map<String, Object> templateData = new HashMap<>();
+// 用户输入直接作为数据模型的值，且未过滤
+templateData.put("userInfo", request.getParameter("data"));
+Template template = cfg.getTemplate("user_profile.ftl");
+template.process(templateData, out); // 如果data包含恶意freemarker语法，可能导致SSTI
+```
 3. **潜在影响**
-   - **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令，完全控制服务器。
-   - **数据泄露**: 攻击者可以访问服务器上的敏感文件或数据库。
-   - **服务中断**: 攻击者可以破坏或删除文件，导致服务不可用。
-   - **权限提升**: 攻击者可能利用漏洞获取更高的系统权限。
-CODE
+- **远程代码执行 (RCE)**: 攻击者可以在服务器上执行任意系统命令，完全控制服务器。
+- **数据泄露**: 攻击者可以访问服务器上的敏感文件或数据库。
+- **服务中断**: 攻击者可以破坏或删除文件，导致服务不可用。
+- **权限提升**: 攻击者可能利用漏洞获取更高的系统权限。
+DESC
 	level: "high",
+	message: "检测到Java Freemarker模板注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "SSTI",
+	name: "sink",
 }
 
 

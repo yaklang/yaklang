@@ -27,6 +27,9 @@ const (
 	defaultMaxWaitTime = time.Duration(2000) * time.Millisecond
 )
 
+type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte))
+type CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
+
 type LowhttpExecConfig struct {
 	Host              string
 	Port              int
@@ -43,24 +46,28 @@ type LowhttpExecConfig struct {
 	EnableSystemProxyFromEnv         bool
 	ConnectTimeout                   time.Duration
 	Timeout                          time.Duration
+	NoBodyBuffer                     bool
 	RedirectTimes                    int
 	RetryTimes                       int
 	RetryInStatusCode                []int
 	RetryNotInStatusCode             []int
-	RetryHandler                     func(https bool, retryCount int, req []byte, rsp []byte) bool
+	RetryHandler                     RetryHandler
+	CustomFailureChecker             CustomFailureChecker
 	RetryWaitTime                    time.Duration
 	RetryMaxWaitTime                 time.Duration
 	JsRedirect                       bool
 	Proxy                            []string
 	ForceLegacyProxy                 bool
 	NoFixContentLength               bool
+	NoReadMultiResponse              bool
 	RedirectHandler                  func(bool, []byte, []byte) bool
 	Session                          interface{}
 	BeforeDoRequest                  func([]byte) []byte
 	Ctx                              context.Context
 	SaveHTTPFlow                     bool
 	SaveHTTPFlowSync                 bool
-	SaveHTTPFlowHandler              func(*LowhttpResponse)
+	SaveHTTPFlowHandler              []func(*LowhttpResponse)
+	UseMITMRule                      bool
 	RequestSource                    string
 	EtcHosts                         map[string]string
 	DNSServers                       []string
@@ -170,6 +177,10 @@ func yakitColor(i string) string {
 
 func (r *LowhttpResponse) AddTag(i string) {
 	r.Tags = append(r.Tags, i)
+}
+
+func (r *LowhttpResponse) AddTags(i ...string) {
+	r.Tags = append(r.Tags, i...)
 }
 
 func (r *LowhttpResponse) Red() {
@@ -369,6 +380,18 @@ func NewLowhttpOption() *LowhttpExecConfig {
 }
 
 type LowhttpOpt func(o *LowhttpExecConfig)
+
+func WithNoBodyBuffer(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.NoBodyBuffer = b
+	}
+}
+
+func WithNoReadMultiResponse(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.NoReadMultiResponse = b
+	}
+}
 
 func WithAppendHTTPFlowTag(tag string) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
@@ -578,18 +601,34 @@ func WithRetryTimes(retryTimes int) LowhttpOpt {
 
 // WithRetryHandler sets a retry handler function that will be called when a request fails.
 // return true for retry, return false for not retry.
-func WithRetryHandler(retryHandler func(https bool, retryCount int, req []byte, rsp []byte) bool) LowhttpOpt {
+func WithRetryHandler(retryHandler RetryHandler) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
 		if !utils.IsNil(retryHandler) {
-			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte) (ret bool) {
+			o.RetryHandler = func(https bool, retryCount int, req []byte, rsp []byte, retryFunc func(...[]byte)) {
 				defer func() {
 					if err := recover(); err != nil {
-						ret = false
 						log.Errorf("retry handler failed: %v\n%v", err, utils.ErrorStack(err))
 					}
 				}()
-				ret = retryHandler(https, retryCount, req, rsp)
+				retryHandler(https, retryCount, req, rsp, retryFunc)
 				return
+			}
+		}
+	}
+}
+
+// WithCustomFailureChecker sets a custom failure checker function that will be called when a request succeeds.
+// The checker can call the fail function with an error message to mark the request as failed.
+func WithCustomFailureChecker(customFailureChecker CustomFailureChecker) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		if !utils.IsNil(customFailureChecker) {
+			o.CustomFailureChecker = func(https bool, req []byte, rsp []byte, fail func(string)) {
+				defer func() {
+					if err := recover(); err != nil {
+						log.Errorf("custom failure checker failed: %v\n%v", err, utils.ErrorStack(err))
+					}
+				}()
+				customFailureChecker(https, req, rsp, fail)
 			}
 		}
 	}
@@ -667,9 +706,18 @@ func WithSaveHTTPFlowSync(b bool) LowhttpOpt {
 	}
 }
 
-func WithSaveHTTPFlowHandler(f func(*LowhttpResponse)) LowhttpOpt {
+func WithSaveHTTPFlowHandler(f ...func(*LowhttpResponse)) LowhttpOpt {
 	return func(o *LowhttpExecConfig) {
-		o.SaveHTTPFlowHandler = f
+		if o.SaveHTTPFlowHandler == nil {
+			o.SaveHTTPFlowHandler = make([]func(*LowhttpResponse), 0, 1)
+		}
+		o.SaveHTTPFlowHandler = append(o.SaveHTTPFlowHandler, f...)
+	}
+}
+
+func WithUseMITMRule(b bool) LowhttpOpt {
+	return func(o *LowhttpExecConfig) {
+		o.UseMITMRule = b
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/bytedance/mockey"
 	"github.com/jinzhu/gorm"
@@ -340,4 +341,158 @@ func TestSSARiskFeedbackToOnline(t *testing.T) {
 		assert.NotNil(t, resp)
 	})
 
+}
+
+func TestGRPCMUSTPASS_SSA_QuerySSARisks_LatestDisposalStatus(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	taskId := uuid.NewString()
+	testUUID := uuid.NewString()
+
+	createRisk := func(filePath, severity, riskType string) int64 {
+		risk := &schema.SSARisk{
+			CodeSourceUrl: filePath,
+			Severity:      schema.ValidSeverityType(severity),
+			RiskType:      riskType,
+			RuntimeId:     taskId,
+			Title:         "Test Risk - " + testUUID,
+			TitleVerbose:  "Test Risk Verbose",
+			ProgramName:   "TestProgram",
+		}
+		err := yakit.CreateSSARisk(ssadb.GetDB(), risk)
+		require.NoError(t, err)
+		return int64(risk.ID)
+	}
+
+	riskId1 := createRisk("ssadb://prog1/1", "high", "sql-injection")
+	riskId2 := createRisk("ssadb://prog1/2", "medium", "xss")
+	riskId3 := createRisk("ssadb://prog2/1", "low", "path-traversal")
+
+	defer func() {
+		yakit.DeleteSSARisks(ssadb.GetDB(), &ypb.SSARisksFilter{
+			RuntimeID: []string{taskId},
+		})
+		yakit.DeleteSSARiskDisposals(ssadb.GetDB(), &ypb.DeleteSSARiskDisposalsRequest{
+			Filter: &ypb.SSARiskDisposalsFilter{
+				RiskId: []int64{riskId1, riskId2, riskId3},
+			},
+		})
+	}()
+
+	ctx := context.Background()
+
+	t.Run("风险无处置记录应返回not_set状态", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId1},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 1)
+		require.Equal(t, "not_set", queryResp.Data[0].LatestDisposalStatus)
+	})
+
+	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+		RiskIds: []int64{riskId1},
+		Status:  "is_issue",
+		Comment: "第一个处置记录-" + testUUID,
+	})
+	require.NoError(t, err)
+
+	t.Run("风险有一个处置记录应返回该状态", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId1},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 1)
+		require.Equal(t, "is_issue", queryResp.Data[0].LatestDisposalStatus)
+	})
+
+	time.Sleep(1 * time.Second)
+
+	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+		RiskIds: []int64{riskId1},
+		Status:  "not_issue",
+		Comment: "第二个处置记录-" + testUUID,
+	})
+	require.NoError(t, err)
+
+	t.Run("风险有多个处置记录应返回最新状态", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId1},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 1)
+		require.Equal(t, "not_issue", queryResp.Data[0].LatestDisposalStatus)
+	})
+
+	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+		RiskIds: []int64{riskId2},
+		Status:  "suspicious",
+		Comment: "riskId2的处置记录-" + testUUID,
+	})
+	require.NoError(t, err)
+
+	t.Run("批量查询多个风险应返回各自正确的处置状态", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId1, riskId2, riskId3},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 3)
+
+		statusMap := make(map[int64]string)
+		for _, risk := range queryResp.Data {
+			statusMap[risk.Id] = risk.LatestDisposalStatus
+		}
+
+		require.Equal(t, "not_issue", statusMap[riskId1], "riskId1应该是最新的not_issue状态")
+		require.Equal(t, "suspicious", statusMap[riskId2], "riskId2应该是suspicious状态")
+		require.Equal(t, "not_set", statusMap[riskId3], "riskId3应该是not_set状态（无处置记录）")
+	})
+
+	time.Sleep(1 * time.Second)
+	_, err = client.CreateSSARiskDisposals(ctx, &ypb.CreateSSARiskDisposalsRequest{
+		RiskIds: []int64{riskId1},
+		Status:  "is_issue",
+		Comment: "第三个处置记录-" + testUUID,
+	})
+	require.NoError(t, err)
+
+	t.Run("验证处置状态确实是最新的", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				ID: []int64{riskId1},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, queryResp.Data, 1)
+		require.Equal(t, "is_issue", queryResp.Data[0].LatestDisposalStatus)
+	})
+
+	t.Run("通过搜索条件查询验证处置状态", func(t *testing.T) {
+		queryResp, err := client.QuerySSARisks(ctx, &ypb.QuerySSARisksRequest{
+			Filter: &ypb.SSARisksFilter{
+				Search: testUUID,
+			},
+		})
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(queryResp.Data), 3)
+
+		foundRisk1 := false
+		for _, risk := range queryResp.Data {
+			if risk.Id == riskId1 {
+				require.Equal(t, "is_issue", risk.LatestDisposalStatus)
+				foundRisk1 = true
+				break
+			}
+		}
+		require.True(t, foundRisk1, "搜索结果中应该包含riskId1")
+	})
 }

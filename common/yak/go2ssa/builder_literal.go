@@ -56,8 +56,11 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}
@@ -68,16 +71,18 @@ func (b *astbuilder) buildFunctionLit(exp *gol.FunctionLitContext) ssa.Value {
 		b.SupportClosure = true
 		b.SetForceCapture(true)
 
-		if para, ok := exp.Signature().(*gol.SignatureContext); ok {
-			b.buildSignature(para)
-		}
+		b.BuildSyntaxBlock(func() {
+			if para, ok := exp.Signature().(*gol.SignatureContext); ok {
+				b.buildSignature(para)
+			}
 
-		handleFunctionType(b.Function)
+			handleFunctionType(b.Function)
 
-		b.SetGlobal = false
-		if block, ok := exp.Block().(*gol.BlockContext); ok {
-			b.buildBlock(block, true)
-		}
+			b.SetGlobal = false
+			if block, ok := exp.Block().(*gol.BlockContext); ok {
+				b.buildBlock(block, false)
+			}
+		})
 
 		b.Finish()
 		b.SetForceCapture(false)
@@ -116,9 +121,17 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 				} else {
 					kvs = b.buildLiteralValue(s, false)
 				}
-			case *ssa.AliasType: // 处理golang库
-				typ = typ.(*ssa.AliasType).GetType()
-				kvs = b.buildLiteralValue(s, true)
+			case *ssa.AliasType: // 已弃用
+				if a, ok := ssa.ToAliasType(t); ok {
+					typ = a.GetType()
+					kvs = b.buildLiteralValue(s, true)
+				}
+			case *ssa.Blueprint: // 处理golang库
+				if bp, ok := ssa.ToClassBluePrintType(t); ok {
+					bp.Build()
+					typ = ssa.CreateAnyType()
+					kvs = b.buildLiteralValue(s, true)
+				}
 			default:
 				typ = ssa.CreateAnyType()
 				kvs = b.buildLiteralValue(s, true)
@@ -250,7 +263,7 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 			alias := typ.(*ssa.AliasType)
 			obj = typeHandler(alias.GetType(), kvs)
 		case ssa.AnyTypeKind: // 对于未知类型，这里选择根据LiteralValue的特征来推测其类型
-			var typt ssa.Type
+			var objtyp ssa.Type
 
 			if len(kvs) == 0 {
 				return b.EmitUndefined(typ.String())
@@ -261,20 +274,20 @@ func (b *astbuilder) buildCompositeLit(exp *gol.CompositeLitContext) ssa.Value {
 
 			if kvs[0].key == nil && kvs[0].value == nil { // array slice
 				kv := kvs[0].kv
-				typt = ssa.NewSliceType(kv[0].value.GetType())
+				objtyp = ssa.NewSliceType(kv[0].value.GetType())
 			} else if kvs[0].key == nil { // any
 				return b.EmitUndefined(typ.String())
 			} else if _, ok := ssa.ToBasicType(kvs[0].key.GetType()); ok { // struct map
-				typt = ssa.NewStructType()
+				objtyp = ssa.NewStructType()
 				for _, kv := range kvs {
 					value := kv.kv[0].value
-					typt.(*ssa.ObjectType).AddField(kv.key, value.GetType())
+					objtyp.(*ssa.ObjectType).AddField(kv.key, value.GetType())
 				}
 			} else {
-				return b.EmitUndefined(typt.String())
+				return b.EmitUndefined(objtyp.String())
 			}
 
-			return typeHandler(typt, kvs)
+			return typeHandler(objtyp, kvs)
 		case ssa.UndefinedTypeKind:
 			obj = b.InterfaceAddFieldBuild(0,
 				func(i int) ssa.Value {
@@ -480,7 +493,12 @@ func (b *astbuilder) buildTypeLit(stmt *gol.TypeLitContext) ssa.Type {
 	if strings.HasPrefix(text, "*") {
 		if p := stmt.PointerType(); p != nil {
 			if t := p.(*gol.PointerTypeContext).Type_(); t != nil {
-				return b.buildType(t.(*gol.Type_Context))
+				ssatyp := b.buildType(t.(*gol.Type_Context))
+				// newtyp := ssa.NewPointerType()
+				// newtyp.SetName("Pointer")
+				// newtyp.SetFullTypeNames(ssatyp.GetFullTypeNames())
+				// return newtyp
+				return ssatyp
 			}
 		}
 	}
@@ -594,7 +612,7 @@ func (b *astbuilder) buildSliceTypeLiteral(stmt *gol.SliceTypeContext) ssa.Type 
 
 	var ssatyp ssa.Type
 	if stmt.GetText() == "[]byte" || stmt.GetText() == "[]uint8" {
-		return ssa.BasicTypes[ssa.BytesTypeKind]
+		return ssa.CreateBytesType()
 	}
 	if s, ok := stmt.ElementType().(*gol.ElementTypeContext); ok {
 		if eleTyp := b.buildType(s.Type_().(*gol.Type_Context)); eleTyp != nil {
@@ -674,13 +692,24 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 			if a := typ.TypeArgs(); a != nil {
 				b.tpHandler[b.Function.GetName()] = b.buildTypeArgs(a.(*gol.TypeArgsContext))
 			}
-			if p, ok := parent.(*ssa.ObjectType); ok {
-				structTyp.AnonymousField[typ.TypeName().GetText()] = p
-				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), p)
-			} else if a, ok := parent.(*ssa.AliasType); ok {
-				structTyp.AddField(b.EmitConstInst(a.Name), a.GetType())
-			} else if ba, ok := parent.(*ssa.BasicType); ok { // 遇到golang库时，会进入这里
-				structTyp.AddField(b.EmitConstInst(ba.GetName()), ba)
+
+			if fromUser, ok := parent.(*ssa.ObjectType); ok {
+				structTyp.AnonymousField[typ.TypeName().GetText()] = fromUser
+				structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), fromUser)
+			} else if fromAlias, ok := parent.(*ssa.AliasType); ok {
+				if fromUser, ok := ssa.ToObjectType(fromAlias.GetType()); ok {
+					structTyp.AnonymousField[typ.TypeName().GetText()] = fromUser
+					structTyp.AddField(b.EmitConstInst(typ.TypeName().GetText()), fromUser)
+				}
+				structTyp.AddField(b.EmitConstInst(fromAlias.Name), fromAlias.GetType())
+			} else if fromLib, ok := parent.(*ssa.Blueprint); ok {
+				structTyp.AddField(b.EmitConstInst(fromLib.Name), fromLib)
+				for _, fn := range fromLib.GetFullTypeNames() {
+					structTyp.AddFullTypeName(fn)
+				}
+			} else if notUse, ok := parent.(*ssa.BasicType); ok {
+				// b.NewError(ssa.Warn, TAG, Unreachable())
+				structTyp.AddField(b.EmitConstInst(notUse.GetName()), notUse)
 			}
 		}
 	}
@@ -831,7 +860,7 @@ func coverType(ityp, iwantTyp ssa.Type) {
 		})
 	}
 	for n, a := range wantTyp.AnonymousField {
-		// TODO: 匿名结构体应该是一个指针，修改时应该要连带父类一起修改
+		// TODO: 匿名结构体可能是一个指针，修改时应该要连带父类一起修改
 		typ.AnonymousField[n] = a
 	}
 }

@@ -28,13 +28,16 @@ func (t *TypeInference) Run(prog *ssa.Program) {
 func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 	t.DeleteInst = make([]ssa.Instruction, 0)
 	for _, bRaw := range fun.Blocks {
-		b := fun.GetBasicBlockByID(bRaw)
-		if b == nil {
-			log.Errorf("TypeInference: %s is not a basic block", b.GetName())
+		b, ok := fun.GetBasicBlockByID(bRaw)
+		if !ok || b == nil {
+			log.Errorf("TypeInference: %d is not a basic block", bRaw)
 			continue
 		}
 		for _, instId := range b.Insts {
-			inst := b.GetInstructionById(instId)
+			inst, ok := b.GetInstructionById(instId)
+			if !ok {
+				continue
+			}
 			t.InferenceOnInstruction(inst)
 		}
 	}
@@ -53,7 +56,10 @@ func (t *TypeInference) RunOnFunction(fun *ssa.Function) {
 		return
 	}
 	for name, fv := range fun.FreeValues {
-		fv := fun.GetValueById(fv)
+		fv, ok := fun.GetValueById(fv)
+		if !ok {
+			continue
+		}
 		param, ok := ssa.ToParameter(fv)
 		if !ok {
 			log.Warnf("free value %s is not a parameter", name)
@@ -70,7 +76,7 @@ func (t *TypeInference) InferenceOnInstruction(inst ssa.Instruction) {
 	if iv, ok := inst.(ssa.Value); ok {
 		t := iv.GetType()
 		if utils.IsNil(t) {
-			iv.SetType(ssa.BasicTypes[ssa.NullTypeKind])
+			iv.SetType(ssa.CreateNullType())
 		}
 	}
 
@@ -139,8 +145,8 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 		// // skip unreachable block
 		func(index int, value ssa.Value) bool {
 			blockRaw := phi.GetBlock().Preds[index]
-			block := phi.GetBasicBlockByID(blockRaw)
-			if block == nil {
+			block, ok := phi.GetBasicBlockByID(blockRaw)
+			if !ok || block == nil {
 				log.Warnf("BUG: block is not *ssa.BasicBlock")
 				return true
 			}
@@ -153,7 +159,10 @@ func (t *TypeInference) TypeInferencePhi(phi *ssa.Phi) {
 }
 
 func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
-	method := call.GetValueById(call.Method)
+	method, ok := call.GetValueById(call.Method)
+	if !ok {
+		return
+	}
 	iFuncType := method.GetType()
 	funcType, ok := iFuncType.(*ssa.FunctionType)
 	if !ok {
@@ -188,11 +197,14 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 				if i >= argFuncParams {
 					break
 				}
-				argFunc := call.GetValueById(argFunc.Params[i])
+				argFunc, ok := call.GetValueById(argFunc.Params[i])
+				if !ok {
+					continue
+				}
 				argFunc.SetType(paramFuncType.Parameter[i])
 				argFuncType.Parameter[i] = paramFuncType.Parameter[i]
 			}
-		} else if argTyp == ssa.GetAnyType() {
+		} else if argTyp == ssa.CreateAnyType() {
 			arg.SetType(paramTyp)
 		}
 	}
@@ -204,16 +216,22 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 			}
 			if i == paramsLen-1 && funcType.IsVariadic {
 				for j := i; j < len(args); j++ {
-					arg := call.GetValueById(args[j])
-					paramTyp, ok := ssa.ToObjectType(paramTyp)
-					if ok && paramTyp.Kind == ssa.SliceTypeKind {
-						typeInferenceArgWithParam(arg, arg.GetType(), paramTyp.FieldType)
+					arg, ok := call.GetValueById(args[j])
+					if !ok {
+						continue
+					}
+					paramTypObj, ok := ssa.ToObjectType(paramTyp)
+					if ok && paramTypObj.Kind == ssa.SliceTypeKind {
+						typeInferenceArgWithParam(arg, arg.GetType(), paramTypObj.FieldType)
 					}
 				}
 				break
 			}
 
-			arg := call.GetValueById(args[i])
+			arg, ok := call.GetValueById(args[i])
+			if !ok {
+				continue
+			}
 			typeInferenceArgWithParam(arg, arg.GetType(), paramTyp)
 		}
 	}
@@ -221,11 +239,16 @@ func (t *TypeInference) TypeInferenceCall(call *ssa.Call) {
 }
 
 func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
-	if bin == nil || bin.X <= 0 || bin.Y <= 0 {
+	x, ok := bin.GetValueById(bin.X)
+	if !ok {
 		return
 	}
-	XTyps := bin.GetValueById(bin.X).GetType()
-	YTyps := bin.GetValueById(bin.Y).GetType()
+	y, ok := bin.GetValueById(bin.Y)
+	if !ok {
+		return
+	}
+	XTyps := x.GetType()
+	YTyps := y.GetType()
 
 	handlerBinOpType := func(x, y ssa.Type) ssa.Type {
 		if x == nil {
@@ -244,7 +267,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 
 		// if y.GetTypeKind() == ssa.Null {
 		if ssa.IsCompareOpcode(bin.Op) {
-			return ssa.BasicTypes[ssa.BooleanTypeKind]
+			return ssa.CreateBooleanType()
 		}
 		// }
 		return nil
@@ -257,7 +280,7 @@ func (t *TypeInference) TypeInferenceBinOp(bin *ssa.BinOp) {
 
 	// typ := handler
 	if ssa.IsCompareOpcode(bin.Op) {
-		bin.SetType(ssa.BasicTypes[ssa.BooleanTypeKind])
+		bin.SetType(ssa.CreateBooleanType())
 		return
 	} else {
 		bin.SetType(retTyp)

@@ -1,54 +1,47 @@
 desc(
-	title: "Audit Golang File Upload Vulnerability"
+	title: "Detect Golang File Upload Vulnerability"
+	title_zh: "检测Golang文件上传漏洞"
 	type: audit
-	level: high
+	level: low
+	risk: "file-upload"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 文件上传功能允许用户向服务器上传文件。如果应用程序未对用户上传的文件进行充分的安全检查，攻击者可能绕过验证机制，上传恶意文件（如WebShell），从而在服务器上执行任意代码。此外，如果未正确处理文件名和路径，可能存在路径穿越漏洞（Path Traversal），攻击者可以通过构造恶意路径（如 `../`）访问或覆盖服务器上的任意文件，甚至上传文件到非预期目录。
-
 2. **触发场景**
 上传文件时，应用程序直接使用用户提供的文件名或未对路径进行充分验证。
-
 **不安全代码示例：**
-
 ```go
 package main
-
 import (
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strings"
+"fmt"
+"io"
+"net/http"
+"os"
+"path/filepath"
+"strings"
 )
-
 func main() {
-    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		file, handler, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		// 保存文件，直接使用用户提供的文件名，存在路径穿越风险
-		dst, err := os.Create(handler.Filename)
-		if err != nil {
-			http.Error(w, "Error creating the file", http.StatusInternalServerError)
-			return
-		}
-		defer dst.Close()
-
-		io.Copy(dst, file)
-		fmt.Fprintf(w, "File uploaded successfully")
-	})
+http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+file, handler, err := r.FormFile("file")
+if err != nil {
+http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+return
+}
+defer file.Close()
+// 保存文件，直接使用用户提供的文件名，存在路径穿越风险
+dst, err := os.Create(handler.Filename)
+if err != nil {
+http.Error(w, "Error creating the file", http.StatusInternalServerError)
+return
+}
+defer dst.Close()
+io.Copy(dst, file)
+fmt.Fprintf(w, "File uploaded successfully")
+})
 }
 ```
 在这个示例中，`os.Create(handler.Filename)` 直接使用了用户上传文件时提供的文件名 (`handler.Filename`)。如果攻击者上传的文件名为 `../../../../etc/passwd`，服务器可能会在 `/etc/passwd` 写入文件，导致敏感信息泄露或系统文件被覆盖。
-
 3. **潜在影响**
 - **远程代码执行 (RCE)**: 上传WebShell后，攻击者可以在服务器上执行任意命令。
 - **敏感信息泄露**: 通过路径穿越读取 `/etc/passwd`, `/etc/shadow` 等敏感文件。
@@ -58,211 +51,181 @@ DESC
 	rule_id: "e4420d8f-b1f9-4c46-8de7-f4998091d973"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格验证文件名和路径
-
 使用 `filepath.Base()` 获取文件名，丢弃路径信息，然后将其安全地拼接到目标上传目录中。同时，验证生成的最终路径是否仍然在预期的上传目录下，防止路径穿越。
-
 ```go
 package main
-
 import (
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strings"
+"fmt"
+"io"
+"net/http"
+"os"
+"path/filepath"
+"strings"
 )
-
 func main() {
-    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		file, handler, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		// 验证文件路径
-		const uploadDir = "/var/www/uploads"
-		safeFilename := filepath.Base(handler.Filename) // 仅获取文件名
-		safePath := filepath.Join(uploadDir, safeFilename)
-
-        // 检查最终路径是否在上传目录下
-		if !strings.HasPrefix(safePath, uploadDir) {
-			http.Error(w, "Invalid file path", http.StatusBadRequest)
-			return
-		}
-
-		// 保存文件
-		dst, err := os.Create(safePath)
-		if err != nil {
-			http.Error(w, "Error creating the file", http.StatusInternalServerError)
-			return
-		}
-		defer dst.Close()
-
-		io.Copy(dst, file)
-		fmt.Fprintf(w, "File uploaded successfully")
-	})
+http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+file, handler, err := r.FormFile("file")
+if err != nil {
+http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+return
+}
+defer file.Close()
+// 验证文件路径
+const uploadDir = "/var/www/uploads"
+safeFilename := filepath.Base(handler.Filename) // 仅获取文件名
+safePath := filepath.Join(uploadDir, safeFilename)
+// 检查最终路径是否在上传目录下
+if !strings.HasPrefix(safePath, uploadDir) {
+http.Error(w, "Invalid file path", http.StatusBadRequest)
+return
+}
+// 保存文件
+dst, err := os.Create(safePath)
+if err != nil {
+http.Error(w, "Error creating the file", http.StatusInternalServerError)
+return
+}
+defer dst.Close()
+io.Copy(dst, file)
+fmt.Fprintf(w, "File uploaded successfully")
+})
 }
 ```
-
 #### 2. 限制文件类型和大小
-
 - **文件类型**: 仅允许上传已知安全的类型，例如图片（JPEG, PNG）、PDF等。依靠文件扩展名是不安全的，因为MIME类型或文件内容可以被伪造。应结合检查文件头部（Magic Bytes）来确定实际文件类型。
 - **文件大小**: 设置最大上传文件大小限制，防止拒绝服务攻击。
-
 #### 3. 对上传文件进行安全扫描
-
 在文件保存后，使用杀毒软件或安全扫描工具对文件进行检查，确保不含有恶意代码。
-
 #### 4. 将文件上传到隔离区域
-
 将用户上传的文件保存在与Web服务器隔离的区域，避免直接通过Web访问执行。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-434: Unrestricted Upload of File with Dangerous Type](https://cwe.mitre.org/data/definitions/434.html)
 REFERENCE
-	title_zh: "审计Golang文件上传漏洞"
 )
 
 <include('golang-file-path')> as $path;
 <include('golang-os-sink')> as $sink;
+<include('golang-user-input')> as $input;
 
 strings.HasPrefix(* #-> as $check);
 $path.Clean(* #-> as $check);
 $path.IsAbs(* #-> as $check);
+$path.Join(* #-> as $check);
 
 $sink #{include: `$check`}-> as $safe;
-$sink #{exclude: `$safe`}-> as $high;
+$sink - $safe as $data;
+$data & $input as $low;
 
-alert $high for {
-	solution: <<<CODE
+alert $low for {
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格验证文件名和路径
 使用 `filepath.Base()` 获取文件名，丢弃路径信息，然后将其安全地拼接到目标上传目录中。同时，验证生成的最终路径是否仍然在预期的上传目录下，防止路径穿越。
-
 ```go
 package main
-
 import (
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strings"
+"fmt"
+"io"
+"net/http"
+"os"
+"path/filepath"
+"strings"
 )
-
 func main() {
-    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		file, handler, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		// 验证文件路径
-		const uploadDir = "/var/www/uploads"
-		safeFilename := filepath.Base(handler.Filename) // 仅获取文件名
-		safePath := filepath.Join(uploadDir, safeFilename)
-
-        // 检查最终路径是否在上传目录下
-		if !strings.HasPrefix(safePath, uploadDir) {
-			http.Error(w, "Invalid file path", http.StatusBadRequest)
-			return
-		}
-
-		// 保存文件
-		dst, err := os.Create(safePath)
-		if err != nil {
-			http.Error(w, "Error creating the file", http.StatusInternalServerError)
-			return
-		}
-		defer dst.Close()
-
-		io.Copy(dst, file)
-		fmt.Fprintf(w, "File uploaded successfully")
-	})
+http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+file, handler, err := r.FormFile("file")
+if err != nil {
+http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+return
+}
+defer file.Close()
+// 验证文件路径
+const uploadDir = "/var/www/uploads"
+safeFilename := filepath.Base(handler.Filename) // 仅获取文件名
+safePath := filepath.Join(uploadDir, safeFilename)
+// 检查最终路径是否在上传目录下
+if !strings.HasPrefix(safePath, uploadDir) {
+http.Error(w, "Invalid file path", http.StatusBadRequest)
+return
+}
+// 保存文件
+dst, err := os.Create(safePath)
+if err != nil {
+http.Error(w, "Error creating the file", http.StatusInternalServerError)
+return
+}
+defer dst.Close()
+io.Copy(dst, file)
+fmt.Fprintf(w, "File uploaded successfully")
+})
 }
 ```
-
 #### 2. 限制文件类型和大小
 - **文件类型**: 仅允许上传已知安全的类型，例如图片（JPEG, PNG）、PDF等。依靠文件扩展名是不安全的，因为MIME类型或文件内容可以被伪造。应结合检查文件头部（Magic Bytes）来确定实际文件类型。
 - **文件大小**: 设置最大上传文件大小限制，防止拒绝服务攻击。
-
 #### 3. 对上传文件进行安全扫描
 在文件保存后，使用杀毒软件或安全扫描工具对文件进行检查，确保不含有恶意代码。
-
 #### 4. 将文件上传到隔离区域
 将用户上传的文件保存在与Web服务器隔离的区域，避免直接通过Web访问执行。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 文件上传功能允许用户向服务器上传文件。如果应用程序未对用户上传的文件进行充分的安全检查，攻击者可能绕过验证机制，上传恶意文件（如WebShell），从而在服务器上执行任意代码。此外，如果未正确处理文件名和路径，可能存在路径穿越漏洞（Path Traversal），攻击者可以通过构造恶意路径（如 `../`）访问或覆盖服务器上的任意文件，甚至上传文件到非预期目录。
-
 2. **触发场景**
 上传文件时，应用程序直接使用用户提供的文件名或未对路径进行充分验证。
-
 **不安全代码示例：**
-
 ```go
 package main
-
 import (
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "path/filepath"
-    "strings"
+"fmt"
+"io"
+"net/http"
+"os"
+"path/filepath"
+"strings"
 )
-
 func main() {
-    http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		file, handler, err := r.FormFile("file")
-		if err != nil {
-			http.Error(w, "Error retrieving the file", http.StatusBadRequest)
-			return
-		}
-		defer file.Close()
-
-		// 保存文件，直接使用用户提供的文件名，存在路径穿越风险
-		dst, err := os.Create(handler.Filename)
-		if err != nil {
-			http.Error(w, "Error creating the file", http.StatusInternalServerError)
-			return
-		}
-		defer dst.Close()
-
-		io.Copy(dst, file)
-		fmt.Fprintf(w, "File uploaded successfully")
-	})
+http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
+file, handler, err := r.FormFile("file")
+if err != nil {
+http.Error(w, "Error retrieving the file", http.StatusBadRequest)
+return
+}
+defer file.Close()
+// 保存文件，直接使用用户提供的文件名，存在路径穿越风险
+dst, err := os.Create(handler.Filename)
+if err != nil {
+http.Error(w, "Error creating the file", http.StatusInternalServerError)
+return
+}
+defer dst.Close()
+io.Copy(dst, file)
+fmt.Fprintf(w, "File uploaded successfully")
+})
 }
 ```
 在这个示例中，`os.Create(handler.Filename)` 直接使用了用户上传文件时提供的文件名 (`handler.Filename`)。如果攻击者上传的文件名为 `../../../../etc/passwd`，服务器可能会在 `/etc/passwd` 写入文件，导致敏感信息泄露或系统文件被覆盖。
-
 3. **潜在影响**
 - **远程代码执行 (RCE)**: 上传WebShell后，攻击者可以在服务器上执行任意命令。
 - **敏感信息泄露**: 通过路径穿越读取 `/etc/passwd`, `/etc/shadow` 等敏感文件。
 - **服务拒绝 (DoS)**: 上传超大文件或恶意文件导致服务器资源耗尽或程序崩溃。
 - **网站篡改或恶意内容传播**: 上传恶意网页或病毒文件。
-CODE
-	level: "high",
+DESC
+	level: "low",
 	type: "vuln",
 	title: "Unvalidated File Upload Path in Golang",
 	title_zh: "检测到Golang文件上传路径未验证风险",
+	risk: "文件上传",
+	name: "low",
+	message: "检测到Golang文件上传路径未验证风险，并且从数据源（source）到污染汇聚点（sink）间，可能存在过滤函数，需进一步审计进行确认。",
 }
 
 desc(
 	lang: golang
-	alert_high: 1
+	alert_low: 1
 	'file://main.go': <<<UNSAFE
 package main
 
@@ -296,7 +259,7 @@ func main() {
 	})
 }
 UNSAFE
-	'safe://main.go': <<<SAFE
+	'safefile://main.go': <<<SAFE
 package main
 
 import (

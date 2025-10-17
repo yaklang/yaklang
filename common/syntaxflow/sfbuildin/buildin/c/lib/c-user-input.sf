@@ -1,0 +1,184 @@
+desc(
+	title: "Find C User Input Functions"
+	type: audit
+	level: info
+	lib: 'c-user-input'
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计C语言代码中所有可能的用户输入函数，帮助安全研究人员和开发人员识别代码中接收用户输入的位置。通过识别这些关键函数（如`fgets`、`scanf`、`recv`等），可以在安全审计中重点关注这些输入点的数据处理和验证逻辑，防止潜在的缓冲区溢出、注入攻击等安全风险。
+
+### 2.规则详细
+1. **覆盖关键输入函数**
+该规则检测以下10个C标准输入函数：
+`getenv`, `fgets`, `gets`, `scanf`, `fscanf`, `read`, `recv`, `recvfrom`, `recvmsg`。
+2. **输入来源全面覆盖**
+包括：
+- 命令行参数（`argv`）
+- 环境变量（`getenv`）
+- 标准输入（`fgets`）
+- 文件输入（`fscanf`）
+- 网络输入（`recv`系列函数）
+3. **安全风险分析**
+这些输入函数如果未经过严格的输入验证和边界检查，可能导致缓冲区溢出、格式化字符串漏洞或任意代码执行等安全风险。例如，`gets`函数由于无法限制输入长度，极易引起缓冲区溢出。
+4. **审计要点**
+审计时需重点关注这些函数的数据处理逻辑，包括输入验证、边界检查以及后续的数据处理和使用情况。
+DESC
+	rule_id: "5b44af50-f3c8-4a40-b411-86cf65ee656b"
+	title_zh: "查找C语言用户输入函数"
+	solution: <<<SOLUTION
+### 安全建议
+
+#### 1. 输入验证
+对所有用户输入实施严格的类型、长度和格式验证，拒绝非法输入。
+```c
+// 示例：校验输入长度
+if (strlen(user_input) > MAX_LENGTH) {
+fprintf(stderr, "Input exceeds maximum length\n");
+exit(1);
+}
+```
+
+#### 2. 使用安全函数
+避免使用不安全的函数如`gets`，改用安全替代方案如`fgets`。
+```c
+// 使用fgets替代gets
+fgets(buffer, sizeof(buffer), stdin);
+```
+
+#### 3. 边界检查
+确保所有输入操作不会导致缓冲区溢出。
+```c
+// 使用strncpy替代strcpy
+strncpy(buffer, user_input, sizeof(buffer) - 1);
+buffer[sizeof(buffer) - 1] = '\0';
+```
+
+#### 4. 使用安全的网络输入函数
+对于网络输入，确保使用recv等函数的正确方式，避免潜在的缓冲区溢出问题。
+```c
+// 示例：安全的recv使用
+recv(sock, buffer, sizeof(buffer) - 1, 0);
+buffer[sizeof(buffer) - 1] = '\0';
+```
+
+#### 5. 环境变量安全处理
+在处理环境变量时，确保对其进行验证和限制长度，避免潜在的滥用问题。
+```c
+// 示例：环境变量安全处理
+char *env_var = getenv("USER_INPUT");
+if (env_var && strlen(env_var) < MAX_LEN) {
+strncpy(buffer, env_var, sizeof(buffer) - 1);
+buffer[sizeof(buffer) - 1] = '\0';
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
+)
+
+main<getFormalParams><slice(index=1)> as $output
+
+getenv() as $output;
+getenv as $output;
+
+fgets(*<slice(index=0)> as $output);
+gets(*<slice(index=0)> as $output);
+scanf(*<slice(index=1)> as $output);
+sscanf(*<slice(index=2)> as $output);
+fscanf(*<slice(index=2)> as $output);
+read(*<slice(index=1)> as $output);
+
+recv(*<slice(index=1)> as $output);
+recvfrom(*<slice(index=1)> as $output);
+recvmsg(*<slice(index=1)> as $output);
+
+alert $output for {
+	level: "info",
+	title: "Audit C User Input",
+	title_zh: "审计C语言用户输入",
+	message: "发现C语言用户输入函数调用点",
+	solution: <<<SOLUTION
+### 安全建议
+#### 1. 输入验证
+对所有用户输入实施严格的类型、长度和格式验证，拒绝非法输入。
+```c
+// 示例：校验输入长度
+if (strlen(user_input) > MAX_LENGTH) {
+fprintf(stderr, "Input exceeds maximum length\n");
+exit(1);
+}
+```
+#### 2. 使用安全函数
+避免使用不安全的函数如`gets`，改用安全替代方案如`fgets`。
+```c
+// 使用fgets替代gets
+fgets(buffer, sizeof(buffer), stdin);
+```
+#### 3. 边界检查
+确保所有输入操作不会导致缓冲区溢出。
+```c
+// 使用strncpy替代strcpy
+strncpy(buffer, user_input, sizeof(buffer) - 1);
+buffer[sizeof(buffer) - 1] = '\0';
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计C语言中用户输入相关的函数调用，帮助识别可能的输入点，便于进一步的安全审查。
+### 2.规则详细
+1. **作为基础检测库**
+属于`c-user-input`库规则（`lib`类型），用于定位C语言程序中可能接收用户输入的函数调用点。
+2. **覆盖高危输入函数**
+检测以下C语言输入函数：`getenv`, `fgets`, `gets`, `scanf`, `fscanf`, `read`, `recv`, `recvfrom`, `recvmsg`。
+DESC
+	name: "output",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://user_input.c': <<<PARAM
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+
+int main(int argc, char **argv) {
+    char buffer[1024];
+    char *env_var;
+    
+    // 命令行参数输入
+    if (argc > 1) {
+        strcpy(buffer, argv[1]);
+    }
+    
+    // 环境变量输入
+    env_var = getenv("USER_INPUT");
+    if (env_var) {
+        strcat(buffer, env_var);
+    }
+    
+    // 标准输入
+    fgets(buffer, sizeof(buffer), stdin);
+    
+    // 文件输入
+    FILE *file = fopen("input.txt", "r");
+    if (file) {
+        fgets(buffer, sizeof(buffer), file);
+        fclose(file);
+    }
+    
+    // 网络输入
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock >= 0) {
+        recv(sock, buffer, sizeof(buffer), 0);
+        close(sock);
+    }
+    
+    return 0;
+}
+PARAM
+)

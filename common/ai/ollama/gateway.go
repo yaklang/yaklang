@@ -32,9 +32,6 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
 	)
 }
-func (g *GatewayClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return aispec.ChatExBase(g.targetUrl, g.config.Model, details, function, g.BuildHTTPOptions, g.config.StreamHandler)
-}
 
 func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	return aispec.ChatWithStream(g.targetUrl, g.config.Model, s, g.config.HTTPErrorHandler, g.config.StreamHandler, g.BuildHTTPOptions)
@@ -66,16 +63,8 @@ func (g *GatewayClient) LoadOption(opt ...aispec.AIConfigOption) {
 			}
 			g.targetUrl += "v1/chat/completions"
 		}
-	} else if config.Domain != "" {
-		// 根据域名构建 URL
-		if config.NoHttps {
-			g.targetUrl = "http://" + config.Domain + "/v1/chat/completions"
-		} else {
-			g.targetUrl = "https://" + config.Domain + "/v1/chat/completions"
-		}
 	} else {
-		// 使用默认 URL
-		g.targetUrl = "http://127.0.0.1:11434/v1/chat/completions"
+		g.targetUrl = aispec.GetBaseURLFromConfig(g.config, "http://127.0.0.1:11434", "/v1/chat/completions")
 	}
 
 	// 检查是否显式指定了使用原生 API（通过模型名后缀）
@@ -113,6 +102,12 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		opts = append(opts, poc.WithConnectTimeout(g.config.Timeout))
 	}
 	opts = append(opts, poc.WithTimeout(600))
+	if g.config.Host != "" {
+		opts = append(opts, poc.WithHost(g.config.Host))
+	}
+	if g.config.Port > 0 {
+		opts = append(opts, poc.WithPort(g.config.Port))
+	}
 	return opts, nil
 }
 

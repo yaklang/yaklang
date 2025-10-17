@@ -4,101 +4,79 @@ desc(
 	type: vuln
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序作为中间人向不信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证、过滤或限制，攻击者可以控制应用程序发起任意HTTP请求，访问内部资源（如内网服务、数据库等）或发起对外部系统的恶意请求（如扫描端口、攻击其他服务器）。这通常发生在使用 `RestTemplate`、`URLConnection`、`OkHttpClient` 等HTTP客户端库，并且请求的URL部分可由用户控制的场景。
-
+服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序作为中间人向不信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证、过滤或限制，攻击者可以控制应用程序发起任意HTTP请求，访问内部资源（如内网服务、数据库等）或发起对外部系统的恶意请求（如扫描端口、攻击其他服务器）。这通常发生在使用 `RestTemplate`、`URLConnection`、`OkHttpClient` 等HTTP客户端库，并且请求的URL部分可由用户控制的场景。
 2. **触发场景**
-   当应用程序从用户提供的参数或URL中获取需要访问的URL，并直接或间接地将其用于发起HTTP请求时，就可能存在SSRF漏洞。例如，一个提供“图片加载”功能的接口，如果直接加载用户传入的`imageUrl`而未验证其合法性，攻击者可以输入内网IP或本地文件路径，试图访问内部资源。
-
-   // 存在漏洞的代码示例 (使用RestTemplate)
-   ```java
-   import org.springframework.web.bind.annotation.GetMapping;
-   import org.springframework.web.bind.annotation.RequestParam;
-   import org.springframework.web.bind.annotation.RestController;
-   import org.springframework.web.client.RestTemplate;
-
-   @RestController
-   public class SsrfVulnerableController {
-
-       @GetMapping("/fetch-url")
-       public String fetchUrl(@RequestParam("url") String url) {
-           try {
-               RestTemplate restTemplate = new RestTemplate();
-               // 用户输入的url直接用于发起请求，未经验证
-               String result = restTemplate.getForObject(url, String.class);
-               return result;
-           } catch (Exception e) {
-               return "Error: " + e.getMessage();
-           }
-       }
-   }
-   ```
-
+当应用程序从用户提供的参数或URL中获取需要访问的URL，并直接或间接地将其用于发起HTTP请求时，就可能存在SSRF漏洞。例如，一个提供“图片加载”功能的接口，如果直接加载用户传入的`imageUrl`而未验证其合法性，攻击者可以输入内网IP或本地文件路径，试图访问内部资源。
+// 存在漏洞的代码示例 (使用RestTemplate)
+```java
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+@RestController
+public class SsrfVulnerableController {
+@GetMapping("/fetch-url")
+public String fetchUrl(@RequestParam("url") String url) {
+try {
+RestTemplate restTemplate = new RestTemplate();
+// 用户输入的url直接用于发起请求，未经验证
+String result = restTemplate.getForObject(url, String.class);
+return result;
+} catch (Exception e) {
+return "Error: " + e.getMessage();
+}
+}
+}
+```
 3. **潜在影响**
-   - **内网服务探测与攻击**: 攻击者可以扫描内部网络端口、访问敏感服务的API。 
-   - **敏感数据泄露**: 攻击者可能通过访问内部API获取敏感配置、凭证或业务数据。
-   - **网络钓鱼**: 虽然不常见于纯粹的SSRF，但在某些场景下可以辅助进行钓鱼。
-   - **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
-   - **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
+- **内网服务探测与攻击**: 攻击者可以扫描内部网络端口、访问敏感服务的API。
+- **敏感数据泄露**: 攻击者可能通过访问内部API获取敏感配置、凭证或业务数据。
+- **网络钓鱼**: 虽然不常见于纯粹的SSRF，但在某些场景下可以辅助进行钓鱼。
+- **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
+- **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
 DESC
 	rule_id: "0539f4d4-14b9-4b9d-8a7b-8c72decdf400"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格的URL验证和过滤
-
 对用户的URL输入进行严格的白名单验证。只允许访问经过明确允许的特定域名、IP或URL模式。限制协议类型（例如，只允许`http`和`https`，禁止`file`、`ftp`等）。
-
 ```java
 import java.net.URL;
 import java.net.MalformedURLException;
-
 // ...
-
 @GetMapping("/fetch-url")
 public String fetchUrl(@RequestParam("url") String url) {
-    try {
-        URL validatedUrl = new URL(url);
-        String host = validatedUrl.getHost();
-
-        // 白名单示例：只允许访问特定的域名
-        if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
-             // 或者使用更复杂的逻辑判断IP地址是否是内网IP
-             // if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
-             throw new SecurityException("Invalid host: " + host);
-        }
-
-        RestTemplate restTemplate = new RestTemplate();
-        String result = restTemplate.getForObject(url, String.class);
-        return result;
-    } catch (MalformedURLException e) {
-        return "Error: Invalid URL format";
-    } catch (SecurityException e) {
-        return "Error: " + e.getMessage();
-    } catch (Exception e) {
-        return "Error: " + e.getMessage();
-    }
+try {
+URL validatedUrl = new URL(url);
+String host = validatedUrl.getHost();
+// 白名单示例：只允许访问特定的域名
+if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
+// 或者使用更复杂的逻辑判断IP地址是否是内网IP
+// if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
+throw new SecurityException("Invalid host: " + host);
 }
-
+RestTemplate restTemplate = new RestTemplate();
+String result = restTemplate.getForObject(url, String.class);
+return result;
+} catch (MalformedURLException e) {
+return "Error: Invalid URL format";
+} catch (SecurityException e) {
+return "Error: " + e.getMessage();
+} catch (Exception e) {
+return "Error: " + e.getMessage();
+}
+}
 // 辅助方法：判断是否为内网IP (需要实现)
 // private boolean isPrivateIp(String host) { ... }
 ```
-
 #### 2. 禁用或限制重定向
-
 许多HTTP客户端（包括 `RestTemplate`）默认会跟随HTTP重定向。攻击者可以通过重定向绕过初始的URL验证。配置HTTP客户端禁用自动重定向，或者在重定向发生后对重定向的目标URL再次进行验证。
-
 #### 3. 限制端口和协议
-
 除了限制域名/IP，还应限制可以访问的端口（例如，只允许标准的HTTP/HTTPS端口80, 443）和协议（明确禁止`file://`, `gopher://` 等协议）。
-
 #### 4. 使用专业的SSRF防护库或服务
-
 考虑使用专门用于防止SSRF的库或服务，这些工具通常集成了更全面的校验逻辑，包括IP地址类型判断（公网/私网）、端口限制、协议限制等。
-
 #### 5. 最小权限原则
-
 运行应用程序的用户或服务应遵循最小权限原则，限制其访问敏感资源的权限，即使发生SSRF漏洞，也能降低攻击成功率。
 SOLUTION
 	reference: <<<REFERENCE
@@ -114,109 +92,88 @@ $sink #{
 }->as  $mid;
 
 alert $mid for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格的URL验证和过滤
-
 对用户的URL输入进行严格的白名单验证。只允许访问经过明确允许的特定域名、IP或URL模式。限制协议类型（例如，只允许`http`和`https`，禁止`file`、`ftp`等）。
-
 ```java
 import java.net.URL;
 import java.net.MalformedURLException;
-
 // ...
-
 @GetMapping("/fetch-url")
 public String fetchUrl(@RequestParam("url") String url) {
-    try {
-        URL validatedUrl = new URL(url);
-        String host = validatedUrl.getHost();
-
-        // 白名单示例：只允许访问特定的域名
-        if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
-             // 或者使用更复杂的逻辑判断IP地址是否是内网IP
-             // if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
-             throw new SecurityException("Invalid host: " + host);
-        }
-
-        RestTemplate restTemplate = new RestTemplate();
-        String result = restTemplate.getForObject(url, String.class);
-        return result;
-    } catch (MalformedURLException e) {
-        return "Error: Invalid URL format";
-    } catch (SecurityException e) {
-        return "Error: " + e.getMessage();
-    } catch (Exception e) {
-        return "Error: " + e.getMessage();
-    }
+try {
+URL validatedUrl = new URL(url);
+String host = validatedUrl.getHost();
+// 白名单示例：只允许访问特定的域名
+if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
+// 或者使用更复杂的逻辑判断IP地址是否是内网IP
+// if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
+throw new SecurityException("Invalid host: " + host);
 }
-
+RestTemplate restTemplate = new RestTemplate();
+String result = restTemplate.getForObject(url, String.class);
+return result;
+} catch (MalformedURLException e) {
+return "Error: Invalid URL format";
+} catch (SecurityException e) {
+return "Error: " + e.getMessage();
+} catch (Exception e) {
+return "Error: " + e.getMessage();
+}
+}
 // 辅助方法：判断是否为内网IP (需要实现)
 // private boolean isPrivateIp(String host) { ... }
 ```
-
 #### 2. 禁用或限制重定向
-
 许多HTTP客户端（包括 `RestTemplate`）默认会跟随HTTP重定向。攻击者可以通过重定向绕过初始的URL验证。配置HTTP客户端禁用自动重定向，或者在重定向发生后对重定向的目标URL再次进行验证。
-
 #### 3. 限制端口和协议
-
 除了限制域名/IP，还应限制可以访问的端口（例如，只允许标准的HTTP/HTTPS端口80, 443）和协议（明确禁止`file://`, `gopher://` 等协议）。
-
 #### 4. 使用专业的SSRF防护库或服务
-
 考虑使用专门用于防止SSRF的库或服务，这些工具通常集成了更全面的校验逻辑，包括IP地址类型判断（公网/私网）、端口限制、协议限制等。
-
 #### 5. 最小权限原则
-
 运行应用程序的用户或服务应遵循最小权限原则，限制其访问敏感资源的权限，即使发生SSRF漏洞，也能降低攻击成功率。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序作为中间人向不信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证、过滤或限制，攻击者可以控制应用程序发起任意HTTP请求，访问内部资源（如内网服务、数据库等）或发起对外部系统的恶意请求（如扫描端口、攻击其他服务器）。这通常发生在使用 `RestTemplate`、`URLConnection`、`OkHttpClient` 等HTTP客户端库，并且请求的URL部分可由用户控制的场景。
-
+服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序作为中间人向不信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证、过滤或限制，攻击者可以控制应用程序发起任意HTTP请求，访问内部资源（如内网服务、数据库等）或发起对外部系统的恶意请求（如扫描端口、攻击其他服务器）。这通常发生在使用 `RestTemplate`、`URLConnection`、`OkHttpClient` 等HTTP客户端库，并且请求的URL部分可由用户控制的场景。
 2. **触发场景**
-   当应用程序从用户提供的参数或URL中获取需要访问的URL，并直接或间接地将其用于发起HTTP请求时，就可能存在SSRF漏洞。例如，一个提供“图片加载”功能的接口，如果直接加载用户传入的`imageUrl`而未验证其合法性，攻击者可以输入内网IP或本地文件路径，试图访问内部资源。
-
-   // 存在漏洞的代码示例 (使用RestTemplate)
-   ```java
-   import org.springframework.web.bind.annotation.GetMapping;
-   import org.springframework.web.bind.annotation.RequestParam;
-   import org.springframework.web.bind.annotation.RestController;
-   import org.springframework.web.client.RestTemplate;
-
-   @RestController
-   public class SsrfVulnerableController {
-
-       @GetMapping("/fetch-url")
-       public String fetchUrl(@RequestParam("url") String url) {
-           try {
-               RestTemplate restTemplate = new RestTemplate();
-               // 用户输入的url直接用于发起请求，未经验证
-               String result = restTemplate.getForObject(url, String.class);
-               return result;
-           } catch (Exception e) {
-               return "Error: " + e.getMessage();
-           }
-       }
-   }
-   ```
-
+当应用程序从用户提供的参数或URL中获取需要访问的URL，并直接或间接地将其用于发起HTTP请求时，就可能存在SSRF漏洞。例如，一个提供“图片加载”功能的接口，如果直接加载用户传入的`imageUrl`而未验证其合法性，攻击者可以输入内网IP或本地文件路径，试图访问内部资源。
+// 存在漏洞的代码示例 (使用RestTemplate)
+```java
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+@RestController
+public class SsrfVulnerableController {
+@GetMapping("/fetch-url")
+public String fetchUrl(@RequestParam("url") String url) {
+try {
+RestTemplate restTemplate = new RestTemplate();
+// 用户输入的url直接用于发起请求，未经验证
+String result = restTemplate.getForObject(url, String.class);
+return result;
+} catch (Exception e) {
+return "Error: " + e.getMessage();
+}
+}
+}
+```
 3. **潜在影响**
-   - **内网服务探测与攻击**: 攻击者可以扫描内部网络端口、访问敏感服务的API。 
-   - **敏感数据泄露**: 攻击者可能通过访问内部API获取敏感配置、凭证或业务数据。
-   - **网络钓鱼**: 虽然不常见于纯粹的SSRF，但在某些场景下可以辅助进行钓鱼。
-   - **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
-   - **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
-CODE
+- **内网服务探测与攻击**: 攻击者可以扫描内部网络端口、访问敏感服务的API。
+- **敏感数据泄露**: 攻击者可能通过访问内部API获取敏感配置、凭证或业务数据。
+- **网络钓鱼**: 虽然不常见于纯粹的SSRF，但在某些场景下可以辅助进行钓鱼。
+- **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
+- **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
+DESC
 	level: "mid",
 	message: "发现Java SpringBoot SSRF漏洞,并且没有任何数据流过滤。",
-	risk: "ssrf",
+	risk: "SSRF",
 	title: "Detect Java SpringBoot SSRF Vulnerability",
 	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
+	name: "mid",
 }
 
 $sink #{
@@ -226,109 +183,88 @@ $sink #{
 $result - $mid as $low;
 
 alert $low for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格的URL验证和过滤
-
 对用户的URL输入进行严格的白名单验证。只允许访问经过明确允许的特定域名、IP或URL模式。限制协议类型（例如，只允许`http`和`https`，禁止`file`、`ftp`等）。
-
 ```java
 import java.net.URL;
 import java.net.MalformedURLException;
-
 // ...
-
 @GetMapping("/fetch-url")
 public String fetchUrl(@RequestParam("url") String url) {
-    try {
-        URL validatedUrl = new URL(url);
-        String host = validatedUrl.getHost();
-
-        // 白名单示例：只允许访问特定的域名
-        if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
-             // 或者使用更复杂的逻辑判断IP地址是否是内网IP
-             // if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
-             throw new SecurityException("Invalid host: " + host);
-        }
-
-        RestTemplate restTemplate = new RestTemplate();
-        String result = restTemplate.getForObject(url, String.class);
-        return result;
-    } catch (MalformedURLException e) {
-        return "Error: Invalid URL format";
-    } catch (SecurityException e) {
-        return "Error: " + e.getMessage();
-    } catch (Exception e) {
-        return "Error: " + e.getMessage();
-    }
+try {
+URL validatedUrl = new URL(url);
+String host = validatedUrl.getHost();
+// 白名单示例：只允许访问特定的域名
+if (!"*.example.com".equals(host) && !"api.mydomain.com".equals(host)) {
+// 或者使用更复杂的逻辑判断IP地址是否是内网IP
+// if (isPrivateIp(host)) throw new SecurityException("Cannot access private IP");
+throw new SecurityException("Invalid host: " + host);
 }
-
+RestTemplate restTemplate = new RestTemplate();
+String result = restTemplate.getForObject(url, String.class);
+return result;
+} catch (MalformedURLException e) {
+return "Error: Invalid URL format";
+} catch (SecurityException e) {
+return "Error: " + e.getMessage();
+} catch (Exception e) {
+return "Error: " + e.getMessage();
+}
+}
 // 辅助方法：判断是否为内网IP (需要实现)
 // private boolean isPrivateIp(String host) { ... }
 ```
-
 #### 2. 禁用或限制重定向
-
 许多HTTP客户端（包括 `RestTemplate`）默认会跟随HTTP重定向。攻击者可以通过重定向绕过初始的URL验证。配置HTTP客户端禁用自动重定向，或者在重定向发生后对重定向的目标URL再次进行验证。
-
 #### 3. 限制端口和协议
-
 除了限制域名/IP，还应限制可以访问的端口（例如，只允许标准的HTTP/HTTPS端口80, 443）和协议（明确禁止`file://`, `gopher://` 等协议）。
-
 #### 4. 使用专业的SSRF防护库或服务
-
 考虑使用专门用于防止SSRF的库或服务，这些工具通常集成了更全面的校验逻辑，包括IP地址类型判断（公网/私网）、端口限制、协议限制等。
-
 #### 5. 最小权限原则
-
 运行应用程序的用户或服务应遵循最小权限原则，限制其访问敏感资源的权限，即使发生SSRF漏洞，也能降低攻击成功率。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序作为中间人向不信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证、过滤或限制，攻击者可以控制应用程序发起任意HTTP请求，访问内部资源（如内网服务、数据库等）或发起对外部系统的恶意请求（如扫描端口、攻击其他服务器）。这通常发生在使用 `RestTemplate`、`URLConnection`、`OkHttpClient` 等HTTP客户端库，并且请求的URL部分可由用户控制的场景。
-
+服务器端请求伪造（SSRF）漏洞允许攻击者通过应用程序作为中间人向不信任的服务器发起请求。在Java SpringBoot应用程序中，如果开发者未对外部URL输入进行适当的验证、过滤或限制，攻击者可以控制应用程序发起任意HTTP请求，访问内部资源（如内网服务、数据库等）或发起对外部系统的恶意请求（如扫描端口、攻击其他服务器）。这通常发生在使用 `RestTemplate`、`URLConnection`、`OkHttpClient` 等HTTP客户端库，并且请求的URL部分可由用户控制的场景。
 2. **触发场景**
-   当应用程序从用户提供的参数或URL中获取需要访问的URL，并直接或间接地将其用于发起HTTP请求时，就可能存在SSRF漏洞。例如，一个提供“图片加载”功能的接口，如果直接加载用户传入的`imageUrl`而未验证其合法性，攻击者可以输入内网IP或本地文件路径，试图访问内部资源。
-
-   // 存在漏洞的代码示例 (使用RestTemplate)
-   ```java
-   import org.springframework.web.bind.annotation.GetMapping;
-   import org.springframework.web.bind.annotation.RequestParam;
-   import org.springframework.web.bind.annotation.RestController;
-   import org.springframework.web.client.RestTemplate;
-
-   @RestController
-   public class SsrfVulnerableController {
-
-       @GetMapping("/fetch-url")
-       public String fetchUrl(@RequestParam("url") String url) {
-           try {
-               RestTemplate restTemplate = new RestTemplate();
-               // 用户输入的url直接用于发起请求，未经验证
-               String result = restTemplate.getForObject(url, String.class);
-               return result;
-           } catch (Exception e) {
-               return "Error: " + e.getMessage();
-           }
-       }
-   }
-   ```
-
+当应用程序从用户提供的参数或URL中获取需要访问的URL，并直接或间接地将其用于发起HTTP请求时，就可能存在SSRF漏洞。例如，一个提供“图片加载”功能的接口，如果直接加载用户传入的`imageUrl`而未验证其合法性，攻击者可以输入内网IP或本地文件路径，试图访问内部资源。
+// 存在漏洞的代码示例 (使用RestTemplate)
+```java
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
+@RestController
+public class SsrfVulnerableController {
+@GetMapping("/fetch-url")
+public String fetchUrl(@RequestParam("url") String url) {
+try {
+RestTemplate restTemplate = new RestTemplate();
+// 用户输入的url直接用于发起请求，未经验证
+String result = restTemplate.getForObject(url, String.class);
+return result;
+} catch (Exception e) {
+return "Error: " + e.getMessage();
+}
+}
+}
+```
 3. **潜在影响**
-   - **内网服务探测与攻击**: 攻击者可以扫描内部网络端口、访问敏感服务的API。 
-   - **敏感数据泄露**: 攻击者可能通过访问内部API获取敏感配置、凭证或业务数据。
-   - **网络钓鱼**: 虽然不常见于纯粹的SSRF，但在某些场景下可以辅助进行钓鱼。
-   - **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
-   - **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
-CODE
+- **内网服务探测与攻击**: 攻击者可以扫描内部网络端口、访问敏感服务的API。
+- **敏感数据泄露**: 攻击者可能通过访问内部API获取敏感配置、凭证或业务数据。
+- **网络钓鱼**: 虽然不常见于纯粹的SSRF，但在某些场景下可以辅助进行钓鱼。
+- **拒绝服务攻击(DoS)**: 攻击者可以利用应用程序对内部或外部服务发起大量请求，导致服务不可用。
+- **云环境下的风险**: 在云环境中，SSRF可用于访问云服务提供商的元数据服务（如AWS的`http://169.254.169.254/latest/meta-data/`），获取敏感信息（如IAM角色凭证）。
+DESC
 	level: "low",
-	risk: "ssrf",
+	risk: "SSRF",
 	message: "发现Java SpringBoot SSRF漏洞,但是有数据流过滤。",
 	title: "Detect Java SpringBoot SSRF Vulnerability",
 	title_zh: "检测Java SpringBoot 服务端请求伪造(SSRF)漏洞",
+	name: "low",
 }
 
 desc(

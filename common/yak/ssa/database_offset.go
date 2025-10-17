@@ -6,50 +6,50 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
-func SaveValueOffset(inst Instruction) {
+func ConvertValue2Offset(inst Instruction) *ssadb.IrOffset {
 	if inst.GetId() == -1 {
-		return
+		return nil
 	}
 
 	if block, ok := ToBasicBlock(inst); ok {
 		if len(block.Preds) == 0 && len(block.Succs) == 0 && len(block.Insts) == 0 {
-			return
+			return nil
 		}
 	}
 
 	rng := inst.GetRange()
 	if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
-		inst.GetRange()
-		log.Errorf("%v: CreateOffset: rng or editor is nil", inst.GetVerboseName())
-		return
+		// inst.GetRange()
+		// log.Errorf("%v: CreateOffset: rng or editor is nil", inst.GetVerboseName())
+		return nil
 	}
 	irOffset := ssadb.CreateOffset(rng, inst.GetProgram().GetApplication().GetProgramName())
 	// program name \ file name \ offset
-	irOffset.ProgramName = inst.GetProgram().GetProgramName()
 	// value id
 	irOffset.ValueID = int64(inst.GetId())
-	ssadb.SaveIrOffset(irOffset)
+	return irOffset
 }
 
-func SaveVariableOffset(v *Variable, variableName string, valueID int64) {
-	if v.GetId() == -1 {
-		return
+func ConvertVariable2Offset(v *Variable, variableName string, valueID int64) []*ssadb.IrOffset {
+	if utils.IsNil(v) || v.GetId() == -1 {
+		return nil
 	}
-	add := func(rng memedit.RangeIf) {
+	ret := make([]*ssadb.IrOffset, 0, 10)
+	createOffset := func(rng *memedit.Range) {
 		if utils.IsNil(rng) || utils.IsNil(rng.GetEditor()) {
 			return
 		}
 		irOffset := ssadb.CreateOffset(rng, v.GetProgram().GetApplication().GetProgramName())
 		// program name \ file name \ offset
-		irOffset.ProgramName = v.GetProgram().GetProgramName()
 		// variable name
 		irOffset.VariableName = variableName
 		irOffset.ValueID = valueID
-		ssadb.SaveIrOffset(irOffset)
+		ret = append(ret, irOffset)
 	}
 
-	add(v.DefRange)
+	createOffset(v.DefRange)
 	for r := range v.UseRange {
-		add(r)
+		createOffset(r)
 	}
+	return ret
 }

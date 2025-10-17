@@ -2,8 +2,9 @@ package php2ssa
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"strings"
+
+	"github.com/google/uuid"
 
 	"github.com/yaklang/yaklang/common/utils"
 
@@ -459,7 +460,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 			}
 			return value
 		}
-		if funcx := y.GetFunc(valName, ""); !utils.IsNil(funcx) {
+		if funcx, ok := y.GetFunc(valName, ""); ok {
 			return funcx
 		}
 		if !y.isFunction {
@@ -477,7 +478,7 @@ func (y *builder) VisitExpression(raw phpparser.IExpressionContext) (v ssa.Value
 				}
 				return value
 			}
-			if funcx := y.GetFunc(valName, ""); !utils.IsNil(funcx) {
+			if funcx, ok := y.GetFunc(valName, ""); ok {
 				return funcx
 			}
 		}
@@ -1149,7 +1150,7 @@ func (y *builder) VisitLeftVariable(raw phpparser.IFlexiVariableContext) *ssa.Va
 	case *phpparser.IndexVariableContext:
 		value := y.VisitRightValue(i.FlexiVariable())
 		if key := y.VisitIndexMemberCallKey(i.IndexMemberCallKey()); key != nil {
-			return y.CreateMemberCallVariable(value, key) //这里有问�?
+			return y.CreateMemberCallVariable(value, key) //这里有问题?
 		} else {
 			return y.VisitLeftVariable(i.FlexiVariable())
 		}
@@ -1186,8 +1187,11 @@ func (y *builder) VisitRightValue(raw phpparser.IFlexiVariableContext) ssa.Value
 		)
 
 		handler := func() ssa.Value {
-			member, _ := y.GetProgram().GetApplication().GlobalScope.GetStringMember(position)
-			return member
+			app := y.GetProgram().GetApplication()
+			if g, ok := app.GetGlobalVariable(position); ok {
+				return g
+			}
+			return nil
 		}
 
 		switch variable {

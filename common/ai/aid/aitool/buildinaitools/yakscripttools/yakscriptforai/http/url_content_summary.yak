@@ -1,7 +1,7 @@
 __DESC__ = <<<EOF
 Retrieves the content of a specified URL via a GET request. Logs the response headers and body size. If the content type indicates HTML, it extracts and logs: 1. The page title found within the <title> tag. 2. All text content stripped from the HTML elements, concatenated together. Essentially, it provides a summary (title and text) of an HTML web page.
 EOF
-
+__VERBOSE_NAME__ = "URL内容摘要提取工具"
 __KEYWORDS__ = "url retrieval,page title,http,web page,content extraction,web crawling,html parsing,text extraction,get request,内容提取,web scraper,网页抓取,url获取,页面标题,get请求,html解析,网页信息"
 
 yakit.AutoInitYakit()

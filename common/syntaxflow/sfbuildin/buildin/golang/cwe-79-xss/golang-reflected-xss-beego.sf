@@ -3,100 +3,88 @@ desc(
 	title_zh: "检测Golang在Beego框架中的反射型跨站脚本攻击漏洞"
 	type: vuln
 	severity: mid
-	risk: xss
+	risk: "xss"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   反射型跨站脚本攻击（Reflected XSS）是一种常见的Web安全漏洞，攻击者通过构造包含恶意脚本的URL，诱导受害者点击该链接。当受害者的浏览器加载页面时，恶意脚本会被执行，从而允许攻击者窃取敏感信息或执行其他恶意操作。
-
-   在使用Go语言编写的Web应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到HTML页面中，就可能导致反射型XSS漏洞。此漏洞具有高风险，因为它允许攻击者绕过同源策略，执行任意JavaScript代码，进而对受害者发起攻击。
-
+反射型跨站脚本攻击（Reflected XSS）是一种常见的Web安全漏洞，攻击者通过构造包含恶意脚本的URL，诱导受害者点击该链接。当受害者的浏览器加载页面时，恶意脚本会被执行，从而允许攻击者窃取敏感信息或执行其他恶意操作。
+在使用Go语言编写的Web应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到HTML页面中，就可能导致反射型XSS漏洞。此漏洞具有高风险，因为它允许攻击者绕过同源策略，执行任意JavaScript代码，进而对受害者发起攻击。
 2. **触发场景**
-   ```go
-   package main
-
-   import (
-       "github.com/beego/beego/v2/server/web"
-   )
-
-   func (c *XSSVuln1Controller) Get() {
-       xss := c.GetString("xss", "hello")
-       c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
-       c.Ctx.ResponseWriter.Write([]byte(xss))
-   }
-   ```
-   攻击者可以通过访问类似以下URL来触发漏洞：`http://example.com/path?xss=<script>alert('XSS')</script>`，这会导致恶意脚本在用户的浏览器中执行。
-
+```go
+package main
+import (
+"github.com/beego/beego/v2/server/web"
+)
+type XSSVuln1Controller struct {
+beego.Controller
+}
+func (c *XSSVuln1Controller) Get() {
+xss := c.GetString("xss", "hello")
+c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+c.Ctx.ResponseWriter.Write([]byte(xss))
+}
+```
+攻击者可以通过访问类似以下URL来触发漏洞：`http://example.com/path?xss=<script>alert('XSS')</script>`，这会导致恶意脚本在用户的浏览器中执行。
 3. **潜在影响**
-   - 攻击者可以窃取用户的Cookie、Session等敏感信息。
-   - 攻击者可以劫持用户会话，冒充受害者身份。
-   - 攻击者可以篡改页面内容或重定向用户至钓鱼网站。
-
+- 攻击者可以窃取用户的Cookie、Session等敏感信息。
+- 攻击者可以劫持用户会话，冒充受害者身份。
+- 攻击者可以篡改页面内容或重定向用户至钓鱼网站。
 ### 规则目的
 该规则用于检测Go语言（尤其是Beego框架）实现的应用程序中是否存在反射型XSS漏洞，通过分析用户输入是否未经转义直接输出到HTML页面中，识别潜在的安全隐患。
 DESC
 	rule_id: "c7872ddf-bab4-4cd5-8e12-d470a889dbd1"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 对用户输入进行HTML转义
-   确保所有动态插入HTML的内容都经过严格的HTML转义处理，避免恶意脚本被执行。
-   ```go
-   import "html/template"
-
-   func (c *XSSVuln1Controller) Get() {
-       xss := c.GetString("xss", "hello")
-       escapedXSS := template.HTMLEscapeString(xss)
-       c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
-       c.Ctx.ResponseWriter.Write([]byte(escapedXSS))
-   }
-   ```
-
+确保所有动态插入HTML的内容都经过严格的HTML转义处理，避免恶意脚本被执行。
+```go
+import "html/template"
+func (c *XSSVuln1Controller) Get() {
+xss := c.GetString("xss", "hello")
+escapeXSS := template.HTMLEscapeString(xss)
+c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+c.Ctx.ResponseWriter.Write([]byte(escapedXSS))
+}
+```
 #### 2. 使用安全模板引擎
-   利用Go内置的`html/template`包代替`text/template`，它会自动对特殊字符进行转义。
-   ```go
-   import "html/template"
-
-   func renderTemplate(w http.ResponseWriter, name string, data interface{}) {
-       t, err := template.New(name).Parse(`<html><body>{{.}}</body></html>`) // 自动转义
-       if err != nil {
-           http.Error(w, err.Error(), http.StatusInternalServerError)
-           return
-       }
-       t.Execute(w, data)
-   }
-   ```
-
+利用Go内置的`html/template`包代替`text/template`，它会自动对特殊字符进行转义。
+```go
+import "html/template"
+func renderTemplate(w http.ResponseWriter, name string, data interface{}) {
+t, err := template.New(name).Parse(`<html><body>{{.}}</body></html>`) // 自动转义
+if err != nil {
+http.Error(w, err.Error(), http.StatusInternalServerError)
+return
+}
+t.Execute(w, data)
+}
+```
 #### 3. 输入验证
-   对用户输入实施白名单校验，确保仅接受合法的输入。
-   ```go
-   import "regexp"
-
-   func validateInput(input string) bool {
-       matched, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, input) // 允许字母和数字
-       return matched
-   }
-
-   func (c *XSSVuln1Controller) Get() {
-       xss := c.GetString("xss", "hello")
-       if !validateInput(xss) {
-           http.Error(c.Ctx.ResponseWriter, "非法输入", http.StatusBadRequest)
-           return
-       }
-       c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
-       c.Ctx.ResponseWriter.Write([]byte(xss))
-   }
-   ```
-
+对用户输入实施白名单校验，确保仅接受合法的输入。
+```go
+import "regexp"
+func validateInput(input string) bool {
+matched, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, input) // 允许字母和数字
+return matched
+}
+func (c *XSSVuln1Controller) Get() {
+xss := c.GetString("xss", "hello")
+if !validateInput(xss) {
+http.Error(c.Ctx.ResponseWriter, "非法输入", http.StatusBadRequest)
+return
+}
+c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+c.Ctx.ResponseWriter.Write([]byte(xss))
+}
+```
 #### 4. 设置HTTP响应头
-   增强安全性，设置HTTP响应头以减少XSS攻击的风险。
-   ```go
-   func (c *XSSVuln1Controller) Get() {
-       c.Ctx.ResponseWriter.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'")
-       c.Ctx.ResponseWriter.Header().Set("X-XSS-Protection", "1; mode=block")
-   }
-   ```
+增强安全性，设置HTTP响应头以减少XSS攻击的风险。
+```go
+func (c *XSSVuln1Controller) Get() {
+c.Ctx.ResponseWriter.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'")
+c.Ctx.ResponseWriter.Header().Set("X-XSS-Protection", "1; mode=block")
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-79](https://cwe.mitre.org/data/definitions/79.html)
@@ -104,22 +92,110 @@ SOLUTION
 REFERENCE
 )
 
-.Ctx.ResponseWriter.Write(* #-> as $sink)
+.Ctx.ResponseWriter.Write(* #-> as $sink);
+html.EscapeString(* #-> as $safeOutput);
+
 $sink<dataflow(
-	include:" * ?{have: 'GetString'}",
-)> as $mid;
+    exclude: $safeOutput,
+)> as $target;
+
+$target.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $mid;
 
 alert $mid for {
-	title: "Reflected XSS detected",
-	title_zh: "检测到反射XSS",
+	title: "Golang Reflected XSS Vulnerability in Beego Was Detected",
+	title_zh: "检测到Golang在Beego框架中的反射型跨站脚本攻击漏洞",
 	level: "mid",
 	type: "vuln",
+	message: "检测到Golang在Beego框架中存在反射型XSS漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 对用户输入进行HTML转义
+确保所有动态插入HTML的内容都经过严格的HTML转义处理，避免恶意脚本被执行。
+```go
+import "html/template"
+func (c *XSSVuln1Controller) Get() {
+  xss := c.GetString("xss", "hello")
+  escapedXSS := template.HTMLEscapeString(xss)
+  c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+  c.Ctx.ResponseWriter.Write([]byte(escapedXSS))
+}
+```
+#### 2. 使用安全模板引擎
+利用Go内置的`html/template`包代替`text/template`，它会自动对特殊字符进行转义。
+```go
+import "html/template"
+func renderTemplate(w http.ResponseWriter, name string, data interface{}) {
+  t, err := template.New(name).Parse(`<html><body>{{.}}</body></html>`) // 自动转义
+  if err != nil {
+    http.Error(w, err.Error(), http.StatusInternalServerError)
+    return
+  }
+  t.Execute(w, data)
+}
+```
+#### 3. 输入验证
+对用户输入实施白名单校验，确保仅接受合法的输入。
+```go
+import "regexp"
+func validateInput(input string) bool {
+  matched, _ := regexp.MatchString(`^[a-zA-Z0-9]+$`, input) // 允许字母和数字
+  return matched
+}
+func (c *XSSVuln1Controller) Get() {
+  xss := c.GetString("xss", "hello")
+  if !validateInput(xss) {
+    http.Error(c.Ctx.ResponseWriter, "非法输入", http.StatusBadRequest)
+    return
+  }
+  c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+  c.Ctx.ResponseWriter.Write([]byte(xss))
+}
+```
+#### 4. 设置HTTP响应头
+增强安全性，设置HTTP响应头以减少XSS攻击的风险。
+```go
+func (c *XSSVuln1Controller) Get() {
+  c.Ctx.ResponseWriter.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'")
+  c.Ctx.ResponseWriter.Header().Set("X-XSS-Protection", "1; mode=block")
+}
+```
+SOLUTION
+	risk: "XSS",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+反射型跨站脚本攻击（Reflected XSS）是一种常见的Web安全漏洞，攻击者通过构造包含恶意脚本的URL，诱导受害者点击该链接。当受害者的浏览器加载页面时，恶意脚本会被执行，从而允许攻击者窃取敏感信息或执行其他恶意操作。
+在使用Go语言编写的Web应用中，如果未对用户输入进行适当的过滤或转义，直接将用户输入嵌入到HTML页面中，就可能导致反射型XSS漏洞。此漏洞具有高风险，因为它允许攻击者绕过同源策略，执行任意JavaScript代码，进而对受害者发起攻击。
+2. **触发场景**
+```go
+package main
+import (
+  "github.com/beego/beego/v2/server/web"
+)
+type XSSVuln1Controller struct {
+  beego.Controller
+}
+func (c *XSSVuln1Controller) Get() {
+  xss := c.GetString("xss", "hello")
+  c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+  c.Ctx.ResponseWriter.Write([]byte(xss))
+}
+```
+攻击者可以通过访问类似以下URL来触发漏洞：`http://example.com/path?xss=<script>alert('XSS')</script>`，这会导致恶意脚本在用户的浏览器中执行。
+3. **潜在影响**
+- 攻击者可以窃取用户的Cookie、Session等敏感信息。
+- 攻击者可以劫持用户会话，冒充受害者身份。
+- 攻击者可以篡改页面内容或重定向用户至钓鱼网站。
+### 规则目的
+该规则用于检测Go语言（尤其是Beego框架）实现的应用程序中是否存在反射型XSS漏洞，通过分析用户输入是否未经转义直接输出到HTML页面中，识别潜在的安全隐患。
+DESC
+	name: "mid",
 }
 
 desc(
 	lang: golang
 	alert_mid: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -130,12 +206,37 @@ import (
 	beego "github.com/beego/beego/v2/server/web"
 )
 
+type XSSVuln1Controller struct {
+	beego.Controller
+}
+
 func (c *XSSVuln1Controller) Get() {
 	xss := c.GetString("xss", "hello")
 	c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
 	c.Ctx.ResponseWriter.Write([]byte(xss))
 }
-
-
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "html"
+	"go-sec-code/utils"
+	"html/template"
+	"io/ioutil"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type XSSVuln1Controller struct {
+	beego.Controller
+}
+
+func (c *XSSVuln1Controller) Get() {
+	xss := c.GetString("xss", "hello")
+	c.Ctx.ResponseWriter.Header().Set("Content-Type", "text/html")
+	safeOutput := html.EscapeString(xss)  // 关键修复
+	c.Ctx.ResponseWriter.Write([]byte(safeOutput))
+}
+SAFE
 )

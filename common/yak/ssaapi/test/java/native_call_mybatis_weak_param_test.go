@@ -235,7 +235,7 @@ public interface UserMapper {
 			res.Show()
 			params := res.GetValues("params")
 
-			checkRng := true
+			checkRng := false
 			params.Recursive(func(vo sfvm.ValueOperator) error {
 				if v, ok := vo.(*ssaapi.Value); ok {
 					for _, p := range v.Predecessors {
@@ -251,4 +251,78 @@ public interface UserMapper {
 			return nil
 		}, ssaapi.WithLanguage(consts.JAVA))
 	})
+}
+
+func TestRealMyBatisSink1(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("ReportMapper.java", `package org.itstec.report.mapper;
+
+import java.util.List;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.itstec.report.entity.Report;
+import org.itstec.user.entity.User;
+
+import com.xxx.mybatisplus.core.mapper.BaseMapper;
+
+@Mapper
+public interface ReportMapper extends BaseMapper<User>{
+
+	int addRep(Report report);
+	
+	int updateRep(@Param("doctorId") String doctorId, @Param("userId") String userId, 
+			@Param("dateTime") String dateTime, 
+			@Param("subject") String subject, @Param("sData") double sData);
+	
+	List<Report> queryByUser(@Param("userId") String userId);
+	
+	List<Report> queryRep(@Param("dateTime") String dateTime, @Param("userId") String userId);
+	
+	Report queryRepByDoctor(@Param("dateTime") String dateTime, 
+			@Param("userId") String userId, @Param("doctorId") String doctorId);
+	
+	List<Report> querySubjData(@Param("doctorId") String doctorId, @Param("dateTime") String dateTime, 
+			@Param("subject") String subject, @Param("condition") String condition, @Param("sData") double sData);
+
+	List<Report> queryCustOrder(@Param("doctorId") String doctorId, @Param("dateTime") String dateTime, 
+			@Param("subject") String subject, @Param("condition") String condition, @Param("sData") double sData, @Param("order") String order);
+
+	int queryCountUser(@Param("doctorId") String doctorId, @Param("dateTime") String dateTime, @Param("subject") String subject);
+	
+}
+`)
+
+	vf.AddFile("ReportMapper.xml", `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper SYSTEM "file:///D:/mybatis-3-mapper.dtd">
+<mapper namespace="org.itstec.report.mapper.ReportMapper">
+	<select id="queryCountUser" resultType="org.itstec.report.entity.Report">
+		SELECT COUNT(userId)
+		FROM t_report
+		WHERE dateTime = #{dateTime} and doctorId = #{doctorId}
+		group by ${subject} > 0
+	</select>
+</mapper>`)
+	ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+		prog := programs[0]
+		res, err := prog.SyntaxFlowWithError(`<mybatisSink> as $params`)
+		require.NoError(t, err)
+		res.Show()
+		params := res.GetValues("params")
+
+		checkRng := false
+		params.Recursive(func(vo sfvm.ValueOperator) error {
+			if v, ok := vo.(*ssaapi.Value); ok {
+				for _, p := range v.Predecessors {
+					p.Node.ShowWithRange()
+					if strings.Contains(p.Node.StringWithRange(), `"${subject}"	8:12 - 8:22: ${subject}`) {
+						checkRng = true
+					}
+				}
+			}
+			return nil
+		})
+		require.True(t, checkRng, "mybatis 位置信息错误")
+		return nil
+	}, ssaapi.WithLanguage(consts.JAVA))
 }

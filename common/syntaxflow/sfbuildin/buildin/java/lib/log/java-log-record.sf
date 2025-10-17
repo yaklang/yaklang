@@ -6,13 +6,54 @@ desc(
 	reference: <<<REFERENCE
 [Java Logging API](https://docs.oracle.com/javase/8/docs/api/java/util/logging/Logger.html)
 [Log4j API](https://logging.apache.org/log4j/2.x/javadoc/log4j-api/org/apache/logging/log4j/Logger.html)
+[CWE-532: Information Exposure Through Log Files](https://cwe.mitre.org/data/definitions/532.html)
 REFERENCE
 	description: <<<DESCRIPTION
 该规则用于检测Java应用程序中的日志记录方法。日志记录是应用程序中重要的调试和监控工具，但不当的日志记录可能导致信息泄露或其他安全问题。此规则审计了可能受到用户输入影响的日志记录点，特别是那些使用`log.info()`、`log.error()`等方法进行日志记录的点。
 DESCRIPTION
 	rule_id: "78903daf-72e2-454b-8275-91771836659b"
 	solution: <<<SOLUTION
-none
+### 修复建议
+
+#### 1. 避免记录敏感信息
+   在记录日志时，避免直接输出未经处理的用户输入或敏感信息（如密码、信用卡号等）。可以通过屏蔽特定字段来保护隐私。
+   ```java
+   public void logUserDetails(String username, String password) {
+       // 屏蔽密码字段
+       logger.info("User logged in: " + username + ", Password: [REDACTED]");
+   }
+   ```
+
+#### 2. 使用结构化日志记录
+   采用结构化日志记录方式，确保日志条目清晰且易于解析，同时减少敏感信息泄露的可能性。
+   ```java
+   import org.slf4j.Logger;
+   import org.slf4j.LoggerFactory;
+
+   public class StructuredLoggingExample {
+       private static final Logger logger = LoggerFactory.getLogger(StructuredLoggingExample.class);
+
+       public void logEvent(String event, String user) {
+           // 使用键值对形式记录日志
+           logger.info("event={}, user={}", event, user);
+       }
+   }
+   ```
+
+#### 3. 实施日志级别控制
+   根据应用需求合理设置日志级别（DEBUG、INFO、WARN、ERROR），以避免过多无关日志。
+   ```java
+   if (logger.isDebugEnabled()) {
+       logger.debug("Detailed debug information for developers.");
+   }
+   ```
+
+#### 4. 配置日志轮转和权限
+   - 设置日志文件的最大大小，并启用自动轮转功能，防止日志文件无限增长。
+   - 限制日志目录的访问权限，仅允许授权用户读取或修改日志文件。
+
+#### 5. 定期审查日志策略
+   定期检查日志配置和内容，确保符合组织的安全政策与合规性要求。
 SOLUTION
 )
 
@@ -21,6 +62,61 @@ alert $output for {
 	title_zh: "查找Java日志记录方法",
 	level: "info",
 	title: "Find Java Logging Method",
+	name: "output",
+	message: "发现Java日志记录方法的使用情况，需审计是否存在敏感信息泄露风险。",
+	solution: <<<SOLUTION
+### 安全建议
+#### 1. 避免记录敏感信息
+在使用日志记录方法（如`log.info()`、`log.error()`等）时，避免直接记录用户输入或敏感数据（如密码、个人身份信息等）。可以通过数据脱敏技术对敏感字段进行处理。
+
+```java
+// 示例：对敏感字段进行脱敏处理
+String maskedPassword = maskSensitiveData(password);
+logger.info("User login attempt with username: " + username + " and password: " + maskedPassword);
+
+private String maskSensitiveData(String sensitiveData) {
+    return sensitiveData == null ? null : "******";
+}
+```
+
+#### 2. 使用结构化日志框架
+推荐使用支持结构化日志记录的日志框架（如Log4j、SLF4J），并启用参数化日志记录以减少不必要的字符串拼接。
+
+```java
+// 示例：使用参数化日志记录
+logger.info("User login attempt with username: {}", username);
+```
+
+#### 3. 配置日志级别和过滤规则
+根据环境配置适当的日志级别（如生产环境中仅保留ERROR或WARN级别的日志），并通过过滤器屏蔽不必要的日志输出。
+
+```properties
+# 示例：Log4j配置文件中设置日志级别
+log4j.rootLogger=ERROR, console
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+该规则用于检测Java应用程序中的日志记录方法。日志记录是应用程序中重要的调试和监控工具，但不当的日志记录可能导致信息泄露或其他安全问题。
+
+### 规则详细
+1. **作为基础检测库**
+   属于`java-log-record`库规则（`lib`类型），用于识别可能受到用户输入影响的日志记录点，尤其是以下方法：
+   - `log.info()`
+   - `log.error()`
+   - `log.warn()`
+   - `log.debug()`
+   - `log.fatal()`
+   - 其他类似的日志记录方法。
+
+2. **覆盖高危日志记录函数**
+   检测以下常见的日志记录方法是否直接暴露了用户输入或敏感数据：
+   ```java
+   logger.info(userInput); // 不安全的示例
+   logger.error(errorMessage); // 不安全的示例
+   ```
+DESC
 }
 
 
@@ -42,6 +138,45 @@ desc(
         }
     }
 CODE
+	"safefile://SafeLoggingMethods.java": <<<CODE
+// 安全的代码示例：避免使用被规则直接匹配的日志方法名进行自定义方法命名
+public class SafeLoggingMethods {
+    // 定义一个不会被规则直接捕获的方法名，例如 useInfo 而非 info
+    public void useInfo(String message) {
+        // 实际的日志记录可以通过一个私有辅助方法或其他库进行
+        System.out.println("Info message: " + message); // 这是一个示例，实际中应使用日志库
+    }
+
+    // 定义一个类似但不会直接匹配规则中 'error' 系列的方法
+    public void logErrorDetails(String details) {
+        System.err.println("Error details: " + details);
+    }
+
+    // 使用日志框架时，避免硬编码直接匹配规则中的方法，而是通过参数化或更复杂的结构
+    public void logWithLevel(String level, String message) {
+        if ("INFO".equalsIgnoreCase(level)) {
+            // logger.info(message); // 假设此处使用了实际的Logger实例
+            System.out.println("INFO: " + message);
+        } else if ("ERROR".equalsIgnoreCase(level)) {
+            // logger.error(message); // 假设此处使用了实际的Logger实例
+            System.err.println("ERROR: " + message);
+        }
+    }
+}
+CODE
+	"safefile://NonLoggerClass.java": <<<CODE
+// 这是一个不涉及日志操作的普通类，不应触发日志规则。
+public class NonLoggerClass {
+    public void doSomething(String data) {
+        String result = data.toUpperCase();
+        System.out.println("Processed data: " + result);
+    }
+
+    public int calculateSum(int a, int b) {
+        return a + b;
+    }
+}
+CODE
 )
 
 desc(
@@ -53,5 +188,44 @@ desc(
             log.warn(message);
         }
     }
+CODE
+	"safefile://SafeLoggingMethods.java": <<<CODE
+// 安全的代码示例：避免使用被规则直接匹配的日志方法名进行自定义方法命名
+public class SafeLoggingMethods {
+    // 定义一个不会被规则直接捕获的方法名，例如 useInfo 而非 info
+    public void useInfo(String message) {
+        // 实际的日志记录可以通过一个私有辅助方法或其他库进行
+        System.out.println("Info message: " + message); // 这是一个示例，实际中应使用日志库
+    }
+
+    // 定义一个类似但不会直接匹配规则中 'error' 系列的方法
+    public void logErrorDetails(String details) {
+        System.err.println("Error details: " + details);
+    }
+
+    // 使用日志框架时，避免硬编码直接匹配规则中的方法，而是通过参数化或更复杂的结构
+    public void logWithLevel(String level, String message) {
+        if ("INFO".equalsIgnoreCase(level)) {
+            // logger.info(message); // 假设此处使用了实际的Logger实例
+            System.out.println("INFO: " + message);
+        } else if ("ERROR".equalsIgnoreCase(level)) {
+            // logger.error(message); // 假设此处使用了实际的Logger实例
+            System.err.println("ERROR: " + message);
+        }
+    }
+}
+CODE
+	"safefile://NonLoggerClass.java": <<<CODE
+// 这是一个不涉及日志操作的普通类，不应触发日志规则。
+public class NonLoggerClass {
+    public void doSomething(String data) {
+        String result = data.toUpperCase();
+        System.out.println("Processed data: " + result);
+    }
+
+    public int calculateSum(int a, int b) {
+        return a + b;
+    }
+}
 CODE
 )

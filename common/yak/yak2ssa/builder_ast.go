@@ -22,22 +22,34 @@ func (b *astbuilder) handlerWs(ws *yak.WsContext) {
 }
 
 // entry point
-func (b *astbuilder) build(ast *yak.ProgramContext) {
+func (b *astbuilder) build(raw ssa.FrontAST) {
+	if utils.IsNil(raw) {
+		return
+	}
+	ast, ok := raw.(*yak.ProgramContext)
+	if !ok {
+		return
+	}
+
 	prog := b.GetProgram()
 	currentEditor := prog.GetCurrentEditor()
 	hasFile := func(p *ssa.Program) bool {
-		if hash, ok := p.FileList[currentEditor.GetFilename()]; ok {
-			if hash == currentEditor.SourceCodeMd5() {
+		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
+			if hash == currentEditor.GetIrSourceHash() {
 				return true
 			}
 		}
 		return false
 	}
-
 	skip := hasFile(prog)
 	if skip {
 		return
 	}
+
+	// if prog.ProgramKind == ssa.Application {
+	// 	prog = prog.GetSubProgram(currentEditor.GetUrl())
+	// 	b.FunctionBuilder = prog.GetAndCreateFunctionBuilder(currentEditor.GetUrl(), string(ssa.MainFunctionName))
+	// }
 
 	for _, ws := range ast.AllWs() {
 		b.handlerWs(ws.(*yak.WsContext))
@@ -382,16 +394,16 @@ func (b *astbuilder) buildForStmt(stmt *yak.ForStmtContext) {
 
 	loop.SetCondition(func() ssa.Value {
 		var condition ssa.Value
-		if cond == nil {
+		if utils.IsNil(cond) {
 			condition = b.EmitConstInst(true)
 		} else {
 			// recoverRange := b.SetRange(cond.BaseParserRuleContext)
 			// defer recoverRange()
 			condition = b.buildExpression(cond)
-			if condition == nil {
-				condition = b.EmitConstInst(true)
-				// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
-			}
+		}
+		if utils.IsNil(condition) {
+			condition = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 		}
 		return condition
 	})
@@ -454,6 +466,10 @@ func (b *astbuilder) buildForRangeStmt(stmt *yak.ForRangeStmtContext) {
 				b.AssignVariable(lefts[0], key)
 				b.AssignVariable(lefts[1], field)
 			}
+		}
+		if utils.IsNil(ok) {
+			ok = b.EmitConstInst(true)
+			// b.NewError(ssa.Warn, TAG, "loop condition expression is nil, default is true")
 		}
 		return ok
 	})
@@ -1449,8 +1465,11 @@ func (b *astbuilder) buildAnonymousFunctionDecl(stmt *yak.AnonymousFunctionDeclC
 		}
 
 		for i, p := range fun.Params {
-			p := fun.GetValueById(p)
-			p.SetType(MarkedFunctionType.Parameter[i])
+			val, ok := fun.GetValueById(p)
+			if !ok {
+				continue
+			}
+			val.SetType(MarkedFunctionType.Parameter[i])
 		}
 		hitDefinedFunction = true
 	}

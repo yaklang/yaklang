@@ -3,15 +3,20 @@ package crep
 import (
 	"context"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/google/uuid"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/utils/tlsutils"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/google/uuid"
+	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
 var ca = []byte(`-----BEGIN CERTIFICATE-----
@@ -129,6 +134,65 @@ BrKSqjLNV8P8dDI//k6gqyTUjV+fLxc1UqdxRNLyBScPVCfQED7pC+/9LGfO3XbS
 rw7+Y9oqjInyd9bbtnY+6o7LMnbG+I+IDp7M9ELpwHAz6g1uf7D/nA==
 -----END RSA PRIVATE KEY-----`)
 
+var gmCA = []byte(`-----BEGIN CERTIFICATE-----
+MIIB9jCCAZygAwIBAgIQWnrJ5ywzJj++KbgmeCpk+DAKBggqgRzPVQGDdTBaMQ0w
+CwYDVQQGEwR0ZXN0MQ0wCwYDVQQIEwR0ZXN0MQ0wCwYDVQQHEwR0ZXN0MQ0wCwYD
+VQQKEwR0ZXN0MQ0wCwYDVQQLEwR0ZXN0MQ0wCwYDVQQDEwR0ZXN0MCAXDTk5MTIz
+MTE2MDAwMFoYDzIxMjQwNzI5MDM1NDUwWjBaMQ0wCwYDVQQGEwR0ZXN0MQ0wCwYD
+VQQIEwR0ZXN0MQ0wCwYDVQQHEwR0ZXN0MQ0wCwYDVQQKEwR0ZXN0MQ0wCwYDVQQL
+EwR0ZXN0MQ0wCwYDVQQDEwR0ZXN0MFkwEwYHKoZIzj0CAQYIKoEcz1UBgi0DQgAE
+gtf3+bmT2BaQ1x9LHw3IPmwhLPB3T5WYCeMihZKnmK+zr7baovNJoqCcj5UZw7jx
+arp9UbA+016ZMR9Gjuk3UaNCMEAwDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQG
+CCsGAQUFBwMCBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MAoGCCqBHM9VAYN1
+A0gAMEUCIA/K6vI/qdkyNupJ1CdQIL7ZS7qjsulUZ0OvIJirOtJHAiEAvBR5mDl7
+O9O4kuFkCgzqRYgBYT4HNDJ93rASOSiF6M8=
+-----END CERTIFICATE-----`)
+
+var gmCAKey = []byte(`-----BEGIN PRIVATE KEY-----
+MIGTAgEAMBMGByqGSM49AgEGCCqBHM9VAYItBHkwdwIBAQQgEzTXyGC6rwpLp7jt
+/jNNrqJoyWvwboFHBE4x0krpXcegCgYIKoEcz1UBgi2hRANCAASC1/f5uZPYFpDX
+H0sfDcg+bCEs8HdPlZgJ4yKFkqeYr7Ovttqi80mioJyPlRnDuPFqun1RsD7TXpkx
+H0aO6TdR
+-----END PRIVATE KEY-----`)
+
+var gmServerCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIBojCCAUigAwIBAgIRAJlgn/+0aF5oCYzKzqOyTw0wCgYIKoEcz1UBg3UwWjEN
+MAsGA1UEBhMEdGVzdDENMAsGA1UECBMEdGVzdDENMAsGA1UEBxMEdGVzdDENMAsG
+A1UEChMEdGVzdDENMAsGA1UECxMEdGVzdDENMAsGA1UEAxMEdGVzdDAeFw05OTEy
+MzExNjAwMDBaFw0zNTA4MjAwMzU0NTBaMBQxEjAQBgNVBAMTCTEyNy4wLjAuMTBZ
+MBMGByqGSM49AgEGCCqBHM9VAYItA0IABIu+kZDB5D4OkMIUWdcY5L3mTctW8QeO
+NB8BCLdIF/VyJvBpADMUq5VN4p6l4jx3/qJt+8L1yT/A4bBcDRDledijNTAzMA4G
+A1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggrBgEFBQcDATAMBgNVHRMBAf8EAjAA
+MAoGCCqBHM9VAYN1A0gAMEUCIQDFh3M3QLfjwrLllylRASjRHv2AKNMREtny/2rN
+9Lhr6AIgDbyxQi/pGSCISLUyCytSJcEq2t2GBtW6Qhr21ePStfQ=
+-----END CERTIFICATE-----`)
+
+var gmServerKey = []byte(`-----BEGIN PRIVATE KEY-----
+MIGTAgEAMBMGByqGSM49AgEGCCqBHM9VAYItBHkwdwIBAQQgS4jjdCZaKRrSl3EV
+UzMRZE1zEAlUpHmNlk/6L9y3Mw+gCgYIKoEcz1UBgi2hRANCAASLvpGQweQ+DpDC
+FFnXGOS95k3LVvEHjjQfAQi3SBf1cibwaQAzFKuVTeKepeI8d/6ibfvC9ck/wOGw
+XA0Q5XnY
+-----END PRIVATE KEY-----`)
+
+var gmClientCert = []byte(`-----BEGIN CERTIFICATE-----
+MIIBoTCCAUegAwIBAgIQWHoM6EOQ0bLyJya2ppwvSDAKBggqgRzPVQGDdTBaMQ0w
+CwYDVQQGEwR0ZXN0MQ0wCwYDVQQIEwR0ZXN0MQ0wCwYDVQQHEwR0ZXN0MQ0wCwYD
+VQQKEwR0ZXN0MQ0wCwYDVQQLEwR0ZXN0MQ0wCwYDVQQDEwR0ZXN0MB4XDTk5MTIz
+MTE2MDAwMFoXDTM1MDgyMDAzNTQ1MFowFDESMBAGA1UEAwwJR01fQ0xJRU5UMFkw
+EwYHKoZIzj0CAQYIKoEcz1UBgi0DQgAE5Ctz3BSodQtDoKt5OBIicU9sOeo4Ut+l
+1D4QmARmcKzp9ku16MrmGsKSs+9SQm6BBTr6kcyRK1EVnCqpUbFuyqM1MDMwDgYD
+VR0PAQH/BAQDAgKkMBMGA1UdJQQMMAoGCCsGAQUFBwMCMAwGA1UdEwEB/wQCMAAw
+CgYIKoEcz1UBg3UDSAAwRQIgS8LlOFDpVxSMrCVpASTAoxx81C+W0FTsHhdlgwr+
+qGoCIQD78fRygR++WlvEQjLTlnRDX3XHs+DsvMPQ51cxe/6Ssw==
+-----END CERTIFICATE-----`)
+
+var gmClientKey = []byte(`-----BEGIN PRIVATE KEY-----
+MIGTAgEAMBMGByqGSM49AgEGCCqBHM9VAYItBHkwdwIBAQQg8fCQoDha5V6rzTVg
+g8i13+nUyBDUeoS0QP1qHhJ0BaKgCgYIKoEcz1UBgi2hRANCAATkK3PcFKh1C0Og
+q3k4EiJxT2w56jhS36XUPhCYBGZwrOn2S7XoyuYawpKz71JCboEFOvqRzJErURWc
+KqlRsW7K
+-----END PRIVATE KEY-----`)
+
 func TestMTLS_MITM_GENERATE_CERTS(t *testing.T) {
 	ca, key, _ := tlsutils.GenerateSelfSignedCertKeyWithCommonName("test", "", nil, nil)
 	sCert, sKey, _ := tlsutils.SignServerCrtNKeyWithParams(ca, key, "127.0.0.1", time.Now().Add(24*time.Hour*365*10), true)
@@ -138,6 +202,39 @@ func TestMTLS_MITM_GENERATE_CERTS(t *testing.T) {
 	clientCert, clientKey, _ := tlsutils.SignClientCrtNKeyEx(ca, key, "CLIENT", true)
 	println(string(clientCert))
 	println(string(clientKey))
+}
+
+// 国密证书生成测试函数
+func TestGMMTLS_MITM_GENERATE_CERTS(t *testing.T) {
+	// 生成国密CA证书和私钥
+	gmCA, gmCAKey, err := tlsutils.GenerateGMSelfSignedCertKey("test")
+	if err != nil {
+		t.Fatalf("生成国密CA证书失败: %v", err)
+	}
+	println("国密CA证书:")
+	println(string(gmCA))
+	println("国密CA私钥:")
+	println(string(gmCAKey))
+
+	// 生成国密服务器证书和私钥
+	gmServerCert, gmServerKey, err := tlsutils.SignGMServerCrtNKeyWithParams(gmCA, gmCAKey, "127.0.0.1", time.Now().Add(24*time.Hour*365*10), true)
+	if err != nil {
+		t.Fatalf("生成国密服务器证书失败: %v", err)
+	}
+	println("国密服务器证书:")
+	println(string(gmServerCert))
+	println("国密服务器私钥:")
+	println(string(gmServerKey))
+
+	// 生成国密客户端证书和私钥 - 使用现有的SignGMClientCrtNKeyWithParams函数来生成客户端证书
+	gmClientCert, gmClientKey, err := tlsutils.SignGMClientCrtNKeyWithParams(gmCA, gmCAKey, "GM_CLIENT", time.Now().Add(24*time.Hour*365*10), true)
+	if err != nil {
+		t.Fatalf("生成国密客户端证书失败: %v", err)
+	}
+	println("国密客户端证书:")
+	println(string(gmClientCert))
+	println("国密客户端私钥:")
+	println(string(gmClientKey))
 }
 
 func TestMTLS_MITM_StartLongServer(t *testing.T) {
@@ -150,6 +247,37 @@ func TestMTLS_MITM_StartLongServer(t *testing.T) {
 	server.TLS, _ = tlsutils.GetX509MutualAuthServerTlsConfig(ca, serverCert, serverKey)
 	server.StartTLS()
 	println(server.URL)
+	time.Sleep(time.Hour)
+}
+
+func TestGMMTLS_MITM_StartLongServer(t *testing.T) {
+	uid := uuid.New().String()
+	println(uid)
+	println("Start Long GM mTLS server")
+	port := utils.GetRandomAvailableTCPPort()
+
+	// 配置国密双向认证TLS
+	gmConfig, err := tlsutils.GetX509GMServerTlsConfigWithAuth(gmCA, gmServerCert, gmServerKey, true)
+	if err != nil {
+		t.Fatalf("配置国密双向认证服务器失败: %v", err)
+	}
+	ln, err := gmtls.Listen("tcp", fmt.Sprintf(":%d", port), gmConfig)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	defer ln.Close()
+
+	http.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Write([]byte(uid))
+	})
+	fmt.Printf(">> HTTP Over [GMSSL/TLS] running on port %d...\n", port)
+	go func() {
+		err = http.Serve(ln, nil)
+		if err != nil {
+			panic(err)
+		}
+	}()
 	time.Sleep(time.Hour)
 }
 
@@ -186,7 +314,15 @@ func TestMTLS_MITM(t *testing.T) {
 		panic("mTLS failed")
 	}
 
-	proxy, err := NewMITMServer(MITM_MutualTLSClient(clientCert, clientKey, ca))
+	p12Bytes, err := tlsutils.BuildP12(clientCert, clientKey, "", ca)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = netx.LoadP12Bytes(p12Bytes, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy, err := NewMITMServer()
 	if err != nil {
 		panic(err)
 	}
@@ -217,4 +353,131 @@ func TestMTLS_MITM(t *testing.T) {
 	if !utils.IContains(string(raw), uid) {
 		panic("MITM mTLS Failed")
 	}
+}
+
+func TestGMMTLS_MITM(t *testing.T) {
+	uid := uuid.New().String()
+	port := utils.GetRandomAvailableTCPPort()
+
+	// 配置国密双向认证TLS服务器
+	gmConfig, err := tlsutils.GetX509GMServerTlsConfigWithAuth(gmCA, gmServerCert, gmServerKey, true)
+	if err != nil {
+		t.Fatalf("配置国密双向认证服务器失败: %v", err)
+	}
+
+	// 启动真正的国密TLS服务器
+	ln, err := gmtls.Listen("tcp", fmt.Sprintf(":%d", port), gmConfig)
+	if err != nil {
+		t.Fatalf("启动国密TLS监听失败: %v", err)
+	}
+	defer ln.Close()
+
+	serverURL := fmt.Sprintf("https://127.0.0.1:%d", port)
+
+	// 启动HTTP服务器
+	go func() {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+			writer.Write([]byte(uid))
+		})
+		err = http.Serve(ln, mux)
+		if err != nil {
+			t.Logf("国密HTTP服务器错误: %v", err)
+		}
+	}()
+	time.Sleep(time.Second * 1)
+
+	// 测试1: 验证没有客户端证书时连接失败（使用标准HTTP客户端）
+	client := utils.NewDefaultHTTPClient()
+	tr := client.Transport.(*http.Transport)
+	tr.TLSClientConfig.InsecureSkipVerify = true
+	_, err = client.Get(serverURL)
+	if err == nil {
+		t.Fatal("国密mTLS验证失败: 应该要求客户端证书")
+	}
+	spew.Dump(err)
+
+	// 测试2: 使用国密客户端直接连接国密服务器
+	gmClientTLSConfig, err := tlsutils.GetX509GMMutualAuthClientTlsConfig(gmClientCert, gmClientKey, gmCA)
+	if err != nil {
+		t.Fatalf("配置国密双向认证客户端失败: %v", err)
+	}
+
+	// 使用国密TLS客户端连接
+	gmConn, err := gmtls.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", port), gmClientTLSConfig)
+	if err != nil {
+		t.Fatalf("国密TLS客户端连接失败: %v", err)
+	}
+	defer gmConn.Close()
+
+	// 发送HTTP请求
+	httpReq := fmt.Sprintf("GET / HTTP/1.1\r\nHost: 127.0.0.1:%d\r\nConnection: close\r\n\r\n", port)
+	_, err = gmConn.Write([]byte(httpReq))
+	if err != nil {
+		t.Fatalf("发送HTTP请求失败: %v", err)
+	}
+
+	// 读取响应
+	response := make([]byte, 1024)
+	n, err := gmConn.Read(response)
+	if err != nil && err != io.EOF {
+		t.Fatalf("读取响应失败: %v", err)
+	}
+
+	responseStr := string(response[:n])
+	if !utils.IContains(responseStr, uid) {
+		t.Fatalf("国密mTLS直接连接响应验证失败，期望包含: %s, 实际响应: %s", uid, responseStr)
+	}
+	t.Logf("国密mTLS直接连接测试成功!")
+
+	// 配置国密客户端证书
+	p12Bytes, err := tlsutils.BuildP12(gmClientCert, gmClientKey, "", gmCA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = netx.LoadP12Bytes(p12Bytes, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 测试3: 通过MITM代理进行国密mTLS
+	proxy, err := NewMITMServer(
+		MITM_SetGM(true),       // 启用国密支持
+		MITM_SetGMPrefer(true), // 优先使用国密
+	)
+	if err != nil {
+		t.Fatalf("创建国密MITM代理失败: %v", err)
+	}
+
+	proxyPort := utils.GetRandomAvailableTCPPort()
+	proxyUrl := fmt.Sprintf("http://127.0.0.1:%v", proxyPort)
+
+	go func() {
+		err := proxy.Serve(context.Background(), "127.0.0.1:"+fmt.Sprint(proxyPort))
+		if err != nil {
+			t.Logf("MITM代理服务错误: %v", err)
+		}
+	}()
+	time.Sleep(time.Second)
+
+	// 配置客户端使用MITM代理
+	client = utils.NewDefaultHTTPClient()
+	tr = client.Transport.(*http.Transport)
+	tr.Proxy = func(request *http.Request) (*url.URL, error) {
+		return url.Parse(proxyUrl)
+	}
+	tr.TLSClientConfig.InsecureSkipVerify = true
+
+	client.Timeout = time.Second * 60
+	rsp, err := client.Get(serverURL)
+	if err != nil {
+		t.Fatalf("通过MITM代理的国密mTLS连接失败: %v", err)
+	}
+
+	raw, _ := utils.HttpDumpWithBody(rsp, true)
+	if !utils.IContains(string(raw), uid) {
+		t.Error(rsp)
+		t.Fatal("MITM国密mTLS代理测试失败")
+	}
+
+	t.Logf("国密mTLS MITM代理测试成功!")
 }

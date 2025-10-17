@@ -4,86 +4,77 @@ desc(
 	type:security
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   Java的`java.io`库中，一些方法（如`File.delete()`、`InputStream.read()`、`RandomAccessFile.skipBytes()`等）会返回一个布尔值、整型或其他类型的值，用以指示操作是否成功、读取到的字节数、跳过的字节数等。如果调用者没有检查并处理这些返回值，就无法得知操作是否按预期执行，可能导致以下问题：
-   - **错误屏蔽**: 操作失败的信号（如文件删除失败、读取未达预期）被忽略，程序继续执行，可能导致后续逻辑错误。
-   - **资源泄露**: 例如未能正确判断文件是否删除成功，可能导致临时文件或敏感文件残留。
-   - **逻辑缺陷**: 未检查`read()`返回的-1（表示 stream 结束）可能导致无限循环或数据处理不完整。
-   - **安全隐患**: 在某些涉及权限、文件状态判断的方法（如`canExecute`、`exists`、`isDirectory`）中，未检查返回值可能导致错误的逻辑判断，从而引入安全风险。
-
+Java的`java.io`库中，一些方法（如`File.delete()`、`InputStream.read()`、`RandomAccessFile.skipBytes()`等）会返回一个布尔值、整型或其他类型的值，用以指示操作是否成功、读取到的字节数、跳过的字节数等。如果调用者没有检查并处理这些返回值，就无法得知操作是否按预期执行，可能导致以下问题：
+- **错误屏蔽**: 操作失败的信号（如文件删除失败、读取未达预期）被忽略，程序继续执行，可能导致后续逻辑错误。
+- **资源泄露**: 例如未能正确判断文件是否删除成功，可能导致临时文件或敏感文件残留。
+- **逻辑缺陷**: 未检查`read()`返回的-1（表示 stream 结束）可能导致无限循环或数据处理不完整。
+- **安全隐患**: 在某些涉及权限、文件状态判断的方法（如`canExecute`、`exists`、`isDirectory`）中，未检查返回值可能导致错误的逻辑判断，从而引入安全风险。
 2. **触发场景**
-   任何调用了`java.io`库中会返回操作结果的方法，但未对返回值进行有效判断或处理的代码都可能触发此规则。例如：
-   ```java
-   File file = new File("temp.txt");
-   file.delete(); // 未检查返回值，不知道文件是否删除成功
-
-   InputStream is = new FileInputStream("data.bin");
-   is.read(); // 未检查返回值，无法得知读取了多少字节或是否到达文件末尾
-   ```
-
+任何调用了`java.io`库中会返回操作结果的方法，但未对返回值进行有效判断或处理的代码都可能触发此规则。例如：
+```java
+File file = new File("temp.txt");
+file.delete(); // 未检查返回值，不知道文件是否删除成功
+InputStream is = new FileInputStream("data.bin");
+is.read(); // 未检查返回值，无法得知读取了多少字节或是否到达文件末尾
+```
 3. **潜在影响**
-   - **程序健壮性差**: 在文件操作失败时无法及时发现和处理，可能导致程序崩溃或产生不可预期的行为。
-   - **数据处理不正确**: 未正确处理读取或跳过字节的返回值可能导致数据丢失、截断或处理错误。
-   - **安全逻辑绕过**: 在依赖文件状态或权限判断的场景中，未校验返回值可能导致错误的安全决策。
-   - **难以调试**: 当出现问题时，由于缺乏对操作结果的反馈，会使得问题定位变得困难。
-   - **资源残留**: 文件删除或其他资源释放类操作未成功但未被发现，可能导致系统资源被占用或敏感信息残留。
+- **程序健壮性差**: 在文件操作失败时无法及时发现和处理，可能导致程序崩溃或产生不可预期的行为。
+- **数据处理不正确**: 未正确处理读取或跳过字节的返回值可能导致数据丢失、截断或处理错误。
+- **安全逻辑绕过**: 在依赖文件状态或权限判断的场景中，未校验返回值可能导致错误的安全决策。
+- **难以调试**: 当出现问题时，由于缺乏对操作结果的反馈，会使得问题定位变得困难。
+- **资源残留**: 文件删除或其他资源释放类操作未成功但未被发现，可能导致系统资源被占用或敏感信息残留。
 DESC
 	rule_id: "93b522c2-9ead-4ad8-b81c-bf5219793594"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **检查并处理返回值**
-   对于`java.io`库中会返回结果的方法，务必检查其返回值，并根据业务逻辑对成功或失败的情况进行相应的处理。
-   ```java
-   // 修复代码示例 1: 检查文件删除结果
-   File file = new File("temp.txt");
-   if (file.delete()) {
-       System.out.println("文件删除成功");
-   } else {
-       System.out.println("文件删除失败");
-       // 考虑异常处理或重试逻辑
-   }
-
-   // 修复代码示例 2: 检查 read() 方法返回值
-   InputStream is = new FileInputStream("data.bin");
-   int data = is.read();
-   while (data != -1) {
-       // 处理读取到的数据
-       System.out.print((char) data);
-       data = is.read(); // 再次读取并检查返回值
-   }
-   is.close(); // 确保流被关闭
-
-   // 修复代码示例 3: 检查 skipBytes() 返回值
-   RandomAccessFile raf = new RandomAccessFile("large_file.bin", "r");
-   long bytesToSkip = 1024;
-   long actualSkipped = raf.skipBytes((int)bytesToSkip); // 注意 skipBytes 返回 int
-   if (actualSkipped == bytesToSkip) {
-       System.out.println("成功跳过指定字节数");
-   } else {
-       System.out.println("未能完全跳过指定字节数，实际跳过 " + actualSkipped + " 字节");
-       // 根据实际情况处理，可能需要循环调用 skipBytes 或使用 skip 方法
-   }
-   raf.close();
-   ```
-
+对于`java.io`库中会返回结果的方法，务必检查其返回值，并根据业务逻辑对成功或失败的情况进行相应的处理。
+```java
+// 修复代码示例 1: 检查文件删除结果
+File file = new File("temp.txt");
+if (file.delete()) {
+System.out.println("文件删除成功");
+} else {
+System.out.println("文件删除失败");
+// 考虑异常处理或重试逻辑
+}
+// 修复代码示例 2: 检查 read() 方法返回值
+InputStream is = new FileInputStream("data.bin");
+int data = is.read();
+while (data != -1) {
+// 处理读取到的数据
+System.out.print((char) data);
+data = is.read(); // 再次读取并检查返回值
+}
+is.close(); // 确保流被关闭
+// 修复代码示例 3: 检查 skipBytes() 返回值
+RandomAccessFile raf = new RandomAccessFile("large_file.bin", "r");
+long bytesToSkip = 1024;
+long actualSkipped = raf.skipBytes((int)bytesToSkip); // 注意 skipBytes 返回 int
+if (actualSkipped == bytesToSkip) {
+System.out.println("成功跳过指定字节数");
+} else {
+System.out.println("未能完全跳过指定字节数，实际跳过 " + actualSkipped + " 字节");
+// 根据实际情况处理，可能需要循环调用 skipBytes 或使用 skip 方法
+}
+raf.close();
+```
 2. **添加异常处理**
-   对于可能抛出`IOException`的方法，使用`try-catch`块进行适当的异常处理，以应对文件不存在、无权限等情况。
-
+对于可能抛出`IOException`的方法，使用`try-catch`块进行适当的异常处理，以应对文件不存在、无权限等情况。
 3. **使用 try-with-resources**
-   对于需要关闭的资源（如各种流），使用 Java 7+ 的 try-with-resources 语法，确保资源在不再需要时或发生异常时能够自动关闭，防止资源泄露。
-   ```java
-   // 使用 try-with-resources 确保流关闭
-   try (InputStream is = new FileInputStream("data.bin")) {
-       int data;
-       while ((data = is.read()) != -1) {
-           // 处理数据
-       }
-   } catch (IOException e) {
-       e.printStackTrace(); // 打印异常信息或进行其他错误处理
-   }
-   ```
+对于需要关闭的资源（如各种流），使用 Java 7+ 的 try-with-resources 语法，确保资源在不再需要时或发生异常时能够自动关闭，防止资源泄露。
+```java
+// 使用 try-with-resources 确保流关闭
+try (InputStream is = new FileInputStream("data.bin")) {
+int data;
+while ((data = is.read()) != -1) {
+// 处理数据
+}
+} catch (IOException e) {
+e.printStackTrace(); // 打印异常信息或进行其他错误处理
+}
+```
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-252: Unchecked Return Value](https://cwe.mitre.org/data/definitions/252.html)
@@ -93,11 +84,85 @@ REFERENCE
 /^(read|skip|skipBytes|implies|delete|canRead|canWrite|exists|isAbsolute|isDirectory|isFile|isHidden|mkdir|mkdirs|renameTo)$/<getCall> as $toCheck;
 $toCheck?{<typeName>?{have:'java.io'}}?{!<getUsers>} as $weak;
 alert $weak for {
-	risk: "api-abuse",
+	risk: "API误用",
 	title: "Check Java IO Unchecked Return Value",
 	title_zh: "检测Java IO库未检查返回值的API",
 	level: "info",
 	message: "发现Java IO库未检查返回值的API",
+	name: "weak",
+	solution: <<<SOLUTION
+### 修复建议
+1. **检查并处理返回值**
+对于`java.io`库中会返回结果的方法，务必检查其返回值，并根据业务逻辑对成功或失败的情况进行相应的处理。
+```java
+// 修复代码示例 1: 检查文件删除结果
+File file = new File("temp.txt");
+if (file.delete()) {
+System.out.println("文件删除成功");
+} else {
+System.out.println("文件删除失败");
+// 考虑异常处理或重试逻辑
+}
+// 修复代码示例 2: 检查 read() 方法返回值
+InputStream is = new FileInputStream("data.bin");
+int data = is.read();
+while (data != -1) {
+// 处理读取到的数据
+System.out.print((char) data);
+data = is.read(); // 再次读取并检查返回值
+}
+is.close(); // 确保流被关闭
+// 修复代码示例 3: 检查 skipBytes() 返回值
+RandomAccessFile raf = new RandomAccessFile("large_file.bin", "r");
+long bytesToSkip = 1024;
+long actualSkipped = raf.skipBytes((int)bytesToSkip); // 注意 skipBytes 返回 int
+if (actualSkipped == bytesToSkip) {
+System.out.println("成功跳过指定字节数");
+} else {
+System.out.println("未能完全跳过指定字节数，实际跳过 " + actualSkipped + " 字节");
+// 根据实际情况处理，可能需要循环调用 skipBytes 或使用 skip 方法
+}
+raf.close();
+```
+2. **添加异常处理**
+对于可能抛出`IOException`的方法，使用`try-catch`块进行适当的异常处理，以应对文件不存在、无权限等情况。
+3. **使用 try-with-resources**
+对于需要关闭的资源（如各种流），使用 Java 7+ 的 try-with-resources 语法，确保资源在不再需要时或发生异常时能够自动关闭，防止资源泄露。
+```java
+// 使用 try-with-resources 确保流关闭
+try (InputStream is = new FileInputStream("data.bin")) {
+int data;
+while ((data = is.read()) != -1) {
+// 处理数据
+}
+} catch (IOException e) {
+e.printStackTrace(); // 打印异常信息或进行其他错误处理
+}
+```
+SOLUTION
+	desc: <<<DESC
+### 风险描述
+1. **风险原理**
+Java的`java.io`库中，一些方法（如`File.delete()`、`InputStream.read()`、`RandomAccessFile.skipBytes()`等）会返回一个布尔值、整型或其他类型的值，用以指示操作是否成功、读取到的字节数、跳过的字节数等。如果调用者没有检查并处理这些返回值，就无法得知操作是否按预期执行，可能导致以下问题：
+- **错误屏蔽**: 操作失败的信号（如文件删除失败、读取未达预期）被忽略，程序继续执行，可能导致后续逻辑错误。
+- **资源泄露**: 例如未能正确判断文件是否删除成功，可能导致临时文件或敏感文件残留。
+- **逻辑缺陷**: 未检查`read()`返回的-1（表示 stream 结束）可能导致无限循环或数据处理不完整。
+- **安全隐患**: 在某些涉及权限、文件状态判断的方法（如`canExecute`、`exists`、`isDirectory`）中，未检查返回值可能导致错误的逻辑判断，从而引入安全风险。
+2. **触发场景**
+任何调用了`java.io`库中会返回操作结果的方法，但未对返回值进行有效判断或处理的代码都可能触发此规则。例如：
+```java
+File file = new File("temp.txt");
+file.delete(); // 未检查返回值，不知道文件是否删除成功
+InputStream is = new FileInputStream("data.bin");
+is.read(); // 未检查返回值，无法得知读取了多少字节或是否到达文件末尾
+```
+3. **潜在影响**
+- **程序健壮性差**: 在文件操作失败时无法及时发现和处理，可能导致程序崩溃或产生不可预期的行为。
+- **数据处理不正确**: 未正确处理读取或跳过字节的返回值可能导致数据丢失、截断或处理错误。
+- **安全逻辑绕过**: 在依赖文件状态或权限判断的场景中，未校验返回值可能导致错误的安全决策。
+- **难以调试**: 当出现问题时，由于缺乏对操作结果的反馈，会使得问题定位变得困难。
+- **资源残留**: 文件删除或其他资源释放类操作未成功但未被发现，可能导致系统资源被占用或敏感信息残留。
+DESC
 }
 
 
@@ -157,6 +222,58 @@ public class Demo {
     }
 }
 TEXT
+	"safefile://SafeFileOperation.java": <<<CODE
+import java.io.File;
+import java.io.IOException;
+
+public class SafeFileOperation {
+    public static void main(String[] args) {
+        File file = new File("safe_temp.txt");
+
+        // 检查并处理 delete() 方法的返回值
+        if (file.exists()) {
+            if (file.delete()) {
+                System.out.println("文件删除成功: " + file.getName());
+            } else {
+                System.err.println("文件删除失败: " + file.getName());
+                // 可以添加更详细的错误处理逻辑，如日志记录或重试
+            }
+        } else {
+            System.out.println("文件不存在，无需删除: " + file.getName());
+        }
+
+        // 检查 canWrite() 方法的返回值
+        if (file.canWrite()) {
+            System.out.println("文件可写: " + file.getName());
+        } else {
+            System.out.println("文件不可写: " + file.getName());
+        }
+    }
+}
+CODE
+	"safefile://SafeStreamRead.java": <<<CODE
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.IOException;
+
+public class SafeStreamRead {
+    public static void main(String[] args) {
+        String filename = "data.bin";
+        try (InputStream is = new FileInputStream(filename)) { // 使用 try-with-resources 确保流关闭
+            int data;
+            // 循环读取数据，直到 read() 返回 -1 (流结束)
+            while ((data = is.read()) != -1) {
+                // 处理读取到的数据
+                System.out.print((char) data);
+            }
+            System.out.println("\n数据读取完毕。");
+        } catch (IOException e) {
+            System.err.println("读取文件时发生错误: " + e.getMessage());
+            // 进一步的异常处理，如记录日志或向上抛出
+        }
+    }
+}
+CODE
 )
 
 

@@ -1,0 +1,15 @@
+*. MEMORY: 在每次交互后，都要在 `cumulative_summary` 中记录本次交互的关键结论、解决的问题和未解决的难题，这将作为你记忆的一部分。
+*. 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
+    * `{"@action": "directly_answer", "answer_payload": "..[your-answer]..", "cumulative_summary": "..."}`
+*. 如果你想要使用工具：
+    * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "cumulative_summary": "...", "human_readable_thought": "..."}`
+{{ if .AllowKnowledgeEnhanceAnswer }}*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:
+    * `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "..[rewrite-user-query]..", "human_readable_thought": "..."}
+{{end}}
+{{ if .AllowPlan }}如果这个任务本身比较复杂，需要高度专注：
+    * 如果你发现有对应的 AI Blueprint(Forge) 可以使用，请你输出: `{"@action": "require_ai_blueprint", "blueprint_payload": "[your-blueprint-name]", ...}` 可以启动一个已经存在 AI 预设应用执行这个任务。
+    * 如果你觉得任务复杂，且没有现有任务模版（Blueprint）需要使用任务规划能力，输出：`{"@action": "request_plan_and_execution", "plan_request_payload": "..[something-helpful-for-design-plan]..", ""human_readable_thought": "..."}
+{{end}}
+* 如果用户请求编写 yaklang 代码，那么请你使用
+  `{"@action:"write_yaklang_code", "human_readable_thought": "想要编写什么样的代码？有什么功能？需要用到什么大致的功能？流程是什么？", "cumulative_summary": "..."}`
+  使用这个 action 会进入专注编写代码的模式，会获得更多的代码上下文和基础文档语法补充

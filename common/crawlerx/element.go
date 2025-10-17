@@ -98,7 +98,7 @@ func (starter *BrowserStarter) elementCheckGenerate() func(*rod.Element) bool {
 	if len(starter.baseConfig.sensitiveWords) == 0 {
 		return nil
 	}
-	var propertyList = []string{"innerHTML", "value"}
+	var propertyList = []string{"innerHTML", "value", "name"}
 	return func(element *rod.Element) bool {
 		var resultStr string
 		for _, property := range propertyList {
@@ -133,10 +133,10 @@ func (starter *BrowserStarter) elementCheckGenerate() func(*rod.Element) bool {
 }
 
 // map[{{ tagName }}]map[{{ element attribute }}]{{ attribute results }}
-func customizedGetElement(page *rod.Page, searchInfo map[string]map[string][]string) (rod.Elements, error) {
+func customizedGetElement(page *rod.Page, searchInfo []ElementInfo) (rod.Elements, error) {
 	resultElements := make([]*rod.Element, 0)
-	for tagName, tagInfo := range searchInfo {
-		elements, err := customizedCheckTagElements(page, tagName, tagInfo)
+	for _, searchItem := range searchInfo {
+		elements, err := customizedCheckTagElements(page, searchItem)
 		if err != nil {
 			continue
 		}
@@ -145,31 +145,31 @@ func customizedGetElement(page *rod.Page, searchInfo map[string]map[string][]str
 	return resultElements, nil
 }
 
-func customizedCheckTagElements(page *rod.Page, tagName string, tagInfo map[string][]string) (rod.Elements, error) {
-	elements, err := page.Elements(tagName)
+func customizedCheckTagElements(page *rod.Page, elementInfo ElementInfo) (rod.Elements, error) {
+	elements, err := page.Elements(elementInfo.Tag)
 	if err != nil {
-		return nil, utils.Errorf("page %s get tag %s element error: %s", page, tagName, err)
+		return nil, utils.Errorf("page %s get tag %s element error: %s", page, elementInfo.Tag, err)
 	}
-	if len(tagInfo) == 0 {
+	if len(elementInfo.Attributes) == 0 {
 		return elements, nil
 	}
 	resultElements := make([]*rod.Element, 0)
 	for _, element := range elements {
-		if customizedCheckElementAttribute(element, tagInfo) {
+		if customizedCheckElementAttribute(element, elementInfo.Attributes) {
 			resultElements = append(resultElements, element)
 		}
 	}
 	return resultElements, nil
 }
 
-func customizedCheckElementAttribute(element *rod.Element, attributeInfo map[string][]string) bool {
-	for attribute, attributeList := range attributeInfo {
-		info, _ := getAttribute(element, attribute)
+func customizedCheckElementAttribute(element *rod.Element, attributeInfo []ElementAttribute) bool {
+	for _, attributeItem := range attributeInfo {
+		info, _ := getAttribute(element, attributeItem.Name)
 		if info == "" {
 			continue
 		}
 		info = strings.ToLower(info)
-		if StringArrayContains(attributeList, info) {
+		if StringArrayContains(attributeItem.Info, info) {
 			return true
 		}
 	}

@@ -1,6 +1,7 @@
 package yakit
 
 import (
+	"context"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -48,58 +49,67 @@ func WithSyntaxFlowRuleName(name ...string) SyntaxFlowRuleFilterOption {
 	}
 }
 
-func FilterSyntaxFlowRule(db *gorm.DB, params *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlowRuleFilterOption) *gorm.DB {
-	if params == nil {
+func NewSyntaxFlowRuleFilter(filter *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlowRuleFilterOption) *ypb.SyntaxFlowRuleFilter {
+	if filter == nil {
 		if len(opt) == 0 {
 			// if no param and no option, return db
-			return db
+			return nil
 		} else {
 			// if no param but has option, create a new param
-			params = &ypb.SyntaxFlowRuleFilter{}
+			filter = &ypb.SyntaxFlowRuleFilter{}
 		}
 	}
 	// apply options to it
 	for _, o := range opt {
-		o(params)
+		o(filter)
 	}
 
-	db = db.Model(&schema.SyntaxFlowRule{})
+	return filter
+}
 
-	if len(params.GetGroupNames()) > 0 {
+func FilterSyntaxFlowRule(db *gorm.DB, filter *ypb.SyntaxFlowRuleFilter, opt ...SyntaxFlowRuleFilterOption) *gorm.DB {
+	filter = NewSyntaxFlowRuleFilter(filter, opt...)
+
+	db = db.Model(&schema.SyntaxFlowRule{})
+	if filter == nil {
+		return db
+	}
+
+	if len(filter.GetGroupNames()) > 0 {
 		db = db.Joins("JOIN syntax_flow_rule_and_group ON syntax_flow_rule_and_group.syntax_flow_rule_id = syntax_flow_rules.id").
 			Joins("JOIN syntax_flow_groups ON syntax_flow_groups.id = syntax_flow_rule_and_group.syntax_flow_group_id").
-			Where("syntax_flow_groups.group_name IN (?)", params.GetGroupNames()).
+			Where("syntax_flow_groups.group_name IN (?)", filter.GetGroupNames()).
 			Group("syntax_flow_rules.id")
 	}
 
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", params.GetSeverity())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", params.GetRuleNames())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", params.GetLanguage())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", params.GetPurpose())
-	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", params.GetTag())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "severity", filter.GetSeverity())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "rule_name", filter.GetRuleNames())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "language", filter.GetLanguage())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "purpose", filter.GetPurpose())
+	db = bizhelper.ExactOrQueryStringArrayOr(db, "tag", filter.GetTag())
 	//if !params.GetIncludeLibraryRule() {
 	//	db = db.Where("allow_included = ?", false)
 	//}
 
-	if params.GetKeyword() != "" {
+	if filter.GetKeyword() != "" {
 		db = bizhelper.FuzzSearchWithStringArrayOrEx(db, []string{
 			"rule_name", "title", "title_zh", "description", "content", "tag",
-		}, []string{params.GetKeyword()}, false)
+		}, []string{filter.GetKeyword()}, false)
 	}
-	if params.GetAfterId() > 0 {
-		db = db.Where("id > ?", params.GetAfterId())
+	if filter.GetAfterId() > 0 {
+		db = db.Where("id > ?", filter.GetAfterId())
 	}
-	if params.GetBeforeId() > 0 {
-		db = db.Where("id < ?", params.GetBeforeId())
+	if filter.GetBeforeId() > 0 {
+		db = db.Where("id < ?", filter.GetBeforeId())
 	}
-	switch params.GetFilterRuleKind() {
+	switch filter.GetFilterRuleKind() {
 	case FilterBuiltinRuleTrue:
 		db = bizhelper.QueryByBool(db, "is_build_in_rule", true)
 	case FilterBuiltinRuleFalse:
 		db = bizhelper.QueryByBool(db, "is_build_in_rule", false)
 	}
 
-	switch params.GetFilterLibRuleKind() {
+	switch filter.GetFilterLibRuleKind() {
 	case FilterLibRuleTrue:
 		db = bizhelper.QueryByBool(db, "allow_included", true)
 	case FilterLibRuleFalse:
@@ -260,4 +270,41 @@ func AllSyntaxFlowRule(db *gorm.DB, req *ypb.SyntaxFlowRuleFilter) ([]*schema.Sy
 		return nil, utils.Errorf("query failed: %s", err)
 	}
 	return ret, nil
+}
+
+func YieldSyntaxFlowRulesBySSAProjectId(db *gorm.DB, ctx context.Context, ssaProjectId uint) chan *schema.SyntaxFlowRule {
+	if ssaProjectId == 0 {
+		return nil
+	}
+	project, err := LoadSSAProjectBuilderByID(ssaProjectId)
+	if err != nil {
+		return nil
+	}
+	if project == nil {
+		return nil
+	}
+	filter := project.GetRuleFilter()
+	if filter == nil {
+		return nil
+	}
+	db = FilterSyntaxFlowRule(db, filter)
+	return sfdb.YieldSyntaxFlowRules(db, ctx)
+}
+
+func GetRuleCountBySSAProjectId(db *gorm.DB, ssaProjectId uint) (int64, error) {
+	if ssaProjectId == 0 {
+		return 0, utils.Errorf("get rule count by ssa project id failed: ssa project id is 0")
+	}
+	project, err := LoadSSAProjectBuilderByID(ssaProjectId)
+	if err != nil {
+		return 0, utils.Errorf("get rule count by ssa project id failed: %s", err)
+	}
+	if project == nil {
+		return 0, utils.Errorf("get rule count by ssa project id failed: project is nil")
+	}
+	filter := project.GetRuleFilter()
+	db = FilterSyntaxFlowRule(db, filter)
+	var count int64
+	db.Count(&count)
+	return count, nil
 }

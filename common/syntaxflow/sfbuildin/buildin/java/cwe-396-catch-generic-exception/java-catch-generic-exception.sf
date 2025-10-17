@@ -7,78 +7,66 @@ desc(
 	cwe: "CWE-396"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 捕获范围过大的异常（如 `Exception`、`Throwable`、`Error`、`RuntimeException`）是一种不健壮的异常处理方式。这会导致本应由特定 `catch` 块处理的异常或不应被捕获的运行时异常被一并捕获，从而掩盖代码中潜在的逻辑错误或重要的异常信息。这种做法违背了Java异常分类设计的初衷，使得开发者难以针对不同类型的异常进行精细化处理，降低了代码的可维护性和可靠性。特别是在大型复杂系统中，新异常类型的引入可能会被这种泛型捕获块悄无声息地吸收，导致问题难以发现和调试。
-
 2. **触发场景**
 当代码中使用一个 `catch` 块捕获 `Exception`、`Throwable`、`Error` 或 `RuntimeException` 时，就会触发此规则。这通常发生在开发者为了简化代码或未能预见到所有可能的异常类型时。例如：
-
 ```java
 try {
-    // 可能会抛出多种异常的代码逻辑
-    performOperation(); 
-} catch (Exception e) { 
-    // 这里捕获了所有类型的Exception及其子类
-    logger.error("An error occurred", e);
+// 可能会抛出多种异常的代码逻辑
+performOperation();
+} catch (Exception e) {
+// 这里捕获了所有类型的Exception及其子类
+logger.error("An error occurred", e);
 }
 ```
 在这个例子中，`performOperation()` 方法可能抛出 `IOException`、`SQLException`、`NullPointerException` 等多种异常，但都被同一个 `catch (Exception e)` 块捕获并处理，导致无法根据异常类型执行不同的错误处理逻辑。
-
 3. **潜在影响**
 - **异常信息丢失或混淆**：无法区分捕获的具体异常类型，导致日志记录不准确，难以定位问题根源。
 - **掩盖逻辑错误**：意外捕获 `RuntimeException` 等本应导致程序中止的异常，使得潜在的编程错误（如空指针、类型转换错误）被掩盖，导致程序行为异常但无明显错误提示。
 - **可维护性下降**：当方法抛出新的异常类型时，泛型捕获块不会强制开发者更新异常处理逻辑，可能导致新引入的异常未得到正确处理。
 - **调试困难**：由于异常被泛型捕获，堆栈跟踪可能不够精确，增加调试复杂性。
-
 DESC
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 针对具体异常类型进行捕获
 尽量捕获更具体的异常类型，为不同的异常编写单独的 `catch` 块，以便进行有针对性的处理。
-
 ```java
 // 修复代码示例
 try {
-    performOperation();
+performOperation();
 } catch (IOException e) {
-    // 处理IOException
-    logger.error("IO error during operation", e);
+// 处理IOException
+logger.error("IO error during operation", e);
 } catch (SQLException e) {
-    // 处理SQLException
-    logger.error("Database error during operation", e);
+// 处理SQLException
+logger.error("Database error during operation", e);
 } catch (CustomSpecificException e) {
-    // 处理自定义特定异常
-    logger.error("Specific error during operation", e);
+// 处理自定义特定异常
+logger.error("Specific error during operation", e);
 } catch (IllegalArgumentException e) {
-    // 处理IllegalArgumentException，或其他更具体的RuntimeException
-    logger.error("Invalid argument during operation", e);
-} catch (Exception e) { 
-    // 作为最后的捕获块，捕获预期之外的Exception，但应尽量避免
-    logger.error("Unexpected error during operation", e);
-    // 也许需要重新抛出或进行更高级别的处理
+// 处理IllegalArgumentException，或其他更具体的RuntimeException
+logger.error("Invalid argument during operation", e);
+} catch (Exception e) {
+// 作为最后的捕获块，捕获预期之外的Exception，但应尽量避免
+logger.error("Unexpected error during operation", e);
+// 也许需要重新抛出或进行更高级别的处理
 }
 ```
-
 #### 2. 避免捕获 Error 和 Throwable
 通常不应该捕获 `Error` 或 `Throwable`，它们代表了严重的系统级问题，通常无法在应用程序层面恢复，应该让程序中止以进行诊断。
-
 #### 3. 谨慎处理 RuntimeException
 对于 `RuntimeException` 及其子类，除非有明确的业务需求需要捕获并处理，否则通常不应捕获它们，应让其传播至更高级别错误处理机制或导致程序中止，以便及时发现和修复潜在的逻辑错误。
-
 #### 4. 将泛型捕获块限制在最高层级
 如果确实需要在应用程序的最高层级（例如，线程的 `run` 方法、主程序的 `main` 方法、Web框架的全局异常处理器）捕获所有异常以防止程序崩溃，可以使用泛型捕获块，但必须谨慎并完整记录异常信息。
-
 #### 5. 使用多重捕获（Java 7+）
 对于一些需要进行相同处理的不同类型异常，可以使用多重捕获简化代码：
-
 ```java
 try {
-    performOperation();
+performOperation();
 } catch (IOException | SQLException e) {
-    // 对IOException和SQLException进行统一处理
-    logger.error("IO or Database error", e);
+// 对IOException和SQLException进行统一处理
+logger.error("IO or Database error", e);
 }
 ```
 SOLUTION
@@ -93,8 +81,76 @@ $exception?{<typeName()>?{have:/^(Exception|Throwable|Error|RuntimeException)$/}
 
 alert $generic_exception for {
 	level: "low",
-	title: "Detect Java Generic Exception Catching",
-	title_zh: "检测Java泛型异常捕获",
+	title: "Java Generic Exception Catching Was Detected",
+	title_zh: "检测到Java泛型异常捕获",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 针对具体异常类型进行捕获
+尽量捕获更具体的异常类型，为不同的异常编写单独的 `catch` 块，以便进行有针对性的处理。
+```java
+// 修复代码示例
+try {
+performOperation();
+} catch (IOException e) {
+// 处理IOException
+logger.error("IO error during operation", e);
+} catch (SQLException e) {
+// 处理SQLException
+logger.error("Database error during operation", e);
+} catch (CustomSpecificException e) {
+// 处理自定义特定异常
+logger.error("Specific error during operation", e);
+} catch (IllegalArgumentException e) {
+// 处理IllegalArgumentException，或其他更具体的RuntimeException
+logger.error("Invalid argument during operation", e);
+} catch (Exception e) {
+// 作为最后的捕获块，捕获预期之外的Exception，但应尽量避免
+logger.error("Unexpected error during operation", e);
+// 也许需要重新抛出或进行更高级别的处理
+}
+```
+#### 2. 避免捕获 Error 和 Throwable
+通常不应该捕获 `Error` 或 `Throwable`，它们代表了严重的系统级问题，通常无法在应用程序层面恢复，应该让程序中止以进行诊断。
+#### 3. 谨慎处理 RuntimeException
+对于 `RuntimeException` 及其子类，除非有明确的业务需求需要捕获并处理，否则通常不应捕获它们，应让其传播至更高级别错误处理机制或导致程序中止，以便及时发现和修复潜在的逻辑错误。
+#### 4. 将泛型捕获块限制在最高层级
+如果确实需要在应用程序的最高层级（例如，线程的 `run` 方法、主程序的 `main` 方法、Web框架的全局异常处理器）捕获所有异常以防止程序崩溃，可以使用泛型捕获块，但必须谨慎并完整记录异常信息。
+#### 5. 使用多重捕获（Java 7+）
+对于一些需要进行相同处理的不同类型异常，可以使用多重捕获简化代码：
+```java
+try {
+performOperation();
+} catch (IOException | SQLException e) {
+// 对IOException和SQLException进行统一处理
+logger.error("IO or Database error", e);
+}
+```
+SOLUTION
+	risk: "异常处理",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+捕获范围过大的异常（如 `Exception`、`Throwable`、`Error`、`RuntimeException`）是一种不健壮的异常处理方式。这会导致本应由特定 `catch` 块处理的异常或不应被捕获的运行时异常被一并捕获，从而掩盖代码中潜在的逻辑错误或重要的异常信息。这种做法违背了Java异常分类设计的初衷，使得开发者难以针对不同类型的异常进行精细化处理，降低了代码的可维护性和可靠性。特别是在大型复杂系统中，新异常类型的引入可能会被这种泛型捕获块悄无声息地吸收，导致问题难以发现和调试。
+2. **触发场景**
+当代码中使用一个 `catch` 块捕获 `Exception`、`Throwable`、`Error` 或 `RuntimeException` 时，就会触发此规则。这通常发生在开发者为了简化代码或未能预见到所有可能的异常类型时。例如：
+```java
+try {
+// 可能会抛出多种异常的代码逻辑
+performOperation();
+} catch (Exception e) {
+// 这里捕获了所有类型的Exception及其子类
+logger.error("An error occurred", e);
+}
+```
+在这个例子中，`performOperation()` 方法可能抛出 `IOException`、`SQLException`、`NullPointerException` 等多种异常，但都被同一个 `catch (Exception e)` 块捕获并处理，导致无法根据异常类型执行不同的错误处理逻辑。
+3. **潜在影响**
+- **异常信息丢失或混淆**：无法区分捕获的具体异常类型，导致日志记录不准确，难以定位问题根源。
+- **掩盖逻辑错误**：意外捕获 `RuntimeException` 等本应导致程序中止的异常，使得潜在的编程错误（如空指针、类型转换错误）被掩盖，导致程序行为异常但无明显错误提示。
+- **可维护性下降**：当方法抛出新的异常类型时，泛型捕获块不会强制开发者更新异常处理逻辑，可能导致新引入的异常未得到正确处理。
+- **调试困难**：由于异常被泛型捕获，堆栈跟踪可能不够精确，增加调试复杂性。
+DESC
+	name: "generic_exception",
+	message: "检测到Java代码中存在捕获泛型异常的情况，并且从数据源（source）到污染汇聚点（sink）间，可能存在过滤函数，需进一步审计确认。",
 }
 
 desc(

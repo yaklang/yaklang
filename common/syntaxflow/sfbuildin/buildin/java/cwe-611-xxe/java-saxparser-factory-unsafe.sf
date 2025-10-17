@@ -9,50 +9,44 @@ https://cwe.mitre.org/data/definitions/611.html
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   当使用 `SAXParserFactory` 进行XML解析时，如果未禁用外部实体解析功能（如外部通用实体 `external-general-entities` 或外部参数实体 `external-parameter-entities`），攻击者可以在XML输入中构造恶意的外部实体引用。这些外部实体引用可以指向本地文件（如 `/etc/passwd`），或者发起对内部/外部网络的请求。SAXParser在解析过程中会尝试加载和处理这些外部实体，从而导致XXE（XML External Entity）漏洞。
-
+当使用 `SAXParserFactory` 进行XML解析时，如果未禁用外部实体解析功能（如外部通用实体 `external-general-entities` 或外部参数实体 `external-parameter-entities`），攻击者可以在XML输入中构造恶意的外部实体引用。这些外部实体引用可以指向本地文件（如 `/etc/passwd`），或者发起对内部/外部网络的请求。SAXParser在解析过程中会尝试加载和处理这些外部实体，从而导致XXE（XML External Entity）漏洞。
 2. **触发场景**
-   当应用程序接收并解析来自不可信源的XML数据，并且使用了默认配置或未 adequately 配置安全特性的 `SAXParserFactory` 实例时，XXE漏洞就可能被触发。
-   ```java
-   package com.example.sax;
-   import org.xml.sax.SAXException;
-   import org.xml.sax.helpers.DefaultHandler;
-   import org.xml.sax.InputSource;
-   import javax.xml.parsers.ParserConfigurationException;
-   import javax.xml.parsers.SAXParser;
-   import javax.xml.parsers.SAXParserFactory;
-   import java.io.IOException;
-   import java.io.StringReader;
-   
-   public class SAXParserFactoryUnsafe {
-       public void parseXml(String xml) {
-           SAXParserFactory factory = SAXParserFactory.newInstance(); // 未设置安全特性
-           try {
-               SAXParser parser = factory.newSAXParser();
-               parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler()); // 解析用户控制的XML
-           } catch (ParserConfigurationException | SAXException | IOException e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
-   攻击者可以提交包含恶意DTD（Document Type Definition）或实体引用的XML文档。
-
+当应用程序接收并解析来自不可信源的XML数据，并且使用了默认配置或未 adequately 配置安全特性的 `SAXParserFactory` 实例时，XXE漏洞就可能被触发。
+```java
+package com.example.sax;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.InputSource;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import java.io.IOException;
+import java.io.StringReader;
+public class SAXParserFactoryUnsafe {
+public void parseXml(String xml) {
+SAXParserFactory factory = SAXParserFactory.newInstance(); // 未设置安全特性
+try {
+SAXParser parser = factory.newSAXParser();
+parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler()); // 解析用户控制的XML
+} catch (ParserConfigurationException | SAXException | IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+攻击者可以提交包含恶意DTD（Document Type Definition）或实体引用的XML文档。
 3. **潜在影响**
-    - 敏感文件泄露：攻击者可以读取服务器上的任意文件，如配置文件、源码、证书等。
-    - 内网探测：攻击者可以扫描内网端口或访问内网服务。
-    - 服务拒绝（DoS）：攻击者可以构造循环实体引用，导致解析器陷入死循环，消耗大量资源，造成服务不可用。
-    - SSRF（Server-Side Request Forgery）：攻击者可以迫使服务器发送HTTP请求到任意地址，可能用于探测内网或攻击其他服务。
+- 敏感文件泄露：攻击者可以读取服务器上的任意文件，如配置文件、源码、证书等。
+- 内网探测：攻击者可以扫描内网端口或访问内网服务。
+- 服务拒绝（DoS）：攻击者可以构造循环实体引用，导致解析器陷入死循环，消耗大量资源，造成服务不可用。
+- SSRF（Server-Side Request Forgery）：攻击者可以迫使服务器发送HTTP请求到任意地址，可能用于探测内网或攻击其他服务。
 DESC
 	rule_id: "91546005-80bf-4320-9273-1df7155f61a7"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体解析
 在创建 `SAXParserFactory` 实例后，通过 `.setFeature` 方法明确禁用外部实体解析。这是最直接和推荐的防御措施。
-
 ```java
 // 修复代码示例
 package com.example.sax;
@@ -64,30 +58,26 @@ import javax.xml.parsers.SAXParser;
 import javax.xml.parsers.SAXParserFactory;
 import java.io.IOException;
 import java.io.StringReader;
-
 class SAXParserFactorySafe {
-    public void parseXml(String xml) {
-        SAXParserFactory factory = SAXParserFactory.newInstance();
-        try {
-            // 禁用外部通用实体
-            factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
-            // 禁用外部参数实体
-            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
-            // 建议同时禁用DOCTYPE声明，防止攻击者通过DOCTYPE引入外部实体
-            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
-
-            SAXParser parser = factory.newSAXParser();
-            parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler());
-        } catch (ParserConfigurationException | SAXException | IOException e) {
-            e.printStackTrace();
-        }
-    }
+public void parseXml(String xml) {
+SAXParserFactory factory = SAXParserFactory.newInstance();
+try {
+// 禁用外部通用实体
+factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+// 禁用外部参数实体
+factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+// 建议同时禁用DOCTYPE声明，防止攻击者通过DOCTYPE引入外部实体
+factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+SAXParser parser = factory.newSAXParser();
+parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler());
+} catch (ParserConfigurationException | SAXException | IOException e) {
+e.printStackTrace();
+}
+}
 }
 ```
-
 #### 2. 使用最新版本的XML解析库
 确保使用的Java版本和相关的库是最新且已打了安全补丁，新版本通常会增强对XXE等漏洞的防御能力。
-
 #### 3. 输入验证和过滤
 在解析XML之前，对输入数据进行严格的验证和过滤，特别是对特殊字符和结构进行检查，尽管这并不能完全阻止XXE，但可以增加攻击难度。
 SOLUTION
@@ -113,6 +103,81 @@ alert $vulnCall for {
 	title_zh: "检测 Java SAXParserFactory 不安全使用",
 	level: "mid",
 	message: "SAXParserFactory() Unsafe Use in Context Sink",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 禁用外部实体解析
+在创建 `SAXParserFactory` 实例后，通过 `.setFeature` 方法明确禁用外部实体解析。这是最直接和推荐的防御措施。
+```java
+// 修复代码示例
+package com.example.sax;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.InputSource;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import java.io.IOException;
+import java.io.StringReader;
+class SAXParserFactorySafe {
+public void parseXml(String xml) {
+SAXParserFactory factory = SAXParserFactory.newInstance();
+try {
+// 禁用外部通用实体
+factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+// 禁用外部参数实体
+factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+// 建议同时禁用DOCTYPE声明，防止攻击者通过DOCTYPE引入外部实体
+factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+SAXParser parser = factory.newSAXParser();
+parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler());
+} catch (ParserConfigurationException | SAXException | IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+#### 2. 使用最新版本的XML解析库
+确保使用的Java版本和相关的库是最新且已打了安全补丁，新版本通常会增强对XXE等漏洞的防御能力。
+#### 3. 输入验证和过滤
+在解析XML之前，对输入数据进行严格的验证和过滤，特别是对特殊字符和结构进行检查，尽管这并不能完全阻止XXE，但可以增加攻击难度。
+SOLUTION
+	risk: "XXE",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+当使用 `SAXParserFactory` 进行XML解析时，如果未禁用外部实体解析功能（如外部通用实体 `external-general-entities` 或外部参数实体 `external-parameter-entities`），攻击者可以在XML输入中构造恶意的外部实体引用。这些外部实体引用可以指向本地文件（如 `/etc/passwd`），或者发起对内部/外部网络的请求。SAXParser在解析过程中会尝试加载和处理这些外部实体，从而导致XXE（XML External Entity）漏洞。
+2. **触发场景**
+当应用程序接收并解析来自不可信源的XML数据，并且使用了默认配置或未 adequately 配置安全特性的 `SAXParserFactory` 实例时，XXE漏洞就可能被触发。
+```java
+package com.example.sax;
+import org.xml.sax.SAXException;
+import org.xml.sax.helpers.DefaultHandler;
+import org.xml.sax.InputSource;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParser;
+import javax.xml.parsers.SAXParserFactory;
+import java.io.IOException;
+import java.io.StringReader;
+public class SAXParserFactoryUnsafe {
+public void parseXml(String xml) {
+SAXParserFactory factory = SAXParserFactory.newInstance(); // 未设置安全特性
+try {
+SAXParser parser = factory.newSAXParser();
+parser.parse(new InputSource(new StringReader(xml)), new DefaultHandler()); // 解析用户控制的XML
+} catch (ParserConfigurationException | SAXException | IOException e) {
+e.printStackTrace();
+}
+}
+}
+```
+攻击者可以提交包含恶意DTD（Document Type Definition）或实体引用的XML文档。
+3. **潜在影响**
+- 敏感文件泄露：攻击者可以读取服务器上的任意文件，如配置文件、源码、证书等。
+- 内网探测：攻击者可以扫描内网端口或访问内网服务。
+- 服务拒绝（DoS）：攻击者可以构造循环实体引用，导致解析器陷入死循环，消耗大量资源，造成服务不可用。
+- SSRF（Server-Side Request Forgery）：攻击者可以迫使服务器发送HTTP请求到任意地址，可能用于探测内网或攻击其他服务。
+DESC
+	name: "vulnCall",
 }
 
 desc(
@@ -176,7 +241,7 @@ UNSAFE
 
 desc(
 	lang: "java"
-	"file://safefile.java": <<<SAFE
+	"safefile://safefile.java": <<<SAFE
 package com.example.sax;
 import org.xml.sax.SAXException;
 import org.xml.sax.helpers.DefaultHandler;

@@ -107,6 +107,25 @@ func GetExtYakitLibByOutput(Output func(d any) error) map[string]interface{} {
 		Output(tableData)
 		return nil
 	}
+
+	exports["EnableDotGraphTab"] = func(tabName string) {
+		Output(&YakitFeature{
+			Feature: "dot-graph-tab",
+			Params: map[string]interface{}{
+				"tab_name": tabName,
+			},
+		})
+	}
+
+	exports["OutputDotGraph"] = func(tabName string, data string) *YakitDotGraphData {
+		tabData := &YakitDotGraphData{
+			TabName: tabName,
+			Data:    data,
+		}
+		Output(tabData)
+		return tabData
+	}
+
 	exports["StatusCard"] = func(id string, data interface{}, tags ...string) {
 		Output(&YakitStatusCard{
 			Id: id, Data: fmt.Sprint(data), Tags: tags,
@@ -162,17 +181,20 @@ type YakitLog struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
-func NewYakitStatusCardExecResult(status, data string, items ...string) *ypb.ExecResult {
+// 格式化输出 YakitLog
+func (y *YakitLog) String() string {
+	timestamp := time.Unix(y.Timestamp, 0).Format("2006-01-02 15:04:05")
+	return fmt.Sprintf("[%s] %s %s\n", y.Level, timestamp, y.Data)
+}
+
+func NewYakitStatusCardExecResult(status string, data any, items ...string) *ypb.ExecResult {
 	card := &YakitStatusCard{
 		Id:   status,
-		Data: data,
+		Data: fmt.Sprint(data),
 		Tags: items,
 	}
-	raw, _ := YakitMessageGenerator(card)
-	return &ypb.ExecResult{
-		IsMessage: true,
-		Message:   raw,
-	}
+	level, data := MarshalYakitOutput(card)
+	return NewYakitLogExecResult(level, data)
 }
 
 func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
@@ -198,11 +220,12 @@ func ConvertExecResultIntoLog(i *ypb.ExecResult) string {
 	return i.String()
 }
 
-func NewYakitLogExecResult(level string, data string, items ...interface{}) *ypb.ExecResult {
+func NewYakitLogExecResult(level string, input any, items ...interface{}) *ypb.ExecResult {
 	logItem := &YakitLog{
 		Level:     level,
 		Timestamp: time.Now().Unix(),
 	}
+	data := utils.InterfaceToString(input)
 	if len(items) > 0 {
 		logItem.Data = fmt.Sprintf(data, items...)
 	} else {
@@ -217,10 +240,11 @@ func NewYakitLogExecResult(level string, data string, items ...interface{}) *ypb
 }
 
 func NewYakitProgressExecResult(id string, progress float64) *ypb.ExecResult {
-	raw, _ := json.Marshal(&YakitProgress{
+	p := &YakitProgress{
 		Id:       id,
 		Progress: progress,
-	})
+	}
+	raw, _ := YakitMessageGenerator(p)
 	return &ypb.ExecResult{
 		IsMessage: true,
 		Message:   raw,
@@ -397,6 +421,8 @@ func MarshalYakitOutput(t interface{}) (string, string) {
 		return "json-httpflow-risk", string(raw)
 	case *YakitFixedTableData:
 		return "feature-table-data", string(raw)
+	case *YakitDotGraphData:
+		return "dot-graph-data", string(raw)
 	case *YakitTextTabData:
 		return "feature-text-data", string(raw)
 	case *YakitStatusCard:
@@ -466,6 +492,7 @@ func YakitMessageGenerator(i interface{}) ([]byte, error) {
 	switch i.(type) {
 	case *YakitStatusCard:
 		msg.Type = "status-card"
+		msg.Content = raw
 	case *YakitProgress:
 		msg.Type = "progress"
 		msg.Content = raw
@@ -576,45 +603,76 @@ func (c *YakitClient) YakitReport(i int) {
 	c.YakitDraw("report", fmt.Sprint(i))
 }
 
-func (c *YakitClient) YakitFile(fileName string, desc ...interface{}) {
-	title := fileName
-	descStr := ""
-	if len(desc) > 0 {
-		title = utils.InterfaceToString(desc[0])
-		if len(desc) > 1 {
-			descStr = utils.InterfaceToString(funk.Reduce(desc[1:], func(i interface{}, s interface{}) string {
-				return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
-			}, ""))
-			descStr = strings.Trim(descStr, " \r\n,")
+func (c *YakitClient) YakitFile(fileName string, option ...interface{}) {
+	var rawDesc []string
+	var yakitFileAction []*YakitFileAction
+	for _, o := range option {
+		switch o.(type) {
+		case string:
+			rawDesc = append(rawDesc, o.(string))
+		case YakitFileAction:
+			action := o.(YakitFileAction)
+			yakitFileAction = append(yakitFileAction, &action)
+		case *YakitFileAction:
+			action := o.(*YakitFileAction)
+			yakitFileAction = append(yakitFileAction, action)
 		}
 	}
 
-	existed, _ := utils.PathExists(fileName)
-	var size uint64
 	isDir := utils.IsDir(fileName)
-	if existed && !isDir {
-		if info, _ := os.Stat(fileName); info != nil {
-			size = uint64(info.Size())
-		}
-	}
 	dir := fileName
 	if !isDir {
 		dir = filepath.Dir(dir)
 	}
-	raw, err := json.Marshal(map[string]interface{}{
-		"title":       title,
-		"description": descStr,
-		"path":        fileName,
-		"is_dir":      utils.IsDir(fileName),
-		"dir":         dir,
-		"is_existed":  existed,
-		"file_size":   utils.ByteSize(size),
-	})
-	if err != nil {
-		log.Errorf("error for build file struct data: %v", err)
-		return
+
+	if len(rawDesc) > 0 {
+		descStr := ""
+		title := rawDesc[0]
+		if len(rawDesc) > 1 {
+			descStr = utils.InterfaceToString(funk.Reduce(rawDesc[1:], func(i interface{}, s interface{}) string {
+				return utils.InterfaceToString(i) + "," + utils.InterfaceToString(s)
+			}, ""))
+			descStr = strings.Trim(descStr, " \r\n,")
+		}
+		existed, _ := utils.PathExists(fileName)
+		var size uint64
+		if existed && !isDir {
+			if info, _ := os.Stat(fileName); info != nil {
+				size = uint64(info.Size())
+			}
+		}
+		raw, err := json.Marshal(map[string]interface{}{
+			"title":       title,
+			"description": descStr,
+			"path":        fileName,
+			"is_dir":      utils.IsDir(fileName),
+			"dir":         dir,
+			"is_existed":  existed,
+			"file_size":   utils.ByteSize(size),
+		})
+		if err != nil {
+			log.Errorf("error for build file struct data: %v", err)
+			return
+		}
+		c.YakitDraw("file", string(raw))
 	}
-	c.YakitDraw("file", string(raw))
+
+	for _, action := range yakitFileAction {
+		raw, err := json.Marshal(map[string]interface{}{
+			"title":          fmt.Sprintf("operation file [%s] use asction [%s]", fileName, action.Action),
+			"action":         action.Action,
+			"path":           fileName,
+			"is_dir":         utils.IsDir(fileName),
+			"dir":            dir,
+			"action_message": action.Message,
+		})
+		if err != nil {
+			log.Errorf("error for build file struct data: %v", err)
+			return
+		}
+		c.YakitDraw("file", string(raw))
+	}
+
 }
 
 func (c *YakitClient) YakitError(tmp string, items ...interface{}) {

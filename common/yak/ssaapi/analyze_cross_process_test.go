@@ -1,8 +1,9 @@
 package ssaapi_test
 
 import (
-	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
 func Test_CrossProcess(t *testing.T) {
@@ -24,12 +25,12 @@ func Test_CrossProcess(t *testing.T) {
 				-> Function-A
 				  -> Parameter-num
 					-> 1
-			  -> FreeValue-A(2)
+			  -> FreeValue-vA(2)
 				-> Function-A
 			      -> Parameter-num
 					-> 2
 		*/
-		ssatest.CheckSyntaxFlow(t, code, `print(* #{
+		ssatest.CheckSyntaxFlowContain(t, code, `print(* #{
 include:<<<INCLUDE
 	* ?{opcode:const}
 INCLUDE

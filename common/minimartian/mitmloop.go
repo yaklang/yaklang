@@ -276,7 +276,7 @@ func (p *Proxy) handleLoop(isTLSConn bool, conn net.Conn, ctx *Context) {
 	/* TLS */
 	if isTLSConn {
 		s.MarkSecure()
-		s.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, true)
+		s.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, true)
 		var serverUseH2 bool
 		if p.http2 {
 			// does remote server use h2?
@@ -422,7 +422,7 @@ func (p *Proxy) handleConnectionTunnel(req *http.Request, timer *time.Timer, con
 		return err
 	}
 	// 22 is the TLS handshake.
-	session.Set(httpctx.REQUEST_CONTEXT_KEY_IsHttps, isTLS)
+	session.Set(httpctx.REQUEST_CONTEXT_ConnectToHTTPS, isTLS || httpctx.GetContextBoolInfoFromRequest(req, httpctx.REQUEST_CONTEXT_ConnectToHTTPS))
 	if parsedConnectedToPort == 0 {
 		if isTLS {
 			parsedConnectedToPort = 443
@@ -584,19 +584,29 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 	needAuth := (p.proxyUsername != "" || p.proxyPassword != "") && !ctx.GetSessionBoolValue(AUTH_FINISH)
 
 	var isHttps bool
-	if tconn, ok := conn.(*tls.Conn); ok {
+	if tconn, ok := conn.(*tls.Conn); ok { // check req self https or not
 		session.MarkSecure()
 
 		cs := tconn.ConnectionState()
 		req.TLS = &cs
-		req.URL.Scheme = "https"
+		isHttps = true
+		httpctx.SetRequestHTTPS(req, true)
+	} else if gmConn, ok := conn.(*gmtls.Conn); ok {
+		session.MarkSecure()
+
+		cs := gmConn.ConnectionState()
+		req.TLS = &tls.ConnectionState{ // set simple message
+			Version:            cs.Version,
+			CipherSuite:        cs.CipherSuite,
+			NegotiatedProtocol: cs.NegotiatedProtocol,
+			ServerName:         cs.ServerName,
+		}
 		isHttps = true
 		httpctx.SetRequestHTTPS(req, true)
 	}
 
 	if session.IsSecure() {
 		log.Debugf("mitm: forcing HTTPS inside secure session")
-		req.URL.Scheme = "https"
 	}
 
 	req.RemoteAddr = conn.RemoteAddr().String()
@@ -682,6 +692,10 @@ func (p *Proxy) handleProxyAuth(conn net.Conn, req *http.Request, timer *time.Ti
 
 // handleRequest handles an ordinary HTTP request.
 func (p *Proxy) handleRequest(conn net.Conn, req *http.Request, ctx *Context) error {
+	if httpctx.GetRequestHTTPS(req) || ctx.GetSessionBoolValue(httpctx.REQUEST_CONTEXT_ConnectToHTTPS) {
+		req.URL.Scheme = "https"
+		httpctx.SetRequestHTTPS(req, true)
+	}
 	session := ctx.Session()
 	brw := session.brw
 	if err := p.reqmod.ModifyRequest(req); err != nil {
@@ -788,7 +802,9 @@ func (p *Proxy) TLSHandshake(ctx context.Context, conn net.Conn, serverUseH2 boo
 	var newConn net.Conn
 	var useH2 bool
 	if version < tls.VersionTLS12 {
-		tlsConn := gmtls.Server(peekConn, p.mitm.ObsoleteTLS("127.0.0.1", p.http2 && serverUseH2))
+		config := p.mitm.ObsoleteTLS("127.0.0.1", p.http2 && serverUseH2)
+		config.GMSupport = &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch}
+		tlsConn := gmtls.Server(peekConn, config)
 		if tlsConn != nil {
 			err := tlsConn.HandshakeContext(ctx)
 			if err != nil {

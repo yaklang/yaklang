@@ -2499,7 +2499,751 @@ functions:
 - name: codec.Sm4OFBEncrypt
   type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
   long_description: ""
-  description: SM4 OBF 加密
+  description: SM4 OFB 加密
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4Encrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 加密（默认 CBC 模式，PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4Decrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 解密（默认 CBC 模式，PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CBCEncryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CBC 加密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CBCDecryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CBC 解密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CBCEncryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CBC 加密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CBCDecryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CBC 解密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4ECBEncryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 ECB 加密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4ECBDecryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 ECB 解密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4ECBEncryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 ECB 加密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4ECBDecryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 ECB 解密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CFBEncryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CFB 加密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CFBDecryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CFB 解密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CFBEncryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CFB 加密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CFBDecryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CFB 解密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4OFBEncryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 OFB 加密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4OFBDecryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 OFB 解密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4OFBEncryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 OFB 加密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4OFBDecryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 OFB 解密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CTREncrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CTR 加密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CTRDecrypt
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CTR 解密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CTREncryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CTR 加密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CTRDecryptWithZeroPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CTR 解密（零填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CTREncryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CTR 加密（PKCS#7 填充）
+  params:
+  - name: v1
+    param_alias: key
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: v2
+    param_alias: data
+    type_alias: ""
+    description: ""
+    type_str: interface {}
+  - name: v3
+    param_alias: iv
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  returns:
+  - name: r0
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: '[]uint8'
+  - name: r1
+    param_alias: ""
+    type_alias: ""
+    description: ""
+    type_str: error
+- name: codec.Sm4CTRDecryptWithPKCSPadding
+  type_str: 'func (v1: []uint8, v2: interface {}, v3: []uint8) return([]uint8, error) '
+  long_description: ""
+  description: SM4 CTR 解密（PKCS#7 填充）
   params:
   - name: v1
     param_alias: key

@@ -5,23 +5,19 @@ desc(
 	risk: "sql-information-exposure"
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
 应用程序在处理数据库操作或其他敏感任务时，如果未正确处理异常或未过滤函数输出，可能导致将本应仅供内部使用的敏感信息直接返回给客户端或记录在可公开访问的日志中。这些信息可能包括数据库连接信息、SQL错误信息、服务器配置、文件路径、堆栈跟踪等，攻击者可以利用这些信息来进一步了解系统架构、执行SQL注入、路径遍历或其他攻击。
-
 2. **触发场景**
-当应用程序在生产环境中开启调试模式或详细错误报告，或者直接调用能够输出敏感信息的API函数（如 `mysql_error()`、`pg_last_error()`、 `mysql_get_host_info()`、`pg_version()` 等），并将这些函数的返回值未经处理地输出到前端页面或日志文件。
-
+当应用程序在生产环境中开启调试模式或详细错误报告，或者直接调用能够输出敏感信息的API函数（如 `mysql_error()`、`pg_last_error()` 等），并将这些函数的返回值未经处理地输出到前端页面或日志文件。
 例如，在数据库操作失败时直接将 `mysql_error()` 的返回值输出到页面，可能会暴露数据库的详细错误信息乃至部分SQL语句。
 ```php
 <?php
 $conn = mysql_connect("localhost", "wrong_user", "wrong_password");
 if (!$conn) {
-    die("连接失败: " . mysql_error()); // 直接输出详细错误信息
+die("连接失败: " . mysql_error()); // 直接输出详细错误信息
 }
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者获取数据库用户名、密码、主机地址等连接信息。
 - 攻击者获取详细的错误信息，帮助其定向构建SQL注入或漏洞利用代码。
@@ -31,29 +27,26 @@ DESC
 	rule_id: "082ac5f8-c196-4312-8c0f-0244f7ffa8d1"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 关闭或限制详细错误报告
-在生产环境中，应关闭PHP的 `display_errors` 配置，或将错误日志重定向到只有管理员可以访问的安全位置。 instead of displaying them to the client browser.
+在生产环境中，应关闭PHP的 `display_errors` 配置，或将错误日志重定向到只有管理员可以访问的安全位置。
 ```ini
 ; 在php.ini中设置
 display_errors = Off
 log_errors = On
 error_log = /var/log/php_errors.log
 ```
-
 #### 2. 使用通用的错误消息
 捕获数据库操作或其他可能产生敏感信息的函数调用的异常，并向用户显示通用的、不包含具体技术细节的错误消息。例如，可以显示“发生了一个错误，请稍后重试。”之类的信息。
 ```php
 <?php
 $conn = mysql_connect("localhost", "wrong_user", "wrong_password");
 if (!$conn) {
-    // die("连接失败: " . mysql_error()); // 不安全的写法
-    error_log("数据库连接失败: " . mysql_error()); // 将详细错误记录在服务器端日志
-    die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
+// die("连接失败: " . mysql_error()); // 不安全的写法
+error_log("数据库连接失败: " . mysql_error()); // 将详细错误记录在服务器端日志
+die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
 }
 ?>
 ```
-
 #### 3. 避免在生产环境输出敏感信息函数
 在开发和测试阶段可以使用的用于调试或获取系统信息的函数（如`mysql_get_host_info()`、`pg_version()`等），应确保在生产环境中被删除或不会被调用，避免将这些信息暴露给外部用户。
 SOLUTION
@@ -76,9 +69,8 @@ CODE}->} as $mysql_sink
 
 alert $mysql_sink for {
 	title_zh: "检测PHP MySQL数据库信息泄露风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 关闭或限制详细错误报告
 在生产环境中，应关闭PHP的 `display_errors` 配置，或将错误日志重定向到只有管理员可以访问的安全位置。
 ```ini
@@ -87,50 +79,47 @@ display_errors = Off
 log_errors = On
 error_log = /var/log/php_errors.log
 ```
-
 #### 2. 使用通用的错误消息
 捕获数据库操作或其他可能产生敏感信息的函数调用的异常，并向用户显示通用的、不包含具体技术细节的错误消息。例如，可以显示“发生了一个错误，请稍后重试。”之类的信息。
 ```php
 <?php
 $conn = mysql_connect("localhost", "wrong_user", "wrong_password");
 if (!$conn) {
-    // die("连接失败: " . mysql_error()); // 不安全的写法
-    error_log("数据库连接失败: " . mysql_error()); // 将详细错误记录在服务器端日志
-    die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
+// die("连接失败: " . mysql_error()); // 不安全的写法
+error_log("数据库连接失败: " . mysql_error()); // 将详细错误记录在服务器端日志
+die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
 }
 ?>
 ```
-
 #### 3. 避免在生产环境输出敏感信息函数
 在开发和测试阶段可以使用的用于调试或获取系统信息的函数（如`mysql_get_host_info()`等），应确保在生产环境中被删除或不会被调用，避免将这些信息暴露给外部用户。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
 应用程序在处理数据库操作或其他敏感任务时，如果未正确处理异常或未过滤函数输出，可能导致将本应仅供内部使用的敏感信息直接返回给客户端或记录在可公开访问的日志中。这些信息可能包括数据库连接信息、SQL错误信息、服务器配置、文件路径、堆栈跟踪等，攻击者可以利用这些信息来进一步了解系统架构、执行SQL注入、路径遍历或其他攻击。
-
 2. **触发场景**
 当应用程序在生产环境中开启调试模式或详细错误报告，或者直接调用能够输出敏感信息的API函数（如 `mysql_error()`、`mysql_get_host_info()` 等），并将这些函数的返回值未经处理地输出到前端页面或日志文件。
-
 例如，在数据库操作失败时直接将 `mysql_error()` 的返回值输出到页面，可能会暴露数据库的详细错误信息乃至部分SQL语句。
 ```php
 <?php
 $conn = mysql_connect("localhost", "wrong_user", "wrong_password");
 if (!$conn) {
-    die("连接失败: " . mysql_error()); // 直接输出详细错误信息
+die("连接失败: " . mysql_error()); // 直接输出详细错误信息
 }
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者获取数据库用户名、密码、主机地址等连接信息。
 - 攻击者获取详细的错误信息，帮助其定向构建SQL注入或漏洞利用代码。
 - 攻击者获取应用程序文件路径、服务器信息等，辅助进行其他攻击，如路径遍历或远程代码执行。
 - 导致业务逻辑或敏感数据被攻击者猜测或发现。
-CODE
+DESC
 	level: "low",
 	title: "Detect PHP MySQL Information Exposure Risk",
+	name: "mysql_sink",
+	message: "检测到PHP MySQL数据库信息泄露风险，敏感函数如mysql_error()的输出未经过滤直接暴露给客户端。",
+	risk: "信息泄露",
 }
 $param?{<self> #{include: <<<CODE
 * & $pg_information
@@ -139,9 +128,8 @@ CODE}->} as $pg_sink
 alert $pg_sink for {
 	title: "Detect PHP PostgreSQL Information Exposure Risk",
 	title_zh: "检测PHP PostgreSQL数据库信息泄露风险",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 关闭或限制详细错误报告
 在生产环境中，应关闭PHP的 `display_errors` 配置，或将错误日志重定向到只有管理员可以访问的安全位置。
 ```ini
@@ -150,49 +138,46 @@ display_errors = Off
 log_errors = On
 error_log = /var/log/php_errors.log
 ```
-
 #### 2. 使用通用的错误消息
 捕获数据库操作或其他可能产生敏感信息的函数调用的异常，并向用户显示通用的、不包含具体技术细节的错误消息。例如，可以显示“发生了一个错误，请稍后重试。”之类的信息。
 ```php
 <?php
 $conn = pg_connect("host=localhost dbname=test user=wrong_user password=wrong_password");
 if (!$conn) {
-    // echo "连接失败: " . pg_last_error(); // 不安全的写法
-    error_log("数据库连接失败: " . pg_last_error()); // 将详细错误记录在服务器端日志
-    die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
+// echo "连接失败: " . pg_last_error(); // 不安全的写法
+error_log("数据库连接失败: " . pg_last_error()); // 将详细错误记录在服务器端日志
+die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
 }
 ?>
 ```
-
 #### 3. 避免在生产环境输出敏感信息函数
 在开发和测试阶段可以使用的用于调试或获取系统信息的函数（如`pg_version()`等），应确保在生产环境中被删除或不会被调用，避免将这些信息暴露给外部用户。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
 应用程序在处理数据库操作或其他敏感任务时，如果未正确处理异常或未过滤函数输出，可能导致将本应仅供内部使用的敏感信息直接返回给客户端或记录在可公开访问的日志中。这些信息可能包括数据库连接信息、SQL错误信息、服务器配置、文件路径、堆栈跟踪等，攻击者可以利用这些信息来进一步了解系统架构、执行SQL注入、路径遍历或其他攻击。
-
 2. **触发场景**
 当应用程序在生产环境中开启调试模式或详细错误报告，或者直接调用能够输出敏感信息的API函数（如 `pg_last_error()`、`pg_version()` 等），并将这些函数的返回值未经处理地输出到前端页面或日志文件。
-
 例如，在数据库操作失败时直接将 `pg_last_error()` 的返回值输出到页面，可能会暴露数据库的详细错误信息乃至部分SQL语句。
 ```php
 <?php
 $conn = pg_connect("host=localhost dbname=test user=wrong_user password=wrong_password");
 if (!$conn) {
-    die("连接失败: " . pg_last_error()); // 直接输出详细错误信息
+die("连接失败: " . pg_last_error()); // 直接输出详细错误信息
 }
 ?>
 ```
-
 3. **潜在影响**
 - 攻击者获取数据库用户名、密码、主机地址等连接信息。
 - 攻击者获取详细的错误信息，帮助其定向构建SQL注入或漏洞利用代码。
 - 攻击者获取应用程序文件路径、服务器信息等，辅助进行其他攻击，如路径遍历或远程代码执行。
 - 导致业务逻辑或敏感数据被攻击者猜测或发现。
-CODE
+DESC
 	level: "low",
+	name: "pg_sink",
+	message: "检测到PHP PostgreSQL数据库信息泄露风险，敏感函数如pg_last_error()的输出未经过滤直接暴露给客户端。",
+	risk: "信息泄露",
 }
 desc(
 	lang: "php"
@@ -203,4 +188,69 @@ desc(
     echo "数据库主机信息：" . $host_info;
 ?>
 UNSAFE
+	"safefile://SecureDBConnection.php": <<<CODE
+<?php
+ini_set('display_errors', 'Off'); // 生产环境关闭错误显示
+ini_set('log_errors', 'On'); // 开启错误日志
+ini_set('error_log', '/var/log/php_errors.log'); // 指定错误日志文件
+
+// MySQL连接示例
+$conn_mysql = @mysql_connect("localhost", "user", "password");
+if (!$conn_mysql) {
+    error_log("MySQL连接失败: " . mysql_error()); // 将详细错误记录到日志
+    die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
+}
+
+// PostgreSQL连接示例
+$conn_pg = @pg_connect("host=localhost dbname=test user=user password=password");
+if (!$conn_pg) {
+    error_log("PostgreSQL连接失败: " . pg_last_error()); // 将详细错误记录到日志
+    die("数据库服务暂时不可用，请稍后重试。"); // 向用户显示通用信息
+}
+
+echo "数据库连接成功！";
+
+// 确保不输出敏感信息函数，例如不调用 mysql_get_host_info() 或 pg_version()
+// $host_info = mysql_get_host_info(); // 生产环境不应出现
+// echo $host_info; // 生产环境不应出现
+
+mysql_close($conn_mysql);
+pg_close($conn_pg);
+
+?>
+CODE
+	"safefile://SafeErrorHandling.php": <<<CODE
+<?php
+ini_set('display_errors', 'Off');
+ini_set('log_errors', 'On');
+ini_set('error_log', '/var/log/php_app_errors.log');
+
+function safe_db_query($sql) {
+    try {
+        // 模拟数据库连接和查询
+        $result = mysqli_query(new mysqli('localhost', 'user', 'password', 'database'), $sql);
+        if (!$result) {
+            throw new Exception("数据库查询失败: " . mysqli_error(new mysqli()));
+        }
+        return $result;
+    } catch (Exception $e) {
+        error_log("Caught Exception: " . $e->getMessage()); // 详细错误记录日志
+        return false; // 不向外部泄露具体错误
+    }
+}
+
+$sensitive_sql = "SELECT secret_data FROM users WHERE id = 1";
+$result = safe_db_query($sensitive_sql);
+
+if ($result === false) {
+    echo "操作失败，请稍后再试。"; // 通用错误信息
+} else {
+    echo "查询成功。";
+    // 处理查询结果
+}
+
+// 确保不使用如 mysql_error() 或 pg_last_error() 直接输出
+// if (something_failed) { echo mysql_error(); } // 这是反例，不安全
+?>
+CODE
 )

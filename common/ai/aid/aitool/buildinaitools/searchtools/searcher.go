@@ -109,10 +109,16 @@ func NewKeyWordSearcher[T AISearchable](chatToAiFunc func(string) (io.Reader, er
 			resultJSON := rsp[start:end]
 			res := KeywordSearchResult{}
 			err = json.Unmarshal([]byte(resultJSON), &res)
-			if err != nil {
+			if err == nil {
+				callResults = append(callResults, &res)
 				continue
 			}
-			callResults = append(callResults, &res)
+			tools := []*KeywordSearchResult{}
+			err = json.Unmarshal([]byte(resultJSON), &tools)
+			if err == nil {
+				callResults = append(callResults, tools...)
+				continue
+			}
 		}
 
 		if len(callResults) == 0 {

@@ -182,6 +182,21 @@ func (r *Report) baseGeneralKVPair(items ...interface{}) []*graphKVPair {
 	return funk.Filter(pairs, func(pair *graphKVPair) bool { return pair != nil }).([]*graphKVPair)
 }
 
+func (r *Report) RawTable(items interface{}) {
+	defer func() {
+		if err := recover(); err != nil {
+			log.Errorf("marshal interface{} failed: %s", err)
+		}
+	}()
+
+	raw, _ := json.Marshal(items)
+	if len(raw) <= 0 {
+		return
+	}
+
+	r.append(&ReportItem{Type: REPORT_ITEM_TYPE_TABLE, Content: utils.EscapeInvalidUTF8Byte(raw)})
+}
+
 func (r *Report) Table(i interface{}, raw ...interface{}) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -282,6 +297,19 @@ func (r *ReportRecord) ToReport() (*Report, error) {
 
 func (r *Report) Save() int {
 	db := GetGormProjectDatabase()
+
+	record, err := r.ToRecord()
+	if err != nil {
+		return 0
+	}
+	if db != nil {
+		db.Save(record)
+	}
+	return int(record.ID)
+}
+
+func (r *Report) SaveForIRify() int {
+	db := GetDefaultSSADatabase()
 
 	record, err := r.ToRecord()
 	if err != nil {

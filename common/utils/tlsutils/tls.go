@@ -175,11 +175,41 @@ func ParsePEMCertificateAndKey(ca, key []byte) (*x509.Certificate, *rsa.PrivateK
 	return caCert, caKey, nil
 }
 
+func ParsePEMCertificateAndKeyForGM(ca, key []byte) (*x509gm.Certificate, *sm2.PrivateKey, error) {
+	caCertBlock, _ := pem.Decode(ca)
+	caCert, err := x509gm.ParseCertificate(caCertBlock.Bytes)
+	if err != nil {
+		return nil, nil, errors.Errorf("parse ca error: %s", err)
+	}
+
+	caKeyBlock, _ := pem.Decode(key)
+	// 尝试 PKCS8 格式
+	caKey, err := x509gm.ParsePKCS8UnecryptedPrivateKey(caKeyBlock.Bytes)
+	if err == nil {
+		return caCert, caKey, nil
+	}
+	caKey, err = x509gm.ParseSm2PrivateKey(caKeyBlock.Bytes)
+	if err == nil {
+		return caCert, caKey, nil
+	}
+	log.Errorf("all strategry failed while trying to unmarshal GM private key asn1 data")
+	return nil, nil, err
+}
+
 func ParsePEMCertificate(ca []byte) (*x509.Certificate, error) {
 	caCertBlock, _ := pem.Decode(ca)
 	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
 	if err != nil {
 		return nil, errors.Errorf("parse ca error: %s", err)
+	}
+	return caCert, nil
+}
+
+func ParseGMPEMCertificate(ca []byte) (*x509gm.Certificate, error) {
+	caCertBlock, _ := pem.Decode(ca)
+	caCert, err := x509gm.ParseCertificate(caCertBlock.Bytes)
+	if err != nil {
+		return nil, errors.Errorf("parse gm ca error: %s", err)
 	}
 	return caCert, nil
 }
@@ -577,6 +607,7 @@ func GetX509GMMutualAuthClientTlsConfig(clientCrt, clientPriv []byte, caCrts ...
 		InsecureSkipVerify: true,
 		Certificates:       []gmtls.Certificate{pair},
 		ClientCAs:          pool,
+		GMSupport:          &gmtls.GMSupport{WorkMode: gmtls.ModeAutoSwitch},
 	}
 
 	return &config, nil

@@ -1,3 +1,0 @@
-poc.GEt("abc")
-poc.POst("321")
-a,err := fuzz.HTTPRequest("abc")

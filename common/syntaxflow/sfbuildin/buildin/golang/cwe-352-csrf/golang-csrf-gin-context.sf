@@ -1,0 +1,366 @@
+desc(
+	title: "Check Golang CSRF Protection Disabled"
+	title_zh: "检查Golang CSRF保护是否已禁用"
+	type: audit
+	level: high
+	risk: "csrf"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+CSRF（跨站请求伪造）是一种利用Web应用对用户浏览器的信任进行攻击的方式。在这种攻击中，攻击者通过诱导受害者点击恶意链接或访问含有恶意脚本的网页，使受害者的浏览器在未经授权的情况下向目标应用发送请求。由于浏览器会自动携带用户的认证信息（如Cookie），该请求会被目标应用视为合法请求执行，从而导致安全问题。
+
+2. **触发场景**
+以下为存在漏洞的代码示例：
+```go
+func CSRFHandler(c *gin.Context) {
+    username, _ := c.Cookie("username")
+    c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+        "isLoggedIn": username != "",
+        "username":   username,
+    })
+}
+```
+攻击者可以构造一个链接，当用户点击该链接时，会向应用发送一个包含恶意数据的请求。如果用户已经登录到该应用，那么这个请求就会被应用当作合法请求执行，从而导致安全问题。
+
+3. **潜在影响**
+- 用户数据可能被窃取。
+- 攻击者可能以用户身份执行恶意操作，例如修改密码、转账等。
+- 网站功能可能被滥用，例如批量提交垃圾信息。
+
+### 规则详细
+1. **作为基础检测库**
+属于`golang-csrf-gin-context`库规则（`lib`类型），需配合其他规则（如用户输入跟踪规则）共同检测CSRF漏洞，提供核心函数识别能力。
+
+2. **覆盖高危操作函数**
+检测以下操作函数：
+- `Cookie`：用于从客户端获取Cookie。
+- `HTML`：用于渲染HTML模板并返回响应。
+DESC
+	rule_id: "c13ec0d1-e9bd-447b-9307-daf87528bd3e"
+	title_zh: "检查Golang CSRF保护是否已禁用"
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用CSRF令牌
+在用户会话中生成一个CSRF令牌，并在每个表单和AJAX请求中包含这个令牌，服务器在处理请求时会验证令牌的有效性，如果令牌无效或者不存在，则拒绝请求。
+```go
+// 生成CSRF令牌
+func GenerateCSRFToken(c *gin.Context) string {
+    csrfToken, _ := c.Cookie("csrfToken")
+    if csrfToken == "" {
+        csrfToken = uuid.New().String()
+        c.SetCookie("csrfToken", csrfToken, 3600, "/", "", false, true)
+    }
+    return csrfToken
+}
+
+// 验证CSRF令牌
+func VerifyCSRFToken(c *gin.Context, csrfToken string) bool {
+    cookieToken, _ := c.Cookie("csrfToken")
+    return cookieToken == csrfToken
+}
+```
+
+#### 2. 设置SameSite属性
+在Cookie中设置SameSite属性为`Strict`或`Lax`，可以防止浏览器在跨站请求中发送Cookie。
+```go
+// 设置SameSite属性
+func SetSameSiteCookie(c *gin.Context, username string) {
+    c.SetCookie("username", username, 3600, "/", "", false, true)
+    c.SetCookie("username", username, 3600, "/", "", true, true)
+}
+```
+
+#### 3. 使用验证码
+在关键操作（如登录、转账等）前要求用户输入验证码，可以防止自动化攻击。
+```go
+// 使用验证码
+func VerifyCaptcha(c *gin.Context) bool {
+    captcha := c.PostForm("captcha")
+    return captcha == "correct"
+}
+```
+
+#### 4. 使用安全的HTTP头部
+设置`X-Frame-Options`和`Content-Security-Policy`等HTTP头部，可以防止攻击者通过iframe嵌入攻击页面。
+```go
+// 设置HTTP头部
+func SetSecurityHeaders(c *gin.Context) {
+    c.Writer.Header().Set("X-Frame-Options", "DENY")
+    c.Writer.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none';")
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CSRF攻击](https://owasp.org/www-community/vulnerabilities/Cross-Site_Request_Forgery)
+[CWE-352](https://cwe.mitre.org/data/definitions/352.html)
+REFERENCE
+)
+
+<include('golang-gin-context')> as $gin;
+
+$gin.Cookie()?{have: '"username"'} #->?{!opcode:const} as $target
+$gin.HTML(*<slice(index=3)> #-> as $sink)
+$target & $sink as $high
+
+alert $high for {
+	type: "vuln",
+	title: "Golang CSRF Protection Disabled Vulnerability Was Detected",
+	title_zh: "检测到Golang CSRF保护被禁用",
+	level: "high",
+	message: "检测到Golang CSRF保护被禁用，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+为了防止CSRF攻击，可以采取以下措施：
+#### 1. 使用CSRF令牌
+在用户会话中生成一个CSRF令牌，并在每个表单和AJAX请求中包含这个令牌，服务器在处理请求时会验证令牌的有效性，如果令牌无效或者不存在，则拒绝请求。
+```go
+// 生成CSRF令牌
+func GenerateCSRFToken(c *gin.Context) string {
+csrfToken, _ := c.Cookie("csrfToken")
+if csrfToken == "" {
+csrfToken = uuid.New().String()
+c.SetCookie("csrfToken", csrfToken, 3600, "/", "", false, true)
+}
+return csrfToken
+}
+// 验证CSRF令牌
+func VerifyCSRFToken(c *gin.Context, csrfToken string) bool {
+cookieToken, _ := c.Cookie("csrfToken")
+return cookieToken == csrfToken
+}
+```
+#### 2. 设置SameSite属性
+在Cookie中设置SameSite属性为`Strict`或`Lax`，可以防止浏览器在跨站请求中发送Cookie。
+```go
+// 设置SameSite属性
+func SetSameSiteCookie(c *gin.Context, username string) {
+c.SetCookie("username", username, 3600, "/", "", false, true)
+c.SetCookie("username", username, 3600, "/", "", true, true)
+}
+```
+#### 3. 使用验证码
+在关键操作（如登录、转账等）前要求用户输入验证码，可以防止自动化攻击。
+```go
+// 使用验证码
+func VerifyCaptcha(c *gin.Context) bool {
+captcha := c.PostForm("captcha")
+return captcha == "correct"
+}
+```
+#### 4. 使用安全的HTTP头部
+设置`X-Frame-Options`和`Content-Security-Policy`等HTTP头部，可以防止攻击者通过iframe嵌入攻击页面。
+```go
+// 设置HTTP头部
+func SetSecurityHeaders(c *gin.Context) {
+c.Writer.Header().Set("X-Frame-Options", "DENY")
+c.Writer.Header().Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none';")
+}
+```
+SOLUTION
+	risk: "CSRF",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+CSRF攻击利用了Web应用的信任用户浏览器的机制，攻击者通过诱导用户点击链接或者打开含有恶意脚本的网页，使浏览器自动向应用发送请求，攻击者可以构造请求的参数，达到攻击目的。
+2. **触发场景**
+// 存在漏洞的代码示例
+```go
+func CSRFHandler(c *gin.Context) {
+username, _ := c.Cookie("username")
+c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+"isLoggedIn": username != "",
+"username":   username,
+})
+}
+```
+攻击者可以构造一个链接，当用户点击该链接时，会向应用发送一个包含恶意数据的请求，如果用户已经登录到该应用，那么这个请求就会被应用当作合法请求执行，从而导致安全问题。
+3. **潜在影响**
+- 用户数据被窃取。
+- 用户账户被恶意操作。
+- 网站功能被滥用。
+DESC
+	name: "high",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe.go': <<<UNSAFE
+package api
+
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
+
+type User struct {
+	Username string
+	Password string
+	Balance  float64
+}
+
+var users = map[string]User{
+	"admin": {Username: "admin", Password: "admin123", Balance: 1000.0},
+}
+
+func CSRFHandler(c *gin.Context) {
+	username, _ := c.Cookie("username")
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"isLoggedIn": username != "",
+		"username":   username,
+	})
+}
+
+func CSRFLoginHandler(c *gin.Context) {
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+
+	if user, exists := users[username]; exists && user.Password == password {
+		c.SetCookie("username", username, 3600, "/", "", false, true)
+		c.Redirect(http.StatusFound, "/csrf")
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"error":   true,
+		"message": "用户名或密码错误",
+	})
+}
+
+func CSRFLogoutHandler(c *gin.Context) {
+	c.SetCookie("username", "", -1, "/", "", false, true)
+	c.Redirect(http.StatusFound, "/csrf")
+}
+
+func CSRFChangePasswordHandler(c *gin.Context) {
+	username, _ := c.Cookie("username")
+	if username == "" {
+		c.Redirect(http.StatusFound, "/csrf")
+		return
+	}
+
+	newPassword := c.PostForm("newPassword")
+	if user, exists := users[username]; exists {
+		user.Password = newPassword
+		users[username] = user
+		c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+			"isLoggedIn": true,
+			"username":   username,
+			"message":    "密码修改成功",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"error":   true,
+		"message": "修改密码失败",
+	})
+}
+
+func CSRFTransferHandler(c *gin.Context) {
+	username, _ := c.Cookie("username")
+	if username == "" {
+		c.Redirect(http.StatusFound, "/csrf")
+		return
+	}
+
+	to := c.PostForm("to")
+	amount := c.PostForm("amount")
+
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"isLoggedIn": true,
+		"username":   username,
+		"message":    "转账成功：已向 " + to + " 转账 " + amount + " 元",
+	})
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package api
+
+import (
+	"github.com/gin-gonic/gin"
+	"net/http"
+)
+
+type User struct {
+	Username string
+	Password string
+	Balance  float64
+}
+
+var users = map[string]User{
+	"admin": {Username: "admin", Password: "admin123", Balance: 1000.0},
+}
+
+func CSRFHandler(c *gin.Context) {
+	username := "username"
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"isLoggedIn": username != "",
+		"username":   username,
+	})
+}
+
+func CSRFLoginHandler(c *gin.Context) {
+	username := "username"
+	password := "password"
+
+	if user, exists := users[username]; exists && user.Password == password {
+		c.SetCookie("username", username, 3600, "/", "", false, true)
+		c.Redirect(http.StatusFound, "/csrf")
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"error":   true,
+		"message": "用户名或密码错误",
+	})
+}
+
+func CSRFLogoutHandler(c *gin.Context) {
+	c.SetCookie("username", "", -1, "/", "", false, true)
+	c.Redirect(http.StatusFound, "/csrf")
+}
+
+func CSRFChangePasswordHandler(c *gin.Context) {
+	username := "username"
+	if username == "" {
+		c.Redirect(http.StatusFound, "/csrf")
+		return
+	}
+
+	newPassword := c.PostForm("newPassword")
+	if user, exists := users[username]; exists {
+		user.Password = newPassword
+		users[username] = user
+		c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+			"isLoggedIn": true,
+			"username":   username,
+			"message":    "密码修改成功",
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"error":   true,
+		"message": "修改密码失败",
+	})
+}
+
+func CSRFTransferHandler(c *gin.Context) {
+	username := "username"
+	if username == "" {
+		c.Redirect(http.StatusFound, "/csrf")
+		return
+	}
+
+	to := c.PostForm("to")
+	amount := c.PostForm("amount")
+
+	c.HTML(http.StatusOK, "vulns/csrf.tmpl", gin.H{
+		"isLoggedIn": true,
+		"username":   username,
+		"message":    "转账成功：已向 " + to + " 转账 " + amount + " 元",
+	})
+}
+SAFE
+)

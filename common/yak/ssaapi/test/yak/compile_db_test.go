@@ -2,14 +2,11 @@ package ssaapi
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"strconv"
 	"testing"
 
 	"github.com/yaklang/yaklang/common/log"
-
-	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -64,7 +61,7 @@ dump(c)
 	funcIns := prog.Program.GetFunction(string(ssa.MainFunctionName), "")
 	require.NotNil(t, funcIns)
 	brId := funcIns.Blocks[len(funcIns.Blocks)-1]
-	br := funcIns.GetBasicBlockByID(brId)
+	br, _ := funcIns.GetBasicBlockByID(brId)
 	block, _ := ssa.ToBasicBlock(br)
 	require.NotNil(t, block)
 	scope := block.ScopeTable
@@ -155,19 +152,21 @@ c("d")
 	} else {
 		t.Logf("IRCODE Fetch: %v", count)
 	}
-	fmt.Println(includeFile.Len())
-	if includeFile.Len() != 3 {
-		t.Fatal("have not 3 source code hash")
-	}
+	// fmt.Println(includeFile.Len())
+	includeFile.ForEach(func(i string, v any) bool {
+		t.Logf("source code hash: %v", i)
+		return true
+	})
+	require.Equal(t, 2, includeFile.Len(), "should have 2 source code hash")
 }
 
 func TestCompileWithDatabase_MultiFile(t *testing.T) {
 	progName := uuid.New().String()
 	includeCode := `c = i => dump(i)`
-	filename := consts.TempFileFast(includeCode)
-	defer os.RemoveAll(filename)
+	filepath := consts.TempFileFast(includeCode)
+	defer os.RemoveAll(filepath)
 	prog, err := ssaapi.Parse(`
-include `+strconv.Quote(filename)+`
+include `+strconv.Quote(filepath)+`
 
 c("d")
 `, ssaapi.WithProgramName(progName), ssaapi.WithLanguage(ssaapi.Yak))
@@ -179,7 +178,8 @@ c("d")
 
 	haveIncluded := false
 	includeFile := omap.NewOrderedMap(make(map[string]any))
-	includeHash := memedit.NewMemEditorWithFileUrl(includeCode, filename).GetIrSourceHash(progName)
+	includeHash := prog.Program.CreateEditor([]byte(includeCode), filepath, false).GetIrSourceHash()
+	// includeHash := memedit.NewMemEditorWithFileUrl(includeCode, filepath).GetIrSourceHash()
 	for result := range ssadb.YieldIrCodesProgramName(ssadb.GetDB(), context.Background(), progName) {
 		if result.IsEmptySourceCodeHash() {
 			log.Warn("source code hash is empty")
@@ -192,10 +192,12 @@ c("d")
 			haveIncluded = true
 		}
 	}
-	fmt.Println(includeFile.Len())
-	if includeFile.Len() != 3 {
-		t.Fatal("have not 3 source code hash")
-	}
+	// fmt.Println(includeFile.Len())
+	includeFile.ForEach(func(i string, v any) bool {
+		log.Infof("source code hash: %v", i)
+		return true
+	})
+	require.Equal(t, 2, includeFile.Len(), "should have 2 source code hash")
 	if !haveIncluded {
 		t.Fatal("not included")
 	}
@@ -227,8 +229,8 @@ dump(a(3))
 		}
 		m.Set(result.SourceCodeHash, struct{}{})
 	}
-	if m.Len() != 2 {
-		t.Fatal("have not 2 source code hash")
+	if m.Len() != 1 {
+		t.Fatal("have not 1 source code hash")
 	}
 	if count <= 0 {
 		t.Fatal("no result in ir code database")
@@ -236,6 +238,8 @@ dump(a(3))
 }
 
 func TestCompileWithDatabase_CacheHitter(t *testing.T) {
+	//TODO: because cache hitter will low database query now, we shuold use memory check
+	t.Skip("skip for cache hitter test")
 	progName := uuid.New().String()
 	code := `
 a = () => {

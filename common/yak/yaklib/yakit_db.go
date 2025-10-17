@@ -475,4 +475,5 @@ func init() {
 
 	// DeletePayload
 	YakitExports["DeletePayloadByGroup"] = deletePayloadByGroup
+
 }

@@ -2,124 +2,101 @@ desc(
 	title: "Check Golang XXE Read Any File"
 	type: audit
 	level: high
+	risk: "xxe"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XXE（XML External Entity）漏洞是 XML 解析器在解析 XML 文档时，未禁用外部实体引用所导致的一种安全问题。当应用程序支持 DOCTYPE 声明，并且允许引用外部实体时，攻击者可以通过构造恶意的 XML 输入，利用外部实体引用机制读取服务器上的任意文件，例如配置文件、系统敏感文件（如 `/etc/passwd`），甚至在某些情况下可能导致拒绝服务或远程代码执行。
-
+XXE（XML External Entity）漏洞是 XML 解析器在解析 XML 文档时，未禁用外部实体引用所导致的一种安全问题。当应用程序支持 DOCTYPE 声明，并且允许引用外部实体时，攻击者可以通过构造恶意的 XML 输入，利用外部实体引用机制读取服务器上的任意文件，例如配置文件、系统敏感文件（如 `/etc/passwd`），甚至在某些情况下可能导致拒绝服务或远程代码执行。
 2. **触发场景**
-   当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = true` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
-
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE foo [
-     <!ELEMENT foo ANY >
-     <!ENTITY xxe SYSTEM "file:///应用敏感文件路径">
-   ]>
-   <root>
-     <element>&xxe;</element>
-   </root>
-   ```
-
-   解析器在处理 `&xxe;` 时会尝试加载并读取指定的文件内容，并将其嵌入到 XML 文档的解析结果中返回给攻击者，从而实现任意文件读取。
-
-   **易受攻击的代码示例（Golang）:**
-   ```go
-   package main
-
-   import (
-       "encoding/xml"
-       "fmt"
-       "strings"
-   )
-
-   func main() {
-       xmlData := `<?xml version="1.0"?>
+当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = false` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+<!ELEMENT foo ANY >
+<!ENTITY xxe SYSTEM "file:///应用敏感文件路径">
+]>
+<root>
+<element>&xxe;</element>
+</root>
+```
+解析器在处理 `&xxe;` 时会尝试加载并读取指定的文件内容，并将其嵌入到 XML 文档的解析结果中返回给攻击者，从而实现任意文件读取。
+**易受攻击的代码示例（Golang）:**
+```go
+package main
+import (
+"encoding/xml"
+"fmt"
+"strings"
+)
+func main() {
+xmlData := `<?xml version="1.0"?>
 <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
 <person>
-       <name>&xxe;</name>
-       <age>30</age>
+<name>&xxe;</name>
+<age>30</age>
 </person>`
-
-       var person Person
-       decoder := xml.NewDecoder(strings.NewReader(xmlData))
-
-       // 启用外部实体解析（可能导致漏洞）
-       decoder.Strict = true
-       // decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
-
-       err := decoder.Decode(&person)
-       if err != nil {
-           fmt.Println("Error unmarshalling XML:", err)
-           return
-       }
-
-       fmt.Println("Name:", person.Name) // 如果XXE成功，会输出/etc/passwd的内容
-   }
-   ```
-
+var person Person
+decoder := xml.NewDecoder(strings.NewReader(xmlData))
+// 启用非严格模式（可能导致漏洞）
+decoder.Strict = false
+// decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
+err := decoder.Decode(&person)
+if err != nil {
+fmt.Println("Error unmarshalling XML:", err)
+return
+}
+fmt.Println("Name:", person.Name) // 如果XXE成功，会输出/etc/passwd的内容
+}
+```
 3. **潜在影响**
-   - **敏感信息泄露:** 攻击者可以读取服务器上的任意文件，包括但不限于配置文件、源代码、数据库连接信息、用户凭证、私钥等敏感信息。
-   - **拒绝服务 (DoS):** 通过构造引用超大文件或无限递归的外部实体，可能导致服务器资源耗尽，引发拒绝服务。
-   - **端口扫描:** 攻击者可能通过外部实体引用探测内网端口。
-   - **远程代码执行 (在特定配置和环境下):** 在某些极端情况下，结合其他漏洞或特定的系统配置，XXE 可能被提升为远程代码执行。
+- **敏感信息泄露:** 攻击者可以读取服务器上的任意文件，包括但不限于配置文件、源代码、数据库连接信息、用户凭证、私钥等敏感信息。
+- **拒绝服务 (DoS):** 通过构造引用超大文件或无限递归的外部实体，可能导致服务器资源耗尽，引发拒绝服务。
+- **端口扫描:** 攻击者可能通过外部实体引用探测内网端口。
+- **远程代码执行 (在特定配置和环境下):** 在某些极端情况下，结合其他漏洞或特定的系统配置，XXE 可能被提升为远程代码执行。
 DESC
 	rule_id: "2a752b37-c0ec-4098-813d-c0a685e36541"
 	title_zh: "检测Golang XXE任意文件读取漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体解析 (推荐)
 最直接和有效的防御方法是配置 XML 解析器，禁用 XML 外部实体（External Entity）和 DTD（Document Type Definition）的处理。大多数现代 XML 解析库都提供了相应的配置选项。
-
 ** Golang `encoding/xml` 标准库：**
-Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = true` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
-
+Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = false` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
 ** 安全示例 (Golang):**
 ```go
 package main
-
 import (
-    "encoding/xml"
-    "fmt"
-    "strings"
+"encoding/xml"
+"fmt"
+"strings"
 )
-
 type Person struct {
-    Name string `xml:"name"`
-    Age  int `xml:"age"`
+Name string `xml:"name"`
+Age  int `xml:"age"`
 }
-
 func main() {
-    // 模拟用户 XML 输入
-    xmlData := `<?xml version="1.0"?>
+// 模拟用户 XML 输入
+xmlData := `<?xml version="1.0"?>
 <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
 <person>
-    <name>&xxe;</name>
-    <age>30</age>
+<name>&xxe;</name>
+<age>30</age>
 </person>`
-
-    var person Person
-    decoder := xml.NewDecoder(strings.NewReader(xmlData))
-
-    // 避免显式设置 decoder.Strict = true 或 decoder.Entity 为不安全的值
-    // 依赖 Go >= 1.11 的默认安全行为
-
-    err := decoder.Decode(&person)
-    if err != nil {
-        fmt.Println("Error unmarshalling XML:", err)
-        return
-    }
-
-    fmt.Println("Name:", person.Name)
-    fmt.Println("Age:", person.Age)
+var person Person
+decoder := xml.NewDecoder(strings.NewReader(xmlData))
+// 避免显式设置 decoder.Strict = false 或 decoder.Entity 为不安全的值
+// 依赖 Go >= 1.11 的默认安全行为
+err := decoder.Decode(&person)
+if err != nil {
+fmt.Println("Error unmarshalling XML:", err)
+return
+}
+fmt.Println("Name:", person.Name)
+fmt.Println("Age:", person.Age)
 }
 ```
-
 #### 2. 输入验证和过滤
 对接收到的 XML 输入进行严格的验证和过滤。拒绝包含 DOCTYPE 声明或包含外部实体引用的 XML 文档。这可以通过正则表达式或白名单/黑名单过滤来完成。
-
 #### 3. 使用不容易受XXE影响的数据格式
 如果业务场景允许，考虑使用 JSON、 Protocol Buffers 等不容易受 XXE 影响的数据交换格式替代 XML。
 SOLUTION
@@ -130,138 +107,118 @@ REFERENCE
 
 <include('golang-xml-sink')> as $sink;
 
-$sink.Strict?{!have: 'false'} as $high
+$sink.Strict?{have: 'false'} as $high;
+$sink.Entity?{!have: 'xml.HTMLEntity'} as $high;
 
 alert $high for {
 	type: "vuln",
 	title: "Check Golang XXE Read Any File",
 	title_zh: "检测Golang XXE任意文件读取漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 禁用外部实体解析 (推荐)
 最直接和有效的防御方法是配置 XML 解析器，禁用 XML 外部实体（External Entity）和 DTD（Document Type Definition）的处理。大多数现代 XML 解析库都提供了相应的配置选项。
-
 ** Golang `encoding/xml` 标准库：**
-Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = true` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
-
+Golang 的 `encoding/xml` 标准库的 `xml.Decoder` 在默认情况下（v1.11+）对外部实体是相对安全的，但为了明确禁用且兼容旧版本或避免潜在的配置错误，应确保不显式启用可能导致XXE的选项，例如避免设置 `decoder.Strict = false` 或 `decoder.Entity` 为允许外部实体解析的值。通常，建议基于较新的Go版本，并依赖其默认的安全行为。如果需要处理外部引用但又想安全，可以考虑使用专门设计来安全处理XML的第三方库或对输入进行严格验证过滤。
 ** 安全示例 (Golang):**
 ```go
 package main
-
 import (
-    "encoding/xml"
-    "fmt"
-    "strings"
+"encoding/xml"
+"fmt"
+"strings"
 )
-
 type Person struct {
-    Name string `xml:"name"`
-    Age  int `xml:"age"`
+Name string `xml:"name"`
+Age  int `xml:"age"`
 }
-
 func main() {
-    // 模拟用户 XML 输入
-    xmlData := `<?xml version="1.0"?>
+// 模拟用户 XML 输入
+xmlData := `<?xml version="1.0"?>
 <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
 <person>
-    <name>&xxe;</name>
-    <age>30</age>
+<name>&xxe;</name>
+<age>30</age>
 </person>`
-
-    var person Person
-    decoder := xml.NewDecoder(strings.NewReader(xmlData))
-
-    // 避免显式设置 decoder.Strict = true 或 decoder.Entity 为不安全的值
-    // 依赖 Go >= 1.11 的默认安全行为
-
-    err := decoder.Decode(&person)
-    if err != nil {
-        fmt.Println("Error unmarshalling XML:", err)
-        return
-    }
-
-    fmt.Println("Name:", person.Name)
-    fmt.Println("Age:", person.Age)
+var person Person
+decoder := xml.NewDecoder(strings.NewReader(xmlData))
+// 避免显式设置 decoder.Strict = false 或 decoder.Entity 为不安全的值
+// 依赖 Go >= 1.11 的默认安全行为
+err := decoder.Decode(&person)
+if err != nil {
+fmt.Println("Error unmarshalling XML:", err)
+return
+}
+fmt.Println("Name:", person.Name)
+fmt.Println("Age:", person.Age)
 }
 ```
-
 #### 2. 输入验证和过滤
 对接收到的 XML 输入进行严格的验证和过滤。拒绝包含 DOCTYPE 声明或包含外部实体引用的 XML 文档。这可以通过正则表达式或白名单/黑名单过滤来完成。
-
 #### 3. 使用不容易受XXE影响的数据格式
 如果业务场景允许，考虑使用 JSON、 Protocol Buffers 等不容易受 XXE 影响的数据交换格式替代 XML。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XXE（XML External Entity）漏洞是 XML 解析器在解析 XML 文档时，未禁用外部实体引用所导致的一种安全问题。当应用程序支持 DOCTYPE 声明，并且允许引用外部实体时，攻击者可以通过构造恶意的 XML 输入，利用外部实体引用机制读取服务器上的任意文件，例如配置文件、系统敏感文件（如 `/etc/passwd`），甚至在某些情况下可能导致拒绝服务或远程代码执行。
-
+XXE（XML External Entity）漏洞是 XML 解析器在解析 XML 文档时，未禁用外部实体引用所导致的一种安全问题。当应用程序支持 DOCTYPE 声明，并且允许引用外部实体时，攻击者可以通过构造恶意的 XML 输入，利用外部实体引用机制读取服务器上的任意文件，例如配置文件、系统敏感文件（如 `/etc/passwd`），甚至在某些情况下可能导致拒绝服务或远程代码执行。
 2. **触发场景**
-   当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = true` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
-
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE foo [
-     <!ELEMENT foo ANY >
-     <!ENTITY xxe SYSTEM "file:///应用敏感文件路径">
-   ]>
-   <root>
-     <element>&xxe;</element>
-   </root>
-   ```
-
-   解析器在处理 `&xxe;` 时会尝试加载并读取指定的文件内容，并将其嵌入到 XML 文档的解析结果中返回给攻击者，从而实现任意文件读取。
-
-   **易受攻击的代码示例（Golang）:**
-   ```go
-   package main
-
-   import (
-       "encoding/xml"
-       "fmt"
-       "strings"
-   )
-
-   func main() {
-       xmlData := `<?xml version="1.0"?>
+当应用程序接收并解析用户提供的 XML 数据，并且所使用的 XML 解析库未配置为禁用外部实体（例如 `decoder.Strict = false` 在 Go 标准库 `encoding/xml` 中可能会导致外部实体被解析），攻击者可以向应用程序发送包含如下结构的恶意 XML：
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+<!ELEMENT foo ANY >
+<!ENTITY xxe SYSTEM "file:///应用敏感文件路径">
+]>
+<root>
+<element>&xxe;</element>
+</root>
+```
+解析器在处理 `&xxe;` 时会尝试加载并读取指定的文件内容，并将其嵌入到 XML 文档的解析结果中返回给攻击者，从而实现任意文件读取。
+**易受攻击的代码示例（Golang）:**
+```go
+package main
+import (
+"encoding/xml"
+"fmt"
+"strings"
+)
+func main() {
+xmlData := `<?xml version="1.0"?>
 <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
 <person>
-       <name>&xxe;</name>
-       <age>30</age>
+<name>&xxe;</name>
+<age>30</age>
 </person>`
-
-       var person Person
-       decoder := xml.NewDecoder(strings.NewReader(xmlData))
-
-       // 启用外部实体解析（可能导致漏洞）
-       decoder.Strict = true
-       // decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
-
-       err := decoder.Decode(&person)
-       if err != nil {
-           fmt.Println("Error unmarshalling XML:", err)
-           return
-       }
-
-       fmt.Println("Name:", person.Name) // 如果XXE成功，会输出/etc/passwd的内容
-   }
-   ```
-
+var person Person
+decoder := xml.NewDecoder(strings.NewReader(xmlData))
+// 启用非严格模式（可能导致漏洞）
+decoder.Strict = false
+// decoder.Entity = xml.HTMLEntity // 如果不禁用，HTMLEntity也会解析，但system entities会处理file://等
+err := decoder.Decode(&person)
+if err != nil {
+fmt.Println("Error unmarshalling XML:", err)
+return
+}
+fmt.Println("Name:", person.Name) // 如果XXE成功，会输出/etc/passwd的内容
+}
+```
 3. **潜在影响**
-   - **敏感信息泄露:** 攻击者可以读取服务器上的任意文件，包括但不限于配置文件、源代码、数据库连接信息、用户凭证、私钥等敏感信息。
-   - **拒绝服务 (DoS):** 通过构造引用超大文件或无限递归的外部实体，可能导致服务器资源耗尽，引发拒绝服务。
-   - **端口扫描:** 攻击者可能通过外部实体引用探测内网端口。
-   - **远程代码执行 (在特定配置和环境下):** 在某些极端情况下，结合其他漏洞或特定的系统配置，XXE 可能被提升为远程代码执行。
-CODE
+- **敏感信息泄露:** 攻击者可以读取服务器上的任意文件，包括但不限于配置文件、源代码、数据库连接信息、用户凭证、私钥等敏感信息。
+- **拒绝服务 (DoS):** 通过构造引用超大文件或无限递归的外部实体，可能导致服务器资源耗尽，引发拒绝服务。
+- **端口扫描:** 攻击者可能通过外部实体引用探测内网端口。
+- **远程代码执行 (在特定配置和环境下):** 在某些极端情况下，结合其他漏洞或特定的系统配置，XXE 可能被提升为远程代码执行。
+DESC
 	level: "high",
+	risk: "XXE",
+	name: "high",
+	message: "发现Golang XXE任意文件读取漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -287,9 +244,12 @@ func main() {
     var person Person
     decoder := xml.NewDecoder(strings.NewReader(xmlData))
 
-    // 启用外部实体解析
-    decoder.Strict = true
-    decoder.Entity = xml.HTMLEntity
+    // 启用非严格模式
+    decoder.Strict = false
+    decoder.Entity = func(name string) (string, bool) {
+        // 不安全实现：直接返回外部内容
+        return fetchExternalEntity(name), true
+    }
 
     err := decoder.Decode(&person)
     if err != nil {
@@ -302,4 +262,44 @@ func main() {
 }
 
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+    "encoding/xml"
+    "fmt"
+    "os"
+)
+
+type Person struct {
+    Name string `xml:"name"`
+    Age  int    `xml:"age"`
+}
+
+func main() {
+    // 模拟恶意 XML 输入
+    xmlData := `<?xml version="1.0"?>
+<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<person>
+    <name>&xxe;</name>
+    <age>30</age>
+</person>`
+
+    var person Person
+    decoder := xml.NewDecoder(strings.NewReader(xmlData))
+
+    // 启用非严格模式
+    decoder.Strict = true
+
+    err := decoder.Decode(&person)
+    if err != nil {
+        fmt.Println("Error unmarshalling XML:", err)
+        return
+    }
+
+    fmt.Println("Name:", person.Name)
+    fmt.Println("Age:", person.Age)
+}
+
+SAFE
 )

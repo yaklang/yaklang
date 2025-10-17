@@ -16,13 +16,26 @@ import (
 	"google.golang.org/grpc"
 )
 
-type httpFuzzerFallback struct {
+type WrapperHTTPFuzzerStream struct {
 	grpc.ServerStream
 
-	sendMutex          sync.Mutex
+	fallback *httpFuzzerFallback
+}
+
+func NewHTTPFuzzerFallbackWrapper(fallback *httpFuzzerFallback) *WrapperHTTPFuzzerStream {
+	return &WrapperHTTPFuzzerStream{fallback: fallback, ServerStream: fallback.originStream}
+}
+
+func (w *WrapperHTTPFuzzerStream) Send(r *ypb.FuzzerResponse) error {
+	return w.fallback.Send(r)
+}
+
+type httpFuzzerFallback struct {
+	originStream ypb.Yak_HTTPFuzzerSequenceServer
+
+	sendMutex          *sync.Mutex
 	runtimeID          string
 	allowMultiResponse bool
-	originSender       func(response *ypb.FuzzerSequenceResponse) error
 	belong             *ypb.FuzzerRequest
 
 	// resp
@@ -37,7 +50,7 @@ func (h *httpFuzzerFallback) Send(r *ypb.FuzzerResponse) error {
 		return nil
 	}
 
-	if h.firstResponse == nil && r != nil && h.onFirstResponse != nil {
+	if h.firstResponse == nil && h.onFirstResponse != nil {
 		h.firstResponse = r
 		h.onFirstResponse(h.firstResponse)
 	}
@@ -46,10 +59,10 @@ func (h *httpFuzzerFallback) Send(r *ypb.FuzzerResponse) error {
 		h.onEveryResponse(r)
 	}
 
-	if h.originSender != nil {
+	if h.originStream != nil {
 		h.sendMutex.Lock()
 		defer h.sendMutex.Unlock()
-		return h.originSender(&ypb.FuzzerSequenceResponse{
+		return h.originStream.Send(&ypb.FuzzerSequenceResponse{
 			Request:  h.belong,
 			Response: r,
 		})
@@ -57,15 +70,15 @@ func (h *httpFuzzerFallback) Send(r *ypb.FuzzerResponse) error {
 	return utils.Errorf("httpFuzzerFallback is not set for sender")
 }
 
-func newHTTPFuzzerFallback(runtimeID string, req *ypb.FuzzerRequest, server ypb.Yak_HTTPFuzzerSequenceServer) *httpFuzzerFallback {
+func newHTTPFuzzerFallback(senderMutex *sync.Mutex, runtimeID string, req *ypb.FuzzerRequest, server ypb.Yak_HTTPFuzzerSequenceServer) *httpFuzzerFallback {
 	belong := req
 	if req.GetFuzzerIndex() != "" {
 		belong = &ypb.FuzzerRequest{FuzzerIndex: req.GetFuzzerIndex(), FuzzerTabIndex: req.GetFuzzerTabIndex()}
 	}
 
 	return &httpFuzzerFallback{
-		ServerStream: server,
-		originSender: server.Send,
+		sendMutex:    senderMutex,
+		originStream: server,
 		belong:       belong,
 		runtimeID:    runtimeID,
 	}
@@ -201,11 +214,11 @@ func (f *fuzzerSequenceFlow) FromFuzzerResponse(response *ypb.FuzzerResponse) *f
 	return f
 }
 
-func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
+func (s *Server) execFlow(senderMutex *sync.Mutex, flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFlow, stream ypb.Yak_HTTPFuzzerSequenceServer) error {
 	req := f.GetFuzzerRequest()
 	req.FuzzerSequenceIndex = uuid.NewString()
 	runtimeID := uuid.NewString()
-	fallback := newHTTPFuzzerFallback(runtimeID, req, stream)
+	fallback := newHTTPFuzzerFallback(senderMutex, runtimeID, req, stream)
 	if f.next != nil {
 		swg := utils.NewSizedWaitGroup(int(flowMax))
 		originRequest := f.next.origin
@@ -224,13 +237,26 @@ func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFl
 				log.Errorf("json unmarshal FuzzerRequest failed: %s", err)
 				return
 			}
+
+			copiedRsp := ypb.FuzzerResponse{}
+			raw, err = json.Marshal(response)
+			if err != nil {
+				log.Errorf("json marshal ypb.FuzzerRequest failed: %s", err)
+				return
+			}
+			err = json.Unmarshal(raw, &copiedRsp)
+			if err != nil {
+				log.Errorf("json unmarshal FuzzerRequest failed: %s", err)
+				return
+			}
+
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
 				swg.Add()
-				flow := NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(response)
+				flow := NewFuzzerSequenceFlow(&copiedReq).FromFuzzerResponse(&copiedRsp)
 				flow.next = f.next.next
-				err := s.execFlow(flowMax, wg, flow, stream)
+				err := s.execFlow(senderMutex, flowMax, wg, flow, stream)
 				swg.Done()
 				if err != nil {
 					log.Errorf("execFlow: %v", err)
@@ -238,7 +264,7 @@ func (s *Server) execFlow(flowMax int64, wg *sync.WaitGroup, f *fuzzerSequenceFl
 			}()
 		}
 	}
-	err := s.HTTPFuzzer(req, fallback)
+	err := s.HTTPFuzzer(req, NewHTTPFuzzerFallbackWrapper(fallback))
 	if err != nil {
 		log.Error(err)
 	}
@@ -256,6 +282,7 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 		close(finalErr)
 	}()
 
+	senderMutex := new(sync.Mutex)
 	maxFlow := seqreq.GetConcurrent()
 	if maxFlow <= 0 {
 		maxFlow = 5
@@ -288,7 +315,7 @@ func (s *Server) HTTPFuzzerSequence(seqreq *ypb.FuzzerRequests, stream ypb.Yak_H
 			return
 		}
 
-		finalErr <- s.execFlow(maxFlow, wg, firstFlow, stream)
+		finalErr <- s.execFlow(senderMutex, maxFlow, wg, firstFlow, stream)
 	}()
 	select {
 	case err := <-finalErr:

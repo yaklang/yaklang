@@ -52,6 +52,8 @@ func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 	return []byte(header + string(body))
 }
 
+var _contentTypeHeaderRegexp = regexp.MustCompile(`(?i)content-type: ?`)
+
 // FixHTTPPacketCRLF 修复一个HTTP报文的CRLF问题（正常的报文每行末尾为\r\n，但是某些报文可能是有\n），如果noFixLength为true，则不会修复Content-Length，否则会尝试修复Content-Length
 // Example:
 // ```
@@ -63,7 +65,7 @@ func AppendHeaderToHTTPPacket(raw []byte, line string) []byte {
 // ```
 func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 	// 移除左边空白字符
-	raw = TrimLeftHTTPPacket(raw)
+	raw = TrimLeftCRLF(raw)
 	if raw == nil || len(raw) == 0 {
 		return nil
 	}
@@ -93,7 +95,12 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 			keyLower := strings.ToLower(key)
 			valLower := strings.ToLower(value)
 			if !isMultipart && keyLower == "content-type" && strings.HasPrefix(valLower, "multipart/form-data") {
-				contentTypeRawValue = value
+				if matchResult := _contentTypeHeaderRegexp.FindIndex([]byte(line)); len(matchResult) > 1 {
+					end := matchResult[1]
+					contentTypeRawValue = line[end:]
+				} else {
+					contentTypeRawValue = value
+				}
 				isMultipart = true
 			}
 			if !haveContentLength && strings.ToLower(key) == "content-length" {
@@ -155,7 +162,9 @@ func FixHTTPPacketCRLF(raw []byte, noFixLength bool) []byte {
 				params["boundary"] = boundary
 				newContentType = mime.FormatMediaType(origin, params)
 			}
-			header = string(ReplaceMIMEType([]byte(header), newContentType))
+			if !strings.Contains(contentTypeRawValue, boundary) {
+				header = string(ReplaceMIMEType([]byte(header), newContentType))
+			}
 			body = fixed
 		}
 	}

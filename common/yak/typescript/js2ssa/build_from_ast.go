@@ -416,7 +416,7 @@ func (b *builder) VisitWhileStatement(node *ast.WhileStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Expression != nil {
 			condition := b.VisitRightValueExpression(node.Expression)
-			if condition == nil {
+			if utils.IsNil(condition) {
 				return b.EmitConstInst(true)
 			}
 			return condition
@@ -463,7 +463,20 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 			case ast.KindVariableDeclarationList:
 				// 变量声明初始化：for(let i = 0; ...)
 				b.VisitVariableDeclarationList(node.Initializer.AsVariableDeclarationList().AsNode())
-				// 变量声明可能不会返回值，这里不追加到results
+				for _, varDecl := range node.Initializer.AsVariableDeclarationList().Declarations.Nodes {
+					name := varDecl.AsVariableDeclaration().Name()
+					switch {
+					case ast.IsIdentifier(name): // 简单变量: let x = value
+						results = append(results, b.ReadValue(name.AsIdentifier().Text))
+					case ast.IsBindingPattern(name): // 解构模式: let {a, b} = obj 或 let [x, y] = arr
+						bindingPattern := name.AsBindingPattern()
+						for _, element := range bindingPattern.Elements.Nodes {
+							if ast.IsIdentifier(element) {
+								results = append(results, b.ReadValue(element.AsIdentifier().Text))
+							}
+						}
+					}
+				}
 			default:
 				// 表达式初始化：for(i = 0; ...)
 				result := b.VisitRightValueExpression(node.Initializer)
@@ -480,7 +493,7 @@ func (b *builder) VisitForStatement(node *ast.ForStatement) interface{} {
 	loop.SetCondition(func() ssa.Value {
 		if node.Condition != nil {
 			condition := b.VisitRightValueExpression(node.Condition)
-			if condition == nil {
+			if utils.IsNil(condition) {
 				return b.EmitConstInst(true)
 			}
 			return condition
@@ -2277,7 +2290,7 @@ func (b *builder) VisitTemplateExpression(node *ast.TemplateExpression) ssa.Valu
 		for _, spanNode := range node.TemplateSpans.Nodes {
 			// 1. 表达式部分
 			exprVal := b.VisitRightValueExpression(spanNode.AsTemplateSpan().Expression)
-			exprStr := b.EmitTypeCast(exprVal, ssa.BasicTypes[ssa.StringTypeKind])
+			exprStr := b.EmitTypeCast(exprVal, ssa.CreateStringType())
 			result = b.EmitBinOp(ssa.OpAdd, result, exprStr)
 
 			// 2. 字符串字面量部分（tail 或 middle）

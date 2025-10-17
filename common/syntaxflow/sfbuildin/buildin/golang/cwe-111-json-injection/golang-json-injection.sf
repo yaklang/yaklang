@@ -1,0 +1,331 @@
+desc(
+	title: "Detect Golang JSON Injection Vulnerability"
+	title_zh: "检测Golang JSON注入漏洞"
+	type: vuln
+	severity: high
+	risk: "json_injection"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   JSON注入漏洞发生在应用程序将不受信任的数据直接序列化为JSON格式，而没有进行适当的清洗或验证时。攻击者可以构造恶意的JSON数据，利用解析器的差异性或特性，导致数据污染、解析错误或权限绕过。在Golang中，常见的触发场景包括使用`json.Unmarshal`或`json.Marshal`函数时，未对输入数据进行严格检查。
+
+2. **触发场景**
+   ```go
+   package main
+
+   import (
+       "encoding/json"
+       "fmt"
+       "net/http"
+   )
+
+   func handler(w http.ResponseWriter, r *http.Request) {
+       var data map[string]interface{}
+       if err := json.Unmarshal([]byte(r.FormValue("data")), &data); err != nil {
+           fmt.Fprintf(w, "Error: %v", err)
+           return
+       }
+       fmt.Fprintf(w, "Data: %v", data)
+   }
+
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
+   攻击者可以提交恶意的JSON数据，例如包含特殊字符或结构的数据，可能导致解析器错误或非预期的行为。
+
+3. **潜在影响**
+   - 数据污染：攻击者可以注入恶意数据，影响应用程序的逻辑或输出。
+   - 解析器错误：可能导致解析器崩溃或返回错误信息，泄露敏感信息。
+   - 权限绕过：通过构造特定的JSON结构，可能绕过应用程序的权限检查。
+DESC
+	rule_id: "085048db-7a44-4478-a3e7-64872486f239"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 验证和清洗输入数据
+   在使用`json.Unmarshal`或`json.Marshal`之前，确保输入数据是可信的，并进行严格的验证和清洗。
+   ```go
+   package main
+
+   import (
+       "encoding/json"
+       "fmt"
+       "net/http"
+       "regexp"
+   )
+
+   func handler(w http.ResponseWriter, r *http.Request) {
+       input := r.FormValue("data")
+       // 验证输入数据是否为有效的JSON格式
+       if !json.Valid([]byte(input)) {
+           fmt.Fprintf(w, "Error: invalid JSON data")
+           return
+       }
+       // 使用正则表达式进一步验证数据内容
+       if matched, _ := regexp.MatchString(`^\{\s*"\w+"\s*:\s*"[^"]*"\s*\}$`, input); !matched {
+           fmt.Fprintf(w, "Error: invalid JSON structure")
+           return
+       }
+       var data map[string]interface{}
+       if err := json.Unmarshal([]byte(input), &data); err != nil {
+           fmt.Fprintf(w, "Error: %v", err)
+           return
+       }
+       fmt.Fprintf(w, "Data: %v", data)
+   }
+
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
+
+#### 2. 使用严格的JSON解析库
+   考虑使用更严格的JSON解析库，例如`github.com/tidwall/gjson`或`github.com/buger/jsonparser`，这些库提供了更细粒度的控制和安全特性。
+
+#### 3. 限制输入数据大小和结构
+   限制输入的JSON数据大小和结构，避免攻击者提交过大的数据或复杂的嵌套结构。
+   ```go
+   package main
+
+   import (
+       "encoding/json"
+       "fmt"
+       "net/http"
+   )
+
+   func handler(w http.ResponseWriter, r *http.Request) {
+       if len(r.FormValue("data")) > 1024 {
+           fmt.Fprintf(w, "Error: data too large")
+           return
+       }
+       var data map[string]string
+       if err := json.Unmarshal([]byte(r.FormValue("data")), &data); err != nil {
+           fmt.Fprintf(w, "Error: %v", err)
+           return
+       }
+       fmt.Fprintf(w, "Data: %v",data)
+   }
+
+   func main() {
+       http.HandleFunc("/", handler)
+       http.ListenAndServe(":8080", nil)
+   }
+   ```
+SOLUTION
+	reference: <<<REFERENCE
+none
+REFERENCE
+)
+
+json.Unmarshal(* as $unmarshal)
+
+*.ReadBytes -{
+    until: "* & $unmarshal"
+}-> as $sink
+
+json.Marshal(* #-> as $marshal_param);
+$unmarshal & $sink as $high;
+
+
+alert $high for {
+	type: "vuln",
+	title: "Golang JSON Injection Vulnerability Was Detected",
+	title_zh: "检测到Golang JSON注入漏洞",
+	level: "high",
+	name: "high",
+	message: "检测到Golang JSON注入漏洞：不可信数据未经清洗直接序列化为JSON，可能导致解析器差异性攻击、数据污染或权限绕过。",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用结构体绑定而非动态解析
+通过预定义结构体并绑定用户输入，避免动态解析不可信数据。
+```go
+// 修复代码示例
+type SafeData struct {
+    Field1 string `json:"field1"`
+    Field2 int    `json:"field2"`
+}
+
+userInput := r.URL.Query().Get("data")
+var data SafeData
+if err := json.Unmarshal([]byte(userInput), &data); err != nil {
+    log.Fatal(err)
+}
+```
+
+#### 2. 输入合法性校验
+对用户输入实施类型、格式或范围限制，拒绝非法输入。
+```go
+// 示例：校验输入为合法JSON
+if !json.Valid([]byte(userInput)) {
+    log.Fatal("输入必须为合法JSON")
+}
+```
+
+#### 3. 使用严格模式解析
+启用`DisallowUnknownFields`防止未知字段注入。
+```go
+decoder := json.NewDecoder(bytes.NewReader([]byte(userInput)))
+decoder.DisallowUnknownFields()
+if err := decoder.Decode(&data); err != nil {
+    log.Fatal(err)
+}
+```
+SOLUTION
+	risk: "JSON注入",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   JSON注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始JSON数据的结构或内容。这可能导致非预期的数据操作，例如数据污染、权限绕过或解析器差异性攻击。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```go
+   userInput := r.URL.Query().Get("data")
+   var data map[string]interface{}
+   if err := json.Unmarshal([]byte(userInput), &data); err != nil {
+       log.Fatal(err)
+   }
+   ```
+   攻击者输入恶意构造的JSON字符串可能导致解析器异常或数据污染。
+
+3. **潜在影响**
+   - 数据污染导致业务逻辑异常。
+   - 权限绕过导致敏感信息泄露。
+   - 解析器差异性攻击导致服务崩溃或拒绝服务。
+DESC
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://unsafe_json_marshal.go': <<<UNSAFE
+package main
+
+import (
+	"bufio"
+	"bytes"
+	"context"
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	net_url "net/url"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	assistant_service "github.com/UnicomAI/wanwu/api/proto/assistant-service"
+	"github.com/UnicomAI/wanwu/api/proto/common"
+	errs "github.com/UnicomAI/wanwu/api/proto/err-code"
+	knowledgebase_service "github.com/UnicomAI/wanwu/api/proto/knowledgebase-service"
+	mcp_service "github.com/UnicomAI/wanwu/api/proto/mcp-service"
+	"github.com/UnicomAI/wanwu/internal/assistant-service/client/model"
+	"github.com/UnicomAI/wanwu/internal/assistant-service/config"
+	"github.com/UnicomAI/wanwu/internal/assistant-service/pkg/util"
+	"github.com/UnicomAI/wanwu/pkg/es"
+	grpc_util "github.com/UnicomAI/wanwu/pkg/grpc-util"
+	http_client "github.com/UnicomAI/wanwu/pkg/http-client"
+	"github.com/UnicomAI/wanwu/pkg/log"
+	mp "github.com/UnicomAI/wanwu/pkg/model-provider"
+	pkgUtil "github.com/UnicomAI/wanwu/pkg/util"
+
+	"github.com/google/uuid"
+	"google.golang.org/protobuf/types/known/emptypb"
+)
+
+func (s *Service) AssistantConversionStream(req *assistant_service.AssistantConversionStreamReq, stream assistant_service.AssistantService_AssistantConversionStreamServer) error {
+	ctx := stream.Context()
+	reqUserId := req.Identity.UserId
+	log.Debugf("Assistant服务开始智能体流式对话，assistantId: %s, userId: %s, orgId: %s, conversationId: %s, fileInfo: %+v, trial: %v, prompt: %s",
+		req.AssistantId, reqUserId, req.Identity.OrgId, req.ConversationId, req.FileInfo, req.Trial, req.Prompt)
+
+	// 用于跟踪流式响应状态的变量
+	var fullResponse strings.Builder
+	var searchList string
+	var hasReadFirstMessage bool
+	var streamStarted bool
+	var conversationSaved bool // 标记是否已经保存过对话
+
+	// 读取智能体接口返回，并写入流式响应
+	reader := bufio.NewReader(sseResp.Body)
+	lineCount := 0
+	streamStarted = true
+	searchListExtracted := false
+	for {
+		// 检查上下文
+		if ctx.Err() != nil {
+			log.Infof("Assistant服务检测到上下文取消，assistantId: %s", req.AssistantId)
+			return grpc_util.ErrorStatusWithKey(errs.Code_AssistantConversationErr, "assistant_conversation", "智能体问答上下文异常")
+		}
+		line, err := reader.ReadBytes('\n')
+		if err != nil && err == io.EOF { //正常結束
+			// 问答调试不保存
+			if !req.Trial {
+				// 只有在上下文未被取消的情况下才保存并标记为已保存
+				if ctx.Err() == nil {
+					saveConversation(ctx, req, fullResponse.String(), searchList)
+					conversationSaved = true // 标记已保存
+				}
+				// 如果上下文被取消，不设置conversationSaved，让defer函数处理终止消息
+			}
+			log.Debugf("Assistant服务流式响应正常结束，assistantId: %s, 总处理行数: %d", req.AssistantId, lineCount)
+			return nil
+		}
+		if err != nil && err == io.ErrUnexpectedEOF { //异常結束
+			// 真正的SSE读取错误，保存"已中断"消息
+			log.Errorf("Assistant服务读取流式响应失败，assistantId: %s, error: %v, 已处理行数: %d", req.AssistantId, err, lineCount)
+			if !req.Trial {
+				errorMessage := "本次回答已中断"
+				if hasReadFirstMessage && fullResponse.Len() > 0 {
+					errorMessage = fullResponse.String() + "\n" + errorMessage
+				}
+				saveConversation(ctx, req, errorMessage, searchList)
+				conversationSaved = true // 标记已保存，避免defer中重复保存
+				log.Debugf("Assistant服务保存了中断消息，assistantId: %s, errorMessage: %s", req.AssistantId, errorMessage)
+			}
+			SSEError(stream, "本次回答已中断")
+			return grpc_util.ErrorStatusWithKey(errs.Code_AssistantConversationErr, "assistant_conversation", "本次回答已中断")
+		}
+		strLine := string(line)
+		lineCount++
+		if len(strLine) >= 5 && strLine[:5] == "data:" {
+			jsonStrData := strLine[5:]
+			// 解析流式数据，提取response字段和search_list
+			var streamData map[string]interface{}
+			if err := json.Unmarshal([]byte(jsonStrData), &streamData); err == nil {
+				log.Debugf("Assistant服务解析流式数据，assistantId: %s, streamData: %+v", req.AssistantId, streamData)
+				code, ok := extractCodeFromStreamData(streamData)
+				if !ok {
+					log.Errorf("Assistant服务无法提取code字段，assistantId: %s, streamData: %+v", req.AssistantId, streamData)
+					continue
+				}
+
+				if response, ok := streamData["response"].(string); ok && response != "" {
+					fullResponse.WriteString(response)
+				}
+				// 提取第一个search_list
+				if !searchListExtracted {
+					if searchListData, ok := streamData["search_list"]; ok {
+						searchListBytes, err := json.Marshal(searchListData)
+						if err == nil {
+							searchList = string(searchListBytes)
+							searchListExtracted = true
+							log.Debugf("Assistant服务提取到search_list，assistantId: %s, searchList: %s", req.AssistantId, searchList)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+UNSAFE
+)
+

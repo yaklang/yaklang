@@ -1,93 +1,77 @@
 desc(
-	title: "Check Golang SQL Injection Vulnerability"
+	title: "Check Golang SQL Injection Vulnerability in Net"
 	type: audit
 	severity: high
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的SQL代码来操纵后端数据库。在Golang中，如果开发者不正确地使用`database/sql`包，特别是当直接将用户输入拼接到SQL查询中时，就可能导致SQL注入漏洞。例如，当用户输入未经过验证或参数化处理时，攻击者可以利用这些输入执行非预期的数据库操作，如数据泄露、篡改和权限绕过。
-
+SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的SQL代码来操纵后端数据库。在Golang中，如果开发者不正确地使用`database/sql`包，特别是当直接将用户输入拼接到SQL查询中时，就可能导致SQL注入漏洞。例如，当用户输入未经过验证或参数化处理时，攻击者可以利用这些输入执行非预期的数据库操作，如数据泄露、篡改和权限绕过。
 2. **触发场景**
-   - 用户输入被直接拼接到SQL查询字符串中，例如：`db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为SQL命令。
-
-   **示例代码**
-   ```go
-   func login(w http.ResponseWriter, r *http.Request) {
-       username := r.FormValue("username")
-       password := r.FormValue("password")
-
-       // 不安全的 SQL 查询
-       query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
-
-       db, err := sql.Open("mysql", "user:password@/dbname")
-       if err != nil {
-           log.Fatal(err)
-       }
-       defer db.Close()
-
-       var userID int
-       err = db.QueryRow(query).Scan(&userID)
-       if err != nil {
-           http.Error(w, "Invalid login", http.StatusUnauthorized)
-           return
-       }
-
-       fmt.Fprintf(w, "User ID: %d", userID)
-   }
-   ```
-
+- 用户输入被直接拼接到SQL查询字符串中，例如：`db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
+- 未对用户输入进行参数化处理或验证，导致恶意输入被解释为SQL命令。
+**示例代码**
+```go
+func login(w http.ResponseWriter, r *http.Request) {
+username := r.FormValue("username")
+password := r.FormValue("password")
+// 不安全的 SQL 查询
+query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+db, err := sql.Open("mysql", "user:password@/dbname")
+if err != nil {
+log.Fatal(err)
+}
+defer db.Close()
+var userID int
+err = db.QueryRow(query).Scan(&userID)
+if err != nil {
+http.Error(w, "Invalid login", http.StatusUnauthorized)
+return
+}
+fmt.Fprintf(w, "User ID: %d", userID)
+}
+```
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "1c99dff2-ccc4-452a-8a95-2594dd2340d8"
 	title_zh: "检测Golang SQL注入漏洞"
+	risk: "sqli"
 	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用参数化查询（Prepared Statements）**
-   通过使用预编译SQL语句和参数占位符，确保用户输入被视为数据而不是SQL代码的一部分，从而防止注入攻击。
-
-   ```go
-   // 修复代码示例
-   func login(w http.ResponseWriter, r *http.Request) {
-       username := r.FormValue("username")
-       password := r.FormValue("password")
-
-       db, err := sql.Open("mysql", "user:password@/dbname")
-       if err != nil {
-           log.Fatal(err)
-       }
-       defer db.Close()
-
-       // 安全的参数化查询
-       query := "SELECT * FROM users WHERE username = ? AND password = ?"
-       stmt, err := db.Prepare(query)
-       if err != nil {
-           log.Fatal(err)
-       }
-       defer stmt.Close()
-
-       var userID int
-       err = stmt.QueryRow(username, password).Scan(&userID)
-       if err != nil {
-           http.Error(w, "Invalid login", http.StatusUnauthorized)
-           return
-       }
-
-       fmt.Fprintf(w, "User ID: %d", userID)
-   }
-   ```
-
+通过使用预编译SQL语句和参数占位符，确保用户输入被视为数据而不是SQL代码的一部分，从而防止注入攻击。
+```go
+// 修复代码示例
+func login(w http.ResponseWriter, r *http.Request) {
+username := r.FormValue("username")
+password := r.FormValue("password")
+db, err := sql.Open("mysql", "user:password@/dbname")
+if err != nil {
+log.Fatal(err)
+}
+defer db.Close()
+// 安全的参数化查询
+query := "SELECT * FROM users WHERE username = ? AND password = ?"
+stmt, err := db.Prepare(query)
+if err != nil {
+log.Fatal(err)
+}
+defer stmt.Close()
+var userID int
+err = stmt.QueryRow(username, password).Scan(&userID)
+if err != nil {
+http.Error(w, "Invalid login", http.StatusUnauthorized)
+return
+}
+fmt.Fprintf(w, "User ID: %d", userID)
+}
+```
 2. **使用ORM框架**
-   许多ORM框架（如GORM、Xorm等）默认提供安全机制来处理数据库操作，它们通常会自动执行参数化查询。
-
+许多ORM框架（如GORM、Xorm等）默认提供安全机制来处理数据库操作，它们通常会自动执行参数化查询。
 3. **输入验证**
-   在将用户输入用于SQL查询之前，进行严格的输入验证和sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
+在将用户输入用于SQL查询之前，进行严格的输入验证和sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
@@ -95,105 +79,94 @@ REFERENCE
 )
 
 <include('golang-database-sql')> as $sink;
+<include('golang-user-input')> as $input;
+
 $sink.QueryRow( * #-> as $param);
-$param?{have: 'Parameter'} as $high;
+$param & $input as $high;
 
 alert $high for {
 	title: "Check Golang SQL Injection Vulnerability",
 	title_zh: "检测Golang SQL注入漏洞",
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **使用参数化查询（Prepared Statements）**
-   通过使用预编译SQL语句和参数占位符，确保用户输入被视为数据而不是SQL代码的一部分，从而防止注入攻击。
-
-   ```go
-   // 修复代码示例
-   func login(w http.ResponseWriter, r *http.Request) {
-       username := r.FormValue("username")
-       password := r.FormValue("password")
-
-       db, err := sql.Open("mysql", "user:password@/dbname")
-       if err != nil {
-           log.Fatal(err)
-       }
-       defer db.Close()
-
-       // 安全的参数化查询
-       query := "SELECT * FROM users WHERE username = ? AND password = ?"
-       stmt, err := db.Prepare(query)
-       if err != nil {
-           log.Fatal(err)
-       }
-       defer stmt.Close()
-
-       var userID int
-       err = stmt.QueryRow(username, password).Scan(&userID)
-       if err != nil {
-           http.Error(w, "Invalid login", http.StatusUnauthorized)
-           return
-       }
-
-       fmt.Fprintf(w, "User ID: %d", userID)
-   }
-   ```
-
+通过使用预编译SQL语句和参数占位符，确保用户输入被视为数据而不是SQL代码的一部分，从而防止注入攻击。
+```go
+// 修复代码示例
+func login(w http.ResponseWriter, r *http.Request) {
+username := r.FormValue("username")
+password := r.FormValue("password")
+db, err := sql.Open("mysql", "user:password@/dbname")
+if err != nil {
+log.Fatal(err)
+}
+defer db.Close()
+// 安全的参数化查询
+query := "SELECT * FROM users WHERE username = ? AND password = ?"
+stmt, err := db.Prepare(query)
+if err != nil {
+log.Fatal(err)
+}
+defer stmt.Close()
+var userID int
+err = stmt.QueryRow(username, password).Scan(&userID)
+if err != nil {
+http.Error(w, "Invalid login", http.StatusUnauthorized)
+return
+}
+fmt.Fprintf(w, "User ID: %d", userID)
+}
+```
 2. **使用ORM框架**
-   许多ORM框架（如GORM、Xorm等）默认提供安全机制来处理数据库操作，它们通常会自动执行参数化查询。
-
+许多ORM框架（如GORM、Xorm等）默认提供安全机制来处理数据库操作，它们通常会自动执行参数化查询。
 3. **输入验证**
-   在将用户输入用于SQL查询之前，进行严格的输入验证和 sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
-CODE
-	desc: <<<CODE
+在将用户输入用于SQL查询之前，进行严格的输入验证和 sanitization。根据预期的输入类型（如数字、字符串）进行格式、长度和内容的合法性检查。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的 SQL 代码来操纵后端数据库。在 Golang 中，如果开发者不正确地使用 `database/sql` 包，特别是当直接将用户输入拼接到 SQL 查询中时，就可能导致 SQL 注入漏洞。攻击者可以利用这个漏洞来绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或数据。
-
+SQL注入漏洞是一种严重的安全漏洞，它允许攻击者通过输入恶意的 SQL 代码来操纵后端数据库。在 Golang 中，如果开发者不正确地使用 `database/sql` 包，特别是当直接将用户输入拼接到 SQL 查询中时，就可能导致 SQL 注入漏洞。攻击者可以利用这个漏洞来绕过认证、访问或修改敏感数据，甚至执行数据库管理操作，如删除表或数据。
 2. **触发场景**
-   SQL 注入漏洞通常发生在以下场景：
-   - 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
-   - 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
-
-   **示例代码**
-   ```go
-   func login(w http.ResponseWriter, r *http.Request) {
-       username := r.FormValue("username")
-       password := r.FormValue("password")
-
-       // 不安全的 SQL 查询
-       query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
-
-       db, err := sql.Open("mysql", "user:password@/dbname")
-       if err != nil {
-           log.Fatal(err)
-       }
-       defer db.Close()
-
-       var userID int
-       err = db.QueryRow(query).Scan(&userID)
-       if err != nil {
-           http.Error(w, "Invalid login", http.StatusUnauthorized)
-           return
-       }
-
-       fmt.Fprintf(w, "User ID: %d", userID)
-   }
-   ```
-
+SQL 注入漏洞通常发生在以下场景：
+- 用户输入被直接拼接到 SQL 查询字符串中，例如 `db.QueryRow("SELECT * FROM users WHERE username='" + username + "'")`。
+- 未对用户输入进行参数化处理或验证，导致恶意输入被解释为 SQL 命令。
+**示例代码**
+```go
+func login(w http.ResponseWriter, r *http.Request) {
+username := r.FormValue("username")
+password := r.FormValue("password")
+// 不安全的 SQL 查询
+query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'", username, password)
+db, err := sql.Open("mysql", "user:password@/dbname")
+if err != nil {
+log.Fatal(err)
+}
+defer db.Close()
+var userID int
+err = db.QueryRow(query).Scan(&userID)
+if err != nil {
+http.Error(w, "Invalid login", http.StatusUnauthorized)
+return
+}
+fmt.Fprintf(w, "User ID: %d", userID)
+}
+```
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
-CODE
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
 	level: "high",
 	type: "vuln",
+	risk: "SQL注入",
+	name: "high",
+	message: "检测到Golang代码中存在SQL注入漏洞，用户输入未经过滤直接拼接到SQL查询中。",
 }
 
 desc(
 	lang: golang
 	alert_high: 1
-	'file://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -234,4 +207,108 @@ func main() {
 }
 
 UNSAFE
+	"safefile://SafeLogin1.go": <<<CODE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"net/http"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+func loginSafe(w http.ResponseWriter, r *http.Request) {
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	db, err := sql.Open("mysql", "user:password@/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	// 使用参数化查询，这是防止SQL注入的最佳实践
+	query := "SELECT * FROM users WHERE username = ? AND password = ?"
+	stmt, err := db.Prepare(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer stmt.Close()
+
+	var userID int
+	err = stmt.QueryRow(username, password).Scan(&userID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Invalid login", http.StatusUnauthorized)
+		return
+	} else if err != nil {
+		log.Print(err) // 记录错误但避免向用户暴露敏感信息
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprintf(w, "User ID: %d", userID)
+}
+
+func main() {
+	http.HandleFunc("/login", loginSafe)
+	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+
+CODE
+	"safefile://SafeQuery2.go": <<<CODE
+package main
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"strconv"
+
+	_ "github.com/go-sql-driver/mysql"
+)
+
+func getUserByIDSafe(db *sql.DB, id string) (string, error) {
+	// 假设id必然是数字，这里进行严格的输入验证
+	parsedID, err := strconv.Atoi(id)
+	if err != nil {
+		return "", fmt.Errorf("invalid ID format: %w", err)
+	}
+
+	// 即使是数字，也推荐使用参数化查询来增强安全性
+	query := "SELECT username FROM users WHERE id = ?"
+	var username string
+	err = db.QueryRow(query, parsedID).Scan(&username)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("user not found")
+	} else if err != nil {
+		return "", fmt.Errorf("query failed: %w", err)
+	}
+	return username, nil
+}
+
+// 示例用法（非HTTP请求）
+func main() {
+	db, err := sql.Open("mysql", "user:password@/dbname")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
+	username, err := getUserByIDSafe(db, "123")
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		fmt.Println("Username:", username)
+	}
+
+	// 尝试一个非数字的输入，验证输入检查是否有效
+	_, err = getUserByIDSafe(db, "123a")
+	if err != nil {
+		fmt.Println("Error:", err) // 预期会输出错误信息
+	}
+}
+
+CODE
 )

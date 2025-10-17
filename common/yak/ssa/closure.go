@@ -1,9 +1,28 @@
 package ssa
 
 import (
+	"strings"
+
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+type SideEffectKind string
+
+const (
+	NormalSideEffect  SideEffectKind = "NormalSideEffect"
+	PointerSideEffect SideEffectKind = "PointerSideEffect"
+)
+
+func SwitchSideEffectKind(kind string) SideEffectKind {
+	switch kind {
+	case string(NormalSideEffect):
+		return NormalSideEffect
+	case string(PointerSideEffect):
+		return PointerSideEffect
+	}
+	return NormalSideEffect
+}
 
 func (s *FunctionType) SetFreeValue(fv map[*Variable]*Parameter) {
 	s.FreeValue = lo.MapToSlice(fv, func(name *Variable, para *Parameter) *Parameter { return para })
@@ -19,20 +38,40 @@ type FunctionSideEffect struct {
 	Variable *Variable
 
 	forceCreate bool
+	Kind        SideEffectKind
 
 	*parameterMemberInner
 }
 
-func (f *Function) AddForceSideEffect(name string, v Value, index int) {
-	f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
-		Name:        name,
-		Modify:      v.GetId(),
-		forceCreate: true,
-		parameterMemberInner: &parameterMemberInner{
-			MemberCallKind:        ParameterCall,
-			MemberCallObjectIndex: index,
-		},
-	})
+func (f *Function) AddForceSideEffect(variable *Variable, value Value, index int, kind SideEffectKind) {
+	if variable.IsMemberCall() {
+		para, ok := ToParameter(variable.object)
+		if !ok {
+			return
+		}
+		f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
+			Name:                 variable.GetName(),
+			VerboseName:          getMemberVerboseName(variable.object, variable.key),
+			Modify:               value.GetId(),
+			Variable:             variable,
+			forceCreate:          false,
+			Kind:                 kind,
+			parameterMemberInner: newParameterMember(para, variable.key),
+		})
+	} else {
+		f.SideEffects = append(f.SideEffects, &FunctionSideEffect{
+			Name:        variable.GetName(),
+			VerboseName: variable.GetName(),
+			Modify:      value.GetId(),
+			Variable:    variable,
+			forceCreate: true,
+			Kind:        kind,
+			parameterMemberInner: &parameterMemberInner{
+				MemberCallKind:        ParameterCall,
+				MemberCallObjectIndex: index,
+			},
+		})
+	}
 }
 
 func (f *Function) AddSideEffect(variable *Variable, v Value) {
@@ -51,15 +90,19 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 		VerboseName: variable.GetName(),
 		Modify:      v.GetId(),
 		Variable:    bind,
+		Kind:        NormalSideEffect,
 		parameterMemberInner: &parameterMemberInner{
 			MemberCallKind: NoMemberCall,
 		},
 	})
 }
 
-func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
+func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
 	var bind *Variable = variable
 
+	if f.builder == nil {
+		return
+	}
 	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
 		parentScope := p.CurrentBlock.ScopeTable
 		if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
@@ -86,6 +129,7 @@ func (f *FunctionBuilder) CheckAndSetSideEffect(variable *Variable, v Value) {
 			Modify:               v.GetId(),
 			Variable:             bind,
 			forceCreate:          false,
+			Kind:                 NormalSideEffect,
 			parameterMemberInner: newParameterMember(para, variable.key),
 		}
 		f.SideEffects = append(f.SideEffects, sideEffect)
@@ -102,45 +146,133 @@ func (s *FunctionType) SetSideEffect(se []*FunctionSideEffect) {
 	s.SideEffects = se
 }
 
-func handleSideEffect(c *Call, funcTyp *FunctionType) {
+func handleSideEffect(c *Call, funcTyp *FunctionType, buildPointer bool) {
 	currentScope := c.GetBlock().ScopeTable
 	function := c.GetFunc()
 	builder := function.builder
 
 	for _, se := range funcTyp.SideEffects {
-		modify := c.GetValueById(se.Modify)
-		var variable *Variable
-		var modifyScope ScopeIF
-		modifyScope = modify.GetBlock().ScopeTable
-		_ = modifyScope
+		if se.Kind == NormalSideEffect && buildPointer {
+			continue
+		}
 
-		// is object
-		if se.MemberCallKind == NoMemberCall {
+		modify, ok := c.GetValueById(se.Modify)
+		if !ok || modify == nil {
+			continue
+		}
+		if p, ok := ToParameter(modify); ok && !p.IsFreeValue {
+			if p.FormalParameterIndex < len(c.Args) {
+				id := c.Args[p.FormalParameterIndex]
+				if id > 0 && se.Kind == PointerSideEffect {
+					if v, ok := c.GetValueById(id); ok {
+						modify = v
+					}
+				}
+			}
+		}
+
+		var variable *Variable
+		modifyScope := modify.GetBlock().ScopeTable
+
+		switch se.MemberCallKind {
+		case NoMemberCall:
 			if ret := GetFristLocalVariableFromScopeAndParent(currentScope, se.Name); ret != nil {
 				if modifyScope.IsSameOrSubScope(ret.GetScope()) {
 					continue
 				}
 			}
 			variable = builder.CreateVariableForce(se.Name)
-		} else {
-			// is object
+		case ParameterCall:
+			v, exists := se.Get(c)
+			if !exists || utils.IsNil(v) {
+				continue
+			}
+			if utils.IsNil(modify) {
+				modify = v
+			}
+			if v.GetType().GetTypeKind() == PointerKind {
+				se.Name = builder.GetOriginPointerName(v)
+			} else {
+				if v.GetName() != "" {
+					se.Name = v.GetName()
+				} else {
+					if lva := v.GetLastVariable(); lva != nil {
+						se.Name = lva.GetName()
+					}
+				}
+			}
+			if v := currentScope.ReadVariable(se.Name); v != nil {
+				se.Variable = v.(*Variable)
+			}
+			variable = builder.CreateVariableForce(se.Name)
+		case ParameterMemberCall:
 			obj, ok := se.Get(c)
 			if !ok {
 				continue
 			}
-			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
+			if utils.IsNil(modify) {
+				modify = obj
+			}
+			if obj.GetType().GetTypeKind() == PointerKind {
+				obj = builder.GetOriginValue(obj)
+			}
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
+		case CallMemberCall:
+			obj, ok := se.Get(c)
+			if !ok {
+				continue
+			}
+			if utils.IsNil(modify) {
+				modify = obj
+			}
+			if obj.GetType().GetTypeKind() == PointerKind {
+				obj = builder.GetOriginValue(obj)
+			}
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
+		default:
+			obj, ok := se.Get(c)
+			if !ok {
+				continue
+			}
+			if utils.IsNil(modify) {
+				modify = obj
+			}
+			if obj.GetType().GetTypeKind() == PointerKind {
+				obj = builder.GetOriginValue(obj)
+			}
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
 			// TODO: handle side effect in loop scope,
 			// will replace value in scope and create new phi
 			sideEffect = builder.SwitchFreevalueInSideEffect(se.Name, sideEffect)
-			if se.Variable != nil {
-				variable.SetCaptured(se.Variable)
+			if v := ReadVariableFromScopeAndParent(currentScope, se.Name); v != nil {
+				variable.SetCaptured(v)
 			}
+
 			builder.AssignVariable(variable, sideEffect)
-			sideEffect.SetVerboseName(se.VerboseName)
+			if strings.Contains(se.VerboseName, "this") {
+				sideEffect.SetVerboseName(se.VerboseName)
+			}
 			c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
+			if buildPointer {
+				if se.parameterMemberInner.MemberCallObjectIndex < len(c.Args) {
+					c.Args[se.parameterMemberInner.MemberCallObjectIndex] = sideEffect.GetId()
+				}
+			}
 		}
 	}
 }
@@ -151,7 +283,14 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 	builder := function.builder
 
 	for _, se := range funcTyp.SideEffects {
-		modify := c.GetValueById(se.Modify)
+		if se.Kind == PointerSideEffect {
+			continue
+		}
+
+		modify, ok := c.GetValueById(se.Modify)
+		if !ok || modify == nil {
+			continue
+		}
 		var variable, bindVariable *Variable
 		var bindScope, modifyScope ScopeIF
 		if se.Variable != nil {
@@ -174,28 +313,65 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			}
 			variable = builder.CreateVariableForce(se.Name)
 		case ParameterCall:
-			val, exists := se.Get(c)
-			if !exists || utils.IsNil(val) {
+			v, exists := se.Get(c)
+			if !exists || utils.IsNil(v) {
 				continue
 			}
-			//直接找到variable来生成sideEffect
-			//modify side-effect name
-			if val.GetName() != "" {
-				se.Name = val.GetName()
-			} else {
-				se.Name = val.GetLastVariable().GetName()
+			if utils.IsNil(modify) {
+				modify = v
 			}
-			se.Variable = val.GetLastVariable()
-			variable = builder.CreateVariable(se.Name)
+			if v.GetType().GetTypeKind() == PointerKind {
+				se.Name = builder.GetOriginPointerName(v)
+			} else {
+				if v.GetName() != "" {
+					se.Name = v.GetName()
+				} else {
+					if lva := v.GetLastVariable(); lva != nil {
+						se.Name = lva.GetName()
+					}
+				}
+			}
+			if v := currentScope.ReadVariable(se.Name); v != nil {
+				se.Variable = v.(*Variable)
+			}
+			variable = builder.CreateVariableForce(se.Name)
+		case ParameterMemberCall:
+			obj, ok := se.Get(c)
+			if !ok {
+				continue
+			}
+			if utils.IsNil(modify) {
+				modify = obj
+			}
+			if obj.GetType().GetTypeKind() == PointerKind {
+				obj = builder.GetOriginValue(obj)
+			}
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
 		case CallMemberCall:
 			obj, ok := se.Get(c)
 			if !ok {
 				continue
 			}
-			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
+			if utils.IsNil(modify) {
+				modify = obj
+			}
+			if obj.GetType().GetTypeKind() == PointerKind {
+				obj = builder.GetOriginValue(obj)
+			}
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
 			if p, ok := ToParameter(modify); ok {
 				if len(c.Args) > p.FormalParameterIndex {
-					Point(modify, c.GetValueById(c.Args[p.FormalParameterIndex]))
+					if arg, ok := c.GetValueById(c.Args[p.FormalParameterIndex]); ok && arg != nil {
+						Point(modify, arg)
+					}
 				}
 			}
 		default:
@@ -203,8 +379,18 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 			if !ok {
 				continue
 			}
+			if utils.IsNil(modify) {
+				modify = obj
+			}
+			if obj.GetType().GetTypeKind() == PointerKind {
+				obj = builder.GetOriginValue(obj)
+			}
 			// is object
-			variable = builder.CreateMemberCallVariable(obj, c.GetValueById(se.MemberCallKey))
+			if key, ok := c.GetValueById(se.MemberCallKey); ok && key != nil {
+				variable = builder.CreateMemberCallVariable(obj, key)
+			} else {
+				continue
+			}
 		}
 
 		if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
@@ -236,7 +422,9 @@ func handleSideEffectBind(c *Call, funcTyp *FunctionType) {
 					log.Warnf("BUG: variable.Assign error: %v", err)
 					return
 				}
-				sideEffect.SetVerboseName(se.VerboseName)
+				if strings.Contains(se.VerboseName, "this") {
+					sideEffect.SetVerboseName(se.VerboseName)
+				}
 				currentScope.SetCapturedSideEffect(se.VerboseName, variable, se.Variable)
 
 				function.SideEffects = append(function.SideEffects, se)
@@ -327,24 +515,33 @@ func (f *FunctionBuilder) SwitchFreevalueInSideEffectFromScope(name string, se *
 	if scope == nil {
 		return se
 	}
-	if phi, ok := ToPhi(f.GetValueById(se.Value)); ok {
-		for i, id := range phi.Edge {
-			edgeValue := f.GetValueById(id)
-			vs = append(vs, edgeValue)
-			if p, ok := ToParameter(edgeValue); ok && p.IsFreeValue {
-				if value := scope.ReadValue(name); value != nil {
-					vs[i] = value
+	if seValue, ok := f.GetValueById(se.Value); ok && seValue != nil {
+		if phi, ok := ToPhi(seValue); ok {
+			for i, id := range phi.Edge {
+				edgeValue, ok := f.GetValueById(id)
+				if !ok || edgeValue == nil {
+					continue
+				}
+				vs = append(vs, edgeValue)
+				if p, ok := ToParameter(edgeValue); ok && p.IsFreeValue {
+					if value := scope.ReadValue(name); value != nil {
+						vs[i] = value
+					}
+				}
+			}
+			phit := &Phi{
+				anValue:            phi.anValue,
+				CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
+				Edge:               vs.GetIds(),
+			}
+
+			if callSite, ok := f.GetValueById(se.CallSite); ok && callSite != nil {
+				if call, ok := callSite.(*Call); ok {
+					sideEffect := f.EmitSideEffect(name, call, phit)
+					return sideEffect
 				}
 			}
 		}
-		phit := &Phi{
-			anValue:            phi.anValue,
-			CFGEntryBasicBlock: phi.CFGEntryBasicBlock,
-			Edge:               vs.GetIds(),
-		}
-
-		sideEffect := f.EmitSideEffect(name, f.GetValueById(se.CallSite).(*Call), phit)
-		return sideEffect
 	}
 	return se
 }

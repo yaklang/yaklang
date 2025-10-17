@@ -8,8 +8,8 @@ import (
 
 type Variable struct {
 	*ssautil.Versioned[Value]
-	DefRange memedit.RangeIf
-	UseRange map[memedit.RangeIf]struct{}
+	DefRange *memedit.Range
+	UseRange map[*memedit.Range]struct{}
 
 	// for object.member variable  access
 	object      Value
@@ -23,7 +23,7 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 	ret := &Variable{
 		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
 		DefRange:  nil,
-		UseRange:  map[memedit.RangeIf]struct{}{},
+		UseRange:  map[*memedit.Range]struct{}{},
 	}
 	return ret
 }
@@ -68,6 +68,9 @@ func (variable *Variable) Assign(value Value) error {
 }
 
 func (v *Variable) SetMemberCall(obj, key Value) {
+	if utils.IsNil(v) {
+		return
+	}
 	v.object = obj
 	v.key = key
 }
@@ -88,7 +91,7 @@ func (b *Variable) GetMemberCall() (Value, Value) {
 	return b.object, b.key
 }
 
-func (v *Variable) SetDefRange(r memedit.RangeIf) {
+func (v *Variable) SetDefRange(r *memedit.Range) {
 	if r == nil {
 		log.Error("SetDefRange: range is nil use fallback")
 		return
@@ -97,8 +100,8 @@ func (v *Variable) SetDefRange(r memedit.RangeIf) {
 	v.verboseName = r.GetText()
 }
 
-func (v *Variable) AddRange(r memedit.RangeIf, force bool) {
-	if r == nil {
+func (v *Variable) AddRange(r *memedit.Range, force bool) {
+	if utils.IsNil(r) {
 		log.Error("AddRange: range is nil")
 	}
 	//if force || len(*p.SourceCode) == len(v.GetName()) {
@@ -115,6 +118,9 @@ func (v *Variable) AddRange(r memedit.RangeIf, force bool) {
 
 func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 	value := v.GetValue()
+	if utils.IsNil(value) {
+		return
+	}
 	value.GetFunc().NewErrorWithPos(kind, tag, v.DefRange, msg)
 	for rangePos := range v.UseRange {
 		value.GetFunc().NewErrorWithPos(kind, tag, rangePos, msg)
@@ -126,6 +132,9 @@ func (v *Variable) IsPointer() bool {
 }
 
 func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
+	if utils.IsNil(scope) {
+		return nil
+	}
 	if ret := scope.ReadVariable(name, true); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
 			return variable
@@ -135,6 +144,9 @@ func ReadVariableFromScope(scope ScopeIF, name string) *Variable {
 }
 
 func ReadVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
+	if utils.IsNil(scope) {
+		return nil
+	}
 	if ret := scope.ReadVariable(name); ret != nil {
 		if variable, ok := ret.(*Variable); ok {
 			return variable
@@ -179,6 +191,9 @@ func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 }
 
 func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
+	if utils.IsNil(scope) {
+		return nil
+	}
 	if variables := scope.GetAllVariablesByName(name); variables != nil {
 		for _, variable := range variables {
 			if variable.GetLocal() {
@@ -213,15 +228,4 @@ func GetAllVariablesFromScopeAndParent(scope ScopeIF, name string) []*Variable {
 		}
 	}
 	return rets
-}
-
-func GetVariablesWithGlobalIndex(scope ScopeIF, name string, globalIndex int) *Variable {
-	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
-		for _, variable := range variables {
-			if ret, ok := variable.(*Variable); ok && variable.GetGlobalIndex() == globalIndex {
-				return ret
-			}
-		}
-	}
-	return nil
 }

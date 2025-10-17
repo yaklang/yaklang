@@ -7,6 +7,8 @@ import (
 )
 
 func Test__pingScan(t *testing.T) {
+	t.Skip("跳过测试：依赖外部网络 1.1.1.1/24，不符合测试不外连的原则")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	res := _pingScan(
 		"1.1.1.1/24",
@@ -28,6 +30,8 @@ func Test__pingScan(t *testing.T) {
 }
 
 func Test__skipPingScan2(t *testing.T) {
+	t.Skip("跳过测试：依赖外部网络 1.1.1.1/24，不符合测试不外连的原则")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	res := _pingScan(
 		"1.1.1.1/24",

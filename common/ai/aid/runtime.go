@@ -3,17 +3,18 @@ package aid
 import (
 	"bytes"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils"
 	"io"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type runtime struct {
-	RootTask *aiTask
+	RootTask *AiTask
 	config   *Config
-	Stack    *utils.Stack[*aiTask]
+	Stack    *utils.Stack[*AiTask]
 
 	statusMutex sync.Mutex
 }
@@ -21,14 +22,14 @@ type runtime struct {
 func (c *Coordinator) createRuntime() *runtime {
 	r := &runtime{
 		config: c.config,
-		Stack:  utils.NewStack[*aiTask](),
+		Stack:  utils.NewStack[*AiTask](),
 	}
 	c.config.aiTaskRuntime = r
 
 	return r
 }
 
-func (t *aiTask) dumpProgressEx(i int, w io.Writer, details bool) {
+func (t *AiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 	prefix := strings.Repeat(" ", i)
 
 	executing := false
@@ -90,11 +91,11 @@ func (t *aiTask) dumpProgressEx(i int, w io.Writer, details bool) {
 	}
 }
 
-func (t *aiTask) dumpProgress(i int, w io.Writer) {
+func (t *AiTask) dumpProgress(i int, w io.Writer) {
 	t.dumpProgressEx(i, w, false)
 }
 
-func (t *aiTask) Progress() string {
+func (t *AiTask) Progress() string {
 	if t == nil {
 		return ""
 	}
@@ -103,7 +104,7 @@ func (t *aiTask) Progress() string {
 	return buf.String()
 }
 
-func (t *aiTask) ProgressWithDetail() string {
+func (t *AiTask) ProgressWithDetail() string {
 	if t == nil {
 		return ""
 	}
@@ -124,7 +125,7 @@ func (r *runtime) Progress() string {
 	return buf.String()
 }
 
-func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
+func (r *runtime) invokeSubtask(idx int, task *AiTask) error {
 	r.statusMutex.Lock()
 	if r.RootTask == nil {
 		r.RootTask = task
@@ -150,10 +151,10 @@ func (r *runtime) invokeSubtask(idx int, task *aiTask) error {
 		return r.executeSubTask(idx, task)
 	}
 
-	return task.executeTask()
+	return task.executeTaskPushTaskIndex()
 }
 
-func (r *runtime) executeSubTask(idx int, task *aiTask) error {
+func (r *runtime) executeSubTask(idx int, task *AiTask) error {
 	currentID := -1
 	for {
 		currentID++
@@ -173,7 +174,7 @@ func (r *runtime) executeSubTask(idx int, task *aiTask) error {
 	return nil
 }
 
-func (r *runtime) Invoke(task *aiTask) {
+func (r *runtime) Invoke(task *AiTask) {
 	err := r.invokeSubtask(1, task)
 	if err != nil {
 		r.config.EmitError("invoke subtask failed: %v", err)

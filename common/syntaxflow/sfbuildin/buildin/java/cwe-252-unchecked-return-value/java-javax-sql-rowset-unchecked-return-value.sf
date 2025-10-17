@@ -7,7 +7,6 @@ desc(
 
 1. **漏洞原理**
    Java的`javax.sql.rowset.RowSet`接口及其子类（如`JoinRowSet`, `CachedRowSet`等）提供了一些返回布尔值或整数值的方法，用于指示操作是否成功或返回特定的配置状态。然而，开发者在调用这些方法后，可能未对返回值进行检查和适当处理。这种“未检查返回值”的情况，即使这些方法返回`false`或表示失败的状态码，程序仍会继续执行，从而可能导致以下潜在问题：
-
    * **资源泄露：** 如果某个方法返回失败，但后续代码依赖于该操作成功后分配的资源而继续执行，则可能导致资源（如数据库连接、文件句柄）无法正确释放，最终造成资源耗尽。
    * **状态错误：** 依赖于方法返回的正确状态进行后续逻辑判断的代码可能会因为未检查返回值而执行错误的分支，导致程序行为异常或进入不稳定状态。
    * **数据不一致：** 在某些更新或配置方法中，未检查返回值可能导致数据未能如预期般修改或设置正确的配置，从而引入数据不一致性问题。
@@ -15,65 +14,54 @@ desc(
 
 2. **触发场景**
    当调用`javax.sql.rowset`相关接口或实现类中返回布尔值（如`supportsCrossJoin`, `isReadOnly`, `getAutoCommit`等）或整数值的方法时，如果代码没有对这些方法的返回值进行判断，并根据返回值执行相应的错误处理或业务逻辑，则存在未检查返回值的风险。特别是在处理数据库连接、数据同步、事务控制或视图配置等关键操作时，忽略返回值可能带来严重后果。
-
-   ```java
-   package org.example;
-
-   import javax.sql.rowset.*;
-   import com.sun.rowset.*; // 使用Sun/Oracle实现的示例
-
-   public class RowsetDemo {
-       public static void main(String[] args) {
-           try {
-               JoinRowSet joinRowSet = new JoinRowSetImpl(); // 使用Sun/Oracle实现
-               // 未检查 supportsCrossJoin() 的返回值
-               joinRowSet.supportsCrossJoin(); 
-               // 即使不支持CrossJoin，程序也会继续执行
-               System.out.println("Supports Cross Join (Unchecked): " + joinRowSet.supportsCrossJoin()); // 这里仍然会调用并打印，但未基于返回值做逻辑判断
-
-               CachedRowSet cachedRowSet = new CachedRowSetImpl(); // 使用Sun/Oracle实现
-               cachedRowSet.setUrl("jdbc:mysql://localhost:3306/mydatabase");
-               cachedRowSet.setUsername("root");
-               cachedRowSet.setPassword("password");
-               cachedRowSet.setCommand("SELECT * FROM users");
-               cachedRowSet.execute();
-               
-               // 未检查 getShowDeleted() 的返回值，并基于其进行后续处理
-               cachedRowSet.getShowDeleted(); 
-               // ... 后续依赖于 getShowDeleted() 返回值的代码可能会出错
-
-           } catch (Exception e) {
-               e.printStackTrace();
-           }
-       }
-   }
-   ```
+```java
+package org.example;
+import javax.sql.rowset.*;
+import com.sun.rowset.*; // 使用Sun/Oracle实现的示例
+public class RowsetDemo {
+    public static void main(String[] args) {
+        try {
+            JoinRowSet joinRowSet = new JoinRowSetImpl(); // 使用Sun/Oracle实现
+            // 未检查 supportsCrossJoin() 的返回值
+            joinRowSet.supportsCrossJoin();
+            // 即使不支持CrossJoin，程序也会继续执行
+            System.out.println("Supports Cross Join (Unchecked): " + joinRowSet.supportsCrossJoin()); // 这里仍然会调用并打印，但未基于返回值做逻辑判断
+            CachedRowSet cachedRowSet = new CachedRowSetImpl(); // 使用Sun/Oracle实现
+            cachedRowSet.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+            cachedRowSet.setUsername("root");
+            cachedRowSet.setPassword("password");
+            cachedRowSet.setCommand("SELECT * FROM users");
+            cachedRowSet.execute();
+            // 未检查 getShowDeleted() 的返回值，并基于其进行后续处理
+            cachedRowSet.getShowDeleted();
+            // ... 后续依赖于 getShowDeleted() 返回值的代码可能会出错
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
 
 3. **潜在影响**
    * 应用程序可能在运行时出现非预期行为、功能异常或崩溃。
    * 泄露系统资源，导致性能下降甚至服务不可用（拒绝服务）。
    * 数据处理流程出错，可能导致数据丢失、损坏或不一致。
    * 在特定上下文中，可能为攻击者利用其他漏洞创造可乘之机。
-
 DESC
 	rule_id: "a3cccdec-1f7c-4392-81fc-a28ad6cfccd2"
 	solution: <<<SOLUTION
 ### 修复建议
 
 #### 1. 检查并处理方法的返回值
-对于`javax.sql.rowset`接口中具有返回值的关键方法，始终获取其返回值，并根据返回值判断操作是否成功或是否符合预期状态，然后执行相应的后续逻辑或错误处理。
-
+   对于`javax.sql.rowset`接口中具有返回值的关键方法，始终获取其返回值，并根据返回值判断操作是否成功或是否符合预期状态，然后执行相应的后续逻辑或错误处理。
 ```java
 package org.example;
-
 import javax.sql.rowset.*;
 import com.sun.rowset.*;
-
 public class RowsetDemoFixed {
     public static void main(String[] args) {
         try {
             JoinRowSet joinRowSet = new JoinRowSetImpl();
-            
             // 检查 supportsCrossJoin() 的返回值
             boolean supportsCrossJoin = joinRowSet.supportsCrossJoin();
             if (supportsCrossJoin) {
@@ -97,7 +85,7 @@ public class RowsetDemoFixed {
                 System.out.println("Showing deleted rows.");
                 // 根据 showDeleted 的状态调整后续数据处理逻辑
             } else {
-                 System.out.println("Not showing deleted rows.");
+                System.out.println("Not showing deleted rows.");
             }
 
             // 同样检查其他关键方法的返回值，例如 isReadOnly(), getAutoCommit() 等
@@ -109,7 +97,6 @@ public class RowsetDemoFixed {
                 System.out.println("RowSet is writable.");
                 // 可以执行写操作
             }
-
         } catch (Exception e) {
             e.printStackTrace(); // 捕获并处理异常
         }
@@ -118,10 +105,10 @@ public class RowsetDemoFixed {
 ```
 
 #### 2. 查阅API文档
-在调用`javax.sql.rowset`中的方法时，仔细查阅官方API文档，了解每个方法的具体功能、返回值类型及其含义。明确哪些方法返回状态信息需要检查。
+   在调用`javax.sql.rowset`中的方法时，仔细查阅官方API文档，了解每个方法的具体功能、返回值类型及其含义。明确哪些方法返回状态信息需要检查。
 
 #### 3. 完善异常处理机制
-除了检查返回值，还应结合Java的异常处理机制（try-catch-finally）来捕获可能在方法调用过程中抛出的异常，确保在出现错误时能够进行清理和恢复，避免资源泄露或其他不稳定状态。
+   除了检查返回值，还应结合Java的异常处理机制（try-catch-finally）来捕获可能在方法调用过程中抛出的异常，确保在出现错误时能够进行清理和恢复，避免资源泄露或其他不稳定状态。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-252: Unchecked Return Value](https://cwe.mitre.org/data/definitions/252.html)
@@ -133,9 +120,108 @@ $toCheck?{<typeName>?{have:'javax.sql.rowset'}}?{!<getUsers>} as $weak;
 alert $weak for {
 	level: "info",
 	message: "发现Java javax.sql.rowset库未检查返回值的API",
-	risk: "api-abuse",
+	risk: "API误用",
 	title: "Check Java Javax Sql Rowset Unchecked Return Value",
 	title_zh: "检测Java javax.sql.rowset库未检查返回值的API",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 检查并处理方法的返回值
+对于`javax.sql.rowset`接口中具有返回值的关键方法，始终获取其返回值，并根据返回值判断操作是否成功或是否符合预期状态，然后执行相应的后续逻辑或错误处理。
+```java
+package org.example;
+import javax.sql.rowset.*;
+import com.sun.rowset.*;
+public class RowsetDemoFixed {
+public static void main(String[] args) {
+try {
+JoinRowSet joinRowSet = new JoinRowSetImpl();
+// 检查 supportsCrossJoin() 的返回值
+boolean supportsCrossJoin = joinRowSet.supportsCrossJoin();
+if (supportsCrossJoin) {
+System.out.println("Database supports Cross Join.");
+// 执行支持Cross Join时的逻辑
+} else {
+System.out.println("Database does NOT support Cross Join. Consider alternative join methods.");
+// 执行不支持Cross Join时的备用逻辑或抛出异常
+}
+CachedRowSet cachedRowSet = new CachedRowSetImpl();
+cachedRowSet.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+cachedRowSet.setUsername("root");
+cachedRowSet.setPassword("password");
+cachedRowSet.setCommand("SELECT * FROM users");
+cachedRowSet.execute();
+// 检查 getShowDeleted() 的返回值，并基于其进行后续处理
+boolean showDeleted = cachedRowSet.getShowDeleted();
+if (showDeleted) {
+System.out.println("Showing deleted rows.");
+// 根据 showDeleted 的状态调整后续数据处理逻辑
+} else {
+System.out.println("Not showing deleted rows.");
+}
+// 同样检查其他关键方法的返回值，例如 isReadOnly(), getAutoCommit() 等
+boolean isReadOnly = cachedRowSet.isReadOnly();
+if (isReadOnly) {
+System.out.println("RowSet is read-only.");
+// 避免执行写操作
+} else {
+System.out.println("RowSet is writable.");
+// 可以执行写操作
+}
+} catch (Exception e) {
+e.printStackTrace(); // 捕获并处理异常
+}
+}
+}
+```
+#### 2. 查阅API文档
+在调用`javax.sql.rowset`中的方法时，仔细查阅官方API文档，了解每个方法的具体功能、返回值类型及其含义。明确哪些方法返回状态信息需要检查。
+#### 3. 完善异常处理机制
+除了检查返回值，还应结合Java的异常处理机制（try-catch-finally）来捕获可能在方法调用过程中抛出的异常，确保在出现错误时能够进行清理和恢复，避免资源泄露或其他不稳定状态。
+SOLUTION
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+Java的`javax.sql.rowset.RowSet`接口及其子类（如`JoinRowSet`, `CachedRowSet`等）提供了一些返回布尔值或整数值的方法，用于指示操作是否成功或返回特定的配置状态。然而，开发者在调用这些方法后，可能未对返回值进行检查和适当处理。这种“未检查返回值”的情况，即使这些方法返回`false`或表示失败的状态码，程序仍会继续执行，从而可能导致以下潜在问题：
+* **资源泄露：** 如果某个方法返回失败，但后续代码依赖于该操作成功后分配的资源而继续执行，则可能导致资源（如数据库连接、文件句柄）无法正确释放，最终造成资源耗尽。
+* **状态错误：** 依赖于方法返回的正确状态进行后续逻辑判断的代码可能会因为未检查返回值而执行错误的分支，导致程序行为异常或进入不稳定状态。
+* **数据不一致：** 在某些更新或配置方法中，未检查返回值可能导致数据未能如预期般修改或设置正确的配置，从而引入数据不一致性问题。
+* **潜在安全风险：** 虽然这些方法本身不直接导致漏洞，但未检查其返回值可能使得程序在异常或受控环境下的行为不可预测，可能为其他漏洞（如竞争条件、逻辑错误）的利用创造条件。
+2. **触发场景**
+当调用`javax.sql.rowset`相关接口或实现类中返回布尔值（如`supportsCrossJoin`, `isReadOnly`, `getAutoCommit`等）或整数值的方法时，如果代码没有对这些方法的返回值进行判断，并根据返回值执行相应的错误处理或业务逻辑，则存在未检查返回值的风险。特别是在处理数据库连接、数据同步、事务控制或视图配置等关键操作时，忽略返回值可能带来严重后果。
+```java
+package org.example;
+import javax.sql.rowset.*;
+import com.sun.rowset.*; // 使用Sun/Oracle实现的示例
+public class RowsetDemo {
+public static void main(String[] args) {
+try {
+JoinRowSet joinRowSet = new JoinRowSetImpl(); // 使用Sun/Oracle实现
+// 未检查 supportsCrossJoin() 的返回值
+joinRowSet.supportsCrossJoin();
+// 即使不支持CrossJoin，程序也会继续执行
+System.out.println("Supports Cross Join (Unchecked): " + joinRowSet.supportsCrossJoin()); // 这里仍然会调用并打印，但未基于返回值做逻辑判断
+CachedRowSet cachedRowSet = new CachedRowSetImpl(); // 使用Sun/Oracle实现
+cachedRowSet.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+cachedRowSet.setUsername("root");
+cachedRowSet.setPassword("password");
+cachedRowSet.setCommand("SELECT * FROM users");
+cachedRowSet.execute();
+// 未检查 getShowDeleted() 的返回值，并基于其进行后续处理
+cachedRowSet.getShowDeleted();
+// ... 后续依赖于 getShowDeleted() 返回值的代码可能会出错
+} catch (Exception e) {
+e.printStackTrace();
+}
+}
+}
+```
+3. **潜在影响**
+* 应用程序可能在运行时出现非预期行为、功能异常或崩溃。
+* 泄露系统资源，导致性能下降甚至服务不可用（拒绝服务）。
+* 数据处理流程出错，可能导致数据丢失、损坏或不一致。
+* 在特定上下文中，可能为攻击者利用其他漏洞创造可乘之机。
+DESC
+	name: "weak",
 }
 
 desc(
@@ -177,4 +263,120 @@ public class SqlDemo {
     }
 }
 TEXT
+	"safefile://SafeRowsetUsage.java": <<<CODE
+package org.example;
+
+import javax.sql.rowset.*;
+import com.sun.rowset.*;
+
+public class SafeRowsetUsage {
+    public static void main(String[] args) {
+        try {
+            JoinRowSet joinRowSet = new JoinRowSetImpl();
+            // 检查 supportsCrossJoin() 的返回值，并根据结果执行逻辑
+            if (joinRowSet.supportsCrossJoin()) {
+                System.out.println("Database supports Cross Join. Proceed with cross join operations.");
+            } else {
+                System.out.println("Database does NOT support Cross Join. Using alternative join strategy.");
+            }
+
+            CachedRowSet cachedRowSet = new CachedRowSetImpl();
+            cachedRowSet.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+            cachedRowSet.setUsername("root");
+            cachedRowSet.setPassword("password");
+            cachedRowSet.setCommand("SELECT * FROM users");
+            cachedRowSet.execute();
+
+            // 检查 getShowDeleted() 的返回值，并根据其执行相应逻辑
+            boolean showDeleted = cachedRowSet.getShowDeleted();
+            if (showDeleted) {
+                System.out.println("Showing deleted rows. Adjusting data display.");
+            } else {
+                System.out.println("Not showing deleted rows. Displaying active data only.");
+            }
+
+            // 检查 getEscapeProcessing() 的返回值
+            boolean escapeProcessing = cachedRowSet.getEscapeProcessing();
+            if (escapeProcessing) {
+                System.out.println("Escape processing is enabled.");
+            } else {
+                System.out.println("Escape processing is disabled.");
+            }
+
+            // 检查 isReadOnly() 的返回值
+            boolean readOnly = cachedRowSet.isReadOnly();
+            if (readOnly) {
+                System.out.println("RowSet is read-only. No modifications will be attempted.");
+            } else {
+                System.out.println("RowSet is writable. Modifications can be made.");
+            }
+
+            // 检查 getAutoCommit() 的返回值
+            boolean autoCommit = cachedRowSet.getAutoCommit();
+            if (autoCommit) {
+                System.out.println("Auto-commit is enabled. Transactions will be committed automatically.");
+            } else {
+                System.out.println("Auto-commit is disabled. Manual commit required for transactions.");
+            }
+
+            // 检查 supportsUpdatableView() 的返回值
+            boolean supportsUpdatableView = cachedRowSet.supportsUpdatableView();
+            if (supportsUpdatableView) {
+                System.out.println("RowSet supports updatable views.");
+            } else {
+                System.out.println("RowSet does not support updatable views.");
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace(); // 始终捕获并处理可能的异常
+        }
+    }
+}
+CODE
+	"safefile://SafeRowsetWithLogging.java": <<<CODE
+package org.example;
+
+import javax.sql.rowset.*;
+import com.sun.rowset.CachedRowSetImpl;
+import com.sun.rowset.JoinRowSetImpl;
+
+public class SafeRowsetWithLogging {
+    public static void main(String[] args) {
+        try {
+            JoinRowSet joinRs = new JoinRowSetImpl();
+            boolean supportsCrossJoin = joinRs.supportsCrossJoin();
+            if (!supportsCrossJoin) {
+                System.err.println("WARNING: Cross Join not supported. This might affect query performance or capability.");
+                // 可以考虑备用方案或抛出配置错误
+            }
+
+            CachedRowSet cachedRs = new CachedRowSetImpl();
+            cachedRs.setUrl("jdbc:mysql://localhost:3306/mydatabase");
+            cachedRs.setUsername("root");
+            cachedRs.setPassword("password");
+            cachedRs.setCommand("SELECT * FROM products");
+            cachedRs.execute();
+
+            boolean currentShowDeleted = cachedRs.getShowDeleted();
+            if (currentShowDeleted) {
+                System.out.println("INFO: RowSet configured to show deleted rows.");
+            } else {
+                System.out.println("INFO: RowSet not showing deleted rows.");
+            }
+
+            boolean isReadOnly = cachedRs.isReadOnly();
+            if (isReadOnly) {
+                System.out.println("INFO: RowSet is read-only. Write operations attempted will fail.");
+            }
+
+        } catch (SQLException e) {
+            System.err.println("SQL Error during RowSet operation: " + e.getMessage());
+            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("An unexpected error occurred: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

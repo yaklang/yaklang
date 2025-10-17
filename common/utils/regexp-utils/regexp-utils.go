@@ -175,7 +175,7 @@ func (m *YakRegexpUtils) FindAllSubmatchIndex(s string) ([][]int, error) {
 	} else if reg := m.getSecondaryRegexp(); reg.CanUse() {
 		return reg.FindAllSubmatchIndex(s)
 	} else {
-		return nil, utils.Error("yak regexp find fail: no usable regexp")
+		return nil, utils.Errorf("yak regexp find fail: no usable regexp: %s", s)
 	}
 }
 

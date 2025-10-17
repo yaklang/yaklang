@@ -25,7 +25,7 @@ func TestEscape(t *testing.T) {
 		// fileName := "high.php"
 		folderName := "a"
 		folderPath := []string{progName, "vulnerabilities", "csrf", "source"}
-		ssadb.SaveFolder(folderName, folderPath)
+		ssadb.MarshalFolder(append(folderPath, folderName)).Save(ssadb.GetDB())
 		path := fmt.Sprintf("/%s/%s", strings.Join(folderPath, "/"), folderName)
 
 		schema := "ssadb"

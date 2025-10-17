@@ -37,12 +37,20 @@ type SyntaxFlowScanTask struct {
 
 	Kind SyntaxflowResultKind `json:"kind"` // debug / scan / query
 
+	// 扫描批次
+	ScanBatch uint64 `gorm:"index"`
 	// query execute
 	FailedQuery  int64 // query failed
 	SkipQuery    int64 // language not match, skip this rule
 	SuccessQuery int64
 	// risk
-	RiskCount int64
+	RiskCount     int64
+	InfoCount     int64
+	LowCount      int64
+	WarningCount  int64
+	CriticalCount int64
+	HighCount     int64
+
 	// query process
 	TotalQuery int64
 
@@ -52,20 +60,25 @@ type SyntaxFlowScanTask struct {
 
 func (s *SyntaxFlowScanTask) ToGRPCModel() *ypb.SyntaxFlowScanTask {
 	res := &ypb.SyntaxFlowScanTask{
-		Id:           uint64(s.ID),
-		CreatedAt:    s.CreatedAt.Unix(),
-		UpdatedAt:    s.UpdatedAt.Unix(),
-		TaskId:       s.TaskId,
-		Programs:     strings.Split(s.Programs, SYNTAXFLOWSCAN_PROGRAM_SPLIT),
-		RuleCount:    s.RulesCount,
-		Status:       s.Status,
-		Reason:       s.Reason,
-		FailedQuery:  s.FailedQuery,
-		SkipQuery:    s.SkipQuery,
-		SuccessQuery: s.SuccessQuery,
-		RiskCount:    s.RiskCount,
-		TotalQuery:   s.TotalQuery,
-		Kind:         string(s.Kind),
+		Id:            uint64(s.ID),
+		CreatedAt:     s.CreatedAt.Unix(),
+		UpdatedAt:     s.UpdatedAt.Unix(),
+		TaskId:        s.TaskId,
+		Programs:      strings.Split(s.Programs, SYNTAXFLOWSCAN_PROGRAM_SPLIT),
+		RuleCount:     s.RulesCount,
+		Status:        s.Status,
+		Reason:        s.Reason,
+		FailedQuery:   s.FailedQuery,
+		SkipQuery:     s.SkipQuery,
+		SuccessQuery:  s.SuccessQuery,
+		RiskCount:     s.RiskCount,
+		InfoCount:     s.InfoCount,
+		LowCount:      s.LowCount,
+		WarningCount:  s.WarningCount,
+		CriticalCount: s.CriticalCount,
+		HighCount:     s.HighCount,
+		TotalQuery:    s.TotalQuery,
+		Kind:          string(s.Kind),
 	}
 	if len(s.Config) != 0 {
 		_ = json.Unmarshal(s.Config, &res.Config)

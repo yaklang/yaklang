@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"strings"
 	"testing"
 
@@ -138,7 +139,7 @@ func TestDecodeBase64BySearchTool(t *testing.T) {
 	coordinator, err := aid.NewCoordinator("帮我解码一个base64编码的字符串: eWFrbGFuZw==",
 		aid.WithAiToolsSearchTool(),
 		aid.WithAgreeYOLO(),
-		aid.WithAICallback(func(config *aid.Config, request *aid.AIRequest) (*aid.AIResponse, error) {
+		aid.WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			prompt := request.GetPrompt()
 			pair := stateKeyword[currentStateIndex]
 			matcher := pair.matcher

@@ -1,0 +1,174 @@
+desc(
+	title_zh: "检测Java CRLF注入漏洞"
+	title: "Detect Java CRLF Injection Vulnerability"
+	cwe: 93
+	type: vuln
+	level: mid
+	risk: "CRLF注入",
+	harm_zh: "CRLF（回车换行）注入漏洞允许攻击者通过控制 HTTP 响应头的内容插入额外的响应头或响应体，从而实施 HTTP 响应分割攻击。这可能导致跨站脚本攻击（XSS）、缓存投毒、会话劫持等安全问题。",
+	harm: "CRLF (Carriage Return Line Feed) injection vulnerabilities allow attackers to inject additional HTTP headers or body content by controlling parts of the HTTP response header. This can lead to HTTP response splitting, XSS, cache poisoning, and session hijacking."
+	rule_id: "44cc5217-5e06-4b5a-b726-d41bc725e934"
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+CRLF（Carriage Return Line Feed，回车换行）注入漏洞允许攻击者通过在 HTTP 响应头中注入恶意的回车符（\r）和换行符（\n），从而插入额外的 HTTP 响应头或响应体内容。HTTP 协议依赖于 CRLF 来分隔头部字段和请求/响应行以及消息体。当用户输入未经过滤或转义便直接拼接到响应头中时，攻击者可以构造恶意输入来中断原有的 HTTP 头，并注入新的头字段或响应内容，从而实施 HTTP 响应拆分攻击。
+2. **触发场景**
+以下代码展示了可能触发 CRLF 注入漏洞的场景：
+```java
+String userInput = request.getParameter("param");
+response.addHeader("X-Custom-Header", userInput); // 用户输入直接设置响应头
+```
+如果 `userInput` 的值为 `abc\r\nSet-Cookie: hijacked=1`，则攻击者可以注入新的响应头，例如设置伪造的 Cookie，从而导致会话劫持。
+3. **潜在影响**
+- **HTTP 响应拆分**：攻击者可以插入额外的响应内容，导致服务器返回恶意构造的响应。
+- **跨站脚本攻击 (XSS)**：通过注入脚本标签或 JavaScript 代码，窃取用户敏感信息。
+- **缓存投毒**：攻击者可让中间缓存服务器存储恶意响应，影响多个用户。
+- **会话劫持**：通过注入恶意 Cookie 或重定向，窃取用户会话信息。
+- **钓鱼攻击**：通过注入伪造的页面内容，诱导用户输入敏感信息。
+DESC
+	reference: <<<REFERENCE
+[CWE-93: Improper Neutralization of CRLF Sequences ('CRLF Injection')](https://cwe.mitre.org/data/definitions/93.html)
+REFERENCE
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. **严格过滤和转义用户输入**
+对用户输入的任何内容进行严格的校验和转义处理，尤其是涉及 HTTP 响应头拼接的情况。可以使用正则表达式过滤 `\r` 和 `\n` 等特殊字符，防止攻击者注入恶意内容。
+```java
+// 示例：过滤回车和换行符
+String userInput = request.getParameter("param");
+if (userInput != null) {
+userInput = userInput.replaceAll("[\r\n]", ""); // 移除非法字符
+}
+response.addHeader("X-Custom-Header", userInput);
+```
+#### 2. **使用安全的框架或库**
+使用现代 Web 框架（如 Spring MVC）或安全库，这些框架通常内置了对响应头注入的防护机制。例如 Spring 的 `HttpServletResponse` 会对输出进行适当的编码处理。
+#### 3. **设置白名单验证机制**
+对用户输入的参数进行白名单校验，仅允许符合预期格式的内容通过。例如对参数为数字时，使用 `Integer.parseInt()` 进行强制转换；对字符串内容使用正则表达式限制允许的字符集。
+```java
+// 示例：校验输入为字母数字
+if (!userInput.matches("^[a-zA-Z0-9_]+$")) {
+throw new IllegalArgumentException("输入包含非法字符");
+}
+```
+#### 4. **最小化自定义响应头的使用**
+尽量避免直接将用户输入写入 HTTP 响应头中。若非必要，应避免使用 `addHeader` 或 `setHeader` 方法处理用户输入，改用页面内容输出，并确保输出内容经过 HTML 转义处理。
+#### 5. **升级并使用更安全的Java版本**
+现代Java版本已在底层对HTTP头设置进行了安全加固，以防止CRLF注入。建议检查并升级应用的JDK版本至安全版本以上。
+- 检测方式：检查项目构建配置（如 pom.xml 或 build.gradle）或服务器运行环境的Java版本。
+- 修复建议：
+- Oracle JDK/OpenJDK: 建议升级到 JDK 7u171+, 8u161+, 11+ 或更高版本。从这些版本开始，java.net.HttpURLConnection 和相关的HTTP客户端库在设置HTTP头时会默认禁止使用\r和\n字符，从而在底层防止此类注入。
+- 较早的Java版本（如Java 6及更早版本）已停止官方支持，强烈建议升级。
+SOLUTION
+)
+
+<include('java-spring-mvc-param')> as $entry;
+<include('java-servlet-param')> as $entry;
+HttpServletResponse?{<typeName()>?{have:"javax.servlet.http.HttpServletResponse"}} as $response
+$response./addHeader|setHeader/(, , * as $headerContent)
+$response.addCookie(, * as $headerContent)
+
+$headerContent #{
+    until: "* & $entry",
+    exclude:"*?{opcode:phi}"
+}-> as $nocheckControledHeader
+
+alert $nocheckControledHeader for {
+	level: "mid",
+	name: "nocheckControledHeader",
+	title: "Java CRLF Injection Vulnerability Was Detected",
+	title_zh: "检测到Java CRLF注入漏洞",
+	message: "检测到Java代码中存在未经验证的HTTP响应头拼接，可能导致CRLF注入漏洞。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. **严格过滤和转义用户输入**
+对用户输入的任何内容进行严格的校验和转义处理，尤其是涉及 HTTP 响应头拼接的情况。可以使用正则表达式过滤 `\r` 和 `\n` 等特殊字符，防止攻击者注入恶意内容。
+```java
+// 示例：过滤回车和换行符
+String userInput = request.getParameter("param");
+if (userInput != null) {
+userInput = userInput.replaceAll("[\r\n]", ""); // 移除非法字符
+}
+response.addHeader("X-Custom-Header", userInput);
+```
+#### 2. **使用安全的框架或库**
+使用现代 Web 框架（如 Spring MVC）或安全库，这些框架通常内置了对响应头注入的防护机制。例如 Spring 的 `HttpServletResponse` 会对输出进行适当的编码处理。
+#### 3. **设置白名单验证机制**
+对用户输入的参数进行白名单校验，仅允许符合预期格式的内容通过。例如对参数为数字时，使用 `Integer.parseInt()` 进行强制转换；对字符串内容使用正则表达式限制允许的字符集。
+```java
+// 示例：校验输入为字母数字
+if (!userInput.matches("^[a-zA-Z0-9_]+$")) {
+throw new IllegalArgumentException("输入包含非法字符");
+}
+```
+#### 4. **最小化自定义响应头的使用**
+尽量避免直接将用户输入写入 HTTP 响应头中。若非必要，应避免使用 `addHeader` 或 `setHeader` 方法处理用户输入，改用页面内容输出，并确保输出内容经过 HTML 转义处理。
+#### 5. **升级并使用更安全的Java版本**
+现代Java版本已在底层对HTTP头设置进行了安全加固，以防止CRLF注入。建议检查并升级应用的JDK版本至安全版本以上。
+- 检测方式：检查项目构建配置（如 pom.xml 或 build.gradle）或服务器运行环境的Java版本。
+- 修复建议：
+- Oracle JDK/OpenJDK: 建议升级到 JDK 7u171+, 8u161+, 11+ 或更高版本。从这些版本开始，java.net.HttpURLConnection 和相关的HTTP客户端库在设置HTTP头时会默认禁止使用\r和\n字符，从而在底层防止此类注入。
+- 较早的Java版本（如Java 6及更早版本）已停止官方支持，强烈建议升级。
+SOLUTION
+	risk: "CRLF注入",
+}
+
+desc(
+	lang:"java"
+	alert_num:3
+	"file://demo.java":<<<CODE
+    package org.joychou.controller;
+
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.ResponseBody;
+
+    import javax.servlet.http.Cookie;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+
+    @Controller
+    @RequestMapping("/crlf")
+    public class CRLFInjection {
+
+        @RequestMapping("/safecode")
+        @ResponseBody
+        public void crlf(HttpServletRequest request, HttpServletResponse response) {
+            response.addHeader("test1", request.getParameter("test1"));
+            response.setHeader("test2", request.getParameter("test2"));
+            String author = request.getParameter("test3");
+            Cookie cookie = new Cookie("test3", author);
+            response.addCookie(cookie);
+        }
+    }
+CODE
+	"safefile://demo2.java":<<<CODE
+    package org.joychou.controller;
+
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.ResponseBody;
+
+    import javax.servlet.http.Cookie;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+
+
+    @Controller
+    @RequestMapping("/crlf")
+    public class CRLFInjection {
+
+        @RequestMapping("/safecode")
+        @ResponseBody
+        public void crlf(HttpServletRequest request, HttpServletResponse response) {
+
+            String author = request.getParameter("test3");
+            if (author != null) {
+                 author = author.replaceAll("[\r\n]", ""); // 移除非法字符
+            }
+            Cookie cookie = new Cookie("test3", author);
+            response.addCookie(cookie);
+        }
+    }
+CODE
+)

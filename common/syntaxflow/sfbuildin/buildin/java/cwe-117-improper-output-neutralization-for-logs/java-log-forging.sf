@@ -10,54 +10,53 @@ DESCRIPTION
 	solution: <<<SOLUTION
 ### 修复建议
 
-1. **对日志输入进行清理和转义**
-   在将任何用户提供的数据或不受信数据写入日志之前，应对其进行清理和转义。特别是需要删除或转义换行符和回车符（`\n`和`\r`），以及其他可能导致日志格式被破坏的特殊字符。许多日志框架提供了内置的安全编码器或格式化器。
+#### 1. 对日志输入进行清理和转义
+在将任何用户提供的数据或不受信数据写入日志之前，应对其进行清理和转义。特别是需要删除或转义换行符和回车符（`\n`和`\r`），以及其他可能导致日志格式被破坏的特殊字符。许多日志框架提供了内置的安全编码器或格式化器。
 
-   **示例代码（slf4j 结合 Logback/Log4j2 的参数化日志）**
-   ```java
-   import javax.servlet.http.HttpServletRequest;
-   import org.slf4j.Logger;
-   import org.slf4j.LoggerFactory;
+**示例代码（slf4j 结合 Logback/Log4j2 的参数化日志）**
+```java
+import javax.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-   public class ParameterProcessor {
-       private static final Logger log = LoggerFactory.getLogger(ParameterProcessor.class);
+public class ParameterProcessor {
+    private static final Logger log = LoggerFactory.getLogger(ParameterProcessor.class);
 
-       public void processRequest(HttpServletRequest request) {
-           String val = request.getParameter("val");
-           try {
-               int value = Integer.parseInt(val);
-               log.debug("Successfully parsed value: {}", value);
-           } catch (NumberFormatException e) {
-               log.error("Failed to parse val = '{}'", val, e);
-           }
-       }
-   }
-   ```
+    public void processRequest(HttpServletRequest request) {
+        String val = request.getParameter("val");
+        try {
+            int value = Integer.parseInt(val);
+            log.debug("Successfully parsed value: {}", value);
+        } catch (NumberFormatException e) {
+            log.error("Failed to parse val = '{}'", val, e);
+        }
+    }
+}
+```
 
-2. **白名单校验**
-   如果可能，对用户输入的数据进行白名单校验，只接受已知安全的字符集或数据格式。
+#### 2. 白名单校验
+如果可能，对用户输入的数据进行白名单校验，只接受已知安全的字符集或数据格式。
 
-   **示例代码（正则表达式校验）**
-   ```java
-   if (!userInput.matches("^[a-zA-Z0-9_]*$")) {
-       throw new IllegalArgumentException("非法字符检测到");
-   }
-   ```
+**示例代码（正则表达式校验）**
+```java
+if (!userInput.matches("^[a-zA-Z0-9_]*$")) {
+    throw new IllegalArgumentException("非法字符检测到");
+}
+```
 
-3. **避免在日志消息中直接包含敏感信息**
-   尽量避免在日志中记录敏感的用户输入，如密码、信用卡号等，以降低日志泄露的风险。
+#### 3. 避免在日志消息中直接包含敏感信息
+尽量避免在日志中记录敏感的用户输入，如密码、信用卡号等，以降低日志泄露的风险。
 
-   **示例代码（过滤敏感字段）**
-   ```java
-   if (log.isDebugEnabled()) {
-       log.debug("Processing request with parameter: {}", maskSensitiveData(userInput));
-   }
+**示例代码（过滤敏感字段）**
+```java
+if (log.isDebugEnabled()) {
+    log.debug("Processing request with parameter: {}", maskSensitiveData(userInput));
+}
 
-   private String maskSensitiveData(String data) {
-       return data.replaceAll("password=[^&]*", "password=***");
-   }
-   ```
-
+private String maskSensitiveData(String data) {
+    return data.replaceAll("password=[^&]*", "password=***");
+}
+```
 SOLUTION
 	rule_id: "235e953b-955c-43bc-9ef8-0e87715330a3"
 	reference: <<<REFERENCE

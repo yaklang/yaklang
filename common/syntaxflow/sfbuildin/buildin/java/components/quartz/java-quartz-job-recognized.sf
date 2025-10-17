@@ -9,7 +9,7 @@ Quartz 是一个开源的作业调度框架，用于在 Java 应用程序中定�
 
 ### 规则详细
 1. **识别 Job 实现类**
-   该规则通过检查类是否实现了 `org.quartz.Job` 接口来 pinpoint 所有 Quartz Job 类。这些类包含了实现 Quartz 调度逻辑的核心代码。
+   该规则通过检查类是否实现了 `org.quartz.Job` 接口来定位所有 Quartz Job 类。这些类包含了实现 Quartz 调度逻辑的核心代码。
 
 2. **审计焦点**
    识别出 Job 类后，后续的审计工作可以进一步关注这些类的具体实现，例如：
@@ -21,10 +21,74 @@ Quartz 是一个开源的作业调度框架，用于在 Java 应用程序中定�
 
 3. **作为审计基础**
    此规则是 Quartz 框架审计的基础，后续的规则可以基于识别出的 Job 类进一步分析具体的安全脆弱点，例如检测动态方法调用、敏感操作等。
+
+#### 示例代码
+以下为示例代码，展示了实现 `org.quartz.Job` 接口的一个类：
+```java
+package com.itstyle.quartz.job;
+import org.quartz.*;
+@DisallowConcurrentExecution
+public class ChickenJob implements Job {
+@Override
+public void execute(JobExecutionContext context) {
+    JobDetail jobDetail = context.getJobDetail();
+    JobDataMap dataMap = jobDetail.getJobDataMap();
+    String methodName = dataMap.getString("jobMethodName");
+    try {
+        Method method = this.getClass().getMethod(methodName);
+        method.invoke(this);
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+}
+```
 DESC
 	rule_id: "dc04c45c-e7e3-484e-8683-2682f0ece312"
 	solution: <<<SOLUTION
-none
+### 安全建议
+#### 1. 审计任务逻辑的安全性
+针对每个识别出的 Quartz Job 类，重点审计 `execute` 方法中的核心业务逻辑，确认是否存在以下风险：
+- **命令注入**：确保未直接拼接用户输入到系统命令或脚本中。
+- **SQL 注入**：避免在数据库查询中直接拼接用户输入，推荐使用预编译语句（PreparedStatement）。
+```java
+// 示例修复：采用 PreparedStatement 防止 SQL 注入
+String query = "SELECT * FROM users WHERE id = ?";
+try (PreparedStatement stmt = connection.prepareStatement(query)) {
+    stmt.setInt(1, userId);
+    ResultSet rs = stmt.executeQuery();
+}
+```
+- **路径遍历**：如果涉及文件操作，验证路径参数的合法性。
+
+#### 2. 参数校验与过滤
+对从 `JobDataMap` 中提取的参数进行严格校验，确保其类型、格式、范围符合预期。
+```java
+// 示例：校验 JobDataMap 中的参数
+JobDataMap dataMap = context.getJobDetail().getJobDataMap();
+String methodName = dataMap.getString("jobMethodName");
+if (!methodName.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
+    throw new IllegalArgumentException("非法的方法名");
+}
+```
+
+#### 3. 动态方法调用防护
+如需使用反射调用方法，应限制方法名的来源（例如白名单机制），并验证其合法性。
+```java
+// 示例：白名单限制方法调用
+List<String> allowedMethods = Arrays.asList("safeMethod1", "safeMethod2");
+if (!allowedMethods.contains(methodName)) {
+    throw new SecurityException("不允许调用的方法");
+}
+Method method = job.getClass().getMethod(methodName);
+method.invoke(job);
+```
+
+#### 4. 外部资源访问审查
+检查 Job 类中访问的外部资源（如数据库、文件系统、网络服务），确保权限分配合理，避免过度授权。
+
+#### 5. 并发控制策略
+根据业务需求，正确使用 `@DisallowConcurrentExecution` 注解，防止多个任务实例同时运行导致的问题。
 SOLUTION
 	reference: <<<REFERENCE
 https://www.quartz-scheduler.org/
@@ -39,7 +103,66 @@ alert $jobClass for {
 	title: "Audit Java Quartz Job Class Identification",
 	title_zh: "审计 Java Quartz Job 类识别",
 	level: "mid",
-	message: " Found Java Quartz Job Class",
+	message: "发现 Java Quartz Job 类，建议进一步审计其任务逻辑的安全性。",
+	desc: <<<DESC
+### 规则目的
+Quartz 是一个开源的作业调度框架，用于在 Java 应用程序中定时执行任务。此规则旨在识别 Java 应用程序中实现 `org.quartz.Job` 接口的类，这些类代表了 Quartz 框架中的具体调度任务。识别这些 Job 类的位置对于全面审计 Quartz 作业的配置、逻辑和潜在的安全风险至关重要。
+### 规则详细
+1. **识别 Job 实现类**
+该规则通过检查类是否实现了 `org.quartz.Job` 接口来 pinpoint 所有 Quartz Job 类。这些类包含了实现 Quartz 调度逻辑的核心代码。
+2. **审计焦点**
+识别出 Job 类后，后续的审计工作可以进一步关注这些类的具体实现，例如：
+- **任务逻辑的安全性**：检查 `execute` 方法中的业务逻辑，是否存在 Command Injection, SQL Injection, Path Traversal 等漏洞。
+- **参数处理的安全性**：审计如何从 `JobDataMap` 中获取和使用参数，防止通过 Job 参数注入恶意数据。
+- **依赖与资源访问**：检查 Job 类访问的外部资源（数据库、文件系统、网络服务）是否安全，是否存在权限不足或过度授权的问题。
+- **动态方法调用**：特别关注使用反射机制动态调用方法的场景（如示例代码中的 `Method method = job.getClass().getMethod(methodName); method.invoke(job);`），这可能引入严重的安全风险（如远程代码执行），需要严格控制输入 `methodName` 的来源和合法性。
+- **并发控制**：检查 `@DisallowConcurrentExecution` 等注解的使用是否符合预期，防止并发执行导致的问题。
+3. **作为审计基础**
+此规则是 Quartz 框架审计的基础，后续的规则可以基于识别出的 Job 类进一步分析具体的安全脆弱点，例如检测动态方法调用、敏感操作等。
+DESC
+	name: "jobClass",
+	solution: <<<SOLUTION
+### 安全建议
+#### 1. 审计任务逻辑的安全性
+针对每个识别出的 Quartz Job 类，重点审计 `execute` 方法中的核心业务逻辑，确认是否存在以下风险：
+- **命令注入**：确保未直接拼接用户输入到系统命令或脚本中。
+- **SQL 注入**：避免在数据库查询中直接拼接用户输入，推荐使用预编译语句（PreparedStatement）。
+- **路径遍历**：如果涉及文件操作，验证路径参数的合法性。
+```java
+// 示例修复：采用 PreparedStatement 防止 SQL 注入
+String query = "SELECT * FROM users WHERE id = ?";
+try (PreparedStatement stmt = connection.prepareStatement(query)) {
+stmt.setInt(1, userId);
+ResultSet rs = stmt.executeQuery();
+}
+```
+#### 2. 参数校验与过滤
+对从 `JobDataMap` 中提取的参数进行严格校验，确保其类型、格式、范围符合预期。
+```java
+// 示例：校验 JobDataMap 中的参数
+JobDataMap dataMap = context.getJobDetail().getJobDataMap();
+String methodName = dataMap.getString("jobMethodName");
+if (!methodName.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
+throw new IllegalArgumentException("非法的方法名");
+}
+```
+#### 3. 动态方法调用防护
+如需使用反射调用方法，应限制方法名的来源（例如白名单机制），并验证其合法性。
+```java
+// 示例：白名单限制方法调用
+List<String> allowedMethods = Arrays.asList("safeMethod1", "safeMethod2");
+if (!allowedMethods.contains(methodName)) {
+throw new SecurityException("不允许调用的方法");
+}
+Method method = job.getClass().getMethod(methodName);
+method.invoke(job);
+```
+#### 4. 外部资源访问审查
+检查 Job 类中访问的外部资源（如数据库、文件系统、网络服务），确保权限分配合理，避免过度授权。
+#### 5. 并发控制策略
+根据业务需求，正确使用 `@DisallowConcurrentExecution` 注解，防止多个任务实例同时运行导致的问题。
+SOLUTION
+	risk: "信息",
 }
 
 desc(
@@ -91,4 +214,25 @@ public class ChickenJob implements Job, Serializable {
     }
 }
 EOF
+	"safefile://SafeNonQuartzJobClass.java": <<<CODE
+// 这是一个普通的Java类，未实现org.quartz.Job接口
+package com.example.app;
+
+public class SafeNonQuartzJobClass {
+    public void doSomethingSafe() {
+        System.out.println("This is a regular method, not a Quartz job.");
+    }
+}
+CODE
+	"safefile://SafeServiceImpl.java": <<<CODE
+// 这是一个普通的Service实现类，不涉及Quartz调度
+package com.example.service;
+
+public class SafeServiceImpl {
+    public void performBusinessLogic() {
+        // 业务逻辑
+        System.out.println("Executing some safe business logic.");
+    }
+}
+CODE
 )

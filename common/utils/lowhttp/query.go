@@ -177,6 +177,7 @@ func ParseQueryParams(s string, options ...QueryOption) *QueryParams {
 		} else {
 			items = append(items, &QueryParamItem{
 				Raw:          codec.ForceQueryUnescape(pair),
+				Key:          codec.ForceQueryUnescape(key),
 				Position:     position,
 				NoAutoEncode: query.NoAutoEncode,
 			})

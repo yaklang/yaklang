@@ -1,10 +1,11 @@
 package ssaapi
 
 import (
+	"testing"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
-	"testing"
 )
 
 func TestDeepChain(t *testing.T) {

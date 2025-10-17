@@ -4,13 +4,17 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"github.com/h2non/filetype"
-	"github.com/yaklang/yaklang/common/utils"
-	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"io"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/imageutils"
+
+	"github.com/h2non/filetype"
+	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
@@ -27,8 +31,11 @@ type AIConfig struct {
 	Timeout  float64 // `app:"name:请求超时时长"`
 	Deadline time.Time
 
-	APIKey              string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
-	Proxy               string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
+	APIKey string `json:"api_key" app:"name:api_key,verbose:ApiKey,desc:APIKey / Token,required:true,id:1"`
+	Proxy  string `json:"proxy" app:"name:proxy,verbose:代理地址,id:5"`
+	Host   string
+	Port   int
+
 	StreamHandler       func(io.Reader)
 	ReasonStreamHandler func(reader io.Reader)
 	Type                string `json:"Type"`
@@ -39,6 +46,81 @@ type AIConfig struct {
 	HTTPErrorHandler func(error)
 
 	Images []*ImageDescription
+
+	Headers             []*ypb.HTTPHeader
+	EnableThinking      bool
+	EnableThinkingField string
+	EnableThinkingValue any
+}
+
+func WithExtraHeader(headers ...*ypb.HTTPHeader) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Headers = append(c.Headers, headers...)
+	}
+}
+
+func WithExtraHeaderString(key string, value string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Headers = append(c.Headers, &ypb.HTTPHeader{
+			Header: key,
+			Value:  value,
+		})
+	}
+}
+
+func WithEnableThinkingEx(thinkField string, thinkValue any) AIConfigOption {
+	return func(config *AIConfig) {
+		if thinkField != "" && thinkValue != nil {
+			config.EnableThinkingField = thinkField
+			config.EnableThinkingValue = thinkValue
+		}
+	}
+}
+
+func WithEnableThinking(t any) AIConfigOption {
+	return func(config *AIConfig) {
+		if utils.IsNil(t) {
+			return
+		}
+		switch t.(type) {
+		case bool:
+			config.EnableThinking = t.(bool)
+			return
+		}
+
+		switch utils.InterfaceToString(t) {
+		case "yes", "y", "true", "1", "enable", "on", "auto", "a", "enabled":
+			config.EnableThinking = true
+		default:
+			config.EnableThinking = false
+		}
+
+		switch config.Type {
+		case "volcengine":
+			config.EnableThinkingField = "thinking"
+			if config.EnableThinking {
+				config.EnableThinkingValue = map[string]any{
+					"type": "enabled",
+				}
+			} else {
+				config.EnableThinkingValue = map[string]any{
+					"type": "disabled",
+				}
+			}
+		}
+	}
+}
+
+func WithHost(h string) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Host = h
+	}
+}
+
+func WithPort(p int) AIConfigOption {
+	return func(c *AIConfig) {
+		c.Port = p
+	}
 }
 
 func WithNoHTTPS(b bool) AIConfigOption {
@@ -52,15 +134,25 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 		Timeout:                120,
 		FunctionCallRetryTimes: 5,
 		HTTPErrorHandler: func(err error) {
-			log.Errorf("ai request failed: %s", err)
+			log.Debugf("ai request failed: %s", err)
 		},
 	}
+	// 加载Type参数
 	for _, p := range opts {
 		p(c)
 	}
-	err := consts.GetThirdPartyApplicationConfig(c.Type, c)
-	if err != nil {
-		log.Debug(err)
+
+	// 加载默认参数
+	if c.Type != "" {
+		err := consts.GetThirdPartyApplicationConfig(c.Type, c)
+		if err != nil {
+			log.Debug(err)
+		}
+	}
+
+	// 加载用户参数
+	for _, p := range opts {
+		p(c)
 	}
 	return c
 }
@@ -234,6 +326,57 @@ func WithImageFile(i string) AIConfigOption {
 		buf.WriteString(";")
 		buf.WriteString("base64,")
 		buf.WriteString(codec.EncodeBase64(data))
+		config.Images = append(config.Images, &ImageDescription{
+			Url: buf.String(),
+		})
+	}
+}
+
+func WithImageBase64(b64 string) AIConfigOption {
+	return func(config *AIConfig) {
+		if strings.HasPrefix(b64, "data:image/") {
+			for img := range imageutils.ExtractImage(b64) {
+				b64 = img.Base64()
+			}
+		}
+
+		raw, err := codec.DecodeBase64(b64)
+		if err != nil {
+			log.Warnf("decode error: %v", err)
+			return
+		}
+		name, err := filetype.Image(raw)
+		if err != nil {
+			log.Warnf("input is not image: %v", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		buf.WriteString("data:")
+		buf.WriteString(name.MIME.Value)
+		buf.WriteString(";")
+		buf.WriteString("base64,")
+		buf.WriteString(b64)
+		config.Images = append(config.Images, &ImageDescription{
+			Url: buf.String(),
+		})
+	}
+}
+
+func WithImageRaw(raw []byte) AIConfigOption {
+	return func(config *AIConfig) {
+		name, err := filetype.Image(raw)
+		if err != nil {
+			log.Warnf("input is not image: %v", err)
+			return
+		}
+
+		var buf bytes.Buffer
+		buf.WriteString("data:")
+		buf.WriteString(name.MIME.Value)
+		buf.WriteString(";")
+		buf.WriteString("base64,")
+		buf.WriteString(codec.EncodeBase64(raw))
 		config.Images = append(config.Images, &ImageDescription{
 			Url: buf.String(),
 		})

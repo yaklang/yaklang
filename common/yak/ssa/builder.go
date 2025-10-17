@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssalog"
 
 	"github.com/samber/lo"
@@ -53,16 +52,19 @@ type FunctionBuilder struct {
 	Included bool
 	IsReturn bool
 
-	RefParameter map[string]struct{ Index int }
+	RefParameter map[string]struct {
+		Index int
+		Kind  SideEffectKind
+	}
 
 	target *target // for break and continue
 	labels map[string]*BasicBlock
 	// defer function call
 
 	// for build
-	CurrentBlock *BasicBlock     // current block to build
-	CurrentRange memedit.RangeIf // current position in source code
-	CurrentFile  string          // current file name
+	CurrentBlock *BasicBlock    // current block to build
+	CurrentRange *memedit.Range // current position in source code
+	CurrentFile  string         // current file name
 
 	parentScope *ParentScope
 
@@ -85,14 +87,17 @@ type FunctionBuilder struct {
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
 	b := &FunctionBuilder{
-		_editor:              editor,
-		Function:             f,
-		target:               &target{},
-		labels:               make(map[string]*BasicBlock),
-		CurrentBlock:         nil,
-		CurrentRange:         nil,
-		parentBuilder:        parent,
-		RefParameter:         make(map[string]struct{ Index int }),
+		_editor:       editor,
+		Function:      f,
+		target:        &target{},
+		labels:        make(map[string]*BasicBlock),
+		CurrentBlock:  nil,
+		CurrentRange:  nil,
+		parentBuilder: parent,
+		RefParameter: make(map[string]struct {
+			Index int
+			Kind  SideEffectKind
+		}),
 		SyntaxIncludingStack: utils.NewStack[string](),
 		includeStack:         utils.NewStack[*Program](),
 		captureFreeValue:     make(map[string]struct{}),
@@ -113,14 +118,16 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 
 	// b.ScopeStart()
 	// b.Function.SetScope(b.CurrentScope)
-	b.CurrentBlock = f.GetBasicBlockByID(f.EnterBlock)
+	if block, ok := f.GetBasicBlockByID(f.EnterBlock); ok && block != nil {
+		b.CurrentBlock = block
+	}
 	f.builder = b
 	return b
 }
 func (f *FunctionBuilder) AddCaptureFreevalue(name string) {
 	f.captureFreeValue[name] = struct{}{}
 }
-func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
+func (b *FunctionBuilder) GetFunc(name, pkg string) (*Function, bool) {
 	var function *Function
 	b.includeStack.ForeachStack(func(program *Program) bool {
 		functionEx := program.GetFunctionEx(name, pkg)
@@ -130,10 +137,13 @@ func (b *FunctionBuilder) GetFunc(name, pkg string) *Function {
 		}
 		return true
 	})
-	if function != nil {
-		return function
+	if !utils.IsNil(function) {
+		return function, true
 	}
-	return b.GetProgram().GetFunction(name, pkg)
+	if function = b.GetProgram().GetFunction(name, pkg); !utils.IsNil(function) {
+		return function, true
+	}
+	return nil, false
 }
 
 func (b *FunctionBuilder) SetBuildSupport(parent *FunctionBuilder) {
@@ -219,11 +229,12 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
-	if ins, ok := ToParameter(b.GetInstructionById(b.Params[len(b.Params)-1])); ok {
-		_ = ok
-		ins.SetType(NewSliceType(CreateAnyType()))
-	} else {
-		log.Warnf("param contains (%T) cannot be set type and ellipsis", ins)
+	if inst, ok := b.GetInstructionById(b.Params[len(b.Params)-1]); ok && inst != nil {
+		if ins, ok := ToParameter(inst); ok {
+			ins.SetType(NewSliceType(CreateAnyType()))
+		} else {
+			log.Warnf("param contains (%T) cannot be set type and ellipsis", ins)
+		}
 	}
 	b.hasEllipsis = true
 }
@@ -278,9 +289,16 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 	return b.MarkedFuncType
 }
 
-func (b *FunctionBuilder) ReferenceParameter(name string, index int) {
-	b.RefParameter[name] = struct{ Index int }{Index: index}
+func (b *FunctionBuilder) ReferenceParameter(name string, index int, kind SideEffectKind) {
+	b.RefParameter[name] = struct {
+		Index int
+		Kind  SideEffectKind
+	}{
+		Index: index,
+		Kind:  kind,
+	}
 }
+
 func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) Value {
 	method := bluePrint.GetMagicMethod(Constructor, b)
 	constructor := b.NewCall(method, args)
@@ -310,24 +328,24 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		return
 	}
 
-	getMinOffsetRng := func(rs1, rs2 []memedit.RangeIf) memedit.RangeIf {
+	getMinOffsetRng := func(rs1, rs2 []*memedit.Range) *memedit.Range {
 		if len(rs1) == 0 || len(rs2) == 0 {
 			return nil
 		}
 
 		var offsetSlice1 []int
-		offsetMap1 := lo.SliceToMap(rs1, func(item memedit.RangeIf) (int, memedit.RangeIf) {
+		offsetMap1 := lo.SliceToMap(rs1, func(item *memedit.Range) (int, *memedit.Range) {
 			offsetSlice1 = append(offsetSlice1, item.GetStartOffset())
 			return item.GetStartOffset(), item
 		})
 
-		offsetSlice2 := lo.Map(rs2, func(item memedit.RangeIf, index int) int {
+		offsetSlice2 := lo.Map(rs2, func(item *memedit.Range, index int) int {
 			return item.GetStartOffset()
 		})
 		sort.Ints(offsetSlice2)
 
 		minDist := -1
-		var minRng memedit.RangeIf
+		var minRng *memedit.Range
 		for _, offset1 := range offsetSlice1 {
 			// 在offsetSlice2中找距离offset1最近的offset2
 			for _, offset2 := range offsetSlice2 {
@@ -344,7 +362,7 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		return minRng
 	}
 
-	getDependencyRangeByName := func(name string) memedit.RangeIf {
+	getDependencyRangeByName := func(name string) *memedit.Range {
 		id := strings.Split(name, ":")
 		if len(id) != 2 {
 			return nil
@@ -395,46 +413,6 @@ func (b *FunctionBuilder) GenerateDependence(pkgs []*dxtypes.Package, filename s
 		pkgItem := b.CreateMemberCallVariable(container, b.EmitUndefined(pkg.Name))
 		b.AssignVariable(pkgItem, sub)
 	}
-}
-
-func (b *FunctionBuilder) GenerateProjectConfig() {
-	prog := b.GetProgram()
-	if prog == nil {
-		return
-	}
-
-	config := b.PeekValue(ProjectConfigVariable)
-	if utils.IsNil(config) {
-		return
-	}
-	backUp := b.GetEditor()
-	defer b.SetEditor(backUp)
-
-	for k, pc := range prog.ProjectConfig {
-		cv := pc.ConfigValue
-		if content, ok := prog.ExtraFile[pc.Filepath]; ok {
-			var editor *memedit.MemEditor
-			if len(content) <= 128 {
-				hash := content
-				editor, _ = ssadb.GetIrSourceFromHash(hash)
-			} else {
-				editor = memedit.NewMemEditorWithFileUrl(content, pc.Filepath)
-			}
-			b.SetEditor(editor)
-			rng := b.GetRangesByText(k)
-			if len(rng) == 1 {
-				b.SetRangeByRangeIf(rng[0])
-			} else {
-				b.SetEmptyRange()
-			}
-			variable := b.CreateMemberCallVariable(config, b.EmitConstInstPlaceholder(k))
-			b.AssignVariable(variable, b.EmitConstInstPlaceholder(cv))
-
-			val := b.CreateVariable("test")
-			b.AssignVariable(val, b.EmitConstInstPlaceholder(cv))
-		}
-	}
-	return
 }
 
 func (b *FunctionBuilder) SetForceCapture(bo bool) {

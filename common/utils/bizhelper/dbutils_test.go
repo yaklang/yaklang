@@ -1,12 +1,11 @@
 package bizhelper
 
 import (
+	"testing"
+
 	"github.com/jinzhu/gorm"
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
-	"os"
-	"testing"
 )
 
 type testData struct {
@@ -16,11 +15,10 @@ type testData struct {
 }
 
 func TestGroupColumn(t *testing.T) {
-	dbPath, db, err := consts.GetTempTestDatabase()
+	db, err := createTempTestDatabase()
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		db.Close()
-		os.Remove(dbPath)
 	})
 
 	db = db.Debug().AutoMigrate(&testData{}).Model(&testData{})

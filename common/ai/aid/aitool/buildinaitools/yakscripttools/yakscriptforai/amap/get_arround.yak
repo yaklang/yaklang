@@ -1,5 +1,5 @@
 __DESC__ = "根据指定的地理位置名称和关键词，搜索该位置附近的地点（POI），并显示每个地点的详细信息，包括名称、地址、位置、距离、类型、电话和ID。"
-
+__VERBOSE_NAME__ = "高德：周边地点搜索"
 __KEYWORDS__ = "地理位置,周边搜索,地点信息,高德地图,poi搜索,位置服务,信息查询"
 
 location = cli.String("location", cli.setHelp("Location Name."),cli.setRequired(true))

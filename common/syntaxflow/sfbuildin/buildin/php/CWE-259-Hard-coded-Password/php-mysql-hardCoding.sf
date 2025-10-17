@@ -5,19 +5,14 @@ desc(
 	level: "low"
 	desc: <<<DESC
 ### 1.规则目的
-
 此规则旨在识别PHP源代码中直接硬编码数据库（特别是MySQL）密码的安全风险。将敏感凭证直接嵌入代码中会显著增加泄露的风险，例如通过代码版本管理系统泄露、或攻击者通过其他漏洞获取webshell后直接读取源码。
 
 ### 2.风险原理
-
 硬编码密码使得攻击者一旦获取到源代码，即可直接获取数据库访问凭证，从而绕过应用程序的认证机制，直接访问、篡改或删除数据库中的敏感数据。此外，当需要更改数据库密码时，必须修改并重新部署代码，不仅效率低下，也增加了出错的概率和系统的停机时间。
 
 ### 3.触发场景
-
 任何在PHP代码中使用`mysql_connect()`、`mysql_pconnect()`或其他数据库连接函数时，将数据库用户名和密码以字符串字面量的形式直接写在函数参数中，都会触发此规则。
-
 例如：
-
 ```php
 <?php
 // 不安全示例：密码直接明文写入代码
@@ -29,7 +24,6 @@ $conn = mysql_connect($servername, $username, $password);
 ```
 
 ### 4.潜在影响
-
 - **数据库泄露**：攻击者获取硬编码密码后，可直接连接数据库，窃取用户数据、配置信息等敏感信息。
 - **数据篡改/删除**：攻击者可以修改或删除数据库中的数据，造成业务中断或数据完整性问题。
 - **权限提升**：如果数据库用户权限过高，攻击者可能利用数据库功能进一步渗透到服务器操作系统。
@@ -39,40 +33,31 @@ DESC
 	rule_id: "fa195860-525b-4e35-b2a1-358f76db51ad"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用配置文件或环境变量
-
 将数据库凭据从代码中移除，存储在应用程序外部的配置文件中（如 `.env` 文件、INI 文件等），并通过环境变量在应用程序启动时加载。
-
 ```php
 <?php
 // 修复示例：从配置文件加载凭据（假设使用dotenv库）
 require __DIR__ . '/vendor/autoload.php';
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
 $dotenv->load();
-
 $servername = $_ENV['DB_SERVER'];
 $username = $_ENV['DB_USERNAME'];
 $password = $_ENV['DB_PASSWORD'];
-
 $conn = mysql_connect($servername, $username, $password);
 ?>
 ```
 
 #### 2. 使用密钥管理服务
-
 对于云部署或企业应用，考虑使用云服务提供商的密钥管理服务（KMS）或HashiCorp Vault等工具，以加密和安全地存储敏感信息。
 
 #### 3. 限制数据库用户权限
-
 为应用程序创建专属的数据库用户，并只赋予其业务所需的最低权限，即使密码泄露也能限制攻击者的操作范围。
 
-#### 4.定期轮换密码
-
+#### 4. 定期轮换密码
 即使使用了安全存储方式，也应定期更改数据库密码，以降低长期暴露的风险。
 
 #### 5. 避免使用废弃的数据库连接函数
-
 `mysql_*` 函数在PHP 5.5之后已被废弃并在PHP 7.0中移除。应优先使用PDO（PHP Data Objects）或MySQLi扩展进行数据库连接和操作，这些扩展提供更好的安全特性（如预处理语句）。
 SOLUTION
 	reference: <<<REFERENCE
@@ -86,6 +71,56 @@ alert $sink for {
 	title: "Hardcoded MySQL Credentials Detected",
 	title_zh: "检测到MySQL凭据硬编码",
 	level: "low",
+	risk: "硬编码密码",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。这可能导致非预期的数据库操作，例如数据泄露、数据篡改或权限绕过。
+2. **触发场景**
+任何在PHP代码中使用`mysql_connect()`、`mysql_pconnect()`或其他数据库连接函数时，将数据库用户名和密码以字符串字面量的形式直接写在函数参数中，都会触发此规则。
+例如：
+```php
+<?php
+// 不安全示例：密码直接明文写入代码
+$servername = "localhost";
+$username = "username";
+$password = "password"; // 硬编码的密码
+$conn = mysql_connect($servername, $username, $password);
+?>
+```
+攻击者输入 `1 OR 1=1` 可绕过业务逻辑，泄露所有用户数据；输入 `1; DROP TABLE users` 可能导致数据表被删除。
+3. **潜在影响**
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
+	name: "sink",
+	message: "发现PHP代码中存在硬编码的MySQL凭据，建议进行安全存储方式的改进。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用配置文件或环境变量
+将数据库凭据从代码中移除，存储在应用程序外部的配置文件中（如 `.env` 文件、INI 文件等），并通过环境变量在应用程序启动时加载。
+```php
+<?php
+// 修复示例：从配置文件加载凭据（假设使用dotenv库）
+require __DIR__ . '/vendor/autoload.php';
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+$dotenv->load();
+$servername = $_ENV['DB_SERVER'];
+$username = $_ENV['DB_USERNAME'];
+$password = $_ENV['DB_PASSWORD'];
+$conn = mysql_connect($servername, $username, $password);
+?>
+```
+#### 2. 使用密钥管理服务
+对于云部署或企业应用，考虑使用云服务提供商的密钥管理服务（KMS）或HashiCorp Vault等工具，以加密和安全地存储敏感信息。
+#### 3. 限制数据库用户权限
+为应用程序创建专属的数据库用户，并只赋予其业务所需的最低权限，即使密码泄露也能限制攻击者的操作范围。
+#### 4.定期轮换密码
+即使使用了安全存储方式，也应定期更改数据库密码，以降低长期暴露的风险。
+#### 5. 避免使用废弃的数据库连接函数
+`mysql_*` 函数在PHP 5.5之后已被废弃并在PHP 7.0中移除。应优先使用PDO（PHP Data Objects）或MySQLi扩展进行数据库连接和操作，这些扩展提供更好的安全特性（如预处理语句）。
+SOLUTION
 }
 desc(
 	lang: "php"
@@ -97,5 +132,59 @@ desc(
     $username = "username";
     $password = "password"; // 硬编码的密码
     $conn = mysql_connect($servername, $username, $password);
+CODE
+	"safefile://SecureConfigExample.php": <<<CODE
+<?php
+// 修复示例1: 从配置文件中加载凭据
+// 假设config.ini文件内容如下：
+// [database]
+// servername = "localhost"
+// username = "dbuser"
+// password = "secure_password_from_config"
+
+$config = parse_ini_file(__DIR__ . '/config.ini', true);
+
+$servername = $config['database']['servername'];
+$username = $config['database']['username'];
+$password = $config['database']['password'];
+
+// 模拟数据库连接，这里使用mysqli代替mysql_connect以示正确的现代化实践
+// 在实际应用中，应使用PDO或MySQLi
+$conn = new mysqli($servername, $username, $password);
+
+if ($conn->connect_error) {
+    die("连接失败: " . $conn->connect_error);
+}
+echo "数据库连接成功 (通过配置文件)!";
+$conn->close();
+?>
+CODE
+	"safefile://SecureEnvExample.php": <<<CODE
+<?php
+// 修复示例2: 从环境变量中加载凭据 (推荐使用Dotenv库)
+// 假设根目录下有一个.env文件，内容如下：
+// DB_SERVER="localhost"
+// DB_USERNAME="envuser"
+// DB_PASSWORD="secure_password_from_env"
+
+// 引入Dotenv库，生产环境通常通过Composer autoload
+// require __DIR__ . '/vendor/autoload.php';
+// $dotenv = Dotenv\Dotenv::createImmutable(__DIR__);
+// $dotenv->load();
+
+// 假设getenv()或$_ENV已经加载了环境变量
+$servername = getenv('DB_SERVER') ?: $_ENV['DB_SERVER'];
+$username = getenv('DB_USERNAME') ?: $_ENV['DB_USERNAME'];
+$password = getenv('DB_PASSWORD') ?: $_ENV['DB_PASSWORD'];
+
+// 模拟数据库连接，使用MySQLi
+$conn = new mysqli($servername, $username, $password);
+
+if ($conn->connect_error) {
+    die("连接失败: " . $conn->connect_error);
+}
+echo "数据库连接成功 (通过环境变量)!";
+$conn->close();
+?>
 CODE
 )

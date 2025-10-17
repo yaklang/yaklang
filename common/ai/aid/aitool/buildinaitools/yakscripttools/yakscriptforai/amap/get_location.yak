@@ -1,5 +1,5 @@
 __DESC__ = "一个获取当前网络公网IP地址并查询其地理位置信息的工具。它通过访问指定的在线服务来获取IP，然后查询并显示该IP的省份和城市信息。"
-
+__VERBOSE_NAME__ = "高德：获取公网IP及地理位置"
 __KEYWORDS__ = "公网ip,ip地址,地理位置,网络信息,地址查询"
 
 isHttps,req,err = poc.ParseUrlToHTTPRequestRaw("GET","https://ifconfig.me/")

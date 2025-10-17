@@ -3,36 +3,39 @@ package aid
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/yaklang/yaklang/common/log"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-func TestCoordinator_Timeline_ToolUse_TooMany_TimelineShrink(t *testing.T) {
+func TestCoordinator_Timeline_ToolUse_BatchCompression(t *testing.T) {
 	inputChan := make(chan *InputEvent)
-	outputChan := make(chan *Event)
+	outputChan := make(chan *schema.AiOutputEvent)
 
 	requireMoreToolCount := 0
 
-	timelineShrinkTrigger := false
-	timelienShrinkApplyCount := 0
+	timelineBatchCompressTrigger := false
+	timelineBatchCompressApplyCount := 0
 
-	tokenPersistent := utils.RandStringBytes(100)
+	tokenCompressed := utils.RandStringBytes(100)
 
 	coordinator, err := NewCoordinator(
 		"test",
 		WithEventInputChan(inputChan),
 		WithSystemFileOperator(),
 		WithMaxTaskContinue(100),
-		WithEventHandler(func(event *Event) {
+		WithEventHandler(func(event *schema.AiOutputEvent) {
 			outputChan <- event
 		}),
-		WithTimeLineLimit(3),
-		WithAICallback(func(config *Config, request *AIRequest) (*AIResponse, error) {
+		WithTimelineContentLimit(10),
+		WithAICallback(func(config aicommon.AICallerConfigIf, request *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 			rsp := config.NewAIResponse()
 			defer func() {
 				rsp.Close()
@@ -41,14 +44,15 @@ func TestCoordinator_Timeline_ToolUse_TooMany_TimelineShrink(t *testing.T) {
 			fmt.Println("========================================================")
 			fmt.Println(request.GetPrompt())
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), tokenPersistent) {
-				timelienShrinkApplyCount++
+			if utils.MatchAllOfSubString(request.GetPrompt(), tokenCompressed) {
+				timelineBatchCompressApplyCount++
 			}
 
-			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-shrink"`) {
-				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-shrink", "persistent": "` + tokenPersistent + `"}`))
-				log.Info("timeline shrink triggered")
-				timelineShrinkTrigger = true
+			if utils.MatchAllOfSubString(request.GetPrompt(), `@action`, `"timeline-reducer"`) ||
+				strings.Contains(request.GetPrompt(), "批量精炼与浓缩") {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action": "timeline-reducer", "reducer_memory": "` + tokenCompressed + `"}`))
+				log.Info("timeline batch compress triggered")
+				timelineBatchCompressTrigger = true
 				return rsp, nil
 			}
 
@@ -110,12 +114,12 @@ LOOP:
 				break LOOP
 			}
 
-			if result.Type == EVENT_TYPE_CONSUMPTION {
+			if result.Type == schema.EVENT_TYPE_CONSUMPTION {
 				continue
 			}
 
 			fmt.Println("result:" + result.String())
-			if result.Type == EVENT_TYPE_PLAN_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_PLAN_REVIEW_REQUIRE {
 				inputChan <- &InputEvent{
 					Id: result.GetInteractiveId(),
 					Params: aitool.InvokeParams{
@@ -125,7 +129,7 @@ LOOP:
 				continue
 			}
 
-			if result.Type == EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
+			if result.Type == schema.EVENT_TYPE_TOOL_USE_REVIEW_REQUIRE {
 				var a = make(aitool.InvokeParams)
 				json.Unmarshal(result.Content, &a)
 				if a.GetObject("params").GetString("path") == "/abc-target" &&
@@ -141,10 +145,14 @@ LOOP:
 				}
 			}
 
-			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to execute tool:", "ls") {
+			if useToolReview && utils.MatchAllOfSubString(string(result.Content), "start to invoke tool:", "ls") {
 				useToolReviewPass = true
-				// break LOOP
 			}
+
+			if useToolReviewPass && timelineBatchCompressTrigger && requireMoreToolCount > 3 {
+				break LOOP
+			}
+
 			fmt.Println("review task result:" + result.String())
 		}
 	}
@@ -161,11 +169,11 @@ LOOP:
 		t.Fatal("require more tool count not proper")
 	}
 
-	if !timelineShrinkTrigger {
-		t.Fatal("timeline shrink not triggered")
+	if !timelineBatchCompressTrigger {
+		t.Fatal("timeline batch compress not triggered")
 	}
 
-	if timelienShrinkApplyCount <= 3 {
-		t.Fatal("timelien shrink count not proper")
+	if timelineBatchCompressApplyCount <= 0 {
+		t.Fatal("timeline batch compress count not proper")
 	}
 }

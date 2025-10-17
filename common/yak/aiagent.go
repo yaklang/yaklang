@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools/metadata/genmetadata"
 	"io"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -39,20 +40,28 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 			tool,
 			aitool.WithDescription(aiTool.Description),
 			aitool.WithKeywords(strings.Split(aiTool.Keywords, ",")),
-			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, stdout io.Writer, stderr io.Writer) (any, error) {
+			aitool.WithCallback(func(ctx context.Context, params aitool.InvokeParams, runtimeConfig *aitool.ToolRuntimeConfig, stdout io.Writer, stderr io.Writer) (any, error) {
 				ctx, cancel := context.WithCancel(ctx)
 				defer cancel()
-				runtimeId := params.GetString("runtime_id")
-				if runtimeId == "" {
-					runtimeId = uuid.New().String()
+
+				var runtimeId string
+				var runtimeFeedBacker func(result *ypb.ExecResult) error
+				if runtimeConfig != nil {
+					runtimeId = runtimeConfig.RuntimeID
+					runtimeFeedBacker = runtimeConfig.FeedBacker
 				}
-				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(i *ypb.ExecResult) error {
-					if i.IsMessage {
-						stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(i)))
+
+				yakitClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
+					if result.IsMessage {
+						stdout.Write([]byte(yaklib.ConvertExecResultIntoLog(result)))
 						stdout.Write([]byte("\n"))
+					}
+					if runtimeFeedBacker != nil {
+						return runtimeFeedBacker(result)
 					}
 					return nil
 				}, runtimeId)
+
 				engine := NewYakitVirtualClientScriptEngine(yakitClient)
 
 				var args []string
@@ -81,8 +90,8 @@ func YakTool2AITool(aitools []*schema.AIYakTool) []*aitool.Tool {
 				_, err = engine.ExecuteExWithContext(ctx, aiTool.Content, map[string]interface{}{
 					"RUNTIME_ID":   runtimeId,
 					"CTX":          ctx,
-					"PLUGIN_NAME":  runtimeId + ".yak",
-					"YAK_FILENAME": runtimeId + ".yak",
+					"PLUGIN_NAME":  aiTool.Name + ".yak",
+					"YAK_FILENAME": aiTool.Name + ".yak",
 				})
 				if err != nil {
 					log.Errorf("execute ex with context failed: %v", err)
@@ -175,11 +184,15 @@ var AIAgentExport = map[string]any{
 	"disableToolUse":               WithDisableToolUse,
 	"aiAutoRetry":                  WithAIAutoRetry,
 	"aiTransactionRetry":           WithAITransactionRetry,
+	"disableOutputType":            WithDisableOutputType,
 
 	/*
 		ai utils api
 	*/
-	"ExtractPlan":      aid.ExtractPlan,
-	"ExtractAction":    aid.ExtractAction,
-	"GetDefaultMemory": aid.GetDefaultMemory,
+	"ExtractPlan":             aid.ExtractPlan,
+	"ExtractAction":           aicommon.ExtractAction,
+	"GetDefaultMemory":        aid.GetDefaultMemory,
+	"AllYakScriptAiTools":     AllYakScriptTools,
+	"UpdateYakScriptMetaData": genmetadata.UpdateYakScriptMetaData,
+	"ParseYakScriptToAiTools": yakscripttools.LoadYakScriptToAiTools,
 }

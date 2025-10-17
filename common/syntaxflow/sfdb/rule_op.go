@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/cve/cveresources"
 
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 
@@ -111,7 +112,6 @@ func MigrateSyntaxFlow(hash string, i *schema.SyntaxFlowRule) error {
 	} else {
 		return db.Create(i).Error
 	}
-	return nil
 }
 
 func DeleteRuleByRuleName(name string) error {
@@ -151,6 +151,28 @@ func CreateRuleByContent(ruleFileName string, content string, buildIn bool, tags
 	if err != nil {
 		return nil, err
 	}
+
+	cweList := make([]string, 0)
+
+	// 从tags中提取CWE
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, "CWE-") {
+			cweList = append(cweList, tag)
+		}
+	}
+
+	// 如果没有从tags中找到CWE，尝试从CVE获取
+	if len(cweList) == 0 && rule.CVE != "" {
+		cwes, err := getCWEsByCVE(rule.CVE)
+		if err == nil {
+			cweList = append(cweList, cwes...)
+		}
+	}
+
+	rule.CWE = append(rule.CWE, cweList...)
+	// 去重CWE列表
+	rule.CWE = lo.Uniq(rule.CWE)
+
 	rule.Type = ruleType
 	rule.RuleName = ruleFileName
 	rule.Language = string(language)
@@ -233,6 +255,8 @@ func CheckSyntaxFlowLanguage(languageRaw string) (consts.Language, error) {
 		return consts.JS, nil
 	case "golang", "go":
 		return consts.GO, nil
+	case "clang", "c":
+		return consts.C, nil
 	case "general":
 		return consts.General, nil
 	}
@@ -457,4 +481,54 @@ func CreateOrUpdateSyntaxFlowRule(db *gorm.DB, RuleName string, i interface{}) e
 func DeleteSyntaxFlowRuleByRuleNameOrRuleId(name, ruleId string) error {
 	db := consts.GetGormProfileDatabase()
 	return db.Where("rule_name = ? or rule_id = ?", name, ruleId).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
+}
+
+// getCWEsByCVE 通过CVE字符串查询相关的CWE列表
+func getCWEsByCVE(cveStr string) ([]string, error) {
+	if cveStr == "" {
+		return nil, nil
+	}
+
+	// 获取CVE数据库连接
+	db := consts.GetGormCVEDatabase()
+
+	if db == nil {
+		return nil, utils.Errorf("CVE database not available")
+	}
+
+	// 查询CVE详情
+	cve, err := cveresources.GetCVE(db, cveStr)
+	if err != nil {
+		return nil, utils.Wrapf(err, "get CVE %s failed", cveStr)
+	}
+
+	if cve == nil || cve.CWE == "" {
+		return nil, utils.Errorf("CVE %s has no associated CWE information", cveStr)
+	}
+
+	// 解析CWE字符串，支持多种分隔符
+	cwes := utils.PrettifyListFromStringSplitEx(cve.CWE, "|", ",")
+	if len(cwes) == 0 {
+		return nil, utils.Errorf("CVE %s has no associated CWE information", cveStr)
+	}
+
+	// 清理和标准化CWE格式
+	var result []string
+	for _, cwe := range cwes {
+		cwe = strings.TrimSpace(cwe)
+		if cwe == "" {
+			continue
+		}
+
+		// 确保CWE格式正确（以CWE-开头）
+		if !strings.HasPrefix(strings.ToUpper(cwe), "CWE-") {
+			// 如果只是数字，添加CWE-前缀
+			if strings.TrimSpace(cwe) != "" {
+				cwe = "CWE-" + cwe
+			}
+		}
+
+		result = append(result, cwe)
+	}
+	return result, nil
 }

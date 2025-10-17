@@ -7,18 +7,24 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 	"github.com/yaklang/yaklang/common/yakgrpc"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func ParseProjectWithAutoDetective(ctx context.Context, path string, language string) (*programInfo, *ssaapi.Program, error) {
+func ParseProjectWithAutoDetective(ctx context.Context, path, language string, input ...map[string]any) (*programInfo, *ssaapi.Program, error) {
 	pluginName := "SSA 项目探测"
+	param := make(map[string]string)
+	param["target"] = path
+	param["language"] = language
+	for _, input := range input {
+		for key, value := range input {
+			param[key] = codec.AnyToString(value)
+		}
+	}
 
 	progInfo := &programInfo{}
-	err := yakgrpc.ExecScriptWithParam(ctx, pluginName, map[string]string{
-		"target":   path,
-		"language": language,
-	},
+	err := yakgrpc.ExecScriptWithParam(ctx, pluginName, param,
 		"", func(exec *ypb.ExecResult) error {
 			if !exec.IsMessage {
 				return nil

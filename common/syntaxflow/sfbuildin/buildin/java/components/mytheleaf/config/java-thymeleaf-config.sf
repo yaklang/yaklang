@@ -4,10 +4,8 @@ desc(
 	severity: low
 	desc: <<<DESC
 ### 规则描述
-
 #### 1. 漏洞原理
 Thymeleaf 是一种流行的服务器端模板引擎，广泛用于基于 Spring 的现代 Java 应用程序。如果未正确配置 Thymeleaf 模板解析器（例如 `SpringResourceTemplateResolver`），可能会导致攻击者利用模板注入漏洞（Server-Side Template Injection, SSTI）控制模板内容或文件路径，从而执行任意代码或访问敏感文件。
-
 #### 2. 触发场景
 以下代码展示了如何不当配置可能导致安全风险的示例：
 ```java
@@ -16,17 +14,14 @@ templateResolver.setPrefix("classpath:/templates/" + userInput);
 templateResolver.setSuffix(".html");
 ```
 在上述示例中，`setPrefix` 方法允许动态参数（如用户输入），这可能被攻击者利用进行目录遍历或注入恶意模板。
-
 #### 3. 潜在影响
 - **远程代码执行**：攻击者可以通过注入恶意模板执行任意代码。
 - **敏感信息泄露**：通过控制模板路径，攻击者可以读取系统上的敏感文件。
 - **数据篡改**：未经授权修改应用程序行为或数据库内容。
-
 DESC
 	rule_id: "70226437-3bb9-4902-b30a-da4e2820bd63"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 严格配置模板路径
 确保 `setPrefix` 和 `setSuffix` 的配置严格限制模板文件的路径和扩展名，避免使用可能导致目录遍历的配置。
 ```java
@@ -35,21 +30,18 @@ SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateReso
 templateResolver.setPrefix("classpath:/secure/templates/");
 templateResolver.setSuffix(".html");
 ```
-
 #### 2. 避免使用动态路径
 避免在模板路径中使用动态参数，确保路径的静态性和可预测性。
 ```java
 // 避免示例：动态路径配置
 // templateResolver.setPrefix("classpath:/templates/" + userInput);
 ```
-
 #### 3. 使用安全的模板模式
 确保 `setTemplateMode` 配置为安全的模式，如 `TemplateMode.HTML`，避免使用可能导致执行恶意代码的模式。
 ```java
 // 示例：使用安全的模板模式
 templateResolver.setTemplateMode(TemplateMode.HTML);
 ```
-
 #### 4. 定期审计模板配置
 定期审计模板配置文件，确保没有不当的配置项，及时发现潜在的安全风险。
 SOLUTION
@@ -65,6 +57,51 @@ alert $templateResolver for {
 	title: "Audit Java Thymeleaf Configuration",
 	title_zh: "审计Java Thymeleaf配置",
 	level: "info",
+	message: "发现对 Java Thymeleaf 配置的安全审计。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 严格配置模板路径
+确保 `setPrefix` 和 `setSuffix` 的配置严格限制模板文件的路径和扩展名，避免使用可能导致目录遍历的配置。
+```java
+// 示例：严格配置模板路径
+SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
+templateResolver.setPrefix("classpath:/secure/templates/");
+templateResolver.setSuffix(".html");
+```
+#### 2. 避免使用动态路径
+避免在模板路径中使用动态参数，确保路径的静态性和可预测性。
+```java
+// 避免示例：动态路径配置
+// templateResolver.setPrefix("classpath:/templates/" + userInput);
+```
+#### 3. 使用安全的模板模式
+确保 `setTemplateMode` 配置为安全的模式，如 `TemplateMode.HTML`，避免使用可能导致执行恶意代码的模式。
+```java
+// 示例：使用安全的模板模式
+templateResolver.setTemplateMode(TemplateMode.HTML);
+```
+#### 4. 定期审计模板配置
+定期审计模板配置文件，确保没有不当的配置项，及时发现潜在的安全风险。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+#### 1. 漏洞原理
+Thymeleaf 是一种流行的服务器端模板引擎，广泛用于基于 Spring 的现代 Java 应用程序。如果未正确配置 Thymeleaf 模板解析器（例如 `SpringResourceTemplateResolver`），可能会导致攻击者利用模板注入漏洞（Server-Side Template Injection, SSTI）控制模板内容或文件路径，从而执行任意代码或访问敏感文件。
+#### 2. 触发场景
+以下代码展示了如何不当配置可能导致安全风险的示例：
+```java
+SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
+templateResolver.setPrefix("classpath:/templates/" + userInput);
+templateResolver.setSuffix(".html");
+```
+在上述示例中，`setPrefix` 方法允许动态参数（如用户输入），这可能被攻击者利用进行目录遍历或注入恶意模板。
+#### 3. 潜在影响
+- **远程代码执行**：攻击者可以通过注入恶意模板执行任意代码。
+- **敏感信息泄露**：通过控制模板路径，攻击者可以读取系统上的敏感文件。
+- **数据篡改**：未经授权修改应用程序行为或数据库内容。
+DESC
+	name: "templateResolver",
 }
 
 $templateResolver.set*(*?{opcode: const} as $params);
@@ -73,6 +110,50 @@ alert $params for {
 	title_zh: "审计Java Thymeleaf配置参数",
 	level: "info",
 	message: "SpringResourceTemplateResolver is used with some params",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 严格配置模板路径
+确保 `setPrefix` 和 `setSuffix` 的配置严格限制模板文件的路径和扩展名，避免使用可能导致目录遍历的配置。
+```java
+// 示例：严格配置模板路径
+SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
+templateResolver.setPrefix("classpath:/secure/templates/");
+templateResolver.setSuffix(".html");
+```
+#### 2. 避免使用动态路径
+避免在模板路径中使用动态参数，确保路径的静态性和可预测性。
+```java
+// 避免示例：动态路径配置
+// templateResolver.setPrefix("classpath:/templates/" + userInput);
+```
+#### 3. 使用安全的模板模式
+确保 `setTemplateMode` 配置为安全的模式，如 `TemplateMode.HTML`，避免使用可能导致执行恶意代码的模式。
+```java
+// 示例：使用安全的模板模式
+templateResolver.setTemplateMode(TemplateMode.HTML);
+```
+#### 4. 定期审计模板配置
+定期审计模板配置文件，确保没有不当的配置项，及时发现潜在的安全风险。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+#### 1. 漏洞原理
+Thymeleaf 是一种流行的服务器端模板引擎，广泛用于基于 Spring 的现代 Java 应用程序。如果未正确配置 Thymeleaf 模板解析器（例如 `SpringResourceTemplateResolver`），可能会导致攻击者利用模板注入漏洞（Server-Side Template Injection, SSTI）控制模板内容或文件路径，从而执行任意代码或访问敏感文件。
+#### 2. 触发场景
+以下代码展示了如何不当配置可能导致安全风险的示例：
+```java
+SpringResourceTemplateResolver templateResolver = new SpringResourceTemplateResolver();
+templateResolver.setPrefix("classpath:/templates/" + userInput);
+templateResolver.setSuffix(".html");
+```
+在上述示例中，`setPrefix` 方法允许动态参数（如用户输入），这可能被攻击者利用进行目录遍历或注入恶意模板。
+#### 3. 潜在影响
+- **远程代码执行**：攻击者可以通过注入恶意模板执行任意代码。
+- **敏感信息泄露**：通过控制模板路径，攻击者可以读取系统上的敏感文件。
+- **数据篡改**：未经授权修改应用程序行为或数据库内容。
+DESC
+	name: "params",
 }
 
 

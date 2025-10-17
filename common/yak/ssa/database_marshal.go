@@ -97,7 +97,8 @@ func fetchIds(origin any) any {
 	return ids
 }
 
-func marshalExtraInformation(raw Instruction) map[string]any {
+func marshalExtraInformation(cache *ProgramCache, raw Instruction) map[string]any {
+
 	params := make(map[string]any)
 	switch ret := raw.(type) {
 	case *Function:
@@ -110,7 +111,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["free_values"] = freeValues
 		params["current_blueprint"] = -1
 		if ret.currentBlueprint != nil {
-			typID := SaveTypeToDB(ret.currentBlueprint, ret.GetProgramName())
+			typID := saveType(cache, ret.currentBlueprint)
 			params["current_blueprint"] = typID
 		}
 		params["is_method"] = ret.isMethod
@@ -123,6 +124,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 				"verbose_name": se.VerboseName,
 				"modify":       se.Modify,
 				"forceCreate":  se.forceCreate,
+				"kind":         se.Kind,
 			}
 			if se.parameterMemberInner != nil {
 				element["object_name"] = se.ObjectName
@@ -136,9 +138,10 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 			sideEffects = append(sideEffects, element)
 		}
 		params["side_effect"] = sideEffects
-		if p := ret.GetParent(); p != nil {
-			params["parent"] = p.GetId()
-		}
+		params["parent"] = ret.parent
+		// if p := ret.GetParent(); p != nil {
+		// 	params["parent"] = p.GetId()
+		// }
 		params["throws"] = fetchIds(ret.Throws)
 		params["child_funcs"] = fetchIds(ret.ChildFuncs)
 		params["return"] = fetchIds(ret.Return)
@@ -165,7 +168,11 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 			if ret.Condition > 0 {
 				params["block_condition"] = ret.Condition
 			} else {
-				log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) ", ret.Condition, ret.GetValueById(ret.Condition).String())
+				if condValue, ok := ret.GetValueById(ret.Condition); ok && condValue != nil {
+					log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: %v) ", ret.Condition, condValue.String())
+				} else {
+					log.Warnf("strange things happening when marshal BasicBlock: invalid condition(%T: nil) ", ret.Condition)
+				}
 			}
 		}
 		params["block_insts"] = fetchIds(ret.Insts)
@@ -312,7 +319,7 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 	return params
 }
 
-func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
+func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.IrCode) {
 	params := ir.GetExtraInfo()
 	switch ret := inst.(type) {
 	case *Assert:
@@ -434,9 +441,9 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 		}
 		ret.ParameterMembers = utils.MapGetInt64Slice(params, "parameter_members")
 
-		currentBlueprint := utils.MapGetInt(params, "current_blueprint")
+		currentBlueprint := utils.MapGetInt64(params, "current_blueprint")
 		if currentBlueprint != -1 {
-			typ := GetTypeFromDB(currentBlueprint)
+			typ := GetTypeFromDB(cache, currentBlueprint)
 			blueprint, ok := ToClassBluePrintType(typ)
 			if ok {
 				ret.currentBlueprint = blueprint
@@ -452,6 +459,7 @@ func unmarshalExtraInformation(inst Instruction, ir *ssadb.IrCode) {
 				ins.VerboseName = utils.MapGetString(extra, "verbose_name")
 				ins.Modify = utils.MapGetInt64(extra, "modify")
 				ins.forceCreate = utils.MapGetBool(extra, "forceCreate")
+				ins.Kind = SwitchSideEffectKind(utils.MapGetString(extra, "kind"))
 				ins.ObjectName = utils.MapGetString(extra, "object_name")
 				ins.MemberCallKind = ParameterMemberCallKind(utils.MapGetInt(extra, "member_call_kind"))
 				ins.MemberCallObjectIndex = utils.MapGetInt(extra, "member_call_object_index")

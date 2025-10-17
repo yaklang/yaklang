@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -47,19 +48,27 @@ func (b *FunctionBuilder) SetBlueprint(name string, class *Blueprint) {
 // for ref the method/function, the blueprint is a container too,
 // saving the static variables and util methods.
 func (b *FunctionBuilder) CreateBlueprintWithPkgName(name string, tokenizers ...CanStartStopToken) *Blueprint {
-	var tokenizer CanStartStopToken
+	var codeRange *memedit.Range
 	if len(tokenizers) > 0 {
-		tokenizer = tokenizers[0]
-		recoverRange := b.SetRange(tokenizer)
+		tokenizer := tokenizers[0]
+		codeRange = b.GetRangeByToken(tokenizer)
+		recoverRange := b.SetRangePure(codeRange)
 		defer recoverRange()
 	}
 	prog := b.prog
-	blueprint := NewBlueprint(name)
+	if prog == nil {
+		return nil
+	}
 	if prog.Blueprint == nil {
 		prog.Blueprint = omap.NewEmptyOrderedMap[string, *Blueprint]()
 	}
+	if blueprint, ok := prog.Blueprint.Get(name); ok {
+		return blueprint
+	}
 
-	blueprint.Tokenizer = tokenizer
+	blueprint := NewBlueprint(name)
+
+	blueprint.Range = codeRange
 
 	b.SetBlueprint(name, blueprint)
 	blueprintContainer := b.EmitEmptyContainer()

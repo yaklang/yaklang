@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/samber/lo"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (p *Program) NewFunction(name string) *Function {
@@ -23,6 +24,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 		}
 	}
 	f := &Function{
+		LazyBuilder: NewLazyBuilder("Function:" + name),
 		anValue:     NewValue(),
 		Params:      make([]int64, 0),
 		hasEllipsis: false,
@@ -45,7 +47,7 @@ func (p *Program) NewFunctionWithParent(name string, parent *Function) *Function
 	} else {
 		// p.Funcs[name] = f
 		if _, ok := p.Funcs.Get(name); ok {
-			log.Errorf("function %s already exists", name)
+			log.Debugf("function %s already exists", name)
 			name = fmt.Sprintf("%s$%d", name, index)
 		}
 		p.Funcs.Set(name, f)
@@ -77,7 +79,7 @@ func (f *Function) GetType() Type {
 	if f != nil && f.Type != nil {
 		return f.Type
 	} else {
-		return CreateAnyType()
+		return defaultAnyType
 	}
 }
 
@@ -88,7 +90,7 @@ func (f *Function) AddThrow(vs ...Value) {
 }
 
 func (f *Function) SetType(t Type) {
-	if t == nil {
+	if utils.IsNil(f) || utils.IsNil(t) {
 		return
 	}
 
@@ -156,8 +158,8 @@ func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) 
 }
 
 func (f *Function) ReturnValue() []Value {
-	exitBlock := f.GetBasicBlockByID(f.ExitBlock)
-	if exitBlock == nil {
+	exitBlock, ok := f.GetBasicBlockByID(f.ExitBlock)
+	if !ok || exitBlock == nil {
 		log.Warnf("function exit block cannot convert to BasicBlock: %v", f.ExitBlock)
 		return nil
 	}
@@ -174,7 +176,11 @@ func (f *Function) GetParent() *Function {
 		return nil
 	}
 
-	parent := f.GetValueById(f.parent)
+	parent, ok := f.GetValueById(f.parent)
+	if !ok || parent == nil {
+		log.Warnf("function parent not found: %v", f.parent)
+		return nil
+	}
 	fu, ok := ToFunction(parent)
 	if ok {
 		return fu

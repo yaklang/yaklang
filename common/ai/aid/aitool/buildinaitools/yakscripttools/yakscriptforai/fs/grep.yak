@@ -1,5 +1,5 @@
 __DESC__ = "一个文本查找工具，用于在指定文件或目录下查找匹配特定模式的文本。支持子串（区分大小写和不区分大小写）和正则表达式模式。可指定查找的路径、模式、最大结果数量、跳过的匹配次数以及显示匹配文本周围的上下文。"
-
+__VERBOSE_NAME__ = "文本查找工具"
 __KEYWORDS__ = "pattern matching,regexp,file path,模式匹配,查找替换,文件路径,context text,文本查找,文本工具,directory search,text tool,文件搜索,正则表达式,目录搜索,grep,text finder,file search"
 
 yakit.AutoInitYakit()
@@ -24,6 +24,9 @@ if pattern == "" {
 
 count := 0
 m := sync.NewMutex()
+
+findRes := []
+
 
 defer func{
     if count<= 0 { yakit.Info(f"not `${pattern}` find") }
@@ -78,11 +81,13 @@ output = (targetFile, offset, offsetEnd) => {
         if err != nil {
             return
         }
+        yakit.File(targetFile, yakit.fileReadAction(offset, seekLen, "byte", raw))
         if len(raw) > 0 {
             msg := "    dump: %#v" % string(raw)
             println(msg)
             buf.Write(msg)
             buf.WriteByte('\n')
+            findRes = append(findRes, string(raw))
         }
     }
 }
@@ -131,8 +136,10 @@ handle = (patternSubstr, targetFile, content) => {
     }
 }
 
+
 if file.IsDir(pathName) {
     filesys.Recursive(pathName, filesys.onFileStat((fileToCheck, info) => {
+        yakit.File(fileToCheck, yakit.fileStatusAction(info))
         defer recover()
         if end { return }
 
@@ -143,21 +150,28 @@ if file.IsDir(pathName) {
 
         allpattern := str.Split(pattern, ",")
         for subPatternItem in allpattern {
+            fileContent := file.ReadFile(fileToCheck)~
+            yakit.File(fileToCheck, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
             if isRegexp {
-                handleRegexp(subPatternItem, fileToCheck, string(file.ReadFile(fileToCheck)~))
+                handleRegexp(subPatternItem, fileToCheck, string(fileContent))
             } else {
-                handle(subPatternItem, fileToCheck, string(file.ReadFile(fileToCheck)~))
+                handle(subPatternItem, fileToCheck, string(fileContent))
             }
         }
     }))
 } else {
     allpattern := str.Split(pattern, ",")
     for subPatternItem in allpattern {
+        fileContent := file.ReadFile(pathName)~
+        yakit.File(pathName, yakit.fileReadAction(0, len(fileContent), "byte", fileContent))
         if isRegexp {
-            handleRegexp(subPatternItem, pathName, string(file.ReadFile(pathName)~))
+            handleRegexp(subPatternItem, pathName, string(fileContent))
         } else {
-            handle(subPatternItem, pathName, string(file.ReadFile(pathName)~))
+            handle(subPatternItem, pathName, string(fileContent))
         }
     }
 }
 println()
+
+
+yakit.File(pathName, yakit.fileFindAction("content", sprintf("patternMode:[%s] | pattern:[%s]",matchMode,pattern), findRes...))

@@ -1,0 +1,164 @@
+__DESC__ = "一个用于显示指定文件尾部内容的工具。支持按字节数或按行数读取，支持显示行号、十六进制转储等功能。"
+__VERBOSE_NAME__ = "文件尾部内容查看"
+__KEYWORDS__ = "file,tail,bytes,lines,文件读取,文本处理,十六进制转储,行号显示,内容预览,last bytes,last lines"
+
+/*
+文件尾部内容查看工具
+
+功能特点：
+1. 支持两种读取模式：
+   - lines: 按行数读取文件尾部几行内容（默认模式）
+   - bytes: 按字节数读取文件尾部内容（最大 8K）
+
+2. 通用参数：
+   --filename: 指定要查看的文件路径 (必需)
+   --mode: 读取模式，bytes 或 lines (默认: lines)
+   --limit: 读取数量，lines 模式为行数，bytes 模式为字节数 (默认: 20)
+   --no-linenumber: 禁用行号显示 (默认启用行号)
+
+3. 按行模式特有参数：
+   --line-length: 限制每行的最大长度，默认 190 字符 (可选)
+
+4. 按字节模式特有参数：
+   --hexdump: 以十六进制格式显示内容 (可选)
+
+使用示例：
+1. 查看文件后 20 行（默认，带行号）：
+   yak tail.yak --filename test.txt
+
+2. 查看文件后 10 行：
+   yak tail.yak --filename test.txt --limit 10
+
+3. 查看文件后 100 字节：
+   yak tail.yak --filename test.txt --mode bytes --limit 100
+
+4. 查看文件后 8192 字节（8K）：
+   yak tail.yak --filename test.txt --mode bytes
+
+5. 查看文件后 5 行（不带行号）：
+   yak tail.yak --filename test.txt --limit 5 --no-linenumber
+
+6. 查看文件后 100 字节的十六进制转储：
+   yak tail.yak --filename test.txt --mode bytes --limit 100 --hexdump
+
+注意事项：
+- 默认模式为 lines 模式，读取 20 行
+- bytes 模式自动限制最大 8K (8192) 字节
+- 按行模式支持行长度截断，避免显示过长的行
+- 十六进制转储模式会同时显示 dump() 和 sdump() 的结果
+- 行号显示会自动计算合适的宽度对齐
+*/
+
+filename = cli.String("filename", cli.setRequired(true), cli.setHelp("which file you want to check?"))
+mode = cli.String("mode", cli.setDefault("lines"), cli.setHelp("read mode: 'bytes' for byte count, 'lines' for line count (default: lines)"))
+limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("how many bytes/lines you want to read (default: 20 for lines, 8192 for bytes)"))
+noLineNumber = cli.Bool("no-linenumber", cli.setHelp("disable line number display"))
+lineLength = cli.Int("line-length", cli.setDefault(190), cli.setHelp("if the line is so long, use it to limit context (only for lines mode)"))
+hexdumped = cli.Bool("hexdump", cli.setHelp("show result in hex dump (only for bytes mode)"))
+cli.check()
+
+// 默认启用行号显示
+showLineNumber = !noLineNumber
+
+// 设置默认值并处理模式
+if mode == "bytes" {
+    // bytes 模式限制最大 8K (8192) 字节
+    if limit <= 0 || limit > 8192 {
+        limit = 8192
+        yakit.Warn("bytes mode limit set to max 8K (8192 bytes)")
+    }
+} else {
+    // lines 模式默认 20 行
+    if limit <= 0 {
+        limit = 20
+        yakit.Warn("lines mode limit set to default 20 lines")
+    }
+}
+
+// 确保 lineLength 有一个合理的默认值
+if lineLength <= 0 || lineLength > 10000 {
+    lineLength = 190
+    yakit.Warn("line-length set to default 190")
+}
+
+fp, err = file.Open(filename)
+if err != nil {
+    yakit.Error("OPEN Err: %v", err)
+    return
+}
+defer fp.Close()
+
+if mode == "bytes" {
+    // 按字节数读取模式，从尾部读取
+    // 先读取整个文件到内存
+    raw, err := io.ReadAll(fp)
+    if err != nil {
+        yakit.Error("READ Err: %v", err)
+        return
+    }
+    fileSize = len(raw)
+
+    // 计算读取的字节数
+    if limit > fileSize {
+        limit = fileSize
+    }
+
+    // 截取尾部字节
+    raw = raw[len(raw)-limit:]
+
+    if hexdumped {
+        dump(raw)
+        yakit.Info(sdump(raw))
+        return
+    }
+
+    if showLineNumber {
+        // 使用 str.AddPrefixLineNumber 添加行号
+        content := string(raw)
+        result := str.AddPrefixLineNumber(content)
+        yakit.Info(result)
+        yakit.File(filename, yakit.fileReadAction(fileSize-limit, limit, "byte", result))
+        return
+    }
+
+    yakit.File(filename, yakit.fileReadAction(fileSize-limit, limit, "byte", string(raw)))
+    yakit.Info("tail %v bytes: \n%v", limit, string(raw))
+    return
+} else if mode == "lines" {
+    // 按行数读取模式，从尾部读取
+    // 读取整个文件来获取正确的行号
+    raw, _ := io.ReadAll(fp)
+    allLines := str.Split(string(raw), "\n")
+    if len(allLines) > 0 && allLines[len(allLines)-1] == "" {
+        allLines = allLines[:len(allLines)-1]
+    }
+
+    totalLines = len(allLines)
+    startLine = 0
+    endLine = totalLines
+
+    if limit > 0 && totalLines > limit {
+        startLine = totalLines - limit
+    }
+
+    // 构建内容
+    content = ""
+    for i = startLine; i < endLine; i++ {
+        if i > startLine {
+            content += "\n"
+        }
+        if showLineNumber {
+            content += sprintf("%d | %s", i + 1, allLines[i])
+        } else {
+            content += allLines[i]
+        }
+    }
+
+    yakit.File(filename, yakit.fileReadAction(startLine, limit, "line", content))
+    println(content)
+    yakit.Info("tail %v lines: \n%v", limit, content)
+    return
+} else {
+    yakit.Error("invalid mode: %v, supported modes: bytes, lines", mode)
+    return
+}

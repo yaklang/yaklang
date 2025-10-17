@@ -698,6 +698,23 @@ func TestType(t *testing.T) {
 			},
 		})
 	})
+
+	t.Run("check ortype", func(t *testing.T) {
+		test.CheckError(t, test.TestCase{
+			Code: `  
+ispost = cli.Bool("ispost")
+cli.check()
+Location = "AppendHTTPPacketQueryParam"
+
+if ispost {
+	Location = 9999
+}
+Location.HasPrefix("/")
+
+ `,
+			Want: []string{},
+		})
+	})
 }
 
 func TestCallParamReturn(t *testing.T) {
@@ -1571,7 +1588,7 @@ func TestErrorGenericFunc(t *testing.T) {
 a = [1]
 target = append(a, 2, "3")`,
 				Want: []string{
-					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.GetNumberType(), ssa.GetStringType()),
+					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.CreateNumberType(), ssa.CreateStringType()),
 					ssa4analyze.ArgumentTypeError(3, "string", "number", "append"),
 				},
 			},
@@ -1584,7 +1601,7 @@ target = append(a, 2, "3")`,
 a = b"asd"
 target = append(a, b"qwe", b"zxc")`,
 				Want: []string{
-					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.GetByteType(), ssa.GetBytesType()),
+					ssa.GenericTypeError(ssa.TypeT, ssa.TypeT, ssa.CreateByteType(), ssa.CreateBytesType()),
 				},
 			},
 		)

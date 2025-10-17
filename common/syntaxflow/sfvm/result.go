@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -27,7 +28,7 @@ type SFFrameResult struct {
 	// value
 	SymbolTable      *omap.OrderedMap[string, ValueOperator]
 	UnNameValue      ValueOperator
-	AlertSymbolTable map[string]ValueOperator
+	AlertSymbolTable *utils.SafeMap[ValueOperator]
 }
 
 func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
@@ -37,7 +38,7 @@ func NewSFResult(rule *schema.SyntaxFlowRule, config *Config) *SFFrameResult {
 		Description:      omap.NewEmptyOrderedMap[string, string](),
 		CheckParams:      make([]string, 0),
 		SymbolTable:      omap.NewEmptyOrderedMap[string, ValueOperator](),
-		AlertSymbolTable: make(map[string]ValueOperator),
+		AlertSymbolTable: utils.NewSafeMap[ValueOperator](),
 	}
 }
 
@@ -62,9 +63,10 @@ func (s *SFFrameResult) MergeByResult(result *SFFrameResult) {
 		}
 		return true
 	})
-	for k, v := range result.AlertSymbolTable {
-		s.AlertSymbolTable[k] = v
-	}
+	result.AlertSymbolTable.ForEach(func(key string, value ValueOperator) bool {
+		s.AlertSymbolTable.Set(key, value)
+		return true
+	})
 	//for k, v := range result.AlertDesc {
 	//	s.AlertDesc[k] = v
 	//}
@@ -107,7 +109,7 @@ func WithShowAll(show ...bool) ShowOption {
 	}
 }
 func (s *SFFrameResult) Show(opts ...ShowOption) {
-	fmt.Println(s.String(opts...))
+	log.Infof(s.String(opts...))
 }
 func (s *SFFrameResult) String(opts ...ShowOption) string {
 	cfg := new(showConfig)
@@ -135,13 +137,14 @@ func (s *SFFrameResult) String(opts ...ShowOption) string {
 			return true
 		})
 	} else {
-		if len(s.AlertSymbolTable) > 0 {
-			for name, value := range s.AlertSymbolTable {
-				if info, b := s.GetAlertInfo(name); b {
-					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", name, codec.AnyToString(info.Msg)))
+		if s.AlertSymbolTable.Count() > 0 {
+			s.AlertSymbolTable.ForEach(func(key string, value ValueOperator) bool {
+				if info, b := s.GetAlertInfo(key); b {
+					buf.WriteString(fmt.Sprintf("value: %s description: %v\n", key, codec.AnyToString(info.Msg)))
 				}
-				showValueMap(buf, name, value, cfg)
-			}
+				showValueMap(buf, key, value, cfg)
+				return true
+			})
 		} else if s.SymbolTable.Len() > 0 {
 			s.SymbolTable.ForEach(func(i string, v ValueOperator) bool {
 				showValueMap(buf, i, v, cfg)
@@ -180,7 +183,7 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 			idx = fmt.Sprintf("t%v", raw.GetId())
 		}
 		buf.WriteString(fmt.Sprintf(prefixVariableResult+"%v: %v\n", idx, utils.ShrinkString(v.String(), 64)))
-		rangeIns, ok := v.(interface{ GetRange() memedit.RangeIf })
+		rangeIns, ok := v.(interface{ GetRange() *memedit.Range })
 		if !ok {
 			continue
 		}
@@ -190,17 +193,17 @@ func showValueMap(buf *bytes.Buffer, varName string, value ValueOperator, cfg *s
 		}
 		start, end := ssaRange.GetStart(), ssaRange.GetEnd()
 		editor := ssaRange.GetEditor()
-		fileName := editor.GetFilename()
+		fileName := editor.GetUrl()
 		if fileName == "" {
 			var err error
-			editor, err = ssadb.GetIrSourceFromHash(editor.SourceCodeMd5())
+			editor, err = ssadb.GetIrSourceFromHash(editor.GetIrSourceHash())
 			if err != nil {
 				log.Warn(err)
 			}
 			if editor != nil {
 				fileName = editor.GetFilename()
 				if fileName == "" {
-					fileName = `[md5:` + editor.SourceCodeMd5() + `]`
+					fileName = `[md5:` + editor.GetIrSourceHash() + `]`
 				}
 			}
 		}
@@ -262,5 +265,26 @@ func (s *SFFrameResult) GetDescription() string {
 			"solution": s.rule.Solution,
 		}
 		return codec.AnyToString(info)
+	}
+}
+
+func (s *SFFrameResult) ToGRPCModel() *ypb.SyntaxFlowResult {
+	if s == nil {
+		return nil
+	}
+	return &ypb.SyntaxFlowResult{
+		ResultID:    0,
+		TaskID:      "", // TODO: TaskID
+		Kind:        "", // TODO: Kind
+		ProgramName: "", // TODO: ProgramName
+
+		RuleName:    s.rule.RuleName,
+		Title:       s.rule.Title,
+		TitleZh:     s.rule.TitleZh,
+		Description: s.GetDescription(),
+		Severity:    string(s.rule.Severity),
+		Purpose:     string(s.rule.Purpose),
+		Language:    s.rule.Language,
+		RuleContent: s.rule.Content,
 	}
 }

@@ -1,19 +1,16 @@
 package lowhttp
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
-	"io"
-	"mime"
-	"net/http"
-	"regexp"
-	"strings"
-
 	"github.com/gobwas/glob"
 	"github.com/yaklang/yaklang/common/log"
 	utils "github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
+	"mime"
+	"net/http"
+	"regexp"
+	"strings"
 )
 
 var (
@@ -127,14 +124,7 @@ func IsHtmlOrXmlMIMEType(s string) bool {
 // ```
 func FixHTTPResponse(raw []byte) (rsp []byte, body []byte, _ error) {
 	// log.Infof("response raw: \n%v", codec.EncodeBase64(raw))
-	var haveExpect100Continue bool
-	if len(raw) > 0 && raw[0] != 'H' {
-		raw = TrimLeftHTTPPacket(raw)
-	}
-	raw, haveExpect100Continue = bytes.CutPrefix(raw, expect100continue)
-	if !haveExpect100Continue {
-		raw, haveExpect100Continue = bytes.CutPrefix(raw, expect100continue)
-	}
+	raw, _ = bytes.CutPrefix(raw, expect100continue)
 
 	isChunked := false
 	// 这两个用来处理编码特殊情况
@@ -380,55 +370,30 @@ func ReplaceHTTPPacketBody(raw []byte, body []byte, chunk bool) (newHTTPRequest 
 }
 
 func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) []byte {
-	// 移除左边空白字符
-	raw = TrimLeftHTTPPacket(raw)
-	reader := bufio.NewReader(bytes.NewBuffer(raw))
-	firstLineBytes, err := utils.BufioReadLine(reader)
 	isChunked := false
-	if err != nil {
-		return raw
-	}
-
-	headers := []string{
-		string(firstLineBytes),
-	}
-
-	// 接下来解析各种 Header
-	for {
-		lineBytes, err := utils.BufioReadLine(reader)
-		if err != nil && err != io.EOF {
-			break
-		}
-		line := string(lineBytes)
-		line = strings.TrimSpace(line)
-
-		// Header 解析完毕
-		if line == "" {
-			break
-		}
-
-		// 移除 chunked
+	var firstLine string
+	var headers []string
+	_, _ = SplitHTTPPacketEx(raw, nil, nil, func(rawLine string) error {
+		firstLine = rawLine
+		return nil
+	}, func(line string) string {
 		if utils.IHasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
 			isChunked = true
-			continue
+			return line
 		}
 
-		//if strings.HasPrefix(lineLower, "content-encoding:") {
-		//	headers = append(headers, fmt.Sprintf("Content-Encoding: %v", "identity"))
-		//	continue
-		//}
-
-		// 设置 content-length
 		if utils.IHasPrefix(line, "content-length") {
-			continue
+			return line
 		}
 		headers = append(headers, line)
-	}
-
+		return line
+	})
+	headers = append([]string{firstLine}, headers...)
+	var buf bytes.Buffer
 	// 空 body
 	if body == nil {
-		raw := strings.Join(headers, CRLF) + CRLF + CRLF
-		return []byte(raw)
+		buf.WriteString(strings.Join(headers, CRLF) + CRLF + CRLF)
+		return buf.Bytes()
 	}
 
 	// 只有包含了Transfer-Encoding: chunked，以及body符合chunked格式，才认为已经是chunked
@@ -448,75 +413,51 @@ func ReplaceHTTPPacketBodyEx(raw []byte, body []byte, chunk bool, forceCL bool) 
 			body = newBody
 		}
 	}
-
 	if !chunk && (len(body) > 0 || forceCL) {
 		headers = append(headers, fmt.Sprintf("Content-Length: %d", len(body)))
 	}
-	buf := new(bytes.Buffer)
-	for _, header := range headers {
-		buf.WriteString(header)
-		buf.WriteString(CRLF)
-	}
-	buf.WriteString(CRLF)
+	buf.WriteString(strings.Join(headers, CRLF))
+	buf.WriteString(CRLF + CRLF)
 	buf.Write(body)
 	return buf.Bytes()
 }
 
 func ReplaceHTTPPacketBodyRaw(raw []byte, body []byte, fixCL bool) []byte {
 	// 移除左边空白字符
-	raw = TrimLeftHTTPPacket(raw)
-	chunkLine, contentLengthLine := -1, -1
-	reader := bufio.NewReader(bytes.NewBuffer(raw))
-	firstLineBytes, err := utils.BufioReadLine(reader)
-	if err != nil {
-		return raw
-	}
-
-	headers := []string{
-		string(firstLineBytes),
-	}
-
-	// 接下来解析各种 Header
-	for {
-		lineBytes, err := utils.BufioReadLine(reader)
-		if err != nil && err != io.EOF {
-			break
-		}
-		line := string(lineBytes)
-		line = strings.TrimSpace(line)
-
+	var firstLine string
+	var headers []string
+	var hasChunkHeader bool
+	var contentLengthLine = -1
+	_, _ = SplitHTTPPacketEx(raw, nil, nil, func(rawLine string) error {
+		firstLine = rawLine
+		return nil
+	}, func(line string) string {
 		if utils.IHasPrefix(line, "transfer-encoding:") && utils.IContains(line, "chunked") {
-			chunkLine = len(headers)
+			hasChunkHeader = true
 		}
 		if utils.IHasPrefix(line, "content-length") {
 			contentLengthLine = len(headers)
 		}
-
-		// Header 解析完毕
-		if line == "" {
-			break
-		}
-
 		headers = append(headers, line)
-	}
+		return line
+	})
+	headers = append([]string{firstLine}, headers...)
+	var buf bytes.Buffer
 
 	// 空 body
 	if body == nil {
-		raw := strings.Join(headers, CRLF) + CRLF + CRLF
-		return []byte(raw)
+		buf.WriteString(strings.Join(headers, CRLF) + CRLF + CRLF)
+		return buf.Bytes()
 	}
 
 	// fix CL and is CL
-	if fixCL && chunkLine == -1 && contentLengthLine != -1 {
-		headers[contentLengthLine] = fmt.Sprintf("Content-Length: %d", len(body))
+	if fixCL && !hasChunkHeader && contentLengthLine > -1 {
+		// fix index append first line
+		headers[contentLengthLine+1] = fmt.Sprintf("Content-Length: %d", len(body))
 	}
 
-	buf := new(bytes.Buffer)
-	for _, header := range headers {
-		buf.WriteString(header)
-		buf.WriteString(CRLF)
-	}
-	buf.WriteString(CRLF)
+	buf.WriteString(strings.Join(headers, CRLF))
+	buf.WriteString(CRLF + CRLF)
 	buf.Write(body)
 	return buf.Bytes()
 }

@@ -6,28 +6,36 @@ desc(
 	rule_id: "0a74334a-844f-46ea-88a5-b1091d02ee89"
 	desc: <<<DESC
 ### 1. 规则目的
-
-该规则用于审计Java代码中数据库操作的安全性，重点关注使用 JDBC（Java Database Connectivity）时，通过 `PreparedStatement` 执行SQL查询的代码。
+该规则用于审计Java代码中数据库操作的安全性，重点关注使用JDBC（Java Database Connectivity）时，通过`PreparedStatement`执行SQL查询的代码。
 
 ### 2. 规则详细
-
 1. **作为基础审计库**
-   该规则属于 `java-jdbc-prepared-execute-sink` 库规则（`lib` 类型），其主要作用是识别代码中调用 `java.sql.Connection` 对象的 `prepareStatement()` 方法创建 `PreparedStatement` 对象，并最终通过 `executeQuery()` 方法执行查询操作的位置。
+   该规则属于`java-jdbc-prepared-execute-sink`库规则（`lib`类型），其主要作用是识别代码中调用`java.sql.Connection`对象的`prepareStatement()`方法创建`PreparedStatement`对象，并最终通过`executeQuery()`方法执行查询操作的位置。
 
 2. **辅助漏洞检测**
-   虽然 `PreparedStatement` 本身是防止SQL注入的有效手段，但该规则的设计是为了**审计**所有涉及到 `PreparedStatement.executeQuery()` 的代码调用。在实际安全审计流程中，此规则会配合数据流跟踪规则（例如，跟踪用户输入）使用。
-   通过结合数据流跟踪，可以判断传递给 `prepareStatement()` 方法的 SQL 语句是否是由用户输入直接或间接构造而成，或者传递给 `setString()`、`setInt()` 等方法的参数是否是未经验证的用户输入。如果发现用户输入在未经过滤或校验的情况下直接影响 SQL 语句的结构（即使使用了占位符，也可能在动态构建SQL时引入问题）或参数的值，则可能存在SQL注入的风险。
+   虽然`PreparedStatement`本身是防止SQL注入的有效手段，但该规则的设计是为了**审计**所有涉及到`PreparedStatement.executeQuery()`的代码调用。在实际安全审计流程中，此规则会配合数据流跟踪规则（例如，跟踪用户输入）使用。
+   通过结合数据流跟踪，可以判断传递给`prepareStatement()`方法的SQL语句是否是由用户输入直接或间接构造而成，或者传递给`setString()`、`setInt()`等方法的参数是否是未经验证的用户输入。如果发现用户输入在未经过滤或校验的情况下直接影响SQL语句的结构（即使使用了占位符，也可能在动态构建SQL时引入问题）或参数的值，则可能存在SQL注入的风险。
 
 3. **识别潜在风险点**
    该规则还可以帮助识别所有执行数据库查询的关键代码位置，便于后续分析其参数来源、输入校验情况以及是否存在其他潜在的数据安全风险，例如，是否查询了敏感信息并进行了不安全的处理。
+   该规则本身不直接检测SQL注入漏洞，而是提供一个基础的审计点，用于后续更深入的数据流分析，以判断是否存在安全问题。
 
-该规则本身不直接检测SQL注入漏洞，而是提供一个基础的审计点，用于后续更深入的数据流分析，以判断是否存在安全问题。
+#### 示例代码：存在风险的代码
+```java
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?";
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+    pstmt.setString(1, userInput); // 如果对userInput没有进行校验，可能存在风险
+    ResultSet rs = pstmt.executeQuery();
+    while (rs.next()) {
+        System.out.println(rs.getString("username"));
+    }
+}
+```
 DESC
 	solution: <<<SOLUTION
-#### 1. 确保正确使用 PreparedStatement
-
-尽管规则审计的是 `PreparedStatement` 的使用，但如果在动态构建SQL语句时仍然拼接了用户输入，或者将未经验证的用户输入直接作为参数传递，仍然可能存在漏洞。确保所有用户输入都通过 `pstmt.set*()` 方法绑定到占位符，不要将用户输入直接拼接到SQL字符串中。
-
+#### 1. 确保正确使用PreparedStatement
+尽管规则审计的是`PreparedStatement`的使用，但如果在动态构建SQL语句时仍然拼接了用户输入，或者将未经验证的用户输入直接作为参数传递，仍然可能存在漏洞。确保所有用户输入都通过`pstmt.set*()`方法绑定到占位符，不要将用户输入直接拼接到SQL字符串中。
 ```java
 // 修复代码示例 (确保用户输入绑定到占位符)
 String userInput = request.getParameter("id");
@@ -41,16 +49,13 @@ try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
         // 处理非数字输入，例如抛出异常或返回错误信息
         throw new IllegalArgumentException("Invalid user ID format.");
     }
-
     ResultSet rs = pstmt.executeQuery();
     // ...
 }
 ```
 
 #### 2. 对用户输入进行严格的输入验证和过滤
-
 在将用户输入用于构建SQL查询之前，应该对其进行严格的输入验证和过滤。例如，对于期望为数字的输入，应验证其是否确实是数字。对于字符串输入，应限制其长度或移除潜在的恶意字符。
-
 ```java
 // 示例：限制用户ID为数字且在指定范围内
 String userInput = request.getParameter("id");
@@ -58,22 +63,19 @@ if (userInput == null || !userInput.matches("^[0-9]+$")) {
     throw new IllegalArgumentException("Invalid user ID.");
 }
 int id = Integer.parseInt(userInput);
-if (id <= 0 || id > 1000) { // 假设ID在 1 到 1000 之间
-     throw new IllegalArgumentException("User ID out of valid range.");
+if (id <= 0 || id > 1000) { // 假设ID在1到1000之间
+    throw new IllegalArgumentException("User ID out of valid range.");
 }
 // ... 使用验证后的id
 ```
 
 #### 3. 避免在动态SQL中拼接用户输入
+如果需要动态构建SQL语句（例如根据条件添加WHERE子句），应尽量避免直接拼接用户输入。可以考虑使用条件逻辑或安全的第三方库来构建动态SQL，或者限制动态构建的复杂性，确保所有变量都通过参数绑定传入。
 
-如果需要动态构建SQL语句（例如根据条件添加 WHERE 子句），应尽量避免直接拼接用户输入。可以考虑使用条件逻辑或安全的第三方库来构建动态SQL，或者限制动态构建的复杂性，确保所有变量都通过参数绑定传入。
-
-#### 4. 使用 ORM 框架
-
+#### 4. 使用ORM框架
 考虑使用成熟的ORM（对象关系映射）框架，如Hibernate或MyBatis，它们内置了参数化查询和输入处理机制，可以大大降低SQL注入的风险。
 
 #### 5. 最小权限原则
-
 数据库用户应遵循最小权限原则，只授予执行应用程序所需操作的最低权限，即使发生SQL注入，也能限制攻击者的能力。
 SOLUTION
 	reference: <<<REFERENCE
@@ -88,8 +90,65 @@ check $call;
 check $output;
 alert $output for {
 	title_zh: "审计Java JDBC PreparedStatement 执行查询",
-	level: "mid",
+	level: "info",
 	title: "Audit Java JDBC Prepared Statement Execute Query",
+	message: "发现Java JDBC PreparedStatement执行查询的代码审计点，需进一步审查参数来源和输入校验情况。",
+	solution: <<<SOLUTION
+#### 1. 确保正确使用 PreparedStatement
+尽管规则审计的是 `PreparedStatement` 的使用，但如果在动态构建SQL语句时仍然拼接了用户输入，或者将未经验证的用户输入直接作为参数传递，仍然可能存在漏洞。确保所有用户输入都通过 `pstmt.set*()` 方法绑定到占位符，不要将用户输入直接拼接到SQL字符串中。
+```java
+// 修复代码示例 (确保用户输入绑定到占位符)
+String userInput = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?";  // 使用占位符
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+// 确保对用户输入进行适当转换和校验
+try {
+int id = Integer.parseInt(userInput);
+pstmt.setInt(1, id);  // 绑定参数
+} catch (NumberFormatException e) {
+// 处理非数字输入，例如抛出异常或返回错误信息
+throw new IllegalArgumentException("Invalid user ID format.");
+}
+ResultSet rs = pstmt.executeQuery();
+// ...
+}
+```
+#### 2. 对用户输入进行严格的输入验证和过滤
+在将用户输入用于构建SQL查询之前，应该对其进行严格的输入验证和过滤。例如，对于期望为数字的输入，应验证其是否确实是数字。对于字符串输入，应限制其长度或移除潜在的恶意字符。
+```java
+// 示例：限制用户ID为数字且在指定范围内
+String userInput = request.getParameter("id");
+if (userInput == null || !userInput.matches("^[0-9]+$")) {
+throw new IllegalArgumentException("Invalid user ID.");
+}
+int id = Integer.parseInt(userInput);
+if (id <= 0 || id > 1000) { // 假设ID在 1 到 1000 之间
+throw new IllegalArgumentException("User ID out of valid range.");
+}
+// ... 使用验证后的id
+```
+#### 3. 避免在动态SQL中拼接用户输入
+如果需要动态构建SQL语句（例如根据条件添加 WHERE 子句），应尽量避免直接拼接用户输入。可以考虑使用条件逻辑或安全的第三方库来构建动态SQL，或者限制动态构建的复杂性，确保所有变量都通过参数绑定传入。
+#### 4. 使用 ORM 框架
+考虑使用成熟的ORM（对象关系映射）框架，如Hibernate或MyBatis，它们内置了参数化查询和输入处理机制，可以大大降低SQL注入的风险。
+#### 5. 最小权限原则
+数据库用户应遵循最小权限原则，只授予执行应用程序所需操作的最低权限，即使发生SQL注入，也能限制攻击者的能力。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1. 规则目的
+该规则用于审计Java代码中数据库操作的安全性，重点关注使用 JDBC（Java Database Connectivity）时，通过 `PreparedStatement` 执行SQL查询的代码。
+### 2. 规则详细
+1. **作为基础审计库**
+该规则属于 `java-jdbc-prepared-execute-sink` 库规则（`lib` 类型），其主要作用是识别代码中调用 `java.sql.Connection` 对象的 `prepareStatement()` 方法创建 `PreparedStatement` 对象，并最终通过 `executeQuery()` 方法执行查询操作的位置。
+2. **辅助漏洞检测**
+虽然 `PreparedStatement` 本身是防止SQL注入的有效手段，但该规则的设计是为了**审计**所有涉及到 `PreparedStatement.executeQuery()` 的代码调用。在实际安全审计流程中，此规则会配合数据流跟踪规则（例如，跟踪用户输入）使用。
+通过结合数据流跟踪，可以判断传递给 `prepareStatement()` 方法的 SQL 语句是否是由用户输入直接或间接构造而成，或者传递给 `setString()`、`setInt()` 等方法的参数是否是未经验证的用户输入。如果发现用户输入在未经过滤或校验的情况下直接影响 SQL 语句的结构（即使使用了占位符，也可能在动态构建SQL时引入问题）或参数的值，则可能存在SQL注入的风险。
+3. **识别潜在风险点**
+该规则还可以帮助识别所有执行数据库查询的关键代码位置，便于后续分析其参数来源、输入校验情况以及是否存在其他潜在的数据安全风险，例如，是否查询了敏感信息并进行了不安全的处理。
+该规则本身不直接检测SQL注入漏洞，而是提供一个基础的审计点，用于后续更深入的数据流分析，以判断是否存在安全问题。
+DESC
+	name: "output",
 }
 
 
@@ -120,6 +179,67 @@ public class PreparedStatementExample {
             }
 
             rs.close();
+            pstmt.close();
+            conn.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeDirectStatementExample.java": <<<CODE
+// 使用Statement代替PreparedStatement，但是是安全的，因为没有用户输入
+import java.sql.*;
+
+public class SafeDirectStatementExample {
+    public static void main(String[] args) {
+        String url = "jdbc:mysql://localhost:3306/exampledb";
+        String username = "root";
+        String password = "password";
+
+        try {
+            Connection conn = DriverManager.getConnection(url, username, password);
+            Statement stmt = conn.createStatement();
+            
+            // 安全：硬编码的SQL查询，不涉及用户输入，不触发PreparedStatement的审计
+            String sql = "SELECT * FROM users WHERE id = 1"; 
+            ResultSet rs = stmt.executeQuery(sql);
+
+            while (rs.next()) {
+                System.out.println(rs.getString("username"));
+            }
+
+            rs.close();
+            stmt.close();
+            conn.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SafeNoExecuteQueryExample.java": <<<CODE
+// 使用PreparedStatement，但只执行更新或删除，不执行executeQuery，避开规则检测
+import java.sql.*;
+
+public class SafeNoExecuteQueryExample {
+    public static void main(String[] args) {
+        String url = "jdbc:mysql://localhost:3306/exampledb";
+        String username = "root";
+        String password = "password";
+        String userId = "1"; 
+
+        try {
+            Connection conn = DriverManager.getConnection(url, username, password);
+            String sql = "UPDATE users SET status = ? WHERE id = ?";
+            PreparedStatement pstmt = conn.prepareStatement(sql);
+            pstmt.setString(1, "active");
+            pstmt.setString(2, userId);
+            
+            // 安全：执行的是executeUpdate而非executeQuery，不触发规则
+            int affectedRows = pstmt.executeUpdate(); 
+            System.out.println("Rows updated: " + affectedRows);
+
             pstmt.close();
             conn.close();
         } catch (SQLException e) {

@@ -67,10 +67,6 @@ func (g *GetawayClient) Chat(s string, function ...any) (string, error) {
 	return "", errors.New("invalid")
 }
 
-func (g *GetawayClient) ChatEx(details []aispec.ChatDetail, function ...any) ([]aispec.ChatChoice, error) {
-	return nil, nil
-}
-
 func (g *GetawayClient) ExtractData(msg string, desc string, fields map[string]any) (map[string]any, error) {
 	return g.functionCallHandle(msg)
 }
@@ -820,14 +816,14 @@ func TestCallPluginTimeout(t *testing.T) {
 	defaultBytes, _ := json.Marshal(config)
 	defer yakit.Set(consts.GLOBAL_NETWORK_CONFIG, string(defaultBytes))
 
-	config.CallPluginTimeout = 70
+	config.CallPluginTimeout = 5
 	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
 	require.NoError(t, err)
 
 	host, port := utils.DebugMockHTTP([]byte("Hello"))
 	token := utils.RandStringBytes(20)
 	code := fmt.Sprintf(`mirrorHTTPFlow = func(isHttps /*bool*/, url /*string*/, req /*[]byte*/, rsp /*[]byte*/, body /*[]byte*/) {
-    time.sleep(65)
+    time.sleep(2)
     yakit.StatusCard("%s", "%s")
 }`, token, token)
 
@@ -854,6 +850,32 @@ func TestCallPluginTimeout(t *testing.T) {
 	}
 
 	require.True(t, checkOk, "call plugin timeout failed")
+
+	config.CallPluginTimeout = 1
+	_, err = client.SetGlobalNetworkConfig(context.Background(), config)
+	require.NoError(t, err)
+
+	stream, err = client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+		Code:       code,
+		PluginType: "mitm",
+		Input:      utils.HostPort(host, port),
+	})
+	require.NoError(t, err)
+
+	checkOk = false
+	for {
+		exec, err := stream.Recv()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			log.Warn(err)
+		}
+		if exec.IsMessage && strings.Contains(string(exec.Message), token) {
+			checkOk = true
+			break
+		}
+	}
 }
 
 func TestInitNetworkConfig(t *testing.T) {

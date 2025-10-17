@@ -3,15 +3,15 @@ desc(
 	type: audit
 	lib: "java-image-io-read-url"
 	desc: <<<DESC
-### 1.规则目的
+### 1. 规则目的
 该规则用于审计 Java 代码中通过 `ImageIO.read()` 方法从 URL 直接读取图像数据的用法。这种方式可能隐藏安全风险，特别是当 URL 来源不受信任时。
 
-### 2.规则详细
+### 2. 规则详细
 1. **作为基础检测库**
-   属于 `java-image-io-read-url` 库规则 (`lib` 类型)，通常用于与其他规则（如用户输入跟踪规则）配合，以识别是否存在从外部可控 URL 读取图像数据的潜在漏洞。
+属于 `java-image-io-read-url` 库规则 (`lib` 类型)，通常用于与其他规则（如用户输入跟踪规则）配合，以识别是否存在从外部可控 URL 读取图像数据的潜在漏洞。
 
 2. **审计目标**
-   规则的核心是查找所有调用 `javax.imageio.ImageIO.read()` 方法时，参数是 `java.net.URL` 类型的情况。这表明程序正在尝试直接从网络位置加载图像。
+规则的核心是查找所有调用 `javax.imageio.ImageIO.read()` 方法时，参数是 `java.net.URL` 类型的情况。这表明程序正在尝试直接从网络位置加载图像。
 
 **触发场景示例:**
 ```java
@@ -24,7 +24,7 @@ public class ImageLoader {
     public static void main(String[] args) {
         try {
             // 直接从 URL 读取图像数据 (潜在风险点)
-            BufferedImage image = ImageIO.read(new URL("http://example.com/image.jpg")); 
+            BufferedImage image = ImageIO.read(new URL("http://example.com/image.jpg"));
             System.out.println("Image loaded successfully.");
         } catch (IOException e) {
             System.err.println("Error loading image: " + e.getMessage());
@@ -92,9 +92,81 @@ REFERENCE
 ImageIO.read(*?{<typeName>?{have: URL}} as $params);
 $params<getCallee>(,* as $output);
 alert $output for {
-	level: "mid",
+	level: "info",
 	title: "Audit Java ImageIo Read URL",
 	title_zh: "审计Java ImageIo 读取 URL 的方法",
+	desc: <<<DESC
+### 1.规则目的
+该规则用于审计 Java 代码中通过 `ImageIO.read()` 方法从 URL 直接读取图像数据的用法。这种方式可能隐藏安全风险，特别是当 URL 来源不受信任时。
+### 2.规则详细
+1. **作为基础检测库**
+属于 `java-image-io-read-url` 库规则 (`lib` 类型)，通常用于与其他规则（如用户输入跟踪规则）配合，以识别是否存在从外部可控 URL 读取图像数据的潜在漏洞。
+2. **审计目标**
+规则的核心是查找所有调用 `javax.imageio.ImageIO.read()` 方法时，参数是 `java.net.URL` 类型的情况。这表明程序正在尝试直接从网络位置加载图像。
+**触发场景示例:**
+```java
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+public class ImageLoader {
+public static void main(String[] args) {
+try {
+// 直接从 URL 读取图像数据 (潜在风险点)
+BufferedImage image = ImageIO.read(new URL("http://example.com/image.jpg"));
+System.out.println("Image loaded successfully.");
+} catch (IOException e) {
+System.err.println("Error loading image: " + e.getMessage());
+}
+}
+}
+```
+审计这样的代码可以帮助开发者识别需要进一步审查和加固的点。
+DESC
+	name: "output",
+	message: "发现Java ImageIo通过URL读取图像数据的方法，可能存在未验证来源的风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 验证URL来源
+确保所有URL都是可信的，可以通过白名单或黑名单机制验证URL的来源。
+#### 2. 使用安全的库或方法
+考虑使用更安全的库或方法来加载远程图像，这些库或方法可能提供了更多的安全措施，如HTTPS支持、超时控制等。
+#### 3. 实施输入验证
+对所有用户提供的URL进行严格的验证，确保它们满足预定的格式和安全性要求。
+#### 示例代码：
+```java
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.net.URL;
+import java.util.List;
+public class SecureImageLoader {
+private static final List<String> ALLOWED_DOMAINS = List.of("trusted-domain.com", "another-trusted-domain.com");
+public static void main(String[] args) {
+String imageUrl = "http://example.com/image.jpg";
+if (isValidUrl(imageUrl)) {
+try {
+BufferedImage image = ImageIO.read(new URL(imageUrl));
+System.out.println("Image loaded successfully.");
+} catch (IOException e) {
+System.err.println("Error loading image: " + e.getMessage());
+}
+} else {
+System.err.println("Invalid or untrusted URL.");
+}
+}
+private static boolean isValidUrl(String url) {
+try {
+URL parsedUrl = new URL(url);
+return ALLOWED_DOMAINS.contains(parsedUrl.getHost());
+} catch (Exception e) {
+return false;
+}
+}
+}
+```
+SOLUTION
+	risk: "信息",
 }
 
 
@@ -136,4 +208,45 @@ public class ImageDownloadExample {
     }
 }
 TEXT
+	"safefile://SafeImageLoadFromFile.java": <<<CODE
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.File;
+
+public class SafeImageLoadFromFile {
+    public static void main(String[] args) {
+        try {
+            // 从本地文件系统读取图像，不涉及URL，因此不会触发规则。
+            File imageFile = new File("localimage.jpg");
+            BufferedImage image = ImageIO.read(imageFile);
+            System.out.println("Image loaded successfully from file.");
+        } catch (IOException e) {
+            System.err.println("Error loading image from file: " + e.getMessage());
+        }
+    }
+}
+CODE
+	"safefile://SafeImageLoadFromInputStream.java": <<<CODE
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.FileInputStream;
+
+public class SafeImageLoadFromInputStream {
+    public static void main(String[] args) {
+        try {
+            // 通过InputStream读取图像。如果InputStream来自本地文件或已验证的源，则该操作是安全的。
+            // 此处模拟从一个安全且受控的本地InputStream读取。
+            InputStream is = new FileInputStream("safe_local_image.png");
+            BufferedImage image = ImageIO.read(is);
+            is.close();
+            System.out.println("Image loaded successfully from InputStream.");
+        } catch (IOException e) {
+            System.err.println("Error loading image from InputStream: " + e.getMessage());
+        }
+    }
+}
+CODE
 )

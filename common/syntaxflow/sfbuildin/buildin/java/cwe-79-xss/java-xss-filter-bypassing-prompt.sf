@@ -5,91 +5,74 @@ desc(
 	level: low
 	desc: <<<DESC
 ### 风险描述
-
 1. **风险原理**
-   该规则旨在识别 Java 代码中使用了 XSS (Cross-Site Scripting) 过滤或转义函数的地方。尽管代码中使用了这些安全措施，但过滤器的实现方式可能存在缺陷，例如使用不完善的正则表达式、黑名单过滤不全或对特定编码/混淆方式处理不当。攻击者可能利用这些缺陷构造恶意输入，绕过现有的过滤器，从而在用户浏览器中执行恶意脚本。
-
+该规则旨在识别 Java 代码中使用了 XSS (Cross-Site Scripting) 过滤或转义函数的地方。尽管代码中使用了这些安全措施，但过滤器的实现方式可能存在缺陷，例如使用不完善的正则表达式、黑名单过滤不全或对特定编码/混淆方式处理不当。攻击者可能利用这些缺陷构造恶意输入，绕过现有的过滤器，从而在用户浏览器中执行恶意脚本。
 2. **触发场景**
-   当应用程序接收用户输入并在未经验证/正确编码的情况下将其渲染到网页（HTML、JavaScript）时，即存在 XSS 风险。即使代码中调用了看似用于清理 XSS 的函数（如 `clearXss`、`filterXss`、`escapeHtml` 等），如果这些函数的实现存在漏洞，攻击者仍可利用。例如，一个过滤函数仅移除了 `<script>` 标签，攻击者可能尝试使用 `<img src=x onerror=alert(1)>` 或其他标签属性注入脚本。
-
-   以下是一个可能存在过滤绕风险的代码示例：
-   ```java
-   private String clearXss(String value) {
-       if (value == null || "".equals(value)) {
-           return value;
-       }
-
-       value = value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-       value = value.replaceAll("\\(", "&#40;").replace("\\)", "&#41;");
-       value = value.replaceAll("'", "&#39;");
-       value = value.replaceAll("eval\\((.*)\\)", "");
-       value = value.replaceAll("[\\\"\\\'][\\s]*javascript:(.*)[\\\"\\\']",
-               "\"\"");
-       value = value.replace("script", "");
-
-       return value;
-   }
-   ```
-
+当应用程序接收用户输入并在未经验证/正确编码的情况下将其渲染到网页（HTML、JavaScript）时，即存在 XSS 风险。即使代码中调用了看似用于清理 XSS 的函数（如 `clearXss`、`filterXss`、`escapeHtml` 等），如果这些函数的实现存在漏洞，攻击者仍可利用。例如，一个过滤函数仅移除了 `<script>` 标签，攻击者可能尝试使用 `<img src=x onerror=alert(1)>` 或其他标签属性注入脚本。
+以下是一个可能存在过滤绕风险的代码示例：
+```java
+private String clearXss(String value) {
+if (value == null || "".equals(value)) {
+return value;
+}
+value = value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+value = value.replaceAll("\\(", "&#40;").replace("\\)", "&#41;");
+value = value.replaceAll("'", "&#39;");
+value = value.replaceAll("eval\\((.*)\\)", "");
+value = value.replaceAll("[\\"\\'][\\s]*javascript:(.*)[\\"\\']",
+"\"\"");
+value = value.replace("script", "");
+return value;
+}
+```
 3. **潜在影响**
-   - 攻击者在用户浏览器中执行任意 JavaScript 代码。
-   - 窃取用户会话 Cookie，导致会话劫持。
-   - 修改网页内容，进行网络钓鱼。
-   - 通过浏览器漏洞进一步攻击用户系统。
-   - 网站声誉受损。
+- 攻击者在用户浏览器中执行任意 JavaScript 代码。
+- 窃取用户会话 Cookie，导致会话劫持。
+- 修改网页内容，进行网络钓鱼。
+- 通过浏览器漏洞进一步攻击用户系统。
+- 网站声誉受损。
 DESC
 	rule_id: "c44e3929-2379-46d2-ad00-b30fece5e2e1"
 	solution: <<<SOLUTION
 ### 修复建议
-
 该规则标识了代码中潜在的 XSS 过滤器绕过风险点，需手动或进一步结合数据流分析确认是否存在实际漏洞。
-
 1. **使用成熟和经过安全审计的转义库**
-   不要自己实现 XSS 过滤或转义函数。应优先使用业界广泛认可、经过严格安全审计的库来处理用户输出。例如：
-   *   **OWASP Java Encoder Project**: 提供安全的 HTML, CSS, JavaScript 等编码方法。
-   *   **Apache Commons Text**: 包含 `StringEscapeUtils` 类，提供多种编码功能。
-
-   ```java
-   // 修复代码示例：使用OWASP Java Encoder
-   import org.owasp.encoder.Encode;
-
-   // 在将用户输入输出到HTML上下文时使用
-   String escapedHtml = Encode.forHtml(userInput);
-   // 在将用户输入输出到JavaScript上下文时使用
-   String escapedJs = Encode.forJavaScriptBlock(userInput);
-   // ...根据不同的输出上下文选择合适的编码方法
-
-   response.getWriter().write("<div>" + escapedHtml + "</div>");
-   response.getWriter().write("<script>var data = '" + escapedJs + "';</script>");
-   ```
-
+不要自己实现 XSS 过滤或转义函数。应优先使用业界广泛认可、经过严格安全审计的库来处理用户输出。例如：
+*   **OWASP Java Encoder Project**: 提供安全的 HTML, CSS, JavaScript 等编码方法。
+*   **Apache Commons Text**: 包含 `StringEscapeUtils` 类，提供多种编码功能。
+```java
+// 修复代码示例：使用OWASP Java Encoder
+import org.owasp.encoder.Encode;
+// 在将用户输入输出到HTML上下文时使用
+String escapedHtml = Encode.forHtml(userInput);
+// 在将用户输入输出到JavaScript上下文时使用
+String escapedJs = Encode.forJavaScriptBlock(userInput);
+// ...根据不同的输出上下文选择合适的编码方法
+response.getWriter().write("<div>" + escapedHtml + "</div>");
+response.getWriter().write("<script>var data = '" + escapedJs + "';</script>");
+```
 2. **前后端均进行严格的输入验证和输出编码**
-   *   **输入验证**: 对用户输入进行类型、长度、格式的限制，拒绝明显非法的输入。
-   *   **输出编码**: 根据数据要插入到的 HTML 上下文（如 HTML 元素内容、属性值、JavaScript 代码块、CSS 样式等）使用最严格且正确的编码方式。这通常是防御 XSS 最有效的方式。
-
-   ```java
-   // 修复代码示例：结合输入验证
-   if (userInput == null || userInput.length() > 100) {
-       // 输入校验失败处理
-       throw new IllegalArgumentException("Invalid input");
-   }
-   // ... 接着使用正确的输出编码
-   ```
-
+*   **输入验证**: 对用户输入进行类型、长度、格式的限制，拒绝明显非法的输入。
+*   **输出编码**: 根据数据要插入到的 HTML 上下文（如 HTML 元素内容、属性值、JavaScript 代码块、CSS 样式等）使用最严格且正确的编码方式。这通常是防御 XSS 最有效的方式。
+```java
+// 修复代码示例：结合输入验证
+if (userInput == null || userInput.length() > 100) {
+// 输入校验失败处理
+throw new IllegalArgumentException("Invalid input");
+}
+// ... 接着使用正确的输出编码
+```
 3. **实施内容安全策略 (CSP)**
-   通过 HTTP 头或 `<meta>` 标签设置 CSP，限制浏览器只能加载和执行特定来源的资源（如 `<script>`、`<link>`）。这可以显著降低即使存在 XSS 漏洞时的攻击效果。
-
-   ```http
-   // HTTP响应头示例
-   Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted.cdn.com;
-   ```
-
+通过 HTTP 头或 `<meta>` 标签设置 CSP，限制浏览器只能加载和执行特定来源的资源（如 `<script>`、`<link>`）。这可以显著降低即使存在 XSS 漏洞时的攻击效果。
+```http
+// HTTP响应头示例
+Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted.cdn.com;
+```
 4. **使用其他 HTTP 安全头**
-   *   `X-Content-Type-Options: nosniff`: 防止浏览器对响应体进行 MIME-sniffing 猜测类型，有助于防御基于 MIME-sniffing 的 XSS。
-   *   `X-XSS-Protection` (虽然在现代浏览器 CSP 更推荐，但仍可作为补充): 设置为 `1; mode=block` 可以启用浏览器自带的 XSS 过滤器。
-
+*   `X-Content-Type-Options: nosniff`: 防止浏览器对响应体进行 MIME-sniffing 猜测类型，有助于防御基于 MIME-sniffing 的 XSS。
+*   `X-XSS-Protection` (虽然在现代浏览器 CSP 更推荐，但仍可作为补充): 设置为 `1; mode=block` 可以启用浏览器自带的 XSS 过滤器。
 5. **对既有的 XSS 过滤器实现进行安全审查和渗透测试**
-   如果必须使用自定义的过滤器，需要由安全专家进行彻底的安全审查，并进行广泛的渗透测试，尝试各种不同的编码、混淆和绕过技术，确保其没有缺陷。
+如果必须使用自定义的过滤器，需要由安全专家进行彻底的安全审查，并进行广泛的渗透测试，尝试各种不同的编码、混淆和绕过技术，确保其没有缺陷。
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-79: Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')](https://cwe.mitre.org/data/definitions/79.html)
@@ -107,6 +90,79 @@ alert $entryCall for {
 	title: "Audit Java XSS Filter Bypass",
 	title_zh: "审计 Java XSS 白名单绕过",
 	level: "low",
+	risk: "XSS",
+	desc: <<<DESC
+### 风险描述
+1. **风险原理**
+该规则旨在识别 Java 代码中使用了 XSS (Cross-Site Scripting) 过滤或转义函数的地方。尽管代码中使用了这些安全措施，但过滤器的实现方式可能存在缺陷，例如使用不完善的正则表达式、黑名单过滤不全或对特定编码/混淆方式处理不当。攻击者可能利用这些缺陷构造恶意输入，绕过现有的过滤器，从而在用户浏览器中执行恶意脚本。
+2. **触发场景**
+当应用程序接收用户输入并在未经验证/正确编码的情况下将其渲染到网页（HTML、JavaScript）时，即存在 XSS 风险。即使代码中调用了看似用于清理 XSS 的函数（如 `clearXss`、`filterXss`、`escapeHtml` 等），如果这些函数的实现存在漏洞，攻击者仍可利用。例如，一个过滤函数仅移除了 `<script>` 标签，攻击者可能尝试使用 `<img src=x onerror=alert(1)>` 或其他标签属性注入脚本。
+以下是一个可能存在过滤绕风险的代码示例：
+```java
+private String clearXss(String value) {
+if (value == null || "".equals(value)) {
+return value;
+}
+value = value.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+value = value.replaceAll("\\(", "&#40;").replace("\\)", "&#41;");
+value = value.replaceAll("'", "&#39;");
+value = value.replaceAll("eval\\((.*)\\)", "");
+value = value.replaceAll("[\\"\\'][\\s]*javascript:(.*)[\\"\\']",
+"\"\"");
+value = value.replace("script", "");
+return value;
+}
+```
+3. **潜在影响**
+- 攻击者在用户浏览器中执行任意 JavaScript 代码。
+- 窃取用户会话 Cookie，导致会话劫持。
+- 修改网页内容，进行网络钓鱼。
+- 通过浏览器漏洞进一步攻击用户系统。
+- 网站声誉受损。
+DESC
+	name: "entryCall",
+	message: "检测到可能存在绕过的Java XSS过滤函数，需进一步审查其有效性。",
+	solution: <<<SOLUTION
+### 修复建议
+该规则标识了代码中潜在的 XSS 过滤器绕过风险点，需手动或进一步结合数据流分析确认是否存在实际漏洞。
+1. **使用成熟和经过安全审计的转义库**
+不要自己实现 XSS 过滤或转义函数。应优先使用业界广泛认可、经过严格安全审计的库来处理用户输出。例如：
+*   **OWASP Java Encoder Project**: 提供安全的 HTML, CSS, JavaScript 等编码方法。
+*   **Apache Commons Text**: 包含 `StringEscapeUtils` 类，提供多种编码功能。
+```java
+// 修复代码示例：使用OWASP Java Encoder
+import org.owasp.encoder.Encode;
+// 在将用户输入输出到HTML上下文时使用
+String escapedHtml = Encode.forHtml(userInput);
+// 在将用户输入输出到JavaScript上下文时使用
+String escapedJs = Encode.forJavaScriptBlock(userInput);
+// ...根据不同的输出上下文选择合适的编码方法
+response.getWriter().write("<div>" + escapedHtml + "</div>");
+response.getWriter().write("<script>var data = '" + escapedJs + "';</script>");
+```
+2. **前后端均进行严格的输入验证和输出编码**
+*   **输入验证**: 对用户输入进行类型、长度、格式的限制，拒绝明显非法的输入。
+*   **输出编码**: 根据数据要插入到的 HTML 上下文（如 HTML 元素内容、属性值、JavaScript 代码块、CSS 样式等）使用最严格且正确的编码方式。这通常是防御 XSS 最有效的方式。
+```java
+// 修复代码示例：结合输入验证
+if (userInput == null || userInput.length() > 100) {
+// 输入校验失败处理
+throw new IllegalArgumentException("Invalid input");
+}
+// ... 接着使用正确的输出编码
+```
+3. **实施内容安全策略 (CSP)**
+通过 HTTP 头或 `<meta>` 标签设置 CSP，限制浏览器只能加载和执行特定来源的资源（如 `<script>`、`<link>`）。这可以显著降低即使存在 XSS 漏洞时的攻击效果。
+```http
+// HTTP响应头示例
+Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted.cdn.com;
+```
+4. **使用其他 HTTP 安全头**
+*   `X-Content-Type-Options: nosniff`: 防止浏览器对响应体进行 MIME-sniffing 猜测类型，有助于防御基于 MIME-sniffing 的 XSS。
+*   `X-XSS-Protection` (虽然在现代浏览器 CSP 更推荐，但仍可作为补充): 设置为 `1; mode=block` 可以启用浏览器自带的 XSS 过滤器。
+5. **对既有的 XSS 过滤器实现进行安全审查和渗透测试**
+如果必须使用自定义的过滤器，需要由安全专家进行彻底的安全审查，并进行广泛的渗透测试，尝试各种不同的编码、混淆和绕过技术，确保其没有缺陷。
+SOLUTION
 }
 
 
@@ -135,4 +191,42 @@ public class MCmsAction extends net.demo.cms.action.BaseAction {
     }
 }
 UNSAFE
+	"safefile://SafeHtmlOutput.java": <<<CODE
+// SafeHtmlOutput.java
+import org.owasp.encoder.Encode;
+
+public class SafeHtmlOutput {
+    public String processAndOutputHtml(String userInput) {
+        // 使用OWASP ESAPI或其他成熟库进行HTML编码
+        // 这是一个安全的HTML输出示例，不应触发XSS告警
+        String encodedInput = Encode.forHtml(userInput);
+        return "<div>User input: " + encodedInput + "</div>";
+    }
+
+    public String processAndOutputHtmlAttribute(String userInput) {
+        // 对HTML属性值进行编码
+        String encodedInput = Encode.forHtmlAttribute(userInput);
+        return "<a href=\"#\" title=\"" + encodedInput + "\">Link</a>";
+    }
+}
+CODE
+	"safefile://SafeJavaScriptOutput.java": <<<CODE
+// SafeJavaScriptOutput.java
+import org.owasp.encoder.Encode;
+
+public class SafeJavaScriptOutput {
+    public String processAndOutputJs(String userInput) {
+        // 使用OWASP ESAPI或其他成熟库进行JavaScript编码
+        // 这是一个安全的JavaScript输出示例，不应触发XSS告警
+        String encodedInput = Encode.forJavaScriptBlock(userInput);
+        return "<script>var data = '" + encodedInput + "';</script>";
+    }
+
+    public String processAndOutputJsAttribute(String userInput) {
+         // 对JavaScript事件属性值进行编码
+        String encodedInput = Encode.forJavaScriptAttribute(userInput);
+        return "<button onclick=\"alert('" + encodedInput + "');\">Click me</button>";
+    }
+}
+CODE
 )

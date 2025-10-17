@@ -1,0 +1,81 @@
+desc(
+	title:"Predictable Cookie Value (Pseudo-Random)"
+	title_zh:"可预测的Cookie值（伪随机）", 
+	reference: <<<REFERENCE
+- **CWE-330: Use of Insufficiently Random Values** - 应用程序使用随机值或伪随机值，但其熵（随机性）不足以满足安全要求。
+- **CWE-338: Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)** - 应用程序使用了一个加密弱的伪随机数生成器，其输出是可预测的。
+- **OWASP Top 10 (2021) - A07: Identification and Authentication Failures** - 身份认证或会话管理机制中的缺陷可能导致未经授权的访问。
+REFERENCE
+	rule_id: "b072f796-18df-495b-b705-68be589a0e2c"
+	cwe: "cwe-330"
+	cwe: "cwe-338"
+)
+
+setcookie(, * as $cookieValue, ) 
+
+
+random_bytes() as $CSPRNG 
+openssl_random_pseudo_bytes() as $CSPRNG
+$cookieValue #{exclude:"* & $CSPRNG"}->  as $cookieValueTop 
+$cookieValueTop<dataflow(include:"*?{opcode:const,binop}")> as $high 
+alert $high for {
+	title: "Predictable Cookie Value (Pseudo-Random)",
+	title_zh: "可预测的Cookie值（伪随机）",
+	level: "high",
+	risk: "cookie security",
+	solution: <<<SOLUTION
+SOLUTION
+    desc:<<<DESC
+应用程序生成的Cookie值是高度可预测的，因为它直接使用了时间戳、简单的递增数字，或者对这些弱熵源进行了哈希处理。这种生成方式使得攻击者可以相对容易地猜测或暴力破解有效的Cookie值，进而劫持用户会话，绕过认证，或执行其他未经授权的操作。哈希函数在此处仅提供了混淆，而未能提供真正的随机性和安全性。
+ 
+漏洞主要包括：
+1. **直接使用时间戳或微秒时间戳：** 时间戳在短时间内是连续可预测的。
+2. **使用简单递增或递减的数字：** 这使得攻击者可以精确地预测下一个或前一个值。
+3. **对上述弱熵源进行哈希：** 即使经过MD5、SHA1等哈希处理，如果其输入源是可预测的，攻击者仍然可以通过预计算或暴力破解哈希值来推断出原始输入，从而重构Cookie值。
+DESC
+    solution:<<<SOLUTION
+确保用于会话管理或其他敏感目的的Cookie值是不可预测且高熵的。
+强烈建议使用加密安全的伪随机数生成器（CSPRNG）来生成Cookie值。
+ 
+PHP 7+ 推荐使用 `random_bytes()` 函数：
+bin2hex(random_bytes(16)) // 生成16字节的随机数据，并以十六进制表示
+ 
+对于旧版PHP，可以使用 `openssl_random_pseudo_bytes()`：
+$bytes = openssl_random_pseudo_bytes(16, $cstrong);
+if (!$cstrong) {
+    error_log("Failed to generate cryptographically strong random bytes.");
+}
+$value = bin2hex($bytes);
+ 
+总是将敏感Cookie设置为 'HttpOnly' 和 'Secure' 标志，并考虑 'SameSite' 标志以增强防护。
+SOLUTION
+}
+$cookieValueTop-$high as $mid 
+
+alert $mid for {
+	title: "Predictable Cookie Value (Pseudo-Random)",
+	title_zh: "可预测的Cookie值（伪随机）",
+	level: "mid",
+	risk: "cookie security",
+	solution: <<<SOLUTION
+确保用于会话管理或其他敏感目的的Cookie值是不可预测且高熵的。
+强烈建议使用加密安全的伪随机数生成器（CSPRNG）来生成Cookie值。
+ 
+PHP 7+ 推荐使用 `random_bytes()` 函数：
+bin2hex(random_bytes(16)) // 生成16字节的随机数据，并以十六进制表示
+ 
+对于旧版PHP，可以使用 `openssl_random_pseudo_bytes()`：
+$bytes = openssl_random_pseudo_bytes(16, $cstrong);
+if (!$cstrong) {
+    error_log("Failed to generate cryptographically strong random bytes.");
+}
+$value = bin2hex($bytes);
+ 
+总是将敏感Cookie设置为 'HttpOnly' 和 'Secure' 标志，并考虑 'SameSite' 标志以增强防护。
+SOLUTION
+	desc: <<<DESC
+应用程序生成的Cookie值依赖于非加密安全的伪随机数生成器（PRNG），如 `mt_rand()` 或 `rand()`，或 `uniqid()` 函数。尽管这些函数会生成看起来是随机的值，但它们的设计目标不是为了提供加密级别的随机性。在已知生成器的算法和/或种子的情况下，攻击者理论上可以通过分析足够多的输出或暴力破解来预测其未来的输出序列。
+ 
+即使对这些伪随即使对这些伪随机数进行了哈希处理（如MD5、SHA1），也无法有效提高其固有的随机性。这种方法提供的安全性高于简单的递增值或时间戳，但在面对持续且有针对性的攻击时，仍然存在被预测和滥用的风险，特别是在高价值或大规模应用中。
+DESC
+}

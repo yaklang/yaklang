@@ -1,7 +1,9 @@
 desc(
 	title: "Check Golang SSRF HTTP Vulnerability"
+	title_zh: "检测Golang HTTP SSRF漏洞"
 	type: audit
-	severity: high
+	severity: mid
+	risk: "ssrf"
 	desc: <<<DESC
 ### 漏洞描述
 
@@ -13,13 +15,12 @@ SSRF 漏洞通常发生在应用程序需要从外部获取资源的情况下，
 * 通过 URL 参数获取网页内容、图片或文件。
 * 调用外部服务的 API。
 * 进行文件上传或下载时指定外部 URL。
-
 以下代码片段展示了漏洞可能被触发的情况：
 ```golang
 func handler(w http.ResponseWriter, r *http.Request) {
-	url := r.URL.Query().Get("url") // 直接从查询参数获取URL
-	resp, err := http.Get(url) // 直接使用用户输入的URL发起HTTP请求
-	// ...
+    url := r.URL.Query().Get("url") // 直接从查询参数获取URL
+    resp, err := http.Get(url) // 直接使用用户输入的URL发起HTTP请求
+    // ...
 }
 ```
 攻击者可以构造 `?url=http://localhost/admin` 或 `?url=file:///etc/passwd` 等恶意请求，尝试访问服务器内部资源。
@@ -29,12 +30,12 @@ func handler(w http.ResponseWriter, r *http.Request) {
 * 攻击内网主机：利用服务器作为跳板进行端口扫描、内网服务枚举或攻击内部系统。
 * DDoS放大攻击：构造请求攻击外部第三方服务。
 * 绕过防火墙和访问控制策略。
+
 DESC
 	rule_id: "f1f1a062-fcba-4e12-bf59-64a3bf38269d"
 	reference: <<<REFERENCE
 [CWE-918: Server-Side Request Forgery (SSRF)](https://cwe.mitre.org/data/definitions/918.html)
 REFERENCE
-	title_zh: "检测Golang HTTP SSRF漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
 
@@ -42,56 +43,49 @@ REFERENCE
 * 白名单机制：优先使用白名单机制，只允许请求预设的、安全的域名或 IP 地址。对于不在许可范围内的 URL，拒绝请求。
 * 黑名单机制：如果场景复杂无法使用白名单，则使用黑名单机制过滤掉危险协议（如 `file://`, `gopher://`）、本地 IP 地址（如 `127.0.0.1`, `0.0.0.0`, 内网 IP 段）、以及指向敏感服务的端口。但黑名单容易被绕过，不如白名单安全。
 * URL 解析与验证：使用 Go 标准库 `net/url` 解析 URL，然后对解析出的协议、主机名、端口等部分进行单独验证，而不是直接匹配字符串。这可以防止解析差异导致的绕过。
-
 示例代码如下：
 ```golang
 import (
-	"net/url"
-	"net/http"
-	"strings"
-	"net"
+    "net/url"
+    "net/http"
+    "strings"
+    "net"
 )
-
 func isSafeURL(inputURL string) bool {
-	p, err := url.Parse(inputURL)
-	if err != nil {
-		return false // 解析错误
-	}
-
-	// 白名单：只允许http和https协议
-	if p.Scheme != "http" && p.Scheme != "https" {
-		return false
-	}
-
-	// 黑名单：不允许本地IP和内网IP
-	host := p.Hostname()
-	addrs, err := net.LookupIP(host) // 解析域名获取IP
-	if err != nil {
-		return false // 无法解析的域名
-	}
-	for _, addr := range addrs {
-		if addr.IsLoopback() || addr.IsPrivate() { // 判断是否为本地或内网IP
-			return false
-		}
-	}
-	return true
+    p, err := url.Parse(inputURL)
+    if err != nil {
+        return false // 解析错误
+    }
+    // 白名单：只允许http和https协议
+    if p.Scheme != "http" && p.Scheme != "https" {
+        return false
+    }
+    // 黑名单：不允许本地IP和内网IP
+    host := p.Hostname()
+    addrs, err := net.LookupIP(host) // 解析域名获取IP
+    if err != nil {
+        return false // 无法解析的域名
+    }
+    for _, addr := range addrs {
+        if addr.IsLoopback() || addr.IsPrivate() { // 判断是否为本地或内网IP
+            return false
+        }
+    }
+    return true
 }
-
 func handler(w http.ResponseWriter, r *http.Request) {
-	urlParam := r.URL.Query().Get("url")
-	if urlParam == "" {
-		http.Error(w, "URL parameter is missing", http.StatusBadRequest)
-		return
-	}
-
-	if !isSafeURL(urlParam) {
-		http.Error(w, "Unsafe URL", http.StatusBadRequest)
-		return
-	}
-
-	// 发送请求 (使用已验证的 urlParam)
-	resp, err := http.Get(urlParam)
-	// ... rest of handler logic
+    urlParam := r.URL.Query().Get("url")
+    if urlParam == "" {
+        http.Error(w, "URL parameter is missing", http.StatusBadRequest)
+        return
+    }
+    if !isSafeURL(urlParam) {
+        http.Error(w, "Unsafe URL", http.StatusBadRequest)
+        return
+    }
+    // 发送请求 (使用已验证的 urlParam)
+    resp, err := http.Get(urlParam)
+    // ... rest of handler logic
 }
 ```
 
@@ -106,20 +100,109 @@ func handler(w http.ResponseWriter, r *http.Request) {
 SOLUTION
 )
 
-<include('golang-http-sink')> as $output;
-$output.URL.Query().Get() #-> as $sink;
-$sink?{opcode: param} as $mid
+<include('golang-user-input')> as $input;
+
+http.Get(* #-> as $param);
+
+$param #{
+	until: "* & $input" 
+}-> as $mid 
 
 alert $mid for {
-	title: "SSRF detected",
-	title_zh: "检测到SSRF",
+	title: "Golang HTTP SSRF Vulnerability Detected",
+	title_zh: "检测到Golang HTTP SSRF漏洞",
 	level: "mid",
 	type: "vuln",
+	name: "mid",
+	message: "检测到Golang HTTP请求中存在SSRF漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 严格校验和过滤用户输入的 URL
+* 白名单机制：优先使用白名单机制，只允许请求预设的、安全的域名或 IP 地址。对于不在许可范围内的 URL，拒绝请求。
+* 黑名单机制：如果场景复杂无法使用白名单，则使用黑名单机制过滤掉危险协议（如 `file://`, `gopher://`）、本地 IP 地址（如 `127.0.0.1`, `0.0.0.0`, 内网 IP 段）、以及指向敏感服务的端口。但黑名单容易被绕过，不如白名单安全。
+* URL 解析与验证：使用 Go 标准库 `net/url` 解析 URL，然后对解析出的协议、主机名、端口等部分进行单独验证，而不是直接匹配字符串。这可以防止解析差异导致的绕过。
+示例代码如下：
+```golang
+import (
+"net/url"
+"net/http"
+"strings"
+"net"
+)
+func isSafeURL(inputURL string) bool {
+p, err := url.Parse(inputURL)
+if err != nil {
+return false // 解析错误
+}
+// 白名单：只允许http和https协议
+if p.Scheme != "http" && p.Scheme != "https" {
+return false
+}
+// 黑名单：不允许本地IP和内网IP
+host := p.Hostname()
+addrs, err := net.LookupIP(host) // 解析域名获取IP
+if err != nil {
+return false // 无法解析的域名
+}
+for _, addr := range addrs {
+if addr.IsLoopback() || addr.IsPrivate() { // 判断是否为本地或内网IP
+return false
+}
+}
+return true
+}
+func handler(w http.ResponseWriter, r *http.Request) {
+urlParam := r.URL.Query().Get("url")
+if urlParam == "" {
+http.Error(w, "URL parameter is missing", http.StatusBadRequest)
+return
+}
+if !isSafeURL(urlParam) {
+http.Error(w, "Unsafe URL", http.StatusBadRequest)
+return
+}
+// 发送请求 (使用已验证的 urlParam)
+resp, err := http.Get(urlParam)
+// ... rest of handler logic
+}
+```
+#### 2. 限制请求的协议和目标地址
+仅允许程序发起特定协议 (如 HTTP/HTTPS) 的请求，并限制请求的目标主机或 IP 地址范围。
+#### 3. 禁用重定向
+在发起 HTTP 请求时，禁用客户端的自动重定向功能，防止攻击者利用重定向绕过安全校验。
+#### 4. 减少不必要的服务暴露
+内网服务、管理接口等敏感资源，应该避免直接通过公网访问，或设置严格的访问控制和认证。
+SOLUTION
+	risk: "SSRF",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+服务器端请求伪造（Server-Side Request Forgery, SSRF）是一种安全漏洞，攻击者能够控制或影响服务器端应用程序请求的目标。在 Go 语言应用中，如果程序接收用户输入的 URL 或相关参数，并在未对输入进行充分验证和过滤的情况下，直接将用户输入用于发起网络请求（如HTTP、文件读取等），则可能导致 SSRF 漏洞。攻击者可以构造恶意请求，使服务器请求内部网络资源、敏感服务，甚至进行端口扫描或攻击内网其他主机，从而导致敏感信息泄露、内部系统受攻击等风险。
+2. **触发场景**
+SSRF 漏洞通常发生在应用程序需要从外部获取资源的情况下，例如：
+* 通过 URL 参数获取网页内容、图片或文件。
+* 调用外部服务的 API。
+* 进行文件上传或下载时指定外部 URL。
+以下代码片段展示了漏洞可能被触发的情况：
+```golang
+func handler(w http.ResponseWriter, r *http.Request) {
+url := r.URL.Query().Get("url") // 直接从查询参数获取URL
+resp, err := http.Get(url) // 直接使用用户输入的URL发起HTTP请求
+// ...
+}
+```
+攻击者可以构造 `?url=http://localhost/admin` 或 `?url=file:///etc/passwd` 等恶意请求，尝试访问服务器内部资源。
+3. **潜在影响**
+* 敏感信息泄露：访问内网服务、数据库或其他敏感文件。
+* 攻击内网主机：利用服务器作为跳板进行端口扫描、内网服务枚举或攻击内部系统。
+* DDoS放大攻击：构造请求攻击外部第三方服务。
+* 绕过防火墙和访问控制策略。
+DESC
 }
 
 desc(
 	lang: golang
-	alert_num: 1
+	alert_high: 1
 	'file://main.go': <<<UNSAFE
 package main
 
@@ -162,4 +245,162 @@ func main() {
 	}
 }
 UNSAFE
+	"safefile://SafeHTTPClient.go": <<<CODE
+// 1. 白名单机制：只允许访问特定安全域名
+// 2. 解析URL并检查协议和主机
+// 3. 禁用重定向
+// 4. 使用 http.Client 自定义 Transport，更精细化控制
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+	"net"
+)
+
+// isSafeURL 检查URL的安全性，使用白名单和黑名单组合
+func isSafeURL(inputURL string) bool {
+	p, err := url.Parse(inputURL)
+	if err != nil {
+		return false // 解析错误
+	}
+
+	// 1. 协议白名单
+	if p.Scheme != "http" && p.Scheme != "https" {
+		fmt.Printf("Unsafe scheme: %s\n", p.Scheme)
+		return false
+	}
+
+	// 2. 主机白名单 (示例：只允许访问 example.com 和 api.service.com)
+	safeDomains := map[string]bool{
+		"example.com":     true,
+		"api.service.com": true,
+	}
+
+	if !strings.Contains(p.Host, ":") {
+		p.Host = p.Host + ":" + p.Scheme + "port_placeholder"
+	}
+
+	hostname, _, err := net.SplitHostPort(p.Host)
+	if err != nil {
+		hostname = p.Host // No port, assume host is just the hostname
+	}
+
+	if !safeDomains[hostname] {
+		// 如果不是白名单域名，进一步检查是否为私有/回环IP
+		addrs, err := net.LookupIP(hostname)
+		if err != nil {
+			fmt.Printf("Failed to lookup IP for %s: %v\n", hostname, err)
+			return false // 无法解析的域名认为不安全
+		}
+		for _, addr := range addrs {
+			if addr.IsLoopback() || addr.IsPrivate() {
+				fmt.Printf("Blocked loopback or private IP: %s\n", addr.String())
+				return false // 私有或回环IP
+			}
+		}
+		// 如果不是白名单域名且解析到的IP非私有/回环，还需判断是否允许访问所有公网
+		// 这里为了安全，如果不在白名单就不允许。
+		fmt.Printf("Blocked non-whitelisted domain: %s\n", hostname)
+		return false
+	}
+
+	return true
+}
+
+func safeHandler(w http.ResponseWriter, r *http.Request) {
+	urlParam := r.URL.Query().Get("url")
+	if urlParam == "" {
+		http.Error(w, "URL parameter is missing", http.StatusBadRequest)
+		return
+	}
+
+	// 校验 URL 的安全性
+	if !isSafeURL(urlParam) {
+		http.Error(w, "Unsafe URL provided.", http.StatusBadRequest)
+		return
+	}
+
+	// 创建自定义 HTTP 客户端，禁用重定向，设置超时
+	client := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives:   true,
+			MaxIdleConns:        100,
+			IdleConnTimeout:     90 * time.Second,
+			TLSHandshakeTimeout: 10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+		Timeout:   10 * time.Second, // 设置请求超时
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // 禁用重定向
+		},
+	}
+
+	// 发起请求
+	req, err := http.NewRequest("GET", urlParam, nil)
+	if err != nil {
+		http.Error(w, "Error creating request", http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error fetching URL: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Error reading response", http.StatusInternalServerError)
+		return
+	}
+
+	w.Write(body)
+}
+
+func main() {
+	http.HandleFunc("/safe", safeHandler)
+	fmt.Println("Safe server running on :8081")
+	http.ListenAndServe(":8081", nil)
+}
+
+CODE
+	"safefile://HardcodedSafeURL.go": <<<CODE
+// 直接请求硬编码的、安全的URL，不接受用户输入
+package main
+
+import (
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"os"
+)
+
+func main() {
+	// 硬编码一个已知的安全URL，不从用户输入获取
+	// 避免了规则中 $input 变量的匹配，从而不会触发SSRF告警
+	safeURL := "https://www.example.com/api/data"
+
+	resp, err := http.Get(safeURL)
+	if err != nil {
+		fmt.Printf("Error fetching URL: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading response: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Response from %s:\n%s\n", safeURL, string(body))
+}
+
+CODE
 )

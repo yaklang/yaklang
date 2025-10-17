@@ -179,9 +179,9 @@ func GenerateCSRFPoc(raw interface{}, opts ...csrfConfig) (string, error) {
 		if err != nil {
 			return "", utils.Wrap(err, "get params from body failed")
 		}
-		for key, values = range params {
-			for _, value := range values {
-				templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", template.HTMLAttr(key), template.HTMLAttr(value)})
+		for _, param := range params.Items {
+			for _, value := range param.Values {
+				templateConfig.Inputs = append(templateConfig.Inputs, _csrfKeyValues{"hidden", template.HTMLAttr(param.Key), template.HTMLAttr(value)})
 			}
 		}
 	} else {

@@ -1,0 +1,49 @@
+__DESC__ = "一个用于创建和写入文件的工具，支持将指定内容安全地写入到目标文件中，包括创建新文件或覆盖现有文件。适用于文件创建、配置文件生成、日志文件写入等场景。"
+__VERBOSE_NAME__ = "文件写入工具"
+__KEYWORDS__ = "file write,文件写入,文件创建,file creation,content writing,文件操作,file operations,text file,binary file,file save,保存文件,创建文件,写入内容,文件处理"
+
+yakit.AutoInitYakit()
+
+// 解析命令行参数：目标文件路径和要写入的内容
+filename := cli.String("file", cli.setRequired(true), cli.setHelp("target file path you want to write to"))
+content := cli.String("content", cli.setRequired(true), cli.setHelp("content you want to write to the file"))
+overwrite := cli.Bool("force", cli.setRequired(false), cli.setDefault(false), cli.setHelp("force overwrite if file exists, default false"))
+
+cli.check()
+
+yakit.Info("Writing to file: %v", filename)
+
+// 检查文件是否已存在
+if file.IsExisted(filename) && !overwrite {
+    yakit.Warn("File %v already exists. Use --force to overwrite", filename)
+    return
+}
+
+// 获取文件目录，如果目录不存在则尝试创建
+dir := file.GetDirPath(filename)
+if dir != "" && !file.IsExisted(dir) {
+    yakit.Info("Creating directory: %v", dir)
+    err := file.MkdirAll(dir)
+    if err != nil {
+        yakit.Error("Failed to create directory %v: %v", dir, err)
+        return
+    }
+}
+
+// 写入文件内容
+err := file.Save(filename, content)
+if err != nil {
+    yakit.Error("Failed to write file %v: %v", filename, err)
+    return
+}
+
+// 获取写入后的文件信息
+info, err := file.Stat(filename)
+if err != nil {
+    yakit.Warn("File written successfully but failed to get file info: %v", err)
+} else {
+    yakit.Info("File written successfully. Size: %v bytes, ModTime: %v", info.Size(), info.ModTime())
+    yakit.File(filename, yakit.fileWriteAction(len(content), "cover", content))
+}
+
+yakit.Info("Content written to %v successfully", filename)

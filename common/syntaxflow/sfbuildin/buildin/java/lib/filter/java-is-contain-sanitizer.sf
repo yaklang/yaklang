@@ -33,9 +33,35 @@ REFERENCE
 )
 $input?{opcode:call && have:"contain"} as $output;
 alert $output for {
-	level: "mid",
+	level: "info",
 	title: "Find Java Contain Sanitizer",
 	title_zh: "查找Java含有contain方法的过滤器",
+	message: "发现Java代码中存在包含'contain'关键字的方法调用，建议审计人员关注其具体使用场景以确认是否符合安全要求。",
+	solution: <<<SOLUTION
+无明确修复方式，但建议审计人员对匹配到的代码进行深入分析，确保其使用场景符合安全需求。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 1. 规则目的
+该规则用于查找Java代码中是否存在包含"contain"关键字的方法调用。此规则期望输入参数的操作码为`call`，如果该调用名称包含"contain"，则返回调用的原始值。该规则常用于确认数据流分析中是否涉及白名单校验、字符串校验等操作。
+
+### 2. 规则详细
+该规则属于查找类规则，主要用于辅助数据流分析，识别代码中可能存在的字符串包含校验或白名单过滤操作。通过识别包含"contain"关键字的方法调用，可以进一步分析这些方法是否用于实现安全过滤或输入验证机制，从而判断数据流是否经过了适当的净化处理。
+
+例如，在以下场景中，该规则能够检测到相关调用：
+```java
+public class Demo {
+public static void main(String[] args) {
+String str = "hello";
+if (str.contains("he")) { // 包含"contain"关键字的调用
+System.out.println("ok");
+}
+}
+}
+```
+上述代码中的`str.contains("he")`调用会被匹配并返回。
+DESC
+	name: "output",
 }
 
 
@@ -52,5 +78,45 @@ desc(
         }
     }
 EOF
+	"safefile://SafeStringOperation.java": <<<CODE
+// 该代码不包含任何名为'contain'或包含'contain'子串的方法调用。
+// 这是一个安全的字符串操作示例，不会触发规则告警。
+public class SafeStringOperation {
+    public static void main(String[] args) {
+        String text = "Hello, World!";
+        // 使用equals方法比较字符串，不含'contain'关键字
+        if (text.equals("Hello, World!")) {
+            System.out.println("String matches.");
+        }
+        // 使用indexOf方法查找子串，不含'contain'关键字
+        if (text.indexOf("World") != -1) {
+            System.out.println("Substring found.");
+        }
+    }
+}
+CODE
+	"safefile://NoContainMethod.java": <<<CODE
+// 此类中定义的方法名称都不包含'contain'字样，因此不会被规则匹配。
+public class NoContainMethod {
+
+    public boolean checkIfValid(String input) {
+        // 这是一个通用的验证方法，不涉及'contain'关键字
+        return input != null && input.length() > 0;
+    }
+
+    public String processData(byte[] data) {
+        // 这是一个数据处理方法，不包含'contain'关键字
+        return new String(data);
+    }
+
+    public static void main(String[] args) {
+        NoContainMethod obj = new NoContainMethod();
+        String testString = "sample data";
+        if (obj.checkIfValid(testString)) {
+            System.out.println("Input is valid.");
+        }
+    }
+}
+CODE
 )
 

@@ -5,30 +5,50 @@ desc(
 	type : audit
 	desc: <<<DESC
 ### 规则目的
-
 此审计规则旨在识别Java代码中TCP数据接收的位置。TCP数据接收点通常是潜在的攻击面，因为恶意数据可能会通过这些点进入应用程序。
 
 ### 规则详细
-
 1. **作为基础审计库**
-   属于`java-net-socket-read`库规则（`lib`类型），用于识别Java网络编程中数据流入的关键点，通常需要与其他规则（如数据流跟踪规则）配合使用，来检测更具体的漏洞（如反序列化、缓冲区溢出等）。
+属于`java-net-socket-read`库规则（`lib`类型），用于识别Java网络编程中数据流入的关键点，通常需要与其他规则（如数据流跟踪规则）配合使用，来检测更具体的漏洞（如反序列化、缓冲区溢出等）。
 
 2. **检测的类库和函数**
-   该规则主要识别使用了标准Java网络库（`java.net` 和 `java.nio`）中读取TCP数据的相关函数。
-
-   - **`java.net.Socket` 的 `getInputStream()` 方法:** 通过Socket获取输入流，攻击者可以通过该流发送恶意数据。
-   - **`java.net.ServerSocket` 的 `getInputStream()` 方法:** ServerSocket本身不直接读取数据，但此规则在此处可能是为了与 Socket 的 getInputStream() 区分或标记与 Socket 相关的数据流入点。实际数据读取通常发生在 accept() 接受连接后获得的 Socket 对象上。
-   - **`java.nio.channels.SocketChannel` 的 `read()` 方法:** NIO中的 SocketChannel 用于非阻塞 I/O，`read()` 方法用于从通道读取数据到缓冲区，这也是一个重要的数据接收点。
-
+该规则主要识别使用了标准Java网络库（`java.net` 和 `java.nio`）中读取TCP数据的相关函数。
+- **`java.net.Socket` 的 `getInputStream()` 方法:** 通过Socket获取输入流，攻击者可以通过该流发送恶意数据。
+- **`java.net.ServerSocket` 的 `getInputStream()` 方法:** ServerSocket本身不直接读取数据，但此规则在此处可能是为了与 Socket 的 getInputStream() 区分或标记与 Socket 相关的数据流入点。实际数据读取通常发生在 accept() 接受连接后获得的 Socket 对象上。
+- **`java.nio.channels.SocketChannel` 的 `read()` 方法:** NIO中的 SocketChannel 用于非阻塞 I/O，`read()` 方法用于从通道读取数据到缓冲区，这也是一个重要的数据接收点。
 确保这些接收点实施了适当的数据验证和清理措施，以防止诸如缓冲区溢出、注入攻击、不安全的反序列化等安全漏洞。
+
+### 示例代码
+以下为存在风险的TCP数据接收示例：
+```java
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+public class TcpServer {
+    public static void main(String[] args) throws Exception {
+        ServerSocket serverSocket = new ServerSocket(8080);
+        Socket socket = serverSocket.accept();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        String line;
+        while ((line = reader.readLine()) != null) {
+            System.out.println(line);
+        }
+        reader.close();
+        socket.close();
+        serverSocket.close();
+    }
+}
+```
 DESC
 	rule_id: "4db64163-7c7a-4bc3-a627-c63dd1e8abde"
 	solution: <<<SOLUTION
 none
 SOLUTION
 	reference: <<<REFERENCE
-https://owasp.org/www-community/vulnerabilities/Unvalidated_Input
-https://cwe.mitre.org/data/definitions/20.html
+[Unvalidated Input](https://owasp.org/www-community/vulnerabilities/Unvalidated_Input)
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 REFERENCE
 )
 
@@ -39,9 +59,60 @@ REFERENCE
 .read()?{<typeName>?{have: 'java.nio.channels.SocketChannel'}} as $output;
 
 alert $output for {
-	level: "mid",
+	level: "info",
 	title: "Audit Java TCP Data Reception Point",
 	title_zh: "审计Java TCP数据接收点",
+	solution: <<<SOLUTION
+### 安全建议
+#### 1. 数据验证
+在所有数据接收点实施严格的输入验证，包括但不限于：
+- 验证数据长度是否在合理范围内。
+- 检查数据格式是否符合预期。
+- 使用白名单机制过滤输入内容。
+```java
+// 示例：校验接收到的数据长度
+ByteBuffer buffer = ByteBuffer.allocate(1024);
+int bytesRead = socketChannel.read(buffer);
+if (bytesRead > MAX_ALLOWED_SIZE) {
+    throw new IllegalArgumentException("输入数据超出允许大小");
+}
+```
+#### 2. 异常处理
+为所有I/O操作添加异常捕获逻辑，避免因数据错误导致系统崩溃。
+```java
+try {
+    int bytesRead = socketChannel.read(buffer);
+} catch (IOException e) {
+    e.printStackTrace();
+    // 记录日志并终止连接
+    socketChannel.close();
+}
+```
+#### 3. 数据清理
+对所有接收到的数据进行清理，尤其是处理用户输入时。
+```java
+String sanitizedInput = sanitize(input);
+private String sanitize(String input) {
+    return input.replaceAll("[^a-zA-Z0-9]", "");
+}
+```
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+此审计规则旨在识别Java代码中TCP数据接收的位置。TCP数据接收点通常是潜在的攻击面，因为恶意数据可能会通过这些点进入应用程序。
+### 规则详细
+1. **作为基础审计库**
+属于`java-net-socket-read`库规则（`lib`类型），用于识别Java网络编程中数据流入的关键点，通常需要与其他规则（如数据流跟踪规则）配合使用，来检测更具体的漏洞（如反序列化、缓冲区溢出等）。
+2. **检测的类库和函数**
+该规则主要识别使用了标准Java网络库（`java.net` 和 `java.nio`）中读取TCP数据的相关函数。
+- **`java.net.Socket` 的 `getInputStream()` 方法:** 通过Socket获取输入流，攻击者可以通过该流发送恶意数据。
+- **`java.net.ServerSocket` 的 `getInputStream()` 方法:** ServerSocket本身不直接读取数据，但此规则在此处可能是为了与 Socket 的 getInputStream() 区分或标记与 Socket 相关的数据流入点。实际数据读取通常发生在 accept() 接受连接后获得的 Socket 对象上。
+- **`java.nio.channels.SocketChannel` 的 `read()` 方法:** NIO中的 SocketChannel 用于非阻塞 I/O，`read()` 方法用于从通道读取数据到缓冲区，这也是一个重要的数据接收点。
+确保这些接收点实施了适当的数据验证和清理措施，以防止诸如缓冲区溢出、注入攻击、不安全的反序列化等安全漏洞。
+DESC
+	name: "output",
+	message: "发现Java TCP数据接收点的审计规则，该规则主要用于定位可能的危险数据流入点。",
 }
 
 
@@ -125,4 +196,80 @@ EOF
         }
     }
 EOF
+	"safefile://SafeNetworkCommunication.java": <<<CODE
+// 这是一个安全的网络通信示例
+// 此代码模拟了数据发送而非接收，不应触发TCP数据接收点的审计规则。
+// 它展示了如何通过SocketChannel写入数据，而不是读取数据。
+
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.channels.SocketChannel;
+import java.nio.charset.StandardCharsets;
+
+public class SafeNetworkCommunication {
+
+    public static void main(String[] args) {
+        try (SocketChannel client = SocketChannel.open(new InetSocketAddress("localhost", 8080))) {
+            String message = "Hello, server!";
+            ByteBuffer buffer = ByteBuffer.wrap(message.getBytes(StandardCharsets.UTF_8));
+            System.out.println("Sending message: " + message);
+            // 写入数据到通道，而不是从通道读取数据
+            while (buffer.hasRemaining()) {
+                client.write(buffer);
+            }
+            System.out.println("Message sent. Shutting down output for graceful close.");
+            // 关闭了输出，表明客户端不再发送数据
+            // Java 7+ try-with-resources 会自动关闭client
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
+	"safefile://SecureFileUpload.java": <<<CODE
+// 这是一个文件上传的示例，数据来源于文件，而非直接通过网络SocketInputStream或SocketChannel.read()
+// 此处模拟的是从本地文件系统读取数据，而非通过网络Socket接收数据，因此不应触发告警。
+// 尽管文件流可能被用于上传到网络服务，但数据的原始来源点不是TCP接收。
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+public class SecureFileUpload {
+
+    public static void main(String[] args) {
+        Path filePath = Paths.get("example.txt");
+
+        // 检查文件是否存在并创建
+        if (!Files.exists(filePath)) {
+            try {
+                Files.write(filePath, "This is some test content for the file.\nMore lines here.".getBytes());
+                System.out.println("Created example.txt for testing.");
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+        }
+
+        try (InputStream fis = new FileInputStream(filePath)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            System.out.println("Reading from local file: " + filePath.toAbsolutePath());
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                // 打印读取到的内容，这里模拟处理文件数据
+                String content = new String(buffer, 0, bytesRead);
+                System.out.print(content);
+            }
+            System.out.println("\nFinished reading from file.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+CODE
 )

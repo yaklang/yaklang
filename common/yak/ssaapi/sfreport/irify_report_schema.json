@@ -1,0 +1,455 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "代码审计报告 (Code Audit Report)",
+    "description": "用于代码审计和安全扫描结果的标准化报告格式。",
+    "type": "object",
+    "required": [
+        "report_type",
+        "engine_version",
+        "report_time",
+        "program_name",
+        "Rules",
+        "Risks",
+        "File"
+    ],
+    "properties": {
+        "report_type": {
+            "type": "string",
+            "description": "报告类型，例如 'irify' 或 'irify-full'。",
+            "enum": [
+                "irify",
+                "irify-full"
+            ]
+        },
+        "engine_version": {
+            "type": "string",
+            "description": "分析引擎的版本号。"
+        },
+        "report_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "报告生成的时间戳 (ISO 8601格式)。"
+        },
+        "program_name": {
+            "type": "string",
+            "description": "被分析程序的唯一标识或名称。"
+        },
+        "program_lang": {
+            "type": "string",
+            "description": "被分析程序的主要编程语言。"
+        },
+        "description": {
+            "type": "string",
+            "description": "关于本次扫描或程序的描述信息。"
+        },
+        "repository_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "被分析程序的代码仓库地址。"
+        },
+        "file_count": {
+            "type": "integer",
+            "description": "扫描所分析的文件总数。"
+        },
+        "code_line_count": {
+            "type": "integer",
+            "description": "扫描所分析的代码总行数。"
+        },
+        "scan_start_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "扫描开始时间。"
+        },
+        "scan_end_time": {
+            "type": "string",
+            "format": "date-time",
+            "description": "扫描结束时间。"
+        },
+        "Rules": {
+            "type": "array",
+            "description": "本次扫描中涉及的所有规则的列表。",
+            "items": {
+                "$ref": "#/$defs/rule"
+            }
+        },
+        "Risks": {
+            "type": "object",
+            "description": "发现的所有风险的字典，键为风险的唯一哈希值。",
+            "additionalProperties": {
+                "$ref": "#/$defs/risk"
+            }
+        },
+        "File": {
+            "type": "array",
+            "description": "本次扫描中涉及的所有文件的列表。",
+            "items": {
+                "$ref": "#/$defs/file"
+            }
+        }
+    },
+    "$defs": {
+        "rule": {
+            "type": "object",
+            "description": "定义一个扫描规则。",
+            "required": [
+                "rule_name",
+                "language"
+            ],
+            "properties": {
+                "rule_name": {
+                    "type": "string",
+                    "description": "规则的唯一名称。"
+                },
+                "language": {
+                    "type": "string",
+                    "description": "该规则适用的编程语言。"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "规则的标题（英文）。"
+                },
+                "title_zh": {
+                    "type": "string",
+                    "description": "规则的标题（中文）。"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "规则的详细描述信息。"
+                },
+                "solution": {
+                    "type": "string",
+                    "description": "针对该规则发现问题的修复建议。"
+                },
+                "severity": {
+                    "type": "string",
+                    "description": "规则对应的风险严重等级。",
+                    "enum": [
+                        "info",
+                        "low",
+                        "middle",
+                        "high",
+                        "critical"
+                    ]
+                },
+                "content": {
+                    "type": "string",
+                    "description": "规则的具体实现逻辑，使用高级静态分析语言SyntaxFlow编写。"
+                },
+                "risks": {
+                    "type": "array",
+                    "description": "由该规则触发的所有风险的哈希值列表。",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "risk": {
+            "type": "object",
+            "description": "定义一个具体的风险或漏洞。",
+            "required": [
+                "id",
+                "hash",
+                "title",
+                "severity",
+                "time",
+                "language",
+                "rule_name",
+                "program_name"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "全局唯一且自增的风险ID。"
+                },
+                "hash": {
+                    "type": "string",
+                    "description": "根据风险内容计算出的唯一哈希值。"
+                },
+                "title": {
+                    "type": "string",
+                    "description": "风险的标题。"
+                },
+                "title_verbose": {
+                    "type": "string",
+                    "description": "更详细的风险标题。"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "风险的详细描述。"
+                },
+                "solution": {
+                    "type": "string",
+                    "description": "针对此风险的修复建议。"
+                },
+                "severity": {
+                    "type": "string",
+                    "description": "风险的严重等级。",
+                    "enum": [
+                        "info",
+                        "low",
+                        "middle",
+                        "high",
+                        "critical"
+                    ]
+                },
+                "risk_type": {
+                    "type": "string",
+                    "description": "风险的分类，例如 'path-traversal'。"
+                },
+                "details": {
+                    "type": "string",
+                    "description": "包含动态分析上下文等更多风险细节。"
+                },
+                "cve": {
+                    "type": "string",
+                    "description": "关联的CVE编号。"
+                },
+                "cwe": {
+                    "type": "array",
+                    "description": "关联的CWE编号列表。",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "time": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "风险发现的时间戳。"
+                },
+                "language": {
+                    "type": "string",
+                    "description": "风险涉及的编程语言。"
+                },
+                "code_source_url": {
+                    "type": "string",
+                    "description": "风险所在源代码文件的相对路径。"
+                },
+                "line": {
+                    "type": "integer",
+                    "description": "风险在代码中的起始行号。"
+                },
+                "code_range": {
+                    "type": "string",
+                    "description": "JSON字符串化的代码范围对象，用于精确定位。"
+                },
+                "code_fragment": {
+                    "type": "string",
+                    "description": "风险相关的代码片段。"
+                },
+                "function_name": {
+                    "type": "string",
+                    "description": "风险所在的函数或方法名。"
+                },
+                "rule_name": {
+                    "type": "string",
+                    "description": "触发此风险的规则名称。"
+                },
+                "program_name": {
+                    "type": "string",
+                    "description": "风险所属的项目名称。"
+                },
+                "latest_disposal_status": {
+                    "type": "string",
+                    "description": "风险的最新处置状态。",
+                    "default": "not_set"
+                },
+                "data_flow_paths": {
+                    "type": "array",
+                    "description": "数据流路径信息列表。",
+                    "items": {
+                        "$ref": "#/$defs/dataFlowPath"
+                    }
+                }
+            }
+        },
+        "file": {
+            "type": "object",
+            "description": "定义一个被扫描的文件。",
+            "required": [
+                "path",
+                "length",
+                "hash"
+            ],
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "文件的相对路径。"
+                },
+                "length": {
+                    "type": "integer",
+                    "description": "文件的字节长度。"
+                },
+                "hash": {
+                    "type": "object",
+                    "description": "包含多种算法的文件哈希值集合，用于防篡改校验。",
+                    "properties": {
+                        "md5": {
+                            "type": "string"
+                        },
+                        "sha1": {
+                            "type": "string"
+                        },
+                        "sha256": {
+                            "type": "string"
+                        },
+                        "blake3": {
+                            "type": "string"
+                        }
+                    },
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "content": {
+                    "type": "string",
+                    "description": "文件的内容，仅在irify-full报告模式或设置`with-file-content`配置时包含完整内容。"
+                },
+                "line_count": {
+                    "type": "integer",
+                    "description": "文件的总行数。"
+                },
+                "risks": {
+                    "type": "array",
+                    "description": "在该文件中发现的所有风险的哈希值列表。",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "dataFlowPath": {
+            "type": "object",
+            "description": "描述一条完整的数据流路径，从源（source）到汇（sink）。",
+            "required": [
+                "path_id",
+                "nodes",
+                "edges"
+            ],
+            "properties": {
+                "path_id": {
+                    "type": "string",
+                    "description": "数据流路径的唯一标识。"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "对此数据流路径的描述。"
+                },
+                "nodes": {
+                    "type": "array",
+                    "description": "构成此数据流的节点列表。",
+                    "items": {
+                        "$ref": "#/$defs/nodeInfo"
+                    }
+                },
+                "edges": {
+                    "type": "array",
+                    "description": "连接数据流节点的边列表。",
+                    "items": {
+                        "$ref": "#/$defs/edgeInfo"
+                    }
+                },
+                "dot_graph": {
+                    "type": "string",
+                    "description": "用于可视化的DOT语言图描述字符串。"
+                }
+            }
+        },
+        "nodeInfo": {
+            "type": "object",
+            "description": "数据流图中的一个节点信息。",
+            "required": [
+                "node_id"
+            ],
+            "properties": {
+                "node_id": {
+                    "type": "string",
+                    "description": "节点的唯一标识。"
+                },
+                "ir_code": {
+                    "type": "string",
+                    "description": "节点对应的中间表示（IR）代码。"
+                },
+                "source_code": {
+                    "type": "string",
+                    "description": "节点对应的源代码片段。"
+                },
+                "source_code_start": {
+                    "type": "integer",
+                    "description": "源代码片段的起始位置。"
+                },
+                "code_range": {
+                    "$ref": "#/$defs/codeRange"
+                }
+            }
+        },
+        "edgeInfo": {
+            "type": "object",
+            "description": "数据流图中的一条边信息。",
+            "required": [
+                "edge_id",
+                "from_node_id",
+                "to_node_id"
+            ],
+            "properties": {
+                "edge_id": {
+                    "type": "string",
+                    "description": "边的唯一标识。"
+                },
+                "from_node_id": {
+                    "type": "string",
+                    "description": "边的起始节点ID。"
+                },
+                "to_node_id": {
+                    "type": "string",
+                    "description": "边的目标节点ID。"
+                },
+                "edge_type": {
+                    "type": "string",
+                    "description": "边的类型，例如 'data_flow', 'control_flow' 等。"
+                },
+                "description": {
+                    "type": "string",
+                    "description": "对该边的描述，便于理解。"
+                }
+            }
+        },
+        "codeRange": {
+            "type": "object",
+            "description": "精确定位代码中的一个范围。",
+            "required": [
+                "url",
+                "start_line",
+                "start_column",
+                "end_line",
+                "end_column"
+            ],
+            "properties": {
+                "url": {
+                    "type": "string",
+                    "description": "代码所在文件的URL或路径。"
+                },
+                "start_line": {
+                    "type": "integer",
+                    "description": "范围的起始行号。"
+                },
+                "start_column": {
+                    "type": "integer",
+                    "description": "范围的起始列号。"
+                },
+                "end_line": {
+                    "type": "integer",
+                    "description": "范围的结束行号。"
+                },
+                "end_column": {
+                    "type": "integer",
+                    "description": "范围的结束列号。"
+                },
+                "source_code_line": {
+                    "type": "integer",
+                    "description": "源代码中的实际行号。"
+                }
+            }
+        }
+    }
+}

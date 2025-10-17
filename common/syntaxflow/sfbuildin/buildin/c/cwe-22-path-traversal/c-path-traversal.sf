@@ -1,0 +1,281 @@
+desc(
+	title: "Check C Path Traversal Vulnerability"
+	type: audit
+	severity: low
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   路径遍历（Path Traversal）漏洞发生在应用程序未正确验证用户输入用于文件路径操作的场景。攻击者可以通过输入`../`、`..\`等特殊序列或绝对路径来访问或操作预期目录之外的文件系统资源。在C语言中，这通常由于直接拼接用户输入与基础路径（如`sprintf`、`strcat`）或使用未过滤的路径参数（如`fopen`、`unlink`）引起。
+
+2. **触发场景**
+   ```c
+   // 存在漏洞的代码示例
+   void vulnerable_file_read(const char *filename) {
+       char filepath[256];
+       sprintf(filepath, "/var/www/uploads/%s", filename); // 直接拼接用户输入
+       FILE *file = fopen(filepath, "r");
+       // 文件操作...
+   }
+   ```
+   攻击者输入`../../../etc/passwd`可能读取系统敏感文件；输入`/tmp/malicious`可能覆盖或创建非预期文件。
+
+3. **潜在影响**
+   - 任意文件读取（如泄露配置文件、用户数据库）。
+   - 任意文件写入或删除（如破坏系统完整性、植入后门）。
+   - 结合其他漏洞实现远程代码执行（如覆盖`.so`文件）。
+DESC
+	rule_id: "bcac7b40-eb5e-4cab-ae45-96a3e38c0ce4"
+	title_zh: "检测C语言路径遍历漏洞"
+	risk: ""
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 路径规范化与验证
+使用`realpath`解析规范路径，并检查是否在允许的目录范围内：
+```c
+char *real_path = realpath(user_input, NULL);
+if (real_path && strncmp(real_path, "/var/www/uploads", 16) == 0) {
+    FILE *file = fopen(real_path, "r");
+    // 安全操作...
+    free(real_path);
+}
+```
+
+#### 2. 禁用危险字符
+过滤`../`、`/`等序列和特殊字符：
+```c
+int is_safe_path(const char *path) {
+    return !(strstr(path, "..") || strchr(path, '/'));
+}
+```
+
+#### 3. 使用安全API
+限制路径操作权限并启用沙箱机制（如`chroot`）：
+```c
+chdir("/var/www/uploads");  // 锁定工作目录
+FILE *file = fopen(filename, "r");  // 相对路径操作
+```
+
+#### 4. 动态环境隔离
+禁止使用环境变量或不可信源作为路径：
+```c
+char *env_path = getenv("USER_FILE");
+if (env_path) {
+    fprintf(stderr, "Environment variables not allowed");
+    exit(1);
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-22: Path Traversal](https://cwe.mitre.org/data/definitions/22.html)
+[OWASP Path Traversal](https://owasp.org/www-community/attacks/Path_Traversal)
+REFERENCE
+)
+
+<include('c-user-input')> as $user_input;
+<include('c-file-path')> as $file_path;
+
+$file_path & $user_input as $low
+
+alert $low for {
+	level: "low",
+	type: "vuln",
+	title: "C Path Traversal Vulnerability Was Detected",
+	title_zh: "检测到C语言路径遍历漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+路径遍历漏洞是由于应用程序未对用户输入进行严格过滤或限制，攻击者可通过构造特殊输入（如`../`）访问或操作预期范围之外的文件系统路径。这可能导致敏感文件泄露、任意文件写入或系统文件破坏等安全问题。
+
+2. **触发场景**
+```c
+char filepath[256];
+sprintf(filepath, "/var/www/uploads/%s", filename);
+FILE *file = fopen(filepath, "r");
+```
+攻击者输入`../../etc/passwd`可读取系统敏感文件；输入`../../malicious.sh`可能覆盖关键脚本。
+
+3. **潜在影响**
+- 泄露敏感文件（如配置文件、密码文件）。
+- 写入恶意文件导致远程代码执行。
+- 破坏系统关键文件导致服务中断。
+DESC
+	message: "检测到C语言路径遍历漏洞，从用户输入到文件操作间缺乏有效的安全校验",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 路径规范化与校验
+对输入路径进行标准化处理并校验是否在允许范围内。
+```c
+// 安全校验函数示例
+int is_safe_path(const char *input) {
+    if (!input || strstr(input, "..") || input[0] == '/') return 0;
+    return 1;
+}
+```
+
+#### 2. 使用realpath解析绝对路径
+```c
+char *real_path = realpath(user_input, NULL);
+if (!real_path || strncmp(real_path, base_dir, strlen(base_dir)) != 0) {
+    // 拒绝非法路径
+}
+```
+
+#### 3. 白名单限制文件名格式
+```c
+// 仅允许字母数字和特定字符
+if (!strspn(filename, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")) {
+    return ERROR_INVALID_FILENAME;
+}
+```
+SOLUTION
+	risk: "路径遍历",
+	name: "low",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_path.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+
+void vulnerable_file_read(const char *filename) {
+    char filepath[256];
+    
+    sprintf(filepath, "/var/www/uploads/%s", filename);
+    
+    FILE *file = fopen(filepath, "r");
+    if (file) {
+        char buffer[1024];
+        while (fgets(buffer, sizeof(buffer), file)) {
+            printf("%s", buffer);
+        }
+        fclose(file);
+    }
+}
+
+void vulnerable_file_write(const char *filename, const char *content) {
+    char filepath[256];
+    
+    sprintf(filepath, "/var/www/uploads/%s", filename);
+    
+    FILE *file = fopen(filepath, "w");
+    if (file) {
+        fputs(content, file);
+        fclose(file);
+    }
+}
+
+void vulnerable_file_delete(const char *filename) {
+    char filepath[256];
+    
+    sprintf(filepath, "/var/www/uploads/%s", filename);
+    
+    unlink(filepath);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <filename>\n", argv[0]);
+        return 1;
+    }
+    
+    vulnerable_file_read(argv[1]);
+    
+    char *env_file = getenv("TARGET_FILE");
+    if (env_file) {
+        vulnerable_file_write(env_file, "test content");
+        vulnerable_file_delete(env_file);
+    }
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_path.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
+int is_safe_path(const char *input_path) {
+    if (!input_path) return 0;
+    
+    if (strstr(input_path, "..") != NULL) {
+        return 0;
+    }
+    
+    if (input_path[0] == '/') {
+        return 0;
+    }
+    
+    const char *dangerous_chars = "\\:*?\"<>|";
+    for (int i = 0; input_path[i]; i++) {
+        if (strchr(dangerous_chars, input_path[i])) {
+            return 0;
+        }
+    }
+    
+    if (strlen(input_path) > 100) {
+        return 0;
+    }
+    
+    return 1;
+}
+
+void safe_file_read(const char *filename) {
+    if (!is_safe_path(filename)) {
+        printf("Invalid filename\n");
+        return;
+    }
+    
+    char filepath[512];
+    char cwd[256];
+    
+    if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        perror("getcwd");
+        return;
+    }
+    
+    snprintf(filepath, sizeof(filepath), "%s/uploads/%s", cwd, filename);
+    
+    char *real_path = realpath(filepath, NULL);
+    if (!real_path) {
+        printf("File not found\n");
+        return;
+    }
+    
+    if (strncmp(real_path, cwd, strlen(cwd)) != 0) {
+        printf("Access denied\n");
+        free(real_path);
+        return;
+    }
+    
+    FILE *file = fopen(real_path, "r");
+    if (file) {
+        char buffer[1024];
+        while (fgets(buffer, sizeof(buffer), file)) {
+            printf("%s", buffer);
+        }
+        fclose(file);
+    }
+    
+    free(real_path);
+}
+
+int main(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Usage: %s <filename>\n", argv[0]);
+        return 1;
+    }
+    
+    safe_file_read(argv[1]);
+    
+    return 0;
+}
+SAFE
+)

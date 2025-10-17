@@ -51,12 +51,16 @@ var (
 
 	GLOBAL_DB_SAVE_SYNC = utils.NewBool(false)
 
-	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(60)
+	GLOBAL_CALLER_CALL_PLUGIN_TIMEOUT = atomic.NewFloat64(300)
 
 	// tls global config
 	GLOBAL_TLS_MIN_VERSION uint16 = gmtls.VersionSSL30
 	GLOBAL_TLS_MAX_VERSION uint16 = gmtls.VersionTLS13
 )
+
+func SimpleYakGlobalConfig() {
+	GLOBAL_DB_SAVE_SYNC.SetTo(true)
+}
 
 const (
 	YAK_PROJECT_DATA_DB_NAME_RECOVERED   = "default-yakit.db"
@@ -281,6 +285,22 @@ func GetDefaultYakitEngineDir() string {
 
 func GetDefaultYakitPprofDir() string {
 	pt := filepath.Join(GetDefaultYakitBaseDir(), "pprof-log")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
+func GetDefaultLibsDir() string {
+	pt := filepath.Join(GetDefaultYakitProjectsDir(), "libs")
+	if !utils.IsDir(pt) {
+		os.MkdirAll(pt, 0o777)
+	}
+	return pt
+}
+
+func GetDefaultDownloadTempDir() string {
+	pt := filepath.Join(GetDefaultYakitBaseTempDir(), "download")
 	if !utils.IsDir(pt) {
 		os.MkdirAll(pt, 0o777)
 	}

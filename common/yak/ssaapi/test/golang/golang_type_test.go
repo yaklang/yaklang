@@ -17,14 +17,16 @@ func Test_Struct(t *testing.T) {
 		A
 	}
 	func (a *B) getA() int {
-			return a.t
+		return a.t
 	}
 	func main() {
-		b := B{A: A{t: 2}}
-		a2:=b.getA()
+		b  := B{A: A{t: 2}}
+		a2 := b.getA()
 	}
 `
-		ssatest.CheckSyntaxFlow(t, code, `a2 #-> * as $param`, map[string][]string{
+		ssatest.CheckSyntaxFlowEx(t, code, `
+			a2 #-> * as $param
+		`, true, map[string][]string{
 			"param": {"2"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
@@ -64,7 +66,6 @@ func Test_Struct(t *testing.T) {
 			"a2": {"2"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
-
 	t.Run("struct function inheritance extend", func(t *testing.T) {
 		code := `package main
 
@@ -107,6 +108,91 @@ func Test_Struct(t *testing.T) {
 			"a1": {"1"},
 			"a2": {"3"},
 			"a3": {"2"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+}
+
+func Test_FullTypeName(t *testing.T) {
+	t.Run("fulltype name from fakeimport", func(t *testing.T) {
+		code := `package main
+
+import (
+	"encoding/base64"
+	"fmt"
+	"github.com/gin-gonic/gin"
+	"net/http"
+	"os/exec"
+)
+
+func CMD1(c *gin.Context) {
+	var ipaddr string
+	// Check the request method
+	if c.Request.Method == "GET" {
+		ipaddr = c.Query("ip")
+	} else if c.Request.Method == "POST" {
+		ipaddr = c.PostForm("ip")
+	}
+
+	Command := fmt.Sprintf("ping -c 4 %s", ipaddr)
+	output, err := exec.Command("/bin/sh", "-c", Command).Output()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"success": string(output),
+	})
+}
+		`
+
+		ssatest.CheckSyntaxFlowEx(t, code, `
+exec?{<fullTypeName>?{have: 'os/exec'}} as $entry
+$entry.Command(* #-> as $sink) 
+
+*.Query(* #-> as $param)
+$param?{<fullTypeName>?{have: 'github.com/gin-gonic/gin'}} as $input
+
+$sink & $input as $high;
+		`, true, map[string][]string{
+			"high": {"Parameter-c"},
+		}, ssaapi.WithLanguage(ssaapi.GO))
+	})
+
+	t.Run("fulltype name from inheritance", func(t *testing.T) {
+		code := `package main
+
+import (
+    "go-sec-code/utils"
+    "io/ioutil"
+    "net/http"
+
+    beego "github.com/beego/beego/v2/server/web"
+)
+
+type SSRFVuln1Controller struct {
+    beego.Controller
+}
+
+func (c *SSRFVuln1Controller) Get() {
+    url := c.GetString("url", "http://www.example.com")
+    res, err := http.Get(url)
+    if err != nil {
+        panic(err)
+    }
+    defer res.Body.Close()
+    body, err := ioutil.ReadAll(res.Body)
+    if err != nil {
+        panic(err)
+    }
+    c.Ctx.ResponseWriter.Write(body)
+}
+		`
+
+		ssatest.CheckSyntaxFlowEx(t, code, `
+.GetString(*<slice(index=0)> #-> as $sink) 
+$sink<fullTypeName> as $type
+		`, true, map[string][]string{
+			"type": {"github.com/beego/beego/v2/server/web"},
 		}, ssaapi.WithLanguage(ssaapi.GO))
 	})
 }

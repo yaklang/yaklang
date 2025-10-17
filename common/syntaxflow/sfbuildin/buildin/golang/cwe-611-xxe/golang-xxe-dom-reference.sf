@@ -1,0 +1,303 @@
+desc(
+	title: "Check Golang XXE Malicious Document References"
+	type: audit
+	level: high
+	risk: "xxe"
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   XML外部实体（XXE）攻击是一种常见的安全漏洞，当应用程序在解析XML输入时未对外部实体引用进行适当的限制或禁用外部实体处理，攻击者可以利用此漏洞执行多种恶意操作。例如，通过构造恶意的XML文档，攻击者可以读取系统文件、发起服务器端请求伪造（SSRF）攻击，甚至导致拒绝服务（DoS）。在Golang中，`encoding/xml`包默认不解析外部实体，但如果开发者使用了不安全的配置（如手动启用外部实体支持），则可能引入XXE风险。
+
+2. **触发场景**
+   // 存在漏洞的代码示例
+   ```go
+   package main
+   import (
+       "encoding/xml"
+       "fmt"
+       "os"
+   )
+
+   type User struct {
+       Name string `xml:"name"`
+       Email string `xml:"email"`
+   }
+
+   func main() {
+       data := []byte(`<?xml version="1.0"?>
+       <!DOCTYPE user [
+           <!ENTITY xxe SYSTEM "file:///etc/passwd">
+       ]>
+       <user>
+           <name>&xxe;</name>
+           <email>test@example.com</email>
+       </user>`)
+
+       var user User
+       err := xml.Unmarshal(data, &user)
+       if err != nil {
+           fmt.Println("Error:", err)
+       } else {
+           fmt.Printf("User: %+v\n", user)
+       }
+   }
+   ```
+   在上述示例中，攻击者通过构造包含外部实体引用的XML输入，成功读取了系统的敏感文件（如`/etc/passwd`）。
+
+3. **潜在影响**
+   - **敏感数据泄露**：攻击者可能通过XXE读取服务器上的任意文件，包括数据库凭证、配置文件等。
+   - **服务器端请求伪造（SSRF）**：攻击者可以通过构造恶意XML输入，使服务器向内部网络或其他系统发起非授权请求。
+   - **拒绝服务（DoS）**：攻击者可以通过递归定义外部实体的方式耗尽服务器资源，导致服务不可用。
+
+DESC
+	rule_id: "4a6e5ac2-d5d8-4f27-9844-35b5153f5944"
+	title_zh: "检测Golang XXE恶意文档引用"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 使用安全配置的XML解析器
+   在Golang中，`encoding/xml`包默认不会解析外部实体，但为了确保安全性，建议显式设置`Strict`模式为`true`并配置`Entity`字段为`xml.HTMLEntity`以防止意外问题。
+   ```go
+   package main
+
+   import (
+       "encoding/xml"
+       "fmt"
+       "os"
+   )
+
+   type User struct {
+       Name string `xml:"name"`
+       Email string `xml:"email"`
+   }
+
+   func main() {
+       data := []byte(`<?xml version="1.0"?>
+       <user>
+           <name>John Doe</name>
+           <email>john.doe@example.com</email>
+       </user>`)
+
+       decoder := xml.NewDecoder(bytes.NewReader(data))
+       decoder.Strict = true
+       decoder.Entity = xml.HTMLEntity
+
+       var user User
+       err := decoder.Decode(&user)
+       if err != nil {
+           fmt.Println("Error:", err)
+       } else {
+           fmt.Printf("User: %+v\n", user)
+       }
+   }
+   ```
+
+#### 2. 验证和清理用户输入
+   即使使用了安全配置的XML解析器，仍需对所有用户输入进行验证和清理，确保其不包含恶意内容。
+   ```go
+   func validateInput(input []byte) bool {
+       // 简单检查是否存在DTD声明
+       if bytes.Contains(input, []byte("<!DOCTYPE")) {
+           return false
+       }
+       return true
+   }
+   ```
+
+#### 3. 禁用外部实体解析
+   如果不需要处理任何外部实体，可以在解析前移除或过滤相关XML特性。
+   ```go
+   func sanitizeXML(data []byte) []byte {
+       // 移除DTD声明部分
+       re := regexp.MustCompile(`(?i)<!DOCTYPE[^>]*>`) 
+       return re.ReplaceAll(data, []byte{})
+   }
+   ```
+
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-611: Improper Restriction of XML External Entity Reference ('XXE')](https://cwe.mitre.org/data/definitions/611.html)
+REFERENCE
+)
+
+<include('golang-user-input')> as $input;
+<include('golang-xml-sink')> as $decoder;
+
+xml?{<fullTypeName>?{have: 'encoding/xml'}} as $entry;
+$entry.Unmarshal(*<slice(index=0)> #-> as $sink);
+$sink & $input as $high;
+
+$decoder.Strict?{have: 'true'} as $safe;
+$decoder.Entity?{have: 'xml.HTMLEntity'} as $safe;
+
+alert $high for {
+	type: "vuln",
+	title: "Golang XXE Vulnerability Was Detected",
+	title_zh: "检测到Golang XXE漏洞",
+	level: "high",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+   由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始XML语句的逻辑。这可能导致非预期的服务器端文件泄露、SSRF（服务器端请求伪造）或拒绝服务（DoS）。
+2. **触发场景**
+   ```go
+   // 存在漏洞的代码示例
+   func XXEParseHandler(c *gin.Context) {
+       body, err := ioutil.ReadAll(c.Request.Body)
+       var user User
+       err = xml.Unmarshal(body, &user) // 直接解析XML，未限制外部实体
+   }
+   ```
+   攻击者通过提供包含恶意外部实体的XML输入，可以访问敏感文件（例如`/etc/passwd`），或者发起SSRF攻击。
+3. **潜在影响**
+   - 敏感文件（如`/etc/passwd`或其他系统配置）被窃取。
+   - 执行任意HTTP请求（如内网探测或调用内部服务）。
+   - 可能导致服务器资源耗尽（DoS攻击）。
+DESC
+	name: "high",
+	message: "检测到Golang代码中存在XXE漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何对外部实体引用的安全限制。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用安全的XML解析器
+通过设置`xml.Decoder`的`Strict`为`true`并指定`Entity`为`xml.HTMLEntity`，可以有效防止外部实体引用。
+```go
+// 安全解析XML示例
+func XXEParseHandler(c *gin.Context) {
+    body, err := ioutil.ReadAll(c.Request.Body)
+    decoder := xml.NewDecoder(bytes.NewReader(body))
+    decoder.Strict = true
+    decoder.Entity = xml.HTMLEntity
+    var user User
+    err = decoder.Decode(&user)
+}
+```
+#### 2. 验证和清理所有用户输入
+确保用户提供的XML输入不包含恶意实体内容。
+```go
+// 示例：验证输入是否符合预期结构
+if !isValidXML(body) {
+    return errors.New("invalid XML input")
+}
+```
+SOLUTION
+	risk: "XXE",
+}
+
+desc(
+	lang: golang
+	alert_high: 1
+	'file://main.go': <<<UNSAFE
+package api
+
+import (
+	"encoding/xml"
+	"io/ioutil"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// User 定义用于演示的用户结构
+type User struct {
+	XMLName xml.Name 
+	Name    string   
+	Email   string  
+}
+
+// XXEHandler 处理XXE漏洞演示页面
+func XXEHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title": "XXE漏洞演示",
+	})
+}
+
+// XXEParseHandler 处理XML数据解析（不安全的方式）
+func XXEParseHandler(c *gin.Context) {
+	body, err := ioutil.ReadAll(c.Request.Body)
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "读取请求数据失败: " + err.Error(),
+		})
+		return
+	}
+
+	// 故意使用不安全的XML解析方式
+	var user User
+	err = xml.Unmarshal(body, &user)
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "XML解析失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title":    "XXE漏洞演示",
+		"success":  "XML解析成功",
+		"username": user.Name,
+		"email":    user.Email,
+	})
+}
+UNSAFE
+	'safefile://safe.go': <<<SAFE
+package api
+
+import (
+	"encoding/xml"
+	"io/ioutil"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+)
+
+// User 定义用于演示的用户结构
+type User struct {
+	XMLName xml.Name 
+	Name    string   
+	Email   string  
+}
+
+// XXEHandler 处理XXE漏洞演示页面
+func XXEHandler(c *gin.Context) {
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title": "XXE漏洞演示",
+	})
+}
+
+// XXEParseHandler 处理XML数据解析（安全的方式）
+func XXEParseHandler(c *gin.Context) {
+	body, err := ioutil.ReadAll(c.Request.Body)
+	decoder := xml.NewDecoder(body)
+	decoder.Strict = true
+    decoder.Entity = xml.HTMLEntity
+
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "读取请求数据失败: " + err.Error(),
+		})
+		return
+	}
+
+	var user User
+	err = xml.Unmarshal(body, &user)
+	if err != nil {
+		c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+			"title": "XXE漏洞演示",
+			"error": "XML解析失败: " + err.Error(),
+		})
+		return
+	}
+
+	c.HTML(http.StatusOK, "vulns/xxe.tmpl", gin.H{
+		"title":    "XXE漏洞演示",
+		"success":  "XML解析成功",
+		"username": user.Name,
+		"email":    user.Email,
+	})
+}
+SAFE
+)

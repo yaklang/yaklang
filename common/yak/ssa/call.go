@@ -29,12 +29,51 @@ func NewCall(target Value, args Values, binding map[string]Value, block *BasicBl
 		SideEffectValue: map[string]int64{},
 	}
 	if c.Method <= 0 {
-		log.Infof("bb")
+		log.Errorf("NewCall: method id is %d, target: %s", c.Method, target.String())
 	}
 	return c
 }
 
 func (f *FunctionBuilder) NewCall(target Value, args []Value) *Call {
+	targetFuncCallee := target.GetFunc()
+
+	fixCallVariadic := func(args []Value, callee *Function) []Value {
+		if utils.IsNil(callee) || !callee.hasEllipsis || callee.ParamLength <= 0 || args == nil {
+			return args
+		}
+
+		fixedCount := callee.ParamLength - 1 // 最后一个是 variadic
+		if fixedCount > len(args) {
+			fixedCount = len(args)
+		}
+
+		// 固定参数部分
+		newArgs := append([]Value{}, args[:fixedCount]...)
+
+		// variadic 部分
+		variadicArgs := make([]Value, 0)
+		for i := fixedCount; i < len(args); i++ {
+			variadicArgs = append(variadicArgs, args[i])
+		}
+
+		if len(variadicArgs) == 0 { // 如果没有可变参数那就不要塞一个空的make进去了
+			return args
+		}
+
+		// 打包成 slice
+		obj := f.InterfaceAddFieldBuild(len(variadicArgs),
+			func(i int) Value { return f.EmitConstInstPlaceholder(i) },
+			func(i int) Value { return variadicArgs[i] },
+		)
+		obj.GetType().(*ObjectType).Kind = SliceTypeKind
+		newArgs = append(newArgs, obj)
+
+		return newArgs
+	}
+
+	args = fixCallVariadic(args, targetFuncCallee)
+
+	// 创建 Call 指令
 	call := NewCall(target, args, nil, f.CurrentBlock)
 	return call
 }
@@ -49,12 +88,16 @@ func (f *FunctionBuilder) EmitCall(c *Call) *Call {
 	c.handlerReturnType()
 	c.handleCalleeFunction()
 	c.handleMethod()
+	fixupUseChain(c)
 	return c
 }
 
 // handleMethod handle method for call,this call have more type,need handle this type
 func (c *Call) handleMethod() {
-	callMethod := c.GetValueById(c.Method)
+	callMethod, ok := c.GetValueById(c.Method)
+	if !ok || callMethod == nil {
+		return
+	}
 	/*
 		handle weakLanguage call
 	*/
@@ -77,18 +120,20 @@ func (c *Call) handleMethod() {
 				from <string> to getFunc
 			*/
 			if weakLanguage {
-				if newMethod := builder.GetFunc(method.String(), ""); utils.IsNil(newMethod) {
+				if newMethod, ok := builder.GetFunc(method.String(), ""); ok {
+					PointFunc(newMethod, callMethod)
+				} else {
 					log.Errorf("weakLanguage call %s not found", method.String())
 					return
-				} else {
-					PointFunc(newMethod, callMethod)
 				}
 			}
 		case *SideEffect:
 			/*
 				from value to getFunc
 			*/
-			check(ret.GetValueById(ret.Value))
+			if value, ok := ret.GetValueById(ret.Value); ok && value != nil {
+				check(value)
+			}
 		case *Phi:
 			for _, value := range ret.GetValues() {
 				check(value)
@@ -101,8 +146,8 @@ func (c *Call) handleMethod() {
 }
 
 func (c *Call) handlerGeneric() {
-	newMethod := c.GetValueById(c.Method)
-	if !newMethod.IsExtern() || newMethod.GetOpcode() != SSAOpcodeFunction {
+	newMethod, ok := c.GetValueById(c.Method)
+	if !ok || newMethod == nil || !newMethod.IsExtern() || newMethod.GetOpcode() != SSAOpcodeFunction {
 		return
 	}
 	f := newMethod.(*Function)
@@ -130,22 +175,32 @@ func (c *Call) handlerGeneric() {
 	instanceTypeMap := make(map[string]Type, len(genericTypes))
 	paramsType := slices.Clone(fType.Parameter)
 	returnType := fType.ReturnType
+	// variadicType用于参与泛型cache的key计算
+	var variadicType Type
 
 	hasError := false
 	for i, id := range c.Args {
-		arg := c.GetValueById(id)
+		arg, ok := c.GetValueById(id)
+		if !ok || arg == nil {
+			continue
+		}
 		index := i
 		argTyp := arg.GetType()
-		if isVariadic && i > fType.ParameterLen-1 {
+
+		switch {
+		case isVariadic && i > fType.ParameterLen-1:
+			// 有多个可变长参数
 			index = fType.ParameterLen - 1
-		} else if isVariadic && i == fType.ParameterLen-1 {
+			variadicType = arg.GetType()
+		case isVariadic && i == fType.ParameterLen-1:
+			// 可变参数只有一个
 			argType := arg.GetType()
 			if argType.GetTypeKind() != SliceTypeKind {
 				argType = NewSliceType(argType)
 			}
 			paramsType[i] = argType
-		} else {
-			// variadic should not set new paramsType
+			variadicType = argType
+		default:
 			paramsType[i] = arg.GetType()
 		}
 
@@ -154,7 +209,7 @@ func (c *Call) handlerGeneric() {
 			if argTyp.GetTypeKind() == SliceTypeKind {
 				argTyp = argTyp.(*ObjectType).FieldType
 			} else if argTyp.GetTypeKind() == BytesTypeKind {
-				argTyp = GetByteType()
+				argTyp = CreateByteType()
 			} else {
 				// todo: should error
 			}
@@ -169,7 +224,7 @@ func (c *Call) handlerGeneric() {
 	// fallback
 	for typ := range genericTypes {
 		if _, ok := instanceTypeMap[typ.String()]; !ok {
-			instanceTypeMap[typ.String()] = GetAnyType()
+			instanceTypeMap[typ.String()] = CreateAnyType()
 		}
 	}
 
@@ -188,6 +243,11 @@ func (c *Call) handlerGeneric() {
 	for _, k := range keys {
 		nameBuilder.WriteRune('-')
 		nameBuilder.WriteString(instanceTypeMap[k].String())
+	}
+	// for variadic function, we need to include the argument types of the variadic parameter
+	if isVariadic && variadicType != nil {
+		nameBuilder.WriteRune('-')
+		nameBuilder.WriteString(variadicType.String())
 	}
 	name := nameBuilder.String()
 
@@ -209,6 +269,7 @@ func (c *Call) handlerGeneric() {
 	} else {
 		newMethod = value
 	}
+
 	c.Method = newMethod.GetId()
 	if c.Method <= 0 {
 		log.Infof("ab")
@@ -216,7 +277,10 @@ func (c *Call) handlerGeneric() {
 }
 func (c *Call) handlerObjectMethod() {
 	args := c.Args
-	target := c.GetValueById(c.Method)
+	target, ok := c.GetValueById(c.Method)
+	if !ok || target == nil {
+		return
+	}
 	// handler "this" in parameter
 	AddThis := func(this Value) {
 		if len(args) == 0 {
@@ -251,7 +315,10 @@ func (c *Call) handlerObjectMethod() {
 // handler Return type, and handle drop error
 func (c *Call) handlerReturnType() {
 	// get function type
-	method := c.GetValueById(c.Method)
+	method, ok := c.GetValueById(c.Method)
+	if !ok || method == nil {
+		return
+	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok {
 		return
@@ -261,7 +328,7 @@ func (c *Call) handlerReturnType() {
 		if retType, ok := funcTyp.ReturnType.(*ObjectType); ok {
 			if retType.Combination && retType.FieldTypes[len(retType.FieldTypes)-1].GetTypeKind() == ErrorTypeKind {
 				if len(retType.FieldTypes) == 1 {
-					c.SetType(BasicTypes[NullTypeKind])
+					c.SetType(CreateNullType())
 				} else if len(retType.FieldTypes) == 2 {
 					// if len(t.FieldTypes) == 2 {
 					c.SetType(retType.FieldTypes[0])
@@ -279,7 +346,7 @@ func (c *Call) handlerReturnType() {
 			}
 		} else if t, ok := funcTyp.ReturnType.(*BasicType); ok && t.Kind == ErrorTypeKind {
 			// pass
-			c.SetType(BasicTypes[NullTypeKind])
+			c.SetType(CreateNullType())
 			for _, variable := range c.GetAllVariables() {
 				variable.NewError(Error, SSATAG, ValueIsNull())
 			}
@@ -299,7 +366,10 @@ func (c *Call) handleCalleeFunction() {
 	builder := function.builder
 
 	// get function type
-	method := c.GetValueById(c.Method)
+	method, ok := c.GetValueById(c.Method)
+	if !ok || method == nil {
+		return
+	}
 	funcTyp, ok := ToFunctionType(method.GetType())
 	if !ok { // for Test_SideEffect_Double_more
 		if param, ok := ToParameter(method); ok {
@@ -324,7 +394,10 @@ func (c *Call) handleCalleeFunction() {
 			for _, p := range funcTyp.ParameterMember {
 
 				objectName := p.ObjectName
-				key := p.GetValueById(p.MemberCallKey)
+				key, ok := p.GetValueById(p.MemberCallKey)
+				if !ok || utils.IsNil(key) {
+					continue
+				}
 				object, ok := p.Get(c)
 				if !ok {
 					continue
@@ -364,6 +437,11 @@ func (c *Call) handleCalleeFunction() {
 						}
 					}
 				}
+
+				if _, ok := ToExternLib(object); ok {
+					continue
+				}
+
 				if utils.IsNil(val) {
 					val = builder.ReadMemberCallValue(object, key)
 				}
@@ -377,16 +455,16 @@ func (c *Call) handleCalleeFunction() {
 	if builder.isBindLanguage() {
 		handleSideEffectBind(c, funcTyp)
 	} else {
-		handleSideEffect(c, funcTyp)
+		handleSideEffect(c, funcTyp, false)
 	}
+	handleSideEffect(c, funcTyp, true)
 
 	// only handler in method call
 	if !funcTyp.IsMethod {
 		return
 	}
 
-	is := method.IsMember()
-	if !is {
+	if !method.IsMember() {
 		// this function is method Function, but no member call get this.
 		// error
 		return
@@ -413,10 +491,12 @@ func (c *Call) HandleFreeValue(fvs []*Parameter) {
 			// skip instance function, or `go` with instance function,
 			// this function no variable, and code-range of call-site same as function.
 			// we don't mark error in call-site.
-			method := c.GetValueById(c.Method)
-			if fun, ok := ToFunction(method); ok {
-				if len(fun.GetAllVariables()) == 0 {
-					return
+			method, ok := c.GetValueById(c.Method)
+			if ok && method != nil {
+				if fun, ok := ToFunction(method); ok {
+					if len(fun.GetAllVariables()) == 0 {
+						return
+					}
 				}
 			}
 			// other code will mark error in function call-site

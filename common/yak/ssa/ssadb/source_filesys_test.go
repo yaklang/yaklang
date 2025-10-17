@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -99,18 +100,23 @@ func TestSourceFilesysLocal(t *testing.T) {
 				return nil
 			}),
 		)
-
-		assert.Equal(t, []string{
+		wantDir := []string{
 			"example", "example/src", "example/src/main", "example/src/main/java",
 			"example/src/main/java/com", "example/src/main/java/com/example",
 			"example/src/main/java/com/example/apackage",
 			"example/src/main/java/com/example/bpackage",
 			"example/src/main/java/com/example/bpackage/sub",
-		}, dirs)
-		assert.Equal(t, []string{
+		}
+		slices.Sort(dirs)
+		slices.Sort(wantDir)
+		assert.Equal(t, wantDir, dirs)
+		wantFile := []string{
 			"example/src/main/java/com/example/apackage/a.java",
 			"example/src/main/java/com/example/bpackage/sub/b.java",
-		}, file)
+		}
+		slices.Sort(file)
+		slices.Sort(wantFile)
+		assert.Equal(t, wantFile, file)
 	})
 	t.Run("test source file system root path", func(t *testing.T) {
 		info, err := dbfs.Stat("/")
@@ -227,18 +233,23 @@ func TestSourceFilesys(t *testing.T) {
 				return nil
 			}),
 		)
-
-		assert.Equal(t, []string{
+		wantDir := []string{
 			"example", "example/src", "example/src/main", "example/src/main/java",
 			"example/src/main/java/com", "example/src/main/java/com/example",
 			"example/src/main/java/com/example/apackage",
 			"example/src/main/java/com/example/bpackage",
 			"example/src/main/java/com/example/bpackage/sub",
-		}, dir)
-		assert.Equal(t, []string{
+		}
+		slices.Sort(wantDir)
+		slices.Sort(dir)
+		assert.Equal(t, wantDir, dir)
+		wantFile := []string{
 			"example/src/main/java/com/example/apackage/a.java",
 			"example/src/main/java/com/example/bpackage/sub/b.java",
-		}, file)
+		}
+		slices.Sort(wantFile)
+		slices.Sort(file)
+		assert.Equal(t, wantFile, file)
 	})
 
 	t.Run("test source file system root path", func(t *testing.T) {

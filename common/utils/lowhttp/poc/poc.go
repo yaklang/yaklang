@@ -55,7 +55,8 @@ type PocConfig struct {
 	RedirectHandler      func(bool, []byte, []byte) bool
 	Session              interface{} // session的标识符，可以用任意对象
 	SaveHTTPFlow         *bool
-	SaveHTTPFlowHandler  func(*lowhttp.LowhttpResponse)
+	SaveHTTPFlowHandler  []func(*lowhttp.LowhttpResponse)
+	UseMITMRule          *bool
 	SaveHTTPFlowSync     *bool
 	Source               string
 	Username             *string
@@ -170,7 +171,10 @@ func (c *PocConfig) ToLowhttpOptions() []lowhttp.LowhttpOpt {
 		opts = append(opts, lowhttp.WithSaveHTTPFlow(*c.SaveHTTPFlow))
 	}
 	if c.SaveHTTPFlowHandler != nil {
-		opts = append(opts, lowhttp.WithSaveHTTPFlowHandler(c.SaveHTTPFlowHandler))
+		opts = append(opts, lowhttp.WithSaveHTTPFlowHandler(c.SaveHTTPFlowHandler...))
+	}
+	if c.UseMITMRule != nil {
+		opts = append(opts, lowhttp.WithUseMITMRule(*c.UseMITMRule))
 	}
 	if c.SaveHTTPFlowSync != nil {
 		opts = append(opts, lowhttp.WithSaveHTTPFlowSync(*c.SaveHTTPFlowSync))
@@ -793,9 +797,23 @@ func WithSave(b bool) PocConfigOption {
 //	})) // 向 example.com 发起请求，添加test tag
 //
 // ```
-func WithSaveHandler(f func(response *lowhttp.LowhttpResponse)) PocConfigOption {
+func WithSaveHandler(f ...func(response *lowhttp.LowhttpResponse)) PocConfigOption {
 	return func(c *PocConfig) {
-		c.SaveHTTPFlowHandler = f
+		if c.SaveHTTPFlowHandler == nil {
+			c.SaveHTTPFlowHandler = make([]func(*lowhttp.LowhttpResponse), 0)
+		}
+		c.SaveHTTPFlowHandler = append(c.SaveHTTPFlowHandler, f...)
+	}
+}
+
+// mitmRule 是一个请求选项参数，用于指定是否使用MITM规则，默认为false即不会使用MITM规则，使用规则可以完成流量染色，附加tag与提取数据的功能
+// Example:
+// ```
+// poc.Get("https://exmaple.com", poc.save(true), poc.mitmReplacer(true))
+// ```
+func WithMITMRule(b bool) PocConfigOption {
+	return func(c *PocConfig) {
+		c.UseMITMRule = &b
 	}
 }
 
@@ -1929,12 +1947,14 @@ func ExtractPostParams(raw []byte) (map[string]string, error) {
 	if useRaw && err == nil {
 		err = utils.Error("cannot extract post params")
 	}
-	params := lo.MapEntries(totalParams, func(key string, value []string) (string, string) {
-		if len(value) == 0 {
-			return key, ""
+	params := make(map[string]string)
+	for _, param := range totalParams.Items {
+		if len(param.Values) == 0 {
+			params[param.Key] = ""
+		} else {
+			params[param.Key] = param.Values[0]
 		}
-		return key, value[0]
-	})
+	}
 
 	return params, err
 }
@@ -2025,6 +2045,7 @@ var PoCExports = map[string]interface{}{
 	"save":                 WithSave,
 	"saveSync":             WithSaveSync,
 	"saveHandler":          WithSaveHandler,
+	"useMitmRule":          WithMITMRule,
 	"source":               WithSource,
 	"websocket":            WithWebsocket,
 	"websocketFromServer":  WithWebsocketHandler,

@@ -360,7 +360,7 @@ func TestFixHTTPPacketCRLF3(t *testing.T) {
 Host: www.example.com
 Content-Length: 203
 Content-Type: multipart/form-data; boundary=------------------------cDkWacGqpxxAkcXkxoWoNItodEKPxryzekgvPhwK
-     
+
 --------------------------123
 Content-Disposition: form-data; name="{\"key\": \"value\"}"
 
@@ -385,7 +385,7 @@ func TestFixHTTPPacketCRLF4(t *testing.T) {
 Host: www.example.com
 Content-Length: 203
 Content-Type: 123123
-            
+
    asdf`))
 	spew.Dump(results)
 	if !strings.Contains(string(results), "\r\n\r\n   asdf") {
@@ -399,6 +399,51 @@ Content-Type: 123123
  00000040  6e 74 2d 54 79 70 65 3a  20 31 32 33 31 32 33 0d  |nt-Type: 123123.|
  00000050  0a 0d 0a 20 20 20 61 73  64 66                    |...   asdf|`) {
 		panic("CRLF Fix Failed")
+	}
+}
+
+func TestFixHTTPPacketTrim1(t *testing.T) {
+	results := FixHTTPRequest([]byte("\t" + `GET / HTTP/1.1` + CRLF +
+		"\t" + `Host: www.baidu.com` + CRLF + CRLF))
+	fmt.Println(string(results))
+	spew.Dump(results)
+	if bytes.Contains(results, []byte("\t")) {
+		panic("trim Fix Failed")
+	}
+	if !strings.Contains(string(spew.Sdump(results)), `00000000  47 45 54 20 2f 20 48 54  54 50 2f 31 2e 31 0d 0a  |GET / HTTP/1.1..|
+ 00000010  48 6f 73 74 3a 20 77 77  77 2e 62 61 69 64 75 2e  |Host: www.baidu.|
+ 00000020  63 6f 6d 0d 0a 0d 0a                              |com....|`) {
+		panic("trim fix fail")
+	}
+}
+
+func TestFixHTTPPacketTrim2(t *testing.T) {
+	results := FixHTTPRequest([]byte("\t" + "\t" + `GET / HTTP/1.1` + CRLF +
+		"\t" + `Host: www.baidu.com` + CRLF + CRLF))
+	fmt.Println(string(results))
+	spew.Dump(results)
+	if bytes.Contains(results, []byte("\t")) {
+		panic("trim Fix Failed")
+	}
+	if !strings.Contains(string(spew.Sdump(results)), `00000000  47 45 54 20 2f 20 48 54  54 50 2f 31 2e 31 0d 0a  |GET / HTTP/1.1..|
+ 00000010  48 6f 73 74 3a 20 77 77  77 2e 62 61 69 64 75 2e  |Host: www.baidu.|
+ 00000020  63 6f 6d 0d 0a 0d 0a                              |com....|`) {
+		panic("trim fix fail")
+	}
+}
+
+func TestFixHTTPPacketTrim3(t *testing.T) {
+	results := FixHTTPRequest([]byte(`GET / HTTP/1.1` + CRLF +
+		"\t" + `Host: www.baidu.com` + CRLF + CRLF))
+	fmt.Println(string(results))
+	spew.Dump(results)
+	if !bytes.Contains(results, []byte("\t")) {
+		panic("trim Fix Failed")
+	}
+	if !strings.Contains(string(spew.Sdump(results)), `00000000  47 45 54 20 2f 20 48 54  54 50 2f 31 2e 31 0d 0a  |GET / HTTP/1.1..|
+ 00000010  09 48 6f 73 74 3a 20 77  77 77 2e 62 61 69 64 75  |.Host: www.baidu|
+ 00000020  2e 63 6f 6d 0d 0a 0d 0a                           |.com....|`) {
+		panic("trim fix fail")
 	}
 }
 
@@ -701,4 +746,42 @@ file content
 		require.Contains(t, resultStr, "------WebKitFormBoundary", "multipart boundary should be preserved")
 		require.Contains(t, resultStr, "file content", "file content should be preserved")
 	})
+}
+
+func TestTrimTestForFixCRLF(t *testing.T) {
+	packet := "GET / HTTP/1.1\r\nHost: www.example.com\r\nTest: 1 \r\n\r\na"
+	result := FixHTTPPacketCRLF([]byte(packet), false)
+	spew.Dump(result)
+	require.Contains(t, string(result), "\r\nTest: 1 \r\n")
+}
+
+func TestTrimTestForFixCRLF_For_multipart(t *testing.T) {
+	packet := "GET / HTTP/1.1\r\nHost: www.example.com\r\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundaryO8YOixBrea99FhJk  \r\nContent-Length: 139\r\n\r\n" +
+		"------WebKitFormBoundaryO8YOixBrea99FhJk\r\n" +
+		"Content-Disposition: form-data; name=\"key\"\r\n\r\n" +
+		"value\r\n------WebKitFormBoundaryO8YOixBrea99FhJk--\r\n"
+	result := FixHTTPPacketCRLF([]byte(packet), false)
+	spew.Dump(result)
+	require.Contains(t, string(result), "ea99FhJk  \r\nContent-Length")
+}
+
+func TestTrimTestForFixCRLF_For_multipart2(t *testing.T) {
+	packet := "GET / HTTP/1.1\r\nHost: www.example.com\r\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundaryO8YOixBrea99FhJk\r\nContent-Length: 139\r\n\r\n" +
+		"------WebKitFormBoundaryO8YOixBrea99FhJk\r\n" +
+		"Content-Disposition: form-data; name=\"key\"\r\n\r\n" +
+		"value\r\n------WebKitFormBoundaryO8YOixBrea99FhJk--\r\n"
+	result := FixHTTPPacketCRLF([]byte(packet), false)
+	spew.Dump(result)
+	require.Contains(t, string(result), "ea99FhJk\r\nContent-Length")
+}
+
+func TestTrimTestForFixCRLF_For_multipart3(t *testing.T) {
+	packet := "GET / HTTP/1.1\r\nHost: www.example.com\r\nContent-Type: multipart/form-data; boundary=----WebKitFormBoundaryO8YOixBrea99FhJk   \r\nContent-Length: 139\r\n\r\n" +
+		"------WebKitFormBoundaryO8YOixBrea99FhJk   \r\n" +
+		"Content-Disposition: form-data; name=\"key\"\r\n\r\n" +
+		"value\r\n------WebKitFormBoundaryO8YOixBrea99FhJk   --\r\n"
+	result := FixHTTPPacketCRLF([]byte(packet), false)
+	spew.Dump(result)
+	require.Contains(t, string(result), "ea99FhJk   \r\nContent-Length")
+	require.Contains(t, string(result), "ea99FhJk   --")
 }

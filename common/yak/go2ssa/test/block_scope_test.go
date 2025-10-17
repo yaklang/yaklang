@@ -287,7 +287,7 @@ func TestBlock_Value_Select(t *testing.T) {
 			default:
 			}
 		}
-		`, []string{"chan(Function-make(typeValue(chan number)))", "chan(Function-make(typeValue(chan number)))"}, t)
+		`, []string{"chan(make(chan number))", "chan(make(chan number))"}, t)
 	})
 
 	// TODO: select send

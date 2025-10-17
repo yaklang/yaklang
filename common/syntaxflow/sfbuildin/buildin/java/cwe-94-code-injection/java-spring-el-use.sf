@@ -4,25 +4,22 @@ desc(
 	level: middle
 	desc: <<<DESC
 ### 规则目的
-
 该规则用于审计Java代码中Spring Expression Language (SpEL) 的使用情况，特别是关注 `SpelExpressionParser` 的实例化和 `parseExpression` 方法的调用。旨在识别可能存在的EL表达式注入风险点，从而防止攻击者通过构造恶意表达式执行任意代码或访问敏感信息。此规则作为审计类规则，用于辅助人工或自动化工具识别潜在的EL注入入口。
 
 ### 规则详细
-
 1. **作为审计基础**
-   此规则本身不直接检测漏洞，而是作为一种审计工具，标记出代码中使用了 `SpelExpressionParser` 的关键位置。后续需要结合污点分析或人工审计，判断传入 `parseExpression` 方法的表达式是否来源于不可信的用户输入。
+此规则本身不直接检测漏洞，而是作为一种审计工具，标记出代码中使用了 `SpelExpressionParser` 的关键位置。后续需要结合污点分析或人工审计，判断传入 `parseExpression` 方法的表达式是否来源于不可信的用户输入。
 
 2. **覆盖关键类和方法**
-   规则核心在于识别 `SpelExpressionParser` 类的实例化以及对其 `parseExpression` 方法的调用，这两个是SpEL表达式解析和执行的起点，也是潜在的注入风险点。
+规则核心在于识别 `SpelExpressionParser` 类的实例化以及对其 `parseExpression` 方法的调用，这两个是SpEL表达式解析和执行的起点，也是潜在的注入风险点。
 
 3. **识别潜在风险**
-   如果 `parseExpression` 方法的参数（即EL表达式字符串）直接或间接来源于用户可控的输入且未经充分的安全校验（如限制表达式语法、白名单机制等），则存在EL表达式注入漏洞的风险。攻击者可以构造包含恶意代码的EL表达式，一旦这些表达式被解析和执行，可能导致诸如远程代码执行、信息泄露、沙箱逃逸等严重后果。
+如果 `parseExpression` 方法的参数（即EL表达式字符串）直接或间接来源于用户可控的输入且未经充分的安全校验（如限制表达式语法、白名单机制等），则存在EL表达式注入漏洞的风险。攻击者可以构造包含恶意代码的EL表达式，一旦这些表达式被解析和执行，可能导致诸如远程代码执行、信息泄露、沙箱逃逸等严重后果。
 
 ```java
 // 示例：存在EL注入风险的代码
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-
 public class VulnerableCode {
     public static void main(String[] args) {
         String userInput = "T(java.lang.Runtime).getRuntime().exec('calc')"; // 模拟用户输入
@@ -31,13 +28,11 @@ public class VulnerableCode {
     }
 }
 ```
-
 DESC
 	rule_id: "74115441-8b30-4f9c-98d5-491b13b80713"
 	title_zh: "审计Java Spring EL使用"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 避免解析和执行不可信来源的表达式
 最根本的解决方案是确保 `SpelExpressionParser` 解析的表达式字符串**绝对不允许**来源于外部不可信的用户输入。如果必须使用用户输入构建表达式，需要进行严格的沙箱隔离或采用其他安全的表达式引擎。
 
@@ -49,7 +44,6 @@ Spring EL 提供 `SimpleEvaluationContext`，它限制了表达式执行的能�
 ExpressionParser parser = new SpelExpressionParser();
 // 只允许访问 properties 和 method
 EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
-
 // 假设 userInput 来源于外部，使用此 context 可以避免执行危险的表达式
 String sanitizedInput = "'safe string' + ' from input' + userInput;"; // 不安全的用法，仅为示例
 Expression expression = parser.parseExpression(sanitizedInput);
@@ -79,12 +73,112 @@ alert $params for {
 	title: "Audit Java Spring EL Use",
 	title_zh: "审计Java Spring EL使用",
 	level: "middle",
+	message: "发现Java代码中Spring Expression Language (SpEL) 的使用情况，需进一步确认是否存在表达式注入风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免解析和执行不可信来源的表达式
+最根本的解决方案是确保 `SpelExpressionParser` 解析的表达式字符串**绝对不允许**来源于外部不可信的用户输入。如果必须使用用户输入构建表达式，需要进行严格的沙箱隔离或采用其他安全的表达式引擎。
+#### 2. 使用简化的表达式解析器
+Spring EL 提供 `SimpleEvaluationContext`，它限制了表达式执行的能力，仅允许访问Properties和Method，并且不能创建新的对象或调用静态方法。这可以大大降低风险。
+```java
+// 修复代码示例：使用 SimpleEvaluationContext
+ExpressionParser parser = new SpelExpressionParser();
+// 只允许访问 properties 和 method
+EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+// 假设 userInput 来源于外部，使用此 context 可以避免执行危险的表达式
+String sanitizedInput = "'safe string' + ' from input' + userInput;"; // 不安全的用法，仅为示例
+Expression expression = parser.parseExpression(sanitizedInput);
+String result = expression.getValue(context, String.class);
+System.out.println(result);
+```
+#### 3. 对用户输入进行严格的白名单过滤或限制
+如果业务需求必须允许有限的动态表达式，应对用户输入进行极其严格的白名单校验，仅允许特定、无害的语法结构和函数调用。完全禁用可能导致代码执行、系统访问等的特性。
+#### 4. 使用安全沙箱或独立环境
+对于高风险场景，考虑在独立的、资源受限的环境（如沙箱）中执行EL表达式，即使发生注入也仅影响沙箱环境，不影响核心系统。
+#### 5. 升级Spring Framework版本
+确保使用的Spring Framework版本没有已知的SpEL相关的安全漏洞。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+该规则用于审计Java代码中Spring Expression Language (SpEL) 的使用情况，特别是关注 `SpelExpressionParser` 的实例化和 `parseExpression` 方法的调用。旨在识别可能存在的EL表达式注入风险点，从而防止攻击者通过构造恶意表达式执行任意代码或访问敏感信息。此规则作为审计类规则，用于辅助人工或自动化工具识别潜在的EL注入入口。
+### 规则详细
+1. **作为审计基础**
+此规则本身不直接检测漏洞，而是作为一种审计工具，标记出代码中使用了 `SpelExpressionParser` 的关键位置。后续需要结合污点分析或人工审计，判断传入 `parseExpression` 方法的表达式是否来源于不可信的用户输入。
+2. **覆盖关键类和方法**
+规则核心在于识别 `SpelExpressionParser` 类的实例化以及对其 `parseExpression` 方法的调用，这两个是SpEL表达式解析和执行的起点，也是潜在的注入风险点。
+3. **识别潜在风险**
+如果 `parseExpression` 方法的参数（即EL表达式字符串）直接或间接来源于用户可控的输入且未经充分的安全校验（如限制表达式语法、白名单机制等），则存在EL表达式注入漏洞的风险。攻击者可以构造包含恶意代码的EL表达式，一旦这些表达式被解析和执行，可能导致诸如远程代码执行、信息泄露、沙箱逃逸等严重后果。
+```java
+// 示例：存在EL注入风险的代码
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+public class VulnerableCode {
+public static void main(String[] args) {
+String userInput = "T(java.lang.Runtime).getRuntime().exec('calc')"; // 模拟用户输入
+ExpressionParser parser = new SpelExpressionParser();
+parser.parseExpression(userInput).getValue(); // 执行恶意表达式
+}
+}
+```
+DESC
+	name: "params",
 }
 
 alert $call for {
 	level: "middle",
 	title: "Audit Java Spring EL Use",
 	title_zh: "审计Java Spring EL使用",
+	message: "发现Java代码中Spring Expression Language (SpEL) 的使用情况，需进一步确认是否存在表达式注入风险。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 避免解析和执行不可信来源的表达式
+最根本的解决方案是确保 `SpelExpressionParser` 解析的表达式字符串**绝对不允许**来源于外部不可信的用户输入。如果必须使用用户输入构建表达式，需要进行严格的沙箱隔离或采用其他安全的表达式引擎。
+#### 2. 使用简化的表达式解析器
+Spring EL 提供 `SimpleEvaluationContext`，它限制了表达式执行的能力，仅允许访问Properties和Method，并且不能创建新的对象或调用静态方法。这可以大大降低风险。
+```java
+// 修复代码示例：使用 SimpleEvaluationContext
+ExpressionParser parser = new SpelExpressionParser();
+// 只允许访问 properties 和 method
+EvaluationContext context = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+// 假设 userInput 来源于外部，使用此 context 可以避免执行危险的表达式
+String sanitizedInput = "'safe string' + ' from input' + userInput;"; // 不安全的用法，仅为示例
+Expression expression = parser.parseExpression(sanitizedInput);
+String result = expression.getValue(context, String.class);
+System.out.println(result);
+```
+#### 3. 对用户输入进行严格的白名单过滤或限制
+如果业务需求必须允许有限的动态表达式，应对用户输入进行极其严格的白名单校验，仅允许特定、无害的语法结构和函数调用。完全禁用可能导致代码执行、系统访问等的特性。
+#### 4. 使用安全沙箱或独立环境
+对于高风险场景，考虑在独立的、资源受限的环境（如沙箱）中执行EL表达式，即使发生注入也仅影响沙箱环境，不影响核心系统。
+#### 5. 升级Spring Framework版本
+确保使用的Spring Framework版本没有已知的SpEL相关的安全漏洞。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则目的
+该规则用于审计Java代码中Spring Expression Language (SpEL) 的使用情况，特别是关注 `SpelExpressionParser` 的实例化和 `parseExpression` 方法的调用。旨在识别可能存在的EL表达式注入风险点，从而防止攻击者通过构造恶意表达式执行任意代码或访问敏感信息。此规则作为审计类规则，用于辅助人工或自动化工具识别潜在的EL注入入口。
+### 规则详细
+1. **作为审计基础**
+此规则本身不直接检测漏洞，而是作为一种审计工具，标记出代码中使用了 `SpelExpressionParser` 的关键位置。后续需要结合污点分析或人工审计，判断传入 `parseExpression` 方法的表达式是否来源于不可信的用户输入。
+2. **覆盖关键类和方法**
+规则核心在于识别 `SpelExpressionParser` 类的实例化以及对其 `parseExpression` 方法的调用，这两个是SpEL表达式解析和执行的起点，也是潜在的注入风险点。
+3. **识别潜在风险**
+如果 `parseExpression` 方法的参数（即EL表达式字符串）直接或间接来源于用户可控的输入且未经充分的安全校验（如限制表达式语法、白名单机制等），则存在EL表达式注入漏洞的风险。攻击者可以构造包含恶意代码的EL表达式，一旦这些表达式被解析和执行，可能导致诸如远程代码执行、信息泄露、沙箱逃逸等严重后果。
+```java
+// 示例：存在EL注入风险的代码
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+public class VulnerableCode {
+public static void main(String[] args) {
+String userInput = "T(java.lang.Runtime).getRuntime().exec('calc')"; // 模拟用户输入
+ExpressionParser parser = new SpelExpressionParser();
+parser.parseExpression(userInput).getValue(); // 执行恶意表达式
+}
+}
+```
+DESC
+	name: "call",
 }
 
 
@@ -112,4 +206,88 @@ public class SpringElExample {
     }
 }
 USE
+	"safefile://SafeSpringELUse.java": <<<CODE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+import org.springframework.expression.EvaluationContext;
+import org.springframework.expression.TypedValue;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
+
+public class SafeSpringELUse {
+    public static void main(String[] args) {
+        // 1. 使用 SimpleEvaluationContext 限制表达式能力
+        // 仅允许访问属性和方法，禁止创建新对象或调用静态方法
+        ExpressionParser parser = new SpelExpressionParser();
+        EvaluationContext simpleContext = SimpleEvaluationContext.forReadOnlyDataBinding().build();
+
+        // 示例：安全地访问属性
+        User user = new User("Alice", 30);
+        String userName = parser.parseExpression("name").getValue(simpleContext, user, String.class);
+        System.out.println("User Name (safe): " + userName);
+
+        // 示例：尝试执行不允许的操作 (这会报错或无法执行，取决于Spring EL版本和上下文配置)
+        try {
+            parser.parseExpression("T(java.lang.System).exit(1)").getValue(simpleContext);
+        } catch (Exception e) {
+            System.out.println("Attempted dangerous EL (as expected, failed): " + e.getMessage());
+        }
+
+        // 2. 将表达式硬编码或来自可信来源，不包含用户输入
+        // 确保表达式内容在编译时确定，或仅从安全的配置文件中读取
+        String fixedExpression = "'Hello, ' + 'World!'";
+        String greeting = parser.parseExpression(fixedExpression).getValue(String.class);
+        System.out.println("Greeting (fixed): " + greeting);
+
+        // 3. 对所有用户输入进行严格的白名单校验，仅允许特定的、无害的语法结构
+        // 这是一个抽象概念，需要根据具体业务规则实现一个输入校验器
+        String userInputRaw = "user.name"; // 假设这是从用户获取的表达式片段
+        if (isAllowedExpressionFragment(userInputRaw)) { // 假设存在一个白名单校验方法
+            String finalExpression = "#user." + userInputRaw; // 组合成完整的EL，#user 需在上下文中定义
+            // 例如，如果上下文有一个User对象，且只允许访问其公开属性
+            // ... (需要一个完整的上下文和对象来演示，此处仅为概念示意)
+        }
+    }
+
+    private static boolean isAllowedExpressionFragment(String input) {
+        // 这是一个占位符，实际需要实现复杂的白名单逻辑
+        // 例如，只允许字母、数字和特定点号，禁止括号、引号、T()等
+        return input.matches("[a-zA-Z0-9\.]+");
+    }
+
+    static class User {
+        private String name;
+        private int age;
+
+        public User(String name, int age) {
+            this.name = name;
+            this.age = age;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public int getAge() {
+            return age;
+        }
+    }
+}
+CODE
+	"safefile://NoSpELParseExpression.java": <<<CODE
+import org.springframework.expression.ExpressionParser;
+import org.springframework.expression.spel.standard.SpelExpressionParser;
+
+public class NoSpELParseExpression {
+    public static void main(String[] args) {
+        // 故意不使用 SpelExpressionParser 或其 parseExpression 方法
+        // 以确保即使代码中存在 Spring 相关的库，也不会误报
+        String data = "some safe string data";
+        System.out.println("Processing data: " + data);
+
+        // 这是一个普通的字符串操作，不涉及EL解析
+        String transformedData = data.toUpperCase();
+        System.out.println("Transformed data: " + transformedData);
+    }
+}
+CODE
 )

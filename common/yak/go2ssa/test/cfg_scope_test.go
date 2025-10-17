@@ -592,7 +592,7 @@ func TestBasic_Variable_Select(t *testing.T) {
 			}
 		}
 		`, []string{
-			"chan(Function-make(typeValue(chan number)))", "Undefined-data1",
+			"chan(make(chan number))", "Undefined-data1",
 		}, t)
 	})
 
@@ -613,7 +613,7 @@ func TestBasic_Variable_Select(t *testing.T) {
 			println(data1)
 		}
 		`, []string{
-			"phi(data1)[chan(Function-make(typeValue(chan string))),chan(Function-make(typeValue(chan string))),\"hello\"]",
+			"phi(data1)[chan(make(chan string)),chan(make(chan string)),\"hello\"]",
 		}, t)
 	})
 
@@ -652,7 +652,7 @@ func TestBasic_Variable_Select(t *testing.T) {
 			println(data1)
 		}
 		`, []string{
-			"phi(data1)[\"333333\",chan(Function-make(typeValue(chan string))),\"111111\"]",
+			"phi(data1)[\"333333\",chan(make(chan string)),\"111111\"]",
 		}, t)
 	})
 
@@ -675,7 +675,7 @@ func TestBasic_Variable_Select(t *testing.T) {
 			println(data1)
 		}
 		`, []string{
-			"phi(data1)[2,phi(data1)[3,chan(Function-make(typeValue(chan number)))],1]",
+			"phi(data1)[2,phi(data1)[3,chan(make(chan number))],1]",
 		}, t)
 	})
 }

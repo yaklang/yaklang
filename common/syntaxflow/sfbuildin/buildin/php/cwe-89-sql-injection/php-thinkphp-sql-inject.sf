@@ -5,106 +5,90 @@ desc(
 	level: "low"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。在ThinkPHP框架中，如果在构建数据库查询时直接拼接用户控制的变量，而不是使用框架提供的安全方法（如参数绑定、ORM查询），攻击者就可以通过输入恶意字符串来改变SQL语句的含义，从而执行非预期的数据库操作。
-
+SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。在ThinkPHP框架中，如果在构建数据库查询时直接拼接用户控制的变量，而不是使用框架提供的安全方法（如参数绑定、ORM查询），攻击者就可以通过输入恶意字符串来改变SQL语句的含义，从而执行非预期的数据库操作。
 2. **触发场景**
-   当开发者在ThinkPHP应用中，使用 `where()`、`find()`、`select()`、`update()`、`delete()` 等方法构建查询时，如果查询条件、字段名、表名等信息直接或间接来源于用户输入（如 `$_GET`、`$_POST`、`input()` 等），且未经过恰当的清理、过滤或参数化处理，就可能存在SQL注入风险。
-
-   ```php
-   // 漏洞示例代码（不安全写法）
-   namespace app\controller;
-
-   use think\Db;
-
-   class User
-   {
-       public function getUsers()
-       {
-           $id = input('get.id'); // 直接获取外部参数
-           $result = Db::table('user')
-               ->where('id = ' . $id) // 直接拼接用户输入到SQL语句
-               ->find();
-           return json($result);
-       }
-
-       // 存在风险的更新操作
-       public function updateUser()
-       {
-           $newName = input('post.name');
-           Db::table('user')
-               ->where('id', input('post.id')) // 直接使用外部参数作为条件
-               ->update(['username' => $newName]);
-       }
-   }
-   ```
-
+当开发者在ThinkPHP应用中，使用 `where()`、`find()`、`select()`、`update()`、`delete()` 等方法构建查询时，如果查询条件、字段名、表名等信息直接或间接来源于用户输入（如 `$_GET`、`$_POST`、`input()` 等），且未经过恰当的清理、过滤或参数化处理，就可能存在SQL注入风险。
+```php
+// 漏洞示例代码（不安全写法）
+namespace app\controller;
+use think\Db;
+class User
+{
+public function getUsers()
+{
+$id = input('get.id'); // 直接获取外部参数
+$result = Db::table('user')
+->where('id = ' . $id) // 直接拼接用户输入到SQL语句
+->find();
+return json($result);
+}
+// 存在风险的更新操作
+public function updateUser()
+{
+$newName = input('post.name');
+Db::table('user')
+->where('id', input('post.id')) // 直接使用外部参数作为条件
+->update(['username' => $newName]);
+}
+}
+```
 3. **潜在影响**
-   - 数据库敏感信息（如用户凭证、隐私数据）被窃取。
-   - 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
-   - 通过数据库提权进一步渗透至服务器或其他系统组件。
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
 DESC
 	rule_id: "df78b6fe-a4ca-4ef0-91ee-d9f23b651e3f"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用参数绑定（推荐）
 ThinkPHP提供了参数绑定机制，可以将用户输入作为参数传递给数据库驱动，由数据库驱动负责处理特殊字符的转义，从而避免SQL注入。这是最推荐的防范SQL注入的方法。
-
 ```php
 // 修复代码示例：使用参数绑定修复getUsers方法
 namespace app\controller;
-
 use think\Db;
-
 class User
 {
-    public function getUsers()
-    {
-        $id = input('get.id/d'); // 使用/d过滤，确保输入是数字
-        if ($id === null) {
-            // 处理非法输入，例如返回错误信息或默认值
-            // return json(['error' => 'Invalid ID'], 400);
-            $id = 0; // 示例：使用默认值
-        }
-        $result = Db::table('user')
-            ->where('id', $id) // 将 $id 作为参数传递
-            ->find();
-        return json($result);
-    }
-
-    // 修复代码示例：修复updateUser方法
-    public function updateUser()
-    {
-        $newName = input('post.name');
-        $id = input('post.id/d'); // 确保id是数字
-        if ($id === null) {
-             // 处理非法输入
-        }
-        Db::table('user')
-            ->where('id', $id) // 将 $id 作为参数传递
-            ->update(['username' => $newName]);
-    }
+public function getUsers()
+{
+$id = input('get.id/d'); // 使用/d过滤，确保输入是数字
+if ($id === null) {
+// 处理非法输入，例如返回错误信息或默认值
+// return json(['error' => 'Invalid ID'], 400);
+$id = 0; // 示例：使用默认值
+}
+$result = Db::table('user')
+->where('id', $id) // 将 $id 作为参数传递
+->find();
+return json($result);
+}
+// 修复代码示例：修复updateUser方法
+public function updateUser()
+{
+$newName = input('post.name');
+$id = input('post.id/d'); // 确保id是数字
+if ($id === null) {
+// 处理非法输入
+}
+Db::table('user')
+->where('id', $id) // 将 $id 作为参数传递
+->update(['username' => $newName]);
+}
 }
 ```
-
 #### 2. 使用ORM或Query Builder
 优先使用ThinkPHP的ORM或Query Builder提供的方法进行数据库操作。这些方法通常内置了参数化查询的支持，能更安全地处理用户输入。
-
 ```php
 // 示例：使用Query Builder安全查询用户（与上面参数绑定示例类似）
 $id = input('get.id');
 $user = Db::name('user')->where('id', $id)->find();
 ```
-
 #### 3. 严格校验和过滤用户输入
 在使用用户输入之前，对其进行严格的校验和过滤，确保其符合预期的格式和类型。例如，对于数字类型的ID，可以使用 `/d` 修饰符强制转换为整数。
-
 ```php
 $id = input('get.id/d'); // 仅接受数字，非数字返回null
 if ($id === null) {
-    // 非法输入，拒绝请求
+// 非法输入，拒绝请求
 }
 ```
 SOLUTION
@@ -114,21 +98,139 @@ SOLUTION
 REFERENCE
 )
 
-./find|select|where|update|where/ as $function
+
+
+./find|select|where|update|execute|exec/ as $function
+./^prepare$/ as $function
+
 <include('php-tp-all-extern-variable-param-source')> as $params
 
-$function(* as $allParams)
-
-$allParams?{<self> #{include: <<<CODE
-* & $params
+$function(,* as $allParams,)
+$allParams#{
+include: <<<CODE
+    * & $params
 CODE
-}->} as $sink
+}-> as $sink 
+
+// $snik ?{opcode: const} as $constSink 
+// alert $constSink for {
+//     level: "info"
+//     title: "检测到PHP SQL注入漏洞 注入点为常量"
+// }
+
+$sink?{!opcode:const} as $controledSink 
+
+$controledSink<dataflow(exclude:<<<CODE
+*?{<typeName()> ?{have: "number"}} as $number
+CODE)> as $controledNoNumberSink 
+
+alert $controledNoNumberSink for {
+	level: "mid",
+	title: "检测到PHP SQL注入漏洞 数据可控",
+}
+
+$controledSink - $controledNoNumberSink as $controledNumberSink 
+alert $controledNumberSink for {
+	level: "info",
+	title: "检测到PHP SQL注入漏洞 可控数据仅为数字类型",
+}
+
 
 alert $sink for {
 	level: "low",
-	risk: "sqli-inject",
-	title: "Unvalidated SQL Injection",
-	title_zh: "SQL注入风险",
+	risk: "SQL注入",
+	title: "PHP Unvalidated ThinkPHP SQL Injection Vulnerability Was Detected",
+	title_zh: "检测到PHP ThinkPHP SQL注入漏洞",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+SQL注入是由于应用程序未对用户输入进行严格的过滤或参数化处理，攻击者可通过构造特殊输入篡改原始SQL语句的逻辑。在ThinkPHP框架中，如果在构建数据库查询时直接拼接用户控制的变量，而不是使用框架提供的安全方法（如参数绑定、ORM查询），攻击者就可以通过输入恶意字符串来改变SQL语句的含义，从而执行非预期的数据库操作。
+2. **触发场景**
+当开发者在ThinkPHP应用中，使用 `where()`、`find()`、`select()`、`update()`、`delete()` 等方法构建查询时，如果查询条件、字段名、表名等信息直接或间接来源于用户输入（如 `$_GET`、`$_POST`、`input()` 等），且未经过恰当的清理、过滤或参数化处理，就可能存在SQL注入风险。
+```php
+// 漏洞示例代码（不安全写法）
+namespace app\controller;
+use think\Db;
+class User
+{
+public function getUsers()
+{
+$id = input('get.id'); // 直接获取外部参数
+$result = Db::table('user')
+->where('id = ' . $id) // 直接拼接用户输入到SQL语句
+->find();
+return json($result);
+}
+// 存在风险的更新操作
+public function updateUser()
+{
+$newName = input('post.name');
+Db::table('user')
+->where('id', input('post.id')) // 直接使用外部参数作为条件
+->update(['username' => $newName]);
+}
+}
+```
+3. **潜在影响**
+- 数据库敏感信息（如用户凭证、隐私数据）被窃取。
+- 执行任意SQL语句（如插入、删除、修改数据或数据库结构）。
+- 通过数据库提权进一步渗透至服务器或其他系统组件。
+DESC
+	name: "sink",
+	message: "检测到PHP ThinkPHP SQL注入漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计确认。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 使用参数绑定（推荐）
+ThinkPHP提供了参数绑定机制，可以将用户输入作为参数传递给数据库驱动，由数据库驱动负责处理特殊字符的转义，从而避免SQL注入。这是最推荐的防范SQL注入的方法。
+```php
+// 修复代码示例：使用参数绑定修复getUsers方法
+namespace app\controller;
+use think\Db;
+class User
+{
+public function getUsers()
+{
+$id = input('get.id/d'); // 使用/d过滤，确保输入是数字
+if ($id === null) {
+// 处理非法输入，例如返回错误信息或默认值
+// return json(['error' => 'Invalid ID'], 400);
+$id = 0; // 示例：使用默认值
+}
+$result = Db::table('user')
+->where('id', $id) // 将 $id 作为参数传递
+->find();
+return json($result);
+}
+// 修复代码示例：修复updateUser方法
+public function updateUser()
+{
+$newName = input('post.name');
+$id = input('post.id/d'); // 确保id是数字
+if ($id === null) {
+// 处理非法输入
+}
+Db::table('user')
+->where('id', $id) // 将 $id 作为参数传递
+->update(['username' => $newName]);
+}
+}
+```
+#### 2. 使用ORM或Query Builder
+优先使用ThinkPHP的ORM或Query Builder提供的方法进行数据库操作。这些方法通常内置了参数化查询的支持，能更安全地处理用户输入。
+```php
+// 示例：使用Query Builder安全查询用户（与上面参数绑定示例类似）
+$id = input('get.id');
+$user = Db::name('user')->where('id', $id)->find();
+```
+#### 3. 严格校验和过滤用户输入
+在使用用户输入之前，对其进行严格的校验和过滤，确保其符合预期的格式和类型。例如，对于数字类型的ID，可以使用 `/d` 修饰符强制转换为整数。
+```php
+$id = input('get.id/d'); // 仅接受数字，非数字返回null
+if ($id === null) {
+// 非法输入，拒绝请求
+}
+```
+SOLUTION
 }
 
 

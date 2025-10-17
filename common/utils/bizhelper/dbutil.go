@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -19,6 +20,14 @@ import (
 var (
 	escapeRegexp = regexp.MustCompile(`[%_\[\]^\\]`)
 )
+
+func createTempTestDatabase() (*gorm.DB, error) {
+	db, err := gorm.Open("sqlite3", "file::memory:?cache=shared")
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
 
 type Range struct {
 	Min, Max uint64
@@ -466,6 +475,42 @@ func ExactQueryUIntArrayOr(db *gorm.DB, field string, s []uint) *gorm.DB {
 		raw[index] = uint64(sub)
 	}
 	return ExactQueryUInt64ArrayOr(db, field, raw)
+}
+
+func ExactQueryMultipleUInt64ArrayOr(db *gorm.DB, field []string, s []uint64) *gorm.DB {
+	if len(s) <= 0 || len(field) <= 0 {
+		return db
+	}
+
+	var (
+		querys []string
+		items  []interface{}
+	)
+
+	for _, f := range field {
+		querys = append(querys, fmt.Sprintf("( %v IN (?) )", f))
+		items = append(items, s)
+	}
+
+	return db.Where(strings.Join(querys, " OR "), items...)
+}
+
+func ExactQueryMultipleStringArrayOr(db *gorm.DB, field []string, s []string) *gorm.DB {
+	if len(s) <= 0 || len(field) <= 0 {
+		return db
+	}
+
+	var (
+		querys []string
+		items  []interface{}
+	)
+
+	for _, f := range field {
+		querys = append(querys, fmt.Sprintf("( %v IN (?) )", f))
+		items = append(items, s)
+	}
+
+	return db.Where(strings.Join(querys, " OR "), items...)
 }
 
 func ExactQueryUInt64ArrayOr(db *gorm.DB, field string, s []uint64) *gorm.DB {

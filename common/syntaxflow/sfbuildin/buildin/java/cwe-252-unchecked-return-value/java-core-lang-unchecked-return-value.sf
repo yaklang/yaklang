@@ -9,6 +9,7 @@ desc(
 ### 规则详细
 1. **检测目标**
    规则重点关注`java.lang`包下的类中，如`Runtime`, `String`等，其特定方法（如`exec`, `concat`, `replace*`, `substring`, `toLowerCase`, `toUpperCase`, `trim`, `valueOf`等）的返回值。
+
 2. **风险分析**
    - **资源泄露:** 例如，`Runtime.getRuntime().exec()`执行命令后未检查其返回的`Process`对象，可能导致进程资源未 properly managed。
    - **状态未更新:** `String`类的一些方法（如`replace`、`toLowerCase`）返回的是新的String对象，原始字符串 Immutable。若不使用返回值，变量值不会改变，可能导致后续逻辑错误。
@@ -17,12 +18,10 @@ desc(
 ### 触发场景
 ```java
 package org.example;
-
 public class Main {
     public static void main(String[] args) {
         String a = "Hello World!";
         a.toLowerCase(); // toLowerCase() 返回新的字符串，此处未接收返回值
-
         Runtime.getRuntime().exec("command"); // exec() 返回进程对象，此处未接收返回值
     }
 }
@@ -50,8 +49,10 @@ DESC
        // 异常处理逻辑
    }
    ```
+
 2. **明确方法意图**
    在编写或使用代码时，清晰理解所调用方法的返回值含义，并根据其含义进行相应的逻辑处理。
+
 3. **利用IDE或静态分析工具**
    许多现代IDE和静态分析工具可以检测未使用的返回值，利用这些工具辅助代码审查和问题发现。
 SOLUTION
@@ -67,8 +68,56 @@ alert $weak for {
 	title: "Check Java Lang Unchecked Return Value",
 	title_zh: "检测Java Lang库未检查返回值的API",
 	level: "info",
-	risk: "api-abuse",
-	message: "发现Java Lang库未检查返回值的API",
+	risk: "信息",
+	message: "发现Java Lang库未检查返回值的API，可能存在资源泄露或操作失败的风险。",
+	solution: <<<SOLUTION
+### 修复建议
+1. **检查并使用返回值**
+对于返回非void类型的方法，根据业务逻辑和方法用途，务必检查和使用其返回值。
+```java
+// 修复代码示例 (String)
+String a = "Hello World!";
+String lowerA = a.toLowerCase(); // 将返回值赋给新的变量
+System.out.println(lowerA); // 使用返回值
+// 修复代码示例 (Runtime.exec)
+try {
+Process process = Runtime.getRuntime().exec("command"); // 接收返回值
+int exitCode = process.waitFor(); // 检查进程执行结果
+// 根据exitCode进行后续处理
+} catch (IOException | InterruptedException e) {
+e.printStackTrace();
+// 异常处理逻辑
+}
+```
+2. **明确方法意图**
+在编写或使用代码时，清晰理解所调用方法的返回值含义，并根据其含义进行相应的逻辑处理。
+3. **利用IDE或静态分析工具**
+许多现代IDE和静态分析工具可以检测未使用的返回值，利用这些工具辅助代码审查和问题发现。
+SOLUTION
+	desc: <<<DESC
+### 规则目的
+该规则用于检测Java代码中对`java.lang`库中某些方法进行调用后，未检查其返回值的情况。这些方法可能返回表示操作是否成功、新的对象实例或状态信息的值，如果调用者未对这些返回值进行检查和处理，可能会导致潜在的安全风险或其他非预期行为。
+### 规则详细
+1. **检测目标**
+规则重点关注`java.lang`包下的类中，如`Runtime`, `String`等，其特定方法（如`exec`, `concat`, `replace*`, `substring`, `toLowerCase`, `toUpperCase`, `trim`, `valueOf`等）的返回值。
+2. **风险分析**
+- **资源泄露:** 例如，`Runtime.getRuntime().exec()`执行命令后未检查其返回的`Process`对象，可能导致进程资源未 properly managed。
+- **状态未更新:** `String`类的一些方法（如`replace`、`toLowerCase`）返回的是新的String对象，原始字符串 Immutable。若不使用返回值，变量值不会改变，可能导致后续逻辑错误。
+- **操作失败未感知:** 某些方法返回 Boolean 或其他标志表示操作成功或失败，未检查返回值则无法得知操作结果，可能导致程序继续执行错误的分支。
+### 触发场景
+```java
+package org.example;
+public class Main {
+public static void main(String[] args) {
+String a = "Hello World!";
+a.toLowerCase(); // toLowerCase() 返回新的字符串，此处未接收返回值
+Runtime.getRuntime().exec("command"); // exec() 返回进程对象，此处未接收返回值
+}
+}
+```
+在上述示例中，`a.toLowerCase()`和`exec("command")`的返回值都没有被任何变量接收或进行后续处理，这可能导致意想不到的结果，例如`a`变量的值并未变为小写，或者无法获取命令执行的结果。
+DESC
+	name: "weak",
 }
 
 
@@ -86,4 +135,70 @@ public class Main {
     }
 }
 TEXT
+	"safefile://CorrectStringUsage.java": <<<CODE
+// 安全的代码示例：正确使用String方法返回值
+package org.example;
+
+public class CorrectStringUsage {
+    public static void main(String[] args) {
+        String originalString = "Hello World!";
+        // 确保接收并使用toLowerCase()的返回值
+        String lowerCaseString = originalString.toLowerCase(); 
+        System.out.println("Original: " + originalString); // 原始字符串未改变
+        System.out.println("Lowercase: " + lowerCaseString); // 使用了新的字符串
+
+        String modifiedString = originalString.replace('o', 'X'); // 接收并使用replace()返回值
+        System.out.println("Modified: " + modifiedString);
+
+        String subString = originalString.substring(6); // 接收并使用substring()返回值
+        System.out.println("Substring: " + subString);
+    }
+}
+CODE
+	"safefile://SafeRuntimeExec.java": <<<CODE
+// 安全的代码示例：正确处理Runtime.exec()的返回值
+package org.example;
+
+import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+
+public class SafeRuntimeExec {
+    public static void main(String[] args) {
+        Process process = null;
+        try {
+            // 接收并处理exec()返回的Process对象
+            process = Runtime.getRuntime().exec("ls -l"); // Unix/Linux示例
+            // For Windows: process = Runtime.getRuntime().exec("cmd /c dir");
+
+            // 获取命令的输出流
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+            
+            // 等待进程执行完毕，并获取退出码
+            int exitCode = process.waitFor(); 
+            System.out.println("Command exited with code: " + exitCode);
+
+            if (exitCode != 0) {
+                // 处理非零退出码，表明命令执行失败
+                System.err.println("Command execution failed.");
+            }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+            System.err.println("IOException during command execution.");
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // 重新设置中断状态
+            System.err.println("Command execution interrupted.");
+        } finally {
+            if (process != null) {
+                process.destroy(); // 确保进程被销毁，释放资源
+            }
+        }
+    }
+}
+CODE
 )

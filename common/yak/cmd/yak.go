@@ -48,6 +48,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	// start pprof
 	_ "net/http/pprof"
@@ -389,8 +390,36 @@ var startGRPCServerCommand = cli.Command{
 			Usage: "设置证书的 Common Name, 默认为 Server",
 			Value: "Server",
 		},
+		cli.StringFlag{
+			Name:  "local-password",
+			Usage: "本地密码模式，使用固定端口 9011，不使用 TLS，与 host/port/secret/tls/gen-tls-crt 互斥",
+		},
 	},
 	Action: func(c *cli.Context) error {
+		// 检查 local-password 模式
+		localPassword := c.String("local-password")
+		if localPassword != "" {
+			// 检查互斥选项
+			if c.IsSet("host") && c.String("host") != "127.0.0.1" {
+				return utils.Error("local-password is mutually exclusive with host option")
+			}
+			if c.IsSet("port") && c.Int("port") != 8087 {
+				return utils.Error("local-password is mutually exclusive with port option")
+			}
+			if c.IsSet("secret") {
+				return utils.Error("local-password is mutually exclusive with secret option")
+			}
+			if c.IsSet("tls") && c.Bool("tls") {
+				return utils.Error("local-password is mutually exclusive with tls option")
+			}
+			if c.IsSet("gen-tls-crt") && c.String("gen-tls-crt") != "build/" {
+				return utils.Error("local-password is mutually exclusive with gen-tls-crt option")
+			}
+
+			log.Info("starting grpc server in local-password mode")
+			log.Infof("local-password mode: port=9011, tls=false, password=***")
+		}
+
 		if c.String("home") != "" {
 			os.Setenv("YAKIT_HOME", c.String("home"))
 		}
@@ -409,6 +438,7 @@ var startGRPCServerCommand = cli.Command{
 
 		enableProfile := c.Bool("pprof")
 		if enableProfile {
+			runtime.SetBlockProfileRate(1)
 			println("----------------------------------------------------------------------")
 			println("----------------------------------------------------------------------")
 			println("---------------------------YAK GRPC PPROF-----------------------------")
@@ -460,7 +490,12 @@ var startGRPCServerCommand = cli.Command{
 			}
 		}
 
+		// 确定使用的密码：local-password 优先级更高
 		secret := c.String("secret")
+		if localPassword != "" {
+			secret = localPassword
+		}
+
 		streamInterceptors := []grpc.StreamServerInterceptor{grpc_recovery.StreamServerInterceptor()}
 		unaryInterceptors := []grpc.UnaryServerInterceptor{grpc_recovery.UnaryServerInterceptor()}
 		if secret != "" {
@@ -503,10 +538,23 @@ var startGRPCServerCommand = cli.Command{
 		}
 		ypb.RegisterYakServer(grpcTrans, s)
 
-		log.Infof("start to listen on: %v", utils.HostPort(c.String("host"), c.Int("port")))
+		// 确定监听地址和端口
+		var host string
+		var port int
+		if localPassword != "" {
+			// local-password 模式：强制使用 127.0.0.1:9011
+			host = "127.0.0.1"
+			port = 9011
+		} else {
+			host = c.String("host")
+			port = c.Int("port")
+		}
+
+		log.Infof("start to listen on: %v", utils.HostPort(host, port))
 		var lis net.Listener
 
-		if c.Bool("tls") {
+		// local-password 模式下强制不使用 TLS
+		if localPassword == "" && c.Bool("tls") {
 			// 签发证书
 			var cert []byte
 			var key []byte
@@ -548,13 +596,13 @@ var startGRPCServerCommand = cli.Command{
 			if err != nil {
 				return err
 			}
-			lis, err = tls.Listen("tcp", utils.HostPort(c.String("host"), c.Int("port")), tlsConfig)
+			lis, err = tls.Listen("tcp", utils.HostPort(host, port), tlsConfig)
 			if err != nil {
 				log.Error(err)
 				return err
 			}
 		} else {
-			lis, err = net.Listen("tcp", utils.HostPort(c.String("host"), c.Int("port")))
+			lis, err = net.Listen("tcp", utils.HostPort(host, port))
 			if err != nil {
 				log.Error(err)
 				return err
@@ -562,9 +610,13 @@ var startGRPCServerCommand = cli.Command{
 		}
 
 		log.Infof("start to startup grpc server...")
-		if c.String("host") == "127.0.0.1" {
-			log.Info("the current yak grpc for '127.0.0.1', if u want to connect from other host. use \n" +
-				"    yak grpc --host 0.0.0.0")
+		if host == "127.0.0.1" {
+			if localPassword != "" {
+				log.Info("the current yak grpc running in local-password mode on '127.0.0.1:9011'")
+			} else {
+				log.Info("the current yak grpc for '127.0.0.1', if u want to connect from other host. use \n" +
+					"    yak grpc --host 0.0.0.0")
+			}
 		}
 		log.Infof("yak grpc ok") // 勿删
 		err = grpcTrans.Serve(lis)
@@ -572,6 +624,207 @@ var startGRPCServerCommand = cli.Command{
 			log.Error(err)
 			return err
 		}
+		return nil
+	},
+}
+
+var checkSecretLocalGRPCServerCommand = cli.Command{
+	Name:  "check-secret-local-grpc",
+	Usage: "Check if local GRPC server with secret can be started and accessed",
+	Flags: []cli.Flag{
+		cli.StringFlag{
+			Name:  "client-password",
+			Usage: "客户端模式：使用指定密码连接到现有服务器进行测试，不启动服务器",
+		},
+	},
+	Action: func(ctx *cli.Context) error {
+		const port = 9011
+		addr := utils.HostPort("127.0.0.1", port)
+
+		clientPassword := ctx.String("client-password")
+
+		// 客户端模式：只连接服务器测试
+		if clientPassword != "" {
+			log.Info("running in client mode, connecting to existing server...")
+			log.Infof("target: %s", addr)
+
+			// 创建带超时的 context（10 秒）
+			dialCtx, dialCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer dialCancel()
+
+			// 创建客户端连接
+			log.Infof("connecting to grpc server with password (timeout: 10s)...")
+			conn, err := grpc.DialContext(
+				dialCtx,
+				addr,
+				grpc.WithInsecure(),
+				grpc.WithBlock(),
+				grpc.WithDefaultCallOptions(
+					grpc.MaxCallRecvMsgSize(100*1024*1024),
+					grpc.MaxCallSendMsgSize(100*1024*1024),
+				),
+			)
+			if err != nil {
+				log.Errorf("failed to dial grpc server: %s", err)
+				fmt.Printf("\n[FAILED] Cannot connect to server at %s\n", addr)
+				fmt.Printf("Error: %s\n", err)
+				fmt.Printf("Please check if:\n")
+				fmt.Printf("  1. Server is running on port %d\n", port)
+				fmt.Printf("  2. Local firewall is not blocking the connection\n")
+				fmt.Printf("  3. Connection timeout (10s exceeded)\n\n")
+				return err
+			}
+			defer conn.Close()
+
+			client := ypb.NewYakClient(conn)
+
+			// 创建带认证和超时的 context（10 秒）
+			rpcCtx, rpcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer rpcCancel()
+			rpcCtx = metadata.AppendToOutgoingContext(
+				rpcCtx,
+				"authorization", fmt.Sprintf("bearer %v", clientPassword),
+			)
+
+			// 调用 Version 接口
+			log.Infof("calling Version RPC with authentication (timeout: 10s)...")
+			versionResp, err := client.Version(rpcCtx, &ypb.Empty{})
+			if err != nil {
+				log.Errorf("failed to call Version: %s", err)
+				fmt.Printf("\n[FAILED] Authentication or RPC call failed\n")
+				fmt.Printf("Error: %s\n", err)
+				fmt.Printf("Please check if:\n")
+				fmt.Printf("  1. The password is correct\n")
+				fmt.Printf("  2. The server is running in local-password mode\n\n")
+				return err
+			}
+
+			log.Infof("Version RPC successful: %s", versionResp.Version)
+			fmt.Printf("\n[SUCCESS] Client connection test passed\n")
+			fmt.Printf("  Server: %s\n", addr)
+			fmt.Printf("  Password: ***\n")
+			fmt.Printf("  Version: %s\n\n", versionResp.Version)
+
+			return nil
+		}
+
+		// 服务器模式：启动测试服务器
+		log.Info("running in server mode, starting test server...")
+
+		// 检查端口是否被占用
+		lis, err := net.Listen("tcp", addr)
+		if err != nil {
+			log.Errorf("failed to listen on port %d: %s", port, err)
+			fmt.Printf("\n[FAILED] Port %d is already in use\n", port)
+			fmt.Printf("Please check if:\n")
+			fmt.Printf("  1. Local firewall is blocking the port\n")
+			fmt.Printf("  2. Anti-virus software is preventing yak engine from starting\n")
+			fmt.Printf("  3. Another yak instance is already running\n\n")
+			return utils.Errorf("port %d is occupied, please check local firewall or anti-virus software", port)
+		}
+
+		// 生成随机密码
+		secret := utils.RandStringBytes(32)
+		log.Infof("generated random secret for testing: %s", secret)
+
+		// 创建 GRPC 服务器
+		auth := func(authCtx context.Context) (context.Context, error) {
+			userSecret, err := grpc_auth.AuthFromMD(authCtx, "bearer")
+			if err != nil {
+				log.Errorf("secret schema[%v] missed", "bearer")
+				return nil, err
+			}
+			if userSecret != secret {
+				return nil, utils.Errorf("secret verify failed...")
+			}
+			return authCtx, nil
+		}
+
+		streamInterceptors := []grpc.StreamServerInterceptor{
+			grpc_recovery.StreamServerInterceptor(),
+			grpc_auth.StreamServerInterceptor(auth),
+		}
+		unaryInterceptors := []grpc.UnaryServerInterceptor{
+			grpc_recovery.UnaryServerInterceptor(),
+			grpc_auth.UnaryServerInterceptor(auth),
+		}
+
+		grpcTrans := grpc.NewServer(
+			grpc.ChainStreamInterceptor(streamInterceptors...),
+			grpc.ChainUnaryInterceptor(unaryInterceptors...),
+			grpc.MaxRecvMsgSize(100*1024*1024),
+			grpc.MaxSendMsgSize(100*1024*1024),
+		)
+
+		// 初始化服务器
+		s, err := yakgrpc.NewServer(
+			yakgrpc.WithInitFacadeServer(false),
+		)
+		if err != nil {
+			log.Errorf("build yakit server failed: %s", err)
+			return err
+		}
+		ypb.RegisterYakServer(grpcTrans, s)
+
+		// 启动服务器
+		log.Infof("starting test grpc server on %s", addr)
+		go func() {
+			err := grpcTrans.Serve(lis)
+			if err != nil {
+				log.Errorf("grpc serve error: %s", err)
+			}
+		}()
+		defer grpcTrans.Stop()
+
+		// 等待服务器启动
+		time.Sleep(time.Second)
+
+		// 创建带超时的 context（10 秒）
+		dialCtx, dialCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer dialCancel()
+
+		// 创建客户端连接
+		log.Infof("connecting to test grpc server (timeout: 10s)...")
+		conn, err := grpc.DialContext(
+			dialCtx,
+			addr,
+			grpc.WithInsecure(),
+			grpc.WithBlock(),
+			grpc.WithDefaultCallOptions(
+				grpc.MaxCallRecvMsgSize(100*1024*1024),
+				grpc.MaxCallSendMsgSize(100*1024*1024),
+			),
+		)
+		if err != nil {
+			log.Errorf("failed to dial grpc server: %s", err)
+			return err
+		}
+		defer conn.Close()
+
+		client := ypb.NewYakClient(conn)
+
+		// 创建带认证和超时的 context（10 秒）
+		rpcCtx, rpcCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer rpcCancel()
+		rpcCtx = metadata.AppendToOutgoingContext(
+			rpcCtx,
+			"authorization", fmt.Sprintf("bearer %v", secret),
+		)
+
+		// 调用 Version 接口
+		log.Infof("calling Version RPC (timeout: 10s)...")
+		versionResp, err := client.Version(rpcCtx, &ypb.Empty{})
+		if err != nil {
+			log.Errorf("failed to call Version: %s", err)
+			return err
+		}
+
+		log.Infof("Version RPC successful: %s", versionResp.Version)
+		fmt.Printf("\n[SUCCESS] Local GRPC server with secret authentication test passed\n")
+		fmt.Printf("  Port: %d\n", port)
+		fmt.Printf("  Secret: %s\n", secret)
+		fmt.Printf("  Version: %s\n\n", versionResp.Version)
+
 		return nil
 	},
 }
@@ -751,6 +1004,7 @@ func main() {
 			},
 		},
 		&startGRPCServerCommand,
+		&checkSecretLocalGRPCServerCommand,
 		&installSubCommand,
 		&tunnelServerCommand,
 		&mirrorGRPCServerCommand,
@@ -845,6 +1099,7 @@ func main() {
 
 		if len(args) > 0 {
 			// args 被解析到了，说明后面跟着文件，去读文件出来吧
+			consts.SimpleYakGlobalConfig()
 			file := args[0]
 			if file != "" {
 				absFile := file

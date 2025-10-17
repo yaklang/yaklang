@@ -178,6 +178,102 @@ func (s *VulinServer) registerSQLinj() {
 			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字型[id] 无边界闭合】": 1, "存在基于UNION SQL 注入: [参数名:id 原值:1]": 1},
 		},
 		{
+			DefaultQuery: "",
+			Path:         "/user/post/id",
+			Title:        "POST参数数字型SQL注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					// GET请求返回表单页面
+					html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>POST参数SQL注入测试</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h2>POST参数数字型SQL注入测试</h2>
+    <form action="/user/post/id" method="post">
+        <label for="id">用户ID:</label>
+        <input type="text" id="id" name="id" value="1" required>
+        <br><br>
+        <input type="submit" value="查询用户">
+    </form>
+</body>
+</html>`
+					writer.Header().Set("Content-Type", "text/html; charset=UTF-8")
+					writer.Write([]byte(html))
+					return
+				}
+
+				// POST请求处理SQL注入
+				id := LoadFromPostParams(request, "id")
+				if id == "" {
+					writer.Write([]byte("缺少id参数"))
+					writer.WriteHeader(400)
+					return
+				}
+
+				u, err := s.database.GetUserByIdUnsafe(id)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(500)
+					return
+				}
+				sqliWriter(writer, request, u)
+				return
+			},
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：数字型[id] 无边界闭合】": 1, "存在基于UNION SQL 注入: [参数名:id 原值:1]": 1},
+		},
+		{
+			DefaultQuery: "",
+			Path:         "/user/post/name",
+			Title:        "POST参数字符串型SQL注入",
+			Handler: func(writer http.ResponseWriter, request *http.Request) {
+				if request.Method == "GET" {
+					// GET请求返回表单页面
+					html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>POST参数字符串SQL注入测试</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h2>POST参数字符串型SQL注入测试</h2>
+    <form action="/user/post/name" method="post">
+        <label for="name">用户名:</label>
+        <input type="text" id="name" name="name" value="admin" required>
+        <br><br>
+        <input type="submit" value="查询用户">
+    </form>
+</body>
+</html>`
+					writer.Header().Set("Content-Type", "text/html; charset=UTF-8")
+					writer.Write([]byte(html))
+					return
+				}
+
+				// POST请求处理SQL注入
+				name := LoadFromPostParams(request, "name")
+				if name == "" {
+					writer.Write([]byte("缺少name参数"))
+					writer.WriteHeader(400)
+					return
+				}
+
+				u, err := s.database.GetUserByUsernameUnsafe(name)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					writer.WriteHeader(500)
+					return
+				}
+				sqliWriter(writer, request, u)
+				return
+			},
+			RiskDetected:   true,
+			ExpectedResult: map[string]int{"疑似SQL注入：【参数：字符串[name] 单引号闭合】": 1, "存在基于UNION SQL 注入: [参数名:name 原值:admin]": 1},
+		},
+		{
 			DefaultQuery: "id=1",
 			Path:         "/user/id-error",
 			Title:        "ID 为数字型的简单边界SQL报错检测",
@@ -467,6 +563,7 @@ func (s *VulinServer) registerSQLinj() {
 			},
 			RiskDetected: true,
 		},
+
 		{
 			DefaultQuery: "",
 			Path:         "/visitor/reference",

@@ -1,9 +1,10 @@
 package yakcmds
 
 import (
+	"strings"
+
 	"github.com/urfave/cli"
 	"github.com/yaklang/yaklang/common/utils"
-	"strings"
 )
 
 var AICommands = []*cli.Command{
@@ -28,4 +29,9 @@ var AICommands = []*cli.Command{
 			return nil
 		},
 	},
+}
+
+// 合并本地模型命令到AI命令组
+func init() {
+	AICommands = append(AICommands, LocalModelCommands...)
 }

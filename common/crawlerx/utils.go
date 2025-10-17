@@ -109,7 +109,7 @@ func StringArrayCover(array []string, element string) (bool, string) {
 		if s == "" {
 			continue
 		}
-		if strings.Contains(element, s) {
+		if strings.Contains(strings.ToLower(element), s) {
 			return true, s
 		}
 	}
@@ -224,6 +224,9 @@ func EvalOnPage(page *rod.Page, evalJs string) (*proto.RuntimeRemoteObject, erro
 	}.Call(page)
 	if err != nil {
 		return nil, utils.Errorf(`page eval js code error: %v`, err)
+	}
+	if elementObj.Result == nil {
+		return nil, utils.Error(`page eval js code result null`)
 	}
 	return elementObj.Result, nil
 }

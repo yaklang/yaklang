@@ -3,6 +3,7 @@ package yakdoc
 import (
 	"bytes"
 	"fmt"
+	"github.com/yaklang/yaklang/common/log"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -46,7 +47,8 @@ func GetProjectAstPackages() (map[string]*ast.Package, *token.FileSet, error) {
 		if info.IsDir() {
 			pkgs, err := parser.ParseDir(fset, path, nil, parser.ParseComments|parser.AllErrors)
 			if err != nil {
-				return err
+				log.Errorf("parser package path error:%v", err) // ignore error
+				return nil
 			}
 			for name, pkg := range pkgs {
 				// skip test pkg

@@ -27,6 +27,8 @@ type Engine struct {
 	debugCallBack func(*yakvm.Debugger)
 	debugInit     func(*yakvm.Debugger)
 	sandboxMode   bool
+
+	callFuncCallback func(caller *yakvm.Value, wavy bool, args []*yakvm.Value)
 }
 
 func (e *Engine) RuntimeInfo(infoType string, params ...any) (res any, err error) {
@@ -391,6 +393,10 @@ func (n *Engine) EnableDebug() {
 	n.debug = true
 }
 
+func (n *Engine) SetCallFuncCallback(callback func(caller *yakvm.Value, wavy bool, args []*yakvm.Value)) {
+	n.callFuncCallback = callback
+}
+
 func (e *Engine) SetSandboxMode(mode bool) { // sandbox mode call use defineFrame
 	e.sandboxMode = mode
 	e.vm.SetSandboxMode(mode)
@@ -420,7 +426,7 @@ func (n *Engine) EvalWithInline(ctx context.Context, code string, inline bool) e
 	}
 	n.vm.SetDebug(n.debug)
 	n.vm.SetDebugMode(n.debugMode, code, compiler.GetOpcodes(), n.debugInit, n.debugCallBack)
-
+	n.vm.SetCallFuncCallback(n.callFuncCallback)
 	// yakc缓存
 	codes, symtbl := compiler.GetOpcodes(), compiler.GetRootSymbolTable()
 	defer func() {

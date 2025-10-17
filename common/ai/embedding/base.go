@@ -3,7 +3,8 @@ package embedding
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
+	"net/url"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils"
@@ -33,12 +34,26 @@ type embeddingRequest struct {
 
 type embeddingItem struct {
 	Index     int         `json:"index"`
-	Embedding [][]float64 `json:"embedding"`
+	Embedding [][]float32 `json:"embedding"`
 }
 
 type embeddingResponse []embeddingItem
 
-func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float64, error) {
+// 错误响应结构体
+type errorResponse struct {
+	Error struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Type    string `json:"type"`
+	} `json:"error"`
+}
+
+// 预定义的错误类型
+var (
+	ErrInputTooLarge = utils.Error("input is too large")
+)
+
+func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float32, error) {
 	// Prepare the request
 	req := embeddingRequest{
 		Input:          text,
@@ -56,7 +71,10 @@ func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float64, error) {
 
 	var targetUrl string
 	if c.config.BaseURL != "" {
-		targetUrl = filepath.Join(c.config.BaseURL, "/embeddings")
+		targetUrl, err = url.JoinPath(c.config.BaseURL, "/embeddings")
+		if err != nil {
+			targetUrl = c.config.BaseURL + "/embeddings"
+		}
 	} else if c.config.Domain != "" {
 		if c.config.NoHttps {
 			targetUrl = fmt.Sprintf("http://%s/embeddings", c.config.Domain)
@@ -103,18 +121,27 @@ func (c *OpenaiEmbeddingClient) Embedding(text string) ([]float64, error) {
 	// Get response body
 	body := lowhttp.GetHTTPPacketBody(rspInst.RawPacket)
 
-	// Parse the response
+	// 首先尝试按正确响应解析
 	var response embeddingResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, utils.Errorf("unmarshal response failed: %v", err)
+	if err := json.Unmarshal(body, &response); err == nil && len(response) > 0 && len(response[0].Embedding) > 0 {
+		// 成功解析为正确响应
+		last := utils.GetLastElement(response[0].Embedding)
+		last = NormalizeVector(last, 2, 1e-6)
+		return last, nil
 	}
 
-	// Check if we have embeddings
-	if len(response) == 0 {
-		return nil, utils.Errorf("no embedding data returned")
+	// 如果正确响应解析失败，尝试解析错误响应
+	var errResp errorResponse
+	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
+		// 检查是否包含 "input is too large" 错误
+		if strings.Contains(strings.ToLower(errResp.Error.Message), "input is too large") {
+			return nil, ErrInputTooLarge
+		}
+		// 返回其他API错误
+		return nil, utils.Errorf("API error: %s (code: %d, type: %s)",
+			errResp.Error.Message, errResp.Error.Code, errResp.Error.Type)
 	}
-	if len(response[0].Embedding) == 0 {
-		return nil, utils.Errorf("no embedding data returned")
-	}
-	return response[0].Embedding[0], nil
+
+	// 如果两种格式都解析失败，返回通用错误
+	return nil, utils.Errorf("failed to parse response: %s", string(body))
 }

@@ -5,64 +5,51 @@ desc(
 	risk_type: "xpath-injection"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XPath注入漏洞发生在应用程序使用用户提供的数据构建XPath查询表达式时，未对输入进行适当的验证或转义。攻击者可以通过构造恶意的输入来修改XPath表达式的逻辑，从而控制应用程序对XML数据的查询行为。
-
+XPath注入漏洞发生在应用程序使用用户提供的数据构建XPath查询表达式时，未对输入进行适当的验证或转义。攻击者可以通过构造恶意的输入来修改XPath表达式的逻辑，从而控制应用程序对XML数据的查询行为。
 2. **触发场景**
-   在Java应用程序中，当使用`javax.xml.xpath.XPath`等API处理XML数据并通过字符串拼接的方式构建包含用户输入的XPath表达式时，就可能引入XPath注入漏洞。
-
-   // 存在漏洞的代码示例
-   ```java
-   String bookAuthor = request.getParameter("bookAuthor");
-   String expression = "/books/book[author='" + bookAuthor + "']"; // 用户输入直接拼接
-   XPathFactory xPathfactory = XPathFactory.newInstance();
-   XPath xpath = xPathfactory.newXPath();
-   XPathExpression compiledExpression = xpath.compile(expression);
-   NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
-   ```
-   攻击者可以输入 `' OR '1'='1` 来查询所有书籍，或者通过构造更复杂的表达式来遍历或提取未授权的XML数据。
-
+在Java应用程序中，当使用`javax.xml.xpath.XPath`等API处理XML数据并通过字符串拼接的方式构建包含用户输入的XPath表达式时，就可能引入XPath注入漏洞。
+// 存在漏洞的代码示例
+```java
+String bookAuthor = request.getParameter("bookAuthor");
+String expression = "/books/book[author='" + bookAuthor + "']"; // 用户输入直接拼接
+XPathFactory xPathfactory = XPathFactory.newInstance();
+XPath xpath = xPathfactory.newXPath();
+XPathExpression compiledExpression = xpath.compile(expression);
+NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
+```
+攻击者可以输入 `' OR '1'='1` 来查询所有书籍，或者通过构造更复杂的表达式来遍历或提取未授权的XML数据。
 3. **潜在影响**
-   - 泄露XML数据中的敏感信息，例如用户凭证、配置信息或业务数据。
-   - 未授权修改XML数据（如果应用程序逻辑支持）。
-   - 使应用程序处理非预期的XPath表达式，可能导致性能问题或拒绝服务。
-
+- 泄露XML数据中的敏感信息，例如用户凭证、配置信息或业务数据。
+- 未授权修改XML数据（如果应用程序逻辑支持）。
+- 使应用程序处理非预期的XPath表达式，可能导致性能问题或拒绝服务。
 DESC
 	rule_id: "9f04beb1-fc2d-40b3-b75f-9ea63e9a4338"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 参数化查询
 对于用户输入的数据，不建议直接拼接到XPath表达式中。尽可能使用参数化查询或绑定变量的方式来构建XPath表达式，将用户输入作为参数传递，而不是直接作为表达式的一部分。
-
 目前标准的Java XPath API (`javax.xml.xpath`) 没有直接的参数化查询机制。对于需要处理用户输入的场景，可以考虑以下替代方案：
-
 #### 2. 输入验证和过滤
 在将用户输入用于构建XPath表达式之前，对输入进行严格的验证和过滤。根据预期的输入类型和格式，只允许合法的字符、数字或其他白名单内容。
-
 ```java
 // 示例：简单过滤，仅允许字母和数字
 String bookAuthor = request.getParameter("bookAuthor");
 if (!bookAuthor.matches("^[a-zA-Z0-9 ]+$")) {
-    throw new IllegalArgumentException("Invalid author name");
+throw new IllegalArgumentException("Invalid author name");
 }
 String expression = "/books/book[author='" + bookAuthor + "']"; // 过滤后再拼接
 ```
-
 #### 3. 黑名单过滤
 过滤或转义在XPath语法中有特殊含义的字符，例如`'` (单引号)，`"` (双引号)，`/`，`[`, `]`, `@`, `*`, `|`, `and`, `or`等。这有助于防止攻击者注入恶意XPath语法。
-
 ```java
 // 示例：简单转义单引号
 String bookAuthor = request.getParameter("bookAuthor");
 String escapedAuthor = bookAuthor.replace("'", "''"); // 将单引号转义为两个单引号
 String expression = "/books/book[author='" + escapedAuthor + "']";
 ```
-
 #### 4. 使用安全的XML处理库
 考虑使用提供更高级别抽象和安全性特性的XML处理库，这些库可能内置了针对XPath注入的防护机制。
-
 #### 5. 限制XPath返回结果范围
 在可能的情况下，限制XPath表达式能访问的数据范围和类型，降低潜在攻击的影响。
 SOLUTION
@@ -83,69 +70,61 @@ $sink #{
 }->as $high;
 
 alert $high for {
-	title: "Check Java XPath Injection Vulnerability",
-	title_zh: "检测Java XPath注入漏洞",
-	solution: <<<CODE
+	title: "Java XPath Injection Vulnerability Was Detected",
+	title_zh: "检测到Java XPath注入漏洞",
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 参数化查询
 对于用户输入的数据，不建议直接拼接到XPath表达式中。尽可能使用参数化查询或绑定变量的方式来构建XPath表达式，将用户输入作为参数传递，而不是直接作为表达式的一部分。
-
 目前标准的Java XPath API (`javax.xml.xpath`) 没有直接的参数化查询机制。对于需要处理用户输入的场景，可以考虑以下替代方案：
-
 #### 2. 输入验证和过滤
 在将用户输入用于构建XPath表达式之前，对输入进行严格的验证和过滤。根据预期的输入类型和格式，只允许合法的字符、数字或其他白名单内容。
-
 ```java
 // 示例：简单过滤，仅允许字母和数字
 String bookAuthor = request.getParameter("bookAuthor");
 if (!bookAuthor.matches("^[a-zA-Z0-9 ]+$")) {
-    throw new IllegalArgumentException("Invalid author name");
+throw new IllegalArgumentException("Invalid author name");
 }
 String expression = "/books/book[author='" + bookAuthor + "']"; // 过滤后再拼接
 ```
-
 #### 3. 黑名单过滤
 过滤或转义在XPath语法中有特殊含义的字符，例如`'` (单引号)，`"` (双引号)，`/`，`[`, `]`, `@`, `*`, `|`, `and`, `or`等。这有助于防止攻击者注入恶意XPath语法。
-
 ```java
 // 示例：简单转义单引号
 String bookAuthor = request.getParameter("bookAuthor");
 String escapedAuthor = bookAuthor.replace("'", "''"); // 将单引号转义为两个单引号
 String expression = "/books/book[author='" + escapedAuthor + "']";
 ```
-
 #### 4. 使用安全的XML处理库
 考虑使用提供更高级别抽象和安全性特性的XML处理库，这些库可能内置了针对XPath注入的防护机制。
-
 #### 5. 限制XPath返回结果范围
 在可能的情况下，限制XPath表达式能访问的数据范围和类型，降低潜在攻击的影响。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-   XPath注入漏洞发生在应用程序使用用户提供的数据构建XPath查询表达式时，未对输入进行适当的验证或转义。攻击者可以通过构造恶意的输入来修改XPath表达式的逻辑，从而控制应用程序对XML数据的查询行为。
+XPath注入漏洞发生在应用程序使用用户提供的数据构建XPath查询表达式时，未对输入进行适当的验证或转义。攻击者可以通过构造恶意的输入来修改XPath表达式的逻辑，从而控制应用程序对XML数据的查询行为。
 2. **触发场景**
-   在Java应用程序中，当使用`javax.xml.xpath.XPath`等API处理XML数据并通过字符串拼接的方式构建包含用户输入的XPath表达式时，就可能引入XPath注入漏洞。
-
-   // 存在漏洞的代码示例
-   ```java
-   String bookAuthor = request.getParameter("bookAuthor");
-   String expression = "/books/book[author='" + bookAuthor + "']"; // 用户输入直接拼接
-   XPathFactory xPathfactory = XPathFactory.newInstance();
-   XPath xpath = xPathfactory.newXPath();
-   XPathExpression compiledExpression = xpath.compile(expression);
-   NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
-   ```
-   攻击者可以输入 `' OR '1'='1` 来查询所有书籍，或者通过构造更复杂的表达式来遍历或提取未授权的XML数据。
+在Java应用程序中，当使用`javax.xml.xpath.XPath`等API处理XML数据并通过字符串拼接的方式构建包含用户输入的XPath表达式时，就可能引入XPath注入漏洞。
+// 存在漏洞的代码示例
+```java
+String bookAuthor = request.getParameter("bookAuthor");
+String expression = "/books/book[author='" + bookAuthor + "']"; // 用户输入直接拼接
+XPathFactory xPathfactory = XPathFactory.newInstance();
+XPath xpath = xPathfactory.newXPath();
+XPathExpression compiledExpression = xpath.compile(expression);
+NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
+```
+攻击者可以输入 `' OR '1'='1` 来查询所有书籍，或者通过构造更复杂的表达式来遍历或提取未授权的XML数据。
 3. **潜在影响**
-   - 泄露XML数据中的敏感信息，例如用户凭证、配置信息或业务数据。
-   - 未授权修改XML数据（如果应用程序逻辑支持）。
-   - 使应用程序处理非预期的XPath表达式，可能导致性能问题或拒绝服务。
-CODE
+- 泄露XML数据中的敏感信息，例如用户凭证、配置信息或业务数据。
+- 未授权修改XML数据（如果应用程序逻辑支持）。
+- 使应用程序处理非预期的XPath表达式，可能导致性能问题或拒绝服务。
+DESC
 	level: "high",
-	message: "Find LDAP direct injection vulnerability",
+	message: "检测到Java XPath注入漏洞，并且从数据源（source）到污染汇聚点（sink）间，没有发现任何过滤函数信息。",
+	name: "high",
+	risk: "XPath注入",
 }
 
 
@@ -236,4 +215,107 @@ public class VulnerableXPathController {
     }
 }
 EOF
+	"safefile://SecureXPathSearchBooks.java": <<<CODE
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
+import java.io.InputStream;
+import org.springframework.core.io.ClassPathResource;
+import java.util.regex.Pattern;
+
+@RestController
+public class SecureXPathSearchBooks {
+
+    private static final Pattern SAFE_INPUT_PATTERN = Pattern.compile("^[a-zA-Z0-9 ]+$");
+
+    @GetMapping("/secureSearchBooks")
+    public String secureSearchBooks(@RequestParam String bookAuthor) throws Exception {
+        // 1. 输入验证和过滤：仅允许字母、数字和空格
+        if (!SAFE_INPUT_PATTERN.matcher(bookAuthor).matches()) {
+            // 记录日志并返回错误，避免直接暴露给用户具体的错误信息
+            System.err.println("Invalid book author input detected: " + bookAuthor);
+            return "Invalid input. Please provide a valid author name (alphanumeric and spaces only).";
+        }
+
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        // 建议禁用外部实体，防止XXE
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        InputStream inputStream = new ClassPathResource("books.xml").getInputStream();
+        Document document = builder.parse(inputStream);
+
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
+
+        // 2. 将单引号转义为两个单引号，防止单引号注入
+        String escapedAuthor = bookAuthor.replace("'", "''");
+
+        // 使用过滤后的安全输入构建XPath表达式
+        String expression = "/books/book[author='" + escapedAuthor + "']";
+        XPathExpression compiledExpression = xpath.compile(expression);
+
+        NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
+
+        StringBuilder result = new StringBuilder();
+        if (nodeList.getLength() == 0) {
+            result.append("No books found for author: ").append(bookAuthor);
+        } else {
+            for (int i = 0; i < nodeList.getLength(); i++) {
+                result.append(nodeList.item(i).getTextContent()).append("\n");
+            }
+        }
+        return result.toString();
+    }
+}
+
+CODE
+	"safefile://StaticXPathQuery.java": <<<CODE
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.xpath.XPath;
+import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPathExpression;
+import javax.xml.xpath.XPathFactory;
+
+// 这个示例展示了不接受任何用户输入的安全XPath查询
+public class StaticXPathQuery {
+
+    public static void main(String[] args) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        // 假设这里直接从文件加载一个已知的XML文档
+        Document document = builder.parse("src/main/resources/books.xml");
+
+        XPathFactory xPathfactory = XPathFactory.newInstance();
+        XPath xpath = xPathfactory.newXPath();
+
+        // XPath表达式是硬编码的，不包含任何用户输入
+        String expression = "/books/book[price > 50]";
+        XPathExpression compiledExpression = xpath.compile(expression);
+
+        NodeList nodeList = (NodeList) compiledExpression.evaluate(document, XPathConstants.NODESET);
+
+        System.out.println("Books with price > 50:");
+        for (int i = 0; i < nodeList.getLength(); i++) {
+            System.out.println(nodeList.item(i).getTextContent());
+        }
+    }
+}
+
+CODE
 )

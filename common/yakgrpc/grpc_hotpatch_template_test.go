@@ -204,6 +204,7 @@ func TestUploadHotPatchTemplateToOnline(t *testing.T) {
 
 func TestDownloadHotPatchTemplate(t *testing.T) {
 	mockey.PatchConvey("Test DownloadHotPatchTemplate", t, func() {
+		token := "test-token"
 		name := "test-template"
 		templateType := "test-type"
 		template := &yaklib.HotPatchTemplate{
@@ -211,9 +212,11 @@ func TestDownloadHotPatchTemplate(t *testing.T) {
 			Content:      "test-content",
 			TemplateType: templateType,
 		}
-		mockey.Mock((*yaklib.OnlineClient).DownloadHotPatchTemplate).To(func(name, templateType string) (*yaklib.HotPatchTemplate, error) {
-			assert.Equal(t, name, "test-template")
-			assert.Equal(t, templateType, "test-type")
+
+		mockey.Mock((*yaklib.OnlineClient).DownloadHotPatchTemplate).To(func(clientToken, clientName, clientTemplateType string) (*yaklib.HotPatchTemplate, error) {
+			assert.Equal(t, token, clientToken) // 验证传入的token
+			assert.Equal(t, name, clientName)
+			assert.Equal(t, templateType, clientTemplateType)
 			return template, nil
 		}).Build()
 
@@ -229,8 +232,9 @@ func TestDownloadHotPatchTemplate(t *testing.T) {
 		}
 
 		req := &ypb.DownloadHotPatchTemplateRequest{
-			Name: name,
-			Type: templateType,
+			Token: token, // 添加token到请求
+			Name:  name,
+			Type:  templateType,
 		}
 
 		resp, err := server.DownloadHotPatchTemplate(context.Background(), req)

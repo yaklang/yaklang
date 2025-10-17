@@ -1,94 +1,74 @@
 desc(
-	title: "Audit Golang Unfiltered File-or-Path Vulnerability in Beego"
-	title_zh: "审计Golang未过滤文件或路径漏洞（Beego框架）"
+	title: "Detect Golang Unfiltered File-or-Path Vulnerability"
+	title_zh: "检测Golang未过滤的文件或路径漏洞"
 	type: audit
 	severity: low
 	risk: "path-traversal"
 	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
-未过滤的文件或路径访问漏洞（Unfiltered File-or-Path）允许攻击者通过操纵输入参数来访问服务器上的任意文件。在Go语言应用中，如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
-
+未过滤的文件或路径访问漏洞允许攻击者通过操纵输入参数访问服务器上的任意文件。如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
 2. **触发场景**
-// 存在漏洞的代码示例
+这种漏洞通常发生在文件读取功能中，当应用未能限制用户输入的文件路径时，攻击者可以构造恶意请求来访问服务器上的任意文件。例如：
 ```go
-package main
-
-import (
-	"github.com/beego/beego/v2/server/web"
-	"io/ioutil"
-)
-
 func (c *PathTraversalVuln1Controller) Get() {
-	file := c.GetString("file")
-	output, err := ioutil.ReadFile(file)
-	if err != nil {
-		panic(err)
-	}
-	c.Ctx.ResponseWriter.Write(output)
+    file := c.GetString("file") // 用户可控输入
+    output, err := ioutil.ReadFile(file)
+    if err != nil {
+        panic(err)
+    }
+    c.Ctx.ResponseWriter.Write(output)
 }
 ```
-攻击者可以通过发送恶意请求（如`../../etc/passwd`）访问系统文件，进而获取敏感信息或破坏系统。
-
+攻击者可以通过路径遍历（如 `../../etc/passwd`）访问系统文件，进而获取敏感信息或破坏系统。
 3. **潜在影响**
-- 攻击者可能读取敏感文件（例如系统配置、密码文件等），导致数据泄露。
-- 如果与文件写入功能结合，还可能导致远程代码执行。
-- 系统完整性被破坏，增加进一步攻击的风险。
-
+- 攻击者可能读取服务器上的敏感文件，例如配置文件、私钥、数据库凭证等。
+- 可能导致更严重的后果，如远程代码执行或权限提升。
+- 系统完整性受到威胁，可能导致数据泄露或服务中断。
 DESC
 	rule_id: "74414f8f-e984-483c-bfb5-d8bea158ff3a"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 对用户输入的文件路径进行清洗和验证
 使用标准库中的`filepath.Clean`方法清理路径，去除多余的`..`和`.`。
 ```go
 import "path/filepath"
-
 func sanitizeFilePath(input string) string {
-	cleanedPath := filepath.Clean(input)
-	return cleanedPath
+    cleanedPath := filepath.Clean(input)
+    return cleanedPath
 }
 ```
-
 #### 2. 验证路径是否在安全范围内
 确保用户提供的路径位于预定义的安全目录内，避免越界访问。
 ```go
 import (
-	"path/filepath"
-	"strings"
+    "path/filepath"
+    "strings"
 )
-
 func isValidPath(baseDir, input string) bool {
-	resolvedPath := filepath.Clean(filepath.Join(baseDir, input))
-	return strings.HasPrefix(resolvedPath, baseDir)
+    resolvedPath := filepath.Clean(filepath.Join(baseDir, input))
+    return strings.HasPrefix(resolvedPath, baseDir)
 }
 ```
-
 #### 3. 使用白名单机制限制可访问的文件
 只允许访问特定目录下的固定文件名，禁止动态拼接路径。
 ```go
 var allowedFiles = map[string]bool{
-	"/safe/path/file1.txt": true,
-	"/safe/path/file2.txt": true,
+    "/safe/path/file1.txt": true,
+    "/safe/path/file2.txt": true,
 }
-
 func isFileAllowed(filePath string) bool {
-	return allowedFiles[filePath]
+    return allowedFiles[filePath]
 }
 ```
-
 #### 4. 日志记录与监控
 对所有文件访问操作添加日志记录，并设置异常行为报警。
 ```go
 import "log"
-
 func logFileAccess(filePath string) {
-	log.Printf("File accessed: %s", filePath)
+    log.Printf("File accessed: %s", filePath)
 }
 ```
-
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-73](https://cwe.mitre.org/data/definitions/73.html)
@@ -96,95 +76,89 @@ SOLUTION
 REFERENCE
 )
 
-<include('golang-file-read-sink')> as $sink;
-<include('golang-file-write-sink')> as $sink;
+<include('golang-file-read-path-sink')> as $sink;
+<include('golang-file-write-path-sink')> as $sink;
 
 .SaveToFile(* #-> as $sink)
 
-$sink?{have: "GetString"} as $low;
-$sink?{have: "GetFile"} as $low;
+$sink.GetString?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
+$sink.GetFile?{<fullTypeName>?{have: "github.com/beego/beego/v2/server/web"}} as $low;
 
 alert $low for {
-	solution: <<<CODE
+	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 验证和限制用户输入路径
 确保所有从用户接收的路径都经过严格的验证，防止路径遍历攻击。例如，可以使用以下方法：
 ```go
 import (
-	"path/filepath"
-	"strings"
+"path/filepath"
+"strings"
 )
-
 func validateFilePath(basePath, userPath string) (string, error) {
-	// 清洗路径，去除多余的 '..' 和 '.'
-	cleanPath := filepath.Clean(userPath)
-
-	// 检查是否在基础路径下
-	if !strings.HasPrefix(cleanPath, basePath) {
-		return "", fmt.Errorf("非法路径")
-	}
-	return cleanPath, nil
+// 清洗路径，去除多余的 '..' 和 '.'
+cleanPath := filepath.Clean(userPath)
+// 检查是否在基础路径下
+if !strings.HasPrefix(cleanPath, basePath) {
+return "", fmt.Errorf("非法路径")
+}
+return cleanPath, nil
 }
 ```
-
 #### 2. 使用预定义的安全路径
 避免直接使用用户输入的路径，而是通过组合预定义的安全路径与用户输入来生成最终路径。
 ```go
 func getSafeFilePath(userInput string) (string, error) {
-	safeBasePath := "/var/www/safe/"
-	finalPath := filepath.Join(safeBasePath, userInput)
-	return finalPath, nil
+safeBasePath := "/var/www/safe/"
+finalPath := filepath.Join(safeBasePath, userInput)
+return finalPath, nil
 }
 ```
-
 #### 3. 利用框架内置防护机制
 对于使用Beego等框架的应用，应利用其提供的安全组件（如 `GetString` 方法结合路径验证逻辑）来进一步增强安全性。
 ```go
 file := c.GetString("file")
 if !isValidPath(file) {
-	c.Abort("403")
+c.Abort("403")
 }
 ```
-
 #### 4. 日志记录与监控
 对涉及文件操作的行为进行日志记录，并设置实时监控机制，以便快速响应潜在的攻击行为。
-CODE
-	desc: <<<CODE
+SOLUTION
+	desc: <<<DESC
 ### 漏洞描述
-
 1. **漏洞原理**
 未过滤的文件或路径访问漏洞允许攻击者通过操纵输入参数访问服务器上的任意文件。如果开发者未能正确验证或过滤用户输入的文件路径，攻击者可能会利用此漏洞读取敏感文件（如配置文件、数据库凭证等），甚至执行任意代码。
-
 2. **触发场景**
 这种漏洞通常发生在文件读取功能中，当应用未能限制用户输入的文件路径时，攻击者可以构造恶意请求来访问服务器上的任意文件。例如：
 ```go
 func (c *PathTraversalVuln1Controller) Get() {
-	file := c.GetString("file") // 用户可控输入
-	output, err := ioutil.ReadFile(file)
-	if err != nil {
-		panic(err)
-	}
-	c.Ctx.ResponseWriter.Write(output)
+file := c.GetString("file") // 用户可控输入
+output, err := ioutil.ReadFile(file)
+if err != nil {
+panic(err)
+}
+c.Ctx.ResponseWriter.Write(output)
 }
 ```
 攻击者可以通过路径遍历（如 `../../etc/passwd`）访问系统文件，进而获取敏感信息或破坏系统。
-
 3. **潜在影响**
 - 攻击者可能读取服务器上的敏感文件，例如配置文件、私钥、数据库凭证等。
 - 可能导致更严重的后果，如远程代码执行或权限提升。
 - 系统完整性受到威胁，可能导致数据泄露或服务中断。
-CODE
+DESC
 	level: "low",
 	type: "vuln",
 	title: "Detect Golang Unfiltered File-or-Path Vulnerability",
 	title_zh: "检测Golang未过滤的文件或路径漏洞",
+	name: "low",
+	message: "检测到Golang未过滤的文件或路径漏洞，并且从数据源（source）到污染汇聚点（sink）间可能存在过滤函数，需进一步审计进行确认。",
+	risk: "路径遍历",
 }
 
 desc(
 	lang: golang
 	alert_low: 1
-	'unsafe://main.go': <<<UNSAFE
+	'file://unsafe.go': <<<UNSAFE
 package main
 
 import (
@@ -196,6 +170,10 @@ import (
 	beego "github.com/beego/beego/v2/server/web"
 )
 
+type PathTraversalVuln1Controller struct {
+	beego.Controller
+}
+
 func (c *PathTraversalVuln1Controller) Get() {
 	file := c.GetString("file")
 	output, err := ioutil.ReadFile(file)
@@ -205,5 +183,30 @@ func (c *PathTraversalVuln1Controller) Get() {
 	c.Ctx.ResponseWriter.Write(output)
 }
 UNSAFE
+	'safefile://safe.go': <<<SAFE
+package main
+
+import (
+	"go-sec-code/utils"
+	"io/ioutil"
+	"path/filepath"
+	"strings"
+
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type PathTraversalVuln1Controller struct {
+	beego.Controller
+}
+
+func (c *PathTraversalVuln1Controller) Get() {
+	file := "file"
+	output, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic(err)
+	}
+	c.Ctx.ResponseWriter.Write(output)
+}
+SAFE
 )
 

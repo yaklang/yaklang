@@ -1,9 +1,12 @@
 package base
 
 import (
+	"math/rand"
 	"net/http"
+	"net/url"
+	"time"
 
-	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -13,9 +16,26 @@ type BaseSpaceEngineConfig struct {
 	UserIdentifier string `app:"name:user_identifier,verbose:用户信息,desc:email / username,id:2"`
 	Domain         string `app:"name:domain,verbose:域名,desc:域名,id:3"`
 }
+
+// QueryConfig 查询配置
+type QueryConfig struct {
+	RandomDelayRange int // 随机延迟范围（秒），0 表示无延迟
+	RetryTimes       int // 重试次数，0 表示不重试
+}
+
+// ApplyRandomDelay 应用随机延迟
+func ApplyRandomDelay(delayRange int) {
+	if delayRange > 0 {
+		// 生成 1 到 delayRange 秒之间的随机延迟
+		delay := rand.Intn(delayRange) + 1
+		log.Infof("应用随机延迟: %d 秒", delay)
+		time.Sleep(time.Duration(delay) * time.Second)
+	}
+}
+
 type BaseSpaceEngineClient struct {
 	Key     string
-	APIHost string
+	BaseUrl string
 }
 
 type SpaceEngineResponse struct {
@@ -29,12 +49,12 @@ type SpaceEngineResponse struct {
 func NewBaseSpaceEngineClient(key string, host string) *BaseSpaceEngineClient {
 	return &BaseSpaceEngineClient{
 		Key:     key,
-		APIHost: lowhttp.FixURLScheme(host),
+		BaseUrl: lowhttp.FixURLScheme(host),
 	}
 }
 
 func (c *BaseSpaceEngineClient) Do(method, path string, opts ...poc.PocConfigOption) (*SpaceEngineResponse, error) {
-	urlStr, err := utils.UrlJoin(c.APIHost, path)
+	urlStr, err := url.JoinPath(c.BaseUrl, path)
 	if err != nil {
 		return nil, err
 	}

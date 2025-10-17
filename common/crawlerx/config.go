@@ -5,12 +5,14 @@ package crawlerx
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/yaklang/yaklang/common/crawlerx/tools"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"net/url"
 	"regexp"
+	"strings"
 )
 
 type Config struct {
@@ -65,6 +67,10 @@ type BaseConfig struct {
 
 	aiInputUrl  string
 	aiInputInfo string
+
+	login    bool
+	username string
+	password string
 }
 
 type BrowserConfig struct {
@@ -260,7 +266,7 @@ func WithBlackList(keywords ...string) ConfigOpt {
 			if keyword == "" {
 				continue
 			}
-			regKeyword, err := regexp.Compile(keyword)
+			regKeyword, err := regexp.Compile(fmt.Sprintf("(?i)%s", keyword))
 			if err != nil {
 				log.Errorf("blacklist keyword %s compile error: %s", keyword, err)
 				continue
@@ -286,7 +292,7 @@ func WithWhiteList(keywords ...string) ConfigOpt {
 			if keyword == "" {
 				continue
 			}
-			regKeyword, err := regexp.Compile(keyword)
+			regKeyword, err := regexp.Compile(fmt.Sprintf("(?i)%s", keyword))
 			if err != nil {
 				log.Errorf("whitelist keyword %s compile error: %s", keyword, err)
 				continue
@@ -539,7 +545,9 @@ func WithIgnoreQueryName(names ...string) ConfigOpt {
 // ```
 func WithSensitiveWords(words []string) ConfigOpt {
 	return func(config *Config) {
-		config.baseConfig.sensitiveWords = append(config.baseConfig.sensitiveWords, words...)
+		for _, word := range words {
+			config.baseConfig.sensitiveWords = append(config.baseConfig.sensitiveWords, strings.ToLower(word))
+		}
 	}
 }
 
@@ -698,5 +706,19 @@ func WithAIInputUrl(url string) ConfigOpt {
 func WithAIInputInf(info string) ConfigOpt {
 	return func(config *Config) {
 		config.baseConfig.aiInputInfo = info
+	}
+}
+
+func WithLoginUsername(username string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.login = true
+		config.baseConfig.username = username
+	}
+}
+
+func WithLoginPassword(password string) ConfigOpt {
+	return func(config *Config) {
+		config.baseConfig.login = true
+		config.baseConfig.password = password
 	}
 }

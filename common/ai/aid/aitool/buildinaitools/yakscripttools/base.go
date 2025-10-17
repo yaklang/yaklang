@@ -4,7 +4,9 @@ import (
 	"embed"
 	"encoding/json"
 	"io/fs"
+	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -36,9 +38,17 @@ func init() {
 				yakit.Set(key, hash)
 			}()
 		}
+
+		if result, ok := os.LookupEnv("SKIP_SYNC_BUILD_IN_AI_TOOL"); ok {
+			r, _ := strconv.ParseBool(result)
+			if r {
+				return nil
+			}
+		}
+
 		OverrideYakScriptAiTools()
 		return nil
-	})
+	}, "sync-ai-tool")
 }
 
 func BuildInAIToolHash() (string, error) {
@@ -52,7 +62,7 @@ func OverrideYakScriptAiTools() {
 		db := consts.GetGormProfileDatabase()
 		aiTools := loadAllYakScriptFromEmbedFS()
 		for _, aiTool := range aiTools {
-			schema.SaveAIYakTool(db, aiTool)
+			yakit.SaveAIYakTool(db, aiTool)
 		}
 	})
 }
@@ -73,7 +83,7 @@ func loadAllYakScriptFromEmbedFS() []*schema.AIYakTool {
 		if err != nil {
 			return nil
 		}
-		aiTool := loadYakScriptToAiTools(toolname, string(content))
+		aiTool := LoadYakScriptToAiTools(toolname, string(content))
 		if aiTool == nil {
 			return nil
 		}
@@ -92,8 +102,8 @@ func loadAllYakScriptFromEmbedFS() []*schema.AIYakTool {
 	return aiTools
 }
 
-func loadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
-	metadata, err := metadata.ParseYakScriptMetadata(name, string(content))
+func LoadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
+	ins, err := metadata.ParseYakScriptMetadata(name, string(content))
 	if err != nil {
 		log.Warnf("parse yak script metadata failed: %v", err)
 		return nil
@@ -107,8 +117,9 @@ func loadYakScriptToAiTools(name string, content string) *schema.AIYakTool {
 	params, _ := json.Marshal(tool.InputSchema.ToMap())
 	return &schema.AIYakTool{
 		Name:        name,
-		Description: metadata.Description,
-		Keywords:    strings.Join(metadata.Keywords, ","),
+		VerboseName: ins.VerboseName,
+		Description: ins.Description,
+		Keywords:    strings.Join(ins.Keywords, ","),
 		Content:     string(content),
 		Params:      string(params),
 	}
@@ -129,7 +140,7 @@ func covertTools(tools []*schema.AIYakTool) []*aitool.Tool {
 
 func GetAllYakScriptAiTools() []*aitool.Tool {
 	db := consts.GetGormProfileDatabase()
-	allAiTools, err := schema.SearchAIYakTool(db, "")
+	allAiTools, err := yakit.SearchAIYakTool(db, "")
 	if err != nil {
 		log.Errorf("search ai yak tool failed: %v", err)
 		return nil
@@ -141,7 +152,7 @@ func GetYakScriptAiTools(names ...string) []*aitool.Tool {
 	tools := []*schema.AIYakTool{}
 	toolsNameMap := map[string]struct{}{}
 	for _, name := range names {
-		dbAiTools, err := schema.SearchAIYakToolByPath(db, name)
+		dbAiTools, err := yakit.SearchAIYakToolByPath(db, name)
 		if err != nil {
 			log.Errorf("search ai yak tool failed: %v", err)
 			continue

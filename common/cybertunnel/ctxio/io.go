@@ -194,9 +194,13 @@ func (cc *ctxConn) Read(buf []byte) (int, error) {
 	c := make(chan ioret, 1)
 
 	go func() {
+		defer close(c)
+
 		n, err := cc.Conn.Read(buf2)
-		c <- ioret{n, err}
-		close(c)
+		select {
+		case c <- ioret{n, err}:
+		case <-cc.ctx.Done():
+		}
 	}()
 
 	select {

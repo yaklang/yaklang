@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
+	"sort"
 	"strconv"
 	"strings"
 	"unicode"
@@ -14,38 +16,138 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakvm"
 )
 
+var (
+	BoolKind       = "bool"
+	IntKind        = "int"
+	Int8Kind       = []string{"int8", "int"}
+	Int16Kind      = []string{"int16", "int"}
+	Int32Kind      = []string{"int32", "int"}
+	Int64Kind      = []string{"int64", "int"}
+	UintKind       = "uint"
+	Uint8Kind      = []string{"uint8", "byte"}
+	Uint16Kind     = []string{"uint16", "uint"}
+	Uint32Kind     = []string{"uint32", "uint"}
+	Uint64Kind     = []string{"uint64", "uint"}
+	UintptrKind    = "uintptr"
+	Float32Kind    = []string{"float32", "float"}
+	Float64Kind    = []string{"float64", "float"}
+	Complex64Kind  = "complex64"
+	Complex128Kind = "complex128"
+	ArrayKind      = []string{"array"}
+	SliceKind      = []string{"slice", "array"}
+	ChanKind       = "chan"
+	FuncKind       = []string{"func", "function"}
+	InterfaceKind  = []string{"interface", "any"}
+	MapKind        = []string{"map", "dict", "dictionary"}
+	StringKind     = "string"
+	StructKind     = "struct"
+	PointerKind    = []string{"unsafePointer", "pointer"}
+)
+
+func typeofEQ(value *yakvm.Value, value2 *yakvm.Value) (ok bool, ret bool) {
+	var refKindToYakKind func(typ reflect.Type) (kinds []string)
+	refKindToYakKind = func(typ reflect.Type) (kinds []string) {
+		kind := typ.Kind()
+		switch kind {
+		case reflect.Bool:
+			kinds = append(kinds, BoolKind)
+		case reflect.Int:
+			kinds = append(kinds, IntKind)
+		case reflect.Int8:
+			kinds = append(kinds, Int8Kind...)
+		case reflect.Int16:
+			kinds = append(kinds, Int16Kind...)
+		case reflect.Int32:
+			kinds = append(kinds, Int32Kind...)
+		case reflect.Int64:
+			kinds = append(kinds, Int64Kind...)
+		case reflect.Uint:
+			kinds = append(kinds, UintKind)
+		case reflect.Uint8:
+			kinds = append(kinds, Uint8Kind...)
+		case reflect.Uint16:
+			kinds = append(kinds, Uint16Kind...)
+		case reflect.Uint32:
+			kinds = append(kinds, Uint32Kind...)
+		case reflect.Uint64:
+			kinds = append(kinds, Uint64Kind...)
+		case reflect.Uintptr:
+			kinds = append(kinds, UintptrKind)
+		case reflect.Float32:
+			kinds = append(kinds, Float32Kind...)
+		case reflect.Float64:
+			kinds = append(kinds, Float64Kind...)
+		case reflect.Complex64:
+			kinds = append(kinds, Complex64Kind)
+		case reflect.Complex128:
+			kinds = append(kinds, Complex128Kind)
+		case reflect.Chan:
+			kinds = append(kinds, ChanKind)
+		case reflect.Func:
+			kinds = append(kinds, FuncKind...)
+		case reflect.Interface:
+			kinds = append(kinds, InterfaceKind...)
+		case reflect.Map:
+			kinds = append(kinds, MapKind...)
+			keyType := typ.Key()
+			valueType := typ.Elem()
+			keyYakKinds := refKindToYakKind(keyType)
+			valueYakKinds := refKindToYakKind(valueType)
+			for _, kindStr := range MapKind {
+				for _, keyYakKind := range keyYakKinds {
+					for _, valueYakKind := range valueYakKinds {
+						kinds = append(kinds, kindStr+"["+keyYakKind+"]"+valueYakKind)
+					}
+				}
+			}
+		case reflect.Pointer, reflect.UnsafePointer:
+			kinds = append(kinds, PointerKind...)
+		case reflect.Slice:
+			kinds = append(kinds, SliceKind...)
+			elemType := typ.Elem()
+			elemYakKinds := refKindToYakKind(elemType)
+			for _, elemYakKind := range elemYakKinds {
+				kinds = append(kinds, "[]"+elemYakKind)
+			}
+		case reflect.Array:
+			kinds = append(kinds, ArrayKind...)
+			elemType := typ.Elem()
+			elemYakKinds := refKindToYakKind(elemType)
+			for _, elemYakKind := range elemYakKinds {
+				kinds = append(kinds, "[]"+elemYakKind)
+			}
+		case reflect.String:
+			kinds = append(kinds, StringKind)
+		case reflect.Struct:
+			kinds = append(kinds, StructKind)
+		}
+		sort.Strings(kinds)
+		return kinds
+	}
+	if val, ok := value.Value.(reflect.Type); ok {
+		if value2.IsString() {
+			kinds := refKindToYakKind(val)
+			return true, slices.Contains(kinds, value2.String())
+		}
+		if val2, ok := value2.Value.(reflect.Type); ok {
+			val1Kinds := refKindToYakKind(val)
+			val2Kinds := refKindToYakKind(val2)
+			return true, strings.Join(val1Kinds, ",") == strings.Join(val2Kinds, ",")
+		}
+	}
+	if val, ok := value2.Value.(reflect.Type); ok {
+		if value.IsString() {
+			kinds := refKindToYakKind(val)
+			return true, slices.Contains(kinds, value.String())
+		}
+	}
+	return false, false
+}
+
 func _eq(value *yakvm.Value, value2 *yakvm.Value) *yakvm.Value {
-	// if value.IsInt() && value2.IsInt() {
-	// 	return yakvm.NewBoolValue(value.Int() == value2.Int())
-	// }
-
-	// if value.IsFloat() && value2.IsFloat() {
-	// 	return yakvm.NewBoolValue(value.Float64() == value2.Float64())
-	// }
-
-	// if value.IsFloat() && value2.IsInt() {
-	// 	return yakvm.NewBoolValue(value.Float64() == value2.Float64())
-	// }
-
-	// if value2.IsFloat() && value.IsInt() {
-	// 	return yakvm.NewBoolValue(value.Float64() == value2.Float64())
-	// }
-
-	// if value2.IsBool() && value2.IsBool() {
-	// 	return yakvm.NewBoolValue(value.True() == value2.True())
-	// }
-
-	// if value2.IsBytes() || value.IsBytes() {
-	// 	// 如果任意一个是 bytes 的话，都转为 string 进行比较
-	// 	return yakvm.NewBoolValue(value.String() == value2.String())
-	// }
-
-	// // 如果任意又一个值为 undefined 的话
-	// if value.IsUndefined() || value2.IsUndefined() {
-	// 	return yakvm.NewBoolValue(value.False() == value2.False())
-	// }
-
-	// return yakvm.NewBoolValue(funk.Equal(value.Value, value2.Value))
+	if ok, ret := typeofEQ(value, value2); ok {
+		return yakvm.NewBoolValue(ret)
+	}
 	return yakvm.NewBoolValue(value.Equal(value2))
 }
 

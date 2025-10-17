@@ -1,0 +1,385 @@
+desc(
+	title: "Check C Information Exposure Vulnerability"
+	type: audit
+	severity: medium
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   信息泄露漏洞是指应用程序无意中向未授权用户暴露敏感信息。在C语言中，这类漏洞通常发生在错误处理、调试信息输出、日志记录或直接输出用户输入时。攻击者可以利用这些泄露的信息来了解系统架构、获取敏感数据或为进一步攻击做准备。常见的敏感信息包括系统路径、数据库结构、用户数据、配置信息等。
+
+2. **触发场景**
+   ```c
+   #include <stdio.h>
+   #include <string.h>
+   #include <errno.h>
+   #include <mysql/mysql.h>
+   
+   void vulnerable_error_handling(const char *filename) {
+       FILE *file = fopen(filename, "r");
+       if (!file) {
+           // 直接暴露系统错误信息和文件路径
+           printf("Error: Cannot open file %s: %s\n", filename, strerror(errno));
+           printf("Full path attempted: /home/user/sensitive/%s\n", filename);
+       }
+   }
+   
+   void vulnerable_debug_info(const char *user_id) {
+       // 输出敏感的调试信息
+       printf("Debug: Processing user ID %s\n", user_id);
+       printf("Debug: Database connection string: mysql://user:pass@localhost/db\n");
+       printf("Debug: Current working directory: %s\n", getcwd(NULL, 0));
+   }
+   
+   void vulnerable_sql_error() {
+       MYSQL *conn = mysql_init(NULL);
+       if (mysql_query(conn, "SELECT * FROM users") != 0) {
+           // 直接输出SQL错误，可能暴露数据库结构
+           printf("SQL Error: %s\n", mysql_error(conn));
+       }
+   }
+   ```
+
+3. **潜在影响**
+   - **系统信息泄露**: 暴露文件路径、系统配置、软件版本等信息。
+   - **数据库结构泄露**: 通过错误信息暴露表名、字段名等数据库结构。
+   - **用户敏感数据泄露**: 直接输出用户输入或处理过程中的敏感数据。
+   - **为进一步攻击提供信息**: 攻击者利用泄露的信息制定针对性攻击策略。
+DESC
+	rule_id: "a7f9c2e1-3b8d-4f6e-9c2a-1e5f8d3b7c9a"
+	title_zh: "检测C语言信息泄露漏洞"
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 安全的错误处理
+避免在错误信息中暴露敏感的系统信息。
+```c
+#include <stdio.h>
+#include <errno.h>
+
+void safe_error_handling(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        // 只提供必要的错误信息，不暴露系统详细信息
+        fprintf(stderr, "Error: File operation failed\n");
+        // 将详细错误信息记录到安全的日志文件中
+        log_error("File open failed: %s, errno: %d", filename, errno);
+    }
+}
+```
+
+#### 2. 过滤调试信息
+在生产环境中禁用调试信息输出。
+```c
+#ifdef DEBUG
+    #define DEBUG_PRINT(fmt, ...) printf("Debug: " fmt, ##__VA_ARGS__)
+#else
+    #define DEBUG_PRINT(fmt, ...) // 生产环境中不输出调试信息
+#endif
+
+void safe_debug_info(const char *user_id) {
+    DEBUG_PRINT("Processing user request\n"); // 不包含敏感信息
+    // 敏感信息只记录到安全日志
+    secure_log("User ID processed: %s", user_id);
+}
+```
+
+#### 3. 安全的数据库错误处理
+避免直接输出数据库错误信息。
+```c
+void safe_sql_error() {
+    MYSQL *conn = mysql_init(NULL);
+    if (mysql_query(conn, "SELECT * FROM users") != 0) {
+        // 不直接输出SQL错误信息
+        fprintf(stderr, "Database operation failed\n");
+        // 将详细错误记录到安全日志
+        secure_log("SQL Error: %s", mysql_error(conn));
+    }
+}
+```
+
+#### 4. 输入输出过滤
+对用户输入和输出进行适当过滤。
+```c
+void safe_user_input_handling(const char *user_input) {
+    // 验证和清理用户输入
+    if (is_safe_input(user_input)) {
+        // 只输出安全的、经过过滤的信息
+        printf("Request processed successfully\n");
+    } else {
+        printf("Invalid input format\n");
+    }
+}
+
+int is_safe_input(const char *input) {
+    // 实现输入验证逻辑
+    if (!input || strlen(input) > MAX_INPUT_LENGTH) {
+        return 0;
+    }
+    // 检查是否包含敏感字符
+    return 1;
+}
+```
+
+#### 5. 日志安全管理
+建立安全的日志记录机制。
+```c
+void secure_log(const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    
+    // 写入到受保护的日志文件
+    FILE *log_file = fopen("/var/log/secure/app.log", "a");
+    if (log_file) {
+        vfprintf(log_file, format, args);
+        fclose(log_file);
+    }
+    
+    va_end(args);
+}
+```
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-200: Exposure of Sensitive Information to an Unauthorized Actor](https://cwe.mitre.org/data/definitions/200.html)
+[OWASP Information Exposure](https://owasp.org/www-community/vulnerabilities/Information_exposure)
+REFERENCE
+)
+
+<include('c-user-input')> as $user_input;
+
+printf(*<slice(index=1)> as $output_sink);
+fprintf(*<slice(index=2)> as $output_sink);
+puts(* as $output_sink);
+fputs(*<slice(index=1)> as $output_sink);
+
+perror(* as $error_sink);
+strerror() as $error_info;
+
+getcwd() as $system_info;
+getenv() as $system_info;
+mysql_error() as $db_error;
+sqlite3_errmsg() as $db_error;
+
+$user_input?{* #{ until: `* & $output_sink`}-> } as $medium
+$system_info?{* #{ until: `* & $output_sink`}-> } as $medium
+$error_info?{* #{ until: `* & $output_sink`}-> } as $medium
+$db_error?{* #{ until: `* & $output_sink`}-> } as $medium
+alert $medium for {
+	level: "medium",
+	type: "vuln",
+	title: "C Information Exposure Vulnerability Was Detected",
+	title_zh: "检测到C语言信息泄露漏洞",
+	desc: <<<DESC
+### 漏洞描述
+
+1. **漏洞原理**
+   信息泄露漏洞是由于应用程序无意中向未授权用户暴露敏感信息。这可能包括系统错误信息、调试信息、数据库错误、文件路径等敏感数据。
+
+2. **触发场景**
+   检测到以下可能导致信息泄露的情况：
+   - 用户输入被直接输出到标准输出或错误输出
+   - 系统错误信息被直接输出给用户
+   - 数据库错误信息被直接暴露
+   - 系统路径或环境信息被直接输出
+
+   ```c
+   // 危险示例
+   printf("Error: Cannot open file %s: %s\n", filename, strerror(errno));
+   printf("Debug info: %s\n", user_input);
+   printf("Database error: %s\n", mysql_error(conn));
+   ```
+
+3. **潜在影响**
+   - 暴露系统内部结构和配置信息
+   - 泄露用户敏感数据
+   - 为攻击者提供进一步攻击的信息
+   - 违反数据保护和隐私法规
+DESC
+	message: "检测到C语言代码中可能存在信息泄露风险，敏感信息被直接输出",
+	solution: <<<SOLUTION
+### 修复建议
+
+#### 1. 安全的错误处理
+```c
+// 不要直接输出系统错误信息
+FILE *file = fopen(filename, "r");
+if (!file) {
+    fprintf(stderr, "File operation failed\n"); // 通用错误信息
+    // 详细错误记录到日志
+    log_error("fopen failed for %s: %s", filename, strerror(errno));
+}
+```
+
+#### 2. 过滤用户输入输出
+```c
+void safe_output(const char *user_input) {
+    // 验证和清理输入
+    if (is_safe_for_output(user_input)) {
+        printf("Processed: %s\n", sanitize_output(user_input));
+    } else {
+        printf("Invalid input\n");
+    }
+}
+```
+
+#### 3. 禁用生产环境调试信息
+```c
+#ifdef DEBUG
+    #define DEBUG_PRINT(fmt, ...) printf("Debug: " fmt, ##__VA_ARGS__)
+#else
+    #define DEBUG_PRINT(fmt, ...) // 生产环境禁用
+#endif
+```
+
+#### 4. 安全的数据库错误处理
+```c
+if (mysql_query(conn, query) != 0) {
+    fprintf(stderr, "Database operation failed\n");
+    // 详细错误记录到安全日志
+    secure_log("SQL error: %s", mysql_error(conn));
+}
+```
+SOLUTION
+	risk: "信息泄露",
+	name: "medium",
+}
+
+desc(
+	lang: c
+	alert_medium: 1
+	'file://unsafe_info_exposure.c': <<<UNSAFE
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <mysql/mysql.h>
+
+void vulnerable_file_error(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        // 直接暴露文件路径和系统错误
+        printf("Error: Cannot open file %s: %s\n", filename, strerror(errno));
+        printf("Current directory: %s\n", getcwd(NULL, 0));
+    }
+}
+
+void vulnerable_user_echo(const char *user_input) {
+    // 直接输出用户输入，可能包含敏感信息
+    printf("You entered: %s\n", user_input);
+    printf("Processing input: %s\n", user_input);
+}
+
+void vulnerable_database_error() {
+    MYSQL *conn = mysql_init(NULL);
+    if (mysql_real_connect(conn, "localhost", "user", "pass", "db", 0, NULL, 0) == NULL) {
+        // 暴露数据库连接错误信息
+        printf("Database connection failed: %s\n", mysql_error(conn));
+    }
+    
+    if (mysql_query(conn, "SELECT * FROM secret_table") != 0) {
+        // 暴露SQL错误和表结构信息
+        printf("Query failed: %s\n", mysql_error(conn));
+    }
+}
+
+void vulnerable_environment_info() {
+    // 暴露环境变量信息
+    char *path = getenv("PATH");
+    char *home = getenv("HOME");
+    printf("System PATH: %s\n", path);
+    printf("User HOME: %s\n", home);
+}
+
+int main(int argc, char **argv) {
+    if (argc > 1) {
+        vulnerable_file_error(argv[1]);
+        vulnerable_user_echo(argv[1]);
+    }
+    
+    vulnerable_database_error();
+    vulnerable_environment_info();
+    
+    return 0;
+}
+UNSAFE
+	'safefile://safe_info_exposure.c': <<<SAFE
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <unistd.h>
+#include <mysql/mysql.h>
+#include <syslog.h>
+
+// 安全日志函数
+void secure_log(int priority, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    vsyslog(priority, format, args);
+    va_end(args);
+}
+
+void safe_file_error(const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        // 只输出通用错误信息
+        fprintf(stderr, "File operation failed\n");
+        // 详细错误记录到系统日志
+        secure_log(LOG_ERR, "fopen failed for %s: %s", filename, strerror(errno));
+    }
+}
+
+int is_safe_input(const char *input) {
+    if (!input || strlen(input) > 100) return 0;
+    // 检查是否包含控制字符或危险字符
+    for (int i = 0; input[i]; i++) {
+        if (input[i] < 32 || input[i] > 126) return 0;
+    }
+    return 1;
+}
+
+void safe_user_echo(const char *user_input) {
+    if (is_safe_input(user_input)) {
+        printf("Input received and processed\n");
+        // 敏感信息记录到安全日志
+        secure_log(LOG_INFO, "User input processed: %.20s...", user_input);
+    } else {
+        printf("Invalid input format\n");
+    }
+}
+
+void safe_database_error() {
+    MYSQL *conn = mysql_init(NULL);
+    if (mysql_real_connect(conn, "localhost", "user", "pass", "db", 0, NULL, 0) == NULL) {
+        // 不暴露具体的数据库错误信息
+        fprintf(stderr, "Database connection failed\n");
+        secure_log(LOG_ERR, "MySQL connection error: %s", mysql_error(conn));
+    }
+    
+    if (mysql_query(conn, "SELECT * FROM users") != 0) {
+        fprintf(stderr, "Database query failed\n");
+        secure_log(LOG_ERR, "MySQL query error: %s", mysql_error(conn));
+    }
+}
+
+void safe_environment_info() {
+    // 不直接输出环境变量，只记录到安全日志
+    printf("System information logged\n");
+    secure_log(LOG_INFO, "System environment accessed");
+}
+
+int main(int argc, char **argv) {
+    openlog("myapp", LOG_PID, LOG_USER);
+    
+    if (argc > 1) {
+        safe_file_error(argv[1]);
+        safe_user_echo(argv[1]);
+    }
+    
+    safe_database_error();
+    safe_environment_info();
+    
+    closelog();
+    return 0;
+}
+SAFE
+)

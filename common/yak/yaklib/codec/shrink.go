@@ -10,6 +10,14 @@ func ShrinkStringDefault(r any) string {
 }
 
 func ShrinkString(r any, size int) string {
+	return shrinkStringWithMultiLine(r, size, false)
+}
+
+func ShrinkTextBlock(r any, size int) string {
+	return shrinkStringWithMultiLine(r, size, true)
+}
+
+func shrinkStringWithMultiLine(r any, size int, multiline bool) string {
 	if size <= 6 {
 		size = 10
 	}
@@ -23,12 +31,14 @@ func ShrinkString(r any, size int) string {
 		runes = append(runes[:half], append([]rune("..."), runes[len(runes)-half:]...)...)
 		verbose = string(runes)
 	}
-	verbose = strconv.Quote(verbose)
-	verbose = verbose[1:]
-	verbose = verbose[:len(verbose)-1]
-	verbose = strings.ReplaceAll(verbose, `\r`, " ")
-	verbose = strings.ReplaceAll(verbose, `\n`, " ")
-	verbose = strings.ReplaceAll(verbose, `\t`, " ")
-	verbose = strings.ReplaceAll(verbose, `\"`, "\"")
+	if !multiline {
+		verbose = strconv.Quote(verbose)
+		verbose = verbose[1:]
+		verbose = verbose[:len(verbose)-1]
+		verbose = strings.ReplaceAll(verbose, `\r`, " ")
+		verbose = strings.ReplaceAll(verbose, `\n`, " ")
+		verbose = strings.ReplaceAll(verbose, `\t`, " ")
+		verbose = strings.ReplaceAll(verbose, `\"`, "\"")
+	}
 	return verbose
 }

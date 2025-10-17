@@ -6,13 +6,9 @@ desc(
 	desc: <<<DESC
 ### 漏洞描述
 1. **漏洞原理**
-SQL注入是由于应用程序将用户提供的、未经充分过滤或转义的数据直接拼接到SQL查询字符串中，攻击者可以通过构造恶意输入来改变查询的逻辑，甚至执行非预期的数据库命令。
-
-本文中的规则侧重于识别`StringBuilder`或`StringBuffer`对象的`append()`方法中用于SQL构建的部分，特别是当append的内容为非常量时，这增加了SQL注入的风险。
-
+SQL注入是由于应用程序未对用户输入进行严格的过滤、转义或参数化处理，直接将用户可控数据拼接到SQL查询中。攻击者可以通过构造恶意输入篡改原始SQL语句的逻辑，从而执行非预期的数据库操作。本文规则专注于识别`StringBuilder`或`StringBuffer`对象中通过`append()`方法用于SQL构建的部分，特别是当追加内容为非常量时，这显著增加了SQL注入的风险。
 2. **触发场景**
-当开发者使用`StringBuilder`或`StringBuffer`手动构建SQL查询，并将用户输入或其他可控变量直接或间接拼接到查询字符串中时，就可能触发此风险。例如：
-
+当开发者使用`StringBuilder`或`StringBuffer`手动构建SQL查询，并将用户输入或其他外部变量直接或间接拼接到查询字符串中时，就可能触发此风险。例如：
 ```java
 StringBuilder sqlString = new StringBuilder("SELECT * FROM users WHERE id = ");
 String userId = request.getParameter("id"); // 用户输入
@@ -20,54 +16,46 @@ sqlString.append(userId); // 将用户输入直接拼接到SQL
 Statement stmt = connection.createStatement();
 ResultSet rs = stmt.executeQuery(sqlString.toString());
 ```
-
-在上述示例中，如果用户输入 `1 OR 1=1`，最终执行的SQL将变为 `SELECT * FROM users WHERE id = 1 OR 1=1`，导致绕過應用程序原有的查詢邏輯。
-
+在上述示例中，如果用户输入 `1 OR 1=1`，最终执行的SQL将变为 `SELECT * FROM users WHERE id = 1 OR 1=1`，导致绕过应用的原有查询逻辑。
 3. **潜在影响**
 - 绕过身份验证或访问控制。
 - 窃取、更改或删除数据库中的敏感数据。
 - 在数据库服务器上执行系统命令（取决于数据库配置和权限）。
-- 通过数据库作为跳板，对内部网络进行进一步攻击。
+- 通过数据库作为跳板，进一步攻击内部网络。
+
 DESC
 	rule_id: "e53aa369-2d16-445a-a9e9-fb2155791246"
 	title_zh: "检测Java拼接SQL字符串漏洞"
 	solution: <<<SOLUTION
 ### 修复建议
-
-#### 1. 優先使用参数化查询（PreparedStatement）
-使用参数化查询是防止SQL注入最有效的方法。通过预编译SQL语句，并将用户输入作为参数绑定，数据库能够区分代码和数据，从而避免恶意输入被解释为SQL命令。这是Java中最推荐的防御措施。
-
+#### 1. 使用参数化查询（PreparedStatement）
+使用参数化查询是防止SQL注入最有效的方法。通过预编译SQL语句并将用户输入作为参数绑定，数据库能够区分代码和数据，从而避免恶意输入被解释为SQL命令。
 ```java
 // 修复代码示例 (使用 PreparedStatement)
 String userId = request.getParameter("id");
 String sql = "SELECT * FROM users WHERE id = ?"; // Placeholder "?"
 try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
     // 强制类型转换并设置参数，防止注入
-    pstmt.setInt(1, Integer.parseInt(userId)); 
+    pstmt.setInt(1, Integer.parseInt(userId));
     ResultSet rs = pstmt.executeQuery();
     // 处理结果集
 }
 ```
-
 #### 2. 使用ORM框架
 利用现代ORM（Object-Relational Mapping）框架，如Hibernate、MyBatis等。这些框架通常内置了参数化查询的机制，可以自动处理SQL的安全构造。
-
 ```java
 // MyBatis 示例
 // Mapper XML
 <select id="getUserById" resultType="User">
-    SELECT * FROM users WHERE id = #{id}
+SELECT * FROM users WHERE id = #{id}
 </select>
-
 // Java代码 (调用 Mapper)
 String userId = request.getParameter("id");
 // MyBatis 会自动处理 #{id} 的参数绑定
-User user = sqlSession.selectOne("getUserById", Integer.parseInt(userId)); 
+User user = sqlSession.selectOne("getUserById", Integer.parseInt(userId));
 ```
-
 #### 3. 对所有用户输入进行严格的输入验证和过滤
-尽管参数化查询是首选，但在某些情况下（如构建动态查询的WHERE子句），如果必须使用字符串拼接，必须对所有用户输入进行严格的验证和过滤。这包括检查数据类型、长度、格式，并对特殊字符进行转义或移除。**但请注意，这比参数化查询更容易出错，应尽量避免。**
-
+尽管参数化查询是首选，但在某些情况下（如动态查询的WHERE子句），如果必须使用字符串拼接，必须对所有用户输入进行严格的验证和过滤。这包括检查数据类型、长度、格式，并对特殊字符进行转义或移除。请注意，这种方法比参数化查询更容易出错，应尽量避免。
 ```java
 // 示例：简单校验是否为数字
 String userId = request.getParameter("id");
@@ -77,8 +65,9 @@ if (!userId.matches("^[0-9]+$")) {
 }
 // 在校验通过后，如果实在无法使用参数化查询，才考虑谨慎拼接
 // (但这仍然不推荐用于关键查询)
-// StringBuilder sqlString = new StringBuilder("SELECT * FROM users WHERE id = ").append(userId); 
+// StringBuilder sqlString = new StringBuilder("SELECT * FROM users WHERE id = ").append(userId);
 ```
+
 SOLUTION
 	reference: <<<REFERENCE
 [CWE-89: Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')](https://cwe.mitre.org/data/definitions/89.html)
@@ -96,6 +85,72 @@ alert $flag for {
 	title: "Detect Java SQL String Append Vulnerability",
 	title_zh: "检测Java拼接SQL字符串漏洞",
 	level: "low",
+	message: "检测到Java代码中通过StringBuilder或StringBuffer拼接SQL字符串的潜在SQL注入风险，且未发现有效的过滤机制。",
+	solution: <<<SOLUTION
+### 修复建议
+#### 1. 優先使用参数化查询（PreparedStatement）
+使用参数化查询是防止SQL注入最有效的方法。通过预编译SQL语句，并将用户输入作为参数绑定，数据库能够区分代码和数据，从而避免恶意输入被解释为SQL命令。这是Java中最推荐的防御措施。
+```java
+// 修复代码示例 (使用 PreparedStatement)
+String userId = request.getParameter("id");
+String sql = "SELECT * FROM users WHERE id = ?"; // Placeholder "?"
+try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+// 强制类型转换并设置参数，防止注入
+pstmt.setInt(1, Integer.parseInt(userId));
+ResultSet rs = pstmt.executeQuery();
+// 处理结果集
+}
+```
+#### 2. 使用ORM框架
+利用现代ORM（Object-Relational Mapping）框架，如Hibernate、MyBatis等。这些框架通常内置了参数化查询的机制，可以自动处理SQL的安全构造。
+```java
+// MyBatis 示例
+// Mapper XML
+<select id="getUserById" resultType="User">
+SELECT * FROM users WHERE id = #{id}
+</select>
+// Java代码 (调用 Mapper)
+String userId = request.getParameter("id");
+// MyBatis 会自动处理 #{id} 的参数绑定
+User user = sqlSession.selectOne("getUserById", Integer.parseInt(userId));
+```
+#### 3. 对所有用户输入进行严格的输入验证和过滤
+尽管参数化查询是首选，但在某些情况下（如构建动态查询的WHERE子句），如果必须使用字符串拼接，必须对所有用户输入进行严格的验证和过滤。这包括检查数据类型、长度、格式，并对特殊字符进行转义或移除。**但请注意，这比参数化查询更容易出错，应尽量避免。**
+```java
+// 示例：简单校验是否为数字
+String userId = request.getParameter("id");
+if (!userId.matches("^[0-9]+$")) {
+// 处理非法输入，例如抛出异常或返回错误信息
+throw new IllegalArgumentException("Invalid user ID format.");
+}
+// 在校验通过后，如果实在无法使用参数化查询，才考虑谨慎拼接
+// (但这仍然不推荐用于关键查询)
+// StringBuilder sqlString = new StringBuilder("SELECT * FROM users WHERE id = ").append(userId);
+```
+SOLUTION
+	risk: "SQL注入",
+	desc: <<<DESC
+### 漏洞描述
+1. **漏洞原理**
+SQL注入是由于应用程序将用户提供的、未经充分过滤或转义的数据直接拼接到SQL查询字符串中，攻击者可以通过构造恶意输入来改变查询的逻辑，甚至执行非预期的数据库命令。
+本文中的规则侧重于识别`StringBuilder`或`StringBuffer`对象的`append()`方法中用于SQL构建的部分，特别是当append的内容为非常量时，这增加了SQL注入的风险。
+2. **触发场景**
+当开发者使用`StringBuilder`或`StringBuffer`手动构建SQL查询，并将用户输入或其他可控变量直接或间接拼接到查询字符串中时，就可能触发此风险。例如：
+```java
+StringBuilder sqlString = new StringBuilder("SELECT * FROM users WHERE id = ");
+String userId = request.getParameter("id"); // 用户输入
+sqlString.append(userId); // 将用户输入直接拼接到SQL
+Statement stmt = connection.createStatement();
+ResultSet rs = stmt.executeQuery(sqlString.toString());
+```
+在上述示例中，如果用户输入 `1 OR 1=1`，最终执行的SQL将变为 `SELECT * FROM users WHERE id = 1 OR 1=1`，导致绕過應用程序原有的查詢邏輯。
+3. **潜在影响**
+- 绕过身份验证或访问控制。
+- 窃取、更改或删除数据库中的敏感数据。
+- 在数据库服务器上执行系统命令（取决于数据库配置和权限）。
+- 通过数据库作为跳板，对内部网络进行进一步攻击。
+DESC
+	name: "flag",
 }
 
 
@@ -283,4 +338,104 @@ public class DataScopeAspect
     }
 }
 TEXT
+	"safefile://SafePreparedStatementExample.java": <<<CODE
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+
+public class SafePreparedStatementExample {
+
+    public ResultSet getUserById(Connection connection, String userId) throws SQLException {
+        // 使用PreparedStatement进行参数化查询，防止SQL注入
+        String sql = "SELECT * FROM users WHERE id = ?"; 
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            // 将用户输入作为参数绑定，而不是直接拼接到SQL字符串中
+            // 强制转换为整型以确保类型安全，如果userId不是有效数字会抛出NumberFormatException，从而阻止注入
+            pstmt.setInt(1, Integer.parseInt(userId)); 
+            return pstmt.executeQuery();
+        }
+    }
+
+    public ResultSet getUserByUsername(Connection connection, String username) throws SQLException {
+        // 另一个使用PreparedStatement的示例
+        String sql = "SELECT * FROM users WHERE username = ? AND active = true";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, username); 
+            return pstmt.executeQuery();
+        }
+    }
+
+    public void insertUser(Connection connection, String name, int age) throws SQLException {
+        String sql = "INSERT INTO users (name, age) VALUES (?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, name);
+            pstmt.setInt(2, age);
+            pstmt.executeUpdate();
+        }
+    }
+}
+CODE
+	"safefile://SafeMyBatisExample.java": <<<CODE
+// 假设以下是MyBatis Mapper接口和XML配置
+
+// UserMapper.java
+public interface UserMapper {
+    User getUserById(@Param("id") int id);
+    List<User> searchUsers(@Param("username") String username, @Param("status") String status);
+}
+
+// UserMapper.xml
+/*
+<mapper namespace="com.example.mapper.UserMapper">
+    <select id="getUserById" resultType="com.example.model.User">
+        SELECT * FROM users WHERE id = #{id}
+    </select>
+
+    <select id="searchUsers" resultType="com.example.model.User">
+        SELECT * FROM users
+        <where>
+            <if test="username != null and username != ''">
+                username LIKE CONCAT('%', #{username}, '%')
+            </if>
+            <if test="status != null and status != ''">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <insert id="insertUser">
+        INSERT INTO users (name, email) VALUES (#{name}, #{email})
+    </insert>
+</mapper>
+*/
+
+// MainApplication.java (示例如何调用)
+import org.apache.ibatis.session.SqlSession;
+import org.apache.ibatis.session.SqlSessionFactory;
+import com.example.mapper.UserMapper;
+import com.example.model.User;
+
+public class SafeMyBatisExample {
+
+    private SqlSessionFactory sqlSessionFactory; // 假设已初始化
+
+    public User findUser(String idParam) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            // MyBatis会自动处理#{id}的参数绑定，避免SQL注入
+            // 这里将字符串转换为int，进一步保证类型安全
+            return mapper.getUserById(Integer.parseInt(idParam));
+        }
+    }
+
+    public List<User> queryUsers(String username, String status) {
+        try (SqlSession session = sqlSessionFactory.openSession()) {
+            UserMapper mapper = session.getMapper(UserMapper.class);
+            // MyBatis动态SQL中的参数绑定
+            return mapper.searchUsers(username, status);
+        }
+    }
+}
+CODE
 )

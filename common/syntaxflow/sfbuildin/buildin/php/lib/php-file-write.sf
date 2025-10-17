@@ -5,46 +5,39 @@ desc(
 	lib: 'php-file-write'
 	desc: <<<DESC
 ### 规则描述
-
 #### 1. 规则目的
 该规则用于审计PHP代码中文件写入功能的使用情况，主要关注 `fwrite` 和 `file_put_contents` 这两个核心函数。其目的是识别代码中可能存在的文件写入操作点，为后续的安全审计（如任意文件写入漏洞检测）提供基础数据。
-
 #### 2. 规则详细
 - **作为基础检测库**：属于 `php-file-write` 库规则 (`lib` 类型)，不直接报告漏洞，而是作为其他规则（如用户输入跟踪规则结合文件写入点）的辅助规则，用于精确定位潜在的危险 File Write 操作。
 - **覆盖核心写入函数**：检测以下2个主要的PHP文件写入函数：
   - `fwrite()`: 用于向文件流写入数据。
   - `file_put_contents()`: 用于将字符串写入文件。
-
 文件写入功能如果使用不当，可能导致任意文件写入漏洞。攻击者可以通过该漏洞向服务器写入恶意代码（如webshell）或篡改原有重要文件，进而控制服务器或执行恶意操作。因此，所有对文件写入函数的使用都需要进行严格的安全审计，确保：
-- **文件路径可控性**：文件写入的目标路径是否可被用户输入控制。如果可控，攻击者可能指定任意路径进行写入（包括服务器配置文件、后端代码文件等）。
-- **写入内容验证和清理**：写入文件的内容是否经过充分的验证和清理。如果未验证或清理，攻击者可能写入恶意代码。
-
+  - **文件路径可控性**：文件写入的目标路径是否可被用户输入控制。如果可控，攻击者可能指定任意路径进行写入（包括服务器配置文件、后端代码文件等）。
+  - **写入内容验证和清理**：写入文件的内容是否经过充分的验证和清理。如果未验证或清理，攻击者可能写入恶意代码。
 此规则作为基础，帮助审计人员快速定位代码中的文件写入点，以便进一步分析是否符合安全规范，判断是否存在任意文件写入漏洞或其他相关的安全风险。
-
 **触发场景示例代码**：
 ```php
 $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
 $tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
 if (empty($tpl_name)) {
-    return false;
+  return false;
 }
 $tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;
 if (!$handle = @fopen($tpl, 'wb')) {
-    showmsg("打开目标模版文件 $tpl 失败");
+  showmsg("打开目标模版文件 $tpl 失败");
 }
 if (fwrite($handle, $tpl_content) === false) {
-    showmsg('写入目标 $tpl 失败');
+  showmsg('写入目标 $tpl 失败');
 }
 fclose($handle);
 showmsg('编辑模板成功', 'tpl_manage.php');
 file_put_contents("");
 ```
-
 **潜在影响**：若基于此规则的审计进一步发现漏洞，可能导致：
 - 服务器被植入后门或webshell，导致服务器完全失陷。
 - 关键配置文件被恶意篡改，造成服务中断或安全配置失效。
 - 敏感数据被篡改或覆盖。
-
 因此，对文件写入函数的使用进行全面审计和严格的安全控制至关重要。
 DESC
 	rule_id: "7fd490e1-ce5a-42f0-8bf6-cb7c2f2cddce"
@@ -54,45 +47,38 @@ REFERENCE
 	title_zh: "审计PHP文件写入方法"
 	solution: <<<SOLUTION
 ### 修复建议
-
 #### 1. 使用安全的文件写入方法
 确保文件写入操作使用安全的API，并对文件路径和内容进行严格的验证和过滤。
-
 ```php
 // 示例：安全写入文件
 $filePath = '/safe/path/' . basename($_POST['file_name']);
 $content = filter_input(INPUT_POST, 'content', FILTER_SANITIZE_STRING);
 if (file_put_contents($filePath, $content) === false) {
-    throw new Exception('文件写入失败');
+  throw new Exception('文件写入失败');
 }
 ```
-
 #### 2. 验证文件路径
 确保文件路径不可被用户完全控制，避免路径穿越等安全问题。
-
 ```php
 // 示例：验证文件路径
 $baseDir = '/safe/path/';
 $fileName = $_POST['file_name'];
-if (preg_match('/\.\./', $fileName)) {
-    throw new Exception('非法文件路径');
+if (preg_match('/\..\./', $fileName)) {
+  throw new Exception('非法文件路径');
 }
 $filePath = $baseDir . $fileName;
 ```
-
 #### 3. 清理和验证写入内容
 对写入文件的内容进行充分的验证和清理，防止恶意代码注入。
-
 ```php
 // 示例：清理写入内容
 $content = $_POST['content'];
 $content = strip_tags($content); // 移除HTML标签
 $content = htmlspecialchars($content, ENT_QUOTES, 'UTF-8'); // 转义特殊字符
 if (file_put_contents($filePath, $content) === false) {
-    throw new Exception('文件写入失败');
+  throw new Exception('文件写入失败');
 }
 ```
-
 通过以上措施，可以有效防止任意文件写入漏洞的发生，保障系统的安全性。
 SOLUTION
 )
@@ -103,6 +89,49 @@ alert $output for {
 	title: "Unvalidated PHP File Write",
 	title_zh: "未验证的PHP文件写入",
 	level: "info",
+	solution: <<<SOLUTION
+### 修复建议\n#### 1. 使用安全的文件写入方法\n确保文件写入操作使用安全的API，并对文件路径和内容进行严格的验证和过滤。\n```php\n// 示例：安全写入文件\n$filePath = '/safe/path/' . basename($_POST['file_name']);\n$content = filter_input(INPUT_POST, 'content', FILTER_SANITIZE_STRING);\nif (file_put_contents($filePath, $content) === false) {\nthrow new Exception('文件写入失败');\n}\n```\n#### 2. 验证文件路径\n确保文件路径不可被用户完全控制，避免路径穿越等安全问题。\n```php\n// 示例：验证文件路径\n$baseDir = '/safe/path/';\n$fileName = $_POST['file_name'];\nif (preg_match('/\\.\./', $fileName)) {\nthrow new Exception('非法文件路径');\n}\n$filePath = $baseDir . $fileName;\n```\n#### 3. 清理和验证写入内容\n对写入文件的内容进行充分的验证和清理，防止恶意代码注入。\n```php\n// 示例：清理写入内容\n$content = $_POST['content'];\n$content = strip_tags($content); // 移除HTML标签\n$content = htmlspecialchars($content, ENT_QUOTES, 'UTF-8'); // 转义特殊字符\nif (file_put_contents($filePath, $content) === false) {\nthrow new Exception('文件写入失败');\n}\n```\n通过以上措施，可以有效防止任意文件写入漏洞的发生，保障系统的安全性。
+SOLUTION
+	risk: "信息",
+	desc: <<<DESC
+### 规则描述
+#### 1. 规则目的
+该规则用于审计PHP代码中文件写入功能的使用情况，主要关注 `fwrite` 和 `file_put_contents` 这两个核心函数。其目的是识别代码中可能存在的文件写入操作点，为后续的安全审计（如任意文件写入漏洞检测）提供基础数据。
+#### 2. 规则详细
+- **作为基础检测库**：属于 `php-file-write` 库规则 (`lib` 类型)，不直接报告漏洞，而是作为其他规则（如用户输入跟踪规则结合文件写入点）的辅助规则，用于精确定位潜在的危险 File Write 操作。
+- **覆盖核心写入函数**：检测以下2个主要的PHP文件写入函数：
+  - `fwrite()`: 用于向文件流写入数据。
+  - `file_put_contents()`: 用于将字符串写入文件。
+文件写入功能如果使用不当，可能导致任意文件写入漏洞。攻击者可以通过该漏洞向服务器写入恶意代码（如webshell）或篡改原有重要文件，进而控制服务器或执行恶意操作。因此，所有对文件写入函数的使用都需要进行严格的安全审计，确保：
+  - **文件路径可控性**：文件写入的目标路径是否可被用户输入控制。如果可控，攻击者可能指定任意路径进行写入（包括服务器配置文件、后端代码文件等）。
+  - **写入内容验证和清理**：写入文件的内容是否经过充分的验证和清理。如果未验证或清理，攻击者可能写入恶意代码。
+此规则作为基础，帮助审计人员快速定位代码中的文件写入点，以便进一步分析是否符合安全规范，判断是否存在任意文件写入漏洞或其他相关的安全风险。
+**触发场景示例代码**：
+```php
+$tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
+$tpl_content = !empty($_POST['tpl_content']) ? deep_stripslashes($_POST['tpl_content']) : '';
+if (empty($tpl_name)) {
+return false;
+}
+$tpl = BLUE_ROOT . 'templates/default/' . $tpl_name;
+if (!$handle = @fopen($tpl, 'wb')) {
+showmsg("打开目标模版文件 $tpl 失败");
+}
+if (fwrite($handle, $tpl_content) === false) {
+showmsg('写入目标 $tpl 失败');
+}
+fclose($handle);
+showmsg('编辑模板成功', 'tpl_manage.php');
+file_put_contents("");
+```
+**潜在影响**：若基于此规则的审计进一步发现漏洞，可能导致：
+- 服务器被植入后门或webshell，导致服务器完全失陷。
+- 关键配置文件被恶意篡改，造成服务中断或安全配置失效。
+- 敏感数据被篡改或覆盖。
+因此，对文件写入函数的使用进行全面审计和严格的安全控制至关重要。
+DESC
+	name: "output",
+	message: "发现未验证的PHP文件写入方法，需要进一步审计以确认是否存在任意文件写入漏洞。",
 }
 
 desc(
@@ -126,4 +155,38 @@ $tpl_name = !empty($_POST['tpl_name']) ? trim($_POST['tpl_name']) : '';
  	showmsg('编辑模板成功', 'tpl_manage.php');
  	file_put_contents("");
 PARAM
+	"safefile://SafeFileReadExample.php": <<<CODE
+<?php
+// 这是一个文件读取操作，不涉及文件写入，因此不会触发fwrite或file_put_contents检测
+$filePath = './data/config.txt';
+if (file_exists($filePath)) {
+    $content = file_get_contents($filePath);
+    echo "File content: " . $content;
+} else {
+    echo "File does not exist.";
+}
+?>
+CODE
+	"safefile://SafeDatabaseWriteExample.php": <<<CODE
+<?php
+// 数据写入数据库，不涉及文件写入操作，不会触发规则告警
+$conn = new mysqli("localhost", "user", "password", "database");
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+$username = $conn->real_escape_string($_POST['username']);
+$email = $conn->real_escape_string($_POST['email']);
+
+$sql = "INSERT INTO users (username, email) VALUES ('$username', '$email')";
+
+if ($conn->query($sql) === TRUE) {
+    echo "New record created successfully";
+} else {
+    echo "Error: " . $sql . "<br>" . $conn->error;
+}
+
+$conn->close();
+?>
+CODE
 )

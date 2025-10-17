@@ -1,0 +1,21 @@
+__DESC__ = "一个子域名扫描工具，支持递归爆破和泛解析检测。可以扫描指定域名的所有子域名，并解析出对应的IP地址，支持配置是否进行递归扫描和泛解析停止策略。"
+__VERBOSE_NAME__ = "子域名扫描工具"
+__KEYWORDS__ = "子域名扫描,域名爆破,递归扫描,泛解析检测,DNS解析,网络侦察,信息收集,subdomain scan,domain brute force,recursive scan,wildcard detection,DNS resolution,network reconnaissance,information gathering"
+
+target = cli.String("target",cli.setVerboseName("目标域名"),cli.setHelp("扫描目标"), cli.setRequired(true))
+
+notRecursive = cli.Bool("not-recursive",cli.setVerboseName("关闭递归爆破"), cli.setHelp("设置是否递归爆破？"))
+wildcardToStop = cli.Bool("wildcard-to-stop",cli.setVerboseName("泛解析停止"),cli.setHelp("设置泛解析停止")) // 泛解析停止
+
+cli.check()
+res, err := subdomain.Scan(target, subdomain.recursive(!notRecursive), subdomain.wildcardToStop(wildcardToStop))
+if err != nil {
+    yakit.Error("构建子域名扫描失败：%v", err)
+    die(err)
+}
+
+for result = range res {
+    ip = result.IP
+    yakit.Info("域名: %v, IP: %v" % [result.Domain,result.IP])
+}
+

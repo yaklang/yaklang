@@ -30,10 +30,12 @@ var MitmExports = map[string]interface{}{
 	"wscallback":           mitmConfigWSCallback,
 	"wsforcetext":          mitmConfigWSForceTextFrame,
 	"rootCA":               mitmConfigCertAndKey,
+	"gmRootCA":             mitmConfigGMCertAndKey,
 	"useDefaultCA":         mitmConfigUseDefault,
 	"gmtls":                mitmConfigGMTLS,
 	"gmtlsPrefer":          mitmConfigGMTLSPrefer,
 	"gmtlsOnly":            mitmConfigGMTLSOnly,
+	"randomJA3":            mitmConfigRandomJA3,
 }
 
 // Start 启动一个 MITM (中间人)代理服务器，它的第一个参数是端口，接下来可以接收零个到多个选项函数，用于影响中间人代理服务器的行为
@@ -50,19 +52,21 @@ func startMitm(
 }
 
 type mitmConfig struct {
-	ctx                context.Context
-	host               string
-	callback           func(isHttps bool, urlStr string, r *http.Request, rsp *http.Response)
-	wsForceTextFrame   bool
-	wscallback         func(data []byte, isRequest bool) interface{}
-	mitmCert, mitmPkey []byte
-	useDefaultMitmCert bool
-	maxContentLength   int
-	gmtls              bool
-	gmtlsPrefer        bool
-	gmtlsOnly          bool
-	dialer             func(timeout time.Duration, target string) (net.Conn, error)
-	tunMode            bool
+	ctx                    context.Context
+	host                   string
+	callback               func(isHttps bool, urlStr string, r *http.Request, rsp *http.Response)
+	wsForceTextFrame       bool
+	wscallback             func(data []byte, isRequest bool) interface{}
+	mitmCert, mitmPkey     []byte
+	mitmGMCert, mitmGMPKey []byte
+	useDefaultMitmCert     bool
+	maxContentLength       int
+	gmtls                  bool
+	gmtlsPrefer            bool
+	gmtlsOnly              bool
+	randomJA3              bool
+	dialer                 func(timeout time.Duration, target string) (net.Conn, error)
+	tunMode                bool
 
 	// 是否开启透明劫持
 	isTransparent            bool
@@ -261,6 +265,18 @@ func mitmConfigCertAndKey(cert, key []byte) MitmConfigOpt {
 	}
 }
 
+// gmRootCA 是一个选项函数，用于指定中间人代理服务器的国密根证书和私钥
+// Example:
+// ```
+// mitm.Start(8080, mitm.gmRootCA(cert, key))
+// ```
+func mitmConfigGMCertAndKey(cert, key []byte) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.mitmGMCert = cert
+		config.mitmGMPKey = key
+	}
+}
+
 // maxContentLength 是一个选项函数，用于指定中间人代理服务器的最大的请求和响应内容长度，默认为10MB
 // Example:
 // ```
@@ -269,6 +285,17 @@ func mitmConfigCertAndKey(cert, key []byte) MitmConfigOpt {
 func mitmMaxContentLength(i int) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.maxContentLength = i
+	}
+}
+
+// randomJA3 是一个选项函数，用于指定中间人代理服务器是否开启随机 JA3 劫持模式，默认为false
+// Example:
+// ```
+// mitm.Start(8080, mitm.randomJA3(true))
+// ```
+func mitmConfigRandomJA3(b bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.randomJA3 = b
 	}
 }
 
@@ -379,6 +406,7 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		crep.MITM_SetGM(config.gmtls),
 		crep.MITM_SetGMPrefer(config.gmtlsPrefer),
 		crep.MITM_SetGMOnly(config.gmtlsOnly),
+		crep.MITM_RandomJA3(config.randomJA3),
 		crep.MITM_SetWebsocketHijackMode(true),
 		crep.MITM_SetForceTextFrame(config.wsForceTextFrame),
 		crep.MITM_SetWebsocketRequestHijackRaw(func(req []byte, r *http.Request, rspIns *http.Response, t int64) []byte {
@@ -480,7 +508,7 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 			fmt.Println("-----------------------------")
 		}),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
-		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey),
+		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey, config.mitmGMCert, config.mitmGMPKey),
 		crep.MITM_SetHTTPRequestHijackRaw(func(isHttps bool, reqIns *http.Request, req []byte) []byte {
 			if config.hijackRequest == nil {
 				return req

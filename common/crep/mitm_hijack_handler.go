@@ -50,13 +50,7 @@ func (m *MITMServer) setHijackHandler(rootCtx context.Context) {
 		websocketResponseMirror: m.websocketResponseMirror,
 		ProxyGetter:             m.GetMartianProxy,
 		RequestHijackCallback: func(req *http.Request) error {
-			var isHttps bool
-			switch req.URL.Scheme {
-			case "https", "HTTPS":
-				isHttps = true
-			case "http", "HTTP":
-				isHttps = false
-			}
+			var isHttps = req.TLS != nil || httpctx.GetRequestHTTPS(req)
 			hijackedRaw, err := utils.HttpDumpWithBody(req, true)
 			if err != nil {
 				log.Errorf("mitm-hijack marshal request to bytes failed: %s", err)
@@ -137,13 +131,7 @@ func (m *MITMServer) hijackRequestHandler(rootCtx context.Context, wsModifier *W
 	/*
 		handle hijack
 	*/
-	var isHttps bool
-	switch req.URL.Scheme {
-	case "https", "HTTPS":
-		isHttps = true
-	case "http", "HTTP":
-		isHttps = false
-	}
+	var isHttps = req.TLS != nil || httpctx.GetRequestHTTPS(req)
 	httpctx.SetRequestHTTPS(req, isHttps)
 
 	if m.requestHijackHandler != nil {
@@ -344,6 +332,15 @@ func handleBuildInMITMDefaultPageResponse(rsp *http.Response) error {
 		rsp.Body = io.NopCloser(bytes.NewReader(body))
 		rsp.ContentLength = int64(len(body))
 		rsp.Header.Set("Content-Disposition", `attachment; filename="mitm-server.crt"`)
+		rsp.Header.Set("Content-Type", "octet-stream")
+		return nil
+	}
+	if rsp.Request.URL.Path == "/download-mitm-gm-crt" {
+		// 返回mitm-gm-server.crt内容
+		body := defaultGMCA
+		rsp.Body = io.NopCloser(bytes.NewReader(body))
+		rsp.ContentLength = int64(len(body))
+		rsp.Header.Set("Content-Disposition", `attachment; filename="mitm-gm-server.crt"`)
 		rsp.Header.Set("Content-Type", "octet-stream")
 		return nil
 	}

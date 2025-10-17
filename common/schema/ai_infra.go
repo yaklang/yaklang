@@ -2,8 +2,10 @@ package schema
 
 import (
 	"fmt"
-	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"strconv"
 	"time"
+
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 
@@ -11,21 +13,45 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-type AiCoordinatorRuntime struct {
+type AIAgentRuntimeType string
+
+const (
+	AIAgentRuntimeType_PlanAndExec AIAgentRuntimeType = "plan-exec"
+	AIAgentRuntimeType_ReAct       AIAgentRuntimeType = "re-act"
+	AIAgentRuntimeType_Unknown     AIAgentRuntimeType = ""
+)
+
+type AIAgentRuntime struct {
 	gorm.Model
 
-	Uuid            string `json:"uuid" gorm:"unique_index"`
-	Name            string `json:"name"`
-	Seq             int64  `json:"seq" gorm:"index"`
+	Uuid              string `json:"uuid" gorm:"unique_index"`
+	PersistentSession string `gorm:"index"`
+	Name              string `json:"name"`
+	Seq               int64  `json:"seq" gorm:"index"`
+
+	TypeName       AIAgentRuntimeType `gorm:"index"`
+	QuotedTimeline string             `json:"timeline"`
+
 	QuotedUserInput string `json:"quoted_user_input"`
 	ForgeName       string `json:"forge_name"`
 }
 
-func (a *AiCoordinatorRuntime) GetUserInput() string {
+func (a *AIAgentRuntime) GetTimeline() string {
+	if a == nil {
+		return ""
+	}
+	result, err := strconv.Unquote(a.QuotedTimeline)
+	if err != nil {
+		return a.QuotedTimeline
+	}
+	return result
+}
+
+func (a *AIAgentRuntime) GetUserInput() string {
 	return string(codec.StrConvUnquoteForce(a.QuotedUserInput))
 }
 
-func (a *AiCoordinatorRuntime) ToGRPC() *ypb.AITask {
+func (a *AIAgentRuntime) ToGRPC() *ypb.AITask {
 	return &ypb.AITask{
 		CoordinatorId: a.Uuid,
 		Name:          a.Name,
@@ -127,4 +153,53 @@ type LoginSession struct {
 
 	SessionID string    `json:"session_id" gorm:"index"`
 	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// AIMemoryEntity 存储AI记忆条目
+type AIMemoryEntity struct {
+	gorm.Model
+
+	// 记忆条目唯一标识
+	MemoryID string `json:"memory_id" gorm:"unique_index;not null"`
+
+	// 会话ID，关联到特定的AI会话
+	SessionID string `json:"session_id" gorm:"index;not null"`
+
+	// 记忆内容
+	Content string `json:"content" gorm:"type:text;not null"`
+
+	// 领域标签，用于分类和过滤
+	Tags StringArray `json:"tags" gorm:"type:text"`
+
+	// 潜在问题列表，用于RAG检索
+	PotentialQuestions StringArray `json:"potential_questions" gorm:"type:text"`
+
+	// C.O.R.E. P.A.C.T. Framework 评分 (0.0-1.0)
+	C_Score float64 `json:"c_score"` // Connectivity Score 关联度
+	O_Score float64 `json:"o_score"` // Origin Score 来源与确定性
+	R_Score float64 `json:"r_score"` // Relevance Score 相关性
+	E_Score float64 `json:"e_score"` // Emotion Score 情感
+	P_Score float64 `json:"p_score"` // Preference Score 个人偏好
+	A_Score float64 `json:"a_score"` // Actionability Score 可操作性
+	T_Score float64 `json:"t_score"` // Temporality Score 时效性
+
+	// C.O.R.E. P.A.C.T. 向量，用于快速过滤和排序
+	CorePactVector FloatArray `json:"core_pact_vector" gorm:"type:text"`
+}
+
+func (a *AIMemoryEntity) TableName() string {
+	return "ai_memory_entities"
+}
+
+func (a *AIMemoryEntity) BeforeSave() error {
+	if a.MemoryID == "" {
+		return utils.Errorf("memory_id must be set")
+	}
+	if a.SessionID == "" {
+		return utils.Errorf("session_id must be set")
+	}
+	if a.Content == "" {
+		return utils.Errorf("content must be set")
+	}
+	return nil
 }

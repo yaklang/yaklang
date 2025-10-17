@@ -131,6 +131,12 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		}
 		err = createGroups(client, groupNames)
 		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			deleteRuleByNames(client, ruleNames)
+			deleteRuleGroup(client, groupNames)
+		})
+
 		err = addGroups(client, ruleNames, groupNames)
 		require.NoError(t, err)
 
@@ -155,16 +161,22 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		var ruleNames []string
 		for i := 0; i < 10; i++ {
 			groupName := fmt.Sprintf("group_%s", uuid.NewString())
-			err = createSfRule(client, groupName)
-			require.NoError(t, err)
 			groupNames = append(groupNames, groupName)
 		}
 		for i := 0; i < 10; i++ {
 			ruleName := fmt.Sprintf("rule_%s", uuid.NewString())
-			ruleNames = append(groupNames, ruleName)
+			err = createSfRule(client, ruleName)
+			require.NoError(t, err)
+			ruleNames = append(ruleNames, ruleName)
 		}
 		err = createGroups(client, groupNames)
 		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			deleteRuleByNames(client, ruleNames)
+			deleteRuleGroup(client, groupNames)
+		})
+
 		err = addGroups(client, ruleNames, groupNames)
 		require.NoError(t, err)
 		for _, groupName := range groupNames {
@@ -212,8 +224,8 @@ func TestGRPCMUSTPASS_SyntaxFlow_Rule_Group(t *testing.T) {
 		_, err = client.UpdateSyntaxFlowRuleGroup(context.Background(), updateReq)
 		require.NoError(t, err)
 		t.Cleanup(func() {
-			err = deleteRuleByNames(client, []string{ruleName})
-			require.NoError(t, err)
+			deleteRuleByNames(client, []string{ruleName})
+			deleteRuleGroup(client, []string{newGroupName})
 		})
 
 		newRule, err := queryRulesByName(client, []string{ruleName})
