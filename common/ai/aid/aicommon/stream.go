@@ -1,7 +1,9 @@
 package aicommon
 
 import (
+	"bytes"
 	"io"
+	"math/rand"
 	"time"
 
 	"github.com/yaklang/yaklang/common/log"
@@ -86,4 +88,62 @@ func (e *streamAIOutputEventWriter) Write(b []byte) (int, error) {
 	}
 	e.handler(event)
 	return len(b), nil
+}
+
+func TypeWriterWrite(dst io.Writer, src string, bps int) (written int64, err error) {
+	return TypeWriterCopy(dst, bytes.NewBufferString(src), bps)
+}
+
+// TypeWriterCopy 实现打字机模式的 Copy，以约 200 byte/sec 的速率随机延迟打印
+// 模拟 AI 快速输出效果，提升用户体验
+func TypeWriterCopy(dst io.Writer, src io.Reader, bytesPerSeconds int) (written int64, err error) {
+	buf := make([]byte, 4)
+	// 200 tokens/s => 平均每个 token 延迟 5ms
+	// 为了模拟更自然的输出，使用随机延迟 (1-10ms)
+	if bytesPerSeconds <= 0 {
+		bytesPerSeconds = 200
+	}
+	var avgTokenTime = time.Second / time.Duration(bytesPerSeconds)
+
+	for {
+		n, readErr := src.Read(buf)
+		if n > 0 {
+			// 将读取的数据写入目标
+			wn, writeErr := dst.Write(buf[:n])
+			written += int64(wn)
+			if writeErr != nil {
+				return written, writeErr
+			}
+
+			// 根据写入的字节数计算延迟
+			// 假设平均每个 UTF-8 字符大约 1-3 字节，这里简单估算为 1-2 个 token
+			byteCount := int64(n)
+			estimatedTokens := byteCount / 2
+			if estimatedTokens < 1 {
+				estimatedTokens = 1
+			}
+
+			// 计算基础延迟时间
+			baseDelay := time.Duration(estimatedTokens) * avgTokenTime
+
+			// 添加随机波动 (±50%)，使输出看起来更自然
+			randomFactor := 0.5 + (rand.Float64()) // 0.5 到 1.5
+			delay := time.Duration(float64(baseDelay) * randomFactor)
+
+			// 添加小的随机抖动 (0-3ms)
+			jitter := time.Duration(rand.Intn(3)) * time.Millisecond
+			finalDelay := delay + jitter
+
+			time.Sleep(finalDelay)
+		}
+
+		if readErr != nil {
+			if readErr != io.EOF {
+				return written, readErr
+			}
+			break
+		}
+	}
+
+	return written, nil
 }
