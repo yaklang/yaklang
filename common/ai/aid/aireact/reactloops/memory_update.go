@@ -17,7 +17,7 @@ func (r *ReActLoop) currentMemorySize() int {
 }
 
 func (r *ReActLoop) PushMemory(result *aimem.SearchMemoryResult) {
-	if !utils.IsNil(result) {
+	if utils.IsNil(result) {
 		return
 	}
 	mems := result.Memories
