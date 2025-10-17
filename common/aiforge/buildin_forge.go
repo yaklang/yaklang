@@ -123,7 +123,7 @@ func init() {
 		registerBuildInForge("ssapoc")
 		registerBuildInForge("flow_report")
 		registerBuildInForge("ssa_vulnerability_analyzer")
-		//registerBuildInForge("mock_forge")
+		registerBuildInForge("mock_forge")
 		return nil
 	}, "sync-buildin-ai-forge")
 }

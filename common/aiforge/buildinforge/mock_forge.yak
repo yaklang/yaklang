@@ -1,6 +1,9 @@
-
-
 forgeHandle = func(params) {
+    toolName :=db.GetKey("aimocktool")
+    if toolName == "" {
+        toolName = "mock_basic"
+    }
+
     yakit.StatusCard("statue", "mock forge")
    tools := aiagent.AllYakScriptAiTools()
    bp = aiagent.CreateForge("mock-forge",aiagent.tools(tools...),aiagent.aiCallback(func(config , request){
@@ -10,10 +13,10 @@ forgeHandle = func(params) {
 			}()
 
 			if str.MatchAllOfSubString(request.GetPrompt(), `工具名称: `, `"call-tool"`, "const") {
-				rsp.EmitOutputStream(str.NewReader(`{"@action": "call-tool", "tool": "mock_basic", "params": {}}`))
+				rsp.EmitOutputStream(str.NewReader(sprintf(`{"@action": "call-tool", "tool": "%s", "params": {}}`,toolName)))
 				return rsp, nil
 			} else if str.MatchAllOfSubString(request.GetPrompt(), `当前任务: "扫描目录结构"`) {
-				rsp.EmitOutputStream(str.NewReader(`{"@action": "require-tool", "tool": "mock_basic"}`))
+				rsp.EmitOutputStream(str.NewReader(sprintf(`{"@action": "require-tool", "tool": "%s"}`,toolName)))
 				return rsp, nil
 			}
 
