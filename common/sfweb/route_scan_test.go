@@ -89,10 +89,14 @@ func scanContent(t *testing.T, lang, content string) {
 
 	wc.Start()
 	wc.Wait()
+	
+	if len(risks) > 0 {
+		t.Cleanup(func() {
+			ssadb.DeleteProgram(ssadb.GetDB(), risks[0].ProgramName)
+		})
+	}
+	
 	require.Equal(t, 1.0, progress)
 	require.GreaterOrEqual(t, len(risks), 1)
 	require.GreaterOrEqual(t, risks[0].Timestamp, now.Unix(), "timestamp should be >= time that scan started")
-	defer func() {
-		ssadb.DeleteProgram(ssadb.GetDB(), risks[0].ProgramName)
-	}()
 }

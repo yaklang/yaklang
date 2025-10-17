@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/sfweb"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
 func TestReportFalsePositive(t *testing.T) {
@@ -88,6 +89,12 @@ func TestReportFalsePositive(t *testing.T) {
 
 		require.GreaterOrEqual(t, len(risks), 1)
 		require.Equal(t, 1.0, progress)
+
+		t.Cleanup(func() {
+			if len(risks) > 0 {
+				ssadb.DeleteProgram(ssadb.GetDB(), risks[0].ProgramName)
+			}
+		})
 
 		var rsp sfweb.ReportResponse
 		firstRisk := risks[0]
