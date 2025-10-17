@@ -202,11 +202,12 @@ func Frontend(src string, caches ...*ssa.AntlrCache) (phpparser.IHtmlDocumentCon
 	lexer.AddErrorListener(errListener)
 	tokenStream := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
 	parser := phpparser.NewPHPParser(tokenStream)
-	ssa.ParserSetAntlrCache(parser.BaseParser, lexer.BaseLexer, cache)
+	ssa.ParserSetAntlrCache(parser, lexer, cache)
 	parser.RemoveErrorListeners()
 	parser.AddErrorListener(errListener)
 	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
 	ast := parser.HtmlDocument()
+	log.Errorf("ast: %v", ast.ToStringTree(parser.RuleNames, parser))
 	return ast, errListener.Error()
 }
 
