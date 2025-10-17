@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfbuildin"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -81,6 +82,7 @@ func getLibrarySuggestion() []*ypb.SuggestionDescription {
 
 		// items := make([]*ypb.SuggestionDescription, 0)
 		db := consts.GetGormProfileDatabase()
+		sfbuildin.SyncEmbedRule()
 		db = db.Where("allow_included = ? and included_name != ?", true, "")
 		for rule := range sfdb.YieldSyntaxFlowRules(db, context.Background()) {
 			item := &ypb.SuggestionDescription{
