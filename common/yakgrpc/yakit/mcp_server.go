@@ -109,6 +109,9 @@ func QueryMCPServers(db *gorm.DB, req *ypb.GetAllMCPServersRequest) (*bizhelper.
 		limit = 20
 	}
 
+	// Order by
+	db = bizhelper.OrderByPaging(db, req.GetPagination())
+
 	p, db := bizhelper.Paging(db, page, limit, &servers)
 	if db.Error != nil {
 		return nil, nil, utils.Errorf("query mcp servers failed: %s", db.Error)

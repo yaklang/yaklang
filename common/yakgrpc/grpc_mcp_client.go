@@ -150,9 +150,10 @@ func (s *Server) GetAllMCPServers(ctx context.Context, req *ypb.GetAllMCPServers
 		if req.GetIsShowToolList() && server.Enable {
 			tools, err := s.getMCPServerTools(ctx, server)
 			if err != nil {
-				return nil, utils.Errorf("get mcp server tools failed: %s", err)
+				mcpServer.ErrorMsg = err.Error()
+			} else {
+				mcpServer.Tools = tools
 			}
-			mcpServer.Tools = tools
 		}
 
 		mcpServers = append(mcpServers, mcpServer)
