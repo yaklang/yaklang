@@ -188,7 +188,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		react.memoryTriage = cfg.memoryTriage
 	} else {
 		var err error
-		react.memoryTriage, err = aimem.NewAIMemory(cfg.persistentSessionId, aimem.WithInvoker(react))
+		react.memoryTriage, err = aimem.NewAIMemory("default", aimem.WithInvoker(react))
 		if err != nil {
 			return nil, utils.Errorf("create memory triage failed: %v", err)
 		}
