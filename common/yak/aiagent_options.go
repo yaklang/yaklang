@@ -2,9 +2,10 @@ package yak
 
 import (
 	"context"
+	"slices"
+
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/schema"
-	"slices"
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/aiforge"
@@ -41,6 +42,9 @@ func NewAgent(iopts ...any) *Agent {
 		case aiforge.Option:
 			ag.AiForgeOptions = append(ag.AiForgeOptions, o)
 		}
+	}
+	if ag.ctx == nil {
+		ag.ctx, ag.cancel = context.WithCancel(context.Background())
 	}
 	return ag
 }
