@@ -1,6 +1,7 @@
 package aicommon
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"sync"
@@ -163,16 +164,42 @@ func (r *Emitter) EmitStatus(key string, value any) {
 	})
 }
 
-func (r *Emitter) EmitStream(nodeId string, content string) {
-	r.emit(&schema.AiOutputEvent{
-		CoordinatorId: r.id,
-		Type:          schema.EVENT_TYPE_STREAM,
-		NodeId:        nodeId,
-		IsJson:        true,
-		IsStream:      true,
-		StreamDelta:   []byte(content),
-		Timestamp:     time.Now().Unix(),
-	})
+func (r *Emitter) EmitThoughtStream(taskId string, fmtTpl string, item ...any) {
+	content := fmtTpl
+	if item != nil && len(item) > 0 {
+		content = fmt.Sprintf(fmtTpl, item...)
+	}
+	r.EmitTextStreamWithTaskIndex("re-act-loop-thought", content, taskId)
+}
+
+func (r *Emitter) EmitThoughtStreamReader(taskId string, rd io.Reader, finished ...func()) {
+	r.EmitStreamEvent("re-act-loop-thought", time.Now(), rd, taskId, finished...)
+}
+
+func (r *Emitter) EmitThoughtTypeWriterStreamReader(taskId string, origin io.Reader, finished ...func()) {
+	pr, pw := utils.NewPipe()
+	go func() {
+		defer func() {
+			pw.Close()
+		}()
+		TypeWriterCopy(pw, origin, 200)
+	}()
+	r.EmitThoughtStreamReader(taskId, pr, finished...)
+}
+
+func (r *Emitter) EmitTextStreamWithTaskIndex(nodeId string, content string, taskIndex string) {
+	writer := utils.UTF8Reader(bytes.NewBufferString(content))
+	pr, pw := utils.NewPipe()
+	go func() {
+		defer pw.Close()
+		_, _ = TypeWriterCopy(pw, writer, 200)
+	}()
+	r.EmitStreamEvent(
+		nodeId,
+		time.Now(),
+		utils.UTF8Reader(pr),
+		taskIndex,
+	)
 }
 
 func (r *Emitter) EmitStructured(id string, i any) {

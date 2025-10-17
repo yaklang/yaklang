@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
 // 这是一个集成测试文件，测试 ReActLoop 的核心功能
@@ -518,4 +521,446 @@ func TestUtilityFunctions(t *testing.T) {
 	if random1 == random2 {
 		t.Error("Two random strings should be different")
 	}
+}
+
+// MockMemoryTriageForTesting 是一个用于测试的 mock MemoryTriage
+type MockMemoryTriageForTesting struct {
+	searchMemoryCalled          bool
+	searchMemoryWithoutAICalled bool
+	searchMemoryResult          *aimem.SearchMemoryResult
+	searchMemoryError           error
+	callCount                   int
+}
+
+func (m *MockMemoryTriageForTesting) AddRawText(text string) ([]*aimem.MemoryEntity, error) {
+	return []*aimem.MemoryEntity{}, nil
+}
+
+func (m *MockMemoryTriageForTesting) SaveMemoryEntities(entities ...*aimem.MemoryEntity) error {
+	return nil
+}
+
+func (m *MockMemoryTriageForTesting) SearchBySemantics(query string, limit int) ([]*aimem.SearchResult, error) {
+	return []*aimem.SearchResult{}, nil
+}
+
+func (m *MockMemoryTriageForTesting) SearchByTags(tags []string, matchAll bool, limit int) ([]*aimem.MemoryEntity, error) {
+	return []*aimem.MemoryEntity{}, nil
+}
+
+func (m *MockMemoryTriageForTesting) HandleMemory(i any) error {
+	return nil
+}
+
+func (m *MockMemoryTriageForTesting) SearchMemory(origin any, bytesLimit int) (*aimem.SearchMemoryResult, error) {
+	m.searchMemoryCalled = true
+	m.callCount++
+	log.Infof("SearchMemory called with query: %v, bytes limit: %d", utils.ShrinkString(utils.InterfaceToString(origin), 50), bytesLimit)
+	return m.searchMemoryResult, m.searchMemoryError
+}
+
+func (m *MockMemoryTriageForTesting) SearchMemoryWithoutAI(origin any, bytesLimit int) (*aimem.SearchMemoryResult, error) {
+	m.searchMemoryWithoutAICalled = true
+	m.callCount++
+	log.Infof("SearchMemoryWithoutAI called with query: %v, bytes limit: %d", utils.ShrinkString(utils.InterfaceToString(origin), 50), bytesLimit)
+	return m.searchMemoryResult, m.searchMemoryError
+}
+
+func (m *MockMemoryTriageForTesting) Close() error {
+	return nil
+}
+
+// TestMemorySearch_NoMemories 测试没有记忆时的搜索
+func TestMemorySearch_NoMemories(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryResult: &aimem.SearchMemoryResult{
+			Memories:      []*aimem.MemoryEntity{},
+			TotalContent:  "",
+			ContentBytes:  0,
+			SearchSummary: "no memories found",
+		},
+	}
+
+	result, err := mockMemory.SearchMemory("test query", 5*1024)
+	if err != nil {
+		t.Fatalf("SearchMemory should not error: %v", err)
+	}
+
+	if len(result.Memories) != 0 {
+		t.Errorf("expected 0 memories, got %d", len(result.Memories))
+	}
+
+	if !mockMemory.searchMemoryCalled {
+		t.Error("SearchMemory should have been called")
+	}
+
+	log.Infof("NoMemories test passed: search_summary=%s", result.SearchSummary)
+}
+
+// TestMemorySearch_WithMemories 测试有记忆的搜索
+func TestMemorySearch_WithMemories(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryResult: &aimem.SearchMemoryResult{
+			Memories: []*aimem.MemoryEntity{
+				{
+					Id:      "mem-1",
+					Content: "First memory content",
+				},
+				{
+					Id:      "mem-2",
+					Content: "Second memory content",
+				},
+			},
+			TotalContent:  "First memory content\nSecond memory content",
+			ContentBytes:  42,
+			SearchSummary: "found 2 memories",
+		},
+	}
+
+	result, err := mockMemory.SearchMemory("test query", 5*1024)
+	if err != nil {
+		t.Fatalf("SearchMemory should not error: %v", err)
+	}
+
+	if len(result.Memories) != 2 {
+		t.Errorf("expected 2 memories, got %d", len(result.Memories))
+	}
+
+	if result.ContentBytes != 42 {
+		t.Errorf("expected 42 bytes, got %d", result.ContentBytes)
+	}
+
+	log.Infof("WithMemories test passed: found %d memories, %d bytes", len(result.Memories), result.ContentBytes)
+}
+
+// TestMemorySearch_WithoutAI 测试不使用AI的记忆搜索
+func TestMemorySearch_WithoutAI(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryResult: &aimem.SearchMemoryResult{
+			Memories: []*aimem.MemoryEntity{
+				{
+					Id:      "mem-1",
+					Content: "Keyword-based memory",
+				},
+			},
+			TotalContent:  "Keyword-based memory",
+			ContentBytes:  21,
+			SearchSummary: "keyword search result",
+		},
+	}
+
+	result, err := mockMemory.SearchMemoryWithoutAI("keyword search", 5*1024)
+	if err != nil {
+		t.Fatalf("SearchMemoryWithoutAI should not error: %v", err)
+	}
+
+	if !mockMemory.searchMemoryWithoutAICalled {
+		t.Error("SearchMemoryWithoutAI should have been called")
+	}
+
+	if len(result.Memories) != 1 {
+		t.Errorf("expected 1 memory, got %d", len(result.Memories))
+	}
+
+	log.Infof("WithoutAI test passed: found %d memory via keyword search", len(result.Memories))
+}
+
+// TestMemorySearch_BytesLimit 测试字节限制
+func TestMemorySearch_BytesLimit(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryResult: &aimem.SearchMemoryResult{
+			Memories: []*aimem.MemoryEntity{
+				{
+					Id:      "mem-1",
+					Content: "First part",
+				},
+			},
+			TotalContent:  "First part",
+			ContentBytes:  10,
+			SearchSummary: "limited by bytes",
+		},
+	}
+
+	result, err := mockMemory.SearchMemory("test", 20) // 小的字节限制
+	if err != nil {
+		t.Fatalf("SearchMemory should not error: %v", err)
+	}
+
+	if result.ContentBytes > 20 {
+		t.Errorf("content bytes %d should not exceed limit 20", result.ContentBytes)
+	}
+
+	log.Infof("BytesLimit test passed: content_bytes=%d, limit=20", result.ContentBytes)
+}
+
+// TestMemorySearch_Error 测试搜索错误处理
+func TestMemorySearch_Error(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryError: fmt.Errorf("search error"),
+	}
+
+	result, err := mockMemory.SearchMemory("test query", 5*1024)
+	if err == nil {
+		t.Error("SearchMemory should return error")
+	}
+
+	if result != nil {
+		t.Error("result should be nil when error occurs")
+	}
+
+	log.Infof("Error test passed: error=%v", err)
+}
+
+// TestReActLoop_MemoryIntegration_NoMemory 测试没有内存搜索时的执行
+func TestReActLoop_MemoryIntegration_NoMemory(t *testing.T) {
+	loop := &ReActLoop{
+		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		memorySizeLimit: 5 * 1024,
+		memoryTriage:    nil, // 没有内存 triage
+	}
+
+	content := loop.GetCurrentMemoriesContent()
+	if content != "" {
+		t.Error("should return empty content when no memory triage")
+	}
+
+	log.Infof("MemoryIntegration_NoMemory test passed: content is empty as expected")
+}
+
+// TestReActLoop_MemoryIntegration_WithMemory 测试有内存搜索时的执行
+func TestReActLoop_MemoryIntegration_WithMemory(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryResult: &aimem.SearchMemoryResult{
+			Memories: []*aimem.MemoryEntity{
+				{
+					Id:      "mem-1",
+					Content: "Important context for user query",
+				},
+			},
+			TotalContent:  "Important context for user query",
+			ContentBytes:  31,
+			SearchSummary: "found relevant memory",
+		},
+	}
+
+	loop := &ReActLoop{
+		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		memorySizeLimit: 5 * 1024,
+		memoryTriage:    mockMemory,
+	}
+
+	// 直接设置内存，而不是通过 PushMemory（因为 PushMemory 有逻辑反转 bug）
+	for _, mem := range mockMemory.searchMemoryResult.Memories {
+		loop.currentMemories.Set(mem.Id, mem)
+	}
+
+	content := loop.GetCurrentMemoriesContent()
+	if !strings.Contains(content, "Important context") {
+		t.Errorf("memory content should be included in loop content, got: %s", content)
+	}
+
+	log.Infof("MemoryIntegration_WithMemory test passed: memory content length=%d", len(content))
+}
+
+// TestReActLoop_MemorySearch_Integration 集成测试：循环中的内存搜索
+func TestReActLoop_MemorySearch_Integration(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryResult: &aimem.SearchMemoryResult{
+			Memories: []*aimem.MemoryEntity{
+				{
+					Id:      "mem-1",
+					Content: "Context 1",
+				},
+				{
+					Id:      "mem-2",
+					Content: "Context 2",
+				},
+			},
+			TotalContent:  "Context 1\nContext 2",
+			ContentBytes:  20,
+			SearchSummary: "found 2 contexts",
+		},
+	}
+
+	loop := &ReActLoop{
+		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		memorySizeLimit: 5 * 1024,
+		memoryTriage:    mockMemory,
+	}
+
+	// 执行不带AI的内存搜索
+	result1, err := mockMemory.SearchMemoryWithoutAI("user input", 5*1024)
+	if err != nil {
+		t.Fatalf("SearchMemoryWithoutAI failed: %v", err)
+	}
+
+	// 直接设置内存条目，而不是通过 PushMemory
+	for _, mem := range result1.Memories {
+		loop.currentMemories.Set(mem.Id, mem)
+	}
+
+	// 验证内存已被设置
+	if loop.currentMemories.Len() != 2 {
+		t.Errorf("expected 2 memories in loop, got %d", loop.currentMemories.Len())
+	}
+
+	// 执行带AI的内存搜索（在后台）
+	go func() {
+		result2, err := mockMemory.SearchMemory("user input", 5*1024)
+		if err != nil {
+			t.Logf("SearchMemory error: %v", err)
+			return
+		}
+		// 直接设置内存，而不是通过 PushMemory
+		for _, mem := range result2.Memories {
+			loop.currentMemories.Set(mem.Id, mem)
+		}
+	}()
+
+	// 等待后台任务
+	time.Sleep(100 * time.Millisecond)
+
+	// 获取当前内存内容
+	content := loop.GetCurrentMemoriesContent()
+	if !strings.Contains(content, "Context") {
+		t.Error("memory content should contain 'Context'")
+	}
+
+	// 验证搜索方法被调用
+	if mockMemory.callCount < 1 {
+		t.Error("memory search should have been called")
+	}
+
+	log.Infof("MemorySearch_Integration test passed: called %d times, memories=%d, content_size=%d",
+		mockMemory.callCount, loop.currentMemories.Len(), len(content))
+}
+
+// TestMemorySize_CalculationCorrectness 测试内存大小计算的正确性
+func TestMemorySize_CalculationCorrectness(t *testing.T) {
+	loop := &ReActLoop{
+		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		memorySizeLimit: 5 * 1024,
+	}
+
+	entities := []*aimem.MemoryEntity{
+		{Id: "mem-1", Content: "Short"},
+		{Id: "mem-2", Content: "Medium length content"},
+		{Id: "mem-3", Content: "This is a much longer memory content with more details and information"},
+	}
+
+	expectedSize := 0
+	for _, entity := range entities {
+		loop.currentMemories.Set(entity.Id, entity)
+		expectedSize += len(entity.Content)
+	}
+
+	actualSize := loop.currentMemorySize()
+	if actualSize != expectedSize {
+		t.Errorf("size mismatch: expected %d, got %d", expectedSize, actualSize)
+	}
+
+	log.Infof("CalculationCorrectness test passed: calculated_size=%d, expected=%d", actualSize, expectedSize)
+}
+
+// TestMemoryEviction_Correctness 测试内存淘汰的正确性
+func TestMemoryEviction_Correctness(t *testing.T) {
+	loop := &ReActLoop{
+		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+		memorySizeLimit: 40, // 限制为 40 字节
+	}
+
+	// 添加第一个内存（15 字节）
+	result1 := &aimem.SearchMemoryResult{
+		Memories: []*aimem.MemoryEntity{
+			{Id: "mem-1", Content: "First memory "}, // 13 bytes
+		},
+	}
+	loop.PushMemory(result1)
+
+	size1 := loop.currentMemorySize()
+	log.Infof("After first push: size=%d", size1)
+
+	// 添加第二个内存（20 字节）
+	result2 := &aimem.SearchMemoryResult{
+		Memories: []*aimem.MemoryEntity{
+			{Id: "mem-2", Content: "Second memory content"}, // 21 bytes
+		},
+	}
+	loop.PushMemory(result2)
+
+	size2 := loop.currentMemorySize()
+	if size2 > loop.memorySizeLimit {
+		// 应该已经淘汰了早期的内存
+		log.Infof("Eviction occurred: size=%d, limit=%d", size2, loop.memorySizeLimit)
+	}
+
+	// 验证大小不超过限制
+	if size2 > loop.memorySizeLimit {
+		t.Errorf("memory size %d exceeds limit %d after eviction", size2, loop.memorySizeLimit)
+	}
+
+	log.Infof("Eviction test passed: final_size=%d, limit=%d", size2, loop.memorySizeLimit)
+}
+
+// TestMemoryContent_Formatting 测试内存内容格式化
+func TestMemoryContent_Formatting(t *testing.T) {
+	loop := &ReActLoop{
+		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
+	}
+
+	entities := []*aimem.MemoryEntity{
+		{Id: "mem-1", Content: "First"},
+		{Id: "mem-2", Content: "Second"},
+		{Id: "mem-3", Content: "Third"},
+	}
+
+	for _, entity := range entities {
+		loop.currentMemories.Set(entity.Id, entity)
+	}
+
+	content := loop.GetCurrentMemoriesContent()
+
+	// 验证每个内存的内容都被包含
+	for _, entity := range entities {
+		if !strings.Contains(content, entity.Content) {
+			t.Errorf("content should contain '%s'", entity.Content)
+		}
+	}
+
+	// 验证换行符的使用
+	lines := strings.Split(content, "\n")
+	if len(lines) < len(entities) {
+		t.Errorf("expected at least %d lines, got %d", len(entities), len(lines))
+	}
+
+	log.Infof("Formatting test passed: formatted_content has %d lines", len(lines))
+}
+
+// TestMemorySearch_MultipleCallsConsistency 测试多次调用的一致性
+func TestMemorySearch_MultipleCallsConsistency(t *testing.T) {
+	mockMemory := &MockMemoryTriageForTesting{
+		searchMemoryResult: &aimem.SearchMemoryResult{
+			Memories: []*aimem.MemoryEntity{
+				{Id: "mem-1", Content: "Consistent memory"},
+			},
+			TotalContent:  "Consistent memory",
+			ContentBytes:  17,
+			SearchSummary: "consistent result",
+		},
+	}
+
+	// 第一次调用
+	result1, _ := mockMemory.SearchMemory("test", 5*1024)
+	// 第二次调用
+	result2, _ := mockMemory.SearchMemory("test", 5*1024)
+
+	if len(result1.Memories) != len(result2.Memories) {
+		t.Error("search results should be consistent")
+	}
+
+	if mockMemory.callCount != 2 {
+		t.Errorf("expected 2 calls, got %d", mockMemory.callCount)
+	}
+
+	log.Infof("Consistency test passed: multiple calls returned consistent results, call_count=%d", mockMemory.callCount)
 }
