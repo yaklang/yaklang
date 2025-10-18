@@ -34,7 +34,7 @@ func TestReAct_AnswerWithKnowledge_FullFlow(t *testing.T) {
 			return rsp, nil
 		}
 		// Add: handle the AI call after knowledge is enhanced
-		if utils.MatchAllOfSubString(prompt, "MUST use 'directly_answer'") {
+		if utils.MatchAllOfSubString(prompt, "USE THIS FIELD ONLY IF @action is 'directly_answer'") {
 			if !utils.MatchAllOfSubString(prompt, token) {
 				return nil, utils.Errorf("knowledge token should not appear in the final answer prompt")
 			}
