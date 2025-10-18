@@ -7,7 +7,7 @@
 {"@action": "directly_answer"}
 <|FINAL_ANSWER_{{ .Nonce }}|>
 # markdown in mass
-<|FINAL_ANSWER_END {{ .Nonce }}|>
+<|FINAL_ANSWER_END_{{ .Nonce }}|>
 
 *. 如果你想要使用工具：
     * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "cumulative_summary": "...", "human_readable_thought": "..."}`

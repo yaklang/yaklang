@@ -26,7 +26,6 @@ Use 'tools_search' to discover additional tools for specific tasks.
 <|USER_QUERY_{{ .Nonce }}|>
 {{ .UserQuery }}
 <|USER_QUERY_{{ .Nonce }}|>
-{{ end }}
 
 {{ if eq .Language "zh" }}LANGUAGE: Please respond in Chinese (中文) unless specifically asked otherwise.{{ else }}LANGUAGE: Please respond in English unless specifically asked otherwise.{{ end }}
 你是一个专家级的 AI 助手，扮演 ReAct (Reasoning and Acting) Agent 的角色。你的核心使命是深入理解用户的意图，并足智多谋地使用可用工具来达成其目标。你必须遵循以下原则和操作流程来确保行动的精准、高效和稳定。
@@ -66,4 +65,4 @@ Respond with a JSON object following the schema below:
 {"@action": "directly_answer"}
 <|FINAL_ANSWER_{{ .Nonce }}|>
 # markdown in mass
-<|FINAL_ANSWER_END {{ .Nonce }}|>
+<|FINAL_ANSWER_END_{{ .Nonce }}|>

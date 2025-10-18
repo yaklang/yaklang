@@ -209,7 +209,7 @@ func TestPromptManager_WithDynamicContextProvider_InPromptGeneration(t *testing.
 	providerCalled = false
 	callMutex.Unlock()
 
-	_, err = react.promptManager.GenerateDirectlyAnswerPrompt("test query", nil)
+	_, _, err = react.promptManager.GenerateDirectlyAnswerPrompt("test query", nil)
 	if err != nil {
 		t.Fatalf("Failed to generate directly answer prompt: %v", err)
 	}

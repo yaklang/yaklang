@@ -56,7 +56,9 @@ func (r *ReAct) DirectlyAnswer(query string, tools []*aitool.Tool) (string, erro
 			})
 
 			action, err := aicommon.ExtractActionFromStreamWithJSONExtractOptions(
-				stream, "object", []string{}, []jsonextractor.CallbackOption{
+				stream, "object", []string{
+					"directly_answer",
+				}, []jsonextractor.CallbackOption{
 					jsonextractor.WithRegisterFieldStreamHandler(
 						"answer_payload",
 						func(key string, reader io.Reader, parents []string) {
@@ -77,12 +79,15 @@ func (r *ReAct) DirectlyAnswer(query string, tools []*aitool.Tool) (string, erro
 			if err != nil {
 				return err
 			}
-			result := action.GetInvokeParams("next_action").GetString("answer_payload")
-			if result != "" {
-				finalResult = result
-				return nil
+			var payload string
+			if r := action.GetString("answer_payload"); r != "" {
+				payload = r
 			}
-			return utils.Error("answer_payload is required but empty in action")
+			if payload == "" {
+				payload = action.GetInvokeParams("next_action").GetString("answer_payload")
+			}
+			finalResult = payload
+			return nil
 		},
 	)
 	wg.Wait()
