@@ -55,28 +55,13 @@ func getReSelectTool(
 }
 
 func getDirectlyAnswer() string {
-	var opts []any
-
-	actionFields := []aitool.ToolOption{
+	return aitool.NewObjectSchemaWithActionName(
+		"directly_answer",
 		aitool.WithStringParam(
-			"type",
-			aitool.WithParam_Description("You MUST use 'directly_answer' as the action type."),
-			aitool.WithParam_Enum(ActionDirectlyAnswer),
-			aitool.WithParam_Required(true),
+			"answer_payload",
+			aitool.WithParam_Description(
+				`USE THIS FIELD ONLY IF @action is 'directly_answer' AND answer is short (≤200 chars). For long answers, leave this empty and use '<|FINAL_ANSWER_...|>' tags after JSON. ⚠️ CRITICAL: answer_payload and <|FINAL_ANSWER_...|> are STRICTLY MUTUALLY EXCLUSIVE - never use both simultaneously.`,
+			),
 		),
-		aitool.WithStringParam("answer_payload", aitool.WithParam_Description("Provide the final, complete answer for the user here. The content should be self-contained and ready to be displayed."), aitool.WithParam_Required(true)),
-	}
-
-	opts = append(opts, aitool.WithStructParam(
-		"next_action",
-		[]aitool.PropertyOption{
-			aitool.WithParam_Description("Contains the direct answer action."),
-		},
-		actionFields...,
-	), aitool.WithStringParam(
-		"cumulative_summary",
-		aitool.WithParam_Required(true),
-		aitool.WithParam_Description("An evolving summary of the conversation. Update this field to include key information from the current interaction that should be remembered for future responses. Include topics discussed, user preferences, important context, and relevant details. If this is the first interaction, create a new summary. If there's existing context, build upon it."),
-	))
-	return aitool.NewObjectSchemaWithAction(opts...)
+	)
 }

@@ -5,10 +5,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/schema"
 	"io"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
@@ -21,7 +22,15 @@ func (r *ReActLoop) createAITagStreamMirrors(taskIndex string, nonce string, str
 	var aiTagStreamMirror []func(io.Reader)
 	var emitter = r.GetEmitter()
 	var mirrorStart = time.Now()
-	for _, _tagInstance := range r.aiTagFields.Values() {
+
+	tagFields := r.aiTagFields.Copy()
+	for _, i := range r.GetAllActions() {
+		for _, field := range i.AITagStreamFields {
+			tagFields.Set(field.TagName, field)
+		}
+	}
+
+	for _, _tagInstance := range tagFields.Values() {
 		v := _tagInstance
 		aiTagStreamMirror = append(aiTagStreamMirror, func(reader io.Reader) {
 			log.Debugf("[ai-tag] mirror[%s] started, time since mirror start: %v", v.TagName, time.Since(mirrorStart))
