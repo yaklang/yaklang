@@ -161,7 +161,6 @@ type DirectlyAnswerPromptData struct {
 	Language           string
 	Schema             string
 	DynamicContext     string
-	EnhanceData        []string
 }
 
 // ToolReSelectPromptData contains data for tool reselection prompt template
@@ -406,23 +405,23 @@ func (pm *PromptManager) GenerateAIReviewPrompt(userQuery, toolOrTitle, params s
 }
 
 // GenerateDirectlyAnswerPrompt generates directly answer prompt using template
-func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool, enhanceData ...string) (string, error) {
+func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []*aitool.Tool) (string, string, error) {
 	var directlyAnswerSchema = getDirectlyAnswer()
 
+	nonceString := utils.RandStringBytes(4)
 	// Build template data
 	data := &DirectlyAnswerPromptData{
 		AllowPlan:      false,
 		CurrentTime:    time.Now().Format("2006-01-02 15:04:05"),
 		OSArch:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		UserQuery:      userQuery,
-		Nonce:          utils.RandStringBytes(4),
+		Nonce:          nonceString,
 		Language:       pm.react.config.language,
 		Schema:         directlyAnswerSchema,
 		Tools:          tools,
 		ToolsCount:     len(tools),
 		TopToolsCount:  pm.react.config.topToolsCount,
 		DynamicContext: pm.DynamicContext(),
-		EnhanceData:    enhanceData,
 	}
 
 	// Set working directory
@@ -447,7 +446,8 @@ func (pm *PromptManager) GenerateDirectlyAnswerPrompt(userQuery string, tools []
 		data.Timeline = pm.react.config.timeline.Dump()
 	}
 
-	return pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
+	result, err := pm.executeTemplate("directly-answer", directlyAnswerPromptTemplate, data)
+	return result, nonceString, err
 }
 
 // GenerateToolReSelectPrompt generates tool reselection prompt using template
