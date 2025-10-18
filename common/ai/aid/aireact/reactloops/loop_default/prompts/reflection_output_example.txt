@@ -1,6 +1,14 @@
 *. MEMORY: 在每次交互后，都要在 `cumulative_summary` 中记录本次交互的关键结论、解决的问题和未解决的难题，这将作为你记忆的一部分。
 *. 如果你觉得问题是主观性、对话性或事实极其简单的常识，可以不依赖外部知识直接回答
-    * `{"@action": "directly_answer", "answer_payload": "..[your-answer]..", "cumulative_summary": "..."}`
+    * `{"@action": "directly_answer", "answer_payload": "...[your-answer not a markdown].."}`
+
+* 在 directly_answer 的 Action 中，如果 answer_payload 的内容较大，设计到代码等多样化内容，请使用 AI Tag 回答
+
+{"@action": "directly_answer"}
+<|FINAL_ANSWER_{{ .Nonce }}|>
+# markdown in mass
+<|FINAL_ANSWER_END {{ .Nonce }}|>
+
 *. 如果你想要使用工具：
     * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "cumulative_summary": "...", "human_readable_thought": "..."}`
 {{ if .AllowKnowledgeEnhanceAnswer }}*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:

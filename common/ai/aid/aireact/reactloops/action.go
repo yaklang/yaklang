@@ -12,13 +12,14 @@ type LoopActionHandlerFunc func(loop *ReActLoop, action *aicommon.Action, operat
 
 type LoopAction struct {
 	// plan 与 forge executor 会允许支持异步执行，异步情况下仍然允许对话和其他功能
-	AsyncMode      bool
-	ActionType     string `json:"type"`
-	Description    string `json:"description"`
-	Options        []aitool.ToolOption
-	ActionVerifier LoopActionVerifierFunc
-	ActionHandler  LoopActionHandlerFunc
-	StreamFields   []*LoopStreamField
+	AsyncMode         bool
+	ActionType        string `json:"type"`
+	Description       string `json:"description"`
+	Options           []aitool.ToolOption
+	ActionVerifier    LoopActionVerifierFunc
+	ActionHandler     LoopActionHandlerFunc
+	StreamFields      []*LoopStreamField
+	AITagStreamFields []*LoopAITagField
 }
 
 func buildSchema(actions ...*LoopAction) string {
