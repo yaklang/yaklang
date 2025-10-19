@@ -218,4 +218,7 @@ var CodecExports = map[string]interface{}{
 
 	"IsUTF8":     codec.IsUTF8,
 	"IsUTF8File": codec.IsUTF8File,
+
+	"RandBytes":       codec.RandBytes,
+	"CryptoRandBytes": codec.RandBytes,
 }
