@@ -70,6 +70,12 @@ func init() {
 						"check-filepath",
 						utils.MustRenderTemplate(
 							`
+你的目标是根据用户输入，判断这是创建一个新文件名还是使用用户提供的已有文件。
+
+*. 一般来说，如果要修改某一个文件，用户会在输入中或者其他上下文中告诉你具体文件名。
+*. 如果你可以在上下文中找到用户提到的文件名，根据描述信息决定是否使用已有文件名。
+*. 如果用户仅仅只是描述想要实现的功能，而没有提及具体文件名，那么通常是创建一个新文件的任务。
+
 <|DATA_{{ .nonce }}|>
 {{ .data }}
 <|DATA_END_{{ .nonce }}|>
@@ -81,6 +87,7 @@ func init() {
 						[]aitool.ToolOption{
 							aitool.WithBoolParam("create_new_file", aitool.WithParam_Description("Is this task to create a new file or modify an existing file? If modifying an existing file, return the file path to modify in 'existed_filepath' and set 'create_new_file' to false. If creating a new file, set 'create_new_file' to true and the system will create it automatically."), aitool.WithParam_Required(true)),
 							aitool.WithStringParam("existed_filepath", aitool.WithParam_Description("Effective only when create_new_file is false. Set this field to the file path of the existing file to be modified.")),
+							aitool.WithBoolParam("reason", aitool.WithParam_Description("给出这么做的理由，例如：'用户让我在/tmp/test.yak 创建文件，所以直接使用用户路径，无需创建新文件'"), aitool.WithParam_Required(true)),
 						},
 					)
 					if err != nil {
@@ -89,19 +96,24 @@ func init() {
 					}
 					// loading filename
 					createNewFile := result.GetBool("create_new_file")
-					if !createNewFile {
-						existed := result.GetString("existed_filepath")
-						if existed == "" {
-							return utils.Errorf("failed to identify 'existed_filepath': %v", err)
-						}
-						targetPath := result.GetString("existed_filepath")
+
+					reason := result.GetString("reason")
+					existed := result.GetString("existed_filepath")
+
+					r.GetConfig().GetEmitter().EmitThoughtStream(task.GetIndex(), reason)
+
+					log.Infof("identified create_new_file: %v", createNewFile)
+					if !createNewFile || existed != "" {
+						targetPath := existed
+						log.Infof("identified target path: %s", targetPath)
 						filename := utils.GetFirstExistedFile(targetPath)
 						if filename == "" {
 							var createFileErr error
-							createFileErr = os.WriteFile(filename, nil, 0644)
+							createFileErr = os.WriteFile(targetPath, []byte(""), 0644)
 							if createFileErr != nil {
 								return utils.Errorf("not found existed file and cannot create file to disk, failed: %v", createFileErr)
 							}
+							filename = targetPath
 						}
 						r.GetConfig().GetEmitter().EmitPinFilename(filename)
 						loop.Set("filename", filename)
