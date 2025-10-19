@@ -41,7 +41,7 @@ func (r *ReAct) DirectlyAnswer(query string, tools []*aitool.Tool) (string, erro
 					aitag.WithCallback("FINAL_ANSWER", nonceStr, func(rd io.Reader) {
 						var out bytes.Buffer
 						r.Emitter.EmitTextMarkdownStreamEvent(
-							"re-act-loop-final-answer",
+							"re-act-loop-answer-payload",
 							io.TeeReader(rd, &out),
 							rsp.GetTaskIndex(),
 							func() {
