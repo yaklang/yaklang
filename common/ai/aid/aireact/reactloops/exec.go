@@ -324,6 +324,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 
 	defer func() {
 		if err := recover(); err != nil {
+			utils.PrintCurrentGoroutineRuntimeStack()
 			abort(utils.Errorf("ReActLoop panicked: %v", err))
 		} else {
 			complete(nil)
