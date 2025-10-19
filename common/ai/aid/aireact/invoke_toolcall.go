@@ -12,10 +12,13 @@ import (
 
 // ExecuteToolRequiredAndCall handles tool requirement action using aicommon.ToolCaller
 func (r *ReAct) ExecuteToolRequiredAndCall(toolName string) (*aitool.ToolResult, bool, error) {
-	currentTaskId := r.currentTask.GetId()
+	var taskId string
+	if !utils.IsNil(r.currentTask) {
+		taskId = r.currentTask.GetId()
+	}
 	r.config.Emitter = r.config.Emitter.PushEventProcesser(func(event *schema.AiOutputEvent) *schema.AiOutputEvent {
 		if event != nil && event.TaskIndex == "" {
-			event.TaskIndex = currentTaskId
+			event.TaskIndex = taskId
 		}
 		return event
 	})
