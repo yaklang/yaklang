@@ -59,7 +59,7 @@ println("a")
 		rsp.Close()
 		return rsp, nil
 	}
-	
+
 	fmt.Println("Unexpected prompt:", prompt)
 
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
