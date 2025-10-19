@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-var modifyCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.ReActLoopOption {
+var modifyCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"modify_code",
 		"do NOT use this action to create new code file, ONLY use it to modify existing code. Modify the code between the specified line numbers (inclusive). The line numbers are 1-based, meaning the first line of the file is line 1. Ensure that the 'modify_start_line' is less than or equal to 'modify_end_line'.",
@@ -41,6 +41,12 @@ var modifyCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.Re
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			filename := loop.Get("filename")
+			if filename == "" {
+				op.Fail("no filename found in loop context for modify_code action")
+				return
+			}
+
 			invoker := loop.GetInvoker()
 
 			fullCode := loop.Get("full_code")

@@ -71,6 +71,13 @@ println("modifiedcodecodecode")
 		return rsp, nil
 	}
 
+	if utils.MatchAllOfSubString(prompt, `"@action"`, `"create_new_file"`, `"check-filepath"`, `"existed_filepath"`) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`{"@action": "check-filepath", "create_new_file": true}`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	fmt.Println("Unexpected prompt:", prompt)
 
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
