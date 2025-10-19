@@ -135,6 +135,15 @@ func mockedToolCallingWithAIMemory2(i aicommon.AICallerConfigIf, req *aicommon.A
 
 	}
 
+	if utils.MatchAllOfSubString(prompt, `<|TAGS_END_`, `<|INPUT_END`, `<|INPUT_`) {
+		rsp := i.NewAIResponse()
+		rsp.EmitOutputStream(bytes.NewBufferString(`
+{"@action": "tag-selection", "tags": ["工具拒绝", "测试场景"]}
+`))
+		rsp.Close()
+		return rsp, nil
+	}
+
 	fmt.Println("Unexpected prompt:", prompt)
 
 	return nil, utils.Errorf("unexpected prompt: %s", prompt)
