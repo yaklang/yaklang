@@ -295,7 +295,18 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 			fmt.Printf("re-act loop [%v] task init handler start to execute\n", r.loopName)
 			fmt.Println("================================================")
 		})
-		r.initHandler(task)
+		initErr := r.initHandler(r, task)
+		if initErr != nil {
+			inv := r.GetInvoker()
+			inv.AddToTimeline("error", fmt.Sprintf("ReActLoop[%v] task init handler execute failed: %v", r.loopName, initErr))
+			query := "Task initialization failed: " + initErr.Error() + "\n\n Origin INPUT: " + task.GetUserInput() + "\n\n Please give some practical advice for fix this issue or help user"
+			result, err := inv.DirectlyAnswer(query, nil)
+			if err != nil {
+				return utils.Errorf("re-act loop [%v] task init handler execute failed: %v; additionally, failed to get direct answer: %v", r.loopName, initErr, err)
+			}
+			inv.EmitFileArtifactWithExt("init_error_advice.txt", ".md", result)
+			return utils.Errorf("re-act loop [%v] task init handler execute failed: %v", r.loopName, initErr)
+		}
 	}
 
 	done := utils.NewOnce()

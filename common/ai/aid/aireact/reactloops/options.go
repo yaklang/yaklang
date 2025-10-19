@@ -236,7 +236,7 @@ func WithOnPostIteraction(fn func(loop *ReActLoop, iteration int, task aicommon.
 	}
 }
 
-func WithInitTask(initHandler func(task aicommon.AIStatefulTask)) ReActLoopOption {
+func WithInitTask(initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask) error) ReActLoopOption {
 	return func(r *ReActLoop) {
 		r.initHandler = initHandler
 	}

@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-var insertCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.ReActLoopOption {
+var insertCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"insert_code",
 		"Insert new code at the specified line number. The line number is 1-based, meaning the first line of the file is line 1. The code will be inserted at the beginning of the specified line, pushing existing content down.",
@@ -39,8 +39,13 @@ var insertCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.Re
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
-			invoker := loop.GetInvoker()
+			filename := loop.Get("filename")
+			if filename == "" {
+				op.Fail("no filename found in loop context for insert_code action")
+				return
+			}
 
+			invoker := loop.GetInvoker()
 			fullCode := loop.Get("full_code")
 			partialCode := loop.Get("yak_code")
 			editor := memedit.NewMemEditor(fullCode)

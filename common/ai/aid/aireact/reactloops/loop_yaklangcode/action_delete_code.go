@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
-var deleteCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.ReActLoopOption {
+var deleteCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"delete_code",
 		"Delete code lines between the specified line numbers (inclusive). The line numbers are 1-based, meaning the first line of the file is line 1. If only 'delete_start_line' is provided, only that single line will be deleted. If both 'delete_start_line' and 'delete_end_line' are provided, all lines in the range will be deleted.",
@@ -51,6 +51,12 @@ var deleteCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.Re
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
+			filename := loop.Get("filename")
+			if filename == "" {
+				op.Fail("no filename found in loop context for delete_code action")
+				return
+			}
+
 			invoker := loop.GetInvoker()
 
 			fullCode := loop.Get("full_code")
