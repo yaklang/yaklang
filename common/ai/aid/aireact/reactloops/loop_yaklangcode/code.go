@@ -86,6 +86,8 @@ func init() {
 				queryDocumentAction(r, docSearcher),
 				writeCode(r, filename),
 				modifyCode(r, filename),
+				insertCode(r, filename),
+				deleteCode(r, filename),
 			}
 
 			preset = append(preset, opts...)
