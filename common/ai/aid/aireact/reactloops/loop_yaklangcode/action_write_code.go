@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-var writeCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.ReActLoopOption {
+var writeCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopAction(
 		"write_code",
 		"If there is NO CODE, you need to create a new file, then use 'write_code'. If there is already code, it is forbidden to use 'write_code' as it will forcibly overwrite the previous code. You must use 'modify_code' to modify the code.",
@@ -19,6 +19,11 @@ var writeCode = func(r aicommon.AIInvokeRuntime, filename string) reactloops.ReA
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
+			filename := loop.Get("filename")
+			if filename == "" {
+				filename = r.EmitFileArtifactWithExt("gen_code", ".yak", "")
+			}
+
 			invoker := loop.GetInvoker()
 
 			invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)

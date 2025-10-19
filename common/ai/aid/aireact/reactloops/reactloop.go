@@ -72,7 +72,7 @@ type ReActLoop struct {
 	onPostIteration     func(loop *ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any)
 
 	// 启动这个 loop 的时候马上要执行的事情
-	initHandler func(task aicommon.AIStatefulTask)
+	initHandler func(loop *ReActLoop, task aicommon.AIStatefulTask) error
 }
 
 func (r *ReActLoop) getRenderInfo() (string, map[string]any, error) {

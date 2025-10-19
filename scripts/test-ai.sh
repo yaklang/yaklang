@@ -1,9 +1,13 @@
 #!/bin/bash -e
 
+clear
+clear
+
 set -e
 set -o pipefail
 
 export GITHUB_ACTIONS=true
+
 
 go test -v -timeout 3m ./common/ai/aid/... 2>&1 | tee /tmp/ai_aid_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/ai_aid_test.log; }
 go test -v -timeout 60s ./common/ai/tests/... 2>&1 | tee /tmp/ai_tests_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/ai_tests_test.log; }
