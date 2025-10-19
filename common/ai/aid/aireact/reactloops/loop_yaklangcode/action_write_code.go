@@ -24,6 +24,7 @@ var writeCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 				filename = r.EmitFileArtifactWithExt("gen_code", ".yak", "")
 			}
 
+			log.Infof("loop yaklang coding start to exec writing code to file %s", filename)
 			invoker := loop.GetInvoker()
 
 			invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)
