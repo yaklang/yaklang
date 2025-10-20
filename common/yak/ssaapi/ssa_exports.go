@@ -424,7 +424,7 @@ func WithMemory(ttl ...time.Duration) Option {
 }
 
 func WithSSAConfig(sc *ssaconfig.Config) Option {
-	return func(c *config) error {
+	return func(c *Config) error {
 		if sc != nil {
 			c.Config = sc
 		}
