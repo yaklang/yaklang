@@ -19,8 +19,9 @@ import (
 // and load the data from database when the data is not in cache.
 
 type ProgramCache struct {
-	program *Program // mark which program handled
-	DB      *gorm.DB
+	program          *Program // mark which program handled
+	ProgramCacheKind ProgramCacheKind
+	DB               *gorm.DB
 
 	InstructionCache *Cache[Instruction]
 	TypeCache        *Cache[Type]
@@ -47,7 +48,8 @@ func NewDBCache(prog *Program, databaseKind ProgramCacheKind, fileSize int, Conf
 	compileCtx := context.Background()
 	cacheCtx, cancel := context.WithCancel(compileCtx)
 	cache := &ProgramCache{
-		program: prog,
+		program:          prog,
+		ProgramCacheKind: databaseKind,
 		// set ttl
 		cacheCtxCancel: cancel,
 		waitGroup:      &sync.WaitGroup{},
@@ -108,13 +110,15 @@ func (c *ProgramCache) GetInstruction(id int64) Instruction {
 		return ret
 	}
 
-	if inst, err := NewLazyInstruction(c.program, id); err == nil {
-		c.InstructionCache.Set(inst)
-		return inst
-	} else {
-		log.Errorf("LazyInstruction Create faild: %v", err)
-		return nil
+	if c.ProgramCacheKind == ProgramCacheDBRead {
+		if inst, err := NewLazyInstruction(c.program, id); err == nil {
+			c.InstructionCache.Set(inst)
+			return inst
+		} else {
+			log.Debugf("LazyInstruction Create faild: %v", err)
+		}
 	}
+	return nil
 
 }
 

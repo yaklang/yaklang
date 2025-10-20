@@ -77,45 +77,6 @@ func YieldModel[T any](ctx context.Context, db *gorm.DB, opts ...YieldModelOpts)
 	}
 }
 
-func FastPagination[T any](ctx context.Context, db *gorm.DB, cfg *YieldModelConfig, opts ...FastPaginatorOpts) chan T {
-	outC := make(chan T)
-	go func() {
-		defer close(outC)
-		size := 0
-		if cfg != nil {
-			if cfg.Size > 0 {
-				size = cfg.Size
-			}
-			if cfg.IndexField != "" {
-				opts = append(opts, WithFastPaginator_IndexField(cfg.IndexField))
-			}
-		}
-
-		paginator := NewFastPaginator(db, size, opts...)
-		if cfg != nil && cfg.CountCallback != nil {
-			cfg.CountCallback(paginator.totalRecord)
-		}
-		for {
-			var items []T
-			if err, ok := paginator.Next(&items); !ok {
-				break
-			} else if err != nil {
-				log.Errorf("paging failed: %s", err)
-				break
-			}
-
-			for _, d := range items {
-				select {
-				case <-ctx.Done():
-					return
-				case outC <- d:
-				}
-			}
-		}
-	}()
-	return outC
-}
-
 func normalPagination[T any](cfg *YieldModelConfig, ctx context.Context, db *gorm.DB) chan T {
 	outC := make(chan T)
 	total := 0
