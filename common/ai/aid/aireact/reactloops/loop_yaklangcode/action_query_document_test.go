@@ -110,10 +110,8 @@ func TestSearchYakdocLibraries_LibFunctionGlobs(t *testing.T) {
 	for _, result := range results {
 		assert.Contains(t, result.Path, "yakdoc://func/")
 		assert.Contains(t, result.Content, "# Function:")
-		// Should contain either Rand-related functions or str.Split
-		hasRand := result.Content != "" && (result.Content == result.Content && // placeholder for actual content check
-			true) // We'll check the actual content structure
-		_ = hasRand // avoid unused variable warning
+		// Verify that the content is not empty and contains function information
+		assert.NotEmpty(t, result.Content, "Function content should not be empty")
 	}
 }
 
