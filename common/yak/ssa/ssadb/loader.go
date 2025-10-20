@@ -4,66 +4,69 @@ import (
 	"context"
 
 	"github.com/jinzhu/gorm"
+	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
 	"github.com/yaklang/yaklang/common/utils/glob"
 )
 
 func YieldIrCode(DB *gorm.DB, ctx context.Context, progName string) chan *IrCode {
 	db := DB.Model(&IrCode{}).Where("program_name = ?", progName)
-	filter := make(map[int64]struct{})
-	outC := make(chan *IrCode)
-	go func() {
-		defer close(outC)
-		ch := bizhelper.FastPagination[int64](ctx, db, nil, bizhelper.WithFastPaginator_FindField("code_id"))
-		for ir := range ch {
-			if ir <= 0 {
-				continue
-			}
-			if _, ok := filter[ir]; ok {
-				continue
-			}
-			filter[ir] = struct{}{}
-
-			code := GetIrCodeById(GetDB(), progName, ir)
-			if code == nil {
-				continue
-			}
-			select {
-			case <-ctx.Done():
-				return
-			case outC <- code:
-			}
-		}
-	}()
-	return outC
+	ids := make([]int64, 0)
+	if err := db.Pluck("code_id", &ids).Error; err != nil {
+		log.Errorf("failed to get ids: %v", err)
+	}
+	return yieldCodeWithCache(ctx, DB, progName, ids)
 }
 
-func yieldIrIndex(DB *gorm.DB, ctx context.Context) chan *IrCode {
-	db := DB.Model(&IrIndex{})
-	outC := make(chan *IrCode)
+func yieldIrIndex(DB *gorm.DB, ctx context.Context, progName string) chan *IrCode {
 	filter := make(map[int64]struct{})
+	db := DB.Model(&IrIndex{})
+	indexCh := bizhelper.YieldModel[*IrIndex](ctx, db, bizhelper.WithYieldModel_Fast())
+	for index := range indexCh {
+		if index == nil {
+			break
+		}
+		// skip duplicate
+		if _, ok := filter[index.ValueID]; ok {
+			continue
+		}
+		filter[index.ValueID] = struct{}{}
+	}
+
+	ids := lo.MapToSlice(filter, func(id int64, _ struct{}) int64 { return id })
+	return yieldCodeWithCache(ctx, GetDB(), progName, ids)
+}
+
+func yieldCodeWithCache(ctx context.Context, _ *gorm.DB, progName string, ids []int64) chan *IrCode {
+	outC := make(chan *IrCode)
 	go func() {
 		defer close(outC)
-		ch := bizhelper.YieldModel[*IrIndex](ctx, db, bizhelper.WithYieldModel_Fast())
-		for index := range ch {
-			if index == nil {
-				break
-			}
-			// skip duplicate
-			if _, ok := filter[index.ValueID]; ok {
-				continue
-			}
-			filter[index.ValueID] = struct{}{}
-			// get ir code
-			code := GetIrCodeById(GetDB(), index.ProgramName, index.ValueID)
-			select {
-			case <-ctx.Done():
-				return
-			case outC <- code:
+		idsToLoad := make([]int64, 0, len(ids))
+		// 先从缓存加载
+		for _, id := range ids {
+			key := dbKey(progName, id)
+			if ir, ok := irCodeCache.Get(key); ok {
+				outC <- ir
+			} else {
+				idsToLoad = append(idsToLoad, id)
 			}
 		}
+		if len(idsToLoad) == 0 {
+			return
+		}
 
+		// 批量加载缺失的数据
+		db := GetDB().Model(&IrCode{}).Where("program_name = ?", progName)
+		ch := bizhelper.FastPagination[*IrCode](ctx, db, nil,
+			bizhelper.WithFastPaginator_IDs(idsToLoad), bizhelper.WithFastPaginator_IndexField("code_id"),
+		)
+		for ir := range ch {
+			key := dbKey(progName, ir.CodeID)
+			irCodeCache.Set(key, ir)
+			outC <- ir
+		}
 	}()
+
 	return outC
 }
 
@@ -110,7 +113,7 @@ func ExactSearchVariable(DB *gorm.DB, ctx context.Context, progName string, mod 
 		db = db.Where("variable_name = ? OR class_name = ? OR field_name = ?", value, value, value)
 	}
 
-	return yieldIrIndex(db, ctx)
+	return yieldIrIndex(db, ctx, progName)
 }
 
 func GlobSearchVariable(DB *gorm.DB, ctx context.Context, progName string, mod int, value string) chan *IrCode {
@@ -132,7 +135,7 @@ func RegexpSearchVariable(DB *gorm.DB, ctx context.Context, progName string, mod
 	case BothMatch:
 		db = db.Where("variable_name REGEXP ? OR class_name REGEXP ? OR field_name REGEXP ?", value, value, value)
 	}
-	return yieldIrIndex(db, ctx)
+	return yieldIrIndex(db, ctx, progName)
 }
 
 func SearchIrCodeByOpcodes(db *gorm.DB, ctx context.Context, progName string, opcodes ...int) chan *IrCode {
