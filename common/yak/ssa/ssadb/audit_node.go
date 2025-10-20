@@ -2,8 +2,11 @@ package ssadb
 
 import (
 	"context"
+	"math/rand"
+	"time"
 
 	"github.com/jinzhu/gorm"
+	"github.com/oklog/ulid"
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/bizhelper"
@@ -34,6 +37,8 @@ type AuditNode struct {
 	// value
 	IRCodeID int64 `json:"ir_code_id"`
 
+	NodeID string `json:"node_id" gorm:"index;type:char(26)"`
+
 	// if IrCodeId is -1, TmpCode  will be used
 	TmpValue         string `json:"tmp_code"`
 	TmpValueFileHash string `json:"tmp_value_file_hash"`
@@ -41,6 +46,23 @@ type AuditNode struct {
 	TmpEndOffset     int    `json:"tmp_end_offset"`
 
 	VerboseName string `json:"verbose_name"`
+}
+
+// 你需要一个熵源 (entropy source)
+// 在你的应用启动时初始化一次即可
+var ulidEntropy = ulid.Monotonic(rand.New(rand.NewSource(time.Now().UnixNano())), 0)
+
+// 生成一个新的 ULID 字符串的辅助函数
+func NewULID() string {
+	// Monotonic 确保了即使在同一毫秒内快速连续调用，ID 也是递增的
+	id := ulid.MustNew(ulid.Timestamp(time.Now()), ulidEntropy)
+	return id.String()
+}
+
+func CreateAuditNode() *AuditNode {
+	return &AuditNode{
+		NodeID: NewULID(),
+	}
 }
 
 type ResultVariable struct {
@@ -86,66 +108,66 @@ func GetResultValueByVariable(db *gorm.DB, resultID uint, resultVariable string)
 	return items, nil
 }
 
-func GetResultNodeByVariableIndex(db *gorm.DB, resultID uint, resultVariable string, resultIndex uint) (uint, error) {
+func GetResultNodeByVariableIndex(db *gorm.DB, resultID uint, resultVariable string, resultIndex uint) (string, error) {
 	var node AuditNode
 	if err := db.Model(&AuditNode{}).
 		Where("result_id = ? and result_variable = ? and result_index = ? and is_entry_node = true ",
 			resultID, resultVariable, resultIndex).First(&node).Error; err != nil {
-		return 0, err
+		return "", err
 	}
-	return uint(node.ID), nil
+	return node.NodeID, nil
 }
 
-func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]uint, error) {
+func GetResultNodeByVariable(db *gorm.DB, resultID uint, resultVariable string) ([]string, error) {
 	// db = db.Debug()
 	// get andit node by result_id, unique by result_variable, and get number of result_variable
-	var items []uint
+	var items []string
 	if err := db.Model(&AuditNode{}).Order("result_index ASC, id ASC").
 		Where("result_id = ? and result_variable = ? and is_entry_node = true", resultID, resultVariable).
-		Pluck("id", &items).Error; err != nil {
+		Pluck("node_id", &items).Error; err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
-func GetResultNodeByRiskHash(db *gorm.DB, riskHash string) ([]uint, error) {
-	var items []uint
+func GetResultNodeByRiskHash(db *gorm.DB, riskHash string) ([]string, error) {
+	var items []string
 	if err := db.Model(&AuditNode{}).
 		Where("risk_hash = ? and is_entry_node = true", riskHash).
-		Pluck("id", &items).Error; err != nil {
+		Pluck("node_id", &items).Error; err != nil {
 		return nil, err
 	}
 	return items, nil
 }
 
-func GetEffectOnEdgeByFromNodeId(id uint) []uint {
+func GetEffectOnEdgeByFromNodeId(id string) []string {
 	db := GetDB()
-	var effectOns []uint
+	var effectOns []string
 	db.Model(&AuditEdge{}).
 		Where(" from_node = ? AND edge_type = ? ", id, EdgeType_EffectsOn).
 		Pluck("to_node", &effectOns)
 	return effectOns
 }
 
-func GetDependEdgeOnByFromNodeId(id uint) []uint {
+func GetDependEdgeOnByFromNodeId(id string) []string {
 	db := GetDB()
-	var dependOns []uint
+	var dependOns []string
 	db.Model(&AuditEdge{}).
 		Where("from_node =? AND edge_type = ? ", id, EdgeType_DependsOn).
 		Pluck("to_node", &dependOns)
 	return dependOns
 }
 
-func GetDataFlowEdgeByToNodeId(fromId uint) []uint {
+func GetDataFlowEdgeByToNodeId(fromId uint) []string {
 	db := GetDB()
-	var edges []uint
+	var edges []string
 	db.Model(&AuditEdge{}).
 		Where("from_node = ? AND edge_type = ?", fromId, EdgeType_DataFlow).
 		Pluck("to_node", &edges)
 	return edges
 }
 
-func GetPredecessorEdgeByFromID(fromId uint) []*AuditEdge {
+func GetPredecessorEdgeByFromID(fromId string) []*AuditEdge {
 	db := GetDB()
 	var edges []*AuditEdge
 	db.Model(&AuditEdge{}).
@@ -154,20 +176,20 @@ func GetPredecessorEdgeByFromID(fromId uint) []*AuditEdge {
 	return edges
 }
 
-func GetAuditNodeById(id uint) (*AuditNode, error) {
+func GetAuditNodeById(id string) (*AuditNode, error) {
 	db := GetDB()
 	var an AuditNode
-	if err := db.Model(&AuditNode{}).Where("id = ?", id).First(&an).Error; err != nil {
+	if err := db.Model(&AuditNode{}).Where("node_id = ?", id).First(&an).Error; err != nil {
 		return nil, err
 	} else {
 		return &an, nil
 	}
 }
 
-func GetAuditNodesByIds(ids []uint) ([]*AuditNode, error) {
+func GetAuditNodesByIds(ids []string) ([]*AuditNode, error) {
 	db := GetDB()
 	var ans []*AuditNode
-	if err := db.Model(&AuditNode{}).Where("id IN (?)", ids).Find(&ans).Error; err != nil {
+	if err := db.Model(&AuditNode{}).Where("node_id IN (?)", ids).Find(&ans).Error; err != nil {
 		return nil, err
 	} else {
 		return ans, nil
@@ -207,8 +229,8 @@ type AuditEdge struct {
 	ResultId uint `json:"result_id" gorm:"index"`
 
 	// edge
-	FromNode uint `json:"from_node" gorm:"index"`
-	ToNode   uint `json:"to_node" gorm:"index"`
+	FromNode string `json:"from_node" gorm:"index;type:char(26)"`
+	ToNode   string `json:"to_node" gorm:"index;type:char(26)"`
 
 	// program
 	ProgramName string `json:"program_name" gorm:"index"`
@@ -221,11 +243,11 @@ type AuditEdge struct {
 	AnalysisLabel string
 }
 
-func (n *AuditNode) CreateDependsOnEdge(progName string, to uint) *AuditEdge {
+func (n *AuditNode) CreateDependsOnEdge(progName string, to *AuditNode) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName: progName,
-		FromNode:    n.ID,
-		ToNode:      to,
+		FromNode:    n.NodeID,
+		ToNode:      to.NodeID,
 		EdgeType:    EdgeType_DependsOn,
 		TaskId:      n.TaskId,
 		ResultId:    n.ResultId,
@@ -233,11 +255,11 @@ func (n *AuditNode) CreateDependsOnEdge(progName string, to uint) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
+func (n *AuditNode) CreateEffectsOnEdge(progName string, to *AuditNode) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName: progName,
-		FromNode:    n.ID,
-		ToNode:      to,
+		FromNode:    n.NodeID,
+		ToNode:      to.NodeID,
 		EdgeType:    EdgeType_EffectsOn,
 		TaskId:      n.TaskId,
 		ResultId:    n.ResultId,
@@ -245,23 +267,11 @@ func (n *AuditNode) CreateEffectsOnEdge(progName string, to uint) *AuditEdge {
 	return ae
 }
 
-func (n *AuditNode) CreateDataFlowEdge(progName string, to uint) *AuditEdge {
-	ae := &AuditEdge{
-		ProgramName: progName,
-		FromNode:    to,
-		ToNode:      n.ID,
-		EdgeType:    EdgeType_DataFlow,
-		TaskId:      n.TaskId,
-		ResultId:    n.ResultId,
-	}
-	return ae
-}
-
-func (n *AuditNode) CreatePredecessorEdge(progName string, to uint, step int64, label string) *AuditEdge {
+func (n *AuditNode) CreatePredecessorEdge(progName string, to *AuditNode, step int64, label string) *AuditEdge {
 	ae := &AuditEdge{
 		ProgramName:   progName,
-		FromNode:      n.ID,
-		ToNode:        to,
+		FromNode:      n.NodeID,
+		ToNode:        to.NodeID,
 		EdgeType:      EdgeType_Predecessor,
 		AnalysisStep:  step,
 		AnalysisLabel: label,
