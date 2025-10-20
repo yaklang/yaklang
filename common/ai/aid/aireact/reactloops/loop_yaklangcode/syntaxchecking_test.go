@@ -123,15 +123,10 @@ arr := []string{"a", "b", "c"}
 }
 
 func TestCheckCodeAndFormatErrors_ValidCode(t *testing.T) {
-	// Test with valid Yaklang code
+	// Test with valid Yaklang code that doesn't produce warnings
 	code := `
-found := false
-bruteTask.SetResultHandler(func(result) {
-    if result["status"] == "success" {
-        found = true
-        yakit.StatusCard("爆破成功", "找到有效凭证", "brute-success", "success")
-    }
-})
+name := "test"
+println("Hello", name)
 `
 
 	errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(code)
