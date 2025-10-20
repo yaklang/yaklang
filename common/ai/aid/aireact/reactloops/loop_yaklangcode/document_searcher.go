@@ -3,6 +3,7 @@ package loop_yaklangcode
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
@@ -10,7 +11,15 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/ziputil"
+	"github.com/yaklang/yaklang/common/yak/yakurl"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// YakdocSearchResult represents a search result from yakdoc
+type YakdocSearchResult struct {
+	Path    string
+	Content string
+}
 
 // handleQueryDocument handles document query action
 // Returns: documentResults string, shouldContinue bool
@@ -84,6 +93,22 @@ func handleQueryDocument(
 		results = append(results, searchResults...)
 	}
 
+	// Search by lib_names and lib_function_globs using yakdoc
+	yakdocResults := searchYakdocLibraries(payloads)
+	if len(yakdocResults) > 0 {
+		// Convert yakdoc results to ziputil.GrepResult format for consistency
+		for _, yakdocResult := range yakdocResults {
+			grepResult := &ziputil.GrepResult{
+				FileName:    yakdocResult.Path,
+				LineNumber:  1,
+				Line:        yakdocResult.Content,
+				Score:       1.0, // Default score for yakdoc results
+				ScoreMethod: "yakdoc",
+			}
+			results = append(results, grepResult)
+		}
+	}
+
 	if len(results) == 0 {
 		invoker.AddToTimeline("query_document", "no results found")
 		return "No matching documents found for the query; ", false
@@ -150,4 +175,149 @@ func handleQueryDocument(
 	invoker.AddToTimeline("query_document", fmt.Sprintf("found %d documents (%d included)", len(rankedResults), includedResults))
 	invoker.GetConfig().GetEmitter().EmitJSON(schema.EVENT_TYPE_YAKLANG_CODE_EDITOR, "query_document", documentResults)
 	return documentResults, true
+}
+
+// searchYakdocLibraries searches yakdoc for library names and function globs using yakurl
+func searchYakdocLibraries(payloads aitool.InvokeParams) []*YakdocSearchResult {
+	var results []*YakdocSearchResult
+
+	// Search by lib_names (case insensitive)
+	libNames := payloads.GetStringSlice("lib_names")
+	for _, libName := range libNames {
+		// Use case insensitive library search
+		response, err := searchLibraryCaseInsensitive(libName)
+		if err != nil {
+			log.Warnf("failed to load yakdocument for lib '%s': %v", libName, err)
+			continue
+		}
+
+		resources := response.GetResources()
+		if len(resources) > 0 {
+			// Format library content from yakurl resources
+			content := fmt.Sprintf("# Library: %s\n\n", libName)
+
+			// Group resources by type
+			functions := make([]string, 0)
+			variables := make([]string, 0)
+
+			for _, resource := range resources {
+				switch resource.ResourceType {
+				case "function":
+					funcContent := fmt.Sprintf("### %s\n", resource.VerboseName)
+					// Extract content from Extra field
+					for _, extra := range resource.Extra {
+						if extra.Key == "Content" {
+							funcContent += extra.Value + "\n"
+							break
+						}
+					}
+					functions = append(functions, funcContent)
+				case "variable":
+					varContent := fmt.Sprintf("### %s\n", resource.VerboseName)
+					variables = append(variables, varContent)
+				}
+			}
+
+			// Add functions section
+			if len(functions) > 0 {
+				content += "## Functions:\n\n"
+				for _, funcContent := range functions {
+					content += funcContent + "\n"
+				}
+			}
+
+			// Add variables section
+			if len(variables) > 0 {
+				content += "## Variables/Instances:\n\n"
+				for _, varContent := range variables {
+					content += varContent + "\n"
+				}
+			}
+
+			results = append(results, &YakdocSearchResult{
+				Path:    fmt.Sprintf("yakdoc://lib/%s", libName),
+				Content: content,
+			})
+		}
+	}
+
+	// Search by lib_function_globs using yakurl fuzzy search (case insensitive)
+	functionGlobs := payloads.GetStringSlice("lib_function_globs")
+	for _, glob := range functionGlobs {
+		// Use yakurl fuzzy search for function patterns
+		// yakurl internally converts search terms to lowercase for fuzzy matching
+		yakURL := fmt.Sprintf("yakdocument://%s", glob)
+		response, err := yakurl.LoadGetResource(yakURL)
+		if err != nil {
+			log.Warnf("failed to search yakdocument for pattern '%s': %v", glob, err)
+			continue
+		}
+
+		resources := response.GetResources()
+		for _, resource := range resources {
+			if resource.ResourceType == "function" {
+				content := fmt.Sprintf("# Function: %s\n\n", resource.VerboseName)
+
+				// Extract function content from Extra field
+				for _, extra := range resource.Extra {
+					if extra.Key == "Content" {
+						content += extra.Value + "\n"
+						break
+					}
+				}
+
+				results = append(results, &YakdocSearchResult{
+					Path:    fmt.Sprintf("yakdoc://func/%s", resource.ResourceName),
+					Content: content,
+				})
+			}
+		}
+	}
+
+	return results
+}
+
+// searchLibraryCaseInsensitive searches for a library with case insensitive matching
+func searchLibraryCaseInsensitive(libName string) (*ypb.RequestYakURLResponse, error) {
+	// Try original case first
+	yakURL := fmt.Sprintf("yakdocument://%s/", libName)
+	response, err := yakurl.LoadGetResource(yakURL)
+
+	// If found resources, return immediately
+	if err == nil && len(response.GetResources()) > 0 {
+		return response, nil
+	}
+
+	// Try lowercase
+	lowerLibName := strings.ToLower(libName)
+	if lowerLibName != libName {
+		yakURL = fmt.Sprintf("yakdocument://%s/", lowerLibName)
+		response, err = yakurl.LoadGetResource(yakURL)
+		if err == nil && len(response.GetResources()) > 0 {
+			return response, nil
+		}
+	}
+
+	// Try uppercase
+	upperLibName := strings.ToUpper(libName)
+	if upperLibName != libName && upperLibName != lowerLibName {
+		yakURL = fmt.Sprintf("yakdocument://%s/", upperLibName)
+		response, err = yakurl.LoadGetResource(yakURL)
+		if err == nil && len(response.GetResources()) > 0 {
+			return response, nil
+		}
+	}
+
+	// Try title case
+	titleLibName := strings.Title(strings.ToLower(libName))
+	if titleLibName != libName && titleLibName != lowerLibName && titleLibName != upperLibName {
+		yakURL = fmt.Sprintf("yakdocument://%s/", titleLibName)
+		response, err = yakurl.LoadGetResource(yakURL)
+		if err == nil && len(response.GetResources()) > 0 {
+			return response, nil
+		}
+	}
+
+	// If all attempts failed, return the last error
+	return response, err
 }

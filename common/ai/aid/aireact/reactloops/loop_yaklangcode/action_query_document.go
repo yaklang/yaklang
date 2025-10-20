@@ -14,7 +14,7 @@ import (
 var queryDocumentAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.ZipGrepSearcher) reactloops.ReActLoopOption {
 	return reactloops.WithRegisterLoopActionWithStreamField(
 		"query_document",
-		"Query the document database or sample code to find relevant information.",
+		"查询Yaklang代码文档和库函数。支持关键字搜索（使用动宾结构，如'端口扫描'、'文件读取'）、正则表达式匹配、库名查询（如'str'、'http'）和函数模糊搜索（如'*Split*'、'str.Join'）。当你需要了解某个功能如何实现、查找特定函数或学习库的用法时使用此工具。",
 		[]aitool.ToolOption{
 			aitool.WithStructParam(
 				"query_document_payload",
@@ -46,9 +46,37 @@ var queryDocumentAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.
 		[]*reactloops.LoopStreamField{},
 		func(r *reactloops.ReActLoop, action *aicommon.Action) error {
 			payloads := action.GetInvokeParams("query_document_payload")
-			if len(payloads.GetStringSlice("keywords")) == 0 && len(payloads.GetStringSlice("regexp")) == 0 {
-				return utils.Error("query_document action must have at least one keyword or regexp in 'query_document_payload'")
+
+			// Check if at least one search parameter is provided
+			hasKeywords := len(payloads.GetStringSlice("keywords")) > 0
+			hasRegexp := len(payloads.GetStringSlice("regexp")) > 0
+			hasLibNames := len(payloads.GetStringSlice("lib_names")) > 0
+			hasLibFunctionGlobs := len(payloads.GetStringSlice("lib_function_globs")) > 0
+
+			if !hasKeywords && !hasRegexp && !hasLibNames && !hasLibFunctionGlobs {
+				return utils.Error("query_document action must have at least one of: keywords, regexp, lib_names, or lib_function_globs in 'query_document_payload'")
 			}
+
+			// Validate lib_names if provided
+			if hasLibNames {
+				libNames := payloads.GetStringSlice("lib_names")
+				for _, libName := range libNames {
+					if libName == "" {
+						return utils.Error("lib_names cannot contain empty strings")
+					}
+				}
+			}
+
+			// Validate lib_function_globs if provided
+			if hasLibFunctionGlobs {
+				globs := payloads.GetStringSlice("lib_function_globs")
+				for _, glob := range globs {
+					if glob == "" {
+						return utils.Error("lib_function_globs cannot contain empty strings")
+					}
+				}
+			}
+
 			return nil
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
