@@ -136,33 +136,35 @@ func (l *LiteForge) ExecuteEx(ctx context.Context, params []*ypb.ExecParamItem, 
 	}
 	call := callBuffer.String()
 
-	temp := `# Preset
+	temp := `# Core Instruction
+
 你现在在一个任务引擎中，是一个输出JSON的数据处理和总结提示小助手，我会为你提供一些基本信息和输入材料，你需要按照我的Schema生成一个JSON数据直接返回。
 
 作为系统的一部分你应该直接返回JSON，避免多余的解释。
 
-{{ if .PROMPT }}<background_{{ .NONCE }}>
+{{ if .PROMPT }}<|USER_INSTRUCT_{{ .NONCE }}|>
 {{ .PROMPT }}
-</background_{{ .NONCE }}>{{end}}
-{{ if .PARAMS }}<params_{{ .NONCE }}>
-{{ .PARAMS }}
-</params_{{ .NONCE }}>{{end}}
+<|USER_INSTRUCT_END_{{ .NONCE }}>{{end}}
 
-{{ if .MEMORY.PersistentMemory }}# 牢记
+{{ if .PARAMS }}<|PARAM_{{ .NONCE }}|>
+{{ .PARAMS }}
+<|PARAM_END_{{ .NONCE }}|>{{end}}
+
+{{ if .MEMORY.PersistentMemory }}# Persistent Memory
 {{ .MEMORY.PersistentMemory}}{{end}}
 
-# timeline
-<timeline_{{ .NONCE }}>
+{{ if .MEMORY.Timeline }}
+<|TIMELINE_{{ .NONCE }}|>
 {{ .MEMORY.Timeline }}
-</timeline_{{ .NONCE }}>
+<|TIMELINE_END_{{ .NONCE }}|>{{end}}
 
-# Output Formatter
+# Output Schema Formatter
 
 请你根据下面 SCHEMA 构建数据
 
-<schema_{{ .NONCE }}>
+<|SCHEMA_{{ .NONCE }}|>
 {{ .SCHEMA }}
-</schema_{{ .NONCE }}>
+<|SCHEMA_END_{{ .NONCE }}|>
 `
 	var promptParam = map[string]interface{}{
 		"NONCE":  nonce,
