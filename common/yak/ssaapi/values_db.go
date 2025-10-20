@@ -186,10 +186,9 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 			an.TmpEndOffset = R.GetEndOffset()
 		}
 	}
-	an := g.database.GetNode()
-	if an == nil {
-		return nil, utils.Error("get AuditNode failed")
-	}
+	an := ssadb.CreateAuditNode()
+	an.AuditNodeStatus = g.AuditNodeStatus
+	an.IsEntryNode = entry
 
 	saveIrSource := func(v *Value) {
 		inst := v.getInstruction()
@@ -211,11 +210,7 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 		an.IRCodeID = -1
 		setTmpValue(an, value)
 		saveIrSource(value)
-		an.AuditNodeStatus = g.AuditNodeStatus
-		an.IsEntryNode = entry
 	default:
-		an.AuditNodeStatus = g.AuditNodeStatus
-		an.IsEntryNode = entry
 		an.IRCodeID = value.GetId()
 		if value.GetId() == -1 {
 			setTmpValue(an, value)
@@ -245,20 +240,15 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 	msg := edge.Msg
 	switch edge.Kind {
 	case EdgeTypeDependOn:
-		edge := fromNode.CreateDependsOnEdge(g.ProgramName, toNode.ID)
+		edge := fromNode.CreateDependsOnEdge(g.ProgramName, toNode)
 		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
 	case EdgeTypeEffectOn:
-		edge := fromNode.CreateEffectsOnEdge(g.ProgramName, toNode.ID)
+		edge := fromNode.CreateEffectsOnEdge(g.ProgramName, toNode)
 		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
-	// case EdgeTypeDataflow:
-	// 	edge := fromNode.CreateDataFlowEdge(g.ProgramName, toNode.ID)
-	// 	if err := saveEdge(edge); err != nil {
-	// 		log.Errorf("save AuditEdge failed: %v", err)
-	// 	}
 	case EdgeTypePredecessor:
 		var (
 			label string
@@ -272,7 +262,7 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 				step = s
 			}
 		}
-		edge := fromNode.CreatePredecessorEdge(g.ProgramName, toNode.ID, step, label)
+		edge := fromNode.CreatePredecessorEdge(g.ProgramName, toNode, step, label)
 		if err := saveEdge(edge); err != nil {
 			log.Errorf("save AuditEdge failed: %v", err)
 		}
@@ -282,23 +272,9 @@ func (g *DBGraph) CreateEdge(edge Edge) error {
 }
 
 type auditDatabase struct {
-	fetch      *asyncdb.Fetch[*ssadb.AuditNode]
 	nodeSave   *asyncdb.Save[*ssadb.AuditNode]
 	edgeSave   *asyncdb.Save[*ssadb.AuditEdge]
 	editorSave *asyncdb.Save[*ssadb.IrSource]
-}
-
-func (a *auditDatabase) GetNode() *ssadb.AuditNode {
-	// get node from fetch, if err retry 10 times
-	for i := 0; i < 10; i++ {
-		node, err := a.fetch.Fetch()
-		if err == nil {
-			return node
-		}
-		log.Warnf("fetch AuditNode failed: %v", err)
-		time.Sleep(time.Millisecond * 100)
-	}
-	return nil
 }
 
 func (a *auditDatabase) SaveNode(node *ssadb.AuditNode) {
@@ -323,13 +299,6 @@ func (a *auditDatabase) SaveIrSource(editor *ssadb.IrSource) {
 }
 
 func (a *auditDatabase) Close() {
-	a.fetch.DeleteRest(func(an []*ssadb.AuditNode) {
-		if len(an) == 0 {
-			return
-		}
-		db := ssadb.GetDB()
-		ssadb.DeleteAuditNode(db, an...)
-	})
 	a.nodeSave.Close()
 	a.edgeSave.Close()
 	a.editorSave.Close()
@@ -338,29 +307,7 @@ func (a *auditDatabase) Close() {
 func newAuditDatabase(ctx context.Context, db *gorm.DB, size int) *auditDatabase {
 	ret := &auditDatabase{}
 
-	fetchSize := size
 	saveSize := size * 2
-
-	ret.fetch = asyncdb.NewFetch[*ssadb.AuditNode](func(ctx context.Context, fetchSize int) <-chan *ssadb.AuditNode {
-		out := make(chan *ssadb.AuditNode, fetchSize)
-		go func() {
-			defer close(out)
-			utils.GormTransaction(db, func(tx *gorm.DB) error {
-				i := 0
-				for i < fetchSize {
-					node := &ssadb.AuditNode{}
-					if ret := tx.Create(node).Error; ret != nil {
-						log.Errorf("create empty AuditNode failed: %v", ret)
-						continue
-					}
-					i++
-					out <- node
-				}
-				return nil
-			})
-		}()
-		return out
-	}, asyncdb.WithContext(ctx), asyncdb.WithFetchSize(fetchSize), asyncdb.WithName("AuditNode"))
 
 	ret.nodeSave = asyncdb.NewSave[*ssadb.AuditNode](func(ae []*ssadb.AuditNode) {
 		if len(ae) == 0 {
