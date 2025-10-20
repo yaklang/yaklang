@@ -135,6 +135,19 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	var action *aicommon.Action
 	var emitter = r.emitter
 	var actionNames = r.GetAllActionNames()
+	actionNameFallback := ""
+
+	getHandlerActionName := func() string {
+		if action.ActionType() == "object" {
+			if actionNameFallback != "" {
+				return actionNameFallback
+			}
+			if action.GetString("next_action") != "" {
+				return action.GetString("next_action")
+			}
+		}
+		return action.ActionType()
+	}
 
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
 	transactionErr := aicommon.CallAITransaction(
@@ -166,7 +179,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 				stream = rawStream
 			}
 
-			actionNameFallback := ""
+			actionNameFallback = ""
 
 			streamFields := r.streamFields.Copy()
 
@@ -241,10 +254,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if actionErr != nil {
 				return utils.Wrap(actionErr, "failed to parse action")
 			}
-			if actionNameFallback != "" && action.ActionType() == "object" {
-				action.SetActionType(actionNameFallback)
-			}
-			actionName := action.NextActionName()
+			actionName := getHandlerActionName()
 			verifier, err := r.GetActionHandler(actionName)
 			if err != nil {
 				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionName, err))
@@ -266,7 +276,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
 
-	handler, err := r.GetActionHandler(action.NextActionName())
+	handler, err := r.GetActionHandler(getHandlerActionName())
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "GetActionHandler failed")
 	}
