@@ -291,17 +291,19 @@ jobs:
 
           - name: Test AI Infra / RAG / Knowledge
             run: |
-              go test -v -timeout 5m ./common/ai/aid/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 60s ./common/ai/tests/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 60s ./common/ai/rag/pq/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 60s ./common/ai/rag/hnsw/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 60s ./common/ai/aispec/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 60s ./common/aireducer/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 40s ./common/aiforge/aibp/forge_builder_test.go   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 3m ./common/aiforge   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 60s ./common/ai/rag/entityrepos/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 1m -run TestMUSTPASS ./common/ai/rag   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
-              go test -v -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              # 禁用并行测试以避免数据库锁定问题 - 所有 AI 测试共享同一个全局数据库实例
+              echo "Running AI tests sequentially to avoid database lock conflicts..."
+              go test -p=1 -v -timeout 5m ./common/ai/aid/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 60s ./common/ai/tests/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 60s ./common/ai/rag/pq/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 60s ./common/ai/rag/hnsw/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 60s ./common/ai/aispec/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 60s ./common/aireducer/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 40s ./common/aiforge/aibp/forge_builder_test.go   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 3m ./common/aiforge   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 60s ./common/ai/rag/entityrepos/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 1m -run TestMUSTPASS ./common/ai/rag   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 1m -run TestMUSTPASS ./common/ai/rag/plugins_rag/...   2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
 
           - name: Test gRPC StaticAnalyze / BuildIn SyntaxFlow Rule / SSA / SSA-API / SF Scan
             run: |
@@ -408,8 +410,8 @@ jobs:
               go test -v -timeout 2m -run TestLARGEGRPCMUSTPASS* ./common/yakgrpc/... 2>&1 | tee /tmp/large_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/large_test.log; }
               # Test gRPC MUSTPASS COMMON
               go test -v -timeout 5m -run TestGRPCMUSTPASS_COMMON* ./common/yakgrpc/... 2>&1 | tee /tmp/common_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/common_test.log; }
-              # Test AI gRPC
-              go test -v -timeout 1m -run TestAITaskWith ./common/yakgrpc/... 2>&1 | tee /tmp/ai_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/ai_test.log; }
+              # Test AI gRPC - 使用串行执行避免数据库锁定
+              go test -p=1 -v -timeout 1m -run TestAITaskWith ./common/yakgrpc/... 2>&1 | tee /tmp/ai_test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|test timed out|testing\..*panic|recovered)" /tmp/ai_test.log; }
 
           - name: Test gRPC Other
             run:  |
