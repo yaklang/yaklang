@@ -2,6 +2,8 @@ package loop_yaklangcode
 
 import (
 	"bytes"
+	"fmt"
+	"github.com/yaklang/yaklang/common/consts"
 	"sort"
 
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -103,5 +105,13 @@ func checkCodeAndFormatErrors(code string) (string, bool) {
 		buf.WriteString("There are other errors, it's better to fix the critical issues above first before fixing others")
 	}
 
+	if buf.Len() > 0 {
+		if consts.GetYakVersion() == "dev" && buf.String() != "" {
+			fmt.Println("==========================================================")
+			fmt.Println("Check Yaklang Static Analysis Errors Output (Development Version):")
+			fmt.Println(buf.String())
+			fmt.Println("==========================================================")
+		}
+	}
 	return buf.String(), hasBlockingErrors
 }

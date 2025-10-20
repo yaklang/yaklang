@@ -97,6 +97,7 @@ var modifyCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			if hasBlockingErrors {
 				op.DisallowNextLoopExit()
 			}
+
 			msg = utils.ShrinkTextBlock(fmt.Sprintf("line[%v-%v]:\n", modifyStartLine, modifyEndLine)+partialCode, 256)
 			if errMsg != "" {
 				msg += "\n\n--[linter]--\nWriting Code Linter Check:\n" + utils.PrefixLines(utils.ShrinkTextBlock(errMsg, 2048), "  ")
