@@ -156,7 +156,7 @@ func (c *Config) parseProjectWithFS(
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 		start = time.Now()
 		ch := c.GetFileHandler(
-			filesystem, preHandlerFiles, handlerFilesMap, int(c.GetCompileConcurrency()),
+			filesystem, preHandlerFiles, handlerFilesMap,
 		)
 		// ssaprofile.DumpHeapProfile(ssaprofile.WithName("ast"))
 		for fileContent := range ch {

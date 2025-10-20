@@ -75,7 +75,7 @@ func (c *Config) GetFileHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
 		c.astSequence,
-		c.concurrency,
+		int(c.GetCompileConcurrency()),
 	)
 }
 func getGID() uint64 {
