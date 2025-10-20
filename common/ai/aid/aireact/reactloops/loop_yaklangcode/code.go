@@ -115,6 +115,11 @@ func init() {
 							}
 							filename = targetPath
 						}
+						content, _ := os.ReadFile(targetPath)
+						if len(content) > 0 {
+							log.Infof("identified target file: %s, file size: %v", targetPath, len(content))
+							loop.Set("full_code", string(content))
+						}
 						r.GetConfig().GetEmitter().EmitPinFilename(filename)
 						loop.Set("filename", filename)
 						return nil
