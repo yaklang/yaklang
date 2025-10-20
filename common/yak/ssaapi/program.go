@@ -28,7 +28,7 @@ type Program struct {
 	// come from database will affect search operation
 	comeFromDatabase bool
 	//value cache
-	nodeId2ValueCache *utils.CacheWithKey[uint, *Value]
+	nodeId2ValueCache *utils.CacheWithKey[string, *Value]
 	id                *atomic.Int64
 }
 
@@ -79,7 +79,7 @@ func NewProgram(prog *ssa.Program, config *Config) *Program {
 		Program:           prog,
 		config:            config,
 		enableDatabase:    config.databaseKind != ssa.ProgramCacheMemory,
-		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
+		nodeId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
 		id:                atomic.NewInt64(0),
 	}
 
@@ -96,7 +96,7 @@ func NewTmpProgram(name string) *Program {
 		Program:           ssa.NewTmpProgram(name),
 		config:            &Config{},
 		enableDatabase:    false,
-		nodeId2ValueCache: utils.NewTTLCacheWithKey[uint, *Value](8 * time.Second),
+		nodeId2ValueCache: utils.NewTTLCacheWithKey[string, *Value](8 * time.Second),
 		id:                atomic.NewInt64(0),
 	}
 	return p
@@ -245,13 +245,13 @@ func (p *Program) GetValueByIdMust(id int64) *Value {
 }
 
 // from audit node id
-func (v *Value) NewValueFromAuditNode(nodeID uint) *Value {
+func (v *Value) NewValueFromAuditNode(nodeID string) *Value {
 	value := v.ParentProgram.NewValueFromAuditNode(nodeID)
 	return value
 }
 
-func (p *Program) NewValueFromAuditNode(nodeID uint) *Value {
-	if nodeID == 0 {
+func (p *Program) NewValueFromAuditNode(nodeID string) *Value {
+	if nodeID == "" {
 		return nil
 	}
 
