@@ -45,7 +45,7 @@ result = {}
 `,
 		},
 		{
-			name: "var with slice type", 
+			name: "var with slice type",
 			code: `
 var data []byte
 data = []
@@ -69,7 +69,7 @@ result := []string{"a", "b"}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			errorMsg, hasBlockingErrors := checkCodeAndFormatErrors(tt.code)
-			
+
 			if hasBlockingErrors && strings.Contains(errorMsg, "🤖 AI助手提示:") {
 				assert.Contains(t, errorMsg, "变量声明不需要显式类型", "Should contain hint about variable declarations")
 			}

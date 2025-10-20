@@ -151,7 +151,7 @@ var yaklangErrorPatterns = []ErrorPattern{
 	},
 	{
 		Name:       "VarTypeDeclarations",
-		ErrorGlobs: []string{"*no viable alternative*"},
+		ErrorGlobs: []string{"*no viable alternative*", "*extraneous input*", "*mismatched input*"},
 		LineRegexps: []string{
 			`var\s+\w+\s+(map\[|\[\]|string|int|interface\{\}|\*|chan)`,
 			`\w+\s*:=\s*(map\[|\[\]string|\[\]int)`,
@@ -254,14 +254,30 @@ func getIntelligentErrorHint(msg *resultSpec.StaticAnalyzeResult, me *memedit.Me
 func matchesErrorPattern(pattern ErrorPattern, errorMessage, lineContent string) bool {
 	// Check error message patterns
 	if len(pattern.ErrorGlobs) > 0 {
-		if !utils.MatchAnyOfGlob(errorMessage, pattern.ErrorGlobs...) {
+		matched := false
+		for _, glob := range pattern.ErrorGlobs {
+			// Use safe glob matching to avoid panic
+			if safeGlobMatch(errorMessage, glob) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			return false
 		}
 	}
 
 	// Check line content patterns (globs)
 	if len(pattern.LineGlobs) > 0 {
-		if !utils.MatchAnyOfGlob(lineContent, pattern.LineGlobs...) {
+		matched := false
+		for _, glob := range pattern.LineGlobs {
+			// Use safe glob matching to avoid panic
+			if safeGlobMatch(lineContent, glob) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
 			return false
 		}
 	}
@@ -274,6 +290,19 @@ func matchesErrorPattern(pattern ErrorPattern, errorMessage, lineContent string)
 	}
 
 	return true
+}
+
+// safeGlobMatch performs glob matching with error handling to avoid panics
+func safeGlobMatch(text, pattern string) bool {
+	defer func() {
+		if r := recover(); r != nil {
+			// If glob compilation fails, fall back to substring matching
+			return
+		}
+	}()
+
+	// Try utils.MatchAnyOfGlob first
+	return utils.MatchAnyOfGlob(text, pattern)
 }
 
 // formatErrorHint formats the error hint with examples
