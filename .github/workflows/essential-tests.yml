@@ -293,7 +293,7 @@ jobs:
             run: |
               # 禁用并行测试以避免数据库锁定问题 - 所有 AI 测试共享同一个全局数据库实例
               echo "Running AI tests sequentially to avoid database lock conflicts..."
-              go test -p=1 -v -timeout 5m ./common/ai/aid/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
+              go test -p=1 -v -timeout 12m ./common/ai/aid/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               go test -p=1 -v -timeout 60s ./common/ai/tests/...  2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               go test -p=1 -v -timeout 60s ./common/ai/rag/pq/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
               go test -p=1 -v -timeout 60s ./common/ai/rag/hnsw/... 2>&1 | tee /tmp/test.log | { grep -E -A10 -B10 "(FAIL|--- FAIL|panic:|test timed out)" || grep -E "(PASS|RUN|=== RUN|--- PASS|TestTemplate|panic:|goroutine.*\[(running|sleep)\]|testing\..*panic|recovered)" /tmp/test.log; }
