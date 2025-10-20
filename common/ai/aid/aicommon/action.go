@@ -42,13 +42,6 @@ func (q *Action) Name() string {
 	return q.name
 }
 
-func (q *Action) NextActionName() string {
-	if q.params == nil {
-		return q.Name()
-	}
-	return q.params.GetString("next_action", q.name)
-}
-
 func (q *Action) GetInt(key string, defaults ...int) int {
 	return int(q.params.GetInt(key, lo.Map(defaults, func(item int, index int) int64 {
 		return int64(item)
