@@ -2,7 +2,6 @@ package knowledgebase
 
 import (
 	"fmt"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/aiforge/contracts"
@@ -231,6 +230,19 @@ func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, opt
 	return nil
 }
 
+func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
+	err := yakit.CreateKnowledgeBaseEntry(kb.db, entry)
+	if err != nil {
+		return utils.Errorf("创建知识库条目失败: %v", err)
+	}
+
+	if err := kb.addEntryToVectorIndex(entry, options...); err != nil {
+		return utils.Errorf("添加向量索引失败: %v", err)
+	}
+
+	return nil
+}
+
 func (kb *KnowledgeBase) UpdateKnowledgeBaseInfo(name, description, kbType string) error {
 	err := yakit.UpdateKnowledgeBaseInfo(kb.db, kb.id, &schema.KnowledgeBaseInfo{
 		KnowledgeBaseName:        name,
@@ -399,6 +411,33 @@ func (kb *KnowledgeBase) addEntryToVectorIndex(entry *schema.KnowledgeBaseEntry,
 
 	// 添加文档到RAG系统
 	return kb.ragSystem.Add(documentID, content, options...)
+}
+
+func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
+	// 构建元数据
+	metadata := map[string]any{
+		"knowledge_base_id":    entry.KnowledgeBaseID,
+		"knowledge_title":      entry.KnowledgeTitle,
+		"knowledge_type":       entry.KnowledgeType,
+		"importance_score":     entry.ImportanceScore,
+		"keywords":             entry.Keywords,
+		"source_page":          entry.SourcePage,
+		"potential_questions":  entry.PotentialQuestions,
+		schema.META_Data_Title: entry.KnowledgeTitle,
+		schema.META_Data_UUID:  entry.HiddenIndex,
+	}
+
+	// 使用条目ID作为文档ID
+	documentID := utils.InterfaceToString(entry.HiddenIndex)
+	options = append(options, rag.WithDocumentRawMetadata(metadata), rag.WithDocumentType(schema.RAGDocumentType_Knowledge))
+
+	for _, question := range entry.PotentialQuestions {
+		err := kb.ragSystem.Add(documentID, question, options...)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SyncKnowledgeBaseWithRAG 同步知识库和RAG，以知识库为准
