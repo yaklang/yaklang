@@ -33,6 +33,14 @@ var queryDocumentAction = func(r aicommon.AIInvokeRuntime, docSearcher *ziputil.
 					aitool.WithParam_Description(`Regular expressions to match specific code patterns in Yaklang documentation.
 **Note**: Patterns are case-sensitive. Use '\s+' for whitespace, '\w+' for identifiers, '.*' for wildcards.`),
 				),
+				aitool.WithStringArrayParam(
+					"lib_names",
+					aitool.WithParam_Description(`Names of Yaklang built-in libraries. If you want to view members of certain libraries, you can set this parameter to display the library's content and functions to help you find the desired functionality`),
+				),
+				aitool.WithStringArrayParam(
+					"lib_function_globs",
+					aitool.WithParam_Description(`Functions in built-in libraries. You can directly use this to search for function names and which library they belong to. This is particularly useful when you use this search, for example, if you search for '*Rand*', you can find Rand-related functions and their locations and basic declarations in yaklang`),
+				),
 			),
 		},
 		[]*reactloops.LoopStreamField{},
