@@ -242,7 +242,7 @@ func (r *SyntaxFlowResult) getValueFromDB(name string) Values {
 	return vs
 }
 
-func (r *SyntaxFlowResult) getValuesFromTmpAuditNodes(nodeIds []uint) Values {
+func (r *SyntaxFlowResult) getValuesFromTmpAuditNodes(nodeIds []string) Values {
 	auditNodes, err := ssadb.GetAuditNodesByIds(nodeIds)
 	if err != nil {
 		log.Errorf("NewValueFromDB: audit node not found: %v", nodeIds)
@@ -273,7 +273,7 @@ func (r *SyntaxFlowResult) getValuesFromTmpAuditNodes(nodeIds []uint) Values {
 	return vs
 }
 
-func (r *SyntaxFlowResult) getValueFromTmpAuditNode(nodeId uint) *Value {
+func (r *SyntaxFlowResult) getValueFromTmpAuditNode(nodeId string) *Value {
 	auditNode, err := ssadb.GetAuditNodeById(nodeId)
 	if err != nil {
 		log.Errorf("NewValueFromDB: audit node not found: %d", nodeId)

@@ -1039,10 +1039,10 @@ func (v *Value) GetCallee() *Value {
 func (v *Value) GetPredecessors() []*PredecessorValue {
 	if len(v.Predecessors) == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			edges := ssadb.GetPredecessorEdgeByFromID(auditNode.ID)
+			edges := ssadb.GetPredecessorEdgeByFromID(auditNode.NodeID)
 			var preds []*PredecessorValue
 			for _, edge := range edges {
-				p := v.NewValueFromAuditNode(uint(edge.ToNode))
+				p := v.NewValueFromAuditNode(edge.ToNode)
 				if p != nil {
 					preds = append(preds, &PredecessorValue{
 						Node: p,
@@ -1062,7 +1062,7 @@ func (v *Value) GetPredecessors() []*PredecessorValue {
 func (v *Value) GetDependOn() Values {
 	if v.DependOn == nil || v.DependOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			nodeIds := ssadb.GetDependEdgeOnByFromNodeId(auditNode.ID)
+			nodeIds := ssadb.GetDependEdgeOnByFromNodeId(auditNode.NodeID)
 			if v.DependOn == nil {
 				v.DependOn = utils.NewSafeMapWithKey[string, *Value]()
 			}
@@ -1080,7 +1080,7 @@ func (v *Value) GetDependOn() Values {
 func (v *Value) GetEffectOn() Values {
 	if v.EffectOn == nil || v.EffectOn.Count() == 0 {
 		if auditNode := v.auditNode; auditNode != nil {
-			nodeIds := ssadb.GetEffectOnEdgeByFromNodeId(auditNode.ID)
+			nodeIds := ssadb.GetEffectOnEdgeByFromNodeId(auditNode.NodeID)
 			if v.EffectOn == nil {
 				v.EffectOn = utils.NewSafeMapWithKey[string, *Value]()
 			}
