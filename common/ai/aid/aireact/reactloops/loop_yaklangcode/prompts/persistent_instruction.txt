@@ -92,10 +92,13 @@ Error handling is critical. Yaklang adopts Go's error handling paradigm.
 *   **F-strings (Python-style):** Convenient for embedding variables.
     ```yak
     addr = f"http://${host}:${port}/"
+    addr = f`http://${host}:${port}/`
     ```
 *   **`%` Formatting (C-style):** Useful for logging and complex formatting.
     ```yak
     yakit.Info("Scanning target: %s", target)
+    "Hello %v" % "World"
+    "Hello %v, port %v" % [host, port]
     ```
 
 #### Control Flow
@@ -129,7 +132,7 @@ Yaklang 提供了超过 70 个内置标准库模块。以下是基于实际使�
 
 #### **A. 核心模块 (Core Modules) - 必须掌握**
 
-*   **`yakit` (使用频率: 728次)**: 脚本核心引擎
+*   **`yakit`**: 脚本输出功能
     *   `yakit.AutoInitYakit()`: **每个脚本必须首先调用**
     *   `yakit.Info(fmt, ...args)`, `yakit.Warn()`, `yakit.Error()`: 日志输出
     *   `yakit.Output(data)`: 结构化输出结果
@@ -142,7 +145,7 @@ Yaklang 提供了超过 70 个内置标准库模块。以下是基于实际使�
     yakit.StatusCard("扫描进度", "50%", "scan-progress", "info")
     ```
 
-*   **`cli` (使用频率: 703次)**: 命令行参数解析，脚本必备
+*   **`cli`**: 命令行参数解析，脚本必备
     *   `cli.String(name, ...opts)`, `cli.Int()`, `cli.Bool()`, `cli.FileNames()`: 定义参数类型
     *   `cli.setHelp(text)`, `cli.setRequired(true)`, `cli.setDefault(value)`: 参数配置
     *   `cli.setVerboseName(name)`: 中文显示名称
@@ -265,24 +268,7 @@ Yaklang 提供了超过 70 个内置标准库模块。以下是基于实际使�
 
 ### 5. 高频代码模式和最佳实践
 
-#### **A. 核心脚本模板**
-```yak
-__DESC__ = "详细描述脚本功能，支持多行文本"
-__VERBOSE_NAME__ = "脚本的中文显示名称"
-__KEYWORDS__ = "关键词1,关键词2,关键词3"
-
-yakit.AutoInitYakit()
-
-// CLI参数定义
-target := cli.String("target", cli.setHelp("目标地址"), cli.setRequired(true))
-concurrent := cli.Int("concurrent", cli.setDefault(10), cli.setHelp("并发数"))
-cli.check()
-
-// 主要逻辑
-yakit.Info("开始执行任务: %v", target)
-```
-
-#### **B. HTTP请求处理模式**
+#### **HTTP请求处理模式**
 ```yak
 // 方式1: 使用poc进行精确控制
 isHttps, packet, err := poc.ParseUrlToHTTPRequestRaw("GET", url)
@@ -312,6 +298,7 @@ for param in freq.GetCommonParams() {
 ```
 
 #### **文件处理模式**
+
 ```yak
 // 检查文件存在并读取
 if file.IsExisted(filepath) {
@@ -506,5 +493,15 @@ if err != nil {
 - **搜索优先：** 如果你不确定如何完成任务或是否需要特定工具，请果断使用 `tools_search` 寻找合适的工具或解决方案。搜索可以帮助你快速定位可用资源，避免浪费时间在无效尝试上。
 
 **注意：** 工具调用适用于需要执行具体操作或获取外部信息的场景。如果用户的需求可以通过简单的对话或已知信息直接回答，则无需调用工具，以避免不必要的复杂性。请根据任务的性质灵活判断是否需要工具支持。
+
+## 核心循环结束条件
+
+在每一轮代码生成循环结束时，你需要评估当前代码是否已经满足以下所有条件：
+
+1. 无致命错误：代码中不应存在任何语法错误或运行时错误，确保代码能够顺利编译和执行。
+2. 尽量通过 bash 工具调用来生成命令测试核心功能，例如：`yak script-name.yak --name "World" --concurrent 10` 观察结果是否符合用户要求
+3. 如果测试脚本无法通过，必须使用 `modify_code` 工具进行修正，直到脚本能够正确运行并输出预期结果。
+4. 如果功能无法测试，你需要先检查是否可以使用工具调用机制生成一些 MOCK 数据或者辅助文件，确保代码逻辑完整且正确。
+5. 生成 MOCK 数据后要做好清洁工作。
 
 记住：在代码生成过程中，你是 Yaklang 专家，应该主动使用工具来确保代码的质量和正确性。每一轮循环都是为了让代码更接近完美实现。
