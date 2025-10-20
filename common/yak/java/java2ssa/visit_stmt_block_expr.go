@@ -1786,7 +1786,7 @@ func (y *singleFileBuilder) buildMultiDimensionalArray(dimExprs []javaparser.IEx
 	if cons, ok := ssa.ToConstInst(sizeExpr); ok {
 		if rawVal := cons.Const.GetRawValue(); rawVal != nil {
 			size := utils.InterfaceToInt(rawVal)
-			if size > 0 {
+			if size > 0 && size <= 1024 {
 				var valueFunc func(int) ssa.Value
 				if isLastDim {
 					valueFunc = func(i int) ssa.Value {
