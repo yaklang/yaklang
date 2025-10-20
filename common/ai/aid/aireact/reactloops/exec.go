@@ -244,7 +244,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 			if actionNameFallback != "" && action.ActionType() == "object" {
 				action.SetActionType(actionNameFallback)
 			}
-			actionName := action.Name()
+			actionName := action.NextActionName()
 			verifier, err := r.GetActionHandler(actionName)
 			if err != nil {
 				r.GetInvoker().AddToTimeline("error", fmt.Sprintf("action[%s] GetActionHandler failed: %v\nIf you encounter this error, try another '@action' and retry.", actionName, err))
@@ -266,7 +266,7 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
 
-	handler, err := r.GetActionHandler(action.Name())
+	handler, err := r.GetActionHandler(action.NextActionName())
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "GetActionHandler failed")
 	}
