@@ -169,7 +169,7 @@ func TestCheckCodeAndFormatErrors_EmptyCode(t *testing.T) {
 }
 
 func TestCheckCodeAndFormatErrors_MultipleErrors(t *testing.T) {
-	// Test code with multiple syntax errors
+	// Test code with multiple syntax errors.
 	code := `
 package main
 import "fmt"
