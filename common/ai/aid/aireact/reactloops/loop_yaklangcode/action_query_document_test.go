@@ -236,3 +236,60 @@ func TestSearchYakdocLibraries_Combined(t *testing.T) {
 	assert.True(t, hasLibResult, "Should have library result")
 	// Note: function results might not be found if no *Split* functions exist, which is okay
 }
+
+func TestSearchLibraryCaseInsensitive(t *testing.T) {
+	// Test the case insensitive library search helper function
+	tests := []struct {
+		name       string
+		libName    string
+		shouldFind bool
+	}{
+		{
+			name:       "lowercase str",
+			libName:    "str",
+			shouldFind: true,
+		},
+		{
+			name:       "uppercase STR",
+			libName:    "STR",
+			shouldFind: true,
+		},
+		{
+			name:       "mixed case Str",
+			libName:    "Str",
+			shouldFind: true,
+		},
+		{
+			name:       "random case sTr",
+			libName:    "sTr",
+			shouldFind: true,
+		},
+		{
+			name:       "nonexistent library",
+			libName:    "nonexistent_lib_12345",
+			shouldFind: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			response, err := searchLibraryCaseInsensitive(tt.libName)
+
+			if tt.shouldFind {
+				assert.NoError(t, err, "Should not error for existing library %s", tt.libName)
+				assert.NotNil(t, response, "Response should not be nil for %s", tt.libName)
+				if response != nil {
+					resources := response.GetResources()
+					assert.True(t, len(resources) > 0, "Should find resources for %s", tt.libName)
+				}
+			} else {
+				// For non-existent libraries, we might get an error or empty results
+				// Both are acceptable
+				if err == nil && response != nil {
+					resources := response.GetResources()
+					assert.Equal(t, 0, len(resources), "Should not find resources for non-existent library")
+				}
+			}
+		})
+	}
+}
