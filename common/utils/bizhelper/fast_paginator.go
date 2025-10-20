@@ -1,6 +1,7 @@
 package bizhelper
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jinzhu/gorm"
@@ -9,78 +10,105 @@ import (
 
 type FastPaginator struct {
 	db          *gorm.DB
-	ids         []int
+	ids         []int64
 	totalRecord int
 	size        int
 	offset      int
 	page        int
-	cfg         *FastPaginatorConfig
-	findField   string
 	// p   Paginator
-}
-
-type FastPaginatorConfig struct {
 	OrderBy    string
 	IndexField string
 }
 
-func NewFastPaginatorConfig() *FastPaginatorConfig {
-	return &FastPaginatorConfig{
-		IndexField: "id",
+type FastPaginatorOpts func(*FastPaginator)
+
+func WithFastPaginator_IDs(ids []int64) FastPaginatorOpts {
+	return func(c *FastPaginator) {
+		c.ids = ids
 	}
 }
 
-type FastPaginatorOpts func(*FastPaginatorConfig)
-
 func WithFastPaginator_OrderBy(orderBy string) FastPaginatorOpts {
-	return func(c *FastPaginatorConfig) {
+	return func(c *FastPaginator) {
 		c.OrderBy = orderBy
 	}
 }
 
-func WithFastPaginator_FindField(field string) FastPaginatorOpts {
-	return func(c *FastPaginatorConfig) {
-		c.IndexField = field
-	}
-}
-
 func WithFastPaginator_IndexField(selectField string) FastPaginatorOpts {
-	return func(c *FastPaginatorConfig) {
+	return func(c *FastPaginator) {
 		c.IndexField = selectField
 	}
 }
 
+func FastPagination[T any](ctx context.Context, db *gorm.DB, cfg *YieldModelConfig, opts ...FastPaginatorOpts) chan T {
+	outC := make(chan T)
+	go func() {
+		defer close(outC)
+		size := 0
+		if cfg != nil {
+			if cfg.Size > 0 {
+				size = cfg.Size
+			}
+			if cfg.IndexField != "" {
+				opts = append(opts, WithFastPaginator_IndexField(cfg.IndexField))
+			}
+		}
+
+		paginator := NewFastPaginator(db, size, opts...)
+		if cfg != nil && cfg.CountCallback != nil {
+			cfg.CountCallback(paginator.totalRecord)
+		}
+		for {
+			var items []T
+			if err, ok := paginator.Next(&items); !ok {
+				break
+			} else if err != nil {
+				log.Errorf("paging failed: %s", err)
+				break
+			}
+
+			for _, d := range items {
+				select {
+				case <-ctx.Done():
+					return
+				case outC <- d:
+				}
+			}
+		}
+	}()
+	return outC
+}
+
 func NewFastPaginator(db *gorm.DB, size int, opts ...FastPaginatorOpts) *FastPaginator {
 	if size == 0 {
-		size = 1024
+		size = 10
 	}
-	cfg := NewFastPaginatorConfig()
+
+	var paginator = &FastPaginator{
+		IndexField: "id",
+	}
 	if len(opts) > 0 {
 		for _, opt := range opts {
-			opt(cfg)
+			opt(paginator)
 		}
 	}
-	if cfg.OrderBy != "" {
-		db = db.Order(cfg.OrderBy)
+	if paginator.OrderBy != "" {
+		db = db.Order(paginator.OrderBy)
 	}
 
-	var paginator FastPaginator
-	ids := make([]int, 0)
-
-	if err := db.Pluck(cfg.IndexField, &ids).Error; err != nil {
-		log.Errorf("failed to get ids: %v", err)
-		return nil
+	if len(paginator.ids) == 0 {
+		paginator.ids = make([]int64, 0)
+		if err := db.Pluck(paginator.IndexField, &paginator.ids).Error; err != nil {
+			log.Errorf("failed to get ids: %v", err)
+			return nil
+		}
 	}
-	// count := len(ids)
-
-	paginator.cfg = cfg
 	paginator.db = db
-	paginator.ids = ids
-	paginator.totalRecord = len(ids)
+	paginator.totalRecord = len(paginator.ids)
 	paginator.offset = 0
 	paginator.page = 0
 	paginator.size = size
-	return &paginator
+	return paginator
 }
 
 func (p *FastPaginator) Next(result any) (error, bool) {
@@ -101,12 +129,8 @@ func (p *FastPaginator) Next(result any) (error, bool) {
 		if end > len(p.ids) {
 			end = len(p.ids)
 		}
-		db = ExactQueryIntArrayOr(p.db, p.cfg.IndexField, p.ids[p.offset:end])
-		if p.findField != "" {
-			db = db.Pluck(p.findField, result)
-		} else {
-			db = db.Find(result)
-		}
+		db = ExactQueryInt64ArrayOr(p.db, p.IndexField, p.ids[p.offset:end])
+		db = db.Find(result)
 		p.page++
 		p.offset = end
 	}
