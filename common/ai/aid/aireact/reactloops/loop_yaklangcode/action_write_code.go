@@ -44,7 +44,7 @@ var writeCode = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 			errMsg, blocking := checkCodeAndFormatErrors(code)
 			if blocking {
 				operator.DisallowNextLoopExit()
-				loop.RemoveAction("write_code")
+				// loop.RemoveAction("write_code")
 			}
 			msg := utils.ShrinkTextBlock(code, 256)
 			if errMsg != "" {
