@@ -1,6 +1,7 @@
 package yak
 
 import (
+	"github.com/yaklang/yaklang/common/chunkmaker"
 	"github.com/yaklang/yaklang/common/schema"
 	"path/filepath"
 
@@ -71,6 +72,7 @@ var RagExports = map[string]interface{}{
 	"statusCard":      aiforge.WithAnalyzeStatusCard, // use for analyzeStatusCard
 	"extraPrompt":     aiforge.WithExtraPrompt,       // use for analyzeImage and analyzeImageFile
 	"entryLength":     aiforge.RefineWithKnowledgeEntryLength,
+	"chunkSize":       chunkmaker.WithChunkSize,
 	"khopk":           entityrepos.WithKHopK,
 	"khopLimit":       entityrepos.WithKHopLimit,
 	"khopkMin":        entityrepos.WithKHopKMin,
@@ -85,4 +87,6 @@ var RagExports = map[string]interface{}{
 	"BuildCollectionFromRaw":    aiforge.BuildKnowledgeFromBytes,
 
 	"BuildKnowledgeFromEntityRepos": aiforge.BuildKnowledgeFromEntityReposByName,
+
+	"BuildIndexKnowledgeFromFile": aiforge.BuildIndexKnowledgeFromFile,
 }
