@@ -1,6 +1,11 @@
 package loop_yaklangcode
 
 import (
+	"context"
+	"fmt"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils"
 	"strings"
 	"testing"
 
@@ -292,4 +297,21 @@ func TestSearchLibraryCaseInsensitive(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRAGQuerySomke(t *testing.T) {
+	if utils.InGithubActions() {
+		t.Skip()
+	}
+
+	result, ok := handleRAGQueryDocument(aimem.NewMockInvoker(context.Background()),
+		consts.GetGormProfileDatabase(),
+		"yak",
+		aitool.InvokeParams{
+			"question": []string{"如何进行AES解密？", "如何实现HTTP请求？"},
+		},
+	)
+	fmt.Println(ok)
+	fmt.Println(result)
+
 }

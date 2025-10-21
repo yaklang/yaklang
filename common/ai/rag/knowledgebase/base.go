@@ -231,6 +231,7 @@ func (kb *KnowledgeBase) AddKnowledgeEntry(entry *schema.KnowledgeBaseEntry, opt
 }
 
 func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEntry, options ...rag.DocumentOption) error {
+	entry.KnowledgeBaseID = kb.id
 	err := yakit.CreateKnowledgeBaseEntry(kb.db, entry)
 	if err != nil {
 		return utils.Errorf("创建知识库条目失败: %v", err)
@@ -428,10 +429,11 @@ func (kb *KnowledgeBase) addQuestionToVectorIndex(entry *schema.KnowledgeBaseEnt
 	}
 
 	// 使用条目ID作为文档ID
-	documentID := utils.InterfaceToString(entry.HiddenIndex)
-	options = append(options, rag.WithDocumentRawMetadata(metadata), rag.WithDocumentType(schema.RAGDocumentType_Knowledge))
+	baseDocumentID := utils.InterfaceToString(entry.HiddenIndex)
+	options = append(options, rag.WithDocumentRawMetadata(metadata), rag.WithDocumentType(schema.RAGDocumentType_QuestionIndex))
 
 	for _, question := range entry.PotentialQuestions {
+		documentID := fmt.Sprintf("%s_question_%s", baseDocumentID, utils.CalcSha1(question))
 		err := kb.ragSystem.Add(documentID, question, options...)
 		if err != nil {
 			return err

@@ -3,6 +3,8 @@ package loop_yaklangcode
 import (
 	"bytes"
 	_ "embed"
+	"github.com/yaklang/yaklang/common/ai/rag"
+	"github.com/yaklang/yaklang/common/consts"
 	"os"
 	"strings"
 
@@ -147,7 +149,7 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				queryDocumentAction(r, docSearcher),
+
 				writeCode(r),
 				modifyCode(r),
 				insertCode(r),
@@ -155,6 +157,17 @@ func init() {
 			}
 
 			preset = append(preset, opts...)
+			enhanceCollectionName := "yak"
+			if config.GetConfigString("aikb_collection") != "" {
+				enhanceCollectionName = config.GetConfigString("aikb_collection")
+			}
+			if !rag.CollectionIsExists(consts.GetGormProfileDatabase(), enhanceCollectionName) {
+				preset = append(preset, queryDocumentAction(r, docSearcher))
+			} else {
+				log.Infof("RAG collection '%s' loaded successfully for WriteYakLangCode loop", enhanceCollectionName)
+				preset = append(preset, ragQueryDocumentAction(r, consts.GetGormProfileDatabase(), enhanceCollectionName))
+			}
+
 			return reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG, r, preset...)
 		},
 	)
