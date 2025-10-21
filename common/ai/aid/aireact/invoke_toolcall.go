@@ -35,18 +35,27 @@ func (r *ReAct) ExecuteToolRequiredAndCall(toolName string) (*aitool.ToolResult,
 
 	var toolCaller *aicommon.ToolCaller
 	// Create ToolCaller with parameter generation prompt builder
-	// Use current task instead of config.task to ensure proper context handling
+	// Use current task if available for proper context handling
 	currentTask := r.GetCurrentTask()
-	if currentTask == nil {
-		return nil, false, utils.Errorf("no current task available for tool execution")
-	}
 
-	toolCaller, err = aicommon.NewToolCaller(
+	var toolCallerOptions []aicommon.ToolCallerOption
+	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_AICallerConfig(r.config),
 		aicommon.WithToolCaller_AICaller(r.config),
-		aicommon.WithToolCaller_Task(currentTask),
 		aicommon.WithToolCaller_RuntimeId(r.config.id),
 		aicommon.WithToolCaller_Emitter(r.config.Emitter),
+	)
+
+	// Only add task if we have a current task (for proper context cancellation)
+	if currentTask != nil {
+		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(currentTask))
+	} else {
+		// Fall back to config.task if available
+		toolCallerOptions = append(toolCallerOptions, aicommon.WithToolCaller_Task(r.config.task))
+	}
+
+	// Add the remaining options
+	toolCallerOptions = append(toolCallerOptions,
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {
 			toolCaller.SetEmitter(r.config.Emitter.AssociativeAIProcess(&schema.AiProcess{
 				ProcessId:   callToolId,
@@ -62,6 +71,8 @@ func (r *ReAct) ExecuteToolRequiredAndCall(toolName string) (*aitool.ToolResult,
 		aicommon.WithToolCaller_ReviewWrongTool(r._invokeToolCall_ReviewWrongTool),
 		aicommon.WithToolCaller_ReviewWrongParam(r._invokeToolCall_ReviewWrongParam),
 	)
+
+	toolCaller, err = aicommon.NewToolCaller(toolCallerOptions...)
 	if err != nil {
 		return nil, false, utils.Errorf("failed to create tool caller: %v", err)
 	}
