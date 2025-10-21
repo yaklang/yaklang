@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/yaklang/yaklang/common/utils/omap"
 	"strconv"
 	"sync"
 	"time"
@@ -71,6 +72,7 @@ type ReAct struct {
 	wg             *sync.WaitGroup
 	timelineDiffer *aicommon.TimelineDiffer
 	memoryTriage   aimem.MemoryTriage
+	memoryPool     *omap.OrderedMap[string, *aimem.MemoryEntity]
 }
 
 func (r *ReAct) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[string]any, error) {
@@ -182,6 +184,7 @@ func NewReAct(opts ...Option) (*ReAct, error) {
 		saveTimelineThrottle: utils.NewThrottleEx(3, true, true),
 		artifacts:            filesys.NewRelLocalFs(dirname),
 		wg:                   new(sync.WaitGroup),
+		memoryPool:           omap.NewOrderedMap(make(map[string]*aimem.MemoryEntity)),
 	}
 
 	if cfg.memoryTriage != nil {

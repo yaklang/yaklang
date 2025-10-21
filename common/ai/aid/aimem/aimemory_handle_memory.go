@@ -1,11 +1,26 @@
 package aimem
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/schema"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func (t *AIMemoryTriage) GetEmitter() *aicommon.Emitter {
+	if t == nil {
+		return nil
+	}
+	if t.invoker == nil {
+		return nil
+	}
+	if config := t.invoker.GetConfig(); config != nil {
+		return config.GetEmitter()
+	}
+	return nil
+}
 
 // HandleMemory 处理输入内容，自动构造记忆并去重保存
 func (t *AIMemoryTriage) HandleMemory(i any) error {
@@ -27,6 +42,18 @@ func (t *AIMemoryTriage) HandleMemory(i any) error {
 	if len(entities) == 0 {
 		log.Infof("no memory entities generated from input")
 		return nil
+	}
+
+	for _, entity := range entities {
+		if utils.IsNil(entity) {
+			continue
+		}
+		if emitter := t.GetEmitter(); emitter != nil {
+			emitter.EmitJSON(schema.EVENT_TYPE_MEMORY_BUILD, "memory-build", map[string]any{
+				"memory_session_id": t.GetSessionID(),
+				"memory":            entity,
+			})
+		}
 	}
 
 	log.Infof("generated %d memory entities from input", len(entities))

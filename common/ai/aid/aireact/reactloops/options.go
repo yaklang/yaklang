@@ -247,3 +247,21 @@ func WithMemoryTriage(triage aimem.MemoryTriage) ReActLoopOption {
 		r.memoryTriage = triage
 	}
 }
+
+func WithMemoryPool(pool *omap.OrderedMap[string, *aimem.MemoryEntity]) ReActLoopOption {
+	return func(r *ReActLoop) {
+		if utils.IsNil(pool) {
+			return
+		}
+		r.currentMemories = pool
+	}
+}
+
+func WithMemorySizeLimit(sizeLimit int) ReActLoopOption {
+	return func(r *ReActLoop) {
+		r.memorySizeLimit = sizeLimit
+		if r.memorySizeLimit <= 0 {
+			r.memorySizeLimit = 10 * 1024 // 默认 10 KB
+		}
+	}
+}
