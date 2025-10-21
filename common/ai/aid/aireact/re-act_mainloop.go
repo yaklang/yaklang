@@ -27,6 +27,7 @@ func (r *ReAct) processReActFromQueue() {
 	if nextTask == nil {
 		return
 	}
+
 	r.setCurrentTask(nextTask)
 	nextTask.SetStatus(aicommon.AITaskState_Processing)
 	if r.config.debugEvent {
@@ -79,13 +80,15 @@ func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
 func (r *ReAct) executeMainLoop(userQuery string) (bool, error) {
 	mainloop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_DEFAULT, r,
+		reactloops.WithMemoryTriage(r.memoryTriage),
+		reactloops.WithMemoryPool(r.memoryPool),
+		reactloops.WithMemorySizeLimit(10*1024),
 		reactloops.WithOnAsyncTaskTrigger(func(i *reactloops.LoopAction, task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(task)
 		}),
 		reactloops.WithOnAsyncTaskFinished(func(task aicommon.AIStatefulTask) {
 			r.SetCurrentPlanExecutionTask(nil)
 		}),
-		reactloops.WithMemoryTriage(r.memoryTriage),
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any) {
 			r.wg.Add(1)
 			diffStr, err := r.timelineDiffer.Diff()

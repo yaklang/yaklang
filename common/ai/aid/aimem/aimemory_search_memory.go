@@ -49,9 +49,8 @@ func (t *AIMemoryTriage) searchMemoryWithAIOption(origin any, bytesLimit int, di
 	ctx := context.Background()
 	var relevantTags []string
 	var err error
-	if disableAI {
-		// 不使用AI，直接基于简单关键词匹配标签
-	} else {
+	if !disableAI {
+		// AI 作用主要是在关键词搜索上可以更智能地选择标签
 		relevantTags, err = t.SelectTags(ctx, queryText)
 		if err != nil {
 			log.Warnf("failed to select tags: %v", err)

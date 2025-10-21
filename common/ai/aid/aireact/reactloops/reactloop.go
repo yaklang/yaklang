@@ -173,7 +173,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		vars:            omap.NewEmptyOrderedMap[string, any](),
 		taskMutex:       new(sync.Mutex),
 		currentMemories: omap.NewEmptyOrderedMap[string, *aimem.MemoryEntity](),
-		memorySizeLimit: 5 * 1024,
+		memorySizeLimit: 10 * 1024,
 	}
 
 	for _, action := range []*LoopAction{

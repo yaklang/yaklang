@@ -2,6 +2,7 @@ package reactloops
 
 import (
 	"bytes"
+	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/log"
@@ -28,11 +29,26 @@ func (r *ReActLoop) PushMemory(result *aimem.SearchMemoryResult) {
 			r.currentMemories.Set(m.Id, m)
 			continue
 		}
+		if e := r.GetEmitter(); e != nil {
+			e.EmitJSON(schema.EVENT_TYPE_MEMORY_ADD_CONTEXT, "memory-triage", map[string]any{
+				"memory": m,
+			})
+		}
 		r.currentMemories.Set(m.Id, m)
 
 		for r.currentMemorySize() > r.memorySizeLimit {
 			// 删除最早的记忆
-			r.currentMemories.Shift()
+			var removed *aimem.MemoryEntity
+			removed = r.currentMemories.Shift()
+			if utils.IsNil(removed) {
+				continue
+			}
+			if e := r.GetEmitter(); e != nil {
+				r.GetEmitter().EmitJSON(schema.EVENT_TYPE_MEMORY_REMOVED_CONTEXT, "memory-triage", map[string]any{
+					"reason": "memory size limit exceeded",
+					"memory": removed,
+				})
+			}
 		}
 	}
 }

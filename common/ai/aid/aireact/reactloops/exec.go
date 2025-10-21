@@ -136,12 +136,24 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	var emitter = r.emitter
 	var actionNames = r.GetAllActionNames()
 
+	ctxCanceled := utils.NewBool(false)
+	if r.GetCurrentTask() != nil {
+		select {
+		case <-r.GetCurrentTask().GetContext().Done():
+			ctxCanceled.SetTo(true)
+		default:
+		}
+	}
+
 	log.Infof("start to call aicommon.CallAITransaction in ReActLoop[%v]", r.loopName)
 	transactionErr := aicommon.CallAITransaction(
 		r.config,
 		prompt,
 		r.config.CallAI,
 		func(resp *aicommon.AIResponse) error {
+			if ctxCanceled.IsSet() {
+				return nil
+			}
 			rawStream := resp.GetOutputStreamReader(
 				r.loopName,
 				true,
@@ -262,6 +274,11 @@ func (r *ReActLoop) callAITransaction(streamWg *sync.WaitGroup, prompt string, n
 	if transactionErr != nil {
 		return nil, nil, transactionErr
 	}
+
+	if ctxCanceled.IsSet() {
+		return nil, nil, utils.Error("task context canceled before execute ReActLoop")
+	}
+
 	if utils.IsNil(action) {
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
@@ -281,14 +298,21 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	if utils.IsNil(task) {
 		return errors.New("re-act loop task is nil")
 	}
+
 	if r == nil {
 		return errors.New("re-act loop is nil")
 	}
 	if r.taskMutex == nil {
 		return errors.New("re-act loop taskMutex is nil")
 	}
-	r.SetCurrentTask(task)
 
+	select {
+	case <-task.GetContext().Done():
+		return utils.Errorf("task context done before execute ReActLoop: %v", task.GetContext().Err())
+	default:
+	}
+
+	r.SetCurrentTask(task)
 	if r.initHandler != nil {
 		utils.Debug(func() {
 			fmt.Println("================================================")
@@ -421,6 +445,12 @@ LOOP:
 			r.finishIterationLoopWithError(iterationCount, task, utils.Errorf("reached max iterations (%d), stopping code generation loop", maxIterations))
 			log.Warnf("Reached max iterations (%d), stopping code generation loop", maxIterations)
 			break LOOP
+		}
+
+		select {
+		case <-task.GetContext().Done():
+			return utils.Errorf("task context done before execute ReActLoop: %v", task.GetContext().Err())
+		default:
 		}
 
 		var prompt string
