@@ -220,12 +220,18 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 		} else if d := ast.DigitSequence(); d != nil {
 			// TODO
 		}
+		if utils.IsNil(right) {
+			right = b.EmitConstInst(0)
+		}
 	}
 	getVariable := func() {
 		if u := ast.CastExpression(); u != nil {
 			right, left = b.buildCastExpression(u.(*cparser.CastExpressionContext), true)
 		} else if d := ast.DigitSequence(); d != nil {
 			// TODO
+		}
+		if utils.IsNil(left) {
+			left = b.CreateVariable("")
 		}
 	}
 
