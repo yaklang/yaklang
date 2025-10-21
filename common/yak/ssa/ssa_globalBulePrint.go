@@ -2,11 +2,20 @@ package ssa
 
 import "github.com/yaklang/yaklang/common/utils"
 
+func initContainer(fb *FunctionBuilder) {
+	container := fb.EmitEmptyContainer()
+
+	prog := fb.GetProgram()
+	if !utils.IsNil(prog.GlobalVariablesBlueprint) {
+		prog.GlobalVariablesBlueprint.InitializeWithContainer(container)
+	}
+}
+
 func (b *FunctionBuilder) AddGlobalVariable(name string, valueFunc func() Value) {
 	prog := b.GetProgram()
 
-	if prog.GlobalVariablesBlueprint == nil {
-		return
+	if utils.IsNil(prog.GlobalVariablesBlueprint) {
+		initContainer(b)
 	}
 
 	prog.GlobalVariablesBlueprint.AddLazyBuilder(func() {
@@ -38,8 +47,8 @@ func (b *FunctionBuilder) CheckGlobalVariablePhi(l *Variable, r Value) bool {
 	name := l.GetName()
 	prog := b.GetProgram()
 
-	if prog.GlobalVariablesBlueprint == nil {
-		return false
+	if utils.IsNil(prog.GlobalVariablesBlueprint) {
+		initContainer(b)
 	}
 
 	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
@@ -60,8 +69,8 @@ func (b *FunctionBuilder) GetGlobalVariables() map[string]Value {
 	variables := make(map[string]Value)
 	prog := b.GetProgram()
 
-	if prog.GlobalVariablesBlueprint == nil {
-		return variables
+	if utils.IsNil(prog.GlobalVariablesBlueprint) {
+		initContainer(b)
 	}
 
 	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
@@ -86,6 +95,11 @@ func (b *FunctionBuilder) GetGlobalVariableR(name string) Value {
 
 func (b *FunctionBuilder) LoadGlobalVariable() {
 	prog := b.GetProgram()
+
+	if utils.IsNil(prog.GlobalVariablesBlueprint) {
+		initContainer(b)
+	}
+
 	globalVarsContainer := prog.GlobalVariablesBlueprint.Container()
 	for i, m := range globalVarsContainer.GetAllMember() {
 		variable := b.CreateVariableCross(i.String())
