@@ -1367,10 +1367,14 @@ message DeleteKnowledgeBaseEntryRequest {
   string KnowledgeBaseEntryHiddenIndex = 3;
   int64 KnowledgeBaseId = 2;
 }
-
+message SearchKnowledgeBaseEntryFilter {
+  int64 KnowledgeBaseId = 1;
+  string Keyword = 2;
+}
 message SearchKnowledgeBaseEntryRequest {
   int64 KnowledgeBaseId = 1;
   string Keyword = 2;
+  SearchKnowledgeBaseEntryFilter Filter = 4;
   Paging Pagination = 3;
 }
 
@@ -1457,11 +1461,18 @@ message VectorStoreCollection{
   string DistanceFuncType = 10;
 }
 
+message ListVectorStoreEntriesFilter {
+  int64 CollectionID = 1;
+  string Keyword = 2;
+  string CollectionName = 3;
+}
+
 message ListVectorStoreEntriesRequest {
   int64 CollectionID = 1;
   string Keyword = 2;
   Paging Pagination = 3;
   string CollectionName = 4;
+  ListVectorStoreEntriesFilter Filter = 5;
 }
 
 message CreateVectorStoreEntryRequest {

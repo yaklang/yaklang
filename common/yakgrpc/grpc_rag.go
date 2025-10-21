@@ -139,47 +139,19 @@ func (s *Server) UpdateVectorStoreCollection(ctx context.Context, req *ypb.Updat
 func (s *Server) ListVectorStoreEntries(ctx context.Context, req *ypb.ListVectorStoreEntriesRequest) (*ypb.ListVectorStoreEntriesResponse, error) {
 	db := consts.GetGormProfileDatabase()
 
-	var collection *schema.VectorStoreCollection
-	var err error
-	if req.GetCollectionName() != "" {
-		collection, err = yakit.GetRAGCollectionInfoByName(db, req.GetCollectionName())
-		if err != nil {
-			return nil, utils.Errorf("找不到指定的向量存储集合: %v", err)
-		}
-	} else {
-		collection, err = yakit.GetRAGCollectionInfoByID(db, req.GetCollectionID())
-		if err != nil {
-			return nil, utils.Errorf("找不到指定的向量存储集合: %v", err)
-		}
-	}
-
-	// 构建查询
-	query := db.Model(&schema.VectorStoreDocument{}).Where("collection_id = ?", collection.ID)
-
-	// 关键词搜索
-	if req.GetKeyword() != "" {
-		query = bizhelper.FuzzSearchEx(query, []string{"document_id", "content"}, req.GetKeyword(), false)
-	}
-
-	// 分页
-	var documents []*schema.VectorStoreDocument
+	// 构建过滤条件
+	filter := req.GetFilter()
 	pagination := req.GetPagination()
-	page := 1
-	limit := 10
-	if pagination != nil {
-		page = int(pagination.GetPage())
-		if page <= 0 {
-			page = 1
-		}
-		limit = int(pagination.GetLimit())
-		if limit <= 0 {
-			limit = 10
+	if pagination == nil {
+		pagination = &ypb.Paging{
+			Page:  1,
+			Limit: 10,
 		}
 	}
 
-	p, db := bizhelper.Paging(query, page, limit, &documents)
-	if db.Error != nil {
-		return nil, utils.Errorf("查询向量存储条目失败: %v", db.Error)
+	p, documents, err := yakit.QueryRAGDocumentPaging(db, filter, pagination)
+	if err != nil {
+		return nil, utils.Errorf("查询向量存储条目失败: %v", err)
 	}
 
 	// 转换为 protobuf 格式
@@ -190,17 +162,12 @@ func (s *Server) ListVectorStoreEntries(ctx context.Context, req *ypb.ListVector
 		metadataStr := string(metadataBytes)
 
 		// 转换嵌入向量
-		embedding := make([]float32, len(doc.Embedding))
-		for i, v := range doc.Embedding {
-			embedding[i] = v
-		}
-
 		pbEntry := &ypb.VectorStoreEntry{
 			ID:        int64(doc.ID),
 			UID:       doc.DocumentID,
 			Content:   doc.Content,
 			Metadata:  metadataStr,
-			Embedding: embedding,
+			Embedding: doc.Embedding,
 		}
 		pbEntries = append(pbEntries, pbEntry)
 	}

@@ -591,6 +591,109 @@ func TestMUSTPASS_GetKnowledgeBaseEntryByFilter(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, paginatorOverLimit)
 	assert.Len(t, entriesOverLimit, 0) // 超出范围，应该返回空数组
+
+	// 测试 AfterId - 获取ID大于指定值的记录
+	// 先获取第一个条目的ID
+	pagingFirst := &ypb.Paging{
+		Page:  1,
+		Limit: 1,
+	}
+	_, firstEntries, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingFirst)
+	assert.NoError(t, err)
+	assert.Len(t, firstEntries, 1)
+	firstEntryID := firstEntries[0].ID
+
+	// 测试获取ID大于第一个条目的所有记录
+	pagingAfter := &ypb.Paging{
+		Page:    1,
+		Limit:   20, // 足够大以获取所有后续记录
+		AfterId: int64(firstEntryID),
+	}
+	paginatorAfter, entriesAfter, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingAfter)
+	assert.NoError(t, err)
+	assert.NotNil(t, paginatorAfter)
+	assert.Len(t, entriesAfter, 9) // 应该有9条记录（总共10条，排除第一条）
+	// 验证所有返回的记录ID都大于firstEntryID
+	for _, entry := range entriesAfter {
+		assert.Greater(t, entry.ID, firstEntryID, "AfterID过滤后的记录ID应该大于指定ID")
+	}
+
+	// 测试 BeforeId - 获取ID小于指定值的记录
+	// 先获取最后一个条目的ID
+	pagingLast := &ypb.Paging{
+		Page:  2,
+		Limit: 5,
+	}
+	_, lastPageEntries, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingLast)
+	assert.NoError(t, err)
+	assert.Len(t, lastPageEntries, 5)
+	lastEntryID := lastPageEntries[len(lastPageEntries)-1].ID
+
+	// 测试获取ID小于最后一个条目的所有记录
+	pagingBefore := &ypb.Paging{
+		Page:     1,
+		Limit:    20, // 足够大以获取所有之前的记录
+		BeforeId: int64(lastEntryID),
+	}
+	paginatorBefore, entriesBefore, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingBefore)
+	assert.NoError(t, err)
+	assert.NotNil(t, paginatorBefore)
+	assert.Len(t, entriesBefore, 9) // 应该有9条记录（总共10条，排除最后一条）
+	// 验证所有返回的记录ID都小于lastEntryID
+	for _, entry := range entriesBefore {
+		assert.Less(t, entry.ID, lastEntryID, "BeforeID过滤后的记录ID应该小于指定ID")
+	}
+
+	// 测试同时使用 AfterId 和 BeforeId - 获取指定范围内的记录
+	// 获取中间范围的记录（第3到第7条）
+	pagingRange := &ypb.Paging{
+		Page:  1,
+		Limit: 3,
+	}
+	_, rangeEntries, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingRange)
+	assert.NoError(t, err)
+	assert.Len(t, rangeEntries, 3)
+	thirdEntryID := rangeEntries[len(rangeEntries)-1].ID
+
+	pagingRange2 := &ypb.Paging{
+		Page:  3,
+		Limit: 3,
+	}
+	_, rangeEntries2, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingRange2)
+	assert.NoError(t, err)
+	assert.Greater(t, len(rangeEntries2), 0)
+	eighthEntryID := rangeEntries2[0].ID
+
+	// 使用 AfterId 和 BeforeId 获取第4到第7条记录
+	pagingBetween := &ypb.Paging{
+		Page:     1,
+		Limit:    10,
+		AfterId:  int64(thirdEntryID),
+		BeforeId: int64(eighthEntryID),
+	}
+	paginatorBetween, entriesBetween, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "", pagingBetween)
+	assert.NoError(t, err)
+	assert.NotNil(t, paginatorBetween)
+	// 验证所有返回的记录ID在指定范围内
+	for _, entry := range entriesBetween {
+		assert.Greater(t, entry.ID, thirdEntryID, "记录ID应该大于AfterId")
+		assert.Less(t, entry.ID, eighthEntryID, "记录ID应该小于BeforeId")
+	}
+
+	// 测试 AfterId 配合关键词过滤
+	pagingAfterWithKeyword := &ypb.Paging{
+		Page:    1,
+		Limit:   10,
+		AfterId: int64(firstEntryID),
+	}
+	paginatorAfterKeyword, entriesAfterKeyword, err := GetKnowledgeBaseEntryByFilter(db, int64(testKB.ID), "测试", pagingAfterWithKeyword)
+	assert.NoError(t, err)
+	assert.NotNil(t, paginatorAfterKeyword)
+	assert.Len(t, entriesAfterKeyword, 9) // 所有记录都包含"测试"，排除第一条
+	// 验证过滤条件都满足
+	for _, entry := range entriesAfterKeyword {
+		assert.Greater(t, entry.ID, firstEntryID)
+	}
 }
 
 // TestMUSTPASS_KnowledgeBaseCompleteWorkflow 测试知识库完整工作流程
