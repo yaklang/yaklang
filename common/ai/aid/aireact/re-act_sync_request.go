@@ -205,6 +205,49 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 
 		log.Infof("current task %s has been cancelled", currentTask.GetId())
 		return nil
+
+	case SYNC_TYPE_REACT_REMOVE_TASK:
+		// 移除任务：从队列中移除指定 task_id 的任务
+		var targetTaskId string
+
+		// 从 SyncJsonInput 中解析 task_id
+		if event.SyncJsonInput != "" {
+			var params map[string]interface{}
+			if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+				r.EmitError("failed to parse remove task parameters: %v", err)
+				return nil
+			}
+
+			if taskId, ok := params["task_id"].(string); ok && taskId != "" {
+				targetTaskId = taskId
+			} else {
+				r.EmitError("task_id is required for remove task operation")
+				return nil
+			}
+		} else {
+			r.EmitError("SyncJsonInput is required for remove task operation")
+			return nil
+		}
+
+		log.Infof("attempting to remove task: %s", targetTaskId)
+
+		// 尝试从队列中移除指定任务
+		taskRemoved := r.taskQueue.RemoveTask(targetTaskId)
+		if !taskRemoved {
+			r.EmitError("task %s not found in queue, cannot remove", targetTaskId)
+			return nil
+		}
+
+		log.Infof("task %s has been successfully removed from queue", targetTaskId)
+
+		// 发送队列信息更新事件
+		r.handleSyncMessage(&ypb.AIInputEvent{
+			IsSyncMessage: true,
+			SyncType:      SYNC_TYPE_QUEUE_INFO,
+		})
+
+		return nil
+
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
 	}
