@@ -213,30 +213,8 @@ func (s *Server) SearchKnowledgeBaseEntry(ctx context.Context, req *ypb.SearchKn
 	reqPagination := req.GetPagination()
 	db := consts.GetGormProfileDatabase()
 
-	// 如果有关键字搜索，尝试使用知识库的向量搜索功能
-	// if req.GetKeyword() != "" {
-	// 	kb, err := knowledgebase.LoadKnowledgeBaseByID(db, req.GetKnowledgeBaseId())
-	// 	if err == nil {
-	// 		// 使用知识库的搜索功能
-	// 		limit := 50 // 默认限制
-	// 		if reqPagination != nil && reqPagination.Limit > 0 {
-	// 			limit = int(reqPagination.Limit)
-	// 		}
-
-	// 		entries, err := kb.SearchKnowledgeEntries(req.GetKeyword(), limit)
-	// 		if err == nil {
-	// 			return &ypb.SearchKnowledgeBaseEntryResponse{
-	// 				Total:                int64(len(entries)),
-	// 				Pagination:           reqPagination,
-	// 				KnowledgeBaseEntries: KnowledgeBaseEntryListToGrpcModel(entries),
-	// 			}, nil
-	// 		}
-	// 		// 如果向量搜索失败，回退到传统搜索
-	// 	}
-	// }
-
 	// 回退到传统的数据库搜索
-	p, entries, err := yakit.GetKnowledgeBaseEntryByFilter(db, req.GetKnowledgeBaseId(), req.GetKeyword(), reqPagination)
+	p, entries, err := yakit.QueryKnowledgeBaseEntryPaging(db, req.GetFilter(), reqPagination)
 	if err != nil {
 		return nil, err
 	}

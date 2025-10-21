@@ -142,19 +142,54 @@ func SearchKnowledgeBaseEntry(db *gorm.DB, id int64, keyword string) ([]*schema.
 	return knowledgeBases, nil
 }
 
-// GetKnowledgeBaseEntryByFilter 根据过滤条件获取知识库条目
-func GetKnowledgeBaseEntryByFilter(db *gorm.DB, id int64, keyword string, filter *ypb.Paging) (*bizhelper.Paginator, []*schema.KnowledgeBaseEntry, error) {
+// FilterKnowledgeBaseEntry 过滤知识库条目
+func FilterKnowledgeBaseEntry(db *gorm.DB, entryFilter *ypb.SearchKnowledgeBaseEntryFilter) *gorm.DB {
+	if entryFilter == nil {
+		return db
+	}
 	db = db.Model(&schema.KnowledgeBaseEntry{})
-	db = db.Where("knowledge_base_id = ?", id)
-	if keyword != "" {
-		db = bizhelper.FuzzSearchEx(db, []string{"knowledge_title", "knowledge_details", "keywords"}, keyword, false)
+
+	// 精确匹配知识库ID
+	if entryFilter.KnowledgeBaseId > 0 {
+		db = bizhelper.ExactQueryInt64(db, "knowledge_base_id", entryFilter.KnowledgeBaseId)
 	}
-	var knowledgeBases []*schema.KnowledgeBaseEntry
-	pag, db := bizhelper.Paging(db, int(filter.Page), int(filter.Limit), &knowledgeBases)
+
+	// 多字段模糊搜索
+	if entryFilter.Keyword != "" {
+		db = bizhelper.FuzzSearchEx(db, []string{"knowledge_title", "knowledge_details", "keywords"}, entryFilter.Keyword, false)
+	}
+
+	return db
+}
+
+// QueryKnowledgeBaseEntryPaging 分页查询知识库条目
+func QueryKnowledgeBaseEntryPaging(db *gorm.DB, entryFilter *ypb.SearchKnowledgeBaseEntryFilter, paging *ypb.Paging) (*bizhelper.Paginator, []*schema.KnowledgeBaseEntry, error) {
+	// 1. 设置查询的数据模型
+	db = db.Model(&schema.KnowledgeBaseEntry{})
+
+	// 2. 应用过滤条件
+	db = FilterKnowledgeBaseEntry(db, entryFilter)
+
+	// 3. 应用排序和分页相关的预处理
+	db = bizhelper.OrderByPaging(db, paging)
+
+	// 4. 执行分页查询
+	ret := make([]*schema.KnowledgeBaseEntry, 0)
+	pag, db := bizhelper.YakitPagingQuery(db, paging, &ret)
 	if db.Error != nil {
-		return nil, nil, utils.Errorf("get all KnowledgeBase failed: %s", db.Error)
+		return nil, nil, utils.Errorf("paging failed: %s", db.Error)
 	}
-	return pag, knowledgeBases, nil
+
+	return pag, ret, nil
+}
+
+// GetKnowledgeBaseEntryByFilter 根据过滤条件获取知识库条目（兼容旧接口）
+func GetKnowledgeBaseEntryByFilter(db *gorm.DB, id int64, keyword string, filter *ypb.Paging) (*bizhelper.Paginator, []*schema.KnowledgeBaseEntry, error) {
+	entryFilter := &ypb.SearchKnowledgeBaseEntryFilter{
+		KnowledgeBaseId: id,
+		Keyword:         keyword,
+	}
+	return QueryKnowledgeBaseEntryPaging(db, entryFilter, filter)
 }
 
 func GetKnowledgeBaseEntryByUUID(db *gorm.DB, uuid string) (*schema.KnowledgeBaseEntry, error) {
