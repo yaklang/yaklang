@@ -3,6 +3,7 @@ package aireact
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -116,6 +117,31 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 
 		// 通过 Emitter 发送 EVENT_TYPE_MEMORY_CONTEXT 事件
 		r.EmitJSON(schema.EVENT_TYPE_MEMORY_CONTEXT, "memory_context", responseData)
+		return nil
+	case SYNC_TYPE_REACT_CANCEL_CURRENT_TASK:
+		// 中断当前正在执行的任务
+		currentTask := r.GetCurrentTask()
+		if currentTask == nil {
+			r.EmitError("no current task to cancel")
+			return nil
+		}
+
+		log.Infof("cancelling current task: %s", currentTask.GetId())
+
+		// 调用任务的 Cancel 方法，这会取消任务的 context
+		currentTask.Cancel()
+
+		// 设置任务状态为 Aborted
+		currentTask.SetStatus(aicommon.AITaskState_Aborted)
+
+		// 发送任务取消事件
+		r.EmitStructured("react_task_cancelled", map[string]interface{}{
+			"task_id":      currentTask.GetId(),
+			"user_input":   currentTask.GetUserInput(),
+			"cancelled_at": time.Now(),
+		})
+
+		log.Infof("current task %s has been cancelled", currentTask.GetId())
 		return nil
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)
