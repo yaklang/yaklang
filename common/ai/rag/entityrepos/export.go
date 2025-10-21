@@ -21,6 +21,7 @@ type ExportEntityRepositoryOptions struct {
 	ExportRelationshipHandler func(relationship schema.ERModelRelationship) (schema.ERModelRelationship, error)
 	ExportRAGDocumentHandler  func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
 	OnProgressHandler         func(percent float64, message string, messageType string)
+	SkipVectorStore           bool // 是否跳过向量库的导出
 }
 
 func ExportEntityRepository(ctx context.Context, db *gorm.DB, opts *ExportEntityRepositoryOptions) (io.Reader, error) {
@@ -177,29 +178,41 @@ func ExportEntityRepository(ctx context.Context, db *gorm.DB, opts *ExportEntity
 		page++
 	}
 
-	reportProgress(65, "关系导出完成，开始导出向量库数据", "info")
+	reportProgress(65, "关系导出完成", "info")
 
-	// 写入向量库
-	ragBinaryReader, err := rag.ExportRAGToBinary(ctx, db, reposInfo.EntityBaseName,
-		rag.WithExportDocumentHandler(opts.ExportRAGDocumentHandler),
-		rag.WithExportProgressHandler(func(percent float64, message string, messageType string) {
-			// 将RAG导出进度映射到65-95%范围
-			ragProgress := 65 + (percent/100)*30
-			reportProgress(ragProgress, message, messageType)
-		}),
-	)
-	if err != nil {
-		return nil, utils.Wrap(err, "export rag to binary")
-	}
-	ragBinary, err := io.ReadAll(ragBinaryReader)
-	if err != nil {
-		return nil, utils.Wrap(err, "read rag binary")
-	}
-	if err := writer.WriteBytes(ragBinary); err != nil {
-		return nil, utils.Wrap(err, "write rag binary")
+	// 根据 SkipVectorStore 选项决定是否导出向量库
+	if opts.SkipVectorStore {
+		reportProgress(70, "跳过向量库数据导出", "info")
+		// 写入空的向量库数据
+		if err := writer.WriteBytes([]byte{}); err != nil {
+			return nil, utils.Wrap(err, "write empty rag binary")
+		}
+		reportProgress(100, "实体仓库导出完成（已跳过向量库）", "success")
+	} else {
+		reportProgress(65, "开始导出向量库数据", "info")
+		// 写入向量库
+		ragBinaryReader, err := rag.ExportRAGToBinary(ctx, db, reposInfo.EntityBaseName,
+			rag.WithExportDocumentHandler(opts.ExportRAGDocumentHandler),
+			rag.WithExportProgressHandler(func(percent float64, message string, messageType string) {
+				// 将RAG导出进度映射到65-95%范围
+				ragProgress := 65 + (percent/100)*30
+				reportProgress(ragProgress, message, messageType)
+			}),
+		)
+		if err != nil {
+			return nil, utils.Wrap(err, "export rag to binary")
+		}
+		ragBinary, err := io.ReadAll(ragBinaryReader)
+		if err != nil {
+			return nil, utils.Wrap(err, "read rag binary")
+		}
+		if err := writer.WriteBytes(ragBinary); err != nil {
+			return nil, utils.Wrap(err, "write rag binary")
+		}
+
+		reportProgress(100, "实体仓库导出完成", "success")
 	}
 
-	reportProgress(100, "实体仓库导出完成", "success")
 	return &buf, nil
 }
 
@@ -440,14 +453,15 @@ func ImportEntityRepository(ctx context.Context, db *gorm.DB, reader io.Reader, 
 		}
 	}
 
-	reportProgress(65, "关系导入完成，开始导入向量库数据", "info")
+	reportProgress(65, "关系导入完成，开始处理向量库数据", "info")
 
-	// 读取并导入向量库数据
+	// 读取向量库数据
 	ragBinaryBytes, err := pr.ReadBytes()
 	if err != nil {
 		return utils.Wrap(err, "read rag binary data")
 	}
 
+	// 只有在向量库数据不为空时才导入
 	if len(ragBinaryBytes) > 0 {
 		reportProgress(70, "正在导入向量库数据", "info")
 		ragReader := bytes.NewReader(ragBinaryBytes)
@@ -467,6 +481,9 @@ func ImportEntityRepository(ctx context.Context, db *gorm.DB, reader io.Reader, 
 			return utils.Wrap(err, "import rag data")
 		}
 		reportProgress(95, "向量库数据导入完成", "info")
+	} else {
+		// 向量库数据为空，跳过导入
+		reportProgress(70, "向量库数据为空，跳过导入", "info")
 	}
 
 	reportProgress(100, "实体仓库导入完成", "success")
