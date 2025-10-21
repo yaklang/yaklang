@@ -42,7 +42,7 @@ func NewAIMemory(sessionId string, opts ...Option) (*AIMemoryTriage, error) {
 	var system *rag.RAGSystem
 	var embeddingAvailable bool
 	var err error
-	
+
 	// 在 mock 模式下，总是认为 embedding 可用
 	if rag.IsMockMode {
 		log.Debugf("RAG mock mode detected, embedding considered available for session: %s", sessionId)

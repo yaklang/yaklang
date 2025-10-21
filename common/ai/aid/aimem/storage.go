@@ -18,6 +18,7 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
 		return utils.Errorf("database connection is nil")
 	}
 
+	emitter := r.GetEmitter()
 	for _, entity := range entities {
 		if entity == nil {
 			continue
@@ -45,6 +46,12 @@ func (r *AIMemoryTriage) SaveMemoryEntities(entities ...*MemoryEntity) error {
 			return utils.Errorf("save memory entity to database failed: %v", err)
 		}
 
+		if emitter != nil {
+			emitter.EmitJSON(schema.EVENT_TYPE_MEMORY_SAVE, "memory-save", map[string]any{
+				"memory_session_id": r.sessionID,
+				"memory":            entity,
+			})
+		}
 		log.Infof("saved memory entity to database: %s", entity.Id)
 
 		// 添加到HNSW索引
