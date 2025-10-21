@@ -159,11 +159,8 @@ func (c *Config) GetCodeSourceAuth() *AuthConfigInfo {
 // WithCodeSourceKind 设置代码源类型
 func WithCodeSourceKind(kind CodeSourceKind) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Kind can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Kind"); err != nil {
+			return err
 		}
 		c.CodeSource.Kind = kind
 		return nil
@@ -172,11 +169,8 @@ func WithCodeSourceKind(kind CodeSourceKind) Option {
 
 func WithCodeSourceLocalFile(localFile string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Local File can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Local File"); err != nil {
+			return err
 		}
 		c.CodeSource.LocalFile = localFile
 		return nil
@@ -185,11 +179,8 @@ func WithCodeSourceLocalFile(localFile string) Option {
 
 func WithCodeSourceURL(url string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source URL can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source URL"); err != nil {
+			return err
 		}
 		c.CodeSource.URL = url
 		return nil
@@ -198,11 +189,8 @@ func WithCodeSourceURL(url string) Option {
 
 func WithCodeSourceBranch(branch string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Branch can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Branch"); err != nil {
+			return err
 		}
 		c.CodeSource.Branch = branch
 		return nil
@@ -211,11 +199,8 @@ func WithCodeSourceBranch(branch string) Option {
 
 func WithCodeSourcePath(path string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Path can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Path"); err != nil {
+			return err
 		}
 		c.CodeSource.Path = path
 		return nil
@@ -224,11 +209,8 @@ func WithCodeSourcePath(path string) Option {
 
 func WithCodeSourceAuthKind(kind string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Auth Kind can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Auth Kind"); err != nil {
+			return err
 		}
 		if c.CodeSource.Auth == nil {
 			c.CodeSource.Auth = &AuthConfigInfo{}
@@ -240,11 +222,8 @@ func WithCodeSourceAuthKind(kind string) Option {
 
 func WithCodeSourceAuthUserName(userName string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Auth User Name can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Auth User Name"); err != nil {
+			return err
 		}
 		if c.CodeSource.Auth == nil {
 			c.CodeSource.Auth = &AuthConfigInfo{}
@@ -256,11 +235,8 @@ func WithCodeSourceAuthUserName(userName string) Option {
 
 func WithCodeSourceAuthPassword(password string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Auth Password can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Auth Password"); err != nil {
+			return err
 		}
 		if c.CodeSource.Auth == nil {
 			c.CodeSource.Auth = &AuthConfigInfo{}
@@ -272,11 +248,8 @@ func WithCodeSourceAuthPassword(password string) Option {
 
 func WithSSAProjectCodeSourceAuthKeyPath(keyPath string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Auth Key Path can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Auth Key Path"); err != nil {
+			return err
 		}
 		if c.CodeSource.Auth == nil {
 			c.CodeSource.Auth = &AuthConfigInfo{}
@@ -288,11 +261,8 @@ func WithSSAProjectCodeSourceAuthKeyPath(keyPath string) Option {
 
 func WithCodeSourceProxyURL(url string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Proxy URL can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Proxy URL"); err != nil {
+			return err
 		}
 		if c.CodeSource.Proxy == nil {
 			c.CodeSource.Proxy = &ProxyConfigInfo{}
@@ -304,11 +274,8 @@ func WithCodeSourceProxyURL(url string) Option {
 
 func WithCodeSourceProxyAuth(user string, password string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source Proxy Auth can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source Proxy Auth"); err != nil {
+			return err
 		}
 		if c.CodeSource.Proxy == nil {
 			c.CodeSource.Proxy = &ProxyConfigInfo{}
@@ -321,11 +288,8 @@ func WithCodeSourceProxyAuth(user string, password string) Option {
 
 func WithCodeSourceJson(raw string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeCodeSource == 0 {
-			return utils.Errorf("Config: Code Source JSON can only be set in Code Source mode")
-		}
-		if c.CodeSource == nil {
-			c.CodeSource = defaultCodeSourceConfig()
+		if err := c.ensureCodeSource("Code Source JSON"); err != nil {
+			return err
 		}
 		err := json.Unmarshal([]byte(raw), c.CodeSource)
 		if err != nil {

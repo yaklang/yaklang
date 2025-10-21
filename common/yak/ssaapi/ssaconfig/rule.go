@@ -1,7 +1,6 @@
 package ssaconfig
 
 import (
-	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -80,11 +79,8 @@ func (c *Config) SetRuleInput(input *ypb.SyntaxFlowRuleInput) {
 // WithRuleFilter 设置规则过滤器
 func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter"); err != nil {
+			return err
 		}
 		c.SyntaxFlowRule.RuleFilter = filter
 		return nil
@@ -93,11 +89,8 @@ func WithRuleFilter(filter *ypb.SyntaxFlowRuleFilter) Option {
 
 func WithRuleInput(input *ypb.SyntaxFlowRuleInput) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Input can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Input"); err != nil {
+			return err
 		}
 		c.SyntaxFlowRule.RuleInput = input
 		return nil
@@ -107,11 +100,8 @@ func WithRuleInput(input *ypb.SyntaxFlowRuleInput) Option {
 // WithRuleFilterLanguage 设置规则过滤器语言
 func WithRuleFilterLanguage(language ...string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Language can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Language"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -124,11 +114,8 @@ func WithRuleFilterLanguage(language ...string) Option {
 // WithRuleFilterSeverity 设置规则过滤器严重程度
 func WithRuleFilterSeverity(severity ...string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Severity can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Severity"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -141,11 +128,8 @@ func WithRuleFilterSeverity(severity ...string) Option {
 // WithRuleFilterKind 设置规则过滤器类型
 func WithRuleFilterKind(kind string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Kind can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Kind"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -158,11 +142,8 @@ func WithRuleFilterKind(kind string) Option {
 // WithRuleFilterPurpose 设置规则过滤器用途
 func WithRuleFilterPurpose(purpose ...string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Purpose can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Purpose"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -175,11 +156,8 @@ func WithRuleFilterPurpose(purpose ...string) Option {
 // WithRuleFilterKeyword 设置规则过滤器关键字
 func WithRuleFilterKeyword(keyword string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Keyword can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Keyword"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -192,11 +170,8 @@ func WithRuleFilterKeyword(keyword string) Option {
 // WithRuleFilterGroupNames 设置规则过滤器组名
 func WithRuleFilterGroupNames(groupNames ...string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Group Names can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Group Names"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -209,11 +184,8 @@ func WithRuleFilterGroupNames(groupNames ...string) Option {
 // WithRuleFilterRuleNames 设置规则过滤器规则名
 func WithRuleFilterRuleNames(ruleNames ...string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Rule Names can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Rule Names"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -226,11 +198,8 @@ func WithRuleFilterRuleNames(ruleNames ...string) Option {
 // WithRuleFilterTag 设置规则过滤器标签
 func WithRuleFilterTag(tag ...string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Tag can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Tag"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
@@ -243,11 +212,8 @@ func WithRuleFilterTag(tag ...string) Option {
 // WithRuleFilterIncludeLibraryRule 设置规则过滤器包含库规则
 func WithRuleFilterIncludeLibraryRule(includeLibraryRule bool) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSyntaxFlowRule == 0 {
-			return utils.Errorf("Config: Rule Filter Include Library Rule can only be set in Rule mode")
-		}
-		if c.SyntaxFlowRule == nil {
-			c.SyntaxFlowRule = defaultSyntaxFlowRuleConfig()
+		if err := c.ensureSyntaxFlowRule("Rule Filter Include Library Rule"); err != nil {
+			return err
 		}
 		if c.SyntaxFlowRule.RuleFilter == nil {
 			c.SyntaxFlowRule.RuleFilter = &ypb.SyntaxFlowRuleFilter{}
