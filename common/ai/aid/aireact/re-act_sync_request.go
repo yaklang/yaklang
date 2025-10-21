@@ -118,6 +118,68 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		// 通过 Emitter 发送 EVENT_TYPE_MEMORY_CONTEXT 事件
 		r.EmitJSON(schema.EVENT_TYPE_MEMORY_CONTEXT, "memory_context", responseData)
 		return nil
+	case SYNC_TYPE_REACT_JUMP_QUEUE:
+		// 插队任务：将指定 task_id 的任务移动到队列最前面，并取消当前任务
+		var targetTaskId string
+
+		// 从 SyncJsonInput 中解析 task_id
+		if event.SyncJsonInput != "" {
+			var params map[string]interface{}
+			if err := json.Unmarshal([]byte(event.SyncJsonInput), &params); err != nil {
+				r.EmitError("failed to parse jump queue parameters: %v", err)
+				return nil
+			}
+
+			if taskId, ok := params["task_id"].(string); ok && taskId != "" {
+				targetTaskId = taskId
+			} else {
+				r.EmitError("task_id is required for jump queue operation")
+				return nil
+			}
+		} else {
+			r.EmitError("SyncJsonInput is required for jump queue operation")
+			return nil
+		}
+
+		log.Infof("attempting to jump queue for task: %s", targetTaskId)
+
+		// 尝试将指定任务移动到队列最前面
+		taskMoved := r.taskQueue.MoveTaskToFirst(targetTaskId)
+		if !taskMoved {
+			r.EmitError("task %s not found in queue, cannot jump queue", targetTaskId)
+			return nil
+		}
+
+		// 取消当前正在执行的任务（如果有的话）
+		currentTask := r.GetCurrentTask()
+		if currentTask != nil {
+			log.Infof("cancelling current task %s to allow jump queue for task %s", currentTask.GetId(), targetTaskId)
+
+			// 调用任务的 Cancel 方法，这会取消任务的 context
+			currentTask.Cancel()
+
+			// 设置任务状态为 Aborted
+			currentTask.SetStatus(aicommon.AITaskState_Aborted)
+
+			// 发送任务取消事件
+			r.EmitStructured("react_task_cancelled", map[string]interface{}{
+				"task_id":      currentTask.GetId(),
+				"user_input":   currentTask.GetUserInput(),
+				"cancelled_at": time.Now(),
+				"reason":       "jump_queue",
+			})
+
+			log.Infof("current task %s has been cancelled for jump queue", currentTask.GetId())
+		}
+
+		// 发送插队成功事件
+		r.EmitStructured("react_task_jumped_queue", map[string]interface{}{
+			"jumped_task_id": targetTaskId,
+			"jumped_at":      time.Now(),
+		})
+
+		log.Infof("task %s has successfully jumped to front of queue", targetTaskId)
+		return nil
 	case SYNC_TYPE_REACT_CANCEL_CURRENT_TASK:
 		// 中断当前正在执行的任务
 		currentTask := r.GetCurrentTask()

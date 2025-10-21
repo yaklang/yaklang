@@ -300,3 +300,26 @@ func TaskLogger() taskEnqueueHook {
 		return true, nil
 	}
 }
+
+// MoveTaskToFirst 将指定 task_id 的任务移动到队列最前面
+// 如果找到任务则返回 true，否则返回 false
+func (tq *TaskQueue) MoveTaskToFirst(taskId string) bool {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+
+	// 遍历队列查找指定的任务
+	for e := tq.queue.Front(); e != nil; e = e.Next() {
+		task := e.Value.(aicommon.AIStatefulTask)
+		if task.GetId() == taskId {
+			// 找到任务，将其移动到队列最前面
+			tq.queue.Remove(e)       // 先从当前位置移除
+			tq.queue.PushFront(task) // 再添加到队列最前面
+
+			log.Infof("Task queue [%s]: moved task [%s] to front of queue", tq.queueName, taskId)
+			return true
+		}
+	}
+
+	log.Warnf("Task queue [%s]: task [%s] not found in queue", tq.queueName, taskId)
+	return false
+}
