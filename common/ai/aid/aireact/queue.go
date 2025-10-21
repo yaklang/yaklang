@@ -323,3 +323,30 @@ func (tq *TaskQueue) MoveTaskToFirst(taskId string) bool {
 	log.Warnf("Task queue [%s]: task [%s] not found in queue", tq.queueName, taskId)
 	return false
 }
+
+// RemoveTask 从队列中移除指定 task_id 的任务
+// 如果找到并移除任务则返回 true，否则返回 false
+func (tq *TaskQueue) RemoveTask(taskId string) bool {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
+
+	// 遍历队列查找指定的任务
+	for e := tq.queue.Front(); e != nil; e = e.Next() {
+		task := e.Value.(aicommon.AIStatefulTask)
+		if task.GetId() == taskId {
+			// 找到任务，从队列中移除
+			tq.queue.Remove(e)
+
+			// 执行 dequeue hooks 来发送事件
+			for _, hook := range tq.dequeueHooks {
+				hook(task, "manual_remove")
+			}
+
+			log.Infof("Task queue [%s]: removed task [%s] from queue", tq.queueName, taskId)
+			return true
+		}
+	}
+
+	log.Warnf("Task queue [%s]: task [%s] not found in queue, cannot remove", tq.queueName, taskId)
+	return false
+}

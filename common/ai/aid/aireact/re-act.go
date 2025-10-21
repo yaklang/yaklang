@@ -35,6 +35,7 @@ const (
 	SYNC_TYPE_MEMORY_CONTEXT            = "memory_sync"
 	SYNC_TYPE_REACT_CANCEL_CURRENT_TASK = "react_cancel_current_task"
 	SYNC_TYPE_REACT_JUMP_QUEUE          = "react_jump_queue"
+	SYNC_TYPE_REACT_REMOVE_TASK         = "react_remove_task"
 )
 
 // ReactTaskItem 表示ReAct任务队列中的单个任务
