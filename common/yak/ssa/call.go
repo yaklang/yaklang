@@ -402,6 +402,9 @@ func (c *Call) handleCalleeFunction() {
 				if !ok {
 					continue
 				}
+				if utils.IsNil(object) {
+					continue
+				}
 
 				if res := checkCanMemberCallExist(object, key); !res.exist {
 					builder.NewErrorWithPos(Error, SSATAG,

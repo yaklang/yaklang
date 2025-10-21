@@ -356,7 +356,7 @@ func (f *FunctionBuilder) emitMake(parentI Value, typ Type, low, high, max, Len,
 		log.Errorf("BUG: current block is finish, can't emit make")
 		log.Errorf("BUG: current block is finish, can't emit make")
 		log.Errorf("BUG: current block is finish, can't emit make")
-		return nil
+		// return nil
 	}
 	i := NewMake(parentI, typ, low, high, max, Len, Cap)
 	f.emit(i)
@@ -407,13 +407,14 @@ func (f *FunctionBuilder) EmitConstPointer(o *Variable) Value {
 	}, func(i int) Value {
 		return values[i]
 	})
-	p := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
-	p.SetKind(ssautil.PointerVariable)
+	if !utils.IsNil(obj) {
+		p := f.CreateMemberCallVariable(obj, f.EmitConstInstPlaceholder("@pointer"))
+		p.SetKind(ssautil.PointerVariable)
 
-	t := NewPointerType()
-	t.SetName("Pointer")
-	obj.SetType(t)
-
+		t := NewPointerType()
+		t.SetName("Pointer")
+		obj.SetType(t)
+	}
 	return obj
 }
 
