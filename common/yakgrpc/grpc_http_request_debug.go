@@ -14,6 +14,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/mutate"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/cli"
 	"github.com/yaklang/yaklang/common/yak"
@@ -227,14 +228,44 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 
 	var reqs []any
 
+	// smoking
+	isSmoking := false
+	isStrict := false
+	shouldRenderFuzzTag := false
+	if len(execParams) > 0 {
+		for _, p := range execParams {
+			if p.Key == "State" && p.Value == "Smoking" {
+				isSmoking = true
+			}
+			if p.Key == "Mode" && p.Value == "Strict" {
+				isStrict = true
+			}
+			if p.Key == "FuzzTag" && p.Value == "true" {
+				shouldRenderFuzzTag = true
+			}
+		}
+	}
+
 	BuildRes, err := BuildHttpRequestPacket(s.GetProjectDatabase(), baseBuilderParams, targetInput)
 	if err != nil {
 		return utils.Wrapf(err, "build http request failed")
 	}
 
 	for packet := range BuildRes {
+		requestBytes := packet.Request
+
+		// 如果需要渲染 fuzztag，在这里处理
+		if shouldRenderFuzzTag {
+			// 使用 mutate 包渲染 fuzztag
+			rendered, err := mutate.FuzzTagExec(string(requestBytes))
+			if err == nil && len(rendered) > 0 {
+				// 使用第一个渲染结果
+				requestBytes = []byte(rendered[0])
+			}
+		}
+
 		reqs = append(reqs, map[string]any{
-			"RawHTTPRequest": packet.Request,
+			"RawHTTPRequest": requestBytes,
 			"IsHttps":        packet.IsHttps,
 		})
 	}
@@ -258,19 +289,6 @@ func (s *Server) execScriptWithRequest(scriptInstance *schema.YakScript, targetI
 		}
 	}()
 
-	// smoking
-	isSmoking := false
-	isStrict := false
-	if len(execParams) > 0 {
-		for _, p := range execParams {
-			if p.Key == "State" && p.Value == "Smoking" {
-				isSmoking = true
-			}
-			if p.Key == "Mode" && p.Value == "Strict" {
-				isStrict = true
-			}
-		}
-	}
 	feedbackClient := yaklib.NewVirtualYakitClientWithRuntimeID(func(result *ypb.ExecResult) error {
 		result.RuntimeID = runtimeId
 		return stream.Send(result)
