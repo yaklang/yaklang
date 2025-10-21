@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/aimem_mock"
 	"path/filepath"
 	"testing"
 
@@ -76,7 +77,7 @@ func TestNewAIMemory(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 		WithContextProvider(func() (string, error) {
 			return "测试背景：用户正在开发AI记忆系统", nil
 		}),
@@ -103,7 +104,7 @@ func TestAddRawText(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 		WithContextProvider(func() (string, error) {
 			return "已有标签：AI开发、记忆系统、搜索功能", nil
 		}),
@@ -144,7 +145,7 @@ func TestSaveMemoryEntitiesAndVerifyDB(t *testing.T) {
 
 	// 先清理可能存在的旧数据
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -197,7 +198,7 @@ func TestRAGIndexingVerification(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -252,7 +253,7 @@ func TestSearchBySemantics(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -288,7 +289,7 @@ func TestSearchByScoreVector(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -340,7 +341,7 @@ func TestSearchByScores(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -379,7 +380,7 @@ func TestSearchByTags(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -422,7 +423,7 @@ func TestGetAllTags(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -454,7 +455,7 @@ func TestGetDynamicContextWithTags(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -487,7 +488,7 @@ func TestErrorHandling(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)
@@ -552,7 +553,7 @@ func TestSearchEdgeCases(t *testing.T) {
 	// 先清理可能存在的旧数据
 
 	mem, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(ctx)),
+		WithInvoker(aimem_mock.NewMockInvoker(ctx)),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, mem)

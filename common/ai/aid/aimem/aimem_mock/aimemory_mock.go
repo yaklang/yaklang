@@ -1,8 +1,9 @@
-package aimem
+package aimem_mock
 
 import (
 	"context"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aicommon_mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -17,7 +18,7 @@ type MockInvoker struct {
 func NewMockInvoker(ctx context.Context) *MockInvoker {
 	return &MockInvoker{
 		ctx:    ctx,
-		config: aicommon.NewMockedAIConfig(ctx),
+		config: aicommon_mock.NewMockedAIConfig(ctx),
 	}
 }
 

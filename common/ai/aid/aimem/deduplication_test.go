@@ -2,6 +2,7 @@ package aimem
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/aimem_mock"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ func TestShouldSaveMemoryEntities_BatchDeduplication(t *testing.T) {
 
 	// 创建AI记忆系统（使用测试专用的创建函数）
 	memory, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(context.Background())),
+		WithInvoker(aimem_mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
@@ -104,7 +105,7 @@ func TestBatchIsRepeatedMemoryEntities_TagOverlap(t *testing.T) {
 
 	// 创建AI记忆系统（使用测试专用的创建函数）
 	memory, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(context.Background())),
+		WithInvoker(aimem_mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)

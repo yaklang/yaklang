@@ -2,6 +2,7 @@ package aimem
 
 import (
 	"context"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/aimem_mock"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ func TestSearchMemory_Basic(t *testing.T) {
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(context.Background())),
+		WithInvoker(aimem_mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
@@ -84,7 +85,7 @@ func TestSearchMemory_BytesLimit(t *testing.T) {
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(context.Background())),
+		WithInvoker(aimem_mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
@@ -141,7 +142,7 @@ func TestSearchMemory_EmptyQuery(t *testing.T) {
 
 	// 创建AI记忆系统
 	memory, err := CreateTestAIMemory(sessionID,
-		WithInvoker(NewMockInvoker(context.Background())),
+		WithInvoker(aimem_mock.NewMockInvoker(context.Background())),
 	)
 	if err != nil {
 		t.Fatalf("create AI memory failed: %v", err)
