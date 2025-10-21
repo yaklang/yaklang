@@ -1164,6 +1164,10 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 			variable = b.CreateJSVariable(identifier)
 		}
 
+		if initValue == nil {
+			initValue = b.EmitUndefined(identifier)
+		}
+
 		if decl.Initializer != nil { // 定义变量
 			if explicitType != nil {
 				mergedType := b.MergeTypeWithAnnotation(initValue.GetType(), explicitType)
@@ -1179,7 +1183,7 @@ func (b *builder) VisitVariableDeclaration(decl *ast.VariableDeclaration, declTy
 				finalType = ssa.CreateAnyType() // TypeScript的默认类型
 			}
 
-			undefinedValue := b.EmitValueOnlyDeclare(identifier)
+			undefinedValue := b.EmitUndefined(identifier)
 			undefinedValue.SetType(finalType)
 			b.AssignVariable(variable, undefinedValue)
 		}
@@ -1503,15 +1507,22 @@ func (b *builder) VisitExpression(node *ast.Expression, isLval bool) (*ssa.Varia
 
 		bp := b.GetBluePrint(identifierName)
 		if bp != nil {
+			bp.Build()
 			return nil, bp.Container()
 		}
 		if importType, ok := b.GetProgram().TryReadImportDeclare(identifierName); ok {
 			if blueprint, ok := ssa.ToClassBluePrintType(importType); ok {
+				blueprint.Build()
 				return nil, blueprint.Container()
 			}
 		}
-
-		return nil, b.ReadValue(identifierName)
+		readValue := b.ReadValue(identifierName)
+		if !utils.IsNil(readValue) {
+			if function, ok := ssa.ToFunction(readValue); ok && !utils.IsNil(function.LazyBuilder) {
+				function.Build()
+			}
+		}
+		return nil, readValue
 	case ast.KindPropertyAccessExpression:
 		propertyAccessExp := node.AsPropertyAccessExpression()
 		obj, propName := b.VisitPropertyAccessExpression(propertyAccessExp)
@@ -1691,6 +1702,7 @@ func (b *builder) VisitBinaryExpression(node *ast.BinaryExpression) ssa.Value {
 
 	if left == nil || right == nil {
 		b.NewError(ssa.Error, TAG, BinOPWithNilSSAValue())
+		return b.EmitUndefined("bad-binary-op")
 	}
 
 	// 根据操作符类型生成不同的二元操作
@@ -2429,16 +2441,36 @@ func (b *builder) VisitNewExpression(node *ast.NewExpression) ssa.Value {
 	obj := b.EmitUndefined(className)
 	if class == nil {
 		class = b.CreateBlueprint(className)
-		object := b.ReadValue(className)
-		if !utils.IsNil(object) {
-			class.RegisterMagicMethod(ssa.Constructor, object)
-		}
+		defaultCtorFunc := b.NewFunc(fmt.Sprintf("%s_%s", className, "default_ctor_func"))
+		class.RegisterMagicMethod(ssa.Constructor, defaultCtorFunc)
+		store := b.StoreFunctionBuilder()
+		defaultCtorFunc.AddLazyBuilder(func() {
+			switchHandler := b.SwitchFunctionBuilder(store)
+			defer switchHandler()
+			b.FunctionBuilder = b.PushFunction(defaultCtorFunc)
+			{
+				b.NewParam("$this")
+				container := b.EmitEmptyContainer()
+				variable := b.CreateVariable("this")
+				b.AssignVariable(variable, container)
+				container.SetType(class)
+
+				b.EmitReturn([]ssa.Value{container})
+				b.Finish()
+			}
+			b.FunctionBuilder = b.PopFunction()
+		})
 	}
 	obj.SetType(class)
 	args := []ssa.Value{obj}
 	if node.Arguments != nil {
 		for _, arg := range node.Arguments.Nodes {
-			args = append(args, b.VisitRightValueExpression(arg))
+			argVal := b.VisitRightValueExpression(arg)
+			if argVal != nil {
+				args = append(args, argVal)
+			} else {
+				args = append(args, b.EmitUndefined("bad arg when call new()"))
+			}
 
 		}
 	}
@@ -2564,9 +2596,13 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
+	store := b.StoreFunctionBuilder()
+	log.Infof("add function expression funcName = %s", funcName)
 
-	{
-		// 切换到新函数的上下文
+	newFunc.AddLazyBuilder(func() {
+		log.Infof("lazy-build function expression funcName = %s", funcName)
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		// 设置函数返回类型（如果有显式类型注解）
@@ -2599,7 +2635,7 @@ func (b *builder) VisitFunctionExpression(node *ast.FunctionExpression) ssa.Valu
 
 		// 恢复原来的函数上下文
 		b.FunctionBuilder = b.PopFunction()
-	}
+	})
 
 	// 如果函数有名称并且在当前作用域中可见，将其加入变量表
 	if funcName != "" {
@@ -2634,9 +2670,13 @@ func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 
 	// 创建新的函数对象
 	newFunc := b.NewFunc(funcName)
+	store := b.StoreFunctionBuilder()
+	log.Infof("add arrow function funcName = %s", funcName)
 
-	{
-		// 切换到新函数的上下文
+	newFunc.AddLazyBuilder(func() {
+		log.Infof("lazy-build arrow function funcName = %s", funcName)
+		switchHandler := b.SwitchFunctionBuilder(store)
+		defer switchHandler()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 
 		// 设置函数返回类型（如果有显式类型注解）
@@ -2661,18 +2701,19 @@ func (b *builder) VisitArrowFunction(node *ast.ArrowFunction) ssa.Value {
 			b.VisitBlock(node.Body.AsBlock())
 		} else if node.Body != nil {
 			ret := b.VisitRightValueExpression(node.Body)
-			b.EmitReturn([]ssa.Value{ret})
-		}
+			if ret == nil {
+				b.EmitReturn([]ssa.Value{b.EmitUndefined("bad ret val")})
+			} else {
+				b.EmitReturn([]ssa.Value{ret})
+			}
 
+		}
 		// 完成函数构建
 		b.Finish()
-
 		// 恢复原来的函数上下文
 		b.FunctionBuilder = b.PopFunction()
-	}
-
+	})
 	// 箭头函数接收者应该是作为参数或者被赋值给变量
-
 	return newFunc
 }
 
@@ -3008,7 +3049,13 @@ func (b *builder) VisitTypeReference(typeRef *ast.TypeReferenceNode) ssa.Type {
 	defer recoverRange()
 
 	// 获取类型名称
-	typeName := typeRef.TypeName.Text()
+	var typeName string
+	switch typeRef.TypeName.Kind {
+	case ast.KindQualifiedName:
+		typeName = b.VisitQualifiedName(typeRef.TypeName.AsQualifiedName())
+	default: // Identifier
+		typeName = typeRef.TypeName.Text()
+	}
 
 	// 处理泛型参数
 	var typeArgs []ssa.Type
@@ -3901,10 +3948,11 @@ func (b *builder) ProcessClassMethod(member *ast.ClassElement, class *ssa.Bluepr
 		if funcLikeData != nil {
 			returnTypeNode = funcLikeData.Type
 		}
-		if !ast.IsBlock(methodDecl.Body) {
-			return
+		// TODO  这里还没处理箭头函数表达式的情况
+		if methodDecl.Body != nil && ast.IsBlock(methodDecl.Body) {
+			bodyNode = methodDecl.Body.AsBlock()
 		}
-		bodyNode = methodDecl.Body.AsBlock()
+
 	default:
 		b.NewError(ssa.Error, TAG, UnexpectedClassMethodType())
 		return
@@ -4595,6 +4643,26 @@ func (b *builder) VisitInterfaceIndexSignature(indexSig *ast.IndexSignatureDecla
 
 	// 注册为接口的静态成员（使用特殊名称表示索引签名）
 	interfaceBlueprint.RegisterStaticMember("__index__", indexSignatureValue)
+}
+
+// VisitQualifiedName 访问QualifiedName
+func (b *builder) VisitQualifiedName(name *ast.QualifiedName) string {
+	if name == nil || b.IsStop() {
+		return ""
+	}
+
+	recoverRange := b.GetRecoverRange(b.sourceFile, &name.Loc, "")
+	defer recoverRange()
+
+	var leftName, rightName string
+	rightName = name.Right.Text()
+	switch name.Left.Kind {
+	case ast.KindQualifiedName:
+		leftName = b.VisitQualifiedName(name.Left.AsQualifiedName())
+	default:
+		leftName = name.Left.Text()
+	}
+	return leftName + rightName
 }
 
 // HandlePromiseMethod 处理 Promise 的 then, catch, finally 方法
