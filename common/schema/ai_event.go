@@ -103,8 +103,8 @@ const (
 	EVENT_TYPE_MEMORY_SEARCH_SPECIFIC EventType = "memory_search_specific" // specific memory search event, used to emit the specific memory search information
 	EVENT_TYPE_MEMORY_BUILD           EventType = "memory_build"           // memory build event, used to emit the memory build information
 	EVENT_TYPE_MEMORY_SAVE            EventType = "memory_save"            // memory build event, used to emit the memory saving into database
-	EVENT_TYPE_MEMORY_ADD_CONTEXT     EventType = "memory_change_context"
-	EVENT_TYPE_MEMORY_REMOVED_CONTEXT EventType = "memory_removed_context"
+	EVENT_TYPE_MEMORY_ADD_CONTEXT     EventType = "memory_add_context"
+	EVENT_TYPE_MEMORY_REMOVE_CONTEXT  EventType = "memory_remove_context"
 )
 
 type AiOutputEvent struct {

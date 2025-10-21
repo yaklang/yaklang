@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/schema"
-
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aitag"
 	"github.com/yaklang/yaklang/common/jsonextractor"
@@ -400,31 +398,8 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) error {
 	taskStartProcessing()
 	r.GetInvoker().AddToTimeline("current task user input", fmt.Sprintf("%v", task.GetUserInput()))
 
-	if !utils.IsNil(r.memoryTriage) && r.GetCurrentMemoriesContent() == "" {
-		log.Info("start to handle searching memory for ReActLoop without AI")
-		pr, pw := utils.NewPipe()
-		emitter.EmitThoughtTypeWriterStreamReader(task.GetIndex(), pr)
-		pw.WriteString("快速检索记忆：Searching relevant memories quickly...")
-		emitter.EmitJSON(schema.EVENT_TYPE_MEMORY_SEARCH_QUICKLY, "memory-search-quickly", map[string]any{
-			"query": task.GetUserInput(),
-		})
-		searchResult, err := r.memoryTriage.SearchMemoryWithoutAI(task.GetUserInput(), 5*1024)
-		if err != nil {
-			aicommon.TypeWriterWrite(pw, "... 快速检索失败，Reason: "+err.Error(), 300)
-		} else {
-			var size int
-			if !utils.IsNil(searchResult) && searchResult.ContentBytes > 0 {
-				size = searchResult.ContentBytes
-			}
-			if size > 0 {
-				aicommon.TypeWriterWrite(pw, "... 快速记忆检索结束，匹配到记忆大小为："+utils.ByteSize(uint64(size)), 300)
-			} else {
-				aicommon.TypeWriterWrite(pw, "... 快速记忆检索结束，没能找到合适的过往记忆"+utils.ByteSize(uint64(size)), 300)
-			}
-		}
-		pw.Close()
-		r.PushMemory(searchResult)
-		log.Infof("memory updated via fast search memory - ========================== \n%v\n==========================", r.GetCurrentMemoriesContent())
+	if r.GetCurrentMemoriesContent() == "" {
+		r.loadingSearchMemory(task.GetUserInput())
 	}
 
 	go func() {
@@ -528,11 +503,22 @@ LOOP:
 		continueIter := func() {
 			r.GetInvoker().AddToTimeline("iteration", fmt.Sprintf("[%v]ReAct Iteration Done[%v] max:%v continue to next iteration", loopName, iterationCount, maxIterations))
 		}
+
+		select {
+		case <-task.GetContext().Done():
+			return utils.Errorf("task context done in executing ReActLoop(before ActionHandler): %v", task.GetContext().Err())
+		default:
+		}
 		handler.ActionHandler(
 			r,
 			actionParams,
 			operator,
 		)
+		select {
+		case <-task.GetContext().Done():
+			return utils.Errorf("task context done in executing execute ReActLoop(after ActionHandler): %v", task.GetContext().Err())
+		default:
+		}
 
 		// 检查 operator 状态
 		if isTerminated, err := operator.IsTerminated(); isTerminated {
