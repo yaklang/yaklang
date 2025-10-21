@@ -4,9 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"crypto/sha256"
 	"embed"
-	"encoding/hex"
 	"errors"
 	"io"
 	"io/fs"
@@ -18,6 +16,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // PreprocessingEmbed is a simple tools to read file from embed.FS and gzip compress file
@@ -394,24 +393,16 @@ func (c *PreprocessingEmbed) GetHash() (string, error) {
 		return c.cachedHash, nil
 	}
 
-	// 收集所有文件的信息
-	type fileInfo struct {
-		name string
-		data []byte
-	}
-	var files []fileInfo
-
-	// 扫描所有文件
+	var hashes []string
+	// 扫描所有文件并计算每个文件的哈希值
 	err := c.scanFile(func(header *tar.Header, reader io.Reader) (error, bool) {
 		if header.Typeflag == tar.TypeReg {
 			buf := &bytes.Buffer{}
 			if _, err := io.Copy(buf, reader); err != nil {
 				return err, true
 			}
-			files = append(files, fileInfo{
-				name: header.Name,
-				data: buf.Bytes(),
-			})
+			hash := codec.Sha256(buf.Bytes())
+			hashes = append(hashes, hash)
 		}
 		return nil, true
 	})
@@ -419,23 +410,15 @@ func (c *PreprocessingEmbed) GetHash() (string, error) {
 		return "", err
 	}
 
-	// 按文件名排序以确保哈希的一致性
-	sort.Slice(files, func(i, j int) bool {
-		return files[i].name < files[j].name
-	})
-
-	// 计算综合哈希
-	hasher := sha256.New()
-	for _, file := range files {
-		// 写入文件名
-		hasher.Write([]byte(file.name))
-		hasher.Write([]byte("\x00")) // 分隔符
-		// 写入文件内容
-		hasher.Write(file.data)
-		hasher.Write([]byte("\x00")) // 分隔符
+	if len(hashes) <= 0 {
+		return "", utils.Error("no file found")
 	}
 
-	hash := hex.EncodeToString(hasher.Sum(nil))
+	// 按哈希值排序以确保一致性
+	sort.Strings(hashes)
+
+	// 使用 | 连接所有哈希值，然后计算最终的哈希
+	hash := codec.Sha256([]byte(strings.Join(hashes, "|")))
 
 	// 缓存哈希值
 	c.cachedHash = hash
