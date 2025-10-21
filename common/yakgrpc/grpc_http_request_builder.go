@@ -60,6 +60,11 @@ func (s *Server) DebugPlugin(req *ypb.DebugPluginRequest, stream ypb.Yak_DebugPl
 		}
 	}
 
+	// 传递 RenderFuzzTag 参数给调试脚本
+	if req.GetRenderFuzzTag() {
+		execParams = append(execParams, &ypb.KVPair{Key: "FuzzTag", Value: "true"})
+	}
+
 	runtimeId := req.GetRuntimeId()
 	if runtimeId == "" {
 		runtimeId = uuid.New().String()

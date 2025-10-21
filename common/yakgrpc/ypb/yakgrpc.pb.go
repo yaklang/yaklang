@@ -13457,7 +13457,11 @@ type DebugPluginRequest struct {
 	// plugin name, if not empty, will use code
 	PluginName string `protobuf:"bytes,7,opt,name=PluginName,proto3" json:"PluginName,omitempty"`
 	// runtime id ,if empty, will create a new runtime
-	RuntimeId     string `protobuf:"bytes,8,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
+	RuntimeId string `protobuf:"bytes,8,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
+	// 是否在发送请求前渲染 fuzztag（如 {{int(1-100)}}）
+	// 如果为 true，会先渲染 fuzztag 再发送请求
+	// 默认为 false，保持原有行为
+	RenderFuzzTag bool `protobuf:"varint,9,opt,name=RenderFuzzTag,proto3" json:"RenderFuzzTag,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -13546,6 +13550,13 @@ func (x *DebugPluginRequest) GetRuntimeId() string {
 		return x.RuntimeId
 	}
 	return ""
+}
+
+func (x *DebugPluginRequest) GetRenderFuzzTag() bool {
+	if x != nil {
+		return x.RenderFuzzTag
+	}
+	return false
 }
 
 type HTTPRequestBuilderResult struct {
@@ -63726,7 +63737,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bSafeMode\x18\x04 \x01(\bR\bSafeMode\"a\n" +
 	"!GenQualityInspectionReportRequest\x12 \n" +
 	"\vScriptNames\x18\x01 \x03(\tR\vScriptNames\x12\x1a\n" +
-	"\bTaskName\x18\x02 \x01(\tR\bTaskName\"\xe3\x02\n" +
+	"\bTaskName\x18\x02 \x01(\tR\bTaskName\"\x89\x03\n" +
 	"\x12DebugPluginRequest\x12\x12\n" +
 	"\x04Code\x18\x01 \x01(\tR\x04Code\x12\x1e\n" +
 	"\n" +
@@ -63741,7 +63752,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"PluginName\x18\a \x01(\tR\n" +
 	"PluginName\x12\x1c\n" +
-	"\tRuntimeId\x18\b \x01(\tR\tRuntimeId\"h\n" +
+	"\tRuntimeId\x18\b \x01(\tR\tRuntimeId\x12$\n" +
+	"\rRenderFuzzTag\x18\t \x01(\bR\rRenderFuzzTag\"h\n" +
 	"\x18HTTPRequestBuilderResult\x12\x18\n" +
 	"\aIsHttps\x18\x01 \x01(\bR\aIsHttps\x12\x10\n" +
 	"\x03Url\x18\x02 \x01(\tR\x03Url\x12 \n" +

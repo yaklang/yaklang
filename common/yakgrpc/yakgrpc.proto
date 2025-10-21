@@ -2503,6 +2503,11 @@ message DebugPluginRequest {
 
   // runtime id ,if empty, will create a new runtime
   string RuntimeId = 8;
+
+  // 是否在发送请求前渲染 fuzztag（如 {{int(1-100)}}）
+  // 如果为 true，会先渲染 fuzztag 再发送请求
+  // 默认为 false，保持原有行为
+  bool RenderFuzzTag = 9;
 }
 
 message HTTPRequestBuilderResult {
