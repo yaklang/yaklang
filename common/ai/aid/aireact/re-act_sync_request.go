@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 	"github.com/yaklang/yaklang/common/log"
 
 	"github.com/yaklang/yaklang/common/schema"
@@ -82,6 +83,39 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		if event.Params.GetReviewPolicy() != "" {
 			r.config.reviewPolicy = aicommon.AgreePolicyType(event.Params.GetReviewPolicy())
 		}
+		return nil
+	case SYNC_TYPE_MEMORY_CONTEXT:
+		// 获取 memory session ID
+		var memorySessionID string
+		if r.memoryTriage != nil {
+			if aiMemTriage, ok := r.memoryTriage.(*aimem.AIMemoryTriage); ok {
+				memorySessionID = aiMemTriage.GetSessionID()
+			}
+		}
+
+		// 收集 memoryPool 中的所有 MemoryEntity
+		var memoryInfos []*aimem.MemoryEntity
+		var totalSize int
+		if r.memoryPool != nil {
+			for _, memoryEntity := range r.memoryPool.Values() {
+				if memoryEntity != nil {
+					memoryInfos = append(memoryInfos, memoryEntity)
+					totalSize += len(memoryEntity.Content)
+				}
+			}
+		}
+
+		// 构建响应数据
+		responseData := map[string]interface{}{
+			"memory_session_id": memorySessionID,
+			"total_memories":    len(memoryInfos),
+			"total_size":        totalSize,
+			"memory_pool_limit": r.config.memoryPoolSize,
+			"memories":          memoryInfos,
+		}
+
+		// 通过 Emitter 发送 EVENT_TYPE_MEMORY_CONTEXT 事件
+		r.EmitJSON(schema.EVENT_TYPE_MEMORY_CONTEXT, "memory_context", responseData)
 		return nil
 	default:
 		return fmt.Errorf("unsupported sync type: %s", event.SyncType)

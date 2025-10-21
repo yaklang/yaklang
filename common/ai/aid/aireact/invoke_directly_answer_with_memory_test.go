@@ -3,6 +3,10 @@ package aireact
 import (
 	"bytes"
 	"fmt"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
@@ -10,9 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
-	"strings"
-	"testing"
-	"time"
 )
 
 func mockedFreeInputOutputWithMemory(config aicommon.AICallerConfigIf, flag string) (*aicommon.AIResponse, error) {
@@ -59,7 +60,7 @@ func TestReAct_DirectlyWithMemory(t *testing.T) {
 				FreeInput:   "abc",
 			}
 		}
-		close(in)
+		// 不要立即关闭 channel，等待任务完成后发送同步请求
 	}()
 	after := time.After(10 * time.Second)
 
@@ -70,6 +71,8 @@ func TestReAct_DirectlyWithMemory(t *testing.T) {
 	addMem := 0
 	taskFinished := false
 	haveMemorySearched := false
+	haveMemoryContext := false
+	memoryContextSent := false
 LOOP:
 	for {
 		select {
@@ -99,18 +102,59 @@ LOOP:
 				haveMemorySearched = true
 			}
 
+			if e.Type == string(schema.EVENT_TYPE_MEMORY_CONTEXT) {
+				haveMemoryContext = true
+				// 验证 memory context 响应内容
+				totalMemories := jsonpath.FindFirst(e.GetContent(), "$..total_memories")
+				totalSize := jsonpath.FindFirst(e.GetContent(), "$..total_size")
+				memoryPoolLimit := jsonpath.FindFirst(e.GetContent(), "$..memory_pool_limit")
+				memorySessionID := jsonpath.FindFirst(e.GetContent(), "$..memory_session_id")
+
+				if totalMemories == nil {
+					t.Fatal("Expected total_memories in memory context response")
+				}
+				if totalSize == nil {
+					t.Fatal("Expected total_size in memory context response")
+				}
+				if memoryPoolLimit == nil {
+					t.Fatal("Expected memory_pool_limit in memory context response")
+				}
+				if memorySessionID == nil {
+					t.Fatal("Expected memory_session_id in memory context response")
+				}
+
+				// 验证总大小小于配置的 memory size
+				sizeInt := utils.InterfaceToInt(totalSize)
+				limitInt := utils.InterfaceToInt(memoryPoolLimit)
+				if sizeInt > limitInt {
+					t.Fatalf("Memory total size %d should not exceed limit %d", sizeInt, limitInt)
+				}
+			}
+
 			if e.NodeId == "react_task_status_changed" {
 				result := jsonpath.FindFirst(e.GetContent(), "$..react_task_now_status")
 				if utils.InterfaceToString(result) == "completed" {
 					//break LOOP
 					taskFinished = true
+
+					// 任务完成后发送 MEMORY CONTEXT SYNC 请求
+					if !memoryContextSent {
+						memoryContextSent = true
+						// 立即发送同步请求
+						in <- &ypb.AIInputEvent{
+							IsSyncMessage: true,
+							SyncType:      SYNC_TYPE_MEMORY_CONTEXT,
+						}
+					}
 				}
 			}
 
-			if addMem > 50 && taskFinished && removeMem > 0 {
+			if addMem > 50 && taskFinished && removeMem > 0 && haveMemoryContext {
+				close(in) // 关闭输入 channel
 				break LOOP
 			}
 		case <-after:
+			close(in) // 超时时也关闭 channel
 			break LOOP
 		}
 	}
@@ -132,6 +176,9 @@ LOOP:
 	}
 	if !haveMemorySearched {
 		t.Fatal("Expected to have memory searched event, but got none")
+	}
+	if !haveMemoryContext {
+		t.Fatal("Expected to have memory context event, but got none")
 	}
 
 	timeline := ins.DumpTimeline()
