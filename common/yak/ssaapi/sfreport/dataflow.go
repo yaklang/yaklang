@@ -152,15 +152,14 @@ func nodeId(i int) string {
 }
 
 func (n *NodeInfo) ToAuditNode(riskHash string) *ssadb.AuditNode {
-	an := &ssadb.AuditNode{
-		AuditNodeStatus: ssadb.AuditNodeStatus{
-			RiskHash: riskHash,
-		},
-		IsEntryNode:      n.IsEntryNode,
-		IRCodeID:         -1,
-		TmpValue:         n.IRCode,
-		TmpValueFileHash: n.IRSourceHash,
+	an := ssadb.NewAuditNode()
+	an.AuditNodeStatus = ssadb.AuditNodeStatus{
+		RiskHash: riskHash,
 	}
+	an.IsEntryNode = n.IsEntryNode
+	an.IRCodeID = -1
+	an.TmpValue = n.IRCode
+	an.TmpValueFileHash = n.IRSourceHash
 	if n.CodeRange != nil {
 		an.TmpStartOffset = n.StartOffset
 		an.TmpEndOffset = n.EndOffset
