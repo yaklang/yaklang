@@ -4,17 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/asynchelper"
+	"io"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-
 	"github.com/jinzhu/gorm"
 	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/asynchelper"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -29,7 +29,7 @@ type EntityRepositoryRuntimeConfig struct {
 	runtimeID           string
 	queryTop            int
 	ctx                 context.Context
-	disableBulkProcess   bool
+	disableBulkProcess  bool
 
 	entityRagQueryCache *utils.CacheEx[*schema.ERModelEntity]
 }
@@ -994,4 +994,44 @@ func GetOrCreateEntityRepository(db *gorm.DB, name, description string, opts ...
 	}
 
 	return repos, nil
+}
+
+// Export 导出实体仓库
+func (r *EntityRepository) Export(ctx context.Context, opts *ExportEntityRepositoryOptions) (io.Reader, error) {
+	if opts == nil {
+		opts = &ExportEntityRepositoryOptions{}
+	}
+	opts.RepositoryID = r.GetID()
+	return ExportEntityRepository(ctx, r.db, opts)
+}
+
+// DeleteEntityRepository 删除实体仓库
+func DeleteEntityRepository(db *gorm.DB, name string) error {
+	return utils.GormTransaction(db, func(tx *gorm.DB) error {
+		var info schema.EntityRepository
+		err := tx.Model(&schema.EntityRepository{}).Where("entity_base_name = ?", name).First(&info).Error
+		if err != nil {
+			return utils.Errorf("get EntityRepository failed: %s", err)
+		}
+
+		// 删除所有实体
+		err = tx.Where("repository_uuid = ?", info.Uuid).Unscoped().Delete(&schema.ERModelEntity{}).Error
+		if err != nil {
+			return utils.Errorf("delete entities failed: %s", err)
+		}
+
+		// 删除所有关系
+		err = tx.Where("repository_uuid = ?", info.Uuid).Unscoped().Delete(&schema.ERModelRelationship{}).Error
+		if err != nil {
+			return utils.Errorf("delete relationships failed: %s", err)
+		}
+
+		// 删除实体仓库信息
+		err = tx.Where("id = ?", info.ID).Unscoped().Delete(&schema.EntityRepository{}).Error
+		if err != nil {
+			return utils.Errorf("delete EntityRepository failed: %s", err)
+		}
+
+		return nil
+	})
 }
