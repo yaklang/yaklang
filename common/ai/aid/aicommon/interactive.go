@@ -22,6 +22,12 @@ type BaseInteractiveHandler struct {
 	endpointManager *EndpointManager
 }
 
+func NewBaseInteractiveHandler() *BaseInteractiveHandler {
+	return &BaseInteractiveHandler{
+		endpointManager: NewEndpointManager(),
+	}
+}
+
 func (h *BaseInteractiveHandler) Feed(endpointId string, params aitool.InvokeParams) {
 	h.endpointManager.Feed(endpointId, params)
 }
