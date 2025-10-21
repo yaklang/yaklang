@@ -186,7 +186,7 @@ func (g *DBGraph) getOrCreateNode(value *Value, isEntry ...bool) (*ssadb.AuditNo
 			an.TmpEndOffset = R.GetEndOffset()
 		}
 	}
-	an := ssadb.CreateAuditNode()
+	an := ssadb.NewAuditNode()
 	an.AuditNodeStatus = g.AuditNodeStatus
 	an.IsEntryNode = entry
 
