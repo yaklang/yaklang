@@ -19,6 +19,7 @@ type ExportKnowledgeBaseOptions struct {
 	ExportKnowledgeBaseEntryHandler func(entry schema.KnowledgeBaseEntry) (schema.KnowledgeBaseEntry, error)
 	ExportRAGDocumentHandler        func(doc schema.VectorStoreDocument) (schema.VectorStoreDocument, error)
 	OnProgressHandler               func(percent float64, message string, messageType string)
+	ExtraDataReader                 io.Reader // 额外数据的 reader，会在导出时一起导出
 }
 
 func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledgeBaseOptions) (io.Reader, error) {
@@ -121,8 +122,8 @@ func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledge
 	ragBinaryReader, err := rag.ExportRAGToBinary(ctx, db, kbInfo.KnowledgeBaseName,
 		rag.WithExportDocumentHandler(opts.ExportRAGDocumentHandler),
 		rag.WithExportProgressHandler(func(percent float64, message string, messageType string) {
-			// 将RAG导出进度映射到70-95%范围
-			ragProgress := 70 + (percent/100)*25
+			// 将RAG导出进度映射到70-90%范围
+			ragProgress := 70 + (percent/100)*20
 			reportProgress(ragProgress, message, messageType)
 		}),
 	)
@@ -135,6 +136,25 @@ func ExportKnowledgeBase(ctx context.Context, db *gorm.DB, opts *ExportKnowledge
 	}
 	if err := pbWriteBytes(&buf, ragBinary); err != nil {
 		return nil, utils.Wrap(err, "write rag binary")
+	}
+
+	reportProgress(90, "向量库数据导出完成，开始导出额外数据", "info")
+
+	// 写入额外数据
+	if opts.ExtraDataReader != nil {
+		extraData, err := io.ReadAll(opts.ExtraDataReader)
+		if err != nil {
+			return nil, utils.Wrap(err, "read extra data")
+		}
+		if err := pbWriteBytes(&buf, extraData); err != nil {
+			return nil, utils.Wrap(err, "write extra data")
+		}
+		reportProgress(95, "额外数据导出完成", "info")
+	} else {
+		// 如果没有额外数据，写入空字节
+		if err := pbWriteBytes(&buf, []byte{}); err != nil {
+			return nil, utils.Wrap(err, "write empty extra data")
+		}
 	}
 
 	reportProgress(100, "知识库导出完成", "success")
@@ -197,6 +217,7 @@ type ImportKnowledgeBaseOptions struct {
 	OverwriteExisting               bool
 	NewKnowledgeBaseName            string
 	OnProgressHandler               func(percent float64, message string, messageType string)
+	ExtraDataHandler                func(extraData io.Reader) error // 额外数据处理回调函数
 }
 
 // ImportKnowledgeBase 从二进制数据导入知识库
@@ -327,7 +348,7 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 	}
 
 	if len(ragBinaryBytes) > 0 {
-		reportProgress(80, "正在导入向量库数据", "info")
+		reportProgress(75, "正在导入向量库数据", "info")
 		ragReader := bytes.NewReader(ragBinaryBytes)
 
 		// 使用现有的ImportRAGFromReader函数，并传递集合名称
@@ -336,15 +357,31 @@ func ImportKnowledgeBase(ctx context.Context, db *gorm.DB, reader io.Reader, opt
 			CollectionName:    finalKbName, // 使用最终的知识库名称作为集合名称
 			DocumentHandler:   opts.ImportRAGDocumentHandler,
 			OnProgressHandler: func(percent float64, message string, messageType string) {
-				// 将RAG导入进度映射到80-95%范围
-				ragProgress := 80 + (percent/100)*15
+				// 将RAG导入进度映射到75-90%范围
+				ragProgress := 75 + (percent/100)*15
 				reportProgress(ragProgress, message, messageType)
 			},
 		}
 		if err := rag.ImportRAGFromReader(ctx, db, ragReader, importConfig); err != nil {
 			return utils.Wrap(err, "import rag data")
 		}
-		reportProgress(95, "向量库数据导入完成", "info")
+		reportProgress(90, "向量库数据导入完成", "info")
+	}
+
+	reportProgress(92, "开始导入额外数据", "info")
+
+	// 读取并处理额外数据
+	extraDataBytes, err := consumeBytes(reader)
+	if err != nil {
+		return utils.Wrap(err, "read extra data")
+	}
+
+	if len(extraDataBytes) > 0 && opts.ExtraDataHandler != nil {
+		extraDataReader := bytes.NewReader(extraDataBytes)
+		if err := opts.ExtraDataHandler(extraDataReader); err != nil {
+			return utils.Wrap(err, "handle extra data")
+		}
+		reportProgress(98, "额外数据导入完成", "info")
 	}
 
 	reportProgress(100, "知识库导入完成", "success")
