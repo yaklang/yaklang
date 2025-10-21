@@ -3,7 +3,7 @@ package loop_yaklangcode
 import (
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aimem"
+	"github.com/yaklang/yaklang/common/ai/aid/aimem/aimem_mock"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"strings"
@@ -304,7 +304,7 @@ func TestRAGQuerySomke(t *testing.T) {
 		t.Skip()
 	}
 
-	result, ok := handleRAGQueryDocument(aimem.NewMockInvoker(context.Background()),
+	result, ok := handleRAGQueryDocument(aimem_mock.NewMockInvoker(context.Background()),
 		consts.GetGormProfileDatabase(),
 		"yak",
 		aitool.InvokeParams{
