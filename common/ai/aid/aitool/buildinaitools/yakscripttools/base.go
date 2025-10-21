@@ -18,10 +18,17 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mcp/yakcliconvert"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/static_analyzer"
 )
 
 //go:generate gzip-embed -cache --source ./yakscriptforai --gz yakscriptforai.tar.gz --no-embed
+
+// FileSystemWithHash 是一个带有 GetHash 方法的文件系统接口
+type FileSystemWithHash interface {
+	fi.FileSystem
+	GetHash() (string, error)
+}
 
 func init() {
 	InitEmbedFS()
