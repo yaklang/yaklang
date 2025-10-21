@@ -300,7 +300,7 @@ func DeleteAuditNode(DB *gorm.DB, nodes ...*AuditNode) error {
 			if end > len(id) {
 				end = len(id)
 			}
-			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&IrCode{})
+			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&AuditNode{})
 		}
 		return nil
 	})
