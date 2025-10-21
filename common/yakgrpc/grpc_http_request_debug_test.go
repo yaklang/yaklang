@@ -6,10 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/stretchr/testify/require"
-	"github.com/tidwall/gjson"
-	"github.com/yaklang/yaklang/common/consts"
 	"io"
 	"net/http"
 	"reflect"
@@ -18,6 +14,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
+	"github.com/yaklang/yaklang/common/consts"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
@@ -1368,4 +1369,195 @@ mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
 		return nil
 	})
 	require.NoError(t, err)
+}
+
+func TestGRPCMUSTPASS_DebugPlugin_MITM_RenderFuzzTag(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// 记录接收到的请求
+	var receivedRequests []string
+	host, port := utils.DebugMockHTTPHandlerFuncContext(ctx, func(writer http.ResponseWriter, request *http.Request) {
+		raw, _ := utils.HttpDumpWithBody(request, true)
+		receivedRequests = append(receivedRequests, string(raw))
+		writer.Write([]byte("HTTP/1.1 200 OK\r\n\r\nOK"))
+	})
+	targetUrl := "http://" + utils.HostPort(host, port)
+
+	t.Run("Without RenderFuzzTag - fuzztag should NOT be rendered", func(t *testing.T) {
+		receivedRequests = nil // 清空
+
+		rawRequest := fmt.Sprintf(`GET /test?param={{int(1-100)}} HTTP/1.1
+Host: %s
+X-Custom: {{randstr(10)}}
+
+`, utils.HostPort(host, port))
+
+		stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+			Code: `mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+				// 这里什么都不做，只是让请求发送出去
+			}`,
+			PluginType: "mitm",
+			HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+				IsRawHTTPRequest: true,
+				RawHTTPRequest:   []byte(rawRequest),
+			},
+			Input:         targetUrl,
+			RenderFuzzTag: false, // 不渲染
+		})
+		require.NoError(t, err)
+
+		for {
+			_, err := stream.Recv()
+			if err != nil {
+				break
+			}
+		}
+
+		// 验证：请求应该包含未渲染的 fuzztag
+		require.Len(t, receivedRequests, 1, "应该发送一个请求")
+		request := receivedRequests[0]
+		assert.Contains(t, request, "{{int(1-100)}}", "请求应该包含未渲染的 fuzztag")
+		assert.Contains(t, request, "{{randstr(10)}}", "请求应该包含未渲染的 fuzztag")
+		t.Logf("未渲染的请求:\n%s", request)
+	})
+
+	t.Run("With RenderFuzzTag - fuzztag should be rendered", func(t *testing.T) {
+		receivedRequests = nil // 清空
+
+		rawRequest := fmt.Sprintf(`GET /test?param={{int(1-100)}} HTTP/1.1
+Host: %s
+X-Custom: {{randstr(10)}}
+
+`, utils.HostPort(host, port))
+
+		stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+			Code: `mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {
+				// 这里什么都不做，只是让请求发送出去
+			}`,
+			PluginType: "mitm",
+			HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+				IsRawHTTPRequest: true,
+				RawHTTPRequest:   []byte(rawRequest),
+			},
+			Input:         targetUrl,
+			RenderFuzzTag: true, // 渲染
+		})
+		require.NoError(t, err)
+
+		for {
+			_, err := stream.Recv()
+			if err != nil {
+				break
+			}
+		}
+
+		// 验证：请求应该不包含 fuzztag，而是包含渲染后的值
+		require.Len(t, receivedRequests, 1, "应该发送一个请求")
+		request := receivedRequests[0]
+		assert.NotContains(t, request, "{{int(1-100)}}", "请求不应该包含未渲染的 fuzztag")
+		assert.NotContains(t, request, "{{randstr(10)}}", "请求不应该包含未渲染的 fuzztag")
+
+		// 验证参数被渲染成了数字
+		assert.Contains(t, request, "/test?param=", "应该包含参数")
+		// 提取 param 的值，验证是数字
+		lines := strings.Split(request, "\n")
+		if len(lines) > 0 {
+			firstLine := lines[0]
+			if strings.Contains(firstLine, "param=") {
+				parts := strings.Split(firstLine, "param=")
+				if len(parts) > 1 {
+					paramValue := strings.Split(parts[1], " ")[0]
+					num, err := strconv.Atoi(paramValue)
+					assert.NoError(t, err, "param 应该是数字")
+					assert.GreaterOrEqual(t, num, 1, "param 应该 >= 1")
+					assert.LessOrEqual(t, num, 100, "param 应该 <= 100")
+					t.Logf("参数被渲染为: %d", num)
+				}
+			}
+		}
+
+		// 验证 X-Custom 头被渲染成了随机字符串（长度为10）
+		assert.Contains(t, request, "X-Custom:", "应该包含 X-Custom 头")
+		if strings.Contains(request, "X-Custom:") {
+			for _, line := range strings.Split(request, "\n") {
+				if strings.HasPrefix(line, "X-Custom:") {
+					value := strings.TrimSpace(strings.TrimPrefix(line, "X-Custom:"))
+					assert.Len(t, value, 10, "randstr(10) 应该生成长度为10的字符串")
+					t.Logf("X-Custom 被渲染为: %s", value)
+					break
+				}
+			}
+		}
+
+		t.Logf("已渲染的请求:\n%s", request)
+	})
+
+	t.Run("With RenderFuzzTag and multiple fuzztags", func(t *testing.T) {
+		receivedRequests = nil // 清空
+
+		rawRequest := fmt.Sprintf(`POST /api/test HTTP/1.1
+Host: %s
+Content-Type: application/json
+
+{"id": {{int(1000-9999)}}, "name": "{{randstr(5)}}", "value": {{int(1-10)}}}`, utils.HostPort(host, port))
+
+		stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+			Code:       `mirrorFilteredHTTPFlow = (https, url, req, rsp, body) => {}`,
+			PluginType: "mitm",
+			HTTPRequestTemplate: &ypb.HTTPRequestBuilderParams{
+				IsRawHTTPRequest: true,
+				RawHTTPRequest:   []byte(rawRequest),
+			},
+			Input:         targetUrl,
+			RenderFuzzTag: true,
+		})
+		require.NoError(t, err)
+
+		for {
+			_, err := stream.Recv()
+			if err != nil {
+				break
+			}
+		}
+
+		require.Len(t, receivedRequests, 1)
+		request := receivedRequests[0]
+
+		// 验证所有 fuzztag 都被渲染
+		assert.NotContains(t, request, "{{", "不应该包含未渲染的 fuzztag")
+		assert.NotContains(t, request, "}}", "不应该包含未渲染的 fuzztag")
+
+		// 验证 JSON body 中的值都被正确渲染
+		bodyStart := strings.Index(request, "{")
+		if bodyStart != -1 {
+			body := request[bodyStart:]
+			t.Logf("渲染后的 JSON body: %s", body)
+
+			// 解析 JSON 验证
+			var data map[string]interface{}
+			err := json.Unmarshal([]byte(body), &data)
+			assert.NoError(t, err, "应该是有效的 JSON")
+
+			if id, ok := data["id"].(float64); ok {
+				assert.GreaterOrEqual(t, id, float64(1000))
+				assert.LessOrEqual(t, id, float64(9999))
+				t.Logf("id 被渲染为: %v", id)
+			}
+
+			if name, ok := data["name"].(string); ok {
+				assert.Len(t, name, 5)
+				t.Logf("name 被渲染为: %s", name)
+			}
+
+			if value, ok := data["value"].(float64); ok {
+				assert.GreaterOrEqual(t, value, float64(1))
+				assert.LessOrEqual(t, value, float64(10))
+				t.Logf("value 被渲染为: %v", value)
+			}
+		}
+	})
 }
