@@ -51,10 +51,12 @@ func (f *FloatArray) Scan(value interface{}) error {
 type RAGDocumentType string
 
 const (
-	RAGDocumentType_Entity       RAGDocumentType = "entity"
-	RAGDocumentType_Relationship RAGDocumentType = "relationship"
-	RAGDocumentType_Knowledge    RAGDocumentType = "knowledge"
-	RAGDocumentType_KHop         RAGDocumentType = "khop"
+	RAGDocumentType_Entity        RAGDocumentType = "entity"
+	RAGDocumentType_Relationship  RAGDocumentType = "relationship"
+	RAGDocumentType_Knowledge     RAGDocumentType = "knowledge"
+	RAGDocumentType_KHop          RAGDocumentType = "khop"
+	RAGDocumentType_QuestionIndex RAGDocumentType = "question_index"
+
 	RAGDocumentType_Unclassified RAGDocumentType = ""
 )
 
