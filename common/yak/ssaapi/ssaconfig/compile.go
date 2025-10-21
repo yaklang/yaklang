@@ -1,9 +1,5 @@
 package ssaconfig
 
-import (
-	"github.com/yaklang/yaklang/common/utils"
-)
-
 // 基础信息配置
 type BaseInfo struct {
 	ProgramNames       []string `json:"program_names"`
@@ -62,11 +58,8 @@ func (c *Config) GetTags() []string {
 
 func WithProjectID(projectId uint64) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeProjectBase == 0 {
-			return utils.Errorf("Config: Project ID can only be set in Base mode")
-		}
-		if c.BaseInfo == nil {
-			c.BaseInfo = defaultBaseInfo()
+		if err := c.ensureBase("Project ID"); err != nil {
+			return err
 		}
 		c.BaseInfo.ProjectID = projectId
 		return nil
@@ -75,11 +68,8 @@ func WithProjectID(projectId uint64) Option {
 
 func WithProgramNames(programName ...string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeProjectBase == 0 {
-			return utils.Errorf("Config: Program Name can only be set in Base mode")
-		}
-		if c.BaseInfo == nil {
-			c.BaseInfo = defaultBaseInfo()
+		if err := c.ensureBase("Program Name"); err != nil {
+			return err
 		}
 		c.BaseInfo.ProgramNames = append(c.BaseInfo.ProgramNames, programName...)
 		return nil
@@ -88,11 +78,8 @@ func WithProgramNames(programName ...string) Option {
 
 func WithProgramDescription(description string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeProjectBase == 0 {
-			return utils.Errorf("Config: Program Description can only be set in Base mode")
-		}
-		if c.BaseInfo == nil {
-			c.BaseInfo = defaultBaseInfo()
+		if err := c.ensureBase("Program Description"); err != nil {
+			return err
 		}
 		c.BaseInfo.ProjectDescription = description
 		return nil
@@ -101,11 +88,8 @@ func WithProgramDescription(description string) Option {
 
 func WithProgramLanguage(language string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeProjectBase == 0 {
-			return utils.Errorf("Config: Program Language can only be set in Base mode")
-		}
-		if c.BaseInfo == nil {
-			c.BaseInfo = defaultBaseInfo()
+		if err := c.ensureBase("Program Language"); err != nil {
+			return err
 		}
 		c.BaseInfo.Language = language
 		return nil
@@ -231,11 +215,8 @@ func (c *Config) SetCompileConcurrency(concurrency uint32) {
 // WithCompileStrictMode 设置严格模式
 func WithCompileStrictMode(strictMode bool) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSSACompile == 0 {
-			return utils.Errorf("Config: Compile Strict Mode can only be set in Compile mode")
-		}
-		if c.SSACompile == nil {
-			c.SSACompile = &SSACompileConfig{}
+		if err := c.ensureSSACompile("Compile Strict Mode"); err != nil {
+			return err
 		}
 		c.SSACompile.StrictMode = strictMode
 		return nil
@@ -245,11 +226,8 @@ func WithCompileStrictMode(strictMode bool) Option {
 // WithCompilePeepholeSize 设置窥视孔大小
 func WithCompilePeepholeSize(peepholeSize int) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSSACompile == 0 {
-			return utils.Errorf("Config: Compile Peephole Size can only be set in Compile mode")
-		}
-		if c.SSACompile == nil {
-			c.SSACompile = &SSACompileConfig{}
+		if err := c.ensureSSACompile("Compile Peephole Size"); err != nil {
+			return err
 		}
 		c.SSACompile.PeepholeSize = peepholeSize
 		return nil
@@ -259,11 +237,8 @@ func WithCompilePeepholeSize(peepholeSize int) Option {
 // WithCompileExcludeFiles 设置排除文件
 func WithCompileExcludeFiles(excludeFiles []string) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSSACompile == 0 {
-			return utils.Errorf("Config: Compile Exclude Files can only be set in Compile mode")
-		}
-		if c.SSACompile == nil {
-			c.SSACompile = &SSACompileConfig{}
+		if err := c.ensureSSACompile("Compile Exclude Files"); err != nil {
+			return err
 		}
 		c.SSACompile.ExcludeFiles = excludeFiles
 		return nil
@@ -273,11 +248,8 @@ func WithCompileExcludeFiles(excludeFiles []string) Option {
 // WithCompileReCompile 设置重新编译
 func WithCompileReCompile(reCompile bool) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSSACompile == 0 {
-			return utils.Errorf("Config: Compile Re Compile can only be set in Compile mode")
-		}
-		if c.SSACompile == nil {
-			c.SSACompile = &SSACompileConfig{}
+		if err := c.ensureSSACompile("Compile Re Compile"); err != nil {
+			return err
 		}
 		c.SSACompile.ReCompile = reCompile
 		return nil
@@ -287,11 +259,8 @@ func WithCompileReCompile(reCompile bool) Option {
 // WithCompileMemoryCompile 设置内存编译
 func WithCompileMemoryCompile(memoryCompile bool) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSSACompile == 0 {
-			return utils.Errorf("Config: Compile Memory Compile can only be set in Compile mode")
-		}
-		if c.SSACompile == nil {
-			c.SSACompile = &SSACompileConfig{}
+		if err := c.ensureSSACompile("Compile Memory Compile"); err != nil {
+			return err
 		}
 		c.SSACompile.MemoryCompile = memoryCompile
 		return nil
@@ -301,11 +270,8 @@ func WithCompileMemoryCompile(memoryCompile bool) Option {
 // WithCompileConcurrency 设置编译并发数
 func WithCompileConcurrency(concurrency uint32) Option {
 	return func(c *Config) error {
-		if c == nil || c.Mode&ModeSSACompile == 0 {
-			return utils.Errorf("Config: Compile Concurrency can only be set in Compile mode")
-		}
-		if c.SSACompile == nil {
-			c.SSACompile = &SSACompileConfig{}
+		if err := c.ensureSSACompile("Compile Concurrency"); err != nil {
+			return err
 		}
 		c.SSACompile.Concurrency = concurrency
 		return nil
