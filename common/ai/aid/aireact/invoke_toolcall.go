@@ -35,10 +35,16 @@ func (r *ReAct) ExecuteToolRequiredAndCall(toolName string) (*aitool.ToolResult,
 
 	var toolCaller *aicommon.ToolCaller
 	// Create ToolCaller with parameter generation prompt builder
+	// Use current task instead of config.task to ensure proper context handling
+	currentTask := r.GetCurrentTask()
+	if currentTask == nil {
+		return nil, false, utils.Errorf("no current task available for tool execution")
+	}
+
 	toolCaller, err = aicommon.NewToolCaller(
 		aicommon.WithToolCaller_AICallerConfig(r.config),
 		aicommon.WithToolCaller_AICaller(r.config),
-		aicommon.WithToolCaller_Task(r.config.task),
+		aicommon.WithToolCaller_Task(currentTask),
 		aicommon.WithToolCaller_RuntimeId(r.config.id),
 		aicommon.WithToolCaller_Emitter(r.config.Emitter),
 		aicommon.WithToolCaller_OnStart(func(callToolId string) {

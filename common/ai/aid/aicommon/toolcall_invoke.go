@@ -46,7 +46,20 @@ func (a *ToolCaller) invoke(
 	epm := c.GetEndpointManager()
 	ep := epm.CreateEndpointWithEventType(schema.EVENT_TYPE_TOOL_CALL_WATCHER)
 	e.EmitToolCallWatcher(a.callToolId, ep.GetId(), tool, params)
-	ctx, cancel := context.WithCancel(c.GetContext())
+
+	// Use task context if available (for proper cancellation), otherwise fall back to config context
+	var baseCtx context.Context
+	if a.task != nil {
+		if statefulTask, ok := a.task.(AIStatefulTask); ok {
+			baseCtx = statefulTask.GetContext()
+		} else {
+			baseCtx = c.GetContext()
+		}
+	} else {
+		baseCtx = c.GetContext()
+	}
+
+	ctx, cancel := context.WithCancel(baseCtx)
 	defer cancel()
 
 	newToolCallRes := func() *aitool.ToolResult {
