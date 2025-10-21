@@ -626,8 +626,8 @@
   {
     "rule_id": "79bb6b64-7a3f-4bdc-9af9-9f68341d16cd",
     "rule_name": "检测Java Freemarker模板注入漏洞",
-    "hash": "f8cf36fd611c8abb5beff6dead7b0461b320f7207431392e56e98be4b8d4121d",
-    "version": "20251015.0001"
+    "hash": "065489f375e460083d5ae2cf1d38d57550fb67c5418e757e166fc2a2d9c5f942",
+    "version": "20251021.0001"
   },
   {
     "rule_id": "4ada07d0-74e5-4d76-9d7d-4576610ee88e",
