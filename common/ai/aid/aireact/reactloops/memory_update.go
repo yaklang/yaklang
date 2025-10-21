@@ -5,7 +5,6 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -23,7 +22,7 @@ func (r *ReActLoop) PushMemory(result *aimem.SearchMemoryResult) {
 	}
 	mems := result.Memories
 	for _, m := range mems {
-		log.Infof("start to handle memory content bytes: %v", utils.ShrinkString(m.Content, 256))
+		//log.Infof("start to handle memory content bytes: %v", utils.ShrinkString(m.Content, 256))
 		if _, ok := r.currentMemories.Get(m.Id); ok {
 			r.currentMemories.Delete(m.Id)
 			r.currentMemories.Set(m.Id, m)
@@ -44,7 +43,7 @@ func (r *ReActLoop) PushMemory(result *aimem.SearchMemoryResult) {
 				continue
 			}
 			if e := r.GetEmitter(); e != nil {
-				r.GetEmitter().EmitJSON(schema.EVENT_TYPE_MEMORY_REMOVED_CONTEXT, "memory-triage", map[string]any{
+				r.GetEmitter().EmitJSON(schema.EVENT_TYPE_MEMORY_REMOVE_CONTEXT, "memory-triage", map[string]any{
 					"reason": "memory size limit exceeded",
 					"memory": removed,
 				})

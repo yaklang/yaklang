@@ -65,7 +65,12 @@ func NewTestReAct(opts ...Option) (*ReAct, error) {
 		WithMemoryTriage(aimem.NewMockMemoryTriage()),
 	}
 	basicOption = append(basicOption, opts...)
-	return NewReAct(
+	ins, err := NewReAct(
 		basicOption...,
 	)
+	if err != nil {
+		return nil, err
+	}
+	ins.memoryTriage.SetInvoker(ins)
+	return ins, nil
 }

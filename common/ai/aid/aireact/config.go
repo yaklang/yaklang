@@ -152,7 +152,8 @@ type ReActConfig struct {
 	hijackPlanRequest func(ctx context.Context, planPayload string) error
 
 	// Memory triage for dynamic memory management
-	memoryTriage aimem.MemoryTriage
+	memoryTriage   aimem.MemoryTriage
+	memoryPoolSize int64
 }
 
 var _ aicommon.AICallerConfigIf = (*ReActConfig)(nil)
@@ -234,6 +235,12 @@ func WithMemoryTriage(triage aimem.MemoryTriage) Option {
 		if triage != nil {
 			cfg.memoryTriage = triage
 		}
+	}
+}
+
+func WithMemoryPoolSize(t int64) Option {
+	return func(config *ReActConfig) {
+		config.memoryPoolSize = t
 	}
 }
 
@@ -597,6 +604,7 @@ func newReActConfig(ctx context.Context) *ReActConfig {
 		enablePlanAndExec:           true,
 		enableUserInteract:          true,
 		workdir:                     consts.GetDefaultYakitBaseDir(),
+		memoryPoolSize:              10 * 1024,
 
 		// aiforge manager
 		aiBlueprintManager: aiforge.NewForgeFactory(),
