@@ -105,6 +105,7 @@ const (
 	EVENT_TYPE_MEMORY_SAVE            EventType = "memory_save"            // memory build event, used to emit the memory saving into database
 	EVENT_TYPE_MEMORY_ADD_CONTEXT     EventType = "memory_add_context"
 	EVENT_TYPE_MEMORY_REMOVE_CONTEXT  EventType = "memory_remove_context"
+	EVENT_TYPE_MEMORY_CONTEXT         EventType = "memory_context" // memory context sync event, used to emit all memory context information
 )
 
 type AiOutputEvent struct {

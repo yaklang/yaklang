@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/yaklang/yaklang/common/utils/omap"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
 
@@ -27,10 +28,11 @@ import (
 
 // 同步类型常量
 const (
-	SYNC_TYPE_QUEUE_INFO    = "queue_info"
-	SYNC_TYPE_TIMELINE      = "timeline"
-	SYNC_TYPE_KNOWLEDGE     = "enhance_knowledge"
-	SYNC_TYPE_UPDATE_CONFIG = "update_config"
+	SYNC_TYPE_QUEUE_INFO     = "queue_info"
+	SYNC_TYPE_TIMELINE       = "timeline"
+	SYNC_TYPE_KNOWLEDGE      = "enhance_knowledge"
+	SYNC_TYPE_UPDATE_CONFIG  = "update_config"
+	SYNC_TYPE_MEMORY_CONTEXT = "memory_sync"
 )
 
 // ReactTaskItem 表示ReAct任务队列中的单个任务
