@@ -236,8 +236,8 @@ func (kb *KnowledgeBase) AddKnowledgeEntryQuestion(entry *schema.KnowledgeBaseEn
 		return utils.Errorf("创建知识库条目失败: %v", err)
 	}
 
-	if err := kb.addEntryToVectorIndex(entry, options...); err != nil {
-		return utils.Errorf("添加向量索引失败: %v", err)
+	if err := kb.addQuestionToVectorIndex(entry, options...); err != nil {
+		return utils.Errorf("添加知识问题索引失败: %v", err)
 	}
 
 	return nil
