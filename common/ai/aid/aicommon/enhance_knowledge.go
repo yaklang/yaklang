@@ -187,6 +187,23 @@ type BasicEnhanceKnowledge struct {
 	UUID    string
 }
 
+type LazyEnhanceKnowledge struct {
+	BasicEnhanceKnowledge
+	ContentLoader func() string
+}
+
+func (e *LazyEnhanceKnowledge) GetContent() string {
+	if e == nil {
+		return ""
+	}
+
+	if e.ContentLoader != nil {
+		return e.ContentLoader()
+	}
+
+	return e.Content
+}
+
 func NewBasicEnhanceKnowledge(content, source string, score float64) *BasicEnhanceKnowledge {
 	return &BasicEnhanceKnowledge{
 		Content: content,
