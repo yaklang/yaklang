@@ -375,6 +375,9 @@ func GetTmpValueByRiskHash(programName string, risk *schema.SSARisk) (*ssaapi.Va
 
 	prog := ssaapi.NewTmpProgram(programName)
 	value := prog.NewValueFromAuditNode(auditNodeID)
+	if utils.IsNil(value) {
+		return nil, utils.Errorf("value not found from audit node id: %s", auditNodeID)
+	}
 	return value, nil
 }
 

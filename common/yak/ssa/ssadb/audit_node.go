@@ -59,7 +59,7 @@ func NewULID() string {
 	return id.String()
 }
 
-func CreateAuditNode() *AuditNode {
+func NewAuditNode() *AuditNode {
 	return &AuditNode{
 		NodeID: NewULID(),
 	}
