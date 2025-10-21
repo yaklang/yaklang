@@ -155,6 +155,8 @@ func (c *Config) parseProjectWithFS(
 		prog.SetPreHandler(true)
 		prog.ProcessInfof("pre-handler parse project in fs: %v, path: %v", filesystem, c.info)
 		start = time.Now()
+		// TODO: 暂时不开放include, 因为环境问题会导致宏解析失败
+		// c.LanguageBuilder.PreHandlerParseAST(filesystem)
 		ch := c.GetFileHandler(
 			filesystem, preHandlerFiles, handlerFilesMap,
 		)

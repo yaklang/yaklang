@@ -43,6 +43,7 @@ func (s *SSABuilder) FilterParseAST(path string) bool {
 	extension := filepath.Ext(path)
 	return extension == ".yak"
 }
+
 func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, error) {
 	return FrontEnd(src, cache)
 }
