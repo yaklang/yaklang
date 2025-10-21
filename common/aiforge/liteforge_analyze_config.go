@@ -43,8 +43,8 @@ func NewAnalysisConfig(opts ...any) *AnalysisConfig {
 		if optFunc, ok := opt.(AnalysisOption); ok {
 			optFunc(cfg)
 		} else {
-			if chunkOpt, ok := opt.(*chunkmaker.Option); ok {
-				cfg.chunkOption = append(cfg.chunkOption, *chunkOpt)
+			if chunkOpt, ok := opt.(chunkmaker.Option); ok {
+				cfg.chunkOption = append(cfg.chunkOption, chunkOpt)
 			}
 			cfg.fallbackOptions = append(cfg.fallbackOptions, opt)
 		}

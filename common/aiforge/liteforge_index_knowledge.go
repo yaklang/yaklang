@@ -34,11 +34,11 @@ var questionSchema = []aitool.ToolOption{
 		aitool.WithParam_Description(`A high-quality, user-centric question that the answer_snippet directly addresses. This will be embedded for semantic search.`),
 		aitool.WithParam_Required(true),
 	),
-	aitool.WithStructArrayParam(
+	aitool.WithStructParam(
 		"answer_location",
 		[]aitool.PropertyOption{
 			aitool.WithParam_Description("Specifies the exact location of the answer snippet within the input using line numbers."),
-		}, nil,
+		},
 		aitool.WithIntegerParam(
 			"start_line",
 			aitool.WithParam_Description("The starting line number of the snippet (inclusive, 1-based)."),
@@ -86,9 +86,13 @@ func _buildIndex(analyzeChannel <-chan AnalysisResult, option ...any) (<-chan *s
 					return
 				}
 
-				err = SaveKnowledgeEntries(kb, entries, nil, option...)
-				if err != nil {
-					log.Errorf("failed to save knowledge entries to database: %v", err)
+				for _, entry := range entries {
+					output.SafeFeed(entry)
+					err := kb.AddKnowledgeEntryQuestion(entry)
+					if err != nil {
+						log.Errorf("failed to create knowledge base entry: %v", err)
+						return
+					}
 				}
 			}()
 
@@ -115,6 +119,13 @@ func Index2KnowledgeEntity(
 
 	knowledgeMap := make(map[string]*schema.KnowledgeBaseEntry)
 
+	safeGetSnippet := func(startLine, endLine int) string {
+		if startLine < 1 || endLine > len(inputLineList) || startLine > endLine {
+			return Input // fallback to full input
+		}
+		return strings.Join(inputLineList[startLine-1:endLine], "\n")
+	}
+
 	for _, item := range questionList {
 		question := item.GetString("question")
 		answerLocations := item.GetObject("answer_location")
@@ -124,7 +135,7 @@ func Index2KnowledgeEntity(
 		if knowledge, exists := knowledgeMap[utils.CalcSha1(startLine, endLine)]; exists {
 			knowledge.PotentialQuestions = append(knowledge.PotentialQuestions)
 		} else {
-			answerSnippet := strings.Join(inputLineList[startLine-1:endLine], "\n")
+			answerSnippet := safeGetSnippet(int(startLine), int(endLine))
 			entry := &schema.KnowledgeBaseEntry{
 				KnowledgeTitle:     utils.ShrinkString(answerSnippet, 10),
 				KnowledgeType:      "Standard",
@@ -146,9 +157,9 @@ func Index2KnowledgeEntity(
 
 func BuildIndexFormAnalyzeResult(res AnalysisResult, option ...any) ([]*schema.KnowledgeBaseEntry, error) {
 	refineConfig := NewRefineConfig(option...)
-
-	input := utils.PrefixLinesWithLineNumbers(res.Dump())
-	query, err := LiteForgeQueryFromChunk(indexBuildPrompt, refineConfig.ExtraPrompt, chunkmaker.NewBufferChunk([]byte(input)), 200)
+	rawInput := res.Dump()
+	linedInput := utils.PrefixLinesWithLineNumbers(rawInput)
+	query, err := LiteForgeQueryFromChunk(indexBuildPrompt, refineConfig.ExtraPrompt, chunkmaker.NewBufferChunk([]byte(linedInput)), 200)
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +169,7 @@ func BuildIndexFormAnalyzeResult(res AnalysisResult, option ...any) ([]*schema.K
 		return nil, err
 	}
 
-	entries, err := Index2KnowledgeEntity(indexResult.Action, input)
+	entries, err := Index2KnowledgeEntity(indexResult.Action, rawInput)
 	if err != nil {
 		log.Errorf("failed to convert action to knowledge base entries: %v", err)
 		return nil, err
