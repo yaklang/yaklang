@@ -1,22 +1,34 @@
+//go:build !gzip_embed
+
 package yakscripttools
 
 import (
 	"embed"
 
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils/gzip_embed"
+	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 )
 
-//go:embed yakscriptforai.tar.gz
+//go:embed yakscriptforai
 var resourceFS embed.FS
 
-var yakScriptFS *gzip_embed.PreprocessingEmbed
+var yakScriptFS FileSystemWithHash
+
+// embedFSWithHash 包装 embed.FS 并添加 GetHash 方法
+type embedFSWithHash struct {
+	fi.FileSystem
+	fs embed.FS
+}
+
+func (e *embedFSWithHash) GetHash() (string, error) {
+	return filesys.CreateEmbedFSHash(e.fs)
+}
 
 func InitEmbedFS() {
-	var err error
-	yakScriptFS, err = gzip_embed.NewPreprocessingEmbed(&resourceFS, "yakscriptforai.tar.gz", true)
-	if err != nil {
-		log.Errorf("init embed failed: %v", err)
-		yakScriptFS = gzip_embed.NewEmptyPreprocessingEmbed()
+	yakScriptFS = &embedFSWithHash{
+		FileSystem: filesys.NewEmbedFS(resourceFS),
+		fs:         resourceFS,
 	}
+	log.Info("init embed fs successfully")
 }
