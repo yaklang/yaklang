@@ -378,8 +378,10 @@ func (b *astbuilder) buildInitDeclaratorList(ast *cparser.InitDeclaratorListCont
 	var indexs []int
 	for _, i := range ast.AllInitDeclarator() {
 		left, index := b.buildInitDeclarator(i.(*cparser.InitDeclaratorContext), ssatype...)
-		lefts = append(lefts, left)
-		indexs = append(indexs, index)
+		if left != nil {
+			lefts = append(lefts, left)
+			indexs = append(indexs, index)
+		}
 	}
 	return lefts, indexs
 }
@@ -401,7 +403,7 @@ func (b *astbuilder) buildInitDeclarator(ast *cparser.InitDeclaratorContext, ssa
 		}
 		return left, -1
 	}
-	return nil, -1
+	return b.CreateVariable(""), -1
 }
 
 func (b *astbuilder) buildDeclarationSpecifiers(ast *cparser.DeclarationSpecifiersContext) ssa.Types {
@@ -627,7 +629,9 @@ func (b *astbuilder) buildStructDeclaratorList(ast *cparser.StructDeclaratorList
 
 	var ret []*ssa.Variable
 	for _, s := range ast.AllStructDeclarator() {
-		ret = append(ret, b.buildStructDeclarator(s.(*cparser.StructDeclaratorContext)))
+		if v := b.buildStructDeclarator(s.(*cparser.StructDeclaratorContext)); !utils.IsNil(v) {
+			ret = append(ret, v)
+		}
 	}
 	return ret
 }

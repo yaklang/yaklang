@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/utils"
 	cparser "github.com/yaklang/yaklang/common/yak/antlr4c/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
@@ -262,6 +263,8 @@ func (b *astbuilder) buildAssignmentExpression(ast *cparser.AssignmentExpression
 			right = b.EmitBinOp(ssa.OpXor, right, newRight)
 		case "|=":
 			right = b.EmitBinOp(ssa.OpOr, right, newRight)
+		default:
+			b.NewError(ssa.Warn, TAG, fmt.Sprintf("not find: %s", op))
 		}
 		b.AssignVariable(left, right)
 		right.SetType(newRight.GetType())
@@ -483,13 +486,17 @@ func (b *astbuilder) buildInitializer(ast *cparser.InitializerContext, ssatype .
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
+	var value ssa.Value
 	if a := ast.Expression(); a != nil {
-		value, _ := b.buildExpression(a.(*cparser.ExpressionContext), false)
-		return value
+		value, _ = b.buildExpression(a.(*cparser.ExpressionContext), false)
 	} else if i := ast.InitializerList(); i != nil {
-		return b.buildInitializerList(i.(*cparser.InitializerListContext), ssatype...)
+		value = b.buildInitializerList(i.(*cparser.InitializerListContext), ssatype...)
 	}
-	return b.EmitConstInst(0)
+	if utils.IsNil(value) {
+		value = b.EmitConstInst(0)
+	}
+
+	return value
 }
 
 func (b *astbuilder) buildDesignation(ast *cparser.DesignationContext) ssa.Values {
@@ -517,13 +524,17 @@ func (b *astbuilder) buildDesignator(ast *cparser.DesignatorContext) ssa.Value {
 	recoverRange := b.SetRange(ast.BaseParserRuleContext)
 	defer recoverRange()
 
+	var value ssa.Value
 	if e := ast.Expression(); e != nil {
-		value, _ := b.buildExpression(e.(*cparser.ExpressionContext), false)
-		return value
+		value, _ = b.buildExpression(e.(*cparser.ExpressionContext), false)
 	} else if id := ast.Identifier(); id != nil {
-		return b.EmitConstInst(id.GetText())
+		value = b.EmitConstInst(id.GetText())
 	}
-	return b.EmitConstInst(0)
+	if utils.IsNil(value) {
+		value = b.EmitConstInst(0)
+	}
+
+	return value
 }
 
 func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext, isLeft bool) (ssa.Value, *ssa.Variable) {
@@ -536,7 +547,9 @@ func (b *astbuilder) buildCastExpression(ast *cparser.CastExpressionContext, isL
 		ssatype := b.buildTypeName(t.(*cparser.TypeNameContext))
 		if c := ast.CastExpression(); c != nil {
 			right, left = b.buildCastExpression(c.(*cparser.CastExpressionContext), isLeft)
-			right.SetType(ssatype)
+			if right != nil {
+				right.SetType(ssatype)
+			}
 		}
 	} else if u := ast.UnaryExpression(); u != nil {
 		right, left = b.buildUnaryExpression(u.(*cparser.UnaryExpressionContext), isLeft)
@@ -642,7 +655,9 @@ func (b *astbuilder) buildArgumentExpressionList(ast *cparser.ArgumentExpression
 	var ret ssa.Values
 	for _, a := range ast.AllExpression() {
 		right, _ := b.buildExpression(a.(*cparser.ExpressionContext), false)
-		ret = append(ret, right)
+		if right != nil {
+			ret = append(ret, right)
+		}
 	}
 	return ret
 }

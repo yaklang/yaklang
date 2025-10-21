@@ -207,7 +207,8 @@ func (c *Call) ReplaceValue(v Value, to Value) {
 	} else if index := slices.Index(c.ArgMember, v.GetId()); index > -1 {
 		c.ArgMember[index] = to.GetId()
 	} else {
-		panic("call not use this value")
+		// panic("call not use this value")
+		log.Warnf("call not use this value")
 	}
 }
 
