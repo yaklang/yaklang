@@ -5,23 +5,28 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"strings"
 )
 
-func (r *ReActLoop) loadingSearchMemory() {
+func (r *ReActLoop) loadingSearchMemory(input string) {
 	if r.memoryTriage == nil {
 		return
 	}
-	task := r.GetCurrentTask()
 	emitter := r.GetEmitter()
-	
+
+	var taskId string
+	if r.GetCurrentTask() != nil {
+		taskId = r.GetCurrentTask().GetId()
+	}
+
 	log.Info("start to handle searching memory for ReActLoop without AI")
 	pr, pw := utils.NewPipe()
-	emitter.EmitThoughtTypeWriterStreamReader(task.GetIndex(), pr)
+	emitter.EmitThoughtTypeWriterStreamReader(taskId, pr)
 	pw.WriteString("快速检索记忆：Searching relevant memories quickly...")
 	emitter.EmitJSON(schema.EVENT_TYPE_MEMORY_SEARCH_QUICKLY, "memory-search-quickly", map[string]any{
-		"query": task.GetUserInput(),
+		"query": input,
 	})
-	searchResult, err := r.memoryTriage.SearchMemoryWithoutAI(task.GetUserInput(), 5*1024)
+	searchResult, err := r.memoryTriage.SearchMemoryWithoutAI(input, r.memorySizeLimit)
 	if err != nil {
 		aicommon.TypeWriterWrite(pw, "... 快速检索失败，Reason: "+err.Error(), 300)
 	} else {
@@ -37,5 +42,7 @@ func (r *ReActLoop) loadingSearchMemory() {
 	}
 	pw.Close()
 	r.PushMemory(searchResult)
-	log.Infof("memory updated via fast search memory - ========================== \n%v\n==========================", r.GetCurrentMemoriesContent())
+	if strings.TrimSpace(r.GetCurrentMemoriesContent()) != "" {
+		log.Infof("memory updated via fast search memory - ========================== \n%v\n==========================", r.GetCurrentMemoriesContent())
+	}
 }

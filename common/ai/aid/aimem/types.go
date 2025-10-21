@@ -92,8 +92,12 @@ type Option func(config *Config)
 // AIMemoryTriage AI记忆管理系统
 
 type MemoryTriage interface {
+	// SetInvoker 设置AI调用运行时
+	SetInvoker(invoker aicommon.AIInvokeRuntime)
+
 	// AddRawText 添加原始文本，返回提取的记忆实体
 	AddRawText(text string) ([]*MemoryEntity, error)
+
 	// SaveMemoryEntities 保存记忆条目到数据库
 	SaveMemoryEntities(entities ...*MemoryEntity) error
 
@@ -131,6 +135,10 @@ type AIMemoryTriage struct {
 
 	// embedding 服务可用标志
 	embeddingAvailable bool
+}
+
+func (a *AIMemoryTriage) SetInvoker(invoker aicommon.AIInvokeRuntime) {
+	a.invoker = invoker
 }
 
 // WithContextProvider 设置上下文提供者
@@ -174,6 +182,17 @@ func (r *AIMemoryTriage) GetDB() *gorm.DB {
 
 // MockMemoryTriage 这是一个简单的mock，用于不需要使用triage的测试
 type MockMemoryTriage struct {
+	invoker aicommon.AIInvokeRuntime
+
+	overSearch bool
+}
+
+func (m *MockMemoryTriage) SetOverSearch(over bool) {
+	m.overSearch = over
+}
+
+func (m *MockMemoryTriage) SetInvoker(invoker aicommon.AIInvokeRuntime) {
+	m.invoker = invoker
 }
 
 func (m *MockMemoryTriage) AddRawText(text string) ([]*MemoryEntity, error) {
@@ -295,9 +314,32 @@ func (m *MockMemoryTriage) SearchMemoryWithoutAI(origin any, bytesLimit int) (*S
 		PotentialQuestions: []string{"What keywords matched in this search?"},
 	}
 
+	var results []*MemoryEntity
+	results = append(results, entity)
+
+	if m.overSearch {
+		for i := 0; i < 300; i++ {
+			results = append(results, &MemoryEntity{
+				Id:                 "mock-search-no-ai-id-" + utils.InterfaceToString(i),
+				CreatedAt:          time.Now(),
+				Content:            "Mock keyword search result for: " + utils.InterfaceToString(origin) + " #" + utils.InterfaceToString(i),
+				Tags:               []string{"mock-search", "keyword-only"},
+				C_Score:            0.6,
+				O_Score:            0.6,
+				R_Score:            0.7,
+				E_Score:            0.5,
+				P_Score:            0.6,
+				A_Score:            0.6,
+				T_Score:            0.7,
+				CorePactVector:     []float32{0.6, 0.6, 0.7},
+				PotentialQuestions: []string{"What keywords matched in this search?"},
+			})
+		}
+	}
+
 	content := entity.Content
 	return &SearchMemoryResult{
-		Memories:      []*MemoryEntity{entity},
+		Memories:      results,
 		TotalContent:  content,
 		ContentBytes:  len([]byte(content)),
 		SearchSummary: "Mock keyword-based search completed (without AI)",
